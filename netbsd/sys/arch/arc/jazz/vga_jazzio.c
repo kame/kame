@@ -1,4 +1,4 @@
-/* $NetBSD: vga_jazzio.c,v 1.6 2001/09/14 01:10:12 thorpej Exp $ */
+/* $NetBSD: vga_jazzio.c,v 1.10 2003/07/15 00:04:50 lukem Exp $ */
 /* NetBSD: vga_isa.c,v 1.3 1998/06/12 18:45:48 drochner Exp  */
 
 /*
@@ -27,6 +27,9 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vga_jazzio.c,v 1.10 2003/07/15 00:04:50 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -60,9 +63,8 @@ paddr_t	vga_jazzio_mmap __P((void *, off_t, int));
 int	vga_jazzio_match __P((struct device *, struct cfdata *, void *));
 void	vga_jazzio_attach __P((struct device *, struct device *, void *));
 
-struct cfattach vga_jazzio_ca = {
-	sizeof(struct vga_softc), vga_jazzio_match, vga_jazzio_attach,
-};
+CFATTACH_DECL(vga_jazzio, sizeof(struct vga_softc),
+    vga_jazzio_match, vga_jazzio_attach, NULL, NULL);
 
 const struct vga_funcs vga_jazzio_funcs = {
 	NULL,
@@ -156,7 +158,7 @@ vga_jazzio_attach(parent, self, aux)
 	printf("\n");
 
 	vga_jazzio_init_tag(ja->ja_name, &iot, &memt);
-	vga_common_attach(sc, iot, memt, WSDISPLAY_TYPE_JAZZVGA,
+	vga_common_attach(sc, iot, memt, WSDISPLAY_TYPE_JAZZVGA, 0,
 	    &vga_jazzio_funcs);
 }
 

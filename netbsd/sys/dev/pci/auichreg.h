@@ -1,4 +1,4 @@
-/*	$NetBSD: auichreg.h,v 1.2 2000/11/28 16:57:16 thorpej Exp $	*/
+/*	$NetBSD: auichreg.h,v 1.7 2003/11/22 08:49:41 kent Exp $	*/
 
 /*
  * Copyright (c) 2000 Michael Shalayeff
@@ -43,6 +43,10 @@
 #define	ICH_NAMBAR	0x10
 /* 12.1.11 NABMBAR - native audio bus mastering base address register */
 #define	ICH_NABMBAR	0x14
+#define ICH_MMBAR	0x18	/* ICH4/ICH5 native audio mixer BAR */
+#define ICH_MBBAR	0x1c	/* ICH4/ICH5 native bus mastering BAR */
+#define ICH_CFG		0x41
+#define		ICH_CFG_IOSE	0x01
 
 /* table 12-3. native audio bus master control registers */
 #define	ICH_BDBAR	0x00	/* 8-byte aligned address */
@@ -54,7 +58,7 @@
 #define		ICH_BCIS	0x08	/* r- buf cmplt int sts; wr ack */
 #define		ICH_LVBCI	0x04	/* r- last valid bci, wr ack */
 #define		ICH_CELV	0x02	/* current equals last valid */
-#define		ICH_DCH		0x01	/* dma halted */
+#define		ICH_DCH		0x01	/* DMA halted */
 #define		ICH_ISTS_BITS	"\020\01dch\02celv\03lvbci\04bcis\05fifoe"
 #define	ICH_PICB	0x08	/* 16 bits */
 #define	ICH_PIV		0x0a	/* 5 bits prefetched index value */
@@ -70,6 +74,16 @@
 #define	ICH_MICI	0x20
 
 #define	ICH_GCTRL	0x2c
+#define		ICH_SSM_78	0x40000000 /* S/PDIF slots 7 and 8 */
+#define		ICH_SSM_69	0x80000000 /* S/PDIF slots 6 and 9 */
+#define		ICH_SSM_1011	0xc0000000 /* S/PDIF slots 10 and 11 */
+#define		ICH_POM16	0x000000 /* PCM out precision 16bit */
+#define		ICH_POM20	0x400000 /* PCM out precision 20bit */
+#define		ICH_PCM246_MASK	0x300000
+#define		 ICH_PCM2	0x000000 /* 2ch output */
+#define		 ICH_PCM4	0x100000 /* 4ch output */
+#define		 ICH_PCM6	0x200000 /* 6ch output */
+#define		ICH_S2RIE	0x40	/* int when tertiary codec resume */
 #define		ICH_SRIE	0x20	/* int when 2ndary codec resume */
 #define		ICH_PRIE	0x10	/* int when primary codec resume */
 #define		ICH_ACLSO	0x08	/* aclink shut off */
@@ -77,6 +91,14 @@
 #define		ICH_CRESET	0x02	/* cold reset */
 #define		ICH_GIE		0x01	/* gpi int enable */
 #define	ICH_GSTS	0x30
+#define		ICH_S2RI	0x20000000 /* tertiary resume int */
+#define		ICH_S2CR	0x10000000 /* tertiary codec ready */
+#define		ICH_BCS		0x08000000 /* bit clock stopped */
+#define		ICH_SPINT	0x04000000 /* S/PDIF int */
+#define		ICH_P2INT	0x02000000 /* PCM-In 2 int */
+#define		ICH_M2INT	0x01000000 /* mic 2 int */
+#define		ICH_SAMPLE_CAP	0x00c00000 /* sampling precision capability */
+#define		ICH_CHAN_CAP	0x00300000 /* multi-channel capability */
 #define		ICH_MD3		0x20000	/* pwr-dn semaphore for modem */
 #define		ICH_AD3		0x10000	/* pwr-dn semaphore for audio */
 #define		ICH_RCS		0x08000	/* read completion status */
@@ -96,11 +118,6 @@
 #define		ICH_GSTS_BITS	"\020\01gsci\02miict\03moint\06piint\07point\010mint\011pcr\012scr\013pri\014sri\015b1s12\016b2s12\017b3s12\020rcs\021ad3\022md3"
 #define	ICH_CAS		0x34	/* 1/8 bit */
 #define	ICH_SEMATIMO	1000	/* us */
-
-/* Bits in the AC97_REG_POWER register */
-#define		ICH_PM_PCMI	0x100
-#define		ICH_PM_PCMO	0x200
-#define		ICH_PM_MICI	0x400
 
 /*
  * according to the dev/audiovar.h AU_RING_SIZE is 2^16, what fits

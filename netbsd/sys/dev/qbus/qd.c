@@ -1,4 +1,4 @@
-/*	$NetBSD: qd.c,v 1.24 2002/03/17 19:41:01 atatat Exp $	*/
+/*	$NetBSD: qd.c,v 1.31 2003/08/07 16:31:16 agc Exp $	*/
 
 /*-
  * Copyright (c) 1988 Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -62,7 +58,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: qd.c,v 1.24 2002/03/17 19:41:01 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: qd.c,v 1.31 2003/08/07 16:31:16 agc Exp $");
 
 #include "opt_ddb.h"
 
@@ -140,12 +136,6 @@ struct	qd_softc {
 #define MAPEQ		0x04		/* event queue buffer mapped */
 #define MAPSCR		0x08		/* scroll param area mapped */
 #define MAPCOLOR	0x10		/* color map writing buffer mapped */
-
-/*
- * bit definitions for 'selmask' member of qdflag structure 
- */
-#define SEL_READ	0x01		/* read select is active */
-#define SEL_WRITE	0x02		/* write select is active */
 
 /*
  * constants used in shared memory operations 
@@ -238,8 +228,6 @@ int qdcount = 0;		/* count of successfully probed qd's */
 int nNQD = NQD;
 int DMAbuf_size = DMA_BUFSIZ;
 int QDlast_DMAtype;             /* type of the last DMA operation */
-
-/* #define QDSSMAJOR	41 */	/* QDSS major device number.  We don't care! */
 
 /*
  * macro to get system time.  Used to time stamp event queue entries 
@@ -335,7 +323,6 @@ extern	char *q_special[];
  */
 extern struct cdevsw *consops;
 cons_decl(qd);
-cdev_decl(qd);
 void setup_dragon __P((int));
 void init_shared __P((int));
 void clear_qd_screen __P((int));
@@ -350,6 +337,20 @@ void led_control __P((int, int, int));
 void qdstart(struct tty *);
 void qdearly(void);
 int qdpolling = 0;
+
+dev_type_open(qdopen);
+dev_type_close(qdclose);
+dev_type_read(qdread);
+dev_type_write(qdwrite);
+dev_type_ioctl(qdioctl);
+dev_type_stop(qdstop);
+dev_type_poll(qdpoll);
+dev_type_kqfilter(qdkqfilter);
+
+const struct cdevsw qd_cdevsw = {
+	qdopen, qdclose, qdread, qdwrite, qdioctl,
+	qdstop, notty, qdpoll, nommap, qdkqfilter,
+};
 
 /*
  * LK-201 state storage for input console keyboard conversion to ASCII 
@@ -448,12 +449,8 @@ qdcnprobe(cndev)
 		return;
 
 	/* Find the console device corresponding to the console QDSS */
-	for (i = 0; i < nchrdev; i++)
-		if (cdevsw[i].d_open == qdopen)  {
-			      cndev->cn_dev = makedev(i,0);
-			      cndev->cn_pri = CN_INTERNAL;
-			      return;
-		 }
+	cndev->cn_dev = makedev(cdevsw_lookup_major(&qd_cdevsw), 0);
+	cndev->cn_pri = CN_INTERNAL;
 	return;
 }
 
@@ -531,9 +528,8 @@ qdcninit(cndev)
 } /* qdcninit */
 
 /* see <sys/device.h> */
-struct cfattach qd_ca = {
-	sizeof(struct qd_softc), qd_match, qd_attach
-};
+CFATTACH_DECL(qd, sizeof(struct qd_softc),
+    qd_match, qd_attach, NULL, NULL);
 
 #define	QD_RCSR(reg) \
 	bus_space_read_2(sc->sc_iot, sc->sc_ioh, reg)
@@ -1538,15 +1534,11 @@ qdpoll(dev, events, p)
 				revents |= events & (POLLOUT | POLLWRNORM);
 	   
 		if (revents == 0)  {
-			if (events & (POLLIN | POLLRDNORM))  {
+			if (events & (POLLIN | POLLRDNORM))
 				selrecord(p, &qdrsel[unit]);
-				qdflags[unit].selmask |= SEL_READ;
-			}
 
-			if (events & (POLLOUT | POLLWRNORM))  {
+			if (events & (POLLOUT | POLLWRNORM))
 				selrecord(p, &qdrsel[unit]);
-				qdflags[unit].selmask |= SEL_WRITE;
-			}
 		}
 	} else  {
 		/*
@@ -1560,6 +1552,88 @@ qdpoll(dev, events, p)
 	return (revents);
 } /* qdpoll() */
 
+static void
+filt_qdrdetach(struct knote *kn)
+{
+	dev_t dev = (intptr_t) kn->kn_hook;
+	u_int minor_dev = minor(dev);
+	int unit = minor_dev >> 2;
+	int s;
+
+	s = spl5();
+	SLIST_REMOVE(&qdrsel[unit].sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_qdread(struct knote *kn, long hint)
+{
+	dev_t dev = (intptr_t) kn->kn_hook;
+	u_int minor_dev = minor(dev);
+	int unit = minor_dev >> 2;
+
+	if (ISEMPTY(eq_header[unit]))
+		return (0);
+
+	kn->kn_data = 0;	/* XXXLUKEM (thorpej): what to put here? */
+	return (1);
+}
+
+static int
+filt_qdwrite(struct knote *kn, long hint)
+{
+	dev_t dev = (intptr_t) kn->kn_hook;
+	u_int minor_dev = minor(dev);
+	int unit = minor_dev >> 2;
+
+	if (! DMA_ISEMPTY(DMAheader[unit]))
+		return (0);
+
+	kn->kn_data = 0;	/* XXXLUKEM (thorpej): what to put here? */
+	return (1);
+}
+
+static const struct filterops qdread_filtops =
+	{ 1, NULL, filt_qdrdetach, filt_qdread };
+
+static const struct filterops qdwrite_filtops =
+	{ 1, NULL, filt_qdrdetach, filt_qdwrite };
+
+int
+qdkqfilter(dev_t dev, struct knote *kn)
+{
+	struct klist *klist;
+	u_int minor_dev = minor(dev);
+	int s, unit = minor_dev >> 2;
+
+	if ((minor_dev & 0x03) != 2) {
+		/* TTY device. */
+		return (ttykqfilter(dev, kn));
+	}
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &qdrsel[unit].sel_klist;
+		kn->kn_fop = &qdread_filtops;
+		break;
+
+	case EVFILT_WRITE:
+		klist = &qdrsel[unit].sel_klist;
+		kn->kn_fop = &qdwrite_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = (void *)(intptr_t) dev;
+
+	s = spl5();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
+}
 
 void qd_strategy(struct buf *bp);
 
@@ -1568,6 +1642,7 @@ int
 qdwrite(dev, uio, flag)
 	dev_t dev;
 	struct uio *uio;
+	int flag;
 {
 	struct tty *tp;
 	int minor_dev;
@@ -1597,6 +1672,7 @@ int
 qdread(dev, uio, flag)
 	dev_t dev;
 	struct uio *uio;
+	int flag;
 {
 	struct tty *tp;
 	int minor_dev;
@@ -2044,11 +2120,7 @@ qddint(arg)
 		header->newest = header->oldest;
 		header->used = 0;
 
-		if (qdrsel[dv->dv_unit].si_pid && qdflags[dv->dv_unit].selmask & SEL_WRITE) {
-			selwakeup(&qdrsel[dv->dv_unit]);
-			qdrsel[dv->dv_unit].si_pid = 0;
-			qdflags[dv->dv_unit].selmask &= ~SEL_WRITE;
-		}
+		selnotify(&qdrsel[dv->dv_unit], 0);
 
 		if (dga->bytcnt_lo != 0) {
 			dga->bytcnt_lo = 0;
@@ -2063,11 +2135,7 @@ qddint(arg)
 	* wakeup "select" client.
 	*/
 	if (DMA_ISFULL(header)) {
-		if (qdrsel[dv->dv_unit].si_pid && qdflags[dv->dv_unit].selmask & SEL_WRITE) {
-			selwakeup(&qdrsel[dv->dv_unit]);
-			qdrsel[dv->dv_unit].si_pid = 0;  
-			qdflags[dv->dv_unit].selmask &= ~SEL_WRITE;
-		}
+		selnotify(&qdrsel[dv->dv_unit], 0);
 	}
 
 	header->DMAreq[header->oldest].DMAdone |= REQUEST_DONE;
@@ -2083,11 +2151,7 @@ qddint(arg)
 	* if no more DMA pending, wake up "select" client and exit 
 	*/
 	if (DMA_ISEMPTY(header)) {
-		if (qdrsel[dv->dv_unit].si_pid && qdflags[dv->dv_unit].selmask & SEL_WRITE) {
-			selwakeup(&qdrsel[dv->dv_unit]);
-			qdrsel[dv->dv_unit].si_pid = 0;
-			qdflags[dv->dv_unit].selmask &= ~SEL_WRITE;
-		}
+		selnotify(&qdrsel[dv->dv_unit], 0);
 		DMA_CLRACTIVE(header);  /* flag DMA done */
 		return;
 	}
@@ -2716,10 +2780,8 @@ GET_TBUTTON:
 		/*
 		* do select wakeup	
 		*/
-		if (qdrsel[dv->dv_unit].si_pid && do_wakeup && qdflags[dv->dv_unit].selmask & SEL_READ) {
-			selwakeup(&qdrsel[dv->dv_unit]);
-			qdrsel[dv->dv_unit].si_pid = 0;
-			qdflags[dv->dv_unit].selmask &= ~SEL_READ;
+		if (do_wakeup) {
+			selnotify(&qdrsel[dv->dv_unit], 0);
 			do_wakeup = 0;
 		}
 	} else {

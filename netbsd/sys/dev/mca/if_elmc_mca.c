@@ -1,4 +1,4 @@
-/*	$NetBSD: if_elmc_mca.c,v 1.8 2001/11/26 23:31:00 fredette Exp $	*/
+/*	$NetBSD: if_elmc_mca.c,v 1.14 2003/10/25 20:19:01 mycroft Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -46,7 +46,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_elmc_mca.c,v 1.8 2001/11/26 23:31:00 fredette Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_elmc_mca.c,v 1.14 2003/10/25 20:19:01 mycroft Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -145,6 +145,9 @@ elmc_mca_attach(struct device *parent, struct device *self, void *aux)
 	case 2: irq = 7; break;
 	case 8: irq = 9; break;
 	case 1: irq = 12; break;
+	default:
+		printf("%s: cannot determine irq\n", sc->sc_dev.dv_xname);
+		return;
 	}
 
 	pbram_addr = ELMC_MADDR_BASE + (((pos2 & 24) >> 3) * 0x8000);
@@ -400,16 +403,6 @@ elmc_mca_hwreset(sc, why)
 	int why;
 {
     struct elmc_mca_softc* asc = (struct elmc_mca_softc *) sc;
-    int intr = 0;
-
-    switch (why) {
-    case CHIP_PROBE:
-	intr = 0;
-	break;
-    case CARD_RESET:
-	intr = ELMC_CTRL_INT;
-	break;
-    }
 
     /* toggle the RST bit low then high */
     bus_space_write_1(asc->sc_regt, asc->sc_regh, ELMC_CTRL,
@@ -441,6 +434,5 @@ elmc_mca_intrhook(sc, why)
 	return (0);
 }
 
-struct cfattach elmc_mca_ca = {
-	sizeof(struct elmc_mca_softc), elmc_mca_match, elmc_mca_attach
-};
+CFATTACH_DECL(elmc_mca, sizeof(struct elmc_mca_softc),
+    elmc_mca_match, elmc_mca_attach, NULL, NULL);

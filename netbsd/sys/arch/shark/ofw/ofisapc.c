@@ -1,4 +1,4 @@
-/*	$NetBSD: ofisapc.c,v 1.1 2002/02/10 01:57:58 thorpej Exp $	*/
+/*	$NetBSD: ofisapc.c,v 1.5 2003/07/15 03:36:02 lukem Exp $	*/
 
 /*
  * Copyright 1997
@@ -37,6 +37,9 @@
  *  OFW Glue for PCCONS Driver
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ofisapc.c,v 1.5 2003/07/15 03:36:02 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -53,9 +56,8 @@ int ofisapcprobe __P((struct device *, struct cfdata *, void *));
 void ofisapcattach __P((struct device *, struct device *, void *));
 
 
-struct cfattach ofisapc_ca = {
-	sizeof(struct device), ofisapcprobe, ofisapcattach
-};
+CFATTACH_DECL(ofisapc, sizeof(struct device),
+    ofisapcprobe, ofisapcattach, NULL, NULL);
 
 extern struct cfdriver ofisapc_cd;
 

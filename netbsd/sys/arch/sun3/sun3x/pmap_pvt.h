@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap_pvt.h,v 1.9 2001/09/05 12:15:21 tsutsui Exp $	*/
+/*	$NetBSD: pmap_pvt.h,v 1.11 2003/09/26 21:41:16 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -39,6 +39,8 @@
 #ifndef _SUN3X_PMAPPVT_H
 #define _SUN3X_PMAPPVT_H
 
+#include "opt_pmap_debug.h"
+
 /*************************** TMGR STRUCTURES ***************************
  * The sun3x 'tmgr' structures contain MMU tables and additional       *
  * information about their current usage and availability.             *
@@ -58,7 +60,7 @@ struct a_tmgr_struct {
 	u_char          at_wcnt;   /* no. of wired entries in this table */
 	u_char          at_ecnt;   /* no. of valid entries in this table */
 	u_int16_t	at_dum1;   /* structure padding                  */
-    	TAILQ_ENTRY(a_tmgr_struct) at_link;  /* list linker              */
+	TAILQ_ENTRY(a_tmgr_struct) at_link;  /* list linker              */
 };
 
 /* A level B table manager contains a pointer to an MMU table of

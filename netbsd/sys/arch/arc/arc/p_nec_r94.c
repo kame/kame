@@ -1,4 +1,4 @@
-/*	$NetBSD: p_nec_r94.c,v 1.1 2001/06/13 15:36:04 soda Exp $	*/
+/*	$NetBSD: p_nec_r94.c,v 1.4 2003/07/15 00:04:43 lukem Exp $	*/
 
 /*-
  * Copyright (C) 2000 Shuichiro URATA.  All rights reserved.
@@ -26,24 +26,61 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: p_nec_r94.c,v 1.4 2003/07/15 00:04:43 lukem Exp $");
+
 #include <sys/param.h>
 
 #include <machine/autoconf.h>
 #include <machine/platform.h>
 
+#include <arc/jazz/rd94.h>
 #include <arc/jazz/jazziovar.h>
+
+void p_nec_r94_init(void);
 
 struct platform platform_nec_r94 = {
 	"NEC-R94",
 	"NEC W&S",
 	" (R94)",
+	"RISCstation 2200",
 	"NEC",
-	"NEC RISCstation 2200",
 	200, /* MHz ?? */
 	c_jazz_eisa_mainbusdevs,
 	platform_generic_match,
-	c_nec_eisa_init,
+	p_nec_r94_init,
 	c_jazz_eisa_cons_init,
 	jazzio_reset,
 	c_nec_jazz_set_intr,
 };
+
+/*
+ * jazzio bus configuration
+ */
+struct pica_dev nec_r94_cpu[] = {
+	{{ "timer",	-1, 0, },	(void *)RD94_SYS_IT_VALUE, },
+	{{ "dallas_rtc", -1, 0, },	(void *)RD94_SYS_CLOCK, },
+	{{ "LPT1",	0, 0, },	(void *)RD94_SYS_PAR1, },
+	{{ "I82077",	1, 0, },	(void *)RD94_SYS_FLOPPY, },
+	{{ "AD1848",	2, 0, },	(void *)RD94_SYS_SOUND,},
+	{{ "SONIC",	3, 0, },	(void *)RD94_SYS_SONIC, },
+	{{ "NCRC700",	4, 0, },	(void *)RD94_SYS_SCSI0, },
+	{{ "I8742",	6, 0, },	(void *)RD94_SYS_KBD, },
+	{{ "pms",	7, 0, },	(void *)RD94_SYS_KBD, }, /* XXX */
+	{{ "COM1",	8, 0, },	(void *)RD94_SYS_COM1, },
+	{{ "COM2",	9, 0, },	(void *)RD94_SYS_COM2, },
+	{{ NULL,	-1, 0, },	(void *)NULL, },
+};
+
+/*
+ * critical i/o space, interrupt, and other chipset related initialization.
+ */
+void
+p_nec_r94_init()
+{
+
+	c_nec_eisa_init();
+
+	/* chipset-dependent jazzio bus configuration */
+	jazzio_devconfig = nec_r94_cpu;
+}

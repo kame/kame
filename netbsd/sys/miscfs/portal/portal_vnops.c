@@ -1,4 +1,4 @@
-/*	$NetBSD: portal_vnops.c,v 1.41 2001/12/06 04:27:42 chs Exp $	*/
+/*	$NetBSD: portal_vnops.c,v 1.52 2003/11/29 10:02:43 matt Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -44,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: portal_vnops.c,v 1.41 2001/12/06 04:27:42 chs Exp $");
+__KERNEL_RCSID(0, "$NetBSD: portal_vnops.c,v 1.52 2003/11/29 10:02:43 matt Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -60,9 +56,11 @@ __KERNEL_RCSID(0, "$NetBSD: portal_vnops.c,v 1.41 2001/12/06 04:27:42 chs Exp $"
 #include <sys/namei.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
+#include <sys/protosw.h>
 #include <sys/socketvar.h>
 #include <sys/un.h>
 #include <sys/unpcb.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <miscfs/genfs/genfs.h>
@@ -70,12 +68,12 @@ __KERNEL_RCSID(0, "$NetBSD: portal_vnops.c,v 1.41 2001/12/06 04:27:42 chs Exp $"
 
 static int portal_fileid = PORTAL_ROOTFILEID+1;
 
-static void	portal_closefd __P((struct proc *, int));
+static void	portal_closefd __P((struct lwp *, int));
 static int	portal_connect __P((struct socket *, struct socket *));
 
 int	portal_lookup	__P((void *));
-#define	portal_create	genfs_eopnotsupp_rele
-#define	portal_mknod	genfs_eopnotsupp_rele
+#define	portal_create	genfs_eopnotsupp
+#define	portal_mknod	genfs_eopnotsupp
 int	portal_open	__P((void *));
 #define	portal_close	genfs_nullop
 #define	portal_access	genfs_nullop
@@ -89,11 +87,11 @@ int	portal_setattr	__P((void *));
 #define portal_revoke	genfs_revoke
 #define	portal_fsync	genfs_nullop
 #define	portal_seek	genfs_seek
-#define	portal_remove	genfs_eopnotsupp_rele
+#define	portal_remove	genfs_eopnotsupp
 int	portal_link	__P((void *));
-#define	portal_rename	genfs_eopnotsupp_rele
-#define	portal_mkdir	genfs_eopnotsupp_rele
-#define	portal_rmdir	genfs_eopnotsupp_rele
+#define	portal_rename	genfs_eopnotsupp
+#define	portal_mkdir	genfs_eopnotsupp
+#define	portal_rmdir	genfs_eopnotsupp
 int	portal_symlink	__P((void *));
 int	portal_readdir	__P((void *));
 #define	portal_readlink	genfs_eopnotsupp
@@ -167,8 +165,8 @@ const struct vnodeopv_desc portal_vnodeop_opv_desc =
 	{ &portal_vnodeop_p, portal_vnodeop_entries };
 
 static void
-portal_closefd(p, fd)
-	struct proc *p;
+portal_closefd(l, fd)
+	struct lwp *l;
 	int fd;
 {
 	struct sys_close_args /* {
@@ -178,7 +176,7 @@ portal_closefd(p, fd)
 	int error;
 
 	SCARG(&ua, fd) = fd;
-	error = sys_close(p, &ua, retval);
+	error = sys_close(l, &ua, retval);
 	/*
 	 * We should never get an error, and there isn't anything
 	 * we could do if we got one, so just print a message.
@@ -295,7 +293,7 @@ portal_connect(so, so2)
 	so2 = so3;
 
 
-	return (unp_connect2(so, so2));
+	return (unp_connect2(so, so2, PRU_CONNECT2));
 }
 
 int
@@ -336,9 +334,9 @@ portal_open(v)
 	/*
 	 * Can't be opened unless the caller is set up
 	 * to deal with the side effects.  Check for this
-	 * by testing whether the p_dupfd has been set.
+	 * by testing whether the dupfd has been set.
 	 */
-	if (p->p_dupfd >= 0)
+	if (curlwp->l_dupfd >= 0)	/* XXX */
 		return (ENODEV);
 
 	pt = VTOPORTAL(vp);
@@ -494,7 +492,7 @@ portal_open(v)
 		int i;
 		printf("portal_open: %d extra fds\n", newfds - 1);
 		for (i = 1; i < newfds; i++) {
-			portal_closefd(p, *ip);
+			portal_closefd(curlwp, *ip); /* XXXNJWLWP */
 			ip++;
 		}
 	}
@@ -505,7 +503,7 @@ portal_open(v)
 	 */
  	fp = p->p_fd->fd_ofiles[fd];
 	if (((ap->a_mode & (FREAD|FWRITE)) | fp->f_flag) != fp->f_flag) {
-		portal_closefd(p, fd);
+		portal_closefd(curlwp, fd); /* XXXNJWLWP */
 		error = EACCES;
 		goto bad;
 	}
@@ -515,7 +513,7 @@ portal_open(v)
 	 * special error code (ENXIO) which causes magic things to
 	 * happen in vn_open.  The whole concept is, well, hmmm.
 	 */
-	p->p_dupfd = fd;
+	curlwp->l_dupfd = fd;	/* XXX */
 	error = ENXIO;
 
 bad:;
@@ -545,7 +543,6 @@ portal_getattr(v)
 	} */ *ap = v;
 	struct vnode *vp = ap->a_vp;
 	struct vattr *vap = ap->a_vap;
-	struct timeval tv;
 
 	memset(vap, 0, sizeof(*vap));
 	vattr_null(vap);
@@ -554,10 +551,14 @@ portal_getattr(v)
 	vap->va_fsid = vp->v_mount->mnt_stat.f_fsid.val[0];
 	vap->va_size = DEV_BSIZE;
 	vap->va_blocksize = DEV_BSIZE;
-	microtime(&tv);
-	TIMEVAL_TO_TIMESPEC(&tv, &vap->va_atime);
-	vap->va_mtime = vap->va_atime;
-	vap->va_ctime = vap->va_ctime;
+	/*
+	 * Make all times be current TOD.  Avoid microtime(9), it's slow.
+	 * We don't guard the read from time(9) with splclock(9) since we
+	 * don't actually need to be THAT sure the access is atomic. 
+	 */
+	TIMEVAL_TO_TIMESPEC(&time, &vap->va_ctime);
+	vap->va_atime = vap->va_mtime = vap->va_ctime;
+	vap->va_atime = vap->va_mtime = vap->va_ctime;
 	vap->va_gen = 0;
 	vap->va_flags = 0;
 	vap->va_rdev = 0;

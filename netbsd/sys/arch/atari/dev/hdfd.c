@@ -1,11 +1,43 @@
-/*	$NetBSD: hdfd.c,v 1.29 2001/11/21 17:33:27 wiz Exp $	*/
+/*	$NetBSD: hdfd.c,v 1.43 2004/03/25 10:17:19 leo Exp $	*/
 
 /*-
  * Copyright (c) 1996 Leo Weppelman
- * Copyright (c) 1993, 1994, 1995, 1996
- *	Charles M. Hannum.  All rights reserved.
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Don Ahn.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)fd.c	7.4 (Berkeley) 5/25/91
+ */
+
+/*-
+ * Copyright (c) 1993, 1994, 1995, 1996
+ *	Charles M. Hannum.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * Don Ahn.
@@ -58,6 +90,9 @@
  *  dufault@hda.com (Peter Dufault)
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hdfd.c,v 1.43 2004/03/25 10:17:19 leo Exp $");
+
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -68,7 +103,6 @@
 #include <sys/ioctl.h>
 #include <sys/device.h>
 #include <sys/disklabel.h>
-#include <sys/dkstat.h>
 #include <sys/disk.h>
 #include <sys/buf.h>
 #include <sys/malloc.h>
@@ -101,8 +135,7 @@ dev_type_close(fdclose);
 dev_type_read(fdread);
 dev_type_write(fdwrite);
 dev_type_ioctl(fdioctl);
-dev_type_size(fdsize);
-dev_type_dump(fddump);
+dev_type_strategy(fdstrategy);
 
 volatile u_char	*fdio_addr;
 
@@ -112,7 +145,7 @@ volatile u_char	*fdio_addr;
 #define	fdc_ienable()		MFP2->mf_ierb |= IB_DCHG;
 
 /*
- * Interface to the pseudo-dma handler
+ * Interface to the pseudo-DMA handler
  */
 void	fddma_intr(void);
 caddr_t	fddmaaddr  = NULL;
@@ -172,9 +205,8 @@ int	fdcprobe __P((struct device *, struct cfdata *, void *));
 int	fdprint __P((void *, const char *));
 void	fdcattach __P((struct device *, struct device *, void *));
 
-struct cfattach fdc_ca = {
-	sizeof(struct fdc_softc), fdcprobe, fdcattach
-};
+CFATTACH_DECL(fdc, sizeof(struct fdc_softc),
+    fdcprobe, fdcattach, NULL, NULL);
 
 /*
  * Floppies come in various flavors, e.g., 1.2MB vs 1.44MB; here is how
@@ -241,7 +273,7 @@ struct fd_softc {
 
 	TAILQ_ENTRY(fd_softc) sc_drivechain;
 	int		sc_ops;		/* I/O ops since last switch */
-	struct buf_queue sc_q;		/* pending I/O requests */
+	struct bufq_state sc_q;		/* pending I/O requests */
 	int		sc_active;	/* number of active I/O operations */
 };
 
@@ -249,13 +281,20 @@ struct fd_softc {
 int	fdprobe __P((struct device *, struct cfdata *, void *));
 void	fdattach __P((struct device *, struct device *, void *));
 
-struct cfattach hdfd_ca = {
-	sizeof(struct fd_softc), fdprobe, fdattach
-};
+CFATTACH_DECL(hdfd, sizeof(struct fd_softc),
+    fdprobe, fdattach, NULL, NULL);
 
 extern struct cfdriver hdfd_cd;
 
-void	fdstrategy __P((struct buf *));
+const struct bdevsw fd_bdevsw = {
+	fdopen, fdclose, fdstrategy, fdioctl, nodump, nosize, D_DISK
+};
+
+const struct cdevsw fd_cdevsw = {
+	fdopen, fdclose, fdread, fdwrite, fdioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
+};
+
 void	fdstart __P((struct fd_softc *));
 
 struct dkdriver fddkdriver = { fdstrategy };
@@ -301,7 +340,7 @@ fdcprobe(parent, cfp, aux)
 		return 0;
 
 	if (bus_space_map(mb_tag, FD_IOBASE, FD_IOSIZE, 0,
-						(caddr_t*)&fdio_addr)) {
+				(caddr_t*)(void *)&fdio_addr)) {
 		printf("fdcprobe: cannot map io-area\n");
 		mb_free_bus_space_tag(mb_tag);
 		return (0);
@@ -356,7 +395,7 @@ fdprint(aux, fdc)
 	register struct fdc_attach_args *fa = aux;
 
 	if (!fdc)
-		printf(" drive %d", fa->fa_drive);
+		aprint_normal(" drive %d", fa->fa_drive);
 	return QUIET;
 }
 
@@ -496,7 +535,7 @@ fdattach(parent, self, aux)
 	else
 		printf(": density unknown\n");
 
-	BUFQ_INIT(&fd->sc_q);
+	bufq_alloc(&fd->sc_q, BUFQ_DISKSORT|BUFQ_SORT_CYLINDER);
 	fd->sc_cylin      = -1;
 	fd->sc_drive      = drive;
 	fd->sc_deftype    = type;
@@ -531,7 +570,7 @@ fdc_ctrl_intr(frame)
 	MFP2->mf_ierb &= ~IB_DCHG;
 
 	/*
-	 * Set fddmalen to zero so no pseudo-dma transfers will
+	 * Set fddmalen to zero so no pseudo-DMA transfers will
 	 * occur.
 	 */
 	fddmalen = 0;
@@ -602,14 +641,14 @@ fdstrategy(bp)
  	bp->b_cylinder = bp->b_blkno / (FDC_BSIZE/DEV_BSIZE) / fd->sc_type->seccyl;
 
 #ifdef FD_DEBUG
-	printf("fdstrategy: b_blkno %d b_bcount %ld blkno %ld cylin %ld sz"
+	printf("fdstrategy: b_blkno %d b_bcount %ld blkno %qd cylin %ld sz"
 		" %d\n", bp->b_blkno, bp->b_bcount, (long)fd->sc_blkno,
 		bp->b_cylinder, sz);
 #endif
 
 	/* Queue transfer on drive, activate drive and controller if idle. */
 	s = splbio();
-	disksort_cylinder(&fd->sc_q, bp);
+	BUFQ_PUT(&fd->sc_q, bp);
 	callout_stop(&fd->sc_motoroff_ch);		/* a good idea */
 	if (fd->sc_active == 0)
 		fdstart(fd);
@@ -662,17 +701,17 @@ fdfinish(fd, bp)
 	 * another drive is waiting to be serviced, since there is a long motor
 	 * startup delay whenever we switch.
 	 */
+	(void)BUFQ_GET(&fd->sc_q);
 	if (fd->sc_drivechain.tqe_next && ++fd->sc_ops >= 8) {
 		fd->sc_ops = 0;
 		TAILQ_REMOVE(&fdc->sc_drives, fd, sc_drivechain);
-		if (BUFQ_NEXT(bp) != NULL)
+		if (BUFQ_PEEK(&fd->sc_q) != NULL)
 			TAILQ_INSERT_TAIL(&fdc->sc_drives, fd, sc_drivechain);
 		else
 			fd->sc_active = 0;
 	}
 	bp->b_resid = fd->sc_bcount;
 	fd->sc_skip = 0;
-	BUFQ_REMOVE(&fd->sc_q, bp);
 
 	biodone(bp);
 	/* turn off motor 5s from now */
@@ -904,7 +943,7 @@ fdctimeout(arg)
 	s = splbio();
 	fdcstatus(&fd->sc_dev, 0, "timeout");
 
-	if (BUFQ_FIRST(&fd->sc_q) != NULL)
+	if (BUFQ_PEEK(&fd->sc_q) != NULL)
 		fdc->sc_state++;
 	else
 		fdc->sc_state = DEVIDLE;
@@ -949,7 +988,7 @@ loop:
 	}
 
 	/* Is there a transfer to this drive?  If not, deactivate drive. */
-	bp = BUFQ_FIRST(&fd->sc_q);
+	bp = BUFQ_PEEK(&fd->sc_q);
 	if (bp == NULL) {
 		fd->sc_ops = 0;
 		TAILQ_REMOVE(&fdc->sc_drives, fd, sc_drivechain);
@@ -998,7 +1037,7 @@ loop:
 
 		out_fdc(NE7CMD_SPECIFY);/* specify command */
 		out_fdc(fd->sc_type->steprate);
-		out_fdc(0x7);	/* XXX head load time == 6ms - non-dma */
+		out_fdc(0x7);	/* XXX head load time == 6ms - non-DMA */
 
 		fdc_ienable();
 
@@ -1037,7 +1076,7 @@ loop:
 		     block = (fd->sc_cylin * type->heads + head)
 				* type->sectrac + sec;
 		     if (block != fd->sc_blkno) {
-			 printf("fdcintr: block %d != blkno %d\n",
+			 printf("fdcintr: block %d != blkno %qd\n",
 						block, fd->sc_blkno);
 #ifdef DDB
 			 Debugger();
@@ -1048,7 +1087,7 @@ loop:
 		read = bp->b_flags & B_READ ? 1 : 0;
 
 		/*
-		 * Setup pseudo-dma address & count
+		 * Setup pseudo-DMA address & count
 		 */
 		fddmaaddr = bp->b_data + fd->sc_skip;
 		fddmalen  = fd->sc_nbytes;
@@ -1103,7 +1142,8 @@ loop:
 		return 1;
 
 	case SEEKCOMPLETE:
-		disk_unbusy(&fd->sc_dk, 0);	/* no data on seek */
+		/* no data on seek */
+		disk_unbusy(&fd->sc_dk, 0, 0);
 
 		/* Make sure seek really happened. */
 		out_fdc(NE7CMD_SENSEI);
@@ -1128,7 +1168,8 @@ loop:
 	case IOCOMPLETE: /* IO DONE, post-analyze */
 		callout_stop(&fdc->sc_timo_ch);
 
-		disk_unbusy(&fd->sc_dk, (bp->b_bcount - bp->b_resid));
+		disk_unbusy(&fd->sc_dk, (bp->b_bcount - bp->b_resid),
+		    (bp->b_flags & B_READ));
 
 		if (fdcresult(fdc) != 7 || (st1 & 0x37) != 0) {
 			/*
@@ -1142,7 +1183,7 @@ loop:
 #ifdef FD_DEBUG
 			fdcstatus(&fd->sc_dev, 7, bp->b_flags & B_READ ?
 			    "read failed" : "write failed");
-			printf("blkno %d nblks %d\n",
+			printf("blkno %qd nblks %d\n",
 			    fd->sc_blkno, fd->sc_nblks);
 #endif
 			fdcretry(fdc);
@@ -1237,7 +1278,7 @@ fdcretry(fdc)
 	struct buf *bp;
 
 	fd = fdc->sc_drives.tqh_first;
-	bp = BUFQ_FIRST(&fd->sc_q);
+	bp = BUFQ_PEEK(&fd->sc_q);
 
 	if (fd->sc_opts & FDOPT_NORETRY)
 	    goto fail;
@@ -1287,27 +1328,6 @@ fdcretry(fdc)
 		fdfinish(fd, bp);
 	}
 	fdc->sc_errors++;
-}
-
-int
-fdsize(dev)
-	dev_t dev;
-{
-
-	/* Swapping to floppies would not make sense. */
-	return -1;
-}
-
-int
-fddump(dev, blkno, va, size)
-	dev_t dev;
-	daddr_t blkno;
-	caddr_t va;
-	size_t size;
-{
-
-	/* Not implemented. */
-	return ENXIO;
 }
 
 int

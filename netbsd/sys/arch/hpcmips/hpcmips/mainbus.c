@@ -1,4 +1,4 @@
-/*	$NetBSD: mainbus.c,v 1.19 2002/02/11 09:21:47 takemura Exp $	*/
+/*	$NetBSD: mainbus.c,v 1.25 2003/07/15 02:29:32 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999
@@ -34,6 +34,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.25 2003/07/15 02:29:32 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 
@@ -55,9 +58,8 @@ STATIC void mainbus_attach(struct device *, struct device *, void *);
 STATIC int mainbus_search(struct device *, struct cfdata *, void *);
 STATIC int mainbus_print(void *, const char *);
 
-struct cfattach mainbus_ca = {
-	sizeof(struct device), mainbus_match, mainbus_attach
-};
+CFATTACH_DECL(mainbus, sizeof(struct device),
+    mainbus_match, mainbus_attach, NULL, NULL);
 
 STATIC int __mainbus_attached;
 
@@ -73,7 +75,8 @@ mainbus_attach(struct device *parent, struct device *self, void *aux)
 {
 	static const char *devnames[] = {	/* ATTACH ORDER */
 		"cpu",				/* 1. CPU */
-		"vrip", "vr4102ip", "vr4122ip",	/* 2. System BUS */
+		"vrip", "vr4102ip", "vr4122ip",
+		"vr4181ip",			/* 2. System BUS */
 		"txsim",			
 		"bivideo", "btnmgr", "hpcapm",	/* 3. misc */
 	};
@@ -104,7 +107,7 @@ mainbus_search(struct device *parent, struct cfdata *cf, void *aux)
 	int locator = cf->cf_loc[MAINBUSCF_PLATFORM];
 
 	/* check device name */
-	if (strcmp(ma->ma_name, cf->cf_driver->cd_name) != 0)
+	if (strcmp(ma->ma_name, cf->cf_name) != 0)
 		return (0);
 
 	/* check platform ID in config file */
@@ -113,7 +116,7 @@ mainbus_search(struct device *parent, struct cfdata *cf, void *aux)
 		return (0);
 
 	/* attach device */
-	if ((*cf->cf_attach->ca_match)(parent, cf, ma))
+	if (config_match(parent, cf, ma))
 		config_attach(parent, cf, ma, mainbus_print);
 
 	return (0);

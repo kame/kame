@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_sigaction.c,v 1.23 2002/03/31 22:22:47 christos Exp $	*/
+/*	$NetBSD: linux_sigaction.c,v 1.25 2003/01/18 21:21:32 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: linux_sigaction.c,v 1.23 2002/03/31 22:22:47 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: linux_sigaction.c,v 1.25 2003/01/18 21:21:32 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -52,6 +52,7 @@ __KERNEL_RCSID(0, "$NetBSD: linux_sigaction.c,v 1.23 2002/03/31 22:22:47 christo
 #include <sys/signal.h>
 #include <sys/signalvar.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/linux/common/linux_types.h>
@@ -68,8 +69,8 @@ __KERNEL_RCSID(0, "$NetBSD: linux_sigaction.c,v 1.23 2002/03/31 22:22:47 christo
  * and just call sigaction().
  */
 int
-linux_sys_sigaction(p, v, retval)
-	struct proc *p;
+linux_sys_sigaction(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -78,6 +79,7 @@ linux_sys_sigaction(p, v, retval)
 		syscallarg(const struct linux_old_sigaction *) nsa;
 		syscallarg(struct linux_old_sigaction *) osa;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct linux_old_sigaction nlsa, olsa;
 	struct sigaction nbsa, obsa;
 	int error, sig;
@@ -101,7 +103,8 @@ linux_sys_sigaction(p, v, retval)
 		obsa.sa_flags = 0;
 	} else {
 		error = sigaction1(p, linux_to_native_signo[sig],
-		    SCARG(uap, nsa) ? &nbsa : 0, SCARG(uap, osa) ? &obsa : 0);
+		    SCARG(uap, nsa) ? &nbsa : 0, SCARG(uap, osa) ? &obsa : 0,
+		    NULL, 0);
 		if (error)
 			return (error);
 	}

@@ -1,7 +1,6 @@
-/*	$NetBSD: zs.c,v 1.35 2002/03/17 19:40:36 atatat Exp $	*/
+/*	$NetBSD: zs.c,v 1.42 2004/03/25 10:17:19 leo Exp $	*/
 
 /*
- * Copyright (c) 1995 L. Weppelman (Atari modifications)
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -23,11 +22,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -46,6 +41,38 @@
  *	@(#)zs.c	8.1 (Berkeley) 7/19/93
  */
 
+/*-
+ * Copyright (c) 1995 The NetBSD Foundation, Inc. (Atari modifications)
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to The NetBSD Foundation
+ * by Leo Weppelman.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of The NetBSD Foundation nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
+
 /*
  * Zilog Z8530 (ZSCC) driver.
  *
@@ -53,6 +80,10 @@
  *
  * This driver knows far too much about chip to usage mappings.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zs.c,v 1.42 2004/03/25 10:17:19 leo Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -191,9 +222,8 @@ static u_long *zs_frequencies;
 static int	zsmatch __P((struct device *, struct cfdata *, void *));
 static void	zsattach __P((struct device *, struct device *, void *));
 
-struct cfattach zs_ca = {
-	sizeof(struct zs_softc), zsmatch, zsattach
-};
+CFATTACH_DECL(zs, sizeof(struct zs_softc),
+    zsmatch, zsattach, NULL, NULL);
 
 extern struct cfdriver zs_cd;
 
@@ -202,9 +232,15 @@ dev_type_open(zsopen);
 dev_type_close(zsclose);
 dev_type_read(zsread);
 dev_type_write(zswrite);
-dev_type_poll(zspoll);
 dev_type_ioctl(zsioctl);
+dev_type_stop(zsstop);
 dev_type_tty(zstty);
+dev_type_poll(zspoll);
+
+const struct cdevsw zs_cdevsw = {
+	zsopen, zsclose, zsread, zswrite, zsioctl,
+	zsstop, zstty, zspoll, nommap, ttykqfilter, D_TTY
+};
 
 /* Interrupt handlers. */
 int		zshard __P((long));
@@ -217,7 +253,6 @@ static struct zs_chanstate *zslist;
 
 /* Routines called from other code. */
 static void	zsstart __P((struct tty *));
-void		zsstop __P((struct tty *, int));
 
 /* Routines purely local to this driver. */
 static void	zsoverrun __P((int, long *, char *));

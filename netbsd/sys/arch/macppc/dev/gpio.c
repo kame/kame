@@ -1,4 +1,4 @@
-/*	$NetBSD: gpio.c,v 1.3 2001/06/19 12:02:56 simonb Exp $	*/
+/*	$NetBSD: gpio.c,v 1.7 2003/07/15 02:43:28 lukem Exp $	*/
 
 /*-
  * Copyright (C) 1998	Internet Research Institute, Inc.
@@ -31,6 +31,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: gpio.c,v 1.7 2003/07/15 02:43:28 lukem Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -57,13 +60,11 @@ struct gpio_softc {
 	u_int8_t *sc_port;
 };
 
-struct cfattach gpio_obio_ca = {
-	sizeof(struct gpio_softc), gpio_obio_match, gpio_obio_attach
-};
+CFATTACH_DECL(gpio_obio, sizeof(struct gpio_softc),
+    gpio_obio_match, gpio_obio_attach, NULL, NULL);
 
-struct cfattach gpio_gpio_ca = {
-	sizeof(struct gpio_softc), gpio_gpio_match, gpio_gpio_attach
-};
+CFATTACH_DECL(gpio_gpio, sizeof(struct gpio_softc),
+    gpio_gpio_match, gpio_gpio_attach, NULL, NULL);
 
 extern struct cfdriver gpio_cd;
 
@@ -128,10 +129,10 @@ gpio_obio_print(void *aux, const char *gpio)
 	struct confargs *ca = aux;
 
 	if (gpio)
-		printf("%s at %s", ca->ca_name, gpio);
+		aprint_normal("%s at %s", ca->ca_name, gpio);
 
 	if (ca->ca_nreg > 0)
-		printf(" offset 0x%x", ca->ca_reg[0]);
+		aprint_normal(" offset 0x%x", ca->ca_reg[0]);
 
 	return UNCONF;
 }

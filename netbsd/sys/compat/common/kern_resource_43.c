@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_resource_43.c,v 1.9 2001/11/13 02:08:01 lukem Exp $	*/
+/*	$NetBSD: kern_resource_43.c,v 1.12 2003/11/19 15:48:21 christos Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1991, 1993
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,30 +37,28 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kern_resource_43.c,v 1.9 2001/11/13 02:08:01 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_resource_43.c,v 1.12 2003/11/19 15:48:21 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/file.h>
 #include <sys/resourcevar.h>
-#include <sys/malloc.h>
 #include <sys/proc.h>
 
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 /* ARGSUSED */
 int
-compat_43_sys_getrlimit(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_getrlimit(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_getrlimit_args /* {
 		syscallarg(int) which;
 		syscallarg(struct orlimit *) rlp;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	int which = SCARG(uap, which);
 	struct orlimit olim;
 
@@ -82,15 +76,13 @@ compat_43_sys_getrlimit(p, v, retval)
 
 /* ARGSUSED */
 int
-compat_43_sys_setrlimit(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_setrlimit(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_setrlimit_args /* {
 		syscallarg(int) which;
 		syscallarg(const struct orlimit *) rlp;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	int which = SCARG(uap, which);
 	struct orlimit olim;
 	struct rlimit lim;

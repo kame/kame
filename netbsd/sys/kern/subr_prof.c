@@ -1,4 +1,4 @@
-/*	$NetBSD: subr_prof.c,v 1.25 2001/11/12 15:25:21 lukem Exp $	*/
+/*	$NetBSD: subr_prof.c,v 1.30.2.1 2004/04/21 04:27:34 jmc Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: subr_prof.c,v 1.25 2001/11/12 15:25:21 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: subr_prof.c,v 1.30.2.1 2004/04/21 04:27:34 jmc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -44,6 +40,7 @@ __KERNEL_RCSID(0, "$NetBSD: subr_prof.c,v 1.25 2001/11/12 15:25:21 lukem Exp $")
 #include <sys/proc.h>
 #include <sys/user.h>
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 #include <sys/sysctl.h>
 
@@ -52,6 +49,8 @@ __KERNEL_RCSID(0, "$NetBSD: subr_prof.c,v 1.25 2001/11/12 15:25:21 lukem Exp $")
 #ifdef GPROF
 #include <sys/malloc.h>
 #include <sys/gmon.h>
+
+MALLOC_DEFINE(M_GPROF, "gprof", "kernel profiling buffer");
 
 /*
  * Froms is actually a bunch of unsigned shorts indexing tos
@@ -106,51 +105,105 @@ kmstartup()
 /*
  * Return kernel profiling information.
  */
-int
-sysctl_doprof(name, namelen, oldp, oldlenp, newp, newlen)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
+/*
+ * sysctl helper routine for kern.profiling subtree.  enables/disables
+ * kernel profiling and gives out copies of the profiling data.
+ */
+static int
+sysctl_kern_profiling(SYSCTLFN_ARGS)
 {
 	struct gmonparam *gp = &_gmonparam;
 	int error;
+	struct sysctlnode node;
 
-	/* all sysctl names at this level are terminal */
-	if (namelen != 1)
-		return (ENOTDIR);		/* overloaded */
+	node = *rnode;
 
-	/* Check we got the necessary memory at startup. */
-	if (gp->kcount == NULL)
-		return (EOPNOTSUPP);
-
-	switch (name[0]) {
+	switch (node.sysctl_num) {
 	case GPROF_STATE:
-		error = sysctl_int(oldp, oldlenp, newp, newlen, &gp->state);
-		if (error)
-			return (error);
+		node.sysctl_data = &gp->state;
+		break;
+	case GPROF_COUNT:
+		node.sysctl_data = gp->kcount;
+		node.sysctl_size = gp->kcountsize;
+		break;
+	case GPROF_FROMS:
+		node.sysctl_data = gp->froms;
+		node.sysctl_size = gp->fromssize;
+		break;
+	case GPROF_TOS:
+		node.sysctl_data = gp->tos;
+		node.sysctl_size = gp->tossize;
+		break;
+	case GPROF_GMONPARAM:
+		node.sysctl_data = gp;
+		node.sysctl_size = sizeof(*gp);
+		break;
+	default:
+		return (EOPNOTSUPP);
+	}
+
+	error = sysctl_lookup(SYSCTLFN_CALL(&node));
+	if (error || newp == NULL)
+		return (error);
+
+	if (node.sysctl_num == GPROF_STATE) {
 		if (gp->state == GMON_PROF_OFF)
 			stopprofclock(&proc0);
 		else
 			startprofclock(&proc0);
-		return (0);
-	case GPROF_COUNT:
-		return (sysctl_struct(oldp, oldlenp, newp, newlen,
-		    gp->kcount, gp->kcountsize));
-	case GPROF_FROMS:
-		return (sysctl_struct(oldp, oldlenp, newp, newlen,
-		    gp->froms, gp->fromssize));
-	case GPROF_TOS:
-		return (sysctl_struct(oldp, oldlenp, newp, newlen,
-		    gp->tos, gp->tossize));
-	case GPROF_GMONPARAM:
-		return (sysctl_rdstruct(oldp, oldlenp, newp, gp, sizeof(*gp)));
-	default:
-		return (EOPNOTSUPP);
 	}
-	/* NOTREACHED */
+
+	return (0);
+}
+
+SYSCTL_SETUP(sysctl_kern_gprof_setup, "sysctl kern.profiling subtree setup")
+{
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "kern", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_KERN, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "profiling",
+		       SYSCTL_DESCR("Profiling information (available)"),
+		       NULL, 0, NULL, 0,
+		       CTL_KERN, KERN_PROF, CTL_EOL);
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "state",
+		       SYSCTL_DESCR("Profiling state"),
+		       sysctl_kern_profiling, 0, NULL, 0,
+		       CTL_KERN, KERN_PROF, GPROF_STATE, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_STRUCT, "count",
+		       SYSCTL_DESCR("Array of statistical program counters"),
+		       sysctl_kern_profiling, 0, NULL, 0,
+		       CTL_KERN, KERN_PROF, GPROF_COUNT, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_STRUCT, "froms",
+		       SYSCTL_DESCR("Array indexed by program counter of "
+				    "call-from points"),
+		       sysctl_kern_profiling, 0, NULL, 0,
+		       CTL_KERN, KERN_PROF, GPROF_FROMS, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_STRUCT, "tos",
+		       SYSCTL_DESCR("Array of structures describing "
+				    "destination of calls and their counts"),
+		       sysctl_kern_profiling, 0, NULL, 0,
+		       CTL_KERN, KERN_PROF, GPROF_TOS, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_STRUCT, "gmonparam",
+		       SYSCTL_DESCR("Structure giving the sizes of the above "
+				    "arrays"),
+		       sysctl_kern_profiling, 0, NULL, 0,
+		       CTL_KERN, KERN_PROF, GPROF_GMONPARAM, CTL_EOL);
 }
 #endif /* GPROF */
 
@@ -162,8 +215,8 @@ sysctl_doprof(name, namelen, oldp, oldlenp, newp, newlen)
  */
 /* ARGSUSED */
 int
-sys_profil(p, v, retval)
-	struct proc *p;
+sys_profil(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -173,6 +226,7 @@ sys_profil(p, v, retval)
 		syscallarg(u_int) offset;
 		syscallarg(u_int) scale;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct uprof *upp;
 	int s;
 

@@ -1,4 +1,4 @@
-#	$NetBSD: files.macppc,v 1.50.4.1 2003/06/19 11:16:44 grant Exp $
+#	$NetBSD: files.macppc,v 1.63 2004/03/25 18:52:25 matt Exp $
 #
 # macppc-specific configuration info
 
@@ -12,62 +12,39 @@ include "arch/powerpc/conf/files.ofw"
 file arch/macppc/macppc/autoconf.c
 file arch/macppc/macppc/bus_dma.c
 file arch/macppc/macppc/clock.c
-file arch/macppc/macppc/conf.c
 file arch/macppc/macppc/disksubr.c		disk
 file arch/macppc/macppc/extintr.c
 file arch/macppc/macppc/machdep.c
-file arch/macppc/macppc/procfs_machdep.c	procfs
 file arch/macppc/dev/dbdma.c
+
+file arch/powerpc/powerpc/procfs_machdep.c	procfs
+file arch/powerpc/powerpc/softintr.c
 file dev/cons.c
 
 #
 # Memory Disk for install floppy
 #
 file dev/md_root.c				memory_disk_hooks
-major {md = 9}
-
-#
-# Compatibility modules
-#
-
-# OSS audio driver compatibility
-include "compat/ossaudio/files.ossaudio"
-
-# Linux binary compatibility (COMPAT_LINUX)
-include "compat/linux/files.linux"
-include "compat/linux/arch/powerpc/files.linux_powerpc"
-file arch/powerpc/powerpc/linux_sigcode.S	compat_linux
-file arch/powerpc/powerpc/linux_trap.c		compat_linux
-
-#
-# RAIDframe
-#
-major {raid = 12}
 
 #
 # Machine-independent SCSI drivers
 #
 include "dev/scsipi/files.scsipi"
-major {sd = 4}
-major {cd = 6}
 
 #
 # Machine-independent ATA drivers
 #
 include "dev/ata/files.ata"
-major {wd = 10}
 
 #
 # Generic OpenFirmware device support
 #
 include "dev/ofw/files.ofw"
-major {ofdisk = 0}
 
 #
 # Machine-independent I2O drivers
 #
 include "dev/i2o/files.i2o"
-major {ld = 13}
 
 #
 # System bus types
@@ -159,6 +136,10 @@ file arch/macppc/dev/adb.c			adb needs-flag
 file arch/macppc/dev/adb_direct.c		adb
 file arch/macppc/dev/pm_direct.c		adb
 
+device apm
+attach apm at adb
+file arch/macppc/dev/apm.c			apm needs-count
+
 device aed
 attach aed at adb
 file arch/macppc/dev/aed.c			aed needs-flag
@@ -185,7 +166,7 @@ file arch/macppc/dev/wdc_obio.c			wdc_obio
 attach wi at obio with wi_obio
 file arch/macppc/dev/if_wi_obio.c		wi_obio
 
-device awacs: audiobus, auconv, mulaw
+device awacs: audiobus, auconv, mulaw, aurateconv
 attach awacs at obio
 file arch/macppc/dev/awacs.c			awacs
 
@@ -193,21 +174,6 @@ device gpio {}
 attach gpio at obio with gpio_obio
 attach gpio at gpio with gpio_gpio
 file arch/macppc/dev/gpio.c			gpio
-
-define grfdev {}
-
-device grfati: grfdev
-attach grfati at pci
-file arch/macppc/dev/grf_ati.c			grfati needs-flag
-
-device grf {}
-attach grf at grfdev
-file arch/macppc/dev/grf.c			grf needs-flag
-file arch/macppc/dev/grf_subr.c			grf
-
-device ite: tty
-attach ite at grf
-file arch/macppc/dev/ite.c			ite needs-flag
 
 device macofcons: tty
 attach macofcons at pci
@@ -227,3 +193,15 @@ include "dev/cardbus/files.cardbus"
 include "dev/pcmcia/files.pcmcia"
 
 file arch/macppc/macppc/rbus_machdep.c		cardbus
+
+# Keywest I2C
+device ki2c {}
+attach ki2c at obio
+file arch/macppc/dev/ki2c.c			ki2c
+
+# snapper audio
+device snapper: audiobus, auconv, mulaw, aurateconv
+attach snapper at obio
+file arch/macppc/dev/snapper.c			snapper
+
+include "arch/macppc/conf/majors.macppc"

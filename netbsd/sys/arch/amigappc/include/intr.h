@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.10 2002/02/11 11:19:29 wiz Exp $	*/
+/*	$NetBSD: intr.h,v 1.14 2003/12/10 01:26:24 jmc Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -45,8 +45,10 @@
 #ifndef _MACHINE_INTR_H_
 #define _MACHINE_INTR_H_
 
+#ifdef _KERNEL
 #include <amiga/amiga/isr.h>
 #include <amiga/include/mtpr.h>
+#endif
 
 /* ADAM: commented out
 #define IPL_SOFTSERIAL 1
@@ -69,7 +71,7 @@
 #define	IPL_NET		5	/* network */
 #define	IPL_SOFTSERIAL	4	/* serial */
 #define	IPL_TTY		3	/* terminal */
-#define	IPL_IMP		3	/* memory allocation */
+#define	IPL_VM		3	/* memory allocation */
 #define	IPL_AUDIO	2	/* audio */
 #define	IPL_CLOCK	1	/* clock */
 #define	IPL_HIGH	1	/* everything */
@@ -96,14 +98,6 @@ struct intrhand {
 	int	ih_level;
 	int	ih_irq;
 };
-
-void clearsoftclock __P((void));
-int  splsoftclock __P((void));
-/*
-void setsoftnet   __P((void));
-*/
-void clearsoftnet __P((void));
-int  splsoftnet   __P((void));
 
 void do_pending_int __P((void));
 
@@ -212,7 +206,7 @@ softintr(ipl)
 /*
  * Miscellaneous
  */
-#define splvm()		splraise(imask[IPL_IMP])
+#define splvm()		splraise(imask[IPL_VM])
 #define	splhigh()	splraise(imask[IPL_HIGH])
 #define	splsched()	splhigh()
 #define	spllock()	splhigh()

@@ -1,4 +1,4 @@
-/*	$NetBSD: xd.c,v 1.34 2001/09/05 14:03:49 tsutsui Exp $	*/
+/*	$NetBSD: xd.c,v 1.46 2003/09/29 09:50:22 wiz Exp $	*/
 
 /*
  *
@@ -50,6 +50,9 @@
  * different sizes.   the 753 is a 6U VME card, while the 7053 is a 9U
  * VME card (found in many VME based suns).
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: xd.c,v 1.46 2003/09/29 09:50:22 wiz Exp $");
 
 #undef XDC_DEBUG		/* full debug */
 #define XDC_DIAG		/* extra sanity checks */
@@ -238,10 +241,6 @@ void	xdc_xdreset __P((struct xdc_softc *, struct xd_softc *));
 /* machine interrupt hook */
 int	xdcintr __P((void *));
 
-/* bdevsw, cdevsw */
-bdev_decl(xd);
-cdev_decl(xd);
-
 /* autoconf */
 static int	xdcmatch __P((struct device *, struct cfdata *, void *));
 static void	xdcattach __P((struct device *, struct device *, void *));
@@ -258,13 +257,11 @@ int	xdgetdisklabel __P((struct xd_softc *, void *));
  * cfattach's: device driver interface to autoconfig
  */
 
-struct cfattach xdc_ca = {
-	sizeof(struct xdc_softc), xdcmatch, xdcattach
-};
+CFATTACH_DECL(xdc, sizeof(struct xdc_softc),
+    xdcmatch, xdcattach, NULL, NULL);
 
-struct cfattach xd_ca = {
-	sizeof(struct xd_softc), xdmatch, xdattach
-};
+CFATTACH_DECL(xd, sizeof(struct xd_softc),
+    xdmatch, xdattach, NULL, NULL);
 
 extern struct cfdriver xd_cd;
 
@@ -273,6 +270,24 @@ struct xdc_attach_args {	/* this is the "aux" args to xdattach */
 	char	*dvmabuf;	/* scratch buffer for reading disk label */
 	int	fullmode;	/* submit mode */
 	int	booting;	/* are we booting or not? */
+};
+
+dev_type_open(xdopen);
+dev_type_close(xdclose);
+dev_type_read(xdread);
+dev_type_write(xdwrite);
+dev_type_ioctl(xdioctl);
+dev_type_strategy(xdstrategy);
+dev_type_dump(xddump);
+dev_type_size(xdsize);
+
+const struct bdevsw xd_bdevsw = {
+	xdopen, xdclose, xdstrategy, xdioctl, xddump, xdsize, D_DISK
+};
+
+const struct cdevsw xd_cdevsw = {
+	xdopen, xdclose, xdread, xdwrite, xdioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
 };
 
 /*
@@ -303,7 +318,7 @@ xdgetdisklabel(xd, b)
 	struct xd_softc *xd;
 	void *b;
 {
-	char *err;
+	const char *err;
 	struct sun_disklabel *sdl;
 
 	/* We already have the label data in `b'; setup for dummy strategy */
@@ -438,7 +453,7 @@ xdcattach(parent, self, aux)
 
 	/* init queue of waiting bufs */
 
-	BUFQ_INIT(&xdc->sc_wq);
+	bufq_alloc(&xdc->sc_wq, BUFQ_FCFS);
 	callout_init(&xdc->sc_tick_ch);
 
 	/*
@@ -499,10 +514,10 @@ xdc_print(aux, name)
 	struct xdc_attach_args *xa = aux;
 
 	if (name != NULL)
-		printf("%s: ", name);
+		aprint_normal("%s: ", name);
 
 	if (xa->driveno != -1)
-		printf(" drive %d", xa->driveno);
+		aprint_normal(" drive %d", xa->driveno);
 
 	return UNCONF;
 }
@@ -1058,7 +1073,7 @@ xdstrategy(bp)
 	 * partition. Adjust transfer if needed, and signal errors or early
 	 * completion. */
 
-	if (bounds_check_with_label(bp, xd->sc_dk.dk_label,
+	if (bounds_check_with_label(&xd->sc_dk, bp,
 		(xd->flags & XD_WLABEL) != 0) <= 0)
 		goto done;
 
@@ -1074,7 +1089,7 @@ xdstrategy(bp)
 
 	/* first, give jobs in front of us a chance */
 	parent = xd->parent;
-	while (parent->nfree > 0 && BUFQ_FIRST(&parent->sc_wq) != NULL)
+	while (parent->nfree > 0 && BUFQ_PEEK(&parent->sc_wq) != NULL)
 		if (xdc_startbuf(parent, NULL, NULL) != XD_ERR_AOK)
 			break;
 
@@ -1083,7 +1098,7 @@ xdstrategy(bp)
 	 * buffs will get picked up later by xdcintr().
 	 */
 	if (parent->nfree == 0) {
-		BUFQ_INSERT_TAIL(&parent->sc_wq, bp);
+		BUFQ_PUT(&parent->sc_wq, bp);
 		splx(s);
 		return;
 	}
@@ -1131,7 +1146,7 @@ xdcintr(v)
 	xdc_start(xdcsc, XDC_MAXIOPB);
 
 	/* fill up any remaining iorq's with queue'd buffers */
-	while (xdcsc->nfree > 0 && BUFQ_FIRST(&xdcsc->sc_wq) != NULL)
+	while (xdcsc->nfree > 0 && BUFQ_PEEK(&xdcsc->sc_wq) != NULL)
 		if (xdc_startbuf(xdcsc, NULL, NULL) != XD_ERR_AOK)
 			break;
 
@@ -1374,10 +1389,9 @@ xdc_startbuf(xdcsc, xdsc, bp)
 	/* get buf */
 
 	if (bp == NULL) {
-		bp = BUFQ_FIRST(&xdcsc->sc_wq);
+		bp = BUFQ_GET(&xdcsc->sc_wq);
 		if (bp == NULL)
 			panic("xdc_startbuf bp");
-		BUFQ_REMOVE(&xdcsc->sc_wq, bp);
 		xdsc = xdcsc->sc_drives[DISKUNIT(bp->b_dev)];
 	}
 	partno = DISKPART(bp->b_dev);
@@ -1418,7 +1432,7 @@ xdc_startbuf(xdcsc, xdsc, bp)
 		printf("%s: warning: out of DVMA space\n",
 			   xdcsc->sc_dev.dv_xname);
 		XDC_FREE(xdcsc, rqno);
-		BUFQ_INSERT_TAIL(&xdcsc->sc_wq, bp);
+		BUFQ_PUT(&xdcsc->sc_wq, bp);
 		return (XD_ERR_FAIL);	/* XXX: need some sort of
 		                         * call-back scheme here? */
 	}
@@ -1467,7 +1481,7 @@ xdc_startbuf(xdcsc, xdsc, bp)
  * picked up later by the interrupt routine.  for case [2] the
  * programmed i/o driver is called with a special flag that says
  * return when one iopb is free.  for case [3] the process can sleep
- * on the iorq free list until some iopbs are avaliable.
+ * on the iorq free list until some iopbs are available.
  */
 
 
@@ -1619,7 +1633,7 @@ xdc_piodriver(xdcsc, iorqno, freeone)
 	/* now that we've drained everything, start up any bufs that have
 	 * queued */
 
-	while (xdcsc->nfree > 0 && BUFQ_FIRST(&xdcsc->sc_wq) != NULL)
+	while (xdcsc->nfree > 0 && BUFQ_PEEK(&xdcsc->sc_wq) != NULL)
 		if (xdc_startbuf(xdcsc, NULL, NULL) != XD_ERR_AOK)
 			break;
 
@@ -1714,7 +1728,8 @@ xdc_reset(xdcsc, quiet, blastmode, error, xdsc)
 				dvma_mapout(iorq->dbufbase,
 				            iorq->buf->b_bcount);
 			    disk_unbusy(&iorq->xd->sc_dk,
-					(iorq->buf->b_bcount - iorq->buf->b_resid));
+					(iorq->buf->b_bcount - iorq->buf->b_resid),
+					(iorq->buf->b_flags & B_READ));
 			    biodone(iorq->buf);
 			    XDC_FREE(xdcsc, lcv);	/* add to free list */
 			    break;
@@ -1919,7 +1934,8 @@ xdc_remove_iorq(xdcsc)
 			dvma_mapout(iorq->dbufbase,
 					    iorq->buf->b_bcount);
 			disk_unbusy(&iorq->xd->sc_dk,
-			    (bp->b_bcount - bp->b_resid));
+			    (bp->b_bcount - bp->b_resid),
+			    (bp->b_flags & B_READ));
 			XDC_FREE(xdcsc, rqno);
 			biodone(bp);
 			break;

@@ -1,4 +1,4 @@
-/*	$NetBSD: sysconf.c,v 1.7 2000/01/10 03:24:41 simonb Exp $	*/
+/*	$NetBSD: sysconf.c,v 1.9 2003/07/15 02:54:40 lukem Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -29,6 +29,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sysconf.c,v 1.9 2003/07/15 02:54:40 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -130,7 +133,7 @@ platform_not_configured()
 	printf("Please build a kernel with \"options %s\" and reboot.\n",
 	    sysinit[systype].option);
 	printf("\n");
-	panic("platform not configured\n");
+	panic("platform not configured");
 }
 
 void

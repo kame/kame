@@ -1,4 +1,4 @@
-/*	$NetBSD: sgecreg.h,v 1.1 1999/08/08 11:41:29 ragge Exp $	*/
+/*	$NetBSD: sgecreg.h,v 1.3 2003/08/07 16:31:03 agc Exp $	*/
 /*
  * Copyright (c) 1988 Regents of the University of California.
  * All rights reserved.
@@ -14,11 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,6 +32,8 @@
  *
  */
 
+#ifndef _DEV_IC_SGECREG_H_
+#define _DEV_IC_SGECREG_H_
 
 /* Driver for SGEC (second generation Ethernet controller) chip, type DC-541,
    found on the KA670 (and prob ably other) CPU.
@@ -239,3 +237,4 @@ struct ze_tdes {
 #define ZE_TDES1_IC 0x0100		/* interrupt on completion */
 #define ZE_TDES1_VT 0x0080		/* virtual(1)/phys PTE address */
 
+#endif /* _DEV_IC_SGECREG_H_ */

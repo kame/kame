@@ -1,9 +1,41 @@
-/*	$NetBSD: mem.c,v 1.51 2002/02/27 01:20:53 christos Exp $	*/
+/*	$NetBSD: mem.c,v 1.59 2003/08/07 16:27:55 agc Exp $	*/
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1982, 1986, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)mem.c	8.3 (Berkeley) 1/12/94
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -45,7 +77,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mem.c,v 1.51 2002/02/27 01:20:53 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mem.c,v 1.59 2003/08/07 16:27:55 agc Exp $");
 
 #include "opt_compat_netbsd.h"
 
@@ -56,14 +88,27 @@ __KERNEL_RCSID(0, "$NetBSD: mem.c,v 1.51 2002/02/27 01:20:53 christos Exp $");
 #include <sys/malloc.h>
 #include <sys/proc.h>
 #include <sys/fcntl.h>
+#include <sys/conf.h>
 
 #include <machine/cpu.h>
-#include <machine/conf.h>
 
 #include <uvm/uvm_extern.h>
 
+#define	DEV_IO	14		/* iopl for compat_10 */
+
 extern char *vmmap;            /* poor name! */
 caddr_t zeropage;
+
+dev_type_open(mmopen);
+dev_type_read(mmrw);
+dev_type_ioctl(mmioctl);
+dev_type_mmap(mmmmap);
+
+const struct cdevsw mem_cdevsw = {
+	mmopen, nullclose, mmrw, mmrw, mmioctl,
+	nostop, notty, nopoll, mmmmap, nokqfilter,
+};
+
 
 /*ARGSUSED*/
 int
@@ -79,7 +124,7 @@ mmopen(dev, flag, mode, p)
 	case DEV_IO:
 		if (flag & FWRITE) {
 			struct trapframe *fp;
-			fp = curproc->p_md.md_regs;
+			fp = curlwp->l_md.md_regs;
 			fp->tf_eflags |= PSL_IOPL;
 		}
 		break;
@@ -88,17 +133,6 @@ mmopen(dev, flag, mode, p)
 	default:
 		break;
 	}
-	return (0);
-}
-
-/*ARGSUSED*/
-int
-mmclose(dev, flag, mode, p)
-	dev_t dev;
-	int flag, mode;
-	struct proc *p;
-{
-
 	return (0);
 }
 
@@ -213,5 +247,5 @@ mmmmap(dev, off, prot)
 
 	if ((u_int)off > ctob(physmem) && suser(p->p_ucred, &p->p_acflag) != 0)
 		return (-1);
-	return (i386_btop((u_int)off));
+	return (x86_btop((u_int)off));
 }

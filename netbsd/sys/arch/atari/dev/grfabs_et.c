@@ -1,4 +1,4 @@
-/*	$NetBSD: grfabs_et.c,v 1.19 2002/03/04 15:35:57 wiz Exp $	*/
+/*	$NetBSD: grfabs_et.c,v 1.23 2004/02/13 11:36:11 wiz Exp $	*/
 
 /*
  * Copyright (c) 1996 Leo Weppelman.
@@ -44,6 +44,10 @@
  * Thanks guys!
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: grfabs_et.c,v 1.23 2004/02/13 11:36:11 wiz Exp $");
+
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <sys/malloc.h>
@@ -112,7 +116,7 @@ struct grfabs_sw et_vid_sw = {
 
 static struct grfvideo_mode hw_modes[] = {
     { 
-	0, "", 25175000,		/* num, descr, pix-clock	*/
+	0, "", 22450000,		/* num, descr, pix-clock	*/
 	640, 400, 4,			/* width, height, depth		*/
 	632/8, 672/8, 688/8, 808/8, 768/8,/* HBS, HBE, HSS, HSE, HT	*/
 	399, 450, 408, 413, 449		/* VBS, VBE, VSS, VSE, VT	*/
@@ -166,7 +170,7 @@ struct grfabs_et_priv {
 
 /*
  * XXX: called from ite console init routine.
- * Initialize list of possible video modes.
+ * Initialize list of posible video modes.
  */
 void
 et_probe_video(modelp)
@@ -230,7 +234,7 @@ view_t *v;
 	if (mode->current_view == v) {
 #if 0
 		if (v->flags & VF_DISPLAY)
-			panic("Cannot shutdown display\n"); /* XXX */
+			panic("Cannot shutdown display"); /* XXX */
 #endif
 		mode->current_view = NULL;
 	}
@@ -444,7 +448,27 @@ et_probe_card()
 
 	if (PCI_PRODUCT(id) ==  PCI_PRODUCT_TSENG_ET6000)
 		et_priv.board_type = BT_ET6000;
-	else et_priv.board_type = BT_ET4000;
+	else {
+#ifdef ET4000_HAS_2MB_MEM
+		volatile u_char *ba;
+#endif
+
+		et_priv.board_type = BT_ET4000;
+
+#ifdef ET4000_HAS_2MB_MEM
+		/* set KEY to access the tseng private registers */
+		ba = (volatile caddr_t)pci_io_addr;
+		vgaw(ba, GREG_HERCULESCOMPAT, 0x03);
+		vgaw(ba, GREG_DISPMODECONTROL, 0xa0);
+
+		/* enable memory interleave */
+		WCrt(ba, CRT_ID_RASCAS_CONFIG, 0xa0);
+		WCrt(ba, CRT_ID_VIDEO_CONFIG2, 0x89);
+
+		/* release KEY */
+		vgaw(ba, GREG_DISPMODECONTROL, 0x00);
+#endif
+	}
 
 	et_priv.pci_tag = tag;
 
@@ -504,7 +528,7 @@ et_sv_reg_t		*regs;
 
 	regs->seq[SEQ_ID_RESET]           = 0x03; /* reset off		*/
 	regs->seq[SEQ_ID_CLOCKING_MODE]   = 0x21; /* Turn off screen	*/
-	regs->seq[SEQ_ID_MAP_MASK]        = 0xff; /* Cpu writes all planes*/
+	regs->seq[SEQ_ID_MAP_MASK]        = 0xff; /* CPU writes all planes*/
 	regs->seq[SEQ_ID_CHAR_MAP_SELECT] = 0x00; /* Char. generator 0	*/
 	regs->seq[SEQ_ID_MEMORY_MODE]     = 0x0e; /* Seq. Memory mode	*/
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: cfb.c,v 1.40 2001/09/19 19:04:16 thorpej Exp $	*/
+/*	$NetBSD: cfb.c,v 1.44 2003/08/07 16:29:06 agc Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -80,6 +76,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cfb.c,v 1.44 2003/08/07 16:29:06 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/fcntl.h>
@@ -134,9 +133,8 @@ static void	cfbattach __P((struct device *, struct device *, void *));
 static int	cfbinit __P((struct fbinfo *, caddr_t, int, int));
 static int	cfb_intr __P((void *sc));
 
-struct cfattach cfb_ca = {
-	sizeof(struct fbsoftc), cfbmatch, cfbattach
-};
+CFATTACH_DECL(cfb, sizeof(struct fbsoftc),
+    cfbmatch, cfbattach, NULL, NULL);
 
 int
 cfb_cnattach(addr)

@@ -1,9 +1,43 @@
-/*	$NetBSD: vm_machdep.c,v 1.33 2002/05/09 12:28:09 uch Exp $	*/
+/*	$NetBSD: vm_machdep.c,v 1.43 2004/03/24 15:38:42 wiz Exp $	*/
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc. All rights reserved.
- * Copyright (c) 1995 Charles M. Hannum.  All rights reserved.
  * Copyright (c) 1982, 1986 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department, and William Jolitz.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
+ */
+
+/*-
+ * Copyright (c) 1995 Charles M. Hannum.  All rights reserved.
  * Copyright (c) 1989, 1990 William Jolitz
  * All rights reserved.
  *
@@ -46,6 +80,9 @@
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vm_machdep.c,v 1.43 2004/03/24 15:38:42 wiz Exp $");
+
 #include "opt_kstack_debug.h"
 
 #include <sys/param.h>
@@ -67,6 +104,8 @@
 #include <sh3/mmu.h>
 #include <sh3/cache.h>
 
+extern void proc_trampoline(void);
+
 /*
  * Finish a fork operation, with process p2 nearly set up.
  * Copy and update the pcb and trap frame, making the child ready to run.
@@ -86,20 +125,19 @@
  * accordingly.
  */
 void
-cpu_fork(struct proc *p1, struct proc *p2, void *stack,
+cpu_lwp_fork(struct lwp *l1, struct lwp *l2, void *stack,
     size_t stacksize, void (*func)(void *), void *arg)
 {
-	extern void proc_trampoline(void);
 	struct pcb *pcb;
 	struct trapframe *tf;
 	struct switchframe *sf;
 	vaddr_t spbase, fptop;
 #define	P1ADDR(x)	(SH3_PHYS_TO_P1SEG(*__pmap_kpte_lookup(x) & PG_PPN))
 
-	KDASSERT(!(p1 != curproc && p1 != &proc0));
+	KDASSERT(l1 == curlwp || l1 == &lwp0);
 
 	/* Copy flags */
-	p2->p_md.md_flags = p1->p_md.md_flags;
+	l2->l_md.md_flags = l1->l_md.md_flags;
 
 #ifdef SH3
 	/*
@@ -108,23 +146,20 @@ cpu_fork(struct proc *p1, struct proc *p2, void *stack,
 	 * exception. For SH3, we are 4K page, P3/P1 conversion don't
 	 * cause virtual-aliasing.
 	 */
-	if (CPU_IS_SH3) {
-		pcb = (struct pcb *)P1ADDR((vaddr_t)&p2->p_addr->u_pcb);
-		p2->p_md.md_pcb = pcb;
-		fptop = (vaddr_t)pcb + NBPG;
-	}
+	if (CPU_IS_SH3)
+		pcb = (struct pcb *)P1ADDR((vaddr_t)&l2->l_addr->u_pcb);
 #endif /* SH3 */
 #ifdef SH4
 	/* SH4 can make wired entry, no need to convert to P1. */
-	if (CPU_IS_SH4) {
-		pcb = &p2->p_addr->u_pcb;
-		p2->p_md.md_pcb = pcb;
-		fptop = (vaddr_t)pcb + NBPG;
-	}
+	if (CPU_IS_SH4)
+		pcb = &l2->l_addr->u_pcb;
 #endif /* SH4 */
 
+	l2->l_md.md_pcb = pcb;
+	fptop = (vaddr_t)pcb + PAGE_SIZE;
+
 	/* set up the kernel stack pointer */
-	spbase = (vaddr_t)p2->p_addr + NBPG;
+	spbase = (vaddr_t)l2->l_addr + PAGE_SIZE;
 #ifdef P1_STACK
 	/* Convert to P1 from P3 */
 	/*
@@ -132,33 +167,33 @@ cpu_fork(struct proc *p1, struct proc *p2, void *stack,
 	 * is accessed from P1 instead of P3.
 	 */
 	if (SH_HAS_VIRTUAL_ALIAS)
-		sh_dcache_wbinv_range((vaddr_t)p2->p_addr, USPACE);
+		sh_dcache_wbinv_range((vaddr_t)l2->l_addr, USPACE);
 	spbase = P1ADDR(spbase);
 #else /* P1_STACK */
 	/* Prepare u-area PTEs */
 #ifdef SH3
 	if (CPU_IS_SH3)
-		sh3_switch_setup(p2);
+		sh3_switch_setup(l2);
 #endif
 #ifdef SH4
 	if (CPU_IS_SH4)
-		sh4_switch_setup(p2);
+		sh4_switch_setup(l2);
 #endif
 #endif /* P1_STACK */
 
 #ifdef KSTACK_DEBUG
 	/* Fill magic number for tracking */
-	memset((char *)fptop - NBPG + sizeof(struct user), 0x5a,
-	    NBPG - sizeof(struct user));
-	memset((char *)spbase, 0xa5, (USPACE - NBPG));
+	memset((char *)fptop - PAGE_SIZE + sizeof(struct user), 0x5a,
+	    PAGE_SIZE - sizeof(struct user));
+	memset((char *)spbase, 0xa5, (USPACE - PAGE_SIZE));
 	memset(&pcb->pcb_sf, 0xb4, sizeof(struct switchframe));
 #endif /* KSTACK_DEBUG */
 
 	/*
 	 * Copy the user context.
 	 */
-	p2->p_md.md_regs = tf = (struct trapframe *)fptop - 1;
-	memcpy(tf, p1->p_md.md_regs, sizeof(struct trapframe));
+	l2->l_md.md_regs = tf = (struct trapframe *)fptop - 1;
+	memcpy(tf, l1->l_md.md_regs, sizeof(struct trapframe));
 
 	/*
 	 * If specified, give the child a different stack.
@@ -170,7 +205,7 @@ cpu_fork(struct proc *p1, struct proc *p2, void *stack,
 	sf = &pcb->pcb_sf;
 	sf->sf_r11 = (int)arg;		/* proc_trampoline hook func */
 	sf->sf_r12 = (int)func;		/* proc_trampoline hook func's arg */
-	sf->sf_r15 = spbase + USPACE - NBPG;	/* current stack pointer */
+	sf->sf_r15 = spbase + USPACE - PAGE_SIZE;/* current stack pointer */
 	sf->sf_r7_bank = sf->sf_r15;	/* stack top */
 	sf->sf_r6_bank = (vaddr_t)tf;	/* current frame pointer */
 	/* when switch to me, jump to proc_trampoline */
@@ -183,37 +218,95 @@ cpu_fork(struct proc *p1, struct proc *p2, void *stack,
 }
 
 /*
- * void cpu_exit(sturct proc *p):
- *	+ Change kernel context to proc0's one.
- *	+ Schedule freeing process 'p' resources.
- *	+ switch to another process.
+ * void cpu_setfunc(struct lwp *l, void (*func)(void *), void *arg):
+ *	+ Reset the stack pointer for the process.
+ *	+ Arrange to the process to call the specified func
+ *	  with argument via the proc_trampoline.
+ *
+ *	XXX There is a lot of duplicated code here (with cpu_lwp_fork()).
  */
 void
-cpu_exit(struct proc *p)
+cpu_setfunc(struct lwp *l, void (*func)(void *), void *arg)
 {
+	struct pcb *pcb;
+	struct trapframe *tf;
 	struct switchframe *sf;
+	vaddr_t fptop, spbase;
 
-	splsched();
-	uvmexp.swtch++;
+#ifdef SH3
+	/*
+	 * Convert frame pointer top to P1. because SH3 can't make
+	 * wired TLB entry, context store space accessing must not cause
+	 * exception. For SH3, we are 4K page, P3/P1 conversion don't
+	 * cause virtual-aliasing.
+	 */
+	if (CPU_IS_SH3)
+		pcb = (struct pcb *)P1ADDR((vaddr_t)&l->l_addr->u_pcb);
+#endif /* SH3 */
+#ifdef SH4
+	/* SH4 can make wired entry, no need to convert to P1. */
+	if (CPU_IS_SH4)
+		pcb = &l->l_addr->u_pcb;
+#endif /* SH4 */
 
-	/* Switch to proc0 stack */
-	curproc = 0;
-	curpcb = proc0.p_md.md_pcb;
-	sf = &curpcb->pcb_sf;
-	__asm__ __volatile__(
-		"mov	%0, r15;"	/* current stack */
-		"ldc	%1, r6_bank;"	/* current frame pointer */
-		"ldc	%2, r7_bank;"	/* stack top */
-		::
-		"r"(sf->sf_r15),
-		"r"(sf->sf_r6_bank),
-		"r"(sf->sf_r7_bank));
+	fptop = (vaddr_t)pcb + PAGE_SIZE;
+	l->l_md.md_pcb = pcb;
 
-	/* Schedule freeing process resources */
-	exit2(p);
+	/* set up the kernel stack pointer */
+	spbase = (vaddr_t)l->l_addr + PAGE_SIZE;
+#ifdef P1_STACK
+	/* Convert to P1 from P3 */
+	/*
+	 * wbinv u-area to avoid cache-aliasing, since kernel stack
+	 * is accessed from P1 instead of P3.
+	 */
+	if (SH_HAS_VIRTUAL_ALIAS)
+		sh_dcache_wbinv_range((vaddr_t)l->l_addr, USPACE);
+	spbase = P1ADDR(spbase);
+#else /* P1_STACK */
+	/* Prepare u-area PTEs */
+#ifdef SH3
+	if (CPU_IS_SH3)
+		sh3_switch_setup(l);
+#endif
+#ifdef SH4
+	if (CPU_IS_SH4)
+		sh4_switch_setup(l);
+#endif
+#endif /* P1_STACK */
 
-	cpu_switch(p);
-	/* NOTREACHED */
+#ifdef KSTACK_DEBUG
+	/* Fill magic number for tracking */
+	memset((char *)fptop - PAGE_SIZE + sizeof(struct user), 0x5a,
+	    PAGE_SIZE - sizeof(struct user));
+	memset((char *)spbase, 0xa5, (USPACE - PAGE_SIZE));
+	memset(&pcb->pcb_sf, 0xb4, sizeof(struct switchframe));
+#endif /* KSTACK_DEBUG */
+
+	l->l_md.md_regs = tf = (struct trapframe *)fptop - 1;
+	tf->tf_ssr = PSL_USERSET;
+
+	/* Setup switch frame */
+	sf = &pcb->pcb_sf;
+	sf->sf_r11 = (int)arg;		/* proc_trampoline hook func */
+	sf->sf_r12 = (int)func;		/* proc_trampoline hook func's arg */
+	sf->sf_r15 = spbase + USPACE - PAGE_SIZE;/* current stack pointer */
+	sf->sf_r7_bank = sf->sf_r15;	/* stack top */
+	sf->sf_r6_bank = (vaddr_t)tf;	/* current frame pointer */
+	/* when switch to me, jump to proc_trampoline */
+	sf->sf_pr  = (int)proc_trampoline;
+	/*
+	 * Enable interrupt when switch frame is restored, since
+	 * kernel thread begin to run without restoring trapframe.
+	 */
+	sf->sf_sr = PSL_MD;		/* kernel mode, interrupt enable */
+}
+
+void
+cpu_lwp_free(struct lwp *l, int proc)
+{
+
+	/* Nothing to do */
 }
 
 /*
@@ -224,7 +317,7 @@ struct md_core {
 };
 
 int
-cpu_coredump(struct proc *p, struct vnode *vp, struct ucred *cred,
+cpu_coredump(struct lwp *l, struct vnode *vp, struct ucred *cred,
     struct core *chdr)
 {
 	struct md_core md_core;
@@ -237,7 +330,7 @@ cpu_coredump(struct proc *p, struct vnode *vp, struct ucred *cred,
 	chdr->c_cpusize = sizeof(md_core);
 
 	/* Save integer registers. */
-	error = process_read_regs(p, &md_core.intreg);
+	error = process_read_regs(l, &md_core.intreg);
 	if (error)
 		return error;
 
@@ -248,13 +341,13 @@ cpu_coredump(struct proc *p, struct vnode *vp, struct ucred *cred,
 
 	error = vn_rdwr(UIO_WRITE, vp, (caddr_t)&cseg, chdr->c_seghdrsize,
 	    (off_t)chdr->c_hdrsize, UIO_SYSSPACE, IO_NODELOCKED|IO_UNIT, cred,
-	    (int *)0, p);
+	    (int *)0, l->l_proc);
 	if (error)
 		return error;
 
 	error = vn_rdwr(UIO_WRITE, vp, (caddr_t)&md_core, sizeof(md_core),
 	    (off_t)(chdr->c_hdrsize + chdr->c_seghdrsize), UIO_SYSSPACE,
-	    IO_NODELOCKED|IO_UNIT, cred, (int *)0, p);
+	    IO_NODELOCKED|IO_UNIT, cred, (int *)0, l->l_proc);
 	if (error)
 		return error;
 
@@ -284,9 +377,9 @@ pagemove(caddr_t from, caddr_t to, size_t size)
 		*fpte++ = 0;
 		sh_tlb_invalidate_addr(0, (vaddr_t)from);
 		sh_tlb_invalidate_addr(0, (vaddr_t)to);
-		from += NBPG;
-		to += NBPG;
-		size -= NBPG;
+		from += PAGE_SIZE;
+		to += PAGE_SIZE;
+		size -= PAGE_SIZE;
 	}
 }
 

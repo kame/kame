@@ -1,4 +1,4 @@
-/* 	$NetBSD: iomd_dma.c,v 1.5 2002/04/10 19:35:23 thorpej Exp $	*/
+/* 	$NetBSD: iomd_dma.c,v 1.8 2003/07/15 00:24:45 lukem Exp $	*/
 
 /*
  * Copyright (c) 1995 Scott Stevens
@@ -35,6 +35,9 @@
  *
  * Created      : 15/03/97
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: iomd_dma.c,v 1.8 2003/07/15 00:24:45 lukem Exp $");
 
 #define DMA_DEBUG
 #include <sys/param.h>
@@ -206,7 +209,7 @@ fill:
 #endif
 	if (dp->dc_len == 0) goto done;
 	PHYS(dp->dc_nextaddr, &cur);
-	len = NBPG - (cur & PGOFSET);
+	len = PAGE_SIZE - (cur & PGOFSET);
 	if (len > dp->dc_len) {
 		/* Last buffer */
 		len = dp->dc_len;
@@ -320,7 +323,7 @@ dma_init(ch, extp, dmasize, ipl)
 	dp->dc_ih.ih_maskbits = (1 << ch);
 
 	if (irq_claim(IRQ_DMACH0 + ch, &dp->dc_ih))
-		panic("Cannot install DMA IRQ handler\n");
+		panic("Cannot install DMA IRQ handler");
 
 	return(dp);
 }

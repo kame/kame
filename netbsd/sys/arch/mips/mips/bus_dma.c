@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_dma.c,v 1.1 2002/03/18 02:32:54 simonb Exp $	*/
+/*	$NetBSD: bus_dma.c,v 1.10 2003/10/29 23:52:22 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 2001 The NetBSD Foundation, Inc.
@@ -39,7 +39,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: bus_dma.c,v 1.1 2002/03/18 02:32:54 simonb Exp $");
+__KERNEL_RCSID(0, "$NetBSD: bus_dma.c,v 1.10 2003/10/29 23:52:22 simonb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -114,7 +114,7 @@ _bus_dmamap_destroy(bus_dma_tag_t t, bus_dmamap_t map)
 	free(map, M_DMAMAP);
 }
 
-extern paddr_t kvtophys(vaddr_t);	/* XXX */
+paddr_t kvtophys(vaddr_t);	/* XXX */
 
 /*
  * Utility function to load a linear buffer.  lastaddrp holds state
@@ -128,7 +128,8 @@ _bus_dmamap_load_buffer(bus_dma_tag_t t, bus_dmamap_t map,
     int *segp, int first)
 {
 	bus_size_t sgsize;
-	bus_addr_t curaddr, lastaddr, baddr, bmask;
+	bus_size_t bmask;
+	paddr_t baddr, curaddr, lastaddr;
 	vaddr_t vaddr = (vaddr_t)buf;
 	int seg;
 
@@ -161,7 +162,7 @@ _bus_dmamap_load_buffer(bus_dma_tag_t t, bus_dmamap_t map,
 		/*
 		 * Compute the segment size, and adjust counts.
 		 */
-		sgsize = NBPG - ((u_long)vaddr & PGOFSET);
+		sgsize = PAGE_SIZE - ((u_long)vaddr & PGOFSET);
 		if (buflen < sgsize)
 			sgsize = buflen;
 		if (map->_dm_maxsegsz < sgsize)
@@ -335,8 +336,7 @@ _bus_dmamap_load_uio(bus_dma_tag_t t, bus_dmamap_t map,
 		p = uio->uio_procp;
 #ifdef DIAGNOSTIC
 		if (p == NULL)
-			panic("_bus_dmamap_load_uio: "
-			    "USERSPACE but no proc");
+			panic("_bus_dmamap_load_uio: USERSPACE but no proc");
 #endif
 	}
 
@@ -433,7 +433,7 @@ _bus_dmamap_sync(bus_dma_tag_t t, bus_dmamap_t map, bus_addr_t offset,
 	 *
 	 *	PREWRITE -- Write-back the D-cache.  If we have to use
 	 *	an Index op, we also have to invalidate.  Note that if
-	 *	we are doing PREREAD|PREWRITE, we can collapse everyhing
+	 *	we are doing PREREAD|PREWRITE, we can collapse everything
 	 *	into a single op.
 	 *
 	 *	POSTREAD -- Nothing.
@@ -465,7 +465,8 @@ _bus_dmamap_sync(bus_dma_tag_t t, bus_dmamap_t map, bus_addr_t offset,
 	 *
 	 * This should be true the vast majority of the time.
 	 */
-	if (__predict_true(map->_dm_proc == NULL || map->_dm_proc == curproc))
+	if (__predict_true(map->_dm_proc == NULL || 
+		map->_dm_proc == curlwp->l_proc))
 		useindex = 0;
 	else
 		useindex = 1;
@@ -567,7 +568,6 @@ _bus_dmamem_alloc_range(bus_dma_tag_t t, bus_size_t size, bus_size_t alignment,
 	/*
 	 * Allocate pages from the VM system.
 	 */
-	TAILQ_INIT(&mlist);
 	error = uvm_pglistalloc(size, low, high, alignment, boundary,
 	    &mlist, nsegs, (flags & BUS_DMA_NOWAIT) == 0);
 	if (error)
@@ -588,7 +588,7 @@ _bus_dmamem_alloc_range(bus_dma_tag_t t, bus_size_t size, bus_size_t alignment,
 #ifdef DIAGNOSTIC
 		if (curaddr < low || curaddr >= high) {
 			printf("uvm_pglistalloc returned non-sensical"
-			    " address 0x%lx\n", curaddr);
+			    " address 0x%llx\n", (uint64_t)curaddr);
 			panic("_bus_dmamem_alloc");
 		}
 #endif
@@ -671,7 +671,7 @@ _bus_dmamem_map(bus_dma_tag_t t, bus_dma_segment_t *segs, int nsegs,
 	for (curseg = 0; curseg < nsegs; curseg++) {
 		for (addr = segs[curseg].ds_addr;
 		    addr < (segs[curseg].ds_addr + segs[curseg].ds_len);
-		    addr += NBPG, va += NBPG, size -= NBPG) {
+		    addr += PAGE_SIZE, va += PAGE_SIZE, size -= PAGE_SIZE) {
 			if (size == 0)
 				panic("_bus_dmamem_map: size botch");
 			pmap_enter(pmap_kernel(), va, addr,
@@ -694,7 +694,7 @@ _bus_dmamem_unmap(bus_dma_tag_t t, caddr_t kva, size_t size)
 
 #ifdef DIAGNOSTIC
 	if ((u_long)kva & PGOFSET)
-		panic("_bus_dmamem_unmap");
+		panic("_bus_dmamem_unmap: bad alignment on %p", kva);
 #endif
 
 	/*
@@ -734,7 +734,7 @@ _bus_dmamem_mmap(bus_dma_tag_t t, bus_dma_segment_t *segs, int nsegs,
 			continue;
 		}
 
-		return (mips_btop((caddr_t)segs[i].ds_addr + off));
+		return (mips_btop((paddr_t)segs[i].ds_addr + off));
 	}
 
 	/* Page not found. */

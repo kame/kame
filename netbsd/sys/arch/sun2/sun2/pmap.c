@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.17 2002/03/08 20:48:35 thorpej Exp $	*/
+/*	$NetBSD: pmap.c,v 1.24 2003/07/15 03:36:13 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -88,7 +88,11 @@
  * the MMU H/W (and this pmap) is fixed for all time.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.24 2003/07/15 03:36:13 lukem Exp $");
+
 #include "opt_ddb.h"
+#include "opt_pmap_debug.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -218,8 +222,8 @@ static int temp_seg_inuse;
  * to be used in copy/zero operations.
  */
 vaddr_t tmp_vpages[2] = {
-	NBPG * 8,
-	NBPG * 9 };
+	PAGE_SIZE * 8,
+	PAGE_SIZE * 9 };
 int tmp_vpages_inuse;
 
 static int pmap_version = 1;
@@ -418,16 +422,14 @@ void pmap_release __P((pmap_t));
 static inline pmap_t
 current_pmap __P((void))
 {
-	struct proc *p;
 	struct vmspace *vm;
 	struct vm_map *map;
 	pmap_t	pmap;
 
-	p = curproc;	/* XXX */
-	if (p == NULL)
+	if (curlwp == NULL)
 		pmap = kernel_pmap;
 	else {
-		vm = p->p_vmspace;
+		vm = curproc->p_vmspace;
 		map = &vm->vm_map;
 		pmap = vm_map_pmap(map);
 	}
@@ -736,7 +738,7 @@ pmeg_mon_init(sva, eva, keep)
 		if (sme != SEGINV) {
 			valid = 0;
 			endseg = sva + NBSG;
-			for (pgva = sva; pgva < endseg; pgva += NBPG) {
+			for (pgva = sva; pgva < endseg; pgva += PAGE_SIZE) {
 				pte = get_pte(pgva);
 				if (pte & PG_VALID) {
 					valid++;
@@ -773,7 +775,7 @@ pmeg_clean(pmegp)
 	sme = pmegp->pmeg_index;
 	set_segmap(temp_seg_va, sme);
 
-	for (va = 0; va < NBSG; va += NBPG)
+	for (va = 0; va < NBSG; va += PAGE_SIZE)
 		set_pte(temp_seg_va + va, PG_INVAL);
 
 	set_segmap(temp_seg_va, SEGINV);
@@ -1039,7 +1041,7 @@ pmeg_verify_empty(va)
 	vaddr_t eva;
 	int pte;
 
-	for (eva = va + NBSG;  va < eva; va += NBPG) {
+	for (eva = va + NBSG;  va < eva; va += PAGE_SIZE) {
 		pte = get_pte(va);
 		if (pte & PG_VALID)
 			panic("pmeg_verify_empty");
@@ -1135,7 +1137,7 @@ pv_changepte(pa, set_bits, clear_bits)
 #ifdef	DIAGNOSTIC
 	/* This function should only clear these bits: */
 	if (clear_bits & ~(PG_WRITE | PG_NC | PG_REF | PG_MOD))
-		panic("pv_changepte: clear=0x%x\n", clear_bits);
+		panic("pv_changepte: clear=0x%x", clear_bits);
 #endif
 
 	flags = 0;
@@ -1191,7 +1193,7 @@ pv_changepte(pa, set_bits, clear_bits)
 #ifdef	DIAGNOSTIC
 		/* PV entries point only to valid mappings. */
 		if ((pte & PG_VALID) == 0)
-			panic("pv_changepte: not PG_VALID at va=0x%lx\n", va);
+			panic("pv_changepte: not PG_VALID at va=0x%lx", va);
 #endif
 		/* Get these while it's easy. */
 		if (pte & PG_MODREF) {
@@ -1293,7 +1295,7 @@ pv_syncflags(pv)
 #ifdef	DIAGNOSTIC
 		/* PV entries point only to valid mappings. */
 		if ((pte & PG_VALID) == 0)
-			panic("pv_syncflags: not PG_VALID at va=0x%lx\n", va);
+			panic("pv_syncflags: not PG_VALID at va=0x%lx", va);
 #endif
 		/* OK, do what we came here for... */
 		if (pte & PG_MODREF) {
@@ -1333,7 +1335,7 @@ pv_remove_all(pa)
 	while ((pv = *head) != NULL) {
 		pmap = pv->pv_pmap;
 		va   = pv->pv_va;
-		pmap_remove1(pmap, va, va + NBPG);
+		pmap_remove1(pmap, va, va + PAGE_SIZE);
 #ifdef PMAP_DEBUG
 		/* Make sure it went away. */
 		if (pv == *head) {
@@ -1566,7 +1568,7 @@ pmap_bootstrap(nextva)
 	 * Done allocating PAGES of virtual space, so
 	 * clean out the rest of the last used segment.
 	 */
-	for (va = nextva; va < virtual_avail; va += NBPG)
+	for (va = nextva; va < virtual_avail; va += PAGE_SIZE)
 		set_pte(va, PG_INVAL);
 
 	/*
@@ -1639,14 +1641,14 @@ pmap_bootstrap(nextva)
 	 * vector table - just in case something happens before then
 	 * and we drop into the PROM.
 	 */
-	eva = va + NBPG * 4;
+	eva = va + PAGE_SIZE * 4;
 	va = eva;
 
 	/*
 	 * We use pages four through seven for the msgbuf.
 	 */
-	eva = va + NBPG * 4;
-	for(; va < eva; va += NBPG) {
+	eva = va + PAGE_SIZE * 4;
+	for(; va < eva; va += PAGE_SIZE) {
 		pte = get_pte(va);
 		pte |= (PG_SYSTEM | PG_WRITE | PG_NC);
 		set_pte(va, pte);
@@ -1660,16 +1662,16 @@ pmap_bootstrap(nextva)
 	 * and nine for this.
 	 */
 	set_pte(va, PG_INVAL);
-	va += NBPG;
+	va += PAGE_SIZE;
 	set_pte(va, PG_INVAL);
-	va += NBPG;
+	va += PAGE_SIZE;
 
 	/*
 	 * Pages ten and eleven remain for the temporary kernel stack,
 	 * which is set up by locore.s.  Hopefully this is enough space.
 	 */
-	eva = va + NBPG * 2;
-	for(; va < eva ; va += NBPG) {
+	eva = va + PAGE_SIZE * 2;
+	for(; va < eva ; va += PAGE_SIZE) {
 		pte = get_pte(va);
 		pte &= ~(PG_NC);
 		pte |= (PG_SYSTEM | PG_WRITE);
@@ -1693,7 +1695,7 @@ pmap_bootstrap(nextva)
 		/* Kernel text is read-only */
 		pte |= (PG_SYSTEM);
 		set_pte(va, pte);
-		va += NBPG;
+		va += PAGE_SIZE;
 	}
 	/* data, bss, etc. */
 	while (va < nextva) {
@@ -1704,7 +1706,7 @@ pmap_bootstrap(nextva)
 		pte &= ~(PG_NC);
 		pte |= (PG_SYSTEM | PG_WRITE);
 		set_pte(va, pte);
-		va += NBPG;
+		va += PAGE_SIZE;
 	}
 
 	/*
@@ -1857,9 +1859,9 @@ pmap_map(va, pa, endpa, prot)
 	sz = endpa - pa;
 	do {
 		pmap_enter(kernel_pmap, va, pa, prot, 0);
-		va += NBPG;
-		pa += NBPG;
-		sz -= NBPG;
+		va += PAGE_SIZE;
+		pa += PAGE_SIZE;
+		sz -= PAGE_SIZE;
 	} while (sz > 0);
 	pmap_update(kernel_pmap);
 	return(va);
@@ -2216,7 +2218,7 @@ pmap_enter_user(pmap, pgva, new_pte, wired)
 	if (pmap != current_pmap()) {
 #ifdef	PMAP_DEBUG
 		/* Aparently, this never happens. */
-		db_printf("pmap_enter_user: not curproc\n");
+		db_printf("pmap_enter_user: not curlwp\n");
 		Debugger();
 #endif
 		/* Just throw it out (fault it in later). */
@@ -2523,7 +2525,7 @@ pmap_kremove(va, len)
 #endif
 
 		/* Invalidate the PTEs in the given range. */
-		for (pgva = va; pgva < neva; pgva += NBPG) {
+		for (pgva = va; pgva < neva; pgva += PAGE_SIZE) {
 			pte = get_pte(pgva);
 			if (pte & PG_VALID) {
 #ifdef	HAVECACHE
@@ -2831,16 +2833,16 @@ _pmap_switch(pmap)
 /*
  * Exported version of pmap_activate().  This is called from the
  * machine-independent VM code when a process is given a new pmap.
- * If (p == curproc) do like cpu_switch would do; otherwise just
+ * If (p == curlwp) do like cpu_switch would do; otherwise just
  * take this as notification that the process has a new pmap.
  */
 void
-pmap_activate(p)
-	struct proc *p;
+pmap_activate(l)
+	struct lwp *l;
 {
-	pmap_t pmap = p->p_vmspace->vm_map.pmap;
+	pmap_t pmap = l->l_proc->p_vmspace->vm_map.pmap;
 
-	if (p == curproc) {
+	if (curlwp && l->l_proc == curproc) {
 		_pmap_switch(pmap);
 	}
 }
@@ -2849,8 +2851,8 @@ pmap_activate(p)
  * Deactivate the address space of the specified process.
  */
 void
-pmap_deactivate(p)
-	struct proc *p;
+pmap_deactivate(l)
+	struct lwp *l;
 {
 	/* Nothing to do. */
 }
@@ -2997,7 +2999,7 @@ pmap_extract(pmap, va, pap)
 	pa = PG_PA(pte);
 #ifdef	DIAGNOSTIC
 	if (pte & PG_TYPE) {
-		panic("pmap_extract: not main mem, va=0x%lx\n", va);
+		panic("pmap_extract: not main mem, va=0x%lx", va);
 	}
 #endif
 	if (pap != NULL)
@@ -3222,7 +3224,7 @@ pmap_protect_mmu(pmap, sva, eva)
 #endif
 
 	/* Remove write permission in the given range. */
-	for (pgva = sva; pgva < eva; pgva += NBPG) {
+	for (pgva = sva; pgva < eva; pgva += PAGE_SIZE) {
 		pte = get_pte(pgva);
 		if (pte & PG_VALID) {
 #ifdef	HAVECACHE
@@ -3283,7 +3285,7 @@ pmap_protect_noctx(pmap, sva, eva)
 	eva += (temp_seg_va - segva);
 
 	/* Remove write permission in the given range. */
-	for (pgva = sva; pgva < eva; pgva += NBPG) {
+	for (pgva = sva; pgva < eva; pgva += PAGE_SIZE) {
 		pte = get_pte(pgva);
 		if (pte & PG_VALID) {
 			/* No cache flush needed. */
@@ -3468,7 +3470,7 @@ pmap_remove_mmu(pmap, sva, eva)
 #endif
 
 	/* Invalidate the PTEs in the given range. */
-	for (pgva = sva; pgva < eva; pgva += NBPG) {
+	for (pgva = sva; pgva < eva; pgva += PAGE_SIZE) {
 		pte = get_pte(pgva);
 		if (pte & PG_VALID) {
 #ifdef	HAVECACHE
@@ -3575,7 +3577,7 @@ pmap_remove_noctx(pmap, sva, eva)
 	eva += (temp_seg_va - segva);
 
 	/* Invalidate the PTEs in the given range. */
-	for (pgva = sva; pgva < eva; pgva += NBPG) {
+	for (pgva = sva; pgva < eva; pgva += PAGE_SIZE) {
 		pte = get_pte(pgva);
 		if (pte & PG_VALID) {
 			/* No cache flush needed. */
@@ -3857,7 +3859,8 @@ pmap_get_pagemap(pt, off)
 	int saved_ctx;
 
 	sme = (off / (NPAGSEG * sizeof(*pt)));	/* PMEG to start on */
-	sme_end = sme + (NBPG / (NPAGSEG * sizeof(*pt))); /* where to stop */
+	sme_end =
+	    sme + (PAGE_SIZE / (NPAGSEG * sizeof(*pt))); /* where to stop */
 	va_end = temp_seg_va + NBSG;
 
 	saved_ctx = get_context();
@@ -3867,7 +3870,7 @@ pmap_get_pagemap(pt, off)
 		va = temp_seg_va;
 		do {
 			*pt++ = get_pte(va);
-			va += NBPG;
+			va += PAGE_SIZE;
 		} while (va < va_end);
 		sme++;
 	} while (sme < sme_end);
@@ -3898,7 +3901,7 @@ get_pte_pmeg(int pmeg_num, int page_num)
 
 	va = temp_seg_va;
 	set_segmap(temp_seg_va, pmeg_num);
-	va += NBPG*page_num;
+	va += PAGE_SIZE*page_num;
 	pte = get_pte(va);
 	set_segmap(temp_seg_va, SEGINV);
 
@@ -3927,7 +3930,7 @@ set_pte_pmeg(int pmeg_num, int page_num, int pte)
 	/* We never access data in temp_seg_va so no need to flush. */
 	va = temp_seg_va;
 	set_segmap(temp_seg_va, pmeg_num);
-	va += NBPG*page_num;
+	va += PAGE_SIZE*page_num;
 	set_pte(va, pte);
 	set_segmap(temp_seg_va, SEGINV);
 

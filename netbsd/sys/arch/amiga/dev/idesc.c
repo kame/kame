@@ -1,8 +1,6 @@
-/*	$NetBSD: idesc.c,v 1.49.10.1 2003/01/26 10:12:10 jmc Exp $ */
+/*	$NetBSD: idesc.c,v 1.55 2004/03/28 18:59:39 mhitch Exp $ */
 
 /*
- * Copyright (c) 1994 Michael L. Hitch
- * Copyright (c) 1993, 1994 Charles M. Hannum.
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
  *
@@ -17,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,6 +30,35 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ *	@(#)wd.c	7.4 (Berkeley) 5/25/91
+ */
+/*
+ * Copyright (c) 1994 Michael L. Hitch
+ * Copyright (c) 1993, 1994 Charles M. Hannum.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Don Ahn.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *	@(#)wd.c	7.4 (Berkeley) 5/25/91
  */
@@ -70,7 +93,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: idesc.c,v 1.49.10.1 2003/01/26 10:12:10 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: idesc.c,v 1.55 2004/03/28 18:59:39 mhitch Exp $");
 
 /*
  * A4000 IDE interface, emulating a SCSI controller
@@ -80,9 +103,7 @@ __KERNEL_RCSID(0, "$NetBSD: idesc.c,v 1.49.10.1 2003/01/26 10:12:10 jmc Exp $");
 #include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/buf.h>
-#include <sys/dkstat.h>
 #include <sys/disklabel.h>
-#include <sys/dkstat.h>
 #include <sys/malloc.h>
 #include <sys/proc.h>
 #include <sys/reboot.h>
@@ -284,9 +305,8 @@ int ide_atapi_start(struct idec_softc *);
 int ide_atapi_intr(struct idec_softc *);
 void ide_atapi_done(struct idec_softc *);
 
-struct cfattach idesc_ca = {
-	sizeof(struct idec_softc), idescmatch, idescattach
-};
+CFATTACH_DECL(idesc, sizeof(struct idec_softc),
+    idescmatch, idescattach, NULL, NULL);
 
 struct {
 	short	ide_err;

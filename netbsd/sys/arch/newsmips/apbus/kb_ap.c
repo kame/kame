@@ -1,4 +1,4 @@
-/*	$NetBSD: kb_ap.c,v 1.2 2002/03/17 19:40:45 atatat Exp $	*/
+/*	$NetBSD: kb_ap.c,v 1.5 2003/07/15 02:59:28 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2000 Tsubai Masanari.  All rights reserved.
@@ -25,6 +25,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kb_ap.c,v 1.5 2003/07/15 02:59:28 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -80,9 +83,8 @@ int kb_ap_ioctl(void *, u_long, caddr_t, int, struct proc *);
 
 extern struct wscons_keydesc newskb_keydesctab[];
 
-struct cfattach kb_ap_ca = {
-	sizeof(struct kb_ap_softc), kb_ap_match, kb_ap_attach
-};
+CFATTACH_DECL(kb_ap, sizeof(struct kb_ap_softc),
+    kb_ap_match, kb_ap_attach, NULL, NULL);
 
 struct wskbd_accessops kb_ap_accessops = {
 	kb_ap_enable,

@@ -1,4 +1,4 @@
-/*	$NetBSD: iwm_fd.c,v 1.11 2000/05/27 10:25:15 jdolecek Exp $	*/
+/*	$NetBSD: iwm_fd.c,v 1.25 2003/10/27 22:16:04 fredb Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998 Hauke Fath.  All rights reserved.
@@ -32,6 +32,10 @@
  * The present implementation supports the GCR format (800K) on
  * non-{DMA,IOP} machines.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: iwm_fd.c,v 1.25 2003/10/27 22:16:04 fredb Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/callout.h>
@@ -40,6 +44,7 @@
 #include <sys/ioctl.h>
 #include <sys/malloc.h>
 #include <sys/device.h>
+#include <sys/event.h>
 
 #define FSTYPENAMES
 #define DKTYPENAMES
@@ -58,10 +63,6 @@
 
 #include <mac68k/obio/iwmreg.h>
 #include <mac68k/obio/iwm_fdvar.h>
-
-#ifdef _LKM
-#include "iwm_mod.h"
-#endif
 
 /**
  **	Private functions
@@ -190,11 +191,6 @@ static diskZone_t diskZones[] = {
 	{16,  8, 672, 799}
 };
 
-/* disk(9) framework device switch */
-struct dkdriver fd_dkDriver = {
-	fdstrategy
-};
-
 /* Drive format codes/indexes */
 enum {
 	IWM_400K_GCR = 0,
@@ -222,22 +218,7 @@ enum {
  * {device}_cd
  * references all found devices of a type.
  */
-#ifdef _LKM
-
-struct cfdriver iwm_cd = {
-	NULL,			/* Ptr to array of devices found	 */
-	"iwm",			/* Device name string			 */
-	DV_DULL,		/* Device classification		 */
-	0			/* Number of devices found		 */
-};
-struct cfdriver fd_cd = {
-	NULL,
-	"fd",
-	DV_DISK,
-	0
-};
-
-#else /* defined _LKM */
+#ifndef _LKM
 
 extern struct cfdriver iwm_cd;
 extern struct cfdriver fd_cd;
@@ -245,20 +226,33 @@ extern struct cfdriver fd_cd;
 #endif /* defined _LKM */
 
 /* IWM floppy disk controller */
-struct cfattach iwm_ca = {
-	sizeof(iwm_softc_t),	/* Size of device data for malloc()	 */
-	iwm_match,		/* Probe device and return match level	 */
-	iwm_attach		/* Initialize and attach device		 */
-};
+CFATTACH_DECL(iwm, sizeof(iwm_softc_t),
+    iwm_match, iwm_attach, NULL, NULL);
 
 /* Attached floppy disk drives */
-struct cfattach fd_ca = {
-	sizeof(fd_softc_t),
-	fd_match,
-	fd_attach
+CFATTACH_DECL(fd, sizeof(fd_softc_t),
+    fd_match, fd_attach, NULL, NULL);
+
+dev_type_open(fdopen);
+dev_type_close(fdclose);
+dev_type_read(fdread);
+dev_type_write(fdwrite);
+dev_type_ioctl(fdioctl);
+dev_type_strategy(fdstrategy);
+
+const struct bdevsw fd_bdevsw = {
+	fdopen, fdclose, fdstrategy, fdioctl, nodump, nosize, D_DISK
 };
 
+const struct cdevsw fd_cdevsw = {
+	fdopen, fdclose, fdread, fdwrite, fdioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
+};
 
+/* disk(9) framework device switch */
+struct dkdriver fd_dkDriver = {
+	fdstrategy
+};
 
 /***  Configure the IWM controller  ***/
 
@@ -474,7 +468,7 @@ fd_attach(parent, self, auxp)
 	iwm->fd[ia->unit] = fd;		/* iwm has ptr to this drive */
 	iwm->drives++;
 
-	BUFQ_INIT(&fd->bufQueue);
+	bufq_alloc(&fd->bufQueue, BUFQ_DISKSORT|BUFQ_SORT_CYLINDER);
 	callout_init(&fd->motor_ch);
 
 	printf(" drive %d: ", fd->unit);
@@ -525,7 +519,7 @@ fd_print(auxp, controller)
 
 	ia = (iwmAttachArgs_t *)auxp;
 	if (NULL != controller)
-		printf("fd%d at %s", ia->unit, controller);
+		aprint_normal("fd%d at %s", ia->unit, controller);
 	return UNCONF;
 }
 
@@ -666,6 +660,7 @@ fdopen(dev, flags, devType, proc)
 	iwm_softc_t *iwm = iwm_cd.cd_devs[0];
 #endif
 	info = NULL;		/* XXX shut up egcs */
+	fd = NULL;		/* XXX shut up gcc3 */
 
 	/*
 	 * See <device.h> for struct cfdriver, <disklabel.h> for
@@ -724,7 +719,7 @@ fdopen(dev, flags, devType, proc)
 			printf(" Drive %d is empty.\n", fd->unit);
 #endif
 		} else {
-			if (!(fd->drvFlags & IWM_WRITEABLE) && (flags & FWRITE)) {
+			if (!(fd->drvFlags & IWM_WRITABLE) && (flags & FWRITE)) {
 
 				err = EPERM;
 #ifdef DIAGNOSTIC
@@ -977,31 +972,6 @@ fdioctl(dev, cmd, data, flags, proc)
 
 
 /*
- * fddump -- We don't dump to a floppy disk.
- */
-int
-fddump(dev, blkno, va, size)
-	dev_t dev;
-	daddr_t blkno;
-	caddr_t va;
-	size_t size;
-{
-	return ENXIO;
-}
-
-
-/*
- * fdsize -- We don't dump to a floppy disk.
- */
-int
-fdsize(dev)
-	dev_t dev;
-{
-	return -1;
-}
-
-
-/*
  * fdread
  */
 int
@@ -1049,6 +1019,8 @@ fdstrategy(bp)
 
 	err = 0;
 	done = 0;
+	sectSize = 0;		/* XXX shut up gcc3 */
+	fd = NULL;		/* XXX shut up gcc3 */
 
 	fdUnit = minor(bp->b_dev) / MAXPARTITIONS;
 	if (TRACE_STRAT) {
@@ -1080,8 +1052,8 @@ fdstrategy(bp)
 		    || (bp->b_bcount % sectSize) != 0) {
 			if (TRACE_STRAT)
 				printf(" Illegal transfer size: "
-				    "block %d, %ld bytes\n",
-				    bp->b_blkno, bp->b_bcount);
+				    "block %lld, %ld bytes\n",
+				    (long long) bp->b_blkno, bp->b_bcount);
 			err = EINVAL;
 		}
 	}
@@ -1099,9 +1071,9 @@ fdstrategy(bp)
 		if (bp->b_blkno + transferSize > fd->currentType->secPerDisk) {
 			if (TRACE_STRAT) {
 				printf("iwm: Transfer beyond end of disk!\n" \
-				    " (Starting block %d, # of blocks %d," \
+				    " (Starting block %lld, # of blocks %d," \
 				    " last disk block %d).\n",
-				    bp->b_blkno, transferSize,
+				    (long long) bp->b_blkno, transferSize,
 				    fd->currentType->secPerDisk);
 			}
 			/* Return EOF if we are exactly at the end of the
@@ -1131,14 +1103,14 @@ fdstrategy(bp)
 		bp->b_cylinder = physDiskLoc.track;
 
 		if (TRACE_STRAT) {
-			printf(" This job starts at b_blkno %d; ",
-			    bp->b_blkno);
+			printf(" This job starts at b_blkno %lld; ",
+			    (long long) bp->b_blkno);
 			printf("it gets sorted for cylinder # %ld.\n",
 			    bp->b_cylinder);
 		}
 		spl = splbio();
 		callout_stop(&fd->motor_ch);
-		disksort_cylinder(&fd->bufQueue, bp);
+		BUFQ_PUT(&fd->bufQueue, bp);
 		if (fd->sc_active == 0)
 			fdstart(fd);
 		splx(spl);
@@ -1253,7 +1225,7 @@ fdstart_Init(fd)
 	 * Get the first entry from the queue. This is the buf we gave to
 	 * fdstrategy(); disksort() put it into our softc.
 	 */
-	bp = BUFQ_FIRST(&fd->bufQueue);
+	bp = BUFQ_PEEK(&fd->bufQueue);
 	if (NULL == bp) {
 		if (TRACE_STRAT)
 			printf("Queue empty: Nothing to do");
@@ -1291,7 +1263,7 @@ fdstart_Seek(fd)
 
 	/* Calculate the side/track/sector our block is at. */
 	if (TRACE_STRAT)
-		printf(" Remap block %d ", fd->startBlk);
+		printf(" Remap block %lld ", (long long) fd->startBlk);
 	remap_geometry(fd->startBlk,
 	    fd->currentType->heads, &fd->pos);
 	if (TRACE_STRAT)
@@ -1656,7 +1628,7 @@ fdstart_Exit(fd)
 			    fd->pos.track, fd->pos.side, fd->pos.sector);
 #endif
 
-	bp = BUFQ_FIRST(&fd->bufQueue);
+	bp = BUFQ_GET(&fd->bufQueue);
 
 	bp->b_resid = fd->bytesLeft;
 	bp->b_error = (0 == fd->iwmErr) ? 0 : EIO;
@@ -1669,15 +1641,11 @@ fdstart_Exit(fd)
 		if (DISABLED)
 			hexDump(bp->b_data, bp->b_bcount);
 	}
-	/*
-	 * Remove requested buf from beginning of queue
-	 * and release it.
-	 */
-	BUFQ_REMOVE(&fd->bufQueue, bp);
 	if (DISABLED && TRACE_STRAT)
 		printf(" Next buf (bufQueue first) at %p\n",
-		    BUFQ_FIRST(&fd->bufQueue));
-	disk_unbusy(&fd->diskInfo, bp->b_bcount - bp->b_resid);
+		    BUFQ_PEEK(&fd->bufQueue));
+	disk_unbusy(&fd->diskInfo, bp->b_bcount - bp->b_resid,
+	    (bp->b_flags & B_READ));
 	biodone(bp);
 	/* 
 	 * Stop motor after 10s
@@ -1775,7 +1743,7 @@ fdGetDiskLabel(fd, dev)
 	fd_softc_t *fd;
 	dev_t dev;
 {
-	char *msg;
+	const char *msg;
 	int fdType;
 	struct disklabel *lp;
 	struct cpu_disklabel *clp;
@@ -1908,7 +1876,7 @@ getFDType(unit)
  * Drive flags are: Bit  0 - 1 = Drive is double sided
  *			 1 - 1 = No disk inserted
  *			 2 - 1 = Motor is off
- *			 3 - 1 = Disk is writeable
+ *			 3 - 1 = Disk is writable
  *			 4 - 1 = Disk is DD (800/720K)
  *			31 - 1 = No drive / invalid drive #
  */

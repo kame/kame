@@ -1,4 +1,4 @@
-/* $NetBSD: disksubr.c,v 1.2 2002/03/17 06:28:57 simonb Exp $ */
+/* $NetBSD: disksubr.c,v 1.9 2003/10/08 04:25:46 lukem Exp $ */
 
 /*
  * Copyright (c) 1982, 1986, 1988 Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -32,6 +28,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: disksubr.c,v 1.9 2003/10/08 04:25:46 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -61,16 +60,16 @@ mbr_findslice(dp, bp)
 	int i;
 
 	/* Note: Magic number is little-endian. */
-	mbrmagicp = (uint16_t *)(bp->b_data + MBR_MAGICOFF);
+	mbrmagicp = (uint16_t *)(bp->b_data + MBR_MAGIC_OFFSET);
 	if (*mbrmagicp != MBR_MAGIC)
 		return (NO_MBR_SIGNATURE);
 
 	/* XXX how do we check veracity/bounds of this? */
-	memcpy(dp, bp->b_data + MBR_PARTOFF, NMBRPART * sizeof(*dp));
+	memcpy(dp, bp->b_data + MBR_PART_OFFSET, MBR_PART_COUNT * sizeof(*dp));
 
 	/* look for NetBSD partition */
-	for (i = 0; i < NMBRPART; i++) {
-		if (dp[i].mbrp_typ == MBR_PTYPE_NETBSD) {
+	for (i = 0; i < MBR_PART_COUNT; i++) {
+		if (dp[i].mbrp_type == MBR_PTYPE_NETBSD) {
 			ourdp = &dp[i];
 			break;
 		}
@@ -82,7 +81,7 @@ mbr_findslice(dp, bp)
 
 /*
  * Attempt to read a disk label from a device
- * using the indicated stategy routine.
+ * using the indicated strategy routine.
  * The label must be partly set up before this:
  * secpercyl, secsize and anything required for a block i/o read
  * operation in the driver's strategy/start routines
@@ -95,7 +94,7 @@ mbr_findslice(dp, bp)
  *
  * Returns null on success and an error string on failure.
  */
-char *
+const char *
 readdisklabel(dev, strat, lp, osdep)
 	dev_t dev;
 	void (*strat)(struct buf *);
@@ -162,15 +161,15 @@ readdisklabel(dev, strat, lp, osdep)
 		if (ourdp ==  NO_MBR_SIGNATURE)
 			goto nombrpart;
 
-		for (i = 0; i < NMBRPART; i++, dp++) {
+		for (i = 0; i < MBR_PART_COUNT; i++, dp++) {
 			/* Install in partition e, f, g, or h. */
 			pp = &lp->d_partitions[RAW_PART + 1 + i];
 			pp->p_offset = dp->mbrp_start;
 			pp->p_size = dp->mbrp_size;
-			if (dp->mbrp_typ == MBR_PTYPE_LNXEXT2)
+			if (dp->mbrp_type == MBR_PTYPE_LNXEXT2)
 				pp->p_fstype = FS_EX2FS;
 
-			if (dp->mbrp_typ == MBR_PTYPE_LNXSWAP)
+			if (dp->mbrp_type == MBR_PTYPE_LNXSWAP)
 				pp->p_fstype = FS_SWAP;
 
 			/* is this ours? */
@@ -408,11 +407,12 @@ done:
  * if needed, and signal errors or early completion.
  */
 int
-bounds_check_with_label(bp, lp, wlabel)
+bounds_check_with_label(dk, bp, wlabel)
+	struct disk *dk;
 	struct buf *bp;
-	struct disklabel *lp;
 	int wlabel;
 {
+	struct disklabel *lp = dk->dk_label;
 	struct partition *p = lp->d_partitions + DISKPART(bp->b_dev);
 	int labelsector = lp->d_partitions[2].p_offset + LABELSECTOR;
 	int sz;
@@ -424,7 +424,7 @@ bounds_check_with_label(bp, lp, wlabel)
 		if (sz == 0) {
 			/* If exactly at end of disk, return EOF. */
 			bp->b_resid = bp->b_bcount;
-			goto done;
+			return (0);
 		}
 		if (sz < 0) {
 			/* If past end of disk, return EINVAL. */
@@ -452,6 +452,5 @@ bounds_check_with_label(bp, lp, wlabel)
 
 bad:
 	bp->b_flags |= B_ERROR;
-done:
-	return (0);
+	return (-1);
 }

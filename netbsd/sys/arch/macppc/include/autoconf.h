@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.h,v 1.4 2001/06/08 00:32:03 matt Exp $	*/
+/*	$NetBSD: autoconf.h,v 1.6 2004/03/24 19:42:04 matt Exp $	*/
 
 /*-
  * Copyright (C) 1998	Internet Research Institute, Inc.
@@ -65,7 +65,7 @@ void identifycpu __P((char *));
 void initppc __P((u_int, u_int, char *));
 void install_extint __P((void (*) __P((void)))); 
 void *mapiodev __P((paddr_t, psize_t));
-int kvtop __P((caddr_t));
+paddr_t kvtop __P((caddr_t));
 
 /* these are in extintr.c */
 void ext_intr __P((void));
@@ -82,10 +82,12 @@ int akbd_cnattach __P((void));
 int ofb_is_console __P((void));
 int ofb_cnattach __P((void));
 
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
 /* these are in dev/zs.c */
 int zssoft __P((void *));
 
 /* these are in ../../dev/ic/com.c */
 void comsoft __P((void));
+#endif
 
 #endif /* _MACHINE_AUTOCONF_H_ */

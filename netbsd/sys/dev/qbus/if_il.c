@@ -1,4 +1,4 @@
-/*	$NetBSD: if_il.c,v 1.4.8.1 2003/01/27 05:11:26 jmc Exp $	*/
+/*	$NetBSD: if_il.c,v 1.10 2003/08/07 16:31:14 agc Exp $	*/
 /*
  * Copyright (c) 1982, 1986 Regents of the University of California.
  * All rights reserved.
@@ -11,11 +11,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -39,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_il.c,v 1.4.8.1 2003/01/27 05:11:26 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_il.c,v 1.10 2003/08/07 16:31:14 agc Exp $");
 
 #include "opt_inet.h"
 #include "opt_ns.h"
@@ -132,9 +128,8 @@ static	void ilwatch(struct ifnet *);
 static	void iltotal(struct il_softc *);
 static	void ilstop(struct ifnet *, int);
 
-struct	cfattach il_ca = {
-	sizeof(struct il_softc), ilmatch, ilattach
-};
+CFATTACH_DECL(il, sizeof(struct il_softc),
+    ilmatch, ilattach, NULL, NULL);
 
 #define IL_WCSR(csr, val) \
 	bus_space_write_2(sc->sc_iot, sc->sc_ioh, csr, val)
@@ -326,7 +321,7 @@ ilinit(struct ifnet *ifp)
 		IL_WCSR(IL_CSR, ((sc->sc_ui.ui_baddr >> 2) & IL_EUA)|ILC_STAT);
 		if (ilwait(sc, "verifying setaddr"))
 			return 0;
-		if (bcmp((caddr_t)sc->sc_stats.ils_addr,
+		if (memcmp((caddr_t)sc->sc_stats.ils_addr,
 		    (caddr_t)LLADDR(ifp->if_sadl), ETHER_ADDR_LEN) != 0) {
 			printf("%s: setaddr didn't work\n",
 			    sc->sc_dev.dv_xname);
@@ -602,8 +597,8 @@ iltotal(struct il_softc *sc)
 		*sum++ += *interval++;
 	sc->sc_if.if_collisions = sc->sc_sum.ils_collis;
 	if ((sc->sc_flags & ILF_SETADDR) &&
-	    (bcmp((caddr_t)sc->sc_stats.ils_addr, LLADDR(ifp->if_sadl),
-					ETHER_ADDR_LEN) != 0)) {
+	    (memcmp((caddr_t)sc->sc_stats.ils_addr, LLADDR(ifp->if_sadl),
+		    ETHER_ADDR_LEN) != 0)) {
 		log(LOG_ERR, "%s: physaddr reverted\n", sc->sc_dev.dv_xname);
 		sc->sc_flags &= ~ILF_RUNNING;
 		ilinit(&sc->sc_if);

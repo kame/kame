@@ -1,4 +1,4 @@
-/*	$NetBSD: dpti.c,v 1.3.14.1 2002/12/12 23:34:45 he Exp $	*/
+/*	$NetBSD: dpti.c,v 1.17 2003/12/09 19:51:23 ad Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -64,7 +64,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: dpti.c,v 1.3.14.1 2002/12/12 23:34:45 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dpti.c,v 1.17 2003/12/09 19:51:23 ad Exp $");
 
 #include "opt_i2o.h"
 
@@ -82,7 +82,7 @@ __KERNEL_RCSID(0, "$NetBSD: dpti.c,v 1.3.14.1 2002/12/12 23:34:45 he Exp $");
 #include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
-#ifdef i386
+#ifdef __i386__
 #include <machine/pio.h>
 #endif
 
@@ -101,18 +101,18 @@ __KERNEL_RCSID(0, "$NetBSD: dpti.c,v 1.3.14.1 2002/12/12 23:34:45 he Exp $");
 static struct dpt_sig dpti_sig = {
 	{ 'd', 'P', 't', 'S', 'i', 'G'},
 	SIG_VERSION,
-#if defined(i386)
+#if defined(__i386__)
 	PROC_INTEL,
-#elif defined(powerpc)
+#elif defined(__powerpc__)
 	PROC_POWERPC,
-#elif defined(alpha)
+#elif defined(__alpha__)
 	PROC_ALPHA,
-#elif defined(mips)
+#elif defined(__mips__)
 	PROC_MIPS,
-#elif defined(sparc64)
+#elif defined(__sparc64__)
 	PROC_ULTRASPARC,
 #endif
-#if defined(i386)
+#if defined(__i386__)
 	PROC_386 | PROC_486 | PROC_PENTIUM | PROC_SEXIUM,
 #else
 	0,
@@ -142,13 +142,18 @@ int	dpti_match(struct device *, struct cfdata *, void *);
 int	dpti_passthrough(struct dpti_softc *, caddr_t, struct proc *);
 int	dpti_sysinfo(struct dpti_softc *, int, caddr_t);
 
-cdev_decl(dpti);
+dev_type_open(dptiopen);
+dev_type_ioctl(dptiioctl);
+
+const struct cdevsw dpti_cdevsw = {
+	dptiopen, nullclose, noread, nowrite, dptiioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
 
 extern struct cfdriver dpti_cd;
 
-struct cfattach dpti_ca = {
-	sizeof(struct dpti_softc), dpti_match, dpti_attach
-};
+CFATTACH_DECL(dpti, sizeof(struct dpti_softc),
+    dpti_match, dpti_attach, NULL, NULL);
 
 int
 dpti_match(struct device *parent, struct cfdata *match, void *aux)
@@ -212,13 +217,6 @@ dptiopen(dev_t dev, int flag, int mode, struct proc *p)
 }
 
 int
-dpticlose(dev_t dev, int flag, int mode, struct proc *p)
-{
-
-	return (0);
-}
-
-int
 dptiioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 {
 	struct iop_softc *iop;
@@ -228,6 +226,7 @@ dptiioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 
 	sc = device_lookup(&dpti_cd, minor(dev));
 	iop = (struct iop_softc *)sc->sc_dv.dv_parent;
+	rv = 0;
 
 	if (cmd == PTIOCLINUX) {
 		pt = (struct ioctl_pt *)data;
@@ -246,30 +245,35 @@ dptiioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 		if (size > sizeof(dpti_sig))
 			size = sizeof(dpti_sig);
 		memcpy(data, &dpti_sig, size);
-		return (0);
+		break;
 
 	case DPT_CTRLINFO:
-		return (dpti_ctlrinfo(sc, size, data));
+		rv = dpti_ctlrinfo(sc, size, data);
+		break;
 
 	case DPT_SYSINFO:
-		return (dpti_sysinfo(sc, size, data));
+		rv = dpti_sysinfo(sc, size, data);
+		break;
 
 	case DPT_BLINKLED:
 		if ((i = dpti_blinkled(sc)) == -1)
 			i = 0;
 
-		if (size == 0)
-			return (copyout(&i, *(caddr_t *)data, sizeof(i)));
+		if (size == 0) {
+			rv = copyout(&i, *(caddr_t *)data, sizeof(i));
+			break;
+		}
 
 		*(int *)data = i;
-		return (0);
+		break;
 
 	case DPT_TARGET_BUSY:
 		/*
 		 * XXX This is here to stop linux_machdepioctl() from
 		 * whining about an unknown ioctl.
 		 */
-		return (EIO);
+		rv = EIO;
+		break;
 
 	case DPT_I2OUSRCMD:
 		if (sc->sc_nactive++ >= 2)
@@ -282,19 +286,27 @@ dptiioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 
 		sc->sc_nactive--;
 		wakeup_one(&sc->sc_nactive);
-		return (rv);
+		break;
 
 	case DPT_I2ORESETCMD:
 		printf("%s: I2ORESETCMD not implemented\n",
 		    sc->sc_dv.dv_xname);
-		return (EOPNOTSUPP);
+		rv = EOPNOTSUPP;
+		break;
 
 	case DPT_I2ORESCANCMD:
-		return (iop_reconfigure(iop, 0));
+		if ((rv = lockmgr(&iop->sc_conflock, LK_EXCLUSIVE, NULL)) != 0)
+			break;
+		rv = iop_reconfigure(iop, 0);
+		lockmgr(&iop->sc_conflock, LK_RELEASE, NULL);
+		break;
 
 	default:
-		return (ENOTTY);
+		rv = ENOTTY;
+		break;
 	}
+
+	return (rv);
 }
 
 int
@@ -351,13 +363,13 @@ dpti_sysinfo(struct dpti_softc *sc, int size, caddr_t data)
 {
 	struct dpt_sysinfo info;
 	int rv;
-#ifdef i386
+#ifdef __i386__
 	int i, j;
 #endif
 
 	memset(&info, 0, sizeof(info));
 
-#ifdef i386
+#ifdef __i386__
 	outb (0x70, 0x12);
 	i = inb(0x71);
 	j = i >> 4;
@@ -442,7 +454,7 @@ dpti_passthrough(struct dpti_softc *sc, caddr_t data, struct proc *proc)
 	u_int32_t mbtmp[IOP_MAX_MSG_SIZE / sizeof(u_int32_t)];
 	u_int32_t rbtmp[IOP_MAX_MSG_SIZE / sizeof(u_int32_t)];
 	int rv, msgsize, repsize, sgoff, i, mapped, nbuf, nfrag, j, sz;
-	u_int32_t *p, *pmax, *pstart;
+	u_int32_t *p, *pmax;
 
 	iop = (struct iop_softc *)sc->sc_dv.dv_parent;
 	im = NULL;
@@ -542,12 +554,7 @@ dpti_passthrough(struct dpti_softc *sc, caddr_t data, struct proc *proc)
 		}
 
 		memset(bufs, 0, sizeof(bufs));
-	} else
-		nbuf = -1;
 
-	rv = EINVAL;
-
-	if (sgoff != 0) {
 		p = mbtmp + sgoff;
 		pmax = mbtmp + (msgsize >> 2) - 2;
 
@@ -590,7 +597,7 @@ dpti_passthrough(struct dpti_softc *sc, caddr_t data, struct proc *proc)
 			 */
 			nfrag = 0;
 			sz = 0;
-			for (pstart = p; p <= pmax; p += 2) {
+			for (; p <= pmax; p += 2) {
 				if (nfrag == DPTI_MAX_SEGS) {
 					DPRINTF(("%s: too many segments\n",
 					    sc->sc_dv.dv_xname));
@@ -661,7 +668,8 @@ dpti_passthrough(struct dpti_softc *sc, caddr_t data, struct proc *proc)
 			    sc->sc_dv.dv_xname));
 			goto bad;
 		}
-	}
+	} else
+		nbuf = -1;
 
 	/*
 	 * Allocate a wrapper, and adjust the message header fields to

@@ -1,4 +1,4 @@
-/*	$NetBSD: j720kbdmap.c,v 1.3 2002/01/18 15:27:26 toshii Exp $	*/
+/*	$NetBSD: j720kbdmap.c,v 1.10 2004/03/13 17:23:32 bjh21 Exp $	*/
 
 /*-
  * Copyright (c) 1997, 2001 The NetBSD Foundation, Inc.
@@ -36,15 +36,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: j720kbdmap.c,v 1.10 2004/03/13 17:23:32 bjh21 Exp $");
+
 #include <sys/types.h>
 #include <dev/wscons/wsksymdef.h>
 #include <dev/wscons/wsksymvar.h>
-#include <dev/pckbc/wskbdmap_mfii.h>
 
 #define KC(n) KS_KEYCODE(n)
 
 static const keysym_t j720kbd_keydesc_us[] = {
-/*  pos      command		normal		shifted */
+/*  pos      command		normal		shifted		altgr */
     KC(1),   KS_Cmd_Debugger,	KS_Escape,
     KC(2),   KS_Cmd_Screen0,	KS_f1,
     KC(3),   KS_Cmd_Screen1,	KS_f2,
@@ -54,10 +56,13 @@ static const keysym_t j720kbd_keydesc_us[] = {
     KC(7),   KS_Cmd_Screen5,	KS_f6,
     KC(8),   KS_Cmd_Screen6,	KS_f7,
     KC(9),   KS_Cmd_Screen7,	KS_f8,
-    KC(17),  			KS_1,		KS_exclam,
-    KC(18),  			KS_2,		KS_at,
-    KC(19),  			KS_3,		KS_numbersign,
-    KC(20),  			KS_4,		KS_dollar,
+    KC(10),			KS_f9,
+    KC(11),			KS_f10,
+    KC(12),			KS_f11,
+    KC(17),  			KS_1,		KS_exclam,	KS_asciitilde,
+    KC(18),  			KS_2,		KS_at,		KS_grave,
+    KC(19),  			KS_3,		KS_numbersign,	KS_sterling,
+    KC(20),  			KS_4,		KS_dollar,   /* KS_euro, */
     KC(21),  			KS_5,		KS_percent,
     KC(22),  			KS_6,		KS_asciicircum,
     KC(23),  			KS_7,		KS_ampersand,
@@ -75,8 +80,8 @@ static const keysym_t j720kbd_keydesc_us[] = {
     KC(39), 			KS_u,
     KC(40), 			KS_i,
     KC(41), 			KS_o,
-    KC(42), 			KS_p,
-    KC(43), 			KS_backslash,	KS_bar,
+    KC(42), 			KS_p,           KS_P,		KS_braceleft,
+    KC(43), 			KS_backslash,	KS_bar,		KS_braceright,
     KC(44),			KS_BackSpace,
     KC(49), 			KS_a,
     KC(50), 			KS_s,
@@ -87,6 +92,7 @@ static const keysym_t j720kbd_keydesc_us[] = {
     KC(55), 			KS_j,
     KC(56), 			KS_k,
     KC(57), 			KS_l,
+    KC(58), 			KS_semicolon,	KS_colon,	KS_bracketleft,
     KC(65), 			KS_z,
     KC(66), 			KS_x,
     KC(67), 			KS_c,
@@ -96,11 +102,13 @@ static const keysym_t j720kbd_keydesc_us[] = {
     KC(71), 			KS_m,
     KC(72), 			KS_comma,	KS_less,
     KC(73), 			KS_period,	KS_greater,
+    KC(75), 			KS_apostrophe,	KS_quotedbl,	KS_bracketright,
     KC(76), 			KS_Return,
     KC(81), 			KS_Tab,
     KC(83), 			KS_Shift_L,
     KC(92), 			KS_Shift_R,
-    KC(101), KS_Cmd2,		KS_Alt_L,
+    KC(101),  KS_Cmd2,		KS_Alt_L,
+    KC(102),			KS_Mode_switch,
 
     KC(113),			KS_Meta_L,
     KC(114),  KS_Cmd1,		KS_Control_L,
@@ -108,15 +116,49 @@ static const keysym_t j720kbd_keydesc_us[] = {
     KC(120), 			KS_slash,	KS_question,
     KC(121),  KS_Cmd_ResetEmul,	KS_Delete,
 
-    /* below are guesses from Japanese model key layout */
-    KC(59),			KS_bracketright, KS_braceright,
-    KC(58), 			KS_semicolon,	KS_colon,
-    KC(75), 			KS_apostrophe,	KS_quotedbl,
-
     KC(90),			KS_Up,
     KC(105),			KS_Left,
     KC(107),			KS_Right,
     KC(106),			KS_Down,
+};
+
+static const keysym_t j720kbd_keydesc_fr[] = {
+/*  pos      normal		shifted		altgr		shift-altgr */
+    KC(17),  KS_ampersand,	KS_1,		KS_plusminus,
+    KC(18),  KS_eacute,		KS_2,		KS_asciitilde,
+    KC(19),  KS_quotedbl,	KS_3,		KS_numbersign,
+    KC(20),  KS_apostrophe,	KS_4,		KS_braceleft,
+    KC(21),  KS_parenleft,	KS_5,		KS_bracketleft,
+    KC(22),  KS_minus,		KS_6,		KS_bar,
+    KC(23),  KS_egrave,		KS_7,		KS_grave,
+    KC(24),  KS_underscore,	KS_8,		KS_backslash,
+    KC(25),  KS_ccedilla,	KS_9,		KS_asciicircum,
+    KC(26),  KS_agrave,		KS_0,		KS_at,
+    KC(27),  KS_parenright,	KS_degree,	KS_bracketright,
+    KC(28),  KS_equal,		KS_plus,	KS_braceright,
+    KC(33),  KS_a,
+    KC(34),  KS_z,
+    KC(36),  KS_r,		KS_R,		KS_onequarter,
+    KC(37),  KS_t,		KS_T,		KS_onehalf,
+    KC(38),  KS_y,		KS_Y,		KS_threequarters,
+    KC(43),  KS_dead_circumflex,KS_dead_diaeresis,
+    KC(50),  KS_s,		KS_S,		KS_guillemotleft,
+    KC(51),  KS_d,		KS_D,		KS_guillemotright,
+    KC(59),  KS_dollar,		KS_sterling,	KS_currency,
+    KC(49),  KS_q,		KS_Q,		KS_bar,
+    KC(58),  KS_m,
+    KC(60),  KS_asterisk,	KS_mu,
+    KC(75),  KS_ugrave,		KS_percent,	KS_apostrophe,
+    KC(65),  KS_w,		KS_W,		KS_less,
+    KC(66),  KS_x,		KS_X,		KS_greater,
+    KC(71),  KS_comma,		KS_question,	KS_mu,
+    KC(72),  KS_semicolon,	KS_period,
+    KC(73),  KS_colon,		KS_slash,
+    KC(74),  KS_exclam,		KS_section,	KS_eacute,
+    KC(83),  KS_Shift_L, 	KS_Shift_L,	KS_Caps_Lock,
+    KC(102), KS_twosuperior,	KS_twosuperior,	KS_threesuperior,
+    KC(114), KS_Cmd1,	KS_Control_L, KS_Control_L, KS_Num_Lock, 
+    KC(120), KS_Mode_switch,	KS_Multi_key, 
 };
 
 static const keysym_t j720kbd_keydesc_jp[] = {
@@ -144,6 +186,42 @@ static const keysym_t j720kbd_keydesc_jp[] = {
     KC(91),  KS_backslash,      KS_bar,
 };
 
+static const keysym_t j720kbd_keydesc_pt[] = {
+/*  pos      normal		shifted		altgr		shift-altgr */
+    KC(17),  KS_1,		KS_exclam,	KS_onesuperior,
+    KC(18),  KS_2,		KS_at,		KS_twosuperior,
+    KC(19),  KS_3,		KS_numbersign,	KS_threesuperior,
+    KC(20),  KS_4,		KS_backslash,	KS_dollar,
+    KC(21),  KS_5,		KS_percent,	KS_cent,
+    KC(22),  KS_6,		KS_dead_diaeresis, KS_notsign,
+    KC(23),  KS_7,		KS_ampersand,	KS_sterling,
+    KC(28),  KS_equal,		KS_plus,	KS_section,
+    KC(33),  KS_q,		KS_Q,		KS_slash,
+    KC(34),  KS_w,		KS_W,		KS_question,	
+    KC(35),  KS_e,		KS_E,
+    KC(42),  KS_p,		KS_P,
+    KC(43),  KS_dead_acute,    KS_dead_grave,
+    KC(49),  KS_a,		KS_A,		KS_degree,
+    KC(58),  KS_ccedilla,
+    KC(59),  KS_bracketleft,	KS_braceleft,	KS_ordfeminine,
+    KC(60),  KS_bracketright,	KS_braceright,	KS_masculine,
+    KC(65),  KS_z,		KS_Z,		KS_backslash,
+    KC(66),  KS_x,		KS_X,		KS_bar,
+    KC(72),  KS_comma,		KS_less,	KS_guillemotleft,
+    KC(73),  KS_period,	KS_greater,	KS_guillemotright,
+    KC(74),  KS_semicolon,	KS_colon,
+    KC(75),  KS_dead_tilde,	KS_dead_circumflex,
+    KC(83),  KS_Shift_L,	KS_Shift_L,     KS_Caps_Lock,
+    KC(102), KS_apostrophe,	KS_quotedbl,
+    KC(113), KS_slash,		KS_bar,		KS_backslash,
+    KC(120), KS_Mode_switch,	KS_Multi_key,
+
+    KC(90),  KS_Up,             KS_Up,          KS_Prior,
+    KC(105), KS_Left,           KS_Left,        KS_Home,
+    KC(107), KS_Right,          KS_Right,       KS_End,
+    KC(106), KS_Down,           KS_Down,        KS_Next,
+};
+
 #define KBD_MAP(name, base, map) \
 			{ name, base, sizeof(map)/sizeof(keysym_t), map }
 /* KBD_NULLMAP generates a entry for machine native variant.
@@ -153,6 +231,8 @@ static const keysym_t j720kbd_keydesc_jp[] = {
 const struct wscons_keydesc j720kbd_keydesctab[] = {
 	KBD_MAP(KB_US,			0,	j720kbd_keydesc_us),
 	KBD_MAP(KB_JP,			KB_US,	j720kbd_keydesc_jp),
+	KBD_MAP(KB_FR,			KB_US,	j720kbd_keydesc_fr),
+	KBD_MAP(KB_PT,			KB_US,	j720kbd_keydesc_pt),
 	{0, 0, 0, 0}
 };
 

@@ -1,4 +1,4 @@
-/* $NetBSD: lca.c,v 1.37 2002/05/16 01:01:32 thorpej Exp $ */
+/* $NetBSD: lca.c,v 1.41 2003/06/15 23:08:55 fvdl Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -69,7 +69,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: lca.c,v 1.37 2002/05/16 01:01:32 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: lca.c,v 1.41 2003/06/15 23:08:55 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -103,9 +103,8 @@ __KERNEL_RCSID(0, "$NetBSD: lca.c,v 1.37 2002/05/16 01:01:32 thorpej Exp $");
 int	lcamatch __P((struct device *, struct cfdata *, void *));
 void	lcaattach __P((struct device *, struct device *, void *));
 
-struct cfattach lca_ca = {
-	sizeof(struct lca_softc), lcamatch, lcaattach,
-};
+CFATTACH_DECL(lca, sizeof(struct lca_softc),
+    lcamatch, lcaattach, NULL, NULL);
 
 extern struct cfdriver lca_cd;
 
@@ -250,6 +249,7 @@ lcaattach(parent, self, aux)
 	pba.pba_memt = &lcp->lc_memt;
 	pba.pba_dmat =
 	    alphabus_dma_get_tag(&lcp->lc_dmat_direct, ALPHA_BUS_PCI);
+	pba.pba_dmat64 = NULL;
 	pba.pba_pc = &lcp->lc_pc;
 	pba.pba_bus = 0;
 	pba.pba_bridgetag = NULL;
@@ -267,8 +267,8 @@ lcaprint(aux, pnp)
 
 	/* only PCIs can attach to LCAes; easy. */
 	if (pnp)
-		printf("%s at %s", pba->pba_busname, pnp);
-	printf(" bus %d", pba->pba_bus);
+		aprint_normal("%s at %s", pba->pba_busname, pnp);
+	aprint_normal(" bus %d", pba->pba_bus);
 	return (UNCONF);
 }
 

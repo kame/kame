@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.s,v 1.153.10.1 2002/06/18 15:46:05 lukem Exp $	*/
+/*	$NetBSD: locore.s,v 1.198.2.1 2004/04/24 18:30:47 jdc Exp $	*/
 
 /*
  * Copyright (c) 1996 Paul Kranenburg
@@ -67,6 +67,7 @@
 #include <sparc/dev/zsreg.h>
 #endif
 #include <machine/ctlreg.h>
+#include <machine/intr.h>
 #include <machine/psl.h>
 #include <machine/signal.h>
 #include <machine/trap.h>
@@ -95,6 +96,11 @@
  * area at times anyway.
  */
 #define	CCFSZ	96
+
+/* We rely on the fact that %lo(CPUINFO_VA) is zero */
+.if CPUINFO_VA & 0x1fff
+BARF
+.endif
 
 /*
  * A handy macro for maintaining instrumentation counters.
@@ -159,8 +165,12 @@ _EINTSTACKP = CPUINFO_VA + CPUINFO_EINTSTACK
  * virtual address for the same structure.  It must be stored in p->p_cpu
  * upon context switch.
  */
-_CISELFP = CPUINFO_VA + CPUINFO_SELF
-_CIFLAGS = CPUINFO_VA + CPUINFO_FLAGS
+_CISELFP	= CPUINFO_VA + CPUINFO_SELF
+_CIFLAGS	= CPUINFO_VA + CPUINFO_FLAGS
+
+/* Per-CPU AST and reschedule requests */
+_WANT_AST	= CPUINFO_VA + CPUINFO_WANT_AST
+_WANT_RESCHED	= CPUINFO_VA + CPUINFO_WANT_RESCHED
 
 /*
  * When a process exits and its u. area goes away, we set cpcb to point
@@ -204,11 +214,11 @@ _C_LABEL(kgdb_stack):
  */
 cpcb = CPUINFO_VA + CPUINFO_CURPCB
 
-/* curproc points to the current process that has the CPU */
-curproc = CPUINFO_VA + CPUINFO_CURPROC
+/* curlwp points to the current LWP that has the CPU */
+curlwp = CPUINFO_VA + CPUINFO_CURLWP
 
 /*
- * cputyp is the current cpu type, used to distinguish between
+ * cputyp is the current CPU type, used to distinguish between
  * the many variations of different sun4* machines. It contains
  * the value CPU_SUN4, CPU_SUN4C, or CPU_SUN4M.
  */
@@ -248,6 +258,10 @@ _mapme:
 #endif
 #endif
 
+#if !defined(SUN4D)
+sun4d_notsup:
+	.asciz	"cr .( NetBSD/sparc: this kernel does not support the sun4d) cr"
+#endif
 #if !defined(SUN4M)
 sun4m_notsup:
 	.asciz	"cr .( NetBSD/sparc: this kernel does not support the sun4m) cr"
@@ -359,6 +373,18 @@ sun4_notsup:
 #define	ZS_INTERRUPT44C	HARDINT44C(12)
 #define	ZS_INTERRUPT4M	HARDINT4M(12)
 #endif
+
+#ifdef DEBUG
+#define TRAP_TRACE(tt, tmp)					\
+	sethi	%hi(CPUINFO_VA + CPUINFO_TT), tmp;		\
+	st	tt, [tmp + %lo(CPUINFO_VA + CPUINFO_TT)];
+#define TRAP_TRACE2(tt, tmp1, tmp2)				\
+	mov	tt, tmp1;					\
+	TRAP_TRACE(tmp1, tmp2)
+#else /* DEBUG */
+#define TRAP_TRACE(tt,tmp)		/**/
+#define TRAP_TRACE2(tt,tmp1,tmp2)	/**/
+#endif /* DEBUG */
 
 	.globl	_ASM_LABEL(start), _C_LABEL(kernel_text)
 	_C_LABEL(kernel_text) = start		! for kvm_mkdb(8)
@@ -924,7 +950,7 @@ trapbase_sun4m:
 	HARDINT4M(14)			! 1e = level 14 interrupt
 	VTRAP(15, nmi_sun4m)		! 1f = nonmaskable interrupt
 	UTRAP(0x20)
-	UTRAP(0x21)
+	VTRAP(T_TEXTERROR, memfault_sun4m)	! 21 = instr. fetch error
 	UTRAP(0x22)
 	UTRAP(0x23)
 	TRAP(T_CPDISABLED)	! 24 = coprocessor instr, EC bit off in psr
@@ -932,7 +958,7 @@ trapbase_sun4m:
 	UTRAP(0x26)
 	UTRAP(0x27)
 	TRAP(T_CPEXCEPTION)	! 28 = coprocessor exception
-	UTRAP(0x29)
+	VTRAP(T_DATAERROR, memfault_sun4m)	! 29 = data fetch error
 	UTRAP(0x2a)
 	VTRAP(T_STOREBUFFAULT, memfault_sun4m) ! 2b = SuperSPARC store buffer fault
 	UTRAP(0x2c)
@@ -1030,7 +1056,7 @@ trapbase_sun4m:
 	SYSCALL			! 88 = svr4 syscall
 	SYSCALL			! 89 = bsd syscall
 	BPT_KGDB_EXEC		! 8a = enter kernel gdb on kernel startup
-	STRAP(0x8b)
+	TRAP(T_DBPAUSE)		! 8b = hold CPU for kernel debugger
 	STRAP(0x8c)
 	STRAP(0x8d)
 	STRAP(0x8e)
@@ -1159,7 +1185,8 @@ trapbase_sun4m:
 	.skip	4096
 #endif
 
-#ifdef DEBUG
+/* redzones don't work currently in multi-processor mode */
+#if defined(DEBUG) && !defined(MULTIPROCESSOR)
 /*
  * A hardware red zone is impossible.  We simulate one in software by
  * keeping a `red zone' pointer; if %sp becomes less than this, we panic.
@@ -1288,16 +1315,23 @@ Lpanic_red:
  * locks the fault address and status registers if the translation
  * fails (thanks to Chris Torek for finding this quirk).
  */
-/* note: pmap currently does not use the PPROT_R_R and PPROT_RW_RW cases */
 #define CMP_PTE_USER_READ4M(pte, tmp) \
-	or	pte, ASI_SRMMUFP_L3, pte; \
+	/*or	pte, ASI_SRMMUFP_L3, pte; -- ASI_SRMMUFP_L3 == 0 */ \
 	lda	[pte] ASI_SRMMUFP, pte; \
 	set	SRMMU_SFSR, tmp; \
-	and	pte, (SRMMU_TETYPE | SRMMU_PROT_MASK), pte; \
-	cmp	pte, (SRMMU_TEPTE | PPROT_RWX_RWX); \
-	be	8f; \
-	 lda	[tmp] ASI_SRMMU, %g0; \
-	cmp	pte, (SRMMU_TEPTE | PPROT_RX_RX); \
+	lda	[tmp] ASI_SRMMU, %g0; \
+	and	pte, SRMMU_TETYPE, tmp; \
+	/* Check for valid pte */ \
+	cmp	tmp, SRMMU_TEPTE; \
+	bnz	8f; \
+	and	pte, SRMMU_PROT_MASK, pte; \
+	/* check for one of: R_R, RW_RW, RX_RX and RWX_RWX */ \
+	cmp	pte, PPROT_X_X; \
+	bcs,a	8f; \
+	 /* Now we have carry set if OK; turn it into Z bit */ \
+	 subxcc	%g0, -1, %g0; \
+	/* One more case to check: R_RW */ \
+	cmp	pte, PPROT_R_RW; \
 8:
 
 
@@ -1463,6 +1497,7 @@ wmask:	.skip	32			! u_char wmask[0..31];
 	 mov	%g7, %l7	/* save %g7 in %l7 for clean_trap_window */
 
 #define	TRAP_SETUP(stackspace) \
+	TRAP_TRACE(%l3,%l5); \
 	rd	%wim, %l4; \
 	mov	1, %l5; \
 	sll	%l5, %l0, %l5; \
@@ -1513,6 +1548,7 @@ wmask:	.skip	32			! u_char wmask[0..31];
  * to check the current %fp against both ends of the stack space.
  */
 #define	INTR_SETUP(stackspace) \
+	TRAP_TRACE(%l3,%l5); \
 	rd	%wim, %l4; \
 	mov	1, %l5; \
 	sll	%l5, %l0, %l5; \
@@ -1563,6 +1599,7 @@ wmask:	.skip	32			! u_char wmask[0..31];
 #else /* MULTIPROCESSOR */
 
 #define	INTR_SETUP(stackspace) \
+	TRAP_TRACE(%l3,%l5); \
 	rd	%wim, %l4; \
 	mov	1, %l5; \
 	sll	%l5, %l0, %l5; \
@@ -1946,10 +1983,6 @@ memfault_sun4c:
 
 #if defined(SUN4M)
 memfault_sun4m:
-	! DANGER: we use the fact that %lo(CPUINFO_VA) is zero
-.if CPUINFO_VA & 0x1fff
-BARF
-.endif
 	sethi	%hi(CPUINFO_VA), %l4
 	ld	[%l4 + %lo(CPUINFO_VA+CPUINFO_GETSYNCFLT)], %l5
 	jmpl	%l5, %l7
@@ -2122,8 +2155,8 @@ softtrap:
 	 * The interrupt stack is not at a fixed location
 	 * and %sp must be checked against both ends.
 	 */
-	sethi	%hi(_EINTSTACKP), %l7
-	ld	[%l7 + %lo(_EINTSTACKP)], %l7
+	sethi	%hi(_EINTSTACKP), %l6
+	ld	[%l6 + %lo(_EINTSTACKP)], %l7
 	cmp	%sp, %l7
 	bge	Lslowtrap_reenter
 	 EMPTY
@@ -2329,6 +2362,10 @@ kgdb_rett:
  */
 _C_LABEL(_syscall):
 	TRAP_SETUP(-CCFSZ-80)
+#ifdef DEBUG
+	or	%g1, 0x1000, %l6	! mark syscall
+	TRAP_TRACE(%l6,%l5)
+#endif
 	wr	%l0, PSR_ET, %psr
 	std	%l0, [%sp + CCFSZ + 0]	! tf_psr, tf_pc
 	rd	%y, %l3
@@ -2419,7 +2456,7 @@ softintr_sun44c:
 softintr_common:
 	INTR_SETUP(-CCFSZ-80)
 	std	%g2, [%sp + CCFSZ + 24]	! save registers
-	INCR(_C_LABEL(uvmexp)+V_INTR)	! cnt.v_intr++; (clobbers %o0,%o1)
+	INCR(_C_LABEL(uvmexp)+V_SOFT)	! cnt.v_intr++; (clobbers %o0,%o1)
 	mov	%g1, %l7
 	rd	%y, %l6
 	std	%g4, [%sp + CCFSZ + 32]
@@ -2436,13 +2473,28 @@ softintr_common:
 	std	%l2, [%sp + CCFSZ + 8]
 	inc	%o0
 	st	%o0, [%l4 + %l5]
-	set	_C_LABEL(intrhand), %l4	! %l4 = intrhand[intlev];
+	set	_C_LABEL(sintrhand), %l4! %l4 = sintrhand[intlev];
 	ld	[%l4 + %l5], %l4
+
+#if defined(MULTIPROCESSOR)
+	/* Grab the kernel lock for interrupt levels <= IPL_CLOCK */
+	cmp	%l3, IPL_CLOCK
+	bgeu	3f
+	 st	%fp, [%sp + CCFSZ + 16]
+	call	_C_LABEL(intr_lock_kernel)
+	 nop
+#endif
+
 	b	3f
 	 st	%fp, [%sp + CCFSZ + 16]
 
-1:	ld	[%l4], %o1
+1:	ld	[%l4 + 12], %o2		! ih->ih_classipl
+	rd	%psr, %o3		!  (bits already shifted to PIL field)
+	andn	%o3, PSR_PIL, %o3	! %o3 = psr & ~PSR_PIL
+	wr	%o3, %o2, %psr		! splraise(ih->ih_classipl)
+	ld	[%l4], %o1
 	ld	[%l4 + 4], %o0
+	nop				! one more isns before touching ICC
 	tst	%o0
 	bz,a	2f
 	 add	%sp, CCFSZ, %o0
@@ -2451,6 +2503,16 @@ softintr_common:
 3:	tst	%l4			! while ih != NULL
 	bnz	1b
 	 nop
+
+#if defined(MULTIPROCESSOR)
+	cmp	%l3, IPL_CLOCK
+	bgeu	0f
+	 nop
+	call	_C_LABEL(intr_unlock_kernel)
+	 nop
+0:
+#endif
+
 	mov	%l7, %g1
 	wr	%l6, 0, %y
 	ldd	[%sp + CCFSZ + 24], %g2
@@ -2466,32 +2528,111 @@ softintr_common:
 #if defined(SUN4M)
 _ENTRY(_C_LABEL(sparc_interrupt4m))
 #if !defined(MSIIEP)	/* "normal" sun4m */
+	sethi	%hi(CPUINFO_VA), %l6
+	ld	[%l6 + CPUINFO_INTREG], %l7
 	mov	1, %l4
-	sethi	%hi(CPUINFO_VA+CPUINFO_INTREG), %l6
-	ld	[%l6 + %lo(CPUINFO_VA+CPUINFO_INTREG)], %l6
-	ld	[%l6 + ICR_PI_PEND_OFFSET], %l5	! get pending interrupts
-	sll	%l4, %l3, %l4			! test SOFTINT bit
-	andcc	%l5, %l4, %g0
-	bne	sparc_interrupt_common
+	ld	[%l7 + ICR_PI_PEND_OFFSET], %l5	! get pending interrupts
+	sll	%l4, %l3, %l4	! hw intr bits are in the lower halfword
+
+	btst	%l4, %l5	! has pending hw intr at this level?
+	bnz	sparc_interrupt_common
 	 nop
 
-	! a soft interrupt; clear bit in interrupt-pending register
-	sll	%l4, 16, %l5
-	st	%l5, [%l6 + ICR_PI_CLR_OFFSET]
-	b,a	softintr_common
+	! both softint pending and clear bits are in upper halfwords of
+	! their respective registers so shift the test bit in %l4 up there
+	sll	%l4, 16, %l4
+
+	st	%l4, [%l7 + ICR_PI_CLR_OFFSET]	! ack soft intr
+#if defined(MULTIPROCESSOR)
+	cmp	%l3, 14
+	be	lev14_softint
+#endif
+	/* Drain hw reg; might be necessary for Ross CPUs */
+	 ld	[%l7 + ICR_PI_PEND_OFFSET], %g0
+
+#ifdef DIAGNOSTIC
+	btst	%l4, %l5	! make sure softint pending bit is set
+	bnz	softintr_common
+	/* FALLTHROUGH to sparc_interrupt4m_bogus */
+#else
+	b	softintr_common
+#endif
+	 nop
+
 #else /* MSIIEP */
 	sethi	%hi(MSIIEP_PCIC_VA), %l6
 	mov	1, %l4
 	ld	[%l6 + PCIC_PROC_IPR_REG], %l5 ! get pending interrupts
-	sll	%l4, %l3, %l4
-	btst	%l4, %l5	!  has pending hw intr at this level?
+	sll	%l4, %l3, %l4	! hw intr bits are in the lower halfword
+
+	btst	%l4, %l5	! has pending hw intr at this level?
 	bnz	sparc_interrupt_common
 	 nop
 
-	! a soft interrupt; clear its bit in softintr clear register
+#ifdef DIAGNOSTIC
+	! softint pending bits are in the upper halfword, but softint
+	! clear bits are in the lower halfword so we want the bit in %l4
+	! kept in the lower half and instead shift pending bits right
+	srl	%l5, 16, %l7
+	btst	%l4, %l7	! make sure softint pending bit is set
+	bnz	softintr_common
+	 sth	%l4, [%l6 + PCIC_SOFT_INTR_CLEAR_REG]
+	/* FALLTHROUGH to sparc_interrupt4m_bogus */
+#else
 	b	softintr_common
 	 sth	%l4, [%l6 + PCIC_SOFT_INTR_CLEAR_REG]
+#endif
+
 #endif /* MSIIEP */
+
+#ifdef DIAGNOSTIC
+	/*
+	 * sparc_interrupt4m detected that neither hardware nor software
+	 * interrupt pending bit is set for this interrupt.  Report this
+	 * situation, this is most probably a symptom of a driver bug.
+	 */
+sparc_interrupt4m_bogus:
+	INTR_SETUP(-CCFSZ-80)
+	std	%g2, [%sp + CCFSZ + 24]	! save registers
+	INCR(_C_LABEL(uvmexp)+V_INTR)	! cnt.v_intr++; (clobbers %o0,%o1)
+	mov	%g1, %l7
+	rd	%y, %l6
+	std	%g4, [%sp + CCFSZ + 32]
+	andn	%l0, PSR_PIL, %l4	! %l4 = psr & ~PSR_PIL |
+	sll	%l3, 8, %l5		!	intlev << IPLSHIFT
+	std	%g6, [%sp + CCFSZ + 40]
+	or	%l5, %l4, %l4		!			;
+	wr	%l4, 0, %psr		! the manual claims this
+	wr	%l4, PSR_ET, %psr	! song and dance is necessary
+	std	%l0, [%sp + CCFSZ + 0]	! set up intrframe/clockframe
+	sll	%l3, 2, %l5
+	set	_C_LABEL(intrcnt), %l4	! intrcnt[intlev]++;
+	ld	[%l4 + %l5], %o0
+	std	%l2, [%sp + CCFSZ + 8]	! set up intrframe/clockframe
+	inc	%o0
+	st	%o0, [%l4 + %l5]
+
+	st	%fp, [%sp + CCFSZ + 16]
+
+	/* Unhandled interrupts while cold cause IPL to be raised to `high' */
+	sethi	%hi(_C_LABEL(cold)), %o0
+	ld	[%o0 + %lo(_C_LABEL(cold))], %o0
+	tst	%o0			! if (cold) {
+	bnz,a	1f			!	splhigh();
+	 or	%l0, 0xf00, %l0		! } else
+	
+	call	_C_LABEL(bogusintr)	!	strayintr(&intrframe)
+	 add	%sp, CCFSZ, %o0
+	/* all done: restore registers and go return */
+1:
+	mov	%l7, %g1
+	wr	%l6, 0, %y
+	ldd	[%sp + CCFSZ + 24], %g2
+	ldd	[%sp + CCFSZ + 32], %g4
+	ldd	[%sp + CCFSZ + 40], %g6
+	b	return_from_trap
+	 wr	%l0, 0, %psr
+#endif /* DIAGNOSTIC */
 #endif /* SUN4M */
 
 _ENTRY(_C_LABEL(sparc_interrupt44c))
@@ -2518,16 +2659,24 @@ sparc_interrupt_common:
 	set	_C_LABEL(intrhand), %l4	! %l4 = intrhand[intlev];
 	ld	[%l4 + %l5], %l4
 
-#if defined(MULTIPROCESSOR) && defined(SUN4M) /* XXX */
+#if defined(MULTIPROCESSOR)
+	/* Grab the kernel lock for interrupt levels <= IPL_CLOCK */
+	cmp	%l3, IPL_CLOCK
+	bgeu	3f
+	 st	%fp, [%sp + CCFSZ + 16]
 	call	_C_LABEL(intr_lock_kernel)
 	 nop
 #endif
-
 	b	3f
 	 st	%fp, [%sp + CCFSZ + 16]
 
-1:	ld	[%l4], %o1
+1:	ld	[%l4 + 12], %o2		! ih->ih_classipl
+	rd	%psr, %o3		!  (bits already shifted to PIL field)
+	andn	%o3, PSR_PIL, %o3	! %o3 = psr & ~PSR_PIL
+	wr	%o3, %o2, %psr		! splraise(ih->ih_classipl)
+	ld	[%l4], %o1
 	ld	[%l4 + 4], %o0
+	nop				! one more isns before touching ICC
 	tst	%o0
 	bz,a	2f
 	 add	%sp, CCFSZ, %o0
@@ -2551,9 +2700,13 @@ sparc_interrupt_common:
 	 add	%sp, CCFSZ, %o0
 	/* all done: restore registers and go return */
 4:
-#if defined(MULTIPROCESSOR) && defined(SUN4M) /* XXX */
+#if defined(MULTIPROCESSOR)
+	cmp	%l3, IPL_CLOCK
+	bgeu	0f
+	 nop
 	call	_C_LABEL(intr_unlock_kernel)
 	 nop
+0:
 #endif
 	mov	%l7, %g1
 	wr	%l6, 0, %y
@@ -2562,6 +2715,202 @@ sparc_interrupt_common:
 	ldd	[%sp + CCFSZ + 40], %g6
 	b	return_from_trap
 	 wr	%l0, 0, %psr
+
+#if defined(MULTIPROCESSOR)
+/*
+ * Level 14 software interrupt: fast IPI
+ * <%l0,%l1,%l2> = <psr, pc, npc>
+ * %l3 = int level
+ * %l6 = &cpuinfo
+ */
+lev14_softint:
+	set	_C_LABEL(lev14_evcnt), %l7	! lev14_evcnt.ev_count++;
+	ldd	[%l7 + EV_COUNT], %l4
+	inccc	%l5
+	addx	%l4, %g0, %l4
+	std	%l4, [%l7 + EV_COUNT]
+
+	ld	[%l6 + CPUINFO_XMSG_TRAP], %l7
+#ifdef DIAGNOSTIC
+	tst	%l7
+	bz	sparc_interrupt4m_bogus
+	 nop
+#endif
+	jmp	%l7
+	 ld	[%l6 + CPUINFO_XMSG_ARG0], %l3	! prefetch 1st arg
+
+/*
+ * Fast flush handlers. xcalled from other CPUs throught soft interrupt 14
+ * On entry:	%l6 = CPUINFO_VA
+ *		%l3 = first argument
+ *
+ * As always, these fast trap handlers should preserve all registers
+ * except %l3 to %l7
+ */
+_ENTRY(_C_LABEL(ft_tlb_flush))
+	!	<%l3 already fetched for us>	! va
+	ld	[%l6 + CPUINFO_XMSG_ARG2], %l5	! level
+	andn	%l3, 0xfff, %l3			! %l3 = (va&~0xfff | lvl);
+	ld	[%l6 + CPUINFO_XMSG_ARG1], %l4	! context
+	or	%l3, %l5, %l3
+
+	mov	SRMMU_CXR, %l7			!
+	lda	[%l7]ASI_SRMMU, %l5		! %l5 = old context
+	sta	%l4, [%l7]ASI_SRMMU		! set new context
+
+	sta	%g0, [%l3]ASI_SRMMUFP		! flush TLB
+
+ft_rett:
+	! common return from Fast Flush handlers
+	! enter here with %l5 = ctx to restore, %l6 = CPUINFO_VA, %l7 = ctx reg
+	mov	1, %l4				!
+	sta	%l5, [%l7]ASI_SRMMU		! restore context
+	st	%l4, [%l6 + CPUINFO_XMSG_CMPLT]	! completed = 1
+
+	mov	%l0, %psr			! return from trap
+	 nop
+	RETT
+
+_ENTRY(_C_LABEL(ft_srmmu_vcache_flush_page))
+	!	<%l3 already fetched for us>	! va
+	ld	[%l6 + CPUINFO_XMSG_ARG1], %l4	! context
+
+	mov	SRMMU_CXR, %l7			!
+	lda	[%l7]ASI_SRMMU, %l5		! %l5 = old context
+	sta	%l4, [%l7]ASI_SRMMU		! set new context
+
+	set	4096, %l4			! N = page size
+	ld	[%l6 + CPUINFO_CACHE_LINESZ], %l7
+1:
+	sta	%g0, [%l3]ASI_IDCACHELFP	!  flush cache line
+	subcc	%l4, %l7, %l4			!  p += linesz;
+	bgu	1b				! while ((N -= linesz) > 0)
+	 add	%l3, %l7, %l3
+
+	ld	[%l6 + CPUINFO_XMSG_ARG0], %l3	! reload va
+	!or	%l3, ASI_SRMMUFP_L3(=0), %l3	! va |= ASI_SRMMUFP_L3
+	sta	%g0, [%l3]ASI_SRMMUFP		! flush TLB
+
+	b	ft_rett
+	 mov	SRMMU_CXR, %l7			! reload ctx register
+
+_ENTRY(_C_LABEL(ft_srmmu_vcache_flush_segment))
+	!	<%l3 already fetched for us>	! vr
+	ld	[%l6 + CPUINFO_XMSG_ARG1], %l5	! vs
+	ld	[%l6 + CPUINFO_XMSG_ARG2], %l4	! context
+
+	sll	%l3, 24, %l3			! va = VSTOVA(vr,vs)
+	sll	%l5, 18, %l5
+	or	%l3, %l5, %l3
+
+	mov	SRMMU_CXR, %l7			!
+	lda	[%l7]ASI_SRMMU, %l5		! %l5 = old context
+	sta	%l4, [%l7]ASI_SRMMU		! set new context
+
+	ld	[%l6 + CPUINFO_CACHE_NLINES], %l4
+	ld	[%l6 + CPUINFO_CACHE_LINESZ], %l7
+1:
+	sta	%g0, [%l3]ASI_IDCACHELFS	!  flush cache line
+	deccc	%l4				!  p += linesz;
+	bgu	1b				! while (--nlines > 0)
+	 add	%l3, %l7, %l3
+
+	b	ft_rett
+	 mov	SRMMU_CXR, %l7			! reload ctx register
+
+_ENTRY(_C_LABEL(ft_srmmu_vcache_flush_region))
+	!	<%l3 already fetched for us>	! vr
+	ld	[%l6 + CPUINFO_XMSG_ARG1], %l4	! context
+
+	sll	%l3, 24, %l3			! va = VRTOVA(vr)
+
+	mov	SRMMU_CXR, %l7			!
+	lda	[%l7]ASI_SRMMU, %l5		! %l5 = old context
+	sta	%l4, [%l7]ASI_SRMMU		! set new context
+
+	ld	[%l6 + CPUINFO_CACHE_NLINES], %l4
+	ld	[%l6 + CPUINFO_CACHE_LINESZ], %l7
+1:
+	sta	%g0, [%l3]ASI_IDCACHELFR	!  flush cache line
+	deccc	%l4				!  p += linesz;
+	bgu	1b				! while (--nlines > 0)
+	 add	%l3, %l7, %l3
+
+	b	ft_rett
+	 mov	SRMMU_CXR, %l7			! reload ctx register
+
+_ENTRY(_C_LABEL(ft_srmmu_vcache_flush_context))
+	!	<%l3 already fetched for us>	! context
+
+	mov	SRMMU_CXR, %l7			!
+	lda	[%l7]ASI_SRMMU, %l5		! %l5 = old context
+	sta	%l3, [%l7]ASI_SRMMU		! set new context
+
+	ld	[%l6 + CPUINFO_CACHE_NLINES], %l4
+	ld	[%l6 + CPUINFO_CACHE_LINESZ], %l7
+	mov	%g0, %l3			! va = 0
+1:
+	sta	%g0, [%l3]ASI_IDCACHELFC	!  flush cache line
+	deccc	%l4				!  p += linesz;
+	bgu	1b				! while (--nlines > 0)
+	 add	%l3, %l7, %l3
+
+	b	ft_rett
+	 mov	SRMMU_CXR, %l7			! reload ctx register
+
+_ENTRY(_C_LABEL(ft_srmmu_vcache_flush_range))
+	!	<%l3 already fetched for us>	! va
+	ld	[%l6 + CPUINFO_XMSG_ARG2], %l4	! context
+
+	mov	SRMMU_CXR, %l7			!
+	lda	[%l7]ASI_SRMMU, %l5		! %l5 = old context
+	sta	%l4, [%l7]ASI_SRMMU		! set new context
+
+	ld	[%l6 + CPUINFO_XMSG_ARG1], %l4	! size
+	and	%l3, 7, %l7			! double-word alignment
+	andn	%l3, 7, %l3			!  off = va & 7; va &= ~7
+	add	%l4, %l7, %l4			!  sz += off
+
+	ld	[%l6 + CPUINFO_CACHE_LINESZ], %l7
+1:
+	sta	%g0, [%l3]ASI_IDCACHELFP	!  flush cache line
+	subcc	%l4, %l7, %l4			!  p += linesz;
+	bgu	1b				! while ((sz -= linesz) > 0)
+	 add	%l3, %l7, %l3
+
+	/* Flush TLB on all pages we visited */
+	ld	[%l6 + CPUINFO_XMSG_ARG0], %l3	! reload va
+	ld	[%l6 + CPUINFO_XMSG_ARG1], %l4	! reload sz
+	add	%l3, %l4, %l4			! %l4 = round_page(va + sz)
+	add	%l4, 0xfff, %l4
+	andn	%l4, 0xfff, %l4
+	andn	%l3, 0xfff, %l3			! va &= ~PGOFSET;
+	sub	%l4, %l3, %l4			! and finally: size rounded
+						! to page boundary
+	set	4096, %l7			! page size
+
+2:
+	!or	%l3, ASI_SRMMUFP_L3(=0), %l3	!  va |= ASI_SRMMUFP_L3
+	sta	%g0, [%l3]ASI_SRMMUFP		!  flush TLB
+	subcc	%l4, %l7, %l4			! while ((sz -= PGSIZE) > 0)
+	bgu	2b
+	 add	%l3, %l7, %l3
+
+	b	ft_rett
+	 mov	SRMMU_CXR, %l7			! reload ctx register
+
+_ENTRY(_C_LABEL(ft_want_ast))
+	mov	1, %l4				! ack xcall in all cases
+	st	%l4, [%l6 + CPUINFO_XMSG_CMPLT]	! completed = 1
+
+	btst	PSR_PS, %l0		! if from user mode
+	be,a	slowtrap		!  call trap(T_AST)
+	 mov	T_AST, %l3
+
+	mov	%l0, %psr		! else return from trap
+	 nop				! AST will be noticed on out way out
+	RETT
+#endif /* MULTIPROCESSOR */
 
 #ifdef notyet
 /*
@@ -2743,9 +3092,11 @@ nmi_sun4m:
 	st	%o1, [%l6 + ICR_PI_CLR_OFFSET]
 	 nop; nop; nop;
 	ld	[%l6 + ICR_PI_PEND_OFFSET], %g0	! drain register!?
-	 nop; nop; nop;
+	 nop;
 
-	wr	%l0, PSR_ET, %psr	! okay, turn traps on again
+	or	%l0, PSR_PIL, %o4	! splhigh()
+	wr	%o4, 0, %psr		!
+	wr	%o4, PSR_ET, %psr	! turn traps on again
 
 	std	%g2, [%sp + CCFSZ + 80]	! save g2, g3
 	rd	%y, %l4			! save y
@@ -2818,6 +3169,7 @@ window_of:
 	 * a lot of time, so we have separate paths for kernel and user.
 	 * We also know for sure that the window has overflowed.
 	 */
+	TRAP_TRACE2(5,%l6,%l5)
 	btst	PSR_PS, %l0
 	bz	winof_user
 	 sethi	%hi(clean_trap_window), %l7
@@ -2915,6 +3267,7 @@ window_uf:
 	save	%g0, %g0, %g0		! back to T
 	RETT
 #else
+	TRAP_TRACE2(6,%l6,%l5)
 	wr	%g0, 0, %wim		! allow us to enter I
 	btst	PSR_PS, %l0
 	restore				! enter window R
@@ -3158,8 +3511,8 @@ rft_kernel:
  * If returning to a valid window, just set psr and return.
  */
 rft_user:
-!	sethi	%hi(_C_LABEL(want_ast)), %l7	! (done below)
-	ld	[%l7 + %lo(_C_LABEL(want_ast))], %l7
+!	sethi	%hi(_WANT_AST)), %l7	! (done below)
+	ld	[%l7 + %lo(_WANT_AST)], %l7
 	tst	%l7			! want AST trap?
 	bne,a	softtrap		! yes, re-enter trap with type T_AST
 	 mov	T_AST, %o0
@@ -3270,7 +3623,7 @@ rft_user_or_recover_pcb_windows:
 	ld	[%l6 + PCB_NSAVED], %l7
 	tst	%l7
 	bz,a	rft_user
-	 sethi	%hi(_C_LABEL(want_ast)), %l7	! first instr of rft_user
+	 sethi	%hi(_WANT_AST), %l7	! first instr of rft_user
 
 	bg,a	softtrap		! if (pcb_nsaved > 0)
 	 mov	T_WINOF, %o0		!	trap(T_WINOF);
@@ -3379,36 +3732,37 @@ init_tables:
 	retl
 	 stb	%o2, [%o3 + %o1]	! (wmask - 1)[i] = j;
 
-#ifdef SUN4
-/*
- * getidprom(struct idprom *, sizeof(struct idprom))
- */
-_ENTRY(_C_LABEL(getidprom))
-	set	AC_IDPROM, %o2
-1:	lduba	[%o2] ASI_CONTROL, %o3
-	stb	%o3, [%o0]
-	inc	%o0
-	inc	%o2
-	dec	%o1
-	cmp	%o1, 0
-	bne	1b
-	 nop
-	retl
-	 nop
-#endif
 
 dostart:
 	/*
 	 * Startup.
 	 *
-	 * We have been loaded in low RAM, at some address which
+	 * We may have been loaded in low RAM, at some address which
 	 * is page aligned (PROM_LOADADDR actually) rather than where we
 	 * want to run (KERNBASE+PROM_LOADADDR).  Until we get everything set,
 	 * we have to be sure to use only pc-relative addressing.
 	 */
 
 	/*
-	 * We now use the bootinfo method to pass arguments, and the new
+	 * Find out if the above is the case.
+	 */
+0:	call	1f
+	 sethi	%hi(0b), %l0		! %l0 = virtual address of 0:
+1:	or	%l0, %lo(0b), %l0
+	sub	%l0, %o7, %l7		! subtract actual physical address of 0:
+
+	/*
+	 * If we're already running at our desired virtual load address,
+	 * %l7 will be set to 0, otherwise it will be KERNBASE.
+	 * From now on until the end of locore bootstrap code, %l7 will
+	 * be used to relocate memory references.
+	 */
+#define RELOCATE(l,r)		\
+	set	l, r;		\
+	sub	r, %l7, r
+
+	/*
+	 * We use the bootinfo method to pass arguments, and the new
 	 * magic number indicates that. A pointer to the kernel top, i.e.
 	 * the first address after the load kernel image (including DDB
 	 * symbols, if any) is passed in %o4[0] and the bootinfo structure
@@ -3432,7 +3786,6 @@ dostart:
 	 * the difference between KERNBASE and the old value (known to be
 	 * 0xf8000000) compiled into pre-1.3 bootblocks.
 	 */
-	set	KERNBASE, %l4
 
 	set	0x44444232, %l3		! bootinfo magic
 	cmp	%o5, %l3
@@ -3441,19 +3794,20 @@ dostart:
 
 	/* The loader has passed to us a `bootinfo' structure */
 	ld	[%o4], %l3		! 1st word is kernel_top
-	add	%l3, %l4, %o5		! relocate: + KERNBASE
-	sethi	%hi(_C_LABEL(kernel_top) - KERNBASE), %l3 ! and store it
-	st	%o5, [%l3 + %lo(_C_LABEL(kernel_top) - KERNBASE)]
+	add	%l3, %l7, %o5		! relocate: + KERNBASE
+	RELOCATE(_C_LABEL(kernel_top),%l3)
+	st	%o5, [%l3]		! and store it
 
 	ld	[%o4 + 4], %l3		! 2nd word is bootinfo
-	add	%l3, %l4, %o5		! relocate
-	sethi	%hi(_C_LABEL(bootinfo) - KERNBASE), %l3	! store bootinfo
-	st	%o5, [%l3 + %lo(_C_LABEL(bootinfo) - KERNBASE)]
+	add	%l3, %l7, %o5		! relocate
+	RELOCATE(_C_LABEL(bootinfo),%l3)
+	st	%o5, [%l3]		! store bootinfo
 	b,a	4f
 
 1:
 #ifdef DDB
 	/* Check for old-style DDB loader magic */
+	set	KERNBASE, %l4
 	set	0x44444231, %l3		! Is it DDB_MAGIC1?
 	cmp	%o5, %l3
 	be,a	2f
@@ -3481,8 +3835,8 @@ dostart:
 	 * let it default to `end'.
 	 */
 	set	end, %o4
-	sethi	%hi(_C_LABEL(kernel_top) - KERNBASE), %l3 ! store kernel_top
-	st	%o4, [%l3 + %lo(_C_LABEL(kernel_top) - KERNBASE)]
+	RELOCATE(_C_LABEL(kernel_top),%l3)
+	st	%o4, [%l3]	! store kernel_top
 
 4:
 
@@ -3495,9 +3849,10 @@ dostart:
 	be	is_sun4
 	 nop
 
-#if defined(SUN4C) || defined(SUN4M)
+#if defined(SUN4C) || defined(SUN4M) || defined(SUN4D)
 	/*
 	 * Be prepared to get OF client entry in either %o0 or %o3.
+	 * XXX Will this ever trip on sun4d?  Let's hope not!
 	 */
 	cmp	%o0, 0
 	be	is_openfirm
@@ -3513,31 +3868,37 @@ dostart:
 	 nop				! }
 
 	/*
-	 * are we on a sun4c or a sun4m?
+	 * are we on a sun4c or a sun4m or a sun4d?
 	 */
 	ld	[%g7 + PV_NODEOPS], %o4	! node = pv->pv_nodeops->no_nextnode(0)
 	ld	[%o4 + NO_NEXTNODE], %o4
 	call	%o4
 	 mov	0, %o0			! node
 
-	mov	%o0, %l0
-	set	cputypvar-KERNBASE, %o1	! name = "compatible"
-	set	cputypval-KERNBASE, %o2	! buffer ptr (assume buffer long enough)
+	!mov	%o0, %l0
+	RELOCATE(cputypvar,%o1)		! name = "compatible"
+	RELOCATE(cputypval,%l2)		! buffer ptr (assume buffer long enough)
 	ld	[%g7 + PV_NODEOPS], %o4	! (void)pv->pv_nodeops->no_getprop(...)
 	ld	[%o4 + NO_GETPROP], %o4
 	call	 %o4
-	 nop
-	set	cputypval-KERNBASE, %o2	! buffer ptr
-	ldub	[%o2 + 4], %o0		! which is it... "sun4c", "sun4m", "sun4d"?
+	 mov	%l2, %o2
+	!set	cputypval-KERNBASE, %o2	! buffer ptr
+	ldub	[%l2 + 4], %o0		! which is it... "sun4c", "sun4m", "sun4d"?
 	cmp	%o0, 'c'
 	be	is_sun4c
 	 nop
 	cmp	%o0, 'm'
 	be	is_sun4m
 	 nop
-#endif /* SUN4C || SUN4M */
+	cmp	%o0, 'd'
+	be	is_sun4d
+	 nop
+#endif /* SUN4C || SUN4M || SUN4D */
 
-	! ``on a sun4d?!  hell no!''
+	/*
+	 * Don't know what type of machine this is; just halt back
+	 * out to the PROM.
+	 */
 	ld	[%g7 + PV_HALT], %o1	! by this kernel, then halt
 	call	%o1
 	 nop
@@ -3554,10 +3915,26 @@ is_sun4m:
 	b	start_havetype
 	 mov	CPU_SUN4M, %g4
 #else
-	set	sun4m_notsup-KERNBASE, %o0
+	RELOCATE(sun4m_notsup,%o0)
 	ld	[%g7 + PV_EVAL], %o1
 	call	%o1			! print a message saying that the
 	 nop				! sun4m architecture is not supported
+	ld	[%g7 + PV_HALT], %o1	! by this kernel, then halt
+	call	%o1
+	 nop
+	/*NOTREACHED*/
+#endif
+is_sun4d:
+#if defined(SUN4D)
+	set	trapbase_sun4m, %g6	/* XXXJRT trapbase_sun4d */
+	mov	SUN4CM_PGSHIFT, %g5
+	b	start_havetype
+	 mov	CPU_SUN4D, %g4
+#else
+	RELOCATE(sun4d_notsup,%o0)
+	ld	[%g7 + PV_EVAL], %o1
+	call	%o1			! print a message saying that the
+	 nop				! sun4d architecture is not supported
 	ld	[%g7 + PV_HALT], %o1	! by this kernel, then halt
 	call	%o1
 	 nop
@@ -3574,7 +3951,7 @@ is_sun4c:
 	b	start_havetype
 	 mov	CPU_SUN4C, %g4		! XXX CPU_SUN4
 #else
-	set	sun4c_notsup-KERNBASE, %o0
+	RELOCATE(sun4c_notsup,%o0)
 
 	ld	[%g7 + PV_ROMVEC_VERS], %o1
 	cmp	%o1, 0
@@ -3584,6 +3961,7 @@ is_sun4c:
 	! stupid version 0 rom interface is pv_eval(int length, char *string)
 	mov	%o0, %o1
 2:	ldub	[%o0], %o4
+	tst	%o4
 	bne	2b
 	 inc	%o0
 	dec	%o0
@@ -3610,7 +3988,7 @@ is_sun4:
 #else
 	set	PROM_BASE, %g7
 
-	set	sun4_notsup-KERNBASE, %o0
+	RELOCATE(sun4_notsup,%o0)
 	ld	[%g7 + OLDMON_PRINTF], %o1
 	call	%o1			! print a message saying that the
 	 nop				! sun4 architecture is not supported
@@ -3621,6 +3999,9 @@ is_sun4:
 #endif
 
 start_havetype:
+	cmp	%l7, 0
+	be	startmap_done
+
 	/*
 	 * Step 1: double map low RAM (addresses [0.._end-start-1])
 	 * to KERNBASE (addresses [KERNBASE.._end-1]).  None of these
@@ -3700,10 +4081,14 @@ no_3mmu:
 2:
 #endif /* SUN4 */
 
-#if defined(SUN4M)
-	cmp	%g4, CPU_SUN4M		! skip for sun4m!
-	bne	3f
+#if defined(SUN4M) || defined(SUN4D)
+	cmp	%g4, CPU_SUN4M
+	beq	3f
+	 nop
+	cmp	%g4, CPU_SUN4D
+	bne	4f
 
+3:
 	/*
 	 * The OBP guarantees us a 16MB mapping using a level 1 PTE at
 	 * the start of the memory bank in which we were loaded. All we
@@ -3770,9 +4155,8 @@ remap_notvik:
 	add	%o1, %o2, %o1
 	sta	%l4, [%o1] ASI_BYPASS
 	!b,a	startmap_done
-
-3:
-#endif /* SUN4M */
+4:
+#endif /* SUN4M || SUN4D */
 	! botch! We should blow up.
 
 startmap_done:
@@ -3784,7 +4168,7 @@ startmap_done:
 	jmp	%g1
 	 nop
 1:
-	sethi	%hi(_C_LABEL(cputyp)), %o0	! what type of cpu we are on
+	sethi	%hi(_C_LABEL(cputyp)), %o0	! what type of CPU we are on
 	st	%g4, [%o0 + %lo(_C_LABEL(cputyp))]
 
 	sethi	%hi(_C_LABEL(pgshift)), %o0	! pgshift = log2(nbpg)
@@ -3860,7 +4244,7 @@ startmap_done:
 	/*
 	 * Some sun4/sun4c models have fewer than 8 windows. For extra
 	 * speed, we do not need to save/restore those windows
-	 * The save/restore code has 7 "save"'s followed by 7
+	 * The save/restore code has 6 "save"'s followed by 6
 	 * "restore"'s -- we "nop" out the last "save" and first
 	 * "restore"
 	 */
@@ -3870,12 +4254,12 @@ noplab:	 nop
 	sethi	%hi(noplab), %l0
 	ld	[%l0 + %lo(noplab)], %l1
 	set	wb1, %l0
+	st	%l1, [%l0 + 5*4]
 	st	%l1, [%l0 + 6*4]
-	st	%l1, [%l0 + 7*4]
 1:
 #endif
 
-#if ((defined(SUN4) || defined(SUN4C)) && defined(SUN4M))
+#if (defined(SUN4) || defined(SUN4C)) && (defined(SUN4M) || defined(SUN4D))
 
 	/*
 	 * Patch instructions at specified labels that start
@@ -3891,10 +4275,14 @@ Lgandul:	nop
 	ld	[%o0 + %lo(Lgandul)], %l0	! %l0 = NOP
 
 	cmp	%g4, CPU_SUN4M
+	beq,a	2f
+	 nop
+
+	cmp	%g4, CPU_SUN4D
 	bne,a	1f
 	 nop
 
-	! this should be automated!
+2:	! this should be automated!
 	MUNGE(NOP_ON_4M_1)
 	MUNGE(NOP_ON_4M_2)
 	MUNGE(NOP_ON_4M_3)
@@ -3907,8 +4295,6 @@ Lgandul:	nop
 	MUNGE(NOP_ON_4M_10)
 	MUNGE(NOP_ON_4M_11)
 	MUNGE(NOP_ON_4M_12)
-	MUNGE(NOP_ON_4M_13)
-	MUNGE(NOP_ON_4M_14)
 	MUNGE(NOP_ON_4M_15)
 	b,a	2f
 
@@ -3923,17 +4309,16 @@ Lgandul:	nop
 	/*
 	 * Step 4: change the trap base register, now that our trap handlers
 	 * will function (they need the tables we just set up).
-	 * This depends on the fact that bzero does not use %g6.
+	 * This depends on the fact that memset does not use %g6.
 	 */
 	wr	%g6, 0, %tbr
 	nop; nop; nop			! paranoia
 
-
-	/* Clear `cpuinfo' */
-	sethi	%hi(CPUINFO_VA), %o0		! bzero(&cpuinfo, NBPG)
-	sethi	%hi(CPUINFO_STRUCTSIZE), %o1
-	call	_C_LABEL(bzero)
-	 add	%o1, %lo(CPUINFO_STRUCTSIZE), %o1
+	/* Clear `cpuinfo': memset(&cpuinfo, 0, sizeof cpuinfo) */
+	sethi	%hi(CPUINFO_VA), %o0
+	set	CPUINFO_STRUCTSIZE, %o2
+	call	_C_LABEL(memset)
+	 clr	%o1
 
 	/*
 	 * Initialize `cpuinfo' fields which are needed early.  Note
@@ -3966,6 +4351,93 @@ Lgandul:	nop
 	 clr	%o0			! our frame arg is ignored
 	/*NOTREACHED*/
 
+/*
+ * Openfirmware entry point: openfirmware(void *args)
+ */
+ENTRY(openfirmware)
+	sethi	%hi(_C_LABEL(romp)), %o1
+	ld	[%o1 + %lo(_C_LABEL(romp))], %o2
+	jmp	%o2
+	 nop
+
+#if defined(SUN4M) || defined(SUN4D)
+/*
+ * V8 multiply and divide routines, to be copied over the code
+ * for the V6/V7 routines.  Seems a shame to spend the call, but....
+ * Note: while .umul and .smul return a 64-bit result in %o1%o0,
+ * gcc only really cares about the low 32 bits in %o0.  This is
+ * really just gcc output, cleaned up a bit.
+ */
+	.globl	_C_LABEL(sparc_v8_muldiv)
+_C_LABEL(sparc_v8_muldiv):
+	save    %sp, -CCFSZ, %sp
+
+#define	OVERWRITE(rtn, v8_rtn, len)	\
+	set	v8_rtn, %o0;		\
+	set	rtn, %o1;		\
+	call	_C_LABEL(bcopy);	\
+	 mov	len, %o2;		\
+	/* now flush the insn cache */	\
+	set	rtn, %o0;		\
+	 mov	len, %o1;		\
+0:					\
+	flush	%o0;			\
+	subcc	%o1, 8, %o1;		\
+	bgu	0b;			\
+	 add	%o0, 8, %o0;		\
+
+	OVERWRITE(.mul,  v8_smul, .Lv8_smul_len)
+	OVERWRITE(.umul, v8_umul, .Lv8_umul_len)
+	OVERWRITE(.div,  v8_sdiv, .Lv8_sdiv_len)
+	OVERWRITE(.udiv, v8_udiv, .Lv8_udiv_len)
+	OVERWRITE(.rem,  v8_srem, .Lv8_srem_len)
+	OVERWRITE(.urem, v8_urem, .Lv8_urem_len)
+#undef	OVERWRITE
+	ret
+	 restore
+
+v8_smul:
+	retl
+	 smul	%o0, %o1, %o0
+.Lv8_smul_len = .-v8_smul
+v8_umul:
+	retl
+	 umul	%o0, %o1, %o0
+!v8_umul_len = 2 * 4
+.Lv8_umul_len = .-v8_umul
+v8_sdiv:
+	sra	%o0, 31, %g2
+	wr	%g2, 0, %y
+	nop; nop; nop
+	retl
+	 sdiv	%o0, %o1, %o0
+.Lv8_sdiv_len = .-v8_sdiv
+v8_udiv:
+	wr	%g0, 0, %y
+	nop; nop; nop
+	retl
+	 udiv	%o0, %o1, %o0
+.Lv8_udiv_len = .-v8_udiv
+v8_srem:
+	sra	%o0, 31, %g3
+	wr	%g3, 0, %y
+	nop; nop; nop
+	sdiv	%o0, %o1, %g2
+	smul	%g2, %o1, %g2
+	retl
+	 sub	%o0, %g2, %o0
+.Lv8_srem_len = .-v8_srem
+v8_urem:
+	wr	%g0, 0, %y
+	nop; nop; nop
+	udiv	%o0, %o1, %g2
+	smul	%g2, %o1, %g2
+	retl
+	 sub	%o0, %g2, %o0
+.Lv8_urem_len = .-v8_urem
+
+#endif /* SUN4M || SUN4D */
+
 #if defined(MULTIPROCESSOR)
 	/*
 	 * Entry point for non-boot CPUs in MP systems.
@@ -3992,20 +4464,25 @@ _C_LABEL(cpu_hatch):
 
 	/* Set up a stack */
 	set	USRSTACK - CCFSZ, %fp	! as if called from user code
-	sethi	%hi(_C_LABEL(cpu_hatchstack)), %o0
-	ld	[%o0+%lo(_C_LABEL(cpu_hatchstack))], %o0
+	sethi	%hi(IDLE_UP), %o0
+	ld	[%o0 + %lo(IDLE_UP)], %o0
 	set	USPACE - CCFSZ - 80, %sp
 	add	%sp, %o0, %sp
 
 	/* Enable traps */
 	rd	%psr, %l0
 	wr	%l0, PSR_ET, %psr
-	nop; nop; nop
+	nop; nop
 
 	/* Call C code */
-	sethi	%hi(_C_LABEL(cpu_hatch_sc)), %o0
 	call	_C_LABEL(cpu_setup)
-	 ld	[%o0+%lo(_C_LABEL(cpu_hatch_sc))], %o0
+	 nop				! 3rd from above
+
+	/* Enable interrupts */
+	rd	%psr, %l0
+	andn	%l0, PSR_PIL, %l0	! psr &= ~PSR_PIL;
+	wr	%l0, 0, %psr		! (void) spl0();
+	nop; nop; nop
 
 	/* Wait for go_smp_cpus to go */
 	set	_C_LABEL(go_smp_cpus), %l1
@@ -4015,38 +4492,12 @@ _C_LABEL(cpu_hatch):
 	be	1b
 	 ld	[%l1], %l0
 
-#if 0	/* doesn't quite work yet */
-
-	set	_C_LABEL(proc0), %g3		! p = proc0
-	sethi	%hi(_C_LABEL(sched_whichqs)), %g2
-	sethi	%hi(cpcb), %g6
-	sethi	%hi(curproc), %g7
-	st	%g0, [%g7 + %lo(curproc)]	! curproc = NULL;
-
-	mov	PSR_S|PSR_ET, %g1		! oldpsr = PSR_S | PSR_ET;
-	sethi	%hi(IDLE_UP), %g5
-	ld	[%g5 + %lo(IDLE_UP)], %g5
-	st	%g5, [%g6 + %lo(cpcb)]		! cpcb = &idle_u
-	set	USPACE-CCFSZ, %o1
-	add	%g5, %o1, %sp			! set new %sp
-
-#ifdef DEBUG
-	mov	%g5, %o2			! %o2 = _idle_u
-	SET_SP_REDZONE(%o2, %o1)
-#endif /* DEBUG */
-
-	b	idle_enter_no_schedlock
-	 clr	%g4				! lastproc = NULL;	
-#else
-	/* Idle here .. */
-	rd	%psr, %l0
-	andn	%l0, PSR_PIL, %l0	! psr &= ~PSR_PIL;
-	wr	%l0, 0, %psr		! (void) spl0();
-	nop; nop; nop
-9:	ba 9b
-	 nop
-	/*NOTREACHED*/
-#endif
+	mov	PSR_S|PSR_ET, %l1	! oldpsr = PSR_S | PSR_ET;
+	sethi	%hi(_C_LABEL(sched_whichqs)), %l2
+	clr	%l4
+	sethi	%hi(cpcb), %l6
+	b	idle_enter
+	 sethi	%hi(curlwp), %l7
 
 #endif /* MULTIPROCESSOR */
 
@@ -4066,12 +4517,13 @@ _C_LABEL(sigcode):
 	RESTORE_STATE
 
 	! get registers back & set syscall #
-	restore	%g0, SYS___sigreturn14, %g1
+	restore	%g0, SYS_compat_16___sigreturn14, %g1
 	add	%sp, 64 + 16, %o0	! compute scp
 	t	ST_SYSCALL		! sigreturn(scp)
 	! sigreturn does not return unless it fails
 	mov	SYS_exit, %g1		! exit(errno)
 	t	ST_SYSCALL
+	/* NOTREACHED */
 _C_LABEL(esigcode):
 
 /*
@@ -4291,15 +4743,6 @@ ENTRY(write_user_windows)
 	 nop
 
 
-	.comm	_C_LABEL(want_resched),4
-	.comm	_C_LABEL(want_ast),4
-/*
- * Masterpaddr is the p->p_addr of the last process on the processor.
- * XXX masterpaddr is almost the same as cpcb
- * XXX should delete this entirely
- */
-	.comm	_C_LABEL(masterpaddr), 4
-
 /*
  * Switch statistics (for later tweaking):
  *	nswitchdiff = p1 => p2 (i.e., chose different process)
@@ -4310,63 +4753,16 @@ ENTRY(write_user_windows)
 	.comm	_C_LABEL(nswitchexit), 4
 
 /*
- * REGISTER USAGE IN cpu_switch AND switchexit:
- * This is split into two phases, more or less
- * `before we locate a new proc' and `after'.
- * Some values are the same in both phases.
- * Note that the %o0-registers are not preserved across
- * the psr change when entering a new process, since this
- * usually changes the CWP field (hence heavy usage of %g's).
- *
- *	%g1 = oldpsr (excluding ipl bits)
- *	%g2 = %hi(whichqs); newpsr
- *	%g3 = p
- *	%g4 = lastproc
- *	%g5 = <free>; newpcb
- *	%g6 = %hi(cpcb)
- *	%g7 = %hi(curproc)
- *	%o0 = tmp 1
- *	%o1 = tmp 2
- *	%o2 = tmp 3
- *	%o3 = tmp 4; whichqs; vm
- *	%o4 = tmp 4; which; sswap
- *	%o5 = tmp 5; q; <free>
- */
-
-/*
- * When calling external functions from cpu_switch() and idle(), we must
- * preserve the global registers mentioned above across the call.  We also
- * set up a stack frame since we will be running in our caller's frame
- * in cpu_switch().
- */
-#define SAVE_GLOBALS_AND_CALL(name)	\
-	save	%sp, -CCFSZ, %sp;	\
-	mov	%g1, %i0;		\
-	mov	%g2, %i1;		\
-	mov	%g3, %i2;		\
-	mov	%g4, %i3;		\
-	mov	%g6, %i4;		\
-	call	_C_LABEL(name);		\
-	 mov	%g7, %i5;		\
-	mov	%i5, %g7;		\
-	mov	%i4, %g6;		\
-	mov	%i3, %g4;		\
-	mov	%i2, %g3;		\
-	mov	%i1, %g2;		\
-	mov	%i0, %g1;		\
-	restore
-
-
-/*
  * switchexit is called only from cpu_exit() before the current process
  * has freed its vmspace and kernel stack; we must schedule them to be
- * freed.  (curproc is already NULL.)
+ * freed.  (curlwp is already NULL.)
  *
  * We lay the process to rest by changing to the `idle' kernel stack,
  * and note that the `last loaded process' is nonexistent.
  */
 ENTRY(switchexit)
 	mov	%o0, %g2		! save proc for exit2() call
+	mov	%o1, %g1		! exit2() or lwp_exit2()
 
 	/*
 	 * Change pcb to idle u. area, i.e., set %sp to top of stack
@@ -4398,93 +4794,103 @@ ENTRY(switchexit)
 	mov	%g5, %l6		! %l6 = _idle_u
 	SET_SP_REDZONE(%l6, %l5)
 #endif
-
 	wr	%g0, PSR_S|PSR_ET, %psr	! and then enable traps
-	call	_C_LABEL(exit2)		! exit2(p)
+	 nop
+	call	%g1			! {lwp}exit2(p)
 	 mov	%g2, %o0
 
 	/*
-	 * Now fall through to `the last switch'.  %g6 was set to
+	 * Now fall through to `the last switch'.  %l6 was set to
 	 * %hi(cpcb), but may have been clobbered in exit2(),
 	 * so all the registers described below will be set here.
 	 *
 	 * REGISTER USAGE AT THIS POINT:
-	 *	%g1 = oldpsr (excluding ipl bits)
-	 *	%g2 = %hi(whichqs)
-	 *	%g4 = lastproc
-	 *	%g6 = %hi(cpcb)
-	 *	%g7 = %hi(curproc)
+	 *	%l1 = oldpsr (excluding ipl bits)
+	 *	%l2 = %hi(whichqs)
+	 *	%l4 = lastproc
+	 *	%l6 = %hi(cpcb)
+	 *	%l7 = %hi(curlwp)
 	 *	%o0 = tmp 1
 	 *	%o1 = tmp 2
-	 *	%o3 = whichqs
 	 */
 
 	INCR(_C_LABEL(nswitchexit))	! nswitchexit++;
 	INCR(_C_LABEL(uvmexp)+V_SWTCH)	! cnt.v_switch++;
 
-	mov	PSR_S|PSR_ET, %g1	! oldpsr = PSR_S | PSR_ET;
-	sethi	%hi(_C_LABEL(sched_whichqs)), %g2
-	clr	%g4			! lastproc = NULL;
-	sethi	%hi(cpcb), %g6
-	sethi	%hi(curproc), %g7
-	st	%g0, [%g7 + %lo(curproc)]	! curproc = NULL;
-	b,a	idle_enter_no_schedlock
-	/* FALLTHROUGH */
-
-
-/* Macro used for register window flushing in the context switch code */
-#define	SAVE save %sp, -64, %sp
+	mov	PSR_S|PSR_ET, %l1	! oldpsr = PSR_S | PSR_ET;
+	sethi	%hi(_C_LABEL(sched_whichqs)), %l2
+#if !defined(MULTIPROCESSOR)
+	clr	%l4			! lastproc = NULL;
+#endif
+	sethi	%hi(cpcb), %l6
+	sethi	%hi(curlwp), %l7
+	b	idle_enter
+	 st	%g0, [%l7 + %lo(curlwp)]	! curlwp = NULL;
 
 /*
  * When no processes are on the runq, switch
  * idles here waiting for something to come ready.
  * The registers are set up as noted above.
+ *
+ * There are three entry points into the idle loop.
+ *	idle_switch:	when a switch to the CPU's idle stack is required
+ *	idle:		when already on the idle stack, scheduler lock held
+ *	idle_enter:	when already on the idle stack, scheduler lock not held
  */
-idle:
+idle_switch:
 #if defined(MULTIPROCESSOR)
-	/*
-	 * Change pcb to idle u. area, i.e., set %sp to top of stack
-	 * and %psr to PSR_S, and set cpcb to point to idle_u.
-	 */
-	/* XXX: FIXME
-	 * 7 of each:
-	 */
-	SAVE;    SAVE;    SAVE;    SAVE;    SAVE;    SAVE;    SAVE
-	restore; restore; restore; restore; restore; restore; restore
-
 	sethi	%hi(IDLE_UP), %g5
 	ld	[%g5 + %lo(IDLE_UP)], %g5
-	rd	%psr, %g1		! oldpsr = %psr;
-	andn	%g1, PSR_PIL|PSR_PS, %g1! oldpsr &= ~(PSR_PIL|PSR_PS);
-	and	%g1, PSR_S|PSR_ET, %g1	! oldpsr |= PSR_S|PSR_ET;
+#else
+	set	_C_LABEL(idle_u), %g5
+#endif
+	mov	%l6, %g6		! save %hi(cpcb) before changing windows
+	wr	%g0, PSR_S|PSR_PIL, %psr! change to window 0, traps off
+	wr	%g0, 2, %wim		! and make window 1 the trap window
+	mov	1, %o0
 	st	%g5, [%g6 + %lo(cpcb)]	! cpcb = &idle_u
-	set	USPACE-CCFSZ, %o1
+	st	%o0, [%g5 + PCB_WIM]	! idle_u.pcb_wim = log2(2) = 1
+#if defined(MULTIPROCESSOR)
+	set	USPACE-CCFSZ, %o1	!
 	add	%g5, %o1, %sp		! set new %sp
-	clr	%g4			! lastproc = NULL;
+#else
+	set	_C_LABEL(idle_u) + USPACE-CCFSZ, %sp	! set new %sp
+#endif
+	mov	%g0, %i6		! paranoid
+	mov	%g0, %i7		!
 
 #ifdef DEBUG
-	mov	%g5, %o2		! %o2 = _idle_u
-	SET_SP_REDZONE(%o2, %o1)
-#endif /* DEBUG */
-#endif /* MULTIPROCESSOR */
+	mov	%g5, %o0		! %o0 = _idle_u
+	SET_SP_REDZONE(%o0, %o1)
+#endif
+	! enable traps and continue at splsched()
+	wr	%g0, PSR_S|PSR_ET|(IPL_SCHED<<8), %psr
 
+	/* now set up the locals in our new window */
+	mov	PSR_S|PSR_ET, %l1	! oldpsr = PSR_S | PSR_ET;
+	sethi	%hi(_C_LABEL(sched_whichqs)), %l2
+	clr	%l4			! lastproc = NULL;
+	sethi	%hi(cpcb), %l6
+	sethi	%hi(curlwp), %l7
+	/* FALLTHROUGH*/
+
+idle:
 #if defined(MULTIPROCESSOR) || defined(LOCKDEBUG)
-	/* Release the scheduler lock */
-	SAVE_GLOBALS_AND_CALL(sched_unlock_idle)
+	! unlock scheduler lock
+	call	_C_LABEL(sched_unlock_idle)
+	 nop
 #endif
 
-idle_enter_no_schedlock:
-	wr	%g1, 0, %psr		! spl0();
+idle_enter:
+#if defined(MULTIPROCESSOR)
+	clr	%l4			! lastproc = NULL;
+#endif
+	wr	%l1, 0, %psr		! (void) spl0();
 1:					! spin reading whichqs until nonzero
-	ld	[%g2 + %lo(_C_LABEL(sched_whichqs))], %o3
+	ld	[%l2 + %lo(_C_LABEL(sched_whichqs))], %o3
 	tst	%o3
-#if defined(MULTIPROCESSOR) || defined(LOCKDEBUG)
 	bnz,a	idle_leave
-#else
-	bnz,a	Lsw_scan
-#endif
-	! NB: annulled delay slot (executed when we leave the idle loop)
-	 wr	%g1, PSR_PIL, %psr	! (void) splhigh();
+	 wr	%l1, (IPL_SCHED << 8), %psr	! (void) splsched();
 
 	! Check uvm.page_idle_zero
 	sethi	%hi(_C_LABEL(uvm) + UVM_PAGE_IDLE_ZERO), %o3
@@ -4493,16 +4899,21 @@ idle_enter_no_schedlock:
 	bz	1b
 	 nop
 
-	SAVE_GLOBALS_AND_CALL(uvm_pageidlezero)
+	call	_C_LABEL(uvm_pageidlezero)
+	 nop
 	b,a	1b
 
-#if defined(MULTIPROCESSOR) || defined(LOCKDEBUG)
 idle_leave:
+	! just wrote to %psr; observe psr delay before doing a `save'
+	! or loading sched_whichqs.
+	nop; nop
+#if defined(MULTIPROCESSOR) || defined(LOCKDEBUG)
 	/* Before we leave the idle loop, detain the scheduler lock */
-	nop;nop;nop;	/* just wrote to %psr; delay before doing a `save' */
-	SAVE_GLOBALS_AND_CALL(sched_lock_idle)
-	b,a	Lsw_scan
+	call	_C_LABEL(sched_lock_idle)
+	 nop
 #endif
+	b	Lsw_scan
+	 ld	[%l2 + %lo(_C_LABEL(sched_whichqs))], %o3
 
 Lsw_panic_rq:
 	sethi	%hi(1f), %o0
@@ -4529,22 +4940,23 @@ Lsw_panic_srun:
  * it here until we have found someone to load.  If that someone
  * is the current process we avoid both store and load.
  *
- * cpu_switch() is always entered at splstatclock or splhigh.
+ * cpu_switch() is always entered at splsched.
  *
  * IT MIGHT BE WORTH SAVING BEFORE ENTERING idle TO AVOID HAVING TO
  * SAVE LATER WHEN SOMEONE ELSE IS READY ... MUST MEASURE!
  */
 	.globl	_C_LABEL(__ffstab)
 ENTRY(cpu_switch)
+ENTRY(cpu_switchto)
 	/*
 	 * REGISTER USAGE AT THIS POINT:
-	 *	%g1 = oldpsr (excluding ipl bits)
-	 *	%g2 = %hi(whichqs)
-	 *	%g3 = p
-	 *	%g4 = lastproc
-	 *	%g5 = tmp 0
-	 *	%g6 = %hi(cpcb)
-	 *	%g7 = %hi(curproc)
+	 *	%l1 = oldpsr (excluding ipl bits)
+	 *	%l2 = %hi(whichqs)
+	 *	%l3(%g3) = p
+	 *	%l4(%g4) = lastproc
+	 *	%l5 = tmp 0
+	 *	%l6 = %hi(cpcb)
+	 *	%l7 = %hi(curlwp)
 	 *	%o0 = tmp 1
 	 *	%o1 = tmp 2
 	 *	%o2 = tmp 3
@@ -4552,22 +4964,46 @@ ENTRY(cpu_switch)
 	 *	%o4 = tmp 5, then at Lsw_scan, which
 	 *	%o5 = tmp 6, then at Lsw_scan, q
 	 */
-	mov	%o0, %g4			! lastproc = p;
-	sethi	%hi(_C_LABEL(sched_whichqs)), %g2	! set up addr regs
-	sethi	%hi(cpcb), %g6
-	ld	[%g6 + %lo(cpcb)], %o0
-	std	%o6, [%o0 + PCB_SP]		! cpcb->pcb_<sp,pc> = <sp,pc>;
-	rd	%psr, %g1			! oldpsr = %psr;
-	st	%g1, [%o0 + PCB_PSR]		! cpcb->pcb_psr = oldpsr;
-	andn	%g1, PSR_PIL, %g1		! oldpsr &= ~PSR_PIL;
-	sethi	%hi(curproc), %g7
-	st	%g0, [%g7 + %lo(curproc)]	! curproc = NULL;
+	save	%sp, -CCFSZ, %sp
+	mov	%i0, %l4			! save p
+	sethi	%hi(cpcb), %l6
+	ld	[%l6 + %lo(cpcb)], %o0
+	std	%i6, [%o0 + PCB_SP]		! cpcb->pcb_<sp,pc> = <fp,pc>;
+	rd	%psr, %l1			! oldpsr = %psr;
+	sethi	%hi(curlwp), %l7
+	st	%l1, [%o0 + PCB_PSR]		! cpcb->pcb_psr = oldpsr;
+	andn	%l1, PSR_PIL, %l1		! oldpsr &= ~PSR_PIL;
+	st	%g0, [%l7 + %lo(curlwp)]	! curlwp = NULL;
+	/*
+	 * Save the old process: write back all windows (excluding
+	 * the current one).  XXX crude; knows nwindows <= 8
+	 */
+#define	SAVE save %sp, -64, %sp
+wb1:	SAVE; SAVE; SAVE; SAVE; SAVE; SAVE;	/* 6 of each: */
+	restore; restore; restore; restore; restore; restore
+
+#if defined(MULTIPROCESSOR)
+	/* flush this process's context from TLB (on SUN4M/4D) */
+	call	_C_LABEL(pmap_deactivate)	! pmap_deactive(lastproc);
+	 mov	%i0, %o0
+#endif
+
+	/* If we've been given a process to switch to, skip the rq stuff */
+	tst	%i1
+	bnz,a	Lsw_load
+	 mov	%i1, %l3	! but move into the expected register first
+
+	/* If nothing on the rq, wait after switching to idle stack */
+	sethi	%hi(_C_LABEL(sched_whichqs)), %l2
+	ld	[%l2 + %lo(_C_LABEL(sched_whichqs))], %o3
+	tst	%o3
+	bz	idle_switch
+	 EMPTY
 
 Lsw_scan:
-	nop; nop; nop				! paranoia
-	ld	[%g2 + %lo(_C_LABEL(sched_whichqs))], %o3
-
 	/*
+	 * Enter here with %o3 set to sched_whichqs.
+	 *
 	 * Optimized inline expansion of `which = ffs(whichqs) - 1';
 	 * branches to idle if ffs(whichqs) was 0.
 	 */
@@ -4602,30 +5038,31 @@ Lsw_scan:
 	set	_C_LABEL(sched_qs), %o5	! q = &qs[which];
 	sll	%o4, 3, %o0
 	add	%o0, %o5, %o5
-	ld	[%o5], %g3		! p = q->ph_link;
-	cmp	%g3, %o5		! if (p == q)
+	ld	[%o5], %l3		! p = q->ph_link;
+	cmp	%l3, %o5		! if (p == q)
 	be	Lsw_panic_rq		!	panic("switch rq");
 	 EMPTY
-	ld	[%g3], %o0		! tmp0 = p->p_forw;
+	ld	[%l3], %o0		! tmp0 = p->p_forw;
 	st	%o0, [%o5]		! q->ph_link = tmp0;
 	st	%o5, [%o0 + 4]		! tmp0->p_back = q;
 	cmp	%o0, %o5		! if (tmp0 == q)
-	bne	1f
+	bne	Lsw_load
 	 EMPTY
 	mov	1, %o1			!	whichqs &= ~(1 << which);
 	sll	%o1, %o4, %o1
 	andn	%o3, %o1, %o3
-	st	%o3, [%g2 + %lo(_C_LABEL(sched_whichqs))]
-1:
+	st	%o3, [%l2 + %lo(_C_LABEL(sched_whichqs))]
+
+Lsw_load:
 	/*
 	 * PHASE TWO: NEW REGISTER USAGE:
-	 *	%g1 = oldpsr (excluding ipl bits)
-	 *	%g2 = newpsr
-	 *	%g3 = p
-	 *	%g4 = lastproc
-	 *	%g5 = newpcb
-	 *	%g6 = %hi(cpcb)
-	 *	%g7 = %hi(curproc)
+	 *	%l1 = oldpsr (excluding ipl bits)
+	 *	%l2 =
+	 *	%l3 = p
+	 *	%l4 = lastproc
+	 *	%l5 =
+	 *	%l6 = %hi(cpcb)
+	 *	%l7 = %hi(curlwp)
 	 *	%o0 = tmp 1
 	 *	%o1 = tmp 2
 	 *	%o2 = tmp 3
@@ -4633,12 +5070,12 @@ Lsw_scan:
 	 */
 
 	/* firewalls */
-	ld	[%g3 + P_WCHAN], %o0	! if (p->p_wchan)
+	ld	[%l3 + L_WCHAN], %o0	! if (p->p_wchan)
 	tst	%o0
 	bne	Lsw_panic_wchan		!	panic("switch wchan");
 	 EMPTY
-	ldsb	[%g3 + P_STAT], %o0	! if (p->p_stat != SRUN)
-	cmp	%o0, SRUN
+	ld	[%l3 + L_STAT], %o0	! if (p->p_stat != LSRUN)
+	cmp	%o0, LSRUN
 	bne	Lsw_panic_srun		!	panic("switch SRUN");
 	 EMPTY
 
@@ -4646,117 +5083,133 @@ Lsw_scan:
 	 * Committed to running process p.
 	 * It may be the same as the one we were running before.
 	 */
-	mov	SONPROC, %o0			! p->p_stat = SONPROC;
-	stb	%o0, [%g3 + P_STAT]
+	mov	LSONPROC, %o0			! p->p_stat = LSONPROC;
+	st	%o0, [%l3 + L_STAT]
 
 	/* p->p_cpu initialized in fork1() for single-processor */
 #if defined(MULTIPROCESSOR)
 	sethi	%hi(_CISELFP), %o0		! p->p_cpu = cpuinfo.ci_self;
 	ld	[%o0 + %lo(_CISELFP)], %o0
-	st	%o0, [%g3 + P_CPU]
+	st	%o0, [%l3 + L_CPU]
 #endif
 
-	sethi	%hi(_C_LABEL(want_resched)), %o0	! want_resched = 0;
-	st	%g0, [%o0 + %lo(_C_LABEL(want_resched))]
-#if defined(MULTIPROCESSOR) || defined(LOCKDEBUG)
-	/* Done with the run queues; release the scheduler lock */
-	SAVE_GLOBALS_AND_CALL(sched_unlock_idle)
-#endif
-	ld	[%g3 + P_ADDR], %g5		! newpcb = p->p_addr;
-	st	%g0, [%g3 + 4]			! p->p_back = NULL;
-	ld	[%g5 + PCB_PSR], %g2		! newpsr = newpcb->pcb_psr;
-	st	%g3, [%g7 + %lo(curproc)]	! curproc = p;
-
-	cmp	%g3, %g4		! p == lastproc?
-	be,a	Lsw_sameproc		! yes, go return 0
-	 wr	%g2, 0, %psr		! (after restoring ipl)
-
-	/*
-	 * Not the old process.  Save the old process, if any;
-	 * then load p.
-	 */
-	tst	%g4
-	be,a	Lsw_load		! if no old process, go load
-	 wr	%g1, (PIL_CLOCK << 8) | PSR_ET, %psr
-
-	INCR(_C_LABEL(nswitchdiff))	! clobbers %o0,%o1
-	/*
-	 * save: write back all windows (including the current one).
-	 * XXX	crude; knows nwindows <= 8
-	 */
-wb1:	/* 7 of each: */
-	SAVE;    SAVE;    SAVE;    SAVE;    SAVE;    SAVE;    SAVE
-	restore; restore; restore; restore; restore; restore; restore
+	ld	[%l3 + L_ADDR], %g5		! newpcb = p->p_addr;
+	st	%g0, [%l3 + 4]			! p->p_back = NULL;
+	st	%l3, [%l7 + %lo(curlwp)]	! curlwp = p;
 
 	/*
 	 * Load the new process.  To load, we must change stacks and
-	 * alter cpcb and %wim, hence we must disable traps.  %psr is
-	 * currently equal to oldpsr (%g1) ^ (PIL_CLOCK << 8);
-	 * this means that PSR_ET is on.  Likewise, PSR_ET is on
-	 * in newpsr (%g2), although we do not know newpsr's ipl.
+	 * and alter cpcb. We must also load the CWP and WIM from the
+	 * new process' PCB, since, when we finally return from
+	 * the trap, the CWP of the trap window must match the
+	 * CWP stored in the trap frame.
 	 *
-	 * We also must load up the `in' and `local' registers.
+	 * Once the new CWP is set below our local registers become
+	 * invalid, so:
+	 *
+	 * PHASE THREE: NEW REGISTER USAGE:
+	 *	%g2 = newpsr
+	 *	%g3 = p
+	 *	%g4 = lastproc
+	 *	%g5 = newpcb
+	 *	%l0 = return value
+	 *	%l1 = oldpsr (excluding ipl bits)
+	 *	%l6 = %hi(cpcb)
+	 *	%o0 = tmp 1
+	 *	%o1 = tmp 2
+	 *	%o2 = tmp 3
+	 *	%o3 = vm
 	 */
-	wr	%g1, (PIL_CLOCK << 8) | PSR_ET, %psr
-Lsw_load:
-!	wr	%g1, (PIL_CLOCK << 8) | PSR_ET, %psr	! done above
+
+	mov	%l3, %g3		! save p and lastproc to globals
+	mov	%l4, %g4		!
+	ld	[%g5 + PCB_PSR], %g2	! newpsr = newpcb->pcb_psr;
+
+	/* traps off while we switch to the new stack */
+	wr	%l1, (IPL_SCHED << 8) | PSR_ET, %psr
+
+	/* set new cpcb */
+	st	%g5, [%l6 + %lo(cpcb)]	! cpcb = newpcb;
+
 	/* compute new wim */
 	ld	[%g5 + PCB_WIM], %o0
 	mov	1, %o1
 	sll	%o1, %o0, %o0
 	wr	%o0, 0, %wim		! %wim = 1 << newpcb->pcb_wim;
-	/* Clear FP & CP enable bits, as well as the PIL field */
 	/* now must not change %psr for 3 more instrs */
-/*1*/	set	PSR_EF|PSR_EC|PSR_PIL, %o0
-/*2*/	andn	%g2, %o0, %g2		! newpsr &= ~(PSR_EF|PSR_EC|PSR_PIL);
-/*3*/	nop
+	/* Clear FP & CP enable bits, as well as the PIL field */
+/*1,2*/	set	PSR_EF|PSR_EC|PSR_PIL, %o0
+/*3*/	andn	%g2, %o0, %g2		! newpsr &= ~(PSR_EF|PSR_EC|PSR_PIL);
 	/* set new psr, but with traps disabled */
-	wr	%g2, PSR_ET, %psr	! %psr = newpsr ^ PSR_ET;
-	/* set new cpcb */
-	st	%g5, [%g6 + %lo(cpcb)]	! cpcb = newpcb;
-	ldd	[%g5 + PCB_SP], %o6	! <sp,pc> = newpcb->pcb_<sp,pc>
-	/* load window */
-	ldd	[%sp + (0*8)], %l0
-	ldd	[%sp + (1*8)], %l2
-	ldd	[%sp + (2*8)], %l4
-	ldd	[%sp + (3*8)], %l6
-	ldd	[%sp + (4*8)], %i0
-	ldd	[%sp + (5*8)], %i2
-	ldd	[%sp + (6*8)], %i4
-	ldd	[%sp + (7*8)], %i6
+	wr	%g2, (IPL_SCHED << 8)|PSR_ET, %psr ! %psr = newpsr ^ PSR_ET;
+
+	/* load new stack and return address */
+	ldd	[%g5 + PCB_SP], %i6	! <fp,pc> = newpcb->pcb_<sp,pc>
+	add	%fp, -CCFSZ, %sp	! set stack frame for this window
 #ifdef DEBUG
 	mov	%g5, %o0
 	SET_SP_REDZONE(%o0, %o1)
 	CHECK_SP_REDZONE(%o0, %o1)
 #endif
-	/* finally, enable traps and continue at splclock() */
-	wr	%g2, PIL_CLOCK << 8 , %psr	! psr = newpsr;
+
+	/* finally, enable traps and continue at splsched() */
+	wr	%g2, IPL_SCHED << 8 , %psr	! psr = newpsr;
+
+	mov	%g3, %l3		! restore p and lastproc from globals
+	mov	%g4, %l4		! (globals will get clobbered by the
+					!  sched_unlock_idle() below)
+
+	sethi	%hi(_WANT_RESCHED), %o0		! want_resched = 0;
+#if defined(MULTIPROCESSOR) || defined(LOCKDEBUG)
+	/* Done with the run queues; release the scheduler lock */
+	call	_C_LABEL(sched_unlock_idle)
+#endif
+	st	%g0, [%o0 + %lo(_WANT_RESCHED)]! delay slot
 
 	/*
 	 * Now running p.  Make sure it has a context so that it
 	 * can talk about user space stuff.  (Its pcb_uw is currently
 	 * zero so it is safe to have interrupts going here.)
+	 *
+	 * On multi-processor machines, the context might have changed
+	 * (e.g. by exec(2)) even if we pick up the same process here.
 	 */
-	ld	[%g3 + P_VMSPACE], %o3	! vm = p->p_vmspace;
+	subcc	%l3, %l4, %l0		! p == lastproc?
+#if !defined(MULTIPROCESSOR)
+	be	Lsw_sameproc		! yes, context is still set for p
+	 EMPTY
+#endif
+
+	ld	[%l3 + L_PROC], %o2	! p = l->l_proc;
+	INCR(_C_LABEL(nswitchdiff))	! clobbers %o0,%o1
+	ld	[%o2 + P_VMSPACE], %o3	! vm = p->p_vmspace;
 	ld	[%o3 + VM_PMAP], %o3	! pm = vm->vm_map.vm_pmap;
+#if defined(MULTIPROCESSOR)
+	/* Add this CPU to the pmap's CPU set */
+	sethi	%hi(CPUINFO_VA + CPUINFO_CPUNO), %o0
+	ld	[%o0 + %lo(CPUINFO_VA + CPUINFO_CPUNO)], %o1
+	mov	1, %o2
+	ld	[%o3 + PMAP_CPUSET], %o0
+	sll	%o2, %o1, %o2
+	or	%o0, %o2, %o0		! pm->pm_cpuset |= cpu_number();
+	st	%o0, [%o3 + PMAP_CPUSET]
+#endif
 	ld	[%o3 + PMAP_CTX], %o0	! if (pm->pm_ctx != NULL)
 	tst	%o0
 	bnz,a	Lsw_havectx		!	goto havecontext;
-	 ld	[%o3 + PMAP_CTXNUM], %o0	! load context number
+	 ld	[%o3 + PMAP_CTXNUM], %i1	! load context number
 
 	/* p does not have a context: call ctx_alloc to get one */
-	save	%sp, -CCFSZ, %sp
 	call	_C_LABEL(ctx_alloc)	! ctx_alloc(pm);
-	 mov	%i3, %o0
+	 mov	%o3, %o0
 
 	ret
-	 restore
+	 restore %g0, %l0, %o0		! return (p != lastproc)
 
 	/* p does have a context: just switch to it */
 Lsw_havectx:
-	! context is in %o0
-	! pmap is in %o3
-#if (defined(SUN4) || defined(SUN4C)) && defined(SUN4M)
+	! context is in %i1
+#if defined(SUN4M) && (defined(SUN4) || defined(SUN4C))
 NOP_ON_4M_15:
 	b,a	1f
 	b,a	2f
@@ -4764,35 +5217,34 @@ NOP_ON_4M_15:
 1:
 #if defined(SUN4) || defined(SUN4C)
 	set	AC_CONTEXT, %o1
-	retl
-	 stba	%o0, [%o1] ASI_CONTROL	! setcontext(vm->vm_pmap.pm_ctxnum);
+	stba	%i1, [%o1] ASI_CONTROL	! setcontext(vm->vm_pmap.pm_ctxnum);
+	ret
+	 restore %g0, %l0, %o0		! return (p != lastproc)
 #endif
 2:
-#if defined(SUN4M)
+#if defined(SUN4M) || defined(SUN4D)
 	/*
 	 * Flush caches that need to be flushed on context switch.
 	 * We know this is currently only necessary on the sun4m hypersparc.
 	 */
-	set	CPUINFO_VA+CPUINFO_PURE_VCACHE_FLS, %o2
-	ld	[%o2], %o2
-	mov	%o7, %g7	! save return address
-	jmpl	%o2, %o7	! this function must not clobber %o0 and %g7
-	 nop
-
-	set	SRMMU_CXR, %o1
-	jmp	%g7 + 8
-	 sta	%o0, [%o1] ASI_SRMMU	! setcontext(vm->vm_pmap.pm_ctxnum);
+	sethi	%hi(CPUINFO_VA + CPUINFO_PURE_VCACHE_FLS), %o0
+	ld	[%o0 + %lo(CPUINFO_VA + CPUINFO_PURE_VCACHE_FLS)], %o2
+	jmpl	%o2, %o7
+	 set	SRMMU_CXR, %i2
+	sta	%i1, [%i2] ASI_SRMMU	! setcontext(vm->vm_pmap.pm_ctxnum);
+	ret
+	 restore %g0, %l0, %o0		! return (p != lastproc)
 #endif
 
+#if !defined(MULTIPROCESSOR)
 Lsw_sameproc:
 	/*
 	 * We are resuming the process that was running at the
-	 * call to switch().  Just set psr ipl and return.
+	 * call to switch().
 	 */
-!	wr	%g2, 0 %psr		! %psr = newpsr; (done earlier)
-	nop
-	retl
-	 nop
+	ret
+	 restore %g0, %g0, %o0		! return (0)
+#endif /* !MULTIPROCESSOR */
 
 
 /*
@@ -4830,15 +5282,15 @@ ENTRY(proc_trampoline)
 	 * so we can call other functions from here without using
 	 * `save ... restore'.
 	 */
-#if defined(MULTIPROCESSOR)
+#ifdef MULTIPROCESSOR
 	/* Finish setup in SMP environment: acquire locks etc. */
 	call _C_LABEL(proc_trampoline_mp)
 	 nop
 #endif
 
 	/* Reset interrupt level */
-	rd	%psr, %o0
-	andn	%o0, PSR_PIL, %o0	! psr &= ~PSR_PIL;
+	rd	%psr, %l2
+	andn	%l2, PSR_PIL, %o0	! psr &= ~PSR_PIL;
 	wr	%o0, 0, %psr		! (void) spl0();
 	 nop				! psr delay; the next 2 instructions
 					! can safely be made part of the
@@ -4848,13 +5300,13 @@ ENTRY(proc_trampoline)
 
 	/*
 	 * Here we finish up as in syscall, but simplified.
-	 * cpu_fork() or sendsig() (if we took a pending signal
+	 * cpu_fork() (or sendsig(), if we took a pending signal
 	 * in child_return()) will have set the user-space return
 	 * address in tf_pc. In both cases, %npc should be %pc + 4.
 	 */
-	mov	PSR_S, %l0		! user psr (no need to load it)
-	!?wr	%g0, 2, %wim		! %wim = 2
 	ld	[%sp + CCFSZ + 4], %l1	! pc = tf->tf_pc from cpu_fork()
+	and	%l2, PSR_CWP, %o1	! keep current CWP
+	or	%o1, PSR_S, %l0		! user psr
 	b	return_from_syscall
 	 add	%l1, 4, %l2		! npc = pc+4
 
@@ -5775,31 +6227,15 @@ ENTRY(loadfpstate)
  * ienab_bis(bis) int bis;
  * ienab_bic(bic) int bic;
  *
- * Set and clear bits in the interrupt register.
+ * Set and clear bits in the sun4/sun4c interrupt register.
  */
-
-#if defined(SUN4M) && (defined(SUN4) || defined(SUN4C))
-ENTRY(ienab_bis)
-NOP_ON_4M_13:
-	b,a	_C_LABEL(ienab_bis_4_4c)
-	b,a	_C_LABEL(ienab_bis_4m)
-
-ENTRY(ienab_bic)
-NOP_ON_4M_14:
-	b,a	_C_LABEL(ienab_bic_4_4c)
-	b,a	_C_LABEL(ienab_bic_4m)
-#endif
 
 #if defined(SUN4) || defined(SUN4C)
 /*
  * Since there are no read-modify-write instructions for this,
  * and one of the interrupts is nonmaskable, we must disable traps.
  */
-#if defined(SUN4M)
-ENTRY(ienab_bis_4_4c)
-#else
 ENTRY(ienab_bis)
-#endif
 	! %o0 = bits to set
 	rd	%psr, %o2
 	wr	%o2, PSR_ET, %psr	! disable traps
@@ -5813,11 +6249,7 @@ ENTRY(ienab_bis)
 	retl
 	 nop
 
-#if defined(SUN4M)
-ENTRY(ienab_bic_4_4c)
-#else
 ENTRY(ienab_bic)
-#endif
 	! %o0 = bits to clear
 	rd	%psr, %o2
 	wr	%o2, PSR_ET, %psr	! disable traps
@@ -5830,30 +6262,9 @@ ENTRY(ienab_bic)
 	nop
 	retl
 	 nop
-#endif
+#endif	/* SUN4 || SUN4C */
 
 #if defined(SUN4M)
-/*
- * sun4m has separate registers for clearing/setting the interrupt mask.
- */
-#if defined(SUN4) || defined(SUN4C)
-ENTRY(ienab_bis_4m)
-#else
-ENTRY(ienab_bis)
-#endif
-	set	ICR_SI_SET, %o1
-	retl
-	 st	%o0, [%o1]
-
-#if defined(SUN4) || defined(SUN4C)
-ENTRY(ienab_bic_4m)
-#else
-ENTRY(ienab_bic)
-#endif
-	set	ICR_SI_CLR, %o1
-	retl
-	 st	%o0, [%o1]
-
 /*
  * raise(cpu, level)
  */
@@ -5870,7 +6281,7 @@ ENTRY(raise)
 	 add	%o1, %o3, %o1
 	retl
 	 st	%o2, [%o1]
-#else /* MSIIEP - ignore %o0, only one cpu ever */
+#else /* MSIIEP - ignore %o0, only one CPU ever */
 	mov	1, %o2
 	sethi	%hi(MSIIEP_PCIC_VA), %o0
 	sll	%o2, %o1, %o2
@@ -5913,7 +6324,7 @@ _ENTRY(_C_LABEL(cypress_get_syncflt))
 	jmp	%l7 + 8			! return to caller
 	 st	%l5, [%l4]		! => dump.sfsr
 
-#if defined(MULTIPROCESSOR) && 0 /* notyet *
+#if defined(MULTIPROCESSOR) && 0 /* notyet */
 /*
  * Read Synchronous Fault Status registers.
  * On entry: %o0 == &sfsr, %o1 == &sfar
@@ -6055,7 +6466,7 @@ NOP_ON_4_4C_1:
  * void microtime(struct timeval *tv)
  *
  * This is similar to 4c/4m microtime.   The difference is that
- * counter uses 31 bits and ticks every 4 CPU cycles (cpu is @100MHz)
+ * counter uses 31 bits and ticks every 4 CPU cycles (CPU is @100MHz)
  * the magic to divide by 25 is stolen from gcc
  */
 ENTRY(microtime)
@@ -6139,6 +6550,39 @@ ENTRY(delay)			! %o0 = n
 2:
 	retl				! return
 	 nop				! [delay slot]
+
+
+/*
+ * void __cpu_simple_lock(__cpu_simple_lock_t *alp)
+ */
+_ENTRY(_C_LABEL(__cpu_simple_lock))
+0:
+	ldstub	[%o0], %o1
+	tst	%o1
+	bnz	1f
+	 set	0x1000000, %o2	! set spinout counter
+	retl
+	 EMPTY
+1:
+	ldub	[%o0], %o1
+	tst	%o1
+	bz	0b		! lock has been released; try again
+	deccc	%o2
+	bcc	1b		! repeat until counter < 0
+	 nop
+
+	! spun out; set up stack frame and call panic
+	save	%sp, -CCFSZ, %sp
+	sethi	%hi(CPUINFO_VA + CPUINFO_CPUNO), %o0
+	ld	[%o0 + %lo(CPUINFO_VA + CPUINFO_CPUNO)], %o1
+	mov	%i0, %o2
+	sethi	%hi(Lpanic_spunout), %o0
+	call	_C_LABEL(panic)
+	or	%o0, %lo(Lpanic_spunout), %o0
+
+Lpanic_spunout:
+	.asciz	"cpu%d: stuck on lock@%x"
+	_ALIGN
 
 #if defined(KGDB) || defined(DDB) || defined(DIAGNOSTIC)
 /*

@@ -1,4 +1,4 @@
-/*	$NetBSD: hpux_exec.c,v 1.29 2002/03/16 20:43:50 christos Exp $	*/
+/*	$NetBSD: hpux_exec.c,v 1.42.2.1 2004/08/22 14:10:43 tron Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -48,6 +48,7 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
  *	This product includes software developed by Christopher G. Demetriou.
  * 4. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission
@@ -70,7 +71,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: hpux_exec.c,v 1.29 2002/03/16 20:43:50 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: hpux_exec.c,v 1.42.2.1 2004/08/22 14:10:43 tron Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -88,6 +89,7 @@ __KERNEL_RCSID(0, "$NetBSD: hpux_exec.c,v 1.29 2002/03/16 20:43:50 christos Exp 
 #include <machine/cpu.h>
 #include <machine/reg.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>    
 
 #include <compat/hpux/hpux.h>
@@ -101,26 +103,44 @@ extern struct sysent hpux_sysent[];
 extern const char * const hpux_syscallnames[];
 extern char sigcode[], esigcode[];
 extern int native_to_hpux_errno[];
+#ifdef __HAVE_SYSCALL_INTERN
+void hpux_syscall_intern __P((struct proc *));
+#else
 void syscall __P((void));
+#endif
+
+struct uvm_object *emul_hpux_object;
 
 const struct emul emul_hpux = {
 	"hpux",
 	"/emul/hpux",
+#ifndef __HAVE_MINIMAL_EMUL
 	0,
 	native_to_hpux_errno,
 	HPUX_SYS_syscall,
-	HPUX_SYS_MAXSYSCALL,
+	HPUX_SYS_NSYSENT,
+#endif
 	hpux_sysent,
 	hpux_syscallnames,
 	hpux_sendsig,
 	trapsignal,
+	NULL,
 	sigcode,
 	esigcode,
+	&emul_hpux_object,
 	hpux_setregs,
 	NULL,
 	NULL,
 	NULL,
-	syscall
+	NULL,
+	NULL,
+#ifdef __HAVE_SYSCALL_INTERN
+	hpux_syscall_intern,
+#else
+	syscall,
+#endif
+	NULL,
+	NULL,
 };
 
 /*
@@ -130,8 +150,8 @@ const struct emul emul_hpux = {
  * execve().
  */
 int
-hpux_sys_execv(p, v, retval)
-	struct proc *p;
+hpux_sys_execv(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -139,6 +159,7 @@ hpux_sys_execv(p, v, retval)
 		syscallarg(const char *) path;
 		syscallarg(char **) argv;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct sys_execve_args ap;
 	caddr_t sg;
 
@@ -149,12 +170,12 @@ hpux_sys_execv(p, v, retval)
 	SCARG(&ap, argp) = SCARG(uap, argp);
 	SCARG(&ap, envp) = NULL;
 
-	return sys_execve(p, &ap, retval);
+	return sys_execve(l, &ap, retval);
 }
 
 int
-hpux_sys_execve(p, v, retval)
-	struct proc *p;
+hpux_sys_execve(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -163,6 +184,7 @@ hpux_sys_execve(p, v, retval)
 		syscallarg(char **) argv;
 		syscallarg(char **) envp;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct sys_execve_args ap;
 	caddr_t sg;
 
@@ -173,5 +195,5 @@ hpux_sys_execve(p, v, retval)
 	SCARG(&ap, argp) = SCARG(uap, argp);
 	SCARG(&ap, envp) = SCARG(uap, envp);
 
-	return sys_execve(p, &ap, retval);
+	return sys_execve(l, &ap, retval);
 }

@@ -1,10 +1,43 @@
-/*	$NetBSD: p_dti_tyne.c,v 1.1 2001/06/13 15:27:18 soda Exp $	*/
+/*	$NetBSD: p_dti_tyne.c,v 1.6 2003/08/07 16:26:48 agc Exp $	*/
 /*	$OpenBSD: machdep.c,v 1.36 1999/05/22 21:22:19 weingart Exp $	*/
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department, The Mach Operating System project at
+ * Carnegie-Mellon University and Ralph Campbell.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	from: @(#)machdep.c	8.3 (Berkeley) 1/12/94
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -41,6 +74,9 @@
  *
  *	from: @(#)machdep.c	8.3 (Berkeley) 1/12/94
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: p_dti_tyne.c,v 1.6 2003/08/07 16:26:48 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -86,15 +122,70 @@ struct platform platform_desktech_tyne = {
 	"DESKTECH-TYNE",
 	"DESKTECH",
 	"",
-	"DESKstation Tyne",
+	"DeskStation Tyne",
 	"DESKTECH",
-	150, /* MHz ?? */
+	133, /* MHz */
 	p_dti_tyne_mainbusdevs,
 	platform_generic_match,
 	p_dti_tyne_init,
 	c_isa_cons_init,
 	p_dti_tyne_reset,
 	arc_set_intr,
+};
+
+/*
+ * This is a mask of bits to clear in the SR when we go to a
+ * given interrupt priority level.
+ */
+/* XXX see comments in p_dti_tyne_init() */
+static const u_int32_t dti_tyne_ipl_sr_bits[_IPL_N] = {
+	0,					/* IPL_NONE */
+
+	MIPS_SOFT_INT_MASK_0,			/* IPL_SOFT */
+
+	MIPS_SOFT_INT_MASK_0,			/* IPL_SOFTCLOCK */
+
+	MIPS_SOFT_INT_MASK_0|
+		MIPS_SOFT_INT_MASK_1,		/* IPL_SOFTNET */
+
+	MIPS_SOFT_INT_MASK_0|
+		MIPS_SOFT_INT_MASK_1,		/* IPL_SOFTSERIAL */
+
+	MIPS_SOFT_INT_MASK_0|
+		MIPS_SOFT_INT_MASK_1|
+		MIPS_INT_MASK_0|
+		MIPS_INT_MASK_1|
+		MIPS_INT_MASK_2|
+		MIPS_INT_MASK_3|
+		MIPS_INT_MASK_4|
+		MIPS_INT_MASK_5,		/* XXX IPL_BIO */
+
+	MIPS_SOFT_INT_MASK_0|
+		MIPS_SOFT_INT_MASK_1|
+		MIPS_INT_MASK_0|
+		MIPS_INT_MASK_1|
+		MIPS_INT_MASK_2|
+		MIPS_INT_MASK_3|
+		MIPS_INT_MASK_4|
+		MIPS_INT_MASK_5,		/* XXX IPL_NET */
+
+	MIPS_SOFT_INT_MASK_0|
+		MIPS_SOFT_INT_MASK_1|
+		MIPS_INT_MASK_0|
+		MIPS_INT_MASK_1|
+		MIPS_INT_MASK_2|
+		MIPS_INT_MASK_3|
+		MIPS_INT_MASK_4|
+		MIPS_INT_MASK_5,		/* XXX IPL_{TTY,SERIAL} */
+
+	MIPS_SOFT_INT_MASK_0|
+		MIPS_SOFT_INT_MASK_1|
+		MIPS_INT_MASK_0|
+		MIPS_INT_MASK_1|
+		MIPS_INT_MASK_2|
+		MIPS_INT_MASK_3|
+		MIPS_INT_MASK_4|
+		MIPS_INT_MASK_5,		/* XXX IPL_{CLOCK,HIGH} */
 };
 
 #if NPC_ISA > 0 || NOPMS_ISA > 0
@@ -199,6 +290,7 @@ p_dti_tyne_init()
 	 * or
 	 *	- use MIP3_INTERNAL_TIMER_INTERRUPT for clock
 	 */
+	ipl_sr_bits = dti_tyne_ipl_sr_bits;
 
 	/*
 	 * common configuration for DTI platforms

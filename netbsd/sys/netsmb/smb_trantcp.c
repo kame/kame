@@ -1,4 +1,4 @@
-/*	$NetBSD: smb_trantcp.c,v 1.3 2002/01/04 02:39:45 deberg Exp $	*/
+/*	$NetBSD: smb_trantcp.c,v 1.15 2003/06/29 22:32:11 fvdl Exp $	*/
 
 /*
  * Copyright (c) 2000-2001 Boris Popov
@@ -31,8 +31,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * FreeBSD: src/sys/netsmb/smb_trantcp.c,v 1.4 2001/12/02 08:47:29 bp Exp
+ * FreeBSD: src/sys/netsmb/smb_trantcp.c,v 1.17 2003/02/19 05:47:38 imp Exp
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: smb_trantcp.c,v 1.15 2003/06/29 22:32:11 fvdl Exp $");
+ 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -64,13 +68,14 @@
 
 #define M_NBDATA	M_PCB
 
-static int smb_tcpsndbuf = 10 * 1024;
-static int smb_tcprcvbuf = 10 * 1024;
+static int nb_tcpsndbuf = NB_SNDQ;
+static int nb_tcprcvbuf = NB_RCVQ;
+static const struct timeval nb_timo = { 15, 0 };	/* XXX sysctl? */
 
 #ifndef __NetBSD__
 SYSCTL_DECL(_net_smb);
-SYSCTL_INT(_net_smb, OID_AUTO, tcpsndbuf, CTLFLAG_RW, &smb_tcpsndbuf, 0, "");
-SYSCTL_INT(_net_smb, OID_AUTO, tcprcvbuf, CTLFLAG_RW, &smb_tcprcvbuf, 0, "");
+SYSCTL_INT(_net_smb, OID_AUTO, tcpsndbuf, CTLFLAG_RW, &nb_tcpsndbuf, 0, "");
+SYSCTL_INT(_net_smb, OID_AUTO, tcprcvbuf, CTLFLAG_RW, &nb_tcprcvbuf, 0, "");
 #endif
 
 #ifndef __NetBSD__
@@ -109,126 +114,101 @@ nb_poll(struct nbpcb *nbp, int events, struct proc *p)
         return nbp->nbp_tso->so_proto->pr_usrreqs->pru_sopoll(nbp->nbp_tso,
             events, NULL, p);
 #else
-        register struct socket *so = nbp->nbp_tso;
-        int revents = 0;
-        register int s = splsoftnet();
+	/* XXX this is exactly equal to soo_poll() */
+	struct socket *so = nbp->nbp_tso;
+	int revents = 0;
+	int s = splsoftnet();
 
-        if (events & (POLLIN | POLLRDNORM))
-                if (soreadable(so))
-                        revents |= events & (POLLIN | POLLRDNORM);
+	if (events & (POLLIN | POLLRDNORM))
+		if (soreadable(so))
+			revents |= events & (POLLIN | POLLRDNORM);
 
-        if (events & (POLLOUT | POLLWRNORM))
-                if (sowriteable(so))
-                        revents |= events & (POLLOUT | POLLWRNORM);
+	if (events & (POLLOUT | POLLWRNORM))
+		if (sowritable(so))
+			revents |= events & (POLLOUT | POLLWRNORM);
 
-        if (events & (POLLPRI | POLLRDBAND))
-                if (so->so_oobmark || (so->so_state & SS_RCVATMARK))
-                        revents |= events & (POLLPRI | POLLRDBAND);
+	if (events & (POLLPRI | POLLRDBAND))
+		if (so->so_oobmark || (so->so_state & SS_RCVATMARK))
+			revents |= events & (POLLPRI | POLLRDBAND);
 
-        if (revents == 0) {
-                if (events & (POLLIN | POLLPRI | POLLRDNORM | POLLRDBAND)) {
-                        selrecord(p, &so->so_rcv.sb_sel);
-                        so->so_rcv.sb_flags |= SB_SEL;
-                }
+	if (revents == 0) {
+		if (events & (POLLIN | POLLPRI | POLLRDNORM | POLLRDBAND)) {
+			selrecord(p, &so->so_rcv.sb_sel);
+			so->so_rcv.sb_flags |= SB_SEL;
+		}
 
-                if (events & (POLLOUT | POLLWRNORM)) {
-                        selrecord(p, &so->so_snd.sb_sel);
-                        so->so_snd.sb_flags |= SB_SEL;
-                }
-        }
+		if (events & (POLLOUT | POLLWRNORM)) {
+			selrecord(p, &so->so_snd.sb_sel);
+			so->so_snd.sb_flags |= SB_SEL;
+		}
+	}
 
-        splx(s);
-        return (revents);
+	splx(s);
+	return (revents);
 #endif
 }
 
-#ifdef __NetBSD__
-#define PROC_LOCK(p) /*XXX*/
-#define PROC_UNLOCK(p) /*XXX*/
-#endif
-
 static int
-nbssn_rselect(struct nbpcb *nbp, struct timeval *tv, int events,
+nbssn_rselect(struct nbpcb *nbp, const struct timeval *tv, int events,
 	struct proc *p)
 {
-	struct timeval atv, rtv, ttv;
+	struct timeval atv;
+	extern int nselcoll;
+	int ncoll;
 	int timo, error;
-	int s, sl;
+	int s;
+	struct lwp *l = curlwp;
 
 	if (tv) {
 		atv = *tv;
-		if (itimerfix(&atv)) {
-			error = EINVAL;
-			goto done_noproclock;
-		}
+		if (itimerfix(&atv))
+			return (EINVAL);
 		s = splclock();
 		timeradd(&atv, &time, &atv);
-		timo = hzto(&atv);
-		if (timo == 0)
-			timo = 1;
 		splx(s);
+		timo = hzto(&atv);
+		if (timo <= 0)
+			return (EWOULDBLOCK);
 	} else 
 		timo = 0;
 
-	PROC_LOCK(p);
-	SCHED_LOCK(sl);
-	p->p_flag |= P_SELECT;
-	SCHED_UNLOCK(sl);
-	PROC_UNLOCK(p);
+ retry:
+	ncoll = nselcoll;
+	l->l_flag |= L_SELECT;
 	error = nb_poll(nbp, events, p);
-	PROC_LOCK(p);
 	if (error) {
 		error = 0;
 		goto done;
 	}
 	if (tv) {
-		s = splclock();
-		if (timercmp(&time, &atv, >=)) {
-			splx(s);
-			/*
-			 * An event of our interest may occur during locking a process.
-			 * In order to avoid missing the event that occured during locking
-			 * the process, test P_SELECT and rescan file descriptors if
-			 * necessary.
-			 */
-			SCHED_LOCK(sl);
-			if ((p->p_flag & P_SELECT) == 0) {
-				p->p_flag |= P_SELECT;
-				SCHED_UNLOCK(sl);
-				PROC_UNLOCK(p);
-				error = nb_poll(nbp, events, p);
-				PROC_LOCK(p);
-			} else
-				SCHED_UNLOCK(sl);
+		/*
+		 * We have to recalculate the timeout on every retry.
+		 */
+		timo = hzto(&atv);
+		if (timo <= 0) {
+			error = EWOULDBLOCK;
 			goto done;
-		} else {
-			splx(s);
 		}
-		ttv = atv;
-		timersub(&ttv, &rtv, &ttv);
-		timo = hzto(&ttv);
 	}
-	SCHED_LOCK(sl);
-	p->p_flag &= ~P_SELECT;
-	SCHED_UNLOCK(sl);
-	if (timo > 0)
-		error = tsleep((caddr_t)&selwait, PSOCK, "nbssn_rselect", 
-			       timo);
-	else {
-		tsleep((caddr_t)&selwait, PSOCK, "nbssn_rselect", 0);
-		error = 0;
+
+	s = splsched();
+	if ((l->l_flag & L_SELECT) == 0 || nselcoll != ncoll) {
+		splx(s);
+		goto retry;
 	}
+	l->l_flag &= ~L_SELECT;
+	error = tsleep((caddr_t)&selwait, PSOCK, "smbsel", timo);
+	splx(s);
+
+	if (error == 0)
+		goto retry;
 
 done:
-	SCHED_LOCK(sl);
-	p->p_flag &= ~P_SELECT;
-	SCHED_UNLOCK(sl);
-	PROC_UNLOCK(p);
-
-done_noproclock:
+	l->l_flag &= ~L_SELECT;
+	/* select is not restarted after signals... */
 	if (error == ERESTART)
-		return 0;
-	return error;
+		error = 0;
+	return (error);
 }
 
 static int
@@ -294,9 +274,9 @@ nb_connect_in(struct nbpcb *nbp, struct sockaddr_in *to, struct proc *p)
 	so->so_upcallarg = (caddr_t)nbp;
 	so->so_upcall = nb_upcall;
 	so->so_rcv.sb_flags |= SB_UPCALL;
-	so->so_rcv.sb_timeo = (5 * hz);
-	so->so_snd.sb_timeo = (5 * hz);
-	error = soreserve(so, nbp->nbp_sndbuf, nbp->nbp_rcvbuf);
+	so->so_rcv.sb_timeo = NB_SNDTIMEO;
+	so->so_snd.sb_timeo = NB_RCVTIMEO;
+	error = soreserve(so, nb_tcpsndbuf, nb_tcprcvbuf);
 	if (error)
 		goto bad;
 	nb_setsockopt_int(so, SOL_SOCKET, SO_KEEPALIVE, 1);
@@ -306,7 +286,7 @@ nb_connect_in(struct nbpcb *nbp, struct sockaddr_in *to, struct proc *p)
 #ifndef __NetBSD__
 	error = soconnect(so, (struct sockaddr*)to, p);
 #else
-	MGET(m, M_WAIT, MT_SONAME);
+	m = m_get(M_WAIT, MT_SONAME);
 	*mtod(m, struct sockaddr *) = *(struct sockaddr *)to;
 	m->m_len = sizeof(struct sockaddr);
 	error = soconnect(so, m);
@@ -316,7 +296,7 @@ nb_connect_in(struct nbpcb *nbp, struct sockaddr_in *to, struct proc *p)
 		goto bad;
 	s = splnet();
 	while ((so->so_state & SS_ISCONNECTING) && so->so_error == 0) {
-		tsleep(&so->so_timeo, PSOCK, "nbcon", 2 * hz);
+		tsleep(&so->so_timeo, PSOCK, "smbcon", 2 * hz);
 		if ((so->so_state & SS_ISCONNECTING) && so->so_error == 0 &&
 			(error = nb_intr(nbp, p)) != 0) {
 			so->so_state &= ~SS_ISCONNECTING;
@@ -343,7 +323,6 @@ nbssn_rq_request(struct nbpcb *nbp, struct proc *p)
 	struct mbchain mb, *mbp = &mb;
 	struct mdchain md, *mdp = &md;
 	struct mbuf *m0;
-	struct timeval tv;
 	struct sockaddr_in sin;
 	u_short port;
 	u_int8_t rpcode;
@@ -353,8 +332,8 @@ nbssn_rq_request(struct nbpcb *nbp, struct proc *p)
 	if (error)
 		return error;
 	mb_put_uint32le(mbp, 0);
-	nb_put_name(mbp, nbp->nbp_paddr);
-	nb_put_name(mbp, nbp->nbp_laddr);
+	(void) nb_put_name(mbp, nbp->nbp_paddr);
+	(void) nb_put_name(mbp, nbp->nbp_laddr);
 	nb_sethdr(mbp->mb_top, NB_SSN_REQUEST, mb_fixhdr(mbp) - 4);
 	error = nb_sosend(nbp->nbp_tso, mbp->mb_top, 0, p);
 	if (!error) {
@@ -364,9 +343,7 @@ nbssn_rq_request(struct nbpcb *nbp, struct proc *p)
 	mb_done(mbp);
 	if (error)
 		return error;
-	tv.tv_sec = nbp->nbp_timo.tv_sec;
-	tv.tv_usec = nbp->nbp_timo.tv_usec;
-	error = nbssn_rselect(nbp, &tv, POLLIN, p);
+	error = nbssn_rselect(nbp, &nb_timo, POLLIN, p);
 	if (error == EWOULDBLOCK) {	/* Timeout */
 		NBDEBUG("initial request timeout\n");
 		return ETIMEDOUT;
@@ -467,9 +444,9 @@ nbssn_recv(struct nbpcb *nbp, struct mbuf **mpp, int *lenp,
 {
 	struct socket *so = nbp->nbp_tso;
 	struct uio auio;
-	struct mbuf *m;
+	struct mbuf *m, *tm, *im;
 	u_int8_t rpcode;
-	int len;
+	int len, resid;
 	int error, rcvflg;
 
 	if (so == NULL)
@@ -477,8 +454,12 @@ nbssn_recv(struct nbpcb *nbp, struct mbuf **mpp, int *lenp,
 
 	if (mpp)
 		*mpp = NULL;
+	m = NULL;
 	for(;;) {
-		m = NULL;
+		/*
+		 * Poll for a response header.
+		 * If we don't have one waiting, return.
+		 */
 		error = nbssn_recvhdr(nbp, &len, &rpcode, MSG_DONTWAIT, p);
 		if (so->so_state &
 		    (SS_ISDISCONNECTING | SS_ISDISCONNECTED | SS_CANTRCVMORE)) {
@@ -490,39 +471,82 @@ nbssn_recv(struct nbpcb *nbp, struct mbuf **mpp, int *lenp,
 			return error;
 		if (len == 0 && nbp->nbp_state != NBST_SESSION)
 			break;
+		/* no data, try again */
 		if (rpcode == NB_SSN_KEEPALIVE)
 			continue;
-		bzero(&auio, sizeof(auio));
-		auio.uio_resid = len;
-		auio.uio_procp = p;
-		do {
+
+		/*
+		 * Loop, blocking, for data following the response header.
+		 *
+		 * Note that we can't simply block here with MSG_WAITALL for the
+		 * entire response size, as it may be larger than the TCP
+		 * slow-start window that the sender employs.  This will result
+		 * in the sender stalling until the delayed ACK is sent, then
+		 * resuming slow-start, resulting in very poor performance.
+		 *
+		 * Instead, we never request more than NB_SORECEIVE_CHUNK
+		 * bytes at a time, resulting in an ack being pushed by
+		 * the TCP code at the completion of each call.
+		 */
+		resid = len;
+		while (resid > 0) {
+			tm = NULL;
 			rcvflg = MSG_WAITALL;
-#ifndef __NetBSD__
-			error = so->so_proto->pr_usrreqs->pru_soreceive
-			    (so, (struct sockaddr **)NULL,
-			    &auio, &m, (struct mbuf **)NULL, &rcvflg);
+			bzero(&auio, sizeof(auio));
+			auio.uio_resid = min(resid, NB_SORECEIVE_CHUNK);
+			auio.uio_procp = p;
+			resid -= auio.uio_resid;
+			/*
+			 * Spin until we have collected everything in
+			 * this chunk.
+			 */
+			do {
+				rcvflg = MSG_WAITALL;
+#ifdef __NetBSD__
+				error = (*so->so_receive)(so, (struct mbuf **)0,
+					&auio, &tm, (struct mbuf **)NULL,
+					&rcvflg);
 #else
-			error = (*so->so_receive)(so, (struct mbuf **)0,
-						  &auio, &m, 
-						  (struct mbuf **)NULL,
-						  &rcvflg);
+				error = so->so_proto->pr_usrreqs->pru_soreceive
+				    (so, (struct sockaddr **)NULL,
+				    &auio, &tm, (struct mbuf **)NULL, &rcvflg);
 #endif
-		} while (error == EWOULDBLOCK || error == EINTR ||
+			} while (error == EWOULDBLOCK || error == EINTR ||
 				 error == ERESTART);
-		if (error)
-			break;
-		if (auio.uio_resid > 0) {
-			SMBERROR("packet is shorter than expected\n");
-			error = EPIPE;
-			break;
+			if (error)
+				goto out;
+			/* short return guarantees unhappiness */
+			if (auio.uio_resid > 0) {
+				SMBERROR("packet is shorter than expected\n");
+				error = EPIPE;
+				goto out;
+			}
+			/* append received chunk to previous chunk(s) */
+			if (m == NULL) {
+				m = tm;
+			} else {
+				/*
+				 * Just glue the new chain on the end.
+				 * Consumer will pullup as required.
+				 */
+				for (im = m; im->m_next != NULL; im = im->m_next)
+					;
+				im->m_next = tm;
+			}
 		}
+		/* got a session/message packet? */
 		if (nbp->nbp_state == NBST_SESSION &&
 		    rpcode == NB_SSN_MESSAGE)
 			break;
+		/* drop packet and try for another */
 		NBDEBUG("non-session packet %x\n", rpcode);
-		if (m)
+		if (m) {
 			m_freem(m);
+			m = NULL;
+		}
 	}
+
+out:
 	if (error) {
 		if (m)
 			m_freem(m);
@@ -546,12 +570,9 @@ smb_nbst_create(struct smb_vc *vcp, struct proc *p)
 	struct nbpcb *nbp;
 
 	MALLOC(nbp, struct nbpcb *, sizeof *nbp, M_NBDATA, M_WAITOK);
-	bzero(nbp, sizeof *nbp);
-	nbp->nbp_timo.tv_sec = 15;	/* XXX: sysctl ? */
+	memset(nbp, 0, sizeof *nbp);
 	nbp->nbp_state = NBST_CLOSED;
 	nbp->nbp_vc = vcp;
-	nbp->nbp_sndbuf = smb_tcpsndbuf;
-	nbp->nbp_rcvbuf = smb_tcprcvbuf;
 	vcp->vc_tdata = nbp;
 	return 0;
 }
@@ -611,7 +632,6 @@ smb_nbst_connect(struct smb_vc *vcp, struct sockaddr *sap, struct proc *p)
 	struct nbpcb *nbp = vcp->vc_tdata;
 	struct sockaddr_in sin;
 	struct sockaddr_nb *snb;
-	struct timeval tv1, tv2;
 	int error, slen;
 
 	NBDEBUG("\n");
@@ -631,18 +651,9 @@ smb_nbst_connect(struct smb_vc *vcp, struct sockaddr *sap, struct proc *p)
 		return ENOMEM;
 	nbp->nbp_paddr = snb;
 	sin = snb->snb_addrin;
-	microtime(&tv1);
 	error = nb_connect_in(nbp, &sin, p);
 	if (error)
 		return error;
-	microtime(&tv2);
-	timersub(&tv2, &tv1, &tv2);
-	if (tv2.tv_sec == 0 && tv2.tv_usec == 0)
-		tv2.tv_sec = 1;
-	nbp->nbp_timo = tv2;
-	timeradd(&nbp->nbp_timo, &tv2, &nbp->nbp_timo);
-	timeradd(&nbp->nbp_timo, &tv2, &nbp->nbp_timo);
-	timeradd(&nbp->nbp_timo, &tv2, &nbp->nbp_timo);	/*  * 4 */
 	error = nbssn_rq_request(nbp, p);
 	if (error)
 		smb_nbst_disconnect(vcp, p);
@@ -708,7 +719,8 @@ smb_nbst_recv(struct smb_vc *vcp, struct mbuf **mpp, struct proc *p)
 static void
 smb_nbst_timo(struct smb_vc *vcp)
 {
-	return;
+
+	/* Nothing */
 }
 
 static void
@@ -725,19 +737,17 @@ smb_nbst_intr(struct smb_vc *vcp)
 static int
 smb_nbst_getparam(struct smb_vc *vcp, int param, void *data)
 {
-	struct nbpcb *nbp = vcp->vc_tdata;
-
 	switch (param) {
-	    case SMBTP_SNDSZ:
-		*(int*)data = nbp->nbp_sndbuf;
+	case SMBTP_SNDSZ:
+		*(int*)data = nb_tcpsndbuf;
 		break;
-	    case SMBTP_RCVSZ:
-		*(int*)data = nbp->nbp_rcvbuf;
+	case SMBTP_RCVSZ:
+		*(int*)data = nb_tcprcvbuf;
 		break;
-	    case SMBTP_TIMEOUT:
-		*(struct timeval*)data = nbp->nbp_timo;
+	case SMBTP_TIMEOUT:
+		*(struct timeval*)data = nb_timo;
 		break;
-	    default:
+	default:
 		return EINVAL;
 	}
 	return 0;
@@ -749,10 +759,10 @@ smb_nbst_setparam(struct smb_vc *vcp, int param, void *data)
 	struct nbpcb *nbp = vcp->vc_tdata;
 
 	switch (param) {
-	    case SMBTP_SELECTID:
+	case SMBTP_SELECTID:
 		nbp->nbp_selectid = data;
 		break;
-	    default:
+	default:
 		return EINVAL;
 	}
 	return 0;

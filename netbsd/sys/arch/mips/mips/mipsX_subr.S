@@ -1,4 +1,4 @@
-/*	$NetBSD: mipsX_subr.S,v 1.2 2002/03/11 16:39:40 uch Exp $	*/
+/*	$NetBSD: mipsX_subr.S,v 1.13 2003/08/07 16:28:33 agc Exp $	*/
 
 /*
  * Copyright 2002 Wasabi Systems, Inc.
@@ -82,11 +82,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -153,22 +149,25 @@
  * Use 64bit cp0 instructions?
  */
 #if defined(MIPS3)
+#define	USE_64BIT_INSTRUCTIONS
 #if defined(MIPS3_5900)		/* the 5900 has mips32-like mmu registers */
-#undef	USE_64BIT_FUNCTIONS
+#undef	USE_64BIT_CP0_FUNCTIONS
 #else
-#define	USE_64BIT_FUNCTIONS
+#define	USE_64BIT_CP0_FUNCTIONS
 #endif
 #endif
 
 #if defined(MIPS32)
-#undef	USE_64BIT_FUNCTIONS
+#undef	USE_64BIT_INSTRUCTIONS
+#undef	USE_64BIT_CP0_FUNCTIONS
 #endif
 
 #if defined(MIPS64)
-#define	USE_64BIT_FUNCTIONS
+#define	USE_64BIT_INSTRUCTIONS
+#define	USE_64BIT_CP0_FUNCTIONS
 #endif
 
-#if defined(USE_64BIT_FUNCTIONS)
+#if defined(USE_64BIT_CP0_FUNCTIONS)
 #define	_SLL		dsll
 #define	_SRL		dsrl
 #define	WIRED_SHIFT	34
@@ -181,7 +180,7 @@
 /*
  * Use correct-sized m?c0/dm?c0 opcodes.
  */
-#if defined(USE_64BIT_FUNCTIONS)
+#if defined(USE_64BIT_CP0_FUNCTIONS)
 #define	_MFC0	dmfc0
 #define	_MTC0	dmtc0
 #else
@@ -205,57 +204,45 @@
 	.set	mips64
 #endif
 
-/*
- * Set up hazard/interlock dependancies.
- */
-#if !defined(MIPS3_5900)
-#undef COP0_SYNC
-#define	COP0_SYNC	/* nothing */
-#endif
 
 /*
  * CPP function renaming macros.
  */
-#if defined(LOSING_WITH_CPP)
 
 #if defined(MIPS3)
-#define	MIPSX_PREFIX	mips3
-#endif
-
-#if defined(MIPS32)
-#define	MIPSX_PREFIX	mips32
-#endif
-
-#if defined(MIPS64)
-#define	MIPSX_PREFIX	mips64
-#endif
-
 #ifdef __STDC__
-#define	MIPSX(name)	MIPSX_PREFIX ## _ ## name
+#define	MIPSX(name)	mips3_ ## name
 #else
-#define	MIPSX(name)	MIPSX_PREFIX/**/_/**/name
-#endif
-
-#else	/* LOSING_WITH_CPP */
-
-#if defined(MIPS3)
 #define	MIPSX(name)	mips3_/**/name
+#endif
 #endif
 
 #if defined(MIPS3_5900)
 #undef MIPSX
+#ifdef __STDC__
+#define	MIPSX(name)	mips5900_ ## name
+#else
 #define	MIPSX(name)	mips5900_/**/name
+#endif
 #endif
 	
 #if defined(MIPS32)
+#ifdef __STDC__
+#define	MIPSX(name)	mips32_ ## name
+#else
 #define	MIPSX(name)	mips32_/**/name
+#endif
 #endif
 
 #if defined(MIPS64)
+#ifdef __STDC__
+#define	MIPSX(name)	mips64_ ## name
+#else
 #define	MIPSX(name)	mips64_/**/name
 #endif
+#endif
 
-#endif	/* LOSING_WITH_CPP */
+#define	_VECTOR_END(name)	VECTOR_END(name)
 
 /*
  * XXX We need a cleaner way of handling the instruction hazards of
@@ -360,9 +347,9 @@ VECTOR(MIPSX(TLBMiss), unknown)
 5:	j	slowfault			#1e: no page table present
 	nop					#1f: branch delay slot
 	.set	at
-VECTOR_END(MIPSX(TLBMiss))
+_VECTOR_END(MIPSX(TLBMiss))
 
-#if defined(USE_64BIT_FUNCTIONS)
+#if defined(USE_64BIT_CP0_FUNCTIONS)
 /*
  * mips3_XTLBMiss routine
  *
@@ -400,7 +387,7 @@ VECTOR(MIPSX(XTLBMiss), unknown)
 	mtc0	k0, MIPS_COP_0_TLB_LO0		#11: lo0 is loaded
 	sll	k1, 2				#12: chop top 2 bits (part 2a)
 	srl	k1, 2				#13: chop top 2 bits (part 2b)
-	mtc0	k1, MIPS_COP_0_TLB_LO1	#14: lo1 is loaded
+	mtc0	k1, MIPS_COP_0_TLB_LO1		#14: lo1 is loaded
 	nop					#15: standard nop
 	nop					#16: extra nop for QED5230
 	tlbwr					#17: write to tlb
@@ -413,8 +400,8 @@ VECTOR(MIPSX(XTLBMiss), unknown)
 5:	j	slowfault			#1e: no page table present
 	nop					#1f: branch delay slot
 	.set	at
-VECTOR_END(MIPSX(XTLBMiss))
-#endif /* USE_64BIT_FUNCTIONS */
+_VECTOR_END(MIPSX(XTLBMiss))
+#endif /* USE_64BIT_CP0_FUNCTIONS */
 
 /*
  * Vector to real handler in KSEG1.
@@ -427,7 +414,7 @@ VECTOR(MIPSX(cache), unknown)
 	or	k0, k1
 	j	k0
 	nop
-VECTOR_END(MIPSX(cache))
+_VECTOR_END(MIPSX(cache))
 
 /*
  * Handle MIPS32/MIPS64 style interrupt exception vector.
@@ -436,7 +423,7 @@ VECTOR(MIPSX(intr), unknown)
 	la	k0, MIPSX(KernIntr)
 	j	k0
 	nop
-VECTOR_END(MIPSX(intr))
+_VECTOR_END(MIPSX(intr))
 
 /*
  *----------------------------------------------------------------------------
@@ -477,7 +464,7 @@ VECTOR(MIPSX(exception), unknown)
 	j	k0				#09: jump to the function
 	nop					#0a: branch delay slot
 	.set	at
-VECTOR_END(MIPSX(exception))
+_VECTOR_END(MIPSX(exception))
 
 /*----------------------------------------------------------------------------
  *
@@ -567,10 +554,10 @@ NESTED_NOPROFILE(MIPSX(KernGenException), KERNFRAME_SIZ, ra)
 	REG_S	t2, TF_BASE+TF_REG_T2(sp)
 	REG_S	t3, TF_BASE+TF_REG_T3(sp)
 	mfc0	a1, MIPS_COP_0_CAUSE		# 2nd arg is CAUSE
-	REG_S	t4, TF_BASE+TF_REG_T4(sp)
-	REG_S	t5, TF_BASE+TF_REG_T5(sp)
-	REG_S	t6, TF_BASE+TF_REG_T6(sp)
-	REG_S	t7, TF_BASE+TF_REG_T7(sp)
+	REG_S	ta0, TF_BASE+TF_REG_TA0(sp)
+	REG_S	ta1, TF_BASE+TF_REG_TA1(sp)
+	REG_S	ta2, TF_BASE+TF_REG_TA2(sp)
+	REG_S	ta3, TF_BASE+TF_REG_TA3(sp)
 	mfc0	a2, MIPS_COP_0_BAD_VADDR	# 3rd arg is fault address
 	REG_S	t8, TF_BASE+TF_REG_T8(sp)
 	REG_S	t9, TF_BASE+TF_REG_T9(sp)
@@ -641,10 +628,10 @@ NESTED_NOPROFILE(MIPSX(KernGenException), KERNFRAME_SIZ, ra)
 	REG_L	t1, TF_BASE+TF_REG_T1(sp)
 	REG_L	t2, TF_BASE+TF_REG_T2(sp)
 	REG_L	t3, TF_BASE+TF_REG_T3(sp)
-	REG_L	t4, TF_BASE+TF_REG_T4(sp)
-	REG_L	t5, TF_BASE+TF_REG_T5(sp)
-	REG_L	t6, TF_BASE+TF_REG_T6(sp)
-	REG_L	t7, TF_BASE+TF_REG_T7(sp)
+	REG_L	ta0, TF_BASE+TF_REG_TA0(sp)
+	REG_L	ta1, TF_BASE+TF_REG_TA1(sp)
+	REG_L	ta2, TF_BASE+TF_REG_TA2(sp)
+	REG_L	ta3, TF_BASE+TF_REG_TA3(sp)
 	REG_L	t8, TF_BASE+TF_REG_T8(sp)
 	REG_L	t9, TF_BASE+TF_REG_T9(sp)
 	REG_L	ra, TF_BASE+TF_REG_RA(sp)
@@ -673,7 +660,7 @@ END(MIPSX(KernGenException))
  * Handle an exception from user mode.
  * Save user context atop the kernel stack, then call trap() to process
  * the condition.  The context can be manipulated alternatively via
- * curproc->p_md.md_regs.
+ * curlwp->p_md.md_regs.
  */
 NESTED_NOPROFILE(MIPSX(UserGenException), CALLFRAME_SIZ, ra)
 	.set	noat
@@ -698,10 +685,10 @@ NESTED_NOPROFILE(MIPSX(UserGenException), CALLFRAME_SIZ, ra)
 	REG_S	t2, FRAME_T2(k1)
 	REG_S	t3, FRAME_T3(k1)
 	mfc0	a0, MIPS_COP_0_STATUS		# 1st arg is STATUS
-	REG_S	t4, FRAME_T4(k1)
-	REG_S	t5, FRAME_T5(k1)
-	REG_S	t6, FRAME_T6(k1)
-	REG_S	t7, FRAME_T7(k1)
+	REG_S	ta0, FRAME_TA0(k1)
+	REG_S	ta1, FRAME_TA1(k1)
+	REG_S	ta2, FRAME_TA2(k1)
+	REG_S	ta3, FRAME_TA3(k1)
 	mfc0	a1, MIPS_COP_0_CAUSE		# 2nd arg is CAUSE
 	REG_S	s0, FRAME_S0(k1)
 	REG_S	s1, FRAME_S1(k1)
@@ -749,7 +736,10 @@ NESTED_NOPROFILE(MIPSX(UserGenException), CALLFRAME_SIZ, ra)
 /*
  * Check pending asynchronous traps.
  */
-	lw	t0, _C_LABEL(curproc)
+	lw	t0, _C_LABEL(curlwp)		# t0 = curlwp
+	nop
+	lw	t0, L_PROC(t0)			# t0 = curlwp->l_proc
+	nop
 	lw	t0, P_MD_ASTPENDING(t0)
 	beq	t0, zero, 1f
 	nop
@@ -805,10 +795,10 @@ NESTED_NOPROFILE(MIPSX(UserGenException), CALLFRAME_SIZ, ra)
 	REG_L	t1, FRAME_T1(k1)
 	REG_L	t2, FRAME_T2(k1)
 	REG_L	t3, FRAME_T3(k1)
-	REG_L	t4, FRAME_T4(k1)
-	REG_L	t5, FRAME_T5(k1)
-	REG_L	t6, FRAME_T6(k1)
-	REG_L	t7, FRAME_T7(k1)
+	REG_L	ta0, FRAME_TA0(k1)
+	REG_L	ta1, FRAME_TA1(k1)
+	REG_L	ta2, FRAME_TA2(k1)
+	REG_L	ta3, FRAME_TA3(k1)
 	REG_L	s0, FRAME_S0(k1)
 	REG_L	s1, FRAME_S1(k1)
 	REG_L	s2, FRAME_S2(k1)
@@ -820,7 +810,7 @@ NESTED_NOPROFILE(MIPSX(UserGenException), CALLFRAME_SIZ, ra)
 	REG_L	t8, FRAME_T8(k1)
 	REG_L	t9, FRAME_T9(k1)
 	REG_L	k0, FRAME_SR(k1)
-	DYNAMIC_STATUS_MASK_TOUSER(k0,ra)	# machine dependent masking
+	DYNAMIC_STATUS_MASK_TOUSER(k0, ra)	# machine dependent masking
 	REG_L	gp, FRAME_GP(k1)
 	REG_L	sp, FRAME_SP(k1)
 	REG_L	s8, FRAME_S8(k1)
@@ -837,7 +827,7 @@ END(MIPSX(UserGenException))
  * mipsN_SystemCall
  *
  * Save user context in u_pcb, then call syscall() to process a system call.
- * The context can be manipulated alternatively via curproc->p_md.md_regs;
+ * The context can be manipulated alternatively via curlwp->p_md.md_regs;
  */
 NESTED_NOPROFILE(MIPSX(SystemCall), CALLFRAME_SIZ, ra)
 	.set	noat
@@ -853,17 +843,17 @@ NESTED_NOPROFILE(MIPSX(SystemCall), CALLFRAME_SIZ, ra)
 	REG_S	a1, FRAME_A1(k1)
 	REG_S	a2, FRAME_A2(k1)
 	REG_S	a3, FRAME_A3(k1)
-	lw	a0, _C_LABEL(curproc)		# 1st arg is curproc
+	lw	a0, _C_LABEL(curlwp)		# 1st arg is curlwp
 	mfhi	v1
 	#REG_S	t0, FRAME_T0(k1)		# no need to save temp regs
 	#REG_S	t1, FRAME_T1(k1)
 	#REG_S	t2, FRAME_T2(k1)
 	#REG_S	t3, FRAME_T3(k1)
 	mfc0	a1, MIPS_COP_0_STATUS		# 2nd arg is STATUS
-	#REG_S	t4, FRAME_T4(k1)
-	#REG_S	t5, FRAME_T5(k1)
-	#REG_S	t6, FRAME_T6(k1)
-	#REG_S	t7, FRAME_T7(k1)
+	#REG_S	ta0, FRAME_TA0(k1)
+	#REG_S	ta1, FRAME_TA1(k1)
+	#REG_S	ta2, FRAME_TA2(k1)
+	#REG_S	ta3, FRAME_TA3(k1)
 	mfc0	a2, MIPS_COP_0_CAUSE		# 3rd arg is CAUSE
 	REG_S	s0, FRAME_S0(k1)
 	REG_S	s1, FRAME_S1(k1)
@@ -890,6 +880,7 @@ NESTED_NOPROFILE(MIPSX(SystemCall), CALLFRAME_SIZ, ra)
 	sw	t0, FRAME_PPL(k1)
 	.set noat
 #endif
+	lw	t0, L_PROC(a0)			# curlwp->l_proc (used below)
 	addu	sp, k1, -CALLFRAME_SIZ
 #ifdef __GP_SUPPORT__
 	la	gp, _C_LABEL(_gp)		# switch to kernel GP
@@ -898,7 +889,7 @@ NESTED_NOPROFILE(MIPSX(SystemCall), CALLFRAME_SIZ, ra)
  * Turn off fpu and enter kernel mode
  */
 	.set	at
-	lw	t1, P_MD_SYSCALL(a0)		# t1 = syscall
+	lw	t1, P_MD_SYSCALL(t0)		# t1 = syscall
 	and	t0, a1, ~(MIPS_SR_COP_1_BIT | MIPS_SR_EXL | MIPS_SR_KSU_MASK)
 	.set	noat
 #if defined(DDB) || defined(DEBUG) || defined(KGDB)
@@ -915,8 +906,9 @@ NESTED_NOPROFILE(MIPSX(SystemCall), CALLFRAME_SIZ, ra)
 /*
  * Check pending asynchronous traps.
  */
-	lw	t0, _C_LABEL(curproc)
-	lw	t0, P_MD_ASTPENDING(t0)
+	lw	t0, _C_LABEL(curlwp)
+	lw	t0, L_PROC(t0)
+	lw	t0, P_MD_ASTPENDING(t0)	# curlwp->l_proc->p_md.md_astpending
 	beq	t0, zero, 1f
 	nop
 /*
@@ -975,10 +967,10 @@ NESTED_NOPROFILE(MIPSX(SystemCall), CALLFRAME_SIZ, ra)
 	REG_L	t1, FRAME_T1(k1)
 	REG_L	t2, FRAME_T2(k1)
 	REG_L	t3, FRAME_T3(k1)
-	REG_L	t4, FRAME_T4(k1)
-	REG_L	t5, FRAME_T5(k1)
-	REG_L	t6, FRAME_T6(k1)
-	REG_L	t7, FRAME_T7(k1)
+	REG_L	ta0, FRAME_TA0(k1)
+	REG_L	ta1, FRAME_TA1(k1)
+	REG_L	ta2, FRAME_TA2(k1)
+	REG_L	ta3, FRAME_TA3(k1)
 	REG_L	s0, FRAME_S0(k1)
 	REG_L	s1, FRAME_S1(k1)
 	REG_L	s2, FRAME_S2(k1)
@@ -990,7 +982,7 @@ NESTED_NOPROFILE(MIPSX(SystemCall), CALLFRAME_SIZ, ra)
 	REG_L	t8, FRAME_T8(k1)
 	REG_L	t9, FRAME_T9(k1)
 	REG_L	k0, FRAME_SR(k1)
-	DYNAMIC_STATUS_MASK_TOUSER(k0,ra)	# machine dependent masking
+	DYNAMIC_STATUS_MASK_TOUSER(k0, ra)	# machine dependent masking
 	REG_L	gp, FRAME_GP(k1)
 	REG_L	sp, FRAME_SP(k1)
 	REG_L	s8, FRAME_S8(k1)
@@ -1072,10 +1064,10 @@ NESTED_NOPROFILE(MIPSX(KernIntr), KERNFRAME_SIZ, ra)
 	REG_S	t2, TF_BASE+TF_REG_T2(sp)
 	REG_S	t3, TF_BASE+TF_REG_T3(sp)
 	mfc0	a1, MIPS_COP_0_CAUSE		# 2nd arg is CAUSE
-	REG_S	t4, TF_BASE+TF_REG_T4(sp)
-	REG_S	t5, TF_BASE+TF_REG_T5(sp)
-	REG_S	t6, TF_BASE+TF_REG_T6(sp)
-	REG_S	t7, TF_BASE+TF_REG_T7(sp)
+	REG_S	ta0, TF_BASE+TF_REG_TA0(sp)
+	REG_S	ta1, TF_BASE+TF_REG_TA1(sp)
+	REG_S	ta2, TF_BASE+TF_REG_TA2(sp)
+	REG_S	ta3, TF_BASE+TF_REG_TA3(sp)
 	mfc0	a2, MIPS_COP_0_EXC_PC		# 3rd arg is exception PC
 	REG_S	t8, TF_BASE+TF_REG_T8(sp)
 	REG_S	t9, TF_BASE+TF_REG_T9(sp)
@@ -1118,7 +1110,7 @@ NESTED_NOPROFILE(MIPSX(KernIntr), KERNFRAME_SIZ, ra)
 	.set noat
 #endif
 	REG_L	a0, TF_BASE+TF_REG_SR(sp)	# ??? why differs ???
-	DYNAMIC_STATUS_MASK(a0,t0)		# machine dependent masking
+	DYNAMIC_STATUS_MASK(a0, t0)		# machine dependent masking
 	REG_L	t0, TF_BASE+TF_REG_MULLO(sp)
 	REG_L	t1, TF_BASE+TF_REG_MULHI(sp)
 	REG_L	v0, TF_BASE+TF_REG_EPC(sp)
@@ -1140,10 +1132,10 @@ NESTED_NOPROFILE(MIPSX(KernIntr), KERNFRAME_SIZ, ra)
 	REG_L	t1, TF_BASE+TF_REG_T1(sp)
 	REG_L	t2, TF_BASE+TF_REG_T2(sp)
 	REG_L	t3, TF_BASE+TF_REG_T3(sp)
-	REG_L	t4, TF_BASE+TF_REG_T4(sp)
-	REG_L	t5, TF_BASE+TF_REG_T5(sp)
-	REG_L	t6, TF_BASE+TF_REG_T6(sp)
-	REG_L	t7, TF_BASE+TF_REG_T7(sp)
+	REG_L	ta0, TF_BASE+TF_REG_TA0(sp)
+	REG_L	ta1, TF_BASE+TF_REG_TA1(sp)
+	REG_L	ta2, TF_BASE+TF_REG_TA2(sp)
+	REG_L	ta3, TF_BASE+TF_REG_TA3(sp)
 	REG_L	t8, TF_BASE+TF_REG_T8(sp)
 	REG_L	t9, TF_BASE+TF_REG_T9(sp)
 	REG_L	ra, TF_BASE+TF_REG_RA(sp)
@@ -1195,10 +1187,10 @@ NESTED_NOPROFILE(MIPSX(UserIntr), CALLFRAME_SIZ, ra)
 	REG_S	t2, FRAME_T2(k1)
 	REG_S	t3, FRAME_T3(k1)
 	mfc0	a0, MIPS_COP_0_STATUS		# 1st arg is STATUS
-	REG_S	t4, FRAME_T4(k1)
-	REG_S	t5, FRAME_T5(k1)
-	REG_S	t6, FRAME_T6(k1)
-	REG_S	t7, FRAME_T7(k1)
+	REG_S	ta0, FRAME_TA0(k1)
+	REG_S	ta1, FRAME_TA1(k1)
+	REG_S	ta2, FRAME_TA2(k1)
+	REG_S	ta3, FRAME_TA3(k1)
 	mfc0	a1, MIPS_COP_0_CAUSE		# 2nd arg is CAUSE
 	REG_S	t8, FRAME_T8(k1)
 	REG_S	t9, FRAME_T9(k1)
@@ -1252,8 +1244,9 @@ NESTED_NOPROFILE(MIPSX(UserIntr), CALLFRAME_SIZ, ra)
 	nop					# 3 nop hazard
 	nop
 	nop
-	lw	v0, _C_LABEL(curproc)
+	lw	v0, _C_LABEL(curlwp)
 	addu	a1, sp, CALLFRAME_SIZ
+	lw	v0, L_PROC(v0)
  #	REG_L	a0, FRAME_SR(a1)
 	lw	v0, P_MD_ASTPENDING(v0)		# any pending ast?
  #	mtc0	a0, MIPS_COP_0_STATUS		# restore the SR, disable intrs
@@ -1280,7 +1273,7 @@ NESTED_NOPROFILE(MIPSX(UserIntr), CALLFRAME_SIZ, ra)
 	nop
 #else
 	li	t0, MIPS_HARD_INT_MASK | MIPS_SR_INT_IE
-	DYNAMIC_STATUS_MASK(t0,t1)		# machine dependent masking
+	DYNAMIC_STATUS_MASK(t0, t1)		# machine dependent masking
 	mtc0	t0, MIPS_COP_0_STATUS		# enable interrupts (spl0)
 	COP0_SYNC
 #endif
@@ -1345,14 +1338,14 @@ NESTED_NOPROFILE(MIPSX(UserIntr), CALLFRAME_SIZ, ra)
 	REG_L	t1, FRAME_T1(k1)
 	REG_L	t2, FRAME_T2(k1)
 	REG_L	t3, FRAME_T3(k1)
-	REG_L	t4, FRAME_T4(k1)
-	REG_L	t5, FRAME_T5(k1)
-	REG_L	t6, FRAME_T6(k1)
-	REG_L	t7, FRAME_T7(k1)
+	REG_L	ta0, FRAME_TA0(k1)
+	REG_L	ta1, FRAME_TA1(k1)
+	REG_L	ta2, FRAME_TA2(k1)
+	REG_L	ta3, FRAME_TA3(k1)
 	REG_L	t8, FRAME_T8(k1)
 	REG_L	t9, FRAME_T9(k1)
 	REG_L	k0, FRAME_SR(k1)
-	DYNAMIC_STATUS_MASK_TOUSER(k0,ra)	# machine dependent masking
+	DYNAMIC_STATUS_MASK_TOUSER(k0, ra)	# machine dependent masking
 	REG_L	gp, FRAME_GP(k1)
 	REG_L	sp, FRAME_SP(k1)
 	REG_L	ra, FRAME_RA(k1)
@@ -1542,7 +1535,7 @@ LEAF_NOPROFILE(MIPSX(TLBMissException))
 
 outofworld:
 	/* eret to panic so shutdown can use K2.  Try to ensure valid $sp. */
-	la	a0,_C_LABEL(panic)
+	la	a0, _C_LABEL(panic)
 	_MFC0	a2, MIPS_COP_0_EXC_PC
 	move	a1, sp
 	sll	k0, k0, PGSHIFT
@@ -1754,7 +1747,7 @@ LEAF(MIPSX(TLBRead))
 	mtc0	zero, MIPS_COP_0_STATUS		# Disable interrupts
 	COP0_SYNC
 	nop
-	mfc0	t6, MIPS_COP_0_TLB_PG_MASK	# save current pgMask
+	mfc0	ta2, MIPS_COP_0_TLB_PG_MASK	# save current pgMask
 	nop
 	_MFC0	t0, MIPS_COP_0_TLB_HI		# Get current PID
 
@@ -1769,11 +1762,11 @@ LEAF(MIPSX(TLBRead))
 	nop
 	mfc0	t2, MIPS_COP_0_TLB_PG_MASK	# fetch the pgMask
 	_MFC0	t3, MIPS_COP_0_TLB_HI		# fetch the hi entry
-	_MFC0	t4, MIPS_COP_0_TLB_LO0		# See what we got
-	_MFC0	t5, MIPS_COP_0_TLB_LO1		# See what we got
+	_MFC0	ta0, MIPS_COP_0_TLB_LO0		# See what we got
+	_MFC0	ta1, MIPS_COP_0_TLB_LO1		# See what we got
 	_MTC0	t0, MIPS_COP_0_TLB_HI		# restore PID
 	COP0_SYNC
-	mtc0	t6, MIPS_COP_0_TLB_PG_MASK	# restore pgMask
+	mtc0	ta2, MIPS_COP_0_TLB_PG_MASK	# restore pgMask
 	COP0_SYNC
 	nop
 	nop
@@ -1783,9 +1776,9 @@ LEAF(MIPSX(TLBRead))
 	nop
 	sw	t2, 0(a1)
 	sw	t3, 4(a1)
-	sw	t4, 8(a1)
+	sw	ta0, 8(a1)
 	j	ra
-	sw	t5, 12(a1)
+	sw	ta1, 12(a1)
 END(MIPSX(TLBRead))
 
 #if defined(MIPS3) && !defined(MIPS3_5900)
@@ -1889,6 +1882,7 @@ END(MIPSX(VCEI))
  * and s1 respectively.  There is no need register save operation.
  */
 LEAF(MIPSX(proc_trampoline))
+	addu	sp, sp, -CALLFRAME_SIZ
 	jal	ra, s0
 	move	a0, s1
 	.set	noat
@@ -1938,10 +1932,10 @@ LEAF(MIPSX(proc_trampoline))
 	REG_L	t1, FRAME_T1(k1)
 	REG_L	t2, FRAME_T2(k1)
 	REG_L	t3, FRAME_T3(k1)
-	REG_L	t4, FRAME_T4(k1)
-	REG_L	t5, FRAME_T5(k1)
-	REG_L	t6, FRAME_T6(k1)
-	REG_L	t7, FRAME_T7(k1)
+	REG_L	ta0, FRAME_TA0(k1)
+	REG_L	ta1, FRAME_TA1(k1)
+	REG_L	ta2, FRAME_TA2(k1)
+	REG_L	ta3, FRAME_TA3(k1)
 	REG_L	s0, FRAME_S0(k1)
 	REG_L	s1, FRAME_S1(k1)
 	REG_L	s2, FRAME_S2(k1)
@@ -1953,7 +1947,7 @@ LEAF(MIPSX(proc_trampoline))
 	REG_L	t8, FRAME_T8(k1)
 	REG_L	t9, FRAME_T9(k1)
 	REG_L	k0, FRAME_SR(k1)
-	DYNAMIC_STATUS_MASK(k0,sp)		# machine dependent masking
+	DYNAMIC_STATUS_MASK(k0, sp)		# machine dependent masking
 	REG_L	gp, FRAME_GP(k1)
 	REG_L	s8, FRAME_S8(k1)
 	REG_L	ra, FRAME_RA(k1)
@@ -1967,16 +1961,16 @@ LEAF(MIPSX(proc_trampoline))
 END(MIPSX(proc_trampoline))
 
 /*
- * void mipsN_cpu_switch_resume(struct proc *newproc)
+ * void mipsN_cpu_switch_resume(struct lwp *newlwp)
  *
  * Wiredown the USPACE of newproc in TLB entry#0.  Check whether target
  * USPACE is already in another place of TLB before that, and make
  * sure TBIS(it) in the case.
  */
 LEAF_NOPROFILE(MIPSX(cpu_switch_resume))
-	lw	a1, P_MD_UPTE_0(a0)		# a1 = upte[0]
-	lw	a2, P_MD_UPTE_1(a0)		# a2 = upte[1]
-	lw	v0, P_ADDR(a0)			# va = p->p_addr
+	lw	a1, L_MD_UPTE_0(a0)		# a1 = upte[0]
+	lw	a2, L_MD_UPTE_1(a0)		# a2 = upte[1]
+	lw	v0, L_ADDR(a0)			# va = l->l_addr
 	li	s0, MIPS_KSEG2_START
 	blt	v0, s0, resume
 	nop
@@ -2111,7 +2105,7 @@ LEAF_NOPROFILE(MIPSX(TBIAP))
 1:
 	mtc0	t1, MIPS_COP_0_TLB_INDEX	# set index
 	COP0_SYNC
-	sll	t4, t1, 13			# PAGE_SHIFT + 1
+	sll	ta0, t1, 13			# PAGE_SHIFT + 1
 	nop
 	/* XXX simonb: lose this nop for mips32/64? */
 	nop
@@ -2124,9 +2118,9 @@ LEAF_NOPROFILE(MIPSX(TBIAP))
 	_MFC0	a0, MIPS_COP_0_TLB_LO1
 	and	a0, a0, MIPS3_PG_G		# check to see it has G bit
 	bnez	a0, 2f
-	addu	t4, t4, v0
+	addu	ta0, ta0, v0
 
-	_MTC0	t4, MIPS_COP_0_TLB_HI		# make entryHi invalid
+	_MTC0	ta0, MIPS_COP_0_TLB_HI		# make entryHi invalid
 	COP0_SYNC
 	_MTC0	zero, MIPS_COP_0_TLB_LO0	# zero out entryLo0
 	COP0_SYNC
@@ -2180,9 +2174,9 @@ LEAF_NOPROFILE(MIPSX(TBIA))
 1:
 	mtc0	t1, MIPS_COP_0_TLB_INDEX	# set TLBindex
 	COP0_SYNC
-	sll	t4, t1, 13			# PAGE_SHIFT + 1
-	add	t4, v0, t4
-	_MTC0	t4, MIPS_COP_0_TLB_HI		# make entryHi invalid
+	sll	ta0, t1, 13			# PAGE_SHIFT + 1
+	add	ta0, v0, ta0
+	_MTC0	ta0, MIPS_COP_0_TLB_HI		# make entryHi invalid
 	COP0_SYNC
 	nop
 	nop
@@ -2202,6 +2196,27 @@ LEAF_NOPROFILE(MIPSX(TBIA))
 	mtc0	v1, MIPS_COP_0_STATUS		# restore status register
 	COP0_SYNC				# XXXX - not executed!!
 END(MIPSX(TBIA))
+
+#ifdef USE_64BIT_INSTRUCTIONS
+LEAF(MIPSX(pagezero))
+	li	a1, PAGE_SIZE >> 6
+
+1:	sd	zero, 0(a0)			# try to miss cache first
+	sd	zero, 32(a0)
+	subu	a1, 1
+	sd	zero, 16(a0)
+	sd	zero, 48(a0)
+	sd	zero, 8(a0)			# fill in cache lines
+	sd	zero, 40(a0)
+	sd	zero, 24(a0)
+	sd	zero, 56(a0)
+	bgtz	a1, 1b
+	addu	a0, 64
+
+	j	ra
+	nop
+END(MIPSX(pagezero))
+#endif /* USE_64BIT_INSTRUCTIONS */
 
 	.data
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.38 2002/04/01 13:28:10 ragge Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.42 2003/12/14 19:39:24 ragge Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -55,13 +51,10 @@
 #define	PAGE_MASK	(PAGE_SIZE - 1)
 
 /*
- * USRTEXT is the start of the user text/data space, while USRSTACK
- * is the top (end) of the user stack. Immediately above the user stack
- * resides kernel.
- *
+ * USRSTACK is the top (end) of the user stack. Immediately above the
+ * user stack resides kernel.
  */
 
-#define USRTEXT		NBPG
 #define USRSTACK	KERNBASE
 
 /*
@@ -72,10 +65,10 @@
 #define MAXTSIZ		(8*1024*1024)		/* max text size */
 #endif
 #ifndef DFLDSIZ
-#define DFLDSIZ		(32*1024*1024)		/* initial data size limit */
+#define DFLDSIZ		(128*1024*1024)		/* initial data size limit */
 #endif
 #ifndef MAXDSIZ
-#define MAXDSIZ		(64*1024*1024)		/* max data size */
+#define MAXDSIZ		(1024*1024*1024)	/* max data size */
 #endif
 #ifndef DFLSSIZ
 #define DFLSSIZ		(512*1024)		/* initial stack size limit */
@@ -83,14 +76,6 @@
 #ifndef MAXSSIZ
 #define MAXSSIZ		(8*1024*1024)		/* max stack size */
 #endif
-
-/*
- * All mmap()'ed data will be mapped above MAXDSIZ. This means that
- * pte space must be allocated for (possible) mmap()'ed data.
- * Note: This is just a hint, if we mmap() more than this the page
- * table will be expanded. (at the cost of speed).
- */
-#define MMAPSPACE	(8*1024*1024)
 
 /* 
  * Size of shared memory map
@@ -121,6 +106,13 @@
 #define VM_MAX_ADDRESS		((vaddr_t)KERNBASE)
 #define VM_MIN_KERNEL_ADDRESS	((vaddr_t)KERNBASE)
 #define VM_MAX_KERNEL_ADDRESS	((vaddr_t)(0xC0000000))
+
+/*
+ * The address to which unspecified mapping requests default
+ */
+#define __USE_TOPDOWN_VM
+#define VM_DEFAULT_ADDRESS(da, sz) \
+	trunc_page(VM_MAXUSER_ADDRESS - MAXSSIZ - (sz))
 
 #define	USRIOSIZE		(8 * VAX_NPTEPG)	/* 512MB */
 #define	VM_PHYS_SIZE		(USRIOSIZE*VAX_NBPG)

@@ -1,4 +1,4 @@
-/*	$NetBSD: ufs.c,v 1.30 2000/03/30 12:19:49 augustss Exp $	*/
+/*	$NetBSD: ufs.c,v 1.43 2004/03/20 14:24:59 dsl Exp $	*/
 
 /*-
  * Copyright (c) 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -63,33 +59,37 @@
  */
 
 /*
- * XXX NOTE: ufs.c (FFS) and lfs.c (LFS) should eventually use much common
- * XXX code.  until then, the two files should be easily diffable.
- */
-
-/*
- *	Stand-alone file reading package.
+ *	Stand-alone file reading package for UFS and LFS filesystems.
  */
 
 #include <sys/param.h>
 #include <sys/time.h>
 #include <ufs/ufs/dinode.h>
 #include <ufs/ufs/dir.h>
+#ifdef LIBSA_LFS
+#include <sys/queue.h>
+#include <sys/mount.h>			/* XXX for MNAMELEN */
+#include <ufs/lfs/lfs.h>
+#else
 #include <ufs/ffs/fs.h>
+#endif
 #ifdef _STANDALONE
 #include <lib/libkern/libkern.h>
 #else
 #include <string.h>
-inline u_int
-max(a, b)
-        u_int a, b;
-{
-        return (a > b ? a : b);
-}
 #endif
 
 #include "stand.h"
+#ifdef LIBSA_LFS
+#include "lfs.h"
+#else
 #include "ufs.h"
+#endif
+
+/* If this file is compiled by itself, build ufs (aka ffsv1) support */
+#if !defined(LIBSA_FFSv2) && !defined(LIBSA_LFS)
+#define LIBSA_FFSv1
+#endif
 
 #if defined(LIBSA_FS_SINGLECOMPONENT) && !defined(LIBSA_NO_FS_SYMLINK)
 #define LIBSA_NO_FS_SYMLINK
@@ -98,6 +98,57 @@ max(a, b)
 #undef COMPAT_UFS
 #endif
 
+#ifdef LIBSA_LFS
+/*
+ * In-core LFS superblock.  This exists only to placate the macros in lfs.h,
+ */
+struct fs {
+	struct dlfs	lfs_dlfs;
+};
+#define fs_magic	lfs_magic
+#define fs_maxsymlinklen lfs_maxsymlinklen
+
+#define FS_MAGIC	LFS_MAGIC
+#define SBLOCKSIZE	LFS_SBPAD
+#define SBLOCKOFFSET	LFS_LABELPAD
+#else
+/* NB ufs2 doesn't use the common suberblock code... */
+#define FS_MAGIC	FS_UFS1_MAGIC
+#define SBLOCKOFFSET	SBLOCK_UFS1
+#endif
+
+#if defined(LIBSA_NO_TWIDDLE)
+#define twiddle()
+#endif
+
+#undef cgstart
+#if defined(LIBSA_FFSv2)
+#define cgstart(fc, c) cgstart_ufs2((fs), (c))
+#else
+#define cgstart(fc, c) cgstart_ufs1((fs), (c))
+#endif
+
+#ifndef ufs_dinode
+#define ufs_dinode	ufs1_dinode
+#endif
+#ifndef indp_t
+#define indp_t		uint32_t
+#endif
+#ifndef FSBTODB
+#define FSBTODB(fs, indp) fsbtodb(fs, indp)
+#endif
+
+/*
+ * To avoid having a lot of filesystem-block sized buffers lurking (which
+ * could be 32k) we only keep a few entries of the indirect block map.
+ * With 8k blocks, 2^8 blocks is ~500k so we reread the indirect block
+ * ~13 times pulling in a 6M kernel.
+ * The cache size must be smaller than the smallest filesystem block,
+ * so LN2_IND_CACHE_SZ <= 9 (UFS2 and 4k blocks).
+ */
+#define LN2_IND_CACHE_SZ	6
+#define IND_CACHE_SZ		(1 << LN2_IND_CACHE_SZ)
+#define IND_CACHE_MASK		(IND_CACHE_SZ - 1)
 
 /*
  * In-core open file.
@@ -105,78 +156,119 @@ max(a, b)
 struct file {
 	off_t		f_seekp;	/* seek pointer */
 	struct fs	*f_fs;		/* pointer to super-block */
-	struct dinode	f_di;		/* copy of on-disk inode */
-	unsigned int	f_nindir[NIADDR];
-					/* number of blocks mapped by
-					   indirect block at level i */
-	char		*f_blk[NIADDR];	/* buffer for indirect block at
-					   level i */
-	size_t		f_blksize[NIADDR];
-					/* size of buffer */
-	daddr_t		f_blkno[NIADDR];/* disk address of block in buffer */
+	struct ufs_dinode	f_di;		/* copy of on-disk inode */
+	uint		f_nishift;	/* for blocks in indirect block */
+	indp_t		f_ind_cache_block;
+	indp_t		f_ind_cache[IND_CACHE_SZ];
+
 	char		*f_buf;		/* buffer for data block */
 	size_t		f_buf_size;	/* size of data block */
 	daddr_t		f_buf_blkno;	/* block number of data block */
 };
 
-static int	read_inode __P((ino_t, struct open_file *));
-static int	block_map __P((struct open_file *, daddr_t, daddr_t *));
-static int	buf_read_file __P((struct open_file *, char **, size_t *));
-static int	search_directory __P((char *, struct open_file *, ino_t *));
-#ifdef COMPAT_UFS
-static void	ffs_oldfscompat __P((struct fs *));
+static int read_inode(ino_t, struct open_file *);
+static int block_map(struct open_file *, indp_t, indp_t *);
+static int buf_read_file(struct open_file *, char **, size_t *);
+static int search_directory(const char *, int, struct open_file *, ino_t *);
+#ifdef LIBSA_FFSv1
+static void ffs_oldfscompat(struct fs *);
+#endif
+#ifdef LIBSA_FFSv2
+static int ffs_find_superblock(struct open_file *, struct fs *);
+#endif
+
+#ifdef LIBSA_LFS
+/*
+ * Find an inode's block.  Look it up in the ifile.  Whee!
+ */
+static int
+find_inode_sector(ino_t inumber, struct open_file *f, daddr_t *isp)
+{
+	struct file *fp = (struct file *)f->f_fsdata;
+	struct fs *fs = fp->f_fs;
+	daddr_t ifileent_blkno;
+	char *ent_in_buf;
+	size_t buf_after_ent;
+	int rc;
+
+	rc = read_inode(fs->lfs_ifile, f);
+	if (rc)
+		return (rc);
+
+	ifileent_blkno =
+	    (inumber / fs->lfs_ifpb) + fs->lfs_cleansz + fs->lfs_segtabsz;
+	fp->f_seekp = (off_t)ifileent_blkno * fs->fs_bsize +
+	    (inumber % fs->lfs_ifpb) * sizeof (IFILE_Vx);
+	rc = buf_read_file(f, &ent_in_buf, &buf_after_ent);
+	if (rc)
+		return (rc);
+	/* make sure something's not badly wrong, but don't panic. */
+	if (buf_after_ent < sizeof (IFILE_Vx))
+		return (EINVAL);
+
+	*isp = FSBTODB(fs, ((IFILE_Vx *)ent_in_buf)->if_daddr);
+	if (*isp == LFS_UNUSED_DADDR)	/* again, something badly wrong */
+		return (EINVAL);
+	return (0);
+}
 #endif
 
 /*
  * Read a new inode into a file structure.
  */
 static int
-read_inode(inumber, f)
-	ino_t inumber;
-	struct open_file *f;
+read_inode(ino_t inumber, struct open_file *f)
 {
 	struct file *fp = (struct file *)f->f_fsdata;
 	struct fs *fs = fp->f_fs;
 	char *buf;
-	size_t rsize;
+	ssize_t rsize;
 	int rc;
+	daddr_t inode_sector;
+#ifdef LIBSA_LFS
+	struct ufs_dinode *dip;
+	int cnt;
+#endif
+
+#ifdef LIBSA_LFS
+	if (inumber == fs->lfs_ifile)
+		inode_sector = FSBTODB(fs, fs->lfs_idaddr);
+	else if ((rc = find_inode_sector(inumber, f, &inode_sector)) != 0)
+		return (rc);
+#else
+	inode_sector = FSBTODB(fs, ino_to_fsba(fs, inumber));
+#endif
 
 	/*
 	 * Read inode and save it.
 	 */
-	buf = alloc(fs->fs_bsize);
-#if !defined(LIBSA_NO_TWIDDLE)
+	buf = fp->f_buf;
 	twiddle();
-#endif
 	rc = DEV_STRATEGY(f->f_dev)(f->f_devdata, F_READ,
-		fsbtodb(fs, ino_to_fsba(fs, inumber)), fs->fs_bsize,
-		buf, &rsize);
+	    inode_sector, fs->fs_bsize, buf, &rsize);
 	if (rc)
-		goto out;
-	if (rsize != fs->fs_bsize) {
-		rc = EIO;
-		goto out;
-	}
+		return rc;
+	if (rsize != (ssize_t)fs->fs_bsize)
+		return EIO;
 
-	{
-		struct dinode *dp;
-
-		dp = (struct dinode *)buf;
-		fp->f_di = dp[ino_to_fsbo(fs, inumber)];
+#ifdef LIBSA_LFS
+	cnt = INOPBx(fs);
+	dip = (struct ufs_dinode *)buf + (cnt - 1);
+	for (; dip->di_inumber != inumber; --dip) {
+		/* kernel code panics, but boot blocks which panic are Bad. */
+		if (--cnt == 0)
+			return EINVAL;
 	}
+	fp->f_di = *dip;
+#else
+	fp->f_di = ((struct ufs_dinode *)buf)[ino_to_fsbo(fs, inumber)];
+#endif
 
 	/*
 	 * Clear out the old buffers
 	 */
-	{
-		int level;
-
-		for (level = 0; level < NIADDR; level++)
-			fp->f_blkno[level] = -1;
-		fp->f_buf_blkno = -1;
-	}
-out:
-	free(buf, fs->fs_bsize);
+	fp->f_ind_cache_block = ~0;
+	fp->f_buf_blkno = -1;
 	return (rc);
 }
 
@@ -185,18 +277,16 @@ out:
  * contains that block.
  */
 static int
-block_map(f, file_block, disk_block_p)
-	struct open_file *f;
-	daddr_t file_block;
-	daddr_t *disk_block_p;	/* out */
+block_map(struct open_file *f, indp_t file_block, indp_t *disk_block_p)
 {
 	struct file *fp = (struct file *)f->f_fsdata;
 	struct fs *fs = fp->f_fs;
-	int level;
-	int idx;
-	daddr_t ind_block_num;
-	daddr_t *ind_p;
+	unsigned level;
+	indp_t ind_cache;
+	indp_t ind_block_num;
+	ssize_t rsize;
 	int rc;
+	indp_t *buf = (void *)fp->f_buf;
 
 	/*
 	 * Index structure of an inode:
@@ -229,59 +319,55 @@ block_map(f, file_block, disk_block_p)
 
 	file_block -= NDADDR;
 
-	/*
-	 * nindir[0] = NINDIR
-	 * nindir[1] = NINDIR**2
-	 * nindir[2] = NINDIR**3
-	 *	etc
-	 */
-	for (level = 0; level < NIADDR; level++) {
-		if (file_block < fp->f_nindir[level])
+	ind_cache = file_block >> LN2_IND_CACHE_SZ;
+	if (ind_cache == fp->f_ind_cache_block) {
+		*disk_block_p = fp->f_ind_cache[file_block & IND_CACHE_MASK];
+		return 0;
+	}
+
+	for (level = 0;;) {
+		level += fp->f_nishift;
+		if (file_block < (indp_t)1 << level)
 			break;
-		file_block -= fp->f_nindir[level];
-	}
-	if (level == NIADDR) {
-		/* Block number too high */
-		return (EFBIG);
+		if (level > NIADDR * fp->f_nishift)
+			/* Block number too high */
+			return (EFBIG);
+		file_block -= (indp_t)1 << level;
 	}
 
-	ind_block_num = fp->f_di.di_ib[level];
+	ind_block_num = fp->f_di.di_ib[level / fp->f_nishift - 1];
 
-	for (; level >= 0; level--) {
+	for (;;) {
+		level -= fp->f_nishift;
 		if (ind_block_num == 0) {
 			*disk_block_p = 0;	/* missing */
 			return (0);
 		}
 
-		if (fp->f_blkno[level] != ind_block_num) {
-			if (fp->f_blk[level] == (char *)0)
-				fp->f_blk[level] =
-					alloc(fs->fs_bsize);
-#if !defined(LIBSA_NO_TWIDDLE)
-			twiddle();
-#endif
-			rc = DEV_STRATEGY(f->f_dev)(f->f_devdata, F_READ,
-				fsbtodb(fp->f_fs, ind_block_num),
-				fs->fs_bsize,
-				fp->f_blk[level],
-				&fp->f_blksize[level]);
-			if (rc)
-				return (rc);
-			if (fp->f_blksize[level] != fs->fs_bsize)
-				return (EIO);
-			fp->f_blkno[level] = ind_block_num;
-		}
-
-		ind_p = (daddr_t *)fp->f_blk[level];
-
-		if (level > 0) {
-			idx = file_block / fp->f_nindir[level - 1];
-			file_block %= fp->f_nindir[level - 1];
-		} else
-			idx = file_block;
-
-		ind_block_num = ind_p[idx];
+		twiddle();
+		/*
+		 * If we were feeling brave, we could work out the number
+		 * of the disk sector and read a single disk sector instead
+		 * of a filesystem block.
+		 * However we don't do this very often anyway...
+		 */
+		rc = DEV_STRATEGY(f->f_dev)(f->f_devdata, F_READ,
+			FSBTODB(fp->f_fs, ind_block_num), fs->fs_bsize,
+			buf, &rsize);
+		if (rc)
+			return (rc);
+		if (rsize != (ssize_t)fs->fs_bsize)
+			return EIO;
+		ind_block_num = buf[file_block >> level];
+		if (level == 0)
+			break;
+		file_block &= (1 << level) - 1;
 	}
+
+	/* Save the part of the block that contains this sector */
+	memcpy(fp->f_ind_cache, &buf[file_block & ~IND_CACHE_MASK],
+	    IND_CACHE_SZ * sizeof fp->f_ind_cache[0]);
+	fp->f_ind_cache_block = ind_cache;
 
 	*disk_block_p = ind_block_num;
 
@@ -289,44 +375,40 @@ block_map(f, file_block, disk_block_p)
 }
 
 /*
- * Read a portion of a file into an internal buffer.  Return
- * the location in the buffer and the amount in the buffer.
+ * Read a portion of a file into an internal buffer.
+ * Return the location in the buffer and the amount in the buffer.
  */
 static int
-buf_read_file(f, buf_p, size_p)
-	struct open_file *f;
-	char **buf_p;		/* out */
-	size_t *size_p;		/* out */
+buf_read_file(struct open_file *f, char **buf_p, size_t *size_p)
 {
 	struct file *fp = (struct file *)f->f_fsdata;
 	struct fs *fs = fp->f_fs;
 	long off;
-	daddr_t file_block;
-	daddr_t	disk_block;
+	indp_t file_block;
+	indp_t disk_block;
 	size_t block_size;
 	int rc;
 
 	off = blkoff(fs, fp->f_seekp);
 	file_block = lblkno(fs, fp->f_seekp);
+#ifdef LIBSA_LFS
 	block_size = dblksize(fs, &fp->f_di, file_block);
+#else
+	block_size = sblksize(fs, (int64_t)fp->f_di.di_size, file_block);
+#endif
 
 	if (file_block != fp->f_buf_blkno) {
 		rc = block_map(f, file_block, &disk_block);
 		if (rc)
 			return (rc);
 
-		if (fp->f_buf == (char *)0)
-			fp->f_buf = alloc(fs->fs_bsize);
-
 		if (disk_block == 0) {
-			bzero(fp->f_buf, block_size);
+			memset(fp->f_buf, 0, block_size);
 			fp->f_buf_size = block_size;
 		} else {
-#if !defined(LIBSA_NO_TWIDDLE)
 			twiddle();
-#endif
 			rc = DEV_STRATEGY(f->f_dev)(f->f_devdata, F_READ,
-				fsbtodb(fs, disk_block),
+				FSBTODB(fs, disk_block),
 				block_size, fp->f_buf, &fp->f_buf_size);
 			if (rc)
 				return (rc);
@@ -354,35 +436,33 @@ buf_read_file(f, buf_p, size_p)
 
 /*
  * Search a directory for a name and return its
- * i_number.
+ * inode number.
  */
 static int
-search_directory(name, f, inumber_p)
-	char *name;
-	struct open_file *f;
-	ino_t *inumber_p;		/* out */
+search_directory(const char *name, int length, struct open_file *f,
+    ino_t *inumber_p)
 {
 	struct file *fp = (struct file *)f->f_fsdata;
 	struct direct *dp;
 	struct direct *edp;
 	char *buf;
 	size_t buf_size;
-	int namlen, length;
+	int namlen;
 	int rc;
 
-	length = strlen(name);
-
 	fp->f_seekp = 0;
-	while (fp->f_seekp < fp->f_di.di_size) {
+	while (fp->f_seekp < (off_t)fp->f_di.di_size) {
 		rc = buf_read_file(f, &buf, &buf_size);
 		if (rc)
 			return (rc);
 
 		dp = (struct direct *)buf;
 		edp = (struct direct *)(buf + buf_size);
-		while (dp < edp) {
+		for (;dp < edp; dp = (void *)((char *)dp + dp->d_reclen)) {
+			if (dp->d_reclen <= 0)
+				break;
 			if (dp->d_ino == (ino_t)0)
-				goto next;
+				continue;
 #if BYTE_ORDER == LITTLE_ENDIAN
 			if (fp->f_fs->fs_maxsymlinklen <= 0)
 				namlen = dp->d_type;
@@ -390,82 +470,144 @@ search_directory(name, f, inumber_p)
 #endif
 				namlen = dp->d_namlen;
 			if (namlen == length &&
-			    !strcmp(name, dp->d_name)) {
+			    !memcmp(name, dp->d_name, length)) {
 				/* found entry */
 				*inumber_p = dp->d_ino;
 				return (0);
 			}
-		next:
-			dp = (struct direct *)((char *)dp + dp->d_reclen);
 		}
 		fp->f_seekp += buf_size;
 	}
 	return (ENOENT);
 }
 
+#ifdef LIBSA_FFSv2
+
+daddr_t sblock_try[] = SBLOCKSEARCH;
+
+static int
+ffs_find_superblock(struct open_file *f, struct fs *fs)
+{
+	int i, rc;
+	size_t buf_size;
+
+	for (i = 0; sblock_try[i] != -1; i++) {
+		rc = DEV_STRATEGY(f->f_dev)(f->f_devdata, F_READ,
+		    sblock_try[i] / DEV_BSIZE, SBLOCKSIZE, fs, &buf_size);
+		if (rc != 0 || buf_size != SBLOCKSIZE)
+			return rc;
+		if (fs->fs_sblockloc != sblock_try[i])
+			/* an alternate superblock - try again */
+			continue;
+		if (fs->fs_magic == FS_UFS2_MAGIC) {
+			return 0;
+		}
+	}
+	return EINVAL;
+}
+
+#endif
+
 /*
  * Open a file.
  */
 int
-ufs_open(path, f)
-	char *path;
-	struct open_file *f;
+ufs_open(const char *path, struct open_file *f)
 {
 #ifndef LIBSA_FS_SINGLECOMPONENT
-	char *cp, *ncp;
+	const char *cp, *ncp;
 	int c;
 #endif
 	ino_t inumber;
 	struct file *fp;
 	struct fs *fs;
 	int rc;
-	size_t buf_size;
 #ifndef LIBSA_NO_FS_SYMLINK
 	ino_t parent_inumber;
 	int nlinks = 0;
 	char namebuf[MAXPATHLEN+1];
-	char *buf = NULL;
+	char *buf;
 #endif
 
 	/* allocate file system specific data structure */
 	fp = alloc(sizeof(struct file));
-	bzero(fp, sizeof(struct file));
+	memset(fp, 0, sizeof(struct file));
 	f->f_fsdata = (void *)fp;
 
 	/* allocate space and read super block */
-	fs = alloc(SBSIZE);
+	fs = alloc(SBLOCKSIZE);
 	fp->f_fs = fs;
-#if !defined(LIBSA_NO_TWIDDLE)
 	twiddle();
-#endif
-	rc = DEV_STRATEGY(f->f_dev)(f->f_devdata, F_READ,
-		SBLOCK, SBSIZE, (char *)fs, &buf_size);
+
+#ifdef LIBSA_FFSv2
+	rc = ffs_find_superblock(f, fs);
 	if (rc)
 		goto out;
+#else
+	{
+		size_t buf_size;
+		rc = DEV_STRATEGY(f->f_dev)(f->f_devdata, F_READ,
+			SBLOCKOFFSET / DEV_BSIZE, SBLOCKSIZE, fs, &buf_size);
+		if (rc)
+			goto out;
+		if (buf_size != SBLOCKSIZE ||
+#ifdef LIBSA_FFS
+		    fs->lfs_version != REQUIRED_LFS_VERSION ||
+#endif
+		    fs->fs_magic != FS_MAGIC) {
+			rc = EINVAL;
+			goto out;
+		}
+	}
+#if defined(LIBSA_LFS) && REQUIRED_LFS_VERSION == 2
+	/*
+	 * XXX	We should check the second superblock and use the eldest
+	 *	of the two.  See comments near the top of lfs_mountfs()
+	 *	in sys/ufs/lfs/lfs_vfsops.c.
+	 *      This may need a LIBSA_LFS_SMALL check as well.
+	 */
+#endif
+#endif
 
-	if (buf_size != SBSIZE || fs->fs_magic != FS_MAGIC ||
-	    fs->fs_bsize > MAXBSIZE || fs->fs_bsize < sizeof(struct fs)) {
+#ifdef LIBSA_FFSv1
+	ffs_oldfscompat(fs);
+#endif
+
+	if (fs->fs_bsize > MAXBSIZE ||
+	    (size_t)fs->fs_bsize < sizeof(struct fs)) {
 		rc = EINVAL;
 		goto out;
 	}
-#ifdef COMPAT_UFS
-	ffs_oldfscompat(fs);
-#endif
 
 	/*
 	 * Calculate indirect block levels.
 	 */
 	{
-		int mult;
-		int level;
+		indp_t mult;
+		int ln2;
 
-		mult = 1;
-		for (level = 0; level < NIADDR; level++) {
-			mult *= NINDIR(fs);
-			fp->f_nindir[level] = mult;
+		/*
+		 * We note that the number of indirect blocks is always
+		 * a power of 2.  This lets us use shifts and masks instead
+		 * of divide and remainder and avoinds pulling in the
+		 * 64bit division routine into the boot code.
+		 */
+		mult = NINDIR(fs);
+#ifdef DEBUG
+		if (mult & (mult - 1)) {
+			/* Hummm was't a power of 2 */
+			rc = EINVAL;
+			goto out;
 		}
+#endif
+		for (ln2 = 0; mult != 1; ln2++)
+			mult >>= 1;
+
+		fp->f_nishift = ln2;
 	}
 
+	/* alloc a block sized buffer used for all fs transfers */
+	fp->f_buf = alloc(fs->fs_bsize);
 	inumber = ROOTINO;
 	if ((rc = read_inode(inumber, f)) != 0)
 		goto out;
@@ -493,19 +635,9 @@ ufs_open(path, f)
 		/*
 		 * Get next component of path name.
 		 */
-		{
-			int len = 0;
-
-			ncp = cp;
-			while ((c = *cp) != '\0' && c != '/') {
-				if (++len > MAXNAMLEN) {
-					rc = ENOENT;
-					goto out;
-				}
-				cp++;
-			}
-			*cp = '\0';
-		}
+		ncp = cp;
+		while ((c = *cp) != '\0' && c != '/')
+			cp++;
 
 		/*
 		 * Look up component in current directory.
@@ -515,8 +647,7 @@ ufs_open(path, f)
 #ifndef LIBSA_NO_FS_SYMLINK
 		parent_inumber = inumber;
 #endif
-		rc = search_directory(ncp, f, &inumber);
-		*cp = c;
+		rc = search_directory(ncp, cp - ncp, f, &inumber);
 		if (rc)
 			goto out;
 
@@ -542,35 +673,30 @@ ufs_open(path, f)
 				goto out;
 			}
 
-			bcopy(cp, &namebuf[link_len], len + 1);
+			memmove(&namebuf[link_len], cp, len + 1);
 
 			if (link_len < fs->fs_maxsymlinklen) {
-				bcopy(fp->f_di.di_shortlink, namebuf,
-				      (unsigned) link_len);
+				memcpy(namebuf, fp->f_di.di_db, link_len);
 			} else {
 				/*
 				 * Read file for symbolic link
 				 */
 				size_t buf_size;
-				daddr_t	disk_block;
-				struct fs *fs = fp->f_fs;
+				indp_t	disk_block;
 
-				if (!buf)
-					buf = alloc(fs->fs_bsize);
-				rc = block_map(f, (daddr_t)0, &disk_block);
+				buf = fp->f_buf;
+				rc = block_map(f, (indp_t)0, &disk_block);
 				if (rc)
 					goto out;
 
-#if !defined(LIBSA_NO_TWIDDLE)
 				twiddle();
-#endif
 				rc = DEV_STRATEGY(f->f_dev)(f->f_devdata,
-					F_READ, fsbtodb(fs, disk_block),
+					F_READ, FSBTODB(fs, disk_block),
 					fs->fs_bsize, buf, &buf_size);
 				if (rc)
 					goto out;
 
-				bcopy((char *)buf, namebuf, (unsigned)link_len);
+				memcpy(namebuf, buf, link_len);
 			}
 
 			/*
@@ -597,7 +723,7 @@ ufs_open(path, f)
 #else /* !LIBSA_FS_SINGLECOMPONENT */
 
 	/* look up component in the current (root) directory */
-	rc = search_directory(path, f, &inumber);
+	rc = search_directory(path, strlen(path), f, &inumber);
 	if (rc)
 		goto out;
 
@@ -609,53 +735,33 @@ ufs_open(path, f)
         fp->f_seekp = 0;		/* reset seek pointer */
 
 out:
-#ifndef LIBSA_NO_FS_SYMLINK
-	if (buf)
-		free(buf, fs->fs_bsize);
-#endif
-	if (rc) {
-		if (fp->f_buf)
-			free(fp->f_buf, fp->f_fs->fs_bsize);
-		free(fp->f_fs, SBSIZE);
-		free(fp, sizeof(struct file));
-	}
+	if (rc)
+		ufs_close(f);
 	return (rc);
 }
 
-#ifndef LIBSA_NO_FS_CLOSE
 int
-ufs_close(f)
-	struct open_file *f;
+ufs_close(struct open_file *f)
 {
 	struct file *fp = (struct file *)f->f_fsdata;
-	int level;
 
-	f->f_fsdata = (void *)0;
-	if (fp == (struct file *)0)
+	f->f_fsdata = NULL;
+	if (fp == NULL)
 		return (0);
 
-	for (level = 0; level < NIADDR; level++) {
-		if (fp->f_blk[level])
-			free(fp->f_blk[level], fp->f_fs->fs_bsize);
-	}
 	if (fp->f_buf)
 		free(fp->f_buf, fp->f_fs->fs_bsize);
-	free(fp->f_fs, SBSIZE);
+	free(fp->f_fs, SBLOCKSIZE);
 	free(fp, sizeof(struct file));
 	return (0);
 }
-#endif /* !LIBSA_NO_FS_CLOSE */
 
 /*
  * Copy a portion of a file into kernel memory.
  * Cross block boundaries when necessary.
  */
 int
-ufs_read(f, start, size, resid)
-	struct open_file *f;
-	void *start;
-	size_t size;
-	size_t *resid;	/* out */
+ufs_read(struct open_file *f, void *start, size_t size, size_t *resid)
 {
 	struct file *fp = (struct file *)f->f_fsdata;
 	size_t csize;
@@ -665,7 +771,7 @@ ufs_read(f, start, size, resid)
 	char *addr = start;
 
 	while (size != 0) {
-		if (fp->f_seekp >= fp->f_di.di_size)
+		if (fp->f_seekp >= (off_t)fp->f_di.di_size)
 			break;
 
 		rc = buf_read_file(f, &buf, &buf_size);
@@ -676,7 +782,7 @@ ufs_read(f, start, size, resid)
 		if (csize > buf_size)
 			csize = buf_size;
 
-		bcopy(buf, addr, csize);
+		memcpy(addr, buf, csize);
 
 		fp->f_seekp += csize;
 		addr += csize;
@@ -692,11 +798,7 @@ ufs_read(f, start, size, resid)
  */
 #ifndef LIBSA_NO_FS_WRITE
 int
-ufs_write(f, start, size, resid)
-	struct open_file *f;
-	void *start;
-	size_t size;
-	size_t *resid;	/* out */
+ufs_write(struct open_file *f, void *start, size_t size, size_t *resid)
 {
 
 	return (EROFS);
@@ -705,10 +807,7 @@ ufs_write(f, start, size, resid)
 
 #ifndef LIBSA_NO_FS_SEEK
 off_t
-ufs_seek(f, offset, where)
-	struct open_file *f;
-	off_t offset;
-	int where;
+ufs_seek(struct open_file *f, off_t offset, int where)
 {
 	struct file *fp = (struct file *)f->f_fsdata;
 
@@ -730,13 +829,12 @@ ufs_seek(f, offset, where)
 #endif /* !LIBSA_NO_FS_SEEK */
 
 int
-ufs_stat(f, sb)
-	struct open_file *f;
-	struct stat *sb;
+ufs_stat(struct open_file *f, struct stat *sb)
 {
 	struct file *fp = (struct file *)f->f_fsdata;
 
 	/* only important stuff */
+	memset(sb, 0, sizeof *sb);
 	sb->st_mode = fp->f_di.di_mode;
 	sb->st_uid = fp->f_di.di_uid;
 	sb->st_gid = fp->f_di.di_gid;
@@ -744,32 +842,23 @@ ufs_stat(f, sb)
 	return (0);
 }
 
-#ifdef COMPAT_UFS
+#ifdef LIBSA_FFSv1
 /*
  * Sanity checks for old file systems.
  *
  * XXX - goes away some day.
+ * Stripped of stuff libsa doesn't need.....
  */
 static void
-ffs_oldfscompat(fs)
-	struct fs *fs;
+ffs_oldfscompat(struct fs *fs)
 {
-	int i;
 
-	fs->fs_npsect = max(fs->fs_npsect, fs->fs_nsect);	/* XXX */
-	fs->fs_interleave = max(fs->fs_interleave, 1);		/* XXX */
-	if (fs->fs_postblformat == FS_42POSTBLFMT)		/* XXX */
-		fs->fs_nrpos = 8;				/* XXX */
-	if (fs->fs_inodefmt < FS_44INODEFMT) {			/* XXX */
-		quad_t sizepb = fs->fs_bsize;			/* XXX */
-								/* XXX */
-		fs->fs_maxfilesize = fs->fs_bsize * NDADDR - 1;	/* XXX */
-		for (i = 0; i < NIADDR; i++) {			/* XXX */
-			sizepb *= NINDIR(fs);			/* XXX */
-			fs->fs_maxfilesize += sizepb;		/* XXX */
-		}						/* XXX */
-		fs->fs_qbmask = ~fs->fs_bmask;			/* XXX */
-		fs->fs_qfmask = ~fs->fs_fmask;			/* XXX */
-	}							/* XXX */
+#ifdef COMPAT_UFS
+	if (fs->fs_magic == FS_UFS1_MAGIC &&
+	    fs->fs_old_inodefmt < FS_44INODEFMT) {	
+		fs->fs_qbmask = ~fs->fs_bmask;
+		fs->fs_qfmask = ~fs->fs_fmask;
+	}
+#endif
 }
 #endif

@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_vfsops.c,v 1.112.10.3 2003/10/04 08:34:30 tron Exp $	*/
+/*	$NetBSD: nfs_vfsops.c,v 1.135.2.1 2004/05/29 09:04:02 tron Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993, 1995
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -39,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: nfs_vfsops.c,v 1.112.10.3 2003/10/04 08:34:30 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: nfs_vfsops.c,v 1.135.2.1 2004/05/29 09:04:02 tron Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
@@ -80,8 +76,7 @@ __KERNEL_RCSID(0, "$NetBSD: nfs_vfsops.c,v 1.112.10.3 2003/10/04 08:34:30 tron E
 extern struct nfsstats nfsstats;
 extern int nfs_ticks;
 
-int nfs_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
-		      struct proc *));
+MALLOC_DEFINE(M_NFSMNT, "NFS mount", "NFS mount structure");
 
 /*
  * nfs vfs operations.
@@ -113,7 +108,7 @@ struct vfsops nfs_vfsops = {
 	nfs_vfs_init,
 	nfs_vfs_reinit,
 	nfs_vfs_done,
-	nfs_sysctl,
+	NULL,
 	nfs_mountroot,
 	nfs_checkexp,
 	nfs_vnodeopv_descs,
@@ -124,9 +119,6 @@ extern u_int32_t nfs_prog, nfs_vers;
 
 static int nfs_mount_diskless __P((struct nfs_dlmount *, const char *,
     struct mount **, struct vnode **, struct proc *));
-
-#define TRUE	1
-#define	FALSE	0
 
 /*
  * nfs statfs call
@@ -150,14 +142,16 @@ nfs_statfs(mp, sbp, p)
 #else
 	int v3 = (nmp->nm_flag & NFSMNT_NFSV3);
 #endif
-	struct mbuf *mreq, *mrep = NULL, *md, *mb, *mb2;
+	struct mbuf *mreq, *mrep = NULL, *md, *mb;
 	struct ucred *cred;
 	u_quad_t tquad;
+	struct nfsnode *np;
 
 #ifndef nolint
 	sfp = (struct nfs_statfs *)0;
 #endif
 	vp = nmp->nm_vnode;
+	np = VTONFS(vp);
 	cred = crget();
 	cred->cr_ngroups = 0;
 #ifndef NFS_V2_ONLY
@@ -165,11 +159,11 @@ nfs_statfs(mp, sbp, p)
 		(void)nfs_fsinfo(nmp, vp, cred, p);
 #endif
 	nfsstats.rpccnt[NFSPROC_FSSTAT]++;
-	nfsm_reqhead(vp, NFSPROC_FSSTAT, NFSX_FH(v3));
-	nfsm_fhtom(vp, v3);
-	nfsm_request(vp, NFSPROC_FSSTAT, p, cred);
+	nfsm_reqhead(np, NFSPROC_FSSTAT, NFSX_FH(v3));
+	nfsm_fhtom(np, v3);
+	nfsm_request(np, NFSPROC_FSSTAT, p, cred);
 	if (v3)
-		nfsm_postop_attr(vp, retattr);
+		nfsm_postop_attr(vp, retattr, 0);
 	if (error) {
 		if (mrep != NULL) {
 			if (mrep->m_next != NULL)
@@ -206,11 +200,7 @@ nfs_statfs(mp, sbp, p)
 		sbp->f_files = 0;
 		sbp->f_ffree = 0;
 	}
-	if (sbp != &mp->mnt_stat) {
-		memcpy(sbp->f_mntonname, mp->mnt_stat.f_mntonname, MNAMELEN);
-		memcpy(sbp->f_mntfromname, mp->mnt_stat.f_mntfromname, MNAMELEN);
-	}
-	strncpy(&sbp->f_fstypename[0], mp->mnt_op->vfs_name, MFSNAMELEN);
+	copy_statfs_info(sbp, mp);
 	nfsm_reqdone;
 	crfree(cred);
 	return (error);
@@ -233,18 +223,20 @@ nfs_fsinfo(nmp, vp, cred, p)
 	u_int32_t *tl, pref, max;
 	caddr_t bpos, dpos, cp2;
 	int error = 0, retattr;
-	struct mbuf *mreq, *mrep, *md, *mb, *mb2;
+	struct mbuf *mreq, *mrep, *md, *mb;
 	u_int64_t maxfsize;
+	struct nfsnode *np = VTONFS(vp);
 
 	nfsstats.rpccnt[NFSPROC_FSINFO]++;
-	nfsm_reqhead(vp, NFSPROC_FSINFO, NFSX_FH(1));
-	nfsm_fhtom(vp, 1);
-	nfsm_request(vp, NFSPROC_FSINFO, p, cred);
-	nfsm_postop_attr(vp, retattr);
+	nfsm_reqhead(np, NFSPROC_FSINFO, NFSX_FH(1));
+	nfsm_fhtom(np, 1);
+	nfsm_request(np, NFSPROC_FSINFO, p, cred);
+	nfsm_postop_attr(vp, retattr, 0);
 	if (!error) {
 		nfsm_dissect(fsp, struct nfsv3_fsinfo *, NFSX_V3FSINFO);
 		pref = fxdr_unsigned(u_int32_t, fsp->fs_wtpref);
-		if (pref < nmp->nm_wsize && pref >= NFS_FABLKSIZE)
+		if ((nmp->nm_flag & NFSMNT_WSIZE) == 0 &&
+		    pref < nmp->nm_wsize && pref >= NFS_FABLKSIZE)
 			nmp->nm_wsize = (pref + NFS_FABLKSIZE - 1) &
 				~(NFS_FABLKSIZE - 1);
 		max = fxdr_unsigned(u_int32_t, fsp->fs_wtmax);
@@ -254,7 +246,8 @@ nfs_fsinfo(nmp, vp, cred, p)
 				nmp->nm_wsize = max;
 		}
 		pref = fxdr_unsigned(u_int32_t, fsp->fs_rtpref);
-		if (pref < nmp->nm_rsize && pref >= NFS_FABLKSIZE)
+		if ((nmp->nm_flag & NFSMNT_RSIZE) == 0 &&
+		    pref < nmp->nm_rsize && pref >= NFS_FABLKSIZE)
 			nmp->nm_rsize = (pref + NFS_FABLKSIZE - 1) &
 				~(NFS_FABLKSIZE - 1);
 		max = fxdr_unsigned(u_int32_t, fsp->fs_rtmax);
@@ -392,6 +385,7 @@ nfs_mount_diskless(ndmntp, mntname, mpp, vpp, p)
 	m = m_get(M_WAIT, MT_SONAME);
 	if (m == NULL)
 		panic("nfs_mountroot: mget soname for %s", mntname);
+	MCLAIM(m, &nfs_mowner);
 	memcpy(mtod(m, caddr_t), (caddr_t)ndmntp->ndm_args.addr,
 	      (m->m_len = ndmntp->ndm_args.addr->sa_len));
 
@@ -562,6 +556,8 @@ nfs_mount(mp, path, data, ndp, p)
 	int error;
 	struct nfs_args args;
 	struct mbuf *nam;
+	struct nfsmount *nmp = VFSTONFS(mp);
+	struct sockaddr *sa;
 	struct vnode *vp;
 	char *pth, *hst;
 	size_t len;
@@ -570,6 +566,39 @@ nfs_mount(mp, path, data, ndp, p)
 	error = copyin(data, (caddr_t)&args, sizeof (struct nfs_args));
 	if (error)
 		return (error);
+
+	if (mp->mnt_flag & MNT_GETARGS) {
+
+		if (nmp == NULL)
+			return (EIO);
+		if (args.addr != NULL) {
+			sa = mtod(nmp->nm_nam, struct sockaddr *);
+			error = copyout(sa, args.addr, sa->sa_len);
+			if (error)
+				return (error);
+			args.addrlen = sa->sa_len;
+		} else
+			args.addrlen = 0;
+
+		args.version = NFS_ARGSVERSION;
+		args.sotype = nmp->nm_sotype;
+		args.proto = nmp->nm_soproto;
+		args.fh = NULL;
+		args.fhsize = 0;
+		args.flags = nmp->nm_flag;
+		args.wsize = nmp->nm_wsize;
+		args.rsize = nmp->nm_rsize;
+		args.readdirsize = nmp->nm_readdirsize;
+		args.timeo = nmp->nm_timeo;
+		args.retrans = nmp->nm_retry;
+		args.maxgrouplist = nmp->nm_numgrps;
+		args.readahead = nmp->nm_readahead;
+		args.leaseterm = nmp->nm_leaseterm;
+		args.deadthresh = nmp->nm_deadthresh;
+		args.hostname = NULL;
+		return (copyout(&args, data, sizeof(args)));
+	}
+
 	if (args.version != NFS_ARGSVERSION)
 		return (EPROGMISMATCH);
 #ifdef NFS_V2_ONLY
@@ -579,8 +608,6 @@ nfs_mount(mp, path, data, ndp, p)
 		return (EPROGMISMATCH);
 #endif
 	if (mp->mnt_flag & MNT_UPDATE) {
-		struct nfsmount *nmp = VFSTONFS(mp);
-
 		if (nmp == NULL)
 			return (EIO);
 		/*
@@ -614,6 +641,7 @@ nfs_mount(mp, path, data, ndp, p)
 	error = sockargs(&nam, (caddr_t)args.addr, args.addrlen, MT_SONAME);
 	if (error)
 		goto free_hst;
+	MCLAIM(nam, &nfs_mowner);
 	args.fh = nfh;
 	error = mountnfs(&args, mp, nam, pth, hst, &vp, p);
 
@@ -664,9 +692,11 @@ mountnfs(argp, mp, nam, pth, hst, vpp, p)
 		MALLOC(nmp, struct nfsmount *, sizeof (struct nfsmount),
 		    M_NFSMNT, M_WAITOK);
 		memset((caddr_t)nmp, 0, sizeof (struct nfsmount));
-		mp->mnt_data = (qaddr_t)nmp;
+		mp->mnt_data = nmp;
 		TAILQ_INIT(&nmp->nm_uidlruhead);
 		TAILQ_INIT(&nmp->nm_bufq);
+		lockinit(&nmp->nm_writeverflock, PRIBIO, "nfswverf", 0, 0);
+		simple_lock_init(&nmp->nm_slock);
 	}
 	vfs_getnewfsid(mp);
 	nmp->nm_mountp = mp;
@@ -707,10 +737,9 @@ mountnfs(argp, mp, nam, pth, hst, vpp, p)
 #else
 	mp->mnt_stat.f_type = 0;
 #endif
-	strncpy(&mp->mnt_stat.f_fstypename[0], mp->mnt_op->vfs_name,
-	    MFSNAMELEN);
-	memcpy(mp->mnt_stat.f_mntfromname, hst, MNAMELEN);
-	memcpy(mp->mnt_stat.f_mntonname, pth, MNAMELEN);
+	error = set_statfs_info(pth, UIO_SYSSPACE, hst, UIO_SYSSPACE, mp, p);
+	if (error)
+		goto bad;
 	nmp->nm_nam = nam;
 
 	/* Set up the sockets and per-host congestion */
@@ -895,9 +924,7 @@ nfs_sync(mp, waitfor, cred, p)
 	 * Force stale buffer cache information to be flushed.
 	 */
 loop:
-	for (vp = mp->mnt_vnodelist.lh_first;
-	     vp != NULL;
-	     vp = vp->v_mntvnodes.le_next) {
+	LIST_FOREACH(vp, &mp->mnt_vnodelist, v_mntvnodes) {
 		/*
 		 * If the vnode that we are about to sync is no longer
 		 * associated with this mount point, start over.
@@ -937,63 +964,53 @@ nfs_vget(mp, ino, vpp)
 /*
  * Do that sysctl thang...
  */
-int
-nfs_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
-	struct proc *p;
+static int
+sysctl_vfs_nfs_iothreads(SYSCTLFN_ARGS)
 {
-	int rv;
+	int error;
 
-	/*
-	 * All names at this level are terminal.
-	 */
-	if(namelen > 1)
-		return ENOTDIR;	/* overloaded */
+	nfs_getset_niothreads(0);
+        error = sysctl_lookup(SYSCTLFN_CALL(rnode));
+	if (error || newp == NULL)
+		return (error);
+	nfs_getset_niothreads(1);
 
-	switch(name[0]) {
-	case NFS_NFSSTATS:
-		if(!oldp) {
-			*oldlenp = sizeof nfsstats;
-			return 0;
-		}
-
-		if(*oldlenp < sizeof nfsstats) {
-			*oldlenp = sizeof nfsstats;
-			return ENOMEM;
-		}
-
-		rv = copyout(&nfsstats, oldp, sizeof nfsstats);
-		if(rv) return rv;
-
-		if(newp && newlen != sizeof nfsstats)
-			return EINVAL;
-
-		if(newp) {
-			return copyin(newp, &nfsstats, sizeof nfsstats);
-		}
-		return 0;
-
-	case NFS_IOTHREADS:
-		nfs_getset_niothreads(0);
-
-		rv = (sysctl_int(oldp, oldlenp, newp, newlen,
-		    &nfs_niothreads));
-
-		if (newp)
-			nfs_getset_niothreads(1);
-
-		return rv;
-                
-	default:
-		return EOPNOTSUPP;
-	}
+	return (0);
 }
 
+SYSCTL_SETUP(sysctl_vfs_nfs_setup, "sysctl vfs.nfs subtree setup")
+{
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "vfs", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_VFS, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "nfs",
+		       SYSCTL_DESCR("NFS vfs options"),
+		       NULL, 0, NULL, 0,
+		       CTL_VFS, 2, CTL_EOL);
+	/*
+	 * XXX the "2" above could be dynamic, thereby eliminating one
+	 * more instance of the "number to vfs" mapping problem, but
+	 * "2" is the order as taken from sys/mount.h
+	 */
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_STRUCT, "nfsstats",
+		       SYSCTL_DESCR("NFS operation statistics"),
+		       NULL, 0, &nfsstats, sizeof(nfsstats), 
+		       CTL_VFS, 2, NFS_NFSSTATS, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "iothreads",
+		       SYSCTL_DESCR("Number of NFS client processes desired"),
+		       sysctl_vfs_nfs_iothreads, 0, &nfs_niothreads, 0,
+		       CTL_VFS, 2, NFS_IOTHREADS, CTL_EOL);
+}
 
 /*
  * At this point, this should never happen

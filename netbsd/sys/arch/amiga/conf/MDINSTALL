@@ -1,4 +1,4 @@
-#	$NetBSD: MDINSTALL,v 1.12.4.1 2002/05/30 21:17:29 tv Exp $
+#	$NetBSD: MDINSTALL,v 1.16.4.1 2004/07/15 20:16:20 he Exp $
 
 #
 # INSTALL kernel for ramdisk installation
@@ -48,16 +48,19 @@ file-system 	CD9660		# ISO 9660 + Rock Ridge filesystem
 file-system 	MSDOSFS		# MS-DOS filesystem
 file-system 	KERNFS		# kernel data-structure filesystem
 
+options 	VNODE_OP_NOINLINE	# Not inlining vnode op calls saves mem
+
 #
 # Support for various kernel options
 #
 options 	KTRACE		# system call tracing support
-options 	UCONSOLE	# anyone can redirect a virtual console
 #options 	INSECURE	# disable kernel security levels
 options 	SCSIVERBOSE	# human readable SCSI error messages
 options 	NTP		# NTP phase/frequency locked loop
-#options 	USERCONF	# userconf(4) support
-#options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+options 	USERCONF	# userconf(4) support
+options 	PIPE_SOCKETPAIR		# smaller, but slower pipe(2)
+#options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
+options 	MALLOC_NOINLINE		# Not inlining MALLOC saves memory
 
 #
 # Misc. debugging options

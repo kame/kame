@@ -1,4 +1,4 @@
-/*	$NetBSD: i80321_timer.c,v 1.1 2002/03/27 21:45:48 thorpej Exp $	*/
+/*	$NetBSD: i80321_timer.c,v 1.7 2003/07/27 04:52:28 thorpej Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002 Wasabi Systems, Inc.
@@ -39,16 +39,25 @@
  * Timer/clock support for the Intel i80321 I/O processor.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: i80321_timer.c,v 1.7 2003/07/27 04:52:28 thorpej Exp $");
+
+#include "opt_perfctrs.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/time.h>
+
+#include <dev/clock_subr.h>
 
 #include <machine/bus.h>
 #include <arm/cpufunc.h>
 
 #include <arm/xscale/i80321reg.h>
 #include <arm/xscale/i80321var.h>
+
+#include <arm/xscale/xscalevar.h>
 
 void	(*i80321_hardclock_hook)(void);
 
@@ -149,9 +158,12 @@ void
 cpu_initclocks(void)
 {
 	u_int oldirqstate;
+#if defined(PERFCTRS)
+	void *pmu_ih;
+#endif
 
 	if (hz < 50 || COUNTS_PER_SEC % hz) {
-		printf("Cannot get %d Hz clock; using 100 Hz\n", hz);
+		aprint_error("Cannot get %d Hz clock; using 100 Hz\n", hz);
 		hz = 100;
 	}
 	tick = 1000000 / hz;	/* number of microseconds between interrupts */
@@ -170,15 +182,15 @@ cpu_initclocks(void)
 	 * this situation).
 	 */
 	if (stathz != 0)
-		printf("Cannot get %d Hz statclock\n", stathz);
+		aprint_error("Cannot get %d Hz statclock\n", stathz);
 	stathz = 0;
 
 	if (profhz != 0)
-		printf("Cannot get %d Hz profclock\n", profhz);
+		aprint_error("Cannot get %d Hz profclock\n", profhz);
 	profhz = 0;
 
 	/* Report the clock frequency. */
-	printf("clock: hz=%d stathz=%d profhz=%d\n", hz, stathz, profhz);
+	aprint_normal("clock: hz=%d stathz=%d profhz=%d\n", hz, stathz, profhz);
 
 	oldirqstate = disable_interrupts(I32_bit);
 
@@ -187,6 +199,13 @@ cpu_initclocks(void)
 	    clockhandler, NULL);
 	if (clock_ih == NULL)
 		panic("cpu_initclocks: unable to register timer interrupt");
+
+#if defined(PERFCTRS)
+	pmu_ih = i80321_intr_establish(ICU_INT_PMU, IPL_STATCLOCK,
+	    xscale_pmc_dispatch, NULL);
+	if (pmu_ih == NULL)
+		panic("cpu_initclocks: unable to register timer interrupt");
+#endif
 
 	/* Set up the new clock parameters. */
 
@@ -298,17 +317,74 @@ delay(u_int n)
 	}
 }
 
+todr_chip_handle_t todr_handle;
+
+/*
+ * todr_attach:
+ *
+ *	Set the specified time-of-day register as the system real-time clock.
+ */
+void
+todr_attach(todr_chip_handle_t todr)
+{
+
+	if (todr_handle)
+		panic("todr_attach: rtc already configured");
+	todr_handle = todr;
+}
+
 /*
  * inittodr:
  *
  *	Initialize time from the time-of-day register.
  */
+#define	MINYEAR		2003	/* minimum plausible year */
 void
 inittodr(time_t base)
 {
+	time_t deltat;
+	int badbase;
 
-	time.tv_sec = base;
-	time.tv_usec = 0;
+	if (base < (MINYEAR - 1970) * SECYR) {
+		printf("WARNING: preposterous time in file system");
+		/* read the system clock anyway */
+		base = (MINYEAR - 1970) * SECYR;
+		badbase = 1;
+	} else
+		badbase = 0;
+
+	if (todr_handle == NULL ||
+	    todr_gettime(todr_handle, (struct timeval *)&time) != 0 ||
+	    time.tv_sec == 0) {
+		/*
+		 * Believe the time in the file system for lack of
+		 * anything better, resetting the TODR.
+		 */
+		time.tv_sec = base;
+		time.tv_usec = 0;
+		if (todr_handle != NULL && !badbase) {
+			printf("WARNING: preposterous clock chip time\n");
+			resettodr();
+		}
+		goto bad;
+	}
+
+	if (!badbase) {
+		/*
+		 * See if we tained/lost two or more days; if
+		 * so, assume something is amiss.
+		 */
+		deltat = time.tv_sec - base;
+		if (deltat < 0)
+			deltat = -deltat;
+		if (deltat < 2 * SECDAY)
+			return;		/* all is well */
+		printf("WARNING: clock %s %ld days\n",
+		    time.tv_sec < base ? "lost" : "gained",
+		    (long)deltat / SECDAY);
+	}
+ bad:
+	printf("WARNING: CHECK AND RESET THE DATE!\n");
 }
 
 /*
@@ -319,6 +395,13 @@ inittodr(time_t base)
 void
 resettodr(void)
 {
+
+	if (time.tv_sec == 0)
+		return;
+
+	if (todr_handle != NULL &&
+	    todr_settime(todr_handle, (struct timeval *)&time) != 0)
+		printf("resettodr: failed to set time\n");
 }
 
 /*

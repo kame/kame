@@ -1,4 +1,4 @@
-/*	$NetBSD: pcivar.h,v 1.51.2.1 2003/08/15 12:45:59 tron Exp $	*/
+/*	$NetBSD: pcivar.h,v 1.59 2003/08/15 07:17:21 itojun Exp $	*/
 
 /*
  * Copyright (c) 1996, 1997 Christopher G. Demetriou.  All rights reserved.
@@ -66,6 +66,7 @@ struct pcibus_attach_args {
 	bus_space_tag_t pba_iot;	/* pci i/o space tag */
 	bus_space_tag_t pba_memt;	/* pci mem space tag */
 	bus_dma_tag_t pba_dmat;		/* DMA tag */
+	bus_dma_tag_t pba_dmat64;	/* DMA tag */
 	pci_chipset_tag_t pba_pc;
 	int		pba_flags;	/* flags; see below */
 
@@ -92,6 +93,7 @@ struct pci_attach_args {
 	bus_space_tag_t pa_iot;		/* pci i/o space tag */
 	bus_space_tag_t pa_memt;	/* pci mem space tag */
 	bus_dma_tag_t pa_dmat;		/* DMA tag */
+	bus_dma_tag_t pa_dmat64;	/* DMA tag */
 	pci_chipset_tag_t pa_pc;
 	int		pa_flags;	/* flags; see below */
 
@@ -153,12 +155,11 @@ struct pci_quirkdata {
 #define	PCI_QUIRK_SKIP_FUNC6		PCI_QUIRK_SKIP_FUNC(6)
 #define	PCI_QUIRK_SKIP_FUNC7		PCI_QUIRK_SKIP_FUNC(7)
 
-#include "locators.h"
-
 struct pci_softc {
 	struct device sc_dev;
 	bus_space_tag_t sc_iot, sc_memt;
 	bus_dma_tag_t sc_dmat;
+	bus_dma_tag_t sc_dmat64;
 	pci_chipset_tag_t sc_pc;
 	int sc_bus, sc_maxndevs;
 	pcitag_t *sc_bridgetag;
@@ -188,6 +189,7 @@ extern struct cfdriver pci_cd;
  * Configuration space access and utility functions.  (Note that most,
  * e.g. make_tag, conf_read, conf_write are declared by pci_machdep.h.)
  */
+int	pci_mapreg_probe __P((pci_chipset_tag_t, pcitag_t, int, pcireg_t *));
 pcireg_t pci_mapreg_type __P((pci_chipset_tag_t, pcitag_t, int));
 int	pci_mapreg_info __P((pci_chipset_tag_t, pcitag_t, int, pcireg_t,
 	    bus_addr_t *, bus_size_t *, int *));
@@ -219,11 +221,30 @@ int	pci_devioctl __P((pci_chipset_tag_t, pcitag_t, u_long, caddr_t,
 	    int flag, struct proc *));
 
 /*
+ * Power Management (PCI 2.2)
+ */
+
+#define PCI_PWR_D0	0
+#define PCI_PWR_D1	1
+#define PCI_PWR_D2	2
+#define PCI_PWR_D3	3
+int	pci_set_powerstate __P((pci_chipset_tag_t, pcitag_t, int));
+int	pci_get_powerstate __P((pci_chipset_tag_t, pcitag_t));
+
+/*
+ * Vital Product Data (PCI 2.2)
+ */
+int	pci_vpd_read __P((pci_chipset_tag_t, pcitag_t, int, int, pcireg_t *));
+int	pci_vpd_write __P((pci_chipset_tag_t, pcitag_t, int, int, pcireg_t *));
+
+/*
  * Misc.
  */
 char   *pci_findvendor __P((pcireg_t));
 int	pci_find_device(struct pci_attach_args *pa,
 			int (*match)(struct pci_attach_args *));
+int	pci_dma64_available(struct pci_attach_args *);
+
 
 #endif /* _KERNEL */
 

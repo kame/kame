@@ -1,4 +1,4 @@
-/*	$NetBSD: opm.c,v 1.7 2001/12/27 02:23:25 wiz Exp $	*/
+/*	$NetBSD: opm.c,v 1.11 2003/07/15 01:44:52 lukem Exp $	*/
 
 /*
  * Copyright (c) 1995 Masanobu Saitoh, Takuya Harakawa.
@@ -36,6 +36,9 @@
  * Temporary implementation: not fully bus.h'fied.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: opm.c,v 1.11 2003/07/15 01:44:52 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -60,9 +63,8 @@ struct opm_softc	*opm0;	/* XXX */
 static int opm_match __P((struct device *, struct cfdata *, void *));
 static void opm_attach __P((struct device *, struct device *, void *));
 
-struct cfattach opm_ca = {
-	sizeof (struct opm_softc), opm_match, opm_attach
-};
+CFATTACH_DECL(opm, sizeof (struct opm_softc),
+    opm_match, opm_attach, NULL, NULL);
 
 static int
 opm_match(parent, cf, aux)

@@ -1,13 +1,13 @@
-/*	$NetBSD: vnode_if.h,v 1.38 2001/11/12 14:48:47 lukem Exp $	*/
+/*	$NetBSD: vnode_if.h,v 1.45 2004/01/25 18:06:49 hannken Exp $	*/
 
 /*
  * Warning: This file is generated automatically.
  * (Modifications made here may easily be lost!)
  *
  * Created from the file:
- *	NetBSD: vnode_if.src,v 1.30 2001/09/15 20:36:37 chs Exp 
+ *	NetBSD: vnode_if.src,v 1.38 2004/01/25 18:02:04 hannken Exp 
  * by the script:
- *	NetBSD: vnode_if.sh,v 1.30 2001/11/12 14:34:24 lukem Exp 
+ *	NetBSD: vnode_if.sh,v 1.34 2004/01/25 18:02:04 hannken Exp 
  */
 
 /*
@@ -22,11 +22,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -391,7 +387,7 @@ struct vop_ioctl_args {
 	const struct vnodeop_desc *a_desc;
 	struct vnode *a_vp;
 	u_long a_command;
-	caddr_t a_data;
+	void *a_data;
 	int a_fflag;
 	struct ucred *a_cred;
 	struct proc *a_p;
@@ -400,7 +396,7 @@ extern const struct vnodeop_desc vop_ioctl_desc;
 #ifndef VNODE_OP_NOINLINE
 static __inline
 #endif
-int VOP_IOCTL(struct vnode *, u_long, caddr_t, int, struct ucred *, 
+int VOP_IOCTL(struct vnode *, u_long, void *, int, struct ucred *, 
     struct proc *)
 #ifndef VNODE_OP_NOINLINE
 __attribute__((__unused__))
@@ -410,7 +406,7 @@ __attribute__((__unused__))
 static __inline int VOP_IOCTL(vp, command, data, fflag, cred, p)
 	struct vnode *vp;
 	u_long command;
-	caddr_t data;
+	void *data;
 	int fflag;
 	struct ucred *cred;
 	struct proc *p;
@@ -431,7 +427,7 @@ struct vop_fcntl_args {
 	const struct vnodeop_desc *a_desc;
 	struct vnode *a_vp;
 	u_int a_command;
-	caddr_t a_data;
+	void *a_data;
 	int a_fflag;
 	struct ucred *a_cred;
 	struct proc *a_p;
@@ -440,7 +436,7 @@ extern const struct vnodeop_desc vop_fcntl_desc;
 #ifndef VNODE_OP_NOINLINE
 static __inline
 #endif
-int VOP_FCNTL(struct vnode *, u_int, caddr_t, int, struct ucred *, 
+int VOP_FCNTL(struct vnode *, u_int, void *, int, struct ucred *, 
     struct proc *)
 #ifndef VNODE_OP_NOINLINE
 __attribute__((__unused__))
@@ -450,7 +446,7 @@ __attribute__((__unused__))
 static __inline int VOP_FCNTL(vp, command, data, fflag, cred, p)
 	struct vnode *vp;
 	u_int command;
-	caddr_t data;
+	void *data;
 	int fflag;
 	struct ucred *cred;
 	struct proc *p;
@@ -494,6 +490,33 @@ static __inline int VOP_POLL(vp, events, p)
 	a.a_events = events;
 	a.a_p = p;
 	return (VCALL(vp, VOFFSET(vop_poll), &a));
+}
+#endif
+
+struct vop_kqfilter_args {
+	const struct vnodeop_desc *a_desc;
+	struct vnode *a_vp;
+	struct knote *a_kn;
+};
+extern const struct vnodeop_desc vop_kqfilter_desc;
+#ifndef VNODE_OP_NOINLINE
+static __inline
+#endif
+int VOP_KQFILTER(struct vnode *, struct knote *)
+#ifndef VNODE_OP_NOINLINE
+__attribute__((__unused__))
+#endif
+;
+#ifndef VNODE_OP_NOINLINE
+static __inline int VOP_KQFILTER(vp, kn)
+	struct vnode *vp;
+	struct knote *kn;
+{
+	struct vop_kqfilter_args a;
+	a.a_desc = VDESC(vop_kqfilter);
+	a.a_vp = vp;
+	a.a_kn = kn;
+	return (VCALL(vp, VOFFSET(vop_kqfilter), &a));
 }
 #endif
 
@@ -1072,6 +1095,33 @@ static __inline int VOP_BMAP(vp, bn, vpp, bnp, runp)
 }
 #endif
 
+struct vop_strategy_args {
+	const struct vnodeop_desc *a_desc;
+	struct vnode *a_vp;
+	struct buf *a_bp;
+};
+extern const struct vnodeop_desc vop_strategy_desc;
+#ifndef VNODE_OP_NOINLINE
+static __inline
+#endif
+int VOP_STRATEGY(struct vnode *, struct buf *)
+#ifndef VNODE_OP_NOINLINE
+__attribute__((__unused__))
+#endif
+;
+#ifndef VNODE_OP_NOINLINE
+static __inline int VOP_STRATEGY(vp, bp)
+	struct vnode *vp;
+	struct buf *bp;
+{
+	struct vop_strategy_args a;
+	a.a_desc = VDESC(vop_strategy);
+	a.a_vp = vp;
+	a.a_bp = bp;
+	return (VCALL(vp, VOFFSET(vop_strategy), &a));
+}
+#endif
+
 struct vop_print_args {
 	const struct vnodeop_desc *a_desc;
 	struct vnode *a_vp;
@@ -1153,7 +1203,7 @@ static __inline int VOP_PATHCONF(vp, name, retval)
 struct vop_advlock_args {
 	const struct vnodeop_desc *a_desc;
 	struct vnode *a_vp;
-	caddr_t a_id;
+	void *a_id;
 	int a_op;
 	struct flock *a_fl;
 	int a_flags;
@@ -1162,7 +1212,7 @@ extern const struct vnodeop_desc vop_advlock_desc;
 #ifndef VNODE_OP_NOINLINE
 static __inline
 #endif
-int VOP_ADVLOCK(struct vnode *, caddr_t, int, struct flock *, int)
+int VOP_ADVLOCK(struct vnode *, void *, int, struct flock *, int)
 #ifndef VNODE_OP_NOINLINE
 __attribute__((__unused__))
 #endif
@@ -1170,7 +1220,7 @@ __attribute__((__unused__))
 #ifndef VNODE_OP_NOINLINE
 static __inline int VOP_ADVLOCK(vp, id, op, fl, flags)
 	struct vnode *vp;
-	caddr_t id;
+	void *id;
 	int op;
 	struct flock *fl;
 	int flags;
@@ -1562,30 +1612,6 @@ static __inline int VOP_PUTPAGES(vp, offlo, offhi, flags)
 /* Special cases: */
 #include <sys/buf.h>
 
-struct vop_strategy_args {
-	const struct vnodeop_desc *a_desc;
-	struct buf *a_bp;
-};
-extern const struct vnodeop_desc vop_strategy_desc;
-#ifndef VNODE_OP_NOINLINE
-static __inline
-#endif
-int VOP_STRATEGY(struct buf *)
-#ifndef VNODE_OP_NOINLINE
-__attribute__((__unused__))
-#endif
-;
-#ifndef VNODE_OP_NOINLINE
-static __inline int VOP_STRATEGY(bp)
-	struct buf *bp;
-{
-	struct vop_strategy_args a;
-	a.a_desc = VDESC(vop_strategy);
-	a.a_bp = bp;
-	return (VCALL(bp->b_vp, VOFFSET(vop_strategy), &a));
-}
-#endif
-
 struct vop_bwrite_args {
 	const struct vnodeop_desc *a_desc;
 	struct buf *a_bp;
@@ -1610,7 +1636,7 @@ static __inline int VOP_BWRITE(bp)
 }
 #endif
 
-#define VNODE_OPS_COUNT	49
+#define VNODE_OPS_COUNT	50
 
 /* End of special cases. */
 

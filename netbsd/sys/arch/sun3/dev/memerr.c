@@ -1,4 +1,4 @@
-/*	$NetBSD: memerr.c,v 1.11 2001/05/27 06:30:27 chs Exp $ */
+/*	$NetBSD: memerr.c,v 1.16 2003/08/07 16:29:55 agc Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -43,6 +39,9 @@
  *
  *	@(#)memreg.c	8.1 (Berkeley) 6/11/93
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: memerr.c,v 1.16 2003/08/07 16:29:55 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -77,9 +76,8 @@ static void memerr_attach __P((struct device *, struct device *, void *));
 static int  memerr_interrupt __P((void *));
 static void memerr_correctable __P((struct memerr_softc *));
 
-struct cfattach memerr_ca = {
-	sizeof(struct memerr_softc), memerr_match, memerr_attach
-};
+CFATTACH_DECL(memerr, sizeof(struct memerr_softc),
+    memerr_match, memerr_attach, NULL, NULL);
 
 int memerr_attached;
 

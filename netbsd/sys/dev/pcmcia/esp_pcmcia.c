@@ -1,4 +1,4 @@
-/*	$NetBSD: esp_pcmcia.c,v 1.10 2001/11/13 07:26:32 lukem Exp $	*/
+/*	$NetBSD: esp_pcmcia.c,v 1.16 2003/12/28 06:50:42 itohy Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: esp_pcmcia.c,v 1.10 2001/11/13 07:26:32 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: esp_pcmcia.c,v 1.16 2003/12/28 06:50:42 itohy Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -86,12 +86,10 @@ int	esp_pcmcia_match __P((struct device *, struct cfdata *, void *));
 void	esp_pcmcia_attach __P((struct device *, struct device *, void *));  
 void	esp_pcmcia_init __P((struct esp_pcmcia_softc *));
 int	esp_pcmcia_detach __P((struct device *, int));
-int	esp_pcmcia_enable __P((void *, int));
+int	esp_pcmcia_enable __P((struct device *, int));
 
-struct cfattach esp_pcmcia_ca = {
-	sizeof(struct esp_pcmcia_softc), esp_pcmcia_match, esp_pcmcia_attach,
-	esp_pcmcia_detach
-};
+CFATTACH_DECL(esp_pcmcia, sizeof(struct esp_pcmcia_softc),
+    esp_pcmcia_match, esp_pcmcia_attach, esp_pcmcia_detach, NULL);
 
 /*
  * Functions and the switch for the MI code.
@@ -110,6 +108,9 @@ void	esp_pcmcia_dma_go __P((struct ncr53c9x_softc *));
 void	esp_pcmcia_dma_stop __P((struct ncr53c9x_softc *));
 int	esp_pcmcia_dma_isactive __P((struct ncr53c9x_softc *));
 
+static const struct esp_pcmcia_product *
+    esp_pcmcia_lookup __P((struct pcmcia_attach_args *));
+
 struct ncr53c9x_glue esp_pcmcia_glue = {
 	esp_pcmcia_read_reg,
 	esp_pcmcia_write_reg,
@@ -123,12 +124,47 @@ struct ncr53c9x_glue esp_pcmcia_glue = {
 	NULL,			/* gl_clear_latched_intr */
 };
 
-const struct pcmcia_product esp_pcmcia_products[] = {
+const struct esp_pcmcia_product {
+	const char	*epp_name;		/* product name */
+	u_int32_t	epp_vendor;		/* vendor ID */
+	u_int32_t	epp_product;		/* product ID */
+	const char	*epp_cisinfo[4];	/* CIS information */
+} esp_pcmcia_products[] = {
 	{ PCMCIA_STR_PANASONIC_KXLC002,		PCMCIA_VENDOR_PANASONIC,
-	  PCMCIA_PRODUCT_PANASONIC_KXLC002,	0 },
+	  PCMCIA_PRODUCT_PANASONIC_KXLC002,	PCMCIA_CIS_PANASONIC_KXLC002 },
+
+	{ PCMCIA_STR_RATOC_REX_9530,		PCMCIA_VENDOR_RATOC,
+	  PCMCIA_PRODUCT_RATOC_REX_9530,	PCMCIA_CIS_RATOC_REX_9530 },
 
 	{ NULL }
 };
+
+static const struct esp_pcmcia_product *
+esp_pcmcia_lookup(pa)
+	struct pcmcia_attach_args *pa;
+{
+	const struct esp_pcmcia_product *epp;
+
+	for (epp = esp_pcmcia_products; epp->epp_name != NULL; epp++) {
+		/* match by CIS information */
+		if (pa->card->cis1_info[0] != NULL &&
+		    epp->epp_cisinfo[0] != NULL &&
+		    strcmp(pa->card->cis1_info[0], epp->epp_cisinfo[0]) == 0 &&
+		    pa->card->cis1_info[1] != NULL &&
+		    epp->epp_cisinfo[1] != NULL &&
+		    strcmp(pa->card->cis1_info[1], epp->epp_cisinfo[1]) == 0)
+			return (epp);
+
+		/* match by vendor/product id */
+		if (pa->manufacturer != PCMCIA_VENDOR_INVALID &&
+		    pa->manufacturer == epp->epp_vendor &&
+		    pa->product != PCMCIA_PRODUCT_INVALID &&
+		    pa->product == epp->epp_product)
+			return (epp);
+	}
+
+	return (NULL);
+}
 
 int
 esp_pcmcia_match(parent, match, aux)
@@ -138,8 +174,7 @@ esp_pcmcia_match(parent, match, aux)
 {
 	struct pcmcia_attach_args *pa = aux;
 
-	if (pcmcia_product_lookup(pa, esp_pcmcia_products,
-	    sizeof esp_pcmcia_products[0], NULL) != NULL)
+	if (esp_pcmcia_lookup(pa) != NULL)
 		return (1);
 	return (0);
 }
@@ -154,12 +189,11 @@ esp_pcmcia_attach(parent, self, aux)
 	struct pcmcia_attach_args *pa = aux;
 	struct pcmcia_config_entry *cfe;
 	struct pcmcia_function *pf = pa->pf;
-	const struct pcmcia_product *pp;
+	const struct esp_pcmcia_product *epp;
 
 	esc->sc_pf = pf;
 
-	for (cfe = SIMPLEQ_FIRST(&pf->cfe_head); cfe != NULL;
-	    cfe = SIMPLEQ_NEXT(cfe, cfe_list)) {
+	SIMPLEQ_FOREACH(cfe, &pf->cfe_head, cfe_list) {
 		if (cfe->num_memspace != 0 ||
 		    cfe->num_iospace != 1)
 			continue;
@@ -188,14 +222,13 @@ esp_pcmcia_attach(parent, self, aux)
 		goto iomap_failed;
 	}
 
-	pp = pcmcia_product_lookup(pa, esp_pcmcia_products,
-	    sizeof esp_pcmcia_products[0], NULL);
-	if (pp == NULL) {
+	epp = esp_pcmcia_lookup(pa);
+	if (epp == NULL) {
 		printf("\n");
 		panic("esp_pcmcia_attach: impossible");
 	}
 
-	printf(": %s\n", pp->pp_name);
+	printf(": %s", epp->epp_name);
 
 	esp_pcmcia_init(esc);
 
@@ -205,6 +238,7 @@ esp_pcmcia_attach(parent, self, aux)
 	esc->sc_flags |= ESP_PCMCIA_ATTACHING;
 	sc->sc_adapter.adapt_minphys = minphys;
 	sc->sc_adapter.adapt_request = ncr53c9x_scsipi_request;
+	sc->sc_adapter.adapt_enable = esp_pcmcia_enable;
 	ncr53c9x_attach(sc);
 	esc->sc_flags &= ~ESP_PCMCIA_ATTACHING;
 	esc->sc_flags |= ESP_PCMCIA_ATTACHED;
@@ -289,10 +323,10 @@ esp_pcmcia_detach(self, flags)
 
 int
 esp_pcmcia_enable(arg, onoff)
-	void *arg;
+	struct device *arg;
 	int onoff;
 {
-	struct esp_pcmcia_softc *esc = arg;
+	struct esp_pcmcia_softc *esc = (void *) arg;
 
 	if (onoff) {
 #ifdef ESP_PCMCIA_POLL
@@ -433,7 +467,7 @@ esp_pcmcia_dma_intr(sc)
 				NCR_WRITE_REG(sc, NCR_CMD, NCRCMD_TRANS);
 			else
 				esc->sc_active = 0;
-	 	} else {
+		} else {
 			if (espphase == DATA_OUT_PHASE ||
 			    espphase == MESSAGE_OUT_PHASE) {
 				NCR_WRITE_REG(sc, NCR_FIFO, *p++);

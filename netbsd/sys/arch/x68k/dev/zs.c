@@ -1,4 +1,4 @@
-/*	$NetBSD: zs.c,v 1.18 2001/12/27 02:23:26 wiz Exp $	*/
+/*	$NetBSD: zs.c,v 1.25 2003/07/15 01:44:53 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998 Minoura Makoto
@@ -46,6 +46,9 @@
  * supports up to 5 chips including the built-in one.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zs.c,v 1.25 2003/07/15 01:44:53 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -82,7 +85,6 @@ extern void Debugger __P((void));
  */
 int zs_def_cflag = (CREAD | CS8 | HUPCL);
 int zscn_def_cflag = (CREAD | CS8 | HUPCL);
-int zs_major = 12;
 
 /*
  * X68k provides a 5.0 MHz clock to the ZS chips.
@@ -131,9 +133,8 @@ static int	zs_match __P((struct device *, struct cfdata *, void *));
 static void	zs_attach __P((struct device *, struct device *, void *));
 static int  zs_print __P((void *, const char *name));
 
-struct cfattach zsc_ca = {
-	sizeof(struct zsc_softc), zs_match, zs_attach
-};
+CFATTACH_DECL(zsc, sizeof(struct zsc_softc),
+    zs_match, zs_attach, NULL, NULL);
 
 extern struct cfdriver zsc_cd;
 
@@ -213,6 +214,7 @@ zs_attach(parent, self, aux)
 		cs = &zsc->zsc_cs_store[channel];
 		zsc->zsc_cs[channel] = cs;
 
+		simple_lock_init(&cs->cs_lock);
 		cs->cs_channel = channel;
 		cs->cs_private = NULL;
 		cs->cs_ops = &zsops_null;
@@ -304,10 +306,10 @@ zs_print(aux, name)
 	struct zsc_attach_args *args = aux;
 
 	if (name != NULL)
-		printf("%s: ", name);
+		aprint_normal("%s: ", name);
 
 	if (args->channel != -1)
-		printf(" channel %d", args->channel);
+		aprint_normal(" channel %d", args->channel);
 
 	return UNCONF;
 }
@@ -659,21 +661,18 @@ zscnputc(dev, c)
 	zs_putc(c);
 }
 
-extern int zsopen(dev_t, int, int, struct proc *);
-
 void
 zscnprobe(cd)
 	struct consdev *cd;
 {
 	int maj;
+	extern const struct cdevsw zstty_cdevsw;
 
 	/* locate the major number */
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == zsopen)
-			break;
+	maj = cdevsw_lookup_major(&zstty_cdevsw);
 	/* XXX: minor number is 0 */
 
-	if (cdevsw[maj].d_open != zsopen)
+	if (maj == -1)
 		cd->cn_pri = CN_DEAD;
 	else {
 #ifdef ZSCONSOLE

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_xi.c,v 1.21.4.2 2003/06/30 02:49:41 grant Exp $ */
+/*	$NetBSD: if_xi.c,v 1.33 2003/10/28 23:26:28 mycroft Exp $ */
 /*	OpenBSD: if_xe.c,v 1.9 1999/09/16 11:28:42 niklas Exp 	*/
 
 /*
@@ -49,9 +49,10 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_xi.c,v 1.21.4.2 2003/06/30 02:49:41 grant Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_xi.c,v 1.33 2003/10/28 23:26:28 mycroft Exp $");
 
 #include "opt_inet.h"
+#include "opt_ipx.h"
 #include "bpfilter.h"
 
 #include <sys/param.h>
@@ -95,9 +96,6 @@ __KERNEL_RCSID(0, "$NetBSD: if_xi.c,v 1.21.4.2 2003/06/30 02:49:41 grant Exp $")
 #include <net/bpf.h>
 #include <net/bpfdesc.h>
 #endif
-
-#define ETHER_MIN_LEN 64
-#define ETHER_CRC_LEN 4
 
 /*
  * Maximum number of bytes to read per interrupt.  Linux recommends
@@ -182,13 +180,8 @@ struct xi_pcmcia_softc {
 #define XI_RES_MI	8
 };
 
-struct cfattach xi_pcmcia_ca = {
-	sizeof(struct xi_pcmcia_softc),
-	xi_pcmcia_match,
-	xi_pcmcia_attach,
-	xi_pcmcia_detach,
-	xi_pcmcia_activate
-};
+CFATTACH_DECL(xi_pcmcia, sizeof(struct xi_pcmcia_softc),
+    xi_pcmcia_match, xi_pcmcia_attach, xi_pcmcia_detach, xi_pcmcia_activate);
 
 static int xi_pcmcia_cis_quirks __P((struct pcmcia_function *));
 static void xi_cycle_power __P((struct xi_softc *));
@@ -397,7 +390,7 @@ xi_pcmcia_attach(parent, self, aux)
 
 	/* Enable the card */
 	psc->sc_pf = pa->pf;
-	pcmcia_function_init(psc->sc_pf, psc->sc_pf->cfe_head.sqh_first);
+	pcmcia_function_init(psc->sc_pf, SIMPLEQ_FIRST(&psc->sc_pf->cfe_head));
 	if (pcmcia_function_enable(psc->sc_pf)) {
 		printf(": function enable failed\n");
 		goto fail;
@@ -439,7 +432,7 @@ xi_pcmcia_attach(parent, self, aux)
 	if (sc->sc_flags & XIFLAGS_DINGO) {
 		struct pcmcia_mem_handle pcmh;
 		int ccr_window;
-		bus_addr_t ccr_offset;
+		bus_size_t ccr_offset;
 
 		/* get access to the DINGO CCR space */
 		if (pcmcia_mem_alloc(psc->sc_pf, PCMCIA_CCR_SIZE_DINGO,
@@ -907,16 +900,16 @@ xi_intr(arg)
 	if ((tx_status & TX_ABORT) && ifp->if_opackets > 0)
 		ifp->if_oerrors++;
 
+	/* have handled the interrupt */
+#if NRND > 0    
+	rnd_add_uint32(&sc->sc_rnd_source, tx_status);  
+#endif
+
 end:
 	/* Reenable interrupts. */
 	PAGE(sc, savedpage);
 	bus_space_write_1(sc->sc_bst, sc->sc_bsh, sc->sc_offset + CR,
 	    ENABLE_INT);
-
-	/* have handled the interrupt */
-#if NRND > 0    
-	rnd_add_uint32(&sc->sc_rnd_source, tx_status);  
-#endif
 
 	return (1);
 }
@@ -1036,7 +1029,7 @@ xi_mdi_idle(sc)
 {
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
-	bus_addr_t offset = sc->sc_offset;
+	bus_size_t offset = sc->sc_offset;
 
 	/* Drive MDC low... */
 	bus_space_write_1(bst, bsh, offset + GP2, MDC_LOW);
@@ -1056,7 +1049,7 @@ xi_mdi_pulse(sc, data)
 {
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
-	bus_addr_t offset = sc->sc_offset;
+	bus_size_t offset = sc->sc_offset;
 	u_int8_t bit = data ? MDIO_HIGH : MDIO_LOW;
 
 	/* First latch the data bit MDIO with clock bit MDC low...*/
@@ -1286,7 +1279,7 @@ xi_start(ifp)
 	struct xi_softc *sc = ifp->if_softc;
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
-	bus_addr_t offset = sc->sc_offset;
+	bus_size_t offset = sc->sc_offset;
 	unsigned int s, len, pad = 0;
 	struct mbuf *m0, *m;
 	u_int16_t space;
@@ -1512,7 +1505,7 @@ xi_set_address(sc)
 {
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
-	bus_addr_t offset = sc->sc_offset;
+	bus_size_t offset = sc->sc_offset;
 	struct ethercom *ether = &sc->sc_ethercom;
 	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
 #if WORKING_MULTICAST
@@ -1590,7 +1583,7 @@ xi_cycle_power(sc)
 {
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
-	bus_addr_t offset = sc->sc_offset;
+	bus_size_t offset = sc->sc_offset;
 
 	DPRINTF(XID_CONFIG, ("xi_cycle_power()\n"));
 
@@ -1612,7 +1605,7 @@ xi_full_reset(sc)
 {
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
-	bus_addr_t offset = sc->sc_offset;
+	bus_size_t offset = sc->sc_offset;
 
 	DPRINTF(XID_CONFIG, ("xi_full_reset()\n"));
 
@@ -1626,7 +1619,7 @@ xi_full_reset(sc)
 		PAGE(sc, 4);
 		/*
 		 * Drive GP1 low to power up ML6692 and GP2 high to power up
-		 * the 10Mhz chip.  XXX What chip is that?  The phy?
+		 * the 10MHz chip.  XXX What chip is that?  The phy?
 		 */
 		bus_space_write_1(bst, bsh, offset + GP0,
 		    GP1_OUT | GP2_OUT | GP2_WR);

@@ -1,4 +1,4 @@
-/*	$NetBSD: spkr.c,v 1.6.10.1 2002/12/07 21:42:56 he Exp $	*/
+/*	$NetBSD: spkr.c,v 1.15 2003/06/29 22:30:22 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1990 Eric S. Raymond (esr@snark.thyrsus.com)
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: spkr.c,v 1.6.10.1 2002/12/07 21:42:56 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: spkr.c,v 1.15 2003/06/29 22:30:22 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -60,8 +60,6 @@ __KERNEL_RCSID(0, "$NetBSD: spkr.c,v 1.6.10.1 2002/12/07 21:42:56 he Exp $");
 
 #include <dev/isa/spkrio.h>
 
-cdev_decl(spkr);
-
 int spkrprobe __P((struct device *, struct cfdata *, void *));
 void spkrattach __P((struct device *, struct device *, void *));
 
@@ -69,8 +67,17 @@ struct spkr_softc {
 	struct device sc_dev;
 };
 
-struct cfattach spkr_ca = {
-	sizeof(struct spkr_softc), spkrprobe, spkrattach
+CFATTACH_DECL(spkr, sizeof(struct spkr_softc),
+    spkrprobe, spkrattach, NULL, NULL);
+
+dev_type_open(spkropen);
+dev_type_close(spkrclose);
+dev_type_write(spkrwrite);
+dev_type_ioctl(spkrioctl);
+
+const struct cdevsw spkr_cdevsw = {
+	spkropen, spkrclose, noread, spkrwrite, spkrioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
 };
 
 static pcppi_tag_t ppicookie;
@@ -262,14 +269,18 @@ playstring(cp, slen)
 	    {
 		if (abs(pitch-lastpitch) > abs(pitch+OCTAVE_NOTES-lastpitch))
 		{
-		    ++octave;
-		    pitch += OCTAVE_NOTES;
+		    if (octave < NOCTAVES - 1) {
+			++octave;
+			pitch += OCTAVE_NOTES;
+		    }
 		}
 
 		if (abs(pitch-lastpitch) > abs((pitch-OCTAVE_NOTES)-lastpitch))
 		{
-		    --octave;
-		    pitch -= OCTAVE_NOTES;
+		    if (octave > 0) {
+			--octave;
+			pitch -= OCTAVE_NOTES;
+		    }
 		}
 	    }
 	    octprefix = FALSE;

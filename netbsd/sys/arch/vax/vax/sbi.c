@@ -1,4 +1,4 @@
-/*	$NetBSD: sbi.c,v 1.21.20.1 2002/06/05 04:13:17 lukem Exp $ */
+/*	$NetBSD: sbi.c,v 1.30 2003/11/06 00:33:36 he Exp $ */
 /*
  * Copyright (c) 1994 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -33,6 +33,9 @@
  * Still to do: Write all SBI error handling.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sbi.c,v 1.30 2003/11/06 00:33:36 he Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/device.h>
@@ -57,25 +60,26 @@ sbi_print(void *aux, const char *name)
 	if (name) {
 		switch (sa->sa_type) {
 		case NEX_MBA:
-			printf("mba at %s", name);
+			aprint_normal("mba at %s", name);
+			break;
+		case NEX_CI:
+			aprint_normal("ci at %s", name);
+			unsupp++;
 			break;
 		default:
-			printf("unknown device 0x%x at %s", sa->sa_type, name);
+			aprint_normal("unknown device 0x%x at %s",
+			    sa->sa_type, name);
 			unsupp++;
 		}		
 	}
-	printf(" tr%d", sa->sa_nexnum);
+	aprint_normal(" tr%d", sa->sa_nexnum);
 	return (unsupp ? UNSUPP : UNCONF);
 }
 
 int
 sbi_match_abus(struct device *parent, struct cfdata *cf, void *aux)
 {
-	struct bp_conf *bp = aux;
-
-	if (bp->num == 0) /* XXX - only one SBI */
-		return 1;
-	return 0;
+	return 1;	/* We've already done the matching... */
 }
 
 int
@@ -90,14 +94,13 @@ void
 sbi_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct bp_conf *bp = aux;
-	u_int	nexnum, minnex;
+	u_int	nexnum, minnex = 0; /* default only one SBI, as on 780 */
 	struct	sbi_attach_args sa;
 
 	printf("\n");
 
 #define NEXPAGES (sizeof(struct nexus) / VAX_NBPG)
 	if (vax_boardtype == VAX_BTYP_780) {
-		minnex = 0;	/* only one SBI */
 		sa.sa_sbinum = 0;
 	}
 	if (vax_boardtype == VAX_BTYP_790) {
@@ -123,10 +126,8 @@ sbi_attach(struct device *parent, struct device *self, void *aux)
 	}
 }
 
-struct	cfattach sbi_mainbus_ca = {
-	sizeof(struct device), sbi_match, sbi_attach
-};
+CFATTACH_DECL(sbi_mainbus, sizeof(struct device),
+    sbi_match, sbi_attach, NULL, NULL);
 
-struct	cfattach sbi_abus_ca = {
-	sizeof(struct device), sbi_match_abus, sbi_attach
-};
+CFATTACH_DECL(sbi_abus, sizeof(struct device),
+    sbi_match_abus, sbi_attach, NULL, NULL);

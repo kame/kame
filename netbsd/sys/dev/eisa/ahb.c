@@ -1,4 +1,4 @@
-/*	$NetBSD: ahb.c,v 1.35 2002/04/05 18:27:48 bouyer Exp $	*/
+/*	$NetBSD: ahb.c,v 1.39 2003/11/02 09:57:58 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -53,7 +53,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ahb.c,v 1.35 2002/04/05 18:27:48 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ahb.c,v 1.39 2003/11/02 09:57:58 wiz Exp $");
 
 #include "opt_ddb.h"
 
@@ -152,9 +152,8 @@ integrate int ahb_init_ecb __P((struct ahb_softc *, struct ahb_ecb *));
 int	ahbmatch __P((struct device *, struct cfdata *, void *));
 void	ahbattach __P((struct device *, struct device *, void *));
 
-struct cfattach ahb_ca = {
-	sizeof(struct ahb_softc), ahbmatch, ahbattach
-};
+CFATTACH_DECL(ahb, sizeof(struct ahb_softc),
+    ahbmatch, ahbattach, NULL, NULL);
 
 #define	AHB_ABORT_TIMEOUT	2000	/* time to wait for abort (mSec) */
 
@@ -386,7 +385,7 @@ ahbintr(arg)
 	for (;;) {
 		/*
 		 * First get all the information and then
-		 * acknowlege the interrupt
+		 * acknowledge the interrupt
 		 */
 		ahbstat = bus_space_read_1(iot, ioh, G2INTST);
 		mboxval = bus_space_read_4(iot, ioh, MBOXIN0);

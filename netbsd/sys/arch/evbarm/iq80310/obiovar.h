@@ -1,7 +1,7 @@
-/*	$NetBSD: obiovar.h,v 1.1 2001/11/07 00:33:26 thorpej Exp $	*/
+/*	$NetBSD: obiovar.h,v 1.4 2003/06/16 17:40:52 thorpej Exp $	*/
 
 /*
- * Copyright (c) 2001 Wasabi Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003 Wasabi Systems, Inc.
  * All rights reserved.
  *
  * Written by Jason R. Thorpe for Wasabi Systems, Inc.
@@ -39,9 +39,10 @@
 #define	_IQ80310_OBIOVAR_H_
 
 struct obio_attach_args {
-	const char *oba_name;		/* name of device */
 	bus_space_tag_t oba_st;		/* bus space tag */
 	bus_addr_t oba_addr;		/* address of device */
+	bus_size_t oba_size;		/* size of device */
+	int oba_width;			/* bus width */
 	int oba_irq;			/* CPLD interrupt bit # */
 };
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_dma.c,v 1.2 2001/06/10 02:31:25 briggs Exp $	*/
+/*	$NetBSD: bus_dma.c,v 1.17 2003/07/25 10:12:46 scw Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -37,6 +37,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bus_dma.c,v 1.17 2003/07/25 10:12:46 scw Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -53,6 +56,30 @@
 
 int	_bus_dmamap_load_buffer (bus_dma_tag_t, bus_dmamap_t, void *,
 	    bus_size_t, struct proc *, int, paddr_t *, int *, int);
+
+static __inline void
+dcbst(paddr_t pa, long len, int dcache_line_size)
+{
+	paddr_t epa;
+	for (epa = pa + len; pa < epa; pa += dcache_line_size)
+		__asm __volatile("dcbst 0,%0" :: "r"(pa));
+}
+
+static __inline void
+dcbi(paddr_t pa, long len, int dcache_line_size)
+{
+	paddr_t epa;
+	for (epa = pa + len; pa < epa; pa += dcache_line_size)
+		__asm __volatile("dcbi 0,%0" :: "r"(pa));
+}
+
+static __inline void
+dcbf(paddr_t pa, long len, int dcache_line_size)
+{
+	paddr_t epa;
+	for (epa = pa + len; pa < epa; pa += dcache_line_size)
+		__asm __volatile("dcbf 0,%0" :: "r"(pa));
+}
 
 /*
  * Common function for DMA map creation.  May be called by bus-specific
@@ -150,7 +177,7 @@ _bus_dmamap_load_buffer(t, map, buf, buflen, p, flags, lastaddrp, segp, first)
 		 */
 		if (p != NULL)
 			(void) pmap_extract(p->p_vmspace->vm_map.pmap,
-			    vaddr, (paddr_t *)&curaddr);
+			    vaddr, (void *)&curaddr);
 		else
 			curaddr = vtophys(vaddr);
 
@@ -165,7 +192,7 @@ _bus_dmamap_load_buffer(t, map, buf, buflen, p, flags, lastaddrp, segp, first)
 		/*
 		 * Compute the segment size, and adjust counts.
 		 */
-		sgsize = NBPG - ((u_long)vaddr & PGOFSET);
+		sgsize = PAGE_SIZE - ((u_long)vaddr & PGOFSET);
 		if (buflen < sgsize)
 			sgsize = buflen;
 
@@ -183,7 +210,7 @@ _bus_dmamap_load_buffer(t, map, buf, buflen, p, flags, lastaddrp, segp, first)
 		 * the previous segment if possible.
 		 */
 		if (first) {
-			map->dm_segs[seg].ds_addr = PHYS_TO_PCI_MEM(curaddr);
+			map->dm_segs[seg].ds_addr = PHYS_TO_BUS_MEM(t, curaddr);
 			map->dm_segs[seg].ds_len = sgsize;
 			first = 0;
 		} else {
@@ -198,7 +225,7 @@ _bus_dmamap_load_buffer(t, map, buf, buflen, p, flags, lastaddrp, segp, first)
 				if (++seg >= map->_dm_segcnt)
 					break;
 				map->dm_segs[seg].ds_addr =
-					PHYS_TO_PCI_MEM(curaddr);
+					PHYS_TO_BUS_MEM(t, curaddr);
 				map->dm_segs[seg].ds_len = sgsize;
 			}
 		}
@@ -286,10 +313,38 @@ _bus_dmamap_load_mbuf(t, map, m0, flags)
 	first = 1;
 	seg = 0;
 	error = 0;
-	for (m = m0; m != NULL && error == 0; m = m->m_next) {
-		error = _bus_dmamap_load_buffer(t, map, m->m_data, m->m_len,
-		    NULL, flags, &lastaddr, &seg, first);
-		first = 0;
+	for (m = m0; m != NULL && error == 0; m = m->m_next, first = 0) {
+#ifdef POOL_VTOPHYS
+		/* XXX Could be better about coalescing. */
+		/* XXX Doesn't check boundaries. */
+		switch (m->m_flags & (M_EXT|M_CLUSTER)) {
+		case M_EXT|M_CLUSTER:
+			/* XXX KDASSERT */
+			KASSERT(m->m_ext.ext_paddr != M_PADDR_INVALID);
+			lastaddr = m->m_ext.ext_paddr +
+			    (m->m_data - m->m_ext.ext_buf);
+ have_addr:
+			if (first == 0 && ++seg >= map->_dm_segcnt) {
+				error = EFBIG;
+				continue;
+			}
+			map->dm_segs[seg].ds_addr =
+			    PHYS_TO_BUS_MEM(t, lastaddr);
+			map->dm_segs[seg].ds_len = m->m_len;
+			lastaddr += m->m_len;
+			continue;
+
+		case 0:
+			lastaddr = m->m_paddr + M_BUFOFFSET(m) +
+			    (m->m_data - M_BUFADDR(m));
+			goto have_addr;
+
+		default:
+			break;
+		}
+#endif
+		error = _bus_dmamap_load_buffer(t, map, m->m_data,
+		    m->m_len, NULL, flags, &lastaddr, &seg, first);
 	}
 	if (error == 0) {
 		map->dm_mapsize = m0->m_pkthdr.len;
@@ -403,7 +458,113 @@ _bus_dmamap_sync(t, map, offset, len, ops)
 	bus_size_t len;
 	int ops;
 {
-	/* Nothing to do here. */
+	const int dcache_line_size = curcpu()->ci_ci.dcache_line_size;
+	const bus_dma_segment_t *ds = map->dm_segs;
+
+	if ((ops & (BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE)) != 0 &&
+	    (ops & (BUS_DMASYNC_POSTREAD|BUS_DMASYNC_POSTWRITE)) != 0)
+		panic("_bus_dmamap_sync: invalid ops %#x", ops);
+
+#ifdef DIAGNOSTIC
+	if (offset + len > map->dm_mapsize)
+		panic("_bus_dmamap_sync: bad offset and/or length");
+#endif
+
+	/*
+	 * Skip leading amount
+	 */
+	while (offset >= ds->ds_len) {
+		offset -= ds->ds_len;
+		ds++;
+	}
+	__asm __volatile("eieio");
+	for (; len > 0; ds++, offset = 0) {
+		bus_size_t seglen = ds->ds_len - offset;
+		bus_addr_t addr = ds->ds_addr + offset;
+		if (seglen > len)
+			seglen = len;
+		len -= seglen;
+		KASSERT(ds < &map->dm_segs[map->dm_nsegs]);
+		/*
+		 * Readjust things to start on cacheline boundarys
+		 */
+		offset = (addr & (dcache_line_size-1));
+		seglen += offset;
+		addr -= offset;
+		/*
+		 * Now do the appropriate thing.
+		 */
+		switch (ops) {
+		case BUS_DMASYNC_PREWRITE:
+			/*
+			 * Make sure cache contents are in memory for the DMA.
+			 */
+			dcbst(addr, seglen, dcache_line_size);
+			break;
+		case BUS_DMASYNC_PREREAD:
+			/*
+			 * If the region to be invalidated doesn't fall on
+			 * cacheline boundary, flush that cacheline so we
+			 * preserve the leading content.
+			 */
+			if (offset) {
+				dcbf(addr, 1, 1);
+				/*
+				 * If we are doing <= one cache line, stop now.
+				 */
+				if (seglen <= dcache_line_size)
+					break;
+				/*
+				 * Advance one cache line since we've flushed
+				 * this one.
+				 */
+				addr += dcache_line_size;
+				seglen -= dcache_line_size;
+			}
+			/*
+			 * If the byte after the region to be invalidated
+			 * doesn't fall on cacheline boundary, flush that
+			 * cacheline so we preserve the trailing content.
+			 */
+			if (seglen & (dcache_line_size-1)) {
+				dcbf(addr + seglen, 1, 1);
+				if (seglen <= dcache_line_size)
+					break;
+				/*
+				 * Truncate the length to a multiple of a
+				 * dcache line size.  No reason to flush
+				 * the last entry again.
+				 */
+				seglen &= ~(dcache_line_size - 1);
+			}
+			__asm __volatile("sync; eieio"); /* is this needed? */
+			/* FALLTHROUGH */
+		case BUS_DMASYNC_POSTREAD|BUS_DMASYNC_POSTWRITE:
+		case BUS_DMASYNC_POSTREAD:
+			/*
+			 * The contents will have changed, make sure to remove
+			 * them from the cache.  Note: some implementation
+			 * implement dcbi identically to dcbf.  Thus if the
+			 * cacheline has data, it will be written to memory.
+			 * If the DMA is updaing the same cacheline at the
+			 * time, bad things can happen.
+			 */
+			dcbi(addr, seglen, dcache_line_size);
+			break;
+		case BUS_DMASYNC_POSTWRITE:
+			/*
+			 * Do nothing.
+			 */
+			break;
+		case BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE:
+			/*
+			 * Force it to memory and remove from cache.
+			 */
+			dcbf(addr, seglen, dcache_line_size);
+			break;
+		}
+	}
+	__asm __volatile("sync");
 }
 
 /*
@@ -453,8 +614,8 @@ _bus_dmamem_free(t, segs, nsegs)
 	 */
 	TAILQ_INIT(&mlist);
 	for (curseg = 0; curseg < nsegs; curseg++) {
-		for (addr = PCI_MEM_TO_PHYS(segs[curseg].ds_addr);
-		    addr < (PCI_MEM_TO_PHYS(segs[curseg].ds_addr)
+		for (addr = BUS_MEM_TO_PHYS(t, segs[curseg].ds_addr);
+		    addr < (BUS_MEM_TO_PHYS(t, segs[curseg].ds_addr)
 			+ segs[curseg].ds_len);
 		    addr += PAGE_SIZE) {
 			m = PHYS_TO_VM_PAGE(addr);
@@ -492,15 +653,23 @@ _bus_dmamem_map(t, segs, nsegs, size, kvap, flags)
 	*kvap = (caddr_t)va;
 
 	for (curseg = 0; curseg < nsegs; curseg++) {
-		for (addr = PCI_MEM_TO_PHYS(segs[curseg].ds_addr);
-		    addr < (PCI_MEM_TO_PHYS(segs[curseg].ds_addr)
+		for (addr = BUS_MEM_TO_PHYS(t, segs[curseg].ds_addr);
+		    addr < (BUS_MEM_TO_PHYS(t, segs[curseg].ds_addr)
 			+ segs[curseg].ds_len);
-		    addr += NBPG, va += NBPG, size -= NBPG) {
+		    addr += PAGE_SIZE, va += PAGE_SIZE, size -= PAGE_SIZE) {
 			if (size == 0)
 				panic("_bus_dmamem_map: size botch");
-			pmap_enter(pmap_kernel(), va, addr,
-			    VM_PROT_READ | VM_PROT_WRITE,
-			    VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
+			/*
+			 * If we are mapping nocache, flush the page from
+			 * cache before we map it.
+			 */
+			if (flags & BUS_DMA_NOCACHE)
+				dcbf(addr, PAGE_SIZE,
+				    curcpu()->ci_ci.dcache_line_size);
+			pmap_kenter_pa(va, addr,
+			    VM_PROT_READ | VM_PROT_WRITE |
+			    PMAP_WIRED |
+			    ((flags & BUS_DMA_NOCACHE) ? PMAP_NC : 0));
 		}
 	}
 
@@ -546,7 +715,7 @@ _bus_dmamem_mmap(t, segs, nsegs, off, prot, flags)
 #ifdef DIAGNOSTIC
 		if (off & PGOFSET)
 			panic("_bus_dmamem_mmap: offset unaligned");
-		if (PCI_MEM_TO_PHYS(segs[i].ds_addr) & PGOFSET)
+		if (BUS_MEM_TO_PHYS(t, segs[i].ds_addr) & PGOFSET)
 			panic("_bus_dmamem_mmap: segment unaligned");
 		if (segs[i].ds_len & PGOFSET)
 			panic("_bus_dmamem_mmap: segment size not multiple"
@@ -557,7 +726,7 @@ _bus_dmamem_mmap(t, segs, nsegs, off, prot, flags)
 			continue;
 		}
 
-		return (PCI_MEM_TO_PHYS(segs[i].ds_addr) + off);
+		return (BUS_MEM_TO_PHYS(t, segs[i].ds_addr) + off);
 	}
 
 	/* Page not found. */
@@ -591,7 +760,6 @@ _bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
 	/*
 	 * Allocate pages from the VM system.
 	 */
-	TAILQ_INIT(&mlist);
 	error = uvm_pglistalloc(size, low, high, alignment, boundary,
 	    &mlist, nsegs, (flags & BUS_DMA_NOWAIT) == 0);
 	if (error)
@@ -604,7 +772,7 @@ _bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
 	m = mlist.tqh_first;
 	curseg = 0;
 	lastaddr = VM_PAGE_TO_PHYS(m);
-	segs[curseg].ds_addr = PHYS_TO_PCI_MEM(lastaddr);
+	segs[curseg].ds_addr = PHYS_TO_BUS_MEM(t, lastaddr);
 	segs[curseg].ds_len = PAGE_SIZE;
 	m = m->pageq.tqe_next;
 
@@ -621,7 +789,7 @@ _bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
 			segs[curseg].ds_len += PAGE_SIZE;
 		else {
 			curseg++;
-			segs[curseg].ds_addr = PHYS_TO_PCI_MEM(curaddr);
+			segs[curseg].ds_addr = PHYS_TO_BUS_MEM(t, curaddr);
 			segs[curseg].ds_len = PAGE_SIZE;
 		}
 		lastaddr = curaddr;
@@ -630,4 +798,28 @@ _bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
 	*rsegs = curseg + 1;
 
 	return (0);
+}
+
+/*
+ * Generic form of PHYS_TO_BUS_MEM().
+ */
+bus_addr_t
+_bus_dma_phys_to_bus_mem_generic(t, addr)
+	bus_dma_tag_t t;
+	bus_addr_t addr;
+{
+
+	return (addr);
+}
+
+/*
+ * Generic form of BUS_MEM_TO_PHYS().
+ */
+bus_addr_t
+_bus_dma_bus_mem_to_phys_generic(t, addr)
+	bus_dma_tag_t t;
+	bus_addr_t addr;
+{
+
+	return (addr);
 }

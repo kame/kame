@@ -1,4 +1,4 @@
-/*	$NetBSD: pchb.c,v 1.3 2000/01/18 20:01:28 thorpej Exp $	*/
+/*	$NetBSD: pchb.c,v 1.6 2003/07/15 01:26:32 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pchb.c,v 1.6 2003/07/15 01:26:32 lukem Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,9 +54,8 @@
 int	pchbmatch __P((struct device *, void *, void *));
 void	pchbattach __P((struct device *, struct device *, void *));
 
-struct cfattach pchb_ca = {
-	sizeof(struct device), (cfmatch_t)pchbmatch, pchbattach
-};
+CFATTACH_DECL(pchb, sizeof(struct device),
+    (cfmatch_t)pchbmatch, pchbattach, NULL, NULL);
 
 int
 pchbmatch(parent, match, aux)

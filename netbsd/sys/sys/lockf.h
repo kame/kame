@@ -1,4 +1,4 @@
-/*	$NetBSD: lockf.h,v 1.10 2000/08/04 09:20:21 jdolecek Exp $	*/
+/*	$NetBSD: lockf.h,v 1.14 2003/08/07 16:34:07 agc Exp $	*/
 
 /*
  * Copyright (c) 1991, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -61,7 +57,8 @@ struct lockf {
 	short	lf_type;	 /* Lock type: F_RDLCK, F_WRLCK */
 	off_t	lf_start;	 /* The byte # of the start of the lock */
 	off_t	lf_end;		 /* The byte # of the end of the lock (-1=EOF)*/
-	caddr_t	lf_id;		 /* The id of the resource holding the lock */
+	void	*lf_id;		 /* process or file description holding lock */
+	struct	lwp *lf_lwp;	 /* LWP waiting for lock */
 	struct	lockf **lf_head; /* Back pointer to the head of lockf list */
 	struct	lockf *lf_next;	 /* Next lock on this vnode, or blocking lock */
 	struct  locklist lf_blkhd; /* List of requests blocked on this lock */
@@ -73,28 +70,7 @@ struct lockf {
 
 #ifdef _KERNEL
 
-__BEGIN_DECLS
-void	 lf_addblock __P((struct lockf *, struct lockf *));
-int	 lf_advlock __P((struct vop_advlock_args *, struct lockf **, off_t));
-int	 lf_clearlock __P((struct lockf *));
-int	 lf_findoverlap __P((struct lockf *,
-	    struct lockf *, int, struct lockf ***, struct lockf **));
-struct lockf *
-	 lf_getblock __P((struct lockf *));
-int	 lf_getlock __P((struct lockf *, struct flock *));
-int	 lf_setlock __P((struct lockf *));
-void	 lf_split __P((struct lockf *, struct lockf *));
-void	 lf_wakelock __P((struct lockf *));
-__END_DECLS
-
-#ifdef LOCKF_DEBUG
-extern int lockf_debug;
-
-__BEGIN_DECLS
-void	lf_print __P((char *, struct lockf *));
-void	lf_printlist __P((char *, struct lockf *));
-__END_DECLS
-#endif /* LOCKF_DEBUG */
+int lf_advlock(struct vop_advlock_args *, struct lockf **, off_t);
 
 #endif /* _KERNEL */
 

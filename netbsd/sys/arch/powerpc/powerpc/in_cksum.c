@@ -1,4 +1,4 @@
-/*	$NetBSD: in_cksum.c,v 1.3.18.1 2002/08/05 23:51:19 lukem Exp $	*/
+/*	$NetBSD: in_cksum.c,v 1.7 2003/07/15 02:54:48 lukem Exp $	*/
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -34,6 +34,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: in_cksum.c,v 1.7 2003/07/15 02:54:48 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/mbuf.h>
@@ -236,6 +239,7 @@ in_cksum_internal(struct mbuf *m, int off, int len, u_int sum)
 int
 in_cksum(struct mbuf *m, int len)
 {
+
 	return (in_cksum_internal(m, 0, len, 0));
 }
 
@@ -244,16 +248,19 @@ in4_cksum(struct mbuf *m, uint8_t nxt, int off, int len)
 {
 	uint16_t *w;
 	u_int sum = 0;
-	struct ipovly ipov;
+	union {
+		struct ipovly ipov;
+		u_int16_t w[10];
+	} u;
 
 	if (nxt != 0) {
 		/* pseudo header */
-		memset(&ipov, 0, sizeof(ipov));
-		ipov.ih_len = htons(len);
-		ipov.ih_pr = nxt; 
-		ipov.ih_src = mtod(m, struct ip *)->ip_src; 
-		ipov.ih_dst = mtod(m, struct ip *)->ip_dst;
-		w = (uint16_t *)&ipov;
+		memset(&u.ipov, 0, sizeof(u.ipov));
+		u.ipov.ih_len = htons(len);
+		u.ipov.ih_pr = nxt; 
+		u.ipov.ih_src = mtod(m, struct ip *)->ip_src; 
+		u.ipov.ih_dst = mtod(m, struct ip *)->ip_dst;
+		w = u.w;
 		/* assumes sizeof(ipov) == 20 */
 		sum += w[0]; sum += w[1]; sum += w[2]; sum += w[3]; sum += w[4];
 		sum += w[5]; sum += w[6]; sum += w[7]; sum += w[8]; sum += w[9];

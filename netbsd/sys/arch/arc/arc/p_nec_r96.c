@@ -1,4 +1,4 @@
-/*	$NetBSD: p_nec_r96.c,v 1.1 2001/06/13 15:35:04 soda Exp $	*/
+/*	$NetBSD: p_nec_r96.c,v 1.4 2003/07/15 00:04:43 lukem Exp $	*/
 
 /*-
  * Copyright (C) 2000 Shuichiro URATA.  All rights reserved.
@@ -26,6 +26,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: p_nec_r96.c,v 1.4 2003/07/15 00:04:43 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kcore.h>
@@ -49,7 +52,7 @@ struct platform platform_nec_r96 = {
 	c_jazz_eisa_mainbusdevs,
 	platform_generic_match,
 	c_nec_eisa_init,
-	c_jazz_eisa_cons_init,
+	c_nec_eisa_cons_init,
 	jazzio_reset,
 	c_nec_jazz_set_intr,
 };
@@ -64,7 +67,7 @@ struct platform platform_nec_riscserver_2200 = {
 	c_jazz_eisa_mainbusdevs,
 	p_nec_riscserver_2200_match,
 	c_nec_eisa_init,
-	c_jazz_eisa_cons_init,
+	c_nec_eisa_cons_init,
 	jazzio_reset,
 	c_nec_jazz_set_intr,
 };

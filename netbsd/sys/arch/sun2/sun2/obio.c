@@ -1,4 +1,4 @@
-/*	$NetBSD: obio.c,v 1.7 2001/12/15 22:13:11 fredette Exp $	*/
+/*	$NetBSD: obio.c,v 1.12 2003/07/15 03:36:13 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: obio.c,v 1.12 2003/07/15 03:36:13 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -61,9 +64,8 @@ struct obio_softc {
 	bus_dma_tag_t	sc_dmatag;	/* parent bus dma tag */
 };
 
-struct cfattach obio_ca = {
-	sizeof(struct obio_softc), obio_match, obio_attach
-};
+CFATTACH_DECL(obio, sizeof(struct obio_softc),
+    obio_match, obio_attach, NULL, NULL);
 
 static	paddr_t obio_bus_mmap __P((bus_space_tag_t, bus_type_t, bus_addr_t,
 			       off_t, int, int));
@@ -98,7 +100,7 @@ obio_match(parent, cf, aux)
 {
 	struct mainbus_attach_args *ma = aux;
 
-	return (ma->ma_name == NULL || strcmp(cf->cf_driver->cd_name, ma->ma_name) == 0);
+	return (ma->ma_name == NULL || strcmp(cf->cf_name, ma->ma_name) == 0);
 }
 
 static void

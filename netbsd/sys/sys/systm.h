@@ -1,4 +1,4 @@
-/*	$NetBSD: systm.h,v 1.144.2.1 2002/11/09 10:21:27 tron Exp $	*/
+/*	$NetBSD: systm.h,v 1.170 2004/01/23 05:01:19 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1988, 1991, 1993
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -74,12 +70,14 @@
 #if defined(_KERNEL_OPT)
 #include "opt_ddb.h"
 #include "opt_multiprocessor.h"
+#include "opt_syscall_debug.h"
 #endif
 
 #include <machine/endian.h>
 
 struct clockframe;
 struct device;
+struct lwp;
 struct proc;
 struct timeval;
 struct tty;
@@ -101,9 +99,6 @@ extern const char version[];	/* system version */
 extern int autonicetime;        /* time (in seconds) before autoniceval */
 extern int autoniceval;         /* proc priority after autonicetime */
 
-extern int nblkdev;		/* number of entries in bdevsw */
-extern int nchrdev;		/* number of entries in cdevsw */
-
 extern int selwait;		/* select timeout address */
 
 extern int maxmem;		/* max memory per process */
@@ -124,10 +119,12 @@ extern const char *rootspec;	/* how root device was specified */
  * is used by the swap pager to indirect through the routines
  * in sys/vm/vm_swap.c.
  */
-extern dev_t swapdev;		/* swapping device */
+extern const dev_t swapdev;	/* swapping device */
 extern struct vnode *swapdev_vp;/* vnode equivalent to above */
 
-typedef int	sy_call_t(struct proc *, void *, register_t *);
+extern const dev_t zerodev;	/* /dev/zero */
+
+typedef int	sy_call_t(struct lwp *, void *, register_t *);
 
 extern struct sysent {		/* system call table */
 	short	sy_narg;	/* number of args */
@@ -169,22 +166,36 @@ int	enoioctl __P((void));
 int	enxio __P((void));
 int	eopnotsupp __P((void));
 
-#if defined(LKM) || defined(_LKM)
-int	lkmenodev __P((void));
-#endif
-
 enum hashtype {
 	HASH_LIST,
 	HASH_TAILQ
 };
 
-void	*hashinit __P((int, enum hashtype, int, int, u_long *));
-void	hashdone __P((void *, int));
+struct malloc_type;
+void	*hashinit __P((u_int, enum hashtype, struct malloc_type *,
+	    int, u_long *));
+void	hashdone __P((void *, struct malloc_type *));
 int	seltrue __P((dev_t, int, struct proc *));
-int	sys_nosys __P((struct proc *, void *, register_t *));
+int	sys_nosys __P((struct lwp *, void *, register_t *));
 
 
 #ifdef _KERNEL
+void	aprint_normal __P((const char *, ...))
+    __attribute__((__format__(__printf__,1,2)));
+void	aprint_error __P((const char *, ...))
+    __attribute__((__format__(__printf__,1,2)));
+void	aprint_naive __P((const char *, ...))
+    __attribute__((__format__(__printf__,1,2)));
+void	aprint_verbose __P((const char *, ...))
+    __attribute__((__format__(__printf__,1,2)));
+void	aprint_debug __P((const char *, ...))
+    __attribute__((__format__(__printf__,1,2)));
+
+int	aprint_get_error_count __P((void));
+
+void	printf_nolog __P((const char *, ...))
+    __attribute__((__format__(__printf__,1,2)));
+
 void	printf __P((const char *, ...))
     __attribute__((__format__(__printf__,1,2)));
 int	sprintf __P((char *, const char *, ...))
@@ -194,6 +205,9 @@ int	snprintf __P((char *, size_t, const char *, ...))
 void	vprintf __P((const char *, _BSD_VA_LIST_));
 int	vsprintf __P((char *, const char *, _BSD_VA_LIST_));
 int	vsnprintf __P((char *, size_t, const char *, _BSD_VA_LIST_));
+int	humanize_number __P((char *, size_t, u_int64_t, const char *, int));
+
+void	twiddle __P((void));
 #endif /* _KERNEL */
 
 void	panic __P((const char *, ...))
@@ -205,7 +219,6 @@ void	ttyprintf __P((struct tty *, const char *, ...))
 
 char	*bitmask_snprintf __P((u_quad_t, const char *, char *, size_t));
 
-int	humanize_number __P((char *, size_t, u_int64_t, const char *, int));
 int	format_bytes __P((char *, size_t, u_int64_t));
 
 void	tablefull __P((const char *, const char *));
@@ -244,17 +257,16 @@ long	fuword __P((const void *));
 long	fuiword __P((const void *));
 
 int	hzto __P((struct timeval *));
-void	realitexpire __P((void *));
 
 void	hardclock __P((struct clockframe *));
-#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
 void	softclock __P((void *));
-#endif
 void	statclock __P((struct clockframe *));
 #ifdef NTP
 void	hardupdate __P((long offset));
 #ifdef PPS_SYNC
 void	hardpps __P((struct timeval *, long));
+extern	void *pps_kc_hardpps_source;
+extern	int pps_kc_hardpps_mode;
 #endif
 #endif
 
@@ -265,6 +277,7 @@ void	cpu_initclocks __P((void));
 
 void	startprofclock __P((struct proc *));
 void	stopprofclock __P((struct proc *));
+void	proftick __P((struct clockframe *));
 void	setstatclockrate __P((int));
 
 /*
@@ -276,7 +289,7 @@ void	shutdownhook_disestablish __P((void *));
 void	doshutdownhooks __P((void));
 
 /*
- * Power managment hooks.
+ * Power management hooks.
  */
 void	*powerhook_establish __P((void (*)(int, void *), void *));
 void	powerhook_disestablish __P((void *));
@@ -315,13 +328,24 @@ void	*exithook_establish __P((void (*)(struct proc *, void *), void *));
 void	exithook_disestablish __P((void *));
 void	doexithooks __P((struct proc *));
 
-int	uiomove __P((void *, int, struct uio *));
+/*
+ * Fork hooks.  Subsystems may want to do special processing when a process
+ * forks.
+ */
+void	*forkhook_establish __P((void (*)(struct proc *, struct proc *)));
+void	forkhook_disestablish __P((void *));
+void	doforkhooks __P((struct proc *, struct proc *));
+
+/*
+ * kernel syscall tracing/debugging hooks.
+ */
+int	trace_enter __P((struct lwp *, register_t, register_t,
+	    const struct sysent *, void *));
+void	trace_exit __P((struct lwp *, register_t, void *, register_t [], int));
+
+int	uiomove __P((void *, size_t, struct uio *));
 
 #ifdef _KERNEL
-caddr_t	allocsys __P((caddr_t, caddr_t (*)(caddr_t)));
-#define	ALLOCSYS(base, name, type, num) \
-	    (name) = (type *)(base); (base) = (caddr_t)ALIGN((name)+(num))
-
 int	setjmp	__P((label_t *));
 void	longjmp	__P((label_t *));
 #endif
@@ -361,10 +385,10 @@ typedef struct cnm_state {
 #define cn_isconsole(d)	(cn_tab != NULL && (d) == cn_tab->cn_dev)
 #endif
 
-void cn_init_magic __P((cnm_state_t *cnm));
-void cn_destroy_magic __P((cnm_state_t *cnm));
-int cn_set_magic __P((char *magic));
-int cn_get_magic __P((char *magic, int len));
+void cn_init_magic __P((cnm_state_t *));
+void cn_destroy_magic __P((cnm_state_t *));
+int cn_set_magic __P((char *));
+int cn_get_magic __P((char *, int));
 /* This should be called for each byte read */
 #ifndef cn_check_magic
 #define cn_check_magic(d, k, s)						\
@@ -407,30 +431,30 @@ extern int db_fromconsole; /* XXX ddb/ddbvar.h */
 #endif /* _KERNEL */
 
 #ifdef SYSCALL_DEBUG
-void scdebug_call __P((struct proc *, register_t, register_t[]));
-void scdebug_ret __P((struct proc *, register_t, int, register_t[]));
+void scdebug_call __P((struct lwp *, register_t, register_t[]));
+void scdebug_ret __P((struct lwp *, register_t, int, register_t[]));
 #endif /* SYSCALL_DEBUG */
 
 #if defined(MULTIPROCESSOR)
 void	_kernel_lock_init(void);
 void	_kernel_lock(int);
 void	_kernel_unlock(void);
-void	_kernel_proc_lock(struct proc *);
-void	_kernel_proc_unlock(struct proc *);
+void	_kernel_proc_lock(struct lwp *);
+void	_kernel_proc_unlock(struct lwp *);
 
 #define	KERNEL_LOCK_INIT()		_kernel_lock_init()
 #define	KERNEL_LOCK(flag)		_kernel_lock((flag))
 #define	KERNEL_UNLOCK()			_kernel_unlock()
-#define	KERNEL_PROC_LOCK(p)		_kernel_proc_lock((p))
-#define	KERNEL_PROC_UNLOCK(p)		_kernel_proc_unlock((p))
+#define	KERNEL_PROC_LOCK(l)		_kernel_proc_lock((l))
+#define	KERNEL_PROC_UNLOCK(l)		_kernel_proc_unlock((l))
 
 #else /* ! MULTIPROCESSOR */
 
 #define	KERNEL_LOCK_INIT()		/* nothing */
 #define	KERNEL_LOCK(flag)		/* nothing */
 #define	KERNEL_UNLOCK()			/* nothing */
-#define	KERNEL_PROC_LOCK(p)		/* nothing */
-#define	KERNEL_PROC_UNLOCK(p)		/* nothing */
+#define	KERNEL_PROC_LOCK(l)		/* nothing */
+#define	KERNEL_PROC_UNLOCK(l)		/* nothing */
 
 #endif /* MULTIPROCESSOR */
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: p_nec_jc94.c,v 1.1 2001/06/13 15:30:38 soda Exp $	*/
+/*	$NetBSD: p_nec_jc94.c,v 1.3 2003/07/15 00:04:43 lukem Exp $	*/
 
 /*
  * Copyright (c) 2001 Izumi Tsutsui.  All rights reserved.
@@ -25,6 +25,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: p_nec_jc94.c,v 1.3 2003/07/15 00:04:43 lukem Exp $");
 
 #include <sys/param.h>
 
@@ -58,16 +61,16 @@ struct platform platform_nec_jc94 = {
 struct pica_dev nec_jc94_cpu[] = {
 	{{ "timer",	-1, 0, },	(void *)RD94_SYS_IT_VALUE, },
 	{{ "dallas_rtc", -1, 0, },	(void *)RD94_SYS_CLOCK, },
-	{{ "lpt",	0, 0, },	(void *)RD94_SYS_PAR1, },
-	{{ "fdc",	1, 0, },	(void *)RD94_SYS_FLOPPY, },
+	{{ "LPT1",	0, 0, },	(void *)RD94_SYS_PAR1, },
+	{{ "I82077",	1, 0, },	(void *)RD94_SYS_FLOPPY, },
 	{{ "AD1848",	2, 0, },	(void *)RD94_SYS_SOUND,},
-	{{ "sonic",	3, 0, },	(void *)RD94_SYS_SONIC, },
-	{{ "osiop",	5, 0, },	(void *)RD94_SYS_SCSI1, }, /*scsi(0)*/
-	{{ "osiop",	4, 0, },	(void *)RD94_SYS_SCSI0, }, /*scsi(1)*/
-	{{ "pckbd",	6, 0, },	(void *)RD94_SYS_KBD, },
-	{{ "pms",	7, 0, },	(void *)RD94_SYS_KBD, },
-	{{ "com",	8, 0, },	(void *)RD94_SYS_COM1, },
-	{{ "com",	9, 0, },	(void *)RD94_SYS_COM2, },
+	{{ "SONIC",	3, 0, },	(void *)RD94_SYS_SONIC, },
+	{{ "NCRC710",	5, 0, },	(void *)RD94_SYS_SCSI1, }, /*scsi(0)*/
+	{{ "NCRC710",	4, 0, },	(void *)RD94_SYS_SCSI0, }, /*scsi(1)*/
+	{{ "I8742",	6, 0, },	(void *)RD94_SYS_KBD, },
+	{{ "pms",	7, 0, },	(void *)RD94_SYS_KBD, }, /* XXX */
+	{{ "COM1",	8, 0, },	(void *)RD94_SYS_COM1, },
+	{{ "COM2",	9, 0, },	(void *)RD94_SYS_COM2, },
 	{{ NULL,	-1, 0, },	(void *)NULL, },
 };
 

@@ -1,4 +1,4 @@
-/* $NetBSD: sgmap_common.c,v 1.18 2001/07/19 04:27:37 thorpej Exp $ */
+/* $NetBSD: sgmap_common.c,v 1.20 2003/04/01 02:20:14 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1997, 1998, 2001 The NetBSD Foundation, Inc.
@@ -39,7 +39,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: sgmap_common.c,v 1.18 2001/07/19 04:27:37 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sgmap_common.c,v 1.20 2003/04/01 02:20:14 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -93,7 +93,7 @@ alpha_sgmap_init(bus_dma_tag_t t, struct alpha_sgmap *sgmap, const char *name,
 		 * this must be aligned to the page table size.  However,
 		 * some platforms have more strict alignment reqirements.
 		 */
-		ptsize = (sgvasize / NBPG) * ptesize;
+		ptsize = (sgvasize / PAGE_SIZE) * ptesize;
 		if (minptalign != 0) {
 			if (minptalign < ptsize)
 				minptalign = ptsize;
@@ -101,7 +101,7 @@ alpha_sgmap_init(bus_dma_tag_t t, struct alpha_sgmap *sgmap, const char *name,
 			minptalign = ptsize;
 		if (bus_dmamem_alloc(t, ptsize, minptalign, 0, &seg, 1, &rseg,
 		    BUS_DMA_NOWAIT)) {
-			panic("unable to allocate page table for sgmap `%s'\n",
+			panic("unable to allocate page table for sgmap `%s'",
 			    name);
 			goto die;
 		}
@@ -125,7 +125,7 @@ alpha_sgmap_init(bus_dma_tag_t t, struct alpha_sgmap *sgmap, const char *name,
 	 * Allocate a spill page if that hasn't already been done.
 	 */
 	if (alpha_sgmap_prefetch_spill_page_va == 0) {
-		if (bus_dmamem_alloc(t, NBPG, 0, 0, &seg, 1, &rseg,
+		if (bus_dmamem_alloc(t, PAGE_SIZE, 0, 0, &seg, 1, &rseg,
 		    BUS_DMA_NOWAIT)) {
 			printf("unable to allocate spill page for sgmap `%s'\n",
 			    name);
@@ -134,7 +134,8 @@ alpha_sgmap_init(bus_dma_tag_t t, struct alpha_sgmap *sgmap, const char *name,
 		alpha_sgmap_prefetch_spill_page_pa = seg.ds_addr;
 		alpha_sgmap_prefetch_spill_page_va =
 		    ALPHA_PHYS_TO_K0SEG(alpha_sgmap_prefetch_spill_page_pa);
-		memset((caddr_t)alpha_sgmap_prefetch_spill_page_va, 0, NBPG);
+		memset((caddr_t)alpha_sgmap_prefetch_spill_page_va, 0,
+		    PAGE_SIZE);
 	}
 	
 	return;

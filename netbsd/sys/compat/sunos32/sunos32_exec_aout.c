@@ -1,4 +1,4 @@
-/*	$NetBSD: sunos32_exec_aout.c,v 1.4 2001/11/29 18:53:50 briggs Exp $	*/
+/*	$NetBSD: sunos32_exec_aout.c,v 1.7 2003/06/29 22:29:45 fvdl Exp $	*/
 
 /*
  * Copyright (c) 2001 Matthew R. Green
@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sunos32_exec_aout.c,v 1.4 2001/11/29 18:53:50 briggs Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sunos32_exec_aout.c,v 1.7 2003/06/29 22:29:45 fvdl Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_execfmt.h"

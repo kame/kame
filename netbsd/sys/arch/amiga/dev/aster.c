@@ -1,4 +1,4 @@
-/*	$NetBSD: aster.c,v 1.16 2002/01/28 09:56:51 aymeric Exp $ */
+/*	$NetBSD: aster.c,v 1.20 2003/01/01 00:28:57 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1998,2001 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: aster.c,v 1.16 2002/01/28 09:56:51 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: aster.c,v 1.20 2003/01/01 00:28:57 thorpej Exp $");
 
 /*
  * zbus ISDN Blaster, ISDN Master driver.
@@ -51,7 +51,6 @@ __KERNEL_RCSID(0, "$NetBSD: aster.c,v 1.16 2002/01/28 09:56:51 aymeric Exp $");
 #include <sys/param.h>
 
 #include <machine/bus.h>
-#include <machine/conf.h>
 
 #include <amiga/include/cpu.h>
 
@@ -71,9 +70,8 @@ int astermatch(struct device *, struct cfdata *, void *);
 void asterattach(struct device *, struct device *, void *);
 int asterprint(void *auxp, const char *);
 
-struct cfattach aster_ca = {
-	sizeof(struct aster_softc), astermatch, asterattach
-};
+CFATTACH_DECL(aster, sizeof(struct aster_softc),
+    astermatch, asterattach, NULL, NULL);
 
 int
 astermatch(struct device *parent, struct cfdata *cfp, void *auxp)
@@ -163,7 +161,7 @@ asterprint(void *auxp, const char *pnp)
 	if (pnp == NULL)
 		return(QUIET);
 
-	printf("%s at %s port 0x%04x",
+	aprint_normal("%s at %s port 0x%04x",
 	    supa->supio_name, pnp, supa->supio_iobase);
 
 	return(UNCONF);

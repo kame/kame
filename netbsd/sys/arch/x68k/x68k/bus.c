@@ -1,4 +1,4 @@
-/*	$NetBSD: bus.c,v 1.18 2001/12/19 14:53:26 minoura Exp $	*/
+/*	$NetBSD: bus.c,v 1.23 2003/07/15 01:44:56 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * bus_space(9) and bus_dma(9) implementation for NetBSD/x68k.
  * These are default implementations; some buses may use their own.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bus.c,v 1.23 2003/07/15 01:44:56 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -342,7 +345,7 @@ dmasync_flush(bus_addr_t addr, bus_size_t len)
 
 		do {
 			DCFP(addr);
-			addr += NBPG;
+			addr += PAGE_SIZE;
 		} while (addr < end);
 	}
 }
@@ -366,7 +369,7 @@ dmasync_inval(bus_addr_t addr, bus_size_t len)
 		do {
 			DCPL(addr);
 			ICPP(addr);
-			addr += NBPG;
+			addr += PAGE_SIZE;
 		} while (addr < end);
 	}
 }
@@ -508,7 +511,7 @@ x68k_bus_dmamem_map(t, segs, nsegs, size, kvap, flags)
 	for (curseg = 0; curseg < nsegs; curseg++) {
 		for (addr = segs[curseg].ds_addr;
 		    addr < (segs[curseg].ds_addr + segs[curseg].ds_len);
-		    addr += NBPG, va += NBPG, size -= NBPG) {
+		    addr += PAGE_SIZE, va += PAGE_SIZE, size -= PAGE_SIZE) {
 			if (size == 0)
 				panic("x68k_bus_dmamem_map: size botch");
 			pmap_enter(pmap_kernel(), va, addr,
@@ -631,7 +634,7 @@ x68k_bus_dmamap_load_buffer(map, buf, buflen, p, flags,
 		/*
 		 * Compute the segment size, and adjust counts.
 		 */
-		sgsize = NBPG - m68k_page_offset(vaddr);
+		sgsize = PAGE_SIZE - m68k_page_offset(vaddr);
 		if (buflen < sgsize)
 			sgsize = buflen;
 
@@ -711,7 +714,6 @@ x68k_bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
 	/*
 	 * Allocate pages from the VM system.
 	 */
-	TAILQ_INIT(&mlist);
 	error = uvm_pglistalloc(size, low, high, alignment, boundary,
 	    &mlist, nsegs, (flags & BUS_DMA_NOWAIT) == 0);
 	if (error)

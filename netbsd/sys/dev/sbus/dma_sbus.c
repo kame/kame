@@ -1,4 +1,4 @@
-/*	$NetBSD: dma_sbus.c,v 1.11 2002/03/21 00:16:15 eeh Exp $ */
+/*	$NetBSD: dma_sbus.c,v 1.21 2004/03/17 17:04:58 pk Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -66,7 +66,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: dma_sbus.c,v 1.11 2002/03/21 00:16:15 eeh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dma_sbus.c,v 1.21 2004/03/17 17:04:58 pk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -84,13 +84,6 @@ __KERNEL_RCSID(0, "$NetBSD: dma_sbus.c,v 1.11 2002/03/21 00:16:15 eeh Exp $");
 #include <dev/ic/lsi64854reg.h>
 #include <dev/ic/lsi64854var.h>
 
-#include <dev/scsipi/scsi_all.h>
-#include <dev/scsipi/scsipi_all.h>
-#include <dev/scsipi/scsiconf.h>
-
-#include <dev/ic/ncr53c9xreg.h>
-#include <dev/ic/ncr53c9xvar.h>
-
 struct dma_softc {
 	struct lsi64854_softc	sc_lsi64854;	/* base device */
 	struct sbusdev	sc_sd;			/* sbus device */
@@ -105,19 +98,17 @@ void	*dmabus_intr_establish __P((
 		bus_space_tag_t,
 		int,			/*bus interrupt priority*/
 		int,			/*`device class' level*/
-		int,			/*flags*/
 		int (*) __P((void *)),	/*handler*/
-		void *));		/*handler arg*/
+		void *,			/*handler arg*/
+		void (*) __P((void))));	/*optional fast trap handler*/
 
 static	bus_space_tag_t dma_alloc_bustag __P((struct dma_softc *sc));
 
-struct cfattach dma_sbus_ca = {
-	sizeof(struct dma_softc), dmamatch_sbus, dmaattach_sbus
-};
+CFATTACH_DECL(dma_sbus, sizeof(struct dma_softc),
+    dmamatch_sbus, dmaattach_sbus, NULL, NULL);
 
-struct cfattach ledma_ca = {
-	sizeof(struct dma_softc), dmamatch_sbus, dmaattach_sbus
-};
+CFATTACH_DECL(ledma, sizeof(struct dma_softc),
+    dmamatch_sbus, dmaattach_sbus, NULL, NULL);
 
 int
 dmaprint_sbus(aux, busname)
@@ -142,7 +133,7 @@ dmamatch_sbus(parent, cf, aux)
 {
 	struct sbus_attach_args *sa = aux;
 
-	return (strcmp(cf->cf_driver->cd_name, sa->sa_name) == 0 ||
+	return (strcmp(cf->cf_name, sa->sa_name) == 0 ||
 		strcmp("espdma", sa->sa_name) == 0);
 }
 
@@ -185,7 +176,7 @@ dmaattach_sbus(parent, self, aux)
 	if (sbusburst == 0)
 		sbusburst = SBUS_BURST_32 - 1; /* 1->16 */
 
-	burst = PROM_getpropint(node,"burst-sizes", -1);
+	burst = prom_getpropint(node,"burst-sizes", -1);
 	if (burst == -1)
 		/* take SBus burst sizes */
 		burst = sbusburst;
@@ -195,7 +186,7 @@ dmaattach_sbus(parent, self, aux)
 	sc->sc_burst = (burst & SBUS_BURST_32) ? 32 :
 		       (burst & SBUS_BURST_16) ? 16 : 0;
 
-	if (sc->sc_dev.dv_cfdata->cf_attach == &ledma_ca) {
+	if (strcmp(sc->sc_dev.dv_cfdata->cf_name, "ledma") == 0) {
 		char *cabletype;
 		u_int32_t csr;
 		/*
@@ -205,7 +196,7 @@ dmaattach_sbus(parent, self, aux)
 		 * the "cable-selection" property; default to TP and then
 		 * the user can change it via a "media" option to ifconfig.
 		 */
-		cabletype = PROM_getpropstring(node, "cable-selection");
+		cabletype = prom_getpropstring(node, "cable-selection");
 		csr = L64854_GCSR(sc);
 		if (strcmp(cabletype, "tpe") == 0) {
 			csr |= E_TP_AUI;
@@ -237,13 +228,13 @@ dmaattach_sbus(parent, self, aux)
 }
 
 void *
-dmabus_intr_establish(t, pri, level, flags, handler, arg)
+dmabus_intr_establish(t, pri, level, handler, arg, fastvec)
 	bus_space_tag_t t;
 	int pri;
 	int level;
-	int flags;
 	int (*handler) __P((void *));
 	void *arg;
+	void (*fastvec) __P((void));	/* ignored */
 {
 	struct lsi64854_softc *sc = t->cookie;
 
@@ -254,7 +245,7 @@ dmabus_intr_establish(t, pri, level, flags, handler, arg)
 		handler = lsi64854_enet_intr;
 		arg = sc;
 	}
-	return (bus_intr_establish(sc->sc_bustag, pri, level, flags,
+	return (bus_intr_establish(sc->sc_bustag, pri, level,
 				   handler, arg));
 }
 

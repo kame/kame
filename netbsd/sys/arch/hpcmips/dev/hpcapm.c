@@ -1,4 +1,4 @@
-/*	$NetBSD: hpcapm.c,v 1.12 2002/05/12 07:41:23 takemura Exp $	*/
+/*	$NetBSD: hpcapm.c,v 1.17 2003/10/25 18:04:34 mycroft Exp $	*/
 
 /*
  * Copyright (c) 2000 Takemura Shin
@@ -27,6 +27,9 @@
  * SUCH DAMAGE.
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hpcapm.c,v 1.17 2003/10/25 18:04:34 mycroft Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -94,9 +97,8 @@ struct apmhpc_softc {
 	int minutes_left;
 };
 
-struct cfattach hpcapm_ca = {
-	sizeof (struct apmhpc_softc), hpcapm_match, hpcapm_attach
-};
+CFATTACH_DECL(hpcapm, sizeof (struct apmhpc_softc),
+    hpcapm_match, hpcapm_attach, NULL, NULL);
 
 struct apm_accessops hpcapm_accessops = {
 	hpcapm_disconnect,
@@ -352,7 +354,7 @@ hpcapm_set_powstate(void *scx, u_int devid, u_int powstat)
 			 * It sleeps until you push the power button.
 			 */
 			__asm(".set noreorder");
-			__asm(__CONCAT(".word	",___STRING(VR_OPCODE_STANDBY)));
+			__asm(".word	" ___STRING(VR_OPCODE_STANDBY));
 			__asm("nop");
 			__asm("nop");
 			__asm("nop");
@@ -392,7 +394,7 @@ hpcapm_set_powstate(void *scx, u_int devid, u_int powstat)
 			 * It sleeps until you push the power button.
 			 */
 			__asm(".set noreorder");
-			__asm(__CONCAT(".word	",___STRING(VR_OPCODE_SUSPEND)));
+			__asm(".word	" ___STRING(VR_OPCODE_SUSPEND));
 			__asm("nop");
 			__asm("nop");
 			__asm("nop");

@@ -1,4 +1,4 @@
-/*	$NetBSD: timer_hb.c,v 1.1 2001/07/07 15:27:22 tsutsui Exp $	*/
+/*	$NetBSD: timer_hb.c,v 1.6 2003/07/15 02:59:26 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: timer_hb.c,v 1.6 2003/07/15 02:59:26 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -65,13 +68,12 @@ void timer_hb_attach(struct device *, struct device *, void *);
 void timer_hb_initclocks(int, int);
 void clock_intr(struct clockframe *);
 
-static __inline void leds_intr __P((void));
+static __inline void leds_intr(void);
 
-extern void _isr_clock __P((void));	/* locore.s */
+extern void _isr_clock(void);	/* locore.s */
 
-struct cfattach timer_hb_ca = {
-	sizeof(struct device), timer_hb_match, timer_hb_attach
-};
+CFATTACH_DECL(timer_hb, sizeof(struct device),
+    timer_hb_match, timer_hb_attach, NULL, NULL);
 
 static volatile u_int8_t *ctrl_timer; /* XXX */
 
@@ -118,7 +120,7 @@ timer_hb_attach(parent, self, aux)
 
 	printf("\n");
 
-        timer_config(timer_hb_initclocks);
+	timer_config(timer_hb_initclocks);
 
 #if 0 /* XXX this will be done in timer_hb_initclocks() */
 	isrlink_custom(ha->ha_ipl, (void *)_isr_clock);
@@ -156,7 +158,7 @@ void
 clock_intr(cf)
 	struct clockframe *cf;
 {
-#ifdef	LED_IDLE_CHECK 
+#ifdef	LED_IDLE_CHECK
 	extern char _Idle[];	/* locore.s */
 #endif
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: magmareg.h,v 1.4 2002/01/22 17:00:47 pk Exp $	*/
+/*	$NetBSD: magmareg.h,v 1.7 2003/02/22 05:11:16 tsutsui Exp $	*/
 /* magmareg.h
  *
  *  Copyright (c) 1998 Iain Hibbert
@@ -89,7 +89,7 @@ struct magma_board_info {
 struct cd1400 {
 	__volatile u_char *cd_reg;	/* chip registers */
 	int cd_chiprev;			/* chip revision */
-	int cd_clock;			/* clock speed in Mhz */
+	int cd_clock;			/* clock speed in MHz */
 	int cd_parmode;			/* parallel mode operation */
 };
 
@@ -123,6 +123,8 @@ struct magma_softc {
 	struct mtty_softc *ms_mtty;
 	struct mbpp_softc *ms_mbpp;
 
+	/* softintr(9) cookie */
+	void	*ms_sicookie;
 };
 
 #define MTTY_RBUF_SIZE		(2 * 512)
@@ -210,7 +212,7 @@ void cd1400_enable_transmitter __P((struct cd1400 *, int));
 int magma_match __P((struct device *, struct cfdata *, void *));
 void magma_attach __P((struct device *, struct device *, void *));
 int magma_hard __P((void *));
-int magma_soft __P((void *));
+void magma_soft __P((void *));
 
 int mtty_match __P((struct device *, struct cfdata *, void *));
 void mtty_attach __P((struct device *, struct device *, void *));
@@ -220,7 +222,6 @@ void mtty_start __P((struct tty *));
 
 int mbpp_match __P((struct device *, struct cfdata *, void *));
 void mbpp_attach __P((struct device *, struct device *, void *));
-int mbpp_rw __P((dev_t, struct uio *));
 void mbpp_timeout __P((void *));
 void mbpp_start __P((void *));
 int mbpp_send __P((struct mbpp_port *, caddr_t, int));

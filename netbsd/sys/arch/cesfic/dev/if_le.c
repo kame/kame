@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le.c,v 1.1 2001/05/14 18:23:07 drochner Exp $	*/
+/*	$NetBSD: if_le.c,v 1.5 2003/09/28 22:00:26 cl Exp $	*/
 
 /*
  * Copyright (c) 1997, 1999
@@ -25,6 +25,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_le.c,v 1.5 2003/09/28 22:00:26 cl Exp $");
 
 #include "opt_inet.h"
 
@@ -57,9 +60,8 @@
 int lematch __P((struct device *, struct cfdata *, void *));
 void leattach __P((struct device *, struct device *, void *));
 
-struct cfattach le_ca = {
-	sizeof(struct am79900_softc), lematch, leattach
-};
+CFATTACH_DECL(le, sizeof(struct am79900_softc),
+    lematch, leattach, NULL, NULL);
 
 int	leintr __P((void *));
 
@@ -113,8 +115,8 @@ leattach(parent, self, aux)
 	int i;
 	struct lance_softc *sc = (struct lance_softc *)self;
 
-	mainbus_map(0x4c000000, 0x10000, 0, (void **)&lemembase);
-	mainbus_map(0x48000000, 0x1000, 0, (void **)&lebase);
+	mainbus_map(0x4c000000, 0x10000, 0, (void *)&lemembase);
+	mainbus_map(0x48000000, 0x1000, 0, (void *)&lebase);
 
 	sc->sc_mem = lemembase;
 	sc->sc_conf3 = LE_C3_BSWP;

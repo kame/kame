@@ -1,4 +1,4 @@
-/*	$NetBSD: com_cpcbus.c,v 1.1 2002/05/21 02:58:25 augustss Exp $	*/
+/*	$NetBSD: com_cpcbus.c,v 1.5 2003/07/14 15:47:10 lukem Exp $	*/
 
 /*
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: com_cpcbus.c,v 1.5 2003/07/14 15:47:10 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/tty.h>
@@ -57,9 +60,8 @@ struct com_cpc_softc {
 static int	com_cpc_match(struct device *, struct cfdata *, void *);
 static void	com_cpc_attach(struct device *, struct device *, void *);
 
-struct cfattach com_cpcbus_ca = {
-	sizeof(struct com_cpc_softc), com_cpc_match, com_cpc_attach
-};
+CFATTACH_DECL(com_cpcbus, sizeof(struct com_cpc_softc),
+    com_cpc_match, com_cpc_attach, NULL, NULL);
 
 int
 com_cpc_match(struct device *parent, struct cfdata *cf, void *aux)

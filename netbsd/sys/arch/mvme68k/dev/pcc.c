@@ -1,4 +1,4 @@
-/*	$NetBSD: pcc.c,v 1.20 2001/08/12 18:33:13 scw Exp $	*/
+/*	$NetBSD: pcc.c,v 1.25 2003/07/15 02:43:46 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -70,6 +70,9 @@
  * peripheral channel controller
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pcc.c,v 1.25 2003/07/15 02:43:46 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -91,9 +94,8 @@ void pccattach __P((struct device *, struct device *, void *));
 int pccmatch __P((struct device *, struct cfdata *, void *));
 int pccprint __P((void *, const char *));
 
-struct cfattach pcc_ca = {
-	sizeof(struct pcc_softc), pccmatch, pccattach
-};
+CFATTACH_DECL(pcc, sizeof(struct pcc_softc),
+    pccmatch, pccattach, NULL, NULL);
 
 extern struct cfdriver pcc_cd;
 static int pccintr __P((void *));
@@ -245,11 +247,11 @@ pccprint(aux, cp)
 	pa = aux;
 
 	if (cp)
-		printf("%s at %s", pa->pa_name, cp);
+		aprint_normal("%s at %s", pa->pa_name, cp);
 
-	printf(" offset 0x%lx", pa->pa_offset - pa->_pa_base);
+	aprint_normal(" offset 0x%lx", pa->pa_offset - pa->_pa_base);
 	if (pa->pa_ipl != -1)
-		printf(" ipl %d", pa->pa_ipl);
+		aprint_normal(" ipl %d", pa->pa_ipl);
 
 	return (UNCONF);
 }
@@ -320,7 +322,7 @@ pccsoftintrassert(void)
 }
 
 /*
- * Handle PCC soft interupt #1
+ * Handle PCC soft interrupt #1
  */
 static int
 pccsoftintr(arg)

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_de.c,v 1.36 1999/05/18 23:52:54 thorpej Exp $	*/
+/*	$NetBSD: if_de.c,v 1.41 2003/08/07 16:30:07 agc Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989 Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -44,6 +40,9 @@
  * TODO:
  *	timeout routine (get statistics)
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_de.c,v 1.41 2003/08/07 16:30:07 agc Exp $");
 
 #include "opt_inet.h"
 #include "opt_iso.h"
@@ -156,9 +155,8 @@ void	de_setaddr __P((u_char *, struct de_softc *));
 void	deintr __P((int));
 
 
-struct	cfattach de_ca = {
-	sizeof(struct de_softc), dematch, deattach
-};
+CFATTACH_DECL(de, sizeof(struct de_softc),
+    dematch, deattach, NULL, NULL);
 
 extern struct cfdriver de_cd;
 

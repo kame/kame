@@ -1,4 +1,4 @@
-/*	$NetBSD: isapnp.c,v 1.36 2002/01/07 21:47:15 thorpej Exp $	*/
+/*	$NetBSD: isapnp.c,v 1.42 2003/12/04 13:57:30 keihan Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: isapnp.c,v 1.36 2002/01/07 21:47:15 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: isapnp.c,v 1.42 2003/12/04 13:57:30 keihan Exp $");
 
 #include "isadma.h"
 
@@ -89,9 +89,8 @@ static int isapnp_match __P((struct device *, struct cfdata *, void *));
 static void isapnp_attach __P((struct device *, struct device *, void *));
 static void isapnp_callback __P((struct device *));
 
-struct cfattach isapnp_ca = {
-	sizeof(struct isapnp_softc), isapnp_match, isapnp_attach
-};
+CFATTACH_DECL(isapnp, sizeof(struct isapnp_softc),
+    isapnp_match, isapnp_attach, NULL, NULL);
 
 /*
  * This keeps track if which ISA's we have been probed on.
@@ -539,13 +538,13 @@ isapnp_print_region(str, r, n)
 	if (n == 0)
 		return;
 
-	printf(" %s ", str);
+	aprint_normal(" %s ", str);
 	for (i = 0; i < n; i++, r++) {
-		printf("0x%x", r->base);
+		aprint_normal("0x%x", r->base);
 		if (r->length)
-			printf("/%d", r->length);
+			aprint_normal("/%d", r->length);
 		if (i != n - 1)
-			printf(",");
+			aprint_normal(",");
 	}
 }
 
@@ -584,7 +583,7 @@ isapnp_print(aux, str)
 	struct isapnp_attach_args *ipa = aux;
 
 	if (str != NULL)
-		printf("%s: <%s, %s, %s, %s>",
+		aprint_normal("%s: <%s, %s, %s, %s>",
 		    str, ipa->ipa_devident, ipa->ipa_devlogic,
 		    ipa->ipa_devcompat, ipa->ipa_devclass);
 
@@ -608,8 +607,7 @@ isapnp_submatch(parent, match, aux)
 	struct cfdata *match;
 	void *aux;
 {
-	struct cfdata *cf = (struct cfdata *) match;
-	return ((*cf->cf_attach->ca_match)(parent, match, aux));
+	return (config_match(parent, match, aux));
 }
 
 
@@ -676,7 +674,7 @@ isapnp_isa_attach_hook(isa_sc)
 	 * (BTW, We're not alone in having problems with these chips: 
 	 * Windoze 98 couldn't detect the sound chip on a Dell when I tried.)
 	 *
-	 *     Lennart Augustsson <augustss@netbsd.org>
+	 *     Lennart Augustsson <augustss@NetBSD.org>
 	 *
 	 * (Implementation from John Kohl <jtk@kolvir.arlington.ma.us>)
 	 */

@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_cdrom.c,v 1.13 2002/03/22 17:14:18 christos Exp $ */
+/*	$NetBSD: linux_cdrom.c,v 1.17 2003/06/29 22:29:26 fvdl Exp $ */
 
 /*
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: linux_cdrom.c,v 1.13 2002/03/22 17:14:18 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: linux_cdrom.c,v 1.17 2003/06/29 22:29:26 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -46,6 +46,7 @@ __KERNEL_RCSID(0, "$NetBSD: linux_cdrom.c,v 1.13 2002/03/22 17:14:18 christos Ex
 #include <sys/cdio.h>
 #include <sys/dvdio.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/linux/common/linux_types.h>
@@ -104,7 +105,7 @@ linux_ioctl_cdrom(p, uap, retval)
 	caddr_t sg;
 	struct file *fp;
 	struct filedesc *fdp;
-	int (*ioctlf) __P((struct file *, u_long, caddr_t, struct proc *));
+	int (*ioctlf)(struct file *, u_long, void *, struct proc *);
 
 	struct linux_cdrom_blk l_blk;
 	struct linux_cdrom_msf l_msf;

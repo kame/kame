@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_dma.c,v 1.15 2002/01/06 12:39:55 takemura Exp $	*/
+/*	$NetBSD: bus_dma.c,v 1.20 2003/07/15 02:29:31 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bus_dma.c,v 1.20 2003/07/15 02:29:31 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -166,7 +169,7 @@ _hpcmips_bd_map_load_buffer(bus_dmamap_t mapx, void *buf, bus_size_t buflen,
 		/*
 		 * Compute the segment size, and adjust counts.
 		 */
-		sgsize = NBPG - ((u_long)vaddr & PGOFSET);
+		sgsize = PAGE_SIZE - ((u_long)vaddr & PGOFSET);
 		if (buflen < sgsize)
 			sgsize = buflen;
 
@@ -546,7 +549,6 @@ _hpcmips_bd_mem_alloc_range(bus_dma_tag_t t, bus_size_t size,
 	/*
 	 * Allocate pages from the VM system.
 	 */
-	TAILQ_INIT(&mlist);
 	error = uvm_pglistalloc(size, low, high, alignment, boundary,
 	    &mlist, nsegs, (flags & BUS_DMA_NOWAIT) == 0);
 	if (error)
@@ -650,7 +652,7 @@ _hpcmips_bd_mem_map(bus_dma_tag_t t, bus_dma_segment_t *segs, int nsegs,
 	for (curseg = 0; curseg < nsegs; curseg++) {
 		for (addr = segs[curseg].ds_addr;
 		    addr < (segs[curseg].ds_addr + segs[curseg].ds_len);
-		    addr += NBPG, va += NBPG, size -= NBPG) {
+		    addr += PAGE_SIZE, va += PAGE_SIZE, size -= PAGE_SIZE) {
 			if (size == 0)
 				panic("_hpcmips_bd_mem_map: size botch");
 			pmap_enter(pmap_kernel(), va, addr,

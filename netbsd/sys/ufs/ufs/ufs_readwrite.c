@@ -1,4 +1,4 @@
-/*	$NetBSD: ufs_readwrite.c,v 1.42.4.1 2002/10/21 01:54:27 lukem Exp $	*/
+/*	$NetBSD: ufs_readwrite.c,v 1.55 2003/08/07 16:34:46 agc Exp $	*/
 
 /*-
  * Copyright (c) 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(1, "$NetBSD: ufs_readwrite.c,v 1.42.4.1 2002/10/21 01:54:27 lukem Exp $");
+__KERNEL_RCSID(1, "$NetBSD: ufs_readwrite.c,v 1.55 2003/08/07 16:34:46 agc Exp $");
 
 #ifdef LFS_READWRITE
 #define	BLKSIZE(a, b, c)	blksize(a, b, c)
@@ -78,7 +74,7 @@ READ(void *v)
 	void *win;
 	vsize_t bytelen;
 	struct buf *bp;
-	ufs_daddr_t lbn, nextlbn;
+	daddr_t lbn, nextlbn;
 	off_t bytesinfile;
 	long size, xfersize, blkoffset;
 	int error;
@@ -94,9 +90,9 @@ READ(void *v)
 		panic("%s: mode", READ_S);
 
 	if (vp->v_type == VLNK) {
-		if ((int)ip->i_ffs_size < vp->v_mount->mnt_maxsymlinklen ||
+		if ((int)ip->i_size < vp->v_mount->mnt_maxsymlinklen ||
 		    (vp->v_mount->mnt_maxsymlinklen == 0 &&
-		     ip->i_ffs_blocks == 0))
+		     DIP(ip, blocks) == 0))
 			panic("%s: short symlink", READ_S);
 	} else if (vp->v_type != VREG && vp->v_type != VDIR)
 		panic("%s: type %d", READ_S, vp->v_type);
@@ -106,16 +102,18 @@ READ(void *v)
 		return (EFBIG);
 	if (uio->uio_resid == 0)
 		return (0);
-	if (uio->uio_offset >= ip->i_ffs_size) {
+	if (uio->uio_offset >= ip->i_size) {
 		goto out;
 	}
 
-#ifndef LFS_READWRITE
+#ifdef LFS_READWRITE
+	usepc = (vp->v_type == VREG && ip->i_number != LFS_IFILE_INUM);
+#else /* !LFS_READWRITE */
 	usepc = vp->v_type == VREG;
-#endif
+#endif /* !LFS_READWRITE */
 	if (usepc) {
 		while (uio->uio_resid > 0) {
-			bytelen = MIN(ip->i_ffs_size - uio->uio_offset,
+			bytelen = MIN(ip->i_size - uio->uio_offset,
 			    uio->uio_resid);
 			if (bytelen == 0)
 				break;
@@ -131,7 +129,7 @@ READ(void *v)
 	}
 
 	for (error = 0, bp = NULL; uio->uio_resid > 0; bp = NULL) {
-		bytesinfile = ip->i_ffs_size - uio->uio_offset;
+		bytesinfile = ip->i_size - uio->uio_offset;
 		if (bytesinfile <= 0)
 			break;
 		lbn = lblkno(fs, uio->uio_offset);
@@ -141,7 +139,7 @@ READ(void *v)
 		xfersize = MIN(MIN(fs->fs_bsize - blkoffset, uio->uio_resid),
 		    bytesinfile);
 
-		if (lblktosize(fs, nextlbn) >= ip->i_ffs_size)
+		if (lblktosize(fs, nextlbn) >= ip->i_size)
 			error = bread(vp, lbn, size, NOCRED, &bp);
 		else {
 			int nextsize = BLKSIZE(fs, ip, nextlbn);
@@ -201,15 +199,19 @@ WRITE(void *v)
 	struct buf *bp;
 	struct proc *p;
 	struct ucred *cred;
-	ufs_daddr_t lbn;
+	daddr_t lbn;
 	off_t osize, origoff, oldoff, preallocoff, endallocoff, nsize;
 	int blkoffset, error, flags, ioflag, resid, size, xfersize;
 	int bsize, aflag;
 	int ubc_alloc_flags;
+	int extended=0;
 	void *win;
 	vsize_t bytelen;
 	boolean_t async;
 	boolean_t usepc = FALSE;
+#ifdef LFS_READWRITE
+	boolean_t need_unreserve = FALSE;
+#endif
 
 	cred = ap->a_cred;
 	ioflag = ap->a_ioflag;
@@ -218,7 +220,7 @@ WRITE(void *v)
 	ip = VTOI(vp);
 	gp = VTOG(vp);
 
-	KASSERT(vp->v_size == ip->i_ffs_size);
+	KASSERT(vp->v_size == ip->i_size);
 #ifdef DIAGNOSTIC
 	if (uio->uio_rw != UIO_WRITE)
 		panic("%s: mode", WRITE_S);
@@ -227,8 +229,8 @@ WRITE(void *v)
 	switch (vp->v_type) {
 	case VREG:
 		if (ioflag & IO_APPEND)
-			uio->uio_offset = ip->i_ffs_size;
-		if ((ip->i_ffs_flags & APPEND) && uio->uio_offset != ip->i_ffs_size)
+			uio->uio_offset = ip->i_size;
+		if ((ip->i_flags & APPEND) && uio->uio_offset != ip->i_size)
 			return (EPERM);
 		/* FALLTHROUGH */
 	case VLNK:
@@ -270,13 +272,22 @@ WRITE(void *v)
 	async = vp->v_mount->mnt_flag & MNT_ASYNC;
 	origoff = uio->uio_offset;
 	resid = uio->uio_resid;
-	osize = ip->i_ffs_size;
+	osize = ip->i_size;
 	bsize = fs->fs_bsize;
 	error = 0;
 
-#ifndef LFS_READWRITE
 	usepc = vp->v_type == VREG;
-#endif
+#ifdef LFS_READWRITE
+	async = TRUE;
+
+	/* Account writes.  This overcounts if pages are already dirty. */
+	if (usepc) {
+		simple_lock(&lfs_subsys_lock);
+		lfs_subsys_pages += round_page(uio->uio_resid) >> PAGE_SHIFT;
+		simple_unlock(&lfs_subsys_lock);
+	}
+	lfs_check(vp, LFS_UNUSED_LBN, 0);
+#endif /* !LFS_READWRITE */
 	if (!usepc) {
 		goto bcache;
 	}
@@ -372,6 +383,7 @@ WRITE(void *v)
 		newoff = oldoff + bytelen;
 		if (vp->v_size < newoff) {
 			uvm_vnp_setsize(vp, newoff);
+			extended = 1;
 		}
 
 		if (error) {
@@ -413,14 +425,23 @@ WRITE(void *v)
 		else
 			flags &= ~B_CLRBUF;
 
+#ifdef LFS_READWRITE
+		error = lfs_reserve(fs, vp, NULL,
+		    btofsb(fs, (NIADDR + 1) << fs->lfs_bshift));
+		if (error)
+			break;
+		need_unreserve = TRUE;
+#endif
 		error = VOP_BALLOC(vp, uio->uio_offset, xfersize,
 		    ap->a_cred, flags, &bp);
 
 		if (error)
 			break;
-		if (uio->uio_offset + xfersize > ip->i_ffs_size) {
-			ip->i_ffs_size = uio->uio_offset + xfersize;
-			uvm_vnp_setsize(vp, ip->i_ffs_size);
+		if (uio->uio_offset + xfersize > ip->i_size) {
+			ip->i_size = uio->uio_offset + xfersize;
+			DIP_ASSIGN(ip, size, ip->i_size);
+			uvm_vnp_setsize(vp, ip->i_size);
+			extended = 1;
 		}
 		size = BLKSIZE(fs, ip, lbn) - bp->b_resid;
 		if (xfersize > size)
@@ -439,11 +460,10 @@ WRITE(void *v)
 			break;
 		}
 #ifdef LFS_READWRITE
-		if (!error)
-			error = lfs_reserve(fs, vp, btofsb(fs, (NIADDR + 1) << fs->lfs_bshift));
 		(void)VOP_BWRITE(bp);
-		if (!error)
-			lfs_reserve(fs, vp, -btofsb(fs, (NIADDR + 1) << fs->lfs_bshift));
+		lfs_reserve(fs, vp, NULL,
+		    -btofsb(fs, (NIADDR + 1) << fs->lfs_bshift));
+		need_unreserve = FALSE;
 #else
 		if (ioflag & IO_SYNC)
 			(void)bwrite(bp);
@@ -455,6 +475,13 @@ WRITE(void *v)
 		if (error || xfersize == 0)
 			break;
 	}
+#ifdef LFS_READWRITE
+	if (need_unreserve) {
+		lfs_reserve(fs, vp, NULL,
+		    -btofsb(fs, (NIADDR + 1) << fs->lfs_bshift));
+	}
+#endif
+
 	/*
 	 * If we successfully wrote any data, and we are not the superuser
 	 * we clear the setuid and setgid bits as a precaution against
@@ -462,8 +489,12 @@ WRITE(void *v)
 	 */
 out:
 	ip->i_flag |= IN_CHANGE | IN_UPDATE;
-	if (resid > uio->uio_resid && ap->a_cred && ap->a_cred->cr_uid != 0)
-		ip->i_ffs_mode &= ~(ISUID | ISGID);
+	if (resid > uio->uio_resid && ap->a_cred && ap->a_cred->cr_uid != 0) {
+		ip->i_mode &= ~(ISUID | ISGID);
+		DIP_ASSIGN(ip, mode, ip->i_mode);
+	}
+	if (resid > uio->uio_resid)
+		VN_KNOTE(vp, NOTE_WRITE | (extended ? NOTE_EXTEND : 0));
 	if (error) {
 		(void) VOP_TRUNCATE(vp, osize, ioflag & IO_SYNC, ap->a_cred,
 		    uio->uio_procp);
@@ -471,6 +502,6 @@ out:
 		uio->uio_resid = resid;
 	} else if (resid > uio->uio_resid && (ioflag & IO_SYNC) == IO_SYNC)
 		error = VOP_UPDATE(vp, NULL, NULL, UPDATE_WAIT);
-	KASSERT(vp->v_size == ip->i_ffs_size);
+	KASSERT(vp->v_size == ip->i_size);
 	return (error);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.h,v 1.12 2001/10/05 15:27:56 pooka Exp $ */
+/*	$NetBSD: autoconf.h,v 1.21 2004/03/21 14:10:08 pk Exp $ */
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -57,11 +57,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -85,7 +81,7 @@
  */
 
 #include <machine/bus.h>
-#include <sparc64/dev/upavar.h>
+#include <machine/promlib.h>
 #include <dev/sbus/sbusvar.h>
 
 /* This is used to map device classes to IPLs */
@@ -103,6 +99,12 @@ extern struct intrmap intrmap[];
  * peripheral buses and things like FHC bus systems.
  */
 
+/* Encoding for one "reg" properties item */
+struct upa_reg {
+	int64_t	ur_paddr;
+	int64_t	ur_len;
+};
+
 /* 
  * Attach arguments presented by mainbus_attach() 
  *
@@ -115,27 +117,13 @@ struct mainbus_attach_args {
 	struct upa_reg	*ma_reg;	/* "reg" properties */
 	u_int		*ma_address;	/* "address" properties -- 32 bits */
 	u_int		*ma_interrupts;	/* "interrupts" properties */
-	int		ma_upaid;	/* UPA bus ID */
+	int		ma_upaid;	/* UPA port ID */
 	int		ma_node;	/* PROM handle */
 	int		ma_nreg;	/* Counts for those properties */
 	int		ma_naddress;
 	int		ma_ninterrupts;
 	int		ma_pri;		/* priority (IPL) */
 };
-
-/*
- * length; the others convert or make some other guarantee.
- */
-long	PROM_getproplen __P((int node, char *name));
-int	PROM_getprop __P((int, char *, size_t, int *, void **));
-char	*PROM_getpropstring __P((int node, char *name));
-int	PROM_getpropint __P((int node, char *name, int deflt));
-
-/* Frequently used options node */
-extern int optionsnode;
-
-	/* new interfaces: */
-char	*PROM_getpropstringA __P((int, char *, char *));
 
 /*
  * The matchbyname function is useful in drivers that are matched
@@ -170,14 +158,5 @@ void	mountroot_hook_establish __P((void (*) __P((struct device *)),
 				      struct device *));
 
 void	bootstrap __P((int));
-int	firstchild __P((int));
-int	nextsibling __P((int));
-void	callrom __P((void));
 struct device *getdevunit __P((char *, int));
-void	*findzs __P((int));
-void	rominterpret __P((char *));
 int	romgetcursoraddr __P((int **, int **));
-int	findroot __P((void));
-int	findnode __P((int, const char *));
-int	node_has_property __P((int, const char *));
-

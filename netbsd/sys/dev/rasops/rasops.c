@@ -1,4 +1,4 @@
-/*	 $NetBSD: rasops.c,v 1.39 2002/03/13 15:05:15 ad Exp $	*/
+/*	 $NetBSD: rasops.c,v 1.44 2003/11/08 22:49:28 uwe Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rasops.c,v 1.39 2002/03/13 15:05:15 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rasops.c,v 1.44 2003/11/08 22:49:28 uwe Exp $");
 
 #include "opt_rasops.h"
 #include "rasops_glue.h"
@@ -90,9 +90,31 @@ const u_char rasops_cmap[256*3] = {
 			_CMWHITE _CMWHITE _CMWHITE _CMWHITE
 	_CMWHITE16 _CMWHITE16 _CMWHITE16 _CMWHITE16 _CMWHITE16
 	_CMWHITE16 _CMWHITE16 _CMWHITE16 _CMWHITE16 _CMWHITE16
-	_CMWHITE16 _CMWHITE16 _CMWHITE16 _CMWHITE16 _CMWHITE16
+	_CMWHITE16 _CMWHITE16 _CMWHITE16 _CMWHITE16 /* but not the last one */
 #undef _CMWHITE16
 #undef _CMWHITE
+
+	/*
+	 * For the cursor the fg/bg indices are bit inverted, so
+	 * provide complimentary colors in the upper 16 entries.
+	 */
+	0x7f, 0x7f, 0x7f, /* black */
+	0xff, 0x00, 0x00, /* red */
+	0x00, 0xff, 0x00, /* green */
+	0xff, 0xff, 0x00, /* brown */
+	0x00, 0x00, 0xff, /* blue */
+	0xff, 0x00, 0xff, /* magenta */
+	0x00, 0xff, 0xff, /* cyan */
+	0xff, 0xff, 0xff, /* white */
+
+	0x00, 0x00, 0x00, /* black */
+	0x7f, 0x00, 0x00, /* red */
+	0x00, 0x7f, 0x00, /* green */
+	0x7f, 0x7f, 0x00, /* brown */
+	0x00, 0x00, 0x7f, /* blue */
+	0x7f, 0x00, 0x7f, /* magenta */
+	0x00, 0x7f, 0x7f, /* cyan */
+	0xc7, 0xc7, 0xc7, /* white - XXX too dim? */
 };
 
 /* True if color is gray */
@@ -107,8 +129,8 @@ const u_char rasops_isgray[16] = {
 static void	rasops_copyrows __P((void *, int, int, int));
 static int	rasops_mapchar __P((void *, int, u_int *));
 static void	rasops_cursor __P((void *, int, int, int));
-static int	rasops_alloc_cattr __P((void *, int, int, int, long *));
-static int	rasops_alloc_mattr __P((void *, int, int, int, long *));
+static int	rasops_allocattr_color __P((void *, int, int, int, long *));
+static int	rasops_allocattr_mono __P((void *, int, int, int, long *));
 static void	rasops_do_cursor __P((struct rasops_info *));
 static void	rasops_init_devcmap __P((struct rasops_info *));
 
@@ -182,7 +204,7 @@ rasops_reconfig(ri, wantrows, wantcols)
 	s = splhigh();
 
 	if (ri->ri_font->fontwidth > 32 || ri->ri_font->fontwidth < 4)
-		panic("rasops_init: fontwidth assumptions botched!\n");
+		panic("rasops_init: fontwidth assumptions botched!");
 
 	/* Need this to frob the setup below */
 	bpp = (ri->ri_depth == 15 ? 16 : ri->ri_depth);
@@ -260,10 +282,10 @@ rasops_reconfig(ri, wantrows, wantcols)
 	ri->ri_do_cursor = rasops_do_cursor;
 
 	if (ri->ri_depth < 8 || (ri->ri_flg & RI_FORCEMONO) != 0) {
-		ri->ri_ops.alloc_attr = rasops_alloc_mattr;
+		ri->ri_ops.allocattr = rasops_allocattr_mono;
 		ri->ri_caps = WSSCREEN_UNDERLINE | WSSCREEN_REVERSE;
 	} else {
-		ri->ri_ops.alloc_attr = rasops_alloc_cattr;
+		ri->ri_ops.allocattr = rasops_allocattr_color;
 		ri->ri_caps = WSSCREEN_UNDERLINE | WSSCREEN_HILIT |
 		    WSSCREEN_WSCOLORS | WSSCREEN_REVERSE;
 	}
@@ -331,7 +353,7 @@ rasops_mapchar(cookie, c, cp)
 
 #ifdef DIAGNOSTIC
 	if (ri->ri_font == NULL)
-		panic("rasops_mapchar: no font selected\n");
+		panic("rasops_mapchar: no font selected");
 #endif
 
 	if (ri->ri_font->encoding != WSDISPLAY_FONTENC_ISO) {
@@ -360,7 +382,7 @@ rasops_mapchar(cookie, c, cp)
  * Allocate a color attribute.
  */
 static int
-rasops_alloc_cattr(cookie, fg, bg, flg, attr)
+rasops_allocattr_color(cookie, fg, bg, flg, attr)
 	void *cookie;
 	int fg, bg, flg;
 	long *attr;
@@ -404,7 +426,7 @@ rasops_alloc_cattr(cookie, fg, bg, flg, attr)
  * Allocate a mono attribute.
  */
 static int
-rasops_alloc_mattr(cookie, fg, bg, flg, attr)
+rasops_allocattr_mono(cookie, fg, bg, flg, attr)
 	void *cookie;
 	int fg, bg, flg;
 	long *attr;
@@ -508,7 +530,7 @@ rasops_copyrows(cookie, src, dst, num)
 /*
  * Copy columns. This is slow, and hard to optimize due to alignment,
  * and the fact that we have to copy both left->right and right->left.
- * We simply cop-out here and use bcopy(), since it handles all of
+ * We simply cop-out here and use memmove(), since it handles all of
  * these cases anyway.
  */
 void
@@ -558,7 +580,7 @@ rasops_copycols(cookie, row, src, dst, num)
 	dp = ri->ri_bits + row + dst * ri->ri_xscale;
 
 	while (height--) {
-		bcopy(sp, dp, num);
+		memmove(dp, sp, num);
 		dp += ri->ri_stride;
 		sp += ri->ri_stride;
 	}

@@ -1,4 +1,4 @@
-/*	$NetBSD: bsd_openprom.h,v 1.17.18.1 2002/11/22 22:30:31 tron Exp $ */
+/*	$NetBSD: bsd_openprom.h,v 1.21 2004/03/16 22:45:18 pk Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -349,7 +345,34 @@ struct nodeops {
 	char	*(*no_nextprop) __P((int node, char *name));
 };
 
-/* Frequently used options node */
-extern int optionsnode;
+/*
+ *  OBP Module mailbox messages for multi processor machines.
+ *
+ *	00..7F	: power-on self test
+ *	80..8F	: active in boot prom (at the "ok" prompt)
+ *	90..EF	: idle in boot prom
+ *	F0	: active in application
+ *	F1..FA	: reserved for future use
+ *
+ *	FB	: pv_v3cpustop(node) was called for this CPU,
+ *		  respond by calling pv_v3cpustop(0).
+ *
+ *	FC	: pv_v3cpuidle(node) was called for this CPU,
+ *		  respond by calling pv_v3cpuidle(0).
+ *
+ *	FD	: One processor hit a BREAKPOINT, call pv_v3cpuidle(0).
+ *		  [According to SunOS4 header; but what breakpoint?]
+ *
+ *	FE	: One processor got a WATCHDOG RESET, call pv_v3cpustop(0).
+ *		  [According to SunOS4 header; never seen this, although
+ *		   I've had plenty of watchdogs already]
+ *
+ *	FF	: This processor is not available.
+ */
+
+#define OPENPROM_MBX_STOP	0xfb
+#define OPENPROM_MBX_ABORT	0xfc
+#define OPENPROM_MBX_BPT	0xfd
+#define OPENPROM_MBX_WD		0xfe
 
 #endif /* _BSD_OPENPROM_H_ */

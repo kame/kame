@@ -1,11 +1,11 @@
-/*	$NetBSD: joy_pci.c,v 1.2 2002/04/14 12:24:27 martin Exp $	*/
+/*	$NetBSD: joy_pci.c,v 1.7.2.1 2004/04/05 20:29:56 tron Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Martin Husemann <martin@netbsd.org>.
+ * by Martin Husemann <martin@NetBSD.org>.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: joy_pci.c,v 1.2 2002/04/14 12:24:27 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: joy_pci.c,v 1.7.2.1 2004/04/05 20:29:56 tron Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -56,9 +56,8 @@ int	joy_pci_match __P((struct device *, struct cfdata *, void *));
 void	joy_pci_attach __P((struct device *, struct device *, void *));
 static int bar_is_io __P((pci_chipset_tag_t pc, pcitag_t tag, int reg));
 
-struct cfattach joy_pci_ca = {
-	sizeof(struct joy_softc), joy_pci_match, joy_pci_attach
-};
+CFATTACH_DECL(joy_pci, sizeof(struct joy_softc),
+    joy_pci_match, joy_pci_attach, NULL, NULL);
 
 int
 joy_pci_match(parent, match, aux)
@@ -72,6 +71,13 @@ joy_pci_match(parent, match, aux)
 	    PCI_SUBCLASS(pa->pa_class) == PCI_SUBCLASS_INPUT_GAMEPORT &&
 	    PCI_INTERFACE(pa->pa_class) == 0x10)
 		return (1);
+
+	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_CREATIVELABS &&
+	    (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_CREATIVELABS_SBJOY ||
+	     PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_CREATIVELABS_SBJOY2))
+	{
+		return (1);
+	}
 
 	return (0);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: kbd.c,v 1.11 2001/06/12 15:17:21 wiz Exp $	*/
+/*	$NetBSD: kbd.c,v 1.20 2003/09/28 21:14:41 cl Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1990 The Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -32,6 +28,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kbd.c,v 1.20 2003/09/28 21:14:41 cl Exp $");
 
 #include "ite.h"
 #include "bell.h"
@@ -71,12 +70,6 @@ struct kbd_softc {
 };
 
 void	kbdenable	__P((int));
-int	kbdopen 	__P((dev_t, int, int, struct proc *));
-int	kbdclose	__P((dev_t, int, int, struct proc *));
-int	kbdread 	__P((dev_t, struct uio *, int));
-int	kbdwrite	__P((dev_t, struct uio *, int));
-int	kbdioctl	__P((dev_t, u_long, caddr_t, int, struct proc *));
-int	kbdpoll 	__P((dev_t, int, struct proc *));
 int	kbdintr 	__P((void *));
 void	kbdsoftint	__P((void));
 void	kbd_bell	__P((int));
@@ -88,10 +81,20 @@ int	kbd_send_command __P((int));
 static int kbdmatch	__P((struct device *, struct cfdata *, void *));
 static void kbdattach	__P((struct device *, struct device *, void *));
 
-struct cfattach kbd_ca = {
-	sizeof(struct kbd_softc), kbdmatch, kbdattach
-};
+CFATTACH_DECL(kbd, sizeof(struct kbd_softc),
+    kbdmatch, kbdattach, NULL, NULL);
 
+dev_type_open(kbdopen);
+dev_type_close(kbdclose);
+dev_type_read(kbdread);
+dev_type_ioctl(kbdioctl);
+dev_type_poll(kbdpoll);
+dev_type_kqfilter(kbdkqfilter);
+
+const struct cdevsw kbd_cdevsw = {
+	kbdopen, kbdclose, kbdread, nowrite, kbdioctl,
+	nostop, notty, kbdpoll, nommap, kbdkqfilter,
+};
 
 static int
 kbdmatch(parent, cf, aux)
@@ -215,16 +218,6 @@ kbdread(dev, uio, flags)
 	return ev_read(&k->sc_events, uio, flags);
 }
 
-/* this routine should not exist, but is convenient to write here for now */
-int
-kbdwrite(dev, uio, flags)
-	dev_t dev;
-	struct uio *uio;
-	int flags;
-{
-	return EOPNOTSUPP;
-}
-
 #if NBELL > 0
 struct bell_info;
 int opm_bell_setup __P((struct bell_info *));
@@ -287,6 +280,12 @@ kbdioctl(dev, cmd, data, flag, p)
 		k->sc_events.ev_async = *(int *)data != 0;
 		return (0);
 
+	case FIOSETOWN:
+		if (-*(int *)data != k->sc_events.ev_io->p_pgid
+		    && *(int *)data != k->sc_events.ev_io->p_pid)
+			return (EPERM);
+		return 0;
+
 	case TIOCSPGRP:
 		if (*(int *)data != k->sc_events.ev_io->p_pgid)
 			return (EPERM);
@@ -315,6 +314,14 @@ kbdpoll(dev, events, p)
 	return (ev_poll(&k->sc_events, events, p));
 }
 
+int
+kbdkqfilter(dev_t dev, struct knote *kn)
+{
+	struct kbd_softc *k;
+
+	k = kbd_cd.cd_devs[minor(dev)];
+	return (ev_kqfilter(&k->sc_events, kn));
+}
 
 #define KBDBUFMASK 63
 #define KBDBUFSIZ 64

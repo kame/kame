@@ -1,4 +1,4 @@
-/*	$NetBSD: shb.c,v 1.2 2002/04/28 17:10:32 uch Exp $	*/
+/*	$NetBSD: shb.c,v 1.7 2003/07/15 03:35:55 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -33,6 +33,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: shb.c,v 1.7 2003/07/15 03:35:55 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -44,9 +47,8 @@ void shb_attach(struct device *, struct device *, void *);
 int shb_print(void *, const char *);
 int shb_search(struct device *, struct cfdata *, void *);
 
-struct cfattach shb_ca = {
-	sizeof(struct device), shb_match, shb_attach
-};
+CFATTACH_DECL(shb, sizeof(struct device),
+    shb_match, shb_attach, NULL, NULL);
 
 int
 shb_match(struct device *parent, struct cfdata *cf, void *aux)
@@ -73,7 +75,7 @@ int
 shb_search(struct device *parent, struct cfdata *cf, void *aux)
 {
 
-	if ((*cf->cf_attach->ca_match)(parent, cf, NULL) > 0)
+	if (config_match(parent, cf, NULL) > 0)
 		config_attach(parent, cf, NULL, shb_print);
 
 	return (0);

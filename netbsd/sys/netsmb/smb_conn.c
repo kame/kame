@@ -1,4 +1,4 @@
-/*	$NetBSD: smb_conn.c,v 1.3 2002/01/04 02:39:39 deberg Exp $	*/
+/*	$NetBSD: smb_conn.c,v 1.15 2004/03/21 10:09:52 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 2000-2001 Boris Popov
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: smb_conn.c,v 1.3 2002/01/04 02:39:39 deberg Exp $");
+__KERNEL_RCSID(0, "$NetBSD: smb_conn.c,v 1.15 2004/03/21 10:09:52 jdolecek Exp $");
 
 /*
  * Connection engine.
@@ -48,7 +48,7 @@ __KERNEL_RCSID(0, "$NetBSD: smb_conn.c,v 1.3 2002/01/04 02:39:39 deberg Exp $");
 #include <sys/proc.h>
 #include <sys/lock.h>
 #include <sys/sysctl.h>
-#include <sys/socketvar.h>
+#include <sys/mbuf.h>		/* for M_SONAME */
 
 #include <netsmb/iconv.h>
 
@@ -63,13 +63,15 @@ static int smb_vcnext = 1;	/* next unique id for VC */
 
 #ifndef __NetBSD__
 SYSCTL_NODE(_net, OID_AUTO, smb, CTLFLAG_RW, NULL, "SMB protocol");
-
-MALLOC_DEFINE(M_SMBCONN, "SMB conn", "SMB connection");
 #endif
 
-static void smb_co_init(struct smb_connobj *cp, int level, char *objname);
+MALLOC_DEFINE(M_SMBCONN, "SMB conn", "SMB connection");
+
+static void smb_co_init(struct smb_connobj *cp, int level, const char *objname);
 static void smb_co_done(struct smb_connobj *cp);
+#ifdef DIAGNOSTIC
 static int  smb_co_lockstatus(struct smb_connobj *cp);
+#endif
 
 static int  smb_vc_disconnect(struct smb_vc *vcp);
 static void smb_vc_free(struct smb_connobj *cp);
@@ -98,10 +100,10 @@ smb_sm_done(void)
 {
 
 	/* XXX: hold the mutex */
-	if (smb_vclist.co_usecount > 1) {
-		SMBERROR("%d connections still active\n", smb_vclist.co_usecount - 1);
-		return EBUSY;
-	}
+#ifdef DIAGNOSTIC
+	if (smb_vclist.co_usecount > 1)
+		panic("%d connections still active\n", smb_vclist.co_usecount - 1);
+#endif
 	smb_co_done(&smb_vclist);
 	return 0;
 }
@@ -126,54 +128,54 @@ smb_sm_lookupint(struct smb_vcspec *vcspec, struct smb_sharespec *shspec,
 {
 	struct smb_vc *vcp;
 	int exact = 1;
-	int error;
+	int fail = 1;
 
 	vcspec->shspec = shspec;
-	error = ENOENT;
 	SMBCO_FOREACH((struct smb_connobj*)vcp, &smb_vclist) {
-		error = smb_vc_lock(vcp, LK_EXCLUSIVE);
-		if (error)
+		if (smb_vc_lock(vcp, LK_EXCLUSIVE) != 0)
 			continue;
-		itry {
+
+		do {
 			if ((vcp->obj.co_flags & SMBV_PRIVATE) ||
 			    !CONNADDREQ(vcp->vc_paddr, vcspec->sap) ||
 			    strcmp(vcp->vc_username, vcspec->username) != 0)
-				ithrow(1);
+				break;
+
 			if (vcspec->owner != SMBM_ANY_OWNER) {
 				if (vcp->vc_uid != vcspec->owner)
-					ithrow(1);
+					break;
 			} else
 				exact = 0;
 			if (vcspec->group != SMBM_ANY_GROUP) {
 				if (vcp->vc_grp != vcspec->group)
-					ithrow(1);
+					break;
 			} else
 				exact = 0;
 
 			if (vcspec->mode & SMBM_EXACT) {
 				if (!exact ||
 				    (vcspec->mode & SMBM_MASK) != vcp->vc_mode)
-					ithrow(1);
+					break;
 			}
 			if (smb_vc_access(vcp, scred, vcspec->mode) != 0)
-				ithrow(1);
+				break;
 			vcspec->ssp = NULL;
-			if (shspec)
-				ithrow(smb_vc_lookupshare(vcp, shspec, scred, &vcspec->ssp));
-			error = 0;
-			break;
-		} icatch(error) {
-			smb_vc_unlock(vcp, 0);
-		} ifinally {
-		} iendtry;
-		if (error == 0)
-			break;
+			if (shspec
+			    &&smb_vc_lookupshare(vcp, shspec, scred, &vcspec->ssp) != 0)
+				break;
+
+			/* if we get here, all checks succeeded */
+			smb_vc_ref(vcp);
+			*vcpp = vcp;
+			fail = 0;
+			goto out;
+		} while(0);
+
+		smb_vc_unlock(vcp, 0);
 	}
-	if (vcp) {
-		smb_vc_ref(vcp);
-		*vcpp = vcp;
-	}
-	return error;
+
+    out:
+	return fail;
 }
 
 int
@@ -182,20 +184,20 @@ smb_sm_lookup(struct smb_vcspec *vcspec, struct smb_sharespec *shspec,
 {
 	struct smb_vc *vcp;
 	struct smb_share *ssp = NULL;
-	int error;
+	int fail, error;
 
 	*vcpp = vcp = NULL;
 
 	error = smb_sm_lockvclist(LK_EXCLUSIVE);
 	if (error)
 		return error;
-	error = smb_sm_lookupint(vcspec, shspec, scred, vcpp);
-	if (error == 0 || (vcspec->flags & SMBV_CREATE) == 0) {
+	fail = smb_sm_lookupint(vcspec, shspec, scred, vcpp);
+	if (!fail || (vcspec->flags & SMBV_CREATE) == 0) {
 		smb_sm_unlockvclist();
-		return error;
+		return 0;
 	}
-	error = smb_sm_lookupint(vcspec, NULL, scred, &vcp);
-	if (error) {
+	fail = smb_sm_lookupint(vcspec, NULL, scred, &vcp);
+	if (fail) {
 		error = smb_vc_create(vcspec, scred, &vcp);
 		if (error)
 			goto out;
@@ -226,7 +228,7 @@ out:
  * Common code for connection object
  */
 static void
-smb_co_init(struct smb_connobj *cp, int level, char *objname)
+smb_co_init(struct smb_connobj *cp, int level, const char *objname)
 {
 	SLIST_INIT(&cp->co_children);
 	smb_sl_init(&cp->co_interlock, objname);
@@ -240,7 +242,9 @@ static void
 smb_co_done(struct smb_connobj *cp)
 {
 	smb_sl_destroy(&cp->co_interlock);
-#ifndef __NetBSD__
+#ifdef __NetBSD__
+	lockmgr(&cp->co_lock, LK_DRAIN, NULL);
+#else
 	lockdestroy(&cp->co_lock);
 #endif
 }
@@ -254,7 +258,7 @@ smb_co_gone(struct smb_connobj *cp, struct smb_cred *scred)
 		cp->co_gone(cp, scred);
 	parent = cp->co_parent;
 	if (parent) {
-		smb_co_lock(parent, LK_EXCLUSIVE);
+		smb_co_lock(parent, LK_EXCLUSIVE|LK_CANRECURSE);
 		SLIST_REMOVE(&parent->co_children, cp, smb_connobj, co_next);
 		smb_co_put(parent, scred);
 	}
@@ -275,20 +279,20 @@ void
 smb_co_rele(struct smb_connobj *cp, struct smb_cred *scred)
 {
 	SMB_CO_LOCK(cp);
+	lockmgr(&cp->co_lock, LK_RELEASE, NULL);
 	if (cp->co_usecount > 1) {
 		cp->co_usecount--;
 		SMB_CO_UNLOCK(cp);
 		return;
 	}
-	if (cp->co_usecount == 0) {
-		SMBERROR("negative use_count for object %d", cp->co_level);
-		SMB_CO_UNLOCK(cp);
-		return;
-	}
+#ifdef DIAGNOSTIC
+	if (cp->co_usecount == 0)
+		panic("negative use_count for object %d", cp->co_level);
+#endif
 	cp->co_usecount--;
 	cp->co_flags |= SMBO_GONE;
+	SMB_CO_UNLOCK(cp);
 
-	lockmgr(&cp->co_lock, LK_DRAIN | LK_INTERLOCK, &cp->co_interlock);
 	smb_co_gone(cp, scred);
 }
 
@@ -313,31 +317,31 @@ smb_co_get(struct smb_connobj *cp, int flags, struct smb_cred *scred)
 void
 smb_co_put(struct smb_connobj *cp, struct smb_cred *scred)
 {
-	int flags;
 
-	flags = LK_RELEASE;
 	SMB_CO_LOCK(cp);
 	if (cp->co_usecount > 1) {
 		cp->co_usecount--;
 	} else if (cp->co_usecount == 1) {
 		cp->co_usecount--;
 		cp->co_flags |= SMBO_GONE;
-		flags = LK_DRAIN;
-	} else {
-		SMBERROR("negative usecount");
 	}
+#ifdef DIAGNOSTIC
+	else
+		panic("smb_co_put: negative usecount");
+#endif
 	lockmgr(&cp->co_lock, LK_RELEASE | LK_INTERLOCK, &cp->co_interlock);
 	if ((cp->co_flags & SMBO_GONE) == 0)
 		return;
-	lockmgr(&cp->co_lock, LK_DRAIN, NULL);
 	smb_co_gone(cp, scred);
 }
 
+#ifdef DIAGNOSTIC
 int
 smb_co_lockstatus(struct smb_connobj *cp)
 {
 	return lockstatus(&cp->co_lock);
 }
+#endif
 
 int
 smb_co_lock(struct smb_connobj *cp, int flags)
@@ -347,11 +351,6 @@ smb_co_lock(struct smb_connobj *cp, int flags)
 		return EINVAL;
 	if ((flags & LK_TYPE_MASK) == 0)
 		flags |= LK_EXCLUSIVE;
-	if (smb_co_lockstatus(cp) == LK_EXCLUSIVE && 
-	    (flags & LK_CANRECURSE) == 0) {
-		SMBERROR("recursive lock for object %d\n", cp->co_level);
-		return 0;
-	}
 	return lockmgr(&cp->co_lock, flags, &cp->co_interlock);
 }
 
@@ -388,7 +387,7 @@ smb_vc_create(struct smb_vcspec *vcspec,
 	char *domain = vcspec->domain;
 	int error, isroot;
 
-	isroot = smb_suser(cred) == 0;
+	isroot = (smb_suser(cred) == 0);
 	/*
 	 * Only superuser can create VCs with different uid and gid
 	 */
@@ -402,7 +401,6 @@ smb_vc_create(struct smb_vcspec *vcspec,
 	vcp->obj.co_free = smb_vc_free;
 	vcp->obj.co_gone = smb_vc_gone;
 	vcp->vc_number = smb_vcnext++;
-	vcp->vc_timo = SMB_DEFRQTIMO;
 	vcp->vc_smbuid = SMB_UID_UNKNOWN;
 	vcp->vc_mode = vcspec->rights & SMBM_MASK;
 	vcp->obj.co_flags = vcspec->flags & (SMBV_PRIVATE | SMBV_SINGLESHARE);
@@ -416,39 +414,53 @@ smb_vc_create(struct smb_vcspec *vcspec,
 	vcp->vc_grp = gid;
 
 	smb_sl_init(&vcp->vc_stlock, "vcstlock");
-	error = 0;
-	itry {
-		vcp->vc_paddr = dup_sockaddr(vcspec->sap, 1);
-		ierror(vcp->vc_paddr == NULL, ENOMEM);
+	error = ENOMEM;
+	if ((vcp->vc_paddr = dup_sockaddr(vcspec->sap, 1)) == NULL)
+		goto fail;
 
-		vcp->vc_laddr = dup_sockaddr(vcspec->lap, 1);
-		ierror(vcp->vc_laddr == NULL, ENOMEM);
+	if ((vcp->vc_laddr = dup_sockaddr(vcspec->lap, 1)) == NULL)
+		goto fail;
 
-		ierror((vcp->vc_pass = smb_strdup(vcspec->pass)) == NULL, ENOMEM);
+	if ((vcp->vc_pass = smb_strdup(vcspec->pass)) == NULL)
+		goto fail;
 
-		vcp->vc_domain = smb_strdup((domain && domain[0]) ? domain : "NODOMAIN");
-		ierror(vcp->vc_domain == NULL, ENOMEM);
+	vcp->vc_domain = smb_strdup((domain && domain[0]) ? domain : "NODOMAIN");
+	if (vcp->vc_domain == NULL)
+		goto fail;
 
-		ierror((vcp->vc_srvname = smb_strdup(vcspec->srvname)) == NULL, ENOMEM);
-		ierror((vcp->vc_username = smb_strdup(vcspec->username)) == NULL, ENOMEM);
+	if ((vcp->vc_srvname = smb_strdup(vcspec->srvname)) == NULL)
+		goto fail;
 
-		ithrow(iconv_open("tolower", vcspec->localcs, &vcp->vc_tolower));
-		ithrow(iconv_open("toupper", vcspec->localcs, &vcp->vc_toupper));
-		if (vcspec->servercs[0]) {
-			ithrow(iconv_open(vcspec->servercs, vcspec->localcs,
-			    &vcp->vc_toserver));
-			ithrow(iconv_open(vcspec->localcs, vcspec->servercs,
-			    &vcp->vc_tolocal));
-		}
+	if ((vcp->vc_username = smb_strdup(vcspec->username)) == NULL)
+		goto fail;
 
-		ithrow(smb_iod_create(vcp));
-		*vcpp = vcp;
-		smb_co_addchild(&smb_vclist, VCTOCP(vcp));
-	} icatch(error) {
-		smb_vc_put(vcp, scred);
-	} ifinally {
-	} iendtry;
-	return error;
+#define ithrow(cmd)				\
+		if ((error = cmd))		\
+			goto fail
+
+	ithrow(iconv_open("tolower", vcspec->localcs, &vcp->vc_tolower));
+	ithrow(iconv_open("toupper", vcspec->localcs, &vcp->vc_toupper));
+	if (vcspec->servercs[0]) {
+		ithrow(iconv_open(vcspec->servercs, vcspec->localcs,
+		    &vcp->vc_toserver));
+		ithrow(iconv_open(vcspec->localcs, vcspec->servercs,
+		    &vcp->vc_tolocal));
+	}
+
+	ithrow(smb_iod_create(vcp));
+
+#undef ithrow
+
+	/* all is well, return success */
+	*vcpp = vcp;
+	smb_co_addchild(&smb_vclist, VCTOCP(vcp));
+
+	return 0;
+
+    fail:
+	smb_vc_put(vcp, scred);
+	return (error);
+
 }
 
 static void
@@ -617,7 +629,7 @@ smb_vc_disconnect(struct smb_vc *vcp)
 	return 0;
 }
 
-static char smb_emptypass[] = "";
+static const char * const smb_emptypass = "";
 
 const char *
 smb_vc_getpass(struct smb_vc *vcp)
@@ -681,10 +693,14 @@ smb_share_create(struct smb_vc *vcp, struct smb_sharespec *shspec,
 	/*
 	 * Only superuser can create shares with different uid and gid
 	 */
-	if (uid != SMBM_ANY_OWNER && uid != realuid && !isroot)
+	if (uid != SMBM_ANY_OWNER && uid != realuid && !isroot) {
+printf("uid %d realuid %d isroot %d\n", uid, realuid, isroot);
 		return EPERM;
-	if (gid != SMBM_ANY_GROUP && !groupmember(gid, cred) && !isroot)
+	}
+	if (gid != SMBM_ANY_GROUP && !groupmember(gid, cred) && !isroot) {
+printf("gid %d groupmem %d isroot %d\n", uid, groupmember(gid, cred), isroot);
 		return EPERM;
+	}
 	error = smb_vc_lookupshare(vcp, shspec, scred, &ssp);
 	if (!error) {
 		smb_share_put(ssp, scred);
@@ -779,12 +795,6 @@ smb_share_access(struct smb_share *ssp, struct smb_cred *scred, mode_t mode)
 	if (!groupmember(ssp->ss_grp, cred))
 		mode >>= 3;
 	return (ssp->ss_mode & mode) == mode ? 0 : EACCES;
-}
-
-void
-smb_share_invalidate(struct smb_share *ssp)
-{
-	ssp->ss_tid = SMB_TID_UNKNOWN;
 }
 
 int

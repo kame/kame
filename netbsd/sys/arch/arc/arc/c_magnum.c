@@ -1,10 +1,43 @@
-/*	$NetBSD: c_magnum.c,v 1.1 2001/06/13 15:19:28 soda Exp $	*/
+/*	$NetBSD: c_magnum.c,v 1.6 2003/08/07 16:26:47 agc Exp $	*/
 /*	$OpenBSD: machdep.c,v 1.36 1999/05/22 21:22:19 weingart Exp $	*/
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department, The Mach Operating System project at
+ * Carnegie-Mellon University and Ralph Campbell.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	from: @(#)machdep.c	8.3 (Berkeley) 1/12/94
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -46,6 +79,9 @@
  * for Magnum derived machines like Microsoft-Jazz and PICA-61.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: c_magnum.c,v 1.6 2003/08/07 16:26:47 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -60,51 +96,12 @@
 #include <dev/isa/isavar.h>
 
 #include <arc/arc/wired_map.h>
-#include <arc/dev/mcclockvar.h>
 #include <arc/jazz/pica.h>
 #include <arc/jazz/jazziovar.h>
-#include <arc/jazz/mcclock_jazziovar.h>
 #include <arc/jazz/timer_jazziovar.h>
 #include <arc/isa/isabrvar.h>
 
 extern int cpu_int_mask;
-
-/*
- * chipset-dependent mcclock routines.
- */
-
-u_int mc_magnum_read __P((struct mcclock_softc *, u_int));
-void mc_magnum_write __P((struct mcclock_softc *, u_int, u_int));
-
-struct mcclock_jazzio_config mcclock_magnum_conf = {
-	0x80004000, 1,
-	{ mc_magnum_read, mc_magnum_write }
-};
-
-u_int
-mc_magnum_read(sc, reg)
-	struct mcclock_softc *sc;
-	u_int reg;
-{
-	int i, as;
-
-	as = in32(PICA_SYS_ISA_AS) & 0x80;
-	out32(PICA_SYS_ISA_AS, as | reg);
-	i = bus_space_read_1(sc->sc_iot, sc->sc_ioh, 0);
-	return (i);
-}
-
-void
-mc_magnum_write(sc, reg, datum)
-	struct mcclock_softc *sc;
-	u_int reg, datum;
-{
-	int as;
-
-	as = in32(PICA_SYS_ISA_AS) & 0x80;
-	out32(PICA_SYS_ISA_AS, as | reg);
-	bus_space_write_1(sc->sc_iot, sc->sc_ioh, 0, datum);
-}
 
 /*
  * chipset-dependent timer routine.
@@ -117,6 +114,54 @@ struct timer_jazzio_config timer_magnum_conf = {
 	MIPS_INT_MASK_4,
 	timer_magnum_intr,
 	timer_magnum_init,
+};
+
+/*
+ * This is a mask of bits to clear in the SR when we go to a
+ * given interrupt priority level.
+ */
+static const u_int32_t magnum_ipl_sr_bits[_IPL_N] = {
+	0,					/* IPL_NONE */
+
+	MIPS_SOFT_INT_MASK_0,			/* IPL_SOFT */
+
+	MIPS_SOFT_INT_MASK_0,			/* IPL_SOFTCLOCK */
+
+	MIPS_SOFT_INT_MASK_0|
+		MIPS_SOFT_INT_MASK_1,		/* IPL_SOFTNET */
+
+	MIPS_SOFT_INT_MASK_0|
+		MIPS_SOFT_INT_MASK_1,		/* IPL_SOFTSERIAL */
+
+	MIPS_SOFT_INT_MASK_0|
+		MIPS_SOFT_INT_MASK_1|
+		MIPS_INT_MASK_0|
+		MIPS_INT_MASK_1|
+		MIPS_INT_MASK_2|
+		MIPS_INT_MASK_3,		/* IPL_BIO */
+
+	MIPS_SOFT_INT_MASK_0|
+		MIPS_SOFT_INT_MASK_1|
+		MIPS_INT_MASK_0|
+		MIPS_INT_MASK_1|
+		MIPS_INT_MASK_2|
+		MIPS_INT_MASK_3,		/* IPL_NET */
+
+	MIPS_SOFT_INT_MASK_0|
+		MIPS_SOFT_INT_MASK_1|
+		MIPS_INT_MASK_0|
+		MIPS_INT_MASK_1|
+		MIPS_INT_MASK_2|
+		MIPS_INT_MASK_3,		/* IPL_{TTY,SERIAL} */
+
+	MIPS_SOFT_INT_MASK_0|
+		MIPS_SOFT_INT_MASK_1|
+		MIPS_INT_MASK_0|
+		MIPS_INT_MASK_1|
+		MIPS_INT_MASK_2|
+		MIPS_INT_MASK_3|
+		MIPS_INT_MASK_4|
+		MIPS_INT_MASK_5,		/* IPL_{CLOCK,HIGH} */
 };
 
 int
@@ -140,7 +185,7 @@ timer_magnum_init(interval)
 	int interval; /* milliseconds */
 {
 	if (interval <= 0)
-		panic("timer_nec_jazz_init: invalid interval %d", interval);
+		panic("timer_magnum_init: invalid interval %d", interval);
 
 	out32(R4030_SYS_IT_VALUE, interval - 1);
 
@@ -228,12 +273,7 @@ c_magnum_init()
 	/*
 	 * Initialize interrupt priority
 	 */
-	splvec.splnet = MIPS_INT_MASK_SPL3;
-	splvec.splbio = MIPS_INT_MASK_SPL3;
-	splvec.splvm = MIPS_INT_MASK_SPL3;
-	splvec.spltty = MIPS_INT_MASK_SPL3;
-	splvec.splclock = MIPS_INT_MASK_SPL5;
-	splvec.splstatclock = MIPS_INT_MASK_SPL5;
+	ipl_sr_bits = magnum_ipl_sr_bits;
 
 	/*
 	 * Disable all interrupts. New masks will be set up
@@ -244,9 +284,6 @@ c_magnum_init()
 
 	/* common configuration for Magnum derived and NEC EISA machines */
 	c_jazz_eisa_init();
-
-	/* chipset-dependent mcclock configuration */
-	mcclock_jazzio_conf = &mcclock_magnum_conf;
 
 	/* chipset-dependent timer configuration */
 	timer_jazzio_conf = &timer_magnum_conf;

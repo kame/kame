@@ -1,4 +1,4 @@
-/*	$NetBSD: dc21285reg.h,v 1.1 2001/06/09 10:29:12 chris Exp $	*/
+/*	$NetBSD: dc21285reg.h,v 1.4 2003/01/17 22:29:43 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1997,1998 Mark Brinicombe.
@@ -309,14 +309,14 @@
 #define	IRQ_DMA_1		0x10
 #define	IRQ_DMA_2		0x11
 #define	IRQ_PCI			0x12
-#define	IRQ_RESERVED1		0x13
-#define	IRQ_RESERVED2		0x14
-#define	IRQ_RESERVED3		0x15
+#define	IRQ_PMCSR		0x13
+#define	IRQ_RESERVED1		0x14
+#define	IRQ_RESERVED2		0x15
 #define	IRQ_BIST		0x16
 #define	IRQ_SERR		0x17
 #define	IRQ_SDRAM_PARITY	0x18
 #define	IRQ_I2O			0x19
-#define	IRQ_RESERVED4		0x1A
+#define	IRQ_RESERVED3		0x1A
 #define	IRQ_DISCARD_TIMER	0x1B
 #define	IRQ_DATA_PARITY		0x1C
 #define	IRQ_MASTER_ABORT	0x1D
@@ -364,7 +364,7 @@
 
 /* Maximum timer value */
 
-#define TIMER_MAX		0x00FFFFFF
+#define TIMER_MAX_VAL		0x00FFFFFF
 
 /* Specific registers */
 

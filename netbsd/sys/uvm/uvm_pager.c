@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_pager.c,v 1.57.4.1 2003/08/26 06:47:08 tron Exp $	*/
+/*	$NetBSD: uvm_pager.c,v 1.62.2.1 2004/05/10 14:26:44 tron Exp $	*/
 
 /*
  *
@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_pager.c,v 1.57.4.1 2003/08/26 06:47:08 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_pager.c,v 1.62.2.1 2004/05/10 14:26:44 tron Exp $");
 
 #include "opt_uvmhist.h"
 
@@ -83,7 +83,7 @@ static boolean_t emerginuse;
 void
 uvm_pager_init()
 {
-	int lcv;
+	u_int lcv;
 	vaddr_t sva, eva;
 
 	/*
@@ -326,7 +326,8 @@ uvm_aio_aiodone(bp)
 		uvm_lock_pageq();
 	} else if (error) {
 		if (pg->uobject != NULL) {
-			swslot = uao_find_swslot(pg->uobject, pg->offset);
+			swslot = uao_find_swslot(pg->uobject,
+			    pg->offset >> PAGE_SHIFT);
 		} else {
 			swslot = pg->uanon->an_swslot;
 		}
@@ -362,6 +363,7 @@ uvm_aio_aiodone(bp)
 		 */
 
 		if (error) {
+			int slot;
 			if (!write) {
 				pg->flags |= PG_RELEASED;
 				continue;
@@ -372,6 +374,21 @@ uvm_aio_aiodone(bp)
 				}
 				pg->flags &= ~PG_CLEAN;
 				uvm_pageactivate(pg);
+				slot = 0;
+			} else
+				slot = SWSLOT_BAD;
+
+			if (swap) {
+				if (pg->uobject != NULL) {
+					int oldslot;
+					oldslot = uao_set_swslot(pg->uobject,
+						pg->offset >> PAGE_SHIFT, slot);
+					KASSERT(oldslot == swslot + i);
+				} else {
+					KASSERT(pg->uanon->an_swslot ==
+						swslot + i);
+					pg->uanon->an_swslot = slot;
+				}
 			}
 		}
 
@@ -405,9 +422,15 @@ uvm_aio_aiodone(bp)
 		 */
 
 		if (swap) {
-			uvm_page_unbusy(&pg, 1);
-			uvm_unlock_pageq();
-			simple_unlock(slock);
+			if (pg->uobject == NULL && pg->uanon->an_ref == 0 &&
+			    (pg->flags & PG_RELEASED) != 0) {
+				uvm_unlock_pageq();
+				uvm_anon_release(pg->uanon);
+			} else {
+				uvm_page_unbusy(&pg, 1);
+				uvm_unlock_pageq();
+				simple_unlock(slock);
+			}
 		}
 	}
 	if (!swap) {
@@ -420,11 +443,16 @@ uvm_aio_aiodone(bp)
 		/* these pages are now only in swap. */
 		simple_lock(&uvm.swap_data_lock);
 		KASSERT(uvmexp.swpgonly + npages <= uvmexp.swpginuse);
-		uvmexp.swpgonly += npages;
+		if (error != ENOMEM)
+			uvmexp.swpgonly += npages;
 		simple_unlock(&uvm.swap_data_lock);
 		if (error) {
-			uvm_swap_markbad(swslot, npages);
+			if (error != ENOMEM)
+				uvm_swap_markbad(swslot, npages);
+			else
+				uvm_swap_free(swslot, npages);
 		}
+		uvmexp.pdpending--;
 	}
 	s = splbio();
 	if (write && (bp->b_flags & B_AGE) != 0) {

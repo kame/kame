@@ -1,4 +1,4 @@
-/*	$NetBSD: oclock.c,v 1.1 2002/03/28 11:54:17 pk Exp $ */
+/*	$NetBSD: oclock.c,v 1.8.2.1 2004/07/10 16:38:27 tron Exp $ */
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -42,6 +42,10 @@
  *
  * Only 4/100's and 4/200's have this old clock device.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: oclock.c,v 1.8.2.1 2004/07/10 16:38:27 tron Exp $");
+
 #include "opt_sparc_arch.h"
 
 #include <sys/param.h>
@@ -50,8 +54,8 @@
 #include <sys/systm.h>
 
 #include <machine/bus.h>
+#include <machine/promlib.h>
 #include <machine/autoconf.h>
-#include <machine/idprom.h>
 
 #include <dev/clock_subr.h>
 #include <dev/ic/intersil7170.h>
@@ -61,16 +65,13 @@ extern todr_chip_handle_t todr_handle;
 extern int oldclk;
 extern int timerblurb;
 extern void (*timer_init)(void);
-void establish_hostid(struct idprom *);
 
 
 static int oclockmatch(struct device *, struct cfdata *, void *);
 static void oclockattach(struct device *, struct device *, void *);
 
-struct cfattach oclock_ca = {
-	sizeof(struct device), oclockmatch, oclockattach
-};
-
+CFATTACH_DECL(oclock, sizeof(struct device),
+    oclockmatch, oclockattach, NULL, NULL);
 
 #if defined(SUN4)
 static bus_space_tag_t i7_bt;
@@ -136,7 +137,6 @@ oclockattach(parent, self, aux)
 	struct obio4_attach_args *oba = &uoba->uoba_oba4;
 	bus_space_tag_t bt = oba->oba_bustag;
 	bus_space_handle_t bh;
-	extern struct idprom sun4_idprom_store;
 
 	oldclk = 1;  /* we've got an oldie! */
 
@@ -194,18 +194,12 @@ oclockattach(parent, self, aux)
 	timer_init = oclock_init;
 
 	/* link interrupt handler */
-	intr_establish(10, &level10);
+	intr_establish(10, 0, &level10, NULL);
 
 	/* Our TOD clock year 0 represents 1968 */
 	if ((todr_handle = intersil7170_attach(bt, bh, 1968)) == NULL)
 		panic("Can't attach tod clock");
-
-	/*
-	 * This has nothing to do with `oclock' but since on mostek
-	 * TOD clock based machines the host ID is established when
-	 * the clock attaches, we do it here as well.
-	 */
-	establish_hostid(&sun4_idprom_store);
+	printf("\n");
 #endif /* SUN4 */
 }
 
@@ -245,10 +239,20 @@ oclockintr(cap)
 	void *cap;
 {
 	volatile int discard;
+	int s;
+
+	/*
+	 * Protect the clearing of the clock interrupt.  If we don't
+	 * do this, and we're interrupted (by the zs, for example),
+	 * the clock stops!
+	 * XXX WHY DOES THIS HAPPEN?
+	 */
+	s = splhigh();
 
 	discard = intersil_clear();
 	ienab_bic(IE_L10);  /* clear interrupt */
 	ienab_bis(IE_L10);  /* enable interrupt */
+	splx(s);
 
 	hardclock((struct clockframe *)cap);
 	return (1);

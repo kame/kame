@@ -1,4 +1,4 @@
-/*	$NetBSD: ka6400.c,v 1.1 2000/07/06 17:40:00 ragge Exp $	*/
+/*	$NetBSD: ka6400.c,v 1.5 2003/07/15 02:15:04 lukem Exp $	*/
 
 /*
  * Copyright (c) 2000 Ludd, University of Lule}, Sweden. All rights reserved.
@@ -38,6 +38,9 @@
  *	- Machine check code
  *	- Vector processor code
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ka6400.c,v 1.5 2003/07/15 02:15:04 lukem Exp $");
 
 #include "opt_multiprocessor.h"
 
@@ -110,9 +113,8 @@ struct ka6400_softc {
 	int sc_nodeid;		/* CPU node ID */
 };
 
-struct cfattach cpu_xmi_ca = {
-	sizeof(struct ka6400_softc), ka6400_match, ka6400_attach
-};
+CFATTACH_DECL(cpu_xmi, sizeof(struct ka6400_softc),
+    ka6400_match, ka6400_attach, NULL, NULL);
 
 static int
 ka6400_match(struct device *parent, struct cfdata *cf, void *aux)
@@ -197,9 +199,8 @@ struct mem_xmi_softc {
 	bus_space_handle_t sc_ioh;
 };
 
-struct cfattach mem_xmi_ca = {
-	sizeof(struct mem_xmi_softc), ms6400_match, ms6400_attach
-};
+CFATTACH_DECL(mem_xmi, sizeof(struct mem_xmi_softc),
+    ms6400_match, ms6400_attach, NULL, NULL);
 
 static int
 ms6400_match(struct device *parent, struct cfdata *cf, void *aux)

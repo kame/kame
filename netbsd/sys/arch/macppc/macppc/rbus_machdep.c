@@ -1,4 +1,4 @@
-/*	$NetBSD: rbus_machdep.c,v 1.10 2001/06/10 15:32:58 tsubai Exp $	*/
+/*	$NetBSD: rbus_machdep.c,v 1.12 2003/10/20 00:12:10 matt Exp $	*/
 
 /*
  * Copyright (c) 1999
@@ -27,13 +27,16 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rbus_machdep.c,v 1.12 2003/10/20 00:12:10 matt Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
 
 #include <uvm/uvm_extern.h>
 
-#include <machine/bat.h>
+#include <powerpc/oea/bat.h>
 #include <machine/bus.h>
 
 #include <dev/pci/pcivar.h>

@@ -1,4 +1,4 @@
-/*	$NetBSD: algor_p4032_intr.c,v 1.6 2001/10/29 23:33:42 thorpej Exp $	*/
+/*	$NetBSD: algor_p4032_intr.c,v 1.8 2003/07/14 22:57:46 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -43,6 +43,9 @@
  * flexible -- it can take an interrupt source and route it to an
  * arbitrary MIPS CPU hardware interrupt pin.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: algor_p4032_intr.c,v 1.8 2003/07/14 22:57:46 lukem Exp $");
 
 #include "opt_ddb.h"
 
@@ -544,7 +547,7 @@ algor_p4032_pci_intr_string(void *v, pci_intr_handle_t ih)
 {
 
 	if (ih >= NPCIIRQS)
-		panic("algor_p4032_intr_string: bogus IRQ %ld\n", ih);
+		panic("algor_p4032_intr_string: bogus IRQ %ld", ih);
 
 	return (p4032_intrnames[ih]);
 }
@@ -562,7 +565,7 @@ algor_p4032_pci_intr_establish(void *v, pci_intr_handle_t ih, int level,
 {
 
 	if (ih >= NPCIIRQS)
-		panic("algor_p4032_intr_establish: bogus IRQ %ld\n", ih);
+		panic("algor_p4032_intr_establish: bogus IRQ %ld", ih);
 
 	return (algor_p4032_intr_establish(ih, func, arg));
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: ifpga_pci.c,v 1.2 2002/01/30 03:59:41 thorpej Exp $	*/
+/*	$NetBSD: ifpga_pci.c,v 1.9 2003/09/06 13:01:29 rearnsha Exp $	*/
 
 /*
  * Copyright (c) 2001 ARM Ltd
@@ -61,17 +61,20 @@
  * SUCH DAMAGE.
  */
 
+#define _ARM32_BUS_DMA_PRIVATE
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ifpga_pci.c,v 1.9 2003/09/06 13:01:29 rearnsha Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
 #include <sys/malloc.h>
 #include <sys/device.h>
 
-#define _ARM32_BUS_DMA_PRIVATE
 #include <evbarm/integrator/int_bus_dma.h>
 
 #include <machine/intr.h>
-#include <evbarm/ifpga/irqhandler.h>	/* XXX XXX XXX */
 
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
@@ -120,19 +123,21 @@ struct arm32_pci_chipset ifpga_pci_chipset = {
 struct arm32_bus_dma_tag ifpga_pci_bus_dma_tag = {
 	0,
 	0,
+	NULL,
 	_bus_dmamap_create, 
 	_bus_dmamap_destroy,
-	integrator_bus_dmamap_load,
-	integrator_bus_dmamap_load_mbuf,
-	integrator_bus_dmamap_load_uio,
+	_bus_dmamap_load,
+	_bus_dmamap_load_mbuf,
+	_bus_dmamap_load_uio,
 	_bus_dmamap_load_raw,
 	_bus_dmamap_unload,
-	_bus_dmamap_sync,
-	integrator_bus_dmamem_alloc,
-	integrator_bus_dmamem_free,
-	integrator_bus_dmamem_map,
+	_bus_dmamap_sync,	/* pre */
+	NULL,			/* post */
+	_bus_dmamem_alloc,
+	_bus_dmamem_free,
+	_bus_dmamem_map,
 	_bus_dmamem_unmap,
-	integrator_bus_dmamem_mmap,
+	_bus_dmamem_mmap,
 };
 
 /*
@@ -324,7 +329,7 @@ ifpga_pci_intr_string(void *pcv, pci_intr_handle_t ih)
 	printf("ifpga_pci_intr_string(pcv=0x%p, ih=0x%lx)\n", pcv, ih);
 #endif
 	if (ih == 0)
-		panic("ifpga_pci_intr_string: bogus handle 0x%lx\n", ih);
+		panic("ifpga_pci_intr_string: bogus handle 0x%lx", ih);
 
 	sprintf(irqstr, "pciint%ld", ih - IFPGA_INTRNUM_PCIINT0);
 	return irqstr;	
@@ -344,7 +349,6 @@ ifpga_pci_intr_establish(void *pcv, pci_intr_handle_t ih, int level,
 {
 	void *intr;
 	int length;
-	char *string;
 
 #ifdef PCI_DEBUG
 	printf("ifpga_pci_intr_establish(pcv=%p, ih=0x%lx, level=%d, "
@@ -353,9 +357,7 @@ ifpga_pci_intr_establish(void *pcv, pci_intr_handle_t ih, int level,
 
 	/* Copy the interrupt string to a private buffer */
 	length = strlen(ifpga_pci_intr_string(pcv, ih));
-	string = malloc(length + 1, M_DEVBUF, M_WAITOK);
-	strcpy(string, ifpga_pci_intr_string(pcv, ih));
-	intr = intr_claim(ih, level, string, func, arg);
+	intr = ifpga_intr_establish(ih, level, func, arg);
 
 	return intr;
 }
@@ -369,5 +371,5 @@ ifpga_pci_intr_disestablish(void *pcv, void *cookie)
 #endif
 	/* XXXX Need to free the string */
 
-	intr_release(cookie);
+	ifpga_intr_disestablish(cookie);
 }

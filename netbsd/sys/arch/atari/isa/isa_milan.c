@@ -1,4 +1,4 @@
-/*	$NetBSD: isa_milan.c,v 1.5 2002/02/23 20:44:45 leo Exp $	*/
+/*	$NetBSD: isa_milan.c,v 1.7 2003/07/15 01:19:54 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: isa_milan.c,v 1.7 2003/07/15 01:19:54 lukem Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -239,7 +242,7 @@ isa_intr_disestablish(ic, handler)
 	isa_intr_info_t *iinfo_p = (isa_intr_info_t *)handler;
 
 	if (iinfo_p->ifunc == NULL)
-	    panic("isa_intr_disestablish: interrupt was not established\n");
+	    panic("isa_intr_disestablish: interrupt was not established");
 
 	iinfo_p->ifunc = NULL;
 	new_imask();

@@ -1,4 +1,4 @@
-/*	$NetBSD: isr.c,v 1.45 2001/09/05 13:21:09 tsutsui Exp $	*/
+/*	$NetBSD: isr.c,v 1.48 2003/07/15 03:36:17 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * This handles multiple attach of autovectored interrupts,
  * and the handy software interrupt request register.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: isr.c,v 1.48 2003/07/15 03:36:17 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -120,7 +123,7 @@ static struct isr *isr_autovec_list[NUM_LEVELS];
 
 /*
  * This is called by the assembly routines
- * for handling auto-vectored interupts.
+ * for handling auto-vectored interrupts.
  */
 void isr_autovec(cf)
 	struct clockframe cf;
@@ -187,7 +190,7 @@ static struct vector_handler isr_vector_handlers[192];
 
 /*
  * This is called by the assembly glue
- * for handling vectored interupts.
+ * for handling vectored interrupts.
  */
 void
 isr_vectored(cf)
@@ -255,7 +258,7 @@ set_vector_entry(entry, handler)
 	void *handler;
 {
 	if ((entry <0) || (entry >= NVECTORS))
-	panic("set_vector_entry: setting vector too high or low\n");
+	panic("set_vector_entry: setting vector too high or low");
 	vector_table[entry] = handler;
 }
 
@@ -264,6 +267,6 @@ get_vector_entry(entry)
 	int entry;
 {
 	if ((entry <0) || (entry >= NVECTORS))
-	panic("get_vector_entry: setting vector too high or low\n");
+	panic("get_vector_entry: setting vector too high or low");
 	return ((void *) vector_table[entry]);
 }

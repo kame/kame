@@ -1,7 +1,7 @@
-/*	$NetBSD: rpc_machdep.c,v 1.36.4.2 2003/02/14 22:20:40 he Exp $	*/
+/*	$NetBSD: rpc_machdep.c,v 1.59 2003/12/31 18:49:00 bjh21 Exp $	*/
 
 /*
- * Copyright (c) 2000-2001 Reinoud Zandijk.
+ * Copyright (c) 2000-2002 Reinoud Zandijk.
  * Copyright (c) 1994-1998 Mark Brinicombe.
  * Copyright (c) 1994 Brini.
  * All rights reserved.
@@ -44,7 +44,7 @@
  * This file still needs a lot of work
  *
  * Created      : 17/09/94
- * Updated for new bootloader 22/10/00
+ * Updated for yet another new bootloader 28/12/02
  */
 
 #include "opt_ddb.h"
@@ -52,10 +52,11 @@
 #include "vidcvideo.h"
 #include "rpckbd.h"
 #include "pckbc.h"
+#include "podulebus.h"
 
 #include <sys/param.h>
 
-__KERNEL_RCSID(0, "$NetBSD: rpc_machdep.c,v 1.36.4.2 2003/02/14 22:20:40 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rpc_machdep.c,v 1.59 2003/12/31 18:49:00 bjh21 Exp $");
 
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -63,6 +64,7 @@ __KERNEL_RCSID(0, "$NetBSD: rpc_machdep.c,v 1.36.4.2 2003/02/14 22:20:40 he Exp 
 #include <sys/proc.h>
 #include <sys/msgbuf.h>
 #include <sys/exec.h>
+#include <sys/ksyms.h>
 
 #include <dev/cons.h>
 
@@ -96,7 +98,24 @@ __KERNEL_RCSID(0, "$NetBSD: rpc_machdep.c,v 1.36.4.2 2003/02/14 22:20:40 he Exp 
 #include <arm/iomd/rpckbdvar.h>
 #include <dev/ic/pckbcvar.h>
 
+#include <dev/i2c/i2cvar.h>
+#include <dev/i2c/pcf8583var.h>
+#include <arm/iomd/iomdiicvar.h>
+
+static i2c_tag_t acorn32_i2c_tag;
+
 #include "opt_ipkdb.h"
+#include "ksyms.h"
+
+/* Kernel text starts at the base of the kernel address space. */
+#define	KERNEL_TEXT_BASE	(KERNEL_BASE + 0x00000000)
+#define	KERNEL_VM_BASE		(KERNEL_BASE + 0x01000000)
+
+/*
+ * The range 0xf1000000 - 0xf5ffffff is available for kernel VM space
+ * Fixed mappings exist from 0xf6000000 - 0xffffffff
+ */
+#define	KERNEL_VM_SIZE		0x05000000
 
 /*
  * Address to call from cpu_reset() to reset the machine.
@@ -119,7 +138,7 @@ u_int cpu_reset_address = 0x0; /* XXX 0x3800000 too for rev0 RiscPC 600 */
 #endif
 
 
-BootConfig bootconfig;		/* Boot config storage */
+struct bootconfig bootconfig;	/* Boot config storage */
 videomemory_t videomemory;	/* Video memory descriptor */
 
 char *boot_args = NULL;		/* holds the pre-processed boot arguments */
@@ -141,10 +160,10 @@ int physmem = 0;
 paddr_t memoryblock_end;
 
 #ifndef PMAP_STATIC_L1S
-int max_processes = 64;			/* Default number */
+int max_processes = 64;		/* Default number */
 #endif	/* !PMAP_STATIC_L1S */
 
-u_int videodram_size = 0;		/* Amount of DRAM to reserve for video */
+u_int videodram_size = 0;	/* Amount of DRAM to reserve for video */
 
 /* Physical and virtual addresses for some global pages */
 pv_addr_t systempage;
@@ -163,11 +182,11 @@ extern u_int undefined_handler_address;
 extern int pmap_debug_level;
 #endif	/* PMAP_DEBUG */
 
-#define	KERNEL_PT_VMEM		0	/* Page table for mapping video memory */
-#define	KERNEL_PT_SYS		1	/* Page table for mapping proc0 zero page */
-#define	KERNEL_PT_KERNEL	2	/* Page table for mapping kernel */
-#define	KERNEL_PT_VMDATA	3	/* Page tables for mapping kernel VM */
-#define	KERNEL_PT_VMDATA_NUM	4	/* start with 16MB of KVM */	
+#define	KERNEL_PT_VMEM		0 /* Page table for mapping video memory */
+#define	KERNEL_PT_SYS		1 /* Page table for mapping proc0 zero page */
+#define	KERNEL_PT_KERNEL	2 /* Page table for mapping kernel */
+#define	KERNEL_PT_VMDATA	3 /* Page tables for mapping kernel VM */
+#define	KERNEL_PT_VMDATA_NUM	4 /* start with 16MB of KVM */	
 #define	NUM_KERNEL_PTS		(KERNEL_PT_VMDATA + KERNEL_PT_VMDATA_NUM)
 
 pv_addr_t kernel_pt_table[NUM_KERNEL_PTS];
@@ -180,40 +199,40 @@ static vaddr_t sa110_cc_base;
 #endif	/* CPU_SA110 */
 
 /* Prototypes */
-void physcon_display_base	__P((u_int addr));
-extern void consinit		__P((void));
+void physcon_display_base(u_int);
+extern void consinit(void);
 
-void data_abort_handler		__P((trapframe_t *frame));
-void prefetch_abort_handler	__P((trapframe_t *frame));
-void undefinedinstruction_bounce	__P((trapframe_t *frame));
+void data_abort_handler(trapframe_t *);
+void prefetch_abort_handler(trapframe_t *);
+void undefinedinstruction_bounce(trapframe_t *frame);
 
-static void canonicalise_bootconfig __P((BootConfig *, BootConfig *));
-static void process_kernel_args	__P((void));
+static void canonicalise_bootconfig(struct bootconfig *, struct bootconfig *);
+static void process_kernel_args(void);
 
-extern void dump_spl_masks	__P((void));
-extern void vidcrender_reinit	__P((void));
-extern int vidcrender_blank	__P((struct vconsole *vc, int type));
+extern void dump_spl_masks(void);
+extern void vidcrender_reinit(void);
+extern int vidcrender_blank(struct vconsole *, int);
 
-void rpc_sa110_cc_setup		__P((void));
+void rpc_sa110_cc_setup(void);
 
-extern void parse_mi_bootargs	__P((char *args));
-void parse_rpc_bootargs		__P((char *args));
+extern void parse_mi_bootargs(char *args);
+void parse_rpc_bootargs(char *args);
 
-extern void dumpsys		__P((void));
+extern void dumpsys(void);
 
 
 #if NVIDCVIDEO > 0
-#	define console_flush()		/* empty */;
+#	define console_flush()		/* empty */
 #else
-	extern void console_flush	__P((void));
+	extern void console_flush(void);
 #endif
 
 
-#define panic2(a) { \
-	memset((void *) (videomemory.vidm_vbase), 0x55, 50*1024); \
-	consinit(); \
-	panic a; \
-	}
+#define panic2(a) do {							\
+	memset((void *) (videomemory.vidm_vbase), 0x55, 50*1024);	\
+	consinit();							\
+	panic a;							\
+} while (/* CONSTCOND */ 0)
 
 /*
  * void cpu_reboot(int howto, char *bootstr)
@@ -230,17 +249,15 @@ extern u_int spl_mask;
 extern u_int current_mask;
 
 void
-cpu_reboot(howto, bootstr)
-	int howto;
-	char *bootstr;
+cpu_reboot(int howto, char *bootstr)
 {
 
 #ifdef DIAGNOSTIC
-	printf("boot: howto=%08x curproc=%p\n", howto, curproc);
+	printf("boot: howto=%08x curlwp=%p\n", howto, curlwp);
 
-	printf("ipl_bio=%08x ipl_net=%08x ipl_tty=%08x ipl_imp=%08x\n",
+	printf("ipl_bio=%08x ipl_net=%08x ipl_tty=%08x ipl_vm=%08x\n",
 	    irqmasks[IPL_BIO], irqmasks[IPL_NET], irqmasks[IPL_TTY],
-	    irqmasks[IPL_IMP]);
+	    irqmasks[IPL_VM]);
 	printf("ipl_audio=%08x ipl_clock=%08x ipl_none=%08x\n",
 	    irqmasks[IPL_AUDIO], irqmasks[IPL_CLOCK], irqmasks[IPL_NONE]);
 
@@ -267,9 +284,10 @@ cpu_reboot(howto, bootstr)
 
 	/*
 	 * If RB_NOSYNC was not specified sync the discs.
-	 * Note: Unless cold is set to 1 here, syslogd will die during the unmount.
-	 * It looks like syslogd is getting woken up only to find that it cannot
-	 * page part of the binary in as the filesystem has been unmounted.
+	 * Note: Unless cold is set to 1 here, syslogd will die during
+	 * the unmount.  It looks like syslogd is getting woken up
+	 * only to find that it cannot page part of the binary in as
+	 * the filesystem has been unmounted.
 	 */
 	if (!(howto & RB_NOSYNC))
 		bootsync();
@@ -388,82 +406,38 @@ struct l1_sec_map {
 	{ IO_BASE,		IO_HW_BASE,
 	    ONE_MB,		VM_PROT_READ|VM_PROT_WRITE,
 	    PTE_NOCACHE },
-
+#if NPODULEBUS > 0	/* XXXJRT */
+	/* Map the Fast and Sync simple podule space */
+	{ SYNC_PODULE_BASE & 0xfff00000, SYNC_PODULE_HW_BASE & 0xfff00000,
+	    L1_S_SIZE,		VM_PROT_READ|VM_PROT_WRITE,
+	    PTE_NOCACHE },
+	/* Map the EASI podule space */
+	{ EASI_BASE,		EASI_HW_BASE,
+	    MAX_PODULES * EASI_SIZE,	VM_PROT_READ|VM_PROT_WRITE,
+	    PTE_NOCACHE },
+#endif
 	{ 0, 0, 0, 0, 0 }
 };
 
 
 static void
-canonicalise_bootconfig(bootconf, raw_bootconf)
-	BootConfig *bootconf;
-	BootConfig *raw_bootconf;
+canonicalise_bootconfig(struct bootconfig *bootconf, struct bootconfig *raw_bootconf)
 {
-	BootConfig_v1 *old_v1_style;
-	int block;
-
 	/* check for bootconfig v2+ structure */
 	if (raw_bootconf->magic == BOOTCONFIG_MAGIC) {
 		/* v2+ cleaned up structure found */
 		*bootconf = *raw_bootconf;
 		return;
 	} else {
-		/* old messy structure assumed */
-		old_v1_style = (BootConfig_v1 *) raw_bootconf;
-
-		bootconf->magic			= old_v1_style->magic;
-		bootconf->version		= 1;
-		memcpy(bootconf->machine_id, old_v1_style->machine_id, 4);
-		memcpy(bootconf->kernelname, old_v1_style->kernelname, 80);
-		memcpy(bootconf->args, (char *) old_v1_style->argvirtualbase, 512);
-
-		bootconf->kernvirtualbase	= old_v1_style->kernvirtualbase;
-		bootconf->kernphysicalbase	= old_v1_style->kernphysicalbase;
-		bootconf->kernsize		= old_v1_style->kernsize;
-		bootconf->scratchvirtualbase	= old_v1_style->scratchvirtualbase;
-		bootconf->scratchphysicalbase	= old_v1_style->scratchphysicalbase;
-		bootconf->scratchsize		= old_v1_style->scratchsize;
-
-		/* this shouldn't be happening */
-		bootconf->ksym_start		= 0;
-		bootconf->ksym_end		= 0;
-
-		/* Mode definition file */
-		bootconf->MDFvirtualbase	= 0;
-		bootconf->MDFphysicalbase	= 0;
-		bootconf->MDFsize		= 0;
-
-		bootconf->display_phys		= old_v1_style->display_phys;
-		bootconf->display_start		= old_v1_style->display_start;
-		bootconf->display_size		= old_v1_style->display_size;
-		bootconf->width			= old_v1_style->width;
-		bootconf->height		= old_v1_style->height;
-		bootconf->log2_bpp		= old_v1_style->log2_bpp;
-		bootconf->framerate		= old_v1_style->framerate;
-
-		memset(bootconf->reserved, 0, 512);
-
-		bootconf->pagesize		= old_v1_style->pagesize;
-		bootconf->drampages		= old_v1_style->drampages;
-		bootconf->vrampages		= old_v1_style->vrampages;
-		bootconf->dramblocks		= old_v1_style->dramblocks;
-		bootconf->vramblocks		= old_v1_style->vramblocks;
-
-		for(block=0; block<4; block++) {
-			bootconf->dram[block].address = old_v1_style->dram[block].address;
-			bootconf->dram[block].pages   = old_v1_style->dram[block].pages;
-			bootconf->dram[block].flags   = 0;	/* XXX */
-		};
-
-		bootconf->vram[0].address = old_v1_style->vram[0].address;
-		bootconf->vram[0].pages   = old_v1_style->vram[0].pages;
-	};
+		panic2(("Internal error: no valid bootconfig block found"));
+	}
 }
 
 
 u_int
 initarm(void *cookie)
 {
-	BootConfig *raw_bootconf = cookie;
+	struct bootconfig *raw_bootconf = cookie;
 	int loop;
 	int loop1;
 	u_int logical;
@@ -471,7 +445,6 @@ initarm(void *cookie)
 	u_int l1pagetable;
 	struct exec *kernexec = (struct exec *)KERNEL_TEXT_BASE;
 	pv_addr_t kernel_l1pt;
-	pv_addr_t kernel_ptpt;
 
 	/*
 	 * Heads up ... Setup the CPU / MMU / TLB functions
@@ -502,8 +475,7 @@ initarm(void *cookie)
 	if (bootconfig.vram[0].pages) 
 		videomemory.vidm_type = VIDEOMEM_TYPE_VRAM;
 	else 
-		videomemory.vidm_type = VIDEOMEM_TYPE_DRAM
-	;
+		videomemory.vidm_type = VIDEOMEM_TYPE_DRAM;
 	vidc_base = (int *) VIDC_HW_BASE;
 	iomd_base =         IOMD_HW_BASE;
 
@@ -523,7 +495,7 @@ initarm(void *cookie)
 	 * Once all the memory map changes are complete we can call consinit()
 	 * and not have to worry about things moving.
 	 */
-/*      fcomcnattach(DC21285_ARMCSR_BASE, comcnspeed, comcnmode);*/
+	/* fcomcnattach(DC21285_ARMCSR_BASE, comcnspeed, comcnmode); */
 	/* XXX snif .... i am still not able to this */
 
 	/*
@@ -545,17 +517,19 @@ initarm(void *cookie)
 	 * by pmap etc. 
 	 */
 
-/** START OF REAL NEW STUFF */
+	/* START OF REAL NEW STUFF */
 
 	/* Check to make sure the page size is correct */
-	if (NBPG != bootconfig.pagesize)
-		panic2(("Page size is %d bytes instead of %d !! (huh?)\n", bootconfig.pagesize, NBPG));
+	if (PAGE_SIZE != bootconfig.pagesize)
+		panic2(("Page size is %d bytes instead of %d !! (huh?)\n",
+			   bootconfig.pagesize, PAGE_SIZE));
 
 	/* process arguments */
 	process_kernel_args();
 
 
-	/* Now set up the page tables for the kernel ... this part is copied
+	/*
+	 * Now set up the page tables for the kernel ... this part is copied
 	 * in a (modified?) way from the EBSA machine port.... 
 	 */
 
@@ -563,44 +537,77 @@ initarm(void *cookie)
 	printf("Allocating page tables\n");
 #endif
 	/*
-	 * Set up the variables that define the availablilty of physcial
+	 * Set up the variables that define the availablilty of physical
 	 * memory
 	 */
-	physical_start = bootconfig.dram[0].address;
-
+	physical_start = 0xffffffff;
 	physical_end = 0; 
 	for (loop = 0, physmem = 0; loop < bootconfig.dramblocks; ++loop) {
-		memoryblock_end = bootconfig.dram[loop].address + bootconfig.dram[loop].pages * NBPG;
-		if (memoryblock_end > physical_end) physical_end = memoryblock_end;
+	    	if (bootconfig.dram[loop].address < physical_start)
+			physical_start = bootconfig.dram[loop].address;
+		memoryblock_end = bootconfig.dram[loop].address +
+		    bootconfig.dram[loop].pages * PAGE_SIZE;
+		if (memoryblock_end > physical_end)
+			physical_end = memoryblock_end;
 		physmem += bootconfig.dram[loop].pages;
 	};
-	physical_freestart = physical_start;
-	free_pages = bootconfig.drampages;
-	physical_freeend = physical_end;
-
 	/* constants for now, but might be changed/configured */
 	dma_range_begin = (paddr_t) physical_start;
 	dma_range_end   = (paddr_t) MIN(physical_end, 512*1024*1024);
-/* XXX HACK HACK XXX */
-/* dma_range_end   = 0x18000000; */
+	/* XXX HACK HACK XXX */
+	/* dma_range_end   = 0x18000000; */
 
-	/* AHUM !! set this variable ... it was set up in the old 1st stage bootloader */
+	if (physical_start !=  bootconfig.dram[0].address) {
+		int oldblocks = 0;
+
+		/* 
+		 * must be a kinetic, as it's the only thing to shuffle memory
+		 * around
+		 */
+		/* hack hack - throw away the slow dram */
+		for (loop = 0; loop < bootconfig.dramblocks; ++loop) {
+			if (bootconfig.dram[loop].address <
+			    bootconfig.dram[0].address)	{
+				/* non kinetic ram */
+				bootconfig.dram[loop].address = 0;
+				physmem -= bootconfig.dram[loop].pages;
+				bootconfig.drampages -=
+				    bootconfig.dram[loop].pages;
+				bootconfig.dram[loop].pages = 0;
+				oldblocks++;
+			}
+		}
+		physical_start = bootconfig.dram[0].address;
+		bootconfig.dramblocks -= oldblocks; 
+	}
+      
+	physical_freestart = physical_start;
+	free_pages = bootconfig.drampages;
+	physical_freeend = physical_end;
+ 
+
+	/*
+	 * AHUM !! set this variable ... it was set up in the old 1st
+	 * stage bootloader
+	 */
 	kerneldatasize = bootconfig.kernsize + bootconfig.MDFsize;
 
 	/* Update the address of the first free page of physical memory */
-	physical_freestart += bootconfig.kernsize + bootconfig.MDFsize + bootconfig.scratchsize;
-	free_pages -= (physical_freestart - physical_start) / NBPG;
+	/* XXX Assumption that the kernel and stuff is at the LOWEST physical memory address? XXX */
+	physical_freestart +=
+	    bootconfig.kernsize + bootconfig.MDFsize + bootconfig.scratchsize;
+	free_pages -= (physical_freestart - physical_start) / PAGE_SIZE;
   
 	/* Define a macro to simplify memory allocation */
-#define	valloc_pages(var, np)			\
-	alloc_pages((var).pv_pa, (np));		\
+#define	valloc_pages(var, np)						\
+	alloc_pages((var).pv_pa, (np));					\
 	(var).pv_va = KERNEL_BASE + (var).pv_pa - physical_start;
 
-#define alloc_pages(var, np)			\
-	(var) = physical_freestart;		\
-	physical_freestart += ((np) * NBPG);	\
-	free_pages -= (np);			\
-	memset((char *)(var), 0, ((np) * NBPG));
+#define alloc_pages(var, np)						\
+	(var) = physical_freestart;					\
+	physical_freestart += ((np) * PAGE_SIZE);			\
+	free_pages -= (np);						\
+	memset((char *)(var), 0, ((np) * PAGE_SIZE));
 
 	loop1 = 0;
 	kernel_l1pt.pv_pa = 0;
@@ -608,12 +615,10 @@ initarm(void *cookie)
 		/* Are we 16KB aligned for an L1 ? */
 		if ((physical_freestart & (L1_TABLE_SIZE - 1)) == 0
 		    && kernel_l1pt.pv_pa == 0) {
-			valloc_pages(kernel_l1pt, L1_TABLE_SIZE / NBPG);
+			valloc_pages(kernel_l1pt, L1_TABLE_SIZE / PAGE_SIZE);
 		} else {
-			alloc_pages(kernel_pt_table[loop1].pv_pa,
-			    L2_TABLE_SIZE / NBPG);
-			kernel_pt_table[loop1].pv_va =
-			    kernel_pt_table[loop1].pv_pa;
+			valloc_pages(kernel_pt_table[loop1],
+					L2_TABLE_SIZE / PAGE_SIZE);
 			++loop1;
 		}
 	}
@@ -622,7 +627,8 @@ initarm(void *cookie)
 #ifdef DIAGNOSTIC
 	/* This should never be able to happen but better confirm that. */
 	if (!kernel_l1pt.pv_pa || (kernel_l1pt.pv_pa & (L1_TABLE_SIZE-1)) != 0)
-		panic2(("initarm: Failed to align the kernel page directory\n"));
+		panic2(("initarm: Failed to align the kernel page "
+		    "directory\n"));
 #endif
 
 	/*
@@ -632,9 +638,6 @@ initarm(void *cookie)
 	 */
 	alloc_pages(systempage.pv_pa, 1);
 
-	/* Allocate a page for the page table to map kernel page tables*/
-	valloc_pages(kernel_ptpt, L2_TABLE_SIZE / NBPG);
-
 	/* Allocate stacks for all modes */
 	valloc_pages(irqstack, IRQ_STACK_SIZE);
 	valloc_pages(abtstack, ABT_STACK_SIZE);
@@ -643,14 +646,18 @@ initarm(void *cookie)
 
 #ifdef VERBOSE_INIT_ARM
 	printf("Setting up stacks :\n");
-	printf("IRQ stack: p0x%08lx v0x%08lx\n", irqstack.pv_pa, irqstack.pv_va); 
-	printf("ABT stack: p0x%08lx v0x%08lx\n", abtstack.pv_pa, abtstack.pv_va); 
-	printf("UND stack: p0x%08lx v0x%08lx\n", undstack.pv_pa, undstack.pv_va); 
-	printf("SVC stack: p0x%08lx v0x%08lx\n", kernelstack.pv_pa, kernelstack.pv_va); 
+	printf("IRQ stack: p0x%08lx v0x%08lx\n",
+	    irqstack.pv_pa, irqstack.pv_va); 
+	printf("ABT stack: p0x%08lx v0x%08lx\n",
+	    abtstack.pv_pa, abtstack.pv_va); 
+	printf("UND stack: p0x%08lx v0x%08lx\n",
+	    undstack.pv_pa, undstack.pv_va); 
+	printf("SVC stack: p0x%08lx v0x%08lx\n",
+	    kernelstack.pv_pa, kernelstack.pv_va); 
 	printf("\n");
 #endif
 
-	alloc_pages(msgbufphys, round_page(MSGBUFSIZE) / NBPG);
+	alloc_pages(msgbufphys, round_page(MSGBUFSIZE) / PAGE_SIZE);
 
 #ifdef CPU_SA110
 	/*
@@ -687,7 +694,6 @@ initarm(void *cookie)
 	for (loop = 0; loop < KERNEL_PT_VMDATA_NUM; ++loop)
 		pmap_link_l2pt(l1pagetable, KERNEL_VM_BASE + loop * 0x00400000,
 		    &kernel_pt_table[KERNEL_PT_VMDATA + loop]);
-	pmap_link_l2pt(l1pagetable, PTE_BASE, &kernel_ptpt);
 	pmap_link_l2pt(l1pagetable, VMEM_VBASE,
 	    &kernel_pt_table[KERNEL_PT_VMEM]);
 
@@ -700,7 +706,7 @@ initarm(void *cookie)
 #endif
 
 	/* Now we fill in the L2 pagetable for the kernel code/data */
-
+	/* XXX Kernel doesn't have to be on physical_start (!) use bootconfig XXX */
 	/*
 	 * The defines are a workaround for a recent problem that occurred
 	 * with ARM 610 processors and some ARM 710 processors
@@ -723,7 +729,8 @@ initarm(void *cookie)
 	} else {	/* !ZMAGIC */
 		/*
 		 * Most likely an ELF kernel ...
-		 * XXX no distinction yet between read only and read/write area's ...
+		 * XXX no distinction yet between read only and
+		 * read/write area's ...
 		 */
 		pmap_map_chunk(l1pagetable, KERNEL_TEXT_BASE,
 		    physical_start, kerneldatasize,
@@ -737,65 +744,38 @@ initarm(void *cookie)
 
 	/* Map the stack pages */
 	pmap_map_chunk(l1pagetable, irqstack.pv_va, irqstack.pv_pa,
-	    IRQ_STACK_SIZE * NBPG, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+	    IRQ_STACK_SIZE * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
 	pmap_map_chunk(l1pagetable, abtstack.pv_va, abtstack.pv_pa,
-	    ABT_STACK_SIZE * NBPG, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+	    ABT_STACK_SIZE * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
 	pmap_map_chunk(l1pagetable, undstack.pv_va, undstack.pv_pa,
-	    UND_STACK_SIZE * NBPG, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+	    UND_STACK_SIZE * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
 	pmap_map_chunk(l1pagetable, kernelstack.pv_va, kernelstack.pv_pa,
-	    UPAGES * NBPG, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+	    UPAGES * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
 
 	pmap_map_chunk(l1pagetable, kernel_l1pt.pv_va, kernel_l1pt.pv_pa,
-	    L1_TABLE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
+	    L1_TABLE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_PAGETABLE);
 
-	/* Map the page table that maps the kernel pages */
-	pmap_map_entry(l1pagetable, kernel_ptpt.pv_va, kernel_ptpt.pv_pa,
-	    VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
-
+	for (loop = 0; loop < NUM_KERNEL_PTS; ++loop) {
+		pmap_map_chunk(l1pagetable, kernel_pt_table[loop].pv_va,
+		    kernel_pt_table[loop].pv_pa, L2_TABLE_SIZE,
+		    VM_PROT_READ|VM_PROT_WRITE, PTE_PAGETABLE);
+	}
 
 	/* Now we fill in the L2 pagetable for the VRAM */
 	/*
-	 * Current architectures mean that the VRAM is always in 1 continuous
-	 * bank.
-	 * This means that we can just map the 2 meg that the VRAM would occupy.
-	 * In theory we don't need a page table for VRAM, we could section map
-	 * it but we would need the page tables if DRAM was in use.
-	 * XXX please map two adjacent virtual areas to ONE physical area
+	 * Current architectures mean that the VRAM is always in 1
+	 * continuous bank.  This means that we can just map the 2 meg
+	 * that the VRAM would occupy.  In theory we don't need a page
+	 * table for VRAM, we could section map it but we would need
+	 * the page tables if DRAM was in use.
+	 * XXX please map two adjacent virtual areas to ONE physical
+	 * area
 	 */
 	pmap_map_chunk(l1pagetable, VMEM_VBASE, videomemory.vidm_pbase,
 	    videomemory.vidm_size, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
 	pmap_map_chunk(l1pagetable, VMEM_VBASE + videomemory.vidm_size,
 	    videomemory.vidm_pbase, videomemory.vidm_size,
 	    VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
-
-
-	/*
-	 * Map entries in the page table used to map PTE's
-	 * Basically every kernel page table gets mapped here
-	 */
-	/* The -2 is slightly bogus, it should be -log2(sizeof(pt_entry_t)) */
-	pmap_map_entry(l1pagetable,
-	    PTE_BASE + (KERNEL_BASE >> (PGSHIFT-2)),
-	    kernel_pt_table[KERNEL_PT_KERNEL].pv_pa, VM_PROT_READ|VM_PROT_WRITE,
-	    PTE_NOCACHE);
-	pmap_map_entry(l1pagetable,
-	    PTE_BASE + (PTE_BASE >> (PGSHIFT-2)),
-	    kernel_ptpt.pv_pa, VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
-	pmap_map_entry(l1pagetable,
-	    PTE_BASE + (VMEM_VBASE >> (PGSHIFT-2)),
-	    kernel_pt_table[KERNEL_PT_VMEM].pv_pa, VM_PROT_READ|VM_PROT_WRITE,
-	    PTE_NOCACHE);
-	pmap_map_entry(l1pagetable,
-	    PTE_BASE+ (0x00000000 >> (PGSHIFT-2)),
-	    kernel_pt_table[KERNEL_PT_SYS].pv_pa, VM_PROT_READ|VM_PROT_WRITE,
-	    PTE_NOCACHE);
-	for (loop = 0; loop < KERNEL_PT_VMDATA_NUM; ++loop) {
-		pmap_map_entry(l1pagetable,
-		    PTE_BASE + ((KERNEL_VM_BASE +
-		    (loop * 0x00400000)) >> (PGSHIFT-2)),
-		    kernel_pt_table[KERNEL_PT_VMDATA + loop].pv_pa,
-		    VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
-	}
 
 	/* Map the vector page. */
 	pmap_map_entry(l1pagetable, vector_page, systempage.pv_pa,
@@ -821,14 +801,16 @@ initarm(void *cookie)
 	}
 
 	/*
-	 * Now we have the real page tables in place so we can switch to them.
-	 * Once this is done we will be running with the REAL kernel page tables.
+	 * Now we have the real page tables in place so we can switch
+	 * to them.  Once this is done we will be running with the
+	 * REAL kernel page tables.
 	 */
 
 	/* Switch tables */
 #ifdef VERBOSE_INIT_ARM
 	printf("switching to new L1 page table\n");
 #endif
+	cpu_domains((DOMAIN_CLIENT << (PMAP_DOMAIN_KERNEL*2)) | DOMAIN_CLIENT);
 
 	setttb(kernel_l1pt.pv_pa);
 
@@ -843,8 +825,20 @@ initarm(void *cookie)
 	 * this problem will not occur after initarm().
 	 */
 	cpu_idcache_wbinv_all();
+	cpu_tlb_flushID();
+	cpu_domains(DOMAIN_CLIENT << (PMAP_DOMAIN_KERNEL*2));
 
-	/* if there is support for a serial console ...we should now reattach it */
+	/*
+	 * Moved from cpu_startup() as data_abort_handler() references
+	 * this during uvm init
+	 */
+	proc0paddr = (struct user *)kernelstack.pv_va;
+	lwp0.l_addr = proc0paddr;
+
+	/* 
+	 * if there is support for a serial console ...we should now
+	 * reattach it
+	 */
 	/*      fcomcndetach();*/
 
 	/*
@@ -889,9 +883,12 @@ initarm(void *cookie)
 	console_flush();
 #endif
 
-	set_stackptr(PSR_IRQ32_MODE, irqstack.pv_va + IRQ_STACK_SIZE * NBPG);
-	set_stackptr(PSR_ABT32_MODE, abtstack.pv_va + ABT_STACK_SIZE * NBPG);
-	set_stackptr(PSR_UND32_MODE, undstack.pv_va + UND_STACK_SIZE * NBPG);
+	set_stackptr(PSR_IRQ32_MODE,
+	    irqstack.pv_va + IRQ_STACK_SIZE * PAGE_SIZE);
+	set_stackptr(PSR_ABT32_MODE,
+	    abtstack.pv_va + ABT_STACK_SIZE * PAGE_SIZE);
+	set_stackptr(PSR_UND32_MODE,
+	    undstack.pv_va + UND_STACK_SIZE * PAGE_SIZE);
 #ifdef PMAP_DEBUG
 	if (pmap_debug_level >= 0)
 		printf("kstack V%08lx P%08lx\n", kernelstack.pv_va,
@@ -915,18 +912,21 @@ initarm(void *cookie)
 	console_flush();
 
 
-	/* At last !
+	/*
+	 * At last !
 	 * We now have the kernel in physical memory from the bottom upwards.
 	 * Kernel page tables are physically above this.
 	 * The kernel is mapped to 0xf0000000
-	 * The kernel data PTs will handle the mapping of 0xf1000000-0xf5ffffff (80 Mb)
+	 * The kernel data PTs will handle the mapping of 
+	 *   0xf1000000-0xf5ffffff (80 Mb)
 	 * 2Meg of VRAM is mapped to 0xf7000000
 	 * The page tables are mapped to 0xefc00000
 	 * The IOMD is mapped to 0xf6000000
 	 * The VIDC is mapped to 0xf6100000
-	 * The IOMD/VIDC could be pushed up higher but i havent got sufficient
-	 * documentation to do so; the addresses are not parametized yet and hard
-	 * to read... better fix this before; its pretty unforgiving.
+	 * The IOMD/VIDC could be pushed up higher but i havent got
+	 * sufficient documentation to do so; the addresses are not
+	 * parametized yet and hard to read... better fix this before;
+	 * its pretty unforgiving.
 	 */
 
 	/* Initialise the undefined instruction handlers */
@@ -936,11 +936,32 @@ initarm(void *cookie)
 	undefined_init();
 	console_flush();
 
+	/* Load memory into UVM. */
+#ifdef VERBOSE_INIT_ARM
+	printf("page ");
+#endif
+	uvm_setpagesize();	/* initialize PAGE_SIZE-dependent variables */
+	for (loop = 0; loop < bootconfig.dramblocks; loop++) {
+		paddr_t start = (paddr_t)bootconfig.dram[loop].address;
+		paddr_t end = start + (bootconfig.dram[loop].pages * PAGE_SIZE);
+
+		if (start < physical_freestart)
+			start = physical_freestart;
+		if (end > physical_freeend)
+			end = physical_freeend;
+
+		/* XXX Consider DMA range intersection checking. */
+
+		uvm_page_physload(atop(start), atop(end),
+		    atop(start), atop(end), VM_FREELIST_DEFAULT);
+	}
+
 	/* Boot strap pmap telling it where the kernel page table is */
 #ifdef VERBOSE_INIT_ARM
 	printf("pmap ");
 #endif
-	pmap_bootstrap((pd_entry_t *)kernel_l1pt.pv_va, kernel_ptpt);
+	pmap_bootstrap((pd_entry_t *)kernel_l1pt.pv_va, KERNEL_VM_BASE,
+	    KERNEL_VM_BASE + KERNEL_VM_SIZE);
 	console_flush();
 
 	/* Setup the IRQ system */
@@ -961,21 +982,26 @@ initarm(void *cookie)
 	printf("NetBSD/acorn32 booting ... \n");
 
 	/* Tell the user if his boot loader is too old */
-	if ((bootconfig.magic < BOOTCONFIG_MAGIC) || (bootconfig.version != BOOTCONFIG_VERSION)) {
+	if ((bootconfig.magic < BOOTCONFIG_MAGIC) ||
+	    (bootconfig.version != BOOTCONFIG_VERSION)) {
 		printf("\nDETECTED AN OLD BOOTLOADER. PLEASE UPGRADE IT\n\n");
 		delay(5000000);
 	}
 
 	printf("Kernel loaded from file %s\n", bootconfig.kernelname);
-	printf("Kernel arg string (@%p) %s\n", bootconfig.args, bootconfig.args);
-	printf("\nBoot configuration structure reports the following memory\n");
+	printf("Kernel arg string (@%p) %s\n",
+	    bootconfig.args, bootconfig.args);
+	printf("\nBoot configuration structure reports the following "
+	    "memory\n");
 
-	printf(" DRAM block 0a at %08x size %08x DRAM block 0b at %08x size %08x\n\r",
+	printf(" DRAM block 0a at %08x size %08x "
+	    "DRAM block 0b at %08x size %08x\n\r",
 	    bootconfig.dram[0].address,
 	    bootconfig.dram[0].pages * bootconfig.pagesize,
 	    bootconfig.dram[1].address,
 	    bootconfig.dram[1].pages * bootconfig.pagesize);
-	printf(" DRAM block 1a at %08x size %08x DRAM block 1b at %08x size %08x\n\r",
+	printf(" DRAM block 1a at %08x size %08x "
+	    "DRAM block 1b at %08x size %08x\n\r",
 	    bootconfig.dram[2].address,
 	    bootconfig.dram[2].pages * bootconfig.pagesize,
 	    bootconfig.dram[3].address,
@@ -984,6 +1010,11 @@ initarm(void *cookie)
 	    bootconfig.vram[0].address,
 	    bootconfig.vram[0].pages * bootconfig.pagesize);
 
+	/*
+	 * Get a handle on the I2C interface so we can read
+	 * the NVRAM in the real-time clock chip.
+	 */
+	acorn32_i2c_tag = iomdiic_bootstrap_cookie();
 
 	if (cmos_read(RTC_ADDR_REBOOTCNT) > 0)
 		printf("Warning: REBOOTCNT = %d\n",
@@ -1001,20 +1032,14 @@ initarm(void *cookie)
 		ipkdb_connect(0);
 #endif	/* NIPKDB */
 
-#ifdef DDB
-	db_machine_init();
-
-#ifdef __ELF__
-	ddb_init(bootconfig.ksym_end - bootconfig.ksym_start,
+#if NKSYMS || defined(DDB) || defined(LKM)
+	ksyms_init(bootconfig.ksym_end - bootconfig.ksym_start,
 		(void *) bootconfig.ksym_start, (void *) bootconfig.ksym_end);
-#else
-	{
-		extern int end, *esym;
-		ddb_init(*(int *)&end, ((int *)&end) + 1, esym);
-	};
 #endif
 
 
+#ifdef DDB
+	db_machine_init();
 	if (boothowto & RB_KDB)
 		Debugger();
 #endif	/* DDB */
@@ -1044,25 +1069,26 @@ process_kernel_args(void)
 
 
 void
-parse_rpc_bootargs(args)
-	char *args;
+parse_rpc_bootargs(char *args)
 {
 	int integer;
 
-	if (get_bootconf_option(args, "videodram", BOOTOPT_TYPE_INT, &integer)) {
+	if (get_bootconf_option(args, "videodram", BOOTOPT_TYPE_INT,
+	    &integer)) {
 		videodram_size = integer;
 		/* Round to 4K page */
 		videodram_size *= 1024;
 		videodram_size = round_page(videodram_size);
 		if (videodram_size > 1024*1024)
 			videodram_size = 1024*1024;
-	};
+	}
 
 #if 0
 	/* XXX this I would rather have in the new bootconfig structure */
-	if (get_bootconf_option(args, "kinetic", BOOTOPT_TYPE_BOOLEAN, &integer)) {
+	if (get_bootconf_option(args, "kinetic", BOOTOPT_TYPE_BOOLEAN,
+	    &integer)) {
 		bootconfig.RPC_kinetic_card_support = 1;
-	};
+	}
 #endif
 }
 
@@ -1088,14 +1114,59 @@ rpc_sa110_cc_setup(void)
 	pt_entry_t *pte;
 
 	(void) pmap_extract(pmap_kernel(), KERNEL_TEXT_BASE, &kaddr);
-	for (loop = 0; loop < CPU_SA110_CACHE_CLEAN_SIZE; loop += NBPG) {
+	for (loop = 0; loop < CPU_SA110_CACHE_CLEAN_SIZE; loop += PAGE_SIZE) {
 		pte = vtopte(sa110_cc_base + loop);
 		*pte = L2_S_PROTO | kaddr |
 		    L2_S_PROT(PTE_KERNEL, VM_PROT_READ) | pte_l2_s_cache_mode;
+		PTE_SYNC(pte);
 	}
 	sa1_cache_clean_addr = sa110_cc_base;
 	sa1_cache_clean_size = CPU_SA110_CACHE_CLEAN_SIZE / 2;
 }
 #endif	/* CPU_SA110 */
+
+/*
+ * To convert from RISC OS addresses to real CMOS addresses, do this:
+ *
+ * if (riscosaddr < 0xc0)
+ *         realaddr = riscosaddr + 0x40;
+ * else
+ *         realaddr = riscosaddr - 0xb0;
+ */
+
+/* Read a byte from CMOS RAM. */
+int
+cmos_read(int location)
+{
+	uint8_t val;
+
+	if (pcfrtc_bootstrap_read(acorn32_i2c_tag, 0x50,
+	    location, &val, 1) != 0)
+		return (-1);
+	return (val);
+}
+
+/* Write a byte to CMOS RAM. */
+int
+cmos_write(int location, int value)
+{
+	uint8_t val = value;
+	int oldvalue, oldsum;
+
+	/* Get the old value and checksum. */
+	if ((oldvalue = cmos_read(location)) < 0)
+		return (-1);
+	if ((oldsum = cmos_read(RTC_ADDR_CHECKSUM)) < 0)
+		return (-1);
+
+	if (pcfrtc_bootstrap_write(acorn32_i2c_tag, 0x50,
+	    location, &val, 1) != 0)
+		return (-1);
+
+	/* Now update the checksum. */
+	val = (uint8_t)oldsum - (uint8_t)oldvalue + val;
+	return (pcfrtc_bootstrap_write(acorn32_i2c_tag, 0x50,
+	    RTC_ADDR_CHECKSUM, &val, 1));
+}
 
 /* End of machdep.c */

@@ -1,4 +1,4 @@
-/*	$NetBSD: zs.c,v 1.28 2001/07/07 07:51:38 scw Exp $	*/
+/*	$NetBSD: zs.c,v 1.33 2003/12/04 12:42:54 keihan Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -42,8 +42,11 @@
  * Runs two serial lines per chip using slave drivers.
  * Plain tty/async lines use the zs_async slave.
  *
- * Modified for NetBSD/mvme68k by Jason R. Thorpe <thorpej@NetBSD.ORG>
+ * Modified for NetBSD/mvme68k by Jason R. Thorpe <thorpej@NetBSD.org>
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zs.c,v 1.33 2003/12/04 12:42:54 keihan Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -73,8 +76,6 @@
  * or you can not see messages done with printf during boot-up...
  */
 int zs_def_cflag = (CREAD | CS8 | HUPCL);
-/* XXX Shouldn't hardcode the minor number... */
-int zs_major = 12;
 
 /* Flags from zscnprobe() */
 static int zs_hwflags[NZSC][2];
@@ -153,6 +154,7 @@ zs_config(zsc, zs, vector, pclk)
 		zsc_args.hwflags = zs_hwflags[zsc_unit][channel];
 		cs = &zsc->zsc_cs_store[channel];
 		zsc->zsc_cs[channel] = cs;
+		simple_lock_init(&cs->cs_lock);
 
 		/*
 		 * If we're the console, copy the channel state, and
@@ -230,10 +232,10 @@ zsc_print(aux, name)
 	struct zsc_attach_args *args = aux;
 
 	if (name != NULL)
-		printf("%s: ", name);
+		aprint_normal("%s: ", name);
 
 	if (args->channel != -1)
-		printf(" channel %d", args->channel);
+		aprint_normal(" channel %d", args->channel);
 
 	return UNCONF;
 }

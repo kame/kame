@@ -1,4 +1,4 @@
-/*	$NetBSD: sb_ofisa.c,v 1.6 2001/11/13 07:29:45 lukem Exp $	*/
+/*	$NetBSD: sb_ofisa.c,v 1.11 2003/05/03 18:11:32 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sb_ofisa.c,v 1.6 2001/11/13 07:29:45 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sb_ofisa.c,v 1.11 2003/05/03 18:11:32 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -63,9 +63,8 @@ __KERNEL_RCSID(0, "$NetBSD: sb_ofisa.c,v 1.6 2001/11/13 07:29:45 lukem Exp $");
 int	sb_ofisa_match __P((struct device *, struct cfdata *, void *));
 void	sb_ofisa_attach __P((struct device *, struct device *, void *));
 
-struct cfattach sb_ofisa_ca = {
-	sizeof(struct sbdsp_softc), sb_ofisa_match, sb_ofisa_attach
-};
+CFATTACH_DECL(sb_ofisa, sizeof(struct sbdsp_softc),
+    sb_ofisa_match, sb_ofisa_attach, NULL, NULL);
 
 int
 sb_ofisa_match(parent, cf, aux)
@@ -74,7 +73,7 @@ sb_ofisa_match(parent, cf, aux)
 	void *aux;
 {
 	struct ofisa_attach_args *aa = aux;
-	const char *compatible_strings[] = {
+	static const char *const compatible_strings[] = {
 		"pnpPNP,b000",			/* generic SB 1.5 */
 		"pnpPNP,b001",			/* generic SB 2.0 */
 		"pnpPNP,b002",			/* generic SB Pro */
@@ -115,7 +114,7 @@ sb_ofisa_attach(parent, self, aux)
 	 *
 	 *	1 i/o register region
 	 *	1 interrupt
-	 *	1 or 2 dma channels
+	 *	1 or 2 DMA channels
 	 */
 
 	n = ofisa_reg_get(aa->oba.oba_phandle, &reg, 1);

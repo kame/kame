@@ -1,4 +1,4 @@
-/*	$NetBSD: mesh.c,v 1.14 2002/04/05 18:27:45 bouyer Exp $	*/
+/*	$NetBSD: mesh.c,v 1.19 2003/07/15 02:43:29 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2000	Tsubai Masanari.
@@ -31,6 +31,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mesh.c,v 1.19 2003/07/15 02:43:29 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -176,9 +179,8 @@ void mesh_minphys __P((struct buf *));
 
 #define MESH_PHASE_MASK	(MESH_STATUS0_MSG | MESH_STATUS0_CD | MESH_STATUS0_IO)
 
-struct cfattach mesh_ca = {
-	sizeof(struct mesh_softc), mesh_match, mesh_attach
-};
+CFATTACH_DECL(mesh, sizeof(struct mesh_softc),
+    mesh_match, mesh_attach, NULL, NULL);
 
 int
 mesh_match(parent, cf, aux)
@@ -577,7 +579,7 @@ mesh_dma_setup(sc, scb)
 
 	count = scb->dlen;
 
-	if (count / NBPG > 32)
+	if (count / PAGE_SIZE > 32)
 		panic("mesh: transfer size >= 128k");
 
 	va = scb->daddr;
@@ -585,7 +587,7 @@ mesh_dma_setup(sc, scb)
 
 	/* if va is not page-aligned, setup the first page */
 	if (offset != 0) {
-		int rest = NBPG - offset;	/* the rest in the page */
+		int rest = PAGE_SIZE - offset;	/* the rest in the page */
 
 		if (count > rest) {		/* if continues to next page */
 			DBDMA_BUILD(cmdp, cmd, 0, rest, vtophys(va),
@@ -598,15 +600,15 @@ mesh_dma_setup(sc, scb)
 	}
 
 	/* now va is page-aligned */
-	while (count > NBPG) {
-		DBDMA_BUILD(cmdp, cmd, 0, NBPG, vtophys(va),
+	while (count > PAGE_SIZE) {
+		DBDMA_BUILD(cmdp, cmd, 0, PAGE_SIZE, vtophys(va),
 			DBDMA_INT_NEVER, DBDMA_WAIT_NEVER, DBDMA_BRANCH_NEVER);
-		count -= NBPG;
-		va += NBPG;
+		count -= PAGE_SIZE;
+		va += PAGE_SIZE;
 		cmdp++;
 	}
 
-	/* the last page (count <= NBPG here) */
+	/* the last page (count <= PAGE_SIZE here) */
 	cmd = datain ? DBDMA_CMD_IN_LAST : DBDMA_CMD_OUT_LAST;
 	DBDMA_BUILD(cmdp, cmd , 0, count, vtophys(va),
 		DBDMA_INT_NEVER, DBDMA_WAIT_NEVER, DBDMA_BRANCH_NEVER);
@@ -1152,7 +1154,7 @@ mesh_timeout(arg)
 
 	s = splbio();
 	if (sc->sc_flags & MESH_DMA_ACTIVE) {
-		printf("mesh: resetting dma\n");
+		printf("mesh: resetting DMA\n");
 		dbdma_reset(sc->sc_dmareg);
 	}
 	scb->xs->error = XS_TIMEOUT;

@@ -1,4 +1,4 @@
-/*	$NetBSD: ams.c,v 1.11 2002/03/17 19:40:43 atatat Exp $	*/
+/*	$NetBSD: ams.c,v 1.14 2003/07/15 02:43:16 lukem Exp $	*/
 
 /*
  * Copyright (C) 1998	Colin Wood
@@ -29,6 +29,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ams.c,v 1.14 2003/07/15 02:43:16 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -71,9 +74,8 @@ extern int	kbd_polling; /* Are we polling (Debugger mode)? from kbd.c */
  */
 
 /* Driver definition. */
-struct cfattach ams_ca = {
-	sizeof(struct ams_softc), amsmatch, amsattach
-};
+CFATTACH_DECL(ams, sizeof(struct ams_softc),
+    amsmatch, amsattach, NULL, NULL);
 
 extern struct cfdriver ams_cd;
 

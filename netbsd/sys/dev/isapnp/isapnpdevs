@@ -1,4 +1,4 @@
-$NetBSD: isapnpdevs,v 1.46.4.1 2002/11/30 13:51:04 he Exp $
+$NetBSD: isapnpdevs,v 1.55 2004/01/28 19:31:07 jdolecek Exp $
 
 /*-
  * Copyright (c) 1998, 1999, 2000, 2001 The NetBSD Foundation, Inc.
@@ -42,10 +42,12 @@ $NetBSD: isapnpdevs,v 1.46.4.1 2002/11/30 13:51:04 he Exp $
 driver	aha	Adaptec SCSI
 driver	aic	Adaptec SCSI
 driver	an	Aironet 802.11
+driver	atppc	AT Parallel Port
 driver	com	National Semiconductor Serial
 driver	cs	Cirrus Logic Crystal CS89x0 Ethernet
 driver	ep	3Com 3CXXX Ethernet
 driver	ess	ESS Audio Drive
+driver	fmv	Fujitsu FMV-18x Ethernet
 driver	joy	Generic Joystick
 driver	gus	Gravis Ultrasound
 driver	le	Lance Ethernet
@@ -78,6 +80,12 @@ devcompat	aic	ADP1530		0	(Adaptec AVA-1505A)
 devlogic	an	AOL0001		0	Aironet 4500/4800
 
 /*
+ * atppc
+ */
+devlogic	atppc	PNP0400		0	Generic AT Parallel Port
+devlogic	atppc	PNP0401		0	Generic ECP Prallel Port
+
+/*
  * com
  */
 devlogic	com	AZT4001		0	Aztech Modem
@@ -86,8 +94,10 @@ devlogic	com	OZO8039		0	Zoom 56k flex
 devlogic	com	BRI1400		0	Boca 33.6 PnP
 devlogic	com	BRIB400		0	Boca 56k PnP
 devlogic	com	ROK0010		0	Rockwell ?
+devlogic	com	ROK3360		0	Rockwell 33.6k PnP
 devlogic	com	USR0004		0	USR Sportster 14.4k
 devlogic	com	USR0006		0	USR Sportster 33.6k
+devlogic	com	USR0009		0	USR Courier V.Everything
 devlogic	com	USR2070		0	USR Sportster 56k
 devlogic	com	USR3031		0	USR 56k Faxmodem
 devlogic 	com	USR3090		0	USR 56K Voice INT
@@ -100,6 +110,7 @@ devlogic	com	SUP1650		0	Supra 336i Sp Intl
 devlogic	com	SUP2480		0	SupraExpress 56i Sp V.90
 devlogic	com	SUP2720		0	DIAMOND SupraExpress 56I SP V.90
 devlogic	com	GVC0505		0	GVC 56k Faxmodem
+devlogic	com	GVC000F		0	GVC 33.6k Faxmodem
 devlogic	com	IOD0081		0	I-O DATA IFML-560
 devcompat	com	PNP0500		0	Generic 8250/16450
 devcompat	com	PNP0501		0	Generic 16550A
@@ -124,6 +135,13 @@ devlogic	ep	TCM5098		0	3Com 3c509B-8
  */
 devlogic	ess	ESS1868		0	ESS1868
 devlogic	ess	ESS1869		0	ESS1869
+devlogic	ess	ESS1878		0	ESS1878
+
+/*
+ * fmv
+ */
+devlogic	fmv	FUJ01C1		0	Fujitsu FMV-183
+devlogic	fmv	FUJ01D1		0	Fujitsu FMV-184
 
 /*
  * joy
@@ -135,6 +153,7 @@ devlogic	joy	CSCA801		0	Terratec EWS64XL
 devlogic	joy	CTL7001		0	Creative Awe64
 devlogic	joy	CTL7002		0	Creative Vibra16CL
 devlogic	joy	ESS0001		0	ESS1868
+devlogic	joy	ESS0005		0	ESS1878
 devlogic	joy	OPT0001		0	OPTi Audio 16
 devlogic	joy	PNPB02F		0	XXX broken GUS PnP
 devlogic	joy	ASB16FD		0	AdLib NSC 16 PNP
@@ -151,6 +170,7 @@ devlogic	gus	GRV0000		0	Gravis Ultrasound
 devlogic	le	TKN0010		0	Lance Ethernet on TEKNOR board
 devlogic	le	ATK1500		0	Lance Ethernet on Allied Telesyn board
 devlogic	le	CSI2203		0	Cabletron E22xx
+devlogic	le	BUF0001		0	Melco Inc. LGY-IV
 
 /*
  * mpu
@@ -219,6 +239,7 @@ devlogic	wss	CSC0100		0	CS4235 CODEC
 devlogic	wss	CSCA800		0	Terratec EWS64 CoDec
 devlogic	wss	ASB1611		0	AdLib NSC 16 PNP
 devlogic	wss	ASB1622		0	AdLib MSC 32 Wave PnP V3SB
+devlogic	wss	@@@0001		0	CMI8330/C3D Audio Adapter
 
 /*
  * ym

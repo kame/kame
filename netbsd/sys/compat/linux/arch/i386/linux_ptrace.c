@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_ptrace.c,v 1.8 2001/11/15 09:48:00 lukem Exp $	*/
+/*	$NetBSD: linux_ptrace.c,v 1.11 2003/01/18 08:02:48 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: linux_ptrace.c,v 1.8 2001/11/15 09:48:00 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: linux_ptrace.c,v 1.11 2003/01/18 08:02:48 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -45,6 +45,7 @@ __KERNEL_RCSID(0, "$NetBSD: linux_ptrace.c,v 1.8 2001/11/15 09:48:00 lukem Exp $
 #include <sys/proc.h>
 #include <sys/ptrace.h>
 #include <sys/systm.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 #include <uvm/uvm_extern.h>
 
@@ -82,41 +83,41 @@ struct linux_reg {
 };
 
 /* structure used for storing floating point context */
-struct linux_fpreg {
-  long cwd;
-  long swd;
-  long twd;
-  long fip;
-  long fcs;
-  long foo;
-  long fos;
-  long st_space [20];
+struct linux_fpctx {
+	long cwd;
+	long swd;
+	long twd;
+	long fip;
+	long fcs;
+	long foo;
+	long fos;
+	long st_space[20];
 };
 
 /* user struct for linux process - this is used for Linux ptrace emulation */
 /* most of it is junk only used by gdb */
 struct linux_user {
-  struct linux_reg regs;	/* registers */
-  int u_fpvalid;		/* true if math co-processor being used. */
-  struct linux_fpreg i387;	/* Math Co-processor registers. */
+	struct linux_reg regs;		/* registers */
+	int u_fpvalid;		/* true if math co-processor being used. */
+	struct linux_fpctx i387;	/* Math Co-processor registers. */
 /* The rest of this junk is to help gdb figure out what goes where */
 #define lusr_startgdb	u_tsize
-  unsigned long int u_tsize;	/* Text segment size (pages). */
-  unsigned long int u_dsize;	/* Data segment size (pages). */
-  unsigned long int u_ssize;	/* Stack segment size (pages). */
-  unsigned long start_code;     /* Starting virtual address of text. */
-  unsigned long start_stack;	/* Starting virtual address of stack area.
-				   This is actually the bottom of the stack,
-				   the top of the stack is always found in the
-				   esp register.  */
-  long int __signal;  		/* Signal that caused the core dump. */
-  int __reserved;		/* unused */
-  void * u_ar0;			/* Used by gdb to help find the values for */
-				/* the registers. */
-  struct linux_fpreg* u_fpstate;/* Math Co-processor pointer. */
-  unsigned long __magic;	/* To uniquely identify a core file */
-  char u_comm[32];		/* User command that was responsible */
-  int u_debugreg[8];
+	unsigned long int u_tsize;	/* Text segment size (pages). */
+	unsigned long int u_dsize;	/* Data segment size (pages). */
+	unsigned long int u_ssize;	/* Stack segment size (pages). */
+	unsigned long start_code;	/* Starting virtual address of text. */
+	unsigned long start_stack;	/* Starting virtual address of stack 
+					   area. This is actually the bottom of
+					   the stack, the top of the stack is
+					   always found in the esp register. */
+	long int __signal;  		/* Signal that caused the core dump. */
+	int __reserved;			/* unused */
+	void *u_ar0;			/* Used by gdb to help find the values
+					   for the registers. */
+	struct linux_fpctx *u_fpstate;	/* Math Co-processor pointer. */
+	unsigned long __magic;		/* To uniquely identify a core file */
+	char u_comm[32];		/* User command that was responsible */
+	int u_debugreg[8];
 #define u_debugreg_end	u_debugreg[7]
 };
 
@@ -124,8 +125,8 @@ struct linux_user {
 #define ISSET(t, f)		((t) & (f))
 
 int
-linux_sys_ptrace_arch(p, v, retval)
-	struct proc *p;
+linux_sys_ptrace_arch(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -135,12 +136,14 @@ linux_sys_ptrace_arch(p, v, retval)
 		syscallarg(int) addr;
 		syscallarg(int) data;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	int request, error;
 	struct proc *t;				/* target process */
+	struct lwp *lt;
 	struct reg *regs = NULL;
 	struct fpreg *fpregs = NULL;
 	struct linux_reg *linux_regs = NULL;
-	struct linux_fpreg *linux_fpregs = NULL;
+	struct linux_fpctx *linux_fpregs = NULL;
 	int addr;
 
 	request = SCARG(uap, request);
@@ -183,6 +186,17 @@ linux_sys_ptrace_arch(p, v, retval)
 	if (t->p_stat != SSTOP || !ISSET(t->p_flag, P_WAITED))
 		return EBUSY;
 
+	/* XXX NJWLWP
+	 * The entire ptrace interface needs work to be useful to
+	 * a process with multiple LWPs. For the moment, we'll 
+	 * just kluge this and fail on others.
+	 */
+
+	if (p->p_nlwps > 1)
+		return (ENOSYS);
+
+	lt = LIST_FIRST(&t->p_lwps);
+
 	*retval = 0;
 
 	switch (request) {
@@ -191,7 +205,7 @@ linux_sys_ptrace_arch(p, v, retval)
 		MALLOC(linux_regs, struct linux_reg*, sizeof(struct linux_reg),
 			M_TEMP, M_WAITOK);
 
-		error = process_read_regs(t, regs);
+		error = process_read_regs(lt, regs);
 		if (error != 0)
 			goto out;
 
@@ -240,50 +254,50 @@ linux_sys_ptrace_arch(p, v, retval)
 		regs->r_esp = linux_regs->esp;
 		regs->r_ss = linux_regs->xss;
 
-		error = process_write_regs(t, regs);
+		error = process_write_regs(lt, regs);
 		goto out;
 
 	case  LINUX_PTRACE_GETFPREGS:
 		MALLOC(fpregs, struct fpreg *, sizeof(struct fpreg),
 			M_TEMP, M_WAITOK);
-		MALLOC(linux_fpregs, struct linux_fpreg *,
-			sizeof(struct linux_fpreg), M_TEMP, M_WAITOK);
+		MALLOC(linux_fpregs, struct linux_fpctx *,
+			sizeof(struct linux_fpctx), M_TEMP, M_WAITOK);
 
-		error = process_read_fpregs(t, fpregs);
+		error = process_read_fpregs(lt, fpregs);
 		if (error != 0)
 			goto out;
 
 		/* zero the contents if NetBSD fpreg structure is smaller */
-		if (sizeof(struct fpreg) < sizeof(struct linux_fpreg))
-			memset(linux_fpregs, '\0', sizeof(struct linux_fpreg));
+		if (sizeof(struct fpreg) < sizeof(struct linux_fpctx))
+			memset(linux_fpregs, '\0', sizeof(struct linux_fpctx));
 
 		memcpy(linux_fpregs, fpregs,
-			min(sizeof(struct linux_fpreg), sizeof(struct fpreg)));
+			min(sizeof(struct linux_fpctx), sizeof(struct fpreg)));
 		error = copyout(linux_fpregs, (caddr_t)SCARG(uap, data),
-		    sizeof(struct linux_fpreg));
+		    sizeof(struct linux_fpctx));
 		goto out;
 
 	case  LINUX_PTRACE_SETFPREGS:
 		MALLOC(fpregs, struct fpreg *, sizeof(struct fpreg),
 			M_TEMP, M_WAITOK);
-		MALLOC(linux_fpregs, struct linux_fpreg *,
-			sizeof(struct linux_fpreg), M_TEMP, M_WAITOK);
+		MALLOC(linux_fpregs, struct linux_fpctx *,
+			sizeof(struct linux_fpctx), M_TEMP, M_WAITOK);
 		error = copyin((caddr_t)SCARG(uap, data), linux_fpregs,
-		    sizeof(struct linux_fpreg));
+		    sizeof(struct linux_fpctx));
 		if (error != 0)
 			goto out;
 
 		memset(fpregs, '\0', sizeof(struct fpreg));
 		memcpy(fpregs, linux_fpregs,
-			min(sizeof(struct linux_fpreg), sizeof(struct fpreg)));
+			min(sizeof(struct linux_fpctx), sizeof(struct fpreg)));
 
-		error = process_write_regs(t, regs);
+		error = process_write_regs(lt, regs);
 		goto out;
 
 	case  LINUX_PTRACE_PEEKUSR:
 		addr = SCARG(uap, addr);
 
-		PHOLD(t);	/* need full process info */
+		PHOLD(lt);	/* need full process info */
 		error = 0;
 		if (addr < LUSR_OFF(lusr_startgdb)) {
 			/* XXX should provide appropriate register */
@@ -328,7 +342,7 @@ linux_sys_ptrace_arch(p, v, retval)
 			error = 1;
 		}
 
-		PRELE(t);
+		PRELE(lt);
 
 		if (!error)
 			return 0;
@@ -345,9 +359,9 @@ linux_sys_ptrace_arch(p, v, retval)
 			if (t->p_emul != &emul_linux)
 				return EINVAL;
 
-			PHOLD(t);
+			PHOLD(lt);
 			((struct linux_emuldata *)t->p_emuldata)->debugreg[off] = data;
-			PRELE(t);
+			PRELE(lt);
 			return (0);
 		}
 

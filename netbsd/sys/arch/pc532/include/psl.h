@@ -1,4 +1,4 @@
-/*	$NetBSD: psl.h,v 1.26 2001/04/13 23:30:03 thorpej Exp $	*/
+/*	$NetBSD: psl.h,v 1.29 2004/01/23 04:03:38 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -39,7 +35,7 @@
  */
 
 #ifndef _NS532_PSL_H_
-#define _NS532_PSL_H_
+#define	_NS532_PSL_H_
 
 /*
  * 32532 processor status longword.
@@ -52,9 +48,9 @@
 #define	PSL_Z		0x00000040	/* zero bit */
 #define	PSL_N		0x00000080	/* negative bit */
 
-#define PSL_USER	0x00000100	/* User mode bit */
-#define PSL_US		0x00000200	/* User stack mode bit */
-#define PSL_P		0x00000400	/* Prevent TRC trap */
+#define	PSL_USER	0x00000100	/* User mode bit */
+#define	PSL_US		0x00000200	/* User stack mode bit */
+#define	PSL_P		0x00000400	/* Prevent TRC trap */
 #define	PSL_I		0x00000800	/* interrupt enable bit */
 
 #define	PSL_USERSET	(PSL_USER | PSL_US | PSL_I)
@@ -62,162 +58,6 @@
 #define	USERMODE(psr)	(((psr) & PSL_USER) == PSL_USER)
 
 /* The PSR versions ... */
-#define PSR_USR PSL_USER
-
-#ifdef _KERNEL
-#include <machine/icu.h>
-/*
- * Interrupt levels
- */
-#define IPL_ZERO	0	/* level 0 */
-#define IPL_HIGH	1	/* block all interrupts */
-#define	IPL_BIO		2	/* block I/O */
-#define	IPL_NET		3	/* network */
-#define	IPL_TTY		4	/* terminal */
-#define	IPL_CLOCK	5	/* clock */
-#define IPL_IMP		6	/* memory allocation */
-#define	IPL_SOFTCLOCK	7	/* softlock */
-#define	IPL_SOFTNET	8	/* softnet */
-#define	NIPL		9	/* number of interrupt priority levels */
-#define IPL_NAMES	{"zero", "", "bio", "net", "tty", "clock", "imp", \
-			 "softclock", "softnet" }
-
-/* IPL_RTTY (for the scn driver) is the same as IPL_HIGH. */
-#define	IPL_RTTY	IPL_HIGH
-
-/*
- * Preassigned software interrupts
- */
-#define SOFTINT		16
-#define	SIR_CLOCK	(SOFTINT+0)
-#define	SIR_CLOCKMASK	((1 << SIR_CLOCK) | (1 << IR_SOFT))
-#define	SIR_NET		(SOFTINT+1)
-#define	SIR_NETMASK	((1 << SIR_NET) | SIR_CLOCKMASK)
-#define SIR_ALLMASK	0xffff0000
-
-#ifndef _LOCORE
-/*
- * Structure of the software interrupt table
- */
-struct iv {
-	void (*iv_vec) __P((void *));
-	void *iv_arg;
-	long iv_level;
-	long iv_mask;
-	long iv_cnt;
-	char *iv_use;
-};
-
-extern struct iv ivt[];
-extern unsigned int imask[], Cur_pl, sirpending, astpending;
-
-#if defined(NO_INLINE_SPLX) || defined(DEFINE_SPLX)
-# define PSL_STATIC
-#else
-# define PSL_STATIC static
-#endif
-#if defined(NO_INLINE_SPLX)
-# define PSL_INLINE
-#else
-# define PSL_INLINE __inline
-#endif
-
-void	intr_init __P((void));
-void	check_sir __P((void *));
-int	intr_establish __P((int, void (*)(void *), void *, char *,
-				int, int, int));
-
-PSL_STATIC PSL_INLINE int splraise __P((unsigned int));
-PSL_STATIC PSL_INLINE int splx __P((unsigned int));
-
-/*
- * Disable/Enable CPU-Interrupts
- */
-#define di() /* Removing the nop will give you *BIG* trouble */ \
-	__asm __volatile("bicpsrw 0x800 ; nop" : : : "cc")
-#define ei() __asm __volatile("bispsrw 0x800" : : : "cc")
-
-/*
- * Add a mask to Cur_pl, and return the old value of Cur_pl.
- */
-#if !defined(NO_INLINE_SPLX) || defined(DEFINE_SPLX)
-PSL_STATIC PSL_INLINE int
-splraise(ncpl)
-	register unsigned int ncpl;
-{
-	register unsigned int ocpl;
-	di();
-	ocpl = Cur_pl;
-	ncpl |= ocpl;
-	ICUW(IMSK) = ncpl;
-	Cur_pl = ncpl;
-	ei();
-	return(ocpl);
-}
-
-/*
- * Restore a value to Cur_pl (cpu interrupts will get unmasked).
- *
- * NOTE: We go to the trouble of returning the old value of cpl for
- * the benefit of some splsoftclock() callers.  This extra work is
- * usually optimized away by the compiler.
- */
-PSL_STATIC PSL_INLINE int
-splx(ncpl)
-	register unsigned int ncpl;
-{
-	register unsigned int ocpl;
-	di();
-	ocpl = Cur_pl;
-	ICUW(IMSK) = ncpl;
-	Cur_pl = ncpl;
-	ei();
-	return(ocpl);
-}
-#endif
-
-/*
- * Hardware interrupt masks
- */
-#define splbio()	splraise(imask[IPL_BIO])
-#define splnet()	splraise(imask[IPL_NET])
-#define spltty()	splraise(imask[IPL_TTY])
-#define splclock()	splraise(imask[IPL_CLOCK])
-#define splvm()		splraise(imask[IPL_IMP])
-#define splrtty()	splraise(imask[IPL_RTTY])
-#define	splstatclock()	splclock()
-
-/*
- * Software interrupt masks
- *
- * NOTE: splsoftclock() is used by hardclock() to lower the priority from
- * clock to softclock before it calls softclock().
- */
-#define	spllowersoftclock() splx(imask[IPL_SOFTCLOCK])
-#define	splsoftclock()	splraise(imask[IPL_SOFTCLOCK])
-#define	splsoftnet()	splraise(imask[IPL_SOFTNET])
-
-/*
- * Miscellaneous
- */
-#define	splhigh()	splraise(imask[IPL_HIGH])
-#define	splsched()	splhigh()
-#define	spllock()	splhigh()
-#define	spl0()		splx(imask[IPL_ZERO])
-#define splnone()	spl0()
-
-/*
- * Software interrupt registration
- */
-#define	softintr(n)	((sirpending |= (1 << (n))), setsofticu(IR_SOFT))
-#define	setsoftast()	(astpending = 1)
-#define	setsoftclock()	softintr(SIR_CLOCK)
-#define	setsoftnet()	softintr(SIR_NET)
-
-#undef PSL_INLINE
-#undef PSL_STATIC
-
-#endif /* !_LOCORE */
-#endif /* _KERNEL */
+#define	PSR_USR PSL_USER
 
 #endif /* _NS532_PSL_H_ */

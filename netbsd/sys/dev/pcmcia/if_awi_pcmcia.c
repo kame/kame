@@ -1,4 +1,4 @@
-/* $NetBSD: if_awi_pcmcia.c,v 1.22 2001/12/15 13:23:22 soren Exp $ */
+/* $NetBSD: if_awi_pcmcia.c,v 1.28 2003/10/22 09:13:17 mjl Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -40,12 +40,12 @@
  * PCMCIA attachment for BayStack 650 802.11FH PCMCIA card,
  * based on the AMD 79c930 802.11 controller chip.
  *
- * This attachment can probably be trivally adapted for other FH and
+ * This attachment can probably be trivially adapted for other FH and
  * DS cards based on the same chipset.
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_awi_pcmcia.c,v 1.22 2001/12/15 13:23:22 soren Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_awi_pcmcia.c,v 1.28 2003/10/22 09:13:17 mjl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -61,7 +61,9 @@ __KERNEL_RCSID(0, "$NetBSD: if_awi_pcmcia.c,v 1.22 2001/12/15 13:23:22 soren Exp
 #include <net/if_dl.h>
 #include <net/if_ether.h>
 #include <net/if_media.h>
-#include <net/if_ieee80211.h>
+
+#include <net80211/ieee80211_var.h>
+#include <net80211/ieee80211_compat.h>
 
 #include <machine/cpu.h>
 #include <machine/bus.h>
@@ -97,10 +99,8 @@ struct awi_pcmcia_softc {
 static int	awi_pcmcia_find __P((struct awi_pcmcia_softc *,
     struct pcmcia_attach_args *, struct pcmcia_config_entry *));
 
-struct cfattach awi_pcmcia_ca = {
-	sizeof(struct awi_pcmcia_softc), awi_pcmcia_match, awi_pcmcia_attach,
-	awi_pcmcia_detach, awi_activate
-};
+CFATTACH_DECL(awi_pcmcia, sizeof(struct awi_pcmcia_softc),
+    awi_pcmcia_match, awi_pcmcia_attach, awi_pcmcia_detach, awi_activate);
 
 static const struct awi_pcmcia_product {
 	u_int32_t	app_vendor;	/* vendor ID */
@@ -286,8 +286,7 @@ awi_pcmcia_attach(parent, self, aux)
 
 	psc->sc_pf = pa->pf;
 
-	for (cfe = SIMPLEQ_FIRST(&pa->pf->cfe_head); cfe != NULL;
-	     cfe = SIMPLEQ_NEXT(cfe, cfe_list)) {
+	SIMPLEQ_FOREACH(cfe, &pa->pf->cfe_head, cfe_list) {
 		if (cfe->iftype != PCMCIA_IFTYPE_IO)
 			continue;
 		if (cfe->num_iospace < 1)

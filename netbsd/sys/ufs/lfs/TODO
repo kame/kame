@@ -1,4 +1,19 @@
-#   $NetBSD: TODO,v 1.5 2001/07/13 20:30:22 perseant Exp $
+#   $NetBSD: TODO,v 1.7 2003/02/23 00:22:33 perseant Exp $
+
+- Lock audit.  Need to check locking for multiprocessor case in particular.
+
+- Get rid of the syscalls: make them into ioctl calls instead.  This would
+  allow LFS to be loaded as a module.  We would then ideally have an
+  in-kernel cleaner that runs if no userland cleaner has asserted itself.
+
+- Get rid of lfs_segclean(); the kernel should clean a dirty segment IFF it
+  has passed two checkpoints containing zero live bytes.
+
+- Now that our cache is basically all of physical memory, we need to make
+  sure that segwrite is not starving other important things.  Need a way
+  to prioritize which blocks are most important to write, and write only
+  those before giving up the seglock to do the rest.  How does this change
+  our notion of what a checkpoint is?
 
 - Investigate alternate inode locking strategy: Inode locks are useful
   for locking against simultaneous changes to inode size (balloc,
@@ -10,12 +25,6 @@
 
 - Fully working fsck_lfs.  (Really, need a general-purpose external
   partial-segment writer.)
-
-- Inode blocks are currently the same size as the fs block size; but all
-  the ones I've seen are mostly empty, and this will be especially true
-  if atime information is kept in the ifile instead of the inode.  Could
-  we shrink the inode block size to DEV_BSIZE?  Or parametrize it at fs
-  creation time?
 
 - Get rid of DEV_BSIZE, pay attention to the media block size at mount time.
 
@@ -29,13 +38,13 @@
   and possibly perform additional tasks:
 
   - Backups.  At a minimum, turn the cleaner off and on to allow
-	effective live backups.  More aggressively, the cleaner itself could
-	be the backup agent, and dump_lfs would merely be a controller.
+    effective live backups.  More aggressively, the cleaner itself could
+    be the backup agent, and dump_lfs would merely be a controller.
 
   - Cleaning time policies.  Be able to tweak the cleaner's thresholds
-	to allow more thorough cleaning during policy-determined idle
-	periods (regardless of actual idleness) or put off until later
-	during short, intensive write periods.
+    to allow more thorough cleaning during policy-determined idle
+    periods (regardless of actual idleness) or put off until later
+    during short, intensive write periods.
 
   - File coalescing and placement.  During periods we expect to be idle,
     coalesce fragmented files into one place on disk for better read

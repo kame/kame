@@ -1,11 +1,12 @@
-/*	$NetBSD: agp_machdep.c,v 1.2 2001/11/15 07:03:33 lukem Exp $	*/
+/*	$NetBSD: agp_machdep.c,v 1.4 2002/11/22 15:23:52 fvdl Exp $	*/
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: agp_machdep.c,v 1.2 2001/11/15 07:03:33 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: agp_machdep.c,v 1.4 2002/11/22 15:23:52 fvdl Exp $");
 
 #include <sys/types.h>
 #include <sys/device.h>
 
+#include <machine/cpu.h>
 #include <machine/bus.h>
 
 #include <dev/pci/pcivar.h>

@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.21 2002/03/27 20:18:25 scw Exp $
+#	$NetBSD: Makefile,v 1.25 2003/08/22 21:00:26 dsl Exp $
 
 LIB=sa
 
@@ -17,17 +17,17 @@ SRC_net= arp.c \
 SRC_sa= alloc.c \
 	close.c closeall.c \
 	dev.c dev_net.c dkcksum.c \
-	exit.c \
+	ether_sprintf.c exit.c \
 	files.c fstat.c \
 	getfile.c gets.c globals.c \
 	intoa.c \
 	loadfile.c loadfile_aout.c loadfile_elf32.c lseek.c \
-	memcmp.c memcpy.c memset.c \
+	memmove.c memcmp.c memcpy.c memset.c \
 	nullfs.c \
 	open.c \
 	panic.c printf.c \
 	read.c \
-	sprintf.c strerror.c subr_prf.c \
+	snprintf.c sprintf.c strerror.c subr_prf.c \
 	twiddle.c \
 	udp.c ufs.c
 

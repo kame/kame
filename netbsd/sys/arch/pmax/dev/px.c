@@ -1,4 +1,4 @@
-/* 	$NetBSD: px.c,v 1.38 2002/03/13 15:05:20 ad Exp $	*/
+/*	$NetBSD: px.c,v 1.49 2003/06/29 22:28:46 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -43,7 +43,7 @@
 #endif
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: px.c,v 1.38 2002/03/13 15:05:20 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: px.c,v 1.49 2003/06/29 22:28:46 fvdl Exp $");
 
 /*
  * px.c: driver for the DEC TURBOchannel 2D and 3D accelerated framebuffers
@@ -80,7 +80,6 @@ __KERNEL_RCSID(0, "$NetBSD: px.c,v 1.38 2002/03/13 15:05:20 ad Exp $");
 #include <dev/wsfont/wsfont.h>
 
 #include <machine/autoconf.h>
-#include <machine/conf.h>
 #include <dev/sun/fbio.h>
 #include <machine/fbvar.h>
 #include <machine/pmioctl.h>
@@ -118,10 +117,19 @@ static void	px_cursor_hack __P((struct fbinfo *, int, int));
 static int	px_probe_sram __P((struct px_info *));
 static void	px_bt459_flush __P((struct px_info *));
 
-struct cfattach px_ca = {
-	sizeof(struct px_softc),
-	px_match,
-	px_attach,
+CFATTACH_DECL(px, sizeof(struct px_softc),
+    px_match, px_attach, NULL, NULL);
+
+dev_type_open(pxopen);
+dev_type_close(pxclose);
+dev_type_ioctl(pxioctl);
+dev_type_poll(pxpoll);
+dev_type_mmap(pxmmap);
+dev_type_kqfilter(pxkqfilter);
+
+const struct cdevsw px_cdevsw = {
+	pxopen, pxclose, noread, nowrite, pxioctl,
+	nostop, notty, pxpoll, pxmmap, pxkqfilter,
 };
 
 /* The different types of card that we support, for px_match(). */
@@ -143,7 +151,7 @@ static void	px_copycols __P((void *, int, int, int, int));
 static void	px_copyrows __P((void *, int, int, int num));
 static void	px_erasecols __P((void *, int, int, int num, long));
 static void	px_eraserows __P((void *, int, int, long));
-static int	px_alloc_attr __P((void *, int, int, int, long *));
+static int	px_allocattr __P((void *, int, int, int, long *));
 static int	px_mapchar __P((void *, int, unsigned int *));
 
 static struct wsdisplay_emulops px_emulops = {
@@ -154,7 +162,7 @@ static struct wsdisplay_emulops px_emulops = {
 	px_erasecols,
 	px_copyrows,
 	px_eraserows,
-	px_alloc_attr
+	px_allocattr
 };
 
 /* Colormap for wscons, matching WSCOL_*. Upper 8 are high-intensity */
@@ -222,7 +230,7 @@ static const u_char px_shuffle[256] = {
 	0xab, 0xeb, 0xbb, 0xfb, 0xaf, 0xef, 0xbf, 0xff,
 };
 
-#define PXMAP_INFO_SIZE	(NBPG)
+#define PXMAP_INFO_SIZE	(PAGE_SIZE)
 #define PXMAP_RBUF_SIZE	(4096 * 16 + 8192 * 2)
 
 /* Need alignment to 8KB here... */
@@ -1246,7 +1254,7 @@ px_rect(pxi, x, y, w, h, color)
  * Allocate attribute. We just pack these into an integer.
  */
 static int
-px_alloc_attr(cookie, fg, bg, flags, attr)
+px_allocattr(cookie, fg, bg, flags, attr)
 	void *cookie;
 	int fg, bg, flags;
 	long *attr;
@@ -1875,6 +1883,58 @@ pxpoll(dev, events, p)
 	return (revents);
 }
 
+static void
+filt_pxrdetach(struct knote *kn)
+{
+	struct fbinfo *fi = kn->kn_hook;
+	int s;
+
+	s = spltty();
+	SLIST_REMOVE(&fi->fi_selp.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_pxread(struct knote *kn, long hint)
+{
+	struct fbinfo *fi = kn->kn_hook;
+
+	if (fi->fi_fbu->scrInfo.qe.eHead == fi->fi_fbu->scrInfo.qe.eTail)
+		return (0);
+
+	kn->kn_data = 0;	/* XXXLUKEM (thorpej): what to put here? */
+	return (1);
+}
+
+static const struct filterops pxread_filtops =
+	{ 1, NULL, filt_pxrdetach, filt_pxread };
+
+int
+pxkqfilter(dev_t dev, struct knote *kn)
+{
+	struct fbinfo *fi = &px_unit[minor(dev)]->pxi_fbinfo;
+	struct klist *klist;
+	int s;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &fi->fi_selp.sel_klist;
+		kn->kn_fop = &pxread_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = fi;
+
+	s = spltty();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
+}
+
 paddr_t
 pxmmap(dev, off, prot)
 	dev_t dev;
@@ -1894,9 +1954,9 @@ pxmmap(dev, off, prot)
 	/* 
 	 * STIC control registers
 	 */	
-	if (off < NBPG)
+	if (off < PAGE_SIZE)
 		return mips_btop(MIPS_KSEG1_TO_PHYS(pxi->pxi_stic) + off);
-	off -= NBPG;
+	off -= PAGE_SIZE;
 	
 	/*
 	 * STIC poll registers
@@ -1937,7 +1997,7 @@ px_mmap_info (p, dev, va)
 	size = sizeof(struct px_map);
 	prot = VM_PROT_READ | VM_PROT_WRITE;
 	flags = MAP_SHARED | MAP_FILE;
-	*va = round_page((vaddr_t)p->p_vmspace->vm_taddr + MAXTSIZ + MAXDSIZ);
+	*va = VM_DEFAULT_ADDRESS(p->p_vmspace->vm_daddr, size);
 	return uvm_mmap(&p->p_vmspace->vm_map, va, size, prot,
 	    VM_PROT_ALL, flags, &vn, 0, p->p_rlimit[RLIMIT_MEMLOCK].rlim_cur);
 }

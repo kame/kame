@@ -1,4 +1,4 @@
-/*	$NetBSD: ustir.c,v 1.2.6.1 2003/01/26 09:31:37 jmc Exp $	*/
+/*	$NetBSD: ustir.c,v 1.12 2003/06/29 22:30:59 fvdl Exp $	*/
 
 /*
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ustir.c,v 1.2.6.1 2003/01/26 09:31:37 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ustir.c,v 1.12 2003/06/29 22:30:59 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -217,6 +217,7 @@ Static int ustir_set_params(void *h, struct irda_params *params);
 Static int ustir_get_speeds(void *h, int *speeds);
 Static int ustir_get_turnarounds(void *h, int *times);
 Static int ustir_poll(void *h, int events, usb_proc_ptr p);
+Static int ustir_kqfilter(void *h, struct knote *kn);
 
 #ifdef USTIR_DEBUG_IOCTLS
 Static int ustir_ioctl(void *h, u_long cmd, caddr_t addr, int flag, usb_proc_ptr p);
@@ -224,7 +225,8 @@ Static int ustir_ioctl(void *h, u_long cmd, caddr_t addr, int flag, usb_proc_ptr
 
 Static struct irframe_methods const ustir_methods = {
 	ustir_open, ustir_close, ustir_read, ustir_write, ustir_poll,
-	ustir_set_params, ustir_get_speeds, ustir_get_turnarounds,
+	ustir_kqfilter, ustir_set_params, ustir_get_speeds,
+	ustir_get_turnarounds,
 #ifdef USTIR_DEBUG_IOCTLS
 	ustir_ioctl
 #endif
@@ -276,12 +278,12 @@ ustir_write_reg(struct ustir_softc *sc, unsigned int reg, u_int8_t data)
 
 #ifdef USTIR_DEBUG
 static void
-ustir_dumpdata(char const *data, size_t dlen, char const *desc)
+ustir_dumpdata(u_int8_t const *data, size_t dlen, char const *desc)
 {
 	size_t bdindex;
 	printf("%s: (%lx)", desc, (unsigned long)dlen);
 	for (bdindex = 0; bdindex < dlen; bdindex++)
-		printf(" %02x", (unsigned int)(unsigned char)data[bdindex]);
+		printf(" %02x", (unsigned int)data[bdindex]);
 	printf("\n");
 }
 #endif
@@ -476,6 +478,8 @@ deframe_process(struct framestate *fstate, u_int8_t const **bptr, size_t *blen)
 			break;
 
 		state_in_end:
+			/* FALLTHROUGH */
+
 		case FSTATE_IN_END:
 			if (--fstate->state_index == 0) {
 				u_int32_t crc;
@@ -560,7 +564,7 @@ deframe_rd_ur(struct ustir_softc *sc)
 		case FR_FRAMEOK:
 			sc->sc_ur_framelen = sc->sc_framestate.bufindex;
 			wakeup(&sc->sc_ur_framelen); /* XXX should use flag */
-			selwakeup(&sc->sc_rd_sel);
+			selnotify(&sc->sc_rd_sel, 0);
 			return 1;
 		}
 	}
@@ -606,7 +610,7 @@ ustir_periodic(struct ustir_softc *sc)
 
 		err = ustir_read_reg(sc, STIR_REG_STATUS,
 				     &regval);
-		if (err) {
+		if (err != USBD_NORMAL_COMPLETION) {
 			printf("%s: status register read failed: %s\n",
 			       USBDEVNAME(sc->sc_dev),
 			       usbd_errstr(err));
@@ -633,11 +637,11 @@ ustir_periodic(struct ustir_softc *sc)
 						      STIR_RSTATUS_FFCLR);
 				/* XXX if we fail partway through
 				 * this, we may not recover? */
-				if (!err)
+				if (err == USBD_NORMAL_COMPLETION)
 					err = ustir_write_reg(sc,
 							      STIR_REG_STATUS,
 							      0);
-				if (err) {
+				if (err != USBD_NORMAL_COMPLETION) {
 					printf("%s: FIFO reset failed: %s\n",
 					       USBDEVNAME(sc->sc_dev),
 					       usbd_errstr(err));
@@ -784,7 +788,7 @@ ustir_rd_cb(usbd_xfer_handle xfer, usbd_private_handle priv,
 
 		/* Wake up for possible output */
 		wakeup(&sc->sc_wr_buf);
-		selwakeup(&sc->sc_wr_sel);
+		selnotify(&sc->sc_wr_sel, 0);
 	}
 }
 
@@ -825,7 +829,7 @@ ustir_start_read(struct ustir_softc *sc)
 			USBD_NO_TIMEOUT, ustir_rd_cb);
 	err = usbd_transfer(sc->sc_rd_xfer);
 	if (err != USBD_IN_PROGRESS) {
-		DPRINTFN(0, ("%s: err=%d\n", __func__, err));
+		DPRINTFN(0, ("%s: err=%d\n", __func__, (int)err));
 		return err;
 	}
 	return USBD_NORMAL_COMPLETION;
@@ -850,6 +854,7 @@ ustir_activate(device_ptr_t self, enum devact act)
 	return error;
 }
 
+/* ARGSUSED */
 Static int
 ustir_open(void *h, int flag, int mode, usb_proc_ptr p)
 {
@@ -860,12 +865,12 @@ ustir_open(void *h, int flag, int mode, usb_proc_ptr p)
 	DPRINTFN(0, ("%s: sc=%p\n", __func__, sc));
 
 	err = usbd_open_pipe(sc->sc_iface, sc->sc_rd_addr, 0, &sc->sc_rd_pipe);
-	if (err) {
+	if (err != USBD_NORMAL_COMPLETION) {
 		error = EIO;
 		goto bad1;
 	}
 	err = usbd_open_pipe(sc->sc_iface, sc->sc_wr_addr, 0, &sc->sc_wr_pipe);
-	if (err) {
+	if (err != USBD_NORMAL_COMPLETION) {
 		error = EIO;
 		goto bad2;
 	}
@@ -938,6 +943,7 @@ ustir_open(void *h, int flag, int mode, usb_proc_ptr p)
 	return error;
 }
 
+/* ARGSUSED */
 Static int
 ustir_close(void *h, int flag, int mode, usb_proc_ptr p)
 {
@@ -986,6 +992,7 @@ ustir_close(void *h, int flag, int mode, usb_proc_ptr p)
 	return 0;
 }
 
+/* ARGSUSED */
 Static int
 ustir_read(void *h, struct uio *uio, int flag)
 {
@@ -1055,6 +1062,7 @@ ustir_read(void *h, struct uio *uio, int flag)
 	return error;
 }
 
+/* ARGSUSED */
 Static int
 ustir_write(void *h, struct uio *uio, int flag)
 {
@@ -1156,7 +1164,7 @@ ustir_write(void *h, struct uio *uio, int flag)
 					 USTIR_WR_TIMEOUT,
 					 wrbuf, &btlen, "ustiwr");
 		DPRINTFN(2, ("%s: err=%d\n", __func__, err));
-		if (err) {
+		if (err != USBD_NORMAL_COMPLETION) {
 			if (err == USBD_INTERRUPTED)
 				error = EINTR;
 			else if (err == USBD_TIMEOUT)
@@ -1208,6 +1216,82 @@ ustir_poll(void *h, int events, usb_proc_ptr p)
 	return revents;
 }
 
+static void
+filt_ustirrdetach(struct knote *kn)
+{
+	struct ustir_softc *sc = kn->kn_hook;
+	int s;
+
+	s = splusb();
+	SLIST_REMOVE(&sc->sc_rd_sel.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+/* ARGSUSED */
+static int
+filt_ustirread(struct knote *kn, long hint)
+{
+	struct ustir_softc *sc = kn->kn_hook;
+
+	kn->kn_data = sc->sc_ur_framelen;
+	return (kn->kn_data > 0);
+}
+
+static void
+filt_ustirwdetach(struct knote *kn)
+{
+	struct ustir_softc *sc = kn->kn_hook;
+	int s;
+
+	s = splusb();
+	SLIST_REMOVE(&sc->sc_wr_sel.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+/* ARGSUSED */
+static int
+filt_ustirwrite(struct knote *kn, long hint)
+{
+	struct ustir_softc *sc = kn->kn_hook;
+
+	kn->kn_data = 0;
+	return (sc->sc_direction != udir_input);
+}
+
+static const struct filterops ustirread_filtops =
+	{ 1, NULL, filt_ustirrdetach, filt_ustirread };
+static const struct filterops ustirwrite_filtops =
+	{ 1, NULL, filt_ustirwdetach, filt_ustirwrite };
+
+Static int
+ustir_kqfilter(void *h, struct knote *kn)
+{
+	struct ustir_softc *sc = h;
+	struct klist *klist;
+	int s;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &sc->sc_rd_sel.sel_klist;
+		kn->kn_fop = &ustirread_filtops;
+		break;
+	case EVFILT_WRITE:
+		klist = &sc->sc_wr_sel.sel_klist;
+		kn->kn_fop = &ustirwrite_filtops;
+		break;
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = sc;
+
+	s = splusb();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
+}
+
 #ifdef USTIR_DEBUG_IOCTLS
 Static int ustir_ioctl(void *h, u_long cmd, caddr_t addr, int flag, usb_proc_ptr p)
 {
@@ -1238,7 +1322,7 @@ Static int ustir_ioctl(void *h, u_long cmd, caddr_t addr, int flag, usb_proc_ptr
 			      regnum, (unsigned int)regdata));
 
 		*(unsigned int *)addr = regdata;
-		if (err) {
+		if (err != USBD_NORMAL_COMPLETION) {
 			printf("%s: register read failed: %s\n",
 			       USBDEVNAME(sc->sc_dev),
 			       usbd_errstr(err));
@@ -1260,7 +1344,7 @@ Static int ustir_ioctl(void *h, u_long cmd, caddr_t addr, int flag, usb_proc_ptr
 			      regnum, (unsigned int)regdata));
 
 		err = ustir_write_reg(sc, regnum, regdata);
-		if (err) {
+		if (err != USBD_NORMAL_COMPLETION) {
 			printf("%s: register write failed: %s\n",
 			       USBDEVNAME(sc->sc_dev),
 			       usbd_errstr(err));
@@ -1343,12 +1427,12 @@ ustir_set_params(void *h, struct irda_params *p)
 		DPRINTFN(10, ("%s: setting BRATE = %x\n", __func__,
 			      (unsigned int)regbrate));
 		err = ustir_write_reg(sc, STIR_REG_BRATE, regbrate);
-		if (!err) {
+		if (err == USBD_NORMAL_COMPLETION) {
 			DPRINTFN(10, ("%s: setting MODE = %x\n", __func__,
 				      (unsigned int)regmode));
 			err = ustir_write_reg(sc, STIR_REG_MODE, regmode);
 		}
-		if (err) {
+		if (err != USBD_NORMAL_COMPLETION) {
 			DPRINTFN(10, ("%s: error setting register: %s\n",
 				      __func__, usbd_errstr(err)));
 			return EIO;

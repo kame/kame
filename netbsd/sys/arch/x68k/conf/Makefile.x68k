@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile.x68k,v 1.55 2001/12/04 15:22:29 minoura Exp $
+#	$NetBSD: Makefile.x68k,v 1.57 2002/11/26 18:51:18 thorpej Exp $
 #
 # Makefile for NetBSD
 #

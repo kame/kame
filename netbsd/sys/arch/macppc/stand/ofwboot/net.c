@@ -1,4 +1,4 @@
-/*	$NetBSD: net.c,v 1.3 2002/03/29 15:15:07 tsutsui Exp $	*/
+/*	$NetBSD: net.c,v 1.5 2003/12/26 13:43:29 aymeric Exp $	*/
 
 /*
  * Copyright (C) 1995 Wolfgang Solfrank.
@@ -40,7 +40,7 @@
  *
  * At open time, this does:
  *
- * find interface	- netif_open()
+ * find interface	- netif_of_open()
  * BOOTP		- bootp()
  * RPC/mountd		- nfs_mount()
  *
@@ -49,6 +49,8 @@
  *
  * Note: this is based in part on sys/arch/sparc/stand/net.c
  */
+
+#include "net.h"
 
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -59,22 +61,25 @@
 
 #include <lib/libsa/stand.h>
 #include <lib/libsa/net.h>
-#include <lib/libsa/netif.h>
 
 #include <lib/libkern/libkern.h>
+
+#include "ofdev.h"
+#include "netif_of.h"
 
 char	rootpath[FNAME_SIZE];
 
 static	int netdev_sock = -1;
 static	int open_count;
 
+static int net_mountroot(void);
+
 /*
  * Called by devopen after it sets f->f_dev to our devsw entry.
  * This opens the low-level device and sets f->f_devdata.
  */
 int
-net_open(op)
-	struct of_dev *op;
+net_open(struct of_dev *op)
 {
 	int error = 0;
 
@@ -83,7 +88,7 @@ net_open(op)
 	 */
 	if (open_count == 0) {
 		/* Find network interface. */
-		if ((netdev_sock = netif_open(op)) < 0) {
+		if ((netdev_sock = netif_of_open(op)) < 0) {
 			error = errno;
 			goto bad;
 		}
@@ -93,28 +98,27 @@ net_open(op)
 	open_count++;
 bad:
 	if (netdev_sock >= 0 && open_count == 0) {
-		netif_close(netdev_sock);
+		netif_of_close(netdev_sock);
 		netdev_sock = -1;
 	}
 	return error;
 }
 
 int
-net_close(op)
-	struct of_dev *op;
+net_close(struct of_dev *op)
 {
 	/*
 	 * On last close, do netif close, etc.
 	 */
 	if (open_count > 0)
 		if (--open_count == 0) {
-			netif_close(netdev_sock);
+			netif_of_close(netdev_sock);
 			netdev_sock = -1;
 		}
 }
 
-int
-net_mountroot()
+static int
+net_mountroot(void)
 {
 
 #ifdef	DEBUG

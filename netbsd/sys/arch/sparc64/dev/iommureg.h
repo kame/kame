@@ -1,4 +1,4 @@
-/*	$NetBSD: iommureg.h,v 1.8 2002/03/20 18:54:47 eeh Exp $	*/
+/*	$NetBSD: iommureg.h,v 1.11 2003/10/11 20:53:14 petrov Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -97,7 +93,7 @@ struct iommu_strbuf {
 #define	IOTTE_LOCAL	0x0800000000000000LL	/* Accesses to same bus segment? */
 #define IOTTE_PAMASK	0x000001ffffffe000LL	/* Let's assume this is correct */
 #define IOTTE_C		0x0000000000000010LL	/* Accesses to cacheable space */
-#define IOTTE_W		0x0000000000000002LL	/* Writeable */
+#define IOTTE_W		0x0000000000000002LL	/* Writable */
 
 /*
  * On sun4u each bus controller has a separate IOMMU.  The IOMMU has 
@@ -140,6 +136,7 @@ struct iommu_strbuf {
 
 #define INTMAP_V	0x080000000LL	/* Interrupt valid (enabled) */
 #define INTMAP_TID	0x07c000000LL	/* UPA target ID mask */
+#define INTMAP_TID_SHIFT 26
 #define INTMAP_IGN	0x0000007c0LL	/* Interrupt group no (sbus only). */
 #define INTMAP_INO	0x00000003fLL	/* Interrupt number */
 #define INTMAP_INR	(INTMAP_IGN|INTMAP_INO)

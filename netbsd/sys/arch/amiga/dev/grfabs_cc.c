@@ -1,4 +1,4 @@
-/*	$NetBSD: grfabs_cc.c,v 1.23 2002/03/13 20:33:35 jandberg Exp $ */
+/*	$NetBSD: grfabs_cc.c,v 1.25 2004/02/24 15:05:54 wiz Exp $ */
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -38,12 +38,14 @@
 #include "opt_amigaccgrf.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: grfabs_cc.c,v 1.23 2002/03/13 20:33:35 jandberg Exp $");
+__KERNEL_RCSID(0, "$NetBSD: grfabs_cc.c,v 1.25 2004/02/24 15:05:54 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
 #include <sys/queue.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <amiga/amiga/custom.h>
 #include <amiga/amiga/cc.h>
@@ -303,7 +305,7 @@ alloc_bitmap(u_short width, u_short height, u_short depth, u_short flags)
 	/* Sigh, it seems for mapping to work we need the bitplane data to 1:
 	 * be aligned on a page boundry. 2: be n pages large.
 	 *
-	 * why? becuase the user gets a page aligned address, if this is before
+	 * why? because the user gets a page aligned address, if this is before
 	 * your allocation, too bad.  Also it seems that the mapping routines
 	 * do not watch to closely to the allowable length. so if you go over
 	 * n pages by less than another page, the user gets to write all over
@@ -314,7 +316,7 @@ alloc_bitmap(u_short width, u_short height, u_short depth, u_short flags)
 #endif
 	total_size = m68k_round_page(plane_size * depth) +	/* for length */
 	    (temp_size) + (array_size) + sizeof(bmap_t) +
-	    NBPG;		/* for alignment */
+	    PAGE_SIZE;		/* for alignment */
 	bm = alloc_chipmem(total_size);
 	if (bm) {
 		if (flags & BMF_CLEAR) {

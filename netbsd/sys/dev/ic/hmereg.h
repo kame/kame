@@ -1,4 +1,4 @@
-/*	$NetBSD: hmereg.h,v 1.12 2002/05/07 05:56:47 uwe Exp $	*/
+/*	$NetBSD: hmereg.h,v 1.16 2003/11/02 11:07:45 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -73,18 +73,18 @@
 #define HME_SEB_STAT_DTIMEXP	0x00008000	/* defer timer expired */
 #define HME_SEB_STAT_RXTOHOST	0x00010000	/* pkt moved from rx fifo->memory */
 #define HME_SEB_STAT_NORXD	0x00020000	/* out of receive descriptors */
-#define HME_SEB_STAT_RXERR	0x00040000	/* rx dma error */
-#define HME_SEB_STAT_RXLATERR	0x00080000	/* late error during rx dma */
-#define HME_SEB_STAT_RXPERR	0x00100000	/* parity error during rx dma */
-#define HME_SEB_STAT_RXTERR	0x00200000	/* tag error during rx dma */
+#define HME_SEB_STAT_RXERR	0x00040000	/* rx DMA error */
+#define HME_SEB_STAT_RXLATERR	0x00080000	/* late error during rx DMA */
+#define HME_SEB_STAT_RXPERR	0x00100000	/* parity error during rx DMA */
+#define HME_SEB_STAT_RXTERR	0x00200000	/* tag error during rx DMA */
 #define HME_SEB_STAT_EOPERR	0x00400000	/* tx descriptor did not set EOP */
 #define HME_SEB_STAT_MIFIRQ	0x00800000	/* mif needs attention */
 #define HME_SEB_STAT_HOSTTOTX	0x01000000	/* pkt moved from memory->tx fifo */
 #define HME_SEB_STAT_TXALL	0x02000000	/* all pkts in fifo transmitted */
-#define HME_SEB_STAT_TXEACK	0x04000000	/* error during tx dma */
-#define HME_SEB_STAT_TXLERR	0x08000000	/* late error during tx dma */
-#define HME_SEB_STAT_TXPERR	0x10000000	/* parity error during tx dma */
-#define HME_SEB_STAT_TXTERR	0x20000000	/* tag error durig tx dma */
+#define HME_SEB_STAT_TXEACK	0x04000000	/* error during tx DMA */
+#define HME_SEB_STAT_TXLERR	0x08000000	/* late error during tx DMA */
+#define HME_SEB_STAT_TXPERR	0x10000000	/* parity error during tx DMA */
+#define HME_SEB_STAT_TXTERR	0x20000000	/* tag error durig tx DMA */
 #define HME_SEB_STAT_SLVERR	0x40000000	/* pio access error */
 #define HME_SEB_STAT_SLVPERR	0x80000000	/* pio access parity error */
 #define HME_SEB_STAT_BITS	"\177\020"				\
@@ -100,16 +100,22 @@
 			"b\33TXLERR\0b\34TXPERR\0b\35TXTERR\0"		\
 			"b\36SLVERR\0b\37SLVPERR\0\0"
 
+#ifdef HMEDEBUG
+#define HME_SEB_STAT_DEBUG_ERRORS	(HME_SEB_STAT_DTIMEXP | HME_SEB_STAT_RFIFOVF)
+#else
+#define HME_SEB_STAT_DEBUG_ERRORS	0
+#endif
+
 #define HME_SEB_STAT_ALL_ERRORS	\
 	(HME_SEB_STAT_SLVPERR  | HME_SEB_STAT_SLVERR  | HME_SEB_STAT_TXTERR   |\
 	 HME_SEB_STAT_TXPERR   | HME_SEB_STAT_TXLERR  | HME_SEB_STAT_TXEACK   |\
 	 HME_SEB_STAT_EOPERR   | HME_SEB_STAT_RXTERR  | HME_SEB_STAT_RXPERR   |\
 	 HME_SEB_STAT_RXLATERR | HME_SEB_STAT_RXERR   | HME_SEB_STAT_NORXD    |\
-	 HME_SEB_STAT_DTIMEXP  | HME_SEB_STAT_FCNTEXP | HME_SEB_STAT_LCCNTEXP |\
+	 HME_SEB_STAT_FCNTEXP  | HME_SEB_STAT_LCCNTEXP |\
 	 HME_SEB_STAT_ECNTEXP  | HME_SEB_STAT_NCNTEXP | HME_SEB_STAT_MAXPKTERR|\
 	 HME_SEB_STAT_TFIFO_UND| HME_SEB_STAT_STSTERR | HME_SEB_STAT_CVCNTEXP |\
-	 HME_SEB_STAT_RFIFOVF  | HME_SEB_STAT_LCNTEXP | HME_SEB_STAT_CCNTEXP  |\
-	 HME_SEB_STAT_ACNTEXP)
+	 HME_SEB_STAT_LCNTEXP  | HME_SEB_STAT_CCNTEXP |\
+	 HME_SEB_STAT_ACNTEXP  | HME_SEB_STAT_DEBUG_ERRORS)
 
 #define HME_SEB_STAT_VLAN_ERRORS	\
 	(HME_SEB_STAT_SLVPERR  | HME_SEB_STAT_SLVERR  | HME_SEB_STAT_TXTERR   |\
@@ -144,7 +150,7 @@
 #define HME_ETX_TP_DMAWAKEUP	0x00000001	/* Start tx (rw, auto-clear) */
 
 /* TXI_CFG bits */
-#define HME_ETX_CFG_DMAENABLE	0x00000001	/* Enable TX dma */
+#define HME_ETX_CFG_DMAENABLE	0x00000001	/* Enable TX DMA */
 #define HME_ETX_CFG_FIFOTHRESH	0x000003fe	/* TX fifo threshold */
 #define HME_ETX_CFG_IRQDAFTER	0x00000400	/* Intr after tx-fifo empty */
 #define HME_ETX_CFG_IRQDBEFORE	0x00000000	/* Intr before tx-fifo empty */
@@ -163,7 +169,7 @@
 #define HME_ERXI_STATEMACHINE	(7*4)		/* State machine */
 
 /* RXI_CFG bits */
-#define HME_ERX_CFG_DMAENABLE	0x00000001	/* Enable RX dma */
+#define HME_ERX_CFG_DMAENABLE	0x00000001	/* Enable RX DMA */
 #define HME_ERX_CFG_BYTEOFFSET	0x00000038	/* RX first byte offset */
 #define HME_ERX_CFG_RINGSIZE32	0x00000000	/* Descriptor ring size: 32 */
 #define HME_ERX_CFG_RINGSIZE64	0x00000200	/* Descriptor ring size: 64 */
@@ -221,7 +227,7 @@
 /* Receive config register. */
 #define HME_MAC_RXCFG_ENABLE	0x00000001 /* Enable the receiver */
 #define HME_MAC_RXCFG_PSTRIP	0x00000020 /* Pad byte strip enable */
-#define HME_MAC_RXCFG_PMISC	0x00000040 /* Enable promiscous mode */
+#define HME_MAC_RXCFG_PMISC	0x00000040 /* Enable promiscuous mode */
 #define HME_MAC_RXCFG_DERR	0x00000080 /* Disable error checking */
 #define HME_MAC_RXCFG_DCRCS	0x00000100 /* Disable CRC stripping */
 #define HME_MAC_RXCFG_ME	0x00000200 /* Receive packets addressed to me */
@@ -245,10 +251,10 @@
 #define HME_MIF_CFG_PHY		0x00000001	/* PHY select */
 #define HME_MIF_CFG_PE		0x00000002	/* Poll enable */
 #define HME_MIF_CFG_BBMODE	0x00000004	/* Bit-bang mode */
-#define HME_MIF_CFG_PRADDR	0x000000f8	/* Poll register adddress */
+#define HME_MIF_CFG_PRADDR	0x000000f8	/* Poll register address */
 #define HME_MIF_CFG_MDI0	0x00000100	/* MDI_0 (ro) */
 #define HME_MIF_CFG_MDI1	0x00000200	/* MDI_1 (ro) */
-#define HME_MIF_CFG_PPADDR	0x00007c00	/* Poll phy adddress */
+#define HME_MIF_CFG_PPADDR	0x00007c00	/* Poll phy address */
 
 /* MIF Frame/Output register */
 #define HME_MIF_FO_ST		0xc0000000	/* Start of frame */

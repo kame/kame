@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.1 2002/03/24 15:47:12 bjh21 Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.5 2003/08/07 16:26:28 agc Exp $	*/
 
 /*
  * Copyright (c) 1988 The Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,14 @@
 #ifndef	_ARM26_VMPARAM_H_
 #define	_ARM26_VMPARAM_H_
 
-#define	USRTEXT		VM_MIN_ADDRESS
+/*
+ * Page size on the 26-bit ARM CPUs is not variable in the traditional
+ * sense.  We override the PAGE_* definitions to compile-time constants.
+ */
+#define	PAGE_SHIFT	15
+#define	PAGE_SIZE	(1 << PAGE_SHIFT)
+#define	PAGE_MASK	(PAGE_SIZE - 1)
+
 #define	USRSTACK	VM_MAXUSER_ADDRESS
 
 #define	MAXTSIZ		(0x007f8000)		/* max text size */

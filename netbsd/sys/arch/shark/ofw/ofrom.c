@@ -1,4 +1,4 @@
-/*	$NetBSD: ofrom.c,v 1.3 2002/03/24 03:37:26 thorpej Exp $	*/
+/*	$NetBSD: ofrom.c,v 1.11 2003/07/15 03:36:02 lukem Exp $	*/
 
 /*
  * Copyright 1998
@@ -37,6 +37,9 @@
  * XXX open for writing (for user programs to mmap, and write contents)
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ofrom.c,v 1.11 2003/07/15 03:36:02 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -58,13 +61,19 @@ struct ofrom_softc {
 int ofromprobe __P((struct device *, struct cfdata *, void *));
 void ofromattach __P((struct device *, struct device *, void *));
 
-struct cfattach ofrom_ca = {
-	sizeof(struct ofrom_softc), ofromprobe, ofromattach
-};
+CFATTACH_DECL(ofrom, sizeof(struct ofrom_softc),
+    ofromprobe, ofromattach, NULL, NULL);
 
 extern struct cfdriver ofrom_cd;
 
-cdev_decl(ofrom);
+dev_type_open(ofromopen);
+dev_type_read(ofromrw);
+dev_type_mmap(ofrommmap);
+
+const struct cdevsw ofrom_cdevsw = {
+	ofromopen, nullclose, ofromrw, ofromrw, noioctl,
+	nostop, notty, nopoll, ofrommmap, nokqfilter,
+};
 
 int
 ofromprobe(parent, cf, aux)
@@ -73,7 +82,7 @@ ofromprobe(parent, cf, aux)
 	void *aux;
 {
 	struct ofbus_attach_args *oba = aux;
-	const char *compatible_strings[] = { "rom", NULL };
+	static const char *const compatible_strings[] = { "rom", NULL };
 
 	return (of_compatible(oba->oba_phandle, compatible_strings) == -1) ?
 	    0 : 5;
@@ -121,16 +130,6 @@ ofromopen(dev, oflags, devtype, p)
 
 	if (oflags & FWRITE)
 		return (EINVAL);
-
-	return (0);
-}
-
-int
-ofromclose(dev, fflag, devtype, p)
-	dev_t dev;
-	int fflag, devtype;
-	struct proc *p;
-{
 
 	return (0);
 }
@@ -188,10 +187,10 @@ ofromrw(dev, uio, flags)
 		    VM_PROT_READ : VM_PROT_WRITE, PMAP_WIRED);
 		pmap_update(pmap_kernel());
 		o = uio->uio_offset & PGOFSET;
-		c = min(uio->uio_resid, (int)(NBPG - o));
+		c = min(uio->uio_resid, (int)(PAGE_SIZE - o));
 		error = uiomove((caddr_t)memhook + o, c, uio);
 		pmap_remove(pmap_kernel(), (vm_offset_t)memhook,
-		    (vm_offset_t)memhook + NBPG);
+		    (vm_offset_t)memhook + PAGE_SIZE);
 		pmap_update(pmap_kernel());
 	}
 
@@ -200,18 +199,6 @@ ofromrw(dev, uio, flags)
 	physlock = 0;
 
 	return (error);
-}
-
-int
-ofromioctl(dev, cmd, data, flag, p)
-	dev_t dev;
-	u_long cmd;
-	caddr_t data;
-	int flag;
-	struct proc *p;
-{
-
-	return (ENOTTY);
 }
 
 paddr_t

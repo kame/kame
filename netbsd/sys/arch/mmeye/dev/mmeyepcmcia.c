@@ -1,4 +1,4 @@
-/*	$NetBSD: mmeyepcmcia.c,v 1.1 2002/03/24 18:08:46 uch Exp $	*/
+/*	$NetBSD: mmeyepcmcia.c,v 1.8 2003/12/28 01:20:23 christos Exp $	*/
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -35,6 +35,9 @@
  *  T.Horiuichi
  *  Brains Corp. 1998.8.25
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mmeyepcmcia.c,v 1.8 2003/12/28 01:20:23 christos Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -237,10 +240,8 @@ void	mmeyepcmcia_queue_event(struct mmeyepcmcia_handle *, int);
 int	mmeyepcmcia_match(struct device *, struct cfdata *, void *);
 void	mmeyepcmcia_attach(struct device *, struct device *, void *);
 
-struct cfattach mmeyepcmcia_ca = {
-	sizeof(struct mmeyepcmcia_softc), mmeyepcmcia_match,
-	mmeyepcmcia_attach
-};
+CFATTACH_DECL(mmeyepcmcia, sizeof(struct mmeyepcmcia_softc),
+    mmeyepcmcia_match, mmeyepcmcia_attach, NULL, NULL);
 
 static struct pcmcia_chip_functions mmeyepcmcia_functions = {
 	mmeyepcmcia_chip_mem_alloc,
@@ -401,7 +402,7 @@ mmeyepcmcia_event_thread(void *arg)
 			    "mmeyepcmciass", hz/4);
 		}
 		s = splhigh();
-		SIMPLEQ_REMOVE_HEAD(&h->events, pe, pe_q);
+		SIMPLEQ_REMOVE_HEAD(&h->events, pe_q);
 		splx(s);
 
 		switch (pe->pe_type) {
@@ -417,9 +418,9 @@ mmeyepcmcia_event_thread(void *arg)
 				if ((pe2 = SIMPLEQ_NEXT(pe1, pe_q)) == NULL)
 					break;
 				if (pe2->pe_type == MMEYEPCMCIA_EVENT_INSERTION) {
-					SIMPLEQ_REMOVE_HEAD(&h->events, pe1, pe_q);
+					SIMPLEQ_REMOVE_HEAD(&h->events, pe_q);
 					free(pe1, M_TEMP);
-					SIMPLEQ_REMOVE_HEAD(&h->events, pe2, pe_q);
+					SIMPLEQ_REMOVE_HEAD(&h->events, pe_q);
 					free(pe2, M_TEMP);
 				}
 			}
@@ -441,9 +442,9 @@ mmeyepcmcia_event_thread(void *arg)
 				if ((pe2 = SIMPLEQ_NEXT(pe1, pe_q)) == NULL)
 					break;
 				if (pe2->pe_type == MMEYEPCMCIA_EVENT_REMOVAL) {
-					SIMPLEQ_REMOVE_HEAD(&h->events, pe1, pe_q);
+					SIMPLEQ_REMOVE_HEAD(&h->events, pe_q);
 					free(pe1, M_TEMP);
-					SIMPLEQ_REMOVE_HEAD(&h->events, pe2, pe_q);
+					SIMPLEQ_REMOVE_HEAD(&h->events, pe_q);
 					free(pe2, M_TEMP);
 				}
 			}
@@ -510,7 +511,7 @@ int
 mmeyepcmcia_submatch(struct device *parent, struct cfdata *cf, void *aux)
 {
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 int
@@ -518,7 +519,7 @@ mmeyepcmcia_print(void *arg, const char *pnp)
 {
 
 	if (pnp)
-		printf("pcmcia at %s", pnp);
+		aprint_normal("pcmcia at %s", pnp);
 
 	return (UNCONF);
 }
@@ -867,9 +868,10 @@ mmeyepcmcia_chip_io_map(pcmcia_chipset_handle_t pch, int width, bus_addr_t offse
 
 	/* XXX wtf is this doing here? */
 
-	printf(" port 0x%lx", (u_long) ioaddr);
+	printf("%s: port 0x%lx", h->sc->dev.dv_xname, (u_long) ioaddr);
 	if (size > 1)
 		printf("-0x%lx", (u_long) ioaddr + (u_long) size - 1);
+	printf("\n");
 
 	h->io[win].addr = ioaddr;
 	h->io[win].size = size;

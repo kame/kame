@@ -1,4 +1,4 @@
-/*	$NetBSD: mach_syscall.c,v 1.2 2001/11/15 07:03:30 lukem Exp $	*/
+/*	$NetBSD: mach_syscall.c,v 1.11 2003/10/31 03:28:13 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -37,19 +37,24 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mach_syscall.c,v 1.2 2001/11/15 07:03:30 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mach_syscall.c,v 1.11 2003/10/31 03:28:13 simonb Exp $");
 
 #include "opt_syscall_debug.h"
 #include "opt_vm86.h"
 #include "opt_ktrace.h"
+#include "opt_systrace.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/user.h>
 #include <sys/signal.h>
+#include <sys/savar.h>
 #ifdef KTRACE
 #include <sys/ktrace.h>
+#endif
+#ifdef SYSTRACE
+#include <sys/systrace.h>
 #endif
 #include <sys/syscall.h>
 
@@ -60,9 +65,9 @@ __KERNEL_RCSID(0, "$NetBSD: mach_syscall.c,v 1.2 2001/11/15 07:03:30 lukem Exp $
 #include <machine/userret.h>
 #include <compat/mach/mach_syscall.h>
 
-void mach_syscall_intern __P((struct proc *));
-void mach_syscall_plain __P((struct trapframe));
-void mach_syscall_fancy __P((struct trapframe));
+void mach_syscall_intern(struct proc *);
+void mach_syscall_plain(struct trapframe *);
+void mach_syscall_fancy(struct trapframe *);
 
 extern struct sysent mach_sysent[];
 
@@ -70,13 +75,19 @@ void
 mach_syscall_intern(p)
 	struct proc *p;
 {
-
 #ifdef KTRACE
-	if (p->p_traceflag & (KTRFAC_SYSCALL | KTRFAC_SYSRET))
+	if (p->p_traceflag & (KTRFAC_SYSCALL | KTRFAC_SYSRET)) {
 		p->p_md.md_syscall = mach_syscall_fancy;
-	else
+		return;
+	}
 #endif
-		p->p_md.md_syscall = mach_syscall_plain;
+#ifdef SYSTRACE
+	if (ISSET(p->p_flag, P_SYSTRACE)) {
+		p->p_md.md_syscall = mach_syscall_fancy;
+		return;
+	} 
+#endif
+	p->p_md.md_syscall = mach_syscall_plain;
 }
 
 
@@ -87,20 +98,20 @@ mach_syscall_intern(p)
  */
 void
 mach_syscall_plain(frame)
-	struct trapframe frame;
+	struct trapframe *frame;
 {
-	register caddr_t params;
-	register const struct sysent *callp;
-	register struct proc *p;
+	caddr_t params;
+	const struct sysent *callp;
+	struct lwp *l = curlwp;
+	struct proc *p = l->l_proc;
 	int error;
 	size_t argsize;
 	register_t code, args[8], rval[2];
 
 	uvmexp.syscalls++;
-	p = curproc;
 
-	code = frame.tf_eax;
-	params = (caddr_t)frame.tf_esp + sizeof(int);
+	code = frame->tf_eax;
+	params = (caddr_t)frame->tf_esp + sizeof(int);
 
 	switch (code) {
 	case SYS_syscall:
@@ -143,17 +154,17 @@ mach_syscall_plain(frame)
 	}
 
 #ifdef SYSCALL_DEBUG
-	scdebug_call(p, code, args);
+	scdebug_call(l, code, args);
 #endif /* SYSCALL_DEBUG */
 
 	rval[0] = 0;
 	rval[1] = 0;
-	error = (*callp->sy_call)(p, args, rval);
+	error = (*callp->sy_call)(l, args, rval);
 	switch (error) {
 	case 0:
-		frame.tf_eax = rval[0];
-		frame.tf_edx = rval[1];
-		frame.tf_eflags &= ~PSL_C;	/* carry bit */
+		frame->tf_eax = rval[0];
+		frame->tf_edx = rval[1];
+		frame->tf_eflags &= ~PSL_C;	/* carry bit */
 		break;
 	case ERESTART:
 		/*
@@ -161,40 +172,41 @@ mach_syscall_plain(frame)
 		 * the kernel through the trap or call gate.  We pushed the
 		 * size of the instruction into tf_err on entry.
 		 */
-		frame.tf_eip -= frame.tf_err;
+		frame->tf_eip -= frame->tf_err;
 		break;
 	case EJUSTRETURN:
 		/* nothing to do */
 		break;
 	default:
 	bad:
-		frame.tf_eax = error;
-		frame.tf_eflags |= PSL_C;	/* carry bit */
+		frame->tf_eax = error;
+		frame->tf_eflags |= PSL_C;	/* carry bit */
 		break;
 	}
 
 #ifdef SYSCALL_DEBUG
-	scdebug_ret(p, code, error, rval);
+	scdebug_ret(l, code, error, rval);
 #endif /* SYSCALL_DEBUG */
-	userret(p);
+	userret(l);
 }
 
 void
 mach_syscall_fancy(frame)
-	struct trapframe frame;
+	struct trapframe *frame;
 {
-	register caddr_t params;
-	register const struct sysent *callp;
-	register struct proc *p;
+	caddr_t params;
+	const struct sysent *callp;
+	struct lwp *l = curlwp;
+	struct proc *p = l->l_proc;
 	int error;
 	size_t argsize;
-	register_t code, args[8], rval[2];
+	register_t code, realcode, args[8], rval[2];
 
 	uvmexp.syscalls++;
-	p = curproc;
 
-	code = frame.tf_eax;
-	params = (caddr_t)frame.tf_esp + sizeof(int);
+	code = frame->tf_eax;
+	realcode = code;
+	params = (caddr_t)frame->tf_esp + sizeof(int);
 
 	switch (code) {
 	case SYS_syscall:
@@ -235,22 +247,17 @@ mach_syscall_fancy(frame)
 			goto bad;
 	}
 
-#ifdef SYSCALL_DEBUG
-	scdebug_call(p, code, args);
-#endif /* SYSCALL_DEBUG */
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSCALL))
-		ktrsyscall(p, code, argsize, args);
-#endif /* KTRACE */
+	if ((error = trace_enter(l, code, realcode, callp - code, args)) != 0)
+		goto bad;
 
 	rval[0] = 0;
 	rval[1] = 0;
-	error = (*callp->sy_call)(p, args, rval);
+	error = (*callp->sy_call)(l, args, rval);
 	switch (error) {
 	case 0:
-		frame.tf_eax = rval[0];
-		frame.tf_edx = rval[1];
-		frame.tf_eflags &= ~PSL_C;	/* carry bit */
+		frame->tf_eax = rval[0];
+		frame->tf_edx = rval[1];
+		frame->tf_eflags &= ~PSL_C;	/* carry bit */
 		break;
 	case ERESTART:
 		/*
@@ -258,24 +265,19 @@ mach_syscall_fancy(frame)
 		 * the kernel through the trap or call gate.  We pushed the
 		 * size of the instruction into tf_err on entry.
 		 */
-		frame.tf_eip -= frame.tf_err;
+		frame->tf_eip -= frame->tf_err;
 		break;
 	case EJUSTRETURN:
 		/* nothing to do */
 		break;
 	default:
 	bad:
-		frame.tf_eax = error;
-		frame.tf_eflags |= PSL_C;	/* carry bit */
+		frame->tf_eax = error;
+		frame->tf_eflags |= PSL_C;	/* carry bit */
 		break;
 	}
 
-#ifdef SYSCALL_DEBUG
-	scdebug_ret(p, code, error, rval);
-#endif /* SYSCALL_DEBUG */
-	userret(p);
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p, code, error, rval[0]);
-#endif /* KTRACE */
+	trace_exit(l, code, args, rval, error);
+
+	userret(l);
 }

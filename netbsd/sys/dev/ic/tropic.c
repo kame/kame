@@ -1,4 +1,4 @@
-/*	$NetBSD: tropic.c,v 1.19 2001/11/13 13:14:45 lukem Exp $	*/
+/*	$NetBSD: tropic.c,v 1.22 2003/11/02 11:07:46 wiz Exp $	*/
 
 /* 
  * Ported to NetBSD by Onno van der Linden
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tropic.c,v 1.19 2001/11/13 13:14:45 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tropic.c,v 1.22 2003/11/02 11:07:46 wiz Exp $");
 
 #include "opt_inet.h"
 #include "opt_ns.h"
@@ -243,10 +243,7 @@ tr_attach(sc)
 	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
 
 	if (sc->sc_init_status & FAST_PATH_TRANSMIT) {
-		bus_size_t srb;
 		int	nbuf = 0;
-
-		srb = sc->sc_srb;
 
 		switch (sc->sc_memsize) {
 		case 65536:
@@ -1448,7 +1445,7 @@ struct tr_softc *sc;
 
 
 /*
- * copy out the packet byte-by-byte in resonably optimal fashion
+ * copy out the packet byte-by-byte in reasonably optimal fashion
  */
 int
 tr_mbcopy(sc, dhb, m0)
@@ -1482,7 +1479,7 @@ struct mbuf *m0;
  * We copy the trailer information and then all the normal
  * data into mbufs.
  *
- * called from tr_rint - receive interupt routine
+ * called from tr_rint - receive interrupt routine
  */
 struct mbuf *
 tr_get(sc, totlen, ifp)

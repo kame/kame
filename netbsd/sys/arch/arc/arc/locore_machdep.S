@@ -1,4 +1,4 @@
-/*	$NetBSD: locore_machdep.S,v 1.8 2000/06/09 05:07:32 soda Exp $	*/
+/*	$NetBSD: locore_machdep.S,v 1.11 2003/08/07 16:26:47 agc Exp $	*/
 /*	$OpenBSD: locore.S,v 1.12 1997/04/19 17:19:43 pefo Exp $	*/
 
 /*
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -359,8 +355,8 @@ END(mdbpanic)
  *--------------------------------------------------------------------------
  */
 LEAF(mips3_TLBWriteIndexedVPS)
-	mfc0	v1, MIPS_COP_0_STATUS_REG	# Save the status register.
-	mtc0	zero, MIPS_COP_0_STATUS_REG	# Disable interrupts
+	mfc0	v1, MIPS_COP_0_STATUS		# Save the status register.
+	mtc0	zero, MIPS_COP_0_STATUS		# Disable interrupts
 	nop
 	lw	a2, 8(a1)
 	lw	a3, 12(a1)
@@ -387,24 +383,19 @@ LEAF(mips3_TLBWriteIndexedVPS)
 	nop
 	dmtc0	v0, MIPS_COP_0_TLB_PG_MASK	# Restore page mask.
 	j	ra
-	mtc0	v1, MIPS_COP_0_STATUS_REG	# Restore the status register
+	mtc0	v1, MIPS_COP_0_STATUS		# Restore the status register
 END(mips3_TLBWriteIndexedVPS)
 
 
 /*
- * Interrupt counters for vmstat.
+ * Symbols that vmstat -i wants, even though they're not used.
  */
 	.data
 	.globl _C_LABEL(intrcnt)
 	.globl _C_LABEL(eintrcnt)
 	.globl _C_LABEL(intrnames)
 	.globl _C_LABEL(eintrnames)
-_C_LABEL(intrnames):
-	.asciiz	"softclock"
-	.asciiz	"softnet"
-	.asciiz	"fpu"
-_C_LABEL(eintrnames):
-	.align	3
 _C_LABEL(intrcnt):
-	.word	0,0,0
 _C_LABEL(eintrcnt):
+_C_LABEL(intrnames):
+_C_LABEL(eintrnames):

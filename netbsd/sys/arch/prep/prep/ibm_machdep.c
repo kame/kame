@@ -1,4 +1,4 @@
-/*      $NetBSD: ibm_machdep.c,v 1.5 2002/05/02 14:58:37 nonaka Exp $        */
+/*      $NetBSD: ibm_machdep.c,v 1.8 2003/07/15 02:54:52 lukem Exp $        */
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ibm_machdep.c,v 1.8 2003/07/15 02:54:52 lukem Exp $");
+
 #include "opt_platform.h"
 
 #include <sys/param.h>
@@ -45,11 +48,17 @@
 #include <machine/platform.h>
 
 static struct platform *platform_ibm[] = {
+#if defined(PLATFORM_IBM_6040)
+	&platform_ibm_6040,
+#endif
 #if defined(PLATFORM_IBM_6050)
 	&platform_ibm_6050,
 #endif
 #if defined(PLATFORM_IBM_7248)
 	&platform_ibm_7248,
+#endif
+#if defined(PLATFORM_IBM_7043_140)
+	&platform_ibm_7043_140,
 #endif
 	NULL
 };

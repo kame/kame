@@ -1,4 +1,4 @@
-/*	$NetBSD: biconsdev.c,v 1.5 2002/03/17 19:40:55 atatat Exp $	*/
+/*	$NetBSD: biconsdev.c,v 1.10 2003/08/07 16:30:57 agc Exp $	*/
 
 /*-
  * Copyright (c) 1999-2001
@@ -48,11 +48,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -71,7 +67,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: biconsdev.c,v 1.5 2002/03/17 19:40:55 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: biconsdev.c,v 1.10 2003/08/07 16:30:57 agc Exp $");
 
 #include "biconsdev.h"
 #include <sys/param.h>
@@ -90,7 +86,19 @@ struct tty biconsdev_tty[NBICONSDEV];
 void	biconsdevattach(int);
 static	void biconsdev_output(struct tty *);
 
-cdev_decl(biconsdev);
+dev_type_open(biconsdevopen);
+dev_type_close(biconsdevclose);
+dev_type_read(biconsdevread);
+dev_type_write(biconsdevwrite);
+dev_type_ioctl(biconsdevioctl);
+dev_type_tty(biconsdevtty);
+dev_type_poll(biconsdevpoll);
+
+const struct cdevsw biconsdev_cdevsw = {
+	biconsdevopen, biconsdevclose, biconsdevread, biconsdevwrite,
+	biconsdevioctl, nostop, biconsdevtty, biconsdevpoll, nommap,
+	ttykqfilter, D_TTY
+};
 
 void
 biconsdevattach(int n)
@@ -99,9 +107,7 @@ biconsdevattach(int n)
 	int maj;
 
 	/* locate the major number */
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == biconsdevopen)
-			break;
+	maj = cdevsw_lookup_major(&biconsdev_cdevsw);
 
 	/* Set up the tty queues now... */
 	clalloc(&tp->t_rawq, 1024, 1);
@@ -240,10 +246,4 @@ biconsdevioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 	    EPASSTHROUGH)
 		return (error);
 	return (ttioctl(tp, cmd, data, flag, p));
-}
-
-void
-biconsdevstop(struct tty *tp, int rw)
-{
-
 }

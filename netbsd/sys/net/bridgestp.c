@@ -1,4 +1,4 @@
-/*	$NetBSD: bridgestp.c,v 1.2 2001/11/12 23:49:34 lukem Exp $	*/
+/*	$NetBSD: bridgestp.c,v 1.5 2003/11/28 08:56:48 keihan Exp $	*/
 
 /*
  * Copyright (c) 2000 Jason L. Wright (jason@thought.net)
@@ -40,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: bridgestp.c,v 1.2 2001/11/12 23:49:34 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: bridgestp.c,v 1.5 2003/11/28 08:56:48 keihan Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -272,7 +272,7 @@ bstp_send_config_bpdu(struct bridge_softc *sc, struct bridge_iflist *bif,
 	memcpy(mtod(m, caddr_t) + sizeof(*eh), &bpdu, sizeof(bpdu));
 
 	s = splnet();
-	bridge_enqueue(sc, ifp, m);
+	bridge_enqueue(sc, ifp, m, 0);
 	splx(s);
 }
 
@@ -386,7 +386,7 @@ bstp_transmit_tcn(struct bridge_softc *sc)
 	memcpy(mtod(m, caddr_t) + sizeof(*eh), &bpdu, sizeof(bpdu));
 
 	s = splnet();
-	bridge_enqueue(sc, ifp, m);
+	bridge_enqueue(sc, ifp, m, 0);
 	splx(s);
 }
 
@@ -851,7 +851,7 @@ bstp_initialization(struct bridge_softc *sc)
 	bstp_timer_stop(&sc->sc_tcn_timer);
 	bstp_timer_stop(&sc->sc_topology_change_timer);
 
-	if (callout_active(&sc->sc_bstpcallout) == 0)
+	if (callout_pending(&sc->sc_bstpcallout) == 0)
 		callout_reset(&sc->sc_bstpcallout, hz,
 		    bstp_tick, sc);
 
@@ -1053,7 +1053,7 @@ bstp_tick(void *arg)
 		 * XXX and "spanning tree gets updated".  We need
 		 * XXX come sort of callback from the link state
 		 * XXX update code to kick spanning tree.
-		 * XXX --thorpej@netbsd.org
+		 * XXX --thorpej@NetBSD.org
 		 */
 		bstp_ifupdstatus(sc, bif);
 	}

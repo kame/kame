@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_exec_elf64.c,v 1.3 2001/11/13 02:09:22 lukem Exp $	 */
+/*	$NetBSD: svr4_exec_elf64.c,v 1.9 2003/10/31 14:04:36 drochner Exp $	 */
 
 /*-
  * Copyright (c) 1994 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: svr4_exec_elf64.c,v 1.3 2001/11/13 02:09:22 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: svr4_exec_elf64.c,v 1.9 2003/10/31 14:04:36 drochner Exp $");
 
 #define	ELFSIZE		64				/* XXX should die */
 
@@ -62,43 +62,6 @@ __KERNEL_RCSID(0, "$NetBSD: svr4_exec_elf64.c,v 1.3 2001/11/13 02:09:22 lukem Ex
 #include <compat/svr4/svr4_errno.h>
 
 int
-svr4_copyargs64(pack, arginfo, stackp, argp)
-	struct exec_package *pack;
-	struct ps_strings *arginfo;
-	char **stackp;
-	void *argp;
-{
-	AuxInfo *a;
-	int error;
-
-	if ((error = elf64_copyargs(pack, arginfo, stackp, argp)) != 0)
-		return error;
-
-	a = (AuxInfo *)*stackp;
-#ifdef SVR4_COMPAT_SOLARIS2
-	if (pack->ep_emul_arg) {
-		a->au_type = AT_SUN_UID;
-		a->au_v = p->p_ucred->cr_uid;
-		a++;
-
-		a->au_type = AT_SUN_RUID;
-		a->au_v = p->p_cred->ruid;
-		a++;
-
-		a->au_type = AT_SUN_GID;
-		a->au_v = p->p_ucred->cr_gid;
-		a++;
-
-		a->au_type = AT_SUN_RGID;
-		a->au_v = p->p_cred->rgid;
-		a++;
-	}
-#endif
-	*stackp = (char *)a;
-	return 0;
-}
-
-int
 svr4_elf64_probe(p, epp, eh, itp, pos)
 	struct proc *p;
 	struct exec_package *epp;
@@ -106,17 +69,14 @@ svr4_elf64_probe(p, epp, eh, itp, pos)
 	char *itp;
 	vaddr_t *pos;
 {
-	const char *bp;
 	int error;
-	size_t len;
 
-	if (itp[0]) {
-		if ((error = emul_find(p, NULL, epp->ep_esch->es_emul->e_path, itp, &bp, 0)))
+	if (itp) {
+		if ((error = emul_find_interp(p, epp->ep_esch->es_emul->e_path, itp)))
 			return error;
-		if ((error = copystr(bp, itp, MAXPATHLEN, &len)))
-			return error;
-		free((void *)bp, M_TEMP);
 	}
+#ifdef SVR4_INTERP_ADDR
 	*pos = SVR4_INTERP_ADDR;
+#endif
 	return 0;
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: stic.c,v 1.17 2002/03/17 19:41:03 atatat Exp $	*/
+/*	$NetBSD: stic.c,v 1.27 2003/12/17 03:59:33 ad Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000, 2001 The NetBSD Foundation, Inc.
@@ -73,7 +73,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: stic.c,v 1.17 2002/03/17 19:41:03 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: stic.c,v 1.27 2003/12/17 03:59:33 ad Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -164,10 +164,6 @@ void	stic_free_screen(void *, void *);
 int	stic_show_screen(void *, void *, int, void (*)(void *, int, int),
 			 void *);
 
-int	sticopen(dev_t, int, int, struct proc *);
-int	sticclose(dev_t, int, int, struct proc *);
-paddr_t	sticmmap(dev_t, off_t, int);
-
 void	stic_do_switch(void *);
 void	stic_setup_backing(struct stic_info *, struct stic_screen *);
 void	stic_setup_vdac(struct stic_info *);
@@ -187,7 +183,16 @@ void	stic_erasecols(void *, int, int, int, long);
 void	stic_eraserows(void *, int, int, long);
 int	stic_mapchar(void *, int, u_int *);
 void	stic_putchar(void *, int, int, u_int, long);
-int	stic_alloc_attr(void *, int, int, int, long *);
+int	stic_allocattr(void *, int, int, int, long *);
+
+dev_type_open(sticopen);
+dev_type_close(sticclose);
+dev_type_mmap(sticmmap);
+
+const struct cdevsw stic_cdevsw = {
+	sticopen, sticclose, noread, nowrite, noioctl,
+	nostop, notty, nopoll, sticmmap, nokqfilter,
+};
 
 /* Colormap for wscons, matching WSCOL_*. Upper 8 are high-intensity. */
 static const u_int8_t stic_cmap[16*3] = {
@@ -269,7 +274,7 @@ static const struct wsdisplay_emulops stic_emulops = {
 	stic_erasecols,
 	stic_copyrows,
 	stic_eraserows,
-	stic_alloc_attr
+	stic_allocattr
 };
 
 static struct wsscreen_descr stic_stdscreen = {
@@ -345,10 +350,10 @@ stic_init(struct stic_info *si)
 		cookie = wsfont_find(NULL, 0, 0, 2, WSDISPLAY_FONTORDER_R2L,
 		    WSDISPLAY_FONTORDER_L2R);
 	if (cookie <= 0)
-		panic("stic_init: font table is empty\n");
+		panic("stic_init: font table is empty");
 
 	if (wsfont_lock(cookie, &si->si_font))
-		panic("stic_init: couldn't lock font\n");
+		panic("stic_init: couldn't lock font");
 
 	si->si_fontw = si->si_font->fontwidth;
 	si->si_fonth = si->si_font->fontheight;
@@ -471,7 +476,7 @@ stic_cnattach(struct stic_info *si)
 	si->si_flags |= SI_CURENB_CHANGED;
 	stic_flush(si);
 
-	stic_alloc_attr(ss, 0, 0, 0, &defattr);
+	stic_allocattr(ss, 0, 0, 0, &defattr);
 	stic_eraserows(ss, 0, si->si_consh, 0);
 	wsdisplay_cnattach(&stic_stdscreen, ss, 0, 0, defattr);
 }
@@ -485,8 +490,9 @@ stic_setup_vdac(struct stic_info *si)
 	s = spltty();
 
 	ip = (u_int8_t *)si->si_cursor.cc_image;
-	mp = ip + (sizeof(si->si_cursor.cc_image) >> 1);
+	mp = (u_int8_t *)si->si_cursor.cc_mask;
 	memset(ip, 0, sizeof(si->si_cursor.cc_image));
+	memset(mp, 0, sizeof(si->si_cursor.cc_mask));
 
 	for (r = 0; r < si->si_fonth; r++) {
 		for (c = r & 1; c < si->si_fontw; c += 2) {
@@ -555,6 +561,7 @@ int
 sticioctl(void *v, u_long cmd, caddr_t data, int flag, struct proc *p)
 {
 	struct stic_info *si;
+	int s;
 
 	si = v;
 
@@ -617,7 +624,9 @@ sticioctl(void *v, u_long cmd, caddr_t data, int flag, struct proc *p)
 		if (si->si_dispmode == WSDISPLAYIO_MODE_EMUL) {
 			(*si->si_ioctl)(si, STICIO_STOPQ, NULL, flag, p);
 			stic_setup_vdac(si);
+			s = spltty();
 			stic_flush(si);
+			splx(s);
 			stic_clear_screen(si);
 			stic_do_switch(si->si_curscreen);
 		}
@@ -666,7 +675,7 @@ stic_alloc_screen(void *v, const struct wsscreen_descr *type, void **cookiep,
 	*curxp = 0;
 	*curyp = 0;
 
-	stic_alloc_attr(ss, 0, 0, 0, attrp);
+	stic_allocattr(ss, 0, 0, 0, attrp);
 	return (0);
 }
 
@@ -779,7 +788,7 @@ stic_do_switch(void *cookie)
 }
 
 int
-stic_alloc_attr(void *cookie, int fg, int bg, int flags, long *attr)
+stic_allocattr(void *cookie, int fg, int bg, int flags, long *attr)
 {
 	long tmp;
 
@@ -1211,7 +1220,7 @@ stic_flush(struct stic_info *si)
 		int bcnt;
 
 		ip = (u_int8_t *)si->si_cursor.cc_image;
-		mp = (u_int8_t *)(si->si_cursor.cc_image + CURSOR_MAX_SIZE);
+		mp = (u_int8_t *)si->si_cursor.cc_mask;
 
 		bcnt = 0;
 		SELECT(vdac, BT459_IREG_CRAM_BASE);
@@ -1252,46 +1261,49 @@ stic_flush(struct stic_info *si)
 int
 stic_get_cmap(struct stic_info *si, struct wsdisplay_cmap *p)
 {
-	u_int index, count;
-	
-	index = p->index;
-	count = p->count;
+	u_int index = p->index, count = p->count;
+	int error;
 
-	if (index >= CMAP_SIZE || (index + count) > CMAP_SIZE)
+	if (index >= CMAP_SIZE || count > CMAP_SIZE - index)
 		return (EINVAL);
 
-	if (!uvm_useracc(p->red, count, B_WRITE) ||
-	    !uvm_useracc(p->green, count, B_WRITE) ||
-	    !uvm_useracc(p->blue, count, B_WRITE))
-		return (EFAULT);
-
-	copyout(&si->si_cmap.r[index], p->red, count);
-	copyout(&si->si_cmap.g[index], p->green, count);
-	copyout(&si->si_cmap.b[index], p->blue, count);
-	return (0);
+	error = copyout(&si->si_cmap.r[index], p->red, count);
+	if (error)
+		return error;
+	error = copyout(&si->si_cmap.g[index], p->green, count);
+	if (error)
+		return error;
+	error = copyout(&si->si_cmap.b[index], p->blue, count);
+	return error;
 }
 
 int
 stic_set_cmap(struct stic_info *si, struct wsdisplay_cmap *p)
 {
+	struct stic_hwcmap256 cmap;
 	u_int index, count;
-	int s;
+	int s, error;
 
 	index = p->index;
 	count = p->count;
 
-	if ((index + count) > CMAP_SIZE)
+	if (index >= CMAP_SIZE || count > CMAP_SIZE - index)
 		return (EINVAL);
 
-	if (!uvm_useracc(p->red, count, B_READ) ||
-	    !uvm_useracc(p->green, count, B_READ) ||
-	    !uvm_useracc(p->blue, count, B_READ))
-		return (EFAULT);
+	error = copyin(p->red, &cmap.r[index], count);
+	if (error)
+		return error;
+	error = copyin(p->green, &cmap.g[index], count);
+	if (error)
+		return error;
+	error = copyin(p->blue, &cmap.b[index], count);
+	if (error)
+		return error;
 
 	s = spltty();
-	copyin(p->red, &si->si_cmap.r[index], count);
-	copyin(p->green, &si->si_cmap.g[index], count);
-	copyin(p->blue, &si->si_cmap.b[index], count);
+	memcpy(&si->si_cmap.r[index], &cmap.r[index], count);
+	memcpy(&si->si_cmap.g[index], &cmap.g[index], count);
+	memcpy(&si->si_cmap.b[index], &cmap.b[index], count);
 	si->si_flags |= SI_CMAP_CHANGED;
 	splx(s);
 
@@ -1309,33 +1321,39 @@ int
 stic_set_cursor(struct stic_info *si, struct wsdisplay_cursor *p)
 {
 #define	cc (&si->si_cursor)
-	u_int v, index, count, icount;
+	u_int v, index = 0, count = 0, icount = 0;
 	struct stic_screen *ss;
-	int s;
+	uint8_t r[2], g[2], b[2], image[512], mask[512];
+	int s, error;
 
 	v = p->which;
 	ss = si->si_curscreen;
-
 	if ((v & WSDISPLAY_CURSOR_DOCMAP) != 0) {
 		index = p->cmap.index;
 		count = p->cmap.count;
 		if (index >= 2 || (index + count) > 2)			
 			return (EINVAL);
-		if (!uvm_useracc(p->cmap.red, count, B_READ) ||
-		    !uvm_useracc(p->cmap.green, count, B_READ) ||
-		    !uvm_useracc(p->cmap.blue, count, B_READ))
-			return (EFAULT);
+		error = copyin(p->cmap.red, &r[index], count);
+		if (error)
+			return error;
+		error = copyin(p->cmap.green, &g[index], count);
+		if (error)
+			return error;
+		error = copyin(p->cmap.blue, &b[index], count);
+		if (error)
+			return error;
 	}
-
 	if ((v & WSDISPLAY_CURSOR_DOSHAPE) != 0) {
 		if (p->size.x > CURSOR_MAX_SIZE || p->size.y > CURSOR_MAX_SIZE)
 			return (EINVAL);
 		icount = ((p->size.x < 33) ? 4 : 8) * p->size.y;
-		if (!uvm_useracc(p->image, icount, B_READ) ||
-		    !uvm_useracc(p->mask, icount, B_READ))
-			return (EFAULT);
+		error = copyin(p->image, image, icount);
+		if (error)
+			return error;
+		error = copyin(p->mask, mask, icount);
+		if (error)
+			return error;
 	}
-
 	if ((v & (WSDISPLAY_CURSOR_DOPOS | WSDISPLAY_CURSOR_DOCUR)) != 0) {
 		if (v & WSDISPLAY_CURSOR_DOCUR)
 			cc->cc_hot = p->hot;
@@ -1344,7 +1362,6 @@ stic_set_cursor(struct stic_info *si, struct wsdisplay_cursor *p)
 	}
 
 	s = spltty();
-
 	if ((v & WSDISPLAY_CURSOR_DOCUR) != 0) {
 		if (p->enable)
 			ss->ss_flags |= SS_CURENB;
@@ -1352,21 +1369,19 @@ stic_set_cursor(struct stic_info *si, struct wsdisplay_cursor *p)
 			ss->ss_flags &= ~SS_CURENB;
 		si->si_flags |= SI_CURENB_CHANGED;
 	}
-
 	if ((v & WSDISPLAY_CURSOR_DOCMAP) != 0) {
-		copyin(p->cmap.red, &cc->cc_color[index], count);
-		copyin(p->cmap.green, &cc->cc_color[index + 2], count);
-		copyin(p->cmap.blue, &cc->cc_color[index + 4], count);
+		memcpy(&cc->cc_color[index], &r[index], count);
+		memcpy(&cc->cc_color[index + 2], &g[index], count);
+		memcpy(&cc->cc_color[index + 4], &b[index], count);
 		si->si_flags |= SI_CURCMAP_CHANGED;
 	}
-
 	if ((v & WSDISPLAY_CURSOR_DOSHAPE) != 0) {
-		memset(cc->cc_image, 0, sizeof(cc->cc_image));
-		copyin(p->image, cc->cc_image, icount);
-		copyin(p->mask, cc->cc_image + CURSOR_MAX_SIZE, icount);
+		memset(cc->cc_image, 0, sizeof cc->cc_image);
+		memcpy(cc->cc_image, image, icount);
+		memset(cc->cc_mask, 0, sizeof cc->cc_mask);
+		memcpy(cc->cc_mask, mask, icount);
 		si->si_flags |= SI_CURSHAPE_CHANGED;
 	}
-
 	splx(s);
 
 	/*
@@ -1435,12 +1450,7 @@ stic_set_hwcurpos(struct stic_info *si)
 /*
  * STIC control inteface.  We have a separate device for mapping the board,
  * because access to the DMA engine means that it's possible to circumvent
- * the securelevel mechanism.  Given the way devices work in the BSD kernel,
- * and given the unfortunate design of the mmap() call it's near impossible
- * to protect against this using a shared device (i.e. wsdisplay).
- *
- * This is a gross hack... Hopefully not too many other devices will need
- * it.
+ * the securelevel mechanism.
  */
 int
 sticopen(dev_t dev, int flag, int mode, struct proc *p)

@@ -1,4 +1,4 @@
-/*	$NetBSD: mbmem.c,v 1.8 2001/12/15 22:13:11 fredette Exp $	*/
+/*	$NetBSD: mbmem.c,v 1.13 2003/07/15 03:36:13 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mbmem.c,v 1.13 2003/07/15 03:36:13 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -63,9 +66,8 @@ struct mbmem_softc {
 	bus_dma_tag_t	sc_dmatag;	/* parent bus dma tag */
 };
 
-struct cfattach mbmem_ca = {
-	sizeof(struct mbmem_softc), mbmem_match, mbmem_attach
-};
+CFATTACH_DECL(mbmem, sizeof(struct mbmem_softc),
+    mbmem_match, mbmem_attach, NULL, NULL);
 
 static	paddr_t mbmem_bus_mmap __P((bus_space_tag_t, bus_type_t, bus_addr_t,
 				off_t, int, int));
@@ -100,7 +102,7 @@ mbmem_match(parent, cf, aux)
 {
 	struct mainbus_attach_args *ma = aux;
 
-	return (cpu_has_multibus && (ma->ma_name == NULL || strcmp(cf->cf_driver->cd_name, ma->ma_name) == 0));
+	return (cpu_has_multibus && (ma->ma_name == NULL || strcmp(cf->cf_name, ma->ma_name) == 0));
 }
 
 static void

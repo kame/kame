@@ -1,4 +1,4 @@
-/*	$NetBSD: uscanner.c,v 1.28.4.1 2003/01/26 09:14:59 jmc Exp $	*/
+/*	$NetBSD: uscanner.c,v 1.45 2004/03/15 11:09:23 augustss Exp $	*/
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uscanner.c,v 1.28.4.1 2003/01/26 09:14:59 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uscanner.c,v 1.45 2004/03/15 11:09:23 augustss Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -112,6 +112,9 @@ static const struct uscan_info uscanner_devs[] = {
 
   /* Canon */
  {{ USB_VENDOR_CANON, USB_PRODUCT_CANON_N656U }, 0 },
+ {{ USB_VENDOR_CANON, USB_PRODUCT_CANON_N670U }, 0 },
+ {{ USB_VENDOR_CANON, USB_PRODUCT_CANON_N1220U }, 0 },
+ {{ USB_VENDOR_CANON, USB_PRODUCT_CANON_N1240U }, 0 },
 
   /* Kye */
  {{ USB_VENDOR_KYE, USB_PRODUCT_KYE_VIVIDPRO }, 0 },
@@ -145,9 +148,13 @@ static const struct uscan_info uscanner_devs[] = {
  {{ USB_VENDOR_MICROTEK, USB_PRODUCT_MICROTEK_V6UL }, 0 },
 #endif
 
+  /* Minolta */
+ {{ USB_VENDOR_MINOLTA, USB_PRODUCT_MINOLTA_5400 }, 0 },
+
   /* Mustek */
  {{ USB_VENDOR_MUSTEK, USB_PRODUCT_MUSTEK_1200CU }, 0 },
  {{ USB_VENDOR_MUSTEK, USB_PRODUCT_MUSTEK_BEARPAW1200F }, 0 },
+ {{ USB_VENDOR_MUSTEK, USB_PRODUCT_MUSTEK_BEARPAW1200TA }, 0 },
  {{ USB_VENDOR_MUSTEK, USB_PRODUCT_MUSTEK_600USB }, 0 },
  {{ USB_VENDOR_MUSTEK, USB_PRODUCT_MUSTEK_600CU }, 0 },
  {{ USB_VENDOR_MUSTEK, USB_PRODUCT_MUSTEK_1200USB }, 0 },
@@ -166,6 +173,7 @@ static const struct uscan_info uscanner_devs[] = {
  {{ USB_VENDOR_PRIMAX, USB_PRODUCT_PRIMAX_G2E3002 }, 0 },
  {{ USB_VENDOR_PRIMAX, USB_PRODUCT_PRIMAX_9600 }, 0 },
  {{ USB_VENDOR_PRIMAX, USB_PRODUCT_PRIMAX_600U }, 0 },
+ {{ USB_VENDOR_PRIMAX, USB_PRODUCT_PRIMAX_6200 }, 0 },
  {{ USB_VENDOR_PRIMAX, USB_PRODUCT_PRIMAX_19200 }, 0 },
  {{ USB_VENDOR_PRIMAX, USB_PRODUCT_PRIMAX_1200U }, 0 },
  {{ USB_VENDOR_PRIMAX, USB_PRODUCT_PRIMAX_G600 }, 0 },
@@ -178,22 +186,27 @@ static const struct uscan_info uscanner_devs[] = {
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_610 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1200 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1240 }, 0 },
+ {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1250 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1260 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1600 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1640 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1660 }, 0 },
+ {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1670 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_640U }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1650 }, 0 },
+ {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_2400 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_GT9700F }, USC_KEEP_OPEN },
 
   /* UMAX */
  {{ USB_VENDOR_UMAX, USB_PRODUCT_UMAX_ASTRA1220U }, 0 },
  {{ USB_VENDOR_UMAX, USB_PRODUCT_UMAX_ASTRA1236U }, 0 },
  {{ USB_VENDOR_UMAX, USB_PRODUCT_UMAX_ASTRA2000U }, 0 },
+ {{ USB_VENDOR_UMAX, USB_PRODUCT_UMAX_ASTRA2100U }, 0 },
  {{ USB_VENDOR_UMAX, USB_PRODUCT_UMAX_ASTRA2200U }, 0 },
  {{ USB_VENDOR_UMAX, USB_PRODUCT_UMAX_ASTRA3400 }, 0 },
 
   /* Visioneer */
+ {{ USB_VENDOR_VISIONEER, USB_PRODUCT_VISIONEER_3000 }, 0 },
  {{ USB_VENDOR_VISIONEER, USB_PRODUCT_VISIONEER_5300 }, 0 },
  {{ USB_VENDOR_VISIONEER, USB_PRODUCT_VISIONEER_7600 }, 0 },
  {{ USB_VENDOR_VISIONEER, USB_PRODUCT_VISIONEER_6100 }, 0 },
@@ -230,6 +243,8 @@ struct uscanner_softc {
 	int			sc_bulkout_bufferlen;
 	int			sc_bulkout_datalen;
 
+	struct selinfo		sc_selq;
+
 	u_char			sc_state;
 #define USCANNER_OPEN		0x01	/* opened */
 
@@ -237,7 +252,20 @@ struct uscanner_softc {
 	u_char			sc_dying;
 };
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__)
+dev_type_open(uscanneropen);
+dev_type_close(uscannerclose);
+dev_type_read(uscannerread);
+dev_type_write(uscannerwrite);
+dev_type_ioctl(uscannerioctl);
+dev_type_poll(uscannerpoll);
+dev_type_kqfilter(uscannerkqfilter);
+
+const struct cdevsw uscanner_cdevsw = {
+	uscanneropen, uscannerclose, uscannerread, uscannerwrite,
+	uscannerioctl, nostop, notty, uscannerpoll, nommap, uscannerkqfilter,
+};
+#elif defined(__OpenBSD__)
 cdev_decl(uscanner);
 #elif defined(__FreeBSD__)
 d_open_t  uscanneropen;
@@ -373,7 +401,7 @@ uscanneropen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 
 	USB_GET_SC_OPEN(uscanner, unit, sc);
 
- 	DPRINTFN(5, ("uscanneropen: flag=%d, mode=%d, unit=%d\n", 
+ 	DPRINTFN(5, ("uscanneropen: flag=%d, mode=%d, unit=%d\n",
 		     flag, mode, unit));
 
 	if (sc->sc_dying)
@@ -599,7 +627,6 @@ uscanner_activate(device_ptr_t self, enum devact act)
 	switch (act) {
 	case DVACT_ACTIVATE:
 		return (EOPNOTSUPP);
-		break;
 
 	case DVACT_DEACTIVATE:
 		sc->sc_dying = 1;
@@ -644,9 +671,13 @@ USB_DETACH(uscanner)
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	/* locate the major number */
+#if defined(__NetBSD__)
+	maj = cdevsw_lookup_major(&uscanner_cdevsw);
+#elif defined(__OpenBSD__)
 	for (maj = 0; maj < nchrdev; maj++)
 		if (cdevsw[maj].d_open == uscanneropen)
 			break;
+#endif
 
 	/* Nuke the vnodes for any open instances (calls close). */
 	mn = self->dv_unit * USB_MAX_ENDPOINTS;
@@ -677,15 +708,60 @@ uscannerpoll(dev_t dev, int events, usb_proc_ptr p)
 	if (sc->sc_dying)
 		return (EIO);
 
-	/* 
+	/*
 	 * We have no easy way of determining if a read will
 	 * yield any data or a write will happen.
 	 * Pretend they will.
 	 */
-	revents |= events & 
+	revents |= events &
 		   (POLLIN | POLLRDNORM | POLLOUT | POLLWRNORM);
 
 	return (revents);
+}
+
+static void
+filt_uscannerdetach(struct knote *kn)
+{
+	struct uscanner_softc *sc = kn->kn_hook;
+
+	SLIST_REMOVE(&sc->sc_selq.sel_klist, kn, knote, kn_selnext);
+}
+
+static const struct filterops uscanner_seltrue_filtops =
+	{ 1, NULL, filt_uscannerdetach, filt_seltrue };
+
+int
+uscannerkqfilter(dev_t dev, struct knote *kn)
+{
+	struct uscanner_softc *sc;
+	struct klist *klist;
+
+	USB_GET_SC(uscanner, USCANNERUNIT(dev), sc);
+
+	if (sc->sc_dying)
+		return (1);
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+	case EVFILT_WRITE:
+		/* 
+		 * We have no easy way of determining if a read will
+		 * yield any data or a write will happen.
+		 * Pretend they will.
+		 */
+		klist = &sc->sc_selq.sel_klist;
+		kn->kn_fop = &uscanner_seltrue_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = sc;
+
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+
+	return (0);
 }
 
 int

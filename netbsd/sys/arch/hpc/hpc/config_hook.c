@@ -1,4 +1,4 @@
-/*	$NetBSD: config_hook.c,v 1.4 2002/05/12 07:41:22 takemura Exp $	*/
+/*	$NetBSD: config_hook.c,v 1.6 2003/07/15 02:29:27 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999-2001
@@ -33,6 +33,9 @@
  * SUCH DAMAGE.
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: config_hook.c,v 1.6 2003/07/15 02:29:27 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -224,7 +227,7 @@ config_connect(int type, long id)
 		if (hr->hr_id == id) {
 			if (hr->hr_mode == CONFIG_HOOK_SHARE)
 				panic("config_connect: can't connect with "
-				    "shared hook, type=%d id=%ld\n", type, id);
+				    "shared hook, type=%d id=%ld", type, id);
 			cr->hr_ctx = hr->hr_ctx;
 			cr->hr_func = hr->hr_func;
 			cr->hr_mode = hr->hr_mode;

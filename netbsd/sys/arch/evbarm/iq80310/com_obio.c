@@ -1,4 +1,4 @@
-/*	$NetBSD: com_obio.c,v 1.4 2002/04/12 19:32:31 thorpej Exp $	*/
+/*	$NetBSD: com_obio.c,v 1.9 2003/07/15 00:25:01 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: com_obio.c,v 1.9 2003/07/15 00:25:01 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -58,19 +61,15 @@ struct com_obio_softc {
 int	com_obio_match(struct device *, struct cfdata *, void *);
 void	com_obio_attach(struct device *, struct device *, void *);
 
-struct cfattach com_obio_ca = {
-	sizeof(struct com_obio_softc), com_obio_match, com_obio_attach
-};
+CFATTACH_DECL(com_obio, sizeof(struct com_obio_softc),
+    com_obio_match, com_obio_attach, NULL, NULL);
 
 int
 com_obio_match(struct device *parent, struct cfdata *cf, void *aux)
 {
-	struct obio_attach_args *oba = aux;
 
-	if (strcmp(cf->cf_driver->cd_name, oba->oba_name) == 0)
-		return (1);
-
-	return (0);
+	/* We take it on faith that the device is there. */
+	return (1);
 }
 
 void

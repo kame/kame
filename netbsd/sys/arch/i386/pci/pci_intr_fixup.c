@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_intr_fixup.c,v 1.19 2001/12/07 08:07:57 onoe Exp $	*/
+/*	$NetBSD: pci_intr_fixup.c,v 1.27.2.1 2004/04/28 05:19:04 jmc Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -67,7 +67,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pci_intr_fixup.c,v 1.19 2001/12/07 08:07:57 onoe Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pci_intr_fixup.c,v 1.27.2.1 2004/04/28 05:19:04 jmc Exp $");
 
 #include "opt_pcibios.h"
 
@@ -85,7 +85,6 @@ __KERNEL_RCSID(0, "$NetBSD: pci_intr_fixup.c,v 1.19 2001/12/07 08:07:57 onoe Exp
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcidevs.h>
 
-#include <i386/isa/icu.h>
 #include <i386/pci/pci_intr_fixup.h>
 #include <i386/pci/pcibios.h>
 
@@ -138,10 +137,24 @@ const struct pciintr_icu_table {
 	  piix_init },
 	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82371SB_ISA,
 	  piix_init },
+	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82801AA_LPC,
+	  piix_init },			/* ICH */
+	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82801AB_LPC,
+	  piix_init },			/* ICH0 */
 	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82801BA_LPC,
-	  piix_init },
+	  ich_init },			/* ICH2 */
 	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82801BAM_LPC,
-	  piix_init },
+	  ich_init },			/* ICH2M */
+	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82801CA_LPC,
+	  ich_init },			/* ICH3S */
+	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82801CAM_LPC,
+	  ich_init },			/* ICH3M */
+	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82801DB_LPC,
+	  ich_init },			/* ICH4 */
+	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82801DB_ISA,
+	  ich_init },			/* ICH4M */
+	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82801EB_LPC,
+	  ich_init },			/* ICH5 */
 
 	{ PCI_VENDOR_OPTI,	PCI_PRODUCT_OPTI_82C558,
 	  opti82c558_init },
@@ -149,6 +162,8 @@ const struct pciintr_icu_table {
 	  opti82c700_init },
 
 	{ PCI_VENDOR_VIATECH,	PCI_PRODUCT_VIATECH_VT82C586_ISA,
+	  via82c586_init },
+	{ PCI_VENDOR_VIATECH,   PCI_PRODUCT_VIATECH_VT82C596A,
 	  via82c586_init },
 	{ PCI_VENDOR_VIATECH,	PCI_PRODUCT_VIATECH_VT82C686A_ISA,
 	  via82c586_init },
@@ -191,8 +206,7 @@ pciintr_link_lookup(link)
 {
 	struct pciintr_link_map *l;
 
-	for (l = SIMPLEQ_FIRST(&pciintr_link_map_list); l != NULL;
-	     l = SIMPLEQ_NEXT(l, list)) {
+	SIMPLEQ_FOREACH(l, &pciintr_link_map_list, list) {
 		if (l->link == link)
 			return (l);
 	}
@@ -258,10 +272,10 @@ pciintr_link_alloc(pir, pin)
 	l->bitmap = pir->linkmap[pin].bitmap;
 	if (pciintr_icu_tag != NULL) { /* compatible PCI ICU found */
 		l->clink = clink;
-		l->irq = irq; /* maybe I386_PCI_INTERRUPT_LINE_NO_CONNECTION */
+		l->irq = irq; /* maybe X86_PCI_INTERRUPT_LINE_NO_CONNECTION */
 	} else {
 		l->clink = link; /* only for PCIBIOSVERBOSE diagnostic */
-		l->irq = I386_PCI_INTERRUPT_LINE_NO_CONNECTION;
+		l->irq = X86_PCI_INTERRUPT_LINE_NO_CONNECTION;
 	}
 
 	lstart = SIMPLEQ_FIRST(&pciintr_link_map_list);
@@ -297,7 +311,7 @@ static int
 pciintr_bitmap_count_irq(irq_bitmap, irqp)
 	int irq_bitmap, *irqp;
 {
-	int i, bit, count = 0, irq = I386_PCI_INTERRUPT_LINE_NO_CONNECTION;
+	int i, bit, count = 0, irq = X86_PCI_INTERRUPT_LINE_NO_CONNECTION;
 
 	if (irq_bitmap != 0) {
 		for (i = 0, bit = 1; i < 16; i++, bit <<= 1) {
@@ -396,9 +410,8 @@ pciintr_guess_irq()
 	/*
 	 * Stage 1: If only one IRQ is available for the link, use it.
 	 */
-	for (l = SIMPLEQ_FIRST(&pciintr_link_map_list); l != NULL;
-	     l = SIMPLEQ_NEXT(l, list)) {
-		if (l->irq != I386_PCI_INTERRUPT_LINE_NO_CONNECTION)
+	SIMPLEQ_FOREACH(l, &pciintr_link_map_list, list) {
+		if (l->irq != X86_PCI_INTERRUPT_LINE_NO_CONNECTION)
 			continue;
 		if (pciintr_bitmap_count_irq(l->bitmap, &irq) == 1) {
 			l->irq = irq;
@@ -427,9 +440,8 @@ pciintr_link_fixup()
 	 * First stage: Attempt to connect PIRQs which aren't
 	 * yet connected.
 	 */
-	for (l = SIMPLEQ_FIRST(&pciintr_link_map_list); l != NULL;
-	     l = SIMPLEQ_NEXT(l, list)) {
-		if (l->irq != I386_PCI_INTERRUPT_LINE_NO_CONNECTION) {
+	SIMPLEQ_FOREACH(l, &pciintr_link_map_list, list) {
+		if (l->irq != X86_PCI_INTERRUPT_LINE_NO_CONNECTION) {
 			/*
 			 * Interrupt is already connected.  Don't do
 			 * anything to it.
@@ -470,9 +482,8 @@ pciintr_link_fixup()
 	 * Stage 2: Attempt to connect PIRQs which we didn't
 	 * connect in Stage 1.
 	 */
-	for (l = SIMPLEQ_FIRST(&pciintr_link_map_list); l != NULL;
-	     l = SIMPLEQ_NEXT(l, list)) {
-		if (l->irq != I386_PCI_INTERRUPT_LINE_NO_CONNECTION)
+	SIMPLEQ_FOREACH(l, &pciintr_link_map_list, list) {
+		if (l->irq != X86_PCI_INTERRUPT_LINE_NO_CONNECTION)
 			continue;
 		if (pciintr_bitmap_find_lowest_irq(l->bitmap & pciirq,
 		    &l->irq)) {
@@ -495,9 +506,8 @@ pciintr_link_fixup()
 	 * Stage 3: The worst case. I need configuration hint that
 	 * user supplied a mask for the PCI irqs
 	 */
-	for (l = SIMPLEQ_FIRST(&pciintr_link_map_list); l != NULL;
-	     l = SIMPLEQ_NEXT(l, list)) {
-		if (l->irq != I386_PCI_INTERRUPT_LINE_NO_CONNECTION)
+	SIMPLEQ_FOREACH(l, &pciintr_link_map_list, list) {
+		if (l->irq != X86_PCI_INTERRUPT_LINE_NO_CONNECTION)
 			continue;
 		if (pciintr_bitmap_find_lowest_irq(
 		    l->bitmap & pcibios_irqs_hint, &l->irq)) {
@@ -523,10 +533,9 @@ pciintr_link_route(pciirq)
 
 	*pciirq = 0;
 
-	for (l = SIMPLEQ_FIRST(&pciintr_link_map_list); l != NULL;
-	     l = SIMPLEQ_NEXT(l, list)) {
+	SIMPLEQ_FOREACH(l, &pciintr_link_map_list, list) {
 		if (l->fixup_stage == 0) {
-			if (l->irq == I386_PCI_INTERRUPT_LINE_NO_CONNECTION) {
+			if (l->irq == X86_PCI_INTERRUPT_LINE_NO_CONNECTION) {
 				/* Appropriate interrupt was not found. */
 #ifdef DIAGNOSTIC
 				printf("pciintr_link_route: "
@@ -655,7 +664,7 @@ pciintr_do_header_fixup(pc, tag, context)
 		printf("%03d:%02d:%d 0x%04x 0x%04x   %c  0x%02x",
 		    bus, device, function, PCI_VENDOR(id), PCI_PRODUCT(id),
 		    '@' + pin, l->clink);
-		if (l->irq == I386_PCI_INTERRUPT_LINE_NO_CONNECTION)
+		if (l->irq == X86_PCI_INTERRUPT_LINE_NO_CONNECTION)
 			printf("   -");
 		else
 			printf(" %3d", l->irq);
@@ -672,10 +681,10 @@ pciintr_do_header_fixup(pc, tag, context)
 		return;
 	}
 
-	if (l->irq == I386_PCI_INTERRUPT_LINE_NO_CONNECTION) {
+	if (l->irq == X86_PCI_INTERRUPT_LINE_NO_CONNECTION) {
 		/* Appropriate interrupt was not found. */
 		if (pciintr_icu_tag == NULL &&
-		    irq != 0 && irq != I386_PCI_INTERRUPT_LINE_NO_CONNECTION) {
+		    irq != 0 && irq != X86_PCI_INTERRUPT_LINE_NO_CONNECTION) {
 			/*
 			 * Do not print warning,
 			 * if no compatible PCI ICU found,
@@ -694,7 +703,7 @@ pciintr_do_header_fixup(pc, tag, context)
 		return;
 	}
 
-	if (irq == 0 || irq == I386_PCI_INTERRUPT_LINE_NO_CONNECTION) {
+	if (irq == 0 || irq == X86_PCI_INTERRUPT_LINE_NO_CONNECTION) {
 		PCIBIOS_PRINTV((" fixed up\n"));
 	} else {
 		/* routed by BIOS, but inconsistent */
@@ -747,17 +756,15 @@ pci_intr_fixup(pc, iot, pciirq)
 		icutag = pci_make_tag(pc, pcibios_pir_header.router_bus,
 		    PIR_DEVFUNC_DEVICE(pcibios_pir_header.router_devfunc),
 		    PIR_DEVFUNC_FUNCTION(pcibios_pir_header.router_devfunc));
-		icuid = pcibios_pir_header.compat_router;
-		if (icuid == 0 ||
-		    (piit = pciintr_icu_lookup(icuid)) == NULL) {
+		icuid = pci_conf_read(pc, icutag, PCI_ID_REG);
+		if ((piit = pciintr_icu_lookup(icuid)) == NULL) {
 			/*
-			 * No compat ID, or don't know the compat ID?  Read
-			 * it from the configuration header.
+			 * if we fail to look up an ICU at given
+			 * PCI address, try compat ID next.
 			 */
-			icuid = pci_conf_read(pc, icutag, PCI_ID_REG);
-		}
-		if (piit == NULL)
+			icuid = pcibios_pir_header.compat_router;
 			piit = pciintr_icu_lookup(icuid);
+		}
 	} else {
 		int device, maxdevs = pci_bus_maxdevs(pc, 0);
 

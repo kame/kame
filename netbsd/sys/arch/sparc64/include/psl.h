@@ -1,4 +1,4 @@
-/*	$NetBSD: psl.h,v 1.20.18.1 2003/11/14 03:34:52 jmc Exp $ */
+/*	$NetBSD: psl.h,v 1.26 2004/03/14 18:18:54 chs Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -260,6 +256,8 @@ static __inline void setcwp __P((int));
 static __inline void splx __P((int));
 #endif
 static __inline u_int64_t getver __P((void));
+static __inline int intr_disable __P((void));
+static __inline void intr_restore __P((int));
 
 /*
  * GCC pseudo-functions for manipulating privileged registers
@@ -300,6 +298,21 @@ static __inline u_int64_t getver()
 	return (ver);
 }
 
+static __inline int
+intr_disable(void)
+{
+	int pstate = getpstate();
+
+	setpstate(pstate & ~PSTATE_IE);
+	return (pstate);
+}
+
+static __inline void
+intr_restore(int pstate)
+{
+	setpstate(pstate);
+}
+
 /*
  * GCC pseudo-functions for manipulating PIL
  */
@@ -307,7 +320,15 @@ static __inline u_int64_t getver()
 #ifdef SPLDEBUG
 void prom_printf __P((const char *fmt, ...));
 extern int printspl;
-#define SPLPRINT(x)	if(printspl) { int i=10000000; prom_printf x ; while(i--); }
+#define SPLPRINT(x) \
+{ \
+	if (printspl) { \
+		int i = 10000000; \
+		prom_printf x ; \
+		while (i--) \
+			; \
+	} \
+}
 #define	SPL(name, newpil) \
 static __inline int name##X __P((const char*, int)); \
 static __inline int name##X(const char* file, int line) \
@@ -365,6 +386,8 @@ SPLHOLD(splsoftint, 1)
 #define	splsoftclock	splsoftint
 #define	splsoftnet	splsoftint
 
+SPLHOLD(splsoftserial, 4)
+
 /* audio software interrupts are at software level 4 */
 SPLHOLD(splausoft, PIL_AUSOFT)
 
@@ -406,26 +429,16 @@ SPLHOLD(splstatclock, 14)
 SPLHOLD(splsched, PIL_SCHED)
 SPLHOLD(spllock, PIL_LOCK)
 
+SPLHOLD(splipi, PIL_HIGH)
+
 SPLHOLD(splhigh, PIL_HIGH)
 
 /* splx does not have a return value */
 #ifdef SPLDEBUG
-/* Keep gcc happy -- reduce warnings */
-#if 0
-static __inline void splx(newpil)
-	int newpil;
-{
-	int pil;
-
-	__asm __volatile("rdpr %%pil,%0" : "=r" (pil));
-	SPLPRINT(("{%d->%d}", pil, newpil)); \
-	__asm __volatile("wrpr %%g0,%0,%%pil" : : "rn" (newpil));
-}
-#endif
-
 #define	spl0()	spl0X(__FILE__, __LINE__)
 #define	spllowersoftclock() spllowersoftclockX(__FILE__, __LINE__)
 #define	splsoftint()	splsoftintX(__FILE__, __LINE__)
+#define	splsoftserial()	splsoftserialX(__FILE__, __LINE__)
 #define	splausoft()	splausoftX(__FILE__, __LINE__)
 #define	splfdsoft()	splfdsoftX(__FILE__, __LINE__)
 #define	splbio()	splbioX(__FILE__, __LINE__)
@@ -443,20 +456,24 @@ static __inline void splx(newpil)
 #define	spllock()	spllockX(__FILE__, __LINE__)
 #define	splhigh()	splhighX(__FILE__, __LINE__)
 #define splx(x)		splxX((x),__FILE__, __LINE__)
+#define splipi()	splhighX(__FILE__, __LINE__)
 
 static __inline void splxX __P((int, const char*, int));
 static __inline void splxX(newpil, file, line)
-	int newpil, line;
-	const char* file;
+	int newpil;
+	const char *file;
+	int line;
 #else
 static __inline void splx(newpil)
 	int newpil;
 #endif
 {
+#ifdef SPLDEBUG
 	int pil;
 
 	__asm __volatile("rdpr %%pil,%0" : "=r" (pil));
-	SPLPRINT(("{%d->%d}", pil, newpil)); \
+	SPLPRINT(("{%d->%d}", pil, newpil));
+#endif
 	__asm __volatile("wrpr %%g0,%0,%%pil" : : "rn" (newpil));
 }
 #endif /* KERNEL && !_LOCORE */

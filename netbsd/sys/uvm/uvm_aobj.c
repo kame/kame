@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_aobj.c,v 1.51 2002/05/09 07:04:23 enami Exp $	*/
+/*	$NetBSD: uvm_aobj.c,v 1.62 2004/03/24 07:55:01 junyoung Exp $	*/
 
 /*
  * Copyright (c) 1998 Chuck Silvers, Charles D. Cranor and
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_aobj.c,v 1.51 2002/05/09 07:04:23 enami Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_aobj.c,v 1.62 2004/03/24 07:55:01 junyoung Exp $");
 
 #include "opt_uvmhist.h"
 
@@ -169,19 +169,21 @@ struct uvm_aobj {
 
 struct pool uvm_aobj_pool;
 
+MALLOC_DEFINE(M_UVMAOBJ, "UVM aobj", "UVM aobj and related structures");
+
 /*
  * local functions
  */
 
 static struct uao_swhash_elt *uao_find_swhash_elt
-    __P((struct uvm_aobj *, int, boolean_t));
+    (struct uvm_aobj *, int, boolean_t);
 
-static void	uao_free __P((struct uvm_aobj *));
-static int	uao_get __P((struct uvm_object *, voff_t, struct vm_page **,
-		    int *, int, vm_prot_t, int, int));
-static boolean_t uao_put __P((struct uvm_object *, voff_t, voff_t, int));
-static boolean_t uao_pagein __P((struct uvm_aobj *, int, int));
-static boolean_t uao_pagein_page __P((struct uvm_aobj *, int));
+static void	uao_free(struct uvm_aobj *);
+static int	uao_get(struct uvm_object *, voff_t, struct vm_page **,
+		    int *, int, vm_prot_t, int, int);
+static boolean_t uao_put(struct uvm_object *, voff_t, voff_t, int);
+static boolean_t uao_pagein(struct uvm_aobj *, int, int);
+static boolean_t uao_pagein_page(struct uvm_aobj *, int);
 
 /*
  * aobj_pager
@@ -415,11 +417,10 @@ uao_free(aobj)
 				for (j = 0; j < UAO_SWHASH_CLUSTER_SIZE; j++) {
 					int slot = elt->slots[j];
 
-					if (slot == 0) {
-						continue;
+					if (slot > 0) {
+						uvm_swap_free(slot, 1);
+						swpgonlydelta++;
 					}
-					uvm_swap_free(slot, 1);
-					swpgonlydelta++;
 				}
 
 				next = LIST_NEXT(elt, list);
@@ -437,7 +438,7 @@ uao_free(aobj)
 		for (i = 0; i < aobj->u_pages; i++) {
 			int slot = aobj->u_swslots[i];
 
-			if (slot) {
+			if (slot > 0) {
 				uvm_swap_free(slot, 1);
 				swpgonlydelta++;
 			}
@@ -822,9 +823,10 @@ uao_put(uobj, start, stop, flags)
 	if (by_list) {
 		TAILQ_INSERT_TAIL(&uobj->memq, &endmp, listq);
 		nextpg = TAILQ_FIRST(&uobj->memq);
-		PHOLD(curproc);
+		PHOLD(curlwp);
 	} else {
 		curoff = start;
+		nextpg = NULL;	/* Quell compiler warning */
 	}
 
 	uvm_lock_pageq();
@@ -913,11 +915,11 @@ uao_put(uobj, start, stop, flags)
 		}
 	}
 	uvm_unlock_pageq();
-	simple_unlock(&uobj->vmobjlock);
 	if (by_list) {
 		TAILQ_REMOVE(&uobj->memq, &endmp, listq);
-		PRELE(curproc);
+		PRELE(curlwp);
 	}
+	simple_unlock(&uobj->vmobjlock);
 	return 0;
 }
 
@@ -952,7 +954,7 @@ uao_get(uobj, offset, pps, npagesp, centeridx, access_type, advice, flags)
 {
 	struct uvm_aobj *aobj = (struct uvm_aobj *)uobj;
 	voff_t current_offset;
-	struct vm_page *ptmp;
+	struct vm_page *ptmp = NULL;	/* Quell compiler warning */
 	int lcv, gotpages, maxpages, swslot, error, pageidx;
 	boolean_t done;
 	UVMHIST_FUNC("uao_get"); UVMHIST_CALLED(pdhist);
@@ -1196,7 +1198,7 @@ gotpage:
 
 				swslot = uao_set_swslot(&aobj->u_obj, pageidx,
 							SWSLOT_BAD);
-				if (swslot != -1) {
+				if (swslot > 0) {
 					uvm_swap_markbad(swslot, 1);
 				}
 
@@ -1421,7 +1423,7 @@ uao_pagein_page(aobj, pageidx)
 	int pageidx;
 {
 	struct vm_page *pg;
-	int rv, slot, npages;
+	int rv, npages;
 
 	pg = NULL;
 	npages = 1;
@@ -1449,24 +1451,30 @@ uao_pagein_page(aobj, pageidx)
 		 */
 
 		return FALSE;
+
+	default:
+		return TRUE;
 	}
 
 	/*
 	 * ok, we've got the page now.
 	 * mark it as dirty, clear its swslot and un-busy it.
 	 */
-
-	slot = uao_set_swslot(&aobj->u_obj, pageidx, 0);
-	uvm_swap_free(slot, 1);
-	pg->flags &= ~(PG_BUSY|PG_CLEAN|PG_FAKE);
-	UVM_PAGE_OWN(pg, NULL);
+	uao_dropswap(&aobj->u_obj, pageidx);
 
 	/*
 	 * deactivate the page (to make sure it's on a page queue).
 	 */
-
 	uvm_lock_pageq();
-	uvm_pagedeactivate(pg);
+	if (pg->wire_count == 0)
+		uvm_pagedeactivate(pg);
 	uvm_unlock_pageq();
+
+	if (pg->flags & PG_WANTED) {
+		wakeup(pg);
+	}
+	pg->flags &= ~(PG_WANTED|PG_BUSY|PG_CLEAN|PG_FAKE);
+	UVM_PAGE_OWN(pg, NULL);
+
 	return FALSE;
 }

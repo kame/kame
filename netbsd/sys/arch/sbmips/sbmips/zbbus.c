@@ -1,4 +1,4 @@
-/* $NetBSD: zbbus.c,v 1.1 2002/03/06 02:13:52 simonb Exp $ */
+/* $NetBSD: zbbus.c,v 1.8 2003/07/15 03:35:51 lukem Exp $ */
 
 /*
  * Copyright 2000, 2001
@@ -15,10 +15,9 @@
  *    the source file.
  *
  * 2) No right is granted to use any trade name, trademark, or logo of
- *    Broadcom Corporation. Neither the "Broadcom Corporation" name nor any
- *    trademark or logo of Broadcom Corporation may be used to endorse or
- *    promote products derived from this software without the prior written
- *    permission of Broadcom Corporation.
+ *    Broadcom Corporation.  The "Broadcom Corporation" name may not be
+ *    used to endorse or promote products derived from this software
+ *    without the prior written permission of Broadcom Corporation.
  *
  * 3) THIS SOFTWARE IS PROVIDED "AS-IS" AND ANY EXPRESS OR IMPLIED
  *    WARRANTIES, INCLUDING BUT NOT LIMITED TO, ANY IMPLIED WARRANTIES OF
@@ -33,6 +32,9 @@
  *    OR OTHERWISE), EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zbbus.c,v 1.8 2003/07/15 03:35:51 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -44,9 +46,8 @@
 static int	zbbus_match(struct device *, struct cfdata *, void *);
 static void	zbbus_attach(struct device *, struct device *, void *);
 
-struct cfattach zbbus_ca = {
-	sizeof(struct device), zbbus_match, zbbus_attach
-};
+CFATTACH_DECL(zbbus, sizeof(struct device),
+    zbbus_match, zbbus_attach, NULL, NULL);
 
 static int	zbbus_print(void *, const char *);
 static int	zbbus_submatch(struct device *, struct cfdata *, void *);
@@ -99,9 +100,9 @@ zbbus_print(void *aux, const char *pnp)
 	struct zbbus_attach_args *zap = aux;
 
 	if (pnp)
-		printf("%s at %s",
-	zbbus_entity_type_name(zap->za_locs.za_type), pnp);
-	printf(" busid %d", zap->za_locs.za_busid);
+		aprint_normal("%s at %s",
+		    zbbus_entity_type_name(zap->za_locs.za_type), pnp);
+	aprint_normal(" busid %d", zap->za_locs.za_busid);
 	return (UNCONF);
 }
 
@@ -114,7 +115,7 @@ zbbus_submatch(struct device *parent, struct cfdata *cf, void *aux)
 	    cf->cf_loc[ZBBUSCF_BUSID] != zap->za_locs.za_busid)
 		return (0);
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 static const char *

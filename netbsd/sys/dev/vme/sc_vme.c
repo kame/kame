@@ -1,4 +1,4 @@
-/*	$NetBSD: sc_vme.c,v 1.4 2001/11/15 09:48:19 lukem Exp $	*/
+/*	$NetBSD: sc_vme.c,v 1.9 2003/05/03 18:11:42 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1996,2000,2001 The NetBSD Foundation, Inc.
@@ -69,7 +69,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sc_vme.c,v 1.4 2001/11/15 09:48:19 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sc_vme.c,v 1.9 2003/05/03 18:11:42 wiz Exp $");
 
 #include "opt_ddb.h"
 
@@ -117,9 +117,8 @@ static void	sc_vme_attach __P((struct device *, struct device *, void *));
 static int	sc_vme_intr __P((void *));
 
 /* Auto-configuration glue. */
-struct cfattach sc_vme_ca = {
-	sizeof(struct sunscpal_softc), sc_vme_match, sc_vme_attach
-};
+CFATTACH_DECL(sc_vme, sizeof(struct sunscpal_softc),
+    sc_vme_match, sc_vme_attach, NULL, NULL);
 
 static int
 sc_vme_match(parent, cf, aux)
@@ -202,7 +201,7 @@ sc_vme_attach(parent, self, aux)
 	i = SUNSCPAL_OPENINGS * sizeof(struct sunscpal_dma_handle);
 	sc->sc_dma_handles = (struct sunscpal_dma_handle *)malloc(i, M_DEVBUF, M_NOWAIT);
 	if (sc->sc_dma_handles == NULL)
-		panic("sc: dma handle malloc failed\n");
+		panic("sc: DMA handle malloc failed");
 
 	for (i = 0; i < SUNSCPAL_OPENINGS; i++) {
 		sc->sc_dma_handles[i].dh_flags = 0;

@@ -1,43 +1,25 @@
-#	$NetBSD: Makefile.evbarm.inc,v 1.11 2002/03/27 21:51:28 thorpej Exp $
+#	$NetBSD: Makefile.evbarm.inc,v 1.16 2003/01/03 02:16:26 thorpej Exp $
 
 SYSTEM_LD_TAIL_EXTRA=; \
 	echo "${DBSYM} $@ || true"; \
 	${DBSYM} $@ || true
 
-.if (${BOARDTYPE} == "integrator")
-GENASSYM_EXTRAS+=	${THISARM}/ifpga/genassym.cf
-SYSTEM_FIRST_OBJ=	intmmu.o
-SYSTEM_FIRST_SFILE=	${THISARM}/integrator/intmmu.S
+.if defined(BOARDMKFRAG)	# Must be a full pathname.
+.include "${BOARDMKFRAG}"
 .endif
 
-.if (${BOARDTYPE} == "iq80310")
-SYSTEM_FIRST_OBJ=	iq80310_start.o
-SYSTEM_FIRST_SFILE=	${THISARM}/iq80310/iq80310_start.S
+.if defined(KERNEL_BASE_PHYS)
 
-LINKFLAGS=	-T ${THISARM}/conf/ldscript.iq80310
+LINKFLAGS=	-T ldscript
 
-SYSTEM_LD_TAIL_EXTRA+=; \
-	echo ${OBJCOPY} -S -O srec $@ $@.srec; \
-	${OBJCOPY} -S -O srec $@ $@.srec; \
-	echo ${OBJCOPY} -S -O binary $@ $@.bin; \
-	${OBJCOPY} -S -O binary $@ $@.bin
+netbsd: ldscript             # XXX
+EXTRA_CLEAN+= ldscript tmp
 
-EXTRA_KERNELS+= ${KERNELS:@.KERNEL.@${.KERNEL.}.srec@}
-EXTRA_KERNELS+= ${KERNELS:@.KERNEL.@${.KERNEL.}.bin@}
-.endif
+# generate ldscript from common template 
+ldscript: ${THISARM}/conf/ldscript.evbarm ${THISARM}/conf/Makefile.evbarm.inc
+	echo ${KERNELS}
+	sed -e 's/@KERNEL_BASE_PHYS@/${KERNEL_BASE_PHYS}/' \
+	    -e 's/@KERNEL_BASE_VIRT@/${KERNEL_BASE_VIRT}/' \
+	    ${THISARM}/conf/ldscript.evbarm > tmp && mv tmp $@
 
-.if (${BOARDTYPE} == "iq80321")
-SYSTEM_FIRST_OBJ=	iq80321_start.o
-SYSTEM_FIRST_SFILE=	${THISARM}/iq80321/iq80321_start.S
-
-LINKFLAGS=	-T ${THISARM}/conf/ldscript.iq80321
-
-SYSTEM_LD_TAIL_EXTRA+=; \
-	echo ${OBJCOPY} -S -O srec $@ $@.srec; \
-	${OBJCOPY} -S -O srec $@ $@.srec; \
-	echo ${OBJCOPY} -S -O binary $@ $@.bin; \
-	${OBJCOPY} -S -O binary $@ $@.bin
-
-EXTRA_KERNELS+= ${KERNELS:@.KERNEL.@${.KERNEL.}.srec@}
-EXTRA_KERNELS+= ${KERNELS:@.KERNEL.@${.KERNEL.}.bin@}
-.endif
+.endif	# KERNEL_BASE_PHYS

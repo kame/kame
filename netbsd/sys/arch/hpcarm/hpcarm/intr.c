@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.c,v 1.5 2001/11/27 01:12:55 thorpej Exp $	*/
+/*	$NetBSD: intr.c,v 1.8 2003/07/15 00:25:09 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -35,6 +35,9 @@
  * Soft interrupt and other generic interrupt functions.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: intr.c,v 1.8 2003/07/15 00:25:09 lukem Exp $");
+
 #include "opt_irqstats.h"
 
 #include <sys/param.h>
@@ -44,6 +47,7 @@
 
 #include <uvm/uvm_extern.h>
 
+#include <machine/atomic.h>
 #include <machine/intr.h>
 #include <machine/cpu.h>
 
@@ -77,6 +81,10 @@ extern void sacomsoft	__P((void));
 #endif	/* NSACOM > 0 */
 
 /* Eventually these will become macros */
+
+void setsoftintr(u_int);
+void clearsoftintr(u_int);
+void dosoftints(void);
 
 void
 setsoftintr(intrmask)

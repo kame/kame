@@ -1,4 +1,4 @@
-/*	$NetBSD: disksubr.c,v 1.2.10.1 2002/08/27 23:30:36 lukem Exp $	*/
+/*	$NetBSD: disksubr.c,v 1.9.2.1 2004/10/01 02:40:16 jmc Exp $	*/
 
 /*
  * Copyright (c) 1998 Christopher G. Demetriou.  All rights reserved.
@@ -32,6 +32,36 @@
 
 /*
  * Copyright (c) 1982, 1986, 1988 Regents of the University of California.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	from: @(#)ufs_disksubr.c	7.16 (Berkeley) 5/4/91
+ */
+
+/*
  * Copyright (c) 1995 Mark Brinicombe
  * All rights reserved.
  *
@@ -66,6 +96,9 @@
  *	from: @(#)ufs_disksubr.c	7.16 (Berkeley) 5/4/91
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: disksubr.c,v 1.9.2.1 2004/10/01 02:40:16 jmc Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -91,7 +124,7 @@
  * Returns null on success and an error string on failure.
  */
 
-char *
+const char *
 readdisklabel(dev, strat, lp, osdep)
 	dev_t dev;
 	void (*strat) __P((struct buf *));
@@ -101,9 +134,7 @@ readdisklabel(dev, strat, lp, osdep)
 	struct buf *bp;
 	struct disklabel *dlp;
 	char *msg = NULL;
-	int cyl, netbsdpartoff, i;
-
-/*	printf("Reading disclabel for %04x\n", dev);*/
+	int cyl, netbsdpartoff, i, found = 0;
 
 	/* minimal requirements for archtypal disk label */
 
@@ -113,13 +144,8 @@ readdisklabel(dev, strat, lp, osdep)
 	if (lp->d_secperunit == 0)
 		lp->d_secperunit = 0x1fffffff;
 
-	lp->d_npartitions = MAXPARTITIONS;
-	for (i = 0; i < MAXPARTITIONS; i++) {
-		if (i == RAW_PART) continue;
-		lp->d_partitions[i].p_offset = 0;
-		lp->d_partitions[i].p_fstype = FS_UNUSED;
-		lp->d_partitions[i].p_size = 0;
-	}
+	if (lp->d_npartitions < RAW_PART + 1)
+	      lp->d_npartitions = RAW_PART + 1;
 
 	if (lp->d_partitions[RAW_PART].p_size == 0) {
 		lp->d_partitions[RAW_PART].p_fstype = FS_UNUSED; 
@@ -159,8 +185,6 @@ readdisklabel(dev, strat, lp, osdep)
 
 	/* next, dig out disk label */
 
-/*	printf("Reading disklabel addr=%08x\n", netbsdpartoff * DEV_BSIZE);*/
-  
 	bp->b_blkno = netbsdpartoff + LABELSECTOR;
 	bp->b_cylinder = bp->b_blkno / lp->d_secpercyl;
 	bp->b_bcount = lp->d_secsize;
@@ -177,19 +201,19 @@ readdisklabel(dev, strat, lp, osdep)
 	    dlp <= (struct disklabel *)(bp->b_data + lp->d_secsize - sizeof(*dlp));
 	    dlp = (struct disklabel *)((char *)dlp + sizeof(long))) {
 		if (dlp->d_magic != DISKMAGIC || dlp->d_magic2 != DISKMAGIC) {
-			if (msg == NULL)
-				msg = "no disk label";
+			continue;
 		} else if (dlp->d_npartitions > MAXPARTITIONS ||
 			   dkcksum(dlp) != 0)
 			msg = "disk label corrupted";
 		else {
 			*lp = *dlp;
 			msg = NULL;
+			found = 1;
 			break;
 		}
 	}
 
-	if (msg)
+	if (msg != NULL || found == 0)
 		goto done;
 
 	/* obtain bad sector table if requested and present */
@@ -388,11 +412,12 @@ done:
  * if needed, and signal errors or early completion.
  */
 int
-bounds_check_with_label(bp, lp, wlabel)
+bounds_check_with_label(dk, bp, wlabel)
+	struct disk *dk;
 	struct buf *bp;
-	struct disklabel *lp;
 	int wlabel;
 {
+	struct disklabel *lp = dk->dk_label;
 	struct partition *p = lp->d_partitions + DISKPART(bp->b_dev);
 	int labelsector = lp->d_partitions[RAW_PART].p_offset + LABELSECTOR;
 	int sz;
@@ -404,7 +429,7 @@ bounds_check_with_label(bp, lp, wlabel)
 		if (sz == 0) {
 			/* If exactly at end of disk, return EOF. */
 			bp->b_resid = bp->b_bcount;
-			goto done;
+			return (0);
 		}
 		if (sz < 0) {
 			/* If past end of disk, return EINVAL. */
@@ -432,8 +457,7 @@ bounds_check_with_label(bp, lp, wlabel)
 
 bad:
 	bp->b_flags |= B_ERROR;
-done:
-	return (0);
+	return (-1);
 }
 
 /* End of disksubr.c */

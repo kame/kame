@@ -1,4 +1,4 @@
-/*	$NetBSD: pte.h,v 1.10 2002/03/20 18:41:53 eeh Exp $ */
+/*	$NetBSD: pte.h,v 1.13 2004/03/14 18:18:54 chs Exp $ */
 
 /*
  * Copyright (c) 1996-1999 Eduardo Horvath
@@ -52,7 +52,7 @@
  *			data_cacheable:2,	(cacheability control)
  *			data_e:1,	(explicit accesses only)
  *			data_priv:1,	(privileged page)
- *			data_w:1,	(writeable)
+ *			data_w:1,	(writable)
  *			data_g:1;	(same as tag_g)
  *	};	
  */
@@ -111,7 +111,7 @@ struct sun4u_data_fields {
 		data_cacheable:2,	/* cacheability control */
 		data_e:1,	/* explicit accesses only */
 		data_priv:1,	/* privileged page */
-		data_w:1,	/* writeable */
+		data_w:1,	/* writable */
 		data_g:1;	/* same as tag_g */
 };
 union sun4u_data { struct sun4u_data_fields f; int64_t data; };
@@ -127,9 +127,29 @@ struct sun4u_tte {
 #endif
 typedef struct sun4u_tte pte_t;
 
-/* Assembly routine to flush a mapping */
-extern void tlb_flush_pte __P((vaddr_t addr, int ctx));
-extern void tlb_flush_ctx __P((int ctx));
+/* TLB shootdown handler arguments. */
+struct ipi_tlb_args {
+	vaddr_t ita_vaddr;
+	int ita_ctx;
+};
+
+/* Assembly routines to flush TLB mappings */
+void sp_tlb_flush_pte __P((vaddr_t, int));
+void sp_tlb_flush_ctx __P((int));
+void sp_tlb_flush_all __P((void));
+
+#if defined(MULTIPROCESSOR)
+void smp_tlb_flush_pte __P((vaddr_t, int));
+void smp_tlb_flush_ctx __P((int));
+void smp_tlb_flush_all __P((void));
+#define	tlb_flush_pte(va,ctx)	smp_tlb_flush_pte(va, ctx)
+#define	tlb_flush_ctx(ctx)	smp_tlb_flush_ctx(ctx)
+#define	tlb_flush_all()		smp_tlb_flush_all()
+#else
+#define	tlb_flush_pte(va,ctx)	sp_tlb_flush_pte(va, ctx)
+#define	tlb_flush_ctx(ctx)	sp_tlb_flush_ctx(ctx)
+#define	tlb_flush_all()		sp_tlb_flush_all()
+#endif
 
 #endif /* _LOCORE */
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: rcons_subr.c,v 1.10 2001/11/15 09:48:15 lukem Exp $ */
+/*	$NetBSD: rcons_subr.c,v 1.12 2003/08/07 16:31:21 agc Exp $ */
 
 /*
  * Copyright (c) 1991, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -45,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rcons_subr.c,v 1.10 2001/11/15 09:48:15 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rcons_subr.c,v 1.12 2003/08/07 16:31:21 agc Exp $");
 
 #include <sys/param.h>
 #ifdef _KERNEL
@@ -92,7 +88,7 @@ rcons_init_ops(rc)
 	rc->rc_supwsflg = 0;
 	
 	for (i = 1; i < 256; i <<= 1)
-		if (rc->rc_ops->alloc_attr(rc->rc_cookie, 0, 0, i, &tmp) == 0)
+		if (rc->rc_ops->allocattr(rc->rc_cookie, 0, 0, i, &tmp) == 0)
 			rc->rc_supwsflg |= i;
 
 	/* Allocate kernel output attribute */
@@ -531,7 +527,7 @@ rcons_setcolor(rc, fg, bg)
 	flg = (rc->rc_wsflg | WSATTR_WSCOLORS) & rc->rc_supwsflg;
 	rc->rc_bgcolor = bg;
 	rc->rc_fgcolor = fg;
-	rc->rc_ops->alloc_attr(rc->rc_cookie, fg, bg, flg, &rc->rc_attr);
+	rc->rc_ops->allocattr(rc->rc_cookie, fg, bg, flg, &rc->rc_attr);
 }
 
 

@@ -3,7 +3,7 @@
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Martin Husemann <martin@netbsd.org>.
+ * by Martin Husemann <martin@NetBSD.org>.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: isic_isa.c,v 1.13 2002/04/14 12:24:26 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: isic_isa.c,v 1.19 2003/12/04 13:57:30 keihan Exp $");
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -78,7 +78,7 @@ __KERNEL_RCSID(0, "$NetBSD: isic_isa.c,v 1.13 2002/04/14 12:24:26 martin Exp $")
 #include <netisdn/i4b_mbuf.h>
 #include <netisdn/i4b_global.h>
 
-extern const struct isdn_layer1_bri_driver isic_std_driver;
+extern const struct isdn_layer1_isdnif_driver isic_std_driver;
 
 #if defined(__OpenBSD__)
 #define __BROKEN_INDIRECT_CONFIG
@@ -98,9 +98,8 @@ static int setup_io_map __P((int flags, bus_space_tag_t iot,
 	int *msize));
 static void args_unmap __P((int *num_mappings, struct isic_io_map *maps));
 
-struct cfattach isic_isa_ca = {
-	sizeof(struct isic_softc), isic_isa_probe, isic_isa_attach
-};
+CFATTACH_DECL(isic_isa, sizeof(struct isic_softc),
+    isic_isa_probe, isic_isa_attach, NULL, NULL);
 
 #define	ISIC_FMT	"%s: "
 #define	ISIC_PARM	sc->sc_dev.dv_xname
@@ -997,7 +996,7 @@ isic_isa_attach(parent, self, aux)
 			 * solved by setting an interrupt type in the sc
 			 * structure. I don't feel familiar enough with the
 			 * code to do this currently. Feel free to contact
-			 * me about it (leo@netbsd.org).
+			 * me about it (leo@NetBSD.org).
 			 */
 			isicintr(sc);
 		}

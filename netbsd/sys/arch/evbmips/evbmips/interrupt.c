@@ -1,4 +1,4 @@
-/*	$NetBSD: interrupt.c,v 1.2 2002/04/08 14:08:26 simonb Exp $	*/
+/*	$NetBSD: interrupt.c,v 1.6 2003/07/15 01:37:32 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -36,8 +36,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: interrupt.c,v 1.6 2003/07/15 01:37:32 lukem Exp $");
+
 #include <sys/param.h>
-#include <sys/malloc.h>
 #include <sys/device.h>
 
 #include <uvm/uvm_extern.h>
@@ -46,23 +48,6 @@
 #include <machine/locore.h>
 
 #include <evbmips/evbmips/clockvar.h>
-
-struct evbmips_soft_intrhand *softnet_intrhand;
-
-/*
- * This is a mask of bits to clear in the SR when we go to a
- * given software interrupt priority level.
- * Hardware ipls are port/board specific.
- */
-
-const u_int32_t ipl_si_to_sr[_IPL_NSOFT] = {
-	MIPS_SOFT_INT_MASK_0,			/* IPL_SOFT */
-	MIPS_SOFT_INT_MASK_0,			/* IPL_SOFTCLOCK */
-	MIPS_SOFT_INT_MASK_1,			/* IPL_SOFTNET */
-	MIPS_SOFT_INT_MASK_1,			/* IPL_SOFTSERIAL */
-};
-
-struct evbmips_soft_intr evbmips_soft_intrs[_IPL_NSOFT];
 
 struct evcnt mips_int5_evcnt =
     EVCNT_INITIALIZER(EVCNT_TYPE_INTR, NULL, "mips", "int 5 (clock)");
@@ -74,6 +59,7 @@ void
 intr_init(void)
 {
 
+	evcnt_attach_static(&mips_int5_evcnt);
 	evbmips_intr_init();	/* board specific stuff */
 
 	softintr_init();
@@ -83,10 +69,7 @@ void
 cpu_intr(u_int32_t status, u_int32_t cause, u_int32_t pc, u_int32_t ipending)
 {
 	struct clockframe cf;
-	struct evbmips_soft_intr *si;
-	struct evbmips_soft_intrhand *sih;
 	uint32_t new_cnt;
-	int i, s;
 
 	uvmexp.intrs++;
 
@@ -103,7 +86,7 @@ cpu_intr(u_int32_t status, u_int32_t cause, u_int32_t pc, u_int32_t ipending)
 		 * counting again from the current value.
 		 */
 		if ((next_cp0_clk_intr - new_cnt) & 0x80000000) {
-#if 0
+#if 0	/* XXX - should add an event counter for this */
 			missed_clk_intrs++;
 #endif
 
@@ -136,107 +119,5 @@ cpu_intr(u_int32_t status, u_int32_t cause, u_int32_t pc, u_int32_t ipending)
 
 	_clrsoftintr(ipending);
 
-	for (i = _IPL_NSOFT - 1; i >= 0; i--) {
-		if ((ipending & ipl_si_to_sr[i]) == 0)
-			continue;
-
-		si = &evbmips_soft_intrs[i];
-
-		if (TAILQ_FIRST(&si->softintr_q) != NULL)
-			si->softintr_evcnt.ev_count++;
-
-		for (;;) {
-			s = splhigh();
-
-			sih = TAILQ_FIRST(&si->softintr_q);
-			if (sih != NULL) {
-				TAILQ_REMOVE(&si->softintr_q, sih, sih_q);
-				sih->sih_pending = 0;
-			}
-
-			splx(s);
-
-			if (sih == NULL)
-				break;
-
-			uvmexp.softs++;
-			(*sih->sih_fn)(sih->sih_arg);
-		}
-	}
-}
-
-/*
- * softintr_init:
- *
- *	Initialize the software interrupt system.
- */
-void
-softintr_init(void)
-{
-	static const char *softintr_names[] = IPL_SOFTNAMES;
-	struct evbmips_soft_intr *si;
-	int i;
-
-	for (i = 0; i < _IPL_NSOFT; i++) {
-		si = &evbmips_soft_intrs[i];
-		TAILQ_INIT(&si->softintr_q);
-		si->softintr_ipl = IPL_SOFT + i;
-		evcnt_attach_dynamic(&si->softintr_evcnt, EVCNT_TYPE_INTR,
-		    NULL, "soft", softintr_names[i]);
-	}
-
-	/* XXX Establish legacy soft interrupt handlers. */
-	softnet_intrhand = softintr_establish(IPL_SOFTNET,
-	    (void (*)(void *))netintr, NULL);
-
-	assert(softnet_intrhand != NULL);
-}
-
-/*
- * softintr_establish:		[interface]
- *
- *	Register a software interrupt handler.
- */
-void *
-softintr_establish(int ipl, void (*func)(void *), void *arg)
-{
-	struct evbmips_soft_intr *si;
-	struct evbmips_soft_intrhand *sih;
-
-	if (__predict_false(ipl >= (IPL_SOFT + _IPL_NSOFT) ||
-			    ipl < IPL_SOFT))
-		panic("softintr_establish");
-
-	si = &evbmips_soft_intrs[ipl - IPL_SOFT];
-
-	sih = malloc(sizeof(*sih), M_DEVBUF, M_NOWAIT);
-	if (__predict_true(sih != NULL)) {
-		sih->sih_intrhead = si;
-		sih->sih_fn = func;
-		sih->sih_arg = arg;
-		sih->sih_pending = 0;
-	}
-	return (sih);
-}
-
-/*
- * softintr_disestablish:	[interface]
- *
- *	Unregister a software interrupt handler.
- */
-void
-softintr_disestablish(void *arg)
-{
-	struct evbmips_soft_intrhand *sih = arg;
-	struct evbmips_soft_intr *si = sih->sih_intrhead;
-	int s;
-
-	s = splhigh();
-	if (sih->sih_pending) {
-		TAILQ_REMOVE(&si->softintr_q, sih, sih_q);
-		sih->sih_pending = 0;
-	}
-	splx(s);
-
-	free(sih, M_DEVBUF);
+	softintr_dispatch(ipending);
 }

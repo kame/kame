@@ -1,4 +1,4 @@
-/*	$NetBSD: akbd.c,v 1.23.6.1 2003/06/19 11:37:00 grant Exp $	*/
+/*	$NetBSD: akbd.c,v 1.31 2003/07/24 20:56:24 nathanw Exp $	*/
 
 /*
  * Copyright (C) 1998	Colin Wood
@@ -29,6 +29,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: akbd.c,v 1.31 2003/07/24 20:56:24 nathanw Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -64,7 +67,6 @@ static int	akbdmatch __P((struct device *, struct cfdata *, void *));
 static void	akbdattach __P((struct device *, struct device *, void *));
 void		kbd_adbcomplete __P((caddr_t buffer, caddr_t data_area, int adb_command));
 static void	kbd_processevent __P((adb_event_t *event, struct akbd_softc *));
-static void kbd_passup __P((struct akbd_softc *sc, int));
 #ifdef notyet
 static u_char	getleds __P((int));
 static int	setleds __P((struct akbd_softc *, u_char));
@@ -72,9 +74,8 @@ static void	blinkleds __P((struct akbd_softc *));
 #endif
 
 /* Driver definition. */
-struct cfattach akbd_ca = {
-	sizeof(struct akbd_softc), akbdmatch, akbdattach
-};
+CFATTACH_DECL(akbd, sizeof(struct akbd_softc),
+    akbdmatch, akbdattach, NULL, NULL);
 
 extern struct cfdriver akbd_cd;
 
@@ -532,18 +533,45 @@ kbd_intr(arg)
 {
 	adb_event_t *event = arg;
 	int key;
+#ifdef CAPS_IS_CONTROL
+	static int shift;
+#endif
 
 	struct akbd_softc *sc = akbd_cd.cd_devs[0];
 
 	key = event->u.k.key;
 
+#ifdef CAPS_IS_CONTROL
+	/*
+	 * Caps lock is weird. The key sequence generated is:
+	 * press:   down(57) [57]  (LED turns on)
+	 * release: up(127)  [255]
+	 * press:   up(127)  [255]
+	 * release: up(57)   [185] (LED turns off)
+	 */
+	if ((key == 57) || (key == 185))
+		shift = 0;
+	
+	if (key == 255) {
+		if (shift == 0) {
+			key = 185;
+			shift = 1;
+		} else {
+			key = 57;
+			shift = 0;
+		}
+	}
+#endif
+
 	switch (key) {
+#ifndef CAPS_IS_CONTROL
 	case 57:	/* Caps Lock pressed */
 	case 185:	/* Caps Lock released */
 		key = ADBK_KEYDOWN(ADBK_KEYVAL(key));
 		kbd_passup(sc,key);
 		key = ADBK_KEYUP(ADBK_KEYVAL(key));
 		break;
+#endif
 	case 245:
 		if (pcmcia_soft_eject)
 			pm_eject_pcmcia(0);

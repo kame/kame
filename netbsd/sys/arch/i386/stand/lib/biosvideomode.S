@@ -1,3 +1,4 @@
+/*	$NetBSD: biosvideomode.S,v 1.3 2003/04/16 13:49:21 dsl Exp $	*/
 
 /*
  * Copyright (c) 1996
@@ -30,11 +31,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-	
 
 #include <machine/asm.h>
-
-#define	data32	.byte 0x66
 
 	.text
 
@@ -46,17 +44,17 @@ ENTRY(biosvideomode)
 	push	%edi
 
 	call	_C_LABEL(prot_to_real)
+	.code16
 
 	movb	$0, %ah
 	movb	$2, %al
 	int	$0x10
 	# zero-extend 16-bit result to 32 bits.
-	data32
 	movl	$0, %ebx
-	mov	%eax,%ebx		# !!! at run time, it is mov %ax,%bx
+	movw	%ax,%bx
 
-	data32
-	call	_C_LABEL(real_to_prot)
+	calll	_C_LABEL(real_to_prot)
+	.code32
 
 	movl	%ebx, %eax
 

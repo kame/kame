@@ -1,4 +1,4 @@
-/*	$NetBSD: pcib.c,v 1.2 2002/03/18 10:10:16 simonb Exp $	*/
+/*	$NetBSD: pcib.c,v 1.8 2003/07/15 01:37:34 lukem Exp $	*/
 
 /*
  * Copyright 2002 Wasabi Systems, Inc.
@@ -34,6 +34,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pcib.c,v 1.8 2003/07/15 01:37:34 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -132,9 +135,8 @@ static int	pcib_isa_intr_alloc(void *, int, int, int *);
 static const char *
 		pcib_isa_intr_string(void *, int);
 
-struct cfattach pcib_ca = {
-	sizeof(struct pcib_softc), pcib_match, pcib_attach
-};
+CFATTACH_DECL(pcib, sizeof(struct pcib_softc),
+    pcib_match, pcib_attach, NULL, NULL);
 
 static int
 pcib_match(struct device *parent, struct cfdata *match, void *aux)
@@ -158,7 +160,7 @@ pcib_attach(struct device *parent, struct device *self, void *aux)
 	printf("\n");
 
 	if (my_sc != NULL)
-		panic("pcib_attach: already attached!\n");
+		panic("pcib_attach: already attached!");
 	my_sc = (void *)self;
 
 	/*
@@ -334,7 +336,7 @@ pcib_print(void *aux, const char *pnp)
 
 	/* Only ISAs can attach to pcib's; easy. */
 	if (pnp)
-		printf("isa at %s", pnp);
+		aprint_normal("isa at %s", pnp);
 	return (UNCONF);
 }
 
@@ -443,7 +445,7 @@ pcib_isa_intr_string(void *v, int irq)
 	static char irqstr[12];		/* 8 + 2 + NULL + sanity */
 
 	if (irq == 0 || irq >= ICU_LEN || irq == 2)
-		panic("pcib_isa_intr_string: bogus isa irq 0x%x\n", irq);
+		panic("pcib_isa_intr_string: bogus isa irq 0x%x", irq);
 
 	sprintf(irqstr, "isa irq %d", irq);
 	return (irqstr);
@@ -454,7 +456,7 @@ pcib_isa_intr_evcnt(void *v, int irq)
 {
 
 	if (irq == 0 || irq >= ICU_LEN || irq == 2)
-		panic("pcib_isa_intr_evcnt: bogus isa irq 0x%x\n", irq);
+		panic("pcib_isa_intr_evcnt: bogus isa irq 0x%x", irq);
 
 	return (&my_sc->sc_intrtab[irq].intr_count);
 }

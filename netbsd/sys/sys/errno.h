@@ -1,4 +1,4 @@
-/*	$NetBSD: errno.h,v 1.27 2002/03/17 19:41:12 atatat Exp $	*/
+/*	$NetBSD: errno.h,v 1.34 2003/08/07 16:34:03 agc Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -58,9 +54,7 @@
 #define	ENOMEM		12		/* Cannot allocate memory */
 #define	EACCES		13		/* Permission denied */
 #define	EFAULT		14		/* Bad address */
-#if !defined(_POSIX_SOURCE) && !defined(_XOPEN_SOURCE)
 #define	ENOTBLK		15		/* Block device required */
-#endif /* !_POSIX_SOURCE && !_XOPEN_SOURCE */
 #define	EBUSY		16		/* Device busy */
 #define	EEXIST		17		/* File exists */
 #define	EXDEV		18		/* Cross-device link */
@@ -71,9 +65,7 @@
 #define	ENFILE		23		/* Too many open files in system */
 #define	EMFILE		24		/* Too many open files */
 #define	ENOTTY		25		/* Inappropriate ioctl for device */
-#ifndef _POSIX_SOURCE
 #define	ETXTBSY		26		/* Text file busy */
-#endif /* !_POSIX_SOURCE */
 #define	EFBIG		27		/* File too large */
 #define	ENOSPC		28		/* No space left on device */
 #define	ESPIPE		29		/* Illegal seek */
@@ -83,11 +75,10 @@
 
 /* math software */
 #define	EDOM		33		/* Numerical argument out of domain */
-#define	ERANGE		34		/* Result too large */
+#define	ERANGE		34		/* Result too large or too small */
 
 /* non-blocking and interrupt i/o */
 #define	EAGAIN		35		/* Resource temporarily unavailable */
-#ifndef _POSIX_SOURCE
 #define	EWOULDBLOCK	EAGAIN		/* Operation would block */
 #define	EINPROGRESS	36		/* Operation now in progress */
 #define	EALREADY	37		/* Operation already in progress */
@@ -99,13 +90,9 @@
 #define	EPROTOTYPE	41		/* Protocol wrong type for socket */
 #define	ENOPROTOOPT	42		/* Protocol not available */
 #define	EPROTONOSUPPORT	43		/* Protocol not supported */
-#ifndef _XOPEN_SOURCE
 #define	ESOCKTNOSUPPORT	44		/* Socket type not supported */
-#endif /* !_XOPEN_SOURCE */
 #define	EOPNOTSUPP	45		/* Operation not supported */
-#ifndef _XOPEN_SOURCE
 #define	EPFNOSUPPORT	46		/* Protocol family not supported */
-#endif /* !_XOPEN_SOURCE */
 #define	EAFNOSUPPORT	47		/* Address family not supported by protocol family */
 #define	EADDRINUSE	48		/* Address already in use */
 #define	EADDRNOTAVAIL	49		/* Can't assign requested address */
@@ -113,74 +100,71 @@
 /* ipc/network software -- operational errors */
 #define	ENETDOWN	50		/* Network is down */
 #define	ENETUNREACH	51		/* Network is unreachable */
-#ifndef _XOPEN_SOURCE
 #define	ENETRESET	52		/* Network dropped connection on reset */
-#endif /* !_XOPEN_SOURCE */
 #define	ECONNABORTED	53		/* Software caused connection abort */
 #define	ECONNRESET	54		/* Connection reset by peer */
 #define	ENOBUFS		55		/* No buffer space available */
 #define	EISCONN		56		/* Socket is already connected */
 #define	ENOTCONN	57		/* Socket is not connected */
-#ifndef _XOPEN_SOURCE
 #define	ESHUTDOWN	58		/* Can't send after socket shutdown */
 #define	ETOOMANYREFS	59		/* Too many references: can't splice */
-#endif /* !_XOPEN_SOURCE */
 #define	ETIMEDOUT	60		/* Operation timed out */
 #define	ECONNREFUSED	61		/* Connection refused */
 
 #define	ELOOP		62		/* Too many levels of symbolic links */
-#endif /* !_POSIX_SOURCE */
 #define	ENAMETOOLONG	63		/* File name too long */
 
 /* should be rearranged */
-#ifndef _POSIX_SOURCE
-#ifndef _XOPEN_SOURCE
 #define	EHOSTDOWN	64		/* Host is down */
-#endif /* !_XOPEN_SOURCE */
 #define	EHOSTUNREACH	65		/* No route to host */
-#endif /* !_POSIX_SOURCE */
 #define	ENOTEMPTY	66		/* Directory not empty */
 
 /* quotas & mush */
-#ifndef _POSIX_SOURCE
-#ifndef _XOPEN_SOURCE
 #define	EPROCLIM	67		/* Too many processes */
 #define	EUSERS		68		/* Too many users */
-#endif /* !_XOPEN_SOURCE */
 #define	EDQUOT		69		/* Disc quota exceeded */
 
 /* Network File System */
 #define	ESTALE		70		/* Stale NFS file handle */
-#ifndef _XOPEN_SOURCE
 #define	EREMOTE		71		/* Too many levels of remote in path */
 #define	EBADRPC		72		/* RPC struct is bad */
 #define	ERPCMISMATCH	73		/* RPC version wrong */
 #define	EPROGUNAVAIL	74		/* RPC prog. not avail */
 #define	EPROGMISMATCH	75		/* Program version wrong */
 #define	EPROCUNAVAIL	76		/* Bad procedure for program */
-#endif /* !_XOPEN_SOURCE */
-#endif /* !_POSIX_SOURCE */
 
 #define	ENOLCK		77		/* No locks available */
 #define	ENOSYS		78		/* Function not implemented */
 
-#if !defined(_POSIX_SOURCE) && !defined(_XOPEN_SOURCE)
 #define	EFTYPE		79		/* Inappropriate file type or format */
 #define	EAUTH		80		/* Authentication error */
 #define	ENEEDAUTH	81		/* Need authenticator */
-#endif /* !_POSIX_SOURCE && !_XOPEN_SOURCE */
 
 /* SystemV IPC */
-#ifndef _POSIX_SOURCE
 #define	EIDRM		82		/* Identifier removed */
 #define	ENOMSG		83		/* No message of desired type */
 #define	EOVERFLOW	84		/* Value too large to be stored in data type */
-#endif /* !_POSIX_SOURCE */
 
 /* Wide/multibyte-character handling, ISO/IEC 9899/AMD1:1995 */
 #define	EILSEQ		85		/* Illegal byte sequence */
 
-#define	ELAST		85		/* Must equal largest errno */
+/* From IEEE Std 1003.1-2001 */
+/* Base, Realtime, Threads or Thread Priority Scheduling option errors */
+#define ENOTSUP		86		/* Not supported */
+
+/* Realtime option errors */
+#define ECANCELED	87		/* Operation canceled */
+
+/* Realtime, XSI STREAMS option errors */
+#define EBADMSG		88		/* Bad or Corrupt message */
+
+/* XSI STREAMS option errors  */
+#define ENODATA		89		/* No message available */
+#define ENOSR		90		/* No STREAM resources */
+#define ENOSTR		91		/* Not a STREAM */
+#define ETIME		92		/* STREAM ioctl timeout */
+
+#define	ELAST		92		/* Must equal largest errno */
 
 #ifdef _KERNEL
 /* pseudo-errors returned inside kernel to modify return to process */

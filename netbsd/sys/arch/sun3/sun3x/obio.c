@@ -1,4 +1,4 @@
-/*	$NetBSD: obio.c,v 1.14 2001/09/05 14:26:08 tsutsui Exp $	*/
+/*	$NetBSD: obio.c,v 1.22 2003/07/15 03:36:20 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -36,9 +36,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: obio.c,v 1.22 2003/07/15 03:36:20 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/mon.h>
@@ -52,9 +57,8 @@ static void obio_attach __P((struct device *, struct device *, void *));
 static int  obio_print __P((void *, const char *parentname));
 static int	obio_submatch __P((struct device *, struct cfdata *, void *));
 
-struct cfattach obio_ca = {
-	sizeof(struct device), obio_match, obio_attach
-};
+CFATTACH_DECL(obio, sizeof(struct device),
+    obio_match, obio_attach, NULL, NULL);
 
 static int
 obio_match(parent, cf, aux)
@@ -171,7 +175,6 @@ obio_submatch(parent, cf, aux)
 	void *aux;
 {
 	struct confargs *ca = aux;
-	cfmatch_t submatch;
 
 	/*
 	 * Note that a defaulted address locator can never match
@@ -182,8 +185,8 @@ obio_submatch(parent, cf, aux)
 	 */
 #ifdef	DIAGNOSTIC
 	if (cf->cf_paddr == -1)
-		panic("obio_submatch: invalid address for: %s%d\n",
-			cf->cf_driver->cd_name, cf->cf_unit);
+		panic("obio_submatch: invalid address for: %s%d",
+			cf->cf_name, cf->cf_unit);
 #endif
 
 	/*
@@ -204,12 +207,7 @@ obio_submatch(parent, cf, aux)
 	ca->ca_intvec = cf->cf_intvec;
 
 	/* Now call the match function of the potential child. */
-	submatch = cf->cf_attach->ca_match;
-	if (submatch == NULL)
-		panic("obio_submatch: no match function for: %s\n",
-			  cf->cf_driver->cd_name);
-
-	return ((*submatch)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 
@@ -250,7 +248,7 @@ obio_find_mapping(paddr_t pa, psize_t sz)
 	sz += off;
 
 	/* The saved mappings are all one page long. */
-	if (sz > NBPG)
+	if (sz > PAGE_SIZE)
 		return (caddr_t)0;
 
 	/* Linear search for it.  The list is short. */
@@ -278,7 +276,7 @@ save_prom_mappings __P((void))
 	mon_pte = *romVectorPtr->monptaddr;
 
 	for (va = SUN3X_MON_KDB_BASE; va < SUN3X_MONEND;
-		 va += NBPG, mon_pte++)
+		 va += PAGE_SIZE, mon_pte++)
 	{
 		/* Is this a valid mapping to OBIO? */
 		/* XXX - Some macros would be nice... */

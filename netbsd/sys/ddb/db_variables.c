@@ -1,4 +1,4 @@
-/*	$NetBSD: db_variables.c,v 1.24 2002/02/15 07:33:53 simonb Exp $	*/
+/*	$NetBSD: db_variables.c,v 1.30.2.1 2004/05/28 07:17:06 tron Exp $	*/
 
 /*
  * Mach Operating System
@@ -27,9 +27,9 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: db_variables.c,v 1.24 2002/02/15 07:33:53 simonb Exp $");
+__KERNEL_RCSID(0, "$NetBSD: db_variables.c,v 1.30.2.1 2004/05/28 07:17:06 tron Exp $");
 
-#include "opt_ddb.h"
+#include "opt_ddbparam.h"
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -71,13 +71,13 @@ static int	db_find_variable(const struct db_variable **);
 
 /* XXX must all be ints for sysctl. */
 const struct db_variable db_vars[] = {
-	{ "radix",	(long *)&db_radix,	db_rw_internal_variable },
-	{ "maxoff",	(long *)&db_maxoff,	db_rw_internal_variable },
-	{ "maxwidth",	(long *)&db_max_width,	db_rw_internal_variable },
-	{ "tabstops",	(long *)&db_tab_stop_width, db_rw_internal_variable },
-	{ "lines",	(long *)&db_max_line,	db_rw_internal_variable },
-	{ "onpanic",	(long *)&db_onpanic,	db_rw_internal_variable },
-	{ "fromconsole", (long *)&db_fromconsole, db_rw_internal_variable },
+	{ "radix",	(void *)&db_radix,	db_rw_internal_variable },
+	{ "maxoff",	(void *)&db_maxoff,	db_rw_internal_variable },
+	{ "maxwidth",	(void *)&db_max_width,	db_rw_internal_variable },
+	{ "tabstops",	(void *)&db_tab_stop_width, db_rw_internal_variable },
+	{ "lines",	(void *)&db_max_line,	db_rw_internal_variable },
+	{ "onpanic",	(void *)&db_onpanic,	db_rw_internal_variable },
+	{ "fromconsole", (void *)&db_fromconsole, db_rw_internal_variable },
 };
 const struct db_variable * const db_evars = db_vars + sizeof(db_vars)/sizeof(db_vars[0]);
 
@@ -98,41 +98,58 @@ db_rw_internal_variable(const struct db_variable *vp, db_expr_t *valp, int rw)
 /*
  * sysctl(3) access to the DDB variables defined above.
  */
-int
-ddb_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp,
-    size_t newlen, struct proc *p)
+SYSCTL_SETUP(sysctl_ddb_setup, "sysctl ddb subtree setup")
 {
 
-	/* All sysctl names at this level are terminal. */
-	if (namelen != 1)
-		return (ENOTDIR);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "ddb", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_DDB, CTL_EOL);
 
-	switch (name[0]) {
-	case DDBCTL_RADIX:
-		return (sysctl_int(oldp, oldlenp, newp, newlen, &db_radix));
-
-	case DDBCTL_MAXOFF:
-		return (sysctl_int(oldp, oldlenp, newp, newlen, &db_maxoff));
-
-	case DDBCTL_MAXWIDTH:
-		return (sysctl_int(oldp, oldlenp, newp, newlen,
-		    &db_max_width));
-
-	case DDBCTL_TABSTOPS:
-		return (sysctl_int(oldp, oldlenp, newp, newlen,
-		    &db_tab_stop_width));
-
-	case DDBCTL_LINES:
-		return (sysctl_int(oldp, oldlenp, newp, newlen, &db_max_line));
-
-	case DDBCTL_ONPANIC:
-		return (sysctl_int(oldp, oldlenp, newp, newlen, &db_onpanic));
-	case DDBCTL_FROMCONSOLE:
-		return (sysctl_int(oldp, oldlenp, newp, newlen,
-		    &db_fromconsole));
-	}
-
-	return (EOPNOTSUPP);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "radix",
+		       SYSCTL_DESCR("Input and output radix"),
+		       NULL, 0, &db_radix, 0,
+		       CTL_DDB, DDBCTL_RADIX, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "maxoff",
+		       SYSCTL_DESCR("Maximum symbol offset"),
+		       NULL, 0, &db_maxoff, 0,
+		       CTL_DDB, DDBCTL_MAXOFF, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "maxwidth",
+		       SYSCTL_DESCR("Maximum output line width"),
+		       NULL, 0, &db_max_width, 0,
+		       CTL_DDB, DDBCTL_MAXWIDTH, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "lines",
+		       SYSCTL_DESCR("Number of display lines"),
+		       NULL, 0, &db_max_line, 0,
+		       CTL_DDB, DDBCTL_LINES, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "tabstops",
+		       SYSCTL_DESCR("Output tab width"),
+		       NULL, 0, &db_tab_stop_width, 0,
+		       CTL_DDB, DDBCTL_TABSTOPS, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "onpanic",
+		       SYSCTL_DESCR("Whether to enter ddb on a kernel panic"),
+		       NULL, 0, &db_onpanic, 0,
+		       CTL_DDB, DDBCTL_ONPANIC, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "fromconsole",
+		       SYSCTL_DESCR("Whether ddb can be entered from the "
+				    "console"),
+		       NULL, 0, &db_fromconsole, 0,
+		       CTL_DDB, DDBCTL_FROMCONSOLE, CTL_EOL);
 }
 
 int

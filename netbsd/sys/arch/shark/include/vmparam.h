@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.4 2002/03/23 02:54:01 thorpej Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.14 2003/08/07 16:29:32 agc Exp $	*/
 
 /*
  * Copyright (c) 1988 The Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -50,17 +46,6 @@
  */
 #define	KERNEL_BASE		0xf0000000
 
-/* Various constants used by the MD code */
-#define	KERNEL_TEXT_BASE	(KERNEL_BASE + 0x00000000)
-#define	APTE_BASE		(KERNEL_BASE + 0x00c00000)
-#define	KERNEL_VM_BASE		(KERNEL_BASE + 0x01000000)
-
-/*
- * The range 0xf1000000 - 0xf6ffffff is available for kernel VM space
- * OFW sits at 0xf7000000
- */
-#define	KERNEL_VM_SIZE		0x06000000
-
 /*
  * Override the default pager_map size, there's not enough KVA.
  */
@@ -72,15 +57,9 @@
 
 #define USRIOSIZE       300
 
-/* XXX max. amount of KVM to be used by buffers. */
-#ifndef VM_MAX_KERNEL_BUF
-#define VM_MAX_KERNEL_BUF \
-	((KERNEL_VM_SIZE) * 4 / 10)
-#endif
-
 /* virtual sizes (bytes) for various kernel submaps */
 
-#define VM_PHYS_SIZE		(USRIOSIZE*NBPG)
+#define VM_PHYS_SIZE		(USRIOSIZE*PAGE_SIZE)
 
 /*
  * max number of non-contig chunks of physical RAM you can have

@@ -1,4 +1,4 @@
-/*	$NetBSD: copyoutstr.c,v 1.1 2001/06/13 06:01:48 simonb Exp $	*/
+/*	$NetBSD: copyoutstr.c,v 1.5 2003/10/20 05:52:55 simonb Exp $	*/
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -35,20 +35,21 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: copyoutstr.c,v 1.5 2003/10/20 05:52:55 simonb Exp $");
+
 #include <sys/param.h>
 #include <uvm/uvm_extern.h>
 #include <machine/pcb.h>
-
-int setfault(faultbuf);		/* defined in locore.S */
 
 int
 copyoutstr(const void *kaddr, void *udaddr, size_t len, size_t *done)
 {
 	struct pmap *pm = curproc->p_vmspace->vm_map.pmap;
 	int msr, pid, tmp, ctx;
-	faultbuf env;
+	struct faultbuf env;
 
-	if (setfault(env)) {
+	if (setfault(&env)) {
 		curpcb->pcb_onfault = 0;
 		/* XXXX -- len may be lost on a fault */
 		if (done)
@@ -81,11 +82,11 @@ copyoutstr(const void *kaddr, void *udaddr, size_t len, size_t *done)
 			"sync; isync;"
 			"addi %3,%3,1;"			/* Inc len */
 			"or. %2,%2,%2;"
-			"bdnzf 2,1b;"			/* 
+			"bdnzf 2,1b;"			/*
 							 * while(ctr-- && !zero)
 							 */
 
-			"2: mtpid %1; mtmsr %0;"	/* Restore PID, MSR */
+			"mtpid %1; mtmsr %0;"		/* Restore PID, MSR */
 			"sync; isync;"
 			: "=&r" (msr), "=&r" (pid), "=&r" (tmp), "+r" (len)
 			: "r" (ctx), "r" (udaddr), "r" (kaddr));

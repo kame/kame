@@ -1,4 +1,4 @@
-/*	$NetBSD: cgfourteenvar.h,v 1.3.42.1 2002/11/22 17:37:36 tron Exp $ */
+/*	$NetBSD: cgfourteenvar.h,v 1.4 2002/08/23 02:53:11 thorpej Exp $ */
 
 /*
  * Copyright (c) 1996 

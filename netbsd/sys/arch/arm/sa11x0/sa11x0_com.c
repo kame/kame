@@ -1,4 +1,4 @@
-/*      $NetBSD: sa11x0_com.c,v 1.3 2002/03/17 19:40:34 atatat Exp $        */
+/*      $NetBSD: sa11x0_com.c,v 1.19 2003/08/07 16:26:54 agc Exp $        */
 
 /*-
  * Copyright (c) 1998, 1999, 2001 The NetBSD Foundation, Inc.
@@ -51,11 +51,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -74,9 +70,15 @@
  *	@(#)com.c	7.5 (Berkeley) 5/16/91
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sa11x0_com.c,v 1.19 2003/08/07 16:26:54 agc Exp $");
+
 #include "opt_com.h"
 #include "opt_ddb.h"
+#include "opt_ddbparam.h"
 #include "opt_kgdb.h"
+#include "opt_multiprocessor.h"
+#include "opt_lockdebug.h"
 
 #include "rnd.h"
 #if NRND > 0 && defined(RND_COM)
@@ -102,10 +104,28 @@
 #include <arm/sa11x0/sa11x0_var.h>
 #include <arm/sa11x0/sa11x0_comreg.h>
 #include <arm/sa11x0/sa11x0_comvar.h>
+#include <arm/sa11x0/sa11x0_gpioreg.h>
+
+#ifdef hpcarm
+#include <hpc/include/platid.h>
+#include <hpc/include/platid_mask.h>
+#endif
 
 #include "sacom.h"
 
-cdev_decl(sacom);
+dev_type_open(sacomopen);
+dev_type_close(sacomclose);
+dev_type_read(sacomread);
+dev_type_write(sacomwrite);
+dev_type_ioctl(sacomioctl);
+dev_type_stop(sacomstop);
+dev_type_tty(sacomtty);
+dev_type_poll(sacompoll);
+
+const struct cdevsw sacom_cdevsw = {
+	sacomopen, sacomclose, sacomread, sacomwrite, sacomioctl,
+	sacomstop, sacomtty, sacompoll, nommap, ttykqfilter, D_TTY
+};
 
 static	int	sacom_match(struct device *, struct cfdata *, void *);
 static	void	sacom_attach(struct device *, struct device *, void *);
@@ -114,12 +134,13 @@ static	void	sacom_attach_subr(struct sacom_softc *);
 #if defined(DDB) || defined(KGDB)
 static	void	sacom_enable_debugport(struct sacom_softc *);
 #endif
+int		sacom_detach(struct device *, int);
 void		sacom_config(struct sacom_softc *);
+int		sacom_activate(struct device *, enum devact);
 void		sacom_shutdown(struct sacom_softc *);
 static	u_int	cflag2cr0(tcflag_t);
 int		sacomparam(struct tty *, struct termios *);
 void		sacomstart(struct tty *);
-void		sacomstop(struct tty *, int);
 int		sacomhwiflow(struct tty *, int);
 
 void		sacom_loadchannelregs(struct sacom_softc *);
@@ -129,6 +150,11 @@ void		sacom_modem(struct sacom_softc *, int);
 void		tiocm_to_sacom(struct sacom_softc *, u_long, int);
 int		sacom_to_tiocm(struct sacom_softc *);
 void		sacom_iflush(struct sacom_softc *);
+
+int		sacominit(bus_space_tag_t, bus_addr_t, int, tcflag_t,
+			  bus_space_handle_t *);
+int		sacom_is_console(bus_space_tag_t, bus_addr_t,
+				 bus_space_handle_t *);
 
 #ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
 void 		sacomsoft(void *);
@@ -141,6 +167,10 @@ static inline void sacom_txsoft(struct sacom_softc *, struct tty *);
 static inline void sacom_stsoft(struct sacom_softc *, struct tty *);
 static inline void sacom_schedrx(struct sacom_softc *);
 
+#ifdef hpcarm
+/* HPCARM specific functions */
+static void	sacom_j720_init(struct sa11x0_softc *, struct sacom_softc *);
+#endif
 
 #define COMUNIT_MASK	0x7ffff
 #define COMDIALOUT_MASK	0x80000
@@ -177,14 +207,21 @@ static int sacomconsattached;
 static int sacomconsrate;
 static tcflag_t sacomconscflag;
 
-struct cfattach sacom_ca = {
-	sizeof(struct sacom_softc), sacom_match, sacom_attach
-};
+CFATTACH_DECL(sacom, sizeof(struct sacom_softc),
+    sacom_match, sacom_attach, NULL, NULL);
 extern struct cfdriver sacom_cd;
+
+#ifdef hpcarm
+struct platid_data sacom_platid_table[] = {
+	{ &platid_mask_MACH_HP_JORNADA_720, sacom_j720_init },
+	{ &platid_mask_MACH_HP_JORNADA_720JP, sacom_j720_init },
+	{ NULL, NULL }
+};
+#endif
 
 struct consdev sacomcons = {
 	NULL, NULL, sacomcngetc, sacomcnputc, sacomcnpollc, NULL,
-	NODEV, CN_NORMAL
+	NULL, NULL, NODEV, CN_NORMAL
 };
 
 #ifndef CONMODE
@@ -215,6 +252,11 @@ sacom_attach(parent, self, aux)
 	struct sacom_softc *sc = (struct sacom_softc*)self;
 	struct sa11x0_attach_args *sa = aux;
 
+#ifdef hpcarm
+	struct platid_data *p;
+	void (*mdinit)(struct device *, struct sacom_softc *);
+#endif
+
 	printf("\n");
 
 	sc->sc_iot = sa->sa_iot;
@@ -243,6 +285,14 @@ sacom_attach(parent, self, aux)
 	}
 
 	sacom_attach_subr(sc);
+
+#ifdef hpcarm
+	/* Do hpcarm specific initialization, if any */
+	if ((p = platid_search_data(&platid, sacom_platid_table)) != NULL) {
+		mdinit = p->data;
+		(mdinit)(parent, sc);
+	}
+#endif
 
 	sa11x0_intr_establish(0, sa->sa_intr, 1, IPL_SERIAL, sacomintr, sc);
 }
@@ -294,9 +344,7 @@ sacom_attach_subr(sc)
 		int maj;
 
 		/* locate the major number */
-		for (maj = 0; maj < nchrdev; maj++)
-			if (cdevsw[maj].d_open == sacomopen)
-				break;
+		maj = cdevsw_lookup_major(&sacom_cdevsw);
 
 		cn_tab->cn_dev = makedev(maj, sc->sc_dev.dv_unit);
 
@@ -335,9 +383,7 @@ sacom_detach(self, flags)
 	int maj, mn;
 
 	/* locate the major number */
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == sacomopen)
-			break;
+	maj = cdevsw_lookup_major(&sacom_cdevsw);
 
 	/* Nuke the vnodes for any open instances. */
 	mn = self->dv_unit;
@@ -1144,7 +1190,7 @@ sacom_filltx(sc)
 	int c, n;
 
 	n = 0;
-	while(bus_space_read_4(sacomconstag, sacomconsioh, SACOM_SR1)
+	while(bus_space_read_4(iot, ioh, SACOM_SR1)
 	      & SR1_TNF) {
 		if (n == SACOM_TXFIFOLEN || n == sc->sc_tbc)
 			break;
@@ -1434,7 +1480,7 @@ sacomintr(arg)
 			}
 		} else {
 #ifdef DIAGNOSTIC
-			panic("sacomintr: we shouldn't reach here\n");
+			panic("sacomintr: we shouldn't reach here");
 #endif
 			CLR(sc->sc_cr3, CR3_RIE);
 			bus_space_write_4(iot, ioh, SACOM_CR3, sc->sc_cr3);
@@ -1490,6 +1536,16 @@ sacomintr(arg)
 	rnd_add_uint32(&sc->rnd_source, iir | lsr);
 #endif
 	return (1);
+}
+
+static void
+sacom_j720_init(struct sa11x0_softc *parent, struct sacom_softc *sc) {
+
+	/* XXX  this should be done at sc->enable function */
+	bus_space_write_4(parent->sc_iot, parent->sc_gpioh,
+	    SAGPIO_PCR, 0xa0000);
+	bus_space_write_4(parent->sc_iot, parent->sc_gpioh,
+	    SAGPIO_PSR, 0x100);
 }
 
 /* Initialization for serial console */

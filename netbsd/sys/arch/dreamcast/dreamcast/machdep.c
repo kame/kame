@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.21 2002/05/10 20:14:39 uch Exp $	*/
+/*	$NetBSD: machdep.c,v 1.28 2004/03/24 15:34:48 atatat Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998, 2002 The NetBSD Foundation, Inc.
@@ -52,11 +52,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -75,10 +71,14 @@
  *	@(#)machdep.c	7.4 (Berkeley) 6/3/91
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.28 2004/03/24 15:34:48 atatat Exp $");
+
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
 #include "opt_memsize.h"
 #include "scif.h"
+#include "opt_kloader.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -87,6 +87,7 @@
 #include <sys/mount.h>
 #include <sys/reboot.h>
 #include <sys/sysctl.h>
+#include <sys/ksyms.h>
 
 #ifdef KGDB
 #include <sys/kgdb.h>
@@ -99,9 +100,13 @@
 
 #include <sh3/cpu.h>
 #include <sh3/exception.h>
+#include <sh3/bscreg.h>
 #include <machine/intr.h>
+#include <machine/kloader.h>
 
 #include <dev/cons.h>
+
+#include "ksyms.h"
 
 /* the following is used externally (sysctl_hw) */
 char machine[] = MACHINE;		/* dreamcast */
@@ -140,8 +145,8 @@ dreamcast_startup()
 	pmap_bootstrap();
 
 	/* Debugger. */
-#ifdef DDB
-	ddb_init(0, NULL, NULL);
+#if NKSYMS || defined(DDB) || defined(LKM)
+	ksyms_init(0, NULL, NULL);
 #endif
 #if defined(KGDB) && (NSCIF > 0)
 	if (scif_kgdb_init() == 0) {
@@ -154,7 +159,7 @@ dreamcast_startup()
 	__asm__ __volatile__(
 		"jmp	@%0;"
 		"mov	%1, sp"
-		:: "r"(main),"r"(proc0.p_md.md_pcb->pcb_sf.sf_r7_bank));
+		:: "r"(main),"r"(lwp0.l_md.md_pcb->pcb_sf.sf_r7_bank));
 	/* NOTREACHED */
 	while (1)
 		;
@@ -181,23 +186,20 @@ cpu_startup()
 	sh_startup();
 }
 
-int
-cpu_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp,
-    void *newp, size_t newlen, struct proc *p)
+SYSCTL_SETUP(sysctl_machdep_setup, "sysctl machdep subtree setup")
 {
-	/* all sysctl names at this level are terminal */
-	if (namelen != 1)
-		return (ENOTDIR);		/* overloaded */
 
-	switch (name[0]) {
-	case CPU_CONSDEV:
-		return (sysctl_rdstruct(oldp, oldlenp, newp, &cn_tab->cn_dev,
-		    sizeof cn_tab->cn_dev));
-	default:
-		break;
-	}
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "machdep", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_MACHDEP, CTL_EOL);
 
-	return (EOPNOTSUPP);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_STRUCT, "console_device", NULL,
+		       sysctl_consdev, 0, NULL, sizeof(dev_t),
+		       CTL_MACHDEP, CPU_CONSDEV, CTL_EOL);
 }
 
 void
@@ -210,6 +212,15 @@ cpu_reboot(int howto, char *bootstr)
 		goto haltsys;
 	}
 
+#ifdef KLOADER
+	if ((howto & RB_HALT) == 0) {
+		if ((howto & RB_STRING) && bootstr != NULL) {
+			printf("loading a new kernel: %s\n", bootstr);
+			kloader_reboot_setup(bootstr);
+		}
+	}
+#endif
+
 	boothowto = howto;
 	if ((howto & RB_NOSYNC) == 0 && waittime < 0) {
 		waittime = 0;
@@ -218,7 +229,9 @@ cpu_reboot(int howto, char *bootstr)
 		 * If we've been adjusting the clock, the todr
 		 * will be out of synch; adjust it now.
 		 */
-		/* resettodr(); */
+#if 0
+		resettodr();
+#endif
 	}
 
 	/* Disable interrupts. */
@@ -228,7 +241,7 @@ cpu_reboot(int howto, char *bootstr)
 	if ((howto & (RB_DUMP | RB_HALT)) == RB_DUMP)
 		dumpsys();
 
-haltsys:
+ haltsys:
 	doshutdownhooks();
 
 	if (howto & RB_HALT) {
@@ -237,6 +250,14 @@ haltsys:
 		printf("Please press any key to reboot.\n\n");
 		cngetc();
 	}
+
+#ifdef KLOADER
+	else if ((howto & RB_STRING) && bootstr != NULL) {
+		kloader_reboot();
+		printf("\nFailed to load a new kernel.\n");
+		cngetc();
+	}
+#endif
 
 	printf("rebooting...\n");
 	cpu_reset();

@@ -1,4 +1,4 @@
-/* $NetBSD: irongate.c,v 1.7 2002/05/16 01:01:32 thorpej Exp $ */
+/* $NetBSD: irongate.c,v 1.11 2003/06/15 23:08:55 fvdl Exp $ */
 
 /*-
  * Copyright (c) 2000, 2001 The NetBSD Foundation, Inc.
@@ -40,7 +40,7 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(0, "$NetBSD: irongate.c,v 1.7 2002/05/16 01:01:32 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: irongate.c,v 1.11 2003/06/15 23:08:55 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -67,9 +67,8 @@ __KERNEL_RCSID(0, "$NetBSD: irongate.c,v 1.7 2002/05/16 01:01:32 thorpej Exp $")
 int	irongate_match(struct device *, struct cfdata *, void *);
 void	irongate_attach(struct device *, struct device *, void *);
 
-struct cfattach irongate_ca = {
-	sizeof(struct irongate_softc), irongate_match, irongate_attach,
-};
+CFATTACH_DECL(irongate, sizeof(struct irongate_softc),
+    irongate_match, irongate_attach, NULL, NULL);
 
 int	irongate_print(void *, const char *pnp);
 
@@ -184,6 +183,7 @@ irongate_attach(struct device *parent, struct device *self, void *aux)
 	pba.pba_memt = &icp->ic_memt;
 	pba.pba_dmat =
 	    alphabus_dma_get_tag(&icp->ic_dmat_pci, ALPHA_BUS_PCI);
+	pba.pba_dmat64 = NULL;
 	pba.pba_pc = &icp->ic_pc;
 	pba.pba_bus = 0;
 	pba.pba_bridgetag = NULL;
@@ -220,9 +220,9 @@ irongate_print(void *aux, const char *pnp)
 
 	/* Only PCIs can attach to Irongates; easy. */
 	if (pnp != NULL)
-		printf("%s at %s", pba->pba_busname, pnp);
+		aprint_normal("%s at %s", pba->pba_busname, pnp);
 	if (strcmp(pba->pba_busname, "pci") == 0)
-		printf(" bus %d", pba->pba_bus);
+		aprint_normal(" bus %d", pba->pba_bus);
 	return (UNCONF);
 }
 

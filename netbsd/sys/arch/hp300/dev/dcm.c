@@ -1,4 +1,4 @@
-/*	$NetBSD: dcm.c,v 1.51 2002/03/17 19:40:38 atatat Exp $	*/
+/*	$NetBSD: dcm.c,v 1.63 2003/11/17 14:37:59 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -37,9 +37,43 @@
  */
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1982, 1986, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from Utah: $Hdr: dcm.c 1.29 92/01/21$
+ *
+ *	@(#)dcm.c	8.4 (Berkeley) 1/12/94
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -89,7 +123,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: dcm.c,v 1.51 2002/03/17 19:40:38 atatat Exp $");                                                  
+__KERNEL_RCSID(0, "$NetBSD: dcm.c,v 1.63 2003/11/17 14:37:59 tsutsui Exp $");
 
 #include "opt_kgdb.h"
 
@@ -106,13 +140,10 @@ __KERNEL_RCSID(0, "$NetBSD: dcm.c,v 1.51 2002/03/17 19:40:38 atatat Exp $");
 #include <sys/time.h>
 #include <sys/device.h>
 
-#include <machine/autoconf.h>
-#include <machine/cpu.h>
-#include <machine/intr.h>
+#include <machine/bus.h>
 
 #include <dev/cons.h>
 
-#include <hp300/dev/dioreg.h>
 #include <hp300/dev/diovar.h>
 #include <hp300/dev/diodevs.h>
 #include <hp300/dev/dcmreg.h>
@@ -249,6 +280,10 @@ static char iconv[16] = {
 
 struct	dcm_softc {
 	struct	device sc_dev;		/* generic device glue */
+
+	bus_space_tag_t sc_bst;
+	bus_space_handle_t sc_bsh;
+
 	struct	dcmdevice *sc_dcm;	/* pointer to hardware */
 	struct	tty *sc_tty[NDCMPORT];	/* our tty instances */
 	struct	modemreg *sc_modem[NDCMPORT]; /* modem control */
@@ -276,8 +311,6 @@ struct	dcm_softc {
 #endif
 };
 
-cdev_decl(dcm);
-
 int	dcmintr __P((void *));
 void	dcmpint __P((struct dcm_softc *, int, int));
 void	dcmrint __P((struct dcm_softc *));
@@ -287,7 +320,6 @@ void	dcmmint __P((struct dcm_softc *, int, int));
 
 int	dcmparam __P((struct tty *, struct termios *));
 void	dcmstart __P((struct tty *));
-void	dcmstop __P((struct tty *, int));
 int	dcmmctl __P((dev_t, int, int));
 void	dcmsetischeme __P((int, int));
 void	dcminit __P((struct dcmdevice *, int, int));
@@ -301,9 +333,8 @@ void	dcmcnputc __P((dev_t, int));
 int	dcmmatch __P((struct device *, struct cfdata *, void *));
 void	dcmattach __P((struct device *, struct device *, void *));
 
-struct cfattach dcm_ca = {
-	sizeof(struct dcm_softc), dcmmatch, dcmattach
-};
+CFATTACH_DECL(dcm, sizeof(struct dcm_softc),
+    dcmmatch, dcmattach, NULL, NULL);
 
 /*
  * Stuff for DCM console support.  This could probably be done a little
@@ -314,14 +345,36 @@ static	int dcmconsinit;			/* has been initialized */
 /* static	int dcm_lastcnpri = CN_DEAD; */	/* XXX last priority */
 
 static struct consdev dcm_cons = {
-       NULL, NULL, dcmcngetc, dcmcnputc, nullcnpollc, NULL, NODEV, CN_REMOTE
+	NULL,
+	NULL,
+	dcmcngetc,
+	dcmcnputc,
+	nullcnpollc,
+	NULL,
+	NULL,
+	NULL,
+	NODEV,
+	CN_REMOTE
 };
 int	dcmconscode;
 int	dcmdefaultrate = DEFAULT_BAUD_RATE;
 int	dcmconbrdbusy = 0;
-int	dcmmajor;
 
 extern struct cfdriver dcm_cd;
+
+dev_type_open(dcmopen);
+dev_type_close(dcmclose);
+dev_type_read(dcmread);
+dev_type_write(dcmwrite);
+dev_type_ioctl(dcmioctl);
+dev_type_stop(dcmstop);
+dev_type_tty(dcmtty);
+dev_type_poll(dcmpoll);
+
+const struct cdevsw dcm_cdevsw = {
+	dcmopen, dcmclose, dcmread, dcmwrite, dcmioctl,
+	dcmstop, dcmtty, dcmpoll, nommap, ttykqfilter, D_TTY
+};
 
 int
 dcmmatch(parent, match, aux)
@@ -350,7 +403,7 @@ dcmattach(parent, self, aux)
 	struct dcmdevice *dcm;
 	int brd = self->dv_unit;
 	int scode = da->da_scode;
-	int i, mbits, code, ipl;
+	int i, mbits, code;
 
 	sc->sc_flags = 0;
 
@@ -363,21 +416,21 @@ dcmattach(parent, self, aux)
 		 * the console probe, so we have to fixup cn_dev here.
 		 * Note that we always assume port 1 on the board.
 		 */
-		cn_tab->cn_dev = makedev(dcmmajor, (brd << 2) | DCMCONSPORT);
+		cn_tab->cn_dev = makedev(cdevsw_lookup_major(&dcm_cdevsw),
+					 (brd << 2) | DCMCONSPORT);
 	} else {
-		dcm = (struct dcmdevice *)iomap(dio_scodetopa(da->da_scode),
-		    da->da_size);
-		if (dcm == NULL) {
+		sc->sc_bst = da->da_bst;
+		if (bus_space_map(sc->sc_bst, da->da_addr, da->da_size,
+		    BUS_SPACE_MAP_LINEAR, &sc->sc_bsh)) {
 			printf("\n%s: can't map registers\n",
 			    sc->sc_dev.dv_xname);
 			return;
 		}
+		dcm = (struct dcmdevice *)bus_space_vaddr(sc->sc_bst,
+		    sc->sc_bsh);
 	}
 
 	sc->sc_dcm = dcm;
-
-	ipl = DIO_IPL(dcm);
-	printf(" ipl %d", ipl);
 
 	/*
 	 * XXX someone _should_ fix this; the self test screws
@@ -396,7 +449,7 @@ dcmattach(parent, self, aux)
 	sc->sc_flags |= DCM_ACTIVE;
 
 	/* Establish the interrupt handler. */
-	(void) dio_intr_establish(dcmintr, sc, ipl, IPL_TTY);
+	(void) dio_intr_establish(dcmintr, sc, da->da_ipl, IPL_TTY);
 
 	if (dcmistype == DIS_TIMER)
 		dcmsetischeme(brd, DIS_RESET|DIS_TIMER);
@@ -443,7 +496,7 @@ dcmattach(parent, self, aux)
 		printf("\n");
 
 #ifdef KGDB
-	if (major(kgdb_dev) == dcmmajor &&
+	if (cdevsw_lookup(kgdb_dev) == &dcm_cdevsw &&
 	    DCMBOARD(DCMUNIT(kgdb_dev)) == brd) {
 		if (dcmconsole == DCMUNIT(kgdb_dev))	/* XXX fixme */
 			kgdb_dev = NODEV; /* can't debug over console port */
@@ -564,7 +617,7 @@ dcmopen(dev, flag, mode, p)
  bad:
 	return (error);
 }
- 
+
 /*ARGSUSED*/
 int
 dcmclose(dev, flag, mode, p)
@@ -575,7 +628,7 @@ dcmclose(dev, flag, mode, p)
 	int s, unit, board, port;
 	struct dcm_softc *sc;
 	struct tty *tp;
- 
+
 	unit = DCMUNIT(dev);
 	board = DCMBOARD(unit);
 	port = DCMPORT(unit);
@@ -604,7 +657,7 @@ dcmclose(dev, flag, mode, p)
 #endif
 	return (0);
 }
- 
+
 int
 dcmread(dev, uio, flag)
 	dev_t dev;
@@ -624,7 +677,7 @@ dcmread(dev, uio, flag)
 
 	return ((*tp->t_linesw->l_read)(tp, uio, flag));
 }
- 
+
 int
 dcmwrite(dev, uio, flag)
 	dev_t dev;
@@ -661,7 +714,7 @@ dcmpoll(dev, events, p)
 
 	sc = dcm_cd.cd_devs[board];
 	tp = sc->sc_tty[port];
- 
+
 	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
@@ -680,7 +733,7 @@ dcmtty(dev)
 
 	return (sc->sc_tty[port]);
 }
- 
+
 int
 dcmintr(arg)
 	void *arg;
@@ -719,7 +772,7 @@ dcmintr(arg)
 	if (dcmdebug & DDB_INTR) {
 		printf("%s: dcmintr: iir %x pc %x/%x/%x/%x ",
 		       sc->sc_dev.dv_xname, code, pcnd[0], pcnd[1],
-		       pcnd[2], pcnd[3]); 
+		       pcnd[2], pcnd[3]);
 		printf("miir %x mc %x/%x/%x/%x\n",
 		       mcode, mcnd[0], mcnd[1], mcnd[2], mcnd[3]);
 	}
@@ -835,7 +888,11 @@ dcmreadbuf(sc, port)
 
 	if ((tp->t_state & TS_ISOPEN) == 0) {
 #ifdef KGDB
-		if ((makedev(dcmmajor, minor(tp->t_dev)) == kgdb_dev) &&
+		int maj;
+
+		maj = cdevsw_lookup_major(&dcm_cdevsw);
+
+		if ((makedev(maj, minor(tp->t_dev)) == kgdb_dev) &&
 		    (head = pp->r_head & RX_MASK) != (pp->r_tail & RX_MASK) &&
 		    dcm->dcm_rfifos[3-port][head>>1].data_char == FRAME_START) {
 			pp->r_head = (head + 2) & RX_MASK;
@@ -933,10 +990,6 @@ dcmmint(sc, port, mcnd)
 	struct tty *tp;
 	struct dcmdevice *dcm = sc->sc_dcm;
 
-	tp = sc->sc_tty[port];
-	if (tp == NULL || (tp->t_state & TS_ISOPEN) == 0)
-		return;
-
 #ifdef DEBUG
 	if (dcmdebug & DDB_MODEM)
 		printf("%s port %d: dcmmint: mcnd %x mcndlast %x\n",
@@ -944,8 +997,12 @@ dcmmint(sc, port, mcnd)
 #endif
 	delta = mcnd ^ sc->sc_mcndlast[port];
 	sc->sc_mcndlast[port] = mcnd;
+	tp = sc->sc_tty[port];
+	if (tp == NULL || (tp->t_state & TS_ISOPEN) == 0)
+		return;
+
 	if ((delta & MI_CTS) && (tp->t_state & TS_ISOPEN) &&
-	    (tp->t_flags & CCTS_OFLOW)) {
+	    (tp->t_cflag & CCTS_OFLOW)) {
 		if (mcnd & MI_CTS) {
 			tp->t_state &= ~TS_TTSTOP;
 			ttstart(tp);
@@ -987,7 +1044,7 @@ dcmioctl(dev, cmd, data, flag, p)
 	sc = dcm_cd.cd_devs[board];
 	dcm = sc->sc_dcm;
 	tp = sc->sc_tty[port];
- 
+
 #ifdef DEBUG
 	if (dcmdebug & DDB_IOCTL)
 		printf("%s port %d: dcmioctl: cmd %lx data %x flag %x\n",
@@ -1105,12 +1162,12 @@ dcmparam(tp, t)
 	dcm = sc->sc_dcm;
 
 	/* check requested parameters */
-        if (ospeed < 0 || (t->c_ispeed && t->c_ispeed != t->c_ospeed))
-                return (EINVAL);
-        /* and copy to tty */
-        tp->t_ispeed = t->c_ispeed;
-        tp->t_ospeed = t->c_ospeed;
-        tp->t_cflag = cflag;
+	if (ospeed < 0 || (t->c_ispeed && t->c_ispeed != t->c_ospeed))
+		return (EINVAL);
+	/* and copy to tty */
+	tp->t_ispeed = t->c_ispeed;
+	tp->t_ospeed = t->c_ospeed;
+	tp->t_cflag = cflag;
 	if (ospeed == 0) {
 		(void) dcmmctl(DCMUNIT(tp->t_dev), MO_OFF, DMSET);
 		return (0);
@@ -1165,7 +1222,7 @@ dcmparam(tp, t)
 	DELAY(16 * DCM_USPERCH(tp->t_ospeed));
 	return (0);
 }
- 
+
 void
 dcmstart(tp)
 	struct tty *tp;
@@ -1292,7 +1349,7 @@ out:
 #endif
 	splx(s);
 }
- 
+
 /*
  * Stop output on a line.
  */
@@ -1311,7 +1368,7 @@ dcmstop(tp, flag)
 	}
 	splx(s);
 }
- 
+
 /*
  * Modem control
  */
@@ -1491,7 +1548,7 @@ dcmselftest(sc)
 	s = splhigh();
 	dcm->dcm_rsid = DCMRS;
 	DELAY(50000);	/* 5000 is not long enough */
-	dcm->dcm_rsid = 0; 
+	dcm->dcm_rsid = 0;
 	dcm->dcm_ic = IC_IE;
 	dcm->dcm_cr = CR_SELFT;
 	while ((dcm->dcm_ic & IC_IR) == 0) {
@@ -1529,14 +1586,15 @@ dcmselftest(sc)
 int
 dcmcnattach(bus_space_tag_t bst, bus_addr_t addr, int scode)
 {
-        bus_space_handle_t bsh;
-        caddr_t va;
-        struct dcmdevice *dcm;
+	bus_space_handle_t bsh;
+	caddr_t va;
+	struct dcmdevice *dcm;
+	int maj;
 
-        if (bus_space_map(bst, addr, DIOCSIZE, 0, &bsh))
-                return (1);
+	if (bus_space_map(bst, addr, DIOCSIZE, 0, &bsh))
+		return (1);
 
-        va = bus_space_vaddr(bst, bsh);
+	va = bus_space_vaddr(bst, bsh);
 	dcm = (struct dcmdevice *)va;
 
 	switch (dcm->dcm_rsid) {
@@ -1550,18 +1608,16 @@ dcmcnattach(bus_space_tag_t bst, bus_addr_t addr, int scode)
 	}
 
 	dcminit(dcm, DCMCONSPORT, dcmdefaultrate);
-        dcmconsinit = 1;
+	dcmconsinit = 1;
 	dcmconscode = scode;
-        dcm_cn = dcm;
+	dcm_cn = dcm;
 
-        /* locate the major number */
-        for (dcmmajor = 0; dcmmajor < nchrdev; dcmmajor++)
-                if (cdevsw[dcmmajor].d_open == dcmopen)
-                        break;
+	/* locate the major number */
+	maj = cdevsw_lookup_major(&dcm_cdevsw);
 
-        /* initialize required fields */
-        cn_tab = &dcm_cons;
-        cn_tab->cn_dev = makedev(dcmmajor, 0);
+	/* initialize required fields */
+	cn_tab = &dcm_cons;
+	cn_tab->cn_dev = makedev(maj, 0);
 
 #ifdef KGDB_CHEAT
 	/* XXX this needs to be fixed. */
@@ -1569,7 +1625,7 @@ dcmcnattach(bus_space_tag_t bst, bus_addr_t addr, int scode)
 	 * This doesn't currently work, at least not with ite consoles;
 	 * the console hasn't been initialized yet.
 	 */
-	if (major(kgdb_dev) == dcmmajor &&
+	if (major(kgdb_dev) == maj &&
 	    DCMBOARD(DCMUNIT(kgdb_dev)) == DCMBOARD(unit)) {
 		dcminit(dcm_cn, DCMPORT(DCMUNIT(kgdb_dev)), kgdb_rate);
 		if (kgdb_debug_init) {
@@ -1586,11 +1642,11 @@ dcmcnattach(bus_space_tag_t bst, bus_addr_t addr, int scode)
 #endif
 
 
-        return (0);
+	return (0);
 
 error:
-        bus_space_unmap(bst, bsh, DIOCSIZE);
-        return (1);
+	bus_space_unmap(bst, bsh, DIOCSIZE);
+	return (1);
 }
 
 /* ARGSUSED */

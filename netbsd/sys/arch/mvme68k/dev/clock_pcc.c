@@ -1,4 +1,4 @@
-/*	$NetBSD: clock_pcc.c,v 1.11 2002/02/12 20:38:12 scw Exp $	*/
+/*	$NetBSD: clock_pcc.c,v 1.14 2003/07/15 02:43:46 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -41,6 +41,9 @@
  * Mostek clock chip found on the MVME-147.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: clock_pcc.c,v 1.14 2003/07/15 02:43:46 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -63,9 +66,8 @@ struct clock_pcc_softc {
 	u_char sc_clock_lvl;
 };
 
-struct cfattach clock_pcc_ca = {
-	sizeof(struct clock_pcc_softc), clock_pcc_match, clock_pcc_attach
-};
+CFATTACH_DECL(clock_pcc, sizeof(struct clock_pcc_softc),
+    clock_pcc_match, clock_pcc_attach, NULL, NULL);
 
 extern struct cfdriver clock_cd;
 

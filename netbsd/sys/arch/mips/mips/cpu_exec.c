@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu_exec.c,v 1.32.8.2 2003/10/02 09:51:33 tron Exp $	*/
+/*	$NetBSD: cpu_exec.c,v 1.45 2003/11/26 08:36:49 he Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -37,6 +33,9 @@
  *
  *	@(#)machdep.c	8.3 (Berkeley) 1/12/94
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cpu_exec.c,v 1.45 2003/11/26 08:36:49 he Exp $");
 
 #include "opt_compat_netbsd.h"
 #include "opt_compat_ultrix.h"
@@ -119,21 +118,21 @@ cpu_exec_aout_makecmds(p, epp)
 	    epp->ep_daddr + hdr->a_data, NULLVP, 0,
 	    VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 
-	return exec_aout_setup_stack(p, epp);
+	return (*epp->ep_esch->ep_setup_stack)(p, epp);
 #endif
 }
 
 #ifdef EXEC_ECOFF
 void
-cpu_exec_ecoff_setregs(p, epp, stack)
-	struct proc *p;
+cpu_exec_ecoff_setregs(l, epp, stack)
+	struct lwp *l;
 	struct exec_package *epp;
 	u_long stack;
 {
 	struct ecoff_exechdr *execp = (struct ecoff_exechdr *)epp->ep_hdr;
-	struct frame *f = (struct frame *)p->p_md.md_regs;
+	struct frame *f = (struct frame *)l->l_md.md_regs;
 
-	f->f_regs[GP] = (register_t)execp->a.gp_value;
+	f->f_regs[_R_GP] = (register_t)execp->a.gp_value;
 }
 
 /*
@@ -242,23 +241,23 @@ mips_elf_makecmds (p, epp)
 					  epp->ep_vp, offset, prot);
 #ifdef OLD_ELF_DEBUG
 /*XXX*/		printf(
-	"obsolete elf: NEW_VNCMD len %x va %x off %x prot %x residue %x\n",
+	"obsolete elf: NEW_VMCMD len %x va %x off %x prot %x residue %x\n",
 			length, vaddr, offset, prot, residue);
 #endif /*ELF_DEBUG*/
 
 				if (residue) {
-					vaddr &= ~(NBPG - 1);
-					offset &= ~(NBPG - 1);
+					vaddr &= ~(PAGE_SIZE - 1);
+					offset &= ~(PAGE_SIZE - 1);
 					length = roundup (length + ph.p_vaddr
-							  - vaddr, NBPG);
+							  - vaddr, PAGE_SIZE);
 					residue = (ph.p_vaddr + ph.p_memsz)
 						  - (vaddr + length);
 				}
 			} else {
-				vaddr &= ~(NBPG - 1);
-				offset &= ~(NBPG - 1);
+				vaddr &= ~(PAGE_SIZE - 1);
+				offset &= ~(PAGE_SIZE - 1);
 				length = roundup (length + ph.p_vaddr - vaddr,
-						  NBPG);
+						  PAGE_SIZE);
 				residue = (ph.p_vaddr + ph.p_memsz)
 					  - (vaddr + length);
 				if (!epp->ep_taddr || vaddr < epp->ep_taddr)
@@ -274,7 +273,7 @@ mips_elf_makecmds (p, epp)
 			if (residue > 0) {
 #ifdef OLD_ELF_DEBUG
 /*XXX*/			printf(
-	"old elf:resid NEW_VNCMD len %x va %x off %x prot %x residue %x\n",
+	"old elf:resid NEW_VMCMD len %x va %x off %x prot %x residue %x\n",
 				length, vaddr + length, offset, prot, residue);
 #endif /*ELF_DEBUG*/
 

@@ -1,4 +1,4 @@
-/* $NetBSD: if_wi_pcmcia.c,v 1.19.2.4 2002/11/19 21:28:34 tron Exp $ */
+/* $NetBSD: if_wi_pcmcia.c,v 1.41 2004/01/25 02:42:49 sekiya Exp $ */
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_wi_pcmcia.c,v 1.19.2.4 2002/11/19 21:28:34 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_wi_pcmcia.c,v 1.41 2004/01/25 02:42:49 sekiya Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -53,7 +53,11 @@ __KERNEL_RCSID(0, "$NetBSD: if_wi_pcmcia.c,v 1.19.2.4 2002/11/19 21:28:34 tron E
 #include <net/if.h>
 #include <net/if_ether.h>
 #include <net/if_media.h>
-#include <net/if_ieee80211.h>
+
+#include <net80211/ieee80211_var.h>
+#include <net80211/ieee80211_compat.h>
+#include <net80211/ieee80211_radiotap.h>
+#include <net80211/ieee80211_rssadapt.h>
 
 #include <machine/cpu.h>
 #include <machine/bus.h>
@@ -101,10 +105,8 @@ struct wi_pcmcia_softc {
 static int wi_pcmcia_find __P((struct wi_pcmcia_softc *,
 	struct pcmcia_attach_args *, struct pcmcia_config_entry *));
 
-struct cfattach wi_pcmcia_ca = {
-	sizeof(struct wi_pcmcia_softc), wi_pcmcia_match, wi_pcmcia_attach,
-	wi_pcmcia_detach, wi_activate,
-};
+CFATTACH_DECL(wi_pcmcia, sizeof(struct wi_pcmcia_softc),
+    wi_pcmcia_match, wi_pcmcia_attach, wi_pcmcia_detach, wi_activate);
 
 static const struct wi_pcmcia_product {
 	u_int32_t	pp_vendor;	/* vendor ID */
@@ -136,6 +138,16 @@ static const struct wi_pcmcia_product {
 	  PCMCIA_PRODUCT_COREGA_WIRELESS_LAN_PCCB_11,
 	  PCMCIA_CIS_COREGA_WIRELESS_LAN_PCCB_11,
 	  PCMCIA_STR_COREGA_WIRELESS_LAN_PCCB_11 },
+
+	{ PCMCIA_VENDOR_COREGA,
+	  PCMCIA_PRODUCT_COREGA_WIRELESS_LAN_PCCL_11,
+	  PCMCIA_CIS_COREGA_WIRELESS_LAN_PCCL_11,
+	  PCMCIA_STR_COREGA_WIRELESS_LAN_PCCL_11 },
+
+	{ PCMCIA_VENDOR_COREGA,
+	  PCMCIA_PRODUCT_COREGA_WIRELESS_LAN_WLCFL_11,
+	  PCMCIA_CIS_COREGA_WIRELESS_LAN_WLCFL_11,
+	  PCMCIA_STR_COREGA_WIRELESS_LAN_WLCFL_11 },
 
 	{ PCMCIA_VENDOR_INTEL,
 	  PCMCIA_PRODUCT_INTEL_PRO_WLAN_2011,
@@ -212,6 +224,11 @@ static const struct wi_pcmcia_product {
 	  PCMCIA_CIS_IODATA2_WNB11PCM,
 	  PCMCIA_STR_IODATA2_WNB11PCM },
 
+	{ PCMCIA_VENDOR_IODATA2,
+	  PCMCIA_PRODUCT_IODATA2_WCF12,
+	  PCMCIA_CIS_IODATA2_WCF12,
+	  PCMCIA_STR_IODATA2_WCF12 },
+
 	{ PCMCIA_VENDOR_BUFFALO,
 	  PCMCIA_PRODUCT_BUFFALO_WLI_PCM_S11,
 	  PCMCIA_CIS_BUFFALO_WLI_PCM_S11,
@@ -262,6 +279,11 @@ static const struct wi_pcmcia_product {
 	  PCMCIA_CIS_LINKSYS2_WCF11,
 	  PCMCIA_STR_LINKSYS2_WCF11 },
 
+	{ PCMCIA_VENDOR_PLANEX,
+	  PCMCIA_PRODUCT_PLANEX_GWNS11H,
+	  PCMCIA_CIS_PLANEX_GWNS11H,
+	  PCMCIA_STR_PLANEX_GWNS11H },
+
 	{ PCMCIA_VENDOR_BAY,
 	  PCMCIA_PRODUCT_BAY_EMOBILITY_11B,
 	  PCMCIA_CIS_BAY_EMOBILITY_11B,
@@ -271,6 +293,16 @@ static const struct wi_pcmcia_product {
 	  PCMCIA_PRODUCT_ACTIONTEC_PRISM,
 	  PCMCIA_CIS_ACTIONTEC_PRISM,
 	  PCMCIA_STR_ACTIONTEC_PRISM },
+
+	{ PCMCIA_VENDOR_DLINK_2,
+	  PCMCIA_PRODUCT_DLINK_DWL650H,
+	  PCMCIA_CIS_DLINK_DWL650H,
+	  PCMCIA_STR_DLINK_DWL650H },
+
+	{ PCMCIA_VENDOR_FUJITSU,
+	  PCMCIA_PRODUCT_FUJITSU_WL110,
+	  PCMCIA_CIS_FUJITSU_WL110,
+	  PCMCIA_STR_FUJITSU_WL110 },
 
 	{ 0,
 	  0,
@@ -373,17 +405,13 @@ wi_pcmcia_find(psc, pa, cfe)
 
 	/* Allocate/map I/O space. */
 	if (pcmcia_io_alloc(psc->sc_pf, cfe->iospace[0].start,
-	    cfe->iospace[0].length, WI_IOSIZE,
-	    &psc->sc_pcioh) != 0) {
-		printf("%s: can't allocate i/o space\n",
-			sc->sc_dev.dv_xname);
+	    cfe->iospace[0].length, WI_IOSIZE, &psc->sc_pcioh) != 0) {
+		printf("%s: can't allocate i/o space\n", sc->sc_dev.dv_xname);
 		goto fail1;
 	}
-	printf("%s:", sc->sc_dev.dv_xname);
 	if (pcmcia_io_map(psc->sc_pf, PCMCIA_WIDTH_AUTO, 0,
-	    psc->sc_pcioh.size, &psc->sc_pcioh,
-	    &psc->sc_io_window) != 0) {
-		printf(" can't map i/o space\n");
+	    psc->sc_pcioh.size, &psc->sc_pcioh, &psc->sc_io_window) != 0) {
+		printf("%s: can't map i/o space\n", sc->sc_dev.dv_xname);
 		goto fail2;
 	}
 	/* Enable the card */
@@ -426,8 +454,7 @@ wi_pcmcia_attach(parent, self, aux)
 
 	psc->sc_pf = pa->pf;
 
-	for (cfe = SIMPLEQ_FIRST(&pa->pf->cfe_head); cfe != NULL;
-	     cfe = SIMPLEQ_NEXT(cfe, cfe_list)) {
+	SIMPLEQ_FOREACH(cfe, &pa->pf->cfe_head, cfe_list) {
 		if (cfe->iftype != PCMCIA_IFTYPE_IO)
 			continue;
 		if (cfe->iospace[0].length < WI_IOSIZE)
@@ -449,8 +476,19 @@ wi_pcmcia_attach(parent, self, aux)
 	sc->sc_enable = wi_pcmcia_enable;
 	sc->sc_disable = wi_pcmcia_disable;
 	if (pp->pp_vendor == PCMCIA_VENDOR_SYMBOL &&
-	    pp->pp_product == PCMCIA_PRODUCT_SYMBOL_LA4100) {
+	    pp->pp_product == PCMCIA_PRODUCT_SYMBOL_LA4100)
 		psc->sc_symbol_cf = 1;
+	/*
+	 * XXX: Sony PEGA-WL100 CF card has a same vendor/product id as
+	 *	Intel PCMCIA card.  It may be incorrect to detect by the
+	 *	initial value of COR register.
+	 */
+	if (pp->pp_vendor == PCMCIA_VENDOR_INTEL &&
+	    pp->pp_product == PCMCIA_PRODUCT_INTEL_PRO_WLAN_2011 &&
+	    CSR_READ_2(sc, WI_COR) == WI_COR_IOMODE)
+		psc->sc_symbol_cf = 1;
+
+	if (psc->sc_symbol_cf) {
 		if (wi_pcmcia_load_firm(sc,
 		    spectrum24t_primsym, sizeof(spectrum24t_primsym),
 		    spectrum24t_secsym, sizeof(spectrum24t_secsym))) {
@@ -468,7 +506,7 @@ wi_pcmcia_attach(parent, self, aux)
 		goto no_interrupt;
 	}
 
-	sc->sc_ifp = &sc->sc_ethercom.ec_if;
+	printf("%s:", sc->sc_dev.dv_xname);
 	if (wi_attach(sc) != 0) {
 		printf("%s: failed to attach controller\n",
 		    sc->sc_dev.dv_xname);
@@ -623,8 +661,8 @@ wi_pcmcia_write_firm(sc, buf, buflen, ebuf, ebuflen)
 	while (p < ep && *p++ != ' ');	/* FILE: */
 	while (p < ep && *p++ != ' ');	/* filename */
 	while (p < ep && *p++ != ' ');	/* type of the firmware */
-	nblk = strtoul(p, (char **)&p, 10);
-	pdrlen = strtoul(p + 1, (char **)&p, 10);
+	nblk = strtoul(p, (void *)&p, 10);
+	pdrlen = strtoul(p + 1, (void *)&p, 10);
 	while (p < ep && *p++ != 0x1a);	/* skip rest of header */
 
 	/*

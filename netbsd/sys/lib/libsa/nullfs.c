@@ -1,4 +1,4 @@
-/*	$NetBSD: nullfs.c,v 1.2 1999/03/31 01:50:25 cgd Exp $	*/
+/*	$NetBSD: nullfs.c,v 1.7 2003/08/18 15:45:28 dsl Exp $	*/
 
 /*-
  * Copyright (c) 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -64,52 +60,56 @@
  * rights to redistribute these changes.
  */
 
-/*
- * XXX Does not currently implement:
- * XXX
- * XXX LIBSA_NO_FS_CLOSE
- * XXX LIBSA_NO_FS_SEEK
- * XXX LIBSA_NO_FS_WRITE
- * XXX LIBSA_NO_FS_SYMLINK (does this even make sense?)
- * XXX LIBSA_FS_SINGLECOMPONENT (does this even make sense?)
- */
-
 #include "stand.h"
 
 /*
  * Null filesystem
  */
-int	null_open (char *path, struct open_file *f)
+
+int
+null_open(const char *path, struct open_file *f)
 {
-	errno  = EIO;
-	return -1;
+
+	return EIO;
 }
 
-int	null_close(struct open_file *f)
+#ifndef LIBSA_NO_FS_CLOSE
+int
+null_close(struct open_file *f)
 {
+
 	return 0;
 }
+#endif
 
-ssize_t	null_read (struct open_file *f, void *buf, size_t size, size_t *resid)
+int
+null_read(struct open_file *f, void *buf, size_t size, size_t *resid)
 {
-	errno = EIO;
-	return -1;
+
+	return EIO;
 }
 
-ssize_t	null_write (struct open_file *f, void *buf, size_t size, size_t *resid)
+#ifndef LIBSA_NO_FS_WRITE
+int
+null_write(struct open_file *f, void *buf, size_t size, size_t *resid)
 {
-	errno = EIO;
-	return -1;
-}
 
-off_t	null_seek (struct open_file *f, off_t offset, int where)
-{
-	errno = EIO;
-	return -1;
+	return EIO;
 }
+#endif
 
-int	null_stat (struct open_file *f, struct stat *sb)
+#ifndef LIBSA_NO_FS_SEEK
+off_t
+null_seek(struct open_file *f, off_t offset, int where)
 {
-	errno = EIO;
-	return -1;
+
+	return (off_t)-1;
+}
+#endif
+
+int
+null_stat(struct open_file *f, struct stat *sb)
+{
+
+	return EIO;
 }

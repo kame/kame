@@ -1,4 +1,4 @@
-/*	$NetBSD: audio_if.h,v 1.44.4.2 2002/06/10 16:02:33 tv Exp $	*/
+/*	$NetBSD: audio_if.h,v 1.53 2003/06/29 22:29:57 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1994 Havard Eidnes.
@@ -37,6 +37,16 @@
 #ifndef _SYS_DEV_AUDIO_IF_H_
 #define _SYS_DEV_AUDIO_IF_H_
 
+/* check we have an audio(4) configured into kernel */
+#if defined(_KERNEL_OPT)
+#include "audio.h"
+
+#if (NAUDIO == 0) && (NMIDI == 0) && (NMIDIBUS == 0)
+#error "No 'audio* at audiobus?' or 'midi* at midibus?' or similar configured"
+#endif
+
+#endif /* _KERNEL_OPT */
+
 /*
  * Generic interface to hardware driver.
  */
@@ -45,7 +55,7 @@ struct audio_softc;
 
 struct audio_params {
 	u_long	sample_rate;			/* sample rate */
-	u_int	encoding;			/* e.g. ulaw, linear, etc */
+	u_int	encoding;			/* e.g. mu-law, linear, etc */
 	u_int	precision;			/* bits/sample */
 	u_int	channels;			/* mono(1), stereo(2) */
 	/* Software en/decode functions, set if SW coding required by HW */
@@ -66,9 +76,10 @@ struct audio_params {
 	u_int	hw_channels;
 };
 
-/* The default audio mode: 8 kHz mono ulaw */
-extern struct audio_params audio_default;
+/* The default audio mode: 8 kHz mono mu-law */
+extern const struct audio_params audio_default;
 
+struct malloc_type;
 struct audio_hw_if {
 	int	(*open)(void *, int);	/* open hardware */
 	void	(*close)(void *);	/* close hardware */
@@ -124,8 +135,8 @@ struct audio_hw_if {
 	int	(*query_devinfo)(void *, mixer_devinfo_t *);
 
 	/* Allocate/free memory for the ring buffer. Usually malloc/free. */
-	void	*(*allocm)(void *, int, size_t, int, int);
-	void	(*freem)(void *, void *, int);
+	void	*(*allocm)(void *, int, size_t, struct malloc_type *, int);
+	void	(*freem)(void *, void *, struct malloc_type *);
 	size_t	(*round_buffersize)(void *, int, size_t);
 	paddr_t	(*mappage)(void *, void *, off_t, int);
 

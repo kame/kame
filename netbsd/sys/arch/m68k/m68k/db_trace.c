@@ -1,4 +1,4 @@
-/*	$NetBSD: db_trace.c,v 1.36 2002/05/14 00:14:53 matt Exp $	*/
+/*	$NetBSD: db_trace.c,v 1.39 2003/07/15 02:43:12 lukem Exp $	*/
 
 /* 
  * Mach Operating System
@@ -25,6 +25,9 @@
  * any improvements or extensions that they make and grant Carnegie Mellon 
  * the rights to redistribute these changes.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: db_trace.c,v 1.39 2003/07/15 02:43:12 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -93,8 +96,6 @@ extern struct pcb *curpcb;
 		(db_get_value((db_addr_t)(addr), sizeof(int), FALSE))
 #define	get16(addr, space) \
 		(db_get_value((db_addr_t)(addr), sizeof(u_short), FALSE))
-
-#define	offsetof(type, member)	((size_t)(&((type *)0)->member))
 
 #define	NREGISTERS	16
 
@@ -440,17 +441,20 @@ db_stack_trace_print(addr, have_addr, count, modif, pr)
 		if (trace_thread) {
 			struct proc *p;
 			struct user *u;
+			struct lwp *l;
 			(*pr)("trace: pid %d ", (int)addr);
 			p = pfind(addr);
 			if (p == NULL) {
 				(*pr)("not found\n");
 				return;
 			}
-			if (!(p->p_flag & P_INMEM)) {
+			/* XXX: Have to pick on some thread... */
+			l = LIST_FIRST(&p->p_lwps);
+			if (!(l->l_flag & L_INMEM)) {
 				(*pr)("swapped out\n");
 				return;
 			}
-			u = p->p_addr;
+			u = l->l_addr;
 			pos.k_fp = u->u_pcb.pcb_regs[PCB_REGS_FP];
 			/*
 			 * Note: The following only works because cpu_switch()

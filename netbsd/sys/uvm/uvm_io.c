@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_io.c,v 1.17.10.1 2003/08/26 06:46:16 tron Exp $	*/
+/*	$NetBSD: uvm_io.c,v 1.18 2003/04/23 00:55:21 tls Exp $	*/
 
 /*
  *
@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_io.c,v 1.17.10.1 2003/08/26 06:46:16 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_io.c,v 1.18 2003/04/23 00:55:21 tls Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

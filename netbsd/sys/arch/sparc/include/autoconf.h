@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.h,v 1.34 2002/03/11 16:06:42 pk Exp $ */
+/*	$NetBSD: autoconf.h,v 1.37 2003/08/07 16:29:38 agc Exp $ */
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -57,11 +57,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -171,30 +167,12 @@ int	matchbyname __P((struct device *, struct cfdata *cf, void *aux));
  */
 char	*clockfreq __P((int freq));
 
-/*
- * Memory description arrays.  Shared between pmap.c and autoconf.c; no
- * one else should use this (except maybe mem.c, e.g., if we fix the VM to
- * handle discontiguous physical memory).
- */
-struct memarr {
-	paddr_t	addr;
-	psize_t	len;
-};
-int	makememarr(struct memarr *, int max, int which);
-#define	MEMARR_AVAILPHYS	0
-#define	MEMARR_TOTALPHYS	1
-
 /* Openprom V2 style boot path */
 struct bootpath {
 	char	name[16];	/* name of this node */
 	int	val[3];		/* up to three optional values */
 	struct device *dev;	/* device that recognised this component */
 };
-
-#if 0
-struct bootpath	*bootpath_store __P((int, struct bootpath *));
-#endif
-int		sd_crazymap __P((int));
 
 /* Parse a disk string into a dev_t, return device struct pointer */
 struct	device *parsedisk __P((char *, int, int, dev_t *));
@@ -206,3 +184,6 @@ void	mountroot_hook_establish __P((void (*) __P((struct device *)),
 void	bootstrap __P((void));
 struct device *getdevunit __P((char *, int));
 int	romgetcursoraddr __P((int **, int **));
+
+int	bus_translate_address_generic(struct openprom_range *, int,
+	    bus_addr_t, bus_addr_t *);

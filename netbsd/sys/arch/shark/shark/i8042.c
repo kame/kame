@@ -1,4 +1,4 @@
-/*	$NetBSD: i8042.c,v 1.1 2002/02/10 01:58:04 thorpej Exp $	*/
+/*	$NetBSD: i8042.c,v 1.4 2003/10/22 09:43:07 agc Exp $	*/
 
 /*
  * Copyright 1997
@@ -57,6 +57,10 @@
 **
 **--
 */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: i8042.c,v 1.4 2003/10/22 09:43:07 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -268,7 +272,7 @@ i8042_cmd(bus_space_tag_t    iot,
           u_char             value)
 {
     u_int              retries;
-    register u_char    c = NULL;
+    register u_char    c = 0;
     int                status;  
     
     /* Assume failure
@@ -343,7 +347,7 @@ i8042_cmd(bus_space_tag_t    iot,
         if (checkResponse == I8042_CHECK_RESPONSE)
         {
             /* get response from device and check if
-            ** successfull.
+            ** successful.
             */
             if (i8042_wait_input(iot,ioh,I8042_ANY_DATA))
             {
@@ -386,7 +390,7 @@ i8042_cmd(bus_space_tag_t    iot,
         else
         {
             /* Not requested to check for response and we did send the 
-            ** command so I guess we were successfull :-)
+            ** command so I guess we were successful :-)
             */
             status = 1;
             break;

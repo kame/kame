@@ -1,4 +1,4 @@
-/*	$NetBSD: vax1k_exec.c,v 1.6 2001/11/13 02:09:35 lukem Exp $	*/
+/*	$NetBSD: vax1k_exec.c,v 1.10 2004/02/13 11:36:20 wiz Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994 Christopher G. Demetriou
@@ -40,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: vax1k_exec.c,v 1.6 2001/11/13 02:09:35 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: vax1k_exec.c,v 1.10 2004/02/13 11:36:20 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -111,7 +111,7 @@ exec_vax1k_makecmds(p, epp)
 
 #ifdef COMPAT_43
 	/*
-	 * 4.3BSD pre-dates cpu midmag (e.g. MID_VAX1K).   instead, we 
+	 * 4.3BSD pre-dates CPU midmag (e.g. MID_VAX1K).   instead, we 
 	 * expect a magic number in native byte order.
 	 */
 	switch (execp->a_midmag) {
@@ -190,5 +190,5 @@ exec_vax1k_prep_anymagic(p, epp, text_foffset, textpad)
 	epp->ep_dsize += execp->a_bss;
 
 	/* finally, setup the stack ... */
-        return exec_aout_setup_stack(p, epp);
+        return (*epp->ep_esch->es_setup_stack)(p, epp);
 }

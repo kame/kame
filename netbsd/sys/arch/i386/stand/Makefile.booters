@@ -1,21 +1,29 @@
-#	$NetBSD: Makefile.booters,v 1.33.8.2 2002/07/04 10:50:33 lukem Exp $
+#	$NetBSD: Makefile.booters,v 1.56.2.1 2004/06/22 07:56:51 tron Exp $
 
 .include <bsd.own.mk>
 
 STRIPFLAG=
 BINMODE=444
 
+LIBCRT0=	# nothing
+LIBCRTBEGIN=	# nothing
+LIBCRTEND=	# nothing
+LIBC=		# nothing
+
 # Make sure we override any optimization options specified by the
 # user.
+.if ${MACHINE_ARCH} == "x86_64"
+COPTS=	-Os -m32
+CPPFLAGS+= -DBOOT_ELF64
+.else
 COPTS=	-Os -mcpu=i386
+.endif
+COPTS+= -ffreestanding
 
 I386_STAND_DIR?= $S/arch/i386/stand
 
-.PATH: ${I386_STAND_DIR}/lib/crt/bootsect ${I386_STAND_DIR}/lib
-BSSTART= start_bootsect.o fraglist.o bootsectmain.o biosdisk_ll.o \
-	bios_disk.o diskbuf.o
+.PATH: ${I386_STAND_DIR}/lib
 
-.PATH: ${I386_STAND_DIR}/lib/crt/rom
 ROMSTART= start_rom.o
 GENPROMDIR= ${I386_STAND_DIR}/genprom
 GENPROMOBJDIR!= cd ${GENPROMDIR} && ${PRINTOBJDIR}
@@ -30,22 +38,43 @@ PXESTART= start_pxe.o
 CPPFLAGS += -nostdinc -I${.OBJDIR} -I$S -I${I386_STAND_DIR}/lib -I$S/lib/libsa
 CPPFLAGS+= -D_STANDALONE
 
+# XXX
+.if ${MACHINE_ARCH} == "x86_64"
+CPPFLAGS+=-m32
+LD+=-m elf_i386
+LIBKERN_ARCH=i386
+KERNMISCMAKEFLAGS="LIBKERN_ARCH=i386"
+.endif
+
 CLEANFILES+= ${STARTFILE} vers.c ${BASE}.list
 SRCS+=	vers.c
 
 .if !make(obj) && !make(clean) && !make(cleandir)
-.BEGIN: machine
-.NOPATH: machine
+.BEGIN: machine x86 lib
+.NOPATH: machine x86
 .endif
 
-realdepend realall: machine
-CLEANFILES+= machine
+realdepend realall: machine x86 lib
+CLEANFILES+= machine x86
 
-machine::
+machine:: x86
 	-rm -f $@
 	ln -s $S/arch/i386/include $@
 
-${OBJS} ${BSSTART} ${ROMSTART} ${DOSSTART} ${PXESTART}: machine
+x86::
+	-rm -f $@
+	ln -s $S/arch/x86/include $@
+
+${OBJS} ${ROMSTART} ${DOSSTART} ${PXESTART}: machine x86 lib
+
+lib:
+.ifdef LIBOBJ
+	-rm -f $@
+	ln -s ${LIBOBJ}/lib .
+	[ -d ${LIBOBJ}/lib ] || mkdir ${LIBOBJ}/lib
+.else
+	mkdir lib
+.endif
 
 ### find out what to use for libkern
 KERN_AS=	library
@@ -71,7 +100,7 @@ LIBI386=		${I386LIB}
 cleandir distclean: cleanlibdir
 
 cleanlibdir:
-	rm -rf lib
+	-rm -rf lib
 
 .if ${OBJECT_FMT} == "ELF"
 LDFLAGS=-M -e start 	# -N does not work properly.
@@ -81,14 +110,13 @@ LDFLAGS=-N -M -e _start
 
 LIBLIST=${LIBI386} ${LIBSA} ${LIBZ} ${LIBSA} ${LIBKERN} ${LIBI386} ${LIBSA}
 
-.PHONY: vers.c
-vers.c: ${VERSIONFILE}
-	sh ${S}conf/newvers_stand.sh ${.ALLSRC} 'i386' ${NEWVERSWHAT}
+vers.c: ${VERSIONFILE} ${SOURCES}
+	${HOST_SH} ${S}conf/newvers_stand.sh ${.ALLSRC} ${MACHINE} ${NEWVERSWHAT}
 
 CLEANFILES+= ${BASE}.sym
 ${BASE}.sym: ${STARTFILE} ${OBJS} ${LIBSA} ${LIBZ} ${LIBKERN} ${LIBI386}
-	${LD} -o ${BASE}.sym ${LDFLAGS} -Ttext ${RELOC} ${STARTFILE} ${OBJS} \
-	    ${LIBLIST} >${BASE}.list
+	${LD} -o ${BASE}.sym ${LDFLAGS} -Ttext ${RELOC} \
+	    ${STARTFILE} ${OBJS} ${LIBLIST} >${BASE}.list
 
 CLEANFILES+= ${BASE}.rom
 ${BASE}.rom: ${STARTFILE} ${OBJS} ${LIBSA} ${LIBZ} ${LIBKERN} ${LIBI386}

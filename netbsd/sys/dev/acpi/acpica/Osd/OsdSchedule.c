@@ -1,4 +1,4 @@
-/*	$NetBSD: OsdSchedule.c,v 1.2 2001/11/13 13:01:58 lukem Exp $	*/
+/*	$NetBSD: OsdSchedule.c,v 1.10 2003/08/15 17:07:04 kochi Exp $	*/
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -42,14 +42,11 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: OsdSchedule.c,v 1.2 2001/11/13 13:01:58 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: OsdSchedule.c,v 1.10 2003/08/15 17:07:04 kochi Exp $");
 
 #include <sys/param.h>
 #include <sys/malloc.h>
-#include <sys/lock.h>
-#include <sys/queue.h>
 #include <sys/proc.h>
-#include <sys/kthread.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 
@@ -57,44 +54,10 @@ __KERNEL_RCSID(0, "$NetBSD: OsdSchedule.c,v 1.2 2001/11/13 13:01:58 lukem Exp $"
 
 #include <dev/acpi/acpi_osd.h>
 
+#include <dev/sysmon/sysmon_taskq.h>
+
 #define	_COMPONENT	ACPI_OS_SERVICES
-MODULE_NAME("SCHEDULE")
-
-/*
- * ACPICA uses callbacks that are priority scheduled.  We run a kernel
- * thread to execute the callbacks.  The callbacks may be scheduled
- * in interrupt context.
- */
-
-struct acpi_task {
-	TAILQ_ENTRY(acpi_task) at_list;
-	OSD_EXECUTION_CALLBACK at_func;
-	void *at_arg;
-	int at_pri;
-};
-
-TAILQ_HEAD(, acpi_task) acpi_task_queue =
-    TAILQ_HEAD_INITIALIZER(acpi_task_queue);
-struct simplelock acpi_task_queue_slock = SIMPLELOCK_INITIALIZER;
-
-#define	ACPI_TASK_QUEUE_LOCK(s)						\
-do {									\
-	s = splhigh();							\
-	simple_lock(&acpi_task_queue_slock);				\
-} while (/*CONSTCOND*/0)
-
-#define	ACPI_TASK_QUEUE_UNLOCK(s)					\
-do {									\
-	simple_unlock(&acpi_task_queue_slock);				\
-	splx((s));							\
-} while (/*CONSTCOND*/0)
-
-__volatile int acpi_osd_sched_sem;
-
-struct proc *acpi_osd_sched_proc;
-
-void	acpi_osd_sched_create_thread(void *);
-void	acpi_osd_sched(void *);
+ACPI_MODULE_NAME("SCHEDULE")
 
 /*
  * acpi_osd_sched_init:
@@ -105,9 +68,9 @@ void
 acpi_osd_sched_init(void)
 {
 
-	FUNCTION_TRACE(__FUNCTION__);
+	ACPI_FUNCTION_TRACE(__FUNCTION__);
 
-	kthread_create(acpi_osd_sched_create_thread, NULL);
+	sysmon_task_queue_init();
 
 	return_VOID;
 }
@@ -120,88 +83,12 @@ acpi_osd_sched_init(void)
 void
 acpi_osd_sched_fini(void)
 {
-	int s;
 
-	FUNCTION_TRACE(__FUNCTION__);
+	ACPI_FUNCTION_TRACE(__FUNCTION__);
 
-	ACPI_TASK_QUEUE_LOCK(s);
-
-	acpi_osd_sched_sem = 1;
-	wakeup(&acpi_task_queue);
-
-	while (acpi_osd_sched_sem != 0)
-		(void) ltsleep((void *) &acpi_osd_sched_sem, PVM, "asfini", 0,
-		    &acpi_task_queue_slock);
-
-	ACPI_TASK_QUEUE_UNLOCK(s);
+	sysmon_task_queue_fini();
 
 	return_VOID;
-}
-
-/*
- * acpi_osd_sched_create_thread:
- *
- *	Create the ACPICA Osd scheduler thread.
- */
-void
-acpi_osd_sched_create_thread(void *arg)
-{
-	int error;
-
-	error = kthread_create1(acpi_osd_sched, NULL, &acpi_osd_sched_proc,
-	    "acpi sched");
-	if (error) {
-		printf("ACPI: Unable to create scheduler thread, error = %d\n",
-		    error);
-		panic("ACPI Osd Scheduler init failed");
-	}
-}
-
-/*
- * acpi_osd_sched:
- *
- *	The Osd Scheduler thread.  We execute the callbacks that
- *	have been queued for us.
- */
-void
-acpi_osd_sched(void *arg)
-{
-	struct acpi_task *at;
-	int s;
-
-	/*
-	 * Run through all the tasks before we check
-	 * for the exit condition; it's probably more
-	 * imporatant that ACPICA get all of the work
-	 * it has expected to get done actually done.
-	 */
-	for (;;) {
-		ACPI_TASK_QUEUE_LOCK(s);
-		at = TAILQ_FIRST(&acpi_task_queue);
-		if (at == NULL) {
-			/*
-			 * Check for the exit condition.
-			 */
-			if (acpi_osd_sched_sem != 0) {
-				/* Time to die. */
-				acpi_osd_sched_sem = 0;
-				wakeup((void *) &acpi_osd_sched_sem);
-				ACPI_TASK_QUEUE_UNLOCK(s);
-				kthread_exit(0);
-			}
-			(void) ltsleep(&acpi_task_queue, PVM, "acpisched",
-			    0, &acpi_task_queue_slock);
-			ACPI_TASK_QUEUE_UNLOCK(s);
-			continue;
-		}
-		TAILQ_REMOVE(&acpi_task_queue, at, at_list);
-		ACPI_TASK_QUEUE_UNLOCK(s);
-
-		(*at->at_func)(at->at_arg);
-		free(at, M_TEMP);
-	}
-
-	panic("acpi_osd_sched: impossible");
 }
 
 /*
@@ -213,10 +100,12 @@ UINT32
 AcpiOsGetThreadId(void)
 {
 
-	KASSERT(curproc != NULL);
+	/* XXX ACPI CA can call this function in interrupt context */
+	if (curlwp == NULL)
+		return 1;
 
 	/* XXX Bleh, we're not allowed to return 0 (how stupid!) */
-	return (curproc->p_pid + 1);
+	return (curproc->p_pid + 2);
 }
 
 /*
@@ -228,60 +117,41 @@ ACPI_STATUS
 AcpiOsQueueForExecution(UINT32 Priority, OSD_EXECUTION_CALLBACK Function,
     void *Context)
 {
-	struct acpi_task *at, *lat;
-	int s;
+	int pri;
 
-	FUNCTION_TRACE(__FUNCTION__);
-
-	if (acpi_osd_sched_proc == NULL)
-		printf("ACPI: WARNING: Callback scheduled before "
-		    "thread present.\n");
-
-	if (Function == NULL)
-		return_ACPI_STATUS(AE_BAD_PARAMETER);
-
-	at = malloc(sizeof(*at), M_TEMP, M_NOWAIT);
-	if (at == NULL)
-		return_ACPI_STATUS(AE_NO_MEMORY);
-
-	at->at_func = Function;
-	at->at_arg = Context;
+	ACPI_FUNCTION_TRACE(__FUNCTION__);
 
 	switch (Priority) {
 	case OSD_PRIORITY_GPE:
-		at->at_pri = 3;
+		pri = 3;
 		break;
 
 	case OSD_PRIORITY_HIGH:
-		at->at_pri = 2;
+		pri = 2;
 		break;
 
 	case OSD_PRIORITY_MED:
-		at->at_pri = 1;
+		pri = 1;
 		break;
 
 	case OSD_PRIORITY_LO:
-		at->at_pri = 0;
+		pri = 0;
 		break;
 
 	default:
-		free(at, M_TEMP);
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
-	ACPI_TASK_QUEUE_LOCK(s);
-	TAILQ_FOREACH(lat, &acpi_task_queue, at_list) {
-		if (at->at_pri > lat->at_pri) {
-			TAILQ_INSERT_BEFORE(lat, at, at_list);
-			break;
-		}
-	}
-	if (lat == NULL)
-		TAILQ_INSERT_TAIL(&acpi_task_queue, at, at_list);
-	wakeup(&acpi_task_queue);
-	ACPI_TASK_QUEUE_UNLOCK(s);
+	switch (sysmon_task_queue_sched(pri, Function, Context)) {
+	case 0:
+		return_ACPI_STATUS(AE_OK);
 
-	return_ACPI_STATUS(AE_OK);
+	case ENOMEM:
+		return_ACPI_STATUS(AE_NO_MEMORY);
+
+	default:
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
+	}
 }
 
 /*
@@ -294,9 +164,9 @@ AcpiOsSleep(UINT32 Seconds, UINT32 Milliseconds)
 {
 	int timo;
 
-	FUNCTION_TRACE(__FUNCTION__);
+	ACPI_FUNCTION_TRACE(__FUNCTION__);
 
-	timo = (Seconds * hz) + (Milliseconds / (1000 * hz));
+	timo = Seconds * hz + Milliseconds * hz / 1000;
 	if (timo == 0)
 		timo = 1;
 
@@ -314,12 +184,20 @@ void
 AcpiOsStall(UINT32 Microseconds)
 {
 
-	FUNCTION_TRACE(__FUNCTION__);
+	ACPI_FUNCTION_TRACE(__FUNCTION__);
 
+	/*
+	 * sleep(9) isn't safe because AcpiOsStall may be called
+	 * with interrupt-disabled. (eg. by AcpiEnterSleepState)
+	 * we should watch out for long stall requests.
+	 */
+#ifdef ACPI_DEBUG
 	if (Microseconds > 1000)
-		AcpiOsSleep(0, Microseconds / 1000);
-	else
-		delay(Microseconds);
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "long stall: %uus\n",
+		    Microseconds));
+#endif
+
+	delay(Microseconds);
 
 	return_VOID;
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: cbsc.c,v 1.14 2002/01/28 09:56:53 aymeric Exp $ */
+/*	$NetBSD: cbsc.c,v 1.18 2004/02/13 11:36:10 wiz Exp $ */
 
 /*
  * Copyright (c) 1997 Michael L. Hitch
@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cbsc.c,v 1.14 2002/01/28 09:56:53 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cbsc.c,v 1.18 2004/02/13 11:36:10 wiz Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -49,6 +49,8 @@ __KERNEL_RCSID(0, "$NetBSD: cbsc.c,v 1.14 2002/01/28 09:56:53 aymeric Exp $");
 #include <sys/proc.h>
 #include <sys/user.h>
 #include <sys/queue.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <dev/scsipi/scsi_all.h>
 #include <dev/scsipi/scsipi_all.h>
@@ -69,9 +71,8 @@ void	cbscattach(struct device *, struct device *, void *);
 int	cbscmatch(struct device *, struct cfdata *, void *);
 
 /* Linkup to the rest of the kernel */
-struct cfattach cbsc_ca = {
-	sizeof(struct cbsc_softc), cbscmatch, cbscattach
-};
+CFATTACH_DECL(cbsc, sizeof(struct cbsc_softc),
+    cbscmatch, cbscattach, NULL, NULL);
 
 /*
  * Functions and the switch for the MI code.
@@ -351,7 +352,7 @@ cbsc_dma_setup(struct ncr53c9x_softc *sc, caddr_t *addr, size_t *len,
 	 * DMA can be nasty for high-speed serial input, so limit the
 	 * size of this DMA operation if the serial port is running at
 	 * a high speed (higher than 19200 for now - should be adjusted
-	 * based on cpu type and speed?).
+	 * based on CPU type and speed?).
 	 * XXX - add serial speed check XXX
 	 */
 	if (ser_open_speed > 19200 && cbsc_max_dma != 0 &&
@@ -359,7 +360,7 @@ cbsc_dma_setup(struct ncr53c9x_softc *sc, caddr_t *addr, size_t *len,
 		csc->sc_dmasize = cbsc_max_dma;
 	ptr = *addr;			/* Kernel virtual address */
 	pa = kvtop(ptr);		/* Physical address of DMA */
-	xfer = min(csc->sc_dmasize, NBPG - (pa & (NBPG - 1)));
+	xfer = min(csc->sc_dmasize, PAGE_SIZE - (pa & (PAGE_SIZE - 1)));
 	csc->sc_xfr_align = 0;
 	/*
 	 * If output and unaligned, stuff odd byte into FIFO
@@ -384,10 +385,10 @@ cbsc_dma_setup(struct ncr53c9x_softc *sc, caddr_t *addr, size_t *len,
 	while (xfer < csc->sc_dmasize) {
 		if ((pa + xfer) != kvtop(*addr + xfer))
 			break;
-		if ((csc->sc_dmasize - xfer) < NBPG)
+		if ((csc->sc_dmasize - xfer) < PAGE_SIZE)
 			xfer = csc->sc_dmasize;
 		else
-			xfer += NBPG;
+			xfer += PAGE_SIZE;
 ++cbsc_cnt_dma3;
 	}
 if (xfer != *len)

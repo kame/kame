@@ -1,4 +1,4 @@
-/*	$NetBSD: malta_intr.c,v 1.2 2002/04/08 14:08:27 simonb Exp $	*/
+/*	$NetBSD: malta_intr.c,v 1.9 2003/07/15 01:37:33 lukem Exp $	*/
 
 /*
  * Copyright 2001, 2002 Wasabi Systems, Inc.
@@ -39,6 +39,8 @@
  * Platform-specific interrupt support for the MIPS Malta.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: malta_intr.c,v 1.9 2003/07/15 01:37:33 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -62,29 +64,29 @@
  * given hardware interrupt priority level.
  */
 const u_int32_t ipl_sr_bits[_IPL_N] = {
-	0,					/* IPL_NONE */
+	0,					/*  0: IPL_NONE */
 
-	MIPS_SOFT_INT_MASK_0,			/* IPL_SOFT */
+	MIPS_SOFT_INT_MASK_0,			/*  1: IPL_SOFT */
 
-	MIPS_SOFT_INT_MASK_0,			/* IPL_SOFTCLOCK */
-
-	MIPS_SOFT_INT_MASK_0|
-		MIPS_SOFT_INT_MASK_1,		/* IPL_SOFTNET */
+	MIPS_SOFT_INT_MASK_0,			/*  2: IPL_SOFTCLOCK */
 
 	MIPS_SOFT_INT_MASK_0|
-		MIPS_SOFT_INT_MASK_1,		/* IPL_SOFTSERIAL */
+		MIPS_SOFT_INT_MASK_1,		/*  3: IPL_SOFTNET */
 
 	MIPS_SOFT_INT_MASK_0|
-		MIPS_SOFT_INT_MASK_1|
-		MIPS_INT_MASK_0,		/* IPL_BIO */
+		MIPS_SOFT_INT_MASK_1,		/*  4: IPL_SOFTSERIAL */
 
 	MIPS_SOFT_INT_MASK_0|
 		MIPS_SOFT_INT_MASK_1|
-		MIPS_INT_MASK_0,		/* IPL_NET */
+		MIPS_INT_MASK_0,		/*  5: IPL_BIO */
 
 	MIPS_SOFT_INT_MASK_0|
 		MIPS_SOFT_INT_MASK_1|
-		MIPS_INT_MASK_0,		/* IPL_{TTY,SERIAL} */
+		MIPS_INT_MASK_0,		/*  6: IPL_NET */
+
+	MIPS_SOFT_INT_MASK_0|
+		MIPS_SOFT_INT_MASK_1|
+		MIPS_INT_MASK_0,		/*  7: IPL_{TTY,SERIAL} */
 
 	MIPS_SOFT_INT_MASK_0|
 		MIPS_SOFT_INT_MASK_1|
@@ -93,7 +95,19 @@ const u_int32_t ipl_sr_bits[_IPL_N] = {
 		MIPS_INT_MASK_2|
 		MIPS_INT_MASK_3|
 		MIPS_INT_MASK_4|
-		MIPS_INT_MASK_5,		/* IPL_{CLOCK,HIGH} */
+		MIPS_INT_MASK_5,		/*  8: IPL_{CLOCK,HIGH} */
+};
+
+/*
+ * This is a mask of bits to clear in the SR when we go to a
+ * given software interrupt priority level.
+ * Hardware ipls are port/board specific.
+ */
+const u_int32_t mips_ipl_si_to_sr[_IPL_NSOFT] = {
+	MIPS_SOFT_INT_MASK_0,			/* IPL_SOFT */
+	MIPS_SOFT_INT_MASK_0,			/* IPL_SOFTCLOCK */
+	MIPS_SOFT_INT_MASK_1,			/* IPL_SOFTNET */
+	MIPS_SOFT_INT_MASK_1,			/* IPL_SOFTSERIAL */
 };
 
 struct malta_cpuintr {
@@ -135,8 +149,6 @@ evbmips_intr_init(void)
 		    EVCNT_TYPE_INTR, NULL, "mips", malta_cpuintrnames[i]);
 	}
 
-	evcnt_attach_static(&mips_int5_evcnt);
-
 	mcp->mc_pc.pc_intr_v = NULL;
 	mcp->mc_pc.pc_intr_map = malta_pci_intr_map;
 	mcp->mc_pc.pc_intr_string = malta_pci_intr_string;
@@ -151,7 +163,7 @@ evbmips_intr_init(void)
 void
 malta_cal_timer(bus_space_tag_t st, bus_space_handle_t sh)
 {
-	u_long ctrdiff[4], startctr, endctr;
+	uint32_t ctrdiff[4], startctr, endctr;
 	u_int8_t regc;
 	int i;
 
@@ -199,27 +211,10 @@ malta_cal_timer(bus_space_tag_t st, bus_space_handle_t sh)
 	/* Compute the number of ticks for hz. */
 	curcpu()->ci_cycles_per_hz = (curcpu()->ci_cpu_freq + hz / 2) / hz;
 
-	/* Compute the delay divisor. */
+	/* Compute the delay divisor and reciprical. */
 	curcpu()->ci_divisor_delay =
 	    ((curcpu()->ci_cpu_freq + 500000) / 1000000);
-
-	/*
-	 * To implement a more accurate microtime using the CP0 COUNT
-	 * register we need to divide that register by the number of
-	 * cycles per MHz.  But...
-	 *
-	 * DIV and DIVU are expensive on MIPS (eg 75 clocks on the
-	 * R4000).  MULT and MULTU are only 12 clocks on the same CPU.
-	 * On the SB1 these appear to be 40-72 clocks for DIV/DIVU and 3
-	 * clocks for MUL/MULTU.
-	 *
-	 * The strategy we use to to calculate the reciprical of cycles
-	 * per MHz, scaled by 1<<32.  Then we can simply issue a MULTU
-	 * and pluck of the HI register and have the results of the
-	 * division.
-	 */
-	curcpu()->ci_divisor_recip =
-	    0x100000000ULL / curcpu()->ci_divisor_delay;
+	MIPS_SET_CI_RECIPRICAL(curcpu());
 
 	/*
 	 * Get correct cpu frequency if the CPU runs at twice the
@@ -229,7 +224,7 @@ malta_cal_timer(bus_space_tag_t st, bus_space_handle_t sh)
 		curcpu()->ci_cpu_freq *= 2;
 
 #ifdef DEBUG
-	printf("Timer calibration: %lu cycles/sec [(%lu, %lu) * 16]\n",
+	printf("Timer calibration: %lu cycles/sec [(%u, %u) * 16]\n",
 	    curcpu()->ci_cpu_freq, ctrdiff[2], ctrdiff[3]);
 #endif
 }
@@ -286,12 +281,12 @@ evbmips_iointr(uint32_t status, uint32_t cause, uint32_t pc, uint32_t ipending)
 {
 	struct evbmips_intrhand *ih;
 	
-	/* Check for error interrupts (SMI, GT62140) */
+	/* Check for error interrupts (SMI, GT64120) */
 	if (ipending & (MIPS_INT_MASK_1 | MIPS_INT_MASK_3)) {
 		if (ipending & MIPS_INT_MASK_1)
 			panic("piix4 SMI interrupt");
 		if (ipending & MIPS_INT_MASK_3)
-			panic("gt62140 error interrupt");
+			panic("gt64120 error interrupt");
 	}
 
 	/*
@@ -324,7 +319,7 @@ static int
 malta_pci_intr_map(struct pci_attach_args *pa, pci_intr_handle_t *ihp)
 {
 #ifdef YAMON_IRQ_MAP_BAD
-	static const int pciirqmap[13/*device*/][4/*pin*/] = {
+	static const int pciirqmap[12/*device*/][4/*pin*/] = {
 		{ -1, -1, -1, 11 },	/* 10: USB */
 		{ 10, -1, -1, -1 },	/* 11: Ethernet */
 		{ 11, -1, -1, -1 },	/* 12: Audio */

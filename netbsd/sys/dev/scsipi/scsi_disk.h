@@ -1,4 +1,4 @@
-/*	$NetBSD: scsi_disk.h,v 1.20 2001/09/03 17:14:49 thorpej Exp $	*/
+/*	$NetBSD: scsi_disk.h,v 1.24 2003/09/05 09:00:08 mycroft Exp $	*/
 
 /*
  * SCSI-specific interface description
@@ -52,6 +52,8 @@
 /*
  * SCSI command format
  */
+#ifndef _DEV_SCSIPI_SCSI_DISK_H_
+#define _DEV_SCSIPI_SCSI_DISK_H_
 
 /*
  * XXX Is this also used by ATAPI?
@@ -121,16 +123,16 @@ struct scsi_defect_descriptor_bf {
 
 /* Bytes from index format */
 struct scsi_defect_descriptor_bfif {
-	u_int8_t cylinder[2];
+	u_int8_t cylinder[3];
 	u_int8_t head;
-	u_int8_t bytes_from_index[2];
+	u_int8_t bytes_from_index[4];
 };
 
 /* Physical sector format */
 struct scsi_defect_descriptor_psf {
-	u_int8_t cylinder[2];
+	u_int8_t cylinder[3];
 	u_int8_t head;
-	u_int8_t sector[2];
+	u_int8_t sector[4];
 };
 
 /*
@@ -260,8 +262,7 @@ union scsi_disk_pages {
 		u_int8_t head_unload;	/* head unload delay */
 		u_int8_t pin_34_2;	/* pin 34 (6) pin 2 (7/11) definition */
 		u_int8_t pin_4_1;	/* pin 4 (8/9) pin 1 (13) definition */
-		u_int8_t reserved1;
-		u_int8_t reserved2;
+		u_int8_t rpm[2];	/* rotational rate */
 		u_int8_t reserved3;
 		u_int8_t reserved4;
 	} flex_geometry;
@@ -297,4 +298,38 @@ union scsi_disk_pages {
 		u_int8_t reserved1;
 		u_int8_t non_cache_segment_size[2];
 	} caching_params;
+	struct page_control {
+		u_int8_t pg_code;	/* page code (should be 0x0a) */
+		u_int8_t pg_length;	/* page length (should be 0x0a) */
+		u_int8_t ctl_flags1;	/* First set of flags */
+#define CTL1_TST_PER_INTR 	0x40	/* Task set per initiator */
+#define CTL1_TST_FIELD		0xe0	/* Full field */
+#define CTL1_D_SENSE		0x04	/* Descriptor-format sense return */
+#define CTL1_GLTSD		0x02	/* Glob. Log Targ. Save Disable */
+#define CTL1_RLEC		0x01	/* Rpt Logging Exception Condition */
+		u_int8_t ctl_flags2;	/* Second set of flags */
+#define CTL2_QAM_UNRESTRICT 0x10	/* Unrestricted reordering allowed */
+#define CTL2_QAM_FIELD		0xf0	/* Full Queue alogo. modifier field */
+#define CTL2_QERR_ABRT		0x02	/* Queue error - abort all */
+#define CTL2_QERR_ABRT_SELF	0x06	/* Queue error - abort intr's */
+#define CTL2_QERR_FIELD		0x06	/* Full field */
+#define CTL2_DQUE		0x01	/* Disable queuing */
+		u_int8_t ctl_flags3;	/* Third set of flags */
+#define CTL3_TAS		0x80	/* other-intr aborts generate status */
+#define CTL3_RAC		0x40	/* Report A Check */
+#define CTL3_UAIC_RET		0x10	/* retain UA, see SPC-3 */
+#define CTL3_UAIC_RET_EST	0x30	/* retain UA and establish UA */
+#define CTL3_UA_INTRLOCKS	0x30	/* UA Interlock control field */
+#define CTL3_SWP		0x08	/* Software write protect */
+#define CTL3_RAERP		0x04	/* (unit) Ready AER Permission */
+#define CTL3_UAAERP		0x02	/* Unit Attention AER Permission */
+#define CTL3_EAERP		0x01	/* Error AER Permission */
+		u_int8_t ctl_autoload;	/* autoload mode control */
+#define CTL_AUTOLOAD_FIELD	0x07	/* autoload field */
+		u_int8_t ctl_r_hld[2];	/* RAERP holdoff period */
+		u_int8_t ctl_busy[2];	/* busy timeout period */
+		u_int8_t ctl_selt[2];	/* extended self-test completion time */
+	} control_params;
 };
+
+#endif /* _DEV_SCSIPI_SCSI_DISK_H_ */

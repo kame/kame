@@ -1,4 +1,4 @@
-/*	$NetBSD: com_pcmcia.c,v 1.28 2002/04/13 17:06:53 christos Exp $	 */
+/*	$NetBSD: com_pcmcia.c,v 1.34 2003/10/23 00:22:55 uwe Exp $	 */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -48,11 +48,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -72,7 +68,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: com_pcmcia.c,v 1.28 2002/04/13 17:06:53 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: com_pcmcia.c,v 1.34 2003/10/23 00:22:55 uwe Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -134,10 +130,8 @@ struct com_pcmcia_softc {
 	void *sc_ih;				/* interrupt handler */
 };
 
-struct cfattach com_pcmcia_ca = {
-	sizeof(struct com_pcmcia_softc), com_pcmcia_match, com_pcmcia_attach,
-	com_pcmcia_detach, com_activate
-};
+CFATTACH_DECL(com_pcmcia, sizeof(struct com_pcmcia_softc),
+    com_pcmcia_match, com_pcmcia_attach, com_pcmcia_detach, com_activate);
 
 /* Look for pcmcia cards with particular CIS strings */
 static struct com_dev *
@@ -176,8 +170,7 @@ com_pcmcia_match(parent, match, aux)
 
 	/* 2. Does it have all four 'standard' port ranges? */
 	comportmask = 0;
-	for (cfe = pa->pf->cfe_head.sqh_first; cfe;
-	    cfe = cfe->cfe_list.sqe_next) {
+	SIMPLEQ_FOREACH(cfe, &pa->pf->cfe_head, cfe_list) {
 		switch (cfe->iospace[0].start) {
 		case IO_COM1:
 			comportmask |= 1;
@@ -222,8 +215,7 @@ com_pcmcia_attach(parent, self, aux)
 retry:
 	/* find a cfe we can use */
 
-	for (cfe = pa->pf->cfe_head.sqh_first; cfe;
-	    cfe = cfe->cfe_list.sqe_next) {
+	SIMPLEQ_FOREACH(cfe, &pa->pf->cfe_head, cfe_list) {
 #if 0
 		/*
 		 * Some modem cards (e.g. Xircom CM33) also have
@@ -312,7 +304,7 @@ com_pcmcia_detach(self, flags)
 
 	/* Unmap our i/o window. */
 	if (psc->sc_io_window == -1) {
-		printf("%s: I/O window not allocated.",
+		printf("%s: I/O window not allocated.\n",
 		    psc->sc_com.sc_dev.dv_xname);
 		return 0;
 	}

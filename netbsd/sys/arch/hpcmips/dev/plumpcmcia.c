@@ -1,4 +1,4 @@
-/*	$NetBSD: plumpcmcia.c,v 1.10 2002/01/29 18:53:11 uch Exp $ */
+/*	$NetBSD: plumpcmcia.c,v 1.16 2003/07/15 02:29:30 lukem Exp $ */
 
 /*
  * Copyright (c) 1999, 2000 UCHIYAMA Yasushi. All rights reserved.
@@ -29,6 +29,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: plumpcmcia.c,v 1.16 2003/07/15 02:29:30 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -195,9 +198,8 @@ static void __memareadump(plumreg_t) __DEBUG_FUNC;
 static void plumpcmcia_dump(struct plumpcmcia_softc *) __DEBUG_FUNC;
 #endif /* PLUMPCMCIA_DEBUG */
 
-struct cfattach plumpcmcia_ca = {
-	sizeof(struct plumpcmcia_softc), plumpcmcia_match, plumpcmcia_attach
-};
+CFATTACH_DECL(plumpcmcia, sizeof(struct plumpcmcia_softc),
+    plumpcmcia_match, plumpcmcia_attach, NULL, NULL);
 
 int
 plumpcmcia_match(struct device *parent, struct cfdata *cf, void *aux)
@@ -287,7 +289,7 @@ int
 plumpcmcia_print(void *arg, const char *pnp)
 {
 	if (pnp) {
-		printf("pcmcia at %s", pnp);
+		aprint_normal("pcmcia at %s", pnp);
 	}
 
 	return (UNCONF);
@@ -296,7 +298,7 @@ plumpcmcia_print(void *arg, const char *pnp)
 int
 plumpcmcia_submatch(struct device *parent, struct cfdata *cf, void *aux)
 {
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 static void
@@ -952,7 +954,7 @@ plumpcmcia_event_thread(void *arg)
 				break;
 			}
 			s = spltty();
-			SIMPLEQ_REMOVE_HEAD(&sc->sc_event_head, pe, pe_link);
+			SIMPLEQ_REMOVE_HEAD(&sc->sc_event_head, pe_link);
 			plumpcmcia_event_free(pe);
 		}
 		splx(s);

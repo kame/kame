@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.9 2001/10/07 01:39:51 tsutsui Exp $
+#	$NetBSD: Makefile,v 1.11 2003/10/26 07:25:36 lukem Exp $
 
 #	MOTOROLA MICROPROCESSOR & MEMORY TECHNOLOGY GROUP
 #	M68000 Hi-Performance Microprocessor Division
@@ -36,6 +36,8 @@
 #	Makefile for 68040 Floating Point Software Package
 #
 
+.include <bsd.sys.mk>		# for HOST_SH
+
 TARGET = fpsp
 
 CPPFLAGS=	${FPSPCPPFLAGS} ${FPSPMISCCPPFLAGS}
@@ -47,7 +49,11 @@ CPPFLAGS=	${FPSPCPPFLAGS} ${FPSPMISCCPPFLAGS}
 
 AS?		= as
 LD?		= ld
+.if defined(HAVE_GCC3)
+AFLAGS		= -x assembler-with-cpp -m68040
+.else
 AFLAGS		= -x assembler-with-cpp -traditional-cpp -m68040
+.endif
 
 #
 # For the Library Version:
@@ -74,9 +80,9 @@ SYS		= GCC
 PREFIX		= L_
 
 .sa.s:
-	sh ${FPSPDIR}/asm2gas ${.IMPSRC} >${.TARGET}
+	${HOST_SH} ${FPSPDIR}/asm2gas ${.IMPSRC} >${.TARGET}
 .h.defs:
-	sh ${FPSPDIR}/asm2gas ${.IMPSRC} >${.TARGET}
+	${HOST_SH} ${FPSPDIR}/asm2gas ${.IMPSRC} >${.TARGET}
 .s.o:
 	${CC} ${AFLAGS} ${CPPFLAGS} -c -o ${.TARGET} ${.IMPSRC}
 
@@ -249,7 +255,8 @@ $(LIB_O_FILES): l_fpsp.defs
 # the entry routines for each function.
 #
 l_entry.sa: L_ENTRY.AWK L_LIST MONADIC.$(SYS) DYADIC.$(SYS) l_fpsp.h
-	awk -f L_ENTRY.AWK SYS=$(SYS) PREFIX=$(PREFIX) - <L_LIST|sh>l_entry.sa
+	awk -f L_ENTRY.AWK SYS=$(SYS) PREFIX=$(PREFIX) - \
+	    <L_LIST | ${HOST_SH} >l_entry.sa
 
 #
 # Do_func.sa and round.sa need special editing to remove references that
@@ -341,4 +348,3 @@ clean:
 	rm -f $(LIB_TARGET)
 
 clobber:	clean
-

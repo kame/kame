@@ -1,4 +1,4 @@
-/*	$NetBSD: hpc_machdep.c,v 1.47.4.2 2003/02/14 22:26:11 he Exp $	*/
+/*	$NetBSD: hpc_machdep.c,v 1.70 2003/09/16 08:18:22 agc Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -48,8 +48,12 @@
  * hpc_machdep.c 
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hpc_machdep.c,v 1.70 2003/09/16 08:18:22 agc Exp $");
+
 #include "opt_ddb.h"
 #include "opt_pmap_debug.h"
+#include "fs_nfs.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -58,10 +62,13 @@
 #include <sys/proc.h>
 #include <sys/msgbuf.h>
 #include <sys/exec.h>
+#include <sys/ksyms.h>
 
 #include <dev/cons.h>
 
-#ifdef DDB
+#include "ksyms.h"
+
+#if NKSYMS || defined(DDB) || defined(LKM)
 #include <machine/db_machdep.h>
 #include <ddb/db_sym.h>
 #include <ddb/db_extern.h>
@@ -86,7 +93,8 @@
 #include <arm/undefined.h>
 #include <machine/rtc.h>
 #include <machine/platid.h>
-#include <hpcarm/sa11x0/sa11x0_reg.h>
+
+#include <arm/sa11x0/sa11x0_reg.h>
 
 #include <dev/hpc/bicons.h>
 
@@ -94,6 +102,19 @@
 
 /* XXX for consinit related hacks */
 #include <sys/conf.h>
+
+#ifdef NFS
+#include <sys/mount.h>
+#include <nfs/rpcv2.h>
+#include <nfs/nfsproto.h>
+#include <nfs/nfs.h>
+#include <nfs/nfsmount.h>
+#endif
+
+/* Kernel text starts 256K in from the bottom of the kernel address space. */
+#define	KERNEL_TEXT_BASE	(KERNEL_BASE + 0x00040000)
+#define	KERNEL_VM_BASE		(KERNEL_BASE + 0x00c00000)
+#define	KERNEL_VM_SIZE		0x05000000
 
 /*
  * Address to call from cpu_reset() to reset the machine.
@@ -121,7 +142,6 @@ paddr_t physical_start;
 paddr_t physical_freestart;
 paddr_t physical_freeend;
 paddr_t physical_end;
-u_int free_pages;
 int physmem = 0;
 
 #ifndef PMAP_STATIC_L1S
@@ -137,7 +157,7 @@ pv_addr_t abtstack;
 pv_addr_t kernelstack;
 
 char *boot_args = NULL;
-char *boot_file = NULL;
+char boot_file[16];
 
 vaddr_t msgbufphys;
 
@@ -191,10 +211,9 @@ static void fakecninit();
 void dumppages(char *, int);
 #endif
 
-extern int db_trapper();
-
+u_int initarm(int, char **, struct bootinfo *);
+extern int db_trapper(u_int, u_int, trapframe_t *, int);
 extern void dump_spl_masks	__P((void));
-
 extern void dumpsys	__P((void));
 
 /*
@@ -263,6 +282,12 @@ cpu_reboot(howto, bootstr)
 	/*NOTREACHED*/
 }
 
+/* Number of DRAM pages which are installed */
+/* Units are 4K pages, so 8192 is 32 MB of memory */
+#ifndef DRAM_PAGES
+#define DRAM_PAGES	8192
+#endif
+
 /*
  *
  * Initial entry point on startup. This gets called before main() is
@@ -286,8 +311,8 @@ initarm(argc, argv, bi)
 	u_int l1pagetable;
 	vaddr_t freemempos;
 	pv_addr_t kernel_l1pt;
-	pv_addr_t kernel_ptpt;
-#ifdef DDB
+	vsize_t pt_size;
+#if NKSYMS || defined(DDB) || defined(LKM)
 	Elf_Shdr *sh;
 #endif
 
@@ -310,12 +335,12 @@ initarm(argc, argv, bi)
 	 * XXX kill bootconfig and directly call uvm_physload
 	 */
 	bootconfig.dram[0].address = 0xc0000000;
-	bootconfig.dram[0].pages = 8192;
+	bootconfig.dram[0].pages = DRAM_PAGES;
 	bootconfig.dramblocks = 1;
 	kerneldatasize = (u_int32_t)&end - (u_int32_t)KERNEL_TEXT_BASE;
 
 	symbolsize = 0;
-#ifdef DDB
+#if NKSYMS || defined(DDB) || defined(LKM)
 	if (! memcmp(&end, "\177ELF", 4)) {
 		sh = (Elf_Shdr *)((char *)&end + ((Elf_Ehdr *)&end)->e_shoff);
 		loop = ((Elf_Ehdr *)&end)->e_shnum;
@@ -328,9 +353,11 @@ initarm(argc, argv, bi)
 
 	printf("kernsize=0x%x\n", kerneldatasize);
 	kerneldatasize += symbolsize;
-	kerneldatasize = ((kerneldatasize - 1) & ~(NBPG * 4 - 1)) + NBPG * 8;
+	kerneldatasize = ((kerneldatasize - 1) & ~(PAGE_SIZE * 4 - 1)) +
+	    PAGE_SIZE * 8;
 
 	/* parse kernel args */
+	boot_file[0] = '\0';
 	strncpy(booted_kernel_storage, *argv, sizeof(booted_kernel_storage));
 	for(argc--, argv++; argc; argc--, argv++)
 		switch(**argv) {
@@ -339,6 +366,18 @@ initarm(argc, argv, bi)
 			break;
 		case 's':
 			boothowto |= RB_SINGLE;
+			break;
+		case 'b':
+			/* boot device: -b=sd0 etc. */
+#ifdef NFS
+			if (strcmp(*argv + 2, "nfs") == 0)
+				mountroot = nfs_mountroot;
+			else
+				strncpy(boot_file, *argv + 2,
+				    sizeof(boot_file));
+#else /* NFS */
+			strncpy(boot_file, *argv + 2, sizeof(boot_file));
+#endif /* NFS */
 			break;
 		default:
 			break;
@@ -368,18 +407,17 @@ initarm(argc, argv, bi)
 	physical_freestart = physical_start
 	    + (KERNEL_TEXT_BASE - KERNEL_BASE) + kerneldatasize;
 	physical_end = bootconfig.dram[bootconfig.dramblocks - 1].address
-	    + bootconfig.dram[bootconfig.dramblocks - 1].pages * NBPG;
+	    + bootconfig.dram[bootconfig.dramblocks - 1].pages * PAGE_SIZE;
 	physical_freeend = physical_end;
-/*	free_pages = bootconfig.drampages;*/
     
 	for (loop = 0; loop < bootconfig.dramblocks; ++loop)
 		physmem += bootconfig.dram[loop].pages;
     
 	/* XXX handle UMA framebuffer memory */
 
-	/* Use the first 1MB to allocate things */
-	freemempos = 0xc0000000;
-	memset((void *)0xc0000000, 0, KERNEL_TEXT_BASE - 0xc0000000);
+	/* Use the first 256kB to allocate things */
+	freemempos = KERNEL_BASE;
+	memset((void *)KERNEL_BASE, 0, KERNEL_TEXT_BASE - KERNEL_BASE);
 
 	/*
 	 * Right We have the bottom meg of memory mapped to 0x00000000
@@ -413,15 +451,16 @@ initarm(argc, argv, bi)
 	/* Define a macro to simplify memory allocation */
 #define	valloc_pages(var, np)			\
 	(var).pv_pa = (var).pv_va = freemempos;	\
-	freemempos += (np) * NBPG;
+	freemempos += (np) * PAGE_SIZE;
 #define	alloc_pages(var, np)			\
 	(var) = freemempos;			\
-	freemempos += (np) * NBPG;
+	freemempos += (np) * PAGE_SIZE;
 
 
-	valloc_pages(kernel_l1pt, L1_TABLE_SIZE / NBPG);
+	valloc_pages(kernel_l1pt, L1_TABLE_SIZE / PAGE_SIZE);
 	for (loop = 0; loop < NUM_KERNEL_PTS; ++loop) {
-		alloc_pages(kernel_pt_table[loop].pv_pa, L2_TABLE_SIZE / NBPG);
+		alloc_pages(kernel_pt_table[loop].pv_pa,
+		    L2_TABLE_SIZE / PAGE_SIZE);
 		kernel_pt_table[loop].pv_va = kernel_pt_table[loop].pv_pa;
 	}
 
@@ -432,8 +471,7 @@ initarm(argc, argv, bi)
 	 */
 	valloc_pages(systempage, 1);
 
-	/* Allocate a page for the page table to map kernel page tables*/
-	valloc_pages(kernel_ptpt, L2_TABLE_SIZE / NBPG);
+	pt_size = round_page(freemempos) - KERNEL_BASE;
 
 	/* Allocate stacks for all modes */
 	valloc_pages(irqstack, IRQ_STACK_SIZE);
@@ -442,13 +480,17 @@ initarm(argc, argv, bi)
 	valloc_pages(kernelstack, UPAGES);
 
 #ifdef VERBOSE_INIT_ARM
-	printf("IRQ stack: p0x%08lx v0x%08lx\n", irqstack.pv_pa, irqstack.pv_va); 
-	printf("ABT stack: p0x%08lx v0x%08lx\n", abtstack.pv_pa, abtstack.pv_va); 
-	printf("UND stack: p0x%08lx v0x%08lx\n", undstack.pv_pa, undstack.pv_va); 
-	printf("SVC stack: p0x%08lx v0x%08lx\n", kernelstack.pv_pa, kernelstack.pv_va); 
+	printf("IRQ stack: p0x%08lx v0x%08lx\n", irqstack.pv_pa,
+	    irqstack.pv_va); 
+	printf("ABT stack: p0x%08lx v0x%08lx\n", abtstack.pv_pa,
+	    abtstack.pv_va); 
+	printf("UND stack: p0x%08lx v0x%08lx\n", undstack.pv_pa,
+	    undstack.pv_va); 
+	printf("SVC stack: p0x%08lx v0x%08lx\n", kernelstack.pv_pa,
+	    kernelstack.pv_va); 
 #endif
 
-	alloc_pages(msgbufphys, round_page(MSGBUFSIZE) / NBPG);
+	alloc_pages(msgbufphys, round_page(MSGBUFSIZE) / PAGE_SIZE);
 
 	/*
 	 * XXX Actually, we only need virtual space and don't need
@@ -466,7 +508,7 @@ initarm(argc, argv, bi)
 	}
 	{
 		vaddr_t dummy;
-		alloc_pages(dummy, CPU_SA110_CACHE_CLEAN_SIZE / NBPG - 1);
+		alloc_pages(dummy, CPU_SA110_CACHE_CLEAN_SIZE / PAGE_SIZE - 1);
 	}
 	sa1_cache_clean_addr = sa1_cc_base;
 	sa1_cache_clean_size = CPU_SA110_CACHE_CLEAN_SIZE / 2;
@@ -497,8 +539,6 @@ initarm(argc, argv, bi)
 	for (loop = 0; loop < KERNEL_PT_VMDATA_NUM; ++loop)
 		pmap_link_l2pt(l1pagetable, KERNEL_VM_BASE + loop * 0x00400000,
 		    &kernel_pt_table[KERNEL_PT_VMDATA + loop]);
-	pmap_link_l2pt(l1pagetable, PTE_BASE,
-	    &kernel_ptpt);
 
 	/* update the top of the kernel VM */
 	pmap_curmaxkvaddr =
@@ -539,52 +579,24 @@ initarm(argc, argv, bi)
 
 	/* Map the stack pages */
 	pmap_map_chunk(l1pagetable, irqstack.pv_va, irqstack.pv_pa,
-	    IRQ_STACK_SIZE * NBPG, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+	    IRQ_STACK_SIZE * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
 	pmap_map_chunk(l1pagetable, abtstack.pv_va, abtstack.pv_pa,
-	    ABT_STACK_SIZE * NBPG, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+	    ABT_STACK_SIZE * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
 	pmap_map_chunk(l1pagetable, undstack.pv_va, undstack.pv_pa,
-	    UND_STACK_SIZE * NBPG, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+	    UND_STACK_SIZE * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
 	pmap_map_chunk(l1pagetable, kernelstack.pv_va, kernelstack.pv_pa,
-	    UPAGES * NBPG, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+	    UPAGES * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
 
 	pmap_map_chunk(l1pagetable, kernel_l1pt.pv_va, kernel_l1pt.pv_pa,
-	    L1_TABLE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
+	    L1_TABLE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_PAGETABLE);
 
-	/* Map the page table that maps the kernel pages */
-	pmap_map_entry(l1pagetable, kernel_ptpt.pv_va, kernel_ptpt.pv_pa,
-	    VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
+	/* Map page tables */
+	pmap_map_chunk(l1pagetable, KERNEL_BASE, KERNEL_BASE, pt_size,
+	    VM_PROT_READ | VM_PROT_WRITE, PTE_PAGETABLE);
 
 	/* Map a page for entering idle mode */
 	pmap_map_entry(l1pagetable, sa11x0_idle_mem, sa11x0_idle_mem,
 	    VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
-
-	/*
-	 * Map entries in the page table used to map PTE's
-	 * Basically every kernel page table gets mapped here
-	 */
-	/* The -2 is slightly bogus, it should be -log2(sizeof(pt_entry_t)) */
-	pmap_map_entry(l1pagetable,
-	    PTE_BASE + (0x00000000 >> (PGSHIFT-2)),
-	    kernel_pt_table[KERNEL_PT_SYS].pv_pa,
-	    VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
-	pmap_map_entry(l1pagetable,
-	    PTE_BASE + (KERNEL_BASE >> (PGSHIFT-2)),
-	    kernel_pt_table[KERNEL_PT_KERNEL].pv_pa,
-	    VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
-	for (loop = 0; loop < KERNEL_PT_VMDATA_NUM; ++loop) {
-		pmap_map_entry(l1pagetable,
-		    PTE_BASE + ((KERNEL_VM_BASE +
-		    (loop * 0x00400000)) >> (PGSHIFT-2)),
-		    kernel_pt_table[KERNEL_PT_VMDATA + loop].pv_pa,
-		    VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
-	}
-	pmap_map_entry(l1pagetable,
-	    PTE_BASE + (PTE_BASE >> (PGSHIFT-2)),
-	    kernel_ptpt.pv_pa, VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
-	pmap_map_entry(l1pagetable,
-	    PTE_BASE + (SAIPIO_BASE >> (PGSHIFT-2)),
-	    kernel_pt_table[KERNEL_PT_IO].pv_pa, VM_PROT_READ|VM_PROT_WRITE,
-	    PTE_NOCACHE);
 
 	/* Map the vector page. */
 	pmap_map_entry(l1pagetable, vector_page, systempage.pv_pa,
@@ -615,9 +627,12 @@ initarm(argc, argv, bi)
 	 */
 	printf("init subsystems: stacks ");
 
-	set_stackptr(PSR_IRQ32_MODE, irqstack.pv_va + IRQ_STACK_SIZE * NBPG);
-	set_stackptr(PSR_ABT32_MODE, abtstack.pv_va + ABT_STACK_SIZE * NBPG);
-	set_stackptr(PSR_UND32_MODE, undstack.pv_va + UND_STACK_SIZE * NBPG);
+	set_stackptr(PSR_IRQ32_MODE,
+	    irqstack.pv_va + IRQ_STACK_SIZE * PAGE_SIZE);
+	set_stackptr(PSR_ABT32_MODE,
+	    abtstack.pv_va + ABT_STACK_SIZE * PAGE_SIZE);
+	set_stackptr(PSR_UND32_MODE,
+	    undstack.pv_va + UND_STACK_SIZE * PAGE_SIZE);
 #ifdef PMAP_DEBUG
 	if (pmap_debug_level >= 0)
 		printf("kstack V%08lx P%08lx\n", kernelstack.pv_va,
@@ -644,10 +659,20 @@ initarm(argc, argv, bi)
 	undefined_init();
 
 	/* Set the page table address. */
+	cpu_domains((DOMAIN_CLIENT << (PMAP_DOMAIN_KERNEL*2)) | DOMAIN_CLIENT);
 	setttb(kernel_l1pt.pv_pa);
+	cpu_tlb_flushID();
+	cpu_domains(DOMAIN_CLIENT << (PMAP_DOMAIN_KERNEL*2));
+
+	/*
+	 * Moved from cpu_startup() as data_abort_handler() references
+	 * this during uvm init
+	 */
+	proc0paddr = (struct user *)kernelstack.pv_va;
+	lwp0.l_addr = proc0paddr;
 
 #ifdef BOOT_DUMP
-	dumppages((char *)0xc0000000, 16 * NBPG);
+	dumppages((char *)0xc0000000, 16 * PAGE_SIZE);
 	dumppages((char *)0xb0100000, 64); /* XXX */
 #endif
 	/* Enable MMU, I-cache, D-cache, write buffer. */
@@ -662,9 +687,24 @@ initarm(argc, argv, bi)
 	printf("MMU enabled. control=%08x\n", cpu_get_control());
 #endif
 
-	/* Boot strap pmap telling it where the kernel page table is */
-	pmap_bootstrap((pd_entry_t *)kernel_l1pt.pv_va, kernel_ptpt);
+	/* Load memory into UVM. */
+	uvm_setpagesize();	/* initialize PAGE_SIZE-dependent variables */
+	for (loop = 0; loop < bootconfig.dramblocks; loop++) {
+		paddr_t start = (paddr_t)bootconfig.dram[loop].address;
+		paddr_t end = start + (bootconfig.dram[loop].pages * PAGE_SIZE);
 
+		if (start < physical_freestart)
+			start = physical_freestart;
+		if (end > physical_freeend)
+			end = physical_freeend;
+
+		uvm_page_physload(atop(start), atop(end),
+		    atop(start), atop(end), VM_FREELIST_DEFAULT);
+	}
+
+	/* Boot strap pmap telling it where the kernel page table is */
+	pmap_bootstrap((pd_entry_t *)kernel_l1pt.pv_va, KERNEL_VM_BASE,
+	    KERNEL_VM_BASE + KERNEL_VM_SIZE);
 
 	if (cputype == CPU_ID_SA110)
 		rpc_sa110_cc_setup();	
@@ -682,13 +722,10 @@ initarm(argc, argv, bi)
 #endif
 
 #ifdef DDB
-	{
-		static struct undefined_handler uh;
-
-		uh.uh_handler = db_trapper;
-		install_coproc_handler_static(0, &uh);
-	}
-	ddb_init(symbolsize, ((int *)&end), ((char *)&end) + symbolsize);
+	db_machine_init();
+#endif
+#if NKSYMS || defined(DDB) || defined(LKM)
+	ksyms_init(symbolsize, ((int *)&end), ((char *)&end) + symbolsize);
 #endif
 
 	printf("kernsize=0x%x", kerneldatasize);
@@ -758,10 +795,11 @@ rpc_sa110_cc_setup(void)
 	pt_entry_t *pte;
 
 	(void) pmap_extract(pmap_kernel(), KERNEL_TEXT_BASE, &kaddr);
-	for (loop = 0; loop < CPU_SA110_CACHE_CLEAN_SIZE; loop += NBPG) {
+	for (loop = 0; loop < CPU_SA110_CACHE_CLEAN_SIZE; loop += PAGE_SIZE) {
 		pte = vtopte(sa1_cc_base + loop);
 		*pte = L2_S_PROTO | kaddr |
 		    L2_S_PROT(PTE_KERNEL, VM_PROT_READ) | pte_l2_s_cache_mode;
+		PTE_SYNC(pte);
 	}
 	sa1_cache_clean_addr = sa1_cc_base;
 	sa1_cache_clean_size = CPU_SA110_CACHE_CLEAN_SIZE / 2;

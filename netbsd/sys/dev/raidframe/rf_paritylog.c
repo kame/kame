@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_paritylog.c,v 1.7 2001/11/13 07:11:15 lukem Exp $	*/
+/*	$NetBSD: rf_paritylog.c,v 1.9 2002/09/14 17:53:58 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rf_paritylog.c,v 1.7 2001/11/13 07:11:15 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rf_paritylog.c,v 1.9 2002/09/14 17:53:58 oster Exp $");
 
 #include "rf_archs.h"
 
@@ -78,8 +78,7 @@ AllocParityLogCommonData(RF_Raid_t * raidPtr)
 		RF_Malloc(common, sizeof(RF_CommonLogData_t), (RF_CommonLogData_t *));
 		rc = rf_mutex_init(&common->mutex);
 		if (rc) {
-			RF_ERRORMSG3("Unable to init mutex file %s line %d rc=%d\n", __FILE__,
-			    __LINE__, rc);
+			rf_print_unable_to_init_mutex(__FILE__, __LINE__, rc);
 			RF_Free(common, sizeof(RF_CommonLogData_t));
 			common = NULL;
 		}
@@ -810,7 +809,7 @@ rf_ParityLogAppend(
 				RF_ASSERT(log->records[logItem].parityAddr.startSector < raidPtr->regionInfo[regionID].parityStartAddr + raidPtr->regionInfo[regionID].numSectorsParity);
 				log->records[logItem].parityAddr.numSector = 1;
 				log->records[logItem].operation = item->common->operation;
-				bcopy((item->common->bufPtr + (item->bufOffset++ * (1 << item->common->raidPtr->logBytesPerSector))), log->bufPtr + (logItem * (1 << item->common->raidPtr->logBytesPerSector)), (1 << item->common->raidPtr->logBytesPerSector));
+				memcpy(log->bufPtr + (logItem * (1 << item->common->raidPtr->logBytesPerSector)), (item->common->bufPtr + (item->bufOffset++ * (1 << item->common->raidPtr->logBytesPerSector))), (1 << item->common->raidPtr->logBytesPerSector));
 				item->diskAddress.numSector--;
 				item->diskAddress.startSector++;
 				if (item->diskAddress.numSector == 0)

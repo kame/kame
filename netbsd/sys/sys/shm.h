@@ -1,4 +1,4 @@
-/*	$NetBSD: shm.h,v 1.30.4.2 2003/10/22 06:13:20 jmc Exp $	*/
+/*	$NetBSD: shm.h,v 1.35.2.1 2004/10/04 05:19:13 jmc Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -82,16 +82,23 @@
 
 #define	SHM_RDONLY	010000	/* Attach read-only (else read-write) */
 #define	SHM_RND		020000	/* Round attach address to SHMLBA */
+#ifdef _KERNEL
+#define _SHM_RMLINGER	040000	/* Attach even if segment removed */
+#endif
+
 /* Segment low boundry address multiple */
 #if defined(_KERNEL) || defined(_STANDALONE) || defined(_LKM)
 #define	SHMLBA		PAGE_SIZE
 #else
-/* Use libc's internal __sysconf() to retrieve the machine's page size */
-#include <sys/unistd.h> /* for _SC_PAGESIZE */
+/*
+ * SHMLBA uses libc's internal __sysconf() to retrieve the machine's
+ * page size. The value of _SC_PAGESIZE is 28 -- we hard code it so we do not
+ * need to include unistd.h
+ */
 __BEGIN_DECLS
-long			__sysconf __P((int));
+long __sysconf __P((int));
 __END_DECLS
-#define	SHMLBA		(__sysconf(_SC_PAGESIZE))
+#define	SHMLBA		(__sysconf(28))
 #endif
 
 typedef unsigned int	shmatt_t;
@@ -127,22 +134,22 @@ struct shmid_ds14 {
 };
 #endif /* _KERNEL */
 
-#if !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 /*
  * Some systems (e.g. HP-UX) take these as the second (cmd) arg to shmctl().
  * XXX Currently not implemented.
  */
 #define	SHM_LOCK	3	/* Lock segment in memory. */
 #define	SHM_UNLOCK	4	/* Unlock a segment locked by SHM_LOCK. */
-#endif /* _XOPEN_SOURCE */
+#endif /* _NETBSD_SOURCE */
 
-#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 /*
  * Permission definitions used in shmflag arguments to shmat(2) and shmget(2).
  * Provided for source compatibility only; do not use in new code!
  */
-#define	SHM_R		0000400	/* S_IRUSR, R for owner */
-#define	SHM_W		0000200	/* S_IWUSR, W for owner */
+#define	SHM_R		IPC_R	/* S_IRUSR, R for owner */
+#define	SHM_W		IPC_W	/* S_IWUSR, W for owner */
 
 /*
  * System 5 style catch-all structure for shared memory constants that
@@ -172,7 +179,7 @@ struct shm_sysctl_info {
 	int32_t	pad;	/* shminfo not a multiple of 64 bits */
 	struct	shmid_ds_sysctl shmids[1];
 };
-#endif /* !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
+#endif /* _NETBSD_SOURCE */
 
 #ifdef _KERNEL
 extern struct shminfo shminfo;
@@ -184,7 +191,6 @@ void	shminit __P((void));
 void	shmfork __P((struct vmspace *, struct vmspace *));
 void	shmexit __P((struct vmspace *));
 int	shmctl1 __P((struct proc *, int, int, struct shmid_ds *));
-int	shmat1 __P((struct proc *, int, const void *, int, vaddr_t *, int));
 #else /* !_KERNEL */
 
 __BEGIN_DECLS

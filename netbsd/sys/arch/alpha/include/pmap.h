@@ -1,4 +1,4 @@
-/* $NetBSD: pmap.h,v 1.54 2001/09/10 21:19:09 chris Exp $ */
+/* $NetBSD: pmap.h,v 1.63 2003/08/24 17:52:30 chs Exp $ */
 
 /*-
  * Copyright (c) 1998, 1999, 2000, 2001 The NetBSD Foundation, Inc.
@@ -38,9 +38,42 @@
  */
 
 /* 
- * Copyright (c) 1987 Carnegie-Mellon University
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)pmap.h	8.1 (Berkeley) 6/10/93
+ */
+
+/* 
+ * Copyright (c) 1987 Carnegie-Mellon University
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -121,7 +154,7 @@ struct pmap {
 typedef struct pmap	*pmap_t;
 
 /*
- * Compute the sizeo of a pmap structure.  Subtract one because one
+ * Compute the sizeof of a pmap structure.  Subtract one because one
  * ASN info structure is already included in the pmap structure itself.
  */
 #define	PMAP_SIZEOF(x)							\
@@ -130,7 +163,7 @@ typedef struct pmap	*pmap_t;
 
 #define	PMAP_ASN_RESERVED	0	/* reserved for Lev1map users */
 
-extern u_long		kernel_pmap_store[];
+extern struct pmap	kernel_pmap_store[];
 
 /*
  * For each struct vm_page, there is a list of all currently valid virtual
@@ -157,22 +190,11 @@ typedef struct pv_entry {
 #ifdef _KERNEL
 
 #ifndef _LKM
-#include "opt_new_scc_driver.h"
-#include "opt_dec_3000_300.h"			/* XXX */
-#include "opt_dec_3000_500.h"			/* XXX */
 #include "opt_dec_kn8ae.h"			/* XXX */
 
-#if defined(NEW_SCC_DRIVER)
 #if defined(DEC_KN8AE)
 #define	_PMAP_MAY_USE_PROM_CONSOLE
 #endif
-#else /* ! NEW_SCC_DRIVER */
-#if defined(DEC_3000_300)		\
- || defined(DEC_3000_500)		\
- || defined(DEC_KN8AE) 				/* XXX */
-#define _PMAP_MAY_USE_PROM_CONSOLE		/* XXX */
-#endif						/* XXX */
-#endif /* NEW_SCC_DRIVER */
 
 #if defined(MULTIPROCESSOR)
 struct cpu_info;
@@ -195,13 +217,19 @@ void	pmap_do_tlb_shootdown(struct cpu_info *, struct trapframe *);
 #endif /* MULTIPROCESSOR */
 #endif /* _LKM */
 
-#define pmap_kernel()	((pmap_t) (&kernel_pmap_store[0]))
+#define pmap_kernel()			(kernel_pmap_store)
  
 #define	pmap_resident_count(pmap)	((pmap)->pm_stats.resident_count)
 #define	pmap_wired_count(pmap)		((pmap)->pm_stats.wired_count)
 
 #define	pmap_copy(dp, sp, da, l, sa)	/* nothing */
 #define	pmap_update(pmap)		/* nothing (yet) */
+
+static __inline void
+pmap_remove_all(struct pmap *pmap)
+{
+	/* Nothing. */
+}
 
 #define	pmap_is_referenced(pg)						\
 	(((pg)->mdpage.pvh_attrs & PGA_REFERENCED) != 0)
@@ -219,15 +247,19 @@ extern	pt_entry_t *VPT;		/* Virtual Page Table */
 #define	PMAP_MAP_POOLPAGE(pa)		ALPHA_PHYS_TO_K0SEG((pa))
 #define	PMAP_UNMAP_POOLPAGE(va)		ALPHA_K0SEG_TO_PHYS((va))
 
+/*
+ * Other hooks for the pool allocator.
+ */
+#define	POOL_VTOPHYS(va)		ALPHA_K0SEG_TO_PHYS((vaddr_t) (va))
+
 boolean_t			pmap_pageidlezero(paddr_t);
 #define	PMAP_PAGEIDLEZERO(pa)	pmap_pageidlezero((pa))
 
 paddr_t vtophys(vaddr_t);
 
 /* Machine-specific functions. */
-void	pmap_bootstrap(paddr_t ptaddr, u_int maxasn, u_long ncpuids);
-void	pmap_emulate_reference(struct proc *p, vaddr_t v,
-		int user, int write);
+void	pmap_bootstrap(paddr_t, u_int, u_long);
+int	pmap_emulate_reference(struct lwp *, vaddr_t, int, int);
 #ifdef _PMAP_MAY_USE_PROM_CONSOLE
 int	pmap_uses_prom_console(void);
 #endif

@@ -1,7 +1,6 @@
-/*	$NetBSD: mfc.c,v 1.28 2002/03/17 19:40:31 atatat Exp $ */
+/*	$NetBSD: mfc.c,v 1.34 2004/03/28 18:59:39 mhitch Exp $ */
 
 /*
- * Copyright (c) 1994 Michael L. Hitch
  * Copyright (c) 1982, 1990 The Regents of the University of California.
  * All rights reserved.
  *
@@ -13,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,8 +31,34 @@
 
 #include "opt_kgdb.h"
 
+/*
+ * Copyright (c) 1994 Michael L. Hitch
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#include "opt_kgdb.h"
+
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mfc.c,v 1.28 2002/03/17 19:40:31 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mfc.c,v 1.34 2004/03/28 18:59:39 mhitch Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,6 +72,7 @@ __KERNEL_RCSID(0, "$NetBSD: mfc.c,v 1.28 2002/03/17 19:40:31 atatat Exp $");
 #include <sys/kernel.h>
 #include <sys/syslog.h>
 #include <sys/queue.h>
+#include <sys/conf.h>
 #include <machine/cpu.h>
 #include <amiga/amiga/device.h>
 #include <amiga/amiga/isr.h>
@@ -60,9 +82,6 @@ __KERNEL_RCSID(0, "$NetBSD: mfc.c,v 1.28 2002/03/17 19:40:31 atatat Exp $");
 #include <amiga/dev/zbusvar.h>
 
 #include <dev/cons.h>
-
-#include <sys/conf.h>
-#include <machine/conf.h>
 
 #include "mfcs.h"
 
@@ -206,24 +225,34 @@ int mfcpmatch(struct device *, struct cfdata *, void *);
 #endif
 int mfcintr(void *);
 
-struct cfattach mfc_ca = {
-	sizeof(struct mfc_softc), mfcmatch, mfcattach
-};
+CFATTACH_DECL(mfc, sizeof(struct mfc_softc),
+    mfcmatch, mfcattach, NULL, NULL);
 
 #if NMFCS > 0
-struct cfattach mfcs_ca = {
-	sizeof(struct mfcs_softc), mfcsmatch, mfcsattach
-};
+CFATTACH_DECL(mfcs, sizeof(struct mfcs_softc),
+    mfcsmatch, mfcsattach, NULL, NULL);
 
 extern struct cfdriver mfcs_cd;
 #endif
 
 #if NMFCP > 0
-struct cfattach mfcp_ca = {
-	sizeof(struct mfcp_softc), mfcpmatch, mfcpattach
-};
+CFATTACH_DECL(mfcp, sizeof(struct mfcp_softc),
+    mfcpmatch, mfcpattach, NULL, NULL);
 #endif
 
+dev_type_open(mfcsopen);
+dev_type_close(mfcsclose);
+dev_type_read(mfcsread);
+dev_type_write(mfcswrite);
+dev_type_ioctl(mfcsioctl);
+dev_type_stop(mfcsstop);
+dev_type_tty(mfcstty);
+dev_type_poll(mfcspoll);
+
+const struct cdevsw mfcs_cdevsw = {
+	mfcsopen, mfcsclose, mfcsread, mfcswrite, mfcsioctl,
+	mfcsstop, mfcstty, mfcspoll, nommap, ttykqfilter, D_TTY
+};
 
 int	mfcs_active;
 int	mfcsdefaultrate = 38400 /*TTYDEF_SPEED*/;
@@ -1071,8 +1100,12 @@ mfcseint(int unit, int stat)
 
 	if ((tp->t_state & TS_ISOPEN) == 0) {
 #ifdef KGDB
+		extern const struct cdevsw ser_cdevsw;
+		int maj;
+
 		/* we don't care about parity errors */
-		if (kgdb_dev == makedev(sermajor, unit) && c == FRAME_END)
+		maj = cdevsw_lookup_major(&ser_cdevsw);
+		if (kgdb_dev == makedev(maj, unit) && c == FRAME_END)
 			kgdb_connect(0);	/* trap into kgdb */
 #endif
 		return;

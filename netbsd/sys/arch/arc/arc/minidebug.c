@@ -1,4 +1,4 @@
-/*	$NetBSD: minidebug.c,v 1.10 2000/06/29 08:34:09 mrg Exp $	*/
+/*	$NetBSD: minidebug.c,v 1.15 2003/08/07 16:26:48 agc Exp $	*/
 /*	$OpenBSD: minidebug.c,v 1.2 1998/03/16 09:03:36 pefo Exp $	*/
 
 /*-
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -42,6 +38,9 @@
 /*
  * Define machine dependent primitives for mdb.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: minidebug.c,v 1.15 2003/08/07 16:26:48 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -200,7 +199,7 @@ gethex(u_int *val, u_int dotval)
 			return(c);
 		}
 		else if(c == '.') {
-			*val = dotval;;
+			*val = dotval;
 			cnputc(c);
 		}
 	}
@@ -497,7 +496,7 @@ static int ssandrun;	/* Single step and run flag (when cont at brk) */
 				c = gethex(&newaddr, newaddr);
 				if(c == '\n') {
 					printf("= %02x",
-						*(u_char *)newaddr);	
+						*(u_char *)newaddr);
 				}
 				break;
 			case 'h':
@@ -505,7 +504,7 @@ static int ssandrun;	/* Single step and run flag (when cont at brk) */
 				c = gethex(&newaddr, newaddr);
 				if(c == '\n') {
 					printf("= %04x",
-						*(u_short *)newaddr);	
+						*(u_short *)newaddr);
 				}
 				break;
 			case 'w':
@@ -513,7 +512,7 @@ static int ssandrun;	/* Single step and run flag (when cont at brk) */
 				c = gethex(&newaddr, newaddr);
 				if(c == '\n') {
 					printf("= %08x",
-						*(u_int *)newaddr);	
+						*(u_int *)newaddr);
 				}
 				break;
 			}
@@ -529,7 +528,7 @@ static int ssandrun;	/* Single step and run flag (when cont at brk) */
 				if(c == ',') {
 					c = gethex(&size, 0);
 					if(c == '\n') {
-						*(u_char *)newaddr = size;	
+						*(u_char *)newaddr = size;
 					}
 				}
 				break;
@@ -539,7 +538,7 @@ static int ssandrun;	/* Single step and run flag (when cont at brk) */
 				if(c == ',') {
 					c = gethex(&size, 0);
 					if(c == '\n') {
-						*(u_short *)newaddr = size;	
+						*(u_short *)newaddr = size;
 					}
 				}
 				break;
@@ -549,7 +548,7 @@ static int ssandrun;	/* Single step and run flag (when cont at brk) */
 				if(c == ',') {
 					c = gethex(&size, 0);
 					if(c == '\n') {
-						*(u_int *)newaddr = size;	
+						*(u_int *)newaddr = size;
 					}
 				}
 				break;
@@ -578,7 +577,7 @@ static int ssandrun;	/* Single step and run flag (when cont at brk) */
 				break;
 			}
 			break;
-			
+
 #ifdef __OpenBSD__
 		case 'w':
 			printf("watch ");
@@ -612,8 +611,8 @@ u_int mdb_ss_instr;
 static void
 mdbsetsstep()
 {
-	register u_int va;
-	register int *locr0 = mdbpcb.pcb_regs;
+	u_int va;
+	int *locr0 = mdbpcb.pcb_regs;
 
 	/* compute next address after current location */
 	if(mdbpeek(locr0[PC]) != 0) {
@@ -642,7 +641,7 @@ mdbsetsstep()
 static int
 mdbclrsstep(int cr)
 {
-	register u_int pc, va;
+	u_int pc, va;
 	u_int instr;
 
 	/* fix pc if break instruction is in the delay slot */

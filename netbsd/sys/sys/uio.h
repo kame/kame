@@ -1,4 +1,4 @@
-/*	$NetBSD: uio.h,v 1.24 2002/03/31 14:21:56 tron Exp $	*/
+/*	$NetBSD: uio.h,v 1.31 2003/09/13 16:59:29 erh Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993, 1994
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,6 +34,12 @@
 #ifndef _SYS_UIO_H_
 #define	_SYS_UIO_H_
 
+#ifdef _KERNEL
+#ifndef __UIO_EXPOSE
+#define __UIO_EXPOSE
+#endif
+#endif
+
 #include <machine/ansi.h>
 #include <sys/featuretest.h>
 
@@ -56,7 +58,7 @@ struct iovec {
 	size_t	 iov_len;	/* Length. */
 };
 
-#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 #include <sys/ansi.h>
 
 #ifndef	off_t
@@ -72,6 +74,8 @@ enum uio_seg {
 	UIO_SYSSPACE		/* from system space */
 };
 
+#ifdef __UIO_EXPOSE
+
 struct uio {
 	struct	iovec *uio_iov;	/* pointer to array of iovecs */
 	int	uio_iovcnt;	/* number of iovecs in array */
@@ -82,14 +86,20 @@ struct uio {
 	struct	proc *uio_procp;/* process if UIO_USERSPACE */
 };
 
+#endif /* __UIO_EXPOSE */
+
 /*
  * Limits
  */
 /* Deprecated: use IOV_MAX from <limits.h> instead. */
 #define UIO_MAXIOV	1024		/* max 1K of iov's */
-#endif /* !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
+#endif /* _NETBSD_SOURCE */
 
 #ifdef _KERNEL
+#include <sys/mallocvar.h>
+
+MALLOC_DECLARE(M_IOV);
+
 #define UIO_SMALLIOV	8		/* 8 on stack, else malloc */
 #endif
 
@@ -97,15 +107,15 @@ struct uio {
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
-#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 ssize_t preadv __P((int, const struct iovec *, int, off_t));
 ssize_t pwritev __P((int, const struct iovec *, int, off_t));
-#endif /* !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
+#endif /* _NETBSD_SOURCE */
 ssize_t	readv __P((int, const struct iovec *, int));
 ssize_t	writev __P((int, const struct iovec *, int));
 __END_DECLS
 #else
-int ureadc __P((int c, struct uio *));
+int ureadc __P((int, struct uio *));
 #endif /* !_KERNEL */
 
 #endif /* !_SYS_UIO_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: console.c,v 1.9 2002/03/03 14:35:08 uch Exp $	*/
+/*	$NetBSD: console.c,v 1.11 2003/07/15 02:29:38 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001, 2002 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: console.c,v 1.11 2003/07/15 02:29:38 lukem Exp $");
 
 #include "opt_kgdb.h"
 #include "biconsdev.h"
@@ -122,7 +125,7 @@ struct consdev constab[] = {
 #define CN_ENABLE(x)	set_console(x ## cninit, x ## cnprobe)
 
 static int initialized;
-static int attach_kbd  __attribute__((__unused__)) = 1;
+static int attach_kbd  __attribute__((__unused__)) = 0;
 static void set_console(void (*)(struct consdev *), void (*)(struct consdev *));
 static void disable_console(void);
 static void cn_nonprobe(struct consdev *);

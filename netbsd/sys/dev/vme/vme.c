@@ -1,4 +1,4 @@
-/* $NetBSD: vme.c,v 1.4 2001/11/13 06:17:08 lukem Exp $ */
+/* $NetBSD: vme.c,v 1.10 2003/01/01 00:10:27 thorpej Exp $ */
 
 /*
  * Copyright (c) 1999
@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: vme.c,v 1.4 2001/11/13 06:17:08 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: vme.c,v 1.10 2003/01/01 00:10:27 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -57,11 +57,10 @@ int vmedetach __P((struct device*));
 
 #define VME_NUMCFRANGES 3 /* cf. "files.vme" */
 
-struct cfattach vme_ca = {
-	sizeof(struct vmebus_softc), vmematch, vmeattach,
-};
+CFATTACH_DECL(vme, sizeof(struct vmebus_softc),
+    vmematch, vmeattach, NULL, NULL);
 
-struct cfattach vme_slv_ca = {
+const struct cfattach vme_slv_ca = {
 	0	/* never used */
 };
 
@@ -94,16 +93,16 @@ vmeprint(v, dummy)
 	int i;
 
 	for (i = 0; i < v->numcfranges; i++) {
-		printf(" addr %x", v->r[i].offset);
+		aprint_normal(" addr %x", v->r[i].offset);
 		if (v->r[i].size != -1)
-			printf("-%x", v->r[i].offset + v->r[i].size - 1);
+			aprint_normal("-%x", v->r[i].offset + v->r[i].size - 1);
 		if (v->r[i].am != -1)
-			printf(" am %02x", v->r[i].am);
+			aprint_normal(" am %02x", v->r[i].am);
 	}
 	if (v->ilevel != -1) {
-		printf(" irq %d", v->ilevel);
+		aprint_normal(" irq %d", v->ilevel);
 		if (v->ivector != -1)
-			printf(" vector %x", v->ivector);
+			aprint_normal(" vector %x", v->ivector);
 	}
 	return (UNCONF);
 }
@@ -134,7 +133,7 @@ vmesubmatch1(bus, dev, aux)
 	struct vmebus_softc *sc = (struct vmebus_softc*)bus;
 	struct vme_attach_args v;
 
-	if (strcmp(dev->cf_driver->cd_name, VME_SLAVE_DUMMYDRV))
+	if (strcmp(dev->cf_name, VME_SLAVE_DUMMYDRV))
 		return (0);
 
 	vme_extractlocators(dev->cf_loc, &v);
@@ -154,7 +153,7 @@ vmesubmatch(bus, dev, aux)
 	struct vmebus_softc *sc = (struct vmebus_softc*)bus;
 	struct vme_attach_args v;
 
-	if (!strcmp(dev->cf_driver->cd_name, VME_SLAVE_DUMMYDRV))
+	if (!strcmp(dev->cf_name, VME_SLAVE_DUMMYDRV))
 		return (0);
 
 	vme_extractlocators(dev->cf_loc, &v);
@@ -162,7 +161,7 @@ vmesubmatch(bus, dev, aux)
 	v.va_vct = sc->sc_vct;
 	v.va_bdt = sc->sc_bdt;
 
-	if (dev->cf_attach->ca_match(bus, dev, &v)) {
+	if (config_match(bus, dev, &v)) {
 		config_attach(bus, dev, &v, (cfprint_t)vmeprint);
 		return (1);
 	}

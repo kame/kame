@@ -1,9 +1,43 @@
-/*	$NetBSD: ite.c,v 1.28 2002/03/17 19:40:53 atatat Exp $	*/
+/*	$NetBSD: ite.c,v 1.36 2003/11/01 12:56:32 jdolecek Exp $	*/
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: ite.c 1.1 90/07/09$
+ *
+ *	@(#)ite.c	7.6 (Berkeley) 5/16/91
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -47,6 +81,9 @@
  * Supports VT200, a few terminal features will be unavailable until
  * the system actually probes the device (i.e. not after consinit())
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ite.c,v 1.36 2003/11/01 12:56:32 jdolecek Exp $");
 
 #include "ite.h"
 #if NITE > 0
@@ -114,7 +151,6 @@ static int ite_argnum __P((struct ite_softc *ip));
 static int ite_zargnum __P((struct ite_softc *ip));
 static void ite_sendstr __P((struct ite_softc *ip, char *str));
 __inline static int atoi __P((const char *cp));
-__inline static char *index __P((const char *cp, char ch));
 void ite_reset __P((struct ite_softc *ip));
 struct ite_softc *getitesp __P((dev_t));
 int iteon __P((dev_t, int));
@@ -146,8 +182,6 @@ int	next_repeat_timeo  = 3;  /* /100: timeout when repeating for next char */
 
 u_char	cons_tabs[MAX_TABS];
 
-cdev_decl(ite);
-
 void	itestart __P((struct tty *tp));
 
 void iteputchar __P((int c, struct ite_softc *ip));
@@ -156,11 +190,23 @@ void ite_putstr __P((const u_char * s, int len, dev_t dev));
 void iteattach __P((struct device *, struct device *, void *));
 int itematch __P((struct device *, struct cfdata *, void *));
 
-struct cfattach ite_ca = {
-	sizeof(struct ite_softc), itematch, iteattach
-};
+CFATTACH_DECL(ite, sizeof(struct ite_softc),
+    itematch, iteattach, NULL, NULL);
 
 extern struct cfdriver ite_cd;
+
+dev_type_open(iteopen);
+dev_type_close(iteclose);
+dev_type_read(iteread);
+dev_type_write(itewrite);
+dev_type_ioctl(iteioctl);
+dev_type_tty(itetty);
+dev_type_poll(itepoll);
+
+const struct cdevsw ite_cdevsw = {
+	iteopen, iteclose, iteread, itewrite, iteioctl,
+	nostop, itetty, itepoll, nommap, ttykqfilter, D_TTY
+};
 
 int
 itematch(pdp, cdp, auxp)
@@ -192,9 +238,7 @@ itematch(pdp, cdp, auxp)
 	 * during early init we do not have a device pointer
 	 * and thus no unit number.
 	 */
-	for(maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == iteopen)
-			break;
+	maj = cdevsw_lookup_major(&ite_cdevsw);
 	gp->g_itedev = makedev(maj, cdp->cf_unit);
 #endif
 	return(1);
@@ -903,9 +947,9 @@ ite_filter(c)
 			code |= 0x80;
 	} else if ((key.mode & KBD_MODE_KPAD) &&
 	       (kbd_ite && kbd_ite->keypad_appmode)) {
-		static char *in = "0123456789-+.\r()/*";
-		static char *out = "pqrstuvwxymlnMPQRS";
-		char *cp = index (in, code);
+		static const char * const in = "0123456789-+.\r()/*";
+		static const char * const out = "pqrstuvwxymlnMPQRS";
+		char *cp = strchr(in, code);
 
 		/* 
 		 * keypad-appmode sends SS3 followed by the above
@@ -933,7 +977,7 @@ ite_filter(c)
 		 */
 		if (c >= 0x3b && c <= 0x3e && kbd_ite->cursor_appmode
 		    && !memcmp(str, "\x03\x1b[", 3) &&
-		    index("ABCD", str[3]))
+		    strchr("ABCD", str[3]))
 			str = app_cursor + 4 * (str[3] - 'A');
 
 		/* 
@@ -1204,16 +1248,6 @@ atoi (cp)
 	for (n = 0; *cp && *cp >= '0' && *cp <= '9'; cp++)
 		n = n * 10 + *cp - '0';
 	return n;
-}
-
-__inline static char *
-index(cp, ch)
-	const char *cp;
-	char ch;
-{
-	while (*cp && *cp != ch)
-		cp++;
-	return *cp ? (char *) cp : 0;
 }
 
 __inline static int
@@ -1791,7 +1825,7 @@ iteputchar(c, ip)
 				*ip->ap = 0;
 				y = atoi (ip->argbuf);
 				x = 0;
-				cp = index (ip->argbuf, ';');
+				cp = strchr(ip->argbuf, ';');
 				if (cp)
 					x = atoi (cp + 1);
 				if (x) x--;
@@ -1938,7 +1972,7 @@ iteputchar(c, ip)
 				x = atoi (ip->argbuf);
 				x = x ? x : 1;
 				y = ip->rows;
-				cp = index (ip->argbuf, ';');
+				cp = strchr(ip->argbuf, ';');
 				if (cp) {
 					y = atoi (cp + 1);
 					y = y ? y : ip->rows;
@@ -2419,9 +2453,7 @@ itecnprobe(cd)
 	int maj;
 
 	/* locate the major number */
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == iteopen)
-			break;
+	maj = cdevsw_lookup_major(&ite_cdevsw);
 
 	/* 
 	 * return priority of the best ite (already picked from attach)

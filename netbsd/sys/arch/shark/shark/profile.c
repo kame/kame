@@ -1,4 +1,4 @@
-/*	$NetBSD: profile.c,v 1.1 2002/02/10 01:58:08 thorpej Exp $	*/
+/*	$NetBSD: profile.c,v 1.7 2003/07/15 03:36:04 lukem Exp $	*/
 
 /*
  * Copyright 1997
@@ -37,6 +37,9 @@
  * The fiq based profiler.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: profile.c,v 1.7 2003/07/15 03:36:04 lukem Exp $");
+
 #include "profiler.h"
 
 #include <sys/param.h>
@@ -46,7 +49,6 @@
 #include <sys/proc.h>
 #include <sys/user.h>
 #include <sys/ioctl.h>
-#include <sys/map.h>
 #include <sys/conf.h>
 #include <sys/errno.h>
 #include <sys/fcntl.h>
@@ -110,6 +112,15 @@ void profStart(struct profStartInfo *);
 static void profEnter(struct profHashTable * , unsigned int);
 void displayTable(struct profHashTable * );
 
+dev_type_open(profopen);
+dev_type_close(profclose);
+dev_type_read(profread);
+dev_type_ioctl(profioctl);
+
+const struct cdevsw prof_cdevsw = {
+	profopen, profclose, profread, nowrite, profioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
 
 void 
 profilerattach(n)
@@ -218,7 +229,7 @@ profread(dev, uio, flags)
 		}
 		else
 		{
-		    panic("profiler lost buffer\n");
+		    panic("profiler lost buffer");
 		}
 	    }
 	    /* now initialise the backup copy before switching over.
@@ -508,7 +519,7 @@ profFiq(int  x)
     if ( (profTable->hdr.mode & SAMPLE_PROC) &&
 	((spsr & STATUS_MODE_MASK) == USER_MODE) )
     {
-	if ( curproc->p_pid == profTable->hdr.pid )
+	if ( curlwp->p_pid == profTable->hdr.pid )
 	{
 	    profEnter(profTable, stacklr-4);
 	}

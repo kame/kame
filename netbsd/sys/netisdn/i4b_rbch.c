@@ -27,7 +27,7 @@
  *	i4b_rbch.c - device driver for raw B channel data
  *	---------------------------------------------------
  *
- *	$Id: i4b_rbch.c,v 1.9 2002/03/18 23:28:03 martin Exp $
+ *	$Id: i4b_rbch.c,v 1.14 2003/10/03 16:38:44 pooka Exp $
  *
  * $FreeBSD$
  *
@@ -36,7 +36,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: i4b_rbch.c,v 1.9 2002/03/18 23:28:03 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: i4b_rbch.c,v 1.14 2003/10/03 16:38:44 pooka Exp $");
 
 #include "isdnbchan.h"
 
@@ -59,7 +59,6 @@ __KERNEL_RCSID(0, "$NetBSD: i4b_rbch.c,v 1.9 2002/03/18 23:28:03 martin Exp $");
 #endif
 
 #if defined (__NetBSD__) || defined (__OpenBSD__)
-extern cc_t ttydefchars;
 #define termioschars(t) memcpy((t)->c_cc, &ttydefchars, sizeof((t)->c_cc))
 #endif
 
@@ -183,10 +182,18 @@ int isdnbchanwrite __P((dev_t dev, struct uio *uio, int ioflag));
 int isdnbchanioctl __P((dev_t dev, IOCTL_CMD_T cmd, caddr_t arg, int flag, struct proc* pr));
 #ifdef OS_USES_POLL
 int isdnbchanpoll __P((dev_t dev, int events, struct proc *p));
+int isdnbchankqfilter __P((dev_t dev, struct knote *kn));
 #else
 PDEVSTATIC int isdnbchanselect __P((dev_t dev, int rw, struct proc *p));
 #endif
 #endif
+
+#ifdef __NetBSD__
+const struct cdevsw isdnbchan_cdevsw = {
+	isdnbchanopen, isdnbchanclose, isdnbchanread, isdnbchanwrite,
+	isdnbchanioctl, nostop, notty, isdnbchanpoll, nommap,
+};
+#endif /* __NetBSD__ */
 
 #if BSD > 199306 && defined(__FreeBSD__)
 #define PDEVSTATIC	static
@@ -789,6 +796,90 @@ isdnbchanpoll(dev_t dev, int events, struct proc *p)
 	return(revents);
 }
 
+static void
+filt_i4brbchdetach(struct knote *kn)
+{
+	struct rbch_softc *sc = kn->kn_hook;
+	int s;
+
+	s = splhigh();
+	SLIST_REMOVE(&sc->selp.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_i4brbchread(struct knote *kn, long hint)
+{
+	struct rbch_softc *sc = kn->kn_hook;
+	struct ifqueue *iqp;
+
+	if ((sc->sc_devstate & ST_CONNECTED) == 0)
+		return (0);
+
+	if (sc->sc_bprot == BPROT_RHDLC)
+		iqp = &sc->sc_hdlcq;
+	else
+		iqp = sc->sc_ilt->rx_queue;	
+
+	if (IF_QEMPTY(iqp))
+		return (0);
+
+	kn->kn_data = 0;	/* XXXLUKEM (thorpej): what to put here? */
+	return (1);
+}
+
+static const struct filterops i4brbchread_filtops =
+	{ 1, NULL, filt_i4brbchdetach, filt_i4brbchread };
+
+static int
+filt_i4brbchwrite(struct knote *kn, long hint)
+{
+	struct rbch_softc *sc = kn->kn_hook;
+
+	if ((sc->sc_devstate & ST_CONNECTED) == 0)
+		return (0);
+
+	if (IF_QFULL(sc->sc_ilt->tx_queue))
+		return (0);
+
+	kn->kn_data = 0;	/* XXXLUKEM (thorpej): what to put here? */
+	return (1);
+}
+
+static const struct filterops i4brbchwrite_filtops =
+	{ 1, NULL, filt_i4brbchdetach, filt_i4brbchwrite };
+
+int
+isdnbchankqfilter(dev_t dev, struct knote *kn)
+{
+	struct rbch_softc *sc = &rbch_softc[minor(dev)];
+	struct klist *klist;
+	int s;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &sc->selp.sel_klist;
+		kn->kn_fop = &i4brbchread_filtops;
+		break;
+
+	case EVFILT_WRITE:
+		klist = &sc->selp.sel_klist;
+		kn->kn_fop = &i4brbchwrite_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = sc;
+
+	s = splhigh();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
+}
+
 #else /* OS_USES_POLL */
 
 /*---------------------------------------------------------------------------*
@@ -915,8 +1006,8 @@ rbch_connect(void *softc, void *cdp)
 #endif		
 	if(!(sc->sc_devstate & ST_CONNECTED))
 	{
-		NDBGL4(L4_RBCHDBG, "B channel %d at BRI %d, wakeup",
-			cd->channelid, cd->bri);
+		NDBGL4(L4_RBCHDBG, "B channel %d at ISDN %d, wakeup",
+			cd->channelid, cd->isdnif);
 		sc->sc_devstate |= ST_CONNECTED;
 		sc->sc_cd = cdp;
 		wakeup((caddr_t)sc);
@@ -937,15 +1028,15 @@ rbch_disconnect(void *softc, void *cdp)
 	
         if(cd != sc->sc_cd)
 	{
-		NDBGL4(L4_RBCHDBG, "B channel %d at BRI %d not active",
-		    cd->channelid, cd->bri);
+		NDBGL4(L4_RBCHDBG, "B channel %d at ISDN %d not active",
+		    cd->channelid, cd->isdnif);
 		return;
 	}
 
 	s = splnet();
 	
-	NDBGL4(L4_RBCHDBG, "B channel %d at BRI %d disconnect",
-	    cd->channelid, cd->bri);
+	NDBGL4(L4_RBCHDBG, "B channel %d at ISDN %d disconnect",
+	    cd->channelid, cd->isdnif);
 
 	sc->sc_devstate &= ~ST_CONNECTED;
 
@@ -1024,7 +1115,7 @@ rbch_rx_data_rdy(void *softc)
 	{
 		NDBGL4(L4_RBCHDBG, "(minor=%d) NO wakeup", sc->sc_unit);
 	}
-	selwakeup(&sc->selp);
+	selnotify(&sc->selp, 0);
 }
 
 /*---------------------------------------------------------------------------*
@@ -1047,7 +1138,7 @@ rbch_tx_queue_empty(void *softc)
 	{
 		NDBGL4(L4_RBCHDBG, "(minor=%d) NO wakeup", sc->sc_unit);
 	}
-	selwakeup(&sc->selp);
+	selnotify(&sc->selp, 0);
 }
 
 /*---------------------------------------------------------------------------*
@@ -1061,7 +1152,7 @@ rbch_activity(void *softc, int rxtx)
 
 	if (sc->sc_cd)
 		sc->sc_cd->last_active_time = SECOND;
-	selwakeup(&sc->selp);
+	selnotify(&sc->selp, 0);
 }
 
 /*---------------------------------------------------------------------------*

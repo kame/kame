@@ -1,4 +1,4 @@
-/* 	$NetBSD: wsfont.c,v 1.28 2002/03/21 03:26:55 enami Exp $	*/
+/* 	$NetBSD: wsfont.c,v 1.35 2003/12/15 15:13:55 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000, 2001, 2002 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: wsfont.c,v 1.28 2002/03/21 03:26:55 enami Exp $");
+__KERNEL_RCSID(0, "$NetBSD: wsfont.c,v 1.35 2003/12/15 15:13:55 tsutsui Exp $");
 
 #include "opt_wsfont.h"
 
@@ -76,6 +76,28 @@ __KERNEL_RCSID(0, "$NetBSD: wsfont.c,v 1.28 2002/03/21 03:26:55 enami Exp $");
 #ifdef FONT_VT220L8x10
 #define HAVE_FONT 1
 #include <dev/wsfont/vt220l8x10.h>
+#endif
+
+#ifdef FONT_VT220L8x16
+#define HAVE_FONT 1
+#include <dev/wsfont/vt220l8x16.h>
+#endif
+
+#ifdef FONT_VT220ISO8x16
+#define HAVE_FONT 1
+#include <dev/wsfont/vt220iso8x16.h>
+#endif
+
+#ifdef FONT_VT220KOI8x10_KOI8_R
+#define HAVE_FONT 1
+#include <dev/wsfont/vt220koi8x10.h>
+#endif
+
+#ifdef FONT_VT220KOI8x10_KOI8_U
+#define HAVE_FONT 1
+#define KOI8_U
+#include <dev/wsfont/vt220koi8x10.h>
+#undef KOI8_U
 #endif
 
 #ifdef FONT_SONY8x16
@@ -148,6 +170,18 @@ static struct font builtin_fonts[] = {
 #endif
 #ifdef FONT_VT220L8x10
 	{ { NULL }, &vt220l8x10, 0, 0, WSFONT_STATIC | WSFONT_BUILTIN },
+#endif
+#ifdef FONT_VT220L8x16
+	{ { NULL }, &vt220l8x16, 0, 0, WSFONT_STATIC | WSFONT_BUILTIN },
+#endif
+#ifdef FONT_VT220ISO8x16
+	{ { NULL }, &vt220iso8x16, 0, 0, WSFONT_STATIC | WSFONT_BUILTIN },
+#endif
+#ifdef FONT_VT220KOI8x10_KOI8_R
+	{ { NULL }, &vt220kr8x10, 0, 0, WSFONT_STATIC | WSFONT_BUILTIN },
+#endif
+#ifdef FONT_VT220KOI8x10_KOI8_U
+	{ { NULL }, &vt220ku8x10, 0, 0, WSFONT_STATIC | WSFONT_BUILTIN },
 #endif
 #ifdef FONT_SONY8x16
 	{ { NULL }, &sony8x16, 0, 0, WSFONT_STATIC | WSFONT_BUILTIN },
@@ -255,7 +289,7 @@ wsfont_revbyte(struct wsdisplay_font *font)
 }
 
 void
-wsfont_enum(void (*cb)(char *, int, int, int))
+wsfont_enum(void (*cb)(const char *, int, int, int))
 {
 	struct wsdisplay_font *f;
 	struct font *ent;
@@ -302,7 +336,7 @@ wsfont_find0(int cookie, int mask)
 }
 
 int
-wsfont_matches(struct wsdisplay_font *font, char *name,
+wsfont_matches(struct wsdisplay_font *font, const char *name,
 	       int width, int height, int stride)
 {
 
@@ -322,7 +356,7 @@ wsfont_matches(struct wsdisplay_font *font, char *name,
 }
 
 int
-wsfont_find(char *name, int width, int height, int stride, int bito, int byteo)
+wsfont_find(const char *name, int width, int height, int stride, int bito, int byteo)
 {
 	struct font *ent;
 
@@ -347,17 +381,21 @@ wsfont_add0(struct wsdisplay_font *font, int copy)
 		ent->font = font;
 		ent->flags = WSFONT_STATIC;
 	} else {
+		void *data;
+		char *name;
+
 		ent->font = malloc(sizeof(struct wsdisplay_font), M_DEVBUF,
 		    M_WAITOK);
 		memcpy(ent->font, font, sizeof(*ent->font));
 
 		size = font->fontheight * font->numchars * font->stride;
-		ent->font->data = malloc(size, M_DEVBUF, M_WAITOK);
-		memcpy(ent->font->data, font->data, size);
+		data = malloc(size, M_DEVBUF, M_WAITOK);
+		memcpy(data, font->data, size);
+		ent->font->data = data;
 
-		ent->font->name = malloc(strlen(font->name) + 1, M_DEVBUF,
-		    M_WAITOK);
-		strcpy(ent->font->name, font->name);
+		name = malloc(strlen(font->name) + 1, M_DEVBUF, M_WAITOK);
+		strcpy(name, font->name);
+		ent->font->name = name;
 	}
 
 	TAILQ_INSERT_TAIL(&list, ent, chain);
@@ -395,8 +433,8 @@ wsfont_remove(int cookie)
 		return (EBUSY);
 
 	if ((ent->flags & WSFONT_STATIC) == 0) {
-		free(ent->font->data, M_DEVBUF);
-		free(ent->font->name, M_DEVBUF);
+		free((void *)ent->font->data, M_DEVBUF);
+		free((void *)ent->font->name, M_DEVBUF);
 		free(ent->font, M_DEVBUF);
 	}
 
@@ -416,14 +454,21 @@ wsfont_lock(int cookie, struct wsdisplay_font **ptr)
 		if ((ent = wsfont_find0(cookie, WSFONT_IDENT_MASK)) == NULL)
 			return (ENOENT);
 
+		bito = (cookie & WSFONT_BITO_MASK) >> WSFONT_BITO_SHIFT;
+		byteo = (cookie & WSFONT_BYTEO_MASK) >> WSFONT_BYTEO_SHIFT;
+
 		if (ent->lockcount != 0) {
 			neu = wsfont_add0(ent->font, 1);
 			neu->flags |= WSFONT_COPY;
+
+			aprint_debug("wsfont: font '%s' bito %d byteo %d "
+			    "copied to bito %d byteo %d\n",
+			    ent->font->name,
+			    ent->font->bitorder, ent->font->byteorder,
+			    bito, byteo);
+
 			ent = neu;
 		}
-
-		bito = (cookie & WSFONT_BITO_MASK) >> WSFONT_BITO_SHIFT;
-		byteo = (cookie & WSFONT_BYTEO_MASK) >> WSFONT_BYTEO_SHIFT;
 
 		if (bito && bito != ent->font->bitorder) {
 			wsfont_revbit(ent->font);
@@ -452,7 +497,7 @@ wsfont_unlock(int cookie)
 		return (ENOENT);
 
 	if (ent->lockcount == 0)
-		panic("wsfont_unlock: font not locked\n");
+		panic("wsfont_unlock: font not locked");
 
 	if (--ent->lockcount == 0 && (ent->flags & WSFONT_COPY) != 0)
 		wsfont_remove(cookie);

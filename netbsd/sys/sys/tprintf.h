@@ -1,4 +1,4 @@
-/*	$NetBSD: tprintf.h,v 1.12 2000/08/09 03:23:11 tv Exp $	*/
+/*	$NetBSD: tprintf.h,v 1.14 2003/08/07 16:34:19 agc Exp $	*/
 
 /*-
  * Copyright (c) 1990, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -35,6 +31,9 @@
  *	@(#)tprintf.h	8.1 (Berkeley) 6/2/93
  */
 
+#ifndef _SYS_TPRINF_H_
+#define _SYS_TPRINF_H_
+
 #ifdef _KERNEL
 typedef struct session *tpr_t;
 
@@ -44,3 +43,5 @@ void	tprintf_close __P((tpr_t));
 void	tprintf __P((tpr_t, const char *fmt, ...))
     __attribute__((__format__(__printf__,2,3)));
 #endif /* _KERNEL */
+
+#endif /* _SYS_TPRINF_H_ */

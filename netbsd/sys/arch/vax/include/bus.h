@@ -1,4 +1,4 @@
-/*	$NetBSD: bus.h,v 1.18 2001/09/16 20:39:04 ragge Exp $	*/
+/*	$NetBSD: bus.h,v 1.22 2003/06/15 23:09:07 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998, 2001 The NetBSD Foundation, Inc.
@@ -366,7 +366,7 @@ vax_mem_read_region_2(t, h, o, a, c)
 {
 	bus_addr_t addr = h + o;
 
-	for (; c != 0; c--, addr++, a++)
+	for (; c != 0; c--, addr += 2, a++)
 		*a = *(volatile u_int16_t *)(addr);
 }
 
@@ -380,7 +380,7 @@ vax_mem_read_region_4(t, h, o, a, c)
 {
 	bus_addr_t addr = h + o;
 
-	for (; c != 0; c--, addr++, a++)
+	for (; c != 0; c--, addr += 4, a++)
 		*a = *(volatile u_int32_t *)(addr);
 }
 
@@ -878,6 +878,7 @@ vax_mem_copy_region_4(t, h1, o1, h2, o2, c)
 #define	BUS_DMA_BUS4		0x080
 #define	BUS_DMA_READ		0x100	/* mapping is device -> memory only */
 #define	BUS_DMA_WRITE		0x200	/* mapping is memory -> device only */
+#define	BUS_DMA_NOCACHE		0x400	/* hint: map non-cached memory */
 
 #define	VAX_BUS_DMA_SPILLPAGE	BUS_DMA_BUS1	/* VS4000 kludge */
 /*
@@ -917,6 +918,8 @@ typedef enum {
 
 typedef struct vax_bus_dma_tag	*bus_dma_tag_t;
 typedef struct vax_bus_dmamap	*bus_dmamap_t;
+
+#define BUS_DMA_TAG_VALID(t)    ((t) != (bus_dma_tag_t)0)
 
 /*
  *	bus_dma_segment_t
@@ -1058,7 +1061,7 @@ struct vax_bus_dmamap {
 	bus_dma_segment_t dm_segs[1];	/* segments; variable length */
 };
 
-#ifdef _VAX_BUS_DMA_PRIVATE
+/*#ifdef _VAX_BUS_DMA_PRIVATE */
 int	_bus_dmamap_create __P((bus_dma_tag_t, bus_size_t, int, bus_size_t,
 	    bus_size_t, int, bus_dmamap_t *));
 void	_bus_dmamap_destroy __P((bus_dma_tag_t, bus_dmamap_t));
@@ -1087,6 +1090,6 @@ void	_bus_dmamem_unmap __P((bus_dma_tag_t tag, caddr_t kva,
 	    size_t size));
 paddr_t	_bus_dmamem_mmap __P((bus_dma_tag_t tag, bus_dma_segment_t *segs,
 	    int nsegs, off_t off, int prot, int flags));
-#endif /* _VAX_BUS_DMA_PRIVATE */
+/*#endif*/ /* _VAX_BUS_DMA_PRIVATE */
 
 #endif /* _VAX_BUS_H_ */

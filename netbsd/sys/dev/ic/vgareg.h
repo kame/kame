@@ -1,4 +1,4 @@
-/* $NetBSD: vgareg.h,v 1.4 2001/12/30 13:13:04 junyoung Exp $ */
+/* $NetBSD: vgareg.h,v 1.7 2004/03/24 17:26:53 drochner Exp $ */
 
 /*
  * Copyright (c) 1998
@@ -12,12 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed for the NetBSD Project
- *	by Matthias Drochner.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -38,16 +32,18 @@ struct reg_vgaattr { /* indexed via port 0x3c0 */
 	u_int8_t colreset, misc;
 };
 #define VGA_ATC_NREGS	21
-#define VGA_ATC_INDEX	0
-#define VGA_ATC_DATAW	0
-#define VGA_ATC_DATAR	1
+#define VGA_ATC_INDEX	0x0
+#define VGA_ATC_DATAW	0x0
+#define VGA_ATC_DATAR	0x1
 
 struct reg_vgats { /* indexed via port 0x3c4 */
 	u_int8_t syncreset, mode, wrplmask, fontsel, memmode;
 };
-#define VGA_TS_NREGS	5 
-#define VGA_TS_INDEX 	4
-#define VGA_TS_DATA	5
+#define VGA_TS_MODE_BLANK	0x20
+
+#define VGA_TS_NREGS	5
+#define VGA_TS_INDEX 	0x4
+#define VGA_TS_DATA	0x5
 
 struct reg_vgagdc { /* indexed via port 0x3ce */
 	u_int8_t setres, ensetres, colorcomp, rotfunc;
@@ -58,14 +54,17 @@ struct reg_vgagdc { /* indexed via port 0x3ce */
 #define VGA_GDC_INDEX	0xe
 #define VGA_GDC_DATA	0xf
 
-struct reg_vgacrtc { /* indexed via port 0x3d4 */
-	u_int8_t index[25];
-};
-#define VGA_CRTC_NREGS	25
-#define VGA_CRTC_INDEX	0x14
-#define VGA_CRTC_DATA	0x15
+/*
+ * CRTC registers are defined in sys/dev/ic/mc6845reg.h
+ */
+
+/* video DAC palette registers */
+#define VGA_DAC_PELMASK	0x6
+#define VGA_DAC_STATE	0x7
+#define VGA_DAC_ADDRR	0x7
+#define VGA_DAC_ADDRW	0x8
+#define VGA_DAC_PALETTE	0x9
 
 /* misc output register */
-#define VGA_MISC_INDEX	2
 #define VGA_MISC_DATAR	0xc
-#define VGA_MISC_DATAW	2
+#define VGA_MISC_DATAW	0x2

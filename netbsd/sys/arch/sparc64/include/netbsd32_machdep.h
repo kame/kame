@@ -1,4 +1,4 @@
-/*	$NetBSD: netbsd32_machdep.h,v 1.8 2002/01/03 06:43:24 mrg Exp $	*/
+/*	$NetBSD: netbsd32_machdep.h,v 1.16 2004/02/20 16:11:44 drochner Exp $	*/
 
 /*
  * Copyright (c) 1998, 2001 Matthew R. Green
@@ -33,6 +33,14 @@
 
 #include <sys/types.h>
 #include <sys/proc.h>
+
+typedef	u_int32_t netbsd32_pointer_t;
+
+/*
+ * Convert a pointer in the 32-bit world to a valid 64-bit pointer.
+ */
+#define	NETBSD32PTR64(p32)	((void *)(u_long)(u_int)(p32))
+
 #include <compat/netbsd32/netbsd32.h>
 
 /* from <arch/sparc/include/signal.h> */
@@ -63,17 +71,12 @@ struct netbsd32_sigcontext13 {
 	int	sc_o0;			/* %o0 to restore */
 };
 
-struct exec_package;
-void netbsd32_setregs (struct proc *p, struct exec_package *pack, u_long stack);
-int netbsd32_sigreturn (struct proc *p, void *v, register_t *retval);
-void netbsd32_sendsig (sig_t catcher, int sig, sigset_t *mask, u_long code);
-
-extern char netbsd32_esigcode[], netbsd32_sigcode[];
-
 /*
  * Need to plug into get sparc specific ioctl's.
  */
 #define	NETBSD32_MD_IOCTL	/* enable netbsd32_md_ioctl() */
-int netbsd32_md_ioctl (struct file *, netbsd32_u_long, caddr_t, struct proc *);
+int netbsd32_md_ioctl(struct file *, netbsd32_u_long, void *, struct proc *);
+
+#define NETBSD32_MID_MACHINE MID_SPARC
 
 #endif /* _MACHINE_NETBSD32_H_ */

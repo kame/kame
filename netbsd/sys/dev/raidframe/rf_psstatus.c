@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_psstatus.c,v 1.8 2001/11/13 07:11:16 lukem Exp $	*/
+/*	$NetBSD: rf_psstatus.c,v 1.28 2004/03/18 16:54:54 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -37,83 +37,52 @@
  *****************************************************************************/
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rf_psstatus.c,v 1.8 2001/11/13 07:11:16 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rf_psstatus.c,v 1.28 2004/03/18 16:54:54 oster Exp $");
 
 #include <dev/raidframe/raidframevar.h>
 
 #include "rf_raid.h"
 #include "rf_general.h"
 #include "rf_debugprint.h"
-#include "rf_freelist.h"
 #include "rf_psstatus.h"
 #include "rf_shutdown.h"
 
+#if RF_DEBUG_PSS
 #define Dprintf1(s,a)         if (rf_pssDebug) rf_debug_printf(s,(void *)((unsigned long)a),NULL,NULL,NULL,NULL,NULL,NULL,NULL)
 #define Dprintf2(s,a,b)       if (rf_pssDebug) rf_debug_printf(s,(void *)((unsigned long)a),(void *)((unsigned long)b),NULL,NULL,NULL,NULL,NULL,NULL)
 #define Dprintf3(s,a,b,c)     if (rf_pssDebug) rf_debug_printf(s,(void *)((unsigned long)a),(void *)((unsigned long)b),(void *)((unsigned long)c),NULL,NULL,NULL,NULL,NULL)
+#else
+#define Dprintf1(s,a)
+#define Dprintf2(s,a,b)
+#define Dprintf3(s,a,b,c)
+#endif
 
 static void 
 RealPrintPSStatusTable(RF_Raid_t * raidPtr,
     RF_PSStatusHeader_t * pssTable);
 
 #define RF_MAX_FREE_PSS  32
-#define RF_PSS_INC        8
-#define RF_PSS_INITIAL    4
+#define RF_MIN_FREE_PSS   8
 
-static int init_pss(RF_ReconParityStripeStatus_t *, RF_Raid_t *);
-static void clean_pss(RF_ReconParityStripeStatus_t *, RF_Raid_t *);
 static void rf_ShutdownPSStatus(void *);
 
-static int 
-init_pss(p, raidPtr)
-	RF_ReconParityStripeStatus_t *p;
-	RF_Raid_t *raidPtr;
-{
-	RF_Calloc(p->issued, raidPtr->numCol, sizeof(char), (char *));
-	if (p->issued == NULL)
-		return (ENOMEM);
-	return (0);
-}
-
 static void 
-clean_pss(p, raidPtr)
-	RF_ReconParityStripeStatus_t *p;
-	RF_Raid_t *raidPtr;
+rf_ShutdownPSStatus(void *arg)
 {
-	RF_Free(p->issued, raidPtr->numCol * sizeof(char));
-}
 
-static void 
-rf_ShutdownPSStatus(arg)
-	void   *arg;
-{
-	RF_Raid_t *raidPtr = (RF_Raid_t *) arg;
-
-	RF_FREELIST_DESTROY_CLEAN_ARG(raidPtr->pss_freelist, next, (RF_ReconParityStripeStatus_t *), clean_pss, raidPtr);
+	pool_destroy(&rf_pools.pss);
 }
 
 int 
-rf_ConfigurePSStatus(
-    RF_ShutdownList_t ** listp,
-    RF_Raid_t * raidPtr,
-    RF_Config_t * cfgPtr)
+rf_ConfigurePSStatus(RF_ShutdownList_t **listp, RF_Raid_t *raidPtr,
+		     RF_Config_t *cfgPtr)
 {
-	int     rc;
 
 	raidPtr->pssTableSize = RF_PSS_DEFAULT_TABLESIZE;
-	RF_FREELIST_CREATE(raidPtr->pss_freelist, RF_MAX_FREE_PSS,
-	    RF_PSS_INC, sizeof(RF_ReconParityStripeStatus_t));
-	if (raidPtr->pss_freelist == NULL)
-		return (ENOMEM);
-	rc = rf_ShutdownCreate(listp, rf_ShutdownPSStatus, raidPtr);
-	if (rc) {
-		RF_ERRORMSG3("Unable to add to shutdown list file %s line %d rc=%d\n",
-		    __FILE__, __LINE__, rc);
-		rf_ShutdownPSStatus(raidPtr);
-		return (rc);
-	}
-	RF_FREELIST_PRIME_INIT_ARG(raidPtr->pss_freelist, RF_PSS_INITIAL, next,
-	    (RF_ReconParityStripeStatus_t *), init_pss, raidPtr);
+	rf_pool_init(&rf_pools.pss, sizeof(RF_ReconParityStripeStatus_t),
+		     "raidpsspl", RF_MIN_FREE_PSS, RF_MAX_FREE_PSS);
+	rf_ShutdownCreate(listp, rf_ShutdownPSStatus, raidPtr);
+
 	return (0);
 }
 /*****************************************************************************************
@@ -122,76 +91,65 @@ rf_ConfigurePSStatus(
  * malloc up hash chain entries.
  ****************************************************************************************/
 RF_PSStatusHeader_t *
-rf_MakeParityStripeStatusTable(raidPtr)
-	RF_Raid_t *raidPtr;
+rf_MakeParityStripeStatusTable(RF_Raid_t *raidPtr)
 {
 	RF_PSStatusHeader_t *pssTable;
-	int     i, j, rc;
-
-	RF_Calloc(pssTable, raidPtr->pssTableSize, sizeof(RF_PSStatusHeader_t), (RF_PSStatusHeader_t *));
+	int     i;
+	
+	RF_Malloc(pssTable, 
+		  raidPtr->pssTableSize * sizeof(RF_PSStatusHeader_t),
+		  (RF_PSStatusHeader_t *));
 	for (i = 0; i < raidPtr->pssTableSize; i++) {
-		rc = rf_mutex_init(&pssTable[i].mutex);
-		if (rc) {
-			RF_ERRORMSG3("Unable to init mutex file %s line %d rc=%d\n", __FILE__,
-			    __LINE__, rc);
-			/* fail and deallocate */
-			for (j = 0; j < i; j++) {
-				rf_mutex_destroy(&pssTable[i].mutex);
-			}
-			RF_Free(pssTable, raidPtr->pssTableSize * sizeof(RF_PSStatusHeader_t));
-			return (NULL);
-		}
+		rf_mutex_init(&pssTable[i].mutex);
 	}
 	return (pssTable);
 }
 
 void 
-rf_FreeParityStripeStatusTable(raidPtr, pssTable)
-	RF_Raid_t *raidPtr;
-	RF_PSStatusHeader_t *pssTable;
+rf_FreeParityStripeStatusTable(RF_Raid_t *raidPtr, 
+			       RF_PSStatusHeader_t *pssTable)
 {
+#if RF_DEBUG_PSS
 	int     i;
 
 	if (rf_pssDebug)
 		RealPrintPSStatusTable(raidPtr, pssTable);
+
 	for (i = 0; i < raidPtr->pssTableSize; i++) {
 		if (pssTable[i].chain) {
 			printf("ERROR: pss hash chain not null at recon shutdown\n");
 		}
-		rf_mutex_destroy(&pssTable[i].mutex);
 	}
+#endif
 	RF_Free(pssTable, raidPtr->pssTableSize * sizeof(RF_PSStatusHeader_t));
 }
 
 
 /* looks up the status structure for a parity stripe.
- * if the create_flag is on, creates and returns the status structure it it doesn't exist
+ * if the create_flag is on, uses (and returns) newpssPtr if
+ * a parity status structure doesn't exist
  * otherwise returns NULL if the status structure does not exist
  *
  * ASSUMES THE PSS DESCRIPTOR IS LOCKED UPON ENTRY
+ * 
+ * flags - whether or not to use newpssPtr if the needed PSS
+ *         doesn't exist and what flags to set it to initially
  */
 RF_ReconParityStripeStatus_t *
-rf_LookupRUStatus(
-    RF_Raid_t * raidPtr,
-    RF_PSStatusHeader_t * pssTable,
-    RF_StripeNum_t psID,
-    RF_ReconUnitNum_t which_ru,
-    RF_PSSFlags_t flags,	/* whether or not to create it if it doesn't
-				 * exist + what flags to set initially */
-    int *created)
+rf_LookupRUStatus(RF_Raid_t *raidPtr, RF_PSStatusHeader_t *pssTable,
+		  RF_StripeNum_t psID, RF_ReconUnitNum_t which_ru,
+		  RF_PSSFlags_t flags, RF_ReconParityStripeStatus_t *newpssPtr)
 {
 	RF_PSStatusHeader_t *hdr = &pssTable[RF_HASH_PSID(raidPtr, psID)];
 	RF_ReconParityStripeStatus_t *p, *pssPtr = hdr->chain;
 
-	*created = 0;
 	for (p = pssPtr; p; p = p->next) {
 		if (p->parityStripeID == psID && p->which_ru == which_ru)
 			break;
 	}
 
 	if (!p && (flags & RF_PSS_CREATE)) {
-		Dprintf2("PSS: creating pss for psid %ld ru %d\n", psID, which_ru);
-		p = rf_AllocPSStatus(raidPtr);
+		p = newpssPtr;
 		p->next = hdr->chain;
 		hdr->chain = p;
 
@@ -200,11 +158,11 @@ rf_LookupRUStatus(
 		p->flags = flags;
 		p->rbuf = NULL;
 		p->writeRbuf = NULL;
+		p->xorBufCount = 0;
 		p->blockCount = 0;
 		p->procWaitList = NULL;
 		p->blockWaitList = NULL;
 		p->bufWaitList = NULL;
-		*created = 1;
 	} else
 		if (p) {	/* we didn't create, but we want to specify
 				 * some new status */
@@ -225,10 +183,8 @@ rf_LookupRUStatus(
  * chain is ALREADY LOCKED.
  */
 void 
-rf_PSStatusDelete(raidPtr, pssTable, pssPtr)
-	RF_Raid_t *raidPtr;
-	RF_PSStatusHeader_t *pssTable;
-	RF_ReconParityStripeStatus_t *pssPtr;
+rf_PSStatusDelete(RF_Raid_t *raidPtr, RF_PSStatusHeader_t *pssTable, 
+		  RF_ReconParityStripeStatus_t *pssPtr)
 {
 	RF_PSStatusHeader_t *hdr = &(pssTable[RF_HASH_PSID(raidPtr, pssPtr->parityStripeID)]);
 	RF_ReconParityStripeStatus_t *p = hdr->chain, *pt = NULL;
@@ -250,23 +206,25 @@ rf_PSStatusDelete(raidPtr, pssTable, pssPtr)
 }
 /* deletes an entry from the ps status table after reconstruction has completed */
 void 
-rf_RemoveFromActiveReconTable(raidPtr, row, psid, which_ru)
-	RF_Raid_t *raidPtr;
-	RF_RowCol_t row;
-	RF_ReconUnitNum_t which_ru;
-	RF_StripeNum_t psid;
+rf_RemoveFromActiveReconTable(RF_Raid_t *raidPtr, RF_StripeNum_t psid, 
+			      RF_ReconUnitNum_t which_ru)
 {
-	RF_PSStatusHeader_t *hdr = &(raidPtr->reconControl[row]->pssTable[RF_HASH_PSID(raidPtr, psid)]);
+	RF_PSStatusHeader_t *hdr = &(raidPtr->reconControl->pssTable[RF_HASH_PSID(raidPtr, psid)]);
 	RF_ReconParityStripeStatus_t *p, *pt;
 	RF_CallbackDesc_t *cb, *cb1;
 
 	RF_LOCK_MUTEX(hdr->mutex);
+	while(hdr->lock) {
+		ltsleep(&hdr->lock, PRIBIO, "rf_racrecon", 0, &hdr->mutex);
+	}
+	hdr->lock = 1;
+	RF_UNLOCK_MUTEX(hdr->mutex);	
 	for (pt = NULL, p = hdr->chain; p; pt = p, p = p->next) {
 		if ((p->parityStripeID == psid) && (p->which_ru == which_ru))
 			break;
 	}
 	if (p == NULL) {
-		rf_PrintPSStatusTable(raidPtr, row);
+		rf_PrintPSStatusTable(raidPtr);
 	}
 	RF_ASSERT(p);		/* it must be there */
 
@@ -278,7 +236,9 @@ rf_RemoveFromActiveReconTable(raidPtr, row, psid, which_ru)
 	else
 		hdr->chain = p->next;
 	p->next = NULL;
-
+	
+	RF_LOCK_MUTEX(hdr->mutex);
+	hdr->lock = 0;
 	RF_UNLOCK_MUTEX(hdr->mutex);
 
 	/* wakup anyone waiting on the parity stripe ID */
@@ -288,10 +248,6 @@ rf_RemoveFromActiveReconTable(raidPtr, row, psid, which_ru)
 		Dprintf1("Waking up access waiting on parity stripe ID %ld\n", p->parityStripeID);
 		cb1 = cb->next;
 		(cb->callbackFunc) (cb->callbackArg);
-
-		/* THIS IS WHAT THE ORIGINAL CODE HAD... the extra 0 is bogus,
-		 * IMHO */
-		/* (cb->callbackFunc)(cb->callbackArg, 0); */
 		rf_FreeCallbackDesc(cb);
 		cb = cb1;
 	}
@@ -300,37 +256,27 @@ rf_RemoveFromActiveReconTable(raidPtr, row, psid, which_ru)
 }
 
 RF_ReconParityStripeStatus_t *
-rf_AllocPSStatus(raidPtr)
-	RF_Raid_t *raidPtr;
+rf_AllocPSStatus(RF_Raid_t *raidPtr)
 {
 	RF_ReconParityStripeStatus_t *p;
 
-	RF_FREELIST_GET_INIT_ARG(raidPtr->pss_freelist, p, next, (RF_ReconParityStripeStatus_t *), init_pss, raidPtr);
-	if (p) {
-		memset(p->issued, 0, raidPtr->numCol);
-	}
-	p->next = NULL;
-	/* no need to initialize here b/c the only place we're called from is
-	 * the above Lookup */
+	p = pool_get(&rf_pools.pss, PR_WAITOK);
+	memset(p, 0, sizeof(RF_ReconParityStripeStatus_t));
 	return (p);
 }
 
 void 
-rf_FreePSStatus(raidPtr, p)
-	RF_Raid_t *raidPtr;
-	RF_ReconParityStripeStatus_t *p;
+rf_FreePSStatus(RF_Raid_t *raidPtr, RF_ReconParityStripeStatus_t *p)
 {
 	RF_ASSERT(p->procWaitList == NULL);
 	RF_ASSERT(p->blockWaitList == NULL);
 	RF_ASSERT(p->bufWaitList == NULL);
 
-	RF_FREELIST_FREE_CLEAN_ARG(raidPtr->pss_freelist, p, next, clean_pss, raidPtr);
+	pool_put(&rf_pools.pss, p);
 }
 
 static void 
-RealPrintPSStatusTable(raidPtr, pssTable)
-	RF_Raid_t *raidPtr;
-	RF_PSStatusHeader_t *pssTable;
+RealPrintPSStatusTable(RF_Raid_t *raidPtr, RF_PSStatusHeader_t *pssTable)
 {
 	int     i, j, procsWaiting, blocksWaiting, bufsWaiting;
 	RF_ReconParityStripeStatus_t *p;
@@ -370,10 +316,8 @@ RealPrintPSStatusTable(raidPtr, pssTable)
 }
 
 void 
-rf_PrintPSStatusTable(raidPtr, row)
-	RF_Raid_t *raidPtr;
-	RF_RowCol_t row;
+rf_PrintPSStatusTable(RF_Raid_t *raidPtr)
 {
-	RF_PSStatusHeader_t *pssTable = raidPtr->reconControl[row]->pssTable;
+	RF_PSStatusHeader_t *pssTable = raidPtr->reconControl->pssTable;
 	RealPrintPSStatusTable(raidPtr, pssTable);
 }

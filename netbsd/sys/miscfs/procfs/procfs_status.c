@@ -1,9 +1,41 @@
-/*	$NetBSD: procfs_status.c,v 1.17 2001/11/10 13:33:44 lukem Exp $	*/
+/*	$NetBSD: procfs_status.c,v 1.22 2003/08/07 16:32:42 agc Exp $	*/
+
+/*
+ * Copyright (c) 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Jan-Simon Pendry.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)procfs_status.c	8.4 (Berkeley) 6/15/94
+ */
 
 /*
  * Copyright (c) 1993 Jan-Simon Pendry
- * Copyright (c) 1993
- *	The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * Jan-Simon Pendry.
@@ -40,7 +72,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: procfs_status.c,v 1.17 2001/11/10 13:33:44 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: procfs_status.c,v 1.22 2003/08/07 16:32:42 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -55,19 +87,20 @@ __KERNEL_RCSID(0, "$NetBSD: procfs_status.c,v 1.17 2001/11/10 13:33:44 lukem Exp
 #include <miscfs/procfs/procfs.h>
 
 int
-procfs_dostatus(curp, p, pfs, uio)
+procfs_dostatus(curp, l, pfs, uio)
 	struct proc *curp;
-	struct proc *p;
+	struct lwp *l;
 	struct pfsnode *pfs;
 	struct uio *uio;
 {
 	struct session *sess;
 	struct tty *tp;
 	struct ucred *cr;
+	struct proc *p = l->l_proc;
 	char *ps;
 	char *sep;
 	int pid, ppid, pgid, sid;
-	int i;
+	u_int i;
 	int xlen;
 	int error;
 	char psbuf[256+MAXHOSTNAMELEN];		/* XXX - conservative */
@@ -107,7 +140,7 @@ procfs_dostatus(curp, p, pfs, uio)
 	if (*sep != ',')
 		ps += sprintf(ps, "noflags");
 
-	if (p->p_flag & P_INMEM)
+	if (l->l_flag & L_INMEM)
 		ps += sprintf(ps, " %ld,%ld",
 			p->p_stats->p_start.tv_sec,
 			p->p_stats->p_start.tv_usec);
@@ -126,7 +159,7 @@ procfs_dostatus(curp, p, pfs, uio)
 	}
 
 	ps += sprintf(ps, " %s",
-	    (p->p_wchan && p->p_wmesg) ? p->p_wmesg : "nochan");
+	    (l->l_wchan && l->l_wmesg) ? l->l_wmesg : "nochan");
 
 	cr = p->p_ucred;
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: gzboot.c,v 1.6 2002/04/17 17:38:58 thorpej Exp $	*/
+/*	$NetBSD: gzboot.c,v 1.8 2004/03/24 17:06:58 drochner Exp $	*/
 
 /*
  * Copyright (c) 2002 Wasabi Systems, Inc.
@@ -50,12 +50,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed for the NetBSD Project
- *	by Matthias Drochner.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -133,7 +127,14 @@ main(void)
 	board_init();
 
 	printf(">> Load address: 0x%x\n", md_root_loadaddr);
-	printf(">> Image size: %u\n", md_root_size);
+
+	/*
+	 * If md_root_size is 0, then it means that we are simply
+	 * decompressing from an image which was concatenated onto
+	 * the end of the gzboot binary.
+	 */
+	if (md_root_size != 0)
+		printf(">> Image size: %u\n", md_root_size);
 
 	printf("Uncompressing image...");
 	gzcopy((void *) loadaddr, md_root_image, md_root_size);
@@ -169,7 +170,7 @@ static ssize_t
 readbuf(struct state *s, void *buf, size_t len)
 {
 
-	if (len > (s->srcsize - s->srcoff))
+	if (s->srcsize != 0 && len > (s->srcsize - s->srcoff))
 		len = s->srcsize - s->srcoff;
 
 	if ((s->spinny++ & 7) == 0)

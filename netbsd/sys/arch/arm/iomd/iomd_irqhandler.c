@@ -1,4 +1,4 @@
-/*	$NetBSD: iomd_irqhandler.c,v 1.5 2002/04/03 21:06:21 thorpej Exp $	*/
+/*	$NetBSD: iomd_irqhandler.c,v 1.8 2004/01/03 13:11:47 chris Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -38,6 +38,9 @@
  *
  *	from: irqhandler.c,v 1.14 1997/04/02 21:52:19 christos Exp $
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: iomd_irqhandler.c,v 1.8 2004/01/03 13:11:47 chris Exp $");
 
 #include "opt_irqstats.h"
 
@@ -143,13 +146,14 @@ irq_claim(irq, handler)
 {
 	int level;
 	int loop;
+	u_int oldirqstate;
 
 #ifdef DIAGNOSTIC
 	/* Sanity check */
 	if (handler == NULL)
-		panic("NULL interrupt handler\n");
+		panic("NULL interrupt handler");
 	if (handler->ih_func == NULL)
-		panic("Interrupt handler does not have a function\n");
+		panic("Interrupt handler does not have a function");
 #endif	/* DIAGNOSTIC */
 
 	/*
@@ -166,6 +170,8 @@ irq_claim(irq, handler)
 	/* Make sure the level is valid */
 	if (handler->ih_level < 0 || handler->ih_level >= IPL_LEVELS)
     	        return(-1);
+
+	oldirqstate = disable_interrupts(I32_bit);
 
 	/* Attach handler at top of chain */
 	handler->ih_next = irqhandlers[irq];
@@ -271,6 +277,7 @@ irq_claim(irq, handler)
 
 	enable_irq(irq);
 	set_spl_masks();
+	restore_interrupts(oldirqstate);
 
 	return(0);
 }
@@ -423,7 +430,7 @@ intr_claim(irq, level, name, ih_func, ih_arg)
 
 	ih = malloc(sizeof(*ih), M_DEVBUF, M_NOWAIT);
 	if (!ih)
-		panic("intr_claim(): Cannot malloc handler memory\n");
+		panic("intr_claim(): Cannot malloc handler memory");
 
 	ih->ih_level = level;
 	ih->ih_name = name;

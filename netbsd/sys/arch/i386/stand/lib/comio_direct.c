@@ -1,4 +1,4 @@
-/*	$NetBSD: comio_direct.c,v 1.4 2000/01/20 15:22:57 drochner Exp $	*/
+/*	$NetBSD: comio_direct.c,v 1.7 2003/08/07 16:28:03 agc Exp $	*/
 
 /*-
  * Copyright (c) 1993, 1994, 1995, 1996, 1997
@@ -45,11 +45,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -73,6 +69,7 @@
 #include <machine/pio.h>
 #include <dev/ic/comreg.h>
 #include "comio_direct.h"
+#include "libi386.h"
 
 static int comspeed __P((long speed));
 
@@ -98,23 +95,19 @@ comspeed(speed)
 
 	int x, err;
 
-#if 0
-	if (speed == 0)
-		return (0);
-#endif
 	if (speed <= 0)
-		return (-1);
+		speed = 9600;
 	x = divrnd((COM_FREQ / 16), speed);
 	if (x <= 0)
-		return (-1);
+		return divrnd((COM_FREQ / 16), 9600);
 	err = divrnd((COM_FREQ / 16) * 1000, speed * x) - 1000;
 	if (err < 0)
 		err = -err;
 	if (err > COM_TOLERANCE)
-		return (-1);
+		return divrnd((COM_FREQ / 16), 9600);
 	return (x);
 
-#undef	divrnd(n, q)
+#undef	divrnd
 }
 
 /*
@@ -194,8 +187,9 @@ computc_d(c, combase)
  * Initialize UART to known state.
  */
 void
-cominit_d(combase)
+cominit_d(combase,speed)
 	int combase;
+	int speed;
 {
 	int rate;
 
@@ -203,11 +197,7 @@ cominit_d(combase)
 	serbuf_write = 0;
 
 	outb(combase + com_cfcr, LCR_DLAB);
-#ifdef CONSPEED
-	rate = comspeed(CONSPEED);
-#else
-	rate = comspeed(9600);
-#endif
+	rate = comspeed(speed);
 	outb(combase + com_dlbl, rate);
 	outb(combase + com_dlbh, rate >> 8);
 	outb(combase + com_cfcr, LCR_8BITS);

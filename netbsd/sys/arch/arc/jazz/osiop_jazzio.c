@@ -1,4 +1,4 @@
-/* $NetBSD: osiop_jazzio.c,v 1.1 2001/04/30 04:52:54 tsutsui Exp $ */
+/* $NetBSD: osiop_jazzio.c,v 1.5 2003/07/15 00:04:50 lukem Exp $ */
 
 /*
  * Copyright (c) 2001 Izumi Tsutsui.  All rights reserved.
@@ -26,6 +26,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: osiop_jazzio.c,v 1.5 2003/07/15 00:04:50 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -49,9 +52,8 @@ int osiop_jazzio_match(struct device *, struct cfdata *, void *);
 void osiop_jazzio_attach(struct device *, struct device *, void *);
 int osiop_jazzio_intr(void *);
 
-struct cfattach osiop_jazzio_ca = {
-	sizeof(struct osiop_softc), osiop_jazzio_match, osiop_jazzio_attach
-};
+CFATTACH_DECL(osiop_jazzio, sizeof(struct osiop_softc),
+    osiop_jazzio_match, osiop_jazzio_attach, NULL, NULL);
 
 int
 osiop_jazzio_match(parent, match, aux)
@@ -61,7 +63,7 @@ osiop_jazzio_match(parent, match, aux)
 {
 	struct jazzio_attach_args *ja = aux;
 
-	if (strcmp(ja->ja_name, "osiop") != 0)
+	if (strcmp(ja->ja_name, "NCRC710") != 0)
 		return (0);
 
 	return (1);

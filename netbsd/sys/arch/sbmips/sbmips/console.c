@@ -1,4 +1,4 @@
-/* $NetBSD: console.c,v 1.1 2002/03/06 02:13:51 simonb Exp $ */
+/* $NetBSD: console.c,v 1.4 2003/07/15 03:35:51 lukem Exp $ */
 
 /*
  * Copyright 2000, 2001
@@ -15,10 +15,9 @@
  *    the source file.
  *
  * 2) No right is granted to use any trade name, trademark, or logo of
- *    Broadcom Corporation. Neither the "Broadcom Corporation" name nor any
- *    trademark or logo of Broadcom Corporation may be used to endorse or
- *    promote products derived from this software without the prior written
- *    permission of Broadcom Corporation.
+ *    Broadcom Corporation.  The "Broadcom Corporation" name may not be
+ *    used to endorse or promote products derived from this software
+ *    without the prior written permission of Broadcom Corporation.
  *
  * 3) THIS SOFTWARE IS PROVIDED "AS-IS" AND ANY EXPRESS OR IMPLIED
  *    WARRANTIES, INCLUDING BUT NOT LIMITED TO, ANY IMPLIED WARRANTIES OF
@@ -33,20 +32,19 @@
  *    OR OTHERWISE), EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: console.c,v 1.4 2003/07/15 03:35:51 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/tty.h>
 #include <dev/cons.h>
 
-#ifdef IKOS
-#include <sbmips/ikos/ikosvar.h>
-#else
 #ifdef JTAGCONSOLE
 #include <mips/sibyte/dev/sbjcnvar.h>
 #endif
 #include <mips/sibyte/dev/sbscnvar.h>
-#endif
 
 #define	CONMODE ((TTYDEF_CFLAG & ~(CSIZE | CSTOPB | PARENB)) | CS8) /* 8N1 */
 
@@ -54,16 +52,12 @@ void
 consinit(void)
 {
 
-#ifdef IKOS
-	ikoscons_cnattach();
-#else
 #ifdef JTAGCONSOLE
 	sbjcn_cnattach(0x1001FF80, 0, 115200, CONMODE);
 #else
 	sbscn_cnattach(0x10060100, 0, 115200, CONMODE);
 #ifdef KGDB
 	sbscn_kgdb_attach(0x10060100, 1, 115200, CONMODE);
-#endif
 #endif
 #endif
 }

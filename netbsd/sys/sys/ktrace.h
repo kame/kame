@@ -1,4 +1,4 @@
-/*	$NetBSD: ktrace.h,v 1.22 2001/01/05 22:25:27 jdolecek Exp $	*/
+/*	$NetBSD: ktrace.h,v 1.38.2.1 2004/06/24 14:04:11 he Exp $	*/
 
 /*
  * Copyright (c) 1988, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -55,12 +51,12 @@
  * ktrace record header
  */
 struct ktr_header {
-	int	ktr_len;		/* length of buf */
+	int	ktr_len;		/* length of ktr_buf */
 	short	ktr_type;		/* trace record type */
 	pid_t	ktr_pid;		/* process id */
 	char	ktr_comm[MAXCOMLEN+1];	/* command name */
 	struct	timeval ktr_time;	/* timestamp */
-	caddr_t	ktr_buf;
+	const void *ktr_buf;
 };
 
 /*
@@ -94,6 +90,7 @@ struct ktr_sysret {
 	short	ktr_eosys;		/* XXX unused */
 	int	ktr_error;
 	register_t ktr_retval;
+	register_t ktr_retval_1;
 };
 
 /*
@@ -123,6 +120,9 @@ struct ktr_psig {
 	sig_t	action;
 	sigset_t mask;
 	int	code;
+	/*
+	 * followed by optional siginfo_t
+	 */
 };
 
 /*
@@ -154,6 +154,42 @@ struct ktr_user {
 };
 
 /*
+ * KTR_MMSG - Mach message
+ */
+#define KTR_MMSG		9
+struct ktr_mmsg { 
+	/* 
+	 * This is a Mach message header
+	 */
+	int	ktr_bits;
+	int	ktr_size;
+	int	ktr_remote_port;
+	int	ktr_local_port;
+	int	ktr_reserved;
+	int	ktr_id;
+	/* 
+	 * Followed by ktr_size - sizeof(mach_msg_header_t) of message payload
+	 */
+};
+
+/*
+ * KTR_EXEC_ARG, KTR_EXEC_ENV - Arguments and environment from exec
+ */
+#define KTR_EXEC_ARG		10
+#define KTR_EXEC_ENV		11
+	/* record contains arg/env string */
+
+/*
+ * KTR_MOOL - Mach Out Of Line data
+ */
+#define KTR_MOOL		12
+struct ktr_mool {
+	const void 	*uaddr;	/* User address */
+	size_t		size;	/* Data len */
+	/* Followed by size bytes of data */
+};
+
+/*
  * kernel trace points (in p_traceflag)
  */
 #define KTRFAC_MASK	0x00ffffff
@@ -165,35 +201,46 @@ struct ktr_user {
 #define KTRFAC_CSW	(1<<KTR_CSW)
 #define KTRFAC_EMUL	(1<<KTR_EMUL)
 #define	KTRFAC_USER	(1<<KTR_USER)
+#define KTRFAC_MMSG	(1<<KTR_MMSG)
+#define KTRFAC_EXEC_ARG	(1<<KTR_EXEC_ARG)
+#define KTRFAC_EXEC_ENV	(1<<KTR_EXEC_ENV)
+#define KTRFAC_MOOL	(1<<KTR_MOOL)
+
 /*
  * trace flags (also in p_traceflags)
  */
 #define KTRFAC_ROOT	0x80000000	/* root set this trace */
 #define KTRFAC_INHERIT	0x40000000	/* pass trace flags to children */
 #define KTRFAC_ACTIVE	0x20000000	/* ktrace logging in progress, ignore */
+#define KTRFAC_TRC_EMUL	0x10000000	/* ktrace KTR_EMUL before next trace */
 
 #ifndef	_KERNEL
 
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
-int	ktrace __P((const char *, int, int, pid_t));
-int	fktrace __P((int, int, int, pid_t));
-int	utrace __P((const char *, void *, size_t));
+int	ktrace(const char *, int, int, pid_t);
+int	fktrace(int, int, int, pid_t);
+int	utrace(const char *, void *, size_t);
 __END_DECLS
 
 #else
 
-void ktrcsw __P((struct proc *, int, int));
-void ktremul __P((struct proc *));
-void ktrgenio __P((struct proc *, int, enum uio_rw, struct iovec *, int, int));
-void ktrnamei __P((struct proc *, char *));
-void ktrpsig __P((struct proc *, int, sig_t, sigset_t *, int));
-void ktrsyscall __P((struct proc *, register_t, size_t, register_t []));
-void ktrsysret __P((struct proc *, register_t, int, register_t));
-void ktruser __P((struct proc *, const char *, void *, size_t, int));
-void ktrderef __P((struct proc *));
-void ktradref __P((struct proc *));
+int ktrcsw(struct proc *, int, int);
+int ktremul(struct proc *);
+int ktrgenio(struct proc *, int, enum uio_rw, struct iovec *, int, int);
+int ktrnamei(struct proc *, char *);
+int ktrpsig(struct proc *, int, sig_t, const sigset_t *, const ksiginfo_t *);
+int ktrsyscall(struct proc *, register_t, register_t, 
+    const struct sysent *, register_t []);
+int ktrsysret(struct proc *, register_t, int, register_t *);
+int ktruser(struct proc *, const char *, void *, size_t, int);
+int ktrmmsg(struct proc *, const void *, size_t);
+int ktrkmem(struct proc *, int, const void *, size_t);
+int ktrmool(struct proc *, const void *, size_t, const void *);
+
+void ktrderef(struct proc *);
+void ktradref(struct proc *);
 
 #endif	/* !_KERNEL */
 

@@ -1,4 +1,4 @@
-# $NetBSD: GENERIC,v 1.24.4.1 2002/08/01 04:21:43 lukem Exp $
+# $NetBSD: GENERIC,v 1.33.2.2 2004/07/15 20:23:55 he Exp $
 #
 # GENERIC machine description file
 # 
@@ -59,11 +59,16 @@ options 	DEBUG			# extra kernel debugging support
 options 	KLOADER_KERNEL_PATH="\"/netbsd\""
 
 # Standard system options
-options 	RTC_OFFSET=-540 # hardware clock is this many mins. west of GMT
+#options 	RTC_OFFSET=-540 # hardware clock is this many mins. west of GMT
+				# (overrides tz info that hpcboot.exe passes)
 
 #options 	PCMCIAVERBOSE	# verbose PCMCIA configuration messages
-#options 	USERCONF		# userconf(4) support
+options 	USERCONF		# userconf(4) support
 options		PIPE_SOCKETPAIR		# smaller, but slower pipe(2)
+options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
+
+# Compatibility options
+#options 	BSDDISKLABEL_EI	# endian independent disklabel support
 
 # Executable format options
 options 	EXEC_COFF	# 32-bit COFF executables
@@ -82,6 +87,19 @@ file-system 	PROCFS		# /proc
 # Networking options
 options 	INET		# IP + ICMP + TCP + UDP
 options 	INET6		# IPV6
+
+#options 	ALTQ		# Manipulate network interfaces' output queues
+#options 	ALTQ_BLUE	# Stochastic Fair Blue
+#options 	ALTQ_CBQ	# Class-Based Queueing
+#options 	ALTQ_CDNR	# Diffserv Traffic Conditioner
+#options 	ALTQ_FIFOQ	# First-In First-Out Queue
+#options 	ALTQ_FLOWVALVE	# RED/flow-valve (red-penalty-box)
+#options 	ALTQ_HFSC	# Hierarchical Fair Service Curve
+#options 	ALTQ_LOCALQ	# Local queueing discipline
+#options 	ALTQ_PRIQ	# Priority Queueing
+#options 	ALTQ_RED	# Random Early Detection
+#options 	ALTQ_RIO	# RED with IN/OUT
+#options 	ALTQ_WFQ	# Weighted Fair Queueing
 
 options 	NFS_BOOT_DHCP
 
@@ -117,8 +135,26 @@ wskbd*		at hpckbd? mux 1
 #
 # Serial Devices
 # don't need to define SCICONSOLE. you can select from bootloader.
+scif0		at shb?
 options 	SCIFCN_SPEED=19200
-scif0 at shb?
+
+adc*		at shb?			# analog->digital converter
+
+j6x0pwr*	at adc?			# '680 battery, on/off, etc
+
+j6x0lcd*	at shb?			# '680 LCD power, brightness, contrast
+
+j6x0tp*		at adc?			# '680 touch panel
+wsmouse*	at j6x0tp? mux 0	# - as a pointing device
+wskbd1		at j6x0tp? mux 1	# - "hard icons" as keys
+# Do not convert hard icons to key presses while serving mouse input.
+#options 	J6X0TP_WSMOUSE_EXCLUSIVE
+# Customization for the mini-keymap of hard icons.
+#options 	J6X0TP_SETTINGS_ICON_KEYSYM="KS_Home"
+#options 	J6X0TP_PGUP_ICON_KEYSYM="KS_Prior"
+#options 	J6X0TP_PGDN_ICON_KEYSYM="KS_Next"
+#options 	J6X0TP_SWITCH_ICON_KEYSYM="KS_End"
+
 
 hd64461if* at shb?
 hd64461pcmcia*	at hd64461if?
@@ -137,18 +173,21 @@ pcmcia0 at hd64461pcmcia? controller 0 socket ?	# I/O card, memory card
 pcmcia1 at hd64461pcmcia? controller 1 socket ? # memory card only
 
 # PCMCIA network interfaces
-ne*	at pcmcia0 function ?		# NE2000-compatible Ethernet
 mbe*	at pcmcia0 function ?		# MB8696x based Ethernet
+ne*	at pcmcia0 function ?		# NE2000-compatible Ethernet
+wi*	at pcmcia0 function ?		# Lucent/Intersil WaveLan IEEE (802.11)
 
 ukphy*	at mii? phy ?			# generic unknown PHYs
 
 # PCMCIA IDE disk
 # PC-Card slot
 wdc1	at pcmcia0 function ?
-wd*	at wdc1 channel ? drive ? flags 0x0000
+atabus1 at wdc1 channel ?
+wd*	at atabus1 drive ? flags 0x0000
 # Compact Flash slot (only memory mapped mode CF can attach)
 wdc0	at pcmcia1 function ?
-wd*	at wdc0 channel ? drive ? flags 0x0000
+atabus0 at wdc0 channel ?
+wd*	at atabus0 drive ? flags 0x0000
 
 # Network Interfaces
 
@@ -160,6 +199,7 @@ pseudo-device	loop			# network loopback
 pseudo-device	pty			# pseudo-terminals
 pseudo-device	rnd			# /dev/random and in-kernel generator
 pseudo-device	clockctl		# user control of clock subsystem
+pseudo-device	ksyms			# kernel symbol table interface
 
 # mouse & keyboard multiplexor pseudo-devices
 pseudo-device	wsmux

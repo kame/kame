@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utdebug - Debug print routines
- *              xRevision: 87 $
+ *              xRevision: 111 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999, 2000, 2001, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -115,23 +115,21 @@
  *****************************************************************************/
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: utdebug.c,v 1.2 2001/11/13 13:02:02 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: utdebug.c,v 1.10 2004/02/14 16:57:25 kochi Exp $");
 
 #define __UTDEBUG_C__
 
 #include "acpi.h"
 
 #define _COMPONENT          ACPI_UTILITIES
-        MODULE_NAME         ("utdebug")
+        ACPI_MODULE_NAME    ("utdebug")
 
 
-UINT32          AcpiGbl_PrevThreadId = 0xFFFFFFFF;
-char            *AcpiGbl_FnEntryStr = "----Entry";
-char            *AcpiGbl_FnExitStr  = "----Exit-";
+#ifdef ACPI_DEBUG_OUTPUT
 
-
-
-#ifdef ACPI_DEBUG
+static UINT32   AcpiGbl_PrevThreadId = 0xFFFFFFFF;
+static char     *AcpiGbl_FnEntryStr = "----Entry";
+static char     *AcpiGbl_FnExitStr  = "----Exit-";
 
 
 /*****************************************************************************
@@ -153,7 +151,7 @@ AcpiUtInitStackPtrTrace (
     UINT32              CurrentSp;
 
 
-    AcpiGbl_EntryStackPointer =  (UINT32) &CurrentSp;
+    AcpiGbl_EntryStackPointer = ACPI_PTR_DIFF (&CurrentSp, NULL);
 }
 
 
@@ -173,9 +171,10 @@ void
 AcpiUtTrackStackPtr (
     void)
 {
-    UINT32              CurrentSp;
+    ACPI_SIZE           CurrentSp;
 
-    CurrentSp = (UINT32) &CurrentSp;
+
+    CurrentSp = ACPI_PTR_DIFF (&CurrentSp, NULL);
 
     if (CurrentSp < AcpiGbl_LowestStackPointer)
     {
@@ -185,11 +184,6 @@ AcpiUtTrackStackPtr (
     if (AcpiGbl_NestingLevel > AcpiGbl_DeepestNesting)
     {
         AcpiGbl_DeepestNesting = AcpiGbl_NestingLevel;
-
-        if (AcpiGbl_DeepestNesting == 34)
-        {
-            AcpiOsPrintf ("hit deepest nesting\n");
-        }
     }
 }
 
@@ -214,7 +208,7 @@ AcpiUtTrackStackPtr (
  *
  ****************************************************************************/
 
-void
+void  ACPI_INTERNAL_VAR_XFACE
 AcpiUtDebugPrint (
     UINT32                  RequestedDebugLevel,
     UINT32                  LineNumber,
@@ -234,7 +228,6 @@ AcpiUtDebugPrint (
     {
         return;
     }
-
 
     /*
      * Thread tracking and context switch notification
@@ -256,15 +249,14 @@ AcpiUtDebugPrint (
      * Display the module name, current line number, thread ID (if requested),
      * current procedure nesting level, and the current procedure name
      */
-    AcpiOsPrintf ("%8s-%04d ", DbgInfo->ModuleName, LineNumber);
+    AcpiOsPrintf ("%8s-%04ld ", DbgInfo->ModuleName, LineNumber);
 
     if (ACPI_LV_THREADS & AcpiDbgLevel)
     {
-        AcpiOsPrintf ("[%04X] ", ThreadId, AcpiGbl_NestingLevel, DbgInfo->ProcName);
+        AcpiOsPrintf ("[%04lX] ", ThreadId);
     }
 
-    AcpiOsPrintf ("[%02d] %-22.22s: ", AcpiGbl_NestingLevel, DbgInfo->ProcName);
-
+    AcpiOsPrintf ("[%02ld] %-22.22s: ", AcpiGbl_NestingLevel, DbgInfo->ProcName);
 
     va_start (args, Format);
     AcpiOsVprintf (Format, args);
@@ -291,7 +283,7 @@ AcpiUtDebugPrint (
  *
  ****************************************************************************/
 
-void
+void  ACPI_INTERNAL_VAR_XFACE
 AcpiUtDebugPrintRaw (
     UINT32                  RequestedDebugLevel,
     UINT32                  LineNumber,
@@ -309,7 +301,6 @@ AcpiUtDebugPrintRaw (
     }
 
     va_start (args, Format);
-
     AcpiOsVprintf (Format, args);
 }
 
@@ -399,7 +390,7 @@ void
 AcpiUtTraceStr (
     UINT32                  LineNumber,
     ACPI_DEBUG_PRINT_INFO   *DbgInfo,
-    NATIVE_CHAR             *String)
+    char                    *String)
 {
 
     AcpiGbl_NestingLevel++;
@@ -541,7 +532,8 @@ AcpiUtValueExit (
 {
 
     AcpiUtDebugPrint (ACPI_LV_FUNCTIONS, LineNumber, DbgInfo,
-            "%s %08X\n", AcpiGbl_FnExitStr, Value);
+            "%s %8.8X%8.8X\n", AcpiGbl_FnExitStr,
+            ACPI_FORMAT_UINT64 (Value));
 
     AcpiGbl_NestingLevel--;
 }
@@ -581,8 +573,6 @@ AcpiUtPtrExit (
 #endif
 
 
-
-
 /*****************************************************************************
  *
  * FUNCTION:    AcpiUtDumpBuffer
@@ -605,8 +595,8 @@ AcpiUtDumpBuffer (
     UINT32                  Display,
     UINT32                  ComponentId)
 {
-    UINT32                  i = 0;
-    UINT32                  j;
+    ACPI_NATIVE_UINT        i = 0;
+    ACPI_NATIVE_UINT        j;
     UINT32                  Temp32;
     UINT8                   BufChar;
 
@@ -619,6 +609,12 @@ AcpiUtDumpBuffer (
         return;
     }
 
+    if ((Count < 4) || (Count & 0x01))
+    {
+        Display = DB_BYTE_DISPLAY;
+    }
+
+    AcpiOsPrintf ("\nOffset   Value\n");
 
     /*
      * Nasty little dump buffer routine!
@@ -627,8 +623,7 @@ AcpiUtDumpBuffer (
     {
         /* Print current offset */
 
-        AcpiOsPrintf ("%05X    ", i);
-
+        AcpiOsPrintf ("%05X    ", (UINT32) i);
 
         /* Print 16 hex chars */
 
@@ -656,8 +651,7 @@ AcpiUtDumpBuffer (
 
             case DB_WORD_DISPLAY:
 
-                MOVE_UNALIGNED16_TO_32 (&Temp32,
-                                        &Buffer[i + j]);
+                ACPI_MOVE_16_TO_32 (&Temp32, &Buffer[i + j]);
                 AcpiOsPrintf ("%04X ", Temp32);
                 j += 2;
                 break;
@@ -665,8 +659,7 @@ AcpiUtDumpBuffer (
 
             case DB_DWORD_DISPLAY:
 
-                MOVE_UNALIGNED32_TO_32 (&Temp32,
-                                        &Buffer[i + j]);
+                ACPI_MOVE_32_TO_32 (&Temp32, &Buffer[i + j]);
                 AcpiOsPrintf ("%08X ", Temp32);
                 j += 4;
                 break;
@@ -674,24 +667,20 @@ AcpiUtDumpBuffer (
 
             case DB_QWORD_DISPLAY:
 
-                MOVE_UNALIGNED32_TO_32 (&Temp32,
-                                        &Buffer[i + j]);
+                ACPI_MOVE_32_TO_32 (&Temp32, &Buffer[i + j]);
                 AcpiOsPrintf ("%08X", Temp32);
 
-                MOVE_UNALIGNED32_TO_32 (&Temp32,
-                                        &Buffer[i + j + 4]);
+                ACPI_MOVE_32_TO_32 (&Temp32, &Buffer[i + j + 4]);
                 AcpiOsPrintf ("%08X ", Temp32);
                 j += 8;
                 break;
             }
         }
 
-
         /*
          * Print the ASCII equivalent characters
          * But watch out for the bad unprintable ones...
          */
-
         for (j = 0; j < 16; j++)
         {
             if (i + j >= Count)

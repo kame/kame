@@ -1,4 +1,4 @@
-/*	$NetBSD: disk.h,v 1.17 2002/01/27 12:41:09 simonb Exp $	*/
+/*	$NetBSD: disk.h,v 1.24 2003/08/07 16:34:01 agc Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -58,11 +58,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -112,9 +108,11 @@ struct disk {
 	 * on certain types of disks.
 	 */
 	int		dk_busy;	/* busy counter */
-	u_int64_t	dk_xfer;	/* total number of transfers */
+	u_int64_t	dk_rxfer;	/* total number of read transfers */
+	u_int64_t	dk_wxfer;	/* total number of write transfers */
 	u_int64_t	dk_seek;	/* total independent seek operations */
-	u_int64_t	dk_bytes;	/* total bytes transfered */
+	u_int64_t	dk_rbytes;	/* total bytes read */
+	u_int64_t	dk_wbytes;	/* total bytes written */
 	struct timeval	dk_attachtime;	/* time disk was attached */
 	struct timeval	dk_timestamp;	/* timestamp of last unbusy */
 	struct timeval	dk_time;	/* total time spent busy */
@@ -147,15 +145,19 @@ struct disk_sysctl {
 	u_int32_t	dk_timestamp_usec;
 	u_int32_t	dk_time_sec;
 	u_int32_t	dk_time_usec;
+	/* New separate read/write stats */
+	u_int64_t	dk_rxfer;
+	u_int64_t	dk_rbytes;
+	u_int64_t	dk_wxfer;
+	u_int64_t	dk_wbytes;
 };
 
 struct dkdriver {
 	void	(*d_strategy) __P((struct buf *));
 #ifdef notyet
-	int	(*d_open) __P((dev_t dev, int ifmt, int, struct proc *));
-	int	(*d_close) __P((dev_t dev, int, int ifmt, struct proc *));
-	int	(*d_ioctl) __P((dev_t dev, u_long cmd, caddr_t data, int fflag,
-				struct proc *));
+	int	(*d_open) __P((dev_t, int, int, struct proc *));
+	int	(*d_close) __P((dev_t, int, int, struct proc *));
+	int	(*d_ioctl) __P((dev_t, u_long, caddr_t, int, struct proc *));
 	int	(*d_dump) __P((dev_t));
 	void	(*d_start) __P((struct buf *, daddr_t));
 	int	(*d_mklabel) __P((struct disk *));
@@ -170,25 +172,28 @@ struct dkdriver {
 #define	DK_OPEN		4		/* label read, drive open */
 #define	DK_OPENRAW	5		/* open without label */
 
-#ifdef DISKSORT_STATS
-/*
- * Stats from disksort().
- */
-struct disksort_stats {
-	long	ds_newhead;		/* # new queue heads created */
-	long	ds_newtail;		/* # new queue tails created */
-	long	ds_midfirst;		/* # insertions into sort list */
-	long	ds_endfirst;		/* # insertions at end of sort list */
-	long	ds_newsecond;		/* # inversions (2nd lists) created */
-	long	ds_midsecond;		/* # insertions into 2nd list */
-	long	ds_endsecond;		/* # insertions at end of 2nd list */
-};
-#endif
-
 /*
  * disklist_head is defined here so that user-land has access to it.
  */
 TAILQ_HEAD(disklist_head, disk);	/* the disklist is a TAILQ */
+
+/*
+ * Bad sector lists per fixed disk
+ */
+struct disk_badsectors {
+	SLIST_ENTRY(disk_badsectors)	dbs_next;
+	daddr_t		dbs_min;	/* min. sector number */
+	daddr_t		dbs_max;	/* max. sector number */
+	struct timeval	dbs_failedat;	/* first failure at */
+};
+
+struct disk_badsecinfo {
+	u_int32_t	dbsi_bufsize;	/* size of region pointed to */
+	u_int32_t	dbsi_skip;	/* how many to skip past */
+	u_int32_t	dbsi_copied;	/* how many got copied back */
+	u_int32_t	dbsi_left;	/* remaining to copy */
+	caddr_t		dbsi_buffer;	/* region to copy disk_badsectors to */
+};
 
 #ifdef _KERNEL
 extern	int disk_count;			/* number of disks in global disklist */
@@ -197,14 +202,9 @@ void	disk_init __P((void));
 void	disk_attach __P((struct disk *));
 void	disk_detach __P((struct disk *));
 void	disk_busy __P((struct disk *));
-void	disk_unbusy __P((struct disk *, long));
+void	disk_unbusy __P((struct disk *, long, int));
 void	disk_resetstat __P((struct disk *));
 struct	disk *disk_find __P((char *));
-
-#ifdef __BROKEN_DK_ESTABLISH		/* XXX DEPRECATED */
-struct device;
-void	dk_establish __P((struct disk *, struct device *));
-#endif
 #endif
 
 #endif /* _SYS_DISK_H_ */

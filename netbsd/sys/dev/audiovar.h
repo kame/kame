@@ -1,4 +1,4 @@
-/*	$NetBSD: audiovar.h,v 1.27 2002/03/18 00:42:36 enami Exp $	*/
+/*	$NetBSD: audiovar.h,v 1.30 2004/01/31 00:07:56 fredb Exp $	*/
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -91,7 +91,7 @@
 #define AUMINNOBLK 3
 struct audio_ringbuffer {
 	size_t	bufsize;	/* allocated memory */
-	int	blksize;	/* I/O block size */
+	int	blksize;	/* I/O block size (bytes) */
 	int	maxblks;	/* no of blocks in ring */
 	u_char	*start;		/* start of buffer area */
 	u_char	*end;		/* end of buffer area */
@@ -113,14 +113,18 @@ struct audio_ringbuffer {
 #define AUDIO_N_PORTS 4
 
 struct au_mixer_ports {
-	int	index;
-	int	master;
-	int	nports;
-	u_char	isenum;
-	u_int	allports;
-	u_int	aumask[AUDIO_N_PORTS];
-	u_int	misel [AUDIO_N_PORTS];
-	u_int	miport[AUDIO_N_PORTS];
+	int	index;		/* index of port-selector mixerctl */
+	int	master;		/* index of master mixerctl */
+	int	nports;		/* number of selectable ports */
+	u_char	isenum;		/* selector is enum type */
+	u_int	allports;	/* all aumasks or'd */
+	u_int	aumask[AUDIO_N_PORTS];	/* exposed value of "ports" */
+	u_int	misel [AUDIO_N_PORTS];	/* ord of port, for selector */
+	u_int	miport[AUDIO_N_PORTS];	/* index of port's mixerctl */
+	u_char	isdual;		/* has working mixerout */
+	int	mixerout;	/* ord of mixerout, for dual case */
+	int	cur_port;	/* the port that gain actually controls when
+				   mixerout is selected, for dual case */
 };
 
 #if NAURATECONV > 0
@@ -183,8 +187,8 @@ struct audio_softc {
 	u_char	*sc_sil_start;	/* start of silence in buffer */
 	int	sc_sil_count;	/* # of silence bytes */
 
-	u_char	sc_rbus;	/* input dma in progress */
-	u_char	sc_pbus;	/* output dma in progress */
+	u_char	sc_rbus;	/* input DMA in progress */
+	u_char	sc_pbus;	/* output DMA in progress */
 
 	struct	audio_params sc_pparams;	/* play encoding parameters */
 	struct	audio_params sc_rparams;	/* record encoding parameters */

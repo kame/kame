@@ -1,10 +1,11 @@
-/*	$NetBSD: pmap_bootstrap.c,v 1.9 2001/04/02 05:28:38 dbj Exp $	*/
+/*	$NetBSD: pmap_bootstrap.c,v 1.17 2004/02/13 11:36:16 wiz Exp $	*/
 
 /*
  * This file was taken from mvme68k/mvme68k/pmap_bootstrap.c
  * should probably be re-synced when needed.
  * cvs id of source for the most recent syncing:
  *	NetBSD: pmap_bootstrap.c,v 1.15 2000/11/20 19:35:30 scw Exp 
+ *	NetBSD: pmap_bootstrap.c,v 1.17 2001/11/08 21:53:44 scw Exp
  */
 
 
@@ -24,11 +25,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -47,14 +44,20 @@
  *	@(#)pmap_bootstrap.c	8.1 (Berkeley) 6/10/93
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pmap_bootstrap.c,v 1.17 2004/02/13 11:36:16 wiz Exp $");
+
 #include <sys/param.h>
 #include <sys/kcore.h>
 #include <machine/kcore.h>
 #include <machine/pte.h>
 #include <machine/vmparam.h>
+#include <machine/bus.h>
 #include <machine/cpu.h>
 
 #include <next68k/next68k/seglist.h>
+
+#include <next68k/dev/intiovar.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -162,11 +165,11 @@ pmap_bootstrap(nextpa, firstpa)
 #endif
 		kstsize = 1;
 	kstpa = nextpa;
-	nextpa += kstsize * NBPG;
+	nextpa += kstsize * PAGE_SIZE;
 	kptpa = nextpa;
 	nptpages = RELOC(Sysptsize, int) +
 		(IIOMAPSIZE + MONOMAPSIZE + COLORMAPSIZE + NPTEPG - 1) / NPTEPG;
-	nextpa += nptpages * NBPG;
+	nextpa += nptpages * PAGE_SIZE;
 	eiiopa = nextpa;		/* just a reference for later */
 	iiopa = nextpa - IIOMAPSIZE * sizeof(pt_entry_t);
 	
@@ -177,9 +180,9 @@ pmap_bootstrap(nextpa, firstpa)
 	colorpa = ecolorpa - COLORMAPSIZE * sizeof(pt_entry_t);
 
 	kptmpa = nextpa;
-	nextpa += NBPG;
+	nextpa += PAGE_SIZE;
 	lkptpa = nextpa;
-	nextpa += NBPG;
+	nextpa += PAGE_SIZE;
 	p0upa = nextpa;
 	nextpa += USPACE;
 
@@ -280,10 +283,10 @@ pmap_bootstrap(nextpa, firstpa)
 		 */
 		pte = (u_int *)kptmpa;
 		epte = &pte[nptpages+1];
-		protopte = kptpa | PG_RW | PG_CI | PG_V;
+		protopte = kptpa | PG_RW | PG_CI | PG_U | PG_V;
 		while (pte < epte) {
 			*pte++ = protopte;
-			protopte += NBPG;
+			protopte += PAGE_SIZE;
 		}
 		/*
 		 * Invalidate all but the last remaining entry.
@@ -296,7 +299,7 @@ pmap_bootstrap(nextpa, firstpa)
 		 * Initialize the last to point to the page
 		 * table page allocated earlier.
 		 */
-		*pte = lkptpa | PG_RW | PG_CI | PG_V;
+		*pte = lkptpa | PG_RW | PG_CI | PG_U | PG_V;
 	} else
 #endif /* M68040 || M68060 */
 	{
@@ -313,8 +316,8 @@ pmap_bootstrap(nextpa, firstpa)
 		while (pte < epte) {
 			*ste++ = protoste;
 			*pte++ = protopte;
-			protoste += NBPG;
-			protopte += NBPG;
+			protoste += PAGE_SIZE;
+			protopte += PAGE_SIZE;
 		}
 		/*
 		 * Invalidate all but the last remaining entries in both.
@@ -341,8 +344,8 @@ pmap_bootstrap(nextpa, firstpa)
 	while (pte < epte)
 		*pte++ = PG_NV;
 #ifdef MAXADDR
-	/* tmp double-map for cpu's with physmem at the end of memory */
-	*pte = MAXADDR | PG_RW | PG_CI | PG_V;
+	/* tmp double-map for CPUs with physmem at the end of memory */
+	*pte = MAXADDR | PG_RW | PG_CI | PG_U | PG_V;
 #endif
 	/*
 	 * Initialize kernel page table.
@@ -356,12 +359,12 @@ pmap_bootstrap(nextpa, firstpa)
 	 * Validate PTEs for kernel text (RO).  The first page
 	 * of kernel text remains invalid; see locore.s
 	 */
-	pte = &((u_int *)kptpa)[m68k_btop(KERNBASE + NBPG)];
+	pte = &((u_int *)kptpa)[m68k_btop(KERNBASE + PAGE_SIZE)];
 	epte = &pte[m68k_btop(m68k_trunc_page(&etext))];
-	protopte = (firstpa + NBPG) | PG_RO | PG_V;
+	protopte = (firstpa + PAGE_SIZE) | PG_RO | PG_U | PG_V;
 	while (pte < epte) {
 		*pte++ = protopte;
-		protopte += NBPG;
+		protopte += PAGE_SIZE;
 	}
 	/*
 	 * Validate PTEs for kernel data/bss, dynamic data allocated
@@ -377,7 +380,7 @@ pmap_bootstrap(nextpa, firstpa)
 		protopte |= PG_CCB;
 	while (pte < epte) {
 		*pte++ = protopte;
-		protopte += NBPG;
+		protopte += PAGE_SIZE;
 	}
 	/*
 	 * map the kernel segment table cache invalidated for 
@@ -387,12 +390,12 @@ pmap_bootstrap(nextpa, firstpa)
 	epte = &((u_int *)kptpa)[m68k_btop(nextpa - firstpa)];
 	protopte = (protopte & ~PG_PROT) | PG_RW;
 	if (RELOC(mmutype, int) == MMU_68040) {
-		protopte &= ~PG_CCB;
-		protopte |= PG_CIN;
+		protopte &= ~PG_CMASK;
+		protopte |= PG_CI;
 	}
 	while (pte < epte) {
 		*pte++ = protopte;
-		protopte += NBPG;
+		protopte += PAGE_SIZE;
 	}
 	/*
 	 * Finally, validate the internal IO space PTEs (RW+CI).
@@ -403,28 +406,28 @@ pmap_bootstrap(nextpa, firstpa)
 	 */
 	pte = (u_int *)iiopa;
 	epte = (u_int *)eiiopa;
-	protopte = INTIOBASE | PG_RW | PG_CI | PG_V;
+	protopte = INTIOBASE | PG_RW | PG_CI | PG_U | PG_M | PG_V;
 	while (pte < epte) {
 		*pte++ = protopte;
-		protopte += NBPG;
+		protopte += PAGE_SIZE;
 	}
 
 	/* validate the mono fb space PTEs */
 	pte = (u_int *)monopa;
 	epte = (u_int *)emonopa;
-	protopte = MONOBASE | PG_RW | PG_CI | PG_V;
+	protopte = MONOBASE | PG_RW | PG_CWT | PG_U | PG_M | PG_V;
 	while (pte < epte) {
 		*pte++ = protopte;
-		protopte += NBPG;
+		protopte += PAGE_SIZE;
 	}
 
 	/* validate the color fb space PTEs */
 	pte = (u_int *)colorpa;
 	epte = (u_int *)ecolorpa;
-	protopte = COLORBASE | PG_RW | PG_CI | PG_V;
+	protopte = COLORBASE | PG_RW | PG_CWT | PG_U | PG_M | PG_V;
 	while (pte < epte) {
 		*pte++ = protopte;
-		protopte += NBPG;
+		protopte += PAGE_SIZE;
 	}
 
 	/*
@@ -452,30 +455,30 @@ pmap_bootstrap(nextpa, firstpa)
 	 * COLORMAPSIZE pages prior to external IO space at end of static
 	 * kernel page table.
 	 */
-	RELOC(colorbase, char *) =
-		(char *)m68k_ptob(nptpages*NPTEPG - IIOMAPSIZE - MONOMAPSIZE - COLORMAPSIZE);
-	RELOC(colorlimit, char *) =
-		(char *)m68k_ptob(nptpages*NPTEPG - IIOMAPSIZE - MONOMAPSIZE);
+	RELOC(colorbase, vaddr_t) =
+		m68k_ptob(nptpages*NPTEPG - IIOMAPSIZE - MONOMAPSIZE - COLORMAPSIZE);
+	RELOC(colorlimit, vaddr_t) =
+		m68k_ptob(nptpages*NPTEPG - IIOMAPSIZE - MONOMAPSIZE);
 
 	/*
 	 * monobase, monolimit: base and end of mono fb space.
 	 * MONOMAPSIZE pages prior to external IO space at end of static
 	 * kernel page table.
 	 */
-	RELOC(monobase, char *) =
-		(char *)m68k_ptob(nptpages*NPTEPG - IIOMAPSIZE - MONOMAPSIZE);
-	RELOC(monolimit, char *) =
-		(char *)m68k_ptob(nptpages*NPTEPG - IIOMAPSIZE);
+	RELOC(monobase, vaddr_t) =
+		m68k_ptob(nptpages*NPTEPG - IIOMAPSIZE - MONOMAPSIZE);
+	RELOC(monolimit, vaddr_t) =
+		m68k_ptob(nptpages*NPTEPG - IIOMAPSIZE);
 
 	/*
 	 * intiobase, intiolimit: base and end of internal IO space.
 	 * IIOMAPSIZE pages prior to external IO space at end of static
 	 * kernel page table.
 	 */
-	RELOC(intiobase, char *) =
-		(char *)m68k_ptob(nptpages*NPTEPG - IIOMAPSIZE);
-	RELOC(intiolimit, char *) =
-		(char *)m68k_ptob(nptpages*NPTEPG);
+	RELOC(intiobase, vaddr_t) =
+		m68k_ptob(nptpages*NPTEPG - IIOMAPSIZE);
+	RELOC(intiolimit, vaddr_t) =
+		m68k_ptob(nptpages*NPTEPG);
 
 	/*
 	 * Setup u-area for process 0.
@@ -635,13 +638,39 @@ pmap_bootstrap(nextpa, firstpa)
 		vaddr_t va = RELOC(virtual_avail, vaddr_t);
 
 		RELOC(CADDR1, caddr_t) = (caddr_t)va;
-		va += NBPG;
+		va += PAGE_SIZE;
 		RELOC(CADDR2, caddr_t) = (caddr_t)va;
-		va += NBPG;
+		va += PAGE_SIZE;
 		RELOC(vmmap, caddr_t) = (caddr_t)va;
-		va += NBPG;
+		va += PAGE_SIZE;
 		RELOC(msgbufaddr, caddr_t) = (caddr_t)va;
 		va += m68k_round_page(MSGBUFSIZE);
 		RELOC(virtual_avail, vaddr_t) = va;
+	}
+}
+
+void
+pmap_init_md(void)
+{
+
+	if (uvm_map(kernel_map, &intiobase, m68k_ptob(IIOMAPSIZE),
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
+		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE,
+				UVM_INH_NONE, UVM_ADV_RANDOM,
+				UVM_FLAG_FIXED)) != 0)
+		goto failed;
+	if (uvm_map(kernel_map, &monobase, m68k_ptob(MONOMAPSIZE),
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
+		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE,
+				UVM_INH_NONE, UVM_ADV_RANDOM,
+				UVM_FLAG_FIXED)) != 0)
+		goto failed;
+	if (uvm_map(kernel_map, &colorbase, m68k_ptob(COLORMAPSIZE),
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
+		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE,
+				UVM_INH_NONE, UVM_ADV_RANDOM,
+				UVM_FLAG_FIXED)) != 0) {
+failed:
+		panic("pmap_init_md: uvm_map failed");
 	}
 }

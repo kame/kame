@@ -1,4 +1,4 @@
-/*	$NetBSD: zs_kgdb.c,v 1.2 2001/07/08 04:25:36 wdk Exp $	*/
+/*	$NetBSD: zs_kgdb.c,v 1.4 2003/07/15 02:43:44 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -46,6 +46,9 @@
  *   (gdb) set remotebaud 19200
  *   (gdb) target remote /dev/ttyb
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zs_kgdb.c,v 1.4 2003/07/15 02:43:44 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -136,8 +139,9 @@ zs_kgdb_init()
 {
 	volatile struct zschan *zc;
 	int channel, unit;
+	extern const struct cdevsw zstty_cdevsw;
 
-	if (major(kgdb_dev) != zs_major)
+	if (cdevsw_lookup(kgdb_dev) != &zstty_cdevsw)
 		return;
 
 	unit = (kgdb_dev & 2) ? 2 : 0;

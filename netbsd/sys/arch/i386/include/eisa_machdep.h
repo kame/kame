@@ -1,4 +1,4 @@
-/*	$NetBSD: eisa_machdep.h,v 1.8 2000/08/11 00:43:21 thorpej Exp $	*/
+/*	$NetBSD: eisa_machdep.h,v 1.10 2003/02/26 21:29:00 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -42,7 +42,11 @@
 #define	EISA_ID_LEN		(sizeof(EISA_ID) - 1)
 #define	EISA_ID_PADDR		0xfffd9
 
-extern struct i386_bus_dma_tag eisa_bus_dma_tag;
+extern struct x86_bus_dma_tag eisa_bus_dma_tag;
+
+/* EISA Edge/Level trigger control registers */
+#define ELCR0   0x4d0                   /* eisa irq 0-7 */
+#define ELCR1   0x4d1                   /* eisa irq 8-15 */
 
 /*
  * Types provided to machine-independent EISA code.

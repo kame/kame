@@ -1,4 +1,4 @@
-/*	$NetBSD: vtpbc_mainbus.c,v 1.6 2002/05/16 01:01:30 thorpej Exp $	*/
+/*	$NetBSD: vtpbc_mainbus.c,v 1.12 2003/07/14 22:57:47 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vtpbc_mainbus.c,v 1.12 2003/07/14 22:57:47 lukem Exp $");
+
 #include "opt_algor_p4032.h"
 #include "opt_algor_p5064.h"
 
@@ -66,9 +69,8 @@ struct vtpbc_softc {
 int	vtpbc_mainbus_match(struct device *, struct cfdata *, void *);
 void	vtpbc_mainbus_attach(struct device *, struct device *, void *);
 
-struct cfattach vtpbc_mainbus_ca = {
-	sizeof(struct vtpbc_softc), vtpbc_mainbus_match, vtpbc_mainbus_attach,
-};
+CFATTACH_DECL(vtpbc_mainbus, sizeof(struct vtpbc_softc),
+    vtpbc_mainbus_match, vtpbc_mainbus_attach, NULL, NULL);
 extern struct cfdriver vtpbc_cd;
 
 int	vtpbc_mainbus_print(void *, const char *);
@@ -122,6 +124,7 @@ vtpbc_mainbus_attach(struct device *parent, struct device *self, void *aux)
 		pba.pba_iot = &acp->ac_iot;
 		pba.pba_memt = &acp->ac_memt;
 		pba.pba_dmat = &acp->ac_pci_dmat;
+		pba.pba_dmat64 = NULL;
 		pba.pba_pc = &acp->ac_pc;
 	    }
 #elif defined(ALGOR_P5064)
@@ -131,6 +134,7 @@ vtpbc_mainbus_attach(struct device *parent, struct device *self, void *aux)
 		pba.pba_iot = &acp->ac_iot;
 		pba.pba_memt = &acp->ac_memt;
 		pba.pba_dmat = &acp->ac_pci_dmat;
+		pba.pba_dmat64 = NULL;
 		pba.pba_pc = &acp->ac_pc;
 	    }
 #endif /* ALGOR_P4032 || ALGOR_P5064 */
@@ -145,8 +149,8 @@ vtpbc_mainbus_print(void *aux, const char *pnp)
 
 	/* only PCIs can attach to VTPBCs; easy. */
 	if (pnp)
-		printf("%s at %s", pba->pba_busname, pnp);
-	printf(" bus %d", pba->pba_bus);
+		aprint_normal("%s at %s", pba->pba_busname, pnp);
+	aprint_normal(" bus %d", pba->pba_bus);
 
 	return (UNCONF);
 }

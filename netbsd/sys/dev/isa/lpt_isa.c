@@ -1,4 +1,4 @@
-/*	$NetBSD: lpt_isa.c,v 1.52 2002/01/07 21:47:10 thorpej Exp $	*/
+/*	$NetBSD: lpt_isa.c,v 1.57 2003/04/03 15:35:41 christos Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994 Charles M. Hannum.
@@ -54,7 +54,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: lpt_isa.c,v 1.52 2002/01/07 21:47:10 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: lpt_isa.c,v 1.57 2003/04/03 15:35:41 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -93,9 +93,8 @@ struct lpt_isa_softc {
 int lpt_isa_probe __P((struct device *, struct cfdata *, void *));
 void lpt_isa_attach __P((struct device *, struct device *, void *));
 
-struct cfattach lpt_isa_ca = {
-	sizeof(struct lpt_isa_softc), lpt_isa_probe, lpt_isa_attach
-};
+CFATTACH_DECL(lpt_isa, sizeof(struct lpt_isa_softc),
+    lpt_isa_probe, lpt_isa_attach, NULL, NULL);
 
 int	lpt_port_test __P((bus_space_tag_t, bus_space_handle_t, bus_addr_t,
 	    bus_size_t, u_char, u_char));
@@ -160,7 +159,7 @@ lpt_isa_probe(parent, match, aux)
 	u_char mask, data;
 	int i, rv;
 
-#ifdef DEBUG
+#ifdef LPT_DEBUG
 #define	ABORT	do {printf("lptprobe: mask %x data %x failed\n", mask, data); \
 		    goto out;} while (0)
 #else
@@ -178,7 +177,7 @@ lpt_isa_probe(parent, match, aux)
 		return (0);
 
 	iot = ia->ia_iot;
-	base = ia->ia_io[0].ir_addr;;
+	base = ia->ia_io[0].ir_addr;
 	if (bus_space_map(iot, base, LPT_NPORTS, 0, &ioh))
 		return 0;
 

@@ -1,6 +1,4 @@
-/*	$NetBSD: isadma_machdep.c,v 1.1 2002/02/10 01:57:55 thorpej Exp $	*/
-
-#define ISA_DMA_STATS
+/*	$NetBSD: isadma_machdep.c,v 1.7 2003/08/01 22:43:27 kristerw Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -39,6 +37,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: isadma_machdep.c,v 1.7 2003/08/01 22:43:27 kristerw Exp $");
+
+#define ISA_DMA_STATS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/syslog.h>
@@ -64,9 +67,8 @@
  * so that they are protected from being used to service page faults,
  * etc. (unless we've run out of memory elsewhere).
  */
-#define	ISA_DMA_BOUNCE_THRESHOLD	(16 * 1024 * 1024)
-extern bus_dma_segment_t *pmap_isa_dma_ranges;
-extern int pmap_isa_dma_nranges;
+extern struct arm32_dma_range *shark_isa_dma_ranges;
+extern int shark_isa_dma_nranges;
 
 int	_isa_bus_dmamap_create __P((bus_dma_tag_t, bus_size_t, int,
 	    bus_size_t, bus_size_t, int, bus_dmamap_t *));
@@ -98,6 +100,7 @@ void	_isa_dma_free_bouncebuf __P((bus_dma_tag_t, bus_dmamap_t));
 struct arm32_bus_dma_tag isa_bus_dma_tag = {
 	0,				/* _ranges */
 	0,				/* _nranges */
+	NULL,				/* _cookie */
 	_isa_bus_dmamap_create,
 	_isa_bus_dmamap_destroy,
 	_isa_bus_dmamap_load,
@@ -105,7 +108,8 @@ struct arm32_bus_dma_tag isa_bus_dma_tag = {
 	_isa_bus_dmamap_load_uio,
 	_isa_bus_dmamap_load_raw,
 	_isa_bus_dmamap_unload,
-	_isa_bus_dmamap_sync,
+	_isa_bus_dmamap_sync,		/* pre */
+	_isa_bus_dmamap_sync,		/* post */
 	_isa_bus_dmamem_alloc,
 	_bus_dmamem_free,
 	_bus_dmamem_map,
@@ -120,8 +124,8 @@ void
 isa_dma_init()
 {
 
-	isa_bus_dma_tag._ranges = pmap_isa_dma_ranges;
-	isa_bus_dma_tag._nranges = pmap_isa_dma_nranges;
+	isa_bus_dma_tag._ranges = shark_isa_dma_ranges;
+	isa_bus_dma_tag._nranges = shark_isa_dma_nranges;
 }
 
 /**********************************************************************
@@ -192,7 +196,7 @@ _isa_bus_dmamap_create(t, size, nsegments, maxsegsz, boundary, flags, dmamp)
 	 * 32-bit DMA, and indicate that here.
 	 *
 	 * ...or, there is an opposite case.  The most segments
-	 * a transfer will require is (maxxfer / NBPG) + 1.  If
+	 * a transfer will require is (maxxfer / PAGE_SIZE) + 1.  If
 	 * the caller can't handle that many segments (e.g. the
 	 * ISA DMA controller), we may have to bounce it as well.
 	 *
@@ -606,22 +610,13 @@ _isa_bus_dmamem_alloc(t, size, alignment, boundary, segs, nsegs, rsegs, flags)
 	int *rsegs;
 	int flags;
 {
-	bus_dma_segment_t *ds;
-	int i, error;
 
 	if (t->_ranges == NULL)
 		return (ENOMEM);
 
-	for (i = 0, error = ENOMEM, ds = t->_ranges;
-	     i < t->_nranges; i++, ds++) {
-		error = _bus_dmamem_alloc_range(t, size, alignment, boundary,
-		    segs, nsegs, rsegs, flags, ds->ds_addr,
-		    ds->ds_addr + ds->ds_len);
-		if (error == 0)
-			break;
-	}
-
-	return (error);
+	/* _bus_dmamem_alloc() does the range checks for us. */
+	return (_bus_dmamem_alloc(t, size, alignment, boundary, segs, nsegs,
+	    rsegs, flags));
 }
 
 /**********************************************************************
@@ -640,7 +635,7 @@ _isa_dma_alloc_bouncebuf(t, map, size, flags)
 
 	cookie->id_bouncebuflen = round_page(size);
 	error = _isa_bus_dmamem_alloc(t, cookie->id_bouncebuflen,
-	    NBPG, map->_dm_boundary, cookie->id_bouncesegs,
+	    PAGE_SIZE, map->_dm_boundary, cookie->id_bouncesegs,
 	    map->_dm_segcnt, &cookie->id_nbouncesegs, flags);
 	if (error)
 		goto out;

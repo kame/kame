@@ -1,4 +1,4 @@
-/*	$NetBSD: auxiotwo.c,v 1.3 2002/03/11 16:27:03 pk Exp $	*/
+/*	$NetBSD: auxiotwo.c,v 1.7 2003/07/15 00:05:01 lukem Exp $	*/
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -41,6 +41,9 @@
  * at Lawrence Berkeley Laboratory.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: auxiotwo.c,v 1.7 2003/07/15 00:05:01 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -60,9 +63,8 @@ static int auxiotwomatch __P((struct device *, struct cfdata *, void *));
 static void auxiotwoattach
 		__P((struct device *, struct device *, void *));
 
-struct cfattach auxiotwo_obio_ca = {
-	sizeof(struct device), auxiotwomatch, auxiotwoattach
-};
+CFATTACH_DECL(auxiotwo_obio, sizeof(struct device),
+     auxiotwomatch, auxiotwoattach, NULL, NULL);
 
 /*
  * The OPENPROM calls this "auxio2".

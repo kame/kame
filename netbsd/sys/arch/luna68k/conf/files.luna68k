@@ -1,25 +1,26 @@
 #
-#	$NetBSD: files.luna68k,v 1.6 2002/01/21 21:57:04 jdolecek Exp $
+#	$NetBSD: files.luna68k,v 1.14 2003/07/27 01:19:27 thorpej Exp $
 #
 maxpartitions 8
 maxusers 2 8 64
 
+# machine-specific options
+defflag			PANICBUTTON
+
 file arch/luna68k/luna68k/autoconf.c
 file arch/luna68k/luna68k/clock.c
-file arch/luna68k/luna68k/conf.c
-file arch/luna68k/luna68k/db_memrw.c		ddb | kgdb
 file arch/luna68k/luna68k/disksubr.c
 file arch/luna68k/luna68k/isr.c
 file arch/luna68k/luna68k/machdep.c
 file arch/luna68k/luna68k/mem.c
-file arch/luna68k/luna68k/pmap.c
 file arch/luna68k/luna68k/pmap_bootstrap.c
 file arch/luna68k/luna68k/procfs_machdep.c	procfs
-file arch/luna68k/luna68k/sys_machdep.c
 file arch/luna68k/luna68k/trap.c
-file arch/luna68k/luna68k/vm_machdep.c
 file arch/m68k/m68k/cacheops.c
-file dev/clock_subr.c
+file arch/m68k/m68k/db_memrw.c		ddb | kgdb
+file arch/m68k/m68k/pmap_motorola.c
+file arch/m68k/m68k/sys_machdep.c
+file arch/m68k/m68k/vm_machdep.c
 file dev/cons.c
 file arch/luna68k/dev/lcd.c
 
@@ -57,15 +58,9 @@ file dev/ic/mb89352.c			spc
 
 # Machine-idependent SCSI driver.
 include "dev/scsipi/files.scsipi"
-major	{sd = 2}	# SCSI disk
-major	{cd = 4}	# SCSI CD-ROM
 
 # Memory Disk for boot tape
 file	dev/md_root.c			memory_disk_hooks
-major	{md = 7}	# Memory disk (for mini-kernel)
-
-# RAIDframe
-major	{raid = 14}
 
 # "Workstation Console" glue.
 include "dev/wscons/files.wscons"
@@ -75,3 +70,5 @@ include "dev/wscons/files.wscons"
 
 # NetBSD m68k a.out Binary Compatibility (COMPAT_AOUT_M68K)
 include "compat/aoutm68k/files.aoutm68k"
+
+include "arch/luna68k/conf/majors.luna68k"

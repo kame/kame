@@ -1,7 +1,7 @@
-/*	$NetBSD: acpi_button.c,v 1.3 2002/03/10 19:55:01 augustss Exp $	*/
+/*	$NetBSD: acpi_button.c,v 1.13 2003/11/03 18:07:10 mycroft Exp $	*/
 
 /*
- * Copyright 2001 Wasabi Systems, Inc.
+ * Copyright 2001, 2003 Wasabi Systems, Inc.
  * All rights reserved.
  *
  * Written by Jason R. Thorpe for Wasabi Systems, Inc.
@@ -40,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: acpi_button.c,v 1.3 2002/03/10 19:55:01 augustss Exp $");
+__KERNEL_RCSID(0, "$NetBSD: acpi_button.c,v 1.13 2003/11/03 18:07:10 mycroft Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -50,27 +50,30 @@ __KERNEL_RCSID(0, "$NetBSD: acpi_button.c,v 1.3 2002/03/10 19:55:01 augustss Exp
 #include <dev/acpi/acpireg.h>
 #include <dev/acpi/acpivar.h>
 
+#include <dev/sysmon/sysmonvar.h>
+
 struct acpibut_softc {
 	struct device sc_dev;		/* base device glue */
 	struct acpi_devnode *sc_node;	/* our ACPI devnode */
-	int sc_buttype;			/* button type */
+	struct sysmon_pswitch sc_smpsw;	/* our sysmon glue */
 	int sc_flags;			/* see below */
 };
 
-#define	ACPIBUT_TYPE_POWER		0
-#define	ACPIBUT_TYPE_SLEEP		1
+static const char * const button_hid[] = {
+	"PNP0C0C",
+	"PNP0C0E",
+	NULL
+};
 
 #define	ACPIBUT_F_VERBOSE		0x01	/* verbose events */
 
 int	acpibut_match(struct device *, struct cfdata *, void *);
 void	acpibut_attach(struct device *, struct device *, void *);
 
-struct cfattach acpibut_ca = {
-	sizeof(struct acpibut_softc), acpibut_match, acpibut_attach,
-};
+CFATTACH_DECL(acpibut, sizeof(struct acpibut_softc),
+    acpibut_match, acpibut_attach, NULL, NULL);
 
-void	acpibut_pressed_for_sleep(void *);
-void	acpibut_pressed_for_wakeup(void *);
+void	acpibut_pressed_event(void *);
 void	acpibut_notify_handler(ACPI_HANDLE, UINT32, void *context);
 
 /*
@@ -86,11 +89,7 @@ acpibut_match(struct device *parent, struct cfdata *match, void *aux)
 	if (aa->aa_node->ad_type != ACPI_TYPE_DEVICE)
 		return (0);
 
-	if (strcmp(aa->aa_node->ad_devinfo.HardwareId, "PNP0C0C") == 0 ||
-	    strcmp(aa->aa_node->ad_devinfo.HardwareId, "PNP0C0E") == 0)
-		return (1);
-
-	return (0);
+	return (acpi_match_hid(aa->aa_node->ad_devinfo, button_hid));
 }
 
 /*
@@ -106,11 +105,13 @@ acpibut_attach(struct device *parent, struct device *self, void *aux)
 	const char *desc;
 	ACPI_STATUS rv;
 
-	if (strcmp(aa->aa_node->ad_devinfo.HardwareId, "PNP0C0C") == 0) {
-		sc->sc_buttype = ACPIBUT_TYPE_POWER;
+	sc->sc_smpsw.smpsw_name = sc->sc_dev.dv_xname;
+
+	if (strcmp(aa->aa_node->ad_devinfo->HardwareId.Value, "PNP0C0C") == 0) {
+		sc->sc_smpsw.smpsw_type = PSWITCH_TYPE_POWER;
 		desc = "Power";
-	} else if (strcmp(aa->aa_node->ad_devinfo.HardwareId, "PNP0C0E") == 0) {
-		sc->sc_buttype = ACPIBUT_TYPE_SLEEP;
+	} else if (strcmp(aa->aa_node->ad_devinfo->HardwareId.Value, "PNP0C0E") == 0) {
+		sc->sc_smpsw.smpsw_type = PSWITCH_TYPE_SLEEP;
 		desc = "Sleep";
 	} else {
 		printf("\n");
@@ -121,11 +122,17 @@ acpibut_attach(struct device *parent, struct device *self, void *aux)
 
 	sc->sc_node = aa->aa_node;
 
+	if (sysmon_pswitch_register(&sc->sc_smpsw) != 0) {
+		printf("%s: unable to register with sysmon\n",
+		    sc->sc_dev.dv_xname);
+		return;
+	}
+
 	rv = AcpiInstallNotifyHandler(sc->sc_node->ad_handle,
 	    ACPI_DEVICE_NOTIFY, acpibut_notify_handler, sc);
-	if (rv != AE_OK) {
-		printf("%s: unable to register device notify handler: %d\n",
-		    sc->sc_dev.dv_xname, rv);
+	if (ACPI_FAILURE(rv)) {
+		printf("%s: unable to register DEVICE NOTIFY handler: %s\n",
+		    sc->sc_dev.dv_xname, AcpiFormatException(rv));
 		return;
 	}
 
@@ -136,41 +143,19 @@ acpibut_attach(struct device *parent, struct device *self, void *aux)
 }
 
 /*
- * acpibut_pressed_for_sleep:
+ * acpibut_pressed_event:
  *
- *	Deal with a button being pressed for sleep.
+ *	Deal with a button being pressed.
  */
 void
-acpibut_pressed_for_sleep(void *arg)
+acpibut_pressed_event(void *arg)
 {
 	struct acpibut_softc *sc = arg;
 
 	if (sc->sc_flags & ACPIBUT_F_VERBOSE)
-		printf("%s: button pressed for sleep\n",
-		    sc->sc_dev.dv_xname);
+		printf("%s: button pressed\n", sc->sc_dev.dv_xname);
 
-	/*
-	 * XXX Perform the appropriate action.
-	 */
-}
-
-/*
- * acpibut_pressed_for_wakeup:
- *
- *	Deal with a button being pressed for wakeup.
- */
-void
-acpibut_pressed_for_wakeup(void *arg)
-{
-	struct acpibut_softc *sc = arg;
-
-	if (sc->sc_flags & ACPIBUT_F_VERBOSE)
-		printf("%s: button pressed for wakeup\n",
-		    sc->sc_dev.dv_xname);
-
-	/*
-	 * XXX Perform the appropriate action.
-	 */
+	sysmon_pswitch_event(&sc->sc_smpsw, PSWITCH_EVENT_PRESSED);
 }
 
 /*
@@ -194,10 +179,11 @@ acpibut_notify_handler(ACPI_HANDLE handle, UINT32 notify, void *context)
 		    sc->sc_dev.dv_xname);
 #endif
 		rv = AcpiOsQueueForExecution(OSD_PRIORITY_LO,
-		    acpibut_pressed_for_sleep, sc);
-		if (rv != AE_OK)
+		    acpibut_pressed_event, sc);
+		if (ACPI_FAILURE(rv))
 			printf("%s: WARNING: unable to queue button pressed "
-			    "event: %d\n", sc->sc_dev.dv_xname, rv);
+			    "callback: %s\n", sc->sc_dev.dv_xname,
+			    AcpiFormatException(rv));
 		break;
 
 	/* XXX ACPI_NOTIFY_DeviceWake?? */

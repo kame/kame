@@ -1,4 +1,4 @@
-/*	$NetBSD: locore2.c,v 1.79 2001/09/05 14:12:21 tsutsui Exp $	*/
+/*	$NetBSD: locore2.c,v 1.83 2003/07/15 03:36:18 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: locore2.c,v 1.83 2003/07/15 03:36:18 lukem Exp $");
+
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -62,6 +65,8 @@
 #include <sun3/sun3/machdep.h>
 #include <sun3/sun3/obmem.h>
 #include <sun3/sun3/vector.h>
+
+#include "ksyms.h"
 
 /* This is defined in locore.s */
 extern char kernel_text[];
@@ -108,7 +113,7 @@ void _bootstrap __P((void));
 static void _verify_hardware __P((void));
 static void _vm_init __P((void));
 
-#if defined(DDB) && !defined(SYMTAB_SPACE)
+#if NKSYMS || defined(DDB) || defined(LKM)
 static void _save_symtab __P((void));
 
 /*
@@ -167,14 +172,14 @@ _save_symtab()
 	ssym = (char *)ehdr;
 	esym = (char *)maxsym;
 }
-#endif	/* DDB && !SYMTAB_SPACE */
+#endif	/* DDB */
 
 /*
  * This function is called from _bootstrap() to initialize
  * pre-vm-sytem virtual memory.  All this really does is to
  * set virtual_avail to the first page following preloaded
  * data (i.e. the kernel and its symbol table) and special
- * things that may be needed very early (proc0 upages).
+ * things that may be needed very early (lwp0 upages).
  * Once that is done, pmap_bootstrap() is called to do the
  * usual preparations for our use of the MMU.
  */
@@ -189,7 +194,7 @@ _vm_init()
 	 * if DDB is not part of this kernel, ignore the symbols.
 	 */
 	esym = end + 4;
-#if defined(DDB) && !defined(SYMTAB_SPACE)
+#if NKSYMS || defined(DDB) || defined(LKM)
 	/* This will advance esym past the symbols. */
 	_save_symtab();
 #endif
@@ -201,20 +206,20 @@ _vm_init()
 	nextva = m68k_round_page(esym);
 
 	/*
-	 * Setup the u-area pages (stack, etc.) for proc0.
+	 * Setup the u-area pages (stack, etc.) for lwp0.
 	 * This is done very early (here) to make sure the
 	 * fault handler works in case we hit an early bug.
-	 * (The fault handler may reference proc0 stuff.)
+	 * (The fault handler may reference lwp0 stuff.)
 	 */
 	proc0paddr = (struct user *) nextva;
 	nextva += USPACE;
 	memset((caddr_t)proc0paddr, 0, USPACE);
-	proc0.p_addr = proc0paddr;
+	lwp0.l_addr = proc0paddr;
 
 	/*
-	 * Now that proc0 exists, make it the "current" one.
+	 * Now that lwp0 exists, make it the "current" one.
 	 */
-	curproc = &proc0;
+	curlwp = &lwp0;
 	curpcb = &proc0paddr->u_pcb;
 
 	/* This does most of the real work. */

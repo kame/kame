@@ -1,4 +1,4 @@
-/* $NetBSD: podulebus.c,v 1.8.4.1 2002/11/01 11:12:13 tron Exp $ */
+/* $NetBSD: podulebus.c,v 1.17 2003/05/21 17:17:51 thorpej Exp $ */
 
 /*
  * Copyright (c) 1994-1996 Mark Brinicombe.
@@ -43,7 +43,7 @@
 
 #include <sys/param.h>
 
-__KERNEL_RCSID(0, "$NetBSD: podulebus.c,v 1.8.4.1 2002/11/01 11:12:13 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: podulebus.c,v 1.17 2003/05/21 17:17:51 thorpej Exp $");
 
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -111,14 +111,15 @@ podulebusprint(aux, name)
 	struct podule_attach_args *pa = aux;
 
 	if (name)
-		printf("podule at %s", name);
+		aprint_normal("podule at %s", name);
 	if (pa->pa_podule->slottype == SLOT_POD)
-		printf(" slot %d", pa->pa_podule_number);
+		aprint_normal(" slot %d", pa->pa_podule_number);
 	else if (pa->pa_podule->slottype == SLOT_NET)
-		printf(" [ netslot %d ]", pa->pa_podule_number - MAX_PODULES);
+		aprint_normal(" [ netslot %d ]",
+		    pa->pa_podule_number - MAX_PODULES);
 #ifdef DIAGNOSTIC
 	else
-		panic("Invalid slot type\n");
+		panic("Invalid slot type");
 #endif
 
 	return (UNCONF);
@@ -136,12 +137,12 @@ podulebussubmatch(parent, cf, aux)
 	/* Return priority 0 or 1 for wildcarded podule */
 
 	if (cf->cf_loc[PODULEBUSCF_SLOT] == PODULEBUSCF_SLOT_DEFAULT)
-		return((*cf->cf_attach->ca_match)(parent, cf, aux));
+		return(config_match(parent, cf, aux));
 
 	/* Return higher priority if we match the specific podule */
 
 	else if (cf->cf_loc[PODULEBUSCF_SLOT] == pa->pa_podule_number)
-		return((*cf->cf_attach->ca_match)(parent, cf, aux) * 8);
+		return(config_match(parent, cf, aux) * 8);
 
 	/* Fail */
 	return(0);
@@ -440,15 +441,17 @@ podulebusattach(parent, self, aux)
 #endif
 	printf("\n");
 
+
+#if 0 /* XXXJRT */
 	/* Ok we need to map in the podulebus */
-
+	/* with the new pmap mappings have to be done when the L1 tables
+	 * are built during initarm
+	 */
 	/* Map the FAST and SYNC simple podules */
-
 	pmap_map_section((vm_offset_t)pmap_kernel()->pm_pdir,
 	    SYNC_PODULE_BASE & 0xfff00000, SYNC_PODULE_HW_BASE & 0xfff00000,
 	    VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
 	cpu_tlb_flushD();
-
 	/* Now map the EASI space */
 
 	for (loop = 0; loop < MAX_PODULES; ++loop) {
@@ -461,7 +464,7 @@ podulebusattach(parent, self, aux)
 		    VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
 	}
 	cpu_tlb_flushD();
-
+#endif
 	/*
 	 * The MEDIUM and SLOW simple podules and the module space will have been
 	 * mapped when the IOMD and COMBO we mapped in for the RPC
@@ -525,9 +528,8 @@ podulebusattach(parent, self, aux)
 }
 
 
-struct cfattach podulebus_ca = {
-	sizeof(struct device), podulebusmatch, podulebusattach
-};
+CFATTACH_DECL(podulebus, sizeof(struct device),
+	podulebusmatch, podulebusattach, NULL, NULL);
 
 /* Useful functions that drivers may share */
 
@@ -545,7 +547,7 @@ matchpodule(pa, manufacturer, product, required_slot)
 	int required_slot;
 {
 	if (pa->pa_podule->attached)
-		panic("podulebus: Podule already attached\n");
+		panic("podulebus: Podule already attached");
 
 	if (IS_PODULE(pa, manufacturer, product))
 		return(1);

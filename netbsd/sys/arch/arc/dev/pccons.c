@@ -1,11 +1,42 @@
-/*	$NetBSD: pccons.c,v 1.29 2002/03/17 19:40:32 atatat Exp $	*/
+/*	$NetBSD: pccons.c,v 1.38 2004/02/13 11:36:10 wiz Exp $	*/
 /*	$OpenBSD: pccons.c,v 1.22 1999/01/30 22:39:37 imp Exp $	*/
 /*	NetBSD: pccons.c,v 1.89 1995/05/04 19:35:20 cgd Exp	*/
 
 /*-
- * Copyright (c) 1993, 1994, 1995 Charles M. Hannum.  All rights reserved.
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * William Jolitz and Don Ahn.
+ *
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)pccons.c	5.11 (Berkeley) 5/21/91
+ */
+
+/*-
+ * Copyright (c) 1993, 1994, 1995 Charles M. Hannum.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * William Jolitz and Don Ahn.
@@ -47,6 +78,9 @@
 /*
  * code to work keyboard & display for PC-style console
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pccons.c,v 1.38 2004/02/13 11:36:10 wiz Exp $");
 
 #include "opt_ddb.h"
 
@@ -97,8 +131,6 @@ static u_short cursor_shape = 0xffff,	/* don't update until set by user */
 static pccons_keymap_t scan_codes[KB_NUM_KEYS];/* keyboard translation table */
 int pc_xmode = 0;
 
-cdev_decl(pc);
-
 /*
  *  Keyboard output queue.
  */
@@ -135,13 +167,27 @@ void kbd_flush_input __P((void));
 void set_cursor_shape __P((void));
 void get_cursor_shape __P((void));
 void async_update __P((void));
-void do_async_update __P((u_char));;
+void do_async_update __P((u_char));
 
 void pccnputc __P((dev_t, int c));
 int pccngetc __P((dev_t));
 void pccnpollc __P((dev_t, int));
 
 extern struct cfdriver pc_cd;
+
+dev_type_open(pcopen);
+dev_type_close(pcclose);
+dev_type_read(pcread);
+dev_type_write(pcwrite);
+dev_type_ioctl(pcioctl);
+dev_type_tty(pctty);
+dev_type_poll(pcpoll);
+dev_type_mmap(pcmmap);
+
+const struct cdevsw pc_cdevsw = {
+	pcopen, pcclose, pcread, pcwrite, pcioctl,
+	nostop, pctty, pcpoll, pcmmap, ttykqfilter, D_TTY
+};
 
 #define	CHR		2
 
@@ -329,7 +375,7 @@ kbd_cmd(val, polling)
 	u_char polling;
 {
 	u_int retries = 3;
-	register u_int i;
+	u_int i;
 
 	if(!polling) {
 		i = spltty();
@@ -347,7 +393,7 @@ kbd_cmd(val, polling)
 		kbd_data_write_1(val);
 		for (i = 100000; i; i--) {
 			if (kbd_cmd_read_1() & KBS_DIB) {
-				register u_char c;
+				u_char c;
 
 				KBD_DELAY;
 				c = kbd_data_read_1();
@@ -388,7 +434,7 @@ get_cursor_shape()
 	 * real 6845's, as found on, MDA, Hercules or CGA cards, do
 	 * not support reading the cursor shape registers. the 6845
 	 * tri-states it's data bus. This is _normally_ read by the
-	 * cpu as either 0x00 or 0xff.. in which case we just use
+	 * CPU as either 0x00 or 0xff.. in which case we just use
 	 * a line cursor.
 	 */
 	if (cursor_shape == 0x0000 || cursor_shape == 0xffff)
@@ -639,7 +685,7 @@ pcpoll(dev, events, p)
 {
 	struct pc_softc *sc = pc_cd.cd_devs[PCUNIT(dev)];
 	struct tty *tp = sc->sc_tty;
- 
+
 	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
@@ -663,7 +709,7 @@ pcintr(arg)
 	void *arg;
 {
 	struct pc_softc *sc = arg;
-	register struct tty *tp = sc->sc_tty;
+	struct tty *tp = sc->sc_tty;
 	u_char *cp;
 
 	if ((kbd_cmd_read_1() & KBS_DIB) == 0)
@@ -805,13 +851,6 @@ out:
 	splx(s);
 }
 
-void
-pcstop(tp, flag)
-	struct tty *tp;
-	int flag;
-{
-}
-
 /* ARGSUSED */
 void pccons_common_cnattach(crt_iot, crt_memt, kbd_iot, config)
 	bus_space_tag_t crt_iot, crt_memt, kbd_iot;
@@ -819,8 +858,8 @@ void pccons_common_cnattach(crt_iot, crt_memt, kbd_iot, config)
 {
 	int maj;
 	static struct consdev pccons = {
-		NULL, NULL, pccngetc, pccnputc, pccnpollc, NULL,
-		    NODEV, CN_NORMAL
+		NULL, NULL, pccngetc, pccnputc, pccnpollc, NULL, NULL,
+		    NULL, NODEV, CN_NORMAL
 	};
 
 	/*
@@ -831,9 +870,7 @@ void pccons_common_cnattach(crt_iot, crt_memt, kbd_iot, config)
 	pc_context_init(crt_iot, crt_memt, kbd_iot, config);
 
 	/* locate the major number */
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == pcopen)
-			break;
+	maj = cdevsw_lookup_major(&pc_cdevsw);
 	pccons.cn_dev = makedev(maj, 0);
 
 	cn_tab = &pccons;
@@ -862,7 +899,7 @@ int
 pccngetc(dev)
 	dev_t dev;
 {
-	register char *cp;
+	char *cp;
 
 	if (pc_xmode > 0)
 		return 0;
@@ -906,7 +943,7 @@ pccnpollc(dev, on)
 			}
 		}
 	}
-}	
+}
 
 /*
  * Set line parameters.
@@ -939,7 +976,7 @@ static char bgansitopc[] = {
 };
 
 static u_char iso2ibm437[] =
-{     
+{
             0,     0,     0,     0,     0,     0,     0,     0,
             0,     0,     0,     0,     0,     0,     0,     0,
             0,     0,     0,     0,     0,     0,     0,     0,
@@ -1024,7 +1061,7 @@ sput(cp, n)
 		switch (c) {
 		case 0x1B:
 			if (vs.state >= VSS_ESCAPE) {
-				wrtchar(c, vs.so_at); 
+				wrtchar(c, vs.so_at);
 				vs.state = 0;
 				goto maybe_scroll;
 			} else
@@ -1125,7 +1162,7 @@ sput(cp, n)
 						vs.state = 0;
 						break;
 					default: /* Invalid, clear state */
-						wrtchar(c, vs.so_at); 
+						wrtchar(c, vs.so_at);
 						vs.state = 0;
 						goto maybe_scroll;
 				}
@@ -1163,7 +1200,7 @@ sput(cp, n)
 						cx %= vs.nrow;
 					pos = crtat - Crtat;
 					pos += vs.ncol * cx;
-					if (pos >= vs.nchr) 
+					if (pos >= vs.nchr)
 						pos -= vs.nchr;
 					crtat = Crtat + pos;
 					vs.state = 0;
@@ -1414,7 +1451,7 @@ sput(cp, n)
 					}
 					vs.state = 0;
 					break;
-					
+
 				default: /* Only numbers valid here */
 					if ((c >= '0') && (c <= '9')) {
 						if (vs.state >= VSS_EPARAM) {

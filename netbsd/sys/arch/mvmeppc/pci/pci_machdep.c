@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_machdep.c,v 1.1 2002/02/27 21:02:26 scw Exp $	*/
+/*	$NetBSD: pci_machdep.c,v 1.4 2003/07/15 02:43:53 lukem Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -38,6 +38,9 @@
  * up a few function pointers to access the correct method directly.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pci_machdep.c,v 1.4 2003/07/15 02:43:53 lukem Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
@@ -51,6 +54,8 @@
 #include <machine/bus.h>
 #include <machine/intr.h>
 #include <machine/platform.h>
+
+#include <powerpc/pio.h>
 
 #include <dev/isa/isavar.h>
 #include <dev/pci/pcivar.h>
@@ -215,7 +220,7 @@ pci_intr_string(pci_chipset_tag_t pc, pci_intr_handle_t ih)
 	static char irqstr[8];		/* 4 + 2 + NULL + sanity */
 
 	if (ih == 0 || ih >= ICU_LEN || ih == IRQ_SLAVE)
-		panic("pci_intr_string: bogus handle 0x%x\n", ih);
+		panic("pci_intr_string: bogus handle 0x%x", ih);
 
 	sprintf(irqstr, "irq %d", ih);
 	return (irqstr);
@@ -236,7 +241,7 @@ pci_intr_establish(pci_chipset_tag_t pc, pci_intr_handle_t ih, int level,
 {
 
 	if (ih == 0 || ih >= ICU_LEN || ih == IRQ_SLAVE)
-		panic("pci_intr_establish: bogus handle 0x%x\n", ih);
+		panic("pci_intr_establish: bogus handle 0x%x", ih);
 
 	return isa_intr_establish(NULL, ih, IST_LEVEL, level, func, arg);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: cir.c,v 1.2 2001/12/12 15:33:53 augustss Exp $	*/
+/*	$NetBSD: cir.c,v 1.9 2003/07/14 15:47:14 lukem Exp $	*/
 
 /*
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cir.c,v 1.9 2003/07/14 15:47:14 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ioctl.h>
@@ -50,17 +53,26 @@
 #include <dev/ir/cirio.h>
 #include <dev/ir/cirvar.h>
 
-cdev_decl(cir);
+dev_type_open(ciropen);
+dev_type_close(circlose);
+dev_type_read(cirread);
+dev_type_write(cirwrite);
+dev_type_ioctl(cirioctl);
+dev_type_poll(cirpoll);
+dev_type_kqfilter(cirkqfilter);
+
+const struct cdevsw cir_cdevsw = {
+	ciropen, circlose, cirread, cirwrite, cirioctl,
+	nostop, notty, cirpoll, nommap, cirkqfilter,
+};
 
 int cir_match(struct device *parent, struct cfdata *match, void *aux);
 void cir_attach(struct device *parent, struct device *self, void *aux);
 int cir_activate(struct device *self, enum devact act);
 int cir_detach(struct device *self, int flags);
 
-struct cfattach cir_ca = {
-	sizeof(struct cir_softc), cir_match, cir_attach,
-	cir_detach, cir_activate
-};
+CFATTACH_DECL(cir, sizeof(struct cir_softc),
+    cir_match, cir_attach, cir_detach, cir_activate);
 
 extern struct cfdriver cir_cd;
 
@@ -87,7 +99,7 @@ cir_attach(struct device *parent, struct device *self, void *aux)
 	if (sc->sc_methods->im_read == NULL ||
 	    sc->sc_methods->im_write == NULL ||
 	    sc->sc_methods->im_setparams == NULL)
-		panic("%s: missing methods\n", sc->sc_dev.dv_xname);
+		panic("%s: missing methods", sc->sc_dev.dv_xname);
 #endif
 	printf("\n");
 }
@@ -115,9 +127,7 @@ cir_detach(struct device *self, int flags)
 	int maj, mn;
 
 	/* locate the major number */
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == ciropen)
-			break;
+	maj = cdevsw_lookup_major(&cir_cdevsw);
 
 	/* Nuke the vnodes for any open instances (calls close). */
 	mn = self->dv_unit;

@@ -1,4 +1,4 @@
-/*	$NetBSD: OsdSynch.c,v 1.2 2001/11/13 13:01:58 lukem Exp $	*/
+/*	$NetBSD: OsdSynch.c,v 1.6 2003/10/31 20:52:30 mycroft Exp $	*/
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -69,7 +69,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: OsdSynch.c,v 1.2 2001/11/13 13:01:58 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: OsdSynch.c,v 1.6 2003/10/31 20:52:30 mycroft Exp $");
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -79,8 +79,10 @@ __KERNEL_RCSID(0, "$NetBSD: OsdSynch.c,v 1.2 2001/11/13 13:01:58 lukem Exp $");
 
 #include <dev/acpi/acpica.h>
 
+MALLOC_DECLARE(M_ACPI);
+
 #define	_COMPONENT	ACPI_OS_SERVICES
-MODULE_NAME("SYNCH")
+ACPI_MODULE_NAME("SYNCH")
 
 /*
  * Simple counting semaphore implemented using a mutex.  This is
@@ -90,6 +92,10 @@ struct acpi_semaphore {
 	struct simplelock as_slock;
 	UINT32 as_units;
 	UINT32 as_maxunits;
+};
+
+struct acpi_lock {
+	struct simplelock al_slock;
 };
 
 /*
@@ -103,14 +109,14 @@ AcpiOsCreateSemaphore(UINT32 MaxUnits, UINT32 InitialUnits,
 {
 	struct acpi_semaphore *as;
 
-	FUNCTION_TRACE(__FUNCTION__);
+	ACPI_FUNCTION_TRACE(__FUNCTION__);
 
 	if (OutHandle == NULL)
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	if (InitialUnits > MaxUnits)
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 
-	as = malloc(sizeof(*as), M_DEVBUF, M_NOWAIT);
+	as = malloc(sizeof(*as), M_ACPI, M_NOWAIT);
 	if (as == NULL)
 		return_ACPI_STATUS(AE_NO_MEMORY);
 
@@ -136,14 +142,14 @@ AcpiOsDeleteSemaphore(ACPI_HANDLE Handle)
 {
 	struct acpi_semaphore *as = (void *) Handle;
 
-	FUNCTION_TRACE(__FUNCTION__);
+	ACPI_FUNCTION_TRACE(__FUNCTION__);
 
 	if (as == NULL)
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 
-	free(as, M_DEVBUF);
+	free(as, M_ACPI);
 
-	ACPI_DEBUG_PRINT((ACPI_DB_MUTEX, "destroyed semaphre %p\n", as));
+	ACPI_DEBUG_PRINT((ACPI_DB_MUTEX, "destroyed semaphore %p\n", as));
 
 	return_ACPI_STATUS(AE_OK);
 }
@@ -154,7 +160,7 @@ AcpiOsDeleteSemaphore(ACPI_HANDLE Handle)
  *	Wait for units from a semaphore.
  */
 ACPI_STATUS
-AcpiOsWaitSemaphore(ACPI_HANDLE Handle, UINT32 Units, UINT32 Timeout)
+AcpiOsWaitSemaphore(ACPI_HANDLE Handle, UINT32 Units, UINT16 Timeout)
 {
 	struct acpi_semaphore *as = (void *) Handle;
 	ACPI_STATUS rv;
@@ -166,13 +172,13 @@ AcpiOsWaitSemaphore(ACPI_HANDLE Handle, UINT32 Units, UINT32 Timeout)
 	 * would adjust the amount of time left after being awakened.
 	 */
 
-	FUNCTION_TRACE(__FUNCTION__);
+	ACPI_FUNCTION_TRACE(__FUNCTION__);
 
 	if (as == NULL)
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 
-	/* A timeout of -1 means "forever". */
-	if (Timeout == -1)
+	/* A timeout of 0xFFFF means "forever". */
+	if (Timeout == 0xFFFF)
 		timo = 0;
 	else {
 		/* Compute the timeout using uSec per tick. */
@@ -219,7 +225,7 @@ AcpiOsSignalSemaphore(ACPI_HANDLE Handle, UINT32 Units)
 {
 	struct acpi_semaphore *as = (void *) Handle;
 
-	FUNCTION_TRACE(__FUNCTION__);
+	ACPI_FUNCTION_TRACE(__FUNCTION__);
 
 	if (as == NULL)
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
@@ -238,4 +244,94 @@ AcpiOsSignalSemaphore(ACPI_HANDLE Handle, UINT32 Units)
 	simple_unlock(&as->as_slock);
 
 	return_ACPI_STATUS(AE_OK);
+}
+
+/*
+ * AcpiOsCreateLock:
+ *
+ *	Create a lock.
+ */
+ACPI_STATUS
+AcpiOsCreateLock(ACPI_HANDLE *OutHandle)
+{
+	struct acpi_lock *al;
+
+	ACPI_FUNCTION_TRACE(__FUNCTION__);
+
+	if (OutHandle == NULL)
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
+
+	al = malloc(sizeof(*al), M_ACPI, M_NOWAIT);
+	if (al == NULL)
+		return_ACPI_STATUS(AE_NO_MEMORY);
+
+	simple_lock_init(&al->al_slock);
+
+	ACPI_DEBUG_PRINT((ACPI_DB_MUTEX,
+	    "created lock %p\n", al));
+
+	*OutHandle = (ACPI_HANDLE) al;
+	return_ACPI_STATUS(AE_OK);
+}
+
+/*
+ * AcpiOsDeleteLock:
+ *
+ *	Delete a lock.
+ */
+void
+AcpiOsDeleteLock(ACPI_HANDLE Handle)
+{
+	struct acpi_lock *al = (void *) Handle;
+
+	ACPI_FUNCTION_TRACE(__FUNCTION__);
+
+	if (al == NULL)
+		return;
+
+	free(al, M_ACPI);
+
+	ACPI_DEBUG_PRINT((ACPI_DB_MUTEX, "destroyed lock %p\n", al));
+
+	return;
+}
+
+/*
+ * AcpiOsAcquireLock:
+ *
+ *	Acquire a lock.
+ */
+void
+AcpiOsAcquireLock(ACPI_HANDLE Handle, UINT32 Flags)
+{
+	struct acpi_lock *al = (void *) Handle;
+
+	ACPI_FUNCTION_TRACE(__FUNCTION__);
+
+	if (al == NULL)
+		return;
+
+	simple_lock(&al->al_slock);
+
+	return;
+}
+
+/*
+ * AcpiOsReleaseLock:
+ *
+ *	Release a lock.
+ */
+void
+AcpiOsReleaseLock(ACPI_HANDLE Handle, UINT32 Flags)
+{
+	struct acpi_lock *al = (void *) Handle;
+
+	ACPI_FUNCTION_TRACE(__FUNCTION__);
+
+	if (al == NULL)
+		return;
+
+	simple_unlock(&al->al_slock);
+
+	return;
 }

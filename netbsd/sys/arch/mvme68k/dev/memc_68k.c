@@ -1,4 +1,4 @@
-/*	$NetBSD: memc_68k.c,v 1.1 2002/02/12 20:38:20 scw Exp $	*/
+/*	$NetBSD: memc_68k.c,v 1.4 2003/07/15 02:43:46 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2000, 2002 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * Support for the MEMECC and MEMC40 memory controllers on MVME68K
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: memc_68k.c,v 1.4 2003/07/15 02:43:46 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -60,9 +63,8 @@
 int memc_match(struct device *, struct cfdata *, void *);
 void memc_attach(struct device *, struct device *, void *);
 
-struct cfattach memc_ca = {
-	sizeof(struct memc_softc), memc_match, memc_attach
-};
+CFATTACH_DECL(memc, sizeof(struct memc_softc),
+    memc_match, memc_attach, NULL, NULL);
 
 extern struct cfdriver memc_cd;
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: ifpga.c,v 1.8.4.1 2002/05/23 21:56:43 tv Exp $ */
+/*	$NetBSD: ifpga.c,v 1.17 2003/09/06 11:31:20 rearnsha Exp $ */
 
 /*
  * Copyright (c) 2001 ARM Ltd
@@ -37,6 +37,9 @@
  * board is shipped.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ifpga.c,v 1.17 2003/09/06 11:31:20 rearnsha Exp $");
+
 #include <sys/types.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -48,7 +51,6 @@
 #include <dev/pci/pciconf.h>
 
 #include <machine/intr.h>
-#include <evbarm/ifpga/irqhandler.h>	/* XXX XXX XXX */
 
 #include <arm/cpufunc.h>
 
@@ -61,6 +63,9 @@
 #include <evbarm/ifpga/ifpga_pcivar.h>
 #include <evbarm/dev/v360reg.h>
 
+#include <evbarm/integrator/int_bus_dma.h>
+#include "locators.h"
+
 /* Prototypes */
 static int  ifpga_match		(struct device *, struct cfdata *, void *);
 static void ifpga_attach	(struct device *, struct device *, void *);
@@ -68,17 +73,13 @@ static int  ifpga_print		(void *, const char *);
 static int  ifpga_pci_print	(void *, const char *);
 
 /* Drive and attach structures */
-struct cfattach ifpga_ca = {
-	sizeof(struct ifpga_softc), ifpga_match, ifpga_attach
-};
+CFATTACH_DECL(ifpga, sizeof(struct ifpga_softc),
+    ifpga_match, ifpga_attach, NULL, NULL);
 
 int ifpga_found;
 
 /* Default UART clock speed (we should make this a boot option).  */
 int ifpga_uart_clk = IFPGA_UART_CLK;
-
-/* Virtual base of IRQ controller.  */
-void *ifpga_irq_vbase;
 
 #if NPCI > 0
 /* PCI handles */
@@ -89,11 +90,9 @@ static struct bus_space ifpga_pci_io_tag;
 static struct bus_space ifpga_pci_mem_tag;
 #endif /* NPCI > 0 */
 
-struct ifpga_softc *clock_sc;
-
 static struct bus_space ifpga_bs_tag;
 
-static struct ifpga_softc *ifpga_sc;
+struct ifpga_softc *ifpga_sc;
 /*
  * Print the configuration information for children
  */
@@ -104,9 +103,9 @@ ifpga_print(void *aux, const char *pnp)
 	struct ifpga_attach_args *ifa = aux;
 
 	if (ifa->ifa_addr != -1)
-		printf(" addr 0x%lx", (unsigned long)ifa->ifa_addr);
+		aprint_normal(" addr 0x%lx", (unsigned long)ifa->ifa_addr);
 	if (ifa->ifa_irq != -1)
-		printf(" irq %d", ifa->ifa_irq);
+		aprint_normal(" irq %d", ifa->ifa_irq);
 
 	return UNCONF;
 }
@@ -118,9 +117,9 @@ ifpga_pci_print(void *aux, const char *pnp)
 	struct pcibus_attach_args *pci_pba = (struct pcibus_attach_args *)aux;
 
 	if (pnp)
-		printf("%s at %s", pci_pba->pba_busname, pnp);
+		aprint_normal("%s at %s", pci_pba->pba_busname, pnp);
 	if (strcmp(pci_pba->pba_busname, "pci") == 0)
-		printf(" bus %d", pci_pba->pba_bus);
+		aprint_normal(" bus %d", pci_pba->pba_bus);
 
 	return UNCONF;
 }
@@ -141,7 +140,7 @@ ifpga_search(struct device *parent, struct cfdata *cf, void *aux)
 		ifa.ifa_sc_ioh = sc->sc_sc_ioh;
 
 		tryagain = 0;
-		if ((*cf->cf_attach->ca_match)(parent, cf, &ifa) > 0) {
+		if (config_match(parent, cf, &ifa) > 0) {
 			config_attach(parent, cf, &ifa, ifpga_print);
 			tryagain = (cf->cf_fstate == FSTATE_STAR);
 		}
@@ -265,10 +264,9 @@ ifpga_attach(struct device *parent, struct device *self, void *aux)
 	    BUS_SPACE_MAP_LINEAR, &sc->sc_irq_ioh))
 		panic("%s: Cannot map irq controller registers",
 		    self->dv_xname);
-	ifpga_irq_vbase = bus_space_vaddr(sc->sc_iot, sc->sc_irq_ioh);
 
 	/* We can write to the IRQ/FIQ controller now.  */
-	irq_postinit();
+	ifpga_intr_postinit();
 
 	/* Map the core module */
 	if (bus_space_map(sc->sc_iot, IFPGA_IO_CM_BASE, IFPGA_IO_CM_SIZE, 0,
@@ -279,8 +277,6 @@ ifpga_attach(struct device *parent, struct device *self, void *aux)
 	if (bus_space_map(sc->sc_iot, IFPGA_IO_TMR_BASE, IFPGA_IO_TMR_SIZE, 0,
 	    &sc->sc_tmr_ioh))
 		panic("%s: Cannot map timer registers", self->dv_xname);
-
-	clock_sc = sc;
 
 	printf("\n");
 
@@ -335,11 +331,14 @@ ifpga_attach(struct device *parent, struct device *self, void *aux)
 	config_search(ifpga_search, self, NULL);
 
 #if NPCI > 0
+	integrator_pci_dma_init(&ifpga_pci_bus_dma_tag);
+
 	pci_pba.pba_busname = "pci";
 	pci_pba.pba_pc = &ifpga_pci_chipset;
 	pci_pba.pba_iot = &ifpga_pci_io_tag;
 	pci_pba.pba_memt = &ifpga_pci_mem_tag;
 	pci_pba.pba_dmat = &ifpga_pci_bus_dma_tag;
+	pci_pba.pba_dmat64 = NULL;
 	pci_pba.pba_flags = PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED;
 	pci_pba.pba_bus = 0;
 	pci_pba.pba_bridgetag = NULL;

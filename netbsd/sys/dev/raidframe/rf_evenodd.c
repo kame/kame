@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_evenodd.c,v 1.7 2001/11/13 07:11:14 lukem Exp $	*/
+/*	$NetBSD: rf_evenodd.c,v 1.13 2004/01/10 00:56:28 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -33,7 +33,7 @@
  ****************************************************************************************/
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rf_evenodd.c,v 1.7 2001/11/13 07:11:14 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rf_evenodd.c,v 1.13 2004/01/10 00:56:28 oster Exp $");
 
 #include "rf_archs.h"
 
@@ -68,10 +68,8 @@ typedef struct RF_EvenOddConfigInfo_s {
 }       RF_EvenOddConfigInfo_t;
 
 int 
-rf_ConfigureEvenOdd(listp, raidPtr, cfgPtr)
-	RF_ShutdownList_t **listp;
-	RF_Raid_t *raidPtr;
-	RF_Config_t *cfgPtr;
+rf_ConfigureEvenOdd(RF_ShutdownList_t **listp, RF_Raid_t *raidPtr,
+		    RF_Config_t *cfgPtr)
 {
 	RF_RaidLayout_t *layoutPtr = &raidPtr->Layout;
 	RF_EvenOddConfigInfo_t *info;
@@ -94,7 +92,6 @@ rf_ConfigureEvenOdd(listp, raidPtr, cfgPtr)
 
 	/* fill in the remaining layout parameters */
 	layoutPtr->numStripe = layoutPtr->stripeUnitsPerDisk;
-	layoutPtr->bytesPerStripeUnit = layoutPtr->sectorsPerStripeUnit << raidPtr->logBytesPerSector;
 	layoutPtr->numDataCol = raidPtr->numCol - 2;	/* ORIG:
 							 * layoutPtr->numDataCol
 							 * = raidPtr->numCol-1;  */
@@ -124,23 +121,20 @@ rf_ConfigureEvenOdd(listp, raidPtr, cfgPtr)
 }
 
 int 
-rf_GetDefaultNumFloatingReconBuffersEvenOdd(RF_Raid_t * raidPtr)
+rf_GetDefaultNumFloatingReconBuffersEvenOdd(RF_Raid_t *raidPtr)
 {
 	return (20);
 }
 
 RF_HeadSepLimit_t 
-rf_GetDefaultHeadSepLimitEvenOdd(RF_Raid_t * raidPtr)
+rf_GetDefaultHeadSepLimitEvenOdd(RF_Raid_t *raidPtr)
 {
 	return (10);
 }
 
 void 
-rf_IdentifyStripeEvenOdd(
-    RF_Raid_t * raidPtr,
-    RF_RaidAddr_t addr,
-    RF_RowCol_t ** diskids,
-    RF_RowCol_t * outRow)
+rf_IdentifyStripeEvenOdd(RF_Raid_t *raidPtr, RF_RaidAddr_t addr,
+			 RF_RowCol_t **diskids, RF_RowCol_t *outRow)
 {
 	RF_StripeNum_t stripeID = rf_RaidAddressToStripeID(&raidPtr->Layout, addr);
 	RF_EvenOddConfigInfo_t *info = (RF_EvenOddConfigInfo_t *) raidPtr->Layout.layoutSpecificInfo;
@@ -164,13 +158,9 @@ rf_IdentifyStripeEvenOdd(
 
 
 void 
-rf_MapParityEvenOdd(
-    RF_Raid_t * raidPtr,
-    RF_RaidAddr_t raidSector,
-    RF_RowCol_t * row,
-    RF_RowCol_t * col,
-    RF_SectorNum_t * diskSector,
-    int remap)
+rf_MapParityEvenOdd(RF_Raid_t *raidPtr, RF_RaidAddr_t raidSector,
+		    RF_RowCol_t *row, RF_RowCol_t *col,
+		    RF_SectorNum_t *diskSector, int remap)
 {
 	RF_StripeNum_t SUID = raidSector / raidPtr->Layout.sectorsPerStripeUnit;
 	RF_StripeNum_t endSUIDofthisStrip = (SUID / raidPtr->Layout.numDataCol + 1) * raidPtr->Layout.numDataCol - 1;
@@ -182,13 +172,9 @@ rf_MapParityEvenOdd(
 }
 
 void 
-rf_MapEEvenOdd(
-    RF_Raid_t * raidPtr,
-    RF_RaidAddr_t raidSector,
-    RF_RowCol_t * row,
-    RF_RowCol_t * col,
-    RF_SectorNum_t * diskSector,
-    int remap)
+rf_MapEEvenOdd(RF_Raid_t *raidPtr, RF_RaidAddr_t raidSector,
+	       RF_RowCol_t *row, RF_RowCol_t *col, RF_SectorNum_t *diskSector,
+	       int remap)
 {
 	RF_StripeNum_t SUID = raidSector / raidPtr->Layout.sectorsPerStripeUnit;
 	RF_StripeNum_t endSUIDofthisStrip = (SUID / raidPtr->Layout.numDataCol + 1) * raidPtr->Layout.numDataCol - 1;
@@ -200,11 +186,8 @@ rf_MapEEvenOdd(
 }
 
 void 
-rf_EODagSelect(
-    RF_Raid_t * raidPtr,
-    RF_IoType_t type,
-    RF_AccessStripeMap_t * asmap,
-    RF_VoidFuncPtr * createFunc)
+rf_EODagSelect(RF_Raid_t *raidPtr, RF_IoType_t type,
+	       RF_AccessStripeMap_t *asmap, RF_VoidFuncPtr *createFunc)
 {
 	RF_RaidLayout_t *layoutPtr = &(raidPtr->Layout);
 	unsigned ndfail = asmap->numDataFailed;
@@ -214,7 +197,7 @@ rf_EODagSelect(
 	RF_ASSERT(RF_IO_IS_R_OR_W(type));
 	if (ntfail > 2) {
 		RF_ERRORMSG("more than two disks failed in a single group!  Aborting I/O operation.\n");
-		 /* *infoFunc = */ *createFunc = NULL;
+		*createFunc = NULL;
 		return;
 	}
 	/* ok, we can do this I/O */
@@ -350,12 +333,9 @@ rf_EODagSelect(
 
 
 int 
-rf_VerifyParityEvenOdd(raidPtr, raidAddr, parityPDA, correct_it, flags)
-	RF_Raid_t *raidPtr;
-	RF_RaidAddr_t raidAddr;
-	RF_PhysDiskAddr_t *parityPDA;
-	int     correct_it;
-	RF_RaidAccessFlags_t flags;
+rf_VerifyParityEvenOdd(RF_Raid_t *raidPtr, RF_RaidAddr_t raidAddr,
+		       RF_PhysDiskAddr_t *parityPDA, int correct_it,
+		       RF_RaidAccessFlags_t flags)
 {
 	RF_RaidLayout_t *layoutPtr = &(raidPtr->Layout);
 	RF_RaidAddr_t startAddr = rf_RaidAddressOfPrevStripeBoundary(layoutPtr, raidAddr);
@@ -385,11 +365,9 @@ rf_VerifyParityEvenOdd(raidPtr, raidAddr, parityPDA, correct_it, flags)
 	mcpair = rf_AllocMCPair();
 	rf_MakeAllocList(alloclist);
 	RF_MallocAndAdd(buf, numbytes * (layoutPtr->numDataCol + layoutPtr->numParityCol), (char *), alloclist);
-	RF_CallocAndAdd(pbuf, 1, numbytes, (char *), alloclist);	/* use calloc to make
-									 * sure buffer is zeroed */
+	RF_MallocAndAdd(pbuf, numbytes, (char *), alloclist);
 	end_p = buf + bytesPerStripe;
-	RF_CallocAndAdd(redundantbuf2, 1, numbytes, (char *), alloclist);	/* use calloc to make
-										 * sure buffer is zeroed */
+	RF_MallocAndAdd(redundantbuf2, numbytes, (char *), alloclist);
 
 	rd_dag_h = rf_MakeSimpleDAG(raidPtr, stripeWidth, numbytes, buf, rf_DiskReadFunc, rf_DiskReadUndoFunc,
 	    "Rod", alloclist, flags, RF_IO_NORMAL_PRIORITY);
@@ -409,7 +387,7 @@ rf_VerifyParityEvenOdd(raidPtr, raidAddr, parityPDA, correct_it, flags)
 					 * dead.  return w/ good status */
 		blockNode->succedents[i]->params[0].p = pda;
 		blockNode->succedents[i]->params[2].v = psID;
-		blockNode->succedents[i]->params[3].v = RF_CREATE_PARAM3(RF_IO_NORMAL_PRIORITY, 0, 0, which_ru);
+		blockNode->succedents[i]->params[3].v = RF_CREATE_PARAM3(RF_IO_NORMAL_PRIORITY, which_ru);
 	}
 
 	RF_ASSERT(!asmap->parityInfo->next);
@@ -433,10 +411,12 @@ rf_VerifyParityEvenOdd(raidPtr, raidAddr, parityPDA, correct_it, flags)
 	memset((char *) &tracerec, 0, sizeof(tracerec));
 	rd_dag_h->tracerec = &tracerec;
 
+#if RF_DEBUG_VALIDATE_DAG
 	if (rf_verifyParityDebug) {
 		printf("Parity verify read dag:\n");
 		rf_PrintDAGList(rd_dag_h);
 	}
+#endif
 	RF_LOCK_MUTEX(mcpair->mutex);
 	mcpair->flag = 0;
 	rf_DispatchDAG(rd_dag_h, (void (*) (void *)) rf_MCPairWakeupFunc,
@@ -490,13 +470,15 @@ rf_VerifyParityEvenOdd(raidPtr, raidAddr, parityPDA, correct_it, flags)
 		wrUnblock = wrBlock->succedents[0]->succedents[0];
 		wrBlock->succedents[0]->params[0].p = asmap->parityInfo;
 		wrBlock->succedents[0]->params[2].v = psID;
-		wrBlock->succedents[0]->params[3].v = RF_CREATE_PARAM3(RF_IO_NORMAL_PRIORITY, 0, 0, which_ru);
+		wrBlock->succedents[0]->params[3].v = RF_CREATE_PARAM3(RF_IO_NORMAL_PRIORITY, which_ru);
 		memset((char *) &tracerec, 0, sizeof(tracerec));
 		wr_dag_h->tracerec = &tracerec;
+#if RF_DEBUG_VALIDATE_DAG
 		if (rf_verifyParityDebug) {
 			printf("Parity verify write dag:\n");
 			rf_PrintDAGList(wr_dag_h);
 		}
+#endif
 		RF_LOCK_MUTEX(mcpair->mutex);
 		mcpair->flag = 0;
 		rf_DispatchDAG(wr_dag_h, (void (*) (void *)) rf_MCPairWakeupFunc,
@@ -519,13 +501,15 @@ rf_VerifyParityEvenOdd(raidPtr, raidAddr, parityPDA, correct_it, flags)
 		wrUnblock = wrBlock->succedents[0]->succedents[0];
 		wrBlock->succedents[0]->params[0].p = asmap->qInfo;
 		wrBlock->succedents[0]->params[2].v = psID;
-		wrBlock->succedents[0]->params[3].v = RF_CREATE_PARAM3(RF_IO_NORMAL_PRIORITY, 0, 0, which_ru);
+		wrBlock->succedents[0]->params[3].v = RF_CREATE_PARAM3(RF_IO_NORMAL_PRIORITY, which_ru);
 		memset((char *) &tracerec, 0, sizeof(tracerec));
 		wr_dag_h->tracerec = &tracerec;
+#if RF_DEBUG_VALIDATE_DAG
 		if (rf_verifyParityDebug) {
 			printf("Dag of write new second redundant information in parity verify :\n");
 			rf_PrintDAGList(wr_dag_h);
 		}
+#endif
 		RF_LOCK_MUTEX(mcpair->mutex);
 		mcpair->flag = 0;
 		rf_DispatchDAG(wr_dag_h, (void (*) (void *)) rf_MCPairWakeupFunc,

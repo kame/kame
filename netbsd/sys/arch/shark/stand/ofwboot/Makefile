@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.2 2002/02/10 18:28:13 wiz Exp $
+#	$NetBSD: Makefile,v 1.5 2003/10/26 07:25:37 lukem Exp $
 
 S=		${.CURDIR}/../../../..
 
@@ -8,10 +8,14 @@ CFLAGS+=	-Wno-main
 #CPPFLAGS+=	-DDEBUG -DNETIF_DEBUG
 CPPFLAGS+=	-DSUPPORT_DHCP -I${.CURDIR}
 CPPFLAGS+=	-D_STANDALONE
-DBG=		-Os
+DBG=		-Os -ffreestanding
+
+SRCS+=		byteorder.c
+.PATH:		${S}/lib/libsa
 
 # XXX SHOULD NOT NEED TO DEFINE THESE!
 LIBCRT0=
+LIBC=
 LIBCRTBEGIN=
 LIBCRTEND=
 
@@ -56,7 +60,7 @@ LIBSA=		${SALIB}
 
 .PHONY: vers.c
 vers.c: version
-	sh ${S}/conf/newvers_stand.sh ${.CURDIR}/version "shark" ${NEWVERSWHAT}
+	${HOST_SH} ${S}/conf/newvers_stand.sh ${.CURDIR}/version "shark" ${NEWVERSWHAT}
 
 ${PROG}: ${OBJS} ${LIBSA} ${LIBZ} ${LIBKERN}
 	${LD} -s -N -Ttext ${RELOC} -Bstatic -e ${ENTRY} -o ${.TARGET}.aout \

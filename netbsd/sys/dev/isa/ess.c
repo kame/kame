@@ -1,4 +1,4 @@
-/*	$NetBSD: ess.c,v 1.55 2001/11/13 08:01:13 lukem Exp $	*/
+/*	$NetBSD: ess.c,v 1.58 2003/05/09 23:51:28 fvdl Exp $	*/
 
 /*
  * Copyright 1997
@@ -66,7 +66,7 @@
 */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ess.c,v 1.55 2001/11/13 08:01:13 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ess.c,v 1.58 2003/05/09 23:51:28 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -146,8 +146,8 @@ int	ess_getdev __P((void *, struct audio_device *));
 int	ess_set_port __P((void *, mixer_ctrl_t *));
 int	ess_get_port __P((void *, mixer_ctrl_t *));
 
-void   *ess_malloc __P((void *, int, size_t, int, int));
-void	ess_free __P((void *, void *, int));
+void   *ess_malloc __P((void *, int, size_t, struct malloc_type *, int));
+void	ess_free __P((void *, void *, struct malloc_type *));
 size_t	ess_round_buffersize __P((void *, int, size_t));
 paddr_t	ess_mappage __P((void *, void *, off_t, int));
 
@@ -281,12 +281,12 @@ ess_printsc(sc)
 	       (int)sc->sc_open, sc->sc_iobase, sc->out_port,
 	       sc->in_port, sc->spkr_state ? "on" : "off");
 
-	printf("audio1: dmachan %d irq %d nintr %lu intr %p arg %p\n",
+	printf("audio1: DMA chan %d irq %d nintr %lu intr %p arg %p\n",
 	       sc->sc_audio1.drq, sc->sc_audio1.irq, sc->sc_audio1.nintr,
 	       sc->sc_audio1.intr, sc->sc_audio1.arg);
 
 	if (!ESS_USE_AUDIO1(sc->sc_model)) {
-		printf("audio2: dmachan %d irq %d nintr %lu intr %p arg %p\n",
+		printf("audio2: DMA chan %d irq %d nintr %lu intr %p arg %p\n",
 		       sc->sc_audio2.drq, sc->sc_audio2.irq, sc->sc_audio2.nintr,
 		       sc->sc_audio2.intr, sc->sc_audio2.arg);
 	}
@@ -554,7 +554,7 @@ ess_config_drq(sc)
 		break;
 #ifdef DIAGNOSTIC
 	default:
-		printf("ess_config_drq: configured dma chan %d not supported for Audio 1\n", 
+		printf("ess_config_drq: configured DMA chan %d not supported for Audio 1\n", 
 		       sc->sc_audio1.drq);
 		return;
 #endif
@@ -582,7 +582,7 @@ ess_config_drq(sc)
 		break;
 #ifdef DIAGNOSTIC
 	default:
-		printf("ess_config_drq: configured dma chan %d not supported for Audio 2\n", 
+		printf("ess_config_drq: configured DMA chan %d not supported for Audio 2\n", 
 		       sc->sc_audio2.drq);
 		return;
 #endif
@@ -908,6 +908,13 @@ essattach(sc)
 	} else
 		printf("%s: audio1 polled\n", sc->sc_dev.dv_xname);
 	sc->sc_audio1.maxsize = isa_dmamaxsize(sc->sc_ic, sc->sc_audio1.drq);
+
+	if (isa_drq_alloc(sc->sc_ic, sc->sc_audio1.drq) != 0) {
+		printf("%s: can't reserve drq %d\n",
+		    sc->sc_dev.dv_xname, sc->sc_audio1.drq);
+		return;
+	}
+
 	if (isa_dmamap_create(sc->sc_ic, sc->sc_audio1.drq,
 	    sc->sc_audio1.maxsize, BUS_DMA_NOWAIT|BUS_DMA_ALLOCNOW)) {
 		printf("%s: can't create map for drq %d\n",
@@ -927,6 +934,13 @@ essattach(sc)
 			printf("%s: audio2 polled\n", sc->sc_dev.dv_xname);
 		sc->sc_audio2.maxsize = isa_dmamaxsize(sc->sc_ic,
 		    sc->sc_audio2.drq);
+
+		if (isa_drq_alloc(sc->sc_ic, sc->sc_audio2.drq) != 0) {
+			printf("%s: can't reserve drq %d\n",
+			    sc->sc_dev.dv_xname, sc->sc_audio2.drq);
+			return;
+		}
+			
 		if (isa_dmamap_create(sc->sc_ic, sc->sc_audio2.drq,
 		    sc->sc_audio2.maxsize, BUS_DMA_NOWAIT|BUS_DMA_ALLOCNOW)) {
 			printf("%s: can't create map for drq %d\n",
@@ -2168,7 +2182,8 @@ ess_malloc(addr, direction, size, pool, flags)
 	void *addr;
 	int direction;
 	size_t size;
-	int pool, flags;
+	struct malloc_type *pool;
+	int flags;
 {
 	struct ess_softc *sc = addr;
 	int drq;
@@ -2184,7 +2199,7 @@ void
 ess_free(addr, ptr, pool)
 	void *addr;
 	void *ptr;
-	int pool;
+	struct malloc_type *pool;
 {
 	isa_free(ptr, pool);
 }

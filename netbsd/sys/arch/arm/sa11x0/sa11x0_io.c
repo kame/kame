@@ -1,4 +1,4 @@
-/*	$NetBSD: sa11x0_io.c,v 1.8 2002/05/03 03:32:54 thorpej Exp $	*/
+/*	$NetBSD: sa11x0_io.c,v 1.12 2003/07/15 00:24:51 lukem Exp $	*/
 
 /*
  * Copyright (c) 1997 Mark Brinicombe.
@@ -40,6 +40,9 @@
  * bus_space I/O functions for sa11x0
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sa11x0_io.c,v 1.12 2003/07/15 00:24:51 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/queue.h>
@@ -73,7 +76,7 @@ struct bus_space sa11x0_bs_tag = {
 	sa11x0_bs_vaddr,
 
 	/* mmap bus space for userland */
-	bs_notimpl_bs_mmap,
+	sa11x0_bs_mmap,
 
 	/* barrier */
 	sa11x0_bs_barrier,
@@ -147,11 +150,13 @@ sa11x0_bs_map(t, bpa, size, cacheable, bshp)
 	vaddr_t va;
 	pt_entry_t *pte;
 
+#ifdef hpcarm
 	if ((u_long)bpa > (u_long)KERNEL_BASE) {
 		/* XXX This is a temporary hack to aid transition. */
 		*bshp = bpa;
 		return(0);
 	}
+#endif
 
 	startpa = trunc_page(bpa);
 	endpa = round_page(bpa + size);
@@ -167,8 +172,10 @@ sa11x0_bs_map(t, bpa, size, cacheable, bshp)
 	for(pa = startpa; pa < endpa; pa += PAGE_SIZE, va += PAGE_SIZE) {
 		pmap_kenter_pa(va, pa, VM_PROT_READ | VM_PROT_WRITE);
 		pte = vtopte(va);
-		if (cacheable == 0)
+		if (cacheable == 0) {
 			*pte &= ~L2_S_CACHE_MASK;
+			PTE_SYNC(pte);
+		}
 	}
 	pmap_update(pmap_kernel());
 
@@ -185,7 +192,7 @@ sa11x0_bs_alloc(t, rstart, rend, size, alignment, boundary, cacheable,
 	bus_addr_t *bpap;
 	bus_space_handle_t *bshp;
 {
-	panic("sa11x0_alloc(): Help!\n");
+	panic("sa11x0_alloc(): Help!");
 }
 
 
@@ -207,7 +214,7 @@ sa11x0_bs_free(t, bsh, size)
 	bus_size_t size;
 {
 
-	panic("sa11x0_free(): Help!\n");
+	panic("sa11x0_free(): Help!");
 	/* sa11x0_unmap() does all that we need to do. */
 /*	sa11x0_unmap(t, bsh, size);*/
 }
@@ -222,6 +229,20 @@ sa11x0_bs_subregion(t, bsh, offset, size, nbshp)
 
 	*nbshp = bsh + offset;
 	return (0);
+}
+
+paddr_t
+sa11x0_bs_mmap(t, paddr, offset, prot, flags)
+	void *t;
+	bus_addr_t paddr;
+	off_t offset;
+	int prot;
+	int flags;
+{
+	/*
+	 * mmap from address `paddr+offset' for one page
+	 */
+	 return (arm_btop((paddr + offset)));
 }
 
 void *

@@ -1,4 +1,4 @@
-/*	$NetBSD: pcb.h,v 1.8 2001/04/30 15:30:39 martin Exp $	*/
+/*	$NetBSD: pcb.h,v 1.16 2003/08/12 18:34:48 matt Exp $	*/
 
 /*-
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -30,12 +30,19 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef	_MACHINE_PCB_H_
-#define	_MACHINE_PCB_H_
+#ifndef	_POWERPC_PCB_H_
+#define	_POWERPC_PCB_H_
 
 #include <powerpc/reg.h>
 
-typedef int faultbuf[23];
+struct faultbuf {
+	register_t fb_pc;		/* PC */
+	register_t fb_sp;		/* R1 */
+	register_t fb_r2;		/* R2 (why?) */
+	register_t fb_cr;		/* CR */
+	register_t fb_fixreg[19];	/* R13-R31 */
+};
+
 struct fpu {
 	double fpr[32];
 	double fpscr;	/* FPSCR stored as double for easier access */
@@ -43,15 +50,17 @@ struct fpu {
 
 struct pcb {
 	struct pmap *pcb_pm;	/* pmap of our vmspace */
-	struct pmap *pcb_pmreal; /* real address of above */
 	register_t pcb_sp;	/* saved SP */
-	int pcb_spl;		/* saved SPL */
-	faultbuf *pcb_onfault;	/* For use during copyin/copyout */
 	int pcb_flags;
 #define	PCB_FPU		1	/* Process had FPU initialized */
+#define	PCB_ALTIVEC	2	/* Process had AltiVec initialized */
+	struct cpu_info * __volatile pcb_fpcpu; /* CPU with our FP state */
+	struct cpu_info * __volatile pcb_veccpu;/* CPU with our VECTOR state */
+	struct faultbuf *pcb_onfault;	/* For use during copyin/copyout */
+	vaddr_t pcb_kmapsr;	/* where to map user segment in kernel */
+	vaddr_t pcb_umapsr;	/* the user segment mapped in kernel */
 	struct fpu pcb_fpu;	/* Floating point processor */
-	struct cpu_info *pcb_fpcpu; /* CPU with our FP state */
-	struct vreg *pcb_vr;
+	struct vreg pcb_vr __attribute__((aligned(16)));
 };
 
 struct md_coredump {
@@ -60,11 +69,8 @@ struct md_coredump {
 	struct vreg vstate;
 };
 
-#if defined(_KERNEL) && !defined(MULTIPROCESSOR)
-extern struct pcb *curpcb;
-extern struct pmap *curpm;
-extern struct proc *fpuproc, *vecproc;
-extern struct pool *vecpl;
+#ifdef _KERNEL
+int setfault(struct faultbuf *);
 #endif
 
-#endif	/* _MACHINE_PCB_H_ */
+#endif	/* _POWERPC_PCB_H_ */

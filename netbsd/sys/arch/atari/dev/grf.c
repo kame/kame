@@ -1,10 +1,45 @@
-/*	$NetBSD: grf.c,v 1.26 2002/03/17 19:40:35 atatat Exp $	*/
+/*	$NetBSD: grf.c,v 1.34 2004/03/25 10:17:19 leo Exp $	*/
 
 /*
  * Copyright (c) 1995 Leo Weppelman
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: grf.c 1.31 91/01/21$
+ *
+ *	@(#)grf.c	7.8 (Berkeley) 5/7/91
+ */
+
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -49,6 +84,9 @@
  * Hardware access is through the grf_softc->g_mode routine.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: grf.c,v 1.34 2004/03/25 10:17:19 leo Exp $");
+
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/ioctl.h>
@@ -59,7 +97,6 @@
 #include <sys/systm.h>
 #include <sys/vnode.h>
 #include <sys/mman.h>
-#include <sys/poll.h>
 
 #include <machine/cpu.h>
 
@@ -89,11 +126,6 @@
 int grfon __P((dev_t));
 int grfoff __P((dev_t));
 int grfsinfo __P((dev_t, struct grfdyninfo *));
-#ifdef BANKEDDEVPAGER
-int grfbanked_get __P((dev_t, off_t, int));
-int grfbanked_cur __P((dev_t));
-int grfbanked_set __P((dev_t, int));
-#endif
 
 int grfbusprint __P((void *auxp, const char *));
 int grfbusmatch __P((struct device *, struct cfdata *, void *));
@@ -104,11 +136,20 @@ void grfbusattach __P((struct device *, struct device *, void *));
  */
 struct grf_softc *grfsp[NGRF]; /* XXX */
 
-struct cfattach grfbus_ca = {
-	sizeof(struct device), grfbusmatch, grfbusattach
-};
+CFATTACH_DECL(grfbus, sizeof(struct device),
+    grfbusmatch, grfbusattach, NULL, NULL);
 
 extern struct cfdriver grfbus_cd;
+
+dev_type_open(grfopen);
+dev_type_close(grfclose);
+dev_type_ioctl(grfioctl);
+dev_type_mmap(grfmmap);
+
+const struct cdevsw grf_cdevsw = {
+	grfopen, grfclose, noread, nowrite, grfioctl,
+	nostop, notty, nopoll, grfmmap, nokqfilter,
+};
 
 /*
  * only used in console init.
@@ -210,6 +251,7 @@ struct proc	*p;
 {
 	struct grf_softc	*gp;
 	int			error;
+	extern const struct cdevsw view_cdevsw;
 
 	gp = grfsp[GRFUNIT(dev)];
 	error = 0;
@@ -256,26 +298,13 @@ struct proc	*p;
 		 * check to see whether it's a command recognized by the
 		 * view code.
 		 */
-		return(viewioctl(gp->g_viewdev, cmd, data, flag, p));
+		return((*view_cdevsw.d_ioctl)(gp->g_viewdev, cmd, data, flag,
+					      p));
 		error = EINVAL;
 		break;
 
 	}
 	return(error);
-}
-
-/*ARGSUSED*/
-int
-grfpoll(dev, events, p)
-	dev_t		dev;
-	int		events;
-	struct proc	*p;
-{
-	int revents = 0;
-
-	if (events & (POLLOUT | POLLWRNORM))
-		revents |= events & (POLLOUT | POLLWRNORM);
-	return (revents);
 }
 
 /*
@@ -391,10 +420,12 @@ struct grf_softc *gp;
 	struct view_size	vs;
 	bmap_t			bm;
 	struct grfinfo		*gi;
+	extern const struct cdevsw view_cdevsw;
 
 	gi = &gp->g_display;
 
-	viewioctl(gp->g_viewdev, VIOCGBMAP, (caddr_t)&bm, 0, NOPROC);
+	(*view_cdevsw.d_ioctl)(gp->g_viewdev, VIOCGBMAP, (caddr_t)&bm,
+			       0, NOPROC);
   
 	gp->g_data = (caddr_t) 0xDeadBeaf; /* not particularly clean.. */
   
@@ -407,7 +438,8 @@ struct grf_softc *gp;
 	gi->gd_vgasize = bm.vga_mappable;
 	gi->gd_vgabase = bm.vga_base;
 
-	if(viewioctl(gp->g_viewdev, VIOCGSIZE, (caddr_t)&vs, 0, NOPROC)) {
+	if((*view_cdevsw.d_ioctl)(gp->g_viewdev, VIOCGSIZE, (caddr_t)&vs, 0,
+				  NOPROC)) {
 		/*
 		 * fill in some default values...
 		 * XXX: Should _never_ happen
@@ -441,16 +473,20 @@ struct grf_softc	*gp;
 int			cmd, a2, a3;
 void			*arg;
 {
+	extern const struct cdevsw view_cdevsw;
+
 	switch (cmd) {
 		case GM_GRFON:
 			/*
 			 * Get in sync with view, ite might have changed it.
 			 */
 			grf_viewsync(gp);
-			viewioctl(gp->g_viewdev, VIOCDISPLAY, NULL, 0, NOPROC);
+			(*view_cdevsw.d_ioctl)(gp->g_viewdev, VIOCDISPLAY,
+					       NULL, 0, NOPROC);
 			return(0);
 	case GM_GRFOFF:
-			viewioctl(gp->g_viewdev, VIOCREMOVE, NULL, 0, NOPROC);
+			(*view_cdevsw.d_ioctl)(gp->g_viewdev, VIOCREMOVE,
+					       NULL, 0, NOPROC);
 			return(0);
 	case GM_GRFCONFIG:
 	default:

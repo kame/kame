@@ -1,10 +1,48 @@
-/*	$NetBSD: scn.c,v 1.52 2002/03/17 19:40:47 atatat Exp $ */
+/*	$NetBSD: scn.c,v 1.63 2004/01/23 04:12:39 simonb Exp $ */
+
+/*
+ * Copyright (c) 1991, 1992, 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * Portions of this software were developed by the Computer Systems
+ * Engineering group at Lawrence Berkeley Laboratory under DARPA
+ * contract BG 91-66 and contributed to Berkeley.
+ *
+ * All advertising materials mentioning features or use of this software
+ * must display the following acknowledgement:
+ *	This product includes software developed by the University of
+ *	California, Lawrence Berkeley Laboratory.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	from: @(#)com.c	7.5 (Berkeley) 5/16/91
+ */
 
 /*
  * Copyright (c) 1996, 1997 Philip L. Budne.
  * Copyright (c) 1993 Philip A. Nelson.
- * Copyright (c) 1991, 1992, 1993
- *	The Regents of the University of California.  All rights reserved.
  *
  * Portions of this software were developed by the Computer Systems
  * Engineering group at Lawrence Berkeley Laboratory under DARPA
@@ -46,8 +84,12 @@
  *	from: @(#)com.c	7.5 (Berkeley) 5/16/91
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: scn.c,v 1.63 2004/01/23 04:12:39 simonb Exp $");
+
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
+#include "opt_cpu30mhz.h"
 #include "scn.h"
 
 #include <sys/param.h>
@@ -64,6 +106,7 @@
 #include <sys/types.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
+#include <sys/conf.h>
 #ifdef KGDB
 #include <sys/kgdb.h>
 #endif
@@ -71,7 +114,6 @@
 #include <dev/cons.h>
 
 #include <machine/autoconf.h>
-#include <machine/conf.h>
 
 #include "scnreg.h"
 #include "scnvar.h"
@@ -83,8 +125,6 @@ int     scnprobe __P((struct device *, struct cfdata *, void *));
 void    scnattach __P((struct device *, struct device *, void *));
 int     scnparam __P((struct tty *, struct termios *));
 void    scnstart __P((struct tty *));
-int     scnopen __P((dev_t, int, int, struct proc *));
-int     scnclose __P((dev_t, int, int, struct proc *));
 void	scncnprobe __P((struct consdev *));
 void	scncninit __P((struct consdev *));
 int     scncngetc __P((dev_t));
@@ -94,9 +134,24 @@ int	scninit __P((dev_t, int));
 void	scncnreinit __P((void *));
 int     scnhwiflow __P((struct tty *, int));
 
-struct cfattach scn_ca = {sizeof(struct scn_softc), scnprobe, scnattach};
+CFATTACH_DECL(scn, sizeof(struct scn_softc),
+    scnprobe, scnattach, NULL, NULL);
 
 extern struct cfdriver scn_cd;
+
+dev_type_open(scnopen);
+dev_type_close(scnclose);
+dev_type_read(scnread);
+dev_type_write(scnwrite);
+dev_type_ioctl(scnioctl);
+dev_type_stop(scnstop);
+dev_type_tty(scntty);
+dev_type_poll(scnpoll);
+
+const struct cdevsw scn_cdevsw = {
+	scnopen, scnclose, scnread, scnwrite, scnioctl,
+	scnstop, scntty, scnpoll, nommap, ttykqfilter, D_TTY
+};
 
 #ifndef CONSOLE_SPEED
 #define CONSOLE_SPEED TTYDEF_SPEED
@@ -115,7 +170,6 @@ extern struct cfdriver scn_cd;
 int     scnconsole = SCN_CONSOLE;
 int     scndefaultrate = TTYDEF_SPEED;
 int     scnconsrate = CONSOLE_SPEED;
-int     scnmajor;
 
 #define SOFTC(UNIT) scn_cd.cd_devs[(UNIT)]
 
@@ -778,6 +832,7 @@ scnattach(parent, self, aux)
 	u_char delim = ':';
 	enum scntype scntype = SCNUNK;
 	char *duart_type = "Unknown";
+	char *intrname;
 
 	sc = (void *) self;
 	unit = self->dv_unit;	/* sc->sc_dev.dv_unit ??? */
@@ -870,8 +925,10 @@ scnattach(parent, self, aux)
 		splx(s);
 
 		/* Arg 0 is special, so we must pass "unit + 1" */
+		intrname = malloc(sizeof("scnXX"), M_DEVBUF, M_NOWAIT);
+		snprintf(intrname, sizeof("scnXX"), "scn%d", unit);
 		intr_establish(scnints[duart], scnintr, (void *) (unit + 1),
-			       "scn", IPL_TTY, IPL_ZERO, LOW_LEVEL);
+			       intrname, IPL_TTY, IPL_ZERO, LOW_LEVEL);
 
 		printf("%c %s", delim, duart_type);
 		delim = ',';
@@ -880,8 +937,10 @@ scnattach(parent, self, aux)
 		 * IPL_ZERO is the right priority for the rx interrupt.
 		 * Only splhigh() should disable rxints.
 		 */
+		intrname = malloc(sizeof("scnXXrx"), M_DEVBUF, M_NOWAIT);
+		snprintf(intrname, 8, "scn%drx", unit);
 		intr_establish(rxints[duart], scnrxintr, (void *) (unit + 1),
-			       "scnrx", IPL_ZERO, IPL_RTTY, LOW_LEVEL);
+			       intrname, IPL_ZERO, IPL_RTTY, LOW_LEVEL);
 	}
 	/* Record unit number, uart */
 	sc->sc_unit = unit;
@@ -989,7 +1048,9 @@ scnattach(parent, self, aux)
 
 	scn_config(unit, speed, speed, MR1_PNONE | MR1_CS8, MR2_STOP1);
 	if (scnconsole == unit) {
-		shutdownhook_establish(scncnreinit, (void *) makedev(scnmajor, unit));
+		int maj;
+		maj = cdevsw_lookup_major(&scn_cdevsw);
+		shutdownhook_establish(scncnreinit, (void *)makedev(maj, unit));
 		/* Make sure console can do scncngetc */
 		duart_base[DU_OPSET] = (unit & 1) ? (OP_RTSB | OP_DTRB) : (OP_RTSA | OP_DTRA);
 	}
@@ -1008,7 +1069,7 @@ scnattach(parent, self, aux)
 	}
 
 #ifdef KGDB
-	if (kgdb_dev == makedev(scnmajor, unit)) {
+	if (kgdb_dev == makedev(cdevsw_lookup_major(&scn_cdevsw), unit)) {
 		if (scnconsole == unit)
 			kgdb_dev = NODEV; /* can't debug over console port */
 		else {
@@ -1195,7 +1256,7 @@ scnclose(dev, flag, mode, p)
 
 #ifdef KGDB
 	/* do not disable interrupts if debugging */
-	if (kgdb_dev != makedev(scnmajor, unit))
+	if (kgdb_dev != makedev(cdevsw_lookup_major(&scn_cdevsw), unit))
 #endif
 		if ((tp->t_state & TS_ISOPEN) == 0) {
 			scn_rxdisable(sc);
@@ -1250,7 +1311,7 @@ scnpoll(dev, events, p)
 {
 	register struct scn_softc *sc = SOFTC(DEV_UNIT(dev));
 	register struct tty *tp = sc->sc_tty;
- 
+
 	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
@@ -1620,7 +1681,7 @@ scnsoft(arg)
 			}
 			sc->sc_rbget = get;
 		}
-	done:
+	done: ;
 	}
 }
 
@@ -1916,13 +1977,8 @@ void
 scncnprobe(cp)
 	struct consdev *cp;
 {
-	/* Locate the major number. */
-	for (scnmajor = 0; scnmajor < nchrdev; scnmajor++)
-		if (cdevsw[scnmajor].d_open == scnopen)
-			break;
-
 	/* initialize required fields */
-	cp->cn_dev = makedev(scnmajor, SCN_CONSOLE);
+	cp->cn_dev = makedev(cdevsw_lookup_major(&scn_cdevsw), SCN_CONSOLE);
 	cp->cn_pri = CN_NORMAL;
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: drsupio.c,v 1.10 2002/01/28 09:56:54 aymeric Exp $ */
+/*	$NetBSD: drsupio.c,v 1.15 2003/04/01 21:26:31 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: drsupio.c,v 1.10 2002/01/28 09:56:54 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: drsupio.c,v 1.15 2003/04/01 21:26:31 thorpej Exp $");
 
 /*
  * DraCo multi-io chip bus space stuff
@@ -50,8 +50,9 @@ __KERNEL_RCSID(0, "$NetBSD: drsupio.c,v 1.10 2002/01/28 09:56:54 aymeric Exp $")
 #include <sys/systm.h>
 #include <sys/param.h>
 
+#include <uvm/uvm_extern.h>
+
 #include <machine/bus.h>
-#include <machine/conf.h>
 
 #include <amiga/include/cpu.h>
 
@@ -70,9 +71,8 @@ void drsupioattach(struct device *, struct device *, void *);
 int drsupprint(void *auxp, const char *);
 void drlptintack(void *);
 
-struct cfattach drsupio_ca = {
-	sizeof(struct drsupio_softc), drsupiomatch, drsupioattach
-};
+CFATTACH_DECL(drsupio, sizeof(struct drsupio_softc),
+    drsupiomatch, drsupioattach, NULL, NULL);
 
 int
 drsupiomatch(struct device *parent, struct cfdata *cfp, void *auxp)
@@ -114,7 +114,7 @@ drsupioattach(struct device *parent, struct device *self, void *auxp)
 	if (parent)
 		printf("\n");
 
-	drsc->sc_bst.base = DRCCADDR + NBPG * DRSUPIOPG + 1;
+	drsc->sc_bst.base = DRCCADDR + PAGE_SIZE * DRSUPIOPG + 1;
 	drsc->sc_bst.absm = &amiga_bus_stride_4;
 
 	supa.supio_iot = &drsc->sc_bst;
@@ -129,7 +129,7 @@ drsupioattach(struct device *parent, struct device *self, void *auxp)
 	}
 
 	drlptintack(0);
-	ioct = (struct drioct *)(DRCCADDR + NBPG * DRIOCTLPG);
+	ioct = (struct drioct *)(DRCCADDR + PAGE_SIZE * DRIOCTLPG);
 	ioct->io_status2 |= DRSTAT2_PARIRQENA;
 }
 
@@ -139,7 +139,7 @@ drlptintack(void *p)
 	struct drioct *ioct;
 
 	(void)p;
-	ioct = (struct drioct *)(DRCCADDR + NBPG * DRIOCTLPG);
+	ioct = (struct drioct *)(DRCCADDR + PAGE_SIZE * DRIOCTLPG);
 
 	ioct->io_parrst = 0;	/* any value works */
 }
@@ -153,7 +153,7 @@ drsupprint(void *auxp, const char *pnp)
 	if (pnp == NULL)
 		return(QUIET);
 
-	printf("%s at %s port 0x%02x",
+	aprint_normal("%s at %s port 0x%02x",
 	    supa->supio_name, pnp, supa->supio_iobase);
 
 	return(UNCONF);

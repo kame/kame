@@ -1,4 +1,4 @@
-/*	$NetBSD: disklabel.h,v 1.9 2001/01/02 23:06:54 tron Exp $	*/
+/*	$NetBSD: disklabel.h,v 1.12 2003/10/08 04:25:45 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994 Christopher G. Demetriou
@@ -53,19 +53,13 @@
      ((part) / OLDMAXPARTITIONS) * (__I386_MAXDISKS * OLDMAXPARTITIONS))
 
 /* Pull in MBR partition definitions. */
-#include <sys/disklabel_mbr.h>
+#include <sys/bootblock.h>
 
 #ifndef __ASSEMBLER__
 #include <sys/dkbad.h>
 struct cpu_disklabel {
-	struct mbr_partition dosparts[NMBRPART];
 	struct dkbad bad;
 };
-#endif
-
-#ifdef _KERNEL
-struct disklabel;
-int	bounds_check_with_label __P((struct buf *, struct disklabel *, int));
 #endif
 
 #endif /* _MACHINE_DISKLABEL_H_ */

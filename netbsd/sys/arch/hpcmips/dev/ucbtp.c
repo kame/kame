@@ -1,4 +1,4 @@
-/*	$NetBSD: ucbtp.c,v 1.8 2002/03/17 19:40:40 atatat Exp $ */
+/*	$NetBSD: ucbtp.c,v 1.12 2003/07/15 02:29:31 lukem Exp $ */
 
 /*-
  * Copyright (c) 2000, 2001 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * Device driver for PHILIPS UCB1200 Advanced modem/audio analog front-end
  *	Touch panel part.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ucbtp.c,v 1.12 2003/07/15 02:29:31 lukem Exp $");
 
 #include "opt_use_poll.h"
 
@@ -171,9 +174,8 @@ int	ucbtp_enable(void *);
 int	ucbtp_ioctl(void *, u_long, caddr_t, int, struct proc *);
 void	ucbtp_disable(void *);
 
-struct cfattach ucbtp_ca = {
-	sizeof(struct ucbtp_softc), ucbtp_match, ucbtp_attach
-};
+CFATTACH_DECL(ucbtp, sizeof(struct ucbtp_softc),
+    ucbtp_match, ucbtp_attach, NULL, NULL);
 
 const struct wsmouse_accessops ucbtp_accessops = {
 	ucbtp_enable,
@@ -732,6 +734,7 @@ ucbtp_ioctl(void *v, u_long cmd, caddr_t data, int flag, struct proc *p)
 
 	case WSMOUSEIO_SCALIBCOORDS:
 	case WSMOUSEIO_GCALIBCOORDS:
+	case WSMOUSEIO_GETID:
                 return tpcalib_ioctl(&sc->sc_tpcalib, cmd, data, flag, p);
 		
 	default:

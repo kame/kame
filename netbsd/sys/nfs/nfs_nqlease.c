@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_nqlease.c,v 1.40 2002/05/12 23:04:35 matt Exp $	*/
+/*	$NetBSD: nfs_nqlease.c,v 1.53 2003/08/07 16:33:50 agc Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -53,7 +49,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: nfs_nqlease.c,v 1.40 2002/05/12 23:04:35 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: nfs_nqlease.c,v 1.53 2003/08/07 16:33:50 agc Exp $");
 
 #include "fs_nfs.h"
 #include "opt_nfs.h"
@@ -99,6 +95,9 @@ struct nqleasehead nqtimerhead;
 struct nqfhhashhead *nqfhhashtbl;
 u_long nqfhhash;
 
+MALLOC_DEFINE(M_NQLEASE, "NQNFS Lease", "Nqnfs lease");
+MALLOC_DEFINE(M_NQMHOST, "NQNFS Host", "Nqnfs host address table");
+
 /*
  * Signifies which rpcs can have piggybacked lease requests
  */
@@ -131,8 +130,8 @@ const int nqnfs_piggy[NFS_NPROCS] = {
 	0,
 };
 
-extern nfstype nfsv2_type[9];
-extern nfstype nfsv3_type[9];
+extern const nfstype nfsv2_type[9];
+extern const nfstype nfsv3_type[9];
 extern struct nfssvc_sock *nfs_udpsock;
 #ifdef ISO
 extern struct nfssvc_sock *nfs_cltpsock
@@ -143,9 +142,6 @@ extern struct nfssvc_sock *nfs_udp6sock;
 extern int nfsd_waiting;
 extern struct nfsstats nfsstats;
 
-
-#define TRUE	1
-#define	FALSE	0
 
 #if defined(NFSSERVER) || (defined(NFS) && !defined(NFS_V2_ONLY))
 /*
@@ -215,7 +211,7 @@ nqsrv_getlease(vp, duration, flags, slp, procp, nam, cachablep, frev, cred)
 			return (error);
 		}
 		lpp = NQFHHASH(fh.fh_fid.fid_data);
-		for (lp = lpp->lh_first; lp != 0; lp = lp->lc_hash.le_next)
+		LIST_FOREACH (lp, lpp, lc_hash) {
 			if (fh.fh_fsid.val[0] == lp->lc_fsid.val[0] &&
 			    fh.fh_fsid.val[1] == lp->lc_fsid.val[1] &&
 			    !memcmp(fh.fh_fid.fid_data, lp->lc_fiddata,
@@ -226,6 +222,7 @@ nqsrv_getlease(vp, duration, flags, slp, procp, nam, cachablep, frev, cred)
 				tlp = lp;
 				break;
 			}
+		}
 	} else
 		lp = tlp;
 	if (lp != 0) {
@@ -380,18 +377,18 @@ nqsrv_instimeq(lp, duration)
 	newexpiry = time.tv_sec + duration + nqsrv_clockskew;
 	if (lp->lc_expiry == newexpiry)
 		return;
-	if (lp->lc_timer.cqe_next != 0)
+	if (CIRCLEQ_NEXT(lp, lc_timer) != 0)
 		CIRCLEQ_REMOVE(&nqtimerhead, lp, lc_timer);
 	lp->lc_expiry = newexpiry;
 
 	/*
 	 * Find where in the queue it should be.
 	 */
-	tlp = nqtimerhead.cqh_last;
+	tlp = CIRCLEQ_LAST(&nqtimerhead);
 	while (tlp != (void *)&nqtimerhead && tlp->lc_expiry > newexpiry)
-		tlp = tlp->lc_timer.cqe_prev;
+		tlp = CIRCLEQ_PREV(tlp, lc_timer);
 #ifdef HASNVRAM
-	if (tlp == nqtimerhead.cqh_last)
+	if (tlp == CIRCLEQ_LAST(&nqtimerhead))
 		NQSTORENOVRAM(newexpiry);
 #endif /* HASNVRAM */
 	if (tlp == (void *)&nqtimerhead) {
@@ -467,7 +464,7 @@ nqsrv_send_eviction(vp, lp, slp, nam, cred)
 	struct mbuf *m;
 	int siz;
 	struct nqm *lphnext = lp->lc_morehosts;
-	struct mbuf *mreq, *mb, *mb2, *nam2, *mheadend;
+	struct mbuf *mreq, *mb, *nam2, *mheadend;
 	struct socket *so;
 	struct sockaddr_in *saddr;
 	nfsfh_t nfh;
@@ -482,7 +479,8 @@ nqsrv_send_eviction(vp, lp, slp, nam, cred)
 			lph->lph_flag |= LC_VACATED;
 		else if ((lph->lph_flag & (LC_LOCAL | LC_VACATED)) == 0) {
 			if (lph->lph_flag & LC_UDP) {
-				MGET(nam2, M_WAIT, MT_SONAME);
+				nam2 = m_get(M_WAIT, MT_SONAME);
+				MCLAIM(nam2, &nfs_mowner);
 				saddr = mtod(nam2, struct sockaddr_in *);
 				nam2->m_len = saddr->sin_len =
 					sizeof (struct sockaddr_in);
@@ -512,7 +510,7 @@ nqsrv_send_eviction(vp, lp, slp, nam, cred)
 				solockp = &lph->lph_slp->ns_solock;
 			else
 				solockp = (int *)0;
-			nfsm_reqhead((struct vnode *)0, NQNFSPROC_EVICTED,
+			nfsm_reqhead((struct nfsnode *)0, NQNFSPROC_EVICTED,
 				NFSX_V3FH + NFSX_UNSIGNED);
 			fhp = &nfh.fh_generic;
 			memset((caddr_t)fhp, 0, sizeof(nfh));
@@ -556,7 +554,7 @@ nqsrv_send_eviction(vp, lp, slp, nam, cred)
 					nfs_sndunlock(solockp);
 			}
 			if (lph->lph_flag & LC_UDP)
-				MFREE(nam2, m);
+				(void) m_free(nam2);
 		}
 nextone:
 		if (++i == len) {
@@ -629,14 +627,13 @@ nqnfs_serverd()
 	struct nqhost *lph;
 	struct nqlease *nextlp;
 	struct nqm *lphnext, *olphnext;
-	struct mbuf *n;
 	int i, len, ok;
 
-	for (lp = nqtimerhead.cqh_first; lp != (void *)&nqtimerhead;
+	for (lp = CIRCLEQ_FIRST(&nqtimerhead); lp != (void *)&nqtimerhead;
 	    lp = nextlp) {
 		if (lp->lc_expiry >= time.tv_sec)
 			break;
-		nextlp = lp->lc_timer.cqe_next;
+		nextlp = CIRCLEQ_NEXT(lp, lc_timer);
 		if (lp->lc_flag & LC_EXPIREDWANTED) {
 			lp->lc_flag &= ~LC_EXPIREDWANTED;
 			wakeup((caddr_t)&lp->lc_flag);
@@ -674,7 +671,7 @@ nqnfs_serverd()
 			ok = 1;
 			while (ok && (lph->lph_flag & LC_VALID)) {
 				if (lph->lph_flag & (LC_CLTP | LC_UDP6))
-					MFREE(lph->lph_nam, n);
+					(void) m_free(lph->lph_nam);
 				if (lph->lph_flag & LC_SREF)
 					nfsrv_slpderef(lph->lph_slp);
 				if (++i == len) {
@@ -729,7 +726,7 @@ nqnfsrv_getlease(nfsd, slp, procp, mrq)
 	caddr_t bpos;
 	int error = 0;
 	char *cp2;
-	struct mbuf *mb, *mb2, *mreq;
+	struct mbuf *mb, *mreq;
 	int flags, rdonly, cache;
 
 	fhp = &nfh.fh_generic;
@@ -796,8 +793,7 @@ nqnfsrv_vacated(nfsd, slp, procp, mrq)
 	/*
 	 * Find the lease by searching the hash list.
 	 */
-	for (lp = NQFHHASH(fhp->fh_fid.fid_data)->lh_first; lp != 0;
-	    lp = lp->lc_hash.le_next)
+	LIST_FOREACH(lp, NQFHHASH(fhp->fh_fid.fid_data), lc_hash) {
 		if (fhp->fh_fsid.val[0] == lp->lc_fsid.val[0] &&
 		    fhp->fh_fsid.val[1] == lp->lc_fsid.val[1] &&
 		    !memcmp(fhp->fh_fid.fid_data, lp->lc_fiddata,
@@ -806,6 +802,7 @@ nqnfsrv_vacated(nfsd, slp, procp, mrq)
 			tlp = lp;
 			break;
 		}
+	}
 	if (tlp != 0) {
 		lp = tlp;
 		len = 1;
@@ -860,27 +857,27 @@ nqnfs_getlease(vp, rwflag, cred, p)
 	caddr_t bpos, dpos, cp2;
 	time_t reqtime;
 	int error = 0;
-	struct mbuf *mreq, *mrep, *md, *mb, *mb2;
+	struct mbuf *mreq, *mrep, *md, *mb;
 	int cachable;
 	u_quad_t frev;
 
 	nfsstats.rpccnt[NQNFSPROC_GETLEASE]++;
-	mb = mreq = nfsm_reqh(vp, NQNFSPROC_GETLEASE, NFSX_V3FH+2*NFSX_UNSIGNED,
+	np = VTONFS(vp);
+	mb = mreq = nfsm_reqh(np, NQNFSPROC_GETLEASE, NFSX_V3FH+2*NFSX_UNSIGNED,
 		 &bpos);
-	nfsm_fhtom(vp, 1);
+	nfsm_fhtom(np, 1);
 	nfsm_build(tl, u_int32_t *, 2 * NFSX_UNSIGNED);
 	*tl++ = txdr_unsigned(rwflag);
 	*tl = txdr_unsigned(nmp->nm_leaseterm);
 	reqtime = time.tv_sec;
-	nfsm_request(vp, NQNFSPROC_GETLEASE, p, cred);
-	np = VTONFS(vp);
+	nfsm_request(np, NQNFSPROC_GETLEASE, p, cred);
 	nfsm_dissect(tl, u_int32_t *, 4 * NFSX_UNSIGNED);
 	cachable = fxdr_unsigned(int, *tl++);
 	reqtime += fxdr_unsigned(int, *tl++);
 	if (reqtime > time.tv_sec) {
 		frev = fxdr_hyper(tl);
 		nqnfs_clientlease(nmp, np, rwflag, cachable, reqtime, frev);
-		nfsm_loadattr(vp, (struct vattr *)0);
+		nfsm_loadattr(vp, (struct vattr *)0, 0);
 	} else
 		error = NQNFS_EXPIRED;
 	nfsm_reqdone;
@@ -903,14 +900,15 @@ nqnfs_vacated(vp, cred)
 	caddr_t bpos;
 	u_int32_t xid;
 	int error = 0;
-	struct mbuf *mreq, *mb, *mb2, *mheadend;
+	struct mbuf *mreq, *mb, *mheadend;
 	struct nfsmount *nmp;
 	struct nfsreq myrep;
+	struct nfsnode *np = VTONFS(vp);
 
 	nmp = VFSTONFS(vp->v_mount);
 	nfsstats.rpccnt[NQNFSPROC_VACATED]++;
-	nfsm_reqhead(vp, NQNFSPROC_VACATED, NFSX_FH(1));
-	nfsm_fhtom(vp, 1);
+	nfsm_reqhead(np, NQNFSPROC_VACATED, NFSX_FH(1));
+	nfsm_fhtom(np, 1);
 	m = mreq;
 	i = 0;
 	while (m) {
@@ -982,10 +980,10 @@ nqnfs_callback(nmp, mrep, md, dpos)
 	if (error)
 		return (error);
 	vp = NFSTOV(np);
-	if (np->n_timer.cqe_next != 0) {
+	if (CIRCLEQ_NEXT(np, n_timer) != 0) {
 		np->n_expiry = 0;
 		np->n_flag |= NQNFSEVICTED;
-		if (nmp->nm_timerhead.cqh_first != np) {
+		if (CIRCLEQ_FIRST(&nmp->nm_timerhead) != np) {
 			CIRCLEQ_REMOVE(&nmp->nm_timerhead, np, n_timer);
 			CIRCLEQ_INSERT_HEAD(&nmp->nm_timerhead, np, n_timer);
 		}
@@ -1004,19 +1002,19 @@ nqnfs_callback(nmp, mrep, md, dpos)
  * the list asynchronously.
  */
 int
-nqnfs_clientd(nmp, cred, ncd, flag, argp, p)
+nqnfs_clientd(nmp, cred, ncd, flag, argp, l)
 	struct nfsmount *nmp;
 	struct ucred *cred;
 	struct nfsd_cargs *ncd;
 	int flag;
 	caddr_t argp;
-	struct proc *p;
+	struct lwp *l;
 {
+	struct proc *p = l->l_proc;
 #ifndef NFS_V2_ONLY
 	struct nfsnode *np;
 	struct vnode *vp;
 	struct nfsreq myrep;
-	int vpid;
 #endif
 	int error = 0, sleepreturn;
 	struct nfsuid *nuidp, *nnuidp;
@@ -1066,7 +1064,7 @@ nqnfs_clientd(nmp, cred, ncd, flag, argp, p)
 		if (vfs_busy(nmp->nm_mountp, LK_NOWAIT, 0) != 0)
 			lockmgr(&syncer_lock, LK_EXCLUSIVE, NULL);
 		else if (dounmount(nmp->nm_mountp, 0, p) != 0)
-			CLRSIG(p, CURSIG(p));
+			CLRSIG(p, CURSIG(l));
 		sleepreturn = 0;
 		continue;
 	    }
@@ -1077,7 +1075,7 @@ nqnfs_clientd(nmp, cred, ncd, flag, argp, p)
 		 * processes in nfs_reply) and there is data in the receive
 		 * queue, poke for callbacks.
 		 */
-		if (nfs_reqq.tqh_first == 0 && nmp->nm_so &&
+		if (TAILQ_EMPTY(&nfs_reqq) && nmp->nm_so &&
 		    nmp->nm_so->so_rcv.sb_cc > 0) {
 		    myrep.r_flags = R_GETONEREP;
 		    myrep.r_nmp = nmp;
@@ -1089,17 +1087,16 @@ nqnfs_clientd(nmp, cred, ncd, flag, argp, p)
 		/*
 		 * Loop through the leases, updating as required.
 		 */
-		np = nmp->nm_timerhead.cqh_first;
+		np = CIRCLEQ_FIRST(&nmp->nm_timerhead);
 		while (np != (void *)&nmp->nm_timerhead &&
 		       (nmp->nm_iflag & NFSMNT_DISMINPROG) == 0) {
 			vp = NFSTOV(np);
-			vpid = vp->v_id;
 			if (np->n_expiry < time.tv_sec) {
 			   if (vget(vp, LK_EXCLUSIVE) == 0) {
-			     nmp->nm_inprog = vp;
-			     if (vpid == vp->v_id) {
+				nmp->nm_inprog = vp;
 				CIRCLEQ_REMOVE(&nmp->nm_timerhead, np, n_timer);
-				np->n_timer.cqe_next = 0;
+				/* mark this off the list */
+				CIRCLEQ_NEXT(np, n_timer) = 0; /* XXX */
 				if (np->n_flag & (NMODIFIED | NQNFSEVICTED)) {
 					if (np->n_flag & NQNFSEVICTED) {
 						if (vp->v_type == VDIR)
@@ -1115,26 +1112,25 @@ nqnfs_clientd(nmp, cred, ncd, flag, argp, p)
 						np->n_flag &= ~NMODIFIED;
 					}
 				}
-			      }
-			      vput(vp);
-			      nmp->nm_inprog = NULLVP;
+				vput(vp);
+				nmp->nm_inprog = NULLVP;
 			    }
 			} else if ((np->n_expiry - NQ_RENEWAL) < time.tv_sec) {
 			    if ((np->n_flag & (NQNFSWRITE | NQNFSNONCACHE))
-				 == NQNFSWRITE && vp->v_dirtyblkhd.lh_first &&
+				 == NQNFSWRITE &&
+				 !LIST_EMPTY(&vp->v_dirtyblkhd) &&
 				 vget(vp, LK_EXCLUSIVE) == 0) {
 				 nmp->nm_inprog = vp;
-				 if (vpid == vp->v_id &&
-				     nqnfs_getlease(vp, ND_WRITE, cred, p)==0)
+				 if (nqnfs_getlease(vp, ND_WRITE, cred, p)==0)
 					np->n_brev = np->n_lrev;
 				 vput(vp);
 				 nmp->nm_inprog = NULLVP;
 			    }
 			} else
 				break;
-			if (np == nmp->nm_timerhead.cqh_first)
+			if (np == CIRCLEQ_FIRST(&nmp->nm_timerhead))
 				break;
-			np = nmp->nm_timerhead.cqh_first;
+			np = CIRCLEQ_FIRST(&nmp->nm_timerhead);
 		}
 	    }
 #endif /* !NFS_V2_ONLY */
@@ -1163,8 +1159,9 @@ nqnfs_clientd(nmp, cred, ncd, flag, argp, p)
 	/*
 	 * Finally, we can free up the mount structure.
 	 */
-	for (nuidp = nmp->nm_uidlruhead.tqh_first; nuidp != 0; nuidp = nnuidp) {
-		nnuidp = nuidp->nu_lru.tqe_next;
+	for (nuidp = TAILQ_FIRST(&nmp->nm_uidlruhead); nuidp != 0;
+	    nuidp = nnuidp) {
+		nnuidp = TAILQ_NEXT(nuidp, nu_lru);
 		LIST_REMOVE(nuidp, nu_hash);
 		TAILQ_REMOVE(&nmp->nm_uidlruhead, nuidp, nu_lru);
 		free((caddr_t)nuidp, M_NFSUID);
@@ -1190,7 +1187,7 @@ nqnfs_clientlease(nmp, np, rwflag, cachable, expiry, frev)
 {
 	struct nfsnode *tp;
 
-	if (np->n_timer.cqe_next != 0) {
+	if (CIRCLEQ_NEXT(np, n_timer) != 0) {
 		CIRCLEQ_REMOVE(&nmp->nm_timerhead, np, n_timer);
 		if (rwflag == ND_WRITE)
 			np->n_flag |= NQNFSWRITE;
@@ -1234,9 +1231,9 @@ nqnfs_lease_updatetime(deltat)
 	if (nqnfsstarttime != 0)
 		nqnfsstarttime += deltat;
 	s = splsoftnet();
-	for (lp = nqtimerhead.cqh_first; lp != (void *)&nqtimerhead;
-	    lp = lp->lc_timer.cqe_next)
+	CIRCLEQ_FOREACH(lp, &nqtimerhead, lc_timer) {
 		lp->lc_expiry += deltat;
+	}
 	splx(s);
 
 	/*
@@ -1244,24 +1241,24 @@ nqnfs_lease_updatetime(deltat)
 	 * queues.
 	 */
 	simple_lock(&mountlist_slock);
-	for (mp = mountlist.cqh_first; mp != (void *)&mountlist; mp = nxtmp) {
+	for (mp = CIRCLEQ_FIRST(&mountlist); mp != (void *)&mountlist;
+	    mp = nxtmp) {
 		if (vfs_busy(mp, LK_NOWAIT, &mountlist_slock)) {
-			nxtmp = mp->mnt_list.cqe_next;
+			nxtmp = CIRCLEQ_NEXT(mp, mnt_list);
 			continue;
 		}
 		if (!strncmp(&mp->mnt_stat.f_fstypename[0], MOUNT_NFS,
 		    MFSNAMELEN)) {
 			nmp = VFSTONFS(mp);
 			if (nmp->nm_flag & NFSMNT_NQNFS) {
-				for (np = nmp->nm_timerhead.cqh_first;
-				    np != (void *)&nmp->nm_timerhead;
-				    np = np->n_timer.cqe_next) {
+				CIRCLEQ_FOREACH(np, &nmp->nm_timerhead,
+				    n_timer) {
 					np->n_expiry += deltat;
 				}
 			}
 		}
 		simple_lock(&mountlist_slock);
-		nxtmp = mp->mnt_list.cqe_next;
+		nxtmp = CIRCLEQ_NEXT(mp, mnt_list);
 		vfs_unbusy(mp);
 	}
 	simple_unlock(&mountlist_slock);

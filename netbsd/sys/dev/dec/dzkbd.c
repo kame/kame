@@ -1,4 +1,4 @@
-/*	$NetBSD: dzkbd.c,v 1.7 2002/03/17 19:40:54 atatat Exp $	*/
+/*	$NetBSD: dzkbd.c,v 1.12 2003/08/07 16:30:54 agc Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -49,7 +45,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: dzkbd.c,v 1.7 2002/03/17 19:40:54 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dzkbd.c,v 1.12 2003/08/07 16:30:54 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -97,9 +93,8 @@ static int	dzkbd_input __P((void *, int));
 static int	dzkbd_match __P((struct device *, struct cfdata *, void *));
 static void	dzkbd_attach __P((struct device *, struct device *, void *));
 
-struct cfattach dzkbd_ca = {
-	sizeof(struct dzkbd_softc), dzkbd_match, dzkbd_attach,
-};
+CFATTACH_DECL(dzkbd, sizeof(struct dzkbd_softc),
+    dzkbd_match, dzkbd_attach, NULL, NULL);
 
 static int	dzkbd_enable __P((void *, int));
 static void	dzkbd_set_leds __P((void *, int));
@@ -173,8 +168,8 @@ dzkbd_attach(struct device *parent, struct device *self, void *aux)
 				       M_DEVBUF, M_NOWAIT);
 		dzi->dzi_ks.attmt.sendchar = dzkbd_sendchar;
 		dzi->dzi_ks.attmt.cookie = ls;
-		dzi->dzi_ls = ls;
 	}
+	dzi->dzi_ls = ls;
 	dzkbd->sc_itl = dzi;
 
 	printf("\n");

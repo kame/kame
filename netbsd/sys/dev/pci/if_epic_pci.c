@@ -1,4 +1,4 @@
-/*	$NetBSD: if_epic_pci.c,v 1.19 2001/11/13 07:48:43 lukem Exp $	*/
+/*	$NetBSD: if_epic_pci.c,v 1.26 2003/01/31 00:07:42 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_epic_pci.c,v 1.19 2001/11/13 07:48:43 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_epic_pci.c,v 1.26 2003/01/31 00:07:42 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h> 
@@ -88,9 +88,8 @@ struct epic_pci_softc {
 int	epic_pci_match(struct device *, struct cfdata *, void *);
 void	epic_pci_attach(struct device *, struct device *, void *);
 
-struct cfattach epic_pci_ca = {
-	sizeof(struct epic_pci_softc), epic_pci_match, epic_pci_attach,
-};
+CFATTACH_DECL(epic_pci, sizeof(struct epic_pci_softc),
+    epic_pci_match, epic_pci_attach, NULL, NULL);
 
 const struct epic_pci_product {
 	u_int32_t	epp_prodid;	/* PCI product ID */
@@ -123,6 +122,8 @@ const struct epic_pci_subsys_info {
 	pcireg_t subsysid;
 	int flags;
 } epic_pci_subsys_info[] = {
+	{ PCI_ID_CODE(PCI_VENDOR_SMC, 0xa015), /* SMC9432BTX */
+	  EPIC_HAS_BNC },
 	{ PCI_ID_CODE(PCI_VENDOR_SMC, 0xa024), /* SMC9432BTX1 */
 	  EPIC_HAS_BNC },
 	{ PCI_ID_CODE(PCI_VENDOR_SMC, 0xa016), /* SMC9432FTX */
@@ -183,14 +184,25 @@ epic_pci_attach(parent, self, aux)
 	pcireg_t reg;
 	int pmreg, ioh_valid, memh_valid;
 
+	aprint_naive(": Ethernet controller\n");
+
+	epp = epic_pci_lookup(pa);
+	if (epp == NULL) {
+		printf("\n");
+		panic("epic_pci_attach: impossible");
+	}
+
+	aprint_normal(": %s, rev. %d\n", epp->epp_name,
+	    PCI_REVISION(pa->pa_class));
+
 	if (pci_get_capability(pc, pa->pa_tag, PCI_CAP_PWRMGMT, &pmreg, 0)) {
-		reg = pci_conf_read(pc, pa->pa_tag, pmreg + 4);
+		reg = pci_conf_read(pc, pa->pa_tag, pmreg + PCI_PMCSR);
 		switch (reg & PCI_PMCSR_STATE_MASK) {
 		case PCI_PMCSR_STATE_D1:
 		case PCI_PMCSR_STATE_D2:
-			printf(": waking up from power state D%d\n%s",
-			    reg & PCI_PMCSR_STATE_MASK, sc->sc_dev.dv_xname);
-			pci_conf_write(pc, pa->pa_tag, pmreg + 4,
+			aprint_normal("%s: waking up from power state D%d\n",
+			    sc->sc_dev.dv_xname, reg & PCI_PMCSR_STATE_MASK);
+			pci_conf_write(pc, pa->pa_tag, pmreg + PCI_PMCSR,
 			    (reg & ~PCI_PMCSR_STATE_MASK) |
 			    PCI_PMCSR_STATE_D0);
 			break;
@@ -199,9 +211,10 @@ epic_pci_attach(parent, self, aux)
 			 * IO and MEM are disabled. We can't enable
 			 * the card because the BARs might be invalid.
 			 */
-			printf(": unable to wake up from power state D3, "
-			       "reboot required.\n");
-			pci_conf_write(pc, pa->pa_tag, pmreg + 4,
+			aprint_error(
+			    "%s: unable to wake up from power state D3, "
+			    "reboot required.\n", sc->sc_dev.dv_xname);
+			pci_conf_write(pc, pa->pa_tag, pmreg + PCI_PMCSR,
 			    (reg & ~PCI_PMCSR_STATE_MASK) |
 			    PCI_PMCSR_STATE_D0);
 			return;
@@ -225,19 +238,12 @@ epic_pci_attach(parent, self, aux)
 		sc->sc_st = iot;
 		sc->sc_sh = ioh;
 	} else {
-		printf(": unable to map device registers\n");
+		aprint_error("%s: unable to map device registers\n",
+		    sc->sc_dev.dv_xname);
 		return;
 	}
 
 	sc->sc_dmat = pa->pa_dmat;
-
-	epp = epic_pci_lookup(pa);
-	if (epp == NULL) {
-		printf("\n");
-		panic("epic_pci_attach: impossible");
-	}
-
-	printf(": %s, rev. %d\n", epp->epp_name, PCI_REVISION(pa->pa_class));
 
 	/* Make sure bus mastering is enabled. */
 	pci_conf_write(pc, pa->pa_tag, PCI_COMMAND_STATUS_REG,
@@ -248,20 +254,21 @@ epic_pci_attach(parent, self, aux)
 	 * Map and establish our interrupt.
 	 */
 	if (pci_intr_map(pa, &ih)) {
-		printf("%s: unable to map interrupt\n", sc->sc_dev.dv_xname);
+		aprint_error("%s: unable to map interrupt\n",
+		    sc->sc_dev.dv_xname);
 		return;
 	}
 	intrstr = pci_intr_string(pc, ih); 
 	psc->sc_ih = pci_intr_establish(pc, ih, IPL_NET, epic_intr, sc);
 	if (psc->sc_ih == NULL) {
-		printf("%s: unable to establish interrupt",
+		aprint_error("%s: unable to establish interrupt",
 		    sc->sc_dev.dv_xname);
 		if (intrstr != NULL)
-			printf(" at %s", intrstr);
-		printf("\n");
+			aprint_normal(" at %s", intrstr);
+		aprint_normal("\n");
 		return;
 	}
-	printf("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
+	aprint_normal("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
 
 	esp = epic_pci_subsys_lookup(pa);
 	if (esp)

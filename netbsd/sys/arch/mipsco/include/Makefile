@@ -1,11 +1,10 @@
-#	$NetBSD: Makefile,v 1.10 2001/04/15 17:13:12 kleink Exp $
+#	$NetBSD: Makefile,v 1.14 2003/01/17 23:38:07 thorpej Exp $
 
-KDIR=	/sys/arch/mipsco/include
 INCSDIR= /usr/include/mipsco
 
 INCS=	ansi.h aout_machdep.h asm.h autoconf.h \
 	bsd-aout.h bswap.h bus.h \
-	cdefs.h conf.h cpu.h \
+	cdefs.h cpu.h \
 	db_machdep.h disklabel.h \
 	ecoff_machdep.h elf.h elf_machdep.h endian.h endian_machdep.h \
 	float.h \
@@ -14,8 +13,8 @@ INCS=	ansi.h aout_machdep.h asm.h autoconf.h \
 	intr.h \
 	kcore.h kdbparam.h \
 	limits.h lock.h locore.h \
-	mainboard.h math.h mips_opcode.h \
-	param.h pcb.h pmap.h proc.h profile.h psl.h pte.h ptrace.h \
+	mainboard.h math.h mcontext.h mips_opcode.h \
+	param.h pcb.h pmap.h pmc.h proc.h profile.h psl.h pte.h ptrace.h \
 	reg.h regdef.h regnum.h reloc.h \
 	setjmp.h signal.h stdarg.h sysconf.h \
 	trap.h types.h \

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_bridgevar.h,v 1.1.18.1 2003/06/30 03:13:51 grant Exp $	*/
+/*	$NetBSD: if_bridgevar.h,v 1.5 2003/09/16 17:38:24 jdc Exp $	*/
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -103,6 +103,8 @@
 #define	BRDGSMA			20	/* set max age (ifbrparam) */
 #define	BRDGSIFPRIO		21	/* set if priority (ifbreq) */
 #define BRDGSIFCOST		22	/* set if path cost (ifbreq) */
+#define BRDGGFILT	        23	/* get filter flags (ifbrparam) */
+#define BRDGSFILT	        24	/* set filter flags (ifbrparam) */
 
 /*
  * Generic bridge control request.
@@ -126,6 +128,10 @@ struct ifbreq {
 /* BRDGFLUSH */
 #define	IFBF_FLUSHDYN		0x00	/* flush learned addresses only */
 #define	IFBF_FLUSHALL		0x01	/* flush all addresses */
+
+/* BRDGSFILT */
+#define IFBF_FILT_USEIPF	0x00000001 /* enable ipf on bridge */
+#define IFBF_FILT_MASK		0x00000001 /* mask of valid values */
 
 /* STP port states */
 #define	BSTP_IFSTATE_DISABLED	0
@@ -192,6 +198,7 @@ struct ifbrparam {
 #define	ifbrp_hellotime	ifbrp_ifbrpu.ifbrpu_int8	/* hello time (sec) */
 #define	ifbrp_fwddelay	ifbrp_ifbrpu.ifbrpu_int8	/* fwd time (sec) */
 #define	ifbrp_maxage	ifbrp_ifbrpu.ifbrpu_int8	/* max age (sec) */
+#define	ifbrp_filter	ifbrp_ifbrpu.ifbrpu_int32	/* filtering flags */
 
 #ifdef _KERNEL
 /*
@@ -289,13 +296,14 @@ struct bridge_softc {
 	LIST_HEAD(, bridge_rtnode) *sc_rthash;	/* our forwarding table */
 	LIST_HEAD(, bridge_rtnode) sc_rtlist;	/* list version of above */
 	uint32_t		sc_rthash_key;	/* key for hash */
+	uint32_t		sc_filter_flags; /* ipf and flags */
 };
 
 extern const uint8_t bstp_etheraddr[];
 
-void	bridge_ifdetach(struct ifnet *ifp);
+void	bridge_ifdetach(struct ifnet *);
 
-int	bridge_output(struct ifnet *ifp, struct mbuf *, struct sockaddr *,
+int	bridge_output(struct ifnet *, struct mbuf *, struct sockaddr *,
 	    struct rtentry *);
 struct mbuf *bridge_input(struct ifnet *, struct mbuf *);
 
@@ -303,6 +311,7 @@ void	bstp_initialization(struct bridge_softc *);
 void	bstp_stop(struct bridge_softc *);
 struct mbuf *bstp_input(struct ifnet *, struct mbuf *);
 
-void	bridge_enqueue(struct bridge_softc *, struct ifnet *, struct mbuf *);
+void	bridge_enqueue(struct bridge_softc *, struct ifnet *, struct mbuf *,
+	    int);
 
 #endif /* _KERNEL */

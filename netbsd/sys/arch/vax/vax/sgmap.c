@@ -1,4 +1,4 @@
-/* $NetBSD: sgmap.c,v 1.9 2000/11/16 19:25:42 matt Exp $ */
+/* $NetBSD: sgmap.c,v 1.11 2003/07/15 02:15:05 lukem Exp $ */
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sgmap.c,v 1.11 2003/07/15 02:15:05 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -90,7 +93,7 @@ vax_sgmap_init(t, sgmap, name, sgvabase, sgvasize, ptva, minptalign)
 			minptalign = ptsize;
 		if (bus_dmamem_alloc(t, ptsize, minptalign, 0, &seg, 1, &rseg,
 		    BUS_DMA_NOWAIT)) {
-			panic("unable to allocate page table for sgmap `%s'\n",
+			panic("unable to allocate page table for sgmap `%s'",
 			    name);
 			goto die;
 		}

@@ -1,4 +1,4 @@
-/*	$NetBSD: vme_two_68k.c,v 1.3 2002/05/14 02:03:01 matt Exp $	*/
+/*	$NetBSD: vme_two_68k.c,v 1.6 2003/07/15 02:43:47 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2002 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * Front-end for the VMEchip2 found on the MVME-1[67][27] boards.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vme_two_68k.c,v 1.6 2003/07/15 02:43:47 lukem Exp $");
+
 #include "vmetwo.h"
 
 #include <sys/param.h>
@@ -71,9 +74,8 @@ static struct evcnt *vmetwoisrevcnt(void *, int);
 int vmetwo_match __P((struct device *, struct cfdata *, void *));
 void vmetwo_attach __P((struct device *, struct device *, void *));
 
-struct cfattach vmetwo_ca = {
-	sizeof(struct vmetwo_softc), vmetwo_match, vmetwo_attach
-};
+CFATTACH_DECL(vmetwo, sizeof(struct vmetwo_softc),
+    vmetwo_match, vmetwo_attach, NULL, NULL);
 extern struct cfdriver vmetwo_cd;
 
 

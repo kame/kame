@@ -1,4 +1,4 @@
-/*	$NetBSD: proc.h,v 1.5 1996/04/04 06:36:50 phil Exp $	*/
+/*	$NetBSD: proc.h,v 1.8 2004/01/23 04:03:38 simonb Exp $	*/
 
 /*
  * Copyright (c) 1991 Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,13 +32,20 @@
  */
 
 #ifndef _NS532_PROC_H_
-#define _NS532_PROC_H_
+#define	_NS532_PROC_H_
+
+/*
+ * Machine-dependent part of the lwp structure for the pc532.
+ */
+struct mdlwp {
+	struct reg *md_regs;	/* pointer to regs on the stack */
+};
 
 /*
  * Machine-dependent part of the proc structure for the pc532.
  */
 struct mdproc {
-	struct reg *md_regs;	/* pointer to regs on the stack */
+	int md_dummy;
 };
 
 #endif /* _NS532_PROC_H_ */

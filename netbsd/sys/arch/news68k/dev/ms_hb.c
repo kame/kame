@@ -1,4 +1,4 @@
-/*	$NetBSD: ms_hb.c,v 1.2 2002/03/17 19:40:45 atatat Exp $	*/
+/*	$NetBSD: ms_hb.c,v 1.6 2003/07/15 02:59:26 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 Izumi Tsutsui.  All rights reserved.
@@ -26,6 +26,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ms_hb.c,v 1.6 2003/07/15 02:59:26 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -55,9 +58,8 @@ int ms_hb_enable(void *);
 int ms_hb_ioctl(void *, u_long, caddr_t, int, struct proc *);
 void ms_hb_disable(void *);
 
-struct cfattach ms_hb_ca = {
-	sizeof(struct ms_softc), ms_hb_match, ms_hb_attach
-};
+CFATTACH_DECL(ms_hb, sizeof(struct ms_softc),
+    ms_hb_match, ms_hb_attach, NULL, NULL);
 
 struct wsmouse_accessops ms_hb_accessops = {
 	ms_hb_enable,
@@ -78,7 +80,7 @@ ms_hb_match(parent, cf, aux)
 		return 0;
 
 	/* XXX no default address */
-	if (ha->ha_address == -1)
+	if (ha->ha_address == (u_int)-1)
 		return 0;
 
 	addr = IIOV(ha->ha_address); /* XXX */

@@ -1,4 +1,4 @@
-/*	$NetBSD: isadma.c,v 1.49 2001/11/13 08:01:22 lukem Exp $	*/
+/*	$NetBSD: isadma.c,v 1.52 2003/05/09 23:51:29 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 2000 The NetBSD Foundation, Inc.
@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: isadma.c,v 1.49 2001/11/13 08:01:22 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: isadma.c,v 1.52 2003/05/09 23:51:29 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -252,6 +252,28 @@ _isa_dmacascade(ids, chan)
 	return (0);
 }
 
+int
+_isa_drq_alloc(ids, chan)
+	struct isa_dma_state *ids;
+	int chan;
+{
+	if (ISA_DMA_DRQ_ISFREE(ids, chan) == 0)
+		return EBUSY;
+	ISA_DMA_DRQ_ALLOC(ids, chan);
+	return 0;
+}
+
+int
+_isa_drq_free(ids, chan)
+	struct isa_dma_state *ids;
+	int chan;
+{
+	if (ISA_DMA_DRQ_ISFREE(ids, chan))
+		return EINVAL;
+	ISA_DMA_DRQ_FREE(ids, chan);
+	return 0;
+}
+
 bus_size_t
 _isa_dmamaxsize(ids, chan)
 	struct isa_dma_state *ids;
@@ -283,19 +305,8 @@ _isa_dmamap_create(ids, chan, size, flags)
 	if (size > ids->ids_maxsize[chan])
 		return (EINVAL);
 
-	if (ISA_DMA_DRQ_ISFREE(ids, chan) == 0) {
-		printf("%s: drq %d is not free\n", ids->ids_dev->dv_xname,
-		    chan);
-		return (EAGAIN);
-	}
-
-	ISA_DMA_DRQ_ALLOC(ids, chan);
-
 	error = bus_dmamap_create(ids->ids_dmat, size, 1, size,
 	    ids->ids_maxsize[chan], flags, &ids->ids_dmamaps[chan]);
-
-	if (error)
-		ISA_DMA_DRQ_FREE(ids, chan);
 
 	return (error);
 }
@@ -310,14 +321,6 @@ _isa_dmamap_destroy(ids, chan)
 		printf("%s: bogus drq %d\n", ids->ids_dev->dv_xname, chan);
 		goto lose;
 	}
-
-	if (ISA_DMA_DRQ_ISFREE(ids, chan)) {
-		printf("%s: drq %d is already free\n",
-		    ids->ids_dev->dv_xname, chan);
-		goto lose;
-	}
-
-	ISA_DMA_DRQ_FREE(ids, chan);
 
 	bus_dmamap_destroy(ids->ids_dmat, ids->ids_dmamaps[chan]);
 	return;
@@ -357,6 +360,12 @@ _isa_dmastart(ids, chan, addr, nbytes, p, flags, busdmaflags)
 	    chan, addr, nbytes, p, flags, busdmaflags);
 #endif
 
+	if (ISA_DMA_DRQ_ISFREE(ids, chan)) {
+		printf("%s: dma start on free channel %d\n",
+		    ids->ids_dev->dv_xname, chan);
+		goto lose;
+	}
+
 	if (chan & 4) {
 		if (nbytes > (1 << 17) || nbytes & 1 || (u_long)addr & 1) {
 			printf("%s: drq %d, nbytes 0x%lx, addr %p\n",
@@ -375,7 +384,7 @@ _isa_dmastart(ids, chan, addr, nbytes, p, flags, busdmaflags)
 
 	dmam = ids->ids_dmamaps[chan];
 	if (dmam == NULL)
-		panic("_isa_dmastart: no DMA map for chan %d\n", chan);
+		panic("_isa_dmastart: no DMA map for chan %d", chan);
 
 	error = bus_dmamap_load(ids->ids_dmat, dmam, addr, nbytes,
 	    p, busdmaflags |
@@ -748,7 +757,7 @@ _isa_malloc(ids, chan, size, pool, flags)
 	struct isa_dma_state *ids;
 	int chan;
 	size_t size;
-	int pool;
+	struct malloc_type *pool;
 	int flags;
 {
 	bus_addr_t addr;
@@ -783,7 +792,7 @@ _isa_malloc(ids, chan, size, pool, flags)
 void
 _isa_free(addr, pool)
 	void *addr;
-	int pool;
+	struct malloc_type *pool;
 {
 	struct isa_mem **mp, *m;
 	caddr_t kva = (caddr_t)addr;

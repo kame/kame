@@ -1,4 +1,4 @@
-/*	$NetBSD: qereg.h,v 1.3 2000/07/24 04:28:51 mycroft Exp $	*/
+/*	$NetBSD: qereg.h,v 1.5 2003/05/03 18:11:39 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -103,7 +103,7 @@ struct qe_cregs {
 /* qe_cregs.ctrl: control. */
 #define	QE_CR_CTRL_RXOFF	0x00000004	/* disable receiver */
 #define	QE_CR_CTRL_RESET	0x00000002	/* reset this channel */
-#define	QE_CR_CTRL_TWAKEUP	0x00000001	/* tx dma wakeup */
+#define	QE_CR_CTRL_TWAKEUP	0x00000001	/* tx DMA wakeup */
 
 /* qe_cregs.stat: status. */
 #define	QE_CR_STAT_EDEFER	0x10000000	/* excessive defers */
@@ -141,7 +141,7 @@ struct qe_cregs {
 			"b\22TXLERR\0b\23TXDERROR\0b\24TCCOFLOW\0"	\
 			"b\25TXIRQ\0b\26BERROR\0b\27JERROR\0"		\
 			"b\30FUFLOW\0b\31LCOLL\0b\32ERETRIES\0"		\
-			"b\33CLOSS\0b\32EDEFER\0\0"
+			"b\33CLOSS\0b\34EDEFER\0\0"
 
 /*
  * Errors: all status bits except for TX/RX IRQ

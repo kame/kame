@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.74 2002/03/08 20:48:36 thorpej Exp $	*/
+/*	$NetBSD: pmap.c,v 1.84 2003/09/26 22:23:58 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -45,7 +45,7 @@
  * to four.  In this implementation, we use three, named 'A' through 'C'.
  *
  * The MMU translates virtual addresses into physical addresses by 
- * traversing these tables in a proccess called a 'table walk'.  The most 
+ * traversing these tables in a process called a 'table walk'.  The most 
  * significant 7 bits of the Virtual Address ('VA') being translated are 
  * used as an index into the level A table, whose base in physical memory 
  * is stored in a special MMU register, the 'CPU Root Pointer' or CRP.  The 
@@ -111,7 +111,11 @@
  * of the previous note does not apply to the sun3x pmap.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.84 2003/09/26 22:23:58 wiz Exp $");
+
 #include "opt_ddb.h"
+#include "opt_pmap_debug.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -130,6 +134,7 @@
 #include <machine/pmap.h>
 #include <machine/pte.h>
 #include <machine/vmparam.h>
+#include <m68k/cacheops.h>
 
 #include <sun3/sun3/cache.h>
 #include <sun3/sun3/machdep.h>
@@ -526,21 +531,19 @@ pteidx(pte)
 
 /*
  * This just offers a place to put some debugging checks,
- * and reduces the number of places "curproc" appears...
+ * and reduces the number of places "curlwp" appears...
  */
 static INLINE pmap_t
 current_pmap()
 {
-	struct proc *p;
 	struct vmspace *vm;
 	struct vm_map *map;
 	pmap_t	pmap;
 
-	p = curproc;	/* XXX */
-	if (p == NULL)
+	if (curlwp == NULL)
 		pmap = &kernel_pmap;
 	else {
-		vm = p->p_vmspace;
+		vm = curproc->p_vmspace;
 		map = &vm->vm_map;
 		pmap = vm_map_pmap(map);
 	}
@@ -765,7 +768,7 @@ pmap_bootstrap(nextva)
 	 * `virtual_avail' to the nearest page, and set the flag
 	 * to prevent use of pmap_bootstrap_alloc() hereafter.
 	 */
-	pmap_bootstrap_aalign(NBPG);
+	pmap_bootstrap_aalign(PAGE_SIZE);
 	bootstrap_alloc_enabled = FALSE;
 
 	/*
@@ -795,9 +798,9 @@ pmap_bootstrap(nextva)
 	 * address-oritented operations.
 	 */
 	tmp_vpages[0] = virtual_avail;
-	virtual_avail += NBPG;
+	virtual_avail += PAGE_SIZE;
 	tmp_vpages[1] = virtual_avail;
-	virtual_avail += NBPG;
+	virtual_avail += PAGE_SIZE;
 
 	/** Initialize the PV system **/
 	pmap_init_pv();
@@ -835,11 +838,11 @@ pmap_bootstrap(nextva)
 	 * It is non-cached, mostly due to paranoia.
 	 */
 	pmap_enter_kernel(va, pa|PMAP_NC, VM_PROT_ALL);
-	va += NBPG; pa += NBPG;
+	va += PAGE_SIZE; pa += PAGE_SIZE;
 
 	/* Next page is used as the temporary stack. */
 	pmap_enter_kernel(va, pa, VM_PROT_ALL);
-	va += NBPG; pa += NBPG;
+	va += PAGE_SIZE; pa += PAGE_SIZE;
 
 	/*
 	 * Map all of the kernel's text segment as read-only and cacheable.
@@ -849,7 +852,7 @@ pmap_bootstrap(nextva)
 	 * has to be mapped as read/write, to accomodate the data.
 	 */
 	eva = m68k_trunc_page((vaddr_t)etext);
-	for (; va < eva; va += NBPG, pa += NBPG)
+	for (; va < eva; va += PAGE_SIZE, pa += PAGE_SIZE)
 		pmap_enter_kernel(va, pa, VM_PROT_READ|VM_PROT_EXECUTE);
 
 	/*
@@ -857,7 +860,7 @@ pmap_bootstrap(nextva)
 	 * This includes: data, BSS, symbols, and everything in the
 	 * contiguous memory used by pmap_bootstrap_alloc()
 	 */
-	for (; pa < avail_start; va += NBPG, pa += NBPG)
+	for (; pa < avail_start; va += PAGE_SIZE, pa += PAGE_SIZE)
 		pmap_enter_kernel(va, pa, VM_PROT_READ|VM_PROT_WRITE);
 
 	/*
@@ -870,7 +873,7 @@ pmap_bootstrap(nextva)
 	pmap_bootstrap_setprom();
 
 	/* Notify the VM system of our page size. */
-	uvmexp.pagesize = NBPG;
+	uvmexp.pagesize = PAGE_SIZE;
 	uvm_setpagesize();
 
 	pmap_page_upload();
@@ -1530,8 +1533,8 @@ pv_not_found:
 /* pmap_stroll			INTERNAL
  **
  * Retrieve the addresses of all table managers involved in the mapping of
- * the given virtual address.  If the table walk completed sucessfully,
- * return TRUE.  If it was only partially sucessful, return FALSE.
+ * the given virtual address.  If the table walk completed successfully,
+ * return TRUE.  If it was only partially successful, return FALSE.
  * The table walk performed by this function is important to many other
  * functions in this module.
  *
@@ -2101,7 +2104,7 @@ pmap_kremove(va, len)
 	while (idx < eidx) {
 		kernCbase[idx++].attr.raw = MMU_DT_INVALID;
 		TBIS(va);
-		va += NBPG;
+		va += PAGE_SIZE;
 	}
 }
 
@@ -2125,9 +2128,9 @@ pmap_map(va, pa, endpa, prot)
 	sz = endpa - pa;
 	do {
 		pmap_enter_kernel(va, pa, prot);
-		va += NBPG;
-		pa += NBPG;
-		sz -= NBPG;
+		va += PAGE_SIZE;
+		pa += PAGE_SIZE;
+		sz -= PAGE_SIZE;
 	} while (sz > 0);
 	pmap_update(pmap_kernel());
 	return(va);
@@ -2235,7 +2238,7 @@ pmap_protect(pmap, startva, endva, prot)
 		      if (iscurpmap)
 		          TBIS(startva);
 		    }
-		    startva += NBPG;
+		    startva += PAGE_SIZE;
 
 		    if (++c_idx >= MMU_C_TBL_SIZE) { /* exceeded C table? */
 		      c_tbl = NULL;
@@ -2276,7 +2279,7 @@ pmap_protect_kernel(startva, endva, prot)
 	mmu_short_pte_t *pte;
 
 	pte = &kernCbase[(unsigned long) m68k_btop(startva - KERNBASE)];
-	for (va = startva; va < endva; va += NBPG, pte++) {
+	for (va = startva; va < endva; va += PAGE_SIZE, pte++) {
 		if (MMU_VALID_DT(*pte)) {
 		    switch (prot) {
 		        case VM_PROT_ALL:
@@ -2411,11 +2414,11 @@ pmap_copy_page(srcpa, dstpa)
 	pmap_kenter_pa(srcva, srcpa, VM_PROT_READ);
 	pmap_kenter_pa(dstva, dstpa, VM_PROT_READ|VM_PROT_WRITE);
 
-	/* Hand-optimized version of bcopy(src, dst, NBPG) */
+	/* Hand-optimized version of bcopy(src, dst, PAGE_SIZE) */
 	copypage((char *) srcva, (char *) dstva);
 
-	pmap_kremove(srcva, NBPG);
-	pmap_kremove(dstva, NBPG);
+	pmap_kremove(srcva, PAGE_SIZE);
+	pmap_kremove(dstva, PAGE_SIZE);
 
 #ifdef DIAGNOSTIC
 	--tmp_vpages_inuse;
@@ -2447,10 +2450,10 @@ pmap_zero_page(dstpa)
 	/* The comments in pmap_copy_page() above apply here also. */
 	pmap_kenter_pa(dstva, dstpa, VM_PROT_READ|VM_PROT_WRITE);
 
-	/* Hand-optimized version of bzero(ptr, NBPG) */
+	/* Hand-optimized version of bzero(ptr, PAGE_SIZE) */
 	zeropage((char *) dstva);
 
-	pmap_kremove(dstva, NBPG);
+	pmap_kremove(dstva, PAGE_SIZE);
 #ifdef DIAGNOSTIC
 	--tmp_vpages_inuse;
 #endif
@@ -2954,7 +2957,7 @@ pmap_remove_kernel(sva, eva)
 	while (idx < eidx) {
 		pmap_remove_pte(&kernCbase[idx++]);
 		TBIS(sva);
-		sva += NBPG;
+		sva += PAGE_SIZE;
 	}
 }
 
@@ -3464,15 +3467,15 @@ _pmap_switch(pmap)
 /*
  * Exported version of pmap_activate().  This is called from the
  * machine-independent VM code when a process is given a new pmap.
- * If (p == curproc) do like cpu_switch would do; otherwise just
+ * If (p == curlwp) do like cpu_switch would do; otherwise just
  * take this as notification that the process has a new pmap.
  */
 void
-pmap_activate(p)
-	struct proc *p;
+pmap_activate(l)
+	struct lwp *l;
 {
-	if (p == curproc) {
-		_pmap_switch(p->p_vmspace->vm_map.pmap);
+	if (l->l_proc == curproc) {
+		_pmap_switch(l->l_proc->p_vmspace->vm_map.pmap);
 	}
 }
 
@@ -3482,8 +3485,8 @@ pmap_activate(p)
  * This is called to deactivate the specified process's address space.
  */
 void
-pmap_deactivate(p)
-struct proc *p;
+pmap_deactivate(l)
+struct lwp *l;
 {
 	/* Nothing to do. */
 }
@@ -3716,7 +3719,7 @@ pv_list(pa, n)
 #ifdef NOT_YET
 /* and maybe not ever */
 /************************** LOW-LEVEL ROUTINES **************************
- * These routines will eventualy be re-written into assembly and placed *
+ * These routines will eventually be re-written into assembly and placed*
  * in locore.s.  They are here now as stubs so that the pmap module can *
  * be linked as a standalone user program for testing.                  *
  ************************************************************************/

@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_reconbuffer.c,v 1.7 2002/01/09 03:10:20 oster Exp $	*/
+/*	$NetBSD: rf_reconbuffer.c,v 1.21 2004/03/18 16:54:54 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -33,14 +33,13 @@
  ***************************************************/
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rf_reconbuffer.c,v 1.7 2002/01/09 03:10:20 oster Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rf_reconbuffer.c,v 1.21 2004/03/18 16:54:54 oster Exp $");
 
 #include "rf_raid.h"
 #include "rf_reconbuffer.h"
 #include "rf_acctrace.h"
 #include "rf_etimer.h"
 #include "rf_general.h"
-#include "rf_debugprint.h"
 #include "rf_revent.h"
 #include "rf_reconutil.h"
 #include "rf_nwayxor.h"
@@ -82,7 +81,7 @@ __KERNEL_RCSID(0, "$NetBSD: rf_reconbuffer.c,v 1.7 2002/01/09 03:10:20 oster Exp
  * nWayXorFuncs[i] is a pointer to a function that will xor "i"
  * bufs into the accumulating sum.
  */
-static RF_VoidFuncPtr nWayXorFuncs[] = {
+static const RF_VoidFuncPtr nWayXorFuncs[] = {
 	NULL,
 	(RF_VoidFuncPtr) rf_nWayXor1,
 	(RF_VoidFuncPtr) rf_nWayXor2,
@@ -95,15 +94,15 @@ static RF_VoidFuncPtr nWayXorFuncs[] = {
 	(RF_VoidFuncPtr) rf_nWayXor9
 };
 
+/*
+ * rbuf          - the recon buffer to submit
+ * keep_it       - whether we can keep this buffer or we have to return it
+ * use_committed - whether to use a committed or an available recon buffer
+ */
 int 
-rf_SubmitReconBuffer(rbuf, keep_it, use_committed)
-	RF_ReconBuffer_t *rbuf;	/* the recon buffer to submit */
-	int     keep_it;	/* whether we can keep this buffer or we have
-				 * to return it */
-	int     use_committed;	/* whether to use a committed or an available
-				 * recon buffer */
+rf_SubmitReconBuffer(RF_ReconBuffer_t *rbuf, int keep_it, int use_committed)
 {
-	RF_LayoutSW_t *lp;
+	const RF_LayoutSW_t *lp;
 	int     rc;
 
 	lp = rbuf->raidPtr->Layout.map;
@@ -111,23 +110,24 @@ rf_SubmitReconBuffer(rbuf, keep_it, use_committed)
 	return (rc);
 }
 
+/*
+ * rbuf          - the recon buffer to submit
+ * keep_it       - whether we can keep this buffer or we have to return it
+ * use_committed - whether to use a committed or an available recon buffer
+ */
 int 
-rf_SubmitReconBufferBasic(rbuf, keep_it, use_committed)
-	RF_ReconBuffer_t *rbuf;	/* the recon buffer to submit */
-	int     keep_it;	/* whether we can keep this buffer or we have
-				 * to return it */
-	int     use_committed;	/* whether to use a committed or an available
-				 * recon buffer */
+rf_SubmitReconBufferBasic(RF_ReconBuffer_t *rbuf, int keep_it, 
+			  int use_committed)
 {
 	RF_Raid_t *raidPtr = rbuf->raidPtr;
 	RF_RaidLayout_t *layoutPtr = &raidPtr->Layout;
-	RF_ReconCtrl_t *reconCtrlPtr = raidPtr->reconControl[rbuf->row];
+	RF_ReconCtrl_t *reconCtrlPtr = raidPtr->reconControl;
 	RF_ReconParityStripeStatus_t *pssPtr;
 	RF_ReconBuffer_t *targetRbuf, *t = NULL;	/* temporary rbuf
 							 * pointers */
 	caddr_t ta;		/* temporary data buffer pointer */
 	RF_CallbackDesc_t *cb, *p;
-	int     retcode = 0, created = 0;
+	int     retcode = 0;
 
 	RF_Etimer_t timer;
 
@@ -135,14 +135,19 @@ rf_SubmitReconBufferBasic(rbuf, keep_it, use_committed)
 	RF_ASSERT(rbuf);
 	RF_ASSERT(rbuf->col != reconCtrlPtr->fcol);
 
-	Dprintf5("RECON: submission by row %d col %d for psid %ld ru %d (failed offset %ld)\n",
-	    rbuf->row, rbuf->col, (long) rbuf->parityStripeID, rbuf->which_ru, (long) rbuf->failedDiskSectorOffset);
+	Dprintf4("RECON: submission by col %d for psid %ld ru %d (failed offset %ld)\n",
+	    rbuf->col, (long) rbuf->parityStripeID, rbuf->which_ru, (long) rbuf->failedDiskSectorOffset);
 
-	RF_LOCK_PSS_MUTEX(raidPtr, rbuf->row, rbuf->parityStripeID);
+	RF_LOCK_PSS_MUTEX(raidPtr, rbuf->parityStripeID);
 
 	RF_LOCK_MUTEX(reconCtrlPtr->rb_mutex);
+	while(reconCtrlPtr->rb_lock) {
+		ltsleep(&reconCtrlPtr->rb_lock, PRIBIO, "reconctlcnmhs", 0, &reconCtrlPtr->rb_mutex);
+	}
+	reconCtrlPtr->rb_lock = 1;
+	RF_UNLOCK_MUTEX(reconCtrlPtr->rb_mutex);
 
-	pssPtr = rf_LookupRUStatus(raidPtr, reconCtrlPtr->pssTable, rbuf->parityStripeID, rbuf->which_ru, RF_PSS_NONE, &created);
+	pssPtr = rf_LookupRUStatus(raidPtr, reconCtrlPtr->pssTable, rbuf->parityStripeID, rbuf->which_ru, RF_PSS_NONE, NULL);
 	RF_ASSERT(pssPtr);	/* if it didn't exist, we wouldn't have gotten
 				 * an rbuf for it */
 
@@ -158,13 +163,14 @@ rf_SubmitReconBufferBasic(rbuf, keep_it, use_committed)
 	if ((targetRbuf != NULL) &&
 	    ((pssPtr->xorBufCount == rf_numBufsToAccumulate - 1) || (targetRbuf->count + pssPtr->xorBufCount + 1 == layoutPtr->numDataCol))) {
 		pssPtr->rbufsForXor[pssPtr->xorBufCount++] = rbuf;	/* install this buffer */
-		Dprintf3("RECON: row %d col %d invoking a %d-way XOR\n", rbuf->row, rbuf->col, pssPtr->xorBufCount);
+		Dprintf2("RECON: col %d invoking a %d-way XOR\n", rbuf->col, pssPtr->xorBufCount);
 		RF_ETIMER_START(timer);
 		rf_MultiWayReconXor(raidPtr, pssPtr);
 		RF_ETIMER_STOP(timer);
 		RF_ETIMER_EVAL(timer);
 		raidPtr->accumXorTimeUs += RF_ETIMER_VAL_US(timer);
 		if (!keep_it) {
+#if RF_ACC_TRACE > 0
 			raidPtr->recon_tracerecs[rbuf->col].xor_us = RF_ETIMER_VAL_US(timer);
 			RF_ETIMER_STOP(raidPtr->recon_tracerecs[rbuf->col].recon_timer);
 			RF_ETIMER_EVAL(raidPtr->recon_tracerecs[rbuf->col].recon_timer);
@@ -173,6 +179,7 @@ rf_SubmitReconBufferBasic(rbuf, keep_it, use_committed)
 			RF_ETIMER_START(raidPtr->recon_tracerecs[rbuf->col].recon_timer);
 
 			rf_LogTraceRec(raidPtr, &raidPtr->recon_tracerecs[rbuf->col]);
+#endif
 		}
 		rf_CheckForFullRbuf(raidPtr, reconCtrlPtr, pssPtr, layoutPtr->numDataCol);
 
@@ -182,10 +189,13 @@ rf_SubmitReconBufferBasic(rbuf, keep_it, use_committed)
 			t = reconCtrlPtr->committedRbufs;
 			RF_ASSERT(t);
 			reconCtrlPtr->committedRbufs = t->next;
-			rf_ReleaseFloatingReconBuffer(raidPtr, rbuf->row, t);
+			rf_ReleaseFloatingReconBuffer(raidPtr, t);
 		}
 		if (keep_it) {
-			RF_UNLOCK_PSS_MUTEX(raidPtr, rbuf->row, rbuf->parityStripeID);
+			RF_UNLOCK_PSS_MUTEX(raidPtr, rbuf->parityStripeID);
+			RF_LOCK_MUTEX(reconCtrlPtr->rb_mutex);
+			reconCtrlPtr->rb_lock = 0;
+			wakeup(&reconCtrlPtr->rb_lock);
 			RF_UNLOCK_MUTEX(reconCtrlPtr->rb_mutex);
 			rf_FreeReconBuffer(rbuf);
 			return (retcode);
@@ -214,21 +224,19 @@ rf_SubmitReconBufferBasic(rbuf, keep_it, use_committed)
 	 * buf list in the recon ctrl struct. */
 	if (!t) {
 		RF_ASSERT(!keep_it && !use_committed);
-		Dprintf2("RECON: row %d col %d failed to acquire floating rbuf\n", rbuf->row, rbuf->col);
+		Dprintf1("RECON: col %d failed to acquire floating rbuf\n", rbuf->col);
 
 		raidPtr->procsInBufWait++;
 		if ((raidPtr->procsInBufWait == raidPtr->numCol - 1) && (raidPtr->numFullReconBuffers == 0)) {
 			printf("Buffer wait deadlock detected.  Exiting.\n");
-			rf_PrintPSStatusTable(raidPtr, rbuf->row);
+			rf_PrintPSStatusTable(raidPtr);
 			RF_PANIC();
 		}
 		pssPtr->flags |= RF_PSS_BUFFERWAIT;
 		cb = rf_AllocCallbackDesc();	/* append to buf wait list in
 						 * recon ctrl structure */
-		cb->row = rbuf->row;
 		cb->col = rbuf->col;
 		cb->callbackArg.v = rbuf->parityStripeID;
-		cb->callbackArg2.v = rbuf->which_ru;
 		cb->next = NULL;
 		if (!reconCtrlPtr->bufferWaitList)
 			reconCtrlPtr->bufferWaitList = cb;
@@ -240,7 +248,8 @@ rf_SubmitReconBufferBasic(rbuf, keep_it, use_committed)
 		retcode = 1;
 		goto out;
 	}
-	Dprintf2("RECON: row %d col %d acquired rbuf\n", rbuf->row, rbuf->col);
+	Dprintf1("RECON: col %d acquired rbuf\n", rbuf->col);
+#if RF_ACC_TRACE > 0
 	RF_ETIMER_STOP(raidPtr->recon_tracerecs[rbuf->col].recon_timer);
 	RF_ETIMER_EVAL(raidPtr->recon_tracerecs[rbuf->col].recon_timer);
 	raidPtr->recon_tracerecs[rbuf->col].specific.recon.recon_return_to_submit_us +=
@@ -248,15 +257,14 @@ rf_SubmitReconBufferBasic(rbuf, keep_it, use_committed)
 	RF_ETIMER_START(raidPtr->recon_tracerecs[rbuf->col].recon_timer);
 
 	rf_LogTraceRec(raidPtr, &raidPtr->recon_tracerecs[rbuf->col]);
+#endif
 
 	/* initialize the buffer */
 	if (t != rbuf) {
-		t->row = rbuf->row;
 		t->col = reconCtrlPtr->fcol;
 		t->parityStripeID = rbuf->parityStripeID;
 		t->which_ru = rbuf->which_ru;
 		t->failedDiskSectorOffset = rbuf->failedDiskSectorOffset;
-		t->spRow = rbuf->spRow;
 		t->spCol = rbuf->spCol;
 		t->spOffset = rbuf->spOffset;
 
@@ -277,16 +285,16 @@ rf_SubmitReconBufferBasic(rbuf, keep_it, use_committed)
 											 * G=2 */
 
 out:
-	RF_UNLOCK_PSS_MUTEX(raidPtr, rbuf->row, rbuf->parityStripeID);
+	RF_UNLOCK_PSS_MUTEX(raidPtr, rbuf->parityStripeID);
+	RF_LOCK_MUTEX(reconCtrlPtr->rb_mutex);
+	reconCtrlPtr->rb_lock = 0;
+	wakeup(&reconCtrlPtr->rb_lock);
 	RF_UNLOCK_MUTEX(reconCtrlPtr->rb_mutex);
 	return (retcode);
 }
-
+/* pssPtr - the pss descriptor for this parity stripe */
 int 
-rf_MultiWayReconXor(raidPtr, pssPtr)
-	RF_Raid_t *raidPtr;
-	RF_ReconParityStripeStatus_t *pssPtr;	/* the pss descriptor for this
-						 * parity stripe */
+rf_MultiWayReconXor(RF_Raid_t *raidPtr, RF_ReconParityStripeStatus_t *pssPtr)
 {
 	int     i, numBufs = pssPtr->xorBufCount;
 	int     numBytes = rf_RaidAddressToByte(raidPtr, raidPtr->Layout.sectorsPerStripeUnit * raidPtr->Layout.SUsPerRU);
@@ -311,7 +319,7 @@ rf_MultiWayReconXor(raidPtr, pssPtr)
 	 * belongs to the disk whose submission caused this XOR to take place */
 	for (i = 0; i < numBufs - 1; i++) {
 		if (rbufs[i]->type == RF_RBUF_TYPE_FLOATING)
-			rf_ReleaseFloatingReconBuffer(raidPtr, rbufs[i]->row, rbufs[i]);
+			rf_ReleaseFloatingReconBuffer(raidPtr, rbufs[i]);
 		else
 			if (rbufs[i]->type == RF_RBUF_TYPE_FORCED)
 				rf_FreeReconBuffer(rbufs[i]);
@@ -327,24 +335,24 @@ rf_MultiWayReconXor(raidPtr, pssPtr)
  * ASSUMES THE RB_MUTEX IS UNLOCKED AT ENTRY.
  */
 RF_ReconBuffer_t *
-rf_GetFullReconBuffer(reconCtrlPtr)
-	RF_ReconCtrl_t *reconCtrlPtr;
+rf_GetFullReconBuffer(RF_ReconCtrl_t *reconCtrlPtr)
 {
 	RF_ReconBuffer_t *p;
 
 	RF_LOCK_MUTEX(reconCtrlPtr->rb_mutex);
-
-	if ((p = reconCtrlPtr->priorityList) != NULL) {
-		reconCtrlPtr->priorityList = p->next;
-		p->next = NULL;
-		goto out;
+	while(reconCtrlPtr->rb_lock) {
+		ltsleep(&reconCtrlPtr->rb_lock, PRIBIO, "reconctlcnmhs", 0, &reconCtrlPtr->rb_mutex);
 	}
+	reconCtrlPtr->rb_lock = 1;
+	RF_UNLOCK_MUTEX(reconCtrlPtr->rb_mutex);
+
 	if ((p = reconCtrlPtr->fullBufferList) != NULL) {
 		reconCtrlPtr->fullBufferList = p->next;
 		p->next = NULL;
-		goto out;
 	}
-out:
+	RF_LOCK_MUTEX(reconCtrlPtr->rb_mutex);
+	reconCtrlPtr->rb_lock = 0;
+	wakeup(&reconCtrlPtr->rb_lock);
 	RF_UNLOCK_MUTEX(reconCtrlPtr->rb_mutex);
 	return (p);
 }
@@ -355,11 +363,8 @@ out:
  *
  * ASSUMES THE RB_MUTEX IS LOCKED AT ENTRY.  */
 int 
-rf_CheckForFullRbuf(raidPtr, reconCtrl, pssPtr, numDataCol)
-	RF_Raid_t *raidPtr;
-	RF_ReconCtrl_t *reconCtrl;
-	RF_ReconParityStripeStatus_t *pssPtr;
-	int     numDataCol;
+rf_CheckForFullRbuf(RF_Raid_t *raidPtr, RF_ReconCtrl_t *reconCtrl, 
+		    RF_ReconParityStripeStatus_t *pssPtr, int numDataCol)
 {
 	RF_ReconBuffer_t *p, *pt, *rbuf = (RF_ReconBuffer_t *) pssPtr->rbuf;
 
@@ -379,16 +384,9 @@ rf_CheckForFullRbuf(raidPtr, reconCtrl, pssPtr, numDataCol)
 			Dprintf2("RECON: rbuf for psid %ld ru %d is in list\n",
 			    (long) rbuf->parityStripeID, rbuf->which_ru);
 		}
-#if 0
-		pssPtr->writeRbuf = pssPtr->rbuf;	/* DEBUG ONLY:  we like
-							 * to be able to find
-							 * this rbuf while it's
-							 * awaiting write */
-#else
 		rbuf->pssPtr = pssPtr;
-#endif
 		pssPtr->rbuf = NULL;
-		rf_CauseReconEvent(raidPtr, rbuf->row, rbuf->col, NULL, RF_REVENT_BUFREADY);
+		rf_CauseReconEvent(raidPtr, rbuf->col, NULL, RF_REVENT_BUFREADY);
 	}
 	return (0);
 }
@@ -398,12 +396,9 @@ rf_CheckForFullRbuf(raidPtr, reconCtrl, pssPtr, numDataCol)
  * assumes the rb_mutex is LOCKED at entry
  */
 void 
-rf_ReleaseFloatingReconBuffer(raidPtr, row, rbuf)
-	RF_Raid_t *raidPtr;
-	RF_RowCol_t row;
-	RF_ReconBuffer_t *rbuf;
+rf_ReleaseFloatingReconBuffer(RF_Raid_t *raidPtr, RF_ReconBuffer_t *rbuf)
 {
-	RF_ReconCtrl_t *rcPtr = raidPtr->reconControl[row];
+	RF_ReconCtrl_t *rcPtr = raidPtr->reconControl;
 	RF_CallbackDesc_t *cb;
 
 	Dprintf2("RECON: releasing rbuf for psid %ld ru %d\n",
@@ -416,63 +411,12 @@ rf_ReleaseFloatingReconBuffer(raidPtr, row, rbuf)
 		rcPtr->committedRbufs = rbuf;
 		cb = rcPtr->bufferWaitList;
 		rcPtr->bufferWaitList = cb->next;
-		rf_CauseReconEvent(raidPtr, cb->row, cb->col, (void *) 1, RF_REVENT_BUFCLEAR);	/* arg==1 => we've
+		rf_CauseReconEvent(raidPtr, cb->col, (void *) 1, RF_REVENT_BUFCLEAR);	/* arg==1 => we've
 												 * committed a buffer */
 		rf_FreeCallbackDesc(cb);
 		raidPtr->procsInBufWait--;
 	} else {
 		rbuf->next = rcPtr->floatingRbufs;
 		rcPtr->floatingRbufs = rbuf;
-	}
-}
-/* release any disk that is waiting on a buffer for the indicated RU.
- * assumes the rb_mutex is LOCKED at entry
- */
-void 
-rf_ReleaseBufferWaiters(raidPtr, pssPtr)
-	RF_Raid_t *raidPtr;
-	RF_ReconParityStripeStatus_t *pssPtr;
-{
-	RF_CallbackDesc_t *cb1, *cb = pssPtr->bufWaitList;
-
-	Dprintf2("RECON: releasing buf waiters for psid %ld ru %d\n",
-	    (long) pssPtr->parityStripeID, pssPtr->which_ru);
-	pssPtr->flags &= ~RF_PSS_BUFFERWAIT;
-	while (cb) {
-		cb1 = cb->next;
-		cb->next = NULL;
-		rf_CauseReconEvent(raidPtr, cb->row, cb->col, (void *) 0, RF_REVENT_BUFCLEAR);	/* arg==0 => we haven't
-												 * committed a buffer */
-		rf_FreeCallbackDesc(cb);
-		cb = cb1;
-	}
-	pssPtr->bufWaitList = NULL;
-}
-/* when reconstruction is forced on an RU, there may be some disks waiting to
- * acquire a buffer for that RU.  Since we allocate a new buffer as part of
- * the forced-reconstruction process, we no longer have to wait for any
- * buffers, so we wakeup any waiter that we find in the bufferWaitList
- *
- * assumes the rb_mutex is LOCKED at entry
- */
-void 
-rf_ReleaseBufferWaiter(rcPtr, rbuf)
-	RF_ReconCtrl_t *rcPtr;
-	RF_ReconBuffer_t *rbuf;
-{
-	RF_CallbackDesc_t *cb, *cbt;
-
-	for (cbt = NULL, cb = rcPtr->bufferWaitList; cb; cbt = cb, cb = cb->next) {
-		if ((cb->callbackArg.v == rbuf->parityStripeID) && (cb->callbackArg2.v == rbuf->which_ru)) {
-			Dprintf2("RECON: Dropping row %d col %d from buffer wait list\n", cb->row, cb->col);
-			if (cbt)
-				cbt->next = cb->next;
-			else
-				rcPtr->bufferWaitList = cb->next;
-			rf_CauseReconEvent((RF_Raid_t *) rbuf->raidPtr, cb->row, cb->col, (void *) 0, RF_REVENT_BUFREADY);	/* arg==0 => no
-																 * committed buffer */
-			rf_FreeCallbackDesc(cb);
-			return;
-		}
 	}
 }

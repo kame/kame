@@ -1,4 +1,4 @@
-/*      $NetBSD: plcom_ifpga.c,v 1.2 2002/01/30 03:59:41 thorpej Exp $ */
+/*      $NetBSD: plcom_ifpga.c,v 1.8 2003/09/06 11:31:22 rearnsha Exp $ */
 
 /*
  * Copyright (c) 2001 ARM Ltd
@@ -31,6 +31,9 @@
 
 /* Interface to plcom (PL010) serial driver. */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: plcom_ifpga.c,v 1.8 2003/09/06 11:31:22 rearnsha Exp $");
+
 #include <sys/types.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -40,7 +43,6 @@
 #include <sys/termios.h>
 
 #include <machine/intr.h>
-#include <evbarm/ifpga/irqhandler.h>	/* XXX XXX XXX */
 #include <machine/bus.h>
 
 #include <evbarm/dev/plcomreg.h>
@@ -55,16 +57,13 @@ static int  plcom_ifpga_match(struct device *, struct cfdata *, void *);
 static void plcom_ifpga_attach(struct device *, struct device *, void *);
 static void plcom_ifpga_set_mcr(void *, int, u_int);
 
-struct cfattach plcom_ifpga_ca = {
-	sizeof(struct plcom_softc), plcom_ifpga_match, plcom_ifpga_attach
-};
+CFATTACH_DECL(plcom_ifpga, sizeof(struct plcom_softc),
+    plcom_ifpga_match, plcom_ifpga_attach, NULL, NULL);
 
 static int
 plcom_ifpga_match(struct device *parent, struct cfdata *cf, void *aux)
 {
-	if (strcmp(cf->cf_driver->cd_name, "plcom") == 0)
-		return 1;
-	return 0;
+	return 1;
 }
 
 static void
@@ -73,7 +72,6 @@ plcom_ifpga_attach(struct device *parent, struct device *self, void *aux)
 	struct plcom_ifpga_softc *isc = (struct plcom_ifpga_softc *)self;
 	struct plcom_softc *sc = &isc->sc_plcom;
 	struct ifpga_attach_args *ifa = aux;
-	char *irqname;
 
 	isc->sc_iot = ifa->ifa_iot;
 	isc->sc_ioh = ifa->ifa_sc_ioh;
@@ -92,12 +90,10 @@ plcom_ifpga_attach(struct device *parent, struct device *self, void *aux)
 	}
 
 	plcom_attach_subr(sc);
-	irqname = malloc(sizeof("uart") + 2, M_DEVBUF, M_WAITOK);
-	sprintf(irqname, "uart%d", sc->sc_dev.dv_unit);
-	isc->sc_ih = intr_claim(ifa->ifa_irq, IPL_SERIAL, irqname, plcomintr,
+	isc->sc_ih = ifpga_intr_establish(ifa->ifa_irq, IPL_SERIAL, plcomintr,
 	    sc);
 	if (isc->sc_ih == NULL)
-		panic("%s: cannot install interrupt handler\n",
+		panic("%s: cannot install interrupt handler",
 		    sc->sc_dev.dv_xname);
 }
 

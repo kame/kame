@@ -1,4 +1,4 @@
-/*	$NetBSD: sa11x0_irqhandler.c,v 1.2 2002/04/12 18:50:32 thorpej Exp $	*/
+/*	$NetBSD: sa11x0_irqhandler.c,v 1.5 2003/08/07 16:26:54 agc Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998, 2001 The NetBSD Foundation, Inc.
@@ -55,11 +55,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -78,6 +74,9 @@
  *	@(#)isa.c	7.2 (Berkeley) 5/13/91
  */
 
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sa11x0_irqhandler.c,v 1.5 2003/08/07 16:26:54 agc Exp $");
 
 #include "opt_irqstats.h"
 
@@ -108,11 +107,16 @@ u_int irqmasks[IPL_LEVELS];
 u_int irqblock[NIRQS];
 
 
-extern void set_spl_masks();
+extern void set_spl_masks(void);
 static int fakeintr(void *);
 #ifdef DEBUG
-static int dumpirqhandlers();
+static int dumpirqhandlers(void);
 #endif
+void intr_calculatemasks(void);
+
+const struct evcnt *sa11x0_intr_evcnt(sa11x0_chipset_tag_t, int);
+void stray_irqhandler(void *);
+
 /*
  * Recalculate the interrupt masks from scratch.
  * We could code special registry and deregistry versions of this function that
@@ -120,7 +124,7 @@ static int dumpirqhandlers();
  * happen very much anyway.
  */
 void
-intr_calculatemasks()
+intr_calculatemasks(void)
 {
 	int irq, level;
 	struct irqhandler *q;

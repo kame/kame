@@ -1,4 +1,4 @@
-/*	$NetBSD: mii.c,v 1.29 2002/03/25 20:51:25 thorpej Exp $	*/
+/*	$NetBSD: mii.c,v 1.33 2003/01/01 00:10:21 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mii.c,v 1.29 2002/03/25 20:51:25 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mii.c,v 1.33 2003/01/01 00:10:21 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -181,7 +181,7 @@ mii_activate(struct mii_data *mii, enum devact act, int phyloc, int offloc)
 
 		case DVACT_DEACTIVATE:
 			if (config_deactivate(&child->mii_dev) != 0)
-				panic("%s: config_activate(%d) failed\n",
+				panic("%s: config_activate(%d) failed",
 				    child->mii_dev.dv_xname, act);
 		}
 	}
@@ -220,11 +220,11 @@ mii_print(void *aux, const char *pnp)
 	struct mii_attach_args *ma = aux;
 
 	if (pnp != NULL)
-		printf("OUI 0x%06x model 0x%04x rev %d at %s",
+		aprint_normal("OUI 0x%06x model 0x%04x rev %d at %s",
 		    MII_OUI(ma->mii_id1, ma->mii_id2), MII_MODEL(ma->mii_id2),
 		    MII_REV(ma->mii_id2), pnp);
 
-	printf(" phy %d", ma->mii_phyno);
+	aprint_normal(" phy %d", ma->mii_phyno);
 	return (UNCONF);
 }
 
@@ -237,7 +237,7 @@ mii_submatch(struct device *parent, struct cfdata *cf, void *aux)
 	    cf->cf_loc[MIICF_PHY] != MIICF_PHY_DEFAULT)
 		return (0);
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 /*
@@ -313,10 +313,10 @@ bitreverse(unsigned char x)
 	return ((nibbletab[x & 15] << 4) | nibbletab[x >> 4]);
 }
 
-int
-mii_oui(int id1, int id2)
+u_int
+mii_oui(u_int id1, u_int id2)
 {
-	int h;
+	u_int h;
 
 	h = (id1 << 6) | (id2 >> 10);
 

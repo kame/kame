@@ -1,4 +1,4 @@
-/* $NetBSD: dec_axppci_33.c,v 1.50 2001/06/05 04:53:11 thorpej Exp $ */
+/* $NetBSD: dec_axppci_33.c,v 1.55.4.1 2004/07/05 22:42:15 he Exp $ */
 
 /*
  * Copyright (c) 1995, 1996, 1997 Carnegie-Mellon University.
@@ -34,12 +34,13 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: dec_axppci_33.c,v 1.50 2001/06/05 04:53:11 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dec_axppci_33.c,v 1.55.4.1 2004/07/05 22:42:15 he Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/termios.h>
+#include <sys/conf.h>
 #include <dev/cons.h>
 
 #include <uvm/uvm_extern.h>
@@ -47,7 +48,7 @@ __KERNEL_RCSID(0, "$NetBSD: dec_axppci_33.c,v 1.50 2001/06/05 04:53:11 thorpej E
 #include <machine/rpb.h>
 #include <machine/alpha.h>
 #include <machine/autoconf.h>
-#include <machine/conf.h>
+#include <machine/cpuconf.h>
 
 #include <dev/ic/comreg.h>
 #include <dev/ic/comvar.h>
@@ -187,7 +188,7 @@ dec_axppci_33_cons_init()
 			DELAY(160000000 / comcnrate);
 
 			if(comcnattach(&lcp->lc_iot, 0x3f8, comcnrate,
-			    COM_FREQ,
+			    COM_FREQ, COM_TYPE_NORMAL,
 			    (TTYDEF_CFLAG & ~(CSIZE | PARENB)) | CS8))
 				panic("can't init serial console");
 
@@ -217,7 +218,7 @@ dec_axppci_33_cons_init()
 		printf("ctb->ctb_term_type = 0x%lx\n", ctb->ctb_term_type);
 		printf("ctb->ctb_turboslot = 0x%lx\n", ctb->ctb_turboslot);
 
-		panic("consinit: unknown console type %ld\n",
+		panic("consinit: unknown console type %ld",
 		    ctb->ctb_term_type);
 	}
 #ifdef KGDB
@@ -231,28 +232,28 @@ dec_axppci_33_device_register(dev, aux)
 	struct device *dev;
 	void *aux;
 {
-	static int found, initted, scsiboot, netboot;
-	static struct device *pcidev, *scsidev;
+	static int found, initted, diskboot, netboot;
+	static struct device *pcidev, *ctrlrdev;
 	struct bootdev_data *b = bootdev_data;
 	struct device *parent = dev->dv_parent;
 	struct cfdata *cf = dev->dv_cfdata;
-	struct cfdriver *cd = cf->cf_driver;
+	const char *name = cf->cf_name;
 
 	if (found)
 		return;
 
 	if (!initted) {
-		scsiboot = (strcmp(b->protocol, "SCSI") == 0);
-		netboot = (strcmp(b->protocol, "BOOTP") == 0) ||
-		    (strcmp(b->protocol, "MOP") == 0);
+		diskboot = (strcasecmp(b->protocol, "SCSI") == 0);
+		netboot = (strcasecmp(b->protocol, "BOOTP") == 0) ||
+		    (strcasecmp(b->protocol, "MOP") == 0);
 #if 0
-		printf("scsiboot = %d, netboot = %d\n", scsiboot, netboot);
+		printf("diskboot = %d, netboot = %d\n", diskboot, netboot);
 #endif
 		initted =1;
 	}
 
 	if (pcidev == NULL) {
-		if (strcmp(cd->cd_name, "pci"))
+		if (strcmp(name, "pci"))
 			return;
 		else {
 			struct pcibus_attach_args *pba = aux;
@@ -262,84 +263,62 @@ dec_axppci_33_device_register(dev, aux)
 	
 			pcidev = dev;
 #if 0
-			printf("\npcidev = %s\n", pcidev->dv_xname);
+			printf("\npcidev = %s\n", dev->dv_xname);
 #endif
 			return;
 		}
 	}
 
-	if (scsiboot && (scsidev == NULL)) {
+	if (ctrlrdev == NULL) {
 		if (parent != pcidev)
 			return;
 		else {
 			struct pci_attach_args *pa = aux;
+			int slot;
 
-			if ((b->slot % 1000) != pa->pa_device)
+			slot = pa->pa_bus * 1000 + pa->pa_function * 100 +
+			    pa->pa_device;
+			if (b->slot != slot)
 				return;
-
-			/* XXX function? */
 	
-			scsidev = dev;
+			if (netboot) {
+				booted_device = dev;
 #if 0
-			printf("\nscsidev = %s\n", scsidev->dv_xname);
+				printf("\nbooted_device = %s\n", dev->dv_xname);
 #endif
+				found = 1;
+			} else {
+				ctrlrdev = dev;
+#if 0
+				printf("\nctrlrdev = %s\n", dev->dv_xname);
+#endif
+			}
 			return;
 		}
 	}
 
-	if (scsiboot &&
-	    (!strcmp(cd->cd_name, "sd") ||
-	     !strcmp(cd->cd_name, "st") ||
-	     !strcmp(cd->cd_name, "cd"))) {
+	if (!diskboot)
+		return;
+
+	if (!strcmp(name, "sd") || !strcmp(name, "st") || !strcmp(name, "cd")) {
 		struct scsipibus_attach_args *sa = aux;
+		struct scsipi_periph *periph = sa->sa_periph;
+		int unit;
 
-		if (parent->dv_parent != scsidev)
+		if (parent->dv_parent != ctrlrdev)
 			return;
 
-		if (b->unit / 100 != sa->sa_periph->periph_target)
+		unit = periph->periph_target * 100 + periph->periph_lun;
+		if (b->unit != unit)
 			return;
-
-		/* XXX LUN! */
-
-		switch (b->boot_dev_type) {
-		case 0:
-			if (strcmp(cd->cd_name, "sd") &&
-			    strcmp(cd->cd_name, "cd"))
-				return;
-			break;
-		case 1:
-			if (strcmp(cd->cd_name, "st"))
-				return;
-			break;
-		default:
+		if (b->channel != periph->periph_channel->chan_channel)
 			return;
-		}
 
 		/* we've found it! */
 		booted_device = dev;
 #if 0
-		printf("\nbooted_device = %s\n", booted_device->dv_xname);
+		printf("\nbooted_device = %s\n", dev->dv_xname);
 #endif
 		found = 1;
-	}
-
-	if (netboot) {
-		if (parent != pcidev)
-			return;
-		else {
-			struct pci_attach_args *pa = aux;
-
-			if ((b->slot % 1000) != pa->pa_device)
-				return;
-
-			/* XXX function? */
-	
-			booted_device = dev;
-#if 0
-			printf("\nbooted_device = %s\n", booted_device->dv_xname);
-#endif
-			found = 1;
-			return;
-		}
 	}
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: c_nec_pci.c,v 1.1 2001/06/13 15:23:22 soda Exp $	*/
+/*	$NetBSD: c_nec_pci.c,v 1.9 2003/12/04 13:05:15 keihan Exp $	*/
 
 /*-
  * Copyright (C) 2000 Shuichiro URATA.  All rights reserved.
@@ -30,6 +30,9 @@
  * for NEC PCI generation machines.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: c_nec_pci.c,v 1.9 2003/12/04 13:05:15 keihan Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kcore.h>
@@ -37,9 +40,13 @@
 #include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
+#include <machine/bus.h>
 #include <machine/pio.h>
 #include <machine/platform.h>
 #include <mips/pte.h>
+
+#include <dev/clock_subr.h>
+#include <dev/ic/mc146818var.h>
 
 #include <dev/pci/pcivar.h>
 
@@ -48,6 +55,7 @@
 #include <arc/jazz/pica.h>
 #include <arc/jazz/rd94.h>
 #include <arc/jazz/jazziovar.h>
+#include <arc/jazz/mcclock_jazziovar.h>
 #include <arc/pci/necpbvar.h>
 
 #include "tga.h"
@@ -85,6 +93,90 @@ char *c_nec_pci_mainbusdevs[] = {
 };
 
 /*
+ * chipset-dependent mcclock routines.
+ */
+
+static u_int	mc_nec_pci_read(struct mc146818_softc *, u_int);
+static void	mc_nec_pci_write(struct mc146818_softc *, u_int, u_int);
+
+struct mcclock_jazzio_config mcclock_nec_pci_conf = {
+	0x80004000,		/* I/O base */
+	2,			/* I/O size */
+	mc_nec_pci_read,	/* read function */
+	mc_nec_pci_write	/* write function */
+};
+
+/*
+ * This is a mask of bits to clear in the SR when we go to a
+ * given interrupt priority level.
+ */
+static const u_int32_t nec_pci_ipl_sr_bits[_IPL_N] = {
+	0,					/* IPL_NONE */
+
+	MIPS_SOFT_INT_MASK_0,			/* IPL_SOFT */
+
+	MIPS_SOFT_INT_MASK_0,			/* IPL_SOFTCLOCK */
+
+	MIPS_SOFT_INT_MASK_0|
+		MIPS_SOFT_INT_MASK_1,		/* IPL_SOFTNET */
+
+	MIPS_SOFT_INT_MASK_0|
+		MIPS_SOFT_INT_MASK_1,		/* IPL_SOFTSERIAL */
+
+	MIPS_SOFT_INT_MASK_0|
+		MIPS_SOFT_INT_MASK_1|
+		MIPS_INT_MASK_0|
+		MIPS_INT_MASK_1|
+		MIPS_INT_MASK_2,		/* IPL_BIO */
+
+	MIPS_SOFT_INT_MASK_0|
+		MIPS_SOFT_INT_MASK_1|
+		MIPS_INT_MASK_0|
+		MIPS_INT_MASK_1|
+		MIPS_INT_MASK_2,		/* IPL_NET */
+
+	MIPS_SOFT_INT_MASK_0|
+		MIPS_SOFT_INT_MASK_1|
+		MIPS_INT_MASK_0|
+		MIPS_INT_MASK_1|
+		MIPS_INT_MASK_2,		/* IPL_{TTY,SERIAL} */
+
+	MIPS_SOFT_INT_MASK_0|
+		MIPS_SOFT_INT_MASK_1|
+		MIPS_INT_MASK_0|
+		MIPS_INT_MASK_1|
+		MIPS_INT_MASK_2|
+		MIPS_INT_MASK_3|
+		MIPS_INT_MASK_4|
+		MIPS_INT_MASK_5,		/* IPL_{CLOCK,HIGH} */
+};
+
+static u_int
+mc_nec_pci_read(sc, reg)
+	struct mc146818_softc *sc;
+	u_int reg;
+{
+	u_int i, as;
+
+	as = bus_space_read_1(sc->sc_bst, sc->sc_bsh, 1) & 0x80;
+	bus_space_write_1(sc->sc_bst, sc->sc_bsh, 1, as | reg);
+	i = bus_space_read_1(sc->sc_bst, sc->sc_bsh, 0);
+	return i;
+}
+
+static void
+mc_nec_pci_write(sc, reg, datum)
+	struct mc146818_softc *sc;
+	u_int reg, datum;
+{
+	u_int as;
+
+	as = bus_space_read_1(sc->sc_bst, sc->sc_bsh, 1) & 0x80;
+	bus_space_write_1(sc->sc_bst, sc->sc_bsh, 1, as | reg);
+	bus_space_write_1(sc->sc_bst, sc->sc_bsh, 0, datum);
+}
+
+/*
  * chipset-dependent jazzio bus configuration
  */
 
@@ -101,6 +193,7 @@ void
 jazzio_nec_pci_set_iointr_mask(mask)
 	int mask;
 {
+
 	/* XXX: I don't know why, but firmware does. */
 	if (in32(RD94_V_LOCAL_IO_BASE + 0x560) != 0)
 		out16(RD94_SYS_LB_IE2, mask);
@@ -114,6 +207,7 @@ jazzio_nec_pci_set_iointr_mask(mask)
 void
 c_nec_pci_init()
 {
+
 	/*
 	 * Initialize I/O address offset
 	 */
@@ -144,7 +238,7 @@ c_nec_pci_init()
 	 * increase this value by a option like below:
 	 *     options KSEG2IOBUFSIZE=0x1b000000 # 432MB consumes 432KB
 	 * If you met this symptom, please report it to
-	 * port-arc-maintainer@netbsd.org.
+	 * port-arc-maintainer@NetBSD.org.
 	 *
 	 * kseg2iobufsize will be refered from pmap_bootstrap().
 	 */
@@ -153,12 +247,7 @@ c_nec_pci_init()
 	/*
 	 * Initialize interrupt priority
 	 */
-	splvec.splnet = MIPS_INT_MASK_SPL2;
-	splvec.splbio = MIPS_INT_MASK_SPL2;
-	splvec.splvm = MIPS_INT_MASK_SPL2;
-	splvec.spltty = MIPS_INT_MASK_SPL2;
-	splvec.splclock = MIPS_INT_MASK_SPL5;
-	splvec.splstatclock = MIPS_INT_MASK_SPL5;
+	ipl_sr_bits = nec_pci_ipl_sr_bits;
 
 	/*
 	 * Disable all interrupts. New masks will be set up
@@ -173,6 +262,9 @@ c_nec_pci_init()
 	 */
 	c_nec_jazz_init();
 
+	/* chipset-dependent mcclock configuration */
+	mcclock_jazzio_conf = &mcclock_nec_pci_conf;
+
 	/* chipset-dependent jazzio bus configuration */
 	jazzio_conf = &jazzio_nec_pci_conf;
 }
@@ -183,12 +275,13 @@ c_nec_pci_init()
 void
 c_nec_pci_cons_init()
 {
+
 	if (!com_console) {
 		if (strcmp(arc_displayc_id, "10110004") == 0) {
 			/* NEC RISCstation 2200 PCI TGA [NEC-RA94] */
 			/* NEC RISCstation 2250 PCI TGA [NEC-RD94] */
 			/* NEC Express 5800/230 R4400 PCI TGA [NEC-JC94] */
-			/* NEC Express 5800/230 R10000 PCI TGA [[NEC-J95] */
+			/* NEC Express 5800/230 R10000 PCI TGA [NEC-J95] */
 #if NTGA > 0
 			necpb_init(&necpb_main_context);
 			/* XXX device number is hardcoded */
@@ -231,6 +324,6 @@ c_nec_pci_cons_init()
 	if (com_console_address == 0)
 		com_console_address = RD94_SYS_COM1;
 	comcnattach(&jazzio_bus, com_console_address,
-	    com_console_speed, com_freq, com_console_mode);
+	    com_console_speed, com_freq, COM_TYPE_NORMAL, com_console_mode);
 #endif
 }

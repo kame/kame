@@ -1,8 +1,6 @@
-#	$NetBSD: files.news68k,v 1.15 2001/11/28 10:21:17 lukem Exp $
+#	$NetBSD: files.news68k,v 1.25 2003/09/26 22:23:58 wiz Exp $
 
 #	NEWS68K-specific configuration info
-
-defflag	opt_fpuemulate.h	FPU_EMULATE
 
 # maxpartitions must be first item in files.${ARCH}.
 maxpartitions 8
@@ -14,25 +12,22 @@ attach mainbus at root
 
 file	arch/news68k/news68k/autoconf.c
 file	arch/news68k/news68k/bus_space.c
-file	arch/news68k/news68k/conf.c
 #file	arch/news68k/news68k/cons_machdep.c
 file	arch/news68k/news68k/clock.c
-file	arch/news68k/news68k/db_memrw.c		ddb | kgdb
 file	arch/news68k/news68k/disksubr.c		disk
 file	arch/news68k/news68k/isr.c
 file	arch/news68k/news68k/machdep.c
 file	arch/news68k/news68k/mainbus.c
 file	arch/news68k/news68k/mem.c
-file	arch/news68k/news68k/pmap.c
 file	arch/news68k/news68k/pmap_bootstrap.c	compile-with "${NOPROF_C}"
 file	arch/news68k/news68k/procfs_machdep.c	procfs
-file	arch/news68k/news68k/sys_machdep.c
 file	arch/news68k/news68k/trap.c
-file	arch/news68k/news68k/vm_machdep.c
-file	dev/clock_subr.c
+file	arch/m68k/m68k/cacheops.c
+file	arch/m68k/m68k/db_memrw.c		ddb | kgdb
+file	arch/m68k/m68k/pmap_motorola.c
+file	arch/m68k/m68k/sys_machdep.c
+file	arch/m68k/m68k/vm_machdep.c
 file	dev/cons.c
-
-major { vnd = 6 }
 
 # Emulation modules
 # 6888x emulator (FPU_EMULATE)
@@ -43,7 +38,7 @@ device hb { addr = 0, [ipl = -1], [vect = -1] }
 attach hb at mainbus
 file arch/news68k/dev/hb.c			hb
 
-# I/O Proccesser
+# I/O Processor
 #device iop { [addr = -1], [ipl = -1] }
 #attach iop at mainbus
 #file arch/news68k/dev/iop.c			iop
@@ -113,10 +108,6 @@ file arch/news68k/dev/fd.c			fdc | fd needs-flag
 
 # Machine-independent SCSI driver
 include "dev/scsipi/files.scsipi"
-major { sd = 0 }
-major { fd = 1 }
-major { cd = 16 }
-major { st = 17 }
 
 # Sony CXD1180 SCSI controller
 device si: scsi, ncr5380sbc
@@ -124,11 +115,7 @@ file arch/news68k/dev/si.c			si needs-flag
 attach si at hb
 
 # memory disk
-major {md = 2}
 file	dev/md_root.c				memory_disk_hooks
-
-# RAIDframe
-major {raid = 32}
 
 # NetBSD m68k a.out binary compatibility (COMPAT_AOUT_M68K)
 include "compat/aoutm68k/files.aoutm68k"
@@ -154,3 +141,5 @@ include "compat/aout/files.aout"
 
 # OSS audio driver compatibility
 include	"compat/ossaudio/files.ossaudio"
+
+include "arch/news68k/conf/majors.news68k"

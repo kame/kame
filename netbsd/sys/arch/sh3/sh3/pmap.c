@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.40 2002/05/09 12:28:08 uch Exp $	*/
+/*	$NetBSD: pmap.c,v 1.50 2003/12/30 12:33:19 pk Exp $	*/
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.50 2003/12/30 12:33:19 pk Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/pool.h>
@@ -55,7 +58,7 @@
 #define	__PMAP_PTP_SHIFT	22
 #define	__PMAP_PTP_TRUNC(va)						\
 	(((va) + (1 << __PMAP_PTP_SHIFT) - 1) & ~((1 << __PMAP_PTP_SHIFT) - 1))
-#define	__PMAP_PTP_PG_N		(NBPG / sizeof(pt_entry_t))
+#define	__PMAP_PTP_PG_N		(PAGE_SIZE / sizeof(pt_entry_t))
 #define	__PMAP_PTP_INDEX(va)	(((va) >> __PMAP_PTP_SHIFT) & (__PMAP_PTP_N - 1))
 #define	__PMAP_PTP_OFSET(va)	((va >> PGSHIFT) & (__PMAP_PTP_PG_N - 1))
 
@@ -102,28 +105,13 @@ STATIC boolean_t __pmap_map_change(pmap_t, vaddr_t, paddr_t, vm_prot_t,
 void
 pmap_bootstrap()
 {
-	size_t sz;
-	caddr_t v;
 
 	/* Steal msgbuf area */
 	initmsgbuf((caddr_t)uvm_pageboot_alloc(MSGBUFSIZE), MSGBUFSIZE);
 
-	/* Allocate space for system data structures. */
-	sz = (size_t)allocsys(NULL, NULL);
-	v = (caddr_t)uvm_pageboot_alloc(sz);
-	if ((allocsys(v, NULL) - v) != sz)
-		panic("pmap_bootstrap: table size inconsistency");
-
 	avail_start = ptoa(vm_physmem[0].start);
 	avail_end = ptoa(vm_physmem[vm_nphysseg - 1].end);
 	__pmap_kve = VM_MIN_KERNEL_ADDRESS;
-
-	/* Initialize pmap module */
-	pool_init(&__pmap_pmap_pool, sizeof(struct pmap), 0, 0, 0, "pmappl",
-	    &pool_allocator_nointr);
-	pool_init(&__pmap_pv_pool, sizeof(struct pv_entry), 0, 0, 0, "pvpl",
-	    &pmap_pv_page_allocator);
-	pool_setlowat(&__pmap_pv_pool, 16);
 
 	pmap_kernel()->pm_refcnt = 1;
 	pmap_kernel()->pm_ptp = (pt_entry_t **)uvm_pageboot_alloc(PAGE_SIZE);
@@ -226,7 +214,12 @@ void
 pmap_init()
 {
 
-	/* Nothing to do */
+	/* Initialize pmap module */
+	pool_init(&__pmap_pmap_pool, sizeof(struct pmap), 0, 0, 0, "pmappl",
+	    &pool_allocator_nointr);
+	pool_init(&__pmap_pv_pool, sizeof(struct pv_entry), 0, 0, 0, "pvpl",
+	    &pmap_pv_page_allocator);
+	pool_setlowat(&__pmap_pv_pool, 16);
 }
 
 pmap_t
@@ -293,9 +286,9 @@ pmap_reference(pmap_t pmap)
 }
 
 void
-pmap_activate(struct proc *p)
+pmap_activate(struct lwp *l)
 {
-	pmap_t pmap = p->p_vmspace->vm_map.pmap;
+	pmap_t pmap = l->l_proc->p_vmspace->vm_map.pmap;
 
 	if (pmap->pm_asid == -1)
 		pmap->pm_asid = __pmap_asid_alloc();
@@ -305,7 +298,7 @@ pmap_activate(struct proc *p)
 }
 
 void
-pmap_deactivate(struct proc *p)
+pmap_deactivate(struct lwp *l)
 {
 
 	/* Nothing to do */
@@ -362,9 +355,15 @@ pmap_enter(pmap_t pmap, vaddr_t va, paddr_t pa, vm_prot_t prot, int flags)
 		__pmap_pv_enter(pmap, pg, va);
 
 	} else {	/* bus-space (always uncached map) */
-		KDASSERT(kva);
-		entry |= PG_V | PG_SH |
-		    (prot & VM_PROT_WRITE) ? (PG_PR_KRW | PG_D) : PG_PR_KRO;
+		if (kva) {
+			entry |= PG_V | PG_SH |
+			    ((prot & VM_PROT_WRITE) ?
+			    (PG_PR_KRW | PG_D) : PG_PR_KRO);
+		} else {
+			entry |= PG_V |
+			    ((prot & VM_PROT_WRITE) ?
+			    (PG_PR_URW | PG_D) : PG_PR_URO);
+		}
 	}
 
 	/* Register to page table */
@@ -433,7 +432,7 @@ __pmap_map_change(pmap_t pmap, vaddr_t va, paddr_t pa, vm_prot_t prot,
 
 /*
  * void __pmap_pv_enter(pmap_t pmap, struct vm_page *pg, vaddr_t vaddr):
- *	Insert phisical-virutal map to vm_page.
+ *	Insert physical-virtual map to vm_page.
  *	Assume pre-existed mapping is already removed.
  */
 void
@@ -496,7 +495,7 @@ pmap_remove(pmap_t pmap, vaddr_t sva, vaddr_t eva)
 
 /*
  * void __pmap_pv_remove(pmap_t pmap, struct vm_page *pg, vaddr_t vaddr):
- *	Remove phisical-virutal map from vm_page.
+ *	Remove physical-virtual map from vm_page.
  */
 void
 __pmap_pv_remove(pmap_t pmap, struct vm_page *pg, vaddr_t vaddr)

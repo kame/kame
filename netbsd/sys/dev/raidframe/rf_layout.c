@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_layout.c,v 1.11 2001/11/13 07:11:14 lukem Exp $	*/
+/*	$NetBSD: rf_layout.c,v 1.16 2004/01/04 06:37:16 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rf_layout.c,v 1.11 2001/11/13 07:11:14 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rf_layout.c,v 1.16 2004/01/04 06:37:16 oster Exp $");
 
 #include <dev/raidframe/raidframevar.h>
 
@@ -77,15 +77,16 @@ __KERNEL_RCSID(0, "$NetBSD: rf_layout.c,v 1.11 2001/11/13 07:11:14 lukem Exp $")
  *
  ***********************************************************************/
 
-static RF_AccessState_t DefaultStates[] = {rf_QuiesceState,
+static const RF_AccessState_t DefaultStates[] = {
+					   rf_QuiesceState,
 					   rf_IncrAccessesCountState, 
 					   rf_MapState, 
 					   rf_LockState, 
 					   rf_CreateDAGState,
 					   rf_ExecuteDAGState, 
 					   rf_ProcessDAGState, 
-					   rf_DecrAccessesCountState,
 					   rf_CleanupState, 
+					   rf_DecrAccessesCountState,
 					   rf_LastState};
 
 #define RF_NU(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p) a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p
@@ -93,7 +94,7 @@ static RF_AccessState_t DefaultStates[] = {rf_QuiesceState,
 /* Note that if you add any new RAID types to this list, that you must
    also update the mapsw[] table in the raidctl sources */
 
-static RF_LayoutSW_t mapsw[] = {
+static const RF_LayoutSW_t mapsw[] = {
 #if RF_INCLUDE_PARITY_DECLUSTERING > 0
 	/* parity declustering */
 	{'T', "Parity declustering",
@@ -373,10 +374,10 @@ static RF_LayoutSW_t mapsw[] = {
 	}
 };
 
-RF_LayoutSW_t *
+const RF_LayoutSW_t *
 rf_GetLayout(RF_ParityConfig_t parityConfig)
 {
-	RF_LayoutSW_t *p;
+	const RF_LayoutSW_t *p;
 
 	/* look up the specific layout */
 	for (p = &mapsw[0]; p->parityConfig; p++)
@@ -398,14 +399,12 @@ rf_GetLayout(RF_ParityConfig_t parityConfig)
  *
  ****************************************************************************/
 int 
-rf_ConfigureLayout(
-    RF_ShutdownList_t ** listp,
-    RF_Raid_t * raidPtr,
-    RF_Config_t * cfgPtr)
+rf_ConfigureLayout(RF_ShutdownList_t **listp, RF_Raid_t *raidPtr,
+		   RF_Config_t *cfgPtr)
 {
 	RF_RaidLayout_t *layoutPtr = &(raidPtr->Layout);
 	RF_ParityConfig_t parityConfig;
-	RF_LayoutSW_t *p;
+	const RF_LayoutSW_t *p;
 	int     retval;
 
 	layoutPtr->sectorsPerStripeUnit = cfgPtr->sectPerSU;
@@ -437,7 +436,6 @@ rf_ConfigureLayout(
 	if (retval)
 		return (retval);
 
-	layoutPtr->dataBytesPerStripe = layoutPtr->dataSectorsPerStripe << raidPtr->logBytesPerSector;
 	raidPtr->sectorsPerDisk = layoutPtr->stripeUnitsPerDisk * layoutPtr->sectorsPerStripeUnit;
 
 	if (rf_forceNumFloatingReconBufs >= 0) {
@@ -451,19 +449,6 @@ rf_ConfigureLayout(
 	} else {
 		raidPtr->headSepLimit = rf_GetDefaultHeadSepLimit(raidPtr);
 	}
-
-	printf("RAIDFRAME: Configure (%s): total number of sectors is %lu (%lu MB)\n",
-	    layoutPtr->map->configName,
-	    (unsigned long) raidPtr->totalSectors,
-	    (unsigned long) (raidPtr->totalSectors / 1024 * (1 << raidPtr->logBytesPerSector) / 1024));
-	if (raidPtr->headSepLimit >= 0) {
-		printf("RAIDFRAME(%s): Using %ld floating recon bufs with head sep limit %ld\n",
-		    layoutPtr->map->configName, (long) raidPtr->numFloatingReconBufs, (long) raidPtr->headSepLimit);
-	} else {
-		printf("RAIDFRAME(%s): Using %ld floating recon bufs with no head sep limit\n",
-		    layoutPtr->map->configName, (long) raidPtr->numFloatingReconBufs);
-	}
-
 	return (0);
 }
 /* typically there is a 1-1 mapping between stripes and parity stripes.
@@ -474,10 +459,9 @@ rf_ConfigureLayout(
  * a RaidAddressToParityStripeID macro in layout.h
  */
 RF_StripeNum_t 
-rf_MapStripeIDToParityStripeID(layoutPtr, stripeID, which_ru)
-	RF_RaidLayout_t *layoutPtr;
-	RF_StripeNum_t stripeID;
-	RF_ReconUnitNum_t *which_ru;
+rf_MapStripeIDToParityStripeID(RF_RaidLayout_t *layoutPtr,
+			       RF_StripeNum_t stripeID,
+			       RF_ReconUnitNum_t *which_ru)
 {
 	RF_StripeNum_t parityStripeID;
 

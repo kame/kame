@@ -1,4 +1,4 @@
-/*	$NetBSD: wdc_pioc.c,v 1.2 2001/11/27 00:53:11 thorpej Exp $	*/
+/*	$NetBSD: wdc_pioc.c,v 1.15 2004/01/03 22:56:52 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1997-1998 Mark Brinicombe.
@@ -33,6 +33,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: wdc_pioc.c,v 1.15 2004/01/03 22:56:52 thorpej Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -44,6 +47,7 @@
 #include <acorn32/mainbus/piocvar.h>
 
 #include <dev/ata/atavar.h>
+#include <dev/ic/wdcreg.h>
 #include <dev/ic/wdcvar.h>
 
 #include "locators.h"
@@ -54,8 +58,9 @@
 
 struct wdc_pioc_softc {
 	struct	wdc_softc sc_wdcdev;
-	struct	channel_softc *wdc_chanptr;
-	struct	channel_softc wdc_channel;
+	struct	wdc_channel *wdc_chanlist[1];
+	struct	wdc_channel wdc_channel;
+	struct	ata_queue wdc_chqueue;
 	void	*sc_ih;
 };
 
@@ -64,9 +69,8 @@ static int  wdc_pioc_probe  __P((struct device *, struct cfdata *, void *));
 static void wdc_pioc_attach __P((struct device *, struct device *, void *));
 
 /* device attach structure */
-struct cfattach wdc_pioc_ca = {
-	sizeof(struct wdc_pioc_softc), wdc_pioc_probe, wdc_pioc_attach
-};
+CFATTACH_DECL(wdc_pioc, sizeof(struct wdc_pioc_softc),
+    wdc_pioc_probe, wdc_pioc_attach, NULL, NULL);
 
 /*
  * int wdc_pioc_probe(struct device *parent, struct cfdata *cf, void *aux)
@@ -82,8 +86,8 @@ wdc_pioc_probe(parent, cf, aux)
 	void *aux;
 {
 	struct pioc_attach_args *pa = aux;
-	struct channel_softc ch;
-	int res;
+	struct wdc_channel ch;
+	int res, i;
 	u_int iobase;
 
 	if (pa->pa_name && strcmp(pa->pa_name, "wdc") != 0)
@@ -100,18 +104,28 @@ wdc_pioc_probe(parent, cf, aux)
 	ch.ctl_iot = pa->pa_iot;
 
 	if (bus_space_map(ch.cmd_iot, iobase, WDC_PIOC_REG_NPORTS, 0,
-	    &ch.cmd_ioh))
+	    &ch.cmd_baseioh))
 		return(0);
+	for (i = 0; i < WDC_PIOC_REG_NPORTS; i++) {
+		if (bus_space_subregion(ch.cmd_iot, ch.cmd_baseioh, i,
+			i == 0 ? 4 : 1, &ch.cmd_iohs[i]) != 0) {
+			bus_space_unmap(ch.cmd_iot, ch.cmd_baseioh,
+			    WDC_PIOC_REG_NPORTS);
+			return 0;
+		}
+	}
+
 	if (bus_space_map(ch.ctl_iot, iobase + WDC_PIOC_AUXREG_OFFSET,
 	    WDC_PIOC_AUXREG_NPORTS, 0, &ch.ctl_ioh)) {
-		bus_space_unmap(ch.cmd_iot, ch.cmd_ioh, WDC_PIOC_REG_NPORTS);
+		bus_space_unmap(ch.cmd_iot, ch.cmd_baseioh,
+		    WDC_PIOC_REG_NPORTS);
 		return(0);
 	}
 
 	res = wdcprobe(&ch);
 
 	bus_space_unmap(ch.ctl_iot, ch.ctl_ioh, WDC_PIOC_AUXREG_NPORTS);
-	bus_space_unmap(ch.cmd_iot, ch.cmd_ioh, WDC_PIOC_REG_NPORTS);
+	bus_space_unmap(ch.cmd_iot, ch.cmd_baseioh, WDC_PIOC_REG_NPORTS);
 
 	if (res)
 		 pa->pa_iosize = WDC_PIOC_REG_NPORTS;
@@ -132,6 +146,7 @@ wdc_pioc_attach(parent, self, aux)
 	struct wdc_pioc_softc *sc = (void *)self;
 	struct pioc_attach_args *pa = aux;
 	u_int iobase;
+	int i;
 
 	printf("\n");
 
@@ -139,32 +154,34 @@ wdc_pioc_attach(parent, self, aux)
 	sc->wdc_channel.cmd_iot = pa->pa_iot;
 	sc->wdc_channel.ctl_iot = pa->pa_iot;
 	if (bus_space_map(sc->wdc_channel.cmd_iot, iobase,
-	    WDC_PIOC_REG_NPORTS, 0, &sc->wdc_channel.cmd_ioh))
-		panic("%s: couldn't map drive registers\n", self->dv_xname);
+	    WDC_PIOC_REG_NPORTS, 0, &sc->wdc_channel.cmd_baseioh))
+		panic("%s: couldn't map drive registers", self->dv_xname);
+	for (i = 0; i < WDC_PIOC_REG_NPORTS; i++) {
+		if (bus_space_subregion(sc->wdc_channel.cmd_iot,
+			sc->wdc_channel.cmd_baseioh, i,	i == 0 ? 4 : 1,
+			&sc->wdc_channel.cmd_iohs[i]) != 0)
+			panic("%s: couldn't submap drive registers",
+			    self->dv_xname);
+	}
 	    
 	if (bus_space_map(sc->wdc_channel.ctl_iot,
 	    iobase + WDC_PIOC_AUXREG_OFFSET, WDC_PIOC_AUXREG_NPORTS, 0,
 	    &sc->wdc_channel.ctl_ioh))
-		panic("%s: couldn't map aux registers\n", self->dv_xname);
+		panic("%s: couldn't map aux registers", self->dv_xname);
 
 	sc->sc_ih = intr_claim(pa->pa_irq, IPL_BIO, "wdc",  wdcintr,
 	     &sc->wdc_channel);
 	if (!sc->sc_ih)
-		panic("%s: Cannot claim IRQ %d\n", self->dv_xname, pa->pa_irq);
+		panic("%s: Cannot claim IRQ %d", self->dv_xname, pa->pa_irq);
 	sc->sc_wdcdev.cap |= WDC_CAPABILITY_DATA16;
 	sc->sc_wdcdev.PIO_cap = 0;
-	sc->wdc_chanptr = &sc->wdc_channel;
-	sc->sc_wdcdev.channels = &sc->wdc_chanptr;
-	sc->wdc_channel.wdc = &sc->sc_wdcdev;
+	sc->wdc_chanlist[0] = &sc->wdc_channel;
+	sc->sc_wdcdev.channels = sc->wdc_chanlist;
+	sc->wdc_channel.ch_wdc = &sc->sc_wdcdev;
 	sc->sc_wdcdev.nchannels = 1;
-	sc->wdc_channel.channel = 0;
-	sc->wdc_channel.ch_queue = malloc(sizeof(struct channel_queue),
-	    M_DEVBUF, M_NOWAIT);
-	if (sc->wdc_channel.ch_queue == NULL) {
-		printf("%s: can't allocate memory for command queue",
-		    sc->sc_wdcdev.sc_dev.dv_xname);
-		return;
-	}
+	sc->wdc_channel.ch_channel = 0;
+	sc->wdc_channel.ch_queue = &sc->wdc_chqueue;
+
 	wdcattach(&sc->wdc_channel);
 }
 

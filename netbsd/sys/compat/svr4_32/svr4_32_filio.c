@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_32_filio.c,v 1.2 2001/11/13 02:09:28 lukem Exp $	 */
+/*	$NetBSD: svr4_32_filio.c,v 1.6.4.1 2004/11/12 06:56:33 jmc Exp $	 */
 
 /*-
  * Copyright (c) 1994 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: svr4_32_filio.c,v 1.2 2001/11/13 02:09:28 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: svr4_32_filio.c,v 1.6.4.1 2004/11/12 06:56:33 jmc Exp $");
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -53,6 +53,7 @@ __KERNEL_RCSID(0, "$NetBSD: svr4_32_filio.c,v 1.2 2001/11/13 02:09:28 lukem Exp 
 #include <net/if.h>
 #include <sys/malloc.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/svr4_32/svr4_32_types.h>
@@ -78,11 +79,13 @@ svr4_32_fil_ioctl(fp, p, retval, fd, cmd, data)
 	int error;
 	int num;
 	struct filedesc *fdp = p->p_fd;
-	int (*ctl) __P((struct file *, u_long,  caddr_t, struct proc *)) =
+	int (*ctl)(struct file *, u_long, void *, struct proc *) =
 			fp->f_ops->fo_ioctl;
 
 	*retval = 0;
 
+        if ((fp = fd_getfile(fdp, fd)) == NULL)
+                return EBADF;
 	switch (cmd) {
 	case SVR4_FIOCLEX:
 		fdp->fd_ofileflags[fd] |= UF_EXCLOSE;
@@ -108,7 +111,7 @@ svr4_32_fil_ioctl(fp, p, retval, fd, cmd, data)
 		case SVR4_FIONREAD:	cmd = FIONREAD;  break;
 		}
 
-		error = (*ctl)(fp, cmd, (caddr_t) &num, p);
+		error = (*ctl)(fp, cmd,  &num, p);
 
 		if (error)
 			return error;

@@ -1,4 +1,4 @@
-/*	$NetBSD: fd.c,v 1.4 2001/12/20 01:20:21 thorpej Exp $	*/
+/*	$NetBSD: fd.c,v 1.18 2003/08/07 16:26:29 agc Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -51,11 +51,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -92,6 +88,9 @@
  *  dufault@hda.com (Peter Dufault)
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: fd.c,v 1.18 2003/08/07 16:26:29 agc Exp $");
+
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -102,7 +101,6 @@
 #include <sys/ioctl.h>
 #include <sys/device.h>
 #include <sys/disklabel.h>
-#include <sys/dkstat.h>
 #include <sys/disk.h>
 #include <sys/buf.h>
 #include <sys/malloc.h>
@@ -111,6 +109,7 @@
 #include <sys/queue.h>
 #include <sys/proc.h>
 #include <sys/fdio.h>
+#include <sys/conf.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -118,7 +117,6 @@
 
 #include <machine/cpu.h>
 #include <machine/intr.h>
-#include <machine/conf.h>
 #include <machine/io.h>
 #include <arm/arm32/katelib.h>
 #include <machine/bus.h>
@@ -186,9 +184,8 @@ int fdcprobe __P((struct device *, struct cfdata *, void *));
 int fdprint __P((void *, const char *));
 void fdcattach __P((struct device *, struct device *, void *));
 
-struct cfattach fdc_ca = {
-	sizeof(struct fdc_softc), fdcprobe, fdcattach
-};
+CFATTACH_DECL(fdc, sizeof(struct fdc_softc),
+    fdcprobe, fdcattach, NULL, NULL);
 
 /*
  * Floppies come in various flavors, e.g., 1.2MB vs 1.44MB; here is how
@@ -253,7 +250,7 @@ struct fd_softc {
 
 	TAILQ_ENTRY(fd_softc) sc_drivechain;
 	int sc_ops;		/* I/O ops since last switch */
-	struct buf_queue sc_q;	/* pending I/O requests */
+	struct bufq_state sc_q;	/* pending I/O requests */
 	int sc_active;		/* number of active I/O operations */
 };
 
@@ -264,15 +261,29 @@ void fdattach __P((struct device *, struct device *, void *));
 extern char floppy_read_fiq[], floppy_read_fiq_end[];
 extern char floppy_write_fiq[], floppy_write_fiq_end[];
 
-struct cfattach fd_ca = {
-	sizeof(struct fd_softc), fdprobe, fdattach
-};
+CFATTACH_DECL(fd, sizeof(struct fd_softc),
+    fdprobe, fdattach, NULL, NULL);
 
 extern struct cfdriver fd_cd;
 
+dev_type_open(fdopen);
+dev_type_close(fdclose);
+dev_type_read(fdread);
+dev_type_write(fdwrite);
+dev_type_ioctl(fdioctl);
+dev_type_strategy(fdstrategy);
+
+const struct bdevsw fd_bdevsw = {
+	fdopen, fdclose, fdstrategy, fdioctl, nodump, nosize, D_DISK
+};
+
+const struct cdevsw fd_cdevsw = {
+	fdopen, fdclose, fdread, fdwrite, fdioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
+};
+
 void fdgetdisklabel __P((struct fd_softc *));
 int fd_get_parms __P((struct fd_softc *));
-void fdstrategy __P((struct buf *));
 void fdstart __P((struct fd_softc *));
 
 struct dkdriver fddkdriver = { fdstrategy };
@@ -356,7 +367,7 @@ fdprint(aux, fdc)
 	register struct fdc_attach_args *fa = aux;
 
 	if (!fdc)
-		printf(" drive %d", fa->fa_drive);
+		aprint_normal(" drive %d", fa->fa_drive);
 	return QUIET;
 }
 
@@ -393,7 +404,7 @@ fdcattach(parent, self, aux)
 	fdc->sc_ih = intr_claim(pa->pa_irq, IPL_BIO, "fdc",
 	    fdcintr, fdc);
 	if (!fdc->sc_ih)
-		panic("%s: Cannot claim IRQ %d\n", self->dv_xname, pa->pa_irq);
+		panic("%s: Cannot claim IRQ %d", self->dv_xname, pa->pa_irq);
 
 #if 0
 	/*
@@ -498,7 +509,7 @@ fdattach(parent, self, aux)
 	else
 		printf(": density unknown\n");
 
-	BUFQ_INIT(&fd->sc_q);
+	bufq_alloc(&fd->sc_q, BUFQ_DISKSORT|BUFQ_SORT_CYLINDER);
 	fd->sc_cylin = -1;
 	fd->sc_drive = drive;
 	fd->sc_deftype = type;
@@ -602,7 +613,7 @@ fdstrategy(bp)
 
 	/* Queue transfer on drive, activate drive and controller if idle. */
 	s = splbio();
-	disksort_cylinder(&fd->sc_q, bp);
+	BUFQ_PUT(&fd->sc_q, bp);
 	callout_stop(&fd->sc_motoroff_ch);		/* a good idea */
 	if (fd->sc_active == 0)
 		fdstart(fd);
@@ -655,17 +666,17 @@ fdfinish(fd, bp)
 	 * another drive is waiting to be serviced, since there is a long motor
 	 * startup delay whenever we switch.
 	 */
+	(void)BUFQ_GET(&fd->sc_q);
 	if (fd->sc_drivechain.tqe_next && ++fd->sc_ops >= 8) {
 		fd->sc_ops = 0;
 		TAILQ_REMOVE(&fdc->sc_drives, fd, sc_drivechain);
-		if (BUFQ_NEXT(bp) != NULL)
+		if (BUFQ_PEEK(&fd->sc_q) != NULL)
 			TAILQ_INSERT_TAIL(&fdc->sc_drives, fd, sc_drivechain);
 		else
 			fd->sc_active = 0;
 	}
 	bp->b_resid = fd->sc_bcount;
 	fd->sc_skip = 0;
-	BUFQ_REMOVE(&fd->sc_q, bp);
 
 	biodone(bp);
 	/* turn off motor 5s from now */
@@ -910,7 +921,7 @@ fdctimeout(arg)
 #endif
 	fdcstatus(&fd->sc_dev, 0, "timeout");
 
-	if (BUFQ_FIRST(&fd->sc_q) != NULL)
+	if (BUFQ_PEEK(&fd->sc_q) != NULL)
 		fdc->sc_state++;
 	else
 		fdc->sc_state = DEVIDLE;
@@ -955,7 +966,7 @@ loop:
 	}
 
 	/* Is there a transfer to this drive?  If not, deactivate drive. */
-	bp = BUFQ_FIRST(&fd->sc_q);
+	bp = BUFQ_PEEK(&fd->sc_q);
 	if (bp == NULL) {
 		fd->sc_ops = 0;
 		TAILQ_REMOVE(&fdc->sc_drives, fd, sc_drivechain);
@@ -1039,10 +1050,11 @@ loop:
 		head = sec / type->sectrac;
 		sec -= head * type->sectrac;
 #ifdef DIAGNOSTIC
-		{int block;
+		{daddr_t  block;
 		 block = (fd->sc_cylin * type->heads + head) * type->sectrac + sec;
 		 if (block != fd->sc_blkno) {
-			 printf("fdcintr: block %d != blkno %d\n",	
+			 printf("fdcintr: block %" PRId64
+			     " != blkno %" PRId64 "\n",	
 				block, fd->sc_blkno);
 #ifdef DDB
 			 Debugger();
@@ -1071,7 +1083,7 @@ loop:
 		    fdc->sc_fr.fh_r12, (u_int)bp->b_data, fd->sc_skip);
 #endif
 		if (fiq_claim(&fdc->sc_fh) == -1)
-			panic("%s: Cannot claim FIQ vector\n", fdc->sc_dev.dv_xname);
+			panic("%s: Cannot claim FIQ vector", fdc->sc_dev.dv_xname);
 		IOMD_WRITE_BYTE(IOMD_FIQMSK, 0x01);
 		bus_space_write_2(iot, ioh, fdctl, type->rate);
 #ifdef FD_DEBUG
@@ -1123,7 +1135,8 @@ loop:
 		return 1;
 
 	case SEEKCOMPLETE:
-		disk_unbusy(&fd->sc_dk, 0);	/* no data on seek */
+		/* no data on seek */
+		disk_unbusy(&fd->sc_dk, 0, 0);
 
 		/* Make sure seek really happened. */
 		out_fdc(iot, ioh, NE7CMD_SENSEI);
@@ -1150,7 +1163,8 @@ loop:
 	case IOCOMPLETE: /* IO DONE, post-analyze */
 		callout_stop(&fdc->sc_timo_ch);
 
-		disk_unbusy(&fd->sc_dk, (bp->b_bcount - bp->b_resid));
+		disk_unbusy(&fd->sc_dk, (bp->b_bcount - bp->b_resid),
+		    (bp->b_flags & B_READ));
 
 		if (fdcresult(fdc) != 7 || (st0 & 0xf8) != 0) {
 			fiq_release(&fdc->sc_fh);
@@ -1255,7 +1269,7 @@ fdcretry(fdc)
 	struct buf *bp;
 
 	fd = fdc->sc_drives.tqh_first;
-	bp = BUFQ_FIRST(&fd->sc_q);
+	bp = BUFQ_PEEK(&fd->sc_q);
 
 	if (fd->sc_opts & FDOPT_NORETRY)
 	    goto fail;
@@ -1305,27 +1319,6 @@ fdcretry(fdc)
 		fdfinish(fd, bp);
 	}
 	fdc->sc_errors++;
-}
-
-int
-fdsize(dev)
-	dev_t dev;
-{
-
-	/* Swapping to floppies would not make sense. */
-	return -1;
-}
-
-int
-fddump(dev, blkno, va, size)
-	dev_t dev;
-	daddr_t blkno;
-	caddr_t va;
-	size_t size;
-{
-
-	/* Not implemented. */
-	return ENXIO;
 }
 
 int
@@ -1541,7 +1534,8 @@ fdformat(dev, finfo, p)
 	bp->b_data = (caddr_t)finfo;
 
 #ifdef DEBUG
-	printf("fdformat: blkno %x count %lx\n", bp->b_blkno, bp->b_bcount);
+	printf("fdformat: blkno %llx count %lx\n",
+	    (unsigned long long)bp->b_blkno, bp->b_bcount);
 #endif
 
 	/* now do the format */
@@ -1586,7 +1580,7 @@ load_memory_disc_from_floppy(md, dev)
 	int type;
 	int floppysize;
 
-	if (major(dev) != 17)	/* XXX - nice if the major was defined elsewhere */
+	if (bdevsw_lookup(dev) != &fd_bdevsw)
 		return(EINVAL);
 
 	if (md->md_type == MD_UNCONFIGURED || md->md_addr == 0)
@@ -1634,7 +1628,7 @@ load_memory_disc_from_floppy(md, dev)
 		fdstrategy(bp);
 
 		if (biowait(bp))
-			panic("Cannot load floppy image\n");
+			panic("Cannot load floppy image");
                                                  
 		memcpy((caddr_t)md->md_addr + loop * fd_types[type].sectrac
 		    * DEV_BSIZE, (caddr_t)bp->b_data,

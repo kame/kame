@@ -1,4 +1,4 @@
-/*	$NetBSD: txioman.c,v 1.4 2002/01/29 18:53:20 uch Exp $ */
+/*	$NetBSD: txioman.c,v 1.7 2003/07/15 02:29:33 lukem Exp $ */
 
 /*-
  * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: txioman.c,v 1.7 2003/07/15 02:29:33 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -51,9 +54,8 @@ void txioman_callback(struct device *);
 int txioman_print(void *, const char *);
 hpcio_chip_t tx_conf_reference_ioman(void *, int);
 
-struct cfattach txioman_ca = {
-	sizeof(struct device), txioman_match, txioman_attach
-};
+CFATTACH_DECL(txioman, sizeof(struct device),
+    txioman_match, txioman_attach, NULL, NULL);
 
 int
 txioman_match(struct device *parent, struct cfdata *cf, void *aux)

@@ -1,4 +1,4 @@
-/*	$NetBSD: sdvar.h,v 1.16 2002/01/09 04:12:12 thorpej Exp $	*/
+/*	$NetBSD: sdvar.h,v 1.21.2.1 2004/09/11 12:55:40 he Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -53,6 +53,9 @@
  * Ported to run under 386BSD by Julian Elischer (julian@dialix.oz.au) Sept 1992
  */
 
+#ifndef _DEV_SCSIPI_SDVAR_H_
+#define _DEV_SCSIPI_SDVAR_H_
+
 #include "opt_scsi.h"
 #include "rnd.h"
 #if NRND > 0
@@ -66,8 +69,6 @@
 #ifndef	SD_IO_TIMEOUT
 #define	SD_IO_TIMEOUT	(60 * 1000)
 #endif
-
-struct sd_ops;
 
 struct sd_softc {
 	struct device sc_dev;
@@ -89,14 +90,15 @@ struct sd_softc {
 		u_long	cyls;		/* number of cylinders */
 		u_long	sectors;	/* number of sectors/track */
 		u_long	blksize;	/* number of bytes/sector */
-		u_long	disksize;	/* total number sectors */
 		u_long	rot_rate;	/* rotational rate, in RPM */
+		u_int64_t disksize;	/* total number sectors */
+		u_int64_t disksize512;	/* total number sectors */
 	} params;
 
-	struct buf_queue buf_queue;
+	struct bufq_state buf_queue;
+	struct callout sc_callout;
 	u_int8_t type;
 	char name[16]; /* product name, for default disklabel */
-	const struct sd_ops *sc_ops;	/* our bus-dependent ops vector */
 
 	void *sc_sdhook;		/* our shutdown hook */
 
@@ -105,18 +107,8 @@ struct sd_softc {
 #endif
 };
 
-struct sd_ops {
-	int	(*sdo_get_parms) __P((struct sd_softc *, struct disk_parms *,
-		    int));
-	int	(*sdo_flush) __P((struct sd_softc *, int));
-	int	(*sdo_getcache) __P((struct sd_softc *, int *));
-	int	(*sdo_setcache) __P((struct sd_softc *, int));
-};
-#define	SDGP_RESULT_OK		0	/* paramters obtained */
+#define	SDGP_RESULT_OK		0	/* parameters obtained */
 #define	SDGP_RESULT_OFFLINE	1	/* no media, or otherwise losing */
 #define	SDGP_RESULT_UNFORMATTED	2	/* unformatted media (max params) */
 
-void sdattach __P((struct device *, struct sd_softc *, struct scsipi_periph *,
-    const struct sd_ops *));
-int sdactivate __P((struct device *, enum devact));
-int sddetach __P((struct device *, int));
+#endif /* _DEV_SCSIPI_SDVAR_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: rnd.h,v 1.14 2001/09/09 00:48:55 enami Exp $	*/
+/*	$NetBSD: rnd.h,v 1.16 2002/11/10 03:28:59 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -140,6 +140,9 @@ struct __rndsource_element {
 #define	RND_EXTRACT_GOOD	1  /* return as many good bytes
 				      (short read ok) */
 
+#define RND_ENABLED(rp) \
+        (((rp)->data.flags & RND_FLAG_NO_COLLECT) == 0)
+
 void		rndpool_init __P((rndpool_t *));
 void		rndpool_init_global __P((void));
 u_int32_t	rndpool_get_entropy_count __P((rndpool_t *));
@@ -149,14 +152,14 @@ u_int32_t	*rndpool_get_pool __P((rndpool_t *));
 u_int32_t	rndpool_get_poolsize __P((void));
 void		rndpool_add_data __P((rndpool_t *, void *, u_int32_t,
 		    u_int32_t));
-int		rndpool_extract_data __P((rndpool_t *, void *, u_int32_t,
+u_int32_t	rndpool_extract_data __P((rndpool_t *, void *, u_int32_t,
 		    u_int32_t));
 
 void		rnd_init __P((void));
 void		rnd_add_uint32 __P((rndsource_element_t *, u_int32_t));
 void		rnd_add_data __P((rndsource_element_t *, void *, u_int32_t,
 		    u_int32_t));
-int		rnd_extract_data __P((void *, u_int32_t, u_int32_t));
+u_int32_t	rnd_extract_data __P((void *, u_int32_t, u_int32_t));
 void		rnd_attach_source __P((rndsource_element_t *, char *,
 		    u_int32_t, u_int32_t));
 void		rnd_detach_source __P((rndsource_element_t *));

@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_hdio.c,v 1.4 2002/03/16 20:43:53 christos Exp $	*/
+/*	$NetBSD: linux_hdio.c,v 1.8 2003/06/29 22:29:29 fvdl Exp $	*/
 
 /*
  * Copyright (c) 2000 Wasabi Systems, Inc.
@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: linux_hdio.c,v 1.4 2002/03/16 20:43:53 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: linux_hdio.c,v 1.8 2003/06/29 22:29:29 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,6 +51,7 @@ __KERNEL_RCSID(0, "$NetBSD: linux_hdio.c,v 1.4 2002/03/16 20:43:53 christos Exp 
 #include <dev/ic/wdcreg.h>
 #include <sys/ataio.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/linux/common/linux_types.h>
@@ -70,7 +71,7 @@ linux_ioctl_hdio(struct proc *p, struct linux_sys_ioctl_args *uap,
 	caddr_t sg;
 	struct filedesc *fdp;
 	struct file *fp;
-	int (*ioctlf) __P((struct file *, u_long, caddr_t, struct proc *));
+	int (*ioctlf)(struct file *, u_long, void *, struct proc *);
 	struct ataparams *atap, ata;
 	struct atareq req;
 	struct disklabel label, *labp;

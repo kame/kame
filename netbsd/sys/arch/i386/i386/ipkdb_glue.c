@@ -1,4 +1,4 @@
-/*	$NetBSD: ipkdb_glue.c,v 1.3 2001/11/15 07:03:29 lukem Exp $	*/
+/*	$NetBSD: ipkdb_glue.c,v 1.6 2003/10/27 14:11:46 junyoung Exp $	*/
 
 /*
  * Copyright (C) 2000 Wolfgang Solfrank.
@@ -31,7 +31,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ipkdb_glue.c,v 1.3 2001/11/15 07:03:29 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ipkdb_glue.c,v 1.6 2003/10/27 14:11:46 junyoung Exp $");
 
 #include "opt_ipkdb.h"
 
@@ -45,13 +45,13 @@ __KERNEL_RCSID(0, "$NetBSD: ipkdb_glue.c,v 1.3 2001/11/15 07:03:29 lukem Exp $")
 
 int ipkdbregs[NREG];
 
-int ipkdb_trap_glue __P((struct trapframe));
+int ipkdb_trap_glue(struct trapframe);
 
 #ifdef	IPKDB_NE_PCI
 #include <dev/pci/pcivar.h>
 
-int ne_pci_ipkdb_attach __P((struct ipkdb_if *, bus_space_tag_t,		/* XXX */
-			     pci_chipset_tag_t, int, int));
+int ne_pci_ipkdb_attach(struct ipkdb_if *, bus_space_tag_t,		/* XXX */
+			pci_chipset_tag_t, int, int);
 #endif
 
 static char ipkdb_mode = IPKDB_CMD_EXIT;
@@ -136,12 +136,18 @@ int
 ipkdbif_init(kip)
 	struct ipkdb_if *kip;
 {
-#ifdef	IPKDB_NE_PCI
-	pci_mode_detect();						/* XXX */
-	if (ne_pci_ipkdb_attach(kip, I386_BUS_SPACE_IO, NULL, 0, IPKDB_NE_PCISLOT) == 0) {
+#ifdef IPKDB_NE_PCI
+	pci_mode_detect();	/* XXX */
+
+#ifndef IPKDB_NE_PCISLOT
+#error You must specify the IPKDB_NE_PCISLOT to use IPKDB_NE_PCI.
+#endif
+
+	if (ne_pci_ipkdb_attach(kip, X86_BUS_SPACE_IO, NULL, 0,
+	    IPKDB_NE_PCISLOT) == 0) {
 		printf("IPKDB on %s\n", kip->name);
 		return 0;
 	}
-#endif
+#endif /* IPKDB_NE_PCI */
 	return -1;
 }

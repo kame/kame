@@ -1,4 +1,4 @@
-/*	$NetBSD: txcsbus.c,v 1.8 2002/01/29 18:53:20 uch Exp $ */
+/*	$NetBSD: txcsbus.c,v 1.15 2003/07/15 02:29:33 lukem Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: txcsbus.c,v 1.15 2003/07/15 02:29:33 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -100,9 +103,8 @@ struct txcsbus_softc {
 	struct bus_space_tag_hpcmips *sc_cst[TX39_MAXCS];
 };
 
-struct cfattach txcsbus_ca = {
-	sizeof(struct txcsbus_softc), txcsbus_match, txcsbus_attach
-};
+CFATTACH_DECL(txcsbus, sizeof(struct txcsbus_softc),
+    txcsbus_match, txcsbus_attach, NULL, NULL);
 
 static bus_space_tag_t __txcsbus_alloc_cstag(struct txcsbus_softc *, 
     struct cs_handle *);
@@ -113,7 +115,7 @@ txcsbus_match(struct device *parent, struct cfdata *cf, void *aux)
 	struct csbus_attach_args *cba = aux;
 	platid_mask_t mask;
 
-	if (strcmp(cba->cba_busname, cf->cf_driver->cd_name))
+	if (strcmp(cba->cba_busname, cf->cf_name))
 		return (0);
 
 	if (cf->cf_loc[TXCSBUSIFCF_PLATFORM] == TXCSBUSIFCF_PLATFORM_DEFAULT)
@@ -148,7 +150,7 @@ txcsbus_print(void *aux, const char *pnp)
 	struct cs_attach_args *ca = aux;
 	
 	if (ca->ca_csreg.cs != TXCSBUSCF_REGCS_DEFAULT) {
-		printf(" regcs %s %dbit %#x+%#x", 
+		aprint_normal(" regcs %s %dbit %#x+%#x", 
 		    __csmap[ca->ca_csreg.cs].cs_name,
 		    ca->ca_csreg.cswidth,
 		    ca->ca_csreg.csbase,
@@ -156,7 +158,7 @@ txcsbus_print(void *aux, const char *pnp)
 	}
 
 	if (ca->ca_csio.cs != TXCSBUSCF_IOCS_DEFAULT) {
-		printf(" iocs %s %dbit %#x+%#x", 
+		aprint_normal(" iocs %s %dbit %#x+%#x", 
 		    __csmap[ca->ca_csio.cs].cs_name,
 		    ca->ca_csio.cswidth,
 		    ca->ca_csio.csbase,
@@ -164,7 +166,7 @@ txcsbus_print(void *aux, const char *pnp)
 	}
 
 	if (ca->ca_csmem.cs != TXCSBUSCF_MEMCS_DEFAULT) {
-		printf(" memcs %s %dbit %#x+%#x", 
+		aprint_normal(" memcs %s %dbit %#x+%#x", 
 		    __csmap[ca->ca_csmem.cs].cs_name,
 		    ca->ca_csmem.cswidth,
 		    ca->ca_csmem.csbase,
@@ -172,15 +174,15 @@ txcsbus_print(void *aux, const char *pnp)
 	}
 	
 	if (ca->ca_irq1 != TXCSBUSCF_IRQ1_DEFAULT) {
-		printf(" irq1 %d(%d:%d)", PRINTIRQ(ca->ca_irq1));
+		aprint_normal(" irq1 %d(%d:%d)", PRINTIRQ(ca->ca_irq1));
 	}
 
 	if (ca->ca_irq2 != TXCSBUSCF_IRQ2_DEFAULT) {
-		printf(" irq2 %d(%d:%d)", PRINTIRQ(ca->ca_irq2));
+		aprint_normal(" irq2 %d(%d:%d)", PRINTIRQ(ca->ca_irq2));
 	}
 
 	if (ca->ca_irq3 != TXCSBUSCF_IRQ3_DEFAULT) {
-		printf(" irq3 %d(%d:%d)", PRINTIRQ(ca->ca_irq3));
+		aprint_normal(" irq3 %d(%d:%d)", PRINTIRQ(ca->ca_irq3));
 	}
 
 	return (UNCONF);
@@ -225,7 +227,7 @@ txcsbus_search(struct device *parent, struct cfdata *cf, void *aux)
 	ca.ca_irq2		= cf->cf_loc[TXCSBUSCF_IRQ2];
 	ca.ca_irq3		= cf->cf_loc[TXCSBUSCF_IRQ3];
 	
-	if ((*cf->cf_attach->ca_match)(parent, cf, &ca)) {
+	if (config_match(parent, cf, &ca)) {
 		config_attach(parent, cf, &ca, txcsbus_print);
 	}
 
@@ -243,7 +245,7 @@ __txcsbus_alloc_cstag(struct txcsbus_softc *sc, struct cs_handle *csh)
 	txreg_t reg;
 
  	if (!TX39_ISCS(cs) && !TX39_ISMCS(cs) && !TX39_ISCARD(cs)) {
-		panic("txcsbus_alloc_tag: bogus chip select %d\n", cs);
+		panic("txcsbus_alloc_tag: bogus chip select %d", cs);
 	}
 
 	/* Already setuped chip select */
@@ -259,7 +261,7 @@ __txcsbus_alloc_cstag(struct txcsbus_softc *sc, struct cs_handle *csh)
 	/* CS bus-width (configurationable) */
 	switch (width) {
 	default:
-		panic("txcsbus_alloc_tag: bogus bus width %d\n", width);
+		panic("txcsbus_alloc_tag: bogus bus width %d", width);
 
 	case 32:
 		if (TX39_ISCS(cs)) {

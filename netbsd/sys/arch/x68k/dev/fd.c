@@ -1,4 +1,4 @@
-/*	$NetBSD: fd.c,v 1.40 2001/12/27 02:23:24 wiz Exp $	*/
+/*	$NetBSD: fd.c,v 1.60 2003/11/15 15:02:08 isaki Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -51,11 +51,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -74,6 +70,9 @@
  *	@(#)fd.c	7.4 (Berkeley) 5/25/91
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: fd.c,v 1.60 2003/11/15 15:02:08 isaki Exp $");
+
 #include "rnd.h"
 #include "opt_ddb.h"
 #include "opt_m680x0.h"
@@ -89,7 +88,6 @@
 #include <sys/malloc.h>
 #include <sys/device.h>
 #include <sys/disklabel.h>
-#include <sys/dkstat.h>
 #include <sys/disk.h>
 #include <sys/buf.h>
 #include <sys/uio.h>
@@ -154,11 +152,11 @@ struct fdc_softc {
 	struct callout sc_timo_ch;	/* timeout callout */
 	struct callout sc_intr_ch;	/* pseudo-intr callout */
 
-	bus_dma_tag_t sc_dmat;		/* intio dma tag */
-	bus_dmamap_t sc_dmamap;		/* dma map */
+	bus_dma_tag_t sc_dmat;		/* intio DMA tag */
+	bus_dmamap_t sc_dmamap;		/* DMA map */
 	u_int8_t *sc_addr;			/* physical address */
-	struct dmac_channel_stat *sc_dmachan; /* intio dma channel */
-	struct dmac_dma_xfer *sc_xfer;	/* dma transfer */
+	struct dmac_channel_stat *sc_dmachan; /* intio DMA channel */
+	struct dmac_dma_xfer *sc_xfer;	/* DMA transfer */
 
 	struct fd_softc *sc_fd[4];	/* pointers to children */
 	TAILQ_HEAD(drivehead, fd_softc) sc_drives;
@@ -166,9 +164,6 @@ struct fdc_softc {
 	int sc_errors;			/* number of retries so far */
 	u_char sc_status[7];		/* copy of registers */
 } fdc_softc;
-
-bdev_decl(fd);
-cdev_decl(fd);
 
 int fdcintr __P((void*));
 void fdcreset __P((struct fdc_softc *));
@@ -178,9 +173,8 @@ int fdcprobe __P((struct device *, struct cfdata *, void *));
 void fdcattach __P((struct device *, struct device *, void *));
 int fdprint __P((void *, const char *));
 
-struct cfattach fdc_ca = {
-	sizeof(struct fdc_softc), fdcprobe, fdcattach
-};
+CFATTACH_DECL(fdc, sizeof(struct fdc_softc),
+    fdcprobe, fdcattach, NULL, NULL);
 
 extern struct cfdriver fdc_cd;
 
@@ -246,7 +240,7 @@ struct fd_softc {
 
 	TAILQ_ENTRY(fd_softc) sc_drivechain;
 	int sc_ops;		/* I/O ops since last switch */
-	struct buf_queue sc_q;	/* pending I/O requests */
+	struct bufq_state sc_q;	/* pending I/O requests */
 	int sc_active;		/* number of active I/O operations */
 	u_char *sc_copybuf;	/* for secsize >=3 */
 	u_char sc_part;		/* for secsize >=3 */
@@ -263,13 +257,27 @@ struct fd_softc {
 int fdprobe __P((struct device *, struct cfdata *, void *));
 void fdattach __P((struct device *, struct device *, void *));
 
-struct cfattach fd_ca = {
-	sizeof(struct fd_softc), fdprobe, fdattach
-};
+CFATTACH_DECL(fd, sizeof(struct fd_softc),
+    fdprobe, fdattach, NULL, NULL);
 
 extern struct cfdriver fd_cd;
 
-void fdstrategy __P((struct buf *));
+dev_type_open(fdopen);
+dev_type_close(fdclose);
+dev_type_read(fdread);
+dev_type_write(fdwrite);
+dev_type_ioctl(fdioctl);
+dev_type_strategy(fdstrategy);
+
+const struct bdevsw fd_bdevsw = {
+	fdopen, fdclose, fdstrategy, fdioctl, nodump, nosize, D_DISK
+};
+
+const struct cdevsw fd_cdevsw = {
+	fdopen, fdclose, fdread, fdwrite, fdioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
+};
+
 void fdstart __P((struct fd_softc *fd));
 
 struct dkdriver fddkdriver = { fdstrategy };
@@ -292,7 +300,7 @@ static void fd_do_eject __P((struct fdc_softc *, int));
 
 void fd_mountroot_hook __P((struct device *));
 
-/* dma transfer routines */
+/* DMA transfer routines */
 __inline static void fdc_dmastart __P((struct fdc_softc*, int,
 				       caddr_t, vsize_t));
 static int fdcdmaintr __P((void*));
@@ -307,7 +315,7 @@ fdc_dmastart(fdc, read, addr, count)
 {
 	int error;
 
-	DPRINTF(("fdc_dmastart: (%s, addr = %p, count = %d\n",
+	DPRINTF(("fdc_dmastart: %s, addr = %p, count = %ld\n",
 		 read ? "read" : "write", (caddr_t) addr, count));
 
 	error = bus_dmamap_load(fdc->sc_dmat, fdc->sc_dmamap, addr, count,
@@ -406,7 +414,7 @@ fdprint(aux, fdc)
 	register struct fdc_attach_args *fa = aux;
 
 	if (!fdc)
-		printf(" drive %d", fa->fa_drive);
+		aprint_normal(" drive %d", fa->fa_drive);
 	return QUIET;
 }
 
@@ -510,7 +518,7 @@ fdprobe(parent, cf, aux)
 	int drive = fa->fa_drive;
 	bus_space_tag_t iot = fdc->sc_iot;
 	bus_space_handle_t ioh = fdc->sc_ioh;
-	int n;
+	int n = 0;
 	int found = 0;
 	int i;
 
@@ -552,11 +560,10 @@ retry:
 #endif
 
 	if (n == 2) {
-		if ((fdc->sc_status[0] & 0xf0) == 0x20) {
+		if ((fdc->sc_status[0] & 0xf0) == 0x20)
 			found = 1;
-		} else if ((fdc->sc_status[0] & 0xf0) == 0xc0) {
+		else if ((fdc->sc_status[0] & 0xf0) == 0xc0)
 			goto retry;
-		}
 	}
 
 	/* turn off motor */
@@ -596,13 +603,13 @@ fdattach(parent, self, aux)
 	else
 		printf(": density unknown\n");
 
-	BUFQ_INIT(&fd->sc_q);
+	bufq_alloc(&fd->sc_q, BUFQ_DISKSORT|BUFQ_SORT_CYLINDER);
 	fd->sc_cylin = -1;
 	fd->sc_drive = drive;
 	fd->sc_deftype = type;
 	fdc->sc_fd[drive] = fd;
 
-	fd->sc_copybuf = (u_char *)malloc(NBPG, M_DEVBUF, M_WAITOK);
+	fd->sc_copybuf = (u_char *)malloc(PAGE_SIZE, M_DEVBUF, M_WAITOK);
 	if (fd->sc_copybuf == 0)
 		printf("fdprobe: WARNING!! malloc() failed.\n");
 	fd->sc_flags |= FD_ALIVE;
@@ -651,7 +658,8 @@ fdstrategy(bp)
 	    (fd = fd_cd.cd_devs[unit]) == 0 ||
 	    bp->b_blkno < 0 ||
 	    (bp->b_bcount % FDC_BSIZE) != 0) {
-		DPRINTF(("fdstrategy: unit=%d, blkno=%d, bcount=%d\n", unit,
+		DPRINTF(("fdstrategy: unit=%d, blkno=%" PRId64 ", "
+			 "bcount=%ld\n", unit,
 			 bp->b_blkno, bp->b_bcount));
 		bp->b_error = EINVAL;
 		goto bad;
@@ -663,8 +671,10 @@ fdstrategy(bp)
 
 	sz = howmany(bp->b_bcount, FDC_BSIZE);
 
-	if (bp->b_blkno + sz > (fd->sc_type->size << (fd->sc_type->secsize - 2))) {
-		sz = (fd->sc_type->size << (fd->sc_type->secsize - 2)) - bp->b_blkno;
+	if (bp->b_blkno + sz >
+	    (fd->sc_type->size << (fd->sc_type->secsize - 2))) {
+		sz = (fd->sc_type->size << (fd->sc_type->secsize - 2))
+		     - bp->b_blkno;
 		if (sz == 0) {
 			/* If exactly at end of disk, return EOF. */
 			bp->b_resid = bp->b_bcount;
@@ -683,12 +693,12 @@ fdstrategy(bp)
  	bp->b_cylinder = bp->b_blkno / (FDC_BSIZE / DEV_BSIZE)
 		/ (fd->sc_type->seccyl * (1 << (fd->sc_type->secsize - 2)));
 
-	DPRINTF(("fdstrategy: %s b_blkno %d b_bcount %ld cylin %ld\n",
+	DPRINTF(("fdstrategy: %s b_blkno %" PRId64 " b_bcount %ld cylin %ld\n",
 		 bp->b_flags & B_READ ? "read" : "write",
 		 bp->b_blkno, bp->b_bcount, bp->b_cylinder));
 	/* Queue transfer on drive, activate drive and controller if idle. */
 	s = splbio();
-	disksort_cylinder(&fd->sc_q, bp);
+	BUFQ_PUT(&fd->sc_q, bp);
 	callout_stop(&fd->sc_motoroff_ch);		/* a good idea */
 	if (fd->sc_active == 0)
 		fdstart(fd);
@@ -740,17 +750,17 @@ fdfinish(fd, bp)
 	 * another drive is waiting to be serviced, since there is a long motor
 	 * startup delay whenever we switch.
 	 */
+	(void)BUFQ_GET(&fd->sc_q);
 	if (fd->sc_drivechain.tqe_next && ++fd->sc_ops >= 8) {
 		fd->sc_ops = 0;
 		TAILQ_REMOVE(&fdc->sc_drives, fd, sc_drivechain);
-		if (BUFQ_NEXT(bp) != NULL) {
+		if (BUFQ_PEEK(&fd->sc_q) != NULL) {
 			TAILQ_INSERT_TAIL(&fdc->sc_drives, fd, sc_drivechain);
 		} else
 			fd->sc_active = 0;
 	}
 	bp->b_resid = fd->sc_bcount;
 	fd->sc_skip = 0;
-	BUFQ_REMOVE(&fd->sc_q, bp);
 
 #if NRND > 0
 	rnd_add_uint32(&fd->rnd_source, bp->b_blkno);
@@ -1033,7 +1043,7 @@ fdctimeout(arg)
 	s = splbio();
 	fdcstatus(&fd->sc_dev, 0, "timeout");
 
-	if (BUFQ_FIRST(&fd->sc_q) != NULL)
+	if (BUFQ_PEEK(&fd->sc_q) != NULL)
 		fdc->sc_state++;
 	else
 		fdc->sc_state = DEVIDLE;
@@ -1091,7 +1101,7 @@ loop:
 	}
 
 	/* Is there a transfer to this drive?  If not, deactivate drive. */
-	bp = BUFQ_FIRST(&fd->sc_q);
+	bp = BUFQ_PEEK(&fd->sc_q);
 	if (bp == NULL) {
 		fd->sc_ops = 0;
 		TAILQ_REMOVE(&fdc->sc_drives, fd, sc_drivechain);
@@ -1118,7 +1128,8 @@ loop:
 				struct fd_softc *ofd = fdc->sc_fd[i];
 				if (ofd && ofd->sc_flags & FD_MOTOR) {
 					callout_stop(&ofd->sc_motoroff_ch);
-					ofd->sc_flags &= ~(FD_MOTOR | FD_MOTOR_WAIT);
+					ofd->sc_flags &=
+						~(FD_MOTOR | FD_MOTOR_WAIT);
 					break;
 				}
 			}
@@ -1208,15 +1219,19 @@ loop:
 			  + sec) * (1 << (type->secsize - 2));
 		 block += (fd->sc_part == SEC_P01) ? 1 : 0;
 		 if (block != fd->sc_blkno) {
-			 printf("C H R N: %d %d %d %d\n", fd->sc_cylin, head, sec, type->secsize);
-			 printf("fdcintr: doio: block %d != blkno %d\n", block, fd->sc_blkno);
+			 printf("C H R N: %d %d %d %d\n",
+				fd->sc_cylin, head, sec, type->secsize);
+			 printf("fdcintr: doio: block %d != blkno %" PRId64 "\n",
+				block, fd->sc_blkno);
 #ifdef DDB
 			 Debugger();
 #endif
-		 }}
+		 }
+		}
 #endif
 		read = bp->b_flags & B_READ;
-		DPRINTF(("fdcintr: %s drive %d track %d head %d sec %d nblks %d, skip %d\n",
+		DPRINTF(("fdcintr: %s drive %d track %d "
+		         "head %d sec %d nblks %d, skip %d\n",
 			 read ? "read" : "write", fd->sc_drive, fd->sc_cylin,
 			 head, sec, nblks, fd->sc_skip));
 		DPRINTF(("C H R N: %d %d %d %d\n", fd->sc_cylin, head, sec,
@@ -1250,6 +1265,12 @@ loop:
 	case DOCOPY:
 	docopy:
 		DPRINTF(("fdcintr: DOCOPY:\n"));
+		type = fd->sc_type;
+		head = (fd->sc_blkno
+			% (type->seccyl * (1 << (type->secsize - 2))))
+			 / (type->sectrac * (1 << (type->secsize - 2)));
+		pos = fd->sc_blkno % (type->sectrac * (1 << (type->secsize - 2)));
+		sec = pos / (1 << (type->secsize - 2));
 		fdc_dmastart(fdc, B_READ, fd->sc_copybuf, 1024);
 		out_fdc(iot, ioh, NE7CMD_READ);		/* READ */
 		out_fdc(iot, ioh, (head << 2) | fd->sc_drive);
@@ -1269,7 +1290,6 @@ loop:
 	doiohalf:
 		DPRINTF((" DOIOHALF:\n"));
 
-#ifdef DIAGNOSTIC
 		type = fd->sc_type;
 		sectrac = type->sectrac;
 		pos = fd->sc_blkno % (sectrac * (1 << (type->secsize - 2)));
@@ -1277,16 +1297,20 @@ loop:
 		head = (fd->sc_blkno
 			% (type->seccyl * (1 << (type->secsize - 2))))
 			 / (type->sectrac * (1 << (type->secsize - 2)));
+#ifdef DIAGNOSTIC
 		{int block;
-		 block = ((fd->sc_cylin * type->heads + head) * type->sectrac + sec)
+		 block = ((fd->sc_cylin * type->heads + head) *
+			 type->sectrac + sec)
 			 * (1 << (type->secsize - 2));
 		 block += (fd->sc_part == SEC_P01) ? 1 : 0;
 		 if (block != fd->sc_blkno) {
-			 printf("fdcintr: block %d != blkno %d\n", block, fd->sc_blkno);
+			 printf("fdcintr: block %d != blkno %" PRId64 "\n",
+				block, fd->sc_blkno);
 #ifdef DDB
 			 Debugger();
 #endif
-		 }}
+		 }
+		}
 #endif
 		if ((read = bp->b_flags & B_READ)) {
 			memcpy(bp->b_data + fd->sc_skip, fd->sc_copybuf
@@ -1365,7 +1389,7 @@ loop:
 #endif
 			fdcstatus(&fd->sc_dev, 7, bp->b_flags & B_READ ?
 				  "read failed" : "write failed");
-			printf("blkno %d nblks %d\n",
+			printf("blkno %" PRId64 " nblks %d\n",
 			    fd->sc_blkno, fd->sc_nblks);
 			fdcretry(fdc);
 			goto loop;
@@ -1404,7 +1428,7 @@ loop:
 #endif
 			fdcstatus(&fd->sc_dev, 7, bp->b_flags & B_READ ?
 				  "read failed" : "write failed");
-			printf("blkno %d nblks %d\n",
+			printf("blkno %" PRId64 " nblks %d\n",
 			    fd->sc_blkno, fd->sc_nblks);
 			fdcretry(fdc);
 			goto loop;
@@ -1433,7 +1457,7 @@ loop:
 		/* fall through */
 	case DORECAL:
 		DPRINTF(("fdcintr: in DORECAL\n"));
-		out_fdc(iot, ioh, NE7CMD_RECAL);	/* recalibrate function */
+		out_fdc(iot, ioh, NE7CMD_RECAL); /* recalibrate function */
 		out_fdc(iot, ioh, fd->sc_drive);
 		fdc->sc_state = RECALWAIT;
 		callout_reset(&fdc->sc_timo_ch, 5 * hz, fdctimeout, fdc);
@@ -1493,7 +1517,7 @@ fdcretry(fdc)
 
 	DPRINTF(("fdcretry:\n"));
 	fd = fdc->sc_drives.tqh_first;
-	bp = BUFQ_FIRST(&fd->sc_q);
+	bp = BUFQ_PEEK(&fd->sc_q);
 
 	switch (fdc->sc_errors) {
 	case 0:
@@ -1533,27 +1557,6 @@ fdcretry(fdc)
 		fdfinish(fd, bp);
 	}
 	fdc->sc_errors++;
-}
-
-int
-fdsize(dev)
-	dev_t dev;
-{
-
-	/* Swapping to floppies would not make sense. */
-	return -1;
-}
-
-int
-fddump(dev, blkno, va, size)
-	dev_t dev;
-	daddr_t blkno;
-	caddr_t va;
-	size_t size;
-{
-
-	/* Not implemented. */
-	return ENXIO;
 }
 
 int
@@ -1607,7 +1610,8 @@ fdioctl(dev, cmd, addr, flag, p)
 		if ((flag & FWRITE) == 0)
 			return EBADF;
 
-		error = setdisklabel(&buffer, (struct disklabel *)addr, 0, NULL);
+		error = setdisklabel(&buffer, (struct disklabel *)addr,
+		                     0, NULL);
 		if (error)
 			return error;
 

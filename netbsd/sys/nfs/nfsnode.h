@@ -1,4 +1,4 @@
-/*	 $NetBSD: nfsnode.h,v 1.34 2001/09/15 20:36:40 chs Exp $	*/
+/*	 $NetBSD: nfsnode.h,v 1.46.2.2 2004/09/18 19:22:41 he Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -84,10 +80,14 @@ struct nfsdircache {
 	off_t		dc_blkcookie;		/* Offset of block we're in */
 	LIST_ENTRY(nfsdircache) dc_hash;	/* Hash chain */
 	TAILQ_ENTRY(nfsdircache) dc_chain;	/* Least recently entered chn */
-	u_int32_t	dc_cookie32;		/* Key for 64<->32 xlate case */
 	daddr_t		dc_blkno;		/* Number of block we're in */
+	u_int32_t	dc_cookie32;		/* Key for 64<->32 xlate case */
 	int		dc_entry;		/* Entry number within block */
+	int		dc_refcnt;		/* Reference count */
+	int		dc_flags;		/* NFSDC_ flags */
 };
+
+#define	NFSDC_INVALID	1
 
 
 /*
@@ -97,39 +97,77 @@ struct nfsdircache {
  * each current directory, each mounted-on file, text file, and the root.
  * An nfsnode is 'named' by its file handle. (nget/nfs_node.c)
  */
+
+struct nfsnode_spec {
+	struct timespec	nspec_mtim;	/* local mtime */
+	struct timespec	nspec_atim;	/* local atime */
+};
+
+struct nfsnode_reg {
+	off_t nreg_pushedlo;		/* 1st blk in commited range */
+	off_t nreg_pushedhi;		/* Last block in range */
+	off_t nreg_pushlo;		/* 1st block in commit range */
+	off_t nreg_pushhi;		/* Last block in range */
+	struct lock nreg_commitlock;	/* Serialize commits XXX */
+	int nreg_commitflags;
+	int nreg_error;			/* Save write error value */
+};
+
+struct nfsnode_dir {
+	off_t ndir_direof;		/* EOF offset cache */
+	nfsuint64 ndir_cookieverf;	/* Cookie verifier */
+	daddr_t ndir_dblkno;		/* faked dir blkno */
+	struct nfsdirhashhead *ndir_dircache; /* offset -> cache hash heads */
+	struct nfsdirchainhead ndir_dirchain; /* Chain of dir cookies */
+	struct timespec ndir_nctime;	/* Last neg cache entry */
+	unsigned ndir_dircachesize;	/* Size of dir cookie cache */
+};
+
 struct nfsnode {
 	struct genfs_node	n_gnode;
 	u_quad_t		n_size;		/* Current size of file */
-	u_quad_t		n_brev;		/* Modify rev when cached */
-	u_quad_t		n_lrev;		/* Modify rev for lease */
+
 	union {
-		struct timespec	nf_mtim;
-		off_t		nd_direof;	/* Dir. EOF offset cache */
-	} n_un2;
-	union {
-		struct timespec	nf_atim;	/* Special file times */
-		nfsuint64	nd_cookieverf;	/* Cookie verifier (dir only) */
+		struct nfsnode_spec	nu_spec;
+		struct nfsnode_reg	nu_reg;
+		struct nfsnode_dir	nu_dir;
 	} n_un1;
+
+#define n_mtim		n_un1.nu_spec.nspec_mtim
+#define n_atim		n_un1.nu_spec.nspec_atim
+
+#define	n_pushedlo	n_un1.nu_reg.nreg_pushedlo
+#define	n_pushedhi	n_un1.nu_reg.nreg_pushedhi
+#define	n_pushlo	n_un1.nu_reg.nreg_pushlo
+#define	n_pushhi	n_un1.nu_reg.nreg_pushhi
+#define n_commitlock	n_un1.nu_reg.nreg_commitlock
+#define n_commitflags	n_un1.nu_reg.nreg_commitflags
+#define n_error		n_un1.nu_reg.nreg_error
+
+#define n_direofoffset	n_un1.nu_dir.ndir_direof
+#define n_cookieverf	n_un1.nu_dir.ndir_cookieverf
+#define	n_dblkno	n_un1.nu_dir.ndir_dblkno
+#define n_dircache	n_un1.nu_dir.ndir_dircache
+#define	n_dirchain	n_un1.nu_dir.ndir_dirchain
+#define	n_nctime	n_un1.nu_dir.ndir_nctime
+#define	n_dircachesize	n_un1.nu_dir.ndir_dircachesize
+
 	union {
-		struct sillyrename *nf_silly;	/* Ptr to silly rename struct */
-		struct nfsdirhashhead *nd_dircache;
-	} n_un3;
+		struct sillyrename *nf_silly;	/* !VDIR: silly rename struct */
+		unsigned *ndir_dirgens;		/* 32<->64bit xlate gen. no. */
+	} n_un2;
+
+#define n_sillyrename	n_un2.nf_silly
+#define n_dirgens	n_un2.ndir_dirgens
+
 	LIST_ENTRY(nfsnode)	n_hash;		/* Hash chain */
-	CIRCLEQ_ENTRY(nfsnode)	n_timer;	/* Nqnfs timer chain */
-	struct nfsdirchainhead	n_dirchain;	/* Chain of dir cookies */
 	nfsfh_t			*n_fhp;		/* NFS File Handle */
 	struct vattr		*n_vattr;	/* Vnode attribute cache */
 	struct vnode		*n_vnode;	/* associated vnode */
 	struct lockf		*n_lockf;	/* Locking record of file */
-	unsigned		*n_dirgens;	/* 32<->64bit xlate gen. no. */
 	time_t			n_attrstamp;	/* Attr. cache timestamp */
-	time_t			n_mtime;	/* Prev modify time. */
+	struct timespec		n_mtime;	/* Prev modify time. */
 	time_t			n_ctime;	/* Prev create time. */
-	time_t			n_nctime;	/* Last neg cache entry (dir) */
-	time_t			n_expiry;	/* Lease expiry time */
-	daddr_t			n_dblkno;	/* To keep faked dir blkno */
-	unsigned		n_dircachesize;	/* Size of dir cookie cache */
-	int			n_error;	/* Save write error value */
 	short			n_fhsize;	/* size in bytes, of fh */
 	short			n_flag;		/* Flag for locking.. */
 	nfsfh_t			n_fh;		/* Small File Handle */
@@ -137,28 +175,22 @@ struct nfsnode {
 	uid_t			n_accuid;	/* Last access requester */
 	int			n_accmode;	/* Mode last requested */
 	int			n_accerror;	/* Error last returned */
-	off_t			n_pushedlo;	/* 1st blk in commited range */
-	off_t			n_pushedhi;	/* Last block in range */
-	off_t			n_pushlo;	/* 1st block in commit range */
-	off_t			n_pushhi;	/* Last block in range */
-	struct lock		n_commitlock;	/* Serialize commits XXX */
-	int			n_commitflags;
 	struct ucred		*n_rcred;
 	struct ucred		*n_wcred;
+
+	/* members below are only used by NQNFS */
+	CIRCLEQ_ENTRY(nfsnode)	n_timer;	/* Nqnfs timer chain */
+	u_quad_t		n_brev;		/* Modify rev when cached */
+	u_quad_t		n_lrev;		/* Modify rev for lease */
+	time_t			n_expiry;	/* Lease expiry time */
 };
+LIST_HEAD(nfsnodehashhead, nfsnode);
 
 /*
  * Values for n_commitflags
  */
 #define NFS_COMMIT_PUSH_VALID	0x0001		/* push range valid */
 #define NFS_COMMIT_PUSHED_VALID	0x0002		/* pushed range valid */
-
-#define n_atim		n_un1.nf_atim
-#define n_mtim		n_un2.nf_mtim
-#define n_sillyrename	n_un3.nf_silly
-#define n_cookieverf	n_un1.nd_cookieverf
-#define n_direofoffset	n_un2.nd_direof
-#define n_dircache	n_un3.nd_dircache
 
 /*
  * Flags for n_flag
@@ -173,6 +205,9 @@ struct nfsnode {
 #define	NACC		0x0100	/* Special file accessed */
 #define	NUPD		0x0200	/* Special file updated */
 #define	NCHG		0x0400	/* Special file times changed */
+#define	NTRUNCDELAYED	0x1000	/* Should be truncated later */
+#define	NREMOVED	0x2000	/* Has been removed */
+#define	NUSEOPENCRED	0x4000	/* Try open cred first rather than owner's */
 
 /*
  * Convert between nfsnode pointers and vnode pointers
@@ -181,10 +216,15 @@ struct nfsnode {
 #define NFSTOV(np)	((np)->n_vnode)
 
 /*
- * Queue head for nfsiod's
+ * Per-nfsiod datas
  */
-extern struct proc *nfs_iodwant[NFS_MAXASYNCDAEMON];
-extern struct nfsmount *nfs_iodmount[NFS_MAXASYNCDAEMON];
+struct nfs_iod {
+	struct simplelock nid_slock;
+	struct proc *nid_proc;
+	struct proc *nid_want;
+	struct nfsmount *nid_mount;
+};
+extern struct nfs_iod nfs_asyncdaemon[NFS_MAXASYNCDAEMON];
 
 #ifdef _KERNEL
 /*
@@ -226,7 +266,7 @@ int	nfs_readlink	__P((void *));
 int	nfs_inactive	__P((void *));
 int	nfs_reclaim	__P((void *));
 #define nfs_lock	genfs_lock
-#define nfs_unlock	genfs_unlock
+int nfs_unlock	__P((void *));
 #define nfs_islocked	genfs_islocked
 int	nfs_bmap	__P((void *));
 int	nfs_strategy	__P((void *));
@@ -243,8 +283,11 @@ int	nfs_update	__P((void *));
 int	nfs_getpages	__P((void *));
 int	nfs_putpages	__P((void *));
 int	nfs_gop_write(struct vnode *, struct vm_page **, int, int);
+int	nfs_kqfilter	__P((void *));
 
 extern int (**nfsv2_vnodeop_p) __P((void *));
+
+#define	NFS_INVALIDATE_ATTRCACHE(np)	(np)->n_attrstamp = 0
 
 #endif /* _KERNEL */
 

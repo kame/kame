@@ -1,4 +1,4 @@
-/*	$NetBSD: netbios.h,v 1.2 2002/01/04 02:39:38 deberg Exp $	*/
+/*	$NetBSD: netbios.h,v 1.4 2004/02/24 15:12:53 wiz Exp $	*/
 
 /*
  * Copyright (c) 2000-2001 Boris Popov
@@ -56,7 +56,7 @@
 #define	NBPROTO_IPXSSN	11		/* NETBIOS over IPX */
 
 #define NB_NAMELEN	16
-#define	NB_ENCNAMELEN	NB_NAMELEN * 2
+#define	NB_ENCNAMELEN	(NB_NAMELEN * 2)
 #define	NB_MAXLABLEN	63
 
 #define	NB_MINSALEN	(sizeof(struct sockaddr_nb))
@@ -93,7 +93,7 @@
 #define	NBNS_NMFLAG_BCAST	0x01
 #define	NBNS_NMFLAG_RA		0x08	/* recursion available */
 #define	NBNS_NMFLAG_RD		0x10	/* recursion desired */
-#define	NBNS_NMFLAG_TC		0x20	/* truncation occured */
+#define	NBNS_NMFLAG_TC		0x20	/* truncation occurred */
 #define	NBNS_NMFLAG_AA		0x40	/* authoritative answer */
 
 /* 

@@ -1,4 +1,4 @@
-#	$NetBSD: files.sparc,v 1.112 2002/04/22 09:41:21 augustss Exp $
+#	$NetBSD: files.sparc,v 1.127 2004/03/17 18:10:51 matt Exp $
 
 # @(#)files.sparc	8.1 (Berkeley) 7/19/93
 # sparc-specific configuration info
@@ -7,6 +7,7 @@ defflag	opt_sparc_arch.h	SUN4
 defflag	opt_sparc_arch.h	SUN4_MMU3L
 defflag	opt_sparc_arch.h	SUN4C
 defflag	opt_sparc_arch.h	SUN4M
+defflag	opt_sparc_arch.h	SUN4D
 defflag	opt_sparc_arch.h	SUN4U
 defflag	opt_sparc_arch.h	MSIIEP
 
@@ -43,6 +44,14 @@ file	arch/sparc/sparc/iommu.c		iommu
 device obio { [addr = -1], [level = -1] }
 attach obio at mainbus
 
+device cpuunit { }
+attach cpuunit at mainbus
+file	arch/sparc/sparc/cpuunit.c		cpuunit
+
+device bootbus { [slot = -1], [offset = -1] }
+attach bootbus at cpuunit
+file	arch/sparc/dev/bootbus.c		bootbus
+
 include "dev/vme/files.vme"
 device sparcvme: vmebus
 attach sparcvme at mainbus with vme_mainbus
@@ -75,21 +84,24 @@ device timer
 attach timer at mainbus with timer_mainbus
 attach timer at obio with timer_obio
 attach timer at msiiep with timer_msiiep
-file	arch/sparc/sparc/timer.c		timer
+file	arch/sparc/sparc/timer.c		timer & !msiiep
+file	arch/sparc/sparc/timer_sun4.c		timer & (sun4 | sun4c)
+file	arch/sparc/sparc/timer_sun4m.c		timer & sun4m & !msiiep
+file	arch/sparc/sparc/timer_msiiep.c		timer & msiiep
 
 device eeprom
 attach eeprom at obio
 file	arch/sparc/sparc/eeprom.c		eeprom
 
 file	arch/sparc/sparc/clock.c
-file	dev/clock_subr.c
 
 device power
 attach power at obio
 file	arch/sparc/dev/power.c			power	needs-flag
 
 device cpu
-attach cpu at mainbus
+attach cpu at mainbus with cpu_mainbus
+attach cpu at cpuunit with cpu_cpuunit
 file	arch/sparc/sparc/cpu.c
 
 device memreg
@@ -110,8 +122,14 @@ include "dev/sun/files.sun"
 device zs {channel = -1}
 attach zs at mainbus with zs_mainbus
 attach zs at obio with zs_obio
+attach zs at bootbus with zs_bootbus
 file	arch/sparc/dev/zs.c			zs needs-count
 file	dev/ic/z8530sc.c			zs
+
+device zstty {}: tty
+attach zstty at zs
+file dev/ic/z8530tty.c				zstty needs-flag
+file arch/sparc/dev/zs_kgdb.c			kgdb
 
 device fdc {}
 attach fdc at mainbus with fdc_mainbus
@@ -137,46 +155,56 @@ file	arch/sparc/dev/ts102.c			tpcic
 include "dev/pcmcia/files.pcmcia"
 include "dev/ata/files.ata"
 
+
 #
-# Console (zs) related stuff
+# Console related stuff
 #
 
-device zstty: tty
-attach zstty at zs
-file dev/ic/z8530tty.c			zstty needs-flag
-file arch/sparc/dev/zs_kgdb.c		kgdb
+file	arch/sparc/dev/kd.c				# console
 
-define zsevent
-#file dev/sun/event.c			zsevent
+attach pckbc at obio with pckbc_obio: pckbport_machdep_cnattach
+attach pckbc at ebus with pckbc_ebus: pckbport_machdep_cnattach
+file	arch/sparc/dev/pckbc_js.c	pckbc_obio | pckbc_ebus
 
-device kbd: zsevent
+
+# sun keyboard at a serial port
 attach kbd at zs with kbd_zs
-file dev/sun/kbd_zs.c			kbd_zs
-file dev/sun/kbd.c			kbd needs-flag
-file dev/sun/kbd_tables.c 		kbd
-file dev/sun/sunkbd.c			kbd
-file arch/sparc/dev/kd.c
+file dev/sun/kbd_zs.c			kbd_zs		# kbd lower layer
 
-device ms: zsevent
+# sun keyboard at a tty line discipline
+# only used by sparc64, but we can test-compile it here
+#attach kbd at zstty with kbd_tty
+#file	dev/sun/sunkbd.c		kbd_tty		# kbd lower layer
+
+# shared middle layer for serial keyboard
+file	dev/sun/kbdsun.c		kbd_zs | kbd_tty # kbd middle layer
+
+# PC/AT keyboard at 8042 (pckbc) for Mr.Coffee
+attach kbd at pckbport with kbd_pckbport
+file	arch/sparc/dev/kbd_pckbport.c	kbd_pckbport	# kbd mid/lower layers
+
+
+# sun (mouse systems) mouse at a serial port
 attach ms at zs with ms_zs
-file dev/sun/ms_zs.c			ms_zs
-file dev/sun/ms.c			ms needs-flag
-file dev/sun/sunms.c			ms
+file	dev/sun/ms_zs.c			ms_zs		# mouse lower layer
+
+# sun (mouse systems) mouse at a tty line discipline
+# only used by sparc64, but we can test-compile it here
+#attach ms at zstty with ms_tty
+#file	dev/sun/sunms.c			ms_tty		# mouse lower layer
+
+# XXX: middle layer for sun (mouse systems) serial mice consists of
+# just one function in dev/sun/ms.c (upper layer).  Split it out?
+
+# PS/2 mouse at 8042 (pckbc) for Mr.Coffee
+attach ms at pckbport with ms_pckbport
+file	arch/sparc/dev/ms_pckbport.c	ms_pckbport	# lower/middle layers
+
 
 #
 # Machine-independent SCSI drivers
 #
 include "dev/scsipi/files.scsipi"
-
-major	{ cd = 18 }
-major	{ fd = 16 }
-major	{ md = 5 }
-major	{ sd = 7 }
-major	{ xd = 10 }
-major	{ xy = 3 }
-
-# RAIDframe
-major 	{ raid = 25 }
 
 attach dma at obio with dma_obio
 file	arch/sparc/dev/dma_obio.c	dma_obio
@@ -186,6 +214,7 @@ file	arch/sparc/dev/esp_obio.c	esp_obio
 
 device	audioamd: audiobus, am7930
 attach	audioamd at mainbus with audioamd_mainbus
+attach	audioamd at obio with audioamd_obio
 attach	audioamd at sbus with audioamd_sbus
 file	arch/sparc/dev/audioamd.c		audioamd
 file	arch/sparc/sparc/amd7930intr.s		audioamd
@@ -237,6 +266,7 @@ file	arch/sparc/dev/sw.c		sw
 #
 
 file	dev/cons.c
+file	dev/sun/disksubr.c
 
 file	arch/sparc/fpu/fpu.c
 file	arch/sparc/fpu/fpu_add.c
@@ -250,14 +280,12 @@ file	arch/sparc/fpu/fpu_subr.c
 
 file	arch/sparc/sparc/autoconf.c
 file	arch/sparc/sparc/cache.c
-file	arch/sparc/sparc/conf.c
 file	arch/sparc/sparc/emul.c
 file	arch/sparc/sparc/in_cksum.c
 file	arch/sparc/sparc/intr.c
 file	arch/sparc/sparc/kgdb_machdep.c	kgdb
 # sparc/sparc/locore.s is handled specially in the makefile,
 # because it must come first in the "ld" command line.
-file	arch/sparc/sparc/locore2.c
 file	arch/sparc/sparc/machdep.c
 file	arch/sparc/sparc/process_machdep.c
 file	arch/sparc/sparc/mem.c
@@ -272,17 +300,20 @@ file	arch/sparc/sparc/pmap.c
 file	arch/sparc/sparc/sys_machdep.c
 file	arch/sparc/sparc/trap.c
 file	arch/sparc/sparc/vm_machdep.c
-file	arch/sparc/sparc/disksubr.c
 
 file	arch/sparc/sparc/db_interface.c	ddb | kgdb
 file	arch/sparc/sparc/db_trace.c	ddb
 file	arch/sparc/sparc/db_disasm.c	ddb
 
+
 #
-# Raster Console
+# Raster Console / WS Console
 #
-include "dev/rcons/files.rcons"
-include "dev/wsfont/files.wsfont"
+include "dev/wscons/files.wscons"	# includes rcons as well
+include "dev/wsfont/files.wsfont"	# both rcons and wscons need it
+
+include "dev/pckbport/files.pckbport"
+
 
 #
 # Compatibility modules
@@ -309,3 +340,5 @@ file	arch/sparc/sparc/compat_13_machdep.c	compat_13 | compat_sunos
 file	netns/ns_cksum.c		ns
 
 file	dev/md_root.c			memory_disk_hooks
+
+include "arch/sparc/conf/majors.sparc"

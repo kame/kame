@@ -1,4 +1,4 @@
-/*	$NetBSD: fb.c,v 1.7 2002/03/22 00:14:37 fredette Exp $ */
+/*	$NetBSD: fb.c,v 1.19 2004/03/19 16:05:25 pk Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -50,7 +46,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: fb.c,v 1.7 2002/03/22 00:14:37 fredette Exp $");
+__KERNEL_RCSID(0, "$NetBSD: fb.c,v 1.19 2004/03/19 16:05:25 pk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -58,9 +54,9 @@ __KERNEL_RCSID(0, "$NetBSD: fb.c,v 1.7 2002/03/22 00:14:37 fredette Exp $");
 #include <sys/proc.h>
 #include <sys/conf.h>
 
+#include <machine/promlib.h>
 #include <machine/autoconf.h>
 #include <machine/kbd.h>
-#include <machine/conf.h>
 #include <machine/eeprom.h>
 #include <sparc/dev/cons.h>
 
@@ -71,6 +67,18 @@ __KERNEL_RCSID(0, "$NetBSD: fb.c,v 1.7 2002/03/22 00:14:37 fredette Exp $");
 #include "pfour.h"
 
 static struct fbdevice *devfb;
+
+dev_type_open(fbopen);
+dev_type_close(fbclose);
+dev_type_ioctl(fbioctl);
+dev_type_poll(fbpoll);
+dev_type_mmap(fbmmap);
+dev_type_kqfilter(fbkqfilter);
+
+const struct cdevsw fb_cdevsw = {
+	fbopen, fbclose, noread, nowrite, fbioctl,
+	nostop, notty, fbpoll, fbmmap, fbkqfilter,
+};
 
 void
 fb_unblank()
@@ -87,20 +95,11 @@ fb_unblank()
  * on machines with old PROMs; in that case, drivers should consult
  * other sources of configuration information (e.g. EEPROM entries).
  */
-#if defined(SUN4U)
-/* Temporary special case for sun4u */
 int
 fb_is_console(node)
 	int node;
 {
-	extern int fbnode;
-	return (node == fbnode);
-}
-#else
-int
-fb_is_console(node)
-	int node;
-{
+#if !defined(SUN4U)
 	int fbnode;
 
 	switch (prom_version()) {
@@ -116,7 +115,7 @@ fb_is_console(node)
 		if (prom_stdout() != PROMDEV_SCREEN)
 			return (0);
 
-		fbnode = PROM_getpropint(findroot(), "fb", 0);
+		fbnode = prom_getpropint(findroot(), "fb", 0);
 		return (fbnode == 0 || node == fbnode);
 
 	case PROM_OBP_V2:
@@ -127,8 +126,10 @@ fb_is_console(node)
 	}
 
 	return (0);
+#else
+		return (node == prom_stdout_node);
+#endif
 }
-#endif /* SUN4U */
 
 void
 fb_attach(fb, isconsole)
@@ -242,6 +243,15 @@ fbpoll(dev, events, p)
 	return (devfb->fb_driver->fbd_poll)(dev, events, p);
 }
 
+int
+fbkqfilter(dev, kn)
+	dev_t dev;
+	struct knote *kn;
+{
+
+	return (devfb->fb_driver->fbd_kqfilter)(dev, kn);
+}
+
 paddr_t
 fbmmap(dev, off, prot)
 	dev_t dev;
@@ -260,9 +270,9 @@ fb_setsize_obp(fb, depth, def_width, def_height, node)
 	struct fbdevice *fb;
 	int depth, def_width, def_height, node;
 {
-	fb->fb_type.fb_width = PROM_getpropint(node, "width", def_width);
-	fb->fb_type.fb_height = PROM_getpropint(node, "height", def_height);
-	fb->fb_linebytes = PROM_getpropint(node, "linebytes",
+	fb->fb_type.fb_width = prom_getpropint(node, "width", def_width);
+	fb->fb_type.fb_height = prom_getpropint(node, "height", def_height);
+	fb->fb_linebytes = prom_getpropint(node, "linebytes",
 				     (fb->fb_type.fb_width * depth) / 8);
 }
 
@@ -330,30 +340,12 @@ fb_setsize_eeprom(fb, depth, def_width, def_height)
 
 static void fb_bell __P((int));
 
-#if !defined(RASTERCONS_FULLSCREEN)
-static int a2int __P((char *, int));
-
-static int
-a2int(cp, deflt)
-	register char *cp;
-	register int deflt;
-{
-	register int i = 0;
-
-	if (*cp == '\0')
-		return (deflt);
-	while (*cp != '\0')
-		i = i * 10 + *cp++ - '0';
-	return (i);
-}
-#endif
-
 static void
 fb_bell(on)
 	int on;
 {
 #if NKBD > 0
-	(void)kbd_docmd(on?KBD_CMD_BELL:KBD_CMD_NOBELL, 0);
+	kbd_bell(on);
 #endif
 }
 
@@ -393,10 +385,15 @@ fbrcons_init(fb)
 	}
 #endif /* !SUN4U */
 	if (!CPU_ISSUN4) {
-		maxcol =
-		    a2int(PROM_getpropstring(optionsnode, "screen-#columns"), 80);
-		maxrow =
-		    a2int(PROM_getpropstring(optionsnode, "screen-#rows"), 34);
+		char buf[6+1];	/* Enough for six digits */
+		maxcol = (prom_getoption("screen-#columns", buf, sizeof buf) == 0)
+			? strtoul(buf, NULL, 10)
+			: 80;
+
+		maxrow = (prom_getoption("screen-#rows", buf, sizeof buf) != 0)
+			? strtoul(buf, NULL, 10)
+			: 34;
+
 	}
 #endif /* !RASTERCONS_FULLSCREEN */
 	/*

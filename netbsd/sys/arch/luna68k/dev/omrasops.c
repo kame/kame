@@ -1,4 +1,4 @@
-/* $NetBSD: omrasops.c,v 1.1 2000/01/05 08:48:56 nisimura Exp $ */
+/* $NetBSD: omrasops.c,v 1.3 2002/07/04 14:43:49 junyoung Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: omrasops.c,v 1.1 2000/01/05 08:48:56 nisimura Exp $");
+__KERNEL_RCSID(0, "$NetBSD: omrasops.c,v 1.3 2002/07/04 14:43:49 junyoung Exp $");
 
 /*
  * Designed speficically for 'm68k bitorder';
@@ -68,7 +68,7 @@ static void	om_copycols __P((void *, int, int, int, int));
 static void	om_copyrows __P((void *, int, int, int num));
 static void	om_erasecols __P((void *, int, int, int, long));
 static void	om_eraserows __P((void *, int, int, long));
-static int	om_alloc_attr __P((void *, int, int, int, long *));
+static int	om_allocattr __P((void *, int, int, int, long *));
 
 struct wsdisplay_emulops omfb_emulops = {
 	om_cursor,
@@ -78,7 +78,7 @@ struct wsdisplay_emulops omfb_emulops = {
 	om_erasecols,
 	om_copyrows,
 	om_eraserows,
-	om_alloc_attr
+	om_allocattr
 };
 
 #define	ALL1BITS	(~0U)
@@ -378,6 +378,7 @@ om_copycols(cookie, startrow, srccol, dstcol, ncols)
 
     hardluckalignment:
 	/* alignments painfully disagree */
+	return;
 }
 
 /*
@@ -464,7 +465,7 @@ om_cursor(cookie, on, row, col)
  * Allocate attribute. We just pack these into an integer.
  */
 static int
-om_alloc_attr(id, fg, bg, flags, attrp)
+om_allocattr(id, fg, bg, flags, attrp)
 	void *id;
 	int fg, bg, flags;
 	long *attrp;

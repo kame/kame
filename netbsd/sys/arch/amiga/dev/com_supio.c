@@ -1,4 +1,4 @@
-/*	$NetBSD: com_supio.c,v 1.15 2002/01/28 09:56:53 aymeric Exp $ */
+/*	$NetBSD: com_supio.c,v 1.19 2003/08/07 16:26:40 agc Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -48,11 +48,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -72,7 +68,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: com_supio.c,v 1.15 2002/01/28 09:56:53 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: com_supio.c,v 1.19 2003/08/07 16:26:40 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -116,9 +112,8 @@ static int comconsrate;
 static tcflag_t comconscflag;
 #endif
 
-struct cfattach com_supio_ca = {
-	sizeof(struct comsupio_softc), com_supio_match, com_supio_attach
-};
+CFATTACH_DECL(com_supio, sizeof(struct comsupio_softc),
+    com_supio_match, com_supio_attach, NULL, NULL);
 
 int
 com_supio_match(struct device *parent, struct cfdata *match, void *aux)
@@ -161,7 +156,7 @@ com_supio_attach(struct device *parent, struct device *self, void *aux)
 
 	com_attach_subr(csc);
 
-	/* XXX this should be really in the interupt stuff */
+	/* XXX this should be really in the interrupt stuff */
 	needpsl = PSL_S | (supa->supio_ipl << 8);
 
 	if (amiga_serialspl < needpsl) {

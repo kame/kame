@@ -1,11 +1,43 @@
-/*	$NetBSD: esc.c,v 1.7 2002/04/05 16:58:02 thorpej Exp $	*/
+/*	$NetBSD: esc.c,v 1.15 2003/11/10 08:51:51 wiz Exp $	*/
+
+/*
+ * Copyright (c) 1990 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Van Jacobson of Lawrence Berkeley Laboratory.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)scsi.c	7.5 (Berkeley) 5/4/91
+ */
 
 /*
  * Copyright (c) 1995 Scott Stevens
  * Copyright (c) 1995 Daniel Widenfalk
  * Copyright (c) 1994 Christian E. Hopps
- * Copyright (c) 1990 The Regents of the University of California.
- * All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * Van Jacobson of Lawrence Berkeley Laboratory.
@@ -53,10 +85,10 @@
  * Modified for NetBSD/arm32 by Scott Stevens
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: esc.c,v 1.15 2003/11/10 08:51:51 wiz Exp $");
+
 #include <sys/param.h>
-
-__RCSID("$NetBSD: esc.c,v 1.7 2002/04/05 16:58:02 thorpej Exp $");
-
 #include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/buf.h>
@@ -221,8 +253,9 @@ escinitialize(dev)
  */
 	pte = vtopte((vaddr_t) dev->sc_bump_va);
 	*pte &= ~L2_C;
+	PTE_SYNC(pte);
 	cpu_tlb_flushD();
-	cpu_dcache_wbinv_range((vm_offset_t)dev->sc_bump_va, NBPG);
+	cpu_dcache_wbinv_range((vm_offset_t)dev->sc_bump_va, PAGE_SIZE);
 
 	printf(" dmabuf V0x%08x P0x%08x", (u_int)dev->sc_bump_va, (u_int)dev->sc_bump_pa);
 }
@@ -779,7 +812,7 @@ esc_arbitate_target(dev, target)
 }
 
 /*
- * Setup a nexus for use. Initializes command, buffer pointers and dma chain.
+ * Setup a nexus for use. Initializes command, buffer pointers and DMA chain.
  */
 void
 esc_setup_nexus(dev, nexus, pendp, cbuf, clen, buf, len, mode)
@@ -871,11 +904,11 @@ esc_setup_nexus(dev, nexus, pendp, cbuf, clen, buf, len, mode)
 	}
 
 /*
- * Fake a dma-block for polled IO. This way we can use the same code to handle
+ * Fake a DMA-block for polled IO. This way we can use the same code to handle
  * reselection. Much nicer this way.
  */
 	if ((mode & ESC_SELECT_I) || (dev->sc_config_flags & ESC_NO_DMA)) {
-		nexus->dma[0].ptr = (vm_offset_t)buf;
+		nexus->dma[0].ptr = buf;
 		nexus->dma[0].len = len;
 		nexus->dma[0].flg = ESC_CHAIN_PRG;
 		nexus->max_link   = 1;
@@ -1194,7 +1227,7 @@ esc_midaction(dev, rp, nexus)
 		if (dev->sc_dma_len)
 			if (dev->sc_cur_link < dev->sc_max_link) {
 				/*
-				 * Clean up dma and at the same time get how
+				 * Clean up DMA and at the same time get how
 				 * many bytes that were NOT transfered.
 				 */
 			  left = dev->sc_setup_dma(dev, 0, 0, ESC_DMA_CLEAR);
@@ -1228,14 +1261,15 @@ esc_midaction(dev, rp, nexus)
 			  dev->sc_len -= len-left;
 			  dev->sc_buf += len-left;
 
-			  dev->sc_dma_buf += len-left;
-			  dev->sc_dma_len  = left;
+			  dev->sc_dma_buf = (char *)dev->sc_dma_buf + len-left;
+			  dev->sc_dma_len = left;
 
-			  dev->sc_dma_blk_ptr += len-left;
+			  dev->sc_dma_blk_ptr = (char *)dev->sc_dma_blk_ptr +
+				  len-left;
 			  dev->sc_dma_blk_len -= len-left;
 
 			  /*
-			   * If it was the end of a dma block, we select the
+			   * If it was the end of a DMA block, we select the
 			   * next to begin with.
 			   */
 			  if (!dev->sc_dma_blk_len)
@@ -1336,7 +1370,7 @@ esc_postaction(dev, rp, nexus)
 			dev->sc_dma_len = dev->sc_dma_blk_len;
 		  }
 
-		  /* Load DMA with adress and length of transfer. */
+		  /* Load DMA with address and length of transfer. */
 		  dev->sc_setup_dma(dev, (void *)dev->sc_dma_buf,
 		  		    dev->sc_dma_len,
 				    ((nexus->state == ESC_NS_DATA_OUT) ?

@@ -1,4 +1,4 @@
-/*	$NetBSD: apbus.c,v 1.8 2001/11/14 18:15:29 thorpej Exp $	*/
+/*	$NetBSD: apbus.c,v 1.17 2003/07/15 02:59:28 lukem Exp $	*/
 
 /*-
  * Copyright (C) 1999 SHIMIZU Ryo.  All rights reserved.
@@ -26,6 +26,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: apbus.c,v 1.17 2003/07/15 02:59:28 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -38,6 +41,7 @@
 #include <machine/autoconf.h>
 #define _NEWSMIPS_BUS_DMA_PRIVATE
 #include <machine/bus.h>
+#include <machine/intr.h>
 #include <newsmips/apbus/apbusvar.h>
 
 static int  apbusmatch (struct device *, struct cfdata *, void *);
@@ -68,31 +72,17 @@ struct apbus_softc {
 	struct device apbs_dev;
 };
 
-struct cfattach ap_ca = {
-	sizeof(struct apbus_softc), apbusmatch, apbusattach
-};
-
-#define	APBUS_DEVNAMELEN	16
-
-struct ap_intrhand {
-	struct ap_intrhand *ai_next;
-	int ai_mask;
-	int ai_priority;
-	int (*ai_func) (void*);		/* function */
-	void *ai_aux;			/* softc */
-	char ai_name[APBUS_DEVNAMELEN];
-	int ai_ctlno;
-};
+CFATTACH_DECL(ap, sizeof(struct apbus_softc),
+    apbusmatch, apbusattach, NULL, NULL);
 
 #define	NLEVEL	2
-
-static struct ap_intrhand *apintr[NLEVEL];
+static struct newsmips_intr apintr_tab[NLEVEL];
 
 static int
 apbusmatch(parent, cfdata, aux)
-        struct device *parent;
-        struct cfdata *cfdata;
-        void *aux;
+	struct device *parent;
+	struct cfdata *cfdata;
+	void *aux;
 {
 	struct confargs *ca = aux;
 
@@ -105,13 +95,15 @@ apbusmatch(parent, cfdata, aux)
 
 static void
 apbusattach(parent, self, aux)
-        struct device *parent;
-        struct device *self;
-        void *aux;
+	struct device *parent;
+	struct device *self;
+	void *aux;
 {
 	struct apbus_attach_args child;
 	struct apbus_dev *apdev;
 	struct apbus_ctl *apctl;
+	struct newsmips_intr *ip;
+	int i;
 
 	*(volatile u_int *)(NEWS5000_APBUS_INTST) = 0xffffffff;
 	*(volatile u_int *)(NEWS5000_APBUS_INTMSK) = 0xffffffff;
@@ -119,6 +111,11 @@ apbusattach(parent, self, aux)
 	*(volatile u_int *)(NEWS5000_APBUS_DMA) = 0xffffffff;
 
 	printf("\n");
+
+	for (i = 0; i < NLEVEL; i++) {
+		ip = &apintr_tab[i];
+		LIST_INIT(&ip->intr_q);
+	}
 
 	/*
 	 * get first ap-device
@@ -164,7 +161,7 @@ apbusprint(aux, pnp)
 	struct apbus_attach_args *a = aux;
 
 	if (pnp)
-		printf("%s at %s slot%d addr 0x%lx",
+		aprint_normal("%s at %s slot%d addr 0x%lx",
 			a->apa_name, pnp, a->apa_slotno, a->apa_hwbase);
 
 	return UNCONF;
@@ -199,17 +196,20 @@ apbus_wbflush()
  * called by hardware interrupt routine
  */
 int
-apbus_intr_call(level, stat)
+apbus_intr_dispatch(level, stat)
 	int level;
 	int stat;
 {
-	int nintr = 0;
-	struct ap_intrhand *ai;
+	struct newsmips_intr *ip;
+	struct newsmips_intrhand *ih;
+	int nintr;
 
-	for (ai = apintr[level]; ai != NULL; ai = ai->ai_next) {
-		if (ai->ai_mask & stat) {
-			nintr += (*ai->ai_func)(ai->ai_aux);
-		}
+	ip = &apintr_tab[level];
+
+	nintr = 0;
+	LIST_FOREACH(ih, &ip->intr_q, ih_q) {
+		if (ih->ih_mask & stat)
+			nintr += (*ih->ih_func)(ih->ih_arg);
 	}
 	return nintr;
 }
@@ -218,45 +218,58 @@ apbus_intr_call(level, stat)
  * register device interrupt routine
  */
 void *
-apbus_intr_establish(level, mask, priority, func, aux, name, ctlno)
+apbus_intr_establish(level, mask, priority, func, arg, name, ctlno)
 	int level;
 	int mask;
 	int priority;
 	int (*func) (void *);
-	void *aux;
+	void *arg;
 	char *name;
 	int ctlno;
 {
-	struct ap_intrhand *ai, **aip;
-	volatile unsigned int *inten0 = (volatile unsigned int *)NEWS5000_INTEN0;
-	volatile unsigned int *inten1 = (volatile unsigned int *)NEWS5000_INTEN1;
+	struct newsmips_intr *ip;
+	struct newsmips_intrhand *ih, *curih;
+	volatile u_int32_t *inten0, *inten1;
 
-	ai = malloc(sizeof(*ai), M_DEVBUF, M_NOWAIT);
-	if (ai == NULL)
+	ip = &apintr_tab[level];
+
+	ih = malloc(sizeof(*ih), M_DEVBUF, M_NOWAIT);
+	if (ih == NULL)
 		panic("apbus_intr_establish: can't malloc handler info");
-	ai->ai_mask = mask;
-	ai->ai_priority = priority;
-	ai->ai_func = func;
-	ai->ai_aux = aux;
-	strncpy(ai->ai_name, name, APBUS_DEVNAMELEN-1);
-	ai->ai_ctlno = ctlno;
+	ih->ih_mask = mask;
+	ih->ih_priority = priority;
+	ih->ih_func = func;
+	ih->ih_arg = arg;
 
-	for (aip = &apintr[level]; *aip != NULL; aip = &(*aip)->ai_next) {
-		if ((*aip)->ai_priority < priority)
-			break;
+	if (LIST_EMPTY(&ip->intr_q)) {
+		LIST_INSERT_HEAD(&ip->intr_q, ih, ih_q);
+		goto done;
 	}
-	ai->ai_next = *aip;
-	*aip = ai;
+
+	for (curih = LIST_FIRST(&ip->intr_q);
+	    LIST_NEXT(curih, ih_q) != NULL;
+	    curih = LIST_NEXT(curih, ih_q)) {
+		if (ih->ih_priority > curih->ih_priority) {
+			LIST_INSERT_BEFORE(curih, ih, ih_q);
+			goto done;
+		}
+	}
+
+	LIST_INSERT_AFTER(curih, ih, ih_q);
+
+ done:
 	switch (level) {
 	case 0:
+		inten0 = (volatile u_int32_t *)NEWS5000_INTEN0;
 		*inten0 |= mask;
 		break;
 	case 1:
+		inten1 = (volatile u_int32_t *)NEWS5000_INTEN1;
 		*inten1 |= mask;
 		break;
 	}
 
-	return (void *)ai;
+	return (void *)ih;
 }
 
 static void
@@ -291,9 +304,9 @@ apbus_dma_mapalloc(t, map, flags)
 {
 	int i, j, cnt;
 
-	cnt = round_page(map->_dm_size) / NBPG;
+	cnt = round_page(map->_dm_size) / PAGE_SIZE;
 
-  again:
+ again:
 	for (i = 0; i < APBUS_NDMAMAP; i += j + 1) {
 		for (j = 0; j < cnt; j++) {
 			if (apbus_dma_maptbl[i + j])
@@ -326,7 +339,7 @@ apbus_dma_mapfree(t, map)
 		for (i = 0; i < map->_dm_maptblcnt; i++, n++) {
 #ifdef DIAGNOSTIC
 			if (apbus_dma_maptbl[n] == 0)
-				panic("freeing free dma map");
+				panic("freeing free DMA map");
 			APBUS_MAPTBL(n, 0xffffffff);	/* causes DMA error */
 #endif
 			apbus_dma_maptbl[n] = 0;
@@ -350,10 +363,10 @@ apbus_dma_mapset(t, map)
 	for (seg = 0; seg < map->dm_nsegs; seg++) {
 		segs = &map->dm_segs[seg];
 		for (addr = segs->ds_addr, eaddr = addr + segs->ds_len;
-		    addr < eaddr; addr += NBPG, i++) {
+		    addr < eaddr; addr += PAGE_SIZE, i++) {
 #ifdef DIAGNOSTIC
 			if (i >= map->_dm_maptblcnt)
-				panic("dma map table overflow");
+				panic("DMA map table overflow");
 #endif
 			APBUS_MAPTBL(map->_dm_maptbl + i,
 				NEWS5000_APBUS_MAP_VALID |
@@ -379,7 +392,7 @@ apbus_dmamap_create(t, size, nsegments, maxsegsz, boundary, flags, dmamp)
 	int error;
 
 	if (flags & NEWSMIPS_DMAMAP_MAPTBL)
-		nsegments = round_page(size) / NBPG;
+		nsegments = round_page(size) / PAGE_SIZE;
 	error = _bus_dmamap_create(t, size, nsegments, maxsegsz, boundary,
 	    flags, dmamp);
 	if (error == 0 && (flags & NEWSMIPS_DMAMAP_MAPTBL)) {

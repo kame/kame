@@ -1,4 +1,4 @@
-/*	$NetBSD: p_acer_pica_61.c,v 1.1 2001/06/13 15:29:30 soda Exp $	*/
+/*	$NetBSD: p_acer_pica_61.c,v 1.6 2003/07/15 00:04:42 lukem Exp $	*/
 /*	$OpenBSD: picabus.c,v 1.11 1999/01/11 05:11:10 millert Exp $	*/
 
 /*
@@ -29,6 +29,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: p_acer_pica_61.c,v 1.6 2003/07/15 00:04:42 lukem Exp $");
+
 #include <sys/param.h>
 #include <uvm/uvm_extern.h>
 
@@ -38,16 +41,6 @@
 #include <arc/jazz/pica.h>
 #include <arc/jazz/jazziovar.h>
 
-#include "asc.h"
-#if NASC > 0
-#include <arc/jazz/ascvar.h>
-
-struct asc_config asc_acer_pica_61_conf = {
-	&asc_timing_25mhz,
-	0,
-};
-#endif
-
 /* ALI PICA 61 and some MAGNUM? */
 
 void p_acer_pica_61_init __P((void));
@@ -56,7 +49,7 @@ struct platform platform_acer_pica_61 = {
 	"PICA-61",
 	"MIPS MAG",
 	"",
-	"Pica-61",
+	"PICA-61",
 	"Acer",
 	150, /* MHz */
 	c_jazz_eisa_mainbusdevs,
@@ -74,16 +67,16 @@ struct platform platform_acer_pica_61 = {
 struct pica_dev acer_pica_61_cpu[] = {
 	{{ "timer",	-1, 0, },	(void *)R4030_SYS_IT_VALUE, },
 	{{ "dallas_rtc", -1, 0, },	(void *)PICA_SYS_CLOCK, },
-	{{ "lpt",	0, 0, },	(void *)PICA_SYS_PAR1, },
-	{{ "fdc",	1, 0, },	(void *)PICA_SYS_FLOPPY, },
+	{{ "LPT1",	0, 0, },	(void *)PICA_SYS_PAR1, },
+	{{ "I82077",	1, 0, },	(void *)PICA_SYS_FLOPPY, },
 	{{ "MAGNUM",	2, 0, },	(void *)PICA_SYS_SOUND,},
 	{{ "ALI_S3",	3, 0, },	(void *)PICA_V_LOCAL_VIDEO, },
-	{{ "sonic",	4, 0, },	(void *)PICA_SYS_SONIC, },
-	{{ "asc",	5, 0, },	(void *)PICA_SYS_SCSI, },
-	{{ "pckbd",	6, 0, },	(void *)PICA_SYS_KBD, },
-	{{ "pms",	7, 0, },	(void *)PICA_SYS_KBD, },
-	{{ "com",	8, 0, },	(void *)PICA_SYS_COM1, },
-	{{ "com",	9, 0, },	(void *)PICA_SYS_COM2, },
+	{{ "SONIC",	4, 0, },	(void *)PICA_SYS_SONIC, },
+	{{ "ESP216",	5, 0, },	(void *)PICA_SYS_SCSI, },
+	{{ "I8742",	6, 0, },	(void *)PICA_SYS_KBD, },
+	{{ "pms",	7, 0, },	(void *)PICA_SYS_KBD, }, /* XXX */
+	{{ "COM1",	8, 0, },	(void *)PICA_SYS_COM1, },
+	{{ "COM2",	9, 0, },	(void *)PICA_SYS_COM2, },
 	{{ NULL,	-1, 0, },	(void *)NULL, },
 };
 
@@ -106,8 +99,4 @@ p_acer_pica_61_init()
 
 	/* chipset-dependent jazzio bus configuration */
 	jazzio_devconfig = acer_pica_61_cpu;
-
-#if NASC > 0
-	asc_conf = &asc_acer_pica_61_conf;
-#endif
 }

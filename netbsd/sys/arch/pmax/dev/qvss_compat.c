@@ -1,4 +1,4 @@
-/*	$NetBSD: qvss_compat.c,v 1.28 2001/09/19 19:04:17 thorpej Exp $	*/
+/*	$NetBSD: qvss_compat.c,v 1.35 2003/10/31 03:29:59 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -63,6 +59,9 @@
  * functions for the keyboard and mouse.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: qvss_compat.c,v 1.35 2003/10/31 03:29:59 simonb Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -75,6 +74,7 @@
 #include <uvm/uvm_extern.h>
 #include <miscfs/specfs/specdev.h>
 
+#include <dev/cons.h>
 #include <dev/dec/lk201.h>		/* LK-201 keycodes */
 
 #include <dev/sun/fbio.h>
@@ -86,7 +86,6 @@
 #include <pmax/dev/fbreg.h>		/* XXX should be renamed fbvar.h */
 #include <pmax/dev/qvssvar.h>			/* our own externs */
 
-#include <pmax/pmax/cons.h>
 #include <pmax/pmax/pmaxtype.h>
 
 #include <pmax/tc/sccvar.h>			/* ioasic z8530 I/O decls */
@@ -121,7 +120,7 @@ init_pmaxfbu(fi)
 	struct fbuaccess *fbu = NULL;
 
 	if (fi == NULL || fi->fi_fbu == NULL)
-		panic("init_pmaxfb: given null pointer to framebuffer\n");
+		panic("init_pmaxfb: given null pointer to framebuffer");
 
 	/* XXX don't rely on there being a pmax_fb struct */
 	fbu = fi->fi_fbu;
@@ -228,7 +227,7 @@ fbKbdEvent(ch, fi)
 	eventPtr->time = TO_MS(time);
 	eventPtr->key = ch;
 	fbu->scrInfo.qe.eTail = i;
-	selwakeup(&fi->fi_selp);
+	selnotify(&fi->fi_selp, 0);
 }
 
 /*
@@ -349,7 +348,7 @@ fbMouseEvent(newRepPtr, fi)
 	eventPtr->y = fbu->scrInfo.mouse.y;
 	eventPtr->device = MOUSE_DEVICE;
 	fbu->scrInfo.qe.eTail = PM_EVROUND(fbu->scrInfo.qe.eTail + 1);
-	selwakeup(&fi->fi_selp);
+	selnotify(&fi->fi_selp, 0);
 }
 
 /*
@@ -428,7 +427,7 @@ fbMouseButtons(newRepPtr, fi)
 		eventPtr->y = fbu->scrInfo.mouse.y;
 		fbu->scrInfo.qe.eTail = i;
 	}
-	selwakeup(&fi->fi_selp);
+	selnotify(&fi->fi_selp, 0);
 
 	lastRep = *newRepPtr;
 	fbu->scrInfo.mswitches = newSwitch;
@@ -457,7 +456,7 @@ fbmmap_fb(fi, dev, data, p)
 	len = mips_round_page(((vaddr_t)fbu & PGOFSET) +
 			      sizeof(struct fbuaccess)) +
 		mips_round_page(fi->fi_type.fb_size);
-	addr = (vaddr_t)0x20000000;		/* XXX */
+	addr = VM_DEFAULT_ADDRESS(p->p_vmspace->vm_daddr, len);
 	vn.v_type = VCHR;			/* XXX */
 	vn.v_specinfo = &si;			/* XXX */
 	vn.v_rdev = dev;			/* XXX */
@@ -596,6 +595,7 @@ genDeconfigMouse()
 	default:
 		printf("Can't deconfigure mouse/keyboard\n");
 	};
+	splx(s);
 }
 
 

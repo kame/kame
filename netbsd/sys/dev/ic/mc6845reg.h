@@ -1,4 +1,4 @@
-/* $NetBSD: mc6845reg.h,v 1.1 1998/05/28 16:48:40 drochner Exp $ */
+/* $NetBSD: mc6845reg.h,v 1.3 2004/03/24 17:26:53 drochner Exp $ */
 
 /*
  * Copyright (c) 1998
@@ -12,12 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed for the NetBSD Project
- *	by Matthias Drochner.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -33,13 +27,15 @@
  */
 
 struct reg_mc6845 { /* indexed via port 0x3d4 (mono 0x3b4) */
-	char htotal, hdisple, hblanks, hblanke;
-	char hsyncs, hsynce, vtotal, overfll;
-	char irowaddr, maxrow, curstart, curend;
-	char startadrh, startadrl, cursorh, cursorl;
-	char vsyncs, vsynce, vde, offset;
-	char uloc, vbstart, vbend, mode;
-	char splitl;
+	u_int8_t htotal, hdisple, hblanks, hblanke;
+	u_int8_t hsyncs, hsynce, vtotal, overfll;
+	u_int8_t irowaddr, maxrow, curstart, curend;
+	u_int8_t startadrh, startadrl, cursorh, cursorl;
+	u_int8_t vsyncs, vsynce, vde, offset;
+	u_int8_t uloc, vbstart, vbend, mode;
+	u_int8_t splitl;
 };
-#define MC6845_INDEX 4
-#define MC6845_DATA 5
+
+#define MC6845_NREGS	25
+#define MC6845_INDEX	0x4
+#define MC6845_DATA	0x5

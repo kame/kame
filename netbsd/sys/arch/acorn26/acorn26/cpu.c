@@ -1,4 +1,4 @@
-/* $NetBSD: cpu.c,v 1.3 2002/04/12 18:50:30 thorpej Exp $ */
+/* $NetBSD: cpu.c,v 1.12 2003/11/02 12:39:30 he Exp $ */
 
 /*-
  * Copyright (c) 2000, 2001 Ben Harris
@@ -32,7 +32,7 @@
 
 #include <sys/param.h>
 
-__KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.3 2002/04/12 18:50:30 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.12 2003/11/02 12:39:30 he Exp $");
 
 #include <sys/device.h>
 #include <sys/proc.h>
@@ -67,9 +67,8 @@ struct cpu_softc {
 	struct device sc_dev;
 };
 
-struct cfattach cpu_root_ca = {
-	sizeof(struct cpu_softc), cpu_match, cpu_attach
-};
+CFATTACH_DECL(cpu_root, sizeof(struct cpu_softc),
+    cpu_match, cpu_attach, NULL, NULL);
 
 /* cf_flags bits */
 #define CFF_NOCACHE	0x00000001
@@ -131,7 +130,7 @@ static int
 cpu_search(struct device *parent, struct cfdata *cf, void *aux)
 {
 	
-	if ((cf->cf_attach->ca_match)(parent, cf, NULL) > 0)
+	if (config_match(parent, cf, NULL) > 0)
 		config_attach(parent, cf, NULL, NULL);
 
 	return 0;
@@ -153,15 +152,15 @@ cpu_identify()
 	volatile register_t id;
 	void *cp0, *cp15;
 
+	cp0 = install_coproc_handler(0, cpu_undef_handler);
+	cp15 = install_coproc_handler(15, cpu_undef_handler);
 	if (setjmp(&undef_jmp) == 0) {
-		cp0 = install_coproc_handler(0, cpu_undef_handler);
-		cp15 = install_coproc_handler(15, cpu_undef_handler);
 		id = CPU_ID_ARM2;
 		/* ARM250 and ARM3 support SWP. */
-		asm volatile ("swp r0, r0, [%0]" : : "r" (&dummy) : "r0");
+		__asm __volatile ("swp r0, r0, [%0]" : : "r" (&dummy) : "r0");
 		id = CPU_ID_ARM250;
 		/* ARM3 has an internal coprocessor 15 with an ID register. */
-		asm volatile ("mrc 15, 0, %0, cr0, cr0" : "=r" (id));
+		__asm __volatile ("mrc 15, 0, %0, cr0, cr0" : "=r" (id));
 	}
 	remove_coproc_handler(cp0);
 	remove_coproc_handler(cp15);
@@ -198,7 +197,7 @@ arm2_undef_handler(u_int addr, u_int insn, struct trapframe *frame,
 static int
 swp_handler(u_int addr, u_int insn, struct trapframe *tf, int fault_code)
 {
-	struct proc *p;
+	struct proc *p = curlwp->l_proc;
 	int rd, rm, rn, byte;
 	register_t temp;
 	caddr_t uaddr;
@@ -216,9 +215,14 @@ swp_handler(u_int addr, u_int insn, struct trapframe *tf, int fault_code)
 	uaddr = (caddr_t)getreg(rn);
 	/* We want the page wired so we won't sleep */
 	/* XXX only wire one byte due to weirdness with unaligned words */
-	err = uvm_vslock(curproc, uaddr, 1, VM_PROT_READ | VM_PROT_WRITE);
+	err = uvm_vslock(p, uaddr, 1, VM_PROT_READ | VM_PROT_WRITE);
 	if (err != 0) {
-		trapsignal(p, SIGSEGV, (u_int)uaddr);
+		ksiginfo_t ksi;
+		KSI_INIT_TRAP(&ksi);
+		ksi.ksi_signo = SIGSEGV;
+		ksi.ksi_addr = uaddr;
+		ksi.ksi_code = SEGV_MAPERR;
+		trapsignal(curlwp, &ksi);
 		return 0;
 	}
 	/* I believe the uvm_vslock() guarantees the fetch/store won't fail. */
@@ -235,7 +239,7 @@ swp_handler(u_int addr, u_int insn, struct trapframe *tf, int fault_code)
 		suword(uaddr, getreg(rm));
 		getreg(rd) = temp;
 	}
-	uvm_vsunlock(curproc, uaddr, 1);
+	uvm_vsunlock(p, uaddr, 1);
 	return 0;
 }
 #endif
@@ -243,9 +247,9 @@ swp_handler(u_int addr, u_int insn, struct trapframe *tf, int fault_code)
 #ifdef CPU_ARM3
 
 #define ARM3_READ(reg, var) \
-	asm ("mrc 15, 0, %0, cr" __STRING(reg) ", cr0" : "=r" (var))
+	__asm ("mrc 15, 0, %0, cr" __STRING(reg) ", cr0" : "=r" (var))
 #define ARM3_WRITE(reg, val) \
-	asm ("mcr 15, 0, %0, cr" __STRING(reg) ", cr0" : : "r" (val))
+	__asm ("mcr 15, 0, %0, cr" __STRING(reg) ", cr0" : : "r" (val))
 
 static void
 cpu_arm3_setup(struct device *self, int flags)

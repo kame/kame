@@ -1,4 +1,4 @@
-/*	$NetBSD: ncr.c,v 1.46 2001/04/25 17:53:19 bouyer Exp $	*/
+/*	$NetBSD: ncr.c,v 1.50 2004/01/23 04:12:39 simonb Exp $	*/
 
 /*
  * Copyright (c) 1996, 1997 Matthias Pfaller.
@@ -29,6 +29,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ncr.c,v 1.50 2004/01/23 04:12:39 simonb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -81,9 +84,8 @@ static void	ncr_wait_not_req __P((struct ncr5380_softc *sc));
  */
 int ncr_default_options = 0;
 
-struct cfattach ncr_ca = {
-	sizeof(struct ncr5380_softc), ncr_match, ncr_attach
-};
+CFATTACH_DECL(ncr, sizeof(struct ncr5380_softc),
+    ncr_match, ncr_attach, NULL, NULL);
 
 static int
 ncr_match(parent, cf, aux)
@@ -93,7 +95,7 @@ ncr_match(parent, cf, aux)
 {
 	struct confargs *ca = aux;
 	int unit = cf->cf_unit;
-	
+
 	if (unit != 0)	/* Only one unit */
 		return(0);
 
@@ -116,7 +118,7 @@ ncr_attach(parent, self, aux)
 	 */
 	scsi_select_ctlr(DP8490);
 
-	/* Pull in config flags. */ 
+	/* Pull in config flags. */
 	flags = ca->ca_flags | ncr_default_options;
 
 	if (flags)
@@ -325,7 +327,7 @@ static int
 ncr_pdma_out(sc, phase, datalen, data)
 	struct ncr5380_softc *sc;
 	int phase, datalen;
-	u_char *data; 
+	u_char *data;
 {
 	volatile u_char *pdma = PDMA_ADDRESS;
 	int i, s, resid;
@@ -355,7 +357,7 @@ ncr_pdma_out(sc, phase, datalen, data)
 		W4(0);
 		data += 4;
 		resid -= 4;
-		
+
 		for (; resid >= NCR_TSIZE_OUT; resid -= NCR_TSIZE_OUT) {
 			if (ncr_ready(sc) == 0) {
 				resid += 4; /* Overshot */
@@ -398,4 +400,3 @@ interrupt:
 	splx(s);
 	return(datalen - resid);
 }
-

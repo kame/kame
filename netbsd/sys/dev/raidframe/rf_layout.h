@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_layout.h,v 1.7 2001/10/05 15:41:23 oster Exp $	*/
+/*	$NetBSD: rf_layout.h,v 1.14 2004/03/20 04:22:05 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -69,8 +69,6 @@ struct RF_RaidLayout_s {
 					 * array */
 	RF_SectorCount_t dataSectorsPerStripe;
 	RF_StripeCount_t dataStripeUnitsPerDisk;
-	u_int   bytesPerStripeUnit;
-	u_int   dataBytesPerStripe;
 	RF_StripeCount_t numDataCol;	/* number of SUs of data per stripe
 					 * (name here is a la RAID4) */
 	RF_StripeCount_t numParityCol;	/* number of SUs of parity per stripe.
@@ -80,8 +78,8 @@ struct RF_RaidLayout_s {
 						 * now */
 	RF_StripeCount_t stripeUnitsPerDisk;
 
-	RF_LayoutSW_t *map;	/* ptr to struct holding mapping fns and
-				 * information */
+	const RF_LayoutSW_t *map;	/* ptr to struct holding mapping fns and
+					 * information */
 	void   *layoutSpecificInfo;	/* ptr to a structure holding
 					 * layout-specific params */
 };
@@ -101,7 +99,7 @@ struct RF_RaidLayout_s {
 #define RF_PDA_TYPE_Q      2
 
 struct RF_PhysDiskAddr_s {
-	RF_RowCol_t row, col;	/* disk identifier */
+	RF_RowCol_t col;	/* disk identifier */
 	RF_SectorNum_t startSector;	/* sector offset into the disk */
 	RF_SectorCount_t numSector;	/* number of sectors accessed */
 	int     type;		/* used by higher levels: currently, data,
@@ -137,8 +135,6 @@ struct RF_AccessStripeMap_s {
 	RF_PhysDiskAddr_t *qInfo;	/* list of physical addrs for the Q of
 					 * P + Q */
 	RF_LockReqDesc_t lockReqDesc;	/* used for stripe locking */
-	RF_RowCol_t origRow;	/* the original row:  we may redirect the acc
-				 * to a different row */
 	RF_AccessStripeMap_t *next;
 };
 /* flag values */
@@ -166,6 +162,47 @@ struct RF_AccessStripeMapHeader_s {
 						 * Also used for making lists */
 	RF_AccessStripeMapHeader_t *next;
 };
+
+/* A structure to be used in a linked list to keep track of function pointers. */
+typedef struct RF_VoidFunctionPointerListElem_s RF_VoidFunctionPointerListElem_t;
+struct RF_VoidFunctionPointerListElem_s {
+	RF_VoidFuncPtr fn;
+	RF_VoidFunctionPointerListElem_t *next;
+};
+
+/* We need something to just be a linked list of anonymous pointers
+   to stuff */
+typedef struct RF_VoidPointerListElem_s RF_VoidPointerListElem_t;
+struct RF_VoidPointerListElem_s {
+	void *p;
+	RF_VoidPointerListElem_t *next;
+};
+
+/* A structure to be used in a linked list to keep track of ASM Headers */
+typedef struct RF_ASMHeaderListElem_s RF_ASMHeaderListElem_t;
+struct RF_ASMHeaderListElem_s {
+	RF_AccessStripeMapHeader_t *asmh;
+	RF_ASMHeaderListElem_t *next;
+};
+
+/* A structure to keep track of all the data structures associated with 
+a failed stripe.  Used for constructing the appropriate DAGs in
+rf_SelectAlgorithm() in rf_aselect.c */
+typedef struct RF_FailedStripe_s RF_FailedStripe_t;
+struct RF_FailedStripe_s {
+	RF_VoidFunctionPointerListElem_t *vfple;   /* linked list of pointers to DAG creation
+						      functions for stripes */
+	RF_VoidFunctionPointerListElem_t *bvfple;  /* linked list of poitners to DAG creation
+						      functions for blocks */
+	RF_ASMHeaderListElem_t *asmh_u;            /* Access Stripe Map Headers for regular
+						      stripes */
+	RF_ASMHeaderListElem_t *asmh_b;            /* Access Stripe Map Headers used for the
+						      block functions */
+	RF_FailedStripe_t *next;
+};
+
+
+
 /*****************************************************************************************
  *
  * various routines mapping addresses in the RAID address space.  These work across
@@ -239,7 +276,7 @@ struct RF_AccessStripeMapHeader_s {
 #define rf_ParityStripeIDToRaidAddress(_layoutPtr_, _psid_) \
   ( (_psid_) * (_layoutPtr_)->SUsPerPU * (_layoutPtr_)->numDataCol * (_layoutPtr_)->sectorsPerStripeUnit )
 
-RF_LayoutSW_t *rf_GetLayout(RF_ParityConfig_t parityConfig);
+const RF_LayoutSW_t *rf_GetLayout(RF_ParityConfig_t parityConfig);
 int 
 rf_ConfigureLayout(RF_ShutdownList_t ** listp, RF_Raid_t * raidPtr,
     RF_Config_t * cfgPtr);

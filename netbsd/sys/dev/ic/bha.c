@@ -1,4 +1,4 @@
-/*	$NetBSD: bha.c,v 1.49 2002/04/05 18:27:51 bouyer Exp $	*/
+/*	$NetBSD: bha.c,v 1.57 2003/11/02 11:07:45 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 1999 The NetBSD Foundation, Inc.
@@ -53,7 +53,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: bha.c,v 1.49 2002/04/05 18:27:51 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: bha.c,v 1.57 2003/11/02 11:07:45 wiz Exp $");
 
 #include "opt_ddb.h"
 
@@ -175,7 +175,7 @@ bha_attach(sc)
 
 	initial_ccbs = bha_info(sc);
 	if (initial_ccbs == 0) {
-		printf("%s: unable to get adapter info\n",
+		aprint_error("%s: unable to get adapter info\n",
 		    sc->sc_dev.dv_xname);
 		return;
 	}
@@ -212,7 +212,7 @@ bha_attach(sc)
 
 	bha_create_ccbs(sc, initial_ccbs);
 	if (sc->sc_cur_ccbs < 2) {
-		printf("%s: not enough CCBs to run\n",
+		aprint_error("%s: not enough CCBs to run\n",
 		    sc->sc_dev.dv_xname);
 		return;
 	}
@@ -244,7 +244,7 @@ bha_intr(arg)
 #endif /* BHADEBUG */
 
 	/*
-	 * First acknowlege the interrupt, Then if it's not telling about
+	 * First acknowledge the interrupt, Then if it's not telling about
 	 * a completed operation just return.
 	 */
 	sts = bus_space_read_1(iot, ioh, BHA_INTR_PORT);
@@ -582,7 +582,7 @@ bha_get_xfer_mode(sc, xm)
 		}
 
 		xm->xm_period =
-		    scsipi_sync_period_to_factor(period * 10);
+		    scsipi_sync_period_to_factor(period * 100);
 		xm->xm_offset = offset;
 	}
 
@@ -1009,7 +1009,7 @@ bha_inquire_config(bus_space_tag_t iot, bus_space_handle_t ioh,
 	struct bha_config config;
 
 	/*
-	 * Assume we have a board at this stage setup dma channel from
+	 * Assume we have a board at this stage setup DMA channel from
 	 * jumpers and save int level
 	 */
 	delay(1000);
@@ -1083,7 +1083,7 @@ bha_probe_inquiry(bus_space_tag_t iot, bus_space_handle_t ioh,
 /*
  * bha_disable_isacompat:
  *
- *	Disable the ISA-compatiblity ioports on PCI bha devices,
+ *	Disable the ISA-compatibility ioports on PCI bha devices,
  *	to ensure they're not autoconfigured a second time as an ISA bha.
  */
 int
@@ -1311,19 +1311,19 @@ bha_info(sc)
 	    sizeof(setup.cmd), (u_char *)&setup.cmd,
 	    rlen, (u_char *)&setup.reply);
 
-	printf("%s: model BT-%s, firmware %s\n", sc->sc_dev.dv_xname,
+	aprint_normal("%s: model BT-%s, firmware %s\n", sc->sc_dev.dv_xname,
 	    sc->sc_model, sc->sc_firmware);
 
-	printf("%s: %d H/W CCBs", sc->sc_dev.dv_xname, sc->sc_max_ccbs);
+	aprint_normal("%s: %d H/W CCBs", sc->sc_dev.dv_xname, sc->sc_max_ccbs);
 	if (setup.reply.sync_neg)
-		printf(", sync");
+		aprint_normal(", sync");
 	if (setup.reply.parity)
-		printf(", parity");
+		aprint_normal(", parity");
 	if (sc->sc_flags & BHAF_TAGGED_QUEUEING)
-		printf(", tagged queueing");
+		aprint_normal(", tagged queueing");
 	if (sc->sc_flags & BHAF_WIDE_LUN)
-		printf(", wide LUN support");
-	printf("\n");
+		aprint_normal(", wide LUN support");
+	aprint_normal("\n");
 
 	/*
 	 * Poll targets 0 - 7.
@@ -1673,7 +1673,7 @@ bha_create_mailbox(sc)
 	error = bus_dmamem_alloc(sc->sc_dmat, size, PAGE_SIZE, 0, &seg,
 	    1, &rseg, sc->sc_dmaflags);
 	if (error) {
-		printf("%s: unable to allocate mailboxes, error = %d\n",
+		aprint_error("%s: unable to allocate mailboxes, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto bad_0;
 	}
@@ -1681,7 +1681,7 @@ bha_create_mailbox(sc)
 	error = bus_dmamem_map(sc->sc_dmat, &seg, rseg, size,
 	    (caddr_t *)&sc->sc_mbo, sc->sc_dmaflags | BUS_DMA_COHERENT);
 	if (error) {
-		printf("%s: unable to map mailboxes, error = %d\n",
+		aprint_error("%s: unable to map mailboxes, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto bad_1;
 	}
@@ -1691,7 +1691,8 @@ bha_create_mailbox(sc)
 	error = bus_dmamap_create(sc->sc_dmat, size, 1, size, 0,
 	    sc->sc_dmaflags, &sc->sc_dmamap_mbox);
 	if (error) {
-		printf("%s: unable to create mailbox DMA map, error = %d\n",
+		aprint_error(
+		    "%s: unable to create mailbox DMA map, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto bad_2;
 	}
@@ -1699,7 +1700,7 @@ bha_create_mailbox(sc)
 	error = bus_dmamap_load(sc->sc_dmat, sc->sc_dmamap_mbox,
 	    sc->sc_mbo, size, NULL, 0);
 	if (error) {
-		printf("%s: unable to load mailbox DMA map, error = %d\n",
+		aprint_error("%s: unable to load mailbox DMA map, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto bad_3;
 	}
@@ -1774,6 +1775,9 @@ bha_reset_ccb(ccb)
  *	We determine the target CCB count, and then keep creating them
  *	until we reach the target, or fail.  CCBs that are allocated
  *	but not "created" are left on the allocating list.
+ *
+ *	XXX AB_QUIET/AB_SILENT lossage here; this is called during
+ *	boot as well as at run-time.
  */
 void
 bha_create_ccbs(sc, count)
@@ -1818,7 +1822,7 @@ bha_create_ccbs(sc, count)
 	}
 
 	error = bus_dmamem_map(sc->sc_dmat, &seg, rseg, PAGE_SIZE,
-	    (caddr_t *)&bcg,
+	    (void *)&bcg,
 	    sc->sc_dmaflags | BUS_DMA_NOWAIT | BUS_DMA_COHERENT);
 	if (error) {
 		printf("%s: unable to map CCB group, error = %d\n",

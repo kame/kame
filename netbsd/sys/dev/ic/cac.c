@@ -1,4 +1,4 @@
-/*	$NetBSD: cac.c,v 1.20 2002/01/25 16:10:35 ad Exp $	*/
+/*	$NetBSD: cac.c,v 1.26 2003/12/05 10:23:00 pk Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cac.c,v 1.20 2002/01/25 16:10:35 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cac.c,v 1.26 2003/12/05 10:23:00 pk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -100,7 +100,7 @@ cac_init(struct cac_softc *sc, const char *intrstr, int startfw)
 	struct cac_ccb *ccb;
 	
 	if (intrstr != NULL)
-		printf("%s: interrupting at %s\n", sc->sc_dv.dv_xname,
+		aprint_normal("%s: interrupting at %s\n", sc->sc_dv.dv_xname,
 		    intrstr);
 
 	SIMPLEQ_INIT(&sc->sc_ccb_free);
@@ -110,7 +110,7 @@ cac_init(struct cac_softc *sc, const char *intrstr, int startfw)
 
 	if ((error = bus_dmamem_alloc(sc->sc_dmat, size, PAGE_SIZE, 0, &seg, 1, 
 	    &rseg, BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: unable to allocate CCBs, error = %d\n",
+		aprint_error("%s: unable to allocate CCBs, error = %d\n",
 		    sc->sc_dv.dv_xname, error);
 		return (-1);
 	}
@@ -118,21 +118,21 @@ cac_init(struct cac_softc *sc, const char *intrstr, int startfw)
 	if ((error = bus_dmamem_map(sc->sc_dmat, &seg, rseg, size, 
 	    (caddr_t *)&sc->sc_ccbs,
 	    BUS_DMA_NOWAIT | BUS_DMA_COHERENT)) != 0) {
-		printf("%s: unable to map CCBs, error = %d\n",
+		aprint_error("%s: unable to map CCBs, error = %d\n",
 		    sc->sc_dv.dv_xname, error);
 		return (-1);
 	}
 
 	if ((error = bus_dmamap_create(sc->sc_dmat, size, 1, size, 0, 
 	    BUS_DMA_NOWAIT, &sc->sc_dmamap)) != 0) {
-		printf("%s: unable to create CCB DMA map, error = %d\n",
+		aprint_error("%s: unable to create CCB DMA map, error = %d\n",
 		    sc->sc_dv.dv_xname, error);
 		return (-1);
 	}
 
 	if ((error = bus_dmamap_load(sc->sc_dmat, sc->sc_dmamap, sc->sc_ccbs, 
 	    size, NULL, BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: unable to load CCB DMA map, error = %d\n",
+		aprint_error("%s: unable to load CCB DMA map, error = %d\n",
 		    sc->sc_dv.dv_xname, error);
 		return (-1);
 	}
@@ -149,7 +149,7 @@ cac_init(struct cac_softc *sc, const char *intrstr, int startfw)
 		    &ccb->ccb_dmamap_xfer);
 
 		if (error) {
-			printf("%s: can't create ccb dmamap (%d)\n", 
+			aprint_error("%s: can't create ccb dmamap (%d)\n", 
 			    sc->sc_dv.dv_xname, error);
 			break;
 		}
@@ -163,7 +163,7 @@ cac_init(struct cac_softc *sc, const char *intrstr, int startfw)
 	if (startfw) {
 		if (cac_cmd(sc, CAC_CMD_START_FIRMWARE, &cinfo, sizeof(cinfo),
 		    0, 0, CAC_CCB_DATA_IN, NULL)) {
-			printf("%s: CAC_CMD_START_FIRMWARE failed\n",
+			aprint_error("%s: CAC_CMD_START_FIRMWARE failed\n",
 			    sc->sc_dv.dv_xname);
 			return (-1);
 		}
@@ -171,7 +171,7 @@ cac_init(struct cac_softc *sc, const char *intrstr, int startfw)
 
 	if (cac_cmd(sc, CAC_CMD_GET_CTRL_INFO, &cinfo, sizeof(cinfo), 0, 0, 
 	    CAC_CCB_DATA_IN, NULL)) {
-		printf("%s: CAC_CMD_GET_CTRL_INFO failed\n", 
+		aprint_error("%s: CAC_CMD_GET_CTRL_INFO failed\n", 
 		    sc->sc_dv.dv_xname);
 		return (-1);
 	}
@@ -222,8 +222,8 @@ cac_print(void *aux, const char *pnp)
 	caca = (struct cac_attach_args *)aux;
 
 	if (pnp != NULL)
-		printf("block device at %s", pnp);
-	printf(" unit %d", caca->caca_unit);
+		aprint_normal("block device at %s", pnp);
+	aprint_normal(" unit %d", caca->caca_unit);
 	return (UNCONF);
 }
 
@@ -241,7 +241,7 @@ cac_submatch(struct device *parent, struct cfdata *cf, void *aux)
 	    cf->cacacf_unit != caca->caca_unit)
 		return (0);
 
-	return (cf->cf_attach->ca_match(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 /*
@@ -284,9 +284,9 @@ cac_cmd(struct cac_softc *sc, int command, void *data, int datasize,
 
 	size = 0;
 
-	if ((ccb = cac_ccb_alloc(sc, 0)) == NULL) {
+	if ((ccb = cac_ccb_alloc(sc, 1)) == NULL) {
 		printf("%s: unable to alloc CCB", sc->sc_dv.dv_xname);
-		return (ENOMEM);
+		return (EAGAIN);
 	}
 
 	if ((flags & (CAC_CCB_DATA_IN | CAC_CCB_DATA_OUT)) != 0) {
@@ -333,7 +333,7 @@ cac_cmd(struct cac_softc *sc, int command, void *data, int datasize,
 		/* Synchronous commands musn't wait. */
 		if ((*sc->sc_cl.cl_fifo_full)(sc)) {
 			cac_ccb_free(sc, ccb);
-			rv = -1;
+			rv = EAGAIN;
 		} else {
 #ifdef DIAGNOSTIC
 			ccb->ccb_flags |= CAC_CCB_ACTIVE;
@@ -345,7 +345,8 @@ cac_cmd(struct cac_softc *sc, int command, void *data, int datasize,
 	} else {
 		memcpy(&ccb->ccb_context, context, sizeof(struct cac_context));
 		s = splbio();
-		rv = cac_ccb_start(sc, ccb);
+		(void)cac_ccb_start(sc, ccb);
+		rv = 0;
 	}
 	
 	splx(s);
@@ -381,7 +382,7 @@ cac_ccb_poll(struct cac_softc *sc, struct cac_ccb *wantccb, int timo)
 }
 
 /*
- * Enqueue the specifed command (if any) and attempt to start all enqueued 
+ * Enqueue the specified command (if any) and attempt to start all enqueued 
  * commands.  Must be called at splbio.
  */
 int
@@ -393,8 +394,8 @@ cac_ccb_start(struct cac_softc *sc, struct cac_ccb *ccb)
 
 	while ((ccb = SIMPLEQ_FIRST(&sc->sc_ccb_queue)) != NULL) {
 		if ((*sc->sc_cl.cl_fifo_full)(sc))
-			return (EBUSY);
-		SIMPLEQ_REMOVE_HEAD(&sc->sc_ccb_queue, ccb, ccb_chain);
+			return (EAGAIN);
+		SIMPLEQ_REMOVE_HEAD(&sc->sc_ccb_queue, ccb_chain);
 #ifdef DIAGNOSTIC
 		ccb->ccb_flags |= CAC_CCB_ACTIVE;
 #endif
@@ -461,7 +462,7 @@ cac_ccb_alloc(struct cac_softc *sc, int nosleep)
 
 	for (;;) {
 		if ((ccb = SIMPLEQ_FIRST(&sc->sc_ccb_free)) != NULL) {
-			SIMPLEQ_REMOVE_HEAD(&sc->sc_ccb_free, ccb, ccb_chain);
+			SIMPLEQ_REMOVE_HEAD(&sc->sc_ccb_free, ccb_chain);
 			break;
 		}
 		if (nosleep) {

@@ -39,7 +39,7 @@ device	sbtimer
 attach	sbtimer at sbscd
 file	arch/mips/sibyte/dev/sbtimer.c		sbtimer
 
-device	sbwdog
+device	sbwdog: sysmon_wdog
 attach	sbwdog at sbscd
 file	arch/mips/sibyte/dev/sbwdog.c		sbwdog
 
@@ -55,3 +55,22 @@ device	sbscn: tty
 attach	sbscn at sbobio
 file	arch/mips/sibyte/dev/sbscn.c		sbscn	needs-flag
 
+# XXX XXX
+# need to think about SMBus more, just hack something together
+# temporariliy so we can use the RTC.
+
+# SB1250 SMBus
+device	smbus {[chan = -1], [dev = -1]}
+attach	smbus at sbobio
+file	arch/mips/sibyte/dev/sbsmbus.c		smbus
+
+# XXX XXX
+# XXX also, this should be in sbmips/conf/files.sbmips
+# Bogus RTC attachment
+device	xirtc
+attach	xirtc at smbus
+
+device	m41t81rtc
+attach	m41t81rtc at smbus
+
+file	arch/sbmips/sbmips/rtc.c		xirtc | m41t81rtc

@@ -1,4 +1,4 @@
-/*	$NetBSD: zs.c,v 1.6 2001/07/07 05:09:43 tsutsui Exp $	*/
+/*	$NetBSD: zs.c,v 1.18 2003/07/15 02:59:26 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -47,6 +47,9 @@
  * news68k/dev/zs.c - based on {newsmips,x68k,mvme68k}/dev/zs.c
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zs.c,v 1.18 2003/07/15 02:59:26 lukem Exp $");
+
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -63,10 +66,8 @@
 
 #include <news68k/dev/hbvar.h>
 
-int zs_getc __P((void *));
-void zs_putc __P((void *, int));
-
-extern void Debugger __P((void));
+int  zs_getc(void *);
+void zs_putc(void *, int);
 
 /*
  * Some warts needed by z8530tty.c -
@@ -74,7 +75,6 @@ extern void Debugger __P((void));
  * or you can not see messages done with printf during boot-up...
  */
 int zs_def_cflag = (CREAD | CS8 | HUPCL);
-int zs_major = 1;
 
 /*
  * The news68k machines use three different clocks for the ZS chips.
@@ -144,20 +144,19 @@ static u_char zs_init_reg[16] = {
  ****************************************************************/
 
 /* Definition of the driver for autoconfig. */
-static int zs_match __P((struct device *, struct cfdata *, void *));
-static void zs_attach __P((struct device *, struct device *, void *));
-static int zs_print __P((void *, const char *name));
+static int  zs_match(struct device *, struct cfdata *, void *);
+static void zs_attach(struct device *, struct device *, void *);
+static int  zs_print(void *, const char *name);
 
-struct cfattach zsc_ca = {
-	sizeof(struct zsc_softc), zs_match, zs_attach
-};
+CFATTACH_DECL(zsc, sizeof(struct zsc_softc),
+    zs_match, zs_attach, NULL, NULL);
 
 extern struct cfdriver zsc_cd;
 
-static int zshard __P((void *));
-void zssoft __P((void *));
+static int zshard(void *);
+void zssoft(void *);
 #if 0
-static int zs_get_speed __P((struct zs_chanstate *));
+static int zs_get_speed(struct zs_chanstate *);
 #endif
 
 /*
@@ -176,7 +175,7 @@ zs_match(parent, cf, aux)
 		return 0;
 
 	/* XXX no default address */
-	if (ha->ha_address == -1)
+	if (ha->ha_address == (u_int)-1)
 		return 0;
 
 	addr = IIOV(ha->ha_address);
@@ -219,6 +218,8 @@ zs_attach(parent, self, aux)
 	for (channel = 0; channel < 2; channel++) {
 		zsc_args.channel = channel;
 		cs = &zsc->zsc_cs_store[channel];
+		simple_lock_init(&cs->cs_lock);
+
 		zsc->zsc_cs[channel] = cs;
 		zc = (channel == 0) ? &zs->zs_chan_a : &zs->zs_chan_b;
 
@@ -305,10 +306,10 @@ zs_print(aux, name)
 	struct zsc_attach_args *args = aux;
 
 	if (name != NULL)
-		printf("%s: ", name);
+		aprint_normal("%s: ", name);
 
 	if (args->channel != -1)
-		printf(" channel %d", args->channel);
+		aprint_normal(" channel %d", args->channel);
 
 	return UNCONF;
 }
@@ -331,7 +332,7 @@ zshard(arg)
 		setsoftint(zs_sir);
 	}
 
-	return (rval);
+	return rval;
 }
 
 /*
@@ -367,7 +368,7 @@ zs_get_speed(cs)
 
 	tconst = zs_read_reg(cs, 12);
 	tconst |= zs_read_reg(cs, 13) << 8;
-	return (TCONST_TO_BPS(cs->cs_brg_clk, tconst));
+	return TCONST_TO_BPS(cs->cs_brg_clk, tconst);
 }
 #endif
 
@@ -382,7 +383,7 @@ zs_set_speed(cs, bps)
 	int tconst, real_bps;
 
 	if (bps == 0)
-		return (0);
+		return 0;
 
 #ifdef	DIAGNOSTIC
 	if (cs->cs_brg_clk == 0)
@@ -391,20 +392,20 @@ zs_set_speed(cs, bps)
 
 	tconst = BPS_TO_TCONST(cs->cs_brg_clk, bps);
 	if (tconst < 0)
-		return (EINVAL);
+		return EINVAL;
 
 	/* Convert back to make sure we can do it. */
 	real_bps = TCONST_TO_BPS(cs->cs_brg_clk, tconst);
 
 	/* XXX - Allow some tolerance here? */
 	if (real_bps != bps)
-		return (EINVAL);
+		return EINVAL;
 
 	cs->cs_preg[12] = tconst;
 	cs->cs_preg[13] = tconst >> 8;
 
 	/* Caller will stuff the pending registers. */
-	return (0);
+	return 0;
 }
 
 int
@@ -445,7 +446,7 @@ zs_set_modes(cs, cflag)
 	splx(s);
 
 	/* Caller will stuff the pending registers. */
-	return (0);
+	return 0;
 }
 
 
@@ -472,6 +473,7 @@ zs_write_reg(cs, reg, val)
 	struct zs_chanstate *cs;
 	u_char reg, val;
 {
+
 	*cs->cs_reg_csr = reg;
 	ZS_DELAY();
 	*cs->cs_reg_csr = val;
@@ -494,6 +496,7 @@ zs_write_csr(cs, val)
 	struct zs_chanstate *cs;
 	u_char val;
 {
+
 	*cs->cs_reg_csr = val;
 	ZS_DELAY();
 }
@@ -514,6 +517,7 @@ zs_write_data(cs, val)
 	struct zs_chanstate *cs;
 	u_char val;
 {
+
 	*cs->cs_reg_data = val;
 	ZS_DELAY();
 }
@@ -522,6 +526,7 @@ void
 zs_abort(cs)
 	struct zs_chanstate *cs;
 {
+
 #ifdef DDB
 	Debugger();
 #endif
@@ -576,10 +581,10 @@ zs_putc(arg, c)
 
 /*****************************************************************/
 
-static void zscnprobe __P((struct consdev *));
-static void zscninit __P((struct consdev *));
-static int  zscngetc __P((dev_t));
-static void zscnputc __P((dev_t, int));
+static void zscnprobe(struct consdev *);
+static void zscninit(struct consdev *);
+static int  zscngetc(dev_t);
+static void zscnputc(dev_t, int);
 
 struct consdev consdev_zs = {
 	zscnprobe,
@@ -588,19 +593,16 @@ struct consdev consdev_zs = {
 	zscnputc,
 	nullcnpollc,
 	NULL,
+	NULL,
+	NULL,
+	NODEV,
+	CN_DEAD
 };
 
 static void
 zscnprobe(cn)
 	struct consdev *cn;
 {
-	extern int tty00_is_console;
-
-	cn->cn_dev = makedev(zs_major, 0);
-	if (tty00_is_console)
-		cn->cn_pri = CN_REMOTE;
-	else
-		cn->cn_pri = CN_NORMAL;
 }
 
 static void
@@ -609,7 +611,15 @@ zscninit(cn)
 {
 	struct zs_chanstate *cs;
 
+	extern const struct cdevsw zstty_cdevsw;
+	extern int tty00_is_console;
 	extern volatile u_char *sccport0a;
+
+	cn->cn_dev = makedev(cdevsw_lookup_major(&zstty_cdevsw), 0);
+	if (tty00_is_console)
+		cn->cn_pri = CN_REMOTE;
+	else
+		cn->cn_pri = CN_NORMAL;
 
 	zc_cons = (struct zschan *)sccport0a; /* XXX */
 
@@ -641,6 +651,7 @@ static int
 zscngetc(dev)
 	dev_t dev;
 {
+
 	return zs_getc((void *)zs_conschan);
 }
 
@@ -649,5 +660,6 @@ zscnputc(dev, c)
 	dev_t dev;
 	int c;
 {
+
 	zs_putc((void *)zs_conschan, c);
 }

@@ -1,8 +1,40 @@
-/*	$NetBSD: mscp_subr.c,v 1.18 2001/11/13 07:38:28 lukem Exp $	*/
+/*	$NetBSD: mscp_subr.c,v 1.24 2003/08/07 16:31:09 agc Exp $	*/
 /*
- * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
  * Copyright (c) 1988 Regents of the University of California.
  * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Chris Torek.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)mscp.c	7.5 (Berkeley) 12/16/90
+ */
+
+/*
+ * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
  *
  * This code is derived from software contributed to Berkeley by
  * Chris Torek.
@@ -43,7 +75,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mscp_subr.c,v 1.18 2001/11/13 07:38:28 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mscp_subr.c,v 1.24 2003/08/07 16:31:09 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -70,9 +102,8 @@ int	mscp_init __P((struct  mscp_softc *));
 void	mscp_initds __P((struct mscp_softc *));
 int	mscp_waitstep __P((struct mscp_softc *, int, int));
 
-struct	cfattach mscpbus_ca = {
-	sizeof(struct mscp_softc), mscp_match, mscp_attach
-};
+CFATTACH_DECL(mscpbus, sizeof(struct mscp_softc),
+    mscp_match, mscp_attach, NULL, NULL);
 
 #define	READ_SA		(bus_space_read_2(mi->mi_iot, mi->mi_sah, 0))
 #define	READ_IP		(bus_space_read_2(mi->mi_iot, mi->mi_iph, 0))
@@ -163,7 +194,7 @@ mscp_attach(parent, self, aux)
 	mi->mi_rsp.mri_size = NRSP;
 	mi->mi_rsp.mri_desc = mi->mi_uda->mp_ca.ca_rspdsc;
 	mi->mi_rsp.mri_ring = mi->mi_uda->mp_rsp;
-	BUFQ_INIT(&mi->mi_resq);
+	bufq_alloc(&mi->mi_resq, BUFQ_FCFS);
 
 	if (mscp_init(mi)) {
 		printf("%s: can't init, controller hung\n",
@@ -453,7 +484,7 @@ mscp_intr(mi)
 	/*
 	 * If there are any not-yet-handled request, try them now.
 	 */
-	if (BUFQ_FIRST(&mi->mi_resq))
+	if (BUFQ_PEEK(&mi->mi_resq))
 		mscp_kickaway(mi);
 }
 
@@ -467,10 +498,11 @@ mscp_print(aux, name)
 	int type = mp->mscp_guse.guse_mediaid;
 
 	if (name) {
-		printf("%c%c", MSCP_MID_CHAR(2, type), MSCP_MID_CHAR(1, type));
+		aprint_normal("%c%c", MSCP_MID_CHAR(2, type),
+		    MSCP_MID_CHAR(1, type));
 		if (MSCP_MID_ECH(0, type))
-			printf("%c", MSCP_MID_CHAR(0, type));
-		printf("%d at %s drive %d", MSCP_MID_NUM(type), name,
+			aprint_normal("%c", MSCP_MID_CHAR(0, type));
+		aprint_normal("%d at %s drive %d", MSCP_MID_NUM(type), name,
 		    mp->mscp_unit);
 	}
 	return UNCONF;
@@ -487,7 +519,7 @@ mscp_strategy(bp, usc)
 	struct	mscp_softc *mi = (void *)usc;
 	int s = spluba();
 
-	BUFQ_INSERT_TAIL(&mi->mi_resq, bp);
+	BUFQ_PUT(&mi->mi_resq, bp);
 	mscp_kickaway(mi);
 	splx(s);
 }
@@ -501,7 +533,7 @@ mscp_kickaway(mi)
 	struct	mscp *mp;
 	int next;
 
-	while ((bp = BUFQ_FIRST(&mi->mi_resq)) != NULL) {
+	while ((bp = BUFQ_PEEK(&mi->mi_resq)) != NULL) {
 		/*
 		 * Ok; we are ready to try to start a xfer. Get a MSCP packet
 		 * and try to start...
@@ -534,7 +566,7 @@ mscp_kickaway(mi)
 		bp->b_resid = next;
 		(*mi->mi_me->me_fillin)(bp, mp);
 		(*mi->mi_mc->mc_go)(mi->mi_dev.dv_parent, &mi->mi_xi[next]);
-		BUFQ_REMOVE(&mi->mi_resq, bp);
+		(void)BUFQ_GET(&mi->mi_resq);
 	}
 }
 

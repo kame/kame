@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ie_vme.c,v 1.14 2001/11/13 06:17:07 lukem Exp $	*/
+/*	$NetBSD: if_ie_vme.c,v 1.18 2004/03/15 23:51:12 pk Exp $	*/
 
 /*-
  * Copyright (c) 1995 Charles D. Cranor
@@ -145,7 +145,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ie_vme.c,v 1.14 2001/11/13 06:17:07 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ie_vme.c,v 1.18 2004/03/15 23:51:12 pk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -162,6 +162,9 @@ __KERNEL_RCSID(0, "$NetBSD: if_ie_vme.c,v 1.14 2001/11/13 06:17:07 lukem Exp $")
 
 #include <machine/bus.h>
 #include <machine/intr.h>
+#ifdef __sparc__
+#include <machine/autoconf.h>
+#endif
 #include <dev/vme/vmevar.h>
 
 #include <dev/ic/i82586reg.h>
@@ -244,9 +247,8 @@ struct ie_vme_softc {
 	bus_space_handle_t ievh;
 };
 
-struct cfattach ie_vme_ca = {
-	sizeof(struct ie_vme_softc), ie_vme_match, ie_vme_attach
-};
+CFATTACH_DECL(ie_vme, sizeof(struct ie_vme_softc),
+    ie_vme_match, ie_vme_attach, NULL, NULL);
 
 #define read_iev(sc, reg) \
   bus_space_read_2(sc->ievt, sc->ievh, offsetof(struct ievme, reg))
@@ -494,9 +496,6 @@ ie_vme_attach(parent, self, aux)
 	void   *aux;
 {
 	u_int8_t myaddr[ETHER_ADDR_LEN];
-#ifdef __sparc__
-	extern void myetheraddr(u_char *);	/* should be elsewhere */
-#endif
 	struct ie_vme_softc *vsc = (void *) self;
 	struct vme_attach_args *va = aux;
 	vme_chipset_tag_t ct = va->va_vct;
@@ -598,7 +597,7 @@ ie_vme_attach(parent, self, aux)
 	printf("\n%s:", self->dv_xname);
 
 #ifdef __sparc__
-	myetheraddr(myaddr);
+	prom_getether(0, myaddr);
 #endif
 	i82586_attach(sc, "multibus/vme", myaddr, media, NMEDIA, media[0]);
 

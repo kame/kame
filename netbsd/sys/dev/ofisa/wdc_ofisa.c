@@ -1,4 +1,4 @@
-/*	$NetBSD: wdc_ofisa.c,v 1.7 2001/11/13 07:29:45 lukem Exp $	*/
+/*	$NetBSD: wdc_ofisa.c,v 1.19 2004/01/03 22:56:53 thorpej Exp $	*/
 
 /*
  * Copyright 1997, 1998
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: wdc_ofisa.c,v 1.7 2001/11/13 07:29:45 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: wdc_ofisa.c,v 1.19 2004/01/03 22:56:53 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -59,17 +59,17 @@ __KERNEL_RCSID(0, "$NetBSD: wdc_ofisa.c,v 1.7 2001/11/13 07:29:45 lukem Exp $");
 
 struct wdc_ofisa_softc {
 	struct wdc_softc sc_wdcdev;
-	struct	channel_softc *wdc_chanptr;	
-	struct  channel_softc wdc_channel;
+	struct wdc_channel *wdc_chanlist[1];	
+	struct wdc_channel wdc_channel;
+	struct ata_queue wdc_chqueue;
 	void	*sc_ih;
 };
 
 int wdc_ofisa_probe __P((struct device *, struct cfdata *, void *));
 void wdc_ofisa_attach __P((struct device *, struct device *, void *));
 
-struct cfattach wdc_ofisa_ca = {
-	sizeof(struct wdc_ofisa_softc), wdc_ofisa_probe, wdc_ofisa_attach
-};
+CFATTACH_DECL(wdc_ofisa, sizeof(struct wdc_ofisa_softc),
+    wdc_ofisa_probe, wdc_ofisa_attach, NULL, NULL);
 
 int
 wdc_ofisa_probe(parent, cf, aux)
@@ -78,7 +78,7 @@ wdc_ofisa_probe(parent, cf, aux)
 	void *aux;
 {
 	struct ofisa_attach_args *aa = aux;
-	const char *compatible_strings[] = { "pnpPNP,600", NULL };
+	static const char *const compatible_strings[] = { "pnpPNP,600", NULL };
 	int rv = 0;
 
 	if (of_compatible(aa->oba.oba_phandle, compatible_strings) != -1)
@@ -100,6 +100,7 @@ wdc_ofisa_attach(parent, self, aux)
 	struct ofisa_reg_desc reg[2];
 	struct ofisa_intr_desc intr;
 	int n;
+	bus_space_handle_t ioh;
 
 	/*
 	 * We're living on an ofw.  We have to ask the OFW what our
@@ -135,33 +136,36 @@ wdc_ofisa_attach(parent, self, aux)
 	    (reg[0].type == OFISA_REG_TYPE_IO) ? aa->iot : aa->memt;
 	sc->wdc_channel.ctl_iot =
 	    (reg[1].type == OFISA_REG_TYPE_IO) ? aa->iot : aa->memt;
-        if (bus_space_map(sc->wdc_channel.cmd_iot, reg[0].addr, 8, 0,
-              &sc->wdc_channel.cmd_ioh) ||
+        if (bus_space_map(sc->wdc_channel.cmd_iot, reg[0].addr, 8, 0, &ioh) ||
             bus_space_map(sc->wdc_channel.ctl_iot, reg[1].addr, 1, 0,
 	      &sc->wdc_channel.ctl_ioh)) {
                 printf(": can't map register spaces\n");
 		return;
         }
+	sc->wdc_channel.cmd_baseioh = ioh;
+
+	for (n = 0; n < WDC_NREG; n++) {
+		if (bus_space_subregion(sc->wdc_channel.cmd_iot, ioh, n,
+		    n == 0 ? 4 : 1, &sc->wdc_channel.cmd_iohs[n]) != 0) {
+                	printf(": can't subregion register space\n");
+			return;
+		}
+	}
+			
 
 	sc->sc_ih = isa_intr_establish(aa->ic, intr.irq, intr.share,
 	    IPL_BIO, wdcintr, &sc->wdc_channel);
 
 	printf("\n");
 	sc->sc_wdcdev.cap |= WDC_CAPABILITY_DATA16;
-	sc->wdc_chanptr = &sc->wdc_channel;
-	sc->sc_wdcdev.channels = &sc->wdc_chanptr;
+	sc->wdc_chanlist[0] = &sc->wdc_channel;
+	sc->sc_wdcdev.channels = sc->wdc_chanlist;
 	sc->sc_wdcdev.nchannels = 1;
-	sc->wdc_channel.channel = 0;
-	sc->wdc_channel.wdc = &sc->sc_wdcdev;
-	sc->wdc_channel.ch_queue = malloc(sizeof(struct channel_queue),
-	    M_DEVBUF, M_NOWAIT);
-	if (sc->wdc_channel.ch_queue == NULL) {
-	    printf("%s: can't allocate memory for command queue",
-		sc->sc_wdcdev.sc_dev.dv_xname);
-	    return;
-	}
+	sc->wdc_channel.ch_channel = 0;
+	sc->wdc_channel.ch_wdc = &sc->sc_wdcdev;
+	sc->wdc_channel.ch_queue = &sc->wdc_chqueue;
+
 	wdcattach(&sc->wdc_channel);
-	wdc_print_modes(&sc->wdc_channel);
 
 #if 0
 	printf("%s: registers: ", sc->sc_dev.dv_xname);

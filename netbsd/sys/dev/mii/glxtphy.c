@@ -1,4 +1,4 @@
-/*	$NetBSD: glxtphy.c,v 1.4 2002/03/25 20:51:24 thorpej Exp $	*/
+/*	$NetBSD: glxtphy.c,v 1.9 2003/04/29 01:49:33 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000, 2001 The NetBSD Foundation, Inc.
@@ -71,13 +71,12 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: glxtphy.c,v 1.4 2002/03/25 20:51:24 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: glxtphy.c,v 1.9 2003/04/29 01:49:33 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
-#include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/errno.h>
 
@@ -93,10 +92,8 @@ __KERNEL_RCSID(0, "$NetBSD: glxtphy.c,v 1.4 2002/03/25 20:51:24 thorpej Exp $");
 int	glxtphymatch(struct device *, struct cfdata *, void *);
 void	glxtphyattach(struct device *, struct device *, void *);
 
-struct cfattach glxtphy_ca = {
-	sizeof(struct mii_softc), glxtphymatch, glxtphyattach,
-	    mii_phy_detach, mii_phy_activate
-};
+CFATTACH_DECL(glxtphy, sizeof(struct mii_softc),
+    glxtphymatch, glxtphyattach, mii_phy_detach, mii_phy_activate);
 
 int	glxtphy_service(struct mii_softc *, struct mii_data *, int);
 void	glxtphy_status(struct mii_softc *);
@@ -136,7 +133,8 @@ glxtphyattach(struct device *parent, struct device *self, void *aux)
 	const struct mii_phydesc *mpd;
 
 	mpd = mii_phy_match(ma, glxtphys);
-	printf(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
+	aprint_naive(": Media interface\n");
+	aprint_normal(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
 
 	sc->mii_inst = mii->mii_instance;
 	sc->mii_phy = ma->mii_phyno;
@@ -152,13 +150,13 @@ glxtphyattach(struct device *parent, struct device *self, void *aux)
 	if (sc->mii_capabilities & BMSR_EXTSTAT)
 		sc->mii_extcapabilities = PHY_READ(sc, MII_EXTSR);
 
-	printf("%s: ", sc->mii_dev.dv_xname);
+	aprint_normal("%s: ", sc->mii_dev.dv_xname);
 	if ((sc->mii_capabilities & BMSR_MEDIAMASK) == 0 &&
 	    (sc->mii_extcapabilities & EXTSR_MEDIAMASK) == 0)
-		printf("no media present");
+		aprint_error("no media present");
 	else
 		mii_phy_add_media(sc);
-	printf("\n");
+	aprint_normal("\n");
 }
 
 int

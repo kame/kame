@@ -1,9 +1,44 @@
-/*	$NetBSD: pmap.h,v 1.54 2002/05/13 21:11:23 matt Exp $	   */
+/*	$NetBSD: pmap.h,v 1.60 2003/12/14 19:39:24 ragge Exp $	   */
+
+/* 
+ * Copyright (c) 1991 Regents of the University of California.
+ * All rights reserved.
+ *
+ * Changed for the VAX port. /IC
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)pmap.h	7.6 (Berkeley) 5/10/91
+ */
 
 /* 
  * Copyright (c) 1987 Carnegie-Mellon University
- * Copyright (c) 1991 Regents of the University of California.
- * All rights reserved.
  *
  * Changed for the VAX port. /IC
  *
@@ -55,8 +90,6 @@
  */
 #define LTOHPS		(PGSHIFT - VAX_PGSHIFT)
 #define LTOHPN		(1 << LTOHPS)
-#define PROCPTSIZE	((MAXTSIZ + MAXDSIZ + MAXSSIZ + MMAPSPACE) / VAX_NBPG)
-#define	NPTEPGS		(PROCPTSIZE / (NBPG / (sizeof(struct pte) * LTOHPN)))
 
 /*
  * Link struct if more than one process share pmap (like vfork).
@@ -80,7 +113,6 @@ typedef struct pmap {
 	long		 pm_p0lr;	/* page 0 length register */
 	struct pte	*pm_p1br;	/* page 1 base register */
 	long		 pm_p1lr;	/* page 1 length register */
-	u_char		*pm_pref;	/* pte reference count array */
 	struct simplelock pm_lock;	/* Lock entry in MP environment */
 	struct pmap_statistics	 pm_stats;	/* Some statistics */
 } *pmap_t;
@@ -217,6 +249,12 @@ pmap_protect(pmap_t pmap, vaddr_t start, vaddr_t end, vm_prot_t prot)
 	if (pmap->pm_p0lr != 0 || pmap->pm_p1lr != 0x200000 ||
 	    (start & KERNBASE) != 0)
 		pmap_protect_long(pmap, start, end, prot);
+}
+
+static __inline void
+pmap_remove_all(struct pmap *pmap)
+{
+	/* Nothing. */
 }
 
 /* Routines that are best to define as macros */

@@ -1,7 +1,7 @@
-/*	$NetBSD: lfs_balloc.c,v 1.32 2002/05/14 20:03:53 perseant Exp $	*/
+/*	$NetBSD: lfs_balloc.c,v 1.48 2004/01/25 18:06:49 hannken Exp $	*/
 
 /*-
- * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
+ * Copyright (c) 1999, 2000, 2001, 2002, 2003 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -17,8 +17,8 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *      This product includes software developed by the NetBSD
- *      Foundation, Inc. and its contributors.
+ *	This product includes software developed by the NetBSD
+ *	Foundation, Inc. and its contributors.
  * 4. Neither the name of The NetBSD Foundation nor the names of its
  *    contributors may be used to endorse or promote products derived
  *    from this software without specific prior written permission.
@@ -47,11 +47,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -71,7 +67,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: lfs_balloc.c,v 1.32 2002/05/14 20:03:53 perseant Exp $");
+__KERNEL_RCSID(0, "$NetBSD: lfs_balloc.c,v 1.48 2004/01/25 18:06:49 hannken Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_quota.h"
@@ -96,7 +92,9 @@ __KERNEL_RCSID(0, "$NetBSD: lfs_balloc.c,v 1.32 2002/05/14 20:03:53 perseant Exp
 #include <ufs/lfs/lfs.h>
 #include <ufs/lfs/lfs_extern.h>
 
-int lfs_fragextend(struct vnode *, int, int, ufs_daddr_t, struct buf **, struct ucred *);
+#include <uvm/uvm.h>
+
+int lfs_fragextend(struct vnode *, int, int, daddr_t, struct buf **, struct ucred *);
 
 /*
  * Allocate a block, and to inode and filesystem block accounting for it
@@ -127,11 +125,11 @@ lfs_balloc(void *v)
 	int offset;
 	u_long iosize;
 	daddr_t daddr, idaddr;
-	struct buf *ibp, *bp;
+	struct buf *ibp, *bp, **bpp;
 	struct inode *ip;
 	struct lfs *fs;
 	struct indir indirs[NIADDR+2], *idp;
-	ufs_daddr_t	lbn, lastblock;
+	daddr_t	lbn, lastblock;
 	int bb, bcount;
 	int error, frags, i, nsize, osize, num;
 
@@ -140,16 +138,18 @@ lfs_balloc(void *v)
 	fs = ip->i_lfs;
 	offset = blkoff(fs, ap->a_startoffset);
 	iosize = ap->a_size;
+	KASSERT(iosize <= fs->lfs_bsize);
 	lbn = lblkno(fs, ap->a_startoffset);
-	(void)lfs_check(vp, lbn, 0);
-	
+	/* (void)lfs_check(vp, lbn, 0); */
+	bpp = ap->a_bpp;
+
 	/* 
 	 * Three cases: it's a block beyond the end of file, it's a block in
 	 * the file that may or may not have been assigned a disk address or
 	 * we're writing an entire block.
 	 *
 	 * Note, if the daddr is UNWRITTEN, the block already exists in
-	 * the cache (it was read or written earlier).  If so, make sure
+	 * the cache (it was read or written earlier).	If so, make sure
 	 * we don't count it as a new block or zero out its contents. If
 	 * it did not, make sure we allocate any necessary indirect
 	 * blocks.
@@ -159,21 +159,25 @@ lfs_balloc(void *v)
 	 * to rewrite it.
 	 */
 	
-	*ap->a_bpp = NULL;
+	if (bpp)
+		*bpp = NULL;
 	
 	/* Check for block beyond end of file and fragment extension needed. */
-	lastblock = lblkno(fs, ip->i_ffs_size);
+	lastblock = lblkno(fs, ip->i_size);
 	if (lastblock < NDADDR && lastblock < lbn) {
 		osize = blksize(fs, ip, lastblock);
 		if (osize < fs->lfs_bsize && osize > 0) {
 			if ((error = lfs_fragextend(vp, osize, fs->lfs_bsize,
-						    lastblock, &bp,
+						    lastblock,
+						    (bpp ? &bp : NULL),
 						    ap->a_cred)))
 				return (error);
-			ip->i_ffs_size = (lastblock + 1) * fs->lfs_bsize;
-			uvm_vnp_setsize(vp, ip->i_ffs_size);
+			ip->i_ffs1_size = ip->i_size =
+			    (lastblock + 1) * fs->lfs_bsize;
+			uvm_vnp_setsize(vp, ip->i_size);
 			ip->i_flag |= IN_CHANGE | IN_UPDATE;
-			(void) VOP_BWRITE(bp);
+			if (bpp)
+				(void) VOP_BWRITE(bp);
 		}
 	}
 
@@ -185,35 +189,42 @@ lfs_balloc(void *v)
 	 * size or it already exists and contains some fragments and
 	 * may need to extend it.
 	 */
-	if (lbn < NDADDR && lblkno(fs, ip->i_ffs_size) <= lbn) {
+	if (lbn < NDADDR && lblkno(fs, ip->i_size) <= lbn) {
 		osize = blksize(fs, ip, lbn);
 		nsize = fragroundup(fs, offset + iosize);
-		if (lblktosize(fs, lbn) >= ip->i_ffs_size) {
+		if (lblktosize(fs, lbn) >= ip->i_size) {
 			/* Brand new block or fragment */
 			frags = numfrags(fs, nsize);
 			bb = fragstofsb(fs, frags);
-			*ap->a_bpp = bp = getblk(vp, lbn, nsize, 0, 0);
+			if (bpp) {
+				*ap->a_bpp = bp = getblk(vp, lbn, nsize, 0, 0);
+				bp->b_blkno = UNWRITTEN;
+				if (ap->a_flags & B_CLRBUF)
+					clrbuf(bp);
+			}
 			ip->i_lfs_effnblks += bb;
 			ip->i_lfs->lfs_bfree -= bb;
-			ip->i_ffs_db[lbn] = bp->b_blkno = UNWRITTEN;
+			ip->i_ffs1_db[lbn] = UNWRITTEN;
 		} else {
 			if (nsize <= osize) {
 				/* No need to extend */
-				if ((error = bread(vp, lbn, osize, NOCRED, &bp)))
+				if (bpp && (error = bread(vp, lbn, osize, NOCRED, &bp)))
 					return error;
 			} else {
 				/* Extend existing block */
 				if ((error =
-				     lfs_fragextend(vp, osize, nsize, lbn, &bp,
+				     lfs_fragextend(vp, osize, nsize, lbn,
+						    (bpp ? &bp : NULL),
 						    ap->a_cred)))
 					return error;
 			}
-			*ap->a_bpp = bp;
+			if (bpp)
+				*bpp = bp;
 		}
 		return 0;
 	}
 
-	error = ufs_bmaparray(vp, lbn, &daddr, &indirs[0], &num, NULL );
+	error = ufs_bmaparray(vp, lbn, &daddr, &indirs[0], &num, NULL, NULL);
 	if (error)
 		return (error);
 	/*
@@ -238,47 +249,51 @@ lfs_balloc(void *v)
 	}
 
 	if (daddr == UNASSIGNED) {
-		if (num > 0 && ip->i_ffs_ib[indirs[0].in_off] == 0) {
-			ip->i_ffs_ib[indirs[0].in_off] = UNWRITTEN;
+		if (num > 0 && ip->i_ffs1_ib[indirs[0].in_off] == 0) {
+			ip->i_ffs1_ib[indirs[0].in_off] = UNWRITTEN;
 		}
 
 		/*
 		 * Create new indirect blocks if necessary
 		 */
-		if (num > 1)
-			idaddr = ip->i_ffs_ib[indirs[0].in_off];
-		for (i = 1; i < num; ++i) {
-			ibp = getblk(vp, indirs[i].in_lbn, fs->lfs_bsize, 0,0);
-			if (!indirs[i].in_exists) {
-				clrbuf(ibp);
-				ibp->b_blkno = UNWRITTEN;
-			} else if (!(ibp->b_flags & (B_DELWRI | B_DONE))) {
-				ibp->b_blkno = fsbtodb(fs, idaddr);
-				ibp->b_flags |= B_READ;
-				VOP_STRATEGY(ibp);
-				biowait(ibp);
-			}
-			/*
-			 * This block exists, but the next one may not.
-			 * If that is the case mark it UNWRITTEN to keep
-			 * the accounting straight.
-			 */
-			if (((daddr_t *)ibp->b_data)[indirs[i].in_off] == 0)
-				((daddr_t *)ibp->b_data)[indirs[i].in_off] =
-					UNWRITTEN;
-			idaddr = ((daddr_t *)ibp->b_data)[indirs[i].in_off];
-			if ((error = VOP_BWRITE(ibp))) {
-				return error;
+		if (num > 1) {
+			idaddr = ip->i_ffs1_ib[indirs[0].in_off];
+			for (i = 1; i < num; ++i) {
+				ibp = getblk(vp, indirs[i].in_lbn,
+				    fs->lfs_bsize, 0,0);
+				if (!indirs[i].in_exists) {
+					clrbuf(ibp);
+					ibp->b_blkno = UNWRITTEN;
+				} else if (!(ibp->b_flags & (B_DELWRI | B_DONE))) {
+					ibp->b_blkno = fsbtodb(fs, idaddr);
+					ibp->b_flags |= B_READ;
+					VOP_STRATEGY(vp, ibp);
+					biowait(ibp);
+				}
+				/*
+				 * This block exists, but the next one may not.
+				 * If that is the case mark it UNWRITTEN to keep
+				 * the accounting straight.
+				 */
+				/* XXX ondisk32 */
+				if (((int32_t *)ibp->b_data)[indirs[i].in_off] == 0)
+					((int32_t *)ibp->b_data)[indirs[i].in_off] =
+						UNWRITTEN;
+				/* XXX ondisk32 */
+				idaddr = ((int32_t *)ibp->b_data)[indirs[i].in_off];
+				if ((error = VOP_BWRITE(ibp)))
+					return error;
 			}
 		}
 	}	
 
 
 	/*
-	 * Get the existing block from the cache.
+	 * Get the existing block from the cache, if requested.
 	 */
 	frags = fsbtofrags(fs, bb);
-	*ap->a_bpp = bp = getblk(vp, lbn, blksize(fs, ip, lbn), 0, 0);
+	if (bpp)
+		*bpp = bp = getblk(vp, lbn, blksize(fs, ip, lbn), 0, 0);
 	
 	/* 
 	 * The block we are writing may be a brand new block
@@ -289,28 +304,32 @@ lfs_balloc(void *v)
 	 * disk address UNWRITTEN.
 	 */
 	if (daddr == UNASSIGNED) {
-		if (iosize != fs->lfs_bsize)
-			clrbuf(bp);
+		if (bpp) {
+			if (ap->a_flags & B_CLRBUF)
+				clrbuf(bp);
 		
-		/* Note the new address */
-		bp->b_blkno = UNWRITTEN;
+			/* Note the new address */
+			bp->b_blkno = UNWRITTEN;
+		}
 		
 		switch (num) {
 		    case 0:
-			ip->i_ffs_db[lbn] = UNWRITTEN;
+			ip->i_ffs1_db[lbn] = UNWRITTEN;
 			break;
 		    case 1:
-			ip->i_ffs_ib[indirs[0].in_off] = UNWRITTEN;
+			ip->i_ffs1_ib[indirs[0].in_off] = UNWRITTEN;
 			break;
 		    default:
 			idp = &indirs[num - 1];
 			if (bread(vp, idp->in_lbn, fs->lfs_bsize, NOCRED,
 				  &ibp))
-				panic("lfs_balloc: bread bno %d", idp->in_lbn);
-			((ufs_daddr_t *)ibp->b_data)[idp->in_off] = UNWRITTEN;
+				panic("lfs_balloc: bread bno %lld",
+				    (long long)idp->in_lbn);
+			/* XXX ondisk32 */
+			((int32_t *)ibp->b_data)[idp->in_off] = UNWRITTEN;
 			VOP_BWRITE(ibp);
 		}
-	} else if (!(bp->b_flags & (B_DONE|B_DELWRI))) {
+	} else if (bpp && !(bp->b_flags & (B_DONE|B_DELWRI))) {
 		/*
 		 * Not a brand new block, also not in the cache;
 		 * read it in from disk.
@@ -325,7 +344,7 @@ lfs_balloc(void *v)
 			 */
 			bp->b_blkno = daddr;
 			bp->b_flags |= B_READ;
-			VOP_STRATEGY(bp);
+			VOP_STRATEGY(vp, bp);
 			return (biowait(bp));
 		}
 	}
@@ -335,16 +354,14 @@ lfs_balloc(void *v)
 
 /* VOP_BWRITE 1 time */
 int
-lfs_fragextend(struct vnode *vp, int osize, int nsize, ufs_daddr_t lbn, struct buf **bpp, struct ucred *cred)
+lfs_fragextend(struct vnode *vp, int osize, int nsize, daddr_t lbn, struct buf **bpp, struct ucred *cred)
 {
 	struct inode *ip;
 	struct lfs *fs;
 	long bb;
 	int error;
 	extern long locked_queue_bytes;
-	struct buf *ibp;
 	size_t obufsize;
-	SEGUSE *sup;
 
 	ip = VTOI(vp);
 	fs = ip->i_lfs;
@@ -352,23 +369,36 @@ lfs_fragextend(struct vnode *vp, int osize, int nsize, ufs_daddr_t lbn, struct b
 	error = 0;
 
 	/*
-	 * Get the seglock so we don't enlarge blocks or change the segment
-	 * accounting information while a segment is being written.
+	 * Get the seglock so we don't enlarge blocks while a segment
+	 * is being written.  If we're called with bpp==NULL, though,
+	 * we are only pretending to change a buffer, so we don't have to
+	 * lock.
 	 */
     top:
-	lfs_seglock(fs, SEGM_PROT);
+	if (bpp) {
+		lockmgr(&fs->lfs_fraglock, LK_SHARED, 0);
+		LFS_DEBUG_COUNTLOCKED("frag");
+	}
 
 	if (!ISSPACE(fs, bb, cred)) {
 		error = ENOSPC;
 		goto out;
 	}
-	if ((error = bread(vp, lbn, osize, NOCRED, bpp))) {
+
+	/*
+	 * If we are not asked to actually return the block, all we need
+	 * to do is allocate space for it.  UBC will handle dirtying the
+	 * appropriate things and making sure it all goes to disk.
+	 * Don't bother to read in that case.
+	 */
+	if (bpp && (error = bread(vp, lbn, osize, NOCRED, bpp))) {
 		brelse(*bpp);
 		goto out;
 	}
 #ifdef QUOTA
 	if ((error = chkdq(ip, bb, cred, 0))) {
-		brelse(*bpp);
+		if (bpp)
+			brelse(*bpp);
 		goto out;
 	}
 #endif
@@ -378,49 +408,39 @@ lfs_fragextend(struct vnode *vp, int osize, int nsize, ufs_daddr_t lbn, struct b
 	 * holding a block busy or while holding the seglock.  In that case,
 	 * release both and start over after waiting.
 	 */
-	if ((*bpp)->b_flags & B_DELWRI) {
+
+	if (bpp && ((*bpp)->b_flags & B_DELWRI)) {
 		if (!lfs_fits(fs, bb)) {
-			brelse(*bpp);
+			if (bpp)
+				brelse(*bpp);
 #ifdef QUOTA
 			chkdq(ip, -bb, cred, 0);
 #endif
-			lfs_segunlock(fs);
+			lockmgr(&fs->lfs_fraglock, LK_RELEASE, 0);
 			lfs_availwait(fs, bb);
 			goto top;
 		}
 		fs->lfs_avail -= bb;
 	}
 
-	/*
- 	 * Fix the allocation for this fragment so that it looks like the
-         * source segment contained a block of the new size.  This overcounts;
-	 * but the overcount only lasts until the block in question
-	 * is written, so the on-disk live bytes count is always correct.
-	 */
-	if ((*bpp)->b_blkno > 0) {
-		LFS_SEGENTRY(sup, fs, dtosn(fs, dbtofsb(fs, (*bpp)->b_blkno)), ibp);
-		sup->su_nbytes += (nsize - osize);
-		LFS_BWRITE_LOG(ibp);
-		ip->i_ffs_blocks += bb;
-	}
 	fs->lfs_bfree -= bb;
 	ip->i_lfs_effnblks += bb;
 	ip->i_flag |= IN_CHANGE | IN_UPDATE;
 
-	LFS_DEBUG_COUNTLOCKED("frag1");
+	if (bpp) {
+		obufsize = (*bpp)->b_bufsize;
+		allocbuf(*bpp, nsize, 1);
 
-	obufsize = (*bpp)->b_bufsize;
-	allocbuf(*bpp, nsize);
+		/* Adjust locked-list accounting */
+		if (((*bpp)->b_flags & (B_LOCKED | B_CALL)) == B_LOCKED)
+			locked_queue_bytes += (*bpp)->b_bufsize - obufsize;
 
-	/* Adjust locked-list accounting */
-	if (((*bpp)->b_flags & (B_LOCKED | B_CALL)) == B_LOCKED)
-		locked_queue_bytes += (*bpp)->b_bufsize - obufsize;
-
-	LFS_DEBUG_COUNTLOCKED("frag2");
-
-	bzero((char *)((*bpp)->b_data) + osize, (u_int)(nsize - osize));
+		bzero((char *)((*bpp)->b_data) + osize, (u_int)(nsize - osize));
+	}
 
     out:
-	lfs_segunlock(fs);
+	if (bpp) {
+		lockmgr(&fs->lfs_fraglock, LK_RELEASE, 0);
+	}
 	return (error);
 }

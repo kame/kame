@@ -1,4 +1,4 @@
-/*	$NetBSD: asc.c,v 1.10 2001/12/15 11:11:49 wdk Exp $	*/
+/*	$NetBSD: asc.c,v 1.15 2003/07/15 02:43:43 lukem Exp $	*/
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -35,6 +35,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: asc.c,v 1.15 2003/07/15 02:43:43 lukem Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -43,6 +46,8 @@
 #include <sys/device.h>
 #include <sys/buf.h>
 #include <sys/malloc.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <dev/scsipi/scsi_all.h>
 #include <dev/scsipi/scsipi_all.h>
@@ -82,9 +87,8 @@ struct asc_softc {
 static int	ascmatch  (struct device *, struct cfdata *, void *);
 static void	ascattach (struct device *, struct device *, void *);
 
-struct cfattach asc_ca = {
-	sizeof(struct asc_softc), ascmatch, ascattach
-};
+CFATTACH_DECL(asc, sizeof(struct asc_softc),
+    ascmatch, ascattach, NULL, NULL);
 
 /*
  * Functions and the switch for the MI code.
@@ -117,7 +121,7 @@ static int	asc_intr (void *);
 
 #define MAX_SCSI_XFER   (64*1024)
 #define	MAX_DMA_SZ	MAX_SCSI_XFER
-#define	DMA_SEGS	(MAX_DMA_SZ/NBPG)
+#define	DMA_SEGS	(MAX_DMA_SZ/PAGE_SIZE)
 
 static int
 ascmatch(struct device *parent, struct cfdata *cf, void *aux)
@@ -151,7 +155,7 @@ ascattach(struct device *parent, struct device *self, void *aux)
 	if (bus_space_map(ca->ca_bustag, RAMBO_BASE, sizeof(struct rambo_ch),
 			  BUS_SPACE_MAP_LINEAR,
 			  &esc->dm_bsh) != 0) {
-		printf(": cannot map dma registers\n");
+		printf(": cannot map DMA registers\n");
 		return;
 	}
 

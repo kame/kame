@@ -1,4 +1,4 @@
-/*	$NetBSD: p9100.c,v 1.8.6.1 2002/11/22 17:35:44 tron Exp $ */
+/*	$NetBSD: p9100.c,v 1.19 2004/03/17 17:04:58 pk Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -45,7 +45,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: p9100.c,v 1.8.6.1 2002/11/22 17:35:44 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: p9100.c,v 1.19 2004/03/17 17:04:58 pk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -75,8 +75,6 @@ __KERNEL_RCSID(0, "$NetBSD: p9100.c,v 1.8.6.1 2002/11/22 17:35:44 tron Exp $");
 #include <machine/tctrl.h>
 #include <sparc/dev/tctrlvar.h>/*XXX*/
 #endif
-
-#include <machine/conf.h>
 
 /* per-display variables */
 struct p9100_softc {
@@ -124,19 +122,24 @@ static void	p9100_sbus_attach(struct device *, struct device *, void *);
 static void	p9100unblank(struct device *);
 static void	p9100_shutdown(void *);
 
-/* cdevsw prototypes */
-cdev_decl(p9100);
-
-struct cfattach pnozz_ca = {
-	sizeof(struct p9100_softc), p9100_sbus_match, p9100_sbus_attach
-};
+CFATTACH_DECL(pnozz, sizeof(struct p9100_softc),
+    p9100_sbus_match, p9100_sbus_attach, NULL, NULL);
 
 extern struct cfdriver pnozz_cd;
 
+dev_type_open(p9100open);
+dev_type_ioctl(p9100ioctl);
+dev_type_mmap(p9100mmap);
+
+const struct cdevsw pnozz_cdevsw = {
+	p9100open, nullclose, noread, nowrite, p9100ioctl,
+	nostop, notty, nopoll, p9100mmap, nokqfilter,
+};
+
 /* frame buffer generic driver */
 static struct fbdriver p9100fbdriver = {
-	p9100unblank, p9100open, p9100close, p9100ioctl, p9100poll,
-	p9100mmap
+	p9100unblank, p9100open, nullclose, p9100ioctl, nopoll,
+	p9100mmap, nokqfilter
 };
 
 static void p9100loadcmap(struct p9100_softc *, int, int);
@@ -261,7 +264,7 @@ p9100_sbus_attach(struct device *parent, struct device *self, void *args)
 	       (i & 7), fb->fb_type.fb_width, fb->fb_type.fb_height,
 	       fb->fb_type.fb_depth);
 
-	fb->fb_type.fb_cmsize = PROM_getpropint(node, "cmsize", 256);
+	fb->fb_type.fb_cmsize = prom_getpropint(node, "cmsize", 256);
 	if ((1 << fb->fb_type.fb_depth) != fb->fb_type.fb_cmsize)
 		printf(", %d entry colormap", fb->fb_type.fb_cmsize);
 
@@ -339,12 +342,6 @@ p9100open(dev_t dev, int flags, int mode, struct proc *p)
 }
 
 int
-p9100close(dev_t dev, int flags, int mode, struct proc *p)
-{
-	return (0);
-}
-
-int
 p9100ioctl(dev_t dev, u_long cmd, caddr_t data, int flags, struct proc *p)
 {
 	struct p9100_softc *sc = pnozz_cd.cd_devs[minor(dev)];
@@ -396,12 +393,6 @@ p9100ioctl(dev_t dev, u_long cmd, caddr_t data, int flags, struct proc *p)
 		return (ENOTTY);
 	}
 	return (0);
-}
-
-int
-p9100poll(dev_t dev, int events, struct proc *p)
-{
-	return seltrue(dev, events, p);
 }
 
 static uint32_t

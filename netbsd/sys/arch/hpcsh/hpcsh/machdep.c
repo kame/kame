@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.38 2002/05/09 12:37:59 uch Exp $	*/
+/*	$NetBSD: machdep.c,v 1.46 2004/03/24 15:34:49 atatat Exp $	*/
 
 /*-
  * Copyright (c) 2001, 2002 The NetBSD Foundation, Inc.
@@ -33,6 +33,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.46 2004/03/24 15:34:49 atatat Exp $");
+
 #include "opt_md.h"
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
@@ -53,6 +56,9 @@
 #include <sys/sysctl.h>
 #include <sys/kcore.h>
 #include <sys/boot_flag.h>
+#include <sys/ksyms.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <ufs/mfs/mfs_extern.h>		/* mfs_initminiroot() */
 
@@ -65,7 +71,10 @@
 #ifdef KGDB
 #include <sys/kgdb.h>
 #endif
-#if defined(DDB) || defined(KGDB)
+
+#include "ksyms.h"
+
+#if NKSYMS || defined(LKM) || defined(DDB) || defined(KGDB)
 #include <machine/db_machdep.h>
 #include <ddb/db_sym.h>
 #include <ddb/db_extern.h>
@@ -196,6 +205,16 @@ machine_startup(int argc, char *argv[], struct bootinfo *bi)
 	else if (platid_match(&platid, &platid_mask_CPU_SH_4))
 		sh_cpu_init(CPU_ARCH_SH4, CPU_PRODUCT_7750);
 
+#ifndef RTC_OFFSET
+	/*
+	 * rtc_offset from bootinfo.timezone set by hpcboot.exe
+	 */
+	if (rtc_offset == 0
+	    && bootinfo->timezone > (-12*60)
+	    && bootinfo->timezone <= (12*60))
+		rtc_offset = bootinfo->timezone;
+#endif
+
 	/* Start to determine heap area */
 	kernend = (vaddr_t)sh3_round_page(end + symbolsize);
 
@@ -257,12 +276,14 @@ machine_startup(int argc, char *argv[], struct bootinfo *bi)
 	/* Initialize pmap and start to address translation */
 	pmap_bootstrap();
 
-	/* Debugger. */
-#ifdef DDB
+#if NKSYMS || defined(DDB) || defined(LKM)
 	if (symbolsize) {
-		ddb_init(symbolsize, &end, end + symbolsize);
+		ksyms_init(symbolsize, &end, end + symbolsize);
 		_DPRINTF("symbol size = %d byte\n", symbolsize);
 	}
+#endif
+#ifdef DDB
+	/* Debugger. */
 	if (boothowto & RB_KDB)
 		Debugger();
 #endif /* DDB */
@@ -281,7 +302,7 @@ machine_startup(int argc, char *argv[], struct bootinfo *bi)
 	__asm__ __volatile__(
 		"jmp	@%0;"
 		"mov	%1, sp"
-		:: "r"(main),"r"(proc0.p_md.md_pcb->pcb_sf.sf_r7_bank));
+		:: "r"(main),"r"(lwp0.l_md.md_pcb->pcb_sf.sf_r7_bank));
 	/* NOTREACHED */
 	while (1)
 		;
@@ -307,22 +328,20 @@ cpu_startup()
 	    MHZ(cpuclock), MHZ(pclock));
 }
 
-int
-cpu_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp,
-    void *newp, size_t newlen, struct proc *p)
+SYSCTL_SETUP(sysctl_machdep_setup, "sysctl machdep subtree setup")
 {
-	/* all sysctl names at this level are terminal */
-	if (namelen != 1)
-		return (ENOTDIR);		/* overloaded */
 
-	switch (name[0]) {
-	case CPU_CONSDEV:
-		return (sysctl_rdstruct(oldp, oldlenp, newp, &cn_tab->cn_dev,
-		    sizeof cn_tab->cn_dev));
-	default:
-	}
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "machdep", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_MACHDEP, CTL_EOL);
 
-	return (EOPNOTSUPP);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_STRUCT, "console_device", NULL,
+		       sysctl_consdev, 0, NULL, sizeof(dev_t),
+		       CTL_MACHDEP, CPU_CONSDEV, CTL_EOL);
 }
 
 void
@@ -330,7 +349,7 @@ cpu_reboot(int howto, char *bootstr)
 {
 
 	/* take a snap shot before clobbering any registers */
-	if (curproc)
+	if (curlwp)
 		savectx(curpcb);
 
 	/* If system is cold, just halt. */
@@ -488,14 +507,14 @@ __find_dram_shadow(paddr_t start, paddr_t end)
 	    *(volatile int *)(page + 4) != ~x)
 		return;
 
-	for (page += NBPG; page < endaddr; page += NBPG) {
+	for (page += PAGE_SIZE; page < endaddr; page += PAGE_SIZE) {
 		if (*(volatile int *)(page + 0) == x &&
 		    *(volatile int *)(page + 4) == ~x) {
 			goto memend_found;
 		}
 	}
 
-	page -= NBPG;
+	page -= PAGE_SIZE;
 	*(volatile int *)(page + 0) = x;
 	*(volatile int *)(page + 4) = ~x;
 
@@ -524,18 +543,18 @@ __check_dram(paddr_t start, paddr_t end)
 	int i, x;
 
 	_DPRINTF(" checking...");
-	for (; start < end; start += NBPG) {
+	for (; start < end; start += PAGE_SIZE) {
 		page = (u_int8_t *)SH3_PHYS_TO_P2SEG (start);
 		x = random();
-		for (i = 0; i < NBPG; i += 4)
+		for (i = 0; i < PAGE_SIZE; i += 4)
 			*(volatile int *)(page + i) = (x ^ i);
-		for (i = 0; i < NBPG; i += 4)
+		for (i = 0; i < PAGE_SIZE; i += 4)
 			if (*(volatile int *)(page + i) != (x ^ i))
 				goto bad;
 		x = random();
-		for (i = 0; i < NBPG; i += 4)
+		for (i = 0; i < PAGE_SIZE; i += 4)
 			*(volatile int *)(page + i) = (x ^ i);
-		for (i = 0; i < NBPG; i += 4)
+		for (i = 0; i < PAGE_SIZE; i += 4)
 			if (*(volatile int *)(page + i) != (x ^ i))
 				goto bad;
 	}

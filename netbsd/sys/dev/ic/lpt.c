@@ -1,4 +1,4 @@
-/*	$NetBSD: lpt.c,v 1.58 2001/11/13 13:14:40 lukem Exp $	*/
+/*	$NetBSD: lpt.c,v 1.63 2003/06/29 22:30:13 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994 Charles M. Hannum.
@@ -54,7 +54,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: lpt.c,v 1.58 2001/11/13 13:14:40 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: lpt.c,v 1.63 2003/06/29 22:30:13 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -89,10 +89,17 @@ __KERNEL_RCSID(0, "$NetBSD: lpt.c,v 1.58 2001/11/13 13:14:40 lukem Exp $");
 int lptdebug = 0;
 #endif
 
-/* XXX does not belong here */
-cdev_decl(lpt);
-
 extern struct cfdriver lpt_cd;
+
+dev_type_open(lptopen);
+dev_type_close(lptclose);
+dev_type_write(lptwrite);
+dev_type_ioctl(lptioctl);
+
+const struct cdevsw lpt_cdevsw = {
+	lptopen, lptclose, noread, lptwrite, lptioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
 
 #define	LPTUNIT(s)	(minor(s) & 0x1f)
 #define	LPTFLAGS(s)	(minor(s) & 0xe0)
@@ -304,10 +311,13 @@ lptpushbytes(sc)
 			}
 
 			bus_space_write_1(iot, ioh, lpt_data, *sc->sc_cp++);
+			DELAY(1);
 			bus_space_write_1(iot, ioh, lpt_control,
 			    control | LPC_STROBE);
+			DELAY(1);
 			sc->sc_count--;
 			bus_space_write_1(iot, ioh, lpt_control, control);
+			DELAY(1);
 
 			/* adapt busy-wait algorithm */
 			if (spin*2 + 16 < sc->sc_spinmax)
@@ -395,6 +405,7 @@ lptintr(arg)
 		DELAY(1);
 		sc->sc_count--;
 		bus_space_write_1(iot, ioh, lpt_control, control);
+		DELAY(1);
 		sc->sc_state |= LPT_OBUSY;
 	} else
 		sc->sc_state &= ~LPT_OBUSY;

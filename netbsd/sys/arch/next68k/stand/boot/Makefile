@@ -1,4 +1,6 @@
-#	$NetBSD: Makefile,v 1.13 2002/05/12 15:18:27 jdolecek Exp $
+#	$NetBSD: Makefile,v 1.19 2003/10/26 07:25:36 lukem Exp $
+
+NOMAN=	# defined
 
 S=	${.CURDIR}/../../../..
 
@@ -26,7 +28,11 @@ DEFS+=		-D_STANDALONE -DMC68040 -DSUPPORT_BOOTP -DSUPPORT_DHCP  -DDEBUG -DSD_DEB
 SAMISCCPPFLAGS=	-DSUPPORT_DHCP -DSUPPORT_BOOTP -DINSECURE # -DBOOTP_DEBUG -DETHER_DEBUG -DNET_DEBUG # -DNETIF_DEBUG -DNFS_DEBUG  -DARP_DEBUG 
 WARNS=1
 CFLAGS+=	 -ffreestanding -nostdinc ${INCLUDES} ${DEFS}
+# XXX SHOULD NOT NEED TO DEFINE THESE!
 LIBCRT0=
+LIBC=
+LIBCRTBEGIN=
+LIBCRTEND=
 
 PROG=	boot
 SRCS=   boot.c machdep.c conf.c devopen.c rtc.c sd.c scsi.c en.c vers.c build.c
@@ -39,7 +45,6 @@ SRCS+=	dev_net.c
 CLEANFILES+= srt0.o boot.elf boot.raw machine ${MACHINE_ARCH} limits.h
 CLEANFILES+= vers.c build.c build	# generated dynamically
 
-NOMAN=	# defined
 BINDIR=	/usr/mdec
 #LIBS=	${SALIB} ${KERNLIB} ${ZLIB}
 LIBS=	${SALIB} ${KERNLIB}
@@ -48,20 +53,20 @@ LIBS=	${SALIB} ${KERNLIB}
 STRIPFLAG=	# defined
 
 AWKPROG='\
-function x(v) { printf "\0%c%c%c", v / 65536, v / 256, v } \
+function x(v) { printf "\\0\\%o\\%o\\%o", (v / 65536) % 256, (v / 256) % 256, v % 256 } \
 { \
-	printf "\0\207\01\07"; \
+	printf "\047\\0\\207\\01\\07"; \
 	x($$1); \
 	x($$2); \
 	x($$3); \
-	printf "\0\0\0\0\04\070\0\0\0\0\0\0\0\0\0\0" \
+	printf "\\0\\0\\0\\0\\04\\070\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\047" \
 }'
 
 ${PROG}: srt0.o ${OBJS} ${LIBS}
 	${LD} -N -Ttext ${RELOC} -e start srt0.o ${OBJS} ${LIBS} -o $@.elf
-	@${SIZE} $@.elf
-	@${OBJCOPY} -O binary $@.elf $@.raw
-	@(${SIZE} $@.elf | tail +2 | awk ${AWKPROG} ; cat $@.raw) > $@
+	${SIZE} $@.elf
+	${OBJCOPY} -O binary $@.elf $@.raw
+	(${SIZE} $@.elf | tail +2 | awk ${AWKPROG} | xargs printf ; cat $@.raw) > $@
 
 # startup
 
@@ -70,10 +75,10 @@ srt0.o: ${.CURDIR}/srt0.s
 
 .PHONY: build.c
 build.c:
-	sh ${.CURDIR}/newvers.sh
+	${HOST_SH} ${.CURDIR}/newvers.sh
 
 vers.c: version
-	sh ${S}/conf/newvers_stand.sh -MD ${.CURDIR}/version "next68k"
+	${HOST_SH} ${S}/conf/newvers_stand.sh -MD ${.CURDIR}/version "next68k"
 
 #installboot: ${.CURDIR}/installboot.sh
 #	@rm -f installboot

@@ -1,4 +1,4 @@
-/*	$NetBSD: sysbeep_isa.c,v 1.1 2002/02/10 12:26:02 chris Exp $	*/
+/*	$NetBSD: sysbeep_isa.c,v 1.5 2003/03/23 14:12:26 chris Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sysbeep_isa.c,v 1.5 2003/03/23 14:12:26 chris Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -49,9 +52,8 @@ void sysbeep_isa_attach __P((struct device *parent, struct device *self, void *a
 void sysbeep_isa __P((int pitch, int period));
 
 /* device attach structure */
-struct cfattach sysbeep_isa_ca = {
-	sizeof(struct device), sysbeep_isa_match, sysbeep_isa_attach
-};
+CFATTACH_DECL(sysbeep_isa, sizeof(struct device),
+    sysbeep_isa_match, sysbeep_isa_attach, NULL, NULL);
 
 static int ppi_attached;
 static pcppi_tag_t ppicookie;

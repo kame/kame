@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.h,v 1.6 1999/12/17 06:05:40 tsubai Exp $	*/
+/*	$NetBSD: autoconf.h,v 1.9 2003/05/09 13:36:41 tsutsui Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
@@ -28,22 +28,9 @@
  */
 
 /*
- * Machine-dependent structures of autoconfiguration
+ * Machine-dependent structures for autoconfiguration
  */
 
 struct confargs {
-	char	*ca_name;		/* Device name. */
-	int	ca_slot;		/* Device slot (table entry). */
-	int	ca_offset;		/* Offset into slot. */
-	int	ca_addr;		/* Device address. */
-	int	ca_slotpri;		/* Device interrupt "priority" */
+	const char	*ca_name;		/* Device name. */
 };
-
-/* Locator aliases */
-#define cf_addr	cf_loc[0]
-#define cf_level	cf_loc[1]
-
-int news3400_badaddr __P((void *, u_int));
-#define badaddr news3400_badaddr
-
-void *hb_intr_establish __P((int, int, int (*)(void *), void *));

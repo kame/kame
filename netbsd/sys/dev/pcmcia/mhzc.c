@@ -1,4 +1,4 @@
-/*	$NetBSD: mhzc.c,v 1.8 2001/11/13 07:26:34 lukem Exp $	*/
+/*	$NetBSD: mhzc.c,v 1.14 2003/01/01 00:10:23 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
@@ -46,7 +46,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mhzc.c,v 1.8 2001/11/13 07:26:34 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mhzc.c,v 1.14 2003/01/01 00:10:23 thorpej Exp $");
 
 #include "opt_inet.h" 
 #include "opt_ns.h"
@@ -141,10 +141,8 @@ void	mhzc_attach __P((struct device *, struct device *, void *));
 int	mhzc_detach __P((struct device *, int));
 int	mhzc_activate __P((struct device *, enum devact));
 
-struct cfattach mhzc_ca = {
-	sizeof(struct mhzc_softc), mhzc_match, mhzc_attach,
-	    mhzc_detach, mhzc_activate
-};
+CFATTACH_DECL(mhzc, sizeof(struct mhzc_softc),
+    mhzc_match, mhzc_attach, mhzc_detach, mhzc_activate);
 
 int	mhzc_em3336_enaddr __P((struct mhzc_softc *, u_int8_t *));
 int	mhzc_em3336_enable __P((struct mhzc_softc *));
@@ -239,8 +237,7 @@ mhzc_attach(parent, self, aux)
 	 * Sure would have been nice if Megahertz had made the card a
 	 * proper multi-function device.
 	 */
-	for (cfe = SIMPLEQ_FIRST(&pa->pf->cfe_head); cfe != NULL;
-	     cfe = SIMPLEQ_NEXT(cfe, cfe_list)) {
+	SIMPLEQ_FOREACH(cfe, &pa->pf->cfe_head, cfe_list) {
 		if (mhzc_check_cfe(sc, cfe)) {
 			/* Found one! */
 			break;
@@ -344,7 +341,7 @@ mhzc_print(aux, pnp)
 	const char *name = aux;
 
 	if (pnp)
-		printf("%s at %s(*)",  name, pnp);
+		aprint_normal("%s at %s(*)",  name, pnp);
 
 	return (UNCONF);
 }
@@ -666,10 +663,8 @@ void	com_mhzc_attach __P((struct device *, struct device *, void *));
 int	com_mhzc_detach __P((struct device *, int));
 
 /* No mhzc-specific goo in the softc; it's all in the parent. */
-struct cfattach com_mhzc_ca = {
-	sizeof(struct com_softc), com_mhzc_match, com_mhzc_attach,
-	    com_detach, com_activate
-};
+CFATTACH_DECL(com_mhzc, sizeof(struct com_softc),
+    com_mhzc_match, com_mhzc_attach, com_detach, com_activate);
 
 int	com_mhzc_enable __P((struct com_softc *));
 void	com_mhzc_disable __P((struct com_softc *));
@@ -754,10 +749,8 @@ int	sm_mhzc_match __P((struct device *, struct cfdata *, void *));
 void	sm_mhzc_attach __P((struct device *, struct device *, void *));
 
 /* No mhzc-specific goo in the softc; it's all in the parent. */
-struct cfattach sm_mhzc_ca = {
-	sizeof(struct smc91cxx_softc), sm_mhzc_match, sm_mhzc_attach,
-	    smc91cxx_detach, smc91cxx_activate
-};
+CFATTACH_DECL(sm_mhzc, sizeof(struct smc91cxx_softc),
+    sm_mhzc_match, sm_mhzc_attach, smc91cxx_detach, smc91cxx_activate);
 
 int	sm_mhzc_enable __P((struct smc91cxx_softc *));
 void	sm_mhzc_disable __P((struct smc91cxx_softc *));
@@ -796,7 +789,7 @@ sm_mhzc_attach(parent, self, aux)
 	}
 	printf(" io 0x%x-0x%x\n",
 	   (int)msc->sc_ethernet_pcioh.addr,
-	   (int)(msc->sc_ethernet_pcioh.addr + msc->sc_modem_pcioh.size - 1));
+	   (int)(msc->sc_ethernet_pcioh.addr + msc->sc_ethernet_pcioh.size - 1));
 
 	msc->sc_flags |= MHZC_ETHERNET_MAPPED;
 

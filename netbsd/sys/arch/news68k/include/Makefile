@@ -1,6 +1,5 @@
-#	$NetBSD: Makefile,v 1.13 2002/05/21 16:11:11 tsutsui Exp $
+#	$NetBSD: Makefile,v 1.16 2003/01/18 06:05:42 thorpej Exp $
 
-KDIR=	/sys/arch/news68k/include
 INCSDIR= /usr/include/news68k
 
 INCS=	ansi.h aout_machdep.h asm.h autoconf.h \
@@ -14,8 +13,8 @@ INCS=	ansi.h aout_machdep.h asm.h autoconf.h \
 	intr.h \
 	kcore.h \
 	limits.h lock.h \
-	math.h \
-	param.h pcb.h pmap.h proc.h profile.h psl.h pte.h ptrace.h \
+	math.h mcontext.h \
+	param.h pcb.h pmap.h pmc.h proc.h profile.h psl.h pte.h ptrace.h \
 	reg.h \
 	setjmp.h signal.h stdarg.h \
 	trap.h types.h \

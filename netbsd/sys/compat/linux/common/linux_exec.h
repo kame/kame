@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_exec.h,v 1.21 2002/04/02 20:23:44 jdolecek Exp $	*/
+/*	$NetBSD: linux_exec.h,v 1.32 2004/03/26 15:01:16 drochner Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
@@ -68,7 +68,7 @@
 
 #define LINUX_N_TXTADDR(x,m) ((m) == QMAGIC ? PAGE_SIZE : 0)
 
-#define LINUX__N_SEGMENT_ROUND(x) (((x) + NBPG - 1) & ~(NBPG - 1))
+#define LINUX__N_SEGMENT_ROUND(x) (((x) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1))
 
 #define LINUX__N_TXTENDADDR(x,m) (LINUX_N_TXTADDR(x,m)+(x).a_text)
 
@@ -77,6 +77,10 @@
      : (LINUX__N_SEGMENT_ROUND (LINUX__N_TXTENDADDR(x,m))))
 
 #define LINUX_N_BSSADDR(x,m) (LINUX_N_DATADDR(x,m) + (x).a_data)
+
+#ifndef LINUX_MACHDEP_ELF_COPYARGS
+#define LINUX_ELF_AUX_ENTRIES	13	/* we push 13 parameters */
+#endif
 
 /* 
  * From Linux's include/linux/elf.h
@@ -118,19 +122,23 @@ extern const struct emul emul_linux;
 
 int linux_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
     struct proc *));
-void linux_setregs __P((struct proc *, struct exec_package *, u_long));
+void linux_setregs __P((struct lwp *, struct exec_package *, u_long));
 int exec_linux_aout_makecmds __P((struct proc *, struct exec_package *));
-int linux_aout_copyargs __P((struct exec_package *, struct ps_strings *,
-    char **, void *));
-void linux_trapsignal __P((struct proc *, int, u_long));
+int linux_aout_copyargs __P((struct proc *, struct exec_package *,
+    struct ps_strings *, char **, void *));
+void linux_trapsignal __P((struct lwp *, const ksiginfo_t *));
 
 #ifdef EXEC_ELF32
 int linux_elf32_probe __P((struct proc *, struct exec_package *, void *,
     char *, vaddr_t *));
+int linux_elf32_copyargs __P((struct proc *, struct exec_package *,
+    struct ps_strings *, char **, void *));
 #endif
 #ifdef EXEC_ELF64
 int linux_elf64_probe __P((struct proc *, struct exec_package *, void *,
     char *, vaddr_t *));
+int linux_elf64_copyargs __P((struct proc *, struct exec_package *,
+    struct ps_strings *, char **, void *));
 #endif
 __END_DECLS
 #endif /* !_KERNEL */

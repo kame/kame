@@ -1,4 +1,4 @@
-/*	$NetBSD: exec_aout.h,v 1.27 2001/08/16 05:06:35 matt Exp $	*/
+/*	$NetBSD: exec_aout.h,v 1.33 2004/02/11 01:03:35 matt Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994 Christopher G. Demetriou
@@ -34,7 +34,7 @@
 #define _SYS_EXEC_AOUT_H_
 
 #ifndef N_PAGSIZ
-#define	N_PAGSIZ(ex)	(__LDPGSZ)
+#define	N_PAGSIZ(ex)	(AOUT_LDPGSZ)
 #endif
 
 /*
@@ -74,17 +74,23 @@ struct exec {
 #define	MID_NS32532	137	/* ns32532 */
 #define	MID_SPARC	138	/* sparc */
 #define	MID_PMAX	139	/* pmax */
-#define	MID_VAX1K	140	/* vax 1K page size binaries */
+#define	MID_VAX1K	140	/* VAX 1K page size binaries */
 #define	MID_ALPHA	141	/* Alpha BSD binary */
 #define	MID_MIPS	142	/* big-endian MIPS */
 #define	MID_ARM6	143	/* ARM6 */
 #define	MID_M680002K	144	/* m68000 with 2K page sizes */
 #define	MID_SH3		145	/* SH3 */
 #define	MID_POWERPC	149	/* big-endian PowerPC */
-#define	MID_VAX		150	/* vax */
-#define	MID_SPARC64	151	/* LP64 sparc */
-#define	MID_X86_64	152	/* AMD x86-64 */
-#define	MID_M88K	153	/* m88k BSD core dumps */
+#define	MID_VAX		150	/* VAX */
+				/* 151 - MIPS1 */
+				/* 152 - MIPS2 */
+#define	MID_M88K	153	/* m88k BSD */
+#define	MID_HPPA	154	/* HP PARISC */
+#define	MID_SH5_64	155	/* LP64 SH5 */
+#define	MID_SPARC64	156	/* LP64 sparc */
+#define	MID_X86_64	157	/* AMD x86-64 */
+#define	MID_SH5_32	158	/* ILP32 SH5 */
+#define	MID_HP200	200	/* hp200 (68010) BSD binary */
 #define	MID_HP300	300	/* hp300 (68020+68881) BSD binary */
 #define	MID_HPUX	0x20C	/* hp200/300 HP-UX binary */
 #define	MID_HPUX800     0x20B   /* hp800 HP-UX binary */
@@ -133,7 +139,7 @@ struct exec {
 
 #define	N_ALIGN(ex,x) \
 	(N_GETMAGIC(ex) == ZMAGIC || N_GETMAGIC(ex) == QMAGIC ? \
-	((x) + __LDPGSZ - 1) & ~(__LDPGSZ - 1) : (x))
+	((x) + AOUT_LDPGSZ - 1) & ~(AOUT_LDPGSZ - 1) : (x))
 
 /* Valid magic number check. */
 #define	N_BADMAG(ex) \
@@ -141,12 +147,12 @@ struct exec {
 	N_GETMAGIC(ex) != ZMAGIC && N_GETMAGIC(ex) != QMAGIC)
 
 /* Address of the bottom of the text segment. */
-#define	N_TXTADDR(ex)	(N_GETMAGIC2(ex) == (ZMAGIC|0x10000) ? 0 : __LDPGSZ)
+#define	N_TXTADDR(ex)	(N_GETMAGIC2(ex) == (ZMAGIC|0x10000) ? 0 : AOUT_LDPGSZ)
 
 /* Address of the bottom of the data segment. */
 #define	N_DATADDR(ex) \
 	(N_GETMAGIC(ex) == OMAGIC ? N_TXTADDR(ex) + (ex).a_text : \
-	(N_TXTADDR(ex) + (ex).a_text + __LDPGSZ - 1) & ~(__LDPGSZ - 1))
+	(N_TXTADDR(ex) + (ex).a_text + AOUT_LDPGSZ - 1) & ~(AOUT_LDPGSZ - 1))
 
 /* Address of the bottom of the bss segment. */
 #define	N_BSSADDR(ex) \
@@ -155,7 +161,7 @@ struct exec {
 /* Text segment offset. */
 #define	N_TXTOFF(ex) \
 	( N_GETMAGIC2(ex)==ZMAGIC || N_GETMAGIC2(ex)==(QMAGIC|0x10000) ? \
-	0 : (N_GETMAGIC2(ex)==(ZMAGIC|0x10000) ? __LDPGSZ : \
+	0 : (N_GETMAGIC2(ex)==(ZMAGIC|0x10000) ? AOUT_LDPGSZ : \
 	sizeof(struct exec)) )
 
 /* Data segment offset. */
@@ -192,7 +198,6 @@ int	exec_aout_makecmds __P((struct proc *, struct exec_package *));
 int	exec_aout_prep_zmagic __P((struct proc *, struct exec_package *));
 int	exec_aout_prep_nmagic __P((struct proc *, struct exec_package *));
 int	exec_aout_prep_omagic __P((struct proc *, struct exec_package *));
-int	exec_aout_setup_stack __P((struct proc *, struct exec_package *));
 
 /* For compatibility modules */
 int	exec_aout_prep_oldzmagic __P((struct proc *, struct exec_package *));

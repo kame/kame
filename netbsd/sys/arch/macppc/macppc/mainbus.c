@@ -1,4 +1,4 @@
-/*	$NetBSD: mainbus.c,v 1.9 2001/07/22 11:29:47 wiz Exp $	*/
+/*	$NetBSD: mainbus.c,v 1.13 2003/07/15 02:43:33 lukem Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -30,6 +30,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.13 2003/07/15 02:43:33 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -43,9 +46,8 @@ int	mainbus_match __P((struct device *, struct cfdata *, void *));
 void	mainbus_attach __P((struct device *, struct device *, void *));
 int	mainbus_print __P((void *, const char *));
 
-struct cfattach mainbus_ca = {
-	sizeof(struct device), mainbus_match, mainbus_attach
-};
+CFATTACH_DECL(mainbus, sizeof(struct device),
+    mainbus_match, mainbus_attach, NULL, NULL);
 
 /*
  * Probe for the mainbus; always succeeds.
@@ -110,7 +112,7 @@ mainbus_print(aux, pnp)
 	struct pcibus_attach_args *pa= aux;
 
 	if (pnp)
-		printf("%s at %s", pa->pba_busname, pnp);
-	printf(" bus %d", pa->pba_bus);
+		aprint_normal("%s at %s", pa->pba_busname, pnp);
+	aprint_normal(" bus %d", pa->pba_bus);
 	return UNCONF;
 }

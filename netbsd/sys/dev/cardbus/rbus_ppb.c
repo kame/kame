@@ -1,4 +1,4 @@
-/*	$NetBSD: rbus_ppb.c,v 1.3.4.1 2002/06/04 11:22:13 lukem Exp $	*/
+/*	$NetBSD: rbus_ppb.c,v 1.10 2003/11/24 06:11:56 lukem Exp $	*/
 
 /*
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rbus_ppb.c,v 1.3.4.1 2002/06/04 11:22:13 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rbus_ppb.c,v 1.10 2003/11/24 06:11:56 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -129,13 +129,8 @@ struct ppb_cardbus_softc {
   int foo;
 };
 
-struct cfattach rbus_ppb_ca = {
-	sizeof(struct ppb_cardbus_softc),
-	ppb_cardbus_match,
-	ppb_cardbus_attach,
-	ppb_cardbus_detach,
-	ppb_activate
-};
+CFATTACH_DECL(rbus_ppb, sizeof(struct ppb_cardbus_softc),
+    ppb_cardbus_match, ppb_cardbus_attach, ppb_cardbus_detach, ppb_activate);
 
 #ifdef  CBB_DEBUG
 int rbus_ppb_debug = 0;   /* hack with kdb */
@@ -175,8 +170,8 @@ rppbprint(aux, pnp)
 
 	/* only PCIs can attach to PPBs; easy. */
 	if (pnp)
-		printf("pci at %s", pnp);
-	printf(" bus %d (rbus)", pba->pba_bus);
+		aprint_normal("pci at %s", pnp);
+	aprint_normal(" bus %d (rbus)", pba->pba_bus);
 	return (UNCONF);
 }
 
@@ -353,7 +348,7 @@ rbus_pci_addr_fixup(struct ppb_cardbus_softc *csc,
 			      /* flags */ 0,
 			      &start,
 			      &handle) != 0) {
-	    panic("rbus_ppb: can not allocate %ld bytes in IO bus %d\n",
+	    panic("rbus_ppb: can not allocate %ld bytes in IO bus %d",
 		  rct.bussize_ioreqs[minbus], minbus);
 	  }
 	  rct.iobustags[minbus]=rbus_new(caa->ca_rbus_iot,
@@ -372,7 +367,7 @@ rbus_pci_addr_fixup(struct ppb_cardbus_softc *csc,
 			      /* flags */ 0,
 			      &start,
 			      &handle) != 0) {
-	    panic("%s: can not allocate %ld bytes in MEM bus %d\n",
+	    panic("%s: can not allocate %ld bytes in MEM bus %d",
 		  rct.csc->sc_dev.dv_xname,
 		  rct.bussize_memreqs[minbus], minbus);
 	  }
@@ -410,7 +405,7 @@ rbus_pci_addr_fixup(struct ppb_cardbus_softc *csc,
 				/* flags */ 0,
 				&start,
 				&handle) != 0) {
-	      panic("rbus_ppb: can not allocate %ld bytes in IO bus %d\n",
+	      panic("rbus_ppb: can not allocate %ld bytes in IO bus %d",
 		    rct.bussize_ioreqs[busnum], busnum);
 	    }
 	    rct.iobustags[busnum]=rbus_new(rct.iobustags[busparent],
@@ -447,7 +442,7 @@ rbus_pci_addr_fixup(struct ppb_cardbus_softc *csc,
 				/* flags */ 0,
 				&start,
 				&handle) != 0) {
-	      panic("rbus_ppb: can not allocate %ld bytes in MEM bus %d\n",
+	      panic("rbus_ppb: can not allocate %ld bytes in MEM bus %d",
 		    rct.bussize_memreqs[busnum], busnum);
 	    }
 	    rct.membustags[busnum]=rbus_new(rct.membustags[busparent],
@@ -709,6 +704,7 @@ ppb_cardbus_attach(parent, self, aux)
 
 	busdata = cardbus_conf_read(cc, cf, ca->ca_tag, PPB_REG_BUSINFO);
 	minbus = pcibios_max_bus;
+	maxbus = minbus;		/* XXX; gcc */
 
 	if (PPB_BUSINFO_SECONDARY(busdata) == 0) {
 	  printf("%s: not configured by system firmware calling pci_bus_fixup(%d)\n",
@@ -888,7 +884,7 @@ ppb_cardbus_detach(self, flags)
 
 #ifdef DIAGNOSTIC
 	if (ct == NULL)
-		panic("%s: data structure lacks\n", sc->sc_dev.dv_xname);
+		panic("%s: data structure lacks", sc->sc_dev.dv_xname);
 #endif
 
 	rv = fxp_detach(sc);

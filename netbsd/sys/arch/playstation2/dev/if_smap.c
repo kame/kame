@@ -1,4 +1,4 @@
-/*	$NetBSD: if_smap.c,v 1.1 2001/10/16 15:38:33 uch Exp $	*/
+/*	$NetBSD: if_smap.c,v 1.5 2003/07/15 02:54:36 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_smap.c,v 1.5 2003/07/15 02:54:36 lukem Exp $");
 
 #include "debug_playstation2.h"
 
@@ -132,9 +135,8 @@ struct smap_softc {
 STATIC int smap_match(struct device *, struct cfdata *, void *);
 STATIC void smap_attach(struct device *, struct device *, void *);
 
-struct cfattach smap_ca = {
-	sizeof (struct smap_softc), smap_match, smap_attach
-};
+CFATTACH_DECL(smap, sizeof (struct smap_softc),
+    smap_match, smap_attach, NULL, NULL);
 
 STATIC int smap_intr(void *);
 STATIC void smap_rxeof(void *);
@@ -346,7 +348,7 @@ smap_intr(void *arg)
 	if (cause & SPD_INTR_EMAC3)
 		emac3_intr(arg);
 	
-	/* if transmition is pending, start here */
+	/* if transmission is pending, start here */
 	ifp = &sc->ethercom.ec_if;
 	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		smap_start(ifp);

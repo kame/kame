@@ -1,4 +1,4 @@
-/*	$NetBSD: if_rtk_cardbus.c,v 1.7.10.1 2002/12/11 18:06:48 he Exp $	*/
+/*	$NetBSD: if_rtk_cardbus.c,v 1.19 2004/03/11 12:19:14 kanaoka Exp $	*/
 
 /*
  * Copyright (c) 2000 Masanori Kanaoka
@@ -29,14 +29,14 @@
 
 /*
  * if_rtk_cardbus.c:
- *	Cardbus specific routines for RealTek 8139 ethernet adapter.
+ *	Cardbus specific routines for Realtek 8139 ethernet adapter.
  *	Tested for 
  *		- elecom-Laneed	LD-10/100CBA (Accton MPX5030)
- *		- MELCO		LPC3-TX-CB   (RealTek 8139)
+ *		- MELCO		LPC3-TX-CB   (Realtek 8139)
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_rtk_cardbus.c,v 1.7.10.1 2002/12/11 18:06:48 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_rtk_cardbus.c,v 1.19 2004/03/11 12:19:14 kanaoka Exp $");
 
 #include "opt_inet.h"
 #include "opt_ns.h"
@@ -91,7 +91,7 @@ __KERNEL_RCSID(0, "$NetBSD: if_rtk_cardbus.c,v 1.7.10.1 2002/12/11 18:06:48 he E
  * there appear to be problems with memory mapped mode: it looks like
  * doing too many memory mapped access back to back in rapid succession
  * can hang the bus. I'm inclined to blame this on crummy design/construction
- * on the part of RealTek. Memory mapped mode does appear to work on
+ * on the part of Realtek. Memory mapped mode does appear to work on
  * uniprocessor systems though.
  */
 #define RTK_USEIOSPACE 
@@ -104,19 +104,25 @@ __KERNEL_RCSID(0, "$NetBSD: if_rtk_cardbus.c,v 1.7.10.1 2002/12/11 18:06:48 he E
  */
 static const struct rtk_type rtk_cardbus_devs[] = {
 	{ CARDBUS_VENDOR_ACCTON, CARDBUS_PRODUCT_ACCTON_MPX5030,
-		"Accton MPX 5030/5038 10/100BaseTX",
-		RTK_8139 },
+		RTK_8139, "Accton MPX 5030/5038 10/100BaseTX" },
 	{ CARDBUS_VENDOR_DLINK, CARDBUS_PRODUCT_DLINK_DFE_690TXD,
-		"D-Link DFE-690TXD 10/100BaseTX", RTK_8139 },
+		RTK_8139, "D-Link DFE-690TXD 10/100BaseTX" },
 	{ CARDBUS_VENDOR_REALTEK, CARDBUS_PRODUCT_REALTEK_RT8138,
-		"RealTek 8138 10/100BaseTX", RTK_8139 },
+		RTK_8139, "Realtek 8138 10/100BaseTX" },
 	{ CARDBUS_VENDOR_REALTEK, CARDBUS_PRODUCT_REALTEK_RT8139,
-		"RealTek 8139 10/100BaseTX", RTK_8139 },
+		RTK_8139, "Realtek 8139 10/100BaseTX" },
 	{ CARDBUS_VENDOR_COREGA, CARDBUS_PRODUCT_COREGA_CB_TXD,
-		"Corega FEther CB-TXD 10/100BaseTX", RTK_8139 },
+		RTK_8139, "Corega FEther CB-TXD 10/100BaseTX" },
+	{ CARDBUS_VENDOR_COREGA, CARDBUS_PRODUCT_COREGA_2CB_TXD,
+		RTK_8139, "Corega FEther II CB-TXD 10/100BaseTX" },
 	{ CARDBUS_VENDOR_PLANEX, CARDBUS_PRODUCT_PLANEX_FNW_3603_TX,
-		"Planex FNW-3603 10/100BaseTX", RTK_8139 },
-	{ 0, 0, NULL, 0 }
+		RTK_8139, "Planex FNW-3603 10/100BaseTX" },
+	{ CARDBUS_VENDOR_PLANEX, CARDBUS_PRODUCT_PLANEX_FNW_3800_TX,
+		RTK_8139, "Planex 10/100BaseTX FNW-3800-TX" },
+	{ CARDBUS_VENDOR_ABOCOM, CARDBUS_PRODUCT_ABOCOM_FE2000VX,
+		RTK_8139, "AboCom FE2000VX 10/100BaseTX" },
+
+	{ 0, 0, 0, NULL }
 };
 
 static int rtk_cardbus_match	__P((struct device *, struct cfdata *, void *));
@@ -138,11 +144,8 @@ struct rtk_cardbus_softc {
 	int sc_intrline;
 };
 
-struct cfattach rtk_cardbus_ca = {
-	sizeof(struct rtk_cardbus_softc), 
-	rtk_cardbus_match, rtk_cardbus_attach,
-	rtk_cardbus_detach, rtk_activate,
-};
+CFATTACH_DECL(rtk_cardbus, sizeof(struct rtk_cardbus_softc),
+    rtk_cardbus_match, rtk_cardbus_attach, rtk_cardbus_detach, rtk_activate);
 
 const struct rtk_type *rtk_cardbus_lookup
 	__P((const struct cardbus_attach_args *));
@@ -252,7 +255,7 @@ rtk_cardbus_attach(parent, self, aux)
 	 * configuration registers.
 	 */
 	rtk_cardbus_setup(csc);
-	sc->rtk_type = t->rtk_type;
+	sc->rtk_type = t->rtk_basetype;
 
 	rtk_attach(sc);
 
@@ -274,13 +277,13 @@ rtk_cardbus_detach(self, flags)
 
 #ifdef DIAGNOSTIC
 	if (ct == NULL)
-		panic("%s: data structure lacks\n", sc->sc_dev.dv_xname);
+		panic("%s: data structure lacks", sc->sc_dev.dv_xname);
 #endif
 	rv = rtk_detach(sc);
 	if (rv)
 		return (rv);
 	/*
-	 * Unhook the interrut handler.
+	 * Unhook the interrupt handler.
 	 */
 	if (csc->sc_ih != NULL)
 		cardbus_intr_disestablish(ct->ct_cc, ct->ct_cf, csc->sc_ih);
@@ -321,10 +324,10 @@ rtk_cardbus_setup(csc)
 			membase = cardbus_conf_read(cc, cf,csc->sc_tag,
 			    RTK_PCI_LOMEM);
 			irq = cardbus_conf_read(cc, cf,csc->sc_tag,
-			    PCI_PRODUCT_DELTA_8139);
+			    CARDBUS_INTERRUPT_REG);
 
 			/* Reset the power state. */
-			printf("%s: chip is is in D%d power mode "
+			printf("%s: chip is in D%d power mode "
 			    "-- setting to D0\n", sc->sc_dev.dv_xname,
 			    command & RTK_PSTATE_MASK);
 			command &= 0xFFFFFFFC;
@@ -337,7 +340,7 @@ rtk_cardbus_setup(csc)
 			cardbus_conf_write(cc, cf, csc->sc_tag,
 			    RTK_PCI_LOMEM, membase);
 			cardbus_conf_write(cc, cf, csc->sc_tag,
-			    PCI_PRODUCT_DELTA_8139, irq);
+			    CARDBUS_INTERRUPT_REG, irq);
 		}
 	}
 
@@ -415,6 +418,7 @@ rtk_cardbus_disable(sc)
 
 	/* Unhook the interrupt handler. */
 	cardbus_intr_disestablish(cc, cf, csc->sc_ih);
+	csc->sc_ih = NULL;
 
 	/* Power down the socket. */
 	Cardbus_function_disable(ct);

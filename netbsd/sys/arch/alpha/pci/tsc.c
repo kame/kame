@@ -1,4 +1,4 @@
-/* $NetBSD: tsc.c,v 1.7 2002/05/16 01:01:32 thorpej Exp $ */
+/* $NetBSD: tsc.c,v 1.11 2003/06/15 23:08:55 fvdl Exp $ */
 
 /*-
  * Copyright (c) 1999 by Ross Harvey.  All rights reserved.
@@ -35,7 +35,7 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(0, "$NetBSD: tsc.c,v 1.7 2002/05/16 01:01:32 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tsc.c,v 1.11 2003/06/15 23:08:55 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -62,9 +62,8 @@ __KERNEL_RCSID(0, "$NetBSD: tsc.c,v 1.7 2002/05/16 01:01:32 thorpej Exp $");
 int	tscmatch __P((struct device *, struct cfdata *, void *));
 void	tscattach __P((struct device *, struct device *, void *));
 
-struct cfattach tsc_ca = {
-	sizeof(struct tsc_softc), tscmatch, tscattach,
-};
+CFATTACH_DECL(tsc, sizeof(struct tsc_softc),
+    tscmatch, tscattach, NULL, NULL);
 
 extern struct cfdriver tsc_cd;
 
@@ -75,9 +74,8 @@ static int tscprint __P((void *, const char *pnp));
 int	tspmatch __P((struct device *, struct cfdata *, void *));
 void	tspattach __P((struct device *, struct device *, void *));
 
-struct cfattach tsp_ca = {
-	sizeof(struct tsp_softc), tspmatch, tspattach,
-};
+CFATTACH_DECL(tsp, sizeof(struct tsp_softc),
+    tspmatch, tspattach, NULL, NULL);
 
 extern struct cfdriver tsp_cd;
 
@@ -151,7 +149,7 @@ tscprint(aux, p)
 	register struct tsp_attach_args *tsp = aux;
 
 	if(p)
-		printf("%s%d at %s", tsp->tsp_name, tsp->tsp_slot, p);
+		aprint_normal("%s%d at %s", tsp->tsp_name, tsp->tsp_slot, p);
 	return UNCONF;
 }
 
@@ -197,6 +195,7 @@ tspattach(parent, self, aux)
 	pba.pba_memt = &pcp->pc_memt;
 	pba.pba_dmat =
 	    alphabus_dma_get_tag(&pcp->pc_dmat_direct, ALPHA_BUS_PCI);
+	pba.pba_dmat64 = NULL;
 	pba.pba_pc = &pcp->pc_pc;
 	pba.pba_bus = 0;
 	pba.pba_bridgetag = NULL;
@@ -240,8 +239,8 @@ tspprint(aux, p)
 	register struct pcibus_attach_args *pci = aux;
 
 	if(p)
-		printf("%s at %s", pci->pba_busname, p);
-	printf(" bus %d", pci->pba_bus);
+		aprint_normal("%s at %s", pci->pba_busname, p);
+	aprint_normal(" bus %d", pci->pba_bus);
 	return UNCONF;
 }
 

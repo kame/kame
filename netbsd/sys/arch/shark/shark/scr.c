@@ -1,4 +1,4 @@
-/*	$NetBSD: scr.c,v 1.1 2002/02/10 01:58:08 thorpej Exp $	*/
+/*	$NetBSD: scr.c,v 1.12 2003/11/07 18:49:29 martin Exp $	*/
 
 /*
  * Copyright 1997
@@ -54,7 +54,7 @@
 **     
 **
 **    The driver is dived into the standard top half ioctl, and bottom
-**    half interupt.  The interrupt is FIQ, which requires its own stack.  
+**    half interrupt.  The interrupt is FIQ, which requires its own stack.  
 **    disable_interrupts and restore_interrupts must be used to protect from
 **    a FIQ.  Since splxxx functions do not use this, the bottom half cannot
 **    use any standard functions (ie like wakeup, timeout, etc.  
@@ -101,6 +101,9 @@
 **
 */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: scr.c,v 1.12 2003/11/07 18:49:29 martin Exp $");
+
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -128,7 +131,7 @@
     #ifdef DDB
         #define DEBUGGER printf("file = %s, line = %d\n",__FILE__,__LINE__);Debugger()        
     #else
-        #define DEBUGGER panic("file = %s, line = %d\n",__FILE__,__LINE__);
+        #define DEBUGGER panic("file = %s, line = %d",__FILE__,__LINE__);
     #endif
 #else
     #define DEBUGGER
@@ -179,7 +182,7 @@
 #else
     #define ASSERT(f)
     #define TOGGLE_TEST_PIN()
-    //#define INVALID_STATE_CMD(sc,state,cmd)  panic("scr: invalid state/cmd, sc = %X, state = %X, cmd = %X, line = %d\n",sc,state,cmd,__LINE__);
+    //#define INVALID_STATE_CMD(sc,state,cmd)  panic("scr: invalid state/cmd, sc = %X, state = %X, cmd = %X, line = %d",sc,state,cmd,__LINE__);
     #define INVALID_STATE_CMD(sc,state,cmd)  sc->bigTrouble = TRUE;
 
 #endif
@@ -398,7 +401,7 @@ int scrdebug =  //SCRPROBE_DEBUG_INFO	    |
 
 
 /* byte logic level and msb/lsb coding */
-#define CONVENTION_UNKOWN		        0
+#define CONVENTION_UNKNOWN		        0
 #define CONVENTION_INVERSE		        1
 #define CONVENTION_DIRECT		        2    
 #define CONVENIONT_INVERSE_ID			0x3f
@@ -598,14 +601,6 @@ static unsigned char hatStack[HATSTACKSIZE];   /* actual stack used during a FIQ
 int     scrprobe    __P((struct device *, void *, void *));
 void    scrattach   __P((struct device *, struct device *, void *));
 
-/* driver entry points routines */
-int     scropen     __P((dev_t dev, int flag, int mode, struct proc *p));
-int     scrclose    __P((dev_t dev, int flag, int mode, struct proc *p));
-int     scrread     __P((dev_t dev, struct uio *uio, int flag));
-int     scrwrite    __P((dev_t dev, struct uio *uio, int flag));
-int     scrioctl    __P((dev_t dev, u_long cmd, caddr_t data, int flag, struct proc  *p));
-void    scrstop     __P((struct tty *tp, int flag));
-
 static void   initStates           __P((struct scr_softc * sc)); 
 
 
@@ -656,19 +651,21 @@ static void scrUntimeout   __P((void (*func)(struct scr_softc*,int), struct scr_
 
 
 
-/* Declare the cdevsw and bdevsw entrypoint routines 
-*/
-cdev_decl(scr);
-bdev_decl(scr);
 
 
-struct cfattach scr_ca =
-{
-        sizeof(struct scr_softc), (cfmatch_t)scrprobe, scrattach
-};
+CFATTACH_DECL(scr, sizeof(struct scr_softc),
+    (cfmatch_t)scrprobe, scrattach, NULL, NULL);
 
 extern struct cfdriver scr_cd;
 
+dev_type_open(scropen);
+dev_type_close(scrclose);
+dev_type_ioctl(scrioctl);
+
+const struct cdevsw scr_cdevsw = {
+	scropen, scrclose, noread, nowrite, scrioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_TTY
+};
 
 /*
 **++
@@ -713,9 +710,9 @@ int scrprobe(parent, match, aux)
     int                     rv = 0;           
 
     KERN_DEBUG (scrdebug, SCRPROBE_DEBUG_INFO,("scrprobe: called, name = %s\n",
-                                               parent->dv_cfdata->cf_driver->cd_name));
+                                               parent->dv_cfdata->cf_name));
 
-    if (strcmp(parent->dv_cfdata->cf_driver->cd_name, "ofisascr") == 0 &&
+    if (strcmp(parent->dv_cfdata->cf_name, "ofisascr") == 0 &&
         devices == 0)
     {
         /* set "devices" to ensure that we respond only once */
@@ -779,7 +776,7 @@ void scrattach(parent, self, aux)
     struct scr_softc       *sc = (void *)self;
 
     printf("\n");
-    if (!strcmp(parent->dv_cfdata->cf_driver->cd_name, "ofisascr"))
+    if (!strcmp(parent->dv_cfdata->cf_name, "ofisascr"))
     {
         KERN_DEBUG (scrdebug, SCRATTACH_DEBUG_INFO,("scrattach: called \n"));
 
@@ -997,214 +994,6 @@ int scrclose(dev, flag, mode, p)
     KERN_DEBUG (scrdebug, SCRCLOSE_DEBUG_INFO,("scrclose exiting\n"));
     return(0);
 }
-
-
-
-/*
-**++
-**  FUNCTIONAL DESCRIPTION:
-**
-**      scrwrite
-**
-**      not supported
-**
-**  FORMAL PARAMETERS:
-**      
-**      dev  - input : Device identifier consisting of major and minor numbers.
-**      uio  - input : Pointer to the user I/O information (ie. write data).
-**      flag - input : Information on how the I/O should be done (eg. blocking
-**                     or non-blocking).
-**
-**  IMPLICIT INPUTS:
-**
-**
-**  IMPLICIT OUTPUTS:
-**
-**      none
-**
-**  FUNCTION VALUE:
-**
-**      Returns ENODEV
-**
-**  SIDE EFFECTS:
-**
-**      none
-**--
-*/
-int
-scrwrite(dev, uio, flag)
-dev_t      dev;
-struct uio *uio;
-int        flag;
-{
-    return ENODEV;
-} 
-
-
-
-/*
-**++
-**  FUNCTIONAL DESCRIPTION:
-**
-**      scrread
-**
-**      not supported
-**
-**  FORMAL PARAMETERS:
-**      
-**      dev  - input : Device identifier consisting of major and minor numbers.
-**      uio  - input : Pointer to the user I/O information (ie. read buffer).
-**      flag - input : Information on how the I/O should be done (eg. blocking
-**                     or non-blocking).
-**
-**  IMPLICIT INPUTS:
-**
-**
-**  IMPLICIT OUTPUTS:
-**
-**      none
-**
-**  FUNCTION VALUE:
-**
-**      Returns ENODEV
-**
-**  SIDE EFFECTS:
-**
-**      none
-**--
-*/
-int
-scrread(dev, uio, flag)
-dev_t       dev;
-struct uio  *uio;
-int         flag;
-{
-    return ENODEV;
-} 
-
-
-
-
-/*
-**++
-**  FUNCTIONAL DESCRIPTION:
-**
-**      scrpoll
-**
-**      not supported
-**
-**  FORMAL PARAMETERS:
-**      
-**      dev  - input : Device identifier consisting of major and minor numbers.
-**      events -input: Events to poll for
-**      p    - input : Process requesting the poll.
-**
-**  IMPLICIT INPUTS:
-**
-**
-**  IMPLICIT OUTPUTS:
-**
-**      none
-**
-**  FUNCTION VALUE:
-**
-**      Returns ENODEV
-**
-**  SIDE EFFECTS:
-**
-**      none
-**--
-*/
-int
-scrpoll(dev, events, p)
-dev_t       dev;
-int         events;
-struct proc *p;
-{
-    return ENODEV;
-} 
-
-
-
-
-/*
-**++
-**  FUNCTIONAL DESCRIPTION:
-**
-**     scrstop
-**
-**     should not be called
-**  
-**  FORMAL PARAMETERS:
-**
-**     tp   - Pointer to our tty structure.
-**     flag - Ignored.
-**
-**  IMPLICIT INPUTS:
-**
-**     none.
-**
-**  IMPLICIT OUTPUTS:
-**
-**     none.
-**
-**  FUNCTION VALUE:
-**
-**     none.
-**
-**  SIDE EFFECTS:
-**
-**     none.
-**--
-*/
-void scrstop(tp, flag)
-    struct tty *tp;
-    int flag;
-{
-    panic("scrstop: not implemented");
-} 
-
-
-
-
-/*
-**++
-**  FUNCTIONAL DESCRIPTION:
-**
-**      tty
-**
-**      should not be called
-**
-**  FORMAL PARAMETERS:
-**
-**      dev - input : Device identifier consisting of major and minor numbers.
-**
-**  IMPLICIT INPUTS:
-**
-**
-**  IMPLICIT OUTPUTS:
-**
-**      none
-**
-**  FUNCTION VALUE:
-**
-**      null
-**
-**  SIDE EFFECTS:
-**
-**      none.
-**--
-*/
-struct tty * scrtty(dev)
-    dev_t   dev;
-{
-    panic("scrtty: not implemented");
-    return NULL;
-} 
-
-
-
-
 
 /*
 **++
@@ -1683,7 +1472,7 @@ static void masterSM(struct scr_softc * sc,int cmd)
                         
                         /* set initial values */
                         sc->status          = 0;        
-                        sc->convention      = CONVENTION_UNKOWN;            
+                        sc->convention      = CONVENTION_UNKNOWN;            
                         sc->protocolType    = 0;        
                         sc->N               = N_DEFAULT;    
                         sc->Fi              = Fi_DEFAULT;   
@@ -2390,7 +2179,7 @@ static void   t0RecvSM (struct scr_softc * sc,int cmd)
                     /* decide if we have all data */
                     if (sc->dataCount >= sc->dataMax)
                     {
-                        KERN_DEBUG (scrdebug, T0_RECV_SM_DEBUG_INFO,("\t\tt0RecvSM: changing state to t0rsRecvSW1\n",sc->dataByte));
+                        KERN_DEBUG (scrdebug, T0_RECV_SM_DEBUG_INFO,("\t\tt0RecvSM: changing state to t0rsRecvSW1\n"));
                         ASSERT(sc->dataCount == sc->dataMax);
                         sc->t0RecvS = t0rsRecvSW1;
                     }
@@ -3127,7 +2916,7 @@ static void   t0RecvByteSM(struct scr_softc* sc,int cmd)
                     if (sc->shiftBits < 8)
                     {
                         if (sc->convention == CONVENTION_INVERSE || 
-                            sc->convention == CONVENTION_UNKOWN)
+                            sc->convention == CONVENTION_UNKNOWN)
                         {
                             /* logic 1 is low, msb is first */
                             sc->shiftByte <<= 1;
@@ -3154,7 +2943,7 @@ static void   t0RecvByteSM(struct scr_softc* sc,int cmd)
 
 
                         /* in TS byte, check if we have a card that works at 1/2 freq */
-                        if (sc->convention == CONVENTION_UNKOWN  &&   /* in TS byte */
+                        if (sc->convention == CONVENTION_UNKNOWN  &&   /* in TS byte */
                             sc->shiftBits == 3 &&                     /* test at bit 3 in word */
                             sc->shiftByte == 4 &&                     /* check for 1/2 freq pattern */
                             sc->cardFreq  == CARD_FREQ_DEF)           /* only do this if at full freq */
@@ -3201,7 +2990,7 @@ static void   t0RecvByteSM(struct scr_softc* sc,int cmd)
                         else
                         {
                             /* sc->convention not set so sort it out */
-                            ASSERT(sc->convention == CONVENTION_UNKOWN);
+                            ASSERT(sc->convention == CONVENTION_UNKNOWN);
                             if (sc->shiftByte == CONVENIONT_INVERSE_ID && scrGetData())
                             {
                                 sc->convention = CONVENTION_INVERSE;
@@ -4269,7 +4058,7 @@ char * getText(int x)
 
 
         default:
-            printf("unkown case, %x\n",x);
+            printf("unknown case, %x\n",x);
             break;
     }
     return "???";

@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.1.1.1 1998/06/09 07:53:06 dbj Exp $	*/
+/*	$NetBSD: conf.c,v 1.4 2003/08/07 16:28:57 agc Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1990, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -70,6 +66,8 @@ extern int	enclose __P((struct open_file *));
 struct devsw devsw[] = {
 	{ "sd",	sdstrategy,	sdopen,	sdclose,	sdioctl },
 	{ "en",	net_strategy,	net_open, net_close,	net_ioctl },
+	{ "tp",	net_strategy,	net_open, net_close,	net_ioctl },
+	{ "xe",	net_strategy,	net_open, net_close,	net_ioctl },
 #if 0
 	{ "fd",	nullsys,	nodev,	nullsys,	noioctl },
 	{ "od",	nullsys,	nodev,	nullsys,	noioctl },
@@ -86,11 +84,11 @@ struct fs_ops file_system[] = {
 	{ nfs_open, nfs_close, nfs_read, nfs_write, nfs_seek, nfs_stat },
 };
 
-int nfsys = NENTS(file_system);
+int nfsys = sizeof(file_system) / sizeof(file_system[0]);
 
 extern struct netif_driver en_driver;
 
 struct netif_driver *netif_drivers[] = {
 	&en_driver,
 };
-int n_netif_drivers = NENTS(netif_drivers);
+int n_netif_drivers = sizeof(netif_drivers) / sizeof(netif_drivers[0]);

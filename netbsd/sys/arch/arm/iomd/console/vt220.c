@@ -1,4 +1,4 @@
-/*	$NetBSD: vt220.c,v 1.1 2001/10/05 22:27:45 reinoud Exp $	*/
+/*	$NetBSD: vt220.c,v 1.5 2004/03/13 18:48:26 bjh21 Exp $	*/
 
 /*
  * Copyright (c) 1994-1995 Melvyn Tang-Richardson
@@ -42,6 +42,8 @@
  */
 
 #include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vt220.c,v 1.5 2004/03/13 18:48:26 bjh21 Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -55,10 +57,6 @@
 
 #include <arm/iomd/vidc.h>
 #include <arm/iomd/console/vt220.h>
-
-#ifdef DIAGNOSTIC
-#include "qms.h"
-#endif
 
 static char vt220_name[] = "vt100";
 
@@ -90,6 +88,14 @@ char console_proc[41];	/* Is this debugging ? */
 
 extern struct vconsole *vconsole_master;
 
+/*
+ * Hackish support for a bell on the PC Keyboard; when a suitable feeper
+ * is found, it attaches itself into the pckbd driver here.
+ */
+static void	(*vt_bell_fn)(void *, u_int, u_int, u_int, int);
+static void	*vt_bell_fn_arg;
+extern void vt_hookup_bell(void (*)(void *, u_int, u_int, u_int, int), void *);
+
 static int default_beepstate = 0;
 
 #define CDATA struct vt220_info *cdata = (struct vt220_info *)vc->data
@@ -97,13 +103,79 @@ static int default_beepstate = 0;
 struct vt220_info master_termdata_store;
 struct vt220_info *master_termdata = &master_termdata_store;
 
-int do_render __P(( char /*c*/, struct vconsole */*vc*/ ));
-void do_render_noscroll __P(( char /*c*/, struct vconsole */*vc*/ ));
-void do_scrollcheck __P(( struct vconsole */*vc*/ ));
-void vt_ris __P((struct vconsole */*vc*/));
-#if defined(DIAGNOSTIC) && NQMS > 0
-void qms_console_freeze __P((void));	/* XXX */
-#endif /* DIAGNOSTIC && NQMS */
+int do_render(char, struct vconsole *);
+void do_render_noscroll(char, struct vconsole *);
+void do_scrollcheck(struct vconsole *);
+int mapped_cls(struct vconsole *);
+void do_scrollup(struct vconsole *);
+void do_scrolldown(struct vconsole *);
+void vt_ris(struct vconsole *);
+
+void clr_params(struct vt220_info *);
+void respond(struct vconsole *);
+
+int vt220_init(struct vconsole *);
+int vt220_putstring(char *, int, struct vconsole *);
+int vt220_swapin(struct vconsole *);
+int vt220_swapout(struct vconsole *);
+int vt220_sleep(struct vconsole *);
+int vt220_wake(struct vconsole *);
+int vt220_scrollback(struct vconsole *);
+int vt220_scrollforward(struct vconsole *);
+int vt220_scrollbackend(struct vconsole *);
+int vt220_debugprint(struct vconsole *);
+int vt220_modechange(struct vconsole *);
+int vt220_attach(struct vconsole *, struct device *, struct device *, void *);
+
+void vt_curadr(struct vconsole *);
+void vt_reset_dec_priv_qm(struct vconsole *);
+void vt_sc(struct vconsole *);
+void vt_rc(struct vconsole *);
+void vt_clreol(struct vconsole *);
+void vt_ind(struct vconsole *);
+void vt_nel(struct vconsole *);
+void vt_ri(struct vconsole *);
+int vt_sel(struct vconsole *);
+void vt_cuu(struct vconsole *);
+void vt_cub(struct vconsole *);
+void vt_da(struct vconsole *);
+void vt_str(struct vconsole *);
+void vt_ris(struct vconsole *);
+void vt_cud(struct vconsole *);
+void vt_tst(struct vconsole *);
+void vt_il(struct vconsole *);
+void vt_ic(struct vconsole *);
+void vt_dch(struct vconsole *);
+void vt_dl(struct vconsole *);
+void vt_stbm(struct vconsole *);
+void vt_dsr(struct vconsole *);
+void vt_su(struct vconsole *);
+void vt_set_dec_priv_qm(struct vconsole *);
+void vt_keyappl(struct vconsole *);
+void vt_clrtab(struct vconsole *);
+void vt_cuf(struct vconsole *);
+void vt_sgr(struct vconsole *);
+void vt_clreos(struct vconsole *);
+void vt_set_ansi(struct vconsole *);
+void vt_reset_ansi(struct vconsole *);
+
+void
+vt_hookup_bell(void (*fn)(void *, u_int, u_int, u_int, int), void *arg)
+{
+
+	if (vt_bell_fn == NULL) {
+		vt_bell_fn = fn;
+		vt_bell_fn_arg = arg;
+	}
+}
+
+static void
+sysbeep(int pitch, int period)
+{
+
+	if (vt_bell_fn != NULL)
+		(*vt_bell_fn)(vt_bell_fn_arg, pitch, period, 50, FALSE);
+}
 
 void
 clr_params(cdata)
@@ -308,8 +380,6 @@ vt_curadr(vc)
 }
     }
 }
-
-extern void sysbeep __P((int pitch, int period));	/* XXX elsewhere ? */
 
 void
 vt_reset_dec_priv_qm(vc)
@@ -1273,10 +1343,6 @@ TERMTYPE_PUTSTRING(string, length, vc)
     if ( ( c == 0x0a ) || ( c== 0x0d ) )
 	cdata->flags &= ~F_LASTCHAR;
 
-#if defined(DIAGNOSTIC) && NQMS > 0
-	qms_console_freeze();
-#endif /* DIAGNOSTIC && NQMS */
-
 /* Always process characters in the range of 0x00 to 0x1f */
 
 
@@ -1771,11 +1837,6 @@ TERMTYPE_PUTSTRING(string, length, vc)
 		vc->CURSORUPDATE(vc);
 #endif
 	return 0;
-}
-
-void
-console_debug()
-{
 }
 
 int

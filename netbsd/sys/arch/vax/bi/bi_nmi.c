@@ -1,4 +1,4 @@
-/*	$NetBSD: bi_nmi.c,v 1.1 2000/07/26 11:47:15 ragge Exp $	   */
+/*	$NetBSD: bi_nmi.c,v 1.5 2003/07/15 02:15:00 lukem Exp $	   */
 /*
  * Copyright (c) 1999 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -29,6 +29,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bi_nmi.c,v 1.5 2003/07/15 02:15:00 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -102,6 +105,5 @@ bi_nmi_attach(struct device *parent, struct device *self, void *aux)
 	bi_attach(sc);
 }
 
-struct	cfattach bi_nmi_ca = {
-	sizeof(struct bi_softc), bi_nmi_match, bi_nmi_attach
-};
+CFATTACH_DECL(bi_nmi, sizeof(struct bi_softc),
+    bi_nmi_match, bi_nmi_attach, NULL, NULL);

@@ -1,4 +1,4 @@
-/*	$NetBSD: consinit.c,v 1.1 2002/04/25 20:36:50 nonaka Exp $	*/
+/*	$NetBSD: consinit.c,v 1.3 2003/07/15 02:54:52 lukem Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -30,6 +30,9 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: consinit.c,v 1.3 2003/07/15 02:54:52 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -133,6 +136,7 @@ dokbd:
 		bus_space_tag_t tag = &prep_isa_io_space_tag;
 
 		if(comcnattach(tag, consinfo->addr, consinfo->speed, COM_FREQ,
+		    COM_TYPE_NORMAL,
 		    ((TTYDEF_CFLAG & ~(CSIZE | CSTOPB | PARENB)) | CS8)))
 			panic("can't init serial console");
 

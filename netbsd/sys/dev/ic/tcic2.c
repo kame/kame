@@ -1,4 +1,4 @@
-/*	$NetBSD: tcic2.c,v 1.9 2001/12/15 13:23:22 soren Exp $	*/
+/*	$NetBSD: tcic2.c,v 1.14 2003/12/28 01:21:37 christos Exp $	*/
 
 /*
  * Copyright (c) 1998, 1999 Christoph Badura.  All rights reserved.
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tcic2.c,v 1.9 2001/12/15 13:23:22 soren Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tcic2.c,v 1.14 2003/12/28 01:21:37 christos Exp $");
 
 #undef	TCICDEBUG
 
@@ -319,7 +319,7 @@ tcic_attach(sc)
 {
 	int i, reg;
 
-	/* set more chipset dependend parameters in the softc. */
+	/* set more chipset dependent parameters in the softc. */
 	switch (sc->chipid) {
 	case TCIC_CHIPID_DB86084_1:
 	case TCIC_CHIPID_DB86084A:
@@ -477,7 +477,7 @@ tcic_event_thread(arg)
 			(void) tsleep(&h->events, PWAIT, "tcicev", 0);
 			continue;
 		}
-		SIMPLEQ_REMOVE_HEAD(&h->events, pe, pe_q);
+		SIMPLEQ_REMOVE_HEAD(&h->events, pe_q);
 		splx(s);
 
 		switch (pe->pe_type) {
@@ -567,7 +567,7 @@ tcic_submatch(parent, cf, aux)
 		panic("unknown tcic socket");
 	}
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 int
@@ -580,14 +580,14 @@ tcic_print(arg, pnp)
 
 	/* Only "pcmcia"s can attach to "tcic"s... easy. */
 	if (pnp)
-		printf("pcmcia at %s", pnp);
+		aprint_normal("pcmcia at %s", pnp);
 
 	switch (h->sock) {
 	case 0:
-		printf(" socket 0");
+		aprint_normal(" socket 0");
 		break;
 	case 1:
-		printf(" socket 1");
+		aprint_normal(" socket 1");
 		break;
 	default:
 		panic("unknown tcic socket");
@@ -1210,9 +1210,10 @@ tcic_chip_io_map(pch, width, offset, size, pcihp, windowp)
 
 	/* XXX wtf is this doing here? */
 
-	printf(" port 0x%lx", (u_long) ioaddr);
+	printf("%s: port 0x%lx", h->sc->dev.dv_xname, (u_long) ioaddr);
 	if (size > 1)
 		printf("-0x%lx", (u_long) ioaddr + (u_long) size - 1);
+	printf("\n");
 
 	h->io[win].addr = ioaddr;
 	h->io[win].size = size;

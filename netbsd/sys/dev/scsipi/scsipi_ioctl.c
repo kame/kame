@@ -1,4 +1,4 @@
-/*	$NetBSD: scsipi_ioctl.c,v 1.43 2002/01/12 16:37:55 tsutsui Exp $	*/
+/*	$NetBSD: scsipi_ioctl.c,v 1.46.4.1 2004/09/11 12:53:44 he Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -44,7 +44,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: scsipi_ioctl.c,v 1.43 2002/01/12 16:37:55 tsutsui Exp $");
+__KERNEL_RCSID(0, "$NetBSD: scsipi_ioctl.c,v 1.46.4.1 2004/09/11 12:53:44 he Exp $");
 
 #include "opt_compat_freebsd.h"
 #include "opt_compat_netbsd.h"
@@ -90,6 +90,7 @@ si_get()
 	int s;
 
 	si = malloc(sizeof(struct scsi_ioctl), M_TEMP, M_WAITOK|M_ZERO);
+	simple_lock_init(&si->si_bp.b_interlock);
 	s = splbio();
 	LIST_INSERT_HEAD(&si_head, si, si_list);
 	splx(s);
@@ -286,7 +287,7 @@ scsistrategy(bp)
 	if (screq->flags & SCCMD_ESCAPE)
 		flags |= XS_CTL_ESCAPE;
 
-	error = scsipi_command(periph,
+	error = scsipi_command(periph, NULL,
 	    (struct scsipi_generic *)screq->cmd, screq->cmdlen,
 	    (u_char *)bp->b_data, screq->datalen,
 	    0, /* user must do the retries *//* ignored */

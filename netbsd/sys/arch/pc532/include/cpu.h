@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.34 2001/06/14 22:56:57 thorpej Exp $	*/
+/*	$NetBSD: cpu.h,v 1.41 2004/02/14 08:20:43 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -39,8 +35,9 @@
  */
 
 #ifndef _NS532_CPU_H_
-#define _NS532_CPU_H_
+#define	_NS532_CPU_H_
 
+#ifdef _KERNEL
 #if defined(_KERNEL_OPT)
 #include "opt_lockdebug.h"
 #endif
@@ -51,6 +48,7 @@
  *   modified from 386 code for the pc532 by Phil Nelson (12/92)
  */
 
+#include <machine/intr.h>
 #include <machine/psl.h>
 #include <machine/frame.h>
 
@@ -63,18 +61,15 @@ struct cpu_info {
 #endif
 };
 
-#ifdef _KERNEL
 extern struct cpu_info cpu_info_store;
-
 #define	curcpu()			(&cpu_info_store)
-#endif
 
 /*
  * definitions of cpu-dependent requirements
  * referenced in generic code
  */
-#define cpu_swapin(p)           	/* nothing */
-#define	cpu_wait(p)			/* nothing */
+#define	cpu_proc_fork(p1, p2)		/* nothing */
+#define	cpu_swapin(p)           	/* nothing */
 #define	cpu_number()			0
 
 /*
@@ -83,7 +78,7 @@ extern struct cpu_info cpu_info_store;
  * clockframe; for now, use generic intrframe.
  */
 
-#define clockframe intrframe 
+#define	clockframe intrframe
 
 #define	CLKF_USERMODE(framep)	USERMODE((framep)->if_regs.r_psr)
 #define	CLKF_BASEPRI(framep)	((framep)->if_pl == imask[IPL_ZERO])
@@ -108,17 +103,16 @@ int	want_resched;		/* resched() was called */
  * Notify the current process (p) that it has a signal pending,
  * process as soon as possible.
  */
-#define	signotify(p)	setsoftast()
+#define	signotify(p)		setsoftast()
 
 /*
  * We need a machine-independent name for this.
  */
-#define	DELAY(n)	delay(n)
+#define	DELAY(n)		delay(n)
 void	delay __P((int));
 
-#ifdef _KERNEL
 /* ieee_handler.c */
-int	ieee_handle_exception __P((struct proc *));
+int	ieee_handle_exception __P((struct lwp *));
 
 /* locore.s */
 void	delay __P((int));
@@ -140,7 +134,7 @@ int	kvtop __P((caddr_t));
 
 #endif /* _KERNEL */
 
-/* 
+/*
  * CTL_MACHDEP definitions.
  */
 #define	CPU_CONSDEV		1	/* dev_t: console terminal device */
@@ -154,5 +148,4 @@ int	kvtop __P((caddr_t));
 	{ "nkpde", CTLTYPE_INT }, \
 	{ "ieee_disable", CTLTYPE_INT }, \
 }
-
 #endif /* !_NS532_CPU_H_ */

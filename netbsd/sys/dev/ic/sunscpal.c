@@ -1,4 +1,4 @@
-/*	$NetBSD: sunscpal.c,v 1.12 2002/04/05 18:27:54 bouyer Exp $	*/
+/*	$NetBSD: sunscpal.c,v 1.14 2003/05/03 18:11:24 wiz Exp $	*/
 
 /*
  * Copyright (c) 2001 Matthew Fredette
@@ -76,7 +76,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sunscpal.c,v 1.12 2002/04/05 18:27:54 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sunscpal.c,v 1.14 2003/05/03 18:11:24 wiz Exp $");
 
 #include "opt_ddb.h"
 
@@ -293,7 +293,7 @@ sunscpal_dma_poll(sc)
 	if (sc->sc_state & SUNSCPAL_ABORTING)
 		return;
 
-	/* Wait for any "dma complete" or error bits. */
+	/* Wait for any "DMA complete" or error bits. */
 	tmo = POLL_TIMO;
 	for (;;) {
 		if (SUNSCPAL_READ_2(sc, sunscpal_icr) & ICR_MASK)
@@ -329,7 +329,7 @@ sunscpal_dma_stop(sc)
 
 	if ((sc->sc_state & SUNSCPAL_DOINGDMA) == 0) {
 #ifdef	DEBUG
-		printf("sunscpal_dma_stop: dma not running\n");
+		printf("sunscpal_dma_stop: DMA not running\n");
 #endif
 		return;
 	}
@@ -882,7 +882,7 @@ sunscpal_done(sc)
 	}
 #ifdef	DIAGNOSTIC
 	if (sr->sr_dma_hand)
-		panic("sunscpal_done: dma free did not");
+		panic("sunscpal_done: DMA free did not");
 #endif
 
 	if (sc->sc_state & SUNSCPAL_ABORTING) {
@@ -2177,7 +2177,7 @@ sunscpal_dma_alloc(sc)
 
 	/* Make sure our caller checked sc_min_dma_len. */
 	if (xlen < sc->sc_min_dma_len)
-		panic("sunscpal_dma_alloc: xlen=0x%x\n", xlen);
+		panic("sunscpal_dma_alloc: xlen=0x%x", xlen);
 
 	/*
 	 * Never attempt single transfers of more than 63k, because

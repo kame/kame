@@ -1,4 +1,4 @@
-/*	$NetBSD: fwohci_pci.c,v 1.13 2002/01/26 16:30:00 ichiro Exp $	*/
+/*	$NetBSD: fwohci_pci.c,v 1.18 2003/01/31 00:07:42 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -37,12 +37,13 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: fwohci_pci.c,v 1.13 2002/01/26 16:30:00 ichiro Exp $");
+__KERNEL_RCSID(0, "$NetBSD: fwohci_pci.c,v 1.18 2003/01/31 00:07:42 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/socket.h>
 #include <sys/device.h>
+#include <sys/select.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -63,12 +64,8 @@ struct fwohci_pci_softc {
 static int fwohci_pci_match __P((struct device *, struct cfdata *, void *));
 static void fwohci_pci_attach __P((struct device *, struct device *, void *));
 
-struct cfattach fwohci_pci_ca = {
-	sizeof(struct fwohci_pci_softc), fwohci_pci_match, fwohci_pci_attach,
-#if 0
-	fwohci_pci_detach, fwohci_activate
-#endif
-};
+CFATTACH_DECL(fwohci_pci, sizeof(struct fwohci_pci_softc),
+    fwohci_pci_match, fwohci_pci_attach, NULL, NULL);
 
 static int
 fwohci_pci_match(struct device *parent, struct cfdata *match, void *aux)
@@ -93,8 +90,11 @@ fwohci_pci_attach(struct device *parent, struct device *self, void *aux)
 	pci_intr_handle_t ih;
 	u_int32_t csr;
 
+	aprint_naive(": IEEE 1394 Controller\n");
+
 	pci_devinfo(pa->pa_id, pa->pa_class, 0, devinfo);
-	printf(": %s (rev. 0x%02x)\n", devinfo, PCI_REVISION(pa->pa_class));
+	aprint_normal(": %s (rev. 0x%02x)\n", devinfo,
+	    PCI_REVISION(pa->pa_class));
 
 	psc->psc_sc.sc_dmat = pa->pa_dmat;
 	psc->psc_pc = pa->pa_pc;
@@ -103,7 +103,8 @@ fwohci_pci_attach(struct device *parent, struct device *self, void *aux)
 	if (pci_mapreg_map(pa, PCI_OHCI_MAP_REGISTER, PCI_MAPREG_TYPE_MEM, 0,
 	    &psc->psc_sc.sc_memt, &psc->psc_sc.sc_memh,
 	    NULL, &psc->psc_sc.sc_memsize)) {
-		printf("%s: can't map OHCI register space\n", self->dv_xname);
+		aprint_error("%s: can't map OHCI register space\n",
+		    self->dv_xname);
 		return;
 	}
 
@@ -124,20 +125,21 @@ fwohci_pci_attach(struct device *parent, struct device *self, void *aux)
 
 	/* Map and establish the interrupt. */
 	if (pci_intr_map(pa, &ih)) {
-		printf("%s: couldn't map interrupt\n", self->dv_xname);
+		aprint_error("%s: couldn't map interrupt\n", self->dv_xname);
 		return;
 	}
 	intrstr = pci_intr_string(pa->pa_pc, ih);
 	psc->psc_ih = pci_intr_establish(pa->pa_pc, ih, IPL_BIO, fwohci_intr,
 	    &psc->psc_sc);
 	if (psc->psc_ih == NULL) {
-		printf("%s: couldn't establish interrupt", self->dv_xname);
+		aprint_error("%s: couldn't establish interrupt",
+		    self->dv_xname);
 		if (intrstr != NULL)
-			printf(" at %s", intrstr);
-		printf("\n");
+			aprint_normal(" at %s", intrstr);
+		aprint_normal("\n");
 		return;
 	}
-	printf("%s: interrupting at %s\n", self->dv_xname, intrstr);
+	aprint_normal("%s: interrupting at %s\n", self->dv_xname, intrstr);
 
 	if (fwohci_init(&psc->psc_sc, pci_intr_evcnt(pa->pa_pc, ih)) != 0) {
 		pci_intr_disestablish(pa->pa_pc, psc->psc_ih);

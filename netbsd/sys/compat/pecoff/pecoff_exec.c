@@ -1,4 +1,4 @@
-/*	$NetBSD: pecoff_exec.c,v 1.17 2002/03/25 06:44:46 kent Exp $	*/
+/*	$NetBSD: pecoff_exec.c,v 1.24.2.1 2004/07/19 09:02:16 tron Exp $	*/
 
 /*
  * Copyright (c) 2000 Masaru OKI
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pecoff_exec.c,v 1.17 2002/03/25 06:44:46 kent Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pecoff_exec.c,v 1.24.2.1 2004/07/19 09:02:16 tron Exp $");
 
 /*#define DEBUG_PECOFF*/
 
@@ -71,7 +71,6 @@ void pecoff_load_section (struct exec_vmcmd_set *vcset, struct vnode *vp,
 int exec_pecoff_makecmds (struct proc *p, struct exec_package *epp);
 int exec_pecoff_coff_makecmds (struct proc *p, struct exec_package *epp,
 			       struct coff_filehdr *fp, int peofs);
-int exec_pecoff_setup_stack (struct proc *p, struct exec_package *epp);
 int exec_pecoff_prep_omagic (struct proc *p, struct exec_package *epp,
 			     struct coff_filehdr *fp,
 			     struct coff_aouthdr *ap, int peofs);
@@ -84,7 +83,8 @@ int exec_pecoff_prep_zmagic (struct proc *p, struct exec_package *epp,
 
 
 int
-pecoff_copyargs(pack, arginfo, stackp, argp)
+pecoff_copyargs(p, pack, arginfo, stackp, argp)
+	struct proc *p;
 	struct exec_package *pack;
 	struct ps_strings *arginfo;
 	char **stackp;
@@ -94,7 +94,7 @@ pecoff_copyargs(pack, arginfo, stackp, argp)
 	struct pecoff_args *ap;
 	int error;
 
-	if ((error = copyargs(pack, arginfo, stackp, argp)) != 0)
+	if ((error = copyargs(p, pack, arginfo, stackp, argp)) != 0)
 		return error;
 
 	ap = (struct pecoff_args *)pack->ep_emul_arg;
@@ -161,6 +161,11 @@ pecoff_load_file(p, epp, path, vcset, entry, argp)
 	struct coff_scnhdr *sh = 0;
 	const char *bp;
 
+	/*
+	 * Following has ~same effect as emul_find_interp(), but the code
+	 * needs to do some more checks while having the vnode open.
+	 * emul_find_interp() wouldn't really simplify handling here.
+	 */
 	if ((error = emul_find(p, NULL, epp->ep_esch->es_emul->e_path,
 			       path, &bp, 0))) {
 		char *ptr;
@@ -173,6 +178,7 @@ pecoff_load_file(p, epp, path, vcset, entry, argp)
 		copystr(path, ptr, len, 0);
 		bp = ptr;
 	}
+
 	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, bp, p);
 	if ((error = namei(&nd)) != 0) {
 		free((void *)bp, M_TEMP);
@@ -207,6 +213,9 @@ pecoff_load_file(p, epp, path, vcset, entry, argp)
 	if (vp->v_mount->mnt_flag & MNT_NOSUID)
 		epp->ep_vap->va_mode &= ~(S_ISUID | S_ISGID);
 
+	if ((error = vn_marktext(vp)))
+		goto badunlock;
+
 	VOP_UNLOCK(vp, 0);
 	/*
 	 * Read header.
@@ -218,7 +227,8 @@ pecoff_load_file(p, epp, path, vcset, entry, argp)
 		goto bad;
 	fp = malloc(PECOFF_HDR_SIZE, M_TEMP, M_WAITOK);
 	peofs = dh.d_peofs + sizeof(signature) - 1;
-	if ((error = exec_read_from(p, vp, peofs, fp, PECOFF_HDR_SIZE)) != 0)
+	error = exec_read_from(p, vp, peofs, fp, PECOFF_HDR_SIZE);
+	if (error != 0)
 		goto bad;
 	if (COFF_BADMAG(fp)) {
 		error = ENOEXEC;
@@ -342,6 +352,10 @@ exec_pecoff_makecmds(p, epp)
 	}
 	if ((error = pecoff_signature(p, epp->ep_vp, dp)) != 0)
 		return error;
+
+	if ((error = vn_marktext(epp->ep_vp)) != 0)
+		return error;
+
 	peofs = dp->d_peofs + sizeof(signature) - 1;
 	fp = malloc(PECOFF_HDR_SIZE, M_TEMP, M_WAITOK);
 	error = exec_read_from(p, epp->ep_vp, peofs, fp, PECOFF_HDR_SIZE);
@@ -391,24 +405,6 @@ exec_pecoff_coff_makecmds(p, epp, fp, peofs)
 	return error;
 }
 
-int
-exec_pecoff_setup_stack(p, epp)
-	struct proc *p;
-	struct exec_package *epp;
-{
-	epp->ep_maxsaddr = USRSTACK - MAXSSIZ;
-	epp->ep_minsaddr = USRSTACK;
-	epp->ep_ssize = p->p_rlimit[RLIMIT_STACK].rlim_cur;
-	NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_zero,
-		  ((epp->ep_minsaddr - epp->ep_ssize) - epp->ep_maxsaddr),
-		  epp->ep_maxsaddr, NULLVP, 0, VM_PROT_NONE);
-	NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_zero, epp->ep_ssize,
-		  (epp->ep_minsaddr - epp->ep_ssize), NULLVP, 0,
-		  VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
-
-	return 0;
-}
-
 /*
  */
 int
@@ -447,13 +443,14 @@ exec_pecoff_prep_zmagic(p, epp, fp, ap, peofs)
 {
 	int error, i;
 	struct pecoff_opthdr *wp;
-	long daddr, dsize, baddr, bsize;
+	long tsize, daddr, dsize, baddr, bsize;
 	struct coff_scnhdr *sh;
 	struct pecoff_args *argp;
 	int scnsiz = sizeof(struct coff_scnhdr) * fp->f_nscns;
 
 	wp = (void *)((char *)ap + sizeof(struct coff_aouthdr));
 
+	epp->ep_tsize = ap->a_tsize;
 	epp->ep_daddr = VM_MAXUSER_ADDRESS;
 	epp->ep_dsize = 0;
 	/* read section header */
@@ -481,7 +478,7 @@ exec_pecoff_prep_zmagic(p, epp, fp, ap, peofs)
 				 sh[i].s_vaddr, sh[i].s_size, sh[i].s_scnptr));
 */			pecoff_load_section(&epp->ep_vmcmds, epp->ep_vp,
 					   &sh[i], &epp->ep_taddr,
-					   &epp->ep_tsize, &prot);
+					   &tsize, &prot);
 		} else if ((s_flags & COFF_STYP_BSS) != 0) {
 			/* set up command for bss segment */
 			baddr = sh[i].s_vaddr;
@@ -506,15 +503,11 @@ exec_pecoff_prep_zmagic(p, epp, fp, ap, peofs)
 	/* set up ep_emul_arg */
 	argp = malloc(sizeof(struct pecoff_args), M_TEMP, M_WAITOK);
 	epp->ep_emul_arg = argp;
-	argp->a_base = wp->w_base;
+	argp->a_abiversion = NETBSDPE_ABI_VERSION;
+	argp->a_zero = 0;
 	argp->a_entry = wp->w_base + ap->a_entry;
 	argp->a_end = epp->ep_daddr + epp->ep_dsize;
-	argp->a_subsystem = wp->w_subvers;
-	memcpy(argp->a_imghdr, wp->w_imghdr, sizeof(wp->w_imghdr));
-	/* imghdr RVA --> VA */
-	for (i = 0; i < 16; i++) {
-		argp->a_imghdr[i].i_vaddr += wp->w_base;
-	}
+	argp->a_opthdr = *wp;
 
 	/*
 	 * load dynamic linker
@@ -534,5 +527,5 @@ exec_pecoff_prep_zmagic(p, epp, fp, ap, peofs)
 #endif
 
 	free(sh, M_TEMP);
-	return exec_pecoff_setup_stack(p, epp);
+	return (*epp->ep_esch->es_setup_stack)(p, epp);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: sw.c,v 1.6 2002/03/11 16:27:02 pk Exp $	*/
+/*	$NetBSD: sw.c,v 1.14 2003/12/04 12:42:54 keihan Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -87,9 +87,12 @@
  * bahve the way the 5380 code expects.  For this reason, only
  * DMA is enabled by default in this driver.
  *
- *	Jason R. Thorpe <thorpej@NetBSD.ORG>
+ *	Jason R. Thorpe <thorpej@NetBSD.org>
  *	December 8, 1995
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sw.c,v 1.14 2003/12/04 12:42:54 keihan Exp $");
 
 #include "opt_ddb.h"
 
@@ -219,9 +222,8 @@ void	sw_intr_off __P((struct ncr5380_softc *));
 
 
 /* The Sun "SCSI Weird" 4/100 obio controller. */
-struct cfattach sw_ca = {
-	sizeof(struct sw_softc), sw_match, sw_attach
-};
+CFATTACH_DECL(sw, sizeof(struct sw_softc),
+    sw_match, sw_attach, NULL, NULL);
 
 static int
 sw_match(parent, cf, aux)
@@ -292,7 +294,7 @@ sw_attach(parent, self, aux)
 	if (oba->oba_pri == -1)
 		oba->oba_pri = 3;
 
-	(void)bus_intr_establish(oba->oba_bustag, oba->oba_pri, IPL_BIO, 0,
+	(void)bus_intr_establish(oba->oba_bustag, oba->oba_pri, IPL_BIO,
 				 sw_intr, sc);
 
 	printf(" pri %d\n", oba->oba_pri);
@@ -345,7 +347,7 @@ sw_attach(parent, self, aux)
 	i = SCI_OPENINGS * sizeof(struct sw_dma_handle);
 	sc->sc_dma = (struct sw_dma_handle *)malloc(i, M_DEVBUF, M_NOWAIT);
 	if (sc->sc_dma == NULL)
-		panic("sw: dma handle malloc failed\n");
+		panic("sw: DMA handle malloc failed");
 
 	for (i = 0; i < SCI_OPENINGS; i++) {
 		sc->sc_dma[i].dh_flags = 0;
@@ -515,7 +517,7 @@ sw_dma_alloc(ncr_sc)
 
 	/* Make sure our caller checked sc_min_dma_len. */
 	if (xlen < MIN_DMA_LEN)
-		panic("sw_dma_alloc: xlen=0x%x\n", xlen);
+		panic("sw_dma_alloc: xlen=0x%x", xlen);
 
 	/* Find free DMA handle.  Guaranteed to find one since we have
 	   as many DMA handles as the driver has processes. */
@@ -849,7 +851,7 @@ sw_dma_stop(ncr_sc)
 
 	if ((ncr_sc->sc_state & NCR_DOINGDMA) == 0) {
 #ifdef	DEBUG
-		printf("sw_dma_stop: dma not running\n");
+		printf("sw_dma_stop: DMA not running\n");
 #endif
 		return;
 	}

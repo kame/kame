@@ -1,9 +1,13 @@
+/*	$NetBSD: cpu.c,v 1.5 2003/07/15 01:26:29 lukem Exp $	*/
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.5 2003/07/15 01:26:29 lukem Exp $");
+
 static int cpumatch(struct device *, struct cfdata *, void *);
 static void cpuattach(struct device *, struct device *, void *);
 
-struct cfattach cpu_ca = {
-	sizeof(struct device), cpumatch, cpuattach
-};
+CFATTACH_DECL(cpu, sizeof(struct device),
+    cpumatch, cpuattach, NULL, NULL);
 
 extern struct cfdriver cpu_cd;
 
@@ -15,7 +19,7 @@ cpumatch(struct device *parent, struct cfdata *cf, void *aux)
 	if (strcmp(mba->mba_name, cpu_cd.cd_name) != 0)
 		return 0;
 
-	if (cpu_info_store.ci_dev != NULL)
+	if (cpu_info[0].ci_dev != NULL)
 		return 0;
 
 	return 1;

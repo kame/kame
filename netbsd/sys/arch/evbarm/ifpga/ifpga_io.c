@@ -1,4 +1,4 @@
-/*	$NetBSD: ifpga_io.c,v 1.2 2002/04/12 19:14:12 thorpej Exp $ */
+/*	$NetBSD: ifpga_io.c,v 1.6 2003/07/15 00:24:59 lukem Exp $ */
 
 /*
  * Copyright (c) 1997 Causality Limited
@@ -40,10 +40,15 @@
  * bus_space I/O functions for IFPGA
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ifpga_io.c,v 1.6 2003/07/15 00:24:59 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <machine/bus.h>
 #include <uvm/uvm_extern.h>
+
+#include <evbarm/ifpga/ifpgavar.h>
 
 /* Proto types for all the bus_space structure functions */
 
@@ -196,8 +201,8 @@ ifpga_mem_bs_map(t, bpa, size, cacheable, bshp)
 		   we want.  */
 		pmap_enter(pmap_kernel(), va, (bus_addr_t)t + startpa,
 			   VM_PROT_READ | VM_PROT_WRITE, 0);
-		va += NBPG;
-		startpa += NBPG;
+		va += PAGE_SIZE;
+		startpa += PAGE_SIZE;
 	}
 	pmap_update(pmap_kernel());
 
@@ -214,7 +219,7 @@ ifpga_bs_alloc(t, rstart, rend, size, alignment, boundary, cacheable,
 	bus_addr_t *bpap;
 	bus_space_handle_t *bshp;
 {
-	panic("ifpga_alloc(): Help!\n");
+	panic("ifpga_alloc(): Help!");
 }
 
 
@@ -248,7 +253,7 @@ ifpga_bs_free(t, bsh, size)
 	bus_size_t size;
 {
 
-	panic("ifpga_free(): Help!\n");
+	panic("ifpga_free(): Help!");
 	/* ifpga_bs_unmap() does all that we need to do. */
 /*	ifpga_bs_unmap(t, bsh, size);*/
 }

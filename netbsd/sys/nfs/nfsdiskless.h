@@ -1,4 +1,4 @@
-/*	$NetBSD: nfsdiskless.h,v 1.16 1999/02/21 15:07:49 drochner Exp $	*/
+/*	$NetBSD: nfsdiskless.h,v 1.21 2004/03/11 21:48:43 cl Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1997 The NetBSD Foundation, Inc.
@@ -37,6 +37,8 @@
  *
  *	@(#)nfsdiskless.h	8.1 (Berkeley) 6/10/93
  */
+#ifndef _NFS_NFSDISKLESS_H_
+#define _NFS_NFSDISKLESS_H_
 
 /*
  * Structure holds parameters needed by nfs_mountroot(),
@@ -65,6 +67,7 @@ struct nfs_diskless {
 	struct nfs_dlmount nd_root; 	/* Mount info for root */
 };
 
+#ifdef _KERNEL
 int nfs_boot_init __P((struct nfs_diskless *nd, struct proc *procp));
 void nfs_boot_cleanup __P((struct nfs_diskless *nd, struct proc *procp));
 int nfs_boot_ifupdown __P((struct ifnet *, struct proc *, int));
@@ -82,4 +85,15 @@ int nfs_boot_sendrecv __P((struct socket *, struct mbuf *,
 
 int nfs_bootdhcp  __P((struct nfs_diskless *, struct proc *));
 int nfs_bootparam __P((struct nfs_diskless *, struct proc *));
+int nfs_bootstatic __P((struct nfs_diskless *, struct proc *));
 
+int (*nfs_bootstatic_callback)(struct nfs_diskless *);
+
+#define	NFS_BOOTSTATIC_HAS_MYIP		0x01
+#define	NFS_BOOTSTATIC_HAS_GWIP		0x02
+#define	NFS_BOOTSTATIC_HAS_MASK		0x04
+#define	NFS_BOOTSTATIC_HAS_SERVADDR	0x08
+#define	NFS_BOOTSTATIC_HAS_SERVER	0x10
+#endif /* _KERNEL */
+
+#endif /* _NFS_NFSDISKLESS_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap_bootstrap.c,v 1.55 2001/05/30 15:24:32 lukem Exp $	*/
+/*	$NetBSD: pmap_bootstrap.c,v 1.60 2003/08/07 16:28:22 agc Exp $	*/
 
 /* 
  * Copyright (c) 1991, 1993
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,6 +34,9 @@
  *
  *	@(#)pmap_bootstrap.c	8.1 (Berkeley) 6/10/93
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pmap_bootstrap.c,v 1.60 2003/08/07 16:28:22 agc Exp $");
 
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
@@ -171,18 +170,18 @@ pmap_bootstrap(nextpa, firstpa)
 	else
 		kstsize = 1;
 	kstpa = nextpa;
-	nextpa += kstsize * NBPG;
+	nextpa += kstsize * PAGE_SIZE;
 	kptpa = nextpa;
 	nptpages = Sysptsize +
 		(IIOMAPSIZE + ROMMAPSIZE + VIDMAPSIZE + NPTEPG - 1) / NPTEPG;
-	nextpa += nptpages * NBPG;
+	nextpa += nptpages * PAGE_SIZE;
 	vidpa = nextpa - VIDMAPSIZE * sizeof(pt_entry_t);
 	rompa = vidpa  - ROMMAPSIZE * sizeof(pt_entry_t);
 	iiopa = rompa  - IIOMAPSIZE * sizeof(pt_entry_t);
 	kptmpa = nextpa;
-	nextpa += NBPG;
+	nextpa += PAGE_SIZE;
 	lkptpa = nextpa;
-	nextpa += NBPG;
+	nextpa += PAGE_SIZE;
 	p0upa = nextpa;
 	nextpa += USPACE;
 
@@ -204,7 +203,7 @@ pmap_bootstrap(nextpa, firstpa)
 			printf("Older machines may need Mode32 to get that ");
 			printf("option.\n");
 		}
-		panic("Cannot work with the current memory mappings.\n");
+		panic("Cannot work with the current memory mappings.");
 	}
 
 	/*
@@ -292,7 +291,7 @@ pmap_bootstrap(nextpa, firstpa)
 		protopte = kptpa | PG_RW | PG_CI | PG_V;
 		while (pte < epte) {
 			*pte++ = protopte;
-			protopte += NBPG;
+			protopte += PAGE_SIZE;
 		}
 		/*
 		 * Invalidate all but the last remaining entries in both.
@@ -320,8 +319,8 @@ pmap_bootstrap(nextpa, firstpa)
 		while (pte < epte) {
 			*ste++ = protoste;
 			*pte++ = protopte;
-			protoste += NBPG;
-			protopte += NBPG;
+			protoste += PAGE_SIZE;
+			protopte += PAGE_SIZE;
 		}
 		/*
 		 * Invalidate all but the last remaining entries in both.
@@ -368,7 +367,7 @@ pmap_bootstrap(nextpa, firstpa)
 #endif
 	while (pte < epte) {
 		*pte++ = protopte;
-		protopte += NBPG;
+		protopte += PAGE_SIZE;
 	}
 	/*
 	 * Validate PTEs for kernel data/bss, dynamic data allocated
@@ -384,7 +383,7 @@ pmap_bootstrap(nextpa, firstpa)
 		protopte |= PG_CCB;
 	while (pte < epte) {
 		*pte++ = protopte;
-		protopte += NBPG;
+		protopte += PAGE_SIZE;
 	}
 	/*
 	 * Finally, validate the internal IO space, ROM space, and
@@ -395,7 +394,7 @@ pmap_bootstrap(nextpa, firstpa)
 	protopte = IOBase | PG_RW | PG_CI | PG_V;
 	while (pte < epte) {
 		*pte++ = protopte;
-		protopte += NBPG;
+		protopte += PAGE_SIZE;
 	}
 
 	pte = PA2VA(rompa, u_int *);
@@ -403,7 +402,7 @@ pmap_bootstrap(nextpa, firstpa)
 	protopte = ((u_int) ROMBase) | PG_RO | PG_V;
 	while (pte < epte) {
 		*pte++ = protopte;
-		protopte += NBPG;
+		protopte += PAGE_SIZE;
 	}
 
 	if (vidlen) {
@@ -413,7 +412,7 @@ pmap_bootstrap(nextpa, firstpa)
 		    PG_RW | PG_V | PG_CI;
 		while (pte < epte) {
 			*pte++ = protopte;
-			protopte += NBPG;
+			protopte += PAGE_SIZE;
 		}
 	}
 
@@ -556,11 +555,11 @@ pmap_bootstrap(nextpa, firstpa)
 		vaddr_t va = virtual_avail;
 
 		CADDR1 = (caddr_t)va;
-		va += NBPG;
+		va += PAGE_SIZE;
 		CADDR2 = (caddr_t)va;
-		va += NBPG;
+		va += PAGE_SIZE;
 		vmmap = (caddr_t)va;
-		va += NBPG;
+		va += PAGE_SIZE;
 		msgbufaddr = (caddr_t)va;
 		va += m68k_round_page(MSGBUFSIZE);
 		virtual_avail = va;
@@ -610,7 +609,7 @@ bootstrap_mac68k(tc)
 		printf("Pmap bootstrapped.\n");
 
 	if (!vidlen)
-		panic("Don't know how to relocate video!\n");
+		panic("Don't know how to relocate video!");
 
 	if (mac68k_machine.do_graybars)
 		printf("Moving ROMBase from %p to %p.\n", oldROMBase, ROMBase);
@@ -638,4 +637,19 @@ bootstrap_mac68k(tc)
 #endif
 
 	videoaddr = newvideoaddr;
+}
+
+void
+pmap_init_md(void)
+{
+	vaddr_t addr;
+
+	addr = (vaddr_t)IOBase;
+	if (uvm_map(kernel_map, &addr,
+		    m68k_ptob(IIOMAPSIZE + ROMMAPSIZE + VIDMAPSIZE),
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
+		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE,
+				UVM_INH_NONE, UVM_ADV_RANDOM,
+				UVM_FLAG_FIXED)) != 0)
+		panic("pmap_init_md: uvm_map failed");
 }

@@ -1,4 +1,4 @@
-/* $NetBSD: jensenio.c,v 1.3 2001/07/27 00:25:19 thorpej Exp $ */
+/* $NetBSD: jensenio.c,v 1.8 2003/01/01 00:39:19 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
@@ -50,7 +50,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: jensenio.c,v 1.3 2001/07/27 00:25:19 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: jensenio.c,v 1.8 2003/01/01 00:39:19 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -87,9 +87,8 @@ const struct jensenio_dev {
 int	jensenio_match(struct device *, struct cfdata *, void *);
 void	jensenio_attach(struct device *, struct device *, void *);
 
-struct cfattach jensenio_ca = {
-	sizeof(struct device), jensenio_match, jensenio_attach
-};
+CFATTACH_DECL(jensenio, sizeof(struct device),
+    jensenio_match, jensenio_attach, NULL, NULL);
 
 int	jensenio_print(void *, const char *);
 int	jensenio_submatch(struct device *, struct cfdata *, void *);
@@ -140,7 +139,7 @@ jensenio_match(struct device *parent, struct cfdata *cf, void *aux)
 {
 	struct mainbus_attach_args *ma = aux;
 
-	if (strcmp(ma->ma_name, cf->cf_driver->cd_name) != 0)
+	if (strcmp(ma->ma_name, cf->cf_name) != 0)
 		return (0);
 
 	/* There can be only one. */
@@ -230,13 +229,13 @@ jensenio_submatch(struct device *parent, struct cfdata *cf, void *aux)
 	 */
 	if (strcmp(ja->ja_name, "eisa") == 0 ||
 	    strcmp(ja->ja_name, "isa") == 0)
-		return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+		return (config_match(parent, cf, aux));
 
 	if (cf->cf_loc[JENSENIOCF_PORT] != JENSENIOCF_PORT_DEFAULT &&
 	    cf->cf_loc[JENSENIOCF_PORT] != ja->ja_ioaddr)
 		return (0);
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 int
@@ -245,7 +244,7 @@ jensenio_print(void *aux, const char *pnp)
 	struct jensenio_attach_args *ja = aux;
 
 	if (pnp != NULL)
-		printf("%s at %s", ja->ja_name, pnp);
+		aprint_normal("%s at %s", ja->ja_name, pnp);
 
 	/*
 	 * Skip the locator song-and-dance if we're attaching the
@@ -253,7 +252,7 @@ jensenio_print(void *aux, const char *pnp)
 	 */
 	if (strcmp(ja->ja_name, "eisa") != 0 &&
 	    strcmp(ja->ja_name, "isa") != 0)
-		printf(" port 0x%lx", ja->ja_ioaddr);
+		aprint_normal(" port 0x%lx", ja->ja_ioaddr);
 
 	return (UNCONF);
 }

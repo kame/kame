@@ -1,4 +1,4 @@
-/*	$NetBSD: intvec.S,v 1.3 2002/05/13 21:11:23 matt Exp $   */
+/*	$NetBSD: intvec.S,v 1.7 2004/02/13 11:36:20 wiz Exp $   */
 
 /*
  * Copyright (c) 1994, 1997 Ludd, University of Lule}, Sweden.
@@ -186,7 +186,7 @@ SCBENTRY(mcheck)
 
 L4:	addl2	(%sp)+,%sp	# remove info pushed on stack
 	pushr	$0x3f		# save regs for clobbering
-	movl	_C_LABEL(dep_call),%r0	# get cpu-specific mchk handler
+	movl	_C_LABEL(dep_call),%r0	# get CPU-specific mchk handler
 	tstl	BADADDR(%r0)	# any handler available?
 	bneq	4f		# yep, call it
 	popr	$0x3f		# nope, restore regs
@@ -208,7 +208,7 @@ L4:	addl2	(%sp)+,%sp	# remove info pushed on stack
 	brb	2f
 
 3:	mtpr	$0xF,$PR_MCESR	# clear the bus error bit
-2:	movl	_C_LABEL(memtest),(%sp)	# REI to new adress
+2:	movl	_C_LABEL(memtest),(%sp)	# REI to new address
 	rei
 
 	TRAPCALL(invkstk, T_KSPNOTVAL)
@@ -243,7 +243,7 @@ SCBENTRY(transl_v)		# 20: Translation violation
 	addl2	$8,%sp
 	rei
 1:	popr	$0x3f
-	brb	Xaccess_v
+	brw	Xaccess_v
 
 SCBENTRY(access_v)			# 24: Access cntrl viol fault
 	blbs	(%sp), ptelen
@@ -300,6 +300,7 @@ SCBENTRY(softclock)
 	jsb	softintr_dispatch
 	incl	_C_LABEL(softclock_intrcnt)+EV_COUNT
 	adwc	$0,_C_LABEL(softclock_intrcnt)+EV_COUNT+4
+	incl	_C_LABEL(uvmexp)+UVME_SOFTS
 	POPR
 	rei
 
@@ -321,6 +322,7 @@ SCBENTRY(softnet)
 	jsb	softintr_dispatch
 	incl	_C_LABEL(softnet_intrcnt)+EV_COUNT
 	adwc	$0,_C_LABEL(softnet_intrcnt)+EV_COUNT+4
+	incl	_C_LABEL(uvmexp)+UVME_SOFTS
 	POPR
 	rei
 
@@ -330,6 +332,7 @@ SCBENTRY(softserial)
 	jsb	softintr_dispatch
 	incl	_C_LABEL(softserial_intrcnt)+EV_COUNT
 	adwc	$0,_C_LABEL(softserial_intrcnt)+EV_COUNT+4
+	incl	_C_LABEL(uvmexp)+UVME_SOFTS
 	POPR
 	rei
 
@@ -372,6 +375,7 @@ SCBENTRY(hardclock)
 1:	pushr	$0x3f
 	incl	_C_LABEL(clock_intrcnt)+EV_COUNT	# count the number of clock interrupts
 	adwc	$0,_C_LABEL(clock_intrcnt)+EV_COUNT+4
+	incl	_C_LABEL(uvmexp)+UVME_INTRS
 #if VAX46 || VAXANY
 	cmpl	_C_LABEL(vax_boardtype),$VAX_BTYP_46
 	bneq	1f

@@ -1,4 +1,4 @@
-/*	$NetBSD: netbsd32.h,v 1.21 2001/12/08 00:35:27 thorpej Exp $	*/
+/*	$NetBSD: netbsd32.h,v 1.27.2.1 2004/05/23 10:44:52 tron Exp $	*/
 
 /*
  * Copyright (c) 1998, 2001 Matthew R. Green
@@ -41,12 +41,14 @@
 #include <sys/systm.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <sys/ucontext.h>
 
 /*
- * first, define all the types we need.
+ * first, define the basic types we need.
  */
 
 typedef int32_t netbsd32_long;
@@ -61,30 +63,60 @@ typedef int32_t netbsd32_key_t;
 typedef int32_t netbsd32_intptr_t;
 typedef u_int32_t netbsd32_uintptr_t;
 
-/* all pointers are u_int32_t */
+/*
+ * machine depedant section; must define:
+ *	netbsd32_pointer_t
+ *		- 32-bit pointer type, normally u_int32_t but can be int32_t
+ *		  for platforms which rely on sign-extension of pointers
+ *		  such as SH-5.
+ *	NETBSD32PTR64(p32)
+ *		- Translate a 32-bit pointer into something valid in a
+ *		  64-bit context.
+ *	struct netbsd32_sigcontext
+ *		- 32bit compatibility sigcontext structure for this arch.
+ *	netbsd32_sigcontextp_t
+ *		- type of pointer to above, normally u_int32_t
+ *	void netbsd32_setregs(struct proc *p, struct exec_package *pack,
+ *	    u_long stack);
+ *	int netbsd32_sigreturn(struct proc *p, void *v,
+ *	    register_t *retval);
+ *	void netbsd32_sendsig(sig_t catcher, int sig, int mask, u_long code);
+ *	char netbsd32_esigcode[], netbsd32_sigcode[]
+ *		- the above are abvious
+ *
+ * pull in the netbsd32 machine dependant header, that may help with the
+ * above, or it may be provided via the MD layer itself.
+ */
+#include <machine/netbsd32_machdep.h>
 
-typedef u_int32_t netbsd32_voidp;
-typedef u_int32_t netbsd32_u_shortp;
-typedef u_int32_t netbsd32_charp;
-typedef u_int32_t netbsd32_u_charp;
-typedef u_int32_t netbsd32_charpp;
-typedef u_int32_t netbsd32_size_tp;
-typedef u_int32_t netbsd32_intp;
-typedef u_int32_t netbsd32_longp;
-typedef u_int32_t netbsd32_caddrp;
-typedef u_int32_t netbsd32_caddr;
-typedef u_int32_t netbsd32_gid_tp;
-typedef u_int32_t netbsd32_fsid_tp_t;
+/*
+ * all pointers are netbsd32_pointer_t (defined in <machine/netbsd32_machdep.h>)
+ */
+
+typedef netbsd32_pointer_t netbsd32_voidp;
+typedef netbsd32_pointer_t netbsd32_u_shortp;
+typedef netbsd32_pointer_t netbsd32_charp;
+typedef netbsd32_pointer_t netbsd32_u_charp;
+typedef netbsd32_pointer_t netbsd32_charpp;
+typedef netbsd32_pointer_t netbsd32_size_tp;
+typedef netbsd32_pointer_t netbsd32_intp;
+typedef netbsd32_pointer_t netbsd32_longp;
+typedef netbsd32_pointer_t netbsd32_caddrp;
+typedef netbsd32_pointer_t netbsd32_caddr;
+typedef netbsd32_pointer_t netbsd32_gid_tp;
+typedef netbsd32_pointer_t netbsd32_fsid_tp_t;
+typedef netbsd32_pointer_t netbsd32_lwpidp;
+typedef netbsd32_pointer_t netbsd32_ucontextp;
 
 /*
  * now, the compatibility structures and their fake pointer types.
  */
 
 /* from <sys/types.h> */
-typedef u_int32_t netbsd32_fd_setp_t;
+typedef netbsd32_pointer_t netbsd32_fd_setp_t;
 
 /* from <sys/uio.h> */
-typedef u_int32_t netbsd32_iovecp_t;
+typedef netbsd32_pointer_t netbsd32_iovecp_t;
 struct netbsd32_iovec {
 	netbsd32_voidp	iov_base;	/* Base address. */
 	netbsd32_size_t	 iov_len;	/* Length. */
@@ -94,36 +126,36 @@ struct netbsd32_iovec {
 typedef int32_t netbsd32_timer_t;
 typedef	int32_t netbsd32_time_t;
 
-typedef u_int32_t netbsd32_timespecp_t;
+typedef netbsd32_pointer_t netbsd32_timespecp_t;
 struct netbsd32_timespec {
 	netbsd32_time_t	tv_sec;			/* seconds */
 	netbsd32_long	tv_nsec;	/* and nanoseconds */
 };
 
-typedef u_int32_t netbsd32_timevalp_t;
+typedef netbsd32_pointer_t netbsd32_timevalp_t;
 struct netbsd32_timeval {
 	netbsd32_long	tv_sec;		/* seconds */
 	netbsd32_long	tv_usec;	/* and microseconds */
 };
 
-typedef u_int32_t netbsd32_timezonep_t;
+typedef netbsd32_pointer_t netbsd32_timezonep_t;
 struct netbsd32_timezone {
 	int	tz_minuteswest;	/* minutes west of Greenwich */
 	int	tz_dsttime;	/* type of dst correction */
 };
 
-typedef u_int32_t netbsd32_itimervalp_t;
+typedef netbsd32_pointer_t netbsd32_itimervalp_t;
 struct	netbsd32_itimerval {
 	struct	netbsd32_timeval it_interval;	/* timer interval */
 	struct	netbsd32_timeval it_value;	/* current value */
 };
 
 /* from <sys/mount.h> */
-typedef u_int32_t netbsd32_fidp_t;
+typedef netbsd32_pointer_t netbsd32_fidp_t;
 
-typedef u_int32_t netbsd32_fhandlep_t;
+typedef netbsd32_pointer_t netbsd32_fhandlep_t;
 
-typedef u_int32_t netbsd32_statfsp_t;
+typedef netbsd32_pointer_t netbsd32_statfsp_t;
 struct netbsd32_statfs {
 	short	f_type;			/* type of file system */
 	u_short	f_flags;		/* copy of mount flags */
@@ -143,10 +175,10 @@ struct netbsd32_statfs {
 };
 
 /* from <sys/poll.h> */
-typedef u_int32_t netbsd32_pollfdp_t;
+typedef netbsd32_pointer_t netbsd32_pollfdp_t;
 
 /* from <sys/resource.h> */
-typedef u_int32_t netbsd32_rusagep_t;
+typedef netbsd32_pointer_t netbsd32_rusagep_t;
 struct	netbsd32_rusage {
 	struct netbsd32_timeval ru_utime;/* user time used */
 	struct netbsd32_timeval ru_stime;/* system time used */
@@ -166,9 +198,9 @@ struct	netbsd32_rusage {
 	netbsd32_long	ru_nivcsw;	/* involuntary " */
 };
 
-typedef u_int32_t netbsd32_orlimitp_t;
+typedef netbsd32_pointer_t netbsd32_orlimitp_t;
 
-typedef u_int32_t netbsd32_rlimitp_t;
+typedef netbsd32_pointer_t netbsd32_rlimitp_t;
 
 struct netbsd32_loadavg {
 	fixpt_t	ldavg[3];
@@ -176,7 +208,7 @@ struct netbsd32_loadavg {
 };
 
 /* from <sys/ipc.h> */
-typedef u_int32_t netbsd32_ipc_permp_t;
+typedef netbsd32_pointer_t netbsd32_ipc_permp_t;
 struct netbsd32_ipc_perm {
 	ushort	cuid;		/* creator user id */
 	ushort	cgid;		/* creator group id */
@@ -197,7 +229,7 @@ struct netbsd32_ipc_perm14 {
 };
 
 /* from <sys/msg.h> */
-typedef u_int32_t netbsd32_msgp_t;
+typedef netbsd32_pointer_t netbsd32_msgp_t;
 struct netbsd32_msg {
 	netbsd32_msgp_t msg_next;	/* next msg in the chain */
 	netbsd32_long	msg_type;	/* type of this message */
@@ -248,7 +280,7 @@ struct netbsd32_msqid_ds14 {
 };
 
 /* from <sys/sem.h> */
-typedef u_int32_t netbsd32_semp_t;
+typedef netbsd32_pointer_t netbsd32_semp_t;
 
 typedef u_int32_t netbsd32_semid_dsp_t;
 struct netbsd32_semid_ds {
@@ -284,7 +316,7 @@ union netbsd32_semun {
 	netbsd32_u_shortp array;	/* array for GETALL & SETALL */
 };
 
-typedef u_int32_t netbsd32_sembufp_t;
+typedef netbsd32_pointer_t netbsd32_sembufp_t;
 struct netbsd32_sembuf {
 	unsigned short	sem_num;	/* semaphore # */
 	short		sem_op;		/* semaphore operation */
@@ -318,35 +350,35 @@ struct netbsd32_shmid_ds14 {
 };
 
 /* from <sys/signal.h> */
-typedef u_int32_t netbsd32_sigsetp_t;
-typedef u_int32_t netbsd32_sigactionp_t;
+typedef netbsd32_pointer_t netbsd32_sigsetp_t;
+typedef netbsd32_pointer_t netbsd32_sigactionp_t;
 struct	netbsd32_sigaction {
-	netbsd32_voidp sa_handler;	/* signal handler */
-	sigset_t sa_mask;		/* signal mask to apply */
-	int	sa_flags;		/* see signal options below */
+	netbsd32_voidp netbsd32_sa_handler;	/* signal handler */
+	sigset_t netbsd32_sa_mask;		/* signal mask to apply */
+	int	netbsd32_sa_flags;		/* see signal options below */
 };
 
-typedef u_int32_t netbsd32_sigaltstack13p_t;
+typedef netbsd32_pointer_t netbsd32_sigaltstack13p_t;
 struct netbsd32_sigaltstack13 {
 	netbsd32_charp	ss_sp;			/* signal stack base */
 	int	ss_size;		/* signal stack length */
 	int	ss_flags;		/* SS_DISABLE and/or SS_ONSTACK */
 };
 
-typedef u_int32_t netbsd32_sigaltstackp_t;
+typedef netbsd32_pointer_t netbsd32_sigaltstackp_t;
 struct netbsd32_sigaltstack {
 	netbsd32_voidp	ss_sp;			/* signal stack base */
 	netbsd32_size_t	ss_size;		/* signal stack length */
 	int	ss_flags;		/* SS_DISABLE and/or SS_ONSTACK */
 };
 
-typedef u_int32_t netbsd32_sigstackp_t;
+typedef netbsd32_pointer_t netbsd32_sigstackp_t;
 struct	netbsd32_sigstack {
 	netbsd32_voidp	ss_sp;			/* signal stack pointer */
 	int	ss_onstack;		/* current status */
 };
 
-typedef u_int32_t netbsd32_sigvecp_t;
+typedef netbsd32_pointer_t netbsd32_sigvecp_t;
 struct	netbsd32_sigvec {
 	netbsd32_voidp sv_handler;	/* signal handler */
 	int	sv_mask;		/* signal mask to apply */
@@ -354,10 +386,10 @@ struct	netbsd32_sigvec {
 };
 
 /* from <sys/socket.h> */
-typedef u_int32_t netbsd32_sockaddrp_t;
-typedef u_int32_t netbsd32_osockaddrp_t;
+typedef netbsd32_pointer_t netbsd32_sockaddrp_t;
+typedef netbsd32_pointer_t netbsd32_osockaddrp_t;
 
-typedef u_int32_t netbsd32_msghdrp_t;
+typedef netbsd32_pointer_t netbsd32_msghdrp_t;
 struct netbsd32_msghdr {
 	netbsd32_caddr_t	msg_name;		/* optional address */
 	u_int	msg_namelen;		/* size of address */
@@ -368,7 +400,7 @@ struct netbsd32_msghdr {
 	int	msg_flags;		/* flags on received message */
 };
 
-typedef u_int32_t netbsd32_omsghdrp_t;
+typedef netbsd32_pointer_t netbsd32_omsghdrp_t;
 struct netbsd32_omsghdr {
 	netbsd32_caddr_t	msg_name;		/* optional address */
 	int	msg_namelen;		/* size of address */
@@ -379,7 +411,7 @@ struct netbsd32_omsghdr {
 };
 
 /* from <sys/stat.h> */
-typedef u_int32_t netbsd32_stat12p_t;
+typedef netbsd32_pointer_t netbsd32_stat12p_t;
 struct netbsd32_stat12 {			/* NetBSD-1.2 stat struct */
 	dev_t	  st_dev;		/* inode's device */
 	ino_t	  st_ino;		/* inode's number */
@@ -400,7 +432,7 @@ struct netbsd32_stat12 {			/* NetBSD-1.2 stat struct */
 	int64_t	  st_qspare[2];
 };
 
-typedef u_int32_t netbsd32_stat43p_t;
+typedef netbsd32_pointer_t netbsd32_stat43p_t;
 struct netbsd32_stat43 {			/* BSD-4.3 stat struct */
 	u_int16_t st_dev;		/* inode's device */
 	ino_t	  st_ino;		/* inode's number */
@@ -418,7 +450,7 @@ struct netbsd32_stat43 {			/* BSD-4.3 stat struct */
 	u_int32_t st_flags;		/* user defined flags for file */
 	u_int32_t st_gen;		/* file generation number */
 };
-typedef u_int32_t netbsd32_statp_t;
+typedef netbsd32_pointer_t netbsd32_statp_t;
 struct netbsd32_stat {
 	dev_t	  st_dev;		/* inode's device */
 	ino_t	  st_ino;		/* inode's number */
@@ -443,14 +475,14 @@ __attribute__((packed))
 ;
 
 /* from <sys/timex.h> */
-typedef u_int32_t netbsd32_ntptimevalp_t;
+typedef netbsd32_pointer_t netbsd32_ntptimevalp_t;
 struct netbsd32_ntptimeval {
 	struct netbsd32_timeval time;	/* current time (ro) */
 	netbsd32_long maxerror;	/* maximum error (us) (ro) */
 	netbsd32_long esterror;	/* estimated error (us) (ro) */
 };
 
-typedef u_int32_t netbsd32_timexp_t;
+typedef netbsd32_pointer_t netbsd32_timexp_t;
 struct netbsd32_timex {
 	unsigned int modes;	/* clock mode bits (wo) */
 	netbsd32_long offset;	/* time offset (us) (rw) */
@@ -478,13 +510,13 @@ struct netbsd32_timex {
 };
 
 /* from <ufs/lfs/lfs.h> */
-typedef u_int32_t netbsd32_block_infop_t;  /* XXX broken */
+typedef netbsd32_pointer_t netbsd32_block_infop_t;  /* XXX broken */
 
 /* from <sys/utsname.h> */
-typedef u_int32_t netbsd32_utsnamep_t;
+typedef netbsd32_pointer_t netbsd32_utsnamep_t;
 
 /* from <compat/common/kern_info_09.c> */
-typedef u_int32_t netbsd32_outsnamep_t;
+typedef netbsd32_pointer_t netbsd32_outsnamep_t;
 
 /* from <arch/sparc{,64}/include/vuid_event.h> */
 typedef struct firm_event32 {
@@ -494,24 +526,8 @@ typedef struct firm_event32 {
 	struct netbsd32_timeval time;
 } Firm_event32;
 
-/*
- * machine depedant section; must define:
- *	struct netbsd32_sigcontext
- *		- 32bit compatibility sigcontext structure for this arch.
- *	netbsd32_sigcontextp_t
- *		- type of pointer to above, normally u_int32_t
- *	void netbsd32_setregs(struct proc *p, struct exec_package *pack,
- *	    u_long stack);
- *	int netbsd32_sigreturn(struct proc *p, void *v,
- *	    register_t *retval);
- *	void netbsd32_sendsig(sig_t catcher, int sig, int mask, u_long code);
- *	char netbsd32_esigcode[], netbsd32_sigcode[]
- *		- the above are abvious
- *
- * pull in the netbsd32 machine dependant header, that may help with the
- * above, or it may be provided via the MD layer itself.
- */
-#include <machine/netbsd32_machdep.h>
+void netbsd32_si_to_si32(siginfo32_t *, siginfo_t *);
+void netbsd32_si32_to_si(siginfo_t *, siginfo32_t *);
 
 /*
  * here are some macros to convert between netbsd32 and sparc64 types.
@@ -521,11 +537,11 @@ typedef struct firm_event32 {
 #define NETBSD32TO64(s32uap, uap, name) \
 	    SCARG(uap, name) = SCARG(s32uap, name)
 #define NETBSD32TOP(s32uap, uap, name, type) \
-	    SCARG(uap, name) = (type *)(u_long)(u_int)SCARG(s32uap, name)
+	    SCARG(uap, name) = (type *)NETBSD32PTR64(SCARG(s32uap, name))
 #define NETBSD32TOX(s32uap, uap, name, type) \
 	    SCARG(uap, name) = (type)SCARG(s32uap, name)
 #define NETBSD32TOX64(s32uap, uap, name, type) \
-	    SCARG(uap, name) = (type)(u_long)SCARG(s32uap, name)
+	    SCARG(uap, name) = (type)(long)SCARG(s32uap, name)
 
 /* and some standard versions */
 #define	NETBSD32TO64_UAP(name)		NETBSD32TO64(uap, &ua, name);
@@ -533,7 +549,7 @@ typedef struct firm_event32 {
 #define	NETBSD32TOX_UAP(name, type)	NETBSD32TOX(uap, &ua, name, type);
 #define	NETBSD32TOX64_UAP(name, type)	NETBSD32TOX64(uap, &ua, name, type);
 
-int	coredump_netbsd32(struct proc *, struct vnode *, struct ucred *);
+int	coredump_netbsd32(struct lwp *, struct vnode *, struct ucred *);
 
 /*
  * random other stuff
@@ -541,6 +557,9 @@ int	coredump_netbsd32(struct proc *, struct vnode *, struct ucred *);
 #include <compat/common/compat_util.h>
 
 void netbsd32_from_stat43 __P((struct stat43 *, struct netbsd32_stat43 *));
-int netbsd32_execve2(struct proc *, struct sys_execve_args *, register_t *);
+int netbsd32_execve2(struct lwp *, struct sys_execve_args *, register_t *);
  
+#ifdef SYSCTL_SETUP_PROTO
+SYSCTL_SETUP_PROTO(netbsd32_sysctl_emul_setup);
+#endif /* SYSCTL_SETUP_PROTO */
 #endif /* _COMPAT_NETBSD32_NETBSD32_H_ */

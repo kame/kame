@@ -1,4 +1,4 @@
-/*	$NetBSD: bicons.c,v 1.5 2002/01/02 12:57:49 uch Exp $	*/
+/*	$NetBSD: bicons.c,v 1.7 2003/10/22 08:58:38 agc Exp $	*/
 
 /*-
  * Copyright (c) 1999-2001
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: bicons.c,v 1.5 2002/01/02 12:57:49 uch Exp $");
+__KERNEL_RCSID(0, "$NetBSD: bicons.c,v 1.7 2003/10/22 08:58:38 agc Exp $");
 
 #define HALF_FONT
 
@@ -121,8 +121,6 @@ int16_t bicons_height;
 static int16_t curs_x;
 static int16_t curs_y;
 
-cdev_decl(biconsdev);
-
 static int bicons_priority;
 int biconscninit(struct consdev *);
 void biconscnprobe(struct consdev *);
@@ -192,12 +190,11 @@ biconscninit(struct consdev *cndev)
 void
 biconscnprobe(struct consdev *cndev)
 {
+	extern const struct cdevsw biconsdev_cdevsw;
 	int maj;
 
 	/* locate the major number */
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == biconsdevopen)
-			break;
+	maj = cdevsw_lookup_major(&biconsdev_cdevsw);
 
 	cndev->cn_dev = makedev(maj, 0);
 	cndev->cn_pri = bicons_priority;
@@ -261,7 +258,7 @@ void
 bicons_puts(char *s)
 {
 	while (*s)
-		biconscnputc(NULL, *s++);
+		biconscnputc(0, *s++);
 }
 
 
@@ -269,7 +266,7 @@ void
 bicons_putn(const char *s, int n)
 {
 	while (0 < n--)
-		biconscnputc(NULL, *s++);
+		biconscnputc(0, *s++);
 }
 
 void

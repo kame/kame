@@ -1,4 +1,4 @@
-/*	$NetBSD: g2bus.c,v 1.2 2002/03/24 18:21:24 uch Exp $	*/
+/*	$NetBSD: g2bus.c,v 1.8 2003/07/15 01:31:38 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 Marcus Comstedt
@@ -32,6 +32,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: g2bus.c,v 1.8 2003/07/15 01:31:38 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -46,18 +50,14 @@ int	g2busmatch(struct device *, struct cfdata *, void *);
 void	g2busattach(struct device *, struct device *, void *);
 int	g2busprint(void *, const char *);
 
-struct cfattach g2bus_ca = {
-	sizeof(struct g2bus_softc), g2busmatch, g2busattach
-};
+CFATTACH_DECL(g2bus, sizeof(struct g2bus_softc),
+    g2busmatch, g2busattach, NULL, NULL);
 
 int	g2bussearch(struct device *, struct cfdata *, void *);
 
 int
 g2busmatch(struct device *parent, struct cfdata *cf, void *aux)
 {
-
-	if (strcmp("g2bus", cf->cf_driver->cd_name))
-		return (0);
 
         return (1);
 }
@@ -90,7 +90,7 @@ int
 g2bussearch(struct device *parent, struct cfdata *cf, void *aux)
 {
 
-	if ((*cf->cf_attach->ca_match)(parent, cf, aux) > 0)
+	if (config_match(parent, cf, aux) > 0)
 		config_attach(parent, cf, aux, g2busprint);
 
 	return (0);

@@ -1,4 +1,4 @@
-/* $NetBSD: sci.c,v 1.26 2002/05/19 15:10:47 msaitoh Exp $ */
+/* $NetBSD: sci.c,v 1.35 2003/08/07 16:29:28 agc Exp $ */
 
 /*-
  * Copyright (C) 1999 T.Horiuchi and SAITOH Masanobu.  All rights reserved.
@@ -74,11 +74,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -102,6 +98,9 @@
  *
  * This code is derived from both z8530tty.c and com.c
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sci.c,v 1.35 2003/08/07 16:29:28 agc Exp $");
 
 #include "opt_kgdb.h"
 #include "opt_sci.h"
@@ -257,13 +256,24 @@ struct callout sci_soft_ch = CALLOUT_INITIALIZER;
 
 u_int sci_rbuf_size = SCI_RING_SIZE;
 
-struct cfattach sci_ca = {
-	sizeof(struct sci_softc), sci_match, sci_attach
-};
+CFATTACH_DECL(sci, sizeof(struct sci_softc),
+    sci_match, sci_attach, NULL, NULL);
 
 extern struct cfdriver sci_cd;
 
-cdev_decl(sci);
+dev_type_open(sciopen);
+dev_type_close(sciclose);
+dev_type_read(sciread);
+dev_type_write(sciwrite);
+dev_type_ioctl(sciioctl);
+dev_type_stop(scistop);
+dev_type_tty(scitty);
+dev_type_poll(scipoll);
+
+const struct cdevsw sci_cdevsw = {
+	sciopen, sciclose, sciread, sciwrite, sciioctl,
+	scistop, scitty, scipoll, nommap, ttykqfilter, D_TTY
+};
 
 void InitializeSci (unsigned int);
 
@@ -323,9 +333,6 @@ void
 sci_putc(unsigned char c)
 {
 
-	if (c == '\n')
-		sci_putc('\r');
-
 	/* wait for ready */
 	while ((SHREG_SCSSR & SCSSR_TDRE) == NULL)
 		;
@@ -384,7 +391,7 @@ static int
 sci_match(struct device *parent, struct cfdata *cfp, void *aux)
 {
 
-	if (strcmp(cfp->cf_driver->cd_name, "sci")
+	if (strcmp(cfp->cf_name, "sci")
 	    || cfp->cf_unit >= SCI_MAX_UNITS) //XXX __BROKEN_CONFIG_UNIT_USAGE
 		return 0;
 
@@ -1378,9 +1385,7 @@ scicnprobe(cp)
 	int maj;
 
 	/* locate the major number */
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == sciopen)
-			break;
+	maj = cdevsw_lookup_major(&sci_cdevsw);
 
 	/* Initialize required fields. */
 	cp->cn_dev = makedev(maj, 0);

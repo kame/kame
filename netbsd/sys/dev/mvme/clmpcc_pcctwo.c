@@ -1,4 +1,4 @@
-/*	$NetBSD: clmpcc_pcctwo.c,v 1.1 2002/02/12 20:38:40 scw Exp $	*/
+/*	$NetBSD: clmpcc_pcctwo.c,v 1.8 2003/11/09 14:26:15 he Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2002 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * Cirrus Logic CD2401 4-channel serial chip. PCCchip2 Front-end.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: clmpcc_pcctwo.c,v 1.8 2003/11/09 14:26:15 he Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -77,16 +80,16 @@ void clmpcc_pcctwo_attach __P((struct device *, struct device *, void *));
 void clmpcc_pcctwo_iackhook __P((struct clmpcc_softc *, int));
 void clmpcc_pcctwo_consiackhook __P((struct clmpcc_softc *, int));
 
-struct cfattach clmpcc_pcctwo_ca = {
-	sizeof(struct clmpcc_softc), clmpcc_pcctwo_match, clmpcc_pcctwo_attach
-};
+CFATTACH_DECL(clmpcc_pcctwo, sizeof(struct clmpcc_softc),
+    clmpcc_pcctwo_match, clmpcc_pcctwo_attach, NULL, NULL);
 
 extern struct cfdriver clmpcc_cd;
 
+extern const struct cdevsw clmpcc_cdevsw;
+
 /*
- * For clmpccopen() and clmpcccn*()
+ * For clmpcccn*()
  */
-cdev_decl(clmpcc);
 cons_decl(clmpcc);
 
 
@@ -171,12 +174,12 @@ clmpcc_pcctwo_iackhook(sc, which)
 	case CLMPCC_IACK_TX:
 		offset = PCC2REG_SCC_TX_PIACK;
 		break;
-#ifdef DEBUG
 	default:
+#ifdef DEBUG
 		printf("%s: Invalid IACK number '%d'\n",
 		    sc->sc_dev.dv_xname, which);
-		panic("clmpcc_pcctwo_iackhook");
 #endif
+		panic("clmpcc_pcctwo_iackhook %d", which);
 	}
 
 	foo = pcc2_reg_read(sys_pcctwo, offset);
@@ -206,12 +209,13 @@ clmpcc_pcctwo_consiackhook(sc, which)
 	case CLMPCC_IACK_TX:
 		offset = PCC2REG_SCC_TX_PIACK;
 		break;
-#ifdef DEBUG
 	default:
+#ifdef DEBUG
 		printf("%s: Invalid IACK number '%d'\n",
 		    sc->sc_dev.dv_xname, which);
 		panic("clmpcc_pcctwo_consiackhook");
 #endif
+		panic("clmpcc_pcctwo_iackhook %d", which);
 	}
 
 #ifdef MVME68K
@@ -255,10 +259,7 @@ clmpcccnprobe(cp)
 	/*
 	 * Locate the major number
 	 */
-	for (maj = 0; maj < nchrdev; maj++) {
-		if (cdevsw[maj].d_open == clmpccopen)
-			break;
-	}
+	maj = cdevsw_lookup_major(&clmpcc_cdevsw);
 
 	/* Initialize required fields. */
 	cp->cn_dev = makedev(maj, 0);

@@ -1,6 +1,6 @@
-#	$NetBSD: std.integrator,v 1.5 2002/01/30 03:59:40 thorpej Exp $
+#	$NetBSD: std.integrator,v 1.12 2003/09/06 11:38:39 rearnsha Exp $
 #
-# standard NetBSD/netwinder options
+# standard NetBSD/integrator options
 
 machine	evbarm arm
 
@@ -14,8 +14,9 @@ options 	EXEC_ELF32
 # To support easy transit to ../arch/arm/arm32
 options 	ARM32
 
-options		__OLD_INTERRUPT_CODE	# XXX for now
+#options 	ARM32_NEW_VM_LAYOUT	# Not yet ready for prime-time
 
-makeoptions	LOADADDRESS="0xa0100000"
-makeoptions	LINKENTRY="-e 0x10000"
 makeoptions	BOARDTYPE="integrator"
+makeoptions	BOARDMKFRAG="${THISARM}/conf/mk.integrator"
+
+options 	ARM_INTR_IMPL="<arch/evbarm/ifpga/ifpga_intr.h>"

@@ -1,4 +1,4 @@
-/*      $NetBSD: rtc.c,v 1.5 2001/05/13 16:55:40 chs Exp $        */
+/*      $NetBSD: rtc.c,v 1.8 2003/07/15 02:59:33 lukem Exp $        */
 /*
  * Copyright (c) 1998 Darrin Jewell
  * Copyright (c) 1997 Rolf Grossmann 
@@ -38,10 +38,14 @@
  * Darrin B Jewell <jewell@mit.edu>  Tue Jan 27 20:59:25 1998
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rtc.c,v 1.8 2003/07/15 02:59:33 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/cdefs.h>          /* for __P */
 #include <sys/systm.h>          /* for panic */
 
+#include <machine/bus.h>
 #include <machine/cpu.h>
 
 #include <dev/clock_subr.h>
@@ -49,6 +53,7 @@
 #include <next68k/next68k/rtc.h>
 
 #include <next68k/dev/clockreg.h>
+#include <next68k/dev/intiovar.h>
 
 /* #define RTC_DEBUG */
 
@@ -233,7 +238,7 @@ poweroff(void)
 	
 	printf("....................."); /* @@@ work around some sort of bug. */
 
-	panic("Failed to poweroff!\n");
+	panic("Failed to poweroff!");
 }
 
 

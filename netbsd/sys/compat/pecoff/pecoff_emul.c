@@ -1,4 +1,4 @@
-/*	$NetBSD: pecoff_emul.c,v 1.1 2002/03/25 06:44:46 kent Exp $	*/
+/*	$NetBSD: pecoff_emul.c,v 1.10 2003/12/20 19:01:30 fvdl Exp $	*/
 
 /*
  * Copyright (c) 2000 Masaru OKI
@@ -37,9 +37,13 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pecoff_emul.c,v 1.1 2002/03/25 06:44:46 kent Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pecoff_emul.c,v 1.10 2003/12/20 19:01:30 fvdl Exp $");
 
 /*#define DEBUG_PECOFF*/
+
+#ifdef _KERNEL_OPT
+#include "opt_syscall_debug.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -71,6 +75,8 @@ void syscall_intern(struct proc *);
 void syscall(void);
 #endif
 
+struct uvm_object *emul_pecoff_object;
+
 const struct emul emul_pecoff = {
 	"pecoff",
 	"/emul/pecoff",
@@ -78,7 +84,7 @@ const struct emul emul_pecoff = {
 	EMUL_HAS_SYS___syscall,
 	0,
 	PECOFF_SYS_syscall,
-	PECOFF_SYS_MAXSYSCALL,
+	PECOFF_SYS_NSYSENT,
 #endif
 	pecoff_sysent,
 #ifdef SYSCALL_DEBUG
@@ -88,9 +94,13 @@ const struct emul emul_pecoff = {
 #endif
 	sendsig,
 	trapsignal,
+	NULL,
 	sigcode,
 	esigcode,
+	&emul_pecoff_object,
 	setregs,
+	NULL,
+	NULL,
 	NULL,
 	NULL,
 	NULL,
@@ -99,4 +109,6 @@ const struct emul emul_pecoff = {
 #else
 	syscall,
 #endif
+	NULL,
+	NULL,
 };

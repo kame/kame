@@ -1,4 +1,4 @@
-/*	$NetBSD: be.c,v 1.31.6.1 2002/11/22 17:39:21 tron Exp $	*/
+/*	$NetBSD: be.c,v 1.42.2.1 2004/07/10 13:27:49 tron Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -64,7 +64,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: be.c,v 1.31.6.1 2002/11/22 17:39:21 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: be.c,v 1.42.2.1 2004/07/10 13:27:49 tron Exp $");
 
 #include "opt_ddb.h"
 #include "opt_inet.h"
@@ -130,7 +130,7 @@ __KERNEL_RCSID(0, "$NetBSD: be.c,v 1.31.6.1 2002/11/22 17:39:21 tron Exp $");
 struct be_softc {
 	struct	device	sc_dev;
 	struct	sbusdev sc_sd;		/* sbus device */
-	bus_space_tag_t	sc_bustag;	/* bus & dma tags */
+	bus_space_tag_t	sc_bustag;	/* bus & DMA tags */
 	bus_dma_tag_t	sc_dmatag;
 	bus_dmamap_t	sc_dmamap;
 	struct	ethercom sc_ethercom;
@@ -168,6 +168,9 @@ struct be_softc {
 
 	/* MAC address */
 	u_int8_t sc_enaddr[6];
+#ifdef BEDEBUG
+	int	sc_debug;
+#endif
 };
 
 int	bematch __P((struct device *, struct cfdata *, void *));
@@ -216,9 +219,8 @@ void	be_intphy_status __P((struct be_softc *));
 int	be_intphy_service __P((struct be_softc *, struct mii_data *, int));
 
 
-struct cfattach be_ca = {
-	sizeof(struct be_softc), bematch, beattach
-};
+CFATTACH_DECL(be, sizeof(struct be_softc),
+    bematch, beattach, NULL, NULL);
 
 int
 bematch(parent, cf, aux)
@@ -228,7 +230,7 @@ bematch(parent, cf, aux)
 {
 	struct sbus_attach_args *sa = aux;
 
-	return (strcmp(cf->cf_driver->cd_name, sa->sa_name) == 0);
+	return (strcmp(cf->cf_name, sa->sa_name) == 0);
 }
 
 void
@@ -249,7 +251,6 @@ beattach(parent, self, aux)
 	int instance;
 	int rseg, error;
 	u_int32_t v;
-	extern void myetheraddr __P((u_char *));
 
 	if (sa->sa_nreg < 3) {
 		printf("%s: only %d register sets\n",
@@ -291,16 +292,16 @@ beattach(parent, self, aux)
 	sc->sc_qec = qec;
 	sc->sc_qr = qec->sc_regs;
 
-	sc->sc_rev = PROM_getpropint(node, "board-version", -1);
+	sc->sc_rev = prom_getpropint(node, "board-version", -1);
 	printf(" rev %x", sc->sc_rev);
 
 	bestop(sc);
 
-	sc->sc_channel = PROM_getpropint(node, "channel#", -1);
+	sc->sc_channel = prom_getpropint(node, "channel#", -1);
 	if (sc->sc_channel == -1)
 		sc->sc_channel = 0;
 
-	sc->sc_burst = PROM_getpropint(node, "burst-sizes", -1);
+	sc->sc_burst = prom_getpropint(node, "burst-sizes", -1);
 	if (sc->sc_burst == -1)
 		sc->sc_burst = qec->sc_burst;
 
@@ -310,9 +311,9 @@ beattach(parent, self, aux)
 	/* Establish interrupt handler */
 	if (sa->sa_nintr)
 		(void)bus_intr_establish(sa->sa_bustag, sa->sa_pri, IPL_NET,
-					 0, beintr, sc);
+					 beintr, sc);
 
-	myetheraddr(sc->sc_enaddr);
+	prom_getether(node, sc->sc_enaddr);
 	printf(" address %s\n", ether_sprintf(sc->sc_enaddr));
 
 	/*
@@ -480,6 +481,9 @@ beattach(parent, self, aux)
 		IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
 	IFQ_SET_READY(&ifp->if_snd);
 
+	/* claim 802.1q capability */
+	sc->sc_ethercom.ec_capabilities |= ETHERCAP_VLAN_MTU;
+
 	/* Attach the interface. */
 	if_attach(ifp);
 	ether_ifattach(ifp, sc->sc_enaddr);
@@ -584,11 +588,12 @@ be_read(sc, idx, len)
 	struct mbuf *m;
 
 	if (len <= sizeof(struct ether_header) ||
-	    len > ETHERMTU + sizeof(struct ether_header)) {
-
-		printf("%s: invalid packet size %d; dropping\n",
-			ifp->if_xname, len);
-
+	    len > ETHER_MAX_LEN + ETHERCAP_VLAN_MTU) {
+#ifdef BEDEBUG
+		if (sc->sc_debug)
+			printf("%s: invalid packet size %d; dropping\n",
+				ifp->if_xname, len);
+#endif
 		ifp->if_ierrors++;
 		return;
 	}
@@ -796,7 +801,7 @@ beqint(sc, why)
 	if (why & (BE_CR_STAT_TXLERR | BE_CR_STAT_TXPERR | BE_CR_STAT_TXSERR)) {
 		r |= 1;
 		rst = 1;
-		printf("%s: tx dma error ( ", sc->sc_dev.dv_xname);
+		printf("%s: tx DMA error ( ", sc->sc_dev.dv_xname);
 		if (why & BE_CR_STAT_TXLERR)
 			printf("Late ");
 		if (why & BE_CR_STAT_TXPERR)
@@ -821,7 +826,7 @@ beqint(sc, why)
 	if (why & (BE_CR_STAT_RXLERR | BE_CR_STAT_RXPERR | BE_CR_STAT_RXSERR)) {
 		r |= 1;
 		rst = 1;
-		printf("%s: rx dma error ( ", sc->sc_dev.dv_xname);
+		printf("%s: rx DMA error ( ", sc->sc_dev.dv_xname);
 		if (why & BE_CR_STAT_RXLERR)
 			printf("Late ");
 		if (why & BE_CR_STAT_RXPERR)
@@ -1164,6 +1169,13 @@ beinit(sc)
 	bus_space_write_4(t, cr, BE_CRI_BMASK, 0);
 	bus_space_write_4(t, cr, BE_CRI_CCNT, 0);
 
+	/* Set max packet length */
+	v = ETHER_MAX_LEN;
+	if (sc->sc_ethercom.ec_capenable & ETHERCAP_VLAN_MTU)
+		v += ETHER_VLAN_ENCAP_LEN;
+	bus_space_write_4(t, br, BE_BRI_RXMAX, v);
+	bus_space_write_4(t, br, BE_BRI_TXMAX, v);
+
 	/* Enable transmitter */
 	bus_space_write_4(t, br, BE_BRI_TXCFG,
 			  BE_BR_TXCFG_FIFO | BE_BR_TXCFG_ENABLE);
@@ -1213,7 +1225,7 @@ be_mcreset(sc)
 
 	ETHER_FIRST_MULTI(step, ec, enm);
 	while (enm != NULL) {
-		if (bcmp(enm->enm_addrlo, enm->enm_addrhi, ETHER_ADDR_LEN)) {
+		if (memcmp(enm->enm_addrlo, enm->enm_addrhi, ETHER_ADDR_LEN)) {
 			/*
 			 * We must listen to a range of multicast
 			 * addresses.  For now, just accept all

@@ -1,4 +1,4 @@
-/* $NetBSD: if_ie.c,v 1.5.10.2 2003/01/28 05:38:39 jmc Exp $ */
+/* $NetBSD: if_ie.c,v 1.13 2003/07/14 22:48:26 lukem Exp $ */
 
 /*
  * Copyright (c) 1995 Melvin Tang-Richardson.
@@ -52,6 +52,9 @@
  *	version.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ie.c,v 1.13 2003/07/14 22:48:26 lukem Exp $");
+
 #define IGNORE_ETHER1_IDROM_CHECKSUM
 
 /* Standard podule includes */
@@ -61,7 +64,7 @@
 
 #include <sys/param.h>
 
-__RCSID("$NetBSD: if_ie.c,v 1.5.10.2 2003/01/28 05:38:39 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ie.c,v 1.13 2003/07/14 22:48:26 lukem Exp $");
 
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -200,9 +203,8 @@ static void start_receiver(struct ie_softc *);
  * Our cfattach structure for the autoconfig system to chew on
  */
 
-struct cfattach ie_ca = {
-	sizeof(struct ie_softc), ieprobe, ieattach
-};
+CFATTACH_DECL(ie, sizeof(struct ie_softc),
+    ieprobe, ieattach, NULL, NULL);
 
 /* Let's go! */
 
@@ -486,7 +488,7 @@ void ieattach ( struct device *parent, struct device *self, void *aux )
 	if (irq_claim(sc->sc_podule->interrupt, &sc->sc_ih)) {
 		sc->sc_irqmode = 0;
 		printf(" POLLED");
-		panic("%s: Cannot install IRQ handler\n", sc->sc_dev.dv_xname);
+		panic("%s: Cannot install IRQ handler", sc->sc_dev.dv_xname);
 	} else {
 		sc->sc_irqmode = 1;
 		printf(" IRQ");

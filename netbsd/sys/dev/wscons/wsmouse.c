@@ -1,4 +1,4 @@
-/* $NetBSD: wsmouse.c,v 1.22 2001/11/22 00:57:14 augustss Exp $ */
+/* $NetBSD: wsmouse.c,v 1.34 2003/11/28 13:19:46 drochner Exp $ */
 
 /*
  * Copyright (c) 1996, 1997 Christopher G. Demetriou.  All rights reserved.
@@ -51,11 +51,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -79,7 +75,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: wsmouse.c,v 1.22 2001/11/22 00:57:14 augustss Exp $");
+__KERNEL_RCSID(0, "$NetBSD: wsmouse.c,v 1.34 2003/11/28 13:19:46 drochner Exp $");
 
 #include "wsmouse.h"
 #include "wsdisplay.h"
@@ -152,16 +148,22 @@ static int  wsmousedoioctl(struct device *, u_long, caddr_t, int, struct proc *)
 
 static int  wsmousedoopen(struct wsmouse_softc *, struct wseventvar *);
 
-struct cfattach wsmouse_ca = {
-	sizeof (struct wsmouse_softc), wsmouse_match, wsmouse_attach,
-	wsmouse_detach, wsmouse_activate
-};
+CFATTACH_DECL(wsmouse, sizeof (struct wsmouse_softc),
+    wsmouse_match, wsmouse_attach, wsmouse_detach, wsmouse_activate);
 
-#if NWSMOUSE > 0
 extern struct cfdriver wsmouse_cd;
-#endif /* NWSMOUSE > 0 */
 
-cdev_decl(wsmouse);
+dev_type_open(wsmouseopen);
+dev_type_close(wsmouseclose);
+dev_type_read(wsmouseread);
+dev_type_ioctl(wsmouseioctl);
+dev_type_poll(wsmousepoll);
+dev_type_kqfilter(wsmousekqfilter);
+
+const struct cdevsw wsmouse_cdevsw = {
+	wsmouseopen, wsmouseclose, wsmouseread, nowrite, wsmouseioctl,
+	nostop, notty, wsmousepoll, nommap, wsmousekqfilter,
+};
 
 #if NWSMUX > 0
 struct wssrcops wsmouse_srcops = {
@@ -178,7 +180,7 @@ wsmousedevprint(void *aux, const char *pnp)
 {
 
 	if (pnp)
-		printf("wsmouse at %s", pnp);
+		aprint_normal("wsmouse at %s", pnp);
 	return (UNCONF);
 }
 
@@ -270,9 +272,7 @@ wsmouse_detach(struct device  *self, int flags)
 	}
 
 	/* locate the major number */
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == wsmouseopen)
-			break;
+	maj = cdevsw_lookup_major(&wsmouse_cdevsw);
 
 	/* Nuke the vnodes for any open instances (calls close). */
 	mn = self->dv_unit;
@@ -465,14 +465,6 @@ wsmouseopen(dev_t dev, int flags, int mode, struct proc *p)
 		return (0);			/* always allow open for write
 						   so ioctl() is possible. */
 
-#if NWSMUX > 0
-	if (sc->sc_base.me_parent != NULL) {
-		/* Grab the mouse out of the greedy hands of the mux. */
-		DPRINTF(("wsmouseopen: detach\n"));
-		wsmux_detach_sc(&sc->sc_base);
-	}
-#endif
-
 	if (sc->sc_base.me_evp != NULL)
 		return (EBUSY);
 
@@ -589,6 +581,14 @@ wsmouse_do_ioctl(struct wsmouse_softc *sc, u_long cmd, caddr_t data,
 		sc->sc_base.me_evp->async = *(int *)data != 0;
 		return (0);
 
+	case FIOSETOWN:
+		if (sc->sc_base.me_evp == NULL)
+			return (EINVAL);
+		if (-*(int *)data != sc->sc_base.me_evp->io->p_pgid
+		    && *(int *)data != sc->sc_base.me_evp->io->p_pid)
+			return (EPERM);
+		return (0);
+
 	case TIOCSPGRP:
 		if (sc->sc_base.me_evp == NULL)
 			return (EINVAL);
@@ -603,7 +603,7 @@ wsmouse_do_ioctl(struct wsmouse_softc *sc, u_long cmd, caddr_t data,
 	 */
 	error = (*sc->sc_accessops->ioctl)(sc->sc_accesscookie, cmd,
 	    data, flag, p);
-	return (error != -1 ? error : ENOTTY);
+	return (error); /* may be EPASSTHROUGH */
 }
 
 int
@@ -614,6 +614,16 @@ wsmousepoll(dev_t dev, int events, struct proc *p)
 	if (sc->sc_base.me_evp == NULL)
 		return (EINVAL);
 	return (wsevent_poll(sc->sc_base.me_evp, events, p));
+}
+
+int
+wsmousekqfilter(dev_t dev, struct knote *kn)
+{
+	struct wsmouse_softc *sc = wsmouse_cd.cd_devs[minor(dev)];
+
+	if (sc->sc_base.me_evp == NULL)
+		return (1);
+	return (wsevent_kqfilter(sc->sc_base.me_evp, kn));
 }
 
 #if NWSMUX > 0

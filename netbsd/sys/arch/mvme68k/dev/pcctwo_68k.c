@@ -1,4 +1,4 @@
-/*	$NetBSD: pcctwo_68k.c,v 1.1 2002/02/12 20:38:25 scw Exp $	*/
+/*	$NetBSD: pcctwo_68k.c,v 1.4 2003/07/15 02:43:47 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2002 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * PCCchip2 and MCchip Mvme68k Front End Driver
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pcctwo_68k.c,v 1.4 2003/07/15 02:43:47 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -60,9 +63,8 @@
 void pcctwoattach(struct device *, struct device *, void *);
 int pcctwomatch(struct device *, struct cfdata *, void *);
 
-struct cfattach pcctwo_ca = {
-	sizeof(struct pcctwo_softc), pcctwomatch, pcctwoattach
-};
+CFATTACH_DECL(pcctwo, sizeof(struct pcctwo_softc),
+    pcctwomatch, pcctwoattach, NULL, NULL);
 
 extern struct cfdriver pcctwo_cd;
 

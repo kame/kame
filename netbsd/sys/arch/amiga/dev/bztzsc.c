@@ -1,4 +1,4 @@
-/*	$NetBSD: bztzsc.c,v 1.17 2002/01/28 09:56:52 aymeric Exp $ */
+/*	$NetBSD: bztzsc.c,v 1.21 2004/02/13 11:36:09 wiz Exp $ */
 
 /*
  * Copyright (c) 1997 Michael L. Hitch
@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: bztzsc.c,v 1.17 2002/01/28 09:56:52 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: bztzsc.c,v 1.21 2004/02/13 11:36:09 wiz Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -55,6 +55,8 @@ __KERNEL_RCSID(0, "$NetBSD: bztzsc.c,v 1.17 2002/01/28 09:56:52 aymeric Exp $");
 #include <sys/proc.h>
 #include <sys/user.h>
 #include <sys/queue.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <dev/scsipi/scsi_all.h>
 #include <dev/scsipi/scsipi_all.h>
@@ -75,9 +77,8 @@ void	bztzscattach(struct device *, struct device *, void *);
 int	bztzscmatch(struct device *, struct cfdata *, void *);
 
 /* Linkup to the rest of the kernel */
-struct cfattach bztzsc_ca = {
-	sizeof(struct bztzsc_softc), bztzscmatch, bztzscattach
-};
+CFATTACH_DECL(bztzsc, sizeof(struct bztzsc_softc),
+    bztzscmatch, bztzscattach, NULL, NULL);
 
 /*
  * Functions and the switch for the MI code.
@@ -352,7 +353,7 @@ bztzsc_dma_setup(struct ncr53c9x_softc *sc, caddr_t *addr, size_t *len,
 	 * DMA can be nasty for high-speed serial input, so limit the
 	 * size of this DMA operation if the serial port is running at
 	 * a high speed (higher than 19200 for now - should be adjusted
-	 * based on cpu type and speed?).
+	 * based on CPU type and speed?).
 	 * XXX - add serial speed check XXX
 	 */
 	if (ser_open_speed > 19200 && bztzsc_max_dma != 0 &&
@@ -360,7 +361,7 @@ bztzsc_dma_setup(struct ncr53c9x_softc *sc, caddr_t *addr, size_t *len,
 		bsc->sc_dmasize = bztzsc_max_dma;
 	ptr = *addr;			/* Kernel virtual address */
 	pa = kvtop(ptr);		/* Physical address of DMA */
-	xfer = min(bsc->sc_dmasize, NBPG - (pa & (NBPG - 1)));
+	xfer = min(bsc->sc_dmasize, PAGE_SIZE - (pa & (PAGE_SIZE - 1)));
 	bsc->sc_xfr_align = 0;
 	/*
 	 * If output and unaligned, stuff odd byte into FIFO
@@ -385,10 +386,10 @@ bztzsc_dma_setup(struct ncr53c9x_softc *sc, caddr_t *addr, size_t *len,
 	while (xfer < bsc->sc_dmasize) {
 		if ((pa + xfer) != kvtop(*addr + xfer))
 			break;
-		if ((bsc->sc_dmasize - xfer) < NBPG)
+		if ((bsc->sc_dmasize - xfer) < PAGE_SIZE)
 			xfer = bsc->sc_dmasize;
 		else
-			xfer += NBPG;
+			xfer += PAGE_SIZE;
 ++bztzsc_cnt_dma3;
 	}
 if (xfer != *len)

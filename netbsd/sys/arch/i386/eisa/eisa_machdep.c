@@ -1,4 +1,4 @@
-/*	$NetBSD: eisa_machdep.c,v 1.14 2001/11/15 07:03:28 lukem Exp $	*/
+/*	$NetBSD: eisa_machdep.c,v 1.21 2003/10/30 21:19:54 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -72,7 +72,9 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: eisa_machdep.c,v 1.14 2001/11/15 07:03:28 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: eisa_machdep.c,v 1.21 2003/10/30 21:19:54 fvdl Exp $");
+
+#include "ioapic.h"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -82,20 +84,27 @@ __KERNEL_RCSID(0, "$NetBSD: eisa_machdep.c,v 1.14 2001/11/15 07:03:28 lukem Exp 
 #include <sys/device.h>
 #include <sys/extent.h>
 
-#define _I386_BUS_DMA_PRIVATE
+#define _X86_BUS_DMA_PRIVATE
 #include <machine/bus.h>
 
-#include <i386/isa/icu.h>
 #include <dev/isa/isareg.h>
 #include <dev/isa/isavar.h>
 #include <dev/eisa/eisavar.h>
+
+#if NIOAPIC > 0
+#include <machine/i82093var.h>
+#include <machine/mpbiosvar.h>
+#endif
 
 /*
  * EISA doesn't have any special needs; just use the generic versions
  * of these funcions.
  */
-struct i386_bus_dma_tag eisa_bus_dma_tag = {
+struct x86_bus_dma_tag eisa_bus_dma_tag = {
 	0,			/* _bounce_thresh */
+	0,			/* _bounce_alloc_lo */
+	0,			/* _bounce_alloc_hi */
+	NULL,			/* _may_bounce */
 	_bus_dmamap_create,
 	_bus_dmamap_destroy,
 	_bus_dmamap_load,
@@ -144,8 +153,7 @@ eisa_intr_map(ec, irq, ihp)
 	u_int irq;
 	eisa_intr_handle_t *ihp;
 {
-
-	if (irq >= ICU_LEN) {
+	if (irq >= NUM_LEGACY_IRQS) {
 		printf("eisa_intr_map: bad IRQ %d\n", irq);
 		*ihp = -1;
 		return 1;
@@ -154,6 +162,19 @@ eisa_intr_map(ec, irq, ihp)
 		printf("eisa_intr_map: changed IRQ 2 to IRQ 9\n");
 		irq = 9;
 	}
+
+#if NIOAPIC > 0
+
+	if (mp_busses != NULL) {
+		if (intr_find_mpmapping(mp_eisa_bus, irq, ihp) == 0 ||
+		    intr_find_mpmapping(mp_isa_bus, irq, ihp) == 0) {
+			*ihp |= irq;
+			return 0;
+		} else
+			printf("eisa_intr_map: no MP mapping found\n");
+	}
+	printf("eisa_intr_map: no MP mapping found\n");
+#endif
 
 	*ihp = irq;
 	return 0;
@@ -166,10 +187,20 @@ eisa_intr_string(ec, ih)
 {
 	static char irqstr[8];		/* 4 + 2 + NULL + sanity */
 
-	if (ih == 0 || ih >= ICU_LEN || ih == 2)
-		panic("eisa_intr_string: bogus handle 0x%x\n", ih);
+	if (ih == 0 || (ih & 0xff) >= NUM_LEGACY_IRQS || ih == 2)
+		panic("eisa_intr_string: bogus handle 0x%x", ih);
 
+#if NIOAPIC > 0
+	if (ih & APIC_INT_VIA_APIC)
+		sprintf(irqstr, "apic %d int %d (irq %d)",
+		    APIC_IRQ_APIC(ih),
+		    APIC_IRQ_PIN(ih),
+		    ih&0xff);
+	else
+		sprintf(irqstr, "irq %d", ih&0xff);
+#else
 	sprintf(irqstr, "irq %d", ih);
+#endif
 	return (irqstr);
 	
 }
@@ -189,11 +220,28 @@ eisa_intr_establish(ec, ih, type, level, func, arg)
 	int type, level, (*func) __P((void *));
 	void *arg;
 {
+	int pin, irq;
+	struct pic *pic;
 
-	if (ih == 0 || ih >= ICU_LEN || ih == 2)
-		panic("eisa_intr_establish: bogus handle 0x%x\n", ih);
+	pic = &i8259_pic;
+	pin = irq = ih;
 
-	return isa_intr_establish(NULL, ih, type, level, func, arg);
+#if NIOAPIC > 0
+	if (ih & APIC_INT_VIA_APIC) {
+		pic = (struct pic *)ioapic_find(APIC_IRQ_APIC(ih));
+		if (pic == NULL) {
+			printf("eisa_intr_establish: bad ioapic %d\n",
+			    APIC_IRQ_APIC(ih));
+			return NULL;
+		}
+		pin = APIC_IRQ_PIN(ih);
+		irq = APIC_IRQ_LEGACY_IRQ(ih);
+		if (irq < 0 || irq >= NUM_LEGACY_IRQS)
+			irq = -1;
+	}
+#endif
+
+	return intr_establish(irq, pic, pin, type, level, func, arg);
 }
 
 void
@@ -202,7 +250,7 @@ eisa_intr_disestablish(ec, cookie)
 	void *cookie;
 {
 
-	isa_intr_disestablish(NULL, cookie);
+	intr_disestablish(cookie);
 }
 
 int

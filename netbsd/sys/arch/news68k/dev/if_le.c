@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le.c,v 1.3 2001/05/30 12:28:47 mrg Exp $	*/
+/*	$NetBSD: if_le.c,v 1.8 2003/07/15 02:59:26 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -39,6 +39,9 @@
 /*
  * news68k/dev/if_le.c - based on newsmips/dev/if_le.c
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_le.c,v 1.8 2003/07/15 02:59:26 lukem Exp $");
 
 #include "opt_inet.h"
 #include "bpfilter.h"
@@ -86,12 +89,11 @@ struct	le_softc {
 	struct	lereg1 *sc_r1;		/* LANCE registers */
 };
 
-static int	le_match __P((struct device *, struct cfdata *, void *));
-static void	le_attach __P((struct device *, struct device *, void *));
+static int  le_match(struct device *, struct cfdata *, void *);
+static void le_attach(struct device *, struct device *, void *);
 
-struct cfattach le_ca = {
-	sizeof(struct le_softc), le_match, le_attach
-};
+CFATTACH_DECL(le, sizeof(struct le_softc),
+    le_match, le_attach, NULL, NULL);
 
 extern volatile u_char *lance_mem, *idrom_addr;
 
@@ -107,9 +109,9 @@ extern volatile u_char *lance_mem, *idrom_addr;
 #define hide		static
 #endif
 
-hide void lewrcsr __P((struct lance_softc *, u_int16_t, u_int16_t));
-hide u_int16_t lerdcsr __P((struct lance_softc *, u_int16_t));  
-int leintr __P((int));
+hide void lewrcsr(struct lance_softc *, u_int16_t, u_int16_t);
+hide u_int16_t lerdcsr(struct lance_softc *, u_int16_t);
+int leintr(int);
 
 hide void
 lewrcsr(sc, port, val)
@@ -133,7 +135,7 @@ lerdcsr(sc, port)
 	ler1->ler1_rap = port;
 	val = ler1->ler1_rdp;
 	return (val);
-} 
+}
 
 int
 le_match(parent, cf, aux)

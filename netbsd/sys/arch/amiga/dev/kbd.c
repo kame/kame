@@ -1,4 +1,4 @@
-/*	$NetBSD: kbd.c,v 1.39 2002/03/17 19:40:31 atatat Exp $ */
+/*	$NetBSD: kbd.c,v 1.46 2003/09/21 19:16:48 jdolecek Exp $ */
 
 /*
  * Copyright (c) 1982, 1986, 1990 The Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kbd.c,v 1.39 2002/03/17 19:40:31 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kbd.c,v 1.46 2003/09/21 19:16:48 jdolecek Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -48,6 +44,7 @@ __KERNEL_RCSID(0, "$NetBSD: kbd.c,v 1.39 2002/03/17 19:40:31 atatat Exp $");
 #include <sys/kernel.h>
 #include <sys/syslog.h>
 #include <sys/signalvar.h>
+#include <sys/conf.h>
 #include <dev/cons.h>
 #include <machine/cpu.h>
 #include <amiga/amiga/device.h>
@@ -135,10 +132,6 @@ static struct wskbd_mapdata kbd_mapdata = {
 
 #endif /* WSKBD */
 
-
-#include <sys/conf.h>
-#include <machine/conf.h>
-
 struct kbd_softc {
 	int k_event_mode;	/* if true, collect events, else pass to ite */
 	struct evvar k_events;	/* event queue state */
@@ -165,8 +158,19 @@ int drkbdputc(u_int8_t);
 int drkbdputc2(u_int8_t, u_int8_t);
 int drkbdwaitfor(int);
 
-struct cfattach kbd_ca = {
-	sizeof(struct device), kbdmatch, kbdattach
+CFATTACH_DECL(kbd, sizeof(struct device),
+    kbdmatch, kbdattach, NULL, NULL);
+
+dev_type_open(kbdopen);
+dev_type_close(kbdclose);
+dev_type_read(kbdread);
+dev_type_ioctl(kbdioctl);
+dev_type_poll(kbdpoll);
+dev_type_kqfilter(kbdkqfilter);
+
+const struct cdevsw kbd_cdevsw = {
+	kbdopen, kbdclose, kbdread, nowrite, kbdioctl,
+	nostop, notty, kbdpoll, nommap, kbdkqfilter,
 };
 
 /*ARGSUSED*/
@@ -301,7 +305,7 @@ kbdenable(void)
 
 #ifdef DRACO
 /*
- * call this with kbd interupt blocked
+ * call this with kbd interrupt blocked
  */
 
 int
@@ -487,6 +491,12 @@ kbdioctl(dev_t dev, u_long cmd, register caddr_t data, int flag,
 			k->k_events.ev_async = *(int *)data != 0;
 			return 0;
 
+		case FIOSETOWN:
+			if (-*(int *)data != k->k_events.ev_io->p_pgid
+			    && *(int *)data != k->k_events.ev_io->p_pid)
+				return EPERM;
+			return 0;
+
 		case TIOCSPGRP:
 			if (*(int *)data != k->k_events.ev_io->p_pgid)
 				return EPERM;
@@ -506,6 +516,14 @@ kbdpoll(dev_t dev, int events, struct proc *p)
 	return ev_poll (&kbd_softc.k_events, events, p);
 }
 
+int
+kbdkqfilter(dev, kn)
+	dev_t dev;
+	struct knote *kn;
+{
+
+	return (ev_kqfilter(&kbd_softc.k_events, kn));
+}
 
 void
 kbdintr(int mask)

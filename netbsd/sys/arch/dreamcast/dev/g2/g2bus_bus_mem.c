@@ -1,4 +1,4 @@
-/*	$NetBSD: g2bus_bus_mem.c,v 1.5 2002/03/03 14:31:29 uch Exp $	*/
+/*	$NetBSD: g2bus_bus_mem.c,v 1.9 2003/08/24 17:33:29 marcus Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -46,6 +46,7 @@
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
+__KERNEL_RCSID(0, "$NetBSD: g2bus_bus_mem.c,v 1.9 2003/08/24 17:33:29 marcus Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h> 
@@ -73,9 +74,43 @@ void	g2bus_bus_mem_write_4(void *, bus_space_handle_t, bus_size_t,
 
 void	g2bus_bus_mem_read_region_1(void *, bus_space_handle_t, bus_size_t,
 	    u_int8_t *, bus_size_t);
+void	g2bus_bus_mem_read_region_2(void *, bus_space_handle_t, bus_size_t,
+	    u_int16_t *, bus_size_t);
+void	g2bus_bus_mem_read_region_4(void *, bus_space_handle_t, bus_size_t,
+	    u_int32_t *, bus_size_t);
 
 void	g2bus_bus_mem_write_region_1(void *, bus_space_handle_t, bus_size_t,
 	    const u_int8_t *, bus_size_t);
+void	g2bus_bus_mem_write_region_2(void *, bus_space_handle_t, bus_size_t,
+	    const u_int16_t *, bus_size_t);
+void	g2bus_bus_mem_write_region_4(void *, bus_space_handle_t, bus_size_t,
+	    const u_int32_t *, bus_size_t);
+
+void	g2bus_bus_mem_set_region_4(void *, bus_space_handle_t, bus_size_t,
+	    u_int32_t, bus_size_t);
+
+u_int8_t g2bus_sparse_bus_mem_read_1(void *, bus_space_handle_t, bus_size_t);
+u_int16_t g2bus_sparse_bus_mem_read_2(void *, bus_space_handle_t, bus_size_t);
+u_int32_t g2bus_sparse_bus_mem_read_4(void *, bus_space_handle_t, bus_size_t);
+
+void	g2bus_sparse_bus_mem_write_1(void *, bus_space_handle_t, bus_size_t,
+	    u_int8_t);
+void	g2bus_sparse_bus_mem_write_2(void *, bus_space_handle_t, bus_size_t,
+	    u_int16_t);
+void	g2bus_sparse_bus_mem_write_4(void *, bus_space_handle_t, bus_size_t,
+	    u_int32_t);
+
+void	g2bus_sparse_bus_mem_read_region_1(void *, bus_space_handle_t,
+	    bus_size_t, u_int8_t *, bus_size_t);
+
+void	g2bus_sparse_bus_mem_write_region_1(void *, bus_space_handle_t,
+	    bus_size_t, const u_int8_t *, bus_size_t);
+
+void	g2bus_sparse_bus_mem_read_multi_1(void *, bus_space_handle_t,
+	    bus_size_t, u_int8_t *, bus_size_t);
+
+void	g2bus_sparse_bus_mem_write_multi_1(void *, bus_space_handle_t,
+	    bus_size_t, const u_int8_t *, bus_size_t);
 
 void
 g2bus_bus_mem_init(struct g2bus_softc *sc)
@@ -96,8 +131,14 @@ g2bus_bus_mem_init(struct g2bus_softc *sc)
 	t->dbs_w_4 = g2bus_bus_mem_write_4;
 
 	t->dbs_rr_1 = g2bus_bus_mem_read_region_1;
+	t->dbs_rr_2 = g2bus_bus_mem_read_region_2;
+	t->dbs_rr_4 = g2bus_bus_mem_read_region_4;
 
 	t->dbs_wr_1 = g2bus_bus_mem_write_region_1;
+	t->dbs_wr_2 = g2bus_bus_mem_write_region_2;
+	t->dbs_wr_4 = g2bus_bus_mem_write_region_4;
+
+	t->dbs_sr_4 = g2bus_bus_mem_set_region_4;
 }
 
 int
@@ -124,30 +165,34 @@ g2bus_bus_mem_unmap(void *v, bus_space_handle_t sh, bus_size_t size)
  * The following paired macros will take the necessary precautions.
  */
 
-#define G2_LOCK								\
-	do {								\
-		_cpu_exception_suspend();				\
-		/* suspend any G2 DMA here... */			\
-		while((*(volatile unsigned int *)0xa05f688c) & 32);	\
-	} while(/*CONSTCOND*/0)
+#define G2LOCK_DECL							\
+	int __s
 
-#define G2_UNLOCK							\
+#define G2_LOCK()							\
+	do {								\
+		__s = _cpu_intr_suspend();				\
+		/* suspend any G2 DMA here... */			\
+		while ((*(__volatile u_int32_t *)0xa05f688c) & 0x20)	\
+			;						\
+	} while (/*CONSTCOND*/0)
+
+#define G2_UNLOCK()							\
 	do {								\
 		/* resume any G2 DMA here... */				\
-		_cpu_exception_resume(0);				\
-	} while(/*CONSTCOND*/0)
-
+		_cpu_intr_resume(__s);					\
+	} while (/*CONSTCOND*/0)
 
 u_int8_t
 g2bus_bus_mem_read_1(void *v, bus_space_handle_t sh, bus_size_t off)
 {
+	G2LOCK_DECL;
 	u_int8_t rv;
 
-	G2_LOCK;
+	G2_LOCK();
 
 	rv = *(__volatile u_int8_t *)(sh + off);
 
-	G2_UNLOCK;
+	G2_UNLOCK();
 
 	return (rv);
 }
@@ -155,13 +200,14 @@ g2bus_bus_mem_read_1(void *v, bus_space_handle_t sh, bus_size_t off)
 u_int16_t
 g2bus_bus_mem_read_2(void *v, bus_space_handle_t sh, bus_size_t off)
 {
+	G2LOCK_DECL;
 	u_int16_t rv;
 
-	G2_LOCK;
+	G2_LOCK();
 
 	rv = *(__volatile u_int16_t *)(sh + off);
 
-	G2_UNLOCK;
+	G2_UNLOCK();
 
 	return (rv);
 }
@@ -169,13 +215,14 @@ g2bus_bus_mem_read_2(void *v, bus_space_handle_t sh, bus_size_t off)
 u_int32_t
 g2bus_bus_mem_read_4(void *v, bus_space_handle_t sh, bus_size_t off)
 {
+	G2LOCK_DECL;
 	u_int32_t rv;
 
-	G2_LOCK;
+	G2_LOCK();
 
 	rv = *(__volatile u_int32_t *)(sh + off);
 
-	G2_UNLOCK;
+	G2_UNLOCK();
 
 	return (rv);
 }
@@ -184,62 +231,311 @@ void
 g2bus_bus_mem_write_1(void *v, bus_space_handle_t sh, bus_size_t off,
     u_int8_t val)
 {
+	G2LOCK_DECL;
 
-	G2_LOCK;
+	G2_LOCK();
 
 	*(__volatile u_int8_t *)(sh + off) = val;
 
-	G2_UNLOCK;
+	G2_UNLOCK();
 }
 
 void
 g2bus_bus_mem_write_2(void *v, bus_space_handle_t sh, bus_size_t off,
     u_int16_t val)
 {
+	G2LOCK_DECL;
 
-	G2_LOCK;
+	G2_LOCK();
 
 	*(__volatile u_int16_t *)(sh + off) = val;
 
-	G2_UNLOCK;
+	G2_UNLOCK();
 }
 
 void
 g2bus_bus_mem_write_4(void *v, bus_space_handle_t sh, bus_size_t off,
     u_int32_t val)
 {
+	G2LOCK_DECL;
 
-	G2_LOCK;
+	G2_LOCK();
 
 	*(__volatile u_int32_t *)(sh + off) = val;
 
-	G2_UNLOCK;
+	G2_UNLOCK();
 }
 
 void
 g2bus_bus_mem_read_region_1(void *v, bus_space_handle_t sh, bus_size_t off,
     u_int8_t *addr, bus_size_t len)
 {
+	G2LOCK_DECL;
 	__volatile const u_int8_t *baddr = (u_int8_t *)(sh + off);
 
-	G2_LOCK;
+	G2_LOCK();
 
 	while (len--)
 		*addr++ = *baddr++;
 
-	G2_UNLOCK;
+	G2_UNLOCK();
+}
+
+void
+g2bus_bus_mem_read_region_2(void *v, bus_space_handle_t sh, bus_size_t off,
+    u_int16_t *addr, bus_size_t len)
+{
+	G2LOCK_DECL;
+	__volatile const u_int16_t *baddr = (u_int16_t *)(sh + off);
+
+	G2_LOCK();
+
+	while (len--)
+		*addr++ = *baddr++;
+
+	G2_UNLOCK();
+}
+
+void
+g2bus_bus_mem_read_region_4(void *v, bus_space_handle_t sh, bus_size_t off,
+    u_int32_t *addr, bus_size_t len)
+{
+	G2LOCK_DECL;
+	__volatile const u_int32_t *baddr = (u_int32_t *)(sh + off);
+
+	G2_LOCK();
+
+	while (len--)
+		*addr++ = *baddr++;
+
+	G2_UNLOCK();
 }
 
 void
 g2bus_bus_mem_write_region_1(void *v, bus_space_handle_t sh, bus_size_t off,
     const u_int8_t *addr, bus_size_t len)
 {
+	G2LOCK_DECL;
 	__volatile u_int8_t *baddr = (u_int8_t *)(sh + off);
 
-	G2_LOCK;
+	G2_LOCK();
 
 	while (len--)
 		*baddr++ = *addr++;
 
-	G2_UNLOCK;
+	G2_UNLOCK();
+}
+
+void
+g2bus_bus_mem_write_region_2(void *v, bus_space_handle_t sh, bus_size_t off,
+    const u_int16_t *addr, bus_size_t len)
+{
+	G2LOCK_DECL;
+	__volatile u_int16_t *baddr = (u_int16_t *)(sh + off);
+
+	G2_LOCK();
+
+	while (len--)
+		*baddr++ = *addr++;
+
+	G2_UNLOCK();
+}
+
+void
+g2bus_bus_mem_write_region_4(void *v, bus_space_handle_t sh, bus_size_t off,
+    const u_int32_t *addr, bus_size_t len)
+{
+	G2LOCK_DECL;
+	__volatile u_int32_t *baddr = (u_int32_t *)(sh + off);
+
+	G2_LOCK();
+
+	while (len--)
+		*baddr++ = *addr++;
+
+	G2_UNLOCK();
+}
+
+void
+g2bus_bus_mem_set_region_4(void *v, bus_space_handle_t sh, bus_size_t off,
+    u_int32_t val, bus_size_t len)
+{
+	G2LOCK_DECL;
+	__volatile u_int32_t *baddr = (u_int32_t *)(sh + off);
+
+	G2_LOCK();
+
+	while (len--)
+		*baddr++ = val;
+
+	G2_UNLOCK();
+}
+
+void
+g2bus_set_bus_mem_sparse(bus_space_tag_t memt)
+{
+
+	memt->dbs_r_1 = g2bus_sparse_bus_mem_read_1;
+	memt->dbs_r_2 = g2bus_sparse_bus_mem_read_2;
+	memt->dbs_r_4 = g2bus_sparse_bus_mem_read_4;
+
+	memt->dbs_w_1 = g2bus_sparse_bus_mem_write_1;
+	memt->dbs_w_2 = g2bus_sparse_bus_mem_write_2;
+	memt->dbs_w_4 = g2bus_sparse_bus_mem_write_4;
+
+	memt->dbs_rr_1 = g2bus_sparse_bus_mem_read_region_1;
+
+	memt->dbs_wr_1 = g2bus_sparse_bus_mem_write_region_1;
+
+	memt->dbs_rm_1 = g2bus_sparse_bus_mem_read_multi_1;
+
+	memt->dbs_wm_1 = g2bus_sparse_bus_mem_write_multi_1;
+}
+
+u_int8_t
+g2bus_sparse_bus_mem_read_1(void *v, bus_space_handle_t sh, bus_size_t off)
+{
+	G2LOCK_DECL;
+	u_int8_t rv;
+
+	G2_LOCK();
+
+	rv = *(__volatile u_int8_t *)(sh + (off * 4));
+
+	G2_UNLOCK();
+
+	return (rv);
+}
+
+u_int16_t
+g2bus_sparse_bus_mem_read_2(void *v, bus_space_handle_t sh, bus_size_t off)
+{
+	G2LOCK_DECL;
+	u_int16_t rv;
+
+	G2_LOCK();
+
+	rv = *(__volatile u_int16_t *)(sh + (off * 4));
+
+	G2_UNLOCK();
+
+	return (rv);
+}
+
+u_int32_t
+g2bus_sparse_bus_mem_read_4(void *v, bus_space_handle_t sh, bus_size_t off)
+{
+	G2LOCK_DECL;
+	u_int32_t rv;
+
+	G2_LOCK();
+
+	rv = *(__volatile u_int32_t *)(sh + (off * 4));
+
+	G2_UNLOCK();
+
+	return (rv);
+}
+
+void
+g2bus_sparse_bus_mem_write_1(void *v, bus_space_handle_t sh, bus_size_t off,
+    u_int8_t val)
+{
+	G2LOCK_DECL;
+
+	G2_LOCK();
+
+	*(__volatile u_int8_t *)(sh + (off * 4)) = val;
+
+	G2_UNLOCK();
+}
+
+void
+g2bus_sparse_bus_mem_write_2(void *v, bus_space_handle_t sh, bus_size_t off,
+    u_int16_t val)
+{
+	G2LOCK_DECL;
+
+	G2_LOCK();
+
+	*(__volatile u_int16_t *)(sh + (off * 4)) = val;
+
+	G2_UNLOCK();
+}
+
+void
+g2bus_sparse_bus_mem_write_4(void *v, bus_space_handle_t sh, bus_size_t off,
+    u_int32_t val)
+{
+	G2LOCK_DECL;
+
+	G2_LOCK();
+
+	*(__volatile u_int32_t *)(sh + (off * 4)) = val;
+
+	G2_UNLOCK();
+}
+
+void
+g2bus_sparse_bus_mem_read_region_1(void *v, bus_space_handle_t sh,
+    bus_size_t off, u_int8_t *addr, bus_size_t len)
+{
+	G2LOCK_DECL;
+	__volatile const u_int8_t *baddr = (u_int8_t *)(sh + (off * 4));
+
+	G2_LOCK();
+
+	while (len--) {
+		*addr++ = *baddr;
+		baddr += 4;
+	}
+
+	G2_UNLOCK();
+}
+
+void
+g2bus_sparse_bus_mem_write_region_1(void *v, bus_space_handle_t sh,
+    bus_size_t off, const u_int8_t *addr, bus_size_t len)
+{
+	G2LOCK_DECL;
+	__volatile u_int8_t *baddr = (u_int8_t *)(sh + (off * 4));
+
+	G2_LOCK();
+
+	while (len--) {
+		*baddr = *addr++;
+		baddr += 4;
+	}
+
+	G2_UNLOCK();
+}
+
+void
+g2bus_sparse_bus_mem_read_multi_1(void *v, bus_space_handle_t sh,
+    bus_size_t off, u_int8_t *addr, bus_size_t len)
+{
+	G2LOCK_DECL;
+	__volatile const u_int8_t *baddr = (u_int8_t *)(sh + (off * 4));
+
+	G2_LOCK();
+
+	while (len--)
+		*addr++ = *baddr;
+
+	G2_UNLOCK();
+}
+
+void
+g2bus_sparse_bus_mem_write_multi_1(void *v, bus_space_handle_t sh,
+    bus_size_t off, const u_int8_t *addr, bus_size_t len)
+{
+	G2LOCK_DECL;
+	__volatile u_int8_t *baddr = (u_int8_t *)(sh + (off * 4));
+
+	G2_LOCK();
+
+	while (len--)
+		*baddr = *addr++;
+
+	G2_UNLOCK();
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: bus.h,v 1.9 2001/11/11 01:38:00 isaki Exp $	*/
+/*	$NetBSD: bus.h,v 1.11 2003/06/15 23:09:08 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2001 The NetBSD Foundation, Inc.
@@ -767,6 +767,9 @@ struct uio;
 
 typedef struct x68k_bus_dma		*bus_dma_tag_t;
 typedef struct x68k_bus_dmamap		*bus_dmamap_t;
+
+#define BUS_DMA_TAG_VALID(t)    ((t) != (bus_dma_tag_t)0)
+
 struct x68k_bus_dma {
 	/*
 	 * The `bounce threshold' is checked while we are loading
@@ -912,6 +915,7 @@ int	x68k_bus_dmamem_alloc_range __P((bus_dma_tag_t tag, bus_size_t size,
 #define	BUS_DMA_BUS4		0x080
 #define	BUS_DMA_READ		0x100	/* mapping is device -> memory only */
 #define	BUS_DMA_WRITE		0x200	/* mapping is memory -> device only */
+#define	BUS_DMA_NOCACHE		0x400	/* hint: map non-cached memory */
 
 /*
  * Operations performed by bus_dmamap_sync().

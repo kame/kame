@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_stat.h,v 1.24 2002/03/05 05:45:54 simonb Exp $	*/
+/*	$NetBSD: uvm_stat.h,v 1.29.2.1 2004/05/09 08:55:42 jdc Exp $	*/
 
 /*
  *
@@ -48,60 +48,12 @@
  */
 
 /*
- * counters  [XXX: maybe replace event counters with this]
- */
-
-#define UVMCNT_MASK	0xf			/* rest are private */
-#define UVMCNT_CNT	0			/* normal counter */
-#define UVMCNT_DEV	1			/* device event counter */
-
-struct uvm_cnt {
-	int c;					/* the value */
-	int t;					/* type */
-	struct uvm_cnt *next;			/* global list of cnts */
-	char *name;				/* counter name */
-	void *p;				/* private data */
-};
-
-#ifdef _KERNEL
-
-extern struct uvm_cnt *uvm_cnt_head;
-
-/*
- * counter operations.  assume spl is set ok.
- */
-
-#define UVMCNT_INIT(CNT,TYP,VAL,NAM,PRIV) \
-do { \
-	CNT.c = VAL; \
-	CNT.t = TYP; \
-	CNT.next = uvm_cnt_head; \
-	uvm_cnt_head = &CNT; \
-	CNT.name = NAM; \
-	CNT.p = PRIV; \
-} while (0)
-
-#define UVMCNT_SET(C,V) \
-do { \
-	(C).c = (V); \
-} while (0)
-
-#define UVMCNT_ADD(C,V) \
-do { \
-	(C).c += (V); \
-} while (0)
-
-#define UVMCNT_INCR(C) UVMCNT_ADD(C,1)
-#define UVMCNT_DECR(C) UVMCNT_ADD(C,-1)
-
-#endif /* _KERNEL */
-
-/*
  * history/tracing
  */
 
 struct uvm_history_ent {
 	struct timeval tv; 		/* time stamp */
+	int cpunum;
 	char *fmt; 			/* printf format */
 	size_t fmtlen;			/* length of printf format */
 	char *fn;			/* function name */
@@ -116,8 +68,9 @@ struct uvm_history {
 	LIST_ENTRY(uvm_history) list;	/* link on list of all histories */
 	int n;				/* number of entries */
 	int f; 				/* next free one */
-	struct simplelock l;		/* lock on this history */
+	int unused;			/* old location of struct simplelock */
 	struct uvm_history_ent *e;	/* the malloc'd entries */
+	struct simplelock l;		/* lock on this history */
 };
 
 LIST_HEAD(uvm_history_head, uvm_history);
@@ -169,7 +122,7 @@ do { \
 		    M_WAITOK); \
 	memset((NAME).e, 0, sizeof(struct uvm_history_ent) * (N)); \
 	LIST_INSERT_HEAD(&uvm_histories, &(NAME), list); \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define UVMHIST_INIT_STATIC(NAME,BUF) \
 do { \
@@ -181,7 +134,7 @@ do { \
 	(NAME).e = (struct uvm_history_ent *) (BUF); \
 	memset((NAME).e, 0, sizeof(struct uvm_history_ent) * (NAME).n); \
 	LIST_INSERT_HEAD(&uvm_histories, &(NAME), list); \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #if defined(UVMHIST_PRINT)
 extern int uvmhist_print_enabled;
@@ -191,7 +144,7 @@ do { \
 			uvmhist_print(E); \
 			DELAY(100000); \
 		} \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 #else
 #define UVMHIST_PRINTNOW(E) /* nothing */
 #endif
@@ -206,6 +159,7 @@ do { \
 	splx(_s_); \
 	if (!cold) \
 		microtime(&(NAME).e[_i_].tv); \
+	(NAME).e[_i_].cpunum = cpu_number(); \
 	(NAME).e[_i_].fmt = (FMT); \
 	(NAME).e[_i_].fmtlen = strlen((NAME).e[_i_].fmt); \
 	(NAME).e[_i_].fn = _uvmhist_name; \
@@ -216,7 +170,7 @@ do { \
 	(NAME).e[_i_].v[2] = (u_long)(C); \
 	(NAME).e[_i_].v[3] = (u_long)(D); \
 	UVMHIST_PRINTNOW(&((NAME).e[_i_])); \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define UVMHIST_CALLED(NAME) \
 do { \
@@ -228,21 +182,21 @@ do { \
 		splx(s); \
 	} \
 	UVMHIST_LOG(NAME,"called!", 0, 0, 0, 0); \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define UVMHIST_FUNC(FNAME) \
 	static int _uvmhist_cnt = 0; \
 	static char *_uvmhist_name = FNAME; \
 	int _uvmhist_call;
 
-static __inline void uvmhist_print __P((struct uvm_history_ent *));
+static __inline void uvmhist_print(struct uvm_history_ent *);
 
 static __inline void
 uvmhist_print(e)
 	struct uvm_history_ent *e;
 {
 	printf("%06ld.%06ld ", e->tv.tv_sec, e->tv.tv_usec);
-	printf("%s#%ld: ", e->fn, e->call);
+	printf("%s#%ld@%d: ", e->fn, e->call, e->cpunum);
 	printf(e->fmt, e->v[0], e->v[1], e->v[2], e->v[3]);
 	printf("\n");
 }

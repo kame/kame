@@ -1,4 +1,4 @@
-/*	$NetBSD: tulip.c,v 1.113.4.4 2003/07/28 17:43:14 he Exp $	*/
+/*	$NetBSD: tulip.c,v 1.126 2003/12/18 18:39:36 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000, 2002 The NetBSD Foundation, Inc.
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tulip.c,v 1.113.4.4 2003/07/28 17:43:14 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tulip.c,v 1.126 2003/12/18 18:39:36 thorpej Exp $");
 
 #include "bpfilter.h"
 
@@ -482,6 +482,13 @@ tlp_attach(sc, enaddr)
 	    ether_sprintf(enaddr));
 
 	/*
+	 * Check to see if we're the simulated Ethernet on Connectix
+	 * Virtual PC.
+	 */
+	if (enaddr[0] == 0x00 && enaddr[1] == 0x03 && enaddr[2] == 0xff)
+		sc->sc_flags |= TULIPF_VPC;
+
+	/*
 	 * Initialize our media structures.  This may probe the MII, if
 	 * present.
 	 */
@@ -685,9 +692,9 @@ tlp_start(ifp)
 {
 	struct tulip_softc *sc = ifp->if_softc;
 	struct mbuf *m0, *m;
-	struct tulip_txsoft *txs, *last_txs;
+	struct tulip_txsoft *txs, *last_txs = NULL;
 	bus_dmamap_t dmamap;
-	int error, firsttx, nexttx, lasttx, ofree, seg;
+	int error, firsttx, nexttx, lasttx = 1, ofree, seg;
 
 	DPRINTF(sc, ("%s: tlp_start: sc_flags 0x%08x, if_flags 0x%08x\n",
 	    sc->sc_dev.dv_xname, sc->sc_flags, ifp->if_flags));
@@ -755,6 +762,7 @@ tlp_start(ifp)
 				    sc->sc_dev.dv_xname);
 				break;
 			}
+			MCLAIM(m, &sc->sc_ethercom.ec_tx_mowner);
 			if (m0->m_pkthdr.len > MHLEN) {
 				MCLGET(m, M_DONTWAIT);
 				if ((m->m_flags & M_EXT) == 0) {
@@ -835,6 +843,8 @@ tlp_start(ifp)
 			lasttx = nexttx;
 		}
 
+		KASSERT(lasttx != -1);
+
 		/* Set `first segment' and `last segment' appropriately. */
 		sc->sc_txdescs[sc->sc_txnext].td_ctl |= htole32(TDCTL_Tx_FS);
 		sc->sc_txdescs[lasttx].td_ctl |= htole32(TDCTL_Tx_LS);
@@ -876,7 +886,7 @@ tlp_start(ifp)
 		sc->sc_txfree -= dmamap->dm_nsegs;
 		sc->sc_txnext = nexttx;
 
-		SIMPLEQ_REMOVE_HEAD(&sc->sc_txfreeq, txs, txs_q);
+		SIMPLEQ_REMOVE_HEAD(&sc->sc_txfreeq, txs_q);
 		SIMPLEQ_INSERT_TAIL(&sc->sc_txdirtyq, txs, txs_q);
 
 		last_txs = txs;
@@ -910,6 +920,7 @@ tlp_start(ifp)
 		 * Some clone chips want IC on the *first* segment in
 		 * the packet.  Appease them.
 		 */
+		KASSERT(last_txs != NULL);
 		if ((sc->sc_flags & TULIPF_IC_FS) != 0 &&
 		    last_txs->txs_firstdesc != lasttx) {
 			sc->sc_txdescs[last_txs->txs_firstdesc].td_ctl |=
@@ -948,7 +959,7 @@ tlp_watchdog(ifp)
 	int doing_setup, doing_transmit;
 
 	doing_setup = (sc->sc_flags & TULIPF_DOING_SETUP);
-	doing_transmit = (SIMPLEQ_FIRST(&sc->sc_txdirtyq) != NULL);
+	doing_transmit = (! SIMPLEQ_EMPTY(&sc->sc_txdirtyq));
 
 	if (doing_setup && doing_transmit) {
 		printf("%s: filter setup and transmit timeout\n",
@@ -1032,7 +1043,7 @@ tlp_intr(arg)
 
 #ifdef DEBUG
 	if (TULIP_IS_ENABLED(sc) == 0)
-		panic("%s: tlp_intr: not enabled\n", sc->sc_dev.dv_xname);
+		panic("%s: tlp_intr: not enabled", sc->sc_dev.dv_xname);
 #endif
 
 	/*
@@ -1324,6 +1335,7 @@ tlp_rxintr(sc)
 			    rxs->rxs_dmamap->dm_mapsize, BUS_DMASYNC_PREREAD);
 			continue;
 		}
+		MCLAIM(m, &sc->sc_ethercom.ec_rx_mowner);
 		if (len > (MHLEN - 2)) {
 			MCLGET(m, M_DONTWAIT);
 			if ((m->m_flags & M_EXT) == 0) {
@@ -1350,6 +1362,27 @@ tlp_rxintr(sc)
 		m->m_flags |= M_HASFCS;
 		m->m_pkthdr.rcvif = ifp;
 		m->m_pkthdr.len = m->m_len = len;
+
+		/*
+		 * XXX Work-around for a weird problem with the emulated
+		 * 21041 on Connectix Virtual PC:
+		 *
+		 * When we receive a full-size TCP segment, we seem to get
+		 * a packet there the Rx status says 1522 bytes, yet we do
+		 * not get a frame-too-long error from the chip.  The extra
+		 * bytes seem to always be zeros.  Perhaps Virtual PC is
+		 * inserting 4 bytes of zeros after every packet.  In any
+		 * case, let's try and detect this condition and truncate
+		 * the length so that it will pass up the stack.
+		 */
+		if (__predict_false((sc->sc_flags & TULIPF_VPC) != 0)) {
+			uint16_t etype = ntohs(eh->ether_type);
+
+			if (len > ETHER_MAX_FRAME(ifp, etype,
+						  M_HASFCS))
+				m->m_pkthdr.len = m->m_len = len =
+				    ETHER_MAX_FRAME(ifp, etype, M_HASFCS);
+		}
 
 #if NBPFILTER > 0
 		/*
@@ -1434,7 +1467,7 @@ tlp_txintr(sc)
 		if (txstat & TDSTAT_OWN)
 			break;
 
-		SIMPLEQ_REMOVE_HEAD(&sc->sc_txdirtyq, txs, txs_q);
+		SIMPLEQ_REMOVE_HEAD(&sc->sc_txdirtyq, txs_q);
 
 		sc->sc_txfree += txs->txs_ndescs;
 
@@ -2043,7 +2076,7 @@ tlp_stop(ifp, disable)
 	 * Release any queued transmit buffers.
 	 */
 	while ((txs = SIMPLEQ_FIRST(&sc->sc_txdirtyq)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(&sc->sc_txdirtyq, txs, txs_q);
+		SIMPLEQ_REMOVE_HEAD(&sc->sc_txdirtyq, txs_q);
 		if (txs->txs_mbuf != NULL) {
 			bus_dmamap_unload(sc->sc_dmat, txs->txs_dmamap);
 			m_freem(txs->txs_mbuf);
@@ -2289,6 +2322,7 @@ tlp_add_rxbuf(sc, idx)
 	if (m == NULL)
 		return (ENOBUFS);
 
+	MCLAIM(m, &sc->sc_ethercom.ec_rx_mowner);
 	MCLGET(m, M_DONTWAIT);
 	if ((m->m_flags & M_EXT) == 0) {
 		m_freem(m);
@@ -2437,14 +2471,22 @@ tlp_parse_old_srom(sc, enaddr)
 
 	if (memcmp(&sc->sc_srom[0], &sc->sc_srom[16], 8) != 0) {
 		/*
+		 * Cobalt Networks interfaces simply have the address
+		 * in the first six bytes. The rest is zeroed out
+		 * on some models, but others contain unknown data.
+		 */
+		if (sc->sc_srom[0] == 0x00 &&
+		    sc->sc_srom[1] == 0x10 &&
+		    sc->sc_srom[2] == 0xe0) {
+			memcpy(enaddr, sc->sc_srom, ETHER_ADDR_LEN);
+			return (1);
+		}
+
+		/*
 		 * Some vendors (e.g. ZNYX) don't use the standard
 		 * DEC Address ROM format, but rather just have an
 		 * Ethernet address in the first 6 bytes, maybe a
 		 * 2 byte checksum, and then all 0xff's.
-		 *
-		 * On the other hand, Cobalt Networks interfaces
-		 * simply have the address in the first six bytes
-		 * with the rest zeroed out.
 		 */
 		for (i = 8; i < 32; i++) {
 			if (sc->sc_srom[i] != 0xff &&
@@ -2535,7 +2577,7 @@ tlp_filter_setup(sc)
 	 * If there are transmissions pending, wait until they have
 	 * completed.
 	 */
-	if (SIMPLEQ_FIRST(&sc->sc_txdirtyq) != NULL ||
+	if (! SIMPLEQ_EMPTY(&sc->sc_txdirtyq) ||
 	    (sc->sc_flags & TULIPF_DOING_SETUP) != 0) {
 		sc->sc_flags |= TULIPF_WANT_SETUP;
 		DPRINTF(sc, ("%s: tlp_filter_setup: deferring\n",
@@ -2733,7 +2775,7 @@ tlp_filter_setup(sc)
 	sc->sc_txfree -= 1;
 	sc->sc_txnext = TULIP_NEXTTX(sc->sc_txnext);
 
-	SIMPLEQ_REMOVE_HEAD(&sc->sc_txfreeq, txs, txs_q);
+	SIMPLEQ_REMOVE_HEAD(&sc->sc_txfreeq, txs_q);
 	SIMPLEQ_INSERT_TAIL(&sc->sc_txdirtyq, txs, txs_q);
 
 	/*
@@ -5173,13 +5215,6 @@ tlp_2114x_nway_service(sc, cmd)
 	return (0);
 }
 
-
-#define TULIP_SET(sc, reg, x) \
-        TULIP_WRITE((sc), (reg), TULIP_READ((sc), (reg)) | (x))
-
-#define TULIP_CLR(sc, reg, x) \
-	TULIP_WRITE((sc), (reg), TULIP_READ((sc), (reg)) & ~(x))
-
 void
 tlp_2114x_nway_auto(sc)
 	struct tulip_softc *sc;
@@ -5974,7 +6009,7 @@ tlp_dm9102_tmsw_init(sc)
 		break;
 
 	default:
-		/* Nothing. */
+		opmode = 0;
 		break;
 	}
 

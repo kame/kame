@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_kthread.c,v 1.12 2001/11/12 15:25:10 lukem Exp $	*/
+/*	$NetBSD: kern_kthread.c,v 1.15 2003/01/18 10:06:26 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kern_kthread.c,v 1.12 2001/11/12 15:25:10 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_kthread.c,v 1.15 2003/01/18 10:06:26 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -71,7 +71,7 @@ kthread_create1(void (*func)(void *), void *arg,
 	va_list ap;
 
 	/* First, create the new process. */
-	error = fork1(&proc0, FORK_SHAREVM | FORK_SHARECWD | FORK_SHAREFILES |
+	error = fork1(&lwp0, FORK_SHAREVM | FORK_SHARECWD | FORK_SHAREFILES |
 	    FORK_SHARESIGS, SIGCHLD, NULL, 0, func, arg, NULL, &p2);
 	if (__predict_false(error != 0))
 		return (error);
@@ -82,7 +82,8 @@ kthread_create1(void (*func)(void *), void *arg,
 	 * to init(8) when they exit.  init(8) can easily wait them
 	 * out for us.
 	 */
-	p2->p_flag |= P_INMEM | P_SYSTEM | P_NOCLDWAIT;	/* XXX */
+	p2->p_flag |= P_SYSTEM | P_NOCLDWAIT;
+	LIST_FIRST(&p2->p_lwps)->l_flag |= L_INMEM;
 
 	/* Name it as specified. */
 	va_start(ap, fmt);
@@ -112,7 +113,7 @@ kthread_exit(int ecode)
 		printf("WARNING: thread `%s' (%d) exits with status %d\n",
 		    curproc->p_comm, curproc->p_pid, ecode);
 
-	exit1(curproc, W_EXITCODE(ecode, 0));
+	exit1(curlwp, W_EXITCODE(ecode, 0));
 
 	/*
 	 * XXX Fool the compiler.  Making exit1() __noreturn__ is a can
@@ -164,7 +165,7 @@ kthread_run_deferred_queue(void)
 	kthread_create_now = 1;
 
 	while ((kq = SIMPLEQ_FIRST(&kthread_q)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(&kthread_q, kq, kq_q);
+		SIMPLEQ_REMOVE_HEAD(&kthread_q, kq_q);
 		(*kq->kq_func)(kq->kq_arg);
 		free(kq, M_TEMP);
 	}

@@ -1,4 +1,4 @@
-/*	$NetBSD: smb_trantcp.h,v 1.2 2002/01/04 02:39:45 deberg Exp $	*/
+/*	$NetBSD: smb_trantcp.h,v 1.4 2003/03/24 18:08:51 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 2000-2001, Boris Popov
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * FreeBSD: src/sys/netsmb/smb_trantcp.h,v 1.2 2001/12/10 08:09:49 obrien Exp
+ * FreeBSD: src/sys/netsmb/smb_trantcp.h,v 1.3 2002/09/18 07:38:10 bp Exp
  */
 #ifndef _NETSMB_SMB_TRANTCP_H_
 #define	_NETSMB_SMB_TRANTCP_H_
@@ -69,19 +69,28 @@ struct nbpcb {
 #define	NBF_RECVLOCK	0x0004
 
 	enum nbstate	nbp_state;
-	struct timeval	nbp_timo;
-	int		nbp_sndbuf;
-	int		nbp_rcvbuf;
 	void *		nbp_selectid;
-
-/*	LIST_ENTRY(nbpcb) nbp_link;*/
 };
 
 /*
  * Nominal space allocated per a NETBIOS socket.
  */
-#define	NB_SNDQ		(10 * 1024)
-#define	NB_RCVQ		(20 * 1024)
+#define	NB_SNDQ		(64 * 1024)
+#define	NB_RCVQ		(64 * 1024)
+
+/*
+ * Timeouts used for send/receive. XXX Sysctl this?
+ */
+#define NB_SNDTIMEO	(5 * hz)
+#define NB_RCVTIMEO	(5 * hz)
+
+/*
+ * TCP slowstart presents a problem in conjunction with large
+ * reads.  To ensure a steady stream of ACKs while reading using
+ * large transaction sizes, we call soreceive() with a smaller
+ * buffer size.  See nbssn_recv().
+ */
+#define NB_SORECEIVE_CHUNK	(8 * 1024)
 
 extern struct smb_tran_desc smb_tran_nbtcp_desc;
 

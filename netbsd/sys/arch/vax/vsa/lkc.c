@@ -1,4 +1,4 @@
-/*	$NetBSD: lkc.c,v 1.13 2002/02/25 14:58:09 ad Exp $ */
+/*	$NetBSD: lkc.c,v 1.17 2003/07/15 02:15:07 lukem Exp $ */
 /*
  * Copyright (c) 1998 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -30,6 +30,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: lkc.c,v 1.17 2003/07/15 02:15:07 lukem Exp $");
+
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -60,9 +63,8 @@ struct  lkc_softc {
 	int	ls_lastchar;	/* last key pressed (for repeat) */
 };
 
-struct cfattach lkc_ca = {
-	sizeof(struct lkc_softc), lkc_match, lkc_attach,
-};
+CFATTACH_DECL(lkc, sizeof(struct lkc_softc),
+    lkc_match, lkc_attach, NULL, NULL);
 
 int
 lkc_match(parent, cf, aux)

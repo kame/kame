@@ -1,4 +1,4 @@
-/*	$NetBSD: dpt.c,v 1.31.10.3 2003/08/09 06:42:53 tron Exp $	*/
+/*	$NetBSD: dpt.c,v 1.42 2003/10/25 18:35:42 christos Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 1999, 2000, 2001 The NetBSD Foundation, Inc.
@@ -78,7 +78,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: dpt.c,v 1.31.10.3 2003/08/09 06:42:53 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dpt.c,v 1.42 2003/10/25 18:35:42 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -87,7 +87,6 @@ __KERNEL_RCSID(0, "$NetBSD: dpt.c,v 1.31.10.3 2003/08/09 06:42:53 tron Exp $");
 #include <sys/buf.h>
 #include <sys/endian.h>
 #include <sys/conf.h>
-#include <sys/ioccom.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -139,7 +138,13 @@ static const char * const dpt_cname[] = {
 
 static void	*dpt_sdh;
 
-cdev_decl(dpt);
+dev_type_open(dptopen);
+dev_type_ioctl(dptioctl);
+
+const struct cdevsw dpt_cdevsw = {
+	dptopen, nullclose, noread, nowrite, dptioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
 
 extern struct cfdriver dpt_cd;
 
@@ -342,28 +347,28 @@ dpt_init(struct dpt_softc *sc, const char *intrstr)
 
 	if ((rv = bus_dmamem_alloc(sc->sc_dmat, mapsize,
 	    PAGE_SIZE, 0, &seg, 1, &rseg, BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: unable to allocate CCBs, rv = %d\n",
+		aprint_error("%s: unable to allocate CCBs, rv = %d\n",
 		    sc->sc_dv.dv_xname, rv);
 		return;
 	}
 
 	if ((rv = bus_dmamem_map(sc->sc_dmat, &seg, rseg, mapsize,
 	    (caddr_t *)&sc->sc_ccbs, BUS_DMA_NOWAIT|BUS_DMA_COHERENT)) != 0) {
-		printf("%s: unable to map CCBs, rv = %d\n",
+		aprint_error("%s: unable to map CCBs, rv = %d\n",
 		    sc->sc_dv.dv_xname, rv);
 		return;
 	}
 
 	if ((rv = bus_dmamap_create(sc->sc_dmat, mapsize,
 	    mapsize, 1, 0, BUS_DMA_NOWAIT, &sc->sc_dmamap)) != 0) {
-		printf("%s: unable to create CCB DMA map, rv = %d\n",
+		aprint_error("%s: unable to create CCB DMA map, rv = %d\n",
 		    sc->sc_dv.dv_xname, rv);
 		return;
 	}
 
 	if ((rv = bus_dmamap_load(sc->sc_dmat, sc->sc_dmamap,
 	    sc->sc_ccbs, mapsize, NULL, BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: unable to load CCB DMA map, rv = %d\n",
+		aprint_error("%s: unable to load CCB DMA map, rv = %d\n",
 		    sc->sc_dv.dv_xname, rv);
 		return;
 	}
@@ -386,7 +391,7 @@ dpt_init(struct dpt_softc *sc, const char *intrstr)
 		    BUS_DMA_NOWAIT | BUS_DMA_ALLOCNOW,
 		    &ccb->ccb_dmamap_xfer);
 		if (rv) {
-			printf("%s: can't create ccb dmamap (%d)\n", 
+			aprint_error("%s: can't create ccb dmamap (%d)\n", 
 			    sc->sc_dv.dv_xname, rv);
 			break;
 		}
@@ -398,11 +403,11 @@ dpt_init(struct dpt_softc *sc, const char *intrstr)
 	}
 
 	if (i == 0) {
-		printf("%s: unable to create CCBs\n", sc->sc_dv.dv_xname);
+		aprint_error("%s: unable to create CCBs\n", sc->sc_dv.dv_xname);
 		return;
 	} else if (i != sc->sc_nccbs) {
-		printf("%s: %d/%d CCBs created!\n", sc->sc_dv.dv_xname, i, 
-		    sc->sc_nccbs);
+		aprint_error("%s: %d/%d CCBs created!\n", sc->sc_dv.dv_xname,
+		    i, sc->sc_nccbs);
 		sc->sc_nccbs = i;
 	}
 
@@ -433,10 +438,10 @@ dpt_init(struct dpt_softc *sc, const char *intrstr)
 		if (memcmp(ei->ei_model + 2, dpt_cname[i], 4) == 0)
 			break;
 
-	printf("%s %s (%s)\n", ei->ei_vendor, dpt_cname[i + 1], model);
+	aprint_normal("%s %s (%s)\n", ei->ei_vendor, dpt_cname[i + 1], model);
 
 	if (intrstr != NULL)
-		printf("%s: interrupting at %s\n", sc->sc_dv.dv_xname,
+		aprint_normal("%s: interrupting at %s\n", sc->sc_dv.dv_xname,
 		    intrstr);
 
 	maxchannel = (ec->ec_feat3 & EC_F3_MAX_CHANNEL_MASK) >>
@@ -444,14 +449,14 @@ dpt_init(struct dpt_softc *sc, const char *intrstr)
 	maxtarget = (ec->ec_feat3 & EC_F3_MAX_TARGET_MASK) >>
 	    EC_F3_MAX_TARGET_SHIFT;
 
-	printf("%s: %d queued commands, %d channel(s), adapter on ID(s)", 
+	aprint_normal("%s: %d queued commands, %d channel(s), adapter on ID(s)",
 	    sc->sc_dv.dv_xname, sc->sc_nccbs, maxchannel + 1);
 
 	for (i = 0; i <= maxchannel; i++) {
 		sc->sc_hbaid[i] = ec->ec_hba[3 - i];
-		printf(" %d", sc->sc_hbaid[i]);
+		aprint_normal(" %d", sc->sc_hbaid[i]);
 	}
-	printf("\n");
+	aprint_normal("\n");
 
 	/*
 	 * Reset the SCSI controller chip(s) and bus.  XXX Do we need to do
@@ -685,7 +690,7 @@ dpt_ccb_poll(struct dpt_softc *sc, struct dpt_ccb *ccb)
 
 #ifdef DEBUG
 	if ((ccb->ccb_flg & CCB_PRIVATE) == 0)
-		panic("dpt_ccb_poll: called for non-CCB_PRIVATE request\n");
+		panic("dpt_ccb_poll: called for non-CCB_PRIVATE request");
 #endif
 
 	s = splbio();
@@ -1268,9 +1273,9 @@ dpt_passthrough(struct dpt_softc *sc, struct eata_ucp *ucp, struct proc *proc)
 	struct eata_sp sp;
 	struct eata_cp *cp;
 	struct eata_sg *sg;
-	bus_dmamap_t xfer;
+	bus_dmamap_t xfer = 0; /* XXX: gcc */
 	bus_dma_segment_t *ds;
-	int datain, s, rv, i, uslen;
+	int datain = 0, s, rv = 0, i, uslen; /* XXX: gcc */
 
 	/*
 	 * Get a CCB and fill.
@@ -1334,7 +1339,7 @@ dpt_passthrough(struct dpt_softc *sc, struct eata_ucp *ucp, struct proc *proc)
 	/*
 	 * Start the command and sleep on completion.
 	 */
-	PHOLD(proc);
+	PHOLD(curlwp);	/* XXXJRT curlwp */
 	bus_dmamap_sync(sc->sc_dmat, sc->sc_dmamap, CCB_OFF(sc, ccb), 
 	    sizeof(struct dpt_ccb), BUS_DMASYNC_PREWRITE);
 	s = splbio();
@@ -1344,7 +1349,7 @@ dpt_passthrough(struct dpt_softc *sc, struct eata_ucp *ucp, struct proc *proc)
 		panic("%s: dpt_cmd failed", sc->sc_dv.dv_xname);
 	tsleep(ccb, PWAIT, "dptucmd", 0);
 	splx(s);
-	PRELE(proc);
+	PRELE(curlwp);	/* XXXJRT curlwp */
 
 	/*
 	 * Sync up the DMA map and copy out results.
@@ -1376,11 +1381,4 @@ dpt_passthrough(struct dpt_softc *sc, struct eata_ucp *ucp, struct proc *proc)
 	ucp->ucp_tstatus = (u_int8_t)ccb->ccb_scsi_status;
 	dpt_ccb_free(sc, ccb);
 	return (rv);
-}
-
-int
-dptclose(dev_t dev, int oflags, int devtype, struct proc *p)
-{
-
-	return (0);
 }

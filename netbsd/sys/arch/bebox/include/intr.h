@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.16 2002/02/11 11:19:28 wiz Exp $	*/
+/*	$NetBSD: intr.h,v 1.19 2003/09/03 21:33:32 matt Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -47,7 +47,7 @@
 #define	IPL_NET		5	/* network */
 #define	IPL_SOFTSERIAL	4	/* software serial interrupt */
 #define	IPL_TTY		3	/* terminal */
-#define	IPL_IMP		3	/* memory allocation */
+#define	IPL_VM		3	/* memory allocation */
 #define	IPL_AUDIO	2	/* audio */
 #define	IPL_CLOCK	1	/* clock */
 #define	IPL_HIGH	1	/* everything */
@@ -62,6 +62,7 @@
 
 #ifndef _LOCORE
 
+#define	CLKF_BASEPRI(frame)	((frame)->pri == 0)
 /*
  * Interrupt handler chains.  intr_establish() inserts a handler into
  * the list.  The handler is called with its (single) argument.
@@ -74,13 +75,6 @@ struct intrhand {
 	int	ih_level;
 	int	ih_irq;
 };
-
-void setsoftclock __P((void));
-void clearsoftclock __P((void));
-int  splsoftclock __P((void));
-void setsoftnet   __P((void));
-void clearsoftnet __P((void));
-int  splsoftnet   __P((void));
 
 void do_pending_int __P((void));
 
@@ -186,7 +180,7 @@ set_sint(pending)
 #define splnet()	splraise(imask[IPL_NET])
 #define spltty()	splraise(imask[IPL_TTY])
 #define splclock()	splraise(imask[IPL_CLOCK])
-#define splvm()		splraise(imask[IPL_IMP])
+#define splvm()		splraise(imask[IPL_VM])
 #define	splserial()	splraise(imask[IPL_SERIAL])
 #define splstatclock()	splclock()
 #define	spllowersoftclock() spllower(imask[IPL_SOFTCLOCK])

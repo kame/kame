@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.29 2001/12/02 22:54:27 bouyer Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.40 2003/12/14 05:16:30 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -31,11 +31,16 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.40 2003/12/14 05:16:30 thorpej Exp $");
+
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/device.h>
 #include <sys/reboot.h>
 #include <sys/systm.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/bus.h>
@@ -48,7 +53,6 @@
 #include <dev/scsipi/scsipi_all.h>
 #include <dev/scsipi/scsiconf.h>
 #include <dev/ata/atavar.h>
-#include <dev/ata/wdvar.h>
 #include <dev/ic/wdcvar.h>
 
 void canonicalize_bootpath __P((void));
@@ -82,15 +86,52 @@ cpu_configure()
 	 * Now allow hardware interrupts.
 	 */
 	asm volatile ("mfmsr %0; ori %0,%0,%1; mtmsr %0"
-		      : "=r"(msr) : "K"((u_short)(PSL_EE|PSL_RI)));
+		      : "=r"(msr) : "K"(PSL_EE|PSL_RI));
 }
 
 void
 canonicalize_bootpath()
 {
 	int node;
-	char *p;
+	char *p, *lastp;
 	char last[32];
+
+	/*
+	 * If the bootpath doesn't start with a / then it isn't
+	 * an OFW path and probably is an alias, so look up the alias
+	 * and regenerate the full bootpath so device_register will work.
+	 */
+	if (bootpath[0] != '/' && bootpath[0] != '\0') {
+		int aliases = OF_finddevice("/aliases");
+		char tmpbuf[100];
+		char aliasbuf[256];
+		if (aliases != 0) {
+			char *cp1, *cp2, *cp;
+			char saved_ch = '\0';
+			int len;
+			cp1 = strchr(bootpath, ':');
+			cp2 = strchr(bootpath, ',');
+			cp = cp1;
+			if (cp1 == NULL || (cp2 != NULL && cp2 < cp1))
+				cp = cp2;
+			tmpbuf[0] = '\0';
+			if (cp != NULL) {
+				strcpy(tmpbuf, cp);
+				saved_ch = *cp;
+				*cp = '\0';
+			}
+			len = OF_getprop(aliases, bootpath, aliasbuf,
+			    sizeof(aliasbuf));
+			if (len > 0) {
+				if (aliasbuf[len-1] == '\0')
+					len--;
+				memcpy(bootpath, aliasbuf, len);
+				strcpy(&bootpath[len], tmpbuf);
+			} else {
+				*cp = saved_ch;
+			}
+		}
+	}
 
 	/*
 	 * Strip kernel name.  bootpath contains "OF-path"/"kernel".
@@ -103,7 +144,7 @@ canonicalize_bootpath()
 	while ((node = OF_finddevice(cbootpath)) == -1) {
 		if ((p = strrchr(cbootpath, '/')) == NULL)
 			break;
-		*p = 0;
+		*p = '\0';
 	}
 
 	if (node == -1) {
@@ -122,7 +163,7 @@ canonicalize_bootpath()
 	if ((p = strrchr(cbootpath, '/')) != NULL)
 		strcpy(last, p + 1);
 	else
-		last[0] = 0;
+		last[0] = '\0';
 
 	memset(cbootpath, 0, sizeof(cbootpath));
 	OF_package_to_path(node, cbootpath, sizeof(cbootpath) - 1);
@@ -131,10 +172,14 @@ canonicalize_bootpath()
 	 * OF_1.x (at least) always returns addr == 0 for
 	 * SCSI disks (i.e. "/bandit@.../.../sd@0,0").
 	 */
-	if ((p = strrchr(cbootpath, '/')) != NULL) {
-		p++;
-		if (strncmp(p, "sd@", 3) == 0 && strncmp(last, "sd@", 3) == 0)
-			strcpy(p, last);
+	lastp = strrchr(cbootpath, '/');
+	if (lastp != NULL) {
+		lastp++;
+		if (strncmp(lastp, "sd@", 3) == 0 
+		    && strncmp(last, "sd@", 3) == 0)
+			strcpy(lastp, last);
+	} else {
+		lastp = cbootpath;
 	}
 
 	/*
@@ -143,21 +188,20 @@ canonicalize_bootpath()
 	 *
 	 * The last component may have no address... so append it.
 	 */
-	p = strrchr(cbootpath, '/');
-	if (p != NULL && strchr(p, '@') == NULL) {
+	if (strchr(lastp, '@') == NULL) {
 		/* Append it. */
 		if ((p = strrchr(last, '@')) != NULL)
 			strcat(cbootpath, p);
 	}
 
-	if ((p = strrchr(cbootpath, ':')) != NULL) {
-		*p++ = 0;
+	if ((p = strrchr(lastp, ':')) != NULL) {
+		*p++ = '\0';
 		/* booted_partition = *p - '0';		XXX correct? */
 	}
 
 	/* XXX Does this belong here, or device_register()? */
-	if ((p = strrchr(cbootpath, ',')) != NULL)
-		*p = 0;
+	if ((p = strrchr(lastp, ',')) != NULL)
+		*p = '\0';
 }
 
 #define DEVICE_IS(dev, name) \
@@ -189,10 +233,11 @@ device_register(dev, aux)
 		return;
 	}
 	if (DEVICE_IS(dev, "atapibus") || DEVICE_IS(dev, "pci") ||
-	    DEVICE_IS(dev, "scsibus"))
+	    DEVICE_IS(dev, "scsibus") || DEVICE_IS(dev, "atabus"))
 		return;
 
 	if (DEVICE_IS(dev->dv_parent, "atapibus") ||
+	    DEVICE_IS(dev->dv_parent, "atabus") ||
 	    DEVICE_IS(dev->dv_parent, "pci") ||
 	    DEVICE_IS(dev->dv_parent, "scsibus")) {
 		if (dev->dv_parent->dv_parent != parent)
@@ -244,7 +289,7 @@ device_register(dev, aux)
 		/* periph_target is target for scsi, drive # for atapi */
 		if (addr != sa->sa_periph->periph_target)
 			return;
-	} else if (DEVICE_IS(dev->dv_parent, "pciide")) {
+	} else if (DEVICE_IS(dev->dv_parent->dv_parent, "pciide")) {
 		struct ata_device *adev = aux;
 
 		if (addr != adev->adev_drv_data->drive)
@@ -261,7 +306,7 @@ device_register(dev, aux)
 			return;
 		if (strtoul(p, &p, 16) != adev->adev_drv_data->drive)
 			return;
-	} else if (DEVICE_IS(dev->dv_parent, "wdc")) {
+	} else if (DEVICE_IS(dev->dv_parent->dv_parent, "wdc")) {
 		struct ata_device *adev = aux;
 
 		if (addr != adev->adev_drv_data->drive)
@@ -281,10 +326,8 @@ device_register(dev, aux)
 			bp++;
 		return;
 	} else {
-#ifdef DEBUG
-		printf("%s -> %s\n", bootpath, dev->dv_xname);
-#endif
 		booted_device = dev;
+		booted_partition = 0; /* XXX -- should be extracted from bootpath */
 		return;
 	}
 }
@@ -330,7 +373,7 @@ OF_interpret(cmd, nreturns, va_alist)
 	ofw_stack();
 	if (nreturns > 8)
 		return -1;
-	if ((i = strlen(cmd)) >= NBPG)
+	if ((i = strlen(cmd)) >= PAGE_SIZE)
 		return -1;
 	ofbcopy(cmd, OF_buf, i + 1);
 	args.cmd = OF_buf;

@@ -1,4 +1,4 @@
-/*	$NetBSD: vidc.h,v 1.3.4.1 2002/06/21 14:49:57 lukem Exp $	*/
+/*	$NetBSD: vidc.h,v 1.7 2003/12/31 14:41:15 bjh21 Exp $	*/
 
 /*
  * Copyright (c) 1994,1995 Mark Brinicombe.
@@ -133,6 +133,11 @@ extern int *vidc_base;
 #define SIR_RIGHT_83  0x06
 #define SIR_RIGHT_100 0x07
 
+#define SCR_SCLR	0x08
+#define SCR_SDAC	0x04
+#define SCR_SERIAL	0x02
+#define SCR_CLKSEL	0x01
+
 /* Video display addresses */
 
 /* Where the display memory is mapped */
@@ -180,8 +185,9 @@ extern int vidc_fref;		/* reference frequency of detected VIDC */
 
 #ifdef _KERNEL
 extern int  vidc_write		__P((u_int /*reg*/, int /*value*/));
-extern void vidc_setstate	__P((struct vidc_state */*vidc*/));
-extern void vidc_setpalette	__P((struct vidc_state */*vidc*/));
+extern void vidc_setstate	__P((struct vidc_state * /*vidc*/));
+extern void vidc_getstate	__P((struct vidc_state * /*vidc*/));
+extern void vidc_setpalette	__P((struct vidc_state * /*vidc*/));
 extern void vidc_stdpalette	__P((void));
 extern int  vidc_col		__P((int /*red*/, int /*green*/, int /*blue*/));
 extern struct vidc_state vidc_current[];

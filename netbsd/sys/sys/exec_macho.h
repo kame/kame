@@ -1,4 +1,4 @@
-/*	$NetBSD: exec_macho.h,v 1.2 2001/07/29 21:23:19 christos Exp $	*/
+/*	$NetBSD: exec_macho.h,v 1.14 2003/10/19 07:52:22 manu Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -39,8 +39,15 @@
 #ifndef _SYS_EXEC_MACHO_H_
 #define	_SYS_EXEC_MACHO_H_
 
+#include <sys/param.h>
+
 #include <machine/int_types.h>
 #include <machine/macho_machdep.h>
+
+/*
+ * CPU supported by a given arch, in sys/arch/<arch>/<arch>/macho_machdep.c
+ */
+extern u_int32_t exec_macho_supported_cpu[];
 
 /*
  * the `fat' binary description
@@ -97,11 +104,11 @@ struct exec_macho_fat_arch {
 #define	MACHO_CPU_SUBTYPE_486		4
 #define	MACHO_CPU_SUBTYPE_486SX		(4 + 128)
 #define	MACHO_CPU_SUBTYPE_586		5
-#define	MACHO_CPU_SUBTYPE_INTEL(f, m)	(f) + ((m) << 4))
-#define	MACHO_CPU_SUBTYPE_PENT		CPU_SUBTYPE_INTEL(5, 0)
-#define	MACHO_CPU_SUBTYPE_PENTPRO	CPU_SUBTYPE_INTEL(6, 1)
-#define	MACHO_CPU_SUBTYPE_PENTII_M3	CPU_SUBTYPE_INTEL(6, 3)
-#define	MACHO_CPU_SUBTYPE_PENTII_M5	CPU_SUBTYPE_INTEL(6, 5)
+#define	MACHO_CPU_SUBTYPE_INTEL(f, m)	((f) + ((m) << 4))
+#define	MACHO_CPU_SUBTYPE_PENT		MACHO_CPU_SUBTYPE_INTEL(5, 0)
+#define	MACHO_CPU_SUBTYPE_PENTPRO	MACHO_CPU_SUBTYPE_INTEL(6, 1)
+#define	MACHO_CPU_SUBTYPE_PENTII_M3	MACHO_CPU_SUBTYPE_INTEL(6, 3)
+#define	MACHO_CPU_SUBTYPE_PENTII_M5	MACHO_CPU_SUBTYPE_INTEL(6, 5)
 #define	MACHO_CPU_SUBTYPE_INTEL_FAMILY(x)	((x) & 15)
 #define	MACHO_CPU_SUBTYPE_INTEL_FAMILY_MAX	15
 #define	MACHO_CPU_SUBTYPE_INTEL_MODEL(x)	((x) >> 4)
@@ -235,6 +242,13 @@ struct exec_macho_thread_command {
 	u_long	count;
 };
 
+struct exec_macho_emul_arg {
+	char *path;
+	char filename[MAXPATHLEN];
+	struct exec_macho_object_header *macho_hdr;
+	int dynamic;
+};
+
 #ifndef _LKM
 #include "opt_execfmt.h"
 #endif
@@ -244,9 +258,8 @@ struct exec_package;
 struct ps_strings;
 u_long	exec_macho_thread_entry(struct exec_macho_thread_command *);
 int	exec_macho_makecmds __P((struct proc *, struct exec_package *));
-int	exec_macho_copyargs __P((struct exec_package *, struct ps_strings *,
-    char **, void *));
-int	exec_macho_setup_stack __P((struct proc *, struct exec_package *));
+int	exec_macho_copyargs __P((struct proc *, struct exec_package *,
+    struct ps_strings *, char **, void *));
 #endif /* _KERNEL */
 
 #endif /* !_SYS_EXEC_MACHO_H_ */

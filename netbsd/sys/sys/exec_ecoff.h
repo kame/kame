@@ -1,4 +1,4 @@
-/*	$NetBSD: exec_ecoff.h,v 1.12 2000/11/21 00:37:56 jdolecek Exp $	*/
+/*	$NetBSD: exec_ecoff.h,v 1.16 2003/08/08 18:54:16 christos Exp $	*/
 
 /*
  * Copyright (c) 1994 Adam Glass
@@ -104,9 +104,8 @@ struct ecoff_exechdr {
 
 #ifdef _KERNEL
 int	exec_ecoff_makecmds __P((struct proc *, struct exec_package *));
-int	exec_ecoff_setup_stack __P((struct proc *, struct exec_package *));
 int	cpu_exec_ecoff_probe __P((struct proc *, struct exec_package *));
-void	cpu_exec_ecoff_setregs __P((struct proc *, struct exec_package *,
+void	cpu_exec_ecoff_setregs __P((struct lwp *, struct exec_package *,
 	    u_long));
 
 int	exec_ecoff_prep_omagic __P((struct proc *, struct exec_package *,

@@ -1,4 +1,4 @@
-/*	$NetBSD: nslm7xvar.h,v 1.8 2002/04/05 16:11:47 bouyer Exp $ */
+/*	$NetBSD: nslm7xvar.h,v 1.11 2003/11/02 11:07:45 wiz Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -69,11 +69,12 @@
 #define LM_ID_MASK	0xFE
 
 /*
- * additionnal registers for the Winbond chips:
+ * additional registers for the Winbond chips:
  * WB83781D: mostly lm7x compatible; extra temp sensors in bank1 & 2
  * WB83782D & WB83627HF: voltage sensors needs different handling, more FAN
  *                       dividers; mode voltage sensors, more temp sensors.
  */
+#define WB_T23ADDR	0x4A	/* temp sens 2/3 I2C addr */
 #define WB_PIN		0x4B	/* pin & fan3 divider */
 #define WB_BANKSEL	0x4E	/* banck select register */
 #define WB_BANKSEL_B0	0x00	/* select bank 0 */
@@ -126,8 +127,12 @@ struct lm_softc {
 	struct	timeval lastread; /* only allow reads every 1.5 seconds */
 	struct	envsys_tre_data sensors[WB_NUM_SENSORS];
 	struct	envsys_basic_info info[WB_NUM_SENSORS];
-	int numsensors;
+	u_int numsensors;
 	void (*refresh_sensor_data) __P((struct lm_softc *));
+
+	int (*lm_banksel)(struct lm_softc *, int);
+	u_int8_t (*lm_readreg)(struct lm_softc *, int);
+	void (*lm_writereg)(struct lm_softc *, int, int);
 
 	struct sysmon_envsys sc_sysmon;
 };

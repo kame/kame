@@ -1,4 +1,4 @@
-/*	$NetBSD: si_obio.c,v 1.22 2001/08/20 12:00:51 wiz Exp $	*/
+/*	$NetBSD: si_obio.c,v 1.28 2004/02/24 15:05:54 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -80,6 +80,9 @@
  * OBIO functions for DMA
  ****************************************************************/
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: si_obio.c,v 1.28 2004/02/24 15:05:54 wiz Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
@@ -132,9 +135,8 @@ static __inline__ int si_obio_udc_read
 static int	si_obio_match __P((struct device *, struct cfdata *, void *));
 static void	si_obio_attach __P((struct device *, struct device *, void *));
 
-struct cfattach si_obio_ca = {
-	sizeof(struct si_softc), si_obio_match, si_obio_attach
-};
+CFATTACH_DECL(si_obio, sizeof(struct si_softc),
+    si_obio_match, si_obio_attach, NULL, NULL);
 
 /*
  * Options for disconnect/reselect, DMA, and interrupts.
@@ -326,7 +328,7 @@ si_obio_dma_setup(ncr_sc)
 
 	/*
 	 * XXX: Reset the FIFO again!  Comment from Sprite:
-	 * Go through reset again becuase of the bug on the 3/50
+	 * Go through reset again because of the bug on the 3/50
 	 * where bytes occasionally linger in the DMA fifo.
 	 */
 	si->si_csr &= ~SI_CSR_FIFO_RES; 	/* active low */
@@ -450,7 +452,7 @@ si_obio_dma_stop(ncr_sc)
 
 	if ((ncr_sc->sc_state & NCR_DOINGDMA) == 0) {
 #ifdef	DEBUG
-		printf("si_dma_stop: dma not running\n");
+		printf("si_dma_stop: DMA not running\n");
 #endif
 		return;
 	}
@@ -485,7 +487,7 @@ si_obio_dma_stop(ncr_sc)
 			if (si->si_csr & SI_CSR_FIFO_EMPTY)
 				break;
 			if (--tmo <= 0) {
-				printf("si: dma fifo did not empty, reset\n");
+				printf("si: DMA FIFO did not empty, reset\n");
 				ncr_sc->sc_state |= NCR_ABORTING;
 				/* si_obio_reset(ncr_sc); */
 				goto out;

@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.29 2002/05/07 04:01:59 thorpej Exp $	*/
+/*	$NetBSD: cpu.h,v 1.34 2004/03/24 15:38:41 wiz Exp $	*/
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc. All rights reserved.
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -72,7 +68,6 @@ extern struct cpu_info cpu_info_store;
  * definitions of cpu-dependent requirements
  * referenced in generic code
  */
-#define	cpu_wait(p)			/* nothing */
 #define	cpu_number()			0
 /*
  * Can't swapout u-area, (__SWAP_BROKEN)
@@ -80,6 +75,7 @@ extern struct cpu_info cpu_info_store;
  */
 #define	cpu_swapin(p)			/* nothing */
 #define	cpu_swapout(p)			panic("cpu_swapout: can't get here");
+#define	cpu_proc_fork(p1, p2)		/* nothing */
 
 /*
  * Arguments to hardclock and gatherstats encapsulate the previous
@@ -111,7 +107,7 @@ struct clockframe {
 do {									\
 	want_resched = 1;						\
 	if (curproc != NULL)						\
-		aston(curproc);						\
+		aston(curproc);					\
 } while (/*CONSTCOND*/0)
 
 /*
@@ -186,11 +182,18 @@ do {									\
 /* SH4 Processor Version Register */
 #define	SH4_PVR_ADDR	0xff000030	/* P4  address */
 #define	SH4_PVR		(*(volatile unsigned int *) SH4_PVR_ADDR)
+#define	SH4_PRR_ADDR	0xff000044	/* P4  address */
+#define	SH4_PRR		(*(volatile unsigned int *) SH4_PRR_ADDR)
 
 #define	SH4_PVR_MASK	0xffffff00
 #define	SH4_PVR_SH7750	0x04020500	/* SH7750  */
 #define	SH4_PVR_SH7750S	0x04020600	/* SH7750S */
+#define	SH4_PVR_SH775xR	0x04050000	/* SH775xR */
 #define	SH4_PVR_SH7751	0x04110000	/* SH7751  */
+
+#define	SH4_PRR_MASK	0xfffffff0
+#define SH4_PRR_7750R	0x00000100	/* SH7750R */
+#define SH4_PRR_7751R	0x00000110	/* SH7751R */
 #endif
 
 /*

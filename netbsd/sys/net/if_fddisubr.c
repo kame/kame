@@ -1,4 +1,4 @@
-/*	$NetBSD: if_fddisubr.c,v 1.43 2001/11/12 23:49:38 lukem Exp $	*/
+/*	$NetBSD: if_fddisubr.c,v 1.52 2004/03/22 18:02:12 matt Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,8 +30,6 @@
  */
 
 /*
- * Copyright (c) 1995, 1996
- *	Matt Thomas <matt@3am-software.com>.  All rights reserved.
  * Copyright (c) 1982, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -43,11 +41,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -68,8 +62,41 @@
  * Id: if_fddisubr.c,v 1.15 1997/03/21 22:35:50 thomas Exp
  */
 
+/*
+ * Copyright (c) 1995, 1996
+ *	Matt Thomas <matt@3am-software.com>.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. The name of its contributor may not be used to endorse or promote
+ *    products derived from this software without specific prior written
+ *    permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)if_fddisubr.c	8.1 (Berkeley) 6/10/93
+ *
+ * Id: if_fddisubr.c,v 1.15 1997/03/21 22:35:50 thomas Exp
+ */
+
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_fddisubr.c,v 1.43 2001/11/12 23:49:38 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_fddisubr.c,v 1.52 2004/03/22 18:02:12 matt Exp $");
 
 #include "opt_inet.h"
 #include "opt_atalk.h"
@@ -77,6 +104,8 @@ __KERNEL_RCSID(0, "$NetBSD: if_fddisubr.c,v 1.43 2001/11/12 23:49:38 lukem Exp $
 #include "opt_llc.h"
 #include "opt_iso.h"
 #include "opt_ns.h"
+#include "opt_ipx.h"
+#include "opt_mbuftrace.h"
 
 #include "bpfilter.h"
 
@@ -107,18 +136,10 @@ __KERNEL_RCSID(0, "$NetBSD: if_fddisubr.c,v 1.43 2001/11/12 23:49:38 lukem Exp $
 #ifdef INET
 #include <netinet/in.h>
 #include <netinet/in_var.h>
-#if defined(__NetBSD__)
 #include <netinet/if_inarp.h>
 #include "opt_gateway.h"
-#else
-#include <netinet/if_ether.h>
 #endif
-#endif
-#if defined(__FreeBSD__)
-#include <netinet/if_fddi.h>
-#else
 #include <net/if_fddi.h>
-#endif
 
 #ifdef IPX
 #include <netipx/ipx.h> 
@@ -181,22 +202,7 @@ extern struct ifqueue pkintrq;
 #define	llc_snap	llc_un.type_snap
 #endif
 
-#if defined(__bsdi__) || defined(__NetBSD__)
-#define	RTALLOC1(a, b)			rtalloc1(a, b)
-#define	ARPRESOLVE(a, b, c, d, e, f)	arpresolve(a, b, c, d, e)
-#define	ETYPEHTONS(t)			(t)
-#elif defined(__FreeBSD__)
-#define	RTALLOC1(a, b)			rtalloc1(a, b, 0UL)
-#define	ARPRESOLVE(a, b, c, d, e, f)	arpresolve(a, b, c, d, e, f)
-#define	ETYPEHTONS(t)			(t)
-#endif
-
-#if defined(__NetBSD__)
 #define	FDDIADDR(ifp)		LLADDR((ifp)->if_sadl)
-#else
-#define	FDDICOM(ifp)		((struct arpcom *)(ifp))
-#define	FDDIADDR(ifp)		(FDDICOM(ifp)->ac_enaddr)
-#endif
 
 static	int fddi_output __P((struct ifnet *, struct mbuf *,
 	    struct sockaddr *, struct rtentry *)); 
@@ -224,12 +230,13 @@ fddi_output(ifp, m0, dst, rt0)
 	ALTQ_DECL(struct altq_pktattr pktattr;)
 	short mflags;
 
+	MCLAIM(m, ifp->if_mowner);
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
 #if !defined(__bsdi__) || _BSDI_VERSION >= 199401
 	if ((rt = rt0) != NULL) {
 		if ((rt->rt_flags & RTF_UP) == 0) {
-			if ((rt0 = rt = RTALLOC1(dst, 1)) != NULL)
+			if ((rt0 = rt = rtalloc1(dst, 1)) != NULL)
 				rt->rt_refcnt--;
 			else 
 				senderr(EHOSTUNREACH);
@@ -239,7 +246,7 @@ fddi_output(ifp, m0, dst, rt0)
 				goto lookup;
 			if (((rt = rt->rt_gwroute)->rt_flags & RTF_UP) == 0) {
 				rtfree(rt); rt = rt0;
-			lookup: rt->rt_gwroute = RTALLOC1(rt->rt_gateway, 1);
+			lookup: rt->rt_gwroute = rtalloc1(rt->rt_gateway, 1);
 				if ((rt = rt->rt_gwroute) == 0)
 					senderr(EHOSTUNREACH);
 			}
@@ -261,26 +268,15 @@ fddi_output(ifp, m0, dst, rt0)
 
 #ifdef INET
 	case AF_INET: {
-#if !defined(__bsdi__) || _BSDI_VERSION >= 199401
-#if defined(__NetBSD__)
 #define SIN(x) ((struct sockaddr_in *)(x))
 		if (m->m_flags & M_BCAST)
                 	bcopy((caddr_t)fddibroadcastaddr, (caddr_t)edst,
 				sizeof(edst));
-
 		else if (m->m_flags & M_MCAST) {
 			ETHER_MAP_IP_MULTICAST(&SIN(dst)->sin_addr,
 			    (caddr_t)edst)
 		} else if (!arpresolve(ifp, rt, m, dst, edst))
-#else
-		if (!ARPRESOLVE(FDDICOM(ifp), rt, m, dst, edst, rt0))
-#endif
 			return (0);	/* if not yet resolved */
-#else
-		int usetrailers;
-		if (!arpresolve(FDDICOM(ifp), m, &((struct sockaddr_in *)dst)->sin_addr, edst, &usetrailers))
-			return (0);	/* if not yet resolved */
-#endif
 		/* If broadcasting on a simplex interface, loopback a copy */
 		if ((m->m_flags & M_BCAST) && (ifp->if_flags & IFF_SIMPLEX))
 			mcopy = m_copy(m, 0, (int)M_COPYALL);
@@ -292,7 +288,7 @@ fddi_output(ifp, m0, dst, rt0)
 	case AF_INET6:
 		if (!nd6_storelladdr(ifp, rt, m, dst, (u_char *)edst)){
 			/* something bad happened */
-			return(0);
+			return (0);
 		}
 		etype = htons(ETHERTYPE_IPV6);
 		break;
@@ -421,15 +417,6 @@ fddi_output(ifp, m0, dst, rt0)
 		l = mtod(m, struct llc *);
 		l->llc_dsap = l->llc_ssap = LLC_ISO_LSAP;
 		l->llc_control = LLC_UI;
-#if defined(__FreeBSD__)
-		IFDEBUG(D_ETHER)
-			int i;
-			printf("unoutput: sending pkt to: ");
-			for (i=0; i<6; i++)
-				printf("%x ", edst[i] & 0xff);
-			printf("\n");
-		ENDDEBUG
-#endif
 		} break;
 #endif /* ISO */
 #ifdef	LLC
@@ -498,7 +485,7 @@ fddi_output(ifp, m0, dst, rt0)
  		bcopy((caddr_t)eh->ether_dhost, (caddr_t)edst, sizeof (edst));
 		if (*edst & 1)
 			m->m_flags |= (M_BCAST|M_MCAST);
-		etype = ETYPEHTONS(eh->ether_type);
+		etype = eh->ether_type;
 		break;
 	}
 
@@ -538,13 +525,8 @@ fddi_output(ifp, m0, dst, rt0)
 	}
 #endif
 	default:
-#if defined(__NetBSD__)
 		printf("%s: can't handle af%d\n", ifp->if_xname,
 		       dst->sa_family);
-#else
-		printf("%s%d: can't handle af%d\n", ifp->if_name, ifp->if_unit,
-		       dst->sa_family);
-#endif
 		senderr(EAFNOSUPPORT);
 	}
 
@@ -624,6 +606,7 @@ fddi_input(ifp, m)
 	struct fddi_header *fh;
 	int s;
 
+	MCLAIM(m, &((struct ethercom *)ifp)->ec_rx_mowner);
 	if ((ifp->if_flags & IFF_UP) == 0) {
 		m_freem(m);
 		return;
@@ -767,11 +750,6 @@ fddi_input(ifp, m)
 				if (m == 0)
 					return;
 				*mtod(m, struct fddi_header *) = *fh;
-#if defined(__FreeBSD__)
-				IFDEBUG(D_ETHER)
-					printf("clnp packet");
-				ENDDEBUG
-#endif
 				schednetisr(NETISR_ISO);
 				inq = &clnlintrq;
 				break;
@@ -852,6 +830,7 @@ fddi_input(ifp, m)
 		IF_ENQUEUE(inq, m);
 	splx(s);
 }
+
 /*
  * Perform common duties while attaching to interface list
  */
@@ -860,6 +839,7 @@ fddi_ifattach(ifp, lla)
 	struct ifnet *ifp;
 	caddr_t lla;
 {
+	struct ethercom *ec = (struct ethercom *)ifp;
 
 	ifp->if_type = IFT_FDDI;
 	ifp->if_addrlen = 6;
@@ -879,6 +859,7 @@ fddi_ifattach(ifp, lla)
 	if (ALIGN(ifp->if_hdrlen) > max_linkhdr)
 		max_linkhdr = ALIGN(ifp->if_hdrlen);
 
+	LIST_INIT(&ec->ec_multiaddrs);
 	if_alloc_sadl(ifp);
 	memcpy(LLADDR(ifp->if_sadl), lla, ifp->if_addrlen);
 
@@ -886,4 +867,17 @@ fddi_ifattach(ifp, lla)
 #if NBPFILTER > 0
 	bpfattach(ifp, DLT_FDDI, sizeof(struct fddi_header));
 #endif /* NBPFILTER > 0 */
+#ifdef MBUFTRACE
+	strlcpy(ec->ec_tx_mowner.mo_name, ifp->if_xname,
+	    sizeof(ec->ec_tx_mowner.mo_name));
+	strlcpy(ec->ec_tx_mowner.mo_descr, "tx",
+	    sizeof(ec->ec_tx_mowner.mo_descr));
+	strlcpy(ec->ec_rx_mowner.mo_name, ifp->if_xname,
+	    sizeof(ec->ec_rx_mowner.mo_name));
+	strlcpy(ec->ec_rx_mowner.mo_descr, "rx",
+	    sizeof(ec->ec_rx_mowner.mo_descr));
+	MOWNER_ATTACH(&ec->ec_tx_mowner);
+	MOWNER_ATTACH(&ec->ec_rx_mowner);
+	ifp->if_mowner = &ec->ec_tx_mowner;
+#endif
 }

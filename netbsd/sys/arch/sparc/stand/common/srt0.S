@@ -1,4 +1,4 @@
-/*	$NetBSD: srt0.S,v 1.7 2001/11/21 21:38:00 uwe Exp $	*/
+/*	$NetBSD: srt0.S,v 1.9 2004/03/23 15:36:08 pk Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -161,6 +161,8 @@ start:
 	b,a	is_sun4cm
 
 is_openfirm:
+	! only javastations have OFW, so we know it is a sun4m
+	mov	CPU_SUN4M, %g4
 	! save address of OpenFirmware client interface handler
 	sethi	%hi(_C_LABEL(romp)), %o1
 	st	%i3, [%o1 + %lo(_C_LABEL(romp))]
@@ -197,6 +199,14 @@ ENTRY(sparc_noop)
 	retl
 	 nop
 
+/*
+ * Openfirmware entry point: openfirmware(void *args)
+ */
+ENTRY(openfirmware)
+	sethi	%hi(_C_LABEL(romp)), %o1
+	ld	[%o1 + %lo(_C_LABEL(romp))], %o2
+	jmp	%o2
+	 nop
 
 #ifdef TIGHT
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: dtop.c,v 1.58 2002/03/17 19:40:48 atatat Exp $	*/
+/*	$NetBSD: dtop.c,v 1.67 2003/08/07 16:29:08 agc Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -94,7 +90,7 @@ SOFTWARE.
 ********************************************************/
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-__KERNEL_RCSID(0, "$NetBSD: dtop.c,v 1.58 2002/03/17 19:40:48 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dtop.c,v 1.67 2003/08/07 16:29:08 agc Exp $");
 
 #include "opt_ddb.h"
 #include "rasterconsole.h"
@@ -114,7 +110,6 @@ __KERNEL_RCSID(0, "$NetBSD: dtop.c,v 1.58 2002/03/17 19:40:48 atatat Exp $");
 #include <dev/tc/ioasicreg.h>
 #include <dev/tc/ioasicvar.h>
 
-#include <machine/conf.h>
 #include <machine/dc7085cons.h>		/*  mdmctl bits same on dtop and dc? */
 
 #include <machine/pmioctl.h>
@@ -204,7 +199,8 @@ static u_char divend[NUMDIVS] = {0xff, 0xa5, 0xbc, 0xbe, 0xb2, 0xaf, 0xa8,
 static u_long keymodes[8] = {0, 0, 0, 0, 0, 0x0003e800, 0, 0};
 
 struct consdev dtopcons = { 
-	NULL, NULL, (void *)dtopKBDGetc, NULL, NULL, NULL, NODEV, 0
+	NULL, NULL, (void *)dtopKBDGetc, NULL, NULL, NULL, NULL, NULL,
+	NODEV, 0
 };
  
 void dtikbd_cnattach __P((void));		/* XXX */
@@ -227,11 +223,24 @@ static int	dtopmatch __P((struct device * parent, struct cfdata *match, void *au
 static void	dtopattach __P((struct device *parent, struct device *self, void *aux));
 static int	dtopintr __P((void *sc));
 
-struct cfattach dtop_ca = {
-	sizeof(struct dtop_softc), dtopmatch, dtopattach
-};
+CFATTACH_DECL(dtop, sizeof(struct dtop_softc),
+    dtopmatch, dtopattach, NULL, NULL);
 
 extern struct cfdriver dtop_cd;
+
+dev_type_open(dtopopen);
+dev_type_close(dtopclose);
+dev_type_read(dtopread);
+dev_type_write(dtopwrite);
+dev_type_ioctl(dtopioctl);
+dev_type_stop(dtopstop);
+dev_type_tty(dtoptty);
+dev_type_poll(dtoppoll);
+
+const struct cdevsw dtop_cdevsw = {
+	dtopopen, dtopclose, dtopread, dtopwrite, dtopioctl,
+	dtopstop, dtoptty, dtoppoll, nommap, ttykqfilter, D_TTY
+};
 
 /* QVSS-compatible in-kernel X input event parser, pointer tracker */
 void	(*dtopDivertXInput) __P((int));
@@ -325,7 +334,8 @@ dtopopen(dev, flag, mode, p)
 		}
 		(void) dtopparam(tp, &tp->t_termios);
 		ttsetwater(tp);
-	} else if ((tp->t_state & TS_XCLUDE) && curproc->p_ucred->cr_uid != 0)
+	} else if ((tp->t_state & TS_XCLUDE)
+	    && curproc->p_ucred->cr_uid != 0)
 		return (EBUSY);
 	s = spltty();
 	while (!(flag & O_NONBLOCK) && !(tp->t_cflag & CLOCAL) &&

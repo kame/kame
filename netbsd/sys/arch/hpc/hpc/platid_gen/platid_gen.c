@@ -1,4 +1,4 @@
-/*	$NetBSD: platid_gen.c,v 1.4 2001/09/27 16:31:24 uch Exp $	*/
+/*	$NetBSD: platid_gen.c,v 1.6 2003/07/15 02:29:28 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999
@@ -33,6 +33,10 @@
  * SUCH DAMAGE.
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: platid_gen.c,v 1.6 2003/07/15 02:29:28 lukem Exp $");
+
 #include <stdio.h>
 #include <strings.h>
 #include <unistd.h>
@@ -193,7 +197,7 @@ main(int argc, char *argv[])
 }
 
 int
-table_getnum(char **table, char *s, int def, int opt)
+table_getnum(char **table, const char *s, int def, int opt)
 {
 	int num;
 

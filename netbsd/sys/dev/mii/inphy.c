@@ -1,4 +1,4 @@
-/*	$NetBSD: inphy.c,v 1.27 2002/03/25 20:51:25 thorpej Exp $	*/
+/*	$NetBSD: inphy.c,v 1.35 2003/04/29 01:49:33 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -72,13 +72,12 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: inphy.c,v 1.27 2002/03/25 20:51:25 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: inphy.c,v 1.35 2003/04/29 01:49:33 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
-#include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/errno.h>
 
@@ -94,10 +93,8 @@ __KERNEL_RCSID(0, "$NetBSD: inphy.c,v 1.27 2002/03/25 20:51:25 thorpej Exp $");
 int	inphymatch(struct device *, struct cfdata *, void *);
 void	inphyattach(struct device *, struct device *, void *);
 
-struct cfattach inphy_ca = {
-	sizeof(struct mii_softc), inphymatch, inphyattach, mii_phy_detach,
-	    mii_phy_activate
-};
+CFATTACH_DECL(inphy, sizeof(struct mii_softc),
+    inphymatch, inphyattach, mii_phy_detach, mii_phy_activate);
 
 int	inphy_service(struct mii_softc *, struct mii_data *, int);
 void	inphy_status(struct mii_softc *);
@@ -109,6 +106,15 @@ const struct mii_phy_funcs inphy_funcs = {
 const struct mii_phydesc inphys[] = {
 	{ MII_OUI_yyINTEL,		MII_MODEL_yyINTEL_I82555,
 	  MII_STR_yyINTEL_I82555 },
+
+	{ MII_OUI_yyINTEL,		MII_MODEL_yyINTEL_I82562EH,
+	  MII_STR_yyINTEL_I82562EH },
+
+	{ MII_OUI_yyINTEL,		MII_MODEL_yyINTEL_I82562EM,
+	  MII_STR_yyINTEL_I82562EM },
+
+	{ MII_OUI_yyINTEL,		MII_MODEL_yyINTEL_I82562ET,
+	  MII_STR_yyINTEL_I82562ET },
 
 	{ 0,				0,
 	  NULL },
@@ -134,7 +140,8 @@ inphyattach(struct device *parent, struct device *self, void *aux)
 	const struct mii_phydesc *mpd;
 
 	mpd = mii_phy_match(ma, inphys);
-	printf(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
+	aprint_naive(": Media interface\n");
+	aprint_normal(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
 
 	sc->mii_inst = mii->mii_instance;
 	sc->mii_phy = ma->mii_phyno;
@@ -147,12 +154,12 @@ inphyattach(struct device *parent, struct device *self, void *aux)
 
 	sc->mii_capabilities =
 	    PHY_READ(sc, MII_BMSR) & ma->mii_capmask;
-	printf("%s: ", sc->mii_dev.dv_xname);
+	aprint_normal("%s: ", sc->mii_dev.dv_xname);
 	if ((sc->mii_capabilities & BMSR_MEDIAMASK) == 0)
-		printf("no media present");
+		aprint_error("no media present");
 	else
 		mii_phy_add_media(sc);
-	printf("\n");
+	aprint_normal("\n");
 }
 
 int
@@ -249,7 +256,7 @@ inphy_status(struct mii_softc *sc)
 			return;
 		}
 		scr = PHY_READ(sc, MII_INPHY_SCR);
-		if (scr & SCR_T4)
+		if ((bmsr & BMSR_100T4) && (scr & SCR_T4))
 			mii->mii_media_active |= IFM_100_T4;
 		else if (scr & SCR_S100)
 			mii->mii_media_active |= IFM_100_TX;

@@ -1,4 +1,4 @@
-/*	$NetBSD: ptrace.h,v 1.25 2002/05/09 15:44:46 thorpej Exp $	*/
+/*	$NetBSD: ptrace.h,v 1.32 2003/08/07 16:34:11 agc Exp $	*/
 
 /*-
  * Copyright (c) 1984, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -48,7 +44,8 @@
 #define	PT_ATTACH	9	/* attach to running process */
 #define	PT_DETACH	10	/* detach from running process */
 #define	PT_IO		11	/* do I/O to/from the stopped process */
-
+#define	PT_DUMPCORE	12	/* make the child generate a core dump */
+#define	PT_LWPINFO	13	/* get info about the LWP */
 #define	PT_FIRSTMACH	32	/* for machine-specific requests */
 #include <machine/ptrace.h>	/* machine-specific requests, if any */
 
@@ -68,6 +65,18 @@ struct ptrace_io_desc {
 #define	PIOD_READ_I	3	/* read from I space */
 #define	PIOD_WRITE_I	4	/* write to I space */
 
+/*
+ * Argument structure for PT_LWPINFO.
+ */
+struct ptrace_lwpinfo {
+	lwpid_t	pl_lwpid;	/* LWP described */
+	int	pl_event;	/* Event that stopped the LWP */
+	/* Add fields at the end */
+};
+
+#define PL_EVENT_NONE	0
+#define PL_EVENT_SIGNAL	1
+
 #ifdef _KERNEL
 
 #if defined(PT_GETREGS) || defined(PT_SETREGS)
@@ -77,33 +86,33 @@ struct reg;
 struct fpreg;
 #endif
 
-int	process_doregs __P((struct proc *, struct proc *, struct uio *));
+int	process_doregs __P((struct proc *, struct lwp *, struct uio *));
 int	process_validregs __P((struct proc *));
 
-int	process_dofpregs __P((struct proc *, struct proc *, struct uio *));
+int	process_dofpregs __P((struct proc *, struct lwp *, struct uio *));
 int	process_validfpregs __P((struct proc *));
 
 int	process_domem __P((struct proc *, struct proc *, struct uio *));
 int	process_checkioperm __P((struct proc *, struct proc *));
 
-void	proc_reparent __P((struct proc *child, struct proc *newparent));
+void	proc_reparent __P((struct proc *, struct proc *));
 #ifdef PT_GETFPREGS
-int	process_read_fpregs __P((struct proc *p, struct fpreg *regs));
+int	process_read_fpregs __P((struct lwp *, struct fpreg *));
 #endif
 #ifdef PT_GETREGS
-int	process_read_regs __P((struct proc *p, struct reg *regs));
+int	process_read_regs __P((struct lwp *, struct reg *));
 #endif
-int	process_set_pc __P((struct proc *p, caddr_t addr));
-int	process_sstep __P((struct proc *p, int sstep));
+int	process_set_pc __P((struct lwp *, caddr_t));
+int	process_sstep __P((struct lwp *, int));
 #ifdef PT_SETFPREGS
-int	process_write_fpregs __P((struct proc *p, struct fpreg *regs));
+int	process_write_fpregs __P((struct lwp *, struct fpreg *));
 #endif
 #ifdef PT_SETREGS
-int	process_write_regs __P((struct proc *p, struct reg *regs));
+int	process_write_regs __P((struct lwp *, struct reg *));
 #endif
 
 #ifdef __HAVE_PROCFS_MACHDEP
-int	ptrace_machdep_dorequest(struct proc *, struct proc *, int,
+int	ptrace_machdep_dorequest(struct proc *, struct lwp *, int,
 	    caddr_t, int);
 #endif
 

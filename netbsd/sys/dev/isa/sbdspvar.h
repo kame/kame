@@ -1,4 +1,4 @@
-/*	$NetBSD: sbdspvar.h,v 1.50 2000/12/19 01:09:15 mjl Exp $	*/
+/*	$NetBSD: sbdspvar.h,v 1.53 2003/07/08 10:06:32 itojun Exp $	*/
 
 /*
  * Copyright (c) 1991-1993 Regents of the University of California.
@@ -143,8 +143,8 @@ struct sbdsp_softc {
 
 	u_long	sc_interrupts;		/* number of interrupts taken */
 
-	int	(*sc_intr8)(void*);	/* dma completion intr handler */
-	int	(*sc_intr16)(void*);	/* dma completion intr handler */
+	int	(*sc_intr8)(void*);	/* DMA completion intr handler */
+	int	(*sc_intr16)(void*);	/* DMA completion intr handler */
 	void	(*sc_intrp)(void*);	/* PCM output intr handler */
 	void	*sc_argp;		/* arg for sc_intrp() */
 	void	(*sc_intrr)(void*);	/* PCM input intr handler */
@@ -190,6 +190,8 @@ struct sbdsp_softc {
 #define ISSB16CLASS(sc) ((sc)->sc_model >= SB_16)
 
 #ifdef _KERNEL
+struct malloc_type;
+
 int	sbdsp_open __P((void *, int));
 void	sbdsp_close __P((void *));
 
@@ -226,7 +228,7 @@ int	sbdsp_reset __P((struct sbdsp_softc *));
 void	sbdsp_spkron __P((struct sbdsp_softc *));
 void	sbdsp_spkroff __P((struct sbdsp_softc *));
 
-int	sbdsp_wdsp __P((struct sbdsp_softc *, int v));
+int	sbdsp_wdsp __P((struct sbdsp_softc *, int));
 int	sbdsp_rdsp __P((struct sbdsp_softc *));
 
 int	sbdsp_intr __P((void *));
@@ -240,8 +242,8 @@ int	sbdsp_mixer_set_port __P((void *, mixer_ctrl_t *));
 int	sbdsp_mixer_get_port __P((void *, mixer_ctrl_t *));
 int	sbdsp_mixer_query_devinfo __P((void *, mixer_devinfo_t *));
 
-void 	*sb_malloc __P((void *, int, size_t, int, int));
-void	sb_free __P((void *, void *, int));
+void 	*sb_malloc __P((void *, int, size_t, struct malloc_type *, int));
+void	sb_free __P((void *, void *, struct malloc_type *));
 size_t	sb_round_buffersize __P((void *, int, size_t));
 paddr_t	sb_mappage __P((void *, void *, off_t, int));
 

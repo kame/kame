@@ -1,12 +1,43 @@
-/*	$NetBSD: isabus.c,v 1.16 2002/03/04 02:19:07 simonb Exp $	*/
+/*	$NetBSD: isabus.c,v 1.25 2003/08/07 16:26:50 agc Exp $	*/
 /*	$OpenBSD: isabus.c,v 1.15 1998/03/16 09:38:46 pefo Exp $	*/
 /*	NetBSD: isa.c,v 1.33 1995/06/28 04:30:51 cgd Exp 	*/
 
 /*-
- * Copyright (c) 1995 Per Fogelstrom
- * Copyright (c) 1993, 1994 Charles M. Hannum.
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * William Jolitz and Don Ahn.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)isa.c	7.2 (Berkeley) 5/12/91
+ */
+/*-
+ * Copyright (c) 1995 Per Fogelstrom
+ * Copyright (c) 1993, 1994 Charles M. Hannum.
  *
  * This code is derived from software contributed to Berkeley by
  * William Jolitz and Don Ahn.
@@ -88,6 +119,9 @@ NEGLIGENCE, OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
 WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: isabus.c,v 1.25 2003/08/07 16:26:50 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/user.h>
@@ -97,6 +131,7 @@ WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
+#include <sys/extent.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -113,6 +148,9 @@ WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 static int beeping;
 static struct callout sysbeep_ch = CALLOUT_INITIALIZER;
+
+static long isa_mem_ex_storage[EXTENT_FIXED_STORAGE_SIZE(16) / sizeof(long)];
+static long isa_io_ex_storage[EXTENT_FIXED_STORAGE_SIZE(16) / sizeof(long)];
 
 #define	IRQ_SLAVE	2
 
@@ -133,6 +171,7 @@ void	intr_calculatemasks __P((void));
 int	fakeintr __P((void *a));
 
 struct isabr_config *isabr_conf = NULL;
+u_int32_t imask[_IPL_N];	/* XXX */
 
 void
 isabrattach(sc)
@@ -157,6 +196,11 @@ isabrattach(sc)
 	sc->arc_isa_cs.ic_intr_establish = isabr_intr_establish;
 	sc->arc_isa_cs.ic_intr_disestablish = isabr_intr_disestablish;
 
+	arc_bus_space_init_extent(&arc_bus_mem, (caddr_t)isa_mem_ex_storage,
+	    sizeof(isa_mem_ex_storage));
+	arc_bus_space_init_extent(&arc_bus_io, (caddr_t)isa_io_ex_storage,
+	    sizeof(isa_io_ex_storage));
+
 	iba.iba_busname = "isa";
 	iba.iba_iot = &arc_bus_io;
 	iba.iba_memt = &arc_bus_mem;
@@ -173,8 +217,8 @@ isabrprint(aux, pnp)
 	struct confargs *ca = aux;
 
         if (pnp)
-                printf("%s at %s", ca->ca_name, pnp);
-        printf(" isa_io_base 0x%lx isa_mem_base 0x%lx",
+                aprint_normal("%s at %s", ca->ca_name, pnp);
+        aprint_verbose(" isa_io_base 0x%lx isa_mem_base 0x%lx",
 		arc_bus_io.bs_vbase, arc_bus_mem.bs_vbase);
         return (UNCONF);
 }
@@ -210,51 +254,59 @@ intr_calculatemasks()
 
 	/* First, figure out which levels each IRQ uses. */
 	for (irq = 0; irq < ICU_LEN; irq++) {
-		register int levels = 0;
+		int levels = 0;
 		for (q = intrhand[irq]; q; q = q->ih_next)
 			levels |= 1 << q->ih_level;
 		intrlevel[irq] = levels;
 	}
 
 	/* Then figure out which IRQs use each level. */
-	for (level = 0; level < 5; level++) {
-		register int irqs = 0;
+	for (level = 0; level < _IPL_N; level++) {
+		int irqs = 0;
 		for (irq = 0; irq < ICU_LEN; irq++)
 			if (intrlevel[irq] & (1 << level))
 				irqs |= 1 << irq;
-		imask[level] = irqs | SIR_ALLMASK;
+		imask[level] = irqs;
 	}
 
-	/*
-	 * There are tty, network and disk drivers that use free() at interrupt
-	 * time, so imp > (tty | net | bio).
-	 */
-	imask[IPL_IMP] |= imask[IPL_TTY] | imask[IPL_NET] | imask[IPL_BIO];
+	imask[IPL_NONE] = 0;
+
+	imask[IPL_SOFT] |= imask[IPL_NONE];
+	imask[IPL_SOFTCLOCK] |= imask[IPL_SOFT];
+	imask[IPL_SOFTNET] |= imask[IPL_SOFTCLOCK];
+	imask[IPL_SOFTSERIAL] |= imask[IPL_SOFTNET];
 
 	/*
 	 * Enforce a hierarchy that gives slow devices a better chance at not
 	 * dropping data.
 	 */
-	imask[IPL_TTY] |= imask[IPL_NET] | imask[IPL_BIO];
+	imask[IPL_BIO] |= imask[IPL_SOFTSERIAL];
 	imask[IPL_NET] |= imask[IPL_BIO];
+	imask[IPL_TTY] |= imask[IPL_NET];
 
 	/*
-	 * These are pseudo-levels.
+	 * Since run queues may be manipulated by both the statclock and tty,
+	 * network, and diskdrivers, clock > tty.
 	 */
-	imask[IPL_NONE] = 0x00000000;
-	imask[IPL_HIGH] = 0xffffffff;
+	imask[IPL_CLOCK] |= imask[IPL_TTY];
+	imask[IPL_STATCLOCK] |= imask[IPL_CLOCK];
+
+	/*
+	 * IPL_HIGH must block everything that can manipulate a run queue.
+	 */
+	imask[IPL_HIGH] |= imask[IPL_STATCLOCK];
 
 	/* And eventually calculate the complete masks. */
 	for (irq = 0; irq < ICU_LEN; irq++) {
-		register int irqs = 1 << irq;
+		int irqs = 1 << irq;
 		for (q = intrhand[irq]; q; q = q->ih_next)
 			irqs |= imask[q->ih_level];
-		intrmask[irq] = irqs | SIR_ALLMASK;
+		intrmask[irq] = irqs;
 	}
 
 	/* Lastly, determine which IRQs are actually in use. */
 	{
-		register int irqs = 0;
+		int irqs = 0;
 		for (irq = 0; irq < ICU_LEN; irq++)
 			if (intrhand[irq])
 				irqs |= 1 << irq;
@@ -288,7 +340,7 @@ isabr_intr_evcnt(ic, irq)
 /*
  *	Establish a ISA bus interrupt.
  */
-void *   
+void *
 isabr_intr_establish(ic, irq, type, level, ih_fun, ih_arg)
         isa_chipset_tag_t ic;
         int irq;
@@ -309,6 +361,9 @@ isabr_intr_establish(ic, irq, type, level, ih_fun, ih_arg)
 		panic("intr_establish: bogus irq or type");
 
 	switch (intrtype[irq]) {
+	case IST_NONE:
+		intrtype[irq] = type;
+		break;
 	case IST_EDGE:
 	case IST_LEVEL:
 		if (type == intrtype[irq])
@@ -354,11 +409,11 @@ isabr_intr_establish(ic, irq, type, level, ih_fun, ih_arg)
 	return (ih);
 }
 
-void                    
+void
 isabr_intr_disestablish(ic, arg)
         isa_chipset_tag_t ic;
-        void *arg;      
-{               
+        void *arg;
+{
 
 }
 
@@ -410,12 +465,26 @@ isabr_iointr(mask, cf)
 }
 
 
-/* 
+/*
  * Initialize the Interrupt controller logic.
  */
 void
 isabr_initicu()
-{  
+{
+
+	int i;
+
+	for (i = 0; i < ICU_LEN; i++) {
+		switch (i) {
+		case 2:
+		case 8:
+			intrtype[i] = IST_EDGE;
+			break;
+		default:
+			intrtype[i] = IST_NONE;
+			break;
+		}
+	}
 
 	isa_outb(IO_ICU1, 0x11);		/* reset; program device, four bytes */
 	isa_outb(IO_ICU1+1, 0);			/* starting at this vector index */
@@ -424,7 +493,7 @@ isabr_initicu()
 	isa_outb(IO_ICU1+1, 0xff);		/* leave interrupts masked */
 	isa_outb(IO_ICU1, 0x68);		/* special mask mode (if available) */
 	isa_outb(IO_ICU1, 0x0a);		/* Read IRR by default. */
-#ifdef REORDER_IRQ  
+#ifdef REORDER_IRQ
 	isa_outb(IO_ICU1, 0xc0 | (3 - 1));	/* pri order 3-7, 0-2 (com2 first) */
 #endif
 
@@ -435,7 +504,7 @@ isabr_initicu()
 	isa_outb(IO_ICU2+1, 0xff);		/* leave interrupts masked */
 	isa_outb(IO_ICU2, 0x68);		/* special mask mode (if available) */
 	isa_outb(IO_ICU2, 0x0a);		/* Read IRR by default. */
-}	       
+}
 
 
 /*
@@ -478,4 +547,41 @@ sysbeep(pitch, period)
 	last_pitch = pitch;
 	beeping = last_period = period;
 	callout_reset(&sysbeep_ch, period, sysbeepstop, NULL);
+}
+
+int
+isa_intr_alloc(isa_chipset_tag_t c, int mask, int type, int *irq_p)
+{
+	int irq;
+	int maybe_irq = -1;
+	int shared_depth = 0;
+	mask &= 0x8b28; /* choose from 3, 5, 8, 9, 11, 15 XXX */
+	for (irq = 0; mask != 0; mask >>= 1, irq++) {
+		if ((mask & 1) == 0)
+			continue;
+		if (intrtype[irq] == IST_NONE) {
+			*irq_p = irq;
+			return 0;
+		}
+		/* Level interrupts can be shared */
+		if (type == IST_LEVEL && intrtype[irq] == IST_LEVEL) {
+			struct intrhand *ih = intrhand[irq];
+			int depth;
+			if (maybe_irq == -1) {
+ 				maybe_irq = irq;
+				continue;
+			}
+			for (depth = 0; ih != NULL; ih = ih->ih_next)
+				depth++;
+			if (depth < shared_depth) {
+				maybe_irq = irq;
+				shared_depth = depth;
+			}
+		}
+	}
+	if (maybe_irq != -1) {
+		*irq_p = maybe_irq;
+		return 0;
+	}
+	return 1;
 }

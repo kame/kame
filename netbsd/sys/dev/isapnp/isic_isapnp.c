@@ -3,7 +3,7 @@
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Martin Husemann <martin@netbsd.org>.
+ * by Martin Husemann <martin@NetBSD.org>.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: isic_isapnp.c,v 1.12 2002/04/14 12:24:27 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: isic_isapnp.c,v 1.17 2003/12/04 13:57:30 keihan Exp $");
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -80,7 +80,7 @@ __KERNEL_RCSID(0, "$NetBSD: isic_isapnp.c,v 1.12 2002/04/14 12:24:27 martin Exp 
 
 #include "opt_isicpnp.h"
 
-extern const struct isdn_layer1_bri_driver isic_std_driver;
+extern const struct isdn_layer1_isdnif_driver isic_std_driver;
 
 #ifdef __BROKEN_INDIRECT_CONFIG
 static int isic_isapnp_probe __P((struct device *, void *, void *));
@@ -89,9 +89,8 @@ static int isic_isapnp_probe __P((struct device *, struct cfdata *, void *));
 #endif
 static void isic_isapnp_attach __P((struct device *, struct device *, void *));
 
-struct cfattach isic_isapnp_ca = {
-	sizeof(struct isic_softc), isic_isapnp_probe, isic_isapnp_attach
-};
+CFATTACH_DECL(isic_isapnp, sizeof(struct isic_softc),
+    isic_isapnp_probe, isic_isapnp_attach, NULL, NULL);
 
 typedef void (*allocmaps_func)(struct isapnp_attach_args *ipa, struct isic_softc *sc);
 typedef void (*attach_func)(struct isic_softc *sc);

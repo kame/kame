@@ -1,4 +1,4 @@
-/*	$NetBSD: smb_conn.h,v 1.2 2002/01/04 02:39:39 deberg Exp $	*/
+/*	$NetBSD: smb_conn.h,v 1.14 2003/06/29 22:32:09 fvdl Exp $	*/
 
 /*
  * Copyright (c) 2000-2001 Boris Popov
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * FreeBSD: src/sys/netsmb/smb_conn.h,v 1.3 2001/12/02 08:47:29 bp Exp
+ * FreeBSD: src/sys/netsmb/smb_conn.h,v 1.8 2002/09/16 10:50:38 bp Exp
  */
 
 /*
@@ -80,9 +80,10 @@
 #define	SMBV_WIN95		0x0010	/* used to apply bugfixes for this OS */
 #define	SMBV_PRIVATE		0x0020	/* connection can be used only by creator */
 #define	SMBV_RECONNECTING	0x0040	/* conn is in the process of reconnection */
-#define SMBV_SINGLESHARE	0x0080	/* only one share connectin should be allowed */
-#define SMBV_CREATE		0x0100	/* lookup for create opeartion */
+#define SMBV_SINGLESHARE	0x0080	/* only one share connecting should be allowed */
+#define SMBV_CREATE		0x0100	/* lookup for create operation */
 /*#define SMBV_FAILED		0x0200*/	/* last reconnect attempt has failed */
+#define SMBV_UNICODE		0x0400	/* connection is configured to use Unicode */
 
 
 /*
@@ -110,13 +111,13 @@ struct smb_sopt {
 	int		sv_proto;
 	int16_t		sv_tz;		/* offset in min relative to UTC */
 	u_int32_t	sv_maxtx;	/* maximum transmit buf size */
-	u_char		sv_sm;		/* security mode */
+	u_int16_t	sv_sm;		/* security mode */
 	u_int16_t	sv_maxmux;	/* max number of outstanding rq's */
 	u_int16_t 	sv_maxvcs;	/* max number of VCs */
 	u_int16_t	sv_rawmode;
 	u_int32_t	sv_maxraw;	/* maximum raw-buffer size */
 	u_int32_t	sv_skey;	/* session key */
-	u_int32_t	sv_caps;	/* capabilites SMB_CAP_ */
+	u_int32_t	sv_caps;	/* capabilities SMB_CAP_ */
 };
 
 /*
@@ -180,11 +181,8 @@ struct smbioc_oshare;
 struct smbioc_ossn;
 struct uio;
 
-TAILQ_HEAD(smb_rqhead, smb_rq);
-
-#define SMB_DEFRQTIMO	5
-
 #define SMB_DIALECT(vcp)	((vcp)->vc_sopt.sv_proto)
+#define SMB_CAPS(vcp)		((vcp)->vc_sopt.sv_caps)
 
 struct smb_tran_desc;
 
@@ -241,7 +239,6 @@ struct smb_vc {
 	char *		vc_pass;	/* password for usl case */
 	char *		vc_domain;	/* workgroup/primary domain */
 
-	u_int		vc_timo;	/* default request timeout */
 	int		vc_maxvcs;	/* maximum number of VC per connection */
 
 	void *		vc_tolower;	/* local charset */
@@ -264,7 +261,9 @@ struct smb_vc {
 	u_char 		vc_ch[SMB_MAXCHALLENGELEN];
 	u_short		vc_mid;		/* multiplex id */
 	struct smb_sopt	vc_sopt;	/* server options */
-	int		vc_txmax;	/* max tx/rx packet size */
+	size_t		vc_txmax;	/* max tx/rx packet size */
+	size_t		vc_rxmax;	/* max readx data size */
+	size_t		vc_wxmax;	/* max writex data size */
 	struct smbiod *	vc_iod;
 	struct smb_slock vc_stlock;
 };
@@ -272,6 +271,7 @@ struct smb_vc {
 #define vc_maxmux	vc_sopt.sv_maxmux
 #define	vc_flags	obj.co_flags
 
+#define SMB_UNICODE_STRINGS(vcp)	((vcp)->vc_hflags2 & SMB_FLAGS2_UNICODE)
 
 /*
  * smb_share structure describes connection to the given SMB share (tree).
@@ -391,7 +391,6 @@ int  smb_share_get(struct smb_share *ssp, int flags, struct smb_cred *scred);
 void smb_share_put(struct smb_share *ssp, struct smb_cred *scred);
 int  smb_share_lock(struct smb_share *ssp, int flags);
 void smb_share_unlock(struct smb_share *ssp, int flags);
-void smb_share_invalidate(struct smb_share *ssp);
 int  smb_share_valid(struct smb_share *ssp);
 const char * smb_share_getpass(struct smb_share *ssp);
 
@@ -407,7 +406,9 @@ int  smb_read(struct smb_share *ssp, u_int16_t fid, struct uio *uio,
 	struct smb_cred *scred);
 int  smb_write(struct smb_share *ssp, u_int16_t fid, struct uio *uio,
 	struct smb_cred *scred);
+#if 0
 int  smb_smb_echo(struct smb_vc *vcp, struct smb_cred *scred);
+#endif
 
 /*
  * smbiod thread
@@ -436,10 +437,10 @@ struct smbiod {
 	int			iod_flags;
 	enum smbiod_state	iod_state;
 	int			iod_muxcnt;	/* number of active outstanding requests */
-	int			iod_sleeptimo;
 	struct smb_vc *		iod_vc;
 	struct smb_slock	iod_rqlock;	/* iod_rqlist, iod_muxwant */
-	struct smb_rqhead	iod_rqlist;	/* list of outstanding requests */
+	SIMPLEQ_HEAD(, smb_rq)
+				iod_rqlist;	/* list of outstanding requests */
 	int			iod_muxwant;
 	struct proc *		iod_p;
 #ifndef __NetBSD__
@@ -448,8 +449,11 @@ struct smbiod {
 	struct smb_cred		iod_scred;
 	struct smb_slock	iod_evlock;	/* iod_evlist */
 	SIMPLEQ_HEAD(,smbiod_event) iod_evlist;
+#if 0
+	int			iod_sleeptimo;
 	struct timeval	 	iod_lastrqsent;
 	struct timeval	 	iod_pingtimo;
+#endif
 };
 
 int  smb_iod_init(void);

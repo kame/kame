@@ -1,4 +1,4 @@
-/*	$NetBSD: rtc.c,v 1.15 2002/05/15 15:19:55 uch Exp $	*/
+/*	$NetBSD: rtc.c,v 1.20 2003/07/15 02:29:34 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999 Shin Takemura. All rights reserved.
@@ -34,6 +34,9 @@
  * SUCH DAMAGE.
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rtc.c,v 1.20 2003/07/15 02:29:34 lukem Exp $");
 
 #include "opt_vr41xx.h"
 
@@ -93,9 +96,8 @@ void	vrrtc_attach(struct device *, struct device *, void *);
 int	vrrtc_intr(void*, u_int32_t, u_int32_t);
 void	vrrtc_dump_regs(struct vrrtc_softc *);
 
-struct cfattach vrrtc_ca = {
-	sizeof(struct vrrtc_softc), vrrtc_match, vrrtc_attach
-};
+CFATTACH_DECL(vrrtc, sizeof(struct vrrtc_softc),
+    vrrtc_match, vrrtc_attach, NULL, NULL);
 
 static __inline__ void vrrtc_write(struct vrrtc_softc *, int, u_int16_t);
 static __inline__ u_int16_t vrrtc_read(struct vrrtc_softc *, int);
@@ -161,7 +163,7 @@ vrrtc_attach(struct device *parent, struct device *self, void *aux)
 		sc->sc_tclk_cnt_h_reg = RTC_NO_REG_W;
 		sc->sc_tclk_cnt_l_reg = RTC_NO_REG_W;
 	} else {
-		panic("%s: unknown base address 0x%lx\n",
+		panic("%s: unknown base address 0x%lx",
 		    sc->sc_dev.dv_xname, va->va_addr);
 	}
 #endif /* SINGLE_VRIP_BASE */
@@ -174,7 +176,7 @@ vrrtc_attach(struct device *parent, struct device *self, void *aux)
 	}
 	/* RTC interrupt handler is directly dispatched from CPU intr */
 	vr_intr_establish(VR_INTR1, vrrtc_intr, sc);
-	/* But need to set level 1 interupt mask register, 
+	/* But need to set level 1 interrupt mask register, 
 	 * so regsiter fake interrurpt handler
 	 */
 	if (!(sc->sc_ih = vrip_intr_establish(va->va_vc, va->va_unit, 0,

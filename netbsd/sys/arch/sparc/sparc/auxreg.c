@@ -1,4 +1,4 @@
-/*	$NetBSD: auxreg.c,v 1.29 2002/03/11 16:27:03 pk Exp $ */
+/*	$NetBSD: auxreg.c,v 1.34 2003/08/07 16:29:44 agc Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -43,6 +39,9 @@
  *
  *	@(#)auxreg.c	8.1 (Berkeley) 6/11/93
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: auxreg.c,v 1.34 2003/08/07 16:29:44 agc Exp $");
 
 #include "opt_blink.h"
 
@@ -66,12 +65,11 @@ static void auxregattach_obio
 
 static void auxregattach __P((struct device *));
 
-struct cfattach auxreg_mainbus_ca = {
-	sizeof(struct device), auxregmatch_mainbus, auxregattach_mainbus
-};
-struct cfattach auxreg_obio_ca = {
-	sizeof(struct device), auxregmatch_obio, auxregattach_obio
-};
+CFATTACH_DECL(auxreg_mainbus, sizeof(struct device),
+    auxregmatch_mainbus, auxregattach_mainbus, NULL, NULL);
+
+CFATTACH_DECL(auxreg_obio, sizeof(struct device),
+    auxregmatch_obio, auxregattach_obio, NULL, NULL);
 
 #ifdef BLINK
 static struct callout blink_ch = CALLOUT_INITIALIZER;

@@ -1,4 +1,4 @@
-/*	$NetBSD: i80321_space.c,v 1.2.4.1 2002/12/07 20:51:22 he Exp $	*/
+/*	$NetBSD: i80321_space.c,v 1.6 2003/10/06 15:43:35 thorpej Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002 Wasabi Systems, Inc.
@@ -38,6 +38,9 @@
 /*
  * bus_space functions for i80321 I/O Processor.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: i80321_space.c,v 1.6 2003/10/06 15:43:35 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -253,14 +256,14 @@ i80321_io_bs_alloc(void *t, bus_addr_t rstart, bus_addr_t rend,
     bus_addr_t *bpap, bus_space_handle_t *bshp)
 {
 
-	panic("i80321_io_bs_alloc(): not implemented\n");
+	panic("i80321_io_bs_alloc(): not implemented");
 }
 
 void    
 i80321_io_bs_free(void *t, bus_space_handle_t bsh, bus_size_t size)
 {
 
-	panic("i80321_io_bs_free(): not implemented\n");
+	panic("i80321_io_bs_free(): not implemented");
 }
 
 void *
@@ -310,7 +313,8 @@ i80321_mem_bs_map(void *t, bus_addr_t bpa, bus_size_t size, int flags,
 
 	for (; pa < endpa; pa += PAGE_SIZE, va += PAGE_SIZE) {
 		pmap_enter(pmap_kernel(), va, pa,
-		    VM_PROT_READ | VM_PROT_WRITE, PMAP_WIRED);
+		    VM_PROT_READ | VM_PROT_WRITE,
+		    VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
 	}
 	pmap_update(pmap_kernel());
 
@@ -335,14 +339,14 @@ i80321_mem_bs_alloc(void *t, bus_addr_t rstart, bus_addr_t rend,
     bus_addr_t *bpap, bus_space_handle_t *bshp)
 {
 
-	panic("i80321_mem_bs_alloc(): not implemented\n");
+	panic("i80321_mem_bs_alloc(): not implemented");
 }
 
 void    
 i80321_mem_bs_free(void *t, bus_space_handle_t bsh, bus_size_t size)
 {
 
-	panic("i80321_mem_bs_free(): not implemented\n");
+	panic("i80321_mem_bs_free(): not implemented");
 }
 
 paddr_t

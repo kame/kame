@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_fdio.c,v 1.3 2001/11/13 02:08:51 lukem Exp $	*/
+/*	$NetBSD: linux_fdio.c,v 1.7 2003/06/29 22:29:28 fvdl Exp $	*/
 
 /*
  * Copyright (c) 2000 Wasabi Systems, Inc.
@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: linux_fdio.c,v 1.3 2001/11/13 02:08:51 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: linux_fdio.c,v 1.7 2003/06/29 22:29:28 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -49,6 +49,7 @@ __KERNEL_RCSID(0, "$NetBSD: linux_fdio.c,v 1.3 2001/11/13 02:08:51 lukem Exp $")
 
 #include <sys/fdio.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <dev/isa/fdreg.h>
@@ -68,7 +69,7 @@ linux_ioctl_fdio(struct proc *p, struct linux_sys_ioctl_args *uap,
 	struct filedesc *fdp;
 	struct file *fp;
 	int error;
-	int (*ioctlf) __P((struct file *, u_long, caddr_t, struct proc *));
+	int (*ioctlf)(struct file *, u_long, void *, struct proc *);
 	u_long com;
 	struct fdformat_parms fparams;
 	struct linux_floppy_struct lflop;

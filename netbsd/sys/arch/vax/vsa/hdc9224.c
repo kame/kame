@@ -1,4 +1,4 @@
-/*	$NetBSD: hdc9224.c,v 1.17 2001/11/09 05:31:44 matt Exp $ */
+/*	$NetBSD: hdc9224.c,v 1.30 2003/07/15 02:15:06 lukem Exp $ */
 /*
  * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -50,6 +50,9 @@
  */
 #undef	RDDEBUG
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hdc9224.c,v 1.30 2003/07/15 02:15:06 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -60,9 +63,7 @@
 #include <sys/buf.h>
 #include <sys/proc.h>
 #include <sys/user.h>
-#include <sys/map.h>
 #include <sys/device.h>
-#include <sys/dkstat.h> 
 #include <sys/disklabel.h>
 #include <sys/disk.h>
 #include <sys/syslog.h>
@@ -141,7 +142,7 @@ struct	hdcsoftc {
 	struct evcnt sc_intrcnt;
 	struct vsbus_dma sc_vd;
 	vaddr_t sc_regs;		/* register addresses */
-	struct buf_queue sc_q;
+	struct bufq_state sc_q;
 	struct buf *sc_active;
 	struct hdc9224_UDCreg sc_creg;	/* (command) registers to be written */
 	struct hdc9224_UDCreg sc_sreg;	/* (status) registers being read */
@@ -182,17 +183,28 @@ static	void hdc_writeregs(struct hdcsoftc *);
 static	void hdc_readregs(struct hdcsoftc *);
 static	void hdc_qstart(void *);
  
-bdev_decl(rd);
-cdev_decl(rd);
+CFATTACH_DECL(hdc, sizeof(struct hdcsoftc),
+    hdcmatch, hdcattach, NULL, NULL);
 
-struct	cfattach hdc_ca = {
-	sizeof(struct hdcsoftc), hdcmatch, hdcattach
+CFATTACH_DECL(rd, sizeof(struct rdsoftc),
+    rdmatch, rdattach, NULL, NULL);
+
+dev_type_open(rdopen);
+dev_type_close(rdclose);
+dev_type_read(rdread);
+dev_type_write(rdwrite);
+dev_type_ioctl(rdioctl);
+dev_type_strategy(rdstrategy);
+dev_type_size(rdsize);
+
+const struct bdevsw rd_bdevsw = {
+	rdopen, rdclose, rdstrategy, rdioctl, nulldump, rdsize, D_DISK
 };
 
-struct	cfattach rd_ca = {
-	sizeof(struct rdsoftc), rdmatch, rdattach
+const struct cdevsw rd_cdevsw = {
+	rdopen, rdclose, rdread, rdwrite, rdioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
 };
-
 
 /* At least 0.7 uS between register accesses */
 static int rd_dmasize, inq = 0;
@@ -247,7 +259,7 @@ hdcprint(void *aux, const char *name)
 	struct hdc_attach_args *ha = aux;
 
 	if (name)
-		printf ("RD?? at %s drive %d", name, ha->ha_drive);
+		aprint_normal ("RD?? at %s drive %d", name, ha->ha_drive);
 	return UNCONF;
 }
 
@@ -289,7 +301,7 @@ hdcattach(struct device *parent, struct device *self, void *aux)
 			sc->sc_dev.dv_xname, status);
 		return;
 	}
-	BUFQ_INIT(&sc->sc_q);
+	bufq_alloc(&sc->sc_q, BUFQ_DISKSORT|BUFQ_SORT_CYLINDER);
 
 	/*
 	 * now probe for all possible hard drives
@@ -327,8 +339,6 @@ rdmatch(parent, cf, aux)
 	return 1;
 }
 
-#define	RDMAJOR 19
-
 void
 rdattach(struct device *parent, struct device *self, void *aux)
 {
@@ -336,7 +346,7 @@ rdattach(struct device *parent, struct device *self, void *aux)
 	struct rdsoftc *rd = (void*)self;
 	struct hdc_attach_args *ha = aux;
 	struct disklabel *dl;
-	char *msg;
+	const char *msg;
 
 	rd->sc_drive = ha->ha_drive;
 	/*
@@ -354,8 +364,9 @@ rdattach(struct device *parent, struct device *self, void *aux)
 	dl = rd->sc_disk.dk_label;
 	rdmakelabel(dl, &rd->sc_xbn);
 	printf("%s", rd->sc_dev.dv_xname);
-	msg = readdisklabel(MAKEDISKDEV(RDMAJOR, rd->sc_dev.dv_unit, RAW_PART),
-	    rdstrategy, dl, NULL);
+	msg = readdisklabel(MAKEDISKDEV(cdevsw_lookup_major(&rd_cdevsw),
+					rd->sc_dev.dv_unit, RAW_PART),
+			    rdstrategy, dl, NULL);
 	if (msg)
 		printf(": %s", msg);
 	printf(": size %d sectors\n", dl->d_secperunit);
@@ -436,7 +447,7 @@ rdstrategy(struct buf *bp)
 	sc = (void *)rd->sc_dev.dv_parent;
 
 	lp = rd->sc_disk.dk_label;
-	if ((bounds_check_with_label(bp, lp, 1)) <= 0)
+	if ((bounds_check_with_label(&rd->sc_disk, bp, 1)) <= 0)
 		goto done;
 
 	if (bp->b_bcount == 0)
@@ -447,7 +458,7 @@ rdstrategy(struct buf *bp)
 	bp->b_cylinder = bp->b_rawblkno / lp->d_secpercyl;
 
 	s = splbio();
-	disksort_cylinder(&sc->sc_q, bp);
+	BUFQ_PUT(&sc->sc_q, bp);
 	if (inq == 0) {
 		inq = 1;
 		vsbus_dma_start(&sc->sc_vd);
@@ -466,7 +477,7 @@ hdc_qstart(void *arg)
 	inq = 0;
 
 	hdcstart(sc, 0);
-	if (BUFQ_FIRST(&sc->sc_q)) {
+	if (BUFQ_PEEK(&sc->sc_q)) {
 		vsbus_dma_start(&sc->sc_vd); /* More to go */
 		inq = 1;
 	}
@@ -487,10 +498,9 @@ hdcstart(struct hdcsoftc *sc, struct buf *ob)
 
 
 	if (ob == 0) {
-		bp = BUFQ_FIRST(&sc->sc_q);
+		bp = BUFQ_GET(&sc->sc_q);
 		if (bp == NULL)
 			return; /* Nothing to do */
-		BUFQ_REMOVE(&sc->sc_q, bp);
 		sc->sc_bufaddr = bp->b_data;
 		sc->sc_diskblk = bp->b_rawblkno;
 		sc->sc_bytecnt = bp->b_bcount;
@@ -740,15 +750,6 @@ rdwrite(dev_t dev, struct uio *uio, int flag)
 }
 
 /*
- *
- */
-int
-rddump(dev_t dev, daddr_t daddr, caddr_t addr, size_t size)
-{
-	return 0;
-}
-
-/*
  * we have to wait 0.7 usec between two accesses to any of the
  * dkc-registers, on a VS2000 with 1 MIPS, this is roughly one
  * instruction. Thus the loop-overhead will be enough...
@@ -822,7 +823,7 @@ rdmakelabel(struct disklabel *dl, struct rdgeom *g)
 	int n, p = 0;
 
 	dl->d_bbsize = BBSIZE;
-	dl->d_sbsize = SBSIZE;
+	dl->d_sbsize = SBLOCKSIZE;
 	dl->d_typename[p++] = MSCP_MID_CHAR(2, g->media_id);
 	dl->d_typename[p++] = MSCP_MID_CHAR(1, g->media_id);
 	if (MSCP_MID_ECH(0, g->media_id))

@@ -1,4 +1,4 @@
-/*	$NetBSD: mfs_vnops.c,v 1.29 2001/12/06 04:27:43 chs Exp $	*/
+/*	$NetBSD: mfs_vnops.c,v 1.36 2004/01/26 10:02:31 hannken Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mfs_vnops.c,v 1.29 2001/12/06 04:27:43 chs Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mfs_vnops.c,v 1.36 2004/01/26 10:02:31 hannken Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -44,7 +40,6 @@ __KERNEL_RCSID(0, "$NetBSD: mfs_vnops.c,v 1.29 2001/12/06 04:27:43 chs Exp $");
 #include <sys/kernel.h>
 #include <sys/proc.h>
 #include <sys/buf.h>
-#include <sys/map.h>
 #include <sys/vnode.h>
 #include <sys/malloc.h>
 
@@ -143,14 +138,15 @@ mfs_strategy(v)
 	void *v;
 {
 	struct vop_strategy_args /* {
+		struct vnode *a_vp;
 		struct buf *a_bp;
 	} */ *ap = v;
+	struct vnode *vp = ap->a_vp;
 	struct buf *bp = ap->a_bp;
 	struct mfsnode *mfsp;
-	struct vnode *vp;
 	struct proc *p = curproc;		/* XXX */
 
-	if (!vfinddev(bp->b_dev, VBLK, &vp) || vp->v_usecount == 0)
+	if (vp->v_type != VBLK || vp->v_usecount == 0)
 		panic("mfs_strategy: bad dev");
 	mfsp = VTOMFS(vp);
 	/* check for mini-root access */
@@ -176,7 +172,7 @@ mfs_strategy(v)
 		bp->b_resid = 0;
 		biodone(bp);
 	} else {
-		BUFQ_INSERT_TAIL(&mfsp->mfs_buflist, bp);
+		BUFQ_PUT(&mfsp->mfs_buflist, bp);
 		wakeup((caddr_t)vp);
 	}
 	return (0);
@@ -250,8 +246,7 @@ mfs_close(v)
 	/*
 	 * Finish any pending I/O requests.
 	 */
-	while ((bp = BUFQ_FIRST(&mfsp->mfs_buflist)) != NULL) {
-		BUFQ_REMOVE(&mfsp->mfs_buflist, bp);
+	while ((bp = BUFQ_GET(&mfsp->mfs_buflist)) != NULL) {
 		mfs_doio(bp, mfsp->mfs_baseoff);
 		wakeup((caddr_t)bp);
 	}
@@ -260,7 +255,7 @@ mfs_close(v)
 	 * we must invalidate any in core blocks, so that
 	 * we can, free up its vnode.
 	 */
-	if ((error = vinvalbuf(vp, 1, ap->a_cred, ap->a_p, 0, 0)) != 0)
+	if ((error = vinvalbuf(vp, V_SAVE, ap->a_cred, ap->a_p, 0, 0)) != 0)
 		return (error);
 	/*
 	 * There should be no way to have any more uses of this
@@ -268,12 +263,12 @@ mfs_close(v)
 	 */
 	if (vp->v_usecount > 1)
 		printf("mfs_close: ref count %d > 1\n", vp->v_usecount);
-	if (vp->v_usecount > 1 || BUFQ_FIRST(&mfsp->mfs_buflist) != NULL)
+	if (vp->v_usecount > 1 || BUFQ_PEEK(&mfsp->mfs_buflist) != NULL)
 		panic("mfs_close");
 	/*
 	 * Send a request to the filesystem server to exit.
 	 */
-	BUFQ_FIRST(&mfsp->mfs_buflist) = (struct buf *) -1;
+	mfsp->mfs_shutdown = 1;
 	wakeup((caddr_t)vp);
 	return (0);
 }
@@ -293,10 +288,9 @@ mfs_inactive(v)
 	struct vnode *vp = ap->a_vp;
 	struct mfsnode *mfsp = VTOMFS(vp);
 
-	if (BUFQ_FIRST(&mfsp->mfs_buflist) != NULL &&
-	    BUFQ_FIRST(&mfsp->mfs_buflist) != (struct buf *) -1)
+	if (BUFQ_PEEK(&mfsp->mfs_buflist) != NULL)
 		panic("mfs_inactive: not inactive (mfs_buflist %p)",
-			BUFQ_FIRST(&mfsp->mfs_buflist));
+			BUFQ_PEEK(&mfsp->mfs_buflist));
 	VOP_UNLOCK(vp, 0);
 	return (0);
 }

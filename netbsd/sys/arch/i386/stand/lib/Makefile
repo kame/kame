@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.20 2001/12/12 01:49:44 tv Exp $
+#	$NetBSD: Makefile,v 1.22 2003/04/16 22:30:40 dsl Exp $
 
 S?=	${.CURDIR}/../../../../
 
@@ -22,6 +22,8 @@ SRCS+= biosmem.S getextmemx.c biosmemx.S printmemlist.c
 SRCS+= pread.c menuutils.c parseutils.c
 SRCS+= bootinfo.c bootinfo_biosgeom.c bootinfo_memmap.c
 SRCS+= startprog.S panic.c
+SRCS+= biosgetsystime.S
+SRCS+= realprot.S message.S dump_eax.S pvcopy.S putstr.S
 .if (${I386_INCLUDE_DISK} == "yes")
 SRCS+= biosdisk.c biosdisk_ll.c bios_disk.S
 .endif
@@ -35,7 +37,7 @@ SRCS+= diskbuf.c
 SRCS+= biospci.c bios_pci.S isapnp.c isadma.c
 .endif
 .if (${I386_INCLUDE_PS2} == "yes")
-SRCS+= biosmca.S
+SRCS+= biosmca.S biosmemps2.S
 .endif
 
 .include <bsd.own.mk>

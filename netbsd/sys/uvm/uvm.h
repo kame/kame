@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm.h,v 1.31.12.1 2003/06/15 12:57:26 tron Exp $	*/
+/*	$NetBSD: uvm.h,v 1.37 2004/02/10 01:30:49 matt Exp $	*/
 
 /*
  *
@@ -151,9 +151,11 @@ extern struct uvm uvm;
  * historys
  */
 
+#ifdef UVMHIST
 UVMHIST_DECL(maphist);
 UVMHIST_DECL(pdhist);
 UVMHIST_DECL(ubchist);
+#endif
 
 /*
  * UVM_UNLOCK_AND_WAIT: atomic unlock+wait... wrapper around the
@@ -164,7 +166,7 @@ UVMHIST_DECL(ubchist);
 do {									\
 	(void) ltsleep(event, PVM | PNORELOCK | (intr ? PCATCH : 0),	\
 	    msg, timo, slock);						\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 /*
  * UVM_KICK_PDAEMON: perform checks to determine if we need to
@@ -190,9 +192,15 @@ do {									\
 #define UVM_PAGE_OWN(PG, TAG) /* nothing */
 #endif /* UVM_PAGE_TRKOWN */
 
+#endif /* _KERNEL */
+
+#endif /* _UVM_UVM_H_ */
+
 /*
  * pull in inlines
  */
+
+#ifdef _KERNEL
 
 #include <uvm/uvm_amap_i.h>
 #include <uvm/uvm_fault_i.h>
@@ -202,4 +210,3 @@ do {									\
 
 #endif /* _KERNEL */
 
-#endif /* _UVM_UVM_H_ */

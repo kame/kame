@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_reconmap.c,v 1.8 2001/11/13 07:11:16 lukem Exp $	*/
+/*	$NetBSD: rf_reconmap.c,v 1.25 2004/03/18 17:46:22 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -34,7 +34,7 @@
  *************************************************************************/
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rf_reconmap.c,v 1.8 2001/11/13 07:11:16 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rf_reconmap.c,v 1.25 2004/03/18 17:46:22 oster Exp $");
 
 #include "rf_raid.h"
 #include <sys/time.h>
@@ -51,42 +51,46 @@ __KERNEL_RCSID(0, "$NetBSD: rf_reconmap.c,v 1.8 2001/11/13 07:11:16 lukem Exp $"
 #define RU_ALL      ((RF_ReconMapListElem_t *) -1)
 #define RU_NOTHING  ((RF_ReconMapListElem_t *) 0)
 
-/* used to mark the end of the list */
-#define RU_NIL      ((RF_ReconMapListElem_t *) 0)
-
+/* For most reconstructs we need at most 3 RF_ReconMapListElem_t's.
+ * Bounding the number we need is quite difficult, as it depends on how
+ * badly the sectors to be reconstructed get divided up.  In the current
+ * code, the reconstructed sectors appeared aligned on stripe boundaries, 
+ * and are always presented in stripe width units, so we're probably 
+ * allocating quite a bit more than we'll ever need.
+ */
+#define RF_NUM_RECON_POOL_ELEM 100
 
 static void 
 compact_stat_entry(RF_Raid_t * raidPtr, RF_ReconMap_t * mapPtr,
     int i);
-static void crunch_list(RF_ReconMap_t * mapPtr, RF_ReconMapListElem_t * listPtr);
+static void crunch_list(RF_ReconMap_t *mapPtr, 
+			RF_ReconMapListElem_t * listPtr);
 static RF_ReconMapListElem_t *
-MakeReconMapListElem(RF_SectorNum_t startSector,
-    RF_SectorNum_t stopSector, RF_ReconMapListElem_t * next);
+MakeReconMapListElem(RF_ReconMap_t *mapPtr, RF_SectorNum_t startSector,
+		     RF_SectorNum_t stopSector, RF_ReconMapListElem_t * next);
 static void 
-FreeReconMapListElem(RF_ReconMap_t * mapPtr,
-    RF_ReconMapListElem_t * p);
-static void update_size(RF_ReconMap_t * mapPtr, int size);
+FreeReconMapListElem(RF_ReconMap_t *mapPtr, RF_ReconMapListElem_t * p);
+#if 0
 static void PrintList(RF_ReconMapListElem_t * listPtr);
+#endif
 
-/*-----------------------------------------------------------------------------
+/*---------------------------------------------------------------------------
  *
  * Creates and initializes new Reconstruction map
  *
- *-----------------------------------------------------------------------------*/
+ * ru_sectors   - size of reconstruction unit in sectors
+ * disk_sectors - size of disk in sectors
+ * spareUnitsPerDisk - zero unless distributed sparing
+ *-------------------------------------------------------------------------*/
 
 RF_ReconMap_t *
-rf_MakeReconMap(raidPtr, ru_sectors, disk_sectors, spareUnitsPerDisk)
-	RF_Raid_t *raidPtr;
-	RF_SectorCount_t ru_sectors;	/* size of reconstruction unit in
-					 * sectors */
-	RF_SectorCount_t disk_sectors;	/* size of disk in sectors */
-	RF_ReconUnitCount_t spareUnitsPerDisk;	/* zero unless distributed
-						 * sparing */
+rf_MakeReconMap(RF_Raid_t *raidPtr, RF_SectorCount_t ru_sectors, 
+		RF_SectorCount_t disk_sectors,
+		RF_ReconUnitCount_t spareUnitsPerDisk)
 {
 	RF_RaidLayout_t *layoutPtr = &raidPtr->Layout;
 	RF_ReconUnitCount_t num_rus = layoutPtr->stripeUnitsPerDisk / layoutPtr->SUsPerRU;
 	RF_ReconMap_t *p;
-	int     rc;
 
 	RF_Malloc(p, sizeof(RF_ReconMap_t), (RF_ReconMap_t *));
 	p->sectorsPerReconUnit = ru_sectors;
@@ -102,48 +106,49 @@ rf_MakeReconMap(raidPtr, ru_sectors, disk_sectors, spareUnitsPerDisk)
 	(void) memset((char *) p->status, 0,
 	    num_rus * sizeof(RF_ReconMapListElem_t *));
 
-	p->size = sizeof(RF_ReconMap_t) + num_rus * sizeof(RF_ReconMapListElem_t *);
-	p->maxSize = p->size;
+	
+	pool_init(&p->elem_pool, sizeof(RF_ReconMapListElem_t), 0,
+	    0, 0, "raidreconpl", NULL);
+	pool_prime(&p->elem_pool, RF_NUM_RECON_POOL_ELEM);
 
-	rc = rf_mutex_init(&p->mutex);
-	if (rc) {
-		RF_ERRORMSG3("Unable to init mutex file %s line %d rc=%d\n", __FILE__,
-		    __LINE__, rc);
-		RF_Free(p->status, num_rus * sizeof(RF_ReconMapListElem_t *));
-		RF_Free(p, sizeof(RF_ReconMap_t));
-		return (NULL);
-	}
+	rf_mutex_init(&p->mutex);
 	return (p);
 }
 
 
-/*-----------------------------------------------------------------------------
+/*---------------------------------------------------------------------------
  *
- * marks a new set of sectors as reconstructed.  All the possible mergings get
- * complicated.  To simplify matters, the approach I take is to just dump
- * something into the list, and then clean it up (i.e. merge elements and
- * eliminate redundant ones) in a second pass over the list (compact_stat_entry()).
- * Not 100% efficient, since a structure can be allocated and then immediately
- * freed, but it keeps this code from becoming (more of) a nightmare of
- * special cases.  The only thing that compact_stat_entry() assumes is that the
- * list is sorted by startSector, and so this is the only condition I maintain
- * here.  (MCH)
+ * marks a new set of sectors as reconstructed.  All the possible
+ * mergings get complicated.  To simplify matters, the approach I take
+ * is to just dump something into the list, and then clean it up
+ * (i.e. merge elements and eliminate redundant ones) in a second pass
+ * over the list (compact_stat_entry()).  Not 100% efficient, since a
+ * structure can be allocated and then immediately freed, but it keeps
+ * this code from becoming (more of) a nightmare of special cases.
+ * The only thing that compact_stat_entry() assumes is that the list
+ * is sorted by startSector, and so this is the only condition I
+ * maintain here.  (MCH)
  *
- *-----------------------------------------------------------------------------*/
+ * This code now uses a pool instead of the previous malloc/free
+ * stuff.
+ *-------------------------------------------------------------------------*/
 
 void 
-rf_ReconMapUpdate(raidPtr, mapPtr, startSector, stopSector)
-	RF_Raid_t *raidPtr;
-	RF_ReconMap_t *mapPtr;
-	RF_SectorNum_t startSector;
-	RF_SectorNum_t stopSector;
+rf_ReconMapUpdate(RF_Raid_t *raidPtr, RF_ReconMap_t *mapPtr,
+		  RF_SectorNum_t startSector, RF_SectorNum_t stopSector)
 {
 	RF_SectorCount_t sectorsPerReconUnit = mapPtr->sectorsPerReconUnit;
 	RF_SectorNum_t i, first_in_RU, last_in_RU;
 	RF_ReconMapListElem_t *p, *pt;
 
 	RF_LOCK_MUTEX(mapPtr->mutex);
-	RF_ASSERT(startSector >= 0 && stopSector < mapPtr->sectorsInDisk && stopSector >= startSector);
+	while(mapPtr->lock) {
+		ltsleep(&mapPtr->lock, PRIBIO, "reconupdate", 0, &mapPtr->mutex);
+	}
+	mapPtr->lock = 1;
+	RF_UNLOCK_MUTEX(mapPtr->mutex);
+	RF_ASSERT(startSector >= 0 && stopSector < mapPtr->sectorsInDisk && 
+		  stopSector >= startSector);
 
 	while (startSector <= stopSector) {
 		i = startSector / mapPtr->sectorsPerReconUnit;
@@ -151,50 +156,51 @@ rf_ReconMapUpdate(raidPtr, mapPtr, startSector, stopSector)
 		last_in_RU = first_in_RU + sectorsPerReconUnit - 1;
 		p = mapPtr->status[i];
 		if (p != RU_ALL) {
-			if (p == RU_NOTHING || p->startSector > startSector) {	/* insert at front of
-										 * list */
+			if (p == RU_NOTHING || p->startSector > startSector) {
+				/* insert at front of list */
 
-				mapPtr->status[i] = MakeReconMapListElem(startSector, RF_MIN(stopSector, last_in_RU), (p == RU_NOTHING) ? NULL : p);
-				update_size(mapPtr, sizeof(RF_ReconMapListElem_t));
+				mapPtr->status[i] = MakeReconMapListElem(mapPtr,startSector, RF_MIN(stopSector, last_in_RU), (p == RU_NOTHING) ? NULL : p);
 
 			} else {/* general case */
 				do {	/* search for place to insert */
 					pt = p;
 					p = p->next;
 				} while (p && (p->startSector < startSector));
-				pt->next = MakeReconMapListElem(startSector, RF_MIN(stopSector, last_in_RU), p);
-				update_size(mapPtr, sizeof(RF_ReconMapListElem_t));
+				pt->next = MakeReconMapListElem(mapPtr,startSector, RF_MIN(stopSector, last_in_RU), p);
+
 			}
 			compact_stat_entry(raidPtr, mapPtr, i);
 		}
 		startSector = RF_MIN(stopSector, last_in_RU) + 1;
 	}
+	RF_LOCK_MUTEX(mapPtr->mutex);
+	mapPtr->lock = 0;
+	wakeup(&mapPtr->lock);
 	RF_UNLOCK_MUTEX(mapPtr->mutex);
 }
 
 
 
-/*-----------------------------------------------------------------------------
+/*---------------------------------------------------------------------------
  *
  * performs whatever list compactions can be done, and frees any space
  * that is no longer necessary.  Assumes only that the list is sorted
- * by startSector.  crunch_list() compacts a single list as much as possible,
- * and the second block of code deletes the entire list if possible.
- * crunch_list() is also called from MakeReconMapAccessList().
+ * by startSector.  crunch_list() compacts a single list as much as
+ * possible, and the second block of code deletes the entire list if
+ * possible.  crunch_list() is also called from
+ * MakeReconMapAccessList().
  *
  * When a recon unit is detected to be fully reconstructed, we set the
  * corresponding bit in the parity stripe map so that the head follow
- * code will not select this parity stripe again.  This is redundant (but
- * harmless) when compact_stat_entry is called from the reconstruction code,
- * but necessary when called from the user-write code.
+ * code will not select this parity stripe again.  This is redundant
+ * (but harmless) when compact_stat_entry is called from the
+ * reconstruction code, but necessary when called from the user-write
+ * code.
  *
- *-----------------------------------------------------------------------------*/
+ *-------------------------------------------------------------------------*/
 
 static void 
-compact_stat_entry(raidPtr, mapPtr, i)
-	RF_Raid_t *raidPtr;
-	RF_ReconMap_t *mapPtr;
-	int     i;
+compact_stat_entry(RF_Raid_t *raidPtr, RF_ReconMap_t *mapPtr, int i)
 {
 	RF_SectorCount_t sectorsPerReconUnit = mapPtr->sectorsPerReconUnit;
 	RF_ReconMapListElem_t *p = mapPtr->status[i];
@@ -202,7 +208,8 @@ compact_stat_entry(raidPtr, mapPtr, i)
 	crunch_list(mapPtr, p);
 
 	if ((p->startSector == i * sectorsPerReconUnit) &&
-	    (p->stopSector == i * sectorsPerReconUnit + sectorsPerReconUnit - 1)) {
+	    (p->stopSector == i * sectorsPerReconUnit + 
+			      sectorsPerReconUnit - 1)) {
 		mapPtr->status[i] = RU_ALL;
 		mapPtr->unitsLeft--;
 		FreeReconMapListElem(mapPtr, p);
@@ -210,9 +217,7 @@ compact_stat_entry(raidPtr, mapPtr, i)
 }
 
 static void 
-crunch_list(mapPtr, listPtr)
-	RF_ReconMap_t *mapPtr;
-	RF_ReconMapListElem_t *listPtr;
+crunch_list(RF_ReconMap_t *mapPtr, RF_ReconMapListElem_t *listPtr)
 {
 	RF_ReconMapListElem_t *pt, *p = listPtr;
 
@@ -232,55 +237,43 @@ crunch_list(mapPtr, listPtr)
 		}
 	}
 }
-/*-----------------------------------------------------------------------------
+/*---------------------------------------------------------------------------
  *
  * Allocate and fill a new list element
  *
- *-----------------------------------------------------------------------------*/
+ *-------------------------------------------------------------------------*/
 
 static RF_ReconMapListElem_t *
-MakeReconMapListElem(
-    RF_SectorNum_t startSector,
-    RF_SectorNum_t stopSector,
-    RF_ReconMapListElem_t * next)
+MakeReconMapListElem(RF_ReconMap_t *mapPtr, RF_SectorNum_t startSector,
+		     RF_SectorNum_t stopSector, RF_ReconMapListElem_t *next)
 {
 	RF_ReconMapListElem_t *p;
 
-	RF_Malloc(p, sizeof(RF_ReconMapListElem_t), (RF_ReconMapListElem_t *));
-	if (p == NULL)
-		return (NULL);
+	p = pool_get(&mapPtr->elem_pool, PR_WAITOK);
 	p->startSector = startSector;
 	p->stopSector = stopSector;
 	p->next = next;
 	return (p);
 }
-/*-----------------------------------------------------------------------------
+/*---------------------------------------------------------------------------
  *
  * Free a list element
  *
- *-----------------------------------------------------------------------------*/
+ *-------------------------------------------------------------------------*/
 
 static void 
-FreeReconMapListElem(mapPtr, p)
-	RF_ReconMap_t *mapPtr;
-	RF_ReconMapListElem_t *p;
+FreeReconMapListElem(RF_ReconMap_t *mapPtr, RF_ReconMapListElem_t *p)
 {
-	int     delta;
-
-	if (mapPtr) {
-		delta = 0 - (int) sizeof(RF_ReconMapListElem_t);
-		update_size(mapPtr, delta);
-	}
-	RF_Free(p, sizeof(*p));
+	pool_put(&mapPtr->elem_pool, p);
 }
-/*-----------------------------------------------------------------------------
+/*---------------------------------------------------------------------------
  *
- * Free an entire status structure.  Inefficient, but can be called at any time.
+ * Free an entire status structure.  Inefficient, but can be called at
+ * any time.
  *
- *-----------------------------------------------------------------------------*/
+ *-------------------------------------------------------------------------*/
 void 
-rf_FreeReconMap(mapPtr)
-	RF_ReconMap_t *mapPtr;
+rf_FreeReconMap(RF_ReconMap_t *mapPtr)
 {
 	RF_ReconMapListElem_t *p, *q;
 	RF_ReconUnitCount_t numRUs;
@@ -298,20 +291,19 @@ rf_FreeReconMap(mapPtr)
 			RF_Free(q, sizeof(*q));
 		}
 	}
-	rf_mutex_destroy(&mapPtr->mutex);
-	RF_Free(mapPtr->status, mapPtr->totalRUs * sizeof(RF_ReconMapListElem_t *));
+	pool_destroy(&mapPtr->elem_pool);
+	RF_Free(mapPtr->status, mapPtr->totalRUs * 
+		sizeof(RF_ReconMapListElem_t *));
 	RF_Free(mapPtr, sizeof(RF_ReconMap_t));
 }
-/*-----------------------------------------------------------------------------
+/*---------------------------------------------------------------------------
  *
  * returns nonzero if the indicated RU has been reconstructed already
  *
- *---------------------------------------------------------------------------*/
+ *-------------------------------------------------------------------------*/
 
 int 
-rf_CheckRUReconstructed(mapPtr, startSector)
-	RF_ReconMap_t *mapPtr;
-	RF_SectorNum_t startSector;
+rf_CheckRUReconstructed(RF_ReconMap_t *mapPtr, RF_SectorNum_t startSector)
 {
 	RF_ReconMapListElem_t *l;	/* used for searching */
 	RF_ReconUnitNum_t i;
@@ -322,39 +314,26 @@ rf_CheckRUReconstructed(mapPtr, startSector)
 }
 
 RF_ReconUnitCount_t 
-rf_UnitsLeftToReconstruct(mapPtr)
-	RF_ReconMap_t *mapPtr;
+rf_UnitsLeftToReconstruct(RF_ReconMap_t *mapPtr)
 {
 	RF_ASSERT(mapPtr != NULL);
 	return (mapPtr->unitsLeft);
 }
-/* updates the size fields of a status descriptor */
-static void 
-update_size(mapPtr, size)
-	RF_ReconMap_t *mapPtr;
-	int     size;
-{
-	mapPtr->size += size;
-	mapPtr->maxSize = RF_MAX(mapPtr->size, mapPtr->maxSize);
-}
 
+#if 0
 static void 
-PrintList(listPtr)
-	RF_ReconMapListElem_t *listPtr;
+PrintList(RF_ReconMapListElem_t *listPtr)
 {
 	while (listPtr) {
-		printf("%d,%d -> ", (int) listPtr->startSector, (int) listPtr->stopSector);
+		printf("%d,%d -> ", (int) listPtr->startSector, 
+		       (int) listPtr->stopSector);
 		listPtr = listPtr->next;
 	}
 	printf("\n");
 }
 
 void 
-rf_PrintReconMap(raidPtr, mapPtr, frow, fcol)
-	RF_Raid_t *raidPtr;
-	RF_ReconMap_t *mapPtr;
-	RF_RowCol_t frow;
-	RF_RowCol_t fcol;
+rf_PrintReconMap(RF_Raid_t *raidPtr, RF_ReconMap_t *mapPtr, RF_RowCol_t fcol)
 {
 	RF_ReconUnitCount_t numRUs;
 	RF_ReconMapListElem_t *p;
@@ -377,21 +356,25 @@ rf_PrintReconMap(raidPtr, mapPtr, frow, fcol)
 			}
 	}
 }
+#endif
 
+#if RF_DEBUG_RECON
 void 
-rf_PrintReconSchedule(mapPtr, starttime)
-	RF_ReconMap_t *mapPtr;
-	struct timeval *starttime;
+rf_PrintReconSchedule(RF_ReconMap_t *mapPtr, struct timeval *starttime)
 {
 	static int old_pctg = -1;
 	struct timeval tv, diff;
 	int     new_pctg;
 
-	new_pctg = 100 - (rf_UnitsLeftToReconstruct(mapPtr) * 100 / mapPtr->totalRUs);
+	new_pctg = 100 - (rf_UnitsLeftToReconstruct(mapPtr) * 
+			  100 / mapPtr->totalRUs);
 	if (new_pctg != old_pctg) {
 		RF_GETTIME(tv);
 		RF_TIMEVAL_DIFF(starttime, &tv, &diff);
-		printf("%d %d.%06d\n", (int) new_pctg, (int) diff.tv_sec, (int) diff.tv_usec);
+		printf("%d %d.%06d\n", (int) new_pctg, (int) diff.tv_sec, 
+		       (int) diff.tv_usec);
 		old_pctg = new_pctg;
 	}
 }
+#endif
+

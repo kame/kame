@@ -1,4 +1,4 @@
-/*	$NetBSD: profile.h,v 1.11 2001/11/03 20:24:42 thorpej Exp $ */
+/*	$NetBSD: profile.h,v 1.13 2003/08/07 16:29:40 agc Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -54,6 +50,17 @@
 
 #ifdef PIC
 /* Inline expansion of PICCY_SET() (see <machine/asm.h>). */
+#ifdef __arch64__
+#define MCOUNT \
+	__asm__(".global " _MCOUNT_ENTRY);\
+	__asm__(_MCOUNT_ENTRY ":");\
+	__asm__("add %o7, 8, %o1");\
+	__asm__("1: rd %pc, %o2");\
+	__asm__("add %o2," _MCOUNT_SYM "-1b, %o2");\
+	__asm__("ld [%o2], %o2");\
+	__asm__("jmpl %o2, %g0");\
+	__asm__("add %i7, 8, %o0");
+#else
 #define MCOUNT \
 	__asm__(".global " _MCOUNT_ENTRY);\
 	__asm__(_MCOUNT_ENTRY ":");\
@@ -63,6 +70,7 @@
 	__asm__("ld [%o2], %o2");\
 	__asm__("jmpl %o2, %g0");\
 	__asm__("add %i7, 8, %o0");
+#endif
 #else
 #define MCOUNT \
 	__asm__(".global " _MCOUNT_ENTRY);\

@@ -1,4 +1,4 @@
-/*	$NetBSD: locore_mips1.S,v 1.54 2002/03/05 16:03:22 simonb Exp $	*/
+/*	$NetBSD: locore_mips1.S,v 1.58 2003/08/07 16:28:32 agc Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -296,7 +292,7 @@ END(mips1_KernGenException)
  * Handle an exception during user mode.
  * Save user context atop of kernel stack, then call trap() to process
  * the condition.  The context can be manipulated alternatively via
- * curproc->p_md.md_regs.
+ * curlwp->l_md.md_regs.
  */
 NESTED_NOPROFILE(mips1_UserGenException, CALLFRAME_SIZ, ra)
 	.set	noat
@@ -365,7 +361,9 @@ NESTED_NOPROFILE(mips1_UserGenException, CALLFRAME_SIZ, ra)
 /*
  * Check pending asynchronous traps.
  */
-	lw	t0, _C_LABEL(curproc)		# t0 = curproc
+	lw	t0, _C_LABEL(curlwp)		# t0 = curlwp
+	nop
+	lw	t0, L_PROC(t0)			# t0 = curlwp->l_proc
 	nop
 	lw	t0, P_MD_ASTPENDING(t0)		# any pending ast?
 	nop
@@ -388,7 +386,7 @@ END(mips1_UserGenException)
  *
  * Save user context atop of kernel stack, then call syscall() to process
  * the condition.  The context can be manipulated alternatively via
- * curproc->p_md.md_regs.
+ * curlwp->l_md.md_regs.
  */
 NESTED_NOPROFILE(mips1_SystemCall, CALLFRAME_SIZ, ra)
 	.set	noat
@@ -408,7 +406,7 @@ NESTED_NOPROFILE(mips1_SystemCall, CALLFRAME_SIZ, ra)
 	sw	a1, FRAME_A1(k1)
 	sw	a2, FRAME_A2(k1)
 	sw	a3, FRAME_A3(k1)
-	lw	a0, _C_LABEL(curproc)		# 1st arg is curproc
+	lw	a0, _C_LABEL(curlwp)		# 1st arg is curlwp
 	mfhi	v1
 	#sw	t0, FRAME_T0(k1)		# no need to save temp regs
 	#sw	t1, FRAME_T1(k1)
@@ -447,7 +445,9 @@ NESTED_NOPROFILE(mips1_SystemCall, CALLFRAME_SIZ, ra)
 	move	ra, a3
 	sw	ra, CALLFRAME_RA(sp)
 #endif
-	lw	t1, P_MD_SYSCALL(a0)		# t1 = syscall
+	lw	t0, L_PROC(a0)			# t0 = curlwp->l_proc
+	nop
+	lw	t1, P_MD_SYSCALL(t0)		# t1 = syscall
 	ori	t0, a1, MIPS_SR_INT_IE		# turn on IEc, enable intr.
 	and	t0, t0, ~MIPS_SR_COP_1_BIT	# turn off FPU
 /*
@@ -458,7 +458,9 @@ NESTED_NOPROFILE(mips1_SystemCall, CALLFRAME_SIZ, ra)
 /*
  * Check pending asynchronous traps.
  */
-	lw	t0, _C_LABEL(curproc)		# t0 = curproc
+	lw	t0, _C_LABEL(curlwp)		# t0 = curlwp
+	nop
+	lw	t0, L_PROC(t0)			# t0 = curlwp->l_proc
 	nop
 	lw	t0, P_MD_ASTPENDING(t0)		# any pending ast?
 	nop
@@ -641,8 +643,9 @@ NESTED_NOPROFILE(mips1_UserIntr, CALLFRAME_SIZ, ra)
 /*
  * Check pending asynchoronous traps.
  */
-	lw	v0, _C_LABEL(curproc)		# v0 = curproc
+	lw	v0, _C_LABEL(curlwp)		# v0 = curlwp
 	addu	a1, sp, CALLFRAME_SIZ
+	lw	v0, L_PROC(v0)			# v0 = curlwp->l_proc
 	lw	a0, FRAME_SR(a1)
 	lw	v0, P_MD_ASTPENDING(v0)		# any pending ast?
 	mtc0	a0, MIPS_COP_0_STATUS		# restore SR, disable intrs
@@ -1003,6 +1006,7 @@ END(mips1_wbflush)
  * calls another.
  */
 LEAF(mips1_proc_trampoline)
+	addu	sp, sp, -CALLFRAME_SIZ
 	jal	ra, s0
 	move	a0, s1
 	.set	noat
@@ -1053,16 +1057,16 @@ XLEAF(mips1_xcpt_return)
 END(mips1_proc_trampoline)
 
 /*
- * void mips1_cpu_switch_resume(struct proc *newproc)
+ * void mips1_cpu_switch_resume(struct lwp *newlwp)
  *
  * Wiredown the USPACE of newproc with TLB entry#0 and #1.  Check
  * if target USPACE is already refered by any TLB entry before
  * doing that, and make sure TBIS(them) in the case.
  */
 LEAF_NOPROFILE(mips1_cpu_switch_resume)
-	lw	a1, P_MD_UPTE_0(a0)		# a1 = upte[0]
-	lw	a2, P_MD_UPTE_1(a0)		# a2 = upte[1]
-	lw	s0, P_ADDR(a0)			# va = p->p_addr
+	lw	a1, L_MD_UPTE_0(a0)		# a1 = upte[0]
+	lw	a2, L_MD_UPTE_1(a0)		# a2 = upte[1]
+	lw	s0, L_ADDR(a0)			# va = l->l_addr
 	li	s2, MIPS_KSEG2_START
 	blt	s0, s2, resume
 	nop
@@ -1087,8 +1091,8 @@ entry0set:
 	nop
 	tlbwi					# set TLB entry #0
 
-	addu	s0, s0, NBPG
-	mtc0	s0, MIPS_COP_0_TLB_HI		# VPN = va+NBPG
+	addu	s0, s0, PAGE_SIZE
+	mtc0	s0, MIPS_COP_0_TLB_HI		# VPN = va+PAGE_SIZE
 	nop
 	tlbp					# probe 2nd VPN
 	mfc0	s1, MIPS_COP_0_TLB_INDEX
@@ -1098,7 +1102,7 @@ entry0set:
 	mtc0	s1, MIPS_COP_0_TLB_HI
 	mtc0	zero, MIPS_COP_0_TLB_LOW
 	nop
-	tlbwi					# TBIS(va+NBPG)
+	tlbwi					# TBIS(va+PAGE_SIZE)
 	nop
 	mtc0	s0, MIPS_COP_0_TLB_HI		# set 2nd VPN again
 entry1set:

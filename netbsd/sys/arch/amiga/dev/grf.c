@@ -1,9 +1,43 @@
-/*	$NetBSD: grf.c,v 1.41 2002/03/17 19:40:28 atatat Exp $ */
+/*	$NetBSD: grf.c,v 1.48 2003/08/07 16:26:41 agc Exp $ */
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: grf.c 1.31 91/01/21$
+ *
+ *	@(#)grf.c	7.8 (Berkeley) 5/7/91
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -43,7 +77,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: grf.c,v 1.41 2002/03/17 19:40:28 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: grf.c,v 1.48 2003/08/07 16:26:41 agc Exp $");
 
 /*
  * Graphics display driver for the Amiga
@@ -60,7 +94,6 @@ __KERNEL_RCSID(0, "$NetBSD: grf.c,v 1.41 2002/03/17 19:40:28 atatat Exp $");
 #include <sys/systm.h>
 #include <sys/vnode.h>
 #include <sys/mman.h>
-#include <sys/poll.h>
 #include <uvm/uvm_extern.h>
 #include <machine/cpu.h>
 #include <dev/sun/fbio.h>
@@ -72,7 +105,6 @@ __KERNEL_RCSID(0, "$NetBSD: grf.c,v 1.41 2002/03/17 19:40:28 atatat Exp $");
 #include <amiga/dev/viewioctl.h>
 
 #include <sys/conf.h>
-#include <machine/conf.h>
 
 #include "view.h"
 #include "grf.h"
@@ -88,11 +120,6 @@ __KERNEL_RCSID(0, "$NetBSD: grf.c,v 1.41 2002/03/17 19:40:28 atatat Exp $");
 int grfon(dev_t);
 int grfoff(dev_t);
 int grfsinfo(dev_t, struct grfdyninfo *);
-#ifdef BANKEDDEVPAGER
-int grfbanked_get(dev_t, off_t, int);
-int grfbanked_cur(dev_t);
-int grfbanked_set(dev_t, int);
-#endif
 
 void grfattach(struct device *, struct device *, void *);
 int grfmatch(struct device *, struct cfdata *, void *);
@@ -102,8 +129,17 @@ int grfprint(void *, const char *);
  */
 struct grf_softc *grfsp[NGRF];
 
-struct cfattach grf_ca = {
-	sizeof(struct device), grfmatch, grfattach
+CFATTACH_DECL(grf, sizeof(struct device),
+    grfmatch, grfattach, NULL, NULL);
+
+dev_type_open(grfopen);
+dev_type_close(grfclose);
+dev_type_ioctl(grfioctl);
+dev_type_mmap(grfmmap);
+
+const struct cdevsw grf_cdevsw = {
+	grfopen, grfclose, nullread, nullwrite, grfioctl,
+	nostop, notty, nopoll, grfmmap, nokqfilter,
 };
 
 /*
@@ -142,9 +178,7 @@ grfattach(struct device *pdp, struct device *dp, void *auxp)
 	/*
 	 * find our major device number
 	 */
-	for(maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == grfopen)
-			break;
+	maj = cdevsw_lookup_major(&grf_cdevsw);
 
 	gp->g_grfdev = makedev(maj, gp->g_unit);
 	if (dp != NULL) {
@@ -166,7 +200,7 @@ int
 grfprint(void *auxp, const char *pnp)
 {
 	if (pnp)
-		printf("ite at %s", pnp);
+		aprint_normal("ite at %s", pnp);
 	return(UNCONF);
 }
 
@@ -275,21 +309,17 @@ grfioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 		 * view code if the unit is 0
 		 * XXX
 		 */
-		if (GRFUNIT(dev) == 0)
-			return(viewioctl(dev, cmd, data, flag, p));
+		if (GRFUNIT(dev) == 0) {
+			extern const struct cdevsw view_cdevsw;
+
+			return((*view_cdevsw.d_ioctl)(dev, cmd, data, flag, p));
+		}
 #endif
 		error = EPASSTHROUGH;
 		break;
 
 	}
 	return(error);
-}
-
-/*ARGSUSED*/
-int
-grfpoll(dev_t dev, int events, struct proc *p)
-{
-	return(events & (POLLOUT | POLLWRNORM));
 }
 
 /*
@@ -316,10 +346,6 @@ grfmmap(dev_t dev, off_t off, int prot)
 	 */
 	if (off >= gi->gd_regsize && off < gi->gd_regsize+gi->gd_fbsize) {
 		off -= gi->gd_regsize;
-#ifdef BANKEDDEVPAGER
-		if (gi->gd_bank_size)
-			off %= gi->gd_bank_size;
-#endif
 		return(((paddr_t)gi->gd_fbaddr + off) >> PGSHIFT);
 	}
 	/* bogus */
@@ -385,46 +411,4 @@ grfsinfo(dev_t dev, struct grfdyninfo *dyninfo)
 	return(error);
 }
 
-#ifdef BANKEDDEVPAGER
-
-int
-grfbanked_get(dev_t dev, off_t off, int prot)
-{
-	struct grf_softc *gp;
-	struct grfinfo *gi;
-	int error, bank;
-
-	gp = grfsp[GRFUNIT(dev)];
-	gi = &gp->g_display;
-
-	off -= gi->gd_regsize;
-	if (off < 0 || off >= gi->gd_fbsize)
-		return -1;
-
-	error = gp->g_mode(gp, GM_GRFGETBANK, &bank, off, prot);
-	return error ? -1 : bank;
-}
-
-int
-grfbanked_cur(dev_t dev)
-{
-	struct grf_softc *gp;
-	int error, bank;
-
-	gp = grfsp[GRFUNIT(dev)];
-
-	error = gp->g_mode(gp, GM_GRFGETCURBANK, &bank, 0, 0);
-	return(error ? -1 : bank);
-}
-
-int
-grfbanked_set(dev_t dev, int bank)
-{
-	struct grf_softc *gp;
-
-	gp = grfsp[GRFUNIT(dev)];
-	return(gp->g_mode(gp, GM_GRFSETBANK, &bank, 0, 0) ? -1 : 0);
-}
-
-#endif /* BANKEDDEVPAGER */
 #endif	/* NGRF > 0 */

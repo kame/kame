@@ -1,4 +1,4 @@
-#	$NetBSD: RAMDISK,v 1.17 2002/04/25 15:06:32 atatat Exp $
+#	$NetBSD: RAMDISK,v 1.19.8.1 2004/07/15 20:19:57 he Exp $
 
 #
 # RAMDISK: Root/swap on ramdisk
@@ -6,7 +6,7 @@
 # a NetBSD/mvme68k installation, and install
 # the miniroot in a swap partition.
 #
-# It is not designed to be used in a production enviroment
+# It is not designed to be used in a production environment
 # due to its cut-down nature.
 #
 
@@ -44,8 +44,9 @@ options 	MEMORY_DISK_HOOKS
 options 	MEMORY_DISK_IS_ROOT
 options 	MEMORY_DISK_ROOT_SIZE=1600
 
-#options 	USERCONF	# userconf(4) support
+options 	USERCONF	# userconf(4) support
 options		PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+#options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
 
 ## "generic" boot (put root on boot device)
 config netbsd		root on ? type ?

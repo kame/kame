@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile.inc,v 1.11 2002/05/19 18:18:36 jdolecek Exp $
+#	$NetBSD: Makefile.inc,v 1.15 2003/10/26 07:25:38 lukem Exp $
 
 .if !target(assym.h)
 S!=	cd ${.CURDIR}/../../..;pwd
@@ -7,13 +7,14 @@ NOMAN=	# defined
 
 .include <bsd.own.mk>
 
-DPSRCS+= assym.h
+DPSRCS+=	assym.h
+CLEANFILES+=	assym.h
 
 .if (${MACHINE_ARCH} == "powerpc")
-.if (${MACHINE} == "macppc")
-# use mpc6xx
-GENASSYM_DIR= $S/arch/${MACHINE_ARCH}/mpc6xx
-CPPFLAGS+=	-DPPC_MPC6XX
+.if (${MACHINE} == "macppc" || ${MACHINE} == "ofppc" || ${MACHINE} == "prep")
+# use oea
+GENASSYM_DIR= $S/arch/${MACHINE_ARCH}/oea
+CPPFLAGS+=	-DPPC_OEA
 .endif
 .endif
 
@@ -26,7 +27,7 @@ GENASSYM_DIR?=
 .endif
 
 assym.h: ${S}/kern/genassym.sh ${GENASSYM_DIR}/genassym.cf
-	sh $S/kern/genassym.sh ${CC} ${CFLAGS} ${CPPFLAGS} ${PROF} \
+	${HOST_SH} $S/kern/genassym.sh ${CC} ${CFLAGS} ${CPPFLAGS} ${PROF} \
 		< ${GENASSYM_DIR}/genassym.cf > assym.h.tmp && \
 	mv -f assym.h.tmp assym.h
 
@@ -36,7 +37,8 @@ CPPFLAGS+=	-Demul_find=${COMPAT_UTIL_OVERRIDE}_emul_find				\
 		-Dstackgap_init=${COMPAT_UTIL_OVERRIDE}_stackgap_init			\
 		-Demul_flags_translate=${COMPAT_UTIL_OVERRIDE}_emul_flags_translate	\
 		-Dstackgap_alloc=${COMPAT_UTIL_OVERRIDE}_stackgap_alloc		 	\
-		-Dcompat_offseterr=${COMPAT_UTIL_OVERRIDE}_compat_offseterr
+		-Dcompat_offseterr=${COMPAT_UTIL_OVERRIDE}_compat_offseterr		\
+		-Demul_find_interp=${COMPAT_UTIL_OVERRIDE}_emul_find_interp
 
 # get emul_find() and friends
 .PATH: $S/compat/common

@@ -1,4 +1,4 @@
-/*      $NetBSD: opms.c,v 1.1 2002/04/19 01:43:50 wiz Exp $        */
+/*      $NetBSD: opms.c,v 1.11 2003/10/22 09:03:40 agc Exp $        */
 
 /*
  * Copyright 1997
@@ -90,6 +90,8 @@
 **--
 */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: opms.c,v 1.11 2003/10/22 09:03:40 agc Exp $");
 
 #include "opms.h"
 #if NOPMS > 1
@@ -109,6 +111,7 @@
 #include <sys/vnode.h>
 #include <sys/device.h>
 #include <sys/poll.h>
+#include <sys/conf.h>
 #include <machine/kerndebug.h>
 
 #include <dev/isa/isavar.h>
@@ -117,7 +120,6 @@
 #include <machine/intr.h>
 #include <machine/pio.h>
 #include <machine/mouse.h>
-#include <machine/conf.h>
 
 #include <dev/isa/isavar.h>
 #include <shark/shark/i8042reg.h>
@@ -192,12 +194,22 @@ int                  opmsintr         __P((void *));
 */
 
 /* Autoconfiguration data structures */
-struct cfattach opms_ca = 
-{
-        sizeof(struct opms_softc), opmsprobe, opmsattach,
-};
+CFATTACH_DECL(opms, sizeof(struct opms_softc),
+    opmsprobe, opmsattach, NULL, NULL);
 
 extern struct cfdriver opms_cd;
+
+dev_type_open(opmsopen);
+dev_type_close(opmsclose);
+dev_type_read(opmsread);
+dev_type_ioctl(opmsioctl);
+dev_type_poll(opmspoll);
+dev_type_kqfilter(opmskqfilter);
+
+const struct cdevsw opms_cdevsw = {
+	opmsopen, opmsclose, opmsread, nowrite, opmsioctl,
+	nostop, notty, opmspoll, nommap, opmskqfilter,
+};
 
 /* variable to control which debugs printed if kernel compiled with 
 ** option KERNEL_DEBUG. 
@@ -233,7 +245,7 @@ int opmsdebug = KERN_DEBUG_WARNING | KERN_DEBUG_ERROR;
 **  FUNCTION VALUE:
 **
 **     0 - Probe failed to find the requested device.
-**     1 - Probe sucessfully talked to the device. 
+**     1 - Probe successfully talked to the device. 
 **
 **  SIDE EFFECTS:
 **
@@ -257,8 +269,8 @@ opmsprobe(parent, match, aux)
     ** child of a real keyboard controller driver.)
     */
     if ((parent != NULL) &&
-        (!strcmp(parent->dv_cfdata->cf_driver->cd_name, "pc") ||
-         (!strcmp(parent->dv_cfdata->cf_driver->cd_name, "vt"))))
+        (!strcmp(parent->dv_cfdata->cf_name, "pc") ||
+         (!strcmp(parent->dv_cfdata->cf_name, "vt"))))
     {
         /* 
         ** The mouse shares registers with the parent, so
@@ -453,7 +465,7 @@ opmsopen(dev, flag, mode, p)
     i8042_flush(sc->sc_iot, sc->sc_ioh);
     sc->sc_protocol_byte = PMS_RD_BYTE1; 
     (void) i8042_cmd(sc->sc_iot, sc->sc_ioh, I8042_AUX_CMD, 
-                         I8042_NO_RESPONSE, NULL, PMS_MOUSE_ENABLE);
+                         I8042_NO_RESPONSE, 0, PMS_MOUSE_ENABLE);
     (void) I8042_AUXENABLE(sc->sc_iot, sc->sc_ioh);
     /* Enable interrupts on the axilliary device.
     */
@@ -510,7 +522,7 @@ opmsclose(dev, flag, mode, p)
     */
     i8042_flush(sc->sc_iot, sc->sc_ioh);
     (void) i8042_cmd(sc->sc_iot, sc->sc_ioh, I8042_AUX_CMD, 
-                         I8042_NO_RESPONSE, NULL, PMS_MOUSE_DISABLE);
+                         I8042_NO_RESPONSE, 0, PMS_MOUSE_DISABLE);
     i8042_flush(sc->sc_iot, sc->sc_ioh);
     (void) I8042_WRITECCB(sc->sc_iot, sc->sc_ioh, NOAUX_CMDBYTE);
     (void) I8042_AUXDISABLE(sc->sc_iot, sc->sc_ioh);
@@ -977,3 +989,51 @@ opmspoll(dev, events, p)
     return (revents);
 } /* End opmspoll */
 
+static void
+filt_opmsrdetach(struct knote *kn)
+{
+	struct opms_softc *sc = kn->kn_hook;
+	int s;
+
+	s = spltty();
+	SLIST_REMOVE(&sc->sc_rsel.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_opmsread(struct knote *kn, long hint)
+{
+	struct opms_softc *sc = kn->kn_hook;
+
+	kn->kn_data = sc->sc_q.c_cc;
+	return (kn->kn_data > 0);
+}
+
+static const struct filterops opmsread_filtops =
+	{ 1, NULL, filt_opmsrdetach, filt_opmsread };
+
+int
+opmskqfilter(dev_t dev, struct knote *kn)
+{
+	struct opms_softc *sc = opms_cd.cd_devs[PMSUNIT(dev)];
+	struct klist *klist;
+	int s;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &sc->sc_rsel.sel_klist;
+		kn->kn_fop = &opmsread_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = sc;
+
+	s = spltty();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
+}

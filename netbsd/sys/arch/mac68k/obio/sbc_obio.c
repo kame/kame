@@ -1,4 +1,4 @@
-/*	$NetBSD: sbc_obio.c,v 1.14 2001/04/25 17:53:15 bouyer Exp $	*/
+/*	$NetBSD: sbc_obio.c,v 1.17 2003/07/15 02:43:26 lukem Exp $	*/
 
 /*
  * Copyright (C) 1996,1997 Scott Reynolds.  All rights reserved.
@@ -25,6 +25,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sbc_obio.c,v 1.17 2003/07/15 02:43:26 lukem Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -75,9 +78,8 @@ void	sbc_intr_enable __P((struct ncr5380_softc *));
 void	sbc_intr_disable __P((struct ncr5380_softc *));
 void	sbc_obio_clrintr __P((struct ncr5380_softc *));
 
-struct cfattach sbc_obio_ca = {
-	sizeof(struct sbc_softc), sbc_obio_match, sbc_obio_attach
-};
+CFATTACH_DECL(sbc_obio, sizeof(struct sbc_softc),
+    sbc_obio_match, sbc_obio_attach, NULL, NULL);
 
 static int
 sbc_obio_match(parent, cf, args)

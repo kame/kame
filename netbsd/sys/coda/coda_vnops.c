@@ -6,7 +6,7 @@ mkdir
 rmdir
 symlink
 */
-/*	$NetBSD: coda_vnops.c,v 1.30 2001/12/06 04:27:40 chs Exp $	*/
+/*	$NetBSD: coda_vnops.c,v 1.38.2.1 2004/06/27 08:23:28 jdc Exp $	*/
 
 /*
  * 
@@ -54,7 +54,7 @@ symlink
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: coda_vnops.c,v 1.30 2001/12/06 04:27:40 chs Exp $");
+__KERNEL_RCSID(0, "$NetBSD: coda_vnops.c,v 1.38.2.1 2004/06/27 08:23:28 jdc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -243,7 +243,7 @@ coda_open(v)
     /* Check for open of control file. */
     if (IS_CTL_VP(*vpp)) {
 	/* XXX */
-	/* if (WRITEABLE(flag)) */ 
+	/* if (WRITABLE(flag)) */ 
 	if (flag & (FWRITE | O_TRUNC | O_CREAT | O_EXCL)) {
 	    MARK_INT_FAIL(CODA_OPEN_STATS);
 	    return(EACCES);
@@ -395,7 +395,6 @@ coda_rdwr(vp, uiop, rw, ioflag, cred, p)
 /* locals */
     struct cnode *cp = VTOC(vp);
     struct vnode *cfvp = cp->c_ovp;
-    int igot_internally = 0;
     int opened_internally = 0;
     int error = 0;
 
@@ -428,7 +427,6 @@ coda_rdwr(vp, uiop, rw, ioflag, cred, p)
 	 * it's completely written.
 	 */
 	if (cp->c_inode != 0 && !(p && (p->p_acflag & ACORE))) { 
-	    igot_internally = 1;
 	    error = coda_grab_vnode(cp->c_device, cp->c_inode, &cfvp);
 	    if (error) {
 		MARK_INT_FAIL(CODA_RDWR_STATS);
@@ -457,9 +455,8 @@ printf("coda_rdwr: Internally Opening %p\n", vp);
     }
 
     /* Have UFS handle the call. */
-    CODADEBUG(CODA_RDWR, myprintf(("indirect rdwr: fid = (%lx.%lx.%lx), refcnt = %d\n",
-			      cp->c_fid.Volume, cp->c_fid.Vnode, 
-			      cp->c_fid.Unique, CTOV(cp)->v_usecount)); )
+    CODADEBUG(CODA_RDWR, myprintf(("indirect rdwr: fid = %s, refcnt = %d\n",
+			coda_f2s(&cp->c_fid), CTOV(cp)->v_usecount)); )
 
     if (rw == UIO_READ) {
 	error = VOP_READ(cfvp, uiop, ioflag, cred);
@@ -593,10 +590,8 @@ coda_getattr(v)
 
     /* Check to see if the attributes have already been cached */
     if (VALID_VATTR(cp)) { 
-	CODADEBUG(CODA_GETATTR, { myprintf(("attr cache hit: (%lx.%lx.%lx)\n",
-				       cp->c_fid.Volume,
-				       cp->c_fid.Vnode,
-				       cp->c_fid.Unique));});
+	CODADEBUG(CODA_GETATTR, { myprintf(("attr cache hit: %s\n",
+					coda_f2s(&cp->c_fid)));});
 	CODADEBUG(CODA_GETATTR, if (!(codadebug & ~CODA_GETATTR))
 		 print_vattr(&cp->c_vattr); );
 	
@@ -608,11 +603,8 @@ coda_getattr(v)
     error = venus_getattr(vtomi(vp), &cp->c_fid, cred, p, vap);
 
     if (!error) {
-	CODADEBUG(CODA_GETATTR, myprintf(("getattr miss (%lx.%lx.%lx): result %d\n",
-				     cp->c_fid.Volume,
-				     cp->c_fid.Vnode,
-				     cp->c_fid.Unique,
-				     error)); )
+	CODADEBUG(CODA_GETATTR, myprintf(("getattr miss %s: result %d\n",
+				     coda_f2s(&cp->c_fid), error)); )
 	    
 	CODADEBUG(CODA_GETATTR, if (!(codadebug & ~CODA_GETATTR))
 		 print_vattr(vap);	);
@@ -854,9 +846,8 @@ coda_inactive(v)
 	return 0;
     }
 
-    CODADEBUG(CODA_INACTIVE, myprintf(("in inactive, %lx.%lx.%lx. vfsp %p\n",
-				  cp->c_fid.Volume, cp->c_fid.Vnode, 
-				  cp->c_fid.Unique, vp->v_mount));)
+    CODADEBUG(CODA_INACTIVE, myprintf(("in inactive, %s, vfsp %p\n",
+				  coda_f2s(&cp->c_fid), vp->v_mount));)
 
     /* If an array has been allocated to hold the symlink, deallocate it */
     if ((coda_symlink_cache) && (VALID_SYMLINK(cp))) {
@@ -870,9 +861,9 @@ coda_inactive(v)
 
     /* Remove it from the table so it can't be found. */
     coda_unsave(cp);
-    if ((struct coda_mntinfo *)(vp->v_mount->mnt_data) == NULL) {
+    if (vp->v_mount->mnt_data == NULL) {
 	myprintf(("Help! vfsp->vfs_data was NULL, but vnode %p wasn't dying\n", vp));
-	panic("badness in coda_inactive\n");
+	panic("badness in coda_inactive");
     }
 
     if (IS_UNMOUNTING(cp)) {
@@ -929,7 +920,7 @@ coda_lookup(v)
     struct cnode *cp;
     const char *nm = cnp->cn_nameptr;
     int len = cnp->cn_namelen;
-    ViceFid VFid;
+    CodaFid VFid;
     int	vtype;
     int error = 0;
 
@@ -937,9 +928,8 @@ coda_lookup(v)
 
     MARK_ENTRY(CODA_LOOKUP_STATS);
 
-    CODADEBUG(CODA_LOOKUP, myprintf(("lookup: %s in %lx.%lx.%lx\n",
-				   nm, dcp->c_fid.Volume,
-				   dcp->c_fid.Vnode, dcp->c_fid.Unique)););
+    CODADEBUG(CODA_LOOKUP, myprintf(("lookup: %s in %s\n",
+				   nm, coda_f2s(&dcp->c_fid))););
 
     /* Check for lookup of control object. */
     if (IS_CTL_NAME(dvp, nm, len)) {
@@ -951,9 +941,8 @@ coda_lookup(v)
 
     if (len+1 > CODA_MAXNAMLEN) {
 	MARK_INT_FAIL(CODA_LOOKUP_STATS);
-	CODADEBUG(CODA_LOOKUP, myprintf(("name too long: lookup, %lx.%lx.%lx(%s)\n",
-				    dcp->c_fid.Volume, dcp->c_fid.Vnode,
-				    dcp->c_fid.Unique, nm)););
+	CODADEBUG(CODA_LOOKUP, myprintf(("name too long: lookup, %s (%s)\n",
+				    coda_f2s(&dcp->c_fid), nm)););
 	*vpp = (struct vnode *)0;
 	error = EINVAL;
 	goto exit;
@@ -973,15 +962,14 @@ coda_lookup(v)
 	
 	if (error) {
 	    MARK_INT_FAIL(CODA_LOOKUP_STATS);
-	    CODADEBUG(CODA_LOOKUP, myprintf(("lookup error on %lx.%lx.%lx(%s)%d\n",
-					dcp->c_fid.Volume, dcp->c_fid.Vnode, dcp->c_fid.Unique, nm, error));)
+	    CODADEBUG(CODA_LOOKUP, myprintf(("lookup error on %s (%s)%d\n",
+					coda_f2s(&dcp->c_fid), nm, error));)
 	    *vpp = (struct vnode *)0;
 	} else {
 	    MARK_INT_SAT(CODA_LOOKUP_STATS);
 	    CODADEBUG(CODA_LOOKUP, 
-		     myprintf(("lookup: vol %lx vno %lx uni %lx type %o result %d\n",
-			    VFid.Volume, VFid.Vnode, VFid.Unique, vtype,
-			    error)); )
+		     myprintf(("lookup: %s type %o result %d\n",
+			    coda_f2s(&VFid), vtype, error)); )
 		
 	    cp = make_coda_node(&VFid, dvp->v_mount, vtype);
 	    *vpp = CTOV(cp);
@@ -1093,7 +1081,7 @@ coda_create(v)
     struct cnode *cp;
     const char *nm = cnp->cn_nameptr;
     int len = cnp->cn_namelen;
-    ViceFid VFid;
+    CodaFid VFid;
     struct vattr attr;
 
     MARK_ENTRY(CODA_CREATE_STATS);
@@ -1138,8 +1126,8 @@ coda_create(v)
 	coda_nc_enter(VTOC(dvp), nm, len, cred, VTOC(*vpp));
 	
 	CODADEBUG(CODA_CREATE, 
-		 myprintf(("create: (%lx.%lx.%lx), result %d\n",
-			VFid.Volume, VFid.Vnode, VFid.Unique, error)); )
+		 myprintf(("create: %s, result %d\n",
+			coda_f2s(&VFid), error)); )
     } else {
 	*vpp = (struct vnode *)0;
 	CODADEBUG(CODA_CREATE, myprintf(("create error %d\n", error));)
@@ -1197,9 +1185,8 @@ coda_remove(v)
 
     MARK_ENTRY(CODA_REMOVE_STATS);
 
-    CODADEBUG(CODA_REMOVE, myprintf(("remove: %s in %lx.%lx.%lx\n",
-				   nm, cp->c_fid.Volume, cp->c_fid.Vnode,
-				   cp->c_fid.Unique)););
+    CODADEBUG(CODA_REMOVE, myprintf(("remove: %s in %s\n",
+				   nm, coda_f2s(&cp->c_fid))););
 
     /* Remove the file's entry from the CODA Name Cache */
     /* We're being conservative here, it might be that this person
@@ -1275,17 +1262,17 @@ coda_link(v)
 
     if (codadebug & CODADBGMSK(CODA_LINK)) {
 
-	myprintf(("nb_link:   vp fid: (%lx.%lx.%lx)\n",
-		  cp->c_fid.Volume, cp->c_fid.Vnode, cp->c_fid.Unique));
-	myprintf(("nb_link: tdvp fid: (%lx.%lx.%lx)\n",
-		  tdcp->c_fid.Volume, tdcp->c_fid.Vnode, tdcp->c_fid.Unique));
+	myprintf(("nb_link:   vp fid: %s\n",
+		  coda_f2s(&cp->c_fid)));
+	myprintf(("nb_link: tdvp fid: %s)\n",
+		  coda_f2s(&tdcp->c_fid)));
 	
     }
     if (codadebug & CODADBGMSK(CODA_LINK)) {
-	myprintf(("link:   vp fid: (%lx.%lx.%lx)\n",
-		  cp->c_fid.Volume, cp->c_fid.Vnode, cp->c_fid.Unique));
-	myprintf(("link: tdvp fid: (%lx.%lx.%lx)\n",
-		  tdcp->c_fid.Volume, tdcp->c_fid.Vnode, tdcp->c_fid.Unique));
+	myprintf(("link:   vp fid: %s\n",
+		  coda_f2s(&cp->c_fid)));
+	myprintf(("link: tdvp fid: %s\n",
+		  coda_f2s(&tdcp->c_fid)));
 
     }
 
@@ -1445,7 +1432,7 @@ coda_mkdir(v)
     const char *nm = cnp->cn_nameptr;
     int len = cnp->cn_namelen;
     struct cnode *cp;
-    ViceFid VFid;
+    CodaFid VFid;
     struct vattr ova;
 
     MARK_ENTRY(CODA_MKDIR_STATS);
@@ -1488,8 +1475,8 @@ coda_mkdir(v)
 	/* Invalidate the parent's attr cache, the modification time has changed */
 	VTOC(dvp)->c_flags &= ~C_VATTR;
 	
-	CODADEBUG( CODA_MKDIR, myprintf(("mkdir: (%lx.%lx.%lx) result %d\n",
-				    VFid.Volume, VFid.Vnode, VFid.Unique, error)); )
+	CODADEBUG( CODA_MKDIR, myprintf(("mkdir: %s result %d\n",
+				    coda_f2s(&VFid), error)); )
     } else {
 	*vpp = (struct vnode *)0;
 	CODADEBUG(CODA_MKDIR, myprintf(("mkdir error %d\n",error));)
@@ -1597,6 +1584,7 @@ coda_symlink(v)
     struct proc *p = cnp->cn_proc;
 /* locals */
     int error;
+    u_long saved_cn_flags;
     /* 
      * XXX I'm assuming the following things about coda_symlink's
      * arguments: 
@@ -1642,26 +1630,28 @@ coda_symlink(v)
     /* Invalidate the parent's attr cache, the modification time has changed */
     tdcp->c_flags &= ~C_VATTR;
 
-    if (!error)
-    {
-	struct nameidata nd;
-	NDINIT(&nd, LOOKUP, FOLLOW|LOCKLEAF, UIO_SYSSPACE, nm, p);
-	nd.ni_cnd.cn_cred = cred;
-	nd.ni_loopcnt = 0;
-	nd.ni_startdir = tdvp;
-	nd.ni_cnd.cn_pnbuf = (char *)nm;
-	nd.ni_cnd.cn_nameptr = nd.ni_cnd.cn_pnbuf;
-	nd.ni_pathlen = len;
-	vput(tdvp);
-	error = lookup(&nd);
-	*ap->a_vpp = nd.ni_vp;
-    }
-
-    /* 
-     * Free the name buffer 
-     */
-    if ((cnp->cn_flags & SAVESTART) == 0) {
-	PNBUF_PUT(cnp->cn_pnbuf);
+    if (!error) {
+	/*
+	 * VOP_SYMLINK is not defined to pay attention to cnp->cn_flags;
+	 * these are defined only for VOP_LOOKUP.   We desire to reuse
+	 * cnp for a VOP_LOOKUP operation, and must be sure to not pass
+	 * stray flags passed to us.  Such stray flags can occur because
+	 * sys_symlink makes a namei call and then reuses the
+	 * componentname structure.
+	 */
+	/*
+	 * XXX Arguably we should create our own componentname structure
+	 * and not reuse the one that was passed in.
+	 */
+	saved_cn_flags = cnp->cn_flags;
+	cnp->cn_flags &= ~(MODMASK | OPMASK);
+	cnp->cn_flags |= LOOKUP;
+	error = VOP_LOOKUP(tdvp, ap->a_vpp, cnp);
+	cnp->cn_flags = saved_cn_flags;
+	/* Either an error occurs, or ap->a_vpp is locked. */
+    } else {
+	/* error, so unlock and deference parent */
+        vput(tdvp);
     }
 
  exit:    
@@ -1716,7 +1706,9 @@ printf("coda_readdir: Internally Opening %p\n", vp);
 	}
 	
 	/* Have UFS handle the call. */
-	CODADEBUG(CODA_READDIR, myprintf(("indirect readdir: fid = (%lx.%lx.%lx), refcnt = %d\n",cp->c_fid.Volume, cp->c_fid.Vnode, cp->c_fid.Unique, vp->v_usecount)); )
+	CODADEBUG(CODA_READDIR, myprintf((
+				"indirect readdir: fid = %s, refcnt = %d\n",
+				coda_f2s(&cp->c_fid), vp->v_usecount)); )
 	error = VOP_READDIR(cp->c_ovp, uiop, cred, eofflag, cookies,
 			       ncookies);
 	if (error)
@@ -1831,8 +1823,8 @@ coda_lock(v)
     ENTRY;
 
     if (coda_lockdebug) {
-	myprintf(("Attempting lock on %lx.%lx.%lx\n",
-		  cp->c_fid.Volume, cp->c_fid.Vnode, cp->c_fid.Unique));
+	myprintf(("Attempting lock on %s\n",
+		  coda_f2s(&cp->c_fid)));
     }
 
     return (lockmgr(&vp->v_lock, ap->a_flags, &vp->v_interlock));
@@ -1851,8 +1843,8 @@ coda_unlock(v)
 
     ENTRY;
     if (coda_lockdebug) {
-	myprintf(("Attempting unlock on %lx.%lx.%lx\n",
-		  cp->c_fid.Volume, cp->c_fid.Vnode, cp->c_fid.Unique));
+	myprintf(("Attempting unlock on %s\n",
+		  coda_f2s(&cp->c_fid)));
     }
 
     return (lockmgr(&vp->v_lock, ap->a_flags | LK_RELEASE, &vp->v_interlock));
@@ -1969,14 +1961,14 @@ print_cred(cred)
 /*
  * Return a vnode for the given fid.
  * If no cnode exists for this fid create one and put it
- * in a table hashed by fid.Volume and fid.Vnode.  If the cnode for
+ * in a table hashed by coda_f2i().  If the cnode for
  * this fid is already in the table return it (ref count is
  * incremented by coda_find.  The cnode will be flushed from the
  * table when coda_inactive calls coda_unsave.
  */
 struct cnode *
 make_coda_node(fid, vfsp, type)
-     ViceFid *fid; struct mount *vfsp; short type;
+     CodaFid *fid; struct mount *vfsp; short type;
 {
     struct cnode *cp;
     int          err;
@@ -1989,7 +1981,7 @@ make_coda_node(fid, vfsp, type)
 	
 	err = getnewvnode(VT_CODA, vfsp, coda_vnodeop_p, &vp);  
 	if (err) {                                                
-	    panic("coda: getnewvnode returned error %d\n", err);   
+	    panic("coda: getnewvnode returned error %d", err);   
 	}                                                         
 	vp->v_data = cp;                                          
 	vp->v_type = type;                                      

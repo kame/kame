@@ -1,4 +1,4 @@
-/*	$NetBSD: pcib.c,v 1.3 2001/07/22 15:04:01 wiz Exp $	*/
+/*	$NetBSD: pcib.c,v 1.9 2003/07/15 03:35:50 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pcib.c,v 1.9 2003/07/15 03:35:50 lukem Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -60,15 +63,14 @@ struct pcib_softc {
 	struct sandpoint_isa_chipset sc_chipset;
 };
 
-struct cfattach pcib_ca = {
-	sizeof(struct pcib_softc), pcibmatch, pcibattach
-};
+CFATTACH_DECL(pcib, sizeof(struct pcib_softc),
+    pcibmatch, pcibattach, NULL, NULL);
 
 void	pcib_callback __P((struct device *));
 int	pcib_print __P((void *, const char *));
 
-extern const struct powerpc_bus_space sandpoint_isa_io_bs_tag;
-extern const struct powerpc_bus_space sandpoint_isa_mem_bs_tag;
+extern struct powerpc_bus_space sandpoint_isa_io_bs_tag;
+extern struct powerpc_bus_space sandpoint_isa_mem_bs_tag;
 
 int
 pcibmatch(parent, match, aux)
@@ -139,6 +141,6 @@ pcib_print(aux, pnp)
 
 	/* Only ISAs can attach to pcib's; easy. */
 	if (pnp)
-		printf("isa at %s", pnp);
+		aprint_normal("isa at %s", pnp);
 	return (UNCONF);
 }

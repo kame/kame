@@ -1,4 +1,4 @@
-/* $NetBSD: dev_net.c,v 1.10 1999/11/13 21:38:20 thorpej Exp $ */
+/* $NetBSD: dev_net.c,v 1.12 2003/03/19 17:21:41 drochner Exp $ */
 
 /*
  * Copyright (c) 1995 Gordon W. Ross
@@ -87,12 +87,7 @@ struct	in_addr gateip;		/* swap ip address */
 n_long	netmask;		/* subnet or net mask */
 
 char rootpath[FNAME_SIZE];
-
-int hostnamelen;
 char hostname[FNAME_SIZE];
-
-int domainnamelen;
-char domainname[FNAME_SIZE];
 
 /*
  * Local things...
@@ -192,13 +187,22 @@ net_close(f)
 }
 
 int
-net_ioctl()
+net_ioctl(f, cmd, data)
+	struct open_file *f;
+	u_long cmd;
+	void *data;
 {
 	return EIO;
 }
 
 int
-net_strategy()
+net_strategy(devdata, rw, blk, size, buf, rsize)
+	void *devdata;
+	int rw;
+	daddr_t blk;
+	size_t size;
+	void *buf;
+	size_t *rsize;
 {
 	return EIO;
 }

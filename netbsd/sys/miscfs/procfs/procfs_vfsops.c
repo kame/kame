@@ -1,9 +1,41 @@
-/*	$NetBSD: procfs_vfsops.c,v 1.41 2001/11/10 13:33:44 lukem Exp $	*/
+/*	$NetBSD: procfs_vfsops.c,v 1.52.2.1 2004/05/29 09:04:41 tron Exp $	*/
+
+/*
+ * Copyright (c) 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Jan-Simon Pendry.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)procfs_vfsops.c	8.7 (Berkeley) 5/10/95
+ */
 
 /*
  * Copyright (c) 1993 Jan-Simon Pendry
- * Copyright (c) 1993
- *	The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * Jan-Simon Pendry.
@@ -44,7 +76,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: procfs_vfsops.c,v 1.41 2001/11/10 13:33:44 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: procfs_vfsops.c,v 1.52.2.1 2004/05/29 09:04:41 tron Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
@@ -54,6 +86,7 @@ __KERNEL_RCSID(0, "$NetBSD: procfs_vfsops.c,v 1.41 2001/11/10 13:33:44 lukem Exp
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
+#include <sys/sysctl.h>
 #include <sys/proc.h>
 #include <sys/buf.h>
 #include <sys/syslog.h>
@@ -82,8 +115,7 @@ int	procfs_fhtovp __P((struct mount *, struct fid *, struct vnode **));
 int	procfs_checkexp __P((struct mount *, struct mbuf *, int *,
 			   struct ucred **));
 int	procfs_vptofh __P((struct vnode *, struct fid *));
-int	procfs_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
-			   struct proc *));
+
 /*
  * VFS Operations.
  *
@@ -98,7 +130,6 @@ procfs_mount(mp, path, data, ndp, p)
 	struct nameidata *ndp;
 	struct proc *p;
 {
-	size_t size;
 	struct procfsmount *pmnt;
 	struct procfs_args args;
 	int error;
@@ -106,6 +137,15 @@ procfs_mount(mp, path, data, ndp, p)
 	if (UIO_MX & (UIO_MX-1)) {
 		log(LOG_ERR, "procfs: invalid directory entry size");
 		return (EINVAL);
+	}
+
+	if (mp->mnt_flag & MNT_GETARGS) {
+		pmnt = VFSTOPROC(mp);
+		if (pmnt == NULL)
+			return EIO;
+		args.version = PROCFS_ARGSVERSION;
+		args.flags = pmnt->pmnt_flags;
+		return copyout(&args, data, sizeof(args));
 	}
 
 	if (mp->mnt_flag & MNT_UPDATE)
@@ -125,18 +165,15 @@ procfs_mount(mp, path, data, ndp, p)
 	pmnt = (struct procfsmount *) malloc(sizeof(struct procfsmount),
 	    M_UFSMNT, M_WAITOK);   /* XXX need new malloc type */
 
-	mp->mnt_data = (qaddr_t)pmnt;
+	mp->mnt_data = pmnt;
 	vfs_getnewfsid(mp);
 
-	(void) copyinstr(path, mp->mnt_stat.f_mntonname, MNAMELEN, &size);
-	memset(mp->mnt_stat.f_mntonname + size, 0, MNAMELEN - size);
-	memset(mp->mnt_stat.f_mntfromname, 0, MNAMELEN);
-	memcpy(mp->mnt_stat.f_mntfromname, "procfs", sizeof("procfs"));
-
+	error = set_statfs_info(path, UIO_USERSPACE, "procfs", UIO_SYSSPACE,
+	    mp, p);
 	pmnt->pmnt_exechook = exechook_establish(procfs_revoke_vnodes, mp);
 	pmnt->pmnt_flags = args.flags;
 
-	return (0);
+	return error;
 }
 
 /*
@@ -171,7 +208,7 @@ procfs_root(mp, vpp)
 	struct vnode **vpp;
 {
 
-	return (procfs_allocvp(mp, vpp, 0, Proot));
+	return (procfs_allocvp(mp, vpp, 0, PFSroot, -1));
 }
 
 /* ARGSUSED */
@@ -207,12 +244,7 @@ procfs_statfs(mp, sbp, p)
 #else
 	sbp->f_type = 0;
 #endif
-	if (sbp != &mp->mnt_stat) {
-		memcpy(&sbp->f_fsid, &mp->mnt_stat.f_fsid, sizeof(sbp->f_fsid));
-		memcpy(sbp->f_mntonname, mp->mnt_stat.f_mntonname, MNAMELEN);
-		memcpy(sbp->f_mntfromname, mp->mnt_stat.f_mntfromname, MNAMELEN);
-	}
-	strncpy(sbp->f_fstypename, mp->mnt_op->vfs_name, MFSNAMELEN);
+	copy_statfs_info(sbp, mp);
 	return (0);
 }
 
@@ -248,7 +280,6 @@ procfs_vget(mp, ino, vpp)
 	ino_t ino;
 	struct vnode **vpp;
 {
-
 	return (EOPNOTSUPP);
 }
 
@@ -303,17 +334,25 @@ procfs_done()
 	procfs_hashdone();
 }
 
-int
-procfs_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
-	struct proc *p;
+SYSCTL_SETUP(sysctl_vfs_procfs_setup, "sysctl vfs.procfs subtree setup")
 {
-	return (EOPNOTSUPP);
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "vfs", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_VFS, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "procfs",
+		       SYSCTL_DESCR("Process file system"),
+		       NULL, 0, NULL, 0,
+		       CTL_VFS, 12, CTL_EOL);
+	/*
+	 * XXX the "12" above could be dynamic, thereby eliminating
+	 * one more instance of the "number to vfs" mapping problem,
+	 * but "12" is the order as taken from sys/mount.h
+	 */
 }
 
 extern const struct vnodeopv_desc procfs_vnodeop_opv_desc;
@@ -338,7 +377,7 @@ struct vfsops procfs_vfsops = {
 	procfs_init,
 	procfs_reinit,
 	procfs_done,
-	procfs_sysctl,
+	NULL,
 	NULL,				/* vfs_mountroot */
 	procfs_checkexp,
 	procfs_vnodeopv_descs,

@@ -1,4 +1,4 @@
-/*	$NetBSD: exec_elf.h,v 1.60 2002/01/28 22:15:54 thorpej Exp $	*/
+/*	$NetBSD: exec_elf.h,v 1.75 2004/02/13 11:36:23 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1994 The NetBSD Foundation, Inc.
@@ -41,10 +41,10 @@
 
 /*
  * The current ELF ABI specification is available at:
- *	http://www.sco.com/developer/gabi/
+ *	http://www.sco.com/developers/gabi/
  *
  * Current header definitions are in:
- *	http://www.sco.com/developer/gabi/latest/ch4.eheader.html
+ *	http://www.sco.com/developers/gabi/latest/ch4.eheader.html
  */
 
 #if defined(_KERNEL) || defined(_STANDALONE)
@@ -144,7 +144,7 @@ typedef struct {
 #define	EI_ABIVERSION	8	/* ABI version */
 #define	EI_PAD		9	/* Start of padding bytes up to EI_NIDENT*/
 
-/* e_ident[ELFMAG0,ELFMAG3] */
+/* e_ident[EI_MAG0,EI_MAG3] */
 #define	ELFMAG0		0x7f
 #define	ELFMAG1		'E'
 #define	ELFMAG2		'L'
@@ -249,7 +249,8 @@ typedef struct {
 #define	EM_TINYJ	61	/* Advanced Logic Corp. TinyJ embedded family processor */
 #define	EM_X86_64	62	/* AMD x86-64 architecture */
 #define	EM_PDSP		63	/* Sony DSP Processor */
-			/* 64-65 - Reserved */
+#define	EM_PDP10	64	/* Digital Equipment Corp. PDP-10 */
+#define	EM_PDP11	65	/* Digital Equipment Corp. PDP-11 */
 #define	EM_FX66		66	/* Siemens FX66 microcontroller */
 #define	EM_ST9PLUS	67	/* STMicroelectronics ST9+ 8/16 bit microcontroller */
 #define	EM_ST7		68	/* STMicroelectronics ST7 8-bit microcontroller */
@@ -258,10 +259,10 @@ typedef struct {
 #define	EM_68HC08	71	/* Motorola MC68HC08 Microcontroller */
 #define	EM_68HC05	72	/* Motorola MC68HC05 Microcontroller */
 #define	EM_SVX		73	/* Silicon Graphics SVx */
-#define	EM_ST19		74	/* STMicroelectronics ST19 8-bit cpu */
+#define	EM_ST19		74	/* STMicroelectronics ST19 8-bit CPU */
 #define	EM_VAX		75	/* Digital VAX */
 #define	EM_CRIS		76	/* Axis Communications 32-bit embedded processor */
-#define	EM_JAVELIN	77	/* Infineon Technologies 32-bit embedded cpu */
+#define	EM_JAVELIN	77	/* Infineon Technologies 32-bit embedded CPU */
 #define	EM_FIREPATH	78	/* Element 14 64-bit DSP processor */
 #define	EM_ZSP		79	/* LSI Logic's 16-bit DSP processor */
 #define	EM_MMIX		80	/* Donald Knuth's educational 64-bit processor */
@@ -320,18 +321,20 @@ typedef struct {
 #define	PT_PHDR		6		/* Entry for header table itself */
 #define	PT_NUM		7
 
+#define	PT_LOOS         0x60000000	/* OS-specific range */
+#define	PT_HIOS         0x6fffffff
+#define	PT_LOPROC	0x70000000	/* Processor-specific range */
+#define	PT_HIPROC	0x7fffffff
+
+#define	PT_MIPS_REGINFO	0x70000000
+
 /* p_flags */
 #define	PF_R		0x4	/* Segment is readable */
 #define	PF_W		0x2	/* Segment is writable */
 #define	PF_X		0x1	/* Segment is executable */
 
-#define	PF_MASKOS	0x0ff00000	/* Opersting system specific values */
+#define	PF_MASKOS	0x0ff00000	/* Operating system specific values */
 #define	PF_MASKPROC	0xf0000000	/* Processor-specific values */
-
-#define	PT_LOPROC	0x70000000	/* Processor-specific range */
-#define	PT_HIPROC	0x7fffffff
-
-#define	PT_MIPS_REGINFO	0x70000000
 
 /*
  * Section Headers
@@ -591,10 +594,10 @@ typedef struct {
 	/* Vendor specific */
 #define	AT_MIPS_NOTELF	10	/* XXX a_val != 0 -> MIPS XCOFF executable */
 
-#define	AT_SUN_UID	2000	/* euid */
-#define	AT_SUN_RUID	2001	/* ruid */
-#define	AT_SUN_GID	2002	/* egid */
-#define	AT_SUN_RGID	2003	/* rgid */
+#define	AT_EUID		2000	/* euid (solaris compatible numbers) */
+#define	AT_RUID		2001	/* ruid (solaris compatible numbers) */
+#define	AT_EGID		2002	/* egid (solaris compatible numbers) */
+#define	AT_RGID		2003	/* rgid (solaris compatible numbers) */
 
 	/* Solaris kernel specific */
 #define	AT_SUN_LDELF	2004	/* dynamic linker's ELF header */
@@ -606,7 +609,7 @@ typedef struct {
 #define	AT_SUN_PLATFORM	2008	/* sysinfo(SI_PLATFORM) */
 #define	AT_SUN_HWCAP	2009	/* process hardware capabilities */
 #define	AT_SUN_IFLUSH	2010	/* do we need to flush the instruction cache? */
-#define	AT_SUN_CPU	2011	/* cpu name */
+#define	AT_SUN_CPU	2011	/* CPU name */
 	/* ibcs2 emulation band aid */
 #define	AT_SUN_EMUL_ENTRY 2012	/* coff entry point */
 #define	AT_SUN_EMUL_EXECFD 2013	/* coff file descriptor */
@@ -702,6 +705,7 @@ struct netbsd_elfcore_procinfo {
 	uint32_t	cpi_nlwps;	/* number of LWPs */
 	int8_t		cpi_name[32];	/* copy of p->p_comm */
 	/* Add version 2 fields below here. */
+	int32_t		cpi_siglwp;	/* LWP target of killing signal */
 };
 
 #if defined(ELFSIZE)
@@ -762,14 +766,18 @@ struct netbsd_elfcore_procinfo {
 
 #ifdef _KERNEL
 
-#define ELF_AUX_ENTRIES	8		/* Size of aux array passed to loader */
+#define ELF_AUX_ENTRIES	12		/* Size of aux array passed to loader */
 #define ELF32_NO_ADDR	(~(Elf32_Addr)0) /* Indicates addr. not yet filled in */
+#define ELF32_LINK_ADDR	((Elf32_Addr)-2) /* advises to use link address */
 #define ELF64_NO_ADDR	(~(Elf64_Addr)0) /* Indicates addr. not yet filled in */
+#define ELF64_LINK_ADDR	((Elf64_Addr)-2) /* advises to use link address */
 
 #if defined(ELFSIZE) && (ELFSIZE == 64)
 #define ELF_NO_ADDR	ELF64_NO_ADDR
+#define ELF_LINK_ADDR	ELF64_LINK_ADDR
 #elif defined(ELFSIZE) && (ELFSIZE == 32)
 #define ELF_NO_ADDR	ELF32_NO_ADDR
+#define ELF_LINK_ADDR	ELF32_LINK_ADDR
 #endif
 
 #ifndef ELF32_EHDR_FLAGS_OK
@@ -801,29 +809,29 @@ struct elf_args {
 #endif
 
 #ifdef EXEC_ELF32
-int	exec_elf32_makecmds __P((struct proc *, struct exec_package *));
-int	elf32_copyargs __P((struct exec_package *, struct ps_strings *,
-    char **, void *));
+int	exec_elf32_makecmds(struct proc *, struct exec_package *);
+int	elf32_copyargs(struct proc *, struct exec_package *, 
+    	    struct ps_strings *, char **, void *);
 
-int	coredump_elf32 __P((struct proc *, struct vnode *, struct ucred *));
-int	coredump_writenote_elf32 __P((struct proc *, struct vnode *,
-	    struct ucred *, off_t, Elf32_Nhdr *, const char *, void *));
+int	coredump_elf32(struct lwp *, struct vnode *, struct ucred *);
+int	coredump_writenote_elf32(struct proc *, struct vnode *,
+	    struct ucred *, off_t, Elf32_Nhdr *, const char *, void *);
+
+int	elf32_check_header(Elf32_Ehdr *, int);
 #endif
 
 #ifdef EXEC_ELF64
-int	exec_elf64_makecmds __P((struct proc *, struct exec_package *));
-int	elf64_read_from __P((struct proc *, struct vnode *, u_long,
-    caddr_t, int));
-int	elf64_copyargs __P((struct exec_package *, struct ps_strings *,
-    char **, void *));
+int	exec_elf64_makecmds(struct proc *, struct exec_package *);
+int	elf64_read_from(struct proc *, struct vnode *, u_long, caddr_t, int);
+int	elf64_copyargs(struct proc *, struct exec_package *, 
+	    struct ps_strings *, char **, void *);
 
-int	coredump_elf64 __P((struct proc *, struct vnode *, struct ucred *));
+int	coredump_elf64 __P((struct lwp *, struct vnode *, struct ucred *));
 int	coredump_writenote_elf64 __P((struct proc *, struct vnode *,
 	    struct ucred *, off_t, Elf64_Nhdr *, const char *, void *));
-#endif
 
-/* common */
-int	exec_elf_setup_stack __P((struct proc *, struct exec_package *));
+int	elf64_check_header(Elf64_Ehdr *, int);
+#endif
 
 #endif /* _KERNEL */
 

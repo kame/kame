@@ -1,4 +1,4 @@
-/*	$NetBSD: m68k4k_exec.c,v 1.8.10.2 2003/10/02 09:52:04 tron Exp $	*/
+/*	$NetBSD: m68k4k_exec.c,v 1.14 2003/08/08 18:57:06 christos Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994 Christopher G. Demetriou
@@ -36,12 +36,12 @@
  * Taken directly from kern/exec_aout.c and frobbed to map text and
  * data as m68k4k executables expect.
  *
- * This module only works on machines with NBPG == 4096.  It's not clear
+ * This module only works on machines with PAGE_SIZE == 4096.  It's not clear
  * that making it work on other machines is worth the trouble.
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: m68k4k_exec.c,v 1.8.10.2 2003/10/02 09:52:04 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: m68k4k_exec.c,v 1.14 2003/08/08 18:57:06 christos Exp $");
 
 #if !defined(__m68k__)
 #error YOU GOTTA BE KIDDING!
@@ -85,7 +85,7 @@ exec_m68k4k_makecmds(p, epp)
 	struct exec *execp = epp->ep_hdr;
 
 	/* See note above... */
-	if (M68K4K_LDPGSZ != NBPG)
+	if (M68K4K_LDPGSZ != PAGE_SIZE)
 		return ENOEXEC;
 
 	if (epp->ep_hdrvalid < sizeof(struct exec))
@@ -159,7 +159,7 @@ exec_m68k4k_prep_zmagic(p, epp)
 	    epp->ep_daddr + execp->a_data, NULLVP, 0,
 	    VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 
-	return exec_aout_setup_stack(p, epp);
+	return (*epp->ep_esch->es_setup_stack)(p, epp);
 }
 
 /*
@@ -192,13 +192,13 @@ exec_m68k4k_prep_nmagic(p, epp)
 	    VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 
 	/* set up command for bss segment */
-	baddr = roundup(epp->ep_daddr + execp->a_data, NBPG);
+	baddr = roundup(epp->ep_daddr + execp->a_data, PAGE_SIZE);
 	bsize = epp->ep_daddr + epp->ep_dsize - baddr;
 	if (bsize > 0)
 		NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_zero, bsize, baddr,
 		    NULLVP, 0, VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 
-	return exec_aout_setup_stack(p, epp);
+	return (*epp->ep_esch->es_setup_stack)(p, epp);
 }
 
 /*
@@ -225,7 +225,7 @@ exec_m68k4k_prep_omagic(p, epp)
 	    sizeof(struct exec), VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 
 	/* set up command for bss segment */
-	baddr = roundup(epp->ep_daddr + execp->a_data, NBPG);
+	baddr = roundup(epp->ep_daddr + execp->a_data, PAGE_SIZE);
 	bsize = epp->ep_daddr + epp->ep_dsize - baddr;
 	if (bsize > 0)
 		NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_zero, bsize, baddr,
@@ -239,7 +239,8 @@ exec_m68k4k_prep_omagic(p, epp)
 	 * Compensate `ep_dsize' for the amount of data covered by the last
 	 * text page. 
 	 */
-	dsize = epp->ep_dsize + execp->a_text - roundup(execp->a_text, NBPG);
+	dsize = epp->ep_dsize + execp->a_text - roundup(execp->a_text,
+							PAGE_SIZE);
 	epp->ep_dsize = (dsize > 0) ? dsize : 0;
-	return exec_aout_setup_stack(p, epp);
+	return (*epp->ep_esch->es_setup_stack)(p, epp);
 }

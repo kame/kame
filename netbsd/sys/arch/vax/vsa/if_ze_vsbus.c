@@ -1,4 +1,4 @@
-/*      $NetBSD: if_ze_vsbus.c,v 1.5 2000/07/26 21:50:49 matt Exp $ */
+/*      $NetBSD: if_ze_vsbus.c,v 1.10 2003/11/10 08:51:52 wiz Exp $ */
 /*
  * Copyright (c) 1999 Ludd, University of Lule}, Sweden. All rights reserved.
  *
@@ -29,6 +29,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ze_vsbus.c,v 1.10 2003/11/10 08:51:52 wiz Exp $");
+
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/device.h>
@@ -58,7 +61,7 @@
 
 #include "ioconf.h"
 /*
- * Adresses.
+ * Addresses.
  */
 #define SGECADDR        0x20008000
 #define NISA_ROM        0x27800000
@@ -67,9 +70,8 @@
 static	int	zematch(struct device *, struct cfdata *, void *);
 static	void	zeattach(struct device *, struct device *, void *);
 
-struct	cfattach ze_vsbus_ca = {
-	sizeof(struct ze_softc), zematch, zeattach
-};
+CFATTACH_DECL(ze_vsbus, sizeof(struct ze_softc),
+    zematch, zeattach, NULL, NULL);
 
 /*
  * Check for present SGEC.

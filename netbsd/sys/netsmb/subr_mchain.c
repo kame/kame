@@ -1,4 +1,4 @@
-/*	$NetBSD: subr_mchain.c,v 1.1 2002/01/04 02:39:46 deberg Exp $	*/
+/*	$NetBSD: subr_mchain.c,v 1.9 2004/02/24 15:12:53 wiz Exp $	*/
 
 /*
  * Copyright (c) 2000, 2001 Boris Popov
@@ -31,9 +31,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * FreeBSD: src/sys/kern/subr_mchain.c,v 1.3 2001/12/10 05:51:45 obrien Exp
+ * FreeBSD: src/sys/kern/subr_mchain.c,v 1.4 2002/02/21 16:23:38 bp Exp
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: subr_mchain.c,v 1.9 2004/02/24 15:12:53 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -42,15 +44,6 @@
 #include <sys/uio.h>
 
 #include <netsmb/mchain.h>
-
-#ifndef __NetBSD__
-MODULE_VERSION(libmchain, 1);
-#endif
-
-#ifdef __NetBSD__
-#define M_TRYWAIT M_WAIT
-#define c_caddr_t const char *
-#endif
 
 #define MBERROR(format, args...) printf("%s(%d): "format, __func__ , \
 				    __LINE__ ,## args)
@@ -66,11 +59,11 @@ m_getm(struct mbuf *m, int len, int how, int type)
 
         KASSERT(len >= 0);
 
-        MGET(mp, how, type);
+        mp = m_get(how, type);
         if (mp == NULL)
                 return (NULL);
         else if (len > MINCLSIZE) {
-                MCLGET(mp, how);
+                m_clget(mp, how);
                 if ((mp->m_flags & M_EXT) == 0) {
                         m_free(mp);
                         return (NULL);
@@ -86,14 +79,14 @@ m_getm(struct mbuf *m, int len, int how, int type)
 
         top = tail = mp;
         while (len > 0) {
-                MGET(mp, how, type);
+                mp = m_get(how, type);
                 if (mp == NULL)
                         goto failed;
 
                 tail->m_next = mp;
                 tail = mp;
                 if (len > MINCLSIZE) {
-                        MCLGET(mp, how);
+                        m_clget(mp, how);
                         if ((mp->m_flags & M_EXT) == 0)
                                 goto failed;
                 }
@@ -135,7 +128,7 @@ mb_init(struct mbchain *mbp)
 {
 	struct mbuf *m;
 
-	m = m_gethdr(M_TRYWAIT, MT_DATA);
+	m = m_gethdr(M_WAIT, MT_DATA);
 	if (m == NULL) 
 		return ENOBUFS;
 	m->m_len = 0;
@@ -179,7 +172,7 @@ mb_fixhdr(struct mbchain *mbp)
 /*
  * Check if object of size 'size' fit to the current position and
  * allocate new mbuf if not. Advance pointers and increase length of mbuf(s).
- * Return pointer to the object placeholder or NULL if any error occured.
+ * Return pointer to the object placeholder or NULL if any error occurred.
  * Note: size should be <= MLEN 
  */
 caddr_t
@@ -189,10 +182,10 @@ mb_reserve(struct mbchain *mbp, int size)
 	caddr_t bpos;
 
 	if (size > MLEN)
-		panic("mb_reserve: size = %d\n", size);
+		panic("mb_reserve: size = %d", size);
 	m = mbp->mb_cur;
 	if (mbp->mb_mleft < size) {
-		mn = m_get(M_TRYWAIT, MT_DATA);
+		mn = m_get(M_WAIT, MT_DATA);
 		if (mn == NULL)
 			return NULL;
 		mbp->mb_cur = m->m_next = mn;
@@ -216,47 +209,47 @@ mb_put_uint8(struct mbchain *mbp, u_int8_t x)
 int
 mb_put_uint16be(struct mbchain *mbp, u_int16_t x)
 {
-	x = htobes(x);
+	x = htobe16(x);
 	return mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM);
 }
 
 int
 mb_put_uint16le(struct mbchain *mbp, u_int16_t x)
 {
-	x = htoles(x);
+	x = htole16(x);
 	return mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM);
 }
 
 int
 mb_put_uint32be(struct mbchain *mbp, u_int32_t x)
 {
-	x = htobel(x);
+	x = htobe32(x);
 	return mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM);
 }
 
 int
 mb_put_uint32le(struct mbchain *mbp, u_int32_t x)
 {
-	x = htolel(x);
+	x = htole32(x);
 	return mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM);
 }
 
 int
 mb_put_int64be(struct mbchain *mbp, int64_t x)
 {
-	x = htobeq(x);
+	x = htobe64(x);
 	return mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM);
 }
 
 int
 mb_put_int64le(struct mbchain *mbp, int64_t x)
 {
-	x = htoleq(x);
+	x = htole64(x);
 	return mb_put_mem(mbp, (caddr_t)&x, sizeof(x), MB_MSYSTEM);
 }
 
 int
-mb_put_mem(struct mbchain *mbp, c_caddr_t source, int size, int type)
+mb_put_mem(struct mbchain *mbp, const char *source, int size, int type)
 {
 	struct mbuf *m;
 	caddr_t dst;
@@ -269,7 +262,7 @@ mb_put_mem(struct mbchain *mbp, c_caddr_t source, int size, int type)
 	while (size > 0) {
 		if (mleft == 0) {
 			if (m->m_next == NULL) {
-				m = m_getm(m, size, M_TRYWAIT, MT_DATA);
+				m = m_getm(m, size, M_WAIT, MT_DATA);
 				if (m == NULL)
 					return ENOBUFS;
 			}
@@ -329,7 +322,6 @@ mb_put_mbuf(struct mbchain *mbp, struct mbuf *m)
 
 /*
  * copies a uio scatter/gather list to an mbuf chain.
- * NOTE: can ony handle iovcnt == 1
  */
 int
 mb_put_uio(struct mbchain *mbp, struct uio *uiop, int size)
@@ -337,14 +329,17 @@ mb_put_uio(struct mbchain *mbp, struct uio *uiop, int size)
 	long left;
 	int mtype, error;
 
-#ifdef DIAGNOSTIC
-	if (uiop->uio_iovcnt != 1)
-		MBPANIC("iovcnt != 1");
-#endif
 	mtype = (uiop->uio_segflg == UIO_SYSSPACE) ? MB_MSYSTEM : MB_MUSER;
 
-	while (size > 0) {
+	while (size > 0 && uiop->uio_resid) {
+		if (uiop->uio_iovcnt <= 0 || uiop->uio_iov == NULL)
+			return EFBIG;
 		left = uiop->uio_iov->iov_len;
+		if (left == 0) {
+			uiop->uio_iov++;
+			uiop->uio_iovcnt--;
+			continue;
+		}
 		if (left > size)
 			left = size;
 		error = mb_put_mem(mbp, uiop->uio_iov->iov_base, left, mtype);
@@ -368,7 +363,7 @@ md_init(struct mdchain *mdp)
 {
 	struct mbuf *m;
 
-	m = m_gethdr(M_TRYWAIT, MT_DATA);
+	m = m_gethdr(M_WAIT, MT_DATA);
 	if (m == NULL) 
 		return ENOBUFS;
 	m->m_len = 0;
@@ -450,7 +445,7 @@ md_get_uint16le(struct mdchain *mdp, u_int16_t *x)
 	u_int16_t v;
 	int error = md_get_uint16(mdp, &v);
 
-	*x = letohs(v);
+	*x = le16toh(v);
 	return error;
 }
 
@@ -459,7 +454,7 @@ md_get_uint16be(struct mdchain *mdp, u_int16_t *x) {
 	u_int16_t v;
 	int error = md_get_uint16(mdp, &v);
 
-	*x = betohs(v);
+	*x = be16toh(v);
 	return error;
 }
 
@@ -476,7 +471,7 @@ md_get_uint32be(struct mdchain *mdp, u_int32_t *x)
 	int error;
 
 	error = md_get_uint32(mdp, &v);
-	*x = betohl(v);
+	*x = be32toh(v);
 	return error;
 }
 
@@ -487,7 +482,7 @@ md_get_uint32le(struct mdchain *mdp, u_int32_t *x)
 	int error;
 
 	error = md_get_uint32(mdp, &v);
-	*x = letohl(v);
+	*x = le32toh(v);
 	return error;
 }
 
@@ -504,7 +499,7 @@ md_get_int64be(struct mdchain *mdp, int64_t *x)
 	int error;
 
 	error = md_get_int64(mdp, &v);
-	*x = betohq(v);
+	*x = be64toh(v);
 	return error;
 }
 
@@ -515,7 +510,7 @@ md_get_int64le(struct mdchain *mdp, int64_t *x)
 	int error;
 
 	error = md_get_int64(mdp, &v);
-	*x = letohq(v);
+	*x = le64toh(v);
 	return error;
 }
 
@@ -529,7 +524,9 @@ md_get_mem(struct mdchain *mdp, caddr_t target, int size, int type)
 	
 	while (size > 0) {
 		if (m == NULL) {
+#ifdef MCHAIN_DEBUG
 			MBERROR("incomplete copy\n");
+#endif
 			return EBADRPC;
 		}
 		s = mdp->md_pos;
@@ -570,7 +567,7 @@ md_get_mbuf(struct mdchain *mdp, int size, struct mbuf **ret)
 {
 	struct mbuf *m = mdp->md_cur, *rm;
 
-	rm = m_copym(m, mdp->md_pos - mtod(m, u_char*), size, M_TRYWAIT);
+	rm = m_copym(m, mdp->md_pos - mtod(m, u_char*), size, M_WAIT);
 	if (rm == NULL)
 		return EBADRPC;
 	md_get_mem(mdp, NULL, size, MB_MZERO);
@@ -586,10 +583,15 @@ md_get_uio(struct mdchain *mdp, struct uio *uiop, int size)
 	int mtype, error;
 
 	mtype = (uiop->uio_segflg == UIO_SYSSPACE) ? MB_MSYSTEM : MB_MUSER;
-	while (size > 0) {
+	while (size > 0 && uiop->uio_resid) {
 		if (uiop->uio_iovcnt <= 0 || uiop->uio_iov == NULL)
 			return EFBIG;
 		left = uiop->uio_iov->iov_len;
+		if (left == 0) {
+			uiop->uio_iov++;
+			uiop->uio_iovcnt--;
+			continue;
+		}
 		uiocp = uiop->uio_iov->iov_base;
 		if (left > size)
 			left = size;
@@ -598,14 +600,9 @@ md_get_uio(struct mdchain *mdp, struct uio *uiop, int size)
 			return error;
 		uiop->uio_offset += left;
 		uiop->uio_resid -= left;
-		if (uiop->uio_iov->iov_len <= size) {
-			uiop->uio_iovcnt--;
-			uiop->uio_iov++;
-		} else {
-                        uiop->uio_iov->iov_base =
+                uiop->uio_iov->iov_base =
                                 (char *)uiop->uio_iov->iov_base + left;
-			uiop->uio_iov->iov_len -= left;
-		}
+		uiop->uio_iov->iov_len -= left;
 		size -= left;
 	}
 	return 0;

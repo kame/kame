@@ -1,4 +1,4 @@
-/*	$NetBSD: usbdi_util.h,v 1.27 2002/03/17 18:02:53 augustss Exp $	*/
+/*	$NetBSD: usbdi_util.h,v 1.28.8.1 2004/07/02 17:24:20 he Exp $	*/
 /*	$FreeBSD: src/sys/dev/usb/usbdi_util.h,v 1.9 1999/11/17 22:33:50 n_hibma Exp $	*/
 
 /*
@@ -38,15 +38,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-usbd_status	usbd_get_desc(usbd_device_handle dev, int type, 
+usbd_status	usbd_get_desc(usbd_device_handle dev, int type,
 			      int index, int len, void *desc);
-usbd_status	usbd_get_config_desc(usbd_device_handle, int, 
+usbd_status	usbd_get_config_desc(usbd_device_handle, int,
 				     usb_config_descriptor_t *);
 usbd_status	usbd_get_config_desc_full(usbd_device_handle, int, void *, int);
 usbd_status	usbd_get_device_desc(usbd_device_handle dev,
 				     usb_device_descriptor_t *d);
 usbd_status	usbd_set_address(usbd_device_handle dev, int addr);
-usbd_status	usbd_get_port_status(usbd_device_handle, 
+usbd_status	usbd_get_port_status(usbd_device_handle,
 				     int, usb_port_status_t *);
 usbd_status	usbd_set_hub_feature(usbd_device_handle dev, int);
 usbd_status	usbd_clear_hub_feature(usbd_device_handle, int);
@@ -70,7 +70,8 @@ usbd_status	usbd_read_report_desc(usbd_interface_handle ifc, void **descp,
 				       int *sizep, usb_malloc_type mem);
 usbd_status	usbd_get_config(usbd_device_handle dev, u_int8_t *conf);
 usbd_status	usbd_get_string_desc(usbd_device_handle dev, int sindex,
-				     int langid,usb_string_descriptor_t *sdesc);
+				     int langid,usb_string_descriptor_t *sdesc,
+				     int *sizep);
 void		usbd_delay_ms(usbd_device_handle, u_int);
 
 

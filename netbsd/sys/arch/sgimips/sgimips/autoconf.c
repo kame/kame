@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.8.6.1 2002/07/15 16:34:26 thorpej Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.20 2004/01/19 03:26:14 sekiya Exp $	*/
 
 /*
  * Copyright (c) 2000 Soren S. Jorvang
@@ -15,7 +15,7 @@
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
  *          This product includes software developed for the
- *          NetBSD Project.  See http://www.netbsd.org/ for
+ *          NetBSD Project.  See http://www.NetBSD.org/ for
  *          information about NetBSD.
  * 4. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
@@ -31,6 +31,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.20 2004/01/19 03:26:14 sekiya Exp $");
 
 #include "opt_ddb.h"
 
@@ -94,17 +97,29 @@ makebootdev(cp)
 
 	booted_slot = booted_unit = booted_partition = 0;
 
-	if (strncmp(cp, "scsi(", 5) == NULL) {
+	if (strncmp(cp, "pci(", 4) == 0) {
+		cp += 4;
+
+		while (*cp && *cp != ')')
+		    cp++;
+
+		if (*cp != ')')
+		    return;
+
+		cp++;
+	}
+
+	if (strncmp(cp, "scsi(", 5) == 0) {
 		cp += 5;
 		if (*cp >= '0' && *cp <= '9')
 			booted_slot = *cp++ - '0';
-		if (strncmp(cp, ")disk(", 6) == NULL) {
+		if (strncmp(cp, ")disk(", 6) == 0) {
 			cp += 6;
 			if (*cp >= '0' && *cp <= '9')
 				booted_unit = *cp++ - '0';
 		}
 		/* XXX can rdisk() ever be other than 0? */
-		if (strncmp(cp, ")rdisk(0)partition(", 19) == NULL) {
+		if (strncmp(cp, ")rdisk(0)partition(", 19) == 0) {
 			cp += 19;
 			while (*cp >= '0' && *cp <= '9')
 				booted_partition =
@@ -115,7 +130,7 @@ makebootdev(cp)
 		booted_protocol = "SCSI";
 		return;
 	}
-	if (strncmp(cp, "dksc(", 5) == NULL) {
+	if (strncmp(cp, "dksc(", 5) == 0) {
 		cp += 5;
 		if (*cp >= '0' && *cp <= '9')
 			booted_slot = *cp++ - '0';
@@ -162,7 +177,7 @@ device_register(dev, aux)
 	static int found, initted, scsiboot, netboot;
 	struct device *parent = dev->dv_parent;
 	struct cfdata *cf = dev->dv_cfdata;
-	struct cfdriver *cd = cf->cf_driver;
+	const char *name = cf->cf_name;
 
 	if (found)
 		return;
@@ -174,29 +189,24 @@ device_register(dev, aux)
 	}
 
 	/*
-	 * Check for WDC controller
+	 * Handle SCSI boot device definitions
+	 * wdsc -- IP22/24
+	 * ahc -- IP32
 	 */
-	if (scsiboot && strcmp(cd->cd_name, "wdsc") == 0) {
-		/* 
-		 * XXX: this fails if the controllers were attached 
-		 * in an order other than the ARCS-imposed order.
-		 */
+	if ( (scsiboot && strcmp(name, "wdsc") == 0) ||
+	     (scsiboot && strcmp(name, "ahc") == 0) ) {
 		if (dev->dv_unit == booted_slot)
 			booted_controller = dev;
 		return;
 	}
 
 	/*
-	 * Other SCSI controllers ??
-	 */
-
-	/*
 	 * If we found the boot controller, if check disk/tape/cdrom device
 	 * on that controller matches.
 	 */
-	if (booted_controller && (strcmp(cd->cd_name, "sd") == 0 ||
-	    strcmp(cd->cd_name, "st") == 0 ||
-	    strcmp(cd->cd_name, "cd") == 0)) {
+	if (booted_controller && (strcmp(name, "sd") == 0 ||
+	    strcmp(name, "st") == 0 ||
+	    strcmp(name, "cd") == 0)) {
 		struct scsipibus_attach_args *sa = aux;
 
 		if (parent->dv_parent != booted_controller)
@@ -211,7 +221,7 @@ device_register(dev, aux)
 	/*
 	 * Check if netboot device.
 	 */
-	if (netboot && strcmp(cd->cd_name, "sq") == 0) {
+	if (netboot && strcmp(name, "sq") == 0) {
 		/* XXX Check unit number? (Which we don't parse yet) */
 		booted_device = dev;
 		found = 1;

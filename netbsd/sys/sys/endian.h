@@ -1,4 +1,4 @@
-/*	$NetBSD: endian.h,v 1.5 2002/05/12 22:59:50 kleink Exp $	*/
+/*	$NetBSD: endian.h,v 1.7.2.1 2004/07/02 18:18:01 he Exp $	*/
 
 /*
  * Copyright (c) 1987, 1991, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -37,6 +33,8 @@
 
 #ifndef _SYS_ENDIAN_H_
 #define _SYS_ENDIAN_H_
+
+#include <sys/featuretest.h>
 
 /*
  * Definitions for byte order, according to byte significance from low
@@ -62,7 +60,7 @@
 #endif
 
 
-#ifndef _POSIX_SOURCE
+#if defined(_XOPEN_SOURCE) || defined(_NETBSD_SOURCE)
 /*
  *  Traditional names for byteorder.  These are defined as the numeric
  *  sequences so that third party code can "#define XXX_ENDIAN" and not
@@ -100,7 +98,7 @@ __END_DECLS
 /*
  * Macros for network/external number representation conversion.
  */
-#if BYTE_ORDER == BIG_ENDIAN && !defined(lint)
+#if BYTE_ORDER == BIG_ENDIAN && !defined(__lint__)
 #define	ntohl(x)	(x)
 #define	ntohs(x)	(x)
 #define	htonl(x)	(x)
@@ -111,13 +109,13 @@ __END_DECLS
 #define	HTONL(x)	(void) (x)
 #define	HTONS(x)	(void) (x)
 
-#else	/* LITTLE_ENDIAN || !defined(lint) */
+#else	/* LITTLE_ENDIAN || !defined(__lint__) */
 
 #define	NTOHL(x)	(x) = ntohl((uint32_t)(x))
 #define	NTOHS(x)	(x) = ntohs((uint16_t)(x))
 #define	HTONL(x)	(x) = htonl((uint32_t)(x))
 #define	HTONS(x)	(x) = htons((uint16_t)(x))
-#endif	/* LITTLE_ENDIAN || !defined(lint) */
+#endif	/* LITTLE_ENDIAN || !defined(__lint__) */
 
 /*
  * Macros to convert to a specific endianness.

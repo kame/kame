@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_fault_i.h,v 1.15 2001/09/15 20:36:45 chs Exp $	*/
+/*	$NetBSD: uvm_fault_i.h,v 1.17 2004/03/24 07:55:01 junyoung Exp $	*/
 
 /*
  *
@@ -40,11 +40,11 @@
 /*
  * uvm_fault_i.h: fault inline functions
  */
-static boolean_t uvmfault_lookup __P((struct uvm_faultinfo *, boolean_t));
-static boolean_t uvmfault_relock __P((struct uvm_faultinfo *));
-static void uvmfault_unlockall __P((struct uvm_faultinfo *, struct vm_amap *,
-			            struct uvm_object *, struct vm_anon *));
-static void uvmfault_unlockmaps __P((struct uvm_faultinfo *, boolean_t));
+static boolean_t uvmfault_lookup(struct uvm_faultinfo *, boolean_t);
+static boolean_t uvmfault_relock(struct uvm_faultinfo *);
+static void uvmfault_unlockall(struct uvm_faultinfo *, struct vm_amap *,
+			       struct uvm_object *, struct vm_anon *);
+static void uvmfault_unlockmaps(struct uvm_faultinfo *, boolean_t);
 
 /*
  * uvmfault_unlockmaps: unlock the maps
@@ -128,6 +128,7 @@ uvmfault_lookup(ufi, write_lock)
 	 * only be two levels so we won't loop very long.
 	 */
 
+	/*CONSTCOND*/
 	while (1) {
 		/*
 		 * Make sure this is not an "interrupt safe" map.

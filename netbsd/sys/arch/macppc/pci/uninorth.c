@@ -1,4 +1,4 @@
-/*	$NetBSD: uninorth.c,v 1.4 2002/05/16 01:01:38 thorpej Exp $	*/
+/*	$NetBSD: uninorth.c,v 1.9 2003/07/15 02:43:34 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2000 Tsubai Masanari.  All rights reserved.
@@ -26,6 +26,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: uninorth.c,v 1.9 2003/07/15 02:43:34 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -48,9 +51,8 @@ int uninorth_print __P((void *, const char *));
 pcireg_t uninorth_conf_read __P((pci_chipset_tag_t, pcitag_t, int));
 void uninorth_conf_write __P((pci_chipset_tag_t, pcitag_t, int, pcireg_t));
 
-struct cfattach uninorth_ca = {
-	sizeof(struct uninorth_softc), uninorth_match, uninorth_attach
-};
+CFATTACH_DECL(uninorth, sizeof(struct uninorth_softc),
+    uninorth_match, uninorth_attach, NULL, NULL);
 
 int
 uninorth_match(parent, cf, aux)
@@ -135,6 +137,7 @@ uninorth_attach(parent, self, aux)
 	pba.pba_memt = pc->memt;
 	pba.pba_iot = pc->iot;
 	pba.pba_dmat = &pci_bus_dma_tag;
+	pba.pba_dmat64 = NULL;
 	pba.pba_bus = pc->bus;
 	pba.pba_bridgetag = NULL;
 	pba.pba_pc = pc;
@@ -151,8 +154,8 @@ uninorth_print(aux, pnp)
 	struct pcibus_attach_args *pa = aux;
 
 	if (pnp)
-		printf("%s at %s", pa->pba_busname, pnp);
-	printf(" bus %d", pa->pba_bus);
+		aprint_normal("%s at %s", pa->pba_busname, pnp);
+	aprint_normal(" bus %d", pa->pba_bus);
 	return UNCONF;
 }
 

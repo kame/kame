@@ -1,4 +1,4 @@
-/*	$NetBSD: bus.h,v 1.7 2002/03/17 21:45:07 simonb Exp $	*/
+/*	$NetBSD: bus.h,v 1.9 2003/06/15 23:09:00 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 2000, 2001, 2002 The NetBSD Foundation, Inc.
@@ -604,6 +604,7 @@ void bus_space_destroy(bus_space_tag_t);
 #define	BUS_DMA_BUS4		0x080
 #define	BUS_DMA_READ		0x100	/* mapping is device -> memory only */
 #define	BUS_DMA_WRITE		0x200	/* mapping is memory -> device only */
+#define	BUS_DMA_NOCACHE		0x400	/* hint: map non-cached memory */
 
 /*
  * Private flags stored in the DMA map.
@@ -624,6 +625,8 @@ struct uio;
 
 typedef struct hpcsh_bus_dma_tag		*bus_dma_tag_t;
 typedef struct hpcsh_bus_dmamap		*bus_dmamap_t;
+
+#define BUS_DMA_TAG_VALID(t)    ((t) != (bus_dma_tag_t)0)
 
 /*
  *	bus_dma_segment_t

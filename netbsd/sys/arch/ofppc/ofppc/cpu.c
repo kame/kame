@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.c,v 1.3 2001/10/22 14:46:09 thorpej Exp $	*/
+/*	$NetBSD: cpu.c,v 1.6 2003/07/15 02:46:32 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2000, 2001 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.6 2003/07/15 02:46:32 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -46,9 +49,8 @@
 static int cpu_match(struct device *, struct cfdata *, void *);
 static void cpu_attach(struct device *, struct device *, void *);
 
-struct cfattach cpu_ca = {
-	sizeof(struct cpu_softc), cpu_match, cpu_attach
-};
+CFATTACH_DECL(cpu, sizeof(struct cpu_softc),
+    cpu_match, cpu_attach, NULL, NULL);
 
 int
 cpu_match(struct device *parent, struct cfdata *cfdata, void *aux)

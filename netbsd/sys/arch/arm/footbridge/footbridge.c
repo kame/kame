@@ -1,4 +1,4 @@
-/*	$NetBSD: footbridge.c,v 1.7 2002/05/16 01:01:33 thorpej Exp $	*/
+/*	$NetBSD: footbridge.c,v 1.14 2003/06/15 23:08:56 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1997,1998 Mark Brinicombe.
@@ -33,6 +33,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: footbridge.c,v 1.14 2003/06/15 23:08:56 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -71,9 +74,8 @@ static int footbridge_print	__P((void *aux, const char *pnp));
 static int footbridge_intr	__P((void *arg));
 
 /* Driver and attach structures */
-struct cfattach footbridge_ca = {
-	sizeof(struct footbridge_softc), footbridge_match, footbridge_attach
-};
+CFATTACH_DECL(footbridge, sizeof(struct footbridge_softc),
+    footbridge_match, footbridge_attach, NULL, NULL);
 
 /* Various bus space tags */
 extern struct bus_space footbridge_bs_tag;
@@ -117,9 +119,9 @@ footbridge_print(aux, pnp)
 	union footbridge_attach_args *fba = aux;
 
 	if (pnp)
-		printf("%s at %s", fba->fba_name, pnp);
+		aprint_normal("%s at %s", fba->fba_name, pnp);
 	if (strcmp(fba->fba_name, "pci") == 0)
-		printf(" bus %d", fba->fba_pba.pba_bus);
+		aprint_normal(" bus %d", fba->fba_pba.pba_bus);
 	return(UNCONF);
 }
 
@@ -166,14 +168,14 @@ footbridge_attach(parent, self, aux)
 	/* Map the Footbridge */
 	if (bus_space_map(sc->sc_iot, DC21285_ARMCSR_VBASE,
 	     DC21285_ARMCSR_VSIZE, 0, &sc->sc_ioh))
-		panic("%s: Cannot map registers\n", self->dv_xname);
+		panic("%s: Cannot map registers", self->dv_xname);
 
 	/* Read the ID to make sure it is what we think it is */
 	vendor = bus_space_read_2(sc->sc_iot, sc->sc_ioh, VENDOR_ID);
 	device = bus_space_read_2(sc->sc_iot, sc->sc_ioh, DEVICE_ID);
 	rev = bus_space_read_1(sc->sc_iot, sc->sc_ioh, REVISION);
 	if (vendor != DC21285_VENDOR_ID && device != DC21285_DEVICE_ID)
-		panic("%s: Unrecognised ID\n", self->dv_xname);
+		panic("%s: Unrecognised ID", self->dv_xname);
 
 	printf(": DC21285 rev %d\n", rev);
 
@@ -184,19 +186,19 @@ footbridge_attach(parent, self, aux)
 /*	bus_space_write_4(sc->sc_iot, sc->sc_ioh, 0x18, 0x40000000);*/
 
 	/* Install a generic handler to catch a load of system interrupts */
-	sc->sc_serr_ih = intr_claim(IRQ_SERR, IPL_NONE,
+	sc->sc_serr_ih = footbridge_intr_claim(IRQ_SERR, IPL_HIGH,
 	    "serr", footbridge_intr, sc);
-	sc->sc_sdram_par_ih = intr_claim(IRQ_SDRAM_PARITY, IPL_NONE,
+	sc->sc_sdram_par_ih = footbridge_intr_claim(IRQ_SDRAM_PARITY, IPL_HIGH,
 	    "sdram parity", footbridge_intr, sc);
-	sc->sc_data_par_ih = intr_claim(IRQ_DATA_PARITY, IPL_NONE,
+	sc->sc_data_par_ih = footbridge_intr_claim(IRQ_DATA_PARITY, IPL_HIGH,
 	    "data parity", footbridge_intr, sc);
-	sc->sc_master_abt_ih = intr_claim(IRQ_MASTER_ABORT, IPL_NONE,
+	sc->sc_master_abt_ih = footbridge_intr_claim(IRQ_MASTER_ABORT, IPL_HIGH,
 	    "mast abt", footbridge_intr, sc);
-	sc->sc_target_abt_ih = intr_claim(IRQ_TARGET_ABORT, IPL_NONE,
+	sc->sc_target_abt_ih = footbridge_intr_claim(IRQ_TARGET_ABORT, IPL_HIGH,
 	    "targ abt", footbridge_intr, sc);
-	sc->sc_parity_ih = intr_claim(IRQ_PARITY, IPL_NONE,
+	sc->sc_parity_ih = footbridge_intr_claim(IRQ_PARITY, IPL_HIGH,
 	    "parity", footbridge_intr, sc);
-
+	
 	/* Set up the PCI bus tags */
 	footbridge_create_io_bs_tag(&footbridge_pci_io_bs_tag,
 	    (void *)DC21285_PCI_IO_VBASE);
@@ -211,6 +213,7 @@ footbridge_attach(parent, self, aux)
 	fba.fba_pba.pba_iot = &footbridge_pci_io_bs_tag;
 	fba.fba_pba.pba_memt = &footbridge_pci_mem_bs_tag;
 	fba.fba_pba.pba_dmat = &footbridge_pci_bus_dma_tag;
+	fba.fba_pba.pba_dmat64 = NULL;
 	fba.fba_pba.pba_flags = PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED;
 	fba.fba_pba.pba_bus = 0;
 	fba.fba_pba.pba_bridgetag = NULL;

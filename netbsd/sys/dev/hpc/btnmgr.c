@@ -1,4 +1,4 @@
-/*	$NetBSD: btnmgr.c,v 1.5 2002/03/17 19:40:56 atatat Exp $	*/
+/*	$NetBSD: btnmgr.c,v 1.12 2002/12/10 06:18:07 hamajima Exp $	*/
 
 /*-
  * Copyright (c) 1999
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: btnmgr.c,v 1.5 2002/03/17 19:40:56 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: btnmgr.c,v 1.12 2002/12/10 06:18:07 hamajima Exp $");
 
 #define BTNMGRDEBUG
 
@@ -71,8 +71,6 @@ int	btnmgr_debug = BTNMGRDEBUG_CONF;
 #define DPRINTFN(n, arg)
 #endif
 
-cdev_decl(btnmgr);
-
 struct btnmgr_softc {
 	struct device sc_dev;
 	config_hook_tag	sc_hook_tag;
@@ -91,9 +89,21 @@ static int btnmgr_hook(void *, int, long, void *);
 /*
  * global/static data
  */
-struct cfattach btnmgr_ca = {
-	sizeof(struct btnmgr_softc), btnmgrmatch, btnmgrattach
+CFATTACH_DECL(btnmgr, sizeof(struct btnmgr_softc),
+    btnmgrmatch, btnmgrattach, NULL, NULL);
+
+#ifdef notyet
+dev_type_open(btnmgropen);
+dev_type_close(btnmgrclose);
+dev_type_read(btnmgrread);
+dev_type_write(btnmgrwrite);
+dev_type_ioctl(btnmgrioctl);
+
+const struct cdevsw btnmgr_cdevsw = {
+	btnmgropen, btnmgrclose, btnmgrread, btnmgrwrite, btnmgrioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
 };
+#endif /* notyet */
 
 /* wskbd accessopts */
 int	btnmgr_wskbd_enable(void *, int);
@@ -165,7 +175,7 @@ btnmgrmatch(struct device *parent, struct cfdata *match, void *aux)
 {
 	struct mainbus_attach_args *ma = aux;
     
-	if (strcmp(ma->ma_name, match->cf_driver->cd_name))
+	if (strcmp(ma->ma_name, match->cf_name))
 		return 0;
 
 	return (1);
@@ -226,7 +236,9 @@ btnmgr_hook(void *ctx, int type, long id, void *msg)
 	if (id == CONFIG_HOOK_BUTTONEVENT_POWER && msg)
 		config_hook_call(CONFIG_HOOK_PMEVENT, 
 		    CONFIG_HOOK_PMEVENT_SUSPENDREQ, NULL);
-
+	else if (id == CONFIG_HOOK_BUTTONEVENT_COVER)
+		config_hook_call(CONFIG_HOOK_POWERCONTROL,
+		    CONFIG_HOOK_POWERCONTROL_LCDLIGHT, (void*)(msg ? 0: 1));
 
 	return (0);
 }

@@ -1,10 +1,10 @@
-/*	$NetBSD: eisadevs_data.h,v 1.27 2001/09/14 13:46:42 martin Exp $	*/
+/*	$NetBSD: eisadevs_data.h,v 1.29 2003/03/22 14:31:28 jdolecek Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: eisadevs,v 1.24 2001/09/14 13:41:29 martin Exp 
+ *	NetBSD: eisadevs,v 1.26 2003/03/22 14:30:48 jdolecek Exp 
  */
 
 /*
@@ -376,6 +376,11 @@ const struct eisa_knowndev eisa_knowndevs[] = {
 	},
 	{
 	    0,
+	    "SMCA010",
+	    EISA_PRODUCT_SMCA010,
+	},
+	{
+	    0,
 	    "USC0240",
 	    EISA_PRODUCT_USC0240,
 	},
@@ -433,6 +438,11 @@ const struct eisa_knowndev eisa_knowndevs[] = {
 	    0,
 	    "TCM5972",
 	    EISA_PRODUCT_TCM5972,
+	},
+	{
+	    0,
+	    "TCM6790",
+	    EISA_PRODUCT_TCM6790,
 	},
 	{
 	    EISA_KNOWNDEV_NOPROD,

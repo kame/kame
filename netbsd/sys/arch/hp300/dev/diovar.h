@@ -1,4 +1,4 @@
-/*	$NetBSD: diovar.h,v 1.7 1998/01/11 21:53:05 thorpej Exp $	*/
+/*	$NetBSD: diovar.h,v 1.9 2003/08/01 00:29:16 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -48,7 +48,9 @@
 struct dio_attach_args {
 	bus_space_tag_t da_bst;		/* bus space tag */
 	int	da_scode;		/* select code */
+	int	da_addr;		/* device address */
 	int	da_size;		/* size of address space */
+	int	da_ipl;			/* interrupt priority level */
 	u_int8_t da_id;			/* primary device id */
 	u_int8_t da_secid;		/* secondary device id */
 };
@@ -73,11 +75,9 @@ struct dio_devdesc {
 	const char *dd_desc;		/* description */
 };
 
-#include "locators.h"
-#define	diocf_scode		cf_loc[DIOCF_SCODE]
-
 #ifdef _KERNEL
 void	*dio_scodetopa __P((int));
 void	*dio_intr_establish __P((int (*)(void *), void *, int, int));
 void	dio_intr_disestablish __P((void *));
+void	dio_set_bus_space_oddbyte __P((bus_space_tag_t));
 #endif /* _KERNEL */

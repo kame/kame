@@ -1,4 +1,4 @@
-;	$NetBSD: esiop.ss,v 1.13.4.1 2003/08/15 19:09:37 tron Exp $
+;	$NetBSD: esiop.ss,v 1.16 2003/10/05 17:48:49 bouyer Exp $
 
 ;
 ; Copyright (c) 2002 Manuel Bouyer.
@@ -14,9 +14,8 @@
 ; 3. All advertising materials mentioning features or use of this software
 ;    must display the following acknowledgement:
 ;	This product includes software developed by Manuel Bouyer.
-; 4. Neither the name of the University nor the names of its contributors
-;    may be used to endorse or promote products derived from this software
-;    without specific prior written permission.
+; 4. The name of the author may not be used to endorse or promote products
+;    derived from this software without specific prior written permission.
 ;
 ; THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
 ; ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -66,7 +65,7 @@ ABSOLUTE int_err	= 0xffff;
 ; scratchC: current target/lun/tag
 ; scratchC0: flags
 ABSOLUTE f_c_target	= 0x01 ; target valid
-ABSOLUTE f_c_lun	= 0x02 ; lun valud
+ABSOLUTE f_c_lun	= 0x02 ; lun valid
 ABSOLUTE f_c_tag	= 0x04 ; tag valid
 ABSOLUTE f_c_data	= 0x08 ; data I/O in progress
 ABSOLUTE f_c_data_mask	= 0xf7 ; ~f_c_data

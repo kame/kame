@@ -1,4 +1,4 @@
-/*	$NetBSD: 4xx_trap_subr.S,v 1.1 2001/06/13 06:01:48 simonb Exp $	*/
+/*	$NetBSD: 4xx_trap_subr.S,v 1.4 2003/08/03 23:26:55 eeh Exp $	*/
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -35,7 +35,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* This file provides necessary handlers for 405GP CPU 
+/* This file provides necessary handlers for 405GP CPU
  * It should be included in locore.S after powerpc/powerpc/trap_subr.S
  */
 
@@ -57,7 +57,7 @@ _C_LABEL(pitfitwdogsize) = .-_C_LABEL(pitfitwdog)
 pithandler:
 	rfi
 	ba	.	/* Protect against prefetch */
-	
+
 wdoghandler:
 	rfi
 	ba	.	/* Protect against prefetch */
@@ -66,47 +66,47 @@ wdoghandler:
 #define	tlbsave		0x3000
 #define tlbstack	tlbsave+tlbstacksize
 
-/* If an unaligned excception (0x600) and DTLB miss exception (0x1100) 
-   occur at the same time, the interrupt vector offsets of the two 
+/* If an unaligned excception (0x600) and DTLB miss exception (0x1100)
+   occur at the same time, the interrupt vector offsets of the two
    exceptions are logically OR'ed together to produce 0x1700.
    See PPC405GP Rev D/E Errata item 51 */
-	
+
 	.globl _C_LABEL(errata51handler),_C_LABEL(errata51size)
 _C_LABEL(errata51handler):
 	ba	0x1100
-_C_LABEL(errata51size) = .-_C_LABEL(errata51handler)			
+_C_LABEL(errata51size) = .-_C_LABEL(errata51handler)
 
 	.globl _C_LABEL(tlbdmiss4xx),_C_LABEL(tlbdm4size)
 _C_LABEL(tlbdmiss4xx):
 	STANDARD_PROLOG(tlbsave)
-	mfdear	r30		/* Get fault address */
-	mfesr	r31
-	stmw	r30,16+tlbsave(0)
+	mfdear	%r30		/* Get fault address */
+	mfesr	%r31
+	stmw	%r30,16+tlbsave(0)
 	bla	s4xx_miss
-_C_LABEL(tlbdm4size) = .-_C_LABEL(tlbdmiss4xx)			
+_C_LABEL(tlbdm4size) = .-_C_LABEL(tlbdmiss4xx)
 
 	.globl _C_LABEL(tlbimiss4xx),_C_LABEL(tlbim4size)
-_C_LABEL(tlbimiss4xx):	
+_C_LABEL(tlbimiss4xx):
 	STANDARD_PROLOG(tlbsave)
-	mfsrr0	r30		/* XXX Get fault address */
-	mfesr	r31
-	stmw	r30,16+tlbsave(0)
+	mfsrr0	%r30		/* XXX Get fault address */
+	mfesr	%r31
+	stmw	%r30,16+tlbsave(0)
 	bla	s4xx_miss
-_C_LABEL(tlbim4size) = .-_C_LABEL(tlbdmiss4xx)			
+_C_LABEL(tlbim4size) = .-_C_LABEL(tlbimiss4xx)
 
 s4xx_miss:
 	.globl	_C_LABEL(pmap_tlbmiss)
 
 	/* If the kernel stack would fault, don't use it. */
-	mfpid	r30
-	li	r31,KERNEL_PID
-	mtpid	r31
-	li	r31,-FRAMELEN
-	tlbsx.	r31,r31,r1
-	mtpid	r30
+	mfpid	%r30
+	li	%r31,KERNEL_PID
+	mtpid	%r31
+	li	%r31,-FRAMELEN
+	tlbsx.	%r31,%r31,%r1
+	mtpid	%r30
 	beq	1f
 
-	/* 
+	/*
 	 * The kernel we want to switch to is not in the TLB.
 	 * To solve this problem, we will simulate a kernel
 	 * fault on the kernel stack and let the miss handler
@@ -117,42 +117,42 @@ s4xx_miss:
 	 */
 
 	/* Switch to tlbstack */
-	addi	r30,r1,-FRAMELEN
-	lis	r1,tlbstack@ha
-	addi	r1,r1,tlbstack@l
-	stw	r30,4(1)
-	
+	addi	%r30,%r1,-FRAMELEN
+	lis	%r1,tlbstack@ha
+	addi	%r1,%r1,tlbstack@l
+	stw	%r30,4(1)
+
 	FRAME_SETUP(tlbsave)
 
 	/* Take an explicit fault at (kernelstack,pid) */
-	lwz	r3, tlbstack+4(0)
-	li	r4,KERNEL_PID
+	lwz	%r3, tlbstack+4(0)
+	li	%r4,KERNEL_PID
 	bl	_C_LABEL(pmap_tlbmiss)
-	/* 
+	/*
 	 * We can retry the old fault or switch stacks and
 	 * take it now.  It's easier to retry.
 	 */
-	mr.	r3,r3
+	mr.	%r3,%r3
 	beq	2f
 
 	/* kernel stack not in the pmap? we should panic */
 	trap
 	ba	trapagain
-1:	
+1:
 	FRAME_SETUP(tlbsave)
-	lwz	r3,FRAME_DEAR+8(1)
-	lwz	r4,FRAME_PID+8(1)
+	lwz	%r3,FRAME_DEAR+8(1)
+	lwz	%r4,FRAME_PID+8(1)
 	bl	_C_LABEL(pmap_tlbmiss)
-	mr.	r3,r3
+	mr.	%r3,%r3
 	beq	2f
 
 	/* XXX DEBUG -- make sure we're not on tlbstack */
-	addi	r7,r1,-tlbsave
-	twllei	r7,(tlbstacksize)
-	
-	/* PTE not found, time to cause a fault */		
+	addi	%r7,%r1,-tlbsave
+	twllei	%r7,(tlbstacksize)
+
+	/* PTE not found, time to cause a fault */
 	ba	trapagain
-2:	
+2:
 	FRAME_LEAVE(tlbsave)
 	rfi
 	ba	.	/* Protect against prefetch */

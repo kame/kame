@@ -1,4 +1,4 @@
-/*	$NetBSD: smbfs_node.h,v 1.2 2002/01/09 17:43:28 deberg Exp $	*/
+/*	$NetBSD: smbfs_node.h,v 1.9 2004/02/29 11:47:08 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 2000-2001, Boris Popov
@@ -36,6 +36,9 @@
 #ifndef _FS_SMBFS_NODE_H_
 #define _FS_SMBFS_NODE_H_
 
+#include <sys/hash.h>			/* for hash32_strn() */
+#include <miscfs/genfs/genfs_node.h>	/* for struct genfs_node */
+
 #define	SMBFS_ROOT_INO		2	/* just like in UFS */
 
 /* Bits for smbnode.n_flag */
@@ -44,25 +47,26 @@
 #define	NMODIFIED		0x0004	/* bogus, until async IO implemented */
 /*efine	NNEW			0x0008*//* smb/vnode has been allocated */
 #define	NREFPARENT		0x0010	/* node holds parent from recycling */
+#define	NOPEN			0x2000	/* file is open */
+
+#define SMBFS_ATTRTIMO		5	/* Attribute cache timeout in sec */
 
 struct smbfs_fctx;
 
 struct smbnode {
-#ifndef FB_CURRENT
-	struct lock		n_lock;		/* smbnode lock. (mbf) */
-#endif
+	struct genfs_node	n_gnode;
 	int			n_flag;
 	struct smbnode *	n_parent;
 	struct vnode *		n_vnode;
 	struct smbmount *	n_mount;
 	time_t			n_attrage;	/* attributes cache time */
-/*	time_t			n_ctime;*/
+	time_t			n_ctime;	/* Prev create time. */
+	time_t			n_nctime;	/* last neg cache entry (dir) */
 	struct timespec		n_mtime;	/* modify time */
 	struct timespec		n_atime;	/* last access time */
 	u_quad_t		n_size;
 	long			n_ino;
 	int			n_dosattr;
-	int 			n_opencount;
 	u_int16_t		n_fid;		/* file handle */
 	int			n_rwstate;	/* granted access mode */
 	u_char			n_nmlen;
@@ -76,22 +80,14 @@ struct smbnode {
 #define VTOSMB(vp)	((struct smbnode *)(vp)->v_data)
 #define SMBTOV(np)	((struct vnode *)(np)->n_vnode)
 
-struct vop_getpages_args;
-struct vop_inactive_args;
-struct vop_putpages_args;
-struct vop_reclaim_args;
-struct ucred;
-struct uio;
 struct smbfattr;
 
 int  smbfs_inactive(void *);
 int  smbfs_reclaim(void *);
 int smbfs_nget(struct mount *mp, struct vnode *dvp, const char *name, int nmlen,
 	struct smbfattr *fap, struct vnode **vpp);
-u_int32_t smbfs_hash(const u_char *name, int nmlen);
+#define	smbfs_hash(x, y)	hash32_strn((x), (y), HASH32_STR_INIT)
 
-int  smbfs_getpages(void *);
-int  smbfs_putpages(void *);
 int  smbfs_readvnode(struct vnode *vp, struct uio *uiop, struct ucred *cred);
 int  smbfs_writevnode(struct vnode *vp, struct uio *uiop, struct ucred *cred, int ioflag);
 void smbfs_attr_cacheenter(struct vnode *vp, struct smbfattr *fap);

@@ -1,4 +1,4 @@
-/*	$NetBSD: isa.c,v 1.110 2002/01/07 21:47:09 thorpej Exp $	*/
+/*	$NetBSD: isa.c,v 1.116 2003/01/01 00:10:20 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2001 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: isa.c,v 1.110 2002/01/07 21:47:09 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: isa.c,v 1.116 2003/01/01 00:10:20 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -63,9 +63,8 @@ int	isamatch(struct device *, struct cfdata *, void *);
 void	isaattach(struct device *, struct device *, void *);
 int	isaprint(void *, const char *);
 
-struct cfattach isa_ca = {
-	sizeof(struct isa_softc), isamatch, isaattach
-};
+CFATTACH_DECL(isa, sizeof(struct isa_softc),
+    isamatch, isaattach, NULL, NULL);
 
 void	isa_attach_knowndevs(struct isa_softc *);
 void	isa_free_knowndevs(struct isa_softc *);
@@ -78,7 +77,7 @@ isamatch(struct device *parent, struct cfdata *cf, void *aux)
 {
 	struct isabus_attach_args *iba = aux;
 
-	if (strcmp(iba->iba_busname, cf->cf_driver->cd_name))
+	if (strcmp(iba->iba_busname, cf->cf_name))
 		return (0);
 
 	/* XXX check other indicators */
@@ -251,7 +250,7 @@ isasubmatch(struct device *parent, struct cfdata *cf, void *aux)
 		}
 	}
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 int
@@ -269,27 +268,27 @@ isaprint(void *aux, const char *isa)
 		struct isa_pnpname *ipn;
 
 		if (ia->ia_pnpname != NULL)
-			printf("%s", ia->ia_pnpname);
+			aprint_normal("%s", ia->ia_pnpname);
 		if ((ipn = ia->ia_pnpcompatnames) != NULL) {
-			printf(" (");	/* ) */
+			aprint_normal(" (");	/* ) */
 			for (sep = ""; ipn != NULL;
 			     ipn = ipn->ipn_next, sep = " ") {
-				printf("%s%s", sep, ipn->ipn_name);
+				aprint_normal("%s%s", sep, ipn->ipn_name);
 			}
-	/* ( */		printf(")");
+	/* ( */		aprint_normal(")");
 		}
-		printf(" at %s", isa);
+		aprint_normal(" at %s", isa);
 	}
 
 	if (ia->ia_nio) {
 		sep = "";
-		printf(" port ");
+		aprint_normal(" port ");
 		for (i = 0; i < ia->ia_nio; i++) {
 			if (ia->ia_io[i].ir_size == 0)
 				continue;
-			printf("%s0x%x", sep, ia->ia_io[i].ir_addr);
+			aprint_normal("%s0x%x", sep, ia->ia_io[i].ir_addr);
 			if (ia->ia_io[i].ir_size > 1)
-				printf("-0x%x", ia->ia_io[i].ir_addr +
+				aprint_normal("-0x%x", ia->ia_io[i].ir_addr +
 				    ia->ia_io[i].ir_size - 1);
 			sep = ",";
 		}
@@ -297,13 +296,13 @@ isaprint(void *aux, const char *isa)
 
 	if (ia->ia_niomem) {
 		sep = "";
-		printf(" iomem ");
+		aprint_normal(" iomem ");
 		for (i = 0; i < ia->ia_niomem; i++) {
 			if (ia->ia_iomem[i].ir_size == 0)
 				continue;
-			printf("%s0x%x", sep, ia->ia_iomem[i].ir_addr);
+			aprint_normal("%s0x%x", sep, ia->ia_iomem[i].ir_addr);
 			if (ia->ia_iomem[i].ir_size > 1)
-				printf("-0x%x", ia->ia_iomem[i].ir_addr +
+				aprint_normal("-0x%x", ia->ia_iomem[i].ir_addr +
 				    ia->ia_iomem[i].ir_size - 1);
 			sep = ",";
 		}
@@ -311,22 +310,22 @@ isaprint(void *aux, const char *isa)
 
 	if (ia->ia_nirq) {
 		sep = "";
-		printf(" irq ");
+		aprint_normal(" irq ");
 		for (i = 0; i < ia->ia_nirq; i++) {
 			if (ia->ia_irq[i].ir_irq == ISACF_IRQ_DEFAULT)
 				continue;
-			printf("%s%d", sep, ia->ia_irq[i].ir_irq);
+			aprint_normal("%s%d", sep, ia->ia_irq[i].ir_irq);
 			sep = ",";
 		}
 	}
 
 	if (ia->ia_ndrq) {
 		sep = "";
-		printf(" drq ");
+		aprint_normal(" drq ");
 		for (i = 0; i < ia->ia_ndrq; i++) {
 			if (ia->ia_drq[i].ir_drq == ISACF_DRQ_DEFAULT)
 				continue;
-			printf("%s%d", sep, ia->ia_drq[i].ir_drq);
+			aprint_normal("%s%d", sep, ia->ia_drq[i].ir_drq);
 			sep = ",";
 		}
 	}
@@ -379,7 +378,7 @@ isasearch(struct device *parent, struct cfdata *cf, void *aux)
 		ia.ia_ndrq = 2;
 
 		tryagain = 0;
-		if ((*cf->cf_attach->ca_match)(parent, cf, &ia) > 0) {
+		if (config_match(parent, cf, &ia) > 0) {
 			config_attach(parent, cf, &ia, isaprint);
 			tryagain = (cf->cf_fstate == FSTATE_STAR);
 		}

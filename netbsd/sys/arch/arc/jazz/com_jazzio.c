@@ -1,4 +1,4 @@
-/*	$NetBSD: com_jazzio.c,v 1.1 2000/12/24 09:25:28 ur Exp $	*/
+/*	$NetBSD: com_jazzio.c,v 1.6 2003/08/07 16:26:50 agc Exp $	*/
 /*	$OpenBSD: com_lbus.c,v 1.7 1998/03/16 09:38:41 pefo Exp $	*/
 /*	NetBSD: com_isa.c,v 1.12 1998/08/15 17:47:17 mycroft Exp 	*/
 
@@ -50,11 +50,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -72,6 +68,9 @@
  *
  *	@(#)com.c	7.5 (Berkeley) 5/16/91
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: com_jazzio.c,v 1.6 2003/08/07 16:26:50 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -95,9 +94,8 @@ extern int com_freq;
 int	com_jazzio_probe __P((struct device *, struct cfdata *, void *));
 void	com_jazzio_attach __P((struct device *, struct device *, void *));
 
-struct cfattach com_jazzio_ca = {
-	sizeof(struct com_softc), com_jazzio_probe, com_jazzio_attach
-};
+CFATTACH_DECL(com_jazzio, sizeof(struct com_softc),
+    com_jazzio_probe, com_jazzio_attach, NULL, NULL);
 
 int
 com_jazzio_probe(parent, match, aux)
@@ -111,7 +109,8 @@ com_jazzio_probe(parent, match, aux)
 	int iobase;
 	int rv = 1;
 
-	if(strcmp(ja->ja_name, "com") != 0)
+	if (strcmp(ja->ja_name, "COM1") != 0 &&
+	    strcmp(ja->ja_name, "COM2") != 0)
 		return (0);
 
 	iot = ja->ja_bust;

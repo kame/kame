@@ -1,10 +1,10 @@
-/*	$NetBSD: umidi.c,v 1.14 2002/03/08 17:24:06 kent Exp $	*/
+/*	$NetBSD: umidi.c,v 1.20 2004/01/19 07:36:35 gson Exp $	*/
 /*
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Takuya SHIOZAKI (tshiozak@netbsd.org).
+ * by Takuya SHIOZAKI (tshiozak@NetBSD.org).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: umidi.c,v 1.14 2002/03/08 17:24:06 kent Exp $");
+__KERNEL_RCSID(0, "$NetBSD: umidi.c,v 1.20 2004/01/19 07:36:35 gson Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -152,7 +152,7 @@ USB_MATCH(umidi)
 		return UMATCH_IFACECLASS_IFACESUBCLASS;
 
 	id = usbd_get_interface_descriptor(uaa->iface);
-	if (id!=NULL && 
+	if (id!=NULL &&
 	    id->bInterfaceClass==UICLASS_AUDIO &&
 	    id->bInterfaceSubClass==UISUBCLASS_MIDISTREAM)
 		return UMATCH_IFACECLASS_IFACESUBCLASS;
@@ -220,7 +220,7 @@ USB_ATTACH(umidi)
 
 	usbd_add_drv_event(USB_EVENT_DRIVER_ATTACH,
 			   sc->sc_udev, USBDEV(sc->sc_dev));
-	
+
 	USB_ATTACH_SUCCESS_RETURN;
 error:
 	printf("%s: disabled.\n", USBDEVNAME(sc->sc_dev));
@@ -615,20 +615,17 @@ alloc_all_endpoints_yamaha(struct umidi_softc *sc)
 static usbd_status
 alloc_all_endpoints_genuine(struct umidi_softc *sc)
 {
+	usb_interface_descriptor_t *interface_desc;
+	usb_config_descriptor_t *config_desc;
 	usb_descriptor_t *desc;
 	int num_ep;
 	size_t remain, descsize;
 	struct umidi_endpoint *p, *q, *lowest, *endep, tmpep;
 	int epaddr;
 
-	desc = TO_D(usbd_get_interface_descriptor(sc->sc_iface));
-	num_ep = TO_IFD(desc)->bNumEndpoints;
-	desc = NEXT_D(desc); /* ifd -> csifd */
-	remain = ((size_t)UGETW(TO_CSIFD(desc)->wTotalLength) -
-		  (size_t)desc->bLength);
-	desc = NEXT_D(desc);
-
-	sc->sc_endpoints = p = malloc(sizeof(struct umidi_endpoint)*num_ep,
+	interface_desc = usbd_get_interface_descriptor(sc->sc_iface);
+	num_ep = interface_desc->bNumEndpoints;
+	sc->sc_endpoints = p = malloc(sizeof(struct umidi_endpoint) * num_ep,
 				      M_USBDEV, M_WAITOK);
 	if (!p)
 		return USBD_NOMEM;
@@ -638,6 +635,9 @@ alloc_all_endpoints_genuine(struct umidi_softc *sc)
 	epaddr = -1;
 
 	/* get the list of endpoints for midi stream */
+	config_desc = usbd_get_config_descriptor(sc->sc_udev);
+	desc = (usb_descriptor_t *) config_desc;
+	remain = (size_t)UGETW(config_desc->wTotalLength);
 	while (remain>=sizeof(usb_descriptor_t)) {
 		descsize = desc->bLength;
 		if (descsize>remain || descsize==0)
@@ -692,7 +692,7 @@ alloc_all_endpoints_genuine(struct umidi_softc *sc)
 		p->num_open = 0;
 		p++;
 	}
-	
+
 	sc->sc_out_ep = sc->sc_out_num_endpoints ? sc->sc_endpoints : NULL;
 	sc->sc_in_ep =
 	    sc->sc_in_num_endpoints ?
@@ -810,9 +810,9 @@ bind_jacks_to_mididev(struct umidi_softc *sc,
 static void
 unbind_jacks_from_mididev(struct umidi_mididev *mididev)
 {
-	if ((mididev->flags&FWRITE) && mididev->out_jack)
+	if ((mididev->flags & FWRITE) && mididev->out_jack)
 		close_out_jack(mididev->out_jack);
-	if ((mididev->flags&FWRITE) && mididev->in_jack)
+	if ((mididev->flags & FREAD) && mididev->in_jack)
 		close_in_jack(mididev->in_jack);
 
 	if (mididev->out_jack)
@@ -890,7 +890,8 @@ open_in_jack(struct umidi_jack *jack, void *arg, void (*intr)(void *, int))
 	jack->opened = 1;
 	if (ep->num_open++==0 && UE_GET_DIR(ep->addr)==UE_DIR_IN) {
 		err = start_input_transfer(ep);
-		if (err!=USBD_NORMAL_COMPLETION) {
+		if (err != USBD_NORMAL_COMPLETION &&
+		    err != USBD_IN_PROGRESS) {
 			ep->num_open--;
 		}
 	}
@@ -906,8 +907,14 @@ close_out_jack(struct umidi_jack *jack)
 
 	if (jack->opened) {
 		s = splusb();
-		LIST_REMOVE(jack, u.out.queue_entry);
-		if (jack==jack->endpoint->queue_tail) {
+		LIST_FOREACH(tail,
+			     &jack->endpoint->queue_head,
+			     u.out.queue_entry)
+			if (tail == jack) {
+				LIST_REMOVE(jack, u.out.queue_entry);
+				break;
+			}
+		if (jack == jack->endpoint->queue_tail) {
 			/* find tail */
 			LIST_FOREACH(tail,
 				     &jack->endpoint->queue_head,
@@ -928,7 +935,9 @@ close_in_jack(struct umidi_jack *jack)
 {
 	if (jack->opened) {
 		jack->opened = 0;
-		jack->endpoint->num_open--;
+		if (--jack->endpoint->num_open == 0) {
+		    usbd_abort_pipe(jack->endpoint->pipe);
+		}
 	}
 }
 
@@ -1073,8 +1082,8 @@ dump_ep(struct umidi_endpoint *ep)
 static void
 dump_jack(struct umidi_jack *jack)
 {
-	DPRINTFN(10, ("\t\t\tep=%p, mididev=%p\n",
-		      jack->endpoint, jack->mididev));
+	DPRINTFN(10, ("\t\t\tep=%p\n",
+		      jack->endpoint));
 }
 
 #endif /* UMIDI_DEBUG */
@@ -1241,7 +1250,7 @@ in_intr(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	}
 	if (!jack->binded || !jack->opened)
 		return;
-	DPR_PACKET(in, ep->sc, &jack->buffer);
+	DPR_PACKET(in, ep->sc, &jack->packet);
 	if (jack->u.in.intr) {
 		for (i=0; i<len; i++) {
 			(*jack->u.in.intr)(jack->arg, ep->buffer[i+1]);

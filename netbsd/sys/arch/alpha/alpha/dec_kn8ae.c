@@ -1,4 +1,4 @@
-/* $NetBSD: dec_kn8ae.c,v 1.27 2001/08/20 12:20:04 wiz Exp $ */
+/* $NetBSD: dec_kn8ae.c,v 1.31 2004/02/13 11:36:09 wiz Exp $ */
 
 /*
  * Copyright (c) 1997 by Matthew Jacob
@@ -32,17 +32,18 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: dec_kn8ae.c,v 1.27 2001/08/20 12:20:04 wiz Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dec_kn8ae.c,v 1.31 2004/02/13 11:36:09 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/termios.h>
+#include <sys/conf.h>
 #include <dev/cons.h>
 
 #include <machine/rpb.h>
 #include <machine/autoconf.h>
-#include <machine/conf.h>
+#include <machine/cpuconf.h>
 #include <machine/frame.h>
 #include <machine/alpha.h>
 #include <machine/cpuconf.h>
@@ -123,7 +124,7 @@ dec_kn8ae_device_register(dev, aux)
 	struct bootdev_data *b = bootdev_data;
 	struct device *parent = dev->dv_parent;
 	struct cfdata *cf = dev->dv_cfdata;
-	struct cfdriver *cd = cf->cf_driver;
+	const char *name = cf->cf_name;
 
 	if (found)
 		return;
@@ -148,7 +149,7 @@ dec_kn8ae_device_register(dev, aux)
 	}
 
 	if (pcidev == NULL) {
-		if (strcmp(cd->cd_name, "pci"))
+		if (strcmp(name, "pci"))
 			return;
 		else {
 			struct pcibus_attach_args *pba = aux;
@@ -185,9 +186,9 @@ dec_kn8ae_device_register(dev, aux)
 	}
 
 	if (scsiboot &&
-	    (!strcmp(cd->cd_name, "sd") ||
-	     !strcmp(cd->cd_name, "st") ||
-	     !strcmp(cd->cd_name, "cd"))) {
+	    (!strcmp(name, "sd") ||
+	     !strcmp(name, "st") ||
+	     !strcmp(name, "cd"))) {
 		struct scsipibus_attach_args *sa = aux;
 
 		if (parent->dv_parent != scsidev)
@@ -202,9 +203,9 @@ dec_kn8ae_device_register(dev, aux)
 		 * the value in boot_dev_type is some weird number
 		 * XXX: Only support SD booting for now.
 		 */
-		if (strcmp(cd->cd_name, "sd") &&
-		    strcmp(cd->cd_name, "cd") &&
-		    strcmp(cd->cd_name, "st"))
+		if (strcmp(name, "sd") &&
+		    strcmp(name, "cd") &&
+		    strcmp(name, "st"))
 			return;
 
 		/* we've found it! */
@@ -394,7 +395,7 @@ kn8ae_harderr(mces, type, logout, framep)
 	 *    see upcoming code branches) and write data back to location.
 	 *
          * 4. When the CPU attempts to read the location, another 620 interrupt
-         *    should occur for the cpu at which instant PAL will scrub the
+         *    should occur for the CPU at which instant PAL will scrub the
          *    location. Then the o.s. scrub routine finishes. If the PAL scrubs
 	 *    the location then the scrubbed flag should be 0 (this is what we
 	 *    expect).

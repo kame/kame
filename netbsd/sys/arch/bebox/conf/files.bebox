@@ -1,61 +1,41 @@
-#	$NetBSD: files.bebox,v 1.34 2002/04/18 15:44:22 wiz Exp $
+#	$NetBSD: files.bebox,v 1.43 2004/03/25 12:40:19 wiz Exp $
 #
 # First try for bebox specific configuration info
 #
-maxpartitions 16
+maxpartitions 8
 
 maxusers 2 8 64
 
+defflag	XSERVER
+
 file	arch/bebox/bebox/autoconf.c
-file	arch/bebox/bebox/bus_space.c
 file	arch/bebox/bebox/clock.c
-file	arch/bebox/bebox/conf.c
 file	arch/bebox/bebox/disksubr.c		disk
 file	arch/bebox/bebox/extintr.c
 file	arch/bebox/bebox/machdep.c
-file	arch/bebox/bebox/procfs_machdep.c	procfs
+
 file	arch/powerpc/powerpc/bus_dma.c
+file	arch/powerpc/powerpc/bus_space.c
+file	arch/powerpc/powerpc/procfs_machdep.c	procfs
 
 # General files
 file	dev/cons.c
 
 #
-# Compatibility modules
-#
-
-# OSS audio driver compatibility
-include "compat/ossaudio/files.ossaudio"
-
-# Linux binary compatibility (COMPAT_LINUX)
-include "compat/linux/files.linux"
-include "compat/linux/arch/powerpc/files.linux_powerpc"
-file arch/powerpc/powerpc/linux_sigcode.S	compat_linux
-file arch/powerpc/powerpc/linux_trap.c		compat_linux
-
-#
 # Machine-independent SCSI drivers
 #
 include "dev/scsipi/files.scsipi"
-major	{sd = 4}
-major	{cd = 6}
 
 #
 # Machine-independent ATA drivers
 #
 
 include "dev/ata/files.ata"
-major	{wd = 0}
 
 #
 # Memory Disk for install floppy
 #
 file	dev/md_root.c			memory_disk_hooks
-major	{md = 17}
-
-#
-# RAIDframe
-#
-major	{raid = 18}
 
 #
 # Machine-independent I2O drivers.
@@ -96,8 +76,6 @@ file	arch/bebox/pci/pcib.c		pcib
 #
 
 include "dev/isa/files.isa"
-major	{mcd = 7}
-#major	{scd = 15}
 
 file	arch/bebox/isa/isa_machdep.c	isa
 file	arch/bebox/isa/isadma_machdep.c	isa
@@ -112,8 +90,8 @@ define pckbcport { [irq = -1], [port = -1] }
 # PC console support a la "pccons"
 device	pc: tty, pckbcport
 attach	pc at isa
-device	pcconskbd
-attach	pcconskbd at pckbc
+device	pcconskbd: pckbport_machdep_cnattach
+attach	pcconskbd at pckbport
 file	arch/bebox/isa/pccons.c		pc | pcconskbd needs-flag
 
 # PC Mice; Logitech-style, Microsoft-style, and PS/2-style
@@ -131,7 +109,7 @@ device	pfb: wsemuldisplaydev, wsrasteremulops
 attach	pfb at pci
 file	arch/bebox/pci/pfb.c		pfb needs-flag
 
-include "dev/pckbc/files.pckbc"
+include "dev/pckbport/files.pckbport"
 
 # Floppy disk controller
 device	fdc {drive = -1}: isadma
@@ -142,10 +120,11 @@ file	dev/isa/fdc_isa.c		fdc_isa
 
 device	fd: disk
 attach	fd at fdc
-major	{fd = 2}
 
 # Game adapter (joystick)
 file	arch/bebox/isa/joy_timer.c	joy
 
 # ISA Plug 'n Play support
 file	arch/bebox/isa/isapnp_machdep.c		isapnp
+
+include	"arch/bebox/conf/majors.bebox"

@@ -1,4 +1,4 @@
-/*	$NetBSD: disksubr.c,v 1.23 2001/09/16 16:34:28 wiz Exp $	*/
+/*	$NetBSD: disksubr.c,v 1.29 2003/07/15 01:19:43 lukem Exp $	*/
 
 /*
  * Copyright (c) 1995 Leo Weppelman.
@@ -29,6 +29,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: disksubr.c,v 1.29 2003/07/15 01:19:43 lukem Exp $");
 
 #ifndef DISKLABEL_NBDA
 #define	DISKLABEL_NBDA	/* required */
@@ -68,11 +71,12 @@ static u_int ahdi_getparts __P((dev_t, void (*)(struct buf *), u_int,
  * if needed, and signal errors or early completion.
  */
 int
-bounds_check_with_label(bp, lp, wlabel)
+bounds_check_with_label(dk, bp, wlabel)
+	struct disk		*dk;
 	struct buf		*bp;
-	struct disklabel	*lp;
 	int			wlabel;
 {
+	struct disklabel	*lp = dk->dk_label;
 	struct partition	*pp;
 	u_int			maxsz, sz;
 
@@ -130,7 +134,7 @@ bounds_check_with_label(bp, lp, wlabel)
  * (e.g. sector size) must be filled in before calling us.
  * Returns NULL on success and an error string on failure.
  */
-char *
+const char *
 readdisklabel(dev, strat, lp, clp)
 	dev_t			dev;
 	void			(*strat)(struct buf *);
@@ -166,7 +170,7 @@ readdisklabel(dev, strat, lp, clp)
 	lp->d_partitions[RAW_PART].p_size = lp->d_secperunit;
 	lp->d_npartitions                 = RAW_PART + 1;
 	lp->d_bbsize                      = BBSIZE;
-	lp->d_sbsize                      = SBSIZE;
+	lp->d_sbsize                      = SBLOCKSIZE;
 
 #ifdef DISKLABEL_NBDA
 	/* Try the native NetBSD/Atari format first. */
@@ -185,7 +189,7 @@ readdisklabel(dev, strat, lp, clp)
 	if (e < 0)
 		return("I/O error");
 
-	/* Unknown format or unitialised volume? */
+	/* Unknown format or uninitialized volume? */
 	if (e > 0)
 		uprintf("Warning: unknown disklabel format"
 			"- assuming empty disk\n");
@@ -307,7 +311,7 @@ writedisklabel(dev, strat, lp, clp)
  * Read bootblock at block `blkno' and check
  * if it contains a valid NetBSD disk label.
  *
- * Returns:  0 if successfull,
+ * Returns:  0 if successful,
  *          -1 if an I/O error occurred,
  *          +1 if no valid label was found.
  */

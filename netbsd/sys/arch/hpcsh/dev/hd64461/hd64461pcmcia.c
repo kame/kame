@@ -1,4 +1,4 @@
-/*	$NetBSD: hd64461pcmcia.c,v 1.15 2002/03/28 15:27:00 uch Exp $	*/
+/*	$NetBSD: hd64461pcmcia.c,v 1.25 2004/03/27 02:53:12 uwe Exp $	*/
 
 /*-
  * Copyright (c) 2001, 2002 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hd64461pcmcia.c,v 1.25 2004/03/27 02:53:12 uwe Exp $");
 
 #include "debug_hpcsh.h"
 
@@ -196,10 +199,8 @@ STATIC void hd64461pcmcia_attach(struct device *, struct device *, void *);
 STATIC int hd64461pcmcia_print(void *, const char *);
 STATIC int hd64461pcmcia_submatch(struct device *, struct cfdata *, void *);
 
-struct cfattach hd64461pcmcia_ca = {
-	sizeof(struct hd64461pcmcia_softc), hd64461pcmcia_match,
-	hd64461pcmcia_attach
-};
+CFATTACH_DECL(hd64461pcmcia, sizeof(struct hd64461pcmcia_softc),
+    hd64461pcmcia_match, hd64461pcmcia_attach, NULL, NULL);
 
 STATIC void hd64461pcmcia_attach_channel(struct hd64461pcmcia_softc *,
     enum controller_channel);
@@ -267,8 +268,13 @@ hd64461pcmcia_attach(struct device *parent, struct device *self, void *aux)
 	SIMPLEQ_INIT (&sc->sc_event_head);
 	kthread_create(hd64461pcmcia_create_event_thread, sc);
 
+#if !defined(HD64461PCMCIA_REORDER_ATTACH)
 	hd64461pcmcia_attach_channel(sc, CHANNEL_0);
 	hd64461pcmcia_attach_channel(sc, CHANNEL_1);
+#else
+	hd64461pcmcia_attach_channel(sc, CHANNEL_1);
+	hd64461pcmcia_attach_channel(sc, CHANNEL_0);
+#endif
 }
 
 void
@@ -310,7 +316,7 @@ hd64461pcmcia_event_thread(void *arg)
 				break;
 			}
 			s = splhigh();
-			SIMPLEQ_REMOVE_HEAD(&sc->sc_event_head, pe, pe_link);
+			SIMPLEQ_REMOVE_HEAD(&sc->sc_event_head, pe_link);
 			pe->__queued = 0;
 		}
 		splx(s);
@@ -323,7 +329,7 @@ hd64461pcmcia_print(void *arg, const char *pnp)
 {
 
 	if (pnp)
-		printf("pcmcia at %s", pnp);
+		aprint_normal("pcmcia at %s", pnp);
 
 	return (UNCONF);
 }
@@ -348,7 +354,7 @@ hd64461pcmcia_submatch(struct device *parent, struct cfdata *cf, void *aux)
 	}
 	paa->pct = (pcmcia_chipset_tag_t)&hd64461pcmcia_functions;
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 void
@@ -359,10 +365,25 @@ hd64461pcmcia_attach_channel(struct hd64461pcmcia_softc *sc,
 	struct hd64461pcmcia_channel *ch = &sc->sc_ch[channel];
 	struct pcmciabus_attach_args paa;	
 	bus_addr_t membase;
+	bus_addr_t gcr;
+	uint8_t r;
 	int i;
 
 	ch->ch_parent = sc;
 	ch->ch_channel = channel;
+
+	/*
+	 * DRV (external buffer) high level
+	 * 
+	 * XXX: This hack makes pcmcia cards "being used" at the boot
+	 * time (by WinCE or NetBSD) correctly detected.
+	 */
+	gcr = HD64461_PCCGCR(channel);
+	r = hd64461_reg_read_1(gcr);
+	if (r & HD64461_PCCGCR_DRVE) {
+		r &= ~HD64461_PCCGCR_DRVE;
+		hd64461_reg_write_1(gcr, r);
+	}
 
 	/* 
 	 * Continuous 16-MB Area Mode 
@@ -709,6 +730,9 @@ hd64461pcmcia_chip_io_map(pcmcia_chipset_handle_t pch, int width,
 		return (1);
 
 	hd64461_set_bus_width(CHANNEL_0, width);
+
+	/* fake.  drivers init that to -1 and check if it was changed. */
+	*windowp = 0;
 
 	DPRINTF("%#lx:%#lx+%#lx %s\n", pcihp->ioh, offset, size,
 	    width_names[width]);

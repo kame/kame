@@ -1,4 +1,4 @@
-/*	$NetBSD: pte.h,v 1.12 2000/09/05 21:52:16 thorpej Exp $	*/
+/*	$NetBSD: pte.h,v 1.14 2003/08/24 17:52:33 chs Exp $	*/
 
 /*
  *
@@ -146,9 +146,9 @@ typedef u_int32_t pt_entry_t;		/* PTE */
 #define	NBPD		(1 << PDSHIFT)	/* # bytes mapped by PD (4MB) */
 #define	PDOFSET		(NBPD-1)	/* mask for non-PD part of VA */
 #if 0 /* not used? */
-#define	NPTEPD		(NBPD / NBPG)	/* # of PTEs in a PD */
+#define	NPTEPD		(NBPD / PAGE_SIZE)	/* # of PTEs in a PD */
 #else
-#define	PTES_PER_PTP	(NBPD / NBPG)	/* # of PTEs in a PTP */
+#define	PTES_PER_PTP	(NBPD / PAGE_SIZE)	/* # of PTEs in a PTP */
 #endif
 #define	PD_MASK		0xffc00000	/* page directory address bits */
 #define	PT_MASK		0x003ff000	/* page table address bits */
@@ -163,7 +163,7 @@ typedef u_int32_t pt_entry_t;		/* PTE */
 #define	PG_RO		0x00000000	/* read-only page */
 #define	PG_RW		0x00000002	/* read-write page */
 #define	PG_u		0x00000004	/* user accessible page */
-#define	PG_PROT		0x00000006	/* all protection bits */
+#define	PG_PROT		0x00000806	/* all protection bits */
 #define	PG_N		0x00000018	/* non-cacheable */
 #define	PG_U		0x00000020	/* has been used */
 #define	PG_M		0x00000040	/* has been modified */

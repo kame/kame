@@ -1,4 +1,4 @@
-#	$NetBSD: IQ80321,v 1.5.4.3 2002/11/16 09:34:12 he Exp $
+#	$NetBSD: IQ80321,v 1.31.2.1 2004/07/15 20:21:52 he Exp $
 #
 #	IQ80321 -- Intel IQ80321 Evaluation Board Kernel
 #
@@ -20,9 +20,11 @@ options 	RTC_OFFSET=0	# hardware clock is this many mins. west of GMT
 
 # For XScale systems
 options 	CPU_XSCALE_80321	# Support the XScale core
-makeoptions	COPTS="-O2 -mcpu=xscale"
+makeoptions	CPUFLAGS="-mcpu=xscale"
 
 # Architecture options
+options 	XSCALE_CACHE_READ_WRITE_ALLOCATE
+#options 	HZ=512
 
 # File systems
 
@@ -76,6 +78,7 @@ options 	NFS_BOOT_DHCP
 # Compatibility options
 
 #options 	COMPAT_43	# 4.3BSD compatibility.
+options 	COMPAT_16	# NetBSD 1.6 compatibility.
 options 	COMPAT_15	# NetBSD 1.5 compatibility.
 options 	COMPAT_14	# NetBSD 1.4 compatibility.
 #options 	COMPAT_13	# NetBSD 1.3 compatibility.
@@ -115,11 +118,13 @@ options 	PCIVERBOSE	# Verbose PCI descriptions
 options 	MIIVERBOSE	# Verbose MII autoconfuration messages
 #options 	PCI_CONFIG_DUMP	# verbosely dump PCI config space
 #options 	DDB_KEYCODE=0x40
-#options 	USERCONF	# userconf(4) support
+options 	USERCONF	# userconf(4) support
 #options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+#options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
 
 # Development and Debugging options
 
+options 	PERFCTRS	# performance counters
 options 	DIAGNOSTIC	# internally consistency checks
 #options 	DEBUG
 #options 	PMAP_DEBUG	# Enable pmap_debug_level code
@@ -127,31 +132,68 @@ options 	DIAGNOSTIC	# internally consistency checks
 #options 	VERBOSE_INIT_ARM # verbose bootstraping messages
 options 	DDB		# in-kernel debugger
 options 	DDB_HISTORY_SIZE=100	# Enable history editing in DDB
-makeoptions	DEBUG="-g"	# compile full symbol table
-options 	SYMTAB_SPACE=200000
+#makeoptions	DEBUG="-g"	# compile full symbol table
+options 	SYMTAB_SPACE=250000
 
 config		netbsd		root on ? type ?
 config		netbsd-wm0	root on wm0 type nfs
+config		netbsd-wd0	root on wd0 type ffs
+config		netbsd-sd0	root on sd0 type ffs
 
 # The main bus device
 mainbus0	at root
 
-# The boot cpu
+# The boot CPU
 cpu0		at mainbus?
 
 # On-board device support
 obio*		at mainbus?
-com*		at obio? addr ?		# on-board TI 165C50 UART
+com0		at obio? addr 0xfe800000 xint 1	# on-board TI 165C50 UART
 
 # i80321 I/O Processor peripheral support
 iopxs*		at mainbus?
 
+iopaau*		at iopxs?		# Application Accelerator Unit
+iopiic*		at iopxs?		# I2C Controller Unit(s)
+iic0		at iopiic?
+iic1		at iopiic?
 iopwdog*	at iopxs?		# Watchdog timer
 pci0		at iopxs? bus ?		# PCI/PCI-X support
 
 # PCI-PCI bridges
 ppb*		at pci? dev ? function ?
 pci*		at ppb? bus ?
+
+#
+# Storage devices
+#
+
+# PCI IDE/S-ATA controllers and devices
+pciide* 	at pci? dev ? function ? flags 0x0000	# GENERIC pciide driver
+artsata*	at pci? dev ? function ?	# Intel i31244 SATA controller
+cmdide* 	at pci? dev ? function ?	# CMD tech IDE controllers
+hptide* 	at pci? dev ? function ?	# Triones/HighPoint IDE controllers
+pdcide* 	at pci? dev ? function ?	# Promise IDE controllers
+satalink*	at pci? dev ? function ?	# SiI SATALink controllers
+
+atabus* 	at ata? channel ?
+wd*		at atabus? drive ? flags 0x0000
+
+# PCI SCSI controllers
+ahc*		at pci? dev ? function ?	# Adaptec [23]94x, aic78x0 SCSI
+isp*		at pci? dev ? function ?	# Qlogic ISP SCSI
+siop*		at pci? dev ? function ?	# Symbios/LSI 53c8xx SCSI
+esiop*		at pci? dev ? function ?	# Symbios/LSI 53c8xx SCSI
+mpt*		at pci? dev ? function ?	# LSI Fusion SCSI/FC
+
+scsibus*	at scsi?
+
+# SCSI devices
+sd*		at scsibus? target ? lun ?	# SCSI disk drives
+st*		at scsibus? target ? lun ?	# SCSI tape drives
+cd*		at scsibus? target ? lun ?	# SCSI CD-ROM drives
+#ch*		at scsibus? target ? lun ?	# SCSI media changers
+#uk*		at scsibus? target ? lun ?	# unknown SCSI devices
 
 #
 # Networking devices
@@ -175,8 +217,14 @@ pseudo-device	vnd		4	# disk-like interface to files
 # network pseudo-devices
 pseudo-device	bpfilter	4	# Berkeley packet filter
 pseudo-device	loop			# network loopback
+pseudo-device	kttcp			# network loopback
 
 # miscellaneous pseudo-devices
 pseudo-device	pty			# pseudo-terminals
 pseudo-device	rnd			# /dev/random and in-kernel generator
 pseudo-device	clockctl		# user control of clock subsystem
+pseudo-device	ksyms			# /dev/ksyms
+
+# data mover pseudo-devices
+#pseudo-device	swdmover		# softare dmover(9) back-end
+pseudo-device	dmoverio		# /dev/dmover dmover(9) interface

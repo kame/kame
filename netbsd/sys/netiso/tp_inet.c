@@ -1,4 +1,4 @@
-/*	$NetBSD: tp_inet.c,v 1.21 2001/11/13 01:10:50 lukem Exp $	*/
+/*	$NetBSD: tp_inet.c,v 1.26 2003/08/22 21:53:11 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -77,7 +73,7 @@ SOFTWARE.
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tp_inet.c,v 1.21 2001/11/13 01:10:50 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tp_inet.c,v 1.26 2003/08/22 21:53:11 itojun Exp $");
 
 #include "opt_inet.h"
 #include "opt_iso.h"
@@ -467,7 +463,12 @@ tpip_output_dg(m0, va_alist)
 	bzero((caddr_t) ip, sizeof *ip);
 
 	ip->ip_p = IPPROTO_TP;
-	m->m_pkthdr.len = ip->ip_len = sizeof(struct ip) + datalen;
+	if (sizeof(struct ip) + datalen > IP_MAXPACKET) {
+		error = EMSGSIZE;
+		goto bad;
+	}
+	m->m_pkthdr.len = sizeof(struct ip) + datalen;
+	ip->ip_len = htons(sizeof(struct ip) + datalen);
 	ip->ip_ttl = MAXTTL;
 	/*
 	 * don't know why you need to set ttl; overlay doesn't even make this
@@ -484,7 +485,8 @@ tpip_output_dg(m0, va_alist)
 	}
 #endif
 
-	error = ip_output(m, (struct mbuf *) 0, ro, IP_ALLOWBROADCAST, NULL);
+	error = ip_output(m, (struct mbuf *) 0, ro, IP_ALLOWBROADCAST, 
+	    (struct ip_moptions *)NULL, (struct socket *)NULL);
 
 #ifdef ARGO_DEBUG
 	if (argo_debug[D_EMIT]) {
@@ -546,7 +548,7 @@ tpip_input(m, va_alist)
 	 */
 
 
-	if ((m = m_pullup(m, iplen + 1)) == MNULL)
+	if ((m = m_pullup(m, iplen + 1)) == NULL)
 		goto discard;
 	CHANGE_MTYPE(m, TPMT_DATA);
 
@@ -558,7 +560,7 @@ tpip_input(m, va_alist)
 	hdrlen = iplen + 1 + mtod(m, u_char *)[iplen];
 
 	if (m->m_len < hdrlen) {
-		if ((m = m_pullup(m, hdrlen)) == MNULL) {
+		if ((m = m_pullup(m, hdrlen)) == NULL) {
 #ifdef ARGO_DEBUG
 			if (argo_debug[D_TPINPUT]) {
 				printf("tp_input, pullup 2!\n");

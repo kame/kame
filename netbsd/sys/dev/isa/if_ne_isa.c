@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ne_isa.c,v 1.13 2002/01/07 21:47:08 thorpej Exp $	*/
+/*	$NetBSD: if_ne_isa.c,v 1.17 2004/02/13 10:05:50 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ne_isa.c,v 1.13 2002/01/07 21:47:08 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ne_isa.c,v 1.17 2004/02/13 10:05:50 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -79,9 +79,8 @@ struct ne_isa_softc {
 	void	*sc_ih;				/* interrupt cookie */
 };
 
-struct cfattach ne_isa_ca = {
-	sizeof(struct ne_isa_softc), ne_isa_match, ne_isa_attach
-};
+CFATTACH_DECL(ne_isa, sizeof(struct ne_isa_softc),
+    ne_isa_match, ne_isa_attach, NULL, NULL);
 
 int
 ne_isa_match(parent, match, aux)
@@ -191,7 +190,7 @@ ne_isa_attach(parent, self, aux)
 	case NE2000_TYPE_NE2000:
 		typestr = "NE2000";
 		/*
-		 * Check for a RealTek 8019.
+		 * Check for a Realtek 8019.
 		 */
 		bus_space_write_1(nict, nich, ED_P0_CR,
 		    ED_CR_PAGE_0 | ED_CR_STP);

@@ -1,4 +1,4 @@
-/* $NetBSD: ioc.c,v 1.2 2002/03/24 23:37:44 bjh21 Exp $ */
+/* $NetBSD: ioc.c,v 1.9 2003/07/14 22:48:21 lukem Exp $ */
 
 /*-
  * Copyright (c) 1998, 1999, 2000 Ben Harris
@@ -30,10 +30,10 @@
  * ioc.c - Acorn/ARM I/O Controller (Albion/VC2311/VL2311/VY86C410)
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ioc.c,v 1.9 2003/07/14 22:48:21 lukem Exp $");
+
 #include <sys/param.h>
-
-__RCSID("$NetBSD: ioc.c,v 1.2 2002/03/24 23:37:44 bjh21 Exp $");
-
 #include <sys/device.h>
 #include <sys/kernel.h>
 #include <sys/queue.h>
@@ -58,9 +58,8 @@ static int ioc_print(void *aux, const char *pnp);
 static int ioc_irq_clock(void *cookie);
 static int ioc_irq_statclock(void *cookie);
 
-struct cfattach ioc_ca = {
-	sizeof(struct ioc_softc), ioc_match, ioc_attach
-};
+CFATTACH_DECL(ioc, sizeof(struct ioc_softc),
+    ioc_match, ioc_attach, NULL, NULL);
 
 struct device *the_ioc;
 
@@ -152,7 +151,7 @@ ioc_search(struct device *parent, struct cfdata *cf, void *aux)
 			    + (IOC_TYPE_SYNC << IOC_TYPE_SHIFT)
 			    + (ioc.ioc_offset >> 2),
 			    1 << IOC_BANK_SHIFT, &ioc.ioc_sync_h);
-	if ((cf->cf_attach->ca_match)(parent, cf, &ioc) > 0)
+	if (config_match(parent, cf, &ioc) > 0)
 		config_attach(parent, cf, &ioc, ioc_print);
 
 	return 0;
@@ -164,9 +163,9 @@ ioc_print(void *aux, const char *pnp)
 	struct ioc_attach_args *ioc = aux;
 
 	if (ioc->ioc_bank != IOCCF_BANK_DEFAULT)
-		printf(" bank %d", ioc->ioc_bank);
+		aprint_normal(" bank %d", ioc->ioc_bank);
 	if (ioc->ioc_offset != IOCCF_OFFSET_DEFAULT)
-		printf(" offset 0x%02x", ioc->ioc_offset);
+		aprint_normal(" offset 0x%02x", ioc->ioc_offset);
 	return UNCONF;
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: ofb.c,v 1.26.6.1 2003/06/24 10:07:47 grant Exp $	*/
+/*	$NetBSD: ofb.c,v 1.38 2003/11/13 03:09:28 chs Exp $	*/
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -27,6 +27,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ofb.c,v 1.38 2003/11/13 03:09:28 chs Exp $");
+
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/conf.h>
@@ -41,6 +44,7 @@
 #include <dev/pci/pcidevs.h>
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
+#include <dev/pci/pciio.h>
 
 #include <dev/wscons/wsconsio.h>
 #include <dev/wscons/wsdisplayvar.h>
@@ -49,10 +53,11 @@
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_pci.h>
 
-#include <machine/bat.h>
 #include <machine/bus.h>
 #include <machine/autoconf.h>
 #include <machine/grfioctl.h>
+
+#include <powerpc/oea/bat.h>
 
 #include <macppc/dev/ofbvar.h>
 
@@ -66,9 +71,8 @@ int	ofbmatch __P((struct device *, struct cfdata *, void *));
 void	ofbattach __P((struct device *, struct device *, void *));
 int	ofbprint __P((void *, const char *));
 
-struct cfattach ofb_ca = {
-	sizeof(struct ofb_softc), ofbmatch, ofbattach,
-};
+CFATTACH_DECL(ofb, sizeof(struct ofb_softc),
+    ofbmatch, ofbattach, NULL, NULL);
 
 struct ofb_devconfig ofb_console_dc;
 
@@ -174,6 +178,9 @@ ofbattach(parent, self, aux)
 			*(u_int32_t *)(dc->dc_paddr + i) = 0xffffffff;
 	}
 	sc->sc_dc = dc;
+
+	sc->sc_pc = pa->pa_pc;
+	sc->sc_pcitag = pa->pa_tag;
 
 	/* XXX */
 	if (OF_getprop(node, "assigned-addresses", sc->sc_addrs,
@@ -360,6 +367,11 @@ ofb_ioctl(v, cmd, data, flag, p)
 		gm->gd_fbaddr = (caddr_t)dc->dc_paddr;
 		gm->gd_fbrowbytes = dc->dc_ri.ri_stride;
 		return 0;
+	/* PCI config read/write passthrough. */
+	case PCI_IOC_CFGREAD:
+	case PCI_IOC_CFGWRITE:
+		return (pci_devioctl(sc->sc_pc, sc->sc_pcitag,
+		    cmd, data, flag, p));
 	}
 	return EPASSTHROUGH;
 }
@@ -412,7 +424,7 @@ ofb_alloc_screen(v, type, cookiep, curxp, curyp, attrp)
 	*cookiep = ri;			/* one and only for now */
 	*curxp = 0;
 	*curyp = 0;
-	(*ri->ri_ops.alloc_attr)(ri, 0, 0, 0, &defattr);
+	(*ri->ri_ops.allocattr)(ri, 0, 0, 0, &defattr);
 	*attrp = defattr;
 	sc->nscreens++;
 	return 0;
@@ -473,7 +485,7 @@ ofb_cnattach()
 		crow = 0;
 	}
 
-	(*ri->ri_ops.alloc_attr)(ri, 0, 0, 0, &defattr);
+	(*ri->ri_ops.allocattr)(ri, 0, 0, 0, &defattr);
 	wsdisplay_cnattach(&ofb_stdscreen, ri, 0, crow, defattr);
 
 	return 0;
@@ -551,28 +563,33 @@ ofb_putcmap(sc, cm)
 	struct ofb_devconfig *dc = sc->sc_dc;
 	u_int index = cm->index;
 	u_int count = cm->count;
-	int i;
+	int i, error;
+	u_char rbuf[256], gbuf[256], bbuf[256];
 	u_char *r, *g, *b;
 
 	if (cm->index >= 256 || cm->count > 256 ||
 	    (cm->index + cm->count) > 256)
 		return EINVAL;
-	if (!uvm_useracc(cm->red, cm->count, B_READ) ||
-	    !uvm_useracc(cm->green, cm->count, B_READ) ||
-	    !uvm_useracc(cm->blue, cm->count, B_READ))
-		return EFAULT;
-	copyin(cm->red,   &sc->sc_cmap_red[index],   count);
-	copyin(cm->green, &sc->sc_cmap_green[index], count);
-	copyin(cm->blue,  &sc->sc_cmap_blue[index],  count);
+	error = copyin(cm->red, &rbuf[index], count);
+	if (error)
+		return error;
+	error = copyin(cm->green, &gbuf[index], count);
+	if (error)
+		return error;
+	error = copyin(cm->blue, &bbuf[index], count);
+	if (error)
+		return error;
+
+	memcpy(&sc->sc_cmap_red[index], &rbuf[index], count);
+	memcpy(&sc->sc_cmap_green[index], &gbuf[index], count);
+	memcpy(&sc->sc_cmap_blue[index], &bbuf[index], count);
 
 	r = &sc->sc_cmap_red[index];
 	g = &sc->sc_cmap_green[index];
 	b = &sc->sc_cmap_blue[index];
-
 	for (i = 0; i < count; i++) {
 		OF_call_method_1("color!", dc->dc_ih, 4, *r, *g, *b, index);
 		r++, g++, b++, index++;
 	}
-
 	return 0;
 }

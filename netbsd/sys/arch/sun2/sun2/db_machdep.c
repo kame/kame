@@ -1,4 +1,4 @@
-/*	$NetBSD: db_machdep.c,v 1.2 2001/06/11 21:35:59 fredette Exp $	*/
+/*	$NetBSD: db_machdep.c,v 1.4 2003/07/15 03:36:12 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -40,8 +40,13 @@
  * Machine-dependent functions used by ddb
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: db_machdep.c,v 1.4 2003/07/15 03:36:12 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/proc.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/db_machdep.h>
 #include <machine/promlib.h>
@@ -125,7 +130,7 @@ db_mach_pagemap(addr, have_addr, count, modif)
 	db_printf("0x%08lx [%02x] 0x%08x", va, sme, pte);
 
 	pte_print(pte);
-	db_next = va + NBPG;
+	db_next = va + PAGE_SIZE;
 }
 
 static void

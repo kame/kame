@@ -1,4 +1,4 @@
-/*	$NetBSD: arm32_machdep.c,v 1.24 2002/05/05 16:26:30 jdolecek Exp $	*/
+/*	$NetBSD: arm32_machdep.c,v 1.44 2004/03/24 15:34:47 atatat Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -41,6 +41,9 @@
  * Updated	: 18/04/01 updated for new wscons
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: arm32_machdep.c,v 1.44 2004/03/24 15:34:47 atatat Exp $");
+
 #include "opt_md.h"
 #include "opt_pmap_debug.h"
 
@@ -73,9 +76,6 @@ struct vm_map *phys_map = NULL;
 
 extern int physmem;
 
-#ifndef PMAP_STATIC_L1S
-extern int max_processes;
-#endif	/* !PMAP_STATIC_L1S */
 #if NMD > 0 && defined(MEMORY_DISK_HOOKS) && !defined(MEMORY_DISK_ROOT_SIZE)
 extern size_t md_root_size;		/* Memory disc size */
 #endif	/* NMD && MEMORY_DISK_HOOKS && !MEMORY_DISK_ROOT_SIZE */
@@ -102,7 +102,6 @@ char *booted_kernel;
 
 /* Prototypes */
 
-u_long strtoul			__P((const char *s, char **ptr, int base));
 void data_abort_handler		__P((trapframe_t *frame));
 void prefetch_abort_handler	__P((trapframe_t *frame));
 extern void configure		__P((void));
@@ -141,6 +140,26 @@ arm32_vector_init(vaddr_t va, int which)
 	cpu_icache_sync_range(va, (ARM_NVEC * 2) * sizeof(u_int));
 
 	vector_page = va;
+
+	if (va == ARM_VECTORS_HIGH) {
+		/*
+		 * Assume the MD caller knows what it's doing here, and
+		 * really does want the vector page relocated.
+		 *
+		 * Note: This has to be done here (and not just in
+		 * cpu_setup()) because the vector page needs to be
+		 * accessible *before* cpu_startup() is called.
+		 * Think ddb(9) ...
+		 *
+		 * NOTE: If the CPU control register is not readable,
+		 * this will totally fail!  We'll just assume that
+		 * any system that has high vector support has a
+		 * readable CPU control register, for now.  If we
+		 * ever encounter one that does not, we'll have to
+		 * rethink this.
+		 */
+		cpu_control(CPU_CONTROL_VECRELOC, CPU_CONTROL_VECRELOC);
+	}
 }
 
 /*
@@ -190,23 +209,13 @@ bootsync(void)
 void
 cpu_startup()
 {
-	int loop;
-	paddr_t minaddr;
-	paddr_t maxaddr;
-	caddr_t sysbase;
-	caddr_t size;
-	vsize_t bufsize;
-	int base, residual;
+	vaddr_t minaddr;
+	vaddr_t maxaddr;
+	u_int loop;
 	char pbuf[9];
 
-	proc0paddr = (struct user *)kernelstack.pv_va;
-	proc0.p_addr = proc0paddr;
-
-	/* Set the cpu control register */
+	/* Set the CPU control register */
 	cpu_setup(boot_args);
-
-	/* All domains MUST be clients, permissions are VERY important */
-	cpu_domains(DOMAIN_CLIENT);
 
 	/* Lock down zero page */
 	vector_page_setprot(VM_PROT_READ);
@@ -223,8 +232,8 @@ cpu_startup()
 
 	/* msgbufphys was setup during the secondary boot strap */
 	for (loop = 0; loop < btoc(MSGBUFSIZE); ++loop)
-		pmap_kenter_pa((vaddr_t)msgbufaddr + loop * NBPG,
-		    msgbufphys + loop * NBPG, VM_PROT_READ|VM_PROT_WRITE);
+		pmap_kenter_pa((vaddr_t)msgbufaddr + loop * PAGE_SIZE,
+		    msgbufphys + loop * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE);
 	pmap_update(pmap_kernel());
 	initmsgbuf(msgbufaddr, round_page(MSGBUFSIZE));
 
@@ -237,62 +246,7 @@ cpu_startup()
 	format_bytes(pbuf, sizeof(pbuf), arm_ptob(physmem));
 	printf("total memory = %s\n", pbuf);
 
-	/*
-	 * Find out how much space we need, allocate it,
-	 * and then give everything true virtual addresses.
-	 */
-	size = allocsys(NULL, NULL);
-	sysbase = (caddr_t)uvm_km_zalloc(kernel_map, round_page((vaddr_t)size));
-	if (sysbase == 0)
-		panic(
-		    "cpu_startup: no room for system tables; %d bytes required",
-		    (u_int)size);
-	if ((caddr_t)((allocsys(sysbase, NULL) - sysbase)) != size)
-		panic("cpu_startup: system table size inconsistency");
-
-   	/*
-	 * Now allocate buffers proper.  They are different than the above
-	 * in that they usually occupy more virtual memory than physical.
-	 */
-	bufsize = MAXBSIZE * nbuf;
-	if (uvm_map(kernel_map, (vaddr_t *)&buffers, round_page(bufsize),
-	    NULL, UVM_UNKNOWN_OFFSET, 0,
-	    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-	    UVM_ADV_NORMAL, 0)) != 0)
-		panic("cpu_startup: cannot allocate UVM space for buffers");
-	minaddr = (vaddr_t)buffers;
-	if ((bufpages / nbuf) >= btoc(MAXBSIZE)) {
-		/* don't want to alloc more physical mem than needed */
-		bufpages = btoc(MAXBSIZE) * nbuf;
-	}
-
-	base = bufpages / nbuf;
-	residual = bufpages % nbuf;
-	for (loop = 0; loop < nbuf; ++loop) {
-		vsize_t curbufsize;
-		vaddr_t curbuf;
-		struct vm_page *pg;
-
-		/*
-		 * Each buffer has MAXBSIZE bytes of VM space allocated.  Of
-		 * that MAXBSIZE space, we allocate and map (base+1) pages
-		 * for the first "residual" buffers, and then we allocate
-		 * "base" pages for the rest.
-		 */
-		curbuf = (vaddr_t) buffers + (loop * MAXBSIZE);
-		curbufsize = NBPG * ((loop < residual) ? (base+1) : base);
-
-		while (curbufsize) {
-			pg = uvm_pagealloc(NULL, 0, NULL, 0);
-			if (pg == NULL)
-				panic("cpu_startup: not enough memory for buffer cache");
-			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
-				VM_PROT_READ|VM_PROT_WRITE);
-			curbuf += PAGE_SIZE;
-			curbufsize -= PAGE_SIZE;
-		}
-	}
-	pmap_update(pmap_kernel());
+	minaddr = 0;
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
@@ -316,22 +270,14 @@ cpu_startup()
 
 	format_bytes(pbuf, sizeof(pbuf), ptoa(uvmexp.free));
 	printf("avail memory = %s\n", pbuf);
-	format_bytes(pbuf, sizeof(pbuf), bufpages * NBPG);
-	printf("using %d buffers containing %s of memory\n", nbuf, pbuf);
 
-	/*
-	 * Set up buffers, so they can be used to read disk labels.
-	 */
-	bufinit();
-
-	curpcb = &proc0.p_addr->u_pcb;
+	curpcb = &lwp0.l_addr->u_pcb;
 	curpcb->pcb_flags = 0;
-	curpcb->pcb_un.un_32.pcb32_und_sp = (u_int)proc0.p_addr +
+	curpcb->pcb_un.un_32.pcb32_und_sp = (u_int)lwp0.l_addr +
 	    USPACE_UNDEF_STACK_TOP;
-	curpcb->pcb_un.un_32.pcb32_sp = (u_int)proc0.p_addr +
+	curpcb->pcb_un.un_32.pcb32_sp = (u_int)lwp0.l_addr +
 	    USPACE_SVC_STACK_TOP;
-	(void) pmap_extract(pmap_kernel(), (vaddr_t)(pmap_kernel())->pm_pdir,
-	    (paddr_t *)&curpcb->pcb_pagedir);
+	pmap_set_pcb_pagedir(pmap_kernel(), curpcb);
 
         curpcb->pcb_tf = (struct trapframe *)curpcb->pcb_un.un_32.pcb32_sp - 1;
 }
@@ -339,51 +285,89 @@ cpu_startup()
 /*
  * machine dependent system variables.
  */
-
-int
-cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
-	struct proc *p;
+static int
+sysctl_machdep_booted_device(SYSCTLFN_ARGS)
 {
-	/* all sysctl names at this level are terminal */
-	if (namelen != 1)
-		return (ENOTDIR);		/* overloaded */
+	struct sysctlnode node;
 
-	switch (name[0]) {
-	case CPU_DEBUG:
-		return(sysctl_int(oldp, oldlenp, newp, newlen, &kernel_debug));
-
-	case CPU_BOOTED_DEVICE:
-		if (booted_device != NULL)
-			return (sysctl_rdstring(oldp, oldlenp, newp,
-			    booted_device->dv_xname));
+	if (booted_device == NULL)
 		return (EOPNOTSUPP);
 
-	case CPU_CONSDEV: {
-		dev_t consdev;
-		if (cn_tab != NULL)
-			consdev = cn_tab->cn_dev;
-		else
-			consdev = NODEV;
-		return (sysctl_rdstruct(oldp, oldlenp, newp, &consdev,
-			sizeof consdev));
-	}
-	case CPU_BOOTED_KERNEL: {
-		if (booted_kernel != NULL && booted_kernel[0] != '\0')
-			return sysctl_rdstring(oldp, oldlenp, newp,
-			    booted_kernel);
-		return (EOPNOTSUPP);
-	}
+	node = *rnode;
+	node.sysctl_data = booted_device->dv_xname;
+	node.sysctl_size = strlen(booted_device->dv_xname) + 1;
+	return (sysctl_lookup(SYSCTLFN_CALL(&node)));
+}
 
-	default:
+static int
+sysctl_machdep_booted_kernel(SYSCTLFN_ARGS)
+{
+	struct sysctlnode node;
+
+	if (booted_kernel == NULL || booted_kernel[0] == '\0')
 		return (EOPNOTSUPP);
-	}
-	/* NOTREACHED */
+
+	node = *rnode;
+	node.sysctl_data = booted_kernel;
+	node.sysctl_size = strlen(booted_kernel) + 1;
+	return (sysctl_lookup(SYSCTLFN_CALL(&node)));
+}
+
+static int
+sysctl_machdep_powersave(SYSCTLFN_ARGS)
+{
+	struct sysctlnode node = *rnode;
+	int error, newval;
+
+	newval = cpu_do_powersave;
+	node.sysctl_data = &newval;
+	if (cpufuncs.cf_sleep == (void *) cpufunc_nullop)
+		node.sysctl_flags &= ~CTLFLAG_READWRITE;
+	error = sysctl_lookup(SYSCTLFN_CALL(&node));
+	if (error || newp == NULL || newval == cpu_do_powersave)
+		return (error);
+
+	if (newval < 0 || newval > 1)
+		return (EINVAL);
+	cpu_do_powersave = newval;
+
+	return (0);
+}
+
+SYSCTL_SETUP(sysctl_machdep_setup, "sysctl machdep subtree setup")
+{
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "machdep", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_MACHDEP, CTL_EOL);
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "debug", NULL,
+		       NULL, 0, &kernel_debug, 0,
+		       CTL_MACHDEP, CPU_DEBUG, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_STRING, "booted_device", NULL,
+		       sysctl_machdep_booted_device, 0, NULL, 0,
+		       CTL_MACHDEP, CPU_BOOTED_DEVICE, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_STRING, "booted_kernel", NULL,
+		       sysctl_machdep_booted_kernel, 0, NULL, 0,
+		       CTL_MACHDEP, CPU_BOOTED_KERNEL, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_STRUCT, "console_device", NULL,
+		       sysctl_consdev, 0, NULL, sizeof(dev_t),
+		       CTL_MACHDEP, CPU_CONSDEV, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "powersave", NULL,
+		       sysctl_machdep_powersave, 0, &cpu_do_powersave, 0,
+		       CTL_MACHDEP, CPU_POWERSAVE, CTL_EOL);
 }
 
 void
@@ -415,16 +399,6 @@ parse_mi_bootargs(args)
 /*	if (get_bootconf_option(args, "nbuf", BOOTOPT_TYPE_INT, &integer))
 		bufpages = integer;*/
 
-#ifndef PMAP_STATIC_L1S
-	if (get_bootconf_option(args, "maxproc", BOOTOPT_TYPE_INT, &integer)) {
-		max_processes = integer;
-		if (max_processes < 16)
-			max_processes = 16;
-		/* Limit is PDSIZE * (max_processes + 1) <= 4MB */
-		if (max_processes > 255)
-			max_processes = 255;
-	}
-#endif	/* !PMAP_STATUC_L1S */
 #if NMD > 0 && defined(MEMORY_DISK_HOOKS) && !defined(MEMORY_DISK_ROOT_SIZE)
 	if (get_bootconf_option(args, "memorydisc", BOOTOPT_TYPE_INT, &integer)
 	    || get_bootconf_option(args, "memorydisk", BOOTOPT_TYPE_INT, &integer)) {

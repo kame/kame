@@ -1,4 +1,4 @@
-/*	$NetBSD: bus.h,v 1.1 2001/10/29 22:28:37 thorpej Exp $	*/
+/*	$NetBSD: bus.h,v 1.6 2003/10/24 05:01:09 matt Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 2000, 2001 The NetBSD Foundation, Inc.
@@ -92,7 +92,7 @@
 #define	__BUS_SPACE_ADDRESS_SANITY(p, t, d)				\
 ({									\
 	if (__BUS_SPACE_ALIGNED_ADDRESS((p), t) == 0) {			\
-		printf("%s 0x%lx not aligned to %lu bytes %s:%d\n",	\
+		printf("%s 0x%lx not aligned to %u bytes %s:%d\n",	\
 		    d, (u_long)(p), sizeof(t), __FILE__, __LINE__);	\
 	}								\
 	(void) 0;							\
@@ -506,6 +506,7 @@ do {									\
 #define	BUS_DMA_BUS4		0x080
 #define	BUS_DMA_READ		0x100	/* mapping is device -> memory only */
 #define	BUS_DMA_WRITE		0x200	/* mapping is memory -> device only */
+#define	BUS_DMA_NOCACHE		0x400	/* hint: map non-cached memory */
 
 /* Forwards needed by prototypes below. */
 struct mbuf;
@@ -521,6 +522,8 @@ struct uio;
 
 typedef struct powerpc_bus_dma_tag	*bus_dma_tag_t;
 typedef struct powerpc_bus_dmamap	*bus_dmamap_t;
+
+#define BUS_DMA_TAG_VALID(t)    ((t) != (bus_dma_tag_t)0)
 
 /*
  *	bus_dma_segment_t
@@ -644,8 +647,8 @@ struct powerpc_bus_dmamap {
 
 #ifdef _POWERPC_BUS_DMA_PRIVATE
 /* These are used by the generic PowerPC bus_dma routines. */
-#define	PHYS_TO_PCI_MEM(x)	(x)
-#define	PCI_MEM_TO_PHYS(x)	(x)
+#define	PHYS_TO_BUS_MEM(t, x)	(x)
+#define	BUS_MEM_TO_PHYS(t, x)	(x)
 
 int	_bus_dmamap_create(bus_dma_tag_t, bus_size_t, int, bus_size_t,
 	    bus_size_t, int, bus_dmamap_t *);
@@ -679,6 +682,8 @@ void	_bus_dmamem_unmap(bus_dma_tag_t tag, caddr_t kva,
 	    size_t size);
 paddr_t	_bus_dmamem_mmap(bus_dma_tag_t tag, bus_dma_segment_t *segs,
 	    int nsegs, off_t off, int prot, int flags);
+bus_addr_t _bus_dma_phys_to_bus_mem_generic(bus_dma_tag_t, bus_addr_t);
+bus_addr_t _bus_dma_bus_mem_to_phys_generic(bus_dma_tag_t, bus_addr_t);
 #endif /* _POWERPC_BUS_DMA_PRIVATE */
 
 #endif /* _KERNEL */

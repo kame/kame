@@ -1,4 +1,4 @@
-/*	$NetBSD: mainbus.c,v 1.11 2002/05/16 01:01:34 thorpej Exp $	*/
+/*	$NetBSD: mainbus.c,v 1.17 2003/07/15 01:26:30 lukem Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -30,6 +30,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.17 2003/07/15 01:26:30 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/extent.h>
@@ -51,9 +54,8 @@
 static int	mainbus_match (struct device *, struct cfdata *, void *);
 static void	mainbus_attach (struct device *, struct device *, void *);
 
-struct cfattach mainbus_ca = {
-	sizeof(struct device), mainbus_match, mainbus_attach
-};
+CFATTACH_DECL(mainbus, sizeof(struct device),
+    mainbus_match, mainbus_attach, NULL, NULL);
 
 int	mainbus_print (void *, const char *);
 
@@ -110,6 +112,7 @@ mainbus_attach(struct device *parent, struct device *self, void *aux)
 	mba.mba_pba.pba_iot = &bebox_io_bs_tag;
 	mba.mba_pba.pba_memt = &bebox_mem_bs_tag;
 	mba.mba_pba.pba_dmat = &pci_bus_dma_tag;
+	mba.mba_pba.pba_dmat64 = NULL;
 	mba.mba_pba.pba_bus = 0;
 	mba.mba_pba.pba_bridgetag = NULL;
 	mba.mba_pba.pba_flags = PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED;
@@ -120,9 +123,8 @@ mainbus_attach(struct device *parent, struct device *self, void *aux)
 static int	cpu_match(struct device *, struct cfdata *, void *);
 static void	cpu_attach(struct device *, struct device *, void *);
 
-struct cfattach cpu_ca = {
-	sizeof(struct device), cpu_match, cpu_attach
-};
+CFATTACH_DECL(cpu, sizeof(struct device),
+    cpu_match, cpu_attach, NULL, NULL);
 
 extern struct cfdriver cpu_cd;
 
@@ -134,7 +136,7 @@ cpu_match(struct device *parent, struct cfdata *cf, void *aux)
 	if (strcmp(mba->mba_busname, cpu_cd.cd_name) != 0)
 		return 0;
 
-	if (cpu_info_store.ci_dev != NULL)
+	if (cpu_info[0].ci_dev != NULL)
 		return 0;
 
 	return 1;
@@ -152,8 +154,8 @@ mainbus_print(void *aux, const char *pnp)
 	union mainbus_attach_args *mba = aux;
 
 	if (pnp)
-		printf("%s at %s", mba->mba_busname, pnp);
+		aprint_normal("%s at %s", mba->mba_busname, pnp);
 	if (!strcmp(mba->mba_busname, "pci"))
-		printf(" bus %d", mba->mba_pba.pba_bus);
+		aprint_normal(" bus %d", mba->mba_pba.pba_bus);
 	return (UNCONF);
 }

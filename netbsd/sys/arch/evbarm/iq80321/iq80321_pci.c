@@ -1,4 +1,4 @@
-/*	$NetBSD: iq80321_pci.c,v 1.1.4.1 2002/11/11 23:34:51 he Exp $	*/
+/*	$NetBSD: iq80321_pci.c,v 1.4 2003/07/15 00:25:04 lukem Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002 Wasabi Systems, Inc.
@@ -39,6 +39,9 @@
  * IQ80321 PCI interrupt support.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: iq80321_pci.c,v 1.4 2003/07/15 00:25:04 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -78,6 +81,7 @@ int
 iq80321_pci_intr_map(struct pci_attach_args *pa, pci_intr_handle_t *ihp)
 {
 	struct i80321_softc *sc = pa->pa_pc->pc_intr_v;
+	int b, d, f;
 	uint32_t busno;
 
 	/*
@@ -97,11 +101,13 @@ iq80321_pci_intr_map(struct pci_attach_args *pa, pci_intr_handle_t *ihp)
 	if (busno == 0xff)
 		busno = 0;
 
+	pci_decompose_tag(pa->pa_pc, pa->pa_intrtag, &b, &d, &f);
+
 	/* No mappings for devices not on our bus. */
-	if (pa->pa_bus != busno)
+	if (b != busno)
 		goto no_mapping;
 
-	switch (pa->pa_device) {
+	switch (d) {
 	case 4:			/* i82544 Gig-E */
 		if (pa->pa_intrpin == 1) {
 			*ihp = ICU_INT_XINT(0);

@@ -1,4 +1,4 @@
-/*	$NetBSD: gvpio.c,v 1.9 2002/01/28 09:56:57 aymeric Exp $ */
+/*	$NetBSD: gvpio.c,v 1.14 2003/01/06 13:04:58 wiz Exp $ */
 
 /*
  * Copyright (c) 1997 Ignatios Souvatzis
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: gvpio.c,v 1.9 2002/01/28 09:56:57 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: gvpio.c,v 1.14 2003/01/06 13:04:58 wiz Exp $");
 
 /*
  * GVP I/O Extender
@@ -46,7 +46,6 @@ __KERNEL_RCSID(0, "$NetBSD: gvpio.c,v 1.9 2002/01/28 09:56:57 aymeric Exp $");
 #include <sys/param.h>
 
 #include <machine/bus.h>
-#include <machine/conf.h>
 #include <machine/intr.h>
 
 #include <amiga/include/cpu.h>
@@ -72,9 +71,8 @@ int gvpioprint(void *auxp, const char *);
 int gvp_com_intr(void *);
 void gvp_com_intr_establish(struct device *, struct gvpcom_int_hdl *);
 
-struct cfattach gvpio_ca = {
-	sizeof(struct gvpio_softc), gvpiomatch, gvpioattach
-};
+CFATTACH_DECL(gvpio, sizeof(struct gvpio_softc),
+    gvpiomatch, gvpioattach, NULL, NULL);
 
 int
 gvpiomatch(struct device *parent, struct cfdata *cfp, void *auxp)
@@ -142,7 +140,7 @@ gvpioattach(struct device *parent, struct device *self, void *auxp)
 		++giosd;
 	}
 	if (giosc->sc_comhdls.lh_first) {
-		/* XXX this should be really in the interupt stuff */
+		/* XXX this should be really in the interrupt stuff */
 		needpsl = PSL_S|PSL_IPL6;
 		if (amiga_serialspl < needpsl) {
 			printf("%s: raising amiga_serialspl from 0x%x to 0x%x\n",
@@ -166,7 +164,7 @@ gvpioprint(void *auxp, const char *pnp)
 	if (pnp == NULL)
 		return(QUIET);
 
-	printf("%s at %s port 0x%02x ipl %d",
+	aprint_normal("%s at %s port 0x%02x ipl %d",
 	    supa->supio_name, pnp, supa->supio_iobase, supa->supio_ipl);
 
 	return(UNCONF);

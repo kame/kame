@@ -1,4 +1,4 @@
-/*	$NetBSD: if_wmreg.h,v 1.1.6.4 2003/06/20 07:01:00 msaitoh Exp $	*/
+/*	$NetBSD: if_wmreg.h,v 1.10 2004/02/19 05:19:52 thorpej Exp $	*/
 
 /*
  * Copyright (c) 2001 Wasabi Systems, Inc.
@@ -98,13 +98,10 @@ typedef struct wiseman_rxdesc {
  * The transmit descriptor ring must be aligned to a 4K boundary,
  * and there must be an even multiple of 8 descriptors in the ring.
  */
-typedef union wiseman_tx_fields {
-	uint32_t	wtxu_bits;	/* bits; see below; */
-	struct {
-		uint8_t wtxu_status;		/* Tx status */
-		uint8_t wtxu_options;		/* options */
-		uint16_t wtxu_vlan;		/* VLAN info */
-	} __attribute__((__packed__)) wtxu_fields;
+typedef struct wiseman_tx_fields {
+	uint8_t wtxu_status;		/* Tx status */
+	uint8_t wtxu_options;		/* options */
+	uint16_t wtxu_vlan;		/* VLAN info */
 } __attribute__((__packed__)) wiseman_txfields_t;
 typedef struct wiseman_txdesc {
 	wiseman_addr_t	wtx_addr;	/* buffer address */
@@ -112,6 +109,7 @@ typedef struct wiseman_txdesc {
 	wiseman_txfields_t wtx_fields;	/* fields; see below */
 } __attribute__((__packed__)) wiseman_txdesc_t;
 
+/* Commands for wtx_cmdlen */
 #define	WTX_CMD_EOP	(1U << 24)	/* end of packet */
 #define	WTX_CMD_IFCS	(1U << 25)	/* insert FCS */
 #define	WTX_CMD_RS	(1U << 27)	/* report status */
@@ -121,8 +119,8 @@ typedef struct wiseman_txdesc {
 #define	WTX_CMD_IDE	(1U << 31)	/* interrupt delay enable */
 
 /* Descriptor types (if DEXT is set) */
-#define	WTX_DTYP_C	(0 << 20)	/* context */
-#define	WTC_DTYP_D	(1U << 20)	/* data */
+#define	WTX_DTYP_C	(0U << 20)	/* context */
+#define	WTX_DTYP_D	(1U << 20)	/* data */
 
 /* wtx_fields status bits */
 #define	WTX_ST_DD	(1U << 0)	/* descriptor done */
@@ -130,9 +128,9 @@ typedef struct wiseman_txdesc {
 #define	WTX_ST_LC	(1U << 2)	/* late collision */
 #define	WTX_ST_TU	(1U << 3)	/* transmit underrun */
 
-/* wtx_fields bits for IP/TCP/UDP checksum offload */
-#define	WTX_IXSM	(1U << 8)	/* IP checksum offload */
-#define	WTX_TXSM	(1U << 9)	/* TCP/UDP checksum offload */
+/* wtx_fields option bits for IP/TCP/UDP checksum offload */
+#define	WTX_IXSM	(1U << 0)	/* IP checksum offload */
+#define	WTX_TXSM	(1U << 1)	/* TCP/UDP checksum offload */
 
 /*
  * The Livengood TCP/IP context descriptor.
@@ -196,6 +194,8 @@ struct livengood_tcpip_ctxdesc {
 #define	CTRL_VME	(1U << 30)	/* VLAN Mode Enable */
 #define	CTRL_PHY_RESET	(1U << 31)	/* PHY reset (Cordova) */
 
+#define	WMREG_CTRL_SHADOW 0x0004	/* Device Control Register (shadow) */
+
 #define	WMREG_STATUS	0x0008	/* Device Status Register */
 #define	STATUS_FD	(1U << 0)	/* full duplex */
 #define	STATUS_LU	(1U << 1)	/* link up */
@@ -218,6 +218,7 @@ struct livengood_tcpip_ctxdesc {
 #define	STATUS_PCIXSPD_50_66   STATUS_PCIXSPD(0)
 #define	STATUS_PCIXSPD_66_100  STATUS_PCIXSPD(1)
 #define	STATUS_PCIXSPD_100_133 STATUS_PCIXSPD(2)
+#define	STATUS_PCIXSPD_MASK    STATUS_PCIXSPD(3)
 
 #define	WMREG_EECD	0x0010	/* EEPROM Control Register */
 #define	EECD_SK		(1U << 0)	/* clock */
@@ -232,10 +233,29 @@ struct livengood_tcpip_ctxdesc {
 #define	EECD_EE_PRES	(1U << 8)	/* EEPROM present */
 #define	EECD_EE_SIZE	(1U << 9)	/* EEPROM size
 					   (0 = 64 word, 1 = 256 word) */
+#define	EECD_EE_ABITS	(1U << 10)	/* EEPROM address bits
+					   (based on type) */
+#define	EECD_EE_TYPE	(1U << 13)	/* EEPROM type
+					   (0 = Microwire, 1 = SPI) */
 
 #define	UWIRE_OPC_ERASE	0x04		/* MicroWire "erase" opcode */
 #define	UWIRE_OPC_WRITE	0x05		/* MicroWire "write" opcode */
 #define	UWIRE_OPC_READ	0x06		/* MicroWire "read" opcode */
+
+#define	SPI_OPC_WRITE	0x02		/* SPI "write" opcode */
+#define	SPI_OPC_READ	0x03		/* SPI "read" opcode */
+#define	SPI_OPC_A8	0x08		/* opcode bit 3 == address bit 8 */
+#define	SPI_OPC_WREN	0x06		/* SPI "set write enable" opcode */
+#define	SPI_OPC_WRDI	0x04		/* SPI "clear write enable" opcode */
+#define	SPI_OPC_RDSR	0x05		/* SPI "read status" opcode */
+#define	SPI_OPC_WRSR	0x01		/* SPI "write status" opcode */
+#define	SPI_MAX_RETRIES	5000		/* max wait of 5ms for RDY signal */
+
+#define	SPI_SR_RDY	0x01
+#define	SPI_SR_WEN	0x02
+#define	SPI_SR_BP0	0x04
+#define	SPI_SR_BP1	0x08
+#define	SPI_SR_WPEN	0x80
 
 #define	EEPROM_OFF_MACADDR	0x00	/* MAC address offset */
 #define	EEPROM_OFF_CFG1		0x0a	/* config word 1 */

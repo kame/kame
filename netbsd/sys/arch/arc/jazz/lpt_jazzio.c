@@ -1,4 +1,4 @@
-/*	$NetBSD: lpt_jazzio.c,v 1.1 2000/12/24 09:25:29 ur Exp $	*/
+/*	$NetBSD: lpt_jazzio.c,v 1.5 2003/07/15 00:04:49 lukem Exp $	*/
 /*	$OpenBSD: lpt_lbus.c,v 1.3 1997/04/10 16:29:17 pefo Exp $	*/
 
 /*
@@ -54,6 +54,9 @@
  * Device Driver for AT parallel printer port
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: lpt_jazzio.c,v 1.5 2003/07/15 00:04:49 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -70,9 +73,8 @@
 int lpt_jazzio_probe __P((struct device *, struct cfdata *, void *));
 void lpt_jazzio_attach __P((struct device *, struct device *, void *));
 
-struct cfattach lpt_jazzio_ca = {
-	sizeof(struct lpt_softc), lpt_jazzio_probe, lpt_jazzio_attach
-};
+CFATTACH_DECL(lpt_jazzio, sizeof(struct lpt_softc),
+    lpt_jazzio_probe, lpt_jazzio_attach, NULL, NULL);
 
 /*
  * XXX - copied from lpt_isa.c
@@ -129,7 +131,7 @@ lpt_jazzio_probe(parent, match, aux)
 #define	ABORT	goto out
 #endif
 
-	if(strcmp(ja->ja_name, "lpt") != 0)
+	if (strcmp(ja->ja_name, "LPT1") != 0)
 		 return (0);
 
 	iot = ja->ja_bust;

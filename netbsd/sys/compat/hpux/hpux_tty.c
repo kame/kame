@@ -1,9 +1,44 @@
-/*	$NetBSD: hpux_tty.c,v 1.20 2001/11/13 02:08:21 lukem Exp $	*/
+/*	$NetBSD: hpux_tty.c,v 1.25.2.2 2004/11/12 06:59:07 jmc Exp $	*/
+
+/*
+ * Copyright (c) 1990, 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: hpux_tty.c 1.14 93/08/05$
+ *
+ *	@(#)hpux_tty.c	8.3 (Berkeley) 1/12/94
+ */
 
 /*
  * Copyright (c) 1988 University of Utah.
- * Copyright (c) 1990, 1993
- *	The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -47,7 +82,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: hpux_tty.c,v 1.20 2001/11/13 02:08:21 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: hpux_tty.c,v 1.25.2.2 2004/11/12 06:59:07 jmc Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_compat_43.h"
@@ -76,21 +111,23 @@ __KERNEL_RCSID(0, "$NetBSD: hpux_tty.c,v 1.20 2001/11/13 02:08:21 lukem Exp $");
  * Map BSD/POSIX style termios info to and from SYS5 style termio stuff.
  */
 int
-hpux_termio(fd, com, data, p)
+hpux_termio(fd, com, data, l)
 	int fd, com;
 	caddr_t data;
-	struct proc *p;
+	struct lwp *l;
 {
+	struct proc *p = l->l_proc;
 	struct file *fp;
+	struct filedesc *fdp = p->p_fd;
 	struct termios tios;
 	struct hpux_termios htios;
 	int line, error;
 	int newi = 0;
 	int (*ioctlrout) __P((struct file *fp, u_long com,
-	    caddr_t data, struct proc *p));
+	    void *data, struct proc *p));
 
-
-	fp = p->p_fd->fd_ofiles[fd];
+        if ((fp = fd_getfile(fdp, fd)) == NULL)
+                return EBADF;
 	ioctlrout = fp->f_ops->fo_ioctl;
 	switch (com) {
 	case HPUXTCGETATTR:
@@ -366,14 +403,14 @@ hpux_termio(fd, com, data, p)
 					args.fdes = fd;
 					args.cmd = F_GETFL;
 					args.arg = 0;
-					(void) hpux_sys_fcntl(p, &args, &flags);
+					(void) hpux_sys_fcntl(l, &args, &flags);
 					if (nbio)
 						flags |= HPUXNDELAY;
 					else
 						flags &= ~HPUXNDELAY;
 					args.cmd = F_SETFL;
 					args.arg = flags;
-					(void) hpux_sys_fcntl(p, &args, &flags);
+					(void) hpux_sys_fcntl(l, &args, &flags);
 				}
 			}
 		}
@@ -477,12 +514,14 @@ hpuxtobsdbaud(hpux_speed)
 		B0,	B0,	B0,	B0,	B0,	B0,	EXTA,	EXTB
 	};
 
+	if (hpux_speed < 0 || hpux_speed > 31)
+		return(B0);
 	return(hpuxtobsdbaudtab[hpux_speed & TIO_CBAUD]);
 }
 
 int
-hpux_sys_stty_6x(p, v, retval)
-	struct proc *p;
+hpux_sys_stty_6x(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -491,12 +530,12 @@ hpux_sys_stty_6x(p, v, retval)
 		syscallarg(caddr_t) arg;
 	} */ *uap = v;
 
-	return (getsettty(p, SCARG(uap, fd), HPUXTIOCGETP, SCARG(uap, arg)));
+	return (getsettty(l, SCARG(uap, fd), HPUXTIOCGETP, SCARG(uap, arg)));
 }
 
 int
-hpux_sys_gtty_6x(p, v, retval)
-	struct proc *p;
+hpux_sys_gtty_6x(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -505,7 +544,7 @@ hpux_sys_gtty_6x(p, v, retval)
 		syscallarg(caddr_t) arg;
 	} */ *uap = v;
 
-	return (getsettty(p, SCARG(uap, fd), HPUXTIOCSETP, SCARG(uap, arg)));
+	return (getsettty(l, SCARG(uap, fd), HPUXTIOCSETP, SCARG(uap, arg)));
 }
 
 /*
@@ -513,11 +552,12 @@ hpux_sys_gtty_6x(p, v, retval)
  * gtty/stty and TIOCGETP/TIOCSETP.
  */
 int
-getsettty(p, fdes, com, cmarg)
-	struct proc *p;
+getsettty(l, fdes, com, cmarg)
+	struct lwp *l;
 	int fdes, com;
 	caddr_t cmarg;
 {
+	struct proc *p = l->l_proc;
 	struct filedesc *fdp = p->p_fd;
 	struct file *fp;
 	struct hpux_sgttyb hsb;

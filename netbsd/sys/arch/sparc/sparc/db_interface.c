@@ -1,4 +1,4 @@
-/*	$NetBSD: db_interface.c,v 1.44 2002/05/13 20:30:10 matt Exp $ */
+/*	$NetBSD: db_interface.c,v 1.60 2004/02/13 11:36:17 wiz Exp $ */
 
 /*
  * Mach Operating System
@@ -31,8 +31,14 @@
 /*
  * Interface to new debugger.
  */
-#include "opt_ddb.h"			/* XXX ddb vs kgdb */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: db_interface.c,v 1.60 2004/02/13 11:36:17 wiz Exp $");
+
+#include "opt_ddb.h"
+#include "opt_kgdb.h"
 #include "opt_multiprocessor.h"
+#include "opt_lockdebug.h"
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -105,19 +111,22 @@ db_write_bytes(addr, size, data)
 
 }
 
+db_regs_t *ddb_regp;
 
 #if defined(DDB)
 
 /*
  * Data and functions used by DDB only.
  */
+
 void
 cpu_Debugger()
 {
 	asm("ta 0x81");
+	sparc_noop();	/* Force this function to allocate a stack frame */
 }
 
-static int nil;
+static long nil;
 
 /*
  * Machine register set.
@@ -133,7 +142,7 @@ const struct db_variable db_regs[] = {
 	{ "npc",	dbreg(npc),		db_sparc_regop, },
 	{ "y",		dbreg(y),		db_sparc_regop, },
 	{ "wim",	dbreg(global[0]),	db_sparc_regop, }, /* see reg.h */
-	{ "g0",		(long *)&nil,		FCN_NULL, },
+	{ "g0",		&nil,			FCN_NULL, 	},
 	{ "g1",		dbreg(global[1]),	db_sparc_regop, },
 	{ "g2",		dbreg(global[2]),	db_sparc_regop, },
 	{ "g3",		dbreg(global[3]),	db_sparc_regop, },
@@ -217,16 +226,22 @@ kdb_kbd_trap(tf)
 	}
 }
 
+/* struct cpu_info of CPU being investigated */
+struct cpu_info *ddb_cpuinfo;
+
 #ifdef MULTIPROCESSOR
 
 #define NOCPU -1
 
 static int db_suspend_others(void);
 static void db_resume_others(void);
-static void ddb_suspend(struct trapframe *tf);
+void ddb_suspend(struct trapframe *tf);
+
+/* from cpu.c */
+void mp_pause_cpus_ddb(void);
+void mp_resume_cpus_ddb(void);
 
 __cpu_simple_lock_t db_lock;
-db_regs_t *ddb_regp = 0;
 int ddb_cpu = NOCPU;
 
 static int
@@ -245,7 +260,7 @@ db_suspend_others(void)
 	__cpu_simple_unlock(&db_lock);
 
 	if (win)
-		mp_pause_cpus();
+		mp_pause_cpus_ddb();
 
 	return win;
 }
@@ -254,27 +269,27 @@ static void
 db_resume_others(void)
 {
 
-	mp_resume_cpus();
+	mp_resume_cpus_ddb();
 
 	__cpu_simple_lock(&db_lock);
 	ddb_cpu = NOCPU;
 	__cpu_simple_unlock(&db_lock);
 }
 
-static void
+void
 ddb_suspend(struct trapframe *tf)
 {
-	db_regs_t regs;
+	volatile db_regs_t dbregs;
 
-	regs.db_tf = *tf;
-	regs.db_fr = *(struct frame *)tf->tf_out[6];
+	/* Initialise local dbregs storage from trap frame */
+	dbregs.db_tf = *tf;
+	dbregs.db_fr = *(struct frame *)tf->tf_out[6];
 
-	cpuinfo.ci_ddb_regs = &regs;
-	while (cpuinfo.flags & CPUFLG_PAUSED)
-		cpuinfo.cache_flush((caddr_t)&cpuinfo.flags, sizeof(cpuinfo.flags));
-	cpuinfo.ci_ddb_regs = 0;
+	cpuinfo.ci_ddb_regs = &dbregs;
+	while (cpuinfo.flags & CPUFLG_PAUSED) /*void*/;
+	cpuinfo.ci_ddb_regs = NULL;
 }
-#endif
+#endif /* MULTIPROCESSOR */
 
 /*
  *  kdb_trap - field a TRACE or BPT trap
@@ -284,9 +299,7 @@ kdb_trap(type, tf)
 	int	type;
 	struct trapframe *tf;
 {
-#ifdef MULTIPROCESSOR
-	db_regs_t dbreg;
-#endif
+	db_regs_t dbregs;
 	int s;
 
 #if NFB > 0
@@ -308,14 +321,18 @@ kdb_trap(type, tf)
 #ifdef MULTIPROCESSOR
 	if (!db_suspend_others()) {
 		ddb_suspend(tf);
-	} else {
-		curcpu()->ci_ddb_regs = ddb_regp = &dbreg;
+		return 1;
+	}
 #endif
+	/* Initialise local dbregs storage from trap frame */
+	dbregs.db_tf = *tf;
+	dbregs.db_fr = *(struct frame *)tf->tf_out[6];
+
+	/* Setup current CPU & reg pointers */
+	ddb_cpuinfo = curcpu();
+	curcpu()->ci_ddb_regs = ddb_regp = &dbregs;
 
 	/* Should switch to kdb`s own stack here. */
-
-	ddb_regs.db_tf = *tf;
-	ddb_regs.db_fr = *(struct frame *)tf->tf_out[6];
 
 	s = splhigh();
 	db_active++;
@@ -325,13 +342,14 @@ kdb_trap(type, tf)
 	db_active--;
 	splx(s);
 
-	*(struct frame *)tf->tf_out[6] = ddb_regs.db_fr;
-	*tf = ddb_regs.db_tf;
+	/* Update trap frame from local dbregs storage */
+	*(struct frame *)tf->tf_out[6] = dbregs.db_fr;
+	*tf = dbregs.db_tf;
+	curcpu()->ci_ddb_regs = ddb_regp = 0;
+	ddb_cpuinfo = NULL;
 
 #ifdef MULTIPROCESSOR
-		db_resume_others();
-		curcpu()->ci_ddb_regs = ddb_regp = 0;
-	}
+	db_resume_others();
 #endif
 
 	return (1);
@@ -344,29 +362,37 @@ db_proc_cmd(addr, have_addr, count, modif)
 	db_expr_t count;
 	char *modif;
 {
+	struct lwp *l;
 	struct proc *p;
 
-	p = curproc;
+	l = curlwp;
 	if (have_addr) 
-		p = (struct proc*) addr;
-	if (p == NULL) {
+		l = (struct lwp *) addr;
+
+	if (l == NULL) {
 		db_printf("no current process\n");
 		return;
 	}
-	db_printf("process %p:", p);
-	db_printf("pid:%d cpu:%d vmspace:%p ", p->p_pid, p->p_cpu->ci_cpuid, p->p_vmspace);
-	db_printf("pmap:%p ctx:%p wchan:%p pri:%d upri:%d\n",
+
+	p = l->l_proc;
+
+	db_printf("LWP %p: ", l);
+	db_printf("PID:%d.%d CPU:%d stat:%d vmspace:%p", p->p_pid,
+	    l->l_lid, l->l_cpu->ci_cpuid, l->l_stat, p->p_vmspace);
+	if (!P_ZOMBIE(p))
+		db_printf(" ctx: %p cpuset %x",
+			  p->p_vmspace->vm_map.pmap->pm_ctx,
+			  p->p_vmspace->vm_map.pmap->pm_cpuset);
+	db_printf("\npmap:%p wchan:%p pri:%d upri:%d\n",
 		  p->p_vmspace->vm_map.pmap, 
-		  p->p_vmspace->vm_map.pmap->pm_ctx,
-		  p->p_wchan, p->p_priority, p->p_usrpri);
-	db_printf("thread @ %p = %p ", &p->p_thread, p->p_thread);
+		  l->l_wchan, l->l_priority, l->l_usrpri);
 	db_printf("maxsaddr:%p ssiz:%d pg or %llxB\n",
 		  p->p_vmspace->vm_maxsaddr, p->p_vmspace->vm_ssize, 
 		  (unsigned long long)ctob(p->p_vmspace->vm_ssize));
 	db_printf("profile timer: %ld sec %ld usec\n",
 		  p->p_stats->p_timer[ITIMER_PROF].it_value.tv_sec,
 		  p->p_stats->p_timer[ITIMER_PROF].it_value.tv_usec);
-	db_printf("pcb: %p\n", &p->p_addr->u_pcb);
+	db_printf("pcb: %p\n", &l->l_addr->u_pcb);
 	return;
 }
 
@@ -509,26 +535,27 @@ db_cpu_cmd(addr, have_addr, count, modif)
 	}
 	
 	if ((addr < 0) || (addr >= ncpu)) {
-		db_printf("%ld: cpu out of range\n", addr);
+		db_printf("%ld: CPU out of range\n", addr);
 		return;
 	}
 	ci = cpus[addr];
 	if (ci == NULL) {
-		db_printf("cpu %ld not configured\n", addr);
+		db_printf("CPU %ld not configured\n", addr);
 		return;
 	}
 	if (ci != curcpu()) {
 		if (!(ci->flags & CPUFLG_PAUSED)) {
-			db_printf("cpu %ld not paused\n", addr);
+			db_printf("CPU %ld not paused\n", addr);
 			return;
 		}
 	}
 	if (ci->ci_ddb_regs == 0) {
-		db_printf("cpu %ld has no saved regs\n", addr);
+		db_printf("CPU %ld has no saved regs\n", addr);
 		return;
 	}
-	db_printf("using cpu %ld", addr);
-	ddb_regp = ci->ci_ddb_regs;
+	db_printf("using CPU %ld", addr);
+	ddb_regp = (void *)ci->ci_ddb_regs;
+	ddb_cpuinfo = ci;
 }
 
 #endif /* MULTIPROCESSOR */
@@ -583,7 +610,7 @@ db_branch_taken(inst, pc, regs)
 	db_regs_t *regs;
 {
     union instr insn;
-    db_addr_t npc = ddb_regs.db_tf.tf_npc;
+    db_addr_t npc = ddb_regp->db_tf.tf_npc;
 
     insn.i_int = inst;
 

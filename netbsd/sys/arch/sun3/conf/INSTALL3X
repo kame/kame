@@ -1,4 +1,4 @@
-# $NetBSD: INSTALL3X,v 1.17 2002/04/25 15:06:39 atatat Exp $
+# $NetBSD: INSTALL3X,v 1.21.2.1 2004/07/15 20:20:33 he Exp $
 #
 # INSTALL3X - Installation kernel for the Sun3X
 #
@@ -28,9 +28,10 @@ maxusers	2
 #options 	SHMMAXPGS=1024	# 1024 pages is the default
 #options 	LKM		# loadable kernel modules
 #options 	INSECURE	# disable kernel security level
-#options 	UCONSOLE	# Allow non-root TIOCCONS
-#options 	USERCONF	# userconf(4) support
-options		PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+options 	USERCONF	# userconf(4) support
+options		PIPE_SOCKETPAIR		# smaller, but slower pipe(2)
+#options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
+options 	MALLOC_NOINLINE		# Not inlining MALLOC saves memory
 
 # Which kernel debugger?  Uncomment either this:
 #options 	DDB
@@ -56,6 +57,8 @@ options		PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
 #options 	COMPAT_12	# NetBSD 1.2
 options 	COMPAT_13	# NetBSD 1.3
 options 	COMPAT_14	# NetBSD 1.4
+options 	COMPAT_15	# NetBSD 1.5
+options 	COMPAT_16	# NetBSD 1.6
 #options 	COMPAT_LINUX	# can run Linux/m68k executables
 #options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 
@@ -76,7 +79,7 @@ file-system	KERNFS		# /kern
 #options 	QUOTA		# FFS quotas
 #options 	FFS_EI		# FFS Endian Independant support
 #options 	NFS_V2_ONLY	# Exclude NFS3 and NQNFS code to save space
-#options 	VNODE_OP_NOINLINE # Save space by not inlining vnode op calls
+options 	VNODE_OP_NOINLINE	# Not inlining vnode op calls saves mem
 
 # Networking options
 options 	INET		# IP prototol stack support

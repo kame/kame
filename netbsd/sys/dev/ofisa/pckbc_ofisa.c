@@ -1,4 +1,4 @@
-/* $NetBSD: pckbc_ofisa.c,v 1.3 2002/01/14 13:32:46 tsutsui Exp $ */
+/* $NetBSD: pckbc_ofisa.c,v 1.8 2004/03/24 17:26:53 drochner Exp $ */
 
 /*
  * Copyright (c) 1998
@@ -14,12 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed for the NetBSD Project
- *	by Matthias Drochner.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -34,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pckbc_ofisa.c,v 1.3 2002/01/14 13:32:46 tsutsui Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pckbc_ofisa.c,v 1.8 2004/03/24 17:26:53 drochner Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -67,20 +61,19 @@ struct pckbc_ofisa_softc {
 	struct ofisa_intr_desc sc_intr[PCKBC_NSLOTS];
 };
 
-struct cfattach pckbc_ofisa_ca = {
-	sizeof(struct pckbc_ofisa_softc), pckbc_ofisa_match, pckbc_ofisa_attach,
-};
+CFATTACH_DECL(pckbc_ofisa, sizeof(struct pckbc_ofisa_softc),
+    pckbc_ofisa_match, pckbc_ofisa_attach, NULL, NULL);
 
 static void pckbc_ofisa_intr_establish (struct pckbc_softc *, pckbc_slot_t);
 
-static const char *kb_compatible_strings[] = { "pnpPNP,303", NULL };
-static const char *ms_compatible_strings[] = { "pnpPNP,f03", NULL };
+static const char *const kb_compatible_strings[] = { "pnpPNP,303", NULL };
+static const char *const ms_compatible_strings[] = { "pnpPNP,f03", NULL };
 
 static int
 pckbc_ofisa_match(struct device *parent, struct cfdata *match, void *aux)
 {
 	struct ofisa_attach_args *aa = aux;
-	static const char *compatible_strings[] = { "INTC,80c42", NULL };
+	static const char *const compatible_strings[] = { "INTC,80c42", NULL };
 	int rv = 0;
 
 	if (of_compatible(aa->oba.oba_phandle, compatible_strings) != -1)

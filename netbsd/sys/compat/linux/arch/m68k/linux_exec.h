@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_exec.h,v 1.4 2002/01/17 17:19:03 bjh21 Exp $	*/
+/*	$NetBSD: linux_exec.h,v 1.8 2003/08/14 02:17:09 christos Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -48,14 +48,8 @@
 #define LINUX_GCC_SIGNATURE	1
 
 #define LINUX_ELF_AUX_ARGSIZ \
-	(howmany(ELF_AUX_ENTRIES * sizeof(Aux32Info), sizeof(Elf32_Addr)))
-#ifdef ELF32NAME
-#define LINUX_COPYARGS_FUNCTION	ELF32NAME(copyargs)
-#else
-#define LINUX_COPYARGS_FUNCTION	ELFNAME(copyargs)
-#endif
+	(howmany(LINUX_ELF_AUX_ENTRIES * sizeof(Aux32Info), sizeof(Elf32_Addr)))
 
-/* Linux uses the standard syscall handler. */
-#define LINUX_SYSCALL_FUNCTION syscall
+#define linux_exec_setup_stack	exec_setup_stack
 
 #endif /* !_M68K_LINUX_EXEC_H */

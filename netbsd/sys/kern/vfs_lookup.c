@@ -1,4 +1,4 @@
-/*	$NetBSD: vfs_lookup.c,v 1.39.10.1 2002/06/21 05:47:58 lukem Exp $	*/
+/*	$NetBSD: vfs_lookup.c,v 1.54 2003/12/08 14:23:33 hannken Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,9 +37,10 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: vfs_lookup.c,v 1.39.10.1 2002/06/21 05:47:58 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: vfs_lookup.c,v 1.54 2003/12/08 14:23:33 hannken Exp $");
 
 #include "opt_ktrace.h"
+#include "opt_systrace.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -62,9 +59,14 @@ __KERNEL_RCSID(0, "$NetBSD: vfs_lookup.c,v 1.39.10.1 2002/06/21 05:47:58 lukem E
 #ifdef KTRACE
 #include <sys/ktrace.h>
 #endif
+#ifdef SYSTRACE
+#include <sys/systrace.h>
+#endif
 
 struct pool pnbuf_pool;		/* pathname buffer pool */
 struct pool_cache pnbuf_cache;	/* pathname buffer cache */
+
+MALLOC_DEFINE(M_NAMEI, "namei", "namei path buffer");
 
 /*
  * Convert a pathname into a pointer to a locked inode.
@@ -138,6 +140,10 @@ namei(ndp)
 	if (KTRPOINT(cnp->cn_proc, KTR_NAMEI))
 		ktrnamei(cnp->cn_proc, cnp->cn_pnbuf);
 #endif
+#ifdef SYSTRACE
+	if (ISSET(cnp->cn_proc->p_flag, P_SYSTRACE))
+		systrace_namei(ndp);
+#endif
 
 	/*
 	 * Get starting point for the translation.
@@ -155,6 +161,12 @@ namei(ndp)
 		VREF(dp);
 	}
 	for (;;) {
+		if (!dp->v_mount)
+		{
+			/* Give up if the directory is no longer mounted */
+			PNBUF_PUT(cnp->cn_pnbuf);
+			return (ENOENT);
+		}
 		cnp->cn_nameptr = cnp->cn_pnbuf;
 		ndp->ni_startdir = dp;
 		if ((error = lookup(ndp)) != 0) {
@@ -388,10 +400,10 @@ dirloop:
 	}
 #ifdef NAMEI_DIAGNOSTIC
 	{ char c = *cp;
-	*cp = '\0';
+	*(char *)cp = '\0';
 	printf("{%s}: ", cnp->cn_nameptr);
-	*cp = c; }
-#endif
+	*(char *)cp = c; }
+#endif /* NAMEI_DIAGNOSTIC */
 	ndp->ni_pathlen -= cnp->cn_namelen;
 	ndp->ni_next = cp;
 	/*
@@ -497,11 +509,11 @@ unionlookup:
 	if ((error = VOP_LOOKUP(dp, &ndp->ni_vp, cnp)) != 0) {
 #ifdef DIAGNOSTIC
 		if (ndp->ni_vp != NULL)
-			panic("leaf should be empty");
-#endif
+			panic("leaf `%s' should be empty", cnp->cn_nameptr);
+#endif /* DIAGNOSTIC */
 #ifdef NAMEI_DIAGNOSTIC
 		printf("not found\n");
-#endif
+#endif /* NAMEI_DIAGNOSTIC */
 		if ((error == ENOENT) &&
 		    (dp->v_flag & VROOT) &&
 		    (dp->v_mount->mnt_flag & MNT_UNION)) {
@@ -520,9 +532,10 @@ unionlookup:
 			goto bad;
 		/*
 		 * If this was not the last component, or there were trailing
-		 * slashes, then the name must exist.
+		 * slashes, and we are not going to create a directory,
+		 * then the name must exist.
 		 */
-		if (cnp->cn_flags & REQUIREDIR) {
+		if ((cnp->cn_flags & (REQUIREDIR | CREATEDIR)) == REQUIREDIR) {
 			error = ENOENT;
 			goto bad;
 		}
@@ -547,7 +560,7 @@ unionlookup:
 	}
 #ifdef NAMEI_DIAGNOSTIC
 	printf("found\n");
-#endif
+#endif /* NAMEI_DIAGNOSTIC */
 
 	/*
 	 * Take into account any additional components consumed by the
@@ -661,23 +674,18 @@ relookup(dvp, vpp, cnp)
 	struct componentname *cnp;
 {
 	struct vnode *dp = 0;		/* the directory we are searching */
-	int docache;			/* == 0 do not cache last component */
 	int wantparent;			/* 1 => wantparent or lockparent flag */
 	int rdonly;			/* lookup read-only flag bit */
 	int error = 0;
-#ifdef NAMEI_DIAGNOSTIC
-	int newhash;			/* DEBUG: check name hash */
-	char *cp;			/* DEBUG: check name ptr/len */
-#endif
+#ifdef DEBUG
+	u_long newhash;			/* DEBUG: check name hash */
+	const char *cp;			/* DEBUG: check name ptr/len */
+#endif /* DEBUG */
 
 	/*
 	 * Setup: break out flag bits into variables.
 	 */
 	wantparent = cnp->cn_flags & (LOCKPARENT|WANTPARENT);
-	docache = (cnp->cn_flags & NOCACHE) ^ NOCACHE;
-	if (cnp->cn_nameiop == DELETE ||
-	    (wantparent && cnp->cn_nameiop != CREATE))
-		docache = 0;
 	rdonly = cnp->cn_flags & RDONLY;
 	cnp->cn_flags &= ~ISSYMLINK;
 	dp = dvp;
@@ -693,17 +701,21 @@ relookup(dvp, vpp, cnp)
 	 * the name set the SAVENAME flag. When done, they assume
 	 * responsibility for freeing the pathname buffer.
 	 */
-#ifdef NAMEI_DIAGNOSTIC
+#ifdef DEBUG
 	cp = NULL;
 	newhash = namei_hash(cnp->cn_nameptr, &cp);
 	if (newhash != cnp->cn_hash)
 		panic("relookup: bad hash");
 	if (cnp->cn_namelen != cp - cnp->cn_nameptr)
 		panic ("relookup: bad len");
+	while (*cp == '/')
+		cp++;
 	if (*cp != 0)
 		panic("relookup: not last component");
+#endif /* DEBUG */
+#ifdef NAMEI_DIAGNOSTIC
 	printf("{%s}: ", cnp->cn_nameptr);
-#endif
+#endif /* NAMEI_DIAGNOSTIC */
 
 	/*
 	 * Check for degenerate name (e.g. / or "")
@@ -722,7 +734,7 @@ relookup(dvp, vpp, cnp)
 	if ((error = VOP_LOOKUP(dp, vpp, cnp)) != 0) {
 #ifdef DIAGNOSTIC
 		if (*vpp != NULL)
-			panic("leaf should be empty");
+			panic("leaf `%s' should be empty", cnp->cn_nameptr);
 #endif
 		if (error != EJUSTRETURN)
 			goto bad;

@@ -1,4 +1,4 @@
-/*	$NetBSD: irframe_tty.c,v 1.20 2002/03/17 19:40:58 atatat Exp $	*/
+/*	$NetBSD: irframe_tty.c,v 1.27 2003/07/14 15:47:14 lukem Exp $	*/
 
 /*
  * TODO
@@ -47,6 +47,9 @@
  * Framing and dongle handling written by Tommy Bohlin.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: irframe_tty.c,v 1.27 2003/07/14 15:47:14 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/ioctl.h>
@@ -85,7 +88,7 @@ int irframetdebug = 0;
 /* Max size with framing. */
 #define MAX_IRDA_FRAME (2*IRDA_MAX_FRAME_SIZE + IRDA_MAX_EBOFS + 4)
 
-struct frame {
+struct irt_frame {
 	u_char *buf;
 	u_int len;
 };
@@ -120,8 +123,10 @@ struct irframet_softc {
 	u_int sc_nframes;
 	u_int sc_framei;
 	u_int sc_frameo;
-	struct frame sc_frames[MAXFRAMES];
+	struct irt_frame sc_frames[MAXFRAMES];
 	struct selinfo sc_rsel;
+	/* XXXJRT Nothing selnotify's sc_wsel */
+	struct selinfo sc_wsel;
 };
 
 /* line discipline methods */
@@ -141,6 +146,7 @@ Static int	irframet_close(void *h, int flag, int mode, struct proc *p);
 Static int	irframet_read(void *h, struct uio *uio, int flag);
 Static int	irframet_write(void *h, struct uio *uio, int flag);
 Static int	irframet_poll(void *h, int events, struct proc *p);
+Static int	irframet_kqfilter(void *h, struct knote *kn);
 Static int	irframet_set_params(void *h, struct irda_params *params);
 Static int	irframet_get_speeds(void *h, int *speeds);
 Static int	irframet_get_turnarounds(void *h, int *times);
@@ -157,7 +163,7 @@ Static void	irt_delay(struct tty *tp, u_int delay);
 
 Static const struct irframe_methods irframet_methods = {
 	irframet_open, irframet_close, irframet_read, irframet_write,
-	irframet_poll, irframet_set_params,
+	irframet_poll, irframet_kqfilter, irframet_set_params,
 	irframet_get_speeds, irframet_get_turnarounds
 };
 
@@ -356,7 +362,7 @@ irt_frame(struct irframet_softc *sc, u_char *buf, u_int len)
 		DPRINTF(("%s: waking up reader\n", __FUNCTION__));
 		wakeup(sc->sc_frames);
 	}
-	selwakeup(&sc->sc_rsel);
+	selnotify(&sc->sc_rsel, 0);
 }
 
 void
@@ -661,6 +667,91 @@ irframet_poll(void *h, int events, struct proc *p)
 	return (revents);
 }
 
+static void
+filt_irframetrdetach(struct knote *kn)
+{
+	struct tty *tp = kn->kn_hook;
+	struct irframet_softc *sc = (struct irframet_softc *)tp->t_sc;
+	int s;
+
+	s = splir();
+	SLIST_REMOVE(&sc->sc_rsel.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_irframetread(struct knote *kn, long hint)
+{
+	struct tty *tp = kn->kn_hook;
+	struct irframet_softc *sc = (struct irframet_softc *)tp->t_sc;
+
+	kn->kn_data = sc->sc_nframes;
+	return (kn->kn_data > 0);
+}
+
+static void
+filt_irframetwdetach(struct knote *kn)
+{
+	struct tty *tp = kn->kn_hook;
+	struct irframet_softc *sc = (struct irframet_softc *)tp->t_sc;
+	int s;
+
+	s = splir();
+	SLIST_REMOVE(&sc->sc_wsel.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_irframetwrite(struct knote *kn, long hint)
+{
+	struct tty *tp = kn->kn_hook;
+
+	/* XXX double-check this */
+
+	if (tp->t_outq.c_cc <= tp->t_lowat) {
+		kn->kn_data = tp->t_lowat - tp->t_outq.c_cc;
+		return (1);
+	}
+
+	kn->kn_data = 0;
+	return (0);
+}
+
+static const struct filterops irframetread_filtops =
+	{ 1, NULL, filt_irframetrdetach, filt_irframetread };
+static const struct filterops irframetwrite_filtops =
+	{ 1, NULL, filt_irframetwdetach, filt_irframetwrite };
+
+int
+irframet_kqfilter(void *h, struct knote *kn)
+{
+	struct tty *tp = h;
+	struct irframet_softc *sc = (struct irframet_softc *)tp->t_sc;
+	struct klist *klist;
+	int s;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &sc->sc_rsel.sel_klist;
+		kn->kn_fop = &irframetread_filtops;
+		break;
+	case EVFILT_WRITE:
+		klist = &sc->sc_wsel.sel_klist;
+		kn->kn_fop = &irframetwrite_filtops;
+		break;
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = tp;
+
+	s = splir();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
+}
+
 int
 irframet_set_params(void *h, struct irda_params *p)
 {
@@ -737,11 +828,16 @@ irframet_get_turnarounds(void *h, int *turnarounds)
 void
 irt_ioctl(struct tty *tp, u_long cmd, void *arg)
 {
+	const struct cdevsw *cdev;
 	int error;
 	dev_t dev;
 
 	dev = tp->t_dev;
-	error = cdevsw[major(dev)].d_ioctl(dev, cmd, arg, 0, curproc);
+	cdev = cdevsw_lookup(dev);
+	if (cdev != NULL)
+		error = (*cdev->d_ioctl)(dev, cmd, arg, 0, curproc);
+	else
+		error = ENXIO;
 #ifdef DIAGNOSTIC
 	if (error)
 		printf("irt_ioctl: cmd=0x%08lx error=%d\n", cmd, error);

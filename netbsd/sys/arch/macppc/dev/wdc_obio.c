@@ -1,7 +1,7 @@
-/*	$NetBSD: wdc_obio.c,v 1.19.10.2 2003/06/24 09:21:52 grant Exp $	*/
+/*	$NetBSD: wdc_obio.c,v 1.36 2004/01/04 07:08:13 dbj Exp $	*/
 
 /*-
- * Copyright (c) 1998 The NetBSD Foundation, Inc.
+ * Copyright (c) 1998, 2003 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: wdc_obio.c,v 1.36 2004/01/04 07:08:13 dbj Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -67,8 +70,9 @@
 
 struct wdc_obio_softc {
 	struct wdc_softc sc_wdcdev;
-	struct channel_softc *wdc_chanptr;
-	struct channel_softc wdc_channel;
+	struct wdc_channel *wdc_chanptr;
+	struct wdc_channel wdc_channel;
+	struct ata_queue wdc_chqueue;
 	dbdma_regmap_t *sc_dmareg;
 	dbdma_command_t	*sc_dmacmd;
 	u_int sc_dmaconf[2];	/* per target value of CONFIG_REG */
@@ -82,15 +86,12 @@ int wdc_obio_dma_init __P((void *, int, int, void *, size_t, int));
 void wdc_obio_dma_start __P((void *, int, int));
 int wdc_obio_dma_finish __P((void *, int, int, int));
 
-static void wdc_obio_select __P((struct channel_softc *, int));
-static void adjust_timing __P((struct channel_softc *));
-static void ata4_adjust_timing __P((struct channel_softc *));
+static void wdc_obio_select __P((struct wdc_channel *, int));
+static void adjust_timing __P((struct wdc_channel *));
+static void ata4_adjust_timing __P((struct wdc_channel *));
 
-struct cfattach wdc_obio_ca = {
-	sizeof(struct wdc_obio_softc), wdc_obio_probe, wdc_obio_attach,
-	wdc_obio_detach, wdcactivate
-};
-
+CFATTACH_DECL(wdc_obio, sizeof(struct wdc_obio_softc),
+    wdc_obio_probe, wdc_obio_attach, wdc_obio_detach, wdcactivate);
 
 int
 wdc_obio_probe(parent, match, aux)
@@ -124,8 +125,8 @@ wdc_obio_attach(parent, self, aux)
 {
 	struct wdc_obio_softc *sc = (void *)self;
 	struct confargs *ca = aux;
-	struct channel_softc *chp = &sc->wdc_channel;
-	int intr;
+	struct wdc_channel *chp = &sc->wdc_channel;
+	int intr, i;
 	int use_dma = 0;
 	char path[80];
 
@@ -153,12 +154,23 @@ wdc_obio_attach(parent, self, aux)
 	chp->cmd_iot = chp->ctl_iot =
 		macppc_make_bus_space_tag(ca->ca_baseaddr + ca->ca_reg[0], 4);
 
-	if (bus_space_map(chp->cmd_iot, 0, WDC_REG_NPORTS, 0, &chp->cmd_ioh) ||
-	    bus_space_subregion(chp->cmd_iot, chp->cmd_ioh,
+	if (bus_space_map(chp->cmd_iot, 0, WDC_REG_NPORTS, 0,
+	    &chp->cmd_baseioh) ||
+	    bus_space_subregion(chp->cmd_iot, chp->cmd_baseioh,
 			WDC_AUXREG_OFFSET, 1, &chp->ctl_ioh)) {
 		printf("%s: couldn't map registers\n",
 			sc->sc_wdcdev.sc_dev.dv_xname);
 		return;
+	}
+	for (i = 0; i < WDC_NREG; i++) {
+		if (bus_space_subregion(chp->cmd_iot, chp->cmd_baseioh, i,
+		    i == 0 ? 4 : 1, &chp->cmd_iohs[i]) != 0) {
+			bus_space_unmap(chp->cmd_iot, chp->cmd_baseioh,
+			    WDC_REG_NPORTS);
+			printf("%s: couldn't subregion registers\n",
+			    sc->sc_wdcdev.sc_dev.dv_xname);
+			return;
+		}
 	}
 #if 0
 	chp->data32iot = chp->cmd_iot;
@@ -188,7 +200,7 @@ wdc_obio_attach(parent, self, aux)
 		}
 #endif
 	} else {
-		/* all non-dma controllers can use adjust_timing */
+		/* all non-DMA controllers can use adjust_timing */
 		sc->sc_wdcdev.set_modes = adjust_timing;
 	}
 
@@ -201,15 +213,9 @@ wdc_obio_attach(parent, self, aux)
 	sc->sc_wdcdev.dma_init = wdc_obio_dma_init;
 	sc->sc_wdcdev.dma_start = wdc_obio_dma_start;
 	sc->sc_wdcdev.dma_finish = wdc_obio_dma_finish;
-	chp->channel = 0;
-	chp->wdc = &sc->sc_wdcdev;
-	chp->ch_queue = malloc(sizeof(struct channel_queue),
-		M_DEVBUF, M_NOWAIT);
-	if (chp->ch_queue == NULL) {
-		printf("%s: can't allocate memory for command queue",
-		sc->sc_wdcdev.sc_dev.dv_xname);
-		return;
-	}
+	chp->ch_channel = 0;
+	chp->ch_wdc = &sc->sc_wdcdev;
+	chp->ch_queue = &sc->wdc_chqueue;
 
 #define OHARE_FEATURE_REG	0xf3000038
 
@@ -225,8 +231,6 @@ wdc_obio_attach(parent, self, aux)
 	}
 
 	wdcattach(chp);
-	sc->sc_wdcdev.set_modes(chp);
-
 }
 
 /* Multiword DMA transfer timings */
@@ -269,22 +273,22 @@ static struct ide_timings udma_timing[5] = {
 
 void
 wdc_obio_select(chp, drive)
-	struct channel_softc *chp;
+	struct wdc_channel *chp;
 	int drive;
 {
-	struct wdc_obio_softc *sc = (struct wdc_obio_softc *)chp->wdc;
-	bus_space_write_4(chp->cmd_iot, chp->cmd_ioh,
+	struct wdc_obio_softc *sc = (struct wdc_obio_softc *)chp->ch_wdc;
+	bus_space_write_4(chp->cmd_iot, chp->cmd_baseioh,
 			CONFIG_REG, sc->sc_dmaconf[drive]);
 }
 
 void
 adjust_timing(chp)
-	struct channel_softc *chp;
+	struct wdc_channel *chp;
 {
-	struct wdc_obio_softc *sc = (struct wdc_obio_softc *)chp->wdc;
+	struct wdc_obio_softc *sc = (struct wdc_obio_softc *)chp->ch_wdc;
 	int drive;
-	int min_cycle, min_active;
-	int cycle_tick, act_tick, inact_tick, half_tick;
+	int min_cycle = 0, min_active = 0;
+	int cycle_tick = 0, act_tick = 0, inact_tick = 0, half_tick;
 
 	for (drive = 0; drive < 2; drive++) {
 		u_int conf = 0;
@@ -307,7 +311,7 @@ adjust_timing(chp)
 			/* mask: 0x000007ff */
 			conf |= (inact_tick << 5) | act_tick;
 		}
-		/* Set up dma mode timings */
+		/* Set up DMA mode timings */
 		if (drvp->drive_flags & DRIVE_DMA) {
 			int dmamode = drvp->DMA_mode;
 			min_cycle = dma_timing[dmamode].cycle;
@@ -342,17 +346,16 @@ adjust_timing(chp)
 	} else if (sc->sc_dmaconf[1]) {
 		wdc_obio_select(chp,1);
 	}
-	wdc_print_modes(chp);
 }
 
 void
 ata4_adjust_timing(chp)
-	struct channel_softc *chp;
+	struct wdc_channel *chp;
 {
-	struct wdc_obio_softc *sc = (struct wdc_obio_softc *)chp->wdc;
+	struct wdc_obio_softc *sc = (struct wdc_obio_softc *)chp->ch_wdc;
 	int drive;
-	int min_cycle, min_active;
-	int cycle_tick, act_tick, inact_tick;
+	int min_cycle = 0, min_active = 0;
+	int cycle_tick = 0, act_tick = 0, inact_tick = 0;
 
 	for (drive = 0; drive < 2; drive++) {
 		u_int conf = 0;
@@ -412,7 +415,6 @@ ata4_adjust_timing(chp)
 	} else if (sc->sc_dmaconf[1]) {
 		wdc_obio_select(chp,1);
 	}
-	wdc_print_modes(chp);
 }
 
 int
@@ -427,8 +429,6 @@ wdc_obio_detach(self, flags)
 		return error;
 
 	intr_disestablish(sc->sc_ih);
-
-	free(sc->wdc_channel.ch_queue, M_DEVBUF);
 
 	/* Unmap our i/o space. */
 	bus_space_unmap(chp->cmd_iot, chp->cmd_ioh, WDC_REG_NPORTS);
@@ -460,7 +460,7 @@ wdc_obio_dma_init(v, channel, drive, databuf, datalen, flags)
 
 	/* if va is not page-aligned, setup the first page */
 	if (offset != 0) {
-		int rest = NBPG - offset;	/* the rest of the page */
+		int rest = PAGE_SIZE - offset;	/* the rest of the page */
 
 		if (datalen > rest) {		/* if continues to next page */
 			DBDMA_BUILD(cmdp, cmd, 0, rest, vtophys(va),
@@ -473,15 +473,15 @@ wdc_obio_dma_init(v, channel, drive, databuf, datalen, flags)
 	}
 
 	/* now va is page-aligned */
-	while (datalen > NBPG) {
-		DBDMA_BUILD(cmdp, cmd, 0, NBPG, vtophys(va),
+	while (datalen > PAGE_SIZE) {
+		DBDMA_BUILD(cmdp, cmd, 0, PAGE_SIZE, vtophys(va),
 			DBDMA_INT_NEVER, DBDMA_WAIT_NEVER, DBDMA_BRANCH_NEVER);
-		datalen -= NBPG;
-		va += NBPG;
+		datalen -= PAGE_SIZE;
+		va += PAGE_SIZE;
 		cmdp++;
 	}
 
-	/* the last page (datalen <= NBPG here) */
+	/* the last page (datalen <= PAGE_SIZE here) */
 	cmd = read ? DBDMA_CMD_IN_LAST : DBDMA_CMD_OUT_LAST;
 	DBDMA_BUILD(cmdp, cmd, 0, datalen, vtophys(va),
 		DBDMA_INT_NEVER, DBDMA_WAIT_NEVER, DBDMA_BRANCH_NEVER);

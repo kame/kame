@@ -1,4 +1,4 @@
-/*	$NetBSD: if_sm_pcmcia.c,v 1.26 2001/11/13 07:26:33 lukem Exp $	*/
+/*	$NetBSD: if_sm_pcmcia.c,v 1.30 2002/10/02 16:52:15 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 2000 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_sm_pcmcia.c,v 1.26 2001/11/13 07:26:33 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_sm_pcmcia.c,v 1.30 2002/10/02 16:52:15 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -82,10 +82,8 @@ struct sm_pcmcia_softc {
 	struct	pcmcia_function *sc_pf;		/* our PCMCIA function */
 };
 
-struct cfattach sm_pcmcia_ca = {
-	sizeof(struct sm_pcmcia_softc), sm_pcmcia_match, sm_pcmcia_attach,
-	    sm_pcmcia_detach, smc91cxx_activate
-};
+CFATTACH_DECL(sm_pcmcia, sizeof(struct sm_pcmcia_softc),
+    sm_pcmcia_match, sm_pcmcia_attach, sm_pcmcia_detach, smc91cxx_activate);
 
 int	sm_pcmcia_enable __P((struct smc91cxx_softc *));
 void	sm_pcmcia_disable __P((struct smc91cxx_softc *));
@@ -139,7 +137,7 @@ sm_pcmcia_attach(parent, self, aux)
 	const struct pcmcia_product *pp;
 
 	psc->sc_pf = pa->pf;
-	cfe = pa->pf->cfe_head.sqh_first;
+	cfe = SIMPLEQ_FIRST(&pa->pf->cfe_head);
 
 	/* Enable the card. */
 	pcmcia_function_init(pa->pf, cfe);

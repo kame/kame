@@ -1,4 +1,4 @@
-/*	$NetBSD: disksubr.c,v 1.8 2002/03/13 13:12:29 simonb Exp $	*/
+/*	$NetBSD: disksubr.c,v 1.13 2003/11/17 10:07:58 keihan Exp $	*/
 
 /*
  * Copyright (c) 2001 Christopher Sekiya
@@ -17,7 +17,7 @@
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
  *          This product includes software developed for the
- *          NetBSD Project.  See http://www.netbsd.org/ for
+ *          NetBSD Project.  See http://www.NetBSD.org/ for
  *          information about NetBSD.
  * 4. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
@@ -33,6 +33,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: disksubr.c,v 1.13 2003/11/17 10:07:58 keihan Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -65,7 +68,7 @@ int mipsvh_cksum(struct sgilabel *vhp);
  * Returns null on success and an error string on failure.
  */
 
-char *
+const char *
 readdisklabel(dev_t dev, void (*strat)(struct buf *), struct disklabel *lp, struct cpu_disklabel *clp)
 {
 	struct buf *bp;
@@ -221,8 +224,9 @@ ioerror:
  * if needed, and signal errors or early completion.
  */
 int
-bounds_check_with_label(struct buf *bp, struct disklabel *lp, int wlabel)
+bounds_check_with_label(struct disk *dk, struct buf *bp, int wlabel)
 {
+	struct disklabel *lp = dk->dk_label;
 	struct partition *p = lp->d_partitions + DISKPART(bp->b_dev);
 	int maxsz = p->p_size;
 	int sz = (bp->b_bcount + DEV_BSIZE - 1) >> DEV_BSHIFT;
@@ -316,7 +320,7 @@ disklabel_sgimips_to_bsd(struct sgilabel *vh, struct disklabel *lp)
 	lp->d_secperunit = lp->d_secpercyl * lp->d_ncylinders;
 
 	lp->d_bbsize = BBSIZE;
-	lp->d_sbsize = SBSIZE;
+	lp->d_sbsize = SBLOCKSIZE;
 	lp->d_npartitions = MAXPARTITIONS;
 
 	for (i = 0; i < 16; i++) {

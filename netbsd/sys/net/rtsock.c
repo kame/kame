@@ -1,4 +1,4 @@
-/*	$NetBSD: rtsock.c,v 1.55.10.1 2003/06/24 09:55:37 grant Exp $	*/
+/*	$NetBSD: rtsock.c,v 1.67.2.1 2004/05/28 07:23:33 tron Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -41,11 +41,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -65,7 +61,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rtsock.c,v 1.55.10.1 2003/06/24 09:55:37 grant Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rtsock.c,v 1.67.2.1 2004/05/28 07:23:33 tron Exp $");
 
 #include "opt_inet.h"
 
@@ -84,6 +80,8 @@ __KERNEL_RCSID(0, "$NetBSD: rtsock.c,v 1.55.10.1 2003/06/24 09:55:37 grant Exp $
 #include <net/raw_cb.h>
 
 #include <machine/stdarg.h>
+
+extern	struct domain routedomain;		/* or at least forward */
 
 struct	sockaddr route_dst = { 2, PF_ROUTE, };
 struct	sockaddr route_src = { 2, PF_ROUTE, };
@@ -106,7 +104,7 @@ static int rt_msg2 __P((int, struct rt_addrinfo *, caddr_t, struct walkarg *,
 static int rt_xaddrs __P((caddr_t, caddr_t, struct rt_addrinfo *));
 static int sysctl_dumpentry __P((struct radix_node *, void *));
 static int sysctl_iflist __P((int, struct walkarg *, int));
-static int sysctl_rtable __P((int *, u_int, void *, size_t *, void *, size_t));
+static int sysctl_rtable __P((SYSCTLFN_PROTO));
 static __inline void rt_adjustcount __P((int, int));
 
 /* Sleazy use of local variables throughout file, warning!!!! */
@@ -223,7 +221,7 @@ route_output(m, va_alist)
 	so = va_arg(ap, struct socket *);
 	va_end(ap);
 
-#define senderr(e) do { error = e; goto flush;} while (0)
+#define senderr(e) do { error = e; goto flush;} while (/*CONSTCOND*/ 0)
 	if (m == 0 || ((m->m_len < sizeof(int32_t)) &&
 	   (m = m_pullup(m, sizeof(int32_t))) == 0))
 		return (ENOBUFS);
@@ -325,8 +323,7 @@ route_output(m, va_alist)
 			rt = (struct rtentry *)rn;
 		}
 
-		switch(rtm->rtm_type) {
-
+		switch (rtm->rtm_type) {
 		case RTM_GET:
 		report:
 			dst = rt_key(rt);
@@ -490,7 +487,7 @@ rt_xaddrs(cp, cplim, rtinfo)
 	caddr_t cp, cplim;
 	struct rt_addrinfo *rtinfo;
 {
-	struct sockaddr *sa;
+	struct sockaddr *sa = NULL;	/* Quell compiler warning */
 	int i;
 
 	for (i = 0; (i < RTAX_MAX) && (cp < cplim); i++) {
@@ -535,6 +532,7 @@ rt_msg1(type, rtinfo, data, datalen)
 	m = m_gethdr(M_DONTWAIT, MT_DATA);
 	if (m == 0)
 		return (m);
+	MCLAIM(m, &routedomain.dom_mowner);
 	switch (type) {
 
 	case RTM_DELADDR:
@@ -567,6 +565,7 @@ rt_msg1(type, rtinfo, data, datalen)
 			m_freem(m);
 			return (NULL);
 		}
+		MCLAIM(m->m_next, m->m_owner);
 		m->m_pkthdr.len = len;
 		m->m_len = MHLEN;
 		m->m_next->m_len = len - MHLEN;
@@ -862,7 +861,7 @@ rt_ifannouncemsg(ifp, what)
 	memset(&info, 0, sizeof(info));
 	memset(&ifan, 0, sizeof(ifan));
 	ifan.ifan_index = ifp->if_index;
-	strcpy(ifan.ifan_name, ifp->if_xname);
+	strlcpy(ifan.ifan_name, ifp->if_xname, sizeof(ifan.ifan_name));
 	ifan.ifan_what = what;
 	m = rt_msg1(RTM_IFANNOUNCE, &info, (caddr_t)&ifan, sizeof(ifan));
 	if (m == 0)
@@ -933,7 +932,7 @@ sysctl_iflist(af, w, type)
 			continue;
 		ifa = TAILQ_FIRST(&ifp->if_addrlist);
 		ifpaddr = ifa->ifa_addr;
-		switch(type) {
+		switch (type) {
 		case NET_RT_IFLIST:
 			error =
 			    rt_msg2(RTM_IFINFO, &info, (caddr_t)0, w, &len);
@@ -951,7 +950,7 @@ sysctl_iflist(af, w, type)
 			return (error);
 		ifpaddr = 0;
 		if (w->w_where && w->w_tmem && w->w_needed <= 0) {
-			switch(type) {
+			switch (type) {
 			case NET_RT_IFLIST: {
 				struct if_msghdr *ifm;
 
@@ -1048,18 +1047,18 @@ sysctl_iflist(af, w, type)
 }
 
 static int
-sysctl_rtable(name, namelen, where, given, new, newlen)
-	int	*name;
-	u_int	namelen;
-	void 	*where;
-	size_t	*given;
-	void	*new;
-	size_t	newlen;
+sysctl_rtable(SYSCTLFN_ARGS)
 {
+	void 	*where = oldp;
+	size_t	*given = oldlenp;
+	const void *new = newp;
 	struct radix_node_head *rnh;
 	int	i, s, error = EINVAL;
 	u_char  af;
 	struct	walkarg w;
+
+	if (namelen == 1 && name[0] == CTL_QUERY)
+		return (sysctl_query(SYSCTLFN_CALL(rnode)));
 
 	if (new)
 		return (EPERM);
@@ -1126,17 +1125,37 @@ again:
  * Definitions of protocols supported in the ROUTE domain.
  */
 
-extern	struct domain routedomain;		/* or at least forward */
-
 struct protosw routesw[] = {
 { SOCK_RAW,	&routedomain,	0,		PR_ATOMIC|PR_ADDR,
   raw_input,	route_output,	raw_ctlinput,	0,
   route_usrreq,
   raw_init,	0,		0,		0,
-  sysctl_rtable,
+  NULL /* @@@ */,
 }
 };
 
 struct domain routedomain =
     { PF_ROUTE, "route", route_init, 0, 0,
       routesw, &routesw[sizeof(routesw)/sizeof(routesw[0])] };
+
+SYSCTL_SETUP(sysctl_net_route_setup, "sysctl net.route subtree setup")
+{
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "net", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_NET, CTL_EOL);
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "route",
+		       SYSCTL_DESCR("PF_ROUTE information"),
+		       NULL, 0, NULL, 0,
+		       CTL_NET, PF_ROUTE, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "rtable",
+		       SYSCTL_DESCR("Routing table information"),
+		       sysctl_rtable, 0, NULL, 0,
+		       CTL_NET, PF_ROUTE, 0 /* any protocol */, CTL_EOL);
+}

@@ -1,4 +1,4 @@
-/*	$NetBSD: cgtwo.c,v 1.35.16.1 2002/08/07 01:30:08 lukem Exp $ */
+/*	$NetBSD: cgtwo.c,v 1.49 2003/08/25 17:50:25 uwe Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -52,6 +48,9 @@
  * XXX should defer colormap updates to vertical retrace interrupts
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cgtwo.c,v 1.49 2003/08/25 17:50:25 uwe Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -62,6 +61,8 @@
 #include <sys/tty.h>
 #include <sys/conf.h>
 
+#include <uvm/uvm_extern.h>
+
 #include <machine/autoconf.h>
 
 #include <dev/sun/fbio.h>
@@ -70,7 +71,6 @@
 #include <dev/vme/vmevar.h>
 
 #include <machine/eeprom.h>
-#include <machine/conf.h>
 #include <machine/cgtworeg.h>
 
 
@@ -95,18 +95,24 @@ static void	cgtwounblank __P((struct device *));
 int		cgtwogetcmap __P((struct cgtwo_softc *, struct fbcmap *));
 int		cgtwoputcmap __P((struct cgtwo_softc *, struct fbcmap *));
 
-/* cdevsw prototypes */
-cdev_decl(cgtwo);
-
-struct cfattach cgtwo_ca = {
-	sizeof(struct cgtwo_softc), cgtwomatch, cgtwoattach
-};
+CFATTACH_DECL(cgtwo, sizeof(struct cgtwo_softc),
+    cgtwomatch, cgtwoattach, NULL, NULL);
 
 extern struct cfdriver cgtwo_cd;
 
+dev_type_open(cgtwoopen);
+dev_type_ioctl(cgtwoioctl);
+dev_type_mmap(cgtwommap);
+
+const struct cdevsw cgtwo_cdevsw = {
+	cgtwoopen, nullclose, noread, nowrite, cgtwoioctl,
+	nostop, notty, nopoll, cgtwommap, nokqfilter,
+};
+
 /* frame buffer generic driver */
 static struct fbdriver cgtwofbdriver = {
-	cgtwounblank, cgtwoopen, cgtwoclose, cgtwoioctl, cgtwopoll, cgtwommap
+	cgtwounblank, cgtwoopen, nullclose, cgtwoioctl, nopoll, cgtwommap,
+	nokqfilter
 };
 
 /*
@@ -154,7 +160,6 @@ cgtwoattach(parent, self, aux)
 	struct fbdevice *fb = &sc->sc_fb;
 	struct eeprom *eep = (struct eeprom *)eeprom_va;
 	int isconsole = 0;
-	char *nam = NULL;
 
 	sc->sc_ct = ct;
 	fb->fb_driver = &cgtwofbdriver;
@@ -166,8 +171,8 @@ cgtwoattach(parent, self, aux)
 	fb_setsize_eeprom(fb, fb->fb_type.fb_depth, 1152, 900);
 
 	fb->fb_type.fb_cmsize = 256;
-	fb->fb_type.fb_size = roundup(CG2_MAPPED_SIZE, NBPG);
-	printf(": %s, %d x %d", nam,
+	fb->fb_type.fb_size = roundup(CG2_MAPPED_SIZE, PAGE_SIZE);
+	printf(": cgtwo, %d x %d",
 	       fb->fb_type.fb_width, fb->fb_type.fb_height);
 
 	/*
@@ -234,16 +239,6 @@ cgtwoopen(dev, flags, mode, p)
 }
 
 int
-cgtwoclose(dev, flags, mode, p)
-	dev_t dev;
-	int flags, mode;
-	struct proc *p;
-{
-
-	return (0);
-}
-
-int
 cgtwoioctl(dev, cmd, data, flags, p)
 	dev_t dev;
 	u_long cmd;
@@ -290,16 +285,6 @@ cgtwoioctl(dev, cmd, data, flags, p)
 		return (ENOTTY);
 	}
 	return (0);
-}
-
-int
-cgtwopoll(dev, events, p)
-	dev_t dev;
-	int events;
-	struct proc *p;
-{
-
-	return (seltrue(dev, events, p));
 }
 
 /*

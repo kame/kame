@@ -1,4 +1,4 @@
-/*	$NetBSD: smb_crypt.c,v 1.3 2002/01/04 02:39:39 deberg Exp $	*/
+/*	$NetBSD: smb_crypt.c,v 1.6 2003/02/25 09:12:11 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 2000-2001, Boris Popov
@@ -33,6 +33,10 @@
  *
  * FreeBSD: src/sys/netsmb/smb_crypt.c,v 1.3 2001/08/21 08:07:18 bp Exp
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: smb_crypt.c,v 1.6 2003/02/25 09:12:11 jdolecek Exp $");
+
 #include <sys/param.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
@@ -51,17 +55,18 @@
 #include <netsmb/smb_subr.h>
 #include <netsmb/smb_dev.h>
 
-#include "opt_smb.h"
+/* always enable */
+#define NETSMBCRYPTO
 
 #ifdef NETSMBCRYPTO
 
 #include <crypto/des/des.h>
 
-static u_char N8[] = {0x4b, 0x47, 0x53, 0x21, 0x40, 0x23, 0x24, 0x25};
+static const u_char N8[] = {0x4b, 0x47, 0x53, 0x21, 0x40, 0x23, 0x24, 0x25};
 
 
 static void
-smb_E(const u_char *key, u_char *data, u_char *dest)
+smb_E(const u_char *key, const u_char *data, u_char *dest)
 {
 	des_key_schedule *ksp;
 	u_char kk[8];

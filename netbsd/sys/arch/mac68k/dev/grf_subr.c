@@ -1,4 +1,4 @@
-/*	$NetBSD: grf_subr.c,v 1.15 2000/02/14 07:01:46 scottr Exp $	*/
+/*	$NetBSD: grf_subr.c,v 1.17 2003/07/15 02:43:16 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: grf_subr.c,v 1.17 2003/07/15 02:43:16 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -81,7 +84,7 @@ grfbusprint(aux, name)
 	struct grfbus_attach_args *ga = aux;
 
 	if (name)
-		printf("%s at %s", ga->ga_name, name);
+		aprint_normal("%s at %s", ga->ga_name, name);
 
 	return (UNCONF);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: qv.c,v 1.7 2002/03/17 19:40:51 atatat Exp $	*/
+/*	$NetBSD: qv.c,v 1.15 2004/02/13 11:36:20 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1988
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -126,6 +122,8 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: qv.c,v 1.15 2004/02/13 11:36:20 wiz Exp $");
 
 #include "qv.h"
 #if NQV > 0
@@ -137,10 +135,8 @@
 #include "sys/user.h"
 #include "qvioctl.h"
 #include "sys/tty.h"
-#include "sys/map.h"
 #include "sys/buf.h"
 #include "sys/vm.h"
-#include "sys/clist.h"
 #include "sys/file.h"
 #include "sys/uio.h"
 #include "sys/kernel.h"
@@ -176,7 +172,6 @@ extern	struct pte QVmap[][512];
  */
 
 #define QVWAITPRI 	(PZERO+1)
-#define QVSSMAJOR	40
 
 #define QVKEYBOARD 	0	/* minor 0, keyboard/glass tty */
 #define QVPCONS 	1	/* minor 1, console interceptor XXX */
@@ -276,6 +271,20 @@ int	qvstart(), qvputc(),  ttrstrt();
 extern u_short q_key[], q_shift_key[], q_cursor[];
 extern char *q_special[], q_font[];
 
+dev_type_open(qvopen);
+dev_type_close(qvclose);
+dev_type_read(qvread);
+dev_type_write(qvwrite);
+dev_type_ioctl(qvioctl);
+dev_type_stop(qvstop);
+dev_type_poll(qvpoll);
+dev_type_kqfilter(qvkqfilter);
+
+const struct cdevsw qv_cdevsw = {
+	qvopen, qvclose, qvread, qvwrite, qvioctl,
+	qvstop, notty, qvpoll, nommap, qvkqfilter,
+};
+
 /*
  * See if the qvss will interrupt.
  */
@@ -301,7 +310,7 @@ qvprobe(reg, ctlr)
 	/*
 	 * Turn on the keyboard and vertical interrupt vectors.
 	 */
-	qvaddr->qv_intcsr = 0;		/* init the interrupt controler */
+	qvaddr->qv_intcsr = 0;		/* init the interrupt controller */
 	qvaddr->qv_intcsr = 0x40;	/* reset irr			*/
 	qvaddr->qv_intcsr = 0x80;	/* specify individual vectors	*/
 	qvaddr->qv_intcsr = 0xc0;	/* preset autoclear data	*/
@@ -359,8 +368,11 @@ qvattach(ui)
 
 
 /*ARGSUSED*/
-qvopen(dev, flag)
+int
+qvopen(dev, flag, mode, p)
 	dev_t dev;
+	int flag, mode;
+	struct proc *p;
 {
 	register struct tty *tp;
 	register int unit, qv;
@@ -418,12 +430,15 @@ qvopen(dev, flag)
 		qp->ihead = qp->itail = 0;
 		return 0;
 	}
+
+	return (0);
 }
 
 /*
  * Close a QVSS line.
  */
 /*ARGSUSED*/
+int
 qvclose(dev, flag, mode, p)
 	dev_t dev;
 	int flag, mode;
@@ -461,9 +476,11 @@ qvclose(dev, flag, mode, p)
 	return (error);
 }
 
-qvread(dev, uio)
+int
+qvread(dev, uio, flag)
 	dev_t dev;
 	struct uio *uio;
+	int flag;
 {
 	register struct tty *tp;
 	int unit = minor( dev );
@@ -475,9 +492,11 @@ qvread(dev, uio)
 	return (ENXIO);
 }
 
-qvwrite(dev, uio)
+int
+qvwrite(dev, uio, flag)
 	dev_t dev;
 	struct uio *uio;
+	int flag;
 {
 	register struct tty *tp;
 	int unit = minor( dev );
@@ -659,9 +678,13 @@ qvkint(qv)
  * Ioctl for QVSS.
  */
 /*ARGSUSED*/
-qvioctl(dev, cmd, data, flag)
+int
+qvioctl(dev, cmd, data, flag, p)
 	dev_t dev;
+	u_long cmd;
 	register caddr_t data;
+	int flag;
+	struct proc *p;
 {
 	register struct tty *tp;
 	register int unit = minor(dev);
@@ -1240,7 +1263,7 @@ qvcons_init()
 		return 0;
 
         /*
-         * Found an entry for this cpu. Because this device is Microvax specific
+         * Found an entry for this CPU. Because this device is Microvax specific
          * we assume that there is a single q-bus and don't have to worry about
          * multiple adapters.
          *
@@ -1262,7 +1285,7 @@ qvcons_init()
         if (!qv_setup(qvaddr, 0, 0))
 		return 0;
 	v_putc = qvputc;
-        consops = &cdevsw[QVSSMAJOR];
+        consops = &qv_cdevsw;
 	return 1;
 }
 /*
@@ -1289,7 +1312,7 @@ int probed;
                 return(0);
 
         /*
-         * Found an entry for this cpu. Because this device is Microvax specific
+         * Found an entry for this CPU. Because this device is Microvax specific
          * we assume that there is a single q-bus and don't have to worry about
          * multiple adapters.
          *

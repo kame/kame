@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_fault.c,v 1.76.4.3 2002/12/10 07:14:41 jmc Exp $	*/
+/*	$NetBSD: uvm_fault.c,v 1.87.2.1 2004/05/10 14:27:00 tron Exp $	*/
 
 /*
  *
@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_fault.c,v 1.76.4.3 2002/12/10 07:14:41 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_fault.c,v 1.87.2.1 2004/05/10 14:27:00 tron Exp $");
 
 #include "opt_uvmhist.h"
 
@@ -179,8 +179,8 @@ static struct uvm_advice uvmadvice[] = {
  * private prototypes
  */
 
-static void uvmfault_amapcopy __P((struct uvm_faultinfo *));
-static __inline void uvmfault_anonflush __P((struct vm_anon **, int));
+static void uvmfault_amapcopy(struct uvm_faultinfo *);
+static __inline void uvmfault_anonflush(struct vm_anon **, int);
 
 /*
  * inline functions
@@ -304,9 +304,9 @@ uvmfault_anonget(ufi, amap, anon)
 	uvmexp.fltanget++;
         /* bump rusage counters */
 	if (anon->u.an_page)
-		curproc->p_addr->u_stats.p_ru.ru_minflt++;
+		curproc->p_stats->p_ru.ru_minflt++;
 	else
-		curproc->p_addr->u_stats.p_ru.ru_majflt++;
+		curproc->p_stats->p_ru.ru_majflt++;
 
 	/*
 	 * loop until we get it, or fail.
@@ -428,8 +428,6 @@ uvmfault_anonget(ufi, amap, anon)
 				wakeup(pg);
 			}
 			if (error) {
-				/* remove page from anon */
-				anon->u.an_page = NULL;
 
 				/*
 				 * remove the swap slot from the anon
@@ -438,8 +436,12 @@ uvmfault_anonget(ufi, amap, anon)
 				 * it from being used again.
 				 */
 
-				uvm_swap_markbad(anon->an_swslot, 1);
+				if (anon->an_swslot > 0)
+					uvm_swap_markbad(anon->an_swslot, 1);
 				anon->an_swslot = SWSLOT_BAD;
+
+				if ((pg->flags & PG_RELEASED) != 0)
+					goto released;
 
 				/*
 				 * note: page was never !PG_BUSY, so it
@@ -458,6 +460,30 @@ uvmfault_anonget(ufi, amap, anon)
 					simple_unlock(&anon->an_lock);
 				UVMHIST_LOG(maphist, "<- ERROR", 0,0,0,0);
 				return error;
+			}
+
+			if ((pg->flags & PG_RELEASED) != 0) {
+released:
+				KASSERT(anon->an_ref == 0);
+
+				/*
+				 * released while we unlocked amap.
+				 */
+
+				if (locked)
+					uvmfault_unlockall(ufi, amap, NULL,
+					    NULL);
+
+				uvm_anon_release(anon);
+
+				if (error) {
+					UVMHIST_LOG(maphist,
+					    "<- ERROR/RELEASED", 0,0,0,0);
+					return error;
+				}
+
+				UVMHIST_LOG(maphist, "<- RELEASED", 0,0,0,0);
+				return ERESTART;
 			}
 
 			/*
@@ -535,7 +561,7 @@ uvm_fault(orig_map, vaddr, fault_type, access_type)
 	vm_prot_t enter_prot, check_prot;
 	boolean_t wired, narrow, promote, locked, shadowed, wire_fault, cow_now;
 	int npages, nback, nforw, centeridx, error, lcv, gotpages;
-	vaddr_t startva, objaddr, currva, offset;
+	vaddr_t startva, objaddr, currva;
 	voff_t uoff;
 	paddr_t pa;
 	struct vm_amap *amap;
@@ -898,8 +924,11 @@ ReFault:
 			currva = startva;
 			for (lcv = 0; lcv < npages;
 			     lcv++, currva += PAGE_SIZE) {
-				if (pages[lcv] == NULL ||
-				    pages[lcv] == PGO_DONTCARE) {
+				struct vm_page *curpg;
+				boolean_t readonly;
+
+				curpg = pages[lcv];
+				if (curpg == NULL || curpg == PGO_DONTCARE) {
 					continue;
 				}
 
@@ -912,7 +941,7 @@ ReFault:
 				 */
 
 				if (lcv == centeridx) {
-					uobjpage = pages[lcv];
+					uobjpage = curpg;
 					UVMHIST_LOG(maphist, "  got uobjpage "
 					    "(0x%x) with locked get",
 					    uobjpage, 0,0,0);
@@ -927,23 +956,27 @@ ReFault:
 				 */
 
 				uvm_lock_pageq();
-				uvm_pageactivate(pages[lcv]);
+				uvm_pageactivate(curpg);
 				uvm_unlock_pageq();
 				UVMHIST_LOG(maphist,
 				  "  MAPPING: n obj: pm=0x%x, va=0x%x, pg=0x%x",
-				  ufi.orig_map->pmap, currva, pages[lcv], 0);
+				  ufi.orig_map->pmap, currva, curpg, 0);
 				uvmexp.fltnomap++;
 
 				/*
 				 * Since this page isn't the page that's
-				 * actually fauling, ignore pmap_enter()
+				 * actually faulting, ignore pmap_enter()
 				 * failures; it's not critical that we
 				 * enter these right now.
 				 */
+				KASSERT((curpg->flags & PG_PAGEOUT) == 0);
+				KASSERT((curpg->flags & PG_RELEASED) == 0);
+				readonly = (curpg->flags & PG_RDONLY)
+				    || (curpg->loan_count > 0);
 
 				(void) pmap_enter(ufi.orig_map->pmap, currva,
-				    VM_PAGE_TO_PHYS(pages[lcv]),
-				    pages[lcv]->flags & PG_RDONLY ?
+				    VM_PAGE_TO_PHYS(curpg),
+				    readonly ?
 				    enter_prot & ~VM_PROT_WRITE :
 				    enter_prot & MASK(ufi.entry),
 				    PMAP_CANFAIL |
@@ -955,8 +988,8 @@ ReFault:
 				 * we've had the handle.
 				 */
 
-				pages[lcv]->flags &= ~(PG_BUSY);
-				UVM_PAGE_OWN(pages[lcv], NULL);
+				curpg->flags &= ~(PG_BUSY);
+				UVM_PAGE_OWN(curpg, NULL);
 			}
 			pmap_update(ufi.orig_map->pmap);
 		}
@@ -1159,8 +1192,7 @@ ReFault:
 				uvm_anfree(anon);
 			}
 			uvmfault_unlockall(&ufi, amap, uobj, oanon);
-			KASSERT(uvmexp.swpgonly <= uvmexp.swpages);
-			if (anon == NULL || uvmexp.swpgonly == uvmexp.swpages) {
+			if (anon == NULL || uvm_swapisfull()) {
 				UVMHIST_LOG(maphist,
 				    "<- failed.  out of VM",0,0,0,0);
 				uvmexp.fltnoanon++;
@@ -1174,8 +1206,10 @@ ReFault:
 
 		/* got all resources, replace anon with nanon */
 		uvm_pagecopy(oanon->u.an_page, pg);
+		uvm_lock_pageq();
 		uvm_pageactivate(pg);
 		pg->flags &= ~(PG_BUSY|PG_FAKE);
+		uvm_unlock_pageq();
 		UVM_PAGE_OWN(pg, NULL);
 		amap_add(&ufi.entry->aref, ufi.orig_rvaddr - ufi.entry->start,
 		    anon, 1);
@@ -1222,8 +1256,7 @@ ReFault:
 		if (anon != oanon)
 			simple_unlock(&anon->an_lock);
 		uvmfault_unlockall(&ufi, amap, uobj, oanon);
-		KASSERT(uvmexp.swpgonly <= uvmexp.swpages);
-		if (uvmexp.swpgonly == uvmexp.swpages) {
+		if (uvm_swapisfull()) {
 			UVMHIST_LOG(maphist,
 			    "<- failed.  out of VM",0,0,0,0);
 			/* XXX instrumentation */
@@ -1304,10 +1337,10 @@ Case2:
 
 	if (uobjpage) {
 		/* update rusage counters */
-		curproc->p_addr->u_stats.p_ru.ru_minflt++;
+		curproc->p_stats->p_ru.ru_minflt++;
 	} else {
 		/* update rusage counters */
-		curproc->p_addr->u_stats.p_ru.ru_majflt++;
+		curproc->p_stats->p_ru.ru_majflt++;
 
 		/* locked: maps(read), amap(if there), uobj */
 		uvmfault_unlockall(&ufi, amap, NULL, NULL);
@@ -1449,9 +1482,7 @@ Case2:
 			} else {
 				/* write fault: must break the loan here */
 
-				/* alloc new un-owned page */
-				pg = uvm_pagealloc(NULL, 0, NULL, 0);
-
+				pg = uvm_loanbreak(uobjpage);
 				if (pg == NULL) {
 
 					/*
@@ -1473,52 +1504,6 @@ Case2:
 					uvm_wait("flt_noram4");
 					goto ReFault;
 				}
-
-				/*
-				 * copy the data from the old page to the new
-				 * one and clear the fake/clean flags on the
-				 * new page (keep it busy).  force a reload
-				 * of the old page by clearing it from all
-				 * pmaps.  then lock the page queues to
-				 * rename the pages.
-				 */
-
-				uvm_pagecopy(uobjpage, pg);	/* old -> new */
-				pg->flags &= ~(PG_FAKE|PG_CLEAN);
-				pmap_page_protect(uobjpage, VM_PROT_NONE);
-				if (uobjpage->flags & PG_WANTED)
-					wakeup(uobjpage);
-				/* uobj still locked */
-				uobjpage->flags &= ~(PG_WANTED|PG_BUSY);
-				UVM_PAGE_OWN(uobjpage, NULL);
-
-				uvm_lock_pageq();
-				offset = uobjpage->offset;
-				uvm_pagerealloc(uobjpage, NULL, 0);
-
-				/*
-				 * if the page is no longer referenced by
-				 * an anon (i.e. we are breaking an O->K
-				 * loan), then remove it from any pageq's.
-				 */
-				if (uobjpage->uanon == NULL)
-					uvm_pagedequeue(uobjpage);
-
-				/*
-				 * at this point we have absolutely no
-				 * control over uobjpage
-				 */
-
-				/* install new page */
-				uvm_pageactivate(pg);
-				uvm_pagerealloc(pg, uobj, offset);
-				uvm_unlock_pageq();
-
-				/*
-				 * done!  loan is broken and "pg" is
-				 * PG_BUSY.   it can now replace uobjpage.
-				 */
-
 				uobjpage = pg;
 			}
 		}
@@ -1575,8 +1560,7 @@ Case2:
 
 			/* unlock and fail ... */
 			uvmfault_unlockall(&ufi, amap, uobj, NULL);
-			KASSERT(uvmexp.swpgonly <= uvmexp.swpages);
-			if (anon == NULL || uvmexp.swpgonly == uvmexp.swpages) {
+			if (anon == NULL || uvm_swapisfull()) {
 				UVMHIST_LOG(maphist, "  promote: out of VM",
 				    0,0,0,0);
 				uvmexp.fltnoanon++;
@@ -1685,8 +1669,7 @@ Case2:
 		pg->flags &= ~(PG_BUSY|PG_FAKE|PG_WANTED);
 		UVM_PAGE_OWN(pg, NULL);
 		uvmfault_unlockall(&ufi, amap, uobj, anon);
-		KASSERT(uvmexp.swpgonly <= uvmexp.swpages);
-		if (uvmexp.swpgonly == uvmexp.swpages) {
+		if (uvm_swapisfull()) {
 			UVMHIST_LOG(maphist,
 			    "<- failed.  out of VM",0,0,0,0);
 			/* XXX instrumentation */

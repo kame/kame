@@ -1,4 +1,4 @@
-/*	$NetBSD: hd64465.c,v 1.3 2002/03/28 15:27:01 uch Exp $	*/
+/*	$NetBSD: hd64465.c,v 1.10 2003/07/15 02:29:37 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hd64465.c,v 1.10 2003/07/15 02:29:37 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -76,15 +79,14 @@ STATIC int hd64465_print(void *, const char *);
 STATIC void hd64465_info(void);
 #endif
 
-struct cfattach hd64465if_ca = {
-	sizeof(struct device), hd64465_match, hd64465_attach
-};
+CFATTACH_DECL(hd64465if, sizeof(struct device),
+    hd64465_match, hd64465_attach, NULL, NULL);
 
 int
 hd64465_match(struct device *parent, struct cfdata *cf, void *aux)
 {
 
-	if (strcmp("hd64465if", cf->cf_driver->cd_name))
+	if (strcmp("hd64465if", cf->cf_name))
 		return (0);
 
 	if (hd64465_reg_read_2(HD64465_SDIDR) != 0x8122) {
@@ -136,7 +138,8 @@ hd64465_print(void *aux, const char *pnp)
 	struct hd64465_attach_args *ha = aux;
 
 	if (pnp)
-		printf("%s at %s", hd64465_modules[ha->ha_module_id].name, pnp);
+		aprint_normal("%s at %s",
+		    hd64465_modules[ha->ha_module_id].name, pnp);
 
 	return (UNCONF);
 }

@@ -1,11 +1,13 @@
-#	$NetBSD: Makefile.booters,v 1.8 2001/12/12 01:49:47 tv Exp $
+#	$NetBSD: Makefile.booters,v 1.12 2003/10/26 07:25:36 lukem Exp $
 
 S?=		${.CURDIR}/../../../..
 MDEC_DIR?=	/usr/mdec
 RELOC?=		0x3F0000
-COPTS?=		-O2 -Wall -Wno-main -Wmissing-prototypes -Wstrict-prototypes
+COPTS?=		-O2 -Wall -Wno-main -Wmissing-prototypes -Wstrict-prototypes \
+		-ffreestanding
 DEFS?= 
 STRIPFLAG?=
+CPPFLAGS+=	-D__daddr_t=int32_t
 
 NOMAN=  # defined
 NOMAN=	# defined
@@ -26,7 +28,7 @@ SRCS+= vers.c
 CLEANFILES+= vers.c
 
 vers.c: version
-	sh ${S}/conf/newvers_stand.sh -DM ${.CURDIR}/version "mvme68k"
+	${HOST_SH} ${S}/conf/newvers_stand.sh -DM ${.CURDIR}/version "mvme68k"
 .endif
 
 CLEANFILES+= machine m68k
@@ -52,9 +54,10 @@ PROGLINKOBJS?=	${PROGDEPENDS}
 ${PROG}: machine m68k ${PROGDEPENDS}
 	${LD} -N -Ttext ${RELOC} -o $@ ${PROGLINKOBJS}
 
+.include <bsd.own.mk>
+
 LIB_SA_DIR=	${.CURDIR}/../libsa
-LIBSA_DIR!=cd ${LIB_SA_DIR}; \
-	printf "xxx: .MAKE\n\t@echo \$${.OBJDIR}\n" | ${MAKE} -s -f-
+LIBSA_DIR!=	cd ${LIB_SA_DIR} && ${PRINTOBJDIR}
 LIBSA=${LIBSA_DIR}/libsa.a
 
 .PHONY: ${LIBSA}
@@ -69,8 +72,7 @@ ${SRTOBJ}:
 	@cd ${LIB_SA_DIR} && ${MAKE} SRT0.o
 
 LIB_BUG_DIR=	${.CURDIR}/../libbug
-LIBBUG_DIR!=cd ${LIB_BUG_DIR}; \
-	printf "xxx: .MAKE\n\t@echo \$${.OBJDIR}\n" | ${MAKE} -s -f-
+LIBBUG_DIR!=	cd ${LIB_BUG_DIR} && ${PRINTOBJDIR}
 LIBBUG=${LIBBUG_DIR}/libbug.a
 
 .PHONY: ${LIBBUG}
@@ -86,8 +88,7 @@ $(BUGCRT):
 	@(cd ${LIB_BUG_DIR}; ${MAKE} bugstart.o)
 
 WRTVID_BOOT_DIR=  ${.CURDIR}/../wrtvid
-WRTVID_DIR!=cd ${WRTVID_BOOT_DIR}; \
-	printf "xxx: .MAKE\n\t@echo \$${.OBJDIR}\n" | ${MAKE} -s -f-
+WRTVID_DIR!=	cd ${WRTVID_BOOT_DIR} && ${PRINTOBJDIR}
 WRTVID=${WRTVID_DIR}/wrtvid
 
 .PHONY: ${WRTVID}

@@ -1,4 +1,4 @@
-/* $NetBSD: vga_pci.c,v 1.10 2002/03/17 19:41:00 atatat Exp $ */
+/*	$NetBSD: vga_pci.c,v 1.23 2003/06/29 22:30:29 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: vga_pci.c,v 1.10 2002/03/17 19:41:00 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: vga_pci.c,v 1.23 2003/06/29 22:30:29 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -73,12 +73,10 @@ struct vga_pci_softc {
 
 int	vga_pci_match(struct device *, struct cfdata *, void *);
 void	vga_pci_attach(struct device *, struct device *, void *);
+static int vga_pci_lookup_quirks(struct pci_attach_args *);
 
-struct cfattach vga_pci_ca = {
-	sizeof(struct vga_pci_softc), 
-	vga_pci_match, 
-	vga_pci_attach,
-};
+CFATTACH_DECL(vga_pci, sizeof(struct vga_pci_softc),
+    vga_pci_match, vga_pci_attach, NULL, NULL);
 
 int	vga_pci_ioctl(void *, u_long, caddr_t, int, struct proc *);
 paddr_t	vga_pci_mmap(void *, off_t, int);
@@ -87,6 +85,40 @@ const struct vga_funcs vga_pci_funcs = {
 	vga_pci_ioctl,
 	vga_pci_mmap,
 };
+
+static const struct {
+	int id;
+	int quirks;
+} vga_pci_quirks[] = {
+	{PCI_ID_CODE(PCI_VENDOR_SILMOTION, PCI_PRODUCT_SILMOTION_SM712),
+	 VGA_QUIRK_NOFASTSCROLL},
+};
+
+static const struct {
+	int vid;
+	int quirks;
+} vga_pci_vquirks[] = {
+	{PCI_VENDOR_ATI, VGA_QUIRK_ONEFONT},
+};
+
+static int
+vga_pci_lookup_quirks(pa)
+	struct pci_attach_args *pa;
+{
+	int i;
+
+	for (i = 0; i < sizeof(vga_pci_quirks) / sizeof (vga_pci_quirks[0]);
+	     i++) {
+		if (vga_pci_quirks[i].id == pa->pa_id)
+			return (vga_pci_quirks[i].quirks);
+	}
+	for (i = 0; i < sizeof(vga_pci_vquirks) / sizeof (vga_pci_vquirks[0]);
+	     i++) {
+		if (vga_pci_vquirks[i].vid == PCI_VENDOR(pa->pa_id))
+			return (vga_pci_vquirks[i].quirks);
+	}
+	return (0);
+}
 
 int
 vga_pci_match(struct device *parent, struct cfdata *match, void *aux)
@@ -151,8 +183,11 @@ vga_pci_attach(struct device *parent, struct device *self, void *aux)
 	 */
 	for (bar = 0; bar < NBARS; bar++) {
 		reg = PCI_MAPREG_START + (bar * 4);
-		psc->sc_bars[bar].vb_type = pci_mapreg_type(psc->sc_pc,
-		    psc->sc_pcitag, reg);
+		if (!pci_mapreg_probe(psc->sc_pc, psc->sc_pcitag, reg,
+				      &psc->sc_bars[bar].vb_type)) {
+			/* there is no valid mapping register */
+			continue;
+		}
 		if (PCI_MAPREG_TYPE(psc->sc_bars[bar].vb_type) ==
 		    PCI_MAPREG_TYPE_IO) {
 			/* Don't bother fetching I/O BARs. */
@@ -163,26 +198,29 @@ vga_pci_attach(struct device *parent, struct device *self, void *aux)
 			/* XXX */
 			printf("%s: WARNING: ignoring 64-bit BAR @ 0x%02x\n",
 			    sc->sc_dev.dv_xname, reg);
+			bar++;
 			continue;
 		}
-		/* Ignore errors (unimplemented BARs). */
-		(void) pci_mapreg_info(psc->sc_pc, psc->sc_pcitag, reg,
+		if (pci_mapreg_info(psc->sc_pc, psc->sc_pcitag, reg,
 		     psc->sc_bars[bar].vb_type,
 		     &psc->sc_bars[bar].vb_base,
 		     &psc->sc_bars[bar].vb_size,
-		     &psc->sc_bars[bar].vb_flags);
+		     &psc->sc_bars[bar].vb_flags))
+			printf("%s: WARNING: strange BAR @ 0x%02x\n",
+			       sc->sc_dev.dv_xname, reg);
 	}
 
 	/* XXX Expansion ROM? */
 
 	vga_common_attach(sc, pa->pa_iot, pa->pa_memt, WSDISPLAY_TYPE_PCIVGA,
-	    &vga_pci_funcs);
+			  vga_pci_lookup_quirks(pa), &vga_pci_funcs);
 }
 
 int
 vga_pci_cnattach(bus_space_tag_t iot, bus_space_tag_t memt, 
     pci_chipset_tag_t pc, int bus, int device, int function)
 {
+
 	return (vga_cnattach(iot, memt, WSDISPLAY_TYPE_PCIVGA, 0));
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: i82365_isasubr.c,v 1.30 2001/11/15 09:48:09 lukem Exp $	*/
+/*	$NetBSD: i82365_isasubr.c,v 1.33 2003/09/05 01:02:52 mycroft Exp $	*/
 
 /*
  * Copyright (c) 2000 Christian E. Hopps.  All rights reserved.
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: i82365_isasubr.c,v 1.30 2001/11/15 09:48:09 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: i82365_isasubr.c,v 1.33 2003/09/05 01:02:52 mycroft Exp $");
 
 #define	PCICISADEBUG
 
@@ -153,7 +153,7 @@ pcic_isa_count_intr(arg)
 
 	/*
 	 * make sure we don't get stuck in a loop due to
-	 * unhandled level interupts
+	 * unhandled level interrupts
 	 */
 	if (++sc->intr_false > 40) {
 		isa_intr_disestablish(isc->sc_ic, sc->ih);
@@ -300,8 +300,7 @@ pcic_isa_config_interrupts(self)
 
 		/* the cirrus chips lack support for the soft interrupt */
 		if (pcic_irq_probe != 0 &&
-		    h->vendor != PCIC_VENDOR_CIRRUS_PD6710 &&
-		    h->vendor != PCIC_VENDOR_CIRRUS_PD672X)
+		    h->vendor != PCIC_VENDOR_CIRRUS_PD67XX)
 			pcic_isa_probe_interrupts(sc, h);
 
 		chipmask &= sc->intr_mask[h->chip];
@@ -496,7 +495,7 @@ pcic_isa_chip_intr_establish(pch, pf, ipl, fct, arg)
 	h->ih_irq = irq;
 	if (h->flags & PCIC_FLAG_ENABLED) {
 		reg = pcic_read(h, PCIC_INTR);
-		reg &= ~(PCIC_INTR_IRQ_MASK | PCIC_INTR_ENABLE);
+		reg &= ~PCIC_INTR_IRQ_MASK;
 		pcic_write(h, PCIC_INTR, reg | irq);
 	}
 
@@ -523,7 +522,7 @@ pcic_isa_chip_intr_disestablish(pch, ih)
 	h->ih_irq = 0;
 	if (h->flags & PCIC_FLAG_ENABLED) {
 		reg = pcic_read(h, PCIC_INTR);
-		reg &= ~(PCIC_INTR_IRQ_MASK | PCIC_INTR_ENABLE);
+		reg &= ~PCIC_INTR_IRQ_MASK;
 		pcic_write(h, PCIC_INTR, reg);
 	}
 }

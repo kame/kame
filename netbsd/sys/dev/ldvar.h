@@ -1,4 +1,4 @@
-/*	$NetBSD: ldvar.h,v 1.5 2001/06/10 10:48:42 ad Exp $	*/
+/*	$NetBSD: ldvar.h,v 1.7.4.1 2004/07/28 11:26:37 tron Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -42,7 +42,7 @@
 struct ld_softc {
 	struct	device sc_dv;
 	struct	disk sc_dk;
-	struct	buf_queue sc_bufq;
+	struct	bufq_state sc_bufq;
 #if NRND > 0
 	rndsource_element_t	sc_rnd_source;
 #endif
@@ -55,7 +55,7 @@ struct ld_softc {
 	 * The following are filled by hardware specific attachment code.
 	 */
 	int	sc_flags;		/* control flags */
-	int	sc_secperunit;		/* # sectors in total */
+	uint64_t	sc_secperunit;		/* # sectors in total */
 	int	sc_secsize;		/* sector size in bytes */
 	int	sc_maxxfer;		/* max xfer size in bytes */
 	int	sc_maxqueuecnt;		/* maximum h/w queue depth */
@@ -65,13 +65,15 @@ struct ld_softc {
 	int	(*sc_start)(struct ld_softc *, struct buf *);
 };
 
-#define	LDF_ENABLED	0x01		/* device enabled */
-#define	LDF_LKHELD	0x02		/* lock held */
-#define	LDF_LKWANTED	0x04		/* lock wanted */
-#define	LDF_WLABEL	0x08		/* label is writable */
-#define	LDF_LABELLING	0x10		/* writing label */
-#define	LDF_DRAIN	0x20		/* maxqueuecnt has changed; drain */
-#define	LDF_DETACH	0x40		/* detach pending */
+#define	LDF_ENABLED	0x001		/* device enabled */
+#define	LDF_LKHELD	0x002		/* lock held */
+#define	LDF_LKWANTED	0x004		/* lock wanted */
+#define	LDF_WLABEL	0x008		/* label is writable */
+#define	LDF_LABELLING	0x010		/* writing label */
+#define	LDF_DRAIN	0x020		/* maxqueuecnt has changed; drain */
+#define	LDF_DETACH	0x040		/* detach pending */
+#define	LDF_KLABEL	0x080		/* keep label on close */
+#define	LDF_VLABEL	0x100		/* label is valid */
 
 int	ldadjqparam(struct ld_softc *, int);
 void	ldattach(struct ld_softc *);

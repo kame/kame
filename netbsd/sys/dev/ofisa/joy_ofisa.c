@@ -1,4 +1,4 @@
-/*	$NetBSD: joy_ofisa.c,v 1.3 2002/02/03 23:17:58 pooka Exp $	*/
+/*	$NetBSD: joy_ofisa.c,v 1.7 2002/10/02 16:34:29 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1998 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: joy_ofisa.c,v 1.3 2002/02/03 23:17:58 pooka Exp $");
+__KERNEL_RCSID(0, "$NetBSD: joy_ofisa.c,v 1.7 2002/10/02 16:34:29 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -57,9 +57,8 @@ __KERNEL_RCSID(0, "$NetBSD: joy_ofisa.c,v 1.3 2002/02/03 23:17:58 pooka Exp $");
 int	joy_ofisa_match __P((struct device *, struct cfdata *, void *));
 void	joy_ofisa_attach __P((struct device *, struct device *, void *));
 
-struct cfattach joy_ofisa_ca = {
-	sizeof(struct joy_softc), joy_ofisa_match, joy_ofisa_attach
-};
+CFATTACH_DECL(joy_ofisa, sizeof(struct joy_softc),
+    joy_ofisa_match, joy_ofisa_attach, NULL, NULL);
 
 int
 joy_ofisa_match(parent, match, aux)
@@ -68,7 +67,7 @@ joy_ofisa_match(parent, match, aux)
 	void *aux;
 {
 	struct ofisa_attach_args *aa = aux;
-	const char *compatible_strings[] = {
+	static const char *const compatible_strings[] = {
 		"pnpPNP,b02f",			/* generic joystick */
 		NULL,
 	};

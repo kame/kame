@@ -1,4 +1,4 @@
-/*	$NetBSD: trap.c,v 1.70.4.1 2002/12/01 22:35:03 he Exp $     */
+/*	$NetBSD: trap.c,v 1.93 2004/03/14 01:08:49 cl Exp $     */
 
 /*
  * Copyright (c) 1994 Ludd, University of Lule}, Sweden.
@@ -32,8 +32,12 @@
 
  /* All bugs are subject to removal without further notice */
 		
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: trap.c,v 1.93 2004/03/14 01:08:49 cl Exp $");
+
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
+#include "opt_systrace.h"
 #include "opt_multiprocessor.h"
 
 #include <sys/types.h>
@@ -44,6 +48,9 @@
 #include <sys/systm.h>
 #include <sys/signalvar.h>
 #include <sys/exec.h>
+#include <sys/sa.h>
+#include <sys/savar.h>
+#include <sys/pool.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -61,17 +68,22 @@
 #ifdef KTRACE
 #include <sys/ktrace.h>
 #endif
+#ifdef SYSTRACE
+#include <sys/systrace.h>
+#endif
 
 #ifdef TRAPDEBUG
 volatile int startsysc = 0, faultdebug = 0;
 #endif
 
-static __inline void userret (struct proc *, struct trapframe *, u_quad_t);
+int	cpu_printfataltraps = 0;
+
+static __inline void userret (struct lwp *, struct trapframe *, u_quad_t);
 
 void	trap (struct trapframe *);
 void	syscall (struct trapframe *);
 
-char *traptypes[]={
+const char * const traptypes[]={
 	"reserved addressing",
 	"privileged instruction",
 	"reserved operand",
@@ -95,8 +107,8 @@ int no_traps = 18;
 
 #define USERMODE(framep)   ((((framep)->psl) & (PSL_U)) == PSL_U)
 #define FAULTCHK						\
-	if (p->p_addr->u_pcb.iftrap) {				\
-		frame->pc = (unsigned)p->p_addr->u_pcb.iftrap;	\
+	if (l->l_addr->u_pcb.iftrap) {				\
+		frame->pc = (unsigned)l->l_addr->u_pcb.iftrap;	\
 		frame->psl &= ~PSL_FPD;				\
 		frame->r0 = EFAULT;/* for copyin/out */		\
 		frame->r1 = -1; /* for fetch/store */		\
@@ -110,22 +122,31 @@ int no_traps = 18;
  *	return to usermode.
  */
 static __inline void
-userret(struct proc *p, struct trapframe *frame, u_quad_t oticks)
+userret(struct lwp *l, struct trapframe *frame, u_quad_t oticks)
 {
 	int sig;
+	struct proc *p = l->l_proc;
+
+	/* Generate UNBLOCKED upcall. */
+	if (l->l_flag & L_SA_BLOCKING)
+		sa_unblock_userret(l);
 
 	/* Take pending signals. */
-	while ((sig = CURSIG(p)) != 0)
+	while ((sig = CURSIG(l)) != 0)
 		postsig(sig);
-	p->p_priority = p->p_usrpri;
+	l->l_priority = l->l_usrpri;
 	if (curcpu()->ci_want_resched) {
 		/*
 		 * We are being preempted.
 		 */
-		preempt(NULL);
-		while ((sig = CURSIG(p)) != 0)
+		preempt(0);
+		while ((sig = CURSIG(l)) != 0)
 			postsig(sig);
 	}
+
+	/* Invoke per-process kernel-exit handling, if any */
+	if (p->p_userret)
+		(p->p_userret)(l, p->p_userret_arg);
 
 	/*
 	 * If profiling, charge system time to the trapped pc.
@@ -136,26 +157,33 @@ userret(struct proc *p, struct trapframe *frame, u_quad_t oticks)
 		addupc_task(p, frame->pc,
 		    (int)(p->p_sticks - oticks) * psratio);
 	}
-	curcpu()->ci_schedstate.spc_curpriority = p->p_priority;
+	/* Invoke any pending upcalls. */
+	if (l->l_flag & L_SA_UPCALL)
+		sa_upcall_userret(l);
+
+	curcpu()->ci_schedstate.spc_curpriority = l->l_priority;
 }
 
 void
 trap(struct trapframe *frame)
 {
-	u_int	sig = 0, type = frame->trap, trapsig = 1;
+	u_int	sig = 0, type = frame->trap, trapsig = 1, code = 0;
 	u_int	rv, addr, umode;
-	struct	proc *p = curproc;
+	struct	lwp *l;
+	struct	proc *p = NULL;
 	u_quad_t oticks = 0;
 	struct vmspace *vm;
 	struct vm_map *map;
 	vm_prot_t ftype;
 	vsize_t nss;
 
+	if ((l = curlwp) != NULL)
+		p = l->l_proc;
 	uvmexp.traps++;
 	if ((umode = USERMODE(frame))) {
 		type |= T_USER;
 		oticks = p->p_sticks;
-		p->p_addr->u_pcb.framep = frame; 
+		l->l_addr->u_pcb.framep = frame; 
 	}
 
 	type&=~(T_WRITE|T_PTEFETCH);
@@ -201,6 +229,7 @@ fram:
 	case T_ACCFLT|T_USER:
 		if (frame->code < 0) { /* Check for kernel space */
 			sig = SIGSEGV;
+			code = SEGV_ACCERR;
 			break;
 		}
 
@@ -239,9 +268,13 @@ if(faultdebug)printf("trap accflt type %lx, code %lx, pc %lx, psl %lx\n",
 		else
 			ftype = VM_PROT_READ;
 
-		if (umode)
-			KERNEL_PROC_LOCK(p);
-		else
+		if (umode) {
+			KERNEL_PROC_LOCK(l);
+			if (l->l_flag & L_SA) {
+				l->l_savp->savp_faultaddr = (vaddr_t)frame->code;
+				l->l_flag |= L_SA_PAGEFAULT;
+			}
+		} else
 			KERNEL_LOCK(LK_CANRECURSE|LK_EXCLUSIVE);
 
 		nss = 0;
@@ -266,6 +299,7 @@ if(faultdebug)printf("trap accflt type %lx, code %lx, pc %lx, psl %lx\n",
 				panic("Segv in kernel mode: pc %x addr %x",
 				    (u_int)frame->pc, (u_int)frame->code);
 			}
+			code = SEGV_ACCERR;
 			if (rv == ENOMEM) {
 				printf("UVM: pid %d (%s), uid %d killed: "
 				       "out of swap\n",
@@ -275,28 +309,42 @@ if(faultdebug)printf("trap accflt type %lx, code %lx, pc %lx, psl %lx\n",
 				sig = SIGKILL;
 			} else {
 				sig = SIGSEGV;
+				if (rv != EACCES)
+					code = SEGV_MAPERR;
 			}
 		} else {
 			trapsig = 0;
 			if (nss != 0 && nss > vm->vm_ssize)
 				vm->vm_ssize = nss;
 		}
-		if (umode) 
-			KERNEL_PROC_UNLOCK(p);
-		else
+		if (umode) {
+			l->l_flag &= ~L_SA_PAGEFAULT;
+			KERNEL_PROC_UNLOCK(l);
+		} else
 			KERNEL_UNLOCK();
 		break;
 
 	case T_BPTFLT|T_USER:
+		sig = SIGTRAP;
+		code = TRAP_BRKPT;
+		break;
 	case T_TRCTRAP|T_USER:
 		sig = SIGTRAP;
+		code = TRAP_TRACE;
 		frame->psl &= ~PSL_T;
 		break;
 
 	case T_PRIVINFLT|T_USER:
+		sig = SIGILL;
+		code = ILL_PRVOPC;
+		break;
 	case T_RESADFLT|T_USER:
+		sig = SIGILL;
+		code = ILL_ILLADR;
+		break;
 	case T_RESOPFLT|T_USER:
 		sig = SIGILL;
+		code = ILL_ILLOPC;
 		break;
 
 	case T_XFCFLT|T_USER:
@@ -322,35 +370,39 @@ if(faultdebug)printf("trap accflt type %lx, code %lx, pc %lx, psl %lx\n",
 #endif
 	}
 	if (trapsig) {
-#ifdef DEBUG
-		if (sig == SIGSEGV || sig == SIGILL)
-			printf("pid %d (%s): sig %d: type %lx, code %lx, pc %lx, psl %lx\n",
-			       p->p_pid, p->p_comm, sig, frame->trap,
+		ksiginfo_t ksi;
+		if ((sig == SIGSEGV || sig == SIGILL) && cpu_printfataltraps)
+			printf("pid %d.%d (%s): sig %d: type %lx, code %lx, pc %lx, psl %lx\n",
+			       p->p_pid, l->l_lid, p->p_comm, sig, frame->trap,
 			       frame->code, frame->pc, frame->psl);
-#endif
-		KERNEL_PROC_LOCK(p);
-		trapsignal(p, sig, frame->code);
-		KERNEL_PROC_UNLOCK(p);
+		KERNEL_PROC_LOCK(l);
+		KSI_INIT_TRAP(&ksi);
+		ksi.ksi_signo = sig;
+		ksi.ksi_trap = frame->trap;
+		ksi.ksi_addr = (void *)frame->code;
+		ksi.ksi_code = code;
+		trapsignal(l, &ksi);
+		KERNEL_PROC_UNLOCK(l);
 	}
 
 	if (umode == 0)
 		return;
 
-	userret(p, frame, oticks);
+	userret(l, frame, oticks);
 }
 
 void
-setregs(struct proc *p, struct exec_package *pack, u_long stack)
+setregs(struct lwp *l, struct exec_package *pack, u_long stack)
 {
 	struct trapframe *exptr;
 
-	exptr = p->p_addr->u_pcb.framep;
+	exptr = l->l_addr->u_pcb.framep;
 	exptr->pc = pack->ep_entry + 2;
 	exptr->sp = stack;
-	exptr->r6 = stack;			/* for ELF */
-	exptr->r7 = 0;				/* for ELF */
-	exptr->r8 = 0;				/* for ELF */
-	exptr->r9 = (u_long) p->p_psstr;	/* for ELF */
+	exptr->r6 = stack;				/* for ELF */
+	exptr->r7 = 0;					/* for ELF */
+	exptr->r8 = 0;					/* for ELF */
+	exptr->r9 = (u_long) l->l_proc->p_psstr;	/* for ELF */
 }
 
 void
@@ -361,17 +413,17 @@ syscall(struct trapframe *frame)
 	int nsys;
 	int err, rval[2], args[8];
 	struct trapframe *exptr;
-	struct proc *p = curproc;
-
+	struct lwp *l = curlwp;
+	struct proc *p = l->l_proc;
 
 #ifdef TRAPDEBUG
 if(startsysc)printf("trap syscall %s pc %lx, psl %lx, sp %lx, pid %d, frame %p\n",
 	       syscallnames[frame->code], frame->pc, frame->psl,frame->sp,
-		curproc->p_pid,frame);
+		p->p_pid,frame);
 #endif
 	uvmexp.syscalls++;
  
-	exptr = p->p_addr->u_pcb.framep = frame;
+	exptr = l->l_addr->u_pcb.framep = frame;
 	callp = p->p_emul->e_sysent;
 	nsys = p->p_emul->e_nsysent;
 	oticks = p->p_sticks;
@@ -391,25 +443,23 @@ if(startsysc)printf("trap syscall %s pc %lx, psl %lx, sp %lx, pid %d, frame %p\n
 
 	rval[0] = 0;
 	rval[1] = frame->r1;
-	KERNEL_PROC_LOCK(p);
+	KERNEL_PROC_LOCK(l);
 	if (callp->sy_narg) {
 		err = copyin((char*)frame->ap + 4, args, callp->sy_argsize);
 		if (err) {
-#ifdef KTRACE
-			if (KTRPOINT(p, KTR_SYSCALL))
-				ktrsyscall(p, frame->code,
-				    callp->sy_argsize, args);
-#endif
+			KERNEL_PROC_UNLOCK(l);
 			goto bad;
 		}
 	}
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSCALL))
-		ktrsyscall(p, frame->code, callp->sy_argsize, args);
-#endif
-	err = (*callp->sy_call)(curproc, args, rval);
-	KERNEL_PROC_UNLOCK(p);
-	exptr = curproc->p_addr->u_pcb.framep;
+
+	if ((err = trace_enter(l, frame->code, frame->code, NULL, args)) != 0) {
+		KERNEL_PROC_UNLOCK(l);
+		goto bad;
+	}
+
+	err = (*callp->sy_call)(curlwp, args, rval);
+	KERNEL_PROC_UNLOCK(l);
+	exptr = l->l_addr->u_pcb.framep;
 
 #ifdef TRAPDEBUG
 if(startsysc)
@@ -439,30 +489,56 @@ bad:
 		break;
 	}
 
-	userret(p, frame, oticks);
+	trace_exit(l, frame->code, args, rval, err);
 
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSRET)) {
-		KERNEL_PROC_LOCK(p);
-		ktrsysret(p, frame->code, err, rval[0]);
-		KERNEL_PROC_UNLOCK(p);
-	}
-#endif
+	userret(l, frame, oticks);
 }
 
 void
 child_return(void *arg)
 {
-        struct proc *p = arg;
+        struct lwp *l = arg;
 
-	KERNEL_PROC_UNLOCK(p);
-	userret(p, p->p_addr->u_pcb.framep, 0);
+	KERNEL_PROC_UNLOCK(l);
+	userret(l, l->l_addr->u_pcb.framep, 0);
 
 #ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSRET)) {
-		KERNEL_PROC_LOCK(p);
-		ktrsysret(p, SYS_fork, 0, 0);
-		KERNEL_PROC_UNLOCK(p);
+	if (KTRPOINT(l->l_proc, KTR_SYSRET)) {
+		KERNEL_PROC_LOCK(l);
+		ktrsysret(l->l_proc, SYS_fork, 0, 0);
+		KERNEL_PROC_UNLOCK(l);
 	}
 #endif
 }
+
+/* 
+ * Start a new LWP
+ */
+void
+startlwp(arg)
+	void *arg;
+{
+	int err;
+	ucontext_t *uc = arg;
+	struct lwp *l = curlwp;
+
+	err = cpu_setmcontext(l, &uc->uc_mcontext, uc->uc_flags);
+#if DIAGNOSTIC
+	if (err) {
+		printf("Error %d from cpu_setmcontext.", err);
+	}
+#endif
+	pool_put(&lwp_uc_pool, uc);
+
+	/* XXX - profiling spoiled here */
+	userret(l, l->l_addr->u_pcb.framep, l->l_proc->p_sticks);
+}
+
+void
+upcallret(struct lwp *l)
+{
+
+	/* XXX - profiling */
+	userret(l, l->l_addr->u_pcb.framep, l->l_proc->p_sticks);
+}
+

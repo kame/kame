@@ -1,4 +1,4 @@
-/*	$NetBSD: cdefs.h,v 1.42.10.1 2003/01/01 17:20:07 tron Exp $	*/
+/*	$NetBSD: cdefs.h,v 1.51 2004/01/07 19:38:10 martin Exp $	*/
 
 /*
  * Copyright (c) 1991, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -169,6 +165,26 @@
 #define	__pure
 #endif
 
+#if __GNUC_PREREQ__(2, 7)
+#define	__unused	__attribute__((__unused__))
+#else
+#define	__unused	/* delete */
+#endif
+
+#if __GNUC_PREREQ__(2, 7)
+#define	__packed	__attribute__((__packed__))
+#define	__aligned(x)	__attribute__((__aligned__(x)))
+#define	__section(x)	__attribute__((__section__(x)))
+#elif defined(__lint__)
+#define	__packed	/* delete */
+#define	__aligned(x)	/* delete */
+#define	__section(x)	/* delete */
+#else
+#define	__packed	error: no __packed for this compiler
+#define	__aligned(x)	error: no __aligned for this compiler
+#define	__section(x)	error: no __section for this compiler
+#endif
+
 /*
  * C99 defines the restrict type qualifier keyword, which was made available
  * in GCC 2.92.
@@ -209,11 +225,22 @@
 #ifdef __lint__
 #define	__RENAME(x)	__symbolrename(x)
 #else
- #error "No function renaming possible"
+#error "No function renaming possible"
 #endif /* __lint__ */
 #endif /* __GNUC__ */
 #else /* _STANDALONE || _KERNEL */
 #define	__RENAME(x)	no renaming in kernel or standalone environment
+#endif
+
+/*
+ * A barrier to stop the optimizer from moving code or assume live
+ * register values. This is gcc specific, the version is more or less
+ * arbitrary, might work with older compilers.
+ */
+#if __GNUC_PREREQ__(2, 95)
+#define	__insn_barrier()	__asm __volatile("":::"memory")
+#else
+#define	__insn_barrier()	/* */
 #endif
 
 /*
@@ -222,7 +249,7 @@
  * code blocks can be reordered such that the predicted path
  * sees a more linear flow, thus improving cache behavior, etc.
  *
- * The following two macros provide us with a way to utilize this
+ * The following two macros provide us with a way to use this
  * compiler feature.  Use __predict_true() if you expect the expression
  * to evaluate to true, and __predict_false() if you expect the
  * expression to evaluate to false.
@@ -245,11 +272,60 @@
  *	  larger code.
  */
 #if __GNUC_PREREQ__(2, 96)
-#define	__predict_true(exp)	__builtin_expect(((exp) != 0), 1)
-#define	__predict_false(exp)	__builtin_expect(((exp) != 0), 0)
+#define	__predict_true(exp)	__builtin_expect((exp) != 0, 1)
+#define	__predict_false(exp)	__builtin_expect((exp) != 0, 0)
 #else
-#define	__predict_true(exp)	((exp) != 0)
-#define	__predict_false(exp)	((exp) != 0)
+#define	__predict_true(exp)	(exp)
+#define	__predict_false(exp)	(exp)
 #endif
+
+/*
+ * Macros for manipulating "link sets".  Link sets are arrays of pointers
+ * to objects, which are gathered up by the linker.
+ *
+ * Object format-specific code has provided us with the following macros:
+ *
+ *	__link_set_add_text(set, sym)
+ *		Add a reference to the .text symbol `sym' to `set'.
+ *
+ *	__link_set_add_rodata(set, sym)
+ *		Add a reference to the .rodata symbol `sym' to `set'.
+ *
+ *	__link_set_add_data(set, sym)
+ *		Add a reference to the .data symbol `sym' to `set'.
+ *
+ *	__link_set_add_bss(set, sym)
+ *		Add a reference to the .bss symbol `sym' to `set'.
+ *
+ *	__link_set_decl(set, ptype)
+ *		Provide an extern declaration of the set `set', which
+ *		contains an array of the pointer type `ptype'.  This
+ *		macro must be used by any code which wishes to reference
+ *		the elements of a link set.
+ *
+ *	__link_set_start(set)
+ *		This points to the first slot in the link set.
+ *
+ *	__link_set_end(set)
+ *		This points to the (non-existent) slot after the last
+ *		entry in the link set.
+ *
+ *	__link_set_count(set)
+ *		Count the number of entries in link set `set'.
+ *
+ * In addition, we provide the following macros for accessing link sets:
+ *
+ *	__link_set_foreach(pvar, set)
+ *		Iterate over the link set `set'.  Because a link set is
+ *		an array of pointers, pvar must be declared as "type **pvar",
+ *		and the actual entry accessed as "*pvar".
+ *
+ *	__link_set_entry(set, idx)
+ *		Access the link set entry at index `idx' from set `set'.
+ */
+#define	__link_set_foreach(pvar, set)					\
+	for (pvar = __link_set_start(set); pvar < __link_set_end(set); pvar++)
+
+#define	__link_set_entry(set, idx)	(__link_set_begin(set)[idx])
 
 #endif /* !_SYS_CDEFS_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: ffs_vnops.c,v 1.49 2002/05/05 17:00:06 chs Exp $	*/
+/*	$NetBSD: ffs_vnops.c,v 1.66 2003/11/15 01:19:38 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ffs_vnops.c,v 1.49 2002/05/05 17:00:06 chs Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ffs_vnops.c,v 1.66 2003/11/15 01:19:38 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -45,6 +41,7 @@ __KERNEL_RCSID(0, "$NetBSD: ffs_vnops.c,v 1.49 2002/05/05 17:00:06 chs Exp $");
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/buf.h>
+#include <sys/event.h>
 #include <sys/proc.h>
 #include <sys/mount.h>
 #include <sys/vnode.h>
@@ -86,6 +83,7 @@ const struct vnodeopv_entry_desc ffs_vnodeop_entries[] = {
 	{ &vop_ioctl_desc, ufs_ioctl },			/* ioctl */
 	{ &vop_fcntl_desc, ufs_fcntl },			/* fcntl */
 	{ &vop_poll_desc, ufs_poll },			/* poll */
+	{ &vop_kqfilter_desc, genfs_kqfilter },		/* kqfilter */
 	{ &vop_revoke_desc, ufs_revoke },		/* revoke */
 	{ &vop_mmap_desc, ufs_mmap },			/* mmap */
 	{ &vop_fsync_desc, ffs_fsync },			/* fsync */
@@ -141,6 +139,7 @@ const struct vnodeopv_entry_desc ffs_specop_entries[] = {
 	{ &vop_ioctl_desc, spec_ioctl },		/* ioctl */
 	{ &vop_fcntl_desc, ufs_fcntl },			/* fcntl */
 	{ &vop_poll_desc, spec_poll },			/* poll */
+	{ &vop_kqfilter_desc, spec_kqfilter },		/* kqfilter */
 	{ &vop_revoke_desc, spec_revoke },		/* revoke */
 	{ &vop_mmap_desc, spec_mmap },			/* mmap */
 	{ &vop_fsync_desc, ffs_fsync },			/* fsync */
@@ -195,6 +194,7 @@ const struct vnodeopv_entry_desc ffs_fifoop_entries[] = {
 	{ &vop_ioctl_desc, fifo_ioctl },		/* ioctl */
 	{ &vop_fcntl_desc, ufs_fcntl },			/* fcntl */
 	{ &vop_poll_desc, fifo_poll },			/* poll */
+	{ &vop_kqfilter_desc, fifo_kqfilter },		/* kqfilter */
 	{ &vop_revoke_desc, fifo_revoke },		/* revoke */
 	{ &vop_mmap_desc, fifo_mmap },			/* mmap */
 	{ &vop_fsync_desc, ffs_fsync },			/* fsync */
@@ -231,9 +231,6 @@ const struct vnodeopv_entry_desc ffs_fifoop_entries[] = {
 const struct vnodeopv_desc ffs_fifoop_opv_desc =
 	{ &ffs_fifoop_p, ffs_fifoop_entries };
 
-int doclusterread = 1;
-int doclusterwrite = 1;
-
 #include <ufs/ufs/ufs_readwrite.c>
 
 int
@@ -258,7 +255,8 @@ ffs_fsync(v)
 	/*
 	 * XXX no easy way to sync a range in a file with softdep.
 	 */
-	if ((ap->a_offlo == 0 && ap->a_offhi == 0) || DOINGSOFTDEP(ap->a_vp))
+	if ((ap->a_offlo == 0 && ap->a_offhi == 0) || DOINGSOFTDEP(ap->a_vp) ||
+			(ap->a_vp->v_type != VREG))
 		return ffs_full_fsync(v);
 
 	vp = ap->a_vp;
@@ -272,13 +270,12 @@ ffs_fsync(v)
 	 * First, flush all pages in range.
 	 */
 
-	if (vp->v_type == VREG) {
-		simple_lock(&vp->v_interlock);
-		error = VOP_PUTPAGES(vp, trunc_page(ap->a_offlo),
-		    round_page(ap->a_offhi), PGO_CLEANIT|PGO_SYNCIO);
-		if (error) {
-			return error;
-		}
+	simple_lock(&vp->v_interlock);
+	error = VOP_PUTPAGES(vp, trunc_page(ap->a_offlo),
+	    round_page(ap->a_offhi), PGO_CLEANIT |
+	    ((ap->a_flags & FSYNC_WAIT) ? PGO_SYNCIO : 0));
+	if (error) {
+		return error;
 	}
 
 	/*
@@ -286,7 +283,7 @@ ffs_fsync(v)
 	 */
 
 	s = splbio();
-	if (!(ap->a_flags & FSYNC_DATAONLY) && blk_high >= NDADDR) {
+	if (blk_high >= NDADDR) {
 		error = ufs_getlbns(vp, blk_high, ia, &num);
 		if (error) {
 			splx(s);
@@ -294,26 +291,35 @@ ffs_fsync(v)
 		}
 		for (i = 0; i < num; i++) {
 			bp = incore(vp, ia[i].in_lbn);
-			if (bp != NULL && !(bp->b_flags & B_BUSY) &&
-			    (bp->b_flags & B_DELWRI)) {
-				bp->b_flags |= B_BUSY | B_VFLUSH;
-				splx(s);
-				bawrite(bp);
-				s = splbio();
+			if (bp != NULL) {
+				simple_lock(&bp->b_interlock);
+				if (!(bp->b_flags & B_BUSY) && (bp->b_flags & B_DELWRI)) {
+					bp->b_flags |= B_BUSY | B_VFLUSH;
+					simple_unlock(&bp->b_interlock);
+					splx(s);
+					bawrite(bp);
+					s = splbio();
+				} else {
+					simple_unlock(&bp->b_interlock);
+				}
 			}
 		}
 	}
 
 	if (ap->a_flags & FSYNC_WAIT) {
+		simple_lock(&global_v_numoutput_slock);
 		while (vp->v_numoutput > 0) {
 			vp->v_flag |= VBWAIT;
-			tsleep(&vp->v_numoutput, PRIBIO + 1, "fsync_range", 0);
+			ltsleep(&vp->v_numoutput, PRIBIO + 1, "fsync_range", 0,
+				&global_v_numoutput_slock);
 		}
+		simple_unlock(&global_v_numoutput_slock);
 	}
 	splx(s);
 
 	return (VOP_UPDATE(vp, NULL, NULL,
-	    (ap->a_flags & FSYNC_WAIT) ? UPDATE_WAIT : 0));
+	    ((ap->a_flags & (FSYNC_WAIT | FSYNC_DATAONLY)) == FSYNC_WAIT)
+	    ? UPDATE_WAIT : 0));
 }
 
 /*
@@ -359,7 +365,7 @@ ffs_full_fsync(v)
 
 	passes = NIADDR + 1;
 	skipmeta = 0;
-	if (ap->a_flags & (FSYNC_DATAONLY|FSYNC_WAIT))
+	if (ap->a_flags & FSYNC_WAIT)
 		skipmeta = 1;
 	s = splbio();
 
@@ -368,12 +374,18 @@ loop:
 		bp->b_flags &= ~B_SCANNED;
 	for (bp = LIST_FIRST(&vp->v_dirtyblkhd); bp; bp = nbp) {
 		nbp = LIST_NEXT(bp, b_vnbufs);
-		if (bp->b_flags & (B_BUSY | B_SCANNED))
+		simple_lock(&bp->b_interlock);
+		if (bp->b_flags & (B_BUSY | B_SCANNED)) {
+			simple_unlock(&bp->b_interlock);
 			continue;
+		}
 		if ((bp->b_flags & B_DELWRI) == 0)
 			panic("ffs_fsync: not dirty");
-		if (skipmeta && bp->b_lblkno < 0)
+		if (skipmeta && bp->b_lblkno < 0) {
+			simple_unlock(&bp->b_interlock);
 			continue;
+		}
+		simple_unlock(&bp->b_interlock);
 		bp->b_flags |= B_BUSY | B_VFLUSH | B_SCANNED;
 		splx(s);
 		/*
@@ -392,20 +404,19 @@ loop:
 		 */
 		nbp = LIST_FIRST(&vp->v_dirtyblkhd);
 	}
-	if (skipmeta && !(ap->a_flags & FSYNC_DATAONLY)) {
+	if (skipmeta) {
 		skipmeta = 0;
 		goto loop;
 	}
 	if (ap->a_flags & FSYNC_WAIT) {
+		simple_lock(&global_v_numoutput_slock);
 		while (vp->v_numoutput) {
 			vp->v_flag |= VBWAIT;
-			(void) tsleep(&vp->v_numoutput, PRIBIO + 1,
-			    "ffsfsync", 0);
+			(void) ltsleep(&vp->v_numoutput, PRIBIO + 1,
+			    "ffsfsync", 0, &global_v_numoutput_slock);
 		}
+		simple_unlock(&global_v_numoutput_slock);
 		splx(s);
-
-		if (ap->a_flags & FSYNC_DATAONLY)
-			return (0);
 
 		/* 
 		 * Ensure that any filesystem metadata associated
@@ -455,10 +466,18 @@ ffs_reclaim(v)
 		struct proc *a_p;
 	} */ *ap = v;
 	struct vnode *vp = ap->a_vp;
+	struct inode *ip = VTOI(vp);
+	struct ufsmount *ump = ip->i_ump;
 	int error;
 
 	if ((error = ufs_reclaim(vp, ap->a_p)) != 0)
 		return (error);
+	if (ip->i_din.ffs1_din != NULL) {
+		if (ump->um_fstype == UFS1)
+			pool_put(&ffs_dinode1_pool, ip->i_din.ffs1_din);
+		else
+			pool_put(&ffs_dinode2_pool, ip->i_din.ffs2_din);
+	}
 	/*
 	 * XXX MFS ends up here, too, to free an inode.  Should we create
 	 * XXX a separate pool for MFS inodes?
@@ -518,7 +537,6 @@ ffs_putpages(void *v)
 	struct fs *fs = ip->i_fs;
 	struct vm_page *pg;
 	off_t off;
-	ufs_lbn_t lbn;
 
 	if (!DOINGSOFTDEP(vp) || (ap->a_flags & PGO_CLEANIT) == 0) {
 		return genfs_putpages(v);
@@ -531,7 +549,6 @@ ffs_putpages(void *v)
 	 */
 
 	ap->a_offlo &= ~fs->fs_qbmask;
-	lbn = lblkno(fs, ap->a_offhi);
 	ap->a_offhi = blkroundup(fs, ap->a_offhi);
 	if (curproc == uvm.pagedaemon_proc) {
 		for (off = ap->a_offlo; off < ap->a_offhi; off += PAGE_SIZE) {
@@ -563,13 +580,17 @@ ffs_putpages(void *v)
  */
 
 void
-ffs_gop_size(struct vnode *vp, off_t size, off_t *eobp)
+ffs_gop_size(struct vnode *vp, off_t size, off_t *eobp, int flags)
 {
 	struct inode *ip = VTOI(vp);
 	struct fs *fs = ip->i_fs;
-	ufs_lbn_t olbn, nlbn;
+	daddr_t olbn, nlbn;
 
-	olbn = lblkno(fs, ip->i_ffs_size);
+	KASSERT(flags & (GOP_SIZE_READ | GOP_SIZE_WRITE));
+	KASSERT((flags & (GOP_SIZE_READ | GOP_SIZE_WRITE)) 
+		!= (GOP_SIZE_READ | GOP_SIZE_WRITE));
+
+	olbn = lblkno(fs, ip->i_size);
 	nlbn = lblkno(fs, size);
 	if (nlbn < NDADDR && olbn <= nlbn) {
 		*eobp = fragroundup(fs, size);

@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_machdep.c,v 1.11 2001/10/29 23:35:31 thorpej Exp $	*/
+/*	$NetBSD: pci_machdep.c,v 1.13 2003/07/15 01:26:33 lukem Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -41,6 +41,9 @@
  * using `options PCI_CONF_MODE=N', where `N' is the configuration mode
  * as defined section 3.6.4.1, `Generating Configuration Cycles'.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pci_machdep.c,v 1.13 2003/07/15 01:26:33 lukem Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -225,7 +228,7 @@ pci_intr_string(pc, ih)
 	static char irqstr[8];		/* 4 + 2 + NULL + sanity */
 
 	if (ih == 0 || ih >= ICU_LEN || ih == IRQ_SLAVE)
-		panic("pci_intr_string: bogus handle 0x%x\n", ih);
+		panic("pci_intr_string: bogus handle 0x%x", ih);
 
 	sprintf(irqstr, "irq %d", ih);
 	return (irqstr);
@@ -251,7 +254,7 @@ pci_intr_establish(pc, ih, level, func, arg)
 {
 
 	if (ih == 0 || ih >= ICU_LEN || ih == IRQ_SLAVE)
-		panic("pci_intr_establish: bogus handle 0x%x\n", ih);
+		panic("pci_intr_establish: bogus handle 0x%x", ih);
 
 	return (void *)intr_establish(ih, IST_LEVEL, level, func, arg);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: mman.h,v 1.28.18.1 2003/08/17 10:14:59 tron Exp $	*/
+/*	$NetBSD: mman.h,v 1.34 2003/10/07 00:17:09 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -90,15 +86,29 @@ typedef	__off_t		off_t;		/* file offset */
 #define	MAP_RENAME	 0x0020	/* Sun: rename private pages to file */
 #define	MAP_NORESERVE	 0x0040	/* Sun: don't reserve needed swap area */
 #define	MAP_INHERIT	 0x0080	/* region is retained after exec */
-#define	MAP_NOEXTEND	 0x0100	/* for MAP_FILE, don't change file size */
 #define	MAP_HASSEMAPHORE 0x0200	/* region may contain semaphores */
 #define	MAP_TRYFIXED     0x0400 /* attempt hint address, even within break */
+#define	MAP_WIRED	 0x0800	/* mlock() mapping when it is established */
 
 /*
  * Mapping type
  */
 #define	MAP_FILE	0x0000	/* map from file (default) */
 #define	MAP_ANON	0x1000	/* allocated from memory, swap space */
+
+/*
+ * Alignment (expressed in log2).  Must be >= log2(PAGE_SIZE) and
+ * < # bits in a pointer (26 (acorn26), 32 or 64).
+ */
+#define	MAP_ALIGNED(n)		((n) << MAP_ALIGNMENT_SHIFT)
+#define	MAP_ALIGNMENT_SHIFT	24
+#define	MAP_ALIGNMENT_MASK	MAP_ALIGNED(0xff)
+#define	MAP_ALIGNMENT_64KB	MAP_ALIGNED(16)	/* 2^16 */
+#define	MAP_ALIGNMENT_16MB	MAP_ALIGNED(24)	/* 2^24 */
+#define	MAP_ALIGNMENT_4GB	MAP_ALIGNED(32)	/* 2^32 */
+#define	MAP_ALIGNMENT_1TB	MAP_ALIGNED(40)	/* 2^40 */
+#define	MAP_ALIGNMENT_256TB	MAP_ALIGNED(48)	/* 2^48 */
+#define	MAP_ALIGNMENT_64PB	MAP_ALIGNED(56)	/* 2^56 */
 
 /*
  * Error indicator returned by mmap(2)
@@ -118,7 +128,7 @@ typedef	__off_t		off_t;		/* file offset */
 #define	MCL_CURRENT	0x01	/* lock all pages currently mapped */
 #define	MCL_FUTURE	0x02	/* lock all pages mapped in the future */
 
-#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 /*
  * Advice to madvise
  */
@@ -158,7 +168,7 @@ int	mlock __P((const void *, size_t));
 int	munlock __P((const void *, size_t));
 int	mlockall __P((int));
 int	munlockall __P((void));
-#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 int	madvise __P((void *, size_t, int));
 int	mincore __P((void *, size_t, char *));
 int	minherit __P((void *, size_t, int));

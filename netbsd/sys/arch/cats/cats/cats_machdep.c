@@ -1,4 +1,4 @@
-/*	$NetBSD: cats_machdep.c,v 1.29.4.2 2003/02/14 22:21:52 he Exp $	*/
+/*	$NetBSD: cats_machdep.c,v 1.51 2003/10/04 15:43:05 chris Exp $	*/
 
 /*
  * Copyright (c) 1997,1998 Mark Brinicombe.
@@ -39,8 +39,13 @@
  * Created      : 24/11/97
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cats_machdep.c,v 1.51 2003/10/04 15:43:05 chris Exp $");
+
 #include "opt_ddb.h"
 #include "opt_pmap_debug.h"
+
+#include "isadma.h"
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -51,6 +56,7 @@
 #include <sys/msgbuf.h>
 #include <sys/reboot.h>
 #include <sys/termios.h>
+#include <sys/ksyms.h>
 
 #include <dev/cons.h>
 
@@ -59,6 +65,7 @@
 #include <ddb/db_extern.h>
 
 #include <machine/bootconfig.h>
+#define	_ARM32_BUS_DMA_PRIVATE
 #include <machine/bus.h>
 #include <machine/cpu.h>
 #include <machine/frame.h>
@@ -70,7 +77,9 @@
 #include <arm/footbridge/dc21285mem.h>
 #include <arm/footbridge/dc21285reg.h>
 
+#include "ksyms.h"
 #include "opt_ipkdb.h"
+#include "opt_ableelf.h"
 
 #include "isa.h"
 #if NISA > 0
@@ -78,6 +87,19 @@
 #include <dev/isa/isavar.h>
 #endif
 
+/* Kernel text starts at the base of the kernel address space. */
+#define	KERNEL_TEXT_BASE	(KERNEL_BASE + 0x00000000)
+#define	KERNEL_VM_BASE		(KERNEL_BASE + 0x01000000)
+
+/*
+ * The range 0xf1000000 - 0xfcffffff is available for kernel VM space
+ * Footbridge registers and I/O mappings occupy 0xfd000000 - 0xffffffff
+ */
+
+/*
+ * Size of available KVM space, note that growkernel will grow into this.
+ */
+#define KERNEL_VM_SIZE	0x0C000000
 
 /*
  * Address to call from cpu_reset() to reset the machine.
@@ -214,7 +236,7 @@ cpu_reboot(howto, bootstr)
 {
 #ifdef DIAGNOSTIC
 	/* info */
-	printf("boot: howto=%08x curproc=%p\n", howto, curproc);
+	printf("boot: howto=%08x curlwp=%p\n", howto, curlwp);
 #endif
 
 	/*
@@ -337,11 +359,9 @@ initarm(bootargs)
 	struct ebsaboot *bootinfo = bootargs;
 	int loop;
 	int loop1;
-	u_int logical;
 	u_int l1pagetable;
-	struct exec *kernexec = (struct exec *)KERNEL_TEXT_BASE;
 	pv_addr_t kernel_l1pt;
-	pv_addr_t kernel_ptpt;
+	extern u_int cpu_get_control(void);
 
 	/*
 	 * Heads up ... Setup the CPU / MMU / TLB functions
@@ -360,7 +380,7 @@ initarm(bootargs)
 	bootconfig.dramblocks = 1;
 	bootconfig.dram[0].address = ebsabootinfo.bt_memstart;
 	bootconfig.dram[0].pages = (ebsabootinfo.bt_memend
-	    - ebsabootinfo.bt_memstart) / NBPG;
+	    - ebsabootinfo.bt_memstart) / PAGE_SIZE;
 
 	/*
 	 * Initialise the diagnostic serial console
@@ -368,14 +388,16 @@ initarm(bootargs)
 	 * Once all the memory map changes are complete we can call consinit()
 	 * and not have to worry about things moving.
 	 */
-/*	fcomcnattach(DC21285_ARMCSR_BASE, comcnspeed, comcnmode);*/
+#ifdef FCOM_INIT_ARM
+	 fcomcnattach(DC21285_ARMCSR_BASE, comcnspeed, comcnmode);
+#endif
 
 	/* Talk to the user */
 	printf("NetBSD/cats booting ...\n");
 
 	if (ebsabootinfo.bt_magic != BT_MAGIC_NUMBER_EBSA
 	    && ebsabootinfo.bt_magic != BT_MAGIC_NUMBER_CATS)
-		panic("Incompatible magic number passed in boot args\n");
+		panic("Incompatible magic number passed in boot args");
 
 /*	{
 	int loop;
@@ -425,9 +447,9 @@ initarm(bootargs)
 	physical_freestart = physical_start;
 	physical_end = ebsabootinfo.bt_memend;
 	physical_freeend = physical_end;
-	free_pages = (physical_end - physical_start) / NBPG;
+	free_pages = (physical_end - physical_start) / PAGE_SIZE;
     
-	physmem = (physical_end - physical_start) / NBPG;
+	physmem = (physical_end - physical_start) / PAGE_SIZE;
 
 	/* Tell the user about the memory */
 	printf("physmemory: %d pages at 0x%08lx -> 0x%08lx\n", physmem,
@@ -455,13 +477,16 @@ initarm(bootargs)
 	 */
 
 #ifdef VERBOSE_INIT_ARM
-	printf("Allocating page tables\n");
+	printf("Allocating page tables");
 #endif
 
 	/* Update the address of the first free page of physical memory */
 	physical_freestart = ebsabootinfo.bt_memavail;
-	free_pages -= (physical_freestart - physical_start) / NBPG;
-
+	free_pages -= (physical_freestart - physical_start) / PAGE_SIZE;
+	
+#ifdef VERBOSE_INIT_ARM
+	printf(" above %p\n", (void *)physical_freestart);
+#endif
 	/* Define a macro to simplify memory allocation */
 #define	valloc_pages(var, np)			\
 	alloc_pages((var).pv_pa, (np));	\
@@ -469,9 +494,9 @@ initarm(bootargs)
 
 #define alloc_pages(var, np)			\
 	(var) = physical_freestart;		\
-	physical_freestart += ((np) * NBPG);	\
+	physical_freestart += ((np) * PAGE_SIZE);\
 	free_pages -= (np);			\
-	memset((char *)(var), 0, ((np) * NBPG));
+	memset((char *)(var), 0, ((np) * PAGE_SIZE));
 
 	loop1 = 0;
 	kernel_l1pt.pv_pa = 0;
@@ -479,20 +504,18 @@ initarm(bootargs)
 		/* Are we 16KB aligned for an L1 ? */
 		if ((physical_freestart & (L1_TABLE_SIZE - 1)) == 0
 		    && kernel_l1pt.pv_pa == 0) {
-			valloc_pages(kernel_l1pt, L1_TABLE_SIZE / NBPG);
+			valloc_pages(kernel_l1pt, L1_TABLE_SIZE / PAGE_SIZE);
 		} else {
-			alloc_pages(kernel_pt_table[loop1].pv_pa,
-			    L2_TABLE_SIZE / NBPG);
-			kernel_pt_table[loop1].pv_va =
-			    kernel_pt_table[loop1].pv_pa;
-			++loop1;
+			valloc_pages(kernel_pt_table[loop1],
+					L2_TABLE_SIZE / PAGE_SIZE);
+			++loop1;			
 		}
 	}
 
 #ifdef DIAGNOSTIC
 	/* This should never be able to happen but better confirm that. */
 	if (!kernel_l1pt.pv_pa || (kernel_l1pt.pv_pa & (L1_TABLE_SIZE-1)) != 0)
-		panic("initarm: Failed to align the kernel page directory\n");
+		panic("initarm: Failed to align the kernel page directory");
 #endif
 
 	/*
@@ -501,9 +524,6 @@ initarm(bootargs)
 	 * shared by all processes.
 	 */
 	alloc_pages(systempage.pv_pa, 1);
-
-	/* Allocate a page for the page table to map kernel page tables*/
-	valloc_pages(kernel_ptpt, L2_TABLE_SIZE / NBPG);
 
 	/* Allocate stacks for all modes */
 	valloc_pages(irqstack, IRQ_STACK_SIZE);
@@ -518,7 +538,7 @@ initarm(bootargs)
 	printf("SVC stack: p0x%08lx v0x%08lx\n", kernelstack.pv_pa, kernelstack.pv_va); 
 #endif
 
-	alloc_pages(msgbufphys, round_page(MSGBUFSIZE) / NBPG);
+	alloc_pages(msgbufphys, round_page(MSGBUFSIZE) / PAGE_SIZE);
 
 	/*
 	 * Ok we have allocated physical pages for the primary kernel
@@ -552,36 +572,57 @@ initarm(bootargs)
 	pmap_curmaxkvaddr =
 	    KERNEL_VM_BASE + (KERNEL_PT_VMDATA_NUM * 0x00400000);
 	
-	pmap_link_l2pt(l1pagetable, PTE_BASE, &kernel_ptpt);
-
 #ifdef VERBOSE_INIT_ARM
 	printf("Mapping kernel\n");
 #endif
 
 	/* Now we fill in the L2 pagetable for the kernel static code/data */
+#ifdef ABLEELF
+	{
+		extern char etext[], _end[];
+		size_t textsize = (uintptr_t) etext - KERNEL_BASE;
+		size_t totalsize = (uintptr_t) _end - KERNEL_BASE;
+		u_int logical;
+		
+		textsize = round_page(textsize);
+		totalsize = round_page(totalsize);
 
-	if (N_GETMAGIC(kernexec[0]) != ZMAGIC)
-		panic("Illegal kernel format\n");
-	else {
-		extern int end;
+		logical = pmap_map_chunk(l1pagetable, KERNEL_BASE,
+		    physical_start, textsize,
+		    VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
 
-		logical = pmap_map_chunk(l1pagetable, KERNEL_TEXT_BASE,
-			physical_start, kernexec->a_text,
-			VM_PROT_READ, PTE_CACHE);
-		logical += pmap_map_chunk(l1pagetable,
-			KERNEL_TEXT_BASE + logical,
-			physical_start + logical, kernexec->a_data,
-			VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
-		logical += pmap_map_chunk(l1pagetable,
-			KERNEL_TEXT_BASE + logical,
-			physical_start + logical, kernexec->a_bss,
-			VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
-		logical += pmap_map_chunk(l1pagetable,
-			KERNEL_TEXT_BASE + logical,
-			physical_start + logical, kernexec->a_syms + sizeof(int)
-			+ *(u_int *)((int)&end + kernexec->a_syms + sizeof(int)),
-			VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+		(void) pmap_map_chunk(l1pagetable, KERNEL_BASE + logical,
+		    physical_start + logical, totalsize - textsize,
+		    VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
 	}
+#else
+	{
+		struct exec *kernexec = (struct exec *)KERNEL_TEXT_BASE;
+		if (N_GETMAGIC(kernexec[0]) != ZMAGIC)
+			panic("Illegal kernel format");
+		else {
+			extern int end;
+			u_int logical;
+			
+			logical = pmap_map_chunk(l1pagetable, KERNEL_TEXT_BASE,
+					physical_start, kernexec->a_text,
+					VM_PROT_READ, PTE_CACHE);
+			logical += pmap_map_chunk(l1pagetable,
+					KERNEL_TEXT_BASE + logical,
+					physical_start + logical, kernexec->a_data,
+					VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+			logical += pmap_map_chunk(l1pagetable,
+					KERNEL_TEXT_BASE + logical,
+					physical_start + logical, kernexec->a_bss,
+					VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+			logical += pmap_map_chunk(l1pagetable,
+					KERNEL_TEXT_BASE + logical,
+					physical_start + logical, kernexec->a_syms + sizeof(int)
+					+ *(u_int *)((int)&end + kernexec->a_syms + sizeof(int)),
+					VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+		}
+	}
+#endif
 
 	/*
 	 * PATCH PATCH ...
@@ -604,47 +645,22 @@ initarm(bootargs)
 
 	/* Map the stack pages */
 	pmap_map_chunk(l1pagetable, irqstack.pv_va, irqstack.pv_pa,
-	    IRQ_STACK_SIZE * NBPG, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+	    IRQ_STACK_SIZE * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
 	pmap_map_chunk(l1pagetable, abtstack.pv_va, abtstack.pv_pa,
-	    ABT_STACK_SIZE * NBPG, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+	    ABT_STACK_SIZE * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
 	pmap_map_chunk(l1pagetable, undstack.pv_va, undstack.pv_pa,
-	    UND_STACK_SIZE * NBPG, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+	    UND_STACK_SIZE * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
 	pmap_map_chunk(l1pagetable, kernelstack.pv_va, kernelstack.pv_pa,
-	    UPAGES * NBPG, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+	    UPAGES * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
 
 	pmap_map_chunk(l1pagetable, kernel_l1pt.pv_va, kernel_l1pt.pv_pa,
-	    L1_TABLE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
+	    L1_TABLE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_PAGETABLE);
 
-	/* Map the page table that maps the kernel pages */
-	pmap_map_entry(l1pagetable, kernel_ptpt.pv_va, kernel_ptpt.pv_pa,
-	    VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
-
-	/*
-	 * Map entries in the page table used to map PTE's
-	 * Basically every kernel page table gets mapped here
-	 */
-	/* The -2 is slightly bogus, it should be -log2(sizeof(pt_entry_t)) */
-	for (loop = 0; loop < KERNEL_PT_KERNEL_NUM; loop++)
-		pmap_map_entry(l1pagetable,
-		    PTE_BASE + ((KERNEL_BASE +
-		    (loop * 0x00400000)) >> (PGSHIFT-2)),
-		    kernel_pt_table[KERNEL_PT_KERNEL + loop].pv_pa,
-		    VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
-
-	pmap_map_entry(l1pagetable,
-	    PTE_BASE + (PTE_BASE >> (PGSHIFT-2)),
-	    kernel_ptpt.pv_pa,
-	    VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
-	pmap_map_entry(l1pagetable,
-	    PTE_BASE + (0x00000000 >> (PGSHIFT-2)),
-	    kernel_pt_table[KERNEL_PT_SYS].pv_pa,
-	    VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
-	for (loop = 0; loop < KERNEL_PT_VMDATA_NUM; ++loop)
-		pmap_map_entry(l1pagetable,
-		    PTE_BASE + ((KERNEL_VM_BASE +
-		    (loop * 0x00400000)) >> (PGSHIFT-2)),
-		    kernel_pt_table[KERNEL_PT_VMDATA + loop].pv_pa,
-		    VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
+	for (loop = 0; loop < NUM_KERNEL_PTS; ++loop) {
+		pmap_map_chunk(l1pagetable, kernel_pt_table[loop].pv_va,
+		    kernel_pt_table[loop].pv_pa, L2_TABLE_SIZE,
+		    VM_PROT_READ|VM_PROT_WRITE, PTE_PAGETABLE);
+	}
 
 	/* Map the vector page. */
 	pmap_map_entry(l1pagetable, vector_page, systempage.pv_pa,
@@ -673,20 +689,54 @@ initarm(bootargs)
 	 * Now we have the real page tables in place so we can switch to them.
 	 * Once this is done we will be running with the REAL kernel page tables.
 	 */
+#ifdef VERBOSE_INIT_ARM
+	/* checking sttb address */
+	printf("setttb address = %p\n", cpufuncs.cf_setttb);
 
+	printf("kernel_l1pt=0x%08x old = 0x%08x, phys = 0x%08x\n",
+			((uint*)kernel_l1pt.pv_va)[0xf00],
+			((uint*)ebsabootinfo.bt_l1)[0xf00],
+			((uint*)kernel_l1pt.pv_pa)[0xf00]);
+
+	printf("old pt @ %p, new pt @ %p\n", (uint*)kernel_l1pt.pv_pa, (uint*)ebsabootinfo.bt_l1);
+
+	printf("Enabling System access\n");
+#endif
+	/* 
+	 * enable the system bit in the control register, otherwise we can't
+	 * access the kernel after the switch to the new L1 table
+	 * I suspect cyclone hid this problem, by enabling the ROM bit
+	 * Note can not have both SYST and ROM enabled together, the results
+	 * are "undefined"
+	 */
+	cpu_control(CPU_CONTROL_SYST_ENABLE | CPU_CONTROL_ROM_ENABLE, CPU_CONTROL_SYST_ENABLE);
+#ifdef VERBOSE_INIT_ARM
+	printf("switching domains\n");
+#endif
+	/* be a client to all domains */
+	cpu_domains(0x55555555);
 	/* Switch tables */
 #ifdef VERBOSE_INIT_ARM
 	printf("switching to new L1 page table\n");
 #endif
 
-	setttb(kernel_l1pt.pv_pa);
-
 	/*
-	 * Ok the DC21285 CSR registers have just moved.
-	 * Detach the diagnostic serial port and reattach at the new address.
+	 * Ok the DC21285 CSR registers are about to be moved.
+	 * Detach the diagnostic serial port.
 	 */
-/*	fcomcndetach();*/
-
+#ifdef FCOM_INIT_ARM
+	fcomcndetach();
+#endif
+	
+	setttb(kernel_l1pt.pv_pa);
+	cpu_tlb_flushID();
+	cpu_domains(DOMAIN_CLIENT << (PMAP_DOMAIN_KERNEL*2));
+	/*
+	 * Moved from cpu_startup() as data_abort_handler() references
+	 * this during uvm init
+	 */
+	proc0paddr = (struct user *)kernelstack.pv_va;
+	lwp0.l_addr = proc0paddr;
 	/*
 	 * XXX this should only be done in main() but it useful to
 	 * have output earlier ...
@@ -709,9 +759,12 @@ initarm(bootargs)
 	 */
 	printf("init subsystems: stacks ");
 
-	set_stackptr(PSR_IRQ32_MODE, irqstack.pv_va + IRQ_STACK_SIZE * NBPG);
-	set_stackptr(PSR_ABT32_MODE, abtstack.pv_va + ABT_STACK_SIZE * NBPG);
-	set_stackptr(PSR_UND32_MODE, undstack.pv_va + UND_STACK_SIZE * NBPG);
+	set_stackptr(PSR_IRQ32_MODE,
+	    irqstack.pv_va + IRQ_STACK_SIZE * PAGE_SIZE);
+	set_stackptr(PSR_ABT32_MODE,
+	    abtstack.pv_va + ABT_STACK_SIZE * PAGE_SIZE);
+	set_stackptr(PSR_UND32_MODE,
+	    undstack.pv_va + UND_STACK_SIZE * PAGE_SIZE);
 
 	/*
 	 * Well we should set a data abort handler.
@@ -738,13 +791,91 @@ initarm(bootargs)
 	printf("undefined ");
 	undefined_init();
 
+	/* Load memory into UVM. */
+	printf("page ");
+	uvm_setpagesize();	/* initialize PAGE_SIZE-dependent variables */
+
+	/* XXX Always one RAM block -- nuke the loop. */
+	for (loop = 0; loop < bootconfig.dramblocks; loop++) {
+		paddr_t start = (paddr_t)bootconfig.dram[loop].address;
+		paddr_t end = start + (bootconfig.dram[loop].pages * PAGE_SIZE);
+#if NISADMA > 0
+		paddr_t istart, isize;
+		extern struct arm32_dma_range *footbridge_isa_dma_ranges;
+		extern int footbridge_isa_dma_nranges;
+#endif
+
+		if (start < physical_freestart)
+			start = physical_freestart;
+		if (end > physical_freeend)
+			end = physical_freeend;
+
+#if 0
+		printf("%d: %lx -> %lx\n", loop, start, end - 1);
+#endif
+
+#if NISADMA > 0
+		if (arm32_dma_range_intersect(footbridge_isa_dma_ranges,
+					      footbridge_isa_dma_nranges,
+					      start, end - start,
+					      &istart, &isize)) {
+			/*
+			 * Place the pages that intersect with the
+			 * ISA DMA range onto the ISA DMA free list.
+			 */
+#if 0
+			printf("    ISADMA 0x%lx -> 0x%lx\n", istart,
+			    istart + isize - 1);
+#endif
+			uvm_page_physload(atop(istart),
+			    atop(istart + isize), atop(istart),
+			    atop(istart + isize), VM_FREELIST_ISADMA);
+
+			/*
+			 * Load the pieces that come before the
+			 * intersection onto the default free list.
+			 */
+			if (start < istart) {
+#if 0
+				printf("    BEFORE 0x%lx -> 0x%lx\n",
+				    start, istart - 1);
+#endif
+				uvm_page_physload(atop(start),
+				    atop(istart), atop(start),
+				    atop(istart), VM_FREELIST_DEFAULT);
+			}
+
+			/*
+			 * Load the pieces that come after the
+			 * intersection onto the default free list.
+			 */
+			if ((istart + isize) < end) {
+#if 0
+				printf("     AFTER 0x%lx -> 0x%lx\n",
+				    (istart + isize), end - 1);
+#endif
+				uvm_page_physload(atop(istart + isize),
+				    atop(end), atop(istart + isize), 
+				    atop(end), VM_FREELIST_DEFAULT);
+			}
+		} else {
+			uvm_page_physload(atop(start), atop(end),
+			    atop(start), atop(end), VM_FREELIST_DEFAULT);
+		}
+#else /* NISADMA > 0 */
+		uvm_page_physload(atop(start), atop(end),
+		    atop(start), atop(end), VM_FREELIST_DEFAULT);
+#endif /* NISADMA > 0 */
+	}
+
 	/* Boot strap pmap telling it where the kernel page table is */
 	printf("pmap ");
-	pmap_bootstrap((pd_entry_t *)kernel_l1pt.pv_va, kernel_ptpt);
+	pmap_bootstrap((pd_entry_t *)kernel_l1pt.pv_va, KERNEL_VM_BASE,
+	    KERNEL_VM_BASE + KERNEL_VM_SIZE);
 
 	/* Setup the IRQ system */
 	printf("irq ");
-	irq_init();
+	footbridge_intr_init();
 	printf("done.\n");
 
 #ifdef IPKDB
@@ -754,22 +885,24 @@ initarm(bootargs)
 		ipkdb_connect(0);
 #endif
 
-#ifdef DDB
-	db_machine_init();
+#if NKSYMS || defined(DDB) || defined(LKM)
 #ifdef __ELF__
 	/* ok this is really rather sick, in ELF what happens is that the
 	 * ELF symbol table is added after the text section.
 	 */
-	ddb_init(0, NULL, NULL);	/* XXX */
+	ksyms_init(0, NULL, NULL);	/* XXX */
 #else
 	{
 		extern int end;
 		extern int *esym;
 
-		ddb_init(*(int *)&end, ((int *)&end) + 1, esym);
+		ksyms_init(*(int *)&end, ((int *)&end) + 1, esym);
 	}
 #endif /* __ELF__ */
+#endif
 
+#ifdef DDB
+	db_machine_init();
 	if (boothowto & RB_KDB)
 		Debugger();
 #endif
@@ -826,7 +959,7 @@ consinit(void)
 
 #if NISA > 0
 	/* Initialise the ISA subsystem early ... */
-	isa_cats_init(DC21285_PCI_IO_VBASE, DC21285_PCI_ISA_MEM_VBASE);
+	isa_footbridge_init(DC21285_PCI_IO_VBASE, DC21285_PCI_ISA_MEM_VBASE);
 #endif
 
 	footbridge_pci_bs_tag_init();
@@ -849,7 +982,7 @@ consinit(void)
 #if (NCOM > 0)
 	else if (strncmp(console, "com", 3) == 0) {
 		if (comcnattach(&isa_io_bs_tag, CONCOMADDR, comcnspeed,
-		    COM_FREQ, comcnmode))
+		    COM_FREQ, COM_TYPE_NORMAL, comcnmode))
 			panic("can't init serial console @%x", CONCOMADDR);
 	}
 #endif

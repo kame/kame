@@ -1,4 +1,4 @@
-#	$NetBSD: files.arc,v 1.38 2002/04/16 20:50:17 thorpej Exp $
+#	$NetBSD: files.arc,v 1.50 2004/03/13 17:31:33 bjh21 Exp $
 #	$OpenBSD: files.arc,v 1.21 1999/09/11 10:20:20 niklas Exp $
 #
 # maxpartitions must be first item in files.${ARCH}
@@ -15,6 +15,7 @@ defflag	opt_platform.h			PLATFORM_ACER_PICA_61
 					PLATFORM_DESKTECH_ARCSTATION_I
 					PLATFORM_DESKTECH_TYNE
 					PLATFORM_MICROSOFT_JAZZ
+					PLATFORM_NEC_J96A
 					PLATFORM_NEC_JC94
 					PLATFORM_NEC_R94
 					PLATFORM_NEC_R96
@@ -26,15 +27,18 @@ file	arch/arc/arc/c_isa.c		platform_desktech_arcstation_i |
 					platform_desktech_tyne
 file	arch/arc/arc/c_jazz_eisa.c	platform_acer_pica_61 |
 					platform_microsoft_jazz |
+					platform_nec_j96a |
 					platform_nec_r94 |
 					platform_nec_r96
 file	arch/arc/arc/c_magnum.c		platform_acer_pica_61 |
 					platform_microsoft_jazz
-file	arch/arc/arc/c_nec_eisa.c	platform_nec_r94 |
+file	arch/arc/arc/c_nec_eisa.c	platform_nec_j96a |
+					platform_nec_r94 |
 					platform_nec_r96
-file	arch/arc/arc/c_nec_jazz.c	platform_nec_r94 |
-					platform_nec_r96 |
+file	arch/arc/arc/c_nec_jazz.c	platform_nec_j96a |
 					platform_nec_jc94 |
+					platform_nec_r94 |
+					platform_nec_r96 |
 					platform_nec_rax94 |
 					platform_nec_rd94
 file	arch/arc/arc/c_nec_pci.c	platform_nec_jc94 |
@@ -45,6 +49,7 @@ file	arch/arc/arc/p_acer_pica_61.c	platform_acer_pica_61
 file	arch/arc/arc/p_dti_arcstation.c	platform_desktech_arcstation_i
 file	arch/arc/arc/p_dti_tyne.c	platform_desktech_tyne
 file	arch/arc/arc/p_ms_jazz.c	platform_microsoft_jazz
+file	arch/arc/arc/p_nec_j96a.c	platform_nec_j96a
 file	arch/arc/arc/p_nec_jc94.c	platform_nec_jc94
 file	arch/arc/arc/p_nec_r94.c	platform_nec_r94
 file	arch/arc/arc/p_nec_r96.c	platform_nec_r96
@@ -60,13 +65,11 @@ file	arch/arc/arc/platform.c
 ##
 
 file	arch/arc/arc/autoconf.c
-file	arch/arc/arc/conf.c
 file	arch/arc/arc/disksubr.c
 file	arch/arc/arc/machdep.c
 #file	arch/arc/arc/minidebug.c
 file	arch/arc/arc/timer.c
 file	arch/arc/arc/todclock.c
-file	dev/clock_subr.c
 file	arch/arc/arc/arc_trap.c
 file	arch/arc/arc/bus_space.c
 file	arch/arc/arc/bus_space_sparse.c
@@ -76,11 +79,12 @@ file	arch/arc/arc/wired_map.c
 
 file	arch/arc/arc/arcbios.c
 
+file	arch/mips/mips/softintr.c
+
 ##
 ##	Machine-independent ATAPI drivers
 ##
 include "dev/ata/files.ata"
-major	{ wd = 4 }
 
 # Raster operations
 include "dev/rasops/files.rasops"
@@ -91,7 +95,7 @@ include "dev/wsfont/files.wsfont"
 #
 include "dev/wscons/files.wscons"
 
-include "dev/pckbc/files.pckbc"
+include "dev/pckbport/files.pckbport"
 
 #
 #	System BUS types
@@ -111,7 +115,6 @@ file arch/arc/arc/cpu.c			cpu
 device	jazzio {}
 attach	jazzio at mainbus		# optional
 file	arch/arc/jazz/jazzio.c		jazzio
-file	arch/arc/jazz/dma.c		# XXX jazzio
 file	arch/arc/jazz/jazzdmatlb.c	# XXX jazzio
 file	arch/arc/jazz/bus_dma_jazz.c	# XXX jazzio
 
@@ -134,6 +137,9 @@ device	tyneisabr {} : isabus, isabr	# PLATFORM_DESKTECH_TYNE
 attach	tyneisabr at mainbus
 file	arch/arc/dti/tyneisabr.c	tyneisabr
 
+# ISA Plug 'n Play devices
+file	arch/arc/isa/isapnp_machdep.c	isapnp
+
 #
 #	NEC RISCstation PCI host bridge
 #
@@ -155,17 +161,19 @@ include "dev/i2o/files.i2o"
 
 #	Use machine independent SCSI driver routines
 include	"dev/scsipi/files.scsipi"
-major	{sd = 0}
-major	{cd = 3}
 
 #	Symbios 53C94 SCSI interface driver on Jazz-Internal bus
-device	asc: scsi
+device	asc: scsi, ncr53c9x
 attach	asc at jazzio
 file	arch/arc/jazz/asc.c		asc	needs-flag
 
 #	Symbios 53C710 SCSI interface driver on Jazz-Internal bus
 attach	osiop at jazzio with osiop_jazzio
 file	arch/arc/jazz/osiop_jazzio.c	osiop_jazzio
+
+#	NCR53C700 SCSI I/O processor on Jazz-Internal bus
+attach	oosiop at jazzio with oosiop_jazzio
+file	arch/arc/jazz/oosiop_jazzio.c		oosiop_jazzio
 
 #	Floppy disk controller on Jazz-internal bus
 device	fdc {drive = -1}
@@ -176,7 +184,6 @@ file	arch/arc/jazz/fdc_jazzio.c	fdc_jazzio
 
 device	fd: disk
 attach	fd at fdc
-major	{fd = 7}
 
 #	bus independent raster console glue
 device	rasdisplay: wsemuldisplaydev, pcdisplayops
@@ -210,10 +217,9 @@ file	arch/arc/jazz/timer_jazzio.c	timer & timer_jazzio needs-flag
 file	arch/arc/isa/timer_isa.c	timer & timer_isa needs-flag
 
 #	Real time clock, must have one..
-device	mcclock
+device	mcclock: mc146818
 attach	mcclock at jazzio with mcclock_jazzio
 attach	mcclock at isa with mcclock_isa
-file	arch/arc/dev/mcclock.c		mcclock needs-flag
 file	arch/arc/jazz/mcclock_jazzio.c	mcclock & mcclock_jazzio needs-flag
 file	arch/arc/isa/mcclock_isa.c	mcclock & mcclock_isa needs-flag
 
@@ -247,15 +253,6 @@ file	arch/arc/jazz/com_jazzio.c	com & com_jazzio
 # Game adapter (joystick)
 file	arch/arc/isa/joy_timer.c	joy
 
-# National Semiconductor DS8390/WD83C690-based boards
-# (WD/SMC 80x3 family, SMC Ultra [8216], 3Com 3C503, NE[12]000, and clones)
-# XXX conflicts with other ports; can't be in files.isa
-## XXX: should fix conflict with files.isa
-#device	ed: ether, ifnet
-#attach	ed at isa with ed_isa
-#attach	ed at pcmcia with ed_pcmcia
-#file	dev/isa/if_ed.c			ed & (ed_isa | ed_pcmcia) needs-flag
-
 #	Parallel printer port driver
 attach	lpt at jazzio with lpt_jazzio
 file	arch/arc/jazz/lpt_jazzio.c	lpt & lpt_jazzio
@@ -275,10 +272,6 @@ file	arch/arc/pci/pci_vga.c		pcivga
 #
 # memory disk for installation
 file dev/md_root.c			memory_disk_hooks
-major {md = 8}
-
-# RAIDframe
-major {raid = 9}
 
 # USB
 include "dev/usb/files.usb"
@@ -291,3 +284,5 @@ file	dev/cons.c
 #file	dev/cninit.c
 #file	netinet/in_cksum.c
 #file	netns/ns_cksum.c			ns
+
+include "arch/arc/conf/majors.arc"

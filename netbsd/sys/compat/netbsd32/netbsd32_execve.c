@@ -1,4 +1,4 @@
-/*	$NetBSD: netbsd32_execve.c,v 1.9.4.1 2002/06/07 19:44:48 thorpej Exp $	*/
+/*	$NetBSD: netbsd32_execve.c,v 1.18 2004/02/25 18:15:45 drochner Exp $	*/
 
 /*
  * Copyright (c) 1998, 2001 Matthew R. Green
@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: netbsd32_execve.c,v 1.9.4.1 2002/06/07 19:44:48 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: netbsd32_execve.c,v 1.18 2004/02/25 18:15:45 drochner Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_ktrace.h"
@@ -49,6 +49,7 @@ __KERNEL_RCSID(0, "$NetBSD: netbsd32_execve.c,v 1.9.4.1 2002/06/07 19:44:48 thor
 
 #include <uvm/uvm_extern.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 #include <sys/proc.h>
 #include <sys/acct.h>
@@ -59,7 +60,7 @@ __KERNEL_RCSID(0, "$NetBSD: netbsd32_execve.c,v 1.9.4.1 2002/06/07 19:44:48 thor
 #include <compat/netbsd32/netbsd32_syscallargs.h>
 
 /* this is provided by kern/kern_exec.c */
-extern int exec_maxhdrsz;
+extern u_int exec_maxhdrsz;
 #if defined(LKM) || defined(_LKM)
 extern struct lock exec_lock;
 #endif
@@ -69,8 +70,8 @@ extern struct lock exec_lock;
  */
 /* ARGSUSED */
 int
-netbsd32_execve(p, v, retval)
-	struct proc *p;
+netbsd32_execve(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -81,6 +82,7 @@ netbsd32_execve(p, v, retval)
 	} */ *uap = v;
 	struct sys_execve_args ua;
 	caddr_t sg;
+	struct proc *p = l->l_proc;
 
 	NETBSD32TOP_UAP(path, const char);
 	NETBSD32TOP_UAP(argp, char *);
@@ -88,16 +90,17 @@ netbsd32_execve(p, v, retval)
 	sg = stackgap_init(p, 0);
 	CHECK_ALT_EXIST(p, &sg, SCARG(&ua, path));
 
-	return netbsd32_execve2(p, &ua, retval);
+	return netbsd32_execve2(l, &ua, retval);
 }
 
 int
-netbsd32_execve2(p, uap, retval)
-	struct proc *p;
+netbsd32_execve2(l, uap, retval)
+	struct lwp *l;
 	struct sys_execve_args *uap;
 	register_t *retval;
 {
 	/* Function args */
+	struct proc *p = l->l_proc;
 	int error, i;
 	struct exec_package pack;
 	struct nameidata nid;
@@ -253,7 +256,7 @@ netbsd32_execve2(p, uap, retval)
 	 * for remapping.  Note that this might replace the current
 	 * vmspace with another!
 	 */
-	uvmspace_exec(p, VM_MIN_ADDRESS, (vaddr_t)pack.ep_minsaddr);
+	uvmspace_exec(l, VM_MIN_ADDRESS, (vaddr_t)pack.ep_minsaddr);
 
 	/* Now map address space */
 	vm = p->p_vmspace;
@@ -315,7 +318,7 @@ netbsd32_execve2(p, uap, retval)
 
 	stack = (char *) (vm->vm_minsaddr - len);
 	/* Now copy argc, args & environ to new stack */
-	error = (*pack.ep_es->es_copyargs)(&pack, &arginfo,
+	error = (*pack.ep_es->es_copyargs)(p, &pack, &arginfo,
 	    &stack, argp);
 	if (error) {
 #ifdef DEBUG
@@ -354,14 +357,14 @@ netbsd32_execve2(p, uap, retval)
 		}
 #ifdef PMAP_NEED_PROCWR
 		/* This is code. Let the pmap do what is needed. */
-		pmap_procwr(p, (vaddr_t)p->p_sigacts->ps_sigcode, szsigcode);
+		pmap_procwr(p, (vaddr_t)p->p_sigctx.ps_sigcode, szsigcode);
 #endif
 	}
 
 	stopprofclock(p);	/* stop profiling */
 	fdcloseexec(p);		/* handle close on exec */
 	execsigs(p);		/* reset catched signals */
-	p->p_ctxlink = NULL;	/* reset ucontext link */
+	l->l_ctxlink = NULL;	/* reset ucontext link */
 
 	/* set command name & other accounting info */
 	len = min(nid.ni_cnd.cn_namelen, MAXCOMLEN);
@@ -426,9 +429,9 @@ netbsd32_execve2(p, uap, retval)
 	vput(pack.ep_vp);
 
 	/* setup new registers and do misc. setup. */
-	(*pack.ep_es->es_emul->e_setregs)(p, &pack, (u_long) stack);
+	(*pack.ep_es->es_emul->e_setregs)(l, &pack, (u_long) stack);
 	if (pack.ep_es->es_setregs)
-		(*pack.ep_es->es_setregs)(p, &pack, (u_long) stack);
+		(*pack.ep_es->es_setregs)(l, &pack, (u_long) stack);
 
 	if (p->p_flag & P_TRACED)
 		psignal(p, SIGTRAP);
@@ -459,6 +462,12 @@ netbsd32_execve2(p, uap, retval)
 	/* update p_emul, the old value is no longer needed */
 	p->p_emul = pack.ep_es->es_emul;
 
+	/* ...and the same for p_execsw */
+	p->p_execsw = pack.ep_es;
+
+#ifdef __HAVE_SYSCALL_INTERN
+	(*p->p_emul->e_syscall_intern)(p);
+#endif
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_EMUL))
 		ktremul(p);
@@ -513,7 +522,7 @@ exec_abort:
 	vput(pack.ep_vp);
 	uvm_km_free_wakeup(exec_map, (vaddr_t) argp, NCARGS);
 	free(pack.ep_hdr, M_EXEC);
-	exit1(p, W_EXITCODE(error, SIGABRT));
+	exit1(l, W_EXITCODE(error, SIGABRT));
 
 	/* NOTREACHED */
 	return 0;

@@ -1,4 +1,4 @@
-/*	$NetBSD: proc.h,v 1.2 1994/10/26 08:02:21 cgd Exp $	*/
+/*	$NetBSD: proc.h,v 1.6 2003/08/07 16:30:11 agc Exp $	*/
 
 /*
  * Copyright (c) 1991 Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -35,15 +31,30 @@
  *	@(#)proc.h	7.1 (Berkeley) 5/15/91
  */
 
+#ifndef _VAX_PROC_H_
+#define _VAX_PROC_H_
+
 /*
- * Machine-dependent part of the proc structure for hp300.
+ * Machine-dependent lwp struct for vax,
+ */
+struct mdlwp {
+	int md_dummy;			/* Must be at least one field */
+};
+
+/*
+ * Machine-dependent part of the proc structure for vax.
  */
 struct mdproc {
-	int	md_flags;		/* machine-dependent flags */
-#if 0
-	int	*md_regs;		/* registers on current frame */
-#endif
+	int md_dummy;			/* Must be at least one field */
 };
 
 /* md_flags */
 #define	MDP_AST		0x0001	/* async trap pending */
+
+/* kernel stack params */
+#define	KSTACK_LOWEST_ADDR(l)	\
+	((caddr_t)(l)->l_addr + (REDZONEADDR + VAX_NBPG))
+#define	KSTACK_SIZE	\
+	(USPACE - (REDZONEADDR + VAX_NBPG))
+
+#endif /* _VAX_PROC_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: mb89352reg.h,v 1.1.1.1 1996/05/05 12:17:10 oki Exp $	*/
+/*	$NetBSD: mb89352reg.h,v 1.3 2004/01/04 16:19:44 wiz Exp $	*/
 
 /*
  * Copyright (c) 1990, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -39,7 +35,7 @@
  */
 
 /*
- * FUJITSU MB89352A SCSI Protocol Controler Hardware Description.
+ * FUJITSU MB89352A SCSI Protocol Controller Hardware Description.
  */
 
 struct mb89352 {

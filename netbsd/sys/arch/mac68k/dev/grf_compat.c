@@ -1,4 +1,4 @@
-/*	$NetBSD: grf_compat.c,v 1.7 2001/04/30 17:12:03 wiz Exp $	*/
+/*	$NetBSD: grf_compat.c,v 1.13 2003/07/15 02:43:16 lukem Exp $	*/
 
 /*
  * Copyright (C) 1999 Scott Reynolds
@@ -31,6 +31,9 @@
  * macfb compatibility with legacy grf devices
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: grf_compat.c,v 1.13 2003/07/15 02:43:16 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/cdefs.h>
@@ -57,7 +60,15 @@
 #include <uvm/uvm_extern.h>
 #include <uvm/uvm_map.h>
 
-cdev_decl(grf);
+dev_type_open(grfopen);
+dev_type_close(grfclose);
+dev_type_ioctl(grfioctl);
+dev_type_mmap(grfmmap);
+
+const struct cdevsw grf_cdevsw = {
+	grfopen, grfclose, noread, nowrite, grfioctl,
+	nostop, notty, nopoll, grfmmap, nokqfilter,
+};
 
 void	grf_scinit __P((struct grf_softc *, const char *, int));
 void	grf_init __P((int));
@@ -210,24 +221,6 @@ grfclose(dev, flag, mode, p)
 }
 
 int
-grfread(dev, uio, ioflag)
-	dev_t dev;
-	struct uio *uio;
-	int ioflag;
-{
-	return ENXIO;
-}
-
-int
-grfwrite(dev, uio, ioflag)
-	dev_t dev;
-	struct uio *uio;
-	int ioflag;
-{
-	return ENXIO;
-}
-
-int
 grfioctl(dev, cmd, data, flag, p)
 	dev_t dev;
 	u_long cmd;
@@ -311,15 +304,6 @@ grfioctl(dev, cmd, data, flag, p)
 	return rv;
 }
 
-int
-grfpoll(dev, events, p)
-	dev_t dev;
-	int events;
-	struct proc *p;
-{
-	return EINVAL;
-}
-
 paddr_t
 grfmmap(dev, off, prot)
 	dev_t dev;
@@ -361,8 +345,8 @@ grfmap(dev, sc, addrp, p)
 	u_long len;
 	int error, flags;
 
-	*addrp = (caddr_t)sc->sc_dc->dc_paddr;
 	len = m68k_round_page(sc->sc_dc->dc_offset + sc->sc_dc->dc_size);
+	*addrp = (caddr_t)VM_DEFAULT_ADDRESS(p->p_vmspace->vm_daddr, len);
 	flags = MAP_SHARED | MAP_FIXED;
 
 	vn.v_type = VCHR;		/* XXX */

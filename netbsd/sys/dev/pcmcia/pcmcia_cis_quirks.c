@@ -1,4 +1,4 @@
-/*	$NetBSD: pcmcia_cis_quirks.c,v 1.18.10.1 2003/10/21 03:47:35 jmc Exp $	*/
+/*	$NetBSD: pcmcia_cis_quirks.c,v 1.20 2002/08/15 10:37:02 christos Exp $	*/
 
 /*
  * Copyright (c) 1998 Marc Horowitz.  All rights reserved.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pcmcia_cis_quirks.c,v 1.18.10.1 2003/10/21 03:47:35 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pcmcia_cis_quirks.c,v 1.20 2002/08/15 10:37:02 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

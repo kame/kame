@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_init.c,v 1.15 2001/11/10 07:37:00 lukem Exp $	*/
+/*	$NetBSD: uvm_init.c,v 1.19 2003/10/26 08:05:00 jdolecek Exp $	*/
 
 /*
  *
@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_init.c,v 1.15 2001/11/10 07:37:00 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_init.c,v 1.19 2003/10/26 08:05:00 jdolecek Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -109,8 +109,7 @@ uvm_init()
 
 	/*
 	 * step 4: setup the kernel's virtual memory data structures.  this
-	 * includes setting up the kernel_map/kernel_object and the kmem_map/
-	 * kmem_object.
+	 * includes setting up the kernel_map/kernel_object.
 	 */
 
 	uvm_km_init(kvm_start, kvm_end);
@@ -124,7 +123,8 @@ uvm_init()
 
 	/*
 	 * step 6: init the kernel memory allocator.   after this call the
-	 * kernel memory allocator (malloc) can be used.
+	 * kernel memory allocator (malloc) can be used. this includes
+	 * setting up the kmem_map.
 	 */
 
 	kmeminit();
@@ -141,6 +141,12 @@ uvm_init()
 
 	amap_init();		/* init amap module */
 	uvm_anon_init();	/* allocate initial anons */
+
+	/*
+	 * step 9: init the uvm_loan() facility.
+	 */
+
+	uvm_loan_init();
 
 	/*
 	 * the VM system is now up!  now that malloc is up we can resize the

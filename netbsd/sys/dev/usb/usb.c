@@ -1,4 +1,4 @@
-/*	$NetBSD: usb.c,v 1.70 2002/05/09 21:54:32 augustss Exp $	*/
+/*	$NetBSD: usb.c,v 1.80 2003/11/07 17:03:25 wiz Exp $	*/
 
 /*
  * Copyright (c) 1998, 2002 The NetBSD Foundation, Inc.
@@ -39,12 +39,15 @@
 
 /*
  * USB specifications and other documentation can be found at
- * http://www.usb.org/developers/data/ and
- * http://www.usb.org/developers/index.html .
+ * http://www.usb.org/developers/docs/ and
+ * http://www.usb.org/developers/devclass_docs/
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: usb.c,v 1.70 2002/05/09 21:54:32 augustss Exp $");
+__KERNEL_RCSID(0, "$NetBSD: usb.c,v 1.80 2003/11/07 17:03:25 wiz Exp $");
+
+#include "ohci.h"
+#include "uhci.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -75,11 +78,11 @@ __KERNEL_RCSID(0, "$NetBSD: usb.c,v 1.70 2002/05/09 21:54:32 augustss Exp $");
 #define DPRINTF(x)	if (usbdebug) logprintf x
 #define DPRINTFN(n,x)	if (usbdebug>(n)) logprintf x
 int	usbdebug = 0;
-#ifdef UHCI_DEBUG
-int	uhcidebug;
+#if defined(UHCI_DEBUG) && NUHCI > 0
+extern int	uhcidebug;
 #endif
-#ifdef OHCI_DEBUG
-int	ohcidebug;
+#if defined(OHCI_DEBUG) && NOHCI > 0
+extern int	ohcidebug;
 #endif
 /*
  * 0  - do usual exploration
@@ -104,7 +107,17 @@ struct usb_softc {
 
 TAILQ_HEAD(, usb_task) usb_all_tasks;
 
-cdev_decl(usb);
+dev_type_open(usbopen);
+dev_type_close(usbclose);
+dev_type_read(usbread);
+dev_type_ioctl(usbioctl);
+dev_type_poll(usbpoll);
+dev_type_kqfilter(usbkqfilter);
+
+const struct cdevsw usb_cdevsw = {
+	usbopen, usbclose, usbread, nowrite, usbioctl,
+	nostop, notty, usbpoll, nommap, usbkqfilter,
+};
 
 Static void	usb_discover(void *);
 Static void	usb_create_event_thread(void *);
@@ -361,7 +374,7 @@ usbctlprint(void *aux, const char *pnp)
 {
 	/* only "usb"es can attach to host controllers */
 	if (pnp)
-		printf("usb at %s", pnp);
+		aprint_normal("usb at %s", pnp);
 
 	return (UNCONF);
 }
@@ -470,10 +483,10 @@ usbioctl(dev_t devt, u_long cmd, caddr_t data, int flag, usb_proc_ptr p)
 		if (!(flag & FWRITE))
 			return (EBADF);
 		usbdebug  = ((*(int *)data) & 0x000000ff);
-#ifdef UHCI_DEBUG
+#if defined(UHCI_DEBUG) && NUHCI > 0
 		uhcidebug = ((*(int *)data) & 0x0000ff00) >> 8;
 #endif
-#ifdef OHCI_DEBUG
+#if defined(OHCI_DEBUG) && NOHCI > 0
 		ohcidebug = ((*(int *)data) & 0x00ff0000) >> 16;
 #endif
 		break;
@@ -584,6 +597,57 @@ usbpoll(dev_t dev, int events, usb_proc_ptr p)
 	}
 }
 
+static void
+filt_usbrdetach(struct knote *kn)
+{
+	int s;
+
+	s = splusb();
+	SLIST_REMOVE(&usb_selevent.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_usbread(struct knote *kn, long hint)
+{
+
+	if (usb_nevents == 0)
+		return (0);
+
+	kn->kn_data = sizeof(struct usb_event);
+	return (1);
+}
+
+static const struct filterops usbread_filtops =
+	{ 1, NULL, filt_usbrdetach, filt_usbread };
+
+int
+usbkqfilter(dev_t dev, struct knote *kn)
+{
+	struct klist *klist;
+	int s;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		if (minor(dev) != USB_DEV_MINOR)
+			return (1);
+		klist = &usb_selevent.sel_klist;
+		kn->kn_fop = &usbread_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = NULL;
+
+	s = splusb();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
+}
+
 /* Explore device tree from the root. */
 Static void
 usb_discover(void *v)
@@ -631,7 +695,7 @@ usb_get_next_event(struct usb_event *ue)
 	}
 #endif
 	*ue = ueq->ue;
-	SIMPLEQ_REMOVE_HEAD(&usb_events, ueq, next);
+	SIMPLEQ_REMOVE_HEAD(&usb_events, next);
 	free(ueq, M_USBDEV);
 	usb_nevents--;
 	return (1);
@@ -680,7 +744,7 @@ usb_add_event(int type, struct usb_event *uep)
 	}
 	SIMPLEQ_INSERT_TAIL(&usb_events, ueq, next);
 	wakeup(&usb_events);
-	selwakeup(&usb_selevent);
+	selnotify(&usb_selevent, 0);
 	if (usb_async_proc != NULL)
 		psignal(usb_async_proc, SIGIO);
 	splx(s);
@@ -717,7 +781,6 @@ usb_activate(device_ptr_t self, enum devact act)
 	switch (act) {
 	case DVACT_ACTIVATE:
 		return (EOPNOTSUPP);
-		break;
 
 	case DVACT_DEACTIVATE:
 		sc->sc_dying = 1;

@@ -1,11 +1,11 @@
-/* $NetBSD: isic_pci.c,v 1.15 2002/04/19 10:55:46 drochner Exp $ */
+/* $NetBSD: isic_pci.c,v 1.20 2003/12/04 13:57:31 keihan Exp $ */
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Martin Husemann <martin@netbsd.org>.
+ * by Martin Husemann <martin@NetBSD.org>.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: isic_pci.c,v 1.15 2002/04/19 10:55:46 drochner Exp $");
+__KERNEL_RCSID(0, "$NetBSD: isic_pci.c,v 1.20 2003/12/04 13:57:31 keihan Exp $");
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -73,7 +73,7 @@ __KERNEL_RCSID(0, "$NetBSD: isic_pci.c,v 1.15 2002/04/19 10:55:46 drochner Exp $
 #include <dev/ic/hscx.h>
 #include <dev/pci/isic_pci.h>
 
-extern const struct isdn_layer1_bri_driver isic_std_driver;
+extern const struct isdn_layer1_isdnif_driver isic_std_driver;
 
 static int isic_pci_match __P((struct device *, struct cfdata *, void *));
 static void isic_pci_attach __P((struct device *, struct device *, void *));
@@ -83,11 +83,8 @@ static void isic_pci_isdn_attach __P((struct pci_isic_softc *psc, struct pci_att
 static int isic_pci_detach(struct device *self, int flags);
 static int isic_pci_activate(struct device *self, enum devact act);
 
-struct cfattach isic_pci_ca = {
-	sizeof(struct pci_isic_softc), isic_pci_match, isic_pci_attach,
-	isic_pci_detach, isic_pci_activate
-};
-
+CFATTACH_DECL(isic_pci, sizeof(struct pci_isic_softc),
+    isic_pci_match, isic_pci_attach, isic_pci_detach, isic_pci_activate);
 
 static const struct isic_pci_product {
 	pci_vendor_id_t npp_vendor;

@@ -1,4 +1,4 @@
-/*	$NetBSD: tp_emit.c,v 1.15 2001/11/13 01:10:49 lukem Exp $	*/
+/*	$NetBSD: tp_emit.c,v 1.18 2003/08/11 15:17:29 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -76,7 +72,7 @@ SOFTWARE.
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tp_emit.c,v 1.15 2001/11/13 01:10:49 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tp_emit.c,v 1.18 2003/08/11 15:17:29 itojun Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -197,8 +193,8 @@ tp_emit(dutype, tpcb, seq, eot, data)
 		if (m) {
 			m->m_type = TPMT_TPHDR;
 			mbstat.m_mtypes[TPMT_TPHDR]++;
-			m->m_next = MNULL;
-			m->m_nextpkt = MNULL;
+			m->m_next = NULL;
+			m->m_nextpkt = NULL;
 			m->m_data = m->m_pktdat;
 			m->m_flags = M_PKTHDR;
 			bzero(&m->m_pkthdr, sizeof(m->m_pkthdr));
@@ -214,7 +210,7 @@ tp_emit(dutype, tpcb, seq, eot, data)
 		goto done;
 	}
 	m->m_len = sizeof(struct tpdu);
-	m->m_nextpkt = MNULL;
+	m->m_nextpkt = NULL;
 
 	hdr = mtod(m, struct tpdu *);
 	bzero((caddr_t) hdr, sizeof(struct tpdu));
@@ -350,8 +346,10 @@ tp_emit(dutype, tpcb, seq, eot, data)
 					x = 0;
 					ADDOPTION(TPP_alt_class, hdr, 1, x);
 				}
+#if 0
 				if (hdr->tpdu_li > MLEN)
 					panic("tp_emit CR/CC");
+#endif
 			}
 			break;
 
@@ -721,11 +719,16 @@ tp_emit(dutype, tpcb, seq, eot, data)
 		}
 
 	}
-	ASSERT(((int) hdr->tpdu_li > 0) && ((int) hdr->tpdu_li < MLEN));
+	ASSERT((int) hdr->tpdu_li != 0);
+#if 0
+ 	ASSERT((int) hdr->tpdu_li < MLEN);
+#endif
 
 	m->m_next = data;
 
+#if 0
 	ASSERT(hdr->tpdu_li < MLEN);	/* leave this in */
+#endif
 	ASSERT(hdr->tpdu_li != 0);	/* leave this in */
 
 	m->m_len = hdr->tpdu_li;
@@ -887,7 +890,7 @@ tp_error_emit(error, sref, faddr, laddr, erdata, erlen, tpcb, cons_channel,
 		return ENOBUFS;
 	}
 	m->m_len = sizeof(struct tpdu);
-	m->m_nextpkt = MNULL;
+	m->m_nextpkt = NULL;
 
 	hdr = mtod(m, struct tpdu *);
 
@@ -959,7 +962,9 @@ tp_error_emit(error, sref, faddr, laddr, erdata, erlen, tpcb, cons_channel,
 			ADDOPTION(TPP_checksum, hdr, 2, csum_offset /* dummy argument */ );
 			csum_offset = hdr->tpdu_li - 2;
 		}
+#if 0
 	ASSERT(hdr->tpdu_li < MLEN);
+#endif
 
 	if (dutype == ER_TPDU_type) {
 		/* copy the errant tpdu into another 'variable part' */

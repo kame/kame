@@ -1,4 +1,4 @@
-/*	$NetBSD: ite.c,v 1.52.6.1 2002/07/06 03:21:21 lukem Exp $	*/
+/*	$NetBSD: ite.c,v 1.62.2.1 2004/06/01 04:37:34 jmc Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -37,9 +37,43 @@
  */
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: ite.c 1.28 92/12/20$
+ *
+ *	@(#)ite.c	8.2 (Berkeley) 1/12/94
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -85,7 +119,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ite.c,v 1.52.6.1 2002/07/06 03:21:21 lukem Exp $");                                                  
+__KERNEL_RCSID(0, "$NetBSD: ite.c,v 1.62.2.1 2004/06/01 04:37:34 jmc Exp $");
 
 #include "hil.h"
 
@@ -110,9 +144,6 @@ __KERNEL_RCSID(0, "$NetBSD: ite.c,v 1.52.6.1 2002/07/06 03:21:21 lukem Exp $");
 #include <hp300/dev/itevar.h>
 #include <hp300/dev/kbdmap.h>
 
-/* prototypes for devsw entry points */
-cdev_decl(ite);
-
 #define set_attr(ip, attr)	((ip)->attribute |= (attr))
 #define clr_attr(ip, attr)	((ip)->attribute &= ~(attr))
 
@@ -127,14 +158,26 @@ int	iteburst = 64;
 int	itematch __P((struct device *, struct cfdata *, void *));
 void	iteattach __P((struct device *, struct device *, void *));
 
-struct cfattach ite_ca = {
-	sizeof(struct ite_softc), itematch, iteattach
-};
+CFATTACH_DECL(ite, sizeof(struct ite_softc),
+    itematch, iteattach, NULL, NULL);
 
 /* XXX this has always been global, but shouldn't be */
 static struct kbdmap *ite_km;
 
 extern struct cfdriver ite_cd;
+
+dev_type_open(iteopen);
+dev_type_close(iteclose);
+dev_type_read(iteread);
+dev_type_write(itewrite);
+dev_type_ioctl(iteioctl);
+dev_type_tty(itetty);
+dev_type_poll(itepoll);
+
+const struct cdevsw ite_cdevsw = {
+	iteopen, iteclose, iteread, itewrite, iteioctl,
+	nostop, itetty, itepoll, nommap, ttykqfilter, D_TTY
+};
 
 /*
  * Terminal emulator state information, statically allocated
@@ -146,7 +189,16 @@ static struct	ite_data ite_cn;
  * console stuff
  */
 static struct consdev ite_cons = {
-	NULL, NULL, itecngetc, itecnputc, nullcnpollc, NULL, NODEV, CN_NORMAL
+	NULL,
+	NULL,
+	itecngetc,
+	itecnputc,
+	nullcnpollc,
+	NULL,
+	NULL,
+	NULL,
+	NODEV,
+	CN_NORMAL
 };
 static int console_kbd_attached;
 static int console_display_attached;
@@ -212,7 +264,8 @@ iteattach(parent, self, aux)
 		 * We didn't know which unit this would be during
 		 * the console probe, so we have to fixup cn_dev here.
 		 */
-		cn_tab->cn_dev = makedev(ite_major(), self->dv_unit);
+		cn_tab->cn_dev = makedev(cdevsw_lookup_major(&ite_cdevsw),
+					 self->dv_unit);
 	} else {
 		MALLOC(ite->sc_data, struct ite_data *,
 		    sizeof(struct ite_data), M_DEVBUF, M_NOWAIT | M_ZERO);
@@ -283,7 +336,7 @@ iteinit(ip)
 
 	if (ip->flags & ITE_INITED)
 		return;
-	
+
 	ip->curx = 0;
 	ip->cury = 0;
 	ip->cursorx = 0;
@@ -444,7 +497,7 @@ itepoll(dev, events, p)
 {
 	struct ite_softc *sc = ite_cd.cd_devs[ITEUNIT(dev)];
 	struct tty *tp = sc->sc_data->tty;
- 
+
 	return ((*tp->t_linesw->l_poll)(tp, events, p));
 }
 
@@ -541,14 +594,6 @@ itestart(tp)
 }
 
 void
-itestop(tp, flag)
-	struct tty *tp;
-	int flag;
-{
-
-}
-
-void
 itefilter(stat, c)
 	char stat, c;
 {
@@ -571,7 +616,7 @@ itefilter(stat, c)
 	case KBD_EXT_RIGHT_DOWN:
 		metamode = 1;
 		return;
-		
+
 	case KBD_EXT_LEFT_UP:
 	case KBD_EXT_RIGHT_UP:
 		metamode = 0;
@@ -582,21 +627,22 @@ itefilter(stat, c)
 	switch ((stat>>KBD_SSHIFT) & KBD_SMASK) {
 	default:
 	case KBD_KEY:
-	        if (!capsmode) {
-			code = ite_km->kbd_keymap[(int)c];
-			break;
-		}
-		/* FALLTHROUGH */
+		code = ite_km->kbd_keymap[(int)c];
+	        if (capsmode)
+			code = toupper(code);
+		break;
 
 	case KBD_SHIFT:
 		code = ite_km->kbd_shiftmap[(int)c];
+	        if (capsmode)
+			code = tolower(code);
 		break;
 
 	case KBD_CTRL:
 		code = ite_km->kbd_ctrlmap[(int)c];
 		break;
-		
-	case KBD_CTRLSHIFT:	
+
+	case KBD_CTRLSHIFT:
 		code = ite_km->kbd_ctrlshiftmap[(int)c];
 		break;
         }
@@ -698,7 +744,7 @@ doesc:
 			case 1:
 				if (c == 'A') {
 					switch (ip->hold) {
-	
+
 					case '0':
 						clr_attr(ip, ATTR_KPAD);
 						break;
@@ -838,7 +884,7 @@ ignore:
 			ite_movecursor(ip, sp);
 		}
 		break;
-	
+
 	case '\b':
 		if (--ip->curx < 0)
 			ip->curx = 0;
@@ -980,24 +1026,6 @@ ite_clrtoeos(ip, sp)
 	ite_drawcursor(ip, sp);
 }
 
-int
-ite_major()
-{
-	static int itemaj, initialized;
-
-	/* Only compute once. */
-	if (initialized)
-		return (itemaj);
-	initialized = 1;
-
-	/* locate the major number */
-	for (itemaj = 0; itemaj < nchrdev; itemaj++)
-		if (cdevsw[itemaj].d_open == iteopen)
-			break;
-
-	return (itemaj);
-}
-
 
 
 /*
@@ -1045,7 +1073,7 @@ itecninit(void)
 {
 
 	cn_tab = &ite_cons;
-	cn_tab->cn_dev = makedev(ite_major(), 0);
+	cn_tab->cn_dev = makedev(cdevsw_lookup_major(&ite_cdevsw), 0);
 }
 
 /*ARGSUSED*/

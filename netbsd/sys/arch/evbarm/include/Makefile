@@ -1,6 +1,5 @@
-#	$NetBSD: Makefile,v 1.7 2001/11/26 20:41:44 thorpej Exp $
+#	$NetBSD: Makefile,v 1.10 2003/01/17 22:45:39 thorpej Exp $
 
-KDIR=	/sys/arch/evbarm/include
 INCSDIR= /usr/include/evbarm
 
 INCS=	ansi.h aout_machdep.h asm.h \
@@ -13,8 +12,8 @@ INCS=	ansi.h aout_machdep.h asm.h \
 	int_const.h int_fmtio.h int_limits.h int_mwgwtypes.h int_types.h \
 	intr.h ipkdb.h \
 	limits.h lock.h \
-	math.h \
-	param.h pcb.h pmap.h proc.h profile.h ptrace.h \
+	math.h mcontext.h \
+	param.h pcb.h pmap.h pmc.h proc.h profile.h ptrace.h \
 	reg.h \
 	setjmp.h signal.h stdarg.h sysarch.h \
 	trap.h types.h \

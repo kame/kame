@@ -1,4 +1,4 @@
-/*	$NetBSD: subr_userconf.c,v 1.5 2001/11/12 15:25:23 lukem Exp $	*/
+/*	$NetBSD: subr_userconf.c,v 1.11 2004/03/23 13:22:04 junyoung Exp $	*/
 
 /*
  * Copyright (c) 1996 Mats O Jansson <moj@stacken.kth.se>
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: subr_userconf.c,v 1.5 2001/11/12 15:25:23 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: subr_userconf.c,v 1.11 2004/03/23 13:22:04 junyoung Exp $");
 
 #include "opt_userconf.h"
 
@@ -63,27 +63,27 @@ char userconf_argbuf[40];			/* Additional input         */
 char userconf_cmdbuf[40];			/* Command line             */
 char userconf_histbuf[40];
 
-void userconf_init __P((void));
-int userconf_more __P((void));
-void userconf_modify __P((const char *, int*));
-void userconf_hist_cmd __P((char));
-void userconf_hist_int __P((int));
-void userconf_hist_eoc __P((void));
-void userconf_pnum __P((int));
-void userconf_pdevnam __P((short));
-void userconf_pdev __P((short));
-int userconf_number __P((char *, int *));
-int userconf_device __P((char *, int *, short *, short *));
-void userconf_change __P((int));
-void userconf_disable __P((int));
-void userconf_enable __P((int));
-void userconf_help __P((void));
-void userconf_list __P((void));
-void userconf_common_dev __P((char *, int, short, short, char));
-void userconf_add_read __P((char *, char, char *, int, int *));
-int userconf_parse __P((char *));
+void userconf_init(void);
+int userconf_more(void);
+void userconf_modify(const char *, int*);
+void userconf_hist_cmd(char);
+void userconf_hist_int(int);
+void userconf_hist_eoc(void);
+void userconf_pnum(int);
+void userconf_pdevnam(short);
+void userconf_pdev(short);
+int userconf_number(char *, int *);
+int userconf_device(char *, int *, short *, short *);
+void userconf_change(int);
+void userconf_disable(int);
+void userconf_enable(int);
+void userconf_help(void);
+void userconf_list(void);
+void userconf_common_dev(char *, int, short, short, char);
+void userconf_add_read(char *, char, char *, int, int *);
+int userconf_parse(char *);
 
-static int getsn __P((char *, int));
+static int getsn(char *, int);
 
 #define UC_CHANGE 'c'
 #define UC_DISABLE 'd'
@@ -113,7 +113,7 @@ userconf_init()
 	struct cfdata *cf;
 
 	i = 0;
-	for (cf = cfdata; cf->cf_driver; cf++)
+	for (cf = cfdata; cf->cf_name; cf++)
 		i++;
 
 	userconf_maxdev = i - 1;
@@ -203,7 +203,7 @@ userconf_pdevnam(dev)
 	struct cfdata *cd;
 
 	cd = &cfdata[dev];
-	printf("%s", cd->cf_driver->cd_name);
+	printf("%s", cd->cf_name);
 	switch (cd->cf_fstate) {
 	case FSTATE_NOTFOUND:
 	case FSTATE_DNOTFOUND:
@@ -227,10 +227,9 @@ userconf_pdev(devno)
 	short devno;
 {
 	struct cfdata *cd;
-	short *p;
+	const struct cfparent *cfp;
 	int   *l;
-	const char **ln;
-	char c;
+	const char * const *ln;
 
 	if (devno > userconf_maxdev) {
 		printf("Unknown devno (max is %d)\n", userconf_maxdev);
@@ -242,15 +241,14 @@ userconf_pdev(devno)
 	printf("[%3d] ", devno);
 	userconf_pdevnam(devno);
 	printf(" at");
-	c = ' ';
-	p = cd->cf_parents;
-	if (*p == -1)
+	cfp = cd->cf_pspec;
+	if (cfp == NULL)
 		printf(" root");
-	while (*p != -1) {
-		printf("%c", c);
-		userconf_pdevnam(*p++);
-		c = '|';
-	}
+	else if (cfp->cfp_parent != NULL && cfp->cfp_unit != -1)
+		printf(" %s%d", cfp->cfp_parent, cfp->cfp_unit);
+	else
+		printf(" %s?", cfp->cfp_parent != NULL ? cfp->cfp_parent
+						       : cfp->cfp_iattr);
 	switch (cd->cf_fstate) {
 	case FSTATE_NOTFOUND:
 	case FSTATE_FOUND:
@@ -364,14 +362,13 @@ userconf_modify(item, val)
 	int ok = 0;
 	int a;
 	char *c;
-	int i;
 
 	while (!ok) {
 		printf("%s [", item);
 		userconf_pnum(*val);
 		printf("] ? ");
 
-		i = getsn(userconf_argbuf, sizeof(userconf_argbuf));
+		getsn(userconf_argbuf, sizeof(userconf_argbuf));
 
 		c = userconf_argbuf;
 		while (*c == ' ' || *c == '\t' || *c == '\n') c++;
@@ -397,7 +394,7 @@ userconf_change(devno)
 	char c = '\0';
 	int   *l;
 	int   ln;
-	const char **locnames;
+	const char * const *locnames;
 
 	if (devno <=  userconf_maxdev) {
 
@@ -580,7 +577,7 @@ userconf_list()
 
 	userconf_cnt = 0;
 
-	while (cfdata[i].cf_attach != 0) {
+	while (cfdata[i].cf_name != NULL) {
 		if (userconf_more())
 			break;
 		userconf_pdev(i++);
@@ -606,8 +603,8 @@ userconf_common_dev(dev, len, unit, state, routine)
 		break;
 	}
 
-	while (cfdata[i].cf_attach != 0) {
-		if (strlen(cfdata[i].cf_driver->cd_name) == len) {
+	while (cfdata[i].cf_name != NULL) {
+		if (strlen(cfdata[i].cf_name) == len) {
 
 			/*
 			 * Ok, if device name is correct
@@ -615,7 +612,7 @@ userconf_common_dev(dev, len, unit, state, routine)
 			 *  If state == FSTATE_STAR, look for "dev*"
 			 *  If state == FSTATE_NOTFOUND, look for "dev0"
 			 */
-			if (strncasecmp(dev, cfdata[i].cf_driver->cd_name,
+			if (strncasecmp(dev, cfdata[i].cf_name,
 					len) == 0 &&
 			    (state == FSTATE_FOUND ||
 			     (state == FSTATE_STAR &&
@@ -670,14 +667,13 @@ userconf_add_read(prompt, field, dev, len, val)
 	int ok = 0;
 	int a;
 	char *c;
-	int i;
 
 	*val = -1;
 
 	while (!ok) {
 		printf("%s ? ", prompt);
 
-		i = getsn(userconf_argbuf, sizeof(userconf_argbuf));
+		getsn(userconf_argbuf, sizeof(userconf_argbuf));
 
 		c = userconf_argbuf;
 		while (*c == ' ' || *c == '\t' || *c == '\n') c++;
@@ -688,7 +684,7 @@ userconf_add_read(prompt, field, dev, len, val)
 					printf("Unknown devno (max is %d)\n",
 					    userconf_maxdev);
 				} else if (strncasecmp(dev,
-				    cfdata[a].cf_driver->cd_name, len) != 0 &&
+				    cfdata[a].cf_name, len) != 0 &&
 					field == 'a') {
 					printf("Not same device type\n");
 				} else {
@@ -817,7 +813,6 @@ userconf_parse(cmd)
 			userconf_hist_cmd('q');
 			userconf_hist_eoc();
 			return(-1);
-			break;
 		case 's':
 		default:
 			printf("Unknown command\n");
@@ -827,7 +822,7 @@ userconf_parse(cmd)
 	return(0);
 }
 
-extern void user_config __P((void));
+extern void user_config(void);
 
 void
 user_config()

@@ -1,4 +1,4 @@
-/*	$NetBSD: tx39biu.c,v 1.6 2002/01/29 18:53:15 uch Exp $ */
+/*	$NetBSD: tx39biu.c,v 1.9 2003/07/15 02:29:33 lukem Exp $ */
 
 /*-
  * Copyright (c) 1999-2002 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: tx39biu.c,v 1.9 2003/07/15 02:29:33 lukem Exp $");
 
 #include "opt_tx39_watchdogtimer.h"
 #include "opt_tx39biu_debug.h"
@@ -76,9 +79,8 @@ struct tx39biu_softc {
 	tx_chipset_tag_t sc_tc;
 };
 
-struct cfattach tx39biu_ca = {
-	sizeof(struct tx39biu_softc), tx39biu_match, tx39biu_attach
-};
+CFATTACH_DECL(tx39biu, sizeof(struct tx39biu_softc),
+    tx39biu_match, tx39biu_attach, NULL, NULL);
 
 int
 tx39biu_match(parent, cf, aux)

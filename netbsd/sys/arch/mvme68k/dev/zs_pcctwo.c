@@ -1,4 +1,4 @@
-/*	$NetBSD: zs_pcctwo.c,v 1.5 2002/02/12 20:38:34 scw Exp $	*/
+/*	$NetBSD: zs_pcctwo.c,v 1.10 2003/12/04 12:42:54 keihan Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -42,10 +42,13 @@
  * Runs two serial lines per chip using slave drivers.
  * Plain tty/async lines use the zs_async slave.
  *
- * Modified for NetBSD/mvme68k by Jason R. Thorpe <thorpej@NetBSD.ORG>
+ * Modified for NetBSD/mvme68k by Jason R. Thorpe <thorpej@NetBSD.org>
  *
  * Modified to attach to the PCCchip2/MCchip backend by Steve Woodford.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zs_pcctwo.c,v 1.10 2003/12/04 12:42:54 keihan Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -77,9 +80,8 @@
 static int	zsc_pcctwo_match(struct device *, struct cfdata *, void *);
 static void	zsc_pcctwo_attach(struct device *, struct device *, void *);
 
-struct cfattach zsc_pcctwo_ca = {
-	sizeof(struct zsc_softc), zsc_pcctwo_match, zsc_pcctwo_attach
-};
+CFATTACH_DECL(zsc_pcctwo, sizeof(struct zsc_softc),
+    zsc_pcctwo_match, zsc_pcctwo_attach, NULL, NULL);
 
 extern struct cfdriver zsc_cd;
 
@@ -162,13 +164,15 @@ void
 zsc_pcctwocnprobe(cp)
 	struct consdev *cp;
 {
+	extern const struct cdevsw zstty_cdevsw;
+
 	if (machineid != MVME_162 && machineid != MVME_172) {
 		cp->cn_pri = CN_DEAD;
 		return;
 	}
 
 	/* Initialize required fields. */
-	cp->cn_dev = makedev(zs_major, 0);
+	cp->cn_dev = makedev(cdevsw_lookup_major(&zstty_cdevsw), 0);
 	cp->cn_pri = CN_NORMAL;
 }
 

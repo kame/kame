@@ -1,4 +1,4 @@
-/*	$NetBSD: ofdev.c,v 1.1 2000/08/20 14:58:41 mrg Exp $	*/
+/*	$NetBSD: ofdev.c,v 1.4 2003/01/01 06:33:29 mrg Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -52,6 +52,8 @@
 
 extern char bootdev[];
 
+#define RF_PROTECTED_SECTORS 64		/* XXX */
+
 /*
  * This is ugly.  A path on a sparc machine is something like this:
  *
@@ -85,15 +87,24 @@ filename(str, ppart)
 #endif
 		*cp = savec;
 		if (dhandle == -1) {
-			/* if not, lp is the delimiter between device and path */
-			/* if the last component was a block device... */
+			/*
+			 * if not, lp is the delimiter between device and
+			 * path.  if the last component was a block device.
+			 */
 			if (!strcmp(devtype, "block")) {
 				/* search for arguments */
 #ifdef NOTDEF_DEBUG
-				printf("filename: hunting for arguments in %s\n", str);
+				printf("filename: hunting for arguments "
+				       "in %s\n", str);
 #endif
-				for (cp = lp;
-				     --cp >= str && *cp != '/' && *cp != '-';);
+				for (cp = lp; ; ) {
+					cp--;
+					if (cp < str ||
+					    cp[0] == '/' ||
+					    (cp[0] == ' ' && (cp+1) != lp &&
+					     cp[1] == '-'))
+						break;
+				}
 				if (cp >= str && *cp == '-') {
 					/* found arguments, make firmware ignore them */
 					*cp = 0;
@@ -489,6 +500,13 @@ devopen(of, name, file)
 			printf("devopen: setting partition %d offset %x\n",
 			       part, ofdev.partoff);
 #endif
+			if (label.d_partitions[part].p_fstype == FS_RAID) {
+				ofdev.partoff += RF_PROTECTED_SECTORS;
+#ifdef NOTDEF_DEBUG
+				printf("devopen: found RAID partition, "
+				    "adjusting offset to %x", ofdev.partoff);
+#endif
+			}
 		}
 		
 		of->f_dev = devsw;

@@ -1,5 +1,4 @@
-/*	$NetBSD: ipaq_lcd.c,v 1.7 2002/03/17 19:40:38 atatat Exp $	*/
-#define IPAQ_LCD_DEBUG
+/*	$NetBSD: ipaq_lcd.c,v 1.11 2003/07/15 00:25:07 lukem Exp $	*/
 
 /*
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -36,6 +35,11 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ipaq_lcd.c,v 1.11 2003/07/15 00:25:07 lukem Exp $");
+
+#define IPAQ_LCD_DEBUG
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -84,9 +88,8 @@ static paddr_t	ipaqlcd_mmap(void *, off_t offset, int);
 #error "define btop, ptob."
 #endif
 
-struct cfattach ipaqlcd_ca = {
-	sizeof(struct ipaqlcd_softc), ipaqlcd_match, ipaqlcd_attach
-};
+CFATTACH_DECL(ipaqlcd, sizeof(struct ipaqlcd_softc),
+    ipaqlcd_match, ipaqlcd_attach, NULL, NULL);
 
 struct hpcfb_accessops ipaqlcd_ha = {
 	ipaqlcd_ioctl, ipaqlcd_mmap
@@ -147,7 +150,7 @@ ipaqlcd_init(sc)
 
 	if (bus_space_map(sc->sc_iot, SALCD_BASE, SALCD_NPORTS,
 			  0, &sc->sc_ioh))
-                panic("ipaqlcd_init:Cannot map registers\n");
+                panic("ipaqlcd_init:Cannot map registers");
 
 	(u_long)bootinfo->fb_addr =
 		bus_space_read_4(sc->sc_iot, sc->sc_ioh, SALCD_BA1);

@@ -1,4 +1,4 @@
-/* $NetBSD: sbscd.c,v 1.1 2002/03/05 23:46:42 simonb Exp $ */
+/* $NetBSD: sbscd.c,v 1.8 2003/07/15 02:43:40 lukem Exp $ */
 
 /*
  * Copyright 2000, 2001
@@ -15,10 +15,9 @@
  *    the source file.
  *
  * 2) No right is granted to use any trade name, trademark, or logo of
- *    Broadcom Corporation. Neither the "Broadcom Corporation" name nor any
- *    trademark or logo of Broadcom Corporation may be used to endorse or
- *    promote products derived from this software without the prior written
- *    permission of Broadcom Corporation.
+ *    Broadcom Corporation.  The "Broadcom Corporation" name may not be
+ *    used to endorse or promote products derived from this software
+ *    without the prior written permission of Broadcom Corporation.
  *
  * 3) THIS SOFTWARE IS PROVIDED "AS-IS" AND ANY EXPRESS OR IMPLIED
  *    WARRANTIES, INCLUDING BUT NOT LIMITED TO, ANY IMPLIED WARRANTIES OF
@@ -33,6 +32,9 @@
  *    OR OTHERWISE), EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sbscd.c,v 1.8 2003/07/15 02:43:40 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -45,9 +47,8 @@
 static int	sbscd_match(struct device *, struct cfdata *, void *);
 static void	sbscd_attach(struct device *, struct device *, void *);
 
-struct cfattach sbscd_ca = {
-	sizeof(struct device), sbscd_match, sbscd_attach
-};
+CFATTACH_DECL(sbscd, sizeof(struct device),
+    sbscd_match, sbscd_attach, NULL, NULL);
 
 static int	sbscd_print(void *, const char *);
 static int	sbscd_submatch(struct device *, struct cfdata *, void *);
@@ -104,12 +105,12 @@ sbscd_print(void *aux, const char *pnp)
 	int i;
 
 	if (pnp)
-		printf("%s at %s",
+		aprint_normal("%s at %s",
 		    sbscd_device_type_name(sap->sa_locs.sa_type), pnp);
-	printf(" offset 0x%lx", (long)sap->sa_locs.sa_offset);
+	aprint_normal(" offset 0x%lx", (long)sap->sa_locs.sa_offset);
 	for (i = 0; i < 2; i++) {
 		if (sap->sa_locs.sa_intr[i] != -1)
-			printf("%s%ld", i == 0 ? " intr " : ",",
+			aprint_normal("%s%ld", i == 0 ? " intr " : ",",
 			    (long)sap->sa_locs.sa_intr[i]);
 	}
 	return (UNCONF);
@@ -131,7 +132,7 @@ sbscd_submatch(struct device *parent, struct cfdata *cf, void *aux)
 			return (0);
 	}
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 static const char *

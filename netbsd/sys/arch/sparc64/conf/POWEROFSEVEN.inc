@@ -1,4 +1,4 @@
-# 	$NetBSD: POWEROFSEVEN.inc,v 1.12.4.1 2002/08/01 04:32:48 lukem Exp $
+# 	$NetBSD: POWEROFSEVEN.inc,v 1.24.2.1 2004/07/15 20:15:27 he Exp $
 #
 # from: NetBSD: GENERIC32,v 1.13 2001/02/28 00:08:18 mjacob Exp
 #
@@ -34,7 +34,6 @@ options 	BLINK			# Blink the system LED
 ## automagically determined at boot time.
 
 config		netbsd	root on ? type ?
-options 	NVNODE=7000
 
 ## UVM options.
 #options 	UVM_PAGE_TRKOWN
@@ -58,8 +57,9 @@ options 	SYSVSHM		# System V shared memory
 ## Loadable kernel module support; still under development.
 options 	LKM
 
-#options 	USERCONF	# userconf(4) support
-#options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+options 	USERCONF	# userconf(4) support
+#options 	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+#options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
 
 ## NFS boot options; default on sparc is the bootparam protocol
 options 	NFS_BOOT_BOOTPARAM
@@ -75,15 +75,6 @@ options 	NFS_BOOT_BOOTPARAM
 options 	DDB			# kernel dynamic debugger
 options 	DDB_HISTORY_SIZE=100	# enable history editing in DDB
 #options 	DDB_ONPANIC		# see also sysctl(8): `ddb.onpanic'
-
-## You may also use gdb, on another computer connected to this machine over
-## a serial port.  Both KGDB_DEV and KGDB_DEVRATE should be specified;
-## KGDB_DEV is a dev_t encoded device number of the serial port to use.
-## (0xc01 = ttya, 0xc02 = ttyb.)
-#options 	KGDB			# support for kernel gdb
-#options 	KGDB_DEV=0xc01		# kgdb device number (this is `ttyb')
-#options 	KGDB_DEVRATE=38400	# baud rate
-
 
 ## Compile the kernel with debugging symbols (`netbsd.gdb' is the debug file),
 ## such that gdb(1) can be used on a kernel coredump.
@@ -111,10 +102,6 @@ options 	PCIVERBOSE
 ## and other insecurities good only for development work.  Do not use this
 ## option on a production machine.
 options 	INSECURE
-
-## Allow non-root users to grab /dev/console with programs such as xconsole.
-## `xconsole' therefore does not need setuid root with this option enabled.
-options 	UCONSOLE
 
 ## `FDSCRIPTS' allows non-readable but executable scripts by providing a
 ## pre-opened opaque file to the script interpreter.  `SETUIDSCRIPTS',
@@ -243,10 +230,9 @@ timer0	at mainbus0				# sun4c
 ##	Siemens SAB82532 controller: ttya and ttyb (sab)
 ##	Part of NS PC87332VLJ Super I/O controller: kbd/mouse (com)
 
-## These are two SAB82532 controllers
-#sab0	at ebus?
-#sabtty0	at sab0 channel 0	# ttya
-#sabtty1	at sab0 channel 1	# ttyb
+## The SAB82532 controller has two serial ports
+sab*	at ebus?				# ttya/ttyb
+sabtty*	at sab? channel ?
 
 ## Part of a PC87332VLJ
 com*	at ebus?				# `com' driver for `su'
@@ -305,9 +291,23 @@ ms0	at com?					# mouse
 #uk*	at scsibus? target ? lun ?		# unknown SCSI
 
 # PCI IDE.
-pciide* at pci ? dev ? function ? flags 0x0000
-wd*	at pciide? channel ? drive ? flags 0x0000
-atapibus* at pciide? channel ?
+pciide* at pci? dev ? function ? flags 0x0000	# GENERIC pciide driver
+acardide* at pci? dev ? function ?	# Acard IDE controllers
+aceride* at pci? dev ? function ?	# Acer Lab IDE controllers
+artsata* at pci? dev ? function ?	# Intel i31244 SATA controller
+cmdide* at pci? dev ? function ?	# CMD tech IDE controllers
+cypide* at pci? dev ? function ?	# Cypress IDE controllers
+hptide* at pci? dev ? function ?	# Triones/HighPoint IDE controllers
+optiide* at pci? dev ? function ?	# Opti IDE controllers
+piixide* at pci? dev ? function ?	# Intel IDE controllers
+pdcide* at pci? dev ? function ?	# Promise IDE controllers
+satalink* at pci? dev ? function ?	# SiI SATALink controllers
+siside* at pci? dev ? function ?	# SiS IDE controllers
+slide*  at pci? dev ? function ?	# Symphony Labs IDE controllers
+viaide* at pci? dev ? function ?	# VIA/AMD/Nvidia IDE controllers
+atabus* at ata?
+wd*	at atabus? drive ? flags 0x0000
+atapibus* at atapi?
 
 cd*	at atapibus? drive ? flags 0x0000	# ATAPI CD-ROM drives
 sd*	at atapibus? drive ? flags 0x0000	# ATAPI disk drives
@@ -332,7 +332,16 @@ uk*	at atapibus? drive ? flags 0x0000	# ATAPI unknown
 
 ## RAIDframe disk driver: software RAID driver.  See raid(4).
 
-#pseudo-device	raid	4
+pseudo-device	raid	4
+options 	RAID_AUTOCONFIG		# auto-configuration of RAID components
+# Options to enable various other RAIDframe RAID types.
+# options 	RF_INCLUDE_EVENODD=1
+# options 	RF_INCLUDE_RAID5_RS=1
+# options 	RF_INCLUDE_PARITYLOGGING=1
+# options 	RF_INCLUDE_CHAINDECLUSTER=1
+# options 	RF_INCLUDE_INTERDECLUSTER=1
+# options 	RF_INCLUDE_PARITY_DECLUSTERING=1
+# options 	RF_INCLUDE_PARITY_DECLUSTERING_DS=1
 
 ## Memory disk device, used on boot floppies with compressed
 ## kernel-plus-root-disk images.

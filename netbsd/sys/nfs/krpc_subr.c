@@ -1,4 +1,4 @@
-/*	$NetBSD: krpc_subr.c,v 1.25 2001/11/10 10:59:08 lukem Exp $	*/
+/*	$NetBSD: krpc_subr.c,v 1.27 2003/02/26 06:31:18 matt Exp $	*/
 
 /*
  * Copyright (c) 1995 Gordon Ross, Adam Glass
@@ -43,11 +43,10 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: krpc_subr.c,v 1.25 2001/11/10 10:59:08 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: krpc_subr.c,v 1.27 2003/02/26 06:31:18 matt Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/conf.h>
 #include <sys/ioctl.h>
 #include <sys/proc.h>
 #include <sys/mount.h>
@@ -56,7 +55,6 @@ __KERNEL_RCSID(0, "$NetBSD: krpc_subr.c,v 1.25 2001/11/10 10:59:08 lukem Exp $")
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 
-#include <net/if.h>
 #include <netinet/in.h>
 
 #include <nfs/rpcv2.h>
@@ -426,7 +424,7 @@ xdr_string_encode(str, len)
 
 	m = m_get(M_WAIT, MT_DATA);
 	if (mlen > MLEN) {
-		MCLGET(m, M_WAIT);
+		m_clget(m, M_WAIT);
 		if ((m->m_flags & M_EXT) == 0) {
 			(void) m_free(m);	/* There can be only one. */
 			return (NULL);

@@ -1,4 +1,4 @@
-/*	$NetBSD: proc.h,v 1.14 2002/03/05 14:12:29 simonb Exp $	*/
+/*	$NetBSD: proc.h,v 1.17 2003/08/07 16:28:28 agc Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,20 +37,26 @@
 #ifndef _MIPS_PROC_H_
 #define _MIPS_PROC_H_
 
-struct proc;
+#include <sys/param.h>
+
+struct lwp;
 
 /*
  * Machine-dependent part of the proc structure for MIPS
  */
-struct mdproc {
+
+struct mdlwp {
 	void	*md_regs;		/* registers on current frame */
 	int	md_flags;		/* machine-dependent flags */
 	int	md_upte[UPAGES];	/* ptes for mapping u page */
-	int	md_ss_addr;		/* single step address for ptrace */
+	vaddr_t	md_ss_addr;		/* single step address for ptrace */
 	int	md_ss_instr;		/* single step instruction for ptrace */
+};
+
+struct mdproc {
 	__volatile int md_astpending;	/* AST pending on return to userland */
 					/* syscall entry for this process */
-	void	(*md_syscall)(struct proc *, u_int, u_int, u_int);
+	void	(*md_syscall)(struct lwp *, u_int, u_int, u_int);
 };
 
 /* md_flags */
@@ -71,7 +73,7 @@ struct frame {
 
 #ifdef _KERNEL
 /* kernel single-step emulation */
-int mips_singlestep(struct proc *p);
+int mips_singlestep(struct lwp *l);
 #endif /* _KERNEL */
 
 #endif /* _MIPS_PROC_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: bootparam.c,v 1.13 1999/11/13 21:17:56 thorpej Exp $	*/
+/*	$NetBSD: bootparam.c,v 1.15 2003/03/19 17:18:07 drochner Exp $	*/
 
 /*
  * Copyright (c) 1995 Gordon W. Ross
@@ -52,7 +52,6 @@
 
 #include "stand.h"
 #include "net.h"
-#include "netif.h"
 #include "rpc.h"
 #include "bootparam.h"
 
@@ -64,6 +63,10 @@
 
 struct in_addr	bp_server_addr;	/* net order */
 n_short		bp_server_port;	/* net order */
+
+int		hostnamelen;
+char		domainname[FNAME_SIZE]; /* our DNS domain */
+int		domainnamelen;
 
 /*
  * RPC definitions for bootparamd

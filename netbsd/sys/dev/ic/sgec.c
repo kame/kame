@@ -1,4 +1,4 @@
-/*      $NetBSD: sgec.c,v 1.18.10.1 2003/01/27 04:42:31 jmc Exp $ */
+/*      $NetBSD: sgec.c,v 1.22 2003/02/26 06:31:10 matt Exp $ */
 /*
  * Copyright (c) 1999 Ludd, University of Lule}, Sweden. All rights reserved.
  *
@@ -45,7 +45,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sgec.c,v 1.18.10.1 2003/01/27 04:42:31 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sgec.c,v 1.22 2003/02/26 06:31:10 matt Exp $");
 
 #include "opt_inet.h"
 #include "bpfilter.h"
@@ -563,6 +563,7 @@ ze_add_rxbuf(sc, i)
 	if (m == NULL)
 		return (ENOBUFS);
 
+	MCLAIM(m, &sc->sc_ec.ec_rx_mowner);
 	MCLGET(m, M_DONTWAIT);
 	if ((m->m_flags & M_EXT) == 0) {
 		m_freem(m);
@@ -576,7 +577,7 @@ ze_add_rxbuf(sc, i)
 	    m->m_ext.ext_buf, m->m_ext.ext_size, NULL,
 	    BUS_DMA_READ|BUS_DMA_NOWAIT);
 	if (error)
-		panic("%s: can't load rx DMA map %d, error = %d\n",
+		panic("%s: can't load rx DMA map %d, error = %d",
 		    sc->sc_dev.dv_xname, i, error);
 	sc->sc_rxmbuf[i] = m;
 

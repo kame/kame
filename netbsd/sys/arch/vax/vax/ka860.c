@@ -1,4 +1,4 @@
-/*	$NetBSD: ka860.c,v 1.16 2000/08/09 03:02:54 tv Exp $	*/
+/*	$NetBSD: ka860.c,v 1.24 2003/08/07 16:30:20 agc Exp $	*/
 /*
  * Copyright (c) 1986, 1988 Regents of the University of California.
  * All rights reserved.
@@ -11,11 +11,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -39,6 +35,9 @@
  * Also contains abus spec's and memory init routines.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ka860.c,v 1.24 2003/08/07 16:30:20 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -52,19 +51,19 @@
 
 #include <vax/vax/gencons.h>
 
-static	void	ka86_memerr __P((void));
-static	int	ka86_mchk __P((caddr_t));
-static	void	ka86_reboot __P((int));
-static	void	ka86_clrf __P((void));
-static	void	ka860_init __P((struct device *));
+static	void	ka86_memerr(void);
+static	int	ka86_mchk(caddr_t);
+static	void	ka86_reboot(int);
+static	void	ka86_clrf(void);
+static	void	ka860_init(void);
 
-void	crlattach __P((void));
+void	crlattach(void);
 
 struct	cpu_dep	ka860_calls = {
 	0,
 	ka86_mchk,
 	ka86_memerr,
-	0,
+	ka860_init,
 	generic_clkread,
 	generic_clkwrite,
 	6,      /* ~VUPS */
@@ -221,8 +220,7 @@ struct mc8600frame {
 
 /* machine check */
 int
-ka86_mchk(cmcf)
-	caddr_t cmcf;
+ka86_mchk(caddr_t cmcf)
 {
 	register struct mc8600frame *mcf = (struct mc8600frame *)cmcf;
 	register int type;
@@ -272,25 +270,27 @@ struct ka86 {
 };
 
 void
-ka860_init(self)
-	struct device *self;
+ka860_init(void)
 {
 	struct	ka86 *ka86 = (void *)&vax_cpudata;
+	int fpa;
 
 	/* Enable cache */
 	mtpr(3, PR_CSWP);
 
-	printf(": CPU serial number %d(%d), hardware ECO level %d(%d)\n%s: ",
-	    ka86->snr, ka86->plant, ka86->eco >> 4, ka86->eco, self->dv_xname);
-	if (mfpr(PR_ACCS) & 255) {
+	printf("cpu0: ka86%d, serial number %d, mfg plant %d, "
+	    "hardware ECO level %d\n", ka86->v8650 ? 5 : 0, ka86->snr,
+	    ka86->plant, ka86->eco);
+	printf("cpu0: ");
+	fpa = mfpr(PR_ACCS);
+	if (fpa & 255) {
 		printf("FPA present, type %d, serial number %d, enabling.\n", 
-		    mfpr(PR_ACCS) & 255, mfpr(PR_ACCS) >> 16);
+		    fpa & 255, fpa >> 16);
 		mtpr(0x8000, PR_ACCS);
 	} else
 		printf("no FPA\n");
 	/* enable CRD reports */
 	mtpr(mfpr(PR_MERG) & ~M8600_ICRD, PR_MERG);
-	crlattach();
 }
 
 /*
@@ -327,8 +327,7 @@ ka86_clrf()
 }
 
 void
-ka86_reboot(howto)
-	int howto;
+ka86_reboot(int howto)
 {
 	WAIT;
 
@@ -346,18 +345,14 @@ static	int abus_print __P((void *, const char *));
 static  int abus_match __P((struct device *, struct cfdata *, void *));
 static  void abus_attach __P((struct device *, struct device *, void*));
 
-struct  cfattach abus_ca = {
-        sizeof(struct device), abus_match, abus_attach
-};
+CFATTACH_DECL(abus, sizeof(struct device),
+    abus_match, abus_attach, NULL, NULL);
 
 /*
  * Abus is the master bus on VAX 8600.
  */
 int
-abus_match(parent, cf, aux)
-        struct device *parent;
-        struct cfdata *cf;
-        void *aux;
+abus_match(struct device *parent, struct cfdata *cf, void *aux)
 {
         if (vax_bustype == VAX_ABUS)
                 return 1;
@@ -365,29 +360,28 @@ abus_match(parent, cf, aux)
 }
 
 void
-abus_attach(parent, self, aux)
-        struct device *parent, *self;
-        void *aux;
+abus_attach(struct device *parent, struct device *self, void *aux)
 {
         volatile int tmp;
         volatile struct sbia_regs *sbiar;
-        struct ioa *ioa;
         int     type, i;
 	struct bp_conf bp;
 
 	/*
 	 * Init CPU.
+	 * Attach crl first.
 	 */
-	ka860_init(self);
+	printf("\n");
+	crlattach();
 
-        for (i = 0; i < MAXNIOA; i++) {
-                ioa = (struct ioa *)vax_map_physmem((paddr_t)IOA8600(0),
+	for (i = 0; i < NIOA8600; i++) {
+		sbiar = (struct sbia_regs *)vax_map_physmem((paddr_t)IOA8600(i),
                     (IOAMAPSIZ / VAX_NBPG));
-                if (badaddr((caddr_t)ioa, 4)) {
-                        vax_unmap_physmem((vaddr_t)ioa, (IOAMAPSIZ / VAX_NBPG));
+                if (badaddr((caddr_t)sbiar, 4)) {
+                        vax_unmap_physmem((vaddr_t)sbiar, (IOAMAPSIZ / VAX_NBPG));
                         continue;
                 }
-                tmp = ioa->ioacsr.ioa_csr;
+                tmp = sbiar->sbi_cfg;
                 type = tmp & IOA_TYPMSK;
 
                 switch (type) {
@@ -395,8 +389,8 @@ abus_attach(parent, self, aux)
                 case IOA_SBIA:
                         bp.type = "sbi";
                         bp.num = i;
+			bp.bp_addr = tmp;
                         config_found(self, &bp, abus_print);
-                        sbiar = (void *)ioa;
                         sbiar->sbi_errsum = -1;
                         sbiar->sbi_error = 0x1000;
                         sbiar->sbi_fltsts = 0xc0000;
@@ -406,17 +400,16 @@ abus_attach(parent, self, aux)
                         printf("IOAdapter %x unsupported\n", type);
                         break;
                 }
-                vax_unmap_physmem((vaddr_t)ioa, (IOAMAPSIZ / VAX_NBPG));
+                vax_unmap_physmem((vaddr_t)sbiar, (IOAMAPSIZ / VAX_NBPG));
         }
 }
 
 int
-abus_print(aux, hej)
-        void *aux;
-        const char *hej;
+abus_print(void *aux, const char *name)
 {
         struct bp_conf *bp = aux;
-        if (hej)
-                printf("%s at %s", bp->type, hej);
+        if (name)
+                aprint_normal("%s at %s", bp->type, name);
+	printf(": rev %d", bp->bp_addr & 0xf);
         return (UNCONF);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: grf_ul.c,v 1.31.6.1 2002/08/07 01:31:37 lukem Exp $ */
+/*	$NetBSD: grf_ul.c,v 1.37 2004/02/13 11:36:10 wiz Exp $ */
 #define UL_DEBUG
 
 /*-
@@ -40,7 +40,7 @@
 #include "opt_amigacons.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: grf_ul.c,v 1.31.6.1 2002/08/07 01:31:37 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: grf_ul.c,v 1.37 2004/02/13 11:36:10 wiz Exp $");
 
 #include "grful.h"
 #if NGRFUL > 0
@@ -311,7 +311,7 @@ ul_load_code(gp)
 	bcopy(ul_ovl_palette, gup->gus_ovcmap, 3*4);
 
 	/*
-	 * Unflush cache, unhalt cpu -> nmi starts to run. This MUST NOT BE
+	 * Unflush cache, unhalt CPU -> nmi starts to run. This MUST NOT BE
 	 * DONE before the image color map initialization above, to guarantee
 	 * the index register in the BT458 is not used by more than one CPU
 	 * at once.
@@ -346,7 +346,7 @@ ul_load_code(gp)
 	 */
 
 
-	/* unflush cache, unhalt cpu first -> nmi starts to run */
+	/* unflush cache, unhalt CPU first -> nmi starts to run */
 	ba->ctrl &= ~(HLT|CF);
 
 	gcm.index = 0;
@@ -445,9 +445,8 @@ void grfulattach(struct device *, struct device *, void *);
 int grfulprint(void *, const char *);
 int grfulmatch(struct device *, struct cfdata *, void *);
 
-struct cfattach grful_ca = {
-	sizeof(struct grf_ul_softc), grfulmatch, grfulattach
-};
+CFATTACH_DECL(grful, sizeof(struct grf_ul_softc),
+    grfulmatch, grfulattach, NULL, NULL);
 
 /*
  * only used in console init
@@ -573,7 +572,7 @@ grfulprint(auxp, pnp)
 	const char *pnp;
 {
 	if (pnp)
-		printf("grf%d at %s", ((struct grf_softc *)auxp)->g_unit,
+		aprint_normal("grf%d at %s", ((struct grf_softc *)auxp)->g_unit,
 			pnp);
 	return(UNCONF);
 }
@@ -969,7 +968,7 @@ gsp_write(gsp, ptr, size)
 	while (next == new_put) {
 		/*
 		 * we should use an intr. here. unfortunately, we already
-		 * are called from an interupt and can't use tsleep.
+		 * are called from an interrupt and can't use tsleep.
 		 * so we do busy waiting, at least for the moment.
 		 */
 

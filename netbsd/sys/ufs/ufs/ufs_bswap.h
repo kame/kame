@@ -1,4 +1,4 @@
-/*	$NetBSD: ufs_bswap.h,v 1.10 2002/01/31 19:18:18 tv Exp $	*/
+/*	$NetBSD: ufs_bswap.h,v 1.13 2003/10/05 17:48:50 bouyer Exp $	*/
 
 /*
  * Copyright (c) 1998 Manuel Bouyer.
@@ -13,11 +13,9 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
+ *	This product includes software developed by Manuel Bouyer.
+ * 4. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -31,6 +29,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+
+#ifndef _UFS_UFS_BSWAP_H_
+#define _UFS_UFS_BSWAP_H_
 
 #if defined(_KERNEL_OPT)
 #include "opt_ffs.h"
@@ -77,9 +78,9 @@ ufs_rw64(a, ns)
 	return ((ns) ?  bswap64(a) : (a));
 }
 #else
-#define ufs_rw16(a, ns) (a)
-#define ufs_rw32(a, ns) (a)
-#define ufs_rw64(a, ns) (a)
+#define ufs_rw16(a, ns) ((uint16_t)(a))
+#define ufs_rw32(a, ns) ((uint32_t)(a))
+#define ufs_rw64(a, ns) ((uint64_t)(a))
 #endif
 
 #define ufs_add16(a, b, ns) \
@@ -88,3 +89,5 @@ ufs_rw64(a, ns)
 	(a) = ufs_rw32(ufs_rw32((a), (ns)) + (b), (ns))
 #define ufs_add64(a, b, ns) \
 	(a) = ufs_rw64(ufs_rw64((a), (ns)) + (b), (ns))
+
+#endif /* !_UFS_UFS_BSWAP_H_ */

@@ -1,7 +1,7 @@
-/*	$NetBSD: i80321var.h,v 1.1.6.3 2002/12/07 19:15:27 he Exp $	*/
+/*	$NetBSD: i80321var.h,v 1.8 2003/10/06 16:06:06 thorpej Exp $	*/
 
 /*
- * Copyright (c) 2002 Wasabi Systems, Inc.
+ * Copyright (c) 2002, 2003 Wasabi Systems, Inc.
  * All rights reserved.
  *
  * Written by Jason R. Thorpe for Wasabi Systems, Inc.
@@ -128,6 +128,9 @@ struct i80321_softc {
 	struct arm32_bus_dma_tag sc_pci_dmat;
 	struct arm32_pci_chipset sc_pci_chipset;
 
+	/* DMA window info for PCI DMA. */
+	struct arm32_dma_range sc_pci_dma_range;
+
 	/* GPIO state */
 	uint8_t sc_gpio_dir;	/* GPIO pin direction (1 == output) */
 	uint8_t sc_gpio_val;	/* GPIO output pin value */
@@ -164,13 +167,15 @@ void	i80321_intr_init(void);
 void	*i80321_intr_establish(int, int, int (*)(void *), void *);
 void	i80321_intr_disestablish(void *);
 
+void	i80321_gpio_set_direction(uint8_t, uint8_t);
+void	i80321_gpio_set_val(uint8_t, uint8_t);
+uint8_t	i80321_gpio_get_val(void);
+
 void	i80321_bs_init(bus_space_tag_t, void *);
 void	i80321_io_bs_init(bus_space_tag_t, void *);
 void	i80321_mem_bs_init(bus_space_tag_t, void *);
 
-void	i80321_local_dma_init(bus_dma_tag_t, void *);
-
-void	i80321_pci_dma_init(bus_dma_tag_t, void *);
+void	i80321_local_dma_init(struct i80321_softc *sc);
 
 void	i80321_pci_init(pci_chipset_tag_t, void *);
 

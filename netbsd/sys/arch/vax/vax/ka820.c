@@ -1,4 +1,4 @@
-/*	$NetBSD: ka820.c,v 1.31 2001/06/03 15:07:20 ragge Exp $	*/
+/*	$NetBSD: ka820.c,v 1.40 2004/02/13 11:36:20 wiz Exp $	*/
 /*
  * Copyright (c) 1988 Regents of the University of California.
  * All rights reserved.
@@ -14,11 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,6 +37,9 @@
  * KA820 specific CPU code.  (Note that the VAX8200 uses a KA820, not
  * a KA8200.  Sigh.)
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ka820.c,v 1.40 2004/02/13 11:36:20 wiz Exp $");
 
 #include "opt_multiprocessor.h"
 
@@ -131,9 +130,8 @@ struct ka820_softc {
 	int sc_binid;		/* CPU node ID */
 };
 
-struct cfattach cpu_bi_ca = {
-	sizeof(struct ka820_softc), ka820_match, ka820_attach
-};
+CFATTACH_DECL(cpu_bi, sizeof(struct ka820_softc),
+    ka820_match, ka820_attach, NULL, NULL);
 
 #ifdef notyet
 extern struct pte BRAMmap[];
@@ -169,7 +167,7 @@ ka820_attach(struct device *parent, struct device *self, void *aux)
 	mastercpu = mfpr(PR_BINID);
 	strcpy(cpu_model, "VAX 8200");
 	cpu_model[6] = rev & 0x8000 ? '5' : '0';
-	printf(": ka82%c (%s) cpu rev %d, u patch rev %d, sec patch %d\n",
+	printf(": ka82%c (%s) CPU rev %d, u patch rev %d, sec patch %d\n",
 	    cpu_model[6], mastercpu == ba->ba_nodenr ? "master" : "slave",
 	    ((rev >> 11) & 15), ((rev >> 1) &1023), rev & 1);
 	sc->sc_binid = ba->ba_nodenr;
@@ -196,8 +194,8 @@ ka820_attach(struct device *parent, struct device *self, void *aux)
 	 */
 	bcopy(curcpu(), &sc->sc_ci, sizeof(struct cpu_info));
 	mtpr(&sc->sc_ci, PR_SSP);
-	proc0.p_addr->u_pcb.SSP = mfpr(PR_SSP);
-	proc0.p_cpu = curcpu();
+	lwp0.l_addr->u_pcb.SSP = mfpr(PR_SSP);
+	lwp0.l_cpu = curcpu();
 	curcpu()->ci_dev = self;
 
 	/* reset the console and enable the RX50 */
@@ -304,9 +302,8 @@ struct mem_bi_softc {
 	bus_space_handle_t sc_ioh;
 };
 
-struct cfattach mem_bi_ca = {
-	sizeof(struct mem_bi_softc), ms820_match, ms820_attach
-};
+CFATTACH_DECL(mem_bi, sizeof(struct mem_bi_softc),
+    ms820_match, ms820_attach, NULL, NULL);
 
 static int
 ms820_match(struct device *parent, struct cfdata *cf, void *aux)
@@ -569,10 +566,10 @@ ka820_startslave(struct device *dev, struct cpu_info *ci)
 	ka820_txrx(id, "S %x\r", (int)&tramp);	/* Start! */
 	expect = 0;
 	for (i = 0; i < 10000; i++)
-		if ((volatile)ci->ci_flags & CI_RUNNING)
+		if ((volatile int)ci->ci_flags & CI_RUNNING)
 			break;
 	if (i == 10000)
-		printf("%s: (ID %d) failed starting??!!??\n",
+		printf("%s: (ID %d) failed starting??\n",
 		    dev->dv_xname, sc->sc_binid);
 }
 

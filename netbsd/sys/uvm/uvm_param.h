@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_param.h,v 1.13 2001/12/09 03:07:19 chs Exp $	*/
+/*	$NetBSD: uvm_param.h,v 1.18 2003/08/07 16:34:50 agc Exp $	*/
 
 /*
  * Copyright (c) 1991, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -71,36 +67,87 @@
 #ifndef	_VM_PARAM_
 #define	_VM_PARAM_
 
+#ifdef _KERNEL_OPT
+#include "opt_uvm.h"
+#endif
 #ifdef _KERNEL
 #include <machine/vmparam.h>
 #endif
 
+#if defined(_KERNEL)
+
+#if defined(PAGE_SIZE)
+
 /*
- * This belongs in types.h, but breaks too many existing programs.
+ * If PAGE_SIZE is defined at this stage, it must be a constant.
  */
-typedef int	boolean_t;
-#ifndef TRUE
-#define	TRUE	1
-#endif
-#ifndef FALSE
-#define	FALSE	0
+
+#if PAGE_SIZE == 0
+#error Invalid PAGE_SIZE definition
 #endif
 
 /*
- *	The machine independent pages are refered to as PAGES.  A page
- *	is some number of hardware pages, depending on the target machine.
+ * If the platform does not need to support a variable PAGE_SIZE,
+ * then provide default values for MIN_PAGE_SIZE and MAX_PAGE_SIZE.
  */
-#define	DEFAULT_PAGE_SIZE	4096
 
-#if defined(_KERNEL) && !defined(PAGE_SIZE)
+#if !defined(MIN_PAGE_SIZE)
+#define	MIN_PAGE_SIZE	PAGE_SIZE
+#endif /* ! MIN_PAGE_SIZE */
+
+#if !defined(MAX_PAGE_SIZE)
+#define	MAX_PAGE_SIZE	PAGE_SIZE
+#endif /* ! MAX_PAGE_SIZE */
+
+#else /* ! PAGE_SIZE */
+
 /*
- *	All references to the size of a page should be done with PAGE_SIZE
- *	or PAGE_SHIFT.  The fact they are variables is hidden here so that
- *	we can easily make them constant if we so desire.
+ * PAGE_SIZE is not a constant; MIN_PAGE_SIZE and MAX_PAGE_SIZE must
+ * be defined.
  */
+
+#if !defined(MIN_PAGE_SIZE)
+#error MIN_PAGE_SIZE not defined
+#endif
+
+#if !defined(MAX_PAGE_SIZE)
+#error MAX_PAGE_SIZE not defined
+#endif
+
+#endif /* PAGE_SIZE */
+
+/*
+ * MIN_PAGE_SIZE and MAX_PAGE_SIZE must be constants.
+ */
+
+#if MIN_PAGE_SIZE == 0
+#error Invalid MIN_PAGE_SIZE definition
+#endif
+
+#if MAX_PAGE_SIZE == 0
+#error Invalid MAX_PAGE_SIZE definition
+#endif
+
+/*
+ * If MIN_PAGE_SIZE and MAX_PAGE_SIZE are not equal, then we must use
+ * non-constant PAGE_SIZE, et al for LKMs.
+ */
+#if (MIN_PAGE_SIZE != MAX_PAGE_SIZE) && defined(_LKM)
+#undef PAGE_SIZE
+#undef PAGE_MASK
+#undef PAGE_SHIFT
+#endif
+
+/*
+ * Now provide PAGE_SIZE, PAGE_MASK, and PAGE_SHIFT if we do not
+ * have ones that are compile-time constants.
+ */
+#if !defined(PAGE_SIZE)
 #define	PAGE_SIZE	uvmexp.pagesize		/* size of page */
 #define	PAGE_MASK	uvmexp.pagemask		/* size of page - 1 */
 #define	PAGE_SHIFT	uvmexp.pageshift	/* bits to shift for pages */
+#endif /* PAGE_SIZE */
+
 #endif /* _KERNEL */
 
 /*
@@ -155,7 +202,44 @@ typedef int	boolean_t;
 #define	round_page(x)	(((x) + PAGE_MASK) & ~PAGE_MASK)
 #define	trunc_page(x)	((x) & ~PAGE_MASK)
 
-extern psize_t		mem_size;	/* size of physical memory (bytes) */
+/*
+ * Set up the default mapping address (VM_DEFAULT_ADDRESS) according to:
+ *
+ * USE_TOPDOWN_VM:	a kernel option to enable on a per-kernel basis
+ *			which only be used on ports that define...
+ * __HAVE_TOPDOWN_VM:	a per-port option to offer the topdown option
+ *
+ * __USE_TOPDOWN_VM:	a per-port option to unconditionally use it
+ *
+ * if __USE_TOPDOWN_VM is defined, the port can specify a default vm
+ * address, or we will use the topdown default from below.  If it is
+ * NOT defined, then the port can offer topdown as an option, but it
+ * MUST define the VM_DEFAULT_ADDRESS macro itself.
+ */
+#if defined(USE_TOPDOWN_VM) || defined(__USE_TOPDOWN_VM)
+# if !defined(__HAVE_TOPDOWN_VM) && !defined(__USE_TOPDOWN_VM)
+#  error "Top down memory allocation not enabled for this system"
+# else /* !__HAVE_TOPDOWN_VM && !__USE_TOPDOWN_VM */
+#  define __USING_TOPDOWN_VM
+#  if !defined(VM_DEFAULT_ADDRESS)
+#   if !defined(__USE_TOPDOWN_VM)
+#    error "Top down memory allocation not configured for this system"
+#   else /* !__USE_TOPDOWN_VM */
+#    define VM_DEFAULT_ADDRESS(da, sz) \
+	trunc_page(VM_MAXUSER_ADDRESS - MAXSSIZ - (sz))
+#   endif /* !__USE_TOPDOWN_VM */
+#  endif /* !VM_DEFAULT_ADDRESS */
+# endif /* !__HAVE_TOPDOWN_VM && !__USE_TOPDOWN_VM */
+#endif /* USE_TOPDOWN_VM || __USE_TOPDOWN_VM */
+
+#if !defined(__USING_TOPDOWN_VM)
+# if defined(VM_DEFAULT_ADDRESS)
+#  error "Default vm address should not be defined here"
+# else /* VM_DEFAULT_ADDRESS */
+#  define VM_DEFAULT_ADDRESS(da, sz) round_page((vaddr_t)(da) + MAXDSIZ)
+# endif /* VM_DEFAULT_ADDRESS */
+#endif /* !__USING_TOPDOWN_VM */
+
 extern int		ubc_nwins;	/* number of UBC mapping windows */
 extern int		ubc_winshift;	/* shift for a UBC mapping window */
 

@@ -1,4 +1,4 @@
-/* $NetBSD: pmap.c,v 1.3 2002/04/12 18:50:30 thorpej Exp $ */
+/* $NetBSD: pmap.c,v 1.10 2003/10/26 13:17:50 jdolecek Exp $ */
 /*-
  * Copyright (c) 1997, 1998, 2000 Ben Harris
  * All rights reserved.
@@ -102,7 +102,7 @@
 
 #include <sys/param.h>
 
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.3 2002/04/12 18:50:30 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.10 2003/10/26 13:17:50 jdolecek Exp $");
 
 #include <sys/kernel.h> /* for cold */
 #include <sys/malloc.h>
@@ -295,7 +295,7 @@ pmap_steal_memory(vsize_t size, vaddr_t *vstartp, vaddr_t *vendp)
 	UVMHIST_FUNC("pmap_steal_memory");
 
 	UVMHIST_CALLED(pmaphist);
-	addr = NULL;
+	addr = 0;
 	size = round_page(size);
 	for (i = 0; i < vm_nphysseg; i++) {
 		if (vm_physmem[i].avail_start < vm_physmem[i].avail_end) {
@@ -421,10 +421,10 @@ _pmap_wired_count(pmap_t pmap)
 }
 
 void
-pmap_activate(struct proc *p)
+pmap_activate(struct lwp *l)
 {
+	struct proc *p = l->l_proc;
 	pmap_t pmap;
-	int i;
 	UVMHIST_FUNC("pmap_activate");
 
 	UVMHIST_CALLED(pmaphist);
@@ -438,14 +438,12 @@ pmap_activate(struct proc *p)
 
 	active_pmap = pmap;
 	pmap->pm_flags |= PM_ACTIVE;
-	for (i = 0; i < 1024; i++)
-		if (pmap->pm_entries[i] != NULL)
-			MEMC_WRITE(pmap->pm_entries[i]->pv_activate);
 }
 
 void
-pmap_deactivate(struct proc *p)
+pmap_deactivate(struct lwp *l)
 {
+	struct proc *p = l->l_proc;
 	pmap_t pmap;
 	int i;
 	UVMHIST_FUNC("pmap_deactivate");
@@ -923,7 +921,7 @@ pmap_fault(struct pmap *pmap, vaddr_t va, vm_prot_t atype)
 	if ((atype & ~pv->pv_prot) == 0) {
 		MEMC_WRITE(pv->pv_activate);
 		/*
-		 * If the new mapping is writeable, we should flush the cache
+		 * If the new mapping is writable, we should flush the cache
 		 * so that stale data for an existing mapping doesn't get
 		 * reused.
 		 * XXX: Should this be done more lazily?
@@ -1070,30 +1068,19 @@ pmap_find(paddr_t pa)
 void
 pmap_zero_page(paddr_t pa)
 {
-	int ppn;
 	UVMHIST_FUNC("pmap_zero_page");
 
 	UVMHIST_CALLED(pmaphist);
 	bzero(pmap_find(pa), PAGE_SIZE);
-	ppn = atop(pa);
-	pv_table[ppn].pv_pflags |= PV_MODIFIED | PV_REFERENCED;
-	pmap_update_page(ppn);
 }
 
 void
 pmap_copy_page(paddr_t src, paddr_t dest)
 {
-	int sppn, dppn;
 	UVMHIST_FUNC("pmap_copy_page");
 
 	UVMHIST_CALLED(pmaphist);
 	memcpy(pmap_find(dest), pmap_find(src), PAGE_SIZE);
-	sppn = atop(src);
-	dppn = atop(dest);
-	pv_table[sppn].pv_pflags |= PV_REFERENCED;
-	pmap_update_page(sppn);
-	pv_table[dppn].pv_pflags |= PV_MODIFIED | PV_REFERENCED;
-	pmap_update_page(dppn);
 }
 
 #ifdef PMAP_DEBUG_MODIFIED

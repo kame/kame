@@ -1,4 +1,4 @@
-/*	$NetBSD: wsmux.c,v 1.29 2002/03/17 19:41:06 atatat Exp $	*/
+/*	$NetBSD: wsmux.c,v 1.35 2003/09/23 09:16:07 simonb Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -44,7 +44,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: wsmux.c,v 1.29 2002/03/17 19:41:06 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: wsmux.c,v 1.35 2003/09/23 09:16:07 simonb Exp $");
 
 #include "wsdisplay.h"
 #include "wsmux.h"
@@ -118,7 +118,17 @@ void wsmuxattach(int);
 #define WSMUXDEV(n) ((n) & 0x7f)
 #define WSMUXCTL(n) ((n) & 0x80)
 
-cdev_decl(wsmux);
+dev_type_open(wsmuxopen);
+dev_type_close(wsmuxclose);
+dev_type_read(wsmuxread);
+dev_type_ioctl(wsmuxioctl);
+dev_type_poll(wsmuxpoll);
+dev_type_kqfilter(wsmuxkqfilter);
+
+const struct cdevsw wsmux_cdevsw = {
+	wsmuxopen, wsmuxclose, wsmuxread, nowrite, wsmuxioctl,
+	nostop, notty, wsmuxpoll, nommap, wsmuxkqfilter,
+};
 
 struct wssrcops wsmux_srcops = {
 	WSMUX_MUX,
@@ -497,6 +507,15 @@ wsmux_do_ioctl(struct device *dv, u_long cmd, caddr_t data, int flag,
 			return (EINVAL);
 		evar->async = *(int *)data != 0;
 		return (0);
+	case FIOSETOWN:
+		DPRINTF(("%s: FIOSETOWN\n", sc->sc_base.me_dv.dv_xname));
+		evar = sc->sc_base.me_evp;
+		if (evar == NULL)
+			return (EINVAL);
+		if (-*(int *)data != evar->io->p_pgid
+		    && *(int *)data != evar->io->p_pid)
+			return (EPERM);
+		return (0);
 	case TIOCSPGRP:
 		DPRINTF(("%s: TIOCSPGRP\n", sc->sc_base.me_dv.dv_xname));
 		evar = sc->sc_base.me_evp;
@@ -563,6 +582,30 @@ wsmuxpoll(dev_t dev, int events, struct proc *p)
 	}
 
 	return (wsevent_poll(sc->sc_base.me_evp, events, p));
+}
+
+/*
+ * kqfilter() of the pseudo device from device table.
+ */
+int
+wsmuxkqfilter(dev_t dev, struct knote *kn)
+{
+	int minr = minor(dev);  
+	struct wsmux_softc *sc = wsmuxdevs[WSMUXDEV(minr)];
+
+	if (WSMUXCTL(minr)) {
+		/* control device */
+		return (1);
+	}
+
+	if (sc->sc_base.me_evp == NULL) {
+#ifdef DIAGNOSTIC
+		printf("wsmuxkqfilter: not open\n");
+#endif
+		return (1);
+	}
+
+	return (wsevent_kqfilter(sc->sc_base.me_evp, kn));
 }
 
 /*

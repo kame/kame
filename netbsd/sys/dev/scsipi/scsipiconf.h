@@ -1,4 +1,4 @@
-/*	$NetBSD: scsipiconf.h,v 1.69 2002/05/16 02:54:21 thorpej Exp $	*/
+/*	$NetBSD: scsipiconf.h,v 1.84.2.1 2004/09/11 12:54:42 he Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -184,7 +184,7 @@ struct scsipi_inquiry_pattern;
  *
  *	Note that `adapt_openings' is used by (the common case of) adapters
  *	which have per-adapter resources.  If an adapter's command resources
- *	are associated with a channel, the the 	`chan_openings' below will
+ *	are associated with a channel, then the `chan_openings' below will
  *	be used instead.
  *
  *	Note that all adapter entry points take a pointer to a channel,
@@ -193,7 +193,7 @@ struct scsipi_inquiry_pattern;
  */
 struct scsipi_adapter {
 	struct device *adapt_dev;	/* pointer to adapter's device */
-	int	adapt_nchannels;	/* numnber of adapter channels */
+	int	adapt_nchannels;	/* number of adapter channels */
 	int	adapt_refcnt;		/* adapter's reference count */
 	int	adapt_openings;		/* total # of command openings */
 	int	adapt_max_periph;	/* max openings per periph */
@@ -238,6 +238,7 @@ struct scsipi_bustype {
 	int	bustype_type;		/* symbolic name of type */
 	
 	int	(*bustype_cmd) __P((struct scsipi_periph *,
+		    struct scsipi_xfer *,
 		    struct scsipi_generic *, int, void *, size_t, int,
 		    int, struct buf *, int));
 	int	(*bustype_interpret_sense) __P((struct scsipi_xfer *));
@@ -298,6 +299,10 @@ struct scsipi_channel {
 	/* callback we may have to call from completion thread */
 	void (*chan_callback) __P((struct scsipi_channel *, void *));
 	void *chan_callback_arg;
+
+	/* callback we may have to call after forking the kthread */
+	void (*chan_init_cb) __P((struct scsipi_channel *, void *));
+	void *chan_init_cb_arg;
 };
 
 /* chan_flags */
@@ -440,22 +445,16 @@ struct scsipi_periph {
 						   LUNs */
 #define	PQUIRK_NOMODESENSE	0x00000040	/* device doesn't do MODE SENSE
 						   properly */
-#define	PQUIRK_NOSTARTUNIT	0x00000080	/* do not issue START UNIT */
 #define	PQUIRK_NOSYNCCACHE	0x00000100	/* do not issue SYNC CACHE */
-#define	PQUIRK_CDROM		0x00000200	/* device is a CD-ROM, no
-						   matter what else it claims */
 #define	PQUIRK_LITTLETOC	0x00000400	/* audio TOC is little-endian */
 #define	PQUIRK_NOCAPACITY	0x00000800	/* no READ CD CAPACITY */
 #define	PQUIRK_NOTUR		0x00001000	/* no TEST UNIT READY */
-#define	PQUIRK_NODOORLOCK	0x00002000	/* can't lock door */
 #define	PQUIRK_NOSENSE		0x00004000	/* can't REQUEST SENSE */
 #define PQUIRK_ONLYBIG		0x00008000	/* only use SCSI_{R,W}_BIG */
-#define PQUIRK_BYTE5_ZERO	0x00010000	/* byte5 in capacity is wrong */
-#define PQUIRK_NO_FLEX_PAGE	0x00020000	/* does not support flex geom
-						   page */
 #define PQUIRK_NOBIGMODESENSE	0x00040000	/* has no big mode-sense op */
 #define PQUIRK_CAP_SYNC		0x00080000	/* SCSI device with ST sync op*/
 #define PQUIRK_CAP_WIDE16	0x00100000	/* SCSI device with ST wide op*/
+#define PQUIRK_CAP_NODT		0x00200000	/* signals DT, but can't. */
 
 
 /*
@@ -510,7 +509,7 @@ struct scsipi_xfer {
 	int	timeout;		/* in milliseconds */
 	struct	scsipi_generic *cmd;	/* The scsipi command to execute */
 	int	cmdlen;			/* how long it is */
-	u_char	*data;			/* dma address OR a uio address */
+	u_char	*data;			/* DMA address OR a uio address */
 	int	datalen;		/* data len (blank if uio) */
 	int	resid;			/* how much buffer was not touched */
 	scsipi_xfer_result_t error;	/* an error value */
@@ -628,7 +627,7 @@ struct scsi_quirk_inquiry_pattern {
 
 #ifdef _KERNEL
 void	scsipi_init __P((void));
-int	scsipi_command __P((struct scsipi_periph *,
+int	scsipi_command __P((struct scsipi_periph *, struct scsipi_xfer *,
 	    struct scsipi_generic *, int, u_char *, int,
 	    int, int, struct buf *, int));
 void	scsipi_create_completion_thread __P((void *));
@@ -637,7 +636,7 @@ caddr_t	scsipi_inqmatch __P((struct scsipi_inquiry_pattern *, caddr_t,
 char	*scsipi_dtype __P((int));
 void	scsipi_strvis __P((u_char *, int, u_char *, int));
 int	scsipi_execute_xs __P((struct scsipi_xfer *));
-u_long	scsipi_size __P((struct scsipi_periph *, int));
+u_int64_t scsipi_size __P((struct scsipi_periph *, int));
 int	scsipi_test_unit_ready __P((struct scsipi_periph *, int));
 int	scsipi_prevent __P((struct scsipi_periph *, int, int));
 int	scsipi_inquire __P((struct scsipi_periph *,
@@ -662,6 +661,7 @@ void	scsipi_print_sense __P((struct scsipi_xfer *, int));
 void	scsipi_print_sense_data __P((struct scsipi_sense_data *, int));
 char   *scsipi_decode_sense __P((void *, int));
 #endif
+void	scsipi_print_cdb __P((struct scsipi_generic *cmd));
 int	scsipi_thread_call_callback __P((struct scsipi_channel *,
 	    void (*callback) __P((struct scsipi_channel *, void *)),
 	    void *));
@@ -715,6 +715,8 @@ static __inline u_int32_t _2btol __P((const u_int8_t *bytes))
 static __inline u_int32_t _3btol __P((const u_int8_t *bytes))
 	__attribute__ ((unused));
 static __inline u_int32_t _4btol __P((const u_int8_t *bytes))
+	__attribute__ ((unused));
+static __inline u_int64_t _5btol __P((const u_int8_t *bytes))
 	__attribute__ ((unused));
 
 static __inline void _lto2l __P((u_int32_t val, u_int8_t *bytes))
@@ -796,6 +798,20 @@ _4btol(bytes)
 	     (bytes[1] << 16) |
 	     (bytes[2] << 8) |
 	     bytes[3];
+	return (rv);
+}
+
+static __inline u_int64_t
+_5btol(bytes)
+	const u_int8_t *bytes;
+{
+	u_int64_t rv;
+
+	rv = ((u_int64_t)bytes[0] << 32) |
+	     ((u_int64_t)bytes[1] << 24) |
+	     ((u_int64_t)bytes[2] << 16) |
+	     ((u_int64_t)bytes[3] << 8) |
+	     (u_int64_t)bytes[4];
 	return (rv);
 }
 

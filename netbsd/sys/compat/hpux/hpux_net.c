@@ -1,9 +1,44 @@
-/*	$NetBSD: hpux_net.c,v 1.22 2001/11/13 02:08:15 lukem Exp $	*/
+/*	$NetBSD: hpux_net.c,v 1.30 2003/08/07 16:30:42 agc Exp $	*/
+
+/*
+ * Copyright (c) 1990, 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: hpux_net.c 1.8 93/08/02$
+ *
+ *	@(#)hpux_net.c	8.2 (Berkeley) 9/9/93
+ */
 
 /*
  * Copyright (c) 1988 University of Utah.
- * Copyright (c) 1990, 1993
- *	The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -47,7 +82,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: hpux_net.c,v 1.22 2001/11/13 02:08:15 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: hpux_net.c,v 1.30 2003/08/07 16:30:42 agc Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_ktrace.h"
@@ -67,12 +102,12 @@ __KERNEL_RCSID(0, "$NetBSD: hpux_net.c,v 1.22 2001/11/13 02:08:15 lukem Exp $");
 #include <sys/socketvar.h>
 #include <sys/uio.h>
 #include <sys/ktrace.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/hpux/hpux.h>
 #include <compat/hpux/hpux_syscallargs.h>
 #include <compat/hpux/hpux_util.h>
-
 
 struct hpux_sys_setsockopt_args {
 	syscallarg(int) s;
@@ -90,8 +125,8 @@ struct hpux_sys_getsockopt_args {
 	syscallarg(int *) avalsize;
 };
 
-int	hpux_sys_setsockopt	__P((struct proc *, void *, register_t *));
-int	hpux_sys_getsockopt	__P((struct proc *, void *, register_t *));
+int	hpux_sys_setsockopt	__P((struct lwp *, void *, register_t *));
+int	hpux_sys_getsockopt	__P((struct lwp *, void *, register_t *));
 
 void	socksetsize __P((int, struct mbuf *));
 
@@ -105,7 +140,7 @@ void	socksetsize __P((int, struct mbuf *));
  */
 
 struct hpuxtobsdipc {
-	int (*rout) __P((struct proc *, void *, register_t *));
+	int (*rout) __P((struct lwp *, void *, register_t *));
 	int nargs;
 } hpuxtobsdipc[NUMBSDIPC] = {
 	{ sys_socket,			3 }, /* 3ee */
@@ -147,8 +182,8 @@ struct hpuxtobsdipc {
  * Gleened from disassembled libbsdipc.a syscall entries.
  */
 int
-hpux_sys_netioctl(p, v, retval)
-	struct proc *p;
+hpux_sys_netioctl(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -156,6 +191,9 @@ hpux_sys_netioctl(p, v, retval)
 	int *args, i;
 	int code;
 	int error;
+#ifdef KTRACE
+	struct proc *p = l->l_proc;
+#endif
 
 	args = SCARG(uap, args);
 	code = SCARG(uap, call) - MINBSDIPCCODE;
@@ -164,20 +202,18 @@ hpux_sys_netioctl(p, v, retval)
 	if ((i = hpuxtobsdipc[code].nargs * sizeof (int)) &&
 	    (error = copyin((caddr_t)args, (caddr_t)uap, (u_int)i))) {
 #ifdef KTRACE
-                if (KTRPOINT(p, KTR_SYSCALL))
-                        ktrsyscall(p, code + MINBSDIPCCODE,
-				   hpuxtobsdipc[code].nargs,
-				   (register_t *)uap);
+		if (KTRPOINT(p, KTR_SYSCALL))
+			ktrsyscall(p, code + MINBSDIPCCODE,
+			    code + MINBSDIPCCODE, NULL, (register_t *)uap);
 #endif
 		return (error);
 	}
 #ifdef KTRACE
-        if (KTRPOINT(p, KTR_SYSCALL))
-                ktrsyscall(p, code + MINBSDIPCCODE,
-			   hpuxtobsdipc[code].nargs,
-			   (register_t *)uap);
+	if (KTRPOINT(p, KTR_SYSCALL))
+		ktrsyscall(p, code + MINBSDIPCCODE,
+		    code + MINBSDIPCCODE, NULL, (register_t *)uap);
 #endif
-	return ((*hpuxtobsdipc[code].rout)(p, uap, retval));
+	return ((*hpuxtobsdipc[code].rout)(l, uap, retval));
 }
 
 void
@@ -209,12 +245,13 @@ socksetsize(size, m)
 
 /* ARGSUSED */
 int
-hpux_sys_setsockopt(p, v, retval)
-	struct proc *p;
+hpux_sys_setsockopt(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct hpux_sys_setsockopt_args *uap = v;
+	struct proc *p = l->l_proc;
 	struct file *fp;
 	struct mbuf *m = NULL;
 	int tmp, error;
@@ -256,12 +293,13 @@ hpux_sys_setsockopt(p, v, retval)
 
 /* ARGSUSED */
 int
-hpux_sys_setsockopt2(p, v, retval)
-	struct proc *p;
+hpux_sys_setsockopt2(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct hpux_sys_setsockopt2_args *uap = v;
+	struct proc *p = l->l_proc;
 	struct file *fp;
 	struct mbuf *m = NULL;
 	int error;
@@ -291,12 +329,13 @@ hpux_sys_setsockopt2(p, v, retval)
 }
 
 int
-hpux_sys_getsockopt(p, v, retval)
-	struct proc *p;
+hpux_sys_getsockopt(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct hpux_sys_getsockopt_args *uap = v;
+	struct proc *p = l->l_proc;
 	struct file *fp;
 	struct mbuf *m = NULL;
 	int valsize, error;

@@ -1,4 +1,4 @@
-/*	$NetBSD: ld_icp.c,v 1.1.4.1 2003/09/12 19:01:33 tron Exp $	*/
+/*	$NetBSD: ld_icp.c,v 1.8 2003/06/13 05:57:31 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ld_icp.c,v 1.1.4.1 2003/09/12 19:01:33 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ld_icp.c,v 1.8 2003/06/13 05:57:31 thorpej Exp $");
 
 #include "rnd.h"
 
@@ -72,6 +72,7 @@ struct ld_icp_softc {
 };
 
 void	ld_icp_attach(struct device *, struct device *, void *);
+int	ld_icp_detach(struct device *, int);
 int	ld_icp_dobio(struct ld_icp_softc *, void *, int, int, int,
 		     struct buf *);
 int	ld_icp_dump(struct ld_softc *, void *, int, int);
@@ -80,8 +81,13 @@ void	ld_icp_intr(struct icp_ccb *);
 int	ld_icp_match(struct device *, struct cfdata *, void *);
 int	ld_icp_start(struct ld_softc *, struct buf *);
 
-struct cfattach ld_icp_ca = {
-	sizeof(struct ld_icp_softc), ld_icp_match, ld_icp_attach,
+void	ld_icp_adjqparam(struct device *, int);
+
+CFATTACH_DECL(ld_icp, sizeof(struct ld_icp_softc),
+    ld_icp_match, ld_icp_attach, ld_icp_detach, NULL);
+
+static const struct icp_servicecb ld_icp_servicecb = {
+	ld_icp_adjqparam,
 };
 
 int
@@ -111,6 +117,8 @@ ld_icp_attach(struct device *parent, struct device *self, void *aux)
 	icp = (struct icp_softc *)parent;
 	icpa = aux;
 	cd = &icp->icp_cdr[icpa->icpa_unit];
+
+	icp_register_servicecb(icp, icpa->icpa_unit, &ld_icp_servicecb);
 
 	sc->sc_hwunit = icpa->icpa_unit;
 	ld->sc_maxxfer = ICP_MAX_XFER;
@@ -171,6 +179,18 @@ ld_icp_attach(struct device *parent, struct device *self, void *aux)
 }
 
 int
+ld_icp_detach(struct device *dv, int flags)
+{
+	int rv;
+
+	if ((rv = ldbegindetach((struct ld_softc *)dv, flags)) != 0)
+		return (rv);
+	ldenddetach((struct ld_softc *) dv);
+
+	return (0);
+}
+
+int
 ld_icp_dobio(struct ld_icp_softc *sc, void *data, int datasize, int blkno,
 	     int dowrite, struct buf *bp)
 {
@@ -184,7 +204,8 @@ ld_icp_dobio(struct ld_icp_softc *sc, void *data, int datasize, int blkno,
 	/*
 	 * Allocate a command control block.
 	 */
-	ic = icp_ccb_alloc(icp);
+	if (__predict_false((ic = icp_ccb_alloc(icp)) == NULL))
+		return (EAGAIN);
 
 	/*
 	 * Map the data transfer.
@@ -260,7 +281,7 @@ ld_icp_flush(struct ld_softc *ld)
 	sc = (struct ld_icp_softc *)ld;
 	icp = (struct icp_softc *)ld->sc_dv.dv_parent;
 
-	ic = icp_ccb_alloc(icp);
+	ic = icp_ccb_alloc_wait(icp);
 	ic->ic_cmd.cmd_opcode = htole16(ICP_FLUSH);
 
 	cc = &ic->ic_cmd.cmd_packet.cc;
@@ -296,10 +317,29 @@ ld_icp_intr(struct icp_ccb *ic)
 		bp->b_flags |= B_ERROR;
 		bp->b_error = EIO;
 		bp->b_resid = bp->b_bcount;
+
+		icp->icp_evt.size = sizeof(icp->icp_evt.eu.sync);
+		icp->icp_evt.eu.sync.ionode = icp->icp_dv.dv_unit;
+		icp->icp_evt.eu.sync.service = icp->icp_service;
+		icp->icp_evt.eu.sync.status = icp->icp_status;
+		icp->icp_evt.eu.sync.info = icp->icp_info;
+		icp->icp_evt.eu.sync.hostdrive = sc->sc_hwunit;
+		if (icp->icp_status >= 0x8000)
+			icp_store_event(icp, GDT_ES_SYNC, 0, &icp->icp_evt);
+		else
+			icp_store_event(icp, GDT_ES_SYNC, icp->icp_service,
+			    &icp->icp_evt);
 	} else
 		bp->b_resid = 0;
 
 	icp_ccb_unmap(icp, ic);
 	icp_ccb_free(icp, ic);
 	lddone(&sc->sc_ld, bp);
+}
+
+void
+ld_icp_adjqparam(struct device *dv, int openings)
+{
+
+	ldadjqparam((struct ld_softc *) dv, openings);
 }

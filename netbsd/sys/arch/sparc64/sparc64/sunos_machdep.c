@@ -1,4 +1,4 @@
-/*	$NetBSD: sunos_machdep.c,v 1.15 2002/03/02 12:28:16 mrg Exp $	*/
+/*	$NetBSD: sunos_machdep.c,v 1.20 2003/10/30 21:02:55 matt Exp $	*/
 
 /*
  * Copyright (c) 1995 Matthew R. Green
@@ -28,6 +28,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sunos_machdep.c,v 1.20 2003/10/30 21:02:55 matt Exp $");
+
 #ifdef _KERNEL_OPT
 #include "opt_ddb.h"
 #endif
@@ -45,6 +48,7 @@
 #include <sys/signalvar.h>
 #include <sys/malloc.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 #include <compat/sunos/sunos.h>
 #include <compat/sunos/sunos_syscallargs.h>
@@ -77,20 +81,21 @@ struct sunos_sigframe {
 };
 
 void
-sunos_sendsig(catcher, sig, mask, code)
-	sig_t catcher;
-	int sig;
-	sigset_t *mask;
-	u_long code;
+sunos_sendsig(ksi, mask)
+	const ksiginfo_t *ksi;
+	const sigset_t *mask;
 {
-	register struct proc *p = curproc;
+	register struct lwp *l = curlwp;
+	struct proc *p = l->l_proc;
 	register struct sunos_sigframe *fp;
 	register struct trapframe64 *tf;
 	register int addr, onstack; 
 	struct rwindow32 *kwin, *oldsp, *newsp;
+	int sig = ksi->ksi_signo;
+	sig_t catcher = SIGACTION(p, sig).sa_handler;
 	struct sunos_sigframe sf;
 
-	tf = p->p_md.md_tf;
+	tf = (struct trapframe64 *)l->l_md.md_tf;
 	/* Need to attempt to zero extend this 32-bit pointer */
 	oldsp = (struct rwindow32 *)(u_long)(u_int)tf->tf_out[6];
 	/*
@@ -124,7 +129,7 @@ sunos_sendsig(catcher, sig, mask, code)
 	 * directly in user space....
 	 */
 	sf.sf_signo = sig;
-	sf.sf_code = code;
+	sf.sf_code = ksi->ksi_trap;
 	sf.sf_scp = (u_long)&fp->sf_sc;
 	sf.sf_addr = 0;			/* XXX */
 
@@ -157,7 +162,7 @@ sunos_sendsig(catcher, sig, mask, code)
 		   fp, &(((struct rwindow32 *)newsp)->rw_in[6]), oldsp);
 #endif
 	kwin = (struct rwindow32 *)(((caddr_t)tf)-CCFSZ);
-	if (rwindow_save(p) || 
+	if (rwindow_save(l) || 
 	    copyout((caddr_t)&sf, (caddr_t)fp, sizeof sf) || 
 	    suword(&(((struct rwindow32 *)newsp)->rw_in[6]), (u_long)oldsp)) {
 		/*
@@ -172,7 +177,7 @@ sunos_sendsig(catcher, sig, mask, code)
 		if (sigdebug & SDB_DDB) Debugger();
 #endif
 #endif
-		sigexit(p, SIGILL);
+		sigexit(l, SIGILL);
 		/* NOTREACHED */
 	}
 
@@ -202,22 +207,23 @@ sunos_sendsig(catcher, sig, mask, code)
 }
 
 int
-sunos_sys_sigreturn(p, v, retval)
-        register struct proc *p;
+sunos_sys_sigreturn(l, v, retval)
+        register struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct sunos_sys_sigreturn_args /* 
 		syscallarg(struct sigcontext13 *) sigcntxp;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct sunos_sigcontext sc, *scp;
 	sigset_t mask;
 	struct trapframe64 *tf;
 
 	/* First ensure consistent stack state (see sendsig). */
 	write_user_windows();
-	if (rwindow_save(p))
-		sigexit(p, SIGILL);
+	if (rwindow_save(l))
+		sigexit(l, SIGILL);
 #ifdef DEBUG
 	if (sigdebug & SDB_FOLLOW) {
 		printf("sunos_sigreturn: %s[%d], sigcntxp %p\n",
@@ -233,7 +239,7 @@ sunos_sys_sigreturn(p, v, retval)
 		return (EFAULT);
 	scp = &sc;
 
-	tf = p->p_md.md_tf;
+	tf = (struct trapframe64 *)l->l_md.md_tf;
 	/*
 	 * Only the icc bits in the psr are used, so it need not be
 	 * verified.  pc and npc must be multiples of 4.  This is all

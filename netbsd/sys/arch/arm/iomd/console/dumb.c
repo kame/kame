@@ -1,4 +1,4 @@
-/*	$NetBSD: dumb.c,v 1.1 2001/10/05 22:27:45 reinoud Exp $	*/
+/*	$NetBSD: dumb.c,v 1.3 2003/07/15 00:24:43 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994-1995 Melvyn Tang-Richardson
@@ -42,6 +42,9 @@
  */
 
 #include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: dumb.c,v 1.3 2003/07/15 00:24:43 lukem Exp $");
+
+#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/device.h>
@@ -51,6 +54,11 @@
 
 #define TERMTYPE_PUTSTRING	dumb_putstring
 #define TERMTYPE_INIT		dumb_init
+
+int dumb_init(struct vconsole *);
+static void do_scrollup(struct vconsole *);
+static int do_render(char, struct vconsole *);
+int dumb_putstring(char *, int, struct vconsole *);
 
 int
 TERMTYPE_INIT(vc)

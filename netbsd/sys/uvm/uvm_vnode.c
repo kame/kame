@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_vnode.c,v 1.58 2002/05/17 22:00:50 enami Exp $	*/
+/*	$NetBSD: uvm_vnode.c,v 1.63 2004/03/24 07:55:01 junyoung Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -50,7 +50,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_vnode.c,v 1.58 2002/05/17 22:00:50 enami Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_vnode.c,v 1.63 2004/03/24 07:55:01 junyoung Exp $");
 
 #include "fs_nfs.h"
 #include "opt_uvmhist.h"
@@ -77,13 +77,13 @@ __KERNEL_RCSID(0, "$NetBSD: uvm_vnode.c,v 1.58 2002/05/17 22:00:50 enami Exp $")
  * functions
  */
 
-void	uvn_detach __P((struct uvm_object *));
-int	uvn_get __P((struct uvm_object *, voff_t, struct vm_page **, int *, int,
-	    vm_prot_t, int, int));
-int	uvn_put __P((struct uvm_object *, voff_t, voff_t, int));
-void	uvn_reference __P((struct uvm_object *));
+void	uvn_detach(struct uvm_object *);
+int	uvn_get(struct uvm_object *, voff_t, struct vm_page **, int *, int,
+	    vm_prot_t, int, int);
+int	uvn_put(struct uvm_object *, voff_t, voff_t, int);
+void	uvn_reference(struct uvm_object *);
 
-int	uvn_findpage __P((struct uvm_object *, voff_t, struct vm_page **, int));
+int	uvn_findpage(struct uvm_object *, voff_t, struct vm_page **, int);
 
 /*
  * master pager structure
@@ -125,6 +125,7 @@ uvn_attach(arg, accessprot)
 	struct vnode *vp = arg;
 	struct uvm_object *uobj = &vp->v_uobj;
 	struct vattr vattr;
+	const struct bdevsw *bdev;
 	int result;
 	struct partinfo pi;
 	voff_t used_vnode_size;
@@ -150,10 +151,14 @@ uvn_attach(arg, accessprot)
 	/*
 	 * if we're mapping a BLK device, make sure it is a disk.
 	 */
-	if (vp->v_type == VBLK && bdevsw[major(vp->v_rdev)].d_type != D_DISK) {
-		simple_unlock(&uobj->vmobjlock);
-		UVMHIST_LOG(maphist,"<- done (VBLK not D_DISK!)", 0,0,0,0);
-		return(NULL);
+	if (vp->v_type == VBLK) {
+		bdev = bdevsw_lookup(vp->v_rdev);
+		if (bdev == NULL || bdev->d_type != D_DISK) {
+			simple_unlock(&uobj->vmobjlock);
+			UVMHIST_LOG(maphist,"<- done (VBLK not D_DISK!)",
+				    0,0,0,0);
+			return(NULL);
+		}
 	}
 	KASSERT(vp->v_type == VREG || vp->v_type == VBLK);
 
@@ -176,8 +181,13 @@ uvn_attach(arg, accessprot)
 		 *
 		 *	(2) All we want is the size, anyhow.
 		 */
-		result = (*bdevsw[major(vp->v_rdev)].d_ioctl)(vp->v_rdev,
-		    DIOCGPART, (caddr_t)&pi, FREAD, curproc);
+		bdev = bdevsw_lookup(vp->v_rdev);
+		if (bdev != NULL) {
+			result = (*bdev->d_ioctl)(vp->v_rdev, DIOCGPART,
+						  (caddr_t)&pi, FREAD, curproc);
+		} else {
+			result = ENXIO;
+		}
 		if (result == 0) {
 			/* XXX should remember blocksize */
 			used_vnode_size = (voff_t)pi.disklab->d_secsize *
@@ -384,11 +394,6 @@ uvn_findpage(uobj, offset, pgp, flags)
 				uvm_wait("uvn_fp1");
 				simple_lock(&uobj->vmobjlock);
 				continue;
-			}
-			if (UVM_OBJ_IS_VTEXT(uobj)) {
-				uvmexp.execpages++;
-			} else {
-				uvmexp.filepages++;
 			}
 			UVMHIST_LOG(ubchist, "alloced %p", pg,0,0,0);
 			break;

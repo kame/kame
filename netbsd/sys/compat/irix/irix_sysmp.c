@@ -1,4 +1,4 @@
-/*	$NetBSD: irix_sysmp.c,v 1.8 2002/04/20 21:25:01 manu Exp $ */
+/*	$NetBSD: irix_sysmp.c,v 1.11 2003/12/04 19:38:22 atatat Exp $ */
 
 /*-
  * Copyright (c) 2001-2002 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: irix_sysmp.c,v 1.8 2002/04/20 21:25:01 manu Exp $");
+__KERNEL_RCSID(0, "$NetBSD: irix_sysmp.c,v 1.11 2003/12/04 19:38:22 atatat Exp $");
 
 #include <sys/errno.h>
 #include <sys/param.h>
@@ -69,8 +69,8 @@ extern struct loadavg averunnable;
 extern long irix_kernel_var[32];
 
 int
-irix_sys_sysmp(p, v, retval)
-	struct proc *p;
+irix_sys_sysmp(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -83,7 +83,6 @@ irix_sys_sysmp(p, v, retval)
 	} */ *uap = v;
 	int cmd = SCARG(uap, cmd);
 	int error = 0;
-	caddr_t sg = stackgap_init(p, 0);
 
 #ifdef DEBUG_IRIX
 	printf("irix_sys_sysmp(): cmd = %d\n", cmd);
@@ -92,13 +91,20 @@ irix_sys_sysmp(p, v, retval)
 	switch(cmd) {
 	case IRIX_MP_NPROCS:	/* Number of processors in complex */
 	case IRIX_MP_NAPROCS: {	/* Number of active processors in complex */
-		int *ncpu = stackgap_alloc(p, &sg, sizeof(int));
-		int name = HW_NCPU;
-		int namelen = sizeof(name);
+		int ncpu, name[2];
+		size_t sz;
 
-		error = hw_sysctl(&name, 1, ncpu, &namelen, NULL, 0, p);
+		name[0] = CTL_HW;
+		name[1] = HW_NCPU;
+		sz = sizeof(ncpu);
+		/*
+		 * by passing a NULL lwp pointer, we indicate that oldp
+		 * (and newp) are kernel addresses, not userspace
+		 * addresses, making this whole thing simpler
+		 */
+		error = old_sysctl(&name[0], 2, &ncpu, &sz, NULL, 0, NULL);
 		if (!error)
-			error = copyin(ncpu, retval, sizeof(int));
+			*retval = ncpu;
 
 		return error;
 		break;
@@ -181,9 +187,6 @@ irix_sysmp_saget(cmd, buf, len)
 	void *kbuf;
 	int error = 0;
 
-	if (!uvm_useracc(buf, len, B_WRITE))
-		return EINVAL;
-
 	kbuf = malloc(len, M_TEMP, M_WAITOK);
 
 	switch (cmd) {
@@ -215,7 +218,7 @@ irix_sysmp_saget(cmd, buf, len)
 	}
 
 	if (error == 0)
-		(void)copyout((void *)kbuf, (void *)buf, len);
+		error = copyout(kbuf, buf, len);
 
 	free(kbuf, M_TEMP);
 	return error;

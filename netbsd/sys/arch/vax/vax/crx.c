@@ -1,4 +1,4 @@
-/*	$NetBSD: crx.c,v 1.5 2000/05/27 04:52:33 thorpej Exp $	*/
+/*	$NetBSD: crx.c,v 1.9 2003/08/07 16:30:17 agc Exp $	*/
 /*
  * Copyright (c) 1988 Regents of the University of California.
  * All rights reserved.
@@ -14,11 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,6 +37,9 @@
  * Routines to handle the console RX50.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: crx.c,v 1.9 2003/08/07 16:30:17 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/proc.h>
@@ -55,13 +54,20 @@
 #include <machine/ka820.h>
 #include <vax/vax/crx.h>
 
+dev_type_open(crxopen);
+dev_type_close(crxclose);
+dev_type_read(crxrw);
+
+const struct cdevsw crx_cdevsw = {
+	crxopen, crxclose, crxrw, crxrw, noioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
+
 extern struct	rx50device *rx50device_ptr;
 #define rxaddr	rx50device_ptr
 extern struct	ka820port *ka820port_ptr;
 
 #define	rx50unit(dev)	minor(dev)
-
-cdev_decl(crx);
 
 struct rx50state {
 	short	rs_flags;	/* see below */
@@ -128,7 +134,6 @@ crxclose(dev, flags, fmt, p)
 /*
  * Perform a read (uio->uio_rw==UIO_READ) or write (uio->uio_rw==UIO_WRITE).
  */
-int	crxrw __P((dev_t, struct uio *, int));
 int
 crxrw(dev, uio, flags)
 	dev_t dev;

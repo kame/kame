@@ -1,4 +1,4 @@
-/* $NetBSD: pcb.h,v 1.8 2001/04/20 00:10:18 thorpej Exp $ */
+/* $NetBSD: pcb.h,v 1.12 2003/06/29 22:28:05 fvdl Exp $ */
 
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -26,6 +26,13 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  */
+
+#ifndef _ALPHA_PCB_H_
+#define	_ALPHA_PCB_H_
+
+#ifdef _KERNEL_OPT
+#include "opt_multiprocessor.h"
+#endif
 
 #include <sys/lock.h>
 
@@ -86,3 +93,4 @@ struct md_coredump {
 	struct	trapframe md_tf;
 	struct	fpreg md_fpstate;
 };
+#endif /* _ALPHA_PCB_H_ */

@@ -1,4 +1,4 @@
-/* $NetBSD: wdog.c,v 1.6 2002/03/24 18:04:42 uch Exp $ */
+/* $NetBSD: wdog.c,v 1.13 2003/07/15 03:35:55 lukem Exp $ */
 
 /*-
  * Copyright (C) 2000 SAITOH Masanobu.  All rights reserved.
@@ -26,6 +26,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: wdog.c,v 1.13 2003/07/15 03:35:55 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/systm.h>
@@ -37,9 +40,9 @@
 #include <sys/malloc.h>
 #include <sys/proc.h>
 #include <sys/syslog.h>
+#include <sys/conf.h>
 
 #include <machine/cpu.h>
-#include <machine/conf.h>
 #include <machine/intr.h>
 
 #include <sh3/frame.h>
@@ -56,11 +59,19 @@ static int wdogmatch(struct device *, struct cfdata *, void *);
 static void wdogattach(struct device *, struct device *, void *);
 static int wdogintr(void *);
 
-struct cfattach wdog_ca = {
-	sizeof(struct wdog_softc), wdogmatch, wdogattach
-};
+CFATTACH_DECL(wdog, sizeof(struct wdog_softc),
+    wdogmatch, wdogattach, NULL, NULL);
 
 extern struct cfdriver wdog_cd;
+
+dev_type_open(wdogopen);
+dev_type_close(wdogclose);
+dev_type_ioctl(wdogioctl);
+
+const struct cdevsw wdog_cdevsw = {
+	wdogopen, wdogclose, noread, nowrite, wdogioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
 
 void
 wdog_wr_cnt(unsigned char x)
@@ -80,7 +91,7 @@ static int
 wdogmatch(struct device *parent, struct cfdata *cfp, void *aux)
 {
 
-	if (strcmp(cfp->cf_driver->cd_name, "wdog"))
+	if (strcmp(cfp->cf_name, "wdog"))
 		return (0);
 
 	return (1);

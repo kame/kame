@@ -1,4 +1,4 @@
-# $NetBSD: GENERIC,v 1.39.4.2 2002/10/24 09:34:32 lukem Exp $
+# $NetBSD: GENERIC,v 1.52.2.3 2004/07/15 20:18:47 he Exp $
 #
 # GENERIC machine description file
 # 
@@ -22,7 +22,7 @@ include 	"arch/mmeye/conf/std.mmeye"
 
 options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
-#ident 		"GENERIC-$Revision: 1.1.1.4 $"
+#ident 		"GENERIC-$Revision: 1.1.1.5 $"
 
 maxusers	16		# estimated number of users
 
@@ -36,12 +36,12 @@ options 	PCLOCK=33330000		# 33.33MHz
 options 	INITTODR_ALWAYS_USE_RTC
 
 # Standard system options
-#options 	UCONSOLE	# users can use TIOCCONS (for xconsole)
 #options 	INSECURE	# disable kernel security levels
 
 options 	HZ=50		# clock interrupt generates every 1/HZ sec
 options 	NTP		# NTP phase/frequency locked loop
 options 	KTRACE		# system call tracing via ktrace(1)
+options 	SYSTRACE	# system call vetting via systrace(1)
 
 options 	SYSVMSG		# System V-like message queues
 options 	SYSVSEM		# System V-like semaphores
@@ -51,11 +51,13 @@ options 	SYSVSEM		# System V-like semaphores
 #options 	SEMMNU=30	# number of undo structures in system
 options 	SYSVSHM		# System V-like memory sharing
 #options 	SHMMAXPGS=1024	# 1024 pages is the default
+options 	P1003_1B_SEMAPHORE # p1003.1b semaphore support
 
 #options 	LKM		# loadable kernel modules
 
-#options 	USERCONF	# userconf(4) support
+options 	USERCONF	# userconf(4) support
 #options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
 
 # Diagnostic/debugging support options
 #options 	DIAGNOSTIC	# cheap kernel consistency checks
@@ -66,10 +68,11 @@ options 	SYSVSHM		# System V-like memory sharing
 #makeoptions	DEBUG="-g"	# compile full symbol table
 
 # Compatibility options
-options 	COMPAT_13	# NetBSD 1.3
 options 	COMPAT_14	# NetBSD 1.4,
 options 	COMPAT_43	# and 4.3BSD
 #options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
+options 	BSDDISKLABEL_EI	# endian independent disklabel support
+options 	COMPAT_MMEYE_OLDLABEL	# old mmeye's disklabel support
 
 # Executable format options
 options 	EXEC_COFF	# COFF executables
@@ -123,6 +126,19 @@ options 	INET6		# IPV6
 #options 	IPFILTER_DEFAULT_BLOCK	# block all packets by default
 #options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 
+#options 	ALTQ		# Manipulate network interfaces' output queues
+#options 	ALTQ_BLUE	# Stochastic Fair Blue
+#options 	ALTQ_CBQ	# Class-Based Queueing
+#options 	ALTQ_CDNR	# Diffserv Traffic Conditioner
+#options 	ALTQ_FIFOQ	# First-In First-Out Queue
+#options 	ALTQ_FLOWVALVE	# RED/flow-valve (red-penalty-box)
+#options 	ALTQ_HFSC	# Hierarchical Fair Service Curve
+#options 	ALTQ_LOCALQ	# Local queueing discipline
+#options 	ALTQ_PRIQ	# Priority Queueing
+#options 	ALTQ_RED	# Random Early Detection
+#options 	ALTQ_RIO	# RED with IN/OUT
+#options 	ALTQ_WFQ	# Weighted Fair Queueing
+
 options 	NFS_BOOT_DHCP	# Support DHCP NFS root
 
 # These options enable verbose messages for several subsystems.
@@ -156,7 +172,8 @@ pcmcia*	at mmeyepcmcia? controller ? socket ?
 
 com*	at pcmcia? function ?		# Modems and serial cards
 wdc*	at pcmcia? function ?
-wd*	at wdc? drive ?			# the drives themselves
+atabus* at ata?
+wd*	at atabus? drive ?			# the drives themselves
 
 ep*	at pcmcia? function ?		# 3Com 3c589 and 3c562 Ethernet
 mbe*	at pcmcia? function ?		# MB8696x based Ethernet
@@ -166,6 +183,7 @@ sm*	at pcmcia? function ?		# Megahertz Ethernet
 # Pseudo-Devices
 
 pseudo-device	ccd		4	# concatenated/striped disk devices
+#pseudo-device	cgd		4	# cryptographic disk devices
 #pseudo-device	raid		8	# RAIDframe disk driver
 #options 	RAID_AUTOCONFIG		# auto-configuration of RAID components
 # Options to enable various other RAIDframe RAID types.
@@ -191,11 +209,13 @@ pseudo-device	gif		4	# IPv[46] over IPv[46] tunnel (RFC1933)
 #pseudo-device	stf		1	# 6to4 IPv6 over IPv4 encapsulation
 pseudo-device	vlan			# IEEE 802.1q encapsulation
 pseudo-device	bridge			# simple inter-network bridging
+#options	BRIDGE_IPF		# bridge uses IP/IPv6 pfil hooks too
 pseudo-device	pty			# pseudo-terminals
 pseudo-device	rnd			# /dev/random and in-kernel generator
 pseudo-device	vcoda		4	# coda minicache <-> venus comm.
 #pseudo-device	md		1	# memory disk device (ramdisk)
 pseudo-device	clockctl		# user control of clock subsystem
+pseudo-device	ksyms			# /dev/ksyms
 
 # Enable the hooks used for initializing the root memory-disk.
 #options 	MEMORY_DISK_HOOKS

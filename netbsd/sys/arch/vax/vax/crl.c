@@ -1,4 +1,4 @@
-/*	$NetBSD: crl.c,v 1.11 2000/11/20 08:24:23 chs Exp $	*/
+/*	$NetBSD: crl.c,v 1.18 2003/09/29 22:54:28 matt Exp $	*/
 /*-
  * Copyright (c) 1982, 1986 The Regents of the University of California.
  * All rights reserved.
@@ -11,11 +11,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,6 +34,9 @@
  * TO DO (tef  7/18/85):
  *	1) change printf's to log() instead???
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: crl.c,v 1.18 2003/09/29 22:54:28 matt Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -70,26 +69,29 @@ void	crlintr __P((void *));
 void	crlattach __P((void));
 static	void crlstart __P((void));
 
-int	crlopen __P((dev_t, int, struct proc *));
-int	crlclose __P((dev_t, int, struct proc *));
-int	crlrw __P((dev_t, struct uio *, int));
+dev_type_open(crlopen);
+dev_type_close(crlclose);
+dev_type_read(crlrw);
 
+const struct cdevsw crl_cdevsw = {
+	crlopen, crlclose, crlrw, crlrw, noioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
 
-struct	ivec_dsp crl_intr;
+struct evcnt crl_ev = EVCNT_INITIALIZER(EVCNT_TYPE_INTR, NULL, "crl", "intr");
 
 void
 crlattach()
 {
-	crl_intr = idsptch;
-	crl_intr.hoppaddr = crlintr;
-	scb->scb_csrint = &crl_intr;
+	evcnt_attach_static(&crl_ev);
+	scb_vecalloc(0xF0, crlintr, NULL, SCB_ISTACK, &crl_ev);
 }	
 
 /*ARGSUSED*/
 int
-crlopen(dev, flag, p)
+crlopen(dev, flag, mode, p)
 	dev_t dev;
-	int flag;
+	int flag, mode;
 	struct proc *p;
 {
 	if (vax_cputype != VAX_8600)
@@ -103,9 +105,9 @@ crlopen(dev, flag, p)
 
 /*ARGSUSED*/
 int
-crlclose(dev, flag, p)
+crlclose(dev, flag, mode, p)
 	dev_t dev;
-	int flag;
+	int flag, mode;
 	struct proc *p;
 {
 
@@ -268,7 +270,7 @@ crlintr(arg)
 		break;
 
 	case CRL_S_HWERR:
-		printf("crl: hard error sn%d\n", bp->b_blkno);
+		printf("crl: hard error sn%" PRId64 "\n", bp->b_blkno);
 		crltab.crl_active = CRL_F_ABORT;
 		mtpr(STXCS_IE | CRL_F_ABORT, PR_STXCS);
 		break;

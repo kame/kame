@@ -1,4 +1,4 @@
-/*	$NetBSD: hyper.c,v 1.12 2002/01/28 09:56:57 aymeric Exp $ */
+/*	$NetBSD: hyper.c,v 1.16 2003/01/01 00:28:59 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1997,1998 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: hyper.c,v 1.12 2002/01/28 09:56:57 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: hyper.c,v 1.16 2003/01/01 00:28:59 thorpej Exp $");
 
 /*
  * zbus HyperCom driver
@@ -51,7 +51,6 @@ __KERNEL_RCSID(0, "$NetBSD: hyper.c,v 1.12 2002/01/28 09:56:57 aymeric Exp $");
 #include <sys/param.h>
 
 #include <machine/bus.h>
-#include <machine/conf.h>
 
 #include <amiga/include/cpu.h>
 
@@ -71,9 +70,8 @@ int hypermatch(struct device *, struct cfdata *, void *);
 void hyperattach(struct device *, struct device *, void *);
 int hyperprint(void *auxp, const char *);
 
-struct cfattach hyper_ca = {
-	sizeof(struct hyper_softc), hypermatch, hyperattach
-};
+CFATTACH_DECL(hyper, sizeof(struct hyper_softc),
+    hypermatch, hyperattach, NULL, NULL);
 
 struct hyper_prods {
 	char *name;
@@ -176,7 +174,7 @@ hyperprint(void *auxp, const char *pnp)
 	if (pnp == NULL)
 		return(QUIET);
 
-	printf("%s at %s port 0x%02x",
+	aprint_normal("%s at %s port 0x%02x",
 	    supa->supio_name, pnp, supa->supio_iobase);
 
 	return(UNCONF);

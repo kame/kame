@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_pglist.c,v 1.19 2001/11/10 07:37:01 lukem Exp $	*/
+/*	$NetBSD: uvm_pglist.c,v 1.31 2004/03/24 07:47:33 junyoung Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_pglist.c,v 1.19 2001/11/10 07:37:01 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_pglist.c,v 1.31 2004/03/24 07:47:33 junyoung Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -58,7 +58,7 @@ __KERNEL_RCSID(0, "$NetBSD: uvm_pglist.c,v 1.19 2001/11/10 07:37:01 lukem Exp $"
 			printf("%s:%d -- Already 0!\n", __FILE__, __LINE__); \
 		else \
 			(v)--; \
-	} while (0)
+	} while (/*CONSTCOND*/ 0)
 u_long	uvm_pglistalloc_npages;
 #else
 #define	STAT_INCR(v)
@@ -68,11 +68,11 @@ u_long	uvm_pglistalloc_npages;
 /*
  * uvm_pglistalloc: allocate a list of pages
  *
- * => allocated pages are placed at the tail of rlist.  rlist is
- *    assumed to be properly initialized by caller.
+ * => allocated pages are placed onto an rlist.  rlist is
+ *    initialized by uvm_pglistalloc.
  * => returns 0 on success or errno on failure
- * => XXX: implementation allocates only a single segment, also
- *	might be able to better advantage of vm_physeg[].
+ * => implementation allocates a single segment if any constraints are
+ *	imposed by call arguments.
  * => doesn't take into account clean non-busy pages on inactive list
  *	that could be used(?)
  * => params:
@@ -84,37 +84,171 @@ u_long	uvm_pglistalloc_npages;
  *			power-of-two boundary (relative to zero).
  */
 
-int
-uvm_pglistalloc(size, low, high, alignment, boundary, rlist, nsegs, waitok)
-	psize_t size;
-	paddr_t low, high, alignment, boundary;
+static void uvm_pglist_add(struct vm_page *, struct pglist *);
+static int uvm_pglistalloc_c_ps(struct vm_physseg *, int, paddr_t, paddr_t,
+				paddr_t, paddr_t, struct pglist *);
+static int uvm_pglistalloc_contig(int, paddr_t, paddr_t, paddr_t, paddr_t,
+				  struct pglist *);
+static int uvm_pglistalloc_s_ps(struct vm_physseg *, int, paddr_t, paddr_t,
+				struct pglist *);
+static int uvm_pglistalloc_simple(int, paddr_t, paddr_t,
+				  struct pglist *, int);
+
+static void
+uvm_pglist_add(pg, rlist)
+	struct vm_page *pg;
 	struct pglist *rlist;
-	int nsegs, waitok;
 {
-	paddr_t try, idxpa, lastidxpa;
-	int psi;
-	struct vm_page *pgs, *pg;
-	int s, tryidx, idx, pgflidx, end, error, free_list, color;
-	u_long pagemask;
+	int free_list, color, pgflidx;
 #ifdef DEBUG
 	struct vm_page *tp;
 #endif
 
-	KASSERT((alignment & (alignment - 1)) == 0);
-	KASSERT((boundary & (boundary - 1)) == 0);
+#if PGFL_NQUEUES != 2
+#error uvm_pglistalloc needs to be updated
+#endif
+
+	free_list = uvm_page_lookup_freelist(pg);
+	color = VM_PGCOLOR_BUCKET(pg);
+	pgflidx = (pg->flags & PG_ZERO) ? PGFL_ZEROS : PGFL_UNKNOWN;
+#ifdef DEBUG
+	for (tp = TAILQ_FIRST(&uvm.page_free[
+		free_list].pgfl_buckets[color].pgfl_queues[pgflidx]);
+	     tp != NULL;
+	     tp = TAILQ_NEXT(tp, pageq)) {
+		if (tp == pg)
+			break;
+	}
+	if (tp == NULL)
+		panic("uvm_pglistalloc: page not on freelist");
+#endif
+	TAILQ_REMOVE(&uvm.page_free[free_list].pgfl_buckets[
+			color].pgfl_queues[pgflidx], pg, pageq);
+	uvmexp.free--;
+	if (pg->flags & PG_ZERO)
+		uvmexp.zeropages--;
+	pg->flags = PG_CLEAN;
+	pg->pqflags = 0;
+	pg->uobject = NULL;
+	pg->uanon = NULL;
+	TAILQ_INSERT_TAIL(rlist, pg, pageq);
+	STAT_INCR(uvm_pglistalloc_npages);
+}
+
+static int
+uvm_pglistalloc_c_ps(ps, num, low, high, alignment, boundary, rlist)
+	struct vm_physseg *ps;
+	int num;
+	paddr_t low, high, alignment, boundary;
+	struct pglist *rlist;
+{
+	int try, limit, tryidx, end, idx;
+	struct vm_page *pgs;
+	int pagemask;
+#ifdef DEBUG
+	paddr_t idxpa, lastidxpa;
+	int cidx;
+#endif
+#ifdef PGALLOC_VERBOSE
+	printf("pgalloc: contig %d pgs from psi %ld\n", num,
+	(long)(ps - vm_physmem));
+#endif
+
+	try = roundup(max(atop(low), ps->avail_start), atop(alignment));
+	limit = min(atop(high), ps->avail_end);
+	pagemask = ~((boundary >> PAGE_SHIFT) - 1);
+
+	for (;;) {
+		if (try + num > limit) {
+			/*
+			 * We've run past the allowable range.
+			 */
+			return (0); /* FAIL */
+		}
+		if (boundary != 0 &&
+		    ((try ^ (try + num - 1)) & pagemask) != 0) {
+			/*
+			 * Region crosses boundary. Jump to the boundary
+			 * just crossed and ensure alignment.
+			 */
+			try = (try + num - 1) & pagemask;
+			try = roundup(try, atop(alignment));
+			continue;
+		}
+#ifdef DEBUG
+		/*
+		 * Make sure this is a managed physical page.
+		 */
+
+		if (vm_physseg_find(try, &cidx) != ps - vm_physmem)
+			panic("pgalloc contig: botch1");
+		if (cidx != try - ps->start)
+			panic("pgalloc contig: botch2");
+		if (vm_physseg_find(try + num - 1, &cidx) != ps - vm_physmem)
+			panic("pgalloc contig: botch3");
+		if (cidx != try - ps->start + num - 1)
+			panic("pgalloc contig: botch4");
+#endif
+		tryidx = try - ps->start;
+		end = tryidx + num;
+		pgs = ps->pgs;
+
+		/*
+		 * Found a suitable starting page.  See if the range is free.
+		 */
+		for (idx = tryidx; idx < end; idx++) {
+			if (VM_PAGE_IS_FREE(&pgs[idx]) == 0)
+				break;
+
+#ifdef DEBUG
+			idxpa = VM_PAGE_TO_PHYS(&pgs[idx]);
+			if (idx > tryidx) {
+				lastidxpa = VM_PAGE_TO_PHYS(&pgs[idx - 1]);
+				if ((lastidxpa + PAGE_SIZE) != idxpa) {
+					/*
+					 * Region not contiguous.
+					 */
+					panic("pgalloc contig: botch5");
+				}
+				if (boundary != 0 &&
+				    ((lastidxpa ^ idxpa) & ~(boundary - 1))
+				    != 0) {
+					/*
+					 * Region crosses boundary.
+					 */
+					panic("pgalloc contig: botch6");
+				}
+			}
+#endif
+		}
+		if (idx == end)
+			break;
+
+		try += atop(alignment);
+	}
 
 	/*
-	 * Our allocations are always page granularity, so our alignment
-	 * must be, too.
+	 * we have a chunk of memory that conforms to the requested constraints.
 	 */
+	idx = tryidx;
+	while (idx < end)
+		uvm_pglist_add(&pgs[idx++], rlist);
 
-	if (alignment < PAGE_SIZE)
-		alignment = PAGE_SIZE;
-	size = round_page(size);
-	try = roundup(low, alignment);
-	if (boundary != 0 && boundary < size)
-		return (EINVAL);
-	pagemask = ~(boundary - 1);
+#ifdef PGALLOC_VERBOSE
+	printf("got %d pgs\n", num);
+#endif
+	return (num); /* number of pages allocated */
+}
+
+static int
+uvm_pglistalloc_contig(num, low, high, alignment, boundary, rlist)
+	int num;
+	paddr_t low, high, alignment, boundary;
+	struct pglist *rlist;
+{
+	int fl, psi;
+	struct vm_physseg *ps;
+	int s, error;
 
 	/* Default to "lose". */
 	error = ENOMEM;
@@ -122,108 +256,37 @@ uvm_pglistalloc(size, low, high, alignment, boundary, rlist, nsegs, waitok)
 	/*
 	 * Block all memory allocation and lock the free list.
 	 */
-
 	s = uvm_lock_fpageq();
 
 	/* Are there even any free pages? */
 	if (uvmexp.free <= (uvmexp.reserve_pagedaemon + uvmexp.reserve_kernel))
 		goto out;
 
-	for (;; try += alignment) {
-		if (try + size > high) {
+	for (fl = 0; fl < VM_NFREELIST; fl++) {
+#if (VM_PHYSSEG_STRAT == VM_PSTRAT_BIGFIRST)
+		for (psi = vm_nphysseg - 1 ; psi >= 0 ; psi--)
+#else
+		for (psi = 0 ; psi < vm_nphysseg ; psi++)
+#endif
+		{
+			ps = &vm_physmem[psi];
 
-			/*
-			 * We've run past the allowable range.
-			 */
+			if (ps->free_list != fl)
+				continue;
 
-			goto out;
-		}
-
-		/*
-		 * Make sure this is a managed physical page.
-		 */
-
-		if ((psi = vm_physseg_find(atop(try), &idx)) == -1)
-			continue; /* managed? */
-		if (vm_physseg_find(atop(try + size), NULL) != psi)
-			continue; /* end must be in this segment */
-		tryidx = idx;
-		end = idx + (size / PAGE_SIZE);
-		pgs = vm_physmem[psi].pgs;
-
-		/*
-		 * Found a suitable starting page.  See of the range is free.
-		 */
-
-		for (; idx < end; idx++) {
-			if (VM_PAGE_IS_FREE(&pgs[idx]) == 0) {
-				break;
-			}
-			idxpa = VM_PAGE_TO_PHYS(&pgs[idx]);
-			if (idx > tryidx) {
-				lastidxpa = VM_PAGE_TO_PHYS(&pgs[idx - 1]);
-				if ((lastidxpa + PAGE_SIZE) != idxpa) {
-
-					/*
-					 * Region not contiguous.
-					 */
-
-					break;
-				}
-				if (boundary != 0 &&
-				    ((lastidxpa ^ idxpa) & pagemask) != 0) {
-
-					/*
-					 * Region crosses boundary.
-					 */
-
-					break;
-				}
+			num -= uvm_pglistalloc_c_ps(ps, num, low, high,
+						    alignment, boundary, rlist);
+			if (num == 0) {
+#ifdef PGALLOC_VERBOSE
+				printf("pgalloc: %lx-%lx\n",
+				       VM_PAGE_TO_PHYS(TAILQ_FIRST(rlist)),
+				       VM_PAGE_TO_PHYS(TAILQ_LAST(rlist)));
+#endif
+				error = 0;
+				goto out;
 			}
 		}
-		if (idx == end) {
-			break;
-		}
 	}
-
-#if PGFL_NQUEUES != 2
-#error uvm_pglistalloc needs to be updated
-#endif
-
-	/*
-	 * we have a chunk of memory that conforms to the requested constraints.
-	 */
-	idx = tryidx;
-	while (idx < end) {
-		pg = &pgs[idx];
-		free_list = uvm_page_lookup_freelist(pg);
-		color = VM_PGCOLOR_BUCKET(pg);
-		pgflidx = (pg->flags & PG_ZERO) ? PGFL_ZEROS : PGFL_UNKNOWN;
-#ifdef DEBUG
-		for (tp = TAILQ_FIRST(&uvm.page_free[
-			free_list].pgfl_buckets[color].pgfl_queues[pgflidx]);
-		     tp != NULL;
-		     tp = TAILQ_NEXT(tp, pageq)) {
-			if (tp == pg)
-				break;
-		}
-		if (tp == NULL)
-			panic("uvm_pglistalloc: page not on freelist");
-#endif
-		TAILQ_REMOVE(&uvm.page_free[free_list].pgfl_buckets[
-		    color].pgfl_queues[pgflidx], pg, pageq);
-		uvmexp.free--;
-		if (pg->flags & PG_ZERO)
-			uvmexp.zeropages--;
-		pg->flags = PG_CLEAN;
-		pg->pqflags = 0;
-		pg->uobject = NULL;
-		pg->uanon = NULL;
-		TAILQ_INSERT_TAIL(rlist, pg, pageq);
-		idx++;
-		STAT_INCR(uvm_pglistalloc_npages);
-	}
-	error = 0;
 
 out:
 	/*
@@ -234,6 +297,156 @@ out:
 	UVM_KICK_PDAEMON();
 	uvm_unlock_fpageq(s);
 	return (error);
+}
+
+static int
+uvm_pglistalloc_s_ps(ps, num, low, high, rlist)
+	struct vm_physseg *ps;
+	int num;
+	paddr_t low, high;
+	struct pglist *rlist;
+{
+	int todo, limit, try;
+	struct vm_page *pg;
+#ifdef DEBUG
+	int cidx;
+#endif
+#ifdef PGALLOC_VERBOSE
+	printf("pgalloc: simple %d pgs from psi %ld\n", num,
+	    (long)(ps - vm_physmem));
+#endif
+
+	todo = num;
+	limit = min(atop(high), ps->avail_end);
+
+	for (try = max(atop(low), ps->avail_start);
+	     try < limit; try ++) {
+#ifdef DEBUG
+		if (vm_physseg_find(try, &cidx) != ps - vm_physmem)
+			panic("pgalloc simple: botch1");
+		if (cidx != (try - ps->start))
+			panic("pgalloc simple: botch2");
+#endif
+		pg = &ps->pgs[try - ps->start];
+		if (VM_PAGE_IS_FREE(pg) == 0)
+			continue;
+
+		uvm_pglist_add(pg, rlist);
+		if (--todo == 0)
+			break;
+	}
+
+#ifdef PGALLOC_VERBOSE
+	printf("got %d pgs\n", num - todo);
+#endif
+	return (num - todo); /* number of pages allocated */
+}
+
+static int
+uvm_pglistalloc_simple(num, low, high, rlist, waitok)
+	int num;
+	paddr_t low, high;
+	struct pglist *rlist;
+	int waitok;
+{
+	int fl, psi, s, error;
+	struct vm_physseg *ps;
+
+	/* Default to "lose". */
+	error = ENOMEM;
+
+again:
+	/*
+	 * Block all memory allocation and lock the free list.
+	 */
+	s = uvm_lock_fpageq();
+
+	/* Are there even any free pages? */
+	if (uvmexp.free <= (uvmexp.reserve_pagedaemon + uvmexp.reserve_kernel))
+		goto out;
+
+	for (fl = 0; fl < VM_NFREELIST; fl++) {
+#if (VM_PHYSSEG_STRAT == VM_PSTRAT_BIGFIRST)
+		for (psi = vm_nphysseg - 1 ; psi >= 0 ; psi--)
+#else
+		for (psi = 0 ; psi < vm_nphysseg ; psi++)
+#endif
+		{
+			ps = &vm_physmem[psi];
+
+			if (ps->free_list != fl)
+				continue;
+
+			num -= uvm_pglistalloc_s_ps(ps, num, low, high, rlist);
+			if (num == 0) {
+				error = 0;
+				goto out;
+			}
+		}
+
+	}
+
+out:
+	/*
+	 * check to see if we need to generate some free pages waking
+	 * the pagedaemon.
+	 */
+
+	UVM_KICK_PDAEMON();
+	uvm_unlock_fpageq(s);
+	if (error) {
+		if (waitok) {
+			/* XXX perhaps some time limitation? */
+#ifdef DEBUG
+			printf("pglistalloc waiting\n");
+#endif
+			uvm_wait("pglalloc");
+			goto again;
+		} else
+			uvm_pglistfree(rlist);
+	}
+#ifdef PGALLOC_VERBOSE
+	if (!error)
+		printf("pgalloc: %lx..%lx\n",
+		       VM_PAGE_TO_PHYS(TAILQ_FIRST(rlist)),
+		       VM_PAGE_TO_PHYS(TAILQ_LAST(rlist, pglist)));
+#endif
+	return (error);
+}
+
+int
+uvm_pglistalloc(size, low, high, alignment, boundary, rlist, nsegs, waitok)
+	psize_t size;
+	paddr_t low, high, alignment, boundary;
+	struct pglist *rlist;
+	int nsegs, waitok;
+{
+	int num, res;
+
+	KASSERT((alignment & (alignment - 1)) == 0);
+	KASSERT((boundary & (boundary - 1)) == 0);
+
+	/*
+	 * Our allocations are always page granularity, so our alignment
+	 * must be, too.
+	 */
+	if (alignment < PAGE_SIZE)
+		alignment = PAGE_SIZE;
+	if (boundary != 0 && boundary < size)
+		return (EINVAL);
+	num = atop(round_page(size));
+	low = roundup(low, alignment);
+
+	TAILQ_INIT(rlist);
+
+	if ((nsegs < size >> PAGE_SHIFT) || (alignment != PAGE_SIZE) ||
+	    (boundary != 0))
+		res = uvm_pglistalloc_contig(num, low, high, alignment,
+					     boundary, rlist);
+	else
+		res = uvm_pglistalloc_simple(num, low, high, rlist, waitok);
+
+	return (res);
 }
 
 /*
@@ -255,13 +468,27 @@ uvm_pglistfree(list)
 
 	s = uvm_lock_fpageq();
 	while ((pg = TAILQ_FIRST(list)) != NULL) {
+		boolean_t iszero;
+
 		KASSERT((pg->pqflags & (PQ_ACTIVE|PQ_INACTIVE)) == 0);
 		TAILQ_REMOVE(list, pg, pageq);
+		iszero = (pg->flags & PG_ZERO);
 		pg->pqflags = PQ_FREE;
+#ifdef DEBUG
+		pg->uobject = (void *)0xdeadbeef;
+		pg->offset = 0xdeadbeef;
+		pg->uanon = (void *)0xdeadbeef;
+#endif /* DEBUG */
+#ifdef DEBUG
+		if (iszero)
+			uvm_pagezerocheck(pg);
+#endif /* DEBUG */
 		TAILQ_INSERT_TAIL(&uvm.page_free[uvm_page_lookup_freelist(pg)].
 		    pgfl_buckets[VM_PGCOLOR_BUCKET(pg)].
-		    pgfl_queues[PGFL_UNKNOWN], pg, pageq);
+		    pgfl_queues[iszero ? PGFL_ZEROS : PGFL_UNKNOWN], pg, pageq);
 		uvmexp.free++;
+		if (iszero)
+			uvmexp.zeropages++;
 		if (uvmexp.zeropages < UVM_PAGEZERO_TARGET)
 			uvm.page_idle_zero = vm_page_zero_enable;
 		STAT_DECR(uvm_pglistalloc_npages);

@@ -1,4 +1,4 @@
-/*	$NetBSD: gentbi.c,v 1.5 2002/03/25 20:51:24 thorpej Exp $	*/
+/*	$NetBSD: gentbi.c,v 1.10 2003/04/29 01:49:33 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000, 2001 The NetBSD Foundation, Inc.
@@ -74,13 +74,12 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: gentbi.c,v 1.5 2002/03/25 20:51:24 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: gentbi.c,v 1.10 2003/04/29 01:49:33 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
-#include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/errno.h>
 
@@ -94,10 +93,8 @@ __KERNEL_RCSID(0, "$NetBSD: gentbi.c,v 1.5 2002/03/25 20:51:24 thorpej Exp $");
 int	gentbimatch(struct device *, struct cfdata *, void *);
 void	gentbiattach(struct device *, struct device *, void *);
 
-struct cfattach gentbi_ca = {
-	sizeof(struct mii_softc), gentbimatch, gentbiattach,
-	    mii_phy_detach, mii_phy_activate
-};
+CFATTACH_DECL(gentbi, sizeof(struct mii_softc),
+    gentbimatch, gentbiattach, mii_phy_detach, mii_phy_activate);
 
 int	gentbi_service(struct mii_softc *, struct mii_data *, int);
 void	gentbi_status(struct mii_softc *);
@@ -146,7 +143,8 @@ gentbiattach(struct device *parent, struct device *self, void *aux)
 	struct mii_attach_args *ma = aux;
 	struct mii_data *mii = ma->mii_data;
 
-	printf(": Generic ten-bit interface, rev. %d\n",
+	aprint_naive(": Media interface\n");
+	aprint_normal(": Generic ten-bit interface, rev. %d\n",
 	    MII_REV(ma->mii_id2));
 
 	sc->mii_inst = mii->mii_instance;
@@ -167,13 +165,13 @@ gentbiattach(struct device *parent, struct device *self, void *aux)
 	if (sc->mii_capabilities & BMSR_EXTSTAT)
 		sc->mii_extcapabilities = PHY_READ(sc, MII_EXTSR);
 
-	printf("%s: ", sc->mii_dev.dv_xname);
+	aprint_normal("%s: ", sc->mii_dev.dv_xname);
 	if ((sc->mii_capabilities & BMSR_MEDIAMASK) == 0 &&
 	    (sc->mii_extcapabilities & EXTSR_MEDIAMASK) == 0)
-		printf("no media present");
+		aprint_error("no media present");
 	else
 		mii_phy_add_media(sc);
-	printf("\n");
+	aprint_normal("\n");
 }
 
 int

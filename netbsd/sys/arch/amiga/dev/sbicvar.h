@@ -1,4 +1,4 @@
-/*	$NetBSD: sbicvar.h,v 1.18 2002/05/14 00:08:22 matt Exp $	*/
+/*	$NetBSD: sbicvar.h,v 1.21 2003/08/07 16:26:43 agc Exp $	*/
 
 /*
  * Copyright (c) 1990 The Regents of the University of California.
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -44,11 +40,11 @@
 
 /*
  * The largest single request will be MAXPHYS bytes which will require
- * at most MAXPHYS/NBPG+1 chain elements to describe, i.e. if none of
- * the buffer pages are physically contiguous (MAXPHYS/NBPG) and the
+ * at most MAXPHYS/PAGE_SIZE+1 chain elements to describe, i.e. if none of
+ * the buffer pages are physically contiguous (MAXPHYS/PAGE_SIZE) and the
  * buffer is not page aligned (+1).
  */
-#define	DMAMAXIO	(MAXPHYS/NBPG+1)
+#define	DMAMAXIO	(MAXPHYS/PAGE_SIZE+1)
 
 struct	dma_chain {
 	int	dc_count;
@@ -133,9 +129,9 @@ struct	sbic_softc {
 	u_char	sc_msg[7];
 	u_long	sc_clkfreq;
 	u_long	sc_tcnt;		/* number of bytes transfered */
-	u_short sc_dmacmd;		/* used by dma drivers */
-	u_short	sc_dmatimo;		/* dma timeout */
-	u_long	sc_dmamask;		/* dma valid mem mask */
+	u_short sc_dmacmd;		/* used by DMA drivers */
+	u_short	sc_dmatimo;		/* DMA timeout */
+	u_long	sc_dmamask;		/* DMA valid mem mask */
 	struct	dma_chain *sc_cur;
 	struct	dma_chain *sc_last;
 	int  (*sc_dmago)(struct sbic_softc *, char *, int, int);
@@ -147,7 +143,7 @@ struct	sbic_softc {
 
 /* sc_flags */
 #define	SBICF_ALIVE	0x01	/* controller initialized */
-#define SBICF_DCFLUSH	0x02	/* need flush for overlap after dma finishes */
+#define SBICF_DCFLUSH	0x02	/* need flush for overlap after DMA finishes */
 #define SBICF_SELECTED	0x04	/* bus is in selected state. */
 #define SBICF_ICMD	0x08	/* Immediate command in execution */
 #define SBICF_BADDMA	0x10	/* controller can only DMA to ztwobus space */

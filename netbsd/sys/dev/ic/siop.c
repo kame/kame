@@ -1,4 +1,4 @@
-/*	$NetBSD: siop.c,v 1.62.2.1 2002/12/11 17:59:23 he Exp $	*/
+/*	$NetBSD: siop.c,v 1.72 2004/03/16 19:10:43 bouyer Exp $	*/
 
 /*
  * Copyright (c) 2000 Manuel Bouyer.
@@ -33,7 +33,7 @@
 /* SYM53c7/8xx PCI-SCSI I/O Processors driver */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: siop.c,v 1.62.2.1 2002/12/11 17:59:23 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: siop.c,v 1.72 2004/03/16 19:10:43 bouyer Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -315,7 +315,7 @@ siop_intr(v)
 	struct siop_cmd *siop_cmd;
 	struct siop_lun *siop_lun;
 	struct scsipi_xfer *xs;
-	int istat, sist, sstat1, dstat;
+	int istat, sist, sstat1, dstat = 0; /* XXX: gcc */
 	u_int32_t irqcode;
 	int need_reset = 0;
 	int offset, target, lun, tag;
@@ -340,9 +340,9 @@ siop_intr(v)
 		    SIOP_ISTAT, 0);
 	}
 	/* use DSA to find the current siop_cmd */
+	siop_cmd = NULL;
 	dsa = bus_space_read_4(sc->sc_c.sc_rt, sc->sc_c.sc_rh, SIOP_DSA);
-	for (cbdp = TAILQ_FIRST(&sc->cmds); cbdp != NULL;
-	    cbdp = TAILQ_NEXT(cbdp, next)) {
+	TAILQ_FOREACH(cbdp, &sc->cmds, next) {
 		if (dsa >= cbdp->xferdma->dm_segs[0].ds_addr &&
 	    	    dsa < cbdp->xferdma->dm_segs[0].ds_addr + PAGE_SIZE) {
 			dsa -= cbdp->xferdma->dm_segs[0].ds_addr;
@@ -352,9 +352,6 @@ siop_intr(v)
 			break;
 		}
 	} 
-	if (cbdp == NULL) {
-		siop_cmd = NULL;
-	}
 	if (siop_cmd) {
 		xs = siop_cmd->cmd_c.xs;
 		siop_target = (struct siop_target *)siop_cmd->cmd_c.siop_target;
@@ -423,7 +420,7 @@ siop_intr(v)
 		if (dstat & DSTAT_MDPE)
 			printf(" parity");
 		if (dstat & DSTAT_DFE)
-			printf(" dma fifo empty");
+			printf(" DMA fifo empty");
 		else
 			siop_clearfifo(&sc->sc_c);
 		printf(", DSP=0x%x DSA=0x%x: ",
@@ -444,7 +441,7 @@ siop_intr(v)
 		if (istat & ISTAT_DIP)
 			delay(10);
 		/*
-		 * Can't read sist0 & sist1 independantly, or we have to
+		 * Can't read sist0 & sist1 independently, or we have to
 		 * insert delay
 		 */
 		sist = bus_space_read_2(sc->sc_c.sc_rt, sc->sc_c.sc_rh,
@@ -587,7 +584,7 @@ siop_intr(v)
 			    SIOP_DSP) - 8);
 			return 1;
 		}
-		/* Else it's an unhandled exeption (for now). */
+		/* Else it's an unhandled exception (for now). */
 		printf("%s: unhandled scsi interrupt, sist=0x%x sstat1=0x%x "
 		    "DSA=0x%x DSP=0x%x\n", sc->sc_c.sc_dev.dv_xname, sist,
 		    bus_space_read_1(sc->sc_c.sc_rt, sc->sc_c.sc_rh,
@@ -700,7 +697,7 @@ scintr:
 				if (siop_cmd->cmd_tables->msg_out[0] & 0x80) {
 					/*
 					 * message was part of a identify +
-					 * something else. Identify shoudl't
+					 * something else. Identify shouldn't
 					 * have been rejected.
 					 */
 					msg =
@@ -935,7 +932,7 @@ scintr:
 	}
 	/* We just should't get there */
 	panic("siop_intr: I shouldn't be there !");
-	return 1;
+
 end:
 	/*
 	 * restart the script now if command completed properly
@@ -1119,7 +1116,7 @@ siop_handle_qtag_reject(siop_cmd)
 
 /*
  * handle a bus reset: reset chip, unqueue all active commands, free all
- * target struct and report loosage to upper layer.
+ * target struct and report lossage to upper layer.
  * As the upper layer may requeue immediatly we have to first store
  * all active commands in a temporary queue.
  */
@@ -1143,7 +1140,7 @@ siop_handle_reset(sc)
 		scsipi_channel_thaw(&sc->sc_c.sc_chan, 1);
 	}
 	/*
-	 * Process all commands: first commmands being executed
+	 * Process all commands: first commands being executed
 	 */
 	for (target = 0; target < sc->sc_c.sc_chan.chan_ntargets;
 	    target++) {
@@ -1522,7 +1519,9 @@ siop_timeout(v)
 	int s;
 
 	scsipi_printaddr(siop_cmd->cmd_c.xs->xs_periph);
-	printf("command timeout\n");
+	printf("command timeout, CDB: ");
+	scsipi_print_cdb(siop_cmd->cmd_c.xs->cmd);
+	printf("\n");
 
 	s = splbio();
 	/* reset the scsi bus */
@@ -1862,9 +1861,9 @@ siop_add_dev(sc, target, lun)
 	ntargets =  sc->sc_c.sc_chan.chan_ntargets - 1 - sc->sc_ntargets;
 
 	/*
-	 * we need 8 bytes for the lun sw additionnal entry, and
+	 * we need 8 bytes for the lun sw additional entry, and
 	 * eventually sizeof(tag_switch) for the tag switch entry.
-	 * Keep enouth free space for the free targets that could be
+	 * Keep enough free space for the free targets that could be
 	 * probed later.
 	 */
 	if (sc->script_free_lo + 2 +
@@ -1873,11 +1872,11 @@ siop_add_dev(sc, target, lun)
 	    sc->script_free_hi - (sizeof(tag_switch) / sizeof(tag_switch[0])) :
 	    sc->script_free_hi)) {
 		/*
-		 * not enouth space, probably not worth dealing with it.
+		 * not enough space, probably not worth dealing with it.
 		 * We can hold 13 tagged-queuing capable devices in the 4k RAM.
 		 */
 #ifdef DEBUG
-		printf("%s:%d:%d: not enouth memory for a lun sw slot\n",
+		printf("%s:%d:%d: not enough memory for a lun sw slot\n",
 		    sc->sc_c.sc_dev.dv_xname, target, lun);
 #endif
 		return;

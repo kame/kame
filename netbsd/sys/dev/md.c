@@ -1,4 +1,4 @@
-/*	$NetBSD: md.c,v 1.28 2002/01/13 19:28:07 tsutsui Exp $	*/
+/*	$NetBSD: md.c,v 1.36 2003/06/29 22:30:00 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1995 Gordon W. Ross, Leo Weppelman.
@@ -46,7 +46,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: md.c,v 1.28 2002/01/13 19:28:07 tsutsui Exp $");
+__KERNEL_RCSID(0, "$NetBSD: md.c,v 1.36 2003/06/29 22:30:00 fvdl Exp $");
 
 #include "opt_md.h"
 
@@ -71,7 +71,7 @@ __KERNEL_RCSID(0, "$NetBSD: md.c,v 1.28 2002/01/13 19:28:07 tsutsui Exp $");
  */
 #ifndef MEMORY_DISK_SERVER
 #define	MEMORY_DISK_SERVER 1
-#endif
+#endif	/* MEMORY_DISK_SERVER */
 
 /*
  * We should use the raw partition for ioctl.
@@ -85,7 +85,7 @@ struct md_softc {
 	struct device sc_dev;	/* REQUIRED first entry */
 	struct disk sc_dkdev;	/* hook for generic disk handling */
 	struct md_conf sc_md;
-	struct buf_queue sc_buflist;
+	struct bufq_state sc_buflist;
 };
 /* shorthand for fields in sc_md: */
 #define sc_addr sc_md.md_addr
@@ -95,7 +95,23 @@ struct md_softc {
 void mdattach __P((int));
 static void md_attach __P((struct device *, struct device *, void *));
 
-void mdstrategy __P((struct buf *bp));
+dev_type_open(mdopen);
+dev_type_close(mdclose);
+dev_type_read(mdread);
+dev_type_write(mdwrite);
+dev_type_ioctl(mdioctl);
+dev_type_strategy(mdstrategy);
+dev_type_size(mdsize);
+
+const struct bdevsw md_bdevsw = {
+	mdopen, mdclose, mdstrategy, mdioctl, nodump, mdsize, D_DISK
+};
+
+const struct cdevsw md_cdevsw = {
+	mdopen, mdclose, mdread, mdwrite, mdioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
+};
+
 struct dkdriver mddkdriver = { mdstrategy };
 
 static int   ramdisk_ndevs;
@@ -113,7 +129,7 @@ mdattach(n)
 
 #ifdef	DIAGNOSTIC
 	if (ramdisk_ndevs) {
-		printf("ramdisk: multiple attach calls?\n");
+		aprint_error("ramdisk: multiple attach calls?\n");
 		return;
 	}
 #endif
@@ -130,7 +146,7 @@ mdattach(n)
 
 		sc = malloc(sizeof(*sc), M_DEVBUF, M_NOWAIT|M_ZERO);
 		if (!sc) {
-			printf("ramdisk: malloc for attach failed!\n");
+			aprint_error("ramdisk: malloc for attach failed!\n");
 			return;
 		}
 		ramdisk_devs[i] = sc;
@@ -147,7 +163,7 @@ md_attach(parent, self, aux)
 {
 	struct md_softc *sc = (struct md_softc *)self;
 
-	BUFQ_INIT(&sc->sc_buflist);
+	bufq_alloc(&sc->sc_buflist, BUFQ_FCFS);
 
 	/* XXX - Could accept aux info here to set the config. */
 #ifdef	MEMORY_DISK_HOOKS
@@ -177,27 +193,9 @@ md_attach(parent, self, aux)
 static int md_server_loop __P((struct md_softc *sc));
 static int md_ioctl_server __P((struct md_softc *sc,
 		struct md_conf *umd, struct proc *proc));
-#endif
+#endif	/* MEMORY_DISK_SERVER */
 static int md_ioctl_kalloc __P((struct md_softc *sc,
 		struct md_conf *umd, struct proc *proc));
-
-dev_type_open(mdopen);
-dev_type_close(mdclose);
-dev_type_read(mdread);
-dev_type_write(mdwrite);
-dev_type_ioctl(mdioctl);
-dev_type_size(mdsize);
-dev_type_dump(mddump);
-
-int
-mddump(dev, blkno, va, size)
-	dev_t dev;
-	daddr_t blkno;
-	caddr_t va;
-	size_t size;
-{
-	return ENODEV;
-}
 
 int
 mdsize(dev_t dev)
@@ -341,12 +339,9 @@ mdstrategy(bp)
 #if MEMORY_DISK_SERVER
 	case MD_UMEM_SERVER:
 		/* Just add this job to the server's queue. */
-		BUFQ_INSERT_TAIL(&sc->sc_buflist, bp);
-		if (BUFQ_FIRST(&sc->sc_buflist) == bp) {
-			/* server queue was empty. */
-			wakeup((caddr_t)sc);
-			/* see md_server_loop() */
-		}
+		BUFQ_PUT(&sc->sc_buflist, bp);
+		wakeup((caddr_t)sc);
+		/* see md_server_loop() */
 		/* no biodone in this case */
 		return;
 #endif	/* MEMORY_DISK_SERVER */
@@ -418,7 +413,7 @@ mdioctl(dev, cmd, data, flag, proc)
 #if MEMORY_DISK_SERVER
 		case MD_UMEM_SERVER:
 			return md_ioctl_server(sc, umd, proc);
-#endif
+#endif	/* MEMORY_DISK_SERVER */
 		default:
 			break;
 		}
@@ -505,14 +500,11 @@ md_server_loop(sc)
 
 	for (;;) {
 		/* Wait for some work to arrive. */
-		while ((bp = BUFQ_FIRST(&sc->sc_buflist)) == NULL) {
+		while ((bp = BUFQ_GET(&sc->sc_buflist)) == NULL) {
 			error = tsleep((caddr_t)sc, md_sleep_pri, "md_idle", 0);
 			if (error)
 				return error;
 		}
-
-		/* Unlink buf from head of list. */
-		BUFQ_REMOVE(&sc->sc_buflist, bp);
 
 		/* Do the transfer to/from user space. */
 		error = 0;

@@ -1,4 +1,4 @@
-/*	$NetBSD: ufs_inode.c,v 1.33 2002/01/26 08:32:05 chs Exp $	*/
+/*	$NetBSD: ufs_inode.c,v 1.42 2003/11/05 10:18:38 hannken Exp $	*/
 
 /*
  * Copyright (c) 1991, 1993
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ufs_inode.c,v 1.33 2002/01/26 08:32:05 chs Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ufs_inode.c,v 1.42 2003/11/05 10:18:38 hannken Exp $");
 
 #include "opt_quota.h"
 
@@ -75,8 +71,10 @@ ufs_inactive(v)
 	} */ *ap = v;
 	struct vnode *vp = ap->a_vp;
 	struct inode *ip = VTOI(vp);
+	struct mount *mp;
 	struct proc *p = ap->a_p;
-	int mode, error = 0;
+	mode_t mode;
+	int error = 0;
 
 	if (prtactive && vp->v_usecount != 0)
 		vprint("ufs_inactive: pushing active", vp);
@@ -84,17 +82,18 @@ ufs_inactive(v)
 	/*
 	 * Ignore inodes related to stale file handles.
 	 */
-	if (ip->i_ffs_mode == 0)
+	if (ip->i_mode == 0)
 		goto out;
 	if (ip->i_ffs_effnlink == 0 && DOINGSOFTDEP(vp))
 		softdep_releasefile(ip);
 
-	if (ip->i_ffs_nlink <= 0 && (vp->v_mount->mnt_flag & MNT_RDONLY) == 0) {
+	if (ip->i_nlink <= 0 && (vp->v_mount->mnt_flag & MNT_RDONLY) == 0) {
+		vn_start_write(vp, &mp, V_WAIT | V_LOWER);
 #ifdef QUOTA
 		if (!getinoquota(ip))
 			(void)chkiq(ip, -1, NOCRED, 0);
 #endif
-		if (ip->i_ffs_size != 0) {
+		if (ip->i_size != 0) {
 			error = VOP_TRUNCATE(vp, (off_t)0, 0, NOCRED, p);
 		}
 		/*
@@ -103,17 +102,23 @@ ufs_inactive(v)
 		 * So, rather than creating a new entry point to do the
 		 * same thing, we just use softdep_change_linkcnt().
 		 */
-		ip->i_ffs_rdev = 0;
-		mode = ip->i_ffs_mode;
-		ip->i_ffs_mode = 0;
+		DIP_ASSIGN(ip, rdev, 0);
+		mode = ip->i_mode;
+		ip->i_mode = 0;
+		DIP_ASSIGN(ip, mode, 0);
 		ip->i_flag |= IN_CHANGE | IN_UPDATE;
 		if (DOINGSOFTDEP(vp))
 			softdep_change_linkcnt(ip);
 		VOP_VFREE(vp, ip->i_number, mode);
+		vn_finished_write(mp, V_LOWER);
 	}
 
-	if (ip->i_flag & (IN_ACCESS | IN_CHANGE | IN_UPDATE | IN_MODIFIED | IN_ACCESSED))
+	if (ip->i_flag &
+	    (IN_ACCESS | IN_CHANGE | IN_UPDATE | IN_MODIFIED | IN_ACCESSED)) {
+		vn_start_write(vp, &mp, V_WAIT | V_LOWER);
 		VOP_UPDATE(vp, NULL, NULL, 0);
+		vn_finished_write(mp, V_LOWER);
+	}
 out:
 	VOP_UNLOCK(vp, 0);
 	/*
@@ -121,7 +126,7 @@ out:
 	 * so that it can be reused immediately.
 	 */
 
-	if (ip->i_ffs_mode == 0)
+	if (ip->i_mode == 0)
 		vrecycle(vp, NULL, p);
 	return (error);
 }
@@ -179,7 +184,7 @@ ufs_balloc_range(vp, off, len, cred, flags)
 	struct ucred *cred;
 	int flags;
 {
-	off_t oldeof, neweof, oldeob, neweob, pagestart;
+	off_t oldeof, neweof, oldeob, oldeop, neweob, pagestart;
 	struct uvm_object *uobj;
 	struct genfs_node *gp = VTOG(vp);
 	int i, delta, error, npages;
@@ -192,10 +197,19 @@ ufs_balloc_range(vp, off, len, cred, flags)
 		    vp, off, len, vp->v_size);
 
 	oldeof = vp->v_size;
-	GOP_SIZE(vp, oldeof, &oldeob);
+	GOP_SIZE(vp, oldeof, &oldeop, GOP_SIZE_WRITE);
+	GOP_SIZE(vp, oldeof, &oldeob, GOP_SIZE_READ);
+
+	/*
+	 * If we need to map pages in the former last block,
+	 * do so now.
+	 */
+	if (oldeob != oldeop) {
+		uvm_vnp_zerorange(vp, oldeop, oldeob - oldeop);
+	}
 
 	neweof = MAX(vp->v_size, off + len);
-	GOP_SIZE(vp, neweof, &neweob);
+	GOP_SIZE(vp, neweof, &neweob, GOP_SIZE_WRITE);
 
 	error = 0;
 	uobj = &vp->v_uobj;

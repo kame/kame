@@ -1,4 +1,4 @@
-/*	$NetBSD: c_jazz_eisa.c,v 1.1 2001/06/13 15:21:00 soda Exp $	*/
+/*	$NetBSD: c_jazz_eisa.c,v 1.8 2003/10/29 18:17:49 tsutsui Exp $	*/
 
 /*
  * Copyright (c) 1998
@@ -31,6 +31,9 @@
  * and NEC EISA generation machines.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: c_jazz_eisa.c,v 1.8 2003/10/29 18:17:49 tsutsui Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kcore.h>
@@ -38,15 +41,25 @@
 
 #include <machine/autoconf.h>
 #include <machine/bus.h>
+#include <machine/pio.h>
 #include <machine/platform.h>
+
+#include <dev/clock_subr.h>
+#include <dev/ic/mc146818var.h>
 
 #include <arc/arc/arcbios.h>
 #include <arc/jazz/pica.h>
 #include <arc/jazz/jazziovar.h>
+#include <arc/jazz/mcclock_jazziovar.h>
 
 #include "pc.h"
 #if NPC_JAZZIO > 0
 #include <arc/jazz/pccons_jazziovar.h>
+#endif
+
+#include "vga_isa.h"
+#if NVGA_ISA > 0
+#include <dev/isa/vga_isavar.h>
 #endif
 
 #include "vga_jazzio.h"
@@ -79,12 +92,52 @@ char *c_jazz_eisa_mainbusdevs[] = {
 };
 
 /*
+ * chipset-dependent mcclock routines.
+ */
+static u_int mc_jazz_eisa_read(struct mc146818_softc *, u_int);
+static void mc_jazz_eisa_write(struct mc146818_softc *, u_int, u_int);
+
+struct mcclock_jazzio_config mcclock_jazz_eisa_conf = {
+	0x80004000,		/* I/O base */
+	1,			/* I/O size */
+	mc_jazz_eisa_read,	/* read function */
+	mc_jazz_eisa_write	/* write function */
+};
+
+static u_int
+mc_jazz_eisa_read(sc, reg)
+	struct mc146818_softc *sc;
+	u_int reg;
+{
+	u_int i, as;
+
+	as = in32(arc_bus_io.bs_vbase + C_JAZZ_EISA_TODCLOCK_AS) & 0x80;
+	out32(arc_bus_io.bs_vbase + C_JAZZ_EISA_TODCLOCK_AS, as | reg);
+	i = bus_space_read_1(sc->sc_bst, sc->sc_bsh, 0);
+	return i;
+}
+
+static void
+mc_jazz_eisa_write(sc, reg, datum)
+	struct mc146818_softc *sc;
+	u_int reg, datum;
+{
+	u_int as;
+
+	as = in32(arc_bus_io.bs_vbase + C_JAZZ_EISA_TODCLOCK_AS) & 0x80;
+	out32(arc_bus_io.bs_vbase + C_JAZZ_EISA_TODCLOCK_AS, as | reg);
+	bus_space_write_1(sc->sc_bst, sc->sc_bsh, 0, datum);
+}
+
+/*
  * common configuration for Magnum derived and NEC EISA generation machines.
  */
 void
 c_jazz_eisa_init()
 {
-	/* nothing to do */
+
+	/* chipset-dependent mcclock configuration */
+        mcclock_jazzio_conf = &mcclock_jazz_eisa_conf;
 }
 
 /*
@@ -114,6 +167,22 @@ c_jazz_eisa_cons_init()
 			return;
 		}
 #endif
+
+#if NVGA_ISA > 0
+		if (strcmp(arc_displayc_id, "necvdfrb") == 0
+			/* NEC RISCserver 2200 R4400 EISA [NEC-R96] */
+			/* NEC Express5800/240 R4400 EISA [NEC-J96A] */
+		    ) {
+			if (vga_isa_cnattach(&arc_bus_io, &arc_bus_mem) == 0) {
+#if NPCKBC_JAZZIO > 0
+				pckbc_cnattach(&jazzio_bus, PICA_SYS_KBD,
+				    JAZZIO_KBCMDP, PCKBC_KBD_SLOT);
+#endif
+				return;
+			}
+		}
+#endif
+
 #if NPC_JAZZIO > 0
 		if (pccons_jazzio_cnattach(arc_displayc_id, &jazzio_bus) == 0)
 			return;
@@ -131,6 +200,6 @@ c_jazz_eisa_cons_init()
 		com_console_address = jazzio_bus.bs_start + 0x6000;
 	}
 	comcnattach(&jazzio_bus, com_console_address,
-	    com_console_speed, com_freq, com_console_mode);
+	    com_console_speed, com_freq, COM_TYPE_NORMAL, com_console_mode);
 #endif
 }

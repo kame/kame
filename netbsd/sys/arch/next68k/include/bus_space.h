@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_space.h,v 1.7 2001/05/12 22:35:29 chs Exp $	*/
+/*	$NetBSD: bus_space.h,v 1.10 2003/10/01 01:25:06 mycroft Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -80,14 +80,14 @@ typedef u_long	bus_space_handle_t;
 /*
  * Value for the next68k bus space tag, not to be used directly by MI code.
  */
-#define NEXT68K_INTIO_BUS_SPACE	intiobase
+#define NEXT68K_INTIO_BUS_SPACE		((bus_space_tag_t)intiobase)
 
 /*
  * Values for the next68k video bus space tags, not to be used directly
  * by MI code.
  */
-#define NEXT68K_MONO_VIDEO_BUS_SPACE	monobase
-#define NEXT68K_COLOR_VIDEO_BUS_SPACE	colorbase
+#define NEXT68K_MONO_VIDEO_BUS_SPACE	((bus_space_tag_t)monobase)
+#define NEXT68K_COLOR_VIDEO_BUS_SPACE	((bus_space_tag_t)colorbase)
 
 /*
  * Mapping and unmapping operations.
@@ -115,6 +115,21 @@ typedef u_long	bus_space_handle_t;
      (-1)
 
 #define	bus_space_free(t, h, s)
+
+/*
+ *	paddr_t bus_space_mmap __P((bus_space_tag_t t, bus_addr_t base,
+ *	    off_t offset, int prot, int flags));
+ *
+ * Mmap an area of bus space.
+ */
+
+#define bus_space_mmap(t, a, s, prot, flags)				\
+	((((a)>=INTIOBASE)&&((a)+(s)<INTIOTOP)) ?			\
+		m68k_btop((t)+((a)-INTIOBASE)) :			\
+	 ((((a)>=MONOBASE)&&((a)+(s)<MONOTOP)) ?			\
+		m68k_btop((t)+((a)-MONOBASE)) :				\
+	  ((((a)>=COLORBASE)&&((a)+(s)<COLORTOP)) ?			\
+		m68k_btop((t)+((a)-COLORBASE)) : (-1))))
 
 /*
  *	u_intN_t bus_space_read_N __P((bus_space_tag_t tag,

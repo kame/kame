@@ -1,10 +1,10 @@
-/*	$NetBSD: cardbusdevs_data.h,v 1.18.10.1 2002/12/11 18:06:09 he Exp $	*/
+/*	$NetBSD: cardbusdevs_data.h,v 1.24.2.2 2004/08/30 09:32:11 tron Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: cardbusdevs,v 1.21.10.1 2002/12/11 18:05:30 he Exp 
+ *	NetBSD: cardbusdevs,v 1.27.2.2 2004/08/30 09:31:08 tron Exp 
  */
 
 /*
@@ -92,16 +92,34 @@ struct cardbus_knowndev cardbus_knowndevs[] = {
 	    "3CCFEM656 10/100 Ethernet",
 	},
 	{
+	    CARDBUS_VENDOR_3COM, CARDBUS_PRODUCT_3COM_3C656_M,
+	    0,
+	    "3Com",
+	    "3CCFEM656 56k Modem",
+	},
+	{
 	    CARDBUS_VENDOR_3COM, CARDBUS_PRODUCT_3COM_3C656B_E,
 	    0,
 	    "3Com",
 	    "3CCFEM656B 10/100 Ethernet",
 	},
 	{
+	    CARDBUS_VENDOR_3COM, CARDBUS_PRODUCT_3COM_3C656B_M,
+	    0,
+	    "3Com",
+	    "3CCFEM656B 56k Modem",
+	},
+	{
 	    CARDBUS_VENDOR_3COM, CARDBUS_PRODUCT_3COM_3C656C_E,
 	    0,
 	    "3Com",
 	    "3CXFEM656C 10/100 Ethernet",
+	},
+	{
+	    CARDBUS_VENDOR_3COM, CARDBUS_PRODUCT_3COM_3C656C_M,
+	    0,
+	    "3Com",
+	    "3CXFEM656C 56k Modem",
 	},
 	{
 	    CARDBUS_VENDOR_ADVSYS, CARDBUS_PRODUCT_ADVSYS_ULTRA,
@@ -126,6 +144,12 @@ struct cardbus_knowndev cardbus_knowndevs[] = {
 	    0,
 	    "IO Data",
 	    "CBIDE2 IDE controller",
+	},
+	{
+	    CARDBUS_VENDOR_IODATA, CARDBUS_PRODUCT_IODATA_CBSCII,
+	    0,
+	    "IO Data",
+	    "CBSCII NinjaSCSI-32Bi SCSI",
 	},
 	{
 	    CARDBUS_VENDOR_ACCTON, CARDBUS_PRODUCT_ACCTON_MPX5030,
@@ -170,6 +194,18 @@ struct cardbus_knowndev cardbus_knowndevs[] = {
 	    "FEther CB-TXD 10/100 Ethernet",
 	},
 	{
+	    CARDBUS_VENDOR_COREGA, CARDBUS_PRODUCT_COREGA_2CB_TXD,
+	    0,
+	    "Corega",
+	    "FEther II CB-TXD 10/100 Ethernet",
+	},
+	{
+	    CARDBUS_VENDOR_NETGEAR, CARDBUS_PRODUCT_NETGEAR_FA511,
+	    0,
+	    "NetGear, Inc.",
+	    "FA511 10/100 Ethernet",
+	},
+	{
 	    CARDBUS_VENDOR_ABOCOM, CARDBUS_PRODUCT_ABOCOM_FE2500,
 	    0,
 	    "AboCom Systems",
@@ -182,10 +218,28 @@ struct cardbus_knowndev cardbus_knowndevs[] = {
 	    "FE2500 10/100 Ethernet",
 	},
 	{
+	    CARDBUS_VENDOR_ABOCOM, CARDBUS_PRODUCT_ABOCOM_FE2500MX,
+	    0,
+	    "AboCom Systems",
+	    "FE2500MX 10/100 Ethernet",
+	},
+	{
+	    CARDBUS_VENDOR_ABOCOM, CARDBUS_PRODUCT_ABOCOM_FE2000VX,
+	    0,
+	    "AboCom Systems",
+	    "IO-DATA CBET100-CL 10/100 Ethernet",
+	},
+	{
 	    CARDBUS_VENDOR_PLANEX, CARDBUS_PRODUCT_PLANEX_FNW_3603_TX,
 	    0,
 	    "Planex Communications Inc",
 	    "FNW-3603-TX 10/100 Ethernet",
+	},
+	{
+	    CARDBUS_VENDOR_PLANEX, CARDBUS_PRODUCT_PLANEX_FNW_3800_TX,
+	    0,
+	    "Planex Communications Inc",
+	    "FNW-3800-TX 10/100 Ethernet",
 	},
 	{
 	    CARDBUS_VENDOR_HAWKING, CARDBUS_PRODUCT_HAWKING_PN672TX,
@@ -210,6 +264,30 @@ struct cardbus_knowndev cardbus_knowndevs[] = {
 	    0,
 	    "Adaptec",
 	    "APA-1480",
+	},
+	{
+	    CARDBUS_VENDOR_ATHEROS, CARDBUS_PRODUCT_ATHEROS_AR5001,
+	    0,
+	    "Atheros Communications, Inc.",
+	    "AR5001 Wireless LAN 802.11a/b/g CardBus Card",
+	},
+	{
+	    CARDBUS_VENDOR_WORKBIT, CARDBUS_PRODUCT_WORKBIT_NJSC32BI,
+	    0,
+	    "Workbit",
+	    "NinjaSCSI-32Bi SCSI",
+	},
+	{
+	    CARDBUS_VENDOR_WORKBIT, CARDBUS_PRODUCT_WORKBIT_NJSC32UDE,
+	    0,
+	    "Workbit",
+	    "NinjaSCSI-32UDE SCSI",
+	},
+	{
+	    CARDBUS_VENDOR_WORKBIT, CARDBUS_PRODUCT_WORKBIT_NJSC32BI_KME,
+	    0,
+	    "Workbit",
+	    "NinjaSCSI-32Bi SCSI (KME)",
 	},
 	{
 	    CARDBUS_VENDOR_DEC, 0,
@@ -260,6 +338,12 @@ struct cardbus_knowndev cardbus_knowndevs[] = {
 	    NULL,
 	},
 	{
+	    CARDBUS_VENDOR_WORKBIT, 0,
+	    CARDBUS_KNOWNDEV_NOPROD,
+	    "Workbit",
+	    NULL,
+	},
+	{
 	    CARDBUS_VENDOR_XIRCOM, 0,
 	    CARDBUS_KNOWNDEV_NOPROD,
 	    "Xircom",
@@ -284,6 +368,12 @@ struct cardbus_knowndev cardbus_knowndevs[] = {
 	    NULL,
 	},
 	{
+	    CARDBUS_VENDOR_NETGEAR, 0,
+	    CARDBUS_KNOWNDEV_NOPROD,
+	    "NetGear, Inc.",
+	    NULL,
+	},
+	{
 	    CARDBUS_VENDOR_ABOCOM, 0,
 	    CARDBUS_KNOWNDEV_NOPROD,
 	    "AboCom Systems",
@@ -293,6 +383,12 @@ struct cardbus_knowndev cardbus_knowndevs[] = {
 	    CARDBUS_VENDOR_PLANEX, 0,
 	    CARDBUS_KNOWNDEV_NOPROD,
 	    "Planex Communications Inc",
+	    NULL,
+	},
+	{
+	    CARDBUS_VENDOR_ATHEROS, 0,
+	    CARDBUS_KNOWNDEV_NOPROD,
+	    "Atheros Communications, Inc.",
 	    NULL,
 	},
 	{

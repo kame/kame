@@ -1,4 +1,4 @@
-/*	$NetBSD: npx_pnpbios.c,v 1.2 2001/11/15 07:03:35 lukem Exp $	*/
+/*	$NetBSD: npx_pnpbios.c,v 1.6 2002/11/24 10:19:37 jmc Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: npx_pnpbios.c,v 1.2 2001/11/15 07:03:35 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: npx_pnpbios.c,v 1.6 2002/11/24 10:19:37 jmc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -58,9 +58,8 @@ __KERNEL_RCSID(0, "$NetBSD: npx_pnpbios.c,v 1.2 2001/11/15 07:03:35 lukem Exp $"
 int	npx_pnpbios_match(struct device *, struct cfdata *, void *);
 void	npx_pnpbios_attach(struct device *, struct device *, void *);
 
-struct cfattach npx_pnpbios_ca = {
-	sizeof(struct npx_softc), npx_pnpbios_match, npx_pnpbios_attach
-};
+CFATTACH_DECL(npx_pnpbios, sizeof(struct npx_softc),
+    npx_pnpbios_match, npx_pnpbios_attach, NULL, NULL);
 
 int
 npx_pnpbios_match(struct device *parent, struct cfdata *match, void *aux)
@@ -102,7 +101,7 @@ npx_pnpbios_attach(struct device *parent, struct device *self, void *aux)
 		    irq);
 		lcr0(rcr0() & ~CR0_NE);
 		sc->sc_ih = isa_intr_establish(0/*XXX*/, irq, ist, IPL_NONE,
-		    npxintr, NULL);
+		     (int (*)(void *))npxintr, NULL);
 		break;
 	case NPX_EXCEPTION:
 		printf("%s: using exception 16\n", sc->sc_dev.dv_xname);

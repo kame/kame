@@ -1,4 +1,4 @@
-/*	$NetBSD: db_lex.c,v 1.16 2002/02/15 07:33:51 simonb Exp $	*/
+/*	$NetBSD: db_lex.c,v 1.18 2003/05/17 09:58:03 scw Exp $	*/
 
 /*
  * Mach Operating System
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: db_lex.c,v 1.16 2002/02/15 07:33:51 simonb Exp $");
+__KERNEL_RCSID(0, "$NetBSD: db_lex.c,v 1.18 2003/05/17 09:58:03 scw Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -46,6 +46,7 @@ __KERNEL_RCSID(0, "$NetBSD: db_lex.c,v 1.16 2002/02/15 07:33:51 simonb Exp $");
 #include <ddb/db_command.h>
 #include <ddb/db_sym.h>
 #include <ddb/db_extern.h>
+#include <ddb/db_interface.h>
 
 db_expr_t	db_tok_number;
 char		db_tok_string[TOK_STRING_SIZE];
@@ -136,6 +137,7 @@ int	db_radix = 16;
 char *
 db_num_to_str(db_expr_t val)
 {
+
 	/*
 	 * 2 chars for "0x", 1 for a sign ("-")
 	 * up to 21 chars for a 64-bit number:
@@ -147,12 +149,16 @@ db_num_to_str(db_expr_t val)
 	static char buf[25];
 
 	if (db_radix == 16)
-		snprintf(buf, sizeof(buf), "%#10lx", val);
+		snprintf(buf, sizeof(buf), DB_EXPR_T_IS_QUAD ? "%#qx" : "%#lx",
+		    val);
 	else if (db_radix == 8)
-		snprintf(buf, sizeof(buf), "%#10lo", val);
+		snprintf(buf, sizeof(buf), DB_EXPR_T_IS_QUAD ? "%#qo" : "%#lo",
+		    val);
 	else
-		snprintf(buf, sizeof(buf), "%10lu", val);
-	return buf;
+		snprintf(buf, sizeof(buf), DB_EXPR_T_IS_QUAD ? "%qu" : "%lu",
+		    val);
+
+	return (buf);
 }
 
 void

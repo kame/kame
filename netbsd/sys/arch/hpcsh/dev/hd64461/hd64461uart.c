@@ -1,4 +1,4 @@
-/*	$NetBSD: hd64461uart.c,v 1.10 2002/03/28 15:27:01 uch Exp $	*/
+/*	$NetBSD: hd64461uart.c,v 1.16 2003/07/15 02:29:37 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001, 2002 The NetBSD Foundation, Inc.
@@ -32,6 +32,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hd64461uart.c,v 1.16 2003/07/15 02:29:37 lukem Exp $");
 
 #include "opt_kgdb.h"
 
@@ -75,17 +78,14 @@ struct hd64461uart_softc {
 };
 
 /* boot console */
-cdev_decl(com);
 void hd64461uartcnprobe(struct consdev *);
 void hd64461uartcninit(struct consdev *);
 
 STATIC int hd64461uart_match(struct device *, struct cfdata *, void *);
 STATIC void hd64461uart_attach(struct device *, struct device *, void *);
 
-struct cfattach hd64461uart_ca = {
-	sizeof(struct hd64461uart_softc), hd64461uart_match,
-	hd64461uart_attach
-};
+CFATTACH_DECL(hd64461uart, sizeof(struct hd64461uart_softc),
+    hd64461uart_match, hd64461uart_attach, NULL, NULL);
 
 STATIC void hd64461uart_init(void);
 STATIC u_int8_t hd64461uart_read_1(void *, bus_space_handle_t, bus_size_t);
@@ -100,12 +100,11 @@ STATIC void hd64461uart_write_1(void *, bus_space_handle_t, bus_size_t,
 void
 hd64461uartcnprobe(struct consdev *cp)
 {
+	extern const struct cdevsw com_cdevsw;
 	int maj;
 
 	/* locate the major number */
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == comopen)
-			break;
+	maj = cdevsw_lookup_major(&com_cdevsw);
 
 	/* Initialize required fields. */
 	cp->cn_dev = makedev(maj, 0);
@@ -119,7 +118,7 @@ hd64461uartcninit(struct consdev *cp)
 	hd64461uart_init();
 
 	comcnattach(hd64461uart_chip.io_tag, 0x0, COMCN_SPEED, COM_FREQ,
-	    CONMODE);	
+	    COM_TYPE_NORMAL, CONMODE);	
 
 	hd64461uart_chip.console = 1;
 }
@@ -138,7 +137,7 @@ hd64461uart_kgdb_init()
 	hd64461uart_init();
 
 	if (com_kgdb_attach(hd64461uart_chip.io_tag, 0x0, kgdb_rate,
-	    COM_FREQ, CONMODE) != 0) {
+	    COM_FREQ, COM_TYPE_NORMAL, CONMODE) != 0) {
 		printf("%s: KGDB console open failed.\n", __FUNCTION__);
 		return (1);
 	}

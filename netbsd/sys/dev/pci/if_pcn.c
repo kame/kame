@@ -1,4 +1,4 @@
-/*	$NetBSD: if_pcn.c,v 1.9.4.3 2002/11/30 13:57:46 he Exp $	*/
+/*	$NetBSD: if_pcn.c,v 1.22 2003/10/25 18:31:11 christos Exp $	*/
 
 /*
  * Copyright (c) 2001 Wasabi Systems, Inc.
@@ -64,10 +64,13 @@
  *	  Ethernet chip (XXX only if we use an ILACC-compatible SWSTYLE).
  */
 
+#include "opt_pcn.h"
+
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_pcn.c,v 1.9.4.3 2002/11/30 13:57:46 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_pcn.c,v 1.22 2003/10/25 18:31:11 christos Exp $");
 
 #include "bpfilter.h"
+#include "rnd.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -80,6 +83,10 @@ __KERNEL_RCSID(0, "$NetBSD: if_pcn.c,v 1.9.4.3 2002/11/30 13:57:46 he Exp $");
 #include <sys/errno.h> 
 #include <sys/device.h>
 #include <sys/queue.h>
+
+#if NRND > 0
+#include <sys/rnd.h>
+#endif
 
 #include <uvm/uvm_extern.h>		/* for PAGE_SIZE */
 
@@ -181,14 +188,14 @@ struct pcn_rxsoft {
 /*
  * Description of Rx FIFO watermarks for various revisions.
  */
-const char *pcn_79c970_rcvfw[] = {
+const char * const pcn_79c970_rcvfw[] = {
 	"16 bytes",
 	"64 bytes",
 	"128 bytes",
 	NULL,
 };
 
-const char *pcn_79c971_rcvfw[] = {
+const char * const pcn_79c971_rcvfw[] = {
 	"16 bytes",
 	"64 bytes",
 	"112 bytes",
@@ -198,21 +205,21 @@ const char *pcn_79c971_rcvfw[] = {
 /*
  * Description of Tx start points for various revisions.
  */
-const char *pcn_79c970_xmtsp[] = {
+const char * const pcn_79c970_xmtsp[] = {
 	"8 bytes",
 	"64 bytes",
 	"128 bytes",
 	"248 bytes",
 };
 
-const char *pcn_79c971_xmtsp[] = {
+const char * const pcn_79c971_xmtsp[] = {
 	"20 bytes",
 	"64 bytes",
 	"128 bytes",
 	"248 bytes",
 };
 
-const char *pcn_79c971_xmtsp_sram[] = {
+const char * const pcn_79c971_xmtsp_sram[] = {
 	"44 bytes",
 	"64 bytes",
 	"128 bytes",
@@ -222,14 +229,14 @@ const char *pcn_79c971_xmtsp_sram[] = {
 /*
  * Description of Tx FIFO watermarks for various revisions.
  */
-const char *pcn_79c970_xmtfw[] = {
+const char * const pcn_79c970_xmtfw[] = {
 	"16 bytes",
 	"64 bytes",
 	"128 bytes",
 	NULL,
 };
 
-const char *pcn_79c971_xmtfw[] = {
+const char * const pcn_79c971_xmtfw[] = {
 	"16 bytes",
 	"64 bytes",
 	"108 bytes",
@@ -288,13 +295,13 @@ struct pcn_softc {
 	struct evcnt sc_ev_txcopy;	/* Tx copies required */
 #endif /* PCN_EVENT_COUNTERS */
 
-	const char **sc_rcvfw_desc;	/* Rx FIFO watermark info */
+	const char * const *sc_rcvfw_desc;	/* Rx FIFO watermark info */
 	int sc_rcvfw;
 
-	const char **sc_xmtsp_desc;	/* Tx start point info */
+	const char * const *sc_xmtsp_desc;	/* Tx start point info */
 	int sc_xmtsp;
 
-	const char **sc_xmtfw_desc;	/* Tx FIFO watermark info */
+	const char * const *sc_xmtfw_desc;	/* Tx FIFO watermark info */
 	int sc_xmtfw;
 
 	int sc_flags;			/* misc. flags; see below */
@@ -312,6 +319,10 @@ struct pcn_softc {
 	uint32_t sc_csr5;		/* prototype CSR5 register */
 	uint32_t sc_mode;		/* prototype MODE register */
 	int sc_phyaddr;			/* PHY address */
+
+#if NRND > 0
+	rndsource_element_t rnd_source;	/* random source */
+#endif
 };
 
 /* sc_flags */
@@ -459,9 +470,8 @@ int	pcn_copy_small = 0;
 int	pcn_match(struct device *, struct cfdata *, void *);
 void	pcn_attach(struct device *, struct device *, void *);
 
-struct cfattach pcn_ca = {
-	sizeof(struct pcn_softc), pcn_match, pcn_attach,
-};
+CFATTACH_DECL(pcn, sizeof(struct pcn_softc),
+    pcn_match, pcn_attach, NULL, NULL);
 
 /*
  * Routines to read and write the PCnet-PCI CSR/BCR space.
@@ -586,8 +596,9 @@ pcn_attach(struct device *parent, struct device *self, void *aux)
 
 	/* Get it out of power save mode, if needed. */
 	if (pci_get_capability(pc, pa->pa_tag, PCI_CAP_PWRMGMT, &pmreg, 0)) {
-		pmode = pci_conf_read(pc, pa->pa_tag, pmreg + 4) & 0x3;
-		if (pmode == 3) {
+		pmode = pci_conf_read(pc, pa->pa_tag, pmreg + PCI_PMCSR) &
+		    PCI_PMCSR_STATE_MASK;
+		if (pmode == PCI_PMCSR_STATE_D3) {
 			/*
 			 * The card has lost all configuration data in
 			 * this state, so punt.
@@ -596,10 +607,11 @@ pcn_attach(struct device *parent, struct device *self, void *aux)
 			    sc->sc_dev.dv_xname);
 			return;
 		}
-		if (pmode != 0) {
+		if (pmode != PCI_PMCSR_STATE_D0) {
 			printf("%s: waking up from power date D%d\n",
 			    sc->sc_dev.dv_xname, pmode);
-			pci_conf_write(pc, pa->pa_tag, pmreg + 4, 0);
+			pci_conf_write(pc, pa->pa_tag, pmreg + PCI_PMCSR,
+			    PCI_PMCSR_STATE_D0);
 		}
 	}
 
@@ -609,12 +621,28 @@ pcn_attach(struct device *parent, struct device *self, void *aux)
 	 */
 	pcn_reset(sc);
 
+#if !defined(PCN_NO_PROM)
+
 	/*
 	 * Read the Ethernet address from the EEPROM.
 	 */
 	for (i = 0; i < ETHER_ADDR_LEN; i++)
 		enaddr[i] = bus_space_read_1(sc->sc_st, sc->sc_sh,
 		    PCN32_APROM + i);
+#else
+	/*
+	 * The PROM is not used; instead we assume that the MAC address
+	 * has been programmed into the device's physical address
+	 * registers by the boot firmware
+	 */
+
+        for (i=0; i < 3; i++) {
+		uint32_t val;
+		val = pcn_csr_read(sc, LE_CSR12 + i);
+		enaddr[2*i] = val & 0x0ff;
+		enaddr[2*i+1] = (val >> 8) & 0x0ff;
+	}
+#endif
 
 	/*
 	 * Now that the device is mapped, attempt to figure out what
@@ -764,6 +792,10 @@ pcn_attach(struct device *parent, struct device *self, void *aux)
 	/* Attach the interface. */
 	if_attach(ifp); 
 	ether_ifattach(ifp, enaddr);
+#if NRND > 0
+	rnd_attach_source(&sc->rnd_source, sc->sc_dev.dv_xname,
+	    RND_TYPE_NET, 0);
+#endif
 
 #ifdef PCN_EVENT_COUNTERS
 	/* Attach event counters. */
@@ -858,7 +890,7 @@ pcn_start(struct ifnet *ifp)
 	struct mbuf *m0, *m;
 	struct pcn_txsoft *txs;
 	bus_dmamap_t dmamap;
-	int error, nexttx, lasttx, ofree, seg;
+	int error, nexttx, lasttx = -1, ofree, seg;
 
 	if ((ifp->if_flags & (IFF_RUNNING|IFF_OACTIVE)) != IFF_RUNNING)
 		return;
@@ -1032,6 +1064,7 @@ pcn_start(struct ifnet *ifp)
 			}
 		}
 
+		KASSERT(lasttx != -1);
 		/* Interrupt on the packet, if appropriate. */
 		if ((sc->sc_txsnext & PCN_TXINTR_MASK) == 0)
 			sc->sc_txdescs[lasttx].tmd1 |= htole32(LE_T1_LTINT);
@@ -1167,6 +1200,11 @@ pcn_intr(void *arg)
 		csr0 = pcn_csr_read(sc, LE_CSR0);
 		if ((csr0 & LE_C0_INTR) == 0)
 			break;
+
+#if NRND > 0
+		if (RND_ENABLED(&sc->rnd_source))
+			rnd_add_uint32(&sc->rnd_source, csr0);
+#endif
 
 		/* ACK the bits and re-enable interrupts. */
 		pcn_csr_write(sc, LE_CSR0, csr0 &
@@ -1411,10 +1449,10 @@ pcn_rxintr(struct pcn_softc *sc)
 					printf("%s: overflow error\n",
 					    sc->sc_dev.dv_xname);
 				else {
-#define	PRINTIT(x, s)							\
+#define	PRINTIT(x, str)							\
 					if (rmd1 & (x))			\
 						printf("%s: %s\n",	\
-						    sc->sc_dev.dv_xname, s);
+						    sc->sc_dev.dv_xname, str);
 					PRINTIT(LE_R1_FRAM, "framing error");
 					PRINTIT(LE_R1_CRC, "CRC error");
 					PRINTIT(LE_R1_BUFF, "buffer error");
@@ -1950,12 +1988,12 @@ pcn_79c970_mediainit(struct pcn_softc *sc)
 {
 	const char *sep = "";
 
-	ifmedia_init(&sc->sc_mii.mii_media, 0, pcn_79c970_mediachange,
+	ifmedia_init(&sc->sc_mii.mii_media, IFM_IMASK, pcn_79c970_mediachange,
 	    pcn_79c970_mediastatus);
 
-#define	ADD(s, m, d)							\
+#define	ADD(str, m, d)							\
 do {									\
-	printf("%s%s", sep, s);						\
+	printf("%s%s", sep, str);					\
 	ifmedia_add(&sc->sc_mii.mii_media, IFM_ETHER|(m), (d), NULL);	\
 	sep = ", ";							\
 } while (/*CONSTCOND*/0)

@@ -1,4 +1,4 @@
-/*	$NetBSD: iop.c,v 1.4 2002/03/08 20:48:31 thorpej Exp $	*/
+/*	$NetBSD: iop.c,v 1.7 2003/07/15 02:43:20 lukem Exp $	*/
 
 /*
  * Copyright (c) 2000 Allen Briggs.
@@ -30,6 +30,9 @@
 /*
  *	This code handles VIA, RBV, and OSS functionality.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: iop.c,v 1.7 2003/07/15 02:43:20 lukem Exp $");
 
 #include "opt_mac68k.h"
 
@@ -339,7 +342,7 @@ iop_message_sent(iop, chan)
 
 	msg = SIMPLEQ_FIRST(&iop->sendq[chan]);
 	msg->status = IOP_MSGSTAT_SENT;
-	SIMPLEQ_REMOVE_HEAD(&iop->sendq[chan], msg, iopm);
+	SIMPLEQ_REMOVE_HEAD(&iop->sendq[chan], iopm);
 
 	msg->handler(iop, msg);
 
@@ -361,9 +364,11 @@ receive_iop_message(iop, chan)
 	struct iop_msg	*msg;
 	int		offset;
 
+	ioph = iop->iop;
+
 	msg = SIMPLEQ_FIRST(&iop->recvq[chan]);
 	if (msg) {
-		SIMPLEQ_REMOVE_HEAD(&iop->recvq[chan], msg, iopm);
+		SIMPLEQ_REMOVE_HEAD(&iop->recvq[chan], iopm);
 	} else {
 		msg = &iop->unsolicited_msg;
 		msg->channel = chan;

@@ -1,4 +1,4 @@
-/*	$NetBSD: scivar.h,v 1.14 2002/01/26 13:41:00 aymeric Exp $	*/
+/*	$NetBSD: scivar.h,v 1.16 2003/08/07 16:26:44 agc Exp $	*/
 
 /*
  * Copyright (c) 1990 The Regents of the University of California.
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -57,11 +53,11 @@ struct	sci_softc {
 	volatile u_char	*sci_bus_csr;	/* r: Bus Status */
 	volatile u_char	*sci_sel_enb;	/* w: Select enable */
 	volatile u_char	*sci_csr;	/* r: Status */
-	volatile u_char	*sci_dma_send;	/* w: Start dma send data */
+	volatile u_char	*sci_dma_send;	/* w: Start DMA send data */
 	volatile u_char	*sci_idata;	/* r: Input data */
-	volatile u_char	*sci_trecv;	/* w: Start dma receive, target */
+	volatile u_char	*sci_trecv;	/* w: Start DMA receive, target */
 	volatile u_char	*sci_iack;	/* r: Interrupt Acknowledge */
-	volatile u_char	*sci_irecv;	/* w: Start dma receive, initiator */
+	volatile u_char	*sci_irecv;	/* w: Start DMA receive, initiator */
 
 	/* psuedo DMA transfer */
 	int	(*dma_xfer_in)(struct sci_softc *, int, u_char *, int);

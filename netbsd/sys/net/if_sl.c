@@ -1,4 +1,4 @@
-/*	$NetBSD: if_sl.c,v 1.80 2002/03/17 19:41:10 atatat Exp $	*/
+/*	$NetBSD: if_sl.c,v 1.84 2003/08/07 16:32:53 agc Exp $	*/
 
 /*
  * Copyright (c) 1987, 1989, 1992, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -64,7 +60,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_sl.c,v 1.80 2002/03/17 19:41:10 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_sl.c,v 1.84 2003/08/07 16:32:53 agc Exp $");
 
 #include "sl.h"
 #if NSL > 0
@@ -231,8 +227,8 @@ slinit(sc)
 {
 
 	if (sc->sc_mbuf == NULL) {
-		MGETHDR(sc->sc_mbuf, M_WAIT, MT_DATA);
-		MCLGET(sc->sc_mbuf, M_WAIT);
+		sc->sc_mbuf = m_gethdr(M_WAIT, MT_DATA);
+		m_clget(sc->sc_mbuf, M_WAIT);
 	}
 	sc->sc_ep = (u_char *) sc->sc_mbuf->m_ext.ext_buf +
 	    sc->sc_mbuf->m_ext.ext_size;
@@ -313,7 +309,7 @@ slopen(dev, tp)
 					 * is no good, so we need to return
 					 * something else.
 					 */
-					return(ENOMEM); /* XXX ?! */
+					return (ENOMEM); /* XXX ?! */
 				}
 			} else
 				sc->sc_oldbufsize = sc->sc_oldbufquot = 0;
@@ -778,6 +774,7 @@ slintr(void *arg)
 			struct mbuf n;
 			u_char *hp;
 
+			n.m_flags = 0;
 			n.m_next = bpf_m;
 			n.m_data = n.m_dat;
 			n.m_len = SLIP_HDRLEN;

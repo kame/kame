@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ne_pbus.c,v 1.4.12.1 2002/11/01 11:13:36 tron Exp $	*/
+/*	$NetBSD: if_ne_pbus.c,v 1.12 2003/12/06 20:00:12 bjh21 Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -56,6 +56,9 @@
  * EtherM - Needs proper media support.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ne_pbus.c,v 1.12 2003/12/06 20:00:12 bjh21 Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/socket.h>
@@ -103,9 +106,8 @@ struct ne_pbus_softc {
 static int  ne_pbus_probe	__P((struct device *, struct cfdata *, void *));
 static void ne_pbus_attach	__P((struct device *, struct device *, void *));
 
-struct cfattach ne_pbus_ca = {
-	sizeof(struct ne_pbus_softc), ne_pbus_probe, ne_pbus_attach
-};
+CFATTACH_DECL(ne_pbus, sizeof(struct ne_pbus_softc),
+    ne_pbus_probe, ne_pbus_attach, NULL, NULL);
 
 /*
  * Prototypes for interface specific routines
@@ -190,7 +192,7 @@ struct ne_clone {
 	},
 	/* Irlam EtherN podule. (supplied with NC) */
 	{
-	  PODULE_ETHERN ,EN_REGSHIFT,
+	  PODULE_ETHERN, EN_REGSHIFT,
 	  EN_NIC_OFFSET, EN_NIC_SIZE, EN_ASIC_OFFSET, EN_ASIC_SIZE,
 	  0,0, NE_SPACE_EASI,
 	  NE_SPACE_EASI, NE_SPACE_EASI, 0,
@@ -200,7 +202,7 @@ struct ne_clone {
 	},
 	/* Acorn EtherI podule. (supplied with NC) */
 	{
-	  PODULE_ETHERI ,EN_REGSHIFT,
+	  PODULE_ETHERI, EN_REGSHIFT,
 	  EN_NIC_OFFSET, EN_NIC_SIZE, EN_ASIC_OFFSET, EN_ASIC_SIZE,
 	  0,0, NE_SPACE_EASI,
 	  NE_SPACE_EASI, NE_SPACE_EASI, 0,
@@ -273,7 +275,7 @@ ne_pbus_attach(parent, self, aux)
 #ifdef	DIAGNOSTIC
 	/* This should never fail as we must have matched at probe time */
 	if (ne == NULL)
-		panic("Podule has vanished\n");
+		panic("Podule has vanished");
 #endif
 
 	/* Update the nic and asic base addresses appropriately */

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_fw.c,v 1.15 2002/03/06 05:33:05 nathanw Exp $	*/
+/*	$NetBSD: if_fw.c,v 1.20 2003/07/03 11:36:18 drochner Exp $	*/
 
 /* XXX ALTQ XXX */
 
@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_fw.c,v 1.15 2002/03/06 05:33:05 nathanw Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_fw.c,v 1.20 2003/07/03 11:36:18 drochner Exp $");
 
 #include "opt_inet.h"
 #include "bpfilter.h"
@@ -57,7 +57,6 @@ __KERNEL_RCSID(0, "$NetBSD: if_fw.c,v 1.15 2002/03/06 05:33:05 nathanw Exp $");
 #include <net/if_ieee1394.h>
 #include <net/if_types.h>
 #include <net/if_media.h>
-#include <net/ethertypes.h>
 #include <net/route.h>
 
 #ifdef INET
@@ -103,10 +102,8 @@ void fw_start(struct ifnet *);
 int  fw_init(struct ifnet *);
 void fw_stop(struct ifnet *, int);
 
-struct cfattach fw_ca = {
-	sizeof(struct fw_softc), fw_match, fw_attach,
-	fw_detach, fw_activate
-};
+CFATTACH_DECL(fw, sizeof(struct fw_softc),
+    fw_match, fw_attach, fw_detach, fw_activate);
 
 int
 fw_match(struct device *parent, struct cfdata *match, void *aux)
@@ -261,6 +258,7 @@ fw_txint(struct device *self, struct mbuf *m0)
 	struct fw_softc *sc = (struct fw_softc *)self;
 	struct ifnet *ifp = &sc->sc_ic.ic_if;
 
+	ifp->if_opackets++;
 	m_freem(m0);
 	if (ifp->if_flags & IFF_OACTIVE) {
 		ifp->if_flags &= ~IFF_OACTIVE;
@@ -302,6 +300,7 @@ fw_input(struct device *self, struct mbuf *m0)
 	struct fw_softc *sc = (struct fw_softc *)self;
 	struct ifnet *ifp = &sc->sc_ic.ic_if;
 
+	ifp->if_ipackets++;
 	m0->m_pkthdr.rcvif = ifp;
 	(*ifp->if_input)(ifp, m0);
 }

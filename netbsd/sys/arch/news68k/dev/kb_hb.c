@@ -1,4 +1,4 @@
-/*	$NetBSD: kb_hb.c,v 1.1 2001/01/25 14:33:30 tsutsui Exp $	*/
+/*	$NetBSD: kb_hb.c,v 1.5 2003/07/15 02:59:26 lukem Exp $	*/
 
 /*
  * Copyright (c) 2001 Izumi Tsutsui.
@@ -27,6 +27,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kb_hb.c,v 1.5 2003/07/15 02:59:26 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -54,9 +57,8 @@ void	kb_hb_init(struct kb_softc *);
 int	kb_hb_intr(void *);
 int	kb_hb_cnattach(void);
 
-struct cfattach kb_hb_ca = {
-	sizeof(struct kb_softc), kb_hb_match, kb_hb_attach
-};
+CFATTACH_DECL(kb_hb, sizeof(struct kb_softc),
+    kb_hb_match, kb_hb_attach, NULL, NULL);
 
 struct console_softc kb_hb_conssc;
 
@@ -75,7 +77,7 @@ kb_hb_match(parent, cf, aux)
 		return 0;
 
 	/* XXX no default address */
-	if (ha->ha_address == -1)
+	if (ha->ha_address == (u_int)-1)
 		return 0;
 
 	addr = IIOV(ha->ha_address); /* XXX */

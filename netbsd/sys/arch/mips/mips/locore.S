@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.S,v 1.139 2002/04/25 06:55:53 simonb Exp $	*/
+/*	$NetBSD: locore.S,v 1.158 2004/03/04 20:17:01 drochner Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -56,28 +52,14 @@
 #include "opt_cputype.h"	/* which mips CPU levels do we support? */
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
-#include "opt_compat_ultrix.h"
-#include "opt_compat_linux.h"
-#include "opt_compat_irix.h"
 #include "opt_ns.h"
 #include "opt_ccitt.h"
 #include "opt_iso.h"
 #include "opt_lockdebug.h"
+#include "opt_multiprocessor.h"
 #include "fs_coda.h"
 
 #include <sys/cdefs.h>
-
-#include <sys/errno.h>
-#include <sys/syscall.h>
-#ifdef COMPAT_ULTRIX
-#include <compat/ultrix/ultrix_syscall.h>
-#endif
-#ifdef COMPAT_LINUX
-#include <compat/linux/linux_syscall.h>
-#endif
-#ifdef COMPAT_IRIX
-#include <compat/irix/irix_syscall.h>
-#endif
 
 #include <machine/param.h>
 #include <mips/asm.h>
@@ -95,7 +77,7 @@ _C_LABEL(kernel_text):
 #if defined(MIPS3_PLUS) && !defined(MIPS1)
 	/* keep firmware exception handler until we hook. */
 	mfc0	v0, MIPS_COP_0_STATUS
-	and	v0, MIPS3_SR_DIAG_BEV
+	and	v0, MIPS_SR_BEV
 	mtc0	v0, MIPS_COP_0_STATUS		# Disable interrupts
 	COP0_SYNC
 #else
@@ -136,7 +118,7 @@ _C_LABEL(kernel_text):
 	mfc0	t0, MIPS_COP_0_STATUS
 	or	t0, MIPS_SR_COP_1_BIT		# Disable interrupts, and
 	mtc0	t0, MIPS_COP_0_STATUS		# enable the fp coprocessor
-	COP0_SYNC
+	COP0_HAZARD_FPUENABLE
 #endif
 	nop
 	nop
@@ -166,131 +148,20 @@ _C_LABEL(kernel_text):
 _C_LABEL(verylocore):
 
 /*
- * This code is copied the user's stack for returning from signal handlers
- * (see sendsig() and sigreturn()). We have to compute the address
- * of the sigcontext struct for the sigreturn call.
- *
- * NB: we cannot profile sigcode(), it executes from userspace.
- */
-LEAF_NOPROFILE(sigcode)
-	addu	a0, sp, 16		# address of sigcontext
-	li	v0, SYS___sigreturn14	# sigreturn(scp)
-	syscall
-	break	0			# just in case sigreturn fails
-END(sigcode)
-XLEAF(esigcode)
-
-#ifdef COMPAT_ULTRIX
-LEAF_NOPROFILE(ultrix_sigcode)
-	addu	a0, sp, 16		# address of sigcontext
-	li	v0, ULTRIX_SYS_sigreturn	# sigreturn(scp)
-	syscall
-	break	0			# just in case sigreturn fails
-END(ultrix_sigcode)
-XLEAF(ultrix_esigcode)
-#endif
-
-#ifdef COMPAT_LINUX
-#define SYSCALL_SHIFT 4000		# 4000 shift as in linux_syscall.c
-LEAF_NOPROFILE(linux_sigcode)
-	move	a0, sp
-	li	v0, LINUX_SYS_sigreturn	+ SYSCALL_SHIFT # sigreturn(sf)
-	syscall
-	break	0			# just in case sigreturn fails
-END(linux_sigcode)
-XLEAF(linux_esigcode)
-#undef SYSCALL_SHIFT
-#endif
-
-/*
- * The following primitives manipulate the run queues.  whichqs tells which
- * of the 32 queues qs have processes in them.  Setrunqueue puts processes
- * into queues, remrunqueue removes them from queues.  The running process is
- * on no queue, other processes are on a queue related to p->p_priority,
- * divided by 4 actually to shrink the 0-127 range of priorities into the 32
- * available queues.
- */
-/*
- * setrunqueue(struct proc *)
- *
- * Call should be made at splclock(), and p->p_stat should be SRUN.
- */
-NESTED(setrunqueue, CALLFRAME_SIZ, ra)
-	.mask	0x80000000, -4
-	subu	sp, sp, CALLFRAME_SIZ
-	lw	t0, P_BACK(a0)		# firewall: p->p_back must be 0
-	sw	ra, CALLFRAME_RA(sp)
-	beq	t0, zero, 1f
-	lbu	t0, P_PRIORITY(a0)	# put on p->p_priority / 4 queue
-	PANIC("setrunqueue")		#
-1:
-	li	t1, 1			# compute corresponding bit
-	srl	t0, t0, 2		# compute index into 'whichqs'
-	sll	t1, t1, t0
-	lw	t2, _C_LABEL(sched_whichqs)	# set corresponding bit
-	nop
-	or	t2, t2, t1
-	sw	t2, _C_LABEL(sched_whichqs)
-	sll	t0, t0, 3		# compute index into 'qs'
-	la	t1, _C_LABEL(sched_qs)
-	addu	t0, t0, t1		# t0 = qp = &qs[pri >> 2]
-	lw	t1, P_BACK(t0)		# t1 = qp->ph_rlink
-	sw	t0, P_FORW(a0)		# p->p_forw = qp
-	sw	t1, P_BACK(a0)		# p->p_back = qp->ph_rlink
-	sw	a0, P_FORW(t1)		# p->p_back->p_forw = p;
-	sw	a0, P_BACK(t0)		# qp->ph_rlink = p
-	j	ra
-	addu	sp, sp, CALLFRAME_SIZ
-END(setrunqueue)
-
-/*
- * remrunqueue(struct proc *)
- *
- * Call should be made at splclock().
- */
-NESTED(remrunqueue, CALLFRAME_SIZ, ra)
-	.mask	0x80000000, -4
-	subu	sp, sp, CALLFRAME_SIZ
-	lbu	t0, P_PRIORITY(a0)	# get from p->p_priority / 4 queue
-	li	t1, 1			# compute corresponding bit
-	srl	t0, t0, 2		# compute index into 'whichqs'
-	lw	t2, _C_LABEL(sched_whichqs)	# check corresponding bit
-	sll	t1, t1, t0
-	and	v0, t2, t1
-	sw	ra, CALLFRAME_RA(sp)
-	bne	v0, zero, 1f
-	lw	v0, P_BACK(a0)		# v0 = p->p_back
-	PANIC("remrunqueue")		# it wasn't recorded to be on its q
-1:
-	lw	v1, P_FORW(a0)		# v1 = p->p_forw
-	nop
-	sw	v1, P_FORW(v0)		# p->p_back->p_forw = p->p_forw;
-	sw	v0, P_BACK(v1)		# p->p_forw->p_back = p->r_rlink
-	sll	t0, t0, 3		# compute index into 'qs'
-	la	v0, _C_LABEL(sched_qs)
-	addu	t0, t0, v0		# t0 = qp = &qs[pri >> 2]
-	lw	v0, P_FORW(t0)		# check if queue empty
-	nop
-	bne	v0, t0, 2f		# No. qp->ph_link != qp
-	nop
-	xor	t2, t2, t1		# clear corresponding bit in 'whichqs'
-	sw	t2, _C_LABEL(sched_whichqs)
-2:
-	sw	zero, P_BACK(a0)	# for firewall checking
-	j	ra
-	addu	sp, sp, CALLFRAME_SIZ
-END(remrunqueue)
-
-/*
  * When no processes are on the runq, cpu_switch branches to idle
  * to wait for something to come ready.
  * Note: this is really a part of cpu_switch() but defined here for kernel
  * profiling.
  */
 LEAF(mips_idle)
+	sw	zero, _C_LABEL(curlwp)		# set curlwp NULL for stats
+#if defined(LOCKDEBUG)
+	jal	_C_LABEL(sched_unlock_idle)	# release sched_lock
+	nop
+#endif
 #ifdef 	IPL_ICU_MASK
 	# all interrupts enable.
-	sw	zero, _C_LABEL(md_imask)	
+	sw	zero, _C_LABEL(md_imask)
 	jal	_C_LABEL(md_imask_update)
 	nop
 #endif
@@ -299,11 +170,6 @@ LEAF(mips_idle)
 	mtc0	t0, MIPS_COP_0_STATUS		# enable all interrupts
 	COP0_SYNC
 	nop
-	sw	zero, _C_LABEL(curproc)		# set curproc NULL for stats
-#if defined(LOCKDEBUG)
-	jal	_C_LABEL(sched_unlock_idle)	# release sched_lock
-	nop
-#endif
 
 	/* Try to zero some free pages. */
 	lw	t0, _C_LABEL(uvm) + UVM_PAGE_IDLE_ZERO
@@ -325,58 +191,57 @@ LEAF(mips_idle)
 	nop
 	beq	t0, zero, 1b
 	nop
-#if defined(LOCKDEBUG)
 	mtc0	zero, MIPS_COP_0_STATUS		# disable all interrupts
 	COP0_SYNC
 	nop
 	nop
 	nop
+#if defined(LOCKDEBUG)
 	nop
 	jal	_C_LABEL(sched_lock_idle)	# acquire sched_lock
 	nop
-	la	ra, cpu_switch_queuescan
-	j	ra
-	nop
-#else
-	mtc0	zero, MIPS_COP_0_STATUS		# disable all interrupts
-	COP0_SYNC
-	nop
-	nop
-	nop
-	la	ra, cpu_switch_queuescan
-	j	ra
-	nop
 #endif
+	la	ra, cpu_switch_queuescan
+	j	ra
+	nop
 END(mips_idle)
 
 /*
- * cpu_switch(struct proc *)
+ * cpu_switch(struct lwp *)
  * Find the highest priority process and resume it.
+ * Arguments:
+ *	a0	'struct lwp *' of the current LWP
+ *
+ * Returns:
+ *      v0	0 = no context switch was done
+ *              1 = switched to another context then restored
  */
 NESTED(cpu_switch, CALLFRAME_SIZ, ra)
-	lw	a0, P_ADDR(a0)
+	lw	a2, L_ADDR(a0)			# a2 = l->l_addr
 	mfc0	t0, MIPS_COP_0_STATUS
 	REG_PROLOGUE
-	REG_S	s0, U_PCB_CONTEXT+SF_REG_S0(a0)
-	REG_S	s1, U_PCB_CONTEXT+SF_REG_S1(a0)
-	REG_S	s2, U_PCB_CONTEXT+SF_REG_S2(a0)
-	REG_S	s3, U_PCB_CONTEXT+SF_REG_S3(a0)
-	REG_S	s4, U_PCB_CONTEXT+SF_REG_S4(a0)
-	REG_S	s5, U_PCB_CONTEXT+SF_REG_S5(a0)
-	REG_S	s6, U_PCB_CONTEXT+SF_REG_S6(a0)
-	REG_S	s7, U_PCB_CONTEXT+SF_REG_S7(a0)
-	REG_S	sp, U_PCB_CONTEXT+SF_REG_SP(a0)
-	REG_S	s8, U_PCB_CONTEXT+SF_REG_S8(a0)
-	REG_S	ra, U_PCB_CONTEXT+SF_REG_RA(a0)
-	REG_S	t0, U_PCB_CONTEXT+SF_REG_SR(a0)
+	REG_S	s0, U_PCB_CONTEXT+SF_REG_S0(a2)
+	REG_S	s1, U_PCB_CONTEXT+SF_REG_S1(a2)
+	REG_S	s2, U_PCB_CONTEXT+SF_REG_S2(a2)
+	REG_S	s3, U_PCB_CONTEXT+SF_REG_S3(a2)
+	REG_S	s4, U_PCB_CONTEXT+SF_REG_S4(a2)
+	REG_S	s5, U_PCB_CONTEXT+SF_REG_S5(a2)
+	REG_S	s6, U_PCB_CONTEXT+SF_REG_S6(a2)
+	REG_S	s7, U_PCB_CONTEXT+SF_REG_S7(a2)
+	REG_S	sp, U_PCB_CONTEXT+SF_REG_SP(a2)
+	REG_S	s8, U_PCB_CONTEXT+SF_REG_S8(a2)
+	REG_S	ra, U_PCB_CONTEXT+SF_REG_RA(a2)
+	REG_S	t0, U_PCB_CONTEXT+SF_REG_SR(a2)
 #ifdef IPL_ICU_MASK
-	lw	t0, _C_LABEL(md_imask)	
-	sw	t0, U_PCB_PPL(a0)
-#endif	
+	lw	t0, _C_LABEL(md_imask)
+	sw	t0, U_PCB_PPL(a2)
+#endif
 	REG_EPILOGUE
 	subu	sp, sp, CALLFRAME_SIZ
 	sw	ra, CALLFRAME_RA(sp)
 	.mask	0x80000000, -4
+
+	move	s0, a0				# s0 = old proc
 /*
  * Entered here from idle() and switch_exit().  Interrupts are
  * blocked, and sched_lock is held.
@@ -408,22 +273,22 @@ cpu_switch_queuescan:
 	sll	t0, t2, 3
 	la	t1, _C_LABEL(sched_qs)
 	addu	t0, t0, t1			# t0 = qp = &qs[highbit]
-	lw	a0, P_FORW(t0)			# a0 = p = highest pri process
+	lw	a0, L_FORW(t0)			# a0 = l = highest pri process
 	nop
-	lw	v0, P_FORW(a0)			# v0 = p->p_forw
+	lw	v0, L_FORW(a0)			# v0 = l->l_forw
 	bne	t0, a0, 2f			# make sure something in queue
-	sw	v0, P_FORW(t0)			# qp->ph_link = p->p_forw;
+	sw	v0, L_FORW(t0)			# qp->ph_link = p->p_forw;
 	PANIC("cpu_switch")			# nothing in queue
 2:
-	sw	t0, P_BACK(v0)			# p->p_forw->p_back = qp
+	sw	t0, L_BACK(v0)			# l->l_forw->l_back = qp
 	bne	v0, t0, 3f			# queue still not empty
-	sw	zero, P_BACK(a0)		## for firewall checking
+	sw	zero, L_BACK(a0)		## for firewall checking
 	li	v1, 1				# compute bit in 'whichqs'
 	sll	v1, v1, t2
 	xor	t3, t3, v1			# clear bit in 'whichqs'
 	sw	t3, _C_LABEL(sched_whichqs)
 3:
-	/* Squirrel away proc pointer. */
+	/* Squirrel away proc pointer into s7 */
 	move	s7, a0
 #if defined(LOCKDEBUG)
 	/*
@@ -432,8 +297,31 @@ cpu_switch_queuescan:
 	 */
 	jal	_C_LABEL(sched_unlock_idle)
 	nop
-	move	a0, s7				# restore proc
 #endif
+
+	/*
+	 * regardless of whether a context switch is required, we need
+	 * to update curlwp and other globals.  We must do this even
+	 * if switching to ourselves because we might have re-entered
+	 * cpu_switch() from idle() - in which case curlwp would be NULL
+	 * This needs to be set before conext switch on MIPS
+	 */
+	li	v1, LSONPROC
+	sw	v1, L_STAT(s7)			# l->l_stat = SONPROC
+	sw	s7, _C_LABEL(curlwp)		# curlwp = l
+
+	/*
+	 * Check to see if we're switching to ourself.  If we are,
+	 * don't bother loading the new context.
+	 *
+	 * Note that even if we re-enter cpu_switch() from idle(),
+	 * s0 will still contain the old curlwp value because any
+	 * users of that register between then and now must have
+	 * saved it.  Also note that switch_exit() ensures that
+	 * s0 is clear before jumping here to find a new process.
+	 */
+	beq	s0, s7, 4f			# oldproc == newproc ??
+	li	s5, 0				# BDslot: didn't switch
 
 /*
  * Switch to new context.
@@ -444,16 +332,14 @@ cpu_switch_queuescan:
 	 * p->p_cpu = curcpu();
 	 */
 #endif
-	li	v1, SONPROC			# p->p_stat = SONPROC
-	sb	v1, P_STAT(a0)
 	lw	t2, _C_LABEL(mips_locoresw) + MIPSX_CPU_SWITCH_RESUME
-	sw	a0, _C_LABEL(curproc)
+	move	a0, s7
 	jal	ra, t2
 	nop
 
 #if 1	/* XXX XXX XXX */
 	REG_PROLOGUE
-	lw	a0, P_ADDR(s7)
+	lw	a0, L_ADDR(s7)
 	nop
 	REG_L	sp, U_PCB_CONTEXT+SF_REG_SP(a0)
 	nop
@@ -463,21 +349,44 @@ cpu_switch_queuescan:
 	jal	_C_LABEL(pmap_activate)
 	move	a0, s7				# -BDSLOT-
 
-	lw	a0, P_ADDR(s7)
+	/*
+	 * Check for restartable atomic sequences (RAS)
+	 */
+	lw	t1, L_PROC(s7)
+	lw	a0, L_ADDR(s7)
+	lw	v1, P_RASLIST(t1)
+
+	addu	t0, a0, USPACE - FRAME_SIZ
+	beq	v1, zero, 1f
+	nop
+	move	a0, t1
+	jal	_C_LABEL(ras_lookup)
+	lw	a1, FRAME_EPC(t0)
+	lw	a0, L_ADDR(s7)
+	li	v1, -1
+	beq	v1, v0, 1f
+	addu	t0, a0, USPACE - FRAME_SIZ
+	sw	v0, FRAME_EPC(t0)
+1:
+	li	s5, 1				# remember that we switched
+4:
+	/* New context is now active */
+	lw	a0, L_ADDR(s7)
 	sw	zero, _C_LABEL(want_resched)	# we've context switched
 	sw	a0, _C_LABEL(curpcb)
 
 #ifdef IPL_ICU_MASK
 	# restore ICU state
 	lw	t0, U_PCB_PPL(a0)
-	sw	t0, _C_LABEL(md_imask)	
+	sw	t0, _C_LABEL(md_imask)
 	jal	_C_LABEL(md_imask_update)
 	nop
-	lw	a0, P_ADDR(s7)			# restore pcb_context pointer.
+	lw	a0, L_ADDR(s7)			# restore pcb_context pointer.
 #endif /* IPL_ICU_MASK */
+	move	v0, s5				# Save return value
 	REG_PROLOGUE
-	REG_L	v0, U_PCB_CONTEXT+SF_REG_SR(a0)
-	DYNAMIC_STATUS_MASK(v0,ra)		# machine dependent masking
+	REG_L	t0, U_PCB_CONTEXT+SF_REG_SR(a0)
+	DYNAMIC_STATUS_MASK(t0,ra)		# machine dependent masking
 	REG_L	ra, U_PCB_CONTEXT+SF_REG_RA(a0)
 	REG_L	s0, U_PCB_CONTEXT+SF_REG_S0(a0)
 	REG_L	s1, U_PCB_CONTEXT+SF_REG_S1(a0)
@@ -490,32 +399,172 @@ cpu_switch_queuescan:
 	REG_L	sp, U_PCB_CONTEXT+SF_REG_SP(a0)
 	REG_L	s8, U_PCB_CONTEXT+SF_REG_S8(a0)
 	REG_EPILOGUE
-	mtc0	v0, MIPS_COP_0_STATUS
+	mtc0	t0, MIPS_COP_0_STATUS
 	COP0_SYNC
 	j	ra
-	li	v0, 1				# possible return to 'savectx()'
+	nop
 END(cpu_switch)
 
+
 /*
- * switch_exit(struct proc *)
+ * cpu_switchto(struct lwp *cur, struct lwp *next)
+ * Switch to the specified next LWP
+ * Arguments:
+ *	a0	'struct lwp *' of the current LWP
+ *	a1	'struct lwp *' of the LWP to switch to
+ */
+NESTED(cpu_switchto, CALLFRAME_SIZ, ra)
+	lw	a2, L_ADDR(a0)
+	mfc0	t0, MIPS_COP_0_STATUS
+	REG_PROLOGUE
+	REG_S	s0, U_PCB_CONTEXT+SF_REG_S0(a2)
+	REG_S	s1, U_PCB_CONTEXT+SF_REG_S1(a2)
+	REG_S	s2, U_PCB_CONTEXT+SF_REG_S2(a2)
+	REG_S	s3, U_PCB_CONTEXT+SF_REG_S3(a2)
+	REG_S	s4, U_PCB_CONTEXT+SF_REG_S4(a2)
+	REG_S	s5, U_PCB_CONTEXT+SF_REG_S5(a2)
+	REG_S	s6, U_PCB_CONTEXT+SF_REG_S6(a2)
+	REG_S	s7, U_PCB_CONTEXT+SF_REG_S7(a2)
+	REG_S	sp, U_PCB_CONTEXT+SF_REG_SP(a2)
+	REG_S	s8, U_PCB_CONTEXT+SF_REG_S8(a2)
+	REG_S	ra, U_PCB_CONTEXT+SF_REG_RA(a2)
+	REG_S	t0, U_PCB_CONTEXT+SF_REG_SR(a2)
+#ifdef IPL_ICU_MASK
+	lw	t0, _C_LABEL(md_imask)
+	sw	t0, U_PCB_PPL(a2)
+#endif
+	REG_EPILOGUE
+	subu	sp, sp, CALLFRAME_SIZ
+	sw	ra, CALLFRAME_RA(sp)
+	.mask	0x80000000, -4
+
+	move	s0, a0				# s0 = old proc
+	move	s7, a1				# s7 = newproc
+
+#if defined(LOCKDEBUG)
+	/*
+	 * Done mucking with the run queues, release the
+	 * scheduler lock, but keep interrupts out.
+	 */
+	jal	_C_LABEL(sched_unlock_idle)
+	nop
+	move	a0, s7				# restore proc
+#endif
+	/*
+	 * regardless of whether a context switch is required, we need
+	 * to update curlwp and other globals.  We must do this even
+	 * if switching to ourselves because we might have re-entered
+	 * cpu_switch() from idle() - in which case curlwp would be NULL
+	 * This needs to be set before conext switch on MIPS
+	 */
+	li	v1, LSONPROC
+	sw	v1, L_STAT(s7)			# l->l_stat = SONPROC
+	sw	s7, _C_LABEL(curlwp)		# curlwp = l
+
+	/*
+	 * Check to see if we're switching to ourself.  If we are,
+	 * don't bother loading the new context.
+	 *
+	 * Note that even if we re-enter cpu_switch() from idle(),
+	 * s0 will still contain the old curlwp value because any
+	 * users of that register between then and now must have
+	 * saved it.  Also note that switch_exit() ensures that
+	 * s0 is clear before jumping here to find a new process.
+	 */
+	beq	s0, s7, 4f			# oldproc == newproc ??
+	li	s5, 0				# BDslot: didn't switch
+
+/*
+ * Switch to new context.
+ */
+#if defined(MULTIPROCESSOR)
+	/*
+	 * XXXSMP
+	 * p->p_cpu = curcpu();
+	 */
+#endif
+	lw	t2, _C_LABEL(mips_locoresw) + MIPSX_CPU_SWITCH_RESUME
+	move	a0, s7
+	jal	ra, t2
+	nop
+
+#if 1	/* XXX XXX XXX */
+	REG_PROLOGUE
+	lw	a0, L_ADDR(s7)
+	nop
+	REG_L	sp, U_PCB_CONTEXT+SF_REG_SP(a0)
+	nop
+	REG_EPILOGUE
+#endif	/* XXX XXX XXX */
+
+	jal	_C_LABEL(pmap_activate)
+	move	a0, s7				# -BDSLOT-
+	li	s5, 1				# remember that we switched
+
+4:
+	/* New context is now active */
+	lw	a0, L_ADDR(s7)
+	sw	zero, _C_LABEL(want_resched)	# we've context switched
+	sw	a0, _C_LABEL(curpcb)
+
+#ifdef IPL_ICU_MASK
+	# restore ICU state
+	lw	t0, U_PCB_PPL(a0)
+	sw	t0, _C_LABEL(md_imask)
+	jal	_C_LABEL(md_imask_update)
+	nop
+	lw	a0, L_ADDR(s7)			# restore pcb_context pointer.
+#endif /* IPL_ICU_MASK */
+	move	v0, s5				# Save return value
+	REG_PROLOGUE
+	REG_L	t0, U_PCB_CONTEXT+SF_REG_SR(a0)
+	DYNAMIC_STATUS_MASK(t0,ra)		# machine dependent masking
+	REG_L	ra, U_PCB_CONTEXT+SF_REG_RA(a0)
+	REG_L	s0, U_PCB_CONTEXT+SF_REG_S0(a0)
+	REG_L	s1, U_PCB_CONTEXT+SF_REG_S1(a0)
+	REG_L	s2, U_PCB_CONTEXT+SF_REG_S2(a0)
+	REG_L	s3, U_PCB_CONTEXT+SF_REG_S3(a0)
+	REG_L	s4, U_PCB_CONTEXT+SF_REG_S4(a0)
+	REG_L	s5, U_PCB_CONTEXT+SF_REG_S5(a0)
+	REG_L	s6, U_PCB_CONTEXT+SF_REG_S6(a0)
+	REG_L	s7, U_PCB_CONTEXT+SF_REG_S7(a0)
+	REG_L	sp, U_PCB_CONTEXT+SF_REG_SP(a0)
+	REG_L	s8, U_PCB_CONTEXT+SF_REG_S8(a0)
+	REG_EPILOGUE
+	mtc0	t0, MIPS_COP_0_STATUS
+	COP0_SYNC
+	j	ra
+	nop
+END(cpu_switchto)
+
+/*
+ * switch_exit(struct lwp *, void (*exit)(struct lwp *))
  *
  * Make the named process exit.  Switch SP to proc0 stack, then
  * call exit2() to schedule exiting proc's vmspace and stack to be
  * released by the reaper thread.  MUST BE CALLED AT SPLHIGH.
  */
 LEAF(switch_exit)
-	lw	v0, _C_LABEL(proc0paddr)	# get proc0 p_addr
+	lw	v0, _C_LABEL(proc0paddr)		# get proc0 l_addr
 	nop
 	sw	v0, _C_LABEL(curpcb)		# set current pcb
 	REG_PROLOGUE
 	REG_L	sp, U_PCB_CONTEXT+SF_REG_SP(v0)	# restore stack pointer
 	REG_EPILOGUE
-	jal	_C_LABEL(exit2)			# proc already in a0
+	jal	ra, a1				# lwp already in a0
 	nop
 #if defined(LOCKDEBUG)
 	jal	_C_LABEL(sched_lock_idle)	# acquire sched_lock
 	nop
 #endif
+	/*
+	 * Now jump back into the middle of cpu_switch().  Note that
+	 * we must clear s0 to guarantee that the check for switching
+	 * to ourselves in cpu_switch() will fail.  This is safe since
+	 * s0 will be restored when a new process is resumed.
+	 */
+	li	s0, 0
+
 	la	ra, cpu_switch_queuescan	# rathole to cpu_switch()
 	j	ra
 	sub	sp, sp, CALLFRAME_SIZ		#BDSlot: set stack call frame
@@ -709,401 +758,6 @@ LEAF(_splnone)
 	nop
 END(_splnone)
 
-
-/*
- * int copystr(void *kfaddr, void *kdaddr, size_t maxlen, size_t *lencopied)
- * Copy a NIL-terminated string, at most maxlen characters long.  Return the
- * number of characters copied (including the NIL) in *lencopied.  If the
- * string is too long, return ENAMETOOLONG; else return 0.
- */
-LEAF(copystr)
-	move	t0, a2
-	beq	a2, zero, 4f
-1:
-	lbu	v0, 0(a0)
-	subu	a2, a2, 1
-	beq	v0, zero, 2f
-	sb	v0, 0(a1)			# each byte until NIL
-	addu	a0, a0, 1
-	bne	a2, zero, 1b			# less than maxlen
-	addu	a1, a1, 1
-4:
-	li	v0, ENAMETOOLONG		# run out of space
-2:
-	beq	a3, zero, 3f			# return num. of copied bytes
-	subu	a2, t0, a2			# if the 4th arg was non-NULL
-	sw	a2, 0(a3)
-3:
-	j	ra				# v0 is 0 or ENAMETOOLONG
-	nop
-END(copystr)
-
-/*
- * int copyinstr(void *uaddr, void *kaddr, size_t maxlen, size_t *lencopied)
- * Copy a NIL-terminated string, at most maxlen characters long, from the
- * user's address space.  Return the number of characters copied (including
- * the NIL) in *lencopied.  If the string is too long, return ENAMETOOLONG;
- * else return 0 or EFAULT.
- */
-LEAF(copyinstr)
-	lw	v1, _C_LABEL(curpcb)
-	la	v0, _C_LABEL(copystrerr)
-	blt	a0, zero, _C_LABEL(copystrerr)
-	sw	v0, U_PCB_ONFAULT(v1)
-	move	t0, a2
-	beq	a2, zero, 4f
-1:
-	lbu	v0, 0(a0)
-	subu	a2, a2, 1
-	beq	v0, zero, 2f
-	sb	v0, 0(a1)
-	addu	a0, a0, 1
-	bne	a2, zero, 1b
-	addu	a1, a1, 1
-4:
-	li	v0, ENAMETOOLONG
-2:
-	beq	a3, zero, 3f
-	subu	a2, t0, a2
-	sw	a2, 0(a3)
-3:
-	j	ra				# v0 is 0 or ENAMETOOLONG
-	sw	zero, U_PCB_ONFAULT(v1)
-END(copyinstr)
-
-/*
- * int copyoutstr(void *uaddr, void *kaddr, size_t maxlen, size_t *lencopied);
- * Copy a NIL-terminated string, at most maxlen characters long, into the
- * user's address space.  Return the number of characters copied (including
- * the NIL) in *lencopied.  If the string is too long, return ENAMETOOLONG;
- * else return 0 or EFAULT.
- */
-LEAF(copyoutstr)
-	lw	v1, _C_LABEL(curpcb)
-	la	v0, _C_LABEL(copystrerr)
-	blt	a1, zero, _C_LABEL(copystrerr)
-	sw	v0, U_PCB_ONFAULT(v1)
-	move	t0, a2
-	beq	a2, zero, 4f
-1:
-	lbu	v0, 0(a0)
-	subu	a2, a2, 1
-	beq	v0, zero, 2f
-	sb	v0, 0(a1)
-	addu	a0, a0, 1
-	bne	a2, zero, 1b
-	addu	a1, a1, 1
-4:
-	li	v0, ENAMETOOLONG
-2:
-	beq	a3, zero, 3f
-	subu	a2, t0, a2
-	sw	a2, 0(a3)
-3:
-	j	ra				# v0 is 0 or ENAMETOOLONG
-	sw	zero, U_PCB_ONFAULT(v1)
-END(copyoutstr)
-
-LEAF(copystrerr)
-	sw	zero, U_PCB_ONFAULT(v1)
-	j	ra
-	li	v0, EFAULT			# return EFAULT
-END(copystrerr)
-
-/*
- * kcopy(const void *src, void *dst, size_t len);
- *
- * Copy len bytes from src to dst, aborting if we encounter a fatal
- * page fault.
- *
- * kcopy() _must_ save and restore the old fault handler since it is
- * called by uiomove(), which may be in the path of servicing a non-fatal
- * page fault.
- */
-NESTED(kcopy, 48, ra)
-	subu	sp, sp, 48			# set up stack frame
-	/* Frame contains RA (31) and S0 (16). */
-	.mask	0x80010000, -4
-	sw	ra, 44(sp)			# save ra
-	sw	s0, 32(sp)			# save s0
-	move	v0, a0				# swap a0, a1 for call to memcpy
-	move	a0, a1
-	move	a1, v0
-	lw	v1, _C_LABEL(curpcb)		# set up fault handler
-	la	v0, _C_LABEL(kcopyerr)
-	lw	s0, U_PCB_ONFAULT(v1)		# save old handler
-	jal	memcpy
-	sw	v0, U_PCB_ONFAULT(v1)
-
-	lw	v1, _C_LABEL(curpcb)		# restore the old handler
-	lw	ra, 44(sp)			# restore ra
-	sw	s0, U_PCB_ONFAULT(v1)
-	lw	s0, 32(sp)			# restore s0
-	addu	sp, sp, 48			# kill stack frame
-	j	ra
-	move	v0, zero			# success!
-END(kcopy)
-
-LEAF(kcopyerr)
-	lw	v1, _C_LABEL(curpcb)		# restore the old handler
-	lw	ra, 44(sp)			# restore ra
-	sw	s0, U_PCB_ONFAULT(v1)
-	lw	s0, 32(sp)			# restore s0
-	addu	sp, sp, 48			# kill stack frame
-	j	ra
-	li	v0, EFAULT			# return EFAULT
-END(kcopyerr)
-
-/*
- * int copyin(void *uaddr, void *kaddr, size_t len)
- * Copies len bytes of data from the user-space address uaddr to the
- * kernel-space address kaddr.  copyin returns 0 on success or EFAULT
- * if a bad address is encountered.
- */
-NESTED(copyin, CALLFRAME_SIZ, ra)
-	subu	sp, sp, CALLFRAME_SIZ
-	.mask	0x80000000, -4
-	sw	ra, CALLFRAME_RA(sp)
-	blt	a0, zero, _C_LABEL(copyerr)
-	move	v0, a0				# swap a0, a1 for call to memcpy
-	move	a0, a1
-	move	a1, v0
-	lw	v1, _C_LABEL(curpcb)
-	la	v0, _C_LABEL(copyerr)
-	jal	memcpy
-	sw	v0, U_PCB_ONFAULT(v1)
-
-	lw	v1, _C_LABEL(curpcb)
-	lw	ra, CALLFRAME_RA(sp)
-	addu	sp, sp, CALLFRAME_SIZ
-	sw	zero, U_PCB_ONFAULT(v1)
-	j	ra
-	move	v0, zero
-END(copyin)
-
-/*
- * int copyout(void *kaddr, void *uaddr, size_t len)
- * Copies len bytes of data from the kernel-space address kaddr to the
- * user-space address uaddr.  copyout returns 0 on success or EFAULT
- * if a bad address is encountered.
- */
-NESTED(copyout, CALLFRAME_SIZ, ra)
-	subu	sp, sp, CALLFRAME_SIZ
-	.mask	0x80000000, -4
-	sw	ra, CALLFRAME_RA(sp)
-	blt	a1, zero, _C_LABEL(copyerr)
-	move	v0, a0				# swap a0, a1 for call to memcpy
-	move	a0, a1
-	move	a1, v0
-	lw	v1, _C_LABEL(curpcb)
-	la	v0, _C_LABEL(copyerr)
-	jal	memcpy
-	sw	v0, U_PCB_ONFAULT(v1)
-
-	lw	v1, _C_LABEL(curpcb)
-	lw	ra, CALLFRAME_RA(sp)
-	addu	sp, sp, CALLFRAME_SIZ
-	sw	zero, U_PCB_ONFAULT(v1)
-	j	ra
-	move	v0, zero
-END(copyout)
-
-LEAF(copyerr)
-	lw	v1, _C_LABEL(curpcb)
-	lw	ra, CALLFRAME_RA(sp)
-	addu	sp, sp, CALLFRAME_SIZ
-	sw	zero, U_PCB_ONFAULT(v1)
-	j	ra
-	li	v0, EFAULT			# return EFAULT
-END(copyerr)
-
-/*
- * int fuswintr(void *)
- * Fetches a short word of data from the user-space address.
- * This function is safe to call during an interrupt context.
- */
-LEAF(fuswintr)
-	lw	v1, _C_LABEL(curpcb)
-	la	v0, _C_LABEL(fswintrberr)
-	lw	a2, U_PCB_ONFAULT(v1)
-	blt	a0, zero, _C_LABEL(fswintrberr)
-	sw	v0, U_PCB_ONFAULT(v1)
-	lhu	v0, 0(a0)			# fetch short
-	j	ra
-	sw	a2, U_PCB_ONFAULT(v1)
-END(fuswintr)
-
-/*
- * int suswintr(void *, short);
- * Stores a short word of data to the user-space address.
- * This function is safe to call during an interrupt context.
- */
-LEAF(suswintr)
-	lw	v1, _C_LABEL(curpcb)
-	la	v0, _C_LABEL(fswintrberr)
-	lw	a2, U_PCB_ONFAULT(v1)
-	blt	a0, zero, _C_LABEL(fswintrberr)
-	sw	v0, U_PCB_ONFAULT(v1)
-	sh	a1, 0(a0)			# store short
-	sw	a2, U_PCB_ONFAULT(v1)
-	j	ra
-	move	v0, zero
-END(suswintr)
-
-/*
- * int fuword(void *)
- * Fetches a word of data from the user-space address.
- */
-LEAF(fuword)
-XLEAF(fuiword)
-	lw	v1, _C_LABEL(curpcb)
-	la	v0, _C_LABEL(fswberr)
-	blt	a0, zero, _C_LABEL(fswberr)
-	sw	v0, U_PCB_ONFAULT(v1)
-	lw	v0, 0(a0)			# fetch word
-	j	ra
-	sw	zero, U_PCB_ONFAULT(v1)
-END(fuword)
-
-/*
- * int fusword(void *)
- * Fetches a short word of data from the user-space address.
- */
-LEAF(fusword)
-XLEAF(fuisword)
-	lw	v1, _C_LABEL(curpcb)
-	la	v0, _C_LABEL(fswberr)
-	blt	a0, zero, _C_LABEL(fswberr)
-	sw	v0, U_PCB_ONFAULT(v1)
-	lhu	v0, 0(a0)			# fetch short
-	j	ra
-	sw	zero, U_PCB_ONFAULT(v1)
-END(fusword)
-
-/*
- * int fubyte(void *)
- * Fetch a byte from the user's address space.
- */
-LEAF(fubyte)
-XLEAF(fuibyte)
-	lw	v1, _C_LABEL(curpcb)
-	la	v0, _C_LABEL(fswberr)
-	blt	a0, zero, _C_LABEL(fswberr)
-	sw	v0, U_PCB_ONFAULT(v1)
-	lbu	v0, 0(a0)			# fetch byte
-	j	ra
-	sw	zero, U_PCB_ONFAULT(v1)
-END(fubyte)
-
-/*
- * int suword(void *, int)
- * Stores a word of data to the user-space address.
- */
-LEAF(suword)
-	lw	v1, _C_LABEL(curpcb)
-	la	v0, _C_LABEL(fswberr)
-	blt	a0, zero, _C_LABEL(fswberr)
-	sw	v0, U_PCB_ONFAULT(v1)
-	sw	a1, 0(a0)			# store word
-	sw	zero, U_PCB_ONFAULT(v1)
-	j	ra
-	move	v0, zero
-END(suword)
-
-/*
- * int suiword(void *, int)
- * Have to flush instruction cache afterwards.
- */
-LEAF(suiword)
-	lw	v1, _C_LABEL(curpcb)
-	la	v0, _C_LABEL(fswberr)
-	blt	a0, zero, _C_LABEL(fswberr)
-	sw	v0, U_PCB_ONFAULT(v1)
-	sw	a1, 0(a0)			# store word
-	sw	zero, U_PCB_ONFAULT(v1)
-	move	v0, zero
-	lw	v1, _C_LABEL(mips_cache_ops) + MIPSX_FLUSHICACHE
-	j	v1				# NOTE: must not clobber v0!
-	li	a1, 4				# size of word
-END(suiword)
-
-/*
- * int susword(void *, short)
- * Stores a short word of data to the user-space address.
- */
-LEAF(susword)
-XLEAF(suisword)
-	lw	v1, _C_LABEL(curpcb)
-	la	v0, _C_LABEL(fswberr)
-	blt	a0, zero, _C_LABEL(fswberr)
-	sw	v0, U_PCB_ONFAULT(v1)
-	sh	a1, 0(a0)			# store short
-	sw	zero, U_PCB_ONFAULT(v1)
-	j	ra
-	move	v0, zero
-END(susword)
-
-/*
- * int subyte(void *, int)
- * Stores a byte of data to the user-space address.
- */
-LEAF(subyte)
-XLEAF(suibyte)
-	lw	v1, _C_LABEL(curpcb)
-	la	v0, _C_LABEL(fswberr)
-	blt	a0, zero, _C_LABEL(fswberr)
-	sw	v0, U_PCB_ONFAULT(v1)
-	sb	a1, 0(a0)			# store byte
-	sw	zero, U_PCB_ONFAULT(v1)
-	j	ra
-	move	v0, zero
-END(subyte)
-
-/*
- * int badaddr(void addr, int len)
- * See if access to addr with a len type instruction causes a machine check.
- * len is length of access (1=byte, 2=short, 4=long)
- */
-LEAF(badaddr)
-	lw	v1, _C_LABEL(curpcb)
-	la	v0, _C_LABEL(baderr)
-	bne	a1, 1, 2f
-	sw	v0, U_PCB_ONFAULT(v1)
-	b	5f
-	lbu	v0, (a0)
-2:
-	bne	a1, 2, 4f
-	nop
-	b	5f
-	lhu	v0, (a0)
-4:
-	lw	v0, (a0)
-5:
-	sw	zero, U_PCB_ONFAULT(v1)
-	j	ra
-	move	v0, zero		# made it w/o errors
-END(badaddr)
-
-/*
- * Error routine for {f,s}uswintr.  The fault handler in trap.c
- * checks for pcb_onfault set to this fault handler and
- * "bails out" before calling the VM fault handler.
- * (We can not call VM code from interrupt level.)
- */
-LEAF(fswintrberr)
-	nop
-	sw	a2, U_PCB_ONFAULT(v1)
-	j	ra
-	li	v0, -1
-END(fswintrberr)
-
-LEAF(fswberr)
-XLEAF(baderr)
-	sw	zero, U_PCB_ONFAULT(v1)
-	j	ra
-	li	v0, -1
-END(fswberr)
-
 #if defined(NS) || defined(ISO) || defined(CCITT) || defined(CODA)
 /*
  * Insert 'p' after 'q'.
@@ -1194,7 +848,7 @@ LEAF(mips_cp0_status_write)
 END(mips_cp0_status_write)
 
 
-#if !defined(NOFPU) || defined(SOFTFLOAT)
+#if !defined(NOFPU) && !defined(SOFTFLOAT)
 /*----------------------------------------------------------------------------
  *
  * MachFPInterrupt --
@@ -1227,18 +881,11 @@ NESTED(MachFPInterrupt, CALLFRAME_SIZ, ra)
 XNESTED(MachFPTrap)
 	.mask	0x80000000, -4
 	subu	sp, sp, CALLFRAME_SIZ
-#ifndef SOFTFLOAT
 	mfc0	t0, MIPS_COP_0_STATUS
-#endif
 	sw	ra, CALLFRAME_RA(sp)
-#ifndef SOFTFLOAT
 	or	t0, t0, MIPS_SR_COP_1_BIT
 	mtc0	t0, MIPS_COP_0_STATUS
-	COP0_SYNC
-	nop
-	nop
-	nop				# 1st extra nop for r4k
-	nop				# 2nd extra nop for r4k
+	COP0_HAZARD_FPUENABLE
 
 	cfc1	t0, MIPS_FPU_CSR	# stall til FP done
 	cfc1	t0, MIPS_FPU_CSR	# now get status
@@ -1246,9 +893,13 @@ XNESTED(MachFPTrap)
 	sll	t2, t0, (31 - 17)	# unimplemented operation?
 	bgez	t2, 3f			# no, normal trap
 	nop
-#endif
 /*
  * We got an unimplemented operation trap so
+ * We received an unimplemented operation trap.
+ *
+ * We check whether it's an unimplemented FP instruction here rather
+ * than invoking MachEmulateInst(), since it is faster.
+ *
  * fetch the instruction and emulate the instruction.
  */
 	bgez	a1, 1f			# Check the branch delay bit.
@@ -1275,21 +926,6 @@ XNESTED(MachFPTrap)
 	beq	t0, MIPS_OPCODE_C1, 4f
 	nop
 
-#ifdef SOFTFLOAT
-	REG_PROLOGUE
-	REG_S	zero, FRAME_ZERO(a3)		# ensure zero has value 0
-	REG_EPILOGUE
-
-	beq	t0, MIPS_OPCODE_LWC1, 5f
-	nop
-	beq	t0, MIPS_OPCODE_LDC1, 6f
-	nop
-	beq	t0, MIPS_OPCODE_SWC1, 7f
-	nop
-	beq	t0, MIPS_OPCODE_SDC1, 8f
-	nop
-#endif
-
 /*
  * Send a floating point exception signal to the current process.
  */
@@ -1300,10 +936,10 @@ XNESTED(MachFPTrap)
 	REG_S	a1, FRAME_CAUSE(a3)
 	REG_EPILOGUE
 
-	move	a2, a0				# code = instruction
-	lw	a0, _C_LABEL(curproc)		# get current process
-	jal	_C_LABEL(trapsignal)
-	li	a1, SIGILL
+	move	a1, a0				# code = instruction
+	lw	a0, _C_LABEL(curlwp)		# get current process
+	jal	_C_LABEL(mips_fpuillinst)
+	nop
 
 	b	FPReturn
 	nop
@@ -1317,10 +953,13 @@ XNESTED(MachFPTrap)
 	REG_S	a1, FRAME_CAUSE(a3)
 	REG_EPILOGUE
 
-	move	a2, a0				# code = instruction
-	lw	a0, _C_LABEL(curproc)		# get current process
-	jal	_C_LABEL(trapsignal)
-	li	a1, SIGFPE			# BDSLOT
+	and	a0, t0, ~MIPS_FPU_EXCEPTION_BITS
+	ctc1	a0, MIPS_FPU_CSR
+
+	move	a1, t0				# FPU status
+	lw	a0, _C_LABEL(curlwp)		# get current process
+	jal	_C_LABEL(mips_fpuexcept)
+	nop
 
 	b	FPReturn
 	nop
@@ -1336,109 +975,96 @@ XNESTED(MachFPTrap)
  * Turn off the floating point coprocessor and return.
  */
 FPReturn:
-#ifndef SOFTFLOAT
 	mfc0	t0, MIPS_COP_0_STATUS
-#endif
 	lw	ra, CALLFRAME_RA(sp)
-#ifndef SOFTFLOAT
 	and	t0, t0, ~MIPS_SR_COP_1_BIT
 	mtc0	t0, MIPS_COP_0_STATUS
 	COP0_SYNC
-#else
-	nop
-#endif
 	j	ra
 	addu	sp, sp, CALLFRAME_SIZ
-
-#ifdef SOFTFLOAT
-5:	# lwc1
-	jal	_C_LABEL(MachEmulateLWC1)
-	move	a1, a3
-	b	FPReturn
-	nop
-
-6:	# ldc1
-	jal	_C_LABEL(MachEmulateLDC1)
-	move	a1, a3
-	b	FPReturn
-	nop
-
-7:	# swc1
-	jal	_C_LABEL(MachEmulateSWC1)
-	move	a1, a3
-	b	FPReturn
-	nop
-
-8:	# sdc1
-	jal	_C_LABEL(MachEmulateSDC1)
-	move	a1, a3
-	b	FPReturn
-	nop
-
-#endif
 END(MachFPInterrupt)
-#endif /* !defined(NOFPU) || defined(SOFTFLOAT) */
+#endif /* !defined(NOFPU) && !defined(SOFTFLOAT) */
 
 LEAF(mips_pagecopy)
-#if !defined(_MIPS_BSD_API) || _MIPS_BSD_API == _MIPS_BSD_API_LP32
-	li	a2, NBPG >> 5
+#if defined(__mips_n32) || defined(_LP64)
+	.set	push
+	.set	mips3
+	li	a2, PAGE_SIZE >> 6
+
+1:	ld	t0, 0(a1)
+	ld	ta0, 32(a1)
+	ld	t2, 16(a1)
+	ld	ta2, 48(a1)
+	subu	a2, 1
+	ld	t1, 8(a1)
+	ld	t3, 24(a1)
+	ld	ta1, 40(a1)
+	ld	ta3, 56(a1)
+
+	sd	t0, 0(a0)
+	sd	ta0, 32(a0)
+	sd	t2, 16(a0)
+	sd	ta2, 48(a0)
+	addu	a1, 64
+	sd	t1, 8(a0)
+	sd	t3, 24(a0)
+	sd	ta1, 40(a0)
+	sd	ta3, 56(a0)
+	bgtz	a2,1b
+	addu	a0, 64
+	.set	pop
+#else
+	/* o32 */
+	li	a2, PAGE_SIZE >> 5
 
 1:	lw	t0, 0(a1)
-	lw	t4, 16(a1)
+	lw	ta0, 16(a1)
 	subu	a2, 1
 	lw	t1, 4(a1)
 	lw	t2, 8(a1)
 	lw	t3, 12(a1)
-	lw	t5, 20(a1)
-	lw	t6, 24(a1)
-	lw	t7, 28(a1)
+	lw	ta1, 20(a1)
+	lw	ta2, 24(a1)
+	lw	ta3, 28(a1)
 
 	sw	t0, 0(a0)
-	sw	t4, 16(a0)
+	sw	ta0, 16(a0)
 	addu	a1, 32
 	sw	t1, 4(a0)
 	sw	t2, 8(a0)
 	sw	t3, 12(a0)
-	sw	t5, 20(a0)
-	sw	t6, 24(a0)
-	sw	t7, 28(a0)
+	sw	ta1, 20(a0)
+	sw	ta2, 24(a0)
+	sw	ta3, 28(a0)
 	bgtz	a2,1b
 	addu	a0, 32
-#else
-	li	a2, NBPG >> 6
-
-	REG_PROLOGUE
-1:	ld	t0, 0(a1)
-	ld	t4, 32(a1)
-	ld	t2, 16(a1)
-	ld	t6, 48(a1)
-	subu	a2, 1
-	ld	t1, 8(a1)
-	ld	t3, 24(a1)
-	ld	t5, 40(a1)
-	ld	t7, 56(a1)
-
-	sd	t0, 0(a0)
-	sd	t4, 32(a0)
-	sd	t2, 16(a0)
-	sd	t6, 48(a0)
-	addu	a1, 64
-	sd	t1, 8(a0)
-	sd	t3, 24(a0)
-	sd	t5, 40(a0)
-	sd	t7, 56(a0)
-	bgtz	a2,1b
-	addu	a0, 64
-	REG_EPILOGUE
-#endif
-
+#endif /* __mips_n32 || _LP64 */
 	j	ra
 	nop
 END(mips_pagecopy)
 
 LEAF(mips_pagezero)
-#if !defined(_MIPS_BSD_API) || _MIPS_BSD_API == _MIPS_BSD_API_LP32
-	li	a1, NBPG >> 5
+/* We can always safely store a 64-bit zero on MIPS3,4,64 */
+#if !defined(MIPS1) && !defined(MIPS32)
+	.set	push
+	.set	mips3
+	li	a1, PAGE_SIZE >> 6
+
+1:	sd	zero, 0(a0)			# try to miss cache first
+	sd	zero, 32(a0)
+	subu	a1, 1
+	sd	zero, 16(a0)
+	sd	zero, 48(a0)
+	sd	zero, 8(a0)			# fill in cache lines
+	sd	zero, 40(a0)
+	sd	zero, 24(a0)
+	sd	zero, 56(a0)
+	bgtz	a1,1b
+	addu	a0, 64
+	.set	pop
+#else
+	/* o32 */
+	li	a1, PAGE_SIZE >> 5
 
 1:	sw	zero, 0(a0)
 	sw	zero, 16(a0)			# try to miss cache first
@@ -1451,24 +1077,7 @@ LEAF(mips_pagezero)
 	sw	zero, 28(a0)
 	bgtz	a1,1b
 	addu	a0, 32
-#else
-	li	a1, NBPG >> 6
-
-	REG_PROLOGUE
-1:	sd	zero, 0(a0)			# try to miss cache first
-	sd	zero, 32(a0)
-	subu	a1, 1
-	sd	zero, 16(a0)
-	sd	zero, 48(a0)
-	sd	zero, 8(a0)			# fill in cache lines
-	sd	zero, 40(a0)
-	sd	zero, 24(a0)
-	sd	zero, 56(a0)
-	REG_EPILOGUE
-	bgtz	a1,1b
-	addu	a0, 64
-#endif
-
+#endif /* __mips_n32 || _LP64 */
 	j	ra
 	nop
 END(mips_pagezero)

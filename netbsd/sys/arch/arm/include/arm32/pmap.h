@@ -1,10 +1,10 @@
-/*	$NetBSD: pmap.h,v 1.53 2002/04/12 21:52:48 thorpej Exp $	*/
+/*	$NetBSD: pmap.h,v 1.77 2003/10/13 20:50:34 scw Exp $	*/
 
 /*
- * Copyright (c 2002 Wasabi Systems, Inc.
+ * Copyright (c) 2002, 2003 Wasabi Systems, Inc.
  * All rights reserved.
  *
- * Written by Jason R. Thorpe for Wasabi Systems, Inc.
+ * Written by Jason R. Thorpe & Steve C. Woodford for Wasabi Systems, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -71,9 +71,11 @@
 #ifdef _KERNEL
 
 #include <arm/cpuconf.h>
-#include <arm/cpufunc.h>
 #include <arm/arm32/pte.h>
+#ifndef _LOCORE
+#include <arm/cpufunc.h>
 #include <uvm/uvm_object.h>
+#endif
 
 /*
  * a pmap describes a processes' 4GB virtual address space.  this
@@ -86,12 +88,6 @@
  * by making the L1 PTEs for those slots above KERNEL_BASE reference
  * kernel L2 tables.
  *
- * The L2 tables are mapped linearly starting at PTE_BASE.  PTE_BASE
- * is below KERNEL_BASE, which means that the current process's PTEs
- * are always available starting at PTE_BASE.  Another region of KVA
- * above KERNEL_BASE, APTE_BASE, is reserved for mapping in the PTEs
- * of another process, should we need to manipulate them.
- *
  * The basic layout of the virtual address space thus looks like this:
  *
  *	0xffffffff
@@ -100,7 +96,6 @@
  *	.
  *	KERNEL_BASE
  *	--------------------
- *	PTE_BASE
  *	.
  *	.
  *	.
@@ -108,18 +103,81 @@
  */
 
 /*
- * The pmap structure itself.
+ * The number of L2 descriptor tables which can be tracked by an l2_dtable.
+ * A bucket size of 16 provides for 16MB of contiguous virtual address
+ * space per l2_dtable. Most processes will, therefore, require only two or
+ * three of these to map their whole working set.
+ */
+#define	L2_BUCKET_LOG2	4
+#define	L2_BUCKET_SIZE	(1 << L2_BUCKET_LOG2)
+
+/*
+ * Given the above "L2-descriptors-per-l2_dtable" constant, the number
+ * of l2_dtable structures required to track all possible page descriptors
+ * mappable by an L1 translation table is given by the following constants:
+ */
+#define	L2_LOG2		((32 - L1_S_SHIFT) - L2_BUCKET_LOG2)
+#define	L2_SIZE		(1 << L2_LOG2)
+
+#ifndef _LOCORE
+
+struct l1_ttable;
+struct l2_dtable;
+
+/*
+ * Track cache/tlb occupancy using the following structure
+ */
+union pmap_cache_state {
+	struct {
+		union {
+			u_int8_t csu_cache_b[2];
+			u_int16_t csu_cache;
+		} cs_cache_u;
+
+		union {
+			u_int8_t csu_tlb_b[2];
+			u_int16_t csu_tlb;
+		} cs_tlb_u;
+	} cs_s;
+	u_int32_t cs_all;
+};
+#define	cs_cache_id	cs_s.cs_cache_u.csu_cache_b[0]
+#define	cs_cache_d	cs_s.cs_cache_u.csu_cache_b[1]
+#define	cs_cache	cs_s.cs_cache_u.csu_cache
+#define	cs_tlb_id	cs_s.cs_tlb_u.csu_tlb_b[0]
+#define	cs_tlb_d	cs_s.cs_tlb_u.csu_tlb_b[1]
+#define	cs_tlb		cs_s.cs_tlb_u.csu_tlb
+
+/*
+ * Assigned to cs_all to force cacheops to work for a particular pmap
+ */
+#define	PMAP_CACHE_STATE_ALL	0xffffffffu
+
+/*
+ * This structure is used by machine-dependent code to describe
+ * static mappings of devices, created at bootstrap time.
+ */
+struct pmap_devmap {
+	vaddr_t		pd_va;		/* virtual address */
+	paddr_t		pd_pa;		/* physical address */
+	psize_t		pd_size;	/* size of region */
+	vm_prot_t	pd_prot;	/* protection code */
+	int		pd_cache;	/* cache attributes */
+};
+
+/*
+ * The pmap structure itself
  */
 struct pmap {
-	struct uvm_object	pm_obj;		/* uvm_object */
-#define	pm_lock	pm_obj.vmobjlock	
-	LIST_ENTRY(pmap)	pm_list;	/* list (lck by pm_list lock) */
-	pd_entry_t		*pm_pdir;	/* KVA of page directory */
-	struct l1pt		*pm_l1pt;	/* L1 table metadata */
-	paddr_t                 pm_pptpt;	/* PA of pt's page table */
-	vaddr_t                 pm_vptpt;	/* VA of pt's page table */
-	struct pmap_statistics	pm_stats;	/* pmap statistics */
-	struct vm_page		*pm_ptphint;	/* recently used PT */
+	u_int8_t		pm_domain;
+	boolean_t		pm_remove_all;
+	struct l1_ttable	*pm_l1;
+	union pmap_cache_state	pm_cstate;
+	struct uvm_object	pm_obj;
+#define	pm_lock pm_obj.vmobjlock
+	struct l2_dtable	*pm_l2[L2_SIZE];
+	struct pmap_statistics	pm_stats;
+	LIST_ENTRY(pmap)	pm_list;
 };
 
 typedef struct pmap *pmap_t;
@@ -143,6 +201,7 @@ typedef struct pv_addr {
 #define	PTE_USER	1
 #define	PTE_NOCACHE	0
 #define	PTE_CACHE	1
+#define	PTE_PAGETABLE	2
 
 /*
  * Flags that indicate attributes of pages or mappings of pages.
@@ -159,7 +218,10 @@ typedef struct pv_addr {
 #define	PVF_REF		0x02		/* page is referenced */
 #define	PVF_WIRED	0x04		/* mapping is wired */
 #define	PVF_WRITE	0x08		/* mapping is writable */
-#define	PVF_NC		0x10		/* mapping is non-cacheable */
+#define	PVF_EXEC	0x10		/* mapping is executable */
+#define	PVF_UNC		0x20		/* mapping is 'user' non-cacheable */
+#define	PVF_KNC		0x40		/* mapping is 'kernel' non-cacheable */
+#define	PVF_NC		(PVF_UNC|PVF_KNC)
 
 /*
  * Commonly referenced structures
@@ -186,31 +248,41 @@ extern int		pmap_debug_level; /* Only exists if PMAP_DEBUG */
 /*
  * Functions that we need to export
  */
-vaddr_t	pmap_map(vaddr_t, vaddr_t, vaddr_t, int);
 void	pmap_procwr(struct proc *, vaddr_t, int);
+void	pmap_remove_all(pmap_t);
+boolean_t pmap_extract(pmap_t, vaddr_t, paddr_t *);
 
 #define	PMAP_NEED_PROCWR
 #define PMAP_GROWKERNEL		/* turn on pmap_growkernel interface */
 
 /* Functions we use internally. */
-void	pmap_bootstrap(pd_entry_t *, pv_addr_t);
+void	pmap_bootstrap(pd_entry_t *, vaddr_t, vaddr_t);
+
+int	pmap_fault_fixup(pmap_t, vaddr_t, vm_prot_t, int);
+boolean_t pmap_get_pde_pte(pmap_t, vaddr_t, pd_entry_t **, pt_entry_t **);
+boolean_t pmap_get_pde(pmap_t, vaddr_t, pd_entry_t **);
+void	pmap_set_pcb_pagedir(pmap_t, struct pcb *);
+
 void	pmap_debug(int);
-int	pmap_handled_emulation(struct pmap *, vaddr_t);
-int	pmap_modified_emulation(struct pmap *, vaddr_t);
 void	pmap_postinit(void);
 
 void	vector_page_setprot(int);
+
+const struct pmap_devmap *pmap_devmap_find_pa(paddr_t, psize_t);
+const struct pmap_devmap *pmap_devmap_find_va(vaddr_t, vsize_t);
 
 /* Bootstrapping routines. */
 void	pmap_map_section(vaddr_t, vaddr_t, paddr_t, int, int);
 void	pmap_map_entry(vaddr_t, vaddr_t, paddr_t, int, int);
 vsize_t	pmap_map_chunk(vaddr_t, vaddr_t, paddr_t, vsize_t, int, int);
 void	pmap_link_l2pt(vaddr_t, vaddr_t, pv_addr_t *);
+void	pmap_devmap_bootstrap(vaddr_t, const struct pmap_devmap *);
+void	pmap_devmap_register(const struct pmap_devmap *);
 
 /*
  * Special page zero routine for use by the idle loop (no cache cleans). 
  */
-boolean_t	pmap_pageidlezero __P((paddr_t));
+boolean_t	pmap_pageidlezero(paddr_t);
 #define PMAP_PAGEIDLEZERO(pa)	pmap_pageidlezero((pa))
 
 /*
@@ -223,25 +295,93 @@ extern vaddr_t	pmap_curmaxkvaddr;
  */
 
 /* Virtual address to page table entry */
-#define vtopte(va) \
-	(((pt_entry_t *)PTE_BASE) + arm_btop((vaddr_t) (va)))
+static __inline pt_entry_t *
+vtopte(vaddr_t va)
+{
+	pd_entry_t *pdep;
+	pt_entry_t *ptep;
 
-/* Virtual address to physical address */
-#define vtophys(va) \
-	((*vtopte(va) & L2_S_FRAME) | ((vaddr_t) (va) & L2_S_OFFSET))
+	if (pmap_get_pde_pte(pmap_kernel(), va, &pdep, &ptep) == FALSE)
+		return (NULL);
+	return (ptep);
+}
+
+/*
+ * Virtual address to physical address
+ */
+static __inline paddr_t
+vtophys(vaddr_t va)
+{
+	paddr_t pa;
+
+	if (pmap_extract(pmap_kernel(), va, &pa) == FALSE)
+		return (0);	/* XXXSCW: Panic? */
+
+	return (pa);
+}
+
+/*
+ * The new pmap ensures that page-tables are always mapping Write-Thru.
+ * Thus, on some platforms we can run fast and loose and avoid syncing PTEs
+ * on every change.
+ *
+ * Unfortunately, not all CPUs have a write-through cache mode.  So we
+ * define PMAP_NEEDS_PTE_SYNC for C code to conditionally do PTE syncs,
+ * and if there is the chance for PTE syncs to be needed, we define
+ * PMAP_INCLUDE_PTE_SYNC so e.g. assembly code can include (and run)
+ * the code.
+ */
+extern int pmap_needs_pte_sync;
+#if defined(_KERNEL_OPT)
+/*
+ * StrongARM SA-1 caches do not have a write-through mode.  So, on these,
+ * we need to do PTE syncs.  If only SA-1 is configured, then evaluate
+ * this at compile time.
+ */
+#if (ARM_MMU_SA1 == 1) && (ARM_NMMUS == 1)
+#define	PMAP_NEEDS_PTE_SYNC	1
+#define	PMAP_INCLUDE_PTE_SYNC
+#elif (ARM_MMU_SA1 == 0)
+#define	PMAP_NEEDS_PTE_SYNC	0
+#endif
+#endif /* _KERNEL_OPT */
+
+/*
+ * Provide a fallback in case we were not able to determine it at
+ * compile-time.
+ */
+#ifndef PMAP_NEEDS_PTE_SYNC
+#define	PMAP_NEEDS_PTE_SYNC	pmap_needs_pte_sync
+#define	PMAP_INCLUDE_PTE_SYNC
+#endif
+
+#define	PTE_SYNC(pte)							\
+do {									\
+	if (PMAP_NEEDS_PTE_SYNC)					\
+		cpu_dcache_wb_range((vaddr_t)(pte), sizeof(pt_entry_t));\
+} while (/*CONSTCOND*/0)
+
+#define	PTE_SYNC_RANGE(pte, cnt)					\
+do {									\
+	if (PMAP_NEEDS_PTE_SYNC) {					\
+		cpu_dcache_wb_range((vaddr_t)(pte),			\
+		    (cnt) << 2); /* * sizeof(pt_entry_t) */		\
+	}								\
+} while (/*CONSTCOND*/0)
 
 #define	l1pte_valid(pde)	((pde) != 0)
 #define	l1pte_section_p(pde)	(((pde) & L1_TYPE_MASK) == L1_TYPE_S)
 #define	l1pte_page_p(pde)	(((pde) & L1_TYPE_MASK) == L1_TYPE_C)
 #define	l1pte_fpage_p(pde)	(((pde) & L1_TYPE_MASK) == L1_TYPE_F)
 
+#define l2pte_index(v)		(((v) & L2_ADDR_BITS) >> L2_S_SHIFT)
 #define	l2pte_valid(pte)	((pte) != 0)
 #define	l2pte_pa(pte)		((pte) & L2_S_FRAME)
+#define l2pte_minidata(pte)	(((pte) & \
+				 (L2_B | L2_C | L2_XSCALE_T_TEX(TEX_XSCALE_X)))\
+				 == (L2_C | L2_XSCALE_T_TEX(TEX_XSCALE_X)))
 
 /* L1 and L2 page table macros */
-#define pmap_pdei(v)		((v & L1_S_FRAME) >> L1_S_SHIFT)
-#define pmap_pde(m, v)		(&((m)->pm_pdir[pmap_pdei(v)]))
-
 #define pmap_pde_v(pde)		l1pte_valid(*(pde))
 #define pmap_pde_section(pde)	l1pte_section_p(*(pde))
 #define pmap_pde_page(pde)	l1pte_page_p(*(pde))
@@ -250,22 +390,31 @@ extern vaddr_t	pmap_curmaxkvaddr;
 #define	pmap_pte_v(pte)		l2pte_valid(*(pte))
 #define	pmap_pte_pa(pte)	l2pte_pa(*(pte))
 
-
 /* Size of the kernel part of the L1 page table */
 #define KERNEL_PD_SIZE	\
 	(L1_TABLE_SIZE - (KERNEL_BASE >> L1_S_SHIFT) * sizeof(pd_entry_t))
 
 /************************* ARM MMU configuration *****************************/
 
-#if ARM_MMU_GENERIC == 1
+#if (ARM_MMU_GENERIC + ARM_MMU_SA1) != 0
 void	pmap_copy_page_generic(paddr_t, paddr_t);
 void	pmap_zero_page_generic(paddr_t);
 
 void	pmap_pte_init_generic(void);
+#if defined(CPU_ARM8)
+void	pmap_pte_init_arm8(void);
+#endif
 #if defined(CPU_ARM9)
 void	pmap_pte_init_arm9(void);
 #endif /* CPU_ARM9 */
-#endif /* ARM_MMU_GENERIC == 1 */
+#if defined(CPU_ARM10)
+void	pmap_pte_init_arm10(void);
+#endif /* CPU_ARM10 */
+#endif /* (ARM_MMU_GENERIC + ARM_MMU_SA1) != 0 */
+
+#if ARM_MMU_SA1 == 1
+void	pmap_pte_init_sa1(void);
+#endif /* ARM_MMU_SA1 == 1 */
 
 #if ARM_MMU_XSCALE == 1
 void	pmap_copy_page_xscale(paddr_t, paddr_t);
@@ -274,6 +423,9 @@ void	pmap_zero_page_xscale(paddr_t);
 void	pmap_pte_init_xscale(void);
 
 void	xscale_setup_minidata(vaddr_t, vaddr_t, paddr_t);
+
+#define	PMAP_UAREA(va)		pmap_uarea(va)
+void	pmap_uarea(vaddr_t);
 #endif /* ARM_MMU_XSCALE == 1 */
 
 extern pt_entry_t		pte_l1_s_cache_mode;
@@ -284,6 +436,10 @@ extern pt_entry_t		pte_l2_l_cache_mask;
 
 extern pt_entry_t		pte_l2_s_cache_mode;
 extern pt_entry_t		pte_l2_s_cache_mask;
+
+extern pt_entry_t		pte_l1_s_cache_mode_pt;
+extern pt_entry_t		pte_l2_l_cache_mode_pt;
+extern pt_entry_t		pte_l2_s_cache_mode_pt;
 
 extern pt_entry_t		pte_l2_s_prot_u;
 extern pt_entry_t		pte_l2_s_prot_w;
@@ -296,12 +452,20 @@ extern pt_entry_t		pte_l2_s_proto;
 extern void (*pmap_copy_page_func)(paddr_t, paddr_t);
 extern void (*pmap_zero_page_func)(paddr_t);
 
+#endif /* !_LOCORE */
+
 /*****************************************************************************/
 
 /*
  * tell MI code that the cache is virtually-indexed *and* virtually-tagged.
  */
 #define PMAP_CACHE_VIVT
+
+/*
+ * Definitions for MMU domains
+ */
+#define	PMAP_DOMAINS		15	/* 15 'user' domains (0-14) */
+#define	PMAP_DOMAIN_KERNEL	15	/* The kernel uses domain #15 */
 
 /*
  * These macros define the various bit masks in the PTE.
@@ -365,7 +529,7 @@ extern void (*pmap_zero_page_func)(paddr_t);
 
 #define	pmap_copy_page(s, d)	(*pmap_copy_page_func)((s), (d))
 #define	pmap_zero_page(d)	(*pmap_zero_page_func)((d))
-#elif ARM_MMU_GENERIC == 1
+#elif (ARM_MMU_GENERIC + ARM_MMU_SA1) != 0
 #define	L2_S_PROT_U		L2_S_PROT_U_generic
 #define	L2_S_PROT_W		L2_S_PROT_W_generic
 #define	L2_S_PROT_MASK		L2_S_PROT_MASK_generic
@@ -409,6 +573,21 @@ extern void (*pmap_zero_page_func)(paddr_t);
 
 #define	L2_S_PROT(ku, pr)	((((ku) == PTE_USER) ? L2_S_PROT_U : 0) | \
 				 (((pr) & VM_PROT_WRITE) ? L2_S_PROT_W : 0))
+
+/*
+ * Macros to test if a mapping is mappable with an L1 Section mapping
+ * or an L2 Large Page mapping.
+ */
+#define	L1_S_MAPPABLE_P(va, pa, size)					\
+	((((va) | (pa)) & L1_S_OFFSET) == 0 && (size) >= L1_S_SIZE)
+
+#define	L2_L_MAPPABLE_P(va, pa, size)					\
+	((((va) | (pa)) & L2_L_OFFSET) == 0 && (size) >= L2_L_SIZE)
+
+/*
+ * Hooks for the pool allocator.
+ */
+#define	POOL_VTOPHYS(va)	vtophys((vaddr_t) (va))
 
 #endif /* _KERNEL */
 

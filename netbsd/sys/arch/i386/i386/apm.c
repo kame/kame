@@ -1,4 +1,4 @@
-/*	$NetBSD: apm.c,v 1.66 2001/11/15 07:03:28 lukem Exp $ */
+/*	$NetBSD: apm.c,v 1.82 2003/10/28 14:49:53 yamt Exp $ */
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: apm.c,v 1.66 2001/11/15 07:03:28 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: apm.c,v 1.82 2003/10/28 14:49:53 yamt Exp $");
 
 #include "apm.h"
 #if NAPM > 1
@@ -59,7 +59,6 @@ __KERNEL_RCSID(0, "$NetBSD: apm.c,v 1.66 2001/11/15 07:03:28 lukem Exp $");
 #include <sys/systm.h>
 #include <sys/signalvar.h>
 #include <sys/kernel.h>
-#include <sys/map.h>
 #include <sys/proc.h>
 #include <sys/kthread.h>
 #include <sys/lock.h>
@@ -86,6 +85,9 @@ __KERNEL_RCSID(0, "$NetBSD: apm.c,v 1.66 2001/11/15 07:03:28 lukem Exp $");
 #include <i386/isa/nvram.h>
 
 #include <machine/bioscall.h>
+#ifdef APM_USE_KVM86
+#include <machine/kvm86.h>
+#endif
 #include <machine/apmvar.h>
 
 #if defined(APMDEBUG)
@@ -144,42 +146,50 @@ struct apm_softc {
 #define	APM_UNLOCK(apmsc)						\
 	(void) lockmgr(&(apmsc)->sc_lock, LK_RELEASE, NULL)
 
-static void	apmattach __P((struct device *, struct device *, void *));
-static int	apmmatch __P((struct device *, struct cfdata *, void *));
+static void	apmattach(struct device *, struct device *, void *);
+static int	apmmatch(struct device *, struct cfdata *, void *);
 
 #if 0
-static void	apm_devpowmgt_enable __P((int, u_int));
-static void	apm_disconnect __P((void *));
+static void	apm_devpowmgt_enable(int, u_int);
+static void	apm_disconnect(void *);
 #endif
-static int	apm_event_handle __P((struct apm_softc *, struct bioscallregs *));
-static int	apm_get_event __P((struct bioscallregs *));
-static int	apm_get_powstat __P((struct bioscallregs *, u_int));
-static void	apm_get_powstate __P((u_int));
-static int	apm_periodic_check __P((struct apm_softc *));
-static void	apm_create_thread __P((void *));
-static void	apm_thread __P((void *));
-static void	apm_perror __P((const char *, struct bioscallregs *, ...))
+static int	apm_event_handle(struct apm_softc *, struct bioscallregs *);
+static int	apm_get_event(struct bioscallregs *);
+static int	apm_get_powstat(struct bioscallregs *, u_int);
+static void	apm_get_powstate(u_int);
+static int	apm_periodic_check(struct apm_softc *);
+static void	apm_create_thread(void *);
+static void	apm_thread(void *);
+static void	apm_perror(const char *, struct bioscallregs *, ...)
 		    __attribute__((__format__(__printf__,1,3)));
 #ifdef APM_POWER_PRINT
-static void	apm_power_print __P((struct apm_softc *, struct bioscallregs *));
+static void	apm_power_print(struct apm_softc *, struct bioscallregs *);
 #endif
-static void	apm_powmgt_enable __P((int));
-static void	apm_powmgt_engage __P((int, u_int));
-static int	apm_record_event __P((struct apm_softc *, u_int));
-static void	apm_get_capabilities __P((struct bioscallregs *));
-static void	apm_set_ver __P((struct apm_softc *));
-static void	apm_standby __P((struct apm_softc *));
-static const char *apm_strerror __P((int));
-static void	apm_suspend __P((struct apm_softc *));
-static void	apm_resume __P((struct apm_softc *, struct bioscallregs *));
+static void	apm_powmgt_enable(int);
+static void	apm_powmgt_engage(int, u_int);
+static int	apm_record_event(struct apm_softc *, u_int);
+static void	apm_get_capabilities(struct bioscallregs *);
+static void	apm_set_ver(struct apm_softc *);
+static void	apm_standby(struct apm_softc *);
+static const char *apm_strerror(int);
+static void	apm_suspend(struct apm_softc *);
+static void	apm_resume(struct apm_softc *, struct bioscallregs *);
 
-cdev_decl(apm);
-
-struct cfattach apm_ca = {
-	sizeof(struct apm_softc), apmmatch, apmattach
-};
+CFATTACH_DECL(apm, sizeof(struct apm_softc),
+    apmmatch, apmattach, NULL, NULL);
 
 extern struct cfdriver apm_cd;
+
+dev_type_open(apmopen);
+dev_type_close(apmclose);
+dev_type_ioctl(apmioctl);
+dev_type_poll(apmpoll);
+dev_type_kqfilter(apmkqfilter);
+
+const struct cdevsw apm_cdevsw = {
+	apmopen, apmclose, noread, nowrite, apmioctl,
+	nostop, notty, apmpoll, nommap, apmkqfilter,
+};
 
 /* configurable variables */
 int	apm_bogus_bios = 0;
@@ -327,7 +337,8 @@ apmcall_debug(func, regs, line)
 	int rv;
 	int print = (apmdebug & APMDEBUG_APMCALLS) != 0;
 	char *name;
-	int inf, outf;
+	int inf;
+	int outf = 0; /* XXX: gcc */
 		
 	if (print) {
 		if (func >= sizeof(aci) / sizeof(aci[0])) {
@@ -604,7 +615,7 @@ apm_record_event(sc, event_type)
 	sc->event_ptr %= APM_NEVENTS;
 	evp->type = event_type;
 	evp->index = ++apm_evindex;
-	selwakeup(&sc->sc_rsel);
+	selnotify(&sc->sc_rsel, 0);
 	return (sc->sc_flags & SCFLAG_OWRITE) ? 0 : 1; /* user may handle */
 }
 
@@ -843,7 +854,7 @@ apm_devpowmgt_enable(onoff, dev)
 	regs.BX = dev;
 
 	/*
-	 * enable is auto BIOS managment.
+	 * enable is auto BIOS management.
 	 * disable is program control.
 	 */
 	regs.CX = onoff ? APM_MGT_ENABLE : APM_MGT_DISABLE;
@@ -948,13 +959,11 @@ apm_set_ver(self)
 	struct apm_softc *self;
 {
 	struct bioscallregs regs;
-	int error;
 
 	regs.CX = 0x0102;	/* APM Version 1.2 */
 	regs.BX = APM_DEV_APM_BIOS;
 	
-	if (apm_v12_enabled &&
-	    (error = apmcall(APM_DRIVER_VERSION, &regs)) == 0) {
+	if (apm_v12_enabled && apmcall(APM_DRIVER_VERSION, &regs) == 0) {
 		apm_majver = 1;
 		apm_minver = 2;
 		goto ok;
@@ -963,8 +972,7 @@ apm_set_ver(self)
 	regs.CX = 0x0101;	/* APM Version 1.1 */
 	regs.BX = APM_DEV_APM_BIOS;
 	
-	if (apm_v11_enabled &&
-	    (error = apmcall(APM_DRIVER_VERSION, &regs)) == 0) {
+	if (apm_v11_enabled && apmcall(APM_DRIVER_VERSION, &regs) == 0) {
 		apm_majver = 1;
 		apm_minver = 1;
 	} else {
@@ -1030,15 +1038,25 @@ int
 apm_busprobe()
 {
 	struct bioscallregs regs;
+#ifdef APM_USE_KVM86
+	int res;
+#endif
 #ifdef APMDEBUG
 	char bits[128];
 #endif
 
+	memset(&regs, 0, sizeof(struct bioscallregs));
 	regs.AX = APM_BIOS_FN(APM_INSTALLATION_CHECK);
 	regs.BX = APM_DEV_APM_BIOS;
-	regs.CX = regs.DX = 0;
-	regs.ESI = regs.EDI = regs.EFLAGS = 0;
+#ifdef APM_USE_KVM86
+	res = kvm86_bioscall_simple(APM_SYSTEM_BIOS, &regs);
+	if (res) {
+		printf("apm_busprobe: kvm86 error\n");
+		return (0);
+	}
+#else
 	bioscall(APM_SYSTEM_BIOS, &regs);
+#endif
 	DPRINTF(APMDEBUG_PROBE, ("apm: bioscall return: %x %x %x %x %s %x %x\n",
 	    regs.AX, regs.BX, regs.CX, regs.DX,
 	    bitmask_snprintf(regs.EFLAGS, I386_FLAGBITS, bits, sizeof(bits)),
@@ -1105,16 +1123,27 @@ apmattach(parent, self, aux)
 	u_int okbases[] = { 0, biosbasemem*1024 };
 	u_int oklimits[] = { PAGE_SIZE, IOM_END};
 	u_int i;
+#ifdef APM_USE_KVM86
+	int res;
+#endif
 #ifdef APMDEBUG
 	char bits[128];
 #endif
 
 	printf(": ");
 
+	memset(&regs, 0, sizeof(struct bioscallregs));
 	regs.AX = APM_BIOS_FN(APM_INSTALLATION_CHECK);
 	regs.BX = APM_DEV_APM_BIOS;
-	regs.CX = regs.DX = regs.SI = regs.DI = regs.FLAGS = 0;
+#ifdef APM_USE_KVM86
+	res = kvm86_bioscall_simple(APM_SYSTEM_BIOS, &regs);
+	if (res) {
+		printf("apm_attach: kvm86 error\n");
+		goto bail_disconnected;
+	}
+#else
 	bioscall(APM_SYSTEM_BIOS, &regs);
+#endif
 	DPRINTF_BIOSRETURN(regs, bits);
 	DPRINTF(APMDEBUG_ATTACH, ("\n%s: ", apmsc->sc_dev.dv_xname));
 
@@ -1124,10 +1153,18 @@ apmattach(parent, self, aux)
 	 * call a disconnect in case it was already connected
 	 * by some previous code.
 	 */
+	memset(&regs, 0, sizeof(struct bioscallregs));
 	regs.AX = APM_BIOS_FN(APM_DISCONNECT);
 	regs.BX = APM_DEV_APM_BIOS;
-	regs.CX = regs.DX = regs.SI = regs.DI = regs.FLAGS = 0;
+#ifdef APM_USE_KVM86
+	res = kvm86_bioscall_simple(APM_SYSTEM_BIOS, &regs);
+	if (res) {
+		printf("apm_attach: kvm86 error\n");
+		goto bail_disconnected;
+	}
+#else
 	bioscall(APM_SYSTEM_BIOS, &regs);
+#endif
 	DPRINTF_BIOSRETURN(regs, bits);
 	DPRINTF(APMDEBUG_ATTACH, ("\n%s: ", apmsc->sc_dev.dv_xname));
 
@@ -1139,11 +1176,18 @@ apmattach(parent, self, aux)
 	/*
 	 * And connect to it.
 	 */
+	memset(&regs, 0, sizeof(struct bioscallregs));
 	regs.AX = APM_BIOS_FN(APM_32BIT_CONNECT);
 	regs.BX = APM_DEV_APM_BIOS;
-	regs.CX = regs.DX = regs.DI = regs.FLAGS = 0;
-	regs.ESI = 0;
+#ifdef APM_USE_KVM86
+	res = kvm86_bioscall_simple(APM_SYSTEM_BIOS, &regs);
+	if (res) {
+		printf("apm_attach: kvm86 error\n");
+		goto bail_disconnected;
+	}
+#else
 	bioscall(APM_SYSTEM_BIOS, &regs);
+#endif
 	DPRINTF_BIOSRETURN(regs, bits);
 	DPRINTF(APMDEBUG_ATTACH, ("\n%s: ", apmsc->sc_dev.dv_xname));
 
@@ -1353,13 +1397,11 @@ apmattach(parent, self, aux)
 	    apminfo.apm_code32_seg_len,
 	    apminfo.apm_data_seg_len,
 	    apmsc->sc_dev.dv_xname));
-	setsegment(&gdt[GAPM32CODE_SEL].sd,
-	    ISA_HOLE_VADDR(apminfo.apm_code32_seg_base),
+	setgdt(GAPM32CODE_SEL, ISA_HOLE_VADDR(apminfo.apm_code32_seg_base),
 	    apminfo.apm_code32_seg_len - 1,
 	    SDT_MEMERA, SEL_KPL, 1, 0);
 #ifdef GAPM16CODE_SEL
-	setsegment(&gdt[GAPM16CODE_SEL].sd,
-	    ISA_HOLE_VADDR(apminfo.apm_code16_seg_base),
+	setgdt(GAPM16CODE_SEL, ISA_HOLE_VADDR(apminfo.apm_code16_seg_base),
 	    apminfo.apm_code16_seg_len - 1,
 	    SDT_MEMERA, SEL_KPL, 0, 0);
 #endif
@@ -1369,7 +1411,7 @@ apmattach(parent, self, aux)
 		 * descriptor to just the first byte of the code
 		 * segment, read only.
 		 */
-		setsegment(&gdt[GAPMDATA_SEL].sd,
+		setgdt(GAPMDATA_SEL,
 		    ISA_HOLE_VADDR(apminfo.apm_code32_seg_base),
 		    0, SDT_MEMROA, SEL_KPL, 0, 0);
 	} else if (apminfo.apm_data_seg_base < IOM_BEGIN) {
@@ -1382,7 +1424,7 @@ apmattach(parent, self, aux)
 		 * implementation on i386 so it can be done without
 		 * extent checking.
 		 */
-		if (_i386_memio_map(I386_BUS_SPACE_MEM,
+		if (_x86_memio_map(X86_BUS_SPACE_MEM,
 		    apminfo.apm_data_seg_base,
 		    apminfo.apm_data_seg_len, 0, &memh)) {
 			printf("couldn't map data segment");
@@ -1392,13 +1434,11 @@ apmattach(parent, self, aux)
 		    ("mapping bios data area %x @ 0x%lx\n%s: ",
 		    apminfo.apm_data_seg_base, memh,
 		    apmsc->sc_dev.dv_xname));
-		setsegment(&gdt[GAPMDATA_SEL].sd,
-		    (void *)memh,
+		setgdt(GAPMDATA_SEL, (void *)memh,
 		    apminfo.apm_data_seg_len - 1,
 		    SDT_MEMRWA, SEL_KPL, 1, 0);
 	} else
-		setsegment(&gdt[GAPMDATA_SEL].sd,
-		    ISA_HOLE_VADDR(apminfo.apm_data_seg_base),
+		setgdt(GAPMDATA_SEL, ISA_HOLE_VADDR(apminfo.apm_data_seg_base),
 		    apminfo.apm_data_seg_len - 1,
 		    SDT_MEMRWA, SEL_KPL, 1, 0);
 
@@ -1481,10 +1521,15 @@ bail:
 	/*
 	 * call a disconnect; we're punting.
 	 */
+	memset(&regs, 0, sizeof(struct bioscallregs));
 	regs.AX = APM_BIOS_FN(APM_DISCONNECT);
 	regs.BX = APM_DEV_APM_BIOS;
 	regs.CX = regs.DX = regs.SI = regs.DI = regs.FLAGS = 0;
+#ifdef APM_USE_KVM86
+	(void)kvm86_bioscall_simple(APM_SYSTEM_BIOS, &regs);
+#else
 	bioscall(APM_SYSTEM_BIOS, &regs);
+#endif
 	DPRINTF(APMDEBUG_ATTACH, ("\n%s: ", apmsc->sc_dev.dv_xname));
 	DPRINTF_BIOSRETURN(regs, bits);
 bail_disconnected:
@@ -1508,10 +1553,14 @@ apm_create_thread(arg)
 	/*
 	 * We were unable to create the APM thread; bail out.
 	 */
+	memset(&regs, 0, sizeof(struct bioscallregs));
 	regs.AX = APM_BIOS_FN(APM_DISCONNECT);
 	regs.BX = APM_DEV_APM_BIOS;
-	regs.CX = regs.DX = regs.SI = regs.DI = regs.FLAGS = 0;
+#ifdef APM_USE_KVM86
+	(void)kvm86_bioscall_simple(APM_SYSTEM_BIOS, &regs);
+#else
 	bioscall(APM_SYSTEM_BIOS, &regs);
+#endif
 	DPRINTF(APMDEBUG_ATTACH, ("\n%s: ", apmsc->sc_dev.dv_xname));
 	DPRINTF_BIOSRETURN(regs, bits);
 	printf("%s: unable to create thread, kernel APM support disabled\n",
@@ -1657,7 +1706,7 @@ apmioctl(dev, cmd, data, flag, p)
 			error = EBADF;
 			break;
 		}
-		apm_suspend_now++;	/* flag for peroidic event */
+		apm_suspend_now++;	/* flag for periodic event */
 		break;
 
 	case APM_IOC_DEV_CTL:
@@ -1765,4 +1814,51 @@ apmpoll(dev, events, p)
 	APM_UNLOCK(sc);
 
 	return (revents);
+}
+
+static void
+filt_apmrdetach(struct knote *kn)
+{
+	struct apm_softc *sc = kn->kn_hook;
+
+	APM_LOCK(sc);
+	SLIST_REMOVE(&sc->sc_rsel.sel_klist, kn, knote, kn_selnext);
+	APM_UNLOCK(sc);
+}
+
+static int
+filt_apmread(struct knote *kn, long hint)
+{
+	struct apm_softc *sc = kn->kn_hook;
+
+	kn->kn_data = sc->event_count;
+	return (kn->kn_data > 0);
+}
+
+static const struct filterops apmread_filtops =
+	{ 1, NULL, filt_apmrdetach, filt_apmread };
+
+int
+apmkqfilter(dev_t dev, struct knote *kn)
+{
+	struct apm_softc *sc = apm_cd.cd_devs[APMUNIT(dev)];
+	struct klist *klist;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &sc->sc_rsel.sel_klist;
+		kn->kn_fop = &apmread_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = sc;
+
+	APM_LOCK(sc);
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	APM_UNLOCK(sc);
+
+	return (0);
 }

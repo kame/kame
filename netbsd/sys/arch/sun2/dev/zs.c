@@ -1,4 +1,4 @@
-/*	$NetBSD: zs.c,v 1.1 2002/03/22 00:23:53 fredette Exp $	*/
+/*	$NetBSD: zs.c,v 1.9 2004/02/13 11:36:19 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -44,6 +44,9 @@
  * Sun keyboard/mouse uses the zs_kbd/zs_ms slaves.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zs.c,v 1.9 2004/02/13 11:36:19 wiz Exp $");
+
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
 
@@ -61,7 +64,6 @@
 
 #include <machine/autoconf.h>
 #include <machine/promlib.h>
-#include <machine/conf.h>
 #include <machine/cpu.h>
 #include <machine/eeprom.h>
 #include <machine/psl.h>
@@ -83,7 +85,6 @@
  * or you can not see messages done with printf during boot-up...
  */
 int zs_def_cflag = (CREAD | CS8 | HUPCL);
-int zs_major = 12;
 
 /* ZS channel used as the console device (if any) */
 void *zs_conschan_get, *zs_conschan_put;
@@ -174,12 +175,12 @@ zs_attach(zsc, zsd, pri)
 	for (channel = 0; channel < 2; channel++) {
 		struct zschan *zc;
 		struct device *child;
-		extern struct cfdriver zstty_cd; /* in ioconf.c */
 
 		zsc_args.channel = channel;
 		cs = &zsc->zsc_cs_store[channel];
 		zsc->zsc_cs[channel] = cs;
 
+		simple_lock_init(&cs->cs_lock);
 		cs->cs_channel = channel;
 		cs->cs_private = NULL;
 		cs->cs_ops = &zsops_null;
@@ -208,8 +209,8 @@ zs_attach(zsc, zsd, pri)
 		cs->cs_reg_csr  = &zc->zc_csr;
 		cs->cs_reg_data = &zc->zc_data;
 
-		bcopy(zs_init_reg, cs->cs_creg, 16);
-		bcopy(zs_init_reg, cs->cs_preg, 16);
+		memcpy(cs->cs_creg, zs_init_reg, 16);
+		memcpy(cs->cs_preg, zs_init_reg, 16);
 
 		/* XXX: Consult PROM properties for this?! */
 		cs->cs_defspeed = zs_get_speed(cs);
@@ -250,7 +251,8 @@ zs_attach(zsc, zsd, pri)
 		 * sunkbd and sunms line disciplines.
 		 */
 		if (child 
-		    && (child->dv_cfdata->cf_driver == &zstty_cd)) {
+		    && (!strcmp(child->dv_cfdata->cf_name,
+		    		"zstty"))) {
 			struct kbd_ms_tty_attach_args kma;
 			struct zstty_softc {	
 				/* The following are the only fields we need here */
@@ -296,7 +298,7 @@ zs_attach(zsc, zsd, pri)
 	 */
 	bus_intr_establish(zsc->zsc_bustag, pri, IPL_SERIAL, 0, zshard, zsc);
 	if (!(zsc->zsc_softintr = softintr_establish(softpri, zssoft, zsc)))
-		panic("zsattach: could not establish soft interrupt\n");
+		panic("zsattach: could not establish soft interrupt");
 
 	evcnt_attach_dynamic(&zsc->zsc_intrcnt, EVCNT_TYPE_INTR, NULL,
 	    zsc->zsc_dev.dv_xname, "intr");
@@ -324,10 +326,10 @@ zs_print(aux, name)
 	struct zsc_attach_args *args = aux;
 
 	if (name != NULL)
-		printf("%s: ", name);
+		aprint_normal("%s: ", name);
 
 	if (args->channel != -1)
-		printf(" channel %d", args->channel);
+		aprint_normal(" channel %d", args->channel);
 
 	return (UNCONF);
 }
@@ -662,7 +664,7 @@ zs_putc(arg, c)
 	 * the `transmit-ready' interrupt isn't de-asserted until
 	 * some period of time after the register write completes
 	 * (more than a couple instructions).  So to avoid stray
-	 * interrupts we put in the 2us delay regardless of cpu model.
+	 * interrupts we put in the 2us delay regardless of CPU model.
 	 */
 	zc->zc_data = c;
 	delay(2);

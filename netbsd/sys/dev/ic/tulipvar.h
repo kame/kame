@@ -1,4 +1,4 @@
-/*	$NetBSD: tulipvar.h,v 1.47.4.1 2003/07/28 17:42:42 he Exp $	*/
+/*	$NetBSD: tulipvar.h,v 1.50 2003/12/18 18:39:36 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -327,7 +327,7 @@ struct tulip_srom_to_ifmedia {
 struct tulip_stats {
 	u_long		ts_tx_uf;	/* transmit underflow errors */
 	u_long		ts_tx_to;	/* transmit jabber timeouts */
-	u_long		ts_tx_ec;	/* excessve collision count */
+	u_long		ts_tx_ec;	/* excessive collision count */
 	u_long		ts_tx_lc;	/* late collision count */
 };
 
@@ -475,6 +475,7 @@ struct tulip_softc {
 #define	TULIPF_ENABLED		0x00001000	/* chip is enabled */
 #define	TULIPF_BLE		0x00002000	/* data is big endian */
 #define	TULIPF_DBO		0x00004000	/* descriptor is big endian */
+#define	TULIPF_VPC		0x00008000	/* Virtual PC Ethernet */
 
 #define	TULIP_IS_ENABLED(sc)	((sc)->sc_flags & TULIPF_ENABLED)
 

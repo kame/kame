@@ -1,4 +1,4 @@
-/*	$NetBSD: fpu.c,v 1.26 2002/05/14 02:03:01 matt Exp $	*/
+/*	$NetBSD: fpu.c,v 1.30.2.1 2004/08/02 07:25:34 tron Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -36,6 +36,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: fpu.c,v 1.30.2.1 2004/08/02 07:25:34 tron Exp $");
+
+#include "opt_fpu_emulate.h"
+
 /*
  * Floating Point Unit (MC68881/882/040)
  * Probe for the FPU at autoconfig time.
@@ -61,9 +66,8 @@ static int  fpu_match __P((struct device *, struct cfdata *, void *));
 static void fpu_attach __P((struct device *, struct device *, void *));
 static int  fpu_probe __P((void));
 
-struct cfattach fpu_ca = {
-	sizeof(struct device), fpu_match, fpu_attach
-};
+CFATTACH_DECL(fpu, sizeof(struct device),
+    fpu_match, fpu_attach, NULL, NULL);
 
 static int
 fpu_match(parent, cf, aux)
@@ -95,6 +99,11 @@ fpu_attach(parent, self, args)
 	char *descr;
 
 	fputype = fpu_probe();
+
+	/* Generate a reference FPU idle frame. */
+	if (fputype != FPU_NONE)
+		m68k_make_fpu_idle_frame();
+
 	if ((0 <= fputype) && (fputype <= 3))
 		descr = fpu_descr[fputype];
 	else

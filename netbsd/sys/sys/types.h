@@ -1,4 +1,4 @@
-/*	$NetBSD: types.h,v 1.51 2002/03/09 23:57:25 chs Exp $	*/
+/*	$NetBSD: types.h,v 1.62 2003/08/07 16:34:21 agc Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1991, 1993, 1994
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -42,6 +38,8 @@
 
 #ifndef _SYS_TYPES_H_
 #define	_SYS_TYPES_H_
+
+#include <sys/featuretest.h>
 
 /* Machine type dependent parameters. */
 #include <machine/types.h>
@@ -99,7 +97,7 @@ typedef	uint64_t	u_int64_t;
 
 #include <machine/endian.h>
 
-#if !defined(_POSIX_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 typedef	unsigned char	u_char;
 typedef	unsigned short	u_short;
 typedef	unsigned int	u_int;
@@ -113,7 +111,7 @@ typedef unsigned long	ulong;		/* Sys V compatibility */
 typedef	u_long		cpuid_t;
 #endif
 
-typedef	u_int64_t	u_quad_t;	/* quads */
+typedef	uint64_t	u_quad_t;	/* quads */
 typedef	int64_t		quad_t;
 typedef	quad_t *	qaddr_t;
 
@@ -127,28 +125,34 @@ typedef	quad_t *	qaddr_t;
  * the C99 types int64_t and uint64_t instead.
  */
 
-typedef	quad_t		longlong_t;	/* for XDR */
-typedef	u_quad_t	u_longlong_t;	/* for XDR */
+typedef	int64_t		longlong_t;	/* for XDR */
+typedef	uint64_t	u_longlong_t;	/* for XDR */
 
 typedef	int64_t		blkcnt_t;	/* fs block count */
-typedef	u_int32_t	blksize_t;	/* fs optimal block size */
+typedef	uint32_t	blksize_t;	/* fs optimal block size */
 
 #ifndef	caddr_t
 typedef	__caddr_t	caddr_t;	/* core address */
 #define	caddr_t		__caddr_t
 #endif
 
-typedef	int32_t		daddr_t;	/* disk address */
-typedef	u_int32_t	dev_t;		/* device number */
-typedef	u_int32_t	fixpt_t;	/* fixed point number */
+#ifdef __daddr_t
+typedef	__daddr_t	daddr_t;	/* disk address */
+#undef __daddr_t
+#else
+typedef	int64_t		daddr_t;	/* disk address */
+#endif
+
+typedef	uint32_t	dev_t;		/* device number */
+typedef	uint32_t	fixpt_t;	/* fixed point number */
 
 #ifndef	gid_t
 typedef	__gid_t		gid_t;		/* group id */
 #define	gid_t		__gid_t
 #endif
 
-typedef	u_int32_t	id_t;		/* group id, process id or user id */
-typedef	u_int32_t	ino_t;		/* inode number */
+typedef	uint32_t	id_t;		/* group id, process id or user id */
+typedef	uint32_t	ino_t;		/* inode number */
 typedef	long		key_t;		/* IPC key (for Sys V IPC) */
 
 #ifndef	mode_t
@@ -156,7 +160,7 @@ typedef	__mode_t	mode_t;		/* permissions */
 #define	mode_t		__mode_t
 #endif
 
-typedef	u_int32_t	nlink_t;	/* link count */
+typedef	uint32_t	nlink_t;	/* link count */
 
 #ifndef	off_t
 typedef	__off_t		off_t;		/* file offset */
@@ -167,7 +171,7 @@ typedef	__off_t		off_t;		/* file offset */
 typedef	__pid_t		pid_t;		/* process id */
 #define	pid_t		__pid_t
 #endif
-
+typedef int32_t		lwpid_t;	/* LWP id */
 typedef quad_t		rlim_t;		/* resource limit */
 typedef	int32_t		segsz_t;	/* segment size */
 typedef	int32_t		swblk_t;	/* swap offset */
@@ -178,6 +182,16 @@ typedef	__uid_t		uid_t;		/* user id */
 #endif
 
 typedef	int32_t		dtime_t;	/* on-disk time_t */
+
+#if defined(_KERNEL)
+typedef int	boolean_t;
+#ifndef TRUE
+#define	TRUE	1
+#endif
+#ifndef FALSE
+#define	FALSE	0
+#endif
+#endif
 
 #if defined(_KERNEL) || defined(_LIBC)
 /*
@@ -190,6 +204,9 @@ union __semun {
 	struct semid_ds	*buf;		/* buffer for IPC_STAT & IPC_SET */
 	unsigned short	*array;		/* array for GETALL & SETALL */
 };
+/* For the same reason as above */
+#include <sys/stdint.h>
+typedef intptr_t semid_t;
 #endif /* _KERNEL || _LIBC */
 
 /*
@@ -197,7 +214,7 @@ union __semun {
  * long arguments will be promoted to off_t if the program fails to
  * include that header or explicitly cast them to off_t.
  */
-#if !defined(_POSIX_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 #ifndef __OFF_T_SYSCALLS_DECLARED
 #define __OFF_T_SYSCALLS_DECLARED
 #ifndef _KERNEL
@@ -209,9 +226,9 @@ int	 truncate __P((const char *, off_t));
 __END_DECLS
 #endif /* !_KERNEL */
 #endif /* __OFF_T_SYSCALLS_DECLARED */
-#endif /* !defined(_POSIX_SOURCE) ... */
+#endif /* defined(_NETBSD_SOURCE) */
 
-#if !defined(_POSIX_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 /* Major, minor numbers, dev_t's. */
 #define	major(x)	((int32_t)((((x) & 0x000fff00) >>  8)))
 #define	minor(x)	((int32_t)((((x) & 0xfff00000) >> 12) | \
@@ -262,9 +279,8 @@ typedef	_BSD_USECONDS_T_	useconds_t;
 #undef	_BSD_USECONDS_T_
 #endif
 
-#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
-    (defined(_XOPEN_SOURCE) && defined(_XOPEN_SOURCE_EXTENDED)) || \
-    (_XOPEN_SOURCE - 0) >= 500
+#if (defined(_XOPEN_SOURCE) && defined(_XOPEN_SOURCE_EXTENDED)) || \
+    (_XOPEN_SOURCE - 0) >= 500 || defined(_NETBSD_SOURCE)
 
 /*
  * Implementation dependent defines, hidden from user space. X/Open does not
@@ -305,7 +321,7 @@ typedef	struct fd_set {
 /*
  * Expose our internals if we are not required to hide them.
  */
-#ifndef _XOPEN_SOURCE
+#if defined(_NETBSD_SOURCE)
 
 #define NBBY __NBBY
 #define fd_mask __fd_mask
@@ -324,6 +340,9 @@ typedef	struct fd_set {
  * common structures that cross subsystem boundaries here; others are mostly
  * used in the same place that the structure is defined.
  */
+struct	lwp;
+struct	user;
+struct	__ucontext;
 struct	proc;
 struct	pgrp;
 struct	ucred;
@@ -334,5 +353,13 @@ struct	tty;
 struct	uio;
 #endif
 
-#endif /* !defined(_POSIX_SOURCE) ... */
+#endif /* _XOPEN_SOURCE_EXTENDED || _XOPEN_SOURCE >= 500 || _NETBSD_SOURCE */
+
+#if !defined(_KERNEL) && !defined(_STANDALONE)
+#if (_POSIX_C_SOURCE - 0L) >= 199506L || (_XOPEN_SOURCE - 0) >= 500 || \
+    defined(_NETBSD_SOURCE)
+#include <pthread_types.h>
+#endif
+#endif
+
 #endif /* !_SYS_TYPES_H_ */

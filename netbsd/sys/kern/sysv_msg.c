@@ -1,4 +1,4 @@
-/*	$NetBSD: sysv_msg.c,v 1.34 2002/03/05 23:28:58 nathanw Exp $	*/
+/*	$NetBSD: sysv_msg.c,v 1.37 2004/03/23 13:22:04 junyoung Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -57,7 +57,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sysv_msg.c,v 1.34 2002/03/05 23:28:58 nathanw Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sysv_msg.c,v 1.37 2004/03/23 13:22:04 junyoung Exp $");
 
 #define SYSVMSG
 
@@ -66,6 +66,7 @@ __KERNEL_RCSID(0, "$NetBSD: sysv_msg.c,v 1.34 2002/03/05 23:28:58 nathanw Exp $"
 #include <sys/msg.h>
 #include <sys/sysctl.h>
 #include <sys/mount.h>		/* XXX for <sys/syscallargs.h> */
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #define MSG_DEBUG
@@ -77,20 +78,21 @@ __KERNEL_RCSID(0, "$NetBSD: sysv_msg.c,v 1.34 2002/03/05 23:28:58 nathanw Exp $"
 #define MSG_PRINTF(a)
 #endif
 
-int	nfree_msgmaps;		/* # of free map entries */
-short	free_msgmaps;		/* head of linked list of free map entries */
-struct	__msg *free_msghdrs;	/* list of free msg headers */
-char	*msgpool;		/* MSGMAX byte long msg buffer pool */
-struct	msgmap *msgmaps;	/* MSGSEG msgmap structures */
-struct __msg *msghdrs;		/* MSGTQL msg headers */
-struct	msqid_ds *msqids;	/* MSGMNI msqid_ds struct's */
+static int	nfree_msgmaps;		/* # of free map entries */
+static short	free_msgmaps;	/* head of linked list of free map entries */
+static struct	__msg *free_msghdrs;	/* list of free msg headers */
+static char	*msgpool;		/* MSGMAX byte long msg buffer pool */
+static struct	msgmap *msgmaps;	/* MSGSEG msgmap structures */
+static struct __msg *msghdrs;		/* MSGTQL msg headers */
+struct	msqid_ds *msqids;		/* MSGMNI msqid_ds struct's */
 
-static void msg_freehdr __P((struct __msg *));
+static void msg_freehdr(struct __msg *);
 
 void
 msginit()
 {
-	int i;
+	int i, sz;
+	vaddr_t v;
 
 	/*
 	 * msginfo.msgssz should be a power of two for efficiency reasons.
@@ -112,8 +114,17 @@ msginit()
 		panic("msginfo.msgseg > 32767");
 	}
 
-	if (msgmaps == NULL)
-		panic("msgmaps is NULL");
+	/* Allocate pageable memory for our structures */
+	sz = msginfo.msgmax
+		+ msginfo.msgseg * sizeof(struct msgmap)
+		+ msginfo.msgtql * sizeof(struct __msg)
+		+ msginfo.msgmni * sizeof(struct msqid_ds);
+	if ((v = uvm_km_zalloc(kernel_map, round_page(sz))) == 0)
+		panic("sysv_msg: cannot allocate memory");
+	msgpool = (void *)v;
+	msgmaps = (void *) (msgpool + msginfo.msgmax);
+	msghdrs = (void *) (msgmaps + msginfo.msgseg);
+	msqids = (void *) (msghdrs + msginfo.msgtql);
 
 	for (i = 0; i < msginfo.msgseg; i++) {
 		if (i > 0)
@@ -168,8 +179,8 @@ msg_freehdr(msghdr)
 }
 
 int
-sys___msgctl13(p, v, retval)
-	struct proc *p;
+sys___msgctl13(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -178,6 +189,7 @@ sys___msgctl13(p, v, retval)
 		syscallarg(int) cmd;
 		syscallarg(struct msqid_ds *) buf;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct msqid_ds msqbuf;
 	int cmd, error;
 
@@ -300,8 +312,8 @@ msgctl1(p, msqid, cmd, msqbuf)
 }
 
 int
-sys_msgget(p, v, retval)
-	struct proc *p;
+sys_msgget(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -309,6 +321,7 @@ sys_msgget(p, v, retval)
 		syscallarg(key_t) key;
 		syscallarg(int) msgflg;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	int msqid, error;
 	int key = SCARG(uap, key);
 	int msgflg = SCARG(uap, msgflg);
@@ -389,8 +402,8 @@ sys_msgget(p, v, retval)
 }
 
 int
-sys_msgsnd(p, v, retval)
-	struct proc *p;
+sys_msgsnd(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -400,6 +413,7 @@ sys_msgsnd(p, v, retval)
 		syscallarg(size_t) msgsz;
 		syscallarg(int) msgflg;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	int msqid = SCARG(uap, msqid);
 	const char *user_msgp = SCARG(uap, msgp);
 	size_t msgsz = SCARG(uap, msgsz);
@@ -664,8 +678,8 @@ sys_msgsnd(p, v, retval)
 }
 
 int
-sys_msgrcv(p, v, retval)
-	struct proc *p;
+sys_msgrcv(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -676,6 +690,7 @@ sys_msgrcv(p, v, retval)
 		syscallarg(long) msgtyp;
 		syscallarg(int) msgflg;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	int msqid = SCARG(uap, msqid);
 	char *user_msgp = SCARG(uap, msgp);
 	size_t msgsz = SCARG(uap, msgsz);

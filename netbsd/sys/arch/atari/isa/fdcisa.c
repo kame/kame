@@ -1,4 +1,4 @@
-/*	$NetBSD: fdcisa.c,v 1.2 2002/01/07 21:47:00 thorpej Exp $	*/
+/*	$NetBSD: fdcisa.c,v 1.8 2003/09/25 19:06:19 mycroft Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -51,11 +51,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -73,6 +69,10 @@
  *
  *	@(#)fd.c	7.4 (Berkeley) 5/25/91
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: fdcisa.c,v 1.8 2003/09/25 19:06:19 mycroft Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/callout.h>
@@ -97,9 +97,8 @@ struct fdc_isa_softc {
 	bus_space_handle_t	sc_baseioh;	/* base I/O handle */
 };
 
-struct cfattach fdcisa_ca = {
-	sizeof(struct fdc_isa_softc), fdc_isa_probe, fdc_isa_attach
-};
+CFATTACH_DECL(fdcisa, sizeof(struct fdc_isa_softc),
+    fdc_isa_probe, fdc_isa_attach, NULL, NULL);
 
 int
 fdc_isa_probe(parent, cfp, aux)

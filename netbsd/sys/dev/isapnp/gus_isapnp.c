@@ -1,4 +1,4 @@
-/*	$NetBSD: gus_isapnp.c,v 1.17 2001/11/13 07:56:40 lukem Exp $	*/
+/*	$NetBSD: gus_isapnp.c,v 1.22 2003/05/03 18:11:30 wiz Exp $	*/
 
 /*
  * Copyright (c) 1997, 1999 The NetBSD Foundation, Inc.
@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: gus_isapnp.c,v 1.17 2001/11/13 07:56:40 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: gus_isapnp.c,v 1.22 2003/05/03 18:11:30 wiz Exp $");
 
 #include "guspnp.h"
 #if NGUSPNP > 0
@@ -63,7 +63,6 @@ __KERNEL_RCSID(0, "$NetBSD: gus_isapnp.c,v 1.17 2001/11/13 07:56:40 lukem Exp $"
 
 #include <dev/isa/isavar.h>
 #include <dev/isa/isadmavar.h>
-#include <i386/isa/icu.h>
 
 #include <dev/isapnp/isapnpreg.h>
 #include <dev/isapnp/isapnpvar.h>
@@ -116,9 +115,8 @@ static struct audio_hw_if guspnp_hw_if = {
 
 
 
-struct cfattach guspnp_ca = {
-	sizeof(struct iw_softc), gus_isapnp_match, gus_isapnp_attach
-};
+CFATTACH_DECL(guspnp, sizeof(struct iw_softc),
+    gus_isapnp_match, gus_isapnp_attach, NULL, NULL);
 
 extern struct cfdriver guspnp_cd;
 
@@ -219,7 +217,7 @@ gus_isapnp_attach(parent, self, aux)
 	      }
 
         /*
-         * isapnp is a child if isa, and we need isa for the dma
+         * isapnp is a child if isa, and we need isa for the DMA
          * routines.
          */
 	sc->iw_cd = &guspnp_cd;

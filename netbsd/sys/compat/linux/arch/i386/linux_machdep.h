@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_machdep.h,v 1.21 2002/02/15 16:48:00 christos Exp $	*/
+/*	$NetBSD: linux_machdep.h,v 1.27 2003/09/06 22:09:21 christos Exp $	*/
 
 /*-
  * Copyright (c) 1995, 2000 The NetBSD Foundation, Inc.
@@ -39,11 +39,47 @@
 #ifndef _I386_LINUX_MACHDEP_H
 #define _I386_LINUX_MACHDEP_H
 
+#include <compat/linux/common/linux_types.h>
 #include <compat/linux/common/linux_signal.h>
+#include <compat/linux/common/linux_siginfo.h>
 
 /*
  * The Linux sigcontext, pretty much a standard 386 trapframe.
  */
+struct linux_fpreg {
+	uint16_t	mant[4];
+	uint16_t	expo;
+};
+
+struct linux_fpxreg {
+	uint16_t	mant[4];
+	uint16_t	expo;
+	uint16_t	pad[3];
+};
+
+struct linux_xmmreg {
+	uint32_t	reg[4];
+};
+
+struct linux_fpstate {
+	uint32_t	cw;
+	uint32_t	sw;
+	uint32_t	tag;
+	uint32_t	ipoff;
+	uint32_t	cssel;
+	uint32_t	dataoff;
+	uint32_t	datasel;
+	struct linux_fpreg	st[8];
+	uint16_t	status;
+	uint16_t	magic;
+	uint32_t	fxsr_env[6];
+	uint32_t	mxcsr;
+	uint32_t	reserved;
+	struct linux_fpxreg	fxsr_st[8];
+	struct linux_xmmreg	xmm[8];
+	uint32_t	padding[56];
+};
+
 
 struct linux_sigcontext {
 	int	sc_gs;
@@ -65,10 +101,36 @@ struct linux_sigcontext {
 	int	sc_eflags;
 	int	sc_esp_at_signal;
 	int	sc_ss;
-	int	sc_387;
+	struct linux_fpstate *sc_387;
 	/* XXX check this */
 	linux_old_sigset_t sc_mask;
 	int	sc_cr2;
+};
+
+struct linux_libc_fpreg {
+	unsigned short  significand[4];
+	unsigned short  exponent;
+};
+
+struct linux_libc_fpstate {
+	unsigned long cw;
+	unsigned long sw;
+	unsigned long tag;
+	unsigned long ipoff;
+	unsigned long cssel;
+	unsigned long dataoff;
+	unsigned long datasel;
+	struct linux_libc_fpreg _st[8];
+	unsigned long status;
+};
+
+struct linux_ucontext {
+	unsigned long	uc_flags;
+	struct ucontext	*uc_link;
+	struct linux_sigaltstack uc_stack;
+	struct linux_sigcontext uc_mcontext;
+	linux_sigset_t uc_sigmask;
+	struct linux_libc_fpstate uc_fpregs_mem;
 };
 
 /*
@@ -77,6 +139,14 @@ struct linux_sigcontext {
  * This means that we need to pass the pointer to the handler too.
  * It is appended to the frame to not interfere with the rest of it.
  */
+struct linux_rt_sigframe {
+	int	sf_sig;
+	struct	linux_siginfo  *sf_sip;
+	struct	linux_ucontext *sf_ucp;
+	struct	linux_siginfo  sf_si;
+	struct	linux_ucontext sf_uc;
+	sig_t	sf_handler;
+};
 
 struct linux_sigframe {
 	int	sf_sig;
@@ -84,18 +154,11 @@ struct linux_sigframe {
 	sig_t	sf_handler;
 };
 
-#ifdef _KERNEL
-__BEGIN_DECLS
-void linux_sendsig __P((sig_t, int, sigset_t *, u_long));
-__END_DECLS
-#endif /* _KERNEL */
-
 /*
  * Major device numbers of VT device on both Linux and NetBSD. Used in
  * ugly patch to fake device numbers.
  */
 #define LINUX_CONS_MAJOR   4
-#define NETBSD_WSCONS_MAJOR 47
 
 /*
  * Linux ioctl calls for the keyboard.

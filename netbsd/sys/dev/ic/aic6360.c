@@ -1,4 +1,4 @@
-/*	$NetBSD: aic6360.c,v 1.78 2002/04/05 18:27:50 bouyer Exp $	*/
+/*	$NetBSD: aic6360.c,v 1.80 2003/11/02 11:07:44 wiz Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995, 1996 Charles M. Hannum.  All rights reserved.
@@ -58,7 +58,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: aic6360.c,v 1.78 2002/04/05 18:27:50 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: aic6360.c,v 1.80 2003/11/02 11:07:44 wiz Exp $");
 
 #include "opt_ddb.h"
 #ifdef DDB
@@ -257,7 +257,7 @@ aicattach(struct aic_softc *sc)
 	 * the chip's clock input and the size and offset of the sync period
 	 * register.
 	 *
-	 * For a 20Mhz clock, this gives us 25, or 100nS, or 10MB/s, as a
+	 * For a 20MHz clock, this gives us 25, or 100nS, or 10MB/s, as a
 	 * maximum transfer rate, and 112.5, or 450nS, or 2.22MB/s, as a
 	 * minimum transfer rate.
 	 */
@@ -823,7 +823,7 @@ abort:
 /*
  * Schedule a SCSI operation.  This has now been pulled out of the interrupt
  * handler so that we may call it from aic_scsipi_request and aic_done.  This
- * may save us an unecessary interrupt just to get things going.  Should only
+ * may save us an unnecessary interrupt just to get things going.  Should only
  * be called when state == AIC_IDLE and at bio pl.
  */
 void

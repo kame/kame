@@ -1,4 +1,4 @@
-/*      $NetBSD: mtpr.h,v 1.13 2000/07/06 17:42:49 ragge Exp $     */
+/*      $NetBSD: mtpr.h,v 1.15 2004/02/13 11:36:20 wiz Exp $     */
 
 /*
  * Copyright (c) 1994 Ludd, University of Lule}, Sweden.
@@ -129,7 +129,7 @@
 #define	PR_RXDB3  89 /* Serial-Line Unit 3 Receive Data Buffer (KA820) */
 #define	PR_TXCS3  90 /* Serial-Line Unit 3 Transmit CSR (KA820) */
 #define	PR_TXDB3  91 /* Serial-Line Unit 3 Transmit Data Buffer (KA820) */
-#define	PR_RXCD	  92 /* Receive Console Data from another cpu (KA820) */
+#define	PR_RXCD	  92 /* Receive Console Data from another CPU (KA820) */
 #define	PR_CACHEX 93 /* Cache invalidate Register (KA820) */
 #define	PR_BINID  94 /* VAXBI node ID Register (KA820) */
 #define	PR_BISTOP 95 /* VAXBI Stop Register (KA820) */
@@ -166,20 +166,20 @@
 
 #ifndef	_LOCORE
 
-#define mtpr(val,reg)                                   \
-{                                                       \
-        __asm__ __volatile ("mtpr %0,%1"                    \
-                        : /* No output */               \
-                        : "g" (val), "g" (reg));        \
+#define mtpr(val,reg)						\
+{								\
+	__asm__ __volatile ("mtpr %0,%1"			\
+			: /* No output */			\
+			: "g" ((long)(val)), "g" (reg));        \
 }
 
-#define mfpr(reg)                                       \
-({                                                      \
-        register int val;                               \
-        __asm__ __volatile ("mfpr %1,%0"                    \
-                        : "=g" (val)                    \
-                        : "g" (reg));                   \
-        val;                                            \
+#define mfpr(reg)					\
+({							\
+	register int val;				\
+	__asm__ __volatile ("mfpr %1,%0"		\
+			: "=g" (val)			\
+			: "g" (reg));			\
+	val;						\
 })
 #endif	/* _LOCORE */
 

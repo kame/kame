@@ -1,4 +1,4 @@
-/*	$NetBSD: vme_sun68k.c,v 1.2 2001/11/30 17:49:10 fredette Exp $	*/
+/*	$NetBSD: vme_sun68k.c,v 1.8 2003/10/28 08:00:36 mrg Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 2001 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vme_sun68k.c,v 1.8 2003/10/28 08:00:36 mrg Exp $");
 
 #include <sys/param.h>
 #include <sys/extent.h>
@@ -101,9 +104,8 @@ static int	sun68k_vme_dmamap_load_raw __P((bus_dma_tag_t, bus_dmamap_t,
 
 paddr_t sun68k_vme_mmap_cookie __P((vme_addr_t, vme_am_t, bus_space_handle_t *));
 
-struct cfattach sun68kvme_ca = {
-	sizeof(struct sun68kvme_softc), sun68kvme_match, sun68kvme_attach
-};
+CFATTACH_DECL(sun68kvme, sizeof(struct sun68kvme_softc),
+    sun68kvme_match, sun68kvme_attach, NULL, NULL);
 
 /*
  * The VME bus logic on sun68k machines maps DMA requests in the first MB
@@ -142,7 +144,7 @@ sun68kvme_match(parent, cf, aux)
 {
         struct mainbus_attach_args *ma = aux;
 
-        return (cpu_has_vme && (ma->ma_name == NULL || strcmp(cf->cf_driver->cd_name, ma->ma_name) == 0));
+        return (cpu_has_vme && (ma->ma_name == NULL || strcmp(cf->cf_name, ma->ma_name) == 0));
 }
 
 /*
@@ -207,7 +209,7 @@ sun68k_vme_probe(cookie, addr, len, mod, datasize, callback, arg)
 	error = vmebus_translate(mod, addr, &iospace, &paddr);
 	if (error == 0)
 		error = bus_space_map2(sc->sc_bustag, iospace, paddr, len, 
-			0, NULL, &handle);
+			0, 0, &handle);
 	if (error)
 		return (error);
 

@@ -1,10 +1,10 @@
-/*	$NetBSD: umidivar.h,v 1.3 2001/02/03 18:50:32 tshiozak Exp $	*/
+/*	$NetBSD: umidivar.h,v 1.7 2003/12/05 06:05:53 gson Exp $	*/
 /*
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Takuya SHIOZAKI (tshiozak@netbsd.org).
+ * by Takuya SHIOZAKI (tshiozak@NetBSD.org).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -44,7 +44,7 @@ typedef enum {
 	PS_NORMAL_2OF3=2,
 	PS_NORMAL_1OF2=3,
 	PS_EXCL_1=4,
-	PS_EXCL_2=5,
+	PS_EXCL_2=5
 } packet_state_t;
 
 #define UMIDI_PACKET_SIZE 4
@@ -59,8 +59,8 @@ struct umidi_packet {
  * <-- parent	       child -->
  *
  * umidi(sc) -> endpoint -> jack   <- (dynamically assignable) - mididev
- *	   ^	 |    ^	    | 
- *	   +-----+    +-----+ 
+ *	   ^	 |    ^	    |
+ *	   +-----+    +-----+
  */
 
 /* midi device */
@@ -103,7 +103,7 @@ struct umidi_endpoint {
 	int			addr;
 	usbd_pipe_handle	pipe;
 	usbd_xfer_handle	xfer;
-	char			*buffer;
+	unsigned char		*buffer;
 	int			num_open;
 	int			num_jacks;
 	struct umidi_jack	*jacks[UMIDI_MAX_EPJACKS];

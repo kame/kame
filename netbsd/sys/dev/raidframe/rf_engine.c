@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_engine.c,v 1.12 2001/11/13 07:11:14 lukem Exp $	*/
+/*	$NetBSD: rf_engine.c,v 1.34 2004/03/09 03:10:26 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -55,12 +55,11 @@
  ****************************************************************************/
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rf_engine.c,v 1.12 2001/11/13 07:11:14 lukem Exp $");
-
-#include "rf_threadstuff.h"
+__KERNEL_RCSID(0, "$NetBSD: rf_engine.c,v 1.34 2004/03/09 03:10:26 oster Exp $");
 
 #include <sys/errno.h>
 
+#include "rf_threadstuff.h"
 #include "rf_dag.h"
 #include "rf_engine.h"
 #include "rf_etimer.h"
@@ -69,25 +68,12 @@ __KERNEL_RCSID(0, "$NetBSD: rf_engine.c,v 1.12 2001/11/13 07:11:14 lukem Exp $")
 #include "rf_shutdown.h"
 #include "rf_raid.h"
 
+static void rf_ShutdownEngine(void *);
 static void DAGExecutionThread(RF_ThreadArg_t arg);
-
-#define DO_INIT(_l_,_r_) { \
-  int _rc; \
-  _rc = rf_create_managed_mutex(_l_,&(_r_)->node_queue_mutex); \
-  if (_rc) { \
-    return(_rc); \
-  } \
-  _rc = rf_create_managed_cond(_l_,&(_r_)->node_queue_cond); \
-  if (_rc) { \
-    return(_rc); \
-  } \
-}
+static void rf_RaidIOThread(RF_ThreadArg_t arg);
 
 /* synchronization primitives for this file.  DO_WAIT should be enclosed in a while loop. */
 
-/*
- * XXX Is this spl-ing really necessary?
- */
 #define DO_LOCK(_r_) \
 do { \
 	ks = splbio(); \
@@ -106,72 +92,85 @@ do { \
 #define	DO_SIGNAL(_r_) \
 	RF_BROADCAST_COND((_r_)->node_queue)	/* XXX RF_SIGNAL_COND? */
 
-static void rf_ShutdownEngine(void *);
-
 static void 
-rf_ShutdownEngine(arg)
-	void   *arg;
+rf_ShutdownEngine(void *arg)
 {
 	RF_Raid_t *raidPtr;
+	int ks;
 
 	raidPtr = (RF_Raid_t *) arg;
-	raidPtr->shutdown_engine = 1;
-	DO_SIGNAL(raidPtr);
+
+	/* Tell the rf_RaidIOThread to shutdown */
+	simple_lock(&(raidPtr->iodone_lock));
+
+	raidPtr->shutdown_raidio = 1;
+	wakeup(&(raidPtr->iodone));
+
+	/* ...and wait for it to tell us it has finished */
+	while (raidPtr->shutdown_raidio)
+ 		ltsleep(&(raidPtr->shutdown_raidio), PRIBIO, "raidshutdown", 0,
+			&(raidPtr->iodone_lock));
+
+	simple_unlock(&(raidPtr->iodone_lock));
+
+ 	/* Now shut down the DAG execution engine. */
+ 	DO_LOCK(raidPtr);
+  	raidPtr->shutdown_engine = 1;
+  	DO_SIGNAL(raidPtr);
+ 	DO_UNLOCK(raidPtr);
+
 }
 
 int 
-rf_ConfigureEngine(
-    RF_ShutdownList_t ** listp,
-    RF_Raid_t * raidPtr,
-    RF_Config_t * cfgPtr)
+rf_ConfigureEngine(RF_ShutdownList_t **listp, RF_Raid_t *raidPtr,
+		   RF_Config_t *cfgPtr)
 {
-	int     rc;
 
-	DO_INIT(listp, raidPtr);
-
+	rf_mutex_init(&raidPtr->node_queue_mutex);
 	raidPtr->node_queue = NULL;
 	raidPtr->dags_in_flight = 0;
-
-	rc = rf_init_managed_threadgroup(listp, &raidPtr->engine_tg);
-	if (rc)
-		return (rc);
 
 	/* we create the execution thread only once per system boot. no need
 	 * to check return code b/c the kernel panics if it can't create the
 	 * thread. */
+#if RF_DEBUG_ENGINE
 	if (rf_engineDebug) {
 		printf("raid%d: Creating engine thread\n", raidPtr->raidid);
 	}
-	if (RF_CREATE_THREAD(raidPtr->engine_thread, DAGExecutionThread, raidPtr,"raid")) {
-		RF_ERRORMSG("RAIDFRAME: Unable to create engine thread\n");
+#endif
+	if (RF_CREATE_ENGINE_THREAD(raidPtr->engine_thread, 
+				    DAGExecutionThread, raidPtr,
+				    "raid%d", raidPtr->raidid)) {
+		printf("raid%d: Unable to create engine thread\n",
+		       raidPtr->raidid);
 		return (ENOMEM);
 	}
+	if (RF_CREATE_ENGINE_THREAD(raidPtr->engine_helper_thread,
+				    rf_RaidIOThread, raidPtr, 
+				    "raidio%d", raidPtr->raidid)) {
+		printf("raid%d: Unable to create raidio thread\n", 
+		       raidPtr->raidid);
+		return (ENOMEM);
+	}
+#if RF_DEBUG_ENGINE
 	if (rf_engineDebug) {
 		printf("raid%d: Created engine thread\n", raidPtr->raidid);
 	}
-	RF_THREADGROUP_STARTED(&raidPtr->engine_tg);
-	/* XXX something is missing here... */
-#ifdef debug
-	printf("Skipping the WAIT_START!!\n");
 #endif
-#if 0
-	RF_THREADGROUP_WAIT_START(&raidPtr->engine_tg);
-#endif
+
 	/* engine thread is now running and waiting for work */
+#if RF_DEBUG_ENGINE
 	if (rf_engineDebug) {
 		printf("raid%d: Engine thread running and waiting for events\n", raidPtr->raidid);
 	}
-	rc = rf_ShutdownCreate(listp, rf_ShutdownEngine, raidPtr);
-	if (rc) {
-		RF_ERRORMSG3("Unable to add to shutdown list file %s line %d rc=%d\n", __FILE__,
-		    __LINE__, rc);
-		rf_ShutdownEngine(NULL);
-	}
-	return (rc);
+#endif
+	rf_ShutdownCreate(listp, rf_ShutdownEngine, raidPtr);
+
+	return (0);
 }
 
 static int 
-BranchDone(RF_DagNode_t * node)
+BranchDone(RF_DagNode_t *node)
 {
 	int     i;
 
@@ -186,13 +185,12 @@ BranchDone(RF_DagNode_t * node)
 		/* node is currently executing, so we're not done */
 		return (RF_FALSE);
 	case rf_good:
-		for (i = 0; i < node->numSuccedents; i++)	/* for each succedent */
-			if (!BranchDone(node->succedents[i]))	/* recursively check
-								 * branch */
+		/* for each succedent recursively check branch */
+		for (i = 0; i < node->numSuccedents; i++)
+			if (!BranchDone(node->succedents[i]))
 				return RF_FALSE;
 		return RF_TRUE;	/* node and all succedent branches aren't in
 				 * fired state */
-		break;
 	case rf_bad:
 		/* succedents can't fire */
 		return (RF_TRUE);
@@ -205,7 +203,6 @@ BranchDone(RF_DagNode_t * node)
 		/* XXX need to fix this case */
 		/* for now, assume that we're done */
 		return (RF_TRUE);
-		break;
 	default:
 		/* illegal node status */
 		RF_PANIC();
@@ -214,14 +211,15 @@ BranchDone(RF_DagNode_t * node)
 }
 
 static int 
-NodeReady(RF_DagNode_t * node)
+NodeReady(RF_DagNode_t *node)
 {
 	int     ready;
 
 	switch (node->dagHdr->status) {
 	case rf_enable:
 	case rf_rollForward:
-		if ((node->status == rf_wait) && (node->numAntecedents == node->numAntDone))
+		if ((node->status == rf_wait) && 
+		    (node->numAntecedents == node->numAntDone))
 			ready = RF_TRUE;
 		else
 			ready = RF_FALSE;
@@ -230,7 +228,8 @@ NodeReady(RF_DagNode_t * node)
 		RF_ASSERT(node->numSuccDone <= node->numSuccedents);
 		RF_ASSERT(node->numSuccFired <= node->numSuccedents);
 		RF_ASSERT(node->numSuccFired <= node->numSuccDone);
-		if ((node->status == rf_good) && (node->numSuccDone == node->numSuccedents))
+		if ((node->status == rf_good) && 
+		    (node->numSuccDone == node->numSuccedents))
 			ready = RF_TRUE;
 		else
 			ready = RF_FALSE;
@@ -246,23 +245,24 @@ NodeReady(RF_DagNode_t * node)
 
 
 
-/* user context and dag-exec-thread context:
- * Fire a node.  The node's status field determines which function, do or undo,
- * to be fired.
- * This routine assumes that the node's status field has alread been set to
- * "fired" or "recover" to indicate the direction of execution.
+/* user context and dag-exec-thread context: Fire a node.  The node's
+ * status field determines which function, do or undo, to be fired.
+ * This routine assumes that the node's status field has alread been
+ * set to "fired" or "recover" to indicate the direction of execution.
  */
 static void 
-FireNode(RF_DagNode_t * node)
+FireNode(RF_DagNode_t *node)
 {
 	switch (node->status) {
 	case rf_fired:
 		/* fire the do function of a node */
+#if RF_DEBUG_ENGINE
 		if (rf_engineDebug) {
 			printf("raid%d: Firing node 0x%lx (%s)\n", 
 			       node->dagHdr->raidPtr->raidid, 
 			       (unsigned long) node, node->name);
 		}
+#endif
 		if (node->flags & RF_DAGNODE_FLAG_YIELD) {
 #if defined(__NetBSD__) && defined(_KERNEL)
 			/* thread_block(); */
@@ -277,11 +277,13 @@ FireNode(RF_DagNode_t * node)
 		break;
 	case rf_recover:
 		/* fire the undo function of a node */
+#if RF_DEBUG_ENGINE
 		if (rf_engineDebug) {
 			printf("raid%d: Firing (undo) node 0x%lx (%s)\n", 
 			       node->dagHdr->raidPtr->raidid,
 			       (unsigned long) node, node->name);
 		}
+#endif
 		if (node->flags & RF_DAGNODE_FLAG_YIELD)
 #if defined(__NetBSD__) && defined(_KERNEL)
 			/* thread_block(); */
@@ -306,9 +308,7 @@ FireNode(RF_DagNode_t * node)
  * The entire list is fired atomically.
  */
 static void 
-FireNodeArray(
-    int numNodes,
-    RF_DagNode_t ** nodeList)
+FireNodeArray(int numNodes, RF_DagNode_t **nodeList)
 {
 	RF_DagStatus_t dstat;
 	RF_DagNode_t *node;
@@ -318,9 +318,11 @@ FireNodeArray(
 	for (i = 0; i < numNodes; i++) {
 		node = nodeList[i];
 		dstat = node->dagHdr->status;
-		RF_ASSERT((node->status == rf_wait) || (node->status == rf_good));
+		RF_ASSERT((node->status == rf_wait) || 
+			  (node->status == rf_good));
 		if (NodeReady(node)) {
-			if ((dstat == rf_enable) || (dstat == rf_rollForward)) {
+			if ((dstat == rf_enable) || 
+			    (dstat == rf_rollForward)) {
 				RF_ASSERT(node->status == rf_wait);
 				if (node->commitNode)
 					node->dagHdr->numCommits++;
@@ -330,15 +332,16 @@ FireNodeArray(
 			} else {
 				RF_ASSERT(dstat == rf_rollBackward);
 				RF_ASSERT(node->status == rf_good);
-				RF_ASSERT(node->commitNode == RF_FALSE);	/* only one commit node
-										 * per graph */
+				/* only one commit node per graph */
+				RF_ASSERT(node->commitNode == RF_FALSE);
 				node->status = rf_recover;
 			}
 		}
 	}
 	/* now, fire the nodes */
 	for (i = 0; i < numNodes; i++) {
-		if ((nodeList[i]->status == rf_fired) || (nodeList[i]->status == rf_recover))
+		if ((nodeList[i]->status == rf_fired) || 
+		    (nodeList[i]->status == rf_recover))
 			FireNode(nodeList[i]);
 	}
 }
@@ -349,7 +352,7 @@ FireNodeArray(
  * The entire list is fired atomically.
  */
 static void 
-FireNodeList(RF_DagNode_t * nodeList)
+FireNodeList(RF_DagNode_t *nodeList)
 {
 	RF_DagNode_t *node, *next;
 	RF_DagStatus_t dstat;
@@ -360,9 +363,11 @@ FireNodeList(RF_DagNode_t * nodeList)
 		for (node = nodeList; node; node = next) {
 			next = node->next;
 			dstat = node->dagHdr->status;
-			RF_ASSERT((node->status == rf_wait) || (node->status == rf_good));
+			RF_ASSERT((node->status == rf_wait) || 
+				  (node->status == rf_good));
 			if (NodeReady(node)) {
-				if ((dstat == rf_enable) || (dstat == rf_rollForward)) {
+				if ((dstat == rf_enable) || 
+				    (dstat == rf_rollForward)) {
 					RF_ASSERT(node->status == rf_wait);
 					if (node->commitNode)
 						node->dagHdr->numCommits++;
@@ -372,8 +377,8 @@ FireNodeList(RF_DagNode_t * nodeList)
 				} else {
 					RF_ASSERT(dstat == rf_rollBackward);
 					RF_ASSERT(node->status == rf_good);
-					RF_ASSERT(node->commitNode == RF_FALSE);	/* only one commit node
-											 * per graph */
+					/* only one commit node per graph */
+					RF_ASSERT(node->commitNode == RF_FALSE);
 					node->status = rf_recover;
 				}
 			}
@@ -381,7 +386,8 @@ FireNodeList(RF_DagNode_t * nodeList)
 		/* now, fire the nodes */
 		for (node = nodeList; node; node = next) {
 			next = node->next;
-			if ((node->status == rf_fired) || (node->status == rf_recover))
+			if ((node->status == rf_fired) || 
+			    (node->status == rf_recover))
 				FireNode(node);
 		}
 	}
@@ -403,9 +409,7 @@ FireNodeList(RF_DagNode_t * nodeList)
  * entire function, but this is certainly overkill.
  */
 static void 
-PropagateResults(
-    RF_DagNode_t * node,
-    int context)
+PropagateResults(RF_DagNode_t *node, int context)
 {
 	RF_DagNode_t *s, *a;
 	RF_Raid_t *raidPtr;
@@ -464,13 +468,19 @@ PropagateResults(
 							/* we only have to
 							 * enqueue if we're at
 							 * intr context */
-							s->next = firelist;	/* put node on a list to
-										 * be fired after we
-										 * unlock */
+							/* put node on
+                                                           a list to
+                                                           be fired
+                                                           after we
+                                                           unlock */
+							s->next = firelist;
 							firelist = s;
-						} else {	/* enqueue the node for
-								 * the dag exec thread
-								 * to fire */
+						} else {	
+							/* enqueue the
+							   node for
+							   the dag
+							   exec thread
+							   to fire */
 							RF_ASSERT(NodeReady(s));
 							if (q) {
 								q->next = s;
@@ -513,14 +523,15 @@ PropagateResults(
 			if (finishlist->commitNode)
 				finishlist->dagHdr->numCommits++;
 			/*
-		         * Okay, here we're calling rf_FinishNode() on nodes that
-		         * have the null function as their work proc. Such a node
-		         * could be the terminal node in a DAG. If so, it will
-		         * cause the DAG to complete, which will in turn free
-		         * memory used by the DAG, which includes the node in
-		         * question. Thus, we must avoid referencing the node
-		         * at all after calling rf_FinishNode() on it.
-		         */
+		         * Okay, here we're calling rf_FinishNode() on
+		         * nodes that have the null function as their
+		         * work proc. Such a node could be the
+		         * terminal node in a DAG. If so, it will
+		         * cause the DAG to complete, which will in
+		         * turn free memory used by the DAG, which
+		         * includes the node in question. Thus, we
+		         * must avoid referencing the node at all
+		         * after calling rf_FinishNode() on it.  */
 			rf_FinishNode(finishlist, context);	/* recursive call */
 		}
 		/* fire all nodes in firelist */
@@ -544,13 +555,14 @@ PropagateResults(
 					if (context != RF_INTR_CONTEXT) {
 						/* we only have to enqueue if
 						 * we're at intr context */
-						a->next = firelist;	/* put node on a list to
-									 * be fired after we
-									 * unlock */
+						/* put node on a list to be 
+						   fired after we unlock */
+						a->next = firelist;
+
 						firelist = a;
-					} else {	/* enqueue the node for
-							 * the dag exec thread
-							 * to fire */
+					} else {
+						/* enqueue the node for the 
+						   dag exec thread to fire */
 						RF_ASSERT(NodeReady(a));
 						if (q) {
 							q->next = a;
@@ -570,19 +582,20 @@ PropagateResults(
 			DO_SIGNAL(raidPtr);
 		}
 		DO_UNLOCK(raidPtr);
-		for (; finishlist; finishlist = next) {	/* NIL nodes: no need to
-							 * fire them */
+		for (; finishlist; finishlist = next) {	
+			/* NIL nodes: no need to fire them */
 			next = finishlist->next;
 			finishlist->status = rf_good;
 			/*
-		         * Okay, here we're calling rf_FinishNode() on nodes that
-		         * have the null function as their work proc. Such a node
-		         * could be the first node in a DAG. If so, it will
-		         * cause the DAG to complete, which will in turn free
-		         * memory used by the DAG, which includes the node in
-		         * question. Thus, we must avoid referencing the node
-		         * at all after calling rf_FinishNode() on it.
-		         */
+		         * Okay, here we're calling rf_FinishNode() on
+		         * nodes that have the null function as their
+		         * work proc. Such a node could be the first
+		         * node in a DAG. If so, it will cause the DAG
+		         * to complete, which will in turn free memory
+		         * used by the DAG, which includes the node in
+		         * question. Thus, we must avoid referencing
+		         * the node at all after calling
+		         * rf_FinishNode() on it.  */
 			rf_FinishNode(finishlist, context);	/* recursive call */
 		}
 		/* fire all nodes in firelist */
@@ -602,9 +615,7 @@ PropagateResults(
  * Process a fired node which has completed
  */
 static void 
-ProcessNode(
-    RF_DagNode_t * node,
-    int context)
+ProcessNode(RF_DagNode_t *node, int context)
 {
 	RF_Raid_t *raidPtr;
 
@@ -615,18 +626,23 @@ ProcessNode(
 		/* normal case, don't need to do anything */
 		break;
 	case rf_bad:
-		if ((node->dagHdr->numCommits > 0) || (node->dagHdr->numCommitNodes == 0)) {
-			node->dagHdr->status = rf_rollForward;	/* crossed commit
-								 * barrier */
-			if (rf_engineDebug || 1) {
+		if ((node->dagHdr->numCommits > 0) || 
+		    (node->dagHdr->numCommitNodes == 0)) {
+			/* crossed commit barrier */
+			node->dagHdr->status = rf_rollForward;	
+#if RF_DEBUG_ENGINE
+			if (rf_engineDebug) {
 				printf("raid%d: node (%s) returned fail, rolling forward\n", raidPtr->raidid, node->name);
 			}
+#endif
 		} else {
-			node->dagHdr->status = rf_rollBackward;	/* never reached commit
-								 * barrier */
-			if (rf_engineDebug || 1) {
+			/* never reached commit barrier */
+			node->dagHdr->status = rf_rollBackward;	
+#if RF_DEBUG_ENGINE
+			if (rf_engineDebug) {
 				printf("raid%d: node (%s) returned fail, rolling backward\n", raidPtr->raidid, node->name);
 			}
+#endif
 		}
 		break;
 	case rf_undone:
@@ -655,11 +671,8 @@ ProcessNode(
  * as complete and fire off any successors that have been enabled.
  */
 int 
-rf_FinishNode(
-    RF_DagNode_t * node,
-    int context)
+rf_FinishNode(RF_DagNode_t *node, int context)
 {
-	/* as far as I can tell, retcode is not used -wvcii */
 	int     retcode = RF_FALSE;
 	node->dagHdr->numNodesCompleted++;
 	ProcessNode(node, context);
@@ -668,37 +681,41 @@ rf_FinishNode(
 }
 
 
-/* user context:
- * submit dag for execution, return non-zero if we have to wait for completion.
- * if and only if we return non-zero, we'll cause cbFunc to get invoked with
- * cbArg when the DAG has completed.
+/* user context: submit dag for execution, return non-zero if we have
+ * to wait for completion.  if and only if we return non-zero, we'll
+ * cause cbFunc to get invoked with cbArg when the DAG has completed.
  *
- * for now we always return 1.  If the DAG does not cause any I/O, then the callback
- * may get invoked before DispatchDAG returns.  There's code in state 5 of ContinueRaidAccess
- * to handle this.
+ * for now we always return 1.  If the DAG does not cause any I/O,
+ * then the callback may get invoked before DispatchDAG returns.
+ * There's code in state 5 of ContinueRaidAccess to handle this.
  *
- * All we do here is fire the direct successors of the header node.  The
- * DAG execution thread does the rest of the dag processing.
- */
+ * All we do here is fire the direct successors of the header node.
+ * The DAG execution thread does the rest of the dag processing.  */
 int 
-rf_DispatchDAG(
-    RF_DagHeader_t * dag,
-    void (*cbFunc) (void *),
-    void *cbArg)
+rf_DispatchDAG(RF_DagHeader_t *dag, void (*cbFunc) (void *),
+	       void *cbArg)
 {
 	RF_Raid_t *raidPtr;
 
 	raidPtr = dag->raidPtr;
+#if RF_ACC_TRACE > 0
 	if (dag->tracerec) {
 		RF_ETIMER_START(dag->tracerec->timer);
 	}
+#endif
+#if DEBUG
+#if RF_DEBUG_VALIDATE_DAG
 	if (rf_engineDebug || rf_validateDAGDebug) {
 		if (rf_ValidateDAG(dag))
 			RF_PANIC();
 	}
+#endif
+#endif
+#if RF_DEBUG_ENGINE
 	if (rf_engineDebug) {
 		printf("raid%d: Entering DispatchDAG\n", raidPtr->raidid);
 	}
+#endif
 	raidPtr->dags_in_flight++;	/* debug only:  blow off proper
 					 * locking */
 	dag->cbFunc = cbFunc;
@@ -708,15 +725,12 @@ rf_DispatchDAG(
 	FireNodeArray(dag->numSuccedents, dag->succedents);
 	return (1);
 }
-/* dedicated kernel thread:
- * the thread that handles all DAG node firing.
- * To minimize locking and unlocking, we grab a copy of the entire node queue and then set the
- * node queue to NULL before doing any firing of nodes.  This way we only have to release the
- * lock once.  Of course, it's probably rare that there's more than one node in the queue at
- * any one time, but it sometimes happens.
- *
- * In the kernel, this thread runs at spl0 and is not swappable.  I copied these
- * characteristics from the aio_completion_thread.
+/* dedicated kernel thread: the thread that handles all DAG node
+ * firing.  To minimize locking and unlocking, we grab a copy of the
+ * entire node queue and then set the node queue to NULL before doing
+ * any firing of nodes.  This way we only have to release the lock
+ * once.  Of course, it's probably rare that there's more than one
+ * node in the queue at any one time, but it sometimes happens.  
  */
 
 static void 
@@ -729,13 +743,12 @@ DAGExecutionThread(RF_ThreadArg_t arg)
 
 	raidPtr = (RF_Raid_t *) arg;
 
+#if RF_DEBUG_ENGINE
 	if (rf_engineDebug) {
 		printf("raid%d: Engine thread is running\n", raidPtr->raidid);
 	}
-
+#endif
 	s = splbio();
-
-	RF_THREADGROUP_RUNNING(&raidPtr->engine_tg);
 
 	DO_LOCK(raidPtr);
 	while (!raidPtr->shutdown_engine) {
@@ -800,13 +813,60 @@ DAGExecutionThread(RF_ThreadArg_t arg)
 
 			DO_LOCK(raidPtr);
 		}
-		while (!raidPtr->shutdown_engine && raidPtr->node_queue == NULL)
+		while (!raidPtr->shutdown_engine && 
+		       raidPtr->node_queue == NULL) {
 			DO_WAIT(raidPtr);
+		}
 	}
 	DO_UNLOCK(raidPtr);
 
-	RF_THREADGROUP_DONE(&raidPtr->engine_tg);
-
 	splx(s);
+	kthread_exit(0);
+}
+
+/* 
+ * rf_RaidIOThread() -- When I/O to a component completes,
+ * KernelWakeupFunc() puts the completed request onto raidPtr->iodone
+ * TAILQ.  This function looks after requests on that queue by calling
+ * rf_DiskIOComplete() for the request, and by calling any required
+ * CompleteFunc for the request.  
+ */
+
+static void
+rf_RaidIOThread(RF_ThreadArg_t arg)
+{
+	RF_Raid_t *raidPtr;
+	RF_DiskQueueData_t *req;
+	int s;
+
+	raidPtr = (RF_Raid_t *) arg;
+
+	s = splbio();
+	simple_lock(&(raidPtr->iodone_lock));
+
+	while (!raidPtr->shutdown_raidio) {
+		/* if there is nothing to do, then snooze. */
+		if (TAILQ_EMPTY(&(raidPtr->iodone))) {
+			ltsleep(&(raidPtr->iodone), PRIBIO, "raidiow", 0,
+				&(raidPtr->iodone_lock));
+		}
+
+		/* See what I/Os, if any, have arrived */
+		while ((req = TAILQ_FIRST(&(raidPtr->iodone))) != NULL) {
+			TAILQ_REMOVE(&(raidPtr->iodone), req, iodone_entries);
+			simple_unlock(&(raidPtr->iodone_lock));
+			rf_DiskIOComplete(req->queue, req, req->error);
+			(req->CompleteFunc) (req->argument, req->error);
+			simple_lock(&(raidPtr->iodone_lock));
+		}
+	}
+
+	/* Let rf_ShutdownEngine know that we're done... */
+	raidPtr->shutdown_raidio = 0;
+	wakeup(&(raidPtr->shutdown_raidio));
+
+	simple_unlock(&(raidPtr->iodone_lock));
+	splx(s);
+
 	kthread_exit(0);
 }

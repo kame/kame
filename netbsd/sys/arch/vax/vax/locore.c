@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.c,v 1.63.14.1 2002/06/05 04:13:08 lukem Exp $	*/
+/*	$NetBSD: locore.c,v 1.68 2004/02/13 11:36:20 wiz Exp $	*/
 /*
  * Copyright (c) 1994, 1998 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -31,6 +31,9 @@
 
  /* All bugs are subject to removal without further notice */
 		
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: locore.c,v 1.68 2004/02/13 11:36:20 wiz Exp $");
+
 #include "opt_compat_netbsd.h"
 
 #include <sys/param.h>
@@ -59,11 +62,11 @@ void	main(void);
 
 extern	paddr_t avail_end;
 paddr_t esym;
-u_int	proc0paddr;
+struct user *proc0paddr;
 
 /*
- * The strict cpu-dependent information is set up here, in
- * form of a pointer to a struct that is specific for each cpu.
+ * The strict CPU-dependent information is set up here, in
+ * form of a pointer to a struct that is specific for each CPU.
  */
 extern struct cpu_dep ka780_calls;
 extern struct cpu_dep ka750_calls;
@@ -324,15 +327,12 @@ _start(struct rpb *prpb)
 
 	avail_end &= ~PGOFSET; /* be sure */
 
-	proc0.p_addr = (void *)proc0paddr; /* XXX */
-
-	/* Clear the used parts of the uarea except for the pcb */
-	bzero(&proc0.p_addr->u_stats, sizeof(struct user) - sizeof(struct pcb));
+	lwp0.l_addr = (void *)proc0paddr; /* XXX */
 
 	pmap_bootstrap();
 
 	/* Now running virtual. set red zone for proc0 */
-	pt = kvtopte((u_int)proc0.p_addr + REDZONEADDR);
+	pt = kvtopte((u_int)lwp0.l_addr + REDZONEADDR);
 	pt->pg_v = 0;
 
 	((struct pcb *)proc0paddr)->framep = scratch;

@@ -1,4 +1,4 @@
-#	$NetBSD: files.isa,v 1.124 2002/04/22 09:41:22 augustss Exp $
+#	$NetBSD: files.isa,v 1.132 2004/01/31 13:59:20 jdolecek Exp $
 #
 # Config file and device description for machine-independent ISA code.
 # Included by ports that need it.  Requires that the SCSI files be
@@ -73,14 +73,15 @@ file	dev/isa/com_multi.c		com_multi
 attach	cy at isa with cy_isa
 file	dev/isa/cy_isa.c		cy_isa
 
-# PC-style parallel ports (XXX what chip?)
+# PC-style parallel ports: ISA bus attachment (XXX what chip?)
 # XXX chip driver should be defined elsewhere
-device	lpt
-file	dev/ic/lpt.c			lpt			needs-flag
-
-# PC-style parallel ports: ISA bus attachment
 attach	lpt at isa with lpt_isa
-file	dev/isa/lpt_isa.c		lpt_isa
+file	dev/isa/lpt_isa.c		lpt_isa & !ppbus
+
+# Parallel port chipset
+attach	atppc at isa with atppc_isa: isadma
+file	dev/isa/atppc_isa.c		atppc_isa
+file	dev/isa/atppc_isadma.c		atppc_isa | atppc_acpi | atppc_pnpbios | atppc_ofisa | atppc_isapnp
 
 #
 # SCSI host adapters
@@ -146,13 +147,21 @@ device	scd: disk
 attach	scd at isa
 file	dev/isa/scd.c			scd			needs-flag
 
-attach	wdc at isa with wdc_isa: isadma
+attach	wdc at isa with wdc_isa
 file	dev/isa/wdc_isa.c		wdc_isa
 
 # Wangtek- and Archive-compatible tape controller boards
 device	wt: tape, isadma
 attach	wt at isa
 file	dev/isa/wt.c			wt			needs-flag
+
+#
+# GPIB controllers
+#
+
+device	cec: gpibdev
+attach	cec at isa
+file	dev/isa/cec.c			cec
 
 #
 # ISA networking drivers
@@ -209,9 +218,9 @@ file	dev/isa/if_cs_isa.c		cs_isa
 
 # Fujitsu MB86960-based boards
 # (Fujitsu FMV-180 series)
-device	fmv: arp, ether, ifnet, mb86960
-attach	fmv at isa
-file	dev/isa/if_fmv.c		fmv
+# device in sys/conf/files
+attach	fmv at isa with fmv_isa
+file	dev/isa/if_fmv_isa.c		fmv_isa
 
 # HP Lan Ethernet controllers
 # XXX currently broken
@@ -471,6 +480,15 @@ file	dev/isa/isic_isa_itk_ix1.c	isic_isa
 # Game adapter (joystick)
 attach	joy at isa with joy_isa
 file	dev/isa/joy_isa.c		joy_isa
+
+# NSC PC87366 Super IO / monitor chip
+device nsclpcsio: sysmon_envsys
+attach nsclpcsio at isa with nsclpcsio_isa
+file dev/isa/nsclpcsio_isa.c nsclpcsio_isa
+
+# USB Controller
+attach	slhci at isa with slhci_isa
+file	dev/isa/slhci_isa.c		slhci_isa
 
 #
 # ISA Plug 'n Play autoconfiguration glue.

@@ -1,4 +1,4 @@
-/* $NetBSD: pckbc_jazzio.c,v 1.4 2001/07/23 21:03:19 jdolecek Exp $ */
+/* $NetBSD: pckbc_jazzio.c,v 1.11 2004/03/24 17:06:58 drochner Exp $ */
 /* NetBSD: pckbc_isa.c,v 1.2 2000/03/23 07:01:35 thorpej Exp  */
 
 /*
@@ -13,12 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed for the NetBSD Project
- *	by Matthias Drochner.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -32,12 +26,15 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pckbc_jazzio.c,v 1.11 2004/03/24 17:06:58 drochner Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/proc.h>
 #include <sys/device.h>
-#include <sys/malloc.h> 
+#include <sys/malloc.h>
 #include <sys/errno.h>
 #include <sys/queue.h>
 #include <sys/lock.h>
@@ -64,10 +61,8 @@ struct pckbc_jazzio_softc {
 	int sc_intr[PCKBC_NSLOTS];
 };
 
-struct cfattach pckbc_jazzio_ca = {
-	sizeof(struct pckbc_jazzio_softc),
-	pckbc_jazzio_match, pckbc_jazzio_attach,
-};
+CFATTACH_DECL(pckbc_jazzio, sizeof(struct pckbc_jazzio_softc),
+    pckbc_jazzio_match, pckbc_jazzio_attach, NULL, NULL);
 
 int
 pckbc_jazzio_match(parent, match, aux)
@@ -81,8 +76,8 @@ pckbc_jazzio_match(parent, match, aux)
 	bus_addr_t addr = ja->ja_addr;
 	int res, ok = 1;
 
-	if (strcmp(ja->ja_name, "pckbd") != 0)
-		return(0);
+	if (strcmp(ja->ja_name, "I8742") != 0)
+		return (0);
 
 	if (pckbc_is_console(iot, addr) == 0) {
 		struct pckbc_internal t;
@@ -100,14 +95,14 @@ pckbc_jazzio_match(parent, match, aux)
 		t.t_ioh_c = ioh_c;
 
 		/* flush KBC */
-		(void) pckbc_poll_data1(&t, PCKBC_KBD_SLOT, 0);
+		(void) pckbc_poll_data1(&t, PCKBC_KBD_SLOT);
 
 		/* KBC selftest */
 		if (pckbc_send_cmd(iot, ioh_c, KBC_SELFTEST) == 0) {
 			ok = 0;
 			goto out;
 		}
-		res = pckbc_poll_data1(&t, PCKBC_KBD_SLOT, 0);
+		res = pckbc_poll_data1(&t, PCKBC_KBD_SLOT);
 		if (res != 0x55) {
 			printf("kbc selftest: %x\n", res);
 			ok = 0;

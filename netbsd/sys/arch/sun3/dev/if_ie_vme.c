@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ie_vme.c,v 1.13 1998/10/01 20:05:11 thorpej Exp $	*/
+/*	$NetBSD: if_ie_vme.c,v 1.17 2003/07/15 03:36:15 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -39,6 +39,9 @@
 /*
  * Machine-dependent glue for the Intel Ethernet (ie) driver.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ie_vme.c,v 1.17 2003/07/15 03:36:15 lukem Exp $");
 
 #include "opt_inet.h"
 
@@ -87,10 +90,8 @@ static void *wmemset __P((void *dst, int val, size_t size));
 static int  ie_vme_match __P((struct device *, struct cfdata *, void *));
 static void ie_vme_attach __P((struct device *, struct device *, void *));
 
-struct cfattach ie_vme_ca = {
-	sizeof(struct ie_softc), ie_vme_match, ie_vme_attach
-};
-
+CFATTACH_DECL(ie_vme, sizeof(struct ie_softc),
+    ie_vme_match, ie_vme_attach, NULL, NULL);
 
 static int
 ie_vme_match(parent, cf, args)

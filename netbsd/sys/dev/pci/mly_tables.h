@@ -1,4 +1,4 @@
-/*	$NetBSD: mly_tables.h,v 1.1 2001/07/30 19:59:07 ad Exp $	*/
+/*	$NetBSD: mly_tables.h,v 1.3 2003/03/31 03:35:02 perry Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.

@@ -1,4 +1,4 @@
-/*	$NetBSD: promdev.h,v 1.7 1999/05/27 14:04:25 pk Exp $ */
+/*	$NetBSD: promdev.h,v 1.9 2003/03/01 13:01:56 pk Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -55,7 +55,6 @@ struct promdata {
 #define DDB_MAGIC2	( ('D'<<24) | ('D'<<16) | ('B'<<8) | ('2') )
 
 extern time_t	getsecs __P((void));
-extern void	prom_getether __P((int, u_char *));
 extern char	*prom_bootdevice;
 extern int	cputyp, nbpg, pgofset, pgshift;
 extern int	debug;
@@ -71,6 +70,11 @@ extern void	dvma_free __P((char *, int));
 extern int	net_open __P((struct promdata *));
 extern int	net_close __P((struct promdata *));
 extern int	net_mountroot __P((void));
+
+/* In mmu.c */
+extern int	mmu_init(void);
+extern int	(*pmap_map)(vaddr_t, paddr_t, psize_t);
+extern int	(*pmap_extract)(vaddr_t, paddr_t *);
 
 /* In str0.S: */
 extern void	sparc_noop __P((void));

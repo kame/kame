@@ -1,4 +1,4 @@
-/*	$NetBSD: boot.c,v 1.11 2001/10/23 03:31:26 thorpej Exp $	*/
+/*	$NetBSD: boot.c,v 1.14 2003/07/14 09:46:07 aymeric Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -92,6 +92,8 @@
 
 #include <machine/cpu.h>
 
+#include "alloc.h"
+#include "boot.h"
 #include "ofdev.h"
 #include "openfirm.h"
 
@@ -106,16 +108,14 @@ char bootfile[128];
 int boothowto;
 int debug;
 
-static int ofw_version = 0;
-static char *kernels[] = { "/netbsd", "/netbsd.gz", "/netbsd.ofppc", NULL };
+static char *kernels[] = { "/netbsd.ofppc", "/netbsd", "/netbsd.gz", NULL };
 
 static void
-prom2boot(dev)
-	char *dev;
+prom2boot(char *dev)
 {
 	char *cp, *ocp;
 	
-	ocp = cp;
+	ocp = dev;
 	cp = dev + strlen(dev) - 1;
 	for (; cp >= ocp; cp--) {
 		if (*cp == ':') {
@@ -126,15 +126,17 @@ prom2boot(dev)
 }
 
 static void
-parseargs(str, howtop)
-	char *str;
-	int *howtop;
+parseargs(char *str, int *howtop)
 {
 	char *cp;
 
 	/* Allow user to drop back to the PROM. */
 	if (strcmp(str, "exit") == 0)
 		OF_exit();
+	if (strcmp(str, "halt") == 0)
+		OF_exit();
+	if (strcmp(str, "reboot") == 0)
+		OF_boot("");
 
 	*howtop = 0;
 
@@ -151,10 +153,7 @@ parseargs(str, howtop)
 }
 
 static void
-chain(entry, args, ssym, esym)
-	void (*entry)();
-	char *args;
-	void *ssym, *esym;
+chain(boot_entry_t entry, char *args, void *ssym, void *esym)
 {
 	extern char end[], *cp;
 	u_int l, magic = 0x19730224;
@@ -178,19 +177,19 @@ chain(entry, args, ssym, esym)
 	l += sizeof(esym);
 	DPRINTF("args + l -> %p\n", args + l);
 
-	OF_chain((void *)RELOC, end - (char *)RELOC, entry, args, l);
+	OF_chain((void *) RELOC, end - (char *)RELOC, entry, args, l);
 	panic("chain");
 }
 
 __dead void
-_rtt()
+_rtt(void)
 {
 
 	OF_exit();
 }
 
 void
-main()
+main(void)
 {
 	extern char bootprog_name[], bootprog_rev[],
 		    bootprog_maker[], bootprog_date[];
@@ -277,8 +276,8 @@ main()
 	esym = (void *)marks[MARK_END];
 
 	printf(" start=0x%x\n", entry);
-	__syncicache((void *)entry, (u_int)ssym - (u_int)entry);
-	chain((void *)entry, bootline, ssym, esym);
+	__syncicache((void *) entry, (u_int) ssym - (u_int) entry);
+	chain((boot_entry_t) entry, bootline, ssym, esym);
 
 	OF_exit();
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: hpux_machdep.h,v 1.11 1998/10/01 08:28:30 thorpej Exp $	*/
+/*	$NetBSD: hpux_machdep.h,v 1.19 2003/11/17 14:37:59 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -39,12 +39,12 @@
 #ifndef _MACHINE_HPUX_MACHDEP_H_
 #define _MACHINE_HPUX_MACHDEP_H_
 
-/*    
+/*
  * Information pushed on stack when a signal is delivered.
  * This is used by the kernel to restore state following
  * execution of the signal handler.  It is also made available
  * to the handler to allow it to restore state properly if
- * a non-standard exit is performed. 
+ * a non-standard exit is performed.
  */
 struct hpuxsigcontext {
 	int	hsc_syscall;		/* ??? (syscall number?) */
@@ -72,10 +72,10 @@ struct exec_vmcmd;
 int	hpux_cpu_makecmds __P((struct proc *, struct exec_package *));
 int	hpux_cpu_vmcmd __P((struct proc *, struct exec_vmcmd *));
 int	hpux_cpu_sysconf_arch __P((void));
-int	hpux_to_bsd_uoff __P((int *, int *, struct proc *));
+int	hpux_to_bsd_uoff __P((int *, int *, struct lwp *));
 
-void	hpux_sendsig __P((sig_t, int, sigset_t *, u_long));
-void	hpux_setregs __P((struct proc *, struct exec_package *,
+void	hpux_sendsig __P((const ksiginfo_t *, const sigset_t *));
+void	hpux_setregs __P((struct lwp *, struct exec_package *,
 	    u_long));
 #endif /* _KERNEL */
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: zbus.c,v 1.47 2002/04/25 09:20:32 aymeric Exp $ */
+/*	$NetBSD: zbus.c,v 1.54 2004/02/13 11:36:10 wiz Exp $ */
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -31,11 +31,14 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: zbus.c,v 1.47 2002/04/25 09:20:32 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: zbus.c,v 1.54 2004/02/13 11:36:10 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
+
+#include <uvm/uvm_extern.h>
+
 #include <machine/cpu.h>
 #include <machine/pte.h>
 #include <amiga/amiga/cfdev.h>
@@ -118,7 +121,7 @@ static struct aconfdata aconftab[] = {
 	/* Village Tronic Ariadne II */
 	{ "ne",		2167,	202},
 	/* bsc/Alf Data */
-	{ "Tandem", 2092,    6 },	/* Tandem AT disk controler */
+	{ "Tandem", 2092,    6 },	/* Tandem AT disk controller */
 	{ "mfc",	2092,	16 },
 	{ "mfc",	2092,	17 },
 	{ "mfc",	2092,	18 },
@@ -177,7 +180,9 @@ static struct aconfdata aconftab[] = {
 	{ "hyper4",	5001,	2},	/* Hypercom4-Zbus */
 	{ "hyper3Z",	5001,	3},	/* Hypercom3-Zbus */
 	{ "hyper4+",	5001,	6},	/* Hypercom4+ */
-	{ "hyper3+",	5001,	7}	/* Hypercom3+ */
+	{ "hyper3+",	5001,	7},	/* Hypercom3+ */
+	/* Matay Grzegorz Kraszewski */
+	{ "Prometheus",	44359,	1}	/* Prometheus PCI bridge */
 };
 static int naconfent = sizeof(aconftab) / sizeof(struct aconfdata);
 
@@ -241,9 +246,8 @@ aconflookup(int mid, int pid)
  * mainbus driver
  */
 
-struct cfattach zbus_ca = {
-	sizeof(struct device), zbusmatch, zbusattach
-};
+CFATTACH_DECL(zbus, sizeof(struct device),
+    zbusmatch, zbusattach, NULL, NULL);
 
 static struct cfdata *early_cfdata;
 
@@ -276,7 +280,8 @@ zbusattach(struct device *pdp, struct device *dp, void *auxp)
 	if (amiga_realconfig) {
 		if (ZTWOMEMADDR)
 			printf(": mem 0x%08lx-0x%08lx",
-			    ZTWOMEMADDR, ZTWOMEMADDR + NBPG * NZTWOMEMPG - 1);
+			    ZTWOMEMADDR,
+			    ZTWOMEMADDR + PAGE_SIZE * NZTWOMEMPG - 1);
 		if (ZBUSAVAIL)
 			printf (": i/o size 0x%08x", ZBUSAVAIL);
 		printf("\n");
@@ -333,12 +338,13 @@ zbusprint(void *auxp, const char *pnp)
 	zap = auxp;
 
 	if (pnp) {
-		printf("%s at %s:", aconflookup(zap->manid, zap->prodid),
-		    pnp);
+		aprint_normal("%s at %s:",
+		    aconflookup(zap->manid, zap->prodid), pnp);
 		if (zap->manid == -1)
 			rv = UNSUPP;
 	}
-	printf(" pa %8p man/pro %d/%d", zap->pa, zap->manid, zap->prodid);
+	aprint_normal(" pa %8p man/pro %d/%d", zap->pa, zap->manid,
+	    zap->prodid);
 	return(rv);
 }
 
@@ -374,7 +380,7 @@ zbusmap(caddr_t pa, u_int size)
 #elif defined(__m68k__)
 	physaccess((caddr_t)kva, (caddr_t)pa, size, PG_RW|PG_CI);
 #else
-ERROR no support for this target cpu yet.
+ERROR no support for this target CPU yet.
 #endif
 	return((caddr_t)kva);
 }

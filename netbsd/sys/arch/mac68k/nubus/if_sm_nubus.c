@@ -1,4 +1,4 @@
-/*	$NetBSD: if_sm_nubus.c,v 1.2 2000/08/01 13:08:39 briggs Exp $	*/
+/*	$NetBSD: if_sm_nubus.c,v 1.5 2003/07/15 02:43:24 lukem Exp $	*/
 
 /*
  * Copyright (c) 2000 Allen Briggs.
@@ -26,6 +26,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_sm_nubus.c,v 1.5 2003/07/15 02:43:24 lukem Exp $");
 
 #include "opt_inet.h"
 
@@ -55,9 +58,8 @@
 static int	sm_nubus_match __P((struct device *, struct cfdata *, void *));
 static void	sm_nubus_attach __P((struct device *, struct device *, void *));
 
-struct cfattach sm_nubus_ca = {
-	sizeof(struct smc91cxx_softc), sm_nubus_match, sm_nubus_attach
-};
+CFATTACH_DECL(sm_nubus, sizeof(struct smc91cxx_softc),
+    sm_nubus_match, sm_nubus_attach, NULL, NULL);
 
 static int
 sm_nubus_match(parent, cf, aux)

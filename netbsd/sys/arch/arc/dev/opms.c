@@ -1,11 +1,46 @@
-/*	$NetBSD: opms.c,v 1.3 2001/09/28 11:59:51 chs Exp $	*/
+/*	$NetBSD: opms.c,v 1.10 2003/08/07 16:26:48 agc Exp $	*/
 /*	$OpenBSD: pccons.c,v 1.22 1999/01/30 22:39:37 imp Exp $	*/
 /*	NetBSD: pms.c,v 1.21 1995/04/18 02:25:18 mycroft Exp	*/
 
 /*-
- * Copyright (c) 1993, 1994, 1995 Charles M. Hannum.  All rights reserved.
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * William Jolitz and Don Ahn.
+ *
+ * Copyright (c) 1994 Charles M. Hannum.
+ * Copyright (c) 1992, 1993 Erik Forsberg.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)pccons.c	5.11 (Berkeley) 5/21/91
+ */
+
+/*-
+ * Copyright (c) 1993, 1994, 1995 Charles M. Hannum.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * William Jolitz and Don Ahn.
@@ -44,6 +79,9 @@
  *	@(#)pccons.c	5.11 (Berkeley) 5/21/91
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: opms.c,v 1.10 2003/08/07 16:26:48 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/vnode.h>
@@ -51,6 +89,7 @@
 #include <sys/tty.h>
 #include <sys/device.h>
 #include <sys/proc.h>
+#include <sys/conf.h>
 
 #include <machine/bus.h>
 #include <machine/kbdreg.h>
@@ -92,12 +131,18 @@
 
 extern struct cfdriver opms_cd;
 
-int opmsopen __P((dev_t, int));
-int opmsclose __P((dev_t, int));
-int opmsread __P((dev_t, struct uio *, int));
-int opmsioctl __P((dev_t, u_long, caddr_t, int));
-int opmsselect __P((dev_t, int, struct proc *));
-int opmspoll __P((dev_t, int, struct proc *));
+dev_type_open(opmsopen);
+dev_type_close(opmsclose);
+dev_type_read(opmsread);
+dev_type_ioctl(opmsioctl);
+dev_type_poll(opmspoll);
+dev_type_kqfilter(opmskqfilter);
+
+const struct cdevsw opms_cdevsw = {
+	opmsopen, opmsclose, opmsread, nowrite, opmsioctl,
+	nostop, notty, opmspoll, nommap, opmskqfilter,
+};
+
 static __inline void pms_dev_cmd __P((u_char));
 static __inline void pms_aux_cmd __P((u_char));
 static __inline void pms_pit_cmd __P((u_char));
@@ -162,9 +207,10 @@ opms_common_attach(sc, opms_iot, config)
 }
 
 int
-opmsopen(dev, flag)
+opmsopen(dev, flag, mode, p)
 	dev_t dev;
-	int flag;
+	int flag, mode;
+	struct proc *p;
 {
 	int unit = PMSUNIT(dev);
 	struct opms_softc *sc;
@@ -202,9 +248,10 @@ opmsopen(dev, flag)
 }
 
 int
-opmsclose(dev, flag)
+opmsclose(dev, flag, mode, p)
 	dev_t dev;
-	int flag;
+	int flag, mode;
+	struct proc *p;
 {
 	struct opms_softc *sc = opms_cd.cd_devs[PMSUNIT(dev)];
 
@@ -270,11 +317,12 @@ opmsread(dev, uio, flag)
 }
 
 int
-opmsioctl(dev, cmd, addr, flag)
+opmsioctl(dev, cmd, addr, flag, p)
 	dev_t dev;
 	u_long cmd;
 	caddr_t addr;
 	int flag;
+	struct proc *p;
 {
 	struct opms_softc *sc = opms_cd.cd_devs[PMSUNIT(dev)];
 	struct mouseinfo info;
@@ -387,7 +435,7 @@ opmsintr(arg)
 				sc->sc_state &= ~PMS_ASLP;
 				wakeup((caddr_t)sc);
 			}
-			selwakeup(&sc->sc_rsel);
+			selnotify(&sc->sc_rsel, 0);
 		}
 
 		break;
@@ -414,4 +462,53 @@ opmspoll(dev, events, p)
 
 	splx(s);
 	return (revents);
+}
+
+static void
+filt_opmsrdetach(struct knote *kn)
+{
+	struct opms_softc *sc = kn->kn_hook;
+	int s;
+
+	s = spltty();
+	SLIST_REMOVE(&sc->sc_rsel.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_opmsread(struct knote *kn, long hint)
+{
+	struct opms_softc *sc = kn->kn_hook;
+
+	kn->kn_data = sc->sc_q.c_cc;
+	return (kn->kn_data > 0);
+}
+
+static const struct filterops opmsread_filtops =
+	{ 1, NULL, filt_opmsrdetach, filt_opmsread };
+
+int
+opmskqfilter(dev_t dev, struct knote *kn)
+{
+	struct opms_softc *sc = opms_cd.cd_devs[PMSUNIT(dev)];
+	struct klist *klist;
+	int s;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &sc->sc_rsel.sel_klist;
+		kn->kn_fop = &opmsread_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = sc;
+
+	s = spltty();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
 }

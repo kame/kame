@@ -1,4 +1,4 @@
-/*	$NetBSD: mainbus.c,v 1.8 2002/05/16 01:01:39 thorpej Exp $	*/
+/*	$NetBSD: mainbus.c,v 1.15 2003/07/15 03:35:50 lukem Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -30,6 +30,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.15 2003/07/15 03:35:50 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/extent.h>
 #include <sys/device.h>
@@ -51,9 +54,8 @@
 int	mainbus_match __P((struct device *, void *, void *));
 void	mainbus_attach __P((struct device *, struct device *, void *));
 
-struct cfattach mainbus_ca = {
-	sizeof(struct device), (cfmatch_t)mainbus_match, mainbus_attach
-};
+CFATTACH_DECL(mainbus, sizeof(struct device),
+    (cfmatch_t)mainbus_match, mainbus_attach, NULL, NULL);
 
 int	mainbus_print __P((void *, const char *));
 
@@ -120,6 +122,7 @@ mainbus_attach(parent, self, aux)
 	mba.mba_pba.pba_iot = &sandpoint_io_bs_tag;
 	mba.mba_pba.pba_memt = &sandpoint_mem_bs_tag;
 	mba.mba_pba.pba_dmat = &pci_bus_dma_tag;
+	mba.mba_pba.pba_dmat64 = NULL;
 	mba.mba_pba.pba_bus = 0;
 	mba.mba_pba.pba_pc = 0;
 	mba.mba_pba.pba_bridgetag = NULL;
@@ -132,9 +135,8 @@ mainbus_attach(parent, self, aux)
 static int	cpu_match(struct device *, struct cfdata *, void *);
 static void	cpu_attach(struct device *, struct device *, void *);
 
-struct cfattach cpu_ca = {
-	sizeof(struct device), cpu_match, cpu_attach
-};
+CFATTACH_DECL(cpu, sizeof(struct device),
+    cpu_match, cpu_attach, NULL, NULL);
 
 extern struct cfdriver cpu_cd;
 
@@ -146,7 +148,7 @@ cpu_match(struct device *parent, struct cfdata *cf, void *aux)
 	if (strcmp(mba->mba_busname, cpu_cd.cd_name) != 0)
 		return 0;
 
-	if (cpu_info_store.ci_dev != NULL)
+	if (cpu_info[0].ci_dev != NULL)
 		return 0;
 
 	return 1;
@@ -166,8 +168,8 @@ mainbus_print(aux, pnp)
 	union mainbus_attach_args *mba = aux;
 
 	if (pnp)
-		printf("%s at %s", mba->mba_busname, pnp);
+		aprint_normal("%s at %s", mba->mba_busname, pnp);
 	if (!strcmp(mba->mba_busname, "pci"))
-		printf(" bus %d", mba->mba_pba.pba_bus);
+		aprint_normal(" bus %d", mba->mba_pba.pba_bus);
 	return (UNCONF);
 }

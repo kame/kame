@@ -1,4 +1,4 @@
-/*	$NetBSD: compat_13_machdep.c,v 1.8 2000/12/22 22:58:55 jdolecek Exp $	*/
+/*	$NetBSD: compat_13_machdep.c,v 1.11 2003/11/26 08:36:49 he Exp $	*/
 
 /*
  * Copyright 1996 The Board of Trustees of The Leland Stanford
@@ -15,7 +15,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: compat_13_machdep.c,v 1.8 2000/12/22 22:58:55 jdolecek Exp $");
+__KERNEL_RCSID(0, "$NetBSD: compat_13_machdep.c,v 1.11 2003/11/26 08:36:49 he Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -24,6 +24,7 @@ __KERNEL_RCSID(0, "$NetBSD: compat_13_machdep.c,v 1.8 2000/12/22 22:58:55 jdolec
 #include <sys/proc.h>
 #include <sys/user.h>
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <mips/regnum.h>
@@ -37,8 +38,8 @@ extern int sigdebug;
 #endif
 
 int
-compat_13_sys_sigreturn(p, v, retval)
-	struct proc *p;
+compat_13_sys_sigreturn(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -46,6 +47,7 @@ compat_13_sys_sigreturn(p, v, retval)
 		syscallarg(struct sigcontext13 *) sigcntxp;
 	} */ *uap = v;
 	struct sigcontext13 *scp, ksc;
+	struct proc *p = l->l_proc;
 	int error;
 	struct frame *f;
 	sigset_t mask;
@@ -63,18 +65,18 @@ compat_13_sys_sigreturn(p, v, retval)
 	if ((error = copyin(scp, &ksc, sizeof(ksc))) != 0)
 		return (error);
 
-	if ((int)ksc.sc_regs[ZERO] != 0xACEDBADE)	/* magic number */
+	if ((u_int)ksc.sc_regs[_R_ZERO] != 0xacedbadeU)/* magic number */
 		return (EINVAL);
 
 	/* Resture the register context. */
-	f = (struct frame *)p->p_md.md_regs;
-	f->f_regs[PC] = ksc.sc_pc;
-	f->f_regs[MULLO] = ksc.mullo;
-	f->f_regs[MULHI] = ksc.mulhi;
+	f = (struct frame *)l->l_md.md_regs;
+	f->f_regs[_R_PC] = ksc.sc_pc;
+	f->f_regs[_R_MULLO] = ksc.mullo;
+	f->f_regs[_R_MULHI] = ksc.mulhi;
 	memcpy(&f->f_regs[1], &scp->sc_regs[1],
 	    sizeof(scp->sc_regs) - sizeof(scp->sc_regs[0]));
 	if (scp->sc_fpused)
-		p->p_addr->u_pcb.pcb_fpregs = *(struct fpreg *)scp->sc_fpregs;
+		l->l_addr->u_pcb.pcb_fpregs = *(struct fpreg *)scp->sc_fpregs;
 
 	/* Restore signal stack. */
 	if (ksc.sc_onstack & SS_ONSTACK)

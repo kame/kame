@@ -1,4 +1,4 @@
-/*	$NetBSD: openfirmio.h,v 1.3 2001/06/08 00:19:17 matt Exp $ */
+/*	$NetBSD: openfirmio.h,v 1.5 2003/08/07 16:31:10 agc Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -61,11 +57,5 @@ struct ofiocdesc {
 #define	OFIOCGETNEXT	_IOWR('O', 5, int)	/* get next node of node */
 #define	OFIOCGETCHILD	_IOWR('O', 6, int)	/* get first child of node */
 #define	OFIOCFINDDEVICE	_IOWR('O', 7, struct ofiocdesc) /* find a specific device */
-
-#ifdef _KERNEL
-int openfirmopen(dev_t, int, int, struct proc *);
-int openfirmclose(dev_t, int, int, struct proc *);
-int openfirmioctl(dev_t, u_long, caddr_t, int, struct proc *);
-#endif
 
 #endif /* _DEV_OFW_OPENFIRMIO_H_ */

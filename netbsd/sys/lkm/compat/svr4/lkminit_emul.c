@@ -1,4 +1,4 @@
-/* $NetBSD: lkminit_emul.c,v 1.6 2001/11/12 23:23:05 lukem Exp $ */
+/* $NetBSD: lkminit_emul.c,v 1.8 2003/03/04 10:39:10 dsl Exp $ */
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: lkminit_emul.c,v 1.6 2001/11/12 23:23:05 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: lkminit_emul.c,v 1.8 2003/03/04 10:39:10 dsl Exp $");
 
 #include <sys/param.h>
 #include <sys/ioctl.h>
@@ -86,8 +86,8 @@ svr4_init(lkmtp, cmd)
 #define	IDTVEC(name)	__CONCAT(X, name)
 	extern void IDTVEC(svr4_fasttrap) __P((void));
 
-	setgate(&idt[0xd2].gd, &IDTVEC(svr4_fasttrap), 0, SDT_SYS386TGT,
-		SEL_UPL);
+	setgate(&idt[0xd2], &IDTVEC(svr4_fasttrap), 0, SDT_SYS386TGT,
+		SEL_UPL, GSEL(GCODE_SEL, SEL_KPL));
 #endif
 
 	return (0);
@@ -100,8 +100,8 @@ svr4_done(struct lkm_table *lkmtp, int cmd)
 	/* XXX is this right? Wouldn't this cause null pointer dereference
 	 * if some userland code would use the gate after the LKM is unloaded?
 	 */
-	setgate(&idt[0xd2].gd, NULL, 0, SDT_SYS386TGT,
-		SEL_UPL);
+	setgate(&idt[0xd2], NULL, 0, SDT_SYS386TGT,
+		SEL_UPL, GSEL(GCODE_SEL, SEL_KPL));
 #endif
 
 	return (0);

@@ -1,4 +1,4 @@
-/*	$NetBSD: sa11x0.c,v 1.4 2002/03/13 00:02:41 rjs Exp $	*/
+/*	$NetBSD: sa11x0.c,v 1.14 2003/07/15 00:24:50 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001, The NetBSD Foundation, Inc.  All rights reserved.
@@ -55,11 +55,17 @@
  * SUCH DAMAGE.
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sa11x0.c,v 1.14 2003/07/15 00:24:50 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/kernel.h>
 #include <sys/reboot.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <machine/bus.h>
@@ -71,6 +77,12 @@
 #include <arm/sa11x0/sa11x0_ppcreg.h>
 #include <arm/sa11x0/sa11x0_gpioreg.h>
 
+#ifdef hpcarm
+#include <hpc/include/config_hook.h>
+#include <hpc/include/platid.h>
+#include <hpc/include/platid_mask.h>
+#endif
+
 #include "locators.h"
 
 /* prototypes */
@@ -80,14 +92,11 @@ static int 	sa11x0_search(struct device *, struct cfdata *, void *);
 static int	sa11x0_print(void *, const char *);
 
 /* attach structures */
-struct cfattach saip_ca = {
-	sizeof(struct sa11x0_softc), sa11x0_match, sa11x0_attach
-};
+CFATTACH_DECL(saip, sizeof(struct sa11x0_softc),
+    sa11x0_match, sa11x0_attach, NULL, NULL);
 
 extern struct bus_space sa11x0_bs_tag;
 extern vaddr_t saipic_base;
-
-extern int SetCPSR(int, int);
 
 /*
  * int sa11x0_print(void *aux, const char *name)
@@ -102,17 +111,13 @@ sa11x0_print(aux, name)
 	struct sa11x0_attach_args *sa = (struct sa11x0_attach_args*)aux;
 
 	if (sa->sa_size)
-                printf(" addr 0x%lx", sa->sa_addr);
+                aprint_normal(" addr 0x%lx", sa->sa_addr);
         if (sa->sa_size > 1)
-                printf("-0x%lx", sa->sa_addr + sa->sa_size - 1);
-	if (sa->sa_memsize)
-		printf(" membase 0x%lx", sa->sa_membase);
-	if (sa->sa_memsize > 1)
-		printf("-0x%lx", sa->sa_membase + sa->sa_memsize - 1);
+                aprint_normal("-0x%lx", sa->sa_addr + sa->sa_size - 1);
         if (sa->sa_intr > 1)
-                printf(" intr %d", sa->sa_intr);
+                aprint_normal(" intr %d", sa->sa_intr);
 	if (sa->sa_gpio != -1)
-		printf(" gpio %d", sa->sa_gpio);
+		aprint_normal(" gpio %d", sa->sa_gpio);
 
         return (UNCONF);
 }
@@ -139,29 +144,29 @@ sa11x0_attach(parent, self, aux)
 	/* Map the SAIP */
 	if (bus_space_map(sc->sc_iot, SAIPIC_BASE, SAIPIC_NPORTS,
 			0, &sc->sc_ioh))
-		panic("%s: Cannot map registers\n", self->dv_xname);
+		panic("%s: Cannot map registers", self->dv_xname);
 	saipic_base = sc->sc_ioh;
 
 	/* Map the GPIO registers */
 	if (bus_space_map(sc->sc_iot, SAGPIO_BASE, SAGPIO_NPORTS,
 			  0, &sc->sc_gpioh))
-		panic("%s: unable to map GPIO registers\n", self->dv_xname);
+		panic("%s: unable to map GPIO registers", self->dv_xname);
 	bus_space_write_4(sc->sc_iot, sc->sc_gpioh, SAGPIO_EDR, 0xffffffff);
 
 	/* Map the PPC registers */
 	if (bus_space_map(sc->sc_iot, SAPPC_BASE, SAPPC_NPORTS,
 			  0, &sc->sc_ppch))
-		panic("%s: unable to map PPC registers\n", self->dv_xname);
+		panic("%s: unable to map PPC registers", self->dv_xname);
 
 	/* Map the DMA controller registers */
 	if (bus_space_map(sc->sc_iot, SADMAC_BASE, SADMAC_NPORTS,
 			  0, &sc->sc_dmach))
-		panic("%s: unable to map DMAC registers\n", self->dv_xname);
+		panic("%s: unable to map DMAC registers", self->dv_xname);
 
 	/* Map the reset controller registers */
-	if (bus_space_map(sc->sc_iot, SARCR_BASE, NBPG,
+	if (bus_space_map(sc->sc_iot, SARCR_BASE, PAGE_SIZE,
 			  0, &sc->sc_reseth))
-		panic("%s: unable to map reset registers\n", self->dv_xname);
+		panic("%s: unable to map reset registers", self->dv_xname);
 
 	printf("\n");
 
@@ -211,12 +216,10 @@ sa11x0_search(parent, cf, aux)
         sa.sa_iot = sc->sc_iot;
         sa.sa_addr = cf->cf_loc[SAIPCF_ADDR];
         sa.sa_size = cf->cf_loc[SAIPCF_SIZE];
-	sa.sa_membase = cf->cf_loc[SAIPCF_MEMBASE];
-        sa.sa_memsize = cf->cf_loc[SAIPCF_MEMSIZE];
         sa.sa_intr = cf->cf_loc[SAIPCF_INTR];
 	sa.sa_gpio = cf->cf_loc[SAIPCF_GPIO];
 
-        if ((*cf->cf_attach->ca_match)(parent, cf, &sa) > 0)
+        if (config_match(parent, cf, &sa) > 0)
                 config_attach(parent, cf, &sa, sa11x0_print);
 
         return 0;

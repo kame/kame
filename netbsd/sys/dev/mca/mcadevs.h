@@ -1,10 +1,10 @@
-/*	$NetBSD: mcadevs.h,v 1.17 2001/12/01 10:44:35 jdolecek Exp $	*/
+/*	$NetBSD: mcadevs.h,v 1.19 2003/06/29 14:49:15 jdolecek Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: mcadevs,v 1.16 2001/12/01 10:43:36 jdolecek Exp 
+ *	NetBSD: mcadevs,v 1.18 2003/06/29 14:48:21 jdolecek Exp 
  */
 
 /*-
@@ -48,6 +48,7 @@
  * Supported MCA devices
  */
 
+#define	MCA_PRODUCT_BT640A	0x0708	/* BusTek BT-640A SCSI Host Adapter */
 #define	MCA_PRODUCT_AHA1640	0x0F1F	/* Adaptec AHA-1640 SCSI Adapter */
 #define	MCA_PRODUCT_3C523	0x6042	/* 3Com EtherLink/MC Ethernet Adapter (3C523) */
 #define	MCA_PRODUCT_WD_8013EP	0x61C8	/* EtherCard PLUS Elite/A (8013EP/A) */
@@ -84,6 +85,7 @@
 #define	MCA_PRODUCT_EVERAM	0x77FB	/* Everex EV-136 4Mb Memory Expansion */
 #define	MCA_PRODUCT_BOCARAM	0x7A7A	/* Boca BOCARAM/2 PLUS Memory Expansion */
 #define	MCA_PRODUCT_NCR53C90	0x7F4F	/* NCR SCSI Host Adapter */
+#define	MCA_PRODUCT_IBM_SVGA	0x90EE	/* IBM SVGA Adapter/A */
 #define	MCA_PRODUCT_IBM_ESDIC	0xDDFF	/* IBM ESDI Fixed Disk Controller */
 #define	MCA_PRODUCT_IBM_MPCOM	0xDEFF	/* IBM Multi-Protocol Communications Adapter */
 #define	MCA_PRODUCT_IBM_ESDIC_IG	0xDF9F	/* IBM Integ. ESDI Fixed Disk & Controller */

@@ -1,4 +1,4 @@
-/*	$NetBSD: smb_tran.h,v 1.2 2002/01/04 02:39:45 deberg Exp $	*/
+/*	$NetBSD: smb_tran.h,v 1.4 2003/06/29 22:32:11 fvdl Exp $	*/
 
 /*
  * Copyright (c) 2000-2001, Boris Popov

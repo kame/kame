@@ -1,4 +1,4 @@
-/*	$NetBSD: m38813c.c,v 1.6 2002/01/29 18:53:10 uch Exp $ */
+/*	$NetBSD: m38813c.c,v 1.9 2003/07/15 02:29:29 lukem Exp $ */
 
 /*-
  * Copyright (c) 1999, 2001 The NetBSD Foundation, Inc.
@@ -39,6 +39,9 @@
 /*
  * Device driver for MITUBISHI M38813 controller
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: m38813c.c,v 1.9 2003/07/15 02:29:29 lukem Exp $");
 
 #include "opt_use_poll.h"
 
@@ -83,9 +86,8 @@ int	m38813c_input_establish(void *, struct hpckbd_if *);
 
 struct m38813c_chip m38813c_chip;
 
-struct cfattach m38813c_ca = {
-	sizeof(struct m38813c_softc), m38813c_match, m38813c_attach
-};
+CFATTACH_DECL(m38813c, sizeof(struct m38813c_softc),
+    m38813c_match, m38813c_attach, NULL, NULL);
 
 int
 m38813c_match(struct device *parent, struct cfdata *cf, void *aux)

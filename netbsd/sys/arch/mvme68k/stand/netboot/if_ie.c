@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ie.c,v 1.6 2001/07/07 09:06:44 scw Exp $	*/
+/*	$NetBSD: if_ie.c,v 1.9 2003/12/10 12:06:25 agc Exp $	*/
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -11,12 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed under OpenBSD by
- *	Theo de Raadt for Willowglen Singapore.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
  * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -156,7 +150,7 @@ ie_error(nif, str, ier)
 	char   *str;
 	volatile struct iereg *ier;
 {
-	panic("ie%d: unknown error\n", nif->nif_unit);
+	panic("ie%d: unknown error", nif->nif_unit);
 }
 
 void
@@ -410,7 +404,7 @@ ie_put(desc, pkt, len)
 
 	if (ie_debug) {
 		printf("ie%d: send %d to %x:%x:%x:%x:%x:%x\n",
-		    desc->io_netif->nif_unit, len,
+		    ((struct netif *)desc->io_netif)->nif_unit, len,
 		    p[0], p[1], p[2], p[3], p[4], p[5]);
 	}
 	return (len);
@@ -444,11 +438,11 @@ ie_init(desc, machdep_hint)
 	struct netif *nif = desc->io_netif;
 
 	if (ie_debug)
-		printf("ie%d: ie_init called\n", desc->io_netif->nif_unit);
+		printf("ie%d: ie_init called\n", nif->nif_unit);
 	machdep_common_ether(desc->myea);
 	memset(&ie_softc, 0, sizeof(ie_softc));
 	ie_softc.sc_reg =
-	    (struct iereg *) ie_config[desc->io_netif->nif_unit].phys_addr;
+	    (struct iereg *) ie_config[nif->nif_unit].phys_addr;
 	ie_softc.sc_mem = (struct iemem *) 0x3e0000;
 	ie_reset(desc->io_netif, desc->myea);
 	printf("device: %s%d attached to %s\n", nif->nif_driver->netif_bname,

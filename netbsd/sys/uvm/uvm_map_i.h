@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_map_i.h,v 1.22 2001/06/26 17:55:15 thorpej Exp $	*/
+/*	$NetBSD: uvm_map_i.h,v 1.28 2004/02/10 01:30:49 matt Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -66,9 +66,6 @@
  * rights to redistribute these changes.
  */
 
-#ifndef _UVM_UVM_MAP_I_H_
-#define _UVM_UVM_MAP_I_H_
-
 /*
  * uvm_map_i.h
  */
@@ -79,15 +76,15 @@
 
 #if defined(UVM_MAP_INLINE) || defined(UVM_MAP)
 
+#ifndef _UVM_UVM_MAP_I_H_
+#define _UVM_UVM_MAP_I_H_
+
 /*
  * uvm_map_create: create map
  */
 
 MAP_INLINE struct vm_map *
-uvm_map_create(pmap, min, max, flags)
-	pmap_t pmap;
-	vaddr_t min, max;
-	int flags;
+uvm_map_create(pmap_t pmap, vaddr_t min, vaddr_t max, int flags)
 {
 	struct vm_map *result;
 
@@ -105,12 +102,10 @@ uvm_map_create(pmap, min, max, flags)
  */
 
 MAP_INLINE void
-uvm_map_setup(map, min, max, flags)
-	struct vm_map *map;
-	vaddr_t min, max;
-	int flags;
+uvm_map_setup(struct vm_map *map, vaddr_t min, vaddr_t max, int flags)
 {
 
+	RB_INIT(&map->rbhead);
 	map->header.next = map->header.prev = &map->header;
 	map->nentries = 0;
 	map->size = 0;
@@ -140,9 +135,7 @@ uvm_map_setup(map, min, max, flags)
  */
 
 MAP_INLINE void
-uvm_unmap(map, start, end)
-	struct vm_map *map;
-	vaddr_t start,end;
+uvm_unmap(struct vm_map *map, vaddr_t start, vaddr_t end)
 {
 	struct vm_map_entry *dead_entries;
 	UVMHIST_FUNC("uvm_unmap"); UVMHIST_CALLED(maphist);
@@ -171,43 +164,12 @@ uvm_unmap(map, start, end)
  */
 
 MAP_INLINE void
-uvm_map_reference(map)
-	struct vm_map *map;
+uvm_map_reference(struct vm_map *map)
 {
 	simple_lock(&map->ref_lock);
 	map->ref_count++;
 	simple_unlock(&map->ref_lock);
 }
-
-/*
- * uvm_map_deallocate: drop reference to a map
- *
- * => caller must not lock map
- * => we will zap map if ref count goes to zero
- */
-
-MAP_INLINE void
-uvm_map_deallocate(map)
-	struct vm_map *map;
-{
-	int c;
-
-	simple_lock(&map->ref_lock);
-	c = --map->ref_count;
-	simple_unlock(&map->ref_lock);
-	if (c > 0) {
-		return;
-	}
-
-	/*
-	 * all references gone.   unmap and free.
-	 */
-
-	uvm_unmap(map, map->min_offset, map->max_offset);
-	pmap_destroy(map->pmap);
-	FREE(map, M_VMMAP);
-}
+#endif /* _UVM_UVM_MAP_I_H_ */
 
 #endif /* defined(UVM_MAP_INLINE) || defined(UVM_MAP) */
-
-#endif /* _UVM_UVM_MAP_I_H_ */

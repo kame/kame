@@ -1,4 +1,4 @@
-/* $NetBSD: locore.h,v 1.61 2002/05/13 04:15:40 simonb Exp $ */
+/* $NetBSD: locore.h,v 1.68 2004/02/13 11:36:15 wiz Exp $ */
 
 /*
  * Copyright 1996 The Board of Trustees of The Leland Stanford
@@ -14,7 +14,7 @@
  */
 
 /*
- * Jump table for MIPS cpu locore functions that are implemented
+ * Jump table for MIPS CPU locore functions that are implemented
  * differently on different generations, or instruction-level
  * archtecture (ISA) level, the Mips family.
  *
@@ -26,17 +26,11 @@
 
 #ifndef _LKM
 #include "opt_cputype.h"
-#include "opt_mips_cache.h"
 #endif
 
 #include <mips/cpuregs.h>
 
 struct tlb;
-
-/*
- * locore service routine for exception vectors. Used outside locore
- * only to print them by name in stack tracebacks
- */
 
 uint32_t mips_cp0_cause_read(void);
 void	mips_cp0_cause_write(uint32_t);
@@ -66,6 +60,7 @@ void	mips3_TLBRead(int, struct tlb *);
 void	mips3_wbflush(void);
 void	mips3_proc_trampoline(void);
 void	mips3_cpu_switch_resume(void);
+void	mips3_pagezero(caddr_t dst);
 
 #ifdef MIPS3_5900
 void	mips5900_SetPID(int);
@@ -77,6 +72,7 @@ void	mips5900_TLBRead(int, struct tlb *);
 void	mips5900_wbflush(void);
 void	mips5900_proc_trampoline(void);
 void	mips5900_cpu_switch_resume(void);
+void	mips5900_pagezero(caddr_t dst);
 #endif
 #endif
 
@@ -102,15 +98,21 @@ void	mips64_TLBRead(int, struct tlb *);
 void	mips64_wbflush(void);
 void	mips64_proc_trampoline(void);
 void	mips64_cpu_switch_resume(void);
+void	mips64_pagezero(caddr_t dst);
 #endif
 
+#if defined(MIPS3) || defined(MIPS4) || defined(MIPS32) || defined(MIPS64)
 uint32_t mips3_cp0_compare_read(void);
 void	mips3_cp0_compare_write(uint32_t);
 
 uint32_t mips3_cp0_config_read(void);
 void	mips3_cp0_config_write(uint32_t);
+#if defined(MIPS32) || defined(MIPS64)
 uint32_t mipsNN_cp0_config1_read(void);
 void	mipsNN_cp0_config1_write(uint32_t);
+uint32_t mipsNN_cp0_config2_read(void);
+uint32_t mipsNN_cp0_config3_read(void);
+#endif
 
 uint32_t mips3_cp0_count_read(void);
 void	mips3_cp0_count_write(uint32_t);
@@ -120,7 +122,9 @@ void	mips3_cp0_wired_write(uint32_t);
 
 uint64_t mips3_ld(uint64_t *);
 void	mips3_sd(uint64_t *, uint64_t);
+#endif	/* MIPS3 || MIPS4 || MIPS32 || MIPS64 */
 
+#if defined(MIPS3) || defined(MIPS4) || defined(MIPS64)
 static inline uint32_t	mips3_lw_a64(uint64_t addr)
 		    __attribute__((__unused__));
 static inline void	mips3_sw_a64(uint64_t addr, uint32_t val)
@@ -182,6 +186,7 @@ mips3_sw_a64(uint64_t addr, uint32_t val)
 
 	mips_cp0_status_write(sr);
 }
+#endif	/* MIPS3 || MIPS4 || MIPS64 */
 
 /*
  * A vector with an entry for each mips-ISA-level dependent
@@ -198,12 +203,10 @@ typedef struct  {
 	void (*wbflush)(void);
 } mips_locore_jumpvec_t;
 
-/* Override writebuffer-drain method. */
 void	mips_set_wbflush(void (*)(void));
+void	mips_wait_idle(void);
 
-/* stacktrace() -- print a stack backtrace to the console */
 void	stacktrace(void);
-/* logstacktrace() -- log a stack traceback to msgbuf */
 void	logstacktrace(void);
 
 /*
@@ -282,6 +285,12 @@ typedef int mips_prid_t;
 #define	    MIPS_PRID_CID_ALCHEMY	0x03	/* Alchemy Semiconductor */
 #define	    MIPS_PRID_CID_SIBYTE	0x04	/* SiByte */
 #define	    MIPS_PRID_CID_SANDCRAFT	0x05	/* SandCraft */
+#define	    MIPS_PRID_CID_PHILIPS	0x06	/* Philips */
+#define	    MIPS_PRID_CID_TOSHIBA	0x07	/* Toshiba */
+#define	    MIPS_PRID_CID_LSI		0x08	/* LSI */
+				/*	0x09	unannounced */
+				/*	0x0a	unannounced */
+#define	    MIPS_PRID_CID_LEXRA		0x0b	/* Lexra */
 #define	MIPS_PRID_COPTS(x)	(((x) >> 24) & 0x00ff)	/* Company Options */
 
 #ifdef _KERNEL
@@ -304,13 +313,49 @@ void mips_machdep_cache_config(void);
 /*
  * trapframe argument passed to trap()
  */
+
+#define	TF_AST		0
+#define	TF_V0		1
+#define	TF_V1		2
+#define	TF_A0		3
+#define	TF_A1		4
+#define	TF_A2		5
+#define	TF_A3		6
+#define	TF_T0		7
+#define	TF_T1		8
+#define	TF_T2		9
+#define	TF_T3		10
+
+#if defined(__mips_n32) || defined(__mips_n64)
+#define	TF_A4		11
+#define	TF_A5		12
+#define	TF_A6		13
+#define	TF_A7		14
+#else
+#define	TF_T4		11
+#define	TF_T5		12
+#define	TF_T6		13
+#define	TF_T7		14
+#endif /* __mips_n32 || __mips_n64 */
+
+#define	TF_TA0		11
+#define	TF_TA1		12
+#define	TF_TA2		13
+#define	TF_TA3		14
+
+#define	TF_T8		15
+#define	TF_T9		16
+
+#define	TF_RA		17
+#define	TF_SR		18
+#define	TF_MULLO	19
+#define	TF_MULHI	20
+#define	TF_EPC		21		/* may be changed by trap() call */
+
+#define	TF_NREGS	22
+
 struct trapframe {
-	mips_reg_t tf_regs[17];
-	mips_reg_t tf_ra;
-	mips_reg_t tf_sr;
-	mips_reg_t tf_mullo;
-	mips_reg_t tf_mulhi;
-	mips_reg_t tf_epc;		/* may be changed by trap() call */
+	mips_reg_t tf_regs[TF_NREGS];
 	u_int32_t  tf_ppl;		/* previous priority level */
 	int32_t    tf_pad;		/* for 8 byte aligned */
 };

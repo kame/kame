@@ -1,4 +1,4 @@
-/*	$NetBSD: fpu.c,v 1.16 2001/02/03 14:30:42 tsutsui Exp $	*/
+/*	$NetBSD: fpu.c,v 1.19 2003/07/15 03:36:17 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -40,6 +40,11 @@
  * Floating Point Unit (MC68881/882)
  * Probe for the FPU at autoconfig time.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: fpu.c,v 1.19 2003/07/15 03:36:17 lukem Exp $");
+
+#include "opt_fpu_emulate.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -105,7 +110,7 @@ fpu_probe()
 	 * so we can determine which we have by
 	 * examining the size of the FP state frame.
 	 */
-	asm("fnop");
+	__asm("fnop");
 
 	nofault = NULL;
 
@@ -113,7 +118,7 @@ fpu_probe()
 	 * have if this will. We save the state in order to get the
 	 * size of the frame.
 	 */
-	asm("fsave %0@" : : "a" (&fpframe) : "memory");
+	__asm("fsave %0@" : : "a" (&fpframe) : "memory");
 
 	b = fpframe.fpf_fsize;
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: stubs.c,v 1.9 2002/03/23 19:21:59 thorpej Exp $	*/
+/*	$NetBSD: stubs.c,v 1.14 2003/07/15 00:24:42 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -40,6 +40,9 @@
  * Created      : 17/09/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: stubs.c,v 1.14 2003/07/15 00:24:42 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
@@ -54,7 +57,6 @@
 #include <arm/arm32/machdep.h>
 
 extern dev_t dumpdev;
-extern BootConfig bootconfig;
 
 /*
  * These variables are needed by /sbin/savecore
@@ -76,17 +78,17 @@ struct pcb dumppcb;
 void
 cpu_dumpconf()
 {
+	const struct bdevsw *bdev;
 	int nblks;	/* size of dump area */
-	int maj;
 
 	if (dumpdev == NODEV)
 		return;
-	maj = major(dumpdev);
-	if (maj < 0 || maj >= nblkdev)
+	bdev = bdevsw_lookup(dumpdev);
+	if (bdev == NULL)
 		panic("dumpconf: bad dumpdev=0x%x", dumpdev);
-	if (bdevsw[maj].d_psize == NULL)
+	if (bdev->d_psize == NULL)
 		return;
-	nblks = (*bdevsw[maj].d_psize)(dumpdev);
+	nblks = (*bdev->d_psize)(dumpdev);
 	if (nblks <= ctod(1))
 		return;
 
@@ -116,6 +118,7 @@ extern char *memhook;		/* XXX */
 void
 dumpsys()
 {
+	const struct bdevsw *bdev;
 	daddr_t blkno;
 	int psize;
 	int error;
@@ -126,6 +129,8 @@ dumpsys()
 
 	/* Save registers. */
 	savectx(&dumppcb);
+	/* flush everything out of caches */
+	cpu_dcache_wbinv_all();
 
 	if (dumpdev == NODEV)
 		return;
@@ -145,7 +150,10 @@ dumpsys()
 	blkno = dumplo;
 	dumpspace = (vaddr_t) memhook;
 
-	psize = (*bdevsw[major(dumpdev)].d_psize)(dumpdev);
+	bdev = bdevsw_lookup(dumpdev);
+	if (bdev == NULL || bdev->d_psize == NULL)
+		return;
+	psize = (*bdev->d_psize)(dumpdev);
 	printf("dump ");
 	if (psize == -1) {
 		printf("area unavailable\n");
@@ -158,15 +166,20 @@ dumpsys()
 	for (block = 0; block < bootconfig.dramblocks && error == 0; ++block) {
 		addr = bootconfig.dram[block].address;
 		for (;addr < (bootconfig.dram[block].address
-		    + (bootconfig.dram[block].pages * NBPG)); addr += NBPG) {
+		    + (bootconfig.dram[block].pages * PAGE_SIZE));
+		     addr += PAGE_SIZE) {
 		    	if ((len % (1024*1024)) == 0)
 		    		printf("%d ", len / (1024*1024));
-	                pmap_map(dumpspace, addr, addr + NBPG, VM_PROT_READ);
-			error = (*bdevsw[major(dumpdev)].d_dump)(dumpdev,
-			    blkno, (caddr_t) dumpspace, NBPG);
+			pmap_kenter_pa(dumpspace, addr, VM_PROT_READ);
+			pmap_update(pmap_kernel());
+
+			error = (*bdev->d_dump)(dumpdev,
+			    blkno, (caddr_t) dumpspace, PAGE_SIZE);
+			pmap_kremove(dumpspace, PAGE_SIZE);
+			pmap_update(pmap_kernel());
 			if (error) break;
-			blkno += btodb(NBPG);
-			len += NBPG;
+			blkno += btodb(PAGE_SIZE);
+			len += PAGE_SIZE;
 		}
 	}
 

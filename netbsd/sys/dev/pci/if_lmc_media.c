@@ -1,4 +1,4 @@
-/*	$NetBSD: if_lmc_media.c,v 1.13 2002/01/04 12:21:24 martin Exp $	*/
+/*	$NetBSD: if_lmc_media.c,v 1.15 2003/02/22 04:57:49 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1997-1999 LAN Media Corporation (LMC)
@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_lmc_media.c,v 1.13 2002/01/04 12:21:24 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_lmc_media.c,v 1.15 2003/02/22 04:57:49 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -661,10 +661,10 @@ lmc_ssi_set_speed(lmc_softc_t * const sc, lmc_ctl_t *ctl)
 
 	/*
 	 * original settings for clock rate of:
-	 *  100 Khz (8,25,0,0,2) were incorrect
+	 *  100 KHz (8,25,0,0,2) were incorrect
 	 *  they should have been 80,125,1,3,3
 	 *  There are 17 param combinations to produce this freq.
-	 *  For 1.5 Mhz use 120,100,1,1,2 (226 param. combinations)
+	 *  For 1.5 MHz use 120,100,1,1,2 (226 param. combinations)
 	 */
 	if (ctl == NULL) {
 		av = &ictl->cardspec.ssi;
@@ -849,15 +849,17 @@ write_av9110(lmc_softc_t *sc, u_int32_t n, u_int32_t m, u_int32_t v,
 static void
 lmc_ssi_watchdog(lmc_softc_t * const sc)
 {
-	u_int16_t mii17;
-	struct ssicsr2 {
-		unsigned short dtr:1, dsr:1, rts:1, cable:3, crc:1, led0:1,
-		led1:1, led2:1, led3:1, fifo:1, ll:1, rl:1, tm:1, loop:1;
-	};
-	struct ssicsr2 *ssicsr;
-	mii17 = lmc_mii_readreg (sc, 0, 17);
-	ssicsr = (struct ssicsr2 *) &mii17;
-	if (ssicsr->cable == 7) {
+	union {
+		u_int16_t mii17;
+		struct ssicsr2 {
+			unsigned short dtr:1, dsr:1, rts:1, cable:3, crc:1,
+			    led0:1, led1:1, led2:1, led3:1, fifo:1, ll:1,
+			    rl:1, tm:1, loop:1;
+		} ssicsr;
+	} ssicr_un;
+
+	ssicr_un.mii17 = lmc_mii_readreg (sc, 0, 17);
+	if (ssicr_un.ssicsr.cable == 7) {
 		lmc_led_off (sc, LMC_MII16_LED2);
 	}
 	else {

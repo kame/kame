@@ -1,7 +1,7 @@
-/*	$NetBSD: lfs_extern.h,v 1.30.4.1 2002/06/20 03:51:23 lukem Exp $	*/
+/*	$NetBSD: lfs_extern.h,v 1.59.2.1 2004/05/23 10:44:28 tron Exp $	*/
 
 /*-
- * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
+ * Copyright (c) 1999, 2000, 2001, 2002, 2003 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -17,8 +17,8 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *      This product includes software developed by the NetBSD
- *      Foundation, Inc. and its contributors.
+ *	This product includes software developed by the NetBSD
+ *	Foundation, Inc. and its contributors.
  * 4. Neither the name of The NetBSD Foundation nor the names of its
  *    contributors may be used to endorse or promote products derived
  *    from this software without specific prior written permission.
@@ -47,11 +47,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -70,6 +66,15 @@
  *	@(#)lfs_extern.h	8.6 (Berkeley) 5/8/95
  */
 
+#ifndef _UFS_LFS_LFS_EXTERN_H_
+#define _UFS_LFS_LFS_EXTERN_H_
+
+#ifdef _KERNEL
+#include <sys/mallocvar.h>
+
+MALLOC_DECLARE(M_SEGMENT);
+#endif
+
 /* Copied from ext2fs for ITIMES.  XXX This is a bogus use of v_tag. */
 #define IS_LFS_VNODE(vp)   (vp->v_tag == VT_LFS)
 
@@ -78,8 +83,8 @@
  */
 #define LFS_WRITEINDIR	 1 /* flush indirect blocks on non-checkpoint writes */
 #define LFS_CLEAN_VNHEAD 2 /* put prev unrefed cleaned vnodes on head of free list */
-#define LFS_DOSTATS      3
-#define LFS_STATS        4
+#define LFS_DOSTATS	 3
+#define LFS_MAXPAGES	 4
 #define LFS_MAXID	 5
 
 #define LFS_NAMES { \
@@ -87,7 +92,7 @@
 	{ "flushindir", CTLTYPE_INT }, \
 	{ "clean_vnhead", CTLTYPE_INT }, \
 	{ "dostats", CTLTYPE_INT }, \
-	{ "stats", CTLTYPE_STRUCT }, \
+	{ "maxpages", CTLTYPE_INT }, \
 }
 
 struct fid;
@@ -99,16 +104,25 @@ struct timeval;
 struct inode;
 struct uio;
 struct mbuf;
-struct dinode;
+struct ufs1_dinode;
 struct buf;
 struct vnode;
 struct dlfs;
 struct lfs;
 struct segment;
 struct ucred;
+struct block_info;
 
 extern int lfs_allclean_wakeup;
 extern struct pool lfs_inode_pool;		/* memory pool for inodes */
+extern struct pool lfs_dinode_pool;		/* memory pool for dinodes */
+extern struct pool lfs_inoext_pool;	/* memory pool for inode extension */
+
+extern int locked_queue_count;
+extern long locked_queue_bytes;
+extern int lfs_subsys_pages;	
+extern int lfs_dirvcount;
+extern struct simplelock lfs_subsys_lock;
 
 __BEGIN_DECLS
 /* lfs_alloc.c */
@@ -120,22 +134,16 @@ int lfs_bwrite_ext(struct buf *, int);
 int lfs_fits(struct lfs *, int);
 void lfs_flush_fs(struct lfs *, int);
 void lfs_flush(struct lfs *, int);
-int lfs_check(struct vnode *, ufs_daddr_t, int);
-#ifdef MALLOCLOG
-void lfs_freebuf_malloclog(struct buf *, char *, int);
-struct buf *lfs_newbuf_malloclog(struct lfs *, struct vnode *,
-				 ufs_daddr_t, size_t, char *, int);
-#define lfs_freebuf(BP) lfs_freebuf_malloclog((BP), __FILE__, __LINE__)
-#define lfs_newbuf(F, V, A, S) lfs_newbuf_malloclog((F),(V),(A),(S),__FILE__,__LINE__)
-#else
-void lfs_freebuf(struct buf *);
-struct buf *lfs_newbuf(struct lfs *, struct vnode *, ufs_daddr_t, size_t);
-#endif
+int lfs_check(struct vnode *, daddr_t, int);
+void lfs_freebuf(struct lfs *, struct buf *);
+struct buf *lfs_newbuf(struct lfs *, struct vnode *, daddr_t, size_t, int);
 void lfs_countlocked(int *, long *, char *);
-int lfs_reserve(struct lfs *, struct vnode *, int);
+int lfs_reserve(struct lfs *, struct vnode *, struct vnode *, int);
 
 /* lfs_cksum.c */
 u_int32_t cksum(void *, size_t);
+u_int32_t lfs_cksum_part(void *, size_t, u_int32_t);
+#define lfs_cksum_fold(sum)	(sum)
 u_int32_t lfs_sb_cksum(struct dlfs *);
 
 /* lfs_debug.c */
@@ -143,26 +151,26 @@ u_int32_t lfs_sb_cksum(struct dlfs *);
 int lfs_bwrite_log(struct buf *, char *, int);
 void lfs_dumplog(void);
 void lfs_dump_super(struct lfs *);
-void lfs_dump_dinode(struct dinode *);
+void lfs_dump_dinode(struct ufs1_dinode *);
 void lfs_check_bpp(struct lfs *, struct segment *, char *, int);
 void lfs_check_segsum(struct lfs *, struct segment *, char *, int);
 #endif /* DEBUG */
 
 /* lfs_inode.c */
-struct dinode *lfs_ifind(struct lfs *, ino_t, struct buf *);
+struct ufs1_dinode *lfs_ifind(struct lfs *, ino_t, struct buf *);
 
 /* lfs_segment.c */
 void lfs_imtime(struct lfs *);
 int lfs_vflush(struct vnode *);
-int lfs_writevnodes(struct lfs *, struct mount *, struct segment *, int);
 int lfs_segwrite(struct mount *, int);
 void lfs_writefile(struct lfs *, struct segment *, struct vnode *);
 int lfs_writeinode(struct lfs *, struct segment *, struct inode *);
 int lfs_gatherblock(struct segment *, struct buf *, int *);
 int lfs_gather(struct lfs *, struct segment *, struct vnode *, int (*match )(struct lfs *, struct buf *));
+void lfs_update_single(struct lfs *, struct segment *, struct vnode *,
+    daddr_t, int32_t, int);
 void lfs_updatemeta(struct segment *);
 int lfs_initseg(struct lfs *);
-void lfs_newseg(struct lfs *);
 int lfs_writeseg(struct lfs *, struct segment *);
 void lfs_writesuper(struct lfs *, daddr_t);
 int lfs_match_data(struct lfs *, struct buf *);
@@ -170,19 +178,29 @@ int lfs_match_indir(struct lfs *, struct buf *);
 int lfs_match_dindir(struct lfs *, struct buf *);
 int lfs_match_tindir(struct lfs *, struct buf *);
 void lfs_callback(struct buf *);
-void lfs_supercallback(struct buf *);
-void lfs_shellsort(struct buf **, ufs_daddr_t *, int);
 int lfs_vref(struct vnode *);
 void lfs_vunref(struct vnode *);
 void lfs_vunref_head(struct vnode *);
 
 /* lfs_subr.c */
-void lfs_seglock(struct lfs *, unsigned long);
+void lfs_setup_resblks(struct lfs *);
+void lfs_pad_check(unsigned char *, int, char *, int);
+void lfs_free_resblks(struct lfs *);
+void *lfs_malloc(struct lfs *, size_t, int);
+void lfs_free(struct lfs *, void *, int);
+int lfs_seglock(struct lfs *, unsigned long);
 void lfs_segunlock(struct lfs *);
+int lfs_writer_enter(struct lfs *, const char *);
+void lfs_writer_leave(struct lfs *);
 
 /* lfs_syscalls.c */
-int lfs_fastvget(struct mount *, ino_t, ufs_daddr_t, struct vnode **, struct dinode *, int *);
+int lfs_fastvget(struct mount *, ino_t, daddr_t, struct vnode **, struct ufs1_dinode *);
 struct buf *lfs_fakebuf(struct lfs *, struct vnode *, int, size_t, caddr_t);
+int lfs_do_segclean(struct lfs *, unsigned long);
+void lfs_fakebuf_iodone(struct buf *);
+int lfs_segwait(fsid_t *, struct timeval *);
+int lfs_bmapv(struct proc *, fsid_t *, struct block_info *, int);
+int lfs_markv(struct proc *, fsid_t *, struct block_info *, int);
 
 /* lfs_vfsops.c */
 void lfs_init(void);
@@ -190,19 +208,23 @@ void lfs_reinit(void);
 void lfs_done(void);
 int lfs_mountroot(void);
 int lfs_mount(struct mount *, const char *, void *, struct nameidata *, struct proc *);
-int lfs_mountfs(struct vnode *, struct mount *, struct proc *);
 int lfs_unmount(struct mount *, int, struct proc *);
 int lfs_statfs(struct mount *, struct statfs *, struct proc *);
 int lfs_sync(struct mount *, int, struct ucred *, struct proc *);
 int lfs_vget(struct mount *, ino_t, struct vnode **);
 int lfs_fhtovp(struct mount *, struct fid *, struct vnode **);
 int lfs_vptofh(struct vnode *, struct fid *);
-int lfs_sysctl(int *, u_int, void *, size_t *, void *, size_t, struct proc *);
+void lfs_vinit(struct mount *mp, struct vnode **);
 
 /* lfs_vnops.c */
+void lfs_mark_vnode(struct vnode *);
 void lfs_unmark_vnode(struct vnode *);
 void lfs_itimes(struct inode *, struct timespec *, struct timespec *,
 		struct timespec *);
+int lfs_gop_alloc(struct vnode *, off_t, off_t, int, struct ucred *);
+void lfs_gop_size(struct vnode *, off_t, off_t *, int);
+int lfs_putpages_ext(void *, int);
+int lfs_gatherpages(struct vnode *);
 
 int lfs_balloc	 (void *);
 int lfs_valloc	 (void *);
@@ -220,18 +242,24 @@ int lfs_read	 (void *);
 int lfs_remove	 (void *);
 int lfs_rmdir	 (void *);
 int lfs_link	 (void *);
+int lfs_mmap	 (void *);
 int lfs_rename	 (void *);
 int lfs_getattr	 (void *);
 int lfs_setattr	 (void *);
 int lfs_close	 (void *);
 int lfsspec_close(void *);
 int lfsfifo_close(void *);
+int lfs_fcntl	 (void *);
 int lfs_inactive (void *);
 int lfs_reclaim	 (void *);
+int lfs_strategy (void *);
 int lfs_write	 (void *);
-int lfs_whiteout (void *);
 int lfs_getpages (void *);
 int lfs_putpages (void *);
+
+#ifdef SYSCTL_SETUP_PROTO
+SYSCTL_SETUP_PROTO(sysctl_vfs_lfs_setup);
+#endif /* SYSCTL_SETUP_PROTO */
 
 __END_DECLS
 extern int lfs_mount_type;
@@ -239,3 +267,5 @@ extern int (**lfs_vnodeop_p)(void *);
 extern int (**lfs_specop_p)(void *);
 extern int (**lfs_fifoop_p)(void *);
 extern struct genfs_ops lfs_genfsops;
+
+#endif /* !_UFS_LFS_LFS_EXTERN_H_ */

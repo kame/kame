@@ -1,25 +1,24 @@
-/*	$NetBSD: mipsNN.h,v 1.1 2002/03/05 16:07:10 simonb Exp $	*/
+/*	$NetBSD: mipsNN.h,v 1.3 2003/02/07 17:38:48 cgd Exp $	*/
 
 /*
  * Copyright 2000, 2001
  * Broadcom Corporation. All rights reserved.
- * 
+ *
  * This software is furnished under license and may be used and copied only
  * in accordance with the following terms and conditions.  Subject to these
  * conditions, you may download, copy, install, use, modify and distribute
  * modified or unmodified copies of this software in source and/or binary
  * form. No title or ownership is transferred hereby.
- * 
+ *
  * 1) Any source code used, modified or distributed must reproduce and
  *    retain this copyright notice and list of conditions as they appear in
  *    the source file.
- * 
+ *
  * 2) No right is granted to use any trade name, trademark, or logo of
- *    Broadcom Corporation. Neither the "Broadcom Corporation" name nor any
- *    trademark or logo of Broadcom Corporation may be used to endorse or
- *    promote products derived from this software without the prior written
- *    permission of Broadcom Corporation.
- * 
+ *    Broadcom Corporation.  The "Broadcom Corporation" name may not be
+ *    used to endorse or promote products derived from this software
+ *    without the prior written permission of Broadcom Corporation.
+ *
  * 3) THIS SOFTWARE IS PROVIDED "AS-IS" AND ANY EXPRESS OR IMPLIED
  *    WARRANTIES, INCLUDING BUT NOT LIMITED TO, ANY IMPLIED WARRANTIES OF
  *    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR
@@ -87,7 +86,10 @@
 //	reserved		other values
 
 /* Reserved.  Write as 0, reads as 0. */
-//	reserved		0x00000078
+//	reserved		0x00000070
+
+/* "M" (R): Virtual instruction cache if set. */
+#define	MIPSNN_CFG_VI		0x00000008
 
 /* "K0" (RW): Kseg0 coherency algorithm.  (values are TLB_ATTRs) */
 #define	MIPSNN_CFG_K0_MASK	0x00000007

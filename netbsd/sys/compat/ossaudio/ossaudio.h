@@ -1,4 +1,4 @@
-/*	$NetBSD: ossaudio.h,v 1.6 1999/04/13 20:31:32 augustss Exp $	*/
+/*	$NetBSD: ossaudio.h,v 1.8 2003/06/29 22:29:42 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.

@@ -1,4 +1,4 @@
-#	$NetBSD: files.pc532,v 1.46 2002/01/21 21:57:05 jdolecek Exp $
+#	$NetBSD: files.pc532,v 1.54 2004/01/20 19:58:00 jdolecek Exp $
 #
 # new style config file for pc532 architecture
 #
@@ -8,39 +8,36 @@ maxpartitions 8
 
 maxusers 2 16 64
 
+defflag	CPU30MHZ
+defflag	NS381
+
 device	mainbus {[addr = -1], [irq = -1]}
 attach	mainbus at root
 file	arch/pc532/pc532/mainbus.c
 
 # Memory Disk for install floppy
 file	dev/md_root.c			memory_disk_hooks
-major	{md = 3}
-
-# RAIDframe
-major	{raid = 13}
 
 device	rtc
 attach	rtc at mainbus
 device	clock
 attach	clock at mainbus
-file	dev/clock_subr.c
 file	arch/pc532/pc532/clock.c
 
 device	scn: tty
 attach	scn at mainbus
 file	arch/pc532/dev/scn.c		scn needs-flag
 
-device	lpt: ether, ifnet, arp
+#device	lpt: ether, ifnet, arp
 attach	lpt at mainbus
 file	arch/pc532/dev/lpt.c		lpt needs-flag
 
 include "dev/scsipi/files.scsipi"
-major	{sd = 0}
-major	{cd = 4}
 
 device	ncr: scsi, ncr5380sbc
 attach	ncr at mainbus
-file	arch/pc532/dev/ncr.c		ncr needs-flag
+# gcc-3.3.2 bug fix; see doc/HACKS - gcc-pc532-duffs_device
+file	arch/pc532/dev/ncr.c		ncr needs-flag compile-with "${CC_NOERROR}"
 #device	aic: scsi
 #attach	aic at mainbus
 #file	arch/pc532/dev/aic.c		aic needs-flag
@@ -78,3 +75,10 @@ file	netns/ns_cksum.c		ns
 # Binary compatibility with previous NetBSD releases.
 #
 file	arch/pc532/pc532/compat_13_machdep.c	compat_13
+file	arch/pc532/pc532/compat_16_machdep.c	compat_16
+
+# egcs-1.1.2 bug fix; see doc/HACKS - egcs-pc532-ip6_mroute
+file	netinet6/ip6_mroute.c		compile-with "${CC_OPT1}"
+
+
+include "arch/pc532/conf/majors.pc532"

@@ -1,4 +1,4 @@
-/*	$NetBSD: wds.c,v 1.49 2002/04/05 18:27:55 bouyer Exp $	*/
+/*	$NetBSD: wds.c,v 1.56 2003/08/04 00:26:09 christos Exp $	*/
 
 /*
  * XXX
@@ -86,7 +86,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: wds.c,v 1.49 2002/04/05 18:27:55 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: wds.c,v 1.56 2003/08/04 00:26:09 christos Exp $");
 
 #include "opt_ddb.h"
 
@@ -209,9 +209,8 @@ int	wds_create_scbs __P((struct wds_softc *, void *, size_t));
 int	wdsprobe __P((struct device *, struct cfdata *, void *));
 void	wdsattach __P((struct device *, struct device *, void *));
 
-struct cfattach wds_ca = {
-	sizeof(struct wds_softc), wdsprobe, wdsattach
-};
+CFATTACH_DECL(wds, sizeof(struct wds_softc),
+    wdsprobe, wdsattach, NULL, NULL);
 
 #define	WDS_ABORT_TIMEOUT	2000	/* time to wait for abort (mSec) */
 
@@ -637,7 +636,7 @@ wds_create_scbs(sc, mem, size)
 	}
 
 	error = bus_dmamem_map(sc->sc_dmat, &seg, rseg, size,
-	    (caddr_t *)&scb, BUS_DMA_NOWAIT|BUS_DMA_COHERENT);
+	    (void *)&scb, BUS_DMA_NOWAIT|BUS_DMA_COHERENT);
 	if (error) {
 		printf("%s: can't map memory for scbs\n",
 		    sc->sc_dev.dv_xname);
@@ -1012,7 +1011,7 @@ wds_init(sc, isreset)
 	    sizeof(struct wds_mbx), 0, BUS_DMA_NOWAIT, &sc->sc_dmamap_mbox) ||
 	    bus_dmamap_load(sc->sc_dmat, sc->sc_dmamap_mbox, wmbx,
 	    sizeof(struct wds_mbx), NULL, BUS_DMA_NOWAIT))
-		panic("wds_ionit: can't craete or load mailbox dma map");
+		panic("wds_ionit: can't create or load mailbox DMA map");
 
  doinit:
 	/*
@@ -1128,7 +1127,6 @@ wds_scsipi_request(chan, req, arg)
 	struct wds_softc *sc = (void *)chan->chan_adapter->adapt_dev;
 	bus_dma_tag_t dmat = sc->sc_dmat;
 	struct wds_scb *scb;
-	struct wds_scat_gath *sg;
 	int error, seg, flags, s;
 
 	switch (req) {
@@ -1194,7 +1192,6 @@ wds_scsipi_request(chan, req, arg)
 		    0x80 : 0x00;
 
 		if (xs->datalen) {
-			sg = scb->scat_gath;
 			seg = 0;
 #ifdef TFS
 			if (flags & XS_CTL_DATA_UIO) {

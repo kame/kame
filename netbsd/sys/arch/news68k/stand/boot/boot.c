@@ -1,4 +1,4 @@
-/*	$NetBSD: boot.c,v 1.7 2002/04/30 13:10:56 tsutsui Exp $	*/
+/*	$NetBSD: boot.c,v 1.9 2003/11/21 19:44:53 tsutsui Exp $	*/
 
 /*-
  * Copyright (C) 1999 Izumi Tsutsui.  All rights reserved.
@@ -45,9 +45,9 @@ char *devs[] = { "hd", "fh", "fd", NULL, NULL, "rd", "st" };
 char *kernels[] = { "/netbsd", "/netbsd.gz", NULL };
 
 #ifdef BOOT_DEBUG
-# define DPRINTF(x) printf x
+# define DPRINTF printf
 #else
-# define DPRINTF(x)
+# define DPRINTF while (0) printf
 #endif
 
 void
@@ -62,21 +62,19 @@ boot(d4, d5, d6, d7)
 	static char devname[32], file[32];
 	void (*entry)(void);
 
-	printf("\n");
 	printf("%s Secondary Boot, Revision %s\n",
 	    bootprog_name, bootprog_rev);
 	printf("(%s, %s)\n", bootprog_maker, bootprog_date);
-	printf("\n");
 
 	/* bootname is "boot" by default. */
 	if (netbsd == NULL || strcmp(netbsd, "boot") == 0 ||
 			      strcmp(netbsd, "/boot") == 0)
 		netbsd = "";
 
-	DPRINTF(("howto = 0x%x\n", d7));
-	DPRINTF(("bootdev = 0x%x\n", bootdev));
-	DPRINTF(("bootname = %s\n", netbsd));
-	DPRINTF(("maxmem = 0x%x\n", d4));
+	DPRINTF("howto = 0x%x\n", d7);
+	DPRINTF("bootdev = 0x%x\n", bootdev);
+	DPRINTF("bootname = %s\n", netbsd);
+	DPRINTF("maxmem = 0x%x\n", d4);
 
 #define	SET_MAGIC(bootdev, magic) ((bootdev & 0x0fffffff)| (magic << 28))
 	/* PROM monitor passes 0xa, but NEWS-OS /boot passed 0x5... */
@@ -105,7 +103,7 @@ boot(d4, d5, d6, d7)
 
 	for (i = 0; kernels[i]; i++) {
 		sprintf(file, "%s%s", devname, kernels[i]);
-		DPRINTF(("trying %s...\n", file));
+		DPRINTF("trying %s...\n", file);
 		fd = loadfile(file, marks, LOAD_KERNEL);
 		if (fd != -1)
 			break;
@@ -119,9 +117,9 @@ boot(d4, d5, d6, d7)
 #endif
 	}
 
-	DPRINTF(("entry = 0x%x\n", (int)marks[MARK_ENTRY]));
-	DPRINTF(("ssym = 0x%x\n", (int)marks[MARK_SYM]));
-	DPRINTF(("esym = 0x%x\n", (int)marks[MARK_END]));
+	DPRINTF("entry = 0x%x\n", (int)marks[MARK_ENTRY]);
+	DPRINTF("ssym = 0x%x\n", (int)marks[MARK_SYM]);
+	DPRINTF("esym = 0x%x\n", (int)marks[MARK_END]);
 
 	entry = (void *)marks[MARK_ENTRY];
 

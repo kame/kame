@@ -1,4 +1,4 @@
-/*	$NetBSD: ite8181_vrip.c,v 1.5 2002/01/27 14:18:12 takemura Exp $	*/
+/*	$NetBSD: ite8181_vrip.c,v 1.8 2003/07/15 02:29:34 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2000 SATO Kazumi
@@ -29,6 +29,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ite8181_vrip.c,v 1.8 2003/07/15 02:29:34 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -53,9 +56,8 @@ struct ite8181_vrip_softc {
 static int	ite8181_vrip_probe(struct device *, struct cfdata *, void *);
 static void	ite8181_vrip_attach(struct device *, struct device *, void *);
 
-struct cfattach ite8181video_vrip_ca = {
-	sizeof(struct ite8181_vrip_softc), ite8181_vrip_probe, ite8181_vrip_attach
-};
+CFATTACH_DECL(ite8181video_vrip, sizeof(struct ite8181_vrip_softc),
+    ite8181_vrip_probe, ite8181_vrip_attach, NULL, NULL);
 
 static int
 ite8181_vrip_probe(struct device *parent, struct cfdata *cf, void *aux)

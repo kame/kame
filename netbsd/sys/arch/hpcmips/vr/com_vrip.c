@@ -1,4 +1,4 @@
-/*	$NetBSD: com_vrip.c,v 1.12 2002/02/02 10:50:09 takemura Exp $	*/
+/*	$NetBSD: com_vrip.c,v 1.16 2003/07/15 02:29:34 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999 SASAKI Takesi. All rights reserved.
@@ -33,6 +33,9 @@
  * SUCH DAMAGE.
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: com_vrip.c,v 1.16 2003/07/15 02:29:34 lukem Exp $");
 
 #include "opt_kgdb.h"
 
@@ -88,9 +91,8 @@ void vrcmu_init(void);
 void vrcmu_supply(int);
 void vrcmu_mask(int);
 
-struct cfattach com_vrip_ca = {
-	sizeof(struct com_vrip_softc), com_vrip_probe, com_vrip_attach
-};
+CFATTACH_DECL(com_vrip, sizeof(struct com_vrip_softc),
+    com_vrip_probe, com_vrip_attach, NULL, NULL);
 
 int
 com_vrip_cndb_attach(bus_space_tag_t iot, int iobase, int rate, int frequency,
@@ -101,10 +103,12 @@ com_vrip_cndb_attach(bus_space_tag_t iot, int iobase, int rate, int frequency,
 		return (EIO);	/* I can't find appropriate error number. */
 #ifdef KGDB
 	if (kgdb)
-		return (com_kgdb_attach(iot, iobase, rate, frequency, cflag));
+		return (com_kgdb_attach(iot, iobase, rate, frequency,
+		    COM_TYPE_NORMAL, cflag));
 	else
 #endif
-		return (comcnattach(iot, iobase, rate, frequency, cflag));
+		return (comcnattach(iot, iobase, rate, frequency,
+		    COM_TYPE_NORMAL, cflag));
 }
 
 static int

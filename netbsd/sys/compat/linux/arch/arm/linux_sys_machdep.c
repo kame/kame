@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_sys_machdep.c,v 1.7 2002/03/24 15:50:40 bjh21 Exp $	*/
+/*	$NetBSD: linux_sys_machdep.c,v 1.9 2003/10/10 14:44:42 matt Exp $	*/
 
 /*-
  * Copyright (c) 2002 Ben Harris
@@ -29,7 +29,7 @@
 
 #include <sys/param.h>
 
-__KERNEL_RCSID(0, "$NetBSD: linux_sys_machdep.c,v 1.7 2002/03/24 15:50:40 bjh21 Exp $");
+__KERNEL_RCSID(0, "$NetBSD: linux_sys_machdep.c,v 1.9 2003/10/10 14:44:42 matt Exp $");
 
 #include <sys/systm.h>
 
@@ -42,15 +42,19 @@ __KERNEL_RCSID(0, "$NetBSD: linux_sys_machdep.c,v 1.7 2002/03/24 15:50:40 bjh21 
 #include <arm/cpufunc.h>
 
 int
-linux_sys_breakpoint(struct proc *p, void *v, register_t *retval)
+linux_sys_breakpoint(struct lwp *l, void *v, register_t *retval)
 {
+	ksiginfo_t ksi;
 
-	trapsignal(p, SIGTRAP, 0);
+	KSI_INIT_TRAP(&ksi);
+	ksi.ksi_signo = SIGTRAP;
+	ksi.ksi_code = TRAP_BRKPT;
+	trapsignal(l, &ksi);
 	return ERESTART; /* Leave PC pointing back at the breakpoint. */
 }
 
 int
-linux_sys_cacheflush(struct proc *p, void *v, register_t *retval)
+linux_sys_cacheflush(struct lwp *l, void *v, register_t *retval)
 {
 #ifndef acorn26
 	struct linux_sys_cacheflush_args /* {

@@ -1,4 +1,4 @@
-/*	$NetBSD: kgdb_machdep.c,v 1.3 2002/01/06 00:35:13 dbj Exp $	*/
+/*	$NetBSD: kgdb_machdep.c,v 1.11 2004/03/02 00:35:54 kleink Exp $	*/
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -35,6 +35,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kgdb_machdep.c,v 1.11 2004/03/02 00:35:54 kleink Exp $");
+
 #include "opt_ddb.h"
 
 #if defined(DDB)
@@ -51,10 +54,12 @@
 
 #include <uvm/uvm_extern.h>
 
-#include <machine/bat.h>
 #include <machine/reg.h>
 #include <machine/trap.h>
 #include <machine/pmap.h>
+
+#include <powerpc/oea/bat.h>
+#include <powerpc/spr.h>
 
 /*
  * Determine if the memory at va..(va+len) is valid.
@@ -65,7 +70,7 @@ kgdb_acc(vaddr_t va, size_t len)
 	vaddr_t   last_va;
 	paddr_t   pa;
 	u_int msr;
-	u_int batu;
+	u_int batu, batl;
 
 	/* If translation is off, everything is fair game */
 	asm volatile ("mfmsr %0" : "=r"(msr));
@@ -74,29 +79,52 @@ kgdb_acc(vaddr_t va, size_t len)
 	}
 
 	/* Now check battable registers */
-	asm volatile ("mfdbatu %0,0" : "=r"(batu));
-	if (BAT_VALID_P(batu,msr) &&
-			BAT_VA_MATCH_P(batu,va) &&
-			(batu & BAT_PP) != BAT_PP_NONE) {
-		return 1;
-	}
-	asm volatile ("mfdbatu %0,1" : "=r"(batu));
-	if (BAT_VALID_P(batu,msr) &&
-			BAT_VA_MATCH_P(batu,va) &&
-			(batu & BAT_PP) != BAT_PP_NONE) {
-		return 1;
-	}
-	asm volatile ("mfdbatu %0,2" : "=r"(batu));
-	if (BAT_VALID_P(batu,msr) &&
-			BAT_VA_MATCH_P(batu,va) &&
-			(batu & BAT_PP) != BAT_PP_NONE) {
-		return 1;
-	}
-	asm volatile ("mfdbatu %0,3" : "=r"(batu));
-	if (BAT_VALID_P(batu,msr) &&
-			BAT_VA_MATCH_P(batu,va) &&
-			(batu & BAT_PP) != BAT_PP_NONE) {
-		return 1;
+	if ((mfpvr() >> 16) == MPC601) {
+		asm volatile ("mfibatl %0,0" : "=r"(batl));
+		asm volatile ("mfibatu %0,0" : "=r"(batu));
+		if (BAT601_VALID_P(batl) &&
+				BAT601_VA_MATCH_P(batu,batl,va))
+			return 1;
+		asm volatile ("mfibatl %0,1" : "=r"(batl));
+		asm volatile ("mfibatu %0,1" : "=r"(batu));
+		if (BAT601_VALID_P(batl) &&
+				BAT601_VA_MATCH_P(batu,batl,va))
+			return 1;
+		asm volatile ("mfibatl %0,2" : "=r"(batl));
+		asm volatile ("mfibatu %0,2" : "=r"(batu));
+		if (BAT601_VALID_P(batl) &&
+				BAT601_VA_MATCH_P(batu,batl,va))
+			return 1;
+		asm volatile ("mfibatl %0,3" : "=r"(batl));
+		asm volatile ("mfibatu %0,3" : "=r"(batu));
+		if (BAT601_VALID_P(batl) &&
+				BAT601_VA_MATCH_P(batu,batl,va))
+			return 1;
+	} else {
+		asm volatile ("mfdbatu %0,0" : "=r"(batu));
+		if (BAT_VALID_P(batu,msr) &&
+				BAT_VA_MATCH_P(batu,va) &&
+				(batu & BAT_PP) != BAT_PP_NONE) {
+			return 1;
+		}
+		asm volatile ("mfdbatu %0,1" : "=r"(batu));
+		if (BAT_VALID_P(batu,msr) &&
+				BAT_VA_MATCH_P(batu,va) &&
+				(batu & BAT_PP) != BAT_PP_NONE) {
+			return 1;
+		}
+		asm volatile ("mfdbatu %0,2" : "=r"(batu));
+		if (BAT_VALID_P(batu,msr) &&
+				BAT_VA_MATCH_P(batu,va) &&
+				(batu & BAT_PP) != BAT_PP_NONE) {
+			return 1;
+		}
+		asm volatile ("mfdbatu %0,3" : "=r"(batu));
+		if (BAT_VALID_P(batu,msr) &&
+				BAT_VA_MATCH_P(batu,va) &&
+				(batu & BAT_PP) != BAT_PP_NONE) {
+			return 1;
+		}
 	}
 
 	last_va = va + len;
@@ -122,8 +150,7 @@ kgdb_acc(vaddr_t va, size_t len)
  * and should be reviewed.
  */
 int 
-kgdb_signal(type)
-	int type;
+kgdb_signal(int type)
 {
 	switch (type) {
 #ifdef PPC_IBM4XX
@@ -141,7 +168,7 @@ kgdb_signal(type)
 		return SIGSEGV;
 #endif
 
-#ifdef PPC_MPC6XX
+#ifdef PPC_OEA
 	case EXC_PERF:		/* 604/750/7400 - Performance monitoring */
 	case EXC_BPT:		/* 604/750/7400 - Instruction breakpoint */
 	case EXC_SMI:		/* 604/750/7400 - System management interrupt */
@@ -199,9 +226,7 @@ kgdb_signal(type)
  * understood by gdb.
  */
 void
-kgdb_getregs(regs, gdb_regs)
-	db_regs_t *regs;
-	kgdb_reg_t *gdb_regs;
+kgdb_getregs(db_regs_t *regs, kgdb_reg_t *gdb_regs)
 {
 	memcpy(gdb_regs, regs, 32 * sizeof(unsigned long));
 	gdb_regs[KGDB_PPC_PC_REG]  = regs->iar;
@@ -216,9 +241,7 @@ kgdb_getregs(regs, gdb_regs)
  * Reverse the above.
  */
 void
-kgdb_setregs(regs, gdb_regs)
-	db_regs_t *regs;
-	kgdb_reg_t *gdb_regs;
+kgdb_setregs(db_regs_t *regs, kgdb_reg_t *gdb_regs)
 {
 	regs->xer = gdb_regs[KGDB_PPC_XER_REG];
 	regs->ctr = gdb_regs[KGDB_PPC_CTR_REG];
@@ -234,10 +257,8 @@ kgdb_setregs(regs, gdb_regs)
  * noting on the console why nothing else is going on.
  */
 void
-kgdb_connect(verbose)
-	int verbose;
+kgdb_connect(int verbose)
 {
-
 	if (kgdb_dev < 0)
 		return;
 
@@ -258,7 +279,7 @@ kgdb_connect(verbose)
  * (This is called by panic, like Debugger())
  */
 void
-kgdb_panic()
+kgdb_panic(void)
 {
 	if (kgdb_dev >= 0 && kgdb_debug_panic) {
 		printf("entering kgdb\n");

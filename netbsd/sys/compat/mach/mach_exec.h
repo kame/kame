@@ -1,4 +1,4 @@
-/*	$NetBSD: mach_exec.h,v 1.2 2001/07/29 21:26:07 christos Exp $	 */
+/*	$NetBSD: mach_exec.h,v 1.26.2.1 2004/08/15 13:54:31 tron Exp $	 */
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -39,9 +39,46 @@
 #ifndef	_MACH_EXEC_H_
 #define	_MACH_EXEC_H_
 
-int exec_mach_copyargs __P((struct exec_package *, struct ps_strings *,
-    char **, void *));
-int exec_mach_probe __P((char **));
+#include <uvm/uvm_extern.h>
+
+#include <compat/mach/mach_types.h>
+#include <compat/mach/mach_message.h>
+#include <compat/mach/mach_port.h>
+#include <compat/mach/mach_exception.h>
+
+
+struct mach_emuldata {
+	int med_inited;			/* Is this structure initialized? */
+	int med_thpri;			/* Saved priority */
+	LIST_HEAD(med_right, mach_right) med_right;
+	struct lock med_rightlock;	/* process right list and lock */
+	mach_port_t med_nextright;	/* next unused right */
+
+	struct mach_port *med_bootstrap;/* task bootstrap port */
+	struct mach_port *med_kernel;	/* task kernel port */
+	struct mach_port *med_host;	/* task host port */
+	struct mach_port *med_exc[MACH_EXC_MAX + 1];	/* Exception ports */
+
+	int med_dirty_thid;		/* Thread id not yet initialized */
+	int med_suspend;		/* Suspend semaphore */
+	struct lock med_exclock;	/* Process exception handler lock */
+};
+
+struct mach_lwp_emuldata {
+	struct mach_port *mle_kernel;	/* Thread's kernel port */
+};
+
+int exec_mach_copyargs(struct proc *, struct exec_package *, 
+    struct ps_strings *, char **, void *);
+int exec_mach_probe(char **);
+void mach_e_proc_init(struct proc *, struct vmspace *);
+void mach_e_proc_exit(struct proc *);
+void mach_e_proc_exec(struct proc *, struct exec_package *);
+void mach_e_proc_fork(struct proc *, struct proc *, int);
+void mach_e_proc_fork1(struct proc *, struct proc *, int);
+void mach_e_lwp_fork(struct lwp *, struct lwp *);
+void mach_e_lwp_exit(struct lwp *);
+
 extern const struct emul emul_mach;
 
 #endif /* !_MACH_EXEC_H_ */

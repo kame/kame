@@ -1,4 +1,4 @@
-/*	$NetBSD: pcib.c,v 1.5 2001/07/22 14:58:20 wiz Exp $	*/
+/*	$NetBSD: pcib.c,v 1.11 2003/07/15 02:54:51 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pcib.c,v 1.11 2003/07/15 02:54:51 lukem Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -61,9 +64,8 @@ struct pcib_softc {
 	struct prep_isa_chipset sc_chipset;
 };
 
-struct cfattach pcib_ca = {
-	sizeof(struct pcib_softc), pcibmatch, pcibattach
-};
+CFATTACH_DECL(pcib, sizeof(struct pcib_softc),
+    pcibmatch, pcibattach, NULL, NULL);
 
 void	pcib_callback(struct device *);
 int	pcib_print(void *, const char *);
@@ -113,7 +115,12 @@ pcibattach(parent, self, aux)
 	u_int32_t v;
 	int lvlmask = 0;
 
-	printf("\n");
+	/*
+	 * Just print out a description and defer configuration
+	 * until all PCI devices have been attached.
+	 */
+	pci_devinfo(pa->pa_id, pa->pa_class, 0, devinfo);
+	printf(": %s (rev. 0x%02x)\n", devinfo, PCI_REVISION(pa->pa_class));
 
 	v = pci_conf_read(pa->pa_pc, pa->pa_tag, 0x40);
 	if ((v & 0x20) == 0) {
@@ -138,14 +145,6 @@ pcibattach(parent, self, aux)
 	/* Initialize interrupt controller */
 	init_icu(lvlmask);
 #endif
-
-	/*
-	 * Just print out a description and defer configuration
-	 * until all PCI devices have been attached.
-	 */
-	pci_devinfo(pa->pa_id, pa->pa_class, 0, devinfo);
-	printf("%s: %s (rev. 0x%02x)\n", self->dv_xname, devinfo,
-	    PCI_REVISION(pa->pa_class));
 
 	config_defer(self, pcib_callback);
 }
@@ -181,6 +180,6 @@ pcib_print(aux, pnp)
 
 	/* Only ISAs can attach to pcib's; easy. */
 	if (pnp)
-		printf("isa at %s", pnp);
+		aprint_normal("isa at %s", pnp);
 	return (UNCONF);
 }

@@ -1,4 +1,4 @@
-/* $NetBSD: radio.c,v 1.3 2002/01/05 01:30:01 augustss Exp $ */
+/* $NetBSD: radio.c,v 1.12 2003/10/19 01:44:48 simonb Exp $ */
 /* $OpenBSD: radio.c,v 1.2 2001/12/05 10:27:06 mickey Exp $ */
 /* $RuOBSD: radio.c,v 1.7 2001/12/04 06:03:05 tm Exp $ */
 
@@ -30,7 +30,7 @@
 /* This is the /dev/radio driver from OpenBSD */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: radio.c,v 1.3 2002/01/05 01:30:01 augustss Exp $");
+__KERNEL_RCSID(0, "$NetBSD: radio.c,v 1.12 2003/10/19 01:44:48 simonb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -47,16 +47,20 @@ __KERNEL_RCSID(0, "$NetBSD: radio.c,v 1.3 2002/01/05 01:30:01 augustss Exp $");
 
 int	radioprobe(struct device *, struct cfdata *, void *);
 void	radioattach(struct device *, struct device *, void *);
-int	radioopen(dev_t, int, int, struct proc *);
-int	radioclose(dev_t, int, int, struct proc *);
-int	radioioctl(dev_t, u_long, caddr_t, int, struct proc *);
 int	radioprint(void *, const char *);
 int	radiodetach(struct device *, int);
 int	radioactivate(struct device *, enum devact);
 
-struct cfattach radio_ca = {
-	sizeof(struct radio_softc), radioprobe, radioattach,
-	radiodetach, radioactivate
+CFATTACH_DECL(radio, sizeof(struct radio_softc),
+    radioprobe, radioattach, radiodetach, radioactivate);
+
+dev_type_open(radioopen);
+dev_type_close(radioclose);
+dev_type_ioctl(radioioctl);
+
+const struct cdevsw radio_cdevsw = {
+	radioopen, radioclose, noread, nowrite, radioioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
 };
 
 extern struct cfdriver radio_cd;
@@ -165,7 +169,7 @@ int
 radioprint(void *aux, const char *pnp)
 {
 	if (pnp != NULL)
-		printf("radio at %s", pnp);
+		aprint_normal("radio at %s", pnp);
 	return (UNCONF);
 }
 
@@ -176,9 +180,7 @@ radiodetach(struct device *self, int flags)
 	int maj, mn;
 
 	/* locate the major number */
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == radioopen)
-			break;
+	maj = cdevsw_lookup_major(&radio_cdevsw);
 
 	/* Nuke the vnodes for any open instances (calls close). */
 	mn = self->dv_unit;
@@ -195,7 +197,6 @@ radioactivate(struct device *self, enum devact act)
 	switch (act) {
 	case DVACT_ACTIVATE:
 		return (EOPNOTSUPP);
-		break;
 
 	case DVACT_DEACTIVATE:
 		sc->sc_dying = 1;

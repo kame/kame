@@ -1,4 +1,4 @@
-/*	$NetBSD: buf.h,v 1.49 2002/05/12 23:06:28 matt Exp $	*/
+/*	$NetBSD: buf.h,v 1.72 2004/02/28 06:28:47 yamt Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
@@ -54,11 +54,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -82,6 +78,11 @@
 
 #include <sys/pool.h>
 #include <sys/queue.h>
+#include <sys/lock.h>
+
+struct buf;
+struct mount;
+struct vnode;
 
 #define NOLIST ((struct buf *)0x87654321)
 
@@ -93,56 +94,41 @@ LIST_HEAD(workhead, worklist);
 /*
  * Device driver buffer queue.
  */
-struct buf_queue {
-	TAILQ_HEAD(bufq_head, buf) bq_head; /* actual list of buffers */
-	struct buf *bq_barrier;		    /* last B_ORDERED request */
+struct bufq_state {
+	void (*bq_put)(struct bufq_state *, struct buf *);
+	struct buf *(*bq_get)(struct bufq_state *, int);
+	void *bq_private;
+	int bq_flags;			/* Flags from bufq_alloc() */
 };
 
+/*
+ * Flags for bufq_alloc.
+ */
+#define BUFQ_SORT_RAWBLOCK	0x0001	/* Sort by b_rawblkno */
+#define BUFQ_SORT_CYLINDER	0x0002	/* Sort by b_cylinder, b_rawblkno */
+
+#define BUFQ_FCFS		0x0010	/* First-come first-serve */
+#define BUFQ_DISKSORT		0x0020	/* Min seek sort */
+#define BUFQ_READ_PRIO		0x0030	/* Min seek and read priority */
+#define BUFQ_PRIOCSCAN		0x0040	/* Per-priority CSCAN */
+
+#define BUFQ_SORT_MASK		0x000f
+#define BUFQ_METHOD_MASK	0x00f0
+
 #ifdef _KERNEL
-#define	BUFQ_FIRST(bufq)	TAILQ_FIRST(&(bufq)->bq_head)
-#define	BUFQ_NEXT(bp)		TAILQ_NEXT((bp), b_actq)
 
-#define	BUFQ_INIT(bufq)							\
-do {									\
-	TAILQ_INIT(&(bufq)->bq_head);					\
-	(bufq)->bq_barrier = NULL;					\
-} while (/*CONSTCOND*/0)
+extern int bufq_disk_default_strat;
+#define	BUFQ_DISK_DEFAULT_STRAT()	bufq_disk_default_strat
+void	bufq_alloc(struct bufq_state *, int);
+void	bufq_free(struct bufq_state *);
 
-#define	BUFQ_INSERT_HEAD(bufq, bp)					\
-do {									\
-	TAILQ_INSERT_HEAD(&(bufq)->bq_head, (bp), b_actq);		\
-	if (((bp)->b_flags & B_ORDERED) != 0 &&				\
-	    (bufq)->bq_barrier == NULL)					\
-		(bufq)->bq_barrier = (bp);				\
-} while (/*CONSTCOND*/0)
+#define BUFQ_PUT(bufq, bp) \
+	(*(bufq)->bq_put)((bufq), (bp))	/* Put buffer in queue */
+#define BUFQ_GET(bufq) \
+	(*(bufq)->bq_get)((bufq), 1)	/* Get and remove buffer from queue */
+#define BUFQ_PEEK(bufq) \
+	(*(bufq)->bq_get)((bufq), 0)	/* Get buffer from queue */
 
-#define	BUFQ_INSERT_TAIL(bufq, bp)					\
-do {									\
-	TAILQ_INSERT_TAIL(&(bufq)->bq_head, (bp), b_actq);		\
-	if (((bp)->b_flags & B_ORDERED) != 0)				\
-		(bufq)->bq_barrier = (bp);				\
-} while (/*CONSTCOND*/0)
-
-#define	BUFQ_INSERT_AFTER(bufq, lbp, bp)				\
-do {									\
-	KASSERT((bufq)->bq_barrier == NULL);				\
-	KASSERT(((bp)->b_flags & B_ORDERED) == 0);			\
-	TAILQ_INSERT_AFTER(&(bufq)->bq_head, (lbp), (bp), b_actq);	\
-} while (/*CONSTCOND*/0)
-
-#define	BUFQ_INSERT_BEFORE(bufq, lbp, bp)				\
-do {									\
-	KASSERT((bufq)->bq_barrier == NULL);				\
-	KASSERT(((bp)->b_flags & B_ORDERED) == 0);			\
-	TAILQ_INSERT_BEFORE((lbp), (bp), b_actq);			\
-} while (/*CONSTCOND*/0)
-
-#define	BUFQ_REMOVE(bufq, bp)						\
-do {									\
-	if ((bufq)->bq_barrier == (bp))					\
-		(bufq)->bq_barrier = TAILQ_PREV((bp), bufq_head, b_actq); \
-	TAILQ_REMOVE(&(bufq)->bq_head, (bp), b_actq);			\
-} while (/*CONSTCOND*/0)
 #endif /* _KERNEL */
 
 /*
@@ -151,31 +137,26 @@ do {									\
  * to use these hooks, a pointer to a set of bio_ops could be added
  * to each buffer.
  */
-struct buf;
-struct mount;
-struct vnode;
 struct bio_ops {
- 	void	(*io_start) __P((struct buf *));
- 	void	(*io_complete) __P((struct buf *));
- 	void	(*io_deallocate) __P((struct buf *));
- 	int	(*io_fsync) __P((struct vnode *));
- 	int	(*io_sync) __P((struct mount *));
-	void	(*io_movedeps) __P((struct buf *, struct buf *));
-	int	(*io_countdeps) __P((struct buf *, int));
-	void	(*io_pageiodone) __P((struct buf *));
+ 	void	(*io_start)(struct buf *);
+ 	void	(*io_complete)(struct buf *);
+ 	void	(*io_deallocate)(struct buf *);
+ 	int	(*io_fsync)(struct vnode *);
+ 	int	(*io_sync)(struct mount *);
+	void	(*io_movedeps)(struct buf *, struct buf *);
+	int	(*io_countdeps)(struct buf *, int);
+	void	(*io_pageiodone)(struct buf *);
 };
 
 /*
  * The buffer header describes an I/O operation in the kernel.
  */
 struct buf {
-	LIST_ENTRY(buf) b_hash;		/* Hash chain. */
-	LIST_ENTRY(buf) b_vnbufs;	/* Buffer's associated vnode. */
-	TAILQ_ENTRY(buf) b_freelist;	/* Free list position if not active. */
 	TAILQ_ENTRY(buf) b_actq;	/* Device driver queue when active. */
-	struct  proc *b_proc;		/* Associated proc if B_PHYS set. */
+	struct simplelock b_interlock;	/* Lock for b_flags changes */
 	volatile long	b_flags;	/* B_* flags. */
 	int	b_error;		/* Errno value. */
+	int	b_prio;			/* Hint for buffer queue discipline. */
 	long	b_bufsize;		/* Allocated buffer size. */
 	long	b_bcount;		/* Valid bytes in buffer. */
 	long	b_resid;		/* Remaining I/O. */
@@ -183,19 +164,46 @@ struct buf {
 	struct {
 		caddr_t	b_addr;		/* Memory, superblocks, indirect etc. */
 	} b_un;
-	void	*b_saveaddr;		/* Original b_addr for physio. */
-	daddr_t	b_lblkno;		/* Logical block number. */
 	daddr_t	b_blkno;		/* Underlying physical block number
 					   (partition relative) */
 	daddr_t	b_rawblkno;		/* Raw underlying physical block
 					   number (not partition relative) */
 					/* Function to call upon completion. */
-	void	(*b_iodone) __P((struct buf *));
+	void	(*b_iodone)(struct buf *);
+	struct  proc *b_proc;		/* Associated proc if B_PHYS set. */
 	struct	vnode *b_vp;		/* File vnode. */
-	void	*b_private;		/* Private data for owner */
-	off_t	b_dcookie;		/* Offset cookie if dir block */
 	struct  workhead b_dep;		/* List of filesystem dependencies. */
+	void	*b_saveaddr;		/* Original b_addr for physio. */
+
+	/*
+	 * private data for owner.
+	 *  - buffer cache buffers are owned by corresponding filesystem.
+	 *  - non-buffer cache buffers are owned by subsystem which
+	 *    allocated them. (filesystem, disk driver, etc)
+	 */
+	union {
+		void *bf_private;
+		off_t bf_dcookie;	/* NFS: Offset cookie if dir block */
+	} b_fspriv;
+#define	b_private	b_fspriv.bf_private
+#define	b_dcookie	b_fspriv.bf_dcookie
+
+	/*
+	 * buffer cache specific data
+	 */
+	LIST_ENTRY(buf) b_hash;		/* Hash chain. */
+	LIST_ENTRY(buf) b_vnbufs;	/* Buffer's associated vnode. */
+	TAILQ_ENTRY(buf) b_freelist;	/* Free list position if not active. */
+	daddr_t	b_lblkno;		/* Logical block number. */
 };
+
+#define	BUF_INIT(bp)							\
+do {									\
+	LIST_INIT(&(bp)->b_dep);					\
+	simple_lock_init(&(bp)->b_interlock);				\
+	(bp)->b_dev = NODEV;						\
+	BIO_SETPRIO((bp), BPRIO_DEFAULT);				\
+} while (/*CONSTCOND*/0)
 
 /*
  * For portability with historic industry practice, the cylinder number has
@@ -210,7 +218,6 @@ struct buf {
  * These flags are kept in b_flags.
  */
 #define	B_AGE		0x00000001	/* Move to age queue when I/O done. */
-#define	B_NEEDCOMMIT	0x00000002	/* Needs committing to stable storage */
 #define	B_ASYNC		0x00000004	/* Start I/O, do not wait. */
 #define	B_BAD		0x00000008	/* Bad block revectoring in progress. */
 #define	B_BUSY		0x00000010	/* I/O in progress. */
@@ -225,7 +232,6 @@ struct buf {
 #define	B_INVAL		0x00002000	/* Does not contain valid info. */
 #define	B_LOCKED	0x00004000	/* Locked in core (not reusable). */
 #define	B_NOCACHE	0x00008000	/* Do not cache block after use. */
-#define	B_ORDERED	0x00010000	/* ordered I/O request */
 #define	B_CACHE		0x00020000	/* Bread found us in the cache. */
 #define	B_PHYS		0x00040000	/* I/O to user memory. */
 #define	B_RAW		0x00080000	/* Set by physio for raw transfers. */
@@ -265,51 +271,62 @@ do {									\
 
 #ifdef _KERNEL
 
+#define	BIO_GETPRIO(bp)		((bp)->b_prio)
+#define	BIO_SETPRIO(bp, prio)	(bp)->b_prio = (prio)
+#define	BIO_COPYPRIO(bp1, bp2)	BIO_SETPRIO(bp1, BIO_GETPRIO(bp2))
+
+#define	BPRIO_NPRIO		3
+#define	BPRIO_TIMECRITICAL	2
+#define	BPRIO_TIMELIMITED	1
+#define	BPRIO_TIMENONCRITICAL	0
+#define	BPRIO_DEFAULT		BPRIO_TIMELIMITED
+
 extern	struct bio_ops bioops;
-extern	int nbuf;		/* The number of buffer headers */
+extern	u_int nbuf;		/* The number of buffer headers */
 extern	struct buf *buf;	/* The buffer headers. */
 extern	char *buffers;		/* The buffer contents. */
-extern	int bufpages;		/* Number of memory pages in the buffer pool. */
-extern	int nswbuf;		/* Number of swap I/O buffer headers. */
+extern	u_int bufpages;		/* Number of memory pages in the buffer pool. */
 
-extern	struct pool bufpool;	/* I/O buf pool */
+/*
+ * Pool of I/O buffers.  Access to this pool must be protected with
+ * splbio().
+ */
+extern	struct pool bufpool;
 
 __BEGIN_DECLS
-void	allocbuf __P((struct buf *, int));
-void	bawrite __P((struct buf *));
-void	bowrite __P((struct buf *));
-void	bdirty __P((struct buf *));
-void	bdwrite __P((struct buf *));
-void	biodone __P((struct buf *));
-int	biowait __P((struct buf *));
-int	bread __P((struct vnode *, daddr_t, int,
-		   struct ucred *, struct buf **));
-int	breada __P((struct vnode *, daddr_t, int, daddr_t, int,
-		    struct ucred *, struct buf **));
-int	breadn __P((struct vnode *, daddr_t, int, daddr_t *, int *, int,
-		    struct ucred *, struct buf **));
-void	brelse __P((struct buf *));
-void	bremfree __P((struct buf *));
-void	bufinit __P((void));
-int	bwrite __P((struct buf *));
-void	cluster_callback __P((struct buf *));
-int	cluster_read __P((struct vnode *, u_quad_t, daddr_t, long,
-			  struct ucred *, struct buf **));
-void	cluster_write __P((struct buf *, u_quad_t));
-struct buf *getblk __P((struct vnode *, daddr_t, int, int, int));
-struct buf *geteblk __P((int));
-struct buf *getnewbuf __P((int slpflag, int slptimeo));
-struct buf *incore __P((struct vnode *, daddr_t));
+void	allocbuf(struct buf *, int, int);
+void	bawrite(struct buf *);
+void	bdirty(struct buf *);
+void	bdwrite(struct buf *);
+void	biodone(struct buf *);
+int	biowait(struct buf *);
+int	bread(struct vnode *, daddr_t, int, struct ucred *, struct buf **);
+int	breada(struct vnode *, daddr_t, int, daddr_t, int, struct ucred *,
+	       struct buf **);
+int	breadn(struct vnode *, daddr_t, int, daddr_t *, int *, int,
+	       struct ucred *, struct buf **);
+void	brelse(struct buf *);
+void	bremfree(struct buf *);
+void	bufinit(void);
+int	bwrite(struct buf *);
+struct buf *getblk(struct vnode *, daddr_t, int, int, int);
+struct buf *geteblk(int);
+struct buf *getnewbuf(int, int, int);
+struct buf *incore(struct vnode *, daddr_t);
 
-void	minphys __P((struct buf *bp));
-int	physio __P((void (*strategy)(struct buf *), struct buf *bp, dev_t dev,
-		    int flags, void (*minphys)(struct buf *), struct uio *uio));
+void	minphys(struct buf *);
+int	physio(void (*)(struct buf *), struct buf *, dev_t, int,
+	       void (*)(struct buf *), struct uio *);
 
-void  brelvp __P((struct buf *));
-void  reassignbuf __P((struct buf *, struct vnode *));
-void  bgetvp __P((struct vnode *, struct buf *));
+void	brelvp(struct buf *);
+void	reassignbuf(struct buf *, struct vnode *);
+void	bgetvp(struct vnode *, struct buf *);
+int	buf_syncwait(void);
+u_long	buf_memcalc(void);
+int	buf_drain(int);
+int	buf_setvalimit(vsize_t);
 #ifdef DDB
-void	vfs_buf_print __P((struct buf *, int, void (*)(const char *, ...)));
+void	vfs_buf_print(struct buf *, int, void (*)(const char *, ...));
 #endif
 __END_DECLS
 #endif

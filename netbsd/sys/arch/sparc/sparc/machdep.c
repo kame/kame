@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.193.4.1 2003/10/22 06:22:20 jmc Exp $ */
+/*	$NetBSD: machdep.c,v 1.245.2.1 2004/04/29 04:19:33 jmc Exp $ */
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -58,11 +58,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -81,9 +77,13 @@
  *	@(#)machdep.c	8.6 (Berkeley) 1/14/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.245.2.1 2004/04/29 04:19:33 jmc Exp $");
+
 #include "opt_compat_netbsd.h"
 #include "opt_compat_sunos.h"
 #include "opt_sparc_arch.h"
+#include "opt_multiprocessor.h"
 
 #include <sys/param.h>
 #include <sys/signal.h>
@@ -91,7 +91,6 @@
 #include <sys/proc.h>
 #include <sys/user.h>
 #include <sys/extent.h>
-#include <sys/map.h>
 #include <sys/buf.h>
 #include <sys/device.h>
 #include <sys/reboot.h>
@@ -99,13 +98,15 @@
 #include <sys/kernel.h>
 #include <sys/conf.h>
 #include <sys/file.h>
-#include <sys/clist.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/mount.h>
 #include <sys/msgbuf.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 #include <sys/exec.h>
+#include <sys/savar.h>
+#include <sys/ucontext.h>
 
 #include <uvm/uvm.h>		/* we use uvm.kernel_object */
 
@@ -128,14 +129,9 @@
 
 #include "fb.h"
 #include "power.h"
-#include "tctrl.h"
 
 #if NPOWER > 0
 #include <sparc/dev/power.h>
-#endif
-#if NTCTRL > 0
-#include <machine/tctrl.h>
-#include <sparc/dev/tctrlvar.h>
 #endif
 
 struct vm_map *exec_map = NULL;
@@ -143,6 +139,8 @@ struct vm_map *mb_map = NULL;
 extern paddr_t avail_end;
 
 int	physmem;
+
+struct simplelock fpulock = SIMPLELOCK_INITIALIZER;
 
 /*
  * safepri is a safe priority for sleep to set for a spin-wait
@@ -159,17 +157,12 @@ struct extent *dvmamap24;
 void	dumpsys __P((void));
 void	stackdump __P((void));
 
-caddr_t	mdallocsys __P((caddr_t));
-
 /*
  * Machine-dependent startup code
  */
 void
 cpu_startup()
 {
-	unsigned i;
-	caddr_t v;
-	int base, residual;
 #ifdef DEBUG
 	extern int pmapdebug;
 	int opmapdebug = pmapdebug;
@@ -223,7 +216,6 @@ cpu_startup()
 	pmap_extract(pmap_kernel(), (vaddr_t)KERNBASE, &pa);
 
 	/* Allocate additional physical pages */
-	TAILQ_INIT(&mlist);
 	if (uvm_pglistalloc(size - 8192,
 			    vm_first_phys, vm_first_phys+vm_num_phys,
 			    0, 0, &mlist, 1, 0) != 0)
@@ -273,86 +265,51 @@ cpu_startup()
 
 	/*
 	 * Tune buffer cache variables based on the capabilities of the MMU
-	 * to cut down on VM space allocated for the buffer caches that    
+	 * to cut down on VM space allocated for the buffer caches that
 	 * would lead to MMU resource shortage.
 	 */
 	if (CPU_ISSUN4C) {
 		/* Clip UBC windows */
 		if (cpuinfo.mmu_nsegment <= 128) {
-			ubc_nwins = 256; 
-			/*ubc_winshift = 12; tune this too? */
-		}       
-	}       
+			/*
+			 * ubc_nwins and ubc_winshift control the amount
+			 * of VM used by the UBC. Normally, this VM is
+			 * not wired in the kernel map, hence non-locked
+			 * `PMEGs' (see pmap.c) are used for this space.
+			 * We still limit possible fragmentation to prevent
+			 * the occasional wired UBC mappings from tying up
+			 * too many PMEGs.
+			 *
+			 * Set the upper limit to 9 segments (default
+			 * winshift = 13).
+			 */
+			ubc_nwins = 512;
 
-	/*      
-	 * Find out how much space we need, allocate it,
-	 * and then give everything true virtual addresses.
-	 */
-	size = (vsize_t)allocsys(NULL, mdallocsys);
-
-	if ((v = (caddr_t)uvm_km_alloc(kernel_map, round_page(size))) == 0)
-		panic("startup: no room for tables");
-
-	if ((vsize_t)(allocsys(v, mdallocsys) - v) != size)
-		panic("startup: table size inconsistency");
-
-        /*
-         * allocate virtual and physical memory for the buffers.
-         */
-        size = MAXBSIZE * nbuf;         /* # bytes for buffers */
-
-        /* allocate VM for buffers... area is not managed by VM system */
-        if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
-                    NULL, UVM_UNKNOWN_OFFSET, 0,
-                    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-                                UVM_ADV_NORMAL, 0)) != 0)
-        	panic("cpu_startup: cannot allocate VM for buffers");
-
-        minaddr = (vaddr_t) buffers;
-        if ((bufpages / nbuf) >= btoc(MAXBSIZE)) {
-        	bufpages = btoc(MAXBSIZE) * nbuf; /* do not overallocate RAM */
-        }
-        base = bufpages / nbuf;
-        residual = bufpages % nbuf;
-
-        /* now allocate RAM for buffers */
-	for (i = 0 ; i < nbuf ; i++) {
-		vaddr_t curbuf;
-		vsize_t curbufsize;
-		struct vm_page *pg;
-
-		/*
-		 * each buffer has MAXBSIZE bytes of VM space allocated.  of
-		 * that MAXBSIZE space we allocate and map (base+1) pages
-		 * for the first "residual" buffers, and then we allocate
-		 * "base" pages for the rest.
-		 */
-		curbuf = (vaddr_t) buffers + (i * MAXBSIZE);
-		curbufsize = NBPG * ((i < residual) ? (base+1) : base);
-
-		while (curbufsize) {
-			pg = uvm_pagealloc(NULL, 0, NULL, 0);
-			if (pg == NULL)
-				panic("cpu_startup: "
-				    "not enough RAM for buffer cache");
-			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
-			    VM_PROT_READ | VM_PROT_WRITE);
-			curbuf += PAGE_SIZE;
-			curbufsize -= PAGE_SIZE;
+			/*
+			 * buf_setvalimit() allocates a submap for buffer
+			 * allocation. We use it to limit the number of locked
+			 * `PMEGs' (see pmap.c) dedicated to the buffer cache.
+			 *
+			 * Set the upper limit to 12 segments (3MB), which
+			 * corresponds approximately to the size of the
+			 * traditional 5% rule (assuming a maximum 64MB of
+			 * memory in small sun4c machines).
+			 */
+			buf_setvalimit(12 * 256*1024);
 		}
 	}
-	pmap_update(pmap_kernel());
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
 	 * limits the number of processes exec'ing at any time.
 	 */
-        exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-                                 16*NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
+	minaddr = 0;
+	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
+				   16*NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
 
-	if (CPU_ISSUN4OR4C) {
+	if (CPU_ISSUN4 || CPU_ISSUN4C) {
 		/*
-		 * Allocate dma map for 24-bit devices (le, ie)
+		 * Allocate DMA map for 24-bit devices (le, ie)
 		 * [dvma_base - dvma_end] is for VME devices..
 		 */
 		dvmamap24 = extent_create("dvmamap24",
@@ -373,27 +330,8 @@ cpu_startup()
 #endif
 	format_bytes(pbuf, sizeof(pbuf), ptoa(uvmexp.free));
 	printf("avail memory = %s\n", pbuf);
-	format_bytes(pbuf, sizeof(pbuf), bufpages * NBPG);
-	printf("using %d buffers containing %s of memory\n", nbuf, pbuf);
-
-	/*
-	 * Set up buffers, so they can be used to read disk labels.
-	 */
-	bufinit();
 
 	pmap_redzone();
-}
-
-caddr_t
-mdallocsys(v)
-	caddr_t v;
-{
-
-	/* Clip bufpages if necessary. */
-	if (CPU_ISSUN4C && bufpages > (128 * (65536/MAXBSIZE)))
-		bufpages = (128 * (65536/MAXBSIZE));
-
-	return (v);
 }
 
 /*
@@ -403,17 +341,17 @@ mdallocsys(v)
  */
 /* ARGSUSED */
 void
-setregs(p, pack, stack)
-	struct proc *p;
+setregs(l, pack, stack)
+	struct lwp *l;
 	struct exec_package *pack;
 	u_long stack;
 {
-	struct trapframe *tf = p->p_md.md_tf;
+	struct trapframe *tf = l->l_md.md_tf;
 	struct fpstate *fs;
 	int psr;
 
 	/* Don't allow misaligned code by default */
-	p->p_md.md_flags &= ~MDP_FIXALIGN;
+	l->l_md.md_flags &= ~MDP_FIXALIGN;
 
 	/*
 	 * Set the registers to 0 except for:
@@ -423,25 +361,35 @@ setregs(p, pack, stack)
 	 *	%pc,%npc: entry point of program
 	 */
 	psr = tf->tf_psr & (PSR_S | PSR_CWP);
-	if ((fs = p->p_md.md_fpstate) != NULL) {
+	if ((fs = l->l_md.md_fpstate) != NULL) {
+		struct cpu_info *cpi;
+		int s;
 		/*
-		 * We hold an FPU state.  If we own *the* FPU chip state
+		 * We hold an FPU state.  If we own *some* FPU chip state
 		 * we must get rid of it, and the only way to do that is
 		 * to save it.  In any case, get rid of our FPU state.
 		 */
-		if (p == cpuinfo.fpproc) {
-			savefpstate(fs);
-			cpuinfo.fpproc = NULL;
-		} else if (p->p_md.md_fpumid != -1)
-			panic("setreg: own FPU on module %d; fix this",
-				p->p_md.md_fpumid);
-		p->p_md.md_fpumid = -1;
+		FPU_LOCK(s);
+		if ((cpi = l->l_md.md_fpu) != NULL) {
+			if (cpi->fplwp != l)
+				panic("FPU(%d): fplwp %p",
+					cpi->ci_cpuid, cpi->fplwp);
+			if (l == cpuinfo.fplwp)
+				savefpstate(fs);
+#if defined(MULTIPROCESSOR)
+			else
+				XCALL1(savefpstate, fs, 1 << cpi->ci_cpuid);
+#endif
+			cpi->fplwp = NULL;
+		}
+		l->l_md.md_fpu = NULL;
+		FPU_UNLOCK(s);
 		free((void *)fs, M_SUBPROC);
-		p->p_md.md_fpstate = NULL;
+		l->l_md.md_fpstate = NULL;
 	}
 	bzero((caddr_t)tf, sizeof *tf);
 	tf->tf_psr = psr;
-	tf->tf_global[1] = (int)p->p_psstr;
+	tf->tf_global[1] = (int)l->l_proc->p_psstr;
 	tf->tf_pc = pack->ep_entry & ~3;
 	tf->tf_npc = tf->tf_pc + 4;
 	stack -= sizeof(struct rwindow);
@@ -456,7 +404,80 @@ int sigpid = 0;
 #define SDB_FPSTATE	0x04
 #endif
 
-struct sigframe {
+/*
+ * machine dependent system variables.
+ */
+static int
+sysctl_machdep_boot(SYSCTLFN_ARGS)
+{
+	struct sysctlnode node = *rnode;
+	struct btinfo_kernelfile *bi_file;
+	char *cp;
+
+
+	switch (node.sysctl_num) {
+	case CPU_BOOTED_KERNEL:
+		if ((bi_file = lookup_bootinfo(BTINFO_KERNELFILE)) != NULL)
+			cp = bi_file->name;
+		else
+			cp = prom_getbootfile();
+		if (cp != NULL && cp[0] == '\0')
+			cp = "netbsd";
+		break;
+	case CPU_BOOTED_DEVICE:
+		cp = prom_getbootpath();
+		break;
+	case CPU_BOOT_ARGS:
+		cp = prom_getbootargs();
+		break;
+	default:
+		return (EINVAL);
+	}
+
+	if (cp == NULL || cp[0] == '\0')
+		return (ENOENT);
+
+	node.sysctl_data = cp;
+	node.sysctl_size = strlen(cp) + 1;
+	return (sysctl_lookup(SYSCTLFN_CALL(&node)));
+}
+
+SYSCTL_SETUP(sysctl_machdep_setup, "sysctl machdep subtree setup")
+{
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "machdep", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_MACHDEP, CTL_EOL);
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_STRING, "booted_kernel", NULL,
+		       sysctl_machdep_boot, 0, NULL, 0,
+		       CTL_MACHDEP, CPU_BOOTED_KERNEL, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_STRING, "booted_device", NULL,
+		       sysctl_machdep_boot, 0, NULL, 0,
+		       CTL_MACHDEP, CPU_BOOTED_DEVICE, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_STRING, "boot_args", NULL,
+		       sysctl_machdep_boot, 0, NULL, 0,
+		       CTL_MACHDEP, CPU_BOOT_ARGS, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_INT, "cpu_arch", NULL,
+		       NULL, 0, &cpu_arch, 0,
+		       CTL_MACHDEP, CPU_ARCH, CTL_EOL);
+}
+
+/*
+ * Send an interrupt to process.
+ */
+#ifdef COMPAT_16
+struct sigframe_sigcontext {
 	int	sf_signo;		/* signal number */
 	int	sf_code;		/* code */
 	struct	sigcontext *sf_scp;	/* SunOS user addr of sigcontext */
@@ -464,70 +485,21 @@ struct sigframe {
 	struct	sigcontext sf_sc;	/* actual sigcontext */
 };
 
-/*
- * machine dependent system variables.
- */
-int
-cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
-	struct proc *p;
+static void
+sendsig_sigcontext(const ksiginfo_t *ksi, const sigset_t *mask)
 {
-	char *cp;
-	struct btinfo_kernelfile *bi_file;
-
-	/* all sysctl names are this level are terminal */
-	if (namelen != 1)
-		return (ENOTDIR);	/* overloaded */
-
-	switch (name[0]) {
-	case CPU_BOOTED_KERNEL:
-		if ((bi_file = lookup_bootinfo(BTINFO_KERNELFILE)) != NULL)
-			cp = bi_file->name;
-		else
-			cp = prom_getbootfile();
-		if (cp == NULL)
-			return (ENOENT);
-		if (*cp == '\0')
-			cp = "netbsd";
-		return (sysctl_rdstring(oldp, oldlenp, newp, cp));
-	case CPU_BOOTED_DEVICE:
-		cp = prom_getbootpath();
-		if (cp == NULL || cp[0] == '\0')
-			return (ENOENT);
-		return (sysctl_rdstring(oldp, oldlenp, newp, cp));
-	case CPU_BOOT_ARGS:
-		cp = prom_getbootargs();
-		if (cp == NULL || cp[0] == '\0')
-			return (ENOENT);
-		return (sysctl_rdstring(oldp, oldlenp, newp, cp));
-	default:
-		return (EOPNOTSUPP);
-	}
-	/* NOTREACHED */
-}
-
-/*
- * Send an interrupt to process.
- */
-void
-sendsig(catcher, sig, mask, code)
-	sig_t catcher;
-	int sig;
-	sigset_t *mask;
-	u_long code;
-{
-	struct proc *p = curproc;
-	struct sigframe *fp;
+	struct lwp *l = curlwp;
+	struct proc *p = l->l_proc;
+	struct sigacts *ps = p->p_sigacts;
+	struct sigframe_sigcontext *fp;
 	struct trapframe *tf;
 	int addr, onstack, oldsp, newsp;
-	struct sigframe sf;
+	struct sigframe_sigcontext sf;
+	int sig = ksi->ksi_signo;
+	u_long code = KSI_TRAPCODE(ksi);
+	sig_t catcher = SIGACTION(p, sig).sa_handler;
 
-	tf = p->p_md.md_tf;
+	tf = l->l_md.md_tf;
 	oldsp = tf->tf_out[6];
 
 	/*
@@ -539,12 +511,13 @@ sendsig(catcher, sig, mask, code)
 	    (SIGACTION(p, sig).sa_flags & SA_ONSTACK) != 0;
 
 	if (onstack)
-		fp = (struct sigframe *)((caddr_t)p->p_sigctx.ps_sigstk.ss_sp +
-		                               p->p_sigctx.ps_sigstk.ss_size);
+		fp = (struct sigframe_sigcontext *)
+			((caddr_t)p->p_sigctx.ps_sigstk.ss_sp +
+			 p->p_sigctx.ps_sigstk.ss_size);
 	else
-		fp = (struct sigframe *)oldsp;
+		fp = (struct sigframe_sigcontext *)oldsp;
 
-	fp = (struct sigframe *)((int)(fp - 1) & ~7);
+	fp = (struct sigframe_sigcontext *)((int)(fp - 1) & ~7);
 
 #ifdef DEBUG
 	if ((sigdebug & SDB_KSTACK) && p->p_pid == sigpid)
@@ -593,7 +566,7 @@ sendsig(catcher, sig, mask, code)
 	 */
 	newsp = (int)fp - sizeof(struct rwindow);
 	write_user_windows();
-	if (rwindow_save(p) || copyout((caddr_t)&sf, (caddr_t)fp, sizeof sf) ||
+	if (rwindow_save(l) || copyout((caddr_t)&sf, (caddr_t)fp, sizeof sf) ||
 	    suword(&((struct rwindow *)newsp)->rw_in[6], oldsp)) {
 		/*
 		 * Process has trashed its stack; give it an illegal
@@ -603,7 +576,7 @@ sendsig(catcher, sig, mask, code)
 		if ((sigdebug & SDB_KSTACK) && p->p_pid == sigpid)
 			printf("sendsig: window save or copyout error\n");
 #endif
-		sigexit(p, SIGILL);
+		sigexit(l, SIGILL);
 		/* NOTREACHED */
 	}
 #ifdef DEBUG
@@ -615,7 +588,21 @@ sendsig(catcher, sig, mask, code)
 	 * Arrange to continue execution at the code copied out in exec().
 	 * It needs the function to call in %g1, and a new stack pointer.
 	 */
-	addr = (int)p->p_sigctx.ps_sigcode;
+	switch (ps->sa_sigdesc[sig].sd_vers) {
+	case 0:		/* legacy on-stack sigtramp */
+		addr = (int)p->p_sigctx.ps_sigcode;
+		break;
+
+	case 1:
+		addr = (int)ps->sa_sigdesc[sig].sd_tramp;
+		break;
+
+	default:
+		/* Don't know what trampoline version; kill it. */
+		addr = 0;
+		sigexit(l, SIGILL);
+	}
+
 	tf->tf_global[1] = (int)catcher;
 	tf->tf_pc = addr;
 	tf->tf_npc = addr + 4;
@@ -630,7 +617,130 @@ sendsig(catcher, sig, mask, code)
 		printf("sendsig: about to return to catcher\n");
 #endif
 }
+#endif /* COMPAT_16 */
 
+struct sigframe {
+	siginfo_t sf_si;
+	ucontext_t sf_uc;
+};
+
+void sendsig(const ksiginfo_t *ksi, const sigset_t *mask)
+{
+	struct lwp *l = curlwp;
+	struct proc *p = l->l_proc;
+	struct sigacts *ps = p->p_sigacts;
+	struct trapframe *tf;
+	ucontext_t uc;
+	struct sigframe *fp;
+	u_int onstack, oldsp, newsp;
+	u_int catcher;
+	int sig;
+	size_t ucsz;
+
+	sig = ksi->ksi_signo;
+
+#ifdef COMPAT_16
+	if (ps->sa_sigdesc[sig].sd_vers < 2) {
+		sendsig_sigcontext(ksi, mask);
+		return;
+	}
+#endif /* COMPAT_16 */
+
+	tf = l->l_md.md_tf;
+	oldsp = tf->tf_out[6];
+
+	/*
+	 * Compute new user stack addresses, subtract off
+	 * one signal frame, and align.
+	 */
+	onstack =
+	    (p->p_sigctx.ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
+	    (SIGACTION(p, sig).sa_flags & SA_ONSTACK) != 0;
+
+	if (onstack)
+		fp = (struct sigframe *)
+			((caddr_t)p->p_sigctx.ps_sigstk.ss_sp +
+				  p->p_sigctx.ps_sigstk.ss_size);
+	else
+		fp = (struct sigframe *)oldsp;
+
+	fp = (struct sigframe *)((int)(fp - 1) & ~7);
+
+#ifdef DEBUG
+	if ((sigdebug & SDB_KSTACK) && p->p_pid == sigpid)
+		printf("sendsig: %s[%d] sig %d newusp %p si %p uc %p\n",
+		    p->p_comm, p->p_pid, sig, fp, &fp->sf_si, &fp->sf_uc);
+#endif
+
+	/*
+	 * Build the signal context to be used by sigreturn.
+	 */
+	uc.uc_flags = _UC_SIGMASK |
+		((p->p_sigctx.ps_sigstk.ss_flags & SS_ONSTACK)
+			? _UC_SETSTACK : _UC_CLRSTACK);
+	uc.uc_sigmask = *mask;
+	uc.uc_link = NULL;
+	memset(&uc.uc_stack, 0, sizeof(uc.uc_stack));
+	cpu_getmcontext(l, &uc.uc_mcontext, &uc.uc_flags);
+	ucsz = (int)&uc.__uc_pad - (int)&uc;
+
+	/*
+	 * Now copy the stack contents out to user space.
+	 * We need to make sure that when we start the signal handler,
+	 * its %i6 (%fp), which is loaded from the newly allocated stack area,
+	 * joins seamlessly with the frame it was in when the signal occurred,
+	 * so that the debugger and _longjmp code can back up through it.
+	 * Since we're calling the handler directly, allocate a full size
+	 * C stack frame.
+	 */
+	newsp = (int)fp - sizeof(struct frame);
+	if (copyout(&ksi->ksi_info, &fp->sf_si, sizeof ksi->ksi_info) ||
+	    copyout(&uc, &fp->sf_uc, ucsz) ||
+	    suword(&((struct rwindow *)newsp)->rw_in[6], oldsp)) {
+		/*
+		 * Process has trashed its stack; give it an illegal
+		 * instruction to halt it in its tracks.
+		 */
+#ifdef DEBUG
+		if ((sigdebug & SDB_KSTACK) && p->p_pid == sigpid)
+			printf("sendsig: window save or copyout error\n");
+#endif
+		sigexit(l, SIGILL);
+		/* NOTREACHED */
+	}
+
+	switch (ps->sa_sigdesc[sig].sd_vers) {
+	default:
+		/* Unsupported trampoline version; kill the process. */
+		sigexit(l, SIGILL);
+	case 2:
+		/*
+		 * Arrange to continue execution at the user's handler.
+		 * It needs a new stack pointer, a return address and
+		 * three arguments: (signo, siginfo *, ucontext *).
+		 */
+		catcher = (u_int)SIGACTION(p, sig).sa_handler;
+		tf->tf_pc = catcher;
+		tf->tf_npc = catcher + 4;
+		tf->tf_out[0] = sig;
+		tf->tf_out[1] = (int)&fp->sf_si;
+		tf->tf_out[2] = (int)&fp->sf_uc;
+		tf->tf_out[6] = newsp;
+		tf->tf_out[7] = (int)ps->sa_sigdesc[sig].sd_tramp - 8;
+		break;
+	}
+
+	/* Remember that we're now on the signal stack. */
+	if (onstack)
+		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
+
+#ifdef DEBUG
+	if ((sigdebug & SDB_KSTACK) && p->p_pid == sigpid)
+		printf("sendsig: about to return to catcher\n");
+#endif
+}
+
+#ifdef COMPAT_16
 /*
  * System call to cleanup state after a signal
  * has been taken.  Reset signal mask and
@@ -642,22 +752,25 @@ sendsig(catcher, sig, mask, code)
  */
 /* ARGSUSED */
 int
-sys___sigreturn14(p, v, retval)
-	struct proc *p;
+compat_16_sys___sigreturn14(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
-	struct sys___sigreturn14_args /* {
+	struct compat_16_sys___sigreturn14_args /* {
 		syscallarg(struct sigcontext *) sigcntxp;
 	} */ *uap = v;
 	struct sigcontext sc, *scp;
 	struct trapframe *tf;
+	struct proc *p;
 	int error;
+
+	p = l->l_proc;
 
 	/* First ensure consistent stack state (see sendsig). */
 	write_user_windows();
-	if (rwindow_save(p))
-		sigexit(p, SIGILL);
+	if (rwindow_save(l))
+		sigexit(l, SIGILL);
 #ifdef DEBUG
 	if (sigdebug & SDB_FOLLOW)
 		printf("sigreturn: %s[%d], sigcntxp %p\n",
@@ -667,7 +780,7 @@ sys___sigreturn14(p, v, retval)
 		return (error);
 	scp = &sc;
 
-	tf = p->p_md.md_tf;
+	tf = l->l_md.md_tf;
 	/*
 	 * Only the icc bits in the psr are used, so it need not be
 	 * verified.  pc and npc must be multiples of 4.  This is all
@@ -694,7 +807,227 @@ sys___sigreturn14(p, v, retval)
 
 	return (EJUSTRETURN);
 }
+#endif /* COMPAT_16 */
 
+/*
+ * cpu_upcall:
+ *
+ *	Send an an upcall to userland.
+ */
+void
+cpu_upcall(struct lwp *l, int type, int nevents, int ninterrupted,
+	   void *sas, void *ap, void *sp, sa_upcall_t upcall)
+{
+	struct trapframe *tf;
+	vaddr_t addr;
+
+	tf = l->l_md.md_tf;
+	addr = (vaddr_t) upcall;
+
+	/* Arguments to the upcall... */
+	tf->tf_out[0] = type;
+	tf->tf_out[1] = (vaddr_t) sas;
+	tf->tf_out[2] = nevents;
+	tf->tf_out[3] = ninterrupted;
+	tf->tf_out[4] = (vaddr_t) ap;
+
+	/*
+	 * Ensure the stack is double-word aligned, and provide a
+	 * C call frame.
+	 */
+	sp = (void *)(((vaddr_t)sp & ~0x7) - CCFSZ);
+
+	/* Arrange to begin execution at the upcall handler. */
+	tf->tf_pc = addr;
+	tf->tf_npc = addr + 4;
+	tf->tf_out[6] = (vaddr_t) sp;
+	tf->tf_out[7] = -1;		/* "you lose" if upcall returns */
+}
+
+void
+cpu_getmcontext(l, mcp, flags)
+	struct lwp *l;
+	mcontext_t *mcp;
+	unsigned int *flags;
+{
+	struct trapframe *tf = (struct trapframe *)l->l_md.md_tf;
+	__greg_t *r = mcp->__gregs;
+#ifdef FPU_CONTEXT
+	__fpregset_t *f = &mcp->__fpregs;
+	struct fpstate *fps = l->l_md.md_fpstate;
+#endif
+
+	/*
+	 * Put the stack in a consistent state before we whack away
+	 * at it.  Note that write_user_windows may just dump the
+	 * registers into the pcb; we need them in the process's memory.
+	 */
+	write_user_windows();
+	if (rwindow_save(l))
+		sigexit(l, SIGILL);
+
+	/*
+	 * Get the general purpose registers
+	 */
+	r[_REG_PSR] = tf->tf_psr;
+	r[_REG_PC] = tf->tf_pc;
+	r[_REG_nPC] = tf->tf_npc;
+	r[_REG_Y] = tf->tf_y;
+	r[_REG_G1] = tf->tf_global[1];
+	r[_REG_G2] = tf->tf_global[2];
+	r[_REG_G3] = tf->tf_global[3];
+	r[_REG_G4] = tf->tf_global[4];
+	r[_REG_G5] = tf->tf_global[5];
+	r[_REG_G6] = tf->tf_global[6];
+	r[_REG_G7] = tf->tf_global[7];
+	r[_REG_O0] = tf->tf_out[0];
+	r[_REG_O1] = tf->tf_out[1];
+	r[_REG_O2] = tf->tf_out[2];
+	r[_REG_O3] = tf->tf_out[3];
+	r[_REG_O4] = tf->tf_out[4];
+	r[_REG_O5] = tf->tf_out[5];
+	r[_REG_O6] = tf->tf_out[6];
+	r[_REG_O7] = tf->tf_out[7];
+
+	*flags |= _UC_CPU;
+
+#ifdef FPU_CONTEXT
+	/*
+	 * Get the floating point registers
+	 */
+	bcopy(fps->fs_regs, f->__fpu_regs, sizeof(fps->fs_regs));
+	f->__fp_nqsize = sizeof(struct fp_qentry);
+	f->__fp_nqel = fps->fs_qsize;
+	f->__fp_fsr = fps->fs_fsr;
+	if (f->__fp_q != NULL) {
+		size_t sz = f->__fp_nqel * f->__fp_nqsize;
+		if (sz > sizeof(fps->fs_queue)) {
+#ifdef DIAGNOSTIC
+			printf("getcontext: fp_queue too large\n");
+#endif
+			return;
+		}
+		if (copyout(fps->fs_queue, f->__fp_q, sz) != 0) {
+#ifdef DIAGNOSTIC
+			printf("getcontext: copy of fp_queue failed %d\n",
+			    error);
+#endif
+			return;
+		}
+	}
+	f->fp_busy = 0;	/* XXX: How do we determine that? */
+	*flags |= _UC_FPU;
+#endif
+
+	return;
+}
+
+/*
+ * Set to mcontext specified.
+ * Return to previous pc and psl as specified by
+ * context left by sendsig. Check carefully to
+ * make sure that the user has not modified the
+ * psl to gain improper privileges or to cause
+ * a machine fault.
+ * This is almost like sigreturn() and it shows.
+ */
+int
+cpu_setmcontext(l, mcp, flags)
+	struct lwp *l;
+	const mcontext_t *mcp;
+	unsigned int flags;
+{
+	struct trapframe *tf;
+	__greg_t *r = mcp->__gregs;
+#ifdef FPU_CONTEXT
+	__fpregset_t *f = &mcp->__fpregs;
+	struct fpstate *fps = l->l_md.md_fpstate;
+#endif
+
+	write_user_windows();
+	if (rwindow_save(l))
+		sigexit(l, SIGILL);
+
+#ifdef DEBUG
+	if (sigdebug & SDB_FOLLOW)
+		printf("__setmcontext: %s[%d], __mcontext %p\n",
+		    l->l_proc->p_comm, l->l_proc->p_pid, mcp);
+#endif
+
+	if (flags & _UC_CPU) {
+		/* Restore register context. */
+		tf = (struct trapframe *)l->l_md.md_tf;
+
+		/*
+		 * Only the icc bits in the psr are used, so it need not be
+		 * verified.  pc and npc must be multiples of 4.  This is all
+		 * that is required; if it holds, just do it.
+		 */
+		if (((r[_REG_PC] | r[_REG_nPC]) & 3) != 0) {
+			printf("pc or npc are not multiples of 4!\n");
+			return (EINVAL);
+		}
+
+		/* take only psr ICC field */
+		tf->tf_psr = (tf->tf_psr & ~PSR_ICC) |
+		    (r[_REG_PSR] & PSR_ICC);
+		tf->tf_pc = r[_REG_PC];
+		tf->tf_npc = r[_REG_nPC];
+		tf->tf_y = r[_REG_Y];
+
+		/* Restore everything */
+		tf->tf_global[1] = r[_REG_G1];
+		tf->tf_global[2] = r[_REG_G2];
+		tf->tf_global[3] = r[_REG_G3];
+		tf->tf_global[4] = r[_REG_G4];
+		tf->tf_global[5] = r[_REG_G5];
+		tf->tf_global[6] = r[_REG_G6];
+		tf->tf_global[7] = r[_REG_G7];
+
+		tf->tf_out[0] = r[_REG_O0];
+		tf->tf_out[1] = r[_REG_O1];
+		tf->tf_out[2] = r[_REG_O2];
+		tf->tf_out[3] = r[_REG_O3];
+		tf->tf_out[4] = r[_REG_O4];
+		tf->tf_out[5] = r[_REG_O5];
+		tf->tf_out[6] = r[_REG_O6];
+		tf->tf_out[7] = r[_REG_O7];
+	}
+
+#ifdef FPU_CONTEXT
+	if (flags & _UC_FPU) {
+		/*
+		 * Set the floating point registers
+		 */
+		int error;
+		size_t sz = f->__fp_nqel * f->__fp_nqsize;
+		if (sz > sizeof(fps->fs_queue)) {
+#ifdef DIAGNOSTIC
+			printf("setmcontext: fp_queue too large\n");
+#endif
+			return (EINVAL);
+		}
+		bcopy(f->__fpu_regs, fps->fs_regs, sizeof(fps->fs_regs));
+		fps->fs_qsize = f->__fp_nqel;
+		fps->fs_fsr = f->__fp_fsr;
+		if (f->__fp_q != NULL) {
+			if ((error = copyin(f->__fp_q, fps->fs_queue, sz)) != 0) {
+#ifdef DIAGNOSTIC
+				printf("setmcontext: fp_queue copy failed\n");
+#endif
+				return (error);
+			}
+		}
+	}
+#endif
+
+	if (flags & _UC_SETSTACK)  
+		l->l_proc->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
+	if (flags & _UC_CLRSTACK)
+		l->l_proc->p_sigctx.ps_sigstk.ss_flags &= ~SS_ONSTACK; 
+
+	return (0);
+}
 
 int	waittime = -1;
 
@@ -704,6 +1037,7 @@ cpu_reboot(howto, user_boot_string)
 	char *user_boot_string;
 {
 	int i;
+	char opts[4];
 	static char str[128];
 
 	/* If system is cold, just halt. */
@@ -717,12 +1051,12 @@ cpu_reboot(howto, user_boot_string)
 #endif
 	boothowto = howto;
 	if ((howto & RB_NOSYNC) == 0 && waittime < 0) {
-		extern struct proc proc0;
+		extern struct lwp lwp0;
 		extern int sparc_clock_time_is_ok;
 
-		/* XXX protect against curproc->p_stats.foo refs in sync() */
-		if (curproc == NULL)
-			curproc = &proc0;
+		/* XXX protect against curlwp->p_stats.foo refs in sync() */
+		if (curlwp == NULL)
+			curlwp = &lwp0;
 		waittime = 0;
 		vfs_shutdown();
 
@@ -737,8 +1071,17 @@ cpu_reboot(howto, user_boot_string)
 			resettodr();
 	}
 
-	/* Disable interrupts. */
-	(void) splhigh();
+	/* Disable interrupts. But still allow IPI on MP systems */
+	if (ncpu > 1)
+		(void)splsched();
+	else
+		(void)splhigh();
+
+#if defined(MULTIPROCESSOR)
+	/* Direct system interrupts to this CPU, since dump uses polled I/O */
+	if (CPU_ISSUN4M)
+		*((u_int *)ICR_ITR) = cpuinfo.mid - 8;
+#endif
 
 	/* If rebooting and a dump is requested, do it. */
 #if 0
@@ -755,46 +1098,46 @@ cpu_reboot(howto, user_boot_string)
 
 	/* If powerdown was requested, do it. */
 	if ((howto & RB_POWERDOWN) == RB_POWERDOWN) {
+		prom_interpret("power-off");
 #if NPOWER > 0
+		/* Fall back on `power' device if the PROM can't do it */ 
 		powerdown();
 #endif
-#if NTCTRL > 0
-		tadpole_powerdown();
-#endif
-#if NPOWER > 0 || NTCTRL > 0
-		printf("WARNING: powerdown failed!\n");
-#endif
+		printf("WARNING: powerdown not supported\n");
 		/*
 		 * RB_POWERDOWN implies RB_HALT... fall into it...
 		 */
 	}
 
 	if (howto & RB_HALT) {
+#if defined(MULTIPROCESSOR)
+		mp_halt_cpus();
+		printf("cpu%d halted\n\n", cpu_number());
+#else
 		printf("halted\n\n");
+#endif
 		prom_halt();
 	}
 
 	printf("rebooting\n\n");
+
+	i = 1;
+	if (howto & RB_SINGLE)
+		opts[i++] = 's';
+	if (howto & RB_KDB)
+		opts[i++] = 'd';
+	opts[i] = '\0';
+	opts[0] = (i > 1) ? '-' : '\0';
+
 	if (user_boot_string && *user_boot_string) {
 		i = strlen(user_boot_string);
-		if (i > sizeof(str))
+		if (i > sizeof(str) - sizeof(opts) - 1)
 			prom_boot(user_boot_string);	/* XXX */
 		bcopy(user_boot_string, str, i);
-	} else {
-		i = 1;
-		str[0] = '\0';
+		if (opts[0] != '\0')
+			str[i] = ' ';
 	}
-
-	if (howto & RB_SINGLE)
-		str[i++] = 's';
-	if (howto & RB_KDB)
-		str[i++] = 'd';
-	if (i > 1) {
-		if (str[0] == '\0')
-			str[0] = '-';
-		str[i] = 0;
-	} else
-		str[0] = 0;
+	strcat(str, opts);
 	prom_boot(str);
 	/*NOTREACHED*/
 }
@@ -806,13 +1149,16 @@ long	dumplo = 0;
 void
 cpu_dumpconf()
 {
+	const struct bdevsw *bdev;
 	int nblks, dumpblks;
 
-	if (dumpdev == NODEV || bdevsw[major(dumpdev)].d_psize == 0)
-		/* No usable dump device */
+	if (dumpdev == NODEV)
+		return;
+	bdev = bdevsw_lookup(dumpdev);
+	if (bdev == NULL || bdev->d_psize == NULL)
 		return;
 
-	nblks = (*bdevsw[major(dumpdev)].d_psize)(dumpdev);
+	nblks = (*bdev->d_psize)(dumpdev);
 
 	dumpblks = ctod(physmem) + pmap_dumpsize();
 	if (dumpblks > (nblks - ctod(1)))
@@ -851,6 +1197,7 @@ reserve_dumppages(p)
 void
 dumpsys()
 {
+	const struct bdevsw *bdev;
 	int psize;
 	daddr_t blkno;
 	int (*dump)	__P((dev_t, daddr_t, caddr_t, size_t));
@@ -865,6 +1212,9 @@ dumpsys()
 	stackdump();
 
 	if (dumpdev == NODEV)
+		return;
+	bdev = bdevsw_lookup(dumpdev);
+	if (bdev == NULL || bdev->d_psize == NULL)
 		return;
 
 	/*
@@ -881,14 +1231,14 @@ dumpsys()
 	printf("\ndumping to dev %u,%u offset %ld\n", major(dumpdev),
 	    minor(dumpdev), dumplo);
 
-	psize = (*bdevsw[major(dumpdev)].d_psize)(dumpdev);
+	psize = (*bdev->d_psize)(dumpdev);
 	printf("dump ");
 	if (psize == -1) {
 		printf("area unavailable\n");
 		return;
 	}
 	blkno = dumplo;
-	dump = bdevsw[major(dumpdev)].d_dump;
+	dump = bdev->d_dump;
 
 	error = pmap_dumpmmu(dump, blkno);
 	blkno += pmap_dumpsize();
@@ -899,9 +1249,9 @@ dumpsys()
 
 		if (maddr == 0) {
 			/* Skip first page at physical address 0 */
-			maddr += NBPG;
-			i += NBPG;
-			blkno += btodb(NBPG);
+			maddr += PAGE_SIZE;
+			i += PAGE_SIZE;
+			blkno += btodb(PAGE_SIZE);
 		}
 
 		for (; i < mp->len; i += n) {
@@ -917,7 +1267,7 @@ dumpsys()
 					VM_PROT_READ);
 			error = (*dump)(dumpdev, blkno,
 					(caddr_t)dumpspace, (int)n);
-			pmap_remove(pmap_kernel(), dumpspace, dumpspace + n);
+			pmap_kremove(dumpspace, n);
 			pmap_update(pmap_kernel());
 			if (error)
 				break;
@@ -991,17 +1341,18 @@ oldmon_w_trace(va)
 	u_long stop;
 	struct frame *fp;
 
-	if (curproc)
-		printf("curproc = %p, pid %d\n", curproc, curproc->p_pid);
+	if (curlwp)
+		printf("curlwp = %p, pid %d\n",
+			curlwp, curproc->p_pid);
 	else
-		printf("no curproc\n");
+		printf("no curlwp\n");
 
 	printf("uvm: swtch %d, trap %d, sys %d, intr %d, soft %d, faults %d\n",
 	    uvmexp.swtch, uvmexp.traps, uvmexp.syscalls, uvmexp.intrs,
 		uvmexp.softs, uvmexp.faults);
 	write_user_windows();
 
-#define round_up(x) (( (x) + (NBPG-1) ) & (~(NBPG-1)) )
+#define round_up(x) (( (x) + (PAGE_SIZE-1) ) & (~(PAGE_SIZE-1)) )
 
 	printf("\nstack trace with sp = 0x%lx\n", va);
 	stop = round_up(va);
@@ -1055,16 +1406,16 @@ caddr_t addr;
 	int res;
 	int s;
 
-	if (CPU_ISSUN4M) {
-		printf("warning: ldcontrolb called in sun4m\n");
+	if (CPU_ISSUN4M || CPU_ISSUN4D) {
+		printf("warning: ldcontrolb called on sun4m/sun4d\n");
 		return 0;
 	}
 
 	s = splhigh();
-	if (curproc == NULL)
+	if (curlwp == NULL)
 		xpcb = (struct pcb *)proc0paddr;
 	else
-		xpcb = &curproc->p_addr->u_pcb;
+		xpcb = &curlwp->l_addr->u_pcb;
 
 	saveonfault = (u_long)xpcb->pcb_onfault;
         res = xldcontrolb(addr, xpcb);
@@ -1297,7 +1648,6 @@ _bus_dmamem_alloc(t, size, alignment, boundary, segs, nsegs, rsegs, flags)
 	/*
 	 * Allocate pages from the VM system.
 	 */
-	TAILQ_INIT(mlist);
 	error = uvm_pglistalloc(size, low, high, 0, 0,
 				mlist, nsegs, (flags & BUS_DMA_NOWAIT) == 0);
 	if (error)
@@ -1315,7 +1665,7 @@ _bus_dmamem_alloc(t, size, alignment, boundary, segs, nsegs, rsegs, flags)
 	/*
 	 * We now have physical pages, but no DVMA addresses yet. These
 	 * will be allocated in bus_dmamap_load*() routines. Hence we
-	 * save any alignment and boundary requirements in this dma
+	 * save any alignment and boundary requirements in this DMA
 	 * segment.
 	 */
 	segs[0].ds_addr = 0;
@@ -1452,7 +1802,7 @@ _bus_dma_valloc_skewed(size, boundary, align, skew)
 	return (va);
 }
 
-/* sun4/sun4c dma map functions */
+/* sun4/sun4c DMA map functions */
 int	sun4_dmamap_load __P((bus_dma_tag_t, bus_dmamap_t, void *,
 				bus_size_t, struct proc *, int));
 int	sun4_dmamap_load_raw __P((bus_dma_tag_t, bus_dmamap_t,
@@ -1488,11 +1838,11 @@ sun4_dmamap_load(t, map, buf, buflen, p, flags)
 	if (buflen > map->_dm_size)
 		return (EINVAL);
 
-	cpuinfo.cache_flush(buf, buflen);
+	cache_flush(buf, buflen);
 
 	if ((map->_dm_flags & BUS_DMA_24BIT) == 0) {
 		/*
-		 * XXX Need to implement "don't dma across this boundry".
+		 * XXX Need to implement "don't DMA across this boundry".
 		 */
 		if (map->_dm_boundary != 0) {
 			bus_addr_t baddr;
@@ -1773,11 +2123,35 @@ static int	sparc_bus_subregion __P((bus_space_tag_t, bus_space_handle_t,
 static paddr_t	sparc_bus_mmap __P((bus_space_tag_t, bus_addr_t, off_t,
 				    int, int));
 static void	*sparc_mainbus_intr_establish __P((bus_space_tag_t, int, int,
-						   int, int (*) __P((void *)),
-						   void *));
+						   int (*) __P((void *)),
+						   void *,
+						   void (*) __P((void)) ));
 static void     sparc_bus_barrier __P(( bus_space_tag_t, bus_space_handle_t,
 					bus_size_t, bus_size_t, int));
 
+/*
+ * Generic routine to translate an address using OpenPROM `ranges'.
+ */
+int
+bus_translate_address_generic(struct openprom_range *ranges, int nranges,
+    bus_addr_t addr, bus_addr_t *addrp)
+{
+	int i, space = BUS_ADDR_IOSPACE(addr);
+
+	for (i = 0; i < nranges; i++) {
+		struct openprom_range *rp = &ranges[i];
+
+		if (rp->or_child_space != space)
+			continue;
+
+		/* We've found the connection to the parent bus. */
+		*addrp = BUS_ADDR(rp->or_parent_space,
+		    rp->or_parent_base + BUS_ADDR_PADDR(addr));
+		return (0);
+	}
+
+	return (EINVAL);
+}
 
 int
 sparc_bus_map(t, ba, size, flags, va, hp)
@@ -1792,8 +2166,18 @@ sparc_bus_map(t, ba, size, flags, va, hp)
 	unsigned int pmtype;
 static	vaddr_t iobase;
 
+	if (t->ranges != NULL) {
+		bus_addr_t addr;
+		int error;
 
-	if (iobase == NULL)
+		error = bus_translate_address_generic(t->ranges, t->nranges,
+		    ba, &addr);
+		if (error)
+			return (error);
+		return (bus_space_map2(t->parent, addr, size, flags, va, hp));
+	}
+
+	if (iobase == 0)
 		iobase = IODEV_BASE;
 
 	size = round_page(size);
@@ -1862,8 +2246,23 @@ sparc_bus_mmap(t, ba, off, prot, flags)
 	int		prot;
 	int		flags;
 {
-	u_int pmtype = PMAP_IOENC(BUS_ADDR_IOSPACE(ba));
-	paddr_t pa = trunc_page(BUS_ADDR_PADDR(ba) + off);
+	u_int pmtype;
+	paddr_t pa;
+
+	if (t->ranges != NULL) {
+		bus_addr_t addr;
+		int error;
+
+		error = bus_translate_address_generic(t->ranges, t->nranges,
+		    ba, &addr);
+		if (error)
+			return (-1);
+		return (bus_space_mmap(t->parent, addr, off, prot, flags));
+	}
+
+	pmtype = PMAP_IOENC(BUS_ADDR_IOSPACE(ba));
+	pa = trunc_page(BUS_ADDR_PADDR(ba) + off);
+
 	return (paddr_t)(pa | pmtype | PMAP_NC);
 }
 
@@ -1897,13 +2296,13 @@ bus_space_probe(tag, paddr, size, offset, flags, callback, arg)
 
 
 void *
-sparc_mainbus_intr_establish(t, pil, level, flags, handler, arg)
+sparc_mainbus_intr_establish(t, pil, level, handler, arg, fastvec)
 	bus_space_tag_t t;
 	int	pil;
 	int	level;
-	int	flags;
 	int	(*handler)__P((void *));
 	void	*arg;
+	void	(*fastvec)__P((void));
 {
 	struct intrhand *ih;
 
@@ -1914,10 +2313,7 @@ sparc_mainbus_intr_establish(t, pil, level, flags, handler, arg)
 
 	ih->ih_fun = handler;
 	ih->ih_arg = arg;
-	if ((flags & BUS_INTR_ESTABLISH_FASTTRAP) != 0)
-		intr_fasttrap(pil, (void (*)__P((void)))handler);
-	else
-		intr_establish(pil, ih);
+	intr_establish(pil, level, ih, fastvec);
 	return (ih);
 }
 
@@ -1935,10 +2331,22 @@ void sparc_bus_barrier (t, h, offset, size, flags)
 struct sparc_bus_space_tag mainbus_space_tag = {
 	NULL,				/* cookie */
 	NULL,				/* parent bus tag */
+	NULL,				/* ranges */
+	0,				/* nranges */
 	sparc_bus_map,			/* bus_space_map */
 	sparc_bus_unmap,		/* bus_space_unmap */
 	sparc_bus_subregion,		/* bus_space_subregion */
 	sparc_bus_barrier,		/* bus_space_barrier */
 	sparc_bus_mmap,			/* bus_space_mmap */
-	sparc_mainbus_intr_establish	/* bus_intr_establish */
+	sparc_mainbus_intr_establish,	/* bus_intr_establish */
+#if __FULL_SPARC_BUS_SPACE
+	NULL,				/* read_1 */
+	NULL,				/* read_2 */
+	NULL,				/* read_4 */
+	NULL,				/* read_8 */
+	NULL,				/* write_1 */
+	NULL,				/* write_2 */
+	NULL,				/* write_4 */
+	NULL				/* write_8 */
+#endif
 };

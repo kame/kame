@@ -1,4 +1,4 @@
-/*	$NetBSD: kdb.c,v 1.26 2001/11/13 12:51:34 lukem Exp $ */
+/*	$NetBSD: kdb.c,v 1.34 2003/11/04 23:19:12 he Exp $ */
 /*
  * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -40,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kdb.c,v 1.26 2001/11/13 12:51:34 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kdb.c,v 1.34 2003/11/04 23:19:12 he Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -98,9 +98,8 @@ int	kdbprint __P((void *, const char *));
 void	kdbsaerror __P((struct device *, int));
 void	kdbgo __P((struct device *, struct mscp_xi *));
 
-struct	cfattach kdb_ca = {
-	sizeof(struct kdb_softc), kdbmatch, kdbattach
-};
+CFATTACH_DECL(kdb, sizeof(struct kdb_softc),
+    kdbmatch, kdbattach, NULL, NULL);
 
 /*
  * More driver definitions, for generic MSCP code.
@@ -117,7 +116,7 @@ kdbprint(aux, name)
 	const char	*name;
 {
 	if (name)
-		printf("%s: mscpbus", name);
+		aprint_normal("%s: mscpbus", name);
 	return UNCONF;
 }
 
@@ -169,7 +168,7 @@ kdbattach(parent, self, aux)
 	 * response packets into Unibus space.
 	 */
 	if ((error = bus_dmamem_alloc(sc->sc_dmat, sizeof(struct mscp_pack),
-	    NBPG, 0, &seg, 1, &rseg, BUS_DMA_NOWAIT)) != 0) {
+	    PAGE_SIZE, 0, &seg, 1, &rseg, BUS_DMA_NOWAIT)) != 0) {
 		printf("Alloc ctrl area %d\n", error);
 		return;
 	}
@@ -254,19 +253,17 @@ kdbgo(usc, mxi)
 	if ((bp->b_flags & B_PHYS) == 0) {
 		mapaddr = ((u_int32_t)kvtopte(addr)) & ~KERNBASE;
 	} else {
-		struct pcb *pcb;
-		u_int32_t eaddr;
 
-		/*
-		 * We check if the PTE's needed crosses a page boundary.
-		 * If they do; only transfer the amount of data that is
-		 * mapped by the first PTE page and led the system handle
-		 * the rest of the data.
-		 */
-		pcb = &bp->b_proc->p_addr->u_pcb;
-		mapaddr = (u_int32_t)uvtopte(addr, pcb);
-		eaddr = (u_int32_t)uvtopte(addr + (bp->b_bcount - 1), pcb);
-		if (trunc_page(mapaddr) != trunc_page(eaddr)) {
+/* XXX: This code does not belong here! */
+#define	UVTOPTE(addr, pmap) (((addr) < 0x40000000) ? \
+    &(*pmap)->pm_p0br[PG_PFNUM(addr)] : &(*pmap)->pm_p1br[PG_PFNUM(addr)])
+
+		pmap_t *pmap = &bp->b_proc->p_vmspace->vm_map.pmap;
+		u_int32_t eaddr = addr + (bp->b_bcount - 1);
+		u_int32_t emapaddr = (u_int32_t)UVTOPTE(eaddr, pmap);
+
+		mapaddr = (u_int32_t)UVTOPTE(addr, pmap);
+		if (trunc_page(mapaddr) != trunc_page(emapaddr)) {
 			mp->mscp_seq.seq_bytecount =
 			    (((round_page(mapaddr) - mapaddr)/4) * 512);
 		}

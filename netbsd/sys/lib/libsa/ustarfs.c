@@ -1,4 +1,4 @@
-/*	$NetBSD: ustarfs.c,v 1.19 2002/05/10 11:07:01 lukem Exp $	*/
+/*	$NetBSD: ustarfs.c,v 1.23 2003/08/31 22:40:49 fvdl Exp $	*/
 
 /* [Notice revision 2.2]
  * Copyright (c) 1997, 1998 Avalon Computer Systems, Inc.
@@ -134,7 +134,7 @@ typedef struct ust_active_struct {
 static const char formatid[] = "USTARFS",
 		  metaname[] = "USTAR.volsize.";
 
-static int ustarfs_mode_offset = BBSIZE;
+static const int ustarfs_mode_offset = BBSIZE;
 
 static int checksig __P((ust_active_t *));
 static int convert __P((const char *, int, int));
@@ -259,7 +259,7 @@ checksig(ustf)
 {
 	int	i, rcs;
 
-	for(i = rcs = 0; i < sizeof ustf->uas_1cyl; ++i)
+	for(i = rcs = 0; i < (int)(sizeof ustf->uas_1cyl); ++i)
 		rcs += ustf->uas_1cyl[i];
 	return rcs;
 }
@@ -284,7 +284,11 @@ get_volume(f, vn)
 #ifdef HAVE_CHANGEDISK_HOOK
 		changedisk_hook(f);
 #else
-		getchar();
+		for (;;) {
+			int c = getchar();
+			if ((c == '\n') || (c == '\r'))
+				break;
+		}
 #endif
 		printf("\n");
 		e = ustarfs_cylinder_read(f, 0, needvolume != 0);
@@ -346,7 +350,8 @@ read512block(f, vda, block)
 tryagain:
 	if(ustf->uas_init_window
 	&& ustf->uas_windowbase <= vda && vda <
-	   ustf->uas_windowbase + sizeof ustf->uas_1cyl - ustf->uas_offset) {
+	   ustf->uas_windowbase +
+	     (int)(sizeof ustf->uas_1cyl) - ustf->uas_offset) {
 		memcpy(block, ustf->uas_1cyl
 				+ (vda - ustf->uas_windowbase)
 				+ ustf->uas_offset, 512);
@@ -387,7 +392,7 @@ init_volzero_sig(f)
 
 int
 ustarfs_open(path, f)
-	char *path;
+	const char *path;
 	struct open_file *f;
 
 {
@@ -501,7 +506,7 @@ ustarfs_read(f, start, size, resid)
 		readoffs,
 		bufferoffset;
 	size_t	seg;
-	int	infile,
+	size_t	infile,
 		inbuffer;
 
 	e = 0;

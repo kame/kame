@@ -1,4 +1,4 @@
-/*	$NetBSD: bootxx.c,v 1.9 2002/05/18 04:24:22 lukem Exp $	*/
+/*	$NetBSD: bootxx.c,v 1.13 2004/03/12 19:13:37 wrstuden Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -32,7 +32,7 @@
  */
 
 #include <sys/types.h>
-#include <machine/bat.h>
+#include <powerpc/oea/bat.h>
 
 #include <sys/bootblock.h>
 
@@ -52,51 +52,50 @@ struct shared_bbinfo bbinfo = {
 };
 
 #ifndef DEFAULT_ENTRY_POINT
-#define	DEFAULT_ENTRY_POINT	0x600000
+#define	DEFAULT_ENTRY_POINT	0xE00000
 #endif
 
 void (*entry_point)(int, int, void *) = (void *)DEFAULT_ENTRY_POINT;
 
 
-asm("
-	.text
-	.align 2
-	.globl	_start
-_start:
+asm(
+"	.text			\n"
+"	.align 2		\n"
+"	.globl	_start		\n"
+"_start:			\n"
 
-	lis	8,(_start)@ha
-	addi	8,8,(_start)@l
-	li	9,0x40		/* loop 64 times (for 2048 bytes of bootxx) */
-	mtctr	9
-1:
-	dcbf	0,8
-	icbi	0,8
-	addi	8,8,0x20
-	bdnz	1b
-	sync
+"	lis	%r8,(_start)@ha	\n"
+"	addi	%r8,8,(_start)@l\n"
+"	li	%r9,0x40	\n"	/* loop 64 times (for 2048 bytes of bootxx) */
+"	mtctr	%r9		\n"
+"1:				\n"
+"	dcbf	%r0,%r8		\n"
+"	icbi	%r0,%r8		\n"
+"	addi	%r8,%r8,0x20	\n"
+"	bdnz	1b		\n"
+"	sync			\n"
 
-	li	0,0
-	mtdbatu	3,0
-	mtibatu	3,0
-	isync
-	li	8,0x1ffe	/* map the lowest 256MB */
-	li	9,0x22		/* BAT_I */
-	mtdbatl	3,9
-	mtdbatu	3,8
-	mtibatl	3,9
-	mtibatu	3,8
-	isync
+"	li	%r0,0		\n"
+"	mtdbatu	3,%r0		\n"
+"	mtibatu	3,%r0		\n"
+"	isync			\n"
+"	li	%r8,0x1ffe	\n"	/* map the lowest 256MB */
+"	li	%r9,0x22	\n"	/* BAT_I */
+"	mtdbatl	3,%r9		\n"
+"	mtdbatu	3,%r8		\n"
+"	mtibatl	3,%r9		\n"
+"	mtibatu	3,%r8		\n"
+"	isync			\n"
 
-				/*
-				 * setup 32 KB of stack with 32 bytes overpad
-				 * (see above)
-				 */
-	lis	1,(stack  + 4 * 8192)@ha
-	addi	1,1,(stack+ 4 * 8192)@l
-	stw	0,0(1)		/* terminate the frame link chain */
+	/*
+	 * setup 32 KB of stack with 32 bytes overpad (see above)
+	 */
+"	lis	%r1,(stack+32768)@ha\n"
+"	addi	%r1,%r1,(stack+32768)@l\n"
+"	stw	%r0,0(%r1)	\n"	/* terminate the frame link chain */
 
-	b	startup
-");
+"	b	startup		\n"
+);
 
 
 static __inline int
@@ -232,7 +231,7 @@ OF_seek(handle, pos)
 static __inline int
 OF_write(handle, addr, len)
 	int handle;
-	void *addr;
+	const void *addr;
 	int len;
 {
 	static struct {
@@ -240,7 +239,7 @@ OF_write(handle, addr, len)
 		int nargs;
 		int nreturns;
 		int ihandle;
-		void *addr;
+		const void *addr;
 		int len;
 		int actual;
 	} args = {
@@ -274,7 +273,8 @@ startup(arg1, arg2, openfirm)
 	int arg1, arg2;
 	void *openfirm;
 {
-	int fd, blk, chosen, options, i;
+	int fd, blk, chosen, options, j;
+	size_t i;
 	char *addr;
 	char bootpath[128];
 
@@ -308,10 +308,10 @@ startup(arg1, arg2, openfirm)
 
 	addr = (char *)entry_point;
 	putstr("\r\nread stage 2 blocks: ");
-	for (i = 0; i < bbinfo.bbi_block_count; i++) {
-		if ((blk = bbinfo.bbi_block_table[i]) == 0)
+	for (j = 0; j < bbinfo.bbi_block_count; j++) {
+		if ((blk = bbinfo.bbi_block_table[j]) == 0)
 			break;
-		putc('0' + i % 10);
+		putc('0' + j % 10);
 		OF_seek(fd, (u_quad_t)blk * 512);
 		OF_read(fd, addr, bbinfo.bbi_block_size);
 		addr += bbinfo.bbi_block_size;
@@ -321,14 +321,14 @@ startup(arg1, arg2, openfirm)
 	/*
 	 * enable D/I cache
 	 */
-	asm("
-		mtdbatu	3,%0
-		mtdbatl	3,%1
-		mtibatu	3,%0
-		mtibatl	3,%1
-		isync
-	" :: "r"(BATU(0, BAT_BL_256M, BAT_Vs)),
-	     "r"(BATL(0, 0, BAT_PP_RW)));
+	asm(
+		"mtdbatu	3,%0\n\t"
+		"mtdbatl	3,%1\n\t"
+		"mtibatu	3,%0\n\t"
+		"mtibatl	3,%1\n\t"
+		"isync"
+	   ::	"r"(BATU(0, BAT_BL_256M, BAT_Vs)),
+		"r"(BATL(0, 0, BAT_PP_RW)));
 
 	entry_point(0, 0, openfirm);
 	for (;;);			/* just in case */

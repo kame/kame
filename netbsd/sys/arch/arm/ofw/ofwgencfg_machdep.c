@@ -1,4 +1,4 @@
-/*	$NetBSD: ofwgencfg_machdep.c,v 1.2 2002/04/03 23:33:31 thorpej Exp $	*/
+/*	$NetBSD: ofwgencfg_machdep.c,v 1.7 2003/07/15 00:24:48 lukem Exp $	*/
 
 /*
  * Copyright 1997
@@ -37,6 +37,9 @@
  *  Kernel setup for the OFW Generic Configuration
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ofwgencfg_machdep.c,v 1.7 2003/07/15 00:24:48 lukem Exp $");
+
 #include "opt_ddb.h"
 
 #include <sys/types.h>
@@ -46,6 +49,7 @@
 #include <sys/proc.h>
 #include <sys/kernel.h>
 #include <sys/exec.h>
+#include <sys/ksyms.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -65,6 +69,8 @@
 
 #include <dev/ofw/openfirm.h>
 #include <machine/ofw.h>
+
+#include "ksyms.h"
 
 /*
  *  Imported variables
@@ -101,9 +107,8 @@ int max_processes = 64;			/* Default number */
 
 int ofw_handleticks = 0;	/* set to TRUE by cpu_initclocks */
 
-struct cfattach ofbus_root_ca = {
-	sizeof(struct device), ofbus_match, ofbus_attach
-};
+CFATTACH_DECL(ofbus_root, sizeof(struct device),
+    ofbus_match, ofbus_attach, NULL, NULL);
 
 /**************************************************************/
 
@@ -175,8 +180,8 @@ initarm(ofw_handle)
 	 * this routine. All we need to do is prepare for abort-handling 
 	 * and undefined exceptions.
 	 */
-	set_stackptr(PSR_UND32_MODE, undstack.pv_va + NBPG);
-	set_stackptr(PSR_ABT32_MODE, abtstack.pv_va + NBPG);
+	set_stackptr(PSR_UND32_MODE, undstack.pv_va + PAGE_SIZE);
+	set_stackptr(PSR_ABT32_MODE, abtstack.pv_va + PAGE_SIZE);
 
 	/* Set-up exception handlers.
 	 * Take control of selected vectors from OFW.
@@ -197,20 +202,22 @@ initarm(ofw_handle)
 	/* Set-up the IRQ system. */
 	irq_init();
 
-#ifdef DDB
-	db_machine_init();
+#if NKSYMS || defined(DDB) || defined(LKM)
 #ifdef __ELF__
-	ddb_init(0, NULL, NULL);	/* XXX */
+	ksyms_init(0, NULL, NULL);	/* XXX */
 #else
 	{
 		struct exec *kernexec = (struct exec *)KERNEL_TEXT_BASE;
 		extern int end;
 		extern char *esym;
 
-		ddb_init(kernexec->a_syms, &end, esym);
+		ksyms_init(kernexec->a_syms, &end, esym);
 	}
 #endif /* __ELF__ */
+#endif
 
+#ifdef DDB
+	db_machine_init();
 	if (boothowto & RB_KDB)
 		Debugger();
 #endif

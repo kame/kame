@@ -1,4 +1,4 @@
-/* $NetBSD: radiotrack2.c,v 1.4 2002/01/07 21:47:14 thorpej Exp $ */
+/* $NetBSD: radiotrack2.c,v 1.9 2003/07/14 15:47:16 lukem Exp $ */
 /* $OpenBSD: radiotrack2.c,v 1.1 2001/12/05 10:27:06 mickey Exp $ */
 /* $RuOBSD: radiotrack2.c,v 1.2 2001/10/18 16:51:36 pva Exp $ */
 
@@ -34,6 +34,9 @@
  * Philips TEA5757H AM/FM Self Tuned Radio:
  *	http://www.semiconductors.philips.com/pip/TEA5757H
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: radiotrack2.c,v 1.9 2003/07/14 15:47:16 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -105,9 +108,8 @@ struct rtii_softc {
 	struct tea5757_t	tea;
 };
 
-struct cfattach rtii_ca = {
-	sizeof(struct rtii_softc), rtii_probe, rtii_attach
-};
+CFATTACH_DECL(rtii, sizeof(struct rtii_softc),
+    rtii_probe, rtii_attach, NULL, NULL);
 
 void	rtii_set_mute(struct rtii_softc *);
 int	rtii_find(bus_space_tag_t, bus_space_handle_t);
@@ -168,6 +170,7 @@ rtii_attach(struct device *parent, struct device *self, void *aux)
 	struct isa_attach_args *ia = aux;
 
 	sc->tea.iot = ia->ia_iot;
+	sc->tea.flags = 0;
 	sc->mute = 0;
 	sc->vol = 0;
 	sc->freq = MIN_FM_FREQ;
@@ -246,7 +249,7 @@ rtii_find(bus_space_tag_t iot, bus_space_handle_t ioh)
 	tea5757_set_freq(&sc.tea, sc.stereo, sc.lock, sc.freq);
 	rtii_set_mute(&sc);
 	freq = rtii_hw_read(iot, ioh, sc.tea.offset);
-	if (tea5757_decode_freq(freq) == sc.freq)
+	if (tea5757_decode_freq(freq, 0) == sc.freq)
 		return 1;
 
 	return 0;
@@ -299,7 +302,7 @@ rtii_get_info(void *v, struct radio_info *ri)
 	ri->lock = tea5757_decode_lock(sc->lock);
 
 	ri->freq  = sc->freq = tea5757_decode_freq(rtii_hw_read(sc->tea.iot,
-				sc->tea.ioh, sc->tea.offset));
+				sc->tea.ioh, sc->tea.offset), 0);
 
 	switch (bus_space_read_1(sc->tea.iot, sc->tea.ioh, 0)) {
 	case 0xFD:

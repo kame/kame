@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ne_isapnp.c,v 1.14 2001/11/13 07:56:41 lukem Exp $	*/
+/*	$NetBSD: if_ne_isapnp.c,v 1.18 2004/02/13 10:05:50 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ne_isapnp.c,v 1.14 2001/11/13 07:56:41 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ne_isapnp.c,v 1.18 2004/02/13 10:05:50 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -83,9 +83,8 @@ struct ne_isapnp_softc {
 	void	*sc_ih;				/* interrupt cookie */
 };
 
-struct cfattach ne_isapnp_ca = {
-	sizeof(struct ne_isapnp_softc), ne_isapnp_match, ne_isapnp_attach
-};
+CFATTACH_DECL(ne_isapnp, sizeof(struct ne_isapnp_softc),
+    ne_isapnp_match, ne_isapnp_attach, NULL, NULL);
 
 static int
 ne_isapnp_match(parent, match, aux)
@@ -156,7 +155,7 @@ ne_isapnp_attach(
 	case NE2000_TYPE_NE2000:
 		typestr = "NE2000";
 		/*
-		 * Check for a RealTek 8019.
+		 * Check for a Realtek 8019.
 		 */
 		bus_space_write_1(nict, nich, ED_P0_CR,
 		    ED_CR_PAGE_0 | ED_CR_STP);

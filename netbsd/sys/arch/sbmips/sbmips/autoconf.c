@@ -1,4 +1,4 @@
-/* $NetBSD: autoconf.c,v 1.1 2002/03/06 02:13:50 simonb Exp $ */
+/* $NetBSD: autoconf.c,v 1.4 2003/07/15 03:35:50 lukem Exp $ */
 
 /*
  * Copyright 2000, 2001
@@ -15,10 +15,9 @@
  *    the source file.
  *
  * 2) No right is granted to use any trade name, trademark, or logo of
- *    Broadcom Corporation. Neither the "Broadcom Corporation" name nor any
- *    trademark or logo of Broadcom Corporation may be used to endorse or
- *    promote products derived from this software without the prior written
- *    permission of Broadcom Corporation.
+ *    Broadcom Corporation.  The "Broadcom Corporation" name may not be
+ *    used to endorse or promote products derived from this software
+ *    without the prior written permission of Broadcom Corporation.
  *
  * 3) THIS SOFTWARE IS PROVIDED "AS-IS" AND ANY EXPRESS OR IMPLIED
  *    WARRANTIES, INCLUDING BUT NOT LIMITED TO, ANY IMPLIED WARRANTIES OF
@@ -33,16 +32,15 @@
  *    OR OTHERWISE), EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.4 2003/07/15 03:35:50 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
 #include <sys/conf.h>
 #include <sys/device.h>
 #include <machine/intr.h>
-
-#ifdef IKOS
-#include <sbmips/ikos/ikosvar.h>
-#endif
 
 struct device	*booted_device;
 int		booted_partition;
@@ -53,14 +51,8 @@ cpu_configure(void)
 
 	(void)splhigh();
 
-#ifdef IKOS
-	ikos_icu_init();
-	if (system_set_clockfns(NULL, ikos_clock_init))
-		panic("couldn't set clock init to ikos_clock_init");
-#else
 	if (config_rootfound("zbbus", NULL) == NULL)
 		panic("no zbbus found");
-#endif
 
 	_splnone();
 }

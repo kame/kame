@@ -1,4 +1,4 @@
-/*	$NetBSD: ss.c,v 1.38 2001/11/15 09:48:18 lukem Exp $	*/
+/*	$NetBSD: ss.c,v 1.51.2.1 2004/09/11 12:56:41 he Exp $	*/
 
 /*
  * Copyright (c) 1995 Kenneth Stailey.  All rights reserved.
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ss.c,v 1.38 2001/11/15 09:48:18 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ss.c,v 1.51.2.1 2004/09/11 12:56:41 he Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -73,11 +73,20 @@ void ssattach(struct device *, struct device *, void *);
 int ssdetach(struct device *self, int flags);
 int ssactivate(struct device *self, enum devact act);
 
-struct cfattach ss_ca = {
-	sizeof(struct ss_softc), ssmatch, ssattach, ssdetach, ssactivate
-};
+CFATTACH_DECL(ss, sizeof(struct ss_softc),
+    ssmatch, ssattach, ssdetach, ssactivate);
 
 extern struct cfdriver ss_cd;
+
+dev_type_open(ssopen);
+dev_type_close(ssclose);
+dev_type_read(ssread);
+dev_type_ioctl(ssioctl);
+
+const struct cdevsw ss_cdevsw = {
+	ssopen, ssclose, ssread, nowrite, ssioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
 
 void    ssstrategy __P((struct buf *));
 void    ssstart __P((struct scsipi_periph *));
@@ -90,21 +99,25 @@ const struct scsipi_periphsw ss_switch = {
 	NULL,
 };
 
-struct scsipi_inquiry_pattern ss_patterns[] = {
+const struct scsipi_inquiry_pattern ss_patterns[] = {
 	{T_SCANNER, T_FIXED,
 	 "",         "",                 ""},
 	{T_SCANNER, T_REMOV,
 	 "",         "",                 ""},
 	{T_PROCESSOR, T_FIXED,
+	 "HP      ", "C1130A          ", ""},
+	{T_PROCESSOR, T_FIXED,
 	 "HP      ", "C1750A          ", ""},
 	{T_PROCESSOR, T_FIXED,
 	 "HP      ", "C2500A          ", ""},
 	{T_PROCESSOR, T_FIXED,
-	 "HP      ", "C1130A          ", ""},
+	 "HP      ", "C2520A          ", ""},
 	{T_PROCESSOR, T_FIXED,
 	 "HP      ", "C5110A          ", ""},
 	{T_PROCESSOR, T_FIXED,
 	 "HP      ", "C7670A          ", ""},
+	{T_PROCESSOR, T_FIXED,
+	 "HP      ", "", ""},
 };
 
 int
@@ -146,6 +159,13 @@ ssattach(struct device *parent, struct device *self, void *aux)
 	printf("\n");
 
 	/*
+	 * Set up the buf queue for this device
+	 */
+	bufq_alloc(&ss->buf_queue, BUFQ_FCFS);
+
+	callout_init(&ss->sc_callout);
+
+	/*
 	 * look for non-standard scanners with help of the quirk table
 	 * and install functions for special handling
 	 */
@@ -159,10 +179,6 @@ ssattach(struct device *parent, struct device *self, void *aux)
 		/* XXX add code to restart a SCSI2 scanner, if any */
 	}
 
-	/*
-	 * Set up the buf queue for this device
-	 */
-	BUFQ_INIT(&ss->buf_queue);
 	ss->flags &= ~SSF_AUTOCONF;
 }
 
@@ -174,20 +190,22 @@ ssdetach(struct device *self, int flags)
 	int s, cmaj, mn;
 
 	/* locate the major number */
-	for (cmaj = 0; cmaj <= nchrdev; cmaj++)
-		if (cdevsw[cmaj].d_open == ssopen)
-			break;
+	cmaj = cdevsw_lookup_major(&ss_cdevsw);
+
+	/* kill any pending restart */
+	callout_stop(&ss->sc_callout);
 
 	s = splbio();
 
 	/* Kill off any queued buffers. */
-	while ((bp = BUFQ_FIRST(&ss->buf_queue)) != NULL) {
-		BUFQ_REMOVE(&ss->buf_queue, bp);
+	while ((bp = BUFQ_GET(&ss->buf_queue)) != NULL) {
 		bp->b_error = EIO;
 		bp->b_flags |= B_ERROR;
 		bp->b_resid = bp->b_bcount;
 		biodone(bp);
 	}
+
+	bufq_free(&ss->buf_queue);
 
 	/* Kill off any pending commands. */
 	scsipi_kill_pending(ss->sc_periph);
@@ -338,7 +356,7 @@ ssminphys(struct buf *bp)
 	struct ss_softc *ss = ss_cd.cd_devs[SSUNIT(bp->b_dev)];
 	struct scsipi_periph *periph = ss->sc_periph;
 
-	(*periph->periph_channel->chan_adapter->adapt_minphys)(bp);
+	scsipi_adapter_minphys(periph->periph_channel, bp);
 
 	/*
 	 * trim the transfer further for special devices this is
@@ -394,7 +412,7 @@ ssstrategy(bp)
 	int s;
 
 	SC_DEBUG(ss->sc_periph, SCSIPI_DB1,
-	    ("ssstrategy %ld bytes @ blk %d\n", bp->b_bcount, bp->b_blkno));
+	    ("ssstrategy %ld bytes @ blk %" PRId64 "\n", bp->b_bcount, bp->b_blkno));
 
 	/*
 	 * If the device has been made invalid, error out
@@ -431,7 +449,7 @@ ssstrategy(bp)
 	 * at the end (a bit silly because we only have on user..
 	 * (but it could fork()))
 	 */
-	BUFQ_INSERT_TAIL(&ss->buf_queue, bp);
+	BUFQ_PUT(&ss->buf_queue, bp);
 
 	/*
 	 * Tell the device to get going on the transfer if it's
@@ -442,7 +460,6 @@ ssstrategy(bp)
 
 	splx(s);
 	return;
-	bp->b_flags |= B_ERROR;
 done:
 	/*
 	 * Correctly set the buf to indicate a completed xfer
@@ -488,9 +505,8 @@ ssstart(periph)
 		/*
 		 * See if there is a buf with work for us to do..
 		 */
-		if ((bp = BUFQ_FIRST(&ss->buf_queue)) == NULL)
+		if ((bp = BUFQ_PEEK(&ss->buf_queue)) == NULL)
 			return;
-		BUFQ_REMOVE(&ss->buf_queue, bp);
 
 		if (ss->special && ss->special->read) {
 			(ss->special->read)(ss, bp);
@@ -500,6 +516,15 @@ ssstart(periph)
 		}
 	}
 }
+
+void
+ssrestart(void *v)
+{
+	int s = splbio();
+	ssstart((struct scsipi_periph *)v);
+	splx(s);
+}
+
 
 /*
  * Perform special action on behalf of the user;

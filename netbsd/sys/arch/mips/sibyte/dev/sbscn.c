@@ -1,4 +1,4 @@
-/* $NetBSD: sbscn.c,v 1.1 2002/03/05 23:46:43 simonb Exp $ */
+/* $NetBSD: sbscn.c,v 1.12 2003/08/07 16:28:35 agc Exp $ */
 
 /*
  * Copyright 2000, 2001
@@ -15,10 +15,9 @@
  *    the source file.
  *
  * 2) No right is granted to use any trade name, trademark, or logo of
- *    Broadcom Corporation. Neither the "Broadcom Corporation" name nor any
- *    trademark or logo of Broadcom Corporation may be used to endorse or
- *    promote products derived from this software without the prior written
- *    permission of Broadcom Corporation.
+ *    Broadcom Corporation.  The "Broadcom Corporation" name may not be
+ *    used to endorse or promote products derived from this software
+ *    without the prior written permission of Broadcom Corporation.
  *
  * 3) THIS SOFTWARE IS PROVIDED "AS-IS" AND ANY EXPRESS OR IMPLIED
  *    WARRANTIES, INCLUDING BUT NOT LIMITED TO, ANY IMPLIED WARRANTIES OF
@@ -32,8 +31,6 @@
  *    WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  *    OR OTHERWISE), EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#define	SBSCN_DEBUG
 
 /* from: $NetBSD: com.c,v 1.172 2000/05/03 19:19:04 thorpej Exp */
 
@@ -85,11 +82,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -121,6 +114,11 @@
  * So, another driver.  Eventually there should be One True Driver,
  * but we're not here to save the world.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sbscn.c,v 1.12 2003/08/07 16:28:35 agc Exp $");
+
+#define	SBSCN_DEBUG
 
 #include "opt_ddb.h"
 
@@ -164,7 +162,6 @@ int	sbscn_speed(long, long *);
 static int cflag2modes(tcflag_t, u_char *, u_char *);
 int	sbscn_param(struct tty *, struct termios *);
 void	sbscn_start(struct tty *);
-void	sbscnstop(struct tty *, int);
 int	sbscn_hwiflow(struct tty *, int);
 
 void	sbscn_loadchannelregs(struct sbscn_channel *);
@@ -180,14 +177,25 @@ int	sbscn_common_getc(u_long addr, int chan);
 void	sbscn_common_putc(u_long addr, int chan, int c);
 void	sbscn_intr(void *arg, uint32_t status, uint32_t pc);
 
-/* XXX: These belong elsewhere */
-cdev_decl(sbscn);
-
 int	sbscn_cngetc(dev_t dev);
 void	sbscn_cnputc(dev_t dev, int c);
 void	sbscn_cnpollc(dev_t dev, int on);
 
 extern struct cfdriver sbscn_cd;
+
+dev_type_open(sbscnopen);
+dev_type_close(sbscnclose);
+dev_type_read(sbscnread);
+dev_type_write(sbscnwrite);
+dev_type_ioctl(sbscnioctl);
+dev_type_stop(sbscnstop);
+dev_type_tty(sbscntty);
+dev_type_poll(sbscnpoll);
+
+const struct cdevsw sbscn_cdevsw = {
+	sbscnopen, sbscnclose, sbscnread, sbscnwrite, sbscnioctl,
+	sbscnstop, sbscntty, sbscnpoll, nommap, ttykqfilter, D_TTY
+};
 
 #define	integrate	static inline
 void 	sbscn_soft(void *);
@@ -229,9 +237,8 @@ void	sbscn_kgdb_putc(void *, int);
 static int	sbscn_match(struct device *, struct cfdata *, void *);
 static void	sbscn_attach(struct device *, struct device *, void *);
 
-const struct cfattach sbscn_ca = {
-	sizeof(struct sbscn_softc), sbscn_match, sbscn_attach,
-};
+CFATTACH_DECL(sbscn, sizeof(struct sbscn_softc),
+    sbscn_match, sbscn_attach, NULL, NULL);
 
 #define	READ_REG(rp)		(mips3_ld((uint64_t *)(rp)))
 #define	WRITE_REG(rp, val)	(mips3_sd((uint64_t *)(rp), (val)))
@@ -354,9 +361,7 @@ sbscn_attach_channel(struct sbscn_softc *sc, int chan, int intr)
 		int maj;
 
 		/* locate the major number */
-		for (maj = 0; maj < nchrdev; maj++)
-			if (cdevsw[maj].d_open == sbscnopen)
-				break;
+		maj = cdevsw_lookup_major(&sbscn_cdevsw);
 
 		cn_tab->cn_dev = makedev(maj, (sc->sc_dev.dv_unit << 1) + chan);
 
@@ -507,10 +512,14 @@ sbscn_shutdown(struct sbscn_channel *ch)
 	/*
 	 * Hang up if necessary.  Wait a bit, so the other side has time to
 	 * notice even if we immediately open the port again.
+	 * Avoid tsleeping above splhigh().
 	 */
 	if (ISSET(tp->t_cflag, HUPCL)) {
 		sbscn_modem(ch, 0);
+		splx(s);
+		/* XXX tsleep will only timeout */
 		(void) tsleep(ch, TTIPRI, ttclos, hz);
+		s = splserial();
 	}
 
 	/* Turn off interrupts. */
@@ -742,11 +751,11 @@ sbscnioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 	int s;
 
 	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	error = ttioctl(tp, cmd, data, flag, p);
-	if (error >= 0)
+	if (error != EPASSTHROUGH)
 		return (error);
 
 	error = 0;
@@ -792,7 +801,7 @@ sbscnioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 		break;
 
 	default:
-		error = ENOTTY;
+		error = EPASSTHROUGH;
 		break;
 	}
 
@@ -1797,7 +1806,7 @@ sbscn_cnattach(u_long addr, int chan, int rate, tcflag_t cflag)
 	int res;
 	static struct consdev sbscn_cons = {
 		NULL, NULL, sbscn_cngetc, sbscn_cnputc, sbscn_cnpollc, NULL,
-		    NODEV, CN_NORMAL
+		    NULL, NULL, NODEV, CN_NORMAL
 	};
 
 	res = sbscn_init(addr, chan, rate, cflag);

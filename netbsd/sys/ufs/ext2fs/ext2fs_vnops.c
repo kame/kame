@@ -1,7 +1,6 @@
-/*	$NetBSD: ext2fs_vnops.c,v 1.40 2001/11/08 02:39:08 lukem Exp $	*/
+/*	$NetBSD: ext2fs_vnops.c,v 1.52.2.1 2004/05/23 11:56:04 grant Exp $	*/
 
 /*
- * Copyright (c) 1997 Manuel Bouyer.
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -18,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -42,8 +37,40 @@
  * Modified for ext2fs by Manuel Bouyer.
  */
 
+/*
+ * Copyright (c) 1997 Manuel Bouyer.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by Manuel Bouyer.
+ * 4. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ *	@(#)ufs_vnops.c	8.14 (Berkeley) 10/26/94
+ * Modified for ext2fs by Manuel Bouyer.
+ */
+
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ext2fs_vnops.c,v 1.40 2001/11/08 02:39:08 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ext2fs_vnops.c,v 1.52.2.1 2004/05/23 11:56:04 grant Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -53,7 +80,6 @@ __KERNEL_RCSID(0, "$NetBSD: ext2fs_vnops.c,v 1.40 2001/11/08 02:39:08 lukem Exp 
 #include <sys/stat.h>
 #include <sys/buf.h>
 #include <sys/proc.h>
-#include <sys/conf.h>
 #include <sys/mount.h>
 #include <sys/namei.h>
 #include <sys/vnode.h>
@@ -111,9 +137,16 @@ ext2fs_create(v)
 		struct componentname *a_cnp;
 		struct vattr *a_vap;
 	} */ *ap = v;
-	return ext2fs_makeinode(MAKEIMODE(ap->a_vap->va_type,
-					  ap->a_vap->va_mode),
-		ap->a_dvp, ap->a_vpp, ap->a_cnp);
+	int	error;
+
+	error =
+	    ext2fs_makeinode(MAKEIMODE(ap->a_vap->va_type, ap->a_vap->va_mode),
+			     ap->a_dvp, ap->a_vpp, ap->a_cnp);
+
+	if (error)
+		return (error);
+	VN_KNOTE(ap->a_dvp, NOTE_WRITE);
+	return (0);
 }
 
 /*
@@ -140,6 +173,7 @@ ext2fs_mknod(v)
 	if ((error = ext2fs_makeinode(MAKEIMODE(vap->va_type, vap->va_mode),
 		    ap->a_dvp, vpp, ap->a_cnp)) != 0)
 		return (error);
+	VN_KNOTE(ap->a_dvp, NOTE_WRITE);
 	ip = VTOI(*vpp);
 	mp  = (*vpp)->v_mount;
 	ino = ip->i_number;
@@ -149,7 +183,7 @@ ext2fs_mknod(v)
 		 * Want to be able to use this to make badblock
 		 * inodes, so don't truncate the dev number.
 		 */
-		ip->i_din.e2fs_din.e2di_rdev = h2fs32(vap->va_rdev);
+		ip->i_din.e2fs_din->e2di_rdev = h2fs32(vap->va_rdev);
 	}
 	/*
 	 * Remove inode so that it will be reloaded by VFS_VGET and
@@ -260,7 +294,7 @@ ext2fs_getattr(v)
 	vap->va_nlink = ip->i_e2fs_nlink;
 	vap->va_uid = ip->i_e2fs_uid;
 	vap->va_gid = ip->i_e2fs_gid;
-	vap->va_rdev = (dev_t)fs2h32(ip->i_din.e2fs_din.e2di_rdev);
+	vap->va_rdev = (dev_t)fs2h32(ip->i_din.e2fs_din->e2di_rdev);
 	vap->va_size = vp->v_size;
 	vap->va_atime.tv_sec = ip->i_e2fs_atime;
 	vap->va_atime.tv_nsec = 0;
@@ -402,6 +436,7 @@ ext2fs_setattr(v)
 			return (EROFS);
 		error = ext2fs_chmod(vp, (int)vap->va_mode, cred, p);
 	}
+	VN_KNOTE(vp, NOTE_ATTRIB);
 	return (error);
 }
 
@@ -461,7 +496,8 @@ ext2fs_chown(vp, uid, gid, cred, p)
 	 * the caller must be superuser or the call fails.
 	 */
 	if ((cred->cr_uid != ip->i_e2fs_uid || uid != ip->i_e2fs_uid ||
-		(gid != ip->i_e2fs_gid && !groupmember((gid_t)gid, cred))) &&
+		(gid != ip->i_e2fs_gid &&
+		 !(cred->cr_gid == gid || groupmember((gid_t)gid, cred)))) &&
 		(error = suser(cred, &p->p_acflag)))
 		return (error);
 	ogid = ip->i_e2fs_gid;
@@ -497,14 +533,16 @@ ext2fs_remove(v)
 		(ip->i_e2fs_flags & (EXT2_IMMUTABLE | EXT2_APPEND)) ||
 		(VTOI(dvp)->i_e2fs_flags & EXT2_APPEND)) {
 		error = EPERM;
-		goto out;
+	} else {
+		error = ext2fs_dirremove(dvp, ap->a_cnp);
+		if (error == 0) {
+			ip->i_e2fs_nlink--;
+			ip->i_flag |= IN_CHANGE;
+		}
 	}
-	error = ext2fs_dirremove(dvp, ap->a_cnp);
-	if (error == 0) {
-		ip->i_e2fs_nlink--;
-		ip->i_flag |= IN_CHANGE;
-	}
-out:
+
+	VN_KNOTE(vp, NOTE_DELETE);
+	VN_KNOTE(dvp, NOTE_WRITE);
 	if (dvp == vp)
 		vrele(vp);
 	else
@@ -574,6 +612,8 @@ out1:
 	if (dvp != vp)
 		VOP_UNLOCK(vp, 0);
 out2:
+	VN_KNOTE(vp, NOTE_LINK);
+	VN_KNOTE(dvp, NOTE_WRITE);
 	vput(dvp);
 	return (error);
 }
@@ -722,6 +762,7 @@ abortit:
 		oldparent = dp->i_number;
 		doingdirectory++;
 	}
+	VN_KNOTE(fdvp, NOTE_WRITE);		/* XXXLUKEM/XXX: right place? */
 	vrele(fdvp);
 
 	/*
@@ -812,6 +853,7 @@ abortit:
 			}
 			goto bad;
 		}
+		VN_KNOTE(tdvp, NOTE_WRITE);
 		vput(tdvp);
 	} else {
 		if (xp->i_dev != dp->i_dev || xp->i_dev != ip->i_dev)
@@ -866,6 +908,7 @@ abortit:
 			dp->i_e2fs_nlink--;
 			dp->i_flag |= IN_CHANGE;
 		}
+		VN_KNOTE(tdvp, NOTE_WRITE);
 		vput(tdvp);
 		/*
 		 * Adjust the link count of the target to
@@ -885,6 +928,7 @@ abortit:
 			    tcnp->cn_cred, tcnp->cn_proc);
 		}
 		xp->i_flag |= IN_CHANGE;
+		VN_KNOTE(tvp, NOTE_DELETE);
 		vput(tvp);
 		xp = NULL;
 	}
@@ -963,6 +1007,7 @@ abortit:
 		}
 		xp->i_flag &= ~IN_RENAME;
 	}
+	VN_KNOTE(fvp, NOTE_RENAME);
 	if (dp)
 		vput(fdvp);
 	if (xp)
@@ -1094,8 +1139,10 @@ bad:
 		ip->i_e2fs_nlink = 0;
 		ip->i_flag |= IN_CHANGE;
 		vput(tvp);
-	} else
+	} else {
+		VN_KNOTE(dvp, NOTE_WRITE | NOTE_LINK);
 		*ap->a_vpp = tvp;
+	}
 out:
 	PNBUF_PUT(cnp->cn_pnbuf);
 	vput(dvp);
@@ -1158,6 +1205,7 @@ ext2fs_rmdir(v)
 		goto out;
 	dp->i_e2fs_nlink--;
 	dp->i_flag |= IN_CHANGE;
+	VN_KNOTE(dvp, NOTE_WRITE | NOTE_LINK);
 	cache_purge(dvp);
 	vput(dvp);
 	dvp = NULL;
@@ -1177,6 +1225,7 @@ ext2fs_rmdir(v)
 	    cnp->cn_proc);
 	cache_purge(ITOV(ip));
 out:
+	VN_KNOTE(vp, NOTE_DELETE);
 	if (dvp)
 		vput(dvp);
 	vput(vp);
@@ -1205,11 +1254,12 @@ ext2fs_symlink(v)
 			      vpp, ap->a_cnp);
 	if (error)
 		return (error);
+	VN_KNOTE(ap->a_dvp, NOTE_WRITE);
 	vp = *vpp;
 	len = strlen(ap->a_target);
 	if (len < vp->v_mount->mnt_maxsymlinklen) {
 		ip = VTOI(vp);
-		memcpy((char *)ip->i_din.e2fs_din.e2di_shortlink, ap->a_target, len);
+		memcpy((char *)ip->i_din.e2fs_din->e2di_shortlink, ap->a_target, len);
 		ip->i_e2fs_size = len;
 		ip->i_flag |= IN_CHANGE | IN_UPDATE;
 	} else
@@ -1240,7 +1290,7 @@ ext2fs_readlink(v)
 	isize = ip->i_e2fs_size;
 	if (isize < vp->v_mount->mnt_maxsymlinklen ||
 	    (vp->v_mount->mnt_maxsymlinklen == 0 && ip->i_e2fs_nblock == 0)) {
-		uiomove((char *)ip->i_din.e2fs_din.e2di_shortlink, isize, ap->a_uio);
+		uiomove((char *)ip->i_din.e2fs_din->e2di_shortlink, isize, ap->a_uio);
 		return (0);
 	}
 	return (VOP_READ(vp, ap->a_uio, 0, ap->a_cred));
@@ -1286,7 +1336,7 @@ ext2fs_vinit(mntp, specops, fifoops, vpp)
 	case VBLK:
 		vp->v_op = specops;
 		if ((nvp = checkalias(vp,
-		    fs2h32(ip->i_din.e2fs_din.e2di_rdev), mntp)) != NULL) {
+		    fs2h32(ip->i_din.e2fs_din->e2di_rdev), mntp)) != NULL) {
 			/*
 			 * Discard unneeded vnode, but save its inode.
 			 */
@@ -1385,11 +1435,12 @@ bad:
 	 * Write error occurred trying to update the inode
 	 * or the directory so must deallocate the inode.
 	 */
-	PNBUF_PUT(cnp->cn_pnbuf);
-	vput(dvp);
+	tvp->v_type = VNON;	/* Stop explosion if VBLK */
 	ip->i_e2fs_nlink = 0;
 	ip->i_flag |= IN_CHANGE;
 	vput(tvp);
+	PNBUF_PUT(cnp->cn_pnbuf);
+	vput(dvp);
 	return (error);
 }
 
@@ -1422,6 +1473,9 @@ ext2fs_reclaim(v)
 		ip->i_devvp = 0;
 	}
 
+	if (ip->i_din.e2fs_din != NULL)
+		pool_put(&ext2fs_dinode_pool, ip->i_din.e2fs_din);
+
 	pool_put(&ext2fs_inode_pool, vp->v_data);
 	vp->v_data = NULL;
 	return (0);
@@ -1445,6 +1499,7 @@ const struct vnodeopv_entry_desc ext2fs_vnodeop_entries[] = {
 	{ &vop_ioctl_desc, ufs_ioctl },			/* ioctl */
 	{ &vop_fcntl_desc, ufs_fcntl },			/* fcntl */
 	{ &vop_poll_desc, ufs_poll },			/* poll */
+	{ &vop_kqfilter_desc, genfs_kqfilter },		/* kqfilter */
 	{ &vop_revoke_desc, ufs_revoke },		/* revoke */
 	{ &vop_mmap_desc, ufs_mmap },			/* mmap */
 	{ &vop_fsync_desc, ext2fs_fsync },		/* fsync */
@@ -1498,6 +1553,7 @@ const struct vnodeopv_entry_desc ext2fs_specop_entries[] = {
 	{ &vop_ioctl_desc, spec_ioctl },		/* ioctl */
 	{ &vop_fcntl_desc, ufs_fcntl },			/* fcntl */
 	{ &vop_poll_desc, spec_poll },			/* poll */
+	{ &vop_kqfilter_desc, spec_kqfilter },		/* kqfilter */
 	{ &vop_revoke_desc, spec_revoke },		/* revoke */
 	{ &vop_mmap_desc, spec_mmap },			/* mmap */
 	{ &vop_fsync_desc, ext2fs_fsync },		/* fsync */
@@ -1551,6 +1607,7 @@ const struct vnodeopv_entry_desc ext2fs_fifoop_entries[] = {
 	{ &vop_ioctl_desc, fifo_ioctl },		/* ioctl */
 	{ &vop_fcntl_desc, ufs_fcntl },			/* fcntl */
 	{ &vop_poll_desc, fifo_poll },			/* poll */
+	{ &vop_kqfilter_desc, fifo_kqfilter },		/* kqfilter */
 	{ &vop_revoke_desc, fifo_revoke },		/* revoke */
 	{ &vop_mmap_desc, fifo_mmap },			/* mmap */
 	{ &vop_fsync_desc, ext2fs_fsync },		/* fsync */

@@ -1,4 +1,4 @@
-/*	$NetBSD: tc.c,v 1.29 2001/11/13 06:26:10 lukem Exp $	*/
+/*	$NetBSD: tc.c,v 1.36 2003/09/26 17:17:47 tsutsui Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tc.c,v 1.29 2001/11/13 06:26:10 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tc.c,v 1.36 2003/09/26 17:17:47 tsutsui Exp $");
 
 #include "opt_tcverbose.h"
 
@@ -45,9 +45,9 @@ __KERNEL_RCSID(0, "$NetBSD: tc.c,v 1.29 2001/11/13 06:26:10 lukem Exp $");
 int	tcmatch __P((struct device *, struct cfdata *, void *));
 void	tcattach __P((struct device *, struct device *, void *));
 
-struct cfattach tc_ca = {
-	sizeof(struct tc_softc), tcmatch, tcattach
-};
+CFATTACH_DECL(tc, sizeof(struct tc_softc),
+    tcmatch, tcattach, NULL, NULL);
+
 extern struct cfdriver tc_cd;
 
 int	tcprint __P((void *, const char *));
@@ -63,7 +63,7 @@ tcmatch(parent, cf, aux)
 {
 	struct tcbus_attach_args *tba = aux;
 
-	if (strcmp(tba->tba_busname, cf->cf_driver->cd_name))
+	if (strcmp(tba->tba_busname, cf->cf_name))
 		return (0);
 
 	return (1);
@@ -191,10 +191,9 @@ tcprint(aux, pnp)
 
 	if (pnp) {
 		tc_devinfo(ta->ta_modname, devinfo);
-		printf("%s at %s", devinfo, pnp);
+		aprint_normal("%s at %s", devinfo, pnp);
 	}
-	printf(" slot %d offset 0x%lx", ta->ta_slot,
-	    (long)ta->ta_offset);
+	aprint_normal(" slot %d offset 0x%x", ta->ta_slot, ta->ta_offset);
 	return (UNCONF);
 }
 
@@ -213,7 +212,7 @@ tcsubmatch(parent, cf, aux)
 	    (cf->tccf_offset != d->ta_offset))
 		return 0;
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 

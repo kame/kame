@@ -1,4 +1,4 @@
-/*	$NetBSD: irframe.c,v 1.16 2002/01/12 16:59:17 tsutsui Exp $	*/
+/*	$NetBSD: irframe.c,v 1.28 2003/10/21 06:22:46 simonb Exp $	*/
 
 /*
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: irframe.c,v 1.28 2003/10/21 06:22:46 simonb Exp $");
+
 #include "irframe.h"
 
 #include <sys/param.h>
@@ -62,7 +65,18 @@ int irframedebug = 0;
 #define Static static
 #endif
 
-cdev_decl(irframe);
+dev_type_open(irframeopen);
+dev_type_close(irframeclose);
+dev_type_read(irframeread);
+dev_type_write(irframewrite);
+dev_type_ioctl(irframeioctl);
+dev_type_poll(irframepoll);
+dev_type_kqfilter(irframekqfilter);
+
+const struct cdevsw irframe_cdevsw = {
+	irframeopen, irframeclose, irframeread, irframewrite, irframeioctl,
+	nostop, notty, irframepoll, nommap, irframekqfilter,
+};
 
 int irframe_match(struct device *parent, struct cfdata *match, void *aux);
 void irframe_attach(struct device *parent, struct device *self, void *aux);
@@ -74,17 +88,12 @@ Static int irf_reset_params(struct irframe_softc *sc);
 
 #if NIRFRAME == 0
 /* In case we just have tty attachment. */
-struct cfdriver irframe_cd = {
-	NULL, "irframe", DV_DULL
-};
+CFDRIVER_DECL(irframe, DV_DULL, NULL);
 #endif
 
-struct cfattach irframe_ca = {
-	sizeof(struct irframe_softc), irframe_match, irframe_attach,
-	irframe_detach, irframe_activate
-};
+CFATTACH_DECL(irframe, sizeof(struct irframe_softc),
+    irframe_match, irframe_attach, irframe_detach, irframe_activate);
 
-extern struct cfattach irframe_ca;
 extern struct cfdriver irframe_cd;
 
 #define IRFRAMEUNIT(dev) (minor(dev))
@@ -112,10 +121,11 @@ irframe_attach(struct device *parent, struct device *self, void *aux)
 	if (sc->sc_methods->im_read == NULL ||
 	    sc->sc_methods->im_write == NULL ||
 	    sc->sc_methods->im_poll == NULL ||
+	    sc->sc_methods->im_kqfilter == NULL ||
 	    sc->sc_methods->im_set_params == NULL ||
 	    sc->sc_methods->im_get_speeds == NULL ||
 	    sc->sc_methods->im_get_turnarounds == NULL)
-		panic("%s: missing methods\n", sc->sc_dev.dv_xname);
+		panic("%s: missing methods", sc->sc_dev.dv_xname);
 #endif
 
 	(void)sc->sc_methods->im_get_speeds(sc->sc_handle, &speeds);
@@ -148,7 +158,6 @@ irframe_activate(struct device *self, enum devact act)
 	switch (act) {
 	case DVACT_ACTIVATE:
 		return (EOPNOTSUPP);
-		break;
 
 	case DVACT_DEACTIVATE:
 		break;
@@ -165,9 +174,7 @@ irframe_detach(struct device *self, int flags)
 	/* XXX needs reference count */
 
 	/* locate the major number */
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == irframeopen)
-			break;
+	maj = cdevsw_lookup_major(&irframe_cdevsw);
 
 	/* Nuke the vnodes for any open instances (calls close). */
 	mn = self->dv_unit;
@@ -231,8 +238,8 @@ irframeread(dev_t dev, struct uio *uio, int flag)
 		return (EIO);
 	if (uio->uio_resid < sc->sc_params.maxsize) {
 #ifdef DIAGNOSTIC
-		printf("irframeread: short read %d < %d\n", uio->uio_resid,
-		       sc->sc_params.maxsize);
+		printf("irframeread: short read %ld < %d\n",
+		       (long)uio->uio_resid, sc->sc_params.maxsize);
 #endif
 		return (EINVAL);
 	}
@@ -251,8 +258,8 @@ irframewrite(dev_t dev, struct uio *uio, int flag)
 		return (EIO);
 	if (uio->uio_resid > sc->sc_params.maxsize) {
 #ifdef DIAGNOSTIC
-		printf("irframeread: long write %d > %d\n", uio->uio_resid,
-		       sc->sc_params.maxsize);
+		printf("irframeread: long write %ld > %d\n",
+		       (long)uio->uio_resid, sc->sc_params.maxsize);
 #endif
 		return (EINVAL);
 	}
@@ -386,6 +393,19 @@ irframepoll(dev_t dev, int events, struct proc *p)
 	return (sc->sc_methods->im_poll(sc->sc_handle, events, p));
 }
 
+int
+irframekqfilter(dev_t dev, struct knote *kn)
+{
+	struct irframe_softc *sc;
+
+	sc = device_lookup(&irframe_cd, IRFRAMEUNIT(dev));
+	if ((sc->sc_dev.dv_flags & DVF_ACTIVE) == 0 || !sc->sc_open)
+		return (1);
+
+	return (sc->sc_methods->im_kqfilter(sc->sc_handle, kn));
+}
+
+
 /*********/
 
 
@@ -429,5 +449,5 @@ irframe_dealloc(struct device *dev)
 			return;
 		}
 	}
-	panic("irframe_dealloc: device not found\n");
+	panic("irframe_dealloc: device not found");
 }

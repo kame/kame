@@ -1,4 +1,4 @@
-/*	$NetBSD: iq80310_7seg.c,v 1.6 2002/04/12 20:50:26 thorpej Exp $	*/
+/*	$NetBSD: iq80310_7seg.c,v 1.8 2003/07/15 00:25:02 lukem Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002 Wasabi Systems, Inc.
@@ -39,6 +39,9 @@
  * Support for the 7-segment display on the Intel IQ80310.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: iq80310_7seg.c,v 1.8 2003/07/15 00:25:02 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 
@@ -49,6 +52,32 @@
 #include <evbarm/iq80310/obiovar.h>
 
 static int snakestate;
+
+/*
+ * The 7-segment display looks like so:
+ *
+ *         A
+ *	+-----+
+ *	|     |
+ *    F	|     | B
+ *	|  G  |
+ *	+-----+
+ *	|     |
+ *    E	|     | C
+ *	|  D  |
+ *	+-----+ o  DP
+ *
+ * Setting a bit clears the corresponding segment on the
+ * display.
+ */
+#define	SEG_A			(1 << 0)
+#define	SEG_B			(1 << 1)
+#define	SEG_C			(1 << 2)
+#define	SEG_D			(1 << 3)
+#define	SEG_E			(1 << 4)
+#define	SEG_F			(1 << 5)
+#define	SEG_G			(1 << 6)
+#define	SEG_DP			(1 << 7)
 
 static const uint8_t digitmap[] = {
 /*	+#####+

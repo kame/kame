@@ -1,4 +1,4 @@
-/*	$NetBSD: dirent.h,v 1.14 1998/05/05 21:53:38 kleink Exp $	*/
+/*	$NetBSD: dirent.h,v 1.17 2003/08/07 16:34:01 agc Exp $	*/
 
 /*-
  * Copyright (c) 1989, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -64,7 +60,7 @@ struct dirent {
 #endif
 };
 
-#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 /*
  * File types
  */
@@ -83,9 +79,7 @@ struct dirent {
  */
 #define	IFTODT(mode)	(((mode) & 0170000) >> 12)
 #define	DTTOIF(dirtype)	((dirtype) << 12)
-#endif /* !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE) */
 
-#ifdef _KERNEL
 /*
  * The DIRENT_SIZE macro gives the minimum record length which will hold
  * the directory entry.  This requires the amount of space in struct dirent
@@ -95,6 +89,6 @@ struct dirent {
 #define	DIRENT_SIZE(dp) \
     ((sizeof (struct dirent) - (MAXNAMLEN+1)) + (((dp)->d_namlen+1 + 3) &~ 3))
 
-#endif	/* !_KERNEL */
+#endif /* defined(_NETBSD_SOURCE) */
 
 #endif	/* !_SYS_DIRENT_H_ */

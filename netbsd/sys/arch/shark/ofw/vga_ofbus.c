@@ -1,4 +1,4 @@
-/* $NetBSD: vga_ofbus.c,v 1.1 2002/02/10 07:07:07 thorpej Exp $ */
+/* $NetBSD: vga_ofbus.c,v 1.5 2003/07/15 03:36:02 lukem Exp $ */
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -26,6 +26,9 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vga_ofbus.c,v 1.5 2003/07/15 03:36:02 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -57,9 +60,8 @@ struct vga_ofbus_softc {
 int	vga_ofbus_match (struct device *, struct cfdata *, void *);
 void	vga_ofbus_attach (struct device *, struct device *, void *);
 
-struct cfattach vga_ofbus_ca = {
-	sizeof(struct vga_ofbus_softc), vga_ofbus_match, vga_ofbus_attach,
-};
+CFATTACH_DECL(vga_ofbus, sizeof(struct vga_ofbus_softc),
+    vga_ofbus_match, vga_ofbus_attach, NULL, NULL);
 
 static const char *compat_strings[] = { "pnpPNP,900", 0 };
 

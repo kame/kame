@@ -1,4 +1,4 @@
-/*	$NetBSD: disksubr.c,v 1.23 2002/03/05 09:40:40 simonb Exp $	*/
+/*	$NetBSD: disksubr.c,v 1.27 2004/02/13 11:36:15 wiz Exp $	*/
 
 /*
  * Copyright (c) 1995 Dale Rahn.
@@ -29,6 +29,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: disksubr.c,v 1.27 2004/02/13 11:36:15 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -67,7 +70,7 @@ static void printclp __P((struct cpu_disklabel *clp, char *str));
  * (e.g., sector size) must be filled in before calling us.
  * Returns null on success and an error string on failure.
  */
-char *
+const char *
 readdisklabel(dev, strat, lp, clp)
 	dev_t dev;
 	void (*strat)(struct buf *);
@@ -225,7 +228,7 @@ writedisklabel(dev, strat, lp, clp)
 
 #ifdef DEBUG
 	if (disksubr_debug > 0) {
-		printclp(clp, "writedisklabel: cpu label");
+		printclp(clp, "writedisklabel:cpu label");
 	}
 #endif
 
@@ -253,11 +256,12 @@ writedisklabel(dev, strat, lp, clp)
 
 
 int
-bounds_check_with_label(bp, lp, wlabel)
+bounds_check_with_label(dk, bp, wlabel)
+	struct disk *dk;
 	struct buf *bp;
-	struct disklabel *lp;
 	int wlabel;
 {
+	struct disklabel *lp = dk->dk_label;
 	struct partition *p = lp->d_partitions + DISKPART(bp->b_dev);
 	int maxsz = p->p_size;
 	int sz = (bp->b_bcount + DEV_BSIZE - 1) >> DEV_BSHIFT;

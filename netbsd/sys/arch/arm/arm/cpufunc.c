@@ -1,4 +1,4 @@
-/*	$NetBSD: cpufunc.c,v 1.44.4.5 2002/12/07 19:40:24 he Exp $	*/
+/*	$NetBSD: cpufunc.c,v 1.66 2004/01/26 15:54:16 rearnsha Exp $	*/
 
 /*
  * arm7tdmi support code Copyright (c) 2001 John Fremlin
@@ -45,11 +45,16 @@
  * Created      : 30/01/97
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cpufunc.c,v 1.66 2004/01/26 15:54:16 rearnsha Exp $");
+
 #include "opt_compat_netbsd.h"
 #include "opt_cpuoptions.h"
+#include "opt_perfctrs.h"
 
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/pmc.h>
 #include <sys/systm.h>
 #include <machine/cpu.h>
 #include <machine/bootconfig.h>
@@ -70,8 +75,17 @@
 #include <arm/xscale/i80321var.h>
 #endif
 
+#ifdef CPU_XSCALE_IXP425
+#include <arm/xscale/ixp425reg.h>
+#include <arm/xscale/ixp425var.h>
+#endif
+
 #if defined(CPU_XSCALE_80200) || defined(CPU_XSCALE_80321)
 #include <arm/xscale/xscalereg.h>
+#endif
+
+#if defined(PERFCTRS)
+struct arm_pmc_funcs *arm_pmc;
 #endif
 
 /* PRIMARY CACHE VARIABLES */
@@ -88,6 +102,9 @@ int	arm_pcache_unified;
 
 int	arm_dcache_align;
 int	arm_dcache_align_mask;
+
+/* 1 == use cpu_sleep(), 0 == don't */
+int cpu_do_powersave;
 
 #ifdef CPU_ARM3
 struct cpu_functions arm3_cpufuncs = {
@@ -408,17 +425,16 @@ struct cpu_functions arm9_cpufuncs = {
 
 	/* Cache operations */
 
-	arm9_cache_syncI,		/* icache_sync_all	*/
-	arm9_cache_syncI_rng,		/* icache_sync_range	*/
+	arm9_icache_sync_all,		/* icache_sync_all	*/
+	arm9_icache_sync_range,		/* icache_sync_range	*/
 
-		/* ...cache in write-though mode... */
-	arm9_cache_flushD,		/* dcache_wbinv_all	*/
-	arm9_cache_flushD_rng,		/* dcache_wbinv_range	*/
-	arm9_cache_flushD_rng,		/* dcache_inv_range	*/
-	(void *)cpufunc_nullop,		/* dcache_wb_range	*/
+	arm9_dcache_wbinv_all,		/* dcache_wbinv_all	*/
+	arm9_dcache_wbinv_range,	/* dcache_wbinv_range	*/
+/*XXX*/	arm9_dcache_wbinv_range,	/* dcache_inv_range	*/
+	arm9_dcache_wb_range,		/* dcache_wb_range	*/
 
-	arm9_cache_flushID,		/* idcache_wbinv_all	*/
-	arm9_cache_flushID_rng,		/* idcache_wbinv_range	*/
+	arm9_idcache_wbinv_all,		/* idcache_wbinv_all	*/
+	arm9_idcache_wbinv_range,	/* idcache_wbinv_range	*/
 
 	/* Other functions */
 
@@ -440,6 +456,64 @@ struct cpu_functions arm9_cpufuncs = {
 
 };
 #endif /* CPU_ARM9 */
+
+#ifdef CPU_ARM10
+struct cpu_functions arm10_cpufuncs = {
+	/* CPU functions */
+
+	cpufunc_id,			/* id			*/
+	cpufunc_nullop,			/* cpwait		*/
+
+	/* MMU functions */
+
+	cpufunc_control,		/* control		*/
+	cpufunc_domains,		/* Domain		*/
+	arm10_setttb,			/* Setttb		*/
+	cpufunc_faultstatus,		/* Faultstatus		*/
+	cpufunc_faultaddress,		/* Faultaddress		*/
+
+	/* TLB functions */
+
+	armv4_tlb_flushID,		/* tlb_flushID		*/
+	arm10_tlb_flushID_SE,		/* tlb_flushID_SE	*/
+	armv4_tlb_flushI,		/* tlb_flushI		*/
+	arm10_tlb_flushI_SE,		/* tlb_flushI_SE	*/
+	armv4_tlb_flushD,		/* tlb_flushD		*/
+	armv4_tlb_flushD_SE,		/* tlb_flushD_SE	*/
+
+	/* Cache operations */
+
+	arm10_icache_sync_all,		/* icache_sync_all	*/
+	arm10_icache_sync_range,	/* icache_sync_range	*/
+
+	arm10_dcache_wbinv_all,		/* dcache_wbinv_all	*/
+	arm10_dcache_wbinv_range,	/* dcache_wbinv_range	*/
+/*XXX*/	arm10_dcache_wbinv_range,	/* dcache_inv_range	*/
+	arm10_dcache_wb_range,		/* dcache_wb_range	*/
+
+	arm10_idcache_wbinv_all,	/* idcache_wbinv_all	*/
+	arm10_idcache_wbinv_range,	/* idcache_wbinv_range	*/
+
+	/* Other functions */
+
+	cpufunc_nullop,			/* flush_prefetchbuf	*/
+	armv4_drain_writebuf,		/* drain_writebuf	*/
+	cpufunc_nullop,			/* flush_brnchtgt_C	*/
+	(void *)cpufunc_nullop,		/* flush_brnchtgt_E	*/
+
+	(void *)cpufunc_nullop,		/* sleep		*/
+
+	/* Soft functions */
+
+	cpufunc_null_fixup,		/* dataabt_fixup	*/
+	cpufunc_null_fixup,		/* prefetchabt_fixup	*/
+
+	arm10_context_switch,		/* context_switch	*/
+
+	arm10_setup			/* cpu setup		*/
+
+};
+#endif /* CPU_ARM10 */
 
 #ifdef CPU_SA110
 struct cpu_functions sa110_cpufuncs = {
@@ -555,8 +629,65 @@ struct cpu_functions sa11x0_cpufuncs = {
 };          
 #endif	/* CPU_SA1100 || CPU_SA1110 */
 
+#ifdef CPU_IXP12X0
+struct cpu_functions ixp12x0_cpufuncs = {
+	/* CPU functions */
+	
+	cpufunc_id,			/* id			*/
+	cpufunc_nullop,			/* cpwait		*/
+
+	/* MMU functions */
+
+	cpufunc_control,		/* control		*/
+	cpufunc_domains,		/* domain		*/
+	sa1_setttb,			/* setttb		*/
+	cpufunc_faultstatus,		/* faultstatus		*/
+	cpufunc_faultaddress,		/* faultaddress		*/
+
+	/* TLB functions */
+
+	armv4_tlb_flushID,		/* tlb_flushID		*/
+	sa1_tlb_flushID_SE,		/* tlb_flushID_SE	*/
+	armv4_tlb_flushI,		/* tlb_flushI		*/
+	(void *)armv4_tlb_flushI,	/* tlb_flushI_SE	*/
+	armv4_tlb_flushD,		/* tlb_flushD		*/
+	armv4_tlb_flushD_SE,		/* tlb_flushD_SE	*/
+
+	/* Cache operations */
+
+	sa1_cache_syncI,		/* icache_sync_all	*/
+	sa1_cache_syncI_rng,		/* icache_sync_range	*/
+
+	sa1_cache_purgeD,		/* dcache_wbinv_all	*/
+	sa1_cache_purgeD_rng,		/* dcache_wbinv_range	*/
+/*XXX*/	sa1_cache_purgeD_rng,		/* dcache_inv_range	*/
+	sa1_cache_cleanD_rng,		/* dcache_wb_range	*/
+
+	sa1_cache_purgeID,		/* idcache_wbinv_all	*/
+	sa1_cache_purgeID_rng,		/* idcache_wbinv_range	*/
+
+	/* Other functions */
+
+	ixp12x0_drain_readbuf,			/* flush_prefetchbuf	*/
+	armv4_drain_writebuf,		/* drain_writebuf	*/
+	cpufunc_nullop,			/* flush_brnchtgt_C	*/
+	(void *)cpufunc_nullop,		/* flush_brnchtgt_E	*/
+
+	(void *)cpufunc_nullop,		/* sleep		*/
+
+	/* Soft functions */
+
+	cpufunc_null_fixup,		/* dataabt_fixup	*/
+	cpufunc_null_fixup,		/* prefetchabt_fixup	*/
+
+	ixp12x0_context_switch,		/* context_switch	*/
+
+	ixp12x0_setup			/* cpu setup		*/
+};          
+#endif	/* CPU_IXP12X0 */
+
 #if defined(CPU_XSCALE_80200) || defined(CPU_XSCALE_80321) || \
-    defined(CPU_XSCALE_PXA2X0)
+    defined(CPU_XSCALE_PXA2X0) || defined(CPU_XSCALE_IXP425)
 struct cpu_functions xscale_cpufuncs = {
 	/* CPU functions */
 	
@@ -611,7 +742,8 @@ struct cpu_functions xscale_cpufuncs = {
 
 	xscale_setup			/* cpu setup		*/
 };
-#endif /* CPU_XSCALE_80200 || CPU_XSCALE_80321 || CPU_XSCALE_PXA2X0 */
+#endif
+/* CPU_XSCALE_80200 || CPU_XSCALE_80321 || CPU_XSCALE_PXA2X0 || CPU_XSCALE_IXP425 */
 
 /*
  * Global constants also used by locore.s
@@ -622,9 +754,16 @@ u_int cputype;
 u_int cpu_reset_needs_v4_MMU_disable;	/* flag used in locore.s */
 
 #if defined(CPU_ARM7TDMI) || defined(CPU_ARM8) || defined(CPU_ARM9) || \
+    defined (CPU_ARM10) || \
     defined(CPU_XSCALE_80200) || defined(CPU_XSCALE_80321) || \
-    defined(CPU_XSCALE_PXA2X0)
+    defined(CPU_XSCALE_PXA2X0) || defined(CPU_XSCALE_IXP425)
 static void get_cachetype_cp15 __P((void));
+
+/* Additional cache information local to this file.  Log2 of some of the
+   above numbers.  */
+static int	arm_dcache_l2_nsets;
+static int	arm_dcache_l2_assoc;
+static int	arm_dcache_l2_linesize;
 
 static void
 get_cachetype_cp15()
@@ -677,7 +816,7 @@ get_cachetype_cp15()
 		if (dsize & CPU_CT_xSIZE_M)
 			arm_pdcache_line_size = 0; /* not present */
 		else
-			arm_pdcache_ways = 0;
+			arm_pdcache_ways = 1;
 	} else {
 		arm_pdcache_ways = multiplier <<
 		    (CPU_CT_xSIZE_ASSOC(dsize) - 1);
@@ -686,6 +825,11 @@ get_cachetype_cp15()
 
 	arm_dcache_align = arm_pdcache_line_size;
 
+	arm_dcache_l2_assoc = CPU_CT_xSIZE_ASSOC(dsize) + multiplier - 2;
+	arm_dcache_l2_linesize = CPU_CT_xSIZE_LEN(dsize) + 3;
+	arm_dcache_l2_nsets = 6 + CPU_CT_xSIZE_SIZE(dsize) -
+	    CPU_CT_xSIZE_ASSOC(dsize) - CPU_CT_xSIZE_LEN(dsize);
+
  out:
 	arm_dcache_align_mask = arm_dcache_align - 1;
 }
@@ -693,7 +837,7 @@ get_cachetype_cp15()
 
 #if defined(CPU_ARM2) || defined(CPU_ARM250) || defined(CPU_ARM3) || \
     defined(CPU_ARM6) || defined(CPU_ARM7) || defined(CPU_SA110) || \
-    defined(CPU_SA1100) || defined(CPU_SA1110)
+    defined(CPU_SA1100) || defined(CPU_SA1110) || defined(CPU_IXP12X0)
 /* Cache information for CPUs without cache type registers. */
 struct cachetab {
 	u_int32_t ct_cpuid;
@@ -721,6 +865,7 @@ struct cachetab cachetab[] = {
     { CPU_ID_SA110,	CPU_CT_CTYPE_WB1, 0, 16384, 32, 32, 16384, 32, 32 },
     { CPU_ID_SA1100,	CPU_CT_CTYPE_WB1, 0,  8192, 32, 32, 16384, 32, 32 },
     { CPU_ID_SA1110,	CPU_CT_CTYPE_WB1, 0,  8192, 32, 32, 16384, 32, 32 },
+    { CPU_ID_IXP1200,	CPU_CT_CTYPE_WB1, 0, 16384, 32, 32, 16384, 32, 32 }, /* XXX */
     { 0, 0, 0, 0, 0, 0, 0, 0}
 };
 
@@ -751,7 +896,7 @@ get_cachetype_table()
 	arm_dcache_align_mask = arm_dcache_align - 1;
 }
 
-#endif /* ARM2 || ARM250 || ARM3 || ARM6 || ARM7 || SA110 || SA1100 || SA1111 */
+#endif /* ARM2 || ARM250 || ARM3 || ARM6 || ARM7 || SA110 || SA1100 || SA1111 || IXP12X0 */
 
 /*
  * Cannot panic here as we may not have a console yet ...
@@ -763,6 +908,10 @@ set_cpufuncs()
 	cputype = cpufunc_id();
 	cputype &= CPU_ID_CPU_MASK;
 
+	/*
+	 * NOTE: cpu_do_powersave defaults to off.  If we encounter a
+	 * CPU type where we want to use it by default, then we set it.
+	 */
 
 #ifdef CPU_ARM3
 	if ((cputype & CPU_ID_IMPLEMENTOR_MASK) == CPU_ID_ARM_LTD &&
@@ -811,25 +960,53 @@ set_cpufuncs()
 		cpufuncs = arm8_cpufuncs;
 		cpu_reset_needs_v4_MMU_disable = 0;	/* XXX correct? */
 		get_cachetype_cp15();
-		pmap_pte_init_generic();
+		pmap_pte_init_arm8();
 		return 0;
 	}
 #endif	/* CPU_ARM8 */
 #ifdef CPU_ARM9
-	if (cputype == CPU_ID_ARM920T) {
+	if (((cputype & CPU_ID_IMPLEMENTOR_MASK) == CPU_ID_ARM_LTD ||
+	     (cputype & CPU_ID_IMPLEMENTOR_MASK) == CPU_ID_TI) &&
+	    (cputype & 0x0000f000) == 0x00009000) {
 		cpufuncs = arm9_cpufuncs;
 		cpu_reset_needs_v4_MMU_disable = 1;	/* V4 or higher */
 		get_cachetype_cp15();
-		pmap_pte_init_arm9();
+		arm9_dcache_sets_inc = 1U << arm_dcache_l2_linesize;
+		arm9_dcache_sets_max = 
+		    (1U << (arm_dcache_l2_linesize + arm_dcache_l2_nsets)) -
+		    arm9_dcache_sets_inc;
+		arm9_dcache_index_inc = 1U << (32 - arm_dcache_l2_assoc);
+		arm9_dcache_index_max = 0U - arm9_dcache_index_inc;
+		pmap_pte_init_generic();
 		return 0;
 	}
 #endif /* CPU_ARM9 */
+#ifdef CPU_ARM10
+	if (/* cputype == CPU_ID_ARM1020T || */
+	    cputype == CPU_ID_ARM1020E) {
+		/*
+		 * Select write-through cacheing (this isn't really an
+		 * option on ARM1020T).
+		 */
+		cpufuncs = arm10_cpufuncs;
+		cpu_reset_needs_v4_MMU_disable = 1;	/* V4 or higher */
+		get_cachetype_cp15();
+		arm10_dcache_sets_inc = 1U << arm_dcache_l2_linesize;
+		arm10_dcache_sets_max = 
+		    (1U << (arm_dcache_l2_linesize + arm_dcache_l2_nsets)) -
+		    arm10_dcache_sets_inc;
+		arm10_dcache_index_inc = 1U << (32 - arm_dcache_l2_assoc);
+		arm10_dcache_index_max = 0U - arm10_dcache_index_inc;
+		pmap_pte_init_generic();
+		return 0;
+	}
+#endif /* CPU_ARM10 */
 #ifdef CPU_SA110
 	if (cputype == CPU_ID_SA110) {
 		cpufuncs = sa110_cpufuncs;
 		cpu_reset_needs_v4_MMU_disable = 1;	/* SA needs it */
 		get_cachetype_table();
-		pmap_pte_init_generic();
+		pmap_pte_init_sa1();
 		return 0;
 	}
 #endif	/* CPU_SA110 */
@@ -838,7 +1015,11 @@ set_cpufuncs()
 		cpufuncs = sa11x0_cpufuncs;
 		cpu_reset_needs_v4_MMU_disable = 1;	/* SA needs it	*/
 		get_cachetype_table();
-		pmap_pte_init_generic();
+		pmap_pte_init_sa1();
+
+		/* Use powersave on this CPU. */
+		cpu_do_powersave = 1;
+
 		return 0;
 	}
 #endif	/* CPU_SA1100 */
@@ -847,10 +1028,23 @@ set_cpufuncs()
 		cpufuncs = sa11x0_cpufuncs;
 		cpu_reset_needs_v4_MMU_disable = 1;	/* SA needs it	*/
 		get_cachetype_table();
-		pmap_pte_init_generic();
+		pmap_pte_init_sa1();
+
+		/* Use powersave on this CPU. */
+		cpu_do_powersave = 1;
+
 		return 0;
 	}
 #endif	/* CPU_SA1110 */
+#ifdef CPU_IXP12X0
+        if (cputype == CPU_ID_IXP1200) {
+                cpufuncs = ixp12x0_cpufuncs;
+                cpu_reset_needs_v4_MMU_disable = 1;
+                get_cachetype_table();
+                pmap_pte_init_sa1();
+                return 0;
+        }
+#endif  /* CPU_IXP12X0 */
 #ifdef CPU_XSCALE_80200
 	if (cputype == CPU_ID_80200) {
 		int rev = cpufunc_id() & CPU_ID_REVISION_MASK;
@@ -888,6 +1082,9 @@ set_cpufuncs()
 			: "r" (BCUCTL_E0|BCUCTL_E1|BCUCTL_EV));
 
 		cpufuncs = xscale_cpufuncs;
+#if defined(PERFCTRS)
+		xscale_pmu_init();
+#endif
 
 		/*
 		 * i80200 errata: Step-A0 and A1 have a bug where
@@ -923,6 +1120,9 @@ set_cpufuncs()
 			       PMNC_CC_IF));
 
 		cpufuncs = xscale_cpufuncs;
+#if defined(PERFCTRS)
+		xscale_pmu_init();
+#endif
 
 		cpu_reset_needs_v4_MMU_disable = 1;	/* XScale needs it */
 		get_cachetype_cp15();
@@ -931,15 +1131,42 @@ set_cpufuncs()
 	}
 #endif /* CPU_XSCALE_80321 */
 #ifdef CPU_XSCALE_PXA2X0
-	if (cputype == CPU_ID_PXA250 || cputype == CPU_ID_PXA210) {
+	/* ignore core revision to test PXA2xx CPUs */
+	if ((cputype & ~CPU_ID_XSCALE_COREREV_MASK) == CPU_ID_PXA250 ||
+	    (cputype & ~CPU_ID_XSCALE_COREREV_MASK) == CPU_ID_PXA210) {
+
 		cpufuncs = xscale_cpufuncs;
+#if defined(PERFCTRS)
+		xscale_pmu_init();
+#endif
 
 		cpu_reset_needs_v4_MMU_disable = 1;	/* XScale needs it */
 		get_cachetype_cp15();
 		pmap_pte_init_xscale();
+
+		/* Use powersave on this CPU. */
+		cpu_do_powersave = 1;
+
 		return 0;
 	}
 #endif /* CPU_XSCALE_PXA2X0 */
+#ifdef CPU_XSCALE_IXP425
+	if (cputype == CPU_ID_IXP425_533 || cputype == CPU_ID_IXP425_400 ||
+            cputype == CPU_ID_IXP425_266) {
+		ixp425_icu_init();
+
+		cpufuncs = xscale_cpufuncs;
+#if defined(PERFCTRS)
+		xscale_pmu_init();
+#endif
+
+		cpu_reset_needs_v4_MMU_disable = 1;	/* XScale needs it */
+		get_cachetype_cp15();
+		pmap_pte_init_xscale();
+
+		return 0;
+	}
+#endif /* CPU_XSCALE_IXP425 */
 	/*
 	 * Bzzzz. And the answer was ...
 	 */
@@ -1311,7 +1538,7 @@ late_abort_fixup(arg)
 	defined(CPU_ARM8) || defined (CPU_ARM9) || defined(CPU_SA110) || \
 	defined(CPU_SA1100) || defined(CPU_SA1110) || \
 	defined(CPU_XSCALE_80200) || defined(CPU_XSCALE_80321) || \
-	defined(CPU_XSCALE_PXA2X0)
+	defined(CPU_XSCALE_PXA2X0) || defined(CPU_XSCALE_IXP425)
 
 #define IGN	0
 #define OR	1
@@ -1333,6 +1560,9 @@ parse_cpu_options(args, optlist, cpuctrl)
 	u_int cpuctrl; 
 {
 	int integer;
+
+	if (args == NULL)
+		return(cpuctrl);
 
 	while (optlist->co_name) {
 		if (get_bootconf_option(args, optlist->co_name,
@@ -1400,6 +1630,10 @@ arm6_setup(args)
 	cpuctrl |= CPU_CONTROL_LABT_ENABLE;
 #endif	/* ARM6_LATE_ABORT */
 
+#ifndef ARM32_DISABLE_ALIGNMENT_FAULTS
+	cpuctrl |= CPU_CONTROL_AFLT_ENABLE;
+#endif
+
 	cpuctrl = parse_cpu_options(args, arm678_options, cpuctrl);
 	cpuctrl = parse_cpu_options(args, arm6_options, cpuctrl);
 
@@ -1444,6 +1678,10 @@ arm7_setup(args)
 		 | CPU_CONTROL_CPCLK | CPU_CONTROL_LABT_ENABLE
 		 | CPU_CONTROL_ROM_ENABLE | CPU_CONTROL_BEND_ENABLE
 		 | CPU_CONTROL_AFLT_ENABLE;
+
+#ifndef ARM32_DISABLE_ALIGNMENT_FAULTS
+	cpuctrl |= CPU_CONTROL_AFLT_ENABLE;
+#endif
 
 	cpuctrl = parse_cpu_options(args, arm678_options, cpuctrl);
 	cpuctrl = parse_cpu_options(args, arm7_options, cpuctrl);
@@ -1532,6 +1770,10 @@ arm8_setup(args)
 		 | CPU_CONTROL_BPRD_ENABLE | CPU_CONTROL_ROM_ENABLE
 		 | CPU_CONTROL_BEND_ENABLE | CPU_CONTROL_AFLT_ENABLE;
 
+#ifndef ARM32_DISABLE_ALIGNMENT_FAULTS
+	cpuctrl |= CPU_CONTROL_AFLT_ENABLE;
+#endif
+
 	cpuctrl = parse_cpu_options(args, arm678_options, cpuctrl);
 	cpuctrl = parse_cpu_options(args, arm8_options, cpuctrl);
 
@@ -1611,8 +1853,12 @@ arm9_setup(args)
 		 | CPU_CONTROL_IC_ENABLE | CPU_CONTROL_DC_ENABLE
 		 | CPU_CONTROL_WBUF_ENABLE | CPU_CONTROL_ROM_ENABLE
 		 | CPU_CONTROL_BEND_ENABLE | CPU_CONTROL_AFLT_ENABLE
-		 | CPU_CONTROL_LABT_ENABLE | CPU_CONTROL_BPRD_ENABLE
-		 | CPU_CONTROL_CPCLK;
+		 | CPU_CONTROL_LABT_ENABLE | CPU_CONTROL_VECRELOC
+		 | CPU_CONTROL_ROUNDROBIN;
+
+#ifndef ARM32_DISABLE_ALIGNMENT_FAULTS
+	cpuctrl |= CPU_CONTROL_AFLT_ENABLE;
+#endif
 
 	cpuctrl = parse_cpu_options(args, arm9_options, cpuctrl);
 
@@ -1625,10 +1871,64 @@ arm9_setup(args)
 
 	/* Set the control register */
 	curcpu()->ci_ctrl = cpuctrl;
-	cpu_control(0xffffffff, cpuctrl);
+	cpu_control(cpuctrlmask, cpuctrl);
 
 }
 #endif	/* CPU_ARM9 */
+
+#ifdef CPU_ARM10
+struct cpu_option arm10_options[] = {
+	{ "cpu.cache",		BIC, OR,  (CPU_CONTROL_IC_ENABLE | CPU_CONTROL_DC_ENABLE) },
+	{ "cpu.nocache",	OR,  BIC, (CPU_CONTROL_IC_ENABLE | CPU_CONTROL_DC_ENABLE) },
+	{ "arm10.cache",	BIC, OR,  (CPU_CONTROL_IC_ENABLE | CPU_CONTROL_DC_ENABLE) },
+	{ "arm10.icache",	BIC, OR,  CPU_CONTROL_IC_ENABLE },
+	{ "arm10.dcache",	BIC, OR,  CPU_CONTROL_DC_ENABLE },
+	{ "cpu.writebuf",	BIC, OR,  CPU_CONTROL_WBUF_ENABLE },
+	{ "cpu.nowritebuf",	OR,  BIC, CPU_CONTROL_WBUF_ENABLE },
+	{ "arm10.writebuf",	BIC, OR,  CPU_CONTROL_WBUF_ENABLE },
+	{ NULL,			IGN, IGN, 0 }
+};
+
+void
+arm10_setup(args)
+	char *args;
+{
+	int cpuctrl, cpuctrlmask;
+
+	cpuctrl = CPU_CONTROL_MMU_ENABLE | CPU_CONTROL_SYST_ENABLE
+	    | CPU_CONTROL_IC_ENABLE | CPU_CONTROL_DC_ENABLE
+	    | CPU_CONTROL_WBUF_ENABLE | CPU_CONTROL_BPRD_ENABLE;
+	cpuctrlmask = CPU_CONTROL_MMU_ENABLE | CPU_CONTROL_SYST_ENABLE
+	    | CPU_CONTROL_IC_ENABLE | CPU_CONTROL_DC_ENABLE
+	    | CPU_CONTROL_WBUF_ENABLE | CPU_CONTROL_ROM_ENABLE
+	    | CPU_CONTROL_BEND_ENABLE | CPU_CONTROL_AFLT_ENABLE
+	    | CPU_CONTROL_BPRD_ENABLE
+	    | CPU_CONTROL_ROUNDROBIN | CPU_CONTROL_CPCLK;
+
+#ifndef ARM32_DISABLE_ALIGNMENT_FAULTS
+	cpuctrl |= CPU_CONTROL_AFLT_ENABLE;
+#endif
+
+	cpuctrl = parse_cpu_options(args, arm10_options, cpuctrl);
+
+#ifdef __ARMEB__
+	cpuctrl |= CPU_CONTROL_BEND_ENABLE;
+#endif
+
+	/* Clear out the cache */
+	cpu_idcache_wbinv_all();
+
+	/* Now really make sure they are clean.  */
+	asm volatile ("mcr\tp15, 0, r0, c7, c7, 0" : : );
+
+	/* Set the control register */
+	curcpu()->ci_ctrl = cpuctrl;
+	cpu_control(0xffffffff, cpuctrl);
+
+	/* And again. */
+	cpu_idcache_wbinv_all();
+}
+#endif	/* CPU_ARM10 */
 
 #ifdef CPU_SA110
 struct cpu_option sa110_options[] = {
@@ -1664,6 +1964,10 @@ sa110_setup(args)
 		 | CPU_CONTROL_BEND_ENABLE | CPU_CONTROL_AFLT_ENABLE
 		 | CPU_CONTROL_LABT_ENABLE | CPU_CONTROL_BPRD_ENABLE
 		 | CPU_CONTROL_CPCLK;
+
+#ifndef ARM32_DISABLE_ALIGNMENT_FAULTS
+	cpuctrl |= CPU_CONTROL_AFLT_ENABLE;
+#endif
 
 	cpuctrl = parse_cpu_options(args, sa110_options, cpuctrl);
 
@@ -1722,11 +2026,18 @@ sa11x0_setup(args)
 		 | CPU_CONTROL_LABT_ENABLE | CPU_CONTROL_BPRD_ENABLE
 		 | CPU_CONTROL_CPCLK | CPU_CONTROL_VECRELOC;
 
+#ifndef ARM32_DISABLE_ALIGNMENT_FAULTS
+	cpuctrl |= CPU_CONTROL_AFLT_ENABLE;
+#endif
+
 	cpuctrl = parse_cpu_options(args, sa11x0_options, cpuctrl);
 
 #ifdef __ARMEB__
 	cpuctrl |= CPU_CONTROL_BEND_ENABLE;
 #endif
+
+	if (vector_page == ARM_VECTORS_HIGH)
+		cpuctrl |= CPU_CONTROL_VECRELOC;
 
 	/* Clear out the cache */
 	cpu_idcache_wbinv_all();
@@ -1736,8 +2047,61 @@ sa11x0_setup(args)
 }
 #endif	/* CPU_SA1100 || CPU_SA1110 */
 
+#if defined(CPU_IXP12X0)
+struct cpu_option ixp12x0_options[] = {
+	{ "cpu.cache",		BIC, OR,  (CPU_CONTROL_IC_ENABLE | CPU_CONTROL_DC_ENABLE) },
+	{ "cpu.nocache",	OR,  BIC, (CPU_CONTROL_IC_ENABLE | CPU_CONTROL_DC_ENABLE) },
+	{ "ixp12x0.cache",	BIC, OR,  (CPU_CONTROL_IC_ENABLE | CPU_CONTROL_DC_ENABLE) },
+	{ "ixp12x0.icache",	BIC, OR,  CPU_CONTROL_IC_ENABLE },
+	{ "ixp12x0.dcache",	BIC, OR,  CPU_CONTROL_DC_ENABLE },
+	{ "cpu.writebuf",	BIC, OR,  CPU_CONTROL_WBUF_ENABLE },
+	{ "cpu.nowritebuf",	OR,  BIC, CPU_CONTROL_WBUF_ENABLE },
+	{ "ixp12x0.writebuf",	BIC, OR,  CPU_CONTROL_WBUF_ENABLE },
+	{ NULL,			IGN, IGN, 0 }
+};
+
+void
+ixp12x0_setup(args)
+	char *args;
+{
+	int cpuctrl, cpuctrlmask;
+
+
+	cpuctrl = CPU_CONTROL_MMU_ENABLE | CPU_CONTROL_DC_ENABLE
+		 | CPU_CONTROL_WBUF_ENABLE | CPU_CONTROL_SYST_ENABLE
+		 | CPU_CONTROL_IC_ENABLE;
+
+	cpuctrlmask = CPU_CONTROL_MMU_ENABLE | CPU_CONTROL_AFLT_ENABLE
+		 | CPU_CONTROL_DC_ENABLE | CPU_CONTROL_WBUF_ENABLE
+		 | CPU_CONTROL_BEND_ENABLE | CPU_CONTROL_SYST_ENABLE
+		 | CPU_CONTROL_ROM_ENABLE | CPU_CONTROL_IC_ENABLE
+		 | CPU_CONTROL_VECRELOC;
+
+#ifndef ARM32_DISABLE_ALIGNMENT_FAULTS
+	cpuctrl |= CPU_CONTROL_AFLT_ENABLE;
+#endif
+
+	cpuctrl = parse_cpu_options(args, ixp12x0_options, cpuctrl);
+
+#ifdef __ARMEB__
+	cpuctrl |= CPU_CONTROL_BEND_ENABLE;
+#endif
+
+	if (vector_page == ARM_VECTORS_HIGH)
+		cpuctrl |= CPU_CONTROL_VECRELOC;
+
+	/* Clear out the cache */
+	cpu_idcache_wbinv_all();
+
+	/* Set the control register */    
+	curcpu()->ci_ctrl = cpuctrl;
+	/* cpu_control(0xffffffff, cpuctrl); */
+	cpu_control(cpuctrlmask, cpuctrl);
+}
+#endif /* CPU_IXP12X0 */
+
 #if defined(CPU_XSCALE_80200) || defined(CPU_XSCALE_80321) || \
-    defined(CPU_XSCALE_PXA2X0)
+    defined(CPU_XSCALE_PXA2X0) || defined(CPU_XSCALE_IXP425)
 struct cpu_option xscale_options[] = {
 #ifdef COMPAT_12
 	{ "branchpredict", 	BIC, OR,  CPU_CONTROL_BPRD_ENABLE },
@@ -1777,7 +2141,11 @@ xscale_setup(args)
 		 | CPU_CONTROL_WBUF_ENABLE | CPU_CONTROL_ROM_ENABLE
 		 | CPU_CONTROL_BEND_ENABLE | CPU_CONTROL_AFLT_ENABLE
 		 | CPU_CONTROL_LABT_ENABLE | CPU_CONTROL_BPRD_ENABLE
-		 | CPU_CONTROL_CPCLK;
+		 | CPU_CONTROL_CPCLK | CPU_CONTROL_VECRELOC;
+
+#ifndef ARM32_DISABLE_ALIGNMENT_FAULTS
+	cpuctrl |= CPU_CONTROL_AFLT_ENABLE;
+#endif
 
 	cpuctrl = parse_cpu_options(args, xscale_options, cpuctrl);
 
@@ -1785,9 +2153,8 @@ xscale_setup(args)
 	cpuctrl |= CPU_CONTROL_BEND_ENABLE;
 #endif
 
-#ifdef __ARMEB__
-	cpuctrl |= CPU_CONTROL_BEND_ENABLE;
-#endif
+	if (vector_page == ARM_VECTORS_HIGH)
+		cpuctrl |= CPU_CONTROL_VECRELOC;
 
 	/* Clear out the cache */
 	cpu_idcache_wbinv_all();
@@ -1803,8 +2170,12 @@ xscale_setup(args)
 	/* Make sure write coalescing is turned on */
 	__asm __volatile("mrc p15, 0, %0, c1, c0, 1"
 		: "=r" (auxctl));
+#ifdef XSCALE_NO_COALESCE_WRITES
+	auxctl |= XSCALE_AUXCTL_K;
+#else
 	auxctl &= ~XSCALE_AUXCTL_K;
+#endif
 	__asm __volatile("mcr p15, 0, %0, c1, c0, 1"
 		: : "r" (auxctl));
 }
-#endif	/* CPU_XSCALE_80200 || CPU_XSCALE_80321 || CPU_XSCALE_PXA2X0 */
+#endif	/* CPU_XSCALE_80200 || CPU_XSCALE_80321 || CPU_XSCALE_PXA2X0 || CPU_XSCALE_IXP425 */

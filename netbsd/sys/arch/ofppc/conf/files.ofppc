@@ -1,4 +1,4 @@
-#	$NetBSD: files.ofppc,v 1.19 2002/04/16 20:50:22 thorpej Exp $
+#	$NetBSD: files.ofppc,v 1.22 2003/03/05 05:43:44 matt Exp $
 #
 # NetBSD/ofppc configuration info
 #
@@ -20,33 +20,19 @@ file	arch/ofppc/ofppc/conf.c
 file	arch/ofppc/ofppc/disksubr.c		disk
 file	arch/ofppc/ofppc/machdep.c
 file	arch/ofppc/ofppc/platform.c
-file	arch/ofppc/ofppc/procfs_machdep.c	procfs
 file	dev/cons.c
 file	dev/cninit.c
 
+file	arch/powerpc/powerpc/procfs_machdep.c	procfs
 #
 # CPU specific OpenFirmware code
 #
 include "arch/powerpc/conf/files.ofw"
 
 #
-# Compatibility modules
-#
-
-# OSS audio driver compatibility
-include "compat/ossaudio/files.ossaudio"
-
-# Linux binary compatibility (COMPAT_LINUX)
-include "compat/linux/files.linux"
-include "compat/linux/arch/powerpc/files.linux_powerpc"
-file arch/powerpc/powerpc/linux_sigcode.S	compat_linux
-file arch/powerpc/powerpc/linux_trap.c		compat_linux
-
-#
 # Generic OpenFirmware device support
 #
 include "dev/ofw/files.ofw"
-major	{ofdisk = 0}
 
 #
 # I2O device support
@@ -57,24 +43,14 @@ include "dev/i2o/files.i2o"
 # SCSI support
 #
 include "dev/scsipi/files.scsipi"
-major { cd = 3 }
-major { sd = 4 }
 
 #
 # ATA/IDE support
 #
 include "dev/ata/files.ata"
-major { wd = 5 }
 
 # Memory Disk
 file	dev/md_root.c				memory_disk_hooks
-major { md = 6 }
-
-# RAIDframe
-major { raid = 2 }
-
-# Logical disks
-major { ld = 17 }
 
 # Raster operations
 include "dev/rasops/files.rasops"
@@ -134,3 +110,5 @@ file	arch/ofppc/firepower/firepower_intr.c	firepower_es | firepower_mx |
 						firepower_lx
 file	arch/ofppc/firepower/firepower_pci.c	firepower_es | firepower_mx |
 						firepower_lx
+
+include "arch/ofppc/conf/majors.ofppc"

@@ -1,4 +1,4 @@
-/*	$NetBSD: cnode.h,v 1.8 2001/11/24 01:11:34 perry Exp $	*/
+/*	$NetBSD: cnode.h,v 1.13 2003/08/27 17:49:48 drochner Exp $	*/
 
 /*
  * 
@@ -48,6 +48,11 @@
 #define	_CNODE_H_
 
 #include <sys/vnode.h>
+#ifdef _KERNEL
+#include <sys/mallocvar.h>
+
+MALLOC_DECLARE(M_CODA);
+#endif
 
 /*
  * tmp below since we need struct queue
@@ -66,7 +71,7 @@ do {                                                                      \
     if (ptr == 0) {                                                       \
 	panic("kernel malloc returns 0 at %s:%d\n", __FILE__, __LINE__);  \
     }                                                                     \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define CODA_FREE(ptr, size)  free((ptr), M_CODA)
 
@@ -92,12 +97,12 @@ do {                            \
     if (coda_printf_delay)       \
 	DELAY(coda_printf_delay);\
     printf args ;               \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 struct cnode {
     struct vnode	*c_vnode;
     u_short		 c_flags;	/* flags (see below) */
-    ViceFid		 c_fid;		/* file handle */
+    CodaFid		 c_fid;		/* file handle */
     struct vnode	*c_ovp;		/* open vnode pointer */
     u_short		 c_ocount;	/* count of openers */
     u_short		 c_owrite;	/* count of open for write */
@@ -149,6 +154,7 @@ struct coda_mntinfo {
     struct vnode	*mi_rootvp;
     struct mount	*mi_vfsp;
     struct vcomm	 mi_vcomm;
+    int			 mi_started;	
 };
 extern struct coda_mntinfo coda_mnttbl[]; /* indexed by minor device number */
 
@@ -156,7 +162,8 @@ extern struct coda_mntinfo coda_mnttbl[]; /* indexed by minor device number */
  * vfs pointer to mount info
  */
 #define vftomi(vfsp)    ((struct coda_mntinfo *)(vfsp->mnt_data))
-#define	CODA_MOUNTED(vfsp)   (vftomi((vfsp)) != (struct coda_mntinfo *)0)
+#define	CODA_MOUNTED(vfsp)   ((vftomi(vfsp) != (struct coda_mntinfo *)0) \
+	&& (vftomi(vfsp)->mi_started))
 
 /*
  * vnode pointer to mount info
@@ -191,7 +198,7 @@ extern void coda_unmounting(struct mount *whoIam);
 extern int  coda_vmflush(struct cnode *cp);
 
 /* cfs_vnodeops.h */
-extern struct cnode *make_coda_node(ViceFid *fid, struct mount *vfsp, short type);
+extern struct cnode *make_coda_node(CodaFid *fid, struct mount *vfsp, short type);
 extern int coda_vnodeopstats_init(void);
 
 /* coda_vfsops.h */

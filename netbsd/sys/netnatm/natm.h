@@ -1,4 +1,4 @@
-/*	$NetBSD: natm.h,v 1.3 2000/07/03 01:19:23 sommerfeld Exp $	*/
+/*	$NetBSD: natm.h,v 1.5 2003/06/29 22:32:08 fvdl Exp $	*/
 
 /*
  *

@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.81 2002/04/25 09:20:26 aymeric Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.92 2003/10/27 09:56:56 mhitch Exp $	*/
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.81 2002/04/25 09:20:26 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.92 2003/10/27 09:56:56 mhitch Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -41,6 +41,7 @@ __KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.81 2002/04/25 09:20:26 aymeric Exp $"
 #include <sys/device.h>
 #include <sys/disklabel.h>
 #include <sys/disk.h>
+#include <sys/proc.h>
 #include <machine/cpu.h>
 #include <amiga/amiga/cfdev.h>
 #include <amiga/amiga/device.h>
@@ -166,18 +167,27 @@ amiga_config_found(pcfp, pdp, auxp, pfn)
 {
 	struct device temp;
 	struct cfdata *cf;
+	const struct cfattach *ca;
 
 	if (amiga_realconfig)
 		return(config_found(pdp, auxp, pfn) != NULL);
 
-	if (pdp == NULL)
+	if (pdp == NULL) {
+		memset(&temp, 0, sizeof temp);
 		pdp = &temp;
+	}
 
 	pdp->dv_cfdata = pcfp;
+	pdp->dv_cfdriver = config_cfdriver_lookup(pcfp->cf_name);
+	pdp->dv_unit = pcfp->cf_unit;
+
 	if ((cf = config_search((cfmatch_t)NULL, pdp, auxp)) != NULL) {
-		cf->cf_attach->ca_attach(pdp, NULL, auxp);
-		pdp->dv_cfdata = NULL;
-		return(1);
+		ca = config_cfattach_lookup(cf->cf_name, cf->cf_atname);
+		if (ca != NULL) {
+			(*ca->ca_attach)(pdp, NULL, auxp);
+			pdp->dv_cfdata = NULL;
+			return(1);
+		}
 	}
 	pdp->dv_cfdata = NULL;
 	return(0);
@@ -192,6 +202,8 @@ void
 config_console()
 {
 	struct cfdata *cf;
+
+	config_init();
 
 	/*
 	 * we need mainbus' cfdata.
@@ -223,9 +235,8 @@ config_console()
 /*
  * mainbus driver
  */
-struct cfattach mainbus_ca = {
-	sizeof(struct device), mbmatch, mbattach
-};
+CFATTACH_DECL(mainbus, sizeof(struct device),
+    mbmatch, mbattach, NULL, NULL);
 
 int
 mbmatch(pdp, cfp, auxp)
@@ -308,7 +319,7 @@ mbprint(auxp, pnp)
 	const char *pnp;
 {
 	if (pnp)
-		printf("%s at %s", (char *)auxp, pnp);
+		aprint_normal("%s at %s", (char *)auxp, pnp);
 	return(UNCONF);
 }
 
@@ -329,15 +340,19 @@ mbprint(auxp, pnp)
 
 #if NFD > 0
 extern  struct cfdriver fd_cd;
+extern	const struct bdevsw fd_bdevsw;
 #endif
 #if NSD > 0
 extern  struct cfdriver sd_cd;
+extern	const struct bdevsw sd_bdevsw;
 #endif
 #if NCD > 0
 extern  struct cfdriver cd_cd;
+extern	const struct bdevsw cd_bdevsw;
 #endif
 #if NWD > 0
 extern  struct cfdriver wd_cd;
+extern	const struct bdevsw wd_bdevsw;
 #endif
 
 struct cfdriver *genericconf[] = {
@@ -363,6 +378,7 @@ findroot(void)
 	struct partition *pp;
 	struct device **devs;
 	int i, maj, unit;
+	const struct bdevsw *bdp;
 
 #if NSD > 0
 	/*
@@ -373,7 +389,6 @@ findroot(void)
 	printf("Boot partition offset is %ld\n", boot_partition);
 #endif
 	if (boot_partition != 0) {
-	 	struct bdevsw *bdp;
 		int i;
 
 		for (unit = 0; unit < sd_cd.cd_ndevs; ++unit) {
@@ -394,14 +409,12 @@ findroot(void)
 			if (dkp->dk_driver == NULL ||
 			    dkp->dk_driver->d_strategy == NULL)
 				continue;
-			for (bdp = bdevsw; bdp < (bdevsw + nblkdev); bdp++)
-				if (bdp->d_strategy ==
-				    dkp->dk_driver->d_strategy)
-					break;
-			if (bdp->d_open(MAKEDISKDEV(4, unit, RAW_PART),
+			bdp = &sd_bdevsw;
+			maj = bdevsw_lookup_major(bdp);
+			if ((*bdp->d_open)(MAKEDISKDEV(maj, unit, RAW_PART),
 			    FREAD | FNONBLOCK, 0, curproc))
 				continue;
-			bdp->d_close(MAKEDISKDEV(4, unit, RAW_PART),
+			(*bdp->d_close)(MAKEDISKDEV(maj, unit, RAW_PART),
 			    FREAD | FNONBLOCK, 0, curproc);
 			pp = &dkp->dk_label->d_partitions[0];
 			for (i = 0; i < dkp->dk_label->d_npartitions;
@@ -446,20 +459,34 @@ findroot(void)
 			    dkp->dk_driver->d_strategy == NULL)
 				continue;
 
-			for (maj = 0; maj < nblkdev; maj++)
-				if (bdevsw[maj].d_strategy ==
-				    dkp->dk_driver->d_strategy)
-					break;
+			bdp = NULL;
+#if NFD > 0
+			if (fd_bdevsw.d_strategy == dkp->dk_driver->d_strategy)
+				bdp = &fd_bdevsw;
+#endif
+#if NSD > 0
+			if (sd_bdevsw.d_strategy == dkp->dk_driver->d_strategy)
+				bdp = &sd_bdevsw;
+#endif
+#if NWD > 0
+			if (wd_bdevsw.d_strategy == dkp->dk_driver->d_strategy)
+				bdp = &wd_bdevsw;
+#endif
+#if NCD > 0
+			if (cd_bdevsw.d_strategy == dkp->dk_driver->d_strategy)
+				bdp = &cd_bdevsw;
+#endif
 #ifdef DIAGNOSTIC
-			if (maj >= nblkdev)
+			if (bdp == NULL)
 				panic("findroot: impossible");
 #endif
+			maj = bdevsw_lookup_major(bdp);
 
 			/* Open disk; forces read of disklabel. */
-			if ((*bdevsw[maj].d_open)(MAKEDISKDEV(maj,
+			if ((*bdp->d_open)(MAKEDISKDEV(maj,
 			    unit, 0), FREAD|FNONBLOCK, 0, &proc0))
 				continue;
-			(void)(*bdevsw[maj].d_close)(MAKEDISKDEV(maj,
+			(void)(*bdp->d_close)(MAKEDISKDEV(maj,
 			    unit, 0), FREAD|FNONBLOCK, 0, &proc0);
 
 			pp = &dkp->dk_label->d_partitions[0];

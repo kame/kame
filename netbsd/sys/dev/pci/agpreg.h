@@ -1,4 +1,4 @@
-/*	$NetBSD: agpreg.h,v 1.1 2001/09/10 10:01:02 fvdl Exp $	*/
+/*	$NetBSD: agpreg.h,v 1.7 2004/02/04 06:58:24 soren Exp $	*/
 
 /*-
  * Copyright (c) 2000 Doug Rabson
@@ -36,25 +36,45 @@
  */
 #define AGP_APBASE		0x10
 
-/*
- * Offsets from the AGP Capability pointer.
- */
-#define AGP_CAPID		0x02
-#define AGP_CAPID_GET_MAJOR(x)		(((x) & 0x00f00000U) >> 20)
-#define AGP_CAPID_GET_MINOR(x)		(((x) & 0x000f0000U) >> 16)
-#define AGP_CAPID_GET_NEXT_PTR(x)	(((x) & 0x0000ff00U) >> 8)
-#define AGP_CAPID_GET_CAP_ID(x)		(((x) & 0x000000ffU) >> 0)
-
 #define AGP_STATUS		0x4
 #define AGP_COMMAND		0x8
 
 /*
- * Config offsets for Intel AGP chipsets.
+ * Config registers for Intel AGP chipsets.
  */
+/* i845/855PM */
+#define	AGP_I845_AGPMISC	0x51
+# define AGPMISC_AAGN		(1U << 1)  /* Aperture AccessEN */
+
+/* i840/850/850E */
+#define AGP_I840_MCHCFG		0x50
+# define MCHCFG_AAGN		(1U << 9)  /* Aperture AccessEN */
+
+/* i82443LX/BX/GX */
 #define AGP_INTEL_NBXCFG	0x50
-#define AGP_INTEL_STS		0x90
+# define NBXCFG_APAE		(1U << 10) /* AGPtoPCI AccessDIS */
+# define NBXCFG_AAGN		(1U << 9)  /* Aperture AccessEN */
+
+/* Error Status for i8XX Chipset */
+#define	AGP_INTEL_I8XX_ERRSTS	0xc8
+
+/* Common register */
+#define	AGP_INTEL_ERRSTS	0x91	/* Not i8XX */
+#define AGP_INTEL_AGPCMD	0xa8
+# define AGPCMD_SBA		(1U << 9)
+# define AGPCMD_AGPEN		(1U << 8)
+# define AGPCMD_FWEN		(1U << 4)
+# define AGPCMD_RATE_1X		(1U << 1)
+# define AGPCMD_RATE_2X		(1U << 2)
+# define AGPCMD_RATE_4X		(1U << 3)
+
 #define AGP_INTEL_AGPCTRL	0xb0
+# define AGPCTRL_AGPRSE		(1U << 13) /* AGPRSE (82443 only)*/
+# define AGPCTRL_GTLB		(1U << 7)  /* GTLB EN */
+
 #define AGP_INTEL_APSIZE	0xb4
+# define APSIZE_MASK		0x3f
+
 #define AGP_INTEL_ATTBASE	0xb8
 
 /*
@@ -153,4 +173,36 @@
 #define AGP_I810_DRT_POPULATED	0x01
 #define AGP_I810_GTT		0x10000
 
+/*
+ * Config registers for i830MG device 0
+ */
+#define AGP_I830_GCC0			0x50
+#define AGP_I830_GCC1			0x52
+#define AGP_I830_GCC1_DEV2		0x08
+#define AGP_I830_GCC1_DEV2_ENABLED	0x00
+#define AGP_I830_GCC1_DEV2_DISABLED	0x08
+#define AGP_I830_GCC1_GMS		0x70
+#define AGP_I830_GCC1_GMS_STOLEN_512	0x20
+#define AGP_I830_GCC1_GMS_STOLEN_1024	0x30
+#define AGP_I830_GCC1_GMS_STOLEN_8192	0x40
+#define AGP_I830_GCC1_GMASIZE		0x01
+#define AGP_I830_GCC1_GMASIZE_64	0x01
+#define AGP_I830_GCC1_GMASIZE_128	0x00
+
+
+/*
+ * Config registers for 852GM/855GM/865G device 0
+ */
+#define AGP_I855_GCC1			0x52
+#define AGP_I855_GCC1_DEV2		0x08
+#define AGP_I855_GCC1_DEV2_ENABLED	0x00
+#define AGP_I855_GCC1_DEV2_DISABLED	0x08
+#define AGP_I855_GCC1_GMS		0x70
+#define AGP_I855_GCC1_GMS_STOLEN_0M	0x00
+#define AGP_I855_GCC1_GMS_STOLEN_1M	0x10
+#define AGP_I855_GCC1_GMS_STOLEN_4M	0x20
+#define AGP_I855_GCC1_GMS_STOLEN_8M	0x30
+#define AGP_I855_GCC1_GMS_STOLEN_16M	0x40
+#define AGP_I855_GCC1_GMS_STOLEN_32M	0x50
+ 
 #endif /* !_PCI_AGPREG_H_ */

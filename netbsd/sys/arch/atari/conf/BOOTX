@@ -1,17 +1,20 @@
 #
-# $NetBSD: BOOTX,v 1.40.4.2 2003/01/10 06:57:55 jmc Exp $
+# $NetBSD: BOOTX,v 1.51.2.3 2004/07/15 20:41:35 he Exp $
 #
 # This file was automatically created. Changes will be
 # lost when running makeconf in this directory.
 #
 # Created from:
-#		NetBSD: FALCON.in,v 1.5 2001/11/20 11:29:41 lukem Exp $
+#		NetBSD: FALCON.in,v 1.7 2003/10/08 11:05:27 bouyer Exp $
 #		NetBSD$
 
 #This configuration file is for a generic ATARI-Falcon
 
 #Define 'INSTALL_KERNEL' or 'INSTALLX_KERNEL' to generate a BOOT or
 #BOOTX kernel respectively.
+
+#There is no possibility for physical network interfaces. Use the define
+#below to turn off vlan, pppoe, bridge  and NETATALK.
 
 #Generic atari
 
@@ -26,13 +29,13 @@ maxusers	16
 
 options 	HZ=64		# Set the clock-rate (48/64/96)
 
-#X11R6 related options
-
-options 	UCONSOLE	# Allow xconsole to work
-
 #Standard system options
 options 	INSECURE	# disable kernel security levels
 #options 	NTP		# NTP phase/frequency locked loop
+
+#Enable experimental buffer queue strategy for better responsiveness under 
+#high disk I/O load. Use it with caution - it's not proven to be stable yet.
+#options 	NEW_BUFQ_STRATEGY
 
 #(Co)processors this kernel should support
 
@@ -67,6 +70,8 @@ options 	COMPAT_11	# Compatibility to NetBSD1.1
 options 	COMPAT_12	# Compatibility to NetBSD1.2
 options 	COMPAT_13	# Compatibility to NetBSD1.3
 options 	COMPAT_14	# Compatibility to NetBSD1.4
+options 	COMPAT_15	# Compatibility to NetBSD1.5
+options 	COMPAT_16	# Compatibility to NetBSD1.6
 
 options 	COMPAT_AOUT_M68K # Compatibility to a.out executables
 options 	EXEC_AOUT	# a.out format executables
@@ -83,6 +88,7 @@ options 	ST_POOL_SIZE=22		# smallest that allows TT-HIGH
 
 options 	TT_SCSI			# SCSI-support for TT
 options 	TT_VIDEO		# Graphics support for TT
+#options	ET4000_HAS_2MB_MEM	# et4000 with 2 MB video memory
 
 options 	FALCON_SCSI		# SCSI-support for Falcon
 options 	FALCON_VIDEO		# Graphics support for FALCON
@@ -125,10 +131,11 @@ lp0		at mainbus0	# centronics printer
 ser0		at mainbus0	# UART on first 68901 (ttyB0)
 
 wdc0		at mainbus0	# IDE-bus
-wd*		at wdc? channel ? drive ?
+atabus* 	at wdc? channel ?
+wd*		at atabus? drive ?
 
- #ATAPI bus support
-atapibus* at wdc? channel ?
+ # ATAPI bus support
+atapibus* at atabus?
 
 #ATAPI devices
 cd*	at atapibus? drive ?	# ATAPI CD-ROM drives

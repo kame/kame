@@ -1,4 +1,4 @@
-#	$NetBSD: files.vax,v 1.96 2002/03/13 15:18:21 ad Exp $
+#	$NetBSD: files.vax,v 1.101 2003/10/19 15:03:25 ragge Exp $
 #
 # new style config file for vax architecture
 #
@@ -83,7 +83,6 @@ file	arch/vax/mba/mba.c		mba needs-flag
 device	hp: disk
 attach	hp at mba
 file	arch/vax/mba/hp.c		hp needs-flag
-major	{hp = 0}
 
 device	ht: tape
 attach	ht at mba
@@ -100,14 +99,9 @@ include "dev/wsfont/files.wsfont"
 
 # Memory Disk for install floppy
 file	dev/md_root.c			memory_disk_hooks
-major	{md = 23}
-
-# RAIDframe
-major	{raid = 25}
 
 # MSCP device drivers
 include "dev/mscp/files.mscp"
-major	{ra = 9}
 
 # Unibus/Q22 bus definitions
 include "dev/qbus/files.uba"
@@ -118,9 +112,6 @@ attach	uba at sbi with uba_sbi
 file	arch/vax/uba/uba_sbi.c		uba_sbi
 attach	uba at cmi with uba_cmi
 file	arch/vax/uba/uba_cmi.c		uba_cmi
-
-# Unibus disks
-major	{rl = 14}
 
 # BI bus definitions
 include "dev/bi/files.bi"
@@ -166,18 +157,14 @@ file	arch/vax/vsa/hdc9224.c		ry | hdc | rd needs-flag
 
 device	rd: disk
 attach	rd at hdc
-major	{rd = 19}
 
 device	ry: disk
 attach	ry at hdc
-major	{ry = 24}
 
 #
 # Machine-independent SCSI driver.
 #
 include "dev/scsipi/files.scsipi"
-major	{ sd = 20 }
-major	{ cd = 22 }
 
 # builtin NCR5380 SCSI-controller on VAXstation
 device	si: scsi, ncr5380sbc
@@ -188,6 +175,16 @@ file	arch/vax/vsa/ncr.c		si_vsbus
 device	smg: wsemuldisplaydev
 attach	smg at vsbus
 file	arch/vax/vsa/smg.c		smg needs-flag
+
+# Color framebuffer on VS4000/60.
+device	lcg: wsemuldisplaydev
+attach	lcg at vsbus
+file	arch/vax/vsa/lcg.c		lcg needs-flag
+
+# Color framebuffer on VS4000/90.
+device	lcspx: wsemuldisplaydev
+attach	lcspx at vsbus
+file	arch/vax/vsa/lcspx.c		lcspx needs-flag
 
 # LANCE ethernet controller on VAXstation
 attach	le at vsbus with le_vsbus:	le24
@@ -225,17 +222,6 @@ file	arch/vax/uba/tm.c		te needs-flag
 device	mu: tape
 attach	mu at mba
 file	arch/vax/mba/mt.c		mu needs-flag
-
-# DMF32 on UBA
-device	dmf # XXX?
-attach	dmf at uba
-file	arch/vax/uba/dmf.c		dmf needs-flag
-file	arch/vax/uba/dmz.c		dmf needs-flag
-
-# DMZ32 on UBA
-device	dmz # XXX?
-attach	dmz at uba
-file	arch/vax/uba/dmx.c		dmz needs-flag
 
 # DN-11 on UBA
 device	dn # XXX?
@@ -323,9 +309,6 @@ file	arch/vax/uba/dh.c		dh needs-flag
 # These are general files needed for compilation.
 file	dev/cons.c
 file	dev/cninit.c
-file	dev/clock_subr.c		vax8200 | vax410 | vax630 | vax43  |
-					vax660  | vax670 | vax680 | vax46  |
-					vax48   | vax49  | vax53  | vaxany
 file	arch/vax/vax/locore.c
 file	arch/vax/vax/mem.c
 file	arch/vax/vax/clock.c
@@ -359,6 +342,7 @@ file	arch/vax/vax/bus_dma.c
 file	arch/vax/vax/bus_mem.c
 file	arch/vax/vax/procfs_machdep.c	procfs
 file	arch/vax/vax/sgmap.c
+file	arch/vax/vax/sig_machdep.c
 file	arch/vax/vax/vm_machdep.c
 file	arch/vax/vax/findcpu.c
 file	arch/vax/vax/autoconf.c
@@ -396,3 +380,5 @@ include "compat/vax1k/files.vax1k"
 #arch/vax/if/if_pcl.c		optional pcl device-driver
 #arch/vax/if/if_vv.c		optional vv device-driver
 #arch/vax/if/raw_hy.c		optional hy device-driver
+
+include "arch/vax/conf/majors.vax"

@@ -1,4 +1,4 @@
-/* $NetBSD: asc_tc.c,v 1.19 2001/11/15 09:48:19 lukem Exp $ */
+/* $NetBSD: asc_tc.c,v 1.23 2003/02/22 05:13:35 tsutsui Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: asc_tc.c,v 1.19 2001/11/15 09:48:19 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: asc_tc.c,v 1.23 2003/02/22 05:13:35 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -75,9 +75,8 @@ struct asc_softc {
 static int  asc_tc_match __P((struct device *, struct cfdata *, void *));
 static void asc_tc_attach __P((struct device *, struct device *, void *));
 
-struct cfattach asc_tc_ca = {
-	sizeof(struct asc_softc), asc_tc_match, asc_tc_attach
-};
+CFATTACH_DECL(asc_tc, sizeof(struct asc_softc),
+    asc_tc_match, asc_tc_attach, NULL, NULL);
 
 static u_char	asc_read_reg __P((struct ncr53c9x_softc *, int));
 static void	asc_write_reg __P((struct ncr53c9x_softc *, int, u_char));
@@ -160,7 +159,7 @@ asc_tc_attach(parent, self, aux)
 	sc->sc_id = 7;
 	sc->sc_freq = (ta->ta_busspeed) ? 25000000 : 12500000;
 
-	/* gimme Mhz */
+	/* gimme MHz */
 	sc->sc_freq /= 1000000;
 
 	/*

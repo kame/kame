@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_net.c,v 1.28 2002/03/16 20:43:57 christos Exp $	 */
+/*	$NetBSD: svr4_net.c,v 1.35 2003/09/13 08:32:10 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 1994 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: svr4_net.c,v 1.28 2002/03/16 20:43:57 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: svr4_net.c,v 1.35 2003/09/13 08:32:10 jdolecek Exp $");
 
 #define COMPAT_SVR4 1
 
@@ -68,6 +68,7 @@ __KERNEL_RCSID(0, "$NetBSD: svr4_net.c,v 1.28 2002/03/16 20:43:57 christos Exp $
 #include <sys/conf.h>
 #include <sys/mount.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/svr4/svr4_types.h>
@@ -79,6 +80,13 @@ __KERNEL_RCSID(0, "$NetBSD: svr4_net.c,v 1.28 2002/03/16 20:43:57 christos Exp $
 #include <compat/svr4/svr4_ioctl.h>
 #include <compat/svr4/svr4_stropts.h>
 #include <compat/svr4/svr4_socket.h>
+
+dev_type_open(svr4_netopen);
+
+const struct cdevsw svr4_net_cdevsw = {
+	svr4_netopen, noclose, noread, nowrite, noioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
 
 /*
  * Device minor numbers
@@ -103,7 +111,7 @@ int svr4_ptm_alloc __P((struct proc *));
 
 static struct fileops svr4_netops = {
 	soo_read, soo_write, soo_ioctl, soo_fcntl, soo_poll,
-	soo_stat, svr4_soo_close
+	soo_stat, svr4_soo_close, soo_kqfilter
 };
 
 
@@ -134,7 +142,7 @@ svr4_netopen(dev, flag, mode, p)
 
 	DPRINTF(("netopen("));
 
-	if (p->p_dupfd >= 0)
+	if (curlwp->l_dupfd >= 0)	/* XXX */
 		return ENODEV;
 
 	switch (minor(dev)) {
@@ -212,7 +220,7 @@ svr4_netopen(dev, flag, mode, p)
 
 	DPRINTF(("ok);\n"));
 
-	p->p_dupfd = fd;
+	curlwp->l_dupfd = fd;	/* XXX */
 	FILE_SET_MATURE(fp);
 	FILE_UNUSE(fp, p);
 	return ENXIO;
@@ -249,7 +257,7 @@ svr4_ptm_alloc(p)
 	 * Cycle through the names. If sys_open() returns ENOENT (or
 	 * ENXIO), short circuit the cycle and exit.
 	 */
-	static char ptyname[] = "/dev/ptyXX";
+	char ptyname[] = "/dev/ptyXX";
 	static const char ttyletters[] = "pqrstuvwxyzPQRST";
 	static const char ttynumbers[] = "0123456789abcdef";
 	caddr_t sg = stackgap_init(p, 0);
@@ -270,12 +278,12 @@ svr4_ptm_alloc(p)
 		if ((error = copyout(ptyname, path, sizeof(ptyname))) != 0)
 			return error;
 
-		switch (error = sys_open(p, &oa, &fd)) {
+		switch (error = sys_open(curlwp, &oa, &fd)) { /* XXX NJWLWP */
 		case ENOENT:
 		case ENXIO:
 			return error;
 		case 0:
-			p->p_dupfd = fd;
+			curlwp->l_dupfd = fd;	/* XXX */
 			return ENXIO;
 		default:
 			if (ttynumbers[++n] == '\0') {

@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_trap.c,v 1.1 2001/09/22 21:29:20 manu Exp $ */
+/*	$NetBSD: linux_trap.c,v 1.6 2004/03/26 17:34:18 drochner Exp $ */
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: linux_trap.c,v 1.6 2004/03/26 17:34:18 drochner Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -48,6 +51,8 @@
 #include <compat/linux/common/linux_exec.h>
 
 void
-linux_trapsignal(struct proc *p, int signo, u_long type) {
-	trapsignal(p, signo, type);
+linux_trapsignal(struct lwp *l, const ksiginfo_t *ksi)
+{
+
+	(*l->l_proc->p_emul->e_trapsignal)(l, ksi);
 }

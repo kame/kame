@@ -1,4 +1,4 @@
-/* $NetBSD: wskbd.c,v 1.61 2002/03/17 19:41:06 atatat Exp $ */
+/* $NetBSD: wskbd.c,v 1.73.2.3 2004/06/07 09:57:29 tron Exp $ */
 
 /*
  * Copyright (c) 1996, 1997 Christopher G. Demetriou.  All rights reserved.
@@ -54,11 +54,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -83,7 +79,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: wskbd.c,v 1.61 2002/03/17 19:41:06 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: wskbd.c,v 1.73.2.3 2004/06/07 09:57:29 tron Exp $");
 
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
@@ -113,6 +109,7 @@ __KERNEL_RCSID(0, "$NetBSD: wskbd.c,v 1.61 2002/03/17 19:41:06 atatat Exp $");
 #include <dev/wscons/wskbdvar.h>
 #include <dev/wscons/wsksymdef.h>
 #include <dev/wscons/wsksymvar.h>
+#include <dev/wscons/wsdisplayvar.h>
 #include <dev/wscons/wseventvar.h>
 #include <dev/wscons/wscons_callbacks.h>
 
@@ -162,6 +159,9 @@ struct wskbd_softc {
 
 	struct wskbd_bell_data sc_bell_data;
 	struct wskbd_keyrepeat_data sc_keyrepeat_data;
+#ifdef WSDISPLAY_SCROLLSUPPORT
+	struct wskbd_scroll_data sc_scroll_data;
+#endif
 
 	int	sc_repeating;		/* we've called timeout() */
 	struct callout sc_repeat_ch;
@@ -198,6 +198,16 @@ struct wskbd_softc {
 
 #define MOD_ONESET(id, mask)	(((id)->t_modifiers & (mask)) != 0)
 #define MOD_ALLSET(id, mask)	(((id)->t_modifiers & (mask)) == (mask))
+
+#define GETMODSTATE(src, dst)		\
+	do {							\
+		dst |= (src & MOD_SHIFT_L) ? MOD_SHIFT_L : 0; \
+		dst |= (src & MOD_SHIFT_R) ? MOD_SHIFT_R : 0; \
+		dst |= (src & MOD_CONTROL_L) ? MOD_CONTROL_L : 0; \
+		dst |= (src & MOD_CONTROL_R) ? MOD_CONTROL_R : 0; \
+		dst |= (src & MOD_META_L) ? MOD_META_L : 0; \
+		dst |= (src & MOD_META_R) ? MOD_META_R : 0; \
+	} while (0)
 
 static int  wskbd_match(struct device *, struct cfdata *, void *);
 static void wskbd_attach(struct device *, struct device *, void *);
@@ -236,12 +246,22 @@ static int wskbd_mux_close(struct wsevsrc *);
 static int wskbd_do_open(struct wskbd_softc *, struct wseventvar *);
 static int wskbd_do_ioctl(struct device *, u_long, caddr_t, int, struct proc *);
 
-struct cfattach wskbd_ca = {
-	sizeof (struct wskbd_softc), wskbd_match, wskbd_attach,
-	wskbd_detach, wskbd_activate
-};
+CFATTACH_DECL(wskbd, sizeof (struct wskbd_softc),
+    wskbd_match, wskbd_attach, wskbd_detach, wskbd_activate);
 
 extern struct cfdriver wskbd_cd;
+
+dev_type_open(wskbdopen);
+dev_type_close(wskbdclose);
+dev_type_read(wskbdread);
+dev_type_ioctl(wskbdioctl);
+dev_type_poll(wskbdpoll);
+dev_type_kqfilter(wskbdkqfilter);
+
+const struct cdevsw wskbd_cdevsw = {
+	wskbdopen, wskbdclose, wskbdread, nowrite, wskbdioctl,
+	nostop, notty, wskbdpoll, nommap, wskbdkqfilter,
+};
 
 #ifndef WSKBD_DEFAULT_BELL_PITCH
 #define	WSKBD_DEFAULT_BELL_PITCH	1500	/* 1500Hz */
@@ -260,6 +280,18 @@ struct wskbd_bell_data wskbd_default_bell_data = {
 	WSKBD_DEFAULT_BELL_VOLUME,
 };
 
+#ifdef WSDISPLAY_SCROLLSUPPORT
+struct wskbd_scroll_data wskbd_default_scroll_data = {
+ 	WSKBD_SCROLL_DOALL,
+ 	WSKBD_SCROLL_MODE_NORMAL,
+#ifdef WSDISPLAY_SCROLLCOMBO
+ 	WSDISPLAY_SCROLLCOMBO,
+#else
+ 	MOD_SHIFT_L,
+#endif
+};
+#endif
+
 #ifndef WSKBD_DEFAULT_KEYREPEAT_DEL1
 #define	WSKBD_DEFAULT_KEYREPEAT_DEL1	400	/* 400ms to start repeating */
 #endif
@@ -272,8 +304,6 @@ struct wskbd_keyrepeat_data wskbd_default_keyrepeat_data = {
 	WSKBD_DEFAULT_KEYREPEAT_DEL1,
 	WSKBD_DEFAULT_KEYREPEAT_DELN,
 };
-
-cdev_decl(wskbd);
 
 #if NWSDISPLAY > 0 || NWSMUX > 0
 struct wssrcops wskbd_srcops = {
@@ -314,9 +344,9 @@ wskbddevprint(void *aux, const char *pnp)
 #endif
 
 	if (pnp)
-		printf("wskbd at %s", pnp);
+		aprint_normal("wskbd at %s", pnp);
 #if 0
-	printf(" console %d", ap->console);
+	aprint_normal(" console %d", ap->console);
 #endif
 
 	return (UNCONF);
@@ -399,8 +429,12 @@ wskbd_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_bell_data = wskbd_default_bell_data;
 	sc->sc_keyrepeat_data = wskbd_default_keyrepeat_data;
 
+#ifdef WSDISPLAY_SCROLLSUPPORT
+	sc->sc_scroll_data = wskbd_default_scroll_data;
+#endif
+
 	if (ap->console) {
-		KASSERT(wskbd_console_initted); 
+		KASSERT(wskbd_console_initted);
 		KASSERT(wskbd_console_device == NULL);
 
 		wskbd_console_device = sc;
@@ -425,7 +459,7 @@ wskbd_attach(struct device *parent, struct device *self, void *aux)
 #endif
 }
 
-void    
+void
 wskbd_cnattach(const struct wskbd_consops *consops, void *conscookie,
 	const struct wskbd_mapdata *mapdata)
 {
@@ -444,7 +478,7 @@ wskbd_cnattach(const struct wskbd_consops *consops, void *conscookie,
 	wskbd_console_initted = 1;
 }
 
-void    
+void
 wskbd_cndetach(void)
 {
 	KASSERT(wskbd_console_initted);
@@ -542,9 +576,7 @@ wskbd_detach(struct device  *self, int flags)
 	}
 
 	/* locate the major number */
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == wskbdopen)
-			break;
+	maj = cdevsw_lookup_major(&wskbd_cdevsw);
 
 	/* Nuke the vnodes for any open instances. */
 	mn = self->dv_unit;
@@ -556,7 +588,7 @@ wskbd_detach(struct device  *self, int flags)
 void
 wskbd_input(struct device *dev, u_int type, int value)
 {
-	struct wskbd_softc *sc = (struct wskbd_softc *)dev; 
+	struct wskbd_softc *sc = (struct wskbd_softc *)dev;
 	struct wscons_event *ev;
 	struct wseventvar *evar;
 	struct timeval thistime;
@@ -579,6 +611,12 @@ wskbd_input(struct device *dev, u_int type, int value)
 		num = wskbd_translate(sc->id, type, value);
 		if (num > 0) {
 			if (sc->sc_base.me_dispdv != NULL) {
+#ifdef WSDISPLAY_SCROLLSUPPORT
+				if (sc->id->t_symbols [0] != KS_Print_Screen) {
+					wsdisplay_scroll(sc->sc_base.
+					me_dispdv, WSDISPLAY_SCROLL_RESET);
+				}
+#endif
 				for (i = 0; i < num; i++)
 					wsdisplay_kbdinput(
 						sc->sc_base.me_dispdv,
@@ -770,7 +808,7 @@ wskbd_do_open(struct wskbd_softc *sc, struct wseventvar *evp)
 int
 wskbdclose(dev_t dev, int flags, int mode, struct proc *p)
 {
-	struct wskbd_softc *sc = 
+	struct wskbd_softc *sc =
 	    (struct wskbd_softc *)wskbd_cd.cd_devs[minor(dev)];
 	struct wseventvar *evar = sc->sc_base.me_evp;
 
@@ -833,7 +871,7 @@ wskbdioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 
 /* A wrapper around the ioctl() workhorse to make reference counting easy. */
 int
-wskbd_do_ioctl(struct device *dv, u_long cmd, caddr_t data, int flag, 
+wskbd_do_ioctl(struct device *dv, u_long cmd, caddr_t data, int flag,
 	struct proc *p)
 {
 	struct wskbd_softc *sc = (struct wskbd_softc *)dv;
@@ -851,7 +889,7 @@ wskbd_do_ioctl_sc(struct wskbd_softc *sc, u_long cmd, caddr_t data, int flag,
 		  struct proc *p)
 {
 
-	/*      
+	/*
 	 * Try the generic ioctls that the wskbd interface supports.
 	 */
 	switch (cmd) {
@@ -862,6 +900,14 @@ wskbd_do_ioctl_sc(struct wskbd_softc *sc, u_long cmd, caddr_t data, int flag,
 		if (sc->sc_base.me_evp == NULL)
 			return (EINVAL);
 		sc->sc_base.me_evp->async = *(int *)data != 0;
+		return (0);
+
+	case FIOSETOWN:
+		if (sc->sc_base.me_evp == NULL)
+			return (EINVAL);
+		if (-*(int *)data != sc->sc_base.me_evp->io->p_pgid
+		    && *(int *)data != sc->sc_base.me_evp->io->p_pid)
+			return (EPERM);
 		return (0);
 
 	case TIOCSPGRP:
@@ -887,6 +933,9 @@ static int
 wskbd_displayioctl(struct device *dev, u_long cmd, caddr_t data, int flag,
 	struct proc *p)
 {
+#ifdef WSDISPLAY_SCROLLSUPPORT
+	struct wskbd_scroll_data *usdp, *ksdp;
+#endif
 	struct wskbd_softc *sc = (struct wskbd_softc *)dev;
 	struct wskbd_bell_data *ubdp, *kbdp;
 	struct wskbd_keyrepeat_data *ukdp, *kkdp;
@@ -987,6 +1036,33 @@ getkeyrepeat:
 		kkdp = &wskbd_default_keyrepeat_data;
 		goto getkeyrepeat;
 
+#ifdef WSDISPLAY_SCROLLSUPPORT
+#define	SETSCROLLMOD(dstp, srcp, dfltp)					\
+    do {								\
+	(dstp)->mode = ((srcp)->which & WSKBD_SCROLL_DOMODE) ?		\
+	    (srcp)->mode : (dfltp)->mode;				\
+	(dstp)->modifier = ((srcp)->which & WSKBD_SCROLL_DOMODIFIER) ?	\
+	    (srcp)->modifier : (dfltp)->modifier;			\
+	(dstp)->which = WSKBD_SCROLL_DOALL;				\
+    } while (0)
+
+	case WSKBDIO_SETSCROLL:
+		usdp = (struct wskbd_scroll_data *)data;
+		ksdp = &sc->sc_scroll_data;
+		SETSCROLLMOD(ksdp, usdp, ksdp);
+		return (0);
+
+	case WSKBDIO_GETSCROLL:
+		usdp = (struct wskbd_scroll_data *)data;
+		ksdp = &sc->sc_scroll_data;
+		SETSCROLLMOD(usdp, ksdp, ksdp);
+		return (0);
+#else
+	case WSKBDIO_GETSCROLL:
+	case WSKBDIO_SETSCROLL:
+		return ENODEV;
+#endif
+
 #undef SETKEYREPEAT
 
 	case WSKBDIO_SETMAP:
@@ -1085,6 +1161,16 @@ wskbdpoll(dev_t dev, int events, struct proc *p)
 	return (wsevent_poll(sc->sc_base.me_evp, events, p));
 }
 
+int
+wskbdkqfilter(dev_t dev, struct knote *kn)
+{
+	struct wskbd_softc *sc = wskbd_cd.cd_devs[minor(dev)];
+
+	if (sc->sc_base.me_evp == NULL)
+		return (1);
+	return (wsevent_kqfilter(sc->sc_base.me_evp, kn));
+}
+
 #if NWSDISPLAY > 0
 
 int
@@ -1125,7 +1211,7 @@ wskbd_set_display(struct device *dv, struct wsevsrc *me)
 	int error;
 
 	DPRINTF(("wskbd_set_display: %s me=%p odisp=%p disp=%p cons=%d\n",
-		 dv->dv_xname, me, sc->sc_base.me_dispdv, displaydv, 
+		 dv->dv_xname, me, sc->sc_base.me_dispdv, displaydv,
 		 sc->sc_isconsole));
 
 	if (sc->sc_isconsole)
@@ -1283,9 +1369,6 @@ change_displayparam(struct wskbd_softc *sc, int param, int updown,
 	int res;
 	struct wsdisplay_param dp;
 
-	if (sc->sc_base.me_dispdv == NULL)
-		return;
-
 	dp.param = param;
 	res = wsdisplay_param(sc->sc_base.me_dispdv, WSDISPLAYIO_GETPARAM, &dp);
 
@@ -1306,7 +1389,50 @@ static int
 internal_command(struct wskbd_softc *sc, u_int *type, keysym_t ksym,
 	keysym_t ksym2)
 {
+#ifdef WSDISPLAY_SCROLLSUPPORT
+	u_int state = 0;
+#endif
 	switch (ksym) {
+#ifdef WSDISPLAY_SCROLLSUPPORT
+	case KS_Cmd_ScrollFastUp:
+	case KS_Cmd_ScrollFastDown:
+		if (*type == WSCONS_EVENT_KEY_DOWN) {
+			GETMODSTATE(sc->id->t_modifiers, state);
+			if ((sc->sc_scroll_data.mode == WSKBD_SCROLL_MODE_HOLD
+			   	&& MOD_ONESET(sc->id, MOD_HOLDSCREEN))
+			|| (sc->sc_scroll_data.mode == WSKBD_SCROLL_MODE_NORMAL
+				&& sc->sc_scroll_data.modifier == state)) {
+					update_modifier(sc->id, *type, 0, MOD_COMMAND);
+					wsdisplay_scroll(sc->sc_base.me_dispdv,
+						(ksym == KS_Cmd_ScrollFastUp) ?
+						WSDISPLAY_SCROLL_BACKWARD :
+						WSDISPLAY_SCROLL_FORWARD);
+					return (1);
+			} else {
+				return (0);
+			}
+		}
+
+	case KS_Cmd_ScrollSlowUp:
+	case KS_Cmd_ScrollSlowDown:
+		if (*type == WSCONS_EVENT_KEY_DOWN) {
+			GETMODSTATE(sc->id->t_modifiers, state);
+			if ((sc->sc_scroll_data.mode == WSKBD_SCROLL_MODE_HOLD
+			   	&& MOD_ONESET(sc->id, MOD_HOLDSCREEN))
+			|| (sc->sc_scroll_data.mode == WSKBD_SCROLL_MODE_NORMAL
+				&& sc->sc_scroll_data.modifier == state)) {
+					update_modifier(sc->id, *type, 0, MOD_COMMAND);
+					wsdisplay_scroll(sc->sc_base.me_dispdv,
+					   	(ksym == KS_Cmd_ScrollSlowUp) ?
+						WSDISPLAY_SCROLL_BACKWARD | WSDISPLAY_SCROLL_LOW:
+						WSDISPLAY_SCROLL_FORWARD | WSDISPLAY_SCROLL_LOW);
+					return (1);
+			} else {
+				return (0);
+			}
+		}
+#endif
+
 	case KS_Cmd:
 		update_modifier(sc->id, *type, 0, MOD_COMMAND);
 		ksym = ksym2;
@@ -1326,9 +1452,8 @@ internal_command(struct wskbd_softc *sc, u_int *type, keysym_t ksym,
 	     ! MOD_ALLSET(sc->id, MOD_COMMAND1 | MOD_COMMAND2)))
 		return (0);
 
-	switch (ksym) {
 #if defined(DDB) || defined(KGDB)
-	case KS_Cmd_Debugger:
+	if (ksym == KS_Cmd_Debugger) {
 		if (sc->sc_isconsole) {
 #ifdef DDB
 			console_debugger();
@@ -1340,9 +1465,14 @@ internal_command(struct wskbd_softc *sc, u_int *type, keysym_t ksym,
 		/* discard this key (ddb discarded command modifiers) */
 		*type = WSCONS_EVENT_KEY_UP;
 		return (1);
+	}
 #endif
 
 #if NWSDISPLAY > 0
+	if (sc->sc_base.me_dispdv == NULL)
+		return (0);
+
+	switch (ksym) {
 	case KS_Cmd_Screen0:
 	case KS_Cmd_Screen1:
 	case KS_Cmd_Screen2:
@@ -1382,8 +1512,9 @@ internal_command(struct wskbd_softc *sc, u_int *type, keysym_t ksym,
 				    ksym == KS_Cmd_ContrastDown ? -1 : 1,
 				    ksym == KS_Cmd_ContrastRotate ? 1 : 0);
 		return (1);
-#endif
 	}
+#endif
+
 	return (0);
 }
 

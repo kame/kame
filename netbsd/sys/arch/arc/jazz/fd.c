@@ -1,4 +1,4 @@
-/*	$NetBSD: fd.c,v 1.3 2001/07/08 18:06:43 wiz Exp $	*/
+/*	$NetBSD: fd.c,v 1.17 2003/08/07 16:26:50 agc Exp $	*/
 /*	$OpenBSD: fd.c,v 1.6 1998/10/03 21:18:57 millert Exp $	*/
 /*	NetBSD: fd.c,v 1.78 1995/07/04 07:23:09 mycroft Exp 	*/
 
@@ -53,11 +53,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -76,6 +72,9 @@
  *	@(#)fd.c	7.4 (Berkeley) 5/25/91
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: fd.c,v 1.17 2003/08/07 16:26:50 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/callout.h>
@@ -85,7 +84,6 @@
 #include <sys/ioctl.h>
 #include <sys/device.h>
 #include <sys/disklabel.h>
-#include <sys/dkstat.h>
 #include <sys/disk.h>
 #include <sys/buf.h>
 #include <sys/uio.h>
@@ -103,9 +101,6 @@
 #include <arc/jazz/fdcvar.h>
 
 #include "locators.h"
-
-bdev_decl(fd);
-cdev_decl(fd);
 
 #define FDUNIT(dev)	DISKUNIT(dev)
 #define FDTYPE(dev)	DISKPART(dev)
@@ -135,13 +130,20 @@ struct fd_type {
 
 /* The order of entries in the following table is important -- BEWARE! */
 struct fd_type fd_types[] = {
-        { 18,2,36,2,0xff,0xcf,0x1b,0x6c,80,2880,1,FDC_500KBPS,"1.44MB"    }, /* 1.44MB diskette */
-        { 15,2,30,2,0xff,0xdf,0x1b,0x54,80,2400,1,FDC_500KBPS, "1.2MB"    }, /* 1.2 MB AT-diskettes */
-        {  9,2,18,2,0xff,0xdf,0x23,0x50,40, 720,2,FDC_300KBPS, "360KB/AT" }, /* 360kB in 1.2MB drive */
-        {  9,2,18,2,0xff,0xdf,0x2a,0x50,40, 720,1,FDC_250KBPS, "360KB/PC" }, /* 360kB PC diskettes */
-        {  9,2,18,2,0xff,0xdf,0x2a,0x50,80,1440,1,FDC_250KBPS, "720KB"    }, /* 3.5" 720kB diskette */
-        {  9,2,18,2,0xff,0xdf,0x23,0x50,80,1440,1,FDC_300KBPS, "720KB/x"  }, /* 720kB in 1.2MB drive */
-        {  9,2,18,2,0xff,0xdf,0x2a,0x50,40, 720,2,FDC_250KBPS, "360KB/x"  }, /* 360kB in 720kB drive */
+	/* 1.44MB diskette */
+	{ 18,2,36,2,0xff,0xcf,0x1b,0x6c,80,2880,1,FDC_500KBPS,"1.44MB"    },
+	/* 1.2 MB AT-diskettes */
+	{ 15,2,30,2,0xff,0xdf,0x1b,0x54,80,2400,1,FDC_500KBPS, "1.2MB"    },
+	/* 360kB in 1.2MB drive */
+	{  9,2,18,2,0xff,0xdf,0x23,0x50,40, 720,2,FDC_300KBPS, "360KB/AT" },
+	/* 360kB PC diskettes */
+	{  9,2,18,2,0xff,0xdf,0x2a,0x50,40, 720,1,FDC_250KBPS, "360KB/PC" },
+	/* 3.5" 720kB diskette */
+	{  9,2,18,2,0xff,0xdf,0x2a,0x50,80,1440,1,FDC_250KBPS, "720KB"    },
+	/* 720kB in 1.2MB drive */
+	{  9,2,18,2,0xff,0xdf,0x23,0x50,80,1440,1,FDC_300KBPS, "720KB/x"  },
+	/* 360kB in 720kB drive */
+	{  9,2,18,2,0xff,0xdf,0x2a,0x50,40, 720,2,FDC_250KBPS, "360KB/x"  },
 };
 
 /* software state, per disk (with up to 4 disks per ctlr) */
@@ -174,7 +176,7 @@ struct fd_softc {
 
 	TAILQ_ENTRY(fd_softc) sc_drivechain;
 	int sc_ops;		/* I/O ops since last switch */
-	struct buf_queue sc_q;	/* pending I/O requests */
+	struct bufq_state sc_q;	/* pending I/O requests */
 	int sc_active;		/* number of active I/O operations */
 };
 
@@ -184,8 +186,22 @@ void fdattach __P((struct device *, struct device *, void *));
 
 extern struct cfdriver fd_cd;
 
-struct cfattach fd_ca = {
-	sizeof(struct fd_softc), fdprobe, fdattach
+CFATTACH_DECL(fd, sizeof(struct fd_softc), fdprobe, fdattach, NULL, NULL);
+
+dev_type_open(fdopen);
+dev_type_close(fdclose);
+dev_type_read(fdread);
+dev_type_write(fdwrite);
+dev_type_ioctl(fdioctl);
+dev_type_strategy(fdstrategy);
+
+const struct bdevsw fd_bdevsw = {
+	fdopen, fdclose, fdstrategy, fdioctl, nodump, nosize, D_DISK
+};
+
+const struct cdevsw fd_cdevsw = {
+	fdopen, fdclose, fdread, fdwrite, fdioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
 };
 
 void fdgetdisklabel(struct fd_softc *);
@@ -231,10 +247,10 @@ fdprint(aux, fdc)
 	void *aux;
 	const char *fdc;
 {
-	register struct fdc_attach_args *fa = aux;
+	struct fdc_attach_args *fa = aux;
 
 	if (!fdc)
-		printf(" drive %d", fa->fa_drive);
+		aprint_normal(" drive %d", fa->fa_drive);
 	return QUIET;
 }
 
@@ -338,7 +354,7 @@ fdattach(parent, self, aux)
 	else
 		printf(": density unknown\n");
 
-	BUFQ_INIT(&fd->sc_q);
+	bufq_alloc(&fd->sc_q, BUFQ_DISKSORT|BUFQ_SORT_CYLINDER);
 	fd->sc_cylin = -1;
 	fd->sc_drive = drive;
 	fd->sc_deftype = type;
@@ -411,11 +427,11 @@ fd_dev_to_type(fd, dev)
 
 void
 fdstrategy(bp)
-	register struct buf *bp;	/* IO operation to perform */
+	struct buf *bp;		/* IO operation to perform */
 {
 	struct fd_softc *fd = device_lookup(&fd_cd, FDUNIT(bp->b_dev));
 	int sz;
- 	int s;
+	int s;
 
 	/* Valid unit, controller, and request? */
 	if (bp->b_blkno < 0 ||
@@ -446,17 +462,18 @@ fdstrategy(bp)
 	}
 
 	bp->b_rawblkno = bp->b_blkno;
- 	bp->b_cylinder =
+	bp->b_cylinder =
 	    bp->b_blkno / (FDC_BSIZE / DEV_BSIZE) / fd->sc_type->seccyl;
 
 #ifdef FD_DEBUG
-	printf("fdstrategy: b_blkno %d b_bcount %ld blkno %d cylin %ld sz %d\n",
+	printf("fdstrategy: b_blkno %" PRId64 " b_bcount %ld blkno %" PRId64
+	    " cylin %ld sz %d\n",
 	    bp->b_blkno, bp->b_bcount, fd->sc_blkno, bp->b_cylinder, sz);
 #endif
 
 	/* Queue transfer on drive, activate drive and controller if idle. */
 	s = splbio();
-	disksort_cylinder(&fd->sc_q, bp);
+	BUFQ_PUT(&fd->sc_q, bp);
 	callout_stop(&fd->sc_motoroff_ch);		/* a good idea */
 	if (fd->sc_active == 0)
 		fdstart(fd);
@@ -509,17 +526,17 @@ fdfinish(fd, bp)
 	 * another drive is waiting to be serviced, since there is a long motor
 	 * startup delay whenever we switch.
 	 */
+	(void)BUFQ_GET(&fd->sc_q);
 	if (fd->sc_drivechain.tqe_next && ++fd->sc_ops >= 8) {
 		fd->sc_ops = 0;
 		TAILQ_REMOVE(&fdc->sc_drives, fd, sc_drivechain);
-		if (BUFQ_NEXT(bp) != NULL)
+		if (BUFQ_PEEK(&fd->sc_q) != NULL)
 			TAILQ_INSERT_TAIL(&fdc->sc_drives, fd, sc_drivechain);
 		else
 			fd->sc_active = 0;
 	}
 	bp->b_resid = fd->sc_bcount;
 	fd->sc_skip = 0;
-	BUFQ_REMOVE(&fd->sc_q, bp);
 	biodone(bp);
 	/* turn off motor 5s from now */
 	callout_reset(&fd->sc_motoroff_ch, 5 * hz, fd_motor_off, fd);
@@ -759,7 +776,7 @@ fdctimeout(arg)
 #endif
 	fdcstatus(&fd->sc_dev, 0, "timeout");
 
-	if (BUFQ_FIRST(&fd->sc_q) != NULL)
+	if (BUFQ_PEEK(&fd->sc_q) != NULL)
 		fdc->sc_state++;
 	else
 		fdc->sc_state = DEVIDLE;
@@ -799,11 +816,11 @@ loop:
 	fd = fdc->sc_drives.tqh_first;
 	if (fd == NULL) {
 		fdc->sc_state = DEVIDLE;
- 		return 1;
+		return 1;
 	}
 
 	/* Is there a transfer to this drive?  If not, deactivate drive. */
-	bp = BUFQ_FIRST(&fd->sc_q);
+	bp = BUFQ_PEEK(&fd->sc_q);
 	if (bp == NULL) {
 		fd->sc_ops = 0;
 		TAILQ_REMOVE(&fdc->sc_drives, fd, sc_drivechain);
@@ -880,8 +897,8 @@ loop:
 			block = (fd->sc_cylin * type->heads + head) *
 			    type->sectrac + sec;
 			if (block != fd->sc_blkno) {
-				printf("fdcintr: block %d != blkno %d\n",
-				    block, fd->sc_blkno);
+				printf("fdcintr: block %d != blkno %" PRId64
+				    "\n", block, fd->sc_blkno);
 #ifdef DDB
 				 Debugger();
 #endif
@@ -925,7 +942,7 @@ loop:
 		return 1;
 
 	case SEEKCOMPLETE:
-		disk_unbusy(&fd->sc_dk, 0);
+		disk_unbusy(&fd->sc_dk, 0, 0);
 
 		/* Make sure seek really happened. */
 		out_fdc(iot, ioh, NE7CMD_SENSEI);
@@ -952,7 +969,8 @@ loop:
 	case IOCOMPLETE: /* IO DONE, post-analyze */
 		callout_stop(&fdc->sc_timo_ch);
 
-		disk_unbusy(&fd->sc_dk, (bp->b_bcount - bp->b_resid));
+		disk_unbusy(&fd->sc_dk, (bp->b_bcount - bp->b_resid),
+		    (bp->b_flags & B_READ));
 
 		i = fdcresult(fdc);
 		if (i != 7 || (st0 & 0xf8) != 0) {
@@ -960,7 +978,7 @@ loop:
 #ifdef FD_DEBUG
 			fdcstatus(&fd->sc_dev, 7, bp->b_flags & B_READ ?
 			    "read failed" : "write failed");
-			printf("blkno %d nblks %d\n",
+			printf("blkno %" PRId64 " nblks %d\n",
 			    fd->sc_blkno, fd->sc_nblks);
 #endif
 			fdcretry(fdc);
@@ -1052,7 +1070,7 @@ fdcretry(fdc)
 	char bits[64];
 
 	fd = fdc->sc_drives.tqh_first;
-	bp = BUFQ_FIRST(&fd->sc_q);
+	bp = BUFQ_PEEK(&fd->sc_q);
 
 	switch (fdc->sc_errors) {
 	case 0:
@@ -1088,27 +1106,6 @@ fdcretry(fdc)
 		fdfinish(fd, bp);
 	}
 	fdc->sc_errors++;
-}
-
-int
-fdsize(dev)
-	dev_t dev;
-{
-
-	/* Swapping to floppies would not make sense. */
-	return -1;
-}
-
-int
-fddump(dev, blkno, va, size)
-	dev_t dev;
-	daddr_t blkno;
-	caddr_t va;
-	size_t size;
-{
-
-	/* Not implemented. */
-	return ENXIO;
 }
 
 int

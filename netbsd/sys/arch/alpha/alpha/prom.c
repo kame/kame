@@ -1,4 +1,4 @@
-/* $NetBSD: prom.c,v 1.42 2001/07/12 23:35:43 thorpej Exp $ */
+/* $NetBSD: prom.c,v 1.44 2003/03/08 01:18:42 he Exp $ */
 
 /* 
  * Copyright (c) 1992, 1994, 1995, 1996 Carnegie Mellon University
@@ -27,7 +27,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: prom.c,v 1.42 2001/07/12 23:35:43 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: prom.c,v 1.44 2003/03/08 01:18:42 he Exp $");
 
 #include "opt_multiprocessor.h"
 
@@ -49,7 +49,7 @@ __KERNEL_RCSID(0, "$NetBSD: prom.c,v 1.42 2001/07/12 23:35:43 thorpej Exp $");
 
 /* XXX this is to fake out the console routines, while booting. */
 struct consdev promcons = { NULL, NULL, promcngetc, promcnputc,
-			    nullcnpollc, NULL, makedev(23,0), 1 };
+			    nullcnpollc, NULL, NULL, NULL, makedev(23,0), 1 };
 
 struct rpb	*hwrpb;
 int		alpha_console;
@@ -307,8 +307,8 @@ hwrpb_primary_init(void)
 	p = LOCATE_PCS(hwrpb, hwrpb->rpb_primary_cpu_id);
 
 	/* Initialize the primary's HWPCB and the Virtual Page Table Base. */
-	memcpy(p->pcs_hwpcb, &proc0.p_addr->u_pcb.pcb_hw,
-	    sizeof proc0.p_addr->u_pcb.pcb_hw);
+	memcpy(p->pcs_hwpcb, &lwp0.l_addr->u_pcb.pcb_hw,
+	    sizeof lwp0.l_addr->u_pcb.pcb_hw);
 	hwrpb->rpb_vptb = VPTBASE;
 
 	hwrpb->rpb_checksum = hwrpb_checksum();

@@ -1,4 +1,4 @@
-/* $NetBSD: sfasvar.h,v 1.1 2001/10/05 22:27:59 reinoud Exp $ */
+/* $NetBSD: sfasvar.h,v 1.4 2003/11/10 08:51:51 wiz Exp $ */
 
 /*
  * Copyright (c) 1995 Daniel Widenfalk
@@ -41,7 +41,7 @@
  * MAXCHAIN is the anticipated maximum number of chain blocks needed. This
  * assumes that we are NEVER requested to transfer more than MAXPHYS bytes.
  */
-#define MAXCHAIN	(MAXPHYS/NBPG+2)
+#define MAXCHAIN	(MAXPHYS/PAGE_SIZE+2)
 
 /*
  * Maximum number of requests standing by. Could be anything, but I think 9
@@ -51,11 +51,11 @@
 
 /*
  * DMA chain block. If flg == SFAS_CHAIN_PRG or flg == SFAS_CHAIN_BUMP then
- * ptr is a VIRTUAL adress. If flg == SFAS_CHAIN_DMA then ptr is a PHYSICAL
- * adress.
+ * ptr is a VIRTUAL address. If flg == SFAS_CHAIN_DMA then ptr is a PHYSICAL
+ * address.
  */
 struct	sfas_dma_chain {
-	vm_offset_t	ptr;
+	void		*ptr;
 	u_short		len;
 	short		flg;
 };
@@ -88,13 +88,13 @@ struct nexus {
 	short			 max_link;	/* Maximum used of above */
 	short			 cur_link;	/* Currently handled block */
 
-	u_char			*buf;		/* Virtual adress of data */
+	u_char			*buf;		/* Virtual address of data */
 	int			 len;		/* Bytes left to transfer */
 
-	vm_offset_t		 dma_buf;	/* Current DMA adress */
+	void			*dma_buf;	/* Current DMA address */
 	int			 dma_len;	/* Current DMA length */
 
-	vm_offset_t		 dma_blk_ptr;	/* Current chain adress */
+	void			*dma_blk_ptr;	/* Current chain address */
 	int			 dma_blk_len;	/* Current chain length */
 	u_char			 dma_blk_flg;	/* Current chain flags */
 
@@ -164,7 +164,7 @@ struct	sfas_softc {
 	void			*sc_spec;	/* Board-specific data */
 
 	u_char			*sc_bump_va;	/* Bumpbuf virtual adr */
-	vm_offset_t		 sc_bump_pa;	/* Bumpbuf physical adr */
+	void			*sc_bump_pa;	/* Bumpbuf physical adr */
 	int			 sc_bump_sz;	/* Bumpbuf size */
 
 /* Configuration registers, must be set BEFORE sfasinitialize */
@@ -174,16 +174,17 @@ struct	sfas_softc {
 	u_char			 sc_config_flags;
 
 /* Generic DMA functions */
-	int		       (*sc_setup_dma)();
-	int		       (*sc_build_dma_chain)();
-	int		       (*sc_need_bump)();
+	int		       (*sc_setup_dma)(void *, void *, int, int);
+	int		       (*sc_build_dma_chain)(void *, void *, void *,
+						     int);
+	int		       (*sc_need_bump)(void *, void *, int);
 
 /* Optional replacement ixfer */
-	void		       (*sc_ixfer)();
+	void		       (*sc_ixfer)(void *, int);
 
 /* Generic Led data */
 	int			 sc_led_status;
-	void		       (*sc_led)();
+	void		       (*sc_led)(void *, int);
 
 /* Nexus list */
 	struct nexus		 sc_nexus[8];
@@ -194,9 +195,9 @@ struct	sfas_softc {
 	u_char			*sc_buf;	/* va */
 	int			 sc_len;
 
-	vm_offset_t		 sc_dma_buf;	/* pa */
+	void			*sc_dma_buf;	/* pa */
 	int			 sc_dma_len;
-	vm_offset_t		 sc_dma_blk_ptr;
+	void			*sc_dma_blk_ptr;
 	int			 sc_dma_blk_len;
 	short			 sc_dma_blk_flg;
 

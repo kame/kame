@@ -1,4 +1,4 @@
-#	$NetBSD: P6032,v 1.8.4.1 2002/08/01 04:15:33 lukem Exp $
+#	$NetBSD: P6032,v 1.21.2.1 2004/07/15 20:20:32 he Exp $
 #
 # Algorithmics P-6032 kernel.
 #
@@ -7,7 +7,7 @@ include	"arch/algor/conf/std.algor"
 
 #options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
-#ident 		"P6032-$Revision: 1.8.4.1 $"
+#ident 		"P6032-$Revision: 1.21.2.1 $"
 
 maxusers 32
 
@@ -15,8 +15,6 @@ maxusers 32
 #options 	ALGOR_P4032	# Algorithmics P-4032
 #options 	ALGOR_P5064	# Algorithmics P-5064
 options 	ALGOR_P6032	# Algorithmics P-6032
-
-options 	MIPS3_L2CACHE_ABSENT	# No L2 cache on this machine
 
 # Standard system options
 options 	KTRACE			# System call tracing support
@@ -61,6 +59,7 @@ options 	COMPAT_11
 options 	COMPAT_12
 options 	COMPAT_13
 options 	COMPAT_14
+options 	COMPAT_16
 
 # System V-like message queues
 options 	SYSVMSG
@@ -84,9 +83,9 @@ options 	PCIVERBOSE		# recognize "unknown" PCI devices
 options 	MIIVERBOSE		# verbose PHY autoconfig messages
 #options 	PCI_CONFIG_DUMP		# verbosely dump PCI config space
 options 	SCSIVERBOSE		# Verbose SCSI errors
-options 	UCONSOLE		# users can use TIOCCONS (for xconsole)
 #options 	PCMCIAVERBOSE
 #options	PIPE_SOCKETPAIR		# smaller, but slower pipe(2)
+#options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
 
 # The Alpha console firmware network boots using the BOOTP
 # protocol, so we ask the NFS code to use BOOTP/DHCP as well,
@@ -112,9 +111,9 @@ pci*	at	bonito?
 # PCI devices
 #adv*	at	pci? dev ? function ?		# AdvanSys SCSI
 #adw*	at	pci? dev ? function ?		# AdvanSys Wide SCSI
-#options 	ADW_WDTR_DISABLE		# 	disable WDTR
-#options 	ADW_SDTR_DISABLE		# 	disable SDTR
-#options 	ADW_TAGQ_DISABLE		# 	disable Tag Queuing
+#options 	SCSI_ADW_WDTR_DISABLE		# 	disable WDTR
+#options 	SCSI_ADW_SDTR_DISABLE		# 	disable SDTR
+#options 	SCSI_ADW_TAGQ_DISABLE		# 	disable Tag Queuing
 #ahc*	at	pci? dev ? function ?		# Adaptec [23]94x, aic78x0 SCSI
 #bha*	at	pci? dev ? function ?		# BusLogic 9xx SCSI (untested)
 #cac*	at	pci? dev ? function ?		# Compaq array controller (untested)
@@ -137,10 +136,23 @@ pcib*	at	pci? dev ? function ?		# Intel PCI-ISA Bridges
 #mlx*	at	pci? dev ? function ?		# Mylex DAC960 / DEC SWXCR (untested)
 #ne*	at	pci? dev ? function ?		# NE2000-compatible Ethernet
 #ohci*	at	pci? dev ? function ?		# USB Open Host Controller
-pciide*	at	pci? dev ? function ?		# PCI IDE controllers
+pciide* at pci? dev ? function ? flags 0x0000	# GENERIC pciide driver
+acardide* at pci? dev ? function ?		# Acard IDE controllers
+aceride* at pci? dev ? function ?		# Acer Lab IDE controllers
+artsata* at pci? dev ? function ?		# Intel i31244 SATA controller
+cmdide* at pci? dev ? function ?		# CMD tech IDE controllers
+cypide* at pci? dev ? function ?		# Cypress IDE controllers
+hptide* at pci? dev ? function ?		# Triones/HighPoint IDE controllers
+optiide* at pci? dev ? function ?		# Opti IDE controllers
+piixide* at pci? dev ? function ?		# Intel IDE controllers
+pdcide* at pci? dev ? function ?		# Promise IDE controllers
+satalink* at pci? dev ? function ?		# SiI SATALink controllers
+siside* at pci? dev ? function ?		# SiS IDE controllers
+slide*  at pci? dev ? function ?		# Symphony Labs IDE controllers
+viaide* at pci? dev ? function ?		# VIA/AMD/Nvidia IDE controllers
 #pcscp*	at	pci? dev ? function ?		# AMD Am53c974 PCscsi-PCI
 ppb*	at	pci? dev ? function ?		# PCI-PCI Bridges
-#rtk*	at	pci? dev ? function ?		# RealTek 8129/8139 Ethernet
+#rtk*	at	pci? dev ? function ?		# Realtek 8129/8139 Ethernet
 #sip*	at	pci? dev ? function ?		# SiS 900 Ethernet
 #sv*	at	pci? dev ? function ?		# S3 SonicVibes
 #tga*	at	pci? dev ? function ?		# DEC ZLXp-E[123] Graphics
@@ -270,13 +282,14 @@ fdc0	at	isa? port 0x3f0 irq 6 drq 2	# floppy controller
 #sd*	at	scsibus? target ? lun ?		# SCSI disk drives
 #st*	at	scsibus? target ? lun ?		# SCSI tape drives
 
-# ST506/ESDI/IDE devices
-wd*	at	pciide? channel ?
-#wd*	at	wdc? drive ?
+# ATA (IDE) bus support
+atabus* at ata?
+
+# IDE drives
+wd*	at	atabus? drive ?
 
 # ATAPI bus support
-atapibus* at	pciide? channel ?
-#atapibus* at	wdc?
+atapibus* at	atapi?
 
 # ATAPI devices
 sd*	at	atapibus? drive ?		# ATAPI disk devices
@@ -320,13 +333,15 @@ fd*	at	fdc? drive ?
 
 # USB Mass Storage
 #umass*	at uhub? port ? configuration ? interface ?
-#atapibus* at umass? channel ?
+#atapibus* at umass?
 #scsibus* at umass? channel ?
 
 # USB Ethernet adapters
 #aue*	at uhub? port ?		# ADMtek AN986 Pegasus based adapters
 #cue*	at uhub? port ?		# CATC USB-EL1201A based adapters
 #kue*	at uhub? port ?		# Kawasaki LSI KL5KUSB101B based adapters
+#uax*	at uhub? port ?		# ASIX AX88172 based adapters
+#url*	at uhub? port ?		# Realtek RTL8150L based adapters
 
 # Serial adapters
 # FTDI FT8U100AX serial adapter
@@ -349,6 +364,7 @@ fd*	at	fdc? drive ?
 
 pseudo-device	bpfilter	16
 pseudo-device	ccd		4
+#pseudo-device	cgd		4	# cryptographic disk devices
 #pseudo-device	raid		4		# RAIDframe disk driver
 #options 	RAID_AUTOCONFIG		# auto-configuration of RAID components
 pseudo-device	ipfilter	1

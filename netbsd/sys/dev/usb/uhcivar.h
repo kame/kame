@@ -1,4 +1,4 @@
-/*	$NetBSD: uhcivar.h,v 1.33 2002/02/11 11:41:30 augustss Exp $	*/
+/*	$NetBSD: uhcivar.h,v 1.36 2002/12/31 00:39:11 augustss Exp $	*/
 /*	$FreeBSD: src/sys/dev/usb/uhcivar.h,v 1.14 1999/11/17 22:33:42 n_hibma Exp $	*/
 
 /*
@@ -41,8 +41,8 @@
 /*
  * To avoid having 1024 TDs for each isochronous transfer we introduce
  * a virtual frame list.  Every UHCI_VFRAMELIST_COUNT entries in the real
- * frame list points to a non-active TD.  These, in turn, form the 
- * starts of the virtual frame list.  This also has the advantage that it 
+ * frame list points to a non-active TD.  These, in turn, form the
+ * starts of the virtual frame list.  This also has the advantage that it
  * simplifies linking in/out of TDs/QHs in the schedule.
  * Furthermore, initially each of the inactive TDs point to an inactive
  * QH that forms the start of the interrupt traffic for that slot.
@@ -97,7 +97,7 @@ struct uhci_soft_td {
 	uhci_soft_td_qh_t link; 	/* soft version of the td_link field */
 	uhci_physaddr_t physaddr;	/* TD's physical address. */
 };
-/* 
+/*
  * Make the size such that it is a multiple of UHCI_TD_ALIGN.  This way
  * we can pack a number of soft TD together and have the real TD well
  * aligned.
@@ -161,7 +161,10 @@ typedef struct uhci_softc {
 	u_int8_t sc_saved_sof;
 	u_int16_t sc_saved_frnum;
 
+#ifdef USB_USE_SOFTINTR
 	char sc_softwake;
+#endif /* USB_USE_SOFTINTR */
+
 	char sc_isreset;
 	char sc_suspend;
 	char sc_dying;
@@ -173,7 +176,7 @@ typedef struct uhci_softc {
 	usbd_xfer_handle sc_intr_xfer;	/* root hub interrupt transfer */
 	usb_callout_t sc_poll_handle;
 
-	char sc_vendor[16];		/* vendor string for root hub */
+	char sc_vendor[32];		/* vendor string for root hub */
 	int sc_id_vendor;		/* vendor ID for root hub */
 
 	void *sc_powerhook;		/* cookie from power hook */

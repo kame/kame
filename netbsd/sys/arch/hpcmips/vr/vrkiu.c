@@ -1,4 +1,4 @@
-/*	$NetBSD: vrkiu.c,v 1.31 2002/03/10 07:24:54 takemura Exp $	*/
+/*	$NetBSD: vrkiu.c,v 1.36 2004/03/13 17:23:32 bjh21 Exp $	*/
 
 /*-
  * Copyright (c) 1999 SASAKI Takesi All rights reserved.
@@ -35,6 +35,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vrkiu.c,v 1.36 2004/03/13 17:23:32 bjh21 Exp $");
+
 #include <sys/param.h>
 #include <sys/tty.h>
 #include <sys/systm.h>
@@ -63,7 +66,6 @@
 #include <dev/wscons/wskbdvar.h>
 #include <dev/wscons/wsksymdef.h>
 #include <dev/wscons/wsksymvar.h>
-#include <dev/pckbc/wskbdmap_mfii.h>
 #ifdef WSDISPLAY_COMPAT_RAWKBD
 #include <dev/hpc/pckbd_encode.h>
 #endif
@@ -91,9 +93,8 @@ static void eliminate_phantom_keys(struct vrkiu_chip *, unsigned short *);
 static int vrkiu_poll(void*);
 static int vrkiu_input_establish(void*, struct hpckbd_if*);
 
-struct cfattach vrkiu_ca = {
-	sizeof(struct vrkiu_softc), vrkiumatch, vrkiuattach
-};
+CFATTACH_DECL(vrkiu, sizeof(struct vrkiu_softc),
+    vrkiumatch, vrkiuattach, NULL, NULL);
 
 struct vrkiu_chip *vrkiu_consdata = NULL;
 
@@ -142,7 +143,7 @@ vrkiuattach(struct device *parent, struct device *self, void *aux)
 	bus_space_tag_t iot = va->va_iot;
 	bus_space_handle_t ioh;
 
-	if (va->va_parent_ioh != NULL)
+	if (va->va_parent_ioh != 0)
 		res = bus_space_subregion(iot, va->va_parent_ioh, va->va_addr,
 		    va->va_size, &ioh);
 	else

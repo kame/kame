@@ -1,4 +1,4 @@
-/*	$NetBSD: bwtwo_obio.c,v 1.5 2002/03/11 16:27:01 pk Exp $ */
+/*	$NetBSD: bwtwo_obio.c,v 1.12 2003/12/04 12:42:54 keihan Exp $ */
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -57,11 +57,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -85,9 +81,12 @@
  *
  * Does not handle interrupts, even though they can occur.
  *
- * P4 and overlay plane support by Jason R. Thorpe <thorpej@NetBSD.ORG>.
+ * P4 and overlay plane support by Jason R. Thorpe <thorpej@NetBSD.org>.
  * Overlay plane handling hints and ideas provided by Brad Spencer.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bwtwo_obio.c,v 1.12 2003/12/04 12:42:54 keihan Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -101,7 +100,6 @@
 #include <machine/autoconf.h>
 #include <machine/eeprom.h>
 #include <machine/ctlreg.h>
-#include <machine/conf.h>
 #include <sparc/sparc/asm.h>
 
 #include <dev/sun/fbio.h>
@@ -116,9 +114,8 @@ static void	bwtwoattach_obio (struct device *, struct device *, void *);
 static int	bwtwomatch_obio (struct device *, struct cfdata *, void *);
 
 
-struct cfattach bwtwo_obio_ca = {
-	sizeof(struct bwtwo_softc), bwtwomatch_obio, bwtwoattach_obio
-};
+CFATTACH_DECL(bwtwo_obio, sizeof(struct bwtwo_softc),
+    bwtwomatch_obio, bwtwoattach_obio, NULL, NULL);
 
 static int	bwtwo_get_video_sun4(struct bwtwo_softc *);
 static void	bwtwo_set_video_sun4(struct bwtwo_softc *, int);

@@ -1,4 +1,4 @@
-/*	$NetBSD: mainbus.c,v 1.8 1998/02/05 04:57:43 gwr Exp $	*/
+/*	$NetBSD: mainbus.c,v 1.12 2003/07/15 03:36:18 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.12 2003/07/15 03:36:18 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -45,9 +48,8 @@
 static int 	main_match __P((struct device *, struct cfdata *, void *));
 static void	main_attach __P((struct device *, struct device *, void *));
 
-struct cfattach mainbus_ca = {
-	sizeof(struct device), main_match, main_attach
-};
+CFATTACH_DECL(mainbus, sizeof(struct device),
+    main_match, main_attach, NULL, NULL);
 
 /*
  * Probe for the mainbus; always succeeds.

@@ -1,4 +1,4 @@
-/*	$NetBSD: smbfs_subr.h,v 1.2 2002/01/09 17:43:28 deberg Exp $	*/
+/*	$NetBSD: smbfs_subr.h,v 1.9.4.1 2004/05/23 10:45:28 tron Exp $	*/
 
 /*
  * Copyright (c) 2000-2001, Boris Popov
@@ -36,9 +36,8 @@
 #ifndef _FS_SMBFS_SMBFS_SUBR_H_
 #define _FS_SMBFS_SMBFS_SUBR_H_
 
-#ifdef MALLOC_DECLARE
+MALLOC_DECLARE(M_SMBNODENAME);
 MALLOC_DECLARE(M_SMBFSDATA);
-#endif
 
 #define SMBFSERR(format, args...) printf("%s: "format, __func__ ,## args)
 
@@ -117,7 +116,7 @@ struct smbfs_fctx {
 	int		f_ecnt;		/* entries left in the current reponse */
 	int		f_eofs;		/* entry offset in the parameter block */
 	u_char 		f_skey[SMB_SKEYLEN]; /* server side search context */
-	u_char		f_fname[8 + 1 + 3 + 1]; /* common case for 8.3 filenames */
+	char		f_fname[8 + 1 + 3 + 1]; /* common case for 8.3 filenames */
 	u_int16_t	f_Sid;
 	u_int16_t	f_infolevel;
 	int		f_rnamelen;
@@ -127,9 +126,6 @@ struct smbfs_fctx {
 
 #define f_rq	f_urq.uf_rq
 #define f_t2	f_urq.uf_t2
-
-extern int smbfs_debuglevel;
-
 
 /*
  * smb level
@@ -146,8 +142,10 @@ int  smbfs_smb_setpattr(struct smbnode *np, u_int16_t attr,
 	struct timespec *mtime, struct smb_cred *scred);
 int  smbfs_smb_setptime2(struct smbnode *np, struct timespec *mtime,
 	struct timespec *atime, int attr, struct smb_cred *scred);
+#if 0
 int  smbfs_smb_setpattrNT(struct smbnode *np, u_int16_t attr,
 	struct timespec *mtime, struct timespec *atime, struct smb_cred *scred);
+#endif
 
 int  smbfs_smb_setftime(struct smbnode *np, struct timespec *mtime,
 	struct timespec *atime, struct smb_cred *scred);
@@ -167,6 +165,10 @@ int  smbfs_smb_move(struct smbnode *src, struct smbnode *tdnp,
 int  smbfs_smb_mkdir(struct smbnode *dnp, const char *name, int len,
 	struct smb_cred *scred);
 int  smbfs_smb_rmdir(struct smbnode *np, struct smb_cred *scred);
+int  smbfs_smb_ntcreatex(struct smbnode *, int accmode, struct smb_cred *);
+int  smbfs_smb_nt_dirnotify_setup(struct smbnode *, struct smb_rq **, struct smb_cred *, void (*)(void *), void *);
+int  smbfs_smb_nt_dirnotify_fetch(struct smb_rq *, int *);
+int  smbfs_smb_ntcancel(struct smb_connobj *, u_int16_t, struct smb_cred *);
 int  smbfs_findopen(struct smbnode *dnp, const char *wildcard, int wclen,
 	int attr, struct smb_cred *scred, struct smbfs_fctx **ctxpp);
 int  smbfs_findnext(struct smbfs_fctx *ctx, int limit, struct smb_cred *scred);
@@ -186,4 +188,7 @@ void  smb_time_unix2dos(struct timespec *tsp, int tzoff, u_int16_t *ddp,
 	     u_int16_t *dtp, u_int8_t *dhp);
 void smb_dos2unixtime (u_int dd, u_int dt, u_int dh, int tzoff, struct timespec *tsp);
 
+#ifdef SYSCTL_SETUP_PROTO
+SYSCTL_SETUP_PROTO(sysctl_vfs_samba_setup);
+#endif /* SYSCTL_SETUP_PROTO */
 #endif /* !_FS_SMBFS_SMBFS_SUBR_H_ */

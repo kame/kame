@@ -1,8 +1,9 @@
-#	$NetBSD: files.mvme68k,v 1.51 2002/03/24 18:10:14 scw Exp $
+#	$NetBSD: files.mvme68k,v 1.58 2003/07/27 01:19:28 thorpej Exp $
 
 # config file for mvme68k
 
 defflag	opt_m060sp.h		M060SP
+defflag				PANICBUTTON	# panic on ABORT if not DDB
 
 # maxpartitions must be first item in files.${ARCH}.newconf
 maxpartitions 8
@@ -68,13 +69,6 @@ file dev/md_root.c				memory_disk_hooks
 
 include "dev/scsipi/files.scsipi"
 
-major { sd = 4 }
-major { cd = 8 }
-major { md = 9 }
-
-# RAIDframe
-major { raid = 16 }
-
 # WD33C93 SCSI ...
 define sbic
 file arch/mvme68k/dev/sbic.c			sbic
@@ -96,20 +90,19 @@ file arch/mvme68k/mvme68k/bus_dma.c
 file arch/mvme68k/mvme68k/bus_space.c
 file arch/mvme68k/mvme68k/clock.c
 file arch/mvme68k/mvme68k/conf.c
-file arch/mvme68k/mvme68k/db_memrw.c		ddb | kgdb
 file arch/mvme68k/mvme68k/disksubr.c
 file arch/mvme68k/mvme68k/isr.c
 file arch/mvme68k/mvme68k/machdep.c
 file arch/mvme68k/mvme68k/mem.c
-file arch/mvme68k/mvme68k/pmap.c
 file arch/mvme68k/mvme68k/pmap_bootstrap.c	compile-with "${NOPROF_C}"
 file arch/mvme68k/mvme68k/procfs_machdep.c	procfs
 file arch/mvme68k/mvme68k/softintr.c
-file arch/mvme68k/mvme68k/sys_machdep.c
 file arch/mvme68k/mvme68k/trap.c
-file arch/mvme68k/mvme68k/vm_machdep.c
 file arch/m68k/m68k/cacheops.c
-file dev/clock_subr.c
+file arch/m68k/m68k/db_memrw.c			ddb | kgdb
+file arch/m68k/m68k/pmap_motorola.c
+file arch/m68k/m68k/sys_machdep.c
+file arch/m68k/m68k/vm_machdep.c
 file dev/cons.c
 file dev/cninit.c
 
@@ -133,3 +126,5 @@ file arch/m68k/m68k/linux_trap.c		compat_linux
 
 # OSS audio driver compatibility
 include "compat/ossaudio/files.ossaudio"
+
+include	"arch/mvme68k/conf/majors.mvme68k"

@@ -1,4 +1,4 @@
-/*	$NetBSD: promlib.c,v 1.13 2001/12/07 11:00:39 hannken Exp $ */
+/*	$NetBSD: promlib.c,v 1.34 2004/03/23 15:29:56 pk Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -40,12 +40,16 @@
  * OPENPROM functions.  These are here mainly to hide the OPENPROM interface
  * from the rest of the kernel.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: promlib.c,v 1.34 2004/03/23 15:29:56 pk Exp $");
+
 #if defined(_KERNEL_OPT)
 #include "opt_sparc_arch.h"
 #endif
 
-#include <sys/errno.h>
 #include <sys/param.h>
+#include <sys/kernel.h>
 
 #ifdef _STANDALONE
 #include <lib/libsa/stand.h>
@@ -57,40 +61,43 @@
 
 #include <machine/stdarg.h>
 #include <machine/oldmon.h>
-#include <machine/bsd_openprom.h>
 #include <machine/promlib.h>
-#include <machine/openfirm.h>
+#include <machine/ctlreg.h>
+#include <sparc/sparc/asm.h>
+
+#include <lib/libkern/libkern.h>
 
 #define obpvec ((struct promvec *)romp)
 
-static void	notimplemented __P((void));
-static void	obp_v0_fortheval __P((char *));
-static void	obp_set_callback __P((void (*)__P((void))));
-static int	obp_v0_read __P((int, void *, int));
-static int	obp_v0_write __P((int, void *, int));
-static int	obp_v2_getchar __P((void));
-static int	obp_v2_peekchar __P((void));
-static void	obp_v2_putchar __P((int));
-static void	obp_v2_putstr __P((char *, int));
-static int	obp_v2_seek __P((int, u_quad_t));
-static char	*parse_bootfile __P((char *));
-static char	*parse_bootargs __P((char *));
-static char	*obp_v0_getbootpath __P((void));
-static char	*obp_v0_getbootfile __P((void));
-static char	*obp_v0_getbootargs __P((void));
-static char	*obp_v2_getbootpath __P((void));
-static char	*obp_v2_getbootfile __P((void));
-static char	*obp_v2_getbootargs __P((void));
-static int	obp_v2_finddevice __P((char *));
-static int	obp_ticks __P((void));
+static void	notimplemented(void);
+static void	obp_v0_fortheval(char *);
+static void	obp_set_callback(void (*)(void));
+static int	obp_v0_read(int, void *, int);
+static int	obp_v0_write(int, void *, int);
+static int	obp_v2_getchar(void);
+static int	obp_v2_peekchar(void);
+static void	obp_v2_putchar(int);
+static void	obp_v2_putstr(char *, int);
+static int	obp_v2_seek(int, u_quad_t);
+static char	*parse_bootfile(char *);
+static char	*parse_bootargs(char *);
+static char	*obp_v0_getbootpath(void);
+static char	*obp_v0_getbootfile(void);
+static char	*obp_v0_getbootargs(void);
+static char	*obp_v2_getbootpath(void);
+static char	*obp_v2_getbootfile(void);
+static char	*obp_v2_getbootargs(void);
+static int	obp_v2_finddevice(char *);
+static int	obp_ticks(void);
 
-static int	findchosen __P((void));
-static char	*opf_getbootpath __P((void));
-static char	*opf_getbootfile __P((void));
-static char	*opf_getbootargs __P((void));
-static int	opf_finddevice __P((char *));
-static int	opf_instance_to_package __P((int));
-static char	*opf_nextprop __P((int, char *));
+static int	findchosen(void);
+static char	*opf_getbootpath(void);
+static char	*opf_getbootfile(void);
+static char	*opf_getbootargs(void);
+static int	opf_finddevice(char *);
+static int	opf_instance_to_package(int);
+static char	*opf_nextprop(int, char *);
+static void	opf_interpret_simple(char *);
 
 
 /*
@@ -181,7 +188,7 @@ notimplemented()
 
 
 /*
- * PROM_getprop() reads the named property data from a given node.
+ * prom_getprop() reads the named property data from a given node.
  * A buffer for the data may be passed in `*bufp'; if NULL, a
  * buffer is allocated. The argument `size' specifies the data
  * element size of the property data. This function checks that
@@ -191,24 +198,24 @@ notimplemented()
  */
 
 int
-PROM_getprop(node, name, size, nitem, bufp)
+prom_getprop(node, name, size, nitem, bufp)
 	int	node;
 	char	*name;
-	int	size;
+	size_t	size;
 	int	*nitem;
-	void	**bufp;
+	void	*bufp;
 {
 	void	*buf;
 	int	len;
 
-	len = PROM_getproplen(node, name);
+	len = prom_getproplen(node, name);
 	if (len <= 0)
 		return (ENOENT);
 
 	if ((len % size) != 0)
 		return (EINVAL);
 
-	buf = *bufp;
+	buf = *(void **)bufp;
 	if (buf == NULL) {
 		/* No storage provided, so we allocate some */
 		buf = malloc(len, M_DEVBUF, M_NOWAIT);
@@ -220,7 +227,7 @@ PROM_getprop(node, name, size, nitem, bufp)
 	}
 
 	_prom_getprop(node, name, buf, len);
-	*bufp = buf;
+	*(void **)bufp = buf;
 	*nitem = len / size;
 	return (0);
 }
@@ -231,20 +238,20 @@ PROM_getprop(node, name, size, nitem, bufp)
  * subsequent calls.
  */
 char *
-PROM_getpropstring(node, name)
+prom_getpropstring(node, name)
 	int node;
 	char *name;
 {
 	static char stringbuf[32];
 
-	return (PROM_getpropstringA(node, name, stringbuf, sizeof stringbuf));
+	return (prom_getpropstringA(node, name, stringbuf, sizeof stringbuf));
 }
 
 /*
- * Alternative PROM_getpropstring(), where caller provides the buffer
+ * Alternative prom_getpropstring(), where caller provides the buffer
  */
 char *
-PROM_getpropstringA(node, name, buf, bufsize)
+prom_getpropstringA(node, name, buf, bufsize)
 	int node;
 	char *name;
 	char *buf;
@@ -252,7 +259,7 @@ PROM_getpropstringA(node, name, buf, bufsize)
 {
 	int len = bufsize - 1;
 
-	if (PROM_getprop(node, name, 1, &len, (void **)&buf) != 0)
+	if (prom_getprop(node, name, 1, &len, &buf) != 0)
 		len = 0;
 
 	buf[len] = '\0';	/* usually unnecessary */
@@ -264,7 +271,7 @@ PROM_getpropstringA(node, name, buf, bufsize)
  * The return value is the property, or the default if there was none.
  */
 int
-PROM_getpropint(node, name, deflt)
+prom_getpropint(node, name, deflt)
 	int node;
 	char *name;
 	int deflt;
@@ -272,98 +279,39 @@ PROM_getpropint(node, name, deflt)
 	int intbuf, *ip = &intbuf;
 	int len = 1;
 
-	if (PROM_getprop(node, name, sizeof(int), &len, (void **)&ip) != 0)
+	if (prom_getprop(node, name, sizeof(int), &len, &ip) != 0)
 		return (deflt);
 
 	return (*ip);
 }
 
-#if 0
 /*
- * prom_search() recursively searches a PROM tree for a given node
+ * Node Name Matching per IEEE 1275, section 4.3.6.
  */
-int
-prom_search(rootnode, name)
-	int rootnode;
-	const char *name;
+static int prom_matchname(int node, const char *name)
 {
-	int rtnnode;
-	int node = rootnode;
-	char buf[32];
+	char buf[32], *cp;
 
-#define GPSA(nm)	PROM_getpropstringA(node, nm, buf, sizeof buf)
-	if (node == findroot() ||
-	    !strcmp("hierarchical", GPSA("device type")))
-		node = firstchild(node);
+	prom_getpropstringA(node, "name", buf, sizeof buf);
+	if (strcmp(buf, name) == 0)
+		/* Exact match */
+		return (1);
 
-	if (node == 0)
-		panic("prom_search: null node");
+	/* If name has a comma, an exact match is required */
+	if (strchr(name, ','))
+		return (0);
 
-	do {
-		if (strcmp(GPSA("name"), name) == 0)
-			return (node);
-
-		if ((strcmp(GPSA("device_type"), "hierarchical") == 0 ||
-		    strcmp(GPSA("name"), "iommu") == 0)
-		    && (rtnnode = prom_search(node, name)) != 0)
-			return (rtnnode);
-
-	} while ((node = nextsibling(node)) != NULL);
+	/*
+	 * Otherwise, if the node's name contains a comma, we can match
+	 * against the trailing string defined by the first comma.
+	 */
+	if ((cp = strchr(buf, ',')) != NULL) {
+		if (strcmp(cp + 1, name) == 0)
+			return (1);
+	}
 
 	return (0);
 }
-#endif
-
-/*
- * Find the named device in the PROM device tree.
- * XXX - currently we discard any qualifiers attached to device component names
- */
-int
-obp_v2_finddevice(name)
-	char *name;
-{
-	int node;
-	char component[64];
-	char c, *startp, *endp, *cp;
-#define IS_SEP(c)	((c) == '/' || (c) == '@' || (c) == ':')
-
-	if (name == NULL)
-		return (-1);
-
-	node = prom_findroot();
-
-	for (startp = name; *startp != '\0'; ) {
-		node = prom_firstchild(node);
-
-		/*
-		 * Identify next component in pathname
-		 */
-		while (*startp == '/')
-			startp++;
-
-		endp = startp;
-		while ((c = *endp) != '\0' && !IS_SEP(c))
-			endp++;
-
-		/* Copy component */
-		for (cp = component; startp != endp;)
-			*cp++ = *startp++;
-
-		/* Zero terminate this component */
-		*cp = '\0';
-
-		/* Advance `startp' over any non-slash separators */
-		while ((c = *startp) != '\0' && c != '/')
-			startp++;
-
-		node = prom_findnode(node, component);
-		if (node == 0)
-			return (-1);
-	}
-
-	return (node);
-}
-
 
 /*
  * Translate device path to node
@@ -408,11 +356,9 @@ prom_findnode(first, name)
 	const char *name;
 {
 	int node;
-	char buf[32];
 
 	for (node = first; node != 0; node = prom_nextsibling(node)) {
-		if (strcmp(PROM_getpropstringA(node, "name", buf, sizeof(buf)),
-			   name) == 0)
+		if (prom_matchname(node, name))
 			return (node);
 	}
 	return (0);
@@ -427,9 +373,123 @@ prom_node_has_property(node, prop)
 	const char *prop;
 {
 
-	return (PROM_getproplen(node, (caddr_t)prop) != -1);
+	return (prom_getproplen(node, (char *)prop) != -1);
 }
 
+/*
+ * prom_search() recursively searches a PROM subtree for a given node name
+ * See IEEE 1275 `Search for matching child node', section 4.3.3.
+ */
+int
+prom_search(node, name)
+	int node;
+	const char *name;
+{
+
+	if (node == 0)
+		node = prom_findroot();
+
+	if (prom_matchname(node, name))
+		return (node);
+
+	for (node = prom_firstchild(node); node != 0;
+	     node = prom_nextsibling(node)) {
+		int cnode;
+		if ((cnode = prom_search(node, name)) != 0)
+			return (cnode);
+	}
+
+	return (0);
+}
+
+/*
+ * Find the named device in the PROM device tree.
+ * XXX - currently we discard any qualifiers attached to device component names
+ */
+int
+obp_v2_finddevice(path)
+	char *path;
+{
+	int node;
+	char component[64];
+	char c, *startp, *endp, *cp;
+#define IS_SEP(c)	((c) == '/' || (c) == '@' || (c) == ':')
+
+	if (path == NULL)
+		return (-1);
+
+	node = prom_findroot();
+
+	for (startp = path; *startp != '\0'; ) {
+		/*
+		 * Identify next component in path
+		 */
+		while (*startp == '/')
+			startp++;
+
+		endp = startp;
+		while ((c = *endp) != '\0' && !IS_SEP(c))
+			endp++;
+
+		/* Copy component */
+		for (cp = component; startp != endp;) {
+			/* Check component bounds */
+			if (cp > component + sizeof component - 1)
+				return (-1);
+			*cp++ = *startp++;
+		}
+
+		/* Zero terminate this component */
+		*cp = '\0';
+
+		/* Advance `startp' over any non-slash separators */
+		while ((c = *startp) != '\0' && c != '/')
+			startp++;
+
+		node = prom_findnode(prom_firstchild(node), component);
+		if (node == 0)
+			return (-1);
+	}
+
+	return (node);
+}
+
+
+/*
+ * Get the global "options" node Id.
+ */
+int prom_getoptionsnode()
+{
+static	int optionsnode;
+
+	if (optionsnode == 0) {
+		optionsnode = prom_findnode(prom_firstchild(prom_findroot()),
+					    "options");
+	}
+	return optionsnode;
+}
+
+/*
+ * Return a property string value from the global "options" node.
+ */
+int prom_getoption(const char *name, char *buf, int buflen)
+{
+	int node = prom_getoptionsnode();
+	int error, len;
+
+	if (buflen == 0)
+		return (EINVAL);
+
+	if (node == 0)
+		return (ENOENT);
+
+	len = buflen - 1;
+	if ((error = prom_getprop(node, (char *)name, 1, &len, &buf)) != 0)
+		return error;
+
+	buf[len] = '\0';
+	return (0);
+}
 
 void
 prom_halt()
@@ -648,11 +708,17 @@ obp_v2_getbootargs()
 	return (parse_bootargs(*ba->v2_bootargs));
 }
 
+/*
+ * Static storage shared by prom_getbootfile(), prom_getbootargs() and
+ * prom_getbootpath().
+ * Overwritten on each call!
+ */
+static	char storage[128];
+
 char *
 parse_bootfile(args)
 	char *args;
 {
-static	char storage[128];
 	char *cp, *dp;
 
 	cp = args;
@@ -683,8 +749,29 @@ char *
 obp_v2_getbootfile()
 {
 	struct v2bootargs *ba = promops.po_bootcookie;
+	char *kernel = parse_bootfile(*ba->v2_bootargs);
+	char buf[4+1], *prop;
 
-	return (parse_bootfile(*ba->v2_bootargs));
+	if (kernel[0] != '\0')
+		return kernel;
+
+	/*
+	 * The PROM does not insert the `boot-file' variable if any argument
+	 * was given to the `boot' command (e.g `boot -s'). If we determine
+	 * in parse_bootfile() above, that boot args contain only switches
+	 * then get the `boot-file' value (if any) ourselves.
+	 * If the `diag-switch?' PROM variable is set to true, we use
+	 * `diag-file' instead.
+	 */
+	prop = (prom_getoption("diag-switch?", buf, sizeof buf) != 0 ||
+		strcmp(buf, "true") != 0)
+		? "diag-file"
+		: "boot-file";
+
+	if (prom_getoption(prop, storage, sizeof storage) != 0)
+		return (NULL);
+
+	return (storage);
 }
 
 void
@@ -697,7 +784,7 @@ obp_v2_putstr(str, len)
 
 void
 obp_set_callback(f)
-	void (*f)__P((void));
+	void (*f)(void);
 {
 	*obpvec->pv_synchook = f;
 }
@@ -749,10 +836,10 @@ static char *
 opf_getbootpath()
 {
 	int node = findchosen();
-	char *buf = NULL;
-	int blen = 0;
+	char *buf = storage;
+	int blen = sizeof storage;
 
-	if (PROM_getprop(node, "bootpath", 1, &blen, (void **)&buf) != 0)
+	if (prom_getprop(node, "bootpath", 1, &blen, &buf) != 0)
 		return ("");
 
 	return (buf);
@@ -762,10 +849,10 @@ static char *
 opf_getbootargs()
 {
 	int node = findchosen();
-	char *buf = NULL;
-	int blen = 0;
+	char *buf = storage;
+	int blen = sizeof storage;
 
-	if (PROM_getprop(node, "bootargs", 1, &blen, (void **)&buf) != 0)
+	if (prom_getprop(node, "bootargs", 1, &blen, &buf) != 0)
 		return ("");
 
 	return (parse_bootargs(buf));
@@ -775,10 +862,10 @@ static char *
 opf_getbootfile()
 {
 	int node = findchosen();
-	char *buf = NULL;
-	int blen = 0;
+	char *buf = storage;
+	int blen = sizeof storage;
 
-	if (PROM_getprop(node, "bootargs", 1, &blen, (void **)&buf) != 0)
+	if (prom_getprop(node, "bootargs", 1, &blen, &buf) != 0)
 		return ("");
 
 	return (parse_bootfile(buf));
@@ -795,15 +882,260 @@ opf_nextprop(node, prop)
 	return (buf);
 }
 
-static void prom_init_oldmon __P((void));
-static void prom_init_obp __P((void));
-static void prom_init_opf __P((void));
+void
+opf_interpret_simple(char *s)
+{
+	(void)OF_interpret(s, 0, 0);
+}
+
+/*
+ * Retrieve physical memory information from the PROM.
+ * If ap is NULL, return the required length of the array.
+ */
+int
+prom_makememarr(ap, max, which)
+	struct memarr *ap;
+	int max, which;
+{
+	struct v0mlist *mp;
+	int node, n;
+	char *prop;
+
+	if (which != MEMARR_AVAILPHYS && which != MEMARR_TOTALPHYS)
+		panic("makememarr");
+
+	/*
+	 * `struct memarr' is in V2 memory property format.
+	 * On previous ROM versions we must convert.
+	 */
+	switch (prom_version()) {
+		struct promvec *promvec;
+		struct om_vector *oldpvec;
+	case PROM_OLDMON:
+		oldpvec = (struct om_vector *)PROM_BASE;
+		n = 1;
+		if (ap != NULL) {
+			ap[0].zero = 0;
+			ap[0].addr = 0;
+			ap[0].len = (which == MEMARR_AVAILPHYS)
+				? *oldpvec->memoryAvail
+				: *oldpvec->memorySize;
+		}
+		break;
+
+	case PROM_OBP_V0:
+		/*
+		 * Version 0 PROMs use a linked list to describe these
+		 * guys.
+		 */
+		promvec = romp;
+		mp = (which == MEMARR_AVAILPHYS)
+			? *promvec->pv_v0mem.v0_physavail
+			: *promvec->pv_v0mem.v0_phystot;
+		for (n = 0; mp != NULL; mp = mp->next, n++) {
+			if (ap == NULL)
+				continue;
+			if (n >= max) {
+				printf("makememarr: WARNING: lost some memory\n");
+				break;
+			}
+			ap->zero = 0;
+			ap->addr = (u_long)mp->addr;
+			ap->len = mp->nbytes;
+			ap++;
+		}
+		break;
+
+	default:
+		printf("makememarr: hope version %d PROM is like version 2\n",
+			prom_version());
+		/* FALLTHROUGH */
+
+        case PROM_OBP_V3:
+	case PROM_OBP_V2:
+		/*
+		 * Version 2 PROMs use a property array to describe them.
+		 */
+
+		/* Consider emulating `OF_finddevice' */
+		node = findnode(firstchild(findroot()), "memory");
+		goto case_common;
+
+	case PROM_OPENFIRM:
+		node = OF_finddevice("/memory");
+		if (node == -1)
+			node = 0;
+
+	case_common:
+		if (node == 0)
+			panic("makememarr: cannot find \"memory\" node");
+
+		prop = (which == MEMARR_AVAILPHYS) ? "available" : "reg";
+		if (ap == NULL) {
+			n = prom_getproplen(node, prop);
+		} else {
+			n = max;
+			if (prom_getprop(node, prop, sizeof(struct memarr),
+					&n, &ap) != 0)
+				panic("makememarr: cannot get property");
+		}
+		break;
+	}
+
+	if (n <= 0)
+		panic("makememarr: no memory found");
+	/*
+	 * Success!  (Hooray)
+	 */
+	return (n);
+}
+
+static struct idprom idprom;
+#ifdef _STANDALONE
+long hostid;
+#endif
+
+struct idprom *
+prom_getidprom(void)
+{
+	int node, len;
+	u_long h;
+	u_char *dst;
+
+	if (idprom.id_format != 0)
+		/* Already got it */
+		return (&idprom);
+
+	dst = (char *)&idprom;
+	len = sizeof(struct idprom);
+
+	switch (prom_version()) {
+	case PROM_OLDMON:
+#ifdef AC_IDPROM
+		{
+			u_char *src = (char *)AC_IDPROM;
+			do {
+				*dst++ = lduba(src++, ASI_CONTROL);
+			} while (--len > 0);
+		}
+#endif
+		break;
+
+	/*
+	 * Fetch the `idprom' property at the root node.
+	 */
+	case PROM_OBP_V0:
+	case PROM_OBP_V2:
+	case PROM_OPENFIRM:
+	case PROM_OBP_V3:
+		node = prom_findroot();
+		if (prom_getprop(node, "idprom", 1, &len, &dst) != 0) {
+			printf("`idprom' property cannot be read: "
+				"cannot get ethernet address");
+		}
+		break;
+	}
+
+	/* Establish hostid */
+	h =  (u_int)idprom.id_machine << 24;
+	h |= idprom.id_hostid[0] << 16;
+	h |= idprom.id_hostid[1] << 8;
+	h |= idprom.id_hostid[2];
+	hostid = h;
+
+	return (&idprom);
+}
+
+void prom_getether(node, cp)
+	int node;
+	u_char *cp;
+{
+	struct idprom *idp = prom_getidprom();
+	char buf[6+1], *bp;
+	int nitem;
+
+	if (node == 0)
+		goto read_idprom;
+
+	/*
+	 * First, try the node's "mac-address" property.
+	 * This property is set by the adapter's firmware if the
+	 * device has already been opened for traffic, e.g. for
+	 * net booting.  Its value might be `0-terminated', probably
+	 * because the Forth ROMs uses `xdrstring' instead of `xdrbytes'
+	 * to construct the property.
+	 */
+	nitem = 6+1;
+	bp = buf;
+	if (prom_getprop(node, "mac-address", 1, &nitem, &bp) == 0 &&
+	    nitem >= 6) {
+		memcpy(cp, bp, 6);
+		return;
+	}
+
+	/*
+	 * Next, check the global "local-mac-address?" switch to see
+	 * if we should try to extract the node's "local-mac-address"
+	 * property.
+	 */
+	if (prom_getoption("local-mac-address?", buf, sizeof buf) != 0 ||
+	    strcmp(buf, "true") != 0)
+		goto read_idprom;
+
+	/* Retrieve the node's "local-mac-address" property, if any */
+	nitem = 6;
+	if (prom_getprop(node, "local-mac-address", 1, &nitem, &cp) == 0 &&
+	    nitem == 6)
+		return;
+
+	/* Fall back on the machine's global ethernet address */
+read_idprom:
+	memcpy(cp, idp->id_ether, 6);
+}
+
+/*
+ * The integer property "get-unum" on the root device is the address
+ * of a callable function in the PROM that takes a physical address
+ * (in lo/hipart format) and returns a string identifying the chip
+ * location of the corresponding memory cell.
+ */
+char *
+prom_pa_location(u_int phys_lo, u_int phys_hi)
+{
+static	char *(*unum)(u_int,u_int);
+	char *str, *unk = "<Unknown>";
+
+	switch (prom_version()) {
+	case PROM_OLDMON:
+	case PROM_OPENFIRM:
+		/* to do */
+	default:
+		break;
+	case PROM_OBP_V0:
+	case PROM_OBP_V2:
+	case PROM_OBP_V3:
+		if (unum == NULL)
+			unum = (char *(*)(u_int,u_int))(u_long)
+				prom_getpropint(prom_findroot(), "get-unum", 0);
+
+		if (unum == NULL || (str = unum(phys_lo, phys_hi)) == NULL)
+			break;
+
+		return (str);
+	}
+
+	return (unk);
+}
+
+static void prom_init_oldmon(void);
+static void prom_init_obp(void);
+static void prom_init_opf(void);
 
 static __inline__ void
 prom_init_oldmon()
 {
 	struct om_vector *oldpvec = (struct om_vector *)PROM_BASE;
-	extern void sparc_noop __P((void));
+	extern void sparc_noop(void);
 
 	promops.po_version = PROM_OLDMON;
 	promops.po_revision = oldpvec->monId[0];	/*XXX*/
@@ -831,7 +1163,7 @@ prom_init_oldmon()
 #ifdef SUN4
 #ifndef _STANDALONE
 	if (oldpvec->romvecVersion >= 2) {
-		extern void oldmon_w_cmd __P((u_long, char *));
+		extern void oldmon_w_cmd(u_long, char *);
 		*oldpvec->vector_cmd = oldmon_w_cmd;
 	}
 #endif
@@ -957,7 +1289,7 @@ prom_init_opf()
 	promops.po_halt = OF_exit;
 	promops.po_reboot = OF_boot;
 	promops.po_abort = OF_enter;
-	promops.po_interpret = OF_interpret;
+	promops.po_interpret = opf_interpret_simple;
 	promops.po_setcallback = (void *)OF_set_callback;
 	promops.po_ticks = OF_milliseconds;
 
@@ -998,6 +1330,10 @@ prom_init_opf()
 void
 prom_init()
 {
+#ifdef _STANDALONE
+	int node;
+	char *cp;
+#endif
 
 	if (CPU_ISSUN4) {
 		prom_init_oldmon();
@@ -1009,4 +1345,35 @@ prom_init()
 		 */
 		prom_init_opf();
 	}
+
+#ifdef _STANDALONE
+	/*
+	 * Find out what type of machine we're running on.
+	 *
+	 * This process is actually started in srt0.S, which has discovered
+	 * the minimal set of machine specific parameters for the 1st-level
+	 * boot program (bootxx) to run. The page size has already been set
+	 * and the CPU type is either CPU_SUN4, CPU_SUN4C or CPU_SUN4M.
+	 */
+
+	if (cputyp == CPU_SUN4 || cputyp == CPU_SUN4M)
+		return;
+
+	/*
+	 * We have SUN4C, SUN4M or SUN4D.
+	 * Use the PROM `compatible' property to determine which.
+	 * Absence of the `compatible' property means `sun4c'.
+	 */
+
+	node = prom_findroot();
+	cp = prom_getpropstring(node, "compatible");
+	if (*cp == '\0' || strcmp(cp, "sun4c") == 0)
+		cputyp = CPU_SUN4C;
+	else if (strcmp(cp, "sun4m") == 0)
+		cputyp = CPU_SUN4M;
+	else if (strcmp(cp, "sun4d") == 0)
+		cputyp = CPU_SUN4D;
+	else
+		printf("Unknown CPU type (compatible=`%s')\n", cp);
+#endif /* _STANDALONE */
 }

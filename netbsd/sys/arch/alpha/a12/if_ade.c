@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ade.c,v 1.14 2002/05/15 16:57:41 thorpej Exp $	*/
+/*	$NetBSD: if_ade.c,v 1.22 2003/07/14 23:25:35 lukem Exp $	*/
 
 /*
  * NOTE: this version of if_de was modified for bounce buffers prior
@@ -79,6 +79,9 @@
  */
 #define	TULIP_HDR_DATA
 #define	LCLDMA 1
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ade.c,v 1.22 2003/07/14 23:25:35 lukem Exp $");
 
 #include "opt_inet.h"
 #include "opt_ns.h"
@@ -167,6 +170,7 @@
 #if defined(INET)
 #include <netinet/if_inarp.h>
 #endif
+#include <uvm/uvm_extern.h>
 #include <machine/bus.h>
 #if defined(__alpha__)
 #include <machine/intr.h>
@@ -234,7 +238,7 @@ static void dumpring(void **);
  * course, they won't be needing de(4) drivers.
  */
 static void
-donothing(struct mbuf *m, caddr_t buf, u_int size, void *arg)
+donothing(struct mbuf *m, caddr_t buf, size_t size, void *arg)
 {
 	int s;
 
@@ -640,7 +644,7 @@ tulip_media_link_monitor(
 
     if (mi == NULL) {
 #if defined(DIAGNOSTIC) || defined(TULIP_DEBUG)
-	panic("tulip_media_link_monitor: %s: botch at line %d\n",
+	panic("tulip_media_link_monitor: %s: botch at line %d",
 	      tulip_mediums[sc->tulip_media],__LINE__);
 #endif
 	return TULIP_LINK_UNKNOWN;
@@ -921,7 +925,7 @@ tulip_media_poll(
 	    }
 	    default: {
 #if defined(DIAGNOSTIC) || defined(TULIP_DEBUG)
-		panic("tulip_media_poll: botch at line %d\n", __LINE__);
+		panic("tulip_media_poll: botch at line %d", __LINE__);
 #endif
 		break;
 	    }
@@ -1573,7 +1577,7 @@ tulip_mii_autonegotiate(
 	}
 	default: {
 #if defined(DIAGNOSTIC)
-	    panic("tulip_media_poll: botch at line %d\n", __LINE__);
+	    panic("tulip_media_poll: botch at line %d", __LINE__);
 #endif
 	    break;
 	}
@@ -1902,7 +1906,7 @@ static const tulip_boardsw_t tulip_2114x_isv_boardsw = {
 /* 
  * At least in some versions of the driver, all 2114x are mapped to
  * tulip_21140_eb_boardsw, so this isn't necessarily going to be
- * utilized. But for possible later use, provide this as a clone of
+ * used. But for possible later use, provide this as a clone of
  * the dec evalboard configuration. The Avalon card should look the
  * same to the software as the eval card, with the exception of the
  * srom format in the early production units.
@@ -2342,7 +2346,7 @@ tulip_identify_asante_nic(
 	mi->mi_gpr_length = 0;
 	mi->mi_gpr_offset = 0;
 	mi->mi_reset_length = 0;
-	mi->mi_reset_offset = 0;;
+	mi->mi_reset_offset = 0;
 
 	mi->mi_phyaddr = tulip_mii_get_phyaddr(sc, 0);
 	if (mi->mi_phyaddr == TULIP_MII_NOPHY)
@@ -4193,7 +4197,7 @@ tulip_ifstart(
 	do {
 	    int len = m0->m_len;
 	    caddr_t addr = mtod(m0, caddr_t);
-	    unsigned clsize = NBPG - (((u_long) addr) & PGOFSET);
+	    unsigned clsize = PAGE_SIZE - (((u_long) addr) & PGOFSET);
 
 	    next_m0 = m0->m_next;
 	    while (len > 0) {
@@ -4261,7 +4265,7 @@ tulip_ifstart(
 		if (partial)
 		    continue;
 #endif
-		clsize = NBPG;
+		clsize = PAGE_SIZE;
 	    }
 	} while ((m0 = next_m0) != NULL);
 
@@ -4975,9 +4979,8 @@ tulip_pci_probe(
 
 static void tulip_pci_attach(TULIP_PCI_ATTACH_ARGS);
 
-struct cfattach ade_ca = {
-    sizeof(tulip_softc_t), tulip_pci_probe, tulip_pci_attach
-};
+CFATTACH_DECL(ade, sizeof(tulip_softc_t),
+    tulip_pci_probe, tulip_pci_attach, NULL, NULL);
 
 #endif /* __NetBSD__ */
 

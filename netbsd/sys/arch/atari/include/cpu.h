@@ -1,9 +1,43 @@
-/*	$NetBSD: cpu.h,v 1.38 2001/09/08 11:16:43 thomas Exp $	*/
+/*	$NetBSD: cpu.h,v 1.43 2004/01/04 11:33:30 jdolecek Exp $	*/
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1982, 1990 The Regents of the University of California.
  * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: cpu.h 1.16 91/03/25$
+ *
+ *	@(#)cpu.h	7.7 (Berkeley) 6/27/91
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -78,9 +112,10 @@ extern struct cpu_info cpu_info_store;
  * referenced in generic code
  */
 #define	cpu_swapin(p)			/* nothing */
-#define	cpu_wait(p)			/* nothing */
 #define cpu_swapout(p)			/* nothing */
 #define	cpu_number()			0
+
+void	cpu_proc_fork(struct proc *, struct proc *);
 
 /*
  * Arguments to hardclock and gatherstats encapsulate the previous
@@ -196,13 +231,6 @@ void	config_console __P((void));
 long	clkread __P((void));
 
 /*
- * Prototypes from disksubr.c
- */
-struct buf;
-struct disklabel;
-int	bounds_check_with_label __P((struct buf *, struct disklabel *, int));
-
-/*
  * Prototypes from fpu.c
  */
 char	*fpu_describe __P((int));
@@ -214,7 +242,7 @@ int	fpu_probe __P((void));
 int	badbaddr __P((caddr_t, int));
 void	consinit __P((void));
 void	dumpconf __P((void));
-paddr_t	kvtop __P((caddr_t));
+int	kvtop __P((caddr_t));
 void	physaccess __P((caddr_t, caddr_t, int, int));
 void	physunaccess __P((caddr_t, int));
 void	setredzone __P((u_int *, caddr_t));
@@ -236,28 +264,8 @@ u_int	probeva __P((u_int, u_int));
 void	proc_trampoline __P((void));
 void	savectx __P((struct pcb *));
 int	suline __P((caddr_t, caddr_t));
-void	switch_exit __P((struct proc *));
-void	DCIAS __P((vaddr_t));
-void	DCIA __P((void));
-void	DCIS __P((void));
-void	DCIU __P((void));
-void	ICIA __P((void));
-void	ICPA __P((void));
-void	PCIA __P((void));
-void	TBIA __P((void));
-void	TBIS __P((vaddr_t));
-void	TBIAS __P((void));
-void	TBIAU __P((void));
-
-#if defined(M68040) || defined(M68060)
-void	DCFA __P((void));
-void	DCFP __P((paddr_t));
-void	DCFL __P((paddr_t));
-void	DCPL __P((paddr_t));
-void	DCPP __P((paddr_t));
-void	ICPL __P((paddr_t));
-void	ICPP __P((paddr_t));
-#endif
+void	switch_exit __P((struct lwp *));
+void	switch_lwp_exit __P((struct lwp *));
 
 /*
  * Prototypes from machdep.c:

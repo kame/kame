@@ -1,4 +1,4 @@
-/*	$NetBSD: biosmemx.S,v 1.2 1999/03/08 21:38:28 drochner Exp $	*/
+/*	$NetBSD: biosmemx.S,v 1.7 2004/03/24 16:46:28 drochner Exp $	*/
 
 /*
  * Copyright (c) 1997, 1999
@@ -12,12 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed for the NetBSD Project
- *	by Matthias Drochner.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -33,8 +27,6 @@
  */
 
 #include <machine/asm.h>
-
-#define	data32	.byte 0x66
 
 	.text
 
@@ -53,30 +45,33 @@ ENTRY(getextmem2)
 	push	%edi
 
 	call	_C_LABEL(prot_to_real)
+	.code16
 
-	data32
+	xorl	%ebx, %ebx
 	movl	$0xe801, %eax
 	int	$0x15
-	jc	err2
+	pushf
 
-	data32
-	movl	$0, %ecx
-	jmp ok2
-err2:
-	data32
-	movl	$-1, %ecx
-ok2:
-	data32
-	movl	%eax, %edx
+	movw	%si, %ax
+	orw	%si, %bx
+	jz	1f		/* if zero use configured values */
+	movw	%cx, %ax	/* k below 16M (max 0x3c00 = 15MB) */
+	movw	%dx, %bx	/* 64k above 16M */
+1:
+	popf
+	setc	%bl
 
-	data32
-	call	_C_LABEL(real_to_prot)
+	calll	_C_LABEL(real_to_prot)
+	.code32
 
-	movl	8(%ebp), %eax
-	movl	%edx, (%eax)
-	movl	%ebx, 4(%eax)
-
-	movl	%ecx, %eax
+	movl	8(%ebp), %edi
+	xorl	%eax, %eax
+	movw	%cx, %ax
+	stosl
+	movw	%dx, %ax
+	stosl
+	movb	%bl, %al
+	cbw
 
 	pop	%edi
 	pop	%esi
@@ -102,24 +97,32 @@ ENTRY(getmementry)
 	push	%edi
 
 	movl	8(%ebp), %eax
-	movl	0(%eax), %ebx
-	movl	$20, %ecx
-	movl	$0x534d4150, %edx	# "SMAP"
-	movl	12(%ebp), %edi
+	movl	0(%eax), %ebx		/* index */
+	movl	$20, %ecx		/* Buffer size */
+	movl	$0x534d4150, %edx	/* "SMAP" */
+	movl	12(%ebp), %edi		/* buffer address */
 
 	call	_C_LABEL(prot_to_real)
+	.code16
 
-	data32
-	movl	$0xe820, %eax
+	push	%di
+	shrl	$4, %edi
+	mov	%ds, %ax
+	add	%di, %ax
+	mov	%ax, %es
+	pop	%di
+	and	$0xf, %di		/* buffer addres now in ES:DI */
+
+	movl	$0xe820, %eax		/* Some BIOS check EAX value */
 	int	$0x15
 
 	setc	%cl
 
-	data32
-	call	_C_LABEL(real_to_prot)
+	calll	_C_LABEL(real_to_prot)
+	.code32
 
 	movl	8(%ebp), %eax
-	movl	%ebx, 0(%eax)
+	movl	%ebx, 0(%eax)		/* updated index */
 	xorl	%eax, %eax
 	movb	%cl, %al
 

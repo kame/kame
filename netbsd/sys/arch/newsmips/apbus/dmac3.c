@@ -1,4 +1,4 @@
-/*	$NetBSD: dmac3.c,v 1.2 2001/11/14 18:15:30 thorpej Exp $	*/
+/*	$NetBSD: dmac3.c,v 1.6 2003/07/15 02:59:28 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2000 Tsubai Masanari.  All rights reserved.
@@ -25,6 +25,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: dmac3.c,v 1.6 2003/07/15 02:59:28 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -69,9 +72,8 @@ void dmac3_attach __P((struct device *, struct device *, void *));
 
 paddr_t kvtophys __P((vaddr_t));
 
-struct cfattach dmac_ca = {
-	sizeof(struct dmac3_softc), dmac3_match, dmac3_attach
-};
+CFATTACH_DECL(dmac, sizeof(struct dmac3_softc),
+    dmac3_match, dmac3_attach, NULL, NULL);
 
 int
 dmac3_match(parent, cf, aux)
@@ -163,9 +165,9 @@ dmac3_start(sc, addr, len, direction)
 	start = mips_trunc_page(addr);
 	end   = mips_round_page(addr + len);
 	p = sc->sc_dmamap;
-	for (v = start; v < end; v += NBPG) {
+	for (v = start; v < end; v += PAGE_SIZE) {
 		pa = kvtophys(v);
-		mips_dcache_wbinv_range(MIPS_PHYS_TO_KSEG0(pa), NBPG);
+		mips_dcache_wbinv_range(MIPS_PHYS_TO_KSEG0(pa), PAGE_SIZE);
 		*p++ = 0;
 		*p++ = (pa >> PGSHIFT) | 0xc0000000;
 	}

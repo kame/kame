@@ -1,4 +1,4 @@
-/*	$NetBSD: neo.c,v 1.12 2002/04/15 04:13:25 simonb Exp $	*/
+/*	$NetBSD: neo.c,v 1.20.2.1 2004/09/22 20:58:43 jmc Exp $	*/
 
 /*
  * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: neo.c,v 1.12 2002/04/15 04:13:25 simonb Exp $");
+__KERNEL_RCSID(0, "$NetBSD: neo.c,v 1.20.2.1 2004/09/22 20:58:43 jmc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -102,7 +102,7 @@ __KERNEL_RCSID(0, "$NetBSD: neo.c,v 1.12 2002/04/15 04:13:25 simonb Exp $");
  * passes that location while playing, it signals an interrupt.
  * 
  * The ring buffer size is currently 16k. That is about 100ms of audio
- * at 44.1khz/stero/16 bit. However, to keep the buffer full, interrupts
+ * at 44.1kHz/stero/16 bit. However, to keep the buffer full, interrupts
  * are generated more often than that, so 20-40 interrupts per second
  * should not be unexpected. Increasing BUFFSIZE should help minimize
  * of glitches due to drivers that spend to much time looping at high
@@ -130,10 +130,10 @@ struct neo_softc {
 	u_int32_t 	type;
 	void            *ih;
 
-	void	(*pintr)(void *);	/* dma completion intr handler */
+	void	(*pintr)(void *);	/* DMA completion intr handler */
 	void	*parg;		/* arg for intr() */
 
-	void	(*rintr)(void *);	/* dma completion intr handler */
+	void	(*rintr)(void *);	/* DMA completion intr handler */
 	void	*rarg;		/* arg for intr() */
 
 	vaddr_t	buf_vaddr;
@@ -198,20 +198,19 @@ int	neo_mixer_get_port(void *, mixer_ctrl_t *);
 int     neo_attach_codec(void *sc, struct ac97_codec_if *);
 int	neo_read_codec(void *sc, u_int8_t a, u_int16_t *d);
 int	neo_write_codec(void *sc, u_int8_t a, u_int16_t d);
-void    neo_reset_codec(void *sc);
+int     neo_reset_codec(void *sc);
 enum ac97_host_flags neo_flags_codec(void *sc);
 int	neo_query_devinfo(void *, mixer_devinfo_t *);
-void   *neo_malloc(void *, int, size_t, int, int);
-void	neo_free(void *, void *, int);
+void   *neo_malloc(void *, int, size_t, struct malloc_type *, int);
+void	neo_free(void *, void *, struct malloc_type *);
 size_t	neo_round_buffersize(void *, int, size_t);
 paddr_t	neo_mappage(void *, void *, off_t, int);
 int	neo_get_props(void *);
 void	neo_set_mixer(struct neo_softc *sc, int a, int d);
 void	neo_power(int why, void *arg);
 
-struct cfattach neo_ca = {
-	sizeof(struct neo_softc), neo_match, neo_attach
-};
+CFATTACH_DECL(neo, sizeof(struct neo_softc),
+    neo_match, neo_attach, NULL, NULL);
 
 struct audio_device neo_device = {
 	"NeoMagic 256",
@@ -351,10 +350,9 @@ int
 neo_intr(void *p)
 {
 	struct neo_softc *sc = (struct neo_softc *)p;
-	int status, x, active;
+	int status, x;
 	int rv = 0;
 
-	active = (sc->pintr || sc->rintr);
 	status = (sc->irsz == 2) ?
 	    nm_rd_2(sc, NM_INT_REG) :
 	    nm_rd_4(sc, NM_INT_REG);
@@ -556,7 +554,6 @@ neo_attach(struct device *parent, struct device *self, void *aux)
 	char const *intrstr;
 	pci_intr_handle_t ih;
 	pcireg_t csr;
-	int error;
 
 	sc->type = PCI_PRODUCT(pa->pa_id);
 
@@ -570,8 +567,8 @@ neo_attach(struct device *parent, struct device *self, void *aux)
 		return;
 	}
 
-	if (pci_mapreg_map(pa, PCI_MAPREG_START + 4, PCI_MAPREG_TYPE_MEM, 0,
-			   &sc->regiot, &sc->regioh, NULL, NULL)) {
+	if (pci_mapreg_map(pa, PCI_MAPREG_START + 4, PCI_MAPREG_TYPE_MEM,
+	    BUS_SPACE_MAP_LINEAR, &sc->regiot, &sc->regioh, NULL, NULL)) {
 		printf("%s: can't map registers\n", sc->dev.dv_xname);
 		return;
 	}
@@ -595,7 +592,7 @@ neo_attach(struct device *parent, struct device *self, void *aux)
 	}
 	printf("%s: interruping at %s\n", sc->dev.dv_xname, intrstr);
 
-	if ((error = nm_init(sc)) != 0)
+	if (nm_init(sc) != 0)
 		return;
 
 	/* Enable the device. */
@@ -611,7 +608,7 @@ neo_attach(struct device *parent, struct device *self, void *aux)
 	sc->host_if.reset  = neo_reset_codec;
 	sc->host_if.flags  = neo_flags_codec;
 
-	if ((error = ac97_attach(&sc->host_if)) != 0)
+	if (ac97_attach(&sc->host_if) != 0)
 		return;
 
 	sc->powerhook = powerhook_establish(neo_power, sc);
@@ -662,7 +659,7 @@ neo_attach_codec(void *v, struct ac97_codec_if *codec_if)
 	return (0);
 }
 
-void
+int
 neo_reset_codec(void *v)
 {
 	struct neo_softc *sc = v;
@@ -671,6 +668,7 @@ neo_reset_codec(void *v)
 	nm_wr_1(sc, 0x6cc, 0x87);
 	nm_wr_1(sc, 0x6cc, 0x80);
 	nm_wr_1(sc, 0x6cc, 0x00);
+	return 0;
 }
 
 enum ac97_host_flags
@@ -970,7 +968,8 @@ neo_query_devinfo(void *addr, mixer_devinfo_t *dip)
 }
 
 void *
-neo_malloc(void *addr, int direction, size_t size, int pool, int flags)
+neo_malloc(void *addr, int direction, size_t size, struct malloc_type *pool,
+    int flags)
 {
 	struct neo_softc *sc = addr;
 	void *rv = NULL;
@@ -995,7 +994,7 @@ neo_malloc(void *addr, int direction, size_t size, int pool, int flags)
 }
 
 void
-neo_free(void *addr, void *ptr, int pool)
+neo_free(void *addr, void *ptr, struct malloc_type *pool)
 {
 	struct neo_softc *sc = addr;
 	vaddr_t v = (vaddr_t) ptr;

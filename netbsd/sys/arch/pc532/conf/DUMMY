@@ -1,4 +1,4 @@
-#	$NetBSD: DUMMY,v 1.19.4.1 2002/08/01 04:29:39 lukem Exp $
+#	$NetBSD: DUMMY,v 1.21.8.1 2004/07/15 20:20:32 he Exp $
 #
 # DUMMY: Matthias Pfaller's second pc532
 #
@@ -28,8 +28,9 @@ options 	KTRACE			# system call tracing, a la ktrace(1)
 options 	LKM			# loadable kernel modules
 options 	INSECURE		# allow lkms in multiuser mode
 options 	PFIL_HOOKS		# pfil(9) packet filter hooks
-#options 	USERCONF		# userconf(4) support
+options 	USERCONF		# userconf(4) support
 #options	PIPE_SOCKETPAIR		# smaller, but slower pipe(2)
+#options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
 
 # compatibility options
 options 	COMPAT_10		# NetBSD 1.0,

@@ -1,4 +1,4 @@
-/*	$NetBSD: smb_dev.c,v 1.6 2002/01/08 19:52:16 deberg Exp $	*/
+/*	$NetBSD: smb_dev.c,v 1.18 2003/06/29 22:32:10 fvdl Exp $	*/
 
 /*
  * Copyright (c) 2000-2001 Boris Popov
@@ -33,6 +33,10 @@
  *
  * FreeBSD: src/sys/netsmb/smb_dev.c,v 1.4 2001/12/02 08:47:29 bp Exp
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: smb_dev.c,v 1.18 2003/06/29 22:32:10 fvdl Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -61,21 +65,17 @@
 #include <netsmb/smb_conn.h>
 #include <netsmb/smb_subr.h>
 #include <netsmb/smb_dev.h>
+#include <netsmb/smb_rq.h>
 
 #ifdef __NetBSD__
-#include "netsmb.h"
-static struct smb_dev * smb_devtbl[NNETSMB]; /* indexed by minor */
+static struct smb_dev **smb_devtbl; /* indexed by minor */
 #define SMB_GETDEV(dev) (smb_devtbl[minor(dev)])
-#else
+#define NSMB_DEFNUM	4
+
+#else /* !NetBSD */
+
 #define SMB_GETDEV(dev)		((struct smb_dev*)(dev)->si_drv1)
-#endif
 
-#define	SMB_CHECKMINOR(dev)	do { \
-				    sdp = SMB_GETDEV(dev); \
-				    if (sdp == NULL) return ENXIO; \
-				} while(0)
-
-#ifndef __NetBSD__
 static d_open_t	 nsmb_dev_open;
 static d_close_t nsmb_dev_close;
 static d_read_t	 nsmb_dev_read;
@@ -91,9 +91,9 @@ static int smb_version = NSMB_VERSION;
 
 SYSCTL_DECL(_net_smb);
 SYSCTL_INT(_net_smb, OID_AUTO, version, CTLFLAG_RD, &smb_version, 0, "");
+#endif /* NetBSD */
 
 static MALLOC_DEFINE(M_NSMBDEV, "NETSMBDEV", "NET/SMB device");
-#endif
 
 
 /*
@@ -101,7 +101,14 @@ int smb_dev_queue(struct smb_dev *ndp, struct smb_rq *rqp, int prio);
 */
 
 #ifdef __NetBSD__
-cdev_decl(nsmb_dev_);
+dev_type_open(nsmb_dev_open);
+dev_type_close(nsmb_dev_close);
+dev_type_ioctl(nsmb_dev_ioctl);
+
+const struct cdevsw nsmb_cdevsw = {
+	nsmb_dev_open, nsmb_dev_close, noread, nowrite,
+	nsmb_dev_ioctl, nostop, notty, nopoll, nommap, nokqfilter,
+};
 #else
 static struct cdevsw nsmb_cdevsw = {
 	/* open */	nsmb_dev_open,
@@ -117,9 +124,6 @@ static struct cdevsw nsmb_cdevsw = {
 	/* dump */	nodump,
 	/* psize */	nopsize,
 	/* flags */	0,
-#ifndef FB_CURRENT
-	/* bmaj */	-1
-#endif
 };
 #endif /* !__NetBSD__ */
 
@@ -140,19 +144,24 @@ nsmb_dev_clone(void *arg, char *name, int namelen, dev_t *dev)
 
 #else /* __NetBSD__ */
 
-void netsmbattach(int);
+void nsmbattach(int);
 
 void
-netsmbattach(int num)
+nsmbattach(int num)
 {
 
 	if (num <= 0) {
 #ifdef DIAGNOSTIC
-		panic("netsmbattach: cound <= 0");
+		panic("nsmbattach: cound <= 0");
 #endif
 		return;
 	}
 
+	if (num == 1)
+		num = NSMB_DEFNUM;
+
+	smb_devtbl = malloc(num * sizeof(void *), M_NSMBDEV, M_WAITOK|M_ZERO);
+	
 	if (smb_sm_init()) {
 #ifdef DIAGNOSTIC
 		panic("netsmbattach: smb_sm_init failed");
@@ -167,6 +176,8 @@ netsmbattach(int num)
 		smb_sm_done();
 		return;
 	}
+
+	smb_rqinit();
 }
 #endif /* __NetBSD__ */
 
@@ -180,7 +191,7 @@ nsmb_dev_open(dev_t dev, int oflags, int devtype, struct proc *p)
 	if (sdp && (sdp->sd_flags & NSMBFL_OPEN))
 		return EBUSY;
 	if (sdp == NULL) {
-		sdp = malloc(sizeof(*sdp), M_SMBDATA, M_WAITOK);
+		sdp = malloc(sizeof(*sdp), M_NSMBDEV, M_WAITOK);
 		smb_devtbl[minor(dev)] = (void*)sdp;
 	}
 
@@ -216,7 +227,10 @@ nsmb_dev_close(dev_t dev, int flag, int fmt, struct proc *p)
 	struct smb_cred scred;
 	int s;
 
-	SMB_CHECKMINOR(dev);
+	sdp = SMB_GETDEV(dev);
+	if (!sdp)
+		return (ENXIO);
+
 	s = splnet();
 	if ((sdp->sd_flags & NSMBFL_OPEN) == 0) {
 		splx(s);
@@ -224,17 +238,21 @@ nsmb_dev_close(dev_t dev, int flag, int fmt, struct proc *p)
 	}
 	smb_makescred(&scred, p, NULL);
 	ssp = sdp->sd_share;
-	if (ssp != NULL)
+	if (ssp != NULL) {
+		smb_share_lock(ssp, 0);
 		smb_share_rele(ssp, &scred);
+	}
 	vcp = sdp->sd_vc;
-	if (vcp != NULL)
+	if (vcp != NULL) {
+		smb_vc_lock(vcp, 0);
 		smb_vc_rele(vcp, &scred);
+	}
 /*
 	smb_flushq(&sdp->sd_rqlist);
 	smb_flushq(&sdp->sd_rplist);
 */
 	smb_devtbl[minor(dev)] = NULL;
-	free(sdp, M_SMBDATA);
+	free(sdp, M_NSMBDEV);
 #ifndef __NetBSD__
 	destroy_dev(dev);
 #endif
@@ -252,7 +270,9 @@ nsmb_dev_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 	struct smb_cred scred;
 	int error = 0;
 
-	SMB_CHECKMINOR(dev);
+	sdp = SMB_GETDEV(dev);
+	if (!sdp)
+		return (ENXIO);
 	if ((sdp->sd_flags & NSMBFL_OPEN) == 0)
 		return EBADF;
 
@@ -387,6 +407,7 @@ nsmb_dev_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 	return error;
 }
 
+#ifndef __NetBSD__
 int
 nsmb_dev_read(dev_t dev, struct uio *uio, int flag)
 {
@@ -405,7 +426,6 @@ nsmb_dev_poll(dev_t dev, int events, struct proc *p)
 	return ENODEV;
 }
 
-#ifndef __NetBSD__
 static int
 nsmb_dev_load(module_t mod, int cmd, void *arg)
 {
@@ -446,23 +466,11 @@ DEV_MODULE (dev_netsmb, nsmb_dev_load, 0);
 /*
  * Convert a file descriptor to appropriate smb_share pointer
  */
-static struct file*
-nsmb_getfp(struct filedesc* fdp, int fd, int flag)
-{
-	struct file* fp;
-
-	fp = fd_getfile(fdp, fd);
-
-	if ((fp->f_flag & flag) == 0) 
-		return (NULL);
-
-	return (fp);
-}
-
 int
 smb_dev2share(int fd, int mode, struct smb_cred *scred,
 	struct smb_share **sspp)
 {
+	struct proc *p = scred->scr_p;
 	struct file *fp;
 	struct vnode *vp;
 	struct smb_dev *sdp;
@@ -470,22 +478,35 @@ smb_dev2share(int fd, int mode, struct smb_cred *scred,
 	dev_t dev;
 	int error;
 
-	fp = nsmb_getfp(scred->scr_p->p_fd, fd, FREAD | FWRITE);
-	if (fp == NULL)
-		return EBADF;
-	vp = (struct vnode*)fp->f_data;
-	if (vp == NULL)
-		return EBADF;
+	if ((fp = fd_getfile(p->p_fd, fd)) == NULL)
+		return (EBADF);
+
+	FILE_USE(fp);
+
+	vp = (struct vnode *) fp->f_data;
+	if (fp->f_type != DTYPE_VNODE
+	    || (fp->f_flag & (FREAD|FWRITE)) == 0
+	    || vp->v_type != VCHR
+	    || vp->v_rdev == NODEV) {
+		FILE_UNUSE(fp, p);
+		return (EBADF);
+	}
+
 	dev = vp->v_rdev;
-	if (dev == NODEV)
-		return EBADF;
-	SMB_CHECKMINOR(dev);
+
+	FILE_UNUSE(fp, p);
+
+	sdp = SMB_GETDEV(dev);
+	if (!sdp)
+		return (ENXIO);
 	ssp = sdp->sd_share;
 	if (ssp == NULL)
 		return ENOTCONN;
+
 	error = smb_share_get(ssp, LK_EXCLUSIVE, scred);
 	if (error)
 		return error;
+
 	*sspp = ssp;
 	return 0;
 }

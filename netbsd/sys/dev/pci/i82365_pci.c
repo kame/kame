@@ -1,4 +1,4 @@
-/*	$NetBSD: i82365_pci.c,v 1.13 2001/11/15 09:48:12 lukem Exp $	*/
+/*	$NetBSD: i82365_pci.c,v 1.17 2003/01/31 00:07:42 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: i82365_pci.c,v 1.13 2001/11/15 09:48:12 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: i82365_pci.c,v 1.17 2003/01/31 00:07:42 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -60,9 +60,8 @@ __KERNEL_RCSID(0, "$NetBSD: i82365_pci.c,v 1.13 2001/11/15 09:48:12 lukem Exp $"
 int	pcic_pci_match __P((struct device *, struct cfdata *, void *));
 void	pcic_pci_attach __P((struct device *, struct device *, void *));
 
-struct cfattach pcic_pci_ca = {
-	sizeof(struct pcic_pci_softc), pcic_pci_match, pcic_pci_attach
-};
+CFATTACH_DECL(pcic_pci, sizeof(struct pcic_pci_softc),
+    pcic_pci_match, pcic_pci_attach, NULL, NULL);
 
 static struct pcmcia_chip_functions pcic_pci_functions = {
 	pcic_chip_mem_alloc,
@@ -123,9 +122,11 @@ pcic_pci_attach(parent, self, aux)
 	bus_space_handle_t memh;
 	char *model;
 
+	aprint_naive(": PCMCIA controller\n");
+
 	if (pci_mapreg_map(pa, PCI_CBIO, PCI_MAPREG_TYPE_IO, 0,
 	    &sc->iot, &sc->ioh, NULL, NULL)) {
-		printf(": can't map i/o space\n");
+		aprint_error(": can't map i/o space\n");
 		return;
 	}
 
@@ -167,7 +168,7 @@ pcic_pci_attach(parent, self, aux)
 		break;
 	}
 
-	printf(": %s\n", model);
+	aprint_normal(": %s\n", model);
 
 	/* Enable the card. */
 	pci_conf_write(pc, pa->pa_tag, PCI_COMMAND_STATUS_REG,
@@ -186,7 +187,7 @@ pcic_pci_attach(parent, self, aux)
 		   PCIC_CIRRUS_EXT_CONTROL_1);
 	if ((pcic_read(&sc->handle[0], PCIC_CIRRUS_EXTENDED_DATA) &
 	    PCIC_CIRRUS_EXT_CONTROL_1_PCI_INTR_MASK)) {
-		printf("%s: PCI interrupts not supported\n",
+		aprint_error("%s: PCI interrupts not supported\n",
 		       sc->dev.dv_xname);
 		return;
 	}
@@ -198,7 +199,7 @@ pcic_pci_attach(parent, self, aux)
 	/* Map and establish the interrupt. */
 	sc->ih = pcic_pci_machdep_pcic_intr_establish(sc, pcic_intr);
 	if (sc->ih == NULL) {
-		printf("%s: couldn't map interrupt\n", sc->dev.dv_xname);
+		aprint_error("%s: couldn't map interrupt\n", sc->dev.dv_xname);
 		return;
 	}
 #endif

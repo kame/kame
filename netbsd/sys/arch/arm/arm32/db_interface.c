@@ -1,4 +1,4 @@
-/*	$NetBSD: db_interface.c,v 1.21 2002/05/13 20:30:08 matt Exp $	*/
+/*	$NetBSD: db_interface.c,v 1.34 2003/10/26 23:11:15 chris Exp $	*/
 
 /* 
  * Copyright (c) 1996 Scott K. Stevens
@@ -33,7 +33,12 @@
 /*
  * Interface to new debugger.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: db_interface.c,v 1.34 2003/10/26 23:11:15 chris Exp $");
+
 #include "opt_ddb.h"
+#include "opt_kgdb.h"
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -55,7 +60,11 @@
 #include <ddb/db_interface.h>
 #include <dev/cons.h>
 
-static int nil;
+#if defined(KGDB) || !defined(DDB)
+#define db_printf	printf
+#endif
+
+static long nil;
 
 int db_access_und_sp __P((const struct db_variable *, db_expr_t *, int));
 int db_access_abt_sp __P((const struct db_variable *, db_expr_t *, int));
@@ -84,9 +93,9 @@ const struct db_variable db_regs[] = {
 	{ "svc_sp", (long *)&DDB_REGS->tf_svc_sp, FCN_NULL, },
 	{ "svc_lr", (long *)&DDB_REGS->tf_svc_lr, FCN_NULL, },
 	{ "pc", (long *)&DDB_REGS->tf_pc, FCN_NULL, },
-	{ "und_sp", (long *)&nil, db_access_und_sp, },
-	{ "abt_sp", (long *)&nil, db_access_abt_sp, },
-	{ "irq_sp", (long *)&nil, db_access_irq_sp, },
+	{ "und_sp", &nil, db_access_und_sp, },
+	{ "abt_sp", &nil, db_access_abt_sp, },
+	{ "irq_sp", &nil, db_access_irq_sp, },
 };
 
 const struct db_variable * const db_eregs = db_regs + sizeof(db_regs)/sizeof(db_regs[0]);
@@ -120,6 +129,7 @@ db_access_irq_sp(const struct db_variable *vp, db_expr_t *valp, int rw)
 	return(0);
 }
 
+#ifdef DDB
 /*
  *  kdb_trap - field a TRACE or BPT trap
  */
@@ -133,8 +143,8 @@ kdb_trap(int type, db_regs_t *regs)
 	case -1:		/* keyboard interrupt */
 		break;
 	default:
-		db_printf("kernel: trap");
 		if (db_recover != 0) {
+			/* This will longjmp back into db_command_loop() */
 			db_error("Faulted in DDB; continuing...\n");
 			/*NOTREACHED*/
 		}
@@ -156,15 +166,21 @@ kdb_trap(int type, db_regs_t *regs)
 
 	return (1);
 }
+#endif
 
-
-static int
+int
 db_validate_address(vaddr_t addr)
 {
 	struct proc *p = curproc;
 	struct pmap *pmap;
 
-	if (!p || !p->p_vmspace || !p->p_vmspace->vm_map.pmap)
+	if (!p || !p->p_vmspace || !p->p_vmspace->vm_map.pmap ||
+#ifndef ARM32_NEW_VM_LAYOUT
+	    addr >= VM_MAXUSER_ADDRESS
+#else
+	    addr >= VM_MIN_KERNEL_ADDRESS
+#endif
+	   )
 		pmap = pmap_kernel();
 	else
 		pmap = p->p_vmspace->vm_map.pmap;
@@ -181,9 +197,22 @@ db_read_bytes(addr, size, data)
 	size_t	size;
 	char	*data;
 {
-	char	*src;
+	char	*src = (char *)addr;
 
-	src = (char *)addr;
+	if (db_validate_address((u_int)src)) {
+		db_printf("address %p is invalid\n", src);
+		return;
+	}
+
+	if (size == 4 && (addr & 3) == 0 && ((uintptr_t)data & 3) == 0) {
+		*((int*)data) = *((int*)src);
+		return;
+	}
+
+	if (size == 2 && (addr & 1) == 0 && ((uintptr_t)data & 1) == 0) {
+		*((short*)data) = *((short*)src);
+		return;
+	}
 
 	while (size-- > 0) {
 		if (db_validate_address((u_int)src)) {
@@ -204,6 +233,9 @@ db_write_text(vaddr_t addr, size_t size, char *data)
 	size_t limit, savesize;
 	char *dst;
 
+	/* XXX: gcc */
+	oldpte = 0;
+
 	if ((savesize = size) == 0)
 		return;
 
@@ -211,7 +243,8 @@ db_write_text(vaddr_t addr, size_t size, char *data)
 
 	do {
 		/* Get the PDE of the current VA. */
-		pde = pmap_pde(pmap, (vaddr_t) dst);
+		if (pmap_get_pde_pte(pmap, (vaddr_t) dst, &pde, &pte) == FALSE)
+			goto no_mapping;
 		switch ((oldpde = *pde) & L1_TYPE_MASK) {
 		case L1_TYPE_S:
 			pgva = (vaddr_t)dst & L1_S_FRAME;
@@ -219,19 +252,23 @@ db_write_text(vaddr_t addr, size_t size, char *data)
 
 			tmppde = oldpde | L1_S_PROT_W;
 			*pde = tmppde;
+			PTE_SYNC(pde);
 			break;
 
 		case L1_TYPE_C:
 			pgva = (vaddr_t)dst & L2_S_FRAME;
 			limit = L2_S_SIZE - ((vaddr_t)dst & L2_S_OFFSET);
 
-			pte = vtopte(pgva);
+			if (pte == NULL)
+				goto no_mapping;
 			oldpte = *pte;
 			tmppte = oldpte | L2_S_PROT_W;
 			*pte = tmppte;
+			PTE_SYNC(pte);
 			break;
 
 		default:
+		no_mapping:
 			printf(" address 0x%08lx not a valid page\n",
 			    (vaddr_t) dst);
 			return;
@@ -256,10 +293,12 @@ db_write_text(vaddr_t addr, size_t size, char *data)
 		switch (oldpde & L1_TYPE_MASK) {
 		case L1_TYPE_S:
 			*pde = oldpde;
+			PTE_SYNC(pde);
 			break;
 
 		case L1_TYPE_C:
 			*pte = oldpte;
+			PTE_SYNC(pte);
 			break;
 		}
 		cpu_tlb_flushD_SE(pgva);
@@ -276,25 +315,39 @@ db_write_text(vaddr_t addr, size_t size, char *data)
 void
 db_write_bytes(vaddr_t addr, size_t size, char *data)
 {
+	extern char kernel_text[];
 	extern char etext[];
 	char *dst;
 	size_t loop;
 
 	/* If any part is in kernel text, use db_write_text() */
-	if (addr >= KERNEL_TEXT_BASE && addr < (vaddr_t) etext) {
+	if (addr >= (vaddr_t) kernel_text && addr < (vaddr_t) etext) {
 		db_write_text(addr, size, data);
 		return;
 	}
 
 	dst = (char *)addr;
-	loop = size;
-	while (loop-- > 0) {
-		if (db_validate_address((u_int)dst)) {
-			db_printf("address %p is invalid\n", dst);
-			return;
-		}
-		*dst++ = *data++;
+	if (db_validate_address((u_int)dst)) {
+		db_printf("address %p is invalid\n", dst);
+		return;
 	}
+
+	if (size == 4 && (addr & 3) == 0 && ((uintptr_t)data & 3) == 0)
+		*((int*)dst) = *((int*)data);
+	else
+	if (size == 2 && (addr & 1) == 0 && ((uintptr_t)data & 1) == 0)
+		*((short*)dst) = *((short*)data);
+	else {
+		loop = size;
+		while (loop-- > 0) {
+			if (db_validate_address((u_int)dst)) {
+				db_printf("address %p is invalid\n", dst);
+				return;
+			}
+			*dst++ = *data++;
+		}
+	}
+
 	/* make sure the caches and memory are in sync */
 	cpu_icache_sync_range(addr, size);
 
@@ -303,6 +356,7 @@ db_write_bytes(vaddr_t addr, size_t size, char *data)
 	cpu_cpwait();
 }
 
+#ifdef DDB
 void
 cpu_Debugger(void)
 {
@@ -340,29 +394,6 @@ static struct undefined_handler db_uh;
 void
 db_machine_init(void)
 {
-#ifndef __ELF__
-	struct exec *kernexec = (struct exec *)KERNEL_TEXT_BASE;
-	int len;
-
-	/*
-	 * The boot loader currently loads the kernel with the a.out
-	 * header still attached.
-	 */
-
-	if (kernexec->a_syms == 0) {
-		printf("ddb: No symbol table\n");
-	} else {
-		/* cover the symbols themselves (what is the int for?? XXX) */
-		esym = (int)&end + kernexec->a_syms + sizeof(int);
-
-		/*
-		 * and the string table.  (int containing size of string
-		 * table is included in string table size).
-		 */
-		len = *((u_int *)esym);
-		esym += (len + (sizeof(u_int) - 1)) & ~(sizeof(u_int) - 1);
-	}
-#endif
 
 	/*
 	 * We get called before malloc() is available, so supply a static
@@ -371,6 +402,7 @@ db_machine_init(void)
 	db_uh.uh_handler = db_trapper;
 	install_coproc_handler_static(0, &db_uh);
 }
+#endif
 
 u_int
 db_fetch_reg(int reg, db_regs_t *db_regs)

@@ -1,4 +1,4 @@
-/*	$NetBSD: frame.h,v 1.16 2001/06/17 21:01:38 sommerfeld Exp $	*/
+/*	$NetBSD: frame.h,v 1.25 2003/09/25 22:01:31 christos Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -51,11 +51,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -78,6 +74,7 @@
 #define _I386_FRAME_H_
 
 #include <sys/signal.h>
+#include <sys/sa.h>
 
 /*
  * System stack frames.
@@ -130,8 +127,8 @@ struct intrframe {
 	int	if_edx;
 	int	if_ecx;
 	int	if_eax;
-	u_int32_t __if_trapno:32; /* for compat with trap frame - trapno */
-	u_int32_t __if_err:32;	/* for compat with trap frame - err */
+	u_int32_t __if_trapno; /* for compat with trap frame - trapno */
+	u_int32_t __if_err;	/* for compat with trap frame - err */
 	/* below portion defined in 386 hardware */
 	int	if_eip;
 	int	if_cs;
@@ -145,22 +142,55 @@ struct intrframe {
  * Stack frame inside cpu_switch()
  */
 struct switchframe {
-	int	sf_ppl;
 	int	sf_edi;
 	int	sf_esi;
 	int	sf_ebx;
 	int	sf_eip;
 };
 
+#if (defined(COMPAT_16) || defined(COMPAT_IBCS2)) && defined(_KERNEL)
+/*
+ * XXX: Really COMPAT_IBCS2 should not be using our old signal frame.
+ */
 /*
  * Signal frame
  */
-struct sigframe {
-	int	sf_signum;
-	int	sf_code;
-	struct	sigcontext *sf_scp;
-	sig_t	sf_handler;
-	struct	sigcontext sf_sc;
+struct sigframe_sigcontext {
+	int	sf_ra;			/* return address for handler */
+	int	sf_signum;		/* "signum" argument for handler */
+	int	sf_code;		/* "code" argument for handler */
+	struct	sigcontext *sf_scp;	/* "scp" argument for handler */
+	struct	sigcontext sf_sc;	/* actual saved context */
 };
+#endif
+
+struct sigframe_siginfo {
+	int		sf_ra;		/* return address for handler */
+	int		sf_signum;	/* "signum" argument for handler */
+	siginfo_t	*sf_sip;	/* "sip" argument for handler */
+	ucontext_t	*sf_ucp;	/* "ucp" argument for handler */
+	siginfo_t	sf_si;		/* actual saved siginfo */
+	ucontext_t	sf_uc;		/* actual saved ucontext */
+};
+
+/*
+ * Scheduler activations upcall frame
+ */
+struct saframe {
+	int		sa_ra;
+	int		sa_type;
+	struct sa_t**	sa_sas;
+	int		sa_events;
+	int		sa_interrupted;
+	void*		sa_arg;
+};
+
+#ifdef _KERNEL
+void *getframe(struct lwp *, int, int *);
+void buildcontext(struct lwp *, int, void *, void *);
+#ifdef COMPAT_16
+void sendsig_sigcontext(const ksiginfo_t *, const sigset_t *);
+#endif
+#endif
 
 #endif  /* _I386_FRAME_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: cdefs_elf.h,v 1.11 2002/01/27 07:19:25 lukem Exp $	*/
+/*	$NetBSD: cdefs_elf.h,v 1.17 2003/10/29 21:56:02 mycroft Exp $	*/
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -49,36 +49,31 @@
 #endif
 #endif
 
-#undef	__DO_NOT_DO_WEAK__		/* we use weak syms */
-
-#ifndef __DO_NOT_DO_WEAK__
 #define	__indr_reference(sym,alias)	/* nada, since we do weak refs */
-#endif /* !__DO_NOT_DO_WEAK__ */
 
 #if __STDC__
-
-#ifndef __DO_NOT_DO_WEAK__
-#define	__weak_alias(alias,sym)						\
-    __asm__(".weak " _C_LABEL_STRING(#alias) " ; "			\
+#define	__strong_alias(alias,sym)	       				\
+    __asm__(".global " _C_LABEL_STRING(#alias) "\n"			\
 	    _C_LABEL_STRING(#alias) " = " _C_LABEL_STRING(#sym));
-#endif /* !__DO_NOT_DO_WEAK__ */
+
+#define	__weak_alias(alias,sym)						\
+    __asm__(".weak " _C_LABEL_STRING(#alias) "\n"			\
+	    _C_LABEL_STRING(#alias) " = " _C_LABEL_STRING(#sym));
 #define	__weak_extern(sym)						\
     __asm__(".weak " _C_LABEL_STRING(#sym));
 #define	__warn_references(sym,msg)					\
-    __asm__(".section .gnu.warning." #sym " ; .ascii \"" msg "\" ; .text");
+    __asm__(".section .gnu.warning." #sym "\n\t.ascii \"" msg "\"\n\t.text");
 
 #else /* !__STDC__ */
 
-#ifndef __DO_NOT_DO_WEAK__
 #ifdef __LEADING_UNDERSCORE
 #define __weak_alias(alias,sym) ___weak_alias(_/**/alias,_/**/sym)
 #define	___weak_alias(alias,sym)					\
-    __asm__(".weak alias ; alias = sym");
+    __asm__(".weak alias\nalias = sym");
 #else
 #define	__weak_alias(alias,sym)						\
-    __asm__(".weak alias ; alias = sym");
+    __asm__(".weak alias\nalias = sym");
 #endif
-#endif /* !__DO_NOT_DO_WEAK__ */
 #ifdef __LEADING_UNDERSCORE
 #define __weak_extern(sym) ___weak_extern(_/**/sym)
 #define	___weak_extern(sym)						\
@@ -88,16 +83,16 @@
     __asm__(".weak sym");
 #endif
 #define	__warn_references(sym,msg)					\
-    __asm__(".section .gnu.warning.sym ; .ascii msg ; .text");
+    __asm__(".section .gnu.warning.sym\n\t.ascii msg ; .text");
 
 #endif /* !__STDC__ */
 
 #if __STDC__
 #define	__SECTIONSTRING(_sec, _str)					\
-	__asm__(".section " #_sec " ; .asciz \"" _str "\" ; .text")
+	__asm__(".section " #_sec "\n\t.asciz \"" _str "\"\n\t.previous")
 #else
 #define	__SECTIONSTRING(_sec, _str)					\
-	__asm__(".section _sec ; .asciz _str ; .text")
+	__asm__(".section _sec\n\t.asciz _str\n\t.previous")
 #endif
 
 #define	__IDSTRING(_n,_s)		__SECTIONSTRING(.ident,_s)
@@ -119,5 +114,29 @@
 #else
 #define	__KERNEL_COPYRIGHT(_n, _s)	__SECTIONSTRING(.copyright, _s)
 #endif
+
+#ifndef __lint__
+#define	__link_set_make_entry(set, sym)					\
+	static void const * const __link_set_##set##_sym_##sym		\
+	    __section("link_set_" #set) __unused = &sym
+#else
+#define	__link_set_make_entry(set, sym)					\
+	extern void const * const __link_set_##set##_sym_##sym
+#endif /* __lint__ */
+
+#define	__link_set_add_text(set, sym)	__link_set_make_entry(set, sym)
+#define	__link_set_add_rodata(set, sym)	__link_set_make_entry(set, sym)
+#define	__link_set_add_data(set, sym)	__link_set_make_entry(set, sym)
+#define	__link_set_add_bss(set, sym)	__link_set_make_entry(set, sym)
+
+#define	__link_set_decl(set, ptype)					\
+	extern ptype *__start_link_set_##set;				\
+	extern ptype *__stop_link_set_##set
+
+#define	__link_set_start(set)	(&__start_link_set_##set)
+#define	__link_set_end(set)	(&__stop_link_set_##set)
+
+#define	__link_set_count(set)						\
+	(__link_set_end(set) - __link_set_start(set))
 
 #endif /* !_SYS_CDEFS_ELF_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: sed_saip.c,v 1.10 2002/03/17 19:40:39 atatat Exp $	*/
+/*	$NetBSD: sed_saip.c,v 1.13 2003/07/15 00:25:08 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999-2001
@@ -33,6 +33,9 @@
  * SUCH DAMAGE.
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sed_saip.c,v 1.13 2003/07/15 00:25:08 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -93,9 +96,8 @@ void	sed1356_set_contrast(struct sed1356_softc *, int);
 /*
  *  static variables
  */
-struct cfattach sed_ca = {
-	sizeof(struct sed1356_softc), sed1356match, sed1356attach,
-};
+CFATTACH_DECL(sed, sizeof(struct sed1356_softc),
+    sed1356match, sed1356attach, NULL, NULL);
 struct hpcfb_accessops sed1356_ha = {
 	sed1356_ioctl, sed1356_mmap
 };

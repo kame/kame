@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.30.10.1 2002/11/30 13:19:49 he Exp $ */
+/*	$NetBSD: vmparam.h,v 1.35 2003/08/07 16:29:42 agc Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -48,16 +44,38 @@
 #define _SPARC_VMPARAM_H_
 
 /*
- * Machine dependent constants for Sun-4c SPARC
+ * Machine dependent constants for SPARC
  */
 
-#include <machine/param.h>
+#include <machine/cpuconf.h>
 
 /*
- * USRTEXT is the start of the user text/data space, while USRSTACK
- * is the top (end) of the user stack.
+ * Sun4 systems have a 8K page size.  All other platforms have a
+ * 4K page size.  We need to define these upper and lower limits
+ * for machine-independent code.  We also try to make PAGE_SIZE,
+ * PAGE_SHIFT, and PAGE_MASK into compile-time constants, if we can.
+ *
+ * XXX Should garbage-collect the version of this from <machine/param.h>.
  */
-#define	USRTEXT		0x2000			/* Start of user text */
+#define	PAGE_SHIFT_SUN4		13
+#define	PAGE_SHIFT_SUN4CM	12
+
+#define	MIN_PAGE_SIZE		(1 << PAGE_SHIFT_SUN4CM)
+#define	MAX_PAGE_SIZE		(1 << PAGE_SHIFT_SUN4)
+
+#if CPU_NTYPES != 0 && !defined(SUN4)
+#define	PAGE_SHIFT		PAGE_SHIFT_SUN4CM
+#define	PAGE_SIZE		(1 << PAGE_SHIFT)
+#define	PAGE_MASK		(PAGE_SIZE - 1)
+#elif CPU_NTYPES == 1 && defined(SUN4)
+#define	PAGE_SHIFT		PAGE_SHIFT_SUN4
+#define	PAGE_SIZE		(1 << PAGE_SHIFT)
+#define	PAGE_MASK		(PAGE_SIZE - 1)
+#endif
+
+/*
+ * USRSTACK is the top (end) of the user stack.
+ */
 #define	USRSTACK	KERNBASE		/* Start of user stack */
 
 /*
@@ -108,24 +126,32 @@
 #define	VM_NFREELIST		1
 #define	VM_FREELIST_DEFAULT	0
 
-#if !defined(_LKM)
-/*
- * Make the VM PAGE_* macros constants, if possible.
- */
-#if NBPG == 4096 || NBPG == 8192
-#define PAGE_SIZE	NBPG
-#define PAGE_SHIFT	PGSHIFT
-#define PAGE_MASK	(NBPG-1)
-#endif
-#endif /* _LKM */
-
-#define	__HAVE_PMAP_PHYSSEG
+#define __HAVE_VM_PAGE_MD
 
 /*
- * pmap specific data stored in the vm_physmem[] array
+ * For each managed physical page, there is a list of all currently
+ * valid virtual mappings of that page.  Since there is usually one
+ * (or zero) mapping per page, the table begins with an initial entry,
+ * rather than a pointer; this head entry is empty iff its pv_pmap
+ * field is NULL.
  */
-struct pvlist;
-struct pmap_physseg {
-	struct pvlist *pvhead;
+struct vm_page_md {
+	struct pvlist {
+		struct	pvlist *pv_next;	/* next pvlist, if any */
+		struct	pmap *pv_pmap;		/* pmap of this va */
+		vaddr_t	pv_va;			/* virtual address */
+		int	pv_flags;		/* flags (below) */
+	} pvlisthead;
+	struct		simplelock pv_slock;
 };
+#define VM_MDPAGE_PVHEAD(pg)	(&(pg)->mdpage.pvlisthead)
+
+#define VM_MDPAGE_INIT(pg) do {				\
+	(pg)->mdpage.pvlisthead.pv_next = NULL;		\
+	(pg)->mdpage.pvlisthead.pv_pmap = NULL;		\
+	(pg)->mdpage.pvlisthead.pv_va = 0;		\
+	(pg)->mdpage.pvlisthead.pv_flags = 0;		\
+	simple_lock_init(&(pg)->mdpage.pv_slock);	\
+} while(/*CONSTCOND*/0)
+
 #endif /* _SPARC_VMPARAM_H_ */

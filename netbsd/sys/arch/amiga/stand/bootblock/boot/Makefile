@@ -1,4 +1,6 @@
-#	$NetBSD: Makefile,v 1.28 2002/04/15 08:38:55 mhitch Exp $
+#	$NetBSD: Makefile,v 1.34 2003/10/26 07:25:36 lukem Exp $
+
+.include <bsd.sys.mk>		# for HOST_SH
 
 ### what we need:
 
@@ -21,22 +23,23 @@ BINDIR=/usr/mdec
 COBJS = main.o console.o xd.o twiddle.o bzero.o gets.o
 COBJS+=  lseek.o open.o read.o close.o dev.o errno.o
 COBJS+=  ufs.o ustarfs.o panic.o vers.o files.o
+COBJS+=  divdi3.o moddi3.o qdivrem.o snprintf.o
 
 SOBJS = alloc.o ashrdi3.o ashldi3.o bcopy.o muldi3.o printf.o startit.o
 SOBJS += strlen.o strcmp.o memcmp.o strerror.o sprintf.o subr_prf.o
-SOBJS += libstubs.o memset.o strncmp.o
+SOBJS += libstubs.o memcmp.o memmove.o memset.o strncmp.o
 
 OBJS=	$(SOBJS) $(COBJS)
 
 DEFS = -D_STANDALONE -DINSECURE
 DEFS += -D__INTERNAL_LIBSA_CREAD
 SOBJS += cread.o
-SOBJS += crc32.o inflate.o adler32.o infblock.o infcodes.o inftrees.o # XXX need libz!!!
+SOBJS += crc32.o inflate.o infblock.o infcodes.o inftrees.o # XXX need libz!!!
 SOBJS += inffast.o infutil.o
 #DEFS += -DBOOT_ELF32 -DBOOT_AOUT
 SOBJS += loadfile.o loadfile_aout.o loadfile_elf32.o
 
-NETBSD_VERS!=	sh ${.CURDIR}/../../../../../conf/osrelease.sh
+NETBSD_VERS!=	${HOST_SH} ${.CURDIR}/../../../../../conf/osrelease.sh
 DEFS+=	-DNETBSD_VERS='"${NETBSD_VERS}"'
 
 ### main target: ###
@@ -56,8 +59,8 @@ INCPATH += -I${.CURDIR}/../aout2bb -I${DESTDIR}/usr/include
 AFLAGS += -m68030 -l
 CAFLAGS += -Wa,-l -Wa,-m68030 ${INCPATH}
 
-COPTIM= -O -fomit-frame-pointer -fcse-follow-jumps -fcse-skip-blocks  -Wa,-l -m68060 -Wa,-m68030
-CFLAGS= ${COPTIM} ${INCPATH} ${DEFS} -Wall #-Wstrict-prototypes
+COPTIM= -Os -fomit-frame-pointer -fcse-follow-jumps -fcse-skip-blocks  -Wa,-l -m68060 -Wa,-m68030
+CFLAGS= -ffreestanding ${COPTIM} ${INCPATH} ${DEFS} -Wall #-Wstrict-prototypes
 
 .c.o:
 	${CC} ${CFLAGS} -S $< -o $*.s
@@ -85,7 +88,7 @@ libboot.a: ${OBJS}
 
 .PHONY:	vers.c
 vers.c:	${.CURDIR}/version
-	sh ${DIR_TOP}/conf/newvers_stand.sh -N ${.CURDIR}/version "amiga"
+	${HOST_SH} ${DIR_TOP}/conf/newvers_stand.sh -N ${.CURDIR}/version "amiga"
 
 machine:
 	-rm -f $@

@@ -1,4 +1,4 @@
-/* $NetBSD: esa.c,v 1.12 2002/03/24 14:17:35 jmcneill Exp $ */
+/* $NetBSD: esa.c,v 1.22.2.1 2004/09/22 20:58:34 jmc Exp $ */
 
 /*
  * Copyright (c) 2001, 2002 Jared D. McNeill <jmcneill@invisible.ca>
@@ -37,6 +37,9 @@
  * problems with the original list management code present in the Linux
  * driver.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: esa.c,v 1.22.2.1 2004/09/22 20:58:34 jmc Exp $");
 
 #include <sys/types.h>
 #include <sys/errno.h>
@@ -113,8 +116,8 @@ int		esa_halt_input(void *);
 int		esa_set_port(void *, mixer_ctrl_t *);
 int		esa_get_port(void *, mixer_ctrl_t *);
 int		esa_query_devinfo(void *, mixer_devinfo_t *);
-void *		esa_malloc(void *, int, size_t, int, int);
-void		esa_free(void *, void *, int);
+void *		esa_malloc(void *, int, size_t, struct malloc_type *, int);
+void		esa_free(void *, void *, struct malloc_type *);
 int		esa_getdev(void *, struct audio_device *);
 size_t		esa_round_buffersize(void *, int, size_t);
 int		esa_get_props(void *);
@@ -139,7 +142,7 @@ int		esa_init_codec(struct esa_softc *);
 int		esa_attach_codec(void *, struct ac97_codec_if *);
 int		esa_read_codec(void *, u_int8_t, u_int16_t *);
 int		esa_write_codec(void *, u_int8_t, u_int16_t);
-void		esa_reset_codec(void *);
+int		esa_reset_codec(void *);
 enum ac97_host_flags	esa_flags_codec(void *);
 int		esa_wait(struct esa_softc *);
 int		esa_init(struct esa_softc *);
@@ -208,10 +211,8 @@ struct audio_hw_if esa_hw_if = {
 	esa_trigger_input
 };
 
-struct cfattach esa_ca = {
-	sizeof(struct esa_softc), esa_match, esa_attach,
-	esa_detach, /*esa_activate*/ NULL
-};
+CFATTACH_DECL(esa, sizeof(struct esa_softc), esa_match, esa_attach,
+    esa_detach, NULL);
 
 /*
  * audio(9) functions
@@ -266,6 +267,8 @@ esa_set_params(void *hdl, int setmode, int usemode, struct audio_params *play,
 			p = rec;
 			ch = &vc->rec;
 			break;
+		default:
+			return EINVAL;
 		}
 
 		if (p->sample_rate < ESA_MINRATE ||
@@ -479,7 +482,8 @@ esa_halt_input(void *hdl)
 }
 
 void *
-esa_malloc(void *hdl, int direction, size_t size, int type, int flags)
+esa_malloc(void *hdl, int direction, size_t size, struct malloc_type *type,
+    int flags)
 {
 	struct esa_voice *vc = hdl;
 	struct esa_softc *sc = (struct esa_softc *)vc->parent;
@@ -503,7 +507,7 @@ esa_malloc(void *hdl, int direction, size_t size, int type, int flags)
 }
 
 void
-esa_free(void *hdl, void *addr, int type)
+esa_free(void *hdl, void *addr, struct malloc_type *type)
 {
 	struct esa_voice *vc = hdl;
 	struct esa_softc *sc = (struct esa_softc *)vc->parent;
@@ -1019,9 +1023,11 @@ esa_attach(struct device *parent, struct device *self, void *aux)
 	int revision, len;
 	int i;
 
+	aprint_naive(": Audio controller\n");
+
 	pci_devinfo(pa->pa_id, pa->pa_class, 0, devinfo);
 	revision = PCI_REVISION(pa->pa_class);
-	printf(": %s (rev. 0x%02x)\n", devinfo, revision);
+	aprint_normal(": %s (rev. 0x%02x)\n", devinfo, revision);
 
 	for (card = esa_card_types; card->pci_vendor_id; card++)
 		if (PCI_VENDOR(pa->pa_id) == card->pci_vendor_id &&
@@ -1040,7 +1046,7 @@ esa_attach(struct device *parent, struct device *self, void *aux)
 	/* Map I/O register */
 	if (pci_mapreg_map(pa, PCI_CBIO, PCI_MAPREG_TYPE_IO, 0,
 	    &sc->sc_iot, &sc->sc_ioh, &sc->sc_iob, &sc->sc_ios)) {
-		printf("%s: can't map i/o space\n", sc->sc_dev.dv_xname);
+		aprint_error("%s: can't map i/o space\n", sc->sc_dev.dv_xname);
 		return;
 	}
 
@@ -1051,26 +1057,27 @@ esa_attach(struct device *parent, struct device *self, void *aux)
 
 	/* Map and establish an interrupt */
 	if (pci_intr_map(pa, &ih)) {
-		printf("%s: can't map interrupt\n", sc->sc_dev.dv_xname);
+		aprint_error("%s: can't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}
 	intrstr = pci_intr_string(pc, ih);
 	sc->sc_ih = pci_intr_establish(pc, ih, IPL_AUDIO, esa_intr, self);
 	if (sc->sc_ih == NULL) {
-		printf("%s: can't establish interrupt", sc->sc_dev.dv_xname);
+		aprint_error("%s: can't establish interrupt",
+		    sc->sc_dev.dv_xname);
 		if (intrstr != NULL)
-			printf(" at %s", intrstr);
-		printf("\n");
+			aprint_normal(" at %s", intrstr);
+		aprint_normal("\n");
 		return;
 	}
-	printf("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
+	aprint_normal("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
 
 	/* Power up chip */
 	esa_power(sc, PCI_PMCSR_STATE_D0);
 
 	/* Init chip */
 	if (esa_init(sc) == -1) {
-		printf("%s: esa_attach: unable to initialize the card\n",
+		aprint_error("%s: esa_attach: unable to initialize the card\n",
 		    sc->sc_dev.dv_xname);
 		return;
 	}
@@ -1080,7 +1087,7 @@ esa_attach(struct device *parent, struct device *self, void *aux)
 	    + ESA_REV_B_DATA_MEMORY_LENGTH + 1);
 	sc->savemem = (u_int16_t *)malloc(len, M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (sc->savemem == NULL) {
-		printf("%s: unable to allocate suspend buffer\n",
+		aprint_error("%s: unable to allocate suspend buffer\n",
 		    sc->sc_dev.dv_xname);
 		return;
 	}
@@ -1094,8 +1101,7 @@ esa_attach(struct device *parent, struct device *self, void *aux)
 	 * So, we will swap the left and right mixer channels to compensate
 	 * for this.
 	 */ 
-	sc->codec_flags |= AC97_HOST_SWAPPED_CHANNELS;
-	sc->codec_flags |= AC97_HOST_DONT_READ;
+	sc->codec_flags = AC97_HOST_SWAPPED_CHANNELS;
 
 	/* Attach AC97 host interface */
 	sc->host_if.arg = self;
@@ -1134,7 +1140,7 @@ esa_attach(struct device *parent, struct device *self, void *aux)
 
 	sc->powerhook = powerhook_establish(esa_powerhook, sc);
 	if (sc->powerhook == NULL)
-		printf("%s: WARNING: unable to establish powerhook\n",
+		aprint_error("%s: WARNING: unable to establish powerhook\n",
 		    sc->sc_dev.dv_xname);
 
 	return;
@@ -1249,11 +1255,11 @@ esa_write_codec(void *aux, u_int8_t reg, u_int16_t data)
 	return (0);
 }
 
-void
+int
 esa_reset_codec(void *aux)
 {
 
-	return;
+	return 0;
 }
 
 enum ac97_host_flags
@@ -1600,9 +1606,9 @@ esa_power(struct esa_softc *sc, int state)
 	int pmcapreg;
 
 	if (pci_get_capability(pc, tag, PCI_CAP_PWRMGMT, &pmcapreg, 0)) {
-		data = pci_conf_read(pc, tag, pmcapreg + 4);
-		if ((data && PCI_PMCSR_STATE_MASK) != state)
-			pci_conf_write(pc, tag, pmcapreg + 4, state);
+		data = pci_conf_read(pc, tag, pmcapreg + PCI_PMCSR);
+		if ((data & PCI_PMCSR_STATE_MASK) != state)
+			pci_conf_write(pc, tag, pmcapreg + PCI_PMCSR, state);
 	}
 		
 	return (0);

@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_info_43.c,v 1.13 2001/11/13 02:08:00 lukem Exp $	*/
+/*	$NetBSD: kern_info_43.c,v 1.19 2003/12/04 19:38:22 atatat Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1991, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kern_info_43.c,v 1.13 2001/11/13 02:08:00 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_info_43.c,v 1.19 2003/12/04 19:38:22 atatat Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -50,7 +46,6 @@ __KERNEL_RCSID(0, "$NetBSD: kern_info_43.c,v 1.13 2001/11/13 02:08:00 lukem Exp 
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/fcntl.h>
-#include <sys/malloc.h>
 #include <sys/syslog.h>
 #include <sys/unistd.h>
 #include <sys/resourcevar.h>
@@ -59,14 +54,13 @@ __KERNEL_RCSID(0, "$NetBSD: kern_info_43.c,v 1.13 2001/11/13 02:08:00 lukem Exp 
 #include <sys/sysctl.h>
 
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 int
-compat_43_sys_getdtablesize(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_getdtablesize(struct lwp *l, void *v, register_t *retval)
 {
+	struct proc *p = l->l_proc;
 
 	*retval = min((int)p->p_rlimit[RLIMIT_NOFILE].rlim_cur, maxfiles);
 	return (0);
@@ -75,10 +69,7 @@ compat_43_sys_getdtablesize(p, v, retval)
 
 /* ARGSUSED */
 int
-compat_43_sys_gethostid(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_gethostid(struct lwp *l, void *v, register_t *retval)
 {
 
 	*(int32_t *)retval = hostid;
@@ -88,21 +79,19 @@ compat_43_sys_gethostid(p, v, retval)
 
 /*ARGSUSED*/
 int
-compat_43_sys_gethostname(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_gethostname(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_gethostname_args /* {
 		syscallarg(char *) hostname;
 		syscallarg(u_int) len;
 	} */ *uap = v;
-	int name;
+	int name[2];
 	size_t sz;
 
-	name = KERN_HOSTNAME;
+	name[0] = CTL_KERN;
+	name[1] = KERN_HOSTNAME;
 	sz = SCARG(uap, len);
-	return (kern_sysctl(&name, 1, SCARG(uap, hostname), &sz, 0, 0, p));
+	return (old_sysctl(&name[0], 2, SCARG(uap, hostname), &sz, 0, 0, l));
 }
 
 #define	KINFO_PROC		(0<<8)
@@ -148,10 +137,7 @@ struct bsdi_si {
 };
 
 int
-compat_43_sys_getkerninfo(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_getkerninfo(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_getkerninfo_args /* {
 		syscallarg(int) op;
@@ -159,7 +145,7 @@ compat_43_sys_getkerninfo(p, v, retval)
 		syscallarg(int *) size;
 		syscallarg(int) arg;
 	} */ *uap = v;
-	int error, name[5];
+	int error, name[6];
 	size_t size;
 
 	if (SCARG(uap, size) && (error = copyin((caddr_t)SCARG(uap, size),
@@ -169,51 +155,58 @@ compat_43_sys_getkerninfo(p, v, retval)
 	switch (SCARG(uap, op) & 0xff00) {
 
 	case KINFO_RT:
-		name[0] = PF_ROUTE;
-		name[1] = 0;
-		name[2] = (SCARG(uap, op) & 0xff0000) >> 16;
-		name[3] = SCARG(uap, op) & 0xff;
-		name[4] = SCARG(uap, arg);
-		error =
-		    net_sysctl(name, 5, SCARG(uap, where), &size, NULL, 0, p);
+		name[0] = CTL_NET;
+		name[1] = PF_ROUTE;
+		name[2] = 0;
+		name[3] = (SCARG(uap, op) & 0xff0000) >> 16;
+		name[4] = SCARG(uap, op) & 0xff;
+		name[5] = SCARG(uap, arg);
+		error = old_sysctl(&name[0], 6, SCARG(uap, where), &size,
+				   NULL, 0, l);
 		break;
 
 	case KINFO_VNODE:
-		name[0] = KERN_VNODE;
-		error =
-		    kern_sysctl(name, 1, SCARG(uap, where), &size, NULL, 0, p);
+		name[0] = CTL_KERN;
+		name[1] = KERN_VNODE;
+		error = old_sysctl(&name[0], 2, SCARG(uap, where), &size,
+				   NULL, 0, l);
 		break;
 
 	case KINFO_PROC:
-		name[0] = KERN_PROC;
-		name[1] = SCARG(uap, op) & 0xff;
-		name[2] = SCARG(uap, arg);
-		error =
-		    kern_sysctl(name, 3, SCARG(uap, where), &size, NULL, 0, p);
+		name[0] = CTL_KERN;
+		name[1] = KERN_PROC;
+		name[2] = SCARG(uap, op) & 0xff;
+		name[3] = SCARG(uap, arg);
+		error = old_sysctl(&name[0], 4, SCARG(uap, where), &size,
+				   NULL, 0, l);
 		break;
 
 	case KINFO_FILE:
-		name[0] = KERN_FILE;
-		error =
-		    kern_sysctl(name, 1, SCARG(uap, where), &size, NULL, 0, p);
+		name[0] = CTL_KERN;
+		name[1] = KERN_FILE;
+		error = old_sysctl(&name[0], 2, SCARG(uap, where), &size,
+				   NULL, 0, l);
 		break;
 
 	case KINFO_METER:
-		name[0] = VM_METER;
-		error =
-		    uvm_sysctl(name, 1, SCARG(uap, where), &size, NULL, 0, p);
+		name[0] = CTL_VM;
+		name[1] = VM_METER;
+		error = old_sysctl(&name[0], 2, SCARG(uap, where), &size,
+				   NULL, 0, l);
 		break;
 
 	case KINFO_LOADAVG:
-		name[0] = VM_LOADAVG;
-		error =
-		    uvm_sysctl(name, 1, SCARG(uap, where), &size, NULL, 0, p);
+		name[0] = CTL_VM;
+		name[1] = VM_LOADAVG;
+		error = old_sysctl(&name[0], 2, SCARG(uap, where), &size,
+				   NULL, 0, l);
 		break;
 
 	case KINFO_CLOCKRATE:
-		name[0] = KERN_CLOCKRATE;
-		error =
-		    kern_sysctl(name, 1, SCARG(uap, where), &size, NULL, 0, p);
+		name[0] = CTL_KERN;
+		name[1] = KERN_CLOCKRATE;
+		error = old_sysctl(&name[0], 2, SCARG(uap, where), &size,
+				   NULL, 0, l);
 		break;
 
 
@@ -287,14 +280,12 @@ compat_43_sys_getkerninfo(p, v, retval)
 
 /* ARGSUSED */
 int
-compat_43_sys_sethostid(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_sethostid(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_sethostid_args /* {
 		syscallarg(int32_t) hostid;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	int error;
 
 	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
@@ -306,18 +297,13 @@ compat_43_sys_sethostid(p, v, retval)
 
 /* ARGSUSED */
 int
-compat_43_sys_sethostname(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_sethostname(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_sethostname_args *uap = v;
-	int name;
-	int error;
+	int name[2];
 
-	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
-		return (error);
-	name = KERN_HOSTNAME;
-	return (kern_sysctl(&name, 1, 0, 0, SCARG(uap, hostname),
-			    SCARG(uap, len), p));
+	name[0] = CTL_KERN;
+	name[1] = KERN_HOSTNAME;
+	return (old_sysctl(&name[0], 2, 0, 0, SCARG(uap, hostname),
+			   SCARG(uap, len), l));
 }

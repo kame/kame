@@ -1,4 +1,4 @@
-/* $NetBSD: osf1_mmap.c,v 1.8 2001/11/13 02:09:13 lukem Exp $ */
+/* $NetBSD: osf1_mmap.c,v 1.10 2003/04/01 01:53:40 thorpej Exp $ */
 
 /*
  * Copyright (c) 1999 Christopher G. Demetriou.  All rights reserved.
@@ -31,13 +31,14 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: osf1_mmap.c,v 1.8 2001/11/13 02:09:13 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: osf1_mmap.c,v 1.10 2003/04/01 01:53:40 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 #include <uvm/uvm.h>				/* XXX see mmap emulation */
 
@@ -46,8 +47,8 @@ __KERNEL_RCSID(0, "$NetBSD: osf1_mmap.c,v 1.8 2001/11/13 02:09:13 lukem Exp $");
 #include <compat/osf1/osf1_cvt.h>
 
 int
-osf1_sys_madvise(p, v, retval)
-	struct proc *p;
+osf1_sys_madvise(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -98,7 +99,7 @@ osf1_sys_madvise(p, v, retval)
 	}
 
 	if (error == 0) {
-		error = sys_madvise(p, &a, retval);
+		error = sys_madvise(l, &a, retval);
 
 		/*
 		 * NetBSD madvise() currently always returns ENOSYS.
@@ -112,12 +113,13 @@ osf1_sys_madvise(p, v, retval)
 }
 
 int
-osf1_sys_mmap(p, v, retval)
-	struct proc *p;
+osf1_sys_mmap(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct osf1_sys_mmap_args *uap = v;
+	struct proc *p = l->l_proc;
 	struct sys_mmap_args a;
 	unsigned long leftovers;
 
@@ -146,7 +148,7 @@ osf1_sys_mmap(p, v, retval)
 	 * near the address that the user specified.  Therefore, for
 	 * non-fixed entires we try to find space in the address space
 	 * starting at that address.  If the user specified zero, we
-	 * start looking at at least NBPG, so that programs can't
+	 * start looking at at least PAGE_SIZE, so that programs can't
 	 * accidentally live through deferencing NULL.
 	 *
 	 * The need for this kludgery is increased by the fact that
@@ -190,8 +192,8 @@ osf1_sys_mmap(p, v, retval)
 		}
 
 		/* didn't find anything.  take it again from the top. */
-		if (uvm_map_findspace(&p->p_vmspace->vm_map, NBPG, size, &addr,
-		    NULL, 0, 0, 0) != NULL) {
+		if (uvm_map_findspace(&p->p_vmspace->vm_map, PAGE_SIZE, size,
+		    &addr, NULL, 0, 0, 0) != NULL) {
 			fixed = 1;
 			goto done;
 		}
@@ -204,12 +206,12 @@ done:
 		}
 	}
 
-	return sys_mmap(p, &a, retval);
+	return sys_mmap(l, &a, retval);
 }
 
 int
-osf1_sys_mprotect(p, v, retval)
-	struct proc *p;
+osf1_sys_mprotect(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -226,5 +228,5 @@ osf1_sys_mprotect(p, v, retval)
 	if (leftovers != 0)
 		return (EINVAL);
 
-	return sys_mprotect(p, &a, retval);
+	return sys_mprotect(l, &a, retval);
 }

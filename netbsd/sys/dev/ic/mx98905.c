@@ -1,4 +1,4 @@
-/*	$NetBSD: mx98905.c,v 1.2.10.1 2003/01/27 05:26:37 jmc Exp $	*/
+/*	$NetBSD: mx98905.c,v 1.6 2004/03/18 23:38:17 he Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -55,18 +55,18 @@
  */
 
 /*
- * <URL:http://mail-index.netbsd.org/port-arm32/1996/06/23/0005.html>:
+ * <URL:http://mail-index.NetBSD.org/port-arm32/1996/06/23/0005.html>:
  * There are 2 types of etherh card.  One uses the macronics chipset MX98905
- * and that chipset has a bug in it, in that it the MSB remote dma
+ * and that chipset has a bug in it, in that it the MSB remote DMA
  * register does not work.  There is a workaround for this which
  * should be around soon.  In fact, I think only the buffer ram test
- * ever transfers more than 256 bytes across the dma channel, so diabling
+ * ever transfers more than 256 bytes across the DMA channel, so diabling
  * it will make the mx stuff work.
  */
 
 #include <sys/param.h>
 
-__KERNEL_RCSID(0, "$NetBSD: mx98905.c,v 1.2.10.1 2003/01/27 05:26:37 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mx98905.c,v 1.6 2004/03/18 23:38:17 he Exp $");
 
 #include <sys/device.h>
 #include <sys/mbuf.h>
@@ -312,7 +312,7 @@ mx98905_ring_copy(sc, src, dst, amount)
 	bus_space_tag_t asict = nsc->sc_asict;
 	bus_space_handle_t asich = nsc->sc_asich;
 	u_short tmp_amount;
-	int useword = NE2000_USE_WORD(nsc);
+	int useword = nsc->sc_useword;
 
 	/* Does copy wrap to lower addr in ring buffer? */
 	if (src + amount > sc->mem_end) {
@@ -343,7 +343,7 @@ mx98905_read_hdr(sc, buf, hdr)
 
 	mx98905_readmem(sc->sc_regt, sc->sc_regh, nsc->sc_asict, nsc->sc_asich,
 	    buf, (u_int8_t *)hdr, sizeof(struct dp8390_ring),
-	    NE2000_USE_WORD(nsc));
+	    nsc->sc_useword);
 #if BYTE_ORDER == BIG_ENDIAN
 	hdr->count = bswap16(hdr->count);
 #endif

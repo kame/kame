@@ -1,4 +1,4 @@
-/*	$NetBSD: aucc.c,v 1.30 2002/01/28 09:56:51 aymeric Exp $ */
+/*	$NetBSD: aucc.c,v 1.34 2003/05/03 18:10:43 wiz Exp $ */
 
 /*
  * Copyright (c) 1999 Bernardo Innocenti
@@ -35,14 +35,14 @@
 
 /* TODO:
  *
- * - ulaw -> 14bit conversion
+ * - mu-law -> 14bit conversion
  * - channel allocation is wrong for 14bit mono
  * - convert the... err... conversion routines to 68k asm for best performance
  * 	XXX: NO. aucc audio is limited by chipmem speed, anyway. You dont
  *	want to make life difficult for amigappc work.
  *		-is
  *
- * - rely on auconv.c routines for ulaw/alaw conversions
+ * - rely on auconv.c routines for mu-law/A-law conversions
  * - perhaps use a calibration table for better 14bit output
  * - set 31KHz AGA video mode to allow 44.1KHz even if grfcc is missing
  *	in the kernel
@@ -53,7 +53,7 @@
 #if NAUCC > 0
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: aucc.c,v 1.30 2002/01/28 09:56:51 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: aucc.c,v 1.34 2003/05/03 18:10:43 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -136,11 +136,8 @@ static u_int pertofreq(u_int);
 void	auccattach(struct device *, struct device *, void *);
 int	auccmatch(struct device *, struct cfdata *, void *);
 
-struct cfattach aucc_ca = {
-	sizeof(struct aucc_softc),
-	auccmatch,
-	auccattach
-};
+CFATTACH_DECL(aucc, sizeof(struct aucc_softc),
+    auccmatch, auccattach, NULL, NULL);
 
 struct audio_device aucc_device = {
 	"Amiga-audio",
@@ -152,7 +149,7 @@ struct audio_device aucc_device = {
 struct aucc_softc *aucc=NULL;
 
 
-unsigned char ulaw_to_lin[] = {
+unsigned char mulaw_to_lin[] = {
 	0x82, 0x86, 0x8a, 0x8e, 0x92, 0x96, 0x9a, 0x9e,
 	0xa2, 0xa6, 0xaa, 0xae, 0xb2, 0xb6, 0xba, 0xbe,
 	0xc1, 0xc3, 0xc5, 0xc7, 0xc9, 0xcb, 0xcd, 0xcf,
@@ -220,10 +217,10 @@ static void aucc_decode_ulinear8_2ch(u_char **, u_char *, int);
 static void aucc_decode_ulinear8_3ch(u_char **, u_char *, int);
 static void aucc_decode_ulinear8_4ch(u_char **, u_char *, int);
 
-static void aucc_decode_ulaw_1ch(u_char **, u_char *, int);
-static void aucc_decode_ulaw_2ch(u_char **, u_char *, int);
-static void aucc_decode_ulaw_3ch(u_char **, u_char *, int);
-static void aucc_decode_ulaw_4ch(u_char **, u_char *, int);
+static void aucc_decode_mulaw_1ch(u_char **, u_char *, int);
+static void aucc_decode_mulaw_2ch(u_char **, u_char *, int);
+static void aucc_decode_mulaw_3ch(u_char **, u_char *, int);
+static void aucc_decode_mulaw_4ch(u_char **, u_char *, int);
 
 static void aucc_decode_slinear16_1ch(u_char **, u_char *, int);
 static void aucc_decode_slinear16_2ch(u_char **, u_char *, int);
@@ -323,7 +320,7 @@ init_aucc(struct aucc_softc *sc)
 		sc->sc_channel[i].nd_intr=NULL;
 		sc->sc_channel[i].nd_intrdata=NULL;
 		sc->sc_channel[i].nd_doublebuf=0;
-		DPRINTF(("dma buffer for channel %d is %p\n", i,
+		DPRINTF(("DMA buffer for channel %d is %p\n", i,
 		    sc->sc_channel[i].nd_dma));
 	}
 
@@ -338,9 +335,9 @@ init_aucc(struct aucc_softc *sc)
 	sc->sc_precision=8;
 	sc->sc_14bit = 0;
 	sc->sc_encoding=AUDIO_ENCODING_ULAW;
-	sc->sc_decodefunc = aucc_decode_ulaw_1ch;
+	sc->sc_decodefunc = aucc_decode_mulaw_1ch;
 
-	/* clear interrupts and dma: */
+	/* clear interrupts and DMA: */
 	custom.intena = AUCC_ALLINTF;
 	custom.dmacon = AUCC_ALLDMAF;
 
@@ -478,16 +475,16 @@ aucc_set_params(void *addr, int setmode, int usemode, struct audio_params *p,
 		case AUDIO_ENCODING_ULAW:
 			switch (p->channels) {
 			case 1:
-				sc->sc_decodefunc = aucc_decode_ulaw_1ch;
+				sc->sc_decodefunc = aucc_decode_mulaw_1ch;
 				break;
 			case 2:
-				sc->sc_decodefunc = aucc_decode_ulaw_2ch;
+				sc->sc_decodefunc = aucc_decode_mulaw_2ch;
 				break;
 			case 3:
-				sc->sc_decodefunc = aucc_decode_ulaw_3ch;
+				sc->sc_decodefunc = aucc_decode_mulaw_3ch;
 				break;
 			case 4:
-				sc->sc_decodefunc = aucc_decode_ulaw_4ch;
+				sc->sc_decodefunc = aucc_decode_mulaw_4ch;
 				break;
 			default:
 				return EINVAL;
@@ -677,12 +674,12 @@ aucc_start_output(void *addr, void *p, int cc, void (*intr)(void *), void *arg)
 	DPRINTF(("dmap is %p %p %p %p, mask=0x%x\n", dmap[0], dmap[1],
 		dmap[2], dmap[3], mask));
 
-	/* disable ints, dma for channels, until all parameters set */
+	/* disable ints, DMA for channels, until all parameters set */
 	/* XXX dont disable DMA! custom.dmacon=mask;*/
 	custom.intreq = mask << INTB_AUD0;
 	custom.intena = mask << INTB_AUD0;
 
-	/* copy data to dma buffer */
+	/* copy data to DMA buffer */
 
 	if (sc->sc_channels == 1) {
 		dmap[0] =
@@ -715,8 +712,8 @@ aucc_start_output(void *addr, void *p, int cc, void (*intr)(void *), void *arg)
 	/* call audio decoding routine */
 	sc->sc_decodefunc (dmap, (u_char *)p, len);
 
-	/* dma buffers: we use same buffer 4 all channels
-	 * write dma location and length
+	/* DMA buffers: we use same buffer 4 all channels
+	 * write DMA location and length
 	 */
 	for (i = k = 0; i < 4; i++) {
 		if (masks2[i] & mask) {
@@ -746,10 +743,10 @@ aucc_start_output(void *addr, void *p, int cc, void (*intr)(void *), void *arg)
 
 	DPRINTF(("enabled ints: 0x%x\n", (masks2[j] << INTB_AUD0)));
 
-	/* enable dma */
+	/* enable DMA */
 	custom.dmacon = DMAF_SETCLR | DMAF_MASTER | mask;
 
-	DPRINTF(("enabled dma, mask=0x%x\n",mask));
+	DPRINTF(("enabled DMA, mask=0x%x\n",mask));
 
 	return(0);
 }
@@ -769,7 +766,7 @@ aucc_halt_output(void *addr)
 	register int i;
 
 	/* XXX only halt, if input is also halted ?? */
-	/* stop dma, etc */
+	/* stop DMA, etc */
 	custom.intena = AUCC_ALLINTF;
 	custom.dmacon = AUCC_ALLDMAF;
 	/* mark every busy unit idle */
@@ -950,7 +947,7 @@ aucc_inthdl(int ch)
 	register int mask=aucc->sc_channel[ch].nd_mask;
 
 	/* for all channels in this maskgroup:
-	   disable dma, int
+	   disable DMA, int
 	   mark idle */
 	DPRINTF(("inthandler called, channel %d, mask 0x%x\n",ch,mask));
 
@@ -1108,42 +1105,42 @@ aucc_decode_ulinear8_4ch(u_char **dmap, u_char *p, int i)
 
 
 static void
-aucc_decode_ulaw_1ch(u_char **dmap, u_char *p, int i)
+aucc_decode_mulaw_1ch(u_char **dmap, u_char *p, int i)
 {
 	u_char *ch0 = dmap[0];
 
 	while (i--)
-		*ch0++ = ulaw_to_lin[*p++];
+		*ch0++ = mulaw_to_lin[*p++];
 }
 
 static void
-aucc_decode_ulaw_2ch(u_char **dmap, u_char *p, int i)
+aucc_decode_mulaw_2ch(u_char **dmap, u_char *p, int i)
 {
 	u_char *ch0 = dmap[0];
 	u_char *ch1 = dmap[1];
 
 	while (i--) {
-		*ch0++ = ulaw_to_lin[*p++];
-		*ch1++ = ulaw_to_lin[*p++];
+		*ch0++ = mulaw_to_lin[*p++];
+		*ch1++ = mulaw_to_lin[*p++];
 	}
 }
 
 static void
-aucc_decode_ulaw_3ch(u_char **dmap, u_char *p, int i)
+aucc_decode_mulaw_3ch(u_char **dmap, u_char *p, int i)
 {
 	u_char *ch0 = dmap[0];
 	u_char *ch1 = dmap[1];
 	u_char *ch2 = dmap[2];
 
 	while (i--) {
-		*ch0++ = ulaw_to_lin[*p++];
-		*ch1++ = ulaw_to_lin[*p++];
-		*ch2++ = ulaw_to_lin[*p++];
+		*ch0++ = mulaw_to_lin[*p++];
+		*ch1++ = mulaw_to_lin[*p++];
+		*ch2++ = mulaw_to_lin[*p++];
 	}
 }
 
 static void
-aucc_decode_ulaw_4ch(u_char **dmap, u_char *p, int i)
+aucc_decode_mulaw_4ch(u_char **dmap, u_char *p, int i)
 {
 	u_char *ch0 = dmap[0];
 	u_char *ch1 = dmap[1];
@@ -1151,10 +1148,10 @@ aucc_decode_ulaw_4ch(u_char **dmap, u_char *p, int i)
 	u_char *ch3 = dmap[3];
 
 	while (i--) {
-		*ch0++ = ulaw_to_lin[*p++];
-		*ch1++ = ulaw_to_lin[*p++];
-		*ch2++ = ulaw_to_lin[*p++];
-		*ch3++ = ulaw_to_lin[*p++];
+		*ch0++ = mulaw_to_lin[*p++];
+		*ch1++ = mulaw_to_lin[*p++];
+		*ch2++ = mulaw_to_lin[*p++];
+		*ch3++ = mulaw_to_lin[*p++];
 	}
 }
 

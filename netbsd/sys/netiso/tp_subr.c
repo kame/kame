@@ -1,4 +1,4 @@
-/*	$NetBSD: tp_subr.c,v 1.14 2001/11/13 01:10:51 lukem Exp $	*/
+/*	$NetBSD: tp_subr.c,v 1.18 2003/08/11 15:17:31 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -71,7 +67,7 @@ SOFTWARE.
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tp_subr.c,v 1.14 2001/11/13 01:10:51 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tp_subr.c,v 1.18 2003/08/11 15:17:31 itojun Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -170,11 +166,9 @@ tp_rtt_rtv(tpcb)
 	struct tp_pcb *tpcb;
 {
 	int             old = tpcb->tp_rtt;
-	int             s, elapsed, delta = 0;
+	int             elapsed, delta = 0;
 
-	s = splclock();
-	elapsed = (int)(hardclock_ticks - tpcb->tp_rttemit);
-	splx(s);
+	elapsed = hardclock_ticks - tpcb->tp_rttemit;
 
 	if (tpcb->tp_rtt != 0) {
 		/*
@@ -497,14 +491,10 @@ tp_send(tpcb)
 	struct sockbuf *sb = &tpcb->tp_sock->so_snd;
 	unsigned int    eotsdu = 0;
 	SeqNum          highseq, checkseq;
-	int             s, idle, idleticks, off, cong_win;
+	int             idle, idleticks, off, cong_win;
 #ifdef TP_PERF_MEAS
-	u_int64_t       send_start_time;
+	int             send_start_time = hardclock_ticks;
 	SeqNum          oldnxt = tpcb->tp_sndnxt;
-
-	s = splclock();
-	send_start_time = hardclock_ticks;
-	splx(s);
 #endif /* TP_PERF_MEAS */
 
 	idle = (tpcb->tp_snduna == tpcb->tp_sndnew);
@@ -573,7 +563,7 @@ tp_send(tpcb)
 		 */
 		mb = m;
 		m = m_copy(mb, 0, M_COPYALL);
-		if (m == MNULL)
+		if (m == NULL)
 			break;
 #ifdef TPPT
 		if (tp_traceflags[D_STASH]) {
@@ -607,9 +597,7 @@ tp_send(tpcb)
 			 * not currently timing anything.
 			 */
 			if (tpcb->tp_rttemit == 0) {
-				s = splclock();
 				tpcb->tp_rttemit = hardclock_ticks;
-				splx(s);
 				tpcb->tp_rttseq = tpcb->tp_sndnxt;
 			}
 			tpcb->tp_sndnxt = tpcb->tp_sndnew;
@@ -637,9 +625,7 @@ tp_send(tpcb)
 		int             s, elapsed, *t;
 		struct timeval  now;
 
-		s = splclock();
-		elapsed = (int)(hardclock_ticks - send_start_time);
-		splx(s);
+		elapsed = hardclock_ticks - send_start_time;
 
 		npkts = SEQ_SUB(tpcb, tpcb->tp_sndnxt, oldnxt);
 

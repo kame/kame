@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.57 2002/05/16 02:50:54 thorpej Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.60 2003/08/07 16:28:21 agc Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -51,6 +47,9 @@
  * devices are determined (from possibilities mentioned in ioconf.c),
  * and the drivers are initialized.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.60 2003/08/07 16:28:21 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -115,17 +114,16 @@ static void
 findbootdev()
 {
 	struct device *dv;
-	int major, unit, controller, i;
+	int major, unit, controller;
 	char buf[32];
+	const char *name;
 
 	booted_device = NULL;
 	booted_partition = 0;	/* Assume root is on partition a */
 
 	major = B_TYPE(bootdev);
-	for (i = 0; dev_name2blk[i].d_name != NULL; i++)
-		if (major == dev_name2blk[i].d_maj)
-			break;
-	if (dev_name2blk[i].d_name == NULL)
+	name = devsw_blk2name(major);
+	if (name == NULL)
 		return;
 
 	unit = B_UNIT(bootdev);
@@ -146,9 +144,8 @@ findbootdev()
 		break;
 	}
 
-	sprintf(buf, "%s%d", dev_name2blk[i].d_name, unit);
-	for (dv = alldevs.tqh_first; dv != NULL;
-	    dv = dv->dv_list.tqe_next) {
+	sprintf(buf, "%s%d", name, unit);
+	for (dv = alldevs.tqh_first; dv != NULL; dv = dv->dv_list.tqe_next) {
 		if (strcmp(buf, dv->dv_xname) == 0) {
 			booted_device = dv;
 			return;

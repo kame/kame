@@ -1,4 +1,4 @@
-/* $NetBSD: if_ti.c,v 1.47.4.1 2002/07/18 04:27:26 lukem Exp $ */
+/* $NetBSD: if_ti.c,v 1.60.2.1 2004/07/28 11:00:54 tron Exp $ */
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -81,7 +81,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ti.c,v 1.47.4.1 2002/07/18 04:27:26 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ti.c,v 1.60.2.1 2004/07/28 11:00:54 tron Exp $");
 
 #include "bpfilter.h"
 #include "opt_inet.h"
@@ -195,7 +195,7 @@ static void ti_cmd_ext		__P((struct ti_softc *, struct ti_cmd_desc *,
 static void ti_handle_events	__P((struct ti_softc *));
 static int ti_alloc_jumbo_mem	__P((struct ti_softc *));
 static void *ti_jalloc		__P((struct ti_softc *));
-static void ti_jfree		__P((struct mbuf *, caddr_t, u_int, void *));
+static void ti_jfree		__P((struct mbuf *, caddr_t, size_t, void *));
 static int ti_newbuf_std	__P((struct ti_softc *, int, struct mbuf *, bus_dmamap_t));
 static int ti_newbuf_mini	__P((struct ti_softc *, int, struct mbuf *, bus_dmamap_t));
 static int ti_newbuf_jumbo	__P((struct ti_softc *, int, struct mbuf *));
@@ -214,9 +214,8 @@ static int ti_gibinit		__P((struct ti_softc *));
 
 static int ti_ether_ioctl __P((struct ifnet *, u_long, caddr_t));
 
-struct cfattach ti_ca = {
-	sizeof(struct ti_softc), ti_probe, ti_attach
-};
+CFATTACH_DECL(ti, sizeof(struct ti_softc),
+    ti_probe, ti_attach, NULL, NULL);
 
 /*
  * Send an instruction or address to the EEPROM, check for ACK.
@@ -387,9 +386,16 @@ static void ti_mem(sc, addr, len, buf)
 			    TI_WINDOW + (segptr & (TI_WINLEN - 1)), 0,
 			    segsize / 4);
 		} else {
+#ifdef __BUS_SPACE_HAS_STREAM_METHODS
+			bus_space_write_region_stream_4(sc->ti_btag,
+			    sc->ti_bhandle,
+			    TI_WINDOW + (segptr & (TI_WINLEN - 1)),
+			    (u_int32_t *)ptr, segsize / 4);
+#else
 			bus_space_write_region_4(sc->ti_btag, sc->ti_bhandle,
 			    TI_WINDOW + (segptr & (TI_WINLEN - 1)),
 			    (u_int32_t *)ptr, segsize / 4);
+#endif
 			ptr += segsize;
 		}
 		segptr += segsize;
@@ -674,7 +680,7 @@ static void *ti_jalloc(sc)
 		return(NULL);
 	}
 
-	SIMPLEQ_REMOVE_HEAD(&sc->ti_jfree_listhead, entry, jpool_entries);
+	SIMPLEQ_REMOVE_HEAD(&sc->ti_jfree_listhead, jpool_entries);
 	SIMPLEQ_INSERT_HEAD(&sc->ti_jinuse_listhead, entry, jpool_entries);
 	return(sc->ti_cdata.ti_jslots[entry->slot]);
 }
@@ -685,7 +691,7 @@ static void *ti_jalloc(sc)
 static void ti_jfree(m, buf, size, arg)
 	struct mbuf		*m;
 	caddr_t			buf;
-	u_int			size;
+	size_t			size;
 	void *arg;
 {
 	struct ti_softc		*sc;
@@ -711,10 +717,8 @@ static void ti_jfree(m, buf, size, arg)
 	if (entry == NULL)
 		panic("ti_jfree: buffer not in use!");
 	entry->slot = i;
-	SIMPLEQ_REMOVE_HEAD(&sc->ti_jinuse_listhead, 
-	    entry, jpool_entries);
-	SIMPLEQ_INSERT_HEAD(&sc->ti_jfree_listhead, 
-	     entry, jpool_entries);
+	SIMPLEQ_REMOVE_HEAD(&sc->ti_jinuse_listhead, jpool_entries);
+	SIMPLEQ_INSERT_HEAD(&sc->ti_jfree_listhead, entry, jpool_entries);
 
 	if (__predict_true(m != NULL))
 		pool_cache_put(&mbpool_cache, m);
@@ -979,7 +983,7 @@ static int ti_init_rx_ring_jumbo(sc)
 	int		i;
 	struct ti_cmd_desc	cmd;
 
-	for (i = 0; i < (TI_JSLOTS - 20); i++) {
+	for (i = 0; i < TI_JUMBO_RX_RING_CNT; i++) {
 		if (ti_newbuf_jumbo(sc, i, NULL) == ENOBUFS)
 			return(ENOBUFS);
 	};
@@ -1068,7 +1072,7 @@ static void ti_free_tx_ring(sc)
 	}
 
 	while ((dma = SIMPLEQ_FIRST(&sc->txdma_list))) {
-		SIMPLEQ_REMOVE_HEAD(&sc->txdma_list, dma, link);
+		SIMPLEQ_REMOVE_HEAD(&sc->txdma_list, link);
 		bus_dmamap_destroy(sc->sc_dmat, dma->dmamap);
 		free(dma, M_DEVBUF);
 	}
@@ -1207,7 +1211,7 @@ static void ti_setmulti(sc)
 	/* First, zot all the existing filters. */
 	while ((mc = SIMPLEQ_FIRST(&sc->ti_mc_listhead)) != NULL) {
 		ti_del_mcast(sc, &mc->mc_addr);
-		SIMPLEQ_REMOVE_HEAD(&sc->ti_mc_listhead, mc, mc_entries);
+		SIMPLEQ_REMOVE_HEAD(&sc->ti_mc_listhead, mc_entries);
 		free(mc, M_DEVBUF);
 	}
 
@@ -1233,8 +1237,7 @@ static void ti_setmulti(sc)
 	TI_DO_CMD(TI_CMD_SET_ALLMULTI, TI_CMD_CODE_ALLMULTI_DIS, 0);
 
 	/* Now program new ones. */
-	for (mc = SIMPLEQ_FIRST(&sc->ti_mc_listhead); mc != NULL;
-	    mc = SIMPLEQ_NEXT(mc, mc_entries))
+	SIMPLEQ_FOREACH(mc, &sc->ti_mc_listhead, mc_entries)
 		ti_add_mcast(sc, &mc->mc_addr);
 
 	/* Re-enable interrupts. */
@@ -1245,8 +1248,7 @@ static void ti_setmulti(sc)
 allmulti:
 	/* No need to keep individual multicast addresses */
 	while ((mc = SIMPLEQ_FIRST(&sc->ti_mc_listhead)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(&sc->ti_mc_listhead, mc,
-		    mc_entries);
+		SIMPLEQ_REMOVE_HEAD(&sc->ti_mc_listhead, mc_entries);
 		free(mc, M_DEVBUF);
 	}
 
@@ -1294,6 +1296,7 @@ static int ti_chipinit(sc)
 {
 	u_int32_t		cacheline;
 	u_int32_t		pci_writemax = 0;
+	u_int32_t		rev;
 
 	/* Initialize link to down state. */
 	sc->ti_linkstat = TI_EV_CODE_LINK_DOWN;
@@ -1318,7 +1321,8 @@ static int ti_chipinit(sc)
 	TI_SETBIT(sc, TI_CPU_STATE, TI_CPUSTATE_HALT);
 
 	/* Figure out the hardware revision. */
-	switch(CSR_READ_4(sc, TI_MISC_HOST_CTL) & TI_MHC_CHIP_REV_MASK) {
+	rev = CSR_READ_4(sc, TI_MISC_HOST_CTL) & TI_MHC_CHIP_REV_MASK;
+	switch(rev) {
 	case TI_REV_TIGON_I:
 		sc->ti_hwrev = TI_HWREV_TIGON;
 		break;
@@ -1326,7 +1330,8 @@ static int ti_chipinit(sc)
 		sc->ti_hwrev = TI_HWREV_TIGON_II;
 		break;
 	default:
-		printf("%s: unsupported chip revision\n", sc->sc_dev.dv_xname);
+		printf("%s: unsupported chip revision 0x%x\n",
+		    sc->sc_dev.dv_xname, rev);
 		return(ENODEV);
 	}
 
@@ -1705,7 +1710,7 @@ static void ti_attach(parent, self, aux)
 	/* Allocate interrupt */
 	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
-		return;;
+		return;
 	}
 	intrstr = pci_intr_string(pc, ih);
 	sc->sc_ih = pci_intr_establish(pc, ih, IPL_NET, ti_intr, sc);
@@ -1715,7 +1720,7 @@ static void ti_attach(parent, self, aux)
 		if (intrstr != NULL)
 			printf(" at %s", intrstr);
 		printf("\n");
-		return;;
+		return;
 	}
 	printf("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
 	/*
@@ -1890,7 +1895,7 @@ static void ti_attach(parent, self, aux)
                 /*
                  * Copper cards allow manual 10/100 mode selection,
                  * but not manual 1000baseT mode selection. Why?
-                 * Becuase currently there's no way to specify the
+                 * Because currently there's no way to specify the
                  * master/slave setting through the firmware interface,
                  * so Alteon decided to just bag it and handle it
                  * via autonegotiation.
@@ -1959,7 +1964,8 @@ static void ti_rxeof(sc)
 
 		if (cur_rx->ti_flags & TI_BDFLAG_VLAN_TAG) {
 			have_tag = 1;
-			vlan_tag = cur_rx->ti_vlan_tag;
+			/* ti_vlan_tag also has the priority, trim it */
+			vlan_tag = cur_rx->ti_vlan_tag & 4095;
 		}
 
 		if (cur_rx->ti_flags & TI_BDFLAG_JUMBO_RING) {
@@ -2076,17 +2082,20 @@ static void ti_rxeof(sc)
 		}
 
 		if (have_tag) {
-			struct mbuf *n;
-			n = m_aux_add(m, AF_LINK, ETHERTYPE_VLAN);
-			if (n) {
-				*mtod(n, int *) = vlan_tag;
-				n->m_len = sizeof(int);
+			struct m_tag *mtag;
+
+			mtag = m_tag_get(PACKET_TAG_VLAN, sizeof(u_int),
+			    M_NOWAIT);
+			if (mtag) {
+				*(u_int *)(mtag + 1) = vlan_tag;
+				m_tag_prepend(m, mtag);
+				have_tag = vlan_tag = 0;
 			} else {
 				printf("%s: no mbuf for tag\n", ifp->if_xname);
 				m_freem(m);
+				have_tag = vlan_tag = 0;
 				continue;
 			}
-			have_tag = vlan_tag = 0;
 		}
 		(*ifp->if_input)(ifp, m);
 	}
@@ -2282,7 +2291,7 @@ static int ti_encap_tigon1(sc, m_head, txidx)
 	struct txdmamap_pool_entry *dma;
 	bus_dmamap_t dmamap;
 	int error, i;
-	struct mbuf *n;
+	struct m_tag *mtag;
 	u_int16_t csum_flags = 0;
 
 	dma = SIMPLEQ_FIRST(&sc->txdma_list);
@@ -2338,10 +2347,10 @@ static int ti_encap_tigon1(sc, m_head, txidx)
 		TI_HOSTADDR(f->ti_addr) = dmamap->dm_segs[i].ds_addr;
 		f->ti_len = dmamap->dm_segs[i].ds_len;
 		f->ti_flags = csum_flags;
-		n = m_aux_find(m_head, AF_LINK, ETHERTYPE_VLAN);
-		if (n) {
+		mtag = m_tag_find(m_head, PACKET_TAG_VLAN, NULL);
+		if (mtag) {
 			f->ti_flags |= TI_BDFLAG_VLAN_TAG;
-			f->ti_vlan_tag = *mtod(n, int *);
+			f->ti_vlan_tag = *(u_int *)(mtag + 1);
 		} else {
 			f->ti_vlan_tag = 0;
 		}
@@ -2370,7 +2379,7 @@ static int ti_encap_tigon1(sc, m_head, txidx)
 	    BUS_DMASYNC_PREWRITE);
 
 	sc->ti_cdata.ti_tx_chain[cur] = m_head;
-	SIMPLEQ_REMOVE_HEAD(&sc->txdma_list, dma, link);
+	SIMPLEQ_REMOVE_HEAD(&sc->txdma_list, link);
 	sc->txdma[cur] = dma;
 	sc->ti_txcnt += cnt;
 
@@ -2389,7 +2398,7 @@ static int ti_encap_tigon2(sc, m_head, txidx)
 	struct txdmamap_pool_entry *dma;
 	bus_dmamap_t dmamap;
 	int error, i;
-	struct mbuf *n;
+	struct m_tag *mtag;
 	u_int16_t csum_flags = 0;
 
 	dma = SIMPLEQ_FIRST(&sc->txdma_list);
@@ -2433,10 +2442,10 @@ static int ti_encap_tigon2(sc, m_head, txidx)
 		TI_HOSTADDR(f->ti_addr) = dmamap->dm_segs[i].ds_addr;
 		f->ti_len = dmamap->dm_segs[i].ds_len;
 		f->ti_flags = csum_flags;
-		n = m_aux_find(m_head, AF_LINK, ETHERTYPE_VLAN);
-		if (n) {
+		mtag = m_tag_find(m_head, PACKET_TAG_VLAN, NULL);
+		if (mtag) {
 			f->ti_flags |= TI_BDFLAG_VLAN_TAG;
-			f->ti_vlan_tag = *mtod(n, int *);
+			f->ti_vlan_tag = *(u_int *)(mtag + 1);
 		} else {
 			f->ti_vlan_tag = 0;
 		}
@@ -2467,7 +2476,7 @@ static int ti_encap_tigon2(sc, m_head, txidx)
 	TI_CDTXSYNC(sc, firstfrag, cnt, BUS_DMASYNC_PREWRITE);
 
 	sc->ti_cdata.ti_tx_chain[cur] = m_head;
-	SIMPLEQ_REMOVE_HEAD(&sc->txdma_list, dma, link);
+	SIMPLEQ_REMOVE_HEAD(&sc->txdma_list, link);
 	sc->txdma[cur] = dma;
 	sc->ti_txcnt += cnt;
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: rambo.c,v 1.3 2000/09/06 07:52:47 wdk Exp $	*/
+/*	$NetBSD: rambo.c,v 1.6 2003/07/15 02:43:44 lukem Exp $	*/
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rambo.c,v 1.6 2003/07/15 02:43:44 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
@@ -69,9 +72,8 @@ struct rambo_softc {
 
 static struct rambo_softc *rambo;
 
-struct cfattach rambo_ca = {
-	sizeof(struct rambo_softc), rambo_match, rambo_attach
-};
+CFATTACH_DECL(rambo, sizeof(struct rambo_softc),
+    rambo_match, rambo_attach, NULL, NULL);
 
 static int
 rambo_match(parent, cf, aux)

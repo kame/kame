@@ -1,4 +1,4 @@
-/*	$NetBSD: mlxio.h,v 1.1.22.1 2003/07/28 18:07:20 he Exp $	*/
+/*	$NetBSD: mlxio.h,v 1.3 2002/08/26 17:02:15 ad Exp $	*/
 
 /*-
  * Copyright (c) 1999 Michael Smith

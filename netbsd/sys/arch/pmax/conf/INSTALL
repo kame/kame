@@ -1,4 +1,4 @@
-# 	$NetBSD: INSTALL,v 1.45.4.1 2002/08/09 22:53:17 lukem Exp $
+# 	$NetBSD: INSTALL,v 1.52.2.1 2004/07/15 20:15:50 he Exp $
 #
 # Distribution	install kernel (any model)
 #    netbsd:	cut-down kernel for miniroots.
@@ -9,6 +9,7 @@
 #
 #
 include		"arch/pmax/conf/std.pmax"
+include		"arch/pmax/conf/files.pmax_rcons"
 
 #options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
@@ -36,14 +37,14 @@ options 	DEC_3MAXPLUS		#  5000/240 (kn03), 5000/260 (kn05)
 # Standard system options
 #options 	DIAGNOSTIC		# extra kernel debugging checks
 #options 	DEBUG			# extra kernel debugging support
-#options 	COMPAT_43		# compatibility with 4.3BSD binaries
 #options 	KTRACE			# system call tracing support
 #options 	LKM			# loadable kernel modules
-#options 	USERCONF	# userconf(4) support
+options 	USERCONF		# userconf(4) support
 options		PIPE_SOCKETPAIR		# smaller, but slower pipe(2)
+#options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
+options 	MALLOC_NOINLINE		# Not inlining MALLOC saves memory
 
 #options 	NTP			# network time protocol
-#options 	UCONSOLE		# users can redirect console (unsafe)
 
 
 # File systems
@@ -54,18 +55,13 @@ file-system 	KERNFS			# kernel data-structure filesystem
 
 # Filesystem options
 #options 	NFS_V2_ONLY		# Exclude NFS3 and NQNFS code to save space
-options 	VNODE_OP_NOINLINE	# Save space by not inlining vnode op calls
+options 	VNODE_OP_NOINLINE	# Not inlining vnode op calls saves mem
 
 
 # Networking options
 options 	INET			# Internet protocols
 #options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 
-
-options 	COMPAT_12
-options 	COMPAT_13
-options 	COMPAT_14
-#options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 
 # Raster console options
 options 	FONT_BOLD8x16		# Font for fb devices
@@ -147,3 +143,5 @@ pseudo-device	ccd		 4	# concatenated disks
 
 pseudo-device	rasterconsole	 1 	# NB: raster console requires "fb"
 pseudo-device	fb		 1	# only 1 framebuffer supported
+
+pseudo-device	rnd			# /dev/random and in-kernel generator

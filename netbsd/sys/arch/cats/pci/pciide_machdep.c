@@ -1,4 +1,4 @@
-/*	$NetBSD: pciide_machdep.c,v 1.1 2002/02/09 12:14:03 chris Exp $	*/
+/*	$NetBSD: pciide_machdep.c,v 1.3 2003/07/15 01:29:19 lukem Exp $	*/
 
 /*
  * Copyright (c) 1998 Christopher G. Demetriou.  All rights reserved.
@@ -40,6 +40,9 @@
  * PCI SIG.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pciide_machdep.c,v 1.3 2003/07/15 01:29:19 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -73,6 +76,6 @@ pciide_machdep_compat_intr_establish(dev, pa, chan, func, arg)
 	    PCIIDE_CHANNEL_NAME(chan), irq);
 	return (cookie);
 #else
-	panic("pciide_machdep_compat_intr_establish() called\n");
+	panic("pciide_machdep_compat_intr_establish() called");
 #endif
 }

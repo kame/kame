@@ -1,4 +1,4 @@
-/*	$NetBSD: hpib.c,v 1.20 2002/03/15 05:52:54 gmcgarry Exp $	*/
+/*	$NetBSD: hpib.c,v 1.26 2003/11/17 14:37:59 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -48,11 +48,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -76,7 +72,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: hpib.c,v 1.20 2002/03/15 05:52:54 gmcgarry Exp $");                                                  
+__KERNEL_RCSID(0, "$NetBSD: hpib.c,v 1.26 2003/11/17 14:37:59 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -94,9 +90,8 @@ __KERNEL_RCSID(0, "$NetBSD: hpib.c,v 1.20 2002/03/15 05:52:54 gmcgarry Exp $");
 int	hpibbusmatch __P((struct device *, struct cfdata *, void *));
 void	hpibbusattach __P((struct device *, struct device *, void *));
 
-struct cfattach hpibbus_ca = {
-	sizeof(struct hpibbus_softc), hpibbusmatch, hpibbusattach
-};
+CFATTACH_DECL(hpibbus, sizeof(struct hpibbus_softc),
+    hpibbusmatch, hpibbusattach, NULL, NULL);
 
 extern struct cfdriver hpibbus_cd;
 
@@ -229,7 +224,7 @@ hpibbussearch(parent, cf, aux)
 	/* Make sure this is in a consistent state. */
 	ha->ha_punit = 0;
 
-	if ((*cf->cf_attach->ca_match)(parent, cf, ha) > 0) {
+	if (config_match(parent, cf, ha) > 0) {
 		/*
 		 * The device probe has succeeded, and filled in
 		 * the punit information.  Make sure the configuration
@@ -265,7 +260,7 @@ hpibbusprint(aux, pnp)
 {
 	struct hpibbus_attach_args *ha = aux;
 
-	printf(" slave %d punit %d", ha->ha_slave, ha->ha_punit);
+	aprint_normal(" slave %d punit %d", ha->ha_slave, ha->ha_punit);
 	return (UNCONF);
 }
 
@@ -277,7 +272,7 @@ hpibdevprint(aux, pnp)
 
 	/* only hpibbus's can attach to hpibdev's -- easy. */
 	if (pnp != NULL)
-		printf("hpibbus at %s", pnp);
+		aprint_normal("hpibbus at %s", pnp);
 	return (UNCONF);
 }
 

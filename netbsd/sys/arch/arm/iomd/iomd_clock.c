@@ -1,4 +1,4 @@
-/*	$NetBSD: iomd_clock.c,v 1.6 2002/05/02 22:01:47 mycroft Exp $	*/
+/*	$NetBSD: iomd_clock.c,v 1.12 2003/10/06 16:11:19 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1994-1997 Mark Brinicombe.
@@ -47,12 +47,14 @@
 
 #include <sys/param.h>
 
-__RCSID("$NetBSD");
+__KERNEL_RCSID(0, "$NetBSD");
 
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/time.h>
 #include <sys/device.h>
+
+#include <dev/clock_subr.h>
 
 #include <machine/intr.h>
 
@@ -84,9 +86,8 @@ static void checkdelay	__P((void));
 int clockhandler	__P((void *));
 int statclockhandler	__P((void *));
 
-struct cfattach clock_ca = {
-	sizeof(struct clock_softc), clockmatch, clockattach
-};
+CFATTACH_DECL(clock, sizeof(struct clock_softc),
+    clockmatch, clockattach, NULL, NULL);
 
 /*
  * int clockmatch(struct device *parent, void *match, void *aux)
@@ -254,7 +255,7 @@ cpu_initclocks()
 	    clockhandler, 0);
 
 	if (clockirq == NULL)
-		panic("%s: Cannot installer timer 0 IRQ handler\n",
+		panic("%s: Cannot installer timer 0 IRQ handler",
 		    clock_sc->sc_dev.dv_xname);
 
 	if (stathz) {
@@ -262,7 +263,7 @@ cpu_initclocks()
        		statclockirq = intr_claim(IRQ_TIMER1, IPL_CLOCK,
        		    "tmr1 stat clk", statclockhandler, 0);
 		if (statclockirq == NULL)
-			panic("%s: Cannot installer timer 1 IRQ handler\n",
+			panic("%s: Cannot installer timer 1 IRQ handler",
 			    clock_sc->sc_dev.dv_xname);
 	}
 #ifdef DIAGNOSTIC
@@ -358,6 +359,93 @@ delay(n)
 		else
 			for (i = 8; --i;);
 	}
+}
+
+todr_chip_handle_t todr_handle;
+
+/*
+ * todr_attach:
+ *
+ *	Set the specified time-of-day register as the system real-time clock.
+ */
+void
+todr_attach(todr_chip_handle_t todr)
+{
+
+	if (todr_handle)
+		panic("todr_attach: rtc already configured");
+	todr_handle = todr;
+}
+
+/*
+ * inittodr:
+ *
+ *	Initialize time from the time-of-day register.
+ */
+#define	MINYEAR		2003	/* minimum plausible year */
+void
+inittodr(time_t base)
+{
+	time_t deltat;
+	int badbase;
+
+	if (base < (MINYEAR - 1970) * SECYR) {
+		printf("WARNING: preposterous time in file system");
+		/* read the system clock anyway */
+		base = (MINYEAR - 1970) * SECYR;
+		badbase = 1;
+	} else
+		badbase = 0;
+
+	if (todr_handle == NULL ||
+	    todr_gettime(todr_handle, (struct timeval *)&time) != 0 ||
+	    time.tv_sec == 0) {
+		/*
+		 * Believe the time in the file system for lack of
+		 * anything better, resetting the TODR.
+		 */
+		time.tv_sec = base;
+		time.tv_usec = 0;
+		if (todr_handle != NULL && !badbase) {
+			printf("WARNING: preposterous clock chip time\n");
+			resettodr();
+		}
+		goto bad;
+	}
+
+	if (!badbase) {
+		/*
+		 * See if we tained/lost two or more days; if
+		 * so, assume something is amiss.
+		 */
+		deltat = time.tv_sec - base;
+		if (deltat < 0)
+			deltat = -deltat;
+		if (deltat < 2 * SECDAY)
+			return;		/* all is well */
+		printf("WARNING: clock %s %ld days\n",
+		    time.tv_sec < base ? "lost" : "gained",
+		    (long)deltat / SECDAY);
+	}
+ bad:
+	printf("WARNING: CHECK AND RESET THE DATE!\n");
+}
+
+/*
+ * resettodr:
+ *
+ *	Reset the time-of-day register with the current time.
+ */
+void
+resettodr(void)
+{
+
+	if (time.tv_sec == 0)
+		return;
+
+	if (todr_handle != NULL &&
+	    todr_settime(todr_handle, (struct timeval *)&time) != 0)
+		printf("resettodr: failed to set time\n");
 }
 
 /* End of iomd_clock.c */

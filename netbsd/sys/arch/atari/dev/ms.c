@@ -1,4 +1,4 @@
-/*	$NetBSD: ms.c,v 1.10 2000/03/23 06:36:04 thorpej Exp $	*/
+/*	$NetBSD: ms.c,v 1.15 2003/09/21 19:16:52 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 1995 Leo Weppelman.
@@ -26,11 +26,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -54,6 +50,9 @@
 /*
  * Mouse driver.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ms.c,v 1.15 2003/09/21 19:16:52 jdolecek Exp $");
 
 #include <sys/param.h>
 #include <sys/conf.h>
@@ -89,6 +88,12 @@ dev_type_close(msclose);
 dev_type_read(msread);
 dev_type_ioctl(msioctl);
 dev_type_poll(mspoll);
+dev_type_kqfilter(mskqfilter);
+
+const struct cdevsw ms_cdevsw = {
+	msopen, msclose, msread, nowrite, msioctl,
+	nostop, notty, mspoll, nommap, mskqfilter,
+};
 
 static	void	ms_3b_delay __P((struct ms_softc *));
 
@@ -393,6 +398,11 @@ struct proc		*p;
 	case FIOASYNC:
 		ms->ms_events.ev_async = *(int *)data != 0;
 		return(0);
+	case FIOSETOWN:
+		if (-*(int *)data != ms->ms_events.ev_io->p_pgid
+		    && *(int *)data != ms->ms_events.ev_io->p_pid)
+			return(EPERM);
+		return(0);
 	case TIOCSPGRP:
 		if (*(int *)data != ms->ms_events.ev_io->p_pgid)
 			return(EPERM);
@@ -418,5 +428,14 @@ struct proc	*p;
 
 	ms = &ms_softc[minor(dev)];
 	return(ev_poll(&ms->ms_events, events, p));
+}
+
+int
+mskqfilter(dev_t dev, struct knote *kn)
+{
+	struct ms_softc *ms;
+
+	ms = &ms_softc[minor(dev)];
+	return (ev_kqfilter(&ms->ms_events, kn));
 }
 #endif /* NMOUSE > 0 */

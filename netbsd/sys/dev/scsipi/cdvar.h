@@ -1,4 +1,4 @@
-/*	$NetBSD: cdvar.h,v 1.14 2002/04/23 20:41:20 bouyer Exp $	*/
+/*	$NetBSD: cdvar.h,v 1.20.2.1 2004/09/11 12:50:14 he Exp $	*/
 
 /*
  * Copyright (c) 1997 Manuel Bouyer.  All rights reserved.
@@ -31,8 +31,6 @@
 
 #define	CDRETRIES	4
 
-struct cd_ops;
-
 struct cd_softc {
 	struct device sc_dev;
 	struct disk sc_dk;
@@ -47,30 +45,15 @@ struct cd_softc {
 	struct scsipi_periph *sc_periph;
 
 	struct cd_parms {
-		int blksize;
+		u_int blksize;
 		u_long disksize;	/* total number sectors */
+		u_long disksize512;	/* total number sectors */
 	} params;
 
-	struct buf_queue buf_queue;
-	char name[16]; /* product name, for default disklabel */
-	const struct cd_ops *sc_ops;	/* our bus-dependent ops vector */
+	struct bufq_state buf_queue;
+	struct callout sc_callout;
 
 #if NRND > 0
 	rndsource_element_t	rnd_source;
 #endif
 };
-
-struct cd_ops {
-	int	(*cdo_setchan) __P((struct cd_softc *, int, int, int, int,
-		    int));
-	int	(*cdo_getvol) __P((struct cd_softc *, struct ioc_vol *, int));
-	int	(*cdo_setvol) __P((struct cd_softc *, const struct ioc_vol *,
-		    int));
-	int	(*cdo_set_pa_immed) __P((struct cd_softc *, int));
-	int	(*cdo_load_unload) __P((struct cd_softc *, int, int));
-};
-
-void cdattach __P((struct device *, struct cd_softc *, struct scsipi_periph *,
-    const struct cd_ops *));
-int cdactivate __P((struct device *, enum devact));
-int cddetach __P((struct device *, int));

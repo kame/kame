@@ -1,4 +1,4 @@
-/*	$NetBSD: ncr5380reg.h,v 1.14 2001/04/25 17:53:13 bouyer Exp $	*/
+/*	$NetBSD: ncr5380reg.h,v 1.16 2003/05/03 18:10:46 wiz Exp $	*/
 
 /*
  * Copyright (c) 1995 Leo Weppelman.
@@ -175,9 +175,9 @@ struct	ncr_softc {
 };
 
 /*
- * Max. number of dma-chains per request
+ * Max. number of DMA-chains per request
  */
-#define	MAXDMAIO	(MAXPHYS/NBPG + 1)
+#define	MAXDMAIO	(MAXPHYS/PAGE_SIZE + 1)
 
 /*
  * Some requests are not contiguous in physical memory. We need to break them
@@ -205,8 +205,8 @@ typedef struct	req_q {
     u_char		*bounceb;   /* allocated bounce buffer		    */
     u_char		*bouncerp;  /* bounce read-pointer		    */
     struct dma_chain	dm_chain[MAXDMAIO];
-    struct dma_chain	*dm_cur;    /* current dma-request		    */
-    struct dma_chain	*dm_last;   /* last dma-request			    */
+    struct dma_chain	*dm_cur;    /* current DMA-request		    */
+    struct dma_chain	*dm_last;   /* last DMA-request			    */
     long		xdata_len;  /* length of transfer		    */
     u_char		*xdata_ptr; /* virtual address of transfer	    */
     struct scsi_generic	xcmd;	    /* command to execute		    */

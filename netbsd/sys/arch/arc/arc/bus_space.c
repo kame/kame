@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_space.c,v 1.4 2001/09/04 06:57:26 thorpej Exp $	*/
+/*	$NetBSD: bus_space.c,v 1.6 2003/07/15 00:04:40 lukem Exp $	*/
 /*	NetBSD: bus_machdep.c,v 1.1 2000/01/26 18:48:00 drochner Exp 	*/
 
 /*-
@@ -37,6 +37,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bus_space.c,v 1.6 2003/07/15 00:04:40 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -232,7 +235,7 @@ arc_bus_space_unmap(bst, bsh, size)
 		/* bus_space_paddr() becomes unavailable after unmapping */
 		err = bus_space_paddr(bst, bsh, &pa);
 		if (err)
-			panic("arc_bus_space_unmap: %s va 0x%qx: error %d\n",
+			panic("arc_bus_space_unmap: %s va 0x%qx: error %d",
 			    bst->bs_name, (unsigned long long) bsh, err);
 		addr = (bus_size_t)(pa - bst->bs_pbase) + bst->bs_start;
 		extent_free(bst->bs_extent, addr, size,

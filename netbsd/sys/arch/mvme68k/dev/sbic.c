@@ -1,10 +1,42 @@
-/*	$NetBSD: sbic.c,v 1.18 2001/07/22 13:34:06 wiz Exp $	*/
+/*	$NetBSD: sbic.c,v 1.25 2003/11/01 20:04:57 scw Exp $	*/
+
+/*
+ * Copyright (c) 1990 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Van Jacobson of Lawrence Berkeley Laboratory.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *  @(#)scsi.c  7.5 (Berkeley) 5/4/91
+ */
 
 /*
  * Changes Copyright (c) 1996 Steve Woodford
  * Original Copyright (c) 1994 Christian E. Hopps
- * Copyright (c) 1990 The Regents of the University of California.
- * All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * Van Jacobson of Lawrence Berkeley Laboratory.
@@ -52,6 +84,10 @@
  * This version of the driver is pretty well generic, so should work with
  * any flavour of WD33C93 chip.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sbic.c,v 1.25 2003/11/01 20:04:57 scw Exp $");
+
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -59,7 +95,6 @@
 #include <sys/device.h>
 #include <sys/kernel.h> /* For hz */
 #include <sys/disklabel.h>
-#include <sys/dkstat.h>
 #include <sys/buf.h>
 
 #include <dev/scsipi/scsi_all.h>
@@ -91,8 +126,6 @@
  * Convenience macro for waiting for a particular sbic event
  */
 #define SBIC_WAIT(regs, until, timeo) sbicwait(regs, until, timeo, __LINE__)
-
-extern paddr_t kvtop __P((caddr_t));
 
 int     sbicicmd            __P((struct sbic_softc *, void *, int, void *, int));
 int     sbicgo              __P((struct sbic_softc *, struct scsipi_xfer *));
@@ -316,10 +349,10 @@ sbic_load_ptrs(dev)
         vaddr = acb->sc_kv.dc_addr;
         paddr = acb->sc_pa.dc_addr = (char *) kvtop((caddr_t)vaddr);
 
-        for (count = (NBPG - ((int)vaddr & PGOFSET));
+        for (count = (PAGE_SIZE - ((int)vaddr & PGOFSET));
              count < acb->sc_kv.dc_count &&
              (char*)kvtop((caddr_t)(vaddr + count + 4)) == paddr + count + 4;
-             count += NBPG)
+             count += PAGE_SIZE)
             ;   /* Do nothing */
 
         /*
@@ -670,13 +703,13 @@ sbicdmaok(dev, xs)
         return(0);
 
     /*
-     * controller supports dma to any addresses?
+     * controller supports DMA to any addresses?
      */
     if ( (dev->sc_flags & SBICF_BADDMA) == 0 )
         return(1);
 
     /*
-     * this address is ok for dma?
+     * this address is ok for DMA?
      */
     if ( sbiccheckdmap(xs->data, xs->datalen, dev->sc_dmamask) == 0 )
         return(1);
@@ -1561,7 +1594,7 @@ sbicgo(dev, xs)
     count = acb->sc_kv.dc_count;
 
     if ( count && ((char *)kvtop((caddr_t)addr) != acb->sc_pa.dc_addr) ) {
-        printf("sbic: DMA buffer mapping changed %p->%lx\n",
+        printf("sbic: DMA buffer mapping changed %p->%x\n",
                 acb->sc_pa.dc_addr, kvtop((caddr_t)addr));
 #ifdef DDB
         Debugger();
@@ -1704,7 +1737,7 @@ sbicpoll(dev)
 {
     sbic_regmap_p       regs = dev->sc_sbicp;
     u_char              asr,
-                        csr;
+                        csr = SBIC_CSR_RESET;	/* XXX: Quell un-init warning */
     int                 i;
 
     /*
@@ -2208,7 +2241,7 @@ sbicnextstate(dev, csr, asr)
 
                 /*
                  * Do DMA transfer
-                 * set next dma addr and dec count
+                 * set next DMA addr and dec count
                  */
                 sbic_save_ptrs(dev);
                 sbic_load_ptrs(dev);
@@ -2548,7 +2581,7 @@ sbiccheckdmap(bp, len, mask)
     while ( len ) {
 
         phy_buf = kvtop((caddr_t)buffer);
-        phy_len = NBPG - ((int) buffer & PGOFSET);
+        phy_len = PAGE_SIZE - ((int) buffer & PGOFSET);
 
         if ( len < phy_len )
             phy_len = len;
@@ -2634,7 +2667,7 @@ sbictimeout(dev)
 
         if ( dev->sc_dmatimo > 1 ) {
 
-            printf("%s: dma timeout #%d\n", dev->sc_dev.dv_xname,
+            printf("%s: DMA timeout #%d\n", dev->sc_dev.dv_xname,
                                             dev->sc_dmatimo - 1);
 
             GET_SBIC_asr(dev->sc_sbicp, asr);

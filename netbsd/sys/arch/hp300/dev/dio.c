@@ -1,4 +1,4 @@
-/*	$NetBSD: dio.c,v 1.16 2002/03/15 05:55:35 gmcgarry Exp $	*/
+/*	$NetBSD: dio.c,v 1.26 2003/11/17 14:37:59 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: dio.c,v 1.16 2002/03/15 05:55:35 gmcgarry Exp $");                                                  
+__KERNEL_RCSID(0, "$NetBSD: dio.c,v 1.26 2003/11/17 14:37:59 tsutsui Exp $");
 
 #define	_HP300_INTR_H_PRIVATE
 
@@ -49,6 +49,10 @@ __KERNEL_RCSID(0, "$NetBSD: dio.c,v 1.16 2002/03/15 05:55:35 gmcgarry Exp $");
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
+
+#include <machine/bus.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/cpu.h>
@@ -62,9 +66,15 @@ __KERNEL_RCSID(0, "$NetBSD: dio.c,v 1.16 2002/03/15 05:55:35 gmcgarry Exp $");
 #include <hp300/dev/diodevs.h>
 #include <hp300/dev/diodevs_data.h>
 
-extern	caddr_t internalhpib;
+#include "locators.h"
+#define        diocf_scode             cf_loc[DIOCF_SCODE]
 
-int	dio_scodesize __P((struct dio_attach_args *));
+struct dio_softc {
+	struct device sc_dev;
+	struct bus_space_tag sc_tag;
+};
+
+static int	dio_scodesize __P((struct dio_attach_args *));
 char	*dio_devinfo __P((struct dio_attach_args *, char *, size_t));
 
 int	diomatch __P((struct device *, struct cfdata *, void *));
@@ -72,9 +82,8 @@ void	dioattach __P((struct device *, struct device *, void *));
 int	dioprint __P((void *, const char *));
 int	diosubmatch __P((struct device *, struct cfdata *, void *));
 
-struct cfattach dio_ca = {
-	sizeof(struct device), diomatch, dioattach
-};
+CFATTACH_DECL(dio, sizeof(struct dio_softc),
+    diomatch, dioattach, NULL, NULL);
 
 int
 diomatch(parent, match, aux)
@@ -97,13 +106,18 @@ dioattach(parent, self, aux)
 	struct device *parent, *self;
 	void *aux;
 {
+	struct dio_softc *sc = (struct dio_softc *)self;
 	struct dio_attach_args da;
 	caddr_t pa, va;
-	int scode, scmax, didmap, scodesize;
+	bus_space_tag_t bst = &sc->sc_tag;
+	int scode, scmax, scodesize;
+
+	printf("\n");
+
+	memset(bst, 0, sizeof(struct bus_space_tag));
+	bst->bustype = HP300_BUS_SPACE_DIO;
 
 	scmax = DIO_SCMAX(machineid);
-	printf(": ");
-	dmainit();
 
 	for (scode = 0; scode < scmax; ) {
 		if (DIO_INHOLE(scode)) {
@@ -111,59 +125,43 @@ dioattach(parent, self, aux)
 			continue;
 		}
 
-		didmap = 0;
-
 		/*
 		 * Temporarily map the space corresponding to
 		 * the current select code unless:
-		 *	- this is the internal hpib select code,
 		 */
 		pa = dio_scodetopa(scode);
-		if ((scode == 7) && internalhpib)
-			va = internalhpib = (caddr_t)IIOV(pa);
-		else {
-			va = iomap(pa, NBPG);
-			if (va == NULL) {
-				printf("%s: can't map scode %d\n",
-				    self->dv_xname, scode);
-				scode++;
-				continue;
-			}
-			didmap = 1;
+		va = iomap(pa, PAGE_SIZE);
+		if (va == NULL) {
+			printf("%s: can't map scode %d\n",
+			    self->dv_xname, scode);
+			scode++;
+			continue;
 		}
 
 		/* Check for hardware. */
 		if (badaddr(va)) {
-			if (didmap)
-				iounmap(va, NBPG);
+			iounmap(va, PAGE_SIZE);
 			scode++;
 			continue;
 		}
 
 		/* Fill out attach args. */
 		memset(&da, 0, sizeof(da));
-		da.da_bst = HP300_BUS_SPACE_DIO;
+		da.da_bst = bst;
 		da.da_scode = scode;
-		/*
-		 * Internal HP-IB doesn't always return a device ID,
-		 * so we rely on the sysflags.
-		 */
-		if ((scode == 7) && internalhpib)
-			da.da_id = DIO_DEVICE_ID_IHPIB;
-		else
-			da.da_id = DIO_ID(va);
 
+		da.da_id = DIO_ID(va);
 		if (DIO_ISFRAMEBUFFER(da.da_id))
 			da.da_secid = DIO_SECID(va);
-
+		da.da_addr = (bus_addr_t)dio_scodetopa(scode);
 		da.da_size = DIO_SIZE(scode, va);
 		scodesize = dio_scodesize(&da);
 		if (DIO_ISDIO(scode))
 			da.da_size *= scodesize;
+		da.da_ipl = DIO_IPL(va);
 
 		/* No longer need the device to be mapped. */
-		if (didmap)
-			iounmap(va, NBPG);
+		iounmap(va, PAGE_SIZE);
 
 		/* Attach matching device. */
 		config_found_sm(self, &da, dioprint, diosubmatch);
@@ -183,7 +181,7 @@ diosubmatch(parent, cf, aux)
 	    cf->diocf_scode != da->da_scode)
 		return (0);
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 int
@@ -195,8 +193,9 @@ dioprint(aux, pnp)
 	char buf[128];
 
 	if (pnp)
-		printf("%s at %s", dio_devinfo(da, buf, sizeof(buf)), pnp);
-	printf(" scode %d", da->da_scode);
+		aprint_normal("%s at %s",
+		    dio_devinfo(da, buf, sizeof(buf)), pnp);
+	aprint_normal(" scode %d ipl %d", da->da_scode, da->da_ipl);
 	return (UNCONF);
 }
 
@@ -209,9 +208,7 @@ dio_scodetopa(scode)
 {
 	u_long rval;
 
-	if (scode == 7 && internalhpib)
-		rval = DIO_IHPIBADDR;
-	else if (DIO_ISDIO(scode))
+	if (DIO_ISDIO(scode))
 		rval = DIO_BASE + (scode * DIO_DEVSIZE);
 	else if (DIO_ISDIOII(scode))
 		rval = DIOII_BASE + ((scode - DIOII_SCBASE) * DIOII_DEVSIZE);
@@ -225,18 +222,11 @@ dio_scodetopa(scode)
  * Return the select code size for this device, defaulting to 1
  * if we don't know what kind of device we have.
  */
-int
+static int
 dio_scodesize(da)
 	struct dio_attach_args *da;
 {
 	int i;
-
-	/*
-	 * Deal with lame internal HP-IB controllers which don't have
-	 * consistent/reliable device ids.
-	 */
-	if (da->da_scode == 7 && internalhpib)
-		return (1);
 
 	/*
 	 * Find the dio_devdata matchind the primary id.
@@ -277,15 +267,6 @@ dio_devinfo(da, buf, buflen)
 #endif
 
 	memset(buf, 0, buflen);
-
-	/*
-	 * Deal with lame internal HP-IB controllers which don't have
-	 * consistent/reliable device ids.
-	 */
-	if (da->da_scode == 7 && internalhpib) {
-		sprintf(buf, DIO_DEVICE_DESC_IHPIB);
-		return (buf);
-	}
 
 #ifdef DIOVERBOSE
 	/*
@@ -349,4 +330,200 @@ dio_intr_disestablish(arg)
 
 	if (priority == IPL_BIO)
 		dmacomputeipl();
+}
+
+/*
+ * DIO specific bus_space(9) support functions.
+ */
+static u_int8_t dio_bus_space_read_oddbyte_1 __P((bus_space_tag_t,
+    bus_space_handle_t, bus_size_t));
+static void dio_bus_space_write_oddbyte_1 __P((bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int8_t));
+
+static void dio_bus_space_read_multi_oddbyte_1 __P((bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int8_t *, bus_size_t));
+static void dio_bus_space_write_multi_oddbyte_1 __P((bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, const u_int8_t *, bus_size_t));
+
+static void dio_bus_space_read_region_oddbyte_1 __P((bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int8_t *, bus_size_t));
+static void dio_bus_space_write_region_oddbyte_1 __P((bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, const u_int8_t *, bus_size_t));
+
+static void dio_bus_space_set_multi_oddbyte_1 __P((bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int8_t, bus_size_t));
+
+static void dio_bus_space_set_region_oddbyte_1 __P((bus_space_tag_t,
+    bus_space_handle_t, bus_size_t, u_int8_t, bus_size_t));
+
+/*
+ * dio_set_bus_space_oddbyte():
+ *	Override bus_space functions in bus_space_tag_t
+ *	for devices which have odd byte address space.
+ */
+void
+dio_set_bus_space_oddbyte(bst)
+	bus_space_tag_t bst;
+{
+
+	/* XXX only 1-byte functions for now */
+	bst->bsr1 = dio_bus_space_read_oddbyte_1;
+	bst->bsw1 = dio_bus_space_write_oddbyte_1;
+
+	bst->bsrm1 = dio_bus_space_read_multi_oddbyte_1;
+	bst->bswm1 = dio_bus_space_write_multi_oddbyte_1;
+
+	bst->bsrr1 = dio_bus_space_read_region_oddbyte_1;
+	bst->bswr1 = dio_bus_space_write_region_oddbyte_1;
+
+	bst->bssm1 = dio_bus_space_set_multi_oddbyte_1;
+
+	bst->bssr1 = dio_bus_space_set_region_oddbyte_1;
+}
+
+static u_int8_t
+dio_bus_space_read_oddbyte_1(bst, bsh, offset)
+	bus_space_tag_t bst;
+	bus_space_handle_t bsh;
+	bus_size_t offset;
+{
+
+	return *(volatile u_int8_t *)(bsh + (offset << 1) + 1);
+}
+
+static void dio_bus_space_write_oddbyte_1(bst, bsh, offset, val)
+	bus_space_tag_t bst;
+	bus_space_handle_t bsh;
+	bus_size_t offset;
+	u_int8_t val;
+{
+
+	*(volatile u_int8_t *)(bsh + (offset << 1) + 1) = val;
+}
+
+static void
+dio_bus_space_read_multi_oddbyte_1(bst, bsh, offset, addr, len)
+	bus_space_tag_t bst;
+	bus_space_handle_t bsh;
+	bus_size_t offset;
+	u_int8_t *addr;
+	bus_size_t len;
+{
+
+	__asm __volatile (
+	"	movl	%0,%%a0		;\n"
+	"	movl	%1,%%a1		;\n"
+	"	movl	%2,%%d0		;\n"
+	"1:	movb	%%a0@,%%a1@+	;\n"
+	"	subql	#1,%%d0		;\n"
+	"	jne	1b"
+	    :
+	    : "r" (bsh + (offset << 1) + 1), "g" (addr), "g" (len)
+	    : "%a0","%a1","%d0");
+}
+
+static void
+dio_bus_space_write_multi_oddbyte_1(bst, bsh, offset, addr, len)
+	bus_space_tag_t bst;
+	bus_space_handle_t bsh;
+	bus_size_t offset;
+	const u_int8_t *addr;
+	bus_size_t len;
+{
+
+	__asm __volatile (
+	"	movl	%0,%%a0		;\n"
+	"	movl	%1,%%a1		;\n"
+	"	movl	%2,%%d0		;\n"
+	"1:	movb	%%a1@+,%%a0@	;\n"
+	"	subql	#1,%%d0		;\n"
+	"	jne	1b"
+	    :
+	    : "r" (bsh + (offset << 1) + 1), "g" (addr), "g" (len)
+	    : "%a0","%a1","%d0");
+}
+
+static void
+dio_bus_space_read_region_oddbyte_1(bst, bsh, offset, addr, len)
+	bus_space_tag_t bst;
+	bus_space_handle_t bsh;
+	bus_size_t offset;
+	u_int8_t *addr;
+	bus_size_t len;
+{
+	__asm __volatile (
+	"	movl	%0,%%a0		;\n"
+	"	movl	%1,%%a1		;\n"
+	"	movl	%2,%%d0		;\n"
+	"1:	movb	%%a0@,%%a1@+	;\n"
+	"	addql	#2,%%a0		;\n"
+	"	subql	#1,%%d0		;\n"
+	"	jne	1b"
+	    :
+	    : "r" (bsh + (offset << 1) + 1), "g" (addr), "g" (len)
+	    : "%a0","%a1","%d0");
+}
+
+static void
+dio_bus_space_write_region_oddbyte_1(bst, bsh, offset, addr, len)
+	bus_space_tag_t	bst;
+	bus_space_handle_t bsh;
+	bus_size_t offset;
+	const u_int8_t *addr;
+	bus_size_t len;
+{
+
+	__asm __volatile (
+	"	movl	%0,%%a0		;\n"
+	"	movl	%1,%%a1		;\n"
+	"	movl	%2,%%d0		;\n"
+	"1:	movb	%%a1@+,%%a0@	;\n"
+	"	addql	#2,%%a0		;\n"
+	"	subql	#1,%%d0		;\n"
+	"	jne	1b"
+	    :
+	    : "r" (bsh + (offset << 1) + 1), "g" (addr), "g" (len)
+	    : "%a0","%a1","%d0");
+}
+
+static void
+dio_bus_space_set_multi_oddbyte_1(bst, bsh, offset, val, count)
+	bus_space_tag_t bst;
+	bus_space_handle_t bsh;
+	bus_size_t offset;
+	u_int8_t val;
+	bus_size_t count;
+{
+	__asm __volatile (
+	"	movl	%0,%%a0		;\n"
+	"	movl	%1,%%d1		;\n"
+	"	movl	%2,%%d0		;\n"
+	"1:	movb	%%d1,%%a0@	;\n"
+	"	subql	#1,%%d0		;\n"
+	"	jne	1b"
+	    :
+	    : "r" (bsh + (offset << 1) + 1), "g" (val), "g" (count)
+	    : "%a0","%d0","%d1");
+}
+
+static void
+dio_bus_space_set_region_oddbyte_1(bst, bsh, offset, val, count)
+	bus_space_tag_t bst;
+	bus_space_handle_t bsh;
+	bus_size_t offset;
+	u_int8_t val;
+	bus_size_t count;
+{
+
+	__asm __volatile (
+	"	movl	%0,%%a0		;\n"
+	"	movl	%1,%%d1		;\n"
+	"	movl	%2,%%d0		;\n"
+	"1:	movb	%%d1,%%a0@	;\n"
+	"	addql	#2,%%a0		;\n"
+	"	subql	#1,%%d0		;\n"
+	"	jne	1b"
+	    :
+	    : "r" (bsh + (offset << 1) + 1), "g" (val), "g" (count)
+	    : "%a0","%d0","%d1");
 }

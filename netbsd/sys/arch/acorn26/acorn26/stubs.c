@@ -1,24 +1,17 @@
-/* $NetBSD: stubs.c,v 1.1.4.1 2002/11/18 02:27:00 he Exp $ */
+/* $NetBSD: stubs.c,v 1.5 2003/09/30 00:35:30 thorpej Exp $ */
 /*
  * stubs.c -- functions I haven't written yet
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: stubs.c,v 1.5 2003/09/30 00:35:30 thorpej Exp $");
+
 #include <sys/param.h>
-
-__RCSID("$NetBSD: stubs.c,v 1.1.4.1 2002/11/18 02:27:00 he Exp $");
-
 #include <sys/kernel.h>
 #include <sys/systm.h>
 #include <sys/user.h>
 
 #include <uvm/uvm_extern.h>
-
-void
-resettodr()
-{
-
-	printf("resettodr: not doing anything\n");
-}
 
 int
 suibyte(base, c)

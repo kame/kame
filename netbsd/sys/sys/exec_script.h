@@ -1,4 +1,4 @@
-/*	$NetBSD: exec_script.h,v 1.7.54.1 2003/08/17 11:19:40 tron Exp $	*/
+/*	$NetBSD: exec_script.h,v 1.10 2003/06/29 22:32:24 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1994 Christopher G. Demetriou

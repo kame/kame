@@ -1,4 +1,4 @@
-/*	$NetBSD: ibcs2_signal.c,v 1.15 2002/03/31 22:22:44 christos Exp $	*/
+/*	$NetBSD: ibcs2_signal.c,v 1.19.2.1 2004/11/12 04:47:09 jmc Exp $	*/
 
 /*
  * Copyright (c) 1995 Scott Bartram
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ibcs2_signal.c,v 1.15 2002/03/31 22:22:44 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ibcs2_signal.c,v 1.19.2.1 2004/11/12 04:47:09 jmc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -40,8 +40,8 @@ __KERNEL_RCSID(0, "$NetBSD: ibcs2_signal.c,v 1.15 2002/03/31 22:22:44 christos E
 #include <sys/kernel.h>
 #include <sys/signal.h>
 #include <sys/signalvar.h>
-#include <sys/malloc.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/ibcs2/ibcs2_types.h>
@@ -102,24 +102,24 @@ ibcs2_to_native_sigaction(isa, bsa)
 	struct sigaction *bsa;
 {
 
-	bsa->sa_handler = isa->sa_handler;
-	ibcs2_to_native_sigset(&isa->sa_mask, &bsa->sa_mask);
+	bsa->sa_handler = isa->ibcs2_sa_handler;
+	ibcs2_to_native_sigset(&isa->ibcs2_sa_mask, &bsa->sa_mask);
 	bsa->sa_flags = 0;
-	if ((isa->sa_flags & IBCS2_SA_NOCLDSTOP) != 0)
+	if ((isa->ibcs2_sa_flags & IBCS2_SA_NOCLDSTOP) != 0)
 		bsa->sa_flags |= SA_NOCLDSTOP;
-	if ((isa->sa_flags & IBCS2_SA_RESETHAND) != 0)
+	if ((isa->ibcs2_sa_flags & IBCS2_SA_RESETHAND) != 0)
 		bsa->sa_flags |= SA_RESETHAND;
-	if ((isa->sa_flags & IBCS2_SA_RESTART) != 0)
+	if ((isa->ibcs2_sa_flags & IBCS2_SA_RESTART) != 0)
 		bsa->sa_flags |= SA_RESTART;
-	if ((isa->sa_flags & IBCS2_SA_SIGINFO) != 0)
+	if ((isa->ibcs2_sa_flags & IBCS2_SA_SIGINFO) != 0)
 /*XXX*/		printf("ibcs2_to_native_sigaction: SA_SIGINFO ignored\n");
-	if ((isa->sa_flags & IBCS2_SA_NODEFER) != 0)
+	if ((isa->ibcs2_sa_flags & IBCS2_SA_NODEFER) != 0)
 		bsa->sa_flags |= SA_NODEFER;
-	if ((isa->sa_flags & IBCS2_SA_ONSTACK) != 0)
+	if ((isa->ibcs2_sa_flags & IBCS2_SA_ONSTACK) != 0)
 		bsa->sa_flags |= SA_ONSTACK;
-	if ((isa->sa_flags & IBCS2_SA_NOCLDWAIT) != 0)
+	if ((isa->ibcs2_sa_flags & IBCS2_SA_NOCLDWAIT) != 0)
 /*XXX*/		printf("ibcs2_to_native_sigaction: SA_NOCLDWAIT ignored\n");
-	if ((isa->sa_flags & ~IBCS2_SA_ALLBITS) != 0)
+	if ((isa->ibcs2_sa_flags & ~IBCS2_SA_ALLBITS) != 0)
 /*XXX*/		printf("ibcs2_to_native_sigaction: extra bits ignored\n");
 }
 
@@ -129,19 +129,19 @@ native_to_ibcs2_sigaction(bsa, isa)
 	struct ibcs2_sigaction *isa;
 {
 
-	isa->sa_handler = bsa->sa_handler;
-	native_to_ibcs2_sigset(&bsa->sa_mask, &isa->sa_mask);
-	isa->sa_flags = 0;
+	isa->ibcs2_sa_handler = bsa->sa_handler;
+	native_to_ibcs2_sigset(&bsa->sa_mask, &isa->ibcs2_sa_mask);
+	isa->ibcs2_sa_flags = 0;
 	if ((bsa->sa_flags & SA_NOCLDSTOP) != 0)
-		isa->sa_flags |= IBCS2_SA_NOCLDSTOP;
+		isa->ibcs2_sa_flags |= IBCS2_SA_NOCLDSTOP;
 	if ((bsa->sa_flags & SA_RESETHAND) != 0)
-		isa->sa_flags |= IBCS2_SA_RESETHAND;
+		isa->ibcs2_sa_flags |= IBCS2_SA_RESETHAND;
 	if ((bsa->sa_flags & SA_RESTART) != 0)
-		isa->sa_flags |= IBCS2_SA_RESTART;
+		isa->ibcs2_sa_flags |= IBCS2_SA_RESTART;
 	if ((bsa->sa_flags & SA_NODEFER) != 0)
-		isa->sa_flags |= IBCS2_SA_NODEFER;
+		isa->ibcs2_sa_flags |= IBCS2_SA_NODEFER;
 	if ((bsa->sa_flags & SA_ONSTACK) != 0)
-		isa->sa_flags |= IBCS2_SA_ONSTACK;
+		isa->ibcs2_sa_flags |= IBCS2_SA_ONSTACK;
 }
 
 void
@@ -177,8 +177,8 @@ native_to_ibcs2_sigaltstack(bss, sss)
 }
 
 int
-ibcs2_sys_sigaction(p, v, retval)
-	struct proc *p;
+ibcs2_sys_sigaction(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -187,9 +187,14 @@ ibcs2_sys_sigaction(p, v, retval)
 		syscallarg(const struct ibcs2_sigaction *) nsa;
 		syscallarg(struct ibcs2_sigaction *) osa;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct ibcs2_sigaction nisa, oisa;
 	struct sigaction nbsa, obsa;
-	int error;
+	int error, signum = SCARG(uap, signum);
+
+	if (signum < 0 || signum >= IBCS2_NSIG)
+		return EINVAL;
+	signum = ibcs2_to_native_signo[signum];
 
 	if (SCARG(uap, nsa)) {
 		error = copyin(SCARG(uap, nsa), &nisa, sizeof(nisa));
@@ -197,8 +202,9 @@ ibcs2_sys_sigaction(p, v, retval)
 			return (error);
 		ibcs2_to_native_sigaction(&nisa, &nbsa);
 	}
-	error = sigaction1(p, ibcs2_to_native_signo[SCARG(uap, signum)],
-	    SCARG(uap, nsa) ? &nbsa : 0, SCARG(uap, osa) ? &obsa : 0);
+	error = sigaction1(p, signum,
+	    SCARG(uap, nsa) ? &nbsa : 0, SCARG(uap, osa) ? &obsa : 0,
+	    NULL, 0);
 	if (error)
 		return (error);
 	if (SCARG(uap, osa)) {
@@ -211,8 +217,8 @@ ibcs2_sys_sigaction(p, v, retval)
 }
 
 int 
-ibcs2_sys_sigaltstack(p, v, retval)
-	struct proc *p;
+ibcs2_sys_sigaltstack(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -220,6 +226,7 @@ ibcs2_sys_sigaltstack(p, v, retval)
 		syscallarg(const struct ibcs2_sigaltstack *) nss;
 		syscallarg(struct ibcs2_sigaltstack *) oss;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct ibcs2_sigaltstack nsss, osss;
 	struct sigaltstack nbss, obss;
 	int error;
@@ -244,8 +251,8 @@ ibcs2_sys_sigaltstack(p, v, retval)
 }
 
 int
-ibcs2_sys_sigsys(p, v, retval)
-	struct proc *p;
+ibcs2_sys_sigsys(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -253,13 +260,14 @@ ibcs2_sys_sigsys(p, v, retval)
 		syscallarg(int) sig;
 		syscallarg(ibcs2_sig_t) fp;
 	} */ *uap = v;
-	int signum = ibcs2_to_native_signo[IBCS2_SIGNO(SCARG(uap, sig))];
+	struct proc *p = l->l_proc;
 	struct sigaction nbsa, obsa;
 	sigset_t ss;
-	int error;
+	int error, signum = IBCS2_SIGNO(SCARG(uap, sig));
 
-	if (signum <= 0 || signum >= IBCS2_NSIG)
-		return (EINVAL);
+	if (signum < 0 || signum >= IBCS2_NSIG)
+		return EINVAL;
+	signum = ibcs2_to_native_signo[signum];
 	
 	switch (IBCS2_SIGCALL(SCARG(uap, sig))) {
 	case IBCS2_SIGSET_MASK:
@@ -271,7 +279,7 @@ ibcs2_sys_sigsys(p, v, retval)
 		nbsa.sa_handler = (sig_t)SCARG(uap, fp);
 		sigemptyset(&nbsa.sa_mask);
 		nbsa.sa_flags = 0;
-		error = sigaction1(p, signum, &nbsa, &obsa);
+		error = sigaction1(p, signum, &nbsa, &obsa, NULL, 0);
 		if (error)
 			return (error);
 		*retval = (int)obsa.sa_handler;
@@ -292,7 +300,7 @@ ibcs2_sys_sigsys(p, v, retval)
 		nbsa.sa_handler = SIG_IGN;
 		sigemptyset(&nbsa.sa_mask);
 		nbsa.sa_flags = 0;
-		return (sigaction1(p, signum, &nbsa, 0));
+		return (sigaction1(p, signum, &nbsa, 0, NULL, 0));
 		
 	case IBCS2_SIGPAUSE_MASK:
 		ss = p->p_sigctx.ps_sigmask;
@@ -305,8 +313,8 @@ ibcs2_sys_sigsys(p, v, retval)
 }
 
 int
-ibcs2_sys_sigprocmask(p, v, retval)
-	struct proc *p;
+ibcs2_sys_sigprocmask(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -315,6 +323,7 @@ ibcs2_sys_sigprocmask(p, v, retval)
 		syscallarg(const ibcs2_sigset_t *) set;
 		syscallarg(ibcs2_sigset_t *) oset;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	ibcs2_sigset_t niss, oiss;
 	sigset_t nbss, obss;
 	int how;
@@ -354,14 +363,15 @@ ibcs2_sys_sigprocmask(p, v, retval)
 }
 
 int
-ibcs2_sys_sigpending(p, v, retval)
-	struct proc *p;
+ibcs2_sys_sigpending(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct ibcs2_sys_sigpending_args /* {
 		syscallarg(ibcs2_sigset_t *) set;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	sigset_t bss;
 	ibcs2_sigset_t iss;
 
@@ -371,14 +381,15 @@ ibcs2_sys_sigpending(p, v, retval)
 }
 
 int
-ibcs2_sys_sigsuspend(p, v, retval)
-	struct proc *p;
+ibcs2_sys_sigsuspend(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct ibcs2_sys_sigsuspend_args /* {
 		syscallarg(const ibcs2_sigset_t *) set;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	ibcs2_sigset_t sss;
 	sigset_t bss;
 	int error;
@@ -394,18 +405,18 @@ ibcs2_sys_sigsuspend(p, v, retval)
 }
 
 int
-ibcs2_sys_pause(p, v, retval)
-	struct proc *p;
+ibcs2_sys_pause(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 
-	return (sigsuspend1(p, 0));
+	return (sigsuspend1(l->l_proc, 0));
 }
 
 int
-ibcs2_sys_kill(p, v, retval)
-	struct proc *p;
+ibcs2_sys_kill(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -414,8 +425,13 @@ ibcs2_sys_kill(p, v, retval)
 		syscallarg(int) signo;
 	} */ *uap = v;
 	struct sys_kill_args ka;
+	int signum = SCARG(uap, signo);
+
+	if (signum < 0 || signum >= IBCS2_NSIG)
+		return EINVAL;
+	signum = ibcs2_to_native_signo[signum];
 
 	SCARG(&ka, pid) = SCARG(uap, pid);
-	SCARG(&ka, signum) = ibcs2_to_native_signo[SCARG(uap, signo)];
-	return sys_kill(p, &ka, retval);
+	SCARG(&ka, signum) = signum;
+	return sys_kill(l, &ka, retval);
 }

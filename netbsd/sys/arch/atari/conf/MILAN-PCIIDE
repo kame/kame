@@ -1,11 +1,11 @@
 #
-# $NetBSD: MILAN-PCIIDE,v 1.12.4.4 2003/01/10 06:57:58 jmc Exp $
+# $NetBSD: MILAN-PCIIDE,v 1.30.2.3 2004/07/15 20:41:35 he Exp $
 #
 # This file was automatically created. Changes will be
 # lost when running makeconf in this directory.
 #
 # Created from:
-#		NetBSD: MILAN.in,v 1.8.10.1 2002/06/18 23:52:07 lukem Exp $
+#		NetBSD: MILAN.in,v 1.16 2003/12/14 01:32:01 thorpej Exp $
 #		NetBSD$
 
 #This configuration file is for a generic Milan
@@ -23,13 +23,13 @@ maxusers	16
 
 options 	HZ=64		# Set the clock-rate (48/64/96)
 
-#X11R6 related options
-
-options 	UCONSOLE	# Allow xconsole to work
-
 #Standard system options
 options 	INSECURE	# disable kernel security levels
 #options 	NTP		# NTP phase/frequency locked loop
+
+#Enable experimental buffer queue strategy for better responsiveness under 
+#high disk I/O load. Use it with caution - it's not proven to be stable yet.
+#options 	NEW_BUFQ_STRATEGY
 
 #(Co)processors this kernel should support
 
@@ -53,6 +53,7 @@ options 	NS		# XNS
 options 	ISO,TPIP	# OSI
 #options 	EON		# OSI tunneling over IP
 options 	CCITT,LLC,HDLC	# X.25
+
 options 	NETATALK	# AppleTalk networking protocols
 
 options 	PPP_BSDCOMP	# BSD-Compress compression support for PPP
@@ -64,6 +65,19 @@ options 	IPFILTER_LOG	# ipmon(8) log support
 #options  	IPFILTER_DEFAULT_BLOCK	# block packages by default
 
 #options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
+
+#options 	ALTQ		# Manipulate network interfaces' output queues
+#options 	ALTQ_BLUE	# Stochastic Fair Blue
+#options 	ALTQ_CBQ	# Class-Based Queueing
+#options 	ALTQ_CDNR	# Diffserv Traffic Conditioner
+#options 	ALTQ_FIFOQ	# First-In First-Out Queue
+#options 	ALTQ_FLOWVALVE	# RED/flow-valve (red-penalty-box)
+#options 	ALTQ_HFSC	# Hierarchical Fair Service Curve
+#options 	ALTQ_LOCALQ	# Local queueing discipline
+#options 	ALTQ_PRIQ	# Priority Queueing
+#options 	ALTQ_RED	# Random Early Detection
+#options 	ALTQ_RIO	# RED with IN/OUT
+#options 	ALTQ_WFQ	# Weighted Fair Queueing
 
 #File systems
 file-system 	FFS		# Berkeley fast file system
@@ -89,7 +103,7 @@ options 	QUOTA		# Disk quotas for local disks
 options 	SOFTDEP		# FFS soft updates support.
 options 	NFSSERVER	# Network File System server side code
 #options 	EXT2FS_SYSTEM_FLAGS	# makes ext2fs file flags (append and
-				#immutable) behave as system flags.
+				# immutable) behave as system flags.
 
 #Misc. debugging options
 
@@ -107,6 +121,8 @@ options 	COMPAT_11	# Compatibility to NetBSD1.1
 options 	COMPAT_12	# Compatibility to NetBSD1.2
 options 	COMPAT_13	# Compatibility to NetBSD1.3
 options 	COMPAT_14	# Compatibility to NetBSD1.4
+options 	COMPAT_15	# Compatibility to NetBSD1.5
+options 	COMPAT_16	# Compatibility to NetBSD1.6
 
 #options 	COMPAT_09	# has no meaning on the atari
 #options 	COMPAT_SUNOS	# Support to run Sun-3 executables
@@ -125,13 +141,16 @@ options 	SYSVSEM			# System V semaphores
 #options 	SEMMNI=10		# number of semaphore identifiers
 #options 	SEMUME=10		# max number of undo entries per proc.
 #options 	SEMMNU=30		# number of undo structures in system
+options 	P1003_1B_SEMAPHORE # p1003.1b semaphore support
 
 #Support for various kernel options
 
 options 	KTRACE			# Add kernel tracing system call
+options 	SYSTRACE		# system call vetting via systrace(1)
 options 	DIAGNOSTIC		# Add additional error checking code
-#options 	USERCONF		# userconf(4) support
+options 	USERCONF		# userconf(4) support
 #options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
 
 #These options enable verbose messages for several subsystems.
 #Warning, these may compile large string tables into the kernel!
@@ -153,7 +172,7 @@ options 	DISKLABEL_AHDI		# NetBSD/AHDI disklabels
 
 options 	SERCONSOLE		# modem1 console support
 options 	RELOC_KERNEL		# TT/Falcon: relocate kernel to TT-RAM
-#options 	MSGBUFSIZE=32768        # size of kernel msg. buffer
+options 	MSGBUFSIZE=32768        # size of kernel msg. buffer
 #options 	STATCLOCK	        # Separate {stat,prof}clock
 
 #Try linked commands on all targets
@@ -179,9 +198,12 @@ pseudo-device	tun		2	# network tunnel
 pseudo-device	gif		4	# IPv[46] over IPv[46] tunnel (RFC1933)
 #pseudo-device	faith		1	# IPv[46] tcp relay translation i/f
 #pseudo-device	stf		1	# 6to4 IPv6 over IPv4 encapsulation
+
 pseudo-device	vlan			# IEEE 802.1q encapsulation
 pseudo-device	bridge			# simple inter-network bridging
+
 pseudo-device	ccd		4	# concatenating disk driver
+#pseudo-device	cgd		4	# cryptographic disk driver
 pseudo-device	raid		8	# RAIDframe disk driver
 options 	RAID_AUTOCONFIG		# auto-configuration of RAID components
 #Options to enable various other RAIDframe RAID types.
@@ -242,10 +264,10 @@ options 	PCDISPLAY_SOFTCURSOR
 
 #The following sections describe various hardware options.
 
-isabus0 	at mainbus0			# ISA-bus
-isa0 		at isabus0
-pcibus0 	at mainbus0			# PCI-bus
-pci0 		at pcibus0
+isab0 		at mainbus0			# ISA-bus
+isa0 		at isab0
+pcib0 		at mainbus0			# PCI-bus
+pci0 		at pcib0
 nvr0 		at mainbus0			# nvram driver
 ser0 		at mainbus0
 fdcisa0 	at isa? port 0x3f0 irq 6 drq 2	# standard PC floppy contr.
@@ -261,7 +283,7 @@ fdisa0 		at fdcisa0 drive 0
 #a little endian (ISA) bus, in PIO mode this is essentially the same as
 #swapping the bytelanes. The fun starts when you use the PCIIDE DMA mode
 #provided by the PCI_ISA bridge on the Milan. CDROM's are OK, but the data
-# on the disk is swapped :-( Now luckily, both the Milan and HDDRIVER
+#on the disk is swapped :-( Now luckily, both the Milan and HDDRIVER
 #developers have thought up a solution, you can make a byteswapped disk
 #during the partioning with HDDRIVER and TOS supports booting from it!
 #Ok, now you have to choose:
@@ -270,13 +292,26 @@ fdisa0 		at fdcisa0 drive 0
 #- If _all_ of your disks are byteswapped, use the  MILAN-PCIIDE version
 #The is no way to mix things!
 
-pciide* 	at pci? dev ? function ? flags 0x0000	# 2 PCIIDE channels
-wd* 		at pciide? channel ? drive ? flags 0x0000
-atapibus* 	at pciide? channel ?			# ATAPI bus support
+pciide* 	at pci? dev ? function ? flags 0x0000	# GENERIC pciide driver
+acardide*	at pci? dev ? function ?	# Acard IDE controllers
+aceride* 	at pci? dev ? function ?	# Acer Lab IDE controllers
+artsata*	at pci? dev ? function ?	# Intel i31244 SATA controller
+cmdide* 	at pci? dev ? function ?	# CMD tech IDE controllers
+cypide* 	at pci? dev ? function ?	# Cypress IDE controllers
+hptide* 	at pci? dev ? function ?	# Triones/HighPoint IDE controllers
+optiide* 	at pci? dev ? function ?	# Opti IDE controllers
+piixide* 	at pci? dev ? function ?	# Intel IDE controllers
+pdcide* 	at pci? dev ? function ?	# Promise IDE controllers
+satalink*	at pci? dev ? function ?	# SiI SATALink controllers
+siside* 	at pci? dev ? function ?	# SiS IDE controllers
+slide*  	at pci? dev ? function ?	# Symphony Labs IDE controllers
+viaide* 	at pci? dev ? function ?	# VIA/AMD/Nvidia IDE controllers
+
+atabus*		at ata? channel ?
 
 #The Milan uses wscons
 #XXX without the __HAVE_NWSCONS option, the keyboard won't work...
-#
+
 options 	__HAVE_NWSCONS
 vga0 		at pci? dev ? function ?	# a PCI VGA card
 wsdisplay* 	at vga? console ?		# as a wscons console
@@ -284,5 +319,8 @@ pckbc0 		at isa? 			# PC keyboard controller
 pckbd* 		at pckbc?			# PC keyboard
 wskbd* 		at pckbd? console ?		# wscons keyboard
 
+#ATA devices
+wd*		at atabus? drive ?
+atapibus* 	at atabus?				# ATAPI bus support
 #ATAPI devices
 cd* 		at atapibus? drive ?		# ATAPI CD-ROM drives

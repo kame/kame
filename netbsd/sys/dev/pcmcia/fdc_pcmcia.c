@@ -1,4 +1,4 @@
-/*	$NetBSD: fdc_pcmcia.c,v 1.5 2001/11/13 07:26:32 lukem Exp $	*/
+/*	$NetBSD: fdc_pcmcia.c,v 1.10 2002/10/02 16:52:07 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: fdc_pcmcia.c,v 1.5 2001/11/13 07:26:32 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: fdc_pcmcia.c,v 1.10 2002/10/02 16:52:07 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -47,7 +47,6 @@ __KERNEL_RCSID(0, "$NetBSD: fdc_pcmcia.c,v 1.5 2001/11/13 07:26:32 lukem Exp $")
 #include <sys/buf.h>
 
 #include <machine/bus.h>
-#include <machine/conf.h>
 #include <machine/intr.h>
 
 #include <dev/pcmcia/pcmciareg.h>
@@ -70,9 +69,8 @@ int fdc_pcmcia_probe __P((struct device *, struct cfdata *, void *));
 void fdc_pcmcia_attach __P((struct device *, struct device *, void *));
 static void fdc_conf __P((struct fdc_softc *));
 
-struct cfattach fdc_pcmcia_ca = {
-	sizeof(struct fdc_pcmcia_softc), fdc_pcmcia_probe, fdc_pcmcia_attach
-};
+CFATTACH_DECL(fdc_pcmcia, sizeof(struct fdc_pcmcia_softc),
+    fdc_pcmcia_probe, fdc_pcmcia_attach, NULL, NULL);
 
 static void
 fdc_conf(fdc)
@@ -161,8 +159,7 @@ fdc_pcmcia_attach(parent, self, aux)
 
 	psc->sc_pf = pf;
 
-	for (cfe = SIMPLEQ_FIRST(&pf->cfe_head); cfe != NULL;
-	    cfe = SIMPLEQ_NEXT(cfe, cfe_list)) {
+	SIMPLEQ_FOREACH(cfe, &pf->cfe_head, cfe_list) {
 		if (cfe->num_memspace != 0 ||
 		    cfe->num_iospace != 1)
 			continue;

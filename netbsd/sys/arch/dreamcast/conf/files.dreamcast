@@ -1,7 +1,7 @@
-#	$NetBSD: files.dreamcast,v 1.19 2002/04/16 20:50:19 thorpej Exp $
+#	$NetBSD: files.dreamcast,v 1.25 2003/08/24 17:33:27 marcus Exp $
 
 # maxpartitions must be first item in files.${MACHINE}
-maxpartitions 8
+maxpartitions 16
 
 maxusers 2 16 64
 
@@ -18,6 +18,10 @@ file	arch/dreamcast/dreamcast/autoconf.c
 file	arch/dreamcast/dreamcast/clock_machdep.c
 file	arch/sh3/sh3/disksubr.c				disk
 
+file	arch/dreamcast/dreamcast/kloader.c		kloader
+defflag	opt_kloader.h	KLOADER
+defflag	debug_kloader.h	KLOADER_DEBUG
+
 defparam opt_memsize.h	IOM_ROM_BEGIN IOM_ROM_SIZE IOM_RAM_BEGIN IOM_RAM_SIZE
 
 #
@@ -25,20 +29,15 @@ defparam opt_memsize.h	IOM_ROM_BEGIN IOM_ROM_SIZE IOM_RAM_BEGIN IOM_RAM_SIZE
 #
 
 include "dev/scsipi/files.scsipi"
-major	{sd = 4}
-major	{st = 5}
-major	{cd = 6}
 
 #
 # Machine-independent ATA drivers
 #
 
 include "dev/ata/files.ata"
-major	{wd = 0}
 
 # Memory Disk for install floppy
 file dev/md_root.c				memory_disk_hooks
-major	{md = 17}
 
 #
 # System bus types
@@ -69,6 +68,14 @@ device	mms: wsmousedev
 attach	mms at maple
 file	arch/dreamcast/dev/maple/mms.c			mms	needs-flag
 
+device	mmem: disk
+attach	mmem at maple
+file	arch/dreamcast/dev/maple/mmemcard.c		mmem	needs-flag
+
+device	mlcd
+attach	mlcd at maple
+file	arch/dreamcast/dev/maple/mlcd.c			mlcd	needs-flag
+
 device	pvr: wsemuldisplaydev, rasops16
 attach	pvr at shb
 file	arch/dreamcast/dev/pvr.c			pvr	needs-flag
@@ -76,7 +83,6 @@ file	arch/dreamcast/dev/pvr.c			pvr	needs-flag
 device	gdrom: disk
 attach	gdrom at shb
 file	arch/dreamcast/dev/gdrom.c			gdrom	needs-flag
-major	{gdrom = 19}
 
 device	g2bus { }
 attach	g2bus at shb
@@ -88,3 +94,13 @@ attach	gapspci at g2bus
 file	arch/dreamcast/dev/g2/gapspci.c			gapspci
 file	arch/dreamcast/dev/g2/gapspci_dma.c		gapspci
 file	arch/dreamcast/dev/g2/gapspci_pci.c		gapspci
+
+# LAN Adapter
+attach	mbe at g2bus with mbe_g2bus
+file	arch/dreamcast/dev/g2/if_mbe_g2.c		mbe_g2bus
+
+device	aica: audiobus, auconv, mulaw
+attach	aica at g2bus
+file	arch/dreamcast/dev/g2/aica.c			aica	needs-flag
+
+include "arch/dreamcast/conf/majors.dreamcast"

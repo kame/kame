@@ -1,4 +1,4 @@
-/*	$NetBSD: bwtwo_sbus.c,v 1.6 2002/03/11 16:00:55 pk Exp $ */
+/*	$NetBSD: bwtwo_sbus.c,v 1.15 2004/03/17 17:04:58 pk Exp $ */
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -57,11 +57,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -85,12 +81,12 @@
  *
  * Does not handle interrupts, even though they can occur.
  *
- * P4 and overlay plane support by Jason R. Thorpe <thorpej@NetBSD.ORG>.
+ * P4 and overlay plane support by Jason R. Thorpe <thorpej@NetBSD.org>.
  * Overlay plane handling hints and ideas provided by Brad Spencer.
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: bwtwo_sbus.c,v 1.6 2002/03/11 16:00:55 pk Exp $");
+__KERNEL_RCSID(0, "$NetBSD: bwtwo_sbus.c,v 1.15 2004/03/17 17:04:58 pk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -103,7 +99,6 @@ __KERNEL_RCSID(0, "$NetBSD: bwtwo_sbus.c,v 1.6 2002/03/11 16:00:55 pk Exp $");
 
 #include <machine/autoconf.h>
 #include <machine/eeprom.h>
-#include <machine/conf.h>
 
 #include <dev/sbus/sbusvar.h>
 
@@ -124,9 +119,8 @@ struct bwtwo_sbus_softc {
 	struct sbusdev bss_sd;
 };
 
-struct cfattach bwtwo_sbus_ca = {
-	sizeof(struct bwtwo_sbus_softc), bwtwomatch_sbus, bwtwoattach_sbus
-};
+CFATTACH_DECL(bwtwo_sbus, sizeof(struct bwtwo_sbus_softc),
+    bwtwomatch_sbus, bwtwoattach_sbus, NULL, NULL);
 
 static int	bwtwo_get_video (struct bwtwo_softc *);
 static void	bwtwo_set_video (struct bwtwo_softc *, int);
@@ -142,7 +136,7 @@ bwtwomatch_sbus(parent, cf, aux)
 {
 	struct sbus_attach_args *sa = aux;
 
-	return (strcmp(cf->cf_driver->cd_name, sa->sa_name) == 0);
+	return (strcmp(cf->cf_name, sa->sa_name) == 0);
 }
 
 
@@ -186,13 +180,13 @@ bwtwoattach_sbus(parent, self, args)
 		printf("%s: cannot map control registers\n", self->dv_xname);
 		return;
 	}
-	sc->sc_reg = (struct fbcontrol *)bh;
+	sc->sc_reg = (struct fbcontrol *)bus_space_vaddr(sa->sa_bustag, bh);
 	fb->fb_pfour = NULL;
 
 	sc->sc_pixeloffset = BWREG_MEM;
 
 	isconsole = fb_is_console(node);
-	name = PROM_getpropstring(node, "model");
+	name = prom_getpropstring(node, "model");
 
 	/* Assume `bwtwo at sbus' only happens at sun4c's */
 	sc->sc_get_video = bwtwo_get_video;
@@ -209,7 +203,7 @@ bwtwoattach_sbus(parent, self, args)
 			printf("%s: cannot map pixels\n", self->dv_xname);
 			return;
 		}
-		sc->sc_fb.fb_pixels = (char *)bh;
+		sc->sc_fb.fb_pixels = (char *)bus_space_vaddr(sa->sa_bustag, bh);
 	}
 
 	sbus_establish(sd, &sc->sc_dev);

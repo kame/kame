@@ -1,9 +1,38 @@
-/*	$NetBSD: kern_malloc.c,v 1.71.4.1 2003/06/02 14:30:26 tron Exp $	*/
+/*	$NetBSD: kern_malloc.c,v 1.89 2003/10/30 01:58:18 simonb Exp $	*/
+
+/*
+ * Copyright (c) 1987, 1991, 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)kern_malloc.c	8.4 (Berkeley) 5/20/95
+ */
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
- * Copyright (c) 1987, 1991, 1993
- *	The Regents of the University of California.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,13 +66,12 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kern_malloc.c,v 1.71.4.1 2003/06/02 14:30:26 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_malloc.c,v 1.89 2003/10/30 01:58:18 simonb Exp $");
 
 #include "opt_lockdebug.h"
 
 #include <sys/param.h>
 #include <sys/proc.h>
-#include <sys/map.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/systm.h>
@@ -86,10 +114,10 @@ int	nkmempages = NKMEMPAGES;
 #include "opt_malloc_debug.h"
 
 struct kmembuckets bucket[MINBUCKET + 16];
-struct kmemstats kmemstats[M_LAST];
 struct kmemusage *kmemusage;
 char *kmembase, *kmemlimit;
-const char * const memname[] = INITKMEMNAMES;
+
+struct malloc_type *kmemstatistics;
 
 #ifdef MALLOCLOG
 #ifndef MALLOCLOGSIZE
@@ -99,7 +127,7 @@ const char * const memname[] = INITKMEMNAMES;
 struct malloclog {
 	void *addr;
 	long size;
-	int type;
+	struct malloc_type *type;
 	int action;
 	const char *file;
 	long line;
@@ -107,11 +135,9 @@ struct malloclog {
 
 long	malloclogptr;
 
-static void domlog(void *, long, int, int, const char *, long);
-static void hitmlog(void *);
-
 static void
-domlog(void *a, long size, int type, int action, const char *file, long line)
+domlog(void *a, long size, struct malloc_type *type, int action,
+    const char *file, long line)
 {
 
 	malloclog[malloclogptr].addr = a;
@@ -132,12 +158,12 @@ hitmlog(void *a)
 	long l;
 
 #define	PRT do { \
-	if (malloclog[l].addr == a && malloclog[l].action) { \
-		lp = &malloclog[l]; \
+	lp = &malloclog[l]; \
+	if (lp->addr == a && lp->action) { \
 		printf("malloc log entry %ld:\n", l); \
 		printf("\taddr = %p\n", lp->addr); \
 		printf("\tsize = %ld\n", lp->size); \
-		printf("\ttype = %s\n", memname[lp->type]); \
+		printf("\ttype = %s\n", lp->type->ks_shortdesc); \
 		printf("\taction = %s\n", lp->action == 1 ? "alloc" : "free"); \
 		printf("\tfile = %s\n", lp->file); \
 		printf("\tline = %ld\n", lp->line); \
@@ -149,6 +175,7 @@ hitmlog(void *a)
 
 	for (l = 0; l < malloclogptr; l++)
 		PRT;
+#undef PRT
 }
 #endif /* MALLOCLOG */
 
@@ -167,7 +194,7 @@ const long addrmask[] = { 0,
  * The WEIRD_ADDR is used as known text to copy into free objects so
  * that modifications after frees can be detected.
  */
-#define	WEIRD_ADDR	((unsigned) 0xdeadbeef)
+#define	WEIRD_ADDR	((uint32_t) 0xdeadbeef)
 #ifdef DEBUG
 #define	MAX_COPY	PAGE_SIZE
 #else
@@ -177,15 +204,17 @@ const long addrmask[] = { 0,
 /*
  * Normally the freelist structure is used only to hold the list pointer
  * for free objects.  However, when running with diagnostics, the first
- * 8 bytes of the structure is unused except for diagnostic information,
- * and the free list pointer is at offst 8 in the structure.  Since the
+ * 8/16 bytes of the structure is unused except for diagnostic information,
+ * and the free list pointer is at offset 8/16 in the structure.  Since the
  * first 8 bytes is the portion of the structure most often modified, this
  * helps to detect memory reuse problems and avoid free list corruption.
  */
 struct freelist {
-	int32_t	spare0;
-	int16_t	type;
-	int16_t	spare1;
+	uint32_t spare0;
+#ifdef _LP64
+	uint32_t spare1;		/* explicit padding */
+#endif
+	struct malloc_type *type;
 	caddr_t	next;
 };
 #else /* !DIAGNOSTIC */
@@ -195,14 +224,38 @@ struct freelist {
 #endif /* DIAGNOSTIC */
 
 /*
+ * The following are standard, build-in malloc types are are not
+ * specific to any one subsystem.
+ */
+MALLOC_DEFINE(M_DEVBUF, "devbuf", "device driver memory");
+MALLOC_DEFINE(M_DMAMAP, "DMA map", "bus_dma(9) structures");
+MALLOC_DEFINE(M_FREE, "free", "should be on free list");
+MALLOC_DEFINE(M_PCB, "pcb", "protocol control block");
+MALLOC_DEFINE(M_SOFTINTR, "softintr", "Softinterrupt structures");
+MALLOC_DEFINE(M_TEMP, "temp", "misc. temporary data buffers");
+
+/* XXX These should all be elsewhere. */
+MALLOC_DEFINE(M_RTABLE, "routetbl", "routing tables");
+MALLOC_DEFINE(M_FTABLE, "fragtbl", "fragment reassembly header");
+MALLOC_DEFINE(M_UFSMNT, "UFS mount", "UFS mount structure");
+MALLOC_DEFINE(M_NETADDR, "Export Host", "Export host address structure");
+MALLOC_DEFINE(M_IPMOPTS, "ip_moptions", "internet multicast options");
+MALLOC_DEFINE(M_IPMADDR, "in_multi", "internet multicast address");
+MALLOC_DEFINE(M_MRTABLE, "mrt", "multicast routing tables");
+MALLOC_DEFINE(M_1394DATA, "1394data", "IEEE 1394 data buffers");
+
+struct simplelock malloc_slock = SIMPLELOCK_INITIALIZER;
+
+/*
  * Allocate a block of memory
  */
 #ifdef MALLOCLOG
 void *
-_malloc(unsigned long size, int type, int flags, const char *file, long line)
+_malloc(unsigned long size, struct malloc_type *ksp, int flags,
+    const char *file, long line)
 #else
 void *
-malloc(unsigned long size, int type, int flags)
+malloc(unsigned long size, struct malloc_type *ksp, int flags)
 #endif /* MALLOCLOG */
 {
 	struct kmembuckets *kbp;
@@ -212,36 +265,33 @@ malloc(unsigned long size, int type, int flags)
 	int s;
 	caddr_t va, cp, savedlist;
 #ifdef DIAGNOSTIC
-	int32_t *end, *lp;
+	uint32_t *end, *lp;
 	int copysize;
-	const char *savedtype;
 #endif
-#ifdef KMEMSTATS
-	struct kmemstats *ksp = &kmemstats[type];
 
-	if (__predict_false(((unsigned long)type) > M_LAST))
-		panic("malloc - bogus type");
-#endif
 #ifdef LOCKDEBUG
 	if ((flags & M_NOWAIT) == 0)
 		simple_lock_only_held(NULL, "malloc");
 #endif
 #ifdef MALLOC_DEBUG
-	if (debug_malloc(size, type, flags, (void **) &va))
+	if (debug_malloc(size, ksp, flags, (void *) &va))
 		return ((void *) va);
 #endif
 	indx = BUCKETINDX(size);
 	kbp = &bucket[indx];
 	s = splvm();
+	simple_lock(&malloc_slock);
 #ifdef KMEMSTATS
 	while (ksp->ks_memuse >= ksp->ks_limit) {
 		if (flags & M_NOWAIT) {
+			simple_unlock(&malloc_slock);
 			splx(s);
 			return ((void *) NULL);
 		}
 		if (ksp->ks_limblocks < 65535)
 			ksp->ks_limblocks++;
-		tsleep((caddr_t)ksp, PSWP+2, memname[type], 0);
+		ltsleep((caddr_t)ksp, PSWP+2, ksp->ks_shortdesc, 0,
+			&malloc_slock);
 	}
 	ksp->ks_size |= 1 << indx;
 #endif
@@ -255,6 +305,7 @@ malloc(unsigned long size, int type, int flags)
 		else
 			allocsize = 1 << indx;
 		npg = btoc(allocsize);
+		simple_unlock(&malloc_slock);
 		va = (caddr_t) uvm_km_kmemalloc(kmem_map, NULL,
 		    (vsize_t)ctob(npg),
 		    ((flags & M_NOWAIT) ? UVM_KMF_NOWAIT : 0) |
@@ -273,6 +324,7 @@ malloc(unsigned long size, int type, int flags)
 			splx(s);
 			return (NULL);
 		}
+		simple_lock(&malloc_slock);
 #ifdef KMEMSTATS
 		kbp->kb_total += kbp->kb_elmpercl;
 #endif
@@ -305,8 +357,8 @@ malloc(unsigned long size, int type, int flags)
 			 * Copy in known text to detect modification
 			 * after freeing.
 			 */
-			end = (int32_t *)&cp[copysize];
-			for (lp = (int32_t *)cp; lp < end; lp++)
+			end = (uint32_t *)&cp[copysize];
+			for (lp = (uint32_t *)cp; lp < end; lp++)
 				*lp = WEIRD_ADDR;
 			freep->type = M_FREE;
 #endif /* DIAGNOSTIC */
@@ -323,8 +375,7 @@ malloc(unsigned long size, int type, int flags)
 	kbp->kb_next = ((struct freelist *)va)->next;
 #ifdef DIAGNOSTIC
 	freep = (struct freelist *)va;
-	savedtype = (unsigned)freep->type < M_LAST ?
-		memname[freep->type] : "???";
+	/* XXX potential to get garbage pointer here. */
 	if (kbp->kb_next) {
 		int rv;
 		vaddr_t addr = (vaddr_t)kbp->kb_next;
@@ -339,7 +390,7 @@ malloc(unsigned long size, int type, int flags)
 			    "word %ld of object %p size %ld previous type %s "
 			    "(invalid addr %p)\n",
 			    (long)((int32_t *)&kbp->kb_next - (int32_t *)kbp),
-			    va, size, savedtype, kbp->kb_next);
+			    va, size, "foo", kbp->kb_next);
 #ifdef MALLOCLOG
 			hitmlog(va);
 #endif
@@ -348,27 +399,27 @@ malloc(unsigned long size, int type, int flags)
 	}
 
 	/* Fill the fields that we've used with WEIRD_ADDR */
-#if BYTE_ORDER == BIG_ENDIAN
-	freep->type = WEIRD_ADDR >> 16;
+#ifdef _LP64
+	freep->type = (struct malloc_type *)
+	    (WEIRD_ADDR | (((u_long) WEIRD_ADDR) << 32));
+#else
+	freep->type = (struct malloc_type *) WEIRD_ADDR;
 #endif
-#if BYTE_ORDER == LITTLE_ENDIAN
-	freep->type = (short)WEIRD_ADDR;
-#endif
-	end = (int32_t *)&freep->next +
+	end = (uint32_t *)&freep->next +
 	    (sizeof(freep->next) / sizeof(int32_t));
-	for (lp = (int32_t *)&freep->next; lp < end; lp++)
+	for (lp = (uint32_t *)&freep->next; lp < end; lp++)
 		*lp = WEIRD_ADDR;
 
 	/* and check that the data hasn't been modified. */
-	end = (int32_t *)&va[copysize];
-	for (lp = (int32_t *)va; lp < end; lp++) {
+	end = (uint32_t *)&va[copysize];
+	for (lp = (uint32_t *)va; lp < end; lp++) {
 		if (__predict_true(*lp == WEIRD_ADDR))
 			continue;
 		printf("Data modified on freelist: "
 		    "word %ld of object %p size %ld previous type %s "
 		    "(0x%x != 0x%x)\n",
-		    (long)(lp - (int32_t *)va), va, size,
-		    savedtype, *lp, WEIRD_ADDR);
+		    (long)(lp - (uint32_t *)va), va, size,
+		    "bar", *lp, WEIRD_ADDR);
 #ifdef MALLOCLOG
 		hitmlog(va);
 #endif
@@ -396,8 +447,9 @@ out:
 out:
 #endif
 #ifdef MALLOCLOG
-	domlog(va, size, type, 1, file, line);
+	domlog(va, size, ksp, 1, file, line);
 #endif
+	simple_unlock(&malloc_slock);
 	splx(s);
 	if ((flags & M_ZERO) != 0)
 		memset(va, 0, size);
@@ -409,10 +461,10 @@ out:
  */
 #ifdef MALLOCLOG
 void
-_free(void *addr, int type, const char *file, long line)
+_free(void *addr, struct malloc_type *ksp, const char *file, long line)
 #else
 void
-free(void *addr, int type)
+free(void *addr, struct malloc_type *ksp)
 #endif /* MALLOCLOG */
 {
 	struct kmembuckets *kbp;
@@ -425,12 +477,9 @@ free(void *addr, int type)
 	int32_t *end, *lp;
 	long alloc, copysize;
 #endif
-#ifdef KMEMSTATS
-	struct kmemstats *ksp = &kmemstats[type];
-#endif
 
 #ifdef MALLOC_DEBUG
-	if (debug_free(addr, type))
+	if (debug_free(addr, ksp))
 		return;
 #endif
 
@@ -440,8 +489,8 @@ free(void *addr, int type)
 	 * have allocated in the first place.  That is, check
 	 * to see that the address is within kmem_map.
 	 */
-	if (__predict_false((vaddr_t)addr < kmem_map->header.start ||
-	    (vaddr_t)addr >= kmem_map->header.end))
+	if (__predict_false((vaddr_t)addr < vm_map_min(kmem_map) ||
+	    (vaddr_t)addr >= vm_map_max(kmem_map)))
 		panic("free: addr %p not within kmem_map", addr);
 #endif
 
@@ -449,8 +498,9 @@ free(void *addr, int type)
 	size = 1 << kup->ku_indx;
 	kbp = &bucket[kup->ku_indx];
 	s = splvm();
+	simple_lock(&malloc_slock);
 #ifdef MALLOCLOG
-	domlog(addr, 0, type, 2, file, line);
+	domlog(addr, 0, ksp, 2, file, line);
 #endif
 #ifdef DIAGNOSTIC
 	/*
@@ -462,8 +512,8 @@ free(void *addr, int type)
 	else
 		alloc = addrmask[kup->ku_indx];
 	if (((u_long)addr & alloc) != 0)
-		panic("free: unaligned addr %p, size %ld, type %s, mask %ld\n",
-		    addr, size, memname[type], alloc);
+		panic("free: unaligned addr %p, size %ld, type %s, mask %ld",
+		    addr, size, ksp->ks_shortdesc, alloc);
 #endif /* DIAGNOSTIC */
 	if (size > MAXALLOCSAVE) {
 		uvm_km_free(kmem_map, (vaddr_t)addr, ctob(kup->ku_pagecnt));
@@ -475,9 +525,14 @@ free(void *addr, int type)
 		if (ksp->ks_memuse + size >= ksp->ks_limit &&
 		    ksp->ks_memuse < ksp->ks_limit)
 			wakeup((caddr_t)ksp);
+#ifdef DIAGNOSTIC
+		if (ksp->ks_inuse == 0)
+			panic("free 1: inuse 0, probable double free");
+#endif
 		ksp->ks_inuse--;
 		kbp->kb_total -= 1;
 #endif
+		simple_unlock(&malloc_slock);
 		splx(s);
 		return;
 	}
@@ -515,7 +570,7 @@ free(void *addr, int type)
 	end = (int32_t *)&((caddr_t)addr)[copysize];
 	for (lp = (int32_t *)addr; lp < end; lp++)
 		*lp = WEIRD_ADDR;
-	freep->type = type;
+	freep->type = ksp;
 #endif /* DIAGNOSTIC */
 #ifdef KMEMSTATS
 	kup->ku_freecnt++;
@@ -530,6 +585,10 @@ free(void *addr, int type)
 	if (ksp->ks_memuse + size >= ksp->ks_limit &&
 	    ksp->ks_memuse < ksp->ks_limit)
 		wakeup((caddr_t)ksp);
+#ifdef DIAGNOSTIC
+	if (ksp->ks_inuse == 0)
+		panic("free 2: inuse 0, probable double free");
+#endif
 	ksp->ks_inuse--;
 #endif
 	if (kbp->kb_next == NULL)
@@ -538,6 +597,7 @@ free(void *addr, int type)
 		((struct freelist *)kbp->kb_last)->next = addr;
 	freep->next = NULL;
 	kbp->kb_last = addr;
+	simple_unlock(&malloc_slock);
 	splx(s);
 }
 
@@ -545,10 +605,11 @@ free(void *addr, int type)
  * Change the size of a block of memory.
  */
 void *
-realloc(void *curaddr, unsigned long newsize, int type, int flags)
+realloc(void *curaddr, unsigned long newsize, struct malloc_type *ksp,
+    int flags)
 {
 	struct kmemusage *kup;
-	long cursize;
+	unsigned long cursize;
 	void *newaddr;
 #ifdef DIAGNOSTIC
 	long alloc;
@@ -558,13 +619,13 @@ realloc(void *curaddr, unsigned long newsize, int type, int flags)
 	 * realloc() with a NULL pointer is the same as malloc().
 	 */
 	if (curaddr == NULL)
-		return (malloc(newsize, type, flags));
+		return (malloc(newsize, ksp, flags));
 
 	/*
 	 * realloc() with zero size is the same as free().
 	 */
 	if (newsize == 0) {
-		free(curaddr, type);
+		free(curaddr, ksp);
 		return (NULL);
 	}
 
@@ -592,7 +653,7 @@ realloc(void *curaddr, unsigned long newsize, int type, int flags)
 	if (((u_long)curaddr & alloc) != 0)
 		panic("realloc: "
 		    "unaligned addr %p, size %ld, type %s, mask %ld\n",
-		    curaddr, cursize, memname[type], alloc);
+		    curaddr, cursize, ksp->ks_shortdesc, alloc);
 #endif /* DIAGNOSTIC */
 
 	if (cursize > MAXALLOCSAVE)
@@ -608,7 +669,7 @@ realloc(void *curaddr, unsigned long newsize, int type, int flags)
 	 * Can't satisfy the allocation with the existing block.
 	 * Allocate a new one and copy the data.
 	 */
-	newaddr = malloc(newsize, type, flags);
+	newaddr = malloc(newsize, ksp, flags);
 	if (__predict_false(newaddr == NULL)) {
 		/*
 		 * malloc() failed, because flags included M_NOWAIT.
@@ -623,7 +684,7 @@ realloc(void *curaddr, unsigned long newsize, int type, int flags)
 	 * We were successful: free the old allocation and return
 	 * the new one.
 	 */
-	free(curaddr, type);
+	free(curaddr, ksp);
 	return (newaddr);
 }
 
@@ -638,6 +699,86 @@ malloc_roundup(unsigned long size)
 		return (roundup(size, PAGE_SIZE));
 	else
 		return (1 << BUCKETINDX(size));
+}
+
+/*
+ * Add a malloc type to the system.
+ */
+void
+malloc_type_attach(struct malloc_type *type)
+{
+
+	if (nkmempages == 0)
+		panic("malloc_type_attach: nkmempages == 0");
+
+	if (type->ks_magic != M_MAGIC)
+		panic("malloc_type_attach: bad magic");
+
+#ifdef DIAGNOSTIC
+	{
+		struct malloc_type *ksp;
+		for (ksp = kmemstatistics; ksp != NULL; ksp = ksp->ks_next) {
+			if (ksp == type)
+				panic("malloc_type_attach: already on list");
+		}
+	}
+#endif
+
+#ifdef KMEMSTATS
+	if (type->ks_limit == 0)
+		type->ks_limit = ((u_long)nkmempages << PAGE_SHIFT) * 6U / 10U;
+#else
+	type->ks_limit = 0;
+#endif
+
+	type->ks_next = kmemstatistics;
+	kmemstatistics = type;
+}
+
+/*
+ * Remove a malloc type from the system..
+ */
+void
+malloc_type_detach(struct malloc_type *type)
+{
+	struct malloc_type *ksp;
+
+#ifdef DIAGNOSTIC
+	if (type->ks_magic != M_MAGIC)
+		panic("malloc_type_detach: bad magic");
+#endif
+
+	if (type == kmemstatistics)
+		kmemstatistics = type->ks_next;
+	else {
+		for (ksp = kmemstatistics; ksp->ks_next != NULL;
+		     ksp = ksp->ks_next) {
+			if (ksp->ks_next == type) {
+				ksp->ks_next = type->ks_next;
+				break;
+			}
+		}
+#ifdef DIAGNOSTIC
+		if (ksp->ks_next == NULL)
+			panic("malloc_type_detach: not on list");
+#endif
+	}
+	type->ks_next = NULL;
+}
+
+/*
+ * Set the limit on a malloc type.
+ */
+void
+malloc_type_setlimit(struct malloc_type *type, u_long limit)
+{
+#ifdef KMEMSTATS
+	int s;
+
+	s = splvm();
+	type->ks_limit = limit;
+	splx(s);
+#endif
 }
 
 /*
@@ -683,6 +824,9 @@ kmeminit_nkmempages(void)
 void
 kmeminit(void)
 {
+	__link_set_decl(malloc_types, struct malloc_type);
+	struct malloc_type * const *ksp;
+	vaddr_t kmb, kml;
 #ifdef KMEMSTATS
 	long indx;
 #endif
@@ -708,9 +852,12 @@ kmeminit(void)
 
 	kmemusage = (struct kmemusage *) uvm_km_zalloc(kernel_map,
 	    (vsize_t)(nkmempages * sizeof(struct kmemusage)));
-	kmem_map = uvm_km_suballoc(kernel_map, (vaddr_t *)&kmembase,
-	    (vaddr_t *)&kmemlimit, (vsize_t)(nkmempages << PAGE_SHIFT), 
+	kmb = 0;
+	kmem_map = uvm_km_suballoc(kernel_map, &kmb,
+	    &kml, (vsize_t)(nkmempages << PAGE_SHIFT), 
 	    VM_MAP_INTRSAFE, FALSE, &kmem_map_store);
+	kmembase = (char *)kmb;
+	kmemlimit = (char *)kml;
 #ifdef KMEMSTATS
 	for (indx = 0; indx < MINBUCKET + 16; indx++) {
 		if (1 << indx >= PAGE_SIZE)
@@ -719,10 +866,12 @@ kmeminit(void)
 			bucket[indx].kb_elmpercl = PAGE_SIZE / (1 << indx);
 		bucket[indx].kb_highwat = 5 * bucket[indx].kb_elmpercl;
 	}
-	for (indx = 0; indx < M_LAST; indx++)
-		kmemstats[indx].ks_limit =
-		    ((u_long)nkmempages << PAGE_SHIFT) * 6U / 10U;
 #endif
+
+	/* Attach all of the statically-linked malloc types. */
+	__link_set_foreach(ksp, malloc_types)
+		malloc_type_attach(*ksp);
+
 #ifdef MALLOC_DEBUG
 	debug_malloc_init();
 #endif
@@ -742,18 +891,60 @@ void
 dump_kmemstats(void)
 {
 #ifdef KMEMSTATS
-	const char *name;
-	int i;
+	struct malloc_type *ksp;
 
-	for (i = 0; i < M_LAST; i++) {
-		name = memname[i] ? memname[i] : "";
-
-		db_printf("%2d %s%.*s %ld\n", i, name,
-		    (int)(20 - strlen(name)), "                    ",
-		    kmemstats[i].ks_memuse);
+	for (ksp = kmemstatistics; ksp != NULL; ksp = ksp->ks_next) {
+		if (ksp->ks_memuse == 0)
+			continue;
+		db_printf("%s%.*s %ld\n", ksp->ks_shortdesc,
+		    (int)(20 - strlen(ksp->ks_shortdesc)),
+		    "                    ",
+		    ksp->ks_memuse);
 	}
 #else
 	db_printf("Kmem stats are not being collected.\n");
 #endif /* KMEMSTATS */
 }
 #endif /* DDB */
+
+
+#if 0
+/* 
+ * Diagnostic messages about "Data modified on
+ * freelist" indicate a memory corruption, but
+ * they do not help tracking it down.
+ * This function can be called at various places 
+ * to sanity check malloc's freelist and discover
+ * where does the corruption take place.
+ */
+int
+freelist_sanitycheck(void) {
+	int i,j;
+	struct kmembuckets *kbp;
+	struct freelist *freep;
+	int rv = 0;
+		
+	for (i = MINBUCKET; i <= MINBUCKET + 15; i++) {
+		kbp = &bucket[i];	
+		freep = (struct freelist *)kbp->kb_next;
+		j = 0;
+		while(freep) {
+			vm_map_lock(kmem_map);
+			rv = uvm_map_checkprot(kmem_map, (vaddr_t)freep,
+			    (vaddr_t)freep + sizeof(struct freelist), 
+			    VM_PROT_WRITE);
+			vm_map_unlock(kmem_map);
+
+			if ((rv == 0) || (*(int *)freep != WEIRD_ADDR)) {
+				printf("bucket %i, chunck %d at %p modified\n",
+				    i, j, freep);
+				return 1;
+			}
+			freep = (struct freelist *)freep->next;
+			j++;
+		}
+	}
+
+	return 0;
+}
+#endif

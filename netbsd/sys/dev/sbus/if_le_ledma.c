@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le_ledma.c,v 1.17 2002/03/20 20:39:15 eeh Exp $	*/
+/*	$NetBSD: if_le_ledma.c,v 1.24 2004/03/15 23:51:12 pk Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_le_ledma.c,v 1.17 2002/03/20 20:39:15 eeh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_le_ledma.c,v 1.24 2004/03/15 23:51:12 pk Exp $");
 
 #include "opt_inet.h"
 #include "bpfilter.h"
@@ -62,6 +62,7 @@ __KERNEL_RCSID(0, "$NetBSD: if_le_ledma.c,v 1.17 2002/03/20 20:39:15 eeh Exp $")
 
 #include <machine/bus.h>
 #include <machine/intr.h>
+#include <machine/autoconf.h>
 
 #include <dev/sbus/sbusvar.h>
 
@@ -111,9 +112,8 @@ void	lesetaui __P((struct lance_softc *));
 int	lemediachange __P((struct lance_softc *));
 void	lemediastatus __P((struct lance_softc *, struct ifmediareq *));
 
-struct cfattach le_ledma_ca = {
-	sizeof(struct le_softc), lematch_ledma, leattach_ledma
-};
+CFATTACH_DECL(le_ledma, sizeof(struct le_softc),
+    lematch_ledma, leattach_ledma, NULL, NULL);
 
 extern struct cfdriver le_cd;
 
@@ -121,19 +121,11 @@ extern struct cfdriver le_cd;
 #include "opt_ddb.h"
 #endif
 
-#ifdef DDB
-#define	integrate
-#define hide
-#else
-#define	integrate	static __inline
-#define hide		static
-#endif
-
 static void lewrcsr __P((struct lance_softc *, u_int16_t, u_int16_t));
 static u_int16_t lerdcsr __P((struct lance_softc *, u_int16_t));
-hide void lehwreset __P((struct lance_softc *));
-hide void lehwinit __P((struct lance_softc *));
-hide void lenocarrier __P((struct lance_softc *));
+static void lehwreset __P((struct lance_softc *));
+static void lehwinit __P((struct lance_softc *));
+static void lenocarrier __P((struct lance_softc *));
 
 static void
 lewrcsr(sc, port, val)
@@ -141,9 +133,11 @@ lewrcsr(sc, port, val)
 	u_int16_t port, val;
 {
 	struct le_softc *lesc = (struct le_softc *)sc;
+	bus_space_tag_t t = lesc->sc_bustag;
+	bus_space_handle_t h = lesc->sc_reg;
 
-	bus_space_write_2(lesc->sc_bustag, lesc->sc_reg, LEREG1_RAP, port);
-	bus_space_write_2(lesc->sc_bustag, lesc->sc_reg, LEREG1_RDP, val);
+	bus_space_write_2(t, h, LEREG1_RAP, port);
+	bus_space_write_2(t, h, LEREG1_RDP, val);
 
 #if defined(SUN4M)
 	/*
@@ -151,11 +145,7 @@ lewrcsr(sc, port, val)
 	 * easily be accomplished by reading back the register that we
 	 * just wrote (thanks to Chris Torek for this solution).
 	 */
-	if (CPU_ISSUN4M) {
-		volatile u_int16_t discard;
-		discard = bus_space_read_2(lesc->sc_bustag, lesc->sc_reg,
-					   LEREG1_RDP);
-	}
+	(void)bus_space_read_2(t, h, LEREG1_RDP);
 #endif
 }
 
@@ -165,9 +155,11 @@ lerdcsr(sc, port)
 	u_int16_t port;
 {
 	struct le_softc *lesc = (struct le_softc *)sc;
+	bus_space_tag_t t = lesc->sc_bustag;
+	bus_space_handle_t h = lesc->sc_reg;
 
-	bus_space_write_2(lesc->sc_bustag, lesc->sc_reg, LEREG1_RAP, port);
-	return (bus_space_read_2(lesc->sc_bustag, lesc->sc_reg, LEREG1_RDP));
+	bus_space_write_2(t, h, LEREG1_RAP, port);
+	return (bus_space_read_2(t, h, LEREG1_RDP));
 }
 
 void
@@ -246,7 +238,7 @@ lemediastatus(sc, ifmr)
 		ifmr->ifm_active = IFM_ETHER|IFM_10_5;
 }
 
-hide void
+static void
 lehwreset(sc)
 	struct lance_softc *sc;
 {
@@ -278,7 +270,7 @@ lehwreset(sc)
 	delay(20000);	/* must not touch le for 20ms */
 }
 
-hide void
+static void
 lehwinit(sc)
 	struct lance_softc *sc;
 {
@@ -298,7 +290,7 @@ lehwinit(sc)
 	}
 }
 
-hide void
+static void
 lenocarrier(sc)
 	struct lance_softc *sc;
 {
@@ -338,7 +330,7 @@ lematch_ledma(parent, cf, aux)
 {
 	struct sbus_attach_args *sa = aux;
 
-	return (strcmp(cf->cf_driver->cd_name, sa->sa_name) == 0);
+	return (strcmp(cf->cf_name, sa->sa_name) == 0);
 }
 
 
@@ -354,8 +346,6 @@ leattach_ledma(parent, self, aux)
 	bus_dma_tag_t dmatag = sa->sa_dmatag;
 	bus_dma_segment_t seg;
 	int rseg, error;
-	/* XXX the following declarations should be elsewhere */
-	extern void myetheraddr __P((u_char *));
 
 	lesc->sc_bustag = sa->sa_bustag;
 
@@ -427,7 +417,7 @@ leattach_ledma(parent, self, aux)
 	sc->sc_nsupmedia = NLEMEDIA;
 	sc->sc_defaultmedia = IFM_ETHER|IFM_AUTO;
 
-	myetheraddr(sc->sc_enaddr);
+	prom_getether(sa->sa_node, sc->sc_enaddr);
 
 	sc->sc_copytodesc = lance_copytobuf_contig;
 	sc->sc_copyfromdesc = lance_copyfrombuf_contig;
@@ -443,7 +433,7 @@ leattach_ledma(parent, self, aux)
 
 	/* Establish interrupt handler */
 	if (sa->sa_nintr != 0)
-		(void)bus_intr_establish(sa->sa_bustag, sa->sa_pri, IPL_NET, 0,
+		(void)bus_intr_establish(sa->sa_bustag, sa->sa_pri, IPL_NET,
 					 am7990_intr, sc);
 
 	am7990_config(&lesc->sc_am7990);

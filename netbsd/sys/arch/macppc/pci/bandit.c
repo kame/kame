@@ -1,4 +1,4 @@
-/*	$NetBSD: bandit.c,v 1.18 2002/05/16 01:01:38 thorpej Exp $	*/
+/*	$NetBSD: bandit.c,v 1.23 2003/07/15 02:43:33 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2000 Tsubai Masanari.  All rights reserved.
@@ -26,6 +26,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bandit.c,v 1.23 2003/07/15 02:43:33 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -50,9 +53,8 @@ void bandit_conf_write __P((pci_chipset_tag_t, pcitag_t, int, pcireg_t));
 
 static void bandit_init __P((struct bandit_softc *));
 
-struct cfattach bandit_ca = {
-	sizeof(struct bandit_softc), bandit_match, bandit_attach
-};
+CFATTACH_DECL(bandit, sizeof(struct bandit_softc),
+    bandit_match, bandit_attach, NULL, NULL);
 
 int
 bandit_match(parent, cf, aux)
@@ -123,6 +125,7 @@ bandit_attach(parent, self, aux)
 	pba.pba_memt = pc->memt;
 	pba.pba_iot = pc->iot;
 	pba.pba_dmat = &pci_bus_dma_tag;
+	pba.pba_dmat64 = NULL;
 	pba.pba_bus = pc->bus;
 	pba.pba_bridgetag = NULL;
 	pba.pba_pc = pc;
@@ -139,8 +142,8 @@ bandit_print(aux, pnp)
 	struct pcibus_attach_args *pa = aux;
 
 	if (pnp)
-		printf("%s at %s", pa->pba_busname, pnp);
-	printf(" bus %d", pa->pba_bus);
+		aprint_normal("%s at %s", pa->pba_busname, pnp);
+	aprint_normal(" bus %d", pa->pba_bus);
 	return UNCONF;
 }
 

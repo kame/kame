@@ -1,4 +1,4 @@
-/* $NetBSD: sbgbus.c,v 1.1 2002/03/05 23:46:42 simonb Exp $ */
+/* $NetBSD: sbgbus.c,v 1.7 2003/07/15 02:43:39 lukem Exp $ */
 
 /*
  * Copyright 2000, 2001
@@ -15,10 +15,9 @@
  *    the source file.
  *
  * 2) No right is granted to use any trade name, trademark, or logo of
- *    Broadcom Corporation. Neither the "Broadcom Corporation" name nor any
- *    trademark or logo of Broadcom Corporation may be used to endorse or
- *    promote products derived from this software without the prior written
- *    permission of Broadcom Corporation.
+ *    Broadcom Corporation.  The "Broadcom Corporation" name may not be
+ *    used to endorse or promote products derived from this software
+ *    without the prior written permission of Broadcom Corporation.
  *
  * 3) THIS SOFTWARE IS PROVIDED "AS-IS" AND ANY EXPRESS OR IMPLIED
  *    WARRANTIES, INCLUDING BUT NOT LIMITED TO, ANY IMPLIED WARRANTIES OF
@@ -32,6 +31,9 @@
  *    WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  *    OR OTHERWISE), EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sbgbus.c,v 1.7 2003/07/15 02:43:39 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -48,9 +50,8 @@ extern struct cfdriver sbgbus_cd;
 static int	sbgbus_match(struct device *, struct cfdata *, void *);
 static void	sbgbus_attach(struct device *, struct device *, void *);
 
-const struct cfattach sbgbus_ca = {
-	sizeof(struct device), sbgbus_match, sbgbus_attach,
-};
+CFATTACH_DECL(sbgbus, sizeof(struct device),
+    sbgbus_match, sbgbus_attach, NULL, NULL);
 
 static int	sbgbussearch(struct device *, struct cfdata *, void *);
 static int	sbgbusprint(void *, const char *);
@@ -80,13 +81,13 @@ sbgbusprint(void *aux, const char *pnp)
 	struct sbgbus_attach_args *sga = aux;
 
 	if (sga->sga_chipsel != SBGBUS_CHIPSEL_NONE)
-		printf(" chipsel %u", sga->sga_chipsel);
+		aprint_normal(" chipsel %u", sga->sga_chipsel);
 	if (sga->sga_offset != 0)
-		printf(" offset 0x%x", sga->sga_offset);
+		aprint_normal(" offset 0x%x", sga->sga_offset);
 	if (sga->sga_intr[0] != SBGBUS_INTR_NONE) {
-		printf(" intr %u", sga->sga_intr[0]);
+		aprint_normal(" intr %u", sga->sga_intr[0]);
 		if (sga->sga_intr[1] != SBGBUS_INTR_NONE) {
-			printf(",%u", sga->sga_intr[1]);
+			aprint_normal(",%u", sga->sga_intr[1]);
 		}
 	}
 	return (UNCONF);
@@ -150,7 +151,7 @@ sbgbussearch(struct device *parent, struct cfdata *cf, void *aux)
 		}
 
 		tryagain = 0;
-		if ((*cf->cf_attach->ca_match)(parent, cf, &sga) > 0) {
+		if (config_match(parent, cf, &sga) > 0) {
 			config_attach(parent, cf, &sga, sbgbusprint);
 			tryagain = (cf->cf_fstate == FSTATE_STAR);
 		}

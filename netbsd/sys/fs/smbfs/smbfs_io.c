@@ -1,4 +1,4 @@
-/*	$NetBSD: smbfs_io.c,v 1.2 2002/01/09 17:43:28 deberg Exp $	*/
+/*	$NetBSD: smbfs_io.c,v 1.16 2003/10/25 08:39:05 christos Exp $	*/
 
 /*
  * Copyright (c) 2000-2001, Boris Popov
@@ -34,6 +34,10 @@
  * FreeBSD: src/sys/fs/smbfs/smbfs_io.c,v 1.7 2001/12/02 08:56:58 bp Exp
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: smbfs_io.c,v 1.16 2003/10/25 08:39:05 christos Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/resourcevar.h>	/* defines plimit structure in proc struct */
@@ -75,21 +79,7 @@
 #include <fs/smbfs/smbfs_node.h>
 #include <fs/smbfs/smbfs_subr.h>
 
-#ifdef __NetBSD__
-#define PROC_LOCK(x) 
-#define PROC_UNLOCK(x)
-#endif
-
 /*#define SMBFS_RWGENERIC*/
-
-extern int smbfs_pbuf_freecnt;
-
-static int smbfs_fastlookup = 1;
-
-#ifndef __NetBSD__
-SYSCTL_DECL(_vfs_smbfs);
-SYSCTL_INT(_vfs_smbfs, OID_AUTO, fastlookup, CTLFLAG_RW, &smbfs_fastlookup, 0, "");
-#endif
 
 #define DE_SIZE	(sizeof(struct dirent))
 
@@ -97,42 +87,54 @@ static int
 smbfs_readvdir(struct vnode *vp, struct uio *uio, struct ucred *cred)
 {
 	struct dirent de;
-	struct componentname cn;
 	struct smb_cred scred;
 	struct smbfs_fctx *ctx;
-	struct vnode *newvp;
 	struct smbnode *np = VTOSMB(vp);
-	int error/*, *eofflag = ap->a_eofflag*/;
+	int error = 0/*, *eofflag = ap->a_eofflag*/;
 	long offset, limit;
 
-	np = VTOSMB(vp);
-	SMBVDEBUG("dirname='%s'\n", np->n_name);
+	KASSERT(vp->v_type == VDIR);
+
+	if (uio->uio_resid < DE_SIZE || uio->uio_offset < 0)
+		return EINVAL;
+
+	SMBVDEBUG("dirname='%.*s'\n", (int) np->n_nmlen, np->n_name);
 	smb_makescred(&scred, uio->uio_procp, cred);
 	offset = uio->uio_offset / DE_SIZE; 	/* offset in the directory */
 	limit = uio->uio_resid / DE_SIZE;
-	if (uio->uio_resid < DE_SIZE || uio->uio_offset < 0)
-		return EINVAL;
-	while (limit && offset < 2) {
-		limit--;
-		bzero((caddr_t)&de, DE_SIZE);
+
+	/* Simulate . */
+	if (offset < 1) {
+		memset(&de, 0, sizeof(de));
+		de.d_fileno = np->n_ino;
 		de.d_reclen = DE_SIZE;
-		de.d_fileno = (offset == 0) ? np->n_ino :
-		    (np->n_parent ? np->n_parent->n_ino : 2);
-		if (de.d_fileno == 0)
-			de.d_fileno = 0x7ffffffd + offset;
-		de.d_namlen = offset + 1;
-		de.d_name[0] = '.';
-		de.d_name[1] = '.';
-		de.d_name[offset + 1] = '\0';
 		de.d_type = DT_DIR;
-		error = uiomove((caddr_t)&de, DE_SIZE, uio);
+		de.d_namlen = 1;
+		strncpy(de.d_name, ".", 2);
+		error = uiomove((caddr_t)&de, sizeof(struct dirent), uio);
 		if (error)
 			return error;
+		limit--;
 		offset++;
-		uio->uio_offset += DE_SIZE;
 	}
+	/* Simulate .. */
+	if (limit > 0 && offset < 2) {
+		memset(&de, 0, sizeof(de));
+		de.d_fileno = (np->n_parent ? np->n_parent->n_ino : 2);
+		de.d_reclen = DE_SIZE;
+		de.d_type = DT_DIR;
+		de.d_namlen = 2;
+		strncpy(de.d_name, "..", 3);
+		error = uiomove((caddr_t)&de, sizeof(struct dirent), uio);
+		if (error)
+			return error;
+		limit--;
+		offset++;
+	}
+
 	if (limit == 0)
-		return 0;
+		return (0);
+
 	if (offset != np->n_dirofs || np->n_dirseq == NULL) {
 		SMBVDEBUG("Reopening search %ld:%ld\n", offset, np->n_dirofs);
 		if (np->n_dirseq) {
@@ -150,45 +152,38 @@ smbfs_readvdir(struct vnode *vp, struct uio *uio, struct ucred *cred)
 		np->n_dirseq = ctx;
 	} else
 		ctx = np->n_dirseq;
+
+	/* skip entries before offset */
 	while (np->n_dirofs < offset) {
 		error = smbfs_findnext(ctx, offset - np->n_dirofs++, &scred);
 		if (error) {
 			smbfs_findclose(np->n_dirseq, &scred);
 			np->n_dirseq = NULL;
-			return error == ENOENT ? 0 : error;
+			return (error == ENOENT) ? 0 : error;
 		}
 	}
-	error = 0;
+
 	for (; limit; limit--, offset++) {
 		error = smbfs_findnext(ctx, limit, &scred);
-		if (error)
+		if (error) {
+			if (error == ENOENT)
+				error = 0;
 			break;
+		}
 		np->n_dirofs++;
-		bzero((caddr_t)&de, DE_SIZE);
+		memset(&de, 0, DE_SIZE);
 		de.d_reclen = DE_SIZE;
 		de.d_fileno = ctx->f_attr.fa_ino;
 		de.d_type = (ctx->f_attr.fa_attr & SMB_FA_DIR) ? DT_DIR : DT_REG;
 		de.d_namlen = ctx->f_nmlen;
-		bcopy(ctx->f_name, de.d_name, de.d_namlen);
+		memcpy(de.d_name, ctx->f_name, de.d_namlen);
 		de.d_name[de.d_namlen] = '\0';
-		if (smbfs_fastlookup) {
-			error = smbfs_nget(vp->v_mount, vp, ctx->f_name,
-			    ctx->f_nmlen, &ctx->f_attr, &newvp);
-			if (!error) {
-				cn.cn_nameptr = de.d_name;
-				cn.cn_namelen = de.d_namlen;
-		    		cache_enter(vp, newvp, &cn);
-				vput(newvp);
-			}
-		}
 		error = uiomove((caddr_t)&de, DE_SIZE, uio);
 		if (error)
 			break;
 	}
-	if (error == ENOENT)
-		error = 0;
-	uio->uio_offset = offset * DE_SIZE;
-	return error;
+
+	return (error);
 }
 
 int
@@ -199,30 +194,22 @@ smbfs_readvnode(struct vnode *vp, struct uio *uiop, struct ucred *cred)
 	struct proc *p;
 	struct vattr vattr;
 	struct smb_cred scred;
-	int error, lks;
+	int error;
 
-	if (vp->v_type != VREG && vp->v_type != VDIR) {
-		SMBFSERR("vn types other than VREG or VDIR are unsupported !\n");
-		return EIO;
-	}
+	KASSERT(vp->v_type == VREG || vp->v_type == VDIR);
+
 	if (uiop->uio_resid == 0)
 		return 0;
 	if (uiop->uio_offset < 0)
 		return EINVAL;
 /*	if (uiop->uio_offset + uiop->uio_resid > smp->nm_maxfilesize)
 		return EFBIG;*/
-	p = uiop->uio_procp;
 	if (vp->v_type == VDIR) {
-		lks = LK_EXCLUSIVE;/*lockstatus(&vp->v_lock, p);*/
-		if (lks == LK_SHARED)
-			vn_lock(vp, LK_UPGRADE | LK_RETRY);
 		error = smbfs_readvdir(vp, uiop, cred);
-		if (lks == LK_SHARED)
-			vn_lock(vp, LK_DOWNGRADE | LK_RETRY);
 		return error;
 	}
 
-/*	biosize = SSTOCN(smp->sm_share)->sc_txmax;*/
+	p = uiop->uio_procp;
 	if (np->n_flag & NMODIFIED) {
 		smbfs_attr_cacheremove(vp);
 		error = VOP_GETATTR(vp, &vattr, cred, p);
@@ -253,12 +240,15 @@ smbfs_writevnode(struct vnode *vp, struct uio *uiop,
 	struct smb_cred scred;
 	struct proc *p;
 	int error = 0;
+	int extended = 0;
+	size_t resid = uiop->uio_resid;
 
-	if (vp->v_type != VREG) {
-		SMBERROR("vn types other than VREG unsupported !\n");
-		return EIO;
-	}
-	SMBVDEBUG("ofs=%d,resid=%d\n",(int)uiop->uio_offset, uiop->uio_resid);
+	/* vn types other than VREG unsupported */
+	KASSERT(vp->v_type == VREG);
+
+	SMBVDEBUG("ofs=%lld,resid=%d\n",
+		(long long int) uiop->uio_offset,
+		uiop->uio_resid);
 	if (uiop->uio_offset < 0)
 		return EINVAL;
 /*	if (uiop->uio_offset + uiop->uio_resid > smp->nm_maxfilesize)
@@ -278,7 +268,8 @@ smbfs_writevnode(struct vnode *vp, struct uio *uiop,
 			 */
 			smbfs_attr_cacheremove(vp);
 			error = VOP_GETATTR(vp, &vattr, cred, td);
-			if (error) return (error);
+			if (error)
+				return (error);
 #endif
 			uiop->uio_offset = np->n_size;
 		}
@@ -286,20 +277,22 @@ smbfs_writevnode(struct vnode *vp, struct uio *uiop,
 	if (uiop->uio_resid == 0)
 		return 0;
 	if (p && uiop->uio_offset + uiop->uio_resid > p->p_rlimit[RLIMIT_FSIZE].rlim_cur) {
-		PROC_LOCK(p);
 		psignal(p, SIGXFSZ);
-		PROC_UNLOCK(p);
 		return EFBIG;
 	}
 	smb_makescred(&scred, p, cred);
 	error = smb_write(smp->sm_share, np->n_fid, uiop, &scred);
-	SMBVDEBUG("after: ofs=%d,resid=%d\n",(int)uiop->uio_offset, uiop->uio_resid);
+	SMBVDEBUG("after: ofs=%lld,resid=%d,err=%d\n",(long long int)uiop->uio_offset, uiop->uio_resid, error);
 	if (!error) {
 		if (uiop->uio_offset > np->n_size) {
 			np->n_size = uiop->uio_offset;
 			uvm_vnp_setsize(vp, np->n_size);
+			extended = 1;
 		}
+	
 	}
+	if (resid > uiop->uio_resid)
+		VN_KNOTE(vp, NOTE_WRITE | (extended ? NOTE_EXTEND : 0));
 	return error;
 }
 
@@ -402,235 +395,6 @@ smbfs_doio(struct buf *bp, struct ucred *cr, struct proc *p)
 	return error;
 }
 
-#ifndef __NetBSD__
-/*
- * Vnode op for VM getpages.
- * Wish wish .... get rid from multiple IO routines
- */
-int
-smbfs_getpages(ap)
-	struct vop_getpages_args /* {
-		struct vnode *a_vp;
-		vm_page_t *a_m;
-		int a_count;
-		int a_reqpage;
-		vm_ooffset_t a_offset;
-		} */ *ap;
-{
-#ifdef SMBFS_RWGENERIC
-	return vop_stdgetpages(ap);
-#else
-	int i, error, nextoff, size, toff, npages, count;
-	struct uio uio;
-	struct iovec iov;
-	vm_offset_t kva;
-	struct buf *bp;
-	struct vnode *vp;
-	struct proc *p;
-	struct ucred *cred;
-	struct smbmount *smp;
-	struct smbnode *np;
-	struct smb_cred scred;
-	vm_page_t *pages;
-
-	vp = ap->a_vp;
-	p = curproc;
-	cred = td->td_proc->p_ucred;		/* XXX */
-	np = VTOSMB(vp);
-	smp = VFSTOSMBFS(vp->v_mount);
-	pages = ap->a_m;
-	count = ap->a_count;
-
-	if (vp->v_object == NULL) {
-		printf("smbfs_getpages: called with non-merged cache vnode??\n");
-		return VM_PAGER_ERROR;
-	}
-	smb_makescred(&scred, td, cred);
-
-#if __FreeBSD_version >= 400000
-	bp = getpbuf(&smbfs_pbuf_freecnt);
-#else
-	bp = getpbuf();
-#endif
-	npages = btoc(count);
-	kva = (vm_offset_t) bp->b_data;
-	pmap_qenter(kva, pages, npages);
-	cnt.v_vnodein++;
-	cnt.v_vnodepgsin += count;
-
-	iov.iov_base = (caddr_t) kva;
-	iov.iov_len = count;
-	uio.uio_iov = &iov;
-	uio.uio_iovcnt = 1;
-	uio.uio_offset = IDX_TO_OFF(pages[0]->pindex);
-	uio.uio_resid = count;
-	uio.uio_segflg = UIO_SYSSPACE;
-	uio.uio_rw = UIO_READ;
-	uio.uio_td = td;
-
-	error = smb_read(smp->sm_share, np->n_fid, &uio, &scred);
-	pmap_qremove(kva, npages);
-
-#if __FreeBSD_version >= 400000
-	relpbuf(bp, &smbfs_pbuf_freecnt);
-#else
-	relpbuf(bp);
-#endif
-
-	if (error && (uio.uio_resid == count)) {
-		printf("smbfs_getpages: error %d\n",error);
-		for (i = 0; i < npages; i++) {
-			if (ap->a_reqpage != i)
-				vm_page_free(pages[i]);
-		}
-		return VM_PAGER_ERROR;
-	}
-
-	size = count - uio.uio_resid;
-
-	for (i = 0, toff = 0; i < npages; i++, toff = nextoff) {
-		vm_page_t m;
-		nextoff = toff + PAGE_SIZE;
-		m = pages[i];
-
-		m->flags &= ~PG_ZERO;
-
-		if (nextoff <= size) {
-			m->valid = VM_PAGE_BITS_ALL;
-			vm_page_undirty(m);
-		} else {
-			int nvalid = ((size + DEV_BSIZE - 1) - toff) & ~(DEV_BSIZE - 1);
-			vm_page_set_validclean(m, 0, nvalid);
-		}
-		
-		if (i != ap->a_reqpage) {
-			/*
-			 * Whether or not to leave the page activated is up in
-			 * the air, but we should put the page on a page queue
-			 * somewhere (it already is in the object).  Result:
-			 * It appears that emperical results show that
-			 * deactivating pages is best.
-			 */
-
-			/*
-			 * Just in case someone was asking for this page we
-			 * now tell them that it is ok to use.
-			 */
-			if (!error) {
-				if (m->flags & PG_WANTED)
-					vm_page_activate(m);
-				else
-					vm_page_deactivate(m);
-				vm_page_wakeup(m);
-			} else {
-				vm_page_free(m);
-			}
-		}
-	}
-	return 0;
-#endif /* SMBFS_RWGENERIC */
-}
-
-/*
- * Vnode op for VM putpages.
- * possible bug: all IO done in sync mode
- * Note that vop_close always invalidate pages before close, so it's
- * not necessary to open vnode.
- */
-int
-smbfs_putpages(ap)
-	struct vop_putpages_args /* {
-		struct vnode *a_vp;
-		vm_page_t *a_m;
-		int a_count;
-		int a_sync;
-		int *a_rtvals;
-		vm_ooffset_t a_offset;
-	} */ *ap;
-{
-	int error;
-	struct vnode *vp = ap->a_vp;
-	struct thread *td;
-	struct ucred *cred;
-
-#ifdef SMBFS_RWGENERIC
-	td = curthread;			/* XXX */
-	cred = td->td_proc->p_ucred;	/* XXX */
-	VOP_OPEN(vp, FWRITE, cred, td);
-	error = vop_stdputpages(ap);
-	VOP_CLOSE(vp, FWRITE, cred, td);
-	return error;
-#else
-	struct uio uio;
-	struct iovec iov;
-	vm_offset_t kva;
-	struct buf *bp;
-	int i, npages, count;
-	int *rtvals;
-	struct smbmount *smp;
-	struct smbnode *np;
-	struct smb_cred scred;
-	vm_page_t *pages;
-
-	td = curthread;			/* XXX */
-	cred = td->td_proc->p_ucred;	/* XXX */
-/*	VOP_OPEN(vp, FWRITE, cred, td);*/
-	np = VTOSMB(vp);
-	smp = VFSTOSMBFS(vp->v_mount);
-	pages = ap->a_m;
-	count = ap->a_count;
-	rtvals = ap->a_rtvals;
-	npages = btoc(count);
-
-	for (i = 0; i < npages; i++) {
-		rtvals[i] = VM_PAGER_AGAIN;
-	}
-
-#if __FreeBSD_version >= 400000
-	bp = getpbuf(&smbfs_pbuf_freecnt);
-#else
-	bp = getpbuf();
-#endif
-	kva = (vm_offset_t) bp->b_data;
-	pmap_qenter(kva, pages, npages);
-	cnt.v_vnodeout++;
-	cnt.v_vnodepgsout += count;
-
-	iov.iov_base = (caddr_t) kva;
-	iov.iov_len = count;
-	uio.uio_iov = &iov;
-	uio.uio_iovcnt = 1;
-	uio.uio_offset = IDX_TO_OFF(pages[0]->pindex);
-	uio.uio_resid = count;
-	uio.uio_segflg = UIO_SYSSPACE;
-	uio.uio_rw = UIO_WRITE;
-	uio.uio_td = td;
-	SMBVDEBUG("ofs=%d,resid=%d\n",(int)uio.uio_offset, uio.uio_resid);
-
-	smb_makescred(&scred, td, cred);
-	error = smb_write(smp->sm_share, np->n_fid, &uio, &scred);
-/*	VOP_CLOSE(vp, FWRITE, cred, td);*/
-	SMBVDEBUG("paged write done: %d\n", error);
-
-	pmap_qremove(kva, npages);
-#if __FreeBSD_version >= 400000
-	relpbuf(bp, &smbfs_pbuf_freecnt);
-#else
-	relpbuf(bp);
-#endif
-
-	if (!error) {
-		int nwritten = round_page(count - uio.uio_resid) / PAGE_SIZE;
-		for (i = 0; i < nwritten; i++) {
-			rtvals[i] = VM_PAGER_OK;
-			vm_page_undirty(pages[i]);
-		}
-	}
-	return rtvals[0];
-#endif /* SMBFS_RWGENERIC */
-}
-#endif /* !__NetBSD__ */
-
 /*
  * Flush and invalidate all dirty buffers. If another process is already
  * doing the flush, just wait for completion.
@@ -644,36 +408,33 @@ smbfs_vinvalbuf(vp, flags, cred, p, intrflg)
 	int intrflg;
 {
 	struct smbnode *np = VTOSMB(vp);
-	int error = 0, slpflag, slptimeo;
+	int error = 0, slpflag;
 
-	if (vp->v_flag & VXLOCK)
-		return 0;
-	if (intrflg) {
+	if (intrflg)
 		slpflag = PCATCH;
-		slptimeo = 2 * hz;
-	} else {
+	else
 		slpflag = 0;
-		slptimeo = 0;
-	}
+
 	while (np->n_flag & NFLUSHINPROG) {
 		np->n_flag |= NFLUSHWANT;
-		error = tsleep((caddr_t)&np->n_flag, PRIBIO + 2, "smfsvinv", slptimeo);
-		error = smb_proc_intr(p);
-		if (error == EINTR && intrflg)
-			return EINTR;
+		error = tsleep((caddr_t)&np->n_flag,
+			(PRIBIO + 2) | slpflag, "smfsvinv", 0);
+		if (error)
+			return (error);
 	}
 	np->n_flag |= NFLUSHINPROG;
-	error = vinvalbuf(vp, flags, cred, p, slpflag, 0);
-	while (error) {
+	for(;;) {
+		if ((error = vinvalbuf(vp, flags, cred, p, slpflag, 0)) == 0)
+			break;
+
 		if (intrflg && (error == ERESTART || error == EINTR)) {
 			np->n_flag &= ~NFLUSHINPROG;
 			if (np->n_flag & NFLUSHWANT) {
 				np->n_flag &= ~NFLUSHWANT;
 				wakeup((caddr_t)&np->n_flag);
 			}
-			return EINTR;
+			return (error);
 		}
-		error = vinvalbuf(vp, flags, cred, p, slpflag, 0);
 	}
 	np->n_flag &= ~(NMODIFIED | NFLUSHINPROG);
 	if (np->n_flag & NFLUSHWANT) {

@@ -1,4 +1,4 @@
-/*	$NetBSD: ums.c,v 1.56 2002/03/17 19:41:05 atatat Exp $	*/
+/*	$NetBSD: ums.c,v 1.60 2003/03/11 16:44:00 augustss Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -38,11 +38,11 @@
  */
 
 /*
- * HID spec: http://www.usb.org/developers/data/devclass/hid1_1.pdf
+ * HID spec: http://www.usb.org/developers/devclass_docs/HID1_11.pdf
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ums.c,v 1.56 2002/03/17 19:41:05 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ums.c,v 1.60 2003/03/11 16:44:00 augustss Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -134,7 +134,7 @@ ums_match(struct device *parent, struct cfdata *match, void *aux)
 	struct uhidev_attach_arg *uha = aux;
 	int size;
 	void *desc;
-	
+
 	uhidev_get_report_desc(uha->parent, &desc, &size);
 	if (!hid_is_collection(desc, size, uha->reportid,
 			       HID_USAGE2(HUP_GENERIC_DESKTOP, HUG_MOUSE)))
@@ -226,12 +226,12 @@ ums_attach(struct device *parent, struct device *self, void *aux)
 
 #ifdef USB_DEBUG
 	DPRINTF(("ums_attach: sc=%p\n", sc));
-	DPRINTF(("ums_attach: X\t%d/%d\n", 
+	DPRINTF(("ums_attach: X\t%d/%d\n",
 		 sc->sc_loc_x.pos, sc->sc_loc_x.size));
-	DPRINTF(("ums_attach: Y\t%d/%d\n", 
+	DPRINTF(("ums_attach: Y\t%d/%d\n",
 		 sc->sc_loc_y.pos, sc->sc_loc_y.size));
 	if (sc->flags & UMS_Z)
-		DPRINTF(("ums_attach: Z\t%d/%d\n", 
+		DPRINTF(("ums_attach: Z\t%d/%d\n",
 			 sc->sc_loc_z.pos, sc->sc_loc_z.size));
 	for (i = 1; i <= sc->nbuttons; i++) {
 		DPRINTF(("ums_attach: B%d\t%d/%d\n",
@@ -256,7 +256,6 @@ ums_activate(device_ptr_t self, enum devact act)
 	switch (act) {
 	case DVACT_ACTIVATE:
 		return (EOPNOTSUPP);
-		break;
 
 	case DVACT_DEACTIVATE:
 		if (sc->sc_wsmousedev != NULL)
@@ -348,7 +347,7 @@ ums_disable(void *v)
 #endif
 
 	sc->sc_enabled = 0;
-	return (uhidev_close(&sc->sc_hdev));
+	uhidev_close(&sc->sc_hdev);
 }
 
 Static int

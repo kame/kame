@@ -1,4 +1,4 @@
-/*	$NetBSD: zs_any.c,v 1.5 2001/11/26 18:06:36 fredette Exp $	*/
+/*	$NetBSD: zs_any.c,v 1.10 2003/07/15 03:36:12 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -44,6 +44,9 @@
  * Sun keyboard/mouse uses the zs_kbd/zs_ms slaves.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zs_any.c,v 1.10 2003/07/15 03:36:12 lukem Exp $");
+
 #include "opt_kgdb.h"
 
 #include <sys/param.h>
@@ -67,7 +70,7 @@
 
 #include <machine/idprom.h>
 #include <machine/pmap.h>
-#include <dev/sun/cons.h>
+#include <sun2/dev/cons.h>
 #endif
 
 #include <sun2/sun2/machdep.h>
@@ -82,17 +85,14 @@
 static int	zs_any_match __P((struct device *, struct cfdata *, void *));
 static void	zs_any_attach __P((struct device *, struct device *, void *));
 
-struct cfattach zs_obio_ca = {
-	sizeof(struct zsc_softc), zs_any_match, zs_any_attach
-};
+CFATTACH_DECL(zs_obio, sizeof(struct zsc_softc),
+    zs_any_match, zs_any_attach, NULL, NULL);
 
-struct cfattach zs_obmem_ca = {
-	sizeof(struct zsc_softc), zs_any_match, zs_any_attach
-};
+CFATTACH_DECL(zs_obmem, sizeof(struct zsc_softc),
+    zs_any_match, zs_any_attach, NULL, NULL);
 
-struct cfattach zs_mbmem_ca = {
-	sizeof(struct zsc_softc), zs_any_match, zs_any_attach
-};
+CFATTACH_DECL(zs_mbmem, sizeof(struct zsc_softc),
+    zs_any_match, zs_any_attach, NULL, NULL);
 
 /*
  * Is the zs chip present?

@@ -1,4 +1,4 @@
-/*	$NetBSD: ite_cc.c,v 1.32 2002/03/17 19:40:31 atatat Exp $ */
+/*	$NetBSD: ite_cc.c,v 1.35 2004/02/24 15:05:54 wiz Exp $ */
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -33,7 +33,7 @@
 #include "opt_amigaccgrf.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ite_cc.c,v 1.32 2002/03/17 19:40:31 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ite_cc.c,v 1.35 2004/02/24 15:05:54 wiz Exp $");
 
 #include "grfcc.h"
 #if NGRFCC > 0
@@ -93,15 +93,15 @@ extern u_char kernel_font[], kernel_cursor[];
 #endif
 
 #if !defined(USE_C_BFOPS)
-#define BFEXT(v,p,o,w)	asm("bfextu %1@{%2:%3},%0" : "=d" (v) : \
+#define BFEXT(v,p,o,w)	__asm("bfextu %1@{%2:%3},%0" : "=d" (v) : \
 		"a"(p), "d"(o), "d"(w))
-#define BFINS(v,p,o,w)	asm("bfins %0,%1@{%2:%3}" : /* no output */ : \
+#define BFINS(v,p,o,w)	__asm("bfins %0,%1@{%2:%3}" : /* no output */ : \
 		"d"(v), "a"(p), "d"(o), "d"(w))
-#define BFCLR(p,o,w)	asm("bfclr %0@{%1:%2}" : /* no output */ : \
+#define BFCLR(p,o,w)	__asm("bfclr %0@{%1:%2}" : /* no output */ : \
 		"a"(p), "d"(o), "d"(w))
-#define BFCHG(p,o,w)	asm("bfchg %0@{%1:%2}" : /* no output */ : \
+#define BFCHG(p,o,w)	__asm("bfchg %0@{%1:%2}" : /* no output */ : \
 		"a"(p), "d"(o), "d"(w))
-#define BFSET(p,o,w)	asm("bfset %0@{%1:%2}" : /* no output */ : \
+#define BFSET(p,o,w)	__asm("bfset %0@{%1:%2}" : /* no output */ : \
 		"a"(p), "d"(o), "d"(w))
 #else
 #define BFEXT(v,p,o,w)	do {v = ((u_int8_t *)(p))[(o)>>3];} while (0)
@@ -199,6 +199,7 @@ int
 ite_newsize(struct ite_softc *ip, struct itewinsize *winsz)
 {
 	extern struct view_softc views[];
+	extern const struct cdevsw view_cdevsw;
 	struct view_size vs;
 	ipriv_t *cci = ip->priv;
 	u_long i;
@@ -209,7 +210,8 @@ ite_newsize(struct ite_softc *ip, struct itewinsize *winsz)
 	vs.width = winsz->width;
 	vs.height = winsz->height;
 	vs.depth = winsz->depth;
-	error = viewioctl(0, VIOCSSIZE, (caddr_t)&vs, -1, NULL); /* XXX type of vs ? */
+	/* XXX type of vs ? */
+	error = (*view_cdevsw.d_ioctl)(0, VIOCSSIZE, (caddr_t)&vs, -1, NULL);
 
 	/*
 	 * Reinitialize our structs
@@ -315,6 +317,8 @@ ite_grf_ioctl(struct ite_softc *ip, u_long cmd, caddr_t addr, int flag,
 {
 	struct winsize ws;
 	struct itewinsize *is;
+	extern const struct cdevsw ite_cdevsw;
+	extern const struct cdevsw view_cdevsw;
 	ipriv_t *cci;
 	int error;
 
@@ -345,7 +349,8 @@ ite_grf_ioctl(struct ite_softc *ip, u_long cmd, caddr_t addr, int flag,
 			 * XXX tell tty about the change
 			 * XXX this is messy, but works
 			 */
-			iteioctl(0, TIOCSWINSZ, (caddr_t)&ws, 0, p);
+			(*ite_cdevsw.d_ioctl)(0, TIOCSWINSZ,
+					      (caddr_t)&ws, 0, p);
 		}
 		break;
 	case ITEIOCDSPWIN:
@@ -361,7 +366,7 @@ ite_grf_ioctl(struct ite_softc *ip, u_long cmd, caddr_t addr, int flag,
 		 * XXX watchout for that -1 its not really the kernel talking
 		 * XXX these two commands don't use the proc pointer though
 		 */
-		error = viewioctl(0, cmd, addr, -1, p);
+		error = (*view_cdevsw.d_ioctl)(0, cmd, addr, -1, p);
 		break;
 	default:
 		error = EPASSTHROUGH;
@@ -697,7 +702,7 @@ clear8(struct ite_softc *ip, int sy, int sx, int h, int w)
 	  for (i=0; i < ip->ftheight; i++) {
             bzero(ptr, bm->bytes_per_row);
             ptr += bm->bytes_per_row + bm->row_mod;			/* don't get any smart
-                                                   ideas, becuase this is for
+                                                   ideas, because this is for
                                                    interleaved bitmaps */
           }
 	  sy++;

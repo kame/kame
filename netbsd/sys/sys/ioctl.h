@@ -1,4 +1,4 @@
-/*	$NetBSD: ioctl.h,v 1.30 2001/06/11 01:50:57 wiz Exp $	*/
+/*	$NetBSD: ioctl.h,v 1.32 2003/08/07 16:34:05 agc Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1990, 1993, 1994
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -111,10 +107,11 @@ __END_DECLS
 #include "opt_compat_svr4.h"
 #include "opt_compat_43.h"
 #include "opt_compat_osf1.h"
+#include "opt_compat_ibcs2.h"
 #endif
 
 #if defined(USE_OLD_TTY) || defined(COMPAT_43) || defined(COMPAT_SUNOS) || \
     defined(COMPAT_SVR4) || defined(COMPAT_FREEBSD) || defined(COMPAT_OSF1) || \
-    defined(LKM)
+    defined(COMPAT_IBCS2) || defined(LKM)
 #include <sys/ioctl_compat.h>
 #endif

@@ -1,4 +1,4 @@
-/* $NetBSD: ttwoga.c,v 1.2 2002/05/16 01:01:32 thorpej Exp $ */
+/* $NetBSD: ttwoga.c,v 1.7 2003/06/15 23:08:55 fvdl Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: ttwoga.c,v 1.2 2002/05/16 01:01:32 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ttwoga.c,v 1.7 2003/06/15 23:08:55 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -70,18 +70,16 @@ __KERNEL_RCSID(0, "$NetBSD: ttwoga.c,v 1.2 2002/05/16 01:01:32 thorpej Exp $");
 int	ttwogamatch(struct device *, struct cfdata *, void *);
 void	ttwogaattach(struct device *, struct device *, void *);
 
-struct cfattach ttwoga_ca = {
-	sizeof(struct device), ttwogamatch, ttwogaattach
-};
+CFATTACH_DECL(ttwoga, sizeof(struct device),
+    ttwogamatch, ttwogaattach, NULL, NULL);
 
 int	ttwogaprint(void *, const char *);
 
 int	ttwopcimatch(struct device *, struct cfdata *, void *);
 void	ttwopciattach(struct device *, struct device *, void *);
 
-struct cfattach ttwopci_ca = {
-	sizeof(struct device), ttwopcimatch, ttwopciattach
-};
+CFATTACH_DECL(ttwopci, sizeof(struct device),
+    ttwopcimatch, ttwopciattach, NULL, NULL);
 
 int	ttwopciprint(void *, const char *);
 
@@ -120,7 +118,7 @@ ttwogamatch(struct device *parent, struct cfdata *match, void *aux)
 	struct mainbus_attach_args *ma = aux;
 
 	/* Make sure that we're looking for a T2 Gate Array. */
-	if (strcmp(ma->ma_name, match->cf_driver->cd_name) != 0)
+	if (strcmp(ma->ma_name, match->cf_name) != 0)
 		return (0);
 
 	if (ttwogafound)
@@ -163,8 +161,8 @@ ttwogaprint(void *aux, const char *pnp)
 	struct pcibus_attach_args *pba = aux;
 
 	if (pnp)
-		printf("%s at %s", pba->pba_busname, pnp);
-	printf(" hose %d", pba->pba_bus);
+		aprint_normal("%s at %s", pba->pba_busname, pnp);
+	aprint_normal(" hose %d", pba->pba_bus);
 	return (UNCONF);
 }
 
@@ -217,7 +215,7 @@ ttwopcimatch(struct device *parent, struct cfdata *match, void *aux)
 {
 	struct pcibus_attach_args *pba = aux;
 
-	if (strcmp(pba->pba_busname, match->cf_driver->cd_name) != 0)
+	if (strcmp(pba->pba_busname, match->cf_name) != 0)
 		return (0);
 
 	if (match->cf_loc[PCIBUSCF_BUS] != PCIBUSCF_BUS_DEFAULT &&
@@ -266,6 +264,7 @@ ttwopciattach(struct device *parent, struct device *self, void *aux)
 	npba.pba_memt = &tcp->tc_memt;
 	npba.pba_dmat =
 	    alphabus_dma_get_tag(&tcp->tc_dmat_direct, ALPHA_BUS_PCI);
+	npba.pba_dmat64 = NULL;
 	npba.pba_pc = &tcp->tc_pc;
 	npba.pba_bus = 0;
 	npba.pba_bridgetag = NULL;
@@ -289,7 +288,7 @@ ttwopciprint(void *aux, const char *pnp)
 	struct pcibus_attach_args *pba = aux;
 
 	if (pnp)
-		printf("%s at %s", pba->pba_busname, pnp);
-	printf(" bus %d", pba->pba_bus);
+		aprint_normal("%s at %s", pba->pba_busname, pnp);
+	aprint_normal(" bus %d", pba->pba_bus);
 	return (UNCONF);
 }

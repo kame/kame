@@ -1,7 +1,7 @@
-/*	$NetBSD: lfs_debug.c,v 1.16 2002/05/14 20:03:53 perseant Exp $	*/
+/*	$NetBSD: lfs_debug.c,v 1.24 2003/10/30 01:43:10 simonb Exp $	*/
 
 /*-
- * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
+ * Copyright (c) 1999, 2000, 2001, 2002, 2003 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -17,8 +17,8 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *      This product includes software developed by the NetBSD
- *      Foundation, Inc. and its contributors.
+ *	This product includes software developed by the NetBSD
+ *	Foundation, Inc. and its contributors.
  * 4. Neither the name of The NetBSD Foundation nor the names of its
  *    contributors may be used to endorse or promote products derived
  *    from this software without specific prior written permission.
@@ -47,11 +47,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -73,7 +69,7 @@
 #ifdef DEBUG
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: lfs_debug.c,v 1.16 2002/05/14 20:03:53 perseant Exp $");
+__KERNEL_RCSID(0, "$NetBSD: lfs_debug.c,v 1.24 2003/10/30 01:43:10 simonb Exp $");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/namei.h>
@@ -90,13 +86,13 @@ struct lfs_log_entry lfs_log[LFS_LOGLENGTH];
 
 int lfs_bwrite_log(struct buf *bp, char *file, int line)
 {
-        struct vop_bwrite_args a;
-        a.a_desc = VDESC(vop_bwrite);
-        a.a_bp = bp;
+	struct vop_bwrite_args a;
+	a.a_desc = VDESC(vop_bwrite);
+	a.a_bp = bp;
 
 	if (!(bp->b_flags & (B_DELWRI | B_GATHERED)))
 		LFS_ENTER_LOG("write", file, line, bp->b_lblkno, bp->b_flags);
-        return (VCALL(bp->b_vp, VOFFSET(vop_bwrite), &a));
+	return (VCALL(bp->b_vp, VOFFSET(vop_bwrite), &a));
 }
 
 void lfs_dumplog(void)
@@ -105,7 +101,7 @@ void lfs_dumplog(void)
 
 	for (i = lfs_lognum; i != (lfs_lognum - 1) % LFS_LOGLENGTH; i = (i + 1) % LFS_LOGLENGTH)
 		if (lfs_log[i].file) {
-			printf("lbn %d %s %lx %d %s\n",
+			printf("lbn %" PRId64 " %s %lx %d %s\n",
 				lfs_log[i].block,
 				lfs_log[i].op,
 				lfs_log[i].flags,
@@ -167,7 +163,7 @@ lfs_dump_super(struct lfs *lfsp)
 	
 	printf("Checkpoint Info\n");
 	printf("%s%d\t%s%x\t%s%d\n",
-	       "free	 ", lfsp->lfs_free,
+	       "freehd	 ", lfsp->lfs_freehd,
 	       "idaddr	 ", lfsp->lfs_idaddr,
 	       "ifile	 ", lfsp->lfs_ifile);
 	printf("%s%x\t%s%d\t%s%x\t%s%x\t%s%x\t%s%x\n",
@@ -181,7 +177,7 @@ lfs_dump_super(struct lfs *lfsp)
 }
 
 void
-lfs_dump_dinode(struct dinode *dip)
+lfs_dump_dinode(struct ufs1_dinode *dip)
 {
 	int i;
 	
@@ -207,15 +203,15 @@ lfs_dump_dinode(struct dinode *dip)
 void
 lfs_check_segsum(struct lfs *fs, struct segment *sp, char *file, int line)
 {
-	int actual, i;
+	int actual;
 #if 0
 	static int offset; 
 #endif
 	
-	if ((actual = i = 1) == 1)
+	if ((actual = 1) == 1)
 		return; /* XXXX not checking this anymore, really */
 	
-	if (sp->sum_bytes_left >= sizeof(FINFO) - sizeof(ufs_daddr_t)
+	if (sp->sum_bytes_left >= FINFOSIZE
 	   && sp->fip->fi_nblocks > 512) {
 		printf("%s:%d: fi_nblocks = %d\n",file,line,sp->fip->fi_nblocks);
 #ifdef DDB
@@ -233,7 +229,7 @@ lfs_check_segsum(struct lfs *fs, struct segment *sp, char *file, int line)
 		/* amount taken up by FINFOs */
 		- ((char *)&(sp->fip->fi_blocks[sp->fip->fi_nblocks]) - (char *)(sp->segsum))
 			/* amount taken up by inode blocks */
-			- sizeof(ufs_daddr_t)*((sp->ninodes+INOPB(fs)-1) / INOPB(fs));
+			- sizeof(int32_t)*((sp->ninodes+INOPB(fs)-1) / INOPB(fs));
 #if 0
 	if (actual - sp->sum_bytes_left < offset) 
 	{  
@@ -252,7 +248,7 @@ lfs_check_segsum(struct lfs *fs, struct segment *sp, char *file, int line)
 #endif
 	if (sp->sum_bytes_left > 0
 	   && ((char *)(sp->segsum))[fs->lfs_sumsize
-				     - sizeof(ufs_daddr_t) * ((sp->ninodes+INOPB(fs)-1) / INOPB(fs))
+				     - sizeof(int32_t) * ((sp->ninodes+INOPB(fs)-1) / INOPB(fs))
 				     - sp->sum_bytes_left] != '\0') {
 		printf("%s:%d: warning: segsum overwrite at %d (-%d => %d)\n",
 		       file, line, sp->sum_bytes_left,
@@ -276,13 +272,14 @@ lfs_check_bpp(struct lfs *fs, struct segment *sp, char *file, int line)
 	for (bpp = sp->bpp; bpp < sp->cbpp; bpp++) {
 		if ((*bpp)->b_blkno != blkno) {
 			if ((*bpp)->b_vp == devvp) {
-				printf("Oops, would misplace raw block 0x%x at "
-				       "0x%x\n",
+				printf("Oops, would misplace raw block "
+				       "0x%" PRIx64 " at 0x%" PRIx64 "\n",
 				       (*bpp)->b_blkno,
 				       blkno);
 			} else {
-				printf("%s:%d: misplace ino %d lbn %d at "
-				       "0x%x instead of 0x%x\n",
+				printf("%s:%d: misplace ino %d lbn %" PRId64
+				       " at 0x%" PRIx64 " instead of "
+				       "0x%" PRIx64 "\n",
 				       file, line,
 				       VTOI((*bpp)->b_vp)->i_number, (*bpp)->b_lblkno,
 				       blkno,

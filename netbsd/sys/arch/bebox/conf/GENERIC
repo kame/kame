@@ -1,4 +1,4 @@
-# $NetBSD: GENERIC,v 1.55.4.1 2002/08/01 04:17:57 lukem Exp $
+# $NetBSD: GENERIC,v 1.69.2.2 2004/07/15 20:17:54 he Exp $
 #
 # GENERIC machine description file
 # 
@@ -22,7 +22,7 @@ include 	"arch/bebox/conf/std.bebox"
 
 options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
-#ident 		"GENERIC-$Revision: 1.55.4.1 $"
+#ident 		"GENERIC-$Revision: 1.69.2.2 $"
 
 maxusers	32
 
@@ -39,8 +39,14 @@ options 	TRAP_PANICWAIT
 options 	DDB
 #options 	DDB_HISTORY_SIZE=100	# Enable history editing in DDB
 options 	KTRACE
-#options 	USERCONF		# userconf(4) support
+options 	SYSTRACE		# system call vetting via systrace(1)
+options 	USERCONF		# userconf(4) support
 #options	PIPE_SOCKETPAIR		# smaller, but slower pipe(2)
+options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
+
+# Enable experimental buffer queue strategy for better responsiveness under 
+# high disk I/O load. Use it with caution - it's not proven to be stable yet.
+#options 	NEW_BUFQ_STRATEGY
 
 #options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 options 	COMPAT_43
@@ -78,10 +84,25 @@ options 	INET6		# IPV6
 
 #options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 
+#options 	ALTQ		# Manipulate network interfaces' output queues
+#options 	ALTQ_BLUE	# Stochastic Fair Blue
+#options 	ALTQ_CBQ	# Class-Based Queueing
+#options 	ALTQ_CDNR	# Diffserv Traffic Conditioner
+#options 	ALTQ_FIFOQ	# First-In First-Out Queue
+#options 	ALTQ_FLOWVALVE	# RED/flow-valve (red-penalty-box)
+#options 	ALTQ_HFSC	# Hierarchical Fair Service Curve
+#options 	ALTQ_LOCALQ	# Local queueing discipline
+#options 	ALTQ_PRIQ	# Priority Queueing
+#options 	ALTQ_RED	# Random Early Detection
+#options 	ALTQ_RIO	# RED with IN/OUT
+#options 	ALTQ_WFQ	# Weighted Fair Queueing
+
 options 	NFS_BOOT_BOOTPARAM,NFS_BOOT_BOOTP
 
 config		netbsd	root on ? type ?
 
+#pseudo-device 	crypto			# opencrypto framework
+#pseudo-device	cgd		4	# cryptographic disk devices
 pseudo-device	vnd		4
 pseudo-device	loop
 pseudo-device	bpfilter	8	# packet filter
@@ -91,6 +112,7 @@ pseudo-device	gif		4	# IPv[46] over IPv[46] tunnel (RFC1933)
 pseudo-device	vlan			# IEEE 802.1q encapsulation
 pseudo-device	pppoe			# PPP over Ethernet (RFC 2516)
 pseudo-device	bridge			# simple inter-network bridging
+#options	BRIDGE_IPF		# bridge uses IP/IPv6 pfil hooks too
 pseudo-device	pty			# pseudo-terminals
 pseudo-device	raid		8	# RAIDframe disk driver
 options 	RAID_AUTOCONFIG		# auto-configuration of RAID components
@@ -109,6 +131,7 @@ pseudo-device	clockctl		# user control of clock subsystem
 # random number generator pseudo-device
 pseudo-device	rnd			# /dev/random and in-kernel generator
 #options 	RND_COM			# use "com" randomness as well (BROKEN)
+pseudo-device	ksyms			# /dev/ksyms
 
 #
 # device
@@ -158,8 +181,16 @@ wsdisplay*	at pfb? console ?
 wskbd*		at pckbd? console ?
 #wsmouse*	at pms? mux 0
 
+# Cryptographic Devices
+
+# PCI cryptographic devices
+#hifn*	at pci? dev ? function ?	# Hifn 7755/7811/795x
+#ubsec*	at pci? dev ? function ?	# Broadcom 5501/5601/580x/582x
+
 #siop*	at pci? dev ? function ?	# NCR 538XX SCSI controllers
 #scsibus* at siop?
+#esiop*	at pci? dev ? function ?	# NCR 53875 and newer SCSI controllers
+#scsibus* at esiop?
 
 #sd*	at scsibus? target ? lun ?	# SCSI disk drives
 #st*	at scsibus? target ? lun ?	# SCSI tape drives
@@ -174,7 +205,8 @@ fd0	at fdc? drive 1
 #fd*	at fdc? drive ?
 
 wdc0	at isa? port 0x1f0 irq 14	# ST506, ESDI, and IDE controllers
-wd*	at wdc? drive ?
+atabus* at ata?
+wd*	at atabus? drive ?
 
 ne0	at isa? port 0x300 irq 5	# NE[12]000 ethernet cards
 #ipkdbif0 at ne?

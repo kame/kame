@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu_mainbus.c,v 1.3 2002/01/05 22:41:48 chris Exp $	*/
+/*	$NetBSD: cpu_mainbus.c,v 1.7 2003/07/15 00:24:47 lukem Exp $	*/
 
 /*
  * Copyright (c) 1995 Mark Brinicombe.
@@ -41,15 +41,18 @@
  * Created      : 10/10/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cpu_mainbus.c,v 1.7 2003/07/15 00:24:47 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/device.h>
 #include <sys/proc.h>
 #if 0
+#include <sys/conf.h>
 #include <uvm/uvm_extern.h>
 #include <machine/io.h>
-#include <machine/conf.h>
 #endif
 #include <machine/cpu.h>
 #if 0
@@ -94,6 +97,5 @@ cpu_mainbus_attach(parent, self, aux)
 	cpu_attach(self);
 }
 
-struct cfattach cpu_mainbus_ca = {
-	sizeof(struct device), cpu_mainbus_match, cpu_mainbus_attach
-};
+CFATTACH_DECL(cpu_mainbus, sizeof(struct device),
+    cpu_mainbus_match, cpu_mainbus_attach, NULL, NULL);

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_tlp_ap.c,v 1.2 2001/11/14 18:15:30 thorpej Exp $	*/
+/*	$NetBSD: if_tlp_ap.c,v 1.6 2003/07/15 02:59:28 lukem Exp $	*/
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_tlp_ap.c,v 1.6 2003/07/15 02:59:28 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -87,9 +90,8 @@ struct tulip_ap_softc {
 static int	tlp_ap_match __P((struct device *, struct cfdata *, void *));
 static void	tlp_ap_attach __P((struct device *, struct device *, void *));
 
-struct cfattach tlp_ap_ca = {
-	sizeof(struct tulip_ap_softc), tlp_ap_match, tlp_ap_attach
-};
+CFATTACH_DECL(tlp_ap, sizeof(struct tulip_ap_softc),
+    tlp_ap_match, tlp_ap_attach, NULL, NULL);
 
 static void tlp_ap_preinit __P((struct tulip_softc *));
 static void tlp_ap_tmsw_init __P((struct tulip_softc *));
@@ -210,8 +212,8 @@ tlp_ap_attach(parent, self, aux)
 		TULIP_WRITE(sc, CSR_GPP, 0xce);
 	}
 	TULIP_WRITE(sc, CSR_GPP, GPP_GPC | 0xcf);	/* read write */
-	TULIP_WRITE(sc, CSR_GPP, 0xc3);			/* mask abort/dma err */
-	TULIP_WRITE(sc, CSR_GPP, 0xcf);			/* mask abort/dma err */
+	TULIP_WRITE(sc, CSR_GPP, 0xc3);			/* mask abort/DMA err */
+	TULIP_WRITE(sc, CSR_GPP, 0xcf);			/* mask abort/DMA err */
 
 	if (tlp_read_srom(sc) == 0) {
 		printf("%s: srom read failed\n", sc->sc_dev.dv_xname);

@@ -1,4 +1,4 @@
-/*	$NetBSD: cgeight.c,v 1.26 2002/03/11 16:27:01 pk Exp $	*/
+/*	$NetBSD: cgeight.c,v 1.40 2003/12/10 12:06:25 agc Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -37,7 +37,6 @@
  */
 
 /*
- * Copyright (c) 1995 Theo de Raadt
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -58,11 +57,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -82,12 +77,39 @@
  */
 
 /*
+ * Copyright (c) 1995 Theo de Raadt.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/*
  * color display (cgeight) driver.
  *
  * Does not handle interrupts, even though they can occur.
  *
  * XXX should defer colormap updates to vertical retrace interrupts
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cgeight.c,v 1.40 2003/12/10 12:06:25 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -99,10 +121,10 @@
 #include <sys/tty.h>
 #include <sys/conf.h>
 
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/eeprom.h>
-#include <machine/conf.h>
 
 #include <dev/sun/fbio.h>
 #include <dev/sun/fbvar.h>
@@ -130,20 +152,25 @@ static void	cgeightunblank __P((struct device *));
 
 static int	cg8_pfour_probe __P((void *, void *));
 
-/* cdevsw prototypes */
-cdev_decl(cgeight);
-
-struct cfattach cgeight_ca = {
-	sizeof(struct cgeight_softc), cgeightmatch, cgeightattach
-};
+CFATTACH_DECL(cgeight, sizeof(struct cgeight_softc),
+    cgeightmatch, cgeightattach, NULL, NULL);
 
 extern struct cfdriver cgeight_cd;
+
+dev_type_open(cgeightopen);
+dev_type_ioctl(cgeightioctl);
+dev_type_mmap(cgeightmmap);
+
+const struct cdevsw cgeight_cdevsw = {
+	cgeightopen, nullclose, noread, nowrite, cgeightioctl,
+	nostop, notty, nopoll, cgeightmmap, nokqfilter
+};
 
 #if defined(SUN4)
 /* frame buffer generic driver */
 static struct fbdriver cgeightfbdriver = {
-	cgeightunblank, cgeightopen, cgeightclose, cgeightioctl, 
-	cgeightpoll, cgeightmmap
+	cgeightunblank, cgeightopen, nullclose, cgeightioctl, 
+	nopoll, cgeightmmap, nokqfilter
 };
 
 static void cgeightloadcmap __P((struct cgeight_softc *, int, int));
@@ -249,7 +276,7 @@ cgeightattach(parent, self, aux)
 	 * we let the bwtwo driver pick up the overlay plane and
 	 * use it instead.  Rconsole should have better performance
 	 * with the 1-bit depth.
-	 *      -- Jason R. Thorpe <thorpej@NetBSD.ORG>
+	 *      -- Jason R. Thorpe <thorpej@NetBSD.org>
 	 */
 
 	/*
@@ -323,16 +350,6 @@ cgeightopen(dev, flags, mode, p)
 }
 
 int
-cgeightclose(dev, flags, mode, p)
-	dev_t dev;
-	int flags, mode;
-	struct proc *p;
-{
-
-	return (0);
-}
-
-int
 cgeightioctl(dev, cmd, data, flags, p)
 	dev_t dev;
 	u_long cmd;
@@ -393,24 +410,14 @@ cgeightioctl(dev, cmd, data, flags, p)
 	return (0);
 }
 
-int
-cgeightpoll(dev, events, p)
-	dev_t dev;
-	int events;
-	struct proc *p;
-{
-
-	return (seltrue(dev, events, p));
-}
-
 /*
  * Return the address that would map the given device at the given
  * offset, allowing for the given protection, or return -1 for error.
  *
  * The cg8 maps it's overlay plane at 0 for 128K, followed by the
  * enable plane for 128K, followed by the colour for as long as it
- * goes. Starting at 8MB, it maps the ramdac for NBPG, then the p4
- * register for NBPG, then the bootrom for 0x40000.
+ * goes. Starting at 8MB, it maps the ramdac for PAGE_SIZE, then the p4
+ * register for PAGE_SIZE, then the bootrom for 0x40000.
  */
 paddr_t
 cgeightmmap(dev, off, prot)
@@ -472,17 +479,17 @@ cgeightmmap(dev, off, prot)
 		 * colour map (Brooktree)
 		 */
 		poff = PFOUR_COLOR_OFF_CMAP;
-	} else if ((u_int)off == START_SPECIAL + NBPG) {
+	} else if ((u_int)off == START_SPECIAL + PAGE_SIZE) {
 		/*
 		 * p4 register
 		 */
 		poff = 0;
-	} else if ((u_int)off > (START_SPECIAL + (NBPG * 2)) &&
-	    (u_int) off < (START_SPECIAL + (NBPG * 2) + PROMSIZE)) {
+	} else if ((u_int)off > (START_SPECIAL + (PAGE_SIZE * 2)) &&
+	    (u_int) off < (START_SPECIAL + (PAGE_SIZE * 2) + PROMSIZE)) {
 		/*
 		 * rom
 		 */
-		poff = 0x8000 + (off - (START_SPECIAL + (NBPG * 2)));
+		poff = 0x8000 + (off - (START_SPECIAL + (PAGE_SIZE * 2)));
 	} else
 		return (-1);
 

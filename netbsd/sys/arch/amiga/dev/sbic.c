@@ -1,9 +1,41 @@
-/*	$NetBSD: sbic.c,v 1.46.10.1 2002/05/30 21:23:58 tv Exp $ */
+/*	$NetBSD: sbic.c,v 1.53 2003/08/07 16:26:43 agc Exp $ */
+
+/*
+ * Copyright (c) 1990 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Van Jacobson of Lawrence Berkeley Laboratory.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)scsi.c	7.5 (Berkeley) 5/4/91
+ */
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
- * Copyright (c) 1990 The Regents of the University of California.
- * All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * Van Jacobson of Lawrence Berkeley Laboratory.
@@ -46,14 +78,13 @@
 #include "opt_ddb.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sbic.c,v 1.46.10.1 2002/05/30 21:23:58 tv Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sbic.c,v 1.53 2003/08/07 16:26:43 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/kernel.h> /* For hz */
 #include <sys/disklabel.h>
-#include <sys/dkstat.h>
 #include <sys/buf.h>
 #include <dev/scsipi/scsi_all.h>
 #include <dev/scsipi/scsipi_all.h>
@@ -315,10 +346,10 @@ sbic_load_ptrs(struct sbic_softc *dev, sbic_regmap_t regs, int target, int lun)
 
 		vaddr = acb->sc_kv.dc_addr;
 		count = acb->sc_kv.dc_count;
-		for(count = (NBPG - ((int)vaddr & PGOFSET));
+		for(count = (PAGE_SIZE - ((int)vaddr & PGOFSET));
 		    count < acb->sc_kv.dc_count
 		    && (char*)kvtop(vaddr + count + 4) == paddr + count + 4;
-		    count += NBPG);
+		    count += PAGE_SIZE);
 		/* If it's all contiguous... */
 		if(count > acb->sc_kv.dc_count ) {
 			count = acb->sc_kv.dc_count;
@@ -632,7 +663,7 @@ sbicdmaok(struct sbic_softc *dev, struct scsipi_xfer *xs)
 	else if ((dev->sc_flags & SBICF_BADDMA) == 0)
 		return(1);
 	/*
-	 * this address is ok for dma?
+	 * this address is ok for DMA?
 	 */
 	else if (sbiccheckdmap(xs->data, xs->datalen, dev->sc_dmamask) == 0)
 		return(1);
@@ -1336,7 +1367,7 @@ sbicicmd(struct sbic_softc *dev, int target, int lun, void *cbuf, int clen,
 
 		wait = sbic_cmd_wait;
 
-		asr = GET_SBIC_asr (regs, asr);
+		GET_SBIC_asr (regs, asr);
 		GET_SBIC_csr (regs, csr);
 		CSR_TRACE('I',csr,asr,target);
 		QPRINTF((">ASR:%02xCSR:%02x<", asr, csr));
@@ -1631,7 +1662,7 @@ sbicgo(struct sbic_softc *dev, struct scsipi_xfer *xs)
 	if (count && usedma && dev->sc_flags & SBICF_BADDMA &&
 	    sbiccheckdmap(addr, count, dev->sc_dmamask)) {
 		/*
-		 * need to bounce the dma.
+		 * need to bounce the DMA.
 		 */
 		if (dmaflags & DMAGO_READ) {
 			acb->flags |= ACB_BBUF;
@@ -1658,7 +1689,7 @@ sbicgo(struct sbic_softc *dev, struct scsipi_xfer *xs)
 				       dev->target,
 				       kvtop(dev->sc_tinfo[dev->target].bounce));
 			}
-		} else {	/* write: copy to dma buffer */
+		} else {	/* write: copy to DMA buffer */
 #ifdef DEBUG
 			if(data_pointer_debug)
 			printf("sbicgo: copying %x bytes to target %d bounce %x\n",
@@ -1667,7 +1698,7 @@ sbicgo(struct sbic_softc *dev, struct scsipi_xfer *xs)
 #endif
 			bcopy (addr, dev->sc_tinfo[dev->target].bounce, count);
 		}
-		addr = dev->sc_tinfo[dev->target].bounce;/* and use dma buffer */
+		addr = dev->sc_tinfo[dev->target].bounce;/* and use DMA buffer */
 		acb->sc_kv.dc_addr = addr;
 #ifdef DEBUG
 		++sbicdma_bounces;		/* count number of bounced */
@@ -1737,7 +1768,7 @@ sbicgo(struct sbic_softc *dev, struct scsipi_xfer *xs)
 	 * Lets cycle a while then let the interrupt handler take over
 	 */
 
-	asr = GET_SBIC_asr(regs, asr);
+	GET_SBIC_asr(regs, asr);
 	do {
 		GET_SBIC_csr(regs, csr);
 		CSR_TRACE('g',csr,asr,dev->target);
@@ -1906,7 +1937,7 @@ sbicmsgin(struct sbic_softc *dev)
 	recvlen = 1;
 	do {
 		while( recvlen-- ) {
-			asr = GET_SBIC_asr(regs, asr);
+			GET_SBIC_asr(regs, asr);
 			GET_SBIC_csr(regs, csr);
 			QPRINTF(("sbicmsgin ready to go (csr,asr)=(%02x,%02x)\n",
 				 csr, asr));
@@ -1958,7 +1989,7 @@ sbicmsgin(struct sbic_softc *dev)
 					      !(asr & SBIC_ASR_DBR|SBIC_ASR_INT) )
 						GET_SBIC_asr(regs, asr);
 					if( asr & SBIC_ASR_DBR )
-						panic("msgin: jammed again!\n");
+						panic("msgin: jammed again!");
 					GET_SBIC_csr(regs, csr);
 					CSR_TRACE('e',csr,asr,dev->target);
 					if( csr & 0x07 != MESG_OUT_PHASE ) {
@@ -2271,13 +2302,13 @@ sbicnextstate(struct sbic_softc *dev, u_char csr, u_char asr)
 				goto abort;
 			}
 			/*
-			 * do scatter-gather dma
+			 * do scatter-gather DMA
 			 * hacking the controller chip, ouch..
 			 */
 			SET_SBIC_control(regs, SBIC_CTL_EDI | SBIC_CTL_IDI |
 					 SBIC_MACHINE_DMA_MODE);
 			/*
-			 * set next dma addr and dec count
+			 * set next DMA addr and dec count
 			 */
 #if 0
 			SBIC_TC_GET(regs, tcnt);
@@ -2520,7 +2551,7 @@ sbiccheckdmap(void *bp, u_long len, u_long mask)
 
 	while (len) {
 		phy_buf = kvtop(buffer);
-		if (len < (phy_len = NBPG - ((int) buffer & PGOFSET)))
+		if (len < (phy_len = PAGE_SIZE - ((int) buffer & PGOFSET)))
 			phy_len = len;
 		if (phy_buf & mask)
 			return(1);
@@ -2596,7 +2627,7 @@ sbictimeout(struct sbic_softc *dev)
 	s = splbio();
 	if (dev->sc_dmatimo) {
 		if (dev->sc_dmatimo > 1) {
-			printf("%s: dma timeout #%d\n",
+			printf("%s: DMA timeout #%d\n",
 			    dev->sc_dev.dv_xname, dev->sc_dmatimo - 1);
 			GET_SBIC_asr(dev->sc_sbic, asr);
 			if( asr & SBIC_ASR_INT ) {

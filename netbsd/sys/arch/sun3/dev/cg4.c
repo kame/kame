@@ -1,4 +1,4 @@
-/*	$NetBSD: cg4.c,v 1.23.14.1 2002/08/07 01:32:11 lukem Exp $	*/
+/*	$NetBSD: cg4.c,v 1.31 2003/08/07 16:29:54 agc Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -57,6 +53,9 @@
  * Make this driver handle video interrupts.
  * Defer colormap updates to vertical retrace interrupts.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cg4.c,v 1.31 2003/08/07 16:29:54 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -90,8 +89,6 @@ union bt_cmap_u {
 #define CG4_TYPE_A 0	/* AMD DACs */
 #define CG4_TYPE_B 1	/* Brooktree DACs */
 
-cdev_decl(cg4);
-
 #define	CG4_MMAP_SIZE (CG4_OVERLAY_SIZE + CG4_ENABLE_SIZE + CG4_PIXMAP_SIZE)
 
 #define CMAP_SIZE 256
@@ -120,11 +117,19 @@ struct cg4_softc {
 static void	cg4attach __P((struct device *, struct device *, void *));
 static int	cg4match __P((struct device *, struct cfdata *, void *));
 
-struct cfattach cgfour_ca = {
-	sizeof(struct cg4_softc), cg4match, cg4attach
-};
+CFATTACH_DECL(cgfour, sizeof(struct cg4_softc),
+    cg4match, cg4attach, NULL, NULL);
 
 extern struct cfdriver cgfour_cd;
+
+dev_type_open(cg4open);
+dev_type_ioctl(cg4ioctl);
+dev_type_mmap(cg4mmap);
+
+const struct cdevsw cgfour_cdevsw = {
+	cg4open, nullclose, noread, nowrite, cg4ioctl,
+	nostop, notty, nopoll, cg4mmap, nokqfilter,
+};
 
 static int	cg4gattr   __P((struct fbdevice *, void *));
 static int	cg4gvideo  __P((struct fbdevice *, void *));
@@ -141,7 +146,7 @@ static void	cg4b_init   __P((struct cg4_softc *));
 static void	cg4b_ldcmap __P((struct cg4_softc *));
 
 static struct fbdriver cg4_fbdriver = {
-	cg4open, cg4close, cg4mmap, cg4gattr,
+	cg4open, nullclose, cg4mmap, nokqfilter, cg4gattr,
 	cg4gvideo, cg4svideo,
 	cg4getcmap, cg4putcmap };
 
@@ -334,16 +339,6 @@ cg4open(dev, flags, mode, p)
 
 	if (unit >= cgfour_cd.cd_ndevs || cgfour_cd.cd_devs[unit] == NULL)
 		return (ENXIO);
-	return (0);
-}
-
-int
-cg4close(dev, flags, mode, p)
-	dev_t dev;
-	int flags, mode;
-	struct proc *p;
-{
-
 	return (0);
 }
 

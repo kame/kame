@@ -1,4 +1,4 @@
-/*	$NetBSD: par.c,v 1.12 2000/06/11 14:20:45 minoura Exp $	*/
+/*	$NetBSD: par.c,v 1.21 2003/11/01 12:53:33 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 1982, 1990 The Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,6 +34,9 @@
 /*
  * parallel port interface
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: par.c,v 1.21 2003/11/01 12:53:33 jdolecek Exp $");
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -109,16 +108,23 @@ int	pardebug = 0;
 #endif
 #endif
 
-cdev_decl(par);
-
 int parmatch __P((struct device *, struct cfdata *, void *));
 void parattach __P((struct device *, struct device *, void *));
 
-struct cfattach par_ca = {
-	sizeof(struct par_softc), parmatch, parattach
-};
+CFATTACH_DECL(par, sizeof(struct par_softc),
+    parmatch, parattach, NULL, NULL);
 
 extern struct cfdriver par_cd;
+
+dev_type_open(paropen);
+dev_type_close(parclose);
+dev_type_write(parwrite);
+dev_type_ioctl(parioctl);
+
+const struct cdevsw par_cdevsw = {
+	paropen, parclose, noread, parwrite, parioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
 
 int
 parmatch(pdp, cfp, aux)
@@ -152,7 +158,7 @@ parattach(pdp, dp, aux)
 	struct device *pdp, *dp;
 	void *aux;
 {
-	register struct par_softc *sc = (struct par_softc *)dp;
+	struct par_softc *sc = (struct par_softc *)dp;
 	struct intio_attach_args *ia = aux;
 	int r;
 	
@@ -190,8 +196,8 @@ paropen(dev, flags, mode, p)
 	int flags, mode;
 	struct proc *p;
 {
-	register int unit = UNIT(dev);
-	register struct par_softc *sc;
+	int unit = UNIT(dev);
+	struct par_softc *sc;
 	
 	if (unit != 0)
 		return(ENXIO);
@@ -279,12 +285,13 @@ parwrite(dev, uio, flag)
 int
 parrw(dev, uio)
 	dev_t dev;
-	register struct uio *uio;
+	struct uio *uio;
 {
 	int unit = UNIT(dev);
-	register struct par_softc *sc = par_cd.cd_devs[unit];
-	register int s, len, cnt;
-	register char *cp;
+	struct par_softc *sc = par_cd.cd_devs[unit];
+	int len=0xdeadbeef;	/* XXX: shutup gcc */
+	int s, cnt=0;
+	char *cp;
 	int error = 0;
 	int buflen;
 	char *buf;
@@ -389,6 +396,10 @@ parrw(dev, uio)
 	/*
 	 * Adjust for those chars that we uiomove'ed but never wrote
 	 */
+	/*
+	 * XXXjdolecek: this len usage is wrong, this will be incorrect
+	 * if the transfer size is longer than sc_burst
+	 */
 	if (uio->uio_rw == UIO_WRITE && cnt != len) {
 		uio->uio_resid += (len - cnt);
 #ifdef DEBUG
@@ -448,7 +459,7 @@ parhztoms(h)
 	int h;
 {
 	extern int hz;
-	register int m = h;
+	int m = h;
 	
 	if (m > 0)
 		m = m * 1000 / hz;
@@ -460,7 +471,7 @@ parmstohz(m)
 	int m;
 {
 	extern int hz;
-	register int h = m;
+	int h = m;
 	
 	if (h > 0) {
 		h = h * hz / 1000;

@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_unix.c,v 1.26 2001/12/08 00:35:34 thorpej Exp $	*/
+/*	$NetBSD: uvm_unix.c,v 1.29 2003/08/24 17:52:48 chs Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -50,7 +50,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_unix.c,v 1.26 2001/12/08 00:35:34 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_unix.c,v 1.29 2003/08/24 17:52:48 chs Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -59,6 +59,7 @@ __KERNEL_RCSID(0, "$NetBSD: uvm_unix.c,v 1.26 2001/12/08 00:35:34 thorpej Exp $"
 #include <sys/vnode.h>
 
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <uvm/uvm.h>
@@ -68,14 +69,15 @@ __KERNEL_RCSID(0, "$NetBSD: uvm_unix.c,v 1.26 2001/12/08 00:35:34 thorpej Exp $"
  */
 
 int
-sys_obreak(p, v, retval)
-	struct proc *p;
+sys_obreak(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct sys_obreak_args /* {
 		syscallarg(char *) nsize;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct vmspace *vm = p->p_vmspace;
 	vaddr_t new, old;
 	int error;
@@ -93,23 +95,25 @@ sys_obreak(p, v, retval)
 	/*
 	 * grow or shrink?
 	 */
+
 	if (new > old) {
 		error = uvm_map(&vm->vm_map, &old, new - old, NULL,
 		    UVM_UNKNOWN_OFFSET, 0,
-		    UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_COPY,
-		    UVM_ADV_NORMAL, UVM_FLAG_AMAPPAD|UVM_FLAG_FIXED|
-		    UVM_FLAG_OVERLAY|UVM_FLAG_COPYONW));
+		    UVM_MAPFLAG(UVM_PROT_READ | UVM_PROT_WRITE, UVM_PROT_ALL,
+				UVM_INH_COPY,
+				UVM_ADV_NORMAL, UVM_FLAG_AMAPPAD|UVM_FLAG_FIXED|
+				UVM_FLAG_OVERLAY|UVM_FLAG_COPYONW));
 		if (error) {
 			uprintf("sbrk: grow %ld failed, error = %d\n",
 				new - old, error);
-			return error;
+			return (error);
 		}
 		vm->vm_dsize += atop(new - old);
 	} else {
 		uvm_deallocate(&vm->vm_map, new, old - new);
 		vm->vm_dsize -= atop(old - new);
 	}
-	return 0;
+	return (0);
 }
 
 /*
@@ -152,8 +156,8 @@ uvm_grow(p, sp)
 
 /* ARGSUSED */
 int
-sys_ovadvise(p, v, retval)
-	struct proc *p;
+sys_ovadvise(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {

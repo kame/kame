@@ -1,4 +1,4 @@
-/*	$NetBSD: hpux_exec_aout.c,v 1.3.10.1 2003/10/02 09:52:16 tron Exp $	*/
+/*	$NetBSD: hpux_exec_aout.c,v 1.10.2.1 2004/08/22 14:10:38 tron Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -48,6 +48,7 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
  *	This product includes software developed by Christopher G. Demetriou.
  * 4. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission
@@ -70,7 +71,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: hpux_exec_aout.c,v 1.3.10.1 2003/10/02 09:52:16 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: hpux_exec_aout.c,v 1.10.2.1 2004/08/22 14:10:38 tron Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -88,6 +89,7 @@ __KERNEL_RCSID(0, "$NetBSD: hpux_exec_aout.c,v 1.3.10.1 2003/10/02 09:52:16 tron
 #include <machine/cpu.h>
 #include <machine/reg.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>    
 
 #include <compat/hpux/hpux.h>
@@ -123,7 +125,7 @@ exec_hpux_makecmds(p, epp)
 	 * HP-UX is a 4k page size system, and executables assume
 	 * this.
 	 */
-	if (NBPG != HPUX_LDPGSZ)
+	if (PAGE_SIZE != HPUX_LDPGSZ)
 		return (ENOEXEC);
 
 	switch (magic) {
@@ -171,13 +173,13 @@ exec_hpux_prep_nmagic(p, epp)
 	    VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 
 	/* set up command for bss segment */
-	baddr = roundup(epp->ep_daddr + execp->ha_data, NBPG);
+	baddr = roundup(epp->ep_daddr + execp->ha_data, PAGE_SIZE);
 	bsize = epp->ep_daddr + epp->ep_dsize - baddr;
 	if (bsize > 0)
 		NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_zero, bsize, baddr,
 		    NULLVP, 0, VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 
-	return (exec_aout_setup_stack(p, epp));
+	return (*epp->ep_esch->es_setup_stack)(p, epp);
 }
 
 static int
@@ -222,13 +224,13 @@ exec_hpux_prep_zmagic(p, epp)
 	    VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 
 	/* set up command for bss segment */
-	baddr = roundup(epp->ep_daddr + execp->ha_data, NBPG);
+	baddr = roundup(epp->ep_daddr + execp->ha_data, PAGE_SIZE);
 	bsize = epp->ep_daddr + epp->ep_dsize - baddr;
 	if (bsize > 0)
 		NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_zero, bsize, baddr,
 		    NULLVP, 0, VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 
-	return (exec_aout_setup_stack(p, epp));
+	return (*epp->ep_esch->es_setup_stack)(p, epp);
 }
 
 /*
@@ -255,7 +257,7 @@ exec_hpux_prep_omagic(p, epp)
 	    VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 
 	/* set up command for bss segment */
-	baddr = roundup(epp->ep_daddr + execp->ha_data, NBPG);
+	baddr = roundup(epp->ep_daddr + execp->ha_data, PAGE_SIZE);
 	bsize = epp->ep_daddr + epp->ep_dsize - baddr;
 	if (bsize > 0)
 		NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_zero, bsize, baddr,
@@ -269,7 +271,8 @@ exec_hpux_prep_omagic(p, epp)
 	 * Compensate `ep_dsize' for the amount of data covered by the last
 	 * text page.
 	 */
-	dsize = epp->ep_dsize + execp->ha_text - roundup(execp->ha_text, NBPG);
+	dsize = epp->ep_dsize + execp->ha_text - roundup(execp->ha_text,
+							 PAGE_SIZE);
 	epp->ep_dsize = (dsize > 0) ? dsize : 0;
-	return (exec_aout_setup_stack(p, epp));
+	return (*epp->ep_esch->es_setup_stack)(p, epp);
 }

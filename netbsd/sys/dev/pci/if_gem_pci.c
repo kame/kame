@@ -1,4 +1,4 @@
-/*	$NetBSD: if_gem_pci.c,v 1.9.2.1 2002/07/12 04:15:48 thorpej Exp $ */
+/*	$NetBSD: if_gem_pci.c,v 1.15 2004/03/17 13:54:09 martin Exp $ */
 
 /*
  * 
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_gem_pci.c,v 1.9.2.1 2002/07/12 04:15:48 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_gem_pci.c,v 1.15 2004/03/17 13:54:09 martin Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h> 
@@ -75,6 +75,9 @@ __KERNEL_RCSID(0, "$NetBSD: if_gem_pci.c,v 1.9.2.1 2002/07/12 04:15:48 thorpej E
 #ifdef macppc
 #include <dev/ofw/openfirm.h>
 #endif /* macppc */
+#ifdef __sparc__
+#include <machine/promlib.h>
+#endif
 
 struct gem_pci_softc {
 	struct	gem_softc	gsc_gem;	/* GEM device */
@@ -84,9 +87,8 @@ struct gem_pci_softc {
 int	gem_match_pci __P((struct device *, struct cfdata *, void *));
 void	gem_attach_pci __P((struct device *, struct device *, void *));
 
-struct cfattach gem_pci_ca = {
-	sizeof(struct gem_pci_softc), gem_match_pci, gem_attach_pci
-};
+CFATTACH_DECL(gem_pci, sizeof(struct gem_pci_softc),
+    gem_match_pci, gem_attach_pci, NULL, NULL);
 
 /*
  * Attach routines need to be split out to different bus-specific files.
@@ -128,8 +130,11 @@ gem_attach_pci(parent, self, aux)
 	char devinfo[256];
 	uint8_t enaddr[ETHER_ADDR_LEN];
 
+	aprint_naive(": Ethernet controller\n");
+
 	pci_devinfo(pa->pa_id, pa->pa_class, 0, devinfo);
-	printf(": %s (rev. 0x%02x)\n", devinfo, PCI_REVISION(pa->pa_class));
+	aprint_normal(": %s (rev. 0x%02x)\n", devinfo,
+	    PCI_REVISION(pa->pa_class));
 
 	sc->sc_dmatag = pa->pa_dmat;
 
@@ -151,7 +156,7 @@ gem_attach_pci(parent, self, aux)
 	    PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT, 0,
 	    &sc->sc_bustag, &sc->sc_h, NULL, NULL) != 0)
 	{
-		printf("%s: unable to map device registers\n",
+		aprint_error("%s: unable to map device registers\n",
 		    sc->sc_dev.dv_xname);
 		return;
 	}
@@ -162,8 +167,7 @@ gem_attach_pci(parent, self, aux)
 	 */
 #ifdef __sparc__
 	{
-		extern void myetheraddr __P((u_char *));
-		myetheraddr(enaddr);
+		prom_getether(PCITAG_NODE(pa->pa_tag), enaddr);
 	}
 #endif /* __sparc__ */
 #ifdef macppc
@@ -172,7 +176,7 @@ gem_attach_pci(parent, self, aux)
 
 		node = pcidev_to_ofdev(pa->pa_pc, pa->pa_tag);
 		if (node == 0) {
-			printf("%s: unable to locate OpenFirmware node\n",
+			aprint_error("%s: unable to locate OpenFirmware node\n",
 			    sc->sc_dev.dv_xname);
 			return;
 		}
@@ -182,20 +186,21 @@ gem_attach_pci(parent, self, aux)
 #endif /* macppc */
 
 	if (pci_intr_map(pa, &ih) != 0) {
-		printf("%s: unable to map interrupt\n", sc->sc_dev.dv_xname);
+		aprint_error("%s: unable to map interrupt\n",
+		    sc->sc_dev.dv_xname);
 		return;
 	}	
 	intrstr = pci_intr_string(pa->pa_pc, ih);
 	gsc->gsc_ih = pci_intr_establish(pa->pa_pc, ih, IPL_NET, gem_intr, sc);
 	if (gsc->gsc_ih == NULL) {
-		printf("%s: unable to establish interrupt",
+		aprint_error("%s: unable to establish interrupt",
 		    sc->sc_dev.dv_xname);
 		if (intrstr != NULL)
-			printf(" at %s", intrstr);
-		printf("\n");
+			aprint_normal(" at %s", intrstr);
+		aprint_normal("\n");
 		return;
 	}
-	printf("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
+	aprint_normal("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
 
 	/* Finish off the attach. */
 	gem_attach(sc, enaddr);

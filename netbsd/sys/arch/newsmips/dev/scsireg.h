@@ -1,4 +1,4 @@
-/*	$NetBSD: scsireg.h,v 1.6 2001/04/26 15:52:01 tsubai Exp $	*/
+/*	$NetBSD: scsireg.h,v 1.9 2003/08/07 16:28:52 agc Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -162,7 +158,7 @@
 
 
 #ifdef CPU_DOUBLE
-# ifdef mips
+# ifdef __mips__
 #  define	ipc_phys(x)	(caddr_t)K0_TT0(x)
 # else
 #  define	ipc_phys(x)	(caddr_t)((int)(x) & ~0x80000000)
@@ -176,9 +172,8 @@
 #ifdef CPU_SINGLE
 # define	ipc_phys(x)	(caddr_t)(x)
 # ifdef news3400
-#  define	splsc		cpu_spl0	/* Lite2 used spl3 */
+#  define	splsc		splbio		/* Lite2 used spl3 */
 #  define	splscon		spl2 XXX not used
-   extern int cpu_spl0 __P((void));
 # else
 #  define	splsc		spl4
 #  define	splscon		spl3

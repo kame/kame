@@ -1,4 +1,4 @@
-/*	$NetBSD: kgdb_machdep.c,v 1.8 2002/05/09 12:29:16 uch Exp $	*/
+/*	$NetBSD: kgdb_machdep.c,v 1.10 2003/07/15 03:35:57 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997, 2002 The NetBSD Foundation, Inc.
@@ -67,6 +67,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kgdb_machdep.c,v 1.10 2003/07/15 03:35:57 lukem Exp $");
+
 #include "opt_ddb.h"
 
 #if defined(DDB)
@@ -133,11 +136,11 @@ kgdb_acc(vaddr_t va, size_t len)
 {
 	vaddr_t last_va;
 
-	last_va = va + len + NBPG - 1;
+	last_va = va + len + PAGE_SIZE - 1;
 	va  &= ~PGOFSET;
 	last_va &= ~PGOFSET;
 
-	for (; va < last_va; va += NBPG) {
+	for (; va < last_va; va += PAGE_SIZE) {
 		if (kvacc(va) == 0)
 			return 0;
 	}

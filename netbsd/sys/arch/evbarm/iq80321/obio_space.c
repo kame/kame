@@ -1,7 +1,7 @@
-/*	$NetBSD: obio_space.c,v 1.2 2002/04/12 19:02:31 thorpej Exp $	*/
+/*	$NetBSD: obio_space.c,v 1.6 2003/07/15 00:25:05 lukem Exp $	*/
 
 /*
- * Copyright (c) 2001, 2002 Wasabi Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003 Wasabi Systems, Inc.
  * All rights reserved.
  *
  * Written by Jason R. Thorpe for Wasabi Systems, Inc.
@@ -39,6 +39,9 @@
  * bus_space functions for IQ80321 on-board devices
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: obio_space.c,v 1.6 2003/07/15 00:25:05 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 
@@ -49,6 +52,7 @@
 /* Prototypes for all the bus_space structure functions */
 bs_protos(obio);
 bs_protos(generic);
+bs_protos(generic_armv4);
 bs_protos(bs_notimpl);
 
 /*
@@ -79,7 +83,7 @@ struct bus_space obio_bs_tag = {
 
 	/* read (single) */
 	generic_bs_r_1,
-	bs_notimpl_bs_r_2,
+	generic_armv4_bs_r_2,
 	generic_bs_r_4,
 	bs_notimpl_bs_r_8,
 
@@ -90,14 +94,14 @@ struct bus_space obio_bs_tag = {
 	bs_notimpl_bs_rm_8,
 
 	/* read region */
-	bs_notimpl_bs_rr_1,
+	generic_bs_rr_1,
 	bs_notimpl_bs_rr_2,
 	bs_notimpl_bs_rr_4,
 	bs_notimpl_bs_rr_8,
 
 	/* write (single) */
 	generic_bs_w_1,
-	bs_notimpl_bs_w_2,
+	generic_armv4_bs_w_2,
 	generic_bs_w_4,
 	bs_notimpl_bs_w_8,
 
@@ -136,14 +140,36 @@ int
 obio_bs_map(void *t, bus_addr_t bpa, bus_size_t size, int flags,
     bus_space_handle_t *bshp)
 {
+	const struct pmap_devmap *pd;
+	paddr_t startpa, endpa, pa, offset;
+	vaddr_t va;
+	pt_entry_t *pte;
 
-	/*
-	 * IQ80321 on-board devices are mapped VA==PA.  All addresses
-	 * we're provided, therefore, don't need any additional mapping.
-	 */
-	*bshp = bpa;
+	if ((pd = pmap_devmap_find_pa(bpa, size)) != NULL) {
+		/* Device was statically mapped. */
+		*bshp = pd->pd_va + (bpa - pd->pd_pa);
+		return (0);
+	}
 
-	return 0;
+	endpa = round_page(bpa + size);
+	offset = bpa & PAGE_MASK;
+	startpa = trunc_page(bpa);
+		
+	va = uvm_km_valloc(kernel_map, endpa - startpa);
+	if (va == 0)
+		return (ENOMEM);
+
+	*bshp = va + offset;
+
+	for (pa = startpa; pa < endpa; pa += PAGE_SIZE, va += PAGE_SIZE) {
+		pmap_kenter_pa(va, pa, VM_PROT_READ | VM_PROT_WRITE);
+		pte = vtopte(va);
+		*pte &= ~L2_S_CACHE_MASK;
+		PTE_SYNC(pte);
+	}
+	pmap_update(pmap_kernel());
+
+	return (0);
 }
 
 int
@@ -152,22 +178,32 @@ obio_bs_alloc(void *t, bus_addr_t rstart, bus_addr_t rend, bus_size_t size,
     bus_space_handle_t *bshp)
 {
 
-	panic("obio_bs_alloc(): not implemented\n");
+	panic("obio_bs_alloc(): not implemented");
 }
 
 
 void
 obio_bs_unmap(void *t, bus_space_handle_t bsh, bus_size_t size)
 {
+	vaddr_t va, endva;
 
-	/* Nothing to do. */
+	if (pmap_devmap_find_va(bsh, size) != NULL) {
+		/* Device was statically mapped; nothing to do. */
+		return;
+	}
+
+	endva = round_page(bsh + size);
+	va = trunc_page(bsh);
+
+	pmap_kremove(va, endva - va);
+	uvm_km_free(kernel_map, va, endva - va);
 }
 
 void    
 obio_bs_free(void *t, bus_space_handle_t bsh, bus_size_t size)
 {
 
-	panic("obio_bs_free(): not implemented\n");
+	panic("obio_bs_free(): not implemented");
 }
 
 int

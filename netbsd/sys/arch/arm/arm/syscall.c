@@ -1,7 +1,7 @@
-/*	$NetBSD: syscall.c,v 1.9 2002/03/24 15:49:39 bjh21 Exp $	*/
+/*	$NetBSD: syscall.c,v 1.24 2003/11/14 19:03:17 scw Exp $	*/
 
 /*-
- * Copyright (c) 2000 The NetBSD Foundation, Inc.
+ * Copyright (c) 2000, 2003 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -77,11 +77,12 @@
  */
 
 #include "opt_ktrace.h"
+#include "opt_systrace.h"
 #include "opt_syscall_debug.h"
 
 #include <sys/param.h>
 
-__KERNEL_RCSID(0, "$NetBSD: syscall.c,v 1.9 2002/03/24 15:49:39 bjh21 Exp $");
+__KERNEL_RCSID(0, "$NetBSD: syscall.c,v 1.24 2003/11/14 19:03:17 scw Exp $");
 
 #include <sys/device.h>
 #include <sys/errno.h>
@@ -93,6 +94,9 @@ __KERNEL_RCSID(0, "$NetBSD: syscall.c,v 1.9 2002/03/24 15:49:39 bjh21 Exp $");
 #include <sys/user.h>
 #ifdef KTRACE
 #include <sys/ktrace.h>
+#endif
+#ifdef SYSTRACE
+#include <sys/systrace.h>
 #endif
 
 #include <uvm/uvm_extern.h>
@@ -109,7 +113,8 @@ __KERNEL_RCSID(0, "$NetBSD: syscall.c,v 1.9 2002/03/24 15:49:39 bjh21 Exp $");
 void
 swi_handler(trapframe_t *frame)
 {
-	struct proc *p;
+	struct lwp *l = curlwp;
+	struct proc *p = l->l_proc;
 	u_int32_t insn;
 
 	/*
@@ -129,6 +134,29 @@ swi_handler(trapframe_t *frame)
 	frame->tf_pc += INSN_SIZE;
 #endif
 
+	/*
+	 * Make sure the program counter is correctly aligned so we
+	 * don't take an alignment fault trying to read the opcode.
+	 */
+	if (__predict_false(((frame->tf_pc - INSN_SIZE) & 3) != 0)) {
+		ksiginfo_t ksi;
+		/* Give the user an illegal instruction signal. */
+		KSI_INIT_TRAP(&ksi);
+		ksi.ksi_signo = SIGILL;
+		ksi.ksi_code = ILL_ILLOPC;
+		ksi.ksi_addr = (u_int32_t *)(intptr_t) (frame->tf_pc-INSN_SIZE);
+		KERNEL_PROC_LOCK(l->l_proc);
+#if 0
+		/* maybe one day we'll do emulations */
+		(*l->l_proc->p_emul->e_trapsignal)(l, &ksi);
+#else
+		trapsignal(l, &ksi);
+#endif
+		KERNEL_PROC_UNLOCK(l->l_proc);
+		userret(l);
+		return;
+	}
+
 	/* XXX fuword? */
 #ifdef __PROG32
 	insn = *(u_int32_t *)(frame->tf_pc - INSN_SIZE);
@@ -136,8 +164,7 @@ swi_handler(trapframe_t *frame)
 	insn = *(u_int32_t *)((frame->tf_r15 & R15_PC) - INSN_SIZE);
 #endif
 
-	p = curproc;
-	p->p_addr->u_pcb.pcb_tf = frame;
+	l->l_addr->u_pcb.pcb_tf = frame;
 
 #ifdef CPU_ARM7
 	/*
@@ -159,29 +186,52 @@ swi_handler(trapframe_t *frame)
 	if ((insn & 0x0f000000) != 0x0f000000) {
 		frame->tf_pc -= INSN_SIZE;
 		curcpu()->ci_arm700bugcount.ev_count++;
-		userret(p);
+		userret(l);
 		return;
 	}
 #endif	/* CPU_ARM7 */
 
 	uvmexp.syscalls++;
 
-	(*(void(*)(struct trapframe *, struct proc *, u_int32_t))
-	    (p->p_emul->e_syscall))(frame, p, insn);
+	(*(void(*)(struct trapframe *, struct lwp *, u_int32_t))
+	    (p->p_md.md_syscall))(frame, l, insn);
 }
 
 #define MAXARGS 8
 
-/* XXX */
-void syscall(struct trapframe *frame, struct proc *p, u_int32_t insn);
+void syscall_intern(struct proc *);
+void syscall_plain(struct trapframe *, struct lwp *, u_int32_t);
+void syscall_fancy(struct trapframe *, struct lwp *, u_int32_t);
 
 void
-syscall(struct trapframe *frame, struct proc *p, u_int32_t insn)
+syscall_intern(struct proc *p)
 {
+#ifdef KTRACE
+	if (p->p_traceflag & (KTRFAC_SYSCALL | KTRFAC_SYSRET)) {
+		p->p_md.md_syscall = syscall_fancy;
+		return;
+	}
+#endif
+#ifdef SYSTRACE
+	if (p->p_flag & P_SYSTRACE) {
+		p->p_md.md_syscall = syscall_fancy;
+		return;
+	}
+#endif
+	p->p_md.md_syscall = syscall_plain;
+}
+
+void
+syscall_plain(struct trapframe *frame, struct lwp *l, u_int32_t insn)
+{
+	struct proc *p = l->l_proc;
 	const struct sysent *callp;
 	int code, error;
 	u_int nap, nargs;
 	register_t *ap, *args, copyargs[MAXARGS], rval[2];
+	ksiginfo_t ksi;
+
+	KERNEL_PROC_LOCK(p);
 
 	switch (insn & SWI_OS_MASK) { /* Which OS is the SWI from? */
 	case SWI_OS_ARM: /* ARM-defined SWIs */
@@ -196,11 +246,17 @@ syscall(struct trapframe *frame, struct proc *p, u_int32_t insn)
 			break;
 		default:
 			/* Undefined so illegal instruction */
-			trapsignal(p, SIGILL, insn);
+			KSI_INIT_TRAP(&ksi);
+			ksi.ksi_signo = SIGILL;
+			/* XXX get an ILL_ILLSYSCALL assigned */
+			ksi.ksi_code = 0;
+			ksi.ksi_addr = (u_int32_t *)(frame->tf_pc - INSN_SIZE);
+			ksi.ksi_trap = insn;
+			trapsignal(l, &ksi);
 			break;
 		}
 
-		userret(p);
+		userret(l);
 		return;
 	case 0x000000: /* Old unofficial NetBSD range. */
 	case SWI_OS_NETBSD: /* New official NetBSD range. */
@@ -208,8 +264,14 @@ syscall(struct trapframe *frame, struct proc *p, u_int32_t insn)
 		break;
 	default:
 		/* Undefined so illegal instruction */
-		trapsignal(p, SIGILL, insn);
-		userret(p);
+		KSI_INIT_TRAP(&ksi);
+		ksi.ksi_signo = SIGILL;
+		/* XXX get an ILL_ILLSYSCALL assigned */
+		ksi.ksi_code = 0;
+		ksi.ksi_addr = (u_int32_t *)(frame->tf_pc - INSN_SIZE);
+		ksi.ksi_trap = insn;
+		trapsignal(l, &ksi);
+		userret(l);
 		return;
 	}
 
@@ -245,17 +307,9 @@ syscall(struct trapframe *frame, struct proc *p, u_int32_t insn)
 		args = copyargs;
 	}
 
-#ifdef SYSCALL_DEBUG
-	scdebug_call(p, code, args);
-#endif
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSCALL))
-		ktrsyscall(p, code, nargs * sizeof(register_t), args);
-#endif
-
 	rval[0] = 0;
 	rval[1] = 0;
-	error = (*callp->sy_call)(p, args, rval);
+	error = (*callp->sy_call)(l, args, rval);
 
 	switch (error) {
 	case 0:
@@ -291,35 +345,166 @@ syscall(struct trapframe *frame, struct proc *p, u_int32_t insn)
 		break;
 	}
 
-#ifdef SYSCALL_DEBUG
-	scdebug_ret(p, code, error, rval);
+	KERNEL_PROC_UNLOCK(l);
+	userret(l);
+}
+
+void
+syscall_fancy(struct trapframe *frame, struct lwp *l, u_int32_t insn)
+{
+	struct proc *p = l->l_proc;
+	const struct sysent *callp;
+	int code, error;
+	u_int nap, nargs;
+	register_t *ap, *args, copyargs[MAXARGS], rval[2];
+	ksiginfo_t ksi;
+
+	KERNEL_PROC_LOCK(p);
+
+	switch (insn & SWI_OS_MASK) { /* Which OS is the SWI from? */
+	case SWI_OS_ARM: /* ARM-defined SWIs */
+		code = insn & 0x00ffffff;
+		switch (code) {
+		case SWI_IMB:
+		case SWI_IMBrange:
+			/*
+			 * Do nothing as there is no prefetch unit that needs
+			 * flushing
+			 */
+			break;
+		default:
+			/* Undefined so illegal instruction */
+			KSI_INIT_TRAP(&ksi);
+			ksi.ksi_signo = SIGILL;
+			/* XXX get an ILL_ILLSYSCALL assigned */
+			ksi.ksi_code = 0;
+			ksi.ksi_addr = (u_int32_t *)(frame->tf_pc - INSN_SIZE);
+			ksi.ksi_trap = insn;
+			trapsignal(l, &ksi);
+			break;
+		}
+
+		userret(l);
+		return;
+	case 0x000000: /* Old unofficial NetBSD range. */
+	case SWI_OS_NETBSD: /* New official NetBSD range. */
+		nap = 4;
+		break;
+	default:
+		/* Undefined so illegal instruction */
+		KSI_INIT_TRAP(&ksi);
+		ksi.ksi_signo = SIGILL;
+		/* XXX get an ILL_ILLSYSCALL assigned */
+		ksi.ksi_code = 0;
+		ksi.ksi_addr = (u_int32_t *)(frame->tf_pc - INSN_SIZE);
+		ksi.ksi_trap = insn;
+		trapsignal(l, &ksi);
+		userret(l);
+		return;
+	}
+
+	code = insn & 0x000fffff;
+
+	ap = &frame->tf_r0;
+	callp = p->p_emul->e_sysent;
+
+	switch (code) {	
+	case SYS_syscall:
+		code = *ap++;
+		nap--;
+		break;
+        case SYS___syscall:
+		code = ap[_QUAD_LOWWORD];
+		ap += 2;
+		nap -= 2;
+		break;
+	}
+
+	code &= (SYS_NSYSENT - 1);
+	callp += code;
+	nargs = callp->sy_argsize / sizeof(register_t);
+	if (nargs <= nap)
+		args = ap;
+	else {
+		KASSERT(nargs <= MAXARGS);
+		memcpy(copyargs, ap, nap * sizeof(register_t));
+		args = copyargs;
+		error = copyin((void *)frame->tf_usr_sp, copyargs + nap,
+		    (nargs - nap) * sizeof(register_t));
+		if (error)
+			goto bad;
+	}
+
+	if ((error = trace_enter(l, code, code, NULL, args)) != 0)
+		goto bad;
+
+	rval[0] = 0;
+	rval[1] = 0;
+	error = (*callp->sy_call)(l, args, rval);
+
+	switch (error) {
+	case 0:
+		frame->tf_r0 = rval[0];
+		frame->tf_r1 = rval[1];
+
+#ifdef __PROG32
+		frame->tf_spsr &= ~PSR_C_bit;	/* carry bit */
+#else
+		frame->tf_r15 &= ~R15_FLAG_C;	/* carry bit */
 #endif
-	userret(p);
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p, code, error, rval[0]);
+		break;
+
+	case ERESTART:
+		/*
+		 * Reconstruct the pc to point at the swi.
+		 */
+		frame->tf_pc -= INSN_SIZE;
+		break;
+
+	case EJUSTRETURN:
+		/* nothing to do */
+		break;
+
+	default:
+	bad:
+		frame->tf_r0 = error;
+#ifdef __PROG32
+		frame->tf_spsr |= PSR_C_bit;	/* carry bit */
+#else
+		frame->tf_r15 |= R15_FLAG_C;	/* carry bit */
 #endif
+		break;
+	}
+
+	trace_exit(l, code, args, rval, error);
+	KERNEL_PROC_UNLOCK(l);
+	userret(l);
 }
 
 void
 child_return(arg)
 	void *arg;
 {
-	struct proc *p = arg;
-	struct trapframe *frame = p->p_addr->u_pcb.pcb_tf;
+	struct lwp *l = arg;
+	struct trapframe *frame = l->l_addr->u_pcb.pcb_tf;
+#ifdef KTRACE
+	struct proc *p = l->l_proc;
+#endif
 
 	frame->tf_r0 = 0;
 #ifdef __PROG32
-		frame->tf_spsr &= ~PSR_C_bit;	/* carry bit */
+	frame->tf_spsr &= ~PSR_C_bit;	/* carry bit */
 #else
-		frame->tf_r15 &= ~R15_FLAG_C;	/* carry bit */
+	frame->tf_r15 &= ~R15_FLAG_C;	/* carry bit */
 #endif
 
-	userret(p);
+	KERNEL_PROC_UNLOCK(l);
+	userret(l);
 #ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSRET))
+	if (KTRPOINT(p, KTR_SYSRET)) {
+		KERNEL_PROC_LOCK(p);
 		ktrsysret(p, SYS_fork, 0, 0);
+		KERNEL_PROC_UNLOCK(p);
+	}
 #endif
 }
-
-/* End of syscall.c */

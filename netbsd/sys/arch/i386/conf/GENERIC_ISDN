@@ -1,4 +1,4 @@
-# $NetBSD: GENERIC_ISDN,v 1.8 2002/03/25 16:39:52 martin Exp $
+# $NetBSD: GENERIC_ISDN,v 1.13 2003/09/25 16:00:24 pooka Exp $
 #
 # GENERIC kernel with all supported ISDN devices and drivers
 
@@ -51,8 +51,17 @@ isic* at isapnp?
 #
 isic* at pci?
 
+# Winbond W6692
+iwic* 	at pci?
+
 # AVM Fritz!PCI card
 ifpci* at pci?
+
+# AVM Fritz!PCI V2 card
+ifritz* at pci?
+
+# AVM B1/T1 PCI card
+iavc*	at pci?
 
 #
 #---------------------------------------------------------------------
@@ -74,7 +83,7 @@ pseudo-device	isdntrc		2 # userland driver to do ISDN tracing
 pseudo-device	isdnctl		  # userland driver to control the whole thing
 pseudo-device	isdnbchan	4 # userland driver for access to raw B channel
 pseudo-device	isdntel		2 # userland driver for telephony
-options 	IPR_VJ		  # compile support for VJ compression
+options 	IRIP_VJ		  # compile support for VJ compression
 pseudo-device	irip		2 # network driver for IP over raw HDLC ISDN
 pseudo-device	ippp		2 # synchronous PPP over ISDN
 #---------------------------------------------------------------------

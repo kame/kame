@@ -1,4 +1,4 @@
-/*	$NetBSD: mba.c,v 1.25 2000/07/10 09:14:32 ragge Exp $ */
+/*	$NetBSD: mba.c,v 1.32 2003/07/15 02:15:01 lukem Exp $ */
 /*
  * Copyright (c) 1994, 1996 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -36,6 +36,9 @@
  *  Autoconfig new devices 'on the fly'.
  *  More intelligent way to handle different interrupts.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mba.c,v 1.32 2003/07/15 02:15:01 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -79,13 +82,11 @@ void	mbaqueue(struct mba_device *);
 void	mbastart(struct mba_softc *);
 void	mbamapregs(struct mba_softc *);
 
-struct	cfattach mba_cmi_ca = {
-	sizeof(struct mba_softc), mbamatch, mbaattach
-};
+CFATTACH_DECL(mba_cmi, sizeof(struct mba_softc),
+    mbamatch, mbaattach, NULL, NULL);
 
-struct	cfattach mba_sbi_ca = {
-	sizeof(struct mba_softc), mbamatch, mbaattach
-};
+CFATTACH_DECL(mba_sbi, sizeof(struct mba_softc),
+    mbamatch, mbaattach, NULL, NULL);
 
 #define	MBA_WCSR(reg, val) \
 	bus_space_write_4(sc->sc_iot, sc->sc_ioh, (reg), (val))
@@ -186,7 +187,7 @@ mbaintr(void *mba)
 		return;	/* During autoconfig */
 
 	md = sc->sc_first;
-	bp = BUFQ_FIRST(&md->md_q);
+	bp = BUFQ_PEEK(&md->md_q);
 	/*
 	 * A data-transfer interrupt. Current operation is finished,
 	 * call that device's finish routine to see what to do next.
@@ -203,13 +204,13 @@ mbaintr(void *mba)
 			 * If more to transfer, start the adapter again
 			 * by calling mbastart().
 			 */
-			BUFQ_REMOVE(&md->md_q, bp);
+			(void)BUFQ_GET(&md->md_q);
 			sc->sc_first = md->md_back;
 			md->md_back = 0;
 			if (sc->sc_first == 0)
 				sc->sc_last = (void *)&sc->sc_first;
 
-			if (BUFQ_FIRST(&md->md_q) != NULL) {
+			if (BUFQ_PEEK(&md->md_q) != NULL) {
 				sc->sc_last->md_back = md;
 				sc->sc_last = md;
 			}
@@ -245,12 +246,12 @@ mbaprint(void *aux, const char *mbaname)
 
 	if (mbaname) {
 		if (ma->ma_name)
-			printf("%s", ma->ma_name);
+			aprint_normal("%s", ma->ma_name);
 		else
-			printf("device type %o", ma->ma_type);
-		printf(" at %s", mbaname);
+			aprint_normal("device type %o", ma->ma_type);
+		aprint_normal(" at %s", mbaname);
 	}
-	printf(" drive %d", ma->ma_unit);
+	aprint_normal(" drive %d", ma->ma_unit);
 	return (ma->ma_name ? UNCONF : UNSUPP);
 }
 
@@ -273,13 +274,13 @@ mbaqueue(struct mba_device *md)
 
 /*
  * Start activity on (idling) adapter. Calls mbamapregs() to setup
- * for dma transfer, then the unit-specific start routine.
+ * for DMA transfer, then the unit-specific start routine.
  */
 void
 mbastart(struct mba_softc *sc)
 {
 	struct	mba_device *md = sc->sc_first;
-	struct	buf *bp = BUFQ_FIRST(&md->md_q);
+	struct	buf *bp = BUFQ_PEEK(&md->md_q);
 
 	disk_reallymapin(bp, (void *)(sc->sc_ioh + MAPREG(0)), 0, PG_V);
 

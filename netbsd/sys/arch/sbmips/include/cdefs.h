@@ -1,3 +1,3 @@
-/* $NetBSD: cdefs.h,v 1.1.8.1 2002/09/10 23:23:51 lukem Exp $ */
+/* $NetBSD: cdefs.h,v 1.2 2002/06/01 14:29:32 simonb Exp $ */
 
 #include <mips/cdefs.h>

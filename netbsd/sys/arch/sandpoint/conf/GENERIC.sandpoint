@@ -1,4 +1,4 @@
-# $NetBSD: GENERIC.sandpoint,v 1.1.4.1 2002/08/01 04:31:06 lukem Exp $
+# $NetBSD: GENERIC.sandpoint,v 1.11.2.2 2004/07/15 20:15:09 he Exp $
 #
 # GENERIC machine description file
 # 
@@ -22,7 +22,7 @@ include 	"arch/sandpoint/conf/std.sandpoint"
 
 options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
-#ident 		"GENERIC-$Revision: 1.1.4.1 $"
+#ident 		"GENERIC-$Revision: 1.11.2.2 $"
 
 maxusers	32
 
@@ -42,8 +42,9 @@ options 	KTRACE
 #options 	PMAPCHECK
 #options 	PMAPDEBUG
 options 	SYMTAB_SPACE=200000
-#options 	USERCONF	# userconf(4) support
+options 	USERCONF	# userconf(4) support
 #options	PIPE_SOCKETPAIR		# smaller, but slower pipe(2)
+options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
 
 options 	COMPAT_43
 options 	COMPAT_09
@@ -75,6 +76,19 @@ options 	SOFTDEP		# FFS soft updates support.
 options 	INET
 #options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 
+#options 	ALTQ		# Manipulate network interfaces' output queues
+#options 	ALTQ_BLUE	# Stochastic Fair Blue
+#options 	ALTQ_CBQ	# Class-Based Queueing
+#options 	ALTQ_CDNR	# Diffserv Traffic Conditioner
+#options 	ALTQ_FIFOQ	# First-In First-Out Queue
+#options 	ALTQ_FLOWVALVE	# RED/flow-valve (red-penalty-box)
+#options 	ALTQ_HFSC	# Hierarchical Fair Service Curve
+#options 	ALTQ_LOCALQ	# Local queueing discipline
+#options 	ALTQ_PRIQ	# Priority Queueing
+#options 	ALTQ_RED	# Random Early Detection
+#options 	ALTQ_RIO	# RED with IN/OUT
+#options 	ALTQ_WFQ	# Weighted Fair Queueing
+
 options 	NFS_BOOT_BOOTPARAM,NFS_BOOT_BOOTP
 
 config		netbsd	root on ? type ?
@@ -83,6 +97,7 @@ config		netbsd	root on ? type ?
 pseudo-device	bpfilter	8	# packet filter
 pseudo-device	pppoe			# PPP over Ethernet (RFC 2516)
 pseudo-device	bridge			# simple inter-network bridging
+#options	BRIDGE_IPF		# bridge uses IP/IPv6 pfil hooks too
 #pseudo-device	ipfilter
 pseudo-device	loop
 
@@ -92,9 +107,10 @@ pseudo-device	loop
 # miscellaneous pseudo-devices
 pseudo-device	rnd			# /dev/random and in-kernel generator
 pseudo-device	vnd		4
+#pseudo-device	cgd		4	# cryptographic disk devices
 pseudo-device	pty
 pseudo-device	clockctl		# user control of clock subsystem
-
+pseudo-device	ksyms			# /dev/ksyms
 #
 # device
 #
@@ -117,7 +133,21 @@ pcib*	at pci? dev ? function ?	# Winbond 83c553 PCI-ISA bridges
 
 isa*	at pcib?			# ISA on PCI-ISA bridge
 
-#pciide* at pci? dev ? function ?	# Winbond/Symphony IDE interface
+#pciide* at pci? dev ? function ? flags 0x0000	# GENERIC pciide driver
+#acardide* at pci? dev ? function ?	# Acard IDE controllers
+#aceride* at pci? dev ? function ?	# Acer Lab IDE controllers
+#artsata* at pci? dev ? function ?	# Intel i31244 SATA controller
+#cmdide* at pci? dev ? function ?	# CMD tech IDE controllers
+#cypide* at pci? dev ? function ?	# Cypress IDE controllers
+#hptide* at pci? dev ? function ?	# Triones/HighPoint IDE controllers
+#optiide* at pci? dev ? function ?	# Opti IDE controllers
+#piixide* at pci? dev ? function ?	# Intel IDE controllers
+#pdcide* at pci? dev ? function ?	# Promise IDE controllers
+#satalink* at pci? dev ? function ?	# SiI SATALink controllers
+#siside* at pci? dev ? function ?	# SiS IDE controllers
+#slide*  at pci? dev ? function ?	# Symphony Labs IDE controllers
+#viaide* at pci? dev ? function ?	# VIA/AMD/Nvidia IDE controllers
+#atabus* at ata?
 
 vga*	at pci? dev ? function ?
 
@@ -161,8 +191,8 @@ sd*	at scsibus? target ? lun ?	# SCSI disk drives
 #ss*	at scsibus? target ? lun ?	# SCSI scanners
 #uk*	at scsibus? target ? lun ?	# SCSI unknown
 
-#wd*	at pciide? channel ? drive ? flags 0x0000
-#atapibus* at pciide? channel ?
+#wd*	at atabus? drive ? flags 0x0000
+#atapibus* at atapi?
 #cd*	at atapibus? drive ? flags 0x0000	# ATAPI CD-ROM drives
 #sd*	at atapibus? drive ? flags 0x0000	# ATAPI disk drives
 #st*	at atapibus? drive ? flags 0x0000	# ATAPI tape drives

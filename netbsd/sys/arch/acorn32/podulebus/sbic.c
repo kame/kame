@@ -1,4 +1,4 @@
-/* $NetBSD: sbic.c,v 1.3 2002/03/10 15:47:45 bjh21 Exp $ */
+/* $NetBSD: sbic.c,v 1.8 2003/09/21 15:10:05 matt Exp $ */
 
 /*
  * Copyright (c) 2001 Richard Earnshaw
@@ -25,10 +25,37 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * POSSIBILITY OF SUCH DAMAGE.
  *
- *
- * Copyright (c) 1994 Christian E. Hopps
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Van Jacobson of Lawrence Berkeley Laboratory.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * Copyright (c) 1994 Christian E. Hopps
  *
  * This code is derived from software contributed to Berkeley by
  * Van Jacobson of Lawrence Berkeley Laboratory.
@@ -78,14 +105,16 @@
 #define UNPROTECTED_CSR
 #endif
 
+#ifndef DEBUG
 #define DEBUG
+#endif
 /* #define SBIC_DEBUG(a) a */
 
 #include "opt_ddb.h"
 
 #include <sys/param.h>
 
-__KERNEL_RCSID(0, "$NetBSD: sbic.c,v 1.3 2002/03/10 15:47:45 bjh21 Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sbic.c,v 1.8 2003/09/21 15:10:05 matt Exp $");
 
 #include <sys/systm.h>
 #include <sys/callout.h>
@@ -1282,7 +1311,7 @@ sbicicmd(struct sbic_softc *dev, int target, int lun, struct sbic_acb *acb)
 
 		wait = sbic_cmd_wait;
 
-		asr = GET_SBIC_asr (regs, asr);
+		GET_SBIC_asr (regs, asr);
 		GET_SBIC_csr (regs, csr);
 		CSR_TRACE('I',csr,asr,target);
 		QPRINTF((">ASR:%02xCSR:%02x<", asr, csr));
@@ -1578,7 +1607,7 @@ sbicgo(struct sbic_softc *dev, struct scsipi_xfer *xs)
 	 * Lets cycle a while then let the interrupt handler take over
 	 */
 
-	asr = GET_SBIC_asr(regs, asr);
+	GET_SBIC_asr(regs, asr);
 	do {
 		GET_SBIC_csr(regs, csr);
 		CSR_TRACE('g', csr, asr, dev->target);
@@ -1753,7 +1782,7 @@ sbicmsgin(struct sbic_softc *dev)
 	recvlen = 1;
 	do {
 		while (recvlen--) {
-			asr = GET_SBIC_asr(regs, asr);
+			GET_SBIC_asr(regs, asr);
 			GET_SBIC_csr(regs, csr);
 			QPRINTF(("sbicmsgin ready to go (csr,asr)=(%02x,%02x)\n",
 				 csr, asr));
@@ -1807,7 +1836,7 @@ sbicmsgin(struct sbic_softc *dev)
 						(SBIC_ASR_DBR | SBIC_ASR_INT)))
 						GET_SBIC_asr(regs, asr);
 					if (asr & SBIC_ASR_DBR)
-						panic("msgin: jammed again!\n");
+						panic("msgin: jammed again!");
 					GET_SBIC_csr(regs, csr);
 					CSR_TRACE('e', csr, asr, dev->target);
 					if ((csr & 0x07) != MESG_OUT_PHASE) {
@@ -2349,12 +2378,12 @@ sbictimeout(struct sbic_softc *dev)
 	s = splbio();
 	if (dev->sc_dmatimo) {
 		if (dev->sc_dmatimo > 1) {
-			printf("%s: dma timeout #%d\n",
+			printf("%s: DMA timeout #%d\n",
 			    dev->sc_dev.dv_xname, dev->sc_dmatimo - 1);
 			GET_SBIC_asr(&dev->sc_sbicp, asr);
 			if (asr & SBIC_ASR_INT) {
 				/* We need to service a missed IRQ */
-				printf("Servicing a missed int:(%02x,%02x)->(%02x,??)\n",
+				printf("Servicing a missed int:(%02x,%02x)->(%02x,?)\n",
 				    debug_asr, debug_csr, asr);
 				sbicintr(dev);
 			}

@@ -1,4 +1,4 @@
-/*	$NetBSD: vrc4172pwm.c,v 1.15 2002/01/27 14:18:12 takemura Exp $	*/
+/*	$NetBSD: vrc4172pwm.c,v 1.19 2003/12/27 07:29:56 shin Exp $	*/
 
 /*
  * Copyright (c) 2000,2001 SATO Kazumi. All rights reserved.
@@ -24,6 +24,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vrc4172pwm.c,v 1.19 2003/12/27 07:29:56 shin Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -76,9 +79,8 @@ int vrc4172pwm_brightness2rawduty(struct vrc4172pwm_softc *);
 struct vrc4172pwm_param * vrc4172pwm_getparam(void);
 void vrc4172pwm_dumpreg(struct vrc4172pwm_softc *);
 
-struct cfattach vrc4172pwm_ca = {
-	sizeof(struct vrc4172pwm_softc), vrc4172pwmprobe, vrc4172pwmattach
-};
+CFATTACH_DECL(vrc4172pwm, sizeof(struct vrc4172pwm_softc),
+    vrc4172pwmprobe, vrc4172pwmattach, NULL, NULL);
 
 /*
  * platform related parameters
@@ -118,6 +120,8 @@ struct platid_data vrc4172pwm_platid_param_table[] = {
 	{ &platid_mask_MACH_NEC_MCR_SIGMARION,	&vrc4172pwm_sigmarion_param},
 	{ &platid_mask_MACH_NEC_MCR_700,	&vrc4172pwm_mcr700_param},
 	{ &platid_mask_MACH_NEC_MCR_700A,	&vrc4172pwm_mcr700_param},
+	{ &platid_mask_MACH_NEC_MCR_730,	&vrc4172pwm_mcr700_param},
+	{ &platid_mask_MACH_NEC_MCR_730A,	&vrc4172pwm_mcr700_param},
 	{ NULL, NULL}
 };
 

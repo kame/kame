@@ -1,4 +1,4 @@
-/*	$NetBSD: cgsix_obio.c,v 1.9 2002/03/11 16:27:01 pk Exp $ */
+/*	$NetBSD: cgsix_obio.c,v 1.14 2003/07/15 00:04:53 lukem Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * color display (cgsix) driver; sun4 obio bus front-end.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cgsix_obio.c,v 1.14 2003/07/15 00:04:53 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -58,7 +61,6 @@
 #include <machine/bus.h>
 #include <machine/autoconf.h>
 #include <machine/eeprom.h>
-#include <machine/conf.h>
 
 #include <dev/sun/fbio.h>
 #include <dev/sun/fbvar.h>
@@ -73,9 +75,8 @@ static int	cgsixmatch __P((struct device *, struct cfdata *, void *));
 static void	cgsixattach __P((struct device *, struct device *, void *));
 static int	cg6_pfour_probe __P((void *, void *));
 
-struct cfattach cgsix_obio_ca = {
-	sizeof(struct cgsix_softc), cgsixmatch, cgsixattach
-};
+CFATTACH_DECL(cgsix_obio, sizeof(struct cgsix_softc),
+    cgsixmatch, cgsixattach, NULL, NULL);
 
 /*
  * Match a cgsix.

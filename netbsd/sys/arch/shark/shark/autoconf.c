@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.1 2002/02/10 01:58:01 thorpej Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.4 2003/07/15 03:36:03 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -41,6 +41,9 @@
  *
  * Created      : 08/10/94
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.4 2003/07/15 03:36:03 lukem Exp $");
 
 #include "opt_md.h"
 
@@ -90,40 +93,37 @@ static void
 get_device(name)
 	char *name;
 {
-	int loop, unit, part;
-	char buf[32], *cp;
+	int unit, part;
+	char devname[16], buf[32], *cp;
 	struct device *dv;
 
 	if (strncmp(name, "/dev/", 5) == 0)
 		name += 5;
 
-	for (loop = 0; dev_name2blk[loop].d_name != NULL; ++loop) {
-		if (strncmp(name, dev_name2blk[loop].d_name,
-		    strlen(dev_name2blk[loop].d_name)) == 0) {
-			name += strlen(dev_name2blk[loop].d_name);
-			unit = part = 0;
+	if (devsw_name2blk(name, devname, sizeof(devname)) == -1)
+		return;
 
-			cp = name;
-			while (*cp >= '0' && *cp <= '9')
-				unit = (unit * 10) + (*cp++ - '0');
-			if (cp == name)
-				return;
+	name += strlen(devname);
+	unit = part = 0;
 
-			if (*cp >= 'a' && *cp <= ('a' + MAXPARTITIONS))
-				part = *cp - 'a';
-			else if (*cp != '\0' && *cp != ' ')
-				return;
-			sprintf(buf, "%s%d", dev_name2blk[loop].d_name, unit);
-			for (dv = alldevs.tqh_first; dv != NULL;
-			    dv = dv->dv_list.tqe_next) {
-				if (strcmp(buf, dv->dv_xname) == 0) {
-					booted_device = dv;
-					booted_partition = part;
-					return;
-				}
-			}
+	cp = name;
+	while (*cp >= '0' && *cp <= '9')
+		unit = (unit * 10) + (*cp++ - '0');
+	if (cp == name)
+		return;
+
+	if (*cp >= 'a' && *cp <= ('a' + MAXPARTITIONS))
+		part = *cp - 'a';
+	else if (*cp != '\0' && *cp != ' ')
+		return;
+	sprintf(buf, "%s%d", devname, unit);
+	for (dv = alldevs.tqh_first; dv != NULL; dv = dv->dv_list.tqe_next) {
+		if (strcmp(buf, dv->dv_xname) == 0) {
+			booted_device = dv;
+			booted_partition = part;
+			return;
 		}
-	} 
+	}
 }
 
 
@@ -198,9 +198,9 @@ cpu_configure()
 
 	/* Debugging information */
 #ifndef TERSE
-	printf("ipl_bio=%08x ipl_net=%08x ipl_tty=%08x ipl_imp=%08x\n",
+	printf("ipl_bio=%08x ipl_net=%08x ipl_tty=%08x ipl_vm=%08x\n",
 	    irqmasks[IPL_BIO], irqmasks[IPL_NET], irqmasks[IPL_TTY],
-	    irqmasks[IPL_IMP]);
+	    irqmasks[IPL_VM]);
 	printf("ipl_audio=%08x ipl_imp=%08x ipl_high=%08x ipl_serial=%08x\n",
 	    irqmasks[IPL_AUDIO], irqmasks[IPL_CLOCK], irqmasks[IPL_HIGH],
 	    irqmasks[IPL_SERIAL]);

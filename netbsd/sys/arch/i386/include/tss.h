@@ -1,4 +1,4 @@
-/*	$NetBSD: tss.h,v 1.6 1995/10/11 04:20:28 mycroft Exp $	*/
+/*	$NetBSD: tss.h,v 1.8 2003/08/07 16:28:00 agc Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -37,6 +33,9 @@
  *
  *	@(#)tss.h	5.4 (Berkeley) 1/18/91
  */
+
+#ifndef _I386_TSS_H_
+#define _I386_TSS_H_
 
 /*
  * Intel 386 Context Data Type
@@ -70,3 +69,5 @@ struct i386tss {
 	int	tss_ldt;	/* LDT selector */
 	int	tss_ioopt;	/* options and I/O permission map offset */
 };
+
+#endif /* #ifndef _I386_TSS_H_ */

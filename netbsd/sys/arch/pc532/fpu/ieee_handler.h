@@ -1,21 +1,21 @@
-/*	$NetBSD: ieee_handler.h,v 1.4 1998/09/02 19:17:12 matthias Exp $	*/
+/*	$NetBSD: ieee_handler.h,v 1.6 2004/01/23 04:12:39 simonb Exp $	*/
 
-/* 
+/*
  * IEEE floating point support for NS32081 and NS32381 fpus.
  * Copyright (c) 1995 Ian Dall
  * All Rights Reserved.
- * 
+ *
  * Permission to use, copy, modify and distribute this software and its
  * documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
+ *
  * IAN DALL ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION.
  * IAN DALL DISCLAIMS ANY LIABILITY OF ANY KIND FOR ANY DAMAGES
  * WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
  */
-/* 
+/*
  *	File:	ieee_handler.h
  *	Author:	Ian Dall
  *	Date:	November 1995
@@ -69,21 +69,21 @@ typedef struct {
 #include <sys/proc.h>
 #include <sys/user.h>
 
-typedef struct proc state;
+typedef struct lwp state;
 
-#define LREGBASE(s) ((vaddr_t) (s)->p_addr->u_pcb.pcb_freg)
+#define LREGBASE(s) ((vaddr_t) (s)->l_addr->u_pcb.pcb_freg)
 #define LREGOFFSET(n) (n * sizeof(double))
-#define FREGBASE(s) ((vaddr_t) (s)->p_addr->u_pcb.pcb_freg)
+#define FREGBASE(s) ((vaddr_t) (s)->l_addr->u_pcb.pcb_freg)
 #define FREGOFFSET(n) ((n & ~1) * sizeof(double) + (n & 1) * sizeof(float))
-#define REGBASE(s) ((vaddr_t) (s)->p_md.md_regs)
+#define REGBASE(s) ((vaddr_t) (s)->l_md.md_regs)
 #define REGOFFSET(n) offsetof(struct reg, r_r ## n)
 
-#define FSR p_addr->u_pcb.pcb_fsr
-#define FP p_md.md_regs->r_fp
-#define SP p_md.md_regs->r_sp
-#define SB p_md.md_regs->r_sb
-#define PC p_md.md_regs->r_pc
-#define PSR p_md.md_regs->r_psr
+#define FSR l_addr->u_pcb.pcb_fsr
+#define FP l_md.md_regs->r_fp
+#define SP l_md.md_regs->r_sp
+#define SB l_md.md_regs->r_sb
+#define PC l_md.md_regs->r_pc
+#define PSR l_md.md_regs->r_psr
 
 #define PSR_N	PSL_N
 #define PSR_Z	PSL_Z

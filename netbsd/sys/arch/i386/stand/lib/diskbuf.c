@@ -1,4 +1,4 @@
-/*	$NetBSD: diskbuf.c,v 1.1.1.1 1997/03/14 02:40:32 perry Exp $	*/
+/*	$NetBSD: diskbuf.c,v 1.4 2004/03/24 16:46:27 drochner Exp $	*/
 
 /*
  * Copyright (c) 1996
@@ -12,12 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed for the NetBSD Project
- *	by Matthias Drochner.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -35,7 +29,29 @@
 /* data buffer for BIOS disk / DOS I/O  */
 
 #include "diskbuf.h"
+#include "stand.h"
 
-char diskbuf[DISKBUFSIZE];
+char *diskbufp;		/* allocated from heap */
 
-void *diskbuf_user;
+const void *diskbuf_user;
+
+/*
+ * Global shared "diskbuf" is used as read ahead buffer.
+ * This MAY have to not cross a 64k boundary.
+ * In practise it is allocated out of the heap early on...
+ * NB a statically allocated diskbuf is not guaranteed to not
+ * cross a 64k boundary.
+ */
+char *
+alloc_diskbuf(const void *user)
+{
+	diskbuf_user = user;
+	if (!diskbufp) {
+		diskbufp = alloc(DISKBUFSIZE);
+		if (((int)diskbufp & 0xffff) + DISKBUFSIZE > 0x10000) {
+			printf("diskbufp %x\n", (unsigned)diskbufp);
+			panic("diskbuf crosses 64k boundary");
+		}
+	}
+	return diskbufp;
+}

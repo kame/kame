@@ -1,4 +1,4 @@
-/*	$NetBSD: shark_machdep.c,v 1.4.4.1 2003/01/27 07:09:51 jmc Exp $	*/
+/*	$NetBSD: shark_machdep.c,v 1.19 2003/12/14 05:16:30 thorpej Exp $	*/
 
 /*
  * Copyright 1997
@@ -37,6 +37,9 @@
  *  Kernel setup for the SHARK Configuration
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: shark_machdep.c,v 1.19 2003/12/14 05:16:30 thorpej Exp $");
+
 #include "opt_ddb.h"
 
 #include <sys/types.h>
@@ -47,6 +50,7 @@
 #include <sys/kernel.h>
 #include <sys/buf.h>
 #include <sys/exec.h>
+#include <sys/ksyms.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -80,13 +84,14 @@
 
 #if NWD > 0 || NSD > 0 || NCD > 0
 #include <dev/ata/atavar.h>
-#include <dev/ata/wdvar.h>
 #endif
 #if NSD > 0 || NCD > 0
 #include <dev/scsipi/scsi_all.h>
 #include <dev/scsipi/scsipi_all.h>
 #include <dev/scsipi/scsipiconf.h>
 #endif
+
+#include "ksyms.h"
 
 /*
  *  Imported variables
@@ -135,10 +140,8 @@ int ofw_handleticks = 0;	/* set to TRUE by cpu_initclocks */
 extern unsigned int sa1_cache_clean_addr;
 extern unsigned int sa1_cache_clean_size;
 
-struct cfattach ofbus_root_ca = {
-	sizeof(struct device), ofbus_match, ofbus_attach
-};
-
+CFATTACH_DECL(ofbus_root, sizeof(struct device),
+    ofbus_match, ofbus_attach, NULL, NULL);
 
 /*
  *  Exported routines
@@ -150,7 +153,10 @@ extern void ofrootfound		__P((void));
 
 /* Local routines */
 static void process_kernel_args	__P((void));
+void ofw_device_register(struct device *, void *);
 
+/* Kernel text starts at the base of the kernel address space. */
+#define	KERNEL_TEXT_BASE	(KERNEL_BASE + 0x00000000)
 
 /**************************************************************/
 
@@ -253,9 +259,9 @@ initarm(ofw_handle)
 	 * The kernel stack for SVC mode will be updated on return
 	 * from this routine.
 	 */
-	set_stackptr(PSR_IRQ32_MODE, irqstack.pv_va + NBPG);
-	set_stackptr(PSR_UND32_MODE, undstack.pv_va + NBPG);
-	set_stackptr(PSR_ABT32_MODE, abtstack.pv_va + NBPG);
+	set_stackptr(PSR_IRQ32_MODE, irqstack.pv_va + PAGE_SIZE);
+	set_stackptr(PSR_UND32_MODE, undstack.pv_va + PAGE_SIZE);
+	set_stackptr(PSR_ABT32_MODE, abtstack.pv_va + PAGE_SIZE);
 
 	/* Set-up exception handlers. */
 
@@ -289,22 +295,24 @@ initarm(ofw_handle)
 	shark_fiqregs.fr_r13  = 0; /* must set a stack when r9 is set! */
 
 	if (fiq_claim(&shark_fiqhandler))
-		panic("Cannot claim FIQ vector.\n");
+		panic("Cannot claim FIQ vector.");
 
-#ifdef DDB
-	db_machine_init();
+#if NKSYMS || defined(DDB) || defined(LKM)
 #ifdef __ELF__
-	ddb_init(0, NULL, NULL);	/* XXX */
+	ksyms_init(0, NULL, NULL);	/* XXX */
 #else
 	{
 		struct exec *kernexec = (struct exec *)KERNEL_TEXT_BASE;
 		extern int end;
 		extern char *esym;
 
-		ddb_init(kernexec->a_syms, &end, esym);
+		ksyms_init(kernexec->a_syms, &end, esym);
 	}
 #endif /* __ELF__ */
+#endif /* NKSYMS || defined(DDB) || defined(LKM) */
 
+#ifdef DDB
+	db_machine_init();
 	if (boothowto & RB_KDB)
 		Debugger();
 #endif
@@ -381,7 +389,7 @@ ofw_device_register(struct device *dev, void *aux)
 #endif
 	static char *boot_component;
 	struct ofbus_attach_args *oba;
-	const char *cd_name = dev->dv_cfdata->cf_driver->cd_name;
+	const char *cd_name = dev->dv_cfdata->cf_name;
 	char name[64];
 	int i;
 
@@ -416,12 +424,13 @@ ofw_device_register(struct device *dev, void *aux)
 	} else if (parent == NULL) {
 		return;
 	} else if (parent == dev->dv_parent
-		   && !strcmp(parent->dv_cfdata->cf_driver->cd_name, "ofisa")) {
+		   && !strcmp(parent->dv_cfdata->cf_name, "ofisa")) {
 		struct ofisa_attach_args *aa = aux;
 		oba = &aa->oba;
 #if NWD > 0 || NSD > 0 || NCD > 0
-	} else if (parent == dev->dv_parent
-		   && !strcmp(parent->dv_cfdata->cf_driver->cd_name, "wdc")) {
+	} else if (dev->dv_parent->dv_parent != NULL
+		   && parent == dev->dv_parent->dv_parent
+		   && !strcmp(parent->dv_cfdata->cf_name, "wdc")) {
 #if NSD > 0 || NCD > 0
 		if (!strcmp(cd_name, "atapibus")) {
 			scsipidev = dev;

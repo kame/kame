@@ -1,4 +1,4 @@
-/*	$NetBSD: ka780.c,v 1.17 2001/08/31 04:44:57 simonb Exp $ */
+/*	$NetBSD: ka780.c,v 1.23 2003/08/07 16:30:19 agc Exp $ */
 /*-
  * Copyright (c) 1982, 1986, 1988 The Regents of the University of California.
  * All rights reserved.
@@ -11,11 +11,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,6 +34,9 @@
  * 780-specific code.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ka780.c,v 1.23 2003/08/07 16:30:19 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -58,9 +57,8 @@ static	int mem_sbi_match(struct device *, struct cfdata *, void *);
 static	void mem_sbi_attach(struct device *, struct device *, void *);
 static	int getsort(int type);
 
-struct	cfattach mem_sbi_ca = {
-	sizeof(struct mem_softc), mem_sbi_match, mem_sbi_attach
-};
+CFATTACH_DECL(mem_sbi, sizeof(struct mem_softc),
+    mem_sbi_match, mem_sbi_attach, NULL, NULL);
 
 int	
 mem_sbi_match(struct device *parent, struct cfdata *cf, void *aux)

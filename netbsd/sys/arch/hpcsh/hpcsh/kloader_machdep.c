@@ -1,4 +1,4 @@
-/*	$NetBSD: kloader_machdep.c,v 1.6 2002/05/09 12:37:59 uch Exp $	*/
+/*	$NetBSD: kloader_machdep.c,v 1.9 2003/11/01 03:24:12 uwe Exp $	*/
 
 /*-
  * Copyright (c) 2001, 2002 The NetBSD Foundation, Inc.
@@ -33,6 +33,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kloader_machdep.c,v 1.9 2003/11/01 03:24:12 uwe Exp $");
+
+#include "debug_kloader.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 
@@ -53,7 +58,7 @@ void									\
 kloader_sh ## cpu ## _boot(struct kloader_bootinfo *kbi,		\
     struct kloader_page_tag *p)						\
 {									\
-	int tmp;							\
+	int tmp = 0;	/* XXX: -Wuninitialized */			\
 									\
 	/* Disable interrupt. block exception. */			\
 	__asm__ __volatile__(						\

@@ -1,4 +1,4 @@
-#	$NetBSD: files.iq80321,v 1.2 2002/04/12 19:02:31 thorpej Exp $
+#	$NetBSD: files.iq80321,v 1.7 2003/06/16 17:40:50 thorpej Exp $
 #
 # Intel IQ80321 evaluation board configuration info
 #
@@ -6,12 +6,16 @@
 # Use the generic ARM soft interrupt code.
 file	arch/arm/arm/softintr.c
 
+# Use the shared initarm_common() code.
+# XXX: Not yet ready for prime-time
+#file	arch/evbarm/evbarm/initarm_common.c
+
 file	arch/evbarm/iq80321/iq80321_7seg.c
 file	arch/evbarm/iq80321/iq80321_machdep.c
 file	arch/evbarm/iq80321/iq80321_pci.c
 
 # IQ80321 on-board devices
-device	obio {[addr = -1]}: bus_space_generic
+device	obio {addr, [size = -1], [width = -1], [xint = -1]}: bus_space_generic
 attach	obio at mainbus
 file	arch/evbarm/iq80321/obio.c			obio
 file	arch/evbarm/iq80321/obio_space.c		obio

@@ -1,4 +1,4 @@
-/*	$NetBSD: alloc.c,v 1.3.2.1 2002/09/30 13:38:33 lukem Exp $	*/
+/*	$NetBSD: alloc.c,v 1.5 2003/12/26 13:43:29 aymeric Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -126,8 +126,7 @@ LIST_HEAD(, ml) allocatedlist = LIST_HEAD_INITIALIZER(allocatedlist);
 #define	OVERHEAD	ALIGN(sizeof (struct ml))	/* shorthand */
 
 void *
-alloc(size)
-	unsigned size;
+alloc(unsigned size)
 {
 	struct ml *f, *bestf;
 	unsigned bestsize = 0xffffffff;	/* greater than any real size */
@@ -186,7 +185,7 @@ alloc(size)
 		f->size = size;
 #ifdef ALLOC_TRACE
 		printf("=%lx (new chunk size %u)\n",
-		    (u_long)(help + OVERHEAD), f->f_size);
+		    (u_long)(help + OVERHEAD), f->size);
 #endif
 		goto out;
 	}
@@ -208,9 +207,7 @@ alloc(size)
 }
 
 void
-free(ptr, size)
-	void *ptr;
-	unsigned size;	/* only for consistenct check */
+free(void *ptr, unsigned size)
 {
 	register struct ml *a = (struct ml *)((char*)ptr - OVERHEAD);
 
@@ -228,10 +225,10 @@ free(ptr, size)
 	LIST_INSERT_HEAD(&freelist, a, list);
 }
 
+#ifdef __notyet__
 void
-freeall()
+freeall(void)
 {
-#ifdef __notyet__		/* Firmware bug ?! */
 	struct ml *m;
 
 	/* Release chunks on freelist... */
@@ -245,5 +242,5 @@ freeall()
 		LIST_REMOVE(m, list);
 		OF_release(m, m->size);
 	}
-#endif /* __notyet__ */
 }
+#endif /* __notyet__ */

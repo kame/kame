@@ -1,4 +1,4 @@
-/*	$NetBSD: lshldi3.c,v 1.6 1998/03/27 01:30:03 cgd Exp $	*/
+/*	$NetBSD: lshldi3.c,v 1.8 2003/08/07 16:32:08 agc Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -42,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)lshldi3.c	8.1 (Berkeley) 6/4/93";
 #else
-__RCSID("$NetBSD: lshldi3.c,v 1.6 1998/03/27 01:30:03 cgd Exp $");
+__RCSID("$NetBSD: lshldi3.c,v 1.8 2003/08/07 16:32:08 agc Exp $");
 #endif
 #endif /* LIBC_SCCS and not lint */
 
@@ -62,12 +58,12 @@ __lshldi3(a, shift)
 	if (shift == 0)
 		return(a);
 	aa.q = a;
-	if (shift >= LONG_BITS) {
-		aa.ul[H] = aa.ul[L] << (shift - LONG_BITS);
+	if (shift >= INT_BITS) {
+		aa.ul[H] = aa.ul[L] << (shift - INT_BITS);
 		aa.ul[L] = 0;
 	} else {
 		aa.ul[H] = (aa.ul[H] << shift) |
-		    (aa.ul[L] >> (LONG_BITS - shift));
+		    (aa.ul[L] >> (INT_BITS - shift));
 		aa.ul[L] <<= shift;
 	}
 	return (aa.q);

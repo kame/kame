@@ -1,4 +1,4 @@
-/*	$NetBSD: netbsd32_ioctl.h,v 1.9 2002/01/03 15:28:13 mrg Exp $	*/
+/*	$NetBSD: netbsd32_ioctl.h,v 1.15 2004/01/15 14:36:28 mrg Exp $	*/
 
 /*
  * Copyright (c) 1998, 2001 Matthew R. Green
@@ -39,7 +39,7 @@
 			data32, (struct type *)data, cmd); \
 		error = (*fp->f_ops->fo_ioctl)(fp, cmd, data, p); \
 		__CONCAT(netbsd32_from_, type)((struct type *)data, \
-			(struct __CONCAT(netbsd32_, type) *)data32); \
+			(struct __CONCAT(netbsd32_, type) *)data32, cmd); \
 		break
  
 /* from <sys/audioio.h> */
@@ -58,13 +58,13 @@ struct netbsd32_partinfo {
 #define DIOCGPART32	_IOW('d', 104, struct netbsd32_partinfo)	/* get partition */
 #endif
 
+#if 0	/* not implemented by anything */
 struct netbsd32_format_op {
 	netbsd32_charp df_buf;
 	int	 df_count;		/* value-result */
 	daddr_t	 df_startblk;
 	int	 df_reg[8];		/* result */
 };
-#if 1
 #define DIOCRFORMAT32	_IOWR('d', 105, struct netbsd32_format_op)
 #define DIOCWFORMAT32	_IOWR('d', 106, struct netbsd32_format_op)
 #endif
@@ -200,8 +200,8 @@ struct	netbsd32_ifreq {
 #define	SIOCSIFMEDIA32	_IOWR('i', 53, struct netbsd32_ifreq)	/* set net media */
 #define	SIOCSIFMTU32	 _IOW('i', 127, struct netbsd32_ifreq)	/* set ifnet mtu */
 #define	SIOCGIFMTU32	_IOWR('i', 126, struct netbsd32_ifreq)	/* get ifnet mtu */
-#define	SIOCSIFASYNCMAP32  _IOW('i', 125, struct netbsd32_ifreq)	/* set ppp asyncmap */
-#define	SIOCGIFASYNCMAP32 _IOWR('i', 124, struct netbsd32_ifreq)	/* get ppp asyncmap */
+/* was 125 SIOCSIFASYNCMAP32 */
+/* was 124 SIOCGIFASYNCMAP32 */
 /* from <net/bpf.h> */
 #define BIOCGETIF32	_IOR('B',107, struct netbsd32_ifreq)
 #define BIOCSETIF32	_IOW('B',108, struct netbsd32_ifreq)
@@ -245,9 +245,9 @@ struct netbsd32_ifmediareq {
 /* from <net/if.h> */
 struct  netbsd32_ifdrv {
 	char		ifd_name[IFNAMSIZ];	/* if name, e.g. "en0" */
-	unsigned long	ifd_cmd;
-	size_t		ifd_len;
-	void		*ifd_data;
+	netbsd32_u_long	ifd_cmd;
+	netbsd32_size_t	ifd_len;
+	netbsd32_voidp	ifd_data;
 }; 
 #if 1
 /* from <sys/sockio.h> */

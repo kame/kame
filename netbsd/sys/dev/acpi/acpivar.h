@@ -1,4 +1,4 @@
-/*	$NetBSD: acpivar.h,v 1.4 2002/03/24 03:32:14 sommerfeld Exp $	*/
+/*	$NetBSD: acpivar.h,v 1.15.2.2 2004/04/28 05:25:25 jmc Exp $	*/
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -43,8 +43,11 @@
 
 #include <machine/bus.h>
 #include <dev/pci/pcivar.h>
+#include <dev/isa/isavar.h>
 
 #include <dev/acpi/acpica.h>
+
+#include <dev/sysmon/sysmonvar.h>
 
 /*
  * acpibus_attach_args:
@@ -57,6 +60,7 @@ struct acpibus_attach_args {
 	bus_space_tag_t aa_memt;	/* PCI MEM space tag */
 	pci_chipset_tag_t aa_pc;	/* PCI chipset */
 	int aa_pciflags;		/* PCI bus flags */
+	isa_chipset_tag_t aa_ic;	/* ISA chipset */
 };
 
 /*
@@ -77,7 +81,7 @@ struct acpi_devnode {
 	ACPI_HANDLE	ad_handle;	/* our ACPI handle */
 	u_int32_t	ad_level;	/* ACPI level */
 	u_int32_t	ad_type;	/* ACPI object type */
-	ACPI_DEVICE_INFO ad_devinfo;	/* our ACPI device info */
+	ACPI_DEVICE_INFO *ad_devinfo;	/* our ACPI device info */
 	struct acpi_scope *ad_scope;	/* backpointer to scope */
 	struct device	*ad_device;	/* pointer to configured device */
 };
@@ -107,8 +111,16 @@ struct acpi_softc {
 	bus_space_tag_t sc_memt;	/* PCI MEM space tag */
 	pci_chipset_tag_t sc_pc;	/* PCI chipset tag */
 	int sc_pciflags;		/* PCI bus flags */
+	int sc_pci_bus;			/* internal PCI fixup */
+	isa_chipset_tag_t sc_ic;	/* ISA chipset tag */
 
 	void *sc_sdhook;		/* shutdown hook */
+
+	/*
+	 * Power switch handlers for fixed-feature buttons.
+	 */
+	struct sysmon_pswitch sc_smpsw_power;
+	struct sysmon_pswitch sc_smpsw_sleep;
 
 	/*
 	 * Sleep state to transition to when a given
@@ -117,6 +129,8 @@ struct acpi_softc {
 	int sc_switch_sleep[ACPI_NSWITCHES];
 
 	int sc_sleepstate;		/* current sleep state */
+
+	int sc_quirks;
 
 	/*
 	 * Scopes we manage.
@@ -135,6 +149,7 @@ struct acpi_attach_args {
 	bus_space_tag_t aa_memt;	/* PCI MEM space tag */
 	pci_chipset_tag_t aa_pc;	/* PCI chipset tag */
 	int aa_pciflags;		/* PCI bus flags */
+	isa_chipset_tag_t aa_ic;	/* ISA chipset */
 };
 
 /*
@@ -184,6 +199,7 @@ struct acpi_irq {
 	SIMPLEQ_ENTRY(acpi_irq) ar_list;
 	int		ar_index;
 	uint32_t	ar_irq;
+	uint32_t	ar_type;
 };
 
 struct acpi_drq {
@@ -230,7 +246,7 @@ struct acpi_resource_parse_ops {
 	void	(*memrange)(struct device *, void *, uint32_t, uint32_t,
 		    uint32_t, uint32_t);
 
-	void	(*irq)(struct device *, void *, uint32_t);
+	void	(*irq)(struct device *, void *, uint32_t, uint32_t);
 	void	(*drq)(struct device *, void *, uint32_t);
 
 	void	(*start_dep)(struct device *, void *, int);
@@ -243,8 +259,9 @@ extern int acpi_active;
 extern const struct acpi_resource_parse_ops acpi_resource_parse_ops_default;
 
 int		acpi_probe(void);
+int		acpi_match_hid(ACPI_DEVICE_INFO *, const char * const *);
 
-ACPI_STATUS	acpi_eval_integer(ACPI_HANDLE, char *, int *);
+ACPI_STATUS	acpi_eval_integer(ACPI_HANDLE, char *, ACPI_INTEGER *);
 ACPI_STATUS	acpi_eval_string(ACPI_HANDLE, char *, char **);
 ACPI_STATUS	acpi_eval_struct(ACPI_HANDLE, char *, ACPI_BUFFER *);
 
@@ -255,9 +272,38 @@ ACPI_STATUS	acpi_resource_parse(struct device *, struct acpi_devnode *,
 		    void *, const struct acpi_resource_parse_ops *);
 void		acpi_resource_print(struct device *, struct acpi_resources *);
 
+#if defined(_KERNEL_OPT)
+#include "acpiec.h"
+
+#if NACPIEC > 0
+void		acpiec_early_attach(struct device *);
+#endif
+#else
+#define	NACPIEC	0
+#endif
+
 struct acpi_io		*acpi_res_io(struct acpi_resources *, int);
 struct acpi_iorange	*acpi_res_iorange(struct acpi_resources *, int);
 struct acpi_mem		*acpi_res_mem(struct acpi_resources *, int);
 struct acpi_memrange	*acpi_res_memrange(struct acpi_resources *, int);
 struct acpi_irq		*acpi_res_irq(struct acpi_resources *, int);
 struct acpi_drq		*acpi_res_drq(struct acpi_resources *, int);
+
+/*
+ * power state transition
+ */
+ACPI_STATUS	acpi_enter_sleep_state(struct acpi_softc *, int);
+
+/*
+ * quirk handling
+ */
+struct acpi_quirk {
+	const char *aq_oemid;	/* compared against the X/RSDT OemId */
+	int aq_oemrev;		/* compared against the X/RSDT OemRev */
+	int aq_quirks;		/* the actual quirks */
+};
+
+#define ACPI_QUIRK_BADPCI	0x00000001	/* bad PCI hierarchy */
+#define ACPI_QUIRK_BADIRQ	0x00000002	/* bad IRQ information */
+
+int acpi_find_quirks(void);

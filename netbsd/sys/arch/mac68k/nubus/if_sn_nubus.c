@@ -1,4 +1,4 @@
-/*	$NetBSD: if_sn_nubus.c,v 1.20 1999/09/29 06:04:51 scottr Exp $	*/
+/*	$NetBSD: if_sn_nubus.c,v 1.23 2003/07/15 02:43:24 lukem Exp $	*/
 
 /*
  * Copyright (C) 1997 Allen Briggs
@@ -29,6 +29,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_sn_nubus.c,v 1.23 2003/07/15 02:43:24 lukem Exp $");
 
 #include "opt_inet.h"
 
@@ -62,9 +65,8 @@ static void	sn_nubus_attach __P((struct device *, struct device *, void *));
 static int	sn_nb_card_vendor __P((bus_space_tag_t, bus_space_handle_t,
 		    struct nubus_attach_args *));
 
-struct cfattach sn_nubus_ca = {
-	sizeof(struct sn_softc), sn_nubus_match, sn_nubus_attach
-};
+CFATTACH_DECL(sn_nubus, sizeof(struct sn_softc),
+    sn_nubus_match, sn_nubus_attach, NULL, NULL);
 
 
 static int

@@ -1,4 +1,4 @@
-/*	$NetBSD: spifi.c,v 1.6 2002/03/06 16:50:34 tsutsui Exp $	*/
+/*	$NetBSD: spifi.c,v 1.11 2003/07/15 02:59:28 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2000 Tsubai Masanari.  All rights reserved.
@@ -25,6 +25,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: spifi.c,v 1.11 2003/07/15 02:59:28 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -130,9 +133,8 @@ static void spifi_write_count(struct spifi_reg *, int);
 #define DMAC3_FASTACCESS(sc)  dmac3_misc((sc)->sc_dma, DMAC3_CONF_FASTACCESS)
 #define DMAC3_SLOWACCESS(sc)  dmac3_misc((sc)->sc_dma, DMAC3_CONF_SLOWACCESS)
 
-struct cfattach spifi_ca = {
-	sizeof(struct spifi_softc), spifi_match, spifi_attach
-};
+CFATTACH_DECL(spifi, sizeof(struct spifi_softc),
+    spifi_match, spifi_attach, NULL, NULL);
 
 int
 spifi_match(parent, cf, aux)
@@ -234,7 +236,7 @@ spifi_scsipi_request(chan, req, arg)
 
 		scb = spifi_get_scb(sc);
 		if (scb == NULL) {
-			panic("spifi_scsipi_request: no scb\n");
+			panic("spifi_scsipi_request: no scb");
 		}
 
 		scb->xs = xs;
@@ -431,7 +433,7 @@ spifi_intr(v)
 
 	switch (dmac3_intr(sc->sc_dma)) {
 	case 0:
-		DPRINTF("spurious dma intr\n");
+		DPRINTF("spurious DMA intr\n");
 		return 0;
 	case -1:
 		printf("DMAC parity error, data PAD\n");

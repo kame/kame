@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_dma.c,v 1.13 2001/09/10 21:19:29 chris Exp $	*/
+/*	$NetBSD: bus_dma.c,v 1.20 2003/07/15 02:15:02 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -41,10 +41,12 @@
  * NetBSD: bus_dma.c,v 1.11 1998/09/21 22:53:35 thorpej Exp
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bus_dma.c,v 1.20 2003/07/15 02:15:02 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/map.h>
 #include <sys/proc.h>
 #include <sys/buf.h>
 #include <sys/reboot.h>
@@ -63,7 +65,8 @@
 #include <machine/ka43.h>
 #include <machine/sid.h>
 
-extern	vaddr_t avail_start, avail_end, virtual_avail;
+extern	paddr_t avail_start, avail_end;
+extern  vaddr_t virtual_avail;
 
 int	_bus_dmamap_load_buffer __P((bus_dma_tag_t, bus_dmamap_t, void *,
 	    bus_size_t, struct proc *, int, vaddr_t *, int *, int));
@@ -464,7 +467,7 @@ _bus_dmamem_map(t, segs, nsegs, size, kvap, flags)
 	for (curseg = 0; curseg < nsegs; curseg++) {
 		for (addr = segs[curseg].ds_addr;
 		    addr < (segs[curseg].ds_addr + segs[curseg].ds_len);
-		    addr += NBPG, va += NBPG, size -= NBPG) {
+		    addr += PAGE_SIZE, va += PAGE_SIZE, size -= PAGE_SIZE) {
 			if (size == 0)
 				panic("_bus_dmamem_map: size botch");
 			if (vax_boardtype == VAX_BTYP_43)
@@ -597,7 +600,7 @@ _bus_dmamap_load_buffer(t, map, buf, buflen, p, flags, lastaddrp, segp, first)
 		/*
 		 * Compute the segment size, and adjust counts.
 		 */
-		sgsize = NBPG - ((u_long)vaddr & PGOFSET);
+		sgsize = PAGE_SIZE - ((u_long)vaddr & PGOFSET);
 		if (buflen < sgsize)
 			sgsize = buflen;
 
@@ -703,7 +706,6 @@ _bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
 	/*
 	 * Allocate pages from the VM system.
 	 */
-	TAILQ_INIT(&mlist);
 	error = uvm_pglistalloc(size, low, high, alignment, boundary,
 	    &mlist, nsegs, (flags & BUS_DMA_NOWAIT) == 0);
 	if (error)

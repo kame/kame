@@ -1,4 +1,4 @@
-/*	$NetBSD: kb_kbc.c,v 1.1 2001/01/25 14:33:30 tsutsui Exp $	*/
+/*	$NetBSD: kb_kbc.c,v 1.4 2003/07/15 02:59:26 lukem Exp $	*/
 
 /*
  * Copyright (c) 2001 Izumi Tsutsui.
@@ -27,6 +27,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kb_kbc.c,v 1.4 2003/07/15 02:59:26 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -52,9 +55,8 @@ void	kb_kbc_init(struct kb_softc *);
 int	kb_kbc_intr(void *);
 int	kb_kbc_cnattach(void);
 
-struct cfattach kb_kbc_ca = {
-	sizeof(struct kb_softc), kb_kbc_match, kb_kbc_attach
-};
+CFATTACH_DECL(kb_kbc, sizeof(struct kb_softc),
+    kb_kbc_match, kb_kbc_attach, NULL, NULL);
 
 struct console_softc kb_kbc_conssc;
 

@@ -1,9 +1,9 @@
-/*	$NetBSD: ip_icmp.c,v 1.66.10.2 2003/06/16 13:46:51 grant Exp $	*/
+/*	$NetBSD: ip_icmp.c,v 1.82.2.2 2004/08/03 22:37:09 jmc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -81,11 +81,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -105,7 +101,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ip_icmp.c,v 1.66.10.2 2003/06/16 13:46:51 grant Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ip_icmp.c,v 1.82.2.2 2004/08/03 22:37:09 jmc Exp $");
 
 #include "opt_ipsec.h"
 
@@ -137,6 +133,11 @@ __KERNEL_RCSID(0, "$NetBSD: ip_icmp.c,v 1.66.10.2 2003/06/16 13:46:51 grant Exp 
 #include <netkey/key.h>
 #endif
 
+#ifdef FAST_IPSEC
+#include <netipsec/ipsec.h>
+#include <netipsec/key.h>
+#endif	/* FAST_IPSEC*/
+
 #include <machine/stdarg.h>
 
 /*
@@ -150,6 +151,8 @@ int	icmpmaskrepl = 0;
 int	icmpprintfs = 0;
 #endif
 int	icmpreturndatabytes = 8;
+
+struct icmpstat	icmpstat;
 
 /*
  * List of callbacks to notify when Path MTU changes are made.
@@ -184,12 +187,12 @@ static int icmp_ratelimit __P((const struct in_addr *, const int, const int));
 void
 icmp_init()
 {
-	/* 
-	 * This is only useful if the user initializes redirtimeout to 
+	/*
+	 * This is only useful if the user initializes redirtimeout to
 	 * something other than zero.
 	 */
 	if (icmp_redirtimeout != 0) {
-		icmp_redirect_timeout_q = 
+		icmp_redirect_timeout_q =
 			rt_timer_queue_create(icmp_redirtimeout);
 	}
 }
@@ -248,7 +251,7 @@ icmp_error(n, type, code, dest, destifp)
 	 */
 	if (n->m_flags & M_DECRYPTED)
 		goto freeit;
-	if (oip->ip_off &~ (IP_MF|IP_DF))
+	if (oip->ip_off &~ htons(IP_MF|IP_DF))
 		goto freeit;
 	if (oip->ip_p == IPPROTO_ICMP && type != ICMP_REDIRECT &&
 	  n->m_len >= oiplen + ICMP_MINLEN &&
@@ -271,9 +274,10 @@ icmp_error(n, type, code, dest, destifp)
 	/*
 	 * Now, formulate icmp message
 	 */
-	icmplen = oiplen + min(icmpreturndatabytes, oip->ip_len - oiplen);
+	icmplen = oiplen + min(icmpreturndatabytes,
+	    ntohs(oip->ip_len) - oiplen);
 	/*
-	 * Defend against mbuf chains shorter than oip->ip_len:
+	 * Defend against mbuf chains shorter than oip->ip_len - oiplen:
 	 */
 	mblen = 0;
 	for (m = n; m && (mblen < icmplen); m = m->m_next)
@@ -304,6 +308,7 @@ icmp_error(n, type, code, dest, destifp)
 	}
 	if (m == NULL)
 		goto freeit;
+	MCLAIM(m, n->m_owner);
 	m->m_len = icmplen + ICMP_MINLEN;
 	if ((m->m_flags & M_EXT) == 0)
 		MH_ALIGN(m, m->m_len);
@@ -316,7 +321,7 @@ icmp_error(n, type, code, dest, destifp)
 		icp->icmp_gwaddr.s_addr = dest;
 	else {
 		icp->icmp_void = 0;
-		/* 
+		/*
 		 * The following assignments assume an overlay with the
 		 * zeroed icmp_void field.
 		 */
@@ -328,8 +333,6 @@ icmp_error(n, type, code, dest, destifp)
 			icp->icmp_nextmtu = htons(destifp->if_mtu);
 	}
 
-	HTONS(oip->ip_off);
-	HTONS(oip->ip_len);
 	icp->icmp_code = code;
 	m_copydata(n, 0, icmplen, (caddr_t)&icp->icmp_ip);
 	nip = &icp->icmp_ip;
@@ -348,9 +351,9 @@ icmp_error(n, type, code, dest, destifp)
 	/* ip_v set in ip_output */
 	nip->ip_hl = sizeof(struct ip) >> 2;
 	nip->ip_tos = 0;
-	nip->ip_len = m->m_len;
+	nip->ip_len = htons(m->m_len);
 	/* ip_id set in ip_output */
-	nip->ip_off = 0;
+	nip->ip_off = htons(0);
 	/* ip_ttl set in icmp_reflect */
 	nip->ip_p = IPPROTO_ICMP;
 	nip->ip_src = oip->ip_src;
@@ -399,7 +402,7 @@ icmp_input(m, va_alist)
 	 * Locate icmp structure in mbuf, and check
 	 * that not corrupted and of at least minimum length.
 	 */
-	icmplen = ip->ip_len - hlen;
+	icmplen = ntohs(ip->ip_len) - hlen;
 #ifdef ICMPPRINTFS
 	if (icmpprintfs)
 		printf("icmp_input from %x to %x, len %d\n",
@@ -419,6 +422,7 @@ icmp_input(m, va_alist)
 	m->m_len -= hlen;
 	m->m_data += hlen;
 	icp = mtod(m, struct icmp *);
+	/* Don't need to assert alignment, here. */
 	if (in_cksum(m, icmplen)) {
 		icmpstat.icps_checksum++;
 		goto freeit;
@@ -453,7 +457,7 @@ icmp_input(m, va_alist)
 			case ICMP_UNREACH_NEEDFRAG:
 				code = PRC_MSGSIZE;
 				break;
-				
+
 			case ICMP_UNREACH_NET_UNKNOWN:
 			case ICMP_UNREACH_NET_PROHIB:
 			case ICMP_UNREACH_TOSNET:
@@ -501,7 +505,6 @@ icmp_input(m, va_alist)
 		}
 		if (IN_MULTICAST(icp->icmp_ip.ip_dst.s_addr))
 			goto badcode;
-		NTOHS(icp->icmp_ip.ip_len);
 #ifdef ICMPPRINTFS
 		if (icmpprintfs)
 			printf("deliver to protocol %d\n", icp->icmp_ip.ip_p);
@@ -530,7 +533,7 @@ icmp_input(m, va_alist)
 		icp->icmp_rtime = iptime();
 		icp->icmp_ttime = icp->icmp_rtime;	/* bogus, do later! */
 		goto reflect;
-		
+
 	case ICMP_MASKREQ:
 		if (icmpmaskrepl == 0)
 			break;
@@ -595,19 +598,19 @@ reflect:
 		    (struct sockaddr *)0, RTF_GATEWAY | RTF_HOST,
 		    sintosa(&icmpgw), (struct rtentry **)&rt);
 		if (rt != NULL && icmp_redirtimeout != 0) {
-			i = rt_timer_add(rt, icmp_redirect_timeout, 
+			i = rt_timer_add(rt, icmp_redirect_timeout,
 					 icmp_redirect_timeout_q);
 			if (i)
 				log(LOG_ERR, "ICMP:  redirect failed to "
 				    "register timeout for route to %x, "
-				    "code %d\n", 
+				    "code %d\n",
 				    icp->icmp_ip.ip_dst.s_addr, i);
 		}
 		if (rt != NULL)
 			rtfree(rt);
 
 		pfctlinput(PRC_REDIRECT_HOST, sintosa(&icmpsrc));
-#ifdef IPSEC
+#if defined(IPSEC) || defined(FAST_IPSEC)
 		key_sa_routechange((struct sockaddr *)&icmpsrc);
 #endif
 		break;
@@ -670,7 +673,8 @@ icmp_reflect(m)
 	INADDR_TO_IA(t, ia);
 
 	/* look for packet sent to broadcast address */
-	if (ia == NULL && (m->m_pkthdr.rcvif->if_flags & IFF_BROADCAST)) {
+	if (ia == NULL && m->m_pkthdr.rcvif &&
+	    (m->m_pkthdr.rcvif->if_flags & IFF_BROADCAST)) {
 		TAILQ_FOREACH(ifa, &m->m_pkthdr.rcvif->if_addrlist, ifa_list) {
 			if (ifa->ifa_addr->sa_family != AF_INET)
 				continue;
@@ -686,11 +690,13 @@ icmp_reflect(m)
 
 	icmpdst.sin_addr = t;
 
-	/* if the packet is addressed somewhere else, compute the
-	   source address for packets routed back to the source, and
-	   use that, if it's an address on the interface which
-	   received the packet */
-	if (sin == (struct sockaddr_in *)0) {
+	/*
+	 * if the packet is addressed somewhere else, compute the
+	 * source address for packets routed back to the source, and
+	 * use that, if it's an address on the interface which
+	 * received the packet
+	 */
+	if (sin == (struct sockaddr_in *)0 && m->m_pkthdr.rcvif) {
 		struct sockaddr_in sin_dst;
 		struct route icmproute;
 		int errornum;
@@ -719,11 +725,13 @@ icmp_reflect(m)
 		}
 	}
 
-	/* if it was not addressed to us, but the route doesn't go out
-	   the source interface, pick an address on the source
-	   interface.  This can happen when routing is asymmetric, or
-	   when the incoming packet was encapsulated */
-	if (sin == (struct sockaddr_in *)0) {
+	/*
+	 * if it was not addressed to us, but the route doesn't go out
+	 * the source interface, pick an address on the source
+	 * interface.  This can happen when routing is asymmetric, or
+	 * when the incoming packet was encapsulated
+	 */
+	if (sin == (struct sockaddr_in *)0 && m->m_pkthdr.rcvif) {
 		TAILQ_FOREACH(ifa, &m->m_pkthdr.rcvif->if_addrlist, ifa_list) {
 			if (ifa->ifa_addr->sa_family != AF_INET)
 				continue;
@@ -739,7 +747,7 @@ icmp_reflect(m)
 	 * interface.
 	 */
 	if (sin == (struct sockaddr_in *)0)
-		TAILQ_FOREACH(ia, &in_ifaddr, ia_list) {
+		TAILQ_FOREACH(ia, &in_ifaddrhead, ia_list) {
 			if (ia->ia_ifp->if_flags & IFF_LOOPBACK)
 				continue;
 			sin = &ia->ia_addr;
@@ -770,6 +778,7 @@ icmp_reflect(m)
 		cp = (u_char *) (ip + 1);
 		if ((opts = ip_srcroute()) == 0 &&
 		    (opts = m_gethdr(M_DONTWAIT, MT_HEADER))) {
+			MCLAIM(opts, m->m_owner);
 			opts->m_len = sizeof(struct in_addr);
 			*mtod(opts, struct in_addr *) = zeroin_addr;
 		}
@@ -796,7 +805,7 @@ icmp_reflect(m)
 			    /*
 			     * Should check for overflow, but it "can't happen"
 			     */
-			    if (opt == IPOPT_RR || opt == IPOPT_TS || 
+			    if (opt == IPOPT_RR || opt == IPOPT_TS ||
 				opt == IPOPT_SECURITY) {
 				    bcopy((caddr_t)cp,
 					mtod(opts, caddr_t) + opts->m_len, len);
@@ -820,7 +829,7 @@ icmp_reflect(m)
 		 * Now strip out original options by copying rest of first
 		 * mbuf's data back, and adjust the IP length.
 		 */
-		ip->ip_len -= optlen;
+		ip->ip_len = htons(ntohs(ip->ip_len) - optlen);
 		ip->ip_hl = sizeof(struct ip) >> 2;
 		m->m_len -= optlen;
 		if (m->m_flags & M_PKTHDR)
@@ -829,12 +838,14 @@ icmp_reflect(m)
 		bcopy((caddr_t)ip + optlen, (caddr_t)(ip + 1),
 			 (unsigned)(m->m_len - sizeof(struct ip)));
 	}
+	m_tag_delete_nonpersistent(m);
 	m->m_flags &= ~(M_BCAST|M_MCAST);
 
 	/*      
 	 * Clear any in-bound checksum flags for this packet.
 	 */
-	m->m_pkthdr.csum_flags = 0;
+	if (m->m_flags & M_PKTHDR)
+		m->m_pkthdr.csum_flags = 0;
 
 	icmp_send(m, opts);
 done:
@@ -860,18 +871,15 @@ icmp_send(m, opts)
 	m->m_len -= hlen;
 	icp = mtod(m, struct icmp *);
 	icp->icmp_cksum = 0;
-	icp->icmp_cksum = in_cksum(m, ip->ip_len - hlen);
+	icp->icmp_cksum = in_cksum(m, ntohs(ip->ip_len) - hlen);
 	m->m_data -= hlen;
 	m->m_len += hlen;
 #ifdef ICMPPRINTFS
 	if (icmpprintfs)
 		printf("icmp_send dst %x src %x\n", ip->ip_dst, ip->ip_src);
 #endif
-#ifdef IPSEC
-	/* Don't lookup socket */
-	(void)ipsec_setsocket(m, NULL);
-#endif
-	(void) ip_output(m, opts, NULL, 0, NULL);
+	(void) ip_output(m, opts, NULL, 0, 
+	    (struct ip_moptions *)NULL, (struct socket *)NULL);
 }
 
 n_time
@@ -885,67 +893,132 @@ iptime()
 	return (htonl(t));
 }
 
-int
-icmp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
+/*
+ * sysctl helper routine for net.inet.icmp.returndatabytes.  ensures
+ * that the new value is in the correct range.
+ */
+static int
+sysctl_net_inet_icmp_returndatabytes(SYSCTLFN_ARGS)
 {
-	int arg, error;
+	int error, t;
+	struct sysctlnode node;
 
-	/* All sysctl names at this level are terminal. */
-	if (namelen != 1)
-		return (ENOTDIR);
-
-	switch (name[0])
-	{
-	case ICMPCTL_MASKREPL:
-		error = sysctl_int(oldp, oldlenp, newp, newlen, &icmpmaskrepl);
-		break;
-	case ICMPCTL_RETURNDATABYTES:
-		arg = icmpreturndatabytes;
-		error = sysctl_int(oldp, oldlenp, newp, newlen, &arg);
-		if (error)
-			break;
-		if ((arg >= 8) || (arg <= 512))
-			icmpreturndatabytes = arg;
-		else
-			error = EINVAL;
-		break;
-	case ICMPCTL_ERRPPSLIMIT:
-		error = sysctl_int(oldp, oldlenp, newp, newlen, &icmperrppslim);
-		break;
-	case ICMPCTL_REDIRACCEPT:
-		error = sysctl_int(oldp, oldlenp, newp, newlen, 
-				   &icmp_rediraccept);
-		break;
-	case ICMPCTL_REDIRTIMEOUT:
-		error = sysctl_int(oldp, oldlenp, newp, newlen,
-				   &icmp_redirtimeout);
-		if (icmp_redirect_timeout_q != NULL) {
-			if (icmp_redirtimeout == 0) {
-				rt_timer_queue_destroy(icmp_redirect_timeout_q,
-						       TRUE);
-				icmp_redirect_timeout_q = NULL;
-			} else {
-				rt_timer_queue_change(icmp_redirect_timeout_q, 
-						      icmp_redirtimeout);
-			}
-		} else if (icmp_redirtimeout > 0) {
-			icmp_redirect_timeout_q = 
-				rt_timer_queue_create(icmp_redirtimeout);
-		}
+	node = *rnode;
+	node.sysctl_data = &t;
+	t = icmpreturndatabytes;
+	error = sysctl_lookup(SYSCTLFN_CALL(&node));
+	if (error || newp == NULL)
 		return (error);
 
-		break;
-	default:
-		error = ENOPROTOOPT;
-		break;
+	if (t < 8 || t > 512)
+		return (EINVAL);
+	icmpreturndatabytes = t;
+
+	return (0);
+}
+
+/*
+ * sysctl helper routine for net.inet.icmp.redirtimeout.  ensures that
+ * the given value is not less than zero and then resets the timeout
+ * queue.
+ */
+static int
+sysctl_net_inet_icmp_redirtimeout(SYSCTLFN_ARGS)
+{
+	int error, tmp;
+	struct sysctlnode node;
+
+	node = *rnode;
+	node.sysctl_data = &tmp;
+	tmp = icmp_redirtimeout;
+	error = sysctl_lookup(SYSCTLFN_CALL(&node));
+	if (error || newp == NULL)
+		return (error);
+	if (tmp < 0)
+		return (EINVAL);
+	icmp_redirtimeout = tmp;
+
+	/*
+	 * was it a *defined* side-effect that anyone even *reading*
+	 * this value causes these things to happen?
+	 */
+	if (icmp_redirect_timeout_q != NULL) {
+		if (icmp_redirtimeout == 0) {
+			rt_timer_queue_destroy(icmp_redirect_timeout_q,
+			    TRUE);
+			icmp_redirect_timeout_q = NULL;
+		} else {
+			rt_timer_queue_change(icmp_redirect_timeout_q,
+			    icmp_redirtimeout);
+		}
+	} else if (icmp_redirtimeout > 0) {
+		icmp_redirect_timeout_q =
+		    rt_timer_queue_create(icmp_redirtimeout);
 	}
-	return error;
+	
+	return (0);
+}
+
+SYSCTL_SETUP(sysctl_net_inet_icmp_setup, "sysctl net.inet.icmp subtree setup")
+{
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "net", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_NET, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "inet", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_NET, PF_INET, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "icmp",
+		       SYSCTL_DESCR("ICMPv4 related settings"),
+		       NULL, 0, NULL, 0,
+		       CTL_NET, PF_INET, IPPROTO_ICMP, CTL_EOL);
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "maskrepl",
+		       SYSCTL_DESCR("Respond to ICMP_MASKREQ messages"),
+		       NULL, 0, &icmpmaskrepl, 0,
+		       CTL_NET, PF_INET, IPPROTO_ICMP,
+		       ICMPCTL_MASKREPL, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "returndatabytes",
+		       SYSCTL_DESCR("Number of bytes to return in an ICMP "
+				    "error message"),
+		       sysctl_net_inet_icmp_returndatabytes, 0,
+		       &icmpreturndatabytes, 0,
+		       CTL_NET, PF_INET, IPPROTO_ICMP,
+		       ICMPCTL_RETURNDATABYTES, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "errppslimit",
+		       SYSCTL_DESCR("Maximum number of outgoing ICMP error "
+				    "messages per second"),
+		       NULL, 0, &icmperrppslim, 0,
+		       CTL_NET, PF_INET, IPPROTO_ICMP,
+		       ICMPCTL_ERRPPSLIMIT, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "rediraccept",
+		       SYSCTL_DESCR("Accept ICMP_REDIRECT messages"),
+		       NULL, 0, &icmp_rediraccept, 0,
+		       CTL_NET, PF_INET, IPPROTO_ICMP,
+		       ICMPCTL_REDIRACCEPT, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "redirtimeout",
+		       SYSCTL_DESCR("Lifetime of ICMP_REDIRECT generated "
+				    "routes"),
+		       sysctl_net_inet_icmp_redirtimeout, 0,
+		       &icmp_redirtimeout, 0,
+		       CTL_NET, PF_INET, IPPROTO_ICMP,
+		       ICMPCTL_REDIRTIMEOUT, CTL_EOL);
 }
 
 /* Table of common MTUs: */
@@ -969,15 +1042,15 @@ icmp_mtudisc(icp, faddr)
 	rt = rtalloc1(dst, 1);
 	if (rt == 0)
 		return;
-    
+
 	/* If we didn't get a host route, allocate one */
-    
+
 	if ((rt->rt_flags & RTF_HOST) == 0) {
 		struct rtentry *nrt;
 
-		error = rtrequest((int) RTM_ADD, dst, 
+		error = rtrequest((int) RTM_ADD, dst,
 		    (struct sockaddr *) rt->rt_gateway,
-		    (struct sockaddr *) 0, 
+		    (struct sockaddr *) 0,
 		    RTF_GATEWAY | RTF_HOST | RTF_DYNAMIC, &nrt);
 		if (error) {
 			rtfree(rt);
@@ -996,7 +1069,7 @@ icmp_mtudisc(icp, faddr)
 	if (mtu == 0) {
 		int i = 0;
 
-		mtu = icp->icmp_ip.ip_len; /* NTOHS happened in deliver: */
+		mtu = ntohs(icp->icmp_ip.ip_len);
 		/* Some 4.2BSD-based routers incorrectly adjust the ip_len */
 		if (mtu > rt->rt_rmx.rmx_mtu && rt->rt_rmx.rmx_mtu != 0)
 			mtu -= (icp->icmp_ip.ip_hl << 2);
@@ -1030,7 +1103,7 @@ icmp_mtudisc(icp, faddr)
 	if ((rt->rt_rmx.rmx_locks & RTV_MTU) == 0) {
 		if (mtu < 296 || mtu > rt->rt_ifp->if_mtu)
 			rt->rt_rmx.rmx_locks |= RTV_MTU;
-		else if (rt->rt_rmx.rmx_mtu > mtu || 
+		else if (rt->rt_rmx.rmx_mtu > mtu ||
 			 rt->rt_rmx.rmx_mtu == 0) {
 			icmpstat.icps_pmtuchg++;
 			rt->rt_rmx.rmx_mtu = mtu;
@@ -1090,7 +1163,7 @@ icmp_mtudisc_timeout(rt, r)
 {
 	if (rt == NULL)
 		panic("icmp_mtudisc_timeout:  bad route to timeout");
-	if ((rt->rt_flags & (RTF_DYNAMIC | RTF_HOST)) == 
+	if ((rt->rt_flags & (RTF_DYNAMIC | RTF_HOST)) ==
 	    (RTF_DYNAMIC | RTF_HOST)) {
 		rtrequest((int) RTM_DELETE, (struct sockaddr *)rt_key(rt),
 		    rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
@@ -1108,7 +1181,7 @@ icmp_redirect_timeout(rt, r)
 {
 	if (rt == NULL)
 		panic("icmp_redirect_timeout:  bad route to timeout");
-	if ((rt->rt_flags & (RTF_DYNAMIC | RTF_HOST)) == 
+	if ((rt->rt_flags & (RTF_DYNAMIC | RTF_HOST)) ==
 	    (RTF_DYNAMIC | RTF_HOST)) {
 		rtrequest((int) RTM_DELETE, (struct sockaddr *)rt_key(rt),
 		    rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);

@@ -1,4 +1,4 @@
-/*	$NetBSD: getextmemx.c,v 1.2 1999/03/08 21:38:28 drochner Exp $	*/
+/*	$NetBSD: getextmemx.c,v 1.6 2004/03/24 16:46:28 drochner Exp $	*/
 
 /*
  * Copyright (c) 1997, 1999
@@ -12,12 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed for the NetBSD Project
- *	by Matthias Drochner.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -43,29 +37,61 @@
 
 extern int getextmem2 __P((int *));
 extern int getmementry __P((int *, int *));
+extern int getextmemps2 __P((void *));
 
 int
 getextmemx()
 {
 	int buf[5], i;
 	int extmem = getextmem1();
+#ifdef SUPPORT_PS2
+	struct {
+		uint16_t len;
+		uint32_t dta[8];
+		/* pad to 64 bytes - without this, machine would reset */
+		uint8_t __pad[30];
+	} __attribute__((__packed__)) bufps2;
+#endif
 
-	if (!getextmem2(buf) && buf[0] <= 15 * 1024) {
-		int help = buf[0];
-		if (help == 15 * 1024)
-			help += buf[1] * 64;
-		if (extmem < help)
-			extmem = help;
+#ifdef DEBUG_MEMSIZE
+	printf("extmem1: %xk\n", extmem);
+#endif
+	if (!getextmem2(buf)) {
+#ifdef DEBUG_MEMSIZE
+		printf("extmem2: %xk + %xk\n", buf[0], buf[1] * 64);
+#endif
+		if (buf[0] <= 15 * 1024) {
+			int help = buf[0];
+			if (help == 15 * 1024)
+				help += buf[1] * 64;
+			if (extmem < help)
+				extmem = help;
+		}
 	}
 
 	i = 0;
 	do {
 		if (getmementry(&i, buf))
 			break;
+#ifdef DEBUG_MEMSIZE
+		printf("mementry: (%d) %x %x %x %x %x\n",
+			i, buf[0], buf[1], buf[2], buf[3], buf[4]);
+#endif
 		if ((buf[4] == 1 && buf[0] == 0x100000)
 		    && extmem < buf[2] / 1024)
 			extmem = buf[2] / 1024;
 	} while (i);
+
+#ifdef SUPPORT_PS2
+	/* use local memory information from RETURN MEMORY-MAP INFORMATION */
+	if (!getextmemps2((void *) &bufps2)) {
+		int help = bufps2.dta[0];
+		if (help == 15 * 1024)
+			help += bufps2.dta[1];
+		if (extmem < help)
+			extmem = help;
+	}
+#endif
 
 	return (extmem);
 }

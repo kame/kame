@@ -1,4 +1,4 @@
-/* $NetBSD: podulebusreg.h,v 1.1.4.1 2002/11/01 11:12:30 tron Exp $ */
+/* $NetBSD: podulebusreg.h,v 1.2 2002/05/22 22:43:17 bjh21 Exp $ */
 
 /*
  * 2000 Ben Harris

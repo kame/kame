@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_device.c,v 1.40 2002/02/28 21:00:23 christos Exp $	*/
+/*	$NetBSD: uvm_device.c,v 1.42 2004/03/24 07:55:01 junyoung Exp $	*/
 
 /*
  *
@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_device.c,v 1.40 2002/02/28 21:00:23 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_device.c,v 1.42 2004/03/24 07:55:01 junyoung Exp $");
 
 #include "opt_uvmhist.h"
 
@@ -67,11 +67,11 @@ static struct simplelock udv_lock;
  * functions
  */
 
-static void	udv_init __P((void));
-static void	udv_reference __P((struct uvm_object *));
-static void	udv_detach __P((struct uvm_object *));
-static int	udv_fault __P((struct uvm_faultinfo *, vaddr_t,
-    struct vm_page **, int, int, vm_fault_t, vm_prot_t, int));
+static void	udv_init(void);
+static void	udv_reference(struct uvm_object *);
+static void	udv_detach(struct uvm_object *);
+static int	udv_fault(struct uvm_faultinfo *, vaddr_t,
+    struct vm_page **, int, int, vm_fault_t, vm_prot_t, int);
 
 /*
  * master pager structure
@@ -120,6 +120,7 @@ udv_attach(arg, accessprot, off, size)
 {
 	dev_t device = *((dev_t *)arg);
 	struct uvm_device *udv, *lcv;
+	const struct cdevsw *cdev;
 	dev_type_mmap((*mapfn));
 
 	UVMHIST_FUNC("udv_attach"); UVMHIST_CALLED(maphist);
@@ -130,10 +131,11 @@ udv_attach(arg, accessprot, off, size)
 	 * before we do anything, ensure this device supports mmap
 	 */
 
-	mapfn = cdevsw[major(device)].d_mmap;
-	if (mapfn == NULL ||
-	    mapfn == (dev_type_mmap((*))) enodev ||
-	    mapfn == (dev_type_mmap((*))) nullop)
+	cdev = cdevsw_lookup(device);
+	if (cdev == NULL)
+		return (NULL);
+	mapfn = cdev->d_mmap;
+	if (mapfn == NULL || mapfn == nommap || mapfn == nullmmap)
 		return(NULL);
 
 	/*
@@ -365,12 +367,13 @@ udv_fault(ufi, vaddr, pps, npages, centeridx, fault_type, access_type, flags)
 	struct vm_map_entry *entry = ufi->entry;
 	struct uvm_object *uobj = entry->object.uvm_obj;
 	struct uvm_device *udv = (struct uvm_device *)uobj;
+	const struct cdevsw *cdev;
 	vaddr_t curr_va;
 	off_t curr_offset;
 	paddr_t paddr, mdpgno;
 	int lcv, retval;
 	dev_t device;
-	paddr_t (*mapfn) __P((dev_t, off_t, int));
+	paddr_t (*mapfn)(dev_t, off_t, int);
 	vm_prot_t mapprot;
 	UVMHIST_FUNC("udv_fault"); UVMHIST_CALLED(maphist);
 	UVMHIST_LOG(maphist,"  flags=%d", flags,0,0,0);
@@ -392,7 +395,12 @@ udv_fault(ufi, vaddr, pps, npages, centeridx, fault_type, access_type, flags)
 	 */
 
 	device = udv->u_device;
-	mapfn = cdevsw[major(device)].d_mmap;
+	cdev = cdevsw_lookup(device);
+	if (cdev == NULL) {
+		uvmfault_unlockall(ufi, ufi->entry->aref.ar_amap, uobj, NULL);
+		return (EIO);
+	}
+	mapfn = cdev->d_mmap;
 
 	/*
 	 * now we must determine the offset in udv to use and the VA to

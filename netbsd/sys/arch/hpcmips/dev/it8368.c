@@ -1,4 +1,4 @@
-/*	$NetBSD: it8368.c,v 1.13 2002/05/03 07:31:24 takemura Exp $ */
+/*	$NetBSD: it8368.c,v 1.18 2003/07/15 02:29:29 lukem Exp $ */
 
 /*-
  * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: it8368.c,v 1.18 2003/07/15 02:29:29 lukem Exp $");
 
 #undef WINCE_DEFAULT_SETTING /* for debug */
 #undef IT8368DEBUG 
@@ -148,9 +151,8 @@ static struct pcmcia_chip_functions it8368_functions = {
 	it8368_chip_socket_disable
 };
 
-struct cfattach it8368e_ca = {
-	sizeof(struct it8368e_softc), it8368e_match, it8368e_attach
-};
+CFATTACH_DECL(it8368e, sizeof(struct it8368e_softc),
+    it8368e_match, it8368e_attach, NULL, NULL);
 
 /*
  *	IT8368 configuration register is big-endian.
@@ -372,7 +374,7 @@ int
 it8368_print(void *arg, const char *pnp)
 {
 	if (pnp)
-		printf("pcmcia at %s", pnp);
+		aprint_normal("pcmcia at %s", pnp);
 
 	return (UNCONF);
 }
@@ -381,7 +383,7 @@ int
 it8368_submatch(struct device *parent, struct cfdata *cf, void *aux)
 {
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 void

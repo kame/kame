@@ -1,4 +1,4 @@
-/*	$NetBSD: spd.c,v 1.1 2001/10/16 15:38:35 uch Exp $	*/
+/*	$NetBSD: spd.c,v 1.5 2003/07/15 02:54:36 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: spd.c,v 1.5 2003/07/15 02:54:36 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 
@@ -66,9 +69,8 @@ STATIC struct {
 	const char *name;
 } __spd_table[2];
 
-struct cfattach spd_ca = {
-	sizeof(struct device), spd_match, spd_attach
-};
+CFATTACH_DECL(spd, sizeof(struct device),
+    spd_match, spd_attach, NULL, NULL);
 
 #ifdef DEBUG
 #define LEGAL_SLOT(slot)	((slot) >= 0 && (slot) < 2)
@@ -128,7 +130,7 @@ spd_print(void *aux, const char *pnp)
 	struct spd_attach_args *spa = aux;
 
 	if (pnp)
-		printf("%s at %s", __spd_table[spa->spa_slot].name, pnp);
+		aprint_normal("%s at %s", __spd_table[spa->spa_slot].name, pnp);
 
 	return (UNCONF);
 }

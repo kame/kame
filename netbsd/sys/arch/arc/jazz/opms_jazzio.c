@@ -1,4 +1,4 @@
-/* $NetBSD: opms_jazzio.c,v 1.1 2001/06/13 15:05:46 soda Exp $ */
+/* $NetBSD: opms_jazzio.c,v 1.4 2003/07/15 00:04:50 lukem Exp $ */
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -27,6 +27,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: opms_jazzio.c,v 1.4 2003/07/15 00:04:50 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -43,10 +46,8 @@
 int	opms_jazzio_match __P((struct device *, struct cfdata *, void *));
 void	opms_jazzio_attach __P((struct device *, struct device *, void *));
 
-struct cfattach opms_jazzio_ca = {
-	sizeof(struct opms_softc),
-	opms_jazzio_match, opms_jazzio_attach,
-};
+CFATTACH_DECL(opms_jazzio, sizeof(struct opms_softc),
+    opms_jazzio_match, opms_jazzio_attach, NULL, NULL);
 
 int
 opms_jazzio_match(parent, match, aux)

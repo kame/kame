@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_dma.c,v 1.11 2001/11/14 18:15:12 thorpej Exp $	*/
+/*	$NetBSD: bus_dma.c,v 1.18 2003/10/08 18:10:07 tsutsui Exp $	*/
 /*	NetBSD: bus_dma.c,v 1.20 2000/01/10 03:24:36 simonb Exp 	*/
 
 /*-
@@ -37,6 +37,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bus_dma.c,v 1.18 2003/10/08 18:10:07 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -184,7 +187,7 @@ _bus_dmamap_load_buffer(t, map, buf, buflen, p, flags, lastaddrp, segp, first)
 		/*
 		 * Compute the segment size, and adjust counts.
 		 */
-		sgsize = NBPG - ((u_long)vaddr & PGOFSET);
+		sgsize = PAGE_SIZE - ((u_long)vaddr & PGOFSET);
 		if (buflen < sgsize)
 			sgsize = buflen;
 
@@ -442,7 +445,7 @@ _bus_dmamap_sync(t, map, offset, len, ops)
 	int ops;
 {
 	bus_size_t minlen;
-	bus_addr_t addr;
+	bus_addr_t addr, start, end, preboundary, firstboundary, lastboundary;
 	int i, useindex;
 
 	/*
@@ -522,7 +525,7 @@ _bus_dmamap_sync(t, map, offset, len, ops)
 		minlen = len < map->dm_segs[i].ds_len - offset ?
 		    len : map->dm_segs[i].ds_len - offset;
 
-		addr = map->dm_segs[i]._ds_vaddr; 
+		addr = map->dm_segs[i]._ds_vaddr;
 
 #ifdef BUS_DMA_DEBUG
 		printf("bus_dmamap_sync: flushing segment %d "
@@ -544,21 +547,31 @@ _bus_dmamap_sync(t, map, offset, len, ops)
 			continue;
 		}
 
+		start = addr + offset;
 		switch (ops) {
 		case BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE:
-			mips_dcache_wbinv_range(addr + offset, minlen);
+			mips_dcache_wbinv_range(start, minlen);
 			break;
 
 		case BUS_DMASYNC_PREREAD:
-#if 1
-			mips_dcache_wbinv_range(addr + offset, minlen);
-#else
-			mips_dcache_inv_range(addr + offset, minlen);
-#endif
+			end = start + minlen;
+			preboundary = start & ~mips_dcache_align_mask;
+			firstboundary = (start + mips_dcache_align_mask)
+			    & ~mips_dcache_align_mask;
+			lastboundary = end & ~mips_dcache_align_mask;
+			if (preboundary < start && preboundary < lastboundary)
+				mips_dcache_wbinv_range(preboundary,
+				    mips_dcache_align);
+			if (firstboundary < lastboundary)
+				mips_dcache_inv_range(firstboundary,
+				    lastboundary - firstboundary);
+			if (lastboundary < end)
+				mips_dcache_wbinv_range(lastboundary,
+				    mips_dcache_align);
 			break;
 
 		case BUS_DMASYNC_PREWRITE:
-			mips_dcache_wb_range(addr + offset, minlen);
+			mips_dcache_wb_range(start, minlen);
 			break;
 		}
 #ifdef BUS_DMA_DEBUG
@@ -594,12 +607,12 @@ _bus_dmamem_alloc(t, size, alignment, boundary, segs, nsegs, rsegs, flags)
 int
 _bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
     flags, low, high)
-	bus_dma_tag_t t; 
+	bus_dma_tag_t t;
 	bus_size_t size, alignment, boundary;
 	bus_dma_segment_t *segs;
 	int nsegs;
 	int *rsegs;
-	int flags; 
+	int flags;
 	paddr_t low;
 	paddr_t high;
 {
@@ -616,7 +629,6 @@ _bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
 	/*
 	 * Allocate pages from the VM system.
 	 */
-	TAILQ_INIT(&mlist);
 	error = uvm_pglistalloc(size, low, high, alignment, boundary,
 	    &mlist, nsegs, (flags & BUS_DMA_NOWAIT) == 0);
 	if (error)
@@ -731,7 +743,7 @@ _bus_dmamem_map(t, segs, nsegs, size, kvap, flags)
 		segs[curseg]._ds_vaddr = va;
 		for (addr = segs[curseg]._ds_paddr;
 		    addr < (segs[curseg]._ds_paddr + segs[curseg].ds_len);
-		    addr += NBPG, va += NBPG, size -= NBPG) {
+		    addr += PAGE_SIZE, va += PAGE_SIZE, size -= PAGE_SIZE) {
 			if (size == 0)
 				panic("_bus_dmamem_map: size botch");
 			pmap_enter(pmap_kernel(), va, addr,

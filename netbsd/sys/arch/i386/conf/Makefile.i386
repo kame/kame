@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile.i386,v 1.122 2001/12/09 05:00:45 atatat Exp $
+#	$NetBSD: Makefile.i386,v 1.133.2.2 2004/07/15 19:26:49 he Exp $
 
 # Makefile for NetBSD
 #
@@ -42,11 +42,21 @@ KERN_AS=	obj
 ##
 ## (4) local objects, compile rules, and dependencies
 ##
-MD_OBJS=	locore.o
+MD_OBJS=	locore.o spl.o vector.o microtime.o
 MD_CFILES=
-MD_SFILES=	${I386}/i386/locore.s
+MD_SFILES=	${I386}/i386/locore.S ${I386}/i386/spl.S \
+		${I386}/i386/vector.S ${I386}/i386/microtime.S
 
-locore.o: ${I386}/i386/locore.s assym.h
+locore.o: ${I386}/i386/locore.S assym.h
+	${NORMAL_S}
+
+spl.o: ${I386}/i386/spl.S assym.h
+	${NORMAL_S}
+
+vector.o: ${I386}/i386/vector.S assym.h
+	${NORMAL_S}
+
+microtime.o: ${I386}/i386/microtime.S assym.h
 	${NORMAL_S}
 
 ##
@@ -65,13 +75,15 @@ LINKFORMAT=	-z
 ## (6) port specific target dependencies
 ##
 
-freebsd_sigcode.o ibcs2_sigcode.o linux_sigcode.o svr4_sigcode.o: assym.h
-apmcall.o in_cksum.o pnpbioscall.o: assym.h
+freebsd_sigcode.o ibcs2_sigcode.o linux_sigcode.o: assym.h
+svr4_sigcode.o mach_sigcode.o: assym.h
+apmcall.o in_cksum.o pnpbioscall.o bioscall.o: assym.h
+mptramp.o: assym.h
+clock.o: config_time.h
 
 ##
 ## (7) misc settings
 ##
-KERNLINTFLAGS=	-bceghnxzF
 
 ##
 ## (8) config(8) generated machinery
@@ -87,6 +99,22 @@ KERNLINTFLAGS=	-bceghnxzF
 %LOAD
 
 %RULES
+
+# XXX - Ugly, but make doesn't easily handle .o.uue (assumes it's a suffix)
+# XXX - Also, config has no simple was to just add foo.o to the Makefile. 
+#       It needs a pathname of some sort for "object"        
+.if !empty(OBJS:M\/athhal-elf.o)
+OBJS:=${OBJS:C/\/athhal-elf.o/athhal-elf.o/}
+ 
+.PATH: $S/../contrib/sys/arch/i386/dev
+ATH_UUDEC?=	@${_MKSHMSG} "uudecode ${.CURDIR:T}/${.TARGET}"; \
+		${_MKSHECHO}\
+		${UUDECODE} -p $> \> ${.TARGET}; \
+		rm -f ${.TARGET}; \
+		${UUDECODE} -p $> > ${.TARGET}
+athhal-elf.o: athhal-elf-o.uue
+	${ATH_UUDEC}
+.endif
 
 ##
 ## (9) port independent kernel machinery

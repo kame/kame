@@ -1,4 +1,4 @@
-/*	$NetBSD: com_ebus.c,v 1.12 2002/03/20 18:54:46 eeh Exp $	*/
+/*	$NetBSD: com_ebus.c,v 1.21 2004/03/21 15:08:24 pk Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Matthew R. Green
@@ -32,6 +32,9 @@
  * NS Super I/O PC87332VLJ "com" to ebus attachment
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: com_ebus.c,v 1.21 2004/03/21 15:08:24 pk Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -53,14 +56,11 @@
 #include "kbd.h"
 #include "ms.h"
 
-cdev_decl(com); /* XXX this belongs elsewhere */
-
 int	com_ebus_match __P((struct device *, struct cfdata *, void *));
 void	com_ebus_attach __P((struct device *, struct device *, void *));
 
-struct cfattach com_ebus_ca = {
-	sizeof(struct com_softc), com_ebus_match, com_ebus_attach
-};
+CFATTACH_DECL(com_ebus, sizeof(struct com_softc),
+    com_ebus_match, com_ebus_attach, NULL, NULL);
 
 static char *com_names[] = {
 	"su",
@@ -77,21 +77,18 @@ com_ebus_match(parent, match, aux)
 	struct ebus_attach_args *ea = aux;
 	int i;
 
-	for (i=0; com_names[i]; i++)
+	for (i = 0; com_names[i]; i++)
 		if (strcmp(ea->ea_name, com_names[i]) == 0)
 			return (1);
 
 	if (strcmp(ea->ea_name, "serial") == 0) {
-		char compat[80];
+		char *compat;
 
 		/* Could be anything. */
-		if ((i = OF_getproplen(ea->ea_node, "compatible")) &&
-			OF_getprop(ea->ea_node, "compatible", compat,
-				sizeof(compat)) == i) {
-			if (strcmp(compat, "su16550") == 0 || 
-				strcmp(compat, "su") == 0) {
-				return (1);
-			}
+		compat = prom_getpropstring(ea->ea_node, "compatible");
+		if (strcmp(compat, "su16550") == 0 ||
+		    strcmp(compat, "su") == 0) {
+			return (1);
 		}
 	}
 	return (0);
@@ -109,6 +106,7 @@ com_ebus_attach(parent, self, aux)
 	struct kbd_ms_tty_attach_args kma;
 #if (NKBD > 0) || (NMS > 0)
 	int maj;
+	extern const struct cdevsw com_cdevsw;
 #endif
 	int i;
 	int com_is_input;
@@ -117,7 +115,7 @@ com_ebus_attach(parent, self, aux)
 	sc->sc_iot = ea->ea_bustag;
 	sc->sc_iobase = EBUS_ADDR_FROM_REG(&ea->ea_reg[0]);
 	/*
-	 * Addresses that shoud be supplied by the prom:
+	 * Addresses that should be supplied by the prom:
 	 *	- normal com registers
 	 *	- ns873xx configuration registers
 	 *	- DMA space
@@ -141,13 +139,13 @@ com_ebus_attach(parent, self, aux)
 
 	for (i = 0; i < ea->ea_nintr; i++)
 		bus_intr_establish(ea->ea_bustag, ea->ea_intr[i],
-		    IPL_SERIAL, 0, comintr, sc);
+		    IPL_SERIAL, comintr, sc);
 
 	kma.kmta_consdev = NULL;
 
 	/* Figure out if we're the console. */
-	com_is_input = (ea->ea_node == OF_instance_to_package(OF_stdin()));
-	com_is_output = (ea->ea_node == OF_instance_to_package(OF_stdout()));
+	com_is_input = (ea->ea_node == prom_instance_to_package(prom_stdin()));
+	com_is_output = (ea->ea_node == prom_instance_to_package(prom_stdout()));
 
 	if (com_is_input || com_is_output) {
 		extern struct consdev comcons;
@@ -160,7 +158,7 @@ com_ebus_attach(parent, self, aux)
 		/* Attach com as the console. */
 		cn_orig = cn_tab;
 		if (comcnattach(sc->sc_iot, sc->sc_iobase, kma.kmta_baud,
-			sc->sc_frequency, kma.kmta_cflag)) {
+			sc->sc_frequency, COM_TYPE_NORMAL, kma.kmta_cflag)) {
 			printf("Error: comcnattach failed\n");
 		}
 		cn_tab = cn_orig;
@@ -184,22 +182,20 @@ com_ebus_attach(parent, self, aux)
 /* If we figure out we're the console we should point this to our consdev */
 
 	/* locate the major number */
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == comopen)
-			break;
+	maj = cdevsw_lookup_major(&com_cdevsw);
 
 	kma.kmta_dev = makedev(maj, sc->sc_dev.dv_unit);
 
 /* Attach 'em if we got 'em. */
 #if (NKBD > 0)
 	kma.kmta_name = "keyboard";
-	if (OF_getproplen(ea->ea_node, kma.kmta_name) == 0) {
+	if (prom_getproplen(ea->ea_node, kma.kmta_name) == 0) {
 		config_found(self, (void *)&kma, NULL);
 	}
 #endif
 #if (NMS > 0)
 	kma.kmta_name = "mouse";
-	if (OF_getproplen(ea->ea_node, kma.kmta_name) == 0) {
+	if (prom_getproplen(ea->ea_node, kma.kmta_name) == 0) {
 		config_found(self, (void *)&kma, NULL);
 	}
 #endif
@@ -214,4 +210,3 @@ com_ebus_attach(parent, self, aux)
 		cn_tab = kma.kmta_consdev;
 	}
 }
-

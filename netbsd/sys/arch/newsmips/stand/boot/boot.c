@@ -1,4 +1,4 @@
-/*	$NetBSD: boot.c,v 1.11 2002/04/30 01:14:39 tsutsui Exp $	*/
+/*	$NetBSD: boot.c,v 1.13 2003/11/21 19:44:53 tsutsui Exp $	*/
 
 /*-
  * Copyright (C) 1999 Tsubai Masanari.  All rights reserved.
@@ -35,6 +35,9 @@
 #include <machine/cpu.h>
 #include <machine/romcall.h>
 
+void boot __P((u_int32_t, u_int32_t, uint32_t, u_int32_t, u_int32_t,
+    u_int32_t));
+
 void mips1_flushicache __P((void *, int));
 extern char _edata[], _end[];
 
@@ -51,21 +54,22 @@ char *devs[] = { "sd", "fh", "fd", NULL, NULL, "rd", "st" };
 char *kernels[] = { "/netbsd", "/netbsd.gz", NULL };
 
 #ifdef BOOT_DEBUG
-# define DPRINTF(x) printf x
+# define DPRINTF printf
 #else
-# define DPRINTF(x)
+# define DPRINTF while (0) printf
 #endif
 
 void
 boot(a0, a1, a2, a3, a4, a5)
-	u_int a0, a1, a2, a3, a4, a5;
+	u_int32_t a0, a1, a2, a3, a4, a5;
 {
 	int fd, i;
 	char *netbsd = "";
 	int maxmem;
 	u_long marks[MARK_MAX];
 	char devname[32], file[32];
-	void (*entry)();
+	void (*entry) __P((u_int32_t, u_int32_t, uint32_t, u_int32_t,
+	    u_int32_t, u_int32_t));
 	struct btinfo_symtab bi_sym;
 	struct btinfo_bootarg bi_arg;
 	struct btinfo_bootpath bi_bpath;
@@ -96,21 +100,21 @@ boot(a0, a1, a2, a3, a4, a5)
 		int argc = a2;
 		char **argv = (char **)a3;
 
-		DPRINTF(("APbus-based system\n"));
+		DPRINTF("APbus-based system\n");
 
-		DPRINTF(("argc = %d\n", argc));
+		DPRINTF("argc = %d\n", argc);
 		for (i = 0; i < argc; i++) {
-			DPRINTF(("argv[%d] = %s\n", i, argv[i]));
+			DPRINTF("argv[%d] = %s\n", i, argv[i]);
 			if (argv[i][0] != '-' && *netbsd == 0)
 				netbsd = argv[i];
 		}
 		maxmem = _sip->apbsi_memsize;
 		maxmem -= 0x100000;	/* reserve 1MB for ROM monitor */
 
-		DPRINTF(("howto = 0x%x\n", a0));
-		DPRINTF(("bootdev = %s\n", (char *)a1));
-		DPRINTF(("bootname = %s\n", netbsd));
-		DPRINTF(("maxmem = 0x%x\n", maxmem));
+		DPRINTF("howto = 0x%x\n", a0);
+		DPRINTF("bootdev = %s\n", (char *)a1);
+		DPRINTF("bootname = %s\n", netbsd);
+		DPRINTF("maxmem = 0x%x\n", maxmem);
 
 		/* XXX use "sonic()" instead of "tftp()" */
 		if (strncmp(bootdev, "tftp", 4) == 0)
@@ -124,17 +128,17 @@ boot(a0, a1, a2, a3, a4, a5)
 		char *bootname = (char *)a2;
 		int ctlr, unit, part, type;
 
-		DPRINTF(("HB system.\n"));
+		DPRINTF("HB system.\n");
 
 		/* bootname is "/boot" by default on HB system. */
 		if (bootname && strcmp(bootname, "/boot") != 0)
 			netbsd = bootname;
 		maxmem = a3;
 
-		DPRINTF(("howto = 0x%x\n", a0));
-		DPRINTF(("bootdev = 0x%x\n", a1));
-		DPRINTF(("bootname = %s\n", netbsd));
-		DPRINTF(("maxmem = 0x%x\n", maxmem));
+		DPRINTF("howto = 0x%x\n", a0);
+		DPRINTF("bootdev = 0x%x\n", a1);
+		DPRINTF("bootname = %s\n", netbsd);
+		DPRINTF("maxmem = 0x%x\n", maxmem);
 
 		ctlr = BOOTDEV_CTLR(bootdev);
 		unit = BOOTDEV_UNIT(bootdev);
@@ -161,7 +165,7 @@ boot(a0, a1, a2, a3, a4, a5)
 
 	for (i = 0; kernels[i]; i++) {
 		sprintf(file, "%s%s", devname, kernels[i]);
-		DPRINTF(("trying %s...\n", file));
+		DPRINTF("trying %s...\n", file);
 		fd = loadfile(file, marks, LOAD_KERNEL);
 		if (fd != -1)
 			break;
@@ -169,9 +173,9 @@ boot(a0, a1, a2, a3, a4, a5)
 	if (kernels[i] == NULL)
 		_rtt();
 
-	DPRINTF(("entry = 0x%x\n", (int)marks[MARK_ENTRY]));
-	DPRINTF(("ssym = 0x%x\n", (int)marks[MARK_SYM]));
-	DPRINTF(("esym = 0x%x\n", (int)marks[MARK_END]));
+	DPRINTF("entry = 0x%x\n", (int)marks[MARK_ENTRY]);
+	DPRINTF("ssym = 0x%x\n", (int)marks[MARK_SYM]);
+	DPRINTF("esym = 0x%x\n", (int)marks[MARK_END]);
 
 	bi_init(BOOTINFO_ADDR);
 

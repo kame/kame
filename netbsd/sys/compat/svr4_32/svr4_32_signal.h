@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_32_signal.h,v 1.2 2001/02/28 15:58:35 eeh Exp $	 */
+/*	$NetBSD: svr4_32_signal.h,v 1.7 2004/03/26 15:01:16 drochner Exp $	 */
 
 /*-
  * Copyright (c) 1994 The NetBSD Foundation, Inc.
@@ -55,10 +55,10 @@ typedef struct {
 typedef netbsd32_caddr_t svr4_32_sigset_tp;
 
 struct svr4_32_sigaction {
-	int			sa_flags;
-	svr4_32_sig_t		sa_handler;
-	svr4_32_sigset_t	sa_mask;
-	int			sa_reserved[2];
+	int			svr4_32_sa_flags;
+	svr4_32_sig_t		svr4_32_sa_handler;
+	svr4_32_sigset_t	svr4_32_sa_mask;
+	int			svr4_32_sa_reserved[2];
 };
 typedef netbsd32_caddr_t svr4_32_sigactionp;
 
@@ -73,6 +73,6 @@ void native_to_svr4_32_sigset __P((const sigset_t *, svr4_32_sigset_t *));
 void svr4_32_to_native_sigset __P((const svr4_32_sigset_t *, sigset_t *));
 void native_to_svr4_32_sigaltstack __P((const struct sigaltstack *, struct svr4_32_sigaltstack *));
 void svr4_32_to_native_sigaltstack __P((const struct svr4_32_sigaltstack *, struct sigaltstack *));
-void svr4_32_sendsig __P((sig_t, int, sigset_t *, u_long));
+void svr4_32_sendsig __P((const ksiginfo_t *, const sigset_t *));
 
 #endif /* !_SVR4_32_SIGNAL_H_ */

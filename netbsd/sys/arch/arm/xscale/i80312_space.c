@@ -1,4 +1,4 @@
-/*	$NetBSD: i80312_space.c,v 1.3.4.1 2002/12/07 20:50:52 he Exp $	*/
+/*	$NetBSD: i80312_space.c,v 1.7 2003/10/06 00:40:36 thorpej Exp $	*/
 
 /*
  * Copyright (c) 2001 Wasabi Systems, Inc.
@@ -38,6 +38,9 @@
 /*
  * bus_space functions for i80312 Companion I/O chip.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: i80312_space.c,v 1.7 2003/10/06 00:40:36 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -259,14 +262,14 @@ i80312_io_bs_alloc(void *t, bus_addr_t rstart, bus_addr_t rend,
     bus_addr_t *bpap, bus_space_handle_t *bshp)
 {
 
-	panic("i80312_io_bs_alloc(): not implemented\n");
+	panic("i80312_io_bs_alloc(): not implemented");
 }
 
 void    
 i80312_io_bs_free(void *t, bus_space_handle_t bsh, bus_size_t size)
 {
 
-	panic("i80312_io_bs_free(): not implemented\n");
+	panic("i80312_io_bs_free(): not implemented");
 }
 
 void *
@@ -321,7 +324,8 @@ i80312_mem_bs_map(void *t, bus_addr_t bpa, bus_size_t size, int flags,
 
 	for (; pa < endpa; pa += PAGE_SIZE, va += PAGE_SIZE) {
 		pmap_enter(pmap_kernel(), va, pa,
-		    VM_PROT_READ | VM_PROT_WRITE, PMAP_WIRED);
+		    VM_PROT_READ | VM_PROT_WRITE,
+		    VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
 	}
 	pmap_update(pmap_kernel());
 
@@ -346,14 +350,14 @@ i80312_mem_bs_alloc(void *t, bus_addr_t rstart, bus_addr_t rend,
     bus_addr_t *bpap, bus_space_handle_t *bshp)
 {
 
-	panic("i80312_mem_bs_alloc(): not implemented\n");
+	panic("i80312_mem_bs_alloc(): not implemented");
 }
 
 void    
 i80312_mem_bs_free(void *t, bus_space_handle_t bsh, bus_size_t size)
 {
 
-	panic("i80312_mem_bs_free(): not implemented\n");
+	panic("i80312_mem_bs_free(): not implemented");
 }
 
 paddr_t

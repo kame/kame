@@ -1,4 +1,4 @@
-/*	$NetBSD: cache_r5k.c,v 1.5 2002/01/19 04:25:37 shin Exp $	*/
+/*	$NetBSD: cache_r5k.c,v 1.9 2003/07/15 02:43:37 lukem Exp $	*/
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -35,10 +35,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cache_r5k.c,v 1.9 2003/07/15 02:43:37 lukem Exp $");
+
 #include <sys/param.h>
 
 #include <mips/cache.h>
 #include <mips/cache_r4k.h>
+#include <mips/cache_r5k.h>
 #include <mips/locore.h>
 
 /*
@@ -127,7 +131,9 @@ r5k_icache_sync_range_32(vaddr_t va, vsize_t size)
 void
 r5k_icache_sync_range_index_32(vaddr_t va, vsize_t size)
 {
-	vaddr_t w2va, eva;
+	vaddr_t w2va, eva, orig_va;
+
+	orig_va = va;
 
 	eva = round_line(va + size);
 	va = trunc_line(va);
@@ -142,7 +148,7 @@ r5k_icache_sync_range_index_32(vaddr_t va, vsize_t size)
 	 * bits that determine the cache index, and make a KSEG0
 	 * address out of them.
 	 */
-	va = MIPS_PHYS_TO_KSEG0(va & mips_picache_way_mask);
+	va = MIPS_PHYS_TO_KSEG0(orig_va & mips_picache_way_mask);
 
 	eva = round_line(va + size);
 	va = trunc_line(va);
@@ -151,14 +157,14 @@ r5k_icache_sync_range_index_32(vaddr_t va, vsize_t size)
 	while ((eva - va) >= (16 * 32)) {
 		cache_r4k_op_16lines_32_2way(va, w2va,
 		    CACHE_R4K_I|CACHEOP_R4K_INDEX_INV);
-		va += (16 * 32);
+		va   += (16 * 32);
 		w2va += (16 * 32);
 	}
 
 	while (va < eva) {
-		cache_op_r4k_line(va, CACHE_R4K_I|CACHEOP_R4K_INDEX_INV);
+		cache_op_r4k_line(  va, CACHE_R4K_I|CACHEOP_R4K_INDEX_INV);
 		cache_op_r4k_line(w2va, CACHE_R4K_I|CACHEOP_R4K_INDEX_INV);
-		va += 32;
+		va   += 32;
 		w2va += 32;
 	}
 }
@@ -343,14 +349,14 @@ r5k_pdcache_wbinv_range_index_16(vaddr_t va, vsize_t size)
 	while ((eva - va) >= (16 * 16)) {
 		cache_r4k_op_16lines_16_2way(va, w2va,
 		    CACHE_R4K_D|CACHEOP_R4K_INDEX_WB_INV);
-		va += (16 * 16);
+		va   += (16 * 16);
 		w2va += (16 * 16);
 	}
 
 	while (va < eva) {
-		cache_op_r4k_line(va, CACHE_R4K_D|CACHEOP_R4K_INDEX_WB_INV);
+		cache_op_r4k_line(  va, CACHE_R4K_D|CACHEOP_R4K_INDEX_WB_INV);
 		cache_op_r4k_line(w2va, CACHE_R4K_D|CACHEOP_R4K_INDEX_WB_INV);
-		va += 16;
+		va   += 16;
 		w2va += 16;
 	}
 }
@@ -375,14 +381,14 @@ r5k_pdcache_wbinv_range_index_32(vaddr_t va, vsize_t size)
 	while ((eva - va) >= (16 * 32)) {
 		cache_r4k_op_16lines_32_2way(va, w2va,
 		    CACHE_R4K_D|CACHEOP_R4K_INDEX_WB_INV);
-		va += (16 * 32);
+		va   += (16 * 32);
 		w2va += (16 * 32);
 	}
 
 	while (va < eva) {
-		cache_op_r4k_line(va, CACHE_R4K_D|CACHEOP_R4K_INDEX_WB_INV);
+		cache_op_r4k_line(  va, CACHE_R4K_D|CACHEOP_R4K_INDEX_WB_INV);
 		cache_op_r4k_line(w2va, CACHE_R4K_D|CACHEOP_R4K_INDEX_WB_INV);
-		va += 32;
+		va   += 32;
 		w2va += 32;
 	}
 }
@@ -579,3 +585,57 @@ r5k_pdcache_wb_range_32(vaddr_t va, vsize_t size)
 #undef trunc_line16
 #undef round_line
 #undef trunc_line
+
+/*
+ * Cache operations for R5000-style secondary caches:
+ *
+ *	- Direct-mapped
+ *	- Write-through
+ *	- Physically indexed, physically tagged
+ *
+ */
+
+
+__asm(".set mips3");
+
+#define R5K_Page_Invalidate_S   0x17
+
+void
+r5k_sdcache_wbinv_all(void)
+{
+	vaddr_t va = MIPS_PHYS_TO_KSEG0(0);
+	vaddr_t eva = va + mips_sdcache_size;
+
+	while (va < eva) {
+		cache_op_r4k_line(va, R5K_Page_Invalidate_S);
+		va += (128 * 32);
+	}
+}
+
+/* XXX: want wbinv_range_index here instead? */
+void
+r5k_sdcache_wbinv_rangeall(vaddr_t va, vsize_t size)
+{
+	r5k_sdcache_wbinv_all();
+}
+
+#define	round_page(x)		(((x) + (128 * 32 - 1)) & ~(128 * 32 - 1))
+#define	trunc_page(x)		((x) & ~(128 * 32 - 1))
+
+void
+r5k_sdcache_wbinv_range(vaddr_t va, vsize_t size)
+{
+	vaddr_t eva = round_page(va + size);
+	va = trunc_page(va);
+
+	while (va < eva) {
+		cache_op_r4k_line(va, R5K_Page_Invalidate_S);
+		va += (128 * 32);
+	}
+}
+
+void
+r5k_sdcache_wb_range(vaddr_t va, vsize_t size)
+{
+	/* Write-through cache, no need to WB */
+}

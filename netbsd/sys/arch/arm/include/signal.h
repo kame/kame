@@ -1,4 +1,4 @@
-/*	$NetBSD: signal.h,v 1.1 2001/01/13 17:02:37 bjh21 Exp $	*/
+/*	$NetBSD: signal.h,v 1.7 2004/03/26 21:39:57 drochner Exp $	*/
 
 /*
  * Copyright (c) 1994-1996 Mark Brinicombe.
@@ -46,12 +46,20 @@
 #ifndef _ARM32_SIGNAL_H_
 #define _ARM32_SIGNAL_H_
 
+#include <sys/featuretest.h>
+
 #ifndef _LOCORE
 typedef int sig_atomic_t;
 #endif
 
-#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) && \
-    !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
+
+#ifdef COMPAT_16
+#define SIGTRAMP_VALID(vers)	((unsigned)(vers) <= 2)
+#else
+#define SIGTRAMP_VALID(vers)	((vers) == 2)
+#endif
+
 #ifndef _LOCORE
 /*
  * Information pushed on stack when a signal is delivered.
@@ -87,6 +95,7 @@ struct sigcontext13 {
 };
 #endif /* __LIBC12_SOURCE__ || _KERNEL */
 
+#ifdef COMPAT_16
 struct sigcontext {
 	int	sc_onstack;		/* sigstack state to restore */
 	int	__sc_mask13;		/* signal mask to restore (old style) */
@@ -112,6 +121,7 @@ struct sigcontext {
 	
 	sigset_t sc_mask;		/* signal mask to restore (new style) */
 };
+#endif
 
 #endif /* !_LOCORE */
 
@@ -151,7 +161,7 @@ struct sigcontext {
 #define SIG_CODE_SEGV_ADDR_MASK	SIG_CODE_BUS_ADDR_MASK
 #define SIG_CODE_SEGV_TYPE_MASK	SIG_CODE_BUS_TYPE_MASK
 
-#endif	/* !_ANSI_SOURCE && !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
+#endif	/* _NETBSD_SOURCE */
 #endif	/* !_ARM_SIGNAL_H_ */
 
 /* End of signal.h */

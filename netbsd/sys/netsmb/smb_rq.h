@@ -1,4 +1,4 @@
-/*	$NetBSD: smb_rq.h,v 1.2 2002/01/04 02:39:44 deberg Exp $	*/
+/*	$NetBSD: smb_rq.h,v 1.10 2004/02/24 15:22:01 wiz Exp $	*/
 
 /*
  * Copyright (c) 2000-2001, Boris Popov
@@ -50,6 +50,7 @@
 #define	SMBR_INTERNAL		0x0080	/* request is internal to smbrqd */
 #define	SMBR_XLOCK		0x0100	/* request locked and can't be moved */
 #define	SMBR_XLOCKWANT		0x0200	/* waiter on XLOCK */
+#define	SMBR_NOWAIT		0x0400	/* don't wait for reply */
 
 #define SMBT2_ALLSENT		0x0001	/* all data and params are sent */
 #define SMBT2_ALLRECV		0x0002	/* all data and params are received */
@@ -61,6 +62,10 @@
 #define SMBRQ_SUNLOCK(rqp)	smb_sl_unlock(&(rqp)->sr_slock)
 #define SMBRQ_SLOCKPTR(rqp)	(&(rqp)->sr_slock)
 
+/* save 16bit 'what' to memory pointed out by 'where' in little-endian format */
+#define SMBRQ_PUTLE16(where, what)	\
+	(where)[0] = (what) & 0xff;	\
+	(where)[1] = (what) >> 8
 
 enum smbrq_state {
 	SMBRQ_NOTSENT,		/* rq have data to send */
@@ -74,39 +79,32 @@ struct smb_t2rq;
 
 struct smb_rq {
 	enum smbrq_state	sr_state;
-	struct smb_vc * 	sr_vc;
-	struct smb_share*	sr_share;
-	u_short			sr_mid;
+	struct smb_vc * 	sr_vc;		/* session */
+	struct smb_share *	sr_share;
 	struct mbchain		sr_rq;
-	u_int8_t		sr_rqflags;
-	u_int16_t		sr_rqflags2;
-	u_char *		sr_wcount;
-	u_short *		sr_bcount;
+	u_int8_t *		sr_wcount;
+	u_int8_t *		sr_bcount;
 	struct mdchain		sr_rp;
-	int			sr_rpgen;
-	int			sr_rplast;
-	int			sr_flags;	/* SMBR_* */
-	int			sr_rpsize;
+	u_int			sr_rpgen;
+	u_int			sr_rplast;
 	struct smb_cred *	sr_cred;
-	int			sr_timo;
-	int			sr_rexmit;
+	u_short			sr_mid;
+	u_short			sr_flags;	/* SMBR_* */
+	struct callout		sr_timo_ch;	/* for timeout expiration */
+	int			sr_timo;	/* timeout in ticks, -1 notimo*/
 	int			sr_sendcnt;
-	struct timeval	 	sr_timesent;
 	int			sr_lerror;
-	u_int16_t *		sr_rqtid;
-	u_int16_t *		sr_rquid;
-	u_int8_t		sr_errclass;
-	u_int16_t		sr_serror;
-	u_int32_t		sr_error;
-	u_int8_t		sr_rpflags;
-	u_int16_t		sr_rpflags2;
+	u_int8_t *		sr_rqtid;
+	u_int8_t *		sr_rquid;
 	u_int16_t		sr_rptid;
 	u_int16_t		sr_rppid;
 	u_int16_t		sr_rpuid;
 	u_int16_t		sr_rpmid;
 	struct smb_slock	sr_slock;	/* short term locks */
-/*	struct smb_t2rq*sr_t2;*/
-	TAILQ_ENTRY(smb_rq)	sr_link;
+	SIMPLEQ_ENTRY(smb_rq)	sr_link;
+
+	void			(*sr_recvcallback)(void *);
+	void			*sr_recvarg;
 };
 
 struct smb_t2rq {
@@ -121,7 +119,7 @@ struct smb_t2rq {
 	int		t2_flags;	/* SMBT2_ */
 	struct mbchain	t2_tparam;	/* parameters to transmit */
 	struct mbchain	t2_tdata;	/* data to transmit */
-	struct mdchain	t2_rparam;	/* received paramters */
+	struct mdchain	t2_rparam;	/* received parameters */
 	struct mdchain	t2_rdata;	/* received data */
 	struct smb_cred*t2_cred;
 	struct smb_connobj *t2_source;
@@ -129,10 +127,10 @@ struct smb_t2rq {
 	struct smb_vc * t2_vc;
 };
 
+int  smb_rqinit(void);
+
 int  smb_rq_alloc(struct smb_connobj *layer, u_char cmd,
 	struct smb_cred *scred, struct smb_rq **rqpp);
-int  smb_rq_init(struct smb_rq *rqp, struct smb_connobj *layer, u_char cmd,
-	struct smb_cred *scred);
 void smb_rq_done(struct smb_rq *rqp);
 int  smb_rq_getrequest(struct smb_rq *rqp, struct mbchain **mbpp);
 int  smb_rq_getreply(struct smb_rq *rqp, struct mdchain **mbpp);
@@ -142,11 +140,12 @@ void smb_rq_bstart(struct smb_rq *rqp);
 void smb_rq_bend(struct smb_rq *rqp);
 int  smb_rq_intr(struct smb_rq *rqp);
 int  smb_rq_simple(struct smb_rq *rqp);
+int  smb_rq_enqueue(struct smb_rq *rqp);
+int  smb_rq_reply(struct smb_rq *rqp);
+void smb_rq_setcallback(struct smb_rq *, void (*)(void *), void *);
 
 int  smb_t2_alloc(struct smb_connobj *layer, u_short setup, struct smb_cred *scred,
 	struct smb_t2rq **rqpp);
-int  smb_t2_init(struct smb_t2rq *rqp, struct smb_connobj *layer, u_short setup,
-	struct smb_cred *scred);
 void smb_t2_done(struct smb_t2rq *t2p);
 int  smb_t2_request(struct smb_t2rq *t2p);
 

@@ -1,4 +1,4 @@
-/* $NetBSD: a12c.c,v 1.10 2002/05/16 01:01:31 thorpej Exp $ */
+/* $NetBSD: a12c.c,v 1.14 2003/06/15 23:08:54 fvdl Exp $ */
 
 /* [Notice revision 2.2]
  * Copyright (c) 1997, 1998 Avalon Computer Systems, Inc.
@@ -38,7 +38,7 @@
 #include "opt_avalon_a12.h"		/* Config options headers */
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: a12c.c,v 1.10 2002/05/16 01:01:31 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: a12c.c,v 1.14 2003/06/15 23:08:54 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -66,9 +66,8 @@ __KERNEL_RCSID(0, "$NetBSD: a12c.c,v 1.10 2002/05/16 01:01:31 thorpej Exp $");
 int	a12cmatch __P((struct device *, struct cfdata *, void *));
 void	a12cattach __P((struct device *, struct device *, void *));
 
-struct cfattach a12c_ca = {
-	sizeof(struct a12c_softc), a12cmatch, a12cattach,
-};
+CFATTACH_DECL(a12c, sizeof(struct a12c_softc),
+    a12cmatch, a12cattach, NULL, NULL);
 
 extern struct cfdriver a12c_cd;
 
@@ -144,7 +143,7 @@ a12cattach(parent, self, aux)
 	a12c_init(ccp, 1);
 
 	/* XXX print chipset information */
-	printf(": driver %s over logic %x\n", "$Revision: 1.10 $", 
+	printf(": driver %s over logic %x\n", "$Revision: 1.14 $", 
 		A12_ALL_EXTRACT(REGVAL(A12_VERS)));
 
 	pci_a12_pickintr(ccp);
@@ -155,6 +154,7 @@ a12cattach(parent, self, aux)
 	pba.pba_iot = 0;
 	pba.pba_memt = ccp->ac_memt;
 	pba.pba_dmat = &ccp->ac_dmat_direct;
+	pba.pba_dmat64 = NULL;
 	pba.pba_pc = &ccp->ac_pc;
 	pba.pba_bus = 0;
 	pba.pba_bridgetag = NULL;
@@ -181,8 +181,8 @@ a12cprint(aux, pnp)
 
 	/* can attach xbar or pci to a12c */
 	if (pnp)
-		printf("%s at %s", pba->pba_busname, pnp);
-	printf(" bus %d", pba->pba_bus);
+		aprint_normal("%s at %s", pba->pba_busname, pnp);
+	aprint_normal(" bus %d", pba->pba_bus);
 	return (UNCONF);
 }
 

@@ -1,4 +1,4 @@
-/* $NetBSD: userret.h,v 1.1 2001/01/03 22:15:39 thorpej Exp $ */
+/* $NetBSD: userret.h,v 1.3 2003/10/31 16:44:34 cl Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -97,23 +97,24 @@
 #ifndef _ALPHA_USERRET_H_
 #define	_ALPHA_USERRET_H_
 
+#include <sys/userret.h>
+
 /*
  * Define the code needed before returning to user mode, for
  * trap and syscall.
  */
 static __inline void
-userret(struct proc *p)
+userret(struct lwp *l)
 {
-	int sig;
+	struct proc *p = l->l_proc;
 
 	/* Do any deferred user pmap operations. */
 	PMAP_USERRET(vm_map_pmap(&p->p_vmspace->vm_map));
 
-	/* take pending signals */
-	while ((sig = CURSIG(p)) != 0)
-		postsig(sig);
+	/* Invoke MI userret code */
+	mi_userret(l);
 
-	curcpu()->ci_schedstate.spc_curpriority = p->p_priority = p->p_usrpri;
+	curcpu()->ci_schedstate.spc_curpriority = l->l_priority = l->l_usrpri;
 }
 
 #endif /* _ALPHA_USERRET_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: fms.c,v 1.11 2001/11/13 07:48:42 lukem Exp $	*/
+/*	$NetBSD: fms.c,v 1.18.4.1 2004/09/22 20:58:23 jmc Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: fms.c,v 1.11 2001/11/13 07:48:42 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: fms.c,v 1.18.4.1 2004/09/22 20:58:23 jmc Exp $");
 
 #include "mpu.h"
 
@@ -96,8 +96,8 @@ int	fms_getdev __P((void *, struct audio_device *));
 int	fms_set_port __P((void *, mixer_ctrl_t *));
 int	fms_get_port __P((void *, mixer_ctrl_t *));
 int	fms_query_devinfo __P((void *, mixer_devinfo_t *));
-void	*fms_malloc __P((void *, int, size_t, int, int));
-void	fms_free __P((void *, void *, int));
+void	*fms_malloc __P((void *, int, size_t, struct malloc_type *, int));
+void	fms_free __P((void *, void *, struct malloc_type *));
 size_t	fms_round_buffersize __P((void *, int, size_t));
 paddr_t	fms_mappage __P((void *, void *, off_t, int));
 int	fms_get_props __P((void *));
@@ -106,9 +106,8 @@ int	fms_trigger_output __P((void *, void *, void *, int, void (*)(void *),
 int	fms_trigger_input __P((void *, void *, void *, int, void (*)(void *),
 			       void *, struct audio_params *));
 
-struct cfattach fms_ca = {
-	sizeof (struct fms_softc), fms_match, fms_attach
-};
+CFATTACH_DECL(fms, sizeof (struct fms_softc),
+    fms_match, fms_attach, NULL, NULL);
 
 struct audio_device fms_device = {
 	"Forte Media 801",
@@ -150,7 +149,7 @@ struct audio_hw_if fms_hw_if = {
 int	fms_attach_codec __P((void *, struct ac97_codec_if *));
 int	fms_read_codec __P((void *, u_int8_t, u_int16_t *));
 int	fms_write_codec __P((void *, u_int8_t, u_int16_t));
-void	fms_reset_codec __P((void *));
+int	fms_reset_codec __P((void *));
 
 int	fms_allocmem __P((struct fms_softc *, size_t, size_t,
 			  struct fms_dma *));
@@ -251,31 +250,34 @@ fms_attach(parent, self, aux)
 	int i;
 	
 	u_int16_t k1;
-	
-	printf(": Forte Media FM-801\n");
+
+	aprint_naive(": Audio controller\n");
+	aprint_normal(": Forte Media FM-801\n");
 	
 	if (pci_intr_map(pa, &ih)) {
-		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
+		aprint_error("%s: couldn't map interrupt\n",
+		    sc->sc_dev.dv_xname);
 		return;
 	}
 	intrstr = pci_intr_string(pc, ih);
 	
 	sc->sc_ih = pci_intr_establish(pc, ih, IPL_AUDIO, fms_intr, sc);
 	if (sc->sc_ih == NULL) {
-		printf("%s: couldn't establish interrupt",sc->sc_dev.dv_xname);
+		aprint_error("%s: couldn't establish interrupt",
+		    sc->sc_dev.dv_xname);
 		if (intrstr != NULL)
-			printf(" at %s", intrstr);
-		printf("\n");
+			aprint_normal(" at %s", intrstr);
+		aprint_normal("\n");
 		return;
 	}
 	
 	sc->sc_dmat = pa->pa_dmat;
 	
-	printf("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
+	aprint_normal("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
 	
 	if (pci_mapreg_map(pa, 0x10, PCI_MAPREG_TYPE_IO, 0, &sc->sc_iot,
 			   &sc->sc_ioh, &sc->sc_ioaddr, &sc->sc_iosize)) {
-		printf("%s: can't map i/o space\n", sc->sc_dev.dv_xname);
+		aprint_error("%s: can't map i/o space\n", sc->sc_dev.dv_xname);
 		return;
 	}
 	
@@ -431,7 +433,7 @@ fms_attach_codec(addr, cif)
 }
 
 /* Cold Reset */
-void
+int
 fms_reset_codec(addr)
 	void *addr;
 {
@@ -440,6 +442,7 @@ fms_reset_codec(addr)
 	delay(2);
 	bus_space_write_2(sc->sc_iot, sc->sc_ioh, FM_CODEC_CTL, 0x0000);
 	delay(1);
+	return 0;
 }
 
 int
@@ -760,7 +763,8 @@ fms_malloc(addr, direction, size, pool, flags)
 	void *addr;
 	int direction;
 	size_t size;
-	int pool, flags;
+	struct malloc_type *pool;
+	int flags;
 {
 	struct fms_softc *sc = addr;
 	struct fms_dma *p;
@@ -774,28 +778,28 @@ fms_malloc(addr, direction, size, pool, flags)
 	p->size = size;
 	if ((error = bus_dmamem_alloc(sc->sc_dmat, size, PAGE_SIZE, 0, &p->seg,
 				      1, &rseg, BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: unable to allocate dma, error = %d\n", 
+		printf("%s: unable to allocate DMA, error = %d\n", 
 		       sc->sc_dev.dv_xname, error);
 		goto fail_alloc;
 	}
 	
 	if ((error = bus_dmamem_map(sc->sc_dmat, &p->seg, rseg, size, &p->addr,
 				    BUS_DMA_NOWAIT | BUS_DMA_COHERENT)) != 0) {
-		printf("%s: unable to map dma, error = %d\n", 
+		printf("%s: unable to map DMA, error = %d\n", 
 		       sc->sc_dev.dv_xname, error);
 		goto fail_map;
 	}
 	
 	if ((error = bus_dmamap_create(sc->sc_dmat, size, 1, size, 0, 
 				       BUS_DMA_NOWAIT, &p->map)) != 0) {
-		printf("%s: unable to create dma map, error = %d\n",
+		printf("%s: unable to create DMA map, error = %d\n",
 		       sc->sc_dev.dv_xname, error);
 		goto fail_create;
 	}
 	
 	if ((error = bus_dmamap_load(sc->sc_dmat, p->map, p->addr, size, NULL,
 				     BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: unable to load dma map, error = %d\n",
+		printf("%s: unable to load DMA map, error = %d\n",
 		       sc->sc_dev.dv_xname, error);
 		goto fail_load;
 	}
@@ -821,7 +825,7 @@ void
 fms_free(addr, ptr, pool)
 	void *addr;
 	void *ptr;
-	int pool;
+	struct malloc_type *pool;
 {
 	struct fms_softc *sc = addr;
 	struct fms_dma **pp, *p;
@@ -910,7 +914,7 @@ fms_trigger_output(addr, start, end, blksize, intr, arg, param)
 	
 	if (!p)
 		panic("fms_trigger_output: request with bad start "
-		      "address (%p)\n", start);
+		      "address (%p)", start);
 
 	sc->sc_play_start = p->map->dm_segs[0].ds_addr;
 	sc->sc_play_end = sc->sc_play_start + ((char *)end - (char *)start);
@@ -948,7 +952,7 @@ fms_trigger_input(addr, start, end, blksize, intr, arg, param)
 	
 	if (!p)
 		panic("fms_trigger_input: request with bad start "
-		      "address (%p)\n", start);
+		      "address (%p)", start);
 
 	sc->sc_rec_start = p->map->dm_segs[0].ds_addr;
 	sc->sc_rec_end = sc->sc_rec_start + ((char *)end - (char *)start);

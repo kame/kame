@@ -1,4 +1,4 @@
-/*	$NetBSD: i80200_irq.S,v 1.1.14.2 2002/11/11 23:09:59 he Exp $	*/
+/*	$NetBSD: i80200_irq.S,v 1.11 2003/11/05 21:10:59 scw Exp $	*/
 
 /*
  * Copyright (c) 2002 Wasabi Systems, Inc.
@@ -36,6 +36,7 @@
  */
 
 #include "assym.h"
+#include "opt_perfctrs.h"
 
 #include <machine/asm.h>
 #include <machine/cpu.h>
@@ -53,20 +54,24 @@
 	.text
 	.align	0
 
-Lcurrent_intr_depth: 
+.Lcurrent_intr_depth: 
 	.word	_C_LABEL(current_intr_depth)
-	.word	_C_LABEL(prev_intr_depth)
 
-Lintr_dispatch:
+.Lintr_dispatch:
 	.word	_C_LABEL(i80200_extirq_dispatch)
 
-Lastpending:
-	.word	_C_LABEL(astpending)
+#if defined(PERFCTRS)
+.Lpmc_dispatch:
+	.word	_C_LABEL(xscale_pmc_dispatch)
+#endif
+
+AST_ALIGNMENT_FAULT_LOCALS
 
 ASENTRY_NP(irq_entry)
 	sub	lr, lr, #0x00000004	/* Adjust the lr */
 
 	PUSHFRAMEINSVC			/* Push an interrupt frame */
+	ENABLE_ALIGNMENT_FAULTS
 
 	/*
 	 * Note that we have entered the IRQ handler.  We are
@@ -74,10 +79,8 @@ ASENTRY_NP(irq_entry)
 	 * determine if we are in an IRQ.  Instead, we will
 	 * count each time the interrupt handler is nested.
 	 */
-	ldr	r0, Lcurrent_intr_depth
-	ldr	r2, Lcurrent_intr_depth+4
+	ldr	r0, .Lcurrent_intr_depth
 	ldr	r1, [r0]
-	str	r1, [r2]
 	add	r1, r1, #1
 	str	r1, [r0]
 
@@ -86,9 +89,22 @@ ASENTRY_NP(irq_entry)
 	 */
 	mrc	p13, 0, r4, c4, c0, 0
 
+#if defined(PERFCTRS)
 	/*
-	 * XXX Right here will be a good place to check for PMU
-	 * XXX interrupts, if we decide to use IRQs for them.
+	 * Check for PMU interrupts.
+	 * If we have one, call the routine to handle it.
+	 */
+	tst	r4, #(INTSRC_PI)
+	beq	.Lpmc_intr_return
+	mov	r1, r4
+	mov	r0, sp
+	mov	lr, pc
+	ldr	pc, .Lpmc_dispatch
+.Lpmc_intr_return:
+#endif
+
+	/*
+	 * XXX - any need to handle BMU interrupts?
 	 */
 
 	/*
@@ -99,49 +115,20 @@ ASENTRY_NP(irq_entry)
 	 * disabled.
 	 */
 	tst	r4, #(INTSRC_II)
-	beq	Lextirq_return		/* no external IRQ pending */
-	ldr	r1, Lintr_dispatch
-	add	lr, pc, #Lextirq_return - . - 8
+	beq	.Lextirq_return		/* no external IRQ pending */
+	ldr	r1, .Lintr_dispatch
 	mov	r0, sp
+	mov	lr, pc
 	ldr	pc, [r1]
-Lextirq_return:
+.Lextirq_return:
 
 	/* Decremement the nest count. */
-	ldr	r0, Lcurrent_intr_depth 
-	ldr	r2, Lcurrent_intr_depth+4
+	ldr	r0, .Lcurrent_intr_depth 
 	ldr	r1, [r0]
-	str	r1, [r2]
 	sub	r1, r1, #1
 	str	r1, [r0]
 
-	/*
-	 * If we're returning to user mode, check for pending ASTs.
-	 */
-	ldr	r0, [sp]		/* Get the SPSR from stack */
-	and	r0, r0, #(PSR_MODE)	/* Test for USR32 mode before the IRQ */
-	teq	r0, #(PSR_USR32_MODE)
-	bne	Lirqout			/* Nope, get out now */
-
-Lastloop:
-	ldr	r0, Lastpending		/* Do we have an AST pending? */
-	ldr	r1, [r0]
-	teq	r1, #0x00000000
-	beq	Lirqout			/* Nope, get out now */
-
-	mov	r1, #0x00000000
-	str	r1, [r0]		/* Clear astpending */
-
-	mrs	r4, cpsr_all		/* save CPSR */
-	bic	r0, r4, #(I32_bit)	/* Enable IRQs */
-	msr	cpsr_all, r0
-
-	mov	r0, sp
-	bl	_C_LABEL(ast)		/* ast(frame) */
-
-	msr	cpsr_all, r4		/* Disable IRQs */
-	b	Lastloop		/* Check for more ASTs */
-
-Lirqout:
+	DO_AST_AND_RESTORE_ALIGNMENT_FAULTS
 	PULLFRAMEFROMSVCANDEXIT
 	movs	pc, lr			/* Exit */
 
@@ -154,10 +141,6 @@ _C_LABEL(astpending):
 
 	.global	_C_LABEL(current_intr_depth)
 _C_LABEL(current_intr_depth):
-	.word	0
-
-	.global	_C_LABEL(prev_intr_depth)
-_C_LABEL(prev_intr_depth):
 	.word	0
 
 	/*

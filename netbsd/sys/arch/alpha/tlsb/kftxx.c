@@ -1,4 +1,4 @@
-/* $NetBSD: kftxx.c,v 1.9 1998/05/14 00:01:32 thorpej Exp $ */
+/* $NetBSD: kftxx.c,v 1.12 2003/01/01 00:39:21 thorpej Exp $ */
 
 /*
  * Copyright (c) 1997 by Matthew Jacob
@@ -39,7 +39,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: kftxx.c,v 1.9 1998/05/14 00:01:32 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kftxx.c,v 1.12 2003/01/01 00:39:21 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -66,9 +66,8 @@ struct kft_softc {
 
 static int	kftmatch __P((struct device *, struct cfdata *, void *));
 static void	kftattach __P((struct device *, struct device *, void *));
-struct cfattach kft_ca = {
-	sizeof(struct kft_softc), kftmatch, kftattach
-};
+CFATTACH_DECL(kft, sizeof(struct kft_softc),
+    kftmatch, kftattach, NULL, NULL);
 
 static int	kftprint __P((void *, const char *));
 
@@ -79,8 +78,8 @@ kftprint(aux, pnp)
 {
 	register struct kft_dev_attach_args *ka = aux;
 	if (pnp)
-		 printf("%s at %s", ka->ka_name, pnp);
-	printf(" hose %d", ka->ka_hosenum);
+		 aprint_normal("%s at %s", ka->ka_name, pnp);
+	aprint_normal(" hose %d", ka->ka_hosenum);
 	return (UNCONF);
 }
 

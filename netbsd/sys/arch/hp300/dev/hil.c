@@ -1,9 +1,43 @@
-/*	$NetBSD: hil.c,v 1.48.6.1 2002/07/07 07:24:59 lukem Exp $	*/
+/*	$NetBSD: hil.c,v 1.61.2.1 2004/04/11 04:00:27 jmc Exp $	*/
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: hil.c 1.38 92/01/21$
+ *
+ *	@(#)hil.c	8.2 (Berkeley) 1/12/94
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -43,9 +77,10 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: hil.c,v 1.48.6.1 2002/07/07 07:24:59 lukem Exp $");                                                  
+__KERNEL_RCSID(0, "$NetBSD: hil.c,v 1.61.2.1 2004/04/11 04:00:27 jmc Exp $");
 
 #include "opt_compat_hpux.h"
+#include "ite.h"
 #include "rnd.h"
 
 #include <sys/param.h>
@@ -60,6 +95,8 @@ __KERNEL_RCSID(0, "$NetBSD: hil.c,v 1.48.6.1 2002/07/07 07:24:59 lukem Exp $");
 #include <sys/tty.h>
 #include <sys/uio.h>
 #include <sys/user.h>
+
+#include <uvm/uvm_extern.h>
 
 #if NRND > 0
 #include <sys/rnd.h>
@@ -79,9 +116,8 @@ __KERNEL_RCSID(0, "$NetBSD: hil.c,v 1.48.6.1 2002/07/07 07:24:59 lukem Exp $");
 int	hilmatch __P((struct device *, struct cfdata *, void *));
 void	hilattach __P((struct device *, struct device *, void *));
 
-const struct cfattach hil_ca = {
-	sizeof(struct hil_softc), hilmatch, hilattach,
-};
+CFATTACH_DECL(hil, sizeof(struct hil_softc),
+    hilmatch, hilattach, NULL, NULL);
 
 struct	_hilbell default_bell = { BELLDUR, BELLFREQ };
 
@@ -105,8 +141,19 @@ extern struct kbdmap kbd_map[];
 /* symbolic sleep message strings */
 char hilin[] = "hilin";
 
-cdev_decl(hil);
 extern struct cfdriver hil_cd;
+
+dev_type_open(hilopen);
+dev_type_close(hilclose);
+dev_type_read(hilread);
+dev_type_ioctl(hilioctl);
+dev_type_poll(hilpoll);
+dev_type_kqfilter(hilkqfilter);
+
+const struct cdevsw hil_cdevsw = {
+	hilopen, hilclose, hilread, nullwrite, hilioctl,
+	nostop, notty, hilpoll, nommap, hilkqfilter,
+};
 
 void	hilattach_deferred __P((struct device *));
 
@@ -243,7 +290,7 @@ hilopen(dev, flags, mode, p)
 		printf("hilopen(%d): loop %x device %x\n",
 		       p->p_pid, HILLOOP(dev), HILUNIT(dev));
 #endif
-	
+
 	if ((hilp->hl_device[HILLOOPDEV].hd_flags & HIL_ALIVE) == 0)
 		return(ENXIO);
 
@@ -280,7 +327,7 @@ hilopen(dev, flags, mode, p)
 	if (flags & FNONBLOCK)
 		dptr->hd_flags |= HIL_NOBLOCK;
 	/*
-	 * It is safe to flush the read buffer as we are guarenteed
+	 * It is safe to flush the read buffer as we are guaranteed
 	 * that no one else is using it.
 	 */
 	if ((dptr->hd_flags & HIL_OPENED) == 0) {
@@ -534,7 +581,7 @@ hilioctl(dev, cmd, data, flag, p)
 			data[4-i] = hold;
 		}
 		break;
-		
+
 	case HILIOCRT:
 		for (i = 0; i < 4; i++) {
 			send_hil_cmd(hilp->hl_addr, (cmd & 0xFF) + i,
@@ -611,7 +658,7 @@ hilioctl(dev, cmd, data, flag, p)
         case HILIOCRESET:
 	        hilreset(hilp);
 		break;
-		
+
 #ifdef DEBUG
         case HILIOCTEST:
 		hildebug = *(int *) data;
@@ -703,7 +750,7 @@ hpuxhilioctl(dev, cmd, data, flag)
 			data[4-i] = hold;
 		}
 		break;
-		
+
 	case EFTRT:
 		for (i = 0; i < 4; i++) {
 			send_hil_cmd(hilp->hl_addr, (cmd & 0xFF) + i,
@@ -717,13 +764,13 @@ hpuxhilioctl(dev, cmd, data, flag)
 		send_hil_cmd(hilp->hl_addr, (cmd & 0xFF), NULL, 0, &hold);
 		*data = hold;
 		break;
-		
+
         case EFTSRPG:
         case EFTSRD:
         case EFTSRR:
 		send_hil_cmd(hilp->hl_addr, (cmd & 0xFF), data, 1, NULL);
 		break;
-		
+
 	case EFTSBI:
 #ifdef hp800
 		/* XXX big magic */
@@ -756,16 +803,6 @@ hpuxhilioctl(dev, cmd, data, flag)
 	return(0);
 }
 #endif
-
-/* ARGSUSED */
-paddr_t
-hilmmap(dev, off, prot)
-	dev_t dev;
-	off_t off;
-	int prot;
-{
-	return (-1);
-}
 
 /*ARGSUSED*/
 int
@@ -838,6 +875,109 @@ hilpoll(dev, events, p)
 	return (revents);
 }
 
+static void
+filt_hilrdetach(struct knote *kn)
+{
+	dev_t dev = (intptr_t) kn->kn_hook;
+	struct hil_softc *hilp = hil_cd.cd_devs[HILLOOP(dev)];
+	struct hilloopdev *dptr = &hilp->hl_device[HILUNIT(dev)];
+	int s;
+
+	s = splhil();
+	SLIST_REMOVE(&dptr->hd_selr.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_hilread(struct knote *kn, long hint)
+{
+	dev_t dev = (intptr_t) kn->kn_hook;
+	int device = HILUNIT(dev);
+	struct hil_softc *hilp = hil_cd.cd_devs[HILLOOP(dev)];
+	struct hilloopdev *dptr = &hilp->hl_device[device];
+	struct hiliqueue *qp;
+	int mask;
+
+	if (dptr->hd_flags & HIL_READIN) {
+		kn->kn_data = dptr->hd_queue.c_cc;
+		return (kn->kn_data > 0);
+	}
+
+	/*
+	 * Make sure device is alive and real (or the loop device).
+	 * Note that we do not do this for the read interface.
+	 * This is primarily to be consistant with HP-UX.
+	 */
+	if (device && (dptr->hd_flags & (HIL_ALIVE|HIL_PSEUDO)) != HIL_ALIVE) {
+		kn->kn_data = 0; /* XXXLUKEM (thorpej): what to put here? */
+		return (1);
+	}
+
+	/*
+	 * Select on loop device is special.
+	 * Check to see if there are any data for any loop device
+	 * provided it is associated with a queue belonging to this user.
+	 */
+	if (device == 0)
+		mask = -1;
+	else
+		mask = hildevmask(device);
+	/*
+	 * Must check everybody with interrupts blocked to prevent races.
+	 * (Interrupts are already blocked.)
+	 */
+	for (qp = hilp->hl_queue; qp < &hilp->hl_queue[NHILQ]; qp++) {
+		/* XXXLUKEM (thorpej): PROCESS CHECK! */
+		if (/*qp->hq_procp == p &&*/ (mask & qp->hq_devmask) &&
+		    qp->hq_eventqueue->hil_evqueue.head !=
+		    qp->hq_eventqueue->hil_evqueue.tail) {
+			/* XXXLUKEM (thorpej): what to put here? */
+			kn->kn_data = 0;
+			return (1);
+		}
+	}
+
+	return (0);
+}
+
+static const struct filterops hilread_filtops =
+	{ 1, NULL, filt_hilrdetach, filt_hilread };
+
+static const struct filterops hil_seltrue_filtops =
+	{ 1, NULL, filt_hilrdetach, filt_seltrue };
+
+int
+hilkqfilter(dev_t dev, struct knote *kn)
+{
+	struct hil_softc *hilp = hil_cd.cd_devs[HILLOOP(dev)];
+	struct hilloopdev *dptr = &hilp->hl_device[HILUNIT(dev)];
+	struct klist *klist;
+	int s;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &dptr->hd_selr.sel_klist;
+		kn->kn_fop = &hilread_filtops;
+		break;
+
+	case EVFILT_WRITE:
+		klist = &dptr->hd_selr.sel_klist;
+		kn->kn_fop = &hil_seltrue_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = (void *)(intptr_t) dev; /* XXX yuck */
+
+	s = splhil();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
+}
+
 /*ARGSUSED*/
 int
 hilint(v)
@@ -855,8 +995,6 @@ hilint(v)
 #endif
 	return (1);
 }
-
-#include "ite.h"
 
 void
 hil_process_int(hilp, stat, c)
@@ -879,7 +1017,7 @@ hil_process_int(hilp, stat, c)
 		itefilter(stat, c);
 		return;
 #endif
-		
+
 	case HIL_STATUS:			/* The status info. */
 		if (c & HIL_ERROR) {
 		  	hilp->hl_cmddone = TRUE;
@@ -916,12 +1054,12 @@ hil_process_int(hilp, stat, c)
 			   if (hilp->hl_cmdending) {
 				hilp->hl_cmddone = TRUE;
 				hilp->hl_cmdending = FALSE;
-			   } else  
+			   } else
 				*hilp->hl_cmdbp++ = c;
 		        }
 		}
 		return;
-		
+
 	case 0:		/* force full jump table */
 	default:
 		return;
@@ -992,7 +1130,7 @@ hilevent(hilp)
 			continue;
 		mask &= ~hilqmask(qnum);
 		hq = hilp->hl_queue[qnum].hq_eventqueue;
-		
+
 		/*
 		 * Ensure that queue fields that we rely on are valid
 		 * and that there is space in the queue.  If either
@@ -1005,7 +1143,7 @@ hilevent(hilp)
 		 * Copy data to queue.
 		 * If this is the first queue we construct the packet
 		 * with length, timestamp and poll buffer data.
-		 * For second and sucessive packets we just duplicate
+		 * For second and successive packets we just duplicate
 		 * the first packet.
 		 */
 		pp = (u_char *) &hq->hil_event[hq->hil_evqueue.tail];
@@ -1028,9 +1166,9 @@ hilevent(hilp)
 	/*
 	 * Wake up anyone selecting on this device or the loop itself
 	 */
-	selwakeup(&dptr->hd_selr);
+	selnotify(&dptr->hd_selr, 0);
 	dptr = &hilp->hl_device[HILLOOPDEV];
-	selwakeup(&dptr->hd_selr);
+	selnotify(&dptr->hd_selr, 0);
 }
 
 #undef HQFULL
@@ -1073,7 +1211,7 @@ hpuxhilevent(hilp, dptr)
 		dptr->hd_flags &= ~HIL_ASLEEP;
 		wakeup((caddr_t)dptr);
 	}
-	selwakeup(&dptr->hd_selr);
+	selnotify(&dptr->hd_selr, 0);
 }
 
 /*
@@ -1232,7 +1370,7 @@ static struct ite_kbdops hilkbd_cn_ops = {
 	NULL,
 };
 
-extern char *us_keymap, *us_shiftmap, *us_ctrlmap;
+extern char us_keymap[], us_shiftmap[], us_ctrlmap[];
 
 /*
  * XXX: read keyboard directly and return code.
@@ -1274,7 +1412,7 @@ hilkbdcnattach(bus_space_tag_t bst, bus_addr_t addr)
 	bus_space_handle_t bsh;
 	u_char lang;
 
-	if (bus_space_map(bst, addr, NBPG, 0, &bsh))
+	if (bus_space_map(bst, addr, PAGE_SIZE, 0, &bsh))
 		return (1);
 
 	va = bus_space_vaddr(bst, bsh);
@@ -1312,7 +1450,7 @@ hilkbdcnattach(bus_space_tag_t bst, bus_addr_t addr)
 #endif /* End of HIL console keyboard code. */
 
 /*
- * Recoginize and clear keyboard generated NMIs.
+ * Recognize and clear keyboard generated NMIs.
  * Returns 1 if it was ours, 0 otherwise.  Note that we cannot use
  * send_hil_cmd() to issue the clear NMI command as that would actually
  * lower the priority to splvm() and it doesn't wait for the completion
@@ -1611,7 +1749,7 @@ hiliddev(hilp)
 			send_hildev_cmd(hilp, i, HILSECURITY);
 			break;
 		}
-	}		
+	}
 	hilp->hl_cmdbp = hilp->hl_cmdbuf;
 	hilp->hl_cmddev = 0;
 #ifdef DEBUG
@@ -1767,7 +1905,7 @@ polloff(hildevice)
 	/*
 	 * Must wait til polling is really stopped
 	 */
-	do {	
+	do {
 		HILWAIT(hildevice);
 		WRITEHILCMD(hildevice, HIL_READBUSY);
 		HILDATAWAIT(hildevice);
@@ -1852,7 +1990,7 @@ hilreport(hilp)
 			printf("hil%d: sc: ", i);
 			printhilcmdbuf(hilp);
 		}
-	}		
+	}
 	hilp->hl_cmdbp = hilp->hl_cmdbuf;
 	hilp->hl_cmddev = 0;
 	splx(s);

@@ -1,4 +1,4 @@
-/*	$NetBSD: rl.c,v 1.11 2002/03/23 18:12:09 ragge Exp $	*/
+/*	$NetBSD: rl.c,v 1.21 2003/05/10 23:12:46 thorpej Exp $	*/
 
 /*
  * Copyright (c) 2000 Ludd, University of Lule}, Sweden. All rights reserved.
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rl.c,v 1.11 2002/03/23 18:12:09 ragge Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rl.c,v 1.21 2003/05/10 23:12:46 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -55,6 +55,7 @@ __KERNEL_RCSID(0, "$NetBSD: rl.c,v 1.11 2002/03/23 18:12:09 ragge Exp $");
 #include <sys/stat.h>
 #include <sys/dkio.h>
 #include <sys/fcntl.h>
+#include <sys/event.h>
 
 #include <ufs/ufs/dinode.h>
 #include <ufs/ffs/fs.h>
@@ -77,19 +78,32 @@ static	void rlattach(struct device *, struct device *, void *);
 static	void rlcstart(struct rlc_softc *, struct buf *);
 static	void waitcrdy(struct rlc_softc *);
 static	void rlcreset(struct device *);
-cdev_decl(rl);
-bdev_decl(rl);
 
-struct cfattach rlc_ca = {
-	sizeof(struct rlc_softc), rlcmatch, rlcattach
+CFATTACH_DECL(rlc, sizeof(struct rlc_softc),
+    rlcmatch, rlcattach, NULL, NULL);
+
+CFATTACH_DECL(rl, sizeof(struct rl_softc),
+    rlmatch, rlattach, NULL, NULL);
+
+dev_type_open(rlopen);
+dev_type_close(rlclose);
+dev_type_read(rlread);
+dev_type_write(rlwrite);
+dev_type_ioctl(rlioctl);
+dev_type_strategy(rlstrategy);
+dev_type_dump(rldump);
+dev_type_size(rlsize);
+
+const struct bdevsw rl_bdevsw = {
+	rlopen, rlclose, rlstrategy, rlioctl, rldump, rlsize, D_DISK
 };
 
-struct cfattach rl_ca = {
-	sizeof(struct rl_softc), rlmatch, rlattach
+const struct cdevsw rl_cdevsw = {
+	rlopen, rlclose, rlread, rlwrite, rlioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
 };
 
 #define	MAXRLXFER (RL_BPS * RL_SPT)
-#define	RLMAJOR	14
 
 #define	RL_WREG(reg, val) \
 	bus_space_write_2(sc->sc_iot, sc->sc_ioh, (reg), (val))
@@ -142,8 +156,9 @@ rlcprint(void *aux, const char *name)
 	struct rlc_attach_args *ra = aux;
 
 	if (name)
-		printf("RL0%d at %s", ra->type & RLMP_DT ? '2' : '1', name);
-	printf(" drive %d", ra->hwid);
+		aprint_normal("RL0%d at %s",
+		    ra->type & RLMP_DT ? '2' : '1', name);
+	aprint_normal(" drive %d", ra->hwid);
 	return UNCONF;
 }
 
@@ -201,7 +216,7 @@ rlcattach(struct device *parent, struct device *self, void *aux)
 		printf(": Failed to allocate DMA map, error %d\n", error);
 		return;
 	}
-	BUFQ_INIT(&sc->sc_q);
+	bufq_alloc(&sc->sc_q, BUFQ_DISKSORT|BUFQ_SORT_CYLINDER);
 	for (i = 0; i < RL_MAXDPC; i++) {
 		waitcrdy(sc);
 		RL_WREG(RL_DA, RLDA_GS|RLDA_RST);
@@ -251,7 +266,7 @@ rlattach(struct device *parent, struct device *self, void *aux)
 	dl->d_partitions[0].p_offset = dl->d_partitions[2].p_offset = 0;
 	dl->d_interleave = dl->d_headswitch = 1;
 	dl->d_bbsize = BBSIZE;
-	dl->d_sbsize = SBSIZE;
+	dl->d_sbsize = SBLOCKSIZE;
 	dl->d_rpm = 2400;
 	dl->d_type = DTYPE_DEC;
 	printf(": %s, %s\n", dl->d_typename,
@@ -265,7 +280,7 @@ rlopen(dev_t dev, int flag, int fmt, struct proc *p)
 	struct disklabel *dl;
 	struct rlc_softc *sc;
 	struct rl_softc *rc;
-	char *msg;
+	const char *msg;
 
 	/*
 	 * Make sure this is a reasonable open request.
@@ -289,6 +304,7 @@ rlopen(dev_t dev, int flag, int fmt, struct proc *p)
 	dl = rc->rc_disk.dk_label;
 	if (rc->rc_state == DK_CLOSED) {
 		u_int16_t mp;
+		int maj;
 		RL_WREG(RL_CS, RLCS_RHDR|(rc->rc_hwid << RLCS_USHFT));
 		waitcrdy(sc);
 		mp = RL_RREG(RL_MP);
@@ -297,7 +313,8 @@ rlopen(dev_t dev, int flag, int fmt, struct proc *p)
 		rc->rc_state = DK_OPEN;
 		/* Get disk label */
 		printf("%s: ", rc->rc_dev.dv_xname);
-		if ((msg = readdisklabel(MAKEDISKDEV(RLMAJOR,
+		maj = cdevsw_lookup_major(&rl_cdevsw);
+		if ((msg = readdisklabel(MAKEDISKDEV(maj,
 		    rc->rc_dev.dv_unit, RAW_PART), rlstrategy, dl, NULL)))
 			printf("%s: ", msg);
 		printf("size %d sectors\n", dl->d_secperunit);
@@ -362,7 +379,7 @@ rlstrategy(struct buf *bp)
 		panic("rlstrategy: state impossible");
 
 	lp = rc->rc_disk.dk_label;
-	if ((err = bounds_check_with_label(bp, lp, 1)) <= 0)
+	if ((err = bounds_check_with_label(&rc->rc_disk, bp, 1)) <= 0)
 		goto done;
 
 	if (bp->b_bcount == 0)
@@ -374,7 +391,7 @@ rlstrategy(struct buf *bp)
 	sc = (struct rlc_softc *)rc->rc_dev.dv_parent;
 
 	s = splbio();
-	disksort_cylinder(&sc->sc_q, bp);
+	BUFQ_PUT(&sc->sc_q, bp);
 	rlcstart(sc, 0);
 	splx(s);
 	return;
@@ -553,10 +570,9 @@ rlcstart(struct rlc_softc *sc, struct buf *ob)
 		return;	/* Already doing something */
 
 	if (ob == 0) {
-		bp = BUFQ_FIRST(&sc->sc_q);
+		bp = BUFQ_GET(&sc->sc_q);
 		if (bp == NULL)
 			return;	/* Nothing to do */
-		BUFQ_REMOVE(&sc->sc_q, bp);
 		sc->sc_bufaddr = bp->b_data;
 		sc->sc_diskblk = bp->b_rawblkno;
 		sc->sc_bytecnt = bp->b_bcount;
@@ -647,7 +663,7 @@ rlcreset(struct device *dev)
 	if (sc->sc_active == 0)
 		return;
 
-	BUFQ_INSERT_HEAD(&sc->sc_q, sc->sc_active);
+	BUFQ_PUT(&sc->sc_q, sc->sc_active);
 	sc->sc_active = 0;
 	rlcstart(sc, 0);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: wsksymdef.h,v 1.45 2002/04/23 13:42:46 hannken Exp $ */
+/*	$NetBSD: wsksymdef.h,v 1.47.8.1 2004/06/07 09:38:04 tron Exp $ */
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -403,6 +403,14 @@
 #define KS_Execute		0xf38b
 #define KS_Find			0xf38c
 #define KS_Select		0xf38d
+#define KS_Again                0xf38e
+#define KS_Props                0xf38f
+#define KS_Undo                 0xf390
+#define KS_Front                0xf391
+#define KS_Copy                 0xf392
+#define KS_Open                 0xf393
+#define KS_Paste                0xf394
+#define KS_Cut                  0xf395
 
 #define KS_Menu			0xf3c0
 #define KS_Pause		0xf3c1
@@ -434,7 +442,10 @@
 #define KS_Cmd_ContrastUp	0xf429
 #define KS_Cmd_ContrastDown	0xf42a
 #define KS_Cmd_ContrastRotate	0xf42b
-
+#define KS_Cmd_ScrollFastUp	0xf42c
+#define KS_Cmd_ScrollFastDown	0xf42d
+#define KS_Cmd_ScrollSlowUp	0xf42e
+#define KS_Cmd_ScrollSlowDown	0xf42f
 
 /*
  * Group 5 (internal)
@@ -448,14 +459,14 @@
  * keysym groups
  */
 
-#define KS_GROUP_Mod		0xf100
-#define KS_GROUP_Keypad		0xf200
-#define KS_GROUP_Function	0xf300
-#define KS_GROUP_Command	0xf400
-#define KS_GROUP_Internal	0xf500
-#define KS_GROUP_Dead		0xf801		/* not encoded in keysym */
-#define KS_GROUP_Ascii		0xf802		/* not encoded in keysym */
-#define KS_GROUP_Keycode	0xf803		/* not encoded in keysym */
+#define KS_GROUP_Mod		0xf100U
+#define KS_GROUP_Keypad		0xf200U
+#define KS_GROUP_Function	0xf300U
+#define KS_GROUP_Command	0xf400U
+#define KS_GROUP_Internal	0xf500U
+#define KS_GROUP_Dead		0xf801U		/* not encoded in keysym */
+#define KS_GROUP_Ascii		0xf802U		/* not encoded in keysym */
+#define KS_GROUP_Keycode	0xf803U		/* not encoded in keysym */
 
 #define KS_NUMKEYCODES	0x1000
 #define KS_KEYCODE(v)	((v) | 0xe000)

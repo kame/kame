@@ -1,4 +1,4 @@
-/*	$NetBSD: com_mainbus.c,v 1.3 2002/01/13 23:02:34 augustss Exp $	*/
+/*	$NetBSD: com_mainbus.c,v 1.8 2003/10/17 18:20:10 cdi Exp $	*/
 
 /*
  * Copyright (c) 2000 Soren S. Jorvang.  All rights reserved.
@@ -25,6 +25,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: com_mainbus.c,v 1.8 2003/10/17 18:20:10 cdi Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ioctl.h>
@@ -42,12 +45,14 @@
 
 #include <machine/autoconf.h>
 #include <machine/intr.h>
-#include <machine/intr_machdep.h>
 #include <machine/bus.h>
+#include <machine/nvram.h>
 
 #include <dev/ic/comreg.h>
 #include <dev/ic/comvar.h>
 
+
+extern int console_present;
 
 struct com_mainbus_softc {
 	struct com_softc sc_com;
@@ -57,9 +62,8 @@ struct com_mainbus_softc {
 static int	com_mainbus_probe(struct device *, struct cfdata *, void *);
 static void	com_mainbus_attach(struct device *, struct device *, void *);
 
-struct cfattach com_mainbus_ca = {
-	sizeof(struct com_mainbus_softc), com_mainbus_probe, com_mainbus_attach
-};
+CFATTACH_DECL(com_mainbus, sizeof(struct com_mainbus_softc),
+    com_mainbus_probe, com_mainbus_attach, NULL, NULL);
 
 int
 com_mainbus_probe(parent, match, aux)
@@ -67,9 +71,8 @@ com_mainbus_probe(parent, match, aux)
 	struct cfdata *match;
 	void *aux;
 {
-	/* XXX probe */
 
-	return 1;
+	return (console_present != 0);
 }
 
 struct com_softc *com0; /* XXX */

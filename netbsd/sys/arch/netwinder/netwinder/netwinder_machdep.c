@@ -1,4 +1,4 @@
-/*	$NetBSD: netwinder_machdep.c,v 1.31.4.2 2003/02/14 22:27:07 he Exp $	*/
+/*	$NetBSD: netwinder_machdep.c,v 1.57 2004/02/13 11:36:16 wiz Exp $	*/
 
 /*
  * Copyright (c) 1997,1998 Mark Brinicombe.
@@ -39,7 +39,11 @@
  * Created      : 24/11/97
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: netwinder_machdep.c,v 1.57 2004/02/13 11:36:16 wiz Exp $");
+
 #include "opt_ddb.h"
+#include "opt_ipkdb.h"
 #include "opt_pmap_debug.h"
 
 #include <sys/param.h>
@@ -51,6 +55,9 @@
 #include <sys/msgbuf.h>
 #include <sys/reboot.h>
 #include <sys/termios.h>
+#include <sys/ksyms.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <dev/cons.h>
 
@@ -58,7 +65,10 @@
 #include <ddb/db_sym.h>
 #include <ddb/db_extern.h>
 
+#include <arm/arm32/machdep.h>
+
 #include <machine/bootconfig.h>
+#define	_ARM32_BUS_DMA_PRIVATE
 #include <machine/bus.h>
 #include <machine/cpu.h>
 #include <machine/frame.h>
@@ -69,13 +79,30 @@
 #include <arm/footbridge/dc21285mem.h>
 #include <arm/footbridge/dc21285reg.h>
 
-#include "opt_ipkdb.h"
-
 #include "isa.h"
+#include "isadma.h"
 #if NISA > 0
 #include <dev/isa/isareg.h>
 #include <dev/isa/isavar.h>
 #endif
+
+#include "igsfb.h"
+#if NIGSFB > 0
+#include <dev/pci/pcivar.h>
+#include <dev/pci/igsfb_pcivar.h>
+#endif
+
+#include "pckbc.h"
+#if NPCKBC > 0
+#include <dev/ic/i8042reg.h>
+#include <dev/ic/pckbcvar.h>
+#endif
+
+#include "com.h"
+#include <dev/ic/comreg.h>
+#include <dev/ic/comvar.h>
+
+#include "ksyms.h"
 
 static bus_space_handle_t isa_base = (bus_space_handle_t) DC21285_PCI_IO_VBASE;
 
@@ -90,7 +117,7 @@ bs_protos(generic);
  * on where the ROM appears when you turn the MMU off.
  */
 static void netwinder_reset(void);
-u_int cpu_reset_address = (u_int) netwinder_reset;
+u_int cpu_reset_address;
 
 u_int dc21285_fclk = 63750000;
 
@@ -147,57 +174,48 @@ extern int pmap_debug_level;
 
 pv_addr_t kernel_pt_table[NUM_KERNEL_PTS];
 
+#define	KERNEL_VM_BASE		(KERNEL_BASE + 0x01000000)
+/*
+ * The range 0xf1000000 - 0xfcffffff is available for kernel VM space
+ * Footbridge registers and I/O mappings occupy 0xfd000000 - 0xffffffff
+ */
+#if NIGSFB > 0
+/* XXX: uwe: map 16 megs at 0xfc000000 for igsfb(4) */
+#define KERNEL_VM_SIZE		0x0B000000
+#else
+#define KERNEL_VM_SIZE		0x0C000000
+#endif
+
 struct user *proc0paddr;
 
 /* Prototypes */
 
-void consinit		__P((void));
+void consinit(void);
+void process_kernel_args(char *);
+void data_abort_handler(trapframe_t *);
+void prefetch_abort_handler(trapframe_t *);
+void undefinedinstruction_bounce(trapframe_t *);
 
-int fcomcnattach __P((u_int iobase, int rate,tcflag_t cflag));
-int fcomcndetach __P((void));
-
-void isa_netwinder_init __P((u_int iobase, u_int membase));
-
-void process_kernel_args	__P((char *));
-void data_abort_handler		__P((trapframe_t *frame));
-void prefetch_abort_handler	__P((trapframe_t *frame));
-void undefinedinstruction_bounce	__P((trapframe_t *frame));
-extern void configure		__P((void));
-extern void parse_mi_bootargs	__P((char *args));
-extern void dumpsys		__P((void));
 
 /* A load of console goo. */
-#include "vga.h"
-#if (NVGA > 0)
-#include <dev/ic/mc6845reg.h>
-#include <dev/ic/pcdisplayvar.h>
-#include <dev/ic/vgareg.h>
-#include <dev/ic/vgavar.h>
-#endif
+#ifndef CONSDEVNAME
+#  if (NIGSFB > 0) && (NPCKBC > 0)
+#    define CONSDEVNAME "igsfb"
+#  elif NCOM > 0
+#    define CONSDEVNAME "com"
+#  else
+#    error CONSDEVNAME not defined and no known console device configured
+#  endif
+#endif /* !CONSDEVNAME */
 
-#include "pckbc.h"
-#if (NPCKBC > 0)
-#include <dev/ic/i8042reg.h>
-#include <dev/ic/pckbcvar.h>
-#endif
-
-#include "com.h"
-#if (NCOM > 0)
-#include <dev/ic/comreg.h>
-#include <dev/ic/comvar.h>
 #ifndef CONCOMADDR
 #define CONCOMADDR 0x3f8
 #endif
-#endif
 
-#ifndef CONSDEVNAME
-#define CONSDEVNAME "com"
-#endif
-
-#define CONSPEED B115200
 #ifndef CONSPEED
-#define CONSPEED B9600	/* TTYDEF_SPEED */
+#define CONSPEED B115200	/* match NeTTrom */
 #endif
+
 #ifndef CONMODE
 #define CONMODE ((TTYDEF_CFLAG & ~(CSIZE | CSTOPB | PARENB)) | CS8) /* 8N1 */
 #endif
@@ -207,6 +225,27 @@ int comcnmode = CONMODE;
 
 extern struct consdev kcomcons;
 static void kcomcnputc(dev_t, int);
+
+#if NIGSFB > 0
+/* XXX: uwe */
+#define IGS_PCI_MEM_VBASE		0xfc000000
+#define IGS_PCI_MEM_VSIZE		0x01000000
+#define IGS_PCI_MEM_BASE		0x08000000
+
+extern struct arm32_pci_chipset footbridge_pci_chipset;
+extern struct bus_space footbridge_pci_io_bs_tag;
+extern struct bus_space footbridge_pci_mem_bs_tag;
+extern void footbridge_pci_bs_tag_init(void);
+
+/* standard methods */
+extern bs_map_proto(footbridge_mem);
+extern bs_unmap_proto(footbridge_mem);
+
+/* our hooks */
+static bs_map_proto(nw_footbridge_mem);
+static bs_unmap_proto(nw_footbridge_mem);
+#endif
+
 
 /*
  * void cpu_reboot(int howto, char *bootstr)
@@ -218,13 +257,11 @@ static void kcomcnputc(dev_t, int);
  */
 
 void
-cpu_reboot(howto, bootstr)
-	int howto;
-	char *bootstr;
+cpu_reboot(int howto, char *bootstr)
 {
 #ifdef DIAGNOSTIC
 	/* info */
-	printf("boot: howto=%08x curproc=%p\n", howto, curproc);
+	printf("boot: howto=%08x curlwp=%p\n", howto, curlwp);
 #endif
 
 	/*
@@ -246,9 +283,10 @@ cpu_reboot(howto, bootstr)
 
 	/*
 	 * If RB_NOSYNC was not specified sync the discs.
-	 * Note: Unless cold is set to 1 here, syslogd will die during the unmount.
-	 * It looks like syslogd is getting woken up only to find that it cannot
-	 * page part of the binary in as the filesystem has been unmounted.
+	 * Note: Unless cold is set to 1 here, syslogd will die during
+	 * the unmount.  It looks like syslogd is getting woken up
+	 * only to find that it cannot page part of the binary in as
+	 * the filesystem has been unmounted.
 	 */
 	if (!(howto & RB_NOSYNC))
 		bootsync();
@@ -277,14 +315,25 @@ cpu_reboot(howto, bootstr)
 	/*NOTREACHED*/
 }
 
+/*
+ * NB: this function runs with MMU disabled!
+ */
 static void
 netwinder_reset(void)
 {
-	ISA_PUTBYTE(0x370, 0x07); 	/* Select Logical Dev 7 (GPIO) */
-	ISA_PUTBYTE(0x371, 0x07);
-	ISA_PUTBYTE(0x370, 0xe6);	/* Select GP16 Control Reg */
-	ISA_PUTBYTE(0x371, 0x00);	/* Make GP16 an output */
-	ISA_PUTBYTE(0x338, 0xc4);	/* Set GP17/GP16 & GP12 */
+	register u_int base = DC21285_PCI_IO_BASE;
+
+#define PUTBYTE(reg, val) \
+	*((volatile u_int8_t *)(base + (reg))) = (val)
+
+	PUTBYTE(0x338, 0x84);	/* Red led(GP17), fan on(GP12) */
+	PUTBYTE(0x370, 0x87);	/* Enter the extended function mode */
+	PUTBYTE(0x370, 0x87);	/* (need to write the magic twice) */
+	PUTBYTE(0x370, 0x07); 	/* Select Logical Device Number reg */
+	PUTBYTE(0x371, 0x07);	/* Select Logical Device 7 (GPIO) */
+	PUTBYTE(0x370, 0xe6);	/* Select GP16 Control Reg */
+	PUTBYTE(0x371, 0x00);	/* Make GP16 an output */
+	PUTBYTE(0x338, 0xc4);	/* RESET(GP16), red led, fan on */
 }
 
 /*
@@ -333,11 +382,18 @@ struct l1_sec_map {
 	    DC21285_PCI_ISA_MEM_VSIZE,		VM_PROT_READ|VM_PROT_WRITE,
 	    PTE_NOCACHE },
 
+#if NIGSFB > 0
+	/* XXX: uwe: Map 16MB of PCI address space for CyberPro as console */
+	{ IGS_PCI_MEM_VBASE,	DC21285_PCI_MEM_BASE + IGS_PCI_MEM_BASE,
+	    IGS_PCI_MEM_VSIZE,			VM_PROT_READ|VM_PROT_WRITE,
+	    PTE_NOCACHE },
+#endif
+
 	{ 0, 0, 0, 0, 0 }
 };
 
 /*
- * u_int initarm(void);
+ * u_int initarm(...);
  *
  * Initial entry point on startup. This gets called before main() is
  * entered.
@@ -351,14 +407,20 @@ struct l1_sec_map {
  */
 
 u_int
-initarm(void)
+initarm(void *arg)
 {
 	int loop;
 	int loop1;
 	u_int l1pagetable;
 	extern char _end[];
 	pv_addr_t kernel_l1pt;
-	pv_addr_t kernel_ptpt;
+
+	/*
+	 * Turn the led off, then turn it yellow.
+	 * 0x80 - red; 0x04 - fan; 0x02 - green.
+	 */
+	ISA_PUTBYTE(0x338, 0x04);
+	ISA_PUTBYTE(0x338, 0x86);
 
 	/*
 	 * Set up a diagnostic console so we can see what's going
@@ -373,7 +435,7 @@ initarm(void)
 	 * Heads up ... Setup the CPU / MMU / TLB functions
 	 */
 	if (set_cpufuncs())
-		panic("cpu not recognized!");
+		panic("CPU not recognized!");
 
 	/*
 	 * We are currently running with the MMU enabled and the
@@ -426,19 +488,19 @@ initarm(void)
 	 * is free.  We start there and allocate upwards.
 	 */
 	physical_start = bootconfig.dram[0].address;
-	physical_end = physical_start + (bootconfig.dram[0].pages * NBPG);
+	physical_end = physical_start + (bootconfig.dram[0].pages * PAGE_SIZE);
 
 	physical_freestart = ((((vaddr_t) _end) + PGOFSET) & ~PGOFSET) -
 	    KERNEL_BASE;
 	physical_freeend = physical_end;
-	free_pages = (physical_freeend - physical_freestart) / NBPG;
+	free_pages = (physical_freeend - physical_freestart) / PAGE_SIZE;
 
 #ifdef VERBOSE_INIT_ARM
 	printf("freestart = 0x%08lx, free_pages = %d (0x%x)\n",
 	       physical_freestart, free_pages, free_pages);
 #endif
 
-	physmem = (physical_end - physical_start) / NBPG;
+	physmem = (physical_end - physical_start) / PAGE_SIZE;
 
 	/* Tell the user about the memory */
 	printf("physmemory: %d pages at 0x%08lx -> 0x%08lx\n", physmem,
@@ -469,9 +531,9 @@ initarm(void)
 
 #define alloc_pages(var, np)			\
 	(var) = physical_freestart;		\
-	physical_freestart += ((np) * NBPG);	\
+	physical_freestart += ((np) * PAGE_SIZE);\
 	free_pages -= (np);			\
-	memset((char *)(var), 0, ((np) * NBPG));
+	memset((char *)(var), 0, ((np) * PAGE_SIZE));
 
 	loop1 = 0;
 	kernel_l1pt.pv_pa = 0;
@@ -479,19 +541,17 @@ initarm(void)
 		/* Are we 16KB aligned for an L1 ? */
 		if ((physical_freestart & (L1_TABLE_SIZE - 1)) == 0
 		    && kernel_l1pt.pv_pa == 0) {
-			valloc_pages(kernel_l1pt, L1_TABLE_SIZE / NBPG);
+			valloc_pages(kernel_l1pt, L1_TABLE_SIZE / PAGE_SIZE);
 		} else {
-			alloc_pages(kernel_pt_table[loop1].pv_pa,
-			    L2_TABLE_SIZE / NBPG);
-			kernel_pt_table[loop1].pv_va =
-			    kernel_pt_table[loop1].pv_pa;
+			valloc_pages(kernel_pt_table[loop1],
+			    L2_TABLE_SIZE / PAGE_SIZE);
 			++loop1;
 		}
 	}
 
 	/* This should never be able to happen but better confirm that. */
 	if (!kernel_l1pt.pv_pa || (kernel_l1pt.pv_pa & (L1_TABLE_SIZE-1)) != 0)
-		panic("initarm: Failed to align the kernel page directory\n");
+		panic("initarm: Failed to align the kernel page directory");
 
 	/*
 	 * Allocate a page for the system page mapped to V0x00000000
@@ -499,9 +559,6 @@ initarm(void)
 	 * shared by all processes.
 	 */
 	alloc_pages(systempage.pv_pa, 1);
-
-	/* Allocate a page for the page table to map kernel page tables*/
-	valloc_pages(kernel_ptpt, L2_TABLE_SIZE / NBPG);
 
 	/* Allocate stacks for all modes */
 	valloc_pages(irqstack, IRQ_STACK_SIZE);
@@ -520,7 +577,7 @@ initarm(void)
 	    kernelstack.pv_va); 
 #endif
 
-	alloc_pages(msgbufphys, round_page(MSGBUFSIZE) / NBPG);
+	alloc_pages(msgbufphys, round_page(MSGBUFSIZE) / PAGE_SIZE);
 
 	/*
 	 * Ok we have allocated physical pages for the primary kernel
@@ -546,7 +603,6 @@ initarm(void)
 	for (loop = 0; loop < KERNEL_PT_VMDATA_NUM; ++loop)
 		pmap_link_l2pt(l1pagetable, KERNEL_VM_BASE + loop * 0x00400000,
 		    &kernel_pt_table[KERNEL_PT_VMDATA + loop]);
-	pmap_link_l2pt(l1pagetable, PTE_BASE, &kernel_ptpt);
 
 	/* update the top of the kernel VM */
 	pmap_curmaxkvaddr =
@@ -591,44 +647,22 @@ initarm(void)
 
 	/* Map the stack pages */
 	pmap_map_chunk(l1pagetable, irqstack.pv_va, irqstack.pv_pa,
-	    IRQ_STACK_SIZE * NBPG, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+	    IRQ_STACK_SIZE * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
 	pmap_map_chunk(l1pagetable, abtstack.pv_va, abtstack.pv_pa,
-	    ABT_STACK_SIZE * NBPG, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+	    ABT_STACK_SIZE * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
 	pmap_map_chunk(l1pagetable, undstack.pv_va, undstack.pv_pa,
-	    UND_STACK_SIZE * NBPG, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+	    UND_STACK_SIZE * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
 	pmap_map_chunk(l1pagetable, kernelstack.pv_va, kernelstack.pv_pa,
-	    UPAGES * NBPG, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
+	    UPAGES * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_CACHE);
 
 	pmap_map_chunk(l1pagetable, kernel_l1pt.pv_va, kernel_l1pt.pv_pa,
-	    L1_TABLE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
+	    L1_TABLE_SIZE, VM_PROT_READ|VM_PROT_WRITE, PTE_PAGETABLE);
 
-	/* Map the page table that maps the kernel pages */
-	pmap_map_entry(l1pagetable, kernel_ptpt.pv_va, kernel_ptpt.pv_pa,
-	    VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
-
-	/*
-	 * Map entries in the page table used to map PTE's
-	 * Basically every kernel page table gets mapped here
-	 */
-	/* The -2 is slightly bogus, it should be -log2(sizeof(pt_entry_t)) */
-	pmap_map_entry(l1pagetable,
-	    PTE_BASE + (KERNEL_BASE >> (PGSHIFT-2)),
-	    kernel_pt_table[KERNEL_PT_KERNEL].pv_pa,
-	    VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
-	pmap_map_entry(l1pagetable,
-	    PTE_BASE + (PTE_BASE >> (PGSHIFT-2)),
-	    kernel_ptpt.pv_pa,
-	    VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
-	pmap_map_entry(l1pagetable,
-	    PTE_BASE + (0x00000000 >> (PGSHIFT-2)),
-	    kernel_pt_table[KERNEL_PT_SYS].pv_pa,
-	    VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
-	for (loop = 0; loop < KERNEL_PT_VMDATA_NUM; ++loop)
-		pmap_map_entry(l1pagetable,
-		    PTE_BASE + ((KERNEL_VM_BASE +
-		    (loop * 0x00400000)) >> (PGSHIFT-2)),
-		    kernel_pt_table[KERNEL_PT_VMDATA + loop].pv_pa,
-		    VM_PROT_READ|VM_PROT_WRITE, PTE_NOCACHE);
+	for (loop = 0; loop < NUM_KERNEL_PTS; ++loop) {
+		pmap_map_chunk(l1pagetable, kernel_pt_table[loop].pv_va,
+		    kernel_pt_table[loop].pv_pa, L2_TABLE_SIZE,
+		    VM_PROT_READ|VM_PROT_WRITE, PTE_PAGETABLE);
+	}
 
 	/* Map the vector page. */
 	pmap_map_entry(l1pagetable, vector_page, systempage.pv_pa,
@@ -668,7 +702,16 @@ initarm(void)
 	printf("switching to new L1 page table  @%#lx...", kernel_l1pt.pv_pa);
 #endif
 
+	cpu_domains((DOMAIN_CLIENT << (PMAP_DOMAIN_KERNEL*2)) | DOMAIN_CLIENT);
 	setttb(kernel_l1pt.pv_pa);
+	cpu_domains(DOMAIN_CLIENT << (PMAP_DOMAIN_KERNEL*2));
+
+	/*
+	 * Moved from cpu_startup() as data_abort_handler() references
+	 * this during uvm init
+	 */
+	proc0paddr = (struct user *)kernelstack.pv_va;
+	lwp0.l_addr = proc0paddr;
 
 #ifdef VERBOSE_INIT_ARM
 	printf("done!\n");
@@ -696,9 +739,12 @@ initarm(void)
 	 */
 	printf("init subsystems: stacks ");
 
-	set_stackptr(PSR_IRQ32_MODE, irqstack.pv_va + IRQ_STACK_SIZE * NBPG);
-	set_stackptr(PSR_ABT32_MODE, abtstack.pv_va + ABT_STACK_SIZE * NBPG);
-	set_stackptr(PSR_UND32_MODE, undstack.pv_va + UND_STACK_SIZE * NBPG);
+	set_stackptr(PSR_IRQ32_MODE,
+	    irqstack.pv_va + IRQ_STACK_SIZE * PAGE_SIZE);
+	set_stackptr(PSR_ABT32_MODE,
+	    abtstack.pv_va + ABT_STACK_SIZE * PAGE_SIZE);
+	set_stackptr(PSR_UND32_MODE,
+	    undstack.pv_va + UND_STACK_SIZE * PAGE_SIZE);
 
 	/*
 	 * Well we should set a data abort handler.
@@ -718,13 +764,94 @@ initarm(void)
 	printf("undefined ");
 	undefined_init();
 
+	/* Load memory into UVM. */
+	printf("page ");
+	uvm_setpagesize();	/* initialize PAGE_SIZE-dependent variables */
+
+	/* XXX Always one RAM block -- nuke the loop. */
+	for (loop = 0; loop < bootconfig.dramblocks; loop++) {
+		paddr_t start = (paddr_t)bootconfig.dram[loop].address;
+		paddr_t end = start + (bootconfig.dram[loop].pages * PAGE_SIZE);
+#if NISADMA > 0
+		paddr_t istart, isize;
+		extern struct arm32_dma_range *footbridge_isa_dma_ranges;
+		extern int footbridge_isa_dma_nranges;
+#endif
+
+		if (start < physical_freestart)
+			start = physical_freestart;
+		if (end > physical_freeend)
+			end = physical_freeend;
+
+#if 0
+		printf("%d: %lx -> %lx\n", loop, start, end - 1);
+#endif
+
+#if NISADMA > 0
+		if (arm32_dma_range_intersect(footbridge_isa_dma_ranges,
+					      footbridge_isa_dma_nranges,
+					      start, end - start,
+					      &istart, &isize)) {
+			/*
+			 * Place the pages that intersect with the
+			 * ISA DMA range onto the ISA DMA free list.
+			 */
+#if 0
+			printf("    ISADMA 0x%lx -> 0x%lx\n", istart,
+			    istart + isize - 1);
+#endif
+			uvm_page_physload(atop(istart),
+			    atop(istart + isize), atop(istart),
+			    atop(istart + isize), VM_FREELIST_ISADMA);
+
+			/*
+			 * Load the pieces that come before the
+			 * intersection onto the default free list.
+			 */
+			if (start < istart) {
+#if 0
+				printf("    BEFORE 0x%lx -> 0x%lx\n",
+				    start, istart - 1);
+#endif
+				uvm_page_physload(atop(start),
+				    atop(istart), atop(start),
+				    atop(istart), VM_FREELIST_DEFAULT);
+			}
+
+			/*
+			 * Load the pieces that come after the
+			 * intersection onto the default free list.
+			 */
+			if ((istart + isize) < end) {
+#if 0
+				printf("     AFTER 0x%lx -> 0x%lx\n",
+				    (istart + isize), end - 1);
+#endif
+				uvm_page_physload(atop(istart + isize),
+				    atop(end), atop(istart + isize),
+				    atop(end), VM_FREELIST_DEFAULT);
+			}
+		} else {
+			uvm_page_physload(atop(start), atop(end),
+			    atop(start), atop(end), VM_FREELIST_DEFAULT);
+		}
+#else /* NISADMA > 0 */
+		uvm_page_physload(atop(start), atop(end),
+		    atop(start), atop(end), VM_FREELIST_DEFAULT);
+#endif /* NISADMA > 0 */
+	}
+
 	/* Boot strap pmap telling it where the kernel page table is */
 	printf("pmap ");
-	pmap_bootstrap((pd_entry_t *)kernel_l1pt.pv_va, kernel_ptpt);
+	pmap_bootstrap((pd_entry_t *)kernel_l1pt.pv_va, KERNEL_VM_BASE,
+	    KERNEL_VM_BASE + KERNEL_VM_SIZE);
+
+	/* Now that pmap is inited, we can set cpu_reset_address */
+	cpu_reset_address = (u_int)vtophys((vaddr_t)netwinder_reset);
 
 	/* Setup the IRQ system */
 	printf("irq ");
-	irq_init();
+	footbridge_intr_init();
 	printf("done.\n");
 
 	/*
@@ -741,23 +868,27 @@ initarm(void)
 		ipkdb_connect(0);
 #endif
 
+
+#if NKSYMS || defined(DDB) || defined(LKM)
+	/* Firmware doesn't load symbols. */
+	ksyms_init(0, NULL, NULL);
+#endif
+
 #ifdef DDB
 	db_machine_init();
-
-	/* Firmware doesn't load symbols. */
-	ddb_init(0, NULL, NULL);
-
 	if (boothowto & RB_KDB)
 		Debugger();
 #endif
+
+	/* Turn the led green */
+	ISA_PUTBYTE(0x338, 0x06);
 
 	/* We return the new stack pointer address */
 	return(kernelstack.pv_va + USPACE_SVC_STACK_TOP);
 }
 
 void
-process_kernel_args(args)
-	char *args;
+process_kernel_args(char *args)
 {
 
 	boothowto = 0;
@@ -786,10 +917,6 @@ process_kernel_args(args)
 	parse_mi_bootargs(boot_args);
 }
 
-extern struct bus_space footbridge_pci_io_bs_tag;
-extern struct bus_space footbridge_pci_mem_bs_tag;
-void footbridge_pci_bs_tag_init __P((void));
-
 void
 consinit(void)
 {
@@ -801,33 +928,126 @@ consinit(void)
 
 	consinit_called = 1;
 
-#if NISA > 0
-	/* Initialise the ISA subsystem early ... */
-	isa_netwinder_init(DC21285_PCI_IO_VBASE, DC21285_PCI_ISA_MEM_VBASE);
+#ifdef DIAGNOSTIC
+	printf("consinit(\"%s\")\n", console);
 #endif
 
-	footbridge_pci_bs_tag_init();
+#if NISA > 0
+	/* Initialise the ISA subsystem early ... */
+	isa_footbridge_init(DC21285_PCI_IO_VBASE, DC21285_PCI_ISA_MEM_VBASE);
+#endif
 
-	if (strncmp(console, "vga", 3) == 0) {
-#if (NVGA > 0)
-		vga_cnattach(&footbridge_pci_io_bs_tag,
-		    &footbridge_pci_mem_bs_tag, - 1, 0);
-#if (NPCKBC > 0)
-		pckbc_cnattach(&isa_io_bs_tag, IO_KBD, KBCMDP, PCKBC_KBD_SLOT);
-#endif	/* NPCKBC */
+	if (strncmp(console, "igsfb", 5) == 0) {
+#if NIGSFB > 0
+		int res;
+
+		footbridge_pci_bs_tag_init();
+
+		/*
+		 * XXX: uwe: special case mapping for the igsfb memory space.
+		 * 
+		 * The problem with this is that when footbridge is
+		 * attached during normal autoconfiguration the bus
+		 * space tags will be reinited and these hooks lost.
+		 * However, since igsfb(4) don't unmap memory during
+		 * normal operation, this is ok.  But if the igsfb is
+		 * configured but is not a console, we waste 16M of
+		 * kernel VA space.
+		 */
+		footbridge_pci_mem_bs_tag.bs_map = nw_footbridge_mem_bs_map;
+		footbridge_pci_mem_bs_tag.bs_unmap = nw_footbridge_mem_bs_unmap;
+
+		igsfb_pci_cnattach(&footbridge_pci_io_bs_tag,
+				   &footbridge_pci_mem_bs_tag,
+				   &footbridge_pci_chipset,
+				   0, 8, 0);
+#if NPCKBC > 0
+		res = pckbc_cnattach(&isa_io_bs_tag,
+				     IO_KBD, KBCMDP, PCKBC_KBD_SLOT);
+		if (res)
+			printf("pckbc_cnattach: %d!\n", res);
+#endif
 #else
-		panic("vga console not configured");
-#endif	/* NVGA */
+		panic("igsfb console not configured");
+#endif /* NIGSFB */
 	} else {
-#if (NCOM > 0)
+#ifdef DIAGNOSTIC
+		if (strncmp(console, "com", 3) != 0) {
+			printf("consinit: unknown CONSDEVNAME=\"%s\","
+			       " falling back to \"com\"\n", console);
+		}
+#endif
+#if NCOM > 0
 		if (comcnattach(&isa_io_bs_tag, CONCOMADDR, comcnspeed,
-		    COM_FREQ, comcnmode))
+				COM_FREQ, COM_TYPE_NORMAL, comcnmode))
 			panic("can't init serial console @%x", CONCOMADDR);
 #else
-			panic("serial console @%x not configured", CONCOMADDR);
+		panic("serial console @%x not configured", CONCOMADDR);
 #endif
 	}
 }
+
+
+#if NIGSFB > 0
+static int
+nw_footbridge_mem_bs_map(t, bpa, size, cacheable, bshp)
+	void *t;
+	bus_addr_t bpa;
+	bus_size_t size;
+	int cacheable;
+	bus_space_handle_t *bshp;
+{
+	bus_addr_t startpa, endpa;
+
+	/* Round the allocation to page boundries */
+	startpa = trunc_page(bpa);
+	endpa = round_page(bpa + size);
+
+	/*
+	 * Check for mappings of the igsfb(4) memory space as we have
+	 * this space already mapped.
+	 */
+	if (startpa >= IGS_PCI_MEM_BASE
+	    && endpa < (IGS_PCI_MEM_BASE + IGS_PCI_MEM_VSIZE)) {
+		/* Store the bus space handle */
+		*bshp =  IGS_PCI_MEM_VBASE
+			+ (bpa - IGS_PCI_MEM_BASE);
+#ifdef DEBUG
+		printf("nw/mem_bs_map: %08x+%08x: %08x..%08x -> %08x\n",
+		       (u_int32_t)bpa, (u_int32_t)size,
+		       (u_int32_t)startpa, (u_int32_t)endpa,
+		       (u_int32_t)*bshp);
+#endif
+		return 0;
+	}
+
+	return (footbridge_mem_bs_map(t, bpa, size, cacheable, bshp));
+}
+
+
+static void
+nw_footbridge_mem_bs_unmap(t, bsh, size)
+	void *t;
+	bus_space_handle_t bsh;
+	bus_size_t size;
+{
+
+	/*
+	 * Check for mappings of the igsfb(4) memory space as we have
+	 * this space already mapped.
+	 */
+	if (bsh >= IGS_PCI_MEM_VBASE
+	    && bsh < (IGS_PCI_MEM_VBASE + IGS_PCI_MEM_VSIZE)) {
+#ifdef DEBUG
+		printf("nw/bs_unmap: 0x%08x\n", (u_int32_t)bsh);
+#endif
+		return;
+	}
+
+	footbridge_mem_bs_unmap(t, bsh, size);
+}
+#endif /* NIGSFB */
+
 
 static bus_space_handle_t kcom_base = (bus_space_handle_t) (DC21285_PCI_IO_VBASE + CONCOMADDR);
 
@@ -876,5 +1096,5 @@ kcomcnpollc(dev_t dev, int on)
 
 struct consdev kcomcons = {
 	NULL, NULL, kcomcngetc, kcomcnputc, kcomcnpollc, NULL,
-	NODEV, CN_NORMAL
+	NULL, NULL, NODEV, CN_NORMAL
 };

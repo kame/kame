@@ -1,4 +1,4 @@
-/*	$NetBSD: ms.c,v 1.20 2002/01/28 09:57:01 aymeric Exp $ */
+/*	$NetBSD: ms.c,v 1.28 2003/09/22 18:17:31 jandberg Exp $ */
 
 /*
  * based on:
@@ -23,11 +23,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -49,11 +45,21 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ms.c,v 1.20 2002/01/28 09:57:01 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ms.c,v 1.28 2003/09/22 18:17:31 jandberg Exp $");
 
 /*
  * Mouse driver.
+ *
+ * wscons aware. Attaches two wsmouse devices, one for each port.
+ * Also still exports its own device entry points so it is possible
+ * to open this and read firm_events.
+ * The events go only to one place at a time:
+ * - When somebody has opened a ms device directly wsmouse cannot be activated.
+ *   (when wsmouse is opened it calls ms_enable to activate)
+ * - When feeding events to wsmouse open of ms device will fail.
  */
+
+#include "wsmouse.h"
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -65,6 +71,7 @@ __KERNEL_RCSID(0, "$NetBSD: ms.c,v 1.20 2002/01/28 09:57:01 aymeric Exp $");
 #include <sys/callout.h>
 #include <sys/tty.h>
 #include <sys/signalvar.h>
+#include <sys/conf.h>
 
 #include <amiga/dev/event_var.h>
 #include <amiga/dev/vuid_event.h>
@@ -73,8 +80,10 @@ __KERNEL_RCSID(0, "$NetBSD: ms.c,v 1.20 2002/01/28 09:57:01 aymeric Exp $");
 #include <amiga/amiga/cia.h>
 #include <amiga/amiga/device.h>
 
-#include <sys/conf.h>
-#include <machine/conf.h>
+#if NWSMOUSE > 0
+#include <dev/wscons/wsmousevar.h>
+#include <dev/wscons/wsconsio.h>
+#endif
 
 void msattach(struct device *, struct device *, void *);
 int msmatch(struct device *, struct cfdata *, void *);
@@ -93,6 +102,10 @@ struct ms_port {
 	int	ms_dy;		   /* delta-y */
 	volatile int ms_ready;	   /* event queue is ready */
 	struct	evvar ms_events;   /* event queue state */
+#if NWSMOUSE > 0
+	struct device *ms_wsmousedev; /* wsmouse device */
+	int     ms_wsenabled;      /* feeding events to wscons */
+#endif
 };
 
 #define	MS_NPORTS	2
@@ -102,9 +115,8 @@ struct ms_softc {
 	struct ms_port sc_ports[MS_NPORTS];
 };
 
-struct cfattach ms_ca = {
-	sizeof(struct ms_softc), msmatch, msattach
-};
+CFATTACH_DECL(ms, sizeof(struct ms_softc),
+    msmatch, msattach, NULL, NULL);
 
 void msintr(void *);
 void ms_enable(struct ms_port *);
@@ -112,15 +124,42 @@ void ms_disable(struct ms_port *);
 
 extern struct cfdriver ms_cd;
 
+dev_type_open(msopen);
+dev_type_close(msclose);
+dev_type_read(msread);
+dev_type_ioctl(msioctl);
+dev_type_poll(mspoll);
+dev_type_kqfilter(mskqfilter);
+
+const struct cdevsw ms_cdevsw = {
+	msopen, msclose, msread, nowrite, msioctl,
+	nostop, notty, mspoll, nommap, mskqfilter,
+};
+
 #define	MS_UNIT(d)	((minor(d) & ~0x1) >> 1)
 #define	MS_PORT(d)	(minor(d) & 0x1)
 
 /*
  * Given a dev_t, return a pointer to the port's hardware state.
- * Assumes the unit to be valid, so do *not* utilize this in msopen().
+ * Assumes the unit to be valid, so do *not* use this in msopen().
  */
 #define	MS_DEV2MSPORT(d) \
     (&(((struct ms_softc *)getsoftc(ms_cd, MS_UNIT(d)))->sc_ports[MS_PORT(d)]))
+
+#if NWSMOUSE > 0
+/*
+ * Callbacks for wscons.
+ */
+static int ms_wscons_enable(void *);
+static int ms_wscons_ioctl(void *, u_long, caddr_t, int, struct proc *);
+static void ms_wscons_disable(void *);
+
+static struct wsmouse_accessops ms_wscons_accessops = {
+	ms_wscons_enable,
+	ms_wscons_ioctl,
+	ms_wscons_disable
+};
+#endif
 
 int
 msmatch(struct device *pdp, struct cfdata *cfp, void *auxp)
@@ -138,6 +177,9 @@ msmatch(struct device *pdp, struct cfdata *cfp, void *auxp)
 void
 msattach(struct device *pdp, struct device *dp, void *auxp)
 {
+#if NWSMOUSE > 0
+	struct wsmousedev_attach_args waa;
+#endif
 	struct ms_softc *sc = (void *) dp;
 	int i;
 
@@ -145,6 +187,14 @@ msattach(struct device *pdp, struct device *dp, void *auxp)
 	for (i = 0; i < MS_NPORTS; i++) {
 		sc->sc_ports[i].ms_portno = i;
 		callout_init(&sc->sc_ports[i].ms_intr_ch);
+#if NWSMOUSE > 0
+		waa.accessops = &ms_wscons_accessops;
+		waa.accesscookie = &sc->sc_ports[i];
+		
+		sc->sc_ports[i].ms_wsenabled = 0;
+		sc->sc_ports[i].ms_wsmousedev = 
+		    config_found(dp, &waa, wsmousedevprint);
+#endif
 	}
 }
 
@@ -253,6 +303,31 @@ msintr(void *arg)
 	ms->ms_dy = dy;
 	ms->ms_mb = mb;
 
+#if NWSMOUSE > 0
+	/*
+	 * If we have attached wsmouse and we are not opened
+	 * directly then pass events to wscons.
+	 */
+	if (ms->ms_wsmousedev && ms->ms_wsenabled)
+	{
+		int buttons = 0;
+
+		if (mb & 4)
+			buttons |= 1;
+		if (mb & 2)
+			buttons |= 2;
+		if (mb & 1)
+			buttons |= 4;
+
+		wsmouse_input(ms->ms_wsmousedev, 
+			      buttons,
+			      dx,
+			      -dy,
+			      0,
+			      WSMOUSE_INPUT_DELTA);
+
+	} else
+#endif
 	if (dx || dy || ms->ms_ub != ms->ms_mb) {
 		/*
 		 * We have at least one event (mouse button, delta-X, or
@@ -368,6 +443,11 @@ msopen(dev_t dev, int flags, int mode, struct proc *p)
 	if (ms->ms_events.ev_io)
 		return(EBUSY);
 
+#if NWSMOUSE > 0
+	/* don't allow opening when sending events to wsmouse */
+	if (ms->ms_wsenabled)
+		return EBUSY;
+#endif
 	/* initialize potgo bits for mouse mode */
 	custom.potgo = custom.potgor | (0xf00 << (port * 4));
 
@@ -414,6 +494,11 @@ msioctl(dev_t dev, u_long cmd, register caddr_t data, int flag,
 	case FIOASYNC:
 		ms->ms_events.ev_async = *(int *)data != 0;
 		return(0);
+	case FIOSETOWN:
+		if (-*(int *)data != ms->ms_events.ev_io->p_pgid
+		    && *(int *)data != ms->ms_events.ev_io->p_pid)
+			return(EPERM);
+		return(0);
 	case TIOCSPGRP:
 		if (*(int *)data != ms->ms_events.ev_io->p_pgid)
 			return(EPERM);
@@ -438,3 +523,58 @@ mspoll(dev_t dev, int events, struct proc *p)
 
 	return(ev_poll(&ms->ms_events, events, p));
 }
+
+int
+mskqfilter(dev, kn)
+	dev_t dev;
+	struct knote *kn;
+{
+	struct ms_port *ms;
+
+	ms = MS_DEV2MSPORT(dev);
+
+	return (ev_kqfilter(&ms->ms_events, kn));
+}
+
+#if NWSMOUSE > 0
+
+static int
+ms_wscons_ioctl(void *cookie, u_long cmd, caddr_t data, int flag, 
+		struct proc *p)
+{
+	switch(cmd) {
+	case WSMOUSEIO_GTYPE:
+		*(u_int*)data = WSMOUSE_TYPE_AMIGA;
+		return (0);
+	}
+
+	return -1;
+}
+
+static int
+ms_wscons_enable(void *cookie)
+{
+	struct ms_port *port = cookie;
+
+	/* somebody reading events from us directly? */
+	if (port->ms_events.ev_io)
+		return EBUSY;
+
+	port->ms_wsenabled = 1;
+	ms_enable(port);
+
+	return 0;
+}
+
+static void
+ms_wscons_disable(void *cookie)
+{
+	struct ms_port *port = cookie;
+
+	if (port->ms_wsenabled)
+		ms_disable(port);
+	port->ms_wsenabled = 0;
+}
+
+#endif
+

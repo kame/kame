@@ -1,4 +1,4 @@
-/*	$NetBSD: irix_syssgi.c,v 1.26 2002/04/20 07:43:35 manu Exp $ */
+/*	$NetBSD: irix_syssgi.c,v 1.40 2004/03/11 10:14:10 he Exp $ */
 
 /*-
  * Copyright (c) 2001-2002 The NetBSD Foundation, Inc.
@@ -37,9 +37,11 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: irix_syssgi.c,v 1.26 2002/04/20 07:43:35 manu Exp $");
+__KERNEL_RCSID(0, "$NetBSD: irix_syssgi.c,v 1.40 2004/03/11 10:14:10 he Exp $");
 
+#if defined(_KERNEL_OPT)
 #include "opt_ddb.h"
+#endif
 
 #ifndef ELFSIZE
 #define ELFSIZE 32
@@ -63,6 +65,7 @@ __KERNEL_RCSID(0, "$NetBSD: irix_syssgi.c,v 1.26 2002/04/20 07:43:35 manu Exp $"
 #include <sys/exec.h>
 #include <sys/exec_elf.h>
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <uvm/uvm_extern.h>
@@ -73,6 +76,8 @@ __KERNEL_RCSID(0, "$NetBSD: irix_syssgi.c,v 1.26 2002/04/20 07:43:35 manu Exp $"
 
 #include <compat/irix/irix_types.h>
 #include <compat/irix/irix_signal.h>
+#include <compat/irix/irix_exec.h>
+#include <compat/irix/irix_prctl.h>
 #include <compat/irix/irix_syscall.h>
 #include <compat/irix/irix_syscallargs.h>
 #include <compat/irix/irix_syssgi.h>
@@ -83,12 +88,12 @@ void	ELFNAME(load_psection)(struct exec_vmcmd_set *, struct vnode *,
 
 static int irix_syssgi_mapelf __P((int, Elf_Phdr *, int, 
     struct proc *, register_t *));
-static int irix_syssgi_sysconf __P((int name, struct proc *, register_t *));
-static int irix_syssgi_pathconf __P((char *, int, struct proc *, register_t *));
+static int irix_syssgi_sysconf __P((int name, struct lwp *, register_t *));
+static int irix_syssgi_pathconf __P((char *, int, struct lwp *, register_t *));
 
 int
-irix_sys_syssgi(p, v, retval)
-	struct proc *p;
+irix_sys_syssgi(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -100,6 +105,7 @@ irix_sys_syssgi(p, v, retval)
 		syscallarg(void *) arg4;                                        
 		syscallarg(void *) arg5;                                        
 	} */ *uap = v;  
+	struct proc *p = l->l_proc;
 	int request = SCARG(uap, request);
 	void *arg1, *arg2, *arg3; 
 
@@ -116,7 +122,7 @@ irix_sys_syssgi(p, v, retval)
 
 		SCARG(&cup, gidsetsize) = (int)SCARG(uap, arg1);
 		SCARG(&cup, gidset) = (gid_t *)SCARG(uap, arg2);
-		return (sys_setgroups(p, &cup, retval));
+		return (sys_setgroups(l, &cup, retval));
 		break;
 	}
 
@@ -125,19 +131,19 @@ irix_sys_syssgi(p, v, retval)
 
 		SCARG(&cup, gidsetsize) = (int)SCARG(uap, arg1);
 		SCARG(&cup, gidset) = (gid_t *)SCARG(uap, arg2);
-		return (sys_getgroups(p, &cup, retval));
+		return (sys_getgroups(l, &cup, retval));
 		break;
 	}
 
 	case IRIX_SGI_SETSID: 	/* Set session ID: setsid(2) */
-		return (sys_setsid(p, NULL, retval)); 
+		return (sys_setsid(l, NULL, retval)); 
 		break;
 
 	case IRIX_SGI_GETSID: {	/* Get session ID: getsid(2) */
 		struct sys_getsid_args cup;
 
 		SCARG(&cup, pid) = (pid_t)SCARG(uap, arg1); 
-		return (sys_getsid(p, &cup, retval)); 
+		return (sys_getsid(l, &cup, retval)); 
 		break;
 	}
 
@@ -145,7 +151,7 @@ irix_sys_syssgi(p, v, retval)
 		struct sys_getpgid_args cup;
 
 		SCARG(&cup, pid) = (pid_t)SCARG(uap, arg1); 
-		return (sys_getpgid(p, &cup, retval)); 
+		return (sys_getpgid(l, &cup, retval)); 
 		break;
 	}
 
@@ -154,14 +160,56 @@ irix_sys_syssgi(p, v, retval)
 
 		SCARG(&cup, pid) = (pid_t)SCARG(uap, arg1); 
 		SCARG(&cup, pgid) = (pid_t)SCARG(uap, arg2); 
-		return (sys_setpgid(p, &cup, retval)); 
+		return (sys_setpgid(l, &cup, retval)); 
 		break;
 	}
 
 	case IRIX_SGI_PATHCONF: /* Get file limits: pathconf(3) */ 
 		return irix_syssgi_pathconf((char *)SCARG(uap, arg1),
-		    (int)SCARG(uap, arg2), p, retval);
+		    (int)SCARG(uap, arg2), l, retval);
 		break;
+
+	case IRIX_SGI_RUSAGE: {	/* BSD getrusage(2) */
+		struct sys_getrusage_args cup;
+
+		SCARG(&cup, who) = (int)SCARG(uap, arg1);
+		SCARG(&cup, rusage) = (struct rusage *)SCARG(uap, arg2);
+		return sys_getrusage(l, &cup, retval);
+		break;
+	}
+
+	case IRIX_SGI_NUM_MODULES: /* <sys/systeminfo.h> get_num_modules() */
+		*retval = 1;
+		return 0;
+		break;
+		
+	case IRIX_SGI_MODULE_INFO: { /* <sys/systeminfo.h> get_module_info() */
+		int module_num = (int)SCARG(uap, arg1);
+		struct irix_module_info_s *imip = SCARG(uap, arg2);
+		int mss = (int)SCARG(uap, arg3);
+		struct irix_module_info_s imi;
+		char *idx;
+
+		if (module_num != 0)
+			return EINVAL;
+
+		imi.serial_num = (u_int64_t)hostid;
+		imi.mod_num = 0;
+		(void)snprintf(imi.serial_str, IRIX_MAX_SERIAL_SIZE, 
+		    "0800%08x", (u_int32_t)hostid);
+
+		/* Convert to upper case */
+		for (idx = imi.serial_str; *idx; idx++)
+			if (*idx >= 'a' && *idx <= 'f')
+				*idx += ('A' - 'a');
+
+		/* Don't copyout irrelevant data on user request */
+		if (mss > sizeof(struct irix_module_info_s))
+			mss = sizeof(struct irix_module_info_s);
+
+		return copyout(&imi, imip, mss);
+		break;
+	}
 
 	case IRIX_SGI_RDNAME: {	/* Read Processes' name */
 		struct proc *tp;
@@ -169,9 +217,6 @@ irix_sys_syssgi(p, v, retval)
 		arg1 = SCARG(uap, arg1); /* PID of the process */
 		arg2 = SCARG(uap, arg2); /* Address of user buffer */
 		arg3 = SCARG(uap, arg3); /* Length of user buffer */
-		if (!uvm_useracc((caddr_t)arg2, (size_t)arg2, B_WRITE))
-			return EACCES;
-
 		tp = pfind((pid_t)arg1);
 		if (tp == NULL || \
 		    tp->p_psstr == NULL || \
@@ -216,7 +261,7 @@ irix_sys_syssgi(p, v, retval)
 
 	case IRIX_SGI_SYSCONF:		/* POSIX sysconf */
 		arg1 = SCARG(uap, arg1); /* system variable name */
-		return irix_syssgi_sysconf((int)arg1, p, retval);	
+		return irix_syssgi_sysconf((int)arg1, l, retval);	
 		break;
 
 	case IRIX_SGI_SATCTL:		/* control audit stream */
@@ -269,13 +314,7 @@ irix_syssgi_mapelf(fd, ph, count, p, retval)
 	vcset.evs_cnt = 0;
 	vcset.evs_used = 0;
 
-	/* Check that the program header array is readable by the process */
-	if (!uvm_useracc((caddr_t)ph, sizeof(Elf_Phdr) * count, B_READ))
-		return EACCES;
-
-	kph = (Elf_Phdr *)malloc(sizeof(Elf_Phdr) * count,
-	    M_TEMP, M_WAITOK);
-
+	kph = (Elf_Phdr *)malloc(sizeof(Elf_Phdr) * count, M_TEMP, M_WAITOK);
 	error = copyin(ph, kph, sizeof(Elf_Phdr) * count);
 	if (error)
 		goto bad;
@@ -307,7 +346,7 @@ irix_syssgi_mapelf(fd, ph, count, p, retval)
 		 * If not, we will have to perform a relocation
 		 */
 		ret = uvm_map_findspace(&p->p_vmspace->vm_map, 
-		    pht->p_vaddr, pht->p_memsz, (vaddr_t *)&uaddr, 
+		    pht->p_vaddr, pht->p_memsz, (vaddr_t *)(void *)&uaddr,
 		    NULL, 0, 0, UVM_FLAG_FIXED);
 		if (ret == NULL)
 			need_relocation = 1;
@@ -329,7 +368,7 @@ irix_syssgi_mapelf(fd, ph, count, p, retval)
 
 		/* Find a free place for the sections */
 		ret = uvm_map_findspace(&p->p_vmspace->vm_map, 
-		    IRIX_MAPELF_RELOCATE, size, (vaddr_t *)&uaddr, 
+		    IRIX_MAPELF_RELOCATE, size, (vaddr_t *)(void *)&uaddr,
 			NULL, 0, kph->p_align, 0);
 
 		if (ret == NULL) {
@@ -363,6 +402,10 @@ irix_syssgi_mapelf(fd, ph, count, p, retval)
 	FILE_USE(fp);
 	vp = (struct vnode *)fp->f_data;
 
+        error = vn_marktext(vp);
+        if (error)
+                goto bad_unuse;
+
 	/* 
 	 * Load the sections 
 	 */
@@ -387,20 +430,21 @@ irix_syssgi_mapelf(fd, ph, count, p, retval)
 			vcp = &vcset.evs_cmds[j];
 			if (vcp->ev_flags & VMCMD_RELATIVE) {
 				if (base_vcp == NULL)
-					panic("irix_syssgi_mapelf():  bad vmcmd base\n");
+					panic("irix_syssgi_mapelf():  bad vmcmd base");
 				   
 				vcp->ev_addr += base_vcp->ev_addr;
 			}
-			error = (*vcp->ev_proc)(p, vcp);
+			IRIX_VM_SYNC(p, error = (*vcp->ev_proc)(p, vcp));
 			if (error)
-				goto bad;
+				goto bad_unuse;
 		}
 		pht++;
 	}
 
-	FILE_UNUSE(fp, p);
-	
 	*retval = (register_t)kph->p_vaddr;
+
+bad_unuse:	
+	FILE_UNUSE(fp, p);
 bad:
 	free(kph, M_TEMP);
 	return error;
@@ -409,16 +453,15 @@ bad:
 
 
 static int
-irix_syssgi_sysconf(name, p, retval)
+irix_syssgi_sysconf(name, l, retval)
 	int name;
-	struct proc *p;
+	struct lwp *l;
 	register_t *retval;
 {
+	struct proc *p = l->l_proc;
 	int error = 0;
 	int mib[2], value;
-	int len = sizeof(value);
-	struct sys___sysctl_args cup;
-	caddr_t sg = stackgap_init(p, 0);
+	size_t len = sizeof(value);
 
 	switch (name) {
 	case IRIX_SC_ARG_MAX:
@@ -469,31 +512,25 @@ irix_syssgi_sysconf(name, p, retval)
 	default:
 		printf("Warning: syssgi(SYSCONF) unsupported variable %d\n",
 		    name);
-		    return EINVAL;
+		return EINVAL;
 		break;
 	}
 
-	SCARG(&cup, name) = stackgap_alloc(p, &sg, sizeof(mib));
-	if ((error = copyout(&mib, SCARG(&cup, name), sizeof(mib))) != 0)
-		return error;
-	SCARG(&cup, namelen) = sizeof(mib);
-	SCARG(&cup, old) = stackgap_alloc(p, &sg, sizeof(value));
-	if ((copyout(&value, SCARG(&cup, old), sizeof(value))) != 0)
-		return error;
-	SCARG(&cup, oldlenp) = stackgap_alloc(p, &sg, sizeof(len));
-	if ((copyout(&len, SCARG(&cup, oldlenp), sizeof(len))) != 0)
-		return error;
-	SCARG(&cup, new) = NULL;
-	SCARG(&cup, newlen) = 0;
-
-	return sys___sysctl(p, &cup, retval);
+	/*
+	 * calling into sysctl with superuser privs, but we don't mind
+	 * 'cause we're only querying a value.
+	 */
+	error = old_sysctl(&mib[0], 2, &value, &len, NULL, 0, NULL);
+	if (error == 0)
+		*retval = value;
+	return (error);
 }
 
 static int 
-irix_syssgi_pathconf(path, name, p, retval)
+irix_syssgi_pathconf(path, name, l, retval)
 	char *path;
 	int name;
-	struct proc *p;
+	struct lwp *l;
 	register_t *retval;
 {
 	struct sys_pathconf_args cup;
@@ -528,5 +565,5 @@ irix_syssgi_pathconf(path, name, p, retval)
 	}
 	SCARG(&cup, path) = path;
 	SCARG(&cup, name) = bname;
-	return sys_pathconf(p, &cup, retval);
+	return sys_pathconf(l, &cup, retval);
 }

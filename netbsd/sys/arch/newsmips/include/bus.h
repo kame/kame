@@ -1,4 +1,4 @@
-/*	$NetBSD: bus.h,v 1.6 2002/03/17 21:45:08 simonb Exp $	*/
+/*	$NetBSD: bus.h,v 1.8 2003/06/15 23:09:03 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1996, 1997, 1998, 2001 The NetBSD Foundation, Inc.
@@ -486,6 +486,7 @@ __NEWSMIPS_copy_region(4)
 #define	BUS_DMA_BUS4		0x080
 #define	BUS_DMA_READ		0x100	/* mapping is device -> memory only */
 #define	BUS_DMA_WRITE		0x200	/* mapping is memory -> device only */
+#define	BUS_DMA_NOCACHE		0x400	/* hint: map non-cached memory */
 
 #define	NEWSMIPS_DMAMAP_COHERENT 0x10000 /* no cache flush necessary on sync */
 #define	NEWSMIPS_DMAMAP_MAPTBL	0x20000	/* use DMA maping table */
@@ -504,6 +505,8 @@ struct uio;
 
 typedef struct newsmips_bus_dma_tag		*bus_dma_tag_t;
 typedef struct newsmips_bus_dmamap		*bus_dmamap_t;
+
+#define BUS_DMA_TAG_VALID(t)    ((t) != (bus_dma_tag_t)0)
 
 /*
  *	bus_dma_segment_t

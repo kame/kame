@@ -1,4 +1,4 @@
-/*	$NetBSD: if_se.c,v 1.39 2001/11/15 09:48:16 lukem Exp $	*/
+/*	$NetBSD: if_se.c,v 1.45.2.1 2004/09/11 12:51:35 he Exp $	*/
 
 /*
  * Copyright (c) 1997 Ian W. Dall <ian.dall@dsto.defence.gov.au>
@@ -59,7 +59,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_se.c,v 1.39 2001/11/15 09:48:16 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_se.c,v 1.45.2.1 2004/09/11 12:51:35 he Exp $");
 
 #include "opt_inet.h"
 #include "opt_atalk.h"
@@ -206,8 +206,6 @@ struct se_softc {
 	int sc_enabled;
 };
 
-cdev_decl(se);
-
 static int	sematch __P((struct device *, struct cfdata *, void *));
 static void	seattach __P((struct device *, struct device *, void *));
 
@@ -244,11 +242,19 @@ static int	se_set_mode(struct se_softc *, int, int);
 int	se_enable __P((struct se_softc *));
 void	se_disable __P((struct se_softc *));
 
-struct cfattach se_ca = {
-	sizeof(struct se_softc), sematch, seattach
-};
+CFATTACH_DECL(se, sizeof(struct se_softc),
+    sematch, seattach, NULL, NULL);
 
 extern struct cfdriver se_cd;
+
+dev_type_open(seopen);
+dev_type_close(seclose);
+dev_type_ioctl(seioctl);
+
+const struct cdevsw se_cdevsw = {
+	seopen, seclose, noread, nowrite, seioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
 
 const struct scsipi_periphsw se_switch = {
 	NULL,			/* Use default error handler */
@@ -257,7 +263,7 @@ const struct scsipi_periphsw se_switch = {
 	sedone,			/* deal with stats at interrupt time */
 };
 
-struct scsipi_inquiry_pattern se_patterns[] = {
+const struct scsipi_inquiry_pattern se_patterns[] = {
 	{T_PROCESSOR, T_FIXED,
 	 "CABLETRN",         "EA412",                 ""},
 	{T_PROCESSOR, T_FIXED,
@@ -381,7 +387,7 @@ se_scsipi_cmd(periph, scsipi_cmd, cmdlen, data_addr, datalen,
 	int error;
 	int s = splbio();
 
-	error = scsipi_command(periph, scsipi_cmd, cmdlen, data_addr,
+	error = scsipi_command(periph, NULL, scsipi_cmd, cmdlen, data_addr,
 	    datalen, retries, timeout, bp, flags);
 	splx(s);
 	return (error);

@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_kintf.h,v 1.16 2001/10/04 15:58:54 oster Exp $	*/
+/*	$NetBSD: rf_kintf.h,v 1.18 2003/06/29 22:30:32 fvdl Exp $	*/
 /*
  * rf_kintf.h
  *

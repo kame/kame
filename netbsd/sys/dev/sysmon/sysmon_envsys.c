@@ -1,4 +1,4 @@
-/*	$NetBSD: sysmon_envsys.c,v 1.3 2002/01/03 22:35:53 jdolecek Exp $	*/
+/*	$NetBSD: sysmon_envsys.c,v 1.8 2003/08/11 15:07:14 yamt Exp $	*/
 
 /*-
  * Copyright (c) 2000 Zembu Labs, Inc.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sysmon_envsys.c,v 1.3 2002/01/03 22:35:53 jdolecek Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sysmon_envsys.c,v 1.8 2003/08/11 15:07:14 yamt Exp $");
 
 #include <sys/param.h>
 #include <sys/conf.h>
@@ -136,21 +136,31 @@ sysmonioctl_envsys(dev_t dev, u_long cmd, caddr_t data, int flag,
 	case ENVSYS_GRANGE:
 	    {
 		struct envsys_range *rng = (void *) data;
+		int i;
+
+
+		/* Return empty range unless we find something better */
+		rng->low = 1;
+		rng->high = 0;
+
+		if (rng->units == -1) {
+			rng->low = 0;
+			rng->high = sysmon_envsys_next_sensor_index;
+			break;
+		}
 
 		sme = sysmon_envsys_find(0);	/* XXX */
 		if (sme == NULL) {
 			/* Return empty range for `no sensors'. */
-			rng->low = 1;
-			rng->high = 0;
 			break;
 		}
-
-		if (rng->units < ENVSYS_NSENSORS)
-			*rng = sme->sme_ranges[rng->units];
-		else {
-			/* Return empty range for unsupported sensor types. */
-			rng->low = 1;
-			rng->high = 0;
+		for (i = 0;
+		     sme->sme_ranges[i].low <= sme->sme_ranges[i].high;
+		     i++) {
+			if (sme->sme_ranges[i].units == rng->units) {
+				*rng = sme->sme_ranges[i];
+				break;
+			}
 		}
 		sysmon_envsys_release(sme);
 		break;
@@ -234,13 +244,8 @@ sysmon_envsys_register(struct sysmon_envsys *sme)
 {
 	int error = 0;
 
+	KASSERT((sme->sme_flags & (SME_FLAG_BUSY | SME_FLAG_WANTED)) == 0);
 	simple_lock(&sysmon_envsys_list_slock);
-
-	/* XXX Only get to register one, for now. */
-	if (LIST_FIRST(&sysmon_envsys_list) != NULL) {
-		error = EEXIST;
-		goto out;
-	}
 
 	if (sme->sme_envsys_version != SYSMON_ENVSYS_VERSION) {
 		error = EINVAL;
@@ -266,6 +271,10 @@ sysmon_envsys_unregister(struct sysmon_envsys *sme)
 {
 
 	simple_lock(&sysmon_envsys_list_slock);
+	while (sme->sme_flags & SME_FLAG_BUSY) {
+		sme->sme_flags |= SME_FLAG_WANTED;
+		ltsleep(sme, PWAIT, "smeunreg", 0, &sysmon_envsys_list_slock);
+	}
 	LIST_REMOVE(sme, sme_list);
 	simple_unlock(&sysmon_envsys_list_slock);
 }
@@ -273,8 +282,8 @@ sysmon_envsys_unregister(struct sysmon_envsys *sme)
 /*
  * sysmon_envsys_find:
  *
- *	Find an ENVSYS device.  The list remains locked upon
- *	a match.
+ *	Find an ENVSYS device.
+ *	the found device should be sysmon_envsys_release'ed by the caller.
  */
 struct sysmon_envsys *
 sysmon_envsys_find(u_int idx)
@@ -282,16 +291,24 @@ sysmon_envsys_find(u_int idx)
 	struct sysmon_envsys *sme;
 
 	simple_lock(&sysmon_envsys_list_slock);
-
+again:
 	for (sme = LIST_FIRST(&sysmon_envsys_list); sme != NULL;
 	     sme = LIST_NEXT(sme, sme_list)) {
 		if (idx >= sme->sme_fsensor &&
-		    idx < (sme->sme_fsensor + sme->sme_nsensors))
-			return (sme);
+		    idx < (sme->sme_fsensor + sme->sme_nsensors)) {
+			if (sme->sme_flags & SME_FLAG_BUSY) {
+				sme->sme_flags |= SME_FLAG_WANTED;
+				ltsleep(sme, PWAIT, "smefind", 0,
+				    &sysmon_envsys_list_slock);
+				goto again;
+			}
+			sme->sme_flags |= SME_FLAG_BUSY;
+			break;
+		}
 	}
 
 	simple_unlock(&sysmon_envsys_list_slock);
-	return (NULL);
+	return sme;
 }
 
 /*
@@ -304,5 +321,11 @@ void
 sysmon_envsys_release(struct sysmon_envsys *sme)
 {
 
+	KASSERT(sme->sme_flags & SME_FLAG_BUSY);
+
+	simple_lock(&sysmon_envsys_list_slock);
+	if (sme->sme_flags & SME_FLAG_WANTED)
+		wakeup(sme);
+	sme->sme_flags &= ~(SME_FLAG_BUSY | SME_FLAG_WANTED);
 	simple_unlock(&sysmon_envsys_list_slock);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: umap_vfsops.c,v 1.33 2001/11/15 09:48:23 lukem Exp $	*/
+/*	$NetBSD: umap_vfsops.c,v 1.43.2.1 2004/05/29 09:04:20 tron Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -45,10 +41,11 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: umap_vfsops.c,v 1.33 2001/11/15 09:48:23 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: umap_vfsops.c,v 1.43.2.1 2004/05/29 09:04:20 tron Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/sysctl.h>
 #include <sys/proc.h>
 #include <sys/time.h>
 #include <sys/vnode.h>
@@ -76,11 +73,20 @@ umapfs_mount(mp, path, data, ndp, p)
 	struct umap_args args;
 	struct vnode *lowerrootvp, *vp;
 	struct umap_mount *amp;
-	size_t size;
 	int error;
 #ifdef UMAPFS_DIAGNOSTIC
 	int i;
 #endif
+	if (mp->mnt_flag & MNT_GETARGS) {
+		amp = MOUNTTOUMAPMOUNT(mp);
+		if (amp == NULL)
+			return EIO;
+		args.la.target = NULL;
+		vfs_showexport(mp, &args.la.export, &amp->umapm_export);
+		args.nentries = amp->info_nentries;
+		args.gnentries = amp->info_gnentries;
+		return copyout(&args, data, sizeof(args));
+	}
 
 	/* only for root */
 	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
@@ -138,7 +144,7 @@ umapfs_mount(mp, path, data, ndp, p)
 				M_UFSMNT, M_WAITOK);	/* XXX */
 	memset((caddr_t)amp, 0, sizeof(struct umap_mount));
 
-	mp->mnt_data = (qaddr_t) amp;
+	mp->mnt_data = amp;
 	amp->umapm_vfs = lowerrootvp->v_mount;
 	if (amp->umapm_vfs->mnt_flag & MNT_LOCAL)
 		mp->mnt_flag |= MNT_LOCAL;
@@ -221,16 +227,13 @@ umapfs_mount(mp, path, data, ndp, p)
 	vp->v_flag |= VROOT;
 	amp->umapm_rootvp = vp;
 
-	(void) copyinstr(path, mp->mnt_stat.f_mntonname, MNAMELEN - 1, &size);
-	memset(mp->mnt_stat.f_mntonname + size, 0, MNAMELEN - size);
-	(void) copyinstr(args.umap_target, mp->mnt_stat.f_mntfromname,
-		MNAMELEN - 1, &size);
-	memset(mp->mnt_stat.f_mntfromname + size, 0, MNAMELEN - size);
+	error = set_statfs_info(path, UIO_USERSPACE, args.umap_target,
+	    UIO_USERSPACE, mp, p);
 #ifdef UMAPFS_DIAGNOSTIC
 	printf("umapfs_mount: lower %s, alias at %s\n",
 		mp->mnt_stat.f_mntfromname, mp->mnt_stat.f_mntonname);
 #endif
-	return (0);
+	return error;
 }
 
 /*
@@ -287,6 +290,27 @@ umapfs_unmount(mp, mntflags, p)
 	return (0);
 }
 
+SYSCTL_SETUP(sysctl_vfs_umap_setup, "sysctl vfs.umap subtree setup")
+{
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "vfs", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_VFS, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "umap",
+		       SYSCTL_DESCR("UID/GID remapping file system"),
+		       NULL, 0, NULL, 0,
+		       CTL_VFS, 10, CTL_EOL);
+	/*
+	 * XXX the "10" above could be dynamic, thereby eliminating
+	 * one more instance of the "number to vfs" mapping problem,
+	 * but "10" is the order as taken from sys/mount.h
+	 */
+}
+
 extern const struct vnodeopv_desc umapfs_vnodeop_opv_desc;
 
 const struct vnodeopv_desc * const umapfs_vnodeopv_descs[] = {
@@ -309,7 +333,7 @@ struct vfsops umapfs_vfsops = {
 	layerfs_init,
 	NULL,
 	layerfs_done,
-	layerfs_sysctl,
+	NULL,
 	NULL,				/* vfs_mountroot */
 	layerfs_checkexp,
 	umapfs_vnodeopv_descs,

@@ -1,4 +1,4 @@
-/*	$NetBSD: eeprom.c,v 1.21 2001/09/05 14:03:48 tsutsui Exp $	*/
+/*	$NetBSD: eeprom.c,v 1.25 2003/07/15 03:36:14 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -44,6 +44,9 @@
  * (See the Sun-3 Architecture Manual sec. 5.9)
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: eeprom.c,v 1.25 2003/07/15 03:36:14 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -73,9 +76,8 @@ static int ee_busy, ee_want; /* serialization */
 static int  eeprom_match __P((struct device *, struct cfdata *, void *));
 static void eeprom_attach __P((struct device *, struct device *, void *));
 
-struct cfattach eeprom_ca = {
-	sizeof(struct device), eeprom_match, eeprom_attach
-};
+CFATTACH_DECL(eeprom, sizeof(struct device),
+    eeprom_match, eeprom_attach, NULL, NULL);
 
 static int
 eeprom_match(parent, cf, args)

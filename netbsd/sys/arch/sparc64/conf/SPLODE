@@ -1,4 +1,4 @@
-# 	$NetBSD: SPLODE,v 1.12.4.1 2002/08/01 04:32:57 lukem Exp $
+# 	$NetBSD: SPLODE,v 1.23.2.1 2004/07/15 20:22:46 he Exp $
 #
 # Configuration for Ultra1, 32 bit mode.
 
@@ -6,7 +6,7 @@ include "arch/sparc64/conf/std.sparc64"
 
 #options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
-#ident 		"GENERIC-$Revision: 1.12.4.1 $"
+#ident 		"GENERIC-$Revision: 1.23.2.1 $"
 
 maxusers	256
 
@@ -35,8 +35,9 @@ options 	BLINK		# blink the system LED
 ## automagically determined at boot time.
 
 config		netbsd	root on ? type ?
-options 	NVNODE=16384
-options 	NMBCLUSTERS=2048
+#options 	NVNODE=16384
+options 	NMBCLUSTERS=4096
+options 	BUFCACHE=10
 #options 	NKMEMPAGES=16384
 
 ## UVM options.
@@ -61,8 +62,9 @@ options 	SYSVSHM		# System V shared memory
 ## Loadable kernel module support; still under development.
 options 	LKM
 
-#options 	USERCONF	# userconf(4) support
-#options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+options 	USERCONF	# userconf(4) support
+#options 	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+#options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
 
 ## NFS boot options; default on sparc is the bootparam protocol
 options 	NFS_BOOT_BOOTPARAM
@@ -78,15 +80,6 @@ options 	NFS_BOOT_BOOTPARAM
 options 	DDB			# kernel dynamic debugger
 options 	DDB_HISTORY_SIZE=100	# enable history editing in DDB
 #options 	DDB_ONPANIC		# see also sysctl(8): `ddb.onpanic'
-
-## You may also use gdb, on another computer connected to this machine over
-## a serial port.  Both KGDB_DEV and KGDB_DEVRATE should be specified;
-## KGDB_DEV is a dev_t encoded device number of the serial port to use.
-## (0xc01 = ttya, 0xc02 = ttyb.)
-#options 	KGDB			# support for kernel gdb
-#options 	KGDB_DEV=0xc01		# kgdb device number (this is `ttyb')
-#options 	KGDB_DEVRATE=38400	# baud rate
-
 
 ## Compile the kernel with debugging symbols (`netbsd.gdb' is the debug file),
 ## such that gdb(1) can be used on a kernel coredump.
@@ -114,10 +107,6 @@ options 	MIIVERBOSE	# verbose PHY autoconfig messages
 ## and other insecurities good only for development work.  Do not use this
 ## option on a production machine.
 options 	INSECURE
-
-## Allow non-root users to grab /dev/console with programs such as xconsole.
-## `xconsole' therefore does not need setuid root with this option enabled.
-options 	UCONSOLE
 
 ## `FDSCRIPTS' allows non-readable but executable scripts by providing a
 ## pre-opened opaque file to the script interpreter.  `SETUIDSCRIPTS',
@@ -173,11 +162,11 @@ options 	FFS_EI		# FFS Endian Independent support
 
 ## Network protocol support.  In most environments, INET is required.
 options 	INET		# IP (Internet Protocol) v4
-#options 	INET6		# IPV6
+options 	INET6		# IPV6
 options 	IPSEC		# IP security
 options 	IPSEC_ESP	# IP security (encryption part; define w/IPSEC)
 #options 	IPSEC_DEBUG	# debug for IP security
-#options 	GATEWAY		# packet forwarding ("router switch")
+options 	GATEWAY		# packet forwarding ("router switch")
 #options 	MROUTING	# packet forwarding of multicast packets
 #options 	DIRECTED_BROADCAST	# allow broadcasts through routers
 #options 	NS		# Xerox NS networking
@@ -297,9 +286,23 @@ ss*	at scsibus? target ? lun ?		# SCSI scanners
 uk*	at scsibus? target ? lun ?		# unknown SCSI
 
 # PCI IDE.
-#pciide* at pci ? dev ? function ? flags 0x0000
-#wd*	at pciide? channel ? drive ? flags 0x0000
-#atapibus* at pciide? channel ?
+#pciide* at pci? dev ? function ? flags 0x0000	# GENERIC pciide driver
+#acardide* at pci? dev ? function ?	# Acard IDE controllers
+#aceride* at pci? dev ? function ?	# Acer Lab IDE controllers
+#artsata* at pci? dev ? function ?	# Intel i31244 SATA controller
+#cmdide* at pci? dev ? function ?	# CMD tech IDE controllers
+#cypide* at pci? dev ? function ?	# Cypress IDE controllers
+#hptide* at pci? dev ? function ?	# Triones/HighPoint IDE controllers
+#optiide* at pci? dev ? function ?	# Opti IDE controllers
+#piixide* at pci? dev ? function ?	# Intel IDE controllers
+#pdcide* at pci? dev ? function ?	# Promise IDE controllers
+#satalink* at pci? dev ? function ?	# SiI SATALink controllers
+#siside* at pci? dev ? function ?	# SiS IDE controllers
+#slide*  at pci? dev ? function ?	# Symphony Labs IDE controllers
+#viaide* at pci? dev ? function ?	# VIA/AMD/Nvidia IDE controllers
+#atabus* at ata?
+#wd*	at atabus? drive ? flags 0x0000
+#atapibus* at atapi?
 
 #cd*	at atapibus? drive ? flags 0x0000	# ATAPI CD-ROM drives
 #sd*	at atapibus? drive ? flags 0x0000	# ATAPI disk drives

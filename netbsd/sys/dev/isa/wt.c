@@ -1,4 +1,4 @@
-/*	$NetBSD: wt.c,v 1.54 2002/01/07 21:47:14 thorpej Exp $	*/
+/*	$NetBSD: wt.c,v 1.61 2003/05/09 23:51:29 fvdl Exp $	*/
 
 /*
  * Streamer tape driver.
@@ -51,7 +51,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: wt.c,v 1.54 2002/01/07 21:47:14 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: wt.c,v 1.61 2003/05/09 23:51:29 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -96,8 +96,8 @@ static struct wtregs {
 	CMDPORT,	/* command, write only */
 	STATPORT,	/* status, read only */
 	CTLPORT,	/* control, write only */
-	SDMAPORT,	/* start dma */
-	RDMAPORT;	/* reset dma */
+	SDMAPORT,	/* start DMA */
+	RDMAPORT;	/* reset DMA */
 	/* status port bits */
 	u_char BUSY,	/* not ready bit define */
 	NOEXCEP,	/* no exception bit define */
@@ -129,16 +129,16 @@ struct wt_softc {
 	struct callout		sc_timer_ch;
 
 	enum wttype type;	/* type of controller */
-	int chan;		/* dma channel number, 1..3 */
+	int chan;		/* DMA channel number, 1..3 */
 	int flags;		/* state of tape drive */
 	unsigned dens;		/* tape density */
 	int bsize;		/* tape block size */
 	void *buf;		/* internal i/o buffer */
 
-	void *dmavaddr;		/* virtual address of dma i/o buffer */
+	void *dmavaddr;		/* virtual address of DMA i/o buffer */
 	size_t dmatotal;	/* size of i/o buffer */
 	int dmaflags;		/* i/o direction */
-	size_t dmacount;	/* resulting length of dma i/o */
+	size_t dmacount;	/* resulting length of DMA i/o */
 
 	u_short error;		/* code for error encountered */
 	u_short ercnt;		/* number of error blocks */
@@ -147,9 +147,23 @@ struct wt_softc {
 	struct wtregs regs;
 };
 
-/* XXX: These don't belong here really */
-cdev_decl(wt);
-bdev_decl(wt);
+dev_type_open(wtopen);
+dev_type_close(wtclose);
+dev_type_read(wtread);
+dev_type_write(wtwrite);
+dev_type_ioctl(wtioctl);
+dev_type_strategy(wtstrategy);
+dev_type_dump(wtdump);
+dev_type_size(wtsize);
+
+const struct bdevsw wt_bdevsw = {
+	wtopen, wtclose, wtstrategy, wtioctl, wtdump, wtsize, D_TAPE
+};
+
+const struct cdevsw wt_cdevsw = {
+	wtopen, wtclose, wtread, wtwrite, wtioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_TAPE
+};
 
 int wtwait __P((struct wt_softc *sc, int catch, char *msg));
 int wtcmd __P((struct wt_softc *sc, int cmd));
@@ -169,9 +183,8 @@ int wtprobe __P((struct device *, struct cfdata *, void *));
 void wtattach __P((struct device *, struct device *, void *));
 int wtintr __P((void *sc));
 
-struct cfattach wt_ca = {
-	sizeof(struct wt_softc), wtprobe, wtattach
-};
+CFATTACH_DECL(wt, sizeof(struct wt_softc),
+    wtprobe, wtattach, NULL, NULL);
 
 extern struct cfdriver wt_cd;
 
@@ -298,6 +311,12 @@ ok:
 	if ((maxsize = isa_dmamaxsize(sc->sc_ic, sc->chan)) < MAXPHYS) {
 		printf("%s: max DMA size %lu is less than required %d\n",
 		    sc->sc_dev.dv_xname, (u_long)maxsize, MAXPHYS);
+		return;
+	}
+
+	if (isa_drq_alloc(sc->sc_ic, sc->chan) != 0) {
+		printf("%s: can't reserve drq %d\n",
+		    sc->sc_dev.dv_xname, sc->chan);
 		return;
 	}
 
@@ -732,7 +751,7 @@ wtintr(arg)
 	sc->dmacount += sc->bsize;		/* increment counter */
 
 	/*
-	 * Clean up dma.
+	 * Clean up DMA.
 	 */
 	if ((sc->dmaflags & DMAMODE_READ) &&
 	    (sc->dmatotal - sc->dmacount) < sc->bsize) {
@@ -925,7 +944,7 @@ wtwait(sc, catch, msg)
 	return 0;
 }
 
-/* initialize dma for the i/o operation */
+/* initialize DMA for the i/o operation */
 void
 wtdma(sc)
 	struct wt_softc *sc;
@@ -989,7 +1008,7 @@ wtclock(sc)
 		return;
 	sc->flags |= TPTIMER;
 	/*
-	 * Some controllers seem to lose dma interrupts too often.  To make the
+	 * Some controllers seem to lose DMA interrupts too often.  To make the
 	 * tape stream we need 1 tick timeout.
 	 */
 	callout_reset(&sc->sc_timer_ch, (sc->flags & TPACTIVE) ? 1 : hz,

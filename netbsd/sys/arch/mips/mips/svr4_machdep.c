@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_machdep.c,v 1.3 2002/04/06 18:03:17 manu Exp $ */
+/*	$NetBSD: svr4_machdep.c,v 1.7 2003/11/02 08:29:06 simonb Exp $ */
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -42,6 +42,9 @@
  * to build.  
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: svr4_machdep.c,v 1.7 2003/11/02 08:29:06 simonb Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -51,6 +54,7 @@
 #include <sys/signal.h>
 #include <sys/signalvar.h>
 #include <sys/mount.h> 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 #include <sys/exec_elf.h> 
  
@@ -74,8 +78,8 @@
  * XXX This should be filled later 
  */
 int
-svr4_setmcontext(p, mc, flags)
-	struct proc *p;
+svr4_setmcontext(l, mc, flags)
+	struct lwp *l;
 	svr4_mcontext_t *mc;
 	unsigned long flags;
 {
@@ -84,12 +88,11 @@ svr4_setmcontext(p, mc, flags)
 }
 
 void *  
-svr4_getmcontext(p, mc, flags)
-	struct proc *p;
+svr4_getmcontext(l, mc, flags)
+	struct lwp *l;
 	svr4_mcontext_t *mc;
 	unsigned long *flags;
 {    
 	printf("Warning: svr4_getmcontext() called\n");
 	return NULL;
 }
-

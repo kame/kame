@@ -1,4 +1,4 @@
-/*	$NetBSD: kern.ldscript,v 1.1.4.1 2002/12/12 22:19:25 he Exp $	*/
+/*	$NetBSD: kern.ldscript,v 1.1 2002/11/21 01:38:41 thorpej Exp $	*/
 
 OUTPUT_FORMAT("elf32-littlearm", "elf32-bigarm",
 	      "elf32-littlearm")

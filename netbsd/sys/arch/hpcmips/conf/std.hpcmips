@@ -1,7 +1,8 @@
-#	$NetBSD: std.hpcmips,v 1.15 2002/02/11 19:10:29 uch Exp $
+#	$NetBSD: std.hpcmips,v 1.17 2003/08/30 22:44:39 chs Exp $
 # standard, required hpcmips info
 
 machine hpcmips mips
+makeoptions	MACHINE_ARCH="mipsel"
 
 options 	NOFPU			# No FPU
 options 	SOFTFLOAT		# emulate FPU insn
@@ -14,5 +15,4 @@ options 	EXEC_ELF32		# native exec format
 options 	EXEC_SCRIPT		# may be unsafe
 
 makeoptions	DEFTEXTADDR="0x80001000"
-makeoptions	MACHINE_ARCH="mipsel"
 makeoptions	DEFCOPTS="-Os -mmemcpy"

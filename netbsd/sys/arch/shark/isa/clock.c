@@ -1,4 +1,4 @@
-/*	$NetBSD: clock.c,v 1.1 2002/02/10 01:57:51 thorpej Exp $	*/
+/*	$NetBSD: clock.c,v 1.7 2004/02/13 11:36:17 wiz Exp $	*/
 
 /*
  * Copyright 1997
@@ -34,9 +34,40 @@
  */
 
 /*-
- * Copyright (c) 1993, 1994 Charles M. Hannum.
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * William Jolitz and Don Ahn.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)clock.c	7.2 (Berkeley) 5/12/91
+ */
+/*-
+ * Copyright (c) 1993, 1994 Charles M. Hannum.
  *
  * This code is derived from software contributed to Berkeley by
  * William Jolitz and Don Ahn.
@@ -121,6 +152,10 @@ WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 /*
  * Primitive clock interrupt routines.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.7 2004/02/13 11:36:17 wiz Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
@@ -138,24 +173,23 @@ WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <dev/ic/i8253reg.h>
 #include <shark/isa/nvram.h>
 #include <shark/isa/spkrreg.h>
-
-#ifdef SHARK
 #include <shark/shark/hat.h>
-#endif
 
-void	sysbeepstop __P((void *));
-void	sysbeep __P((int, int));
-void	rtcinit __P((void));
+void	sysbeepstop(void *);
+void	sysbeep(int, int);
+void	rtcinit(void);
 int     timer_hz_to_count(int);
 
-static void findcpuspeed __P((void));
-static void init_isa_timer_tables();
+static void findcpuspeed(void);
+static void init_isa_timer_tables(void);
 static void delayloop(int);
-static int  clockintr __P((void *));
-static int  gettick __P((void));
+static int  clockintr(void *);
+static int  gettick(void);
 
-__inline u_int mc146818_read __P((void *, u_int));
-__inline void mc146818_write __P((void *, u_int, u_int));
+void startrtclock(void);
+
+__inline u_int mc146818_read(void *, u_int);
+__inline void mc146818_write(void *, u_int, u_int);
 
 #define	SECMIN	((unsigned)60)			/* seconds per minute */
 #define	SECHOUR	((unsigned)(60*SECMIN))		/* seconds per hour */
@@ -244,7 +278,7 @@ void
 startrtclock()
 {
 	findcpuspeed();		/* use the clock (while it's free)
-					to find the cpu speed */
+					to find the CPU speed */
 
 	init_isa_timer_tables(); 
 
@@ -311,6 +345,8 @@ timer_hz_to_count(timer_hz)
 
 }
 
+void gettimer0count(struct count64 *);
+
 /* must be called at SPL_CLOCK or higher */
 void gettimer0count(pcount)
 	struct count64 *pcount;
@@ -319,7 +355,7 @@ void gettimer0count(pcount)
 
 	/*
 	 * Latch the current value of the timer and then read it.
-	 * This guarentees an atomic reading of the time.
+	 * This guarantees an atomic reading of the time.
 	 */
 
 	current = gettick();
@@ -348,21 +384,17 @@ clockintr(arg)
 #ifdef TESTHAT
 	static int ticks = 0;
 #endif
-#ifdef SHARK
 	static int hatUnwedgeCtr = 0;
-#endif
 
 	gettimer0count(&timer0_at_last_clockintr);
 
 	mc146818_read(NULL, MC_REGC); /* clear the clock interrupt */
 
-#ifdef SHARK
 	/* check to see if the high-availability timer needs to be unwedged */
 	if (++hatUnwedgeCtr >= (hz / HAT_MIN_FREQ)) {
 	  hatUnwedgeCtr = 0;
 	  hatUnwedge(); 
 	}
-#endif
 
 #ifdef TESTHAT
 	++ticks;
@@ -559,7 +591,7 @@ cpu_initclocks()
 		hzval = MC_RATE_1024_Hz;
 		break;
 	default:
-		panic("cannot configure hz = %d\n", hz);
+		panic("cannot configure hz = %d", hz);
         }
 	
 	rtcinit(); /* make sure basics are done by now */

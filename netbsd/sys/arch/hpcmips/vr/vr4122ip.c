@@ -1,4 +1,4 @@
-/*	$NetBSD: vr4122ip.c,v 1.2 2002/02/11 11:44:36 takemura Exp $	*/
+/*	$NetBSD: vr4122ip.c,v 1.5 2003/07/15 02:29:35 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2002 TAKEMURA Shin
@@ -30,6 +30,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vr4122ip.c,v 1.5 2003/07/15 02:29:35 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 
@@ -45,9 +48,8 @@
 
 void	vr4122ipattach(struct device *, struct device *, void *);
 
-struct cfattach vr4122ip_ca = {
-	sizeof(struct vrip_softc), vripmatch, vr4122ipattach
-};
+CFATTACH_DECL(vr4122ip, sizeof(struct vrip_softc),
+    vripmatch, vr4122ipattach, NULL, NULL);
 
 static const struct vrip_unit vr4122ip_units[] = {
 	[VRIP_UNIT_PMU] = { "pmu",

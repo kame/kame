@@ -1,4 +1,4 @@
-/*	$NetBSD: ctu.c,v 1.14 2001/05/14 14:43:45 ragge Exp $ */
+/*	$NetBSD: ctu.c,v 1.20 2003/11/06 00:30:13 he Exp $ */
 /*
  * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -39,6 +39,9 @@
  * so we will loose interrupts.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ctu.c,v 1.20 2003/11/06 00:30:13 he Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/callout.h>
@@ -75,7 +78,7 @@ struct tu_softc {
 	int 	sc_wto;		/* Timeout counter */
 	int	sc_xbytes;	/* Number of xfer'd bytes */
 	int	sc_op;		/* Read/write */
-	struct	buf_queue sc_bufq;	/* pending I/O requests */
+	struct	bufq_state sc_bufq;	/* pending I/O requests */
 } tu_sc;
 
 struct	ivec_dsp tu_recv, tu_xmit;
@@ -87,14 +90,31 @@ static	void ctustart(void);
 static	void ctuwatch(void *);
 static	u_short ctu_cksum(unsigned short *, int);
 
-bdev_decl(ctu);
+dev_type_open(ctuopen);
+dev_type_close(ctuclose);
+#if 0 /* not yet */
+dev_type_read(cturead);
+dev_type_write(ctuwrite);
+#endif
+dev_type_strategy(ctustrategy);
+
+const struct bdevsw ctu_bdevsw = {
+	ctuopen, ctuclose, ctustrategy, noioctl, nodump, nosize, D_TAPE
+};
+
+#if 0 /* not yet */
+const struct cdevsw ctu_cdevsw = {
+	ctuopen, ctuclose, cturead, ctuwrite, noioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_TAPE
+};
+#endif
 
 static struct callout ctu_watch_ch = CALLOUT_INITIALIZER;
 
 void
 ctuattach()
 {
-	BUFQ_INIT(&tu_sc.sc_bufq);
+	bufq_alloc(&tu_sc.sc_bufq, BUFQ_FCFS);
 
 	tu_recv = idsptch;
 	tu_recv.hoppaddr = cturintr;
@@ -157,8 +177,8 @@ ctuclose(dev_t dev, int oflags, int devtype, struct proc *p)
 {
 	struct buf *bp;
 	int s = spl7();
-	while ((bp = BUFQ_FIRST(&tu_sc.sc_bufq)))
-		BUFQ_REMOVE(&tu_sc.sc_bufq, bp);
+	while ((bp = BUFQ_GET(&tu_sc.sc_bufq)))
+		;
 	splx(s);
 
 	mtpr(0, PR_CSRS);
@@ -177,14 +197,16 @@ ctustrategy(struct buf *bp)
 	printf("ctustrategy: bcount %ld blkno %d\n", bp->b_bcount, bp->b_blkno);
 	printf("ctustrategy: bp %p\n", bp);
 #endif
+	s = spl7();
 	if (bp->b_blkno >= 512) {
 		bp->b_resid = bp->b_bcount;
-		return biodone(bp);
+		biodone(bp);
+		splx(s);
+		return;
 	}
 
-	s = spl7();
-	empty = TAILQ_EMPTY(&tu_sc.sc_bufq.bq_head);
-	BUFQ_INSERT_TAIL(&tu_sc.sc_bufq, bp);
+	empty = (BUFQ_PEEK(&tu_sc.sc_bufq) == NULL);
+	BUFQ_PUT(&tu_sc.sc_bufq, bp);
 	if (empty)
 		ctustart();
 	splx(s);
@@ -196,7 +218,7 @@ ctustart()
 	struct rsp *rsp = (struct rsp *)tu_sc.sc_rsp;
 	struct buf *bp;
 
-	bp = BUFQ_FIRST(&tu_sc.sc_bufq);
+	bp = BUFQ_PEEK(&tu_sc.sc_bufq);
 	if (bp == NULL)
 		return;
 #ifdef TUDEBUG
@@ -222,21 +244,6 @@ ctustart()
 	ctutintr(NULL);
 }
 
-int
-ctuioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct proc *p)
-{
-	return ENOTTY;
-}
-
-/*
- * Not bloody likely... 
- */
-int
-ctudump(dev_t dev, daddr_t blkno, caddr_t va, size_t size)
-{
-	return 0;
-}
-
 static int
 readchr(void)
 {
@@ -260,9 +267,9 @@ cturintr(void *arg)
 	int status = mfpr(PR_CSRD);
 	struct	buf *bp;
 	int i, c, tck;
-	unsigned short ck;
+	unsigned short ck = 0;
 
-	bp = BUFQ_FIRST(&tu_sc.sc_bufq);
+	bp = BUFQ_PEEK(&tu_sc.sc_bufq);
 	switch (tu_sc.sc_state) {
 	case TU_RESET:
 		if (status != RSP_TYP_CONTINUE)
@@ -381,7 +388,7 @@ cturintr(void *arg)
 		return;
 	}
 	if ((bp->b_flags & B_ERROR) == 0) {
-		BUFQ_REMOVE(&tu_sc.sc_bufq, bp);
+		(void)BUFQ_GET(&tu_sc.sc_bufq);
 		biodone(bp);
 #ifdef TUDEBUG
 		printf("biodone %p\n", bp);

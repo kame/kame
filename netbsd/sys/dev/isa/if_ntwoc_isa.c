@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ntwoc_isa.c,v 1.3 2002/01/07 21:47:09 thorpej Exp $	*/
+/*	$NetBSD: if_ntwoc_isa.c,v 1.7 2003/05/03 18:11:27 wiz Exp $	*/
 /* 
  * Copyright (c) 1999 Christian E. Hopps
  * Copyright (c) 1996 John Hay.
@@ -29,11 +29,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: if_ntwoc_isa.c,v 1.1.1.2 2002/09/25 05:32:10 itojun Exp $
+ * $Id: if_ntwoc_isa.c,v 1.1.1.3 2004/12/21 08:02:34 itojun Exp $
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ntwoc_isa.c,v 1.3 2002/01/07 21:47:09 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ntwoc_isa.c,v 1.7 2003/05/03 18:11:27 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -95,9 +95,8 @@ static	void ntwoc_isa_get_clock __P((struct sca_port *, u_int8_t, u_int8_t,
 static	void ntwoc_isa_setup_memory(struct sca_softc *sc);
 static	void ntwoc_isa_shutdown __P((void *sc));
 
-struct cfattach ntwoc_isa_ca = {
-	sizeof(struct ntwoc_isa_softc), ntwoc_isa_probe, ntwoc_isa_attach,
-};
+CFATTACH_DECL(ntwoc_isa, sizeof(struct ntwoc_isa_softc),
+    ntwoc_isa_probe, ntwoc_isa_attach, NULL, NULL);
 
 /*
  * Names for daughter card types.  These match the NTWOC_DB_* defines.
@@ -556,7 +555,7 @@ ntwoc_isa_attach(struct device *parent, struct device *self, void *aux)
 	/* disable the memory window */
 	ntwoc_isa_set_off(sca);
 
-	/* enabled sca dma */
+	/* enabled sca DMA */
 	bus_space_write_1(sca->sc_iot, sca->sc_ioh, NTWOC_PSR,
 	    bus_space_read_1(sca->sc_iot, sca->sc_ioh, NTWOC_PSR)
 	    | NTWOC_PSR_EN_SCA_DMA);

@@ -1,4 +1,4 @@
-/* $NetBSD: opms_isa.c,v 1.2 2002/01/07 21:46:57 thorpej Exp $ */
+/* $NetBSD: opms_isa.c,v 1.5 2003/07/15 00:04:47 lukem Exp $ */
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -27,6 +27,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: opms_isa.c,v 1.5 2003/07/15 00:04:47 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/tty.h>
@@ -43,9 +46,8 @@
 int	opms_isa_match __P((struct device *, struct cfdata *, void *));
 void	opms_isa_attach __P((struct device *, struct device *, void *));
 
-struct cfattach opms_isa_ca = {
-	sizeof(struct opms_softc), opms_isa_match, opms_isa_attach,
-};
+CFATTACH_DECL(opms_isa, sizeof(struct opms_softc),
+    opms_isa_match, opms_isa_attach, NULL, NULL);
 
 struct pccons_config *pccons_isa_conf;	/* share stroage with pccons_isa.c */
 

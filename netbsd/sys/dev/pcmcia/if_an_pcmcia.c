@@ -1,4 +1,4 @@
-/* $NetBSD: if_an_pcmcia.c,v 1.11 2001/11/13 07:26:32 lukem Exp $ */
+/* $NetBSD: if_an_pcmcia.c,v 1.17 2004/01/28 15:07:52 onoe Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_an_pcmcia.c,v 1.11 2001/11/13 07:26:32 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_an_pcmcia.c,v 1.17 2004/01/28 15:07:52 onoe Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -54,7 +54,9 @@ __KERNEL_RCSID(0, "$NetBSD: if_an_pcmcia.c,v 1.11 2001/11/13 07:26:32 lukem Exp 
 #include <net/if_dl.h>
 #include <net/if_ether.h>
 #include <net/if_media.h>
-#include <net/if_ieee80211.h>
+
+#include <net80211/ieee80211_var.h>
+#include <net80211/ieee80211_compat.h>
 
 #include <machine/cpu.h>
 #include <machine/bus.h>
@@ -84,10 +86,8 @@ struct an_pcmcia_softc {
 	void *sc_powerhook;			/* power hook descriptor */
 };
 
-struct cfattach an_pcmcia_ca = {
-	sizeof(struct an_pcmcia_softc), an_pcmcia_match, an_pcmcia_attach,
-	an_pcmcia_detach, an_activate
-};
+CFATTACH_DECL(an_pcmcia, sizeof(struct an_pcmcia_softc),
+    an_pcmcia_match, an_pcmcia_attach, an_pcmcia_detach, an_activate);
 
 static struct an_pcmcia_product {
 	u_int32_t	app_vendor;	/* vendor ID */
@@ -116,7 +116,7 @@ an_pcmcia_enable(sc)
 	psc->sc_ih = pcmcia_intr_establish(pf, IPL_NET, an_intr, sc);
 	if (psc->sc_ih == NULL) {
 		printf("%s: couldn't establish interrupt\n",
-		    sc->an_dev.dv_xname);
+		    sc->sc_dev.dv_xname);
 		return (1);
 	}
 
@@ -186,47 +186,47 @@ an_pcmcia_attach(parent, self, aux)
 
 	psc->sc_pf = pa->pf;
 	if ((cfe = SIMPLEQ_FIRST(&pa->pf->cfe_head)) == NULL) {
-		printf("%s: no suitable CIS info found\n", sc->an_dev.dv_xname);
+		printf("%s: no suitable CIS info found\n", sc->sc_dev.dv_xname);
 		goto fail1;
 	}
 
 	if (pcmcia_io_alloc(psc->sc_pf, cfe->iospace[0].start,
 	    cfe->iospace[0].length, AN_IOSIZ, &psc->sc_pcioh) != 0) {
 		printf("%s: failed to allocate io space\n",
-		    sc->an_dev.dv_xname);
+		    sc->sc_dev.dv_xname);
 		goto fail1;
 	}
 
 	if (pcmcia_io_map(psc->sc_pf, PCMCIA_WIDTH_AUTO, 0, psc->sc_pcioh.size,
 	    &psc->sc_pcioh, &psc->sc_io_window) != 0) {
-		printf("%s: failed to map io space\n", sc->an_dev.dv_xname);
+		printf("%s: failed to map io space\n", sc->sc_dev.dv_xname);
 		goto fail2;
 	}
 
 	pcmcia_function_init(psc->sc_pf, cfe);
 
 	if (pcmcia_function_enable(psc->sc_pf)) {
-		printf("%s: failed to enable pcmcia\n", sc->an_dev.dv_xname);
+		printf("%s: failed to enable pcmcia\n", sc->sc_dev.dv_xname);
 		goto fail3;
 	}
 
 	if ((psc->sc_ih = pcmcia_intr_establish(psc->sc_pf, IPL_NET, an_intr,
 	    sc)) == NULL) {
 		printf("%s: unable to establish interrupt\n",
-		    sc->an_dev.dv_xname);
+		    sc->sc_dev.dv_xname);
 		goto fail4;
 	}
 
-	sc->an_btag = psc->sc_pcioh.iot;
-	sc->an_bhandle = psc->sc_pcioh.ioh;
+	sc->sc_iot = psc->sc_pcioh.iot;
+	sc->sc_ioh = psc->sc_pcioh.ioh;
 	sc->sc_enabled = 1;
 	sc->sc_enable = an_pcmcia_enable;
 	sc->sc_disable = an_pcmcia_disable;
 
 	if (an_attach(sc) != 0) {
 		printf("%s: failed to attach controller\n",
-		    sc->an_dev.dv_xname);
-		goto fail5;;
+		    sc->sc_dev.dv_xname);
+		goto fail5;
 	}
 	psc->sc_powerhook = powerhook_establish(an_power, sc);
 	sc->sc_enabled = 0;

@@ -1,8 +1,7 @@
-/*	$NetBSD: drsc.c,v 1.20 2002/01/28 09:56:54 aymeric Exp $ */
+/*	$NetBSD: drsc.c,v 1.27 2004/03/28 18:59:39 mhitch Exp $ */
 
 /*
  * Copyright (c) 1996 Ignatios Souvatzis
- * Copyright (c) 1994 Michael L. Hitch
  * Copyright (c) 1982, 1990 The Regents of the University of California.
  * All rights reserved.
  *
@@ -14,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -37,13 +32,42 @@
  *	@(#)dma.c
  */
 
+/*
+ * Copyright (c) 1994 Michael L. Hitch
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ *	@(#)dma.c
+ */
+
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: drsc.c,v 1.20 2002/01/28 09:56:54 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: drsc.c,v 1.27 2004/03/28 18:59:39 mhitch Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
+
+#include <uvm/uvm_extern.h>
+
 #include <dev/scsipi/scsi_all.h>
 #include <dev/scsipi/scsipi_all.h>
 #include <dev/scsipi/scsiconf.h>
@@ -67,11 +91,8 @@ void drsc_dump(void);
 #ifdef DEBUG
 #endif
 
-struct cfattach drsc_ca = {
-	sizeof(struct siop_softc),
-	drscmatch,
-	drscattach
-};
+CFATTACH_DECL(drsc, sizeof(struct siop_softc),
+    drscmatch, drscattach, NULL, NULL);
 
 static struct siop_softc *drsc_softc;
 
@@ -104,7 +125,7 @@ drscattach(struct device *pdp, struct device *dp, void *auxp)
 
 	zap = auxp;
 
-	sc->sc_siopp = rp = (siop_regmap_p)(DRCCADDR+NBPG*DRSCSIPG);
+	sc->sc_siopp = rp = (siop_regmap_p)(DRCCADDR+PAGE_SIZE*DRSCSIPG);
 
 	/*
 	 * CTEST7 = TT1

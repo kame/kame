@@ -1,4 +1,4 @@
-/*	$NetBSD: bpp.c,v 1.12 2002/03/20 20:39:15 eeh Exp $ */
+/*	$NetBSD: bpp.c,v 1.22 2004/03/17 17:04:58 pk Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: bpp.c,v 1.12 2002/03/20 20:39:15 eeh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: bpp.c,v 1.22 2004/03/17 17:04:58 pk Exp $");
 
 #include <sys/param.h>
 #include <sys/ioctl.h>
@@ -57,7 +57,6 @@ __KERNEL_RCSID(0, "$NetBSD: bpp.c,v 1.12 2002/03/20 20:39:15 eeh Exp $");
 #include <machine/bus.h>
 #include <machine/intr.h>
 #include <machine/autoconf.h>
-#include <machine/conf.h>
 
 #include <dev/ic/lsi64854reg.h>
 #include <dev/ic/lsi64854var.h>
@@ -120,11 +119,23 @@ static void	bppattach	__P((struct device *, struct device *, void *));
 static int	bppintr		__P((void *));
 static void	bpp_setparams	__P((struct bpp_softc *, struct hwstate *));
 
-struct cfattach bpp_ca = {
-	sizeof(struct bpp_softc), bppmatch, bppattach
-};
+CFATTACH_DECL(bpp, sizeof(struct bpp_softc),
+    bppmatch, bppattach, NULL, NULL);
 
 extern struct cfdriver bpp_cd;
+
+dev_type_open(bppopen);
+dev_type_close(bppclose);
+dev_type_write(bppwrite);
+dev_type_ioctl(bppioctl);
+dev_type_poll(bpppoll);
+dev_type_kqfilter(bppkqfilter);
+
+const struct cdevsw bpp_cdevsw = {
+	bppopen, bppclose, noread, bppwrite, bppioctl,
+	nostop, notty, bpppoll, nommap, bppkqfilter,
+};
+
 #define BPPUNIT(dev)	(minor(dev))
 
 
@@ -171,7 +182,7 @@ bppattach(parent, self, aux)
 	if (sbusburst == 0)
 		sbusburst = SBUS_BURST_32 - 1; /* 1->16 */
 
-	burst = PROM_getpropint(node, "burst-sizes", -1);
+	burst = prom_getpropint(node, "burst-sizes", -1);
 	if (burst == -1)
 		/* take SBus burst sizes */
 		burst = sbusburst;
@@ -193,7 +204,7 @@ bppattach(parent, self, aux)
 	if (sa->sa_nintr) {
 		sc->sc_intrchain = bppintr;
 		sc->sc_intrchainarg = dsc;
-		(void)bus_intr_establish(sa->sa_bustag, sa->sa_pri, IPL_TTY, 0,
+		(void)bus_intr_establish(sa->sa_bustag, sa->sa_pri, IPL_TTY,
 					 bppintr, sc);
 	}
 
@@ -296,16 +307,6 @@ bppclose(dev, flags, mode, p)
 	sc->sc_asyncproc = NULL;
 	sc->sc_flags = 0;
 	return (0);
-}
-
-int
-bppread(dev, uio, flags)
-	dev_t dev;
-	struct uio *uio;
-	int flags;
-{
-
-	return (ENXIO);
 }
 
 int
@@ -503,6 +504,84 @@ bpppoll(dev, events, p)
 	return (revents);
 }
 
+static void
+filt_bpprdetach(struct knote *kn)
+{
+	struct bpp_softc *sc = kn->kn_hook;
+	int s;
+
+	s = splbpp();
+	SLIST_REMOVE(&sc->sc_rsel.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_bppread(struct knote *kn, long hint)
+{
+	/* XXX Read not yet implemented. */
+	return (0);
+}
+
+static const struct filterops bppread_filtops =
+	{ 1, NULL, filt_bpprdetach, filt_bppread };
+
+static void
+filt_bppwdetach(struct knote *kn)
+{
+	struct bpp_softc *sc = kn->kn_hook;
+	int s;
+
+	s = splbpp();
+	SLIST_REMOVE(&sc->sc_wsel.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_bpfwrite(struct knote *kn, long hint)
+{
+	struct bpp_softc *sc = kn->kn_hook;
+
+	if (sc->sc_flags & BPP_LOCKED)
+		return (0);
+
+	kn->kn_data = 0;	/* XXXLUKEM (thorpej): what to put here? */
+	return (1);
+}
+
+static const struct filterops bppwrite_filtops =
+	{ 1, NULL, filt_bppwdetach, filt_bpfwrite };
+
+int
+bppkqfilter(dev_t dev, struct knote *kn)
+{
+	struct bpp_softc *sc = bpp_cd.cd_devs[BPPUNIT(dev)];
+	struct klist *klist;
+	int s;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &sc->sc_rsel.sel_klist;
+		kn->kn_fop = &bppread_filtops;
+		break;
+
+	case EVFILT_WRITE:
+		klist = &sc->sc_wsel.sel_klist;
+		kn->kn_fop = &bppwrite_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = sc;
+
+	s = splbpp();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
+}
+
 int
 bppintr(arg)
 	void *arg;
@@ -531,7 +610,7 @@ bppintr(arg)
 		sc->sc_flags &= ~BPP_WANT;
 		wakeup(sc->sc_buf);
 	} else {
-		selwakeup(&sc->sc_wsel);
+		selnotify(&sc->sc_wsel, 0);
 		if (sc->sc_asyncproc != NULL)
 			psignal(sc->sc_asyncproc, SIGIO);
 	}

@@ -1,4 +1,4 @@
-/*	$NetBSD: mips_3x30.c,v 1.5 2001/03/30 23:51:14 wdk Exp $	*/
+/*	$NetBSD: mips_3x30.c,v 1.8 2003/07/15 02:43:43 lukem Exp $	*/
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mips_3x30.c,v 1.8 2003/07/15 02:43:43 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -122,7 +125,9 @@ pizazz_intr(status, cause, pc, ipending)
 		if (!USERMODE(status))
 			panic("kernel used FPU: PC %x, CR %x, SR %x",
 			      pc, cause, status);
-		MachFPInterrupt(status, cause, pc, curproc->p_md.md_regs);
+#if !defined(SOFTFLOAT)
+		MachFPInterrupt(status, cause, pc, curlwp->l_md.md_regs);
+#endif
 	}
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ie.c,v 1.37.16.1 2003/01/28 05:46:36 jmc Exp $ */
+/*	$NetBSD: if_ie.c,v 1.39 2003/07/15 03:36:14 lukem Exp $ */
 
 /*-
  * Copyright (c) 1993, 1994, 1995 Charles M. Hannum.
@@ -96,6 +96,9 @@
    routines should run at splnet(), and should post an acknowledgement
    to every interrupt they generate.
 */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ie.c,v 1.39 2003/07/15 03:36:14 lukem Exp $");
 
 #include "opt_inet.h"
 #include "opt_ns.h"

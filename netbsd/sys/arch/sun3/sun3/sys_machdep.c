@@ -1,4 +1,4 @@
-/*	$NetBSD: sys_machdep.c,v 1.13 2000/12/13 18:13:11 jdolecek Exp $	*/
+/*	$NetBSD: sys_machdep.c,v 1.17 2003/08/07 16:29:58 agc Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -35,6 +31,9 @@
  *	@(#)sys_machdep.c	8.2 (Berkeley) 1/13/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sys_machdep.c,v 1.17 2003/08/07 16:29:58 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ioctl.h>
@@ -45,12 +44,13 @@
 #include <sys/kernel.h>
 #include <sys/buf.h>
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
-#include <sun3/sun3/machdep.h>
+#include <m68k/cacheops.h>
 
 /* XXX should be in an include file somewhere */
 #define CC_PURGE	1
@@ -92,8 +92,8 @@ cachectl1(req, addr, len, p)
 }
 
 int
-sys_sysarch(p, v, retval)
-	struct proc *p;
+sys_sysarch(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {

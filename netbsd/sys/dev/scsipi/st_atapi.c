@@ -1,4 +1,4 @@
-/*	$NetBSD: st_atapi.c,v 1.8 2002/04/23 20:41:20 bouyer Exp $ */
+/*	$NetBSD: st_atapi.c,v 1.12 2003/10/05 17:48:49 bouyer Exp $ */
 
 /*
  * Copyright (c) 2001 Manuel Bouyer.
@@ -14,9 +14,8 @@
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
  *	This product includes software developed by Manuel Bouyer.
- * 4. Neither the name of the University nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
+ * 4. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -32,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: st_atapi.c,v 1.8 2002/04/23 20:41:20 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: st_atapi.c,v 1.12 2003/10/05 17:48:49 bouyer Exp $");
 
 #include "opt_scsi.h"
 #include "rnd.h"
@@ -54,10 +53,8 @@ int	st_atapibus_mode_sense __P((struct st_softc *, int));
 int	st_atapibus_mode_select __P((struct st_softc *, int));
 int	st_atapibus_do_ms __P((struct st_softc *, int, void *, int, int));
 
-struct cfattach st_atapibus_ca = {
-	sizeof(struct st_softc), st_atapibus_match, st_atapibus_attach,
-	stdetach, stactivate
-};
+CFATTACH_DECL(st_atapibus, sizeof(struct st_softc),
+    st_atapibus_match, st_atapibus_attach, stdetach, stactivate);
 
 const struct scsipi_inquiry_pattern st_atapibus_patterns[] = {
 	{T_SEQUENTIAL, T_REMOV,

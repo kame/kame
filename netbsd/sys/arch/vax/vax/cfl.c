@@ -1,8 +1,37 @@
-/*	$NetBSD: cfl.c,v 1.7 2000/11/20 08:24:23 chs Exp $	*/
+/*	$NetBSD: cfl.c,v 1.11 2003/08/07 16:30:16 agc Exp $	*/
 /*-
- * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
  * Copyright (c) 1982, 1986 The Regents of the University of California.
  * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)crl.c	7.5 (Berkeley) 5/9/91
+ */
+
+/*-
+ * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,6 +69,9 @@
  *	XXX - Does not work. (Not completed)
  *	Included here if someone wants to finish it.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cfl.c,v 1.11 2003/08/07 16:30:16 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -88,15 +120,20 @@ struct {
 
 static	void cflstart __P((void));
 
-int	cflopen __P((dev_t, int, struct proc *));
-int	cflclose __P((dev_t, int, struct proc *));
-int	cflrw __P((dev_t, struct uio *, int));
+dev_type_open(cflopen);
+dev_type_close(cflclose);
+dev_type_read(cflrw);
+
+const struct cdevsw cfl_cdevsw = {
+	cflopen, cflclose, cflrw, cflrw, noioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
 
 /*ARGSUSED*/
 int
-cflopen(dev, flag, p)
+cflopen(dev, flag, mode, p)
 	dev_t dev;
-	int flag;
+	int flag, mode;
 	struct proc *p;
 {
 	if (vax_cputype != VAX_780)
@@ -110,9 +147,9 @@ cflopen(dev, flag, p)
 
 /*ARGSUSED*/
 int
-cflclose(dev, flag, p)
+cflclose(dev, flag, mode, p)
 	dev_t dev;
-	int flag;
+	int flag, mode;
 	struct proc *p;
 {
 	int s;

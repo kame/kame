@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_dma.c,v 1.11.4.2 2002/12/07 19:33:41 he Exp $	*/
+/*	$NetBSD: bus_dma.c,v 1.38 2003/10/30 08:44:13 scw Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -37,10 +37,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _ARM32_BUS_DMA_PRIVATE
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bus_dma.c,v 1.38 2003/10/30 08:44:13 scw Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/map.h>
 #include <sys/proc.h>
 #include <sys/buf.h>
 #include <sys/reboot.h>
@@ -53,16 +57,34 @@
 
 #include <uvm/uvm_extern.h>
 
-#define _ARM32_BUS_DMA_PRIVATE
 #include <machine/bus.h>
-
 #include <machine/cpu.h>
 
 #include <arm/cpufunc.h>
 
 int	_bus_dmamap_load_buffer(bus_dma_tag_t, bus_dmamap_t, void *,
 	    bus_size_t, struct proc *, int, paddr_t *, int *, int);
-int	_bus_dma_inrange(bus_dma_segment_t *, int, bus_addr_t);
+struct arm32_dma_range *_bus_dma_inrange(struct arm32_dma_range *,
+	    int, bus_addr_t);
+
+/*
+ * Check to see if the specified page is in an allowed DMA range.
+ */
+__inline struct arm32_dma_range *
+_bus_dma_inrange(struct arm32_dma_range *ranges, int nranges,
+    bus_addr_t curaddr)
+{
+	struct arm32_dma_range *dr;
+	int i;
+
+	for (i = 0, dr = ranges; i < nranges; i++, dr++) {
+		if (curaddr >= dr->dr_sysbase &&
+		    round_page(curaddr) <= (dr->dr_sysbase + dr->dr_len))
+			return (dr);
+	}
+
+	return (NULL);
+}
 
 /*
  * Common function for DMA map creation.  May be called by bus-specific
@@ -140,7 +162,7 @@ _bus_dmamap_destroy(bus_dma_tag_t t, bus_dmamap_t map)
 	map->_dm_buftype = ARM32_BUFTYPE_INVALID;
 	map->_dm_proc = NULL;
 
-	free(map, M_DEVBUF);
+	free(map, M_DMAMAP);
 }
 
 /*
@@ -168,6 +190,9 @@ _bus_dmamap_load(bus_dma_tag_t t, bus_dmamap_t map, void *buf,
 	if (buflen > map->_dm_size)
 		return (EINVAL);
 
+	/* _bus_dmamap_load_buffer() clears this if we're not... */
+	map->_dm_flags |= ARM32_DMAMAP_COHERENT;
+
 	seg = 0;
 	error = _bus_dmamap_load_buffer(t, map, buf, buflen, p, flags,
 	    &lastaddr, &seg, 1);
@@ -191,6 +216,7 @@ int
 _bus_dmamap_load_mbuf(bus_dma_tag_t t, bus_dmamap_t map, struct mbuf *m0,
     int flags)
 {
+	struct arm32_dma_range *dr;
 	paddr_t lastaddr;
 	int seg, error, first;
 	struct mbuf *m;
@@ -214,12 +240,66 @@ _bus_dmamap_load_mbuf(bus_dma_tag_t t, bus_dmamap_t map, struct mbuf *m0,
 	if (m0->m_pkthdr.len > map->_dm_size)
 		return (EINVAL);
 
+	/*
+	 * Mbuf chains should almost never have coherent (i.e.
+	 * un-cached) mappings, so clear that flag now.
+	 */
+	map->_dm_flags &= ~ARM32_DMAMAP_COHERENT;
+
 	first = 1;
 	seg = 0;
 	error = 0;
 	for (m = m0; m != NULL && error == 0; m = m->m_next) {
-		error = _bus_dmamap_load_buffer(t, map, m->m_data, m->m_len,
-		    NULL, flags, &lastaddr, &seg, first);
+		if (m->m_len == 0)
+			continue;
+		/* XXX Could be better about coalescing. */
+		/* XXX Doesn't check boundaries. */
+		switch (m->m_flags & (M_EXT|M_CLUSTER)) {
+		case M_EXT|M_CLUSTER:
+			/* XXX KDASSERT */
+			KASSERT(m->m_ext.ext_paddr != M_PADDR_INVALID);
+			lastaddr = m->m_ext.ext_paddr +
+			    (m->m_data - m->m_ext.ext_buf);
+ have_addr:
+			if (first == 0 &&
+			    ++seg >= map->_dm_segcnt) {
+				error = EFBIG;
+				break;
+			}
+			/*
+			 * Make sure we're in an allowed DMA range.
+			 */
+			if (t->_ranges != NULL) {
+				/* XXX cache last result? */
+				dr = _bus_dma_inrange(t->_ranges, t->_nranges,
+				    lastaddr);
+				if (dr == NULL) {
+					error = EINVAL;
+					break;
+				}
+			
+				/*
+				 * In a valid DMA range.  Translate the
+				 * physical memory address to an address
+				 * in the DMA window.
+				 */
+				lastaddr = (lastaddr - dr->dr_sysbase) +
+				    dr->dr_busbase;
+			}
+			map->dm_segs[seg].ds_addr = lastaddr;
+			map->dm_segs[seg].ds_len = m->m_len;
+			lastaddr += m->m_len;
+			break;
+
+		case 0:
+			lastaddr = m->m_paddr + M_BUFOFFSET(m) +
+			    (m->m_data - M_BUFADDR(m));
+			goto have_addr;
+
+		default:
+			error = _bus_dmamap_load_buffer(t, map, m->m_data,
+			    m->m_len, NULL, flags, &lastaddr, &seg, first);
+		}
 		first = 0;
 	}
 	if (error == 0) {
@@ -265,6 +345,9 @@ _bus_dmamap_load_uio(bus_dma_tag_t t, bus_dmamap_t map, struct uio *uio,
 			panic("_bus_dmamap_load_uio: USERSPACE but no proc");
 #endif
 	}
+
+	/* _bus_dmamap_load_buffer() clears this if we're not... */
+	map->_dm_flags |= ARM32_DMAMAP_COHERENT;
 
 	first = 1;
 	seg = 0;
@@ -328,14 +411,13 @@ _bus_dmamap_unload(bus_dma_tag_t t, bus_dmamap_t map)
 	map->_dm_proc = NULL;
 }
 
-static void
+static __inline void
 _bus_dmamap_sync_linear(bus_dma_tag_t t, bus_dmamap_t map, bus_addr_t offset,
     bus_size_t len, int ops)
 {
 	vaddr_t addr = (vaddr_t) map->_dm_origbuf;
 
 	addr += offset;
-	len -= offset;
 
 	switch (ops) {
 	case BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE:
@@ -343,11 +425,10 @@ _bus_dmamap_sync_linear(bus_dma_tag_t t, bus_dmamap_t map, bus_addr_t offset,
 		break;
 
 	case BUS_DMASYNC_PREREAD:
-#if 1
-		cpu_dcache_wbinv_range(addr, len);
-#else
-		cpu_dcache_inv_range(addr, len);
-#endif
+		if (((addr | len) & arm_dcache_align_mask) == 0)
+			cpu_dcache_inv_range(addr, len);
+		else
+			cpu_dcache_wbinv_range(addr, len);
 		break;
 
 	case BUS_DMASYNC_PREWRITE:
@@ -356,7 +437,7 @@ _bus_dmamap_sync_linear(bus_dma_tag_t t, bus_dmamap_t map, bus_addr_t offset,
 	}
 }
 
-static void
+static __inline void
 _bus_dmamap_sync_mbuf(bus_dma_tag_t t, bus_dmamap_t map, bus_addr_t offset,
     bus_size_t len, int ops)
 {
@@ -383,21 +464,40 @@ _bus_dmamap_sync_mbuf(bus_dma_tag_t t, bus_dmamap_t map, bus_addr_t offset,
 		maddr = mtod(m, vaddr_t);
 		maddr += moff;
 
+		/*
+		 * We can save a lot of work here if we know the mapping
+		 * is read-only at the MMU:
+		 *
+		 * If a mapping is read-only, no dirty cache blocks will
+		 * exist for it.  If a writable mapping was made read-only,
+		 * we know any dirty cache lines for the range will have
+		 * been cleaned for us already.  Therefore, if the upper
+		 * layer can tell us we have a read-only mapping, we can
+		 * skip all cache cleaning.
+		 *
+		 * NOTE: This only works if we know the pmap cleans pages
+		 * before making a read-write -> read-only transition.  If
+		 * this ever becomes non-true (e.g. Physically Indexed
+		 * cache), this will have to be revisited.
+		 */
 		switch (ops) {
 		case BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE:
-			cpu_dcache_wbinv_range(maddr, minlen);
-			break;
+			if (! M_ROMAP(m)) {
+				cpu_dcache_wbinv_range(maddr, minlen);
+				break;
+			}
+			/* else FALLTHROUGH */
 
 		case BUS_DMASYNC_PREREAD:
-#if 1
-			cpu_dcache_wbinv_range(maddr, minlen);
-#else
-			cpu_dcache_inv_range(maddr, minlen);
-#endif
+			if (((maddr | minlen) & arm_dcache_align_mask) == 0)
+				cpu_dcache_inv_range(maddr, minlen);
+			else
+				cpu_dcache_wbinv_range(maddr, minlen);
 			break;
 
 		case BUS_DMASYNC_PREWRITE:
-			cpu_dcache_wb_range(maddr, minlen);
+			if (! M_ROMAP(m))
+				cpu_dcache_wb_range(maddr, minlen);
 			break;
 		}
 		moff = 0;
@@ -405,7 +505,7 @@ _bus_dmamap_sync_mbuf(bus_dma_tag_t t, bus_dmamap_t map, bus_addr_t offset,
 	}
 }
 
-static void
+static __inline void
 _bus_dmamap_sync_uio(bus_dma_tag_t t, bus_dmamap_t map, bus_addr_t offset,
     bus_size_t len, int ops)
 {
@@ -438,11 +538,10 @@ _bus_dmamap_sync_uio(bus_dma_tag_t t, bus_dmamap_t map, bus_addr_t offset,
 			break;
 
 		case BUS_DMASYNC_PREREAD:
-#if 1
-			cpu_dcache_wbinv_range(addr, minlen);
-#else
-			cpu_dcache_inv_range(addr, minlen);
-#endif
+			if (((addr | minlen) & arm_dcache_align_mask) == 0)
+				cpu_dcache_inv_range(addr, minlen);
+			else
+				cpu_dcache_wbinv_range(addr, minlen);
 			break;
 
 		case BUS_DMASYNC_PREWRITE:
@@ -511,19 +610,20 @@ _bus_dmamap_sync(bus_dma_tag_t t, bus_dmamap_t map, bus_addr_t offset,
 	if (ops == 0)
 		return;
 
-	/*
-	 * XXX Skip cache frobbing if mapping was COHERENT.
-	 */
+	/* Skip cache frobbing if mapping was COHERENT. */
+	if (map->_dm_flags & ARM32_DMAMAP_COHERENT) {
+		/* Drain the write buffer. */
+		cpu_drain_writebuf();
+		return;
+	}
 
 	/*
-	 * If the mapping is not the kernel's and also not the
-	 * current process's (XXX actually, vmspace), then we
-	 * don't have anything to do, since the cache is Wb-Inv'd
-	 * on context switch.
-	 *
-	 * XXX REVISIT WHEN WE DO FCSE!
+	 * If the mapping belongs to a non-kernel vmspace, and the
+	 * vmspace has not been active since the last time a full
+	 * cache flush was performed, we don't need to do anything.
 	 */
-	if (__predict_false(map->_dm_proc != NULL && map->_dm_proc != curproc))
+	if (__predict_false(map->_dm_proc != NULL &&
+	    map->_dm_proc->p_vmspace->vm_map.pmap->pm_cstate.cs_cache_d == 0))
 		return;
 
 	switch (map->_dm_buftype) {
@@ -562,8 +662,6 @@ _bus_dmamap_sync(bus_dma_tag_t t, bus_dmamap_t map, bus_addr_t offset,
  */
 
 extern paddr_t physical_start;
-extern paddr_t physical_freestart;
-extern paddr_t physical_freeend;
 extern paddr_t physical_end;
 
 int
@@ -571,16 +669,37 @@ _bus_dmamem_alloc(bus_dma_tag_t t, bus_size_t size, bus_size_t alignment,
     bus_size_t boundary, bus_dma_segment_t *segs, int nsegs, int *rsegs,
     int flags)
 {
-	int error;
+	struct arm32_dma_range *dr;
+	int error, i;
+
 #ifdef DEBUG_DMA
-	printf("dmamem_alloc t=%p size=%lx align=%lx boundary=%lx segs=%p nsegs=%x rsegs=%p flags=%x\n",
-	    t, size, alignment, boundary, segs, nsegs, rsegs, flags);
-#endif	/* DEBUG_DMA */
-	error =  (_bus_dmamem_alloc_range(t, size, alignment, boundary,
-	    segs, nsegs, rsegs, flags, trunc_page(physical_start), trunc_page(physical_end)));
+	printf("dmamem_alloc t=%p size=%lx align=%lx boundary=%lx "
+	    "segs=%p nsegs=%x rsegs=%p flags=%x\n", t, size, alignment,
+	    boundary, segs, nsegs, rsegs, flags);
+#endif
+
+	if ((dr = t->_ranges) != NULL) {
+		error = ENOMEM;
+		for (i = 0; i < t->_nranges; i++, dr++) {
+			if (dr->dr_len == 0)
+				continue;
+			error = _bus_dmamem_alloc_range(t, size, alignment,
+			    boundary, segs, nsegs, rsegs, flags,
+			    trunc_page(dr->dr_sysbase),
+			    trunc_page(dr->dr_sysbase + dr->dr_len));
+			if (error == 0)
+				break;
+		}
+	} else {
+		error = _bus_dmamem_alloc_range(t, size, alignment, boundary,
+		    segs, nsegs, rsegs, flags, trunc_page(physical_start),
+		    trunc_page(physical_end));
+	}
+
 #ifdef DEBUG_DMA
 	printf("dmamem_alloc: =%d\n", error);
-#endif	/* DEBUG_DMA */
+#endif
+
 	return(error);
 }
 
@@ -644,7 +763,7 @@ _bus_dmamem_map(bus_dma_tag_t t, bus_dma_segment_t *segs, int nsegs,
 	for (curseg = 0; curseg < nsegs; curseg++) {
 		for (addr = segs[curseg].ds_addr;
 		    addr < (segs[curseg].ds_addr + segs[curseg].ds_len);
-		    addr += NBPG, va += NBPG, size -= NBPG) {
+		    addr += PAGE_SIZE, va += PAGE_SIZE, size -= PAGE_SIZE) {
 #ifdef DEBUG_DMA
 			printf("wiring p%lx to v%lx", addr, va);
 #endif	/* DEBUG_DMA */
@@ -657,15 +776,16 @@ _bus_dmamem_map(bus_dma_tag_t t, bus_dma_segment_t *segs, int nsegs,
 			 * If the memory must remain coherent with the
 			 * cache then we must make the memory uncacheable
 			 * in order to maintain virtual cache coherency.
-			 * We must also guarentee the cache does not already
+			 * We must also guarantee the cache does not already
 			 * contain the virtal addresses we are making
 			 * uncacheable.
 			 */
 			if (flags & BUS_DMA_COHERENT) {
-				cpu_dcache_wbinv_range(va, NBPG);
+				cpu_dcache_wbinv_range(va, PAGE_SIZE);
 				cpu_drain_writebuf();
 				ptep = vtopte(va);
-				*ptep &= ~pte_l2_s_cache_mask;
+				*ptep &= ~L2_S_CACHE_MASK;
+				PTE_SYNC(ptep);
 				tlb_flush();
 			}
 #ifdef DEBUG_DMA
@@ -749,11 +869,15 @@ _bus_dmamap_load_buffer(bus_dma_tag_t t, bus_dmamap_t map, void *buf,
     bus_size_t buflen, struct proc *p, int flags, paddr_t *lastaddrp,
     int *segp, int first)
 {
+	struct arm32_dma_range *dr;
 	bus_size_t sgsize;
 	bus_addr_t curaddr, lastaddr, baddr, bmask;
 	vaddr_t vaddr = (vaddr_t)buf;
+	pd_entry_t *pde;
+	pt_entry_t pte;
 	int seg;
 	pmap_t pmap;
+	pt_entry_t *ptep;
 
 #ifdef DEBUG_DMA
 	printf("_bus_dmamem_load_buffer(buf=%p, len=%lx, flags=%d, 1st=%d)\n",
@@ -771,20 +895,65 @@ _bus_dmamap_load_buffer(bus_dma_tag_t t, bus_dmamap_t map, void *buf,
 	for (seg = *segp; buflen > 0; ) {
 		/*
 		 * Get the physical address for this segment.
+		 *
+		 * XXX Don't support checking for coherent mappings
+		 * XXX in user address space.
 		 */
-		(void) pmap_extract(pmap, (vaddr_t)vaddr, &curaddr);
+		if (__predict_true(pmap == pmap_kernel())) {
+			(void) pmap_get_pde_pte(pmap, vaddr, &pde, &ptep);
+			if (__predict_false(pmap_pde_section(pde))) {
+				curaddr = (*pde & L1_S_FRAME) |
+				    (vaddr & L1_S_OFFSET);
+				if (*pde & L1_S_CACHE_MASK) {
+					map->_dm_flags &=
+					    ~ARM32_DMAMAP_COHERENT;
+				}
+			} else {
+				pte = *ptep;
+				KDASSERT((pte & L2_TYPE_MASK) != L2_TYPE_INV);
+				if (__predict_false((pte & L2_TYPE_MASK)
+						    == L2_TYPE_L)) {
+					curaddr = (pte & L2_L_FRAME) |
+					    (vaddr & L2_L_OFFSET);
+					if (pte & L2_L_CACHE_MASK) {
+						map->_dm_flags &=
+						    ~ARM32_DMAMAP_COHERENT;
+					}
+				} else {
+					curaddr = (pte & L2_S_FRAME) |
+					    (vaddr & L2_S_OFFSET);
+					if (pte & L2_S_CACHE_MASK) {
+						map->_dm_flags &=
+						    ~ARM32_DMAMAP_COHERENT;
+					}
+				}
+			}
+		} else {
+			(void) pmap_extract(pmap, vaddr, &curaddr);
+			map->_dm_flags &= ~ARM32_DMAMAP_COHERENT;
+		}
 
 		/*
 		 * Make sure we're in an allowed DMA range.
 		 */
-		if (t->_ranges != NULL &&
-		    _bus_dma_inrange(t->_ranges, t->_nranges, curaddr) == 0)
-			return (EINVAL);
+		if (t->_ranges != NULL) {
+			/* XXX cache last result? */
+			dr = _bus_dma_inrange(t->_ranges, t->_nranges,
+			    curaddr);
+			if (dr == NULL)
+				return (EINVAL);
+			
+			/*
+			 * In a valid DMA range.  Translate the physical
+			 * memory address to an address in the DMA window.
+			 */
+			curaddr = (curaddr - dr->dr_sysbase) + dr->dr_busbase;
+		}
 
 		/*
 		 * Compute the segment size, and adjust counts.
 		 */
-		sgsize = NBPG - ((u_long)vaddr & PGOFSET);
+		sgsize = PAGE_SIZE - ((u_long)vaddr & PGOFSET);
 		if (buflen < sgsize)
 			sgsize = buflen;
 
@@ -838,24 +1007,6 @@ _bus_dmamap_load_buffer(bus_dma_tag_t t, bus_dmamap_t map, void *buf,
 }
 
 /*
- * Check to see if the specified page is in an allowed DMA range.
- */
-int
-_bus_dma_inrange(bus_dma_segment_t *ranges, int nranges, bus_addr_t curaddr)
-{
-	bus_dma_segment_t *ds;
-	int i;
-
-	for (i = 0, ds = ranges; i < nranges; i++, ds++) {
-		if (curaddr >= ds->ds_addr &&
-		    round_page(curaddr) <= (ds->ds_addr + ds->ds_len))
-			return (1);
-	}
-
-	return (0);
-}
-
-/*
  * Allocate physical memory from the given physical address range.
  * Called by DMA-safe memory allocation methods.
  */
@@ -880,7 +1031,6 @@ _bus_dmamem_alloc_range(bus_dma_tag_t t, bus_size_t size, bus_size_t alignment,
 	/*
 	 * Allocate pages from the VM system.
 	 */
-	TAILQ_INIT(&mlist);
 	error = uvm_pglistalloc(size, low, high, alignment, boundary,
 	    &mlist, nsegs, (flags & BUS_DMA_NOWAIT) == 0);
 	if (error)
@@ -923,5 +1073,45 @@ _bus_dmamem_alloc_range(bus_dma_tag_t t, bus_size_t size, bus_size_t alignment,
 
 	*rsegs = curseg + 1;
 
+	return (0);
+}
+
+/*
+ * Check if a memory region intersects with a DMA range, and return the
+ * page-rounded intersection if it does.
+ */
+int
+arm32_dma_range_intersect(struct arm32_dma_range *ranges, int nranges,
+    paddr_t pa, psize_t size, paddr_t *pap, psize_t *sizep)
+{
+	struct arm32_dma_range *dr;
+	int i;
+
+	if (ranges == NULL)
+		return (0);
+
+	for (i = 0, dr = ranges; i < nranges; i++, dr++) {
+		if (dr->dr_sysbase <= pa &&
+		    pa < (dr->dr_sysbase + dr->dr_len)) {
+			/*
+			 * Beginning of region intersects with this range.
+			 */
+			*pap = trunc_page(pa);
+			*sizep = round_page(min(pa + size,
+			    dr->dr_sysbase + dr->dr_len) - pa);
+			return (1);
+		}
+		if (pa < dr->dr_sysbase && dr->dr_sysbase < (pa + size)) {
+			/*
+			 * End of region intersects with this range.
+			 */
+			*pap = trunc_page(dr->dr_sysbase);
+			*sizep = round_page(min((pa + size) - dr->dr_sysbase,
+			    dr->dr_len));
+			return (1);
+		}
+	}
+
+	/* No intersection found. */
 	return (0);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: grfabs_fal.c,v 1.14 2002/03/04 15:35:57 wiz Exp $	*/
+/*	$NetBSD: grfabs_fal.c,v 1.17 2003/07/15 01:19:49 lukem Exp $	*/
 
 /*
  * Copyright (c) 1995 Thomas Gerner.
@@ -31,6 +31,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: grfabs_fal.c,v 1.17 2003/07/15 01:19:49 lukem Exp $");
+
 #ifdef FALCON_VIDEO
 /*
  *  atari abstract graphics driver: Falcon-interface
@@ -40,6 +43,8 @@
 #include <sys/malloc.h>
 #include <sys/device.h>
 #include <sys/systm.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/iomap.h>
 #include <machine/video.h>
@@ -411,7 +416,7 @@ view_t *v;
 	if (mode->current_view == v) {
 #if 0
 		if (v->flags & VF_DISPLAY)
-			panic("Cannot shutdown display\n"); /* XXX */
+			panic("Cannot shutdown display"); /* XXX */
 #endif
 		mode->current_view = NULL;
 	}
@@ -581,7 +586,7 @@ u_char	depth;
 	 * (or more) the user writes into someone elses memory. -ch
 	 */
 	bm_size    = m68k_round_page((width * height * depth) / NBBY);
-	total_size = bm_size + sizeof(bmap_t) + NBPG;
+	total_size = bm_size + sizeof(bmap_t) + PAGE_SIZE;
 
 	if ((bm = (bmap_t*)alloc_stmem(total_size, &hw_address)) == NULL)
 		return(NULL);

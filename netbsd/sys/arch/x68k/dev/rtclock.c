@@ -1,4 +1,4 @@
-/*	$NetBSD: rtclock.c,v 1.11 2002/05/14 02:03:03 matt Exp $	*/
+/*	$NetBSD: rtclock.c,v 1.15 2003/07/15 01:44:52 lukem Exp $	*/
 
 /*
  * Copyright 1993, 1994 Masaru Oki
@@ -35,6 +35,9 @@
  * alarm is not supported.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rtclock.c,v 1.15 2003/07/15 01:44:52 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -60,9 +63,8 @@ static void rtc_attach __P((struct device *, struct device *, void *));
 
 int rtclockinit __P((void));
 
-struct cfattach rtc_ca = {
-	sizeof(struct rtc_softc), rtc_match, rtc_attach
-};
+CFATTACH_DECL(rtc, sizeof(struct rtc_softc),
+    rtc_match, rtc_attach, NULL, NULL);
 
 static int
 rtc_match(parent, cf, aux)

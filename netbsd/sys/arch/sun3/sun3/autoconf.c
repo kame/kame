@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.58 2002/05/18 07:32:11 lukem Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.61 2003/07/15 03:36:16 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -43,6 +43,9 @@
  * determined (from possibilities mentioned in ioconf.c), and
  * the drivers are initialized.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.61 2003/07/15 03:36:16 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -107,7 +110,6 @@ int bus_scan(parent, cf, aux)
 	void *aux;
 {
 	struct confargs *ca = aux;
-	cfmatch_t mf;
 
 #ifdef	DIAGNOSTIC
 	if (cf->cf_fstate == FSTATE_STAR)
@@ -128,8 +130,7 @@ int bus_scan(parent, cf, aux)
 	 * preserved for the related attach call.
 	 * XXX - This is a hack...
 	 */
-	mf = cf->cf_attach->ca_match;
-	if ((*mf)(parent, cf, ca) > 0) {
+	if (config_match(parent, cf, ca) > 0) {
 		config_attach(parent, cf, ca, bus_print);
 	}
 	return (0);
@@ -149,14 +150,14 @@ bus_print(args, name)
 	struct confargs *ca = args;
 
 	if (name)
-		printf("%s:", name);
+		aprint_normal("%s:", name);
 
 	if (ca->ca_paddr != -1)
-		printf(" addr 0x%x", ca->ca_paddr);
+		aprint_normal(" addr 0x%x", ca->ca_paddr);
 	if (ca->ca_intpri != -1)
-		printf(" ipl %d", ca->ca_intpri);
+		aprint_normal(" ipl %d", ca->ca_intpri);
 	if (ca->ca_intvec != -1)
-		printf(" vect 0x%x", ca->ca_intvec);
+		aprint_normal(" vect 0x%x", ca->ca_intvec);
 
 	return(UNCONF);
 }

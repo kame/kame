@@ -1,4 +1,4 @@
-/* $NetBSD: latches.c,v 1.1 2002/03/24 15:47:20 bjh21 Exp $ */
+/* $NetBSD: latches.c,v 1.4 2002/10/02 03:25:47 thorpej Exp $ */
 
 /*-
  * Copyright (c) 2001 Ben Harris
@@ -29,7 +29,7 @@
 
 #include <sys/param.h>
 
-__KERNEL_RCSID(0, "$NetBSD: latches.c,v 1.1 2002/03/24 15:47:20 bjh21 Exp $");
+__KERNEL_RCSID(0, "$NetBSD: latches.c,v 1.4 2002/10/02 03:25:47 thorpej Exp $");
 
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -54,9 +54,8 @@ struct latches_softc {
 static int latches_match(struct device *, struct cfdata *, void *);
 static void latches_attach(struct device *, struct device *, void *);
 
-struct cfattach latches_ca = {
-	sizeof(struct latches_softc), latches_match, latches_attach
-};
+CFATTACH_DECL(latches, sizeof(struct latches_softc),
+    latches_match, latches_attach, NULL, NULL);
 
 struct device *the_latches;
 

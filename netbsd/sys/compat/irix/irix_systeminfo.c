@@ -1,4 +1,4 @@
-/*	$NetBSD: irix_systeminfo.c,v 1.3 2002/04/20 21:25:01 manu Exp $ */
+/*	$NetBSD: irix_systeminfo.c,v 1.9 2003/12/04 19:38:22 atatat Exp $ */
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -37,15 +37,17 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: irix_systeminfo.c,v 1.3 2002/04/20 21:25:01 manu Exp $");
+__KERNEL_RCSID(0, "$NetBSD: irix_systeminfo.c,v 1.9 2003/12/04 19:38:22 atatat Exp $");
 
 #include <sys/types.h>
 #include <sys/signal.h>
 #include <sys/param.h>
 #include <sys/mount.h>
+#include <sys/kernel.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
 #include <sys/sysctl.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/common/compat_util.h>
@@ -59,22 +61,24 @@ __KERNEL_RCSID(0, "$NetBSD: irix_systeminfo.c,v 1.3 2002/04/20 21:25:01 manu Exp
 
 #include <compat/irix/irix_types.h>
 #include <compat/irix/irix_signal.h>
+#include <compat/irix/irix_sysctl.h>
 #include <compat/irix/irix_syscallargs.h>
 
-const char irix_si_vendor[] = "Silicon Graphics, Inc.";
-const char irix_si_os_provider[] = "Silicon Graphics, Inc.";
-const char irix_si_os_name[] = "IRIX";
-const char irix_si_hw_name[] = "IP22"; /* XXX */
-const char irix_si_osrel_maj[] = "6";
-const char irix_si_osrel_min[] = "5";
-const char irix_si_osrel_patch[] = "0";
-const char irix_si_processors[] = "R5000 1.0"; /* XXX */
+char irix_si_vendor[128] = "Silicon Graphics, Inc.";
+char irix_si_os_provider[128] = "Silicon Graphics, Inc.";
+char irix_si_os_name[128] = "IRIX";
+char irix_si_hw_name[128] = "IP22"; /* XXX */
+char irix_si_osrel_maj[128] = "6";
+char irix_si_osrel_min[128] = "5";
+char irix_si_osrel_patch[128] = "0";
+char irix_si_processors[128] = "R5000 1.0"; /* XXX */
+char irix_si_version[128] = "04131232";
 
 #define BUF_SIZE 16
 
 int
-irix_sys_systeminfo(p, v, retval)
-	struct proc *p;
+irix_sys_systeminfo(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -85,10 +89,9 @@ irix_sys_systeminfo(p, v, retval)
 	} */ *uap = v;
 	const char *str = NULL;
 	char strbuf[BUF_SIZE + 1];
-	int error;
-	size_t len;
+	int error = 0;
+	size_t len = 0;
 	char buf[256];
-	caddr_t sg = stackgap_init(p, 0);
 
 	u_int rlen = SCARG(uap, len);
 
@@ -127,38 +130,34 @@ irix_sys_systeminfo(p, v, retval)
 
 	case SVR4_MIPS_SI_NUM_PROCESSORS:
 	case SVR4_MIPS_SI_AVAIL_PROCESSORS: {
-		int *ncpup = stackgap_alloc(p, &sg, sizeof(int));
-		int ncpu;
-		int name = HW_NCPU;
-		int namelen = sizeof(name);
+		int ncpu, name[2];
+		size_t sz;
 
-		if ((error = hw_sysctl
-		    (&name, 1, ncpup, &namelen, NULL, 0, p)) != 0)
+		name[0] = CTL_HW;
+		name[1] = HW_NCPU;
+		sz = sizeof(ncpu);
+		error = old_sysctl(&name[0], 2, &ncpu, &sz, NULL, 0, NULL);
+		if (error)
 			return error;
-
-		if ((error = copyin(ncpup, &ncpu, sizeof(int))) != 0)
-			return error;
-
 		snprintf(strbuf, BUF_SIZE, "%d", ncpu);
 		str = strbuf;
 			
 		break;
 	}
 
-	case SVR4_MIPS_SI_HOSTID: {
-		register_t hostid;
-
-		error = compat_43_sys_gethostid(p, NULL, &hostid);
-		if (!error) {
-			snprintf(strbuf, BUF_SIZE, "%08x", (int32_t)hostid);
-			str = strbuf;
-		}
+	case SVR4_SI_HW_SERIAL:
+		snprintf(strbuf, BUF_SIZE, "%d", (int32_t)hostid);
+		str = strbuf;
 		break;
-	}
+
+	case SVR4_MIPS_SI_HOSTID:
+		snprintf(strbuf, BUF_SIZE, "%08x", (int32_t)hostid);
+		str = strbuf;
+		break;
 
 	case SVR4_MIPS_SI_SERIAL: /* Unimplemented yet */
 	default:
-		return svr4_sys_systeminfo(p, v, retval);
+		return svr4_sys_systeminfo(l, v, retval);
 		break;
 	}
 

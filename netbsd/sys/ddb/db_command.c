@@ -1,4 +1,4 @@
-/*	$NetBSD: db_command.c,v 1.65 2002/02/15 11:18:26 simonb Exp $	*/
+/*	$NetBSD: db_command.c,v 1.75.2.1 2004/04/29 04:08:15 jmc Exp $	*/
 
 /*
  * Mach Operating System
@@ -31,9 +31,10 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: db_command.c,v 1.65 2002/02/15 11:18:26 simonb Exp $");
+__KERNEL_RCSID(0, "$NetBSD: db_command.c,v 1.75.2.1 2004/04/29 04:08:15 jmc Exp $");
 
 #include "opt_ddb.h"
+#include "opt_kgdb.h"
 #include "opt_inet.h"
 
 #include <sys/param.h>
@@ -117,6 +118,7 @@ static void	db_stack_trace_cmd(db_expr_t, int, db_expr_t, char *);
 static void	db_sync_cmd(db_expr_t, int, db_expr_t, char *);
 static void	db_uvmexp_print_cmd(db_expr_t, int, db_expr_t, char *);
 static void	db_vnode_print_cmd(db_expr_t, int, db_expr_t, char *);
+static void	db_mount_print_cmd(db_expr_t, int, db_expr_t, char *);
 
 /*
  * 'show' commands
@@ -138,11 +140,13 @@ static const struct db_command db_show_cmds[] = {
 	{ "event",	db_event_print_cmd,	0,	NULL },
 	{ "malloc",	db_malloc_print_cmd,	0,	NULL },
 	{ "map",	db_map_print_cmd,	0,	NULL },
+	{ "mount",	db_mount_print_cmd,	0,	NULL },
 	{ "ncache",	db_namecache_print_cmd,	0,	NULL },
 	{ "object",	db_object_print_cmd,	0,	NULL },
 	{ "page",	db_page_print_cmd,	0,	NULL },
 	{ "pool",	db_pool_print_cmd,	0,	NULL },
 	{ "registers",	db_show_regs,		0,	NULL },
+	{ "sched_qs",	db_show_sched_qs,	0,	NULL },
 	{ "uvmexp",	db_uvmexp_print_cmd,	0,	NULL },
 	{ "vnode",	db_vnode_print_cmd,	0,	NULL },
 	{ "watches",	db_listwatch_cmd, 	0,	NULL },
@@ -150,7 +154,9 @@ static const struct db_command db_show_cmds[] = {
 };
 
 static const struct db_command db_command_table[] = {
+	{ "b",		db_breakpoint_cmd,	0,		NULL },
 	{ "break",	db_breakpoint_cmd,	0,		NULL },
+	{ "bt",		db_stack_trace_cmd,	0,		NULL },
 	{ "c",		db_continue_cmd,	0,		NULL },
 	{ "call",	db_fncall,		CS_OWN,		NULL },
 	{ "callout",	db_show_callout,	0,		NULL },
@@ -161,6 +167,9 @@ static const struct db_command db_command_table[] = {
 	{ "dwatch",	db_deletewatch_cmd,	0,		NULL },
 	{ "examine",	db_examine_cmd,		CS_SET_DOT, 	NULL },
 	{ "kill",	db_kill_proc,		CS_OWN,		NULL },
+#ifdef KGDB
+	{ "kgdb",	db_kgdb_cmd,		0,		NULL },
+#endif
 #ifdef DB_MACHINE_COMMANDS
 	{ "machine",	NULL,			0, db_machine_command_table },
 #endif
@@ -300,7 +309,7 @@ db_cmd_search(const char *name, const struct db_command *table,
 static void
 db_cmd_list(const struct db_command *table)
 {
-	int	 i, j, w, columns, lines, width=0, items, numcmds;
+	int	 i, j, w, columns, lines, width=0, numcmds;
 	const char	*p;
 
 	for (numcmds = 0; table[numcmds].name != NULL; numcmds++) {
@@ -309,7 +318,6 @@ db_cmd_list(const struct db_command *table)
 			width = w;
 	}
 	width = DB_NEXT_TAB(width);
-	items = 0;
 
 	columns = db_max_width / width;
 	if (columns == 0)
@@ -417,7 +425,7 @@ db_command(const struct db_command **last_cmdp,
 					db_flush_lex();
 					return;
 				}
-				db_strcpy(modif, db_tok_string);
+				strlcpy(modif, db_tok_string, sizeof(modif));
 			} else {
 				db_unread_token(t);
 				modif[0] = '\0';
@@ -484,9 +492,9 @@ db_map_print_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
 		full = TRUE;
 
 	if (have_addr == FALSE)
-		addr = (db_expr_t) kernel_map;
+		addr = (db_expr_t)(intptr_t) kernel_map;
 
-	uvm_map_printit((struct vm_map *) addr, full, db_printf);
+	uvm_map_printit((struct vm_map *)(intptr_t) addr, full, db_printf);
 }
 
 /*ARGSUSED*/
@@ -513,7 +521,8 @@ db_object_print_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
 	if (modif[0] == 'f')
 		full = TRUE;
 
-	uvm_object_printit((struct uvm_object *) addr, full, db_printf);
+	uvm_object_printit((struct uvm_object *)(intptr_t) addr, full,
+	    db_printf);
 }
 
 /*ARGSUSED*/
@@ -525,7 +534,7 @@ db_page_print_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
 	if (modif[0] == 'f')
 		full = TRUE;
 
-	uvm_page_printit((struct vm_page *) addr, full, db_printf);
+	uvm_page_printit((struct vm_page *)(intptr_t) addr, full, db_printf);
 }
 
 /*ARGSUSED*/
@@ -537,7 +546,7 @@ db_buf_print_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
 	if (modif[0] == 'f')
 		full = TRUE;
 
-	vfs_buf_print((struct buf *)addr, full, db_printf);
+	vfs_buf_print((struct buf *)(intptr_t) addr, full, db_printf);
 }
 
 /*ARGSUSED*/
@@ -561,7 +570,18 @@ db_vnode_print_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
 	if (modif[0] == 'f')
 		full = TRUE;
 
-	vfs_vnode_print((struct vnode *)addr, full, db_printf);
+	vfs_vnode_print((struct vnode *)(intptr_t) addr, full, db_printf);
+}
+
+static void
+db_mount_print_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
+{
+	boolean_t full = FALSE;
+
+	if (modif[0] == 'f')
+		full = TRUE;
+
+	vfs_mount_print((struct mount *)(intptr_t) addr, full, db_printf);
 }
 
 /*ARGSUSED*/
@@ -569,7 +589,7 @@ static void
 db_pool_print_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
 {
 
-	pool_printit((struct pool *)addr, modif, db_printf);
+	pool_printit((struct pool *)(intptr_t) addr, modif, db_printf);
 }
 
 /*ARGSUSED*/
@@ -578,7 +598,7 @@ db_namecache_print_cmd(db_expr_t addr, int have_addr, db_expr_t count,
     char *modif)
 {
 
-	namecache_print((struct vnode *)addr, db_printf);
+	namecache_print((struct vnode *)(intptr_t) addr, db_printf);
 }
 
 /*ARGSUSED*/
@@ -610,7 +630,7 @@ db_fncall(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
 		db_flush_lex();
 		return;
 	}
-	func = (db_expr_t (*)(db_expr_t, ...)) fn_addr;
+	func = (db_expr_t (*)(db_expr_t, ...))(intptr_t) fn_addr;
 
 	t = db_read_token();
 	if (t == tLPAREN) {
@@ -702,11 +722,19 @@ db_sifting_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
 static void
 db_stack_trace_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
 {
+	register char *cp = modif;
+	register char c;
+	void (*pr)(const char *, ...);
+
+	pr = db_printf;
+	while ((c = *cp++) != 0)
+		if (c == 'l')
+			pr = printf;
 
 	if (count == -1)
 		count = 65535;
 
-	db_stack_trace_print(addr, have_addr, count, modif, db_printf);
+	db_stack_trace_print(addr, have_addr, count, modif, pr);
 }
 
 static void

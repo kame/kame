@@ -1,4 +1,4 @@
-/*	$NetBSD: openfirm.c,v 1.11 2001/09/24 13:22:33 wiz Exp $	*/
+/*	$NetBSD: openfirm.c,v 1.14 2003/09/27 04:44:42 matt Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -30,8 +30,14 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: openfirm.c,v 1.14 2003/09/27 04:44:42 matt Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/psl.h>
 #include <machine/stdarg.h>
@@ -44,8 +50,7 @@ void ofw_stack(void);
 void ofbcopy(const void *, void *, size_t);
 
 int
-OF_peer(phandle)
-	int phandle;
+OF_peer(int phandle)
 {
 	static struct {
 		char *name;
@@ -67,8 +72,7 @@ OF_peer(phandle)
 }
 
 int
-OF_child(phandle)
-	int phandle;
+OF_child(int phandle)
 {
 	static struct {
 		char *name;
@@ -90,8 +94,7 @@ OF_child(phandle)
 }
 
 int
-OF_parent(phandle)
-	int phandle;
+OF_parent(int phandle)
 {
 	static struct {
 		char *name;
@@ -113,8 +116,7 @@ OF_parent(phandle)
 }
 
 int
-OF_instance_to_package(ihandle)
-	int ihandle;
+OF_instance_to_package(int ihandle)
 {
 	static struct {
 		char *name;
@@ -136,9 +138,7 @@ OF_instance_to_package(ihandle)
 }
 
 int
-OF_getproplen(handle, prop)
-	int handle;
-	char *prop;
+OF_getproplen(int handle, char *prop)
 {
 	static struct {
 		char *name;
@@ -162,11 +162,7 @@ OF_getproplen(handle, prop)
 }
 
 int
-OF_getprop(handle, prop, buf, buflen)
-	int handle;
-	char *prop;
-	void *buf;
-	int buflen;
+OF_getprop(int handle, char *prop, void *buf, int buflen)
 {
 	static struct {
 		char *name;
@@ -184,7 +180,7 @@ OF_getprop(handle, prop, buf, buflen)
 	};
 
 	ofw_stack();
-	if (buflen > NBPG)
+	if (buflen > PAGE_SIZE)
 		return -1;
 	args.phandle = handle;
 	args.prop = prop;
@@ -200,10 +196,7 @@ OF_getprop(handle, prop, buf, buflen)
 }
 
 int
-OF_nextprop(handle, prop, nextprop)
-	int handle;
-	char *prop;
-	void *nextprop;
+OF_nextprop(int handle, char *prop, void *nextprop)
 {
 	static struct {
 		char *name;
@@ -230,8 +223,7 @@ OF_nextprop(handle, prop, nextprop)
 }
 
 int
-OF_finddevice(name)
-	char *name;
+OF_finddevice(char *name)
 {
 	static struct {
 		char *name;
@@ -253,10 +245,7 @@ OF_finddevice(name)
 }
 
 int
-OF_instance_to_path(ihandle, buf, buflen)
-	int ihandle;
-	char *buf;
-	int buflen;
+OF_instance_to_path(int ihandle, char *buf, int buflen)
 {
 	static struct {
 		char *name;
@@ -272,7 +261,7 @@ OF_instance_to_path(ihandle, buf, buflen)
 		1,
 	};
 
-	if (buflen > NBPG)
+	if (buflen > PAGE_SIZE)
 		return -1;
 	args.ihandle = ihandle;
 	args.buf = OF_buf;
@@ -287,10 +276,7 @@ OF_instance_to_path(ihandle, buf, buflen)
 }
 
 int
-OF_package_to_path(phandle, buf, buflen)
-	int phandle;
-	char *buf;
-	int buflen;
+OF_package_to_path(int phandle, char *buf, int buflen)
 {
 	static struct {
 		char *name;
@@ -307,7 +293,7 @@ OF_package_to_path(phandle, buf, buflen)
 	};
 
 	ofw_stack();
-	if (buflen > NBPG)
+	if (buflen > PAGE_SIZE)
 		return -1;
 	args.phandle = phandle;
 	args.buf = OF_buf;
@@ -322,16 +308,7 @@ OF_package_to_path(phandle, buf, buflen)
 }
 
 int
-#ifdef	__STDC__
 OF_call_method(char *method, int ihandle, int nargs, int nreturns, ...)
-#else
-OF_call_method(method, ihandle, nargs, nreturns, va_alist)
-	char *method;
-	int ihandle;
-	int nargs;
-	int nreturns;
-	va_dcl
-#endif
 {
 	va_list ap;
 	static struct {
@@ -373,15 +350,7 @@ OF_call_method(method, ihandle, nargs, nreturns, va_alist)
 }
 
 int
-#ifdef	__STDC__
 OF_call_method_1(char *method, int ihandle, int nargs, ...)
-#else
-OF_call_method_1(method, ihandle, nargs, va_alist)
-	char *method;
-	int ihandle;
-	int nargs;
-	va_dcl
-#endif
 {
 	va_list ap;
 	static struct {
@@ -416,8 +385,7 @@ OF_call_method_1(method, ihandle, nargs, va_alist)
 }
 
 int
-OF_open(dname)
-	char *dname;
+OF_open(char *dname)
 {
 	static struct {
 		char *name;
@@ -433,7 +401,7 @@ OF_open(dname)
 	int l;
 
 	ofw_stack();
-	if ((l = strlen(dname)) >= NBPG)
+	if ((l = strlen(dname)) >= PAGE_SIZE)
 		return -1;
 	ofbcopy(dname, OF_buf, l + 1);
 	args.dname = OF_buf;
@@ -443,8 +411,7 @@ OF_open(dname)
 }
 
 void
-OF_close(handle)
-	int handle;
+OF_close(int handle)
 {
 	static struct {
 		char *name;
@@ -463,13 +430,10 @@ OF_close(handle)
 }
 
 /*
- * This assumes that character devices don't read in multiples of NBPG.
+ * This assumes that character devices don't read in multiples of PAGE_SIZE.
  */
 int
-OF_read(handle, addr, len)
-	int handle;
-	void *addr;
-	int len;
+OF_read(int handle, void *addr, int len)
 {
 	static struct {
 		char *name;
@@ -491,7 +455,7 @@ OF_read(handle, addr, len)
 	args.ihandle = handle;
 	args.addr = OF_buf;
 	for (; len > 0; len -= l, p += l) {
-		l = min(NBPG, len);
+		l = min(PAGE_SIZE, len);
 		args.len = l;
 		if (openfirmware(&args) == -1)
 			return -1;
@@ -510,10 +474,7 @@ OF_read(handle, addr, len)
 }
 
 int
-OF_write(handle, addr, len)
-	int handle;
-	void *addr;
-	int len;
+OF_write(int handle, void *addr, int len)
 {
 	static struct {
 		char *name;
@@ -535,7 +496,7 @@ OF_write(handle, addr, len)
 	args.ihandle = handle;
 	args.addr = OF_buf;
 	for (; len > 0; len -= l, p += l) {
-		l = min(NBPG, len);
+		l = min(PAGE_SIZE, len);
 		ofbcopy(p, OF_buf, l);
 		args.len = l;
 		if (openfirmware(&args) == -1)
@@ -547,9 +508,7 @@ OF_write(handle, addr, len)
 }
 
 int
-OF_seek(handle, pos)
-	int handle;
-	u_quad_t pos;
+OF_seek(int handle, u_quad_t pos)
 {
 	static struct {
 		char *name;
@@ -575,8 +534,7 @@ OF_seek(handle, pos)
 }
 
 void
-OF_boot(bootspec)
-	char *bootspec;
+OF_boot(char *bootspec)
 {
 	static struct {
 		char *name;
@@ -590,7 +548,7 @@ OF_boot(bootspec)
 	};
 	int l;
 
-	if ((l = strlen(bootspec)) >= NBPG)
+	if ((l = strlen(bootspec)) >= PAGE_SIZE)
 		panic("OF_boot");
 	ofw_stack();
 	ofbcopy(bootspec, OF_buf, l + 1);
@@ -600,7 +558,7 @@ OF_boot(bootspec)
 }
 
 void
-OF_enter()
+OF_enter(void)
 {
 	static struct {
 		char *name;
@@ -617,7 +575,7 @@ OF_enter()
 }
 
 void
-OF_exit()
+OF_exit(void)
 {
 	static struct {
 		char *name;
@@ -660,10 +618,7 @@ void
  * This version of bcopy doesn't work for overlapping regions!
  */
 void
-ofbcopy(src, dst, len)
-	const void *src;
-	void *dst;
-	size_t len;
+ofbcopy(const void *src, void *dst, size_t len)
 {
 	const char *sp = src;
 	char *dp = dst;

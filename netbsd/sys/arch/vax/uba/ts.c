@@ -1,4 +1,4 @@
-/*	$NetBSD: ts.c,v 1.18 2001/05/16 05:36:54 matt Exp $ */
+/*	$NetBSD: ts.c,v 1.28 2003/11/17 11:16:10 wiz Exp $ */
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -68,6 +64,9 @@
  *
  * should be TS11 compatible (untested)
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ts.c,v 1.28 2003/11/17 11:16:10 wiz Exp $");
 
 #define TS11_COMPAT	/* don't use extended features provided by TS05 */
 
@@ -125,7 +124,6 @@ int tstrace = 1;
 #include <sys/conf.h>
 #include <sys/errno.h>
 #include <sys/file.h>
-#include <sys/map.h>
 #include <sys/syslog.h>
 #include <sys/ioctl.h>
 #include <sys/mtio.h>
@@ -194,18 +192,27 @@ int	tsmatch __P((struct device *, void *, void *));
 void	tsattach __P((struct device *, struct device *, void *));
 void	tsstrategy __P((struct buf *));
 
-int	tsopen __P((dev_t, int, int, struct proc *));
-int	tsclose __P((dev_t, int, int, struct proc *));
-int	tsioctl __P((dev_t, u_long, caddr_t, int, struct proc *));
-int	tsread __P((dev_t, struct uio *));
-int	tswrite __P((dev_t, struct uio *));
-int	tsdump __P((dev_t, daddr_t, caddr_t, size_t));
-
-struct	cfattach ts_ca = {
-	sizeof(struct ts_softc), tsmatch, tsattach
-};
+CFATTACH_DECL(ts, sizeof(struct ts_softc),
+    tsmatch, tsattach, NULL, NULL);
 
 extern struct cfdriver ts_cd;
+
+dev_type_open(tsopen);
+dev_type_close(tsclose);
+dev_type_read(tsread);
+dev_type_write(tswrite);
+dev_type_ioctl(tsioctl);
+dev_type_strategy(tsstrategy);
+dev_type_dump(tsdump);
+
+const struct bdevsw ts_bdevsw = {
+	tsopen, tsclose, tsstrategy, tsioctl, tsdump, nosize, D_TAPE
+};
+
+const struct cdevsw ts_cdevsw = {
+	tsopen, tsclose, tsread, tswrite, tsioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_TAPE
+};
 
 #define ST_INVALID	0	/* uninitialized, before probe */
 #define ST_PROBE	1	/* during tsprobe(), not used */
@@ -405,7 +412,7 @@ tscommand (dev, cmd, count)
 		debug (("tscommand: direct return, no biowait.\n"));
 		return;
 	}
-	debug (("tscommand: calling biowait ...\n"));;
+	debug (("tscommand: calling biowait ...\n"));
 	biowait (bp);
 	if (bp->b_flags & B_WANTED)
 		wakeup ((caddr_t)bp);
@@ -483,7 +490,7 @@ tsstart (sc, bp)
 			/*
 			 * For some reasons which I don't (yet? :) understand,
 			 * tmscp.c initiates in this situation a GET-UNIT
-			 * command. (Because no data-buffers are neccess. ??)
+			 * command. (Because no data-buffers are necessary?)
 			 */
 			cmd = TS_CMD_STAT;
 			goto do_cmd;
@@ -1318,9 +1325,10 @@ tsioctl (dev, cmd, data, flag, p)
  * 
  */
 int
-tsread (dev, uio)
+tsread (dev, uio, flag)
 	dev_t dev;
 	struct uio *uio;
+	int flag;
 {
 	return (physio (tsstrategy, NULL, dev, B_READ, minphys, uio));
 }
@@ -1329,9 +1337,10 @@ tsread (dev, uio)
  *
  */
 int
-tswrite (dev, uio)
+tswrite (dev, uio, flag)
 	dev_t dev;
 	struct uio *uio;
+	int flag;
 {
 	return (physio (tsstrategy, NULL, dev, B_WRITE, minphys, uio));
 }

@@ -1,6 +1,9 @@
-/*	$NetBSD: ascii_kmap.c,v 1.2 1998/01/05 20:52:28 perry Exp $	*/
+/*	$NetBSD: ascii_kmap.c,v 1.4 2003/08/28 09:47:07 isaki Exp $	*/
 /* from: arch/amiga/dev/kbdmap.c */
 /* modified for X680x0 by Masaru Oki */
+
+#include <sys/cdefs.h>
+__RCSID("$NetBSD: ascii_kmap.c,v 1.4 2003/08/28 09:47:07 isaki Exp $");
 
 #include "kbdmap.h"
 

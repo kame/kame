@@ -1,4 +1,4 @@
-/*	$NetBSD: if_mbe_pcmcia.c,v 1.25 2001/12/23 09:25:19 ichiro Exp $	*/
+/*	$NetBSD: if_mbe_pcmcia.c,v 1.30 2002/11/30 14:15:12 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_mbe_pcmcia.c,v 1.25 2001/12/23 09:25:19 ichiro Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_mbe_pcmcia.c,v 1.30 2002/11/30 14:15:12 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -75,10 +75,8 @@ struct mbe_pcmcia_softc {
 	struct	pcmcia_function *sc_pf;		/* our PCMCIA function */
 };
 
-struct cfattach mbe_pcmcia_ca = {
-	sizeof(struct mbe_pcmcia_softc), mbe_pcmcia_match, mbe_pcmcia_attach,
-	    mbe_pcmcia_detach, mb86960_activate
-};
+CFATTACH_DECL(mbe_pcmcia, sizeof(struct mbe_pcmcia_softc),
+    mbe_pcmcia_match, mbe_pcmcia_attach, mbe_pcmcia_detach, mb86960_activate);
 
 int	mbe_pcmcia_enable __P((struct mb86960_softc *));
 void	mbe_pcmcia_disable __P((struct mb86960_softc *));
@@ -216,7 +214,7 @@ mbe_pcmcia_attach(parent, self, aux)
 	}
 
 	psc->sc_pf = pa->pf;
-	cfe = pa->pf->cfe_head.sqh_first;
+	cfe = SIMPLEQ_FIRST(&pa->pf->cfe_head);
 
 	/* Enable the card. */
 	pcmcia_function_init(pa->pf, cfe);
@@ -294,9 +292,9 @@ mbe_pcmcia_attach(parent, self, aux)
 
 	/* Perform generic initialization. */
 	if ((mpp->flags & MBH10302) != 0) 
-		mb86960_attach(sc, MB86960_TYPE_86960, pgea.enaddr);
-	else
-		mb86960_attach(sc, MB86960_TYPE_86965, pgea.enaddr);
+		sc->sc_flags |= FE_FLAGS_MB86960;
+
+	mb86960_attach(sc, pgea.enaddr);
 
 	mb86960_config(sc, NULL, 0, 0);
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: gem.c,v 1.20 2002/05/15 23:51:49 matt Exp $ */
+/*	$NetBSD: gem.c,v 1.30 2003/10/26 19:11:33 christos Exp $ */
 
 /*
  * 
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: gem.c,v 1.20 2002/05/15 23:51:49 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: gem.c,v 1.30 2003/10/26 19:11:33 christos Exp $");
 
 #include "bpfilter.h"
 
@@ -147,7 +147,8 @@ gem_attach(sc, enaddr)
 	if ((error = bus_dmamem_alloc(sc->sc_dmatag,
 	    sizeof(struct gem_control_data), PAGE_SIZE, 0, &sc->sc_cdseg,
 	    1, &sc->sc_cdnseg, 0)) != 0) {
-		printf("%s: unable to allocate control data, error = %d\n",
+		aprint_error(
+		   "%s: unable to allocate control data, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto fail_0;
 	}
@@ -156,7 +157,7 @@ gem_attach(sc, enaddr)
 	if ((error = bus_dmamem_map(sc->sc_dmatag, &sc->sc_cdseg, sc->sc_cdnseg,
 	    sizeof(struct gem_control_data), (caddr_t *)&sc->sc_control_data,
 	    BUS_DMA_COHERENT)) != 0) {
-		printf("%s: unable to map control data, error = %d\n",
+		aprint_error("%s: unable to map control data, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto fail_1;
 	}
@@ -164,7 +165,7 @@ gem_attach(sc, enaddr)
 	if ((error = bus_dmamap_create(sc->sc_dmatag,
 	    sizeof(struct gem_control_data), 1,
 	    sizeof(struct gem_control_data), 0, 0, &sc->sc_cddmamap)) != 0) {
-		printf("%s: unable to create control data DMA map, "
+		aprint_error("%s: unable to create control data DMA map, "
 		    "error = %d\n", sc->sc_dev.dv_xname, error);
 		goto fail_2;
 	}
@@ -172,7 +173,8 @@ gem_attach(sc, enaddr)
 	if ((error = bus_dmamap_load(sc->sc_dmatag, sc->sc_cddmamap,
 	    sc->sc_control_data, sizeof(struct gem_control_data), NULL,
 	    0)) != 0) {
-		printf("%s: unable to load control data DMA map, error = %d\n",
+		aprint_error(
+		    "%s: unable to load control data DMA map, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto fail_3;
 	}
@@ -195,7 +197,7 @@ gem_attach(sc, enaddr)
 		    ETHER_MAX_LEN_JUMBO, GEM_NTXSEGS,
 		    ETHER_MAX_LEN_JUMBO, 0, 0,
 		    &txs->txs_dmamap)) != 0) {
-			printf("%s: unable to create tx DMA map %d, "
+			aprint_error("%s: unable to create tx DMA map %d, "
 			    "error = %d\n", sc->sc_dev.dv_xname, i, error);
 			goto fail_4;
 		}
@@ -208,7 +210,7 @@ gem_attach(sc, enaddr)
 	for (i = 0; i < GEM_NRXDESC; i++) {
 		if ((error = bus_dmamap_create(sc->sc_dmatag, MCLBYTES, 1,
 		    MCLBYTES, 0, 0, &sc->sc_rxsoft[i].rxs_dmamap)) != 0) {
-			printf("%s: unable to create rx DMA map %d, "
+			aprint_error("%s: unable to create rx DMA map %d, "
 			    "error = %d\n", sc->sc_dev.dv_xname, i, error);
 			goto fail_5;
 		}
@@ -222,17 +224,17 @@ gem_attach(sc, enaddr)
 	 */
 
 	/* Announce ourselves. */
-	printf("%s: Ethernet address %s", sc->sc_dev.dv_xname,
+	aprint_normal("%s: Ethernet address %s", sc->sc_dev.dv_xname,
 	    ether_sprintf(enaddr));
 
 	/* Get RX FIFO size */
 	sc->sc_rxfifosize = 64 *
 	    bus_space_read_4(sc->sc_bustag, sc->sc_h, GEM_RX_FIFO_SIZE); 
-	printf(", %uKB RX fifo", sc->sc_rxfifosize / 1024);
+	aprint_normal(", %uKB RX fifo", sc->sc_rxfifosize / 1024);
 
 	/* Get TX FIFO size */
 	v = bus_space_read_4(sc->sc_bustag, sc->sc_h, GEM_TX_FIFO_SIZE); 
-	printf(", %uKB TX fifo\n", v / 16);
+	aprint_normal(", %uKB TX fifo\n", v / 16);
 
 	/* Initialize ifnet structure. */
 	strcpy(ifp->if_xname, sc->sc_dev.dv_xname);
@@ -252,12 +254,12 @@ gem_attach(sc, enaddr)
 	mii->mii_writereg = gem_mii_writereg;
 	mii->mii_statchg = gem_mii_statchg;
 
-	ifmedia_init(&mii->mii_media, 0, gem_mediachange, gem_mediastatus);
+	ifmedia_init(&mii->mii_media, IFM_IMASK, gem_mediachange, gem_mediastatus);
 
 	gem_mifinit(sc);
 
 	mii_attach(&sc->sc_dev, mii, 0xffffffff,
-			MII_PHY_ANY, MII_OFFSET_ANY, 0);
+			MII_PHY_ANY, MII_OFFSET_ANY, MIIF_FORCEANEG);
 
 	child = LIST_FIRST(&mii->mii_phys);
 	if (child == NULL) {
@@ -279,7 +281,8 @@ gem_attach(sc, enaddr)
 			 * connector.
 			 */
 			if (child->mii_phy > 1 || child->mii_inst > 1) {
-				printf("%s: cannot accomodate MII device %s"
+				aprint_error(
+				    "%s: cannot accomodate MII device %s"
 				       " at phy %d, instance %d\n",
 				       sc->sc_dev.dv_xname,
 				       child->mii_dev.dv_xname,
@@ -299,12 +302,12 @@ gem_attach(sc, enaddr)
 		 */
 		if (sc->sc_phys[1]) {
 #ifdef DEBUG
-			printf("using external phy\n");
+			aprint_debug("using external phy\n");
 #endif
 			sc->sc_mif_config |= GEM_MIF_CONFIG_PHY_SEL;
 		} else {
 #ifdef DEBUG
-			printf("using internal phy\n");
+			aprint_debug("using internal phy\n");
 #endif
 			sc->sc_mif_config &= ~GEM_MIF_CONFIG_PHY_SEL;
 		}
@@ -390,7 +393,7 @@ gem_attach(sc, enaddr)
 	 */
 	sc->sc_powerhook = powerhook_establish(gem_power, sc);
 	if (sc->sc_powerhook == NULL)
-		printf("%s: WARNING: unable to establish power hook\n",
+		aprint_error("%s: WARNING: unable to establish power hook\n",
 		    sc->sc_dev.dv_xname);
 #endif
 
@@ -507,13 +510,13 @@ gem_stop(struct ifnet *ifp, int disable)
 
 	/* XXX - Should we reset these instead? */
 	gem_disable_rx(sc);
-	gem_disable_rx(sc);
+	gem_disable_tx(sc);
 
 	/*
 	 * Release any queued transmit buffers.
 	 */
 	while ((txs = SIMPLEQ_FIRST(&sc->sc_txdirtyq)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(&sc->sc_txdirtyq, txs, txs_q);
+		SIMPLEQ_REMOVE_HEAD(&sc->sc_txdirtyq, txs_q);
 		if (txs->txs_mbuf != NULL) {
 			bus_dmamap_unload(sc->sc_dmatag, txs->txs_dmamap);
 			m_freem(txs->txs_mbuf);
@@ -556,7 +559,7 @@ gem_reset_rx(struct gem_softc *sc)
 		if ((bus_space_read_4(t, h, GEM_RX_CONFIG) & 1) == 0)
 			break;
 	if ((bus_space_read_4(t, h, GEM_RX_CONFIG) & 1) != 0)
-		printf("%s: cannot disable read dma\n",
+		printf("%s: cannot disable read DMA\n",
 			sc->sc_dev.dv_xname);
 
 	/* Wait 5ms extra. */
@@ -598,7 +601,7 @@ gem_reset_tx(struct gem_softc *sc)
 		if ((bus_space_read_4(t, h, GEM_TX_CONFIG) & 1) == 0)
 			break;
 	if ((bus_space_read_4(t, h, GEM_TX_CONFIG) & 1) != 0)
-		printf("%s: cannot disable read dma\n",
+		printf("%s: cannot disable read DMA\n",
 			sc->sc_dev.dv_xname);
 
 	/* Wait 5ms extra. */
@@ -718,41 +721,29 @@ gem_meminit(struct gem_softc *sc)
 static int
 gem_ringsize(int sz)
 {
-	int v;
-
 	switch (sz) {
 	case 32:
-		v = GEM_RING_SZ_32;
-		break;
+		return GEM_RING_SZ_32;
 	case 64:
-		v = GEM_RING_SZ_64;
-		break;
+		return GEM_RING_SZ_64;
 	case 128:
-		v = GEM_RING_SZ_128;
-		break;
+		return GEM_RING_SZ_128;
 	case 256:
-		v = GEM_RING_SZ_256;
-		break;
+		return GEM_RING_SZ_256;
 	case 512:
-		v = GEM_RING_SZ_512;
-		break;
+		return GEM_RING_SZ_512;
 	case 1024:
-		v = GEM_RING_SZ_1024;
-		break;
+		return GEM_RING_SZ_1024;
 	case 2048:
-		v = GEM_RING_SZ_2048;
-		break;
+		return GEM_RING_SZ_2048;
 	case 4096:
-		v = GEM_RING_SZ_4096;
-		break;
+		return GEM_RING_SZ_4096;
 	case 8192:
-		v = GEM_RING_SZ_8192;
-		break;
+		return GEM_RING_SZ_8192;
 	default:
-		printf("gem: invalid Receive Descriptor ring size\n");
-		break;
+		printf("gem: invalid Receive Descriptor ring size %d\n", sz);
+		return GEM_RING_SZ_32;
 	}
-	return (v);
 }
 
 /*
@@ -991,7 +982,7 @@ gem_start(ifp)
 	struct mbuf *m0, *m;
 	struct gem_txsoft *txs, *last_txs;
 	bus_dmamap_t dmamap;
-	int error, firsttx, nexttx, lasttx, ofree, seg;
+	int error, firsttx, nexttx, lasttx = -1, ofree, seg;
 
 	if ((ifp->if_flags & (IFF_RUNNING | IFF_OACTIVE)) != IFF_RUNNING)
 		return;
@@ -1044,6 +1035,7 @@ gem_start(ifp)
 				    sc->sc_dev.dv_xname);
 				break;
 			}
+			MCLAIM(m, &sc->sc_ethercom.ec_tx_mowner);
 			if (m0->m_pkthdr.len > MHLEN) {
 				MCLGET(m, M_DONTWAIT);
 				if ((m->m_flags & M_EXT) == 0) {
@@ -1132,6 +1124,8 @@ gem_start(ifp)
 			lasttx = nexttx;
 		}
 
+		KASSERT(lasttx != -1);
+
 #ifdef GEM_DEBUG
 		if (ifp->if_flags & IFF_DEBUG) {
 			printf("     gem_start %p transmit chain:\n", txs);
@@ -1165,7 +1159,7 @@ gem_start(ifp)
 		sc->sc_txfree -= dmamap->dm_nsegs;
 		sc->sc_txnext = nexttx;
 
-		SIMPLEQ_REMOVE_HEAD(&sc->sc_txfreeq, txs, txs_q);
+		SIMPLEQ_REMOVE_HEAD(&sc->sc_txfreeq, txs_q);
 		SIMPLEQ_INSERT_TAIL(&sc->sc_txdirtyq, txs, txs_q);
 
 		last_txs = txs;
@@ -1285,7 +1279,7 @@ gem_tint(sc)
 		}
 
 		DPRINTF(sc, ("gem_tint: releasing a desc\n"));
-		SIMPLEQ_REMOVE_HEAD(&sc->sc_txdirtyq, txs, txs_q);
+		SIMPLEQ_REMOVE_HEAD(&sc->sc_txdirtyq, txs_q);
 
 		sc->sc_txfree += txs->txs_ndescs;
 
@@ -1308,6 +1302,7 @@ gem_tint(sc)
 		progress = 1;
 	}
 
+#if 0
 	DPRINTF(sc, ("gem_tint: GEM_TX_STATE_MACHINE %x "
 		"GEM_TX_DATA_PTR %llx "
 		"GEM_TX_COMPLETION %x\n",
@@ -1317,6 +1312,7 @@ gem_tint(sc)
 			     bus_space_read_4(sc->sc_bustag, sc->sc_h,
 			GEM_TX_DATA_PTR_LO),
 		bus_space_read_4(sc->sc_bustag, sc->sc_h, GEM_TX_COMPLETION)));
+#endif
 
 	if (progress) {
 		if (sc->sc_txfree == GEM_NTXDESC - 1)
@@ -1325,7 +1321,7 @@ gem_tint(sc)
 		ifp->if_flags &= ~IFF_OACTIVE;
 		gem_start(ifp);
 
-		if (SIMPLEQ_FIRST(&sc->sc_txdirtyq) == NULL)
+		if (SIMPLEQ_EMPTY(&sc->sc_txdirtyq))
 			ifp->if_timer = 0;
 	}
 	DPRINTF(sc, ("%s: gem_tint: watchdog %d\n",
@@ -1452,7 +1448,7 @@ gem_rint(sc)
 		if (i == sc->sc_rxptr) {
 			GEM_COUNTER_INCR(sc, sc_ev_rxfull);
 #ifdef GEM_DEBUG
-			if (ifp->if_flags & GEM_DEBUG)
+			if (ifp->if_flags & IFF_DEBUG)
 				printf("%s: rint: ring wrap\n",
 				    sc->sc_dev.dv_xname);
 #endif
@@ -1463,7 +1459,7 @@ gem_rint(sc)
 #ifdef GEM_COUNTERS
 	if (progress <= 4) {
 		GEM_COUNTER_INCR(sc, sc_ev_rxhist[progress]);
-	} else if (progress > 31) {
+	} else if (progress < 32) {
 		if (progress < 16)
 			GEM_COUNTER_INCR(sc, sc_ev_rxhist[5]);
 		else
@@ -1500,6 +1496,7 @@ gem_add_rxbuf(struct gem_softc *sc, int idx)
 	if (m == NULL)
 		return (ENOBUFS);
 
+	MCLAIM(m, &sc->sc_ethercom.ec_rx_mowner);
 	MCLGET(m, M_DONTWAIT);
 	if ((m->m_flags & M_EXT) == 0) {
 		m_freem(m);
@@ -1507,7 +1504,7 @@ gem_add_rxbuf(struct gem_softc *sc, int idx)
 	}
 
 #ifdef GEM_DEBUG
-/* bzero the packet to check dma */
+/* bzero the packet to check DMA */
 	memset(m->m_ext.ext_buf, 0, m->m_ext.ext_size);
 #endif
 
@@ -1568,8 +1565,8 @@ gem_intr(v)
 	sc->sc_ev_intr.ev_count++;
 
 	status = bus_space_read_4(t, seb, GEM_STATUS);
-	DPRINTF(sc, ("%s: gem_intr: cplt %xstatus %s\n",
-		sc->sc_dev.dv_xname, (status>>19),
+	DPRINTF(sc, ("%s: gem_intr: cplt 0x%x status %s\n",
+		sc->sc_dev.dv_xname, (status >> 19),
 		bitmask_snprintf(status, GEM_INTR_BITS, bits, sizeof(bits))));
 
 	if ((status & (GEM_INTR_RX_TAG_ERR | GEM_INTR_BERR)) != 0)
@@ -1753,7 +1750,7 @@ gem_mii_statchg(dev)
 #ifdef GEM_DEBUG
 	if (sc->sc_debug)
 		printf("gem_mii_statchg: status change: phy = %d\n", 
-			sc->sc_phys[instance];);
+			sc->sc_phys[instance]);
 #endif
 
 

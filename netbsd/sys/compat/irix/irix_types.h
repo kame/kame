@@ -1,4 +1,4 @@
-/*	$NetBSD: irix_types.h,v 1.12 2002/03/16 13:29:42 manu Exp $ */
+/*	$NetBSD: irix_types.h,v 1.15 2003/11/08 22:36:01 manu Exp $ */
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -46,6 +46,7 @@
 
 /* From IRIX's <limits.h> */
 #define IRIX_PATH_MAX 1024
+#define IRIX_NAME_MAX 255
 
 /* From IRIX's <sys/signal.h> */
 typedef struct {
@@ -61,6 +62,7 @@ typedef __int64_t irix_app32_long_long_t;
 typedef __uint32_t irix_ino_t;
 typedef __int32_t irix_off_t;
 typedef __uint32_t irix_app32_ptr_t;
+typedef __uint64_t irix_k_sigset_t;
 
 #if 1 /* _MIPS_SZLONG == 32 */
 typedef unsigned long irix_mode_t;
@@ -164,14 +166,33 @@ typedef struct irix_dirent {
 	irix_ino_t	d_ino;
 	irix_off_t	d_off;
 	unsigned short	d_reclen;
-	char		d_name[1];
+	char		d_name[IRIX_NAME_MAX + 1];
 } irix_dirent_t;
 
 typedef struct irix_dirent64 { 
 	irix_ino64_t	d_ino;
 	irix_off64_t	d_off;
 	unsigned short	d_reclen;
-	char		d_name[1];
+	char		d_name[IRIX_NAME_MAX + 1];
 } irix_dirent64_t;
+
+/* From IRIX's <sys/utsname.h> */
+#define IRIX_SYS_NMLN 257
+struct irix_utsname {
+	char sysname[IRIX_SYS_NMLN];
+	char nodename[IRIX_SYS_NMLN];
+	char release[IRIX_SYS_NMLN];
+	char version[IRIX_SYS_NMLN];
+	char machine[IRIX_SYS_NMLN];
+	char m_type[IRIX_SYS_NMLN];
+	char base_rel[IRIX_SYS_NMLN];
+	char reserve5[IRIX_SYS_NMLN];
+	char reserve4[IRIX_SYS_NMLN];
+	char reserve3[IRIX_SYS_NMLN];
+	char reserve2[IRIX_SYS_NMLN];
+	char reserve1[IRIX_SYS_NMLN];
+	char reserve0[IRIX_SYS_NMLN];
+};
+
 
 #endif /* _IRIX_TYPES_H_ */

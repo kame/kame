@@ -1,4 +1,4 @@
-/*	$NetBSD: vm86.h,v 1.9 1997/10/09 08:50:43 jtc Exp $	*/
+/*	$NetBSD: vm86.h,v 1.12 2003/10/27 13:44:20 junyoung Exp $	*/
 
 #undef	VM86_USE_VIF
 
@@ -51,12 +51,8 @@
 #define	VM86_REALFLAGS	(~PSL_USERSTATIC)
 #define	VM86_VIRTFLAGS	(PSL_USERSTATIC & ~(PSL_MBO | PSL_MBZ))
 
-struct vm86_regs {
-	struct sigcontext vmsc;
-};
-
 struct vm86_kern {			/* kernel uses this stuff */
-	struct vm86_regs regs;
+	__gregset_t regs;
 	unsigned long ss_cpu_type;
 };
 #define cpu_type substr.ss_cpu_type
@@ -80,21 +76,24 @@ struct vm86_struct {
 #define VCPU_586		5
 
 #ifdef _KERNEL
-int i386_vm86 __P((struct proc *, char *, register_t *));
-void vm86_gpfault __P((struct proc *, int));
-void vm86_return __P((struct proc *, int));
-static __inline void clr_vif __P((struct proc *));
-static __inline void set_vif __P((struct proc *));
-static __inline void set_vflags __P((struct proc *, int));
-static __inline int get_vflags __P((struct proc *));
-static __inline void set_vflags_short __P((struct proc *, int));
-static __inline int get_vflags_short __P((struct proc *));
+int i386_vm86(struct lwp *, char *, register_t *);
+#ifdef COMPAT_16
+int compat_16_i386_vm86(struct lwp *, char *, register_t *);
+#endif
+void vm86_gpfault(struct lwp *, int);
+void vm86_return(struct lwp *, int);
+static __inline void clr_vif(struct lwp *);
+static __inline void set_vif(struct lwp *);
+static __inline void set_vflags(struct lwp *, int);
+static __inline int get_vflags(struct lwp *);
+static __inline void set_vflags_short(struct lwp *, int);
+static __inline int get_vflags_short(struct lwp *);
 
 static __inline void
-clr_vif(p)
-	struct proc *p;
+clr_vif(l)
+	struct lwp *l;
 {
-	struct pcb *pcb = &p->p_addr->u_pcb;
+	struct pcb *pcb = &l->l_addr->u_pcb;
 
 #ifndef VM86_USE_VIF
 	pcb->vm86_eflags &= ~PSL_I;
@@ -104,10 +103,10 @@ clr_vif(p)
 }
 
 static __inline void
-set_vif(p)
-	struct proc *p;
+set_vif(l)
+	struct lwp *l;
 {
-	struct pcb *pcb = &p->p_addr->u_pcb;
+	struct pcb *pcb = &l->l_addr->u_pcb;
 
 #ifndef VM86_USE_VIF
 	pcb->vm86_eflags |= PSL_I;
@@ -116,16 +115,16 @@ set_vif(p)
 	pcb->vm86_eflags |= PSL_VIF;
 	if ((pcb->vm86_eflags & (PSL_VIF|PSL_VIP)) == (PSL_VIF|PSL_VIP))
 #endif
-		vm86_return(p, VM86_STI);
+		vm86_return(l, VM86_STI);
 }
 
 static __inline void
-set_vflags(p, flags)
-	struct proc *p;
+set_vflags(l, flags)
+	struct lwp *l;
 	int flags;
 {
-	struct trapframe *tf = p->p_md.md_regs;
-	struct pcb *pcb = &p->p_addr->u_pcb;
+	struct trapframe *tf = l->l_md.md_regs;
+	struct pcb *pcb = &l->l_addr->u_pcb;
 
 	flags &= ~pcb->vm86_flagmask;
 	SETFLAGS(pcb->vm86_eflags, flags, VM86_VIRTFLAGS);
@@ -135,15 +134,15 @@ set_vflags(p, flags)
 #else
 	if ((pcb->vm86_eflags & (PSL_VIF|PSL_VIP)) == (PSL_VIF|PSL_VIP))
 #endif
-		vm86_return(p, VM86_STI);
+		vm86_return(l, VM86_STI);
 }
 
 static __inline int
-get_vflags(p)
-	struct proc *p;
+get_vflags(l)
+	struct lwp *l;
 {
-	struct trapframe *tf = p->p_md.md_regs;
-	struct pcb *pcb = &p->p_addr->u_pcb;
+	struct trapframe *tf = l->l_md.md_regs;
+	struct pcb *pcb = &l->l_addr->u_pcb;
 	int flags = PSL_MBO;
 
 	SETFLAGS(flags, pcb->vm86_eflags, VM86_VIRTFLAGS);
@@ -152,28 +151,28 @@ get_vflags(p)
 }
 
 static __inline void
-set_vflags_short(p, flags)
-	struct proc *p;
+set_vflags_short(l, flags)
+	struct lwp *l;
 	int flags;
 {
-	struct trapframe *tf = p->p_md.md_regs;
-	struct pcb *pcb = &p->p_addr->u_pcb;
+	struct trapframe *tf = l->l_md.md_regs;
+	struct pcb *pcb = &l->l_addr->u_pcb;
 
 	flags &= ~pcb->vm86_flagmask;
 	SETFLAGS(pcb->vm86_eflags, flags, VM86_VIRTFLAGS & 0xffff);
 	SETFLAGS(tf->tf_eflags, flags, VM86_REALFLAGS & 0xffff);
 #ifndef VM86_USE_VIF
 	if ((pcb->vm86_eflags & (PSL_I|PSL_VIP)) == (PSL_I|PSL_VIP))
-		vm86_return(p, VM86_STI);
+		vm86_return(l, VM86_STI);
 #endif
 }
 
 static __inline int
-get_vflags_short(p)
-	struct proc *p;
+get_vflags_short(l)
+	struct lwp *l;
 {
-	struct trapframe *tf = p->p_md.md_regs;
-	struct pcb *pcb = &p->p_addr->u_pcb;
+	struct trapframe *tf = l->l_md.md_regs;
+	struct pcb *pcb = &l->l_addr->u_pcb;
 	int flags = PSL_MBO;
 
 	SETFLAGS(flags, pcb->vm86_eflags, VM86_VIRTFLAGS & 0xffff);
@@ -181,5 +180,5 @@ get_vflags_short(p)
 	return (flags);
 }
 #else
-int i386_vm86 __P((struct vm86_struct *vmcp));
+int i386_vm86(struct vm86_struct *vmcp);
 #endif

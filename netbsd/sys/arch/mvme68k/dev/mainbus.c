@@ -1,4 +1,4 @@
-/*	$NetBSD: mainbus.c,v 1.13 2002/03/24 17:22:33 scw Exp $	*/
+/*	$NetBSD: mainbus.c,v 1.17 2003/07/15 02:43:46 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * Derived from the mainbus code in mvme68k/autoconf.c by Chuck Cranor.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.17 2003/07/15 02:43:46 lukem Exp $");
+
 #include "vmetwo.h"
 
 #include <sys/param.h>
@@ -68,9 +71,8 @@ void mainbus_attach __P((struct device *, struct device *, void *));
 int mainbus_match __P((struct device *, struct cfdata *, void *));
 int mainbus_print __P((void *, const char *));
 
-struct cfattach mainbus_ca = {
-	sizeof(struct device), mainbus_match, mainbus_attach
-};
+CFATTACH_DECL(mainbus, sizeof(struct device),
+    mainbus_match, mainbus_attach, NULL, NULL);
 
 
 struct mainbus_devices {
@@ -256,9 +258,9 @@ mainbus_print(aux, cp)
 	ma = aux;
 
 	if (cp)
-		printf("%s at %s", ma->ma_name, cp);
+		aprint_normal("%s at %s", ma->ma_name, cp);
 
-	printf(" address 0x%lx", ma->ma_offset);
+	aprint_normal(" address 0x%lx", ma->ma_offset);
 
 	return (UNCONF);
 }

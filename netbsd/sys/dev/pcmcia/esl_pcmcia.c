@@ -1,4 +1,4 @@
-/*	$NetBSD: esl_pcmcia.c,v 1.4 2001/11/13 07:26:32 lukem Exp $	*/
+/*	$NetBSD: esl_pcmcia.c,v 1.8 2002/10/02 16:52:06 thorpej Exp $	*/
 
 /*
  * Copyright (c) 2000 Jared D. McNeill <jmcneill@invisible.yi.org>
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: esl_pcmcia.c,v 1.4 2001/11/13 07:26:32 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: esl_pcmcia.c,v 1.8 2002/10/02 16:52:06 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -75,10 +75,8 @@ int	esl_pcmcia_detach(struct device *, int);
 int	esl_pcmcia_enable(struct esl_pcmcia_softc *);
 void	esl_pcmcia_disable(struct esl_pcmcia_softc *);
 
-struct cfattach esl_pcmcia_ca = {
-	sizeof(struct esl_pcmcia_softc), esl_pcmcia_match, esl_pcmcia_attach,
-	esl_pcmcia_detach
-};
+CFATTACH_DECL(esl_pcmcia, sizeof(struct esl_pcmcia_softc),
+    esl_pcmcia_match, esl_pcmcia_attach, esl_pcmcia_detach, NULL);
 
 #define ESL_NDEVS (sizeof(esl_pcmcia_products) / sizeof(esl_pcmcia_products[0]))
 
@@ -119,8 +117,7 @@ esl_pcmcia_attach(struct device *parent, struct device *self, void *aux)
 
 	esc->sc_pf = pf;
 
-	for (cfe = SIMPLEQ_FIRST(&pf->cfe_head); cfe != NULL;
-	    cfe = SIMPLEQ_NEXT(cfe, cfe_list)) {
+	SIMPLEQ_FOREACH(cfe, &pf->cfe_head, cfe_list) {
 		if (cfe->num_memspace != 0 ||
 		    cfe->num_iospace != 1)
 			continue;

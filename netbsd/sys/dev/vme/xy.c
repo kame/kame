@@ -1,4 +1,4 @@
-/*	$NetBSD: xy.c,v 1.39 2002/01/14 13:32:48 tsutsui Exp $	*/
+/*	$NetBSD: xy.c,v 1.55 2003/12/23 13:15:18 pk Exp $	*/
 
 /*
  *
@@ -51,7 +51,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: xy.c,v 1.39 2002/01/14 13:32:48 tsutsui Exp $");
+__KERNEL_RCSID(0, "$NetBSD: xy.c,v 1.55 2003/12/23 13:15:18 pk Exp $");
 
 #undef XYC_DEBUG		/* full debug */
 #undef XYC_DIAG			/* extra sanity checks */
@@ -189,22 +189,35 @@ static	int xyc_probe __P((void *, bus_space_tag_t, bus_space_handle_t));
 static	void xydummystrat __P((struct buf *));
 int	xygetdisklabel __P((struct xy_softc *, void *));
 
-bdev_decl(xy);
-cdev_decl(xy);
-
 /*
  * cfattach's: device driver interface to autoconfig
  */
 
-struct cfattach xyc_ca = {
-	sizeof(struct xyc_softc), xycmatch, xycattach
-};
+CFATTACH_DECL(xyc, sizeof(struct xyc_softc),
+    xycmatch, xycattach, NULL, NULL);
 
-struct cfattach xy_ca = {
-	sizeof(struct xy_softc), xymatch, xyattach
-};
+CFATTACH_DECL(xy, sizeof(struct xy_softc),
+    xymatch, xyattach, NULL, NULL);
 
 extern struct cfdriver xy_cd;
+
+dev_type_open(xyopen);
+dev_type_close(xyclose);
+dev_type_read(xyread);
+dev_type_write(xywrite);
+dev_type_ioctl(xyioctl);
+dev_type_strategy(xystrategy);
+dev_type_dump(xydump);
+dev_type_size(xysize);
+
+const struct bdevsw xy_bdevsw = {
+	xyopen, xyclose, xystrategy, xyioctl, xydump, xysize, D_DISK
+};
+
+const struct cdevsw xy_cdevsw = {
+	xyopen, xyclose, xyread, xywrite, xyioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
+};
 
 struct xyc_attach_args {	/* this is the "aux" args to xyattach */
 	int	driveno;	/* unit number */
@@ -240,7 +253,7 @@ xygetdisklabel(xy, b)
 	struct xy_softc *xy;
 	void *b;
 {
-	char *err;
+	const char *err;
 #if defined(__sparc__) || defined(sun3)
 	struct sun_disklabel *sdl;
 #endif
@@ -406,6 +419,7 @@ xycattach(parent, self, aux)
 	bus_dma_segment_t	seg;
 	int			rseg;
 	vme_mapresc_t resc;
+	bus_addr_t		busaddr;
 
 	/* get addressing and intr level stuff from autoconfig and load it
 	 * into our xyc_softc. */
@@ -444,7 +458,7 @@ xycattach(parent, self, aux)
 				MAXPHYS,	/* maxsegsz */
 				0,		/* boundary */
 				BUS_DMA_NOWAIT,
-				&xyc->reqs[lcv].dmamap)) != 0) {
+				&xyc->auxmap)) != 0) {
 
 		printf("%s: DMA buffer map create error %d\n",
 			xyc->sc_dev.dv_xname, error);
@@ -473,11 +487,12 @@ xycattach(parent, self, aux)
 	if ((error = xy_dmamem_alloc(xyc->dmatag, xyc->iopmap, &seg, &rseg,
 				     XYC_MAXIOPB * sizeof(struct xy_iopb),
 				     (caddr_t *)&xyc->iopbase,
-				     (bus_addr_t *)&xyc->dvmaiopb)) != 0) {
+				     &busaddr)) != 0) {
 		printf("%s: DMA buffer alloc error %d\n",
 			xyc->sc_dev.dv_xname, error);
 		return;
 	}
+	xyc->dvmaiopb = (struct xy_iopb *)(u_long)BUS_ADDR_PADDR(busaddr);
 
 	bzero(xyc->iopbase, XYC_MAXIOPB * sizeof(struct xy_iopb));
 
@@ -614,6 +629,7 @@ xyattach(parent, self, aux)
 	struct dkbad *dkb;
 	int			rseg, error;
 	bus_dma_segment_t	seg;
+	bus_addr_t		busaddr;
 	caddr_t			dmaddr;
 	caddr_t			buf;
 
@@ -634,7 +650,7 @@ xyattach(parent, self, aux)
 
 		/* init queue of waiting bufs */
 
-		BUFQ_INIT(&xy->xyq);
+		bufq_alloc(&xy->xyq, BUFQ_DISKSORT|BUFQ_SORT_RAWBLOCK);
 
 		xy->xyrq = &xyc->reqs[xa->driveno];
 
@@ -666,11 +682,12 @@ xyattach(parent, self, aux)
 	if ((error = xy_dmamem_alloc(xyc->dmatag, xyc->auxmap, &seg, &rseg,
 				     XYFM_BPS,
 				     (caddr_t *)&buf,
-				     (bus_addr_t *)&dmaddr)) != 0) {
+				     &busaddr)) != 0) {
 		printf("%s: DMA buffer alloc error %d\n",
 			xyc->sc_dev.dv_xname, error);
 		return;
 	}
+	dmaddr = (caddr_t)(u_long)BUS_ADDR_PADDR(busaddr);
 
 	/* first try and reset the drive */
 	error = xyc_cmd(xyc, XYCMD_RST, 0, xy->xy_drive, 0, 0, 0, fmode);
@@ -1186,7 +1203,7 @@ xystrategy(bp)
 
 	lp = xy->sc_dk.dk_label;
 
-	if (bounds_check_with_label(bp, lp,
+	if (bounds_check_with_label(&xy->sc_dk, bp,
 		(xy->flags & XY_WLABEL) != 0) <= 0)
 		goto done;
 
@@ -1206,7 +1223,7 @@ xystrategy(bp)
 	 */
 	s = splbio();		/* protect the queues */
 
-	disksort_blkno(&xy->xyq, bp);
+	BUFQ_PUT(&xy->xyq, bp);
 
 	/* start 'em up */
 
@@ -1508,7 +1525,7 @@ xyc_startbuf(xycsc, xysc, bp)
  * [2] we can only be blocked if there is a WAIT type I/O request being
  * run.   since this can only happen when we are crashing, we wait a sec
  * and then steal the IOPB.  for case [3] the process can sleep
- * on the iorq free list until some iopbs are avaliable.
+ * on the iorq free list until some iopbs are available.
  */
 
 
@@ -1557,7 +1574,7 @@ xyc_submit_iorq(xycsc, iorq, type)
 	if (dmaiopb == NULL) { /* nothing doing? */
 		if (type == XY_SUB_NORM || type == XY_SUB_NOQ)
 			return(XY_ERR_AOK);
-		panic("xyc_submit_iorq: xyc_chain failed!\n");
+		panic("xyc_submit_iorq: xyc_chain failed!");
 	}
 
 	XYC_GO(xycsc->xyc, (u_long)dmaiopb);
@@ -1825,10 +1842,11 @@ xyc_reset(xycsc, quiet, blastmode, error, xysc)
                 
 			    bus_dmamap_unload(xycsc->dmatag, iorq->dmamap);
 
-			    BUFQ_REMOVE(&iorq->xy->xyq, iorq->buf);
+			    (void)BUFQ_GET(&iorq->xy->xyq);
 			    disk_unbusy(&xycsc->reqs[lcv].xy->sc_dk,
 				(xycsc->reqs[lcv].buf->b_bcount -
-				xycsc->reqs[lcv].buf->b_resid));
+				xycsc->reqs[lcv].buf->b_resid),
+				(xycsc->reqs[lcv].buf->b_flags & B_READ));
 			    biodone(iorq->buf);
 			    iorq->mode = XY_SUB_FREE;
 			    break;
@@ -1871,9 +1889,9 @@ xyc_start(xycsc, iorq)
 	if (iorq == NULL) {
 		for (lcv = 0; lcv < XYC_MAXDEV ; lcv++) {
 			if ((xy = xycsc->sc_drives[lcv]) == NULL) continue;
-			if (BUFQ_FIRST(&xy->xyq) == NULL) continue;
+			if (BUFQ_PEEK(&xy->xyq) == NULL) continue;
 			if (xy->xyrq->mode != XY_SUB_FREE) continue;
-			xyc_startbuf(xycsc, xy, BUFQ_FIRST(&xy->xyq));
+			xyc_startbuf(xycsc, xy, BUFQ_PEEK(&xy->xyq));
 		}
 	}
 	xyc_submit_iorq(xycsc, iorq, XY_SUB_NOQ);
@@ -2008,9 +2026,10 @@ xyc_remove_iorq(xycsc)
                 
 			bus_dmamap_unload(xycsc->dmatag, iorq->dmamap);
 
-			BUFQ_REMOVE(&iorq->xy->xyq, bp);
+			(void)BUFQ_GET(&iorq->xy->xyq);
 			disk_unbusy(&iorq->xy->sc_dk,
-			    (bp->b_bcount - bp->b_resid));
+			    (bp->b_bcount - bp->b_resid),
+			    (bp->b_flags & B_READ));
 			iorq->mode = XY_SUB_FREE;
 			biodone(bp);
 			break;
@@ -2222,12 +2241,15 @@ xyc_ioctlcmd(xy, dev, xio)
 
 	/* create DVMA buffer for request if needed */
 	if (xio->dlen) {
+		bus_addr_t busbuf;
+
 		if ((error = xy_dmamem_alloc(xycsc->dmatag, xycsc->auxmap,
 					     &seg, &rseg,
 					     xio->dlen, &buf,
-					     (bus_addr_t *)&dvmabuf)) != 0) {
+					     &busbuf)) != 0) {
 			return (error);
 		}
+		dvmabuf = (caddr_t)(u_long)BUS_ADDR_PADDR(busbuf);
 
 		if (xio->cmd == XYCMD_WR) {
 			if ((error = copyin(xio->dptr, buf, xio->dlen)) != 0) {

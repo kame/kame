@@ -1,4 +1,4 @@
-/*	$NetBSD: cs89x0var.h,v 1.3 2002/05/21 02:47:04 augustss Exp $	*/
+/*	$NetBSD: cs89x0var.h,v 1.6 2003/07/08 10:06:30 itojun Exp $	*/
 
 /*
  * Copyright 1997
@@ -70,7 +70,7 @@ struct cs_softc {
 	struct ethercom sc_ethercom;	/* Ethernet common */
 	struct ifmedia sc_media;	/* media control structures */
 
-	void	*sc_ih;			/* interupt handler */
+	void	*sc_ih;			/* interrupt handler */
 	void 	*sc_sh;			/* shutdown hook */
 
 	bus_space_tag_t sc_iot;		/* bus space tag for IO */
@@ -111,7 +111,7 @@ struct cs_softc {
 	void (*sc_disable)(struct cs_softc *);
 	void *sc_powerhook;
 
-	/* dma hooks */
+	/* DMA hooks */
 	void (*sc_dma_process_rx)(struct cs_softc *);
 	void (*sc_dma_chipinit)(struct cs_softc *);
 	void (*sc_dma_attach)(struct cs_softc *);
@@ -272,10 +272,9 @@ do {									\
 
 #define MAXLOOP            0x8888
 
-int	cs_attach(struct cs_softc *sc, u_int8_t *enaddr,
-		  int *media, int nmedia, int defmedia);
-int	cs_detach(struct cs_softc *sc);
-int	cs_verify_eeprom(struct cs_softc *sc);
+int	cs_attach(struct cs_softc *, u_int8_t *, int *, int, int);
+int	cs_detach(struct cs_softc *);
+int	cs_verify_eeprom(struct cs_softc *);
 int	cs_read_eeprom(struct cs_softc *, int, u_int16_t *);
 int	cs_intr(void *);
 int	cs_activate(struct device *, enum devact);

@@ -1,4 +1,4 @@
-/*	$NetBSD: mms.c,v 1.6 2001/09/16 16:34:29 wiz Exp $	*/
+/*	$NetBSD: mms.c,v 1.12 2003/07/15 01:26:31 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1993, 1994 Charles M. Hannum.
@@ -23,6 +23,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mms.c,v 1.12 2003/07/15 01:26:31 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -36,12 +39,12 @@
 #include <sys/vnode.h>
 #include <sys/device.h>
 #include <sys/poll.h>
+#include <sys/conf.h>
 
 #include <machine/cpu.h>
 #include <machine/intr.h>
 #include <machine/pio.h>
 #include <machine/mouse.h>
-#include <machine/conf.h>
 
 #include <dev/isa/isavar.h>
 
@@ -71,11 +74,22 @@ int mmsprobe __P((struct device *, struct cfdata *, void *));
 void mmsattach __P((struct device *, struct device *, void *));
 int mmsintr __P((void *));
 
-struct cfattach mms_ca = {
-	sizeof(struct mms_softc), mmsprobe, mmsattach
-};
+CFATTACH_DECL(mms, sizeof(struct mms_softc),
+    mmsprobe, mmsattach, NULL, NULL);
 
 extern struct cfdriver mms_cd;
+
+dev_type_open(mmsopen);
+dev_type_close(mmsclose);
+dev_type_read(mmsread);
+dev_type_ioctl(mmsioctl);
+dev_type_poll(mmspoll);
+dev_type_kqfilter(mmskqfilter);
+
+const struct cdevsw mms_cdevsw = {
+	mmsopen, mmsclose, mmsread, nowrite, mmsioctl,
+	nostop, notty, mmspoll, nommap, mmskqfilter,
+};
 
 #define	MMSUNIT(dev)	(minor(dev))
 
@@ -331,7 +345,7 @@ mmsintr(arg)
 			sc->sc_state &= ~MMS_ASLP;
 			wakeup((caddr_t)sc);
 		}
-		selwakeup(&sc->sc_rsel);
+		selnotify(&sc->sc_rsel, 0);
 	}
 
 	return -1;
@@ -355,4 +369,53 @@ mmspoll(dev, events, p)
 
 	splx(s);
 	return (revents);
+}
+
+static void
+filt_mmsrdetach(struct knote *kn)
+{
+	struct mms_softc *sc = kn->kn_hook;
+	int s;
+
+	s = spltty();
+	SLIST_REMOVE(&sc->sc_rsel.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_mmsread(struct knote *kn, long hint)
+{
+	struct mms_softc *sc = kn->kn_hook;
+
+	kn->kn_data = sc->sc_q.c_cc;
+	return (kn->kn_data > 0);
+}
+
+static const struct filterops mmsread_filtops =
+	{ 1, NULL, filt_mmsrdetach, filt_mmsread };
+
+int
+mmskqfilter(dev_t dev, struct knote *kn)
+{
+	struct mms_softc *sc = mms_cd.cd_devs[LMSUNIT(dev)];
+	struct klist *klist;
+	int s;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &sc->sc_rsel.sel_klist;
+		kn->kn_fop = &mmsread_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = sc;
+
+	s = spltty();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
 }

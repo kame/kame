@@ -1,4 +1,4 @@
-/*	$NetBSD: clock.c,v 1.25 2002/04/28 17:10:38 uch Exp $	*/
+/*	$NetBSD: clock.c,v 1.28 2003/07/15 03:35:56 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.28 2003/07/15 03:35:56 lukem Exp $");
 
 #include "opt_pclock.h"
 #include "wdog.h"
@@ -106,9 +109,9 @@ int sh4_clock_intr(void *);
  */
 #define	TMU_START(x)							\
 do {									\
-	_reg_write_1(SH_(TSTR), _reg_read_1(SH_(TSTR)) & ~TSTR_STR##x);	\
+	_reg_bclr_1(SH_(TSTR), TSTR_STR##x);				\
 	_reg_write_4(SH_(TCNT ## x), 0xffffffff);			\
-	_reg_write_1(SH_(TSTR), _reg_read_1(SH_(TSTR)) | TSTR_STR##x);	\
+	_reg_bset_1(SH_(TSTR), TSTR_STR##x);				\
 } while (/*CONSTCOND*/0)
 #define	TMU_ELAPSED(x)							\
 	(0xffffffff - _reg_read_4(SH_(TCNT ## x)))
@@ -261,7 +264,7 @@ cpu_initclocks()
 	/*
 	 * Use TMU channel 0 as hard clock
 	 */
-	_reg_write_1(SH_(TSTR), _reg_read_1(SH_(TSTR)) & ~TSTR_STR0);
+	_reg_bclr_1(SH_(TSTR), TSTR_STR0);
 
 	if (sh_clock.flags & SH_CLOCK_NORTC) {
 		/* use PCLOCK/16 as TMU0 source */
@@ -279,7 +282,7 @@ cpu_initclocks()
 	intc_intr_establish(SH_INTEVT_TMU0_TUNI0, IST_LEVEL, IPL_CLOCK,
 	    CPU_IS_SH3 ? sh3_clock_intr : sh4_clock_intr, 0);
 	/* start hardclock */
-	_reg_write_1(SH_(TSTR), _reg_read_1(SH_(TSTR)) | TSTR_STR0);
+	_reg_bset_1(SH_(TSTR), TSTR_STR0);
 
 	/*
 	 * TMU channel 1, 2 are one shot timer.
@@ -375,7 +378,7 @@ sh3_clock_intr(void *arg) /* trap frame */
 	wdog_wr_cnt(0);			/* reset to zero */
 #endif
 	/* clear underflow status */
-	_reg_write_2(SH3_TCR0, _reg_read_2(SH3_TCR0) & ~TCR_UNF);
+	_reg_bclr_2(SH3_TCR0, TCR_UNF);
 
 	hardclock(arg);
 
@@ -395,7 +398,7 @@ sh4_clock_intr(void *arg) /* trap frame */
 	wdog_wr_cnt(0);			/* reset to zero */
 #endif
 	/* clear underflow status */
-	_reg_write_2(SH4_TCR0, _reg_read_2(SH4_TCR0) & ~TCR_UNF);
+	_reg_bclr_2(SH4_TCR0, TCR_UNF);
 
 	hardclock(arg);
 
@@ -421,7 +424,7 @@ sh_rtc_get(void *cookie, time_t base, struct clock_ymdhms *dt)
 	int retry = 8;
 
 	/* disable carry interrupt */
-	_reg_write_1(SH_(RCR1), _reg_read_1(SH_(RCR1)) & ~SH_RCR1_CIE);
+	_reg_bclr_1(SH_(RCR1), SH_RCR1_CIE);
 
 	do {
 		u_int8_t r = _reg_read_1(SH_(RCR1));
@@ -447,7 +450,7 @@ sh_rtc_get(void *cookie, time_t base, struct clock_ymdhms *dt)
 
 	if (retry == 0) {
 		printf("rtc_gettime: couldn't read RTC register.\n");
-		memset(dt, sizeof(*dt), 0);
+		memset(dt, 0, sizeof(*dt));
 		return;
 	}
 

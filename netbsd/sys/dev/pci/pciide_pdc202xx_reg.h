@@ -1,4 +1,4 @@
-/*	$NetBSD: pciide_pdc202xx_reg.h,v 1.7.4.2 2003/08/16 15:58:33 tron Exp $ */
+/*	$NetBSD: pciide_pdc202xx_reg.h,v 1.11 2003/10/05 17:48:49 bouyer Exp $ */
 
 /*
  * Copyright (c) 1999 Manuel Bouyer.
@@ -14,9 +14,8 @@
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
  *	This product includes software developed by Manuel Bouyer.
- * 4. Neither the name of the University nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
+ * 4. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -105,7 +104,7 @@
 
 /*
  * The timings provided here cmoes from the PDC20262 docs. I hope they are
- * rigth for the PDC20246 too ...
+ * right for the PDC20246 too ...
  */
 
 static const int8_t pdc2xx_pa[] __attribute__((__unused__)) =

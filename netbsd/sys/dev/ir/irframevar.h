@@ -1,4 +1,4 @@
-/*	$NetBSD: irframevar.h,v 1.8 2001/12/13 15:09:07 augustss Exp $	*/
+/*	$NetBSD: irframevar.h,v 1.13 2003/07/08 10:06:31 itojun Exp $	*/
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -37,14 +37,15 @@
  */
 
 struct irframe_methods {
-	int (*im_open)(void *h, int flag, int mode, struct proc *p);
-	int (*im_close)(void *h, int flag, int mode, struct proc *p);
-	int (*im_read)(void *h, struct uio *uio, int flag);
-	int (*im_write)(void *h, struct uio *uio, int flag);
-	int (*im_poll)(void *h, int events, struct proc *p);
-	int (*im_set_params)(void *h, struct irda_params *params);
-	int (*im_get_speeds)(void *h, int *speeds);
-	int (*im_get_turnarounds)(void *h, int *times);
+	int (*im_open)(void *, int, int, struct proc *);
+	int (*im_close)(void *, int, int, struct proc *);
+	int (*im_read)(void *, struct uio *, int);
+	int (*im_write)(void *, struct uio *, int);
+	int (*im_poll)(void *, int, struct proc *);
+	int (*im_kqfilter)(void *, struct knote *);
+	int (*im_set_params)(void *, struct irda_params *);
+	int (*im_get_speeds)(void *, int *);
+	int (*im_get_turnarounds)(void *, int *);
 };
 
 struct irframe_softc {
@@ -58,8 +59,6 @@ struct irframe_softc {
 	u_int				sc_speed;
 #endif
 };
-
-void irframe_frame_available(struct device *);
 
 #define IRDA_DEFAULT_SPEED	9600
 #define IRDA_DEFAULT_EBOFS	12

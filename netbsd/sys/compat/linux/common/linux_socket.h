@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_socket.h,v 1.10.10.1 2003/10/22 04:18:46 jmc Exp $	*/
+/*	$NetBSD: linux_socket.h,v 1.11 2003/07/27 19:30:03 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.

@@ -1,4 +1,4 @@
-/*	$NetBSD: usb_mem.h,v 1.16 2002/05/19 06:24:33 augustss Exp $	*/
+/*	$NetBSD: usb_mem.h,v 1.20 2003/05/03 18:11:42 wiz Exp $	*/
 /*	$FreeBSD: src/sys/dev/usb/usb_mem.h,v 1.9 1999/11/17 22:33:47 n_hibma Exp $	*/
 
 /*
@@ -51,7 +51,7 @@ typedef struct usb_dma_block {
 	LIST_ENTRY(usb_dma_block) next;
 } usb_dma_block_t;
 
-#define DMAADDR(dma) ((dma)->block->map->dm_segs[0].ds_addr + (dma)->offs)
+#define DMAADDR(dma, o) ((dma)->block->map->dm_segs[0].ds_addr + (dma)->offs + (o))
 #define KERNADDR(dma, o) \
 	((void *)((char *)((dma)->block->kaddr + (dma)->offs) + (o)))
 
@@ -60,8 +60,8 @@ void		usb_freemem(usbd_bus_handle, usb_dma_t *);
 
 #elif defined(__FreeBSD__)
 
-/* 
- * FreeBSD does not have special functions for dma memory, so let's keep it
+/*
+ * FreeBSD does not have special functions for DMA memory, so let's keep it
  * simple for now.
  */
 
@@ -69,19 +69,23 @@ void		usb_freemem(usbd_bus_handle, usb_dma_t *);
 #include <sys/systm.h>
 #include <sys/queue.h>
 #include <sys/proc.h>
+#include <sys/bio.h>
 #include <sys/buf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
 #include <vm/vm.h>
+#include <vm/pmap.h>
+
+#include <machine/pmap.h>       /* for vtophys */
 
 #define		usb_allocmem(t,s,a,p)	(*(p) = malloc(s, M_USB, M_NOWAIT), (*(p) == NULL? USBD_NOMEM: USBD_NORMAL_COMPLETION))
 #define		usb_freemem(t,p)	(free(*(p), M_USB))
 
 #ifdef __alpha__
-#define DMAADDR(dma)	(alpha_XXX_dmamap((vm_offset_t) *(dma)))
+#define DMAADDR(dma, o)	(alpha_XXX_dmamap((vm_offset_t) *(dma) + (o)))
 #else
-#define DMAADDR(dma)	(vtophys(*(dma)))
+#define DMAADDR(dma, o)	(vtophys(*(dma) + (o)))
 #endif
 #define KERNADDR(dma, o)	((void *) ((char *)*(dma) + (o)))
-#endif
+#endif /* __FreeBSD__ */
 

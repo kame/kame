@@ -1,4 +1,4 @@
-/*	$NetBSD: intiovar.h,v 1.3 2000/01/16 14:20:55 minoura Exp $	*/
+/*	$NetBSD: intiovar.h,v 1.5 2004/01/04 16:19:44 wiz Exp $	*/
 
 /*
  *
@@ -55,7 +55,7 @@ struct intio_attach_args {
 	bus_space_tag_t	ia_bst;	/* bus_space tag */
 	bus_dma_tag_t	ia_dmat; /* bus_dma tag */
 
-	char		*ia_name; /* device name */
+	const char	*ia_name; /* device name */
 	int		ia_addr; /* addr */
 	int		ia_size;
 	int		ia_intr; /* interrupt vector */
@@ -134,7 +134,7 @@ extern u_int8_t *intiobase;
 #define intio_get_sysport_mpustat() \
 	(intio_sysport[sysport_mpustat])
 
-/* I/O controler (sicilian/pluto) */
+/* I/O controller (sicilian/pluto) */
 #define INTIO_SICILIAN		(0x00e9c000)
 #define intio_sicilian		INTIO_ADDR(INTIO_SICILIAN)
 #define sicilian_intr		1

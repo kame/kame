@@ -1,4 +1,4 @@
-/*	$NetBSD: pl030_rtc.c,v 1.2 2001/11/23 19:36:50 thorpej Exp $ */
+/*	$NetBSD: pl030_rtc.c,v 1.6 2003/07/15 00:24:59 lukem Exp $ */
 
 /*
  * Copyright (c) 2001 ARM Ltd
@@ -31,6 +31,9 @@
 
 /* Include header files */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pl030_rtc.c,v 1.6 2003/07/15 00:24:59 lukem Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -55,9 +58,8 @@ struct plrtc_softc {
 static int  plrtc_probe  (struct device *, struct cfdata *, void *);
 static void plrtc_attach (struct device *, struct device *, void *);
 
-struct cfattach plrtc_ca = {
-	sizeof(struct plrtc_softc), plrtc_probe, plrtc_attach
-};
+CFATTACH_DECL(plrtc, sizeof(struct plrtc_softc),
+    plrtc_probe, plrtc_attach, NULL, NULL);
 
 /* Remember our handle, since it isn't passed in by inittodr and
    resettodr.  */
@@ -68,9 +70,7 @@ static int timeset = 0;
 static int
 plrtc_probe(struct device *parent, struct cfdata *cf, void *aux)
 {
-	if (strcmp(cf->cf_driver->cd_name, "plrtc") == 0)
-		return 1;
-	return 0;
+	return 1;
 }
 
 static void

@@ -1,4 +1,4 @@
-/*	$NetBSD: sigcode.S,v 1.1 2001/01/13 00:06:50 bjh21 Exp $	*/
+/*	$NetBSD: sigcode.S,v 1.7 2004/03/26 19:05:33 drochner Exp $	*/
 
 /*
  * Copyright (C) 1994-1997 Mark Brinicombe
@@ -33,30 +33,26 @@
 
 #include <machine/asm.h>
 
-RCSID("$NetBSD: sigcode.S,v 1.1 2001/01/13 00:06:50 bjh21 Exp $")
+RCSID("$NetBSD: sigcode.S,v 1.7 2004/03/26 19:05:33 drochner Exp $")
 
 #include "assym.h"
+#include "opt_compat_netbsd.h"
 #include <sys/syscall.h>
 
+#ifdef COMPAT_16
 /*
  * Signal trampoline; copied to top of user stack.
  */
 
 ENTRY_NP(sigcode)
 /*
- * r0-r2 are our signal handler parameters
- * r3 is the handler address
+ * The kernel arranges for the handler to be invoked directly.  This
+ * trampoline is used only to return from the signal.
+ *
+ * The stack pointer points to the saved sigcontext.
  */
-
-	add	lr, pc, #0			/* Set return address */
-	mov	pc, r3				/* Call the handler */
-
-/*
- * Call sig_return with address of the signal context
- * Note: Don't use SIG_SCP as this make have been trashed by the program
- */
-	add	r0, sp, #SIGF_SC
-	swi	SYS___sigreturn14
+	mov	r0, sp
+	swi	SYS_compat_16___sigreturn14
 
 /* Well if that failed we better exit quick ! */
 
@@ -66,3 +62,4 @@ ENTRY_NP(sigcode)
 	.align	0
         .global _C_LABEL(esigcode)
 _C_LABEL(esigcode):
+#endif

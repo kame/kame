@@ -1,4 +1,4 @@
-/*	$NetBSD: vrled.c,v 1.4 2002/01/27 14:18:13 takemura Exp $	*/
+/*	$NetBSD: vrled.c,v 1.7 2003/07/15 02:29:36 lukem Exp $	*/
 
 /*
  * Copyright (c) 2000 SATO Kazumi. All rights reserved.
@@ -24,6 +24,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vrled.c,v 1.7 2003/07/15 02:29:36 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -65,9 +68,8 @@ static int vrled_event(void *, int, long, void *);
 
 int vrled_intr(void *);
 
-struct cfattach vrled_ca = {
-	sizeof(struct vrled_softc), vrledmatch, vrledattach
-};
+CFATTACH_DECL(vrled, sizeof(struct vrled_softc),
+    vrledmatch, vrledattach, NULL, NULL);
 
 struct vrled_softc *this_led;
 

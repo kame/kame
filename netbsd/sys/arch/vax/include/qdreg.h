@@ -1,4 +1,4 @@
-/*	$NetBSD: qdreg.h,v 1.1 1998/03/21 10:02:39 ragge Exp $	*/
+/*	$NetBSD: qdreg.h,v 1.4 2003/08/07 16:30:12 agc Exp $	*/
 /*-
  * Copyright (c) 1982, 1986 The Regents of the University of California.
  * All rights reserved.
@@ -11,11 +11,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -320,7 +316,7 @@
 #define START_BREAK	0x60
 #define STOP_BREAK	0x70
 
-	/* interupt bit definitions */
+	/* interrupt bit definitions */
 
 #define EI_XMT_A	0x01
 #define EI_RCV_A	0x02
@@ -332,7 +328,7 @@
 #define XMT_RDY_B	0x10
 #define RCV_RDY_B	0x20
 
-	/* status register bit defintions */
+	/* status register bit definitions */
 
 #define RCV_RDY 	0x01
 #define FIFO_FULL	0x02

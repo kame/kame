@@ -1,4 +1,4 @@
-/*	$NetBSD: satlink.c,v 1.15 2002/01/07 21:47:12 thorpej Exp $	*/
+/*	$NetBSD: satlink.c,v 1.22 2003/05/09 23:51:29 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -45,7 +45,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: satlink.c,v 1.15 2002/01/07 21:47:12 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: satlink.c,v 1.22 2003/05/09 23:51:29 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -104,13 +104,22 @@ int	satlinkprobe __P((struct device *, struct cfdata *, void *));
 void	satlinkattach __P((struct device *, struct device *, void *));
 void	satlinktimeout __P((void *));
 
-struct cfattach satlink_ca = {
-	sizeof(struct satlink_softc), satlinkprobe, satlinkattach
-};
+CFATTACH_DECL(satlink, sizeof(struct satlink_softc),
+    satlinkprobe, satlinkattach, NULL, NULL);
 
 extern struct cfdriver satlink_cd;
 
-cdev_decl(satlink);
+dev_type_open(satlinkopen);
+dev_type_close(satlinkclose);
+dev_type_read(satlinkread);
+dev_type_ioctl(satlinkioctl);
+dev_type_poll(satlinkpoll);
+dev_type_kqfilter(satlinkkqfilter);
+
+const struct cdevsw satlink_cdevsw = {
+	satlinkopen, satlinkclose, satlinkread, nowrite, satlinkioctl,
+	nostop, notty, satlinkpoll, nommap, satlinkkqfilter,
+};
 
 int
 satlinkprobe(parent, match, aux)
@@ -223,9 +232,19 @@ satlinkattach(parent, self, aux)
 		return;
 	}
 
+	if (isa_drq_alloc(sc->sc_ic, sc->sc_drq) != 0) {
+		printf("%s: can't reserve drq %d\n",
+		    sc->sc_dev.dv_xname, sc->sc_drq);
+		isa_dmamem_unmap(sc->sc_ic, sc->sc_drq, sc->sc_buf,
+		    sc->sc_bufsize);
+		isa_dmamem_free(sc->sc_ic, sc->sc_drq, ringaddr,
+		    sc->sc_bufsize);
+		return;
+	}
+
 	/* Create the DMA map. */
 	if (isa_dmamap_create(sc->sc_ic, sc->sc_drq, sc->sc_bufsize,
-	    BUS_DMA_NOWAIT)) {
+	    BUS_DMA_NOWAIT|BUS_DMA_ALLOCNOW)) {
 		printf("%s: can't create DMA map\n", sc->sc_dev.dv_xname);
 		isa_dmamem_unmap(sc->sc_ic, sc->sc_drq, sc->sc_buf,
 		    sc->sc_bufsize);
@@ -364,16 +383,6 @@ satlinkread(dev, uio, flags)
 }
 
 int
-satlinkwrite(dev, uio, flags)
-	dev_t dev;
-	struct uio *uio;
-	int flags;
-{
-
-	return (ENODEV);
-}
-
-int
 satlinkioctl(dev, cmd, data, flags, p)
 	dev_t dev;
 	u_long cmd;
@@ -428,6 +437,70 @@ satlinkpoll(dev, events, p)
 	return (revents);
 }
 
+static void
+filt_satlinkrdetach(struct knote *kn)
+{
+	struct satlink_softc *sc = kn->kn_hook;
+	int s;
+
+	s = splsoftclock();
+	SLIST_REMOVE(&sc->sc_selq.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_satlinkread(struct knote *kn, long hint)
+{
+	struct satlink_softc *sc = kn->kn_hook;
+
+	if (sc->sc_uptr == sc->sc_sptr)
+		return (0);
+
+	if (sc->sc_sptr > sc->sc_uptr)
+		kn->kn_data = sc->sc_sptr - sc->sc_uptr;
+	else
+		kn->kn_data = (sc->sc_bufsize - sc->sc_uptr) +
+		    sc->sc_sptr;
+	return (1);
+}
+
+static const struct filterops satlinkread_filtops =
+	{ 1, NULL, filt_satlinkrdetach, filt_satlinkread };
+
+static const struct filterops satlink_seltrue_filtops =
+	{ 1, NULL, filt_satlinkrdetach, filt_seltrue };
+
+int
+satlinkkqfilter(dev_t dev, struct knote *kn)
+{
+	struct satlink_softc *sc = device_lookup(&satlink_cd, minor(dev));
+	struct klist *klist;
+	int s;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &sc->sc_selq.sel_klist;
+		kn->kn_fop = &satlinkread_filtops;
+		break;
+
+	case EVFILT_WRITE:
+		klist = &sc->sc_selq.sel_klist;
+		kn->kn_fop = &satlink_seltrue_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = sc;
+
+	s = splsoftclock();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
+}
+
 void
 satlinktimeout(arg)
 	void *arg;
@@ -460,7 +533,7 @@ satlinktimeout(arg)
 	}
 
 	/* Wake up anyone blocked in poll... */
-	selwakeup(&sc->sc_selq);
+	selnotify(&sc->sc_selq, 0);
 
  out:
 	callout_reset(&sc->sc_ch, SATLINK_TIMEOUT, satlinktimeout, sc);

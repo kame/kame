@@ -1,4 +1,4 @@
-/*	$NetBSD: lms.c,v 1.41 2002/03/17 19:40:41 atatat Exp $	*/
+/*	$NetBSD: lms.c,v 1.44 2002/10/02 05:47:13 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1993, 1994 Charles M. Hannum.
@@ -24,7 +24,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: lms.c,v 1.41 2002/03/17 19:40:41 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: lms.c,v 1.44 2002/10/02 05:47:13 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -63,9 +63,8 @@ int lmsprobe __P((struct device *, struct cfdata *, void *));
 void lmsattach __P((struct device *, struct device *, void *));
 int lmsintr __P((void *));
 
-struct cfattach lms_ca = {
-	sizeof(struct lms_softc), lmsprobe, lmsattach
-};
+CFATTACH_DECL(lms, sizeof(struct lms_softc),
+    lmsprobe, lmsattach, NULL, NULL);
 
 int	lms_enable __P((void *));
 int	lms_ioctl __P((void *, u_long, caddr_t, int, struct proc *));

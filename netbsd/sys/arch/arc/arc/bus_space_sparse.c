@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_space_sparse.c,v 1.6 2001/09/10 21:19:31 chris Exp $	*/
+/*	$NetBSD: bus_space_sparse.c,v 1.10 2003/10/21 16:17:52 tsutsui Exp $	*/
 /*	NetBSD: bus_machdep.c,v 1.1 2000/01/26 18:48:00 drochner Exp 	*/
 
 /*-
@@ -45,6 +45,9 @@
  * accessible via KSEG0/KSEG1.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bus_space_sparse.c,v 1.10 2003/10/21 16:17:52 tsutsui Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -73,7 +76,7 @@ arc_kseg2_make_cacheable(vaddr, size)
 	start = mips_trunc_page(vaddr);
 	end = mips_round_page(vaddr + size);
 	mask = ~(CPUISMIPS3 ? MIPS3_PG_UNCACHED : MIPS1_PG_N);
-	for (; start < end; start += NBPG) {
+	for (; start < end; start += PAGE_SIZE) {
 		pte = kvtopte(start);
 		entry = pte->pt_entry & mask;
 		pte->pt_entry &= entry;
@@ -118,7 +121,7 @@ arc_sparse_bus_space_compose_handle(bst, addr, size, flags, bshp)
 	paddr_t start = bst->bs_pbase + mips_trunc_page(offset);
 	paddr_t end = bst->bs_pbase + mips_round_page(offset + size);
 
-	if (end <= MIPS_KSEG1_START - MIPS_KSEG0_START) { 
+	if (end <= MIPS_KSEG1_START - MIPS_KSEG0_START) {
 		/* mappable on KSEG0 or KSEG1 */
 		*bshp = (cacheable ?
 		    MIPS_PHYS_TO_KSEG0(start) :
@@ -127,11 +130,12 @@ arc_sparse_bus_space_compose_handle(bst, addr, size, flags, bshp)
 		vaddr_t va,
 		    vaddr = uvm_km_valloc(kernel_map, (vsize_t)(end - start));
 
-		if (vaddr == NULL)
+		if (vaddr == 0)
 			panic("arc_sparse_bus_space_compose_handle: "
 			      "cannot allocate KVA 0x%llx..0x%llx",
 			      start, end);
-		for (va = vaddr; start < end; start += NBPG, va += NBPG)
+		for (va = vaddr; start < end;
+		     start += PAGE_SIZE, va += PAGE_SIZE)
 			pmap_kenter_pa(va, start, VM_PROT_READ|VM_PROT_WRITE);
 		pmap_update(pmap_kernel());
 		vaddr += (offset & PGOFSET);

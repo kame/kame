@@ -1,4 +1,4 @@
-/*	$NetBSD: pcib.c,v 1.9 2001/06/22 06:02:55 thorpej Exp $	*/
+/*	$NetBSD: pcib.c,v 1.14 2003/11/02 22:03:42 he Exp $	*/
 
 /*-
  * Copyright (c) 2000, 2001 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: pcib.c,v 1.9 2001/06/22 06:02:55 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pcib.c,v 1.14 2003/11/02 22:03:42 he Exp $");
 
 #include "opt_algor_p5064.h" 
 #include "opt_algor_p6032.h"
@@ -121,9 +121,8 @@ struct pcib_softc {
 int	pcib_match(struct device *, struct cfdata *, void *);
 void	pcib_attach(struct device *, struct device *, void *);
 
-struct cfattach pcib_ca = {
-	sizeof(struct pcib_softc), pcib_match, pcib_attach,
-};
+CFATTACH_DECL(pcib, sizeof(struct pcib_softc),
+    pcib_match, pcib_attach, NULL, NULL);
 
 int	pcib_print(void *, const char *pnp);
 void	pcib_isa_attach_hook(struct device *, struct device *,
@@ -334,10 +333,10 @@ pcib_bridge_callback(self)
 int
 pcib_print(void *aux, const char *pnp)
 {
-	struct isabus_attach_args *iba;
+	struct isabus_attach_args *iba = aux;
 
 	if (pnp)
-		printf("%s at %s", iba->iba_busname, pnp);
+		aprint_normal("%s at %s", iba->iba_busname, pnp);
 	return (UNCONF);
 }
 

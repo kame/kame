@@ -1,4 +1,4 @@
-/*	$NetBSD: sebuf.c,v 1.6 2000/06/29 07:19:01 mrg Exp $	*/
+/*	$NetBSD: sebuf.c,v 1.12 2003/07/15 03:36:15 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -51,6 +51,9 @@
  * the two children.  This driver has no device nodes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sebuf.c,v 1.12 2003/07/15 03:36:15 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -69,8 +72,6 @@
 #include "sereg.h"
 #include "sevar.h"
 
-#define	offsetof(type, member) ((size_t)(&((type *)0)->member))
-
 struct sebuf_softc {
 	struct	device sc_dev;		/* base device (required) */
 	struct sebuf_regs *sc_regs;
@@ -84,9 +85,8 @@ static int  sebuf_match __P((struct device *, struct cfdata *, void *));
 static void sebuf_attach __P((struct device *, struct device *, void *));
 static int  sebuf_print __P((void *, const char *));
 
-struct cfattach sebuf_ca = {
-	sizeof(struct sebuf_softc), sebuf_match, sebuf_attach
-};
+CFATTACH_DECL(sebuf, sizeof(struct sebuf_softc),
+    sebuf_match, sebuf_attach, NULL, NULL);
 
 static int
 sebuf_match(parent, cf, args)
@@ -192,7 +192,7 @@ sebuf_print(aux, name)
 {
 
 	if (name != NULL)
-		printf("%s: ", name);
+		aprint_normal("%s: ", name);
 
 	return UNCONF;
 }

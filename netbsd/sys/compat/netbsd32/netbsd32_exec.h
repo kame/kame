@@ -1,4 +1,4 @@
-/*	$NetBSD: netbsd32_exec.h,v 1.10 2001/08/25 15:06:02 mrg Exp $	*/
+/*	$NetBSD: netbsd32_exec.h,v 1.19 2004/03/26 15:01:16 drochner Exp $	*/
 
 /*
  * Copyright (c) 1998, 2001 Matthew R. Green
@@ -61,18 +61,27 @@ int exec_netbsd32_makecmds __P((struct proc *, struct exec_package *));
 #ifdef EXEC_ELF32
 int netbsd32_elf32_probe __P((struct proc *, struct exec_package *, void *,
     char *, vaddr_t *));
-int netbsd32_elf32_copyargs __P((struct exec_package *, struct ps_strings *,
-    char **, void *));
+int netbsd32_elf32_probe_noteless __P((struct proc *, struct exec_package *, 
+    void *, char *, vaddr_t *));
+int netbsd32_elf32_copyargs __P((struct proc *, struct exec_package *,
+    struct ps_strings *, char **, void *));
 #endif /* EXEC_ELF32 */
 
-static __inline int netbsd32_copyargs __P((struct exec_package *,
+static __inline int netbsd32_copyargs __P((struct proc *, struct exec_package *,
     struct ps_strings *, char **, void *));
+
+void netbsd32_setregs (struct lwp *, struct exec_package *, u_long stack);
+int netbsd32_sigreturn (struct proc *, void *, register_t *);
+void netbsd32_sendsig (const ksiginfo_t *, const sigset_t *);
+
+extern char netbsd32_esigcode[], netbsd32_sigcode[];
 
 /*
  * We need to copy out all pointers as 32-bit values.
  */
 static __inline int
-netbsd32_copyargs(pack, arginfo, stackp, argp)
+netbsd32_copyargs(p, pack, arginfo, stackp, argp)
+	struct proc *p;
 	struct exec_package *pack;
 	struct ps_strings *arginfo;
 	char **stackp;
@@ -99,7 +108,7 @@ netbsd32_copyargs(pack, arginfo, stackp, argp)
 
 	for (; --argc >= 0; sp += len, dp += len) {
 		if ((error = copyout(&dp, cpp++, sizeof(dp))) != 0 ||
-		    (error = copyoutstr(sp, (char *)(u_long)dp,
+		    (error = copyoutstr(sp, (char *)NETBSD32PTR64(dp),
 		    ARG_MAX, &len)) != 0)
 			return error;
 	}
@@ -111,7 +120,7 @@ netbsd32_copyargs(pack, arginfo, stackp, argp)
 
 	for (; --envc >= 0; sp += len, dp += len) {
 		if ((error = copyout(&dp, cpp++, sizeof(dp))) != 0 ||
-		    (error = copyoutstr(sp, (char *)(u_long)dp,
+		    (error = copyoutstr(sp, (char *)NETBSD32PTR64(dp),
 		    ARG_MAX, &len)) != 0)
 			return error;
 	}

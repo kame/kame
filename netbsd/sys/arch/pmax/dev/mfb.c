@@ -1,4 +1,4 @@
-/*	$NetBSD: mfb.c,v 1.47 2001/09/19 19:04:16 thorpej Exp $	*/
+/*	$NetBSD: mfb.c,v 1.51 2003/10/31 03:32:19 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -81,7 +77,7 @@
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-__KERNEL_RCSID(0, "$NetBSD: mfb.c,v 1.47 2001/09/19 19:04:16 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mfb.c,v 1.51 2003/10/31 03:32:19 simonb Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -182,9 +178,8 @@ static void	mfbattach __P((struct device *, struct device *, void *));
 static int	mfbinit __P((struct fbinfo *, caddr_t, int, int));
 static int	mfb_intr __P((void *sc));
 
-struct cfattach mfb_ca = {
-	sizeof(struct fbinfo), mfbmatch, mfbattach
-};
+CFATTACH_DECL(mfb, sizeof(struct fbinfo),
+    mfbmatch, mfbattach, NULL, NULL);
 
 int
 mfb_cnattach(addr)
@@ -702,12 +697,9 @@ bt455_video_off(fi)
 {
 	int i;
 	bt455_regmap_t *regs = (bt455_regmap_t *)(fi -> fi_vdac);
-	u_char *cmap;
 
 	if (fi -> fi_blanked)
 		return 0;
-
-	cmap = (u_char *)(fi -> fi_cmap_bits);
 
 	/* Zap colormap entries 0 (background) and 1 (foreground) */
 	BT455_SELECT_ENTRY(regs, 0);

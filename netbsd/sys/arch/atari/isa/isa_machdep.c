@@ -1,4 +1,4 @@
-/*	$NetBSD: isa_machdep.c,v 1.23 2001/05/14 13:18:47 leo Exp $	*/
+/*	$NetBSD: isa_machdep.c,v 1.27 2003/07/15 01:19:54 lukem Exp $	*/
 
 /*
  * Copyright (c) 1997 Leo Weppelman.  All rights reserved.
@@ -30,6 +30,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: isa_machdep.c,v 1.27 2003/07/15 01:19:54 lukem Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -74,9 +77,8 @@ struct isabus_softc {
 	struct atari_isa_chipset sc_chipset;
 };
 
-struct cfattach isabus_ca = {
-	sizeof(struct isabus_softc), isabusmatch, isabusattach
-};
+CFATTACH_DECL(isab, sizeof(struct isabus_softc),
+    isabusmatch, isabusattach, NULL, NULL);
 
 /*
  * We need some static storage to attach a console keyboard on the Milan
@@ -92,7 +94,7 @@ void		*auxp;
 {
 	static int	nmatched = 0;
 
-	if (strcmp((char *)auxp, "isabus"))
+	if (strcmp((char *)auxp, "isab"))
 		return (0); /* Wrong number... */
 
 	if(atari_realconfig == 0)

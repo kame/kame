@@ -1,4 +1,4 @@
-/*	$NetBSD: at_control.c,v 1.7.10.1 2003/06/19 02:21:03 grant Exp $	 */
+/*	$NetBSD: at_control.c,v 1.8 2003/06/02 10:33:25 is Exp $	 */
 
 /*
  * Copyright (c) 1990,1994 Regents of The University of Michigan.
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: at_control.c,v 1.7.10.1 2003/06/19 02:21:03 grant Exp $");
+__KERNEL_RCSID(0, "$NetBSD: at_control.c,v 1.8 2003/06/02 10:33:25 is Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

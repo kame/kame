@@ -1,9 +1,43 @@
-/*	$NetBSD: grf.c,v 1.43 2002/03/15 05:52:53 gmcgarry Exp $	*/
+/*	$NetBSD: grf.c,v 1.55 2003/11/17 14:37:59 tsutsui Exp $	*/
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: grf.c 1.36 93/08/13$
+ *
+ *	@(#)grf.c	8.4 (Berkeley) 1/12/94
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -49,7 +83,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: grf.c,v 1.43 2002/03/15 05:52:53 gmcgarry Exp $");                                                  
+__KERNEL_RCSID(0, "$NetBSD: grf.c,v 1.55 2003/11/17 14:37:59 tsutsui Exp $");
 
 #include "opt_compat_hpux.h"
 
@@ -61,7 +95,6 @@ __KERNEL_RCSID(0, "$NetBSD: grf.c,v 1.43 2002/03/15 05:52:53 gmcgarry Exp $");
 #include <sys/ioctl.h>
 #include <sys/malloc.h>
 #include <sys/mman.h>
-#include <sys/poll.h>
 #include <sys/proc.h>
 #include <sys/vnode.h>
 #include <sys/resourcevar.h>
@@ -90,17 +123,23 @@ __KERNEL_RCSID(0, "$NetBSD: grf.c,v 1.43 2002/03/15 05:52:53 gmcgarry Exp $");
 #define	iteoff(u,f)
 #endif /* NITE > 0 */
 
-/* prototypes for the devsw entry points */
-cdev_decl(grf);
-
 int	grfmatch __P((struct device *, struct cfdata *, void *));
 void	grfattach __P((struct device *, struct device *, void *));
 
-struct cfattach grf_ca = {
-	sizeof(struct grf_softc), grfmatch, grfattach
-};
+CFATTACH_DECL(grf, sizeof(struct grf_softc),
+    grfmatch, grfattach, NULL, NULL);
 
 extern struct cfdriver grf_cd;
+
+dev_type_open(grfopen);
+dev_type_close(grfclose);
+dev_type_ioctl(grfioctl);
+dev_type_mmap(grfmmap);
+
+const struct cdevsw grf_cdevsw = {
+	grfopen, grfclose, nullread, nullwrite, grfioctl,
+	nostop, notty, nopoll, grfmmap, nokqfilter,
+};
 
 int	grfprint __P((void *, const char *));
 
@@ -153,7 +192,7 @@ grfprint(aux, pnp)
 
 	/* Only ITEs can attach to GRFs, easy... */
 	if (pnp)
-		printf("ite at %s", pnp);
+		aprint_normal("ite at %s", pnp);
 
 	return (UNCONF);
 }
@@ -287,17 +326,6 @@ grfioctl(dev, cmd, data, flag, p)
 
 	}
 	return(error);
-}
-
-/*ARGSUSED*/
-int
-grfpoll(dev, events, p)
-	dev_t dev;
-	int events;
-	struct proc *p;
-{
-
-	return (events & (POLLOUT | POLLWRNORM));
 }
 
 /*ARGSUSED*/
@@ -563,7 +591,7 @@ grfunlock(gp)
 		gp->g_lockpslot = gp->g_lock->gl_lockslot = 0;
 	}
 	if (gp->g_flags & GF_WANTED) {
-		wakeup((caddr_t)&gp->g_flags); 
+		wakeup((caddr_t)&gp->g_flags);
 		gp->g_flags &= ~GF_WANTED;
 	}
 	gp->g_lockp = NULL;
@@ -634,7 +662,8 @@ grfmap(dev, addrp, p)
 	if (*addrp)
 		flags |= MAP_FIXED;
 	else
-		*addrp = (caddr_t)0x1000000;	/* XXX */
+		*addrp = (caddr_t)
+		    VM_DEFAULT_ADDRESS(p->p_vmspace->vm_daddr, len);
 	vn.v_type = VCHR;			/* XXX */
 	vn.v_specinfo = &si;			/* XXX */
 	vn.v_rdev = dev;			/* XXX */
@@ -704,7 +733,7 @@ iounmmap(dev, addr)
  * an array of pids.  The first element is used to record the last slot used
  * (for faster lookups).  The remaining elements record up to GRFMAXLCK-1
  * process ids.  Returns a slot number between 1 and GRFMAXLCK or 0 if no
- * slot is available. 
+ * slot is available.
  */
 int
 grffindpid(gp)

@@ -1,4 +1,4 @@
-/*	$NetBSD: int_limits.h,v 1.2 2001/04/26 16:25:23 kleink Exp $	*/
+/*	$NetBSD: int_limits.h,v 1.4 2004/01/23 04:12:39 simonb Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #ifndef _NS32K_INT_LIMITS_H_
-#define _NS32K_INT_LIMITS_H_
+#define	_NS32K_INT_LIMITS_H_
 
 /*
  * 7.18.2 Limits of specified-width integer types
@@ -84,7 +84,7 @@
 #define	UINT_LEAST64_MAX 0xffffffffffffffffULL		/* uint_least64_t */
 
 /* 7.18.2.3 Limits of fastest minimum-width integer types */
- 
+
 /* minimum values of fastest minimum-width signed integer types */
 #define	INT_FAST8_MIN	(-0x7f-1)			/* int_fast8_t	  */
 #define	INT_FAST16_MIN	(-0x7fff-1)			/* int_fast16_t	  */

@@ -1,4 +1,4 @@
-/*	$NetBSD: hpcdma.c,v 1.4 2002/03/13 13:12:27 simonb Exp $	*/
+/*	$NetBSD: hpcdma.c,v 1.9 2003/12/29 06:33:57 sekiya Exp $	*/
 
 /*
  * Copyright (c) 2001 Wayne Knowles
@@ -43,10 +43,15 @@
  * and SCSI1 are the same, this is no problem.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hpcdma.c,v 1.9 2003/12/29 06:33:57 sekiya Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/buf.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
 
@@ -61,7 +66,6 @@ void
 hpcdma_init(struct hpc_attach_args *haa, struct hpc_dma_softc *sc, int ndesc)
 {
 	bus_dma_segment_t seg;
-	struct hpc_dma_desc *hdd;
 	int rseg, allocsz;
 
 	sc->sc_bst = haa->ha_st;
@@ -70,17 +74,17 @@ hpcdma_init(struct hpc_attach_args *haa, struct hpc_dma_softc *sc, int ndesc)
 	sc->sc_flags = 0;
 
 	if (bus_space_subregion(haa->ha_st, haa->ha_sh, haa->ha_dmaoff,
-	    HPC_SCSI0_REGS_SIZE, &sc->sc_bsh) != 0) {
+	    sc->hpc->scsi0_regs_size, &sc->sc_bsh) != 0) {
 		printf(": can't map DMA registers\n");
 		return;
 	}
 
 	/* Alloc 1 additional descriptor - needed for DMA bug fix */
 	allocsz = sizeof(struct hpc_dma_desc) * (ndesc + 1);
-	KASSERT(allocsz <= NBPG);
+	KASSERT(allocsz <= PAGE_SIZE);
 
-	if (bus_dmamap_create(sc->sc_dmat, NBPG, 1 /*seg*/,
-			      NBPG, 0, BUS_DMA_WAITOK,
+	if (bus_dmamap_create(sc->sc_dmat, PAGE_SIZE, 1 /*seg*/,
+			      PAGE_SIZE, 0, BUS_DMA_WAITOK,
 			      &sc->sc_dmamap) != 0) {
 		printf(": failed to create dmamap\n");
 		return;
@@ -96,19 +100,18 @@ hpcdma_init(struct hpc_attach_args *haa, struct hpc_dma_softc *sc, int ndesc)
 	}
 	/* Map pages into kernel memory */
 	if (bus_dmamem_map(sc->sc_dmat, &seg, rseg, allocsz,
-			   (caddr_t *)&hdd, BUS_DMA_NOWAIT)) {
+			   (caddr_t *)&sc->sc_desc_kva, BUS_DMA_NOWAIT)) {
 		printf(": can't map sglist\n");
 		bus_dmamem_free(sc->sc_dmat, &seg, rseg);
 		return;
 	}
 
-	if (bus_dmamap_load(sc->sc_dmat, sc->sc_dmamap, hdd,
+	if (bus_dmamap_load(sc->sc_dmat, sc->sc_dmamap, sc->sc_desc_kva,
 			    allocsz, NULL, BUS_DMA_NOWAIT)) {
 		printf(": can't load sglist\n");
 		return;
 	}
 
-	sc->sc_desc_kva = hdd;
 	sc->sc_desc_pa = (void *) sc->sc_dmamap->dm_segs[0].ds_addr;
 }
 
@@ -133,16 +136,33 @@ hpcdma_sglist_create(struct hpc_dma_softc *sc, bus_dmamap_t dmamap)
 #ifdef DMA_DEBUG
 		printf("%p:%ld, ", (void *)segp->ds_addr, segp->ds_len);
 #endif
-		hva->hdd_bufptr = segp->ds_addr;
-		hva->hdd_ctl    = segp->ds_len;
-		hva->hdd_descptr = (u_int32_t) ++hpa;
+		if (sc->hpc->revision == 3) {
+			hva->hpc3_hdd_bufptr = segp->ds_addr;
+			hva->hpc3_hdd_ctl    = segp->ds_len;
+			hva->hdd_descptr = (u_int32_t) ++hpa;
+		} else /* HPC 1/1.5 */ {
+			/* there doesn't seem to be any good way of doing this
+		   	   via an abstraction layer */
+			hva->hpc1_hdd_bufptr = segp->ds_addr;
+			hva->hpc1_hdd_ctl    = segp->ds_len;
+			hva->hdd_descptr = (u_int32_t) ++hpa;
+		}
 		++hva; ++segp;
 	}
+
 	/* Work around HPC3 DMA bug */
-	hva->hdd_bufptr  = 0;
-	hva->hdd_ctl     = HDD_CTL_EOCHAIN;
-	hva->hdd_descptr = 0;
-	hva++;
+	if (sc->hpc->revision == 3)
+	{
+		hva->hpc3_hdd_bufptr  = 0;
+		hva->hpc3_hdd_ctl     = HDD_CTL_EOCHAIN;
+		hva->hdd_descptr = 0;
+		hva++;
+	} else {
+		hva--;
+		hva->hpc1_hdd_bufptr |= HPC1_HDD_CTL_EOCHAIN;
+		hva->hdd_descptr = 0;
+	}
+
 #ifdef DMA_DEBUG
 	printf(">\n");
 #endif
@@ -151,7 +171,7 @@ hpcdma_sglist_create(struct hpc_dma_softc *sc, bus_dmamap_t dmamap)
 	    BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
 
 	/* Load DMA Descriptor list */
-	bus_space_write_4(sc->sc_bst, sc->sc_bsh, HPC_SCSI0_NDBP,
+	bus_space_write_4(sc->sc_bst, sc->sc_bsh, sc->hpc->scsi0_ndbp,
 			    (u_int32_t)sc->sc_desc_pa);
 }
 
@@ -159,17 +179,17 @@ void
 hpcdma_cntl(struct hpc_dma_softc *sc, uint32_t mode)
 {
 
-	bus_space_write_4(sc->sc_bst, sc->sc_bsh, HPC_SCSI0_CTL, mode);
+	bus_space_write_4(sc->sc_bst, sc->sc_bsh, sc->hpc->scsi0_ctl, mode);
 }
 
 void
 hpcdma_reset(struct hpc_dma_softc *sc)
 {
 
-	bus_space_write_4(sc->sc_bst, sc->sc_bsh, HPC_SCSI0_CTL,
-	    HPC_DMACTL_RESET);
+	bus_space_write_4(sc->sc_bst, sc->sc_bsh, sc->hpc->scsi0_ctl,
+	    sc->hpc->scsi_dmactl_reset);
 	delay(100);
-	bus_space_write_4(sc->sc_bst, sc->sc_bsh, HPC_SCSI0_CTL, 0);
+	bus_space_write_4(sc->sc_bst, sc->sc_bsh, sc->hpc->scsi0_ctl, 0);
 	delay(1000);
 }
 
@@ -178,14 +198,14 @@ hpcdma_flush(struct hpc_dma_softc *sc)
 {
 	u_int32_t	mode;
 
-	mode = bus_space_read_4(sc->sc_bst, sc->sc_bsh, HPC_SCSI0_CTL);
-	bus_space_write_4(sc->sc_bst, sc->sc_bsh, HPC_SCSI0_CTL,
-	    			mode | HPC_DMACTL_FLUSH);
+	mode = bus_space_read_4(sc->sc_bst, sc->sc_bsh, sc->hpc->scsi0_ctl);
+	bus_space_write_4(sc->sc_bst, sc->sc_bsh, sc->hpc->scsi0_ctl,
+	    			mode | sc->hpc->scsi_dmactl_flush);
 
 	/* Wait for Active bit to drop */
-	while (bus_space_read_4(sc->sc_bst, sc->sc_bsh, HPC_SCSI0_CTL) &
-	    HPC_DMACTL_ACTIVE) {
-		bus_space_barrier(sc->sc_bst, sc->sc_bsh, HPC_SCSI0_CTL, 4,
+	while (bus_space_read_4(sc->sc_bst, sc->sc_bsh, sc->hpc->scsi0_ctl) &
+	    sc->hpc->scsi_dmactl_active) {
+		bus_space_barrier(sc->sc_bst, sc->sc_bsh, sc->hpc->scsi0_ctl, 4,
 		    BUS_SPACE_BARRIER_READ);
 	}
 }

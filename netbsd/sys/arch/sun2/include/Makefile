@@ -1,6 +1,5 @@
-#	$NetBSD: Makefile,v 1.2 2002/03/22 00:28:08 fredette Exp $
+#	$NetBSD: Makefile,v 1.5 2003/01/18 06:58:34 thorpej Exp $
 
-KDIR=	/sys/arch/sun2/include
 INCSDIR= /usr/include/sun2
 
 INCS=	ansi.h aout_machdep.h asm.h autoconf.h \
@@ -13,8 +12,8 @@ INCS=	ansi.h aout_machdep.h asm.h autoconf.h \
 	int_const.h int_fmtio.h int_limits.h int_mwgwtypes.h int_types.h \
 	kbd.h kbio.h kcore.h \
 	leds.h limits.h lock.h \
-	math.h mon.h \
-	param.h pcb.h pmap.h promlib.h \
+	math.h mcontext.h mon.h \
+	param.h pcb.h pmap.h pmc.h promlib.h \
 	proc.h profile.h psl.h pte.h ptrace.h \
 	reg.h \
 	setjmp.h signal.h stdarg.h \

@@ -1,4 +1,4 @@
-/*	$NetBSD: simide.c,v 1.2.12.1 2002/11/01 11:13:07 tron Exp $	*/
+/*	$NetBSD: simide.c,v 1.18 2004/01/03 22:56:52 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1997-1998 Mark Brinicombe
@@ -39,6 +39,9 @@
  * the hardware information
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: simide.c,v 1.18 2004/01/03 22:56:52 thorpej Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -52,6 +55,7 @@
 #include <acorn32/podulebus/simidereg.h>
 
 #include <dev/ata/atavar.h>
+#include <dev/ic/wdcreg.h>
 #include <dev/ic/wdcvar.h>
 #include <dev/podulebus/podules.h>
 
@@ -75,7 +79,7 @@
 
 struct simide_softc {
 	struct wdc_softc	sc_wdcdev;	/* common wdc definitions */
-	struct channel_softc	*wdc_chanarray[2]; /* channels definition */
+	struct wdc_channel	*wdc_chanarray[2]; /* channels definition */
 	podule_t 		*sc_podule;		/* Our podule info */
 	int 			sc_podule_number;	/* Our podule number */
 	int			sc_ctl_reg;		/* Global ctl reg */
@@ -84,7 +88,8 @@ struct simide_softc {
 	bus_space_handle_t	sc_ctlioh;		/* control handle */
 	struct bus_space 	sc_tag;			/* custom tag */
 	struct simide_channel {
-		struct channel_softc wdc_channel; /* generic part */
+		struct wdc_channel wdc_channel;	/* generic part */
+		struct ata_queue wdc_chqueue;		/* channel queue */
 		irqhandler_t	sc_ih;			/* interrupt handler */
 		int		sc_irqmask;	/* IRQ mask for this channel */
 	} simide_channels[2];
@@ -95,9 +100,8 @@ void	simide_attach	__P((struct device *, struct device *, void *));
 void	simide_shutdown	__P((void *arg));
 int	simide_intr	__P((void *arg));
 
-struct cfattach simide_ca = {
-	sizeof(struct simide_softc), simide_probe, simide_attach
-};
+CFATTACH_DECL(simide, sizeof(struct simide_softc),
+    simide_probe, simide_attach, NULL, NULL);
 
 
 /*
@@ -158,9 +162,9 @@ simide_attach(parent, self, aux)
 	struct podule_attach_args *pa = (void *)aux;
 	int status;
 	u_int iobase;
-	int channel;
+	int channel, i;
 	struct simide_channel *scp;
-	struct channel_softc *cp;
+	struct wdc_channel *cp;
 	irqhandler_t *ihp;
 
 	/* Note the podule number and validate */
@@ -195,7 +199,7 @@ simide_attach(parent, self, aux)
 	if (bus_space_map(sc->sc_ctliot, pa->pa_podule->mod_base +
 	    CONTROL_REGISTERS_POFFSET, CONTROL_REGISTER_SPACE, 0,
 	    &sc->sc_ctlioh))
-		panic("%s: Cannot map control registers\n", self->dv_xname);
+		panic("%s: Cannot map control registers", self->dv_xname);
 
 	/* Install a clean up handler to make sure IRQ's are disabled */
 	if (shutdownhook_establish(simide_shutdown, (void *)sc) == NULL)
@@ -249,25 +253,26 @@ simide_attach(parent, self, aux)
 		sc->wdc_chanarray[channel] = &scp->wdc_channel;
 		cp = &scp->wdc_channel;
 
-		cp->channel = channel;
-		cp->wdc = &sc->sc_wdcdev;
-		cp->ch_queue = malloc(sizeof(struct channel_queue),
-		    M_DEVBUF, M_NOWAIT);
-		if (cp->ch_queue == NULL) {
-			printf("%s %s channel: can't allocate memory for "
-			    "command queue", self->dv_xname,
-			    (channel == 0) ? "primary" : "secondary");
-			continue;
-		}
+		cp->ch_channel = channel;
+		cp->ch_wdc = &sc->sc_wdcdev;
+		cp->ch_queue = &scp->wdc_chqueue;
 		cp->cmd_iot = cp->ctl_iot = &sc->sc_tag;
 		iobase = pa->pa_podule->mod_base;
 		if (bus_space_map(cp->cmd_iot, iobase +
 		    simide_info[channel].drive_registers,
-		    DRIVE_REGISTERS_SPACE, 0, &cp->cmd_ioh)) 
+		    DRIVE_REGISTERS_SPACE, 0, &cp->cmd_baseioh)) 
 			continue;
+		for (i = 0; i < DRIVE_REGISTERS_SPACE; i++) {
+			if (bus_space_subregion(cp->cmd_iot, cp->cmd_baseioh,
+				i, i == 0 ? 4 : 1, &cp->cmd_iohs[i]) != 0) {
+				bus_space_unmap(cp->cmd_iot, cp->cmd_baseioh,
+				    DRIVE_REGISTERS_SPACE);
+				continue;
+			}
+		}
 		if (bus_space_map(cp->ctl_iot, iobase +
 		    simide_info[channel].aux_register, 4, 0, &cp->ctl_ioh)) {
-			bus_space_unmap(cp->cmd_iot, cp->cmd_ioh,
+			bus_space_unmap(cp->cmd_iot, cp->cmd_baseioh,
 			    DRIVE_REGISTERS_SPACE);
 			continue;
 		}
@@ -276,7 +281,6 @@ simide_attach(parent, self, aux)
 		sc->sc_ctl_reg &= ~scp->sc_irqmask;
 		bus_space_write_1(sc->sc_ctliot, sc->sc_ctlioh,
 		    CONTROL_REGISTER_OFFSET, sc->sc_ctl_reg);
-		wdcattach(cp);
 		ihp = &scp->sc_ih;
 		ihp->ih_func = simide_intr;
 		ihp->ih_arg = scp;
@@ -285,14 +289,14 @@ simide_attach(parent, self, aux)
 		ihp->ih_maskaddr = pa->pa_podule->irq_addr;
 		ihp->ih_maskbits = scp->sc_irqmask;
 		if (irq_claim(sc->sc_podule->interrupt, ihp))
-			panic("%s: Cannot claim interrupt %d\n",
+			panic("%s: Cannot claim interrupt %d",
 			    self->dv_xname, sc->sc_podule->interrupt);
 		/* clear any pending interrupts and enable interrupts */
 		sc->sc_ctl_reg |= scp->sc_irqmask;
 		bus_space_write_1(sc->sc_ctliot, sc->sc_ctlioh,
 		    CONTROL_REGISTER_OFFSET, sc->sc_ctl_reg);
+		wdcattach(cp);
 	}
-
 }
 
 /*

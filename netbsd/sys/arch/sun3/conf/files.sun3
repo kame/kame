@@ -1,4 +1,4 @@
-#	$NetBSD: files.sun3,v 1.62 2001/11/20 12:56:41 lukem Exp $
+#	$NetBSD: files.sun3,v 1.71 2003/11/15 17:52:30 bouyer Exp $
 
 #
 # sun3-specific configuration info
@@ -32,13 +32,10 @@ file arch/sun3/sun3x/pmap.c			_sun3x_
 
 # Standard stuff (common to Sun3 and Sun3X)
 file arch/sun3/sun3/autoconf.c
-file arch/sun3/sun3/conf.c
 file arch/sun3/sun3/db_machdep.c		ddb
 file arch/sun3/sun3/db_memrw.c			ddb | kgdb
-file arch/sun3/sun3/disksubr.c
 file arch/sun3/sun3/fpu.c
 file arch/sun3/sun3/isr.c
-file arch/sun3/sun3/kgdb_machdep.c 		kgdb
 file arch/sun3/sun3/leds.c
 file arch/sun3/sun3/procfs_machdep.c		procfs
 file arch/sun3/sun3/stub.c
@@ -46,7 +43,10 @@ file arch/sun3/sun3/sunmon.c
 file arch/sun3/sun3/sys_machdep.c
 file arch/sun3/sun3/trap.c
 file arch/sun3/sun3/vector.c
-file arch/sun3/sun3/vm_machdep.c
+file arch/m68k/m68k/cacheops.c			_sun3x_
+file arch/m68k/m68k/kgdb_machdep.c 		kgdb
+file arch/m68k/m68k/vm_machdep.c
+file dev/sun/disksubr.c
 
 include "arch/m68k/fpe/files.fpe"
 
@@ -130,7 +130,6 @@ device oclock
 attach oclock at obio
 file arch/sun3/sun3/clock.c		_sun3_
 file arch/sun3/sun3x/clock.c		_sun3x_
-file dev/clock_subr.c
 
 # EEPROM (or NV-RAM)
 device eeprom
@@ -240,6 +239,7 @@ file dev/sun/event.c			zsevent
 device kbd: zsevent
 attach kbd at zsc with kbd_zs
 file dev/sun/kbd_zs.c			kbd_zs
+file dev/sun/kbdsun.c			kbd_zs
 file dev/sun/kbd.c			kbd needs-flag
 file dev/sun/kbd_tables.c 		kbd
 file arch/sun3/dev/kd.c 		kbd
@@ -252,6 +252,14 @@ file dev/sun/ms.c			ms needs-flag
 
 # Memory Disk for boot tape
 file dev/md_root.c			memory_disk_hooks
+
+
+#
+# wscons
+#
+
+include "dev/wscons/files.wscons"
+include "dev/wsfont/files.wsfont"
 
 # Compatibility modules
 
@@ -273,9 +281,4 @@ file arch/m68k/m68k/linux_trap.c	compat_linux
 # OSS audio driver compatibility
 include "compat/ossaudio/files.ossaudio"
 
-# Major numbers for root/swap device configuration
-major	{xy=3}	# Xylogics 450 and 451
-major	{sd=7}	# SCSI disk
-major	{xd=10}	# Xylogics 7053
-major	{md=13}	# Memory disk (for mini-kernel)
-major	{raid=25} # RAIDframe
+include "arch/sun3/conf/majors.sun3"

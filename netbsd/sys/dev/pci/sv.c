@@ -1,4 +1,4 @@
-/*      $NetBSD: sv.c,v 1.15 2001/11/13 07:48:49 lukem Exp $ */
+/*      $NetBSD: sv.c,v 1.22 2003/05/03 18:11:37 wiz Exp $ */
 /*      $OpenBSD: sv.c,v 1.2 1998/07/13 01:50:15 csapuntz Exp $ */
 
 /*
@@ -74,7 +74,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sv.c,v 1.15 2001/11/13 07:48:49 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sv.c,v 1.22 2003/05/03 18:11:37 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -96,6 +96,18 @@ __KERNEL_RCSID(0, "$NetBSD: sv.c,v 1.15 2001/11/13 07:48:49 lukem Exp $");
 #include <dev/pci/svvar.h>
 
 #include <machine/bus.h>
+
+/* XXX
+ * The SonicVibes DMA is broken and only works on 24-bit addresses.
+ * As long as bus_dmamem_alloc_range() is missing we use the ISA
+ * DMA tag on i386.
+ */
+#if defined(i386)
+#include "isa.h"
+#if NISA > 0
+#include <dev/isa/isavar.h>
+#endif
+#endif
 
 #ifdef AUDIO_DEBUG
 #define DPRINTF(x)	if (svdebug) printf x
@@ -121,9 +133,8 @@ struct sv_dma {
 #define DMAADDR(p) ((p)->map->dm_segs[0].ds_addr)
 #define KERNADDR(p) ((void *)((p)->addr))
 
-struct cfattach sv_ca = {
-	sizeof(struct sv_softc), sv_match, sv_attach
-};
+CFATTACH_DECL(sv, sizeof(struct sv_softc),
+    sv_match, sv_attach, NULL, NULL);
 
 struct audio_device sv_device = {
 	"S3 SonicVibes",
@@ -151,8 +162,8 @@ int	sv_getdev __P((void *, struct audio_device *));
 int	sv_mixer_set_port __P((void *, mixer_ctrl_t *));
 int	sv_mixer_get_port __P((void *, mixer_ctrl_t *));
 int	sv_query_devinfo __P((void *, mixer_devinfo_t *));
-void   *sv_malloc __P((void *, int, size_t, int, int));
-void	sv_free __P((void *, void *, int));
+void   *sv_malloc __P((void *, int, size_t, struct malloc_type *, int));
+void	sv_free __P((void *, void *, struct malloc_type *));
 size_t	sv_round_buffersize __P((void *, int, size_t));
 paddr_t	sv_mappage __P((void *, void *, off_t, int));
 int	sv_get_props __P((void *));
@@ -274,8 +285,8 @@ int pci_alloc_io __P((pci_chipset_tag_t pc, pcitag_t pt,
 		      bus_size_t align, bus_size_t bound, int flags,
 		      bus_space_handle_t *ioh));
 
-#define PCI_IO_ALLOC_LOW 0xa000
-#define PCI_IO_ALLOC_HIGH 0xb000
+static pcireg_t pci_io_alloc_low, pci_io_alloc_high;
+
 int
 pci_alloc_io(pc, pt, pcioffs, iot, size, align, bound, flags, ioh)
 	pci_chipset_tag_t pc;
@@ -291,7 +302,7 @@ pci_alloc_io(pc, pt, pcioffs, iot, size, align, bound, flags, ioh)
 	bus_addr_t addr;
 	int error;
 
-	error = bus_space_alloc(iot, PCI_IO_ALLOC_LOW, PCI_IO_ALLOC_HIGH,
+	error = bus_space_alloc(iot, pci_io_alloc_low, pci_io_alloc_high,
 				size, align, bound, flags, &addr, ioh);
 	if (error)
 		return(error);
@@ -313,6 +324,14 @@ sv_defer(self)
 	pcireg_t dmaio;
 
 	DPRINTF(("sv_defer: %p\n", sc));
+
+	/* XXX
+	 * Get a reasonable default for the I/O range.
+	 * Assume the range around SB_PORTBASE is valid on this PCI bus.
+	 */
+	pci_io_alloc_low = pci_conf_read(pc, pt, SV_SB_PORTBASE_SLOT);
+	pci_io_alloc_high = pci_io_alloc_low + 0x1000;
+
 	if (pci_alloc_io(pc, pt, SV_DMAA_CONFIG_OFF, 
 			  sc->sc_iot, SV_DMAA_SIZE, SV_DMAA_ALIGN, 0,
 			  0, &sc->sc_dmaa_ioh)) {
@@ -378,9 +397,16 @@ sv_attach(parent, self, aux)
 	DPRINTF(("sv: IO ports: enhanced=0x%x, OPL=0x%x, MIDI=0x%x\n",
 		 (int)sc->sc_ioh, (int)sc->sc_oplioh, (int)sc->sc_midiioh));
 
-#ifdef alpha
+#if defined(alpha)
 	/* XXX Force allocation through the SGMAP. */
 	sc->sc_dmatag = alphabus_dma_get_tag(pa->pa_dmat, ALPHA_BUS_ISA);
+#elif defined(i386) && NISA > 0
+/* XXX
+ * The SonicVibes DMA is broken and only works on 24-bit addresses.
+ * As long as bus_dmamem_alloc_range() is missing we use the ISA
+ * DMA tag on i386.
+ */
+	sc->sc_dmatag = &isa_bus_dma_tag;
 #else
 	sc->sc_dmatag = pa->pa_dmat;
 #endif
@@ -765,14 +791,14 @@ sv_set_params(addr, setmode, usemode, play, rec)
 	if (setmode & AUMODE_RECORD) {
 		/* The ADC reference frequency (f_out) is 512 * sample rate */
 
-		/* f_out is dervied from the 24.576MHZ crystal by three values:
+		/* f_out is dervied from the 24.576MHz crystal by three values:
 		   M & N & R. The equation is as follows:
 
 		   f_out = (m + 2) * f_ref / ((n + 2) * (2 ^ a))
 
 		   with the constraint that:
 
-		   80 MhZ < (m + 2) / (n + 2) * f_ref <= 150Mhz
+		   80 MHz < (m + 2) / (n + 2) * f_ref <= 150MHz
 		   and n, m >= 1
 		*/
 
@@ -862,7 +888,7 @@ sv_trigger_output(addr, start, end, blksize, intr, arg, param)
 	}
 
 	dma_count = ((char *)end - (char *)start) - 1;
-	DPRINTF(("sv_trigger_output: dma start loop input addr=%x cc=%d\n", 
+	DPRINTF(("sv_trigger_output: DMA start loop input addr=%x cc=%d\n", 
 	    (int)DMAADDR(p), dma_count));
 
 	bus_space_write_4(sc->sc_iot, sc->sc_dmaa_ioh, SV_DMA_ADDR0,
@@ -921,7 +947,7 @@ sv_trigger_input(addr, start, end, blksize, intr, arg, param)
 	}
 
 	dma_count = (((char *)end - (char *)start) >> 1) - 1;
-	DPRINTF(("sv_trigger_input: dma start loop input addr=%x cc=%d\n", 
+	DPRINTF(("sv_trigger_input: DMA start loop input addr=%x cc=%d\n", 
 	    (int)DMAADDR(p), dma_count));
 
 	bus_space_write_4(sc->sc_iot, sc->sc_dmac_ioh, SV_DMA_ADDR0,
@@ -1438,7 +1464,8 @@ sv_malloc(addr, direction, size, pool, flags)
 	void *addr;
 	int direction;
 	size_t size;
-	int pool, flags;
+	struct malloc_type *pool;
+	int flags;
 {
 	struct sv_softc *sc = addr;
 	struct sv_dma *p;
@@ -1461,7 +1488,7 @@ void
 sv_free(addr, ptr, pool)
 	void *addr;
 	void *ptr;
-	int pool;
+	struct malloc_type *pool;
 {
 	struct sv_softc *sc = addr;
 	struct sv_dma **pp, *p;

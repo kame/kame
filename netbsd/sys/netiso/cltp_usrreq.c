@@ -1,4 +1,4 @@
-/*	$NetBSD: cltp_usrreq.c,v 1.19 2002/05/12 21:30:36 matt Exp $	*/
+/*	$NetBSD: cltp_usrreq.c,v 1.23 2003/09/30 00:01:18 christos Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cltp_usrreq.c,v 1.19 2002/05/12 21:30:36 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cltp_usrreq.c,v 1.23 2003/09/30 00:01:18 christos Exp $");
 
 #ifndef CLTPOVAL_SRC		/* XXX -- till files gets changed */
 #include <sys/param.h>
@@ -200,7 +196,7 @@ cltp_ctlinput(cmd, sa, dummy)
 	extern u_char   inetctlerrmap[];
 	struct sockaddr_iso *siso;
 
-	if ((unsigned) cmd > PRC_NCMDS)
+	if ((unsigned)cmd >= PRC_NCMDS)
 		return;
 	if (sa->sa_family != AF_ISO && sa->sa_family != AF_CCITT)
 		return;

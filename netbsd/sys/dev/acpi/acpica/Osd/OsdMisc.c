@@ -1,4 +1,4 @@
-/*	$NetBSD: OsdMisc.c,v 1.2 2001/11/13 13:01:58 lukem Exp $	*/
+/*	$NetBSD: OsdMisc.c,v 1.8 2003/07/06 03:50:07 kochi Exp $	*/
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: OsdMisc.c,v 1.2 2001/11/13 13:01:58 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: OsdMisc.c,v 1.8 2003/07/06 03:50:07 kochi Exp $");
 
 #include "opt_ddb.h"
 
@@ -52,11 +52,14 @@ __KERNEL_RCSID(0, "$NetBSD: OsdMisc.c,v 1.2 2001/11/13 13:01:58 lukem Exp $");
 #include <machine/db_machdep.h>
 
 #include <ddb/db_extern.h>
+#include <ddb/db_output.h>
 
 #include <dev/acpi/acpica.h>
 #include <dev/acpi/acpi_osd.h>
 
 #include <dev/acpi/acpica/Subsystem/acdebug.h>
+
+int acpi_indebugger;
 
 /*
  * AcpiOsSignal:
@@ -108,13 +111,33 @@ AcpiOsGetLine(char *Buffer)
 
 	db_readline(Buffer, 80);
 	for (cp = Buffer; *cp != 0; cp++)
-		if (*cp == '\n')
+		if (*cp == '\n' || *cp == '\r')
 			*cp = 0;
+	db_output_line = 0;
 	return (AE_OK);
 #else
 	printf("ACPI: WARNING: DDB not configured into kernel.\n");
 	return (AE_NOT_EXIST);
 #endif
+}
+
+ACPI_STATUS
+AcpiOsTableOverride(ACPI_TABLE_HEADER *ExistingTable,
+		    ACPI_TABLE_HEADER **NewTable)
+{
+	*NewTable = NULL;
+	return (AE_OK);
+}
+
+ACPI_STATUS
+AcpiOsPredefinedOverride(const ACPI_PREDEFINED_NAMES *InitVal,
+			 ACPI_STRING *NewVal)
+{
+	if (!InitVal || !NewVal)
+		return (AE_BAD_PARAMETER);
+
+	*NewVal = NULL;
+	return (AE_OK);
 }
 
 /*
@@ -125,9 +148,11 @@ AcpiOsGetLine(char *Buffer)
 void
 acpi_osd_debugger(void)
 {
-#ifdef ENABLE_DEBUGGER
+#ifdef ACPI_DEBUGGER
 	static int beenhere;
 	ACPI_PARSE_OBJECT obj;
+	label_t	acpi_jmpbuf;
+	label_t	*savejmp;
 
 	if (beenhere == 0) {
 		printf("Initializing ACPICA debugger...\n");
@@ -136,8 +161,16 @@ acpi_osd_debugger(void)
 	}
 
 	printf("Entering ACPICA debugger...\n");
+	savejmp = db_recover;
+	setjmp(&acpi_jmpbuf);
+	db_recover = &acpi_jmpbuf;
+
+	acpi_indebugger = 1;
 	AcpiDbUserCommands('A', &obj);
+	acpi_indebugger = 0;
+
+	db_recover = savejmp;
 #else
-	printf("ACPI: WARNING: ACPCICA debugger not present.\n");
+	printf("ACPI: WARNING: ACPICA debugger not present.\n");
 #endif
 }

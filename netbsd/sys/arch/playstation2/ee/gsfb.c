@@ -1,4 +1,4 @@
-/*	$NetBSD: gsfb.c,v 1.3 2002/03/17 19:40:48 atatat Exp $	*/
+/*	$NetBSD: gsfb.c,v 1.9 2003/11/02 13:12:14 shin Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: gsfb.c,v 1.9 2003/11/02 13:12:14 shin Exp $");
 
 #include "debug_playstation2.h"
 
@@ -184,9 +187,8 @@ STATIC char _gsfb_debug_buf[80 * 2];
 STATIC int gsfb_match(struct device *, struct cfdata *, void *);
 STATIC void gsfb_attach(struct device *, struct device *, void *);
 
-struct cfattach gsfb_ca = {
-	sizeof(struct device), gsfb_match, gsfb_attach
-};
+CFATTACH_DECL(gsfb, sizeof(struct device),
+    gsfb_match, gsfb_attach, NULL, NULL);
 
 STATIC void gsfb_hwinit(void);
 STATIC int gsfb_swinit(void);
@@ -203,7 +205,7 @@ STATIC void _gsfb_copycols(void *, int, int, int, int);
 STATIC void _gsfb_erasecols(void *, int, int, int, long);
 STATIC void _gsfb_copyrows(void *, int, int, int);
 STATIC void _gsfb_eraserows(void *, int, int, long);
-STATIC int _gsfb_alloc_attr(void *, int, int, int, long *);
+STATIC int _gsfb_allocattr(void *, int, int, int, long *);
 
 /* access ops */
 STATIC int _gsfb_ioctl(void *, u_long, caddr_t, int, struct proc *);
@@ -231,7 +233,7 @@ const struct wsdisplay_emulops _gsfb_emulops = {
 	.erasecols	= _gsfb_erasecols,
 	.copyrows	= _gsfb_copyrows,
 	.eraserows	= _gsfb_eraserows,
-	.alloc_attr	= _gsfb_alloc_attr
+	.allocattr	= _gsfb_allocattr
 };
 
 const struct wsscreen_descr _gsfb_std_screen = {
@@ -496,7 +498,7 @@ _gsfb_eraserows(void *cookie, int row, int nrow, long attr)
 }
 
 int
-_gsfb_alloc_attr(void *cookie, int fg, int bg, int flags, long *attr)
+_gsfb_allocattr(void *cookie, int fg, int bg, int flags, long *attr)
 {
 
 	if ((flags & WSATTR_BLINK) != 0)
@@ -529,7 +531,7 @@ paddr_t
 _gsfb_mmap(void *v, off_t offset, int prot)
 {
 
-	return (NULL); /* can't mmap */
+	return (-1); /* can't mmap */
 }
 
 int

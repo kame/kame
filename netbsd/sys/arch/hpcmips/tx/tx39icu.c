@@ -1,4 +1,4 @@
-/*	$NetBSD: tx39icu.c,v 1.18 2002/05/15 15:19:55 uch Exp $ */
+/*	$NetBSD: tx39icu.c,v 1.21 2003/07/15 02:29:33 lukem Exp $ */
 
 /*-
  * Copyright (c) 1999-2001 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: tx39icu.c,v 1.21 2003/07/15 02:29:33 lukem Exp $");
 
 #include "opt_vr41xx.h"
 #include "opt_tx39xx.h"
@@ -228,9 +231,8 @@ void	tx39_irqhigh_establish(tx_chipset_tag_t, int, int, int,
 void	tx39_irqhigh_intr(u_int32_t, u_int32_t, u_int32_t, u_int32_t);
 int	tx39_irqhigh(int, int);
 
-struct cfattach tx39icu_ca = {
-	sizeof(struct tx39icu_softc), tx39icu_match, tx39icu_attach
-};
+CFATTACH_DECL(tx39icu, sizeof(struct tx39icu_softc),
+    tx39icu_match, tx39icu_attach, NULL, NULL);
 
 int
 tx39icu_match(struct device *parent, struct cfdata *cf, void *aux)

@@ -1,4 +1,4 @@
-/*	$NetBSD: aac_pci.c,v 1.2.4.1 2002/11/16 09:47:01 he Exp $	*/
+/*	$NetBSD: aac_pci.c,v 1.8.2.2 2004/10/08 03:07:51 jmc Exp $	*/
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -72,7 +72,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: aac_pci.c,v 1.2.4.1 2002/11/16 09:47:01 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: aac_pci.c,v 1.8.2.2 2004/10/08 03:07:51 jmc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -248,6 +248,24 @@ struct aac_ident {
 		PCI_VENDOR_ADP2,
 		PCI_PRODUCT_ADP2_ASR2200S,
 		PCI_VENDOR_ADP2,
+		PCI_PRODUCT_ADP2_ASR2200S_SUB2M,
+		AAC_HWIF_I960RX,
+		0,
+		"Adaptec ASR-2200S"
+	},
+	{
+		PCI_VENDOR_ADP2,
+		PCI_PRODUCT_ADP2_ASR2200S,
+		PCI_VENDOR_DELL,
+		PCI_PRODUCT_ADP2_ASR2200S_SUB2M,
+		AAC_HWIF_I960RX,
+		0,
+		"Dell PERC 320/DC"
+	},
+	{
+		PCI_VENDOR_ADP2,
+		PCI_PRODUCT_ADP2_ASR2200S,
+		PCI_VENDOR_ADP2,
 		PCI_PRODUCT_ADP2_ASR2200S,
 		AAC_HWIF_I960RX,
 		0,
@@ -257,10 +275,28 @@ struct aac_ident {
 		PCI_VENDOR_ADP2,
 		PCI_PRODUCT_ADP2_ASR2200S,
 		PCI_VENDOR_ADP2,
+		PCI_PRODUCT_ADP2_AAR2810SA,
+		AAC_HWIF_I960RX,
+		0,
+		"Adaptec AAR-2810SA"
+	},
+	{
+		PCI_VENDOR_ADP2,
+		PCI_PRODUCT_ADP2_ASR2200S,
+		PCI_VENDOR_ADP2,
 		PCI_PRODUCT_ADP2_ASR2120S,
 		AAC_HWIF_I960RX,
 		0,
 		"Adaptec ASR-2120S"
+	},
+	{
+		PCI_VENDOR_ADP2,
+		PCI_PRODUCT_ADP2_ASR2200S,
+		PCI_VENDOR_ADP2,
+		0x0290,
+		AAC_HWIF_I960RX,
+		0,
+		"Adaptec ASR-2410SA"
 	},
 	{
 		PCI_VENDOR_DEC,
@@ -309,9 +345,8 @@ struct aac_ident {
 	},
 };
 
-struct cfattach aac_pci_ca = {
-	sizeof(struct aac_softc), aac_pci_match, aac_pci_attach
-};
+CFATTACH_DECL(aac_pci, sizeof(struct aac_softc),
+    aac_pci_match, aac_pci_attach, NULL, NULL);
 
 const struct aac_ident *
 aac_find_ident(struct pci_attach_args *pa)
@@ -369,7 +404,8 @@ aac_pci_attach(struct device *parent, struct device *self, void *aux)
 	sc = (struct aac_softc *)self;
 	state = 0;
 
-	printf(": ");
+	aprint_naive(": RAID controller\n");
+	aprint_normal(": ");
 
 	/*
 	 * Verify that the adapter is correctly set up in PCI space.
@@ -381,12 +417,12 @@ aac_pci_attach(struct device *parent, struct device *self, void *aux)
 	AAC_DPRINTF(AAC_D_MISC, ("pci command status reg 0x08x "));
 
 	if ((command & PCI_COMMAND_MASTER_ENABLE) == 0) {
-		printf("can't enable bus-master feature\n");
+		aprint_error("can't enable bus-master feature\n");
 		goto bail_out;
 	}
 
 	if ((command & PCI_COMMAND_MEM_ENABLE) == 0) {
-		printf("memory window not available\n");
+		aprint_error("memory window not available\n");
 		goto bail_out;
 	}
 
@@ -396,22 +432,22 @@ aac_pci_attach(struct device *parent, struct device *self, void *aux)
 	if (pci_mapreg_map(pa, PCI_MAPREG_START,
 	    PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT, 0, &sc->sc_memt,
 	    &sc->sc_memh, &membase, &memsize)) {
-		printf("can't find mem space\n");
+		aprint_error("can't find mem space\n");
 		goto bail_out;
 	}
 	state++;
 
 	if (pci_intr_map(pa, &ih)) {
-		printf("couldn't map interrupt\n");
+		aprint_error("couldn't map interrupt\n");
 		goto bail_out;
 	}
 	intrstr = pci_intr_string(pc, ih);
 	sc->sc_ih = pci_intr_establish(pc, ih, IPL_BIO, aac_intr, sc);
 	if (sc->sc_ih == NULL) {
-		printf("couldn't establish interrupt");
+		aprint_error("couldn't establish interrupt");
 		if (intrstr != NULL)
-			printf(" at %s", intrstr);
-		printf("\n");
+			aprint_normal(" at %s", intrstr);
+		aprint_normal("\n");
 		goto bail_out;
 	}
 	state++;
@@ -419,9 +455,10 @@ aac_pci_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_dmat = pa->pa_dmat;
 
 	m = aac_find_ident(pa);
-	printf("%s\n", m->prodstr);
+	aprint_normal("%s\n", m->prodstr);
 	if (intrstr != NULL)
-		printf("%s: interrupting at %s\n", sc->sc_dv.dv_xname, intrstr);
+		aprint_normal("%s: interrupting at %s\n",
+		    sc->sc_dv.dv_xname, intrstr);
 
 	sc->sc_hwif = m->hwif;
 	sc->sc_quirks = m->quirks;

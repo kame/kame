@@ -1,7 +1,6 @@
-/*	$NetBSD: ext2fs.h,v 1.10 2000/01/28 16:00:23 bouyer Exp $	*/
+/*	$NetBSD: ext2fs.h,v 1.15 2004/03/22 19:23:08 bouyer Exp $	*/
 
 /*
- * Copyright (c) 1997 Manuel Bouyer.
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,6 +31,41 @@
  *	@(#)fs.h	8.10 (Berkeley) 10/27/94
  *  Modified for ext2fs by Manuel Bouyer.
  */
+
+/*
+ * Copyright (c) 1997 Manuel Bouyer.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by Manuel Bouyer.
+ * 4. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ *	@(#)fs.h	8.10 (Berkeley) 10/27/94
+ *  Modified for ext2fs by Manuel Bouyer.
+ */
+
+#ifndef _UFS_EXT2FS_EXT2FS_H_
+#define _UFS_EXT2FS_EXT2FS_H_
 
 #include <machine/bswap.h>
 
@@ -58,8 +88,8 @@
 #define SBSIZE		1024
 #define	BBOFF		((off_t)(0))
 #define	SBOFF		((off_t)(BBOFF + BBSIZE))
-#define	BBLOCK		((ufs_daddr_t)(0))
-#define	SBLOCK		((ufs_daddr_t)(BBLOCK + BBSIZE / DEV_BSIZE))
+#define	BBLOCK		((daddr_t)(0))
+#define	SBLOCK		((daddr_t)(BBLOCK + BBSIZE / DEV_BSIZE))
 
 /*
  * Addresses stored in inodes are capable of addressing blocks
@@ -244,8 +274,10 @@ cg_has_sb(i)
 #if BYTE_ORDER == LITTLE_ENDIAN
 #	define h2fs16(x) (x)
 #	define h2fs32(x) (x)
+#	define h2fs64(x) (x)
 #	define fs2h16(x) (x)
 #	define fs2h32(x) (x)
+#	define fs2h64(x) (x)
 #	define e2fs_sbload(old, new) memcpy((new), (old), SBSIZE);
 #	define e2fs_cgload(old, new, size) memcpy((new), (old), (size));
 #	define e2fs_sbsave(old, new) memcpy((new), (old), SBSIZE);
@@ -255,8 +287,10 @@ void e2fs_sb_bswap __P((struct ext2fs *, struct ext2fs *));
 void e2fs_cg_bswap __P((struct ext2_gd *, struct ext2_gd *, int));
 #	define h2fs16(x) bswap16(x)
 #	define h2fs32(x) bswap32(x)
+#	define h2fs64(x) bswap64(x)
 #	define fs2h16(x) bswap16(x)
 #	define fs2h32(x) bswap32(x)
+#	define fs2h64(x) bswap64(x)
 #	define e2fs_sbload(old, new) e2fs_sb_bswap((old), (new))
 #	define e2fs_cgload(old, new, size) e2fs_cg_bswap((old), (new), (size));
 #	define e2fs_sbsave(old, new) e2fs_sb_bswap((old), (new))
@@ -316,3 +350,5 @@ void e2fs_cg_bswap __P((struct ext2_gd *, struct ext2_gd *, int));
  * Number of indirects in a file system block.
  */
 #define	NINDIR(fs)	((fs)->e2fs_bsize / sizeof(u_int32_t))
+
+#endif /* !_UFS_EXT2FS_EXT2FS_H_ */

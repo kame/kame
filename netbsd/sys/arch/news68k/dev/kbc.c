@@ -1,4 +1,4 @@
-/*	$NetBSD: kbc.c,v 1.1 2001/01/25 14:33:30 tsutsui Exp $	*/
+/*	$NetBSD: kbc.c,v 1.7 2003/07/15 02:59:26 lukem Exp $	*/
 
 /*-
  * Copyright (C) 2001 Izumi Tsutsui.  All rights reserved.
@@ -26,6 +26,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kbc.c,v 1.7 2003/07/15 02:59:26 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -44,13 +46,12 @@
 #define KBC_SIZE 0x10 /* XXX */
 
 /* Definition of the driver for autoconfig. */
-static int kbc_match __P((struct device *, struct cfdata *, void *));
-static void kbc_attach __P((struct device *, struct device *, void *));
-static int kbc_print __P((void *, const char *name));
+static int  kbc_match(struct device *, struct cfdata *, void *);
+static void kbc_attach(struct device *, struct device *, void *);
+static int  kbc_print(void *, const char *name);
 
-struct cfattach kbc_ca = {
-	sizeof(struct device), kbc_match, kbc_attach
-};
+CFATTACH_DECL(kbc, sizeof(struct device),
+    kbc_match, kbc_attach, NULL, NULL);
 
 extern struct cfdriver kbc_cd;
 
@@ -66,7 +67,7 @@ static int kbc_match(parent, cf, aux)
 		return 0;
 
 	/* XXX no default address */
-	if (ha->ha_address == -1)
+	if (ha->ha_address == (u_int)-1)
 		return 0;
 
 	addr = IIOV(ha->ha_address); /* XXX */
@@ -116,7 +117,7 @@ kbc_print(aux, name)
 {
 
 	if (name != NULL)
-		printf("%s: ", name);
+		aprint_normal("%s: ", name);
 
 	return UNCONF;
 }

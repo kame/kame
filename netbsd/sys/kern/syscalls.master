@@ -1,4 +1,4 @@
-	$NetBSD: syscalls.master,v 1.111 2002/05/03 00:20:56 eeh Exp $
+	$NetBSD: syscalls.master,v 1.138 2004/03/26 15:18:54 drochner Exp $
 
 ;	@(#)syscalls.master	8.2 (Berkeley) 1/13/94
 
@@ -43,6 +43,7 @@
 #include "opt_compat_netbsd.h"
 #include "opt_sysv.h"
 #include "opt_compat_43.h"
+#include "opt_posix.h"
 
 #include "fs_lfs.h"
 #include "fs_nfs.h"
@@ -51,6 +52,7 @@
 #include <sys/systm.h>
 #include <sys/signal.h>
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 %%
@@ -150,7 +152,7 @@
 48	COMPAT_13	{ int sys_sigprocmask(int how, \
 			    int mask); } sigprocmask13
 49	STD		{ int sys___getlogin(char *namebuf, size_t namelen); }
-50	STD		{ int sys_setlogin(const char *namebuf); }
+50	STD		{ int sys___setlogin(const char *namebuf); }
 51	STD		{ int sys_acct(const char *path); }
 52	COMPAT_13	{ int sys_sigpending(void); } sigpending13
 53	COMPAT_13	{ int sys_sigaltstack( \
@@ -494,11 +496,15 @@
 			    const struct timespec *tp); }
 234	STD		{ int sys_clock_getres(clockid_t clock_id, \
 			    struct timespec *tp); }
-235	UNIMPL		timer_create
-236	UNIMPL		timer_delete
-237	UNIMPL		timer_settime
-238	UNIMPL		timer_gettime
-239	UNIMPL		timer_getoverrun
+235	STD		{ int sys_timer_create(clockid_t clock_id, \
+			    struct sigevent *evp, timer_t *timerid); }
+236	STD		{ int sys_timer_delete(timer_t timerid); }
+237	STD		{ int sys_timer_settime(timer_t timerid, int flags, \
+			    const struct itimerspec *value, \
+			    struct itimerspec *ovalue); }
+238	STD		{ int sys_timer_gettime(timer_t timerid, struct \
+			    itimerspec *value); }
+239	STD		{ int sys_timer_getoverrun(timer_t timerid); }
 ;
 ; Syscalls 240-269 are reserved for other IEEE Std1003.1b syscalls
 ;
@@ -507,29 +513,49 @@
 241	STD		{ int sys_fdatasync(int fd); }
 242	STD		{ int sys_mlockall(int flags); }
 243	STD		{ int sys_munlockall(void); }
-244	UNIMPL
-245	UNIMPL
+244	STD		{ int sys___sigtimedwait(const sigset_t *set, \
+			    siginfo_t *info, \
+			    struct timespec *timeout); }
+245	UNIMPL		sys_sigqueue
+;
+; Syscall 246 is free for any use
+;
 246	UNIMPL
-247	UNIMPL
-248	UNIMPL
-249	UNIMPL
-250	UNIMPL
-251	UNIMPL
-252	UNIMPL
-253	UNIMPL
-254	UNIMPL
-255	UNIMPL
-256	UNIMPL
-257	UNIMPL
-258	UNIMPL
-259	UNIMPL
-260	UNIMPL
-261	UNIMPL
-262	UNIMPL
-263	UNIMPL
-264	UNIMPL
-265	UNIMPL
-266	UNIMPL
+#if defined(P1003_1B_SEMAPHORE) || (!defined(_KERNEL) && defined(_LIBC))
+247	STD		{ int sys__ksem_init(unsigned int value, semid_t *idp); }
+248	STD		{ int sys__ksem_open(const char *name, int oflag, \
+			    mode_t mode, unsigned int value, semid_t *idp); }
+249	STD 		{ int sys__ksem_unlink(const char *name); }
+250	STD		{ int sys__ksem_close(semid_t id); }
+251	STD		{ int sys__ksem_post(semid_t id); }
+252	STD		{ int sys__ksem_wait(semid_t id); }
+253	STD		{ int sys__ksem_trywait(semid_t id); }
+254	STD		{ int sys__ksem_getvalue(semid_t id, \
+			    unsigned int *value); }
+255	STD		{ int sys__ksem_destroy(semid_t id); }
+256	UNIMPL		sys__ksem_timedwait
+#else
+247	EXCL		sys__ksem_init
+248	EXCL		sys__ksem_open
+249	EXCL 		sys__ksem_unlink
+250	EXCL		sys__ksem_close
+251	EXCL		sys__ksem_post
+252	EXCL		sys__ksem_wait
+253	EXCL		sys__ksem_trywait
+254	EXCL		sys__ksem_getvalue
+255	EXCL		sys__ksem_destroy
+256	UNIMPL		sys__ksem_timedwait
+#endif
+257	UNIMPL		sys_mq_open
+258	UNIMPL		sys_mq_close
+259	UNIMPL		sys_mq_unlink
+260	UNIMPL		sys_mq_getattr
+261	UNIMPL		sys_mq_setattr
+262	UNIMPL		sys_mq_notify
+263	UNIMPL		sys_mq_send
+264	UNIMPL		sys_mq_receive
+265	UNIMPL		sys_mq_timedsend
+266	UNIMPL		sys_mq_timedreceive
 267	UNIMPL
 268	UNIMPL
 269	UNIMPL
@@ -572,7 +598,7 @@
 290	STD		{ ssize_t sys_pwritev(int fd, \
 			    const struct iovec *iovp, int iovcnt, \
 			    int pad, off_t offset); }
-291	STD		{ int sys___sigaction14(int signum, \
+291	COMPAT_16	{ int sys___sigaction14(int signum, \
 			    const struct sigaction *nsa, \
 			    struct sigaction *osa); }
 292	STD		{ int sys___sigpending14(sigset_t *set); }
@@ -580,7 +606,7 @@
 			    const sigset_t *set, \
 			    sigset_t *oset); }
 294	STD		{ int sys___sigsuspend14(const sigset_t *set); }
-295	STD		{ int sys___sigreturn14(struct sigcontext *sigcntxp); }
+295	COMPAT_16	{ int sys___sigreturn14(struct sigcontext *sigcntxp); }
 296	STD		{ int sys___getcwd(char *bufp, size_t length); }
 297	STD		{ int sys_fchroot(int fd); }
 298	STD		{ int sys_fhopen(const fhandle_t *fhp, int flags); }
@@ -609,24 +635,21 @@
 304	STD		{ int sys_lchflags(const char *path, u_long flags); }
 305	STD		{ int sys_issetugid(void); }
 306	STD		{ int sys_utrace(const char *label, void *addr, \
-			    size_t len); }
-;
-; Syscalls 307 and 308 are reserved for getcontext and setcontext
-;
-307	UNIMPL
-308	UNIMPL
-;
-; Syscalls 309-339 are reserved for LWP and scheduler activation syscalls.
-;
-309	UNIMPL
-310	UNIMPL
-311	UNIMPL
-312	UNIMPL
-313	UNIMPL
-314	UNIMPL
-315	UNIMPL
-316	UNIMPL
-317	UNIMPL
+				size_t len); }
+307	STD		{ int sys_getcontext(struct __ucontext *ucp); }
+308	STD		{ int sys_setcontext(const struct __ucontext *ucp); }
+309	STD		{ int sys__lwp_create(const struct __ucontext *ucp, \
+				u_long flags, lwpid_t *new_lwp); }
+310	STD		{ int sys__lwp_exit(void); }
+311	STD		{ lwpid_t sys__lwp_self(void); }
+312	STD		{ int sys__lwp_wait(lwpid_t wait_for, \
+				lwpid_t *departed); }
+313	STD		{ int sys__lwp_suspend(lwpid_t target); }
+314	STD		{ int sys__lwp_continue(lwpid_t target); }
+315	STD		{ int sys__lwp_wakeup(lwpid_t target); }
+316	STD		{ void *sys__lwp_getprivate(void); }
+317	STD		{ void sys__lwp_setprivate(void *ptr); }
+; Syscalls 318-329 reserved for remaining Solaris-compatible LWP calls.
 318	UNIMPL
 319	UNIMPL
 320	UNIMPL
@@ -639,13 +662,46 @@
 327	UNIMPL
 328	UNIMPL
 329	UNIMPL
-330	UNIMPL
-331	UNIMPL
-332	UNIMPL
-333	UNIMPL
-334	UNIMPL
-335	UNIMPL
-336	UNIMPL
+; Scheduler activation syscalls
+330	STD		{ int sys_sa_register(sa_upcall_t new, \
+				sa_upcall_t *old, int flags, \
+				ssize_t stackinfo_offset); }
+331	STD		{ int sys_sa_stacks(int num, stack_t *stacks); }
+332	STD		{ int sys_sa_enable(void); }
+333	STD		{ int sys_sa_setconcurrency(int concurrency); }
+334	STD		{ int sys_sa_yield(void); }
+335	STD		{ int sys_sa_preempt(int sa_id); }
+336	OBSOL		sys_sa_unblockyield
+;
+; Syscalls 337-339 are reserved for other scheduler activation syscalls.
+;
 337	UNIMPL
 338	UNIMPL
 339	UNIMPL
+340	STD		{ int sys___sigaction_sigtramp(int signum, \
+			    const struct sigaction *nsa, \
+			    struct sigaction *osa, \
+			    const void *tramp, int vers); }
+341	STD		{ int sys_pmc_get_info(int ctr, int op, void *args); }
+342	STD		{ int sys_pmc_control(int ctr, int op, void *args); }
+343	STD		{ int sys_rasctl(caddr_t addr, size_t len, int op); }
+344	STD		{ int sys_kqueue(void); }
+345	STD		{ int sys_kevent(int fd, \
+			    const struct kevent *changelist, size_t nchanges, \
+			    struct kevent *eventlist, size_t nevents, \
+			    const struct timespec *timeout); }
+;
+; Syscalls 346-353 are reserved for the IEEE Std1003.1b scheduling syscalls
+;
+346	UNIMPL		sys_sched_setparam
+347	UNIMPL		sys_sched_getparam
+348	UNIMPL		sys_sched_setscheduler
+349	UNIMPL		sys_sched_getscheduler
+350	UNIMPL		sys_sched_yield
+351	UNIMPL		sys_sched_get_priority_max
+352	UNIMPL		sys_sched_get_priority_min
+353	UNIMPL		sys_sched_rr_get_interval
+
+354	STD		{ int sys_fsync_range(int fd, int flags, off_t start, \
+			    off_t length); }
+355	STD		{ int sys_uuidgen(struct uuid *store, int count); }

@@ -1,4 +1,4 @@
-/*	$NetBSD: ncr5380.c,v 1.40 2001/04/25 17:53:13 bouyer Exp $	*/
+/*	$NetBSD: ncr5380.c,v 1.46 2003/07/15 01:19:51 lukem Exp $	*/
 
 /*
  * Copyright (c) 1995 Leo Weppelman.
@@ -29,6 +29,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ncr5380.c,v 1.46 2003/07/15 01:19:51 lukem Exp $");
 
 /*
  * Bit mask of targets you want debugging to be shown
@@ -194,10 +197,10 @@ int	ncr_match __P((struct device *, struct cfdata *, void *));
 #define CFNAME(n)	__CONCAT(n,_cd)
 #define CANAME(n)	__CONCAT(n,_ca)
 #define CFSTRING(n)	__STRING(n)
+#define	CFDRNAME(n)	n
 
-struct cfattach CANAME(DRNAME) = {
-	sizeof(struct ncr_softc), ncr_match, ncr_attach
-};
+CFATTACH_DECL(CFDRNAME(DRNAME), sizeof(struct ncr_softc),
+    ncr_match, ncr_attach, NULL, NULL);
 
 extern struct cfdriver CFNAME(DRNAME);
 
@@ -568,8 +571,8 @@ struct ncr_softc *sc;
 connected:
 	    if (connected) {
 		/*
-		 * If the host is currently connected but a 'real-dma' transfer
-		 * is in progress, the 'end-of-dma' interrupt restarts main.
+		 * If the host is currently connected but a 'real-DMA' transfer
+		 * is in progress, the 'end-of-DMA' interrupt restarts main.
 		 * So quit.
 		 */
 		sps = splbio();
@@ -692,7 +695,7 @@ struct ncr_softc *sc;
 #else
 			    if (pdma_ready())
 				return;
-			    panic("Got DMA interrupt without DMA\n");
+			    panic("Got DMA interrupt without DMA");
 #endif
 			}
 			scsi_clr_ipend();
@@ -1488,8 +1491,8 @@ again:
 
 	if (poll) {
 		/*
-		 * On polled-dma transfers, we wait here until the
-		 * 'end-of-dma' condition occurs.
+		 * On polled-DMA transfers, we wait here until the
+		 * 'end-of-DMA' condition occurs.
 		 */
 		poll_edma(reqp);
 		if (!(dma_done = dma_ready()))
@@ -1815,7 +1818,7 @@ struct ncr_softc *sc;
 #ifdef REAL_DMA
 /*
  * Check if DMA can be used for this request. This function also builds
- * the dma-chain.
+ * the DMA-chain.
  */
 static int
 scsi_dmaok(reqp)
@@ -1864,7 +1867,8 @@ SC_REQ	*reqp;
 	 */
 	dm->dm_addr = phy_buf = kvtop(req_addr);
 	while (req_len) {
-		if (req_len < (phy_len = NBPG - ((u_long)req_addr & PGOFSET)))
+		if (req_len <
+		    (phy_len = PAGE_SIZE - ((u_long)req_addr & PGOFSET)))
 			phy_len = req_len;
 
 		req_addr     += phy_len;

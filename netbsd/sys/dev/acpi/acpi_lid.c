@@ -1,7 +1,7 @@
-/*	$NetBSD: acpi_lid.c,v 1.3 2001/11/13 13:01:57 lukem Exp $	*/
+/*	$NetBSD: acpi_lid.c,v 1.13 2004/03/24 11:32:09 kanaoka Exp $	*/
 
 /*
- * Copyright 2001 Wasabi Systems, Inc.
+ * Copyright 2001, 2003 Wasabi Systems, Inc.
  * All rights reserved.
  *
  * Written by Jason R. Thorpe for Wasabi Systems, Inc.
@@ -40,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: acpi_lid.c,v 1.3 2001/11/13 13:01:57 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: acpi_lid.c,v 1.13 2004/03/24 11:32:09 kanaoka Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -50,20 +50,24 @@ __KERNEL_RCSID(0, "$NetBSD: acpi_lid.c,v 1.3 2001/11/13 13:01:57 lukem Exp $");
 #include <dev/acpi/acpireg.h>
 #include <dev/acpi/acpivar.h>
 
+#include <dev/sysmon/sysmonvar.h>
+
 struct acpilid_softc {
 	struct device sc_dev;		/* base device glue */
 	struct acpi_devnode *sc_node;	/* our ACPI devnode */
-	int sc_flags;			/* see below */
+	struct sysmon_pswitch sc_smpsw;	/* our sysmon glue */
 };
 
-#define	ACPILID_F_VERBOSE		0x01	/* verbose events */
+static const char * const lid_hid[] = {
+	"PNP0C0D",
+	NULL
+};
 
 int	acpilid_match(struct device *, struct cfdata *, void *);
 void	acpilid_attach(struct device *, struct device *, void *);
 
-struct cfattach acpilid_ca = {
-	sizeof(struct acpilid_softc), acpilid_match, acpilid_attach,
-};
+CFATTACH_DECL(acpilid, sizeof(struct acpilid_softc),
+    acpilid_match, acpilid_attach, NULL, NULL);
 
 void	acpilid_status_changed(void *);
 void	acpilid_notify_handler(ACPI_HANDLE, UINT32, void *context);
@@ -81,10 +85,7 @@ acpilid_match(struct device *parent, struct cfdata *match, void *aux)
 	if (aa->aa_node->ad_type != ACPI_TYPE_DEVICE)
 		return (0);
 
-	if (strcmp(aa->aa_node->ad_devinfo.HardwareId, "PNP0C0D") == 0)
-		return (1);
-
-	return (0);
+	return (acpi_match_hid(aa->aa_node->ad_devinfo, lid_hid));
 }
 
 /*
@@ -103,16 +104,21 @@ acpilid_attach(struct device *parent, struct device *self, void *aux)
 
 	sc->sc_node = aa->aa_node;
 
-	rv = AcpiInstallNotifyHandler(sc->sc_node->ad_handle,
-	    ACPI_DEVICE_NOTIFY, acpilid_notify_handler, sc);
-	if (rv != AE_OK) {
-		printf("%s: unable to register device notify handler: %d\n",
-		    sc->sc_dev.dv_xname, rv);
+	sc->sc_smpsw.smpsw_name = sc->sc_dev.dv_xname;
+	sc->sc_smpsw.smpsw_type = PSWITCH_TYPE_LID;
+	if (sysmon_pswitch_register(&sc->sc_smpsw) != 0) {
+		printf("%s: unable to register with sysmon\n",
+		    sc->sc_dev.dv_xname);
 		return;
 	}
 
-	/* Display the current state when it changes. */
-	sc->sc_flags = ACPILID_F_VERBOSE;
+	rv = AcpiInstallNotifyHandler(sc->sc_node->ad_handle,
+	    ACPI_DEVICE_NOTIFY, acpilid_notify_handler, sc);
+	if (ACPI_FAILURE(rv)) {
+		printf("%s: unable to register DEVICE NOTIFY handler: %s\n",
+		    sc->sc_dev.dv_xname, AcpiFormatException(rv));
+		return;
+	}
 }
 
 /*
@@ -124,20 +130,15 @@ void
 acpilid_status_changed(void *arg)
 {
 	struct acpilid_softc *sc = arg;
-	int status;
+	ACPI_INTEGER status;
+	ACPI_STATUS rv;
 
-	if (acpi_eval_integer(sc->sc_node->ad_handle, "_LID",
-	    &status) != AE_OK)
+	rv = acpi_eval_integer(sc->sc_node->ad_handle, "_LID", &status);
+	if (ACPI_FAILURE(rv))
 		return;
 
-	if (sc->sc_flags & ACPILID_F_VERBOSE)
-		printf("%s: Lid %s\n",
-		    sc->sc_dev.dv_xname,
-		    status == 0 ? "closed " : "open");
-
-	/*
-	 * XXX Perform the appropriate action for the new lid status.
-	 */
+	sysmon_pswitch_event(&sc->sc_smpsw, status == 0 ?
+	    PSWITCH_EVENT_PRESSED : PSWITCH_EVENT_RELEASED);
 }
 
 /*
@@ -159,9 +160,10 @@ acpilid_notify_handler(ACPI_HANDLE handle, UINT32 notify, void *context)
 #endif
 		rv = AcpiOsQueueForExecution(OSD_PRIORITY_LO,
 		    acpilid_status_changed, sc);
-		if (rv != AE_OK)
+		if (ACPI_FAILURE(rv))
 			printf("%s: WARNING: unable to queue lid change "
-			    "event: %d\n", sc->sc_dev.dv_xname, rv);
+			    "callback: %s\n", sc->sc_dev.dv_xname,
+			    AcpiFormatException(rv));
 		break;
 
 	default:

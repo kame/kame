@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.27 2002/05/08 22:22:46 thorpej Exp $	*/
+/*	$NetBSD: cpu.h,v 1.35 2004/01/04 11:33:29 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 1994-1996 Mark Brinicombe.
@@ -57,7 +57,8 @@
 #define	CPU_BOOTED_DEVICE	2	/* string: device we booted from */
 #define	CPU_BOOTED_KERNEL	3	/* string: kernel we booted */
 #define	CPU_CONSDEV		4	/* struct: dev_t of our console */
-#define	CPU_MAXID		5	/* number of valid machdep ids */
+#define	CPU_POWERSAVE		5	/* int: use CPU powersave mode */
+#define	CPU_MAXID		6	/* number of valid machdep ids */
 
 #define	CTL_MACHDEP_NAMES { \
 	{ 0, 0 }, \
@@ -65,6 +66,7 @@
 	{ "booted_device", CTLTYPE_STRING }, \
 	{ "booted_kernel", CTLTYPE_STRING }, \
 	{ "console_device", CTLTYPE_STRUCT }, \
+	{ "powersave", CTLTYPE_INT }, \
 }    
 
 #ifdef _KERNEL
@@ -74,6 +76,7 @@
  */
 
 #ifndef _LKM
+#include "opt_multiprocessor.h"
 #include "opt_lockdebug.h"
 #endif /* !_LKM */
 
@@ -88,25 +91,30 @@
 
 #include <arm/armreg.h>
 
+#ifndef _LOCORE
+/* 1 == use cpu_sleep(), 0 == don't */
+extern int cpu_do_powersave;
+#endif
+
 #ifdef __PROG32
 #ifdef _LOCORE
 #define IRQdisable \
 	stmfd	sp!, {r0} ; \
-	mrs	r0, cpsr_all ; \
+	mrs	r0, cpsr ; \
 	orr	r0, r0, #(I32_bit) ; \
-	msr	cpsr_all, r0 ; \
+	msr	cpsr_c, r0 ; \
 	ldmfd	sp!, {r0}
 
 #define IRQenable \
 	stmfd	sp!, {r0} ; \
-	mrs	r0, cpsr_all ; \
+	mrs	r0, cpsr ; \
 	bic	r0, r0, #(I32_bit) ; \
-	msr	cpsr_all, r0 ; \
+	msr	cpsr_c, r0 ; \
 	ldmfd	sp!, {r0}		
 
 #else
-#define IRQdisable SetCPSR(I32_bit, I32_bit);
-#define IRQenable SetCPSR(I32_bit, 0);
+#define IRQdisable __set_cpsr_c(I32_bit, I32_bit);
+#define IRQenable __set_cpsr_c(I32_bit, 0);
 #endif	/* _LOCORE */
 #endif
 
@@ -157,12 +165,12 @@ extern int current_intr_depth;
 #endif
 
 /*
- * PROC_PC: Find out the program counter for the given process.
+ * LWP_PC: Find out the program counter for the given lwp.
  */
 #ifdef __PROG32
-#define PROC_PC(p)	((p)->p_addr->u_pcb.pcb_tf->tf_pc)
+#define LWP_PC(l)	((l)->l_addr->u_pcb.pcb_tf->tf_pc)
 #else
-#define PROC_PC(p)	((p)->p_addr->u_pcb.pcb_tf->tf_r15 & R15_PC)
+#define LWP_PC(l)	((l)->l_addr->u_pcb.pcb_tf->tf_r15 & R15_PC)
 #endif
 
 /* The address of the vector page. */
@@ -196,17 +204,27 @@ struct cpu_info {
 	u_long ci_simple_locks;		/* # of simple locks held */
 #endif
 	struct device *ci_dev;		/* Device corresponding to this CPU */
-	u_int32_t ci_cpuid;		/* aggregate CPU id */
-	u_int32_t ci_cputype;		/* CPU type */
-	u_int32_t ci_cpurev;		/* CPU revision */
+	u_int32_t ci_arm_cpuid;		/* aggregate CPU id */
+	u_int32_t ci_arm_cputype;	/* CPU type */
+	u_int32_t ci_arm_cpurev;	/* CPU revision */
 	u_int32_t ci_ctrl;		/* The CPU control register */
 	struct evcnt ci_arm700bugcount;
+#ifdef MULTIPROCESSOR
+	MP_CPU_INFO_MEMBERS
+#endif
 };
 
+#ifndef MULTIPROCESSOR
 extern struct cpu_info cpu_info_store;
 #define	curcpu()	(&cpu_info_store)
 #define cpu_number()	0
+#endif
 
+#ifdef __PROG32
+void	cpu_proc_fork(struct proc *, struct proc *);
+#else
+#define	cpu_proc_fork(p1, p2)
+#endif
 
 /*
  * Scheduling glue
@@ -221,8 +239,6 @@ extern int astpending;
  */
 
 #define signotify(p)            setsoftast()
-
-#define cpu_wait(p)	/* nothing */
 
 /*
  * Preempt the current process if in interrupt from user mode,
@@ -245,12 +261,15 @@ int	want_resched;		/* resched() was called */
 
 struct device;
 void	cpu_attach	__P((struct device *));
+int	cpu_alloc_idlepcb	__P((struct cpu_info *));
 #endif
 
 
 /*
  * Random cruft
  */
+
+struct lwp;
 
 /* locore.S */
 void atomic_set_bit	__P((u_int *address, u_int setmask));
@@ -261,7 +280,7 @@ struct pcb;
 void	savectx		__P((struct pcb *pcb));
 
 /* ast.c */
-void userret		__P((register struct proc *p));
+void userret		__P((register struct lwp *p));
 
 /* machdep.h */
 void bootsync		__P((void));

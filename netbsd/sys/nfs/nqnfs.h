@@ -1,4 +1,4 @@
-/*	$NetBSD: nqnfs.h,v 1.8 2002/05/12 23:04:37 matt Exp $	*/
+/*	$NetBSD: nqnfs.h,v 1.15 2003/08/16 18:08:27 yamt Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -53,7 +49,6 @@
 #define	NQ_MINLEASE	5	/* Min lease duration (sec) */
 #define	NQ_DEFLEASE	30	/* Default lease duration (sec) */
 #define	NQ_RENEWAL	3	/* Time before expiry (sec) to renew */
-#define	NQ_TRYLATERDEL	15	/* Initial try later delay (sec) */
 #define	NQ_MAXNUMLEASE	2048	/* Upper bound on number of server leases */
 #define	NQ_DEADTHRESH	NQ_NEVERDEAD	/* Default nm_deadthresh */
 #define	NQ_NEVERDEAD	9	/* Greater than max. nm_timeouts */
@@ -63,6 +58,7 @@
 #define	NQNFS_VER3	3
 #define	NQNFS_EVICTSIZ	156	/* Size of eviction request in bytes */
 
+#ifdef _KERNEL
 /*
  * Definitions used for saving the "last lease expires" time in Non-volatile
  * RAM on the server. The default definitions below assume that NOVRAM is not
@@ -173,12 +169,12 @@ struct nqm {
    && (VTONFS(v)->n_flag & NQNFSNONCACHE) == 0 && \
    ((f) == ND_READ || (VTONFS(v)->n_flag & NQNFSWRITE)))
 
-#define	NQNFS_NEEDLEASE(v, p) \
-		(time.tv_sec > VTONFS(v)->n_expiry ? \
-		 ((VTONFS(v)->n_flag & NQNFSEVICTED) ? 0 : nqnfs_piggy[p]) : \
-		 (((time.tv_sec + NQ_RENEWAL) > VTONFS(v)->n_expiry && \
+#define	NQNFS_NEEDLEASE(n, p) \
+		(time.tv_sec > (n)->n_expiry ? \
+		 (((n)->n_flag & NQNFSEVICTED) ? 0 : nqnfs_piggy[p]) : \
+		 (((time.tv_sec + NQ_RENEWAL) > (n)->n_expiry && \
 		   nqnfs_piggy[p]) ? \
-		   ((VTONFS(v)->n_flag & NQNFSWRITE) ? \
+		   (((n)->n_flag & NQNFSWRITE) ? \
 		    ND_WRITE : nqnfs_piggy[p]) : 0))
 
 /*
@@ -201,7 +197,6 @@ extern int nqsrv_writeslack;
 #define	NQNFS_EXPIRED	500
 #define	NQNFS_TRYLATER	501
 
-#ifdef _KERNEL
 void	nqnfs_lease_updatetime __P((int));
 int	nqsrv_cmpnam __P((struct nfssvc_sock *,struct mbuf *,struct nqhost *));
 int	nqsrv_getlease __P((struct vnode *, u_int32_t *, int,
@@ -211,7 +206,7 @@ int	nqnfs_getlease __P((struct vnode *, int, struct ucred *,struct proc *));
 int	nqnfs_callback __P((struct nfsmount *, struct mbuf *, struct mbuf *,
 		caddr_t));
 int	nqnfs_clientd __P((struct nfsmount *, struct ucred *,
-		struct nfsd_cargs *, int, caddr_t, struct proc *));
-#endif
+		struct nfsd_cargs *, int, caddr_t, struct lwp *));
+#endif /* _KERNEL */
 
-#endif
+#endif /* _NFS_NQNFS_H_ */

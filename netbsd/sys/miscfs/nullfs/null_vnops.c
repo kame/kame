@@ -1,4 +1,4 @@
-/*	$NetBSD: null_vnops.c,v 1.25 2002/01/04 07:19:33 chs Exp $	*/
+/*	$NetBSD: null_vnops.c,v 1.28.2.3 2004/07/02 17:54:57 he Exp $	*/
 
 /*
  * Copyright (c) 1999 National Aeronautics & Space Administration
@@ -47,11 +47,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -71,7 +67,7 @@
  *
  * Ancestors:
  *	@(#)lofs_vnops.c	1.2 (Berkeley) 6/18/92
- *	$Id: null_vnops.c,v 1.25 2002/01/04 07:19:33 chs Exp $
+ *      Id: lofs_vnops.c,v 1.11 1992/05/30 10:05:43 jsp Exp jsp 
  *	...and...
  *	@(#)null_vnodeops.c 1.20 92/07/07 UCLA Ficus project
  */
@@ -207,7 +203,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: null_vnops.c,v 1.25 2002/01/04 07:19:33 chs Exp $");
+__KERNEL_RCSID(0, "$NetBSD: null_vnops.c,v 1.28.2.3 2004/07/02 17:54:57 he Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -240,10 +236,12 @@ const struct vnodeopv_entry_desc null_vnodeop_entries[] = {
 	{ &vop_inactive_desc, layer_inactive },
 	{ &vop_reclaim_desc,  layer_reclaim },
 	{ &vop_print_desc,    layer_print },
+	{ &vop_remove_desc,   layer_remove },
+	{ &vop_rename_desc,   layer_rename },
+	{ &vop_rmdir_desc,    layer_rmdir },
 
 	{ &vop_open_desc,     layer_open },	/* mount option handling */
 
-	{ &vop_strategy_desc, layer_strategy },
 	{ &vop_bwrite_desc,   layer_bwrite },
 	{ &vop_bmap_desc,     layer_bmap },
 	{ &vop_getpages_desc, layer_getpages },

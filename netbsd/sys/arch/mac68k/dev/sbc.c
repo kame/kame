@@ -1,4 +1,4 @@
-/*	$NetBSD: sbc.c,v 1.41 2000/03/18 16:13:23 mycroft Exp $	*/
+/*	$NetBSD: sbc.c,v 1.44 2003/07/15 02:43:18 lukem Exp $	*/
 
 /*
  * Copyright (C) 1996 Scott Reynolds.  All rights reserved.
@@ -43,6 +43,10 @@
  * Thorpe all helped to refine this code, and were considerable sources
  * of moral support.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sbc.c,v 1.44 2003/07/15 02:43:18 lukem Exp $");
+
 #include "opt_ddb.h"
 
 #include <sys/types.h>
@@ -217,7 +221,7 @@ decode_5380_intr(ncr_sc)
 			printf("%s: select\n", ncr_sc->sc_dev.dv_xname);
 	} else if (((csr & ~SCI_CSR_ACK) == (SCI_CSR_DONE | SCI_CSR_INT)) &&
 	    ((bus_csr & (SCI_BUS_RST | SCI_BUS_BSY | SCI_BUS_SEL)) == SCI_BUS_BSY))
-		printf("%s: dma eop\n", ncr_sc->sc_dev.dv_xname);
+		printf("%s: DMA eop\n", ncr_sc->sc_dev.dv_xname);
 	else if (((csr & ~SCI_CSR_PHASE_MATCH) == SCI_CSR_INT) &&
 	    ((bus_csr & ~SCI_BUS_RST) == 0))
 		printf("%s: bus reset\n", ncr_sc->sc_dev.dv_xname);
@@ -624,7 +628,7 @@ sbc_dma_alloc(ncr_sc)
 
 	/* Make sure our caller checked sc_min_dma_len. */
 	if (xlen < MIN_DMA_LEN)
-		panic("sbc_dma_alloc: len=0x%x\n", xlen);
+		panic("sbc_dma_alloc: len=0x%x", xlen);
 
 	/*
 	 * Find free PDMA handle.  Guaranteed to find one since we
@@ -772,7 +776,7 @@ sbc_dma_stop(ncr_sc)
 #endif
 
 		if (ntrans > ncr_sc->sc_datalen)
-			panic("sbc_dma_stop: excess transfer\n");
+			panic("sbc_dma_stop: excess transfer");
 
 		/* Adjust data pointer */
 		ncr_sc->sc_dataptr += ntrans;

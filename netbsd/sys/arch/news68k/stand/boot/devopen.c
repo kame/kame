@@ -1,4 +1,4 @@
-/*	$NetBSD: devopen.c,v 1.3 2002/04/30 13:09:05 tsutsui Exp $	*/
+/*	$NetBSD: devopen.c,v 1.5 2003/11/21 19:44:53 tsutsui Exp $	*/
 
 /*-
  * Copyright (C) 1999 Tsubai Masanari.  All rights reserved.
@@ -34,14 +34,14 @@
 #include <machine/romcall.h>
 
 #ifdef BOOT_DEBUG
-# define DPRINTF(x) printf x
+# define DPRINTF printf
 #else
-# define DPRINTF(x)
+# define DPRINTF while (0) printf
 #endif
 
-int dkopen __P((struct open_file *, ...));
-int dkclose __P((struct open_file *));
-int dkstrategy __P((void *, int, daddr_t, size_t, void *, size_t *));
+int dkopen(struct open_file *, ...);
+int dkclose(struct open_file *);
+int dkstrategy(void *, int, daddr_t, size_t, void *, size_t *);
 
 struct devsw devsw[] = {
 	{ "dk", dkstrategy, dkopen, dkclose, noioctl }
@@ -69,14 +69,14 @@ devopen(f, fname, file)
 	char devname[32];
 	char *cp;
 
-	DPRINTF(("devopen: %s\n", fname));
+	DPRINTF("devopen: %s\n", fname);
 
 	strcpy(devname, fname);
 	cp = strchr(devname, ')') + 1;
 	*cp = 0;
 	fd = rom_open(devname, 0);
 
-	DPRINTF(("devname = %s, fd = %d\n", devname, fd));
+	DPRINTF("devname = %s, fd = %d\n", devname, fd);
 	if (fd == -1)
 		return -1;
 
@@ -92,7 +92,7 @@ devopen(f, fname, file)
 int
 dkopen(struct open_file *f, ...)
 {
-	DPRINTF(("dkopen\n"));
+	DPRINTF("dkopen\n");
 	return 0;
 }
 
@@ -102,7 +102,7 @@ dkclose(f)
 {
 	struct romdev *dev = f->f_devdata;
 
-	DPRINTF(("dkclose\n"));
+	DPRINTF("dkclose\n");
 	rom_close(dev->fd);
 	return 0;
 }

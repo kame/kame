@@ -1,4 +1,4 @@
-/*	$NetBSD: if_an_pci.c,v 1.6 2001/11/13 07:48:42 lukem Exp $	*/
+/*	$NetBSD: if_an_pci.c,v 1.13 2004/01/29 16:57:29 martin Exp $	*/
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_an_pci.c,v 1.6 2001/11/13 07:48:42 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_an_pci.c,v 1.13 2004/01/29 16:57:29 martin Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h> 
@@ -62,7 +62,9 @@ __KERNEL_RCSID(0, "$NetBSD: if_an_pci.c,v 1.6 2001/11/13 07:48:42 lukem Exp $");
 #include <net/if_dl.h>
 #include <net/if_media.h>
 #include <net/if_ether.h>
-#include <net/if_ieee80211.h>
+
+#include <net80211/ieee80211_var.h>
+#include <net80211/ieee80211_compat.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -87,9 +89,8 @@ struct an_pci_softc {
 int	an_pci_match __P((struct device *, struct cfdata *, void *));
 void	an_pci_attach __P((struct device *, struct device *, void *));
 
-struct cfattach an_pci_ca = {
-	sizeof(struct an_pci_softc), an_pci_match, an_pci_attach,
-};
+CFATTACH_DECL(an_pci, sizeof(struct an_pci_softc),
+    an_pci_match, an_pci_attach, NULL, NULL);
 
 const struct an_pci_product {
 	u_int32_t	app_vendor;	/* PCI vendor ID */
@@ -127,13 +128,15 @@ an_pci_attach(struct device *parent, struct device *self, void *aux)
 	pci_intr_handle_t ih;
 	u_int32_t csr;
 
+	aprint_naive(": 802.11 controller\n");
+
         pci_devinfo(pa->pa_id, pa->pa_class, 0, devinfo);
-        printf(": %s\n", devinfo);
+        aprint_normal(": %s\n", devinfo);
 
         /* Map I/O registers */
         if (pci_mapreg_map(pa, AN_PCI_IOBA, PCI_MAPREG_TYPE_IO, 0,
-	    &sc->an_btag, &sc->an_bhandle, NULL, NULL) != 0) {
-                printf("%s: unable to map registers\n", self->dv_xname);
+	    &sc->sc_iot, &sc->sc_ioh, NULL, NULL) != 0) {
+                aprint_error("%s: unable to map registers\n", self->dv_xname);
                 return;
         }
 
@@ -144,24 +147,26 @@ an_pci_attach(struct device *parent, struct device *self, void *aux)
 
 	/* Map and establish the interrupt. */
 	if (pci_intr_map(pa, &ih)) {
-        	printf("%s: unable to map interrupt\n", self->dv_xname);
+        	aprint_error("%s: unable to map interrupt\n", self->dv_xname);
 		return;
 	}
 	intrstr = pci_intr_string(pa->pa_pc, ih);
 	psc->sc_ih = pci_intr_establish(pa->pa_pc, ih, IPL_NET, an_intr, sc);
 	if (psc->sc_ih == NULL) {
-		printf("%s: unable to establish interrupt", self->dv_xname);
+		aprint_error("%s: unable to establish interrupt",
+		    self->dv_xname);
 		if (intrstr != NULL)
-			printf(" at %s", intrstr);
-		printf("\n");
+			aprint_normal(" at %s", intrstr);
+		aprint_normal("\n");
 		return;
 	}
-	printf("%s: interrupting at %s\n", self->dv_xname, intrstr);
+	aprint_normal("%s: interrupting at %s\n", self->dv_xname, intrstr);
 	sc->sc_enabled = 1;
 
 	if (an_attach(sc) != 0) {
-		printf("%s: failed to attach controller\n", self->dv_xname);
+		aprint_error("%s: failed to attach controller\n",
+		    self->dv_xname);
 		pci_intr_disestablish(pa->pa_pc, psc->sc_ih);
-		bus_space_unmap(sc->an_btag, sc->an_bhandle, AN_IOSIZ);
+		bus_space_unmap(sc->sc_iot, sc->sc_ioh, AN_IOSIZ);
 	}
 }

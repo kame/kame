@@ -1,11 +1,11 @@
 #
-# $NetBSD: HADES,v 1.37.4.3 2003/01/10 06:57:57 jmc Exp $
+# $NetBSD: HADES,v 1.51.2.3 2004/07/15 20:41:35 he Exp $
 #
 # This file was automatically created. Changes will be
 # lost when running makeconf in this directory.
 #
 # Created from:
-#		NetBSD: HADES.in,v 1.4 2001/04/10 06:28:38 leo Exp $
+#		NetBSD: HADES.in,v 1.7 2003/10/08 11:05:27 bouyer Exp $
 #		NetBSD$
 
 #This configuration file is for a generic Medusa-Hades
@@ -23,13 +23,13 @@ maxusers	16
 
 options 	HZ=64		# Set the clock-rate (48/64/96)
 
-#X11R6 related options
-
-options 	UCONSOLE	# Allow xconsole to work
-
 #Standard system options
 options 	INSECURE	# disable kernel security levels
 #options 	NTP		# NTP phase/frequency locked loop
+
+#Enable experimental buffer queue strategy for better responsiveness under 
+#high disk I/O load. Use it with caution - it's not proven to be stable yet.
+#options 	NEW_BUFQ_STRATEGY
 
 #(Co)processors this kernel should support
 
@@ -53,6 +53,7 @@ options 	NS		# XNS
 options 	ISO,TPIP	# OSI
 #options 	EON		# OSI tunneling over IP
 options 	CCITT,LLC,HDLC	# X.25
+
 options 	NETATALK	# AppleTalk networking protocols
 
 options 	PPP_BSDCOMP	# BSD-Compress compression support for PPP
@@ -64,6 +65,19 @@ options 	IPFILTER_LOG	# ipmon(8) log support
 #options  	IPFILTER_DEFAULT_BLOCK	# block packages by default
 
 #options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
+
+#options 	ALTQ		# Manipulate network interfaces' output queues
+#options 	ALTQ_BLUE	# Stochastic Fair Blue
+#options 	ALTQ_CBQ	# Class-Based Queueing
+#options 	ALTQ_CDNR	# Diffserv Traffic Conditioner
+#options 	ALTQ_FIFOQ	# First-In First-Out Queue
+#options 	ALTQ_FLOWVALVE	# RED/flow-valve (red-penalty-box)
+#options 	ALTQ_HFSC	# Hierarchical Fair Service Curve
+#options 	ALTQ_LOCALQ	# Local queueing discipline
+#options 	ALTQ_PRIQ	# Priority Queueing
+#options 	ALTQ_RED	# Random Early Detection
+#options 	ALTQ_RIO	# RED with IN/OUT
+#options 	ALTQ_WFQ	# Weighted Fair Queueing
 
 #File systems
 file-system 	FFS		# Berkeley fast file system
@@ -89,7 +103,7 @@ options 	QUOTA		# Disk quotas for local disks
 options 	SOFTDEP		# FFS soft updates support.
 options 	NFSSERVER	# Network File System server side code
 #options 	EXT2FS_SYSTEM_FLAGS	# makes ext2fs file flags (append and
-				#immutable) behave as system flags.
+				# immutable) behave as system flags.
 
 #Misc. debugging options
 
@@ -107,6 +121,8 @@ options 	COMPAT_11	# Compatibility to NetBSD1.1
 options 	COMPAT_12	# Compatibility to NetBSD1.2
 options 	COMPAT_13	# Compatibility to NetBSD1.3
 options 	COMPAT_14	# Compatibility to NetBSD1.4
+options 	COMPAT_15	# Compatibility to NetBSD1.5
+options 	COMPAT_16	# Compatibility to NetBSD1.6
 
 #options 	COMPAT_09	# has no meaning on the atari
 #options 	COMPAT_SUNOS	# Support to run Sun-3 executables
@@ -125,13 +141,16 @@ options 	SYSVSEM			# System V semaphores
 #options 	SEMMNI=10		# number of semaphore identifiers
 #options 	SEMUME=10		# max number of undo entries per proc.
 #options 	SEMMNU=30		# number of undo structures in system
+options 	P1003_1B_SEMAPHORE # p1003.1b semaphore support
 
 #Support for various kernel options
 
 options 	KTRACE			# Add kernel tracing system call
+options 	SYSTRACE		# system call vetting via systrace(1)
 options 	DIAGNOSTIC		# Add additional error checking code
-#options 	USERCONF		# userconf(4) support
+options 	USERCONF		# userconf(4) support
 #options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
 
 #These options enable verbose messages for several subsystems.
 #Warning, these may compile large string tables into the kernel!
@@ -149,6 +168,7 @@ options 	ST_POOL_SIZE=22		# smallest that allows TT-HIGH
 
 options 	TT_SCSI			# SCSI-support for TT
 options 	TT_VIDEO		# Graphics support for TT
+#options	ET4000_HAS_2MB_MEM	# et4000 with 2 MB video memory
 
 options 	MEMORY_DISK_HOOKS	# Boot RAM-disk
 options 	DISKLABEL_NBDA		# NetBSD disklabels (required)
@@ -156,7 +176,7 @@ options 	DISKLABEL_AHDI		# NetBSD/AHDI disklabels
 
 options 	SERCONSOLE		# modem1 console support
 options 	RELOC_KERNEL		# TT/Falcon: relocate kernel to TT-RAM
-#options 	MSGBUFSIZE=32768        # size of kernel msg. buffer
+options 	MSGBUFSIZE=32768        # size of kernel msg. buffer
 #options 	STATCLOCK	        # Separate {stat,prof}clock
 
 #Try linked commands on all targets
@@ -182,9 +202,12 @@ pseudo-device	tun		2	# network tunnel
 pseudo-device	gif		4	# IPv[46] over IPv[46] tunnel (RFC1933)
 #pseudo-device	faith		1	# IPv[46] tcp relay translation i/f
 #pseudo-device	stf		1	# 6to4 IPv6 over IPv4 encapsulation
+
 pseudo-device	vlan			# IEEE 802.1q encapsulation
 pseudo-device	bridge			# simple inter-network bridging
+
 pseudo-device	ccd		4	# concatenating disk driver
+#pseudo-device	cgd		4	# cryptographic disk driver
 pseudo-device	raid		8	# RAIDframe disk driver
 options 	RAID_AUTOCONFIG		# auto-configuration of RAID components
 #Options to enable various other RAIDframe RAID types.
@@ -235,19 +258,24 @@ grfet1		at grfbus0
 ite1		at grfet1
 grfet2		at grfbus0
 ite2		at grfet2
-pcibus0		at mainbus0	# PCI-bus
-pci0		at pcibus0
+pcib0		at mainbus0	# PCI-bus
+pci0		at pcib0
+#wsdisplay/keybd: if used, remove grfbus* grfet* and ite*
+#vga0		at pci? dev ? function ? # a PCI VGA card
+#wsdisplay*	at vga? console ?	# as a wscons console
+#wskbd0		at kbd0 console ?	# Keyboard
 avmebus0	at mainbus0	# VME bus
 vme0		at avmebus0
 le0		at vme0	irq 5	# Lance ethernet (Riebl/PAM).
 le0		at vme0 irq 4	# Lance ethernet (BVME410).
 et0		at vme0		# Crazy Dots II
-isabus0		at mainbus0	# ISA-bus
-isa0		at isabus0
+isab0		at mainbus0	# ISA-bus
+isa0		at isab0
 wdc0		at mainbus0	# IDE-bus
-wd*		at wdc? channel ? drive ?
+atabus* 	at wdc? channel ?
+wd*		at atabus? drive ?
 #ATAPI bus support
-atapibus*	at wdc? channel ?
+atapibus*	at atabus?
 
 #ATAPI devices
 cd*	at atapibus? drive ?		# ATAPI CD-ROM drives

@@ -1,4 +1,4 @@
-/*	$NetBSD: esp.c,v 1.30 2001/11/18 05:22:32 briggs Exp $	*/
+/*	$NetBSD: esp.c,v 1.35 2003/07/15 02:43:25 lukem Exp $	*/
 
 /*
  * Copyright (c) 1997 Jason R. Thorpe.
@@ -76,6 +76,9 @@
  *  "DMA" glue functions).
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: esp.c,v 1.35 2003/07/15 02:43:25 lukem Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -109,9 +112,8 @@ void	espattach	__P((struct device *, struct device *, void *));
 int	espmatch	__P((struct device *, struct cfdata *, void *));
 
 /* Linkup to the rest of the kernel */
-struct cfattach esp_ca = {
-	sizeof(struct esp_softc), espmatch, espattach
-};
+CFATTACH_DECL(esp, sizeof(struct esp_softc),
+    espmatch, espattach, NULL, NULL);
 
 /*
  * Functions and the switch for the MI code.
@@ -517,7 +519,7 @@ esp_quick_dma_intr(sc)
 	int trans=0, resid=0;
 
 	if (esc->sc_active == 0)
-		panic("dma_intr--inactive DMA\n");
+		panic("dma_intr--inactive DMA");
 
 	esc->sc_active = 0;
 
@@ -743,7 +745,7 @@ restart_dmago:
 						len+=2; addr--;
 					}
 					if (res != len) {
-						panic("esp_quick_dma_go: res %d != len %d\n",
+						panic("esp_quick_dma_go: res %d != len %d",
 							res, len);
 					}
 				}
@@ -773,31 +775,31 @@ restart_dmago:
 	if (esc->sc_datain == 0) {
 		/* while (cnt32--) { 16 instances of *pdma = *addr++; } */
 		/* while (cnt2--) { *pdma = *addr++; } */
-		__asm __volatile ("
-				movl %1, %%a2
-				movl %2, %%a3
-				movw %3, %%d2
-				cmpw #0, %%d2
-				beq  2f
-				subql #1, %%d2
-			1:	movw %%a2@+,%%a3@; movw %%a2@+,%%a3@
-				movw %%a2@+,%%a3@; movw %%a2@+,%%a3@
-				movw %%a2@+,%%a3@; movw %%a2@+,%%a3@
-				movw %%a2@+,%%a3@; movw %%a2@+,%%a3@
-				movw %%a2@+,%%a3@; movw %%a2@+,%%a3@
-				movw %%a2@+,%%a3@; movw %%a2@+,%%a3@
-				movw %%a2@+,%%a3@; movw %%a2@+,%%a3@
-				movw %%a2@+,%%a3@; movw %%a2@+,%%a3@
-				movw #8704,%%sr
-				movw #9728,%%sr
-				dbra %%d2, 1b
-			2:	movw %4, %%d2
-				cmpw #0, %%d2
-				beq  4f
-				subql #1, %%d2
-			3:	movw %%a2@+,%%a3@
-				dbra %%d2, 3b
-			4:	movl %%a2, %0"
+		__asm __volatile (
+			"	movl %1, %%a2	\n"
+			"	movl %2, %%a3	\n"
+			"	movw %3, %%d2	\n"
+			"	cmpw #0, %%d2	\n"
+			"	beq  2f		\n"
+			"	subql #1, %%d2	\n"
+			"1:	movw %%a2@+,%%a3@; movw %%a2@+,%%a3@	\n"
+			"	movw %%a2@+,%%a3@; movw %%a2@+,%%a3@	\n"
+			"	movw %%a2@+,%%a3@; movw %%a2@+,%%a3@	\n"
+			"	movw %%a2@+,%%a3@; movw %%a2@+,%%a3@	\n"
+			"	movw %%a2@+,%%a3@; movw %%a2@+,%%a3@	\n"
+			"	movw %%a2@+,%%a3@; movw %%a2@+,%%a3@	\n"
+			"	movw %%a2@+,%%a3@; movw %%a2@+,%%a3@	\n"
+			"	movw %%a2@+,%%a3@; movw %%a2@+,%%a3@	\n"
+			"	movw #8704,%%sr	\n"
+			"	movw #9728,%%sr	\n"
+			"	dbra %%d2, 1b	\n"
+			"2:	movw %4, %%d2	\n"
+			"	cmpw #0, %%d2	\n"
+			"	beq  4f		\n"
+			"	subql #1, %%d2	\n"
+			"3:	movw %%a2@+,%%a3@ \n"
+			"	dbra %%d2, 3b	\n"
+			"4:	movl %%a2, %0"
 			: "=g" (addr)
 			: "0" (addr), "g" (pdma), "g" (cnt32), "g" (cnt2)
 			: "a2", "a3", "d2");
@@ -816,31 +818,31 @@ restart_dmago:
 	} else {
 		/* while (cnt32--) { 16 instances of *addr++ = *pdma; } */
 		/* while (cnt2--) { *addr++ = *pdma; } */
-		__asm __volatile ("
-				movl %1, %%a2
-				movl %2, %%a3
-				movw %3, %%d2
-				cmpw #0, %%d2
-				beq  6f
-				subql #1, %%d2
-			5:	movw %%a3@,%%a2@+; movw %%a3@,%%a2@+
-				movw %%a3@,%%a2@+; movw %%a3@,%%a2@+
-				movw %%a3@,%%a2@+; movw %%a3@,%%a2@+
-				movw %%a3@,%%a2@+; movw %%a3@,%%a2@+
-				movw %%a3@,%%a2@+; movw %%a3@,%%a2@+
-				movw %%a3@,%%a2@+; movw %%a3@,%%a2@+
-				movw %%a3@,%%a2@+; movw %%a3@,%%a2@+
-				movw %%a3@,%%a2@+; movw %%a3@,%%a2@+
-				movw #8704,%%sr
-				movw #9728,%%sr
-				dbra %%d2, 5b
-			6:	movw %4, %%d2
-				cmpw #0, %%d2
-				beq  8f
-				subql #1, %%d2
-			7:	movw %%a3@,%%a2@+
-				dbra %%d2, 7b
-			8:	movl %%a2, %0"
+		__asm __volatile (
+			"	movl %1, %%a2	\n"
+			"	movl %2, %%a3	\n"
+			"	movw %3, %%d2	\n"
+			"	cmpw #0, %%d2	\n"
+			"	beq  6f		\n"
+			"	subql #1, %%d2	\n"
+			"5:	movw %%a3@,%%a2@+; movw %%a3@,%%a2@+	\n"
+			"	movw %%a3@,%%a2@+; movw %%a3@,%%a2@+	\n"
+			"	movw %%a3@,%%a2@+; movw %%a3@,%%a2@+	\n"
+			"	movw %%a3@,%%a2@+; movw %%a3@,%%a2@+	\n"
+			"	movw %%a3@,%%a2@+; movw %%a3@,%%a2@+	\n"
+			"	movw %%a3@,%%a2@+; movw %%a3@,%%a2@+	\n"
+			"	movw %%a3@,%%a2@+; movw %%a3@,%%a2@+	\n"
+			"	movw %%a3@,%%a2@+; movw %%a3@,%%a2@+	\n"
+			"	movw #8704,%%sr	\n"
+			"	movw #9728,%%sr	\n"
+			"	dbra %%d2, 5b	\n"
+			"6:	movw %4, %%d2	\n"
+			"	cmpw #0, %%d2	\n"
+			"	beq  8f		\n"
+			"	subql #1, %%d2	\n"
+			"7:	movw %%a3@,%%a2@+ \n"
+			"	dbra %%d2, 7b	\n"
+			"8:	movl %%a2, %0"
 			: "=g" (addr)
 			: "0" (addr), "g" (pdma), "g" (cnt32), "g" (cnt2)
 			: "a2", "a3", "d2");

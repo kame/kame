@@ -1,4 +1,4 @@
-/*	$NetBSD: exception.S,v 1.5 2002/01/17 17:26:04 bjh21 Exp $	*/
+/*	$NetBSD: exception.S,v 1.13 2003/10/31 16:30:15 scw Exp $	*/
 
 /*
  * Copyright (c) 1994-1997 Mark Brinicombe.
@@ -54,56 +54,7 @@
 	.text	
 	.align	0
 
-Lastpending:
-        .word   _C_LABEL(astpending)
-
-/*
- * General exception exit handler
- *
- * It exits straight away if not returning to USR mode.
- * This loops around delivering any pending ASTs.
- * Interrupts are disabled at suitable points to avoid ASTs
- * being posted between testing and exit to user mode.
- *
- * This function uses PULLFRAMEFROMSVCANDEXIT thus should
- * only be called if the exception handler used PUSHFRAMEINSVC
- */
-
-exception_exit:
-	mrs     r4, cpsr_all		/* Get CPSR */
-
-	ldr	r0, [sp]		/* Get the SPSR from stack */
-	and	r0, r0, #(PSR_MODE)	/* Test for USR32 mode before the AST */
-	teq	r0, #(PSR_USR32_MODE)
-	bne	do_exit			/* Not USR mode so no AST delivery */
-
-	ldr	r5, Lastpending		/* Get address of astpending */
-
-Lexception_exit_loop:
-	orr     r0, r4, #(I32_bit)	/* Block IRQs */
-	msr     cpsr_all, r0
-
-	ldr	r1, [r5]		/* Do we have an AST pending */
-	teq	r1, #0x00000000
-	bne	do_ast
-
-	PULLFRAMEFROMSVCANDEXIT		/* No AST so exit */
-
-do_ast:
-	mov	r1, #0x00000000		/* Clear ast pending */
-	str	r1, [r5]
-
-	msr     cpsr_all, r4		/* Restore interrupts */
-
-	mov	r0, sp			/* arg 0 = trap frame */
-	bl	_C_LABEL(ast)		/* call the AST handler */
-	b	Lexception_exit_loop	/* Try and exit again */
-
-do_exit:
-	orr     r0, r4, #(I32_bit)	/* Disable interupts */
-	msr     cpsr_all, r0
-
-	PULLFRAMEFROMSVCANDEXIT		/* Restore the trap frame and exit */
+AST_ALIGNMENT_FAULT_LOCALS
 
 /*
  * reset_entry:
@@ -126,34 +77,14 @@ Lreset_panicmsg:
  */
 ASENTRY_NP(swi_entry)
 	PUSHFRAME
+	ENABLE_ALIGNMENT_FAULTS
 
 	mov	r0, sp			/* Pass the frame to any function */
-
 	bl	_C_LABEL(swi_handler)	/* It's a SWI ! */
 
-	ldr	r5, Lastpending		/* Get address of astpending */
-	mrs     r4, cpsr_all		/* Get CPSR */
-
-swi_exit_loop:
-	orr     r0, r4, #(I32_bit)	/* Disable IRQs */
-	msr     cpsr_all, r0
-
-	ldr	r1, [r5]		/* Do we have an AST pending */
-	teq	r1, #0x00000000
-	bne	do_swi_ast
-
+	DO_AST_AND_RESTORE_ALIGNMENT_FAULTS
 	PULLFRAME
 	movs	pc, lr			/* Exit */
-
-do_swi_ast:
-	mov	r1, #0x00000000		/* Clear ast pending */
-	str	r1, [r5]
-
-	msr     cpsr_all, r4		/* Restore interrupts */
-
-	mov	r0, sp			/* arg 0 = trap frame */
-	bl	_C_LABEL(ast)		/* call the AST handler */
-	b	swi_exit_loop		/* Try and exit again */
 
 /*
  * prefetch_abort_entry:
@@ -161,16 +92,20 @@ do_swi_ast:
  *	Handler for the Prefetch Abort exception.
  */
 ASENTRY_NP(prefetch_abort_entry)
+#ifdef __XSCALE__
+	nop				/* Make absolutely sure any pending */
+	nop				/* imprecise aborts have occurred. */
+#endif
         sub     lr, lr, #0x00000004     /* Adjust the lr */
 
 	PUSHFRAMEINSVC
+	ENABLE_ALIGNMENT_FAULTS
 
- 	mov	r0, sp			/* pass the stack pointer as r0 */
-
-	add	lr, pc, #exception_exit - . - 8
 	ldr	r1, Lprefetch_abort_handler_address
+	adr	lr, exception_exit
+ 	mov	r0, sp			/* pass the stack pointer as r0 */
 	ldr	pc, [r1]
-	
+
 Lprefetch_abort_handler_address:
 	.word	_C_LABEL(prefetch_abort_handler_address)
 
@@ -182,7 +117,7 @@ _C_LABEL(prefetch_abort_handler_address):
 
 	.text
 abortprefetch:
-        add     r0, pc, #abortprefetchmsg - . - 8
+        adr     r0, abortprefetchmsg
 	b	_C_LABEL(panic)
 
 abortprefetchmsg:
@@ -195,15 +130,19 @@ abortprefetchmsg:
  *	Handler for the Data Abort exception.
  */
 ASENTRY_NP(data_abort_entry)
+#ifdef __XSCALE__
+	nop				/* Make absolutely sure any pending */
+	nop				/* imprecise aborts have occurred. */
+#endif
         sub     lr, lr, #0x00000008     /* Adjust the lr */
 
 	PUSHFRAMEINSVC			/* Push trap frame and switch */
 					/* to SVC32 mode */
+	ENABLE_ALIGNMENT_FAULTS
 
-	mov	r0, sp			/* pass the stack pointer as r0 */
-
-	add	lr, pc, #exception_exit - . - 8
 	ldr	r1, Ldata_abort_handler_address
+	adr	lr, exception_exit
+	mov	r0, sp			/* pass the stack pointer as r0 */
 	ldr	pc, [r1]
 
 Ldata_abort_handler_address:
@@ -216,7 +155,7 @@ _C_LABEL(data_abort_handler_address):
 
 	.text
 abortdata:
-        add     r0, pc, #abortdatamsg - . - 8
+        adr     r0, abortdatamsg
 	b	_C_LABEL(panic)
 
 abortdatamsg:
@@ -242,6 +181,25 @@ ASENTRY_NP(address_exception_entry)
 Laddress_exception_msg:
 	.asciz	"Address Exception CPSR=0x%08x SPSR=0x%08x LR=0x%08x\n"
 	.balign	4
+
+/*
+ * General exception exit handler
+ * (Placed here to be within range of all the references to it)
+ *
+ * It exits straight away if not returning to USR mode.
+ * This loops around delivering any pending ASTs.
+ * Interrupts are disabled at suitable points to avoid ASTs
+ * being posted between testing and exit to user mode.
+ *
+ * This function uses PULLFRAMEFROMSVCANDEXIT and
+ * DO_AST_AND_RESTORE_ALIGNMENT_FAULTS thus should
+ * only be called if the exception handler used PUSHFRAMEINSVC
+ * followed by ENABLE_ALIGNMENT_FAULTS.
+ */
+
+exception_exit:
+	DO_AST_AND_RESTORE_ALIGNMENT_FAULTS
+	PULLFRAMEFROMSVCANDEXIT
 
 /*
  * undefined_entry:
@@ -275,14 +233,14 @@ ASENTRY_NP(undefined_entry)
  * Test for user mode.
  */
 	tst	r0, #0xf
-	bne	Lprenotuser_push
+	bne	.Lprenotuser_push
 	add	r1, sp, #(8*4)
 	stmia	r1,{r8-r14}^		/* store user mode r8-r14*/
-	b	Lgoipkdb
+	b	.Lgoipkdb
 /*
  * Switch to previous mode to get r8-r13.
  */
-Lprenotuser_push:
+.Lprenotuser_push:
 	orr	r0, r0, #(I32_bit) /* disable interrupts */
 	msr	cpsr_all, r0
 	mov	r1, r8
@@ -306,11 +264,12 @@ Lprenotuser_push:
 /*
  * Now to IPKDB.
  */
-Lgoipkdb:
+.Lgoipkdb:
 	mov	r0, sp
 	bl	_C_LABEL(ipkdb_trap_glue)
-	ldr	r1, Lipkdb_trap_return
+	ldr	r1, .Lipkdb_trap_return
 	str	r0,[r1]
+
 /*
  * Have to load all registers from the stack.
  *
@@ -324,11 +283,11 @@ Lgoipkdb:
  * Test for user mode.
  */
 	tst	r0, #0xf
-	bne	Lprenotuser_pull
+	bne	.Lprenotuser_pull
 	add	r1, sp, #(8*4)
 	ldmia	r1, {r8-r14}^		/* load user mode r8-r14 */
-	b	Lpull_r0r7
-Lprenotuser_pull:
+	b	.Lpull_r0r7
+.Lprenotuser_pull:
 /*
  * Now previous mode spsr and r14.
  */
@@ -352,7 +311,7 @@ Lprenotuser_pull:
 	mov	r12, r5
 	mov	r13, r6
 	msr	cpsr_all, r7
-Lpull_r0r7:
+.Lpull_r0r7:
 /*
  * Now the rest of the registers.
  */
@@ -392,10 +351,11 @@ Lundefined_handler_indirection:
 
 ENTRY_NP(undefinedinstruction_bounce)
 	PUSHFRAMEINSVC
-	mov	r0, sp
-	bl	_C_LABEL(undefinedinstruction)
+	ENABLE_ALIGNMENT_FAULTS
 
-	b	exception_exit
+	mov	r0, sp
+	adr	lr, exception_exit
+	b	_C_LABEL(undefinedinstruction)
 
 	.data
 	.align	0

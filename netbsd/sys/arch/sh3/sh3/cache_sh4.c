@@ -1,4 +1,4 @@
-/*	$NetBSD: cache_sh4.c,v 1.6 2002/05/09 12:30:11 uch Exp $	*/
+/*	$NetBSD: cache_sh4.c,v 1.9 2003/07/15 03:35:56 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cache_sh4.c,v 1.9 2003/07/15 03:35:56 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 
@@ -55,9 +58,9 @@ void sh4_dcache_inv_range(vaddr_t, vsize_t);
 void sh4_dcache_wb_range(vaddr_t, vsize_t);
 
 /* must be inlined. */
-extern __inline__ void cache_sh4_op_line_32(vaddr_t, vaddr_t, u_int32_t,
+static __inline__ void cache_sh4_op_line_32(vaddr_t, vaddr_t, u_int32_t,
     u_int32_t);
-extern __inline__ void cache_sh4_op_8lines_32(vaddr_t, vaddr_t, u_int32_t,
+static __inline__ void cache_sh4_op_8lines_32(vaddr_t, vaddr_t, u_int32_t,
     u_int32_t);
 
 void
@@ -111,13 +114,13 @@ sh4_cache_config()
  *	Clear the specified bits on single 32-byte cache line.
  *
  */
-void
+static __inline__ void
 cache_sh4_op_line_32(vaddr_t va, vaddr_t base, u_int32_t mask, u_int32_t bits)
 {
 	vaddr_t cca;
 
 	cca = base | (va & mask);
-	_reg_write_4(cca, _reg_read_4(cca) & ~bits);
+	_reg_bclr_4(cca, bits);
 }
 
 /*
@@ -126,7 +129,7 @@ cache_sh4_op_line_32(vaddr_t va, vaddr_t base, u_int32_t mask, u_int32_t bits)
  *	Clear the specified bits on 8 32-byte cache lines.
  *
  */
-void
+static __inline__ void
 cache_sh4_op_8lines_32(vaddr_t va, vaddr_t base, u_int32_t mask, u_int32_t bits)
 {
 	__volatile__ u_int32_t *cca = (__volatile__ u_int32_t *)

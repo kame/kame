@@ -1,4 +1,4 @@
-/*	$NetBSD: comreg.h,v 1.11 1997/10/19 14:26:21 fvdl Exp $	*/
+/*	$NetBSD: comreg.h,v 1.13 2003/08/07 16:31:01 agc Exp $	*/
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -47,6 +43,9 @@
 #define	IER_EMSC	0x8	/* Enable modem status interrupt */
 #define	IER_ERTS	0x40	/* Enable RTS interrupt */
 #define	IER_ECTS	0x80	/* Enable CTS interrupt */
+/* PXA2X0's ns16550 ports have extra bits in this register */
+#define	IER_ERXTOUT	0x10	/* Enable rx timeout interrupt */
+#define	IER_EUART	0x40	/* Enable UART */
 
 /* interrupt identification register */
 #define	IIR_IMASK	0xf

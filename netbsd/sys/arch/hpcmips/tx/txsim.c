@@ -1,4 +1,4 @@
-/*	$NetBSD: txsim.c,v 1.7 2002/01/29 18:53:21 uch Exp $ */
+/*	$NetBSD: txsim.c,v 1.12 2003/07/15 02:29:34 lukem Exp $ */
 
 /*-
  * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: txsim.c,v 1.12 2003/07/15 02:29:34 lukem Exp $");
+
 #include "opt_vr41xx.h"
 #include "opt_tx39xx.h"
 /*
@@ -64,9 +67,8 @@ struct txsim_softc {
 	int sc_pri; /* attaching device priority */
 };
 
-struct cfattach txsim_ca = {
-	sizeof(struct txsim_softc), txsim_match, txsim_attach
-};
+CFATTACH_DECL(txsim, sizeof(struct txsim_softc),
+    txsim_match, txsim_attach, NULL, NULL);
 
 int
 txsim_match(struct device *parent, struct cfdata *match, void *aux)
@@ -77,7 +79,7 @@ txsim_match(struct device *parent, struct cfdata *match, void *aux)
 	if (platid_match(&platid, &platid_mask_CPU_MIPS_VR_41XX))
 	  return (0);
 #endif /* VR41XX */
-	if (strcmp(ma->ma_name, match->cf_driver->cd_name))
+	if (strcmp(ma->ma_name, match->cf_name))
 		return (0);
 
 	return (1);
@@ -124,7 +126,7 @@ txsim_search(struct device *parent, struct cfdata *cf, void *aux)
 	
 	ta.ta_tc = tx_conf_get_tag();
 	
-	if ((*cf->cf_attach->ca_match)(parent, cf, &ta) == sc->sc_pri)
+	if (config_match(parent, cf, &ta) == sc->sc_pri)
 		config_attach(parent, cf, &ta, txsim_print);
 
 	return (0);

@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_flow.c,v 1.23 2002/03/08 20:48:43 thorpej Exp $	*/
+/*	$NetBSD: ip_flow.c,v 1.27 2003/12/12 21:17:59 scw Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ip_flow.c,v 1.23 2002/03/08 20:48:43 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ip_flow.c,v 1.27 2003/12/12 21:17:59 scw Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -80,13 +80,13 @@ static int ipflow_inuse;
 do { \
 	LIST_INSERT_HEAD((bucket), (ipf), ipf_hash); \
 	LIST_INSERT_HEAD(&ipflowlist, (ipf), ipf_list); \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define	IPFLOW_REMOVE(ipf) \
 do { \
 	LIST_REMOVE((ipf), ipf_hash); \
 	LIST_REMOVE((ipf), ipf_list); \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #ifndef IPFLOW_MAX
 #define	IPFLOW_MAX		256
@@ -143,7 +143,7 @@ int
 ipflow_fastforward(
 	struct mbuf *m)
 {
-	struct ip *ip;
+	struct ip *ip, ip_store;
 	struct ipflow *ipf;
 	struct rtentry *rt;
 	struct sockaddr *dst;
@@ -162,11 +162,16 @@ ipflow_fastforward(
 	 */
 	if ((m->m_flags & (M_BCAST|M_MCAST)) != 0)
 		return 0;
-	
+
 	/*
 	 * IP header with no option and valid version and length
 	 */
-	ip = mtod(m, struct ip *);
+	if (IP_HDR_ALIGNED_P(mtod(m, caddr_t)))
+		ip = mtod(m, struct ip *);
+	else {
+		memcpy(&ip_store, mtod(m, caddr_t), sizeof(ip_store));
+		ip = &ip_store;
+	}
 	iplen = ntohs(ip->ip_len);
 	if (ip->ip_v != IPVERSION || ip->ip_hl != (sizeof(struct ip) >> 2) ||
 	    iplen < sizeof(struct ip) || iplen > m->m_pkthdr.len)
@@ -219,7 +224,7 @@ ipflow_fastforward(
 	/*
 	 * Everything checks out and so we can forward this packet.
 	 * Modify the TTL and incrementally change the checksum.
-	 * 
+	 *
 	 * This method of adding the checksum works on either endian CPU.
 	 * If htons() is inlined, all the arithmetic is folded; otherwise
 	 * the htons()s are combined by CSE due to the __const__ attribute.
@@ -234,7 +239,13 @@ ipflow_fastforward(
 		ip->ip_sum += htons(IPTTLDEC << 8);
 
 	/*
-	 * Trim the packet in case it's too long.. 
+	 * Done modifying the header; copy it back, if necessary.
+	 */
+	if (IP_HDR_ALIGNED_P(mtod(m, caddr_t)) == 0)
+		memcpy(mtod(m, caddr_t), &ip_store, sizeof(ip_store));
+
+	/*
+	 * Trim the packet in case it's too long..
 	 */
 	if (m->m_pkthdr.len > iplen) {
 		if (m->m_len == m->m_pkthdr.len) {
@@ -420,5 +431,21 @@ ipflow_create(
 	hash = ipflow_hash(ip->ip_dst, ip->ip_src, ip->ip_tos);
 	s = splnet();
 	IPFLOW_INSERT(&ipflowtable[hash], ipf);
+	splx(s);
+}
+
+void
+ipflow_invalidate_all(
+	void)
+{
+	struct ipflow *ipf, *next_ipf;
+	int s;
+
+	s = splnet();
+	ipf = LIST_FIRST(&ipflowlist);
+	for (ipf = LIST_FIRST(&ipflowlist); ipf != NULL; ipf = next_ipf) {
+		next_ipf = LIST_NEXT(ipf, ipf_list);
+		ipflow_free(ipf);
+	}
 	splx(s);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: pchb.c,v 1.33.4.1 2002/06/21 16:30:45 lukem Exp $	*/
+/*	$NetBSD: pchb.c,v 1.49.2.2 2004/07/06 05:47:40 he Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1998, 2000 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pchb.c,v 1.33.4.1 2002/06/21 16:30:45 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pchb.c,v 1.49.2.2 2004/07/06 05:47:40 he Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -84,9 +84,8 @@ void	pchbattach __P((struct device *, struct device *, void *));
 int	pchb_print __P((void *, const char *));
 int	agp_print __P((void *, const char *));
 
-struct cfattach pchb_ca = {
-	sizeof(struct pchb_softc), pchbmatch, pchbattach
-};
+CFATTACH_DECL(pchb, sizeof(struct pchb_softc),
+    pchbmatch, pchbattach, NULL, NULL);
 
 int
 pchbmatch(struct device *parent, struct cfdata *match, void *aux)
@@ -112,7 +111,7 @@ pchbattach(struct device *parent, struct device *self, void *aux)
 	struct pcibus_attach_args pba;
 	struct agpbus_attach_args apa;
 	pcireg_t bcreg;
-	u_char bdnum, pbnum;
+	u_char bdnum, pbnum = 0; /* XXX: gcc */
 	pcitag_t tag;
 	int doattach, attachflags, has_agp;
 
@@ -140,12 +139,18 @@ pchbattach(struct device *parent, struct device *self, void *aux)
 		 * This host bridge has a second PCI bus.
 		 * Configure it.
 		 */
-		doattach = 1;
 		switch (PCI_PRODUCT(pa->pa_id)) {
-		case PCI_PRODUCT_SERVERWORKS_XX5:
-		case PCI_PRODUCT_SERVERWORKS_CNB20HE:
-		case PCI_PRODUCT_SERVERWORKS_CNB20LE:
-		case PCI_PRODUCT_SERVERWORKS_CIOB20:
+		case PCI_PRODUCT_SERVERWORKS_CNB20_LE_AGP:
+		case PCI_PRODUCT_SERVERWORKS_CNB30_LE_PCI:
+		case PCI_PRODUCT_SERVERWORKS_CNB20_LE_PCI:
+		case PCI_PRODUCT_SERVERWORKS_CNB20_HE_PCI:
+		case PCI_PRODUCT_SERVERWORKS_CNB20_HE_AGP:
+		case PCI_PRODUCT_SERVERWORKS_CIOB_X:
+		case PCI_PRODUCT_SERVERWORKS_CNB30_HE:
+		case PCI_PRODUCT_SERVERWORKS_CNB20_HE_PCI2:
+		case PCI_PRODUCT_SERVERWORKS_CIOB_X2:
+		case PCI_PRODUCT_SERVERWORKS_CIOB_E:
+			doattach = 1;
 			if ((attachflags &
 			    (PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED)) ==
 			    PCI_FLAGS_MEM_ENABLED)
@@ -271,6 +276,9 @@ pchbattach(struct device *parent, struct device *self, void *aux)
 		case PCI_PRODUCT_INTEL_82810E_MCH:
 		case PCI_PRODUCT_INTEL_82815_FULL_HUB:
 		case PCI_PRODUCT_INTEL_82830MP_IO_1:
+		case PCI_PRODUCT_INTEL_82845G_DRAM:
+		case PCI_PRODUCT_INTEL_82855GM_MCH:
+		case PCI_PRODUCT_INTEL_82865_HB:
 			/*
 			 * The host bridge is either in GFX mode (internal
 			 * graphics) or in AGP mode. In GFX mode, we pretend
@@ -310,10 +318,14 @@ pchbattach(struct device *parent, struct device *self, void *aux)
 		pba.pba_iot = pa->pa_iot;
 		pba.pba_memt = pa->pa_memt;
 		pba.pba_dmat = pa->pa_dmat;
+		pba.pba_dmat64 = pa->pa_dmat64;
+		pba.pba_pc = pa->pa_pc;
+		pba.pba_flags = attachflags;
 		pba.pba_bus = pbnum;
 		pba.pba_bridgetag = NULL;
-		pba.pba_flags = attachflags;
 		pba.pba_pc = pa->pa_pc;
+		pba.pba_intrswiz = 0;
+		memset(&pba.pba_intrtag, 0, sizeof(pba.pba_intrtag));
 		config_found(self, &pba, pchb_print);
 	}
 }
@@ -323,9 +335,9 @@ pchb_print(void *aux, const char *pnp)
 {
 	struct pcibus_attach_args *pba = aux;
 
-	if (pnp)
-		printf("%s at %s", pba->pba_busname, pnp);
-	printf(" bus %d", pba->pba_bus);
+	if (pnp != NULL)
+		aprint_normal("%s at %s", pba->pba_busname, pnp);
+	aprint_normal(" bus %d", pba->pba_bus);
 	return (UNCONF);
 }
 
@@ -333,7 +345,8 @@ int
 agp_print(void *aux, const char *pnp)
 {
 	struct agpbus_attach_args *apa = aux;
-	if (pnp)
-		printf("%s at %s", apa->apa_busname, pnp);
+
+	if (pnp != NULL)
+		aprint_normal("%s at %s", apa->apa_busname, pnp);
 	return (UNCONF);
 }

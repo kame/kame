@@ -1,4 +1,4 @@
-/*	$NetBSD: layer_vnops.c,v 1.10 2001/12/06 04:29:23 chs Exp $	*/
+/*	$NetBSD: layer_vnops.c,v 1.14.2.4 2004/07/02 17:55:13 he Exp $	*/
 
 /*
  * Copyright (c) 1999 National Aeronautics & Space Administration
@@ -47,11 +47,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -71,7 +67,7 @@
  *
  * Ancestors:
  *	@(#)lofs_vnops.c	1.2 (Berkeley) 6/18/92
- *	$Id: layer_vnops.c,v 1.1.1.3 2002/09/25 05:32:43 itojun Exp $
+ *	$Id: layer_vnops.c,v 1.1.1.4 2004/12/21 08:06:37 itojun Exp $
  *	...and...
  *	@(#)null_vnodeops.c 1.20 92/07/07 UCLA Ficus project
  */
@@ -82,7 +78,7 @@
  * (See mount_null(8) for more information.)
  *
  * The layer.h, layer_extern.h, layer_vfs.c, and layer_vnops.c files provide
- * the core implimentation of the null file system and most other stacked
+ * the core implementation of the null file system and most other stacked
  * fs's. The description below refers to the null file system, but the
  * services provided by the layer* files are useful for all layered fs's.
  *
@@ -125,13 +121,13 @@
  * The null layer is the minimum file system layer,
  * simply bypassing all possible operations to the lower layer
  * for processing there.  The majority of its activity centers
- * on the bypass routine, though which nearly all vnode operations
+ * on the bypass routine, through which nearly all vnode operations
  * pass.
  *
  * The bypass routine accepts arbitrary vnode operations for
  * handling by the lower layer.  It begins by examing vnode
  * operation arguments and replacing any layered nodes by their
- * lower-layer equivlants.  It then invokes the operation
+ * lower-layer equivalents.  It then invokes the operation
  * on the lower layer.  Finally, it replaces the layered nodes
  * in the arguments and, if a vnode is return by the operation,
  * stacks a layered node on top of the returned vnode.
@@ -183,7 +179,7 @@
  * are created as a result of vnode operations on
  * this or other null vnode stacks.
  *
- * New vnode stacks come into existance as a result of
+ * New vnode stacks come into existence as a result of
  * an operation which returns a vnode.  
  * The bypass routine stacks a null-node above the new
  * vnode before returning it to the caller.
@@ -223,20 +219,20 @@
  *
  * The first approach is to call the aliasing layer's bypass routine.
  * This method is most suitable when you wish to invoke the operation
- * currently being hanldled on the lower layer.  It has the advantage
+ * currently being handled on the lower layer.  It has the advantage
  * that the bypass routine already must do argument mapping.
  * An example of this is null_getattrs in the null layer.
  *
- * A second approach is to directly invoked vnode operations on
+ * A second approach is to directly invoke vnode operations on
  * the lower layer with the VOP_OPERATIONNAME interface.
  * The advantage of this method is that it is easy to invoke
  * arbitrary operations on the lower layer.  The disadvantage
- * is that vnodes arguments must be manualy mapped.
+ * is that vnodes' arguments must be manually mapped.
  *
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: layer_vnops.c,v 1.10 2001/12/06 04:29:23 chs Exp $");
+__KERNEL_RCSID(0, "$NetBSD: layer_vnops.c,v 1.14.2.4 2004/07/02 17:55:13 he Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -438,6 +434,7 @@ layer_lookup(v)
 	ap->a_dvp = ldvp;
 	error = VCALL(ldvp, ap->a_desc->vdesc_offset, ap);
 	vp = *ap->a_vpp;
+	*ap->a_vpp = NULL;
 
 	if (error == EJUSTRETURN && (flags & ISLASTCN) &&
 	    (dvp->v_mount->mnt_flag & MNT_RDONLY) &&
@@ -754,10 +751,91 @@ layer_inactive(v)
 	 */
 	VOP_UNLOCK(vp, 0);
 
-	/* ..., but don't cache the device node. */
-	if (vp->v_type == VBLK || vp->v_type == VCHR)
+	/*
+	 * ..., but don't cache the device node. Also, if we did a
+	 * remove, don't cache the node.
+	 */
+	if (vp->v_type == VBLK || vp->v_type == VCHR
+	    || (VTOLAYER(vp)->layer_flags & LAYERFS_REMOVED))
 		vgone(vp);
 	return (0);
+}
+
+int
+layer_remove(v)
+	void *v;
+{
+	struct vop_remove_args /* {
+		struct vonde		*a_dvp;
+		struct vnode		*a_vp;
+		struct componentname	*a_cnp;
+	} */ *ap = v;
+
+	int		error;
+	struct vnode	*vp = ap->a_vp;
+
+	vref(vp);
+	if ((error = LAYERFS_DO_BYPASS(vp, ap)) == 0)
+		VTOLAYER(vp)->layer_flags |= LAYERFS_REMOVED;
+
+	vrele(vp);
+
+	return (error);
+}
+
+int
+layer_rename(v)
+	void *v;
+{
+	struct vop_rename_args  /* {
+		struct vnode		*a_fdvp;
+		struct vnode		*a_fvp;
+		struct componentname	*a_fcnp;
+		struct vnode		*a_tdvp;
+		struct vnode		*a_tvp;
+		struct componentname	*a_tcnp;
+	} */ *ap = v;
+
+	int error;
+	struct vnode *fdvp = ap->a_fdvp;
+	struct vnode *tvp;
+
+	tvp = ap->a_tvp;
+	if (tvp) {
+		if (tvp->v_mount != fdvp->v_mount)
+			tvp = NULL;
+		else
+			vref(tvp);
+	}
+	error = LAYERFS_DO_BYPASS(fdvp, ap);
+	if (tvp) {
+		if (error == 0)
+			VTOLAYER(tvp)->layer_flags |= LAYERFS_REMOVED;
+		vrele(tvp);
+	}
+
+	return (error);
+}
+
+int
+layer_rmdir(v)
+	void *v;
+{
+	struct vop_rmdir_args /* {
+		struct vnode		*a_dvp;
+		struct vnode		*a_vp;
+		struct componentname	*a_cnp;
+	} */ *ap = v;
+	int		error;
+	struct vnode	*vp = ap->a_vp;
+
+	vref(vp);
+	if ((error = LAYERFS_DO_BYPASS(vp, ap)) == 0)
+		VTOLAYER(vp)->layer_flags |= LAYERFS_REMOVED;
+
+	vrele(vp);
+
+	return (error);
 }
 
 int
@@ -836,33 +914,7 @@ layer_print(v)
 }
 
 /*
- * XXX - vop_strategy must be hand coded because it has no
- * vnode in its arguments.
- * This goes away with a merged VM/buffer cache.
- */
-int
-layer_strategy(v)
-	void *v;
-{
-	struct vop_strategy_args /* {
-		struct buf *a_bp;
-	} */ *ap = v;
-	struct buf *bp = ap->a_bp;
-	int error;
-	struct vnode *savedvp;
-
-	savedvp = bp->b_vp;
-	bp->b_vp = LAYERVPTOLOWERVP(bp->b_vp);
-
-	error = VOP_STRATEGY(bp);
-
-	bp->b_vp = savedvp;
-
-	return (error);
-}
-
-/*
- * XXX - like vop_strategy, vop_bwrite must be hand coded because it has no
+ * XXX - vop_bwrite must be hand coded because it has no
  * vnode in its arguments.
  * This goes away with a merged VM/buffer cache.
  */

@@ -1,4 +1,4 @@
-/*	$NetBSD: natm.c,v 1.7 2001/11/13 01:37:45 lukem Exp $	*/
+/*	$NetBSD: natm.c,v 1.9 2003/06/29 22:32:07 fvdl Exp $	*/
 
 /*
  *
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: natm.c,v 1.7 2001/11/13 01:37:45 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: natm.c,v 1.9 2003/06/29 22:32:07 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

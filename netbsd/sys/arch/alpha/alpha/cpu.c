@@ -1,4 +1,4 @@
-/* $NetBSD: cpu.c,v 1.64.16.1 2002/07/29 14:45:34 lukem Exp $ */
+/* $NetBSD: cpu.c,v 1.71 2003/10/27 07:07:35 chs Exp $ */
 
 /*-
  * Copyright (c) 1998, 1999, 2000, 2001 The NetBSD Foundation, Inc.
@@ -66,7 +66,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.64.16.1 2002/07/29 14:45:34 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.71 2003/10/27 07:07:35 chs Exp $");
 
 #include "opt_ddb.h"
 #include "opt_multiprocessor.h"
@@ -120,9 +120,8 @@ u_long	cpu_implver, cpu_amask;
 static int	cpumatch(struct device *, struct cfdata *, void *);
 static void	cpuattach(struct device *, struct device *, void *);
 
-struct cfattach cpu_ca = {
-	sizeof(struct cpu_softc), cpumatch, cpuattach
-};
+CFATTACH_DECL(cpu, sizeof(struct cpu_softc),
+    cpumatch, cpuattach, NULL, NULL);
 
 static void	cpu_announce_extensions(struct cpu_info *);
 
@@ -322,7 +321,6 @@ recognized:
 	/*
 	 * Allocate UPAGES contiguous pages for the idle PCB and stack.
 	 */
-	TAILQ_INIT(&mlist);
 	error = uvm_pglistalloc(USPACE, avail_start, avail_end, 0, 0,
 	    &mlist, 1, 1);
 	if (error != 0) {
@@ -350,8 +348,8 @@ recognized:
 	/*
 	 * Initialize the idle PCB.
 	 */
-	pcb->pcb_hw.apcb_asn = proc0.p_addr->u_pcb.pcb_hw.apcb_asn;
-	pcb->pcb_hw.apcb_ptbr = proc0.p_addr->u_pcb.pcb_hw.apcb_ptbr;
+	pcb->pcb_hw.apcb_asn = lwp0.l_addr->u_pcb.pcb_hw.apcb_asn;
+	pcb->pcb_hw.apcb_ptbr = lwp0.l_addr->u_pcb.pcb_hw.apcb_ptbr;
 #if 0
 	printf("%s: hwpcb ksp = 0x%lx\n", sc->sc_dev.dv_xname,
 	    pcb->pcb_hw.apcb_ksp);
@@ -397,7 +395,7 @@ recognized:
 static void
 cpu_announce_extensions(struct cpu_info *ci)
 {
-	u_long implver, amask;
+	u_long implver, amask = 0;
 	char bits[64];
 
 	implver = alpha_implver();
@@ -600,7 +598,7 @@ cpu_hatch(struct cpu_info *ci)
 	ALPHA_TBIA();
 	alpha_pal_imb();
 
-	microset(ci, NULL);
+	cc_microset(ci);
 
 	/* Initialize our base "runtime". */
 	microtime(&ci->ci_schedstate.spc_runtime);
@@ -706,8 +704,8 @@ cpu_debug_dump(void)
 		    ci->ci_cpuid,
 		    ci->ci_flags,
 		    ci->ci_ipis,
-		    ci->ci_curproc,
-		    ci->ci_fpcurproc);
+		    ci->ci_curlwp,
+		    ci->ci_fpcurlwp);
 	}
 }
 

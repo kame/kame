@@ -1,4 +1,4 @@
-/*	$NetBSD: arcbios.c,v 1.5 2001/11/13 12:53:24 lukem Exp $	*/
+/*	$NetBSD: arcbios.c,v 1.7 2003/03/06 07:59:37 rafal Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: arcbios.c,v 1.5 2001/11/13 12:53:24 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: arcbios.c,v 1.7 2003/03/06 07:59:37 rafal Exp $");
 
 #include <sys/param.h>
 
@@ -63,11 +63,11 @@ void	arcbios_fetch_system_identifier(struct arcbios_component *,
 	    struct arcbios_treewalk_context *);
 
 struct consdev arcbios_cn = {
-	NULL, NULL, arcbios_cngetc, arcbios_cnputc, nullcnpollc, NULL,
-	    NODEV, CN_NORMAL,
+	NULL, NULL, arcbios_cngetc, arcbios_cnputc, nullcnpollc, 
+	    NULL, NULL, NULL, NODEV, CN_NORMAL,
 };
 
-cdev_decl(arcbios_tty);
+extern const struct cdevsw arcbios_cdevsw;
 
 /*
  * arcbios_init:
@@ -97,9 +97,7 @@ arcbios_init(vaddr_t pblkva)
 	ARCBIOS = ARCBIOS_SPB->FirmwareVector;
 
 	/* Find the ARC BIOS console device major (needed by cnopen) */
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == arcbios_ttyopen)
-			break;
+	maj = cdevsw_lookup_major(&arcbios_cdevsw);
 
 	arcbios_cn.cn_dev = makedev(maj, 0);
 

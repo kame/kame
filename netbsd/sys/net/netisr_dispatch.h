@@ -1,4 +1,4 @@
-/* $NetBSD: netisr_dispatch.h,v 1.8 2001/10/06 15:46:33 thorpej Exp $ */
+/* $NetBSD: netisr_dispatch.h,v 1.10 2002/11/02 12:00:03 kristerw Exp $ */
 
 /*
  * netisr_dispatch: This file is included by the 

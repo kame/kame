@@ -1,4 +1,4 @@
-/*	$NetBSD: vr_idle.S,v 1.6 2000/08/20 21:50:08 thorpej Exp $	*/
+/*	$NetBSD: vr_idle.S,v 1.8 2003/08/07 16:27:50 agc Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -65,7 +61,7 @@ LEAF(vr_idle)
 	li	t0, (MIPS_INT_MASK | MIPS_SR_INT_IE)
 	mtc0	t0, MIPS_COP_0_STATUS		# enable all interrupts
 	nop
-	sw	zero, _C_LABEL(curproc)		# set curproc NULL for stats
+	sw	zero, _C_LABEL(curlwp)		# set curlwp NULL for stats
 #if defined(LOCKDEBUG)
 	jal	_C_LABEL(sched_unlock_idle)	# release sched_lock
 	nop

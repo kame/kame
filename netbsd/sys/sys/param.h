@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.138.4.6 2003/10/27 04:44:33 jmc Exp $	*/
+/*	$NetBSD: param.h,v 1.188.2.9 2004/11/29 06:24:21 jmc Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -54,20 +50,23 @@
  *	#define __NetBSD_Version__ MMmmrrpp00
  *
  *	M = major version
- *	m = minor version
- *	r = release ["",A-Z,Z[A-Z] but numeric]
+ *	m = minor version; a minor number of 99 indicates current.
+ *	r = 0 (*)
  *	p = patchlevel
  *
- *	So:
- *	     NetBSD-1.2D  = 102040000
- *	And:
- *	     NetBSD-1.2.1 = 102000100
+ * When new releases are made, src/gnu/usr.bin/groff/tmac/mdoc.local
+ * needs to be updated and the changes sent back to the groff maintainers.
  *
- *
- * Don't forget to change conf/osrelease.sh too.
+ * (*)	Up to 2.0I "release" used to be "",A-Z,Z[A-Z] but numeric
+ *	    	e.g. NetBSD-1.2D  = 102040000 ('D' == 4)
+ *	NetBSD-2.0H 	(200080000) was changed on 20041001 to:
+ *	2.99.9		(299000900)
  */
 
-#define	__NetBSD_Version__	106000200	/* NetBSD 1.6.2 */
+#define	__NetBSD_Version__	200000000	/* NetBSD 2.0 */
+
+#define __NetBSD_Prereq__(M,m,p) (((((M) * 100000000) + \
+    (m) * 1000000) + (p) * 100) >= __NetBSD_Version__)
 
 /*
  * Historical NetBSD #define
@@ -147,6 +146,37 @@
 #include <machine/limits.h>
 
 /*
+ * Stack macros.  On most architectures, the stack grows down, 
+ * towards lower addresses; it is the rare architecture where 
+ * it grows up, towards higher addresses.
+ * 
+ * STACK_GROW and STACK_SHRINK adjust a stack pointer by some 
+ * size, no questions asked.  STACK_ALIGN aligns a stack pointer.
+ *
+ * STACK_ALLOC returns a pointer to allocated stack space of 
+ * some size; given such a pointer and a size, STACK_MAX gives 
+ * the maximum (in the "maxsaddr" sense) stack address of the 
+ * allocated memory.
+ */
+#ifdef _KERNEL
+#ifdef __MACHINE_STACK_GROWS_UP
+#define	STACK_GROW(sp, _size)		(((caddr_t)(sp)) + (_size))
+#define	STACK_SHRINK(sp, _size)		(((caddr_t)(sp)) - (_size))
+#define	STACK_ALIGN(sp, bytes)	\
+	((caddr_t)((((unsigned long)(sp)) + (bytes)) & ~(bytes)))
+#define	STACK_ALLOC(sp, _size)		((caddr_t)(sp))
+#define	STACK_MAX(p, _size)		(((caddr_t)(p)) + (_size))
+#else
+#define	STACK_GROW(sp, _size)		(((caddr_t)(sp)) - (_size))
+#define	STACK_SHRINK(sp, _size)		(((caddr_t)(sp)) + (_size))
+#define	STACK_ALIGN(sp, bytes)	\
+	((caddr_t)(((unsigned long)(sp)) & ~(bytes)))
+#define	STACK_ALLOC(sp, _size)		(((caddr_t)(sp)) - (_size))
+#define	STACK_MAX(p, _size)		((caddr_t)(p))
+#endif
+#endif /* _KERNEL */
+
+/*
  * Priorities.  Note that with 32 run queues, differences less than 4 are
  * insignificant.
  */
@@ -167,7 +197,8 @@
 #define	PCATCH		0x100	/* OR'd with pri for tsleep to check signals */
 #define	PNORELOCK	0x200	/* OR'd with pri for cond_wait() to not relock
 				   the interlock */
-
+#define PNOEXITERR     	0x400   /* OR'd with pri for tsleep to not exit 
+				   with an error code when LWPs are exiting */
 #define	NBPW	sizeof(int)	/* number of bytes per word (integer) */
 
 #define	CMASK	022		/* default file mask: S_IWGRP|S_IWOTH */
@@ -176,7 +207,7 @@
 #define	CBLOCK	64		/* Clist block size, must be a power of 2. */
 #define	CBQSIZE	(CBLOCK/NBBY)	/* Quote bytes/cblock - can do better. */
 				/* Data chars/clist. */
-#define	CBSIZE	(CBLOCK - sizeof(struct cblock *) - CBQSIZE)
+#define	CBSIZE	(CBLOCK - (int)sizeof(struct cblock *) - CBQSIZE)
 #define	CROUND	(CBLOCK - 1)	/* Clist rounding. */
 
 /*
@@ -237,7 +268,11 @@
  * Constraints: NBPG <= MAXALLOCSAVE <= 2 ** (MINBUCKET + 14), and
  * MAXALLOCSAVE must be a power of two.
  */
+#ifdef _LP64
+#define	MINBUCKET	5		/* 5 => min allocation of 32 bytes */
+#else
 #define	MINBUCKET	4		/* 4 => min allocation of 16 bytes */
+#endif
 #define	MAXALLOCSAVE	(2 * NBPG)
 
 /*

@@ -1,4 +1,4 @@
-/*	$NetBSD: bootxx.c,v 1.24 2001/07/07 14:21:01 simonb Exp $	*/
+/*	$NetBSD: bootxx.c,v 1.27 2003/08/07 16:29:15 agc Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -51,11 +51,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -77,6 +73,7 @@
 #include <sys/param.h>
 #include <sys/exec_elf.h>
 #include <lib/libsa/stand.h>
+#include <lib/libkern/libkern.h>
 #include <machine/dec_prom.h>
 
 typedef void (*entrypt) __P((int, char **, int, const void *));
@@ -181,7 +178,7 @@ loadfile(path, name)
 	/* read the exec header */
 	i = read(fd, (char *)&ehdr, sizeof(ehdr));
 	if ((i != sizeof(ehdr)) ||
-	    (memcmp(ehdr.e_ident, ELFMAG, SELFMAG) != 0) ||
+	    (bcmp(ehdr.e_ident, ELFMAG, SELFMAG) != 0) ||
 	    (ehdr.e_ident[EI_CLASS] != ELFCLASS32)) {
 		printf("%s: No ELF header\n", bootfname);
 		goto cerr;

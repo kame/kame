@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.45 2001/11/15 18:06:14 soren Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.56 2003/10/23 08:30:21 chs Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,6 +37,8 @@
 #ifndef _VMPARAM_H_
 #define _VMPARAM_H_
 
+#include <sys/tree.h>
+
 /*
  * Machine dependent constants for 386.
  */
@@ -56,15 +54,9 @@
 /*
  * Virtual address space arrangement. On 386, both user and kernel
  * share the address space, not unlike the vax.
- * USRTEXT is the start of the user text/data space, while USRSTACK
- * is the top (end) of the user stack. Immediately above the user stack
- * resides the user structure, which is UPAGES long and contains the
- * kernel stack.
- *
- * Immediately after the user structure is the page table map, and then
- * kernal address space.
+ * USRSTACK is the top (end) of the user stack. Immediately above the
+ * user stack is the page table map, and then kernel address space.
  */
-#define	USRTEXT		NBPG
 #define	USRSTACK	VM_MAXUSER_ADDRESS
 
 /*
@@ -85,6 +77,14 @@
 #endif
 
 /*
+ * IA-32 can't do per-page execute permission, so instead we implement
+ * two executable segments for %cs, one that covers everything and one
+ * that excludes some of the address space (currently just the stack).
+ * I386_MAX_EXE_ADDR is the upper boundary for the smaller segment.
+ */
+#define I386_MAX_EXE_ADDR	(USRSTACK - MAXSSIZ)
+
+/*
  * Size of shared memory map
  */
 #ifndef SHMMAXPGS
@@ -102,12 +102,23 @@
 
 /* user/kernel map constants */
 #define VM_MIN_ADDRESS		((vaddr_t)0)
-#define	VM_MAXUSER_ADDRESS	\
-			((vaddr_t)((PDSLOT_PTE << PDSHIFT) - (UPAGES * NBPG)))
+#define	VM_MAXUSER_ADDRESS	((vaddr_t)(PDSLOT_PTE << PDSHIFT))
 #define	VM_MAX_ADDRESS		\
 		((vaddr_t)((PDSLOT_PTE << PDSHIFT) + (PDSLOT_PTE << PGSHIFT)))
 #define	VM_MIN_KERNEL_ADDRESS	((vaddr_t)(PDSLOT_KERN << PDSHIFT))
 #define	VM_MAX_KERNEL_ADDRESS	((vaddr_t)(PDSLOT_APTE << PDSHIFT))
+
+/*
+ * The address to which unspecified mapping requests default
+ */
+#ifdef _KERNEL_OPT
+#include "opt_uvm.h"
+#endif
+#define __HAVE_TOPDOWN_VM
+#ifdef USE_TOPDOWN_VM
+#define VM_DEFAULT_ADDRESS(da, sz) \
+	trunc_page(USRSTACK - MAXSSIZ - (sz))
+#endif
 
 /* XXX max. amount of KVM to be used by buffers. */
 #ifndef VM_MAX_KERNEL_BUF
@@ -115,7 +126,7 @@
 #endif
 
 /* virtual sizes (bytes) for various kernel submaps */
-#define VM_PHYS_SIZE		(USRIOSIZE*NBPG)
+#define VM_PHYS_SIZE		(USRIOSIZE*PAGE_SIZE)
 
 #define VM_PHYSSEG_MAX		5	/* 1 "hole" + 4 free lists */
 #define VM_PHYSSEG_STRAT	VM_PSTRAT_BIGFIRST
@@ -125,14 +136,23 @@
 #define	VM_FREELIST_DEFAULT	0
 #define	VM_FREELIST_FIRST16	1
 
-#define	__HAVE_PMAP_PHYSSEG
+#define	__HAVE_VM_PAGE_MD
+#define	VM_MDPAGE_INIT(pg)					\
+	memset(&(pg)->mdpage, 0, sizeof((pg)->mdpage));		\
+	simple_lock_init(&(pg)->mdpage.mp_pvhead.pvh_lock);	\
+	SPLAY_INIT(&(pg)->mdpage.mp_pvhead.pvh_root);
 
-/*
- * pmap specific data stored in the vm_physmem[] array
- */
-struct pmap_physseg {
-	struct pv_head *pvhead;		/* pv_head array */
-	char *attrs;			/* attrs array */
+struct pv_entry;
+
+struct pv_head {
+	struct simplelock pvh_lock;	/* locks every pv in this tree */
+	SPLAY_HEAD(pvtree, pv_entry) pvh_root;
+					/* head of tree (locked by pvh_lock) */
+};
+
+struct vm_page_md {
+	struct pv_head mp_pvhead;
+	int mp_attrs;
 };
 
 #endif /* _VMPARAM_H_ */

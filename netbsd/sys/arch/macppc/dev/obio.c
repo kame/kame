@@ -1,4 +1,4 @@
-/*	$NetBSD: obio.c,v 1.14.18.1 2003/06/19 11:18:56 grant Exp $	*/
+/*	$NetBSD: obio.c,v 1.19 2003/07/15 02:43:30 lukem Exp $	*/
 
 /*-
  * Copyright (C) 1998	Internet Research Institute, Inc.
@@ -31,6 +31,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: obio.c,v 1.19 2003/07/15 02:43:30 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -53,9 +56,8 @@ struct obio_softc {
 };
 
 
-struct cfattach obio_ca = {
-	sizeof(struct obio_softc), obio_match, obio_attach
-};
+CFATTACH_DECL(obio, sizeof(struct obio_softc),
+    obio_match, obio_attach, NULL, NULL);
 
 int
 obio_match(parent, cf, aux)
@@ -184,10 +186,10 @@ obio_print(aux, obio)
 			return QUIET;
 
 	if (obio)
-		printf("%s at %s", ca->ca_name, obio);
+		aprint_normal("%s at %s", ca->ca_name, obio);
 
 	if (ca->ca_nreg > 0)
-		printf(" offset 0x%x", ca->ca_reg[0]);
+		aprint_normal(" offset 0x%x", ca->ca_reg[0]);
 
 	return UNCONF;
 }

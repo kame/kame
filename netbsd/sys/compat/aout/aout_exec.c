@@ -1,4 +1,4 @@
-/*	$NetBSD: aout_exec.c,v 1.13 2001/11/13 02:07:52 lukem Exp $	*/
+/*	$NetBSD: aout_exec.c,v 1.22 2004/03/25 16:54:10 drochner Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -37,10 +37,11 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: aout_exec.c,v 1.13 2001/11/13 02:07:52 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: aout_exec.c,v 1.22 2004/03/25 16:54:10 drochner Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_syscall_debug.h"
+#include "opt_compat_netbsd.h"
 #endif
 
 #include <sys/param.h>
@@ -50,26 +51,29 @@ __KERNEL_RCSID(0, "$NetBSD: aout_exec.c,v 1.13 2001/11/13 02:07:52 lukem Exp $")
 #include <sys/signalvar.h>
 
 #include <compat/aout/aout_syscall.h>
- 
+
 extern struct sysent aout_sysent[];
 #ifdef SYSCALL_DEBUG
 extern const char * const aout_syscallnames[];
 #endif
+#ifdef COMPAT_16
 extern char sigcode[], esigcode[];
+struct uvm_object *emul_netbsd_aout_object;
+#endif
 #ifdef __HAVE_SYSCALL_INTERN
 void syscall_intern __P((struct proc *));
 #else
 void syscall __P((void));
 #endif
 
-struct emul emul_netbsd_aout = {
+const struct emul emul_netbsd_aout = {
 	"netbsd",
 	"/emul/aout",
 #ifndef __HAVE_MINIMAL_EMUL
 	EMUL_HAS_SYS___syscall,
 	NULL,
 	AOUT_SYS_syscall,
-	AOUT_SYS_MAXSYSCALL,
+	AOUT_SYS_NSYSENT,
 #endif
 	aout_sysent,
 #ifdef SYSCALL_DEBUG
@@ -79,9 +83,19 @@ struct emul emul_netbsd_aout = {
 #endif
 	sendsig,
 	trapsignal,
+	NULL,
+#ifdef COMPAT_16
 	sigcode,
 	esigcode,
+	&emul_netbsd_aout_object,
+#else
+	NULL,
+	NULL,
+	NULL,
+#endif
 	setregs,
+	NULL,
+	NULL,
 	NULL,
 	NULL,
 	NULL,
@@ -90,4 +104,6 @@ struct emul emul_netbsd_aout = {
 #else
 	syscall,
 #endif
+	NULL,
+	NULL,
 };

@@ -1,4 +1,4 @@
-/*	$NetBSD: mainbus.c,v 1.6 2002/03/13 13:12:29 simonb Exp $	*/
+/*	$NetBSD: mainbus.c,v 1.14 2003/11/17 10:07:58 keihan Exp $	*/
 
 /*
  * Copyright (c) 2000 Soren S. Jorvang
@@ -15,7 +15,7 @@
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
  *          This product includes software developed for the
- *          NetBSD Project.  See http://www.netbsd.org/ for
+ *          NetBSD Project.  See http://www.NetBSD.org/ for
  *          information about NetBSD.
  * 4. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
@@ -31,6 +31,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.14 2003/11/17 10:07:58 keihan Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,9 +54,8 @@ static void	mainbus_attach(struct device *, struct device *, void *);
 static int	mainbus_search(struct device *, struct cfdata *, void *);
 int		mainbus_print(void *, const char *);
 
-struct cfattach mainbus_ca = {
-	sizeof(struct device), mainbus_match, mainbus_attach
-};
+CFATTACH_DECL(mainbus, sizeof(struct device),
+    mainbus_match, mainbus_attach, NULL, NULL);
 
 static int
 mainbus_match(parent, match, aux)
@@ -94,7 +96,7 @@ mainbus_search(parent, cf, aux)
 		ma->ma_addr = cf->cf_loc[MAINBUSCF_ADDR];
 		ma->ma_iot = 0;
 		ma->ma_ioh = MIPS_PHYS_TO_KSEG1(ma->ma_addr);
-		if ((*cf->cf_attach->ca_match)(parent, cf, ma) > 0)
+		if (config_match(parent, cf, ma) > 0)
 			config_attach(parent, cf, ma, mainbus_print);
 	} while (cf->cf_fstate == FSTATE_STAR);
 
@@ -111,8 +113,8 @@ mainbus_print(aux, pnp)
 	if (pnp != 0)
 		return QUIET;
 
-	if (ma->ma_addr != MAINBUSCF_ADDR_DEFAULT)
-		printf(" addr 0x%lx", ma->ma_addr);
+	if (ma->ma_addr != (u_long) MAINBUSCF_ADDR_DEFAULT)
+		aprint_normal(" addr 0x%lx", ma->ma_addr);
 
 	return UNCONF;
 }

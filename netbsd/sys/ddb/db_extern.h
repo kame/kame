@@ -1,4 +1,4 @@
-/*	$NetBSD: db_extern.h,v 1.9 2002/05/13 20:17:20 matt Exp $	*/
+/*	$NetBSD: db_extern.h,v 1.11 2003/05/16 16:28:31 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1995 The NetBSD Foundation, Inc.
@@ -50,7 +50,6 @@ extern label_t *db_recover;
 void	db_examine_cmd(db_expr_t, int, db_expr_t, char *);
 void	db_print_cmd(db_expr_t, int, db_expr_t, char *);
 void	db_print_loc_and_inst(db_addr_t);
-void	db_strcpy(char *, char *);
 void	db_search_cmd(db_expr_t, boolean_t, db_expr_t, char *);
 
 /* db_expr.c */
@@ -64,6 +63,7 @@ void	db_check_interrupt(void);
 void	db_show_regs(db_expr_t, boolean_t, db_expr_t, char *);
 
 /* db_trap.c */
+extern int	db_trap_type;
 void	db_trap(int, int);
 
 /* db_write_cmd.c */

@@ -1,4 +1,4 @@
-/*	$NetBSD: ct.c,v 1.28 2002/03/15 05:55:35 gmcgarry Exp $	*/
+/*	$NetBSD: ct.c,v 1.37 2003/11/17 14:37:59 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -48,11 +48,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -86,7 +82,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ct.c,v 1.28 2002/03/15 05:55:35 gmcgarry Exp $");                                                  
+__KERNEL_RCSID(0, "$NetBSD: ct.c,v 1.37 2003/11/17 14:37:59 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -118,7 +114,7 @@ struct	ct_softc {
 	struct	ct_ulcmd sc_ul;
 	struct	ct_wfmcmd sc_wfm;
 	struct	ct_clearcmd sc_clear;
-	struct	buf_queue sc_tab;
+	struct	bufq_state sc_tab;
 	int	sc_active;
 	struct	buf *sc_bp;
 	struct	buf sc_bufstore;	/* XXX */
@@ -150,11 +146,26 @@ struct	ct_softc {
 int	ctmatch __P((struct device *, struct cfdata *, void *));
 void	ctattach __P((struct device *, struct device *, void *));
 
-struct cfattach ct_ca = {
-	sizeof(struct ct_softc), ctmatch, ctattach
-};
+CFATTACH_DECL(ct, sizeof(struct ct_softc),
+    ctmatch, ctattach, NULL, NULL);
 
 extern struct cfdriver ct_cd;
+
+dev_type_open(ctopen);
+dev_type_close(ctclose);
+dev_type_read(ctread);
+dev_type_write(ctwrite);
+dev_type_ioctl(ctioctl);
+dev_type_strategy(ctstrategy);
+
+const struct bdevsw ct_bdevsw = {
+	ctopen, ctclose, ctstrategy, ctioctl, nodump, nosize, D_TAPE
+};
+
+const struct cdevsw ct_cdevsw = {
+	ctopen, ctclose, ctread, ctwrite, ctioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_TAPE
+};
 
 int	ctident __P((struct device *, struct ct_softc *,
 	    struct hpibbus_attach_args *));
@@ -170,9 +181,6 @@ void	ctgo __P((void *));
 void	ctintr __P((void *));
 
 void	ctcommand __P((dev_t, int, int));
-
-cdev_decl(ct);
-bdev_decl(ct);
 
 struct	ctinfo {
 	short	hwid;
@@ -227,7 +235,7 @@ ctattach(parent, self, aux)
 	sc->sc_slave = ha->ha_slave;
 	sc->sc_punit = ha->ha_punit;
 
-	BUFQ_INIT(&sc->sc_tab);
+	bufq_alloc(&sc->sc_tab, BUFQ_FCFS);
 
 	/* Initialize hpib job queue entry. */
 	sc->sc_hq.hq_softc = sc;
@@ -387,10 +395,10 @@ ctopen(dev, flag, type, p)
 	else
 		sc->sc_soptc.opt = C_SPAR;
 
-	/* 
+	/*
 	 * Check the return of hpibsend() and hpibswait().
 	 * Drive could be loading/unloading a tape. If not checked,
-	 * driver hangs. 
+	 * driver hangs.
 	 */
 	cc = hpibsend(ctlr, slave, C_CMD, &sc->sc_soptc, sizeof(sc->sc_soptc));
 	if (cc != sizeof(sc->sc_soptc))
@@ -482,7 +490,7 @@ ctcommand(dev, cmd, cnt)
 #ifdef DEBUG
 			if (ctdebug & CT_BSF)
 				printf("%s: backup eof pos %d blk %d\n",
-				    sc->sc_dev.dv_xname, sc->sc_eofp, 
+				    sc->sc_dev.dv_xname, sc->sc_eofp,
 				    sc->sc_eofs[sc->sc_eofp]);
 #endif
 		}
@@ -506,7 +514,7 @@ ctstrategy(bp)
 	sc = ct_cd.cd_devs[unit];
 
 	s = splbio();
-	BUFQ_INSERT_TAIL(&sc->sc_tab, bp);
+	BUFQ_PUT(&sc->sc_tab, bp);
 	if (sc->sc_active == 0) {
 		sc->sc_active = 1;
 		ctustart(sc);
@@ -520,7 +528,7 @@ ctustart(sc)
 {
 	struct buf *bp;
 
-	bp = BUFQ_FIRST(&sc->sc_tab);
+	bp = BUFQ_PEEK(&sc->sc_tab);
 	sc->sc_addr = bp->b_data;
 	sc->sc_resid = bp->b_bcount;
 	if (hpibreq(sc->sc_dev.dv_parent, &sc->sc_hq))
@@ -538,7 +546,7 @@ ctstart(arg)
 	ctlr = sc->sc_dev.dv_parent->dv_unit;
 	slave = sc->sc_slave;
 
-	bp = BUFQ_FIRST(&sc->sc_tab);
+	bp = BUFQ_PEEK(&sc->sc_tab);
 	if ((sc->sc_flags & CTF_CMD) && sc->sc_bp == bp) {
 		switch(sc->sc_cmd) {
 		case MTFSF:
@@ -620,7 +628,7 @@ mustio:
 			bp->b_resid = bp->b_bcount;
 			ctdone(sc, bp);
 			return;
-		}			
+		}
 		sc->sc_flags |= CTF_IO;
 		sc->sc_ioc.unit = C_SUNIT(sc->sc_punit);
 		sc->sc_ioc.saddr = C_SADDR;
@@ -649,7 +657,7 @@ ctgo(arg)
 	struct buf *bp;
 	int rw;
 
-	bp = BUFQ_FIRST(&sc->sc_tab);
+	bp = BUFQ_PEEK(&sc->sc_tab);
 	rw = bp->b_flags & B_READ;
 	hpibgo(sc->sc_dev.dv_parent->dv_unit, sc->sc_slave, C_EXEC,
 	    sc->sc_addr, sc->sc_resid, rw, rw != 0);
@@ -745,7 +753,7 @@ ctintr(arg)
 	slave = sc->sc_slave;
 	unit = sc->sc_dev.dv_unit;
 
-	bp = BUFQ_FIRST(&sc->sc_tab);
+	bp = BUFQ_PEEK(&sc->sc_tab);
 	if (bp == NULL) {
 		printf("%s: bp == NULL\n", sc->sc_dev.dv_xname);
 		return;
@@ -882,10 +890,10 @@ ctdone(sc, bp)
 	struct buf *bp;
 {
 
-	BUFQ_REMOVE(&sc->sc_tab, bp);
+	(void)BUFQ_GET(&sc->sc_tab);
 	biodone(bp);
 	hpibfree(sc->sc_dev.dv_parent, &sc->sc_hq);
-	if (BUFQ_FIRST(&sc->sc_tab) == NULL) {
+	if (BUFQ_PEEK(&sc->sc_tab) == NULL) {
 		sc->sc_active = 0;
 		return;
 	}
@@ -955,18 +963,6 @@ ctioctl(dev, cmd, data, flag, p)
 		return(EINVAL);
 	}
 	return(0);
-}
-
-/* ARGSUSED */
-int
-ctdump(dev, blkno, va, size)
-	dev_t dev;
-	daddr_t blkno;
-	caddr_t va;
-	size_t size;
-{
-
-	return (ENODEV);
 }
 
 void

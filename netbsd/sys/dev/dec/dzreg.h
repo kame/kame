@@ -1,4 +1,4 @@
-/*	$NetBSD: dzreg.h,v 1.1 2002/02/25 14:58:08 ad Exp $ */
+/*	$NetBSD: dzreg.h,v 1.3 2003/12/13 23:02:33 ad Exp $ */
 /*
  * Copyright (c) 1996  Ken C. Wellsch.  All rights reserved.
  *
@@ -21,6 +21,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#ifndef _DEV_DEC_DZREG_H
+#define _DEV_DEC_DZREG_H
 
 union w_b
 {
@@ -50,20 +53,6 @@ struct DZregs
 
 typedef struct DZregs dzregs;
 
-#if 0
-struct	dz_regs	{
-	volatile unsigned short *dr_csr;
-	volatile unsigned short *dr_rbuf;
-#define dr_lpr		 	dr_rbuf
-	volatile unsigned char *dr_dtr;
-	volatile unsigned char *dr_break;
-	volatile unsigned char *dr_tbuf;
-	volatile unsigned char *dr_tcr;
-	volatile unsigned short *dr_tcrw;
-	volatile unsigned char *dr_ring;
-	volatile unsigned char *dr_dcd;
-};
-#else
 struct	dz_regs	{
 	bus_addr_t dr_csr;
 	bus_addr_t dr_rbuf;
@@ -75,6 +64,9 @@ struct	dz_regs	{
 	bus_addr_t dr_tcrw;
 	bus_addr_t dr_ring;
 	bus_addr_t dr_dcd;
+
+	bus_addr_t dr_firstreg;
+	bus_addr_t dr_winsize;
 };
 #define	DZ_UBA_CSR	0
 #define	DZ_UBA_RBUF	2
@@ -85,7 +77,8 @@ struct	dz_regs	{
 #define	DZ_UBA_DCD	7
 #define	DZ_UBA_RING	6
 
-#endif
+#define	DZ_UBA_FIRSTREG	0
+#define	DZ_UBA_WINSIZE	8
 
 /* CSR bits */
 
@@ -142,3 +135,5 @@ struct	dz_regs	{
 #define DZ_LPR_8_BIT_CHAR	0000030
 
 #define DZ_LPR_CHANNEL_MASK	0000007
+
+#endif /* _DEV_DEC_DZREG_H */

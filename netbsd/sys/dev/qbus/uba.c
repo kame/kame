@@ -1,8 +1,39 @@
-/*	$NetBSD: uba.c,v 1.59 2001/11/15 09:48:13 lukem Exp $	   */
+/*	$NetBSD: uba.c,v 1.68 2003/08/28 14:59:06 ragge Exp $	   */
+/*
+ * Copyright (c) 1982, 1986 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)uba.c	7.10 (Berkeley) 12/16/90
+ *	@(#)autoconf.c	7.20 (Berkeley) 5/9/91
+ */
+
 /*
  * Copyright (c) 1996 Jonathan Stone.
  * Copyright (c) 1994, 1996 Ludd, University of Lule}, Sweden.
- * Copyright (c) 1982, 1986 The Regents of the University of California.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,17 +69,15 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uba.c,v 1.59 2001/11/15 09:48:13 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uba.c,v 1.68 2003/08/28 14:59:06 ragge Exp $");
 
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/systm.h>
-#include <sys/map.h>
 #include <sys/buf.h>
 #include <sys/proc.h>
 #include <sys/user.h>
 #include <sys/conf.h>
-#include <sys/dkstat.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/device.h>
@@ -98,7 +127,7 @@ uba_done(struct uba_softc *uh)
 	struct uba_unit *uu;
  
 	while ((uu = SIMPLEQ_FIRST(&uh->uh_resq))) {
-		SIMPLEQ_REMOVE_HEAD(&uh->uh_resq, uu, uu_resq);
+		SIMPLEQ_REMOVE_HEAD(&uh->uh_resq, uu_resq);
 		if ((*uu->uu_ready)(uu) == 0) {
 			SIMPLEQ_INSERT_HEAD(&uh->uh_resq, uu, uu_resq);
 			break;
@@ -157,7 +186,7 @@ ubmemalloc(struct uba_softc *uh, struct ubinfo *ui, int flags)
 	int waitok = (flags & UBA_CANTWAIT ? BUS_DMA_NOWAIT : BUS_DMA_WAITOK);
 	int error;
 
-	if ((error = bus_dmamem_alloc(uh->uh_dmat, ui->ui_size, NBPG, 0,
+	if ((error = bus_dmamem_alloc(uh->uh_dmat, ui->ui_size, PAGE_SIZE, 0,
 	    &ui->ui_seg, 1, &ui->ui_rseg, waitok)))
 		return error;
 	if ((error = bus_dmamem_map(uh->uh_dmat, &ui->ui_seg, ui->ui_rseg,
@@ -236,6 +265,12 @@ uba_attach(struct uba_softc *sc, paddr_t iopagephys)
 	if (bus_space_map(sc->uh_iot, iopagephys, UBAIOSIZE, 0, &sc->uh_ioh))
 		return;
 
+	/*
+	 * Keep track of which addressed devices are found.
+	 */
+	sc->uh_used = malloc(UBAIOSIZE, M_TEMP, M_WAITOK);
+	memset(sc->uh_used, 0, UBAIOSIZE);
+
 	if (sc->uh_beforescan)
 		(*sc->uh_beforescan)(sc);
 	/*
@@ -245,6 +280,8 @@ uba_attach(struct uba_softc *sc, paddr_t iopagephys)
 
 	if (sc->uh_afterscan)
 		(*sc->uh_afterscan)(sc);
+
+	free(sc->uh_used, M_TEMP);
 }
 
 int
@@ -253,6 +290,9 @@ ubasearch(struct device *parent, struct cfdata *cf, void *aux)
 	struct	uba_softc *sc = (struct uba_softc *)parent;
 	struct	uba_attach_args ua;
 	int	i, vec, br;
+
+	if (sc->uh_used[ubdevreg(cf->cf_loc[0])])
+		return 0; /* something are already at this address */
 
 	ua.ua_ioh = ubdevreg(cf->cf_loc[0]) + sc->uh_ioh;
 	ua.ua_iot = sc->uh_iot;
@@ -263,7 +303,7 @@ ubasearch(struct device *parent, struct cfdata *cf, void *aux)
 		goto forgetit;
 
 	scb_vecref(0, 0); /* Clear vector ref */
-	i = (*cf->cf_attach->ca_match) (parent, cf, &ua);
+	i = config_match(parent, cf, &ua);
 
 	if (sc->uh_errchk)
 		if ((*sc->uh_errchk)(sc))
@@ -282,12 +322,14 @@ ubasearch(struct device *parent, struct cfdata *cf, void *aux)
 	ua.ua_iaddr = cf->cf_loc[0];
 	ua.ua_evcnt = NULL;
 
+	sc->uh_used[ubdevreg(cf->cf_loc[0])] = 1;
+
 	config_attach(parent, cf, &ua, ubaprint);
 	return 0;
 
 fail:
 	printf("%s%d at %s csr %o %s\n",
-	    cf->cf_driver->cd_name, cf->cf_unit, parent->dv_xname,
+	    cf->cf_name, cf->cf_unit, parent->dv_xname,
 	    cf->cf_loc[0], (i ? "zero vector" : "didn't interrupt"));
 
 forgetit:
@@ -302,7 +344,7 @@ ubaprint(void *aux, const char *uba)
 {
 	struct uba_attach_args *ua = aux;
 
-	printf(" csr %o vec %o ipl %x", ua->ua_iaddr,
+	aprint_normal(" csr %o vec %o ipl %x", ua->ua_iaddr,
 	    ua->ua_cvec & 511, ua->ua_br);
 	return UNCONF;
 }

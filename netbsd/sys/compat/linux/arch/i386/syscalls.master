@@ -1,4 +1,4 @@
-	$NetBSD: syscalls.master,v 1.63.4.1 2003/10/22 04:03:00 jmc Exp $
+	$NetBSD: syscalls.master,v 1.67 2003/08/10 20:16:22 jdolecek Exp $
 
 ;	@(#)syscalls.master	8.1 (Berkeley) 7/19/93
 
@@ -42,6 +42,7 @@
 #include <sys/systm.h>
 #include <sys/signal.h>
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/linux/common/linux_types.h>
@@ -288,7 +289,7 @@
 			gid_t *rgid, gid_t *egid, gid_t *sgid); }
 172	UNIMPL		prctl
 173	STD		{ int linux_sys_rt_sigreturn( \
-			    struct linux_rt_sigframe *sfp); }
+			    struct linux_ucontext *ucp); }
 174	STD		{ int linux_sys_rt_sigaction(int signum, \
 			    const struct linux_sigaction *nsa, \
 			    struct linux_sigaction *osa, \
@@ -329,7 +330,7 @@
 			    linux_off_t offset); }
 193	STD		{ int linux_sys_truncate64(const char *path, \
 			    off_t length); }
-194	NOARGS		linux_ftruncate64 { int sys_ftruncate(int fd, \
+194	STD		{ int linux_sys_ftruncate64(unsigned int fd, \
 			    off_t length); }
 195	STD		{ int linux_sys_stat64(const char *path, \
 			    struct linux_stat64 *sp); }

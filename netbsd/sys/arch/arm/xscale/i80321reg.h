@@ -1,4 +1,4 @@
-/*	$NetBSD: i80321reg.h,v 1.3.4.1 2002/11/11 22:32:13 he Exp $	*/
+/*	$NetBSD: i80321reg.h,v 1.14 2003/12/19 10:08:11 gavan Exp $	*/
 
 /*
  * Copyright (c) 2002 Wasabi Systems, Inc.
@@ -67,7 +67,7 @@
 #define	VERDE_EXTMEM_BASE		0x90020000UL
 
 #define	VERDE_PMMR_BASE			0xffffe000UL
-#define	VERDE_PMMR_SIZE			0x00000900UL
+#define	VERDE_PMMR_SIZE			0x00001700UL
 
 /*
  * Peripheral Memory Mapped Registers.  Defined as offsets
@@ -76,17 +76,32 @@
 #define	VERDE_ATU_BASE			0x0100
 #define	VERDE_ATU_SIZE			0x0100
 
+#define	VERDE_MU_BASE			0x0300
+#define	VERDE_MU_SIZE			0x0100
+
 #define	VERDE_DMA_BASE			0x0400
+#define	VERDE_DMA_BASE0			(VERDE_DMA_BASE + 0x00)
+#define	VERDE_DMA_BASE1			(VERDE_DMA_BASE + 0x40)
 #define	VERDE_DMA_SIZE			0x0100
+#define	VERDE_DMA_CHSIZE		0x0040
 
 #define	VERDE_MCU_BASE			0x0500
 #define	VERDE_MCU_SIZE			0x0100
 
 #define	VERDE_SSP_BASE			0x0600
-#define	VERDE_SSP_SIZE			0x0100
+#define	VERDE_SSP_SIZE			0x0080
+
+#define	VERDE_PBIU_BASE			0x0680
+#define	VERDE_PBIU_SIZE			0x0080
 
 #define	VERDE_AAU_BASE			0x0800
 #define	VERDE_AAU_SIZE			0x0100
+
+#define	VERDE_I2C_BASE			0x1680
+#define	VERDE_I2C_BASE0			(VERDE_I2C_BASE + 0x00)
+#define	VERDE_I2C_BASE1			(VERDE_I2C_BASE + 0x20)
+#define	VERDE_I2C_SIZE			0x0080
+#define	VERDE_I2C_CHSIZE		0x0020
 
 /*
  * Address Translation Unit
@@ -199,8 +214,8 @@
 #define	PCIXSR_SCD		(1U << 18)
 #define	PCIXSR_133_CAP		(1U << 17)
 #define	PCIXSR_32PCI		(1U << 16)	/* 0 = 32, 1 = 64 */
-#define	PCIXSR_BUSNO(x)		(((x) & 0xff) >> 8)
-#define	PCIXSR_DEVNO(x)		(((x) & 0x1f) >> 3)
+#define	PCIXSR_BUSNO(x)		(((x) & 0xff00) >> 8)
+#define	PCIXSR_DEVNO(x)		(((x) & 0xf8) >> 3)
 #define	PCIXSR_FUNCNO(x)	((x) & 0x7)
 
 /*
@@ -301,10 +316,10 @@
  *	INTSTR	cp6 c4,0	0xffffe7d4
  *	IINTSRC	cp6 c8,0	0xffffe7d8
  *	FINTSRC	cp6 c9,0	0xffffe7dc
- *	PIRSR			0xffffe2ec
+ *	PIRSR			0xffffe1ec
  */
 
-#define	ICU_PIRSR		0x02ec
+#define	ICU_PIRSR		0x01ec
 #define	ICU_GPOE		0x07c4
 #define	ICU_GPID		0x07c8
 #define	ICU_GPOD		0x07cc
@@ -314,7 +329,8 @@
  * INTERRUPTS.  See i80321_icu.c
  */
 #define	ICU_INT_HPI		31	/* high priority interrupt */
-#define	ICU_INT_XINT(x)		((x) + 27) /* external interrupts */
+#define	ICU_INT_XINT0		27	/* external interrupts */
+#define	ICU_INT_XINT(x)		((x) + ICU_INT_XINT0)
 #define	ICU_INT_bit26		26
 #define	ICU_INT_SSP		25	/* SSP serial port */
 #define	ICU_INT_MUE		24	/* msg unit error */
@@ -343,57 +359,11 @@
 #define	ICU_INT_DMA0_EOC	1	/* DMA0 end-of-chain */
 #define	ICU_INT_DMA0_EOT	0	/* DMA0 end-of-transfer */
 
-#define	ICU_INT_HWMASK		(0xffffffff & ~(ICU_INT_bit26|ICU_INT_bit22| \
-						ICU_INT_bit5|ICU_INT_bit4))
-
-/*
- * DMA Controller
- */
-
-struct dma_chain_desc {
-	uint32_t	dcd_nda;	/* next descriptor address */
-	uint32_t	dcd_pad;	/* PCI address (lower) */
-	uint32_t	dcd_puad;	/* PCI address (upper) */
-	uint32_t	dcd_lad;	/* local address */
-	uint32_t	dcd_bc;		/* byte count */
-	uint32_t	dcd_dc;		/* descriptor control */
-} __attribute__((__packed__));
-
-#define	DMA_CHAN1_OFF	0x40		/* offset to channel 1 regs */
-
-#define	DMA_CCR		0x00		/* channel control register */
-#define	DMA_CSR		0x04		/* channel status register */
-#define	DMA_DAR		0x0c		/* descriptor address */
-#define	DMA_DNAR	0x10		/* next descriptor address */
-#define	DMA_PADR	0x14		/* PCI address (low) */
-#define	DMA_PUADR	0x18		/* PCI address (high) */
-#define	DMA_LADR	0x1c		/* local address */
-#define	DMA_BCR		0x20		/* byte count */
-#define	DMA_DCR		0x24		/* descriptor control */
-
-#define	DMA_CCR_CE	(1U << 0)	/* channel enable */
-#define	DMA_CCR_CR	(1U << 1)	/* chain resume */
-
-#define	DMA_SSR_STE	(1U << 1)	/* PCI-X split transaction error */
-#define	DMA_SSR_TAF	(1U << 2)	/* PCI target abort flag */
-#define	DMA_SSR_MAF	(1U << 3)	/* PCI master abort flag */
-#define	DMA_SSR_IBMAF	(1U << 5)	/* Internal bus master abort flag */
-#define	DMA_SSR_ECIF	(1U << 8)	/* end-of-chain interrupt */
-#define	DMA_SSR_ETIF	(1U << 9)	/* end-of-transfer interrupt */
-#define	DMA_SSR_CAF	(1U << 10)	/* channel active flag */
-
-#define	DMA_BCR_MASK	0x00ffffff	/* 24-bit count */
-
-#define	DMA_DCR_TTYPE	0x0000000f	/* PCI transaction type */
-#define	DMA_DCR_IE	(1U << 4)	/* interrupt enable */
-#define	DMA_DCR_DACE	(1U << 5)	/* dual address cycle enable */
-#define	DMA_DCR_MMTE	(1U << 6)	/* memory->memory transfer enable */
-
-#define	DMA_DCR_TTYPE_MR	0x06	/* Memory Read */
-#define	DMA_DCR_TTYPE_MW	0x07	/* Memory Write */
-#define	DMA_DCR_TTYPE_MRM	0x0c	/* Memory Read Multiple */
-#define	DMA_DCR_TTYPE_MRL	0x0e	/* Memory Read Line */
-#define	DMA_DCR_TTYPE_MW2	0x0f	/* Memory Write */
+#define	ICU_INT_HWMASK		(0xffffffff & \
+					~((1 << ICU_INT_bit26) | \
+					  (1 << ICU_INT_bit22) | \
+					  (1 << ICU_INT_bit5)  | \
+					  (1 << ICU_INT_bit4)))
 
 /*
  * SSP Serial Port
@@ -449,29 +419,83 @@ struct dma_chain_desc {
 #define	SSP_SSITR_TROR		(1U << 7)/* Test Rx overrun */
 
 /*
- * Application Accelerator Unit
+ * Peripheral Bus Interface Unit
  */
 
-#define	AAU_ACR		0x00		/* accelerator control */
-#define	AAU_ASR		0x04		/* accelerator status */
-#define	AAU_ADAR	0x08		/* descriptor address */
-#define	AAU_ANDAR	0x0c		/* next descriptor address */
-#define	AAU_DAR		0x20		/* destination address */
-#define	AAU_ABCR	0x24		/* byte count */
-#define	AAU_ADCR	0x28		/* descriptor control */
-#define	AAU_EDCR0	0x3c		/* extended descriptor control 0 */
-#define	AAU_EDCR1	0x60		/* extended descriptor control 1 */
-#define	AAU_EDCR2	0x84		/* extended descriptor control 2 */
+#define PBIU_PBCR		0x00	/* PBIU Control Register */
+#define PBIU_PBBAR0		0x08	/* PBIU Base Address Register 0 */
+#define PBIU_PBLR0		0x0c	/* PBIU Limit Register 0 */
+#define PBIU_PBBAR1		0x10	/* PBIU Base Address Register 1 */
+#define PBIU_PBLR1		0x14	/* PBIU Limit Register 1 */
+#define PBIU_PBBAR2		0x18	/* PBIU Base Address Register 2 */
+#define PBIU_PBLR2		0x1c	/* PBIU Limit Register 2 */
+#define PBIU_PBBAR3		0x20	/* PBIU Base Address Register 3 */
+#define PBIU_PBLR3		0x24	/* PBIU Limit Register 3 */
+#define PBIU_PBBAR4		0x28	/* PBIU Base Address Register 4 */
+#define PBIU_PBLR4		0x2c	/* PBIU Limit Register 4 */
+#define PBIU_PBBAR5		0x30	/* PBIU Base Address Register 5 */
+#define PBIU_PBLR5		0x34	/* PBIU Limit Register 5 */
+#define PBIU_DSCR		0x38	/* PBIU Drive Strength Control Reg. */
+#define PBIU_MBR0		0x40	/* PBIU Memory-less Boot Reg. 0 */
+#define PBIU_MBR1		0x60	/* PBIU Memory-less Boot Reg. 1 */
+#define PBIU_MBR2		0x64	/* PBIU Memory-less Boot Reg. 2 */
 
-#define	AAU_ACR_AAE	(1U << 0)	/* accelerator enable */
-#define	AAU_ACR_CR	(1U << 1)	/* chain resume */
-#define	AAU_ACR_512	(1U << 2)	/* 512-byte buffer enable */
+#define	PBIU_PBCR_PBIEN		(1 << 0)
+#define	PBIU_PBCR_PBI100	(1 << 1)
+#define	PBIU_PBCR_PBI66		(2 << 1)
+#define	PBIU_PBCR_PBI33		(3 << 1)
+#define	PBIU_PBCR_PBBEN		(1 << 3)
 
-#define	AAU_ASR_MA	(1U << 5)	/* master abort */
-#define	AAU_ASR_ECIF	(1U << 8)	/* end of chain interrupt */
-#define	AAU_ASR_ETIF	(1U << 9)	/* end of transfer interrupt */
-#define	AAU_ASR_AAF	(1U << 10)	/* acellerator active */
+#define	PBIU_PBARx_WIDTH8	(0 << 0)
+#define	PBIU_PBARx_WIDTH16	(1 << 0)
+#define	PBIU_PBARx_WIDTH32	(2 << 0)
+#define	PBIU_PBARx_ADWAIT4	(0 << 2)
+#define	PBIU_PBARx_ADWAIT8	(1 << 2)
+#define	PBIU_PBARx_ADWAIT12	(2 << 2)
+#define	PBIU_PBARx_ADWAIT16	(3 << 2)
+#define	PBIU_PBARx_ADWAIT20	(4 << 2)
+#define	PBIU_PBARx_RCWAIT1	(0 << 6)
+#define	PBIU_PBARx_RCWAIT4	(1 << 6)
+#define	PBIU_PBARx_RCWAIT8	(2 << 6)
+#define	PBIU_PBARx_RCWAIT12	(3 << 6)
+#define	PBIU_PBARx_RCWAIT16	(4 << 6)
+#define	PBIU_PBARx_RCWAIT20	(5 << 6)
+#define	PBIU_PBARx_FWE		(1 << 9)
+#define	PBIU_BASE_MASK		0xfffff000U
 
-#define	AAU_ABCR_MASK	0x00ffffff	/* 24-bit count */
+#define	PBIU_PBLRx_SIZE(x)	(~((x) - 1))
+
+/*
+ * Messaging Unit
+ */
+#define MU_IMR0			0x0010	/* MU Inbound Message Register 0 */
+#define MU_IMR1			0x0014	/* MU Inbound Message Register 1 */
+#define MU_OMR0			0x0018	/* MU Outbound Message Register 0 */
+#define MU_OMR1			0x001c	/* MU Outbound Message Register 1 */
+#define MU_IDR			0x0020	/* MU Inbound Doorbell Register */
+#define MU_IISR			0x0024	/* MU Inbound Interrupt Status Reg */
+#define MU_IIMR			0x0028	/* MU Inbound Interrupt Mask Reg */
+#define MU_ODR			0x002c	/* MU Outbound Doorbell Register */
+#define MU_OISR			0x0030	/* MU Outbound Interrupt Status Reg */
+#define MU_OIMR			0x0034	/* MU Outbound Interrupt Mask Reg */
+#define MU_MUCR			0x0050	/* MU Configuration Register */
+#define MU_QBAR			0x0054	/* MU Queue Base Address Register */
+#define MU_IFHPR		0x0060	/* MU Inbound Free Head Pointer Reg */
+#define MU_IFTPR		0x0064	/* MU Inbound Free Tail Pointer Reg */
+#define MU_IPHPR		0x0068	/* MU Inbound Post Head Pointer Reg */
+#define MU_IPTPR		0x006c	/* MU Inbound Post Tail Pointer Reg */
+#define MU_OFHPR		0x0070	/* MU Outbound Free Head Pointer Reg */
+#define MU_OFTPR		0x0074	/* MU Outbound Free Tail Pointer Reg */
+#define MU_OPHPR		0x0078	/* MU Outbound Post Head Pointer Reg */
+#define MU_OPTPR		0x007c	/* MU Outbound Post Tail Pointer Reg */
+#define MU_IAR			0x0080	/* MU Index Address Register */
+
+#define MU_IIMR_IRI	(1 << 6)	/* Index Register Interrupt */
+#define MU_IIMR_OFQFI	(1 << 5)	/* Outbound Free Queue Full Int. */
+#define MU_IIMR_IPQI	(1 << 4)	/* Inbound Post Queue Interrupt */
+#define MU_IIMR_EDI	(1 << 3)	/* Error Doorbell Interrupt */
+#define MU_IIMR_IDI	(1 << 2)	/* Inbound Doorbell Interrupt */
+#define MU_IIMR_IM1I	(1 << 1)	/* Inbound Message 1 Interrupt */
+#define MU_IIMR_IM0I	(1 << 0)	/* Inbound Message 0 Interrupt */
 
 #endif /* _ARM_XSCALE_I80321REG_H_ */

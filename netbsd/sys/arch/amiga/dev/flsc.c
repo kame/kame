@@ -1,4 +1,4 @@
-/*	$NetBSD: flsc.c,v 1.29 2002/01/28 09:56:55 aymeric Exp $ */
+/*	$NetBSD: flsc.c,v 1.33 2004/02/13 11:36:10 wiz Exp $ */
 
 /*
  * Copyright (c) 1997 Michael L. Hitch
@@ -44,7 +44,7 @@
 #include "opt_ddb.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: flsc.c,v 1.29 2002/01/28 09:56:55 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: flsc.c,v 1.33 2004/02/13 11:36:10 wiz Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -57,6 +57,8 @@ __KERNEL_RCSID(0, "$NetBSD: flsc.c,v 1.29 2002/01/28 09:56:55 aymeric Exp $");
 #include <sys/proc.h>
 #include <sys/user.h>
 #include <sys/queue.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <dev/scsipi/scsi_all.h>
 #include <dev/scsipi/scsipi_all.h>
@@ -77,9 +79,8 @@ void	flscattach(struct device *, struct device *, void *);
 int	flscmatch(struct device *, struct cfdata *, void *);
 
 /* Linkup to the rest of the kernel */
-struct cfattach flsc_ca = {
-	sizeof(struct flsc_softc), flscmatch, flscattach
-};
+CFATTACH_DECL(flsc, sizeof(struct flsc_softc),
+    flscmatch, flscattach, NULL, NULL);
 
 /*
  * Functions and the switch for the MI code.
@@ -510,7 +511,7 @@ flsc_dma_setup(struct ncr53c9x_softc *sc, caddr_t *addr, size_t *len,
 	 * DMA can be nasty for high-speed serial input, so limit the
 	 * size of this DMA operation if the serial port is running at
 	 * a high speed (higher than 19200 for now - should be adjusted
-	 * based on cpu type and speed?).
+	 * based on CPU type and speed?).
 	 * XXX - add serial speed check XXX
 	 */
 	if (ser_open_speed > 19200 && flsc_max_dma != 0 &&
@@ -518,7 +519,7 @@ flsc_dma_setup(struct ncr53c9x_softc *sc, caddr_t *addr, size_t *len,
 		fsc->sc_dmasize = flsc_max_dma;
 	ptr = *addr;			/* Kernel virtual address */
 	pa = kvtop(ptr);		/* Physical address of DMA */
-	xfer = min(fsc->sc_dmasize, NBPG - (pa & (NBPG - 1)));
+	xfer = min(fsc->sc_dmasize, PAGE_SIZE - (pa & (PAGE_SIZE - 1)));
 	fsc->sc_xfr_align = 0;
 	fsc->sc_piomode = 0;
 	fsc->sc_portbits &= ~FLSC_PB_DMA_BITS;
@@ -583,10 +584,10 @@ flsc_dma_setup(struct ncr53c9x_softc *sc, caddr_t *addr, size_t *len,
 	while (xfer < fsc->sc_dmasize) {
 		if ((pa + xfer) != kvtop(*addr + xfer))
 			break;
-		if ((fsc->sc_dmasize - xfer) < NBPG)
+		if ((fsc->sc_dmasize - xfer) < PAGE_SIZE)
 			xfer = fsc->sc_dmasize;
 		else
-			xfer += NBPG;
+			xfer += PAGE_SIZE;
 	}
 
 	fsc->sc_dmasize = xfer;

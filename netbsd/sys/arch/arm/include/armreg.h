@@ -1,4 +1,4 @@
-/*	$NetBSD: armreg.h,v 1.18.4.2 2002/07/29 14:42:10 lukem Exp $	*/
+/*	$NetBSD: armreg.h,v 1.28 2003/10/31 16:30:15 scw Exp $	*/
 
 /*
  * Copyright (c) 1998, 2001 Ben Harris
@@ -117,6 +117,7 @@
 #define CPU_ID_ARM_LTD		0x41000000 /* 'A' */
 #define CPU_ID_DEC		0x44000000 /* 'D' */
 #define CPU_ID_INTEL		0x69000000 /* 'i' */
+#define	CPU_ID_TI		0x54000000 /* 'T' */
 
 /* How to decide what format the CPUID is in. */
 #define CPU_ID_ISOLD(x)		(((x) & 0x0000f000) == 0x00000000)
@@ -146,7 +147,10 @@
 /* Next three nybbles are part number */
 #define CPU_ID_PARTNO_MASK	0x0000fff0
 
-#define CPU_ID_XSCALE_COREREV_MASK	0x0000e000
+/* Intel XScale has sub fields in part number */
+#define CPU_ID_XSCALE_COREGEN_MASK	0x0000e000 /* core generation */
+#define CPU_ID_XSCALE_COREREV_MASK	0x00001c00 /* core revision */
+#define CPU_ID_XSCALE_PRODUCT_MASK	0x000003f0 /* product number */
 
 /* And finally, the revision number. */
 #define CPU_ID_REVISION_MASK	0x0000000f
@@ -183,18 +187,29 @@
 #define CPU_ID_ARM946ES		0x41049460 /* XXX no MMU */
 #define	CPU_ID_ARM966ES		0x41049660 /* XXX no MMU */
 #define	CPU_ID_ARM966ESR1	0x41059660 /* XXX no MMU */
+#define CPU_ID_ARM1020E		0x4115a200 /* (AKA arm10 rev 1) */
 #define CPU_ID_ARM1022ES	0x4105a220
 #define CPU_ID_SA110		0x4401a100
 #define CPU_ID_SA1100		0x4401a110
+#define	CPU_ID_TI925T		0x54029250
 #define CPU_ID_SA1110		0x6901b110
 #define CPU_ID_IXP1200		0x6901c120
 #define CPU_ID_80200		0x69052000
-#define CPU_ID_PXA250		0x69052100
-#define CPU_ID_PXA210		0x69052120
+#define CPU_ID_PXA250    	0x69052100 /* sans core revision */
+#define CPU_ID_PXA210    	0x69052120
+#define CPU_ID_PXA250A		0x69052100 /* 1st version Core */
+#define CPU_ID_PXA210A		0x69052120 /* 1st version Core */
+#define CPU_ID_PXA250B		0x69052900 /* 3rd version Core */
+#define CPU_ID_PXA210B		0x69052920 /* 3rd version Core */
+#define CPU_ID_PXA250C		0x69052d00 /* 4th version Core */
+#define CPU_ID_PXA210C		0x69052d20 /* 4th version Core */
 #define	CPU_ID_80321_400	0x69052420
 #define	CPU_ID_80321_600	0x69052430
 #define	CPU_ID_80321_400_B0	0x69052c20
 #define	CPU_ID_80321_600_B0	0x69052c30
+#define	CPU_ID_IXP425_533	0x690541c0
+#define	CPU_ID_IXP425_400	0x690541d0
+#define	CPU_ID_IXP425_266	0x690541f0
 
 /* ARM3-specific coprocessor 15 registers */
 #define ARM3_CP15_FLUSH		1
@@ -311,11 +326,13 @@
 #define FAULT_PERM_S    0x0d /* Permission -- Section */
 #define FAULT_PERM_P    0x0f /* Permission -- Page */
 
+#define	FAULT_IMPRECISE	0x400	/* Imprecise exception (XSCALE) */
+
 /*
  * Address of the vector page, low and high versions.
  */
-#define	ARM_VECTORS_LOW		0x00000000
-#define	ARM_VECTORS_HIGH	0xffff0000
+#define	ARM_VECTORS_LOW		0x00000000U
+#define	ARM_VECTORS_HIGH	0xffff0000U
 
 /*
  * ARM Instructions

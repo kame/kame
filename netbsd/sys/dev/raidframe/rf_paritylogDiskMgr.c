@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_paritylogDiskMgr.c,v 1.13 2001/11/13 07:11:15 lukem Exp $	*/
+/*	$NetBSD: rf_paritylogDiskMgr.c,v 1.16 2004/01/10 00:56:28 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rf_paritylogDiskMgr.c,v 1.13 2001/11/13 07:11:15 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rf_paritylogDiskMgr.c,v 1.16 2004/01/10 00:56:28 oster Exp $");
 
 #include "rf_archs.h"
 
@@ -135,7 +135,7 @@ ReadRegionLog(
 	/* RF_Malloc(*rrd_pda, sizeof(RF_PhysDiskAddr_t), (RF_PhysDiskAddr_t
 	 * *)); */
 	*rrd_pda = rf_AllocPDAList(1);
-	rf_MapLogParityLogging(raidPtr, regionID, 0, &((*rrd_pda)->row), 
+	rf_MapLogParityLogging(raidPtr, regionID, 0,
 			       &((*rrd_pda)->col), &((*rrd_pda)->startSector));
 	(*rrd_pda)->numSector = raidPtr->regionInfo[regionID].capacity;
 
@@ -151,8 +151,7 @@ ReadRegionLog(
 	rrd_rdNode->params[0].p = *rrd_pda;
 /*  rrd_rdNode->params[1] = regionBuffer; */
 	rrd_rdNode->params[2].v = 0;
-	rrd_rdNode->params[3].v = RF_CREATE_PARAM3(RF_IO_NORMAL_PRIORITY, 
-						   0, 0, 0);
+	rrd_rdNode->params[3].v = RF_CREATE_PARAM3(RF_IO_NORMAL_PRIORITY, 0);
 
 	/* launch region log read dag */
 	rf_DispatchDAG(*rrd_dag_h, (void (*) (void *)) rf_MCPairWakeupFunc,
@@ -192,7 +191,7 @@ WriteCoreLog(
 	*fwr_pda = rf_AllocPDAList(1);
 	regionOffset = log->diskOffset;
 	rf_MapLogParityLogging(raidPtr, regionID, regionOffset, 
-			       &((*fwr_pda)->row), &((*fwr_pda)->col), 
+			       &((*fwr_pda)->col), 
 			       &((*fwr_pda)->startSector));
 	(*fwr_pda)->numSector = raidPtr->numSectorsPerLog;
 
@@ -204,8 +203,7 @@ WriteCoreLog(
 	fwr_wrNode->params[0].p = *fwr_pda;
 /*  fwr_wrNode->params[1] = log->bufPtr; */
 	fwr_wrNode->params[2].v = 0;
-	fwr_wrNode->params[3].v = RF_CREATE_PARAM3(RF_IO_NORMAL_PRIORITY, 
-						   0, 0, 0);
+	fwr_wrNode->params[3].v = RF_CREATE_PARAM3(RF_IO_NORMAL_PRIORITY, 0);
 
 	/* launch the dag to write the core log to disk */
 	rf_DispatchDAG(*fwr_dag_h, (void (*) (void *)) rf_MCPairWakeupFunc,
@@ -242,7 +240,7 @@ ReadRegionParity(
 	/* RF_Malloc(*prd_pda, sizeof(RF_PhysDiskAddr_t), (RF_PhysDiskAddr_t
 	 * *)); */
 	*prd_pda = rf_AllocPDAList(1);
-	rf_MapRegionParity(raidPtr, regionID, &((*prd_pda)->row), 
+	rf_MapRegionParity(raidPtr, regionID,
 			   &((*prd_pda)->col), &((*prd_pda)->startSector), 
 			   &((*prd_pda)->numSector));
 	if (rf_parityLogDebug)
@@ -260,10 +258,11 @@ ReadRegionParity(
 	prd_rdNode->params[0].p = *prd_pda;
 	prd_rdNode->params[1].p = parityBuffer;
 	prd_rdNode->params[2].v = 0;
-	prd_rdNode->params[3].v = RF_CREATE_PARAM3(RF_IO_NORMAL_PRIORITY, 
-						   0, 0, 0);
+	prd_rdNode->params[3].v = RF_CREATE_PARAM3(RF_IO_NORMAL_PRIORITY, 0);
+#if RF_DEBUG_VALIDATE_DAG
 	if (rf_validateDAGDebug)
 		rf_ValidateDAG(*prd_dag_h);
+#endif
 	/* launch region parity read dag */
 	rf_DispatchDAG(*prd_dag_h, (void (*) (void *)) rf_MCPairWakeupFunc,
 	    (void *) prd_mcpair);
@@ -299,7 +298,7 @@ WriteRegionParity(
 	/* RF_Malloc(*pwr_pda, sizeof(RF_PhysDiskAddr_t), (RF_PhysDiskAddr_t
 	 * *)); */
 	*pwr_pda = rf_AllocPDAList(1);
-	rf_MapRegionParity(raidPtr, regionID, &((*pwr_pda)->row), 
+	rf_MapRegionParity(raidPtr, regionID,
 			   &((*pwr_pda)->col), &((*pwr_pda)->startSector), 
 			   &((*pwr_pda)->numSector));
 
@@ -311,8 +310,7 @@ WriteRegionParity(
 	pwr_wrNode->params[0].p = *pwr_pda;
 /*  pwr_wrNode->params[1] = parityBuffer; */
 	pwr_wrNode->params[2].v = 0;
-	pwr_wrNode->params[3].v = RF_CREATE_PARAM3(RF_IO_NORMAL_PRIORITY, 
-						   0, 0, 0);
+	pwr_wrNode->params[3].v = RF_CREATE_PARAM3(RF_IO_NORMAL_PRIORITY, 0);
 
 	/* launch the dag to write region parity to disk */
 	rf_DispatchDAG(*pwr_dag_h, (void (*) (void *)) rf_MCPairWakeupFunc,

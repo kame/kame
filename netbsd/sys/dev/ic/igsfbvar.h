@@ -1,7 +1,7 @@
-/*	$NetBSD: igsfbvar.h,v 1.1 2002/03/30 19:48:55 uwe Exp $ */
+/*	$NetBSD: igsfbvar.h,v 1.8 2003/05/31 23:22:26 uwe Exp $ */
 
 /*
- * Copyright (c) 2002 Valeriy E. Ushakov
+ * Copyright (c) 2002, 2003 Valeriy E. Ushakov
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,11 +28,10 @@
  */
 
 /*
- * Integraphics Systems IGA 1682 and (untested) CyberPro 2k.
+ * Integraphics Systems IGA 168x and CyberPro series.
  */
 #ifndef _DEV_IC_IGSFBVAR_H_
 #define _DEV_IC_IGSFBVAR_H_
-
 
 #define	IGS_CMAP_SIZE	256	/* 256 R/G/B entries */
 struct igs_hwcmap {
@@ -54,69 +53,163 @@ struct igs_hwcursor {
 };
 
 
-/*
- * Precomputed bit tables to convert 1bpp image/mask to 2bpp hw cursor
- * sprite.  For IGSFB_HW_BSWAP attachments they are pre-bswapped as well.
- */
-struct igs_bittab {
-	u_int16_t iexpand[256];	/* image: 0 -> 00, 1 -> 01 */
-	u_int16_t mexpand[256];	/* mask:  0 -> 00, 1 -> 11 */
+struct igsfb_devconfig {
+	/* io space, may be memory mapped */
+	bus_space_tag_t dc_iot;
+	bus_addr_t dc_iobase;
+	int dc_ioflags;
+
+	/* io registers */
+	bus_space_handle_t dc_ioh;
+
+	/* graphic coprocessor */
+	bus_space_handle_t dc_coph;
+
+	/* linear memory */
+	bus_space_tag_t dc_memt;
+	bus_addr_t dc_memaddr;
+	bus_size_t dc_memsz; /* size of linear address space including mmio */
+	int dc_memflags;
+
+	/* video memory size */
+	bus_size_t dc_vmemsz;
+
+	/* resolution */
+	int dc_width, dc_height, dc_depth;
+
+	/* part of video memory mapped for wsscreen */
+	bus_space_handle_t dc_fbh;
+	bus_size_t dc_fbsz;
+
+	/* 1KB of cursor sprite data */
+	bus_space_handle_t dc_crh;
+
+	/* product id: IGA 168x, CyberPro 2k &c */
+	int dc_id;
+
+	/* flags that control driver operation */
+	int dc_hwflags;
+#define IGSFB_HW_BSWAP			0x1 /* endianness mismatch */
+#define IGSFB_HW_BE_SELECT		0x2 /* big endian magic (cyberpro) */
+#define IGSFB_HW_TEXT_CURSOR		0x4 /* do text cursor in hardware */
+
+/* do we need to do bswap in software? */
+#define IGSFB_HW_SOFT_BSWAP(dc)						\
+	((((dc)->dc_hwflags) & (IGSFB_HW_BSWAP | IGSFB_HW_BE_SELECT))	\
+		== IGSFB_HW_BSWAP)
+
+	int dc_nscreens;		/* can do only a single screen */
+
+	int dc_blanked;			/* screen is currently blanked */
+	int dc_curenb;			/* cursor sprite enabled */
+	int dc_mapped;			/* currently in mapped mode */
+
+	struct rasops_info dc_ri;
+
+	/* saved dc_ri.ri_ops.putchar */
+	void (*dc_ri_putchar)(void *, int, int, u_int, long);
+
+	struct igs_hwcmap dc_cmap;	/* software copy of colormap */
+	struct igs_hwcursor dc_cursor;	/* software copy of cursor sprite */
+
+	/* precomputed bit table for cursor sprite 1bpp -> 2bpp conversion */
+	u_int16_t dc_bexpand[256];
 };
+
 
 struct igsfb_softc {
 	struct device sc_dev;
-
-	/* io registers */
-	bus_space_tag_t sc_iot;
-	bus_space_handle_t sc_ioh;
-
-	/* linear memory */
-	bus_space_tag_t sc_memt;
-	bus_addr_t sc_memaddr;		/* memory phys addr */
-	bus_size_t sc_memsz;		/* size of linear address space */
-	int sc_memflags;
-
-	/* fb part actually mapped for wsdisplay */
-	bus_space_handle_t sc_fbh;
-	bus_size_t sc_fbsz;
-
-	/* 1k of cursor sprite data */
-	bus_space_handle_t sc_crh;
-
-	/* 
-	 * graphic coprocessor can be accessed either via i/o space or
-	 * via memory-mapped i/o access through memory space.
-	 */
-	bus_space_tag_t sc_copt;
-	bus_space_handle_t sc_coph;
-
-	/* IGA1682 vs CyberPro 2k (use version num. for finer distinction?) */
-	int sc_is2k;
-
-	/* flags that control driver operation */
-	int sc_hwflags;
-
-	struct rasops_info *sc_ri;
-
-	struct igs_hwcmap sc_cmap;	/* software copy of colormap */
-	struct igs_hwcursor sc_cursor;	/* software copy of cursor sprite */
-
-	/* precomputed bit tables for cursor sprite 1bpp -> 2bpp conversion */
-	struct igs_bittab *sc_bittab;
-
-	int nscreens;
-
-	int sc_blanked;			/* screen is currently blanked */
-	int sc_curenb;			/* cursor sprite enabled */
+	struct igsfb_devconfig *sc_dc;
 };
 
-/* sc_hwflags */
-#define IGSFB_HW_BSWAP	1	/* endianness mismatch */
 
 
-/* methods for bus attachment glue */
-int	igsfb_io_enable(bus_space_tag_t, bus_addr_t);
-void	igsfb_mem_enable(struct igsfb_softc *);
-void	igsfb_common_attach(struct igsfb_softc *, int);
+/*
+ * Access sugar for indexed registers
+ */
+
+static __inline__ u_int8_t
+igs_idx_read(bus_space_tag_t, bus_space_handle_t, u_int, u_int8_t);
+static __inline__ void
+igs_idx_write(bus_space_tag_t, bus_space_handle_t, u_int, u_int8_t, u_int8_t);
+
+static __inline__ u_int8_t
+igs_idx_read(t, h, idxport, idx)
+	bus_space_tag_t t;
+	bus_space_handle_t h;
+	u_int idxport;
+	u_int8_t idx;
+{
+	bus_space_write_1(t, h, idxport, idx);
+	return (bus_space_read_1(t, h, idxport + 1));
+}
+
+static __inline__ void
+igs_idx_write(t, h, idxport, idx, val)
+	bus_space_tag_t t;
+	bus_space_handle_t h;
+	u_int idxport;
+	u_int8_t idx, val;
+{
+	bus_space_write_1(t, h, idxport, idx);
+	bus_space_write_1(t, h, idxport + 1, val);
+}
+
+
+/* sugar for sequencer controller */
+#define igs_seq_read(t,h,x)	\
+	(igs_idx_read((t),(h),IGS_SEQ_IDX,(x)))
+#define igs_seq_write(t,h,x,v)	\
+	(igs_idx_write((t),(h),IGS_SEQ_IDX,(x),(v)))
+
+
+/* sugar for CRT controller */
+#define igs_crtc_read(t,h,x)	\
+	(igs_idx_read((t),(h),IGS_CRTC_IDX,(x)))
+#define igs_crtc_write(t,h,x,v)	\
+	(igs_idx_write((t),(h),IGS_CRTC_IDX,(x),(v)))
+
+
+/* sugar for attribute controller */
+#define igs_attr_flip_flop(t,h)	\
+	((void)bus_space_read_1((t),(h),IGS_INPUT_STATUS1));
+#define igs_attr_read(t,h,x)	\
+	(igs_idx_read((t),(h),IGS_ATTR_IDX,(x)))
+
+static __inline__ void
+igs_attr_write(bus_space_tag_t, bus_space_handle_t, u_int8_t, u_int8_t);
+
+static __inline__ void
+igs_attr_write(t, h, idx, val)
+	bus_space_tag_t t;
+	bus_space_handle_t h;
+	u_int8_t idx, val;
+{
+	bus_space_write_1(t, h, IGS_ATTR_IDX, idx);
+	bus_space_write_1(t, h, IGS_ATTR_IDX, val); /* sic, same register */
+}
+
+
+/* sugar for graphics controller registers */
+#define igs_grfx_read(t,h,x)	(igs_idx_read((t),(h),IGS_GRFX_IDX,(x)))
+#define igs_grfx_write(t,h,x,v)	(igs_idx_write((t),(h),IGS_GRFX_IDX,(x),(v)))
+
+
+/* sugar for extended registers */
+#define igs_ext_read(t,h,x)	(igs_idx_read((t),(h),IGS_EXT_IDX,(x)))
+#define igs_ext_write(t,h,x,v)	(igs_idx_write((t),(h),IGS_EXT_IDX,(x),(v)))
+
+
+/* igsfb_subr.c */
+int	igsfb_enable(bus_space_tag_t, bus_addr_t, int);
+void	igsfb_hw_setup(struct igsfb_devconfig *);
+void	igsfb_1024x768_8bpp_60Hz(struct igsfb_devconfig *);
+
+/* igsfb.c */
+int	igsfb_cnattach_subr(struct igsfb_devconfig *);
+void	igsfb_attach_subr(struct igsfb_softc *, int);
+
+
+extern struct igsfb_devconfig igsfb_console_dc;
 
 #endif /* _DEV_IC_IGSFBVAR_H_ */

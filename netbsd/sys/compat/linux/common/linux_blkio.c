@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_blkio.c,v 1.5 2001/11/13 02:08:48 lukem Exp $	*/
+/*	$NetBSD: linux_blkio.c,v 1.9 2003/06/29 22:29:26 fvdl Exp $	*/
 
 /*
  * Copyright (c) 2001 Wasabi Systems, Inc.
@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: linux_blkio.c,v 1.5 2001/11/13 02:08:48 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: linux_blkio.c,v 1.9 2003/06/29 22:29:26 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -47,6 +47,7 @@ __KERNEL_RCSID(0, "$NetBSD: linux_blkio.c,v 1.5 2001/11/13 02:08:48 lukem Exp $"
 #include <sys/proc.h>
 #include <sys/disklabel.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/linux/common/linux_types.h>
@@ -66,7 +67,7 @@ linux_ioctl_blkio(struct proc *p, struct linux_sys_ioctl_args *uap,
 	int error;
 	struct filedesc *fdp;
 	struct file *fp;
-	int (*ioctlf) __P((struct file *, u_long, caddr_t, struct proc *));
+	int (*ioctlf)(struct file *, u_long, void *, struct proc *);
 	struct partinfo partp;
 	struct disklabel label;
 

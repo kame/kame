@@ -1,4 +1,4 @@
-/*	$NetBSD: cache.c,v 1.11 2002/04/03 03:55:07 simonb Exp $	*/
+/*	$NetBSD: cache.c,v 1.24 2003/12/21 07:59:25 nisimura Exp $	*/
 
 /*
  * Copyright 2001, 2002 Wasabi Systems, Inc.
@@ -38,23 +38,22 @@
 /*
  * Copyright 2000, 2001
  * Broadcom Corporation. All rights reserved.
- * 
+ *
  * This software is furnished under license and may be used and copied only
  * in accordance with the following terms and conditions.  Subject to these
  * conditions, you may download, copy, install, use, modify and distribute
  * modified or unmodified copies of this software in source and/or binary
  * form. No title or ownership is transferred hereby.
- * 
+ *
  * 1) Any source code used, modified or distributed must reproduce and
  *    retain this copyright notice and list of conditions as they appear in
  *    the source file.
- * 
+ *
  * 2) No right is granted to use any trade name, trademark, or logo of
- *    Broadcom Corporation. Neither the "Broadcom Corporation" name nor any
- *    trademark or logo of Broadcom Corporation may be used to endorse or
- *    promote products derived from this software without the prior written
- *    permission of Broadcom Corporation.
- * 
+ *    Broadcom Corporation.  The "Broadcom Corporation" name may not be
+ *    used to endorse or promote products derived from this software
+ *    without the prior written permission of Broadcom Corporation.
+ *
  * 3) THIS SOFTWARE IS PROVIDED "AS-IS" AND ANY EXPRESS OR IMPLIED
  *    WARRANTIES, INCLUDING BUT NOT LIMITED TO, ANY IMPLIED WARRANTIES OF
  *    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR
@@ -68,7 +67,11 @@
  *    OR OTHERWISE), EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cache.c,v 1.24 2003/12/21 07:59:25 nisimura Exp $");
+
 #include "opt_cputype.h"
+#include "opt_mips_cache.h"
 
 #include <sys/param.h>
 
@@ -82,7 +85,11 @@
 #endif
 
 #ifdef MIPS3_PLUS
-#include <mips/cache_r4k.h>	/* includes r5k and greater */
+#include <mips/cache_r4k.h>
+#include <mips/cache_r5k.h>
+#ifdef ENABLE_MIPS4_CACHE_R10K
+#include <mips/cache_r10k.h>
+#endif
 #endif
 
 #if defined(MIPS32) || defined(MIPS64)
@@ -91,43 +98,43 @@
 #endif
 
 /* PRIMARY CACHE VARIABLES */
-int mips_picache_size;
-int mips_picache_line_size;
-int mips_picache_ways;
-int mips_picache_way_size;
-int mips_picache_way_mask;
+u_int mips_picache_size;
+u_int mips_picache_line_size;
+u_int mips_picache_ways;
+u_int mips_picache_way_size;
+u_int mips_picache_way_mask;
  
-int mips_pdcache_size;           /* and unified */
-int mips_pdcache_line_size;
-int mips_pdcache_ways;
-int mips_pdcache_way_size;
-int mips_pdcache_way_mask;
+u_int mips_pdcache_size;	/* and unified */
+u_int mips_pdcache_line_size;
+u_int mips_pdcache_ways;
+u_int mips_pdcache_way_size;
+u_int mips_pdcache_way_mask;
 int mips_pdcache_write_through;
 
 int mips_pcache_unified;
 
 /* SECONDARY CACHE VARIABLES */
-int mips_sicache_size;
-int mips_sicache_line_size; 
-int mips_sicache_ways;
-int mips_sicache_way_size;
-int mips_sicache_way_mask;
+u_int mips_sicache_size;
+u_int mips_sicache_line_size; 
+u_int mips_sicache_ways;
+u_int mips_sicache_way_size;
+u_int mips_sicache_way_mask;
 
-int mips_sdcache_size;           /* and unified */
-int mips_sdcache_line_size;
-int mips_sdcache_ways;
-int mips_sdcache_way_size;
-int mips_sdcache_way_mask;
+u_int mips_sdcache_size;	/* and unified */
+u_int mips_sdcache_line_size;
+u_int mips_sdcache_ways;
+u_int mips_sdcache_way_size;
+u_int mips_sdcache_way_mask;
 int mips_sdcache_write_through;
 
 int mips_scache_unified;
 
 /* TERTIARY CACHE VARIABLES */
-int mips_tcache_size;            /* always unified */
-int mips_tcache_line_size;
-int mips_tcache_ways;
-int mips_tcache_way_size;
-int mips_tcache_way_mask;
+u_int mips_tcache_size;		/* always unified */
+u_int mips_tcache_line_size;
+u_int mips_tcache_ways;
+u_int mips_tcache_way_size;
+u_int mips_tcache_way_mask;
 int mips_tcache_write_through;
 
 /*
@@ -139,11 +146,11 @@ int mips_tcache_write_through;
  * Whenever any code updates a data cache line size, it should
  * call mips_dcache_compute_align() to recompute these values.
  */
-int mips_dcache_align;
-int mips_dcache_align_mask;
+u_int mips_dcache_align;
+u_int mips_dcache_align_mask;
 
-int mips_cache_alias_mask;	/* for virtually-indexed caches */
-int mips_cache_prefer_mask;
+u_int mips_cache_alias_mask;	/* for virtually-indexed caches */
+u_int mips_cache_prefer_mask;
 
 struct mips_cache_ops mips_cache_ops;
 
@@ -161,6 +168,9 @@ void	tx39_cache_config_write_through(void);
 #include <mips/cache_r5900.h>
 #endif /* MIPS3_5900 */
 void	mips3_get_cache_config(int);
+#ifdef ENABLE_MIPS4_CACHE_R10K
+void	mips4_get_cache_config(int);
+#endif /* ENABLE_MIPS4_CACHE_R10K */
 #endif /* MIPS3 || MIPS4 */
 
 #if defined(MIPS1) || defined(MIPS3) || defined(MIPS4)
@@ -178,7 +188,7 @@ static void mips_config_cache_modern(void);
 void
 mips_dcache_compute_align(void)
 {
-	int align;
+	u_int align;
 
 	align = mips_pdcache_line_size;
 
@@ -597,10 +607,38 @@ primary_cache_is_2way:
 		    r5900_pdcache_wb_range_64;
 		break;
 #endif /* MIPS3_5900 */
+#ifdef ENABLE_MIPS4_CACHE_R10K
+	case MIPS_R10000:
+	case MIPS_R12000:
+	case MIPS_R14000:
+		mips_picache_ways = 2;
+		mips_pdcache_ways = 2;
+		mips_sdcache_ways = 2;
+
+		mips4_get_cache_config(csizebase);
+
+		mips_cache_ops.mco_icache_sync_all =
+		    r10k_icache_sync_all;
+		mips_cache_ops.mco_icache_sync_range =
+		    r10k_icache_sync_range;
+		mips_cache_ops.mco_icache_sync_range_index =
+		    r10k_icache_sync_range_index;
+		mips_cache_ops.mco_pdcache_wbinv_all =
+		    r10k_pdcache_wbinv_all;
+		mips_cache_ops.mco_pdcache_wbinv_range =
+		    r10k_pdcache_wbinv_range;
+		mips_cache_ops.mco_pdcache_wbinv_range_index =
+		    r10k_pdcache_wbinv_range_index;
+		mips_cache_ops.mco_pdcache_inv_range =
+		    r10k_pdcache_inv_range;
+		mips_cache_ops.mco_pdcache_wb_range =
+		    r10k_pdcache_wb_range;
+		break;
+#endif /* ENABLE_MIPS4_CACHE_R10K */
 #endif /* MIPS3 || MIPS4 */
 
 	default:
-		panic("can't handle primary cache on impl 0x%x\n",
+		panic("can't handle primary cache on impl 0x%x",
 		    MIPS_PRID_IMPL(cpu_id));
 	}
 
@@ -638,16 +676,10 @@ primary_cache_is_2way:
 			(MIPS3_MAX_PCACHE_SIZE - 1) & ~(PAGE_SIZE - 1);
 		mips_cache_prefer_mask = MIPS3_MAX_PCACHE_SIZE - 1;
 		/* FALLTHROUGH */
-	case MIPS_R4100:
-	case MIPS_R4300:
 	case MIPS_R4600:
 #ifdef ENABLE_MIPS_R4700
 	case MIPS_R4700:
 #endif
-#ifndef ENABLE_MIPS_R3NKK
-	case MIPS_R5000:
-#endif
-	case MIPS_RM5200:
 		switch (mips_sdcache_ways) {
 		case 1:
 			switch (mips_sdcache_line_size) {
@@ -692,20 +724,51 @@ primary_cache_is_2way:
 				break;
 
 			default:
-				panic("r4k sdcache %d way line size %d\n",
+				panic("r4k sdcache %d way line size %d",
 				    mips_sdcache_ways, mips_sdcache_line_size);
 			}
 			break;
 
 		default:
-			panic("r4k sdcache %d way line size %d\n",
+			panic("r4k sdcache %d way line size %d",
 			    mips_sdcache_ways, mips_sdcache_line_size);
 		}
 		break;
+#ifndef ENABLE_MIPS_R3NKK
+	case MIPS_R5000:
+#endif
+	case MIPS_RM5200:
+		mips_cache_ops.mco_sdcache_wbinv_all =
+		    r5k_sdcache_wbinv_all;
+		mips_cache_ops.mco_sdcache_wbinv_range =
+		    r5k_sdcache_wbinv_range;
+		mips_cache_ops.mco_sdcache_wbinv_range_index =
+		    r5k_sdcache_wbinv_rangeall;	/* XXX? */
+		mips_cache_ops.mco_sdcache_inv_range =
+		    r5k_sdcache_wbinv_range;
+		mips_cache_ops.mco_sdcache_wb_range =
+		    r5k_sdcache_wb_range;
+		break;
+#ifdef ENABLE_MIPS4_CACHE_R10K
+	case MIPS_R10000:
+	case MIPS_R12000:
+	case MIPS_R14000:
+		mips_cache_ops.mco_sdcache_wbinv_all =
+		    r10k_sdcache_wbinv_all;
+		mips_cache_ops.mco_sdcache_wbinv_range =
+		    r10k_sdcache_wbinv_range;
+		mips_cache_ops.mco_sdcache_wbinv_range_index =
+		    r10k_sdcache_wbinv_range_index;
+		mips_cache_ops.mco_sdcache_inv_range =
+		    r10k_sdcache_inv_range;
+		mips_cache_ops.mco_sdcache_wb_range =
+		    r10k_sdcache_wb_range;
+		break;
+#endif /* ENABLE_MIPS4_CACHE_R10K */
 #endif /* MIPS3 || MIPS4 */
 
 	default:
-		panic("can't handle secondary cache on impl 0x%x\n",
+		panic("can't handle secondary cache on impl 0x%x",
 		    MIPS_PRID_IMPL(cpu_id));
 	}
 
@@ -797,6 +860,7 @@ tx39_cache_config_write_through(void)
 void
 mips3_get_cache_config(int csizebase)
 {
+	int has_sdcache_enable = 0;
 	uint32_t config = mips3_cp0_config_read();
 
 	mips_picache_size = MIPS3_CONFIG_CACHE_SIZE(config,
@@ -814,21 +878,63 @@ mips3_get_cache_config(int csizebase)
 	mips_cache_prefer_mask =
 	    max(mips_pdcache_size, mips_picache_size) - 1;
 
+	switch(MIPS_PRID_IMPL(cpu_id)) {
+#ifndef ENABLE_MIPS_R3NKK
+	case MIPS_R5000:
+#endif
+	case MIPS_RM5200:
+		has_sdcache_enable = 1;
+		break;
+	}
+
+	/* 
+ 	 * If CPU has a software-enabled L2 cache, check both if it's
+	 * present and if it's enabled before making assumptions the
+	 * L2 is usable.  If the L2 is disabled, we treat it the same
+	 * as if there were no L2 cache.
+	 */
 	if ((config & MIPS3_CONFIG_SC) == 0) {
-		mips_sdcache_line_size = MIPS3_CONFIG_CACHE_L2_LSIZE(config);
-		if ((config & MIPS3_CONFIG_SS) == 0)
-			mips_scache_unified = 1;
+		if (has_sdcache_enable == 0 ||
+		    (has_sdcache_enable && (config & MIPS3_CONFIG_SE))) {
+			mips_sdcache_line_size = 
+				MIPS3_CONFIG_CACHE_L2_LSIZE(config);
+			if ((config & MIPS3_CONFIG_SS) == 0)
+				mips_scache_unified = 1;
+		} else {
+#ifdef CACHE_DEBUG
+			printf("External cache detected, but is disabled -- WILL NOT ENABLE!\n");
+#endif	/* CACHE_DEBUG */
+		}
 	}
 }
+
+#ifdef ENABLE_MIPS4_CACHE_R10K
+void
+mips4_get_cache_config(int csizebase)
+{
+	uint32_t config = mips3_cp0_config_read();
+
+	mips_picache_size = MIPS4_CONFIG_CACHE_SIZE(config,
+	    MIPS4_CONFIG_IC_MASK, csizebase, MIPS4_CONFIG_IC_SHIFT);
+	mips_picache_line_size = 64;	/* 64 Byte */
+
+	mips_pdcache_size = MIPS4_CONFIG_CACHE_SIZE(config,
+	    MIPS4_CONFIG_DC_MASK, csizebase, MIPS4_CONFIG_DC_SHIFT);
+	mips_pdcache_line_size = 32;	/* 32 Byte */
+
+	mips_cache_alias_mask =
+	    ((mips_pdcache_size / mips_pdcache_ways) - 1) & ~(PAGE_SIZE - 1);
+	mips_cache_prefer_mask =
+	    max(mips_pdcache_size, mips_picache_size) - 1;
+}
+#endif /* ENABLE_MIPS4_CACHE_R10K */
 #endif /* MIPS3 || MIPS4 */
 #endif /* MIPS1 || MIPS3 || MIPS4 */
 
 #if defined(MIPS32) || defined(MIPS64)
 
-#ifdef MIPS_DISABLE_L1_CACHE
-static void cache_noop(void);
+static void cache_noop(void) __attribute__((__unused__));
 static void cache_noop(void) {}
-#endif
 
 static void
 mips_config_cache_modern(void)
@@ -932,35 +1038,15 @@ mips_config_cache_modern(void)
 		mips_cache_ops.mco_icache_sync_all = mipsNN_icache_sync_all_16;
 		mips_cache_ops.mco_icache_sync_range =
 		    mipsNN_icache_sync_range_16;
-		switch (mips_picache_ways) {
-		case 2:
-			mips_cache_ops.mco_icache_sync_range_index =
-			    mipsNN_icache_sync_range_index_16_2way;
-			break;
-		case 4:
-			mips_cache_ops.mco_icache_sync_range_index =
-			    mipsNN_icache_sync_range_index_16_4way;
-			break;
-		default:
-			panic("no %d-way Icache ops", mips_picache_ways);
-		}
+		mips_cache_ops.mco_icache_sync_range_index =
+		    mipsNN_icache_sync_range_index_16;
 		break;
 	case 32:
 		mips_cache_ops.mco_icache_sync_all = mipsNN_icache_sync_all_32;
 		mips_cache_ops.mco_icache_sync_range =
 		    mipsNN_icache_sync_range_32;
-		switch (mips_picache_ways) {
-		case 2:
-			mips_cache_ops.mco_icache_sync_range_index =
-			    mipsNN_icache_sync_range_index_32_2way;
-			break;
-		case 4:
-			mips_cache_ops.mco_icache_sync_range_index =
-			    mipsNN_icache_sync_range_index_32_4way;
-			break;
-		default:
-			panic("no %d-way Icache ops", mips_picache_ways);
-		}
+		mips_cache_ops.mco_icache_sync_range_index =
+		    mipsNN_icache_sync_range_index_32;
 		break;
 #ifdef MIPS_DISABLE_L1_CACHE
 	case 0:
@@ -977,61 +1063,78 @@ mips_config_cache_modern(void)
 	switch (mips_pdcache_line_size) {
 	case 16:
 		mips_cache_ops.mco_pdcache_wbinv_all =
+		    mips_cache_ops.mco_intern_pdcache_wbinv_all =
 		    mipsNN_pdcache_wbinv_all_16;
 		mips_cache_ops.mco_pdcache_wbinv_range =
 		    mipsNN_pdcache_wbinv_range_16;
-		switch (mips_pdcache_ways) {
-		case 2:
-			mips_cache_ops.mco_pdcache_wbinv_range_index =
-			    mipsNN_pdcache_wbinv_range_index_16_2way;
-			break;
-		case 4:
-			mips_cache_ops.mco_pdcache_wbinv_range_index =
-			    mipsNN_pdcache_wbinv_range_index_16_4way;
-			break;
-		default:
-			panic("no %d-way Dcache ops", mips_pdcache_ways);
-		}
+		mips_cache_ops.mco_pdcache_wbinv_range_index =
+		    mips_cache_ops.mco_intern_pdcache_wbinv_range_index =
+		    mipsNN_pdcache_wbinv_range_index_16;
 		mips_cache_ops.mco_pdcache_inv_range =
 		    mipsNN_pdcache_inv_range_16;
 		mips_cache_ops.mco_pdcache_wb_range =
+		    mips_cache_ops.mco_intern_pdcache_wb_range =
 		    mipsNN_pdcache_wb_range_16;
 		break;
 	case 32:
 		mips_cache_ops.mco_pdcache_wbinv_all =
+		    mips_cache_ops.mco_intern_pdcache_wbinv_all =
 		    mipsNN_pdcache_wbinv_all_32;
 		mips_cache_ops.mco_pdcache_wbinv_range =
 		    mipsNN_pdcache_wbinv_range_32;
-		switch (mips_pdcache_ways) {
-		case 2:
-			mips_cache_ops.mco_pdcache_wbinv_range_index =
-			    mipsNN_pdcache_wbinv_range_index_32_2way;
-			break;
-		case 4:
-			mips_cache_ops.mco_pdcache_wbinv_range_index =
-			    mipsNN_pdcache_wbinv_range_index_32_4way;
-			break;
-		default:
-			panic("no %d-way Dcache ops", mips_pdcache_ways);
-		}
+		mips_cache_ops.mco_pdcache_wbinv_range_index =
+		    mips_cache_ops.mco_intern_pdcache_wbinv_range_index =
+		    mipsNN_pdcache_wbinv_range_index_32;
 		mips_cache_ops.mco_pdcache_inv_range =
 		    mipsNN_pdcache_inv_range_32;
 		mips_cache_ops.mco_pdcache_wb_range =
+		    mips_cache_ops.mco_intern_pdcache_wb_range =
 		    mipsNN_pdcache_wb_range_32;
 		break;
 #ifdef MIPS_DISABLE_L1_CACHE
 	case 0:
+		mips_cache_ops.mco_pdcache_wbinv_all = (void *)cache_noop;
+		mips_cache_ops.mco_intern_pdcache_wbinv_all =
+		    (void *)cache_noop;
+		mips_cache_ops.mco_pdcache_wbinv_range = (void *)cache_noop;
+		mips_cache_ops.mco_pdcache_wbinv_range_index =
+		    (void *)cache_noop;
+		mips_cache_ops.mco_intern_pdcache_wbinv_range_index =
+		    (void *)cache_noop;
+		mips_cache_ops.mco_pdcache_inv_range = (void *)cache_noop;
+		mips_cache_ops.mco_pdcache_wb_range = (void *)cache_noop;
+		mips_cache_ops.mco_intern_pdcache_wb_range = (void *)cache_noop;
+		break;
+#endif
+	default:
+		panic("no Dcache ops for %d byte lines",
+		    mips_pdcache_line_size);
+	}
+
+	mipsNN_cache_init(cfg, cfg1);
+
+	if (mips_cpu_flags &
+	    (CPU_MIPS_D_CACHE_COHERENT | CPU_MIPS_I_D_CACHE_COHERENT)) {
+#ifdef CACHE_DEBUG
+		printf("  Dcache is coherent\n");
+#endif
 		mips_cache_ops.mco_pdcache_wbinv_all = (void *)cache_noop;
 		mips_cache_ops.mco_pdcache_wbinv_range = (void *)cache_noop;
 		mips_cache_ops.mco_pdcache_wbinv_range_index =
 		    (void *)cache_noop;
 		mips_cache_ops.mco_pdcache_inv_range = (void *)cache_noop;
 		mips_cache_ops.mco_pdcache_wb_range = (void *)cache_noop;
-		break;
+	}
+	if (mips_cpu_flags & CPU_MIPS_I_D_CACHE_COHERENT) {
+#ifdef CACHE_DEBUG
+		printf("  Icache is coherent against Dcache\n");
 #endif
-	default:
-		panic("no Dcache ops for %d byte lines",
-		    mips_pdcache_line_size);
+		mips_cache_ops.mco_intern_pdcache_wbinv_all =
+		    (void *)cache_noop;
+		mips_cache_ops.mco_intern_pdcache_wbinv_range_index =
+		    (void *)cache_noop;
+		mips_cache_ops.mco_intern_pdcache_wb_range =
+		    (void *)cache_noop;
 	}
 }
 #endif /* MIPS32 || MIPS64 */

@@ -1,4 +1,4 @@
-/*	$NetBSD: agpio.h,v 1.1.18.1 2003/06/16 12:50:36 grant Exp $	*/
+/*	$NetBSD: agpio.h,v 1.2 2003/02/24 21:59:52 tron Exp $	*/
 
 /*-
  * Copyright (c) 2000 Doug Rabson

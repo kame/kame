@@ -1,4 +1,4 @@
-/*	$NetBSD: lpt_pcc.c,v 1.5 2002/02/12 20:38:17 scw Exp $ */
+/*	$NetBSD: lpt_pcc.c,v 1.8 2003/07/15 02:43:46 lukem Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * Device Driver back-end for the MVME147's parallel printer port
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: lpt_pcc.c,v 1.8 2003/07/15 02:43:46 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -79,9 +82,8 @@ struct lpt_funcs lpt_pcc_funcs = {
 static int lpt_pcc_match __P((struct device *, struct cfdata *, void *));
 static void lpt_pcc_attach __P((struct device *, struct device *, void *));
 
-struct cfattach lpt_pcc_ca = {
-	sizeof(struct lpt_softc), lpt_pcc_match, lpt_pcc_attach
-};
+CFATTACH_DECL(lpt_pcc, sizeof(struct lpt_softc),
+    lpt_pcc_match, lpt_pcc_attach, NULL, NULL);
 
 extern struct cfdriver lpt_cd;
 

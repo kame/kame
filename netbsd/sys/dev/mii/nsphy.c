@@ -1,4 +1,4 @@
-/*	$NetBSD: nsphy.c,v 1.34 2002/03/25 20:51:25 thorpej Exp $	*/
+/*	$NetBSD: nsphy.c,v 1.41 2003/11/02 11:10:36 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -72,13 +72,12 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: nsphy.c,v 1.34 2002/03/25 20:51:25 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: nsphy.c,v 1.41 2003/11/02 11:10:36 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
-#include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/errno.h>
 
@@ -94,16 +93,15 @@ __KERNEL_RCSID(0, "$NetBSD: nsphy.c,v 1.34 2002/03/25 20:51:25 thorpej Exp $");
 int	nsphymatch(struct device *, struct cfdata *, void *);
 void	nsphyattach(struct device *, struct device *, void *);
 
-struct cfattach nsphy_ca = {
-	sizeof(struct mii_softc), nsphymatch, nsphyattach, mii_phy_detach,
-	    mii_phy_activate
-};
+CFATTACH_DECL(nsphy, sizeof(struct mii_softc),
+    nsphymatch, nsphyattach, mii_phy_detach, mii_phy_activate);
 
 int	nsphy_service(struct mii_softc *, struct mii_data *, int);
 void	nsphy_status(struct mii_softc *);
+void	nsphy_reset(struct mii_softc *sc);
 
 const struct mii_phy_funcs nsphy_funcs = {
-	nsphy_service, nsphy_status, mii_phy_reset,
+	nsphy_service, nsphy_status, nsphy_reset,
 };
 
 const struct mii_phydesc nsphys[] = {
@@ -134,7 +132,8 @@ nsphyattach(struct device *parent, struct device *self, void *aux)
 	const struct mii_phydesc *mpd;
 
 	mpd = mii_phy_match(ma, nsphys);
-	printf(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
+	aprint_naive(": Media interface\n");
+	aprint_normal(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
 
 	sc->mii_inst = mii->mii_instance;
 	sc->mii_phy = ma->mii_phyno;
@@ -147,12 +146,12 @@ nsphyattach(struct device *parent, struct device *self, void *aux)
 
 	sc->mii_capabilities =
 	    PHY_READ(sc, MII_BMSR) & ma->mii_capmask;
-	printf("%s: ", sc->mii_dev.dv_xname);
+	aprint_normal("%s: ", sc->mii_dev.dv_xname);
 	if ((sc->mii_capabilities & BMSR_MEDIAMASK) == 0)
-		printf("no media present");
+		aprint_error("no media present");
 	else
 		mii_phy_add_media(sc);
-	printf("\n");
+	aprint_normal("\n");
 }
 
 int
@@ -199,7 +198,7 @@ nsphy_service(struct mii_softc *sc, struct mii_data *mii, int cmd)
 		reg |= PCR_LED4MODE;
 
 		/*
-		 * Make sure Carrier Intgrity Monitor function is
+		 * Make sure Carrier Integrity Monitor function is
 		 * disabled (normal for Node operation, but sometimes
 		 * it's not set?!)
 		 */
@@ -328,3 +327,42 @@ nsphy_status(struct mii_softc *sc)
 	} else
 		mii->mii_media_active = ife->ifm_media;
 }
+
+void
+nsphy_reset(struct mii_softc *sc)
+{
+	int reg, i;
+
+	if (sc->mii_flags & MIIF_NOISOLATE)
+		reg = BMCR_RESET;
+	else
+		reg = BMCR_RESET | BMCR_ISO;
+	PHY_WRITE(sc, MII_BMCR, reg);
+
+	/*
+	 * Give it a little time to settle in case we just got power.
+	 * The DP83840A data sheet suggests that a soft reset not happen
+	 * within 500us of power being applied.  Be conservative.
+	 */
+	delay(1000);
+
+	/*
+	 * Wait another 2s for it to complete.
+	 * This is only a little overkill as under normal circumstances
+	 * the PHY can take up to 1s to complete reset.
+	 * This is also a bit odd because after a reset, the BMCR will
+	 * clear the reset bit and simply reports 0 even though the reset
+	 * is not yet complete.
+	 */
+	for (i = 0; i < 1000; i++) {
+		reg = PHY_READ(sc, MII_BMCR); 
+		if (reg && ((reg & BMCR_RESET) == 0))
+			break;
+		delay(2000);
+	}
+
+	if (sc->mii_inst != 0 && ((sc->mii_flags & MIIF_NOISOLATE) == 0)) {
+		PHY_WRITE(sc, MII_BMCR, reg | BMCR_ISO);
+	}
+}
+

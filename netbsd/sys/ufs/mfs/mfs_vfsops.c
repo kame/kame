@@ -1,4 +1,4 @@
-/*	$NetBSD: mfs_vfsops.c,v 1.38.8.1 2002/11/01 08:41:49 lukem Exp $	*/
+/*	$NetBSD: mfs_vfsops.c,v 1.55.2.1 2004/05/29 09:04:53 tron Exp $	*/
 
 /*
  * Copyright (c) 1989, 1990, 1993, 1994
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mfs_vfsops.c,v 1.38.8.1 2002/11/01 08:41:49 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mfs_vfsops.c,v 1.55.2.1 2004/05/29 09:04:53 tron Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
@@ -44,6 +40,7 @@ __KERNEL_RCSID(0, "$NetBSD: mfs_vfsops.c,v 1.38.8.1 2002/11/01 08:41:49 lukem Ex
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/sysctl.h>
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/proc.h>
@@ -73,6 +70,8 @@ static	int mfs_minor;	/* used for building internal dev_t */
 
 extern int (**mfs_vnodeop_p) __P((void *));
 
+MALLOC_DEFINE(M_MFSNODE, "MFS node", "MFS vnode private part");
+
 /*
  * mfs vfs operations.
  */
@@ -99,11 +98,33 @@ struct vfsops mfs_vfsops = {
 	mfs_init,
 	mfs_reinit,
 	mfs_done,
-	ffs_sysctl,
+	NULL,
 	NULL,
 	ufs_check_export,
 	mfs_vnodeopv_descs,
 };
+
+SYSCTL_SETUP(sysctl_vfs_mfs_setup, "sysctl vfs.mfs subtree setup")
+{
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "vfs", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_VFS, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_ALIAS,
+		       CTLTYPE_NODE, "mfs",
+		       SYSCTL_DESCR("Memory based file system"),
+		       NULL, 1, NULL, 0,
+		       CTL_VFS, 3, CTL_EOL);
+	/*
+	 * XXX the "1" and the "3" above could be dynamic, thereby
+	 * eliminating one more instance of the "number to vfs"
+	 * mapping problem, but they are in order as taken from
+	 * sys/mount.h
+	 */
+}
 
 /* 
  * Memory based filesystem initialization.
@@ -111,6 +132,9 @@ struct vfsops mfs_vfsops = {
 void
 mfs_init()
 {
+#ifdef _LKM
+	malloc_type_attach(M_MFSNODE);
+#endif
 	/*
 	 * ffs_init() ensures to initialize necessary resources
 	 * only once.
@@ -132,6 +156,9 @@ mfs_done()
 	 * only once, when it's no more needed.
 	 */
 	ffs_done();
+#ifdef _LKM
+	malloc_type_detach(M_MFSNODE);
+#endif
 }
 
 /*
@@ -169,10 +196,12 @@ mfs_mountroot()
 	mfsp->mfs_size = mfs_rootsize;
 	mfsp->mfs_vnode = rootvp;
 	mfsp->mfs_proc = NULL;		/* indicate kernel space */
-	BUFQ_INIT(&mfsp->mfs_buflist);
+	mfsp->mfs_shutdown = 0;
+	bufq_alloc(&mfsp->mfs_buflist, BUFQ_FCFS);
 	if ((error = ffs_mountfs(rootvp, mp, p)) != 0) {
 		mp->mnt_op->vfs_refcount--;
 		vfs_unbusy(mp);
+		bufq_free(&mfsp->mfs_buflist);
 		free(mp, M_MOUNT);
 		free(mfsp, M_MFSNODE);
 		vrele(rootvp);
@@ -199,10 +228,10 @@ int
 mfs_initminiroot(base)
 	caddr_t base;
 {
-	struct fs *fs = (struct fs *)(base + SBOFF);
+	struct fs *fs = (struct fs *)(base + SBLOCK_UFS1);
 
 	/* check for valid super block */
-	if (fs->fs_magic != FS_MAGIC || fs->fs_bsize > MAXBSIZE ||
+	if (fs->fs_magic != FS_UFS1_MAGIC || fs->fs_bsize > MAXBSIZE ||
 	    fs->fs_bsize < sizeof(struct fs))
 		return (0);
 	mountroot = mfs_mountroot;
@@ -232,9 +261,30 @@ mfs_mount(mp, path, data, ndp, p)
 	struct ufsmount *ump;
 	struct fs *fs;
 	struct mfsnode *mfsp;
-	size_t size;
 	int flags, error;
 
+	if (mp->mnt_flag & MNT_GETARGS) {
+		struct vnode *vp;
+		struct mfsnode *mfsp;
+
+		ump = VFSTOUFS(mp);
+		if (ump == NULL)
+			return EIO;
+
+		vp = ump->um_devvp;
+		if (vp == NULL)
+			return EIO;
+
+		mfsp = VTOMFS(vp);
+		if (mfsp == NULL)
+			return EIO;
+
+		args.fspec = NULL;
+		vfs_showexport(mp, &args.export, &ump->um_export);
+		args.base = mfsp->mfs_baseoff;
+		args.size = mfsp->mfs_size;
+		return copyout(&args, data, sizeof(args));
+	}
 	/*
 	 * XXX turn off async to avoid hangs when writing lots of data.
 	 * the problem is that MFS needs to allocate pages to clean pages,
@@ -265,7 +315,7 @@ mfs_mount(mp, path, data, ndp, p)
 			if (error)
 				return (error);
 		}
-		if (fs->fs_ronly && (mp->mnt_flag & MNT_WANTRDWR))
+		if (fs->fs_ronly && (mp->mnt_iflag & IMNT_WANTRDWR))
 			fs->fs_ronly = 0;
 		if (args.fspec == 0)
 			return (vfs_export(mp, &ump->um_export, &args.export));
@@ -284,21 +334,20 @@ mfs_mount(mp, path, data, ndp, p)
 	mfsp->mfs_size = args.size;
 	mfsp->mfs_vnode = devvp;
 	mfsp->mfs_proc = p;
-	BUFQ_INIT(&mfsp->mfs_buflist);
+	mfsp->mfs_shutdown = 0;
+	bufq_alloc(&mfsp->mfs_buflist, BUFQ_FCFS);
 	if ((error = ffs_mountfs(devvp, mp, p)) != 0) {
-		BUFQ_FIRST(&mfsp->mfs_buflist) = (struct buf *) -1;
+		mfsp->mfs_shutdown = 1;
 		vrele(devvp);
 		return (error);
 	}
 	ump = VFSTOUFS(mp);
 	fs = ump->um_fs;
-	(void) copyinstr(path, fs->fs_fsmnt, sizeof(fs->fs_fsmnt) - 1, &size);
-	memset(fs->fs_fsmnt + size, 0, sizeof(fs->fs_fsmnt) - size);
-	memcpy(mp->mnt_stat.f_mntonname, fs->fs_fsmnt, MNAMELEN);
-	(void) copyinstr(args.fspec, mp->mnt_stat.f_mntfromname, MNAMELEN - 1,
-	    &size);
-	memset(mp->mnt_stat.f_mntfromname + size, 0, MNAMELEN - size);
-	return (0);
+	error = set_statfs_info(path, UIO_USERSPACE, args.fspec,
+	    UIO_USERSPACE, mp, p);
+	(void)memcpy(fs->fs_fsmnt, mp->mnt_stat.f_mntonname,
+	    sizeof(mp->mnt_stat.f_mntonname));
+	return error;
 }
 
 int	mfs_pri = PWAIT | PCATCH;		/* XXX prob. temp */
@@ -323,11 +372,16 @@ mfs_start(mp, flags, p)
 	struct buf *bp;
 	caddr_t base;
 	int sleepreturn = 0;
+	struct lwp *l; /* XXX NJWLWP */
 
+	/* XXX NJWLWP the vnode interface again gives us a proc in a
+	 * place where we want a execution context. Cheat.
+	 */
+	KASSERT(curproc == p);
+	l = curlwp; 
 	base = mfsp->mfs_baseoff;
-	while (BUFQ_FIRST(&mfsp->mfs_buflist) != (struct buf *) -1) {
-		while ((bp = BUFQ_FIRST(&mfsp->mfs_buflist)) != NULL) {
-			BUFQ_REMOVE(&mfsp->mfs_buflist, bp);
+	while (mfsp->mfs_shutdown != 1) {
+		while ((bp = BUFQ_GET(&mfsp->mfs_buflist)) != NULL) {
 			mfs_doio(bp, base);
 			wakeup((caddr_t)bp);
 		}
@@ -347,13 +401,15 @@ mfs_start(mp, flags, p)
 			if (vfs_busy(mp, LK_NOWAIT, 0) != 0)
 				lockmgr(&syncer_lock, LK_RELEASE, NULL);
 			else if (dounmount(mp, 0, p) != 0)
-				CLRSIG(p, CURSIG(p));
+				CLRSIG(p, CURSIG(l));
 			sleepreturn = 0;
 			continue;
 		}
 
 		sleepreturn = tsleep(vp, mfs_pri, "mfsidl", 0);
 	}
+	KASSERT(BUFQ_PEEK(&mfsp->mfs_buflist) == NULL);
+	bufq_free(&mfsp->mfs_buflist);
 	return (sleepreturn);
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: signal.h,v 1.8 1999/11/27 11:20:41 mrg Exp $ */
+/*	$NetBSD: signal.h,v 1.19 2004/03/26 21:39:57 drochner Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -47,12 +43,13 @@
 #ifndef	_SPARC_SIGNAL_H_
 #define _SPARC_SIGNAL_H_
 
+#include <sys/featuretest.h>
+
 #ifndef _LOCORE
 typedef int sig_atomic_t;
 #endif
 
-#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) && \
-    !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 #ifndef _LOCORE
 
 /*
@@ -88,11 +85,22 @@ struct sigcontext {
 	long		sc_sp;		/* %sp to restore */
 	long		sc_pc;		/* pc to restore */
 	long		sc_npc;		/* npc to restore */
+#ifdef __arch64__
+	long		sc_tstate;	/* tstate to restore */
+#else
 	long		sc_psr;		/* psr to restore */
+#endif
 	long		sc_g1;		/* %g1 to restore */
 	long		sc_o0;		/* %o0 to restore */
 	sigset_t	sc_mask;	/* signal mask to restore (new style) */
 };
+
+#ifdef COMPAT_16
+#define	SIGTRAMP_VALID(vers)	((unsigned)(vers) <= 2)
+#else
+#define	SIGTRAMP_VALID(vers)	((vers) == 2)
+#endif
+
 #else /* _LOCORE */
 /* XXXXX These values don't work for _LP64 */
 #define	SC_SP_OFFSET	8
@@ -116,5 +124,5 @@ struct sigcontext {
 #define	FPE_FLTOPERR_TRAP	0xd0	/* operand error */
 #define	FPE_FLTOVF_TRAP		0xd4	/* overflow */
 
-#endif	/* !_ANSI_SOURCE && !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
+#endif	/* _NETBSD_SOURCE */
 #endif	/* !_SPARC_SIGNAL_H_ */

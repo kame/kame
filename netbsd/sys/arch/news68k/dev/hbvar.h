@@ -1,4 +1,4 @@
-/*	$NetBSD: hbvar.h,v 1.3 2000/10/04 16:26:43 tsutsui Exp $	*/
+/*	$NetBSD: hbvar.h,v 1.5 2002/12/20 16:23:46 tsutsui Exp $	*/
 
 /*-
  * Copyright (C) 1999 Izumi Tsutsui.  All rights reserved.
@@ -38,7 +38,7 @@
  * Structure used to attach hb devices.
  */
 struct hb_attach_args {
-	char		*ha_name;	/* name of device */
+	const char	*ha_name;	/* name of device */
 	bus_space_tag_t	ha_bust;	/* bus space tag */
 	bus_addr_t	ha_address;	/* device address */
 	bus_size_t	ha_size;	/* device space */
@@ -46,5 +46,5 @@ struct hb_attach_args {
 	int		ha_vect;	/* interrupt vector */
 };
 
-void	hb_intr_establish __P((int, int (*)(void *), int, void *));
-void	hb_intr_disestablish __P((int));
+void hb_intr_establish(int, int (*)(void *), int, void *);
+void hb_intr_disestablish(int);

@@ -1,10 +1,39 @@
-/*	$NetBSD: npx_isa.c,v 1.4 2002/01/07 21:47:01 thorpej Exp $	*/
+/*	$NetBSD: npx_isa.c,v 1.9 2003/08/07 16:28:02 agc Exp $	*/
+
+/*-
+ * Copyright (c) 1991 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)npx.c	7.2 (Berkeley) 5/12/91
+ */
 
 /*-
  * Copyright (c) 1994, 1995, 1998 Charles M. Hannum.  All rights reserved.
  * Copyright (c) 1990 William Jolitz.
- * Copyright (c) 1991 The Regents of the University of California.
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,7 +67,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: npx_isa.c,v 1.4 2002/01/07 21:47:01 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: npx_isa.c,v 1.9 2003/08/07 16:28:02 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -57,9 +86,8 @@ __KERNEL_RCSID(0, "$NetBSD: npx_isa.c,v 1.4 2002/01/07 21:47:01 thorpej Exp $");
 int npx_isa_probe(struct device *, struct cfdata *, void *);
 void npx_isa_attach(struct device *, struct device *, void *);
 
-struct cfattach npx_isa_ca = {
-	sizeof(struct npx_softc), npx_isa_probe, npx_isa_attach
-};
+CFATTACH_DECL(npx_isa, sizeof(struct npx_softc),
+    npx_isa_probe, npx_isa_attach, NULL, NULL);
 
 int
 npx_isa_probe(struct device *parent, struct cfdata *match, void *aux)
@@ -127,7 +155,7 @@ npx_isa_attach(struct device *parent, struct device *self, void *aux)
 		printf("\n");
 		lcr0(rcr0() & ~CR0_NE);
 		sc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq[0].ir_irq,
-		    IST_EDGE, IPL_NONE, npxintr, 0);
+		    IST_EDGE, IPL_NONE, (int (*)(void *))npxintr, 0);
 		break;
 	case NPX_EXCEPTION:
 		printf(": using exception 16\n");

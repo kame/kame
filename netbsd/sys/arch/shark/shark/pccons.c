@@ -1,4 +1,4 @@
-/*      $NetBSD: pccons.c,v 1.6 2002/04/19 01:43:50 wiz Exp $       */
+/*      $NetBSD: pccons.c,v 1.18 2004/02/13 11:36:17 wiz Exp $       */
 
 /*
  * Copyright 1997
@@ -34,8 +34,41 @@
  */
 
 /*-
- * Copyright (c) 1993, 1994, 1995 Charles M. Hannum.  All rights reserved.
  * Copyright (c) 1990 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * William Jolitz and Don Ahn.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *      @(#)pccons.c    5.11 (Berkeley) 5/21/91
+ */
+
+/*-
+ * Copyright (c) 1993, 1994, 1995 Charles M. Hannum.  All rights reserved.
  * All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
@@ -85,7 +118,7 @@
 **    The driver has been cleaned up a little as part of the StrongARM 
 **    porting work.  The main modifications have been to change the 
 **    driver to use the bus_space_ macros, re-organise the sget and sput
-**    mechanisms and utilise a more robust set of i8042 keybord controller
+**    mechanisms and use a more robust set of i8042 keybord controller
 **    routines which are now external to this module and also used by the
 **    opms mouse driver.
 **
@@ -100,6 +133,10 @@
 **
 **--
 */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pccons.c,v 1.18 2004/02/13 11:36:17 wiz Exp $");
+
 #include "opt_ddb.h"
 #include "opt_xserver.h"
 
@@ -116,6 +153,7 @@
 #include <sys/kernel.h>
 #include <sys/syslog.h>
 #include <sys/device.h>
+#include <sys/conf.h>
 #include <machine/kerndebug.h>
 
 #include <uvm/uvm_extern.h>
@@ -129,10 +167,8 @@
 #include <machine/pccons.h>
 #ifdef i386
 #include <machine/pc/display.h>
-#include <machine/conf.h>
 #else
 #include <shark/shark/display.h>
-#include <sys/conf.h>
 #endif
 
 #include <dev/isa/isareg.h>
@@ -155,7 +191,7 @@ extern int msgbufmapped;
 #endif
 
 /*
-** Macro defintions
+** Macro definitions
 */
 
 /*
@@ -298,8 +334,13 @@ void                   pccnputc            __P((dev_t, char));
 int                    pccngetc            __P((dev_t));
 void                   pccnpollc           __P((dev_t, int));
 
+char *xinterpret(struct pc_softc *, u_char);
+
 #ifdef SHARK
 static void            force_vga_mode      __P((void));
+int get_shark_screen_ihandle(void);
+void shark_screen_cleanup(int);
+
 /*
 ** Definitions needed by getDisplayInfo
 */
@@ -355,12 +396,24 @@ static void            cga_save_restore    __P((int));
 /*
 ** Data structures required by config
 */
-struct cfattach pc_ca = 
-{
-    sizeof(struct pc_softc), pcprobe, pcattach
-};
+CFATTACH_DECL(pc, sizeof(struct pc_softc),
+    pcprobe, pcattach, NULL, NULL);
 
 extern struct cfdriver pc_cd;
+
+dev_type_open(pcopen);
+dev_type_close(pcclose);
+dev_type_read(pcread);
+dev_type_write(pcwrite);
+dev_type_ioctl(pcioctl);
+dev_type_tty(pctty);
+dev_type_poll(pcpoll);
+dev_type_mmap(pcmmap);
+
+const struct cdevsw pc_cdevsw = {
+	pcopen, pcclose, pcread, pcwrite, pcioctl,
+	nostop, pctty, pcpoll, pcmmap, ttykqfilter, D_TTY
+};
 
 static unsigned int   addr_6845   = MONO_BASE;
 
@@ -631,7 +684,7 @@ get_cursor_shape(struct pc_softc *sc)
      * real 6845's, as found on, MDA, Hercules or CGA cards, do
      * not support reading the cursor shape registers. the 6845
      * tri-states it's data bus. This is _normally_ read by the
-     * cpu as either 0x00 or 0xff.. in which case we just use
+     * CPU as either 0x00 or 0xff.. in which case we just use
      * a line cursor.
      */
     if (cursor_shape == 0x0000 || cursor_shape == 0xffff)
@@ -838,7 +891,7 @@ async_update(struct pc_softc *sc,
 **  FUNCTION VALUE:
 **
 **     0 - Probe failed to find the requested device.
-**     1 - Probe sucessfully talked to the device. 
+**     1 - Probe successfully talked to the device. 
 **
 **  SIDE EFFECTS:
 **
@@ -1869,46 +1922,6 @@ pcstart(struct tty *tp)
     return;
 } /* End pcstart() */
 
-
-
-/*
-**++
-**  FUNCTIONAL DESCRIPTION:
-**
-**     pcstop
-**
-**     This routine does nothing as writes to the output device
-**     aren't buffered and therefore cannot be stopped.
-**
-**  FORMAL PARAMETERS:
-**
-**     tp   - Pointer to our tty structure.
-**     flag - Ignored.
-**
-**  IMPLICIT INPUTS:
-**
-**     none.
-**
-**  IMPLICIT OUTPUTS:
-**
-**     none.
-**
-**  FUNCTION VALUE:
-**
-**     none.
-**
-**  SIDE EFFECTS:
-**
-**     none.
-**--
-*/
-void
-pcstop(struct tty *tp, 
-       int        flag)
-{
-    return;
-} /* End pcstop() */
-
 /*****************************************************************************/
 /*                                                                           */
 /*     The following are the routines that allow the pc device to operate    */
@@ -1961,13 +1974,7 @@ pccnprobe(struct consdev *cp)
     
     /* locate the major number 
     */
-    for (maj = 0; maj < nchrdev; maj++)
-    {
-        if (cdevsw[maj].d_open == pcopen)
-        {
-            break;
-        }
-    }
+    maj = cdevsw_lookup_major(&pc_cdevsw);
     /* initialize required fields 
     */
     cp->cn_dev = makedev(maj, 0);

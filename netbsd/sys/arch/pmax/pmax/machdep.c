@@ -1,9 +1,43 @@
-/*	$NetBSD: machdep.c,v 1.199 2002/03/05 16:14:28 simonb Exp $	*/
+/*	$NetBSD: machdep.c,v 1.208 2003/12/30 12:33:18 pk Exp $	*/
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department, The Mach Operating System project at
+ * Carnegie-Mellon University and Ralph Campbell.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)machdep.c	8.3 (Berkeley) 1/12/94
+ * 	from: Utah Hdr: machdep.c 1.63 91/04/24
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -43,7 +77,7 @@
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.199 2002/03/05 16:14:28 simonb Exp $");
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.208 2003/12/30 12:33:18 pk Exp $");
 
 #include "fs_mfs.h"
 #include "opt_ddb.h"
@@ -57,10 +91,9 @@ __KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.199 2002/03/05 16:14:28 simonb Exp $")
 #include <sys/mount.h>
 #include <sys/kcore.h>
 #include <sys/boot_flag.h>
+#include <sys/ksyms.h>
 
 #include <uvm/uvm_extern.h>
-
-#include <sys/sysctl.h>
 
 #include <dev/cons.h>
 
@@ -78,7 +111,7 @@ __KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.199 2002/03/05 16:14:28 simonb Exp $")
 #define _PMAX_BUS_DMA_PRIVATE
 #include <machine/bus.h>
 
-#ifdef DDB
+#if NKSYMS || defined(DDB) || defined(LKM)
 #include <sys/exec_aout.h>		/* XXX backwards compatilbity for DDB */
 #include <machine/db_machdep.h>
 #include <ddb/db_extern.h>
@@ -87,11 +120,11 @@ __KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.199 2002/03/05 16:14:28 simonb Exp $")
 #include "opt_dec_3min.h"
 #include "opt_dec_maxine.h"
 #include "opt_dec_3maxplus.h"
+#include "ksyms.h"
 
 /* the following is used externally (sysctl_hw) */
-char	machine[] = MACHINE;		/* from <machine/param.h> */
-char	machine_arch[] = MACHINE_ARCH;	/* from <machine/param.h> */
-char	cpu_model[40];
+extern char	cpu_model[];
+
 unsigned ssir;				/* simulated interrupt register */
 
 /* Our exported CPU info; we can have only one. */  
@@ -171,10 +204,8 @@ mach_init(argc, argv, code, cv, bim, bip)
 	char *cp, *bootinfo_msg;
 	u_long first, last;
 	int i;
-	caddr_t kernend, v;
-	unsigned size;
-#ifdef DDB
-	int nsym = 0;
+	caddr_t kernend;
+#if NKSYMS || defined(DDB) || defined(LKM)
 	caddr_t ssym = 0;
 	struct btinfo_symtab *bi_syms;
 	struct exec *aout;		/* XXX backwards compatilbity for DDB */
@@ -197,13 +228,12 @@ mach_init(argc, argv, code, cv, bim, bip)
 		bootinfo_msg = "invalid bootinfo pointer (old bootblocks?)\n";
 
 	/* clear the BSS segment */
-#ifdef DDB
+#if NKSYMS || defined(DDB) || defined(LKM)
 	bi_syms = lookup_bootinfo(BTINFO_SYMTAB);
 	aout = (struct exec *)edata;
 
 	/* Was it a valid bootinfo symtab info? */
 	if (bi_syms != NULL) {
-		nsym = bi_syms->nsym;
 		ssym = (caddr_t)bi_syms->ssym;
 		esym = (caddr_t)bi_syms->esym;
 		kernend = (caddr_t)mips_round_page(esym);
@@ -214,7 +244,6 @@ mach_init(argc, argv, code, cv, bim, bip)
 	 */
 	/* Exec header and symbols? */
 	else if (aout->a_midmag == 0x07018b00 && (i = aout->a_syms) != 0) {
-		nsym = *(long *)end = i;
 		ssym = end;
 		i += (*(long *)(end + i + 4) + 3) & ~3;		/* strings */
 		esym = end + i + 4;
@@ -302,10 +331,12 @@ mach_init(argc, argv, code, cv, bim, bip)
 		kernend += round_page(mfs_initminiroot(kernend));
 #endif
 
-#ifdef DDB
+#if NKSYMS || defined(DDB) || defined(LKM)
 	/* init symbols if present */
 	if (esym)
-		ddb_init(esym - ssym, ssym, esym);
+		ksyms_init(esym - ssym, ssym, esym);
+#endif
+#ifdef DDB
 	if (boothowto & RB_KDB)
 		Debugger();
 #endif
@@ -313,10 +344,10 @@ mach_init(argc, argv, code, cv, bim, bip)
 	/*
 	 * Alloc u pages for proc0 stealing KSEG0 memory.
 	 */
-	proc0.p_addr = proc0paddr = (struct user *)kernend;
-	proc0.p_md.md_regs = (struct frame *)(kernend + USPACE) - 1;
-	memset(proc0.p_addr, 0, USPACE);
-	curpcb = &proc0.p_addr->u_pcb;
+	lwp0.l_addr = proc0paddr = (struct user *)kernend;
+	lwp0.l_md.md_regs = (struct frame *)(kernend + USPACE) - 1;
+	memset(lwp0.l_addr, 0, USPACE);
+	curpcb = &lwp0.l_addr->u_pcb;
 	curpcb->pcb_context[11] = MIPS_INT_MASK | MIPS_SR_INT_IE; /* SR */
 
 	kernend += USPACE;
@@ -372,25 +403,9 @@ mach_init(argc, argv, code, cv, bim, bip)
 	mips_init_msgbuf();
 
 	/*
-	 * Compute the size of system data structures.  pmap_bootstrap()
-	 * needs some of this information.
-	 */
-	size = (unsigned)allocsys(NULL, NULL);
-
-	/*
 	 * Initialize the virtual memory system.
 	 */
 	pmap_bootstrap();
-
-	/*
-	 * Allocate space for system data structures.  These data structures
-	 * are allocated here instead of cpu_startup() because physical memory
-	 * is directly addressable.  We don't have to map these into virtual
-	 * address space.
-	 */
-	v = (caddr_t)uvm_pageboot_alloc(size);
-	if ((allocsys(v, NULL) - v) != size)
-		panic("mach_init: table size inconsistency");
 }
 
 void
@@ -415,10 +430,7 @@ consinit()
 void
 cpu_startup()
 {
-	unsigned i;
-	int base, residual;
 	vaddr_t minaddr, maxaddr;
-	vsize_t size;
 	char pbuf[9];
 #ifdef DEBUG
 	extern int pmapdebug;		/* XXX */
@@ -435,53 +447,7 @@ cpu_startup()
 	format_bytes(pbuf, sizeof(pbuf), ctob(physmem));
 	printf("total memory = %s\n", pbuf);
 
-	/*
-	 * Allocate virtual address space for file I/O buffers.
-	 * Note they are different than the array of headers, 'buf',
-	 * and usually occupy more virtual memory than physical.
-	 */
-	size = MAXBSIZE * nbuf;
-	if (uvm_map(kernel_map, (vaddr_t *)&buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET, 0,
-		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != 0)
-		panic("cpu_startup: cannot allocate VM for buffers");
-
-	minaddr = (vaddr_t)buffers;
-	if ((bufpages / nbuf) >= btoc(MAXBSIZE)) {
-		bufpages = btoc(MAXBSIZE) * nbuf; /* do not overallocate RAM */
-	}
-	base = bufpages / nbuf;
-	residual = bufpages % nbuf;
-
-	/* now allocate RAM for buffers */
-	for (i = 0; i < nbuf; i++) {
-		vsize_t curbufsize;
-		vaddr_t curbuf;
-		struct vm_page *pg;
-
-		/*
-		 * Each buffer has MAXBSIZE bytes of VM space allocated.  Of
-		 * that MAXBSIZE space, we allocate and map (base+1) pages
-		 * for the first "residual" buffers, and then we allocate
-		 * "base" pages for the rest.
-		 */
-		curbuf = (vaddr_t)buffers + (i * MAXBSIZE);
-		curbufsize = NBPG * ((i < residual) ? (base+1) : base);
-
-		while (curbufsize) {
-			pg = uvm_pagealloc(NULL, 0, NULL, 0);
-			if (pg == NULL)
-				panic("cpu_startup: not enough memory for "
-				    "buffer cache");
-			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
-				       VM_PROT_READ|VM_PROT_WRITE);
-			curbuf += PAGE_SIZE;
-			curbufsize -= PAGE_SIZE;
-		}
-	}
-	pmap_update(pmap_kernel());
-
+	minaddr = 0;
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
 	 * limits the number of processes exec'ing at any time.
@@ -506,47 +472,6 @@ cpu_startup()
 #endif
 	format_bytes(pbuf, sizeof(pbuf), ptoa(uvmexp.free));
 	printf("avail memory = %s\n", pbuf);
-	format_bytes(pbuf, sizeof(pbuf), bufpages * NBPG);
-	printf("using %d buffers containing %s of memory\n", nbuf, pbuf);
-
-	/*
-	 * Set up buffers, so they can be used to read disk labels.
-	 */
-	bufinit();
-}
-
-/*
- * Machine dependent system variables.
- */
-int
-cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
-	struct proc *p;
-{
-	struct btinfo_bootpath *bibp;
-
-	/* all sysctl names at this level are terminal */
-	if (namelen != 1)
-		return (ENOTDIR);		/* overloaded */
-
-	switch (name[0]) {
-	case CPU_CONSDEV:
-		return (sysctl_rdstruct(oldp, oldlenp, newp, &cn_tab->cn_dev,
-		    sizeof cn_tab->cn_dev));
-	case CPU_BOOTED_KERNEL:
-	        bibp = lookup_bootinfo(BTINFO_BOOTPATH);
-	        if(!bibp)
-			return (ENOENT); /* ??? */
-		return (sysctl_rdstring(oldp, oldlenp, newp, bibp->bootpath));
-	default:
-		return (EOPNOTSUPP);
-	}
-	/* NOTREACHED */
 }
 
 /*
@@ -581,7 +506,7 @@ cpu_reboot(howto, bootstr)
 {
 
 	/* take a snap shot before clobbering any registers */
-	if (curproc)
+	if (curlwp)
 		savectx((struct user *)curpcb);
 
 #ifdef DEBUG
@@ -665,7 +590,7 @@ memsize_scan(first)
 			break;
 		*(int *)cp = i;
 		((int *)cp)[4] = j;
-		cp += NBPG;
+		cp += PAGE_SIZE;
 		mem++;
 	}
 

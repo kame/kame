@@ -1,4 +1,4 @@
-/*	$NetBSD: if_cs_ofisa_machdep.c,v 1.1 2002/02/10 01:57:57 thorpej Exp $	*/
+/*	$NetBSD: if_cs_ofisa_machdep.c,v 1.3 2003/07/15 03:36:02 lukem Exp $	*/
 
 /*
  * Copyright 1998
@@ -36,6 +36,11 @@
 /*
  * WARNING: THIS FILE IS VERY SHARK-SPECIFIC!
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_cs_ofisa_machdep.c,v 1.3 2003/07/15 03:36:02 lukem Exp $");
+
+#include "opt_compat_old_ofw.h"
 
 #include <sys/param.h>
 #include <sys/device.h>

@@ -1,4 +1,4 @@
-/*	$NetBSD: bw2.c,v 1.17 2001/09/19 18:10:34 thorpej Exp $	*/
+/*	$NetBSD: bw2.c,v 1.25 2003/08/07 16:29:54 agc Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -50,6 +46,9 @@
  * Does not handle interrupts, even though they can occur.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bw2.c,v 1.25 2003/08/07 16:29:54 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -72,8 +71,6 @@
 #include <sun3/dev/bw2reg.h>
 #include <sun3/dev/p4reg.h>
 
-cdev_decl(bw2);
-
 /* per-display variables */
 struct bw2_softc {
 	struct	device sc_dev;		/* base device */
@@ -88,11 +85,19 @@ struct bw2_softc {
 static void	bw2attach __P((struct device *, struct device *, void *));
 static int	bw2match __P((struct device *, struct cfdata *, void *));
 
-struct cfattach bwtwo_ca = {
-	sizeof(struct bw2_softc), bw2match, bw2attach
-};
+CFATTACH_DECL(bwtwo, sizeof(struct bw2_softc),
+    bw2match, bw2attach, NULL, NULL);
 
 extern struct cfdriver bwtwo_cd;
+
+dev_type_open(bw2open);
+dev_type_ioctl(bw2ioctl);
+dev_type_mmap(bw2mmap);
+
+const struct cdevsw bwtwo_cdevsw = {
+	bw2open, nullclose, noread, nowrite, bw2ioctl,
+	nostop, notty, nopoll, bw2mmap, nokqfilter,
+};
 
 /* XXX we do not handle frame buffer interrupts */
 
@@ -100,7 +105,7 @@ static int bw2gvideo __P((struct fbdevice *, void *));
 static int bw2svideo __P((struct fbdevice *, void *));
 
 static struct fbdriver bw2fbdriver = {
-	bw2open, bw2close, bw2mmap,
+	bw2open, nullclose, bw2mmap, nokqfilter,
 	fb_noioctl,
 	bw2gvideo, bw2svideo,
 	fb_noioctl, fb_noioctl, };
@@ -169,6 +174,7 @@ bw2match(parent, cf, args)
 		printf("bwtwo at 0x%x match p4id=0x%x fails\n",
 			   ca->ca_paddr, p4id & 0xFF);
 #endif
+		break;
 	}
 
 	return (0);
@@ -293,16 +299,6 @@ bw2open(dev, flags, mode, p)
 
 	if (unit >= bwtwo_cd.cd_ndevs || bwtwo_cd.cd_devs[unit] == NULL)
 		return (ENXIO);
-	return (0);
-}
-
-int
-bw2close(dev, flags, mode, p)
-	dev_t dev;
-	int flags, mode;
-	struct proc *p;
-{
-
 	return (0);
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: ms.c,v 1.21 2001/11/13 06:54:32 lukem Exp $	*/
+/*	$NetBSD: ms.c,v 1.28 2003/09/21 19:16:57 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -56,7 +52,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ms.c,v 1.21 2001/11/13 06:54:32 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ms.c,v 1.28 2003/09/21 19:16:57 jdolecek Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -79,11 +75,25 @@ __KERNEL_RCSID(0, "$NetBSD: ms.c,v 1.21 2001/11/13 06:54:32 lukem Exp $");
 #include <dev/sun/event_var.h>
 #include <dev/sun/msvar.h>
 
-#include "locators.h"
+#include <dev/wscons/wsconsio.h>
+#include <dev/wscons/wsmousevar.h>
 
-cdev_decl(ms);	/* open, close, read, write, ioctl, stop, ... */
+#include "locators.h"
+#include "wsmouse.h"
 
 extern struct cfdriver ms_cd;
+
+dev_type_open(msopen);
+dev_type_close(msclose);
+dev_type_read(msread);
+dev_type_ioctl(msioctl);
+dev_type_poll(mspoll);
+dev_type_kqfilter(mskqfilter);
+
+const struct cdevsw ms_cdevsw = {
+	msopen, msclose, msread, nowrite, msioctl,
+	nostop, notty, mspoll, nommap, mskqfilter,
+};
 
 /****************************************************************
  *  Entry points for /dev/mouse
@@ -157,17 +167,6 @@ msread(dev, uio, flags)
 	return (ev_read(&ms->ms_events, uio, flags));
 }
 
-/* this routine should not exist, but is convenient to write here for now */
-int
-mswrite(dev, uio, flags)
-	dev_t dev;
-	struct uio *uio;
-	int flags;
-{
-
-	return (EOPNOTSUPP);
-}
-
 int
 msioctl(dev, cmd, data, flag, p)
 	dev_t dev;
@@ -187,6 +186,12 @@ msioctl(dev, cmd, data, flag, p)
 
 	case FIOASYNC:
 		ms->ms_events.ev_async = *(int *)data != 0;
+		return (0);
+
+	case FIOSETOWN:
+		if (-*(int *)data != ms->ms_events.ev_io->p_pgid
+		    && *(int *)data != ms->ms_events.ev_io->p_pid)
+			return (EPERM);
 		return (0);
 
 	case TIOCSPGRP:
@@ -219,6 +224,16 @@ mspoll(dev, events, p)
 	return (ev_poll(&ms->ms_events, events, p));
 }
 
+int
+mskqfilter(dev, kn)
+	dev_t dev;
+	struct knote *kn;
+{
+	struct ms_softc *ms;
+
+	ms = ms_cd.cd_devs[minor(dev)];
+	return (ev_kqfilter(&ms->ms_events, kn));
+}
 
 /****************************************************************
  * Middle layer (translator)
@@ -306,6 +321,19 @@ ms_input(ms, c)
 		/* NOTREACHED */
 	}
 
+#if NWSMOUSE > 0
+	if (ms->ms_wsmousedev != NULL && ms->ms_ready == 2) {
+		mb = ((ms->ms_mb & 4) >> 2) |
+			(ms->ms_mb & 2) |
+			((ms->ms_mb & 1) << 2);
+		wsmouse_input(ms->ms_wsmousedev,
+			      mb, ms->ms_dx, ms->ms_dy, 0,
+			      WSMOUSE_INPUT_DELTA);
+		ms->ms_dx = 0;
+		ms->ms_dy = 0;
+		return;
+	}
+#endif
 	/*
 	 * We have at least one event (mouse button, delta-X, or
 	 * delta-Y; possibly all three, and possibly three separate

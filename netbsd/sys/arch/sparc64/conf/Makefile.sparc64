@@ -1,4 +1,4 @@
-# 	$NetBSD: Makefile.sparc64,v 1.45 2002/03/19 18:10:33 eeh Exp $
+# 	$NetBSD: Makefile.sparc64,v 1.54 2004/03/22 00:43:37 martin Exp $
 
 #=========================================================================
 #
@@ -57,6 +57,7 @@ CPPFLAGS+=	-Dsparc64 -D__sparc64__
 # 64-bit kernels
 CPPFLAGS+=	-D_LP64 -Wa,-Av9a
 AFLAGS+=	-Wa,-Av9a
+CC_NOOPT=	${NORMAL_C}
 .if defined(PROF)
 # Profiling is only supported in the medium low memory model.
 CFLAGS+=	-mcmodel=medlow
@@ -68,16 +69,18 @@ CFLAGS+=	-mcmodel=medlow
 # 32-bit kernels
 CPPFLAGS+=	-m32 -Wa,-Av8plusa -mcpu=ultrasparc
 AFLAGS+=	-Wa,-Av8plusa
+# XXX
+# The sparc gcc version 3.3.3 (NetBSD nb1 20040301) does not compile this
+# file properly with higher optimizations
+CC_NOOPT=	${NORMAL_C:C/-O./-O0/}
 .endif
 CFLAGS+=	-mno-fpu
 AFLAGS+=	-x assembler-with-cpp -traditional-cpp
 
-NOOPT_C=	${CC} ${CFLAGS} ${CPPFLAGS} ${PROF} -O0 -c $<
-
 ##
 ## (3) libkern and compat
 ##
-# KERN_AS=	obj	# bcopy, bzero, memcpy, memset, etc. are in locore.s
+# KERN_AS=	obj	# memcpy, memset, etc. are in locore.s
 
 ##
 ## (4) local objects, compile rules, and dependencies
@@ -88,6 +91,8 @@ MD_SFILES=	${SPARC64}/sparc64/locore.s
 
 locore.o: ${SPARC64}/sparc64/locore.s assym.h
 	${NORMAL_S}
+
+in_cksum.o: assym.h
 
 ##
 ## (5) link settings
@@ -113,6 +118,16 @@ machdep.o mem.o openprom.o pmap.o vm_machdep.o: Makefile
 ##
 ## (7) misc settings
 ##
+
+# define .MAIN _before_ the make() check, so that implicit target
+# would be defined
+.MAIN: all
+
+.if make(depend) || make(all) || make(dependall)
+.BEGIN:
+	@rm -f sparc && \
+		ln -s $S/arch/sparc/include sparc
+.endif
 
 ##
 ## (8) config(8) generated machinery

@@ -1,4 +1,4 @@
-/*	$NetBSD: xel.c,v 1.3 1999/03/24 14:07:39 minoura Exp $	*/
+/*	$NetBSD: xel.c,v 1.7 2003/07/15 01:44:52 lukem Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -41,6 +41,9 @@
  * Detect Xellent30, and reserve its I/O area.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: xel.c,v 1.7 2003/07/15 01:44:52 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -64,9 +67,8 @@ struct xel_softc {
 	bus_space_handle_t sc_bh;
 };
 
-struct cfattach xel_ca = {
-	sizeof (struct xel_softc), xel_match, xel_attach
-};
+CFATTACH_DECL(xel, sizeof (struct xel_softc),
+    xel_match, xel_attach, NULL, NULL);
 
 static paddr_t xel_addrs[] = { 0xec0000, 0xec4000, 0xec8000, 0xecc000 };
 

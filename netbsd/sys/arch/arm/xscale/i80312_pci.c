@@ -1,4 +1,4 @@
-/*	$NetBSD: i80312_pci.c,v 1.6 2001/11/30 19:26:03 thorpej Exp $	*/
+/*	$NetBSD: i80312_pci.c,v 1.8 2003/07/15 00:24:53 lukem Exp $	*/
 
 /*
  * Copyright (c) 2001 Wasabi Systems, Inc.
@@ -38,6 +38,9 @@
 /*
  * PCI configuration support for i80312 Companion I/O chip.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: i80312_pci.c,v 1.8 2003/07/15 00:24:53 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -110,7 +113,7 @@ i80312_pci_init(pci_chipset_tag_t pc, void *cookie)
 	    sc->sc_smemout_base + sc->sc_smemout_size - 1,
 	    M_DEVBUF, NULL, 0, EX_NOWAIT);
 
-	printf("%s: configuring Secondary PCI bus\n", sc->sc_dev.dv_xname);
+	aprint_normal("%s: configuring Secondary PCI bus\n", sc->sc_dev.dv_xname);
 	pci_configure_bus(pc, ioext, memext, NULL, sbus, arm_dcache_align);
 
 	extent_destroy(ioext);

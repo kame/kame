@@ -1,11 +1,11 @@
-/*	$NetBSD: sequencer.c,v 1.19 2002/01/13 19:28:08 tsutsui Exp $	*/
+/*	$NetBSD: sequencer.c,v 1.25 2003/12/04 13:57:30 keihan Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@netbsd.org).
+ * by Lennart Augustsson (augustss@NetBSD.org).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sequencer.c,v 1.19 2002/01/13 19:28:08 tsutsui Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sequencer.c,v 1.25 2003/12/04 13:57:30 keihan Exp $");
 
 #include "sequencer.h"
 
@@ -148,6 +148,20 @@ int midiseq_loadpatch __P((struct midi_dev *, struct sysex_info *,
 			   struct uio *));
 int midiseq_putc __P((struct midi_dev *, int));
 void midiseq_in __P((struct midi_dev *, u_char *, int));
+
+dev_type_open(sequenceropen);
+dev_type_close(sequencerclose);
+dev_type_read(sequencerread);
+dev_type_write(sequencerwrite);
+dev_type_ioctl(sequencerioctl);
+dev_type_poll(sequencerpoll);
+dev_type_kqfilter(sequencerkqfilter);
+
+const struct cdevsw sequencer_cdevsw = {
+	sequenceropen, sequencerclose, sequencerread, sequencerwrite,
+	sequencerioctl, nostop, notty, sequencerpoll, nommap,
+	sequencerkqfilter,
+};
 
 void
 sequencerattach(n)
@@ -283,7 +297,7 @@ seq_timeout(addr)
 	seq_startoutput(sc);
 	if (SEQ_QLEN(&sc->outq) < sc->lowat) {
 		seq_wakeup(&sc->wchan);
-		selwakeup(&sc->wsel);
+		selnotify(&sc->wsel, 0);
 		if (sc->async)
 			psignal(sc->async, SIGIO);
 	}
@@ -346,7 +360,7 @@ seq_input_event(sc, cmd)
 		return (ENOMEM);
 	SEQ_QPUT(q, *cmd);
 	seq_wakeup(&sc->rchan);
-	selwakeup(&sc->rsel);
+	selnotify(&sc->rsel, 0);
 	if (sc->async)
 		psignal(sc->async, SIGIO);
 	return 0;
@@ -658,6 +672,91 @@ sequencerpoll(dev, events, p)
 	}
 
 	return revents;
+}
+
+static void
+filt_sequencerrdetach(struct knote *kn)
+{
+	struct sequencer_softc *sc = kn->kn_hook;
+	int s;
+
+	s = splaudio();
+	SLIST_REMOVE(&sc->rsel.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_sequencerread(struct knote *kn, long hint)
+{
+	struct sequencer_softc *sc = kn->kn_hook;
+
+	/* XXXLUKEM (thorpej): make sure this is correct */
+
+	if (SEQ_QEMPTY(&sc->inq))
+		return (0);
+	kn->kn_data = sizeof(seq_event_rec);
+	return (1);
+}
+
+static const struct filterops sequencerread_filtops =
+	{ 1, NULL, filt_sequencerrdetach, filt_sequencerread };
+
+static void
+filt_sequencerwdetach(struct knote *kn)
+{
+	struct sequencer_softc *sc = kn->kn_hook;
+	int s;
+
+	s = splaudio();
+	SLIST_REMOVE(&sc->wsel.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_sequencerwrite(struct knote *kn, long hint)
+{
+	struct sequencer_softc *sc = kn->kn_hook;
+
+	/* XXXLUKEM (thorpej): make sure this is correct */
+
+	if (SEQ_QLEN(&sc->outq) >= sc->lowat)
+		return (0);
+	kn->kn_data = sizeof(seq_event_rec);
+	return (1);
+}
+
+static const struct filterops sequencerwrite_filtops =
+	{ 1, NULL, filt_sequencerwdetach, filt_sequencerwrite };
+
+int
+sequencerkqfilter(dev_t dev, struct knote *kn)
+{
+	struct sequencer_softc *sc = &seqdevs[SEQUENCERUNIT(dev)];
+	struct klist *klist;
+	int s;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &sc->rsel.sel_klist;
+		kn->kn_fop = &sequencerread_filtops;
+		break;
+
+	case EVFILT_WRITE:
+		klist = &sc->wsel.sel_klist;
+		kn->kn_fop = &sequencerwrite_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = sc;
+
+	s = splaudio();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
 }
 
 void
@@ -1091,13 +1190,14 @@ midiseq_open(unit, flags)
 	int flags;
 {
 	extern struct cfdriver midi_cd;
+	extern const struct cdevsw midi_cdevsw;
 	int error;
 	struct midi_dev *md;
 	struct midi_softc *sc;
 	struct midi_info mi;
 
 	DPRINTFN(2, ("midiseq_open: %d %d\n", unit, flags));
-	error = midiopen(makedev(0, unit), flags, 0, 0);
+	error = (*midi_cdevsw.d_open)(makedev(0, unit), flags, 0, 0);
 	if (error)
 		return (0);
 	sc = midi_cd.cd_devs[unit];
@@ -1120,8 +1220,10 @@ void
 midiseq_close(md)
 	struct midi_dev *md;
 {
+	extern const struct cdevsw midi_cdevsw;
+
 	DPRINTFN(2, ("midiseq_close: %d\n", md->unit));
-	midiclose(makedev(0, md->unit), 0, 0, 0);
+	(*midi_cdevsw.d_close)(makedev(0, md->unit), 0, 0, 0);
 	free(md, M_DEVBUF);
 }
 
@@ -1334,6 +1436,14 @@ midiseq_putc(md, data)
 
 #include "midi.h"
 #if NMIDI == 0
+dev_type_open(midiopen);
+dev_type_close(midiclose);
+
+const struct cdevsw midi_cdevsw = {
+	midiopen, midiclose, noread, nowrite, noioctl,
+	nostop, notty, nopoll, nommap,
+};
+
 /*
  * If someone has a sequencer, but no midi devices there will
  * be unresolved references, so we provide little stubs.

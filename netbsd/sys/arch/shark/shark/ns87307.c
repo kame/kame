@@ -1,4 +1,4 @@
-/*	$NetBSD: ns87307.c,v 1.1 2002/02/10 01:58:06 thorpej Exp $	*/
+/*	$NetBSD: ns87307.c,v 1.3 2003/07/15 03:36:03 lukem Exp $	*/
 
 /*
  * Copyright 1997
@@ -55,6 +55,9 @@
 **
 **--
 */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ns87307.c,v 1.3 2003/07/15 03:36:03 lukem Exp $");
 
 #include "opt_ddb.h"
 
@@ -269,7 +272,7 @@ i87307PrinterConfig(bus_space_tag_t iot,
                 NSIO_LPT_SPP_EXTENDED;
     	NSIO_WRITE_REG( iot, ioh, NSIO_CFG_REG0, value);
     	
-        /* set the type of interupt */
+        /* set the type of interrupt */
         value = NSIO_IRQ_HIGH | 
                 NSIO_IRQ_LEVEL;
         NSIO_CONFIG_IRQ( iot, ioh, irqNum,value);

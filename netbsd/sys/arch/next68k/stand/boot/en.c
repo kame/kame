@@ -1,4 +1,4 @@
-/*      $NetBSD: en.c,v 1.3 1999/05/07 16:19:28 drochner Exp $        */
+/*      $NetBSD: en.c,v 1.10 2003/05/03 18:10:56 wiz Exp $        */
 /*
  * Copyright (c) 1996 Rolf Grossmann
  * All rights reserved.
@@ -48,6 +48,7 @@
 extern char *mg;
 #define	MON(type, off) (*(type *)((u_int) (mg) + off))
 
+#define PRINTF(x) printf x;
 #ifdef EN_DEBUG
 #define DPRINTF(x) printf x;
 #else
@@ -77,8 +78,10 @@ struct netif_dif en_ifs[] = {
 struct netif_driver en_driver = {
 	"en",
 	en_match, en_probe, en_init, en_get, en_put, en_end,
-	en_ifs, NENTS(en_ifs)
+	en_ifs, sizeof(en_ifs) / sizeof(en_ifs[0])
 };
+
+extern int turbo;
 
 /* ### int netdev_sock;
 static int open_count; */
@@ -123,18 +126,38 @@ en_init(struct iodesc *desc, void *machdep_hint)
 	dma_buffers[1] = DMA_ALIGN(char *, dma_buffer2);
 
 	er->reset = EN_RST_RESET;
+/* 	if (turbo) */
+/* 		er->reset = 0; */
 
-	/* ### we'll need this when we need to decide which interface to use
-	 bmap_chip[12] = 0x90000000;
-	 bmap_chip[13] = ~(0x80000000|0x10000000); * BMAP_TPE  ???
-	 */
-
-	er->txmode = EN_TMD_LB_DISABLE;
 	er->txmask = 0;
 	er->txstat = 0xff;
-	er->rxmode = EN_RMD_RECV_NORMAL;
+	if (turbo)
+		er->txmode = 0 | EN_TMD_COLLSHIFT;
+	else
+		er->txmode = EN_TMD_LB_DISABLE;
+
+	/* setup for bnc/tp */
+	if (!turbo) {
+		DPRINTF (("en_media: %s\n",
+			  (bmap_chip[13] & 0x20000000) ? "BNC" : "TP"));
+		if (!(bmap_chip[13] & 0x20000000)) {
+			bmap_chip[12] |= 0x90000000;
+			bmap_chip[13] |= (0x80000000|0x10000000); /* TP */
+		}
+	}
+
+/* 	if (turbo) { */
+/* 		er->txmode |= EN_TMD_COLLSHIFT; */
+/* 	} else { */
+/* 		er->txmode &= ~EN_TMD_LB_DISABLE; /\* ZZZ *\/ */
+/* 	} */
+
 	er->rxmask = 0;
 	er->rxstat = 0xff;
+	if (turbo)
+		er->rxmode = EN_RMD_TEST | EN_RMD_RECV_NORMAL;
+	else
+		er->rxmode = EN_RMD_RECV_NORMAL;
 	for (i=0; i<6; i++)
 	  er->addr[i] = desc->myea[i] = MON(char *,MG_clientetheraddr)[i];
           
@@ -142,7 +165,8 @@ en_init(struct iodesc *desc, void *machdep_hint)
 			desc->myea[0],desc->myea[1],desc->myea[2],
 			desc->myea[3],desc->myea[4],desc->myea[5]));
 
-	er->reset = 0;
+/* 	if (!turbo) */
+		er->reset = 0;
 }
 
 #if 0
@@ -191,22 +215,28 @@ en_put(struct iodesc *desc, void *pkt, size_t len)
 		return -1;
 	}
 	
-	while ((er->txstat & EN_TXS_READY) == 0)
-		printf("en: tx not ready\n");
+	if (!turbo) {
+		while ((er->txstat & EN_TXS_READY) == 0)
+			printf("en: tx not ready\n");
+	}
 
 	for (retries = 0; retries < EN_RETRIES; retries++) {
 		er->txstat = 0xff;
 		bcopy(pkt, dma_buffers[0], len);
+		txdma->dd_csr = (turbo ? DMACSR_INITBUFTURBO : DMACSR_INITBUF) |
+			DMACSR_RESET | DMACSR_WRITE;
 		txdma->dd_csr = 0;
-		txdma->dd_csr = DMACSR_INITBUF | DMACSR_RESET | DMACSR_WRITE;
-		txdma->dd_next_initbuf = dma_buffers[0];
+		txdma->dd_next/* _initbuf */ = dma_buffers[0];
+		txdma->dd_start = (turbo ? dma_buffers[0] : 0);
 		txdma->dd_limit = ENDMA_ENDALIGN(char *,  dma_buffers[0]+len);
-		txdma->dd_start = 0;
 		txdma->dd_stop = 0;
 		txdma->dd_csr = DMACSR_SETENABLE;
-	
+		if (turbo)
+			er->txmode |= 0x80;
+
 		while(1) {
 			if (en_wait_for_intr(ENETX_DMA_INTR)) {
+				printf("en_put: timed out\n");
 				errno = EIO;
 				return -1;
 			}
@@ -215,8 +245,8 @@ en_put(struct iodesc *desc, void *pkt, size_t len)
 				(DMACSR_BUSEXC | DMACSR_COMPLETE
 				 | DMACSR_SUPDATE | DMACSR_ENABLE);
 
-#if 0
-			DPRINTF(("en_put: dma state = 0x%x.\n", state));
+#if 01
+			DPRINTF(("en_put: DMA state = 0x%x.\n", state));
 #endif
 			if (state & (DMACSR_COMPLETE|DMACSR_BUSEXC))
 				txdma->dd_csr = DMACSR_RESET | DMACSR_CLRCOMPLETE;
@@ -225,7 +255,7 @@ en_put(struct iodesc *desc, void *pkt, size_t len)
 	
 		txs = er->txstat;
 
-#if 0
+#if 01
 		DPRINTF(("en_put: done txstat=%x.\n", txs));
 #endif
 
@@ -248,12 +278,16 @@ en_get(struct iodesc *desc, void *pkt, size_t len, time_t timeout)
 {
 	volatile struct en_regs *er;
 	volatile struct dma_dev *rxdma;
+	volatile struct dma_dev *txdma;
 	int state, rxs;
 	size_t rlen;
 	char *gotpkt;
         
 	rxdma = (struct dma_dev *)P_ENETR_CSR;
+	txdma = (struct dma_dev *)P_ENETX_CSR;
 	er = (struct en_regs *)P_ENET;
+
+	DPRINTF(("en_get: rxdma->dd_csr = %x\n",rxdma->dd_csr));
 
 	er->rxstat = 0xff;
 
@@ -263,40 +297,53 @@ en_get(struct iodesc *desc, void *pkt, size_t len, time_t timeout)
 	 */
 
 	rxdma->dd_csr = 0;
-	rxdma->dd_csr = DMACSR_INITBUF | DMACSR_READ | DMACSR_RESET;
+	rxdma->dd_csr = (turbo ? DMACSR_INITBUFTURBO : DMACSR_INITBUF) |
+		DMACSR_READ | DMACSR_RESET;
 
-	rxdma->dd_saved_next = 0;
-	rxdma->dd_saved_limit = 0;
-	rxdma->dd_saved_start = 0;
-	rxdma->dd_saved_stop = 0;
+	if (!turbo) {
+		rxdma->dd_saved_next = 0;
+		rxdma->dd_saved_limit = 0;
+		rxdma->dd_saved_start = 0;
+		rxdma->dd_saved_stop = 0;
+	} else {
+		rxdma->dd_saved_next = dma_buffers[0];
+	}
 
 	rxdma->dd_next = dma_buffers[0];
 	rxdma->dd_limit = DMA_ENDALIGN(char *, dma_buffers[0]+MAX_DMASIZE);
+#if 0
+	if (turbo) {
+		/* !!! not a typo: txdma */
+		txdma->dd_stop = dma_buffers[0];
+	}
+#endif
 	rxdma->dd_start = 0;
 	rxdma->dd_stop = 0;
-	rxdma->dd_csr = DMACSR_SETENABLE;
+	rxdma->dd_csr = DMACSR_SETENABLE | DMACSR_READ;
+	if (turbo)
+		er->rxmode = EN_RMD_TEST | EN_RMD_RECV_NORMAL;
+	else
+		er->rxmode = EN_RMD_RECV_NORMAL;
 
-#if 0
-	DPRINTF(("en_get: blocking on rcv dma\n"));
+#if 01
+	DPRINTF(("en_get: blocking on rcv DMA\n"));
 #endif
 
 	while(1) {
-		if (en_wait_for_intr(ENETR_DMA_INTR)) {	/* ### use timeout? */
-			errno = EIO;
- 			return -1;
-		}
+		if (en_wait_for_intr(ENETR_DMA_INTR))	/* ### use timeout? */
+			return 0;
 		
 		state = rxdma->dd_csr &
 			(DMACSR_BUSEXC | DMACSR_COMPLETE
 			 | DMACSR_SUPDATE | DMACSR_ENABLE);
-		DPRINTF(("en_get: dma state = 0x%x.\n", state));
+		DPRINTF(("en_get: DMA state = 0x%x.\n", state));
 		if ((state & DMACSR_ENABLE) == 0) {
 			rxdma->dd_csr = DMACSR_RESET | DMACSR_CLRCOMPLETE;
 			break;
 		}
 
 		if (state & DMACSR_COMPLETE) {
-			DPRINTF(("en_get: ending dma sequence\n"));
+			PRINTF(("en_get: ending DMA sequence\n"));
 			rxdma->dd_csr = DMACSR_CLRCOMPLETE;
 		}
 
@@ -310,8 +357,13 @@ en_get(struct iodesc *desc, void *pkt, size_t len, time_t timeout)
 		return -1;	/* receive failed */
 	}
 
-	gotpkt = rxdma->dd_saved_next;
-	rlen = rxdma->dd_next - rxdma->dd_saved_next;
+	if (turbo) {
+		gotpkt = rxdma->dd_saved_next;
+		rlen = rxdma->dd_next - rxdma->dd_saved_next;
+	} else {
+		gotpkt = rxdma->dd_saved_next;
+		rlen = rxdma->dd_next - rxdma->dd_saved_next;
+	}
 
 	if (gotpkt != dma_buffers[0]) {
 		printf("Unexpected received packet location\n");
@@ -455,6 +507,5 @@ en_wait_for_intr(int flag)
 		if (*intrstat & flag)
 			return 0;
 
-	printf("enintr: timed out.\n");
 	return -1;
 }

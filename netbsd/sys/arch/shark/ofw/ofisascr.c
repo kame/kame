@@ -1,4 +1,4 @@
-/*	$NetBSD: ofisascr.c,v 1.1 2002/02/10 01:57:58 thorpej Exp $	*/
+/*	$NetBSD: ofisascr.c,v 1.5 2003/07/15 03:36:02 lukem Exp $	*/
 
 /*
  * Copyright 1997
@@ -37,6 +37,9 @@
  *  OFW Glue for Smart Card Driver
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ofisascr.c,v 1.5 2003/07/15 03:36:02 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -51,9 +54,8 @@ int ofisascrprobe __P((struct device *, struct cfdata *, void *));
 void ofisascrattach __P((struct device *, struct device *, void *));
 
 
-struct cfattach ofisascr_ca = {
-	sizeof(struct device), ofisascrprobe, ofisascrattach
-};
+CFATTACH_DECL(ofisascr, sizeof(struct device),
+    ofisascrprobe, ofisascrattach, NULL, NULL);
 
 extern struct cfdriver ofisascr_cd;
 

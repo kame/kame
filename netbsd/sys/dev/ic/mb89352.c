@@ -1,4 +1,4 @@
-/*	$NetBSD: mb89352.c,v 1.12 2002/04/05 18:27:52 bouyer Exp $	*/
+/*	$NetBSD: mb89352.c,v 1.26.2.1 2004/08/12 04:19:08 jmc Exp $	*/
 /*	NecBSD: mb89352.c,v 1.4 1998/03/14 07:31:20 kmatsuda Exp	*/
 
 /*-
@@ -70,7 +70,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mb89352.c,v 1.12 2002/04/05 18:27:52 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mb89352.c,v 1.26.2.1 2004/08/12 04:19:08 jmc Exp $");
 
 #ifdef DDB
 #define	integrate
@@ -81,14 +81,6 @@ __KERNEL_RCSID(0, "$NetBSD: mb89352.c,v 1.12 2002/04/05 18:27:52 bouyer Exp $");
 /*
  * A few customizable items:
  */
-
-/* Use doubleword transfers to/from SCSI chip.  Note: This requires
- * motherboard support.  Basicly, some motherboard chipsets are able to
- * split a 32 bit I/O operation into two 16 bit I/O operations,
- * transparently to the processor.  This speeds up some things, notably long
- * data transfers.
- */
-#define SPC_USE_DWORDS		0
 
 /* Synchronous data transfers? */
 #define SPC_USE_SYNCHRONOUS	0
@@ -112,15 +104,26 @@ __KERNEL_RCSID(0, "$NetBSD: mb89352.c,v 1.12 2002/04/05 18:27:52 bouyer Exp $");
 #define SPC_MSGIN_SPIN	1 	/* Will spinwait upto ?ms for a new msg byte */
 #define SPC_MSGOUT_SPIN	1
 
-/* Include debug functions?  At the end of this file there are a bunch of
+/*
+ * Include debug functions?  At the end of this file there are a bunch of
  * functions that will print out various information regarding queued SCSI
  * commands, driver state and chip contents.  You can call them from the
  * kernel debugger.  If you set SPC_DEBUG to 0 they are not included (the
  * kernel uses less memory) but you lose the debugging facilities.
  */
+#if 0
 #define SPC_DEBUG		1
+#endif
 
 #define	SPC_ABORT_TIMEOUT	2000	/* time to wait for abort */
+
+/* threshold length for DMA transfer */
+#define SPC_MIN_DMA_LEN	32
+
+#ifdef x68k	/* XXX it seems x68k SPC SCSI hardware has some quirks */
+#define NEED_DREQ_ON_HARDWARE_XFER
+#define NO_MANUAL_XFER
+#endif
 
 /* End of customizable parameters */
 
@@ -151,7 +154,7 @@ __KERNEL_RCSID(0, "$NetBSD: mb89352.c,v 1.12 2002/04/05 18:27:52 bouyer Exp $");
 
 #include <dev/ic/mb89352reg.h>
 #include <dev/ic/mb89352var.h>
-
+
 #ifndef DDB
 #define	Debugger() panic("should call debugger here (mb89352.c)")
 #endif /* ! DDB */
@@ -160,7 +163,6 @@ __KERNEL_RCSID(0, "$NetBSD: mb89352.c,v 1.12 2002/04/05 18:27:52 bouyer Exp $");
 int spc_debug = 0x00; /* SPC_SHOWSTART|SPC_SHOWMISC|SPC_SHOWTRACE; */
 #endif
 
-void	spc_minphys	__P((struct buf *));
 void	spc_done	__P((struct spc_softc *, struct spc_acb *));
 void	spc_dequeue	__P((struct spc_softc *, struct spc_acb *));
 void	spc_scsipi_request __P((struct scsipi_channel *,
@@ -190,7 +192,6 @@ void	spc_print_active_acb __P((void));
 
 extern struct cfdriver spc_cd;
 
-
 /*
  * INITIALIZATION ROUTINES (probe, attach ++)
  */
@@ -219,17 +220,21 @@ spc_find(iot, ioh, bdid)
 	bus_space_write_1(iot, ioh, TCM, 0);
 	bus_space_write_1(iot, ioh, TCL, 0);
 	bus_space_write_1(iot, ioh, INTS, 0);
-	bus_space_write_1(iot, ioh, SCTL, SCTL_DISABLE | SCTL_ABRT_ENAB | SCTL_PARITY_ENAB | SCTL_RESEL_ENAB);
+	bus_space_write_1(iot, ioh, SCTL,
+	    SCTL_DISABLE | SCTL_ABRT_ENAB | SCTL_PARITY_ENAB | SCTL_RESEL_ENAB);
 	bus_space_write_1(iot, ioh, BDID, bdid);
 	delay(400);
-	bus_space_write_1(iot, ioh, SCTL, bus_space_read_1(iot, ioh, SCTL) & ~SCTL_DISABLE);
+	bus_space_write_1(iot, ioh, SCTL,
+	    bus_space_read_1(iot, ioh, SCTL) & ~SCTL_DISABLE);
 
 	/* The following detection is derived from spc.c
 	 * (by Takahide Matsutsuka) in FreeBSD/pccard-test.
 	 */
-	while (bus_space_read_1(iot, ioh, PSNS) && timeout)
+	while (bus_space_read_1(iot, ioh, PSNS) && timeout) {
 		timeout--;
-	if (!timeout) {
+		DELAY(1);
+	}
+	if (timeout == 0) {
 		printf("spc: find failed\n");
 		return 0;
 	}
@@ -239,11 +244,11 @@ spc_find(iot, ioh, bdid)
 }
 
 void
-spcattach(sc)
+spc_attach(sc)
 	struct spc_softc *sc;
 {
 
-	SPC_TRACE(("spcattach  "));
+	SPC_TRACE(("spc_attach  "));
 	sc->sc_state = SPC_INIT;
 
 	sc->sc_freq = 20;	/* XXXX Assume 20 MHz. */
@@ -254,7 +259,7 @@ spcattach(sc)
 	 * the chip's clock input and the size and offset of the sync period
 	 * register.
 	 *
-	 * For a 20Mhz clock, this gives us 25, or 100nS, or 10MB/s, as a
+	 * For a 20MHz clock, this gives us 25, or 100nS, or 10MB/s, as a
 	 * maximum transfer rate, and 112.5, or 450nS, or 2.22MB/s, as a
 	 * minimum transfer rate.
 	 */
@@ -271,7 +276,7 @@ spcattach(sc)
 	sc->sc_adapter.adapt_nchannels = 1;
 	sc->sc_adapter.adapt_openings = 7;
 	sc->sc_adapter.adapt_max_periph = 1;
-	sc->sc_adapter.adapt_minphys = spc_minphys;
+	sc->sc_adapter.adapt_minphys = minphys;
 	sc->sc_adapter.adapt_request = spc_scsipi_request;
 
 	sc->sc_channel.chan_adapter = &sc->sc_adapter;
@@ -284,7 +289,7 @@ spcattach(sc)
 	/*
 	 * ask the adapter what subunits are present
 	 */
-	config_found((struct device*)sc, &sc->sc_channel, scsiprint);
+	config_found(&sc->sc_dev, &sc->sc_channel, scsiprint);
 }
 
 /*
@@ -306,16 +311,19 @@ spc_reset(sc)
 	 */
 	bus_space_write_1(iot, ioh, SCTL, SCTL_DISABLE | SCTL_CTRLRST);
 	bus_space_write_1(iot, ioh, SCMD, 0);
+	bus_space_write_1(iot, ioh, TMOD, 0);
 	bus_space_write_1(iot, ioh, PCTL, 0);
 	bus_space_write_1(iot, ioh, TEMP, 0);
 	bus_space_write_1(iot, ioh, TCH, 0);
 	bus_space_write_1(iot, ioh, TCM, 0);
 	bus_space_write_1(iot, ioh, TCL, 0);
 	bus_space_write_1(iot, ioh, INTS, 0);
-	bus_space_write_1(iot, ioh, SCTL, SCTL_DISABLE | SCTL_ABRT_ENAB | SCTL_PARITY_ENAB | SCTL_RESEL_ENAB);
+	bus_space_write_1(iot, ioh, SCTL,
+	    SCTL_DISABLE | SCTL_ABRT_ENAB | SCTL_PARITY_ENAB | SCTL_RESEL_ENAB);
 	bus_space_write_1(iot, ioh, BDID, sc->sc_initiator);
 	delay(400);
-	bus_space_write_1(iot, ioh, SCTL, bus_space_read_1(iot, ioh, SCTL) & ~SCTL_DISABLE);
+	bus_space_write_1(iot, ioh, SCTL,
+	    bus_space_read_1(iot, ioh, SCTL) & ~SCTL_DISABLE);
 }
 
 
@@ -330,9 +338,11 @@ spc_scsi_reset(sc)
 	bus_space_handle_t ioh = sc->sc_ioh;
 
 	SPC_TRACE(("spc_scsi_reset  "));
-	bus_space_write_1(iot, ioh, SCMD, bus_space_read_1(iot, ioh, SCMD) | SCMD_RST);
+	bus_space_write_1(iot, ioh, SCMD,
+	    bus_space_read_1(iot, ioh, SCMD) | SCMD_RST);
 	delay(500);
-	bus_space_write_1(iot, ioh, SCMD, bus_space_read_1(iot, ioh, SCMD) & ~SCMD_RST);
+	bus_space_write_1(iot, ioh, SCMD,
+	    bus_space_read_1(iot, ioh, SCMD) & ~SCMD_RST);
 	delay(50);
 }
 
@@ -372,7 +382,7 @@ spc_init(sc)
 			callout_stop(&acb->xs->xs_callout);
 			spc_done(sc, acb);
 		}
-		while ((acb = sc->nexus_list.tqh_first) != NULL) {
+		while ((acb = TAILQ_FIRST(&sc->nexus_list)) != NULL) {
 			acb->xs->error = XS_DRIVER_STUFFUP;
 			callout_stop(&acb->xs->xs_callout);
 			spc_done(sc, acb);
@@ -437,7 +447,7 @@ spc_get_acb(sc)
 	splx(s);
 	return acb;
 }
-
+
 /*
  * DRIVER FUNCTIONS CALLABLE FROM HIGHER LEVEL DRIVERS
  */
@@ -483,11 +493,18 @@ spc_scsipi_request(chan, req, arg)
 		    periph->periph_target));
 
 		flags = xs->xs_control;
-		if ((acb = spc_get_acb(sc)) == NULL) {
-			xs->error = XS_DRIVER_STUFFUP;
-			scsipi_done(xs);
-			return;
+		acb = spc_get_acb(sc);
+#ifdef DIAGNOSTIC
+		/*
+		 * This should nerver happen as we track the resources
+		 * in the mid-layer.
+		 */
+		if (acb == NULL) {
+			scsipi_printaddr(periph);
+			printf("unable to allocate acb\n");
+			panic("spc_scsipi_request");
 		}
+#endif
 
 		/* Initialize acb */
 		acb->xs = xs;
@@ -499,9 +516,6 @@ spc_scsipi_request(chan, req, arg)
 			acb->data_length = 0;
 		} else {
 			memcpy(&acb->scsipi_cmd, xs->cmd, xs->cmdlen);
-#if 1
-			acb->scsipi_cmd.bytes[0] |= periph->periph_lun << 5; /* XXX? */
-#endif
 			acb->scsipi_cmd_length = xs->cmdlen;
 			acb->data_addr = xs->data;
 			acb->data_length = xs->datalen;
@@ -539,21 +553,20 @@ spc_scsipi_request(chan, req, arg)
 		/* XXX Not supported. */
 		return;
 	case ADAPTER_REQ_SET_XFER_MODE:
-		/* XXX Not supported. */
+	    {
+		/*
+		 * We don't support Sync, Wide, or Tagged Command Queuing.
+		 * Just callback now, to report this.
+		 */
+		struct scsipi_xfer_mode *xm = arg;
+
+		xm->xm_mode = 0;
+		xm->xm_period = 0;
+		xm->xm_offset = 0;
+		scsipi_async_event(chan, ASYNC_EVENT_XFER_MODE, xm);
 		return;
+	    }
 	}
-}
-
-/*
- * Adjust transfer size in buffer structure
- */
-void
-spc_minphys(bp)
-	struct buf *bp;
-{
-
-	SPC_TRACE(("spc_minphys  "));
-	minphys(bp);
 }
 
 /*
@@ -575,7 +588,7 @@ spc_poll(sc, xs, count)
 		 * have got an interrupt?
 		 */
 		if (bus_space_read_1(iot, ioh, INTS) != 0)
-			spcintr(sc);
+			spc_intr(sc);
 		if ((xs->xs_status & XS_STS_DONE) != 0)
 			return 0;
 		delay(1000);
@@ -583,7 +596,7 @@ spc_poll(sc, xs, count)
 	}
 	return 1;
 }
-
+
 /*
  * LOW LEVEL SCSI UTILITIES
  */
@@ -643,15 +656,10 @@ spc_select(sc, acb)
 #if 0
 	bus_space_write_1(iot, ioh, SCMD, SCMD_SET_ATN);
 #endif
-#ifdef x68k			/* XXX? */
-	do {
-		asm ("nop");
-	} while (bus_space_read_1(iot, ioh, SSTS) &
-		 (SSTS_ACTIVE|SSTS_TARGET|SSTS_BUSY));
-#endif
 
 	bus_space_write_1(iot, ioh, PCTL, 0);
-	bus_space_write_1(iot, ioh, TEMP, (1 << sc->sc_initiator) | (1 << target));
+	bus_space_write_1(iot, ioh, TEMP,
+	    (1 << sc->sc_initiator) | (1 << target));
 	/*
 	 * Setup BSY timeout (selection timeout).
 	 * 250ms according to the SCSI specification.
@@ -663,9 +671,10 @@ spc_select(sc, acb)
 	 * X = 2 + 113 / 256
 	 *  ==> tch = 2, tcm = 113 (correct?)
 	 */
+	/* Time to the information transfer phase start. */
+	/* XXX These values should be calculated from sc_freq */
 	bus_space_write_1(iot, ioh, TCH, 2);
 	bus_space_write_1(iot, ioh, TCM, 113);
-	/* Time to the information transfer phase start. */
 	bus_space_write_1(iot, ioh, TCL, 3);
 	bus_space_write_1(iot, ioh, SCMD, SCMD_SELECT);
 
@@ -690,8 +699,8 @@ spc_reselect(sc, message)
 	 */
 	selid = sc->sc_selid & ~(1 << sc->sc_initiator);
 	if (selid & (selid - 1)) {
-		printf("%s: reselect with invalid selid %02x; sending DEVICE RESET\n",
-		    sc->sc_dev.dv_xname, selid);
+		printf("%s: reselect with invalid selid %02x; "
+		    "sending DEVICE RESET\n", sc->sc_dev.dv_xname, selid);
 		SPC_BREAK();
 		goto reset;
 	}
@@ -704,16 +713,15 @@ spc_reselect(sc, message)
 	 */
 	target = ffs(selid) - 1;
 	lun = message & 0x07;
-	for (acb = sc->nexus_list.tqh_first; acb != NULL;
-	     acb = acb->chain.tqe_next) {
+	TAILQ_FOREACH(acb, &sc->nexus_list, chain) {
 		periph = acb->xs->xs_periph;
 		if (periph->periph_target == target &&
 		    periph->periph_lun == lun)
 			break;
 	}
 	if (acb == NULL) {
-		printf("%s: reselect from target %d lun %d with no nexus; sending ABORT\n",
-		    sc->sc_dev.dv_xname, target, lun);
+		printf("%s: reselect from target %d lun %d with no nexus; "
+		    "sending ABORT\n", sc->sc_dev.dv_xname, target, lun);
 		SPC_BREAK();
 		goto abort;
 	}
@@ -747,11 +755,11 @@ abort:
 	spc_sched_msgout(sc, SEND_ABORT);
 	return (1);
 }
-
+
 /*
  * Schedule a SCSI operation.  This has now been pulled out of the interrupt
  * handler so that we may call it from spc_scsi_cmd and spc_done.  This may
- * save us an unecessary interrupt just to get things going.  Should only be
+ * save us an unnecessary interrupt just to get things going.  Should only be
  * called when state == SPC_IDLE and at bio pl.
  */
 void
@@ -770,8 +778,7 @@ spc_sched(sc)
 	 * Find first acb in ready queue that is for a target/lunit pair that
 	 * is not busy.
 	 */
-	for (acb = sc->ready_list.tqh_first; acb != NULL;
-	    acb = acb->chain.tqe_next) {
+	TAILQ_FOREACH(acb, &sc->ready_list, chain) {
 		periph = acb->xs->xs_periph;
 		ti = &sc->sc_tinfo[periph->periph_target];
 		if ((ti->lubusy & (1 << periph->periph_lun)) == 0) {
@@ -788,7 +795,7 @@ spc_sched(sc)
 	SPC_MISC(("idle  "));
 	/* Nothing to start; just enable reselections and wait. */
 }
-
+
 /*
  * POST PROCESSING OF SCSI_CMD (usually current)
  */
@@ -811,7 +818,7 @@ spc_done(sc, acb)
 			case SCSI_CHECK:
 				/* First, save the return values */
 				xs->resid = acb->data_length;
-				/* FALLBACK */
+				/* FALLTHROUGH */
 			case SCSI_BUSY:
 				xs->status = acb->target_stat;
 				xs->error = XS_BUSY;
@@ -823,7 +830,7 @@ spc_done(sc, acb)
 				xs->error = XS_DRIVER_STUFFUP;
 #if SPC_DEBUG
 				printf("%s: spc_done: bad stat 0x%x\n",
-					sc->sc_dev.dv_xname, acb->target_stat);
+				    sc->sc_dev.dv_xname, acb->target_stat);
 #endif
 				break;
 			}
@@ -863,13 +870,12 @@ spc_dequeue(sc, acb)
 {
 
 	SPC_TRACE(("spc_dequeue  "));
-	if (acb->flags & ACB_NEXUS) {
+	if (acb->flags & ACB_NEXUS)
 		TAILQ_REMOVE(&sc->nexus_list, acb, chain);
-	} else {
+	else
 		TAILQ_REMOVE(&sc->ready_list, acb, chain);
-	}
 }
-
+
 /*
  * INTERRUPT/PROTOCOL ENGINE
  */
@@ -886,6 +892,7 @@ spc_msgin(sc)
 	bus_space_tag_t iot = sc->sc_iot;
 	bus_space_handle_t ioh = sc->sc_ioh;
 	int n;
+	u_int8_t msg;
 
 	SPC_TRACE(("spc_msgin  "));
 
@@ -909,13 +916,7 @@ nextbyte:
 	 * itself.
 	 */
 	for (;;) {
-#if 0
-		for (;;) {
-			if ((bus_space_read_1(iot, ioh, PSNS) & PSNS_REQ) != 0)
-				break;
-			/* Wait for REQINIT.  XXX Need timeout. */
-		}
-#endif
+#ifdef NO_MANUAL_XFER /* XXX */
 		if (bus_space_read_1(iot, ioh, INTS) != 0) {
 			/*
 			 * Target left MESSAGE IN, probably because it
@@ -924,7 +925,7 @@ nextbyte:
 			 */
 			goto out;
 		}
-
+#endif
 		/* If parity error, just dump everything on the floor. */
 		if ((bus_space_read_1(iot, ioh, SERR) &
 		     (SERR_SCSI_PAR|SERR_SPC_PAR)) != 0) {
@@ -932,34 +933,53 @@ nextbyte:
 			spc_sched_msgout(sc, SEND_PARITY_ERROR);
 		}
 
+#ifdef NO_MANUAL_XFER /* XXX */
 		/* send TRANSFER command. */
 		bus_space_write_1(iot, ioh, TCH, 0);
 		bus_space_write_1(iot, ioh, TCM, 0);
 		bus_space_write_1(iot, ioh, TCL, 1);
 		bus_space_write_1(iot, ioh, PCTL,
-				  sc->sc_phase | PCTL_BFINT_ENAB);
-#ifdef x68k
-		bus_space_write_1(iot, ioh, SCMD, SCMD_XFR); /* | SCMD_PROG_XFR */
+		    sc->sc_phase | PCTL_BFINT_ENAB);
+#ifdef NEED_DREQ_ON_HARDWARE_XFER
+		bus_space_write_1(iot, ioh, SCMD, SCMD_XFR);
 #else
-		bus_space_write_1(iot, ioh, SCMD, SCMD_XFR | SCMD_PROG_XFR);	/* XXX */
+		bus_space_write_1(iot, ioh, SCMD, SCMD_XFR | SCMD_PROG_XFR);
 #endif
 		for (;;) {
-			/*if ((bus_space_read_1(iot, ioh, SSTS) & SSTS_BUSY) != 0
-				&& (bus_space_read_1(iot, ioh, SSTS) & SSTS_DREG_EMPTY) != 0)*/
-			if ((bus_space_read_1(iot, ioh, SSTS) & SSTS_DREG_EMPTY) == 0)
+			if ((bus_space_read_1(iot, ioh, SSTS) &
+			    SSTS_DREG_EMPTY) == 0)
 				break;
 			if (bus_space_read_1(iot, ioh, INTS) != 0)
 				goto out;
 		}
+		msg = bus_space_read_1(iot, ioh, DREG);
+#else
+		if ((bus_space_read_1(iot, ioh, PSNS) & PSNS_ATN) != 0)
+			bus_space_write_1(iot, ioh, SCMD, SCMD_RST_ATN);
+
+		while ((bus_space_read_1(iot, ioh, PSNS) & PSNS_REQ) == 0) {
+			/* XXX needs timeout */
+			if ((bus_space_read_1(iot, ioh, PSNS) & PH_MASK)
+			     != PH_MSGIN)
+				/*
+				 * Target left MESSAGE IN, probably because it
+				 * a) noticed our ATN signal, or
+				 * b) ran out of messages.
+				 */
+				goto out;
+		}
+
+		bus_space_write_1(iot, ioh, PCTL, PH_MSGIN);
+		msg = bus_space_read_1(iot, ioh, TEMP);
+#endif
 
 		/* Gather incoming message bytes if needed. */
 		if ((sc->sc_flags & SPC_DROP_MSGIN) == 0) {
 			if (n >= SPC_MAX_MSG_LEN) {
-				(void) bus_space_read_1(iot, ioh, DREG);
 				sc->sc_flags |= SPC_DROP_MSGIN;
 				spc_sched_msgout(sc, SEND_REJECT);
 			} else {
-				*sc->sc_imp++ = bus_space_read_1(iot, ioh, DREG);
+				*sc->sc_imp++ = msg;
 				n++;
 				/*
 				 * This testing is suboptimal, but most
@@ -975,19 +995,19 @@ nextbyte:
 				    n == sc->sc_imess[1] + 2)
 					break;
 			}
-		} else
-			(void) bus_space_read_1(iot, ioh, DREG);
-
+		}
 		/*
 		 * If we reach this spot we're either:
 		 * a) in the middle of a multi-byte message, or
 		 * b) dropping bytes.
 		 */
-#if 0
+
+#ifndef NO_MANUAL_XFER /* XXX */
 		/* Ack the last byte read. */
-		/*(void) bus_space_read_1(iot, ioh, DREG);*/
-		while ((bus_space_read_1(iot, ioh, PSNS) & ACKI) != 0)
-			;
+		bus_space_write_1(iot, ioh, SCMD, SCMD_SET_ACK);
+		while ((bus_space_read_1(iot, ioh, PSNS) & PSNS_REQ) != 0)
+			continue;	/* XXX needs timeout */
+		bus_space_write_1(iot, ioh, SCMD, SCMD_RST_ACK);
 #endif
 	}
 
@@ -1011,7 +1031,7 @@ nextbyte:
 				printf("%s: %d extra bytes from %d:%d\n",
 				    sc->sc_dev.dv_xname, -sc->sc_dleft,
 				    periph->periph_target, periph->periph_lun);
-				acb->data_length = 0;
+				sc->sc_dleft = 0;
 			}
 			acb->xs->resid = acb->data_length = sc->sc_dleft;
 			sc->sc_state = SPC_CMDCOMPLETE;
@@ -1083,13 +1103,14 @@ nextbyte:
 				ti->flags &= ~DO_SYNC;
 				if (ti->offset == 0) {
 				} else if (ti->period < sc->sc_minsync ||
-					   ti->period > sc->sc_maxsync ||
-					   ti->offset > 8) {
+				    ti->period > sc->sc_maxsync ||
+				    ti->offset > 8) {
 					ti->period = ti->offset = 0;
 					spc_sched_msgout(sc, SEND_SDTR);
 				} else {
 					scsipi_printaddr(acb->xs->xs_periph);
-					printf("sync, offset %d, period %dnsec\n",
+					printf("sync, offset %d, "
+					    "period %dnsec\n",
 					    ti->offset, ti->period * 4);
 				}
 				spc_setsync(sc, ti);
@@ -1115,8 +1136,8 @@ nextbyte:
 #endif
 
 			default:
-				printf("%s: unrecognized MESSAGE EXTENDED; sending REJECT\n",
-				    sc->sc_dev.dv_xname);
+				printf("%s: unrecognized MESSAGE EXTENDED; "
+				    "sending REJECT\n", sc->sc_dev.dv_xname);
 				SPC_BREAK();
 				goto reject;
 			}
@@ -1134,8 +1155,8 @@ nextbyte:
 
 	case SPC_RESELECTED:
 		if (!MSG_ISIDENTIFY(sc->sc_imess[0])) {
-			printf("%s: reselect without IDENTIFY; sending DEVICE RESET\n",
-			    sc->sc_dev.dv_xname);
+			printf("%s: reselect without IDENTIFY; "
+			    "sending DEVICE RESET\n", sc->sc_dev.dv_xname);
 			SPC_BREAK();
 			goto reset;
 		}
@@ -1158,18 +1179,22 @@ nextbyte:
 #endif
 	}
 
+#ifndef NO_MANUAL_XFER /* XXX */
 	/* Ack the last message byte. */
-#if 0 /* XXX? */
-	(void) bus_space_read_1(iot, ioh, DREG);
-	while ((bus_space_read_1(iot, ioh, PSNS) & ACKI) != 0)
-		;
+	bus_space_write_1(iot, ioh, SCMD, SCMD_SET_ACK);
+	while ((bus_space_read_1(iot, ioh, PSNS) & PSNS_REQ) != 0)
+		continue;	/* XXX needs timeout */
+	bus_space_write_1(iot, ioh, SCMD, SCMD_RST_ACK);
 #endif
 
 	/* Go get the next message, if any. */
 	goto nextmsg;
 
 out:
+#ifdef NO_MANUAL_XFER /* XXX */
+	/* Ack the last message byte. */
 	bus_space_write_1(iot, ioh, SCMD, SCMD_RST_ACK);
+#endif
 	SPC_MISC(("n=%d imess=0x%02x  ", n, sc->sc_imess[0]));
 }
 
@@ -1208,7 +1233,8 @@ spc_msgout(sc)
 			 * Set ATN.  If we're just sending a trivial 1-byte
 			 * message, we'll clear ATN later on anyway.
 			 */
-			bus_space_write_1(iot, ioh, SCMD, SCMD_SET_ATN); /* XXX? */
+			bus_space_write_1(iot, ioh, SCMD,
+			    SCMD_SET_ATN);	/* XXX? */
 		} else {
 			/* This is a continuation of the previous message. */
 			n = sc->sc_omp - sc->sc_omess;
@@ -1240,7 +1266,7 @@ nextmsg:
 		SPC_ASSERT(sc->sc_nexus != NULL);
 		ti = &sc->sc_tinfo[sc->sc_nexus->xs->xs_periph->periph_target];
 		sc->sc_omess[4] = MSG_EXTENDED;
-		sc->sc_omess[3] = 3;
+		sc->sc_omess[3] = MSG_EXT_SDTR_LEN;
 		sc->sc_omess[2] = MSG_EXT_SDTR;
 		sc->sc_omess[1] = ti->period >> 2;
 		sc->sc_omess[0] = ti->offset;
@@ -1253,7 +1279,7 @@ nextmsg:
 		SPC_ASSERT(sc->sc_nexus != NULL);
 		ti = &sc->sc_tinfo[sc->sc_nexus->xs->xs_periph->periph_target];
 		sc->sc_omess[3] = MSG_EXTENDED;
-		sc->sc_omess[2] = 2;
+		sc->sc_omess[2] = MSG_EXT_WDTR_LEN;
 		sc->sc_omess[1] = MSG_EXT_WDTR;
 		sc->sc_omess[0] = ti->width;
 		n = 4;
@@ -1304,10 +1330,11 @@ nextbyte:
 	bus_space_write_1(iot, ioh, TCM, n >> 8);
 	bus_space_write_1(iot, ioh, TCL, n);
 	bus_space_write_1(iot, ioh, PCTL, sc->sc_phase | PCTL_BFINT_ENAB);
-#ifdef x68k
+#ifdef NEED_DREQ_ON_HARDWARE_XFER
 	bus_space_write_1(iot, ioh, SCMD, SCMD_XFR);	/* XXX */
 #else
-	bus_space_write_1(iot, ioh, SCMD, SCMD_XFR | SCMD_PROG_XFR | SCMD_ICPT_XFR);
+	bus_space_write_1(iot, ioh, SCMD,
+	    SCMD_XFR | SCMD_PROG_XFR);
 #endif
 	for (;;) {
 		if ((bus_space_read_1(iot, ioh, SSTS) & SSTS_BUSY) != 0)
@@ -1380,8 +1407,9 @@ nextbyte:
 
 out:
 	/* Disable REQ/ACK protocol. */
+	return;
 }
-
+
 /*
  * spc_dataout_pio: perform a data transfer using the FIFO datapath in the spc
  * Precondition: The SCSI bus should be in the DOUT phase, with REQ asserted
@@ -1408,10 +1436,11 @@ spc_dataout_pio(sc, p, n)
 	bus_space_write_1(iot, ioh, TCM, n >> 8);
 	bus_space_write_1(iot, ioh, TCL, n);
 	bus_space_write_1(iot, ioh, PCTL, sc->sc_phase | PCTL_BFINT_ENAB);
-#ifdef x68k
+#ifdef NEED_DREQ_ON_HARDWARE_XFER
 	bus_space_write_1(iot, ioh, SCMD, SCMD_XFR);	/* XXX */
 #else
-	bus_space_write_1(iot, ioh, SCMD, SCMD_XFR | SCMD_PROG_XFR | SCMD_ICPT_XFR);	/* XXX */
+	bus_space_write_1(iot, ioh, SCMD,
+	    SCMD_XFR | SCMD_PROG_XFR);	/* XXX */
 #endif
 	for (;;) {
 		if ((bus_space_read_1(iot, ioh, SSTS) & SSTS_BUSY) != 0)
@@ -1431,7 +1460,8 @@ spc_dataout_pio(sc, p, n)
 		for (;;) {
 			intstat = bus_space_read_1(iot, ioh, INTS);
 			/* Wait till buffer is empty. */
-			if ((bus_space_read_1(iot, ioh, SSTS) & SSTS_DREG_EMPTY) != 0)
+			if ((bus_space_read_1(iot, ioh, SSTS) &
+			    SSTS_DREG_EMPTY) != 0)
 				break;
 			/* Break on interrupt. */
 			if (intstat != 0)
@@ -1445,9 +1475,8 @@ spc_dataout_pio(sc, p, n)
 		n -= xfer;
 		out += xfer;
 
-		while (xfer-- > 0) {
-			bus_space_write_1(iot, ioh, DREG, *p++);
-		}
+		bus_space_write_multi_1(iot, ioh, DREG, p, xfer);
+		p += xfer;
 	}
 
 	if (out == 0) {
@@ -1460,7 +1489,8 @@ spc_dataout_pio(sc, p, n)
 		/* See the bytes off chip */
 		for (;;) {
 			/* Wait till buffer is empty. */
-			if ((bus_space_read_1(iot, ioh, SSTS) & SSTS_DREG_EMPTY) != 0)
+			if ((bus_space_read_1(iot, ioh, SSTS) &
+			    SSTS_DREG_EMPTY) != 0)
 				break;
 			intstat = bus_space_read_1(iot, ioh, INTS);
 			/* Break on interrupt. */
@@ -1476,20 +1506,18 @@ phasechange:
 		/* Some sort of phase change. */
 		int amount;
 
-		amount = ((bus_space_read_1(iot, ioh, TCH) << 16) |
-			  (bus_space_read_1(iot, ioh, TCM) << 8) |
-			  bus_space_read_1(iot, ioh, TCL));
+		amount = (bus_space_read_1(iot, ioh, TCH) << 16) |
+		    (bus_space_read_1(iot, ioh, TCM) << 8) |
+		    bus_space_read_1(iot, ioh, TCL);
 		if (amount > 0) {
 			out -= amount;
 			SPC_MISC(("+%d ", amount));
 		}
 	}
 
-	/* Turn on ENREQINIT again. */
-
 	return out;
 }
-
+
 /*
  * spc_datain_pio: perform data transfers using the FIFO datapath in the spc
  * Precondition: The SCSI bus should be in the DIN phase, with REQ asserted
@@ -1507,8 +1535,8 @@ spc_datain_pio(sc, p, n)
 {
 	bus_space_tag_t iot = sc->sc_iot;
 	bus_space_handle_t ioh = sc->sc_ioh;
-	u_short intstat;
 	int in = 0;
+	u_int8_t intstat, sstat;
 #define DINAMOUNT 8		/* Full FIFO */
 
 	SPC_TRACE(("spc_datain_pio  "));
@@ -1517,10 +1545,11 @@ spc_datain_pio(sc, p, n)
 	bus_space_write_1(iot, ioh, TCM, n >> 8);
 	bus_space_write_1(iot, ioh, TCL, n);
 	bus_space_write_1(iot, ioh, PCTL, sc->sc_phase | PCTL_BFINT_ENAB);
-#ifdef x68k
+#ifdef NEED_DREQ_ON_HARDWARE_XFER
 	bus_space_write_1(iot, ioh, SCMD, SCMD_XFR);	/* XXX */
 #else
-	bus_space_write_1(iot, ioh, SCMD, SCMD_XFR | SCMD_PROG_XFR);	/* XXX */
+	bus_space_write_1(iot, ioh, SCMD,
+	    SCMD_XFR | SCMD_PROG_XFR);	/* XXX */
 #endif
 	for (;;) {
 		if ((bus_space_read_1(iot, ioh, SSTS) & SSTS_BUSY) != 0)
@@ -1537,41 +1566,36 @@ spc_datain_pio(sc, p, n)
 	while (n > 0) {
 		int xfer;
 
-#define INTSMASK 0xff
 		/* Wait for fifo half full or phase mismatch */
 		for (;;) {
-			intstat = ((bus_space_read_1(iot, ioh, SSTS) << 8) |
-				   bus_space_read_1(iot, ioh, INTS));
-			if ((intstat & (INTSMASK | (SSTS_DREG_FULL << 8))) !=
-			    0)
-				break;
-			if ((intstat & (SSTS_DREG_EMPTY << 8)) == 0)
+			/* XXX needs timeout */
+			intstat = bus_space_read_1(iot, ioh, INTS);
+			sstat = bus_space_read_1(iot, ioh, SSTS);
+			if (intstat != 0 ||
+			    (sstat & SSTS_DREG_EMPTY) == 0)
 				break;
 		}
 
-#if 1
-		if ((intstat & INTSMASK) != 0)
-			goto phasechange;
-#else
-		if ((intstat & INTSMASK) != 0 &&
-		    (intstat & (SSTS_DREG_EMPTY << 8)))
+#ifdef NEED_DREQ_ON_HARDWARE_XFER
+		if (intstat != 0)
 			goto phasechange;
 #endif
-		if ((intstat & (SSTS_DREG_FULL << 8)) != 0)
-			xfer = min(DINAMOUNT, n);
-		else
-			xfer = min(1, n);
 
-		SPC_MISC((">%d ", xfer));
-
-		n -= xfer;
-		in += xfer;
-
-		while (xfer-- > 0) {
+		if (sstat & SSTS_DREG_FULL) {
+			xfer = DINAMOUNT;
+			n -= xfer;
+			in += xfer;
+			bus_space_read_multi_1(iot, ioh, DREG, p, xfer);
+			p += xfer;
+		}
+		while (n > 0 &&
+		    (bus_space_read_1(iot, ioh, SSTS) & SSTS_DREG_EMPTY) == 0) {
+			n--;
+			in++;
 			*p++ = bus_space_read_1(iot, ioh, DREG);
 		}
 
-		if ((intstat & INTSMASK) != 0)
+		if (intstat != 0)
 			goto phasechange;
 	}
 
@@ -1584,6 +1608,7 @@ spc_datain_pio(sc, p, n)
 	 */
 	if (in == 0) {
 		for (;;) {
+			/* XXX needs timeout */
 			if (bus_space_read_1(iot, ioh, INTS) != 0)
 				break;
 		}
@@ -1593,11 +1618,9 @@ spc_datain_pio(sc, p, n)
 phasechange:
 	/* Stop the FIFO data path. */
 
-	/* Turn on ENREQINIT again. */
-
 	return in;
 }
-
+
 /*
  * Catch an interrupt from the adaptor
  */
@@ -1607,7 +1630,7 @@ phasechange:
  * 1) always uses programmed I/O
  */
 int
-spcintr(arg)
+spc_intr(arg)
 	void *arg;
 {
 	struct spc_softc *sc = arg;
@@ -1622,9 +1645,21 @@ spcintr(arg)
 	/*
 	 * Disable interrupt.
 	 */
-	bus_space_write_1(iot, ioh, SCTL, bus_space_read_1(iot, ioh, SCTL) & ~SCTL_INTR_ENAB);
+	bus_space_write_1(iot, ioh, SCTL,
+	    bus_space_read_1(iot, ioh, SCTL) & ~SCTL_INTR_ENAB);
 
-	SPC_TRACE(("spcintr  "));
+	SPC_TRACE(("spc_intr  "));
+
+	ints = bus_space_read_1(iot, ioh, INTS);
+	if (ints == 0)
+		goto out;
+
+	if (sc->sc_dma_done != NULL &&
+	    sc->sc_state == SPC_CONNECTED &&
+	    (sc->sc_flags & SPC_DOINGDMA) != 0 &&
+	    (sc->sc_phase == PH_DATAOUT || sc->sc_phase == PH_DATAIN)) {
+		(*sc->sc_dma_done)(sc);
+	}
 
 loop:
 	/*
@@ -1633,14 +1668,8 @@ loop:
 	/*
 	 * First check for abnormal conditions, such as reset.
 	 */
-#ifdef x68k			/* XXX? */
-	while ((ints = bus_space_read_1(iot, ioh, INTS)) == 0)
-		delay(1);
-	SPC_MISC(("ints = 0x%x  ", ints));
-#else
 	ints = bus_space_read_1(iot, ioh, INTS);
 	SPC_MISC(("ints = 0x%x  ", ints));
-#endif
 
 	if ((ints & INTS_RST) != 0) {
 		printf("%s: SCSI bus reset\n", sc->sc_dev.dv_xname);
@@ -1650,7 +1679,8 @@ loop:
 	/*
 	 * Check for less serious errors.
 	 */
-	if ((bus_space_read_1(iot, ioh, SERR) & (SERR_SCSI_PAR|SERR_SPC_PAR)) != 0) {
+	if ((bus_space_read_1(iot, ioh, SERR) & (SERR_SCSI_PAR|SERR_SPC_PAR))
+	    != 0) {
 		printf("%s: SCSI bus parity error\n", sc->sc_dev.dv_xname);
 		if (sc->sc_prevphase == PH_MSGIN) {
 			sc->sc_flags |= SPC_DROP_MSGIN;
@@ -1711,8 +1741,8 @@ loop:
 			 * c) Mark device as busy.
 			 */
 			if (sc->sc_state != SPC_SELECTING) {
-				printf("%s: selection out while idle; resetting\n",
-				    sc->sc_dev.dv_xname);
+				printf("%s: selection out while idle; "
+				    "resetting\n", sc->sc_dev.dv_xname);
 				SPC_BREAK();
 				goto reset;
 			}
@@ -1756,8 +1786,8 @@ loop:
 			SPC_MISC(("selection timeout  "));
 
 			if (sc->sc_state != SPC_SELECTING) {
-				printf("%s: selection timeout while idle; resetting\n",
-				    sc->sc_dev.dv_xname);
+				printf("%s: selection timeout while idle; "
+				    "resetting\n", sc->sc_dev.dv_xname);
 				SPC_BREAK();
 				goto reset;
 			}
@@ -1770,7 +1800,8 @@ loop:
 			goto finish;
 		} else {
 			if (sc->sc_state != SPC_IDLE) {
-				printf("%s: BUS FREE while not idle; state=%d\n",
+				printf("%s: BUS FREE while not idle; "
+				    "state=%d\n",
 				    sc->sc_dev.dv_xname, sc->sc_state);
 				SPC_BREAK();
 				goto out;
@@ -1791,11 +1822,11 @@ loop:
 
 	if ((ints & INTS_DISCON) != 0) {
 		/* We've gone to BUS FREE phase. */
+		/* disable disconnect interrupt */
 		bus_space_write_1(iot, ioh, PCTL,
 		    bus_space_read_1(iot, ioh, PCTL) & ~PCTL_BFINT_ENAB);
-				/* disable disconnect interrupt */
+		/* XXX reset interrput */
 		bus_space_write_1(iot, ioh, INTS, ints);
-				/* XXX reset interrput */
 
 		switch (sc->sc_state) {
 		case SPC_RESELECTED:
@@ -1840,7 +1871,8 @@ loop:
 				 * disconnecting, and this is necessary to
 				 * clean up their state.
 				 */
-				printf("%s: unexpected disconnect; sending REQUEST SENSE\n",
+				printf("%s: unexpected disconnect; "
+				    "sending REQUEST SENSE\n",
 				    sc->sc_dev.dv_xname);
 				SPC_BREAK();
 				acb->target_stat = SCSI_CHECK;
@@ -1865,7 +1897,8 @@ loop:
 		}
 	}
 	else if ((ints & INTS_CMD_DONE) != 0 &&
-		 sc->sc_prevphase == PH_MSGIN && sc->sc_state != SPC_CONNECTED)
+	    sc->sc_prevphase == PH_MSGIN &&
+	    sc->sc_state != SPC_CONNECTED)
 		goto out;
 
 dophase:
@@ -1885,7 +1918,9 @@ dophase:
 	 * State transition.
 	 */
 	sc->sc_phase = bus_space_read_1(iot, ioh, PSNS) & PH_MASK;
-/*	bus_space_write_1(iot, ioh, PCTL, sc->sc_phase);*/
+#if 0
+	bus_space_write_1(iot, ioh, PCTL, sc->sc_phase);
+#endif
 
 	SPC_MISC(("phase=%d\n", sc->sc_phase));
 	switch (sc->sc_phase) {
@@ -1913,7 +1948,7 @@ dophase:
 			SPC_ASSERT(sc->sc_nexus != NULL);
 			acb = sc->sc_nexus;
 			printf("cmd=0x%02x+%d  ",
-			    acb->scsipi_cmd.opcode, acb->scsipi_cmd_length-1);
+			    acb->scsipi_cmd.opcode, acb->scsipi_cmd_length - 1);
 		}
 #endif
 		n = spc_dataout_pio(sc, sc->sc_cp, sc->sc_cleft);
@@ -1926,6 +1961,12 @@ dophase:
 		if (sc->sc_state != SPC_CONNECTED)
 			break;
 		SPC_MISC(("dataout dleft=%d  ", sc->sc_dleft));
+		if (sc->sc_dma_start != NULL &&
+		    sc->sc_dleft > SPC_MIN_DMA_LEN) {
+			(*sc->sc_dma_start)(sc, sc->sc_dp, sc->sc_dleft, 0);
+			sc->sc_prevphase = PH_DATAOUT;
+			goto out;
+		}
 		n = spc_dataout_pio(sc, sc->sc_dp, sc->sc_dleft);
 		sc->sc_dp += n;
 		sc->sc_dleft -= n;
@@ -1936,6 +1977,12 @@ dophase:
 		if (sc->sc_state != SPC_CONNECTED)
 			break;
 		SPC_MISC(("datain  "));
+		if (sc->sc_dma_start != NULL &&
+		    sc->sc_dleft > SPC_MIN_DMA_LEN) {
+			(*sc->sc_dma_start)(sc, sc->sc_dp, sc->sc_dleft, 1);
+			sc->sc_prevphase = PH_DATAIN;
+			goto out;
+		}
 		n = spc_datain_pio(sc, sc->sc_dp, sc->sc_dleft);
 		sc->sc_dp += n;
 		sc->sc_dleft -= n;
@@ -1947,8 +1994,22 @@ dophase:
 			break;
 		SPC_ASSERT(sc->sc_nexus != NULL);
 		acb = sc->sc_nexus;
-		/*acb->target_stat = bus_space_read_1(iot, ioh, DREG);*/
+
+#ifdef NO_MANUAL_XFER
 		spc_datain_pio(sc, &acb->target_stat, 1);
+#else
+		if ((bus_space_read_1(iot, ioh, PSNS) & PSNS_ATN) != 0)
+			bus_space_write_1(iot, ioh, SCMD, SCMD_RST_ATN);
+		while ((bus_space_read_1(iot, ioh, PSNS) & PSNS_REQ) == 0)
+			continue;	/* XXX needs timeout */
+		bus_space_write_1(iot, ioh, PCTL, PH_STAT);
+		acb->target_stat = bus_space_read_1(iot, ioh, TEMP);
+		bus_space_write_1(iot, ioh, SCMD, SCMD_SET_ACK);
+		while ((bus_space_read_1(iot, ioh, PSNS) & PSNS_REQ) != 0)
+			continue;	/* XXX needs timeout */
+		bus_space_write_1(iot, ioh, SCMD, SCMD_RST_ACK);
+#endif
+
 		SPC_MISC(("target_stat=0x%02x  ", acb->target_stat));
 		sc->sc_prevphase = PH_STAT;
 		goto loop;
@@ -2012,9 +2073,10 @@ spc_timeout(arg)
 	struct spc_acb *acb = arg;
 	struct scsipi_xfer *xs = acb->xs;
 	struct scsipi_periph *periph = xs->xs_periph;
-	struct spc_softc *sc = (void*)periph->periph_channel->chan_adapter->adapt_dev;
+	struct spc_softc *sc;
 	int s;
 
+	sc = (void *)periph->periph_channel->chan_adapter->adapt_dev;
 	scsipi_printaddr(periph);
 	printf("timed out");
 
@@ -2033,7 +2095,7 @@ spc_timeout(arg)
 
 	splx(s);
 }
-
+
 #ifdef SPC_DEBUG
 /*
  * The following functions are mostly used for debugging purposes, either
@@ -2066,7 +2128,7 @@ spc_print_acb(acb)
 
 	printf("acb@%p xs=%p flags=%x", acb, acb->xs, acb->flags);
 	printf(" dp=%p dleft=%d target_stat=%x\n",
-	       acb->data_addr, acb->data_length, acb->target_stat);
+	    acb->data_addr, acb->data_length, acb->target_stat);
 	spc_show_scsi_cmd(acb);
 }
 
@@ -2077,15 +2139,13 @@ spc_print_active_acb()
 	struct spc_softc *sc = spc_cd.cd_devs[0]; /* XXX */
 
 	printf("ready list:\n");
-	for (acb = sc->ready_list.tqh_first; acb != NULL;
-	    acb = acb->chain.tqe_next)
+	TAILQ_FOREACH(acb, &sc->ready_list, chain)
 		spc_print_acb(acb);
 	printf("nexus:\n");
 	if (sc->sc_nexus != NULL)
 		spc_print_acb(sc->sc_nexus);
 	printf("nexus list:\n");
-	for (acb = sc->nexus_list.tqh_first; acb != NULL;
-	    acb = acb->chain.tqe_next)
+	TAILQ_FOREACH(acb, &sc->nexus_list, chain)
 		spc_print_acb(acb);
 }
 
@@ -2130,8 +2190,8 @@ spc_dump_driver(sc)
 	int i;
 
 	printf("nexus=%p prevphase=%x\n", sc->sc_nexus, sc->sc_prevphase);
-	printf("state=%x msgin=%x msgpriq=%x msgoutq=%x lastmsg=%x currmsg=%x\n",
-	    sc->sc_state, sc->sc_imess[0],
+	printf("state=%x msgin=%x msgpriq=%x msgoutq=%x lastmsg=%x "
+	    "currmsg=%x\n", sc->sc_state, sc->sc_imess[0],
 	    sc->sc_msgpriq, sc->sc_msgoutq, sc->sc_lastmsg, sc->sc_currmsg);
 	for (i = 0; i < 7; i++) {
 		ti = &sc->sc_tinfo[i];

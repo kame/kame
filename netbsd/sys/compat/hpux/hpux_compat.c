@@ -1,9 +1,44 @@
-/*	$NetBSD: hpux_compat.c,v 1.59.6.1 2002/08/07 01:31:58 lukem Exp $	*/
+/*	$NetBSD: hpux_compat.c,v 1.68.2.1 2004/11/12 06:56:03 jmc Exp $	*/
+
+/*
+ * Copyright (c) 1990, 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: hpux_compat.c 1.64 93/08/05$
+ *
+ *	@(#)hpux_compat.c	8.4 (Berkeley) 2/13/94
+ */
 
 /*
  * Copyright (c) 1988 University of Utah.
- * Copyright (c) 1990, 1993
- *	The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -47,7 +82,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: hpux_compat.c,v 1.59.6.1 2002/08/07 01:31:58 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: hpux_compat.c,v 1.68.2.1 2004/11/12 06:56:03 jmc Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_sysv.h"
@@ -86,6 +121,7 @@ __KERNEL_RCSID(0, "$NetBSD: hpux_compat.c,v 1.59.6.1 2002/08/07 01:31:58 lukem E
 #include <machine/psl.h>
 #include <machine/vmparam.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/hpux/hpux.h>
@@ -108,30 +144,30 @@ static int	hpux_scale __P((struct timeval *));
  * HP-UX fork and vfork need to map the EAGAIN return value appropriately.
  */
 int
-hpux_sys_fork(p, v, retval)
-	struct proc *p;
+hpux_sys_fork(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	/* struct hpux_sys_fork_args *uap = v; */
 	int error;
 
-	error = sys_fork(p, v, retval);
+	error = sys_fork(l, v, retval);
 	if (error == EAGAIN)
 		error = OEAGAIN;
 	return (error);
 }
 
 int
-hpux_sys_vfork(p, v, retval)
-	struct proc *p;
+hpux_sys_vfork(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	/* struct hpux_sys_vfork_args *uap = v; */
 	int error;
 
-	error = sys_vfork(p, v, retval);
+	error = sys_vfork(l, v, retval);
 	if (error == EAGAIN)
 		error = OEAGAIN;
 	return (error);
@@ -144,8 +180,8 @@ hpux_sys_vfork(p, v, retval)
  * termination signal from BSD to HP-UX.
  */
 int
-hpux_sys_wait3(p, v, retval)
-	struct proc *p;
+hpux_sys_wait3(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -155,20 +191,21 @@ hpux_sys_wait3(p, v, retval)
 	if (SCARG(uap, rusage))
 		return (EINVAL);
 #if __mc68k__
-	p->p_md.md_regs[PS] = PSL_ALLCC;
-	p->p_md.md_regs[R0] = SCARG(uap, options);
-	p->p_md.md_regs[R1] = SCARG(uap, rusage);
+	l->l_md.md_regs[PS] = PSL_ALLCC;
+	l->l_md.md_regs[R0] = SCARG(uap, options);
+	l->l_md.md_regs[R1] = SCARG(uap, rusage);
 #endif
 
-	return (hpux_sys_wait(p, uap, retval));
+	return (hpux_sys_wait(l, uap, retval));
 }
 
 int
-hpux_sys_wait(p, v, retval)
-	struct proc *p;
+hpux_sys_wait(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
+	struct proc *p = l->l_proc;
 	struct hpux_sys_wait_args *uap = v;
 	struct sys_wait4_args w4;
 	int error;
@@ -188,7 +225,7 @@ hpux_sys_wait(p, v, retval)
 
 	SCARG(&w4, pid) = WAIT_ANY;
 
-	error = sys_wait4(p, &w4, retval);
+	error = sys_wait4(l, &w4, retval);
 	/*
 	 * HP-UX wait always returns EINTR when interrupted by a signal
 	 * (well, unless its emulating a BSD process, but we don't bother...)
@@ -217,16 +254,21 @@ hpux_sys_wait(p, v, retval)
 }
 
 int
-hpux_sys_waitpid(p, v, retval)
-	struct proc *p;
+hpux_sys_waitpid(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
-	struct hpux_sys_waitpid_args *uap = v;
+	struct hpux_sys_waitpid_args /* {
+		syscallarg(pid_t) pid;
+		syscallarg(int *) status;
+		syscallarg(int) options;
+		syscallarg(struct rusage *) rusage;
+	} */ *uap = v;
 	int rv, sig, xstat, error;
 
 	SCARG(uap, rusage) = 0;
-	error = sys_wait4(p, uap, retval);
+	error = sys_wait4(l, uap, retval);
 	/*
 	 * HP-UX wait always returns EINTR when interrupted by a signal
 	 * (well, unless its emulating a BSD process, but we don't bother...)
@@ -242,7 +284,10 @@ hpux_sys_waitpid(p, v, retval)
 		 * pull it back, change the signal portion, and write
 		 * it back out.
 		 */
-		rv = fuword((caddr_t)SCARG(uap, status));
+		error = copyin(SCARG(uap, status), &rv, sizeof(int));
+		if (error)
+			return (error);
+
 		if (WIFSTOPPED(rv)) {
 			sig = WSTOPSIG(rv);
 			rv = W_STOPCODE(bsdtohpuxsig(sig));
@@ -252,7 +297,8 @@ hpux_sys_waitpid(p, v, retval)
 			rv = W_EXITCODE(xstat, bsdtohpuxsig(sig)) |
 				WCOREDUMP(rv);
 		}
-		(void)suword((caddr_t)SCARG(uap, status), rv);
+
+		error = copyout(&rv, SCARG(uap, status), sizeof(int));
 	}
 	return (error);
 }
@@ -267,16 +313,18 @@ hpux_sys_waitpid(p, v, retval)
  *	FIOSNBIO:   return -1 and errno == EWOULDBLOCK
  */
 int
-hpux_sys_read(p, v, retval)
-	struct proc *p;
+hpux_sys_read(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
+	struct proc *p = l->l_proc;
 	struct hpux_sys_read_args *uap = v;
 	int error;
 
-	error = sys_read(p, (struct sys_read_args *) uap, retval);
+	error = sys_read(l, (struct sys_read_args *) uap, retval);
 	if (error == EWOULDBLOCK) {
+		/* sys_read validates fd before this indexing */
 		char *fp = &p->p_fd->fd_ofileflags[SCARG(uap, fd)];
 
 		if (*fp & HPUX_UF_NONBLOCK_ON) {
@@ -291,16 +339,18 @@ hpux_sys_read(p, v, retval)
 }
 
 int
-hpux_sys_write(p, v, retval)
-	struct proc *p;
+hpux_sys_write(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
+	struct proc *p = l->l_proc;
 	struct hpux_sys_write_args *uap = v;
 	int error;
 
-	error = sys_write(p, (struct sys_write_args *) uap, retval);
+	error = sys_write(l, (struct sys_write_args *) uap, retval);
 	if (error == EWOULDBLOCK) {
+		/* sys_write validates fd before this indexing */
 		char *fp = &p->p_fd->fd_ofileflags[SCARG(uap, fd)];
 
 		if (*fp & HPUX_UF_NONBLOCK_ON) {
@@ -315,16 +365,18 @@ hpux_sys_write(p, v, retval)
 }
 
 int
-hpux_sys_readv(p, v, retval)
-	struct proc *p;
+hpux_sys_readv(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
+	struct proc *p = l->l_proc;
 	struct hpux_sys_readv_args *uap = v;
 	int error;
 
-	error = sys_readv(p, (struct sys_readv_args *) uap, retval);
+	error = sys_readv(l, (struct sys_readv_args *) uap, retval);
 	if (error == EWOULDBLOCK) {
+		/* sys_readv validates fd before this indexing */
 		char *fp = &p->p_fd->fd_ofileflags[SCARG(uap, fd)];
 
 		if (*fp & HPUX_UF_NONBLOCK_ON) {
@@ -339,16 +391,21 @@ hpux_sys_readv(p, v, retval)
 }
 
 int
-hpux_sys_writev(p, v, retval)
-	struct proc *p;
+hpux_sys_writev(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
+	struct proc *p = l->l_proc;
 	struct hpux_sys_writev_args *uap = v;
 	int error;
 
-	error = sys_writev(p, (struct sys_writev_args *) uap, retval);
+	if (SCARG(uap, fd) < 0)
+		return EBADF;
+
+	error = sys_writev(l, (struct sys_writev_args *) uap, retval);
 	if (error == EWOULDBLOCK) {
+		/* sys_writev validates fd before this indexing */
 		char *fp = &p->p_fd->fd_ofileflags[SCARG(uap, fd)];
 
 		if (*fp & HPUX_UF_NONBLOCK_ON) {
@@ -363,8 +420,8 @@ hpux_sys_writev(p, v, retval)
 }
 
 int
-hpux_sys_utssys(p, v, retval)
-	struct proc *p;
+hpux_sys_utssys(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -423,8 +480,8 @@ hpux_sys_utssys(p, v, retval)
 }
 
 int
-hpux_sys_sysconf(p, v, retval)
-	struct proc *p;
+hpux_sys_sysconf(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -473,11 +530,12 @@ hpux_sys_sysconf(p, v, retval)
 }
 
 int
-hpux_sys_ulimit(p, v, retval)
-	struct proc *p;
+hpux_sys_ulimit(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
+	struct proc *p = l->l_proc;
 	struct hpux_sys_ulimit_args *uap = v;
 	struct rlimit *limp;
 	int error = 0;
@@ -513,8 +571,8 @@ hpux_sys_ulimit(p, v, retval)
  * values -16 (high) thru -1 (low).
  */
 int
-hpux_sys_rtprio(cp, v, retval)
-	struct proc *cp;
+hpux_sys_rtprio(lp, v, retval)
+	struct lwp *lp;
 	void *v;
 	register_t *retval;
 {
@@ -527,7 +585,7 @@ hpux_sys_rtprio(cp, v, retval)
 	    SCARG(uap, prio) != RTPRIO_RTOFF)
 		return (EINVAL);
 	if (SCARG(uap, pid) == 0)
-		p = cp;
+		p = lp->l_proc;
 	else if ((p = pfind(SCARG(uap, pid))) == 0)
 		return (ESRCH);
 	nice = p->p_nice - NZERO;
@@ -550,7 +608,7 @@ hpux_sys_rtprio(cp, v, retval)
 		nice = (SCARG(uap, prio) >> 3) - 16;
 		break;
 	}
-	error = donice(cp, p, nice);
+	error = donice(lp->l_proc, p, nice);
 	if (error == EACCES)
 		error = EPERM;
 	return (error);
@@ -560,8 +618,8 @@ hpux_sys_rtprio(cp, v, retval)
 
 #if 0 /* XXX - This really, really doesn't work anymore. --scottr */
 int
-hpux_sys_ptrace(p, v, retval)
-	struct proc *p;
+hpux_sys_ptrace(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -569,7 +627,7 @@ hpux_sys_ptrace(p, v, retval)
 	int error;
 #if defined(PT_READ_U) || defined(PT_WRITE_U)
 	int isps = 0;
-	struct proc *cp;
+	struct lwp *lp;
 #endif
 
 	switch (SCARG(uap, req)) {
@@ -623,7 +681,7 @@ hpux_sys_ptrace(p, v, retval)
 #endif
 	}
 
-	error = sys_ptrace(p, uap, retval);
+	error = sys_ptrace(l, uap, retval);
 	/*
 	 * Align PS as HP-UX expects it (see WRITE_U comment above).
 	 * Note that we do not return the high part of PC like HP-UX
@@ -641,8 +699,8 @@ hpux_sys_ptrace(p, v, retval)
  * HP-UX mmap() emulation (mainly for shared library support).
  */
 int
-hpux_sys_mmap(p, v, retval)
-	struct proc *p;
+hpux_sys_mmap(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -669,7 +727,7 @@ hpux_sys_mmap(p, v, retval)
 	SCARG(&nargs, fd) = (SCARG(&nargs, flags) & MAP_ANON) ? -1 : SCARG(uap, fd);
 	SCARG(&nargs, pos) = SCARG(uap, pos);
 
-	return (sys_mmap(p, &nargs, retval));
+	return (sys_mmap(l, &nargs, retval));
 }
 
 static int
@@ -708,8 +766,8 @@ hpuxtobsdioctl(com)
  *	the sgttyb struct is 2 bytes longer
  */
 int
-hpux_sys_ioctl(p, v, retval)
-	struct proc *p;
+hpux_sys_ioctl(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -718,6 +776,7 @@ hpux_sys_ioctl(p, v, retval)
 		syscallarg(int) com;
 		syscallarg(caddr_t) data;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct filedesc *fdp = p->p_fd;
 	struct file *fp;
 	int com, error = 0;
@@ -731,7 +790,7 @@ hpux_sys_ioctl(p, v, retval)
 
 	/* XXX */
 	if (com == HPUXTIOCGETP || com == HPUXTIOCSETP)
-		return (getsettty(p, SCARG(uap, fd), com, SCARG(uap, data)));
+		return (getsettty(l, SCARG(uap, fd), com, SCARG(uap, data)));
 
 	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return (EBADF);
@@ -774,6 +833,7 @@ hpux_sys_ioctl(p, v, retval)
 
 	case HPUXFIOSNBIO:
 	{
+		/* This array index is validated by fd_getfile */
 		char *ofp = &fdp->fd_ofileflags[SCARG(uap, fd)];
 		int tmp;
 
@@ -832,7 +892,7 @@ hpux_sys_ioctl(p, v, retval)
 	case HPUXTCSETATTR:
 	case HPUXTCSETATTRD:
 	case HPUXTCSETATTRF:
-		error = hpux_termio(SCARG(uap, fd), com, dt, p);
+		error = hpux_termio(SCARG(uap, fd), com, dt, l);
 		break;
 
 	default:
@@ -857,12 +917,13 @@ hpux_sys_ioctl(p, v, retval)
  * Note we do not check the real uid or "saved" uid.
  */
 int
-hpux_sys_getpgrp2(cp, v, retval)
-	struct proc *cp;
+hpux_sys_getpgrp2(lp, v, retval)
+	struct lwp *lp;
 	void *v;
 	register_t *retval;
 {
 	struct hpux_sys_getpgrp2_args *uap = v;
+	struct proc *cp = lp->l_proc;
 	struct proc *p;
 
 	if (SCARG(uap, pid) == 0)
@@ -882,8 +943,8 @@ hpux_sys_getpgrp2(cp, v, retval)
  * Note we do not check the real uid or "saved" uid or pgrp.
  */
 int
-hpux_sys_setpgrp2(p, v, retval)
-	struct proc *p;
+hpux_sys_setpgrp2(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -892,37 +953,37 @@ hpux_sys_setpgrp2(p, v, retval)
 	/* empirically determined */
 	if (SCARG(uap, pgid) < 0 || SCARG(uap, pgid) >= 30000)
 		return (EINVAL);
-	return (sys_setpgid(p, uap, retval));
+	return (sys_setpgid(l, uap, retval));
 }
 
 /*
  * XXX Same as BSD setre[ug]id right now.  Need to consider saved ids.
  */
 int
-hpux_sys_setresuid(p, v, retval)
-	struct proc *p;
+hpux_sys_setresuid(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct hpux_sys_setresuid_args *uap = v;
 
-	return (sys_setreuid(p, uap, retval));
+	return (sys_setreuid(l, uap, retval));
 }
 
 int
-hpux_sys_setresgid(p, v, retval)
-	struct proc *p;
+hpux_sys_setresgid(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct hpux_sys_setresgid_args *uap = v;
 
-	return (sys_setregid(p, uap, retval));
+	return (sys_setregid(l, uap, retval));
 }
 
 int
-hpux_sys_getrlimit(p, v, retval)
-	struct proc *p;
+hpux_sys_getrlimit(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -937,12 +998,12 @@ hpux_sys_getrlimit(p, v, retval)
 	SCARG(&ap, which) = SCARG(uap, which);
 	SCARG(&ap, rlp) = SCARG(uap, rlp);
 
-	return (compat_43_sys_getrlimit(p, uap, retval));
+	return (compat_43_sys_getrlimit(l, uap, retval));
 }
 
 int
-hpux_sys_setrlimit(p, v, retval)
-	struct proc *p;
+hpux_sys_setrlimit(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -957,15 +1018,15 @@ hpux_sys_setrlimit(p, v, retval)
 	SCARG(&ap, which) = SCARG(uap, which);
 	SCARG(&ap, rlp) = SCARG(uap, rlp);
 
-	return (compat_43_sys_setrlimit(p, uap, retval));
+	return (compat_43_sys_setrlimit(l, uap, retval));
 }
 
 /*
  * XXX: simple recognition hack to see if we can make grmd work.
  */
 int
-hpux_sys_lockf(p, v, retval)
-	struct proc *p;
+hpux_sys_lockf(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -975,11 +1036,12 @@ hpux_sys_lockf(p, v, retval)
 }
 
 int
-hpux_sys_getaccess(p, v, retval)
-	struct proc *p;
+hpux_sys_getaccess(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
+	struct proc *p = l->l_proc;
 	struct hpux_sys_getaccess_args *uap = v;
 	int lgroups[NGROUPS];
 	int error = 0;
@@ -1088,11 +1150,12 @@ hpux_sys_getaccess(p, v, retval)
  * SYS V style setpgrp()
  */
 int
-hpux_sys_setpgrp_6x(p, v, retval)
-	struct proc *p;
+hpux_sys_setpgrp_6x(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
+	struct proc *p = l->l_proc;
 
 	if (p->p_pid != p->p_pgid)
 		enterpgrp(p, p->p_pid, 0);
@@ -1101,8 +1164,8 @@ hpux_sys_setpgrp_6x(p, v, retval)
 }
 
 int
-hpux_sys_time_6x(p, v, retval)
-	struct proc *p;
+hpux_sys_time_6x(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -1121,14 +1184,15 @@ hpux_sys_time_6x(p, v, retval)
 }
 
 int
-hpux_sys_stime_6x(p, v, retval)
-	struct proc *p;
+hpux_sys_stime_6x(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct hpux_sys_stime_6x_args /* {
 		syscallarg(int) time;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct timeval tv;
 	int s, error;
 
@@ -1145,8 +1209,8 @@ hpux_sys_stime_6x(p, v, retval)
 }
 
 int
-hpux_sys_ftime_6x(p, v, retval)
-	struct proc *p;
+hpux_sys_ftime_6x(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -1167,48 +1231,106 @@ hpux_sys_ftime_6x(p, v, retval)
 }
 
 int
-hpux_sys_alarm_6x(p, v, retval)
-	struct proc *p;
+hpux_sys_alarm_6x(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct hpux_sys_alarm_6x_args /* {
 		syscallarg(int) deltat;
 	} */ *uap = v;
-	int s = splhigh();
+	struct proc *p = l->l_proc;
+	int s;
+	struct itimerval *itp, it;
+	struct ptimer *ptp;
 
-	callout_stop(&p->p_realit_ch);
-	timerclear(&p->p_realtimer.it_interval);
-	*retval = 0;
-	if (timerisset(&p->p_realtimer.it_value) &&
-	    timercmp(&p->p_realtimer.it_value, &time, >))
-		*retval = p->p_realtimer.it_value.tv_sec - time.tv_sec;
+ 	if (p->p_timers && p->p_timers->pts_timers[ITIMER_REAL]) {
+		ptp = p->p_timers->pts_timers[ITIMER_REAL];
+		itp = &ptp->pt_time;
+	} else
+		itp = NULL;
+
+	s = splhigh();
+
+	/*
+	 * Clear any pending timer alarms.
+	 */
+	if (itp) {
+		callout_stop(&p->p_timers->pts_timers[ITIMER_REAL]->pt_ch);
+		timerclear(&itp->it_interval);
+		if (timerisset(&itp->it_value) &&
+		    timercmp(&itp->it_value, &time, >))
+			timersub(&itp->it_value, &time, &itp->it_value);
+		/*
+		 * Return how many seconds were left (rounded up)
+		 */
+		retval[0] = itp->it_value.tv_sec;
+		if (itp->it_value.tv_usec)
+			retval[0]++;
+	} else {
+		retval[0] = 0;
+	}
+
+	/*
+	 * alarm(0) just resets the timer.
+	 */
 	if (SCARG(uap, deltat) == 0) {
-		timerclear(&p->p_realtimer.it_value);
+		if (itp)
+			timerclear(&itp->it_value);
 		splx(s);
 		return (0);
 	}
-	p->p_realtimer.it_value = time;
-	p->p_realtimer.it_value.tv_sec += SCARG(uap, deltat);
+
 	/*
-	 * We don't need to check the hzto() return value, here.
-	 * callout_reset() does it for us.
+	 * Check the new alarm time for sanity, and set it.
 	 */
-	callout_reset(&p->p_realit_ch, hzto(&p->p_realtimer.it_value),
-	    realitexpire, p);
+	timerclear(&it.it_interval);
+	it.it_value.tv_sec = SCARG(uap, deltat);
+	it.it_value.tv_usec = 0;
+	if (itimerfix(&it.it_value) || itimerfix(&it.it_interval)) {
+		splx(s);
+		return (EINVAL);
+	}
+	if (p->p_timers == NULL)
+		timers_alloc(p);
+	ptp = p->p_timers->pts_timers[ITIMER_REAL];
+	if (ptp == NULL) {
+		ptp = pool_get(&ptimer_pool, PR_WAITOK);
+		ptp->pt_ev.sigev_notify = SIGEV_SIGNAL;
+		ptp->pt_ev.sigev_signo = SIGALRM;
+		ptp->pt_overruns = 0;
+		ptp->pt_proc = p;
+		ptp->pt_type = CLOCK_REALTIME;
+		ptp->pt_entry = CLOCK_REALTIME;
+		p->p_timers->pts_timers[ITIMER_REAL] = ptp;
+		callout_init(&ptp->pt_ch);
+	}
+
+	if (timerisset(&it.it_value)) {
+		/*
+		 * We don't need to check the hzto() return value, here.
+		 * callout_reset() does it for us.
+		 */
+		timeradd(&it.it_value, &time, &it.it_value);
+		callout_reset(&ptp->pt_ch, hzto(&ptp->pt_time.it_value),
+		    realtimerexpire, ptp);
+	}
+	ptp->pt_time = it;
 	splx(s);
+
 	return (0);
 }
 
 int
-hpux_sys_nice_6x(p, v, retval)
-	struct proc *p;
+hpux_sys_nice_6x(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct hpux_sys_nice_6x_args /* {
 		syscallarg(int) nval;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	int error;
 
 	error = donice(p, p, (p->p_nice - NZERO) + SCARG(uap, nval));
@@ -1218,14 +1340,15 @@ hpux_sys_nice_6x(p, v, retval)
 }
 
 int
-hpux_sys_times_6x(p, v, retval)
-	struct proc *p;
+hpux_sys_times_6x(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct hpux_sys_times_6x_args /* {
 		syscallarg(struct tms *) tms;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct timeval ru, rs;
 	struct tms atms;
 	int error;
@@ -1260,8 +1383,8 @@ hpux_scale(tvp)
  * Can't set ICHG.
  */
 int
-hpux_sys_utime_6x(p, v, retval)
-	struct proc *p;
+hpux_sys_utime_6x(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -1269,6 +1392,7 @@ hpux_sys_utime_6x(p, v, retval)
 		syscallarg(char *) fname;
 		syscallarg(time_t *) tptr;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct vnode *vp;
 	struct vattr vattr;
 	time_t tv[2];
@@ -1301,11 +1425,12 @@ hpux_sys_utime_6x(p, v, retval)
 }
 
 int
-hpux_sys_pause_6x(p, v, retval)
-	struct proc *p;
+hpux_sys_pause_6x(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
+	struct proc *p = l->l_proc;
 
 	return (sigsuspend1(p, &p->p_sigctx.ps_sigmask));
 }

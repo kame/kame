@@ -1,4 +1,4 @@
-/*	$NetBSD: lpt.c,v 1.34 2001/04/13 23:30:02 thorpej Exp $	*/
+/*	$NetBSD: lpt.c,v 1.40 2004/01/23 04:12:39 simonb Exp $	*/
 
 /*
  * Copyright (c) 1994 Matthias Pfaller.
@@ -17,7 +17,7 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *	This software is a component of "386BSD" developed by 
+ *	This software is a component of "386BSD" developed by
  *	William F. Jolitz, TeleMuse.
  * 4. Neither the name of the developer nor the name "386BSD"
  *    may be used to endorse or promote products derived from this software
@@ -37,19 +37,19 @@
  */
 
 /*
- * THIS SOFTWARE IS A COMPONENT OF 386BSD DEVELOPED BY WILLIAM F. JOLITZ 
- * AND IS INTENDED FOR RESEARCH AND EDUCATIONAL PURPOSES ONLY. THIS 
- * SOFTWARE SHOULD NOT BE CONSIDERED TO BE A COMMERCIAL PRODUCT. 
- * THE DEVELOPER URGES THAT USERS WHO REQUIRE A COMMERCIAL PRODUCT 
+ * THIS SOFTWARE IS A COMPONENT OF 386BSD DEVELOPED BY WILLIAM F. JOLITZ
+ * AND IS INTENDED FOR RESEARCH AND EDUCATIONAL PURPOSES ONLY. THIS
+ * SOFTWARE SHOULD NOT BE CONSIDERED TO BE A COMMERCIAL PRODUCT.
+ * THE DEVELOPER URGES THAT USERS WHO REQUIRE A COMMERCIAL PRODUCT
  * NOT MAKE USE OF THIS WORK.
  *
  * FOR USERS WHO WISH TO UNDERSTAND THE 386BSD SYSTEM DEVELOPED
- * BY WILLIAM F. JOLITZ, WE RECOMMEND THE USER STUDY WRITTEN 
- * REFERENCES SUCH AS THE  "PORTING UNIX TO THE 386" SERIES 
- * (BEGINNING JANUARY 1991 "DR. DOBBS JOURNAL", USA AND BEGINNING 
- * JUNE 1991 "UNIX MAGAZIN", GERMANY) BY WILLIAM F. JOLITZ AND 
- * LYNNE GREER JOLITZ, AS WELL AS OTHER BOOKS ON UNIX AND THE 
- * ON-LINE 386BSD USER MANUAL BEFORE USE. A BOOK DISCUSSING THE INTERNALS 
+ * BY WILLIAM F. JOLITZ, WE RECOMMEND THE USER STUDY WRITTEN
+ * REFERENCES SUCH AS THE  "PORTING UNIX TO THE 386" SERIES
+ * (BEGINNING JANUARY 1991 "DR. DOBBS JOURNAL", USA AND BEGINNING
+ * JUNE 1991 "UNIX MAGAZIN", GERMANY) BY WILLIAM F. JOLITZ AND
+ * LYNNE GREER JOLITZ, AS WELL AS OTHER BOOKS ON UNIX AND THE
+ * ON-LINE 386BSD USER MANUAL BEFORE USE. A BOOK DISCUSSING THE INTERNALS
  * OF 386BSD ENTITLED "386BSD FROM THE INSIDE OUT" WILL BE AVAILABLE LATE 1992.
  */
 
@@ -58,6 +58,10 @@
  * This driver is based on the i386 lpt driver and
  * some IP code from Poul-Henning Kamp.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: lpt.c,v 1.40 2004/01/23 04:12:39 simonb Exp $");
+
 #include "opt_inet.h"
 
 #include <sys/param.h>
@@ -72,9 +76,9 @@
 #include <sys/device.h>
 #include <sys/syslog.h>
 #include <sys/malloc.h>
+#include <sys/conf.h>
 
 #include <machine/autoconf.h>
-#include <machine/conf.h>
 
 #if defined(INET) && defined(PLIP)
 #include "bpfilter.h"
@@ -205,11 +209,20 @@ static
 	int	pliptransmit __P((volatile struct i8255 *, u_char *, int));
 #endif
 
-struct cfattach lpt_ca = {
-	sizeof(struct lpt_softc), lptmatch, lptattach
-};
+CFATTACH_DECL(lpt, sizeof(struct lpt_softc),
+    lptmatch, lptattach, NULL, NULL);
 
 extern struct cfdriver lpt_cd;
+
+dev_type_open(lptopen);
+dev_type_close(lptclose);
+dev_type_write(lptwrite);
+dev_type_ioctl(lptioctl);
+
+const struct cdevsw lpt_cdevsw = {
+	lptopen, lptclose, noread, lptwrite, lptioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
 
 static int
 lptmatch(parent, cf, aux)
@@ -233,7 +246,7 @@ lptmatch(parent, cf, aux)
 	i8255->port_control = LPT_PROBE_CLR;
 	if ((i8255->port_c & LPT_PROBE_MASK) != 0)
 		return 0;
-	
+
 	i8255->port_control = LPT_PROBE_SET;
 	if ((i8255->port_c & LPT_PROBE_MASK) == 0)
 		return 0;
@@ -415,13 +428,13 @@ pushbytes(sc)
 	while (sc->sc_count > 0) {
 		i8255->port_control = LPT_IRQENABLE;
 		error = tsleep((caddr_t)sc, LPTPRI | PCATCH, "lptwrite", 0);
-		if (error != 0) 
+		if (error != 0)
 			return error;
 	}
 	return 0;
 }
 
-/* 
+/*
  * Copy a line from user space to a local buffer, then call pushbytes to
  * get the chars moved to the output queue.
  */
@@ -560,7 +573,7 @@ plipioctl(ifp, cmd, data)
 	struct lpt_softc *sc = (struct lpt_softc *)(ifp->if_softc);
 	volatile struct i8255 *i8255 = sc->sc_i8255;
 	struct ifaddr *ifa = (struct ifaddr *)data;
-	struct ifreq *ifr = (struct ifreq *)data; 
+	struct ifreq *ifr = (struct ifreq *)data;
 	struct sockaddr_dl *sdl;
 	int error = 0;
 

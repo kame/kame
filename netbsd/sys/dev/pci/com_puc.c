@@ -1,4 +1,4 @@
-/*	$NetBSD: com_puc.c,v 1.4 2001/11/15 09:48:11 lukem Exp $	*/
+/*	$NetBSD: com_puc.c,v 1.10 2004/02/03 20:35:17 fredb Exp $	*/
 
 /*
  * Copyright (c) 1998 Christopher G. Demetriou.  All rights reserved.
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: com_puc.c,v 1.4 2001/11/15 09:48:11 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: com_puc.c,v 1.10 2004/02/03 20:35:17 fredb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,6 +51,7 @@ __KERNEL_RCSID(0, "$NetBSD: com_puc.c,v 1.4 2001/11/15 09:48:11 lukem Exp $");
 #include <dev/pci/pucvar.h>
 #include <dev/ic/comreg.h>
 #include <dev/ic/comvar.h>
+#include <dev/pci/cybervar.h>
 
 struct com_puc_softc {
 	struct com_softc sc_com;	/* real "com" softc */
@@ -62,9 +63,8 @@ struct com_puc_softc {
 int	com_puc_probe __P((struct device *, struct cfdata *, void *));
 void	com_puc_attach __P((struct device *, struct device *, void *));
 
-struct cfattach com_puc_ca = {
-	sizeof(struct com_puc_softc), com_puc_probe, com_puc_attach
-};
+CFATTACH_DECL(com_puc, sizeof(struct com_puc_softc),
+    com_puc_probe, com_puc_attach, NULL, NULL);
 
 int
 com_puc_probe(parent, match, aux)
@@ -107,23 +107,40 @@ com_puc_attach(parent, self, aux)
 	 * XXX directly on PCI.
 	 */
 
+	aprint_naive(": Serial port\n");
+
 	sc->sc_iobase = aa->a;
 	sc->sc_iot = aa->t;
 	sc->sc_ioh = aa->h;
 	sc->sc_frequency = aa->flags & PUC_COM_CLOCKMASK;
 
+	/* Enable Cyberserial 8X clock. */
+	if (aa->flags & (PUC_COM_SIIG10x|PUC_COM_SIIG20x)) {
+		int usrregno;
+
+		if	(aa->flags & PUC_PORT_USR3) usrregno = 3;
+		else if (aa->flags & PUC_PORT_USR2) usrregno = 2;
+		else if (aa->flags & PUC_PORT_USR1) usrregno = 1;
+		else /* (aa->flags & PUC_PORT_USR0) */ usrregno = 0;
+
+		if (aa->flags & PUC_COM_SIIG10x)
+			write_siig10x_usrreg(aa->pc, aa->tag, usrregno, 1);
+		else
+			write_siig20x_usrreg(aa->pc, aa->tag, usrregno, 1);
+	}
+
 	intrstr = pci_intr_string(aa->pc, aa->intrhandle);
 	psc->sc_ih = pci_intr_establish(aa->pc, aa->intrhandle, IPL_SERIAL,
 	    comintr, sc);
 	if (psc->sc_ih == NULL) {
-		printf(": couldn't establish interrupt");
+		aprint_error(": couldn't establish interrupt");
 		if (intrstr != NULL)
-			printf(" at %s", intrstr);
-		printf("\n");
+			aprint_normal(" at %s", intrstr);
+		aprint_normal("\n");
 		return;
 	}
-	printf(": interrupting at %s\n", intrstr);
-	printf("%s", sc->sc_dev.dv_xname);
+	aprint_normal(": interrupting at %s\n", intrstr);
+	aprint_normal("%s", sc->sc_dev.dv_xname);
 
 	com_attach_subr(sc);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: uhidev.c,v 1.5 2002/02/27 01:30:50 augustss Exp $	*/
+/*	$NetBSD: uhidev.c,v 1.20 2004/01/04 11:11:56 augustss Exp $	*/
 
 /*
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -38,8 +38,11 @@
  */
 
 /*
- * HID spec: http://www.usb.org/developers/data/devclass/hid1_1.pdf
+ * HID spec: http://www.usb.org/developers/devclass_docs/HID1_11.pdf
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: uhidev.c,v 1.20 2004/01/04 11:11:56 augustss Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -85,7 +88,7 @@ USB_MATCH(uhidev)
 {
 	USB_MATCH_START(uhidev, uaa);
 	usb_interface_descriptor_t *id;
-	
+
 	if (uaa->iface == NULL)
 		return (UMATCH_NONE);
 	id = usbd_get_interface_descriptor(uaa->iface);
@@ -95,8 +98,6 @@ USB_MATCH(uhidev)
 		return (uaa->matchlvl);
 	return (UMATCH_IFACECLASS_GENERIC);
 }
-
-int repproto = 1;
 
 USB_ATTACH(uhidev)
 {
@@ -109,9 +110,10 @@ USB_ATTACH(uhidev)
 	int size, nrepid, repid, repsz;
 	int repsizes[256];
 	void *desc;
+	const void *descptr;
 	usbd_status err;
 	char devinfo[1024];
-	
+
 	sc->sc_udev = uaa->device;
 	sc->sc_iface = iface;
 	id = usbd_get_interface_descriptor(iface);
@@ -140,7 +142,7 @@ USB_ATTACH(uhidev)
 	DPRINTFN(10,("uhidev_attach: bLength=%d bDescriptorType=%d "
 		     "bEndpointAddress=%d-%s bmAttributes=%d wMaxPacketSize=%d"
 		     " bInterval=%d\n",
-		     ed->bLength, ed->bDescriptorType, 
+		     ed->bLength, ed->bDescriptorType,
 		     ed->bEndpointAddress & UE_ADDR,
 		     UE_GET_DIR(ed->bEndpointAddress)==UE_DIR_IN? "in" : "out",
 		     ed->bmAttributes & UE_XFERTYPE,
@@ -156,28 +158,54 @@ USB_ATTACH(uhidev)
 	sc->sc_ep_addr = ed->bEndpointAddress;
 
 	/* XXX need to extend this */
-	if (uaa->vendor == USB_VENDOR_WACOM &&
-	    uaa->product == USB_PRODUCT_WACOM_GRAPHIRE /* &&
-	    uaa->revision == 0x???? */) { /* XXX should use revision */
+	descptr = NULL;
+	if (uaa->vendor == USB_VENDOR_WACOM) {
+		static uByte reportbuf[] = {2, 2, 2};
+
 		/* The report descriptor for the Wacom Graphire is broken. */
-		size = sizeof uhid_graphire_report_descr;
+		switch (uaa->product) {
+		case USB_PRODUCT_WACOM_GRAPHIRE:
+			size = sizeof uhid_graphire_report_descr;
+			descptr = uhid_graphire_report_descr;
+			break;
+
+		case USB_PRODUCT_WACOM_GRAPHIRE3_4X5: /* The 6x8 too? */
+			/*
+			 * The Graphire3 needs 0x0202 to be written to
+			 * feature report ID 2 before it'll start
+			 * returning digitizer data.
+			 */
+			usbd_set_report(uaa->iface, UHID_FEATURE_REPORT, 2,
+			    &reportbuf, sizeof reportbuf);
+
+			size = sizeof uhid_graphire3_4x5_report_descr;
+			descptr = uhid_graphire3_4x5_report_descr;
+			break;
+		default:
+			/* Keep descriptor */
+			break;
+		}
+	}
+
+	if (descptr) {
 		desc = malloc(size, M_USBDEV, M_NOWAIT);
 		if (desc == NULL)
 			err = USBD_NOMEM;
 		else {
 			err = USBD_NORMAL_COMPLETION;
-			memcpy(desc, uhid_graphire_report_descr, size);
+			memcpy(desc, descptr, size);
 		}
 	} else {
 		desc = NULL;
-		err = usbd_read_report_desc(uaa->iface, &desc, &size, M_USBDEV);
+		err = usbd_read_report_desc(uaa->iface, &desc, &size,
+		    M_USBDEV);
 	}
 	if (err) {
 		printf("%s: no report descriptor\n", USBDEVNAME(sc->sc_dev));
 		sc->sc_dying = 1;
 		USB_ATTACH_ERROR_RETURN;
 	}
-	
+
 	sc->sc_repdesc = desc;
 	sc->sc_repdesc_size = size;
 
@@ -235,6 +263,11 @@ USB_ATTACH(uhidev)
 					USB_ATTACH_ERROR_RETURN;
 				}
 #endif
+#if NRND > 0
+				rnd_attach_source(&dev->rnd_source, 
+						  USBDEVNAME(dev->sc_dev), 
+						  RND_TYPE_TTY, 0);
+#endif
 			}
 		}
 	}
@@ -264,9 +297,9 @@ uhidevprint(void *aux, const char *pnp)
 	struct uhidev_attach_arg *uha = aux;
 
 	if (pnp)
-		printf("uhid at %s", pnp);
+		aprint_normal("uhid at %s", pnp);
 	if (uha->reportid != 0)
-		printf(" reportid %d", uha->reportid);
+		aprint_normal(" reportid %d", uha->reportid);
 	return (UNCONF);
 }
 
@@ -282,7 +315,7 @@ uhidevsubmatch(struct device *parent, struct cfdata *cf, void *aux)
 		uha->matchlvl = UMATCH_VENDOR_PRODUCT;
 	else
 		uha->matchlvl = 0;
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 int
@@ -294,7 +327,6 @@ uhidev_activate(device_ptr_t self, enum devact act)
 	switch (act) {
 	case DVACT_ACTIVATE:
 		return (EOPNOTSUPP);
-		break;
 
 	case DVACT_DEACTIVATE:
 		rv = 0;
@@ -303,6 +335,9 @@ uhidev_activate(device_ptr_t self, enum devact act)
 				rv |= config_deactivate(
 					&sc->sc_subdevs[i]->sc_dev);
 		sc->sc_dying = 1;
+		break;
+	default:
+		rv = 0;
 		break;
 	}
 	return (rv);
@@ -325,6 +360,9 @@ USB_DETACH(uhidev)
 	rv = 0;
 	for (i = 0; i < sc->sc_nrepid; i++) {
 		if (sc->sc_subdevs[i] != NULL) {
+#if NRND > 0
+			rnd_detach_source(&sc->sc_subdevs[i]->rnd_source);
+#endif
 			rv |= config_detach(&sc->sc_subdevs[i]->sc_dev, flags);
 			sc->sc_subdevs[i] = NULL;
 		}
@@ -350,7 +388,7 @@ uhidev_intr(usbd_xfer_handle xfer, usbd_private_handle addr, usbd_status status)
 #ifdef UHIDEV_DEBUG
 	if (uhidevdebug > 5) {
 		u_int32_t i;
-		
+
 		DPRINTF(("uhidev_intr: status=%d cc=%d\n", status, cc));
 		DPRINTF(("uhidev_intr: data ="));
 		for (i = 0; i < cc; i++)
@@ -388,6 +426,9 @@ uhidev_intr(usbd_xfer_handle xfer, usbd_private_handle addr, usbd_status status)
 		printf("%s: bad input length %d != %d\n",USBDEVNAME(sc->sc_dev),
 		       scd->sc_in_rep_size, cc);
 #endif
+#if NRND > 0
+	rnd_add_uint32(&scd->rnd_source, (uintptr_t)(sc->sc_ibuf));
+#endif
 	scd->sc_intr(scd, p, cc);
 }
 
@@ -421,8 +462,8 @@ uhidev_open(struct uhidev *scd)
 	/* Set up interrupt pipe. */
 	DPRINTF(("uhidev_open: isize=%d, ep=0x%02x\n", sc->sc_isize,
 		 sc->sc_ep_addr));
-	err = usbd_open_pipe_intr(sc->sc_iface, sc->sc_ep_addr, 
-		  USBD_SHORT_XFER_OK, &sc->sc_intrpipe, sc, sc->sc_ibuf, 
+	err = usbd_open_pipe_intr(sc->sc_iface, sc->sc_ep_addr,
+		  USBD_SHORT_XFER_OK, &sc->sc_intrpipe, sc, sc->sc_ibuf,
 		  sc->sc_isize, uhidev_intr, USBD_DEFAULT_INTERVAL);
 	if (err) {
 		DPRINTF(("uhidopen: usbd_open_pipe_intr failed, "
@@ -464,17 +505,23 @@ uhidev_close(struct uhidev *scd)
 usbd_status
 uhidev_set_report(struct uhidev *scd, int type, void *data, int len)
 {
-	/* XXX */
-	char buf[100];
-	if (scd->sc_report_id) {
-		buf[0] = scd->sc_report_id;
-		memcpy(buf+1, data, len);
-		len++;
-		data = buf;
-	}
+	char *buf;
+	usbd_status retstat;
 
-	return usbd_set_report(scd->sc_parent->sc_iface, type, 
-			       scd->sc_report_id, data, len);
+	if (scd->sc_report_id == 0)
+		return usbd_set_report(scd->sc_parent->sc_iface, type,
+				       scd->sc_report_id, data, len);
+
+	buf = malloc(len + 1, M_TEMP, M_WAITOK);
+	buf[0] = scd->sc_report_id;
+	memcpy(buf+1, data, len);
+
+	retstat = usbd_set_report(scd->sc_parent->sc_iface, type,
+				  scd->sc_report_id, buf, len + 1);
+
+	free(buf, M_TEMP);
+
+	return retstat;
 }
 
 void
@@ -489,13 +536,13 @@ uhidev_set_report_async(struct uhidev *scd, int type, void *data, int len)
 		data = buf;
 	}
 
-	usbd_set_report_async(scd->sc_parent->sc_iface, type, 
+	usbd_set_report_async(scd->sc_parent->sc_iface, type,
 			      scd->sc_report_id, data, len);
 }
 
 usbd_status
 uhidev_get_report(struct uhidev *scd, int type, void *data, int len)
 {
-	return usbd_get_report(scd->sc_parent->sc_iface, type, 
+	return usbd_get_report(scd->sc_parent->sc_iface, type,
 			       scd->sc_report_id, data, len);
 }

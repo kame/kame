@@ -1,4 +1,4 @@
-/*	$NetBSD: if_iy.c,v 1.58 2002/03/05 04:12:58 itojun Exp $	*/
+/*	$NetBSD: if_iy.c,v 1.63 2003/10/30 01:58:17 simonb Exp $	*/
 /* #define IYDEBUG */
 /* #define IYMEMDEBUG */
 
@@ -46,7 +46,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_iy.c,v 1.58 2002/03/05 04:12:58 itojun Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_iy.c,v 1.63 2003/10/30 01:58:17 simonb Exp $");
 
 #include "opt_inet.h"
 #include "opt_ns.h"
@@ -191,9 +191,8 @@ static u_int16_t eepromread __P((bus_space_tag_t, bus_space_handle_t, int));
 static int eepromreadall __P((bus_space_tag_t, bus_space_handle_t, u_int16_t *,
     int));
 
-struct cfattach iy_ca = {
-	sizeof(struct iy_softc), iyprobe, iyattach
-};
+CFATTACH_DECL(iy, sizeof(struct iy_softc),
+    iyprobe, iyattach, NULL, NULL);
 
 static u_int8_t eepro_irqmap[] = EEPP_INTMAP;
 static u_int8_t eepro_revirqmap[] = EEPP_RINTMAP;
@@ -985,7 +984,7 @@ iyintr(arg)
 
 		bitmask_snprintf(status, "\020\1RX_STP\2RX\3TX\4EXEC",
 				 sbuf, sizeof(sbuf));
-		printf("%s: got interupt %s", sc->sc_dev.dv_xname, sbuf);
+		printf("%s: got interrupt %s", sc->sc_dev.dv_xname, sbuf);
 
 		if (status & EXEC_INT) {
 			bitmask_snprintf(bus_space_read_1(iot, ioh, 0),
@@ -1094,7 +1093,6 @@ void
 iy_intr_rx(sc)
 struct iy_softc *sc;
 {
-	struct ifnet *ifp;
 	bus_space_tag_t iot;
 	bus_space_handle_t ioh;
 
@@ -1102,7 +1100,6 @@ struct iy_softc *sc;
 
 	iot = sc->sc_iot;
 	ioh = sc->sc_ioh;
-	ifp = &sc->sc_ethercom.ec_if;
 
 	rxadrs = sc->rx_start;
 	bus_space_write_2(iot, ioh, HOST_ADDR_REG, rxadrs);

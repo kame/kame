@@ -1,7 +1,7 @@
-/*	$NetBSD: if_mc_obio.c,v 1.7 2000/06/29 08:15:14 mrg Exp $	*/
+/*	$NetBSD: if_mc_obio.c,v 1.13 2004/03/26 12:15:46 wiz Exp $	*/
 
 /*-
- * Copyright (c) 1997 David Huang <khym@bga.com>
+ * Copyright (c) 1997 David Huang <khym@azeotrope.org>
  * All rights reserved.
  *
  * Portions of this code are based on code by Denton Gentry <denny1@home.com>
@@ -34,6 +34,9 @@
  * MACE ethernet chip). Also uses the PSC (Peripheral Subsystem
  * Controller) for DMA to and from the MACE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_mc_obio.c,v 1.13 2004/03/26 12:15:46 wiz Exp $");
 
 #include "opt_ddb.h"
 
@@ -68,11 +71,8 @@ hide void	mc_reset_rxdma_set __P((struct mc_softc *, int set));
 hide void	mc_reset_txdma __P((struct mc_softc *sc));
 hide int	mc_obio_getaddr __P((struct mc_softc *, u_int8_t *));
 
-extern int	kvtop __P((register caddr_t addr));
-
-struct cfattach mc_obio_ca = {
-	sizeof(struct mc_softc), mc_obio_match, mc_obio_attach
-};
+CFATTACH_DECL(mc_obio, sizeof(struct mc_softc),
+    mc_obio_match, mc_obio_attach, NULL, NULL);
 
 hide int
 mc_obio_match(parent, cf, aux)
@@ -136,9 +136,9 @@ mc_obio_attach(parent, self, aux)
 	}
 
 	/* allocate memory for transmit buffer and mark it non-cacheable */
-	sc->sc_txbuf = malloc(NBPG, M_DEVBUF, M_WAITOK);
+	sc->sc_txbuf = malloc(PAGE_SIZE, M_DEVBUF, M_WAITOK);
 	sc->sc_txbuf_phys = kvtop(sc->sc_txbuf);
-	physaccess (sc->sc_txbuf, (caddr_t)sc->sc_txbuf_phys, NBPG,
+	physaccess (sc->sc_txbuf, (caddr_t)sc->sc_txbuf_phys, PAGE_SIZE,
 	    PG_V | PG_RW | PG_CI);
 
 	/*
@@ -149,15 +149,15 @@ mc_obio_attach(parent, self, aux)
 	 * memory. If it's not, suggest reducing the number of buffers
 	 * to 2, which will fit in one 4K page.
 	 */
-	sc->sc_rxbuf = malloc(MC_NPAGES * NBPG, M_DEVBUF, M_WAITOK);
+	sc->sc_rxbuf = malloc(MC_NPAGES * PAGE_SIZE, M_DEVBUF, M_WAITOK);
 	sc->sc_rxbuf_phys = kvtop(sc->sc_rxbuf);
 	for (i = 0; i < MC_NPAGES; i++) {
 		int pa;
 
-		pa = kvtop(sc->sc_rxbuf + NBPG*i);
-		physaccess (sc->sc_rxbuf + NBPG*i, (caddr_t)pa, NBPG,
+		pa = kvtop(sc->sc_rxbuf + PAGE_SIZE*i);
+		physaccess (sc->sc_rxbuf + PAGE_SIZE*i, (caddr_t)pa, PAGE_SIZE,
 		    PG_V | PG_RW | PG_CI);
-		if (pa != sc->sc_rxbuf_phys + NBPG*i)
+		if (pa != sc->sc_rxbuf_phys + PAGE_SIZE*i)
 			noncontig = 1;
 	}
 

@@ -1,4 +1,4 @@
-/* $NetBSD: tlsb.c,v 1.22 2001/07/12 23:25:41 thorpej Exp $ */
+/* $NetBSD: tlsb.c,v 1.26 2003/01/01 00:39:21 thorpej Exp $ */
 /*
  * Copyright (c) 1997 by Matthew Jacob
  * NASA AMES Research Center.
@@ -39,7 +39,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: tlsb.c,v 1.22 2001/07/12 23:25:41 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tlsb.c,v 1.26 2003/01/01 00:39:21 thorpej Exp $");
 
 #include "opt_multiprocessor.h"
 
@@ -65,9 +65,8 @@ __KERNEL_RCSID(0, "$NetBSD: tlsb.c,v 1.22 2001/07/12 23:25:41 thorpej Exp $");
 static int	tlsbmatch __P((struct device *, struct cfdata *, void *));
 static void	tlsbattach __P((struct device *, struct device *, void *));
 
-struct cfattach tlsb_ca = {
-	sizeof (struct device), tlsbmatch, tlsbattach
-};
+CFATTACH_DECL(tlsb, sizeof (struct device),
+    tlsbmatch, tlsbattach, NULL, NULL);
 
 extern struct cfdriver tlsb_cd;
 
@@ -94,10 +93,10 @@ tlsbprint(aux, pnp)
 	struct tlsb_dev_attach_args *tap = aux;
 
 	if (pnp)
-		printf("%s at %s node %d", tlsb_node_type_str(tap->ta_dtype),
-		    pnp, tap->ta_node);
+		aprint_normal("%s at %s node %d",
+		    tlsb_node_type_str(tap->ta_dtype), pnp, tap->ta_node);
 	else
-		printf(" node %d: %s", tap->ta_node,
+		aprint_normal(" node %d: %s", tap->ta_node,
 		    tlsb_node_type_str(tap->ta_dtype));
 
 	return (UNCONF);
@@ -115,7 +114,7 @@ tlsbsubmatch(parent, cf, aux)
 	    cf->cf_loc[TLSBCF_NODE] != tap->ta_node)
 		return (0);
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 static int

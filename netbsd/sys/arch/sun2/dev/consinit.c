@@ -1,4 +1,4 @@
-/*	$NetBSD: consinit.c,v 1.1 2002/03/22 00:22:43 fredette Exp $	*/
+/*	$NetBSD: consinit.c,v 1.3 2003/07/15 03:36:11 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 Matthew Fredette
@@ -29,6 +29,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: consinit.c,v 1.3 2003/07/15 03:36:11 lukem Exp $");
+
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
 #include "pcons.h"
@@ -50,7 +53,6 @@
 
 #include <machine/autoconf.h>
 #include <machine/promlib.h>
-#include <machine/conf.h>
 #include <machine/cpu.h>
 #include <machine/eeprom.h>
 #include <machine/psl.h>
@@ -105,12 +107,9 @@ prom_cnprobe(cd)
 	struct consdev *cd;
 {
 #if NPCONS > 0
-	int maj;
+	extern const struct cdevsw pcons_cdevsw;
 
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == pconsopen)
-			break;
-	cd->cn_dev = makedev(maj, 0);
+	cd->cn_dev = makedev(cdevsw_lookup_major(&pcons_cdevsw), 0);
 	cd->cn_pri = CN_INTERNAL;
 #endif
 }
@@ -221,6 +220,11 @@ consinit()
 	char buffer[128];
 #endif	/* PROM_OBP_V2 */
 	char *consname = "unknown";
+#if KGDB
+#if NZS > 0
+	extern const struct cdevsw zstty_cdevsw;
+#endif
+#endif
 	
 	DBPRINT(("consinit()\r\n"));
 	if (cn_tab != &consdev_prom) return;
@@ -296,7 +300,7 @@ consinit()
 #ifdef	KGDB
 	/* Set up KGDB */
 #if NZS > 0
-	if (cdevsw[major(kgdb_dev)].d_open == zsopen)
+	if (cdevsw_lookup(kgdb_dev) == &zstty_cdevsw)
 		zs_kgdb_init();
 #endif	/* NZS > 0 */
 #endif	/* KGDB */

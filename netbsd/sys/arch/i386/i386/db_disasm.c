@@ -1,4 +1,4 @@
-/*	$NetBSD: db_disasm.c,v 1.27 2001/11/15 07:03:29 lukem Exp $	*/
+/*	$NetBSD: db_disasm.c,v 1.29 2003/10/27 14:11:46 junyoung Exp $	*/
 
 /* 
  * Mach Operating System
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: db_disasm.c,v 1.27 2001/11/15 07:03:29 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: db_disasm.c,v 1.29 2003/10/27 14:11:46 junyoung Exp $");
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -275,8 +275,8 @@ const struct inst	db_inst_0fax[] = {
 /*ab*/	{ "bts",   TRUE,  LONG,  op2(R,E),    0 },
 /*ac*/	{ "shrd",  TRUE,  LONG,  op3(Ib,E,R), 0 },
 /*ad*/	{ "shrd",  TRUE,  LONG,  op3(CL,E,R), 0 },
-/*a6*/	{ "",      FALSE, NONE,  0,	      0 },
-/*a7*/	{ "imul",  TRUE,  LONG,  op2(E,R),    0 },
+/*ae*/	{ "fxsave",TRUE,  LONG,  0,	      0 },
+/*af*/	{ "imul",  TRUE,  LONG,  op2(E,R),    0 },
 };
 
 const struct inst	db_inst_0fbx[] = {
@@ -873,9 +873,9 @@ const int db_lengths[] = {
 	} while (0)
 
 
-db_addr_t db_read_address __P((db_addr_t, int, int, struct i_addr *));
-void db_print_address __P((char *, int, struct i_addr *));
-db_addr_t db_disasm_esc __P((db_addr_t, int, int, int, char *));
+db_addr_t db_read_address(db_addr_t, int, int, struct i_addr *);
+void db_print_address(char *, int, struct i_addr *);
+db_addr_t db_disasm_esc(db_addr_t, int, int, int, char *);
 
 /*
  * Read address at location and return updated location.

@@ -1,4 +1,4 @@
-/*	$NetBSD: ncr53c9xvar.h,v 1.35.10.1 2002/11/22 17:50:23 tron Exp $	*/
+/*	$NetBSD: ncr53c9xvar.h,v 1.43 2003/11/02 11:07:45 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -65,6 +65,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#ifndef _DEV_IC_NCR53C9XVAR_H_
+#define _DEV_IC_NCR53C9XVAR_H_
+
+#include <sys/lock.h>
 
 /* Set this to 1 for normal debug, or 2 for per-target tracing. */
 /* #define NCR53C9X_DEBUG		1 */
@@ -336,6 +341,8 @@ struct ncr53c9x_softc {
 	int sc_features;	/* Chip features */
 	int sc_minsync;		/* Minimum sync period / 4 */
 	int sc_maxxfer;		/* Maximum transfer size */
+
+	struct simplelock sc_lock;/* driver mutex */
 };
 
 /* values for sc_state */
@@ -431,7 +438,7 @@ struct ncr53c9x_softc {
 
 /*
  * Macro to convert the chip register Clock Per Byte value to
- * Sunchronous Transfer Period.
+ * Synchronous Transfer Period.
  */
 #define	ncr53c9x_cpb2stp(sc, cpb)	\
 	((250 * (cpb)) / (sc)->sc_freq)
@@ -443,3 +450,5 @@ void	ncr53c9x_scsipi_request __P((struct scsipi_channel *chan,
 void	ncr53c9x_reset __P((struct ncr53c9x_softc *));
 int	ncr53c9x_intr __P((void *));
 void	ncr53c9x_init __P((struct ncr53c9x_softc *, int));
+
+#endif /* _DEV_IC_NCR53C9XVAR_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: gus.c,v 1.74 2002/01/07 21:47:05 thorpej Exp $	*/
+/*	$NetBSD: gus.c,v 1.82 2003/11/21 03:08:37 gson Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1999 The NetBSD Foundation, Inc.
@@ -46,7 +46,7 @@
  *	  Maybe use the double-speed sampling/hardware deinterleave trick
  *	  from the GUS SDK?)  A 486/33 isn't quite fast enough to keep
  *	  up with 44.1kHz 16-bit stereo output without some drop-outs.
- *	. use CS4231 for 16-bit sampling, for a-law and mu-law playback.
+ *	. use CS4231 for 16-bit sampling, for A-law and mu-law playback.
  *	. actually test full-duplex sampling(recording) and playback.
  */
 
@@ -76,12 +76,12 @@
  *   |         |              |		       +--------+
  *   |         | play (dram)  |      +----+    |	|
  *   |         |--------------(------|-\  |    |   +-+  |
- *   +---------+              |      |  >-|----|---|C|--|------  dma chan 1
+ *   +---------+              |      |  >-|----|---|C|--|------  DMA chan 1
  *                            |  +---|-/  |    |   +-+ 	|
  *                            |  |   +----+    |    |   |
  *                            |	 |   +----+    |    |   |
  *   +---------+        +-+   +--(---|-\  |    |    |   |
- *   |         | play   |8|      |   |  >-|----|----+---|------  dma chan 2
+ *   |         | play   |8|      |   |  >-|----|----+---|------  DMA chan 2
  *   | ---C----|--------|/|------(---|-/  |    |        |
  *   |    ^    |record  |1|      |   +----+    |	|
  *   |    |    |   /----|6|------+   	       +--------+
@@ -95,7 +95,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: gus.c,v 1.74 2002/01/07 21:47:05 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: gus.c,v 1.82 2003/11/21 03:08:37 gson Exp $");
 
 #include "gus.h"
 #if NGUS > 0
@@ -124,7 +124,6 @@ __KERNEL_RCSID(0, "$NetBSD: gus.c,v 1.74 2002/01/07 21:47:05 thorpej Exp $");
 
 #include <dev/isa/isavar.h>
 #include <dev/isa/isadmavar.h>
-#include <i386/isa/icu.h>
 
 #include <dev/ic/ics2101reg.h>
 #include <dev/ic/cs4231reg.h>
@@ -443,9 +442,8 @@ void	stereo_dmaintr __P((void *));
 int	gusprobe __P((struct device *, struct cfdata *, void *));
 void	gusattach __P((struct device *, struct device *, void *));
 
-struct cfattach gus_ca = {
-	sizeof(struct gus_softc), gusprobe, gusattach,
-};
+CFATTACH_DECL(gus, sizeof(struct gus_softc),
+    gusprobe, gusattach, NULL, NULL);
 
 /*
  * A mapping from IRQ/DRQ values to the values used in the GUS's internal
@@ -962,6 +960,11 @@ gusattach(parent, self, aux)
 	if (sc->sc_playdrq != -1) {
 		sc->sc_play_maxsize = isa_dmamaxsize(sc->sc_ic,
 		    sc->sc_playdrq);
+		if (isa_drq_alloc(sc->sc_ic, sc->sc_playdrq) != 0) {
+			printf("%s: can't reserve drq %d\n",
+			    sc->sc_dev.dv_xname, sc->sc_playdrq);
+			return;
+		}
 		if (isa_dmamap_create(sc->sc_ic, sc->sc_playdrq,
 		    sc->sc_play_maxsize, BUS_DMA_NOWAIT|BUS_DMA_ALLOCNOW)) {
 			printf("%s: can't create map for drq %d\n",
@@ -972,6 +975,11 @@ gusattach(parent, self, aux)
 	if (sc->sc_recdrq != -1 && sc->sc_recdrq != sc->sc_playdrq) {
 		sc->sc_req_maxsize = isa_dmamaxsize(sc->sc_ic,
 		    sc->sc_recdrq);
+		if (isa_drq_alloc(sc->sc_ic, sc->sc_recdrq) != 0) {
+			printf("%s: can't reserve drq %d\n",
+			    sc->sc_dev.dv_xname, sc->sc_recdrq);
+			return;
+		}
 		if (isa_dmamap_create(sc->sc_ic, sc->sc_recdrq,
 		    sc->sc_req_maxsize, BUS_DMA_NOWAIT|BUS_DMA_ALLOCNOW)) {
 			printf("%s: can't create map for drq %d\n",
@@ -1052,7 +1060,7 @@ gusattach(parent, self, aux)
 
 	/*
 	 * Set some default values
-	 * XXX others start with 8kHz mono mulaw
+	 * XXX others start with 8kHz mono mu-law
 	 */
 
 	sc->sc_irate = sc->sc_orate = 44100;
@@ -1235,7 +1243,7 @@ stereo_dmaintr(arg)
       dmarecords[dmarecord_index].count = sa->size;
       dmarecords[dmarecord_index].channel = 1;
       dmarecords[dmarecord_index].direction = 1;
-      dmarecord_index = ++dmarecord_index % NDMARECS;
+      dmarecord_index = (dmarecord_index + 1) % NDMARECS;
     }
 #endif
 
@@ -1329,7 +1337,7 @@ gus_dma_output(addr, buf, size, intr, arg)
 	  dmarecords[dmarecord_index].count = size;
 	  dmarecords[dmarecord_index].channel = 0;
 	  dmarecords[dmarecord_index].direction = 1;
-	  dmarecord_index = ++dmarecord_index % NDMARECS;
+	  dmarecord_index = (dmarecord_index + 1) % NDMARECS;
 	}
 #endif
 
@@ -1413,7 +1421,7 @@ gusintr(arg)
 	if (HAS_CODEC(sc))
 		retval = ad1848_isa_intr(&sc->sc_codec);
 	if ((intr = bus_space_read_1(iot, ioh1, GUS_IRQ_STATUS)) & GUSMASK_IRQ_DMATC) {
-		DMAPRINTF(("gusintr dma flags=%x\n", sc->sc_flags));
+		DMAPRINTF(("gusintr DMA flags=%x\n", sc->sc_flags));
 #ifdef DIAGNOSTIC
 		gusdmaintrcnt++;
 #endif
@@ -1630,7 +1638,7 @@ gus_dmaout_dointr(sc)
 		  playstats[playcntr].dmabuf = sc->sc_dmabuf;
 		  playstats[playcntr].bufcnt = sc->sc_bufcnt;
 		  playstats[playcntr].curaddr = gus_get_curaddr(sc, GUS_VOICE_LEFT);
-		  playcntr = ++playcntr % NDMARECS;
+		  playcntr = (playcntr + 1) % NDMARECS;
 		}
 #endif
 		bus_space_write_1(iot, ioh2, GUS_VOICE_SELECT, GUS_VOICE_LEFT);
@@ -1872,7 +1880,7 @@ gus_start_playing(sc, bufno)
 		playstats[playcntr].dmabuf = sc->sc_dmabuf;
 		playstats[playcntr].bufcnt = sc->sc_bufcnt;
 		playstats[playcntr].vaction = 5;
-		playcntr = ++playcntr % NDMARECS;
+		playcntr = (playcntr + 1) % NDMARECS;
 	}
 #endif
 
@@ -1970,7 +1978,7 @@ gus_continue_playing(sc, voice)
 		playstats[playcntr].playbuf = sc->sc_playbuf;
 		playstats[playcntr].dmabuf = sc->sc_dmabuf;
 		playstats[playcntr].bufcnt = sc->sc_bufcnt;
-		playcntr = ++playcntr % NDMARECS;
+		playcntr = (playcntr + 1) % NDMARECS;
 	}
 #endif
 
@@ -2919,7 +2927,7 @@ gus_init_cs4231(sc)
 
 	ctrl = (port & 0xf0) >> 4;	/* set port address middle nibble */
 	/*
-	 * The codec is a bit weird--swapped dma channels.
+	 * The codec is a bit weird--swapped DMA channels.
 	 */
 	ctrl |= GUS_MAX_CODEC_ENABLE;
 	if (sc->sc_playdrq >= 4)

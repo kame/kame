@@ -1,4 +1,4 @@
-/*	$NetBSD: disksubr.c,v 1.12 2002/02/19 17:09:42 wiz Exp $	*/
+/*	$NetBSD: disksubr.c,v 1.19 2003/10/08 04:25:44 lukem Exp $	*/
 /*	$OpenBSD: disksubr.c,v 1.14 1997/05/08 00:14:29 deraadt Exp $	*/
 /*	NetBSD: disksubr.c,v 1.40 1999/05/06 15:45:51 christos Exp	*/
 
@@ -14,11 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,6 +32,9 @@
  *
  *	@(#)ufs_disksubr.c	7.16 (Berkeley) 5/4/91
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: disksubr.c,v 1.19 2003/10/08 04:25:44 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -57,7 +56,7 @@ static struct mbr_partition *
 mbr_findslice __P((struct mbr_partition* dp, struct buf *bp));
 
 
-/* 
+/*
  * Scan MBR for NetBSD partittion.
  *
  * OpenBSD source suggests MBR_MAGIC does not always exist, so,
@@ -80,17 +79,17 @@ mbr_findslice(dp, bp)
 
 #if 0
 	/* Note: Magic number is little-endian. */
-	mbrmagicp = (u_int16_t *)(bp->b_data + MBR_MAGICOFF);
+	mbrmagicp = (u_int16_t *)(bp->b_data + MBR_MAGIC_OFFSET);
 	if (*mbrmagicp != MBR_MAGIC)
 		return (NO_MBR_SIGNATURE);
 #endif
 
 	/* XXX how do we check veracity/bounds of this? */
-	memcpy(dp, bp->b_data + MBR_PARTOFF, NMBRPART * sizeof(*dp));
+	memcpy(dp, bp->b_data + MBR_PART_OFFSET, MBR_PART_COUNT * sizeof(*dp));
 
 	/* look for NetBSD partition */
-	for (i = 0; i < NMBRPART; i++) {
-		if (dp[i].mbrp_typ == MBR_PTYPE_NETBSD) {
+	for (i = 0; i < MBR_PART_COUNT; i++) {
+		if (dp[i].mbrp_type == MBR_PTYPE_NETBSD) {
 			ourdp = &dp[i];
 			break;
 		}
@@ -99,8 +98,8 @@ mbr_findslice(dp, bp)
 #ifdef COMPAT_386BSD_MBRPART
 	/* didn't find it -- look for 386BSD partition */
 	if (!ourdp) {
-		for (i = 0; i < NMBRPART; i++) {
-			if (dp[i].mbrp_typ == MBR_PTYPE_386BSD) {
+		for (i = 0; i < MBR_PART_COUNT; i++) {
+			if (dp[i].mbrp_type == MBR_PTYPE_386BSD) {
 				printf("WARNING: old BSD partition ID!\n");
 				ourdp = &dp[i];
  				/*
@@ -117,8 +116,8 @@ mbr_findslice(dp, bp)
 
 	/* didn't find it -- look for OpenBSD partition */
 	if (!ourdp) {
-		for (i = 0; i < NMBRPART; i++) {
-			if (dp[i].mbrp_typ == MBR_PTYPE_OPENBSD) {
+		for (i = 0; i < MBR_PART_COUNT; i++) {
+			if (dp[i].mbrp_type == MBR_PTYPE_OPENBSD) {
 				printf("WARNING: using OpenBSD partition\n");
 				ourdp = &dp[i];
 				break;
@@ -145,7 +144,7 @@ mbr_findslice(dp, bp)
  *
  * Returns null on success and an error string on failure.
  */
-char *
+const char *
 readdisklabel(dev, strat, lp, osdep)
 	dev_t dev;
 	void (*strat) __P((struct buf *));
@@ -214,19 +213,19 @@ readdisklabel(dev, strat, lp, osdep)
 		if (ourdp ==  NO_MBR_SIGNATURE)
 			goto nombrpart;
 
-		for (i = 0; i < NMBRPART; i++, dp++) {
+		for (i = 0; i < MBR_PART_COUNT; i++, dp++) {
 			/* Install in partition e, f, g, or h. */
 			pp = &lp->d_partitions[RAW_PART + 1 + i];
 			pp->p_offset = dp->mbrp_start;
 			pp->p_size = dp->mbrp_size;
 			for (ip = fat_types; *ip != -1; ip++) {
-				if (dp->mbrp_typ == *ip)
+				if (dp->mbrp_type == *ip)
 					pp->p_fstype = FS_MSDOS;
 			}
-			if (dp->mbrp_typ == MBR_PTYPE_LNXEXT2)
+			if (dp->mbrp_type == MBR_PTYPE_LNXEXT2)
 				pp->p_fstype = FS_EX2FS;
 
-			if (dp->mbrp_typ == MBR_PTYPE_NTFS)
+			if (dp->mbrp_type == MBR_PTYPE_NTFS)
 				pp->p_fstype = FS_NTFS;
 
 			/* is this ours? */
@@ -239,10 +238,10 @@ readdisklabel(dev, strat, lp, osdep)
 				/* update disklabel with details */
 				lp->d_partitions[2].p_size =
 				    dp->mbrp_size;
-				lp->d_partitions[2].p_offset = 
+				lp->d_partitions[2].p_offset =
 				    dp->mbrp_start;
 
-				if (dp->mbrp_typ == MBR_PTYPE_OPENBSD) {
+				if (dp->mbrp_type == MBR_PTYPE_OPENBSD) {
 					use_openbsd_part = 1;
 				}
 #if 0
@@ -454,7 +453,7 @@ writedisklabel(dev, strat, lp, osdep)
 			goto nombrpart;
 
 		if (ourdp) {
-			if (ourdp->mbrp_typ == MBR_PTYPE_OPENBSD) {
+			if (ourdp->mbrp_type == MBR_PTYPE_OPENBSD) {
 				/* do not override OpenBSD disklabel */
 				error = ESRCH;
 				goto done;
@@ -472,7 +471,7 @@ nombrpart:
 	/* disklabel in appropriate location? */
 	if (lp->d_partitions[2].p_offset != 0
 		&& lp->d_partitions[2].p_offset != dospartoff) {
-		error = EXDEV;		
+		error = EXDEV;
 		goto done;
 	}
 #endif
@@ -514,11 +513,12 @@ done:
  * if needed, and signal errors or early completion.
  */
 int
-bounds_check_with_label(bp, lp, wlabel)
+bounds_check_with_label(dk, bp, wlabel)
+	struct disk *dk;
 	struct buf *bp;
-	struct disklabel *lp;
 	int wlabel;
 {
+	struct disklabel *lp = dk->dk_label;
 	struct partition *p = lp->d_partitions + DISKPART(bp->b_dev);
 	int labelsector = lp->d_partitions[2].p_offset + LABELSECTOR;
 	int sz;
@@ -530,7 +530,7 @@ bounds_check_with_label(bp, lp, wlabel)
 		if (sz == 0) {
 			/* If exactly at end of disk, return EOF. */
 			bp->b_resid = bp->b_bcount;
-			goto done;
+			return 0;
 		}
 		if (sz < 0) {
 			/* If past end of disk, return EINVAL. */
@@ -558,6 +558,5 @@ bounds_check_with_label(bp, lp, wlabel)
 
 bad:
 	bp->b_flags |= B_ERROR;
-done:
-	return (0);
+	return (-1);
 }

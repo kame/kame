@@ -1,4 +1,4 @@
-/* $NetBSD: bus_dma.c,v 1.49 2002/04/26 04:15:18 thorpej Exp $ */
+/* $NetBSD: bus_dma.c,v 1.55 2003/06/29 22:28:04 fvdl Exp $ */
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -39,7 +39,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: bus_dma.c,v 1.49 2002/04/26 04:15:18 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: bus_dma.c,v 1.55 2003/06/29 22:28:04 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -161,7 +161,7 @@ _bus_dmamap_load_buffer_direct(bus_dma_tag_t t, bus_dmamap_t map,
 		/*
 		 * Compute the segment size, and adjust counts.
 		 */
-		sgsize = NBPG - ((u_long)vaddr & PGOFSET);
+		sgsize = PAGE_SIZE - ((u_long)vaddr & PGOFSET);
 		if (buflen < sgsize)
 			sgsize = buflen;
 		if (map->_dm_maxsegsz < sgsize)
@@ -291,8 +291,48 @@ _bus_dmamap_load_mbuf_direct(bus_dma_tag_t t, bus_dmamap_t map,
 	seg = 0;
 	error = 0;
 	for (m = m0; m != NULL && error == 0; m = m->m_next) {
-		error = _bus_dmamap_load_buffer_direct(t, map,
-		    m->m_data, m->m_len, NULL, flags, &lastaddr, &seg, first);
+		if (m->m_len == 0)
+			continue;
+		/* XXX Could be better about coalescing. */
+		/* XXX Doesn't check boundaries. */
+		switch (m->m_flags & (M_EXT|M_EXT_CLUSTER)) {
+		case M_EXT|M_EXT_CLUSTER:
+			/* XXX KDASSERT */
+			KASSERT(m->m_ext.ext_paddr != M_PADDR_INVALID);
+			lastaddr = m->m_ext.ext_paddr +
+			    (m->m_data - m->m_ext.ext_buf);
+ have_addr:
+			if (first == 0 &&
+			    ++seg >= map->_dm_segcnt) {
+				error = EFBIG;
+				break;
+			}
+
+			/*
+			 * If we're beyond the current DMA window, indicate
+			 * that and try to fall back into SGMAPs.
+			 */
+			if (t->_wsize != 0 && lastaddr >= t->_wsize) {
+				error = EINVAL;
+				break;
+			}
+			lastaddr |= t->_wbase;
+
+			map->dm_segs[seg].ds_addr = lastaddr;
+			map->dm_segs[seg].ds_len = m->m_len;
+			lastaddr += m->m_len;
+			break;
+
+		case 0:
+			lastaddr = m->m_paddr + M_BUFOFFSET(m) +
+			    (m->m_data - M_BUFADDR(m));
+			goto have_addr;
+
+		default:
+			error = _bus_dmamap_load_buffer_direct(t, map,
+			    m->m_data, m->m_len, NULL, flags, &lastaddr,
+			    &seg, first);
+		}
 		first = 0;
 	}
 	if (error == 0) {
@@ -444,12 +484,9 @@ _bus_dmamem_alloc_range(bus_dma_tag_t t, bus_size_t size, bus_size_t alignment,
 	/* Always round the size. */
 	size = round_page(size);
 
-	high = avail_end - PAGE_SIZE;
-
 	/*
 	 * Allocate pages from the VM system.
 	 */
-	TAILQ_INIT(&mlist);
 	error = uvm_pglistalloc(size, low, high, alignment, boundary,
 	    &mlist, nsegs, (flags & BUS_DMA_NOWAIT) == 0);
 	if (error)
@@ -550,7 +587,7 @@ _bus_dmamem_map(bus_dma_tag_t t, bus_dma_segment_t *segs, int nsegs,
 	for (curseg = 0; curseg < nsegs; curseg++) {
 		for (addr = segs[curseg].ds_addr;
 		    addr < (segs[curseg].ds_addr + segs[curseg].ds_len);
-		    addr += NBPG, va += NBPG, size -= NBPG) {
+		    addr += PAGE_SIZE, va += PAGE_SIZE, size -= PAGE_SIZE) {
 			if (size == 0)
 				panic("_bus_dmamem_map: size botch");
 			pmap_enter(pmap_kernel(), va, addr,

@@ -1,4 +1,4 @@
-/*	$NetBSD: dz_uba.c,v 1.14 2002/02/25 14:58:07 ad Exp $ */
+/*	$NetBSD: dz_uba.c,v 1.20 2003/12/13 23:02:33 ad Exp $ */
 /*
  * Copyright (c) 1998 Ludd, University of Lule}, Sweden. All rights reserved.
  * Copyright (c) 1996  Ken C. Wellsch.  All rights reserved.
@@ -31,14 +31,13 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: dz_uba.c,v 1.14 2002/02/25 14:58:07 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dz_uba.c,v 1.20 2003/12/13 23:02:33 ad Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ioctl.h>
 #include <sys/tty.h>
 #include <sys/proc.h>
-#include <sys/map.h>
 #include <sys/buf.h>
 #include <sys/conf.h>
 #include <sys/file.h>
@@ -62,9 +61,8 @@ __KERNEL_RCSID(0, "$NetBSD: dz_uba.c,v 1.14 2002/02/25 14:58:07 ad Exp $");
 static	int	dz_uba_match __P((struct device *, struct cfdata *, void *));
 static	void	dz_uba_attach __P((struct device *, struct device *, void *));
 
-struct	cfattach dz_uba_ca = {
-	sizeof(struct dz_softc), dz_uba_match, dz_uba_attach
-};
+CFATTACH_DECL(dz_uba, sizeof(struct dz_softc),
+    dz_uba_match, dz_uba_attach, NULL, NULL);
 
 /* Autoconfig handles: setup the controller to interrupt, */
 /* then complete the housecleaning for full operation */
@@ -131,6 +129,9 @@ dz_uba_attach(parent, self, aux)
 	sc->sc_dr.dr_dcd = DZ_UBA_DCD;
 	sc->sc_dr.dr_ring = DZ_UBA_RING;
 
+	sc->sc_dr.dr_firstreg = DZ_UBA_FIRSTREG;
+	sc->sc_dr.dr_winsize = DZ_UBA_WINSIZE;
+
 	sc->sc_type = DZ_DZ;
 
 	/* Now register the TX & RX interrupt handlers */
@@ -140,5 +141,5 @@ dz_uba_attach(parent, self, aux)
 		dzrint, sc, &sc->sc_rintrcnt);
 	uba_reset_establish(dzreset, self);
 
-	dzattach(sc, ua->ua_evcnt);
+	dzattach(sc, ua->ua_evcnt, -1);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: db_machdep.h,v 1.17 2001/11/09 06:52:24 thorpej Exp $ */
+/*	$NetBSD: db_machdep.h,v 1.20 2003/04/29 17:06:06 scw Exp $ */
 
 /*
  * Mach Operating System
@@ -32,15 +32,11 @@
 /*
  * Machine-dependent defines for new kernel debugger.
  */
-
-
 #include <uvm/uvm_extern.h>
 #include <machine/frame.h>
 #include <machine/psl.h>
 #include <machine/trap.h>
 #include <machine/reg.h>
-
-/* end of mangling */
 
 typedef	vaddr_t		db_addr_t;	/* address - unsigned */
 typedef	long		db_expr_t;	/* expression - signed */
@@ -50,18 +46,13 @@ typedef struct {
 	struct frame	 db_fr;
 } db_regs_t;
 
-#if defined(MULTIPROCESSOR) && defined(DDB)
-extern db_regs_t *ddb_regp;
-#define DDB_REGS        (ddb_regp)
+/* Current CPU register state */
+extern struct cpu_info *ddb_cpuinfo;
+extern db_regs_t	*ddb_regp;
+#define DDB_REGS        ddb_regp
 #define	DDB_TF		(&ddb_regp->db_tf)
 #define	DDB_FR		(&ddb_regp->db_fr)
-#define ddb_regs        (*ddb_regp)
-#else
-db_regs_t		ddb_regs;	/* register state */
-#define	DDB_REGS	(&ddb_regs)
-#define	DDB_TF		(&ddb_regs.db_tf)
-#define	DDB_FR		(&ddb_regs.db_fr)
-#endif
+
 
 #if defined(lint)
 #define	PC_REGS(regs)	((regs)->db_tf.tf_pc)
@@ -74,6 +65,7 @@ db_regs_t		ddb_regs;	/* register state */
 	(regs)->db_tf.tf_npc = n + 4;			\
 } while(0)
 
+#define	BKPT_ADDR(addr)	(addr)		/* breakpoint address */
 #define	BKPT_INST	0x91d02001	/* breakpoint instruction */
 #define	BKPT_SIZE	(4)		/* size of breakpoint inst */
 #define	BKPT_SET(inst)	(BKPT_INST)
@@ -109,7 +101,7 @@ db_addr_t	db_branch_taken __P((int inst, db_addr_t pc, db_regs_t *regs));
 
 /* see note in db_interface.c about reversed breakpoint addrs */
 #define next_instr_address(pc, bd) \
-	((bd) ? (pc) : ddb_regs.db_tf.tf_npc)
+	((bd) ? (pc) : ddb_regp->db_tf.tf_npc)
 
 
 

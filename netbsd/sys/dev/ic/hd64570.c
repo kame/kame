@@ -1,4 +1,4 @@
-/*	$NetBSD: hd64570.c,v 1.21 2002/03/05 04:12:57 itojun Exp $	*/
+/*	$NetBSD: hd64570.c,v 1.26 2004/02/24 15:05:54 wiz Exp $	*/
 
 /*
  * Copyright (c) 1999 Christian E. Hopps
@@ -60,12 +60,12 @@
  *	   than cheating and always sync'ing the whole region.
  *
  *	o  perhaps allow rx and tx to be in more than one page
- *	   if not using dma.  currently the assumption is that
+ *	   if not using DMA.  currently the assumption is that
  *	   rx uses a page and tx uses a page.
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: hd64570.c,v 1.21 2002/03/05 04:12:57 itojun Exp $");
+__KERNEL_RCSID(0, "$NetBSD: hd64570.c,v 1.26 2004/02/24 15:05:54 wiz Exp $");
 
 #include "bpfilter.h"
 #include "opt_inet.h"
@@ -508,7 +508,7 @@ sca_msci_get_baud_rate_values(u_int32_t hz, u_int8_t *tmcp)
 	 * tmc = chip / hz, but have tmc <= 256
 	 */
 
-	/* assume system clock is 9.8304Mhz or 9830400hz */
+	/* assume system clock is 9.8304MHz or 9830400Hz */
 	clock = clock = 9830400 >> 1;
 
 	/* round down */
@@ -606,13 +606,13 @@ sca_msci_init(struct sca_softc *sc, sca_port_t *scp)
 	 * the correct values here are important for avoiding underruns
 	 * for any value less than or equal to TRC0 txrdy is activated
 	 * which will start the dmac transfer to the fifo.
-	 * for buffer size >= TRC1 + 1 txrdy is cleared which will stop dma.
+	 * for buffer size >= TRC1 + 1 txrdy is cleared which will stop DMA.
 	 *
 	 * thus if we are using a very fast clock that empties the fifo
 	 * quickly, delays in the dmac starting to fill the fifo can
 	 * lead to underruns so we want a fairly full fifo to still
 	 * cause the dmac to start.  for cards with on board ram this
-	 * has no effect on system performance.  For cards that dma
+	 * has no effect on system performance.  For cards that DMA
 	 * to/from system memory it will cause more, shorter,
 	 * bus accesses rather than fewer longer ones.
 	 */
@@ -654,10 +654,10 @@ sca_dmac_init(struct sca_softc *sc, sca_port_t *scp)
 	/* make sure that we won't wrap */
 	if ((desc_p & 0xffff0000) !=
 	    ((desc_p + sizeof(*desc) * scp->sp_ntxdesc) & 0xffff0000))
-		panic("sca: tx descriptors cross architecural boundry");
+		panic("sca: tx descriptors cross architecural boundary");
 	if ((buf_p & 0xff000000) !=
 	    ((buf_p + SCA_BSIZE * scp->sp_ntxdesc) & 0xff000000))
-		panic("sca: tx buffers cross architecural boundry");
+		panic("sca: tx buffers cross architecural boundary");
 #endif
 
 	for (i = 0 ; i < scp->sp_ntxdesc ; i++) {
@@ -714,10 +714,10 @@ sca_dmac_init(struct sca_softc *sc, sca_port_t *scp)
 	/* make sure that we won't wrap */
 	if ((desc_p & 0xffff0000) !=
 	    ((desc_p + sizeof(*desc) * scp->sp_nrxdesc) & 0xffff0000))
-		panic("sca: rx descriptors cross architecural boundry");
+		panic("sca: rx descriptors cross architecural boundary");
 	if ((buf_p & 0xff000000) !=
 	    ((buf_p + SCA_BSIZE * scp->sp_nrxdesc) & 0xff000000))
-		panic("sca: rx buffers cross architecural boundry");
+		panic("sca: rx buffers cross architecural boundary");
 #endif
 
 	for (i = 0 ; i < scp->sp_nrxdesc; i++) {
@@ -1469,7 +1469,6 @@ sca_get_packets(sca_port_t *scp)
 static int
 sca_frame_avail(sca_port_t *scp)
 {
-	struct sca_softc *sc;
 	u_int16_t cda;
 	u_int32_t desc_p;	/* physical address (lower 16 bits) */
 	sca_desc_t *desc;
@@ -1479,7 +1478,6 @@ sca_frame_avail(sca_port_t *scp)
 	/*
 	 * Read the current descriptor from the SCA.
 	 */
-	sc = scp->sca;
 	cda = dmac_read_2(scp, SCA_CDAL0);
 
 	/*
@@ -1796,7 +1794,7 @@ sca_frame_print(sca_port_t *scp, sca_desc_t *desc, u_int8_t *p)
 #endif
 
 /*
- * adjust things becuase we have just read the current starting
+ * adjust things because we have just read the current starting
  * frame
  *
  * must be called at splnet()
@@ -1970,11 +1968,8 @@ sca_shutdown(struct sca_softc *sca)
 static void
 sca_port_starttx(sca_port_t *scp)
 {
-	struct sca_softc *sc;
 	u_int32_t	startdesc_p, enddesc_p;
 	int enddesc;
-
-	sc = scp->sca;
 
 	SCA_DPRINTF(SCA_DEBUG_TX, ("TX: starttx\n"));
 

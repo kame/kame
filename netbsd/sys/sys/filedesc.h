@@ -1,4 +1,4 @@
-/*	$NetBSD: filedesc.h,v 1.24 2002/04/23 15:11:26 christos Exp $	*/
+/*	$NetBSD: filedesc.h,v 1.31 2003/10/30 07:27:02 provos Exp $	*/
 
 /*
  * Copyright (c) 1990, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -54,14 +50,32 @@
  */
 #define	NDFILE		20
 #define	NDEXTENT	50		/* 250 bytes in 256-byte alloc */
+#define	NDENTRIES	32		/* 32 fds per entry */
+#define	NDENTRYMASK	(NDENTRIES - 1)
+#define	NDENTRYSHIFT	5		/* bits per entry */
+#define	NDLOSLOTS(x)	(((x) + NDENTRIES - 1) >> NDENTRYSHIFT)
+#define	NDHISLOTS(x)	((NDLOSLOTS(x) + NDENTRIES - 1) >> NDENTRYSHIFT)
 
 struct filedesc {
 	struct file	**fd_ofiles;	/* file structures for open files */
 	char		*fd_ofileflags;	/* per-process open file flags */
 	int		fd_nfiles;	/* number of open files allocated */
+	uint32_t	*fd_himap;	/* each bit points to 32 fds */
+	uint32_t	*fd_lomap;	/* bitmap of free fds */
 	int		fd_lastfile;	/* high-water mark of fd_ofiles */
 	int		fd_freefile;	/* approx. next free file */
 	int		fd_refcnt;	/* reference count */
+
+	int		fd_knlistsize;	/* size of fd_knlist */
+	struct klist	*fd_knlist;	/*
+					 * list of attached fd knotes,
+					 * indexed by fd number
+					 */
+	u_long		fd_knhashmask;	/* size of fd_knhash */
+	struct klist	*fd_knhash;	/*
+					 * hash table for attached
+					 * non-fd knotes
+					 */
 };
 
 struct cwdinfo {
@@ -84,6 +98,12 @@ struct filedesc0 {
 	 */
 	struct file	*fd_dfiles[NDFILE];
 	char		fd_dfileflags[NDFILE];
+	/*
+	 * These arrays are used when the number of open files is
+	 * <= 1024, and are then pointed to by the pointers above.
+	 */
+	uint32_t	fd_dhimap[NDENTRIES >> NDENTRYSHIFT];
+	uint32_t	fd_dlomap[NDENTRIES];
 };
 
 /*
@@ -100,19 +120,19 @@ struct filedesc0 {
 /*
  * Kernel global variables and routines.
  */
-int	dupfdopen(struct proc *p, int indx, int dfd, int mode, int error);
-int	fdalloc(struct proc *p, int want, int *result);
-void	fdexpand(struct proc *p);
-int	fdavail(struct proc *p, int n);
-int	falloc(struct proc *p, struct file **resultfp, int *resultfd);
+int	dupfdopen(struct proc *, int, int, int, int);
+int	fdalloc(struct proc *, int, int *);
+void	fdexpand(struct proc *);
+int	fdavail(struct proc *, int);
+int	falloc(struct proc *, struct file **, int *);
 void	ffree(struct file *);
-struct filedesc *fdcopy(struct proc *p);
-struct filedesc *fdinit(struct proc *p);
-void	fdshare(struct proc *p1, struct proc *p2);
-void	fdunshare(struct proc *p);
-void	fdinit1(struct filedesc0 *newfdp);
-void	fdclear(struct proc *p);
-void	fdfree(struct proc *p);
+struct filedesc *fdcopy(struct proc *);
+struct filedesc *fdinit(struct proc *);
+void	fdshare(struct proc *, struct proc *);
+void	fdunshare(struct proc *);
+void	fdinit1(struct filedesc0 *);
+void	fdclear(struct proc *);
+void	fdfree(struct proc *);
 void	fdremove(struct filedesc *, int);
 int	fdrelease(struct proc *, int);
 void	fdcloseexec(struct proc *);
@@ -124,6 +144,9 @@ struct cwdinfo *cwdinit(struct proc *);
 void	cwdshare(struct proc *, struct proc *);
 void	cwdunshare(struct proc *);
 void	cwdfree(struct proc *);
+#define GETCWD_CHECK_ACCESS 0x0001
+int	getcwd_common(struct vnode *, struct vnode *, char **, char *, int,
+    int, struct proc *);
 
 int	closef(struct file *, struct proc *);
 int	getsock(struct filedesc *, int, struct file **);

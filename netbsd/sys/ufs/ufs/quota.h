@@ -1,4 +1,4 @@
-/*	$NetBSD: quota.h,v 1.12 2001/11/06 06:40:44 simonb Exp $	*/
+/*	$NetBSD: quota.h,v 1.17 2003/08/07 16:34:44 agc Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -182,10 +178,10 @@ struct ucred;
 struct ufsmount;
 struct vnode;
 __BEGIN_DECLS
-int	chkdq __P((struct inode *, long, struct ucred *, int));
-int	chkdqchg __P((struct inode *, long, struct ucred *, int));
-int	chkiq __P((struct inode *, long, struct ucred *, int));
-int	chkiqchg __P((struct inode *, long, struct ucred *, int));
+int	chkdq __P((struct inode *, int64_t, struct ucred *, int));
+int	chkdqchg __P((struct inode *, int64_t, struct ucred *, int));
+int	chkiq __P((struct inode *, int32_t, struct ucred *, int));
+int	chkiqchg __P((struct inode *, int32_t, struct ucred *, int));
 void	dqflush __P((struct vnode *));
 int	dqget __P((struct vnode *,
 	    u_long, struct ufsmount *, int, struct dquot **));
@@ -216,4 +212,4 @@ int quotactl __P((const char *, int , int, void *));
 __END_DECLS
 #endif /* _KERNEL */
 
-#endif /* _UFS_UFS_QUOTA_H_ */
+#endif /* !_UFS_UFS_QUOTA_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: nfsmount.h,v 1.21 2001/09/15 16:13:02 chs Exp $	*/
+/*	$NetBSD: nfsmount.h,v 1.29 2003/10/03 16:34:31 yamt Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -90,6 +86,13 @@ struct nfs_args {
 #define	NFSMNT_READDIRSIZE	0x00020000  /* Set readdir size */
 #define NFSMNT_XLATECOOKIE	0x00040000  /* 32<->64 dir cookie xlation */
 
+#define NFSMNT_BITS	"\177\20" \
+    "b\00soft\0b\01wsize\0b\02rsize\0b\03timeo\0" \
+    "b\04retrans\0b\05maxgrps\0b\06intr\0b\07noconn\0" \
+    "b\10nqnfs\0b\11nfsv3\0b\12kerb\0b\13dumbtimr\0" \
+    "b\14leaseterm\0b\15readahead\0b\16deadthresh\0b\17resvport\0" \
+    "b\20rdirplus\0b\21readdirsize\0b\22xlatecookie\0"
+
 /*
  * NFS internal flags (nm_iflag) */
 
@@ -108,6 +111,7 @@ struct nfs_args {
 #define	NFSMNT_WANTAUTH		0x00001000  /* Wants an authenticator */
 #define	NFSMNT_AUTHERR		0x00002000  /* Authentication error */
 #define NFSMNT_SWAPCOOKIE	0x00004000  /* XDR encode dir cookies */
+#define NFSMNT_STALEWRITEVERF	0x00008000  /* Write verifier is changing */
 
 #ifdef _KERNEL
 /*
@@ -116,6 +120,7 @@ struct nfs_args {
  * Holds NFS specific information for mount.
  */
 struct	nfsmount {
+	struct simplelock nm_slock;	/* Lock for this structure */
 	int	nm_flag;		/* Flags for soft/hard... */
 	struct	mount *nm_mountp;	/* Vfs structure for this filesystem */
 	int	nm_numgrps;		/* Max. size of groupslist */
@@ -146,7 +151,8 @@ struct	nfsmount {
 	char	*nm_authstr;		/* Authenticator string */
 	char	*nm_verfstr;		/* and the verifier */
 	int	nm_verflen;
-	u_char	nm_verf[NFSX_V3WRITEVERF]; /* V3 write verifier */
+	struct lock nm_writeverflock;	/* lock for below */
+	u_char	nm_writeverf[NFSX_V3WRITEVERF]; /* V3 write verifier */
 	NFSKERBKEY_T nm_key;		/* and the session key */
 	int	nm_numuids;		/* Number of nfsuid mappings */
 	TAILQ_HEAD(, nfsuid) nm_uidlruhead; /* Lists of nfsuid mappings */

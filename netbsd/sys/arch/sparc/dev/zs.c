@@ -1,4 +1,4 @@
-/*	$NetBSD: zs.c,v 1.85.6.1 2002/12/07 21:55:32 he Exp $	*/
+/*	$NetBSD: zs.c,v 1.100 2004/03/17 17:04:59 pk Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -44,8 +44,12 @@
  * Sun keyboard/mouse uses the zs_kbd/zs_ms slaves.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zs.c,v 1.100 2004/03/17 17:04:59 pk Exp $");
+
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
+#include "opt_sparc_arch.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -62,7 +66,6 @@
 #include <machine/bsd_openprom.h>
 #include <machine/autoconf.h>
 #include <machine/intr.h>
-#include <machine/conf.h>
 #include <machine/eeprom.h>
 #include <machine/psl.h>
 #include <machine/z8530var.h>
@@ -90,25 +93,11 @@
  * or you can not see messages done with printf during boot-up...
  */
 int zs_def_cflag = (CREAD | CS8 | HUPCL);
-int zs_major = 12;
 
 /*
  * The Sun provides a 4.9152 MHz clock to the ZS chips.
  */
 #define PCLK	(9600 * 512)	/* PCLK pin input clock rate */
-
-/*
- * Select software interrupt bit based on TTY ipl.
- */
-#if PIL_TTY == 1
-# define IE_ZSSOFT IE_L1
-#elif PIL_TTY == 4
-# define IE_ZSSOFT IE_L4
-#elif PIL_TTY == 6
-# define IE_ZSSOFT IE_L6
-#else
-# error "no suitable software interrupt bit"
-#endif
 
 #define	ZS_DELAY()		(CPU_ISSUN4C ? (0) : delay(2))
 
@@ -172,23 +161,33 @@ static int  zs_match_obio __P((struct device *, struct cfdata *, void *));
 static void zs_attach_mainbus __P((struct device *, struct device *, void *));
 static void zs_attach_obio __P((struct device *, struct device *, void *));
 
+#if defined(SUN4D)
+#include <sparc/dev/bootbusvar.h>
+
+static int  zs_match_bootbus __P((struct device *, struct cfdata *, void *));
+static void zs_attach_bootbus __P((struct device *, struct device *, void *));
+
+CFATTACH_DECL(zs_bootbus, sizeof(struct zsc_softc),
+    zs_match_bootbus, zs_attach_bootbus, NULL, NULL);
+#endif /* SUN4D */
 
 static void zs_attach __P((struct zsc_softc *, struct zsdevice *, int));
 static int  zs_print __P((void *, const char *name));
 
-struct cfattach zs_mainbus_ca = {
-	sizeof(struct zsc_softc), zs_match_mainbus, zs_attach_mainbus
-};
+CFATTACH_DECL(zs_mainbus, sizeof(struct zsc_softc),
+    zs_match_mainbus, zs_attach_mainbus, NULL, NULL);
 
-struct cfattach zs_obio_ca = {
-	sizeof(struct zsc_softc), zs_match_obio, zs_attach_obio
-};
+CFATTACH_DECL(zs_obio, sizeof(struct zsc_softc),
+    zs_match_obio, zs_attach_obio, NULL, NULL);
 
 extern struct cfdriver zs_cd;
 
+/* softintr(9) cookie, shared by all instances of this driver */
+static void *zs_sicookie;
+
 /* Interrupt handlers. */
 static int zshard __P((void *));
-static int zssoft __P((void *));
+static void zssoft __P((void *));
 
 static int zs_get_speed __P((struct zs_chanstate *));
 
@@ -211,7 +210,7 @@ zs_match_mainbus(parent, cf, aux)
 {
 	struct mainbus_attach_args *ma = aux;
 
-	if (strcmp(cf->cf_driver->cd_name, ma->ma_name) != 0)
+	if (strcmp(cf->cf_name, ma->ma_name) != 0)
 		return (0);
 
 	return (1);
@@ -229,7 +228,7 @@ zs_match_obio(parent, cf, aux)
 	if (uoba->uoba_isobio4 == 0) {
 		struct sbus_attach_args *sa = &uoba->uoba_sbus;
 
-		if (strcmp(cf->cf_driver->cd_name, sa->sa_name) != 0)
+		if (strcmp(cf->cf_name, sa->sa_name) != 0)
 			return (0);
 
 		return (1);
@@ -239,6 +238,19 @@ zs_match_obio(parent, cf, aux)
 	return (bus_space_probe(oba->oba_bustag, oba->oba_paddr,
 			        1, 0, 0, NULL, NULL));
 }
+
+#if defined(SUN4D)
+static int
+zs_match_bootbus(parent, cf, aux)
+	struct device *parent;
+	struct cfdata *cf;
+	void *aux;
+{
+	struct bootbus_attach_args *baa = aux;
+
+	return (strcmp(cf->cf_name, baa->ba_name) == 0);
+}
+#endif /* SUN4D */
 
 static void
 zs_attach_mainbus(parent, self, aux)
@@ -251,7 +263,7 @@ zs_attach_mainbus(parent, self, aux)
 
 	zsc->zsc_bustag = ma->ma_bustag;
 	zsc->zsc_dmatag = ma->ma_dmatag;
-	zsc->zsc_promunit = PROM_getpropint(ma->ma_node, "slave", -2);
+	zsc->zsc_promunit = prom_getpropint(ma->ma_node, "slave", -2);
 	zsc->zsc_node = ma->ma_node;
 
 	/*
@@ -303,7 +315,7 @@ zs_attach_obio(parent, self, aux)
 		/*
 		 * Check if power state can be set, e.g. Tadpole 3GX
 		 */
-		if (PROM_getpropint(sa->sa_node, "pwr-on-auxio2", 0))
+		if (prom_getpropint(sa->sa_node, "pwr-on-auxio2", 0))
 		{
 			printf (" powered via auxio2");
 			for (channel = 0; channel < 2; channel++) {
@@ -315,7 +327,7 @@ zs_attach_obio(parent, self, aux)
 
 		zsc->zsc_bustag = sa->sa_bustag;
 		zsc->zsc_dmatag = sa->sa_dmatag;
-		zsc->zsc_promunit = PROM_getpropint(sa->sa_node, "slave", -2);
+		zsc->zsc_promunit = prom_getpropint(sa->sa_node, "slave", -2);
 		zsc->zsc_node = sa->sa_node;
 		zs_attach(zsc, va, sa->sa_pri);
 	} else {
@@ -356,6 +368,44 @@ zs_attach_obio(parent, self, aux)
 		zs_attach(zsc, (void *)bh, oba->oba_pri);
 	}
 }
+
+#if defined(SUN4D)
+static void
+zs_attach_bootbus(parent, self, aux)
+	struct device *parent;
+	struct device *self;
+	void *aux;
+{
+	struct zsc_softc *zsc = (void *) self;
+	struct bootbus_attach_args *baa = aux;
+	void *va;
+
+	if (baa->ba_nintr == 0) {
+		printf(": no interrupt lines\n");
+		return;
+	}
+
+	if (baa->ba_npromvaddrs > 0)
+		va = (void *) baa->ba_promvaddrs;
+	else {
+		bus_space_handle_t bh;
+
+		if (bus_space_map(baa->ba_bustag,
+		    BUS_ADDR(baa->ba_slot, baa->ba_offset),
+		    baa->ba_size, BUS_SPACE_MAP_LINEAR, &bh) != 0) {
+			printf(": cannot map zs registers\n");
+			return;
+		}
+		va = (void *) bh;
+	}
+
+	zsc->zsc_bustag = baa->ba_bustag;
+	zsc->zsc_promunit = prom_getpropint(baa->ba_node, "slave", -2);
+	zsc->zsc_node = baa->ba_node;
+	zs_attach(zsc, va, baa->ba_intr[0].oi_pri);
+}
+#endif /* SUN4D */
+
 /*
  * Attach a found zs.
  *
@@ -378,7 +428,15 @@ zs_attach(zsc, zsd, pri)
 		return;
 	}
 
-	printf(" softpri %d\n", PIL_TTY);
+	if (!didintr) {
+		zs_sicookie = softintr_establish(IPL_SOFTSERIAL, zssoft, NULL);
+		if (zs_sicookie == NULL) {
+			printf("\n%s: cannot establish soft int handler\n",
+				zsc->zsc_dev.dv_xname);
+			return;
+		}
+	}
+	printf(" softpri %d\n", IPL_SOFTSERIAL);
 
 	/*
 	 * Initialize software state for each channel.
@@ -390,6 +448,7 @@ zs_attach(zsc, zsd, pri)
 		cs = &zsc->zsc_cs_store[channel];
 		zsc->zsc_cs[channel] = cs;
 
+		simple_lock_init(&cs->cs_lock);
 		cs->cs_channel = channel;
 		cs->cs_private = NULL;
 		cs->cs_ops = &zsops_null;
@@ -461,12 +520,8 @@ zs_attach(zsc, zsd, pri)
 	if (!didintr) {
 		didintr = 1;
 		prevpri = pri;
-		bus_intr_establish(zsc->zsc_bustag, pri, IPL_SERIAL, 0,
+		bus_intr_establish(zsc->zsc_bustag, pri, IPL_SERIAL,
 				   zshard, NULL);
-		bus_intr_establish(zsc->zsc_bustag, PIL_TTY,
-				   IPL_SOFTSERIAL,
-				   BUS_INTR_ESTABLISH_SOFTINTR,
-				   zssoft, NULL);
 	} else if (pri != prevpri)
 		panic("broken zs interrupt scheme");
 
@@ -507,10 +562,10 @@ zs_print(aux, name)
 	struct zsc_attach_args *args = aux;
 
 	if (name != NULL)
-		printf("%s: ", name);
+		aprint_normal("%s: ", name);
 
 	if (args->channel != -1)
-		printf(" channel %d", args->channel);
+		aprint_normal(" channel %d", args->channel);
 
 	return (UNCONF);
 }
@@ -549,13 +604,8 @@ zshard(arg)
 
 	/* We are at splzs here, so no need to lock. */
 	if (softreq && (zssoftpending == 0)) {
-		zssoftpending = IE_ZSSOFT;
-#if defined(SUN4M)
-		if (CPU_ISSUN4M)
-			raise(0, PIL_TTY);
-		else
-#endif
-			ienab_bis(IE_ZSSOFT);
+		zssoftpending = 1;
+		softintr_schedule(zs_sicookie);
 	}
 	return (rval);
 }
@@ -563,7 +613,7 @@ zshard(arg)
 /*
  * Similar scheme as for zshard (look at all of them)
  */
-static int
+static void
 zssoft(arg)
 	void *arg;
 {
@@ -572,7 +622,7 @@ zssoft(arg)
 
 	/* This is not the only ISR on this IPL. */
 	if (zssoftpending == 0)
-		return (0);
+		return;
 
 	/*
 	 * The soft intr. bit will be set by zshard only if
@@ -592,7 +642,6 @@ zssoft(arg)
 		(void)zsc_intr_soft(zsc);
 	}
 	splx(s);
-	return (1);
 }
 
 
@@ -806,8 +855,12 @@ zs_getc(arg)
 {
 	struct zschan *zc = arg;
 	int s, c, rr0;
+	u_int omid;
 
+	/* Temporarily direct interrupts at ourselves */
 	s = splhigh();
+	omid = setitr(cpuinfo.mid);
+
 	/* Wait for a character to arrive. */
 	do {
 		rr0 = zc->zc_csr;
@@ -816,6 +869,7 @@ zs_getc(arg)
 
 	c = zc->zc_data;
 	ZS_DELAY();
+	setitr(omid);
 	splx(s);
 
 	/*
@@ -835,8 +889,11 @@ zs_putc(arg, c)
 {
 	struct zschan *zc = arg;
 	int s, rr0;
+	u_int omid;
 
+	/* Temporarily direct interrupts at ourselves */
 	s = splhigh();
+	omid = setitr(cpuinfo.mid);
 
 	/* Wait for transmitter to become ready. */
 	do {
@@ -851,11 +908,12 @@ zs_putc(arg, c)
 	 * the `transmit-ready' interrupt isn't de-asserted until
 	 * some period of time after the register write completes
 	 * (more than a couple instructions).  So to avoid stray
-	 * interrupts we put in the 2us delay regardless of cpu model.
+	 * interrupts we put in the 2us delay regardless of CPU model.
 	 */
 	zc->zc_data = c;
 	delay(2);
 
+	setitr(omid);
 	splx(s);
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: ns_pcb.c,v 1.17 2001/11/13 01:08:11 lukem Exp $	*/
+/*	$NetBSD: ns_pcb.c,v 1.20 2004/02/24 15:22:01 wiz Exp $	*/
 
 /*
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ns_pcb.c,v 1.17 2001/11/13 01:08:11 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ns_pcb.c,v 1.20 2004/02/24 15:22:01 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -82,7 +78,6 @@ ns_pcbbind(nsp, nam, p)
 {
 	struct sockaddr_ns *sns;
 	u_int16_t lport = 0;
-	int error;
 
 	if (nsp->nsp_lport || !ns_nullhost(nsp->nsp_laddr))
 		return (EINVAL);
@@ -103,7 +98,7 @@ ns_pcbbind(nsp, nam, p)
 	if (lport) {
 
 		if (ntohs(lport) < NSPORT_RESERVED &&
-		    (p == 0 || (error = suser(p->p_ucred, &p->p_acflag))))
+		    (p == 0 || suser(p->p_ucred, &p->p_acflag)))
 			return (EACCES);
 		if (ns_pcblookup(&zerons_addr, lport, 0))
 			return (EADDRINUSE);
@@ -288,7 +283,7 @@ ns_setpeeraddr(nsp, nam)
  * Pass some notification to all connections of a protocol
  * associated with address dst.  Call the
  * protocol specific routine to handle each connection.
- * Also pass an extra paramter via the nspcb. (which may in fact
+ * Also pass an extra parameter via the nspcb. (which may in fact
  * be a parameter list!)
  */
 void

@@ -1,4 +1,4 @@
-/*	$NetBSD: zs.c,v 1.64 2001/09/05 14:03:49 tsutsui Exp $	*/
+/*	$NetBSD: zs.c,v 1.72 2003/07/15 03:36:16 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -43,6 +43,9 @@
  * Plain tty/async lines use the zs_async slave.
  * Sun keyboard/mouse uses the zs_kbd/zs_ms slaves.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zs.c,v 1.72 2003/07/15 03:36:16 lukem Exp $");
 
 #include "opt_kgdb.h"
 
@@ -90,7 +93,6 @@
  * or you can not see messages done with printf during boot-up...
  */
 int zs_def_cflag = (CREAD | CS8 | HUPCL);
-int zs_major = 12;
 
 /*
  * The Sun3 provides a 4.9152 MHz clock to the ZS chips.
@@ -200,9 +202,8 @@ static int	zs_match __P((struct device *, struct cfdata *, void *));
 static void	zs_attach __P((struct device *, struct device *, void *));
 static int  zs_print __P((void *, const char *name));
 
-struct cfattach zsc_ca = {
-	sizeof(struct zsc_softc), zs_match, zs_attach
-};
+CFATTACH_DECL(zsc, sizeof(struct zsc_softc),
+    zs_match, zs_attach, NULL, NULL);
 
 extern struct cfdriver zsc_cd;
 
@@ -278,7 +279,7 @@ zs_attach(parent, self, aux)
 
 	/* Use the mapping setup by the Sun PROM. */
 	if (zsaddr[zs_unit] == NULL)
-		panic("zs_attach: zs%d not mapped\n", zs_unit);
+		panic("zs_attach: zs%d not mapped", zs_unit);
 
 	/*
 	 * Initialize software state for each channel.
@@ -289,6 +290,7 @@ zs_attach(parent, self, aux)
 		cs = &zsc->zsc_cs_store[channel];
 		zsc->zsc_cs[channel] = cs;
 
+		simple_lock_init(&cs->cs_lock);
 		cs->cs_channel = channel;
 		cs->cs_private = NULL;
 		cs->cs_ops = &zsops_null;
@@ -381,10 +383,10 @@ zs_print(aux, name)
 	struct zsc_attach_args *args = aux;
 
 	if (name != NULL)
-		printf("%s: ", name);
+		aprint_normal("%s: ", name);
 
 	if (args->channel != -1)
-		printf(" channel %d", args->channel);
+		aprint_normal(" channel %d", args->channel);
 
 	return UNCONF;
 }
@@ -831,6 +833,7 @@ cninit()
 	struct consdev *cn;
 	int channel, zs_unit, zstty_unit;
 	u_char inSource, outSink;
+	extern const struct cdevsw zstty_cdevsw;
 
 	/* Get the zs driver ready for console duty. */
 	zs_init();
@@ -871,7 +874,8 @@ cninit()
 		zs_unit = zstty_conf[zstty_unit].zs_unit;
 		channel = zstty_conf[zstty_unit].channel;
 		cn = &consdev_tty;
-		cn->cn_dev = makedev(zs_major, zstty_unit);
+		cn->cn_dev = makedev(cdevsw_lookup_major(&zstty_cdevsw),
+				     zstty_unit);
 		cn->cn_pri = CN_REMOTE;
 		break;
 

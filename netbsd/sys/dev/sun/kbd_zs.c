@@ -1,4 +1,4 @@
-/*	$NetBSD: kbd_zs.c,v 1.10 2001/12/09 12:03:32 pk Exp $	*/
+/*	$NetBSD: kbd_zs.c,v 1.16 2003/08/07 16:31:25 agc Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -45,9 +41,8 @@
  */
 
 /*
- * Keyboard driver (/dev/kbd -- note that we do not have minor numbers
- * [yet?]).  Translates incoming bytes to ASCII or to `firm_events' and
- * passes them up to the appropriate reader.
+ * /dev/kbd lower layer for sun keyboard off a zs channel.
+ * This driver uses kbdsun middle layer to hook up to /dev/kbd.
  */
 
 /*
@@ -58,7 +53,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kbd_zs.c,v 1.10 2001/12/09 12:03:32 pk Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kbd_zs.c,v 1.16 2003/08/07 16:31:25 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -75,11 +70,13 @@ __KERNEL_RCSID(0, "$NetBSD: kbd_zs.c,v 1.10 2001/12/09 12:03:32 pk Exp $");
 
 #include <dev/ic/z8530reg.h>
 #include <machine/z8530var.h>
-#include <machine/vuid_event.h>
-#include <machine/kbd.h>
+#include <dev/sun/vuid_event.h>
 #include <dev/sun/event_var.h>
+#include <dev/sun/kbd_reg.h>
 #include <dev/sun/kbd_xlate.h>
 #include <dev/sun/kbdvar.h>
+#include <dev/sun/kbdsunvar.h>
+
 
 /****************************************************************
  * Interface to the lower layer (zscc)
@@ -99,11 +96,10 @@ struct zsops zsops_kbd = {
 
 static int	kbd_zs_match(struct device *, struct cfdata *, void *);
 static void	kbd_zs_attach(struct device *, struct device *, void *);
-static void	kbd_zs_write_data __P((struct kbd_softc *, int));
+static void	kbd_zs_write_data __P((struct kbd_sun_softc *, int));
 
-struct cfattach kbd_zs_ca = {
-	sizeof(struct kbd_softc), kbd_zs_match, kbd_zs_attach
-};
+CFATTACH_DECL(kbd_zs, sizeof(struct kbd_sun_softc),
+    kbd_zs_match, kbd_zs_attach, NULL, NULL);
 
 /* Fall-back baud rate */
 int	kbd_zs_bps = KBD_DEFAULT_BPS;
@@ -133,22 +129,24 @@ kbd_zs_attach(parent, self, aux)
 
 {
 	struct zsc_softc *zsc = (void *) parent;
-	struct kbd_softc *k = (void *) self;
+	struct kbd_sun_softc *k = (void *) self;
 	struct zsc_attach_args *args = aux;
 	struct zs_chanstate *cs;
-	struct cfdata *cf;
-	int channel, kbd_unit;
+	int channel;
 	int reset, s;
 	int bps;
 
-	cf = k->k_dev.dv_cfdata;
-	kbd_unit = k->k_dev.dv_unit;
+	/* provide upper layer with a link to the middle layer */
+	k->k_kbd.k_ops = &kbd_ops_sun;
+
+	/* provide middle layer with a link to the lower layer (i.e. us) */
 	channel = args->channel;
 	cs = zsc->zsc_cs[channel];
 	cs->cs_private = k;
 	cs->cs_ops = &zsops_kbd;
 	k->k_cs = cs;
 	k->k_write_data = kbd_zs_write_data;
+
 	if ((bps = cs->cs_defspeed) == 0)
 		bps = kbd_zs_bps;
 
@@ -158,27 +156,20 @@ kbd_zs_attach(parent, self, aux)
 		/*
 		 * Hookup ourselves as the console input channel
 		 */
-		struct cons_channel *cc;
+		struct cons_channel *cc = kbd_cc_alloc(&k->k_kbd);
 
-		if ((cc = malloc(sizeof *cc, M_DEVBUF, M_NOWAIT)) == NULL)
+		if (cc == NULL)
 			return;
 
-		cc->cc_dev = self;
-		cc->cc_iopen = kbd_cc_open;
-		cc->cc_iclose = kbd_cc_close;
-		cc->cc_upstream = NULL;
 		cons_attach_input(cc, args->consdev);
-		k->k_cc = cc;
-		k->k_isconsole = 1;
+		k->k_kbd.k_isconsole = 1;
 		printf(" (console input)");
 	}
 	printf("\n");
 
-	callout_init(&k->k_repeat_ch);
-
 	/* Initialize the speed, etc. */
 	s = splzs();
-	if (k->k_isconsole == 0) {
+	if (k->k_kbd.k_isconsole == 0) {
 		/* Not the console; may need reset. */
 		reset = (channel == 0) ?
 			ZSWR9_A_RESET : ZSWR9_B_RESET;
@@ -192,11 +183,7 @@ kbd_zs_attach(parent, self, aux)
 	splx(s);
 
 	/* Do this before any calls to kbd_rint(). */
-	kbd_xlate_init(&k->k_state);
-
-	/* XXX - Do this in open? */
-	k->k_repeat_start = hz/2;
-	k->k_repeat_step = hz/20;
+	kbd_xlate_init(&k->k_kbd.k_state);
 
 	/* Magic sequence. */
 	k->k_magic1 = KBD_L1;
@@ -204,11 +191,11 @@ kbd_zs_attach(parent, self, aux)
 }
 
 /*
- * used by kbd_start_tx();
+ * used by kbd_sun_start_tx();
  */
 void
 kbd_zs_write_data(k, c)
-	struct kbd_softc *k;
+	struct kbd_sun_softc *k;
 	int c;
 {
 	int	s;
@@ -223,7 +210,7 @@ static void
 kbd_zs_rxint(cs)
 	struct zs_chanstate *cs;
 {
-	struct kbd_softc *k;
+	struct kbd_sun_softc *k;
 	int put, put_next;
 	u_char c, rr1;
 
@@ -251,7 +238,7 @@ kbd_zs_rxint(cs)
 		k->k_magic1_down = 0;
 		if (c == k->k_magic2) {
 			/* Magic "L1-A" sequence; enter debugger. */
-			if (k->k_isconsole) {
+			if (k->k_kbd.k_isconsole) {
 				zs_abort(cs);
 				/* Debugger done.  Fake L1-up to finish it. */
 				c = k->k_magic1 | KBD_UP;
@@ -287,7 +274,7 @@ static void
 kbd_zs_txint(cs)
 	struct zs_chanstate *cs;
 {
-	struct kbd_softc *k;
+	struct kbd_sun_softc *k;
 
 	k = cs->cs_private;
 	zs_write_csr(cs, ZSWR0_RESET_TXINT);
@@ -302,7 +289,7 @@ kbd_zs_stint(cs, force)
 	struct zs_chanstate *cs;
 	int force;
 {
-	struct kbd_softc *k;
+	struct kbd_sun_softc *k;
 	int rr0;
 
 	k = cs->cs_private;
@@ -341,7 +328,7 @@ static void
 kbd_zs_softint(cs)
 	struct zs_chanstate *cs;
 {
-	struct kbd_softc *k;
+	struct kbd_sun_softc *k;
 	int get, c, s;
 	int intr_flags;
 	u_short ring_data;
@@ -375,21 +362,21 @@ kbd_zs_softint(cs)
 			 * send a reset to resync key translation.
 			 */
 			log(LOG_ERR, "%s: input error (0x%x)\n",
-				k->k_dev.dv_xname, ring_data);
+				k->k_kbd.k_dev.dv_xname, ring_data);
 			get = k->k_rbput; /* flush */
 			goto send_reset;
 		}
 
 		/* Pass this up to the "middle" layer. */
-		kbd_input_raw(k, c);
+		kbd_sun_input(k, c);
 	}
 	if (intr_flags & INTR_RX_OVERRUN) {
 		log(LOG_ERR, "%s: input overrun\n",
-		    k->k_dev.dv_xname);
+		    k->k_kbd.k_dev.dv_xname);
 	send_reset:
 		/* Send a reset to resync translation. */
-		kbd_output(k, KBD_CMD_RESET);
-		kbd_start_tx(k);
+		kbd_sun_output(k, KBD_CMD_RESET);
+		kbd_sun_start_tx(k);
 	}
 	k->k_rbget = get;
 
@@ -399,7 +386,7 @@ kbd_zs_softint(cs)
 		 * clear busy and wakeup drain waiters.
 		 */
 		k->k_txflags &= ~K_TXBUSY;
-		kbd_start_tx(k);
+		kbd_sun_start_tx(k);
 	}
 
 	if (intr_flags & INTR_ST_CHECK) {
@@ -407,7 +394,7 @@ kbd_zs_softint(cs)
 		 * Status line change.  (Not expected.)
 		 */
 		log(LOG_ERR, "%s: status interrupt?\n",
-		    k->k_dev.dv_xname);
+		    k->k_kbd.k_dev.dv_xname);
 		cs->cs_rr0_delta = 0;
 	}
 

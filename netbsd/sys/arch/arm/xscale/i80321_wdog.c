@@ -1,4 +1,4 @@
-/*	$NetBSD: i80321_wdog.c,v 1.4.4.1 2002/11/11 23:03:47 he Exp $	*/
+/*	$NetBSD: i80321_wdog.c,v 1.6 2003/07/15 00:24:54 lukem Exp $	*/
 
 /*
  * Copyright (c) 2002 Wasabi Systems, Inc.
@@ -38,6 +38,9 @@
 /*
  * Watchdog timer support for the Intel i80321 I/O processor.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: i80321_wdog.c,v 1.6 2003/07/15 00:24:54 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -105,7 +108,7 @@ iopwdog_match(struct device *parent, struct cfdata *cf, void *aux)
 {
 	struct iopxs_attach_args *ia = aux;
 
-	if (strcmp(cf->cf_driver->cd_name, ia->ia_name) == 0)
+	if (strcmp(cf->cf_name, ia->ia_name) == 0)
 		return (1);
 
 	return (0);
@@ -123,7 +126,8 @@ iopwdog_attach(struct device *parent, struct device *self, void *aux)
 	 */
 	sc->sc_wdog_period = 7;
 
-	printf(": %d second period\n", sc->sc_wdog_period);
+	aprint_naive(": Watchdog timer\n");
+	aprint_normal(": %d second period\n", sc->sc_wdog_period);
 
 	sc->sc_smw.smw_name = sc->sc_dev.dv_xname;
 	sc->sc_smw.smw_cookie = sc;
@@ -132,10 +136,9 @@ iopwdog_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_smw.smw_period = sc->sc_wdog_period;
 
 	if (sysmon_wdog_register(&sc->sc_smw) != 0)
-		printf("%s: unable to register with sysmon\n",
+		aprint_error("%s: unable to register with sysmon\n",
 		    sc->sc_dev.dv_xname);
 }
 
-struct cfattach iopwdog_ca = {
-	sizeof(struct iopwdog_softc), iopwdog_match, iopwdog_attach,
-};
+CFATTACH_DECL(iopwdog, sizeof(struct iopwdog_softc),
+    iopwdog_match, iopwdog_attach, NULL, NULL);

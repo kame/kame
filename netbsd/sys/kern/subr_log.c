@@ -1,4 +1,4 @@
-/*	$NetBSD: subr_log.c,v 1.22 2002/04/28 04:13:51 enami Exp $	*/
+/*	$NetBSD: subr_log.c,v 1.33 2003/09/22 12:59:57 christos Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -40,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: subr_log.c,v 1.22 2002/04/28 04:13:51 enami Exp $");
+__KERNEL_RCSID(0, "$NetBSD: subr_log.c,v 1.33 2003/09/22 12:59:57 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -63,13 +59,25 @@ __KERNEL_RCSID(0, "$NetBSD: subr_log.c,v 1.22 2002/04/28 04:13:51 enami Exp $");
 struct logsoftc {
 	int	sc_state;		/* see above for possibilities */
 	struct	selinfo sc_selp;	/* process waiting on select call */
-	int	sc_pgid;		/* process/group for async I/O */
+	pid_t	sc_pgid;		/* process/group for async I/O */
 } logsoftc;
 
 int	log_open;			/* also used in log() */
 int	msgbufmapped;			/* is the message buffer mapped */
 int	msgbufenabled;			/* is logging to the buffer enabled */
 struct	kern_msgbuf *msgbufp;		/* the mapped buffer, itself. */
+
+dev_type_open(logopen);
+dev_type_close(logclose);
+dev_type_read(logread);
+dev_type_ioctl(logioctl);
+dev_type_poll(logpoll);
+dev_type_kqfilter(logkqfilter);
+
+const struct cdevsw log_cdevsw = {
+	logopen, logclose, logread, nowrite, logioctl,
+	nostop, notty, logpoll, nommap, logkqfilter,
+};
 
 void
 initmsgbuf(buf, bufsize)
@@ -212,21 +220,68 @@ logpoll(dev, events, p)
 	return (revents);
 }
 
+static void
+filt_logrdetach(struct knote *kn)
+{
+	int s;
+
+	s = splhigh();
+	SLIST_REMOVE(&logsoftc.sc_selp.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_logread(struct knote *kn, long hint)
+{
+
+	if (msgbufp->msg_bufr == msgbufp->msg_bufx)
+		return (0);
+
+	if (msgbufp->msg_bufr < msgbufp->msg_bufx)
+		kn->kn_data = msgbufp->msg_bufx - msgbufp->msg_bufr;
+	else
+		kn->kn_data = (msgbufp->msg_bufs - msgbufp->msg_bufr) +
+		    msgbufp->msg_bufx;
+
+	return (1);
+}
+
+static const struct filterops logread_filtops =
+	{ 1, NULL, filt_logrdetach, filt_logread };
+
+int
+logkqfilter(dev_t dev, struct knote *kn)
+{
+	struct klist *klist;
+	int s;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &logsoftc.sc_selp.sel_klist;
+		kn->kn_fop = &logread_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = NULL;
+
+	s = splhigh();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
+}
+
 void
 logwakeup()
 {
-	struct proc *p;
-
 	if (!log_open)
 		return;
-	selwakeup(&logsoftc.sc_selp);
-	if (logsoftc.sc_state & LOG_ASYNC) {
-		if (logsoftc.sc_pgid < 0)
-			gsignal(-logsoftc.sc_pgid, SIGIO); 
-		else if (logsoftc.sc_pgid > 0 &&
-		    (p = pfind(logsoftc.sc_pgid)) != NULL)
-			psignal(p, SIGIO);
-	}
+	selnotify(&logsoftc.sc_selp, 0);
+	if (logsoftc.sc_state & LOG_ASYNC)
+		fownsignal(logsoftc.sc_pgid, SIGIO, 0, 0, NULL);
 	if (logsoftc.sc_state & LOG_RDWAIT) {
 		wakeup((caddr_t)msgbufp);
 		logsoftc.sc_state &= ~LOG_RDWAIT;
@@ -268,12 +323,12 @@ logioctl(dev, com, data, flag, p)
 		break;
 
 	case TIOCSPGRP:
-		logsoftc.sc_pgid = *(int *)data;
-		break;
+	case FIOSETOWN:
+		return fsetown(p, &logsoftc.sc_pgid, com, data);
 
 	case TIOCGPGRP:
-		*(int *)data = logsoftc.sc_pgid;
-		break;
+	case FIOGETOWN:
+		return fgetown(p, logsoftc.sc_pgid, com, data);
 
 	default:
 		return (EPASSTHROUGH);

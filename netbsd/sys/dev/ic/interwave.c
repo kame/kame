@@ -1,4 +1,4 @@
-/*	$NetBSD: interwave.c,v 1.15 2002/02/06 14:50:42 pooka Exp $	*/
+/*	$NetBSD: interwave.c,v 1.19 2003/10/30 01:58:17 simonb Exp $	*/
 
 /*
  * Copyright (c) 1997, 1999 The NetBSD Foundation, Inc.
@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: interwave.c,v 1.15 2002/02/06 14:50:42 pooka Exp $");
+__KERNEL_RCSID(0, "$NetBSD: interwave.c,v 1.19 2003/10/30 01:58:17 simonb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -126,7 +126,7 @@ iwintr(arg)
 	/*
 	 * The proper order to do this seems to be to read CSR3 to get the
 	 * int cause and fifo over underrrun status, then deal with the ints
-	 * (new dma set up), and to clear ints by writing the respective bit
+	 * (new DMA set up), and to clear ints by writing the respective bit
 	 * to 0.
 	 */
 
@@ -462,7 +462,7 @@ iwreset(sc, warm)
 
 	IW_WRITE_DIRECT_1(sc->codec_index + 2, sc->p2xr_h, 0x00);
 
-	IW_WRITE_CODEC_1(CFIG1I | IW_MCE, 0x00);	/* dma 2 chan access */
+	IW_WRITE_CODEC_1(CFIG1I | IW_MCE, 0x00);	/* DMA 2 chan access */
 	IW_WRITE_CODEC_1(CEXTI, 0x00);	/* disable ints for now */
 
 
@@ -473,7 +473,7 @@ iwreset(sc, warm)
 					 * don't center output in case or
 					 * FIFO underrun */
 	IW_WRITE_CODEC_1(CFIG3I, 0xc0);	/* enable record/playback irq (still
-					 * turned off from CEXTI), max dma
+					 * turned off from CEXTI), max DMA
 					 * rate */
 	IW_WRITE_CODEC_1(CSR3I, 0x00);	/* clear status 3 reg */
 
@@ -525,7 +525,7 @@ iwreset(sc, warm)
 	 * (from codec?) bit 1 = 0 -> output on bit 2 = 1 -> mic in on bit 3
 	 * = 1 -> irq&drq pin enable bit 4 = 1 -> channel interrupts to chan
 	 * 1 bit 5 = 1 -> enable midi loop back bit 6 = 0 -> irq latches
-	 * URCR[2:0] bit 6 = 1 -> dma latches URCR[2:0]
+	 * URCR[2:0] bit 6 = 1 -> DMA latches URCR[2:0]
 	 */
 
 
@@ -641,7 +641,7 @@ iw_query_encoding(addr, fp)
 	 */
 
 	/*
-	 * except in wavetable synth. there we have only ulaw and 8 and 16
+	 * except in wavetable synth. there we have only mu-law and 8 and 16
 	 * bit linear data
 	 */
 
@@ -1047,11 +1047,10 @@ iw_start_output(addr, p, cc, intr, arg)
 	void	*arg;
 {
 	struct	iw_softc *sc = addr;
-	int	counter;
 
 #ifdef AUDIO_DEBUG
 	if (sc->sc_playlocked) {
-		DPRINTF(("iw_start_output: playback dma already going on\n"));
+		DPRINTF(("iw_start_output: playback DMA already going on\n"));
 		/* return 0; */
 	}
 #endif
@@ -1068,8 +1067,6 @@ iw_start_output(addr, p, cc, intr, arg)
 	sc->sc_playarg = arg;
 	sc->sc_dma_flags |= DMAMODE_WRITE;
 	sc->sc_playdma_bp = p;
-
-	counter = 0;
 
 	isa_dmastart(sc->sc_ic, sc->sc_playdrq, sc->sc_playdma_bp,
 		     cc, NULL, DMAMODE_WRITE, BUS_DMA_NOWAIT);
@@ -1112,11 +1109,10 @@ iw_start_input(addr, p, cc, intr, arg)
 	void	*arg;
 {
 	struct	iw_softc *sc = addr;
-	int	counter;
 
 #if AUDIO_DEBUG
 	if (sc->sc_reclocked) {
-		DPRINTF(("iw_start_input: record dma already going on\n"));
+		DPRINTF(("iw_start_input: record DMA already going on\n"));
 		/* return 0; */
 	}
 #endif
@@ -1134,8 +1130,6 @@ iw_start_input(addr, p, cc, intr, arg)
 	sc->sc_recarg = arg;
 	sc->sc_dma_flags |= DMAMODE_READ;
 	sc->sc_recdma_bp = p;
-
-	counter = 0;
 
 	isa_dmastart(sc->sc_ic, sc->sc_recdrq, sc->sc_recdma_bp,
 		     cc, NULL, DMAMODE_READ, BUS_DMA_NOWAIT);
@@ -1615,7 +1609,8 @@ iw_malloc(addr, direction, size, pool, flags)
 	void	*addr;
 	int	direction;
 	size_t	size;
-	int	pool, flags;
+	struct malloc_type *pool;
+	int	flags;
 {
 	struct iw_softc *sc = addr;
 	int drq;
@@ -1631,7 +1626,7 @@ void
 iw_free(addr, ptr, pool)
 	void	*addr;
 	void	*ptr;
-	int	pool;
+	struct malloc_type *pool;
 {
 	isa_free(ptr, pool);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: mb86960reg.h,v 1.4 2001/12/23 09:21:00 ichiro Exp $	*/
+/*	$NetBSD: mb86960reg.h,v 1.9 2003/11/02 11:07:45 wiz Exp $	*/
 
 /*
  * All Rights Reserved, Copyright (C) Fujitsu Limited 1995
@@ -22,8 +22,6 @@
  * SUCH DAMAGE.
  */
 
-#define FE_MB86960_H_VERSION "mb86960.h ver. 0.8"
-
 /*
  * Registers of Fujitsu MB86960A/MB86965A Ethernet controller.
  * Written and contributed by M.S. <seki@sysrap.cs.fujitsu.co.jp>
@@ -32,7 +30,7 @@
 /*
  * Notes on register naming:
  *
- * Fujitsu documents for MB86960A/MB86965A uses no mnemorable names
+ * Fujitsu documents for MB86960A/MB86965A use no mnemonic names
  * for their registers.  They defined only three names for 32
  * registers and appended numbers to distinguish registers of
  * same name.  Surprisingly, the numbers represent I/O address
@@ -46,7 +44,7 @@
  * documents..
  */
 
-/* Data Link Control Registrs, on invaliant port addresses.  */
+/* Data Link Control Registers, on invaliant port addresses.  */
 #define FE_DLCR0	0
 #define FE_DLCR1	1
 #define FE_DLCR2	2
@@ -66,7 +64,7 @@
 #define FE_DLCR14	14
 #define FE_DLCR15	15
 
-/* Malticast Address Registers.  On register bank #1.  */
+/* Multicast Address Registers.  On register bank #1.  */
 #define FE_MAR8		8
 #define FE_MAR9		9
 #define FE_MAR10	10
@@ -97,9 +95,9 @@
 /*
  * Definitions of registers.
  * I don't have Fujitsu documents of MB86960A/MB86965A, so I don't
- * know the official names for each flags and fields.  The following
- * names are assigned by me (the author of this file,) since I cannot
- * mnemorize hexadecimal constants for all of these functions.
+ * know the official names for the flags and fields.  The following
+ * names are assigned by me (the author of this file), since I cannot
+ * memorize hexadecimal constants for all of these functions.
  * Comments?  FIXME.
  */
 
@@ -109,7 +107,7 @@
 #define FE_D0_COLLID	0x04	/* Collision on last transmission	*/
 #define FE_D0_JABBER	0x08	/* Jabber				*/
 #define FE_D0_CRLOST	0x10	/* Carrier lost on last transmission	*/
-#define FE_D0_PKTRCD	0x20	/* No corrision on last transmission	*/
+#define FE_D0_PKTRCD	0x20	/* No collision on last transmission	*/
 #define FE_D0_NETBSY	0x40	/* Network Busy (Carrier Detected)	*/
 #define FE_D0_TXDONE	0x80	/* Transmission complete		*/
 
@@ -172,7 +170,7 @@
 #define FE_D6_BBW	0x10	/* Buffer SRAM bus width		*/
 #define FE_D6_SBW	0x20	/* System bus width			*/
 #define FE_D6_SRAM	0x40	/* Buffer SRAM access time		*/
-#define FE_D6_DLC	0x80	/* Disable DLC (recever/transmitter)	*/
+#define FE_D6_DLC	0x80	/* Disable DLC (receiver/transmitter)	*/
 
 #define FE_D6_BUFSIZ_8KB	0x00	/* The board has  8KB SRAM	*/
 #define FE_D6_BUFSIZ_16KB	0x01	/* The board has 16KB SRAM	*/
@@ -202,6 +200,7 @@
 #define FE_D7_RBS	0x0C	/* Register bank select			*/
 #define FE_D7_RDYPNS	0x10	/* Senses RDYPNSEL input signal		*/
 #define FE_D7_POWER	0x20	/* Stand-by (power down) mode control	*/
+#define FE_D7_ED	0xC0	/* Encoder/Decoder config (for MB86960)	*/
 #define FE_D7_IDENT	0xC0	/* Chip identification			*/
 
 #define FE_D7_BYTSWP_LH	0x00	/* DEC/Intel byte order		*/
@@ -214,12 +213,19 @@
 #define FE_D7_POWER_DOWN	0x00	/* Power down (stand-by) mode	*/
 #define FE_D7_POWER_UP		0x20	/* Normal operation		*/
 
-#define FE_D7_IDENT_NICE	0x80
-#define FE_D7_IDENT_EC		0xC0
+#define FE_D7_ED_NORMAL		0x00	/* Normal NICE			*/
+#define FE_D7_ED_MON		0x40	/* NICE + Monitor		*/
+#define FE_D7_ED_BYPASS		0x80	/* Encoder/Decorder Bypass	*/
+#define FE_D7_ED_TEST		0xC0	/* Encoder/Decorder Test	*/
+
+#define FE_D7_IDENT_86960	0x00	/* MB86960 (NICE)		*/
+#define FE_D7_IDENT_86964	0x40	/* MB86964			*/
+#define FE_D7_IDENT_86967	0x80	/* MB86967			*/
+#define FE_D7_IDENT_86965	0xC0	/* MB86965 (EtherCoupler)	*/
 
 /* DLCR8 thru DLCR13 are for Ethernet station address.  */
 
-/* DLCR14 and DLCR15 are for TDR.  (BTW, what is TDR?  FIXME.)  */
+/* DLCR14 and DLCR15 are for TDR (Time Domain Reflectometry).  */
 
 /* MAR8 thru MAR15 are for Multicast address filter.  */
 
@@ -286,9 +292,9 @@
 /* BMPR17 -- EEPROM data */
 #define FE_B17_DATA	0x80	/* EEPROM data bit			*/
 
-/* BMPR18 ??? */
+/* BMPR18 I/O Base Address (Only JLI mode) */
 
-/* BMPR19 -- ISA interface configuration */
+/* BMPR19 -- Jumperless Setting (Only JLI mode) */
 #define FE_B19_IRQ		0xC0
 #define FE_B19_IRQ_SHIFT	6
 
@@ -303,10 +309,26 @@
  */
 
 /* Number of bytes in an EEPROM accessible through 86965.  */
-#define FE_EEPROM_SIZE	32
+#define FE_EEPROM_SIZE		32
 
 /* Offset for JLI config; automatically copied into BMPR19 at startup.  */
-#define FE_EEPROM_CONF	0
+#define FE_EEPROM_CONF		0x00
+
+/* Delay for 93c06 EEPROM access */
+#define FE_EEPROM_DELAY()	DELAY(4)
+
+/*
+ * EEPROM allocation of AT1700/RE2000.
+ */
+#define FE_ATI_EEP_ADDR		0x08	/* Station address (0x08-0x0d)	*/
+#define FE_ATI_EEP_MEDIA	0x18	/* Media type			*/
+#define FE_ATI_EEP_MAGIC	0x19	/* XXX Magic			*/
+#define FE_ATI_EEP_MODEL	0x1e	/* Hardware type		*/
+#define  FE_ATI_MODEL_AT1700T	0x00
+#define  FE_ATI_MODEL_AT1700BT	0x01
+#define  FE_ATI_MODEL_AT1700FT	0x02
+#define  FE_ATI_MODEL_AT1700AT	0x03
+#define FE_ATI_EEP_REVISION	0x1f	/* Hardware revision		*/
 
 /*
  * Some 86960 specific constants.
@@ -318,8 +340,15 @@
 /* How many packets we can put in the transmission buffer on NIC memory.  */
 #define FE_QUEUEING_MAX 127
 
-/* Length (in bytes) of a "packet length" word in transmission buffer.  */
-#define FE_DATA_LEN_LEN 2
+/* Size (in bytes) of a "packet length" word in transmission buffer.  */
+#define FE_TXLEN_SIZE 2
+
+/* receive packet status in the receive packet header. */
+#define FE_RXSTAT_GOODPKT	0x20
+#define FE_RXSTAT_RMT0900	0x10
+#define FE_RXSTAT_SHORTPKT	0x08
+#define FE_RXSTAT_ALIGNERR	0x04
+#define FE_RXSTAT_CRCERR	0x02
 
 /*
  * FUJITSU MBH10302 specific Registers.

@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_misc_notalpha.c,v 1.63 2002/04/03 14:28:36 tron Exp $	*/
+/*	$NetBSD: linux_misc_notalpha.c,v 1.69.4.1 2004/11/12 06:18:53 jmc Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: linux_misc_notalpha.c,v 1.63 2002/04/03 14:28:36 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: linux_misc_notalpha.c,v 1.69.4.1 2004/11/12 06:18:53 jmc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -52,8 +52,10 @@ __KERNEL_RCSID(0, "$NetBSD: linux_misc_notalpha.c,v 1.63 2002/04/03 14:28:36 tro
 #include <sys/ptrace.h>
 #include <sys/resource.h>
 #include <sys/resourcevar.h>
+#include <sys/time.h>
 #include <sys/wait.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/linux/common/linux_types.h>
@@ -78,39 +80,49 @@ __KERNEL_RCSID(0, "$NetBSD: linux_misc_notalpha.c,v 1.63 2002/04/03 14:28:36 tro
  * Fiddle with the timers to make it work.
  */
 int
-linux_sys_alarm(p, v, retval)
-	struct proc *p;
+linux_sys_alarm(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct linux_sys_alarm_args /* {
 		syscallarg(unsigned int) secs;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	int s;
 	struct itimerval *itp, it;
+	struct ptimer *ptp;
 
-	itp = &p->p_realtimer;
+	if (p->p_timers && p->p_timers->pts_timers[ITIMER_REAL])
+		itp = &p->p_timers->pts_timers[ITIMER_REAL]->pt_time;
+	else
+		itp = NULL;
 	s = splclock();
 	/*
 	 * Clear any pending timer alarms.
 	 */
-	callout_stop(&p->p_realit_ch);
-	timerclear(&itp->it_interval);
-	if (timerisset(&itp->it_value) &&
-	    timercmp(&itp->it_value, &time, >))
-		timersub(&itp->it_value, &time, &itp->it_value);
-	/*
-	 * Return how many seconds were left (rounded up)
-	 */
-	retval[0] = itp->it_value.tv_sec;
-	if (itp->it_value.tv_usec)
-		retval[0]++;
+	if (itp) {
+		callout_stop(&p->p_timers->pts_timers[ITIMER_REAL]->pt_ch);
+		timerclear(&itp->it_interval);
+		if (timerisset(&itp->it_value) &&
+		    timercmp(&itp->it_value, &time, >))
+			timersub(&itp->it_value, &time, &itp->it_value);
+		/*
+		 * Return how many seconds were left (rounded up)
+		 */
+		retval[0] = itp->it_value.tv_sec;
+		if (itp->it_value.tv_usec)
+			retval[0]++;
+	} else {
+		retval[0] = 0;
+	} 
 
 	/*
 	 * alarm(0) just resets the timer.
 	 */
 	if (SCARG(uap, secs) == 0) {
-		timerclear(&itp->it_value);
+		if (itp)
+			timerclear(&itp->it_value);
 		splx(s);
 		return 0;
 	}
@@ -126,24 +138,39 @@ linux_sys_alarm(p, v, retval)
 		return (EINVAL);
 	}
 
+	if (p->p_timers == NULL)
+		timers_alloc(p);
+	ptp = p->p_timers->pts_timers[ITIMER_REAL];
+	if (ptp == NULL) {
+		ptp = pool_get(&ptimer_pool, PR_WAITOK);
+		ptp->pt_ev.sigev_notify = SIGEV_SIGNAL;
+		ptp->pt_ev.sigev_signo = SIGALRM;
+		ptp->pt_overruns = 0;
+		ptp->pt_proc = p;
+		ptp->pt_type = CLOCK_REALTIME;
+		ptp->pt_entry = CLOCK_REALTIME;
+		callout_init(&ptp->pt_ch);
+		p->p_timers->pts_timers[ITIMER_REAL] = ptp;
+	}
+
 	if (timerisset(&it.it_value)) {
 		/*
 		 * Don't need to check hzto() return value, here.
 		 * callout_reset() does it for us.
 		 */
 		timeradd(&it.it_value, &time, &it.it_value);
-		callout_reset(&p->p_realit_ch, hzto(&it.it_value),
-		    realitexpire, p);
+		callout_reset(&ptp->pt_ch, hzto(&it.it_value),
+		    realtimerexpire, ptp);
 	}
-	p->p_realtimer = it;
+	ptp->pt_time = it;
 	splx(s);
 
 	return 0;
 }
 
 int
-linux_sys_nice(p, v, retval)
-	struct proc *p;
+linux_sys_nice(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -155,7 +182,7 @@ linux_sys_nice(p, v, retval)
         SCARG(&bsa, which) = PRIO_PROCESS;
         SCARG(&bsa, who) = 0;
 	SCARG(&bsa, prio) = SCARG(uap, incr);
-        return sys_setpriority(p, &bsa, retval);
+        return sys_setpriority(l, &bsa, retval);
 }
 
 /*
@@ -168,8 +195,8 @@ linux_sys_nice(p, v, retval)
  * really is the reclen, not the namelength.
  */
 int
-linux_sys_readdir(p, v, retval)
-	struct proc *p;
+linux_sys_readdir(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -180,7 +207,7 @@ linux_sys_readdir(p, v, retval)
 	} */ *uap = v;
 
 	SCARG(uap, count) = 1;
-	return linux_sys_getdents(p, uap, retval);
+	return linux_sys_getdents(l, uap, retval);
 }
 
 /*
@@ -188,8 +215,8 @@ linux_sys_readdir(p, v, retval)
  * need to deal with it.
  */
 int
-linux_sys_time(p, v, retval)
-	struct proc *p;
+linux_sys_time(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -215,8 +242,8 @@ linux_sys_time(p, v, retval)
  * and pass it on.
  */
 int
-linux_sys_utime(p, v, retval)
-	struct proc *p;
+linux_sys_utime(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -224,6 +251,7 @@ linux_sys_utime(p, v, retval)
 		syscallarg(const char *) path;
 		syscallarg(struct linux_utimbuf *)times;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	caddr_t sg;
 	int error;
 	struct sys_utimes_args ua;
@@ -249,17 +277,15 @@ linux_sys_utime(p, v, retval)
 	else
 		SCARG(&ua, tptr) = NULL;
 
-	return sys_utimes(p, &ua, retval);
+	return sys_utimes(l, &ua, retval);
 }
 
 /*
- * waitpid(2). Passed on to the NetBSD call, surrounded by code to
- * reserve some space for a NetBSD-style wait status, and converting
- * it to what Linux wants.
+ * waitpid(2).  Just forward on to linux_sys_wait4 with a NULL rusage.
  */
 int
-linux_sys_waitpid(p, v, retval)
-	struct proc *p;
+linux_sys_waitpid(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -268,40 +294,19 @@ linux_sys_waitpid(p, v, retval)
 		syscallarg(int *) status;
 		syscallarg(int) options;
 	} */ *uap = v;
-	struct sys_wait4_args w4a;
-	int error, *status, tstat;
-	caddr_t sg;
+	struct linux_sys_wait4_args linux_w4a;
 
-	if (SCARG(uap, status) != NULL) {
-		sg = stackgap_init(p, 0);
-		status = (int *) stackgap_alloc(p, &sg, sizeof status);
-	} else
-		status = NULL;
+	SCARG(&linux_w4a, pid) = SCARG(uap, pid);
+	SCARG(&linux_w4a, status) = SCARG(uap, status);
+	SCARG(&linux_w4a, options) = SCARG(uap, options);
+	SCARG(&linux_w4a, rusage) = NULL;
 
-	SCARG(&w4a, pid) = SCARG(uap, pid);
-	SCARG(&w4a, status) = status;
-	SCARG(&w4a, options) = SCARG(uap, options);
-	SCARG(&w4a, rusage) = NULL;
-
-	if ((error = sys_wait4(p, &w4a, retval)))
-		return error;
-
-	sigdelset(&p->p_sigctx.ps_siglist, SIGCHLD);
-
-	if (status != NULL) {
-		if ((error = copyin(status, &tstat, sizeof tstat)))
-			return error;
-
-		bsd_to_linux_wstat(&tstat);
-		return copyout(&tstat, SCARG(uap, status), sizeof tstat);
-	}
-
-	return 0;
+	return linux_sys_wait4(l, &linux_w4a, retval);
 }
 
 int
-linux_sys_setresgid(p, v, retval)
-	struct proc *p;
+linux_sys_setresgid(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -310,65 +315,22 @@ linux_sys_setresgid(p, v, retval)
 		syscallarg(gid_t) egid;
 		syscallarg(gid_t) sgid;
 	} */ *uap = v;
-	struct pcred *pc = p->p_cred;
-	gid_t rgid, egid, sgid;
-	int error;
-
-	rgid = SCARG(uap, rgid);
-	egid = SCARG(uap, egid);
-	sgid = SCARG(uap, sgid);
 
 	/*
 	 * Note: These checks are a little different than the NetBSD
 	 * setregid(2) call performs.  This precisely follows the
 	 * behavior of the Linux kernel.
 	 */
-	if (rgid != (gid_t)-1 &&
-	    rgid != pc->p_rgid &&
-	    rgid != pc->pc_ucred->cr_gid &&
-	    rgid != pc->p_svgid &&
-	    (error = suser(pc->pc_ucred, &p->p_acflag)))
-		return (error);
-
-	if (egid != (gid_t)-1 &&
-	    egid != pc->p_rgid &&
-	    egid != pc->pc_ucred->cr_gid &&
-	    egid != pc->p_svgid &&
-	    (error = suser(pc->pc_ucred, &p->p_acflag)))
-		return (error);
-
-	if (sgid != (gid_t)-1 &&
-	    sgid != pc->p_rgid &&
-	    sgid != pc->pc_ucred->cr_gid &&
-	    sgid != pc->p_svgid &&
-	    (error = suser(pc->pc_ucred, &p->p_acflag)))
-		return (error);
-
-	/*
-	 * Now assign the real, effective, and saved GIDs.
-	 * Note that Linux, unlike NetBSD in setregid(2), does not
-	 * set the saved UID in this call unless the user specifies
-	 * it.
-	 */
-	if (rgid != (gid_t)-1)
-		pc->p_rgid = rgid;
-
-	if (egid != (gid_t)-1) {
-		pc->pc_ucred = crcopy(pc->pc_ucred);
-		pc->pc_ucred->cr_gid = egid;
-	}
-
-	if (sgid != (gid_t)-1)
-		pc->p_svgid = sgid;
-
-	if (rgid != (gid_t)-1 && egid != (gid_t)-1 && sgid != (gid_t)-1)
-		p->p_flag |= P_SUGID;
-	return (0);
+	return do_setresgid(l, SCARG(uap,rgid), SCARG(uap, egid),
+			    SCARG(uap, sgid),
+			    ID_R_EQ_R | ID_R_EQ_E | ID_R_EQ_S |
+			    ID_E_EQ_R | ID_E_EQ_E | ID_E_EQ_S |
+			    ID_S_EQ_R | ID_S_EQ_E | ID_S_EQ_S );
 }
 
 int
-linux_sys_getresgid(p, v, retval)
-	struct proc *p;
+linux_sys_getresgid(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -377,6 +339,7 @@ linux_sys_getresgid(p, v, retval)
 		syscallarg(gid_t *) egid;
 		syscallarg(gid_t *) sgid;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct pcred *pc = p->p_cred;
 	int error;
 
@@ -403,14 +366,15 @@ linux_sys_getresgid(p, v, retval)
  * need to deal with it.
  */
 int
-linux_sys_stime(p, v, retval)
-	struct proc *p;
+linux_sys_stime(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct linux_sys_time_args /* {
 		linux_time_t *t;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct timeval atv;
 	linux_time_t tt;
 	int error;

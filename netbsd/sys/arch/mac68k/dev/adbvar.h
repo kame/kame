@@ -1,4 +1,4 @@
-/*	$NetBSD: adbvar.h,v 1.19 2000/07/03 08:59:27 scottr Exp $	*/
+/*	$NetBSD: adbvar.h,v 1.21 2003/04/09 01:55:14 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1994	Bradley A. Grantham
@@ -48,10 +48,6 @@ typedef struct adb_trace_xlate_s {
 
 extern adb_trace_xlate_t adb_trace_xlations[];
 
-#define ADB_MAXTRACE	(NBPG / sizeof(int) - 1)
-extern int	adb_traceq[ADB_MAXTRACE];
-extern int	adb_traceq_tail;
-extern int	adb_traceq_len;
 extern int	adb_polling;
 
 #ifdef DEBUG
@@ -66,12 +62,6 @@ extern int	adb_debug;
 
 /* adb.c */
 void	adb_enqevent __P((adb_event_t *event));
-int	adbopen __P((dev_t dev, int flag, int mode, struct proc *p));
-int	adbclose __P((dev_t dev, int flag, int mode, struct proc *p));
-int	adbread __P((dev_t dev, struct uio *uio, int flag));
-int	adbwrite __P((dev_t dev, struct uio *uio, int flag));
-int	adbioctl __P((dev_t , int , caddr_t , int , struct proc *));
-int	adbpoll __P((dev_t dev, int events, struct proc *p));
 
 int	adb_op_sync __P((Ptr, Ptr, Ptr, short));
 void	adb_op_comprout __P((void));

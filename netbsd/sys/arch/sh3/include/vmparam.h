@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.13 2002/05/09 12:28:08 uch Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.16 2003/04/02 07:36:03 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -40,6 +40,14 @@
 #define	_SH3_VMPARAM_H_
 #include <sys/queue.h>
 
+/*
+ * We use 4K pages on the sh3/sh4.  Override the PAGE_* definitions
+ * to be compile-time constants.
+ */
+#define	PAGE_SHIFT	12
+#define	PAGE_SIZE	(1 << PAGE_SHIFT)
+#define	PAGE_MASK	(PAGE_SIZE - 1)
+
 /* Virtual address map. */
 #define	VM_MIN_ADDRESS		((vaddr_t)0)
 #define	VM_MAXUSER_ADDRESS	((vaddr_t)0x7ffff000)
@@ -47,8 +55,7 @@
 #define	VM_MIN_KERNEL_ADDRESS	((vaddr_t)0xc0000000)
 #define	VM_MAX_KERNEL_ADDRESS	((vaddr_t)0xe0000000)
 
-/* User program text start address and top of stack */
-#define	USRTEXT			0x00001000
+/* top of stack */
 #define	USRSTACK		VM_MAXUSER_ADDRESS
 
 /* Virtual memory resoruce limit. */
@@ -78,10 +85,10 @@
 
 /* Size of user raw I/O map */
 #ifndef USRIOSIZE
-#define	USRIOSIZE		(MAXBSIZE / NBPG * 8)
+#define	USRIOSIZE		(MAXBSIZE / PAGE_SIZE * 8)
 #endif
 
-#define	VM_PHYS_SIZE		(USRIOSIZE * NBPG)
+#define	VM_PHYS_SIZE		(USRIOSIZE * PAGE_SIZE)
 
 /* Physical memory segments */
 #define	VM_PHYSSEG_STRAT	VM_PSTRAT_BSEARCH

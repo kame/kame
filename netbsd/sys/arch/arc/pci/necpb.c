@@ -1,4 +1,4 @@
-/*	$NetBSD: necpb.c,v 1.11 2002/05/16 01:01:33 thorpej Exp $	*/
+/*	$NetBSD: necpb.c,v 1.17 2003/11/01 19:23:52 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -67,6 +67,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: necpb.c,v 1.17 2003/11/01 19:23:52 tsutsui Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
@@ -117,9 +120,8 @@ void		necpb_intr_disestablish __P((pci_chipset_tag_t, void *));
 int		necpb_intr(unsigned, struct clockframe *);
 
 
-struct cfattach necpb_ca = {
-	sizeof(struct necpb_softc), necpbmatch, necpbattach,
-};
+CFATTACH_DECL(necpb, sizeof(struct necpb_softc),
+    necpbmatch, necpbattach, NULL, NULL);
 
 extern struct cfdriver necpb_cd;
 
@@ -241,6 +243,7 @@ necpbattach(parent, self, aux)
 	pba.pba_iot = &sc->sc_ncp->nc_iot;
 	pba.pba_memt = &sc->sc_ncp->nc_memt;
 	pba.pba_dmat = &sc->sc_ncp->nc_dmat;
+	pba.pba_dmat64 = NULL;
 	pba.pba_pc = &sc->sc_ncp->nc_pc;
 	pba.pba_flags = PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED;
 	pba.pba_bus = 0;
@@ -257,8 +260,8 @@ necpbprint(aux, pnp)
 	struct pcibus_attach_args *pba = aux;
 
 	if (pnp)
-		printf("%s at %s", pba->pba_busname, pnp);
-	printf(" bus %d", pba->pba_bus);
+		aprint_normal("%s at %s", pba->pba_busname, pnp);
+	aprint_normal(" bus %d", pba->pba_bus);
 	return (UNCONF);
 }
 
@@ -419,6 +422,9 @@ necpb_intr_establish(pc, ih, level, func, arg)
 	n->ih_arg = arg;
 	n->ih_next = NULL;
 	n->ih_intn = ih;
+	strlcpy(n->ih_evname, necpb_intr_string(pc, ih), sizeof(n->ih_evname));
+	evcnt_attach_dynamic(&n->ih_evcnt, EVCNT_TYPE_INTR, NULL, "necpb",
+	    n->ih_evname);
 
 	if (necpb_inttbl[ih] == NULL) {
 		necpb_inttbl[ih] = n;
@@ -464,6 +470,8 @@ necpb_intr_disestablish(pc, cookie)
 	} else
 		q->ih_next = n->ih_next;
 
+	evcnt_detach(&n->ih_evcnt);
+
 	free(n, M_DEVBUF);
 }
 
@@ -492,6 +500,7 @@ necpb_intr(mask, cf)
 				p = necpb_inttbl[a];
 				while (p != NULL) {
 					(*p->ih_func)(p->ih_arg);
+					p->ih_evcnt.ev_count++;
 					p = p->ih_next;
 				}
 			}

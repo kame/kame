@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.3.2.1 2002/05/24 22:24:21 perry Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.12 2003/07/15 03:36:21 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -43,6 +43,9 @@
  * determined (from possibilities mentioned in ioconf.c), and
  * the drivers are initialized.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.12 2003/07/15 03:36:21 lukem Exp $");
 
 #include "opt_kgdb.h"
 
@@ -113,9 +116,8 @@ cpu_configure()
 static int 	mainbus_match __P((struct device *, struct cfdata *, void *));
 static void	mainbus_attach __P((struct device *, struct device *, void *));
 
-struct cfattach mainbus_ca = {
-	sizeof(struct device), mainbus_match, mainbus_attach
-};
+CFATTACH_DECL(mainbus, sizeof(struct device),
+    mainbus_match, mainbus_attach, NULL, NULL);
 
 /*
  * Probe for the mainbus; always succeeds.
@@ -194,10 +196,9 @@ int sun68k_bus_search(parent, cf, aux)
 {
 	struct mainbus_attach_args *map = aux;
 	struct mainbus_attach_args ma;
-	cfmatch_t mf;
 
 	/* Check whether we're looking for a specifically named device */
-	if (map->ma_name != NULL && strcmp(map->ma_name, cf->cf_driver->cd_name) != 0)
+	if (map->ma_name != NULL && strcmp(map->ma_name, cf->cf_name) != 0)
 		return (0);
 
 #ifdef	DIAGNOSTIC
@@ -222,9 +223,9 @@ int sun68k_bus_search(parent, cf, aux)
 	 * will pass to the device's match and attach functions.
 	 */
 #ifdef	DIAGNOSTIC
-#define BAD_LOCATOR(ma_loc, what) panic("sun68k_bus_search: %s %s for: %s%d\n", \
+#define BAD_LOCATOR(ma_loc, what) panic("sun68k_bus_search: %s %s for: %s%d", \
 				     map-> ma_loc == LOCATOR_REQUIRED ? "missing" : "unexpected", \
-				     what, cf->cf_driver->cd_name, cf->cf_unit)
+				     what, cf->cf_name, cf->cf_unit)
 #else
 #define BAD_LOCATOR(ma_loc, what) return (0)
 #endif
@@ -243,8 +244,7 @@ int sun68k_bus_search(parent, cf, aux)
 	 * preserved for the related attach call.
 	 * XXX - This is a hack...
 	 */
-	mf = cf->cf_attach->ca_match;
-	if ((*mf)(parent, cf, &ma) > 0) {
+	if (config_match(parent, cf, &ma) > 0) {
 		config_attach(parent, cf, &ma, sun68k_bus_print);
 	}
 	return (0);
@@ -264,12 +264,12 @@ sun68k_bus_print(args, name)
 	struct mainbus_attach_args *ma = args;
 
 	if (name)
-		printf("%s:", name);
+		aprint_normal("%s:", name);
 
 	if (ma->ma_paddr != -1)
-		printf(" addr 0x%x", (unsigned int) ma->ma_paddr);
+		aprint_normal(" addr 0x%x", (unsigned int) ma->ma_paddr);
 	if (ma->ma_pri != -1)
-		printf(" ipl %d", ma->ma_pri);
+		aprint_normal(" ipl %d", ma->ma_pri);
 
 	return(UNCONF);
 }

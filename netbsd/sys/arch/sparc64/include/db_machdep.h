@@ -1,4 +1,4 @@
-/*	$NetBSD: db_machdep.h,v 1.13 2001/11/09 06:52:25 thorpej Exp $ */
+/*	$NetBSD: db_machdep.h,v 1.16 2004/01/06 20:41:23 petrov Exp $ */
 
 /*
  * Mach Operating System
@@ -26,8 +26,8 @@
  * the rights to redistribute these changes.
  */
 
-#ifndef	_SPARC_DB_MACHDEP_H_
-#define	_SPARC_DB_MACHDEP_H_
+#ifndef	_SPARC64_DB_MACHDEP_H_
+#define	_SPARC64_DB_MACHDEP_H_
 
 /*
  * Machine-dependent defines for new kernel debugger.
@@ -40,7 +40,6 @@
 #include <machine/trap.h>
 #include <machine/reg.h>
 
-/* end of mangling */
 
 typedef	vaddr_t		db_addr_t;	/* address - unsigned */
 typedef	long		db_expr_t;	/* expression - signed */
@@ -51,7 +50,7 @@ struct trapstate {
 	int64_t	tnpc;
 	int64_t	tt;
 };
-#if 1
+
 typedef struct {
 	struct trapframe64	ddb_tf;
 	struct frame64		ddb_fr;
@@ -59,27 +58,8 @@ typedef struct {
 	int			ddb_tl;
 	struct fpstate64	ddb_fpstate;
 } db_regs_t;
-#else
-typedef struct db_regs {
-	struct trapregs dbr_traps[4];
-	int		dbr_y;
-	char		dbr_tl;
-	char		dbr_canrestore;
-	char		dbr_cansave;
-	char		dbr_cleanwin;
-	char		dbr_cwp;
-	char		dbr_wstate;
-	int64_t		dbr_g[8];
-	int64_t		dbr_ag[8];
-	int64_t		dbr_ig[8];
-	int64_t		dbr_mg[8];
-	int64_t		dbr_out[8];
-	int64_t		dbr_local[8];
-	int64_t		dbr_in[8];
-} db_regs_t;
-#endif
 
-db_regs_t		ddb_regs;	/* register state */
+extern db_regs_t		ddb_regs;
 #define	DDB_REGS	(&ddb_regs)
 #define	DDB_TF		(&ddb_regs.ddb_tf)
 #define	DDB_FR		(&ddb_regs.ddb_fr)
@@ -96,6 +76,7 @@ db_regs_t		ddb_regs;	/* register state */
 	(regs)->ddb_tf.tf_npc = n + 4;			\
 } while(0)
 
+#define	BKPT_ADDR(addr)	(addr)		/* breakpoint address */
 #define	BKPT_INST	0x91d02001	/* breakpoint instruction */
 #define	BKPT_SIZE	(4)		/* size of breakpoint inst */
 #define	BKPT_SET(inst)	(BKPT_INST)
@@ -155,7 +136,7 @@ int kdb_trap __P((int, struct trapframe64 *));
  * KGDB definitions
  */
 typedef u_long		kgdb_reg_t;
-#define KGDB_NUMREGS	72
-#define KGDB_BUFLEN	1024
+#define KGDB_NUMREGS	125
+#define KGDB_BUFLEN	2048
 
-#endif	/* _SPARC_DB_MACHDEP_H_ */
+#endif	/* _SPARC64_DB_MACHDEP_H_ */

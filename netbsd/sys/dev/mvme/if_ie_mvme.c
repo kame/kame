@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ie_mvme.c,v 1.1 2002/02/12 20:38:43 scw Exp $	*/
+/*	$NetBSD: if_ie_mvme.c,v 1.6 2003/07/14 15:47:19 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2002 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ie_mvme.c,v 1.6 2003/07/14 15:47:19 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -74,9 +77,8 @@ struct ie_pcctwo_softc {
 	struct evcnt ps_evcnt;
 };
 
-struct cfattach ie_pcctwo_ca = {
-	sizeof(struct ie_pcctwo_softc), ie_pcctwo_match, ie_pcctwo_attach
-};
+CFATTACH_DECL(ie_pcctwo, sizeof(struct ie_pcctwo_softc),
+    ie_pcctwo_match, ie_pcctwo_attach, NULL, NULL);
 
 extern struct cfdriver ie_cd;
 
@@ -288,7 +290,7 @@ ie_pcctwo_attach(parent, self, args)
 	    0, &ps->ps_bush);
 
 	/* Get contiguous DMA-able memory for the IE chip */
-	if (bus_dmamem_alloc(pa->pa_dmat, ether_data_buff_size, NBPG, 0,
+	if (bus_dmamem_alloc(pa->pa_dmat, ether_data_buff_size, PAGE_SIZE, 0,
 		&seg, 1, &rseg,
 		BUS_DMA_NOWAIT | BUS_DMA_ONBOARD_RAM | BUS_DMA_24BIT) != 0) {
 		printf("%s: Failed to allocate ether buffer\n", self->dv_xname);

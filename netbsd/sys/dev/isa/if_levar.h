@@ -1,4 +1,4 @@
-/*	$NetBSD: if_levar.h,v 1.12.40.1 2002/06/29 08:35:03 lukem Exp $	*/
+/*	$NetBSD: if_levar.h,v 1.13 2002/06/29 05:30:44 rafal Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.

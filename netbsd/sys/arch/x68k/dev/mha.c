@@ -1,4 +1,4 @@
-/*	$NetBSD: mha.c,v 1.28 2002/04/05 18:27:47 bouyer Exp $	*/
+/*	$NetBSD: mha.c,v 1.34 2003/07/15 01:44:52 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996-1999 The NetBSD Foundation, Inc.
@@ -64,6 +64,9 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mha.c,v 1.34 2003/07/15 01:44:52 lukem Exp $");
 
 #include "opt_ddb.h"
 
@@ -271,9 +274,8 @@ void	mha_dump_driver __P((struct mha_softc *));
 
 static int mha_dataio_dma __P((int, int, struct mha_softc *, u_char *, int));
 
-struct cfattach mha_ca = {
-	sizeof(struct mha_softc), mhamatch, mhaattach
-};
+CFATTACH_DECL(mha, sizeof(struct mha_softc),
+    mhamatch, mhaattach, NULL, NULL);
 
 extern struct cfdriver mha_cd;
 
@@ -469,13 +471,13 @@ mha_init(sc)
 				     sc->sc_dmaseg, 1, &sc->sc_ndmasegs,
 				     BUS_DMA_NOWAIT);
 		if (r)
-			panic("mha_init: cannot allocate dma memory");
+			panic("mha_init: cannot allocate DMA memory");
 		if (sc->sc_ndmasegs != 1)
 			panic("mha_init: number of segment > 1??");
 		r = bus_dmamem_map(sc->sc_dmat, sc->sc_dmaseg, sc->sc_ndmasegs,
 				   MAXBSIZE, &sc->sc_dmabuf, BUS_DMA_NOWAIT);
 		if (r)
-			panic("mha_init: cannot map dma memory");
+			panic("mha_init: cannot map DMA memory");
 		r = bus_dmamap_create(sc->sc_dmat, MAXBSIZE, 1,
 				      MAXBSIZE, 0, BUS_DMA_NOWAIT,
 				      &sc->sc_dmamap);
@@ -485,7 +487,7 @@ mha_init(sc)
 				    sc->sc_dmabuf, MAXBSIZE, NULL,
 				    BUS_DMA_NOWAIT);
 		if (r)
-			panic("mha_init: cannot load dma buffer into dmamap");
+			panic("mha_init: cannot load DMA buffer into dmamap");
 		sc->sc_p = 0;
 	} else {
 		/* Cancel any active commands. */
@@ -1519,6 +1521,7 @@ nextbyte:
 
 out:
 	/* Disable REQ/ACK protocol. */
+	return;
 }
 
 

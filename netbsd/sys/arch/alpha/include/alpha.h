@@ -1,9 +1,43 @@
-/* $NetBSD: alpha.h,v 1.17 2001/06/14 22:56:55 thorpej Exp $ */
+/* $NetBSD: alpha.h,v 1.19 2003/08/07 16:26:32 agc Exp $ */
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1982, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: cpu.h 1.16 91/03/25$
+ *
+ *	@(#)cpu.h	8.4 (Berkeley) 1/5/94
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -65,7 +99,7 @@ typedef union alpha_t_float {
 #include <machine/stdarg.h>
 
 struct pcb;
-struct proc;
+struct lwp;
 struct reg;
 struct rpb;
 struct trapframe;
@@ -92,7 +126,7 @@ u_int64_t console_restart(struct trapframe *);
 void	do_sir(void);
 void	dumpconf(void);
 void	exception_return(void);					/* MAGIC */
-void	frametoreg(struct trapframe *, struct reg *);
+void	frametoreg(const struct trapframe *, struct reg *);
 long	fswintrberr(void);					/* MAGIC */
 void	init_bootstrap_console(void);
 void	init_prom_interface(struct rpb *);
@@ -103,9 +137,9 @@ void	machine_check(unsigned long, struct trapframe *, unsigned long,
 u_int64_t hwrpb_checksum(void);
 void	hwrpb_restart_setup(void);
 void	regdump(struct trapframe *);
-void	regtoframe(struct reg *, struct trapframe *);
+void	regtoframe(const struct reg *, struct trapframe *);
 void	savectx(struct pcb *);
-void    switch_exit(struct proc *);				/* MAGIC */
+void    switch_exit(struct lwp *, void (*)(struct lwp *));	/* MAGIC */
 void	proc_trampoline(void);					/* MAGIC */
 void	trap(unsigned long, unsigned long, unsigned long, unsigned long,
 	    struct trapframe *);
@@ -114,7 +148,7 @@ void	enable_nsio_ide(bus_space_tag_t);
 char *	dot_conv(unsigned long);
 
 void	fpusave_cpu(struct cpu_info *, int);
-void	fpusave_proc(struct proc *, int);
+void	fpusave_proc(struct lwp *, int);
 
 /* Multiprocessor glue; cpu.c */
 
@@ -140,11 +174,11 @@ void alpha_ldt(int, t_float *);					/* MAGIC */
 uint64_t alpha_read_fpcr(void);					/* MAGIC */
 void alpha_write_fpcr(u_int64_t);				/* MAGIC */
 
-u_int64_t alpha_read_fp_c(struct proc *);
-void alpha_write_fp_c(struct proc *, u_int64_t);
+u_int64_t alpha_read_fp_c(struct lwp *);
+void alpha_write_fp_c(struct lwp *, u_int64_t);
 
-void alpha_enable_fp(struct proc *, int);
-int alpha_fp_complete(u_long, u_long, struct proc *, u_int64_t *);
+void alpha_enable_fp(struct lwp *, int);
+int alpha_fp_complete(u_long, u_long, struct lwp *, u_int64_t *);
 
 /* Security sensitive rate limiting printf */
 

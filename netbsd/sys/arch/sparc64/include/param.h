@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.30 2002/04/18 16:31:47 eeh Exp $ */
+/*	$NetBSD: param.h,v 1.32 2003/08/07 16:29:49 agc Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -290,12 +286,9 @@ extern int cputyp;
  */
 
 #define CPU_ISSUN4U	(1)
-#define CPU_ISSUN4MOR4U	(1)
 #define CPU_ISSUN4M	(0)
 #define CPU_ISSUN4C	(0)
 #define CPU_ISSUN4	(0)
-#define CPU_ISSUN4OR4C	(0)
-#define CPU_ISSUN4COR4M	(0)
 
 
 #define	PGSHIFT		13		/* log2(NBPG) */

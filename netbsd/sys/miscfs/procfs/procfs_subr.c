@@ -1,10 +1,42 @@
-/*	$NetBSD: procfs_subr.c,v 1.40 2001/12/05 00:58:05 thorpej Exp $	*/
+/*	$NetBSD: procfs_subr.c,v 1.58 2003/09/27 13:29:02 darcy Exp $	*/
+
+/*
+ * Copyright (c) 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Jan-Simon Pendry.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)procfs_subr.c	8.6 (Berkeley) 5/14/95
+ */
 
 /*
  * Copyright (c) 1994 Christopher G. Demetriou.  All rights reserved.
  * Copyright (c) 1993 Jan-Simon Pendry
- * Copyright (c) 1993
- *	The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * Jan-Simon Pendry.
@@ -41,7 +73,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: procfs_subr.c,v 1.40 2001/12/05 00:58:05 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: procfs_subr.c,v 1.58 2003/09/27 13:29:02 darcy Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,12 +83,14 @@ __KERNEL_RCSID(0, "$NetBSD: procfs_subr.c,v 1.40 2001/12/05 00:58:05 thorpej Exp
 #include <sys/vnode.h>
 #include <sys/malloc.h>
 #include <sys/stat.h>
+#include <sys/file.h>
+#include <sys/filedesc.h>
 
 #include <miscfs/procfs/procfs.h>
 
 void procfs_hashins __P((struct pfsnode *));
 void procfs_hashrem __P((struct pfsnode *));
-struct vnode *procfs_hashget __P((pid_t, pfstype, struct mount *));
+struct vnode *procfs_hashget __P((pid_t, pfstype, int, struct mount *));
 
 LIST_HEAD(pfs_hashhead, pfsnode) *pfs_hashtbl;
 u_long	pfs_ihash;	/* size of hash table - 1 */
@@ -94,76 +128,124 @@ struct simplelock pfs_hash_slock;
  * the vnode free list.
  */
 int
-procfs_allocvp(mp, vpp, pid, pfs_type)
+procfs_allocvp(mp, vpp, pid, pfs_type, fd)
 	struct mount *mp;
 	struct vnode **vpp;
-	long pid;
+	pid_t pid;
 	pfstype pfs_type;
+	int fd;
 {
 	struct pfsnode *pfs;
 	struct vnode *vp;
 	int error;
 
 	do {
-		if ((*vpp = procfs_hashget(pid, pfs_type, mp)) != NULL)
+		if ((*vpp = procfs_hashget(pid, pfs_type, fd, mp)) != NULL)
 			return (0);
 	} while (lockmgr(&pfs_hashlock, LK_EXCLUSIVE|LK_SLEEPFAIL, 0));
 
-	if ((error = getnewvnode(VT_PROCFS, mp, procfs_vnodeop_p, vpp)) != 0) {
+	if ((error = getnewvnode(VT_PROCFS, mp, procfs_vnodeop_p, &vp)) != 0) {
 		*vpp = NULL;
 		lockmgr(&pfs_hashlock, LK_RELEASE, NULL);
 		return (error);
 	}
-	vp = *vpp;
 
 	MALLOC(pfs, void *, sizeof(struct pfsnode), M_TEMP, M_WAITOK);
 	vp->v_data = pfs;
 
-	pfs->pfs_pid = (pid_t) pid;
+	pfs->pfs_pid = pid;
 	pfs->pfs_type = pfs_type;
 	pfs->pfs_vnode = vp;
 	pfs->pfs_flags = 0;
-	pfs->pfs_fileno = PROCFS_FILENO(pid, pfs_type);
+	pfs->pfs_fileno = PROCFS_FILENO(pid, pfs_type, fd);
+	pfs->pfs_fd = fd;
 
 	switch (pfs_type) {
-	case Proot:	/* /proc = dr-xr-xr-x */
+	case PFSroot:	/* /proc = dr-xr-xr-x */
 		pfs->pfs_mode = S_IRUSR|S_IXUSR|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH;
 		vp->v_type = VDIR;
 		vp->v_flag = VROOT;
 		break;
 
-	case Pcurproc:	/* /proc/curproc = lr-xr-xr-x */
-	case Pself:	/* /proc/self    = lr-xr-xr-x */
+	case PFScurproc:	/* /proc/curproc = lr-xr-xr-x */
+	case PFSself:	/* /proc/self    = lr-xr-xr-x */
 		pfs->pfs_mode = S_IRUSR|S_IXUSR|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH;
 		vp->v_type = VLNK;
 		break;
 
-	case Pproc:	/* /proc/N = dr-xr-xr-x */
-		pfs->pfs_mode = S_IRUSR|S_IXUSR|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH;
-		vp->v_type = VDIR;
+	case PFSproc:	/* /proc/N = dr-xr-xr-x */
+	case PFSfd:
+		if (fd == -1) {	/* /proc/N/fd = dr-xr-xr-x */
+			pfs->pfs_mode = S_IRUSR|S_IXUSR;
+			vp->v_type = VDIR;
+		} else {	/* /proc/N/fd/M = [ps-]rw------- */
+			struct file *fp;
+			struct vnode *vxp;
+			struct proc *pown;
+
+			/* XXX can procfs_getfp() ever fail here? */
+			if ((error = procfs_getfp(pfs, &pown, &fp)) != 0)
+				goto bad;
+			FILE_USE(fp);
+
+			pfs->pfs_mode = S_IRUSR|S_IWUSR;
+			switch (fp->f_type) {
+			case DTYPE_VNODE:
+				vxp = (struct vnode *)fp->f_data;
+
+				/*
+				 * We make symlinks for directories 
+				 * to avoid cycles.
+				 */
+				if (vxp->v_type == VDIR)
+					goto symlink;
+				vp->v_type = vxp->v_type;
+				break;
+			case DTYPE_PIPE:
+				vp->v_type = VFIFO;
+				break;
+			case DTYPE_SOCKET:
+				vp->v_type = VSOCK;
+				break;
+			case DTYPE_KQUEUE:
+			case DTYPE_MISC:
+			symlink:
+				pfs->pfs_mode = S_IRUSR|S_IXUSR|S_IRGRP|
+				    S_IXGRP|S_IROTH|S_IXOTH;
+				vp->v_type = VLNK;
+				break;
+			default:
+				error = EOPNOTSUPP;
+				FILE_UNUSE(fp, pown);
+				goto bad;
+			}
+			FILE_UNUSE(fp, pown);
+		}
 		break;
 
-	case Pfile:	/* /proc/N/file = -rw------- */
-	case Pmem:	/* /proc/N/mem = -rw------- */
-	case Pregs:	/* /proc/N/regs = -rw------- */
-	case Pfpregs:	/* /proc/N/fpregs = -rw------- */
+	case PFSfile:	/* /proc/N/file = -rw------- */
+	case PFSmem:	/* /proc/N/mem = -rw------- */
+	case PFSregs:	/* /proc/N/regs = -rw------- */
+	case PFSfpregs:	/* /proc/N/fpregs = -rw------- */
 		pfs->pfs_mode = S_IRUSR|S_IWUSR;
 		vp->v_type = VREG;
 		break;
 
-	case Pctl:	/* /proc/N/ctl = --w------ */
-	case Pnote:	/* /proc/N/note = --w------ */
-	case Pnotepg:	/* /proc/N/notepg = --w------ */
+	case PFSctl:	/* /proc/N/ctl = --w------ */
+	case PFSnote:	/* /proc/N/note = --w------ */
+	case PFSnotepg:	/* /proc/N/notepg = --w------ */
 		pfs->pfs_mode = S_IWUSR;
 		vp->v_type = VREG;
 		break;
 
-	case Pmap:	/* /proc/N/map = -r--r--r-- */
-	case Pmaps:	/* /proc/N/maps = -r--r--r-- */
-	case Pstatus:	/* /proc/N/status = -r--r--r-- */
-	case Pcmdline:	/* /proc/N/cmdline = -r--r--r-- */
-	case Pmeminfo:	/* /proc/meminfo = -r--r--r-- */
-	case Pcpuinfo:	/* /proc/cpuinfo = -r--r--r-- */
+	case PFSmap:	/* /proc/N/map = -r--r--r-- */
+	case PFSmaps:	/* /proc/N/maps = -r--r--r-- */
+	case PFSstatus:	/* /proc/N/status = -r--r--r-- */
+	case PFSstat:	/* /proc/N/stat = -r--r--r-- */
+	case PFScmdline:	/* /proc/N/cmdline = -r--r--r-- */
+	case PFSmeminfo:	/* /proc/meminfo = -r--r--r-- */
+	case PFScpuinfo:	/* /proc/cpuinfo = -r--r--r-- */
+	case PFSuptime:	/* /proc/uptime = -r--r--r-- */
 		pfs->pfs_mode = S_IRUSR|S_IRGRP|S_IROTH;
 		vp->v_type = VREG;
 		break;
@@ -182,6 +264,13 @@ procfs_allocvp(mp, vpp, pid, pfs_type)
 	uvm_vnp_setsize(vp, 0);
 	lockmgr(&pfs_hashlock, LK_RELEASE, NULL);
 
+	*vpp = vp;
+	return (0);
+
+ bad:
+	lockmgr(&pfs_hashlock, LK_RELEASE, NULL);
+	FREE(pfs, M_TEMP);
+	ungetnewvnode(vp);
 	return (error);
 }
 
@@ -207,16 +296,24 @@ procfs_rw(v)
 	struct uio *uio = ap->a_uio;
 	struct proc *curp = uio->uio_procp;
 	struct pfsnode *pfs = VTOPFS(vp);
+	struct lwp *l;
 	struct proc *p;
 
 	p = PFIND(pfs->pfs_pid);
 	if (p == 0)
 		return (EINVAL);
 
+	/* XXX NJWLWP
+	 * The entire procfs interface needs work to be useful to
+	 * a process with multiple LWPs. For the moment, we'll 
+	 * just kluge this and fail on others.
+	 */
+	l = proc_representative_lwp(p);
+	
 	switch (pfs->pfs_type) {
-	case Pregs:
-	case Pfpregs:
-	case Pmem:
+	case PFSregs:
+	case PFSfpregs:
+	case PFSmem:
 #if defined(__HAVE_PROCFS_MACHDEP) && defined(PROCFS_MACHDEP_PROTECT_CASES)
 	PROCFS_MACHDEP_PROTECT_CASES
 #endif
@@ -234,43 +331,52 @@ procfs_rw(v)
 	}
 
 	switch (pfs->pfs_type) {
-	case Pnote:
-	case Pnotepg:
+	case PFSnote:
+	case PFSnotepg:
 		return (procfs_donote(curp, p, pfs, uio));
 
-	case Pregs:
-		return (procfs_doregs(curp, p, pfs, uio));
+	case PFSregs:
+		return (procfs_doregs(curp, l, pfs, uio));
 
-	case Pfpregs:
-		return (procfs_dofpregs(curp, p, pfs, uio));
+	case PFSfpregs:
+		return (procfs_dofpregs(curp, l, pfs, uio));
 
-	case Pctl:
-		return (procfs_doctl(curp, p, pfs, uio));
+	case PFSctl:
+		return (procfs_doctl(curp, l, pfs, uio));
 
-	case Pstatus:
-		return (procfs_dostatus(curp, p, pfs, uio));
+	case PFSstatus:
+		return (procfs_dostatus(curp, l, pfs, uio));
 
-	case Pmap:
+	case PFSstat:
+		return (procfs_do_pid_stat(curp, l, pfs, uio));
+
+	case PFSmap:
 		return (procfs_domap(curp, p, pfs, uio, 0));
 
-	case Pmaps:
+	case PFSmaps:
 		return (procfs_domap(curp, p, pfs, uio, 1));
 
-	case Pmem:
+	case PFSmem:
 		return (procfs_domem(curp, p, pfs, uio));
 
-	case Pcmdline:
+	case PFScmdline:
 		return (procfs_docmdline(curp, p, pfs, uio));
 
-	case Pmeminfo:
+	case PFSmeminfo:
 		return (procfs_domeminfo(curp, p, pfs, uio));
 
-	case Pcpuinfo:
+	case PFScpuinfo:
 		return (procfs_docpuinfo(curp, p, pfs, uio));
+
+	case PFSfd:
+		return (procfs_dofd(curp, p, pfs, uio));
+
+	case PFSuptime:
+		return (procfs_douptime(curp, p, pfs, uio));
 
 #ifdef __HAVE_PROCFS_MACHDEP
 	PROCFS_MACHDEP_NODETYPE_CASES
-		return (procfs_machdep_rw(curp, p, pfs, uio));
+		return (procfs_machdep_rw(curp, l, pfs, uio));
 #endif
 
 	default:
@@ -356,8 +462,7 @@ procfs_hashreinit()
 {
 	struct pfsnode *pp;
 	struct pfs_hashhead *oldhash, *hash;
-	u_long oldmask, mask, val;
-	int i;
+	u_long i, oldmask, mask, val;
 
 	hash = hashinit(desiredvnodes / 4, HASH_LIST, M_UFSMNT, M_WAITOK,
 	    &mask);
@@ -388,9 +493,10 @@ procfs_hashdone()
 }
 
 struct vnode *
-procfs_hashget(pid, type, mp)
+procfs_hashget(pid, type, fd, mp)
 	pid_t pid;
 	pfstype type;
+	int fd;
 	struct mount *mp;
 {
 	struct pfs_hashhead *ppp;
@@ -403,7 +509,7 @@ loop:
 	LIST_FOREACH(pp, ppp, pfs_hash) {
 		vp = PFSTOV(pp);
 		if (pid == pp->pfs_pid && pp->pfs_type == type &&
-		    vp->v_mount == mp) {
+		    pp->pfs_fd == fd && vp->v_mount == mp) {
 			simple_lock(&vp->v_interlock);
 			simple_unlock(&pfs_hash_slock);
 			if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK))
@@ -466,4 +572,25 @@ procfs_revoke_vnodes(p, arg)
 		    vp->v_mount == mp)
 			VOP_REVOKE(vp, REVOKEALL);
 	}
+}
+
+int
+procfs_getfp(pfs, pown, fp)
+	struct pfsnode *pfs;
+	struct proc **pown;
+	struct file **fp;
+{
+	struct proc *p = PFIND(pfs->pfs_pid);
+
+	if (p == NULL)
+		return ESRCH;
+
+	if (pfs->pfs_fd == -1)
+		return EINVAL;
+
+	if ((*fp = fd_getfile(p->p_fd, pfs->pfs_fd)) == NULL)
+		return EBADF;
+
+	*pown = p;
+	return 0;
 }

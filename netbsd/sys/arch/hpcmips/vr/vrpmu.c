@@ -1,4 +1,4 @@
-/*	$NetBSD: vrpmu.c,v 1.14 2002/01/29 18:53:22 uch Exp $	*/
+/*	$NetBSD: vrpmu.c,v 1.17 2003/07/15 02:29:36 lukem Exp $	*/
 
 /*
  * Copyright (c) 1999 M. Warner Losh.  All rights reserved.
@@ -26,6 +26,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vrpmu.c,v 1.17 2003/07/15 02:29:36 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -74,9 +77,8 @@ void vrpmu_dump_intr(void *);
 void vrpmu_dump_intr2(unsigned int, unsigned int);
 void vrpmu_dump_regs(void *);
 
-struct cfattach vrpmu_ca = {
-	sizeof(struct vrpmu_softc), vrpmumatch, vrpmuattach
-};
+CFATTACH_DECL(vrpmu, sizeof(struct vrpmu_softc),
+    vrpmumatch, vrpmuattach, NULL, NULL);
 
 struct vrpmu_softc *this_pmu;
 

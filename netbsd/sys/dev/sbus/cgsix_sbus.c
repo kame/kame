@@ -1,4 +1,4 @@
-/*	$NetBSD: cgsix_sbus.c,v 1.8 2002/03/20 17:34:23 eeh Exp $ */
+/*	$NetBSD: cgsix_sbus.c,v 1.13 2004/03/17 17:04:58 pk Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cgsix_sbus.c,v 1.8 2002/03/20 17:34:23 eeh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cgsix_sbus.c,v 1.13 2004/03/17 17:04:58 pk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -80,10 +80,8 @@ struct cgsix_sbus_softc {
 	struct sbusdev bss_sd;
 };
 
-struct cfattach cgsix_sbus_ca = {
-	sizeof(struct cgsix_sbus_softc), cgsixmatch, cgsixattach
-};
-
+CFATTACH_DECL(cgsix_sbus, sizeof(struct cgsix_sbus_softc),
+    cgsixmatch, cgsixattach, NULL, NULL);
 
 /*
  * Match a cgsix.
@@ -96,7 +94,7 @@ cgsixmatch(parent, cf, aux)
 {
 	struct sbus_attach_args *sa = aux;
 
-	return (strcmp(cf->cf_driver->cd_name, sa->sa_name) == 0);
+	return (strcmp(cf->cf_name, sa->sa_name) == 0);
 }
 
 
@@ -185,7 +183,7 @@ cgsixattach(parent, self, aux)
 	sc->sc_fbc = (struct cg6_fbc *)bus_space_vaddr(sa->sa_bustag, bh);
 
 	sbus_establish(sd, &sc->sc_dev);
-	name = PROM_getpropstring(node, "model");
+	name = prom_getpropstring(node, "model");
 
 	isconsole = fb_is_console(node);
 	if (isconsole && cgsix_use_rasterconsole) {

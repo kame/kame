@@ -1,4 +1,4 @@
-/*	$NetBSD: pcons.c,v 1.1 2002/03/22 00:22:44 fredette Exp $	*/
+/*	$NetBSD: pcons.c,v 1.7 2003/07/15 03:36:12 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2000 Eduardo E. Horvath
@@ -33,6 +33,9 @@
  * driver(s) are appropriate.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pcons.c,v 1.7 2003/07/15 03:36:12 lukem Exp $");
+
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -49,7 +52,6 @@
 
 #include <machine/autoconf.h>
 #include <machine/promlib.h>
-#include <machine/conf.h>
 #include <machine/cpu.h>
 #include <machine/psl.h>
 
@@ -60,15 +62,27 @@
 static int pconsmatch __P((struct device *, struct cfdata *, void *));
 static void pconsattach __P((struct device *, struct device *, void *));
 
-struct cfattach pcons_ca = {
-	sizeof(struct pconssoftc), pconsmatch, pconsattach
-};
+CFATTACH_DECL(pcons, sizeof(struct pconssoftc),
+    pconsmatch, pconsattach, NULL, NULL);
 
 extern struct cfdriver pcons_cd;
 static struct cnm_state pcons_cnm_state;
 
 static int pconsprobe __P((void));
 extern struct consdev *cn_tab;
+
+dev_type_open(pconsopen);
+dev_type_close(pconsclose);
+dev_type_read(pconsread);
+dev_type_write(pconswrite);
+dev_type_ioctl(pconsioctl);
+dev_type_tty(pconstty);
+dev_type_poll(pconspoll);
+
+const struct cdevsw pcons_cdevsw = {
+	pconsopen, pconsclose, pconsread, pconswrite, pconsioctl,
+	nostop, pconstty, pconspoll, nommap, ttykqfilter, D_TTY
+};
 
 static int
 pconsmatch(parent, match, aux)
@@ -226,13 +240,6 @@ pconstty(dev)
 	struct pconssoftc *sc = pcons_cd.cd_devs[minor(dev)];
 
 	return sc->of_tty;
-}
-
-void
-pconsstop(tp, flag)
-	struct tty *tp;
-	int flag;
-{
 }
 
 static void

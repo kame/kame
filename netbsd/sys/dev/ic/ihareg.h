@@ -1,7 +1,12 @@
-/*	$NetBSD: ihareg.h,v 1.3 2001/11/17 21:26:12 tsutsui Exp $ */
-/*
- * Initio INI-9xxxU/UW SCSI Device Driver
+/*	$NetBSD: ihareg.h,v 1.7 2003/11/02 11:07:45 wiz Exp $ */
+
+/*-
+ * Device driver for the INI-9XXXU/UW or INIC-940/950 PCI SCSI Controller.
  *
+ *  Written for 386bsd and FreeBSD by
+ *	Winston Hung		<winstonh@initio.com>
+ *
+ * Copyright (c) 1997-1999 Initio Corp.
  * Copyright (c) 2000 Ken Westerback
  * All rights reserved.
  *
@@ -25,22 +30,6 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- *-------------------------------------------------------------------------
- *
- * Ported from i91uscsi.h, provided by Initio Corporation, which probably
- * came from the same people who provided i91u.c:
- *
- * Device driver for the INI-9XXXU/UW or INIC-940/950 PCI SCSI Controller.
- *
- * FreeBSD
- *
- *  Written for 386bsd and FreeBSD by
- *	Winston Hung		<winstonh@initio.com>
- *
- * Copyright (c) 1997-99 Initio Corp.  All rights reserved.
- *
- *-------------------------------------------------------------------------
  */
 
 /*
@@ -156,7 +145,7 @@
 #define TUL_SBID	0x89	       /* R   SCSI BUS ID		     */
 #define TUL_SID		0x89	       /* W   SCSI ID			     */
 #define TUL_SALVC	0x8A	       /* R   FIFO Avail Cnt/Identify Msg    */
-#define     MSG_IDENTIFY_LUNMASK 0x07
+#define     IHA_MSG_IDENTIFY_LUNMASK 0x07
 #define TUL_STIMO	0x8A	       /* W   Sel/Resel Time Out Register    */
 #define     STIMO_250MS	153	       /*     in units of 1.6385us           */
 #define TUL_SDATI	0x8B	       /* R   SCSI Bus contents		     */
@@ -175,17 +164,17 @@
 #define TUL_SCMD	0x91	       /* R/W SCSI Command		     */
 #define     NO_OP	    0x00       /*     Place Holder for tulip_wait()  */
 #define     SEL_NOATN	    0x01       /*     Select w/o ATN Sequence	     */
-#define     XF_FIFO_OUT	    0x03       /*     FIFO Xfer Infomation out	     */
+#define     XF_FIFO_OUT	    0x03       /*     FIFO Xfer Information out	     */
 #define     MSG_ACCEPT	    0x0F       /*     Message Accept		     */
 #define     SEL_ATN	    0x11       /*     Select w ATN Sequence	     */
 #define     SEL_ATNSTOP	    0x12       /*     Select w ATN & Stop Sequence   */
 #define     SELATNSTOP	    0x1E       /*     Select w ATN & Stop Sequence   */
 #define     SEL_ATN3	    0x31       /*     Select w ATN3 Sequence	     */
-#define     XF_DMA_OUT	    0x43       /*     DMA Xfer Infomation out	     */
+#define     XF_DMA_OUT	    0x43       /*     DMA Xfer Information out	     */
 #define     EN_RESEL	    0x80       /*     Enable Reselection	     */
-#define     XF_FIFO_IN	    0x83       /*     FIFO Xfer Infomation in	     */
+#define     XF_FIFO_IN	    0x83       /*     FIFO Xfer Information in	     */
 #define     CMD_COMP	    0x84       /*     Command Complete Sequence	     */
-#define     XF_DMA_IN	    0xC3       /*     DMA Xfer Infomation in	     */
+#define     XF_DMA_IN	    0xC3       /*     DMA Xfer Information in	     */
 #define TUL_STEST0	0x92	       /* R/W Test0			     */
 #define TUL_STEST1	0x93	       /* R/W Test1			     */
 

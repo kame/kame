@@ -1,4 +1,4 @@
-/*	$NetBSD: brgphyreg.h,v 1.1.18.1 2003/01/28 06:27:37 jmc Exp $	*/
+/*	$NetBSD: brgphyreg.h,v 1.2 2002/06/22 14:37:58 fvdl Exp $	*/
 
 /*
  * Copyright (c) 2000

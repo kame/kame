@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_32_machdep.c,v 1.7 2002/04/02 10:25:21 jmc Exp $	 */
+/*	$NetBSD: svr4_32_machdep.c,v 1.18 2003/11/09 16:41:53 martin Exp $	 */
 
 /*-
  * Copyright (c) 1994 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: svr4_32_machdep.c,v 1.18 2003/11/09 16:41:53 martin Exp $");
+
 #ifndef _LKM
 #include "opt_ddb.h"
 #endif
@@ -53,6 +56,7 @@
 #include <sys/signalvar.h>
 #include <sys/malloc.h>
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 #include <sys/exec_elf.h>
 #include <sys/types.h>
@@ -63,6 +67,7 @@
 #include <compat/svr4_32/svr4_32_syscallargs.h>
 #include <compat/svr4_32/svr4_32_util.h>
 #include <compat/svr4_32/svr4_32_exec.h>
+#include <compat/netbsd32/netbsd32_exec.h>
 
 #include <machine/cpu.h>
 #include <machine/psl.h>
@@ -74,14 +79,14 @@
 static void svr4_32_getsiginfo __P((union svr4_32_siginfo *, int, u_long, caddr_t));
 
 void
-svr4_32_setregs(p, epp, stack)
-	struct proc *p;
+svr4_32_setregs(l, epp, stack)
+	struct lwp *l;
 	struct exec_package *epp;
 	u_long stack;
 {
-	register struct trapframe64 *tf = p->p_md.md_tf;
+	register struct trapframe64 *tf = l->l_md.md_tf;
 
-	netbsd32_setregs(p, epp, stack);
+	netbsd32_setregs(l, epp, stack);
 	
 	/* This should be the exit function, not p->p_psstr. */
 	tf->tf_global[1] = (vaddr_t)0;
@@ -128,27 +133,27 @@ svr4_32_printmcontext(fun, mc)
 #endif
 
 void *
-svr4_32_getmcontext(p, mc, flags)
-	struct proc *p;
+svr4_32_getmcontext(l, mc, flags)
+	struct lwp *l;
 	struct svr4_32_mcontext *mc;
 	netbsd32_u_long *flags;
 {
-	struct trapframe64 *tf = (struct trapframe64 *)p->p_md.md_tf;
+	struct trapframe64 *tf = (struct trapframe64 *)l->l_md.md_tf;
 	svr4_32_greg_t *r = mc->greg;
 #ifdef FPU_CONTEXT
 	svr4_32_fregset_t *f = &mc->freg;
-	struct fpstate *fps = p->p_md.md_fpstate;
+	struct fpstate *fps = l->l_md.md_fpstate;
 #endif
 
 	write_user_windows();
-	if (rwindow_save(p)) {
+	if (rwindow_save(l)) {
 #ifdef DEBUG
-		printf("svr4_32_getcontext: rwindow_save(%p) failed, sending SIGILL\n", p);
+		printf("svr4_32_getcontext: rwindow_save(%p) failed, sending SIGILL\n", l);
 #ifdef DDB
 		Debugger();
 #endif
 #endif
-		sigexit(p, SIGILL);
+		sigexit(l, SIGILL);
 	}
 
 	/*
@@ -181,7 +186,7 @@ svr4_32_getmcontext(p, mc, flags)
 	 * Get the floating point registers
 	 */
 	/* Note: copies only pre-v9 floating point registers. */
-	bcopy(fps->fs_regs, f->fpu_regs, sizeof(f->fpu_regs));
+	memcpy(f->fpu_regs, fps->fs_regs, sizeof(f->fpu_regs));
 	f->fp_nqsize = sizeof(struct fp_qentry);
 	f->fp_nqel = fps->fs_qsize;
 	f->fp_fsr = fps->fs_fsr;
@@ -223,8 +228,8 @@ svr4_32_getmcontext(p, mc, flags)
  * This is almost like sigreturn() and it shows.
  */
 int
-svr4_32_setmcontext(p, mc, flags)
-	struct proc *p;
+svr4_32_setmcontext(l, mc, flags)
+	struct lwp *l;
 	struct svr4_32_mcontext *mc;
 	netbsd32_u_long flags;
 {
@@ -240,25 +245,25 @@ svr4_32_setmcontext(p, mc, flags)
 #endif
 
 	write_user_windows();
-	if (rwindow_save(p)) {
+	if (rwindow_save(l)) {
 #ifdef DEBUG
-		printf("svr4_32_setcontext: rwindow_save(%p) failed, sending SIGILL\n", p);
+		printf("svr4_32_setcontext: rwindow_save(%p) failed, sending SIGILL\n", l);
 #ifdef DDB
 		Debugger();
 #endif
 #endif
-		sigexit(p, SIGILL);
+		sigexit(l, SIGILL);
 	}
 
 #ifdef DEBUG
 	if (sigdebug & SDB_FOLLOW)
 		printf("svr4_32_setmcontext: %s[%d], svr4_32_mcontext %p\n",
-		    p->p_comm, p->p_pid, mc);
+		    l->l_proc->p_comm, l->l_proc->p_pid, mc);
 #endif
 
 	if (flags & SVR4_UC_CPU) {
 		/* Restore register context. */
-		tf = (struct trapframe64 *)p->p_md.md_tf;
+		tf = (struct trapframe64 *)l->l_md.md_tf;
 
 		/*
 		 * Only the icc bits in the psr are used, so it need not be
@@ -311,7 +316,7 @@ svr4_32_setmcontext(p, mc, flags)
 			return EINVAL;
 		}
 		/* Note: touches only pre-v9 floating point registers. */
-		bcopy(f->fpu_regs, fps->fs_regs, sizeof(f->fpu_regs));
+		memcpy(fps->fs_regs, f->fpu_regs, sizeof(f->fpu_regs));
 		fps->fs_qsize = f->fp_nqel;
 		fps->fs_fsr = f->fp_fsr;
 		if (f->fp_q != 0) {
@@ -390,7 +395,7 @@ svr4_32_getsiginfo(si, sig, code, addr)
 		si->si_code = SVR4_EMT_TAGOVF;
 		break;
 
-	case T_DIV0:
+	case T_IDIV0:
 		si->si_code = SVR4_FPE_INTDIV;
 		break;
 
@@ -463,19 +468,18 @@ svr4_32_getsiginfo(si, sig, code, addr)
  * will return to the user pc, psl.
  */
 void
-svr4_32_sendsig(catcher, sig, mask, code)
-	sig_t catcher;
-	int sig;
-	sigset_t *mask;
-	u_long code;
+svr4_32_sendsig(const ksiginfo_t *ksi, const sigset_t *mask)
 {
-	register struct proc *p = curproc;
+	int sig = ksi->ksi_signo;
+	register struct lwp *l = curlwp;
+	struct proc *p = l->l_proc;
 	register struct trapframe64 *tf;
 	struct svr4_32_sigframe *fp, frame;
 	int onstack;
 	vaddr_t oldsp, newsp, addr;
+	sig_t catcher = SIGACTION(p, sig).sa_handler;
 
-	tf = (struct trapframe64 *)p->p_md.md_tf;
+	tf = (struct trapframe64 *)l->l_md.md_tf;
 	oldsp = tf->tf_out[6];
 
 	/* Do we need to jump onto the signal stack? */
@@ -506,8 +510,9 @@ svr4_32_sendsig(catcher, sig, mask, code)
 	/*
 	 * Build the argument list for the signal handler.
 	 */
-	svr4_32_getcontext(p, &frame.sf_uc, mask);
-	svr4_32_getsiginfo(&frame.sf_si, sig, code, (caddr_t)(u_long)tf->tf_pc);
+	svr4_32_getcontext(l, &frame.sf_uc, mask);
+	svr4_32_getsiginfo(&frame.sf_si, sig, ksi->ksi_trap,
+	    (caddr_t)(u_long)tf->tf_pc);
 
 	/* Build stack frame for signal trampoline. */
 	frame.sf_signum = frame.sf_si.si_signo;
@@ -531,7 +536,7 @@ svr4_32_sendsig(catcher, sig, mask, code)
 	    printf("svr4_32_sendsig: saving sf to %p, setting stack pointer %p to %p\n",
 		   fp, &(((struct rwindow32 *)newsp)->rw_in[6]), (void *)(u_long)oldsp);
 #endif
-	if (rwindow_save(p) || copyout(&frame, fp, sizeof(frame)) != 0 ||
+	if (rwindow_save(l) || copyout(&frame, fp, sizeof(frame)) != 0 ||
 	    copyout(&oldsp, &((struct rwindow32 *)newsp)->rw_in[6], sizeof(oldsp))) {
 		/*
 		 * Process has trashed its stack; give it an illegal
@@ -545,7 +550,7 @@ svr4_32_sendsig(catcher, sig, mask, code)
 		Debugger();
 #endif
 #endif
-		sigexit(p, SIGILL);
+		sigexit(l, SIGILL);
 		/* NOTREACHED */
 	}
 
@@ -581,12 +586,13 @@ svr4_32_sendsig(catcher, sig, mask, code)
 
 #define	ADVANCE (n = tf->tf_npc, tf->tf_pc = n, tf->tf_npc = n + 4)
 int
-svr4_32_trap(type, p)
+svr4_32_trap(type, l)
 	int	type;
-	struct proc *p;
+	struct lwp *l;
 {
 	int n;
-	struct trapframe64 *tf = p->p_md.md_tf;
+	struct proc *p = l->l_proc;
+	struct trapframe64 *tf = l->l_md.md_tf;
 
 	if (p->p_emul != &emul_svr4_32)
 		return 0;
@@ -626,8 +632,8 @@ svr4_32_trap(type, p)
 
 			tm = (u_quad_t) tv.tv_sec * 1000000000 +
 			    (u_quad_t) tv.tv_usec * 1000;
-			tf->tf_out[0] = ((u_int32_t *) &tm)[0];
-			tf->tf_out[1] = ((u_int32_t *) &tm)[1];
+			tf->tf_out[0] = (tm >> 32) & 0x00000000ffffffffffUL;
+			tf->tf_out[1] = tm & 0x00000000ffffffffffUL;
 		}
 		break;
 
@@ -656,8 +662,8 @@ svr4_32_trap(type, p)
 			                tv.tv_usec -
 			                    spc->spc_runtime.tv_usec)
 			                * 1000;
-			tf->tf_out[0] = ((u_int32_t *) &tm)[0];
-			tf->tf_out[1] = ((u_int32_t *) &tm)[1];
+			tf->tf_out[0] = (tm >> 32) & 0x00000000ffffffffffUL;
+			tf->tf_out[1] = tm & 0x00000000ffffffffffUL;
 		}
 		break;
 
@@ -683,8 +689,8 @@ svr4_32_trap(type, p)
 /*
  */
 int
-svr4_32_sys_sysarch(p, v, retval)
-	struct proc *p;
+svr4_32_sys_sysarch(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {

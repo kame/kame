@@ -1,4 +1,4 @@
-/*	$NetBSD: dma.c,v 1.10 1999/04/08 04:46:41 gwr Exp $ */
+/*	$NetBSD: dma.c,v 1.14 2003/07/15 03:36:14 lukem Exp $ */
 
 /*
  * Copyright (c) 1994 Paul Kranenburg.  All rights reserved.
@@ -30,6 +30,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: dma.c,v 1.14 2003/07/15 03:36:14 lukem Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -56,9 +59,8 @@
 static int	dmamatch  __P((struct device *, struct cfdata *, void *));
 static void	dmaattach __P((struct device *, struct device *, void *));
 
-struct cfattach dma_ca = {
-	sizeof(struct dma_softc), dmamatch, dmaattach
-};
+CFATTACH_DECL(dma, sizeof(struct dma_softc),
+    dmamatch, dmaattach, NULL, NULL);
 
 extern struct cfdriver dma_cd;
 

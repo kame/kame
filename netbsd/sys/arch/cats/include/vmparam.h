@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.12 2002/03/24 20:15:59 chris Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.24 2003/08/07 16:27:13 agc Exp $	*/
 
 /*
  * Copyright (c) 1988 The Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -50,29 +46,10 @@
  */
 #define	KERNEL_BASE		0xf0000000
 
-/* Various constants used by the MD code*/
-#define	KERNEL_TEXT_BASE	(KERNEL_BASE + 0x00000000)
-#define	APTE_BASE		(KERNEL_BASE + 0x00c00000)
-#define	KERNEL_VM_BASE		(KERNEL_BASE + 0x01000000)
 /*
- * The Kernel VM Size varies depending on the machine depending on how
- * much space is needed (and where) for other mappings.
- * In some cases the chosen value may not be the maximum in order that
- * we don't waste memory with kernel pages tables as we can't currently
- * grow the kernel page tables after booting.
- * You only need to increase these values if you find that the number of
- * buffers is being limited due to lack of VA space.
+ * Override the default pager_map size, there's not enough KVA.
  */
-
-/*
- * The range 0xf1000000 - 0xfcffffff is available for kernel VM space
- * Footbridge registers and I/O mappings occupy 0xfd000000 - 0xffffffff
- */
-
-/*
- * Size of available KVM space, note that growkernel will grow into this.
- */
-#define KERNEL_VM_SIZE	0x0C000000
+#define PAGER_MAP_SIZE		(4 * 1024 * 1024)
 
 /*
  * Size of User Raw I/O map
@@ -80,15 +57,9 @@
 
 #define USRIOSIZE       300
 
-/* XXX max. amount of KVM to be used by buffers. */
-#ifndef VM_MAX_KERNEL_BUF
-#define VM_MAX_KERNEL_BUF \
-	(((KERNEL_VM_SIZE) * 4) / 10)
-#endif
-
 /* virtual sizes (bytes) for various kernel submaps */
 
-#define VM_PHYS_SIZE		(USRIOSIZE*NBPG)
+#define VM_PHYS_SIZE		(USRIOSIZE*PAGE_SIZE)
 
 /*
  * max number of non-contig chunks of physical RAM you can have

@@ -1,4 +1,4 @@
-/* $NetBSD: isic_l1.c,v 1.12 2002/05/21 10:31:12 martin Exp $ */
+/* $NetBSD: isic_l1.c,v 1.14 2003/10/03 16:38:44 pooka Exp $ */
 
 /*
  * Copyright (c) 1997, 2000 Hellmuth Michaelis. All rights reserved.
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: isic_l1.c,v 1.12 2002/05/21 10:31:12 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: isic_l1.c,v 1.14 2003/10/03 16:38:44 pooka Exp $");
 
 #include <sys/param.h>
 #include <sys/ioctl.h>
@@ -57,6 +57,9 @@ __KERNEL_RCSID(0, "$NetBSD: isic_l1.c,v 1.12 2002/05/21 10:31:12 martin Exp $");
 #include <dev/ic/ipac.h>
 #include <dev/ic/hscx.h>
 
+#include "nisac.h"
+#include "nisacsx.h"
+
 unsigned int i4b_l1_debug = L1_DEBUG_DEFAULT;
 
 static int isic_std_ph_data_req(isdn_layer1token, struct mbuf *, int);
@@ -64,7 +67,7 @@ static int isic_std_ph_activate_req(isdn_layer1token);
 static int isic_std_mph_command_req(isdn_layer1token, int, void*);
 static void isic_enable_intr(struct isic_softc *sc, int enable);
 
-const struct isdn_layer1_bri_driver isic_std_driver = {
+const struct isdn_layer1_isdnif_driver isic_std_driver = {
 	isic_std_ph_data_req,
 	isic_std_ph_activate_req,
 	isic_std_mph_command_req
@@ -265,8 +268,18 @@ isic_std_mph_command_req(isdn_layer1token token, int command, void *parm)
 static void
 isic_enable_intr(struct isic_softc *sc, int enable)
 {
+#if NNISACSX > 0
+	if (sc->sc_cardtyp == CARD_TYPEP_AVMA1PCIV2) {
+		if (enable)
+			isic_isacsx_init(sc);
+		else isic_isacsx_disable_intr(sc);
+		return;
+	}
+#endif /* NNISACSX > 0 */
+
+#if NNISAC > 0
 	if (enable) {
-		isic_isac_init(sc);
+			isic_isac_init(sc);
 	} else {
 		/* disable receiver */
 		ISAC_WRITE(I_MODE, ISAC_MODE_MDS2|ISAC_MODE_MDS1|ISAC_MODE_DIM0);
@@ -277,4 +290,5 @@ isic_enable_intr(struct isic_softc *sc, int enable)
 			ISAC_WRITE(I_MASK, 0xff);
 		}
 	}
+#endif /* NNISAC > 0 */
 }

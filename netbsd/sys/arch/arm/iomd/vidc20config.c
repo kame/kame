@@ -1,4 +1,4 @@
-/*	$NetBSD: vidc20config.c,v 1.9.6.2 2002/06/21 14:52:14 lukem Exp $	*/
+/*	$NetBSD: vidc20config.c,v 1.17 2003/09/21 15:12:16 matt Exp $	*/
 
 /*
  * Copyright (c) 2001 Reinoud Zandijk
@@ -48,7 +48,7 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(0, "$NetBSD: vidc20config.c,v 1.9.6.2 2002/06/21 14:52:14 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: vidc20config.c,v 1.17 2003/09/21 15:12:16 matt Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -235,7 +235,7 @@ vidcvideo_setpalette(vidc)
 	int counter = 0;
 
 	vidcvideo_write(VIDC_PALREG, 0x00000000);
-	for (counter = 0; counter < 255; counter++)
+	for (counter = 0; counter <= 255; counter++)
 		vidcvideo_write(VIDC_PALETTE, vidc->palette[counter]);
 }
 
@@ -275,6 +275,7 @@ vidcvideo_setstate(vidc)
 /*	vidcvideo_write ( VIDC_CONREG,	vidc->conreg	);	*/
 /*	vidcvideo_write ( VIDC_DCTL,		vidc->dctl	);	*/
 
+	vidcvideo_setpalette(vidc);
 }
 
 
@@ -319,7 +320,7 @@ vidcvideo_coldinit(void)
 		dispsize = videomemory.vidm_size;
 		transfersize = 16;
 	} else {
-		dispsize = bootconfig.vram[0].pages * NBPG;
+		dispsize = bootconfig.vram[0].pages * PAGE_SIZE;
 		transfersize = dispsize >> 10;
 	};
     
@@ -580,9 +581,9 @@ vidcvideo_cursor_init(int width, int height)
 
 	if (!cursor_data) {
 		/* Allocate cursor memory first time round */
-		cursor_data = (char *)uvm_km_zalloc(kernel_map, NBPG);
+		cursor_data = (char *)uvm_km_zalloc(kernel_map, PAGE_SIZE);
 		if (!cursor_data)
-			panic("Cannot allocate memory for hardware cursor\n");
+			panic("Cannot allocate memory for hardware cursor");
 		(void) pmap_extract(pmap_kernel(), (vaddr_t)cursor_data, &pa);
 		IOMD_WRITE_WORD(IOMD_CURSINIT, pa);
 	}
@@ -617,9 +618,9 @@ vidcvideo_cursor_init(int width, int height)
 
 
 	(void) pmap_extract(pmap_kernel(), (vaddr_t)cursor_normal,
-	    (paddr_t *)&p_cursor_normal);
+	    (void *)&p_cursor_normal);
 	(void) pmap_extract(pmap_kernel(), (vaddr_t)cursor_transparent,
-	    (paddr_t *)&p_cursor_transparent);
+	    (void *)&p_cursor_transparent);
 
 	memset ( cursor_normal, 0x55, width*height );			/* white? */
 	memset ( cursor_transparent, 0x00, width*height );		/* to see the diffence */

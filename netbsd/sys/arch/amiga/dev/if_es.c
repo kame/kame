@@ -1,4 +1,4 @@
-/*	$NetBSD: if_es.c,v 1.31 2002/03/06 22:07:39 mhitch Exp $ */
+/*	$NetBSD: if_es.c,v 1.34 2003/01/28 22:35:04 wiz Exp $ */
 
 /*
  * Copyright (c) 1995 Michael L. Hitch
@@ -38,7 +38,7 @@
 #include "opt_ns.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_es.c,v 1.31 2002/03/06 22:07:39 mhitch Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_es.c,v 1.34 2003/01/28 22:35:04 wiz Exp $");
 
 #include "bpfilter.h"
 
@@ -135,9 +135,8 @@ void esmediastatus(struct ifnet *, struct ifmediareq *);
 int esmatch(struct device *, struct cfdata *, void *);
 void esattach(struct device *, struct device *, void *);
 
-struct cfattach es_ca = {
-	sizeof(struct es_softc), esmatch, esattach
-};
+CFATTACH_DECL(es, sizeof(struct es_softc),
+    esmatch, esattach, NULL, NULL);
 
 int
 esmatch(struct device *parent, struct cfdata *cfp, void *aux)
@@ -488,8 +487,8 @@ zzzz:
 			 * This shouldn't have happened:  IST_TX indicates
 			 * the TX completion FIFO is not empty, but the
 			 * status for the packet on the completion FIFO
-			 * shows that the transmit was sucessful.  Since
-			 * AutoRelease is being used, a sucessful transmit
+			 * shows that the transmit was successful.  Since
+			 * AutoRelease is being used, a successful transmit
 			 * should not result in a packet on the completion
 			 * FIFO.  Also, that packet doesn't seem to want
 			 * to be acknowledged.  If this occurs, just reset

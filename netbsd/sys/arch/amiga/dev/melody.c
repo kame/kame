@@ -1,4 +1,4 @@
-/*	$NetBSD: melody.c,v 1.9 2002/01/28 09:57:01 aymeric Exp $ */
+/*	$NetBSD: melody.c,v 1.11 2002/10/02 04:55:52 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: melody.c,v 1.9 2002/01/28 09:57:01 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: melody.c,v 1.11 2002/10/02 04:55:52 thorpej Exp $");
 
 /*
  * Melody audio driver.
@@ -71,9 +71,8 @@ int melody_match(struct device *, struct cfdata *, void *);
 void melody_attach(struct device *, struct device *, void *);
 void melody_intack(struct tav_softc *);
 
-struct cfattach melody_ca = {
-        sizeof(struct melody_softc), melody_match, melody_attach
-};
+CFATTACH_DECL(melody, sizeof(struct melody_softc),
+    melody_match, melody_attach, NULL, NULL);
 
 int
 melody_match(struct device *parent, struct cfdata *cfp, void *aux)

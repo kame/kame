@@ -1,4 +1,4 @@
-/*	$NetBSD: miivar.h,v 1.31 2002/05/10 20:45:06 thorpej Exp $	*/
+/*	$NetBSD: miivar.h,v 1.37 2003/07/01 22:58:48 msaitoh Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000, 2001 The NetBSD Foundation, Inc.
@@ -44,7 +44,7 @@
 #include <sys/callout.h>
 
 /*
- * Media Independent Interface datat structure defintions.
+ * Media Independent Interface datat structure definitions.
  */
 
 struct mii_softc;
@@ -73,13 +73,13 @@ struct mii_data {
 	 * request is made.
 	 */
 	LIST_HEAD(mii_listhead, mii_softc) mii_phys;
-	int mii_instance;
+	u_int mii_instance;
 
 	/*
 	 * PHY driver fills this in with active media status.
 	 */
 	int mii_media_status;
-	int mii_media_active;
+	u_int mii_media_active;
 
 	/*
 	 * Calls from MII layer into network interface driver.
@@ -117,9 +117,10 @@ struct mii_softc {
 	
 	LIST_ENTRY(mii_softc) mii_list;	/* entry on parent's PHY list */
 
+	u_int32_t mii_mpd_model;	/* the PHY's model (MII_MODEL())*/
 	int mii_phy;			/* our MII address */
 	int mii_offset;			/* first PHY, second PHY, etc. */
-	int mii_inst;			/* instance for ifmedia */
+	u_int mii_inst;			/* instance for ifmedia */
 
 	/* Our PHY functions. */
 	const struct mii_phy_funcs *mii_funcs;
@@ -134,7 +135,7 @@ struct mii_softc {
 
 	struct callout mii_nway_ch;	/* NWAY callout */
 
-	int mii_media_active;		/* last active media */
+	u_int mii_media_active;		/* last active media */
 	int mii_media_status;		/* last active status */
 };
 typedef struct mii_softc mii_softc_t;
@@ -150,6 +151,7 @@ typedef struct mii_softc mii_softc_t;
 #define	MIIF_IS_1000X	0x0080		/* is a 1000BASE-X device */
 #define	MIIF_DOPAUSE	0x0100		/* advertise PAUSE capability */
 #define	MIIF_IS_HPNA	0x0200		/* is a HomePNA device */
+#define	MIIF_FORCEANEG	0x0400		/* is a HomePNA device */
 
 #define	MIIF_INHERIT_MASK	(MIIF_NOISOLATE|MIIF_NOLOOP|MIIF_AUTOTSLEEP)
 
@@ -167,8 +169,8 @@ typedef struct mii_softc mii_softc_t;
 struct mii_attach_args {
 	struct mii_data *mii_data;	/* pointer to parent data */
 	int mii_phyno;			/* MII address */
-	int mii_id1;			/* PHY ID register 1 */
-	int mii_id2;			/* PHY ID register 2 */
+	u_int mii_id1;			/* PHY ID register 1 */
+	u_int mii_id2;			/* PHY ID register 2 */
 	int mii_capmask;		/* capability mask from BMSR */
 	int mii_flags;			/* flags from parent */
 };
@@ -255,7 +257,7 @@ int	mii_phy_statusmsg __P((struct mii_softc *));
 
 void	ukphy_status __P((struct mii_softc *));
 
-int mii_oui __P((int, int));
+u_int	mii_oui __P((u_int, u_int));
 #define	MII_OUI(id1, id2)	mii_oui(id1, id2)
 #define	MII_MODEL(id2)		(((id2) & IDR2_MODEL) >> 4)
 #define	MII_REV(id2)		((id2) & IDR2_REV)

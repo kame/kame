@@ -1,4 +1,4 @@
-/*	$NetBSD: disklabel.h,v 1.3 2002/04/28 17:10:34 uch Exp $	*/
+/*	$NetBSD: disklabel.h,v 1.5 2003/10/08 04:25:46 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994 Christopher G. Demetriou
@@ -35,23 +35,18 @@
 
 #define	LABELSECTOR	1		/* sector containing label */
 #define	LABELOFFSET	0		/* offset of label in sector */
-#define	MAXPARTITIONS	8		/* number of partitions */
-#define	RAW_PART	3		/* raw partition: XX?d (XXX) */
+#define	MAXPARTITIONS	16		/* number of partitions */
+#define	RAW_PART	2
 
 /* Pull in MBR partition definitions. */
-#include <sys/disklabel_mbr.h>
+#include <sys/bootblock.h>
 
 #ifndef __ASSEMBLER__
 #include <sys/dkbad.h>
 struct cpu_disklabel {
-	struct mbr_partition dosparts[NMBRPART];
+	struct mbr_partition dosparts[MBR_PART_COUNT];
 	struct dkbad bad;
 };
-#endif
-
-#ifdef _KERNEL
-struct disklabel;
-int	bounds_check_with_label(struct buf *, struct disklabel *, int);
 #endif
 
 #endif /* _MACHINE_DISKLABEL_H_ */

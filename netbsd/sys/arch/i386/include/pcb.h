@@ -1,4 +1,4 @@
-/*	$NetBSD: pcb.h,v 1.31 2002/05/12 23:16:52 matt Exp $	*/
+/*	$NetBSD: pcb.h,v 1.37 2004/02/20 17:35:01 yamt Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -51,11 +51,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -81,6 +77,10 @@
 #ifndef _I386_PCB_H_
 #define _I386_PCB_H_
 
+#if defined(_KERNEL_OPT)
+#include "opt_multiprocessor.h"
+#endif
+
 #include <sys/signal.h>
 
 #include <machine/segments.h>
@@ -95,6 +95,7 @@ struct pcb {
 #define	pcb_cr3	pcb_tss.tss_cr3
 #define	pcb_esp	pcb_tss.tss_esp
 #define	pcb_ebp	pcb_tss.tss_ebp
+#define	pcb_cs	pcb_tss.__tss_cs
 #define	pcb_ldt_sel	pcb_tss.tss_ldt
 	int	pcb_cr0;		/* saved image of CR0 */
 	int	pcb_cr2;		/* page fault address (CR2) */
@@ -103,14 +104,12 @@ struct pcb {
 /*
  * Software pcb (extension)
  */
-	int	pcb_flags;
-#define	PCB_USER_LDT	0x01		/* has user-set LDT */
 	caddr_t	pcb_onfault;		/* copyin/out fault recovery */
 	int	vm86_eflags;		/* virtual eflags for vm86 mode */
 	int	vm86_flagmask;		/* flag mask for vm86 mode */
 	void	*vm86_userp;		/* XXX performance hack */
+	struct cpu_info *pcb_fpcpu;	/* cpu holding our fp state. */
 	u_long	pcb_iomap[NIOPORTS/32];	/* I/O bitmap */
-	struct pmap *pcb_pmap;		/* back pointer to our pmap */
 };
 
 /*    
@@ -120,9 +119,5 @@ struct pcb {
 struct md_coredump {
 	long	md_pad[8];
 };    
-
-#ifdef _KERNEL
-extern	struct pcb *curpcb;		/* our current running pcb */
-#endif
 
 #endif /* _I386_PCB_H_ */

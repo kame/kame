@@ -1,4 +1,4 @@
-/*	$NetBSD: boot.c,v 1.9 2002/05/03 20:48:34 scw Exp $ */
+/*	$NetBSD: boot.c,v 1.12 2003/08/07 16:28:46 agc Exp $ */
 
 /*
  * Copyright (c) 1982, 1986, 1990, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -101,7 +97,7 @@ machdep_common_ether(ether)
 		ea = (u_char *) ETHER_ADDR_147;
 
 		if ((*(int *) ea & 0x2fffff00) == 0x2fffff00)
-			panic("ERROR: ethernet address not set!\r\n");
+			panic("ERROR: ethernet address not set!");
 		ether[0] = 0x08;
 		ether[1] = 0x00;
 		ether[2] = 0x3e;
@@ -112,7 +108,7 @@ machdep_common_ether(ether)
 		ea = (u_char *) ETHER_ADDR_16X;
 
 		if (ea[0] + ea[1] + ea[2] + ea[3] + ea[4] + ea[5] == 0)
-			panic("ERROR: ethernet address not set!\r\n");
+			panic("ERROR: ethernet address not set!");
 		ether[0] = ea[0];
 		ether[1] = ea[1];
 		ether[2] = ea[2];

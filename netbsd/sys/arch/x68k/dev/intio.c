@@ -1,4 +1,4 @@
-/*	$NetBSD: intio.c,v 1.11 2001/12/27 02:23:25 wiz Exp $	*/
+/*	$NetBSD: intio.c,v 1.23 2004/01/04 16:19:44 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1998 NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
 /*
  * NetBSD/x68k internal I/O virtual bus.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: intio.c,v 1.23 2004/01/04 16:19:44 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -125,9 +128,8 @@ static int intio_search __P((struct device *, struct cfdata *cf, void *));
 static int intio_print __P((void *, const char *));
 static void intio_alloc_system_ports __P((struct intio_softc*));
 
-struct cfattach intio_ca = {
-	sizeof(struct intio_softc), intio_match, intio_attach
-};
+CFATTACH_DECL(intio, sizeof(struct intio_softc),
+    intio_match, intio_attach, NULL, NULL);
 
 static struct intio_interrupt_vector {
 	intio_intr_handler_t	iiv_handler;
@@ -198,7 +200,7 @@ intio_attach(parent, self, aux)
 	sc->sc_map = extent_create("intiomap",
 				  PHYS_INTIODEV,
 				  PHYS_INTIODEV + 0x400000,
-				  M_DEVBUF, NULL, NULL, EX_NOWAIT);
+				  M_DEVBUF, NULL, 0, EX_NOWAIT);
 	intio_alloc_system_ports (sc);
 
 	sc->sc_bst = &intio_bus;
@@ -225,13 +227,13 @@ intio_search(parent, cf, aux)
 
 	ia->ia_bst = sc->sc_bst;
 	ia->ia_dmat = sc->sc_dmat;
-	ia->ia_name = cf->cf_driver->cd_name;
+	ia->ia_name = cf->cf_name;
 	ia->ia_addr = cf->cf_addr;
 	ia->ia_intr = cf->cf_intr;
 	ia->ia_dma = cf->cf_dma;
 	ia->ia_dmaintr = cf->cf_dmaintr;
 
-	if ((*cf->cf_attach->ca_match)(parent, cf, ia) > 0)
+	if (config_match(parent, cf, ia) > 0)
 		config_attach(parent, cf, ia, intio_print);
 
 	return (0);
@@ -245,13 +247,13 @@ intio_print(aux, name)
 	struct intio_attach_args *ia = aux;
 
 /*	if (ia->ia_addr > 0)	*/
-		printf (" addr 0x%06x", ia->ia_addr);
+		aprint_normal (" addr 0x%06x", ia->ia_addr);
 	if (ia->ia_intr > 0)
-		printf (" intr 0x%02x", ia->ia_intr);
+		aprint_normal (" intr 0x%02x", ia->ia_intr);
 	if (ia->ia_dma >= 0) {
-		printf (" using DMA ch%d", ia->ia_dma);
+		aprint_normal (" using DMA ch%d", ia->ia_dma);
 		if (ia->ia_dmaintr > 0)
-			printf (" intr 0x%02x and 0x%02x",
+			aprint_normal (" intr 0x%02x and 0x%02x",
 				ia->ia_dmaintr, ia->ia_dmaintr+1);
 	}
 
@@ -431,7 +433,8 @@ intio_intr (frame)
 	/* LOWER TO APPROPRIATE IPL AT VERY FIRST IN THE HANDLER!! */
 #endif
 	if (iiv[vector].iiv_handler == 0) {
-		printf ("Stray interrupt: %d type %x\n", vector, frame->f_format);
+		printf ("Stray interrupt: %d type %x, pc %x\n",
+			vector, frame->f_format, frame->f_pc);
 		return 0;
 	}
 
@@ -441,7 +444,7 @@ intio_intr (frame)
 }
 
 /*
- * Intio I/O controler interrupt
+ * Intio I/O controller interrupt
  */
 static u_int8_t intio_ivec = 0;
 
@@ -460,7 +463,7 @@ intio_set_ivec (vec)
 
 
 /*
- * intio bus dma stuff.  stolen from arch/i386/isa/isa_machdep.c
+ * intio bus DMA stuff.  stolen from arch/i386/isa/isa_machdep.c
  */
 
 /*
@@ -509,7 +512,7 @@ _intio_bus_dmamap_create(t, size, nsegments, maxsegsz, boundary, flags, dmamp)
 	 * need bounce buffers.  We check and remember that here.
 	 *
 	 * ...or, there is an opposite case.  The most segments
-	 * a transfer will require is (maxxfer / NBPG) + 1.  If
+	 * a transfer will require is (maxxfer / PAGE_SIZE) + 1.  If
 	 * the caller can't handle that many segments (e.g. the
 	 * DMAC), we may have to bounce it as well.
 	 */
@@ -518,7 +521,7 @@ _intio_bus_dmamap_create(t, size, nsegments, maxsegsz, boundary, flags, dmamp)
 		map->x68k_dm_bounce_thresh = 0;
 	cookieflags = 0;
 	if (map->x68k_dm_bounce_thresh != 0 ||
-	    ((map->x68k_dm_size / NBPG) + 1) > map->x68k_dm_segcnt) {
+	    ((map->x68k_dm_size / PAGE_SIZE) + 1) > map->x68k_dm_segcnt) {
 		cookieflags |= ID_MIGHT_NEED_BOUNCE;
 		cookiesize += (sizeof(bus_dma_segment_t) * map->x68k_dm_segcnt);
 	}
@@ -939,7 +942,7 @@ _intio_dma_alloc_bouncebuf(t, map, size, flags)
 
 	cookie->id_bouncebuflen = round_page(size);
 	error = _intio_bus_dmamem_alloc(t, cookie->id_bouncebuflen,
-	    NBPG, map->x68k_dm_boundary, cookie->id_bouncesegs,
+	    PAGE_SIZE, map->x68k_dm_boundary, cookie->id_bouncesegs,
 	    map->x68k_dm_segcnt, &cookie->id_nbouncesegs, flags);
 	if (error)
 		goto out;

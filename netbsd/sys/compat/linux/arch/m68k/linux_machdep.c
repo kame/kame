@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_machdep.c,v 1.13 2002/04/08 13:27:37 christos Exp $	*/
+/*	$NetBSD: linux_machdep.c,v 1.22 2003/09/28 00:15:13 cl Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: linux_machdep.c,v 1.13 2002/04/08 13:27:37 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: linux_machdep.c,v 1.22 2003/09/28 00:15:13 cl Exp $");
 
 #define COMPAT_LINUX 1
 
@@ -50,6 +50,7 @@ __KERNEL_RCSID(0, "$NetBSD: linux_machdep.c,v 1.13 2002/04/08 13:27:37 christos 
 #include <sys/mount.h>
 #include <sys/signal.h>
 #include <sys/signalvar.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <machine/cpu.h>
@@ -81,10 +82,10 @@ extern int sigpid;
 #define SDB_FPSTATE	0x04
 #endif
 
-void setup_linux_sigframe __P((struct frame *frame, int sig, sigset_t *mask,
-				caddr_t usp));
-void setup_linux_rt_sigframe __P((struct frame *frame, int sig, sigset_t *mask,
-				caddr_t usp, struct proc *p));
+void setup_linux_sigframe __P((struct frame *frame, int sig,
+    const sigset_t *mask, caddr_t usp));
+void setup_linux_rt_sigframe __P((struct frame *frame, int sig,
+    const sigset_t *mask, caddr_t usp, struct lwp *l));
 
 /*
  * Deal with some m68k-specific things in the Linux emulation code.
@@ -94,13 +95,13 @@ void setup_linux_rt_sigframe __P((struct frame *frame, int sig, sigset_t *mask,
  * Setup registers on program execution.
  */
 void
-linux_setregs(p, epp, stack)
-	struct proc *p;
+linux_setregs(l, epp, stack)
+	struct lwp *l;
 	struct exec_package *epp;
 	u_long stack;
 {
 
-	setregs(p, epp, stack);
+	setregs(l, epp, stack);
 }
 
 /*
@@ -110,10 +111,11 @@ void
 setup_linux_sigframe(frame, sig, mask, usp)
 	struct frame *frame;
 	int sig;
-	sigset_t *mask;
+	const sigset_t *mask;
 	caddr_t usp;
 {
-	struct proc *p = curproc;
+	struct lwp *l = curlwp;
+	struct proc *p = l->l_proc;
 	struct linux_sigframe *fp, kf;
 	short ft;
 
@@ -191,7 +193,7 @@ setup_linux_sigframe(frame, sig, mask, usp)
 		if (((struct fpframe060 *)&kf.sf_c.c_sc.sc_ss.ss_fpstate.FPF_u1)
 					->fpf6_frmfmt != FPF6_FMT_NULL) {
 			asm("fmovem %%fp0-%%fp1,%0" :
-				"=m" (*kf.sf_c.c_sc.sc_ss.ss_fpstate.fpf_regs));
+				"=m" (kf.sf_c.c_sc.sc_ss.ss_fpstate.fpf_regs[0][0]));
 			/*
 			 * On 060,  "fmovem fpcr/fpsr/fpi,<ea>"  is
 			 * emulated by software and slow.
@@ -208,7 +210,7 @@ setup_linux_sigframe(frame, sig, mask, usp)
 			: : "memory");
 		if (kf.sf_c.c_sc.sc_ss.ss_fpstate.fpf_version) {
 			asm("fmovem %%fp0-%%fp1,%0; fmovem %%fpcr/%%fpsr/%%fpi,%1" :
-				"=m" (*kf.sf_c.c_sc.sc_ss.ss_fpstate.fpf_regs),
+				"=m" (kf.sf_c.c_sc.sc_ss.ss_fpstate.fpf_regs[0][0]),
 				"=m" (kf.sf_c.c_sc.sc_ss.ss_fpstate.fpf_fpcr)
 				: : "memory");
 		}
@@ -242,7 +244,7 @@ setup_linux_sigframe(frame, sig, mask, usp)
 		 * Process has trashed its stack; give it a segmentation
 		 * violation to halt it in its tracks.
 		 */
-		sigexit(p, SIGSEGV);
+		sigexit(l, SIGSEGV);
 		/* NOTREACHED */
 	}
 
@@ -267,13 +269,14 @@ setup_linux_sigframe(frame, sig, mask, usp)
  * Setup signal frame for new RT signal interface.
  */
 void
-setup_linux_rt_sigframe(frame, sig, mask, usp, p)
+setup_linux_rt_sigframe(frame, sig, mask, usp, l)
 	struct frame *frame;
 	int sig;
-	sigset_t *mask;
+	const sigset_t *mask;
 	caddr_t usp;
-	struct proc *p;
+	struct lwp *l;
 {
+	struct proc *p = l->l_proc;
 	struct linux_rt_sigframe *fp, kf;
 	short ft;
 
@@ -354,7 +357,7 @@ setup_linux_rt_sigframe(frame, sig, mask, usp, p)
 		if (((struct fpframe060 *) &kf.sf_uc.uc_ss.ss_fpstate.FPF_u1)
 					->fpf6_frmfmt != FPF6_FMT_NULL) {
 			asm("fmovem %%fp0-%%fp7,%0" :
-				"=m" (*kf.sf_uc.uc_mc.mc_fpregs.fpr_regs));
+				"=m" (kf.sf_uc.uc_mc.mc_fpregs.fpr_regs[0][0]));
 			/*
 			 * On 060,  "fmovem fpcr/fpsr/fpi,<ea>"  is
 			 * emulated by software and slow.
@@ -379,7 +382,7 @@ setup_linux_rt_sigframe(frame, sig, mask, usp, p)
 		asm("fsave %0" : "=m" (kf.sf_uc.uc_ss.ss_fpstate));
 		if (kf.sf_uc.uc_ss.ss_fpstate.fpf_version) {
 			asm("fmovem %%fp0-%%fp7,%0; fmovem %%fpcr/%%fpsr/%%fpi,%1" :
-				"=m" (*kf.sf_uc.uc_mc.mc_fpregs.fpr_regs),
+				"=m" (kf.sf_uc.uc_mc.mc_fpregs.fpr_regs[0][0]),
 				"=m" (kf.sf_uc.uc_mc.mc_fpregs.fpr_fpcr)
 				: : "memory");
 		}
@@ -422,7 +425,7 @@ setup_linux_rt_sigframe(frame, sig, mask, usp, p)
 		 * Process has trashed its stack; give it a segmentation
 		 * violation to halt it in its tracks.
 		 */
-		sigexit(p, SIGSEGV);
+		sigexit(l, SIGSEGV);
 		/* NOTREACHED */
 	}
 
@@ -448,33 +451,21 @@ setup_linux_rt_sigframe(frame, sig, mask, usp, p)
  * Send an interrupt to Linux process.
  */
 void
-linux_sendsig(catcher, sig, mask, code)
-	sig_t catcher;
-	int sig;
-	sigset_t *mask;
-	u_long code;
+linux_sendsig(const ksiginfo_t *ksi, const sigset_t *mask)
 {
-	struct proc *p = curproc;
-	struct frame *frame;
-	caddr_t usp;		/* user stack for signal context */
+	/* u_long code = ksi->ksi_trap; */
+	int sig = ksi->ksi_signo;
+	struct lwp *l = curlwp;
+	struct proc *p = l->l_proc;
+	struct frame *frame = (struct frame *)l->l_md.md_regs;
 	int onstack;
-
-	frame = (struct frame *)p->p_md.md_regs;
-
-	/* Do we need to jump onto the signal stack? */
-	onstack = (p->p_sigctx.ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
-		  (SIGACTION(p, sig).sa_flags & SA_ONSTACK) != 0;
-
-	/* Determine user stack for the signal handler context. */
-	if (onstack)
-		usp = (caddr_t)p->p_sigctx.ps_sigstk.ss_sp
-				+ p->p_sigctx.ps_sigstk.ss_size;
-	else
-		usp = (caddr_t)frame->f_regs[SP];
+	/* user stack for signal context */
+	caddr_t usp = getframe(l, sig, &onstack);
+	sig_t catcher = SIGACTION(p, sig).sa_handler;
 
 	/* Setup the signal frame (and part of the trapframe). */
 	if (SIGACTION(p, sig).sa_flags & SA_SIGINFO)
-		setup_linux_rt_sigframe(frame, sig, mask, usp, p);
+		setup_linux_rt_sigframe(frame, sig, mask, usp, l);
 	else
 		setup_linux_sigframe(frame, sig, mask, usp);
 
@@ -509,11 +500,12 @@ linux_sendsig(catcher, sig, mask, code)
  */
 /* ARGSUSED */
 int
-linux_sys_sigreturn(p, v, retval)
-	struct proc *p;
+linux_sys_sigreturn(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
+	struct proc *p = l->l_proc;
 	struct frame *frame;
 	struct linux_sigc2 tsigc2;	/* extra mask and sigcontext */
 	struct linux_sigcontext *scp;	/* pointer to sigcontext */
@@ -525,7 +517,7 @@ linux_sys_sigreturn(p, v, retval)
 	 * sigreturn of Linux/m68k takes no arguments.
 	 * The user stack points at struct linux_sigc2.
 	 */
-	frame = (struct frame *) p->p_md.md_regs;
+	frame = (struct frame *) l->l_md.md_regs;
 	usp = frame->f_regs[SP];
 	if (usp & 1)
 		goto bad;
@@ -538,7 +530,7 @@ linux_sys_sigreturn(p, v, retval)
 
 	/* Grab whole of the sigcontext. */
 	if (copyin((caddr_t) usp, &tsigc2, sizeof tsigc2))
-bad:		sigexit(p, SIGSEGV);
+bad:		sigexit(l, SIGSEGV);
 
 	scp = &tsigc2.c_sc;
 
@@ -630,7 +622,7 @@ bad:		sigexit(p, SIGSEGV);
 				"m" (scp->sc_ss.ss_fpstate.fpf_fpsr),
 				"m" (scp->sc_ss.ss_fpstate.fpf_fpiar));
 			asm("fmovem %0,%%fp0-%%fp1" : :
-				"m" (*scp->sc_ss.ss_fpstate.fpf_regs));
+				"m" (scp->sc_ss.ss_fpstate.fpf_regs[0][0]));
 		}
 		asm("frestore %0" : : "m" (scp->sc_ss.ss_fpstate.FPF_u1));
 		break;
@@ -639,7 +631,7 @@ bad:		sigexit(p, SIGSEGV);
 		if (scp->sc_ss.ss_fpstate.fpf_version) {
 			asm("fmovem %0,%%fpcr/%%fpsr/%%fpi; fmovem %1,%%fp0-%%fp1"::
 				"m" (scp->sc_ss.ss_fpstate.fpf_fpcr),
-				"m" (*scp->sc_ss.ss_fpstate.fpf_regs));
+				"m" (scp->sc_ss.ss_fpstate.fpf_regs[0][0]));
 		}
 		asm("frestore %0" : : "m" (scp->sc_ss.ss_fpstate.FPF_u1));
 		break;
@@ -660,26 +652,27 @@ bad:		sigexit(p, SIGSEGV);
 
 /* ARGSUSED */
 int
-linux_sys_rt_sigreturn(p, v, retval)
-	struct proc *p;
+linux_sys_rt_sigreturn(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
+	struct proc *p = l->l_proc;
 	struct frame *frame;
 	struct linux_ucontext *ucp;	/* ucontext in user space */
 	struct linux_ucontext tuc;	/* copy of *ucp */
 	sigset_t mask;
-	int sz = 0;			/* extra frame size */
+	int sz = 0, error;		/* extra frame size */
 
 	/*
 	 * rt_sigreturn of Linux/m68k takes no arguments.
 	 * usp + 4 is a pointer to siginfo structure,
 	 * usp + 8 is a pointer to ucontext structure.
 	 */
-	frame = (struct frame *) p->p_md.md_regs;
-	ucp = (struct linux_ucontext *) fuword((caddr_t)frame->f_regs[SP] + 8);
-	if ((int) ucp & 1)
-		goto bad;		/* error (-1) or odd address */
+	frame = (struct frame *) l->l_md.md_regs;
+	error = copyin((caddr_t) frame->f_regs[SP] + 8, (void *) &ucp, sizeof(void *));
+	if (error || (int) ucp & 1)
+		goto bad;		/* error or odd address */
 
 #ifdef DEBUG
 	if (sigdebug & SDB_FOLLOW)
@@ -688,7 +681,7 @@ linux_sys_rt_sigreturn(p, v, retval)
 
 	/* Grab whole of the ucontext. */
 	if (copyin(ucp, &tuc, sizeof tuc))
-bad:		sigexit(p, SIGSEGV);
+bad:		sigexit(l, SIGSEGV);
 
 	/*
 	 * Check kernel stack and re-enter to syscall() if needed.
@@ -770,7 +763,7 @@ bad:		sigexit(p, SIGSEGV);
 				"m" (tuc.uc_mc.mc_fpregs.fpr_fpsr),
 				"m" (tuc.uc_mc.mc_fpregs.fpr_fpiar));
 			asm("fmovem %0,%%fp0-%%fp1" : :
-				"m" (*tuc.uc_mc.mc_fpregs.fpr_regs));
+				"m" (tuc.uc_mc.mc_fpregs.fpr_regs[0][0]));
 		}
 		asm("frestore %0" : : "m" (tuc.uc_ss.ss_fpstate.FPF_u1));
 		break;
@@ -779,7 +772,7 @@ bad:		sigexit(p, SIGSEGV);
 		if (tuc.uc_ss.ss_fpstate.fpf_version) {
 			asm("fmovem %0,%%fpcr/%%fpsr/%%fpi; fmovem %1,%%fp0-%%fp1"::
 				"m" (tuc.uc_mc.mc_fpregs.fpr_fpcr),
-				"m" (*tuc.uc_mc.mc_fpregs.fpr_regs));
+				"m" (tuc.uc_mc.mc_fpregs.fpr_regs[0][0]));
 		}
 		asm("frestore %0" : : "m" (tuc.uc_ss.ss_fpstate.FPF_u1));
 		break;
@@ -814,8 +807,8 @@ bad:		sigexit(p, SIGSEGV);
 
 /* ARGSUSED */
 int
-linux_sys_cacheflush(p, v, retval)
-	struct proc *p;
+linux_sys_cacheflush(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -825,6 +818,7 @@ linux_sys_cacheflush(p, v, retval)
 		syscallarg(int)			cache;
 		syscallarg(unsigned long)	len;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	int scope, cache;
 	vaddr_t addr;
 	int len;
@@ -914,5 +908,5 @@ linux_machdepioctl(p, v, retval)
 		return EINVAL;
 	}
 	SCARG(&bia, com) = com;
-	return sys_ioctl(p, &bia, retval);
+	return sys_ioctl(curlwp, &bia, retval);
 }

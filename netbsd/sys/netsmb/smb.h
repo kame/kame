@@ -1,4 +1,4 @@
-/*	$NetBSD: smb.h,v 1.3 2002/01/04 02:39:38 deberg Exp $	*/
+/*	$NetBSD: smb.h,v 1.14 2004/03/22 16:42:06 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 2000-2001 Boris Popov
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * FreeBSD: src/sys/netsmb/smb.h,v 1.2 2001/08/21 08:21:03 bp Exp
+ * FreeBSD: src/sys/netsmb/smb.h,v 1.9 2003/01/01 18:48:56 schweikh Exp
  */
 
 /*
@@ -70,7 +70,7 @@ enum smb_dialects {
  */
 #define	SMB_SIGNATURE		"\xFFSMB"
 #define	SMB_SIGLEN		4
-#define	SMB_HDRMID(p)		(letohs(*(u_short*)((u_char*)(p) + 30)))
+#define	SMB_HDRMID(p)		(le16toh(*(u_short*)((u_char*)(p) + 30)))
 #define	SMB_HDRLEN		32
 /*
  * bits in the smb_flags field
@@ -99,18 +99,29 @@ enum smb_dialects {
  * Security mode bits
  */
 #define SMB_SM_USER		0x01		/* server in the user security mode */
-#define	SMB_SM_ENCRYPT		0x02		/* use challenge/responce */
+#define	SMB_SM_ENCRYPT		0x02		/* use challenge/response */
 
 /*
  * NTLM capabilities
  */
-#define	SMB_CAP_RAW_MODE	0x0001
-#define	SMB_CAP_MPX_MODE	0x0002
-#define	SMB_CAP_UNICODE		0x0004
-#define	SMB_CAP_LARGE_FILES	0x0008		/* 64 bit offsets supported */
-#define	SMB_CAP_NT_SMBS		0x0010
-#define	SMB_CAP_NT_FIND		0x0200
-#define	SMB_CAP_EXT_SECURITY	0x80000000
+#define	SMB_CAP_RAW_MODE		0x0001
+#define	SMB_CAP_MPX_MODE		0x0002
+#define	SMB_CAP_UNICODE			0x0004
+#define	SMB_CAP_LARGE_FILES		0x0008		/* 64 bit offsets supported */
+#define	SMB_CAP_NT_SMBS			0x0010
+#define	SMB_CAP_RPC_REMOTE_APIS		0x0020
+#define	SMB_CAP_STATUS32		0x0040
+#define	SMB_CAP_LEVEL_II_OPLOCKS	0x0080
+#define	SMB_CAP_LOCK_AND_READ		0x0100
+#define	SMB_CAP_NT_FIND			0x0200
+#define	SMB_CAP_DFS			0x1000
+#define	SMB_CAP_INFOLEVEL_PASSTHRU	0x2000
+#define	SMB_CAP_LARGE_READX		0x4000
+#define	SMB_CAP_LARGE_WRITEX		0x8000
+#define	SMB_CAP_UNIX			0x00800000
+#define	SMB_CAP_BULK_TRANSFER		0x20000000
+#define	SMB_CAP_COMPRESSED_DATA		0x40000000
+#define	SMB_CAP_EXT_SECURITY		0x80000000
 
 /*
  * File attributes
@@ -125,20 +136,21 @@ enum smb_dialects {
 /*
  * Extended file attributes
  */
-#define	SMB_EFA_RDONLY		0x0001
-#define	SMB_EFA_HIDDEN		0x0002
-#define	SMB_EFA_SYSTEM		0x0004
-#define	SMB_EFA_ARCHIVE		0x0020
-#define	SMB_EFA_NORMAL		0x0080
-#define	SMB_EFA_TEMPORARY	0x0100
-#define	SMB_EFA_COMPRESSED	0x0800
-#define	SMB_EFA_POSIX_SEMANTICS	0x00100000
-#define	SMB_EFA_BACKUP_SEMANTICS 0x02000000
-#define	SMB_EFA_DELETE_ON_CLOSE	0x04000000
-#define	SMB_EFA_SEQUENTIAL_SCAN	0x08000000
-#define	SMB_EFA_RANDOM_ACCESS	0x10000000
-#define	SMB_EFA_NO_BUFFERING	0x20000000
-#define	SMB_EFA_WRITE_THROUGH	0x80000000
+#define	SMB_EFA_RDONLY			0x00000001
+#define	SMB_EFA_HIDDEN			0x00000002
+#define	SMB_EFA_SYSTEM			0x00000004
+#define	SMB_EFA_DIRECTORY		0x00000010
+#define	SMB_EFA_ARCHIVE			0x00000020
+#define	SMB_EFA_NORMAL			0x00000080
+#define	SMB_EFA_TEMPORARY		0x00000100
+#define	SMB_EFA_COMPRESSED		0x00000800
+#define	SMB_EFA_POSIX_SEMANTICS		0x01000000
+#define	SMB_EFA_BACKUP_SEMANTICS	0x02000000
+#define	SMB_EFA_DELETE_ON_CLOSE		0x04000000
+#define	SMB_EFA_SEQUENTIAL_SCAN		0x08000000
+#define	SMB_EFA_RANDOM_ACCESS		0x10000000
+#define	SMB_EFA_NO_BUFFERING		0x20000000
+#define	SMB_EFA_WRITE_THROUGH		0x80000000
 
 /*
  * Access Mode Encoding
@@ -152,6 +164,18 @@ enum smb_dialects {
 #define	SMB_SM_DENYWRITE	0x0020
 #define	SMB_SM_DENYREADEXEC	0x0030
 #define	SMB_SM_DENYNONE		0x0040
+
+/*
+ * Request flag defines - CIFS spec 3.1.1 via Samba
+ */
+#define	SMB_FL_SUPPORT_LOCKREAD		0x01
+#define SMB_FL_CLIENT_BUF_AVAIL		0x02
+#define SMB_FL_RESERVED			0x04
+#define SMB_FL_CASELESS_PATHNAMES	0x08
+#define SMB_FL_CANONICAL_PATHNAMES	0x10
+#define SMB_FL_REQUEST_OPLOCK		0x20
+#define SMB_FL_REQUEST_BATCH_OPLOCK	0x40
+#define SMB_FL_REPLY			0x80
 
 /*
  * SMB commands
@@ -225,6 +249,62 @@ enum smb_dialects {
 #define	SMB_COM_WRITE_BULK_DATA         0xDA
 
 /*
+ * SMB_COM_NT_TRANSACT subcommands
+ */
+#define SMB_NTTRANS_CREATE		0x01
+#define SMB_NTTRANS_IOCTL		0x02
+#define SMB_NTTRANS_SET_SEC_DESC	0x03	/* Set Security Descriptor */
+#define SMB_NTTRANS_NOTIFY_CHANGE	0x04	/* Directory Change Notify */
+#define SMB_NTTRANS_RENAME		0x05
+#define SMB_NTTRANS_QUERY_SEC_DESC	0x06	/* Query Security Descriptor */
+
+/*
+ * NT TRANSACT NOTIFY CHANGE CompletionFilter flags
+ */
+#define	FILE_NOTIFY_CHANGE_FILE_NAME	0x00000001
+#define	FILE_NOTIFY_CHANGE_DIR_NAME	0x00000002
+#define	FILE_NOTIFY_CHANGE_NAME		0x00000003
+#define	FILE_NOTIFY_CHANGE_ATTRIBUTES	0x00000004
+#define	FILE_NOTIFY_CHANGE_SIZE		0x00000008
+#define	FILE_NOTIFY_CHANGE_LAST_WRITE	0x00000010
+#define	FILE_NOTIFY_CHANGE_LAST_ACCESS	0x00000020
+#define	FILE_NOTIFY_CHANGE_CREATION	0x00000040
+#define	FILE_NOTIFY_CHANGE_EA		0x00000080
+#define	FILE_NOTIFY_CHANGE_SECURITY	0x00000100
+#define	FILE_NOTIFY_CHANGE_STREAM_NAME	0x00000200
+#define	FILE_NOTIFY_CHANGE_STREAM_SIZE	0x00000400
+#define	FILE_NOTIFY_CHANGE_STREAM_WRITE	0x00000800
+
+/*
+ * NT TRANSACT NOTIFY CHANGE Action
+ */
+#define FILE_ACTION_ADDED		0x00000001
+#define FILE_ACTION_REMOVED		0x00000002
+#define FILE_ACTION_MODIFIED		0x00000003
+#define FILE_ACTION_RENAMED_OLD_NAME	0x00000004
+#define FILE_ACTION_RENAMED_NEW_NAME	0x00000005
+#define FILE_ACTION_ADDED_STREAM	0x00000006
+#define FILE_ACTION_REMOVED_STREAM	0x00000007
+#define FILE_ACTION_MODIFIED_STREAM	0x00000008
+
+/*
+ * Some contansts for NT CREATE AND X
+ */
+#define NT_FILE_DIRECTORY_FILE		0x0001
+
+/* perms */
+#define NT_FILE_LIST_DIRECTORY		0x0001
+
+/* share types */
+#define NT_FILE_SHARE_READ		0x0001
+#define NT_FILE_SHARE_WRITE		0x0002
+#define NT_FILE_SHARE_DELETE		0x0004
+
+/* open types - create disposition */
+#define NT_OPEN_EXISTING		0x0001
+#define NT_OPEN_CREATE			0x0002
+
+/*
  * TRANS2 commands
  */
 #define	SMB_TRANS2_OPEN2			0x00
@@ -237,7 +317,9 @@ enum smb_dialects {
 #define	SMB_TRANS2_SET_FILE_INFORMATION		0x08
 #define	SMB_TRANS2_FSCTL			0x09
 #define	SMB_TRANS2_IOCTL2			0x0A
+/* Start monitoring a directory for changes */
 #define	SMB_TRANS2_FIND_NOTIFY_FIRST		0x0B
+/* Continue monitoring a directory for changes */
 #define	SMB_TRANS2_FIND_NOTIFY_NEXT		0x0C
 #define	SMB_TRANS2_CREATE_DIRECTORY		0x0D
 #define	SMB_TRANS2_SESSION_SETUP		0x0E
@@ -255,6 +337,28 @@ enum smb_dialects {
 #define SMB_QUERY_FS_ATTRIBUTE_INFO	0x105
 
 /*
+ * SMB_TRANS2_QUERY_PATH levels
+ */
+#define	SMB_QUERY_FILE_STANDARD			1
+#define	SMB_QUERY_FILE_EA_SIZE			2
+#define	SMB_QUERY_FILE_EAS_FROM_LIST		3
+#define	SMB_QUERY_FILE_ALL_EAS			4
+#define	SMB_QUERY_FILE_IS_NAME_VALID		6
+#define	SMB_QUERY_FILE_BASIC_INFO		0x101
+#define	SMB_QUERY_FILE_STANDARD_INFO		0x102
+#define	SMB_QUERY_FILE_EA_INFO			0x103
+#define	SMB_QUERY_FILE_NAME_INFO		0x104
+#define	SMB_QUERY_FILE_ALL_INFO			0x107
+#define	SMB_QUERY_FILE_ALT_NAME_INFO		0x108
+#define	SMB_QUERY_FILE_STREAM_INFO		0x109
+#define	SMB_QUERY_FILE_COMPRESSION_INFO		0x10b
+#define	SMB_QUERY_FILE_UNIX_BASIC		0x200
+#define	SMB_QUERY_FILE_UNIX_LINK		0x201
+#define	SMB_QUERY_FILE_MAC_DT_GET_APPL		0x306
+#define	SMB_QUERY_FILE_MAC_DT_GET_ICON		0x307
+#define	SMB_QUERY_FILE_MAC_DT_GET_ICON_INFO	0x308
+
+/*
  * SMB_TRANS2_FIND_FIRST2 information levels
  */
 #define SMB_INFO_STANDARD		1
@@ -269,6 +373,7 @@ enum smb_dialects {
  * Set PATH/FILE information levels
  */
 #define	SMB_SET_FILE_BASIC_INFO		0x101
+#define	SMB_SET_FILE_END_OF_FILE_INFO	0x104
 
 /*
  * LOCKING_ANDX LockType flags
@@ -299,7 +404,7 @@ enum smb_dialects {
 #define SMBSUCCESS	0x00
 #define ERRDOS		0x01
 #define ERRSRV		0x02
-#define ERRHRD		0x03	/* Error is an hardware error. */
+#define ERRHRD		0x03	/* Error is a hardware error. */
 #define ERRCMD		0xFF	/* Command was not in the "SMB" format. */
 
 /*
@@ -324,13 +429,34 @@ enum smb_dialects {
 #define ERRnofiles	18	/* no more files found in file search */
 #define ERRbadshare	32	/* Share mode can't be granted */
 #define ERRlock		33	/* A lock request conflicts with existing lock */
+#define ERRunsup	50	/* unsupported - Win 95 */
+#define ERRnoipc	66	/* Bad Device Type */
+#define ERRnosuchshare	67	/* Bad Network Name */	
 #define ERRfilexists	80	/* The file named in the request already exists */
+#define ERRcannotopen	110	/* cannot open the file */
+#define ERRquota	112	/* W2K returns this if quota space exceeds */
+#define ERRinvalidname	123	/* Invalid Name */
+#define ERRunknownlevel 124
+#define ERRdirnempty	145	/* Directory Not Empty */
+#define ERRnotlocked	158	/* region was not locked by this context */
+#define ERRrename	183	/* Already Exists */
+#define ERRbadpipe	230	/* named pipe invalid */
+#define ERRpipebusy	231	/* all pipe instances are busy */
+#define ERRpipeclosing	232	/* close in progress */
+#define ERRnotconnected	233	/* nobody on other end of pipe */
+#define ERRmoredata	234	/* more data to be returned */
+#define ERRbaddirectory	267	/* invalid directory name */
+#define ERReasunsupported	282	/* extended attributes not supported */
+#define ERRunknownipc	2142
+#define ERRbuftoosmall	2123
+#define ERRnosuchprintjob	2151
 
 /*
  * Error codes for the ERRSRV class
  */
 #define ERRerror	1	/* Non-specific error code */
 #define ERRbadpw	2	/* Bad password */
+#define ERRbadtype	3	/* Reserved - Bad Device Type */
 #define ERRaccess	4	/* The client doesn't have enough access rights */
 #define ERRinvnid	5	/* The Tid specified in a command is invalid */
 #define ERRinvnetname	6	/* Invalid server name in the tree connect */
@@ -338,7 +464,7 @@ enum smb_dialects {
 #define ERRqfull	49	/* Print queue full */
 #define ERRqtoobig	50	/* Print queue full - no space */
 #define ERRinvpfid	52	/* Invalid print file FID */
-#define ERRsmbcmd	64	/* The server did not recognise the command */
+#define ERRsmbcmd	64	/* The server did not recognize the command */
 #define ERRsrverror	65	/* The server encountered and internal error */
 #define ERRfilespecs	67	/* The Fid and path name contains an invalid combination */
 #define ERRbadpermits	69	/* Access mode invalid */
@@ -352,8 +478,13 @@ enum smb_dialects {
 #define ERRtoomanyuids	90      /* Too many UIDs active on this session */
 #define ERRbaduid	91	/* The UID is not known in this session */
 #define ERRusempx	250	/* Temporarily unable to support Raw, use MPX mode */
-#define ERRusestd	251	/* Temporarily unable to support Raw, use stdandard r/w */
+#define ERRusestd	251	/* Temporarily unable to support Raw, use standard r/w */
 #define ERRcontmpx	252	/* Continue in MPX mode */
+#define ERRbadPassword	254
+#define ERRaccountExpired	2239
+#define ERRbadClient		2240	/* Cannot access the server from this workstation */
+#define ERRbadLogonTime		2241	/* Cannot access the server at this time */
+#define ERRpasswordExpired	2242
 #define ERRnosupport	65535	/* Invalid function */
 
 /*
@@ -372,11 +503,12 @@ enum smb_dialects {
 #define ERRwrite	29	/* Write fault */
 #define ERRread		30	/* Read fault */
 #define ERRgeneral	31	/* General failure */
-#define	ERRbadshare	32	/* A open conflicts with an existing open */
+#define	ERRbadshare	32	/* An open conflicts with an existing open */
 #define	ERRlock		33	/* lock/unlock conflict */
 #define ERRwrongdisk	34	/* The wrong disk was found in a drive */
 #define ERRFCBunavail	35	/* No FCBs available */
 #define ERRsharebufexc	36	/* A sharing buffer has been exceeded */
+#define ERRdiskfull	39
 
 /*
  * RAP error codes (it seems that they returned not only by RAP)
@@ -384,6 +516,13 @@ enum smb_dialects {
 #define	SMB_ERROR_ACCESS_DENIED		5
 #define	SMB_ERROR_NETWORK_ACCESS_DENIED	65
 #define	SMB_ERROR_MORE_DATA		234
+
+/*
+ * Error message returned from NT Directory Change Notify if
+ * where are too many directory notifications and directory should
+ * be just enumerated.
+ */
+#define	NT_STATUS_NOTIFY_ENUM_DIR	1022
 
 typedef u_int16_t	smbfh;
 

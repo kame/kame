@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.c,v 1.8 2002/01/31 09:43:42 chris Exp $	*/
+/*	$NetBSD: intr.c,v 1.12 2003/07/15 00:24:41 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -35,21 +35,25 @@
  * Soft interrupt and other generic interrupt functions.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: intr.c,v 1.12 2003/07/15 00:24:41 lukem Exp $");
+
 #include "opt_irqstats.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/syslog.h>
 #include <sys/malloc.h>
+#include <sys/conf.h>
 
 #include <uvm/uvm_extern.h>
 
+#include <machine/atomic.h>
 #include <machine/intr.h>
 #include <machine/cpu.h>
 
 #include <net/netisr.h>
 
-#include <machine/conf.h>
 #include <arm/arm32/machdep.h>
  
 #ifndef NPLCOM
@@ -207,7 +211,7 @@ set_spl_masks()
 	spl_masks[_SPL_NET]        = irqmasks[IPL_NET];
 	spl_masks[_SPL_SOFTSERIAL] = irqmasks[IPL_TTY];
 	spl_masks[_SPL_TTY]        = irqmasks[IPL_TTY];
-	spl_masks[_SPL_IMP]        = irqmasks[IPL_IMP];
+	spl_masks[_SPL_VM]         = irqmasks[IPL_VM];
 	spl_masks[_SPL_AUDIO]      = irqmasks[IPL_AUDIO];
 	spl_masks[_SPL_CLOCK]      = irqmasks[IPL_CLOCK];
 #ifdef IPL_STATCLOCK

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_cs_isa.c,v 1.7 2002/05/21 02:47:04 augustss Exp $	*/
+/*	$NetBSD: if_cs_isa.c,v 1.12 2003/10/29 01:10:12 mycroft Exp $	*/
 
 /*
  * Copyright 1997
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_cs_isa.c,v 1.7 2002/05/21 02:47:04 augustss Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_cs_isa.c,v 1.12 2003/10/29 01:10:12 mycroft Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -64,9 +64,8 @@ __KERNEL_RCSID(0, "$NetBSD: if_cs_isa.c,v 1.7 2002/05/21 02:47:04 augustss Exp $
 int	cs_isa_probe __P((struct device *, struct cfdata *, void *));
 void	cs_isa_attach __P((struct device *, struct device *, void *));
 
-struct cfattach cs_isa_ca = {
-	sizeof(struct cs_softc_isa), cs_isa_probe, cs_isa_attach
-};
+CFATTACH_DECL(cs_isa, sizeof(struct cs_softc),
+    cs_isa_probe, cs_isa_attach, NULL, NULL);
 
 int 
 cs_isa_probe(parent, cf, aux)
@@ -128,7 +127,10 @@ cs_isa_probe(parent, cf, aux)
 	case PROD_ID_CS8920:
 	case PROD_ID_CS8920M:
 #endif
-		rv = 1;
+		break;
+	default:
+		/* invalid product ID */
+		goto out;
 	}
 
 	/*
@@ -188,27 +190,28 @@ cs_isa_probe(parent, cf, aux)
 	} else
 		have_mem = 1;
 
+	ia->ia_nio = 1;
+	ia->ia_io[0].ir_size = CS8900_IOSIZE;
+
+	if (maddr == ISACF_IOMEM_DEFAULT)
+		ia->ia_niomem = 0;
+	else {
+		ia->ia_niomem = 1;
+		ia->ia_iomem[0].ir_addr = maddr;
+		ia->ia_iomem[0].ir_size = CS8900_MEMSIZE;
+	}
+
+	ia->ia_nirq = 1;
+	ia->ia_irq[0].ir_irq = irq;
+
+	rv = 1;
+
  out:
 	if (have_io)
 		bus_space_unmap(iot, ioh, CS8900_IOSIZE);
 	if (have_mem)
 		bus_space_unmap(memt, memh, CS8900_MEMSIZE);
 
-	if (rv) {
-		ia->ia_nio = 1;
-		ia->ia_io[0].ir_size = CS8900_IOSIZE;
-
-		if (maddr == ISACF_IOMEM_DEFAULT)
-			ia->ia_niomem = 0;
-		else {
-			ia->ia_niomem = 1;
-			ia->ia_iomem[0].ir_addr = maddr;
-			ia->ia_iomem[0].ir_size = CS8900_MEMSIZE;
-		}
-
-		ia->ia_nirq = 1;
-		ia->ia_irq[0].ir_irq = irq;
-	}
 	return (rv);
 }
 

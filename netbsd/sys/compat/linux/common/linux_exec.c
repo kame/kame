@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_exec.c,v 1.58 2002/04/02 20:23:43 jdolecek Exp $	*/
+/*	$NetBSD: linux_exec.c,v 1.70.2.2 2004/08/15 14:07:39 tron Exp $	*/
 
 /*-
  * Copyright (c) 1994, 1995, 1998, 2000 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: linux_exec.c,v 1.58 2002/04/02 20:23:43 jdolecek Exp $");
+__KERNEL_RCSID(0, "$NetBSD: linux_exec.c,v 1.70.2.2 2004/08/15 14:07:39 tron Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -52,6 +52,7 @@ __KERNEL_RCSID(0, "$NetBSD: linux_exec.c,v 1.58 2002/04/02 20:23:43 jdolecek Exp
 #include <sys/exec_elf.h>
 
 #include <sys/mman.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <machine/cpu.h>
@@ -72,22 +73,19 @@ __KERNEL_RCSID(0, "$NetBSD: linux_exec.c,v 1.58 2002/04/02 20:23:43 jdolecek Exp
 extern struct sysent linux_sysent[];
 extern const char * const linux_syscallnames[];
 extern char linux_sigcode[], linux_esigcode[];
-#ifndef __HAVE_SYSCALL_INTERN
-void LINUX_SYSCALL_FUNCTION __P((void));
-#endif
 
 static void linux_e_proc_exec __P((struct proc *, struct exec_package *));
-static void linux_e_proc_fork __P((struct proc *, struct proc *));
+static void linux_e_proc_fork __P((struct proc *, struct proc *, int));
 static void linux_e_proc_exit __P((struct proc *));
-static void linux_e_proc_init __P((struct proc *, struct vmspace *));
+static void linux_e_proc_init __P((struct proc *, struct proc *, int));
 
 /*
  * Execve(2). Just check the alternate emulation path, and pass it on
  * to the NetBSD execve().
  */
 int
-linux_sys_execve(p, v, retval)
-	struct proc *p;
+linux_sys_execve(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -96,6 +94,7 @@ linux_sys_execve(p, v, retval)
 		syscallarg(char **) argv;
 		syscallarg(char **) envp;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct sys_execve_args ap;
 	caddr_t sg;
 
@@ -106,12 +105,15 @@ linux_sys_execve(p, v, retval)
 	SCARG(&ap, argp) = SCARG(uap, argp);
 	SCARG(&ap, envp) = SCARG(uap, envp);
 
-	return sys_execve(p, &ap, retval);
+	return sys_execve(l, &ap, retval);
 }
 
 /*
  * Emulation switch.
  */
+
+struct uvm_object *emul_linux_object;
+
 const struct emul emul_linux = {
 	"linux",
 	"/emul/linux",
@@ -119,46 +121,80 @@ const struct emul emul_linux = {
 	0,
 	(int*)native_to_linux_errno,
 	LINUX_SYS_syscall,
-	LINUX_SYS_MAXSYSCALL,
+	LINUX_SYS_NSYSENT,
 #endif
 	linux_sysent,
 	linux_syscallnames,
 	linux_sendsig,
 	linux_trapsignal,
+	NULL,
 	linux_sigcode,
 	linux_esigcode,
+	&emul_linux_object,
 	linux_setregs,
 	linux_e_proc_exec,
 	linux_e_proc_fork,
 	linux_e_proc_exit,
+	NULL,
+	NULL,
 #ifdef __HAVE_SYSCALL_INTERN
 	linux_syscall_intern,
 #else
-	LINUX_SYSCALL_FUNCTION,
+#error Implement __HAVE_SYSCALL_INTERN for this platform
 #endif
-	linux_sysctl,
+	NULL,
+	NULL,
 };
 
 static void
-linux_e_proc_init(p, vmspace)
-	struct proc *p;
-	struct vmspace *vmspace;
+linux_e_proc_init(p, parent, forkflags)
+	struct proc *p, *parent;
+	int forkflags;
 {
-	if (!p->p_emuldata) {
+	struct linux_emuldata *e = p->p_emuldata;
+	struct linux_emuldata_shared *s;
+
+	if (!e) {
 		/* allocate new Linux emuldata */
-		MALLOC(p->p_emuldata, void *, sizeof(struct linux_emuldata),
+		MALLOC(e, void *, sizeof(struct linux_emuldata),
 			M_EMULDATA, M_WAITOK);
+	} else  {
+		e->s->refs--;
+		if (e->s->refs == 0)
+			FREE(e->s, M_EMULDATA);
 	}
 
-	memset(p->p_emuldata, '\0', sizeof(struct linux_emuldata));
-	
-	/* Set the process idea of the break to the real value */
-	((struct linux_emuldata*)(p->p_emuldata))->p_break = 
-	    vmspace->vm_daddr + ctob(vmspace->vm_dsize);
+	memset(e, '\0', sizeof(struct linux_emuldata));
+
+	if (forkflags & FORK_SHAREVM) {
+		struct linux_emuldata *e2 = parent->p_emuldata;
+		s = e2->s;
+		s->refs++;
+	} else {
+		struct vmspace *vm;
+
+		MALLOC(s, void *, sizeof(struct linux_emuldata_shared),
+			M_EMULDATA, M_WAITOK);
+		s->refs = 1;
+
+		/*
+		 * Set the process idea of the break to the real value.
+		 * For fork, we use parent's vmspace since our's
+		 * is not setup at the time of this call and is going
+		 * to be copy of parent's anyway. For exec, just
+		 * use our own vmspace.
+		 */
+		vm = (parent) ? parent->p_vmspace : p->p_vmspace;
+		s->p_break = vm->vm_daddr + ctob(vm->vm_dsize);
+
+	}
+
+	e->s = s;
+	p->p_emuldata = e;
 }
 
 /*
- * Allocate per-process structures. Called when executing Linux
+ * Allocate new per-process structures. Called when executing Linux
  * process. We can reuse the old emuldata - if it's not null,
  * the executed process is of same emulation as original forked one.
  */
@@ -168,7 +204,7 @@ linux_e_proc_exec(p, epp)
 	struct exec_package *epp;
 {
 	/* exec, use our vmspace */
-	linux_e_proc_init(p, p->p_vmspace);
+	linux_e_proc_init(p, NULL, 0);
 }
 
 /*
@@ -178,8 +214,13 @@ static void
 linux_e_proc_exit(p)
 	struct proc *p;
 {
+	struct linux_emuldata *e = p->p_emuldata;
+
 	/* free Linux emuldata and set the pointer to null */
-	FREE(p->p_emuldata, M_EMULDATA);
+	e->s->refs--;
+	if (e->s->refs == 0)
+		FREE(e->s, M_EMULDATA);
+	FREE(e, M_EMULDATA);
 	p->p_emuldata = NULL;
 }
 
@@ -187,16 +228,16 @@ linux_e_proc_exit(p)
  * Emulation fork hook.
  */
 static void
-linux_e_proc_fork(p, parent)
+linux_e_proc_fork(p, parent, forkflags)
 	struct proc *p, *parent;
+	int forkflags;
 {
 	/*
-	 * It could be desirable to copy some stuff from parent's
-	 * emuldata. We don't need anything like that for now.
-	 * So just allocate new emuldata for the new process.
+	 * The new process might share some vmspace-related stuff
+	 * with parent, depending on fork flags (CLONE_VM et.al).
+	 * Force allocation of new base emuldata, and share the
+	 * VM-related parts only if necessary.
 	 */
 	p->p_emuldata = NULL;
-
-	/* fork, use parent's vmspace (our vmspace may not be setup yet) */
-	linux_e_proc_init(p, parent->p_vmspace);
+	linux_e_proc_init(p, parent, forkflags);
 }

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbget - ACPI Table get* routines
- *              xRevision: 55 $
+ *              xRevision: 88 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999, 2000, 2001, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -115,19 +115,392 @@
  *****************************************************************************/
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tbget.c,v 1.2 2001/11/13 13:02:02 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tbget.c,v 1.11 2004/02/14 16:57:25 kochi Exp $");
 
 #define __TBGET_C__
 
 #include "acpi.h"
-#include "achware.h"
 #include "actables.h"
 
 
 #define _COMPONENT          ACPI_TABLES
-        MODULE_NAME         ("tbget")
+        ACPI_MODULE_NAME    ("tbget")
 
-#define RSDP_CHECKSUM_LENGTH 20
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiTbGetTable
+ *
+ * PARAMETERS:  Address             - Address of table to retrieve.  Can be
+ *                                    Logical or Physical
+ *              TableInfo           - Where table info is returned
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Get entire table of unknown size.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiTbGetTable (
+    ACPI_POINTER            *Address,
+    ACPI_TABLE_DESC         *TableInfo)
+{
+    ACPI_STATUS             Status;
+    ACPI_TABLE_HEADER       Header;
+
+
+    ACPI_FUNCTION_TRACE ("TbGetTable");
+
+
+    /*
+     * Get the header in order to get signature and table size
+     */
+    Status = AcpiTbGetTableHeader (Address, &Header);
+    if (ACPI_FAILURE (Status))
+    {
+        return_ACPI_STATUS (Status);
+    }
+
+    /* Get the entire table */
+
+    Status = AcpiTbGetTableBody (Address, &Header, TableInfo);
+    if (ACPI_FAILURE (Status))
+    {
+        ACPI_REPORT_ERROR (("Could not get ACPI table (size %X), %s\n",
+            Header.Length, AcpiFormatException (Status)));
+        return_ACPI_STATUS (Status);
+    }
+
+    return_ACPI_STATUS (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiTbGetTableHeader
+ *
+ * PARAMETERS:  Address             - Address of table to retrieve.  Can be
+ *                                    Logical or Physical
+ *              ReturnHeader        - Where the table header is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Get an ACPI table header.  Works in both physical or virtual
+ *              addressing mode.  Works with both physical or logical pointers.
+ *              Table is either copied or mapped, depending on the pointer
+ *              type and mode of the processor.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiTbGetTableHeader (
+    ACPI_POINTER            *Address,
+    ACPI_TABLE_HEADER       *ReturnHeader)
+{
+    ACPI_STATUS             Status = AE_OK;
+    ACPI_TABLE_HEADER       *Header = NULL;
+
+
+    ACPI_FUNCTION_TRACE ("TbGetTableHeader");
+
+
+    /*
+     * Flags contains the current processor mode (Virtual or Physical addressing)
+     * The PointerType is either Logical or Physical
+     */
+    switch (Address->PointerType)
+    {
+    case ACPI_PHYSMODE_PHYSPTR:
+    case ACPI_LOGMODE_LOGPTR:
+
+        /* Pointer matches processor mode, copy the header */
+
+        ACPI_MEMCPY (ReturnHeader, Address->Pointer.Logical, sizeof (ACPI_TABLE_HEADER));
+        break;
+
+
+    case ACPI_LOGMODE_PHYSPTR:
+
+        /* Create a logical address for the physical pointer*/
+
+        Status = AcpiOsMapMemory (Address->Pointer.Physical, sizeof (ACPI_TABLE_HEADER),
+                                    (void *) &Header);
+        if (ACPI_FAILURE (Status))
+        {
+            ACPI_REPORT_ERROR (("Could not map memory at %8.8X%8.8X for length %X\n",
+                ACPI_FORMAT_UINT64 (Address->Pointer.Physical),
+                sizeof (ACPI_TABLE_HEADER)));
+            return_ACPI_STATUS (Status);
+        }
+
+        /* Copy header and delete mapping */
+
+        ACPI_MEMCPY (ReturnHeader, Header, sizeof (ACPI_TABLE_HEADER));
+        AcpiOsUnmapMemory (Header, sizeof (ACPI_TABLE_HEADER));
+        break;
+
+
+    default:
+
+        ACPI_REPORT_ERROR (("Invalid address flags %X\n",
+            Address->PointerType));
+        return_ACPI_STATUS (AE_BAD_PARAMETER);
+    }
+
+    return_ACPI_STATUS (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiTbGetTableBody
+ *
+ * PARAMETERS:  Address             - Address of table to retrieve.  Can be
+ *                                    Logical or Physical
+ *              Header              - Header of the table to retrieve
+ *              TableInfo           - Where the table info is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Get an entire ACPI table with support to allow the host OS to
+ *              replace the table with a newer version (table override.)
+ *              Works in both physical or virtual
+ *              addressing mode.  Works with both physical or logical pointers.
+ *              Table is either copied or mapped, depending on the pointer
+ *              type and mode of the processor.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiTbGetTableBody (
+    ACPI_POINTER            *Address,
+    ACPI_TABLE_HEADER       *Header,
+    ACPI_TABLE_DESC         *TableInfo)
+{
+    ACPI_STATUS             Status;
+
+
+    ACPI_FUNCTION_TRACE ("TbGetTableBody");
+
+
+    if (!TableInfo || !Address)
+    {
+        return_ACPI_STATUS (AE_BAD_PARAMETER);
+    }
+
+    /*
+     * Attempt table override.
+     */
+    Status = AcpiTbTableOverride (Header, TableInfo);
+    if (ACPI_SUCCESS (Status))
+    {
+        /* Table was overridden by the host OS */
+
+        return_ACPI_STATUS (Status);
+    }
+
+    /* No override, get the original table */
+
+    Status = AcpiTbGetThisTable (Address, Header, TableInfo);
+    return_ACPI_STATUS (Status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiTbTableOverride
+ *
+ * PARAMETERS:  Header              - Pointer to table header
+ *              TableInfo           - Return info if table is overridden
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Attempts override of current table with a new one if provided
+ *              by the host OS.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiTbTableOverride (
+    ACPI_TABLE_HEADER       *Header,
+    ACPI_TABLE_DESC         *TableInfo)
+{
+    ACPI_TABLE_HEADER       *NewTable;
+    ACPI_STATUS             Status;
+    ACPI_POINTER            Address;
+
+
+    ACPI_FUNCTION_TRACE ("TbTableOverride");
+
+
+    /*
+     * The OSL will examine the header and decide whether to override this
+     * table.  If it decides to override, a table will be returned in NewTable,
+     * which we will then copy.
+     */
+    Status = AcpiOsTableOverride (Header, &NewTable);
+    if (ACPI_FAILURE (Status))
+    {
+        /* Some severe error from the OSL, but we basically ignore it */
+
+        ACPI_REPORT_ERROR (("Could not override ACPI table, %s\n",
+            AcpiFormatException (Status)));
+        return_ACPI_STATUS (Status);
+    }
+
+    if (!NewTable)
+    {
+        /* No table override */
+
+        return_ACPI_STATUS (AE_NO_ACPI_TABLES);
+    }
+
+    /*
+     * We have a new table to override the old one.  Get a copy of
+     * the new one.  We know that the new table has a logical pointer.
+     */
+    Address.PointerType     = ACPI_LOGICAL_POINTER | ACPI_LOGICAL_ADDRESSING;
+    Address.Pointer.Logical = NewTable;
+
+    Status = AcpiTbGetThisTable (&Address, NewTable, TableInfo);
+    if (ACPI_FAILURE (Status))
+    {
+        ACPI_REPORT_ERROR (("Could not copy override ACPI table, %s\n",
+            AcpiFormatException (Status)));
+        return_ACPI_STATUS (Status);
+    }
+
+    /* Copy the table info */
+
+    ACPI_REPORT_INFO (("Table [%4.4s] replaced by host OS\n",
+        TableInfo->Pointer->Signature));
+
+    return_ACPI_STATUS (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiTbGetThisTable
+ *
+ * PARAMETERS:  Address             - Address of table to retrieve.  Can be
+ *                                    Logical or Physical
+ *              Header              - Header of the table to retrieve
+ *              TableInfo           - Where the table info is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Get an entire ACPI table.  Works in both physical or virtual
+ *              addressing mode.  Works with both physical or logical pointers.
+ *              Table is either copied or mapped, depending on the pointer
+ *              type and mode of the processor.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiTbGetThisTable (
+    ACPI_POINTER            *Address,
+    ACPI_TABLE_HEADER       *Header,
+    ACPI_TABLE_DESC         *TableInfo)
+{
+    ACPI_TABLE_HEADER       *FullTable = NULL;
+    UINT8                   Allocation;
+    ACPI_STATUS             Status = AE_OK;
+
+
+    ACPI_FUNCTION_TRACE ("TbGetThisTable");
+
+
+    /*
+     * Flags contains the current processor mode (Virtual or Physical addressing)
+     * The PointerType is either Logical or Physical
+     */
+    switch (Address->PointerType)
+    {
+    case ACPI_PHYSMODE_PHYSPTR:
+    case ACPI_LOGMODE_LOGPTR:
+
+        /* Pointer matches processor mode, copy the table to a new buffer */
+
+        FullTable = ACPI_MEM_ALLOCATE (Header->Length);
+        if (!FullTable)
+        {
+            ACPI_REPORT_ERROR (("Could not allocate table memory for [%4.4s] length %X\n",
+                Header->Signature, Header->Length));
+            return_ACPI_STATUS (AE_NO_MEMORY);
+        }
+
+        /* Copy the entire table (including header) to the local buffer */
+
+        ACPI_MEMCPY (FullTable, Address->Pointer.Logical, Header->Length);
+
+        /* Save allocation type */
+
+        Allocation = ACPI_MEM_ALLOCATED;
+        break;
+
+
+    case ACPI_LOGMODE_PHYSPTR:
+
+        /*
+         * Just map the table's physical memory
+         * into our address space.
+         */
+        Status = AcpiOsMapMemory (Address->Pointer.Physical, (ACPI_SIZE) Header->Length,
+                                    (void *) &FullTable);
+        if (ACPI_FAILURE (Status))
+        {
+            ACPI_REPORT_ERROR (("Could not map memory for table [%4.4s] at %8.8X%8.8X for length %X\n",
+                Header->Signature,
+                ACPI_FORMAT_UINT64 (Address->Pointer.Physical), Header->Length));
+            return (Status);
+        }
+
+        /* Save allocation type */
+
+        Allocation = ACPI_MEM_MAPPED;
+        break;
+
+
+    default:
+
+        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid address flags %X\n",
+            Address->PointerType));
+        return_ACPI_STATUS (AE_BAD_PARAMETER);
+    }
+
+    /*
+     * Validate checksum for _most_ tables,
+     * even the ones whose signature we don't recognize
+     */
+    if (TableInfo->Type != ACPI_TABLE_FACS)
+    {
+        Status = AcpiTbVerifyTableChecksum (FullTable);
+
+#if (!ACPI_CHECKSUM_ABORT)
+        if (ACPI_FAILURE (Status))
+        {
+            /* Ignore the error if configuration says so */
+
+            Status = AE_OK;
+        }
+#endif
+    }
+
+    /* Return values */
+
+    TableInfo->Pointer      = FullTable;
+    TableInfo->Length       = (ACPI_SIZE) Header->Length;
+    TableInfo->Allocation   = Allocation;
+
+    ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+        "Found table [%4.4s] at %8.8X%8.8X, mapped/copied to %p\n",
+        FullTable->Signature,
+        ACPI_FORMAT_UINT64 (Address->Pointer.Physical), FullTable));
+
+    return_ACPI_STATUS (Status);
+}
 
 
 /*******************************************************************************
@@ -155,7 +528,7 @@ AcpiTbGetTablePtr (
     UINT32                  i;
 
 
-    FUNCTION_TRACE ("TbGetTablePtr");
+    ACPI_FUNCTION_TRACE ("TbGetTablePtr");
 
 
     if (!AcpiGbl_DSDT)
@@ -168,26 +541,26 @@ AcpiTbGetTablePtr (
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
 
-
     /*
      * For all table types (Single/Multiple), the first
      * instance is always in the list head.
      */
     if (Instance == 1)
     {
-        /*
-         * Just pluck the pointer out of the global table!
-         * Will be null if no table is present
-         */
-        *TablePtrLoc = AcpiGbl_AcpiTables[TableType].Pointer;
+        /* Get the first */
+
+        *TablePtrLoc = NULL;
+        if (AcpiGbl_TableLists[TableType].Next)
+        {
+            *TablePtrLoc = AcpiGbl_TableLists[TableType].Next->Pointer;
+        }
         return_ACPI_STATUS (AE_OK);
     }
-
 
     /*
      * Check for instance out of range
      */
-    if (Instance > AcpiGbl_AcpiTables[TableType].Count)
+    if (Instance > AcpiGbl_TableLists[TableType].Count)
     {
         return_ACPI_STATUS (AE_NOT_EXIST);
     }
@@ -199,7 +572,7 @@ AcpiTbGetTablePtr (
      * need to walk from the 2nd table until we reach the Instance
      * that the user is looking for and return its table pointer.
      */
-    TableDesc = AcpiGbl_AcpiTables[TableType].Next;
+    TableDesc = AcpiGbl_TableLists[TableType].Next;
     for (i = 2; i < Instance; i++)
     {
         TableDesc = TableDesc->Next;
@@ -210,681 +583,5 @@ AcpiTbGetTablePtr (
     *TablePtrLoc = TableDesc->Pointer;
 
     return_ACPI_STATUS (AE_OK);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiTbGetTable
- *
- * PARAMETERS:  PhysicalAddress         - Physical address of table to retrieve
- *              *BufferPtr              - If BufferPtr is valid, read data from
- *                                         buffer rather than searching memory
- *              *TableInfo              - Where the table info is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Maps the physical address of table into a logical address
- *
- ******************************************************************************/
-
-ACPI_STATUS
-AcpiTbGetTable (
-    ACPI_PHYSICAL_ADDRESS   PhysicalAddress,
-    ACPI_TABLE_HEADER       *BufferPtr,
-    ACPI_TABLE_DESC         *TableInfo)
-{
-    ACPI_TABLE_HEADER       *TableHeader = NULL;
-    ACPI_TABLE_HEADER       *FullTable = NULL;
-    UINT32                  Size;
-    UINT8                   Allocation;
-    ACPI_STATUS             Status = AE_OK;
-
-
-    FUNCTION_TRACE ("TbGetTable");
-
-
-    if (!TableInfo)
-    {
-        return_ACPI_STATUS (AE_BAD_PARAMETER);
-    }
-
-
-    if (BufferPtr)
-    {
-        /*
-         * Getting data from a buffer, not BIOS tables
-         */
-        TableHeader = BufferPtr;
-        Status = AcpiTbValidateTableHeader (TableHeader);
-        if (ACPI_FAILURE (Status))
-        {
-            /* Table failed verification, map all errors to BAD_DATA */
-
-            return_ACPI_STATUS (AE_BAD_DATA);
-        }
-
-        /* Allocate buffer for the entire table */
-
-        FullTable = ACPI_MEM_ALLOCATE (TableHeader->Length);
-        if (!FullTable)
-        {
-            return_ACPI_STATUS (AE_NO_MEMORY);
-        }
-
-        /* Copy the entire table (including header) to the local buffer */
-
-        Size = TableHeader->Length;
-        MEMCPY (FullTable, BufferPtr, Size);
-
-        /* Save allocation type */
-
-        Allocation = ACPI_MEM_ALLOCATED;
-    }
-
-
-    /*
-     * Not reading from a buffer, just map the table's physical memory
-     * into our address space.
-     */
-    else
-    {
-        Size = SIZE_IN_HEADER;
-
-        Status = AcpiTbMapAcpiTable (PhysicalAddress, &Size, &FullTable);
-        if (ACPI_FAILURE (Status))
-        {
-            return_ACPI_STATUS (Status);
-        }
-
-        /* Save allocation type */
-
-        Allocation = ACPI_MEM_MAPPED;
-    }
-
-
-    /* Return values */
-
-    TableInfo->Pointer      = FullTable;
-    TableInfo->Length       = Size;
-    TableInfo->Allocation   = Allocation;
-    TableInfo->BasePointer  = FullTable;
-
-    return_ACPI_STATUS (Status);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiTbGetAllTables
- *
- * PARAMETERS:  NumberOfTables      - Number of tables to get
- *              TablePtr            - Input buffer pointer, optional
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Load and validate all tables other than the RSDT.  The RSDT must
- *              already be loaded and validated.
- *
- ******************************************************************************/
-
-ACPI_STATUS
-AcpiTbGetAllTables (
-    UINT32                  NumberOfTables,
-    ACPI_TABLE_HEADER       *TablePtr)
-{
-    ACPI_STATUS             Status = AE_OK;
-    UINT32                  Index;
-    ACPI_TABLE_DESC         TableInfo;
-
-
-    FUNCTION_TRACE ("TbGetAllTables");
-
-    ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Number of tables: %d\n", NumberOfTables));
-
-
-    /*
-     * Loop through all table pointers found in RSDT.
-     * This will NOT include the FACS and DSDT - we must get
-     * them after the loop
-     */
-    for (Index = 0; Index < NumberOfTables; Index++)
-    {
-        /* Clear the TableInfo each time */
-
-        MEMSET (&TableInfo, 0, sizeof (ACPI_TABLE_DESC));
-
-        /* Get the table via the XSDT */
-
-        Status = AcpiTbGetTable ((ACPI_PHYSICAL_ADDRESS)
-                                ACPI_GET_ADDRESS (AcpiGbl_XSDT->TableOffsetEntry[Index]),
-                                TablePtr, &TableInfo);
-
-        /* Ignore a table that failed verification */
-
-        if (Status == AE_BAD_DATA)
-        {
-            continue;
-        }
-
-        /* However, abort on serious errors */
-
-        if (ACPI_FAILURE (Status))
-        {
-            return_ACPI_STATUS (Status);
-        }
-
-        /* Recognize and install the table */
-
-        Status = AcpiTbInstallTable (TablePtr, &TableInfo);
-        if (ACPI_FAILURE (Status))
-        {
-            /*
-             * Unrecognized or unsupported table, delete it and ignore the
-             * error.  Just get as many tables as we can, later we will
-             * determine if there are enough tables to continue.
-             */
-            AcpiTbUninstallTable (&TableInfo);
-        }
-    }
-
-
-    /*
-     * Convert the FADT to a common format.  This allows earlier revisions of the
-     * table to coexist with newer versions, using common access code.
-     */
-    Status = AcpiTbConvertTableFadt ();
-    if (ACPI_FAILURE (Status))
-    {
-        return_ACPI_STATUS (Status);
-    }
-
-
-    /*
-     * Get the minimum set of ACPI tables, namely:
-     *
-     * 1) FADT (via RSDT in loop above)
-     * 2) FACS
-     * 3) DSDT
-     *
-     */
-
-    /*
-     * Get the FACS (must have the FADT first, from loop above)
-     * AcpiTbGetTableFacs will fail if FADT pointer is not valid
-     */
-    Status = AcpiTbGetTableFacs (TablePtr, &TableInfo);
-    if (ACPI_FAILURE (Status))
-    {
-        return_ACPI_STATUS (Status);
-    }
-
-    /* Install the FACS */
-
-    Status = AcpiTbInstallTable (TablePtr, &TableInfo);
-    if (ACPI_FAILURE (Status))
-    {
-        return_ACPI_STATUS (Status);
-    }
-
-    /*
-     * Create the common FACS pointer table
-     * (Contains pointers to the original table)
-     */
-    Status = AcpiTbBuildCommonFacs (&TableInfo);
-    if (ACPI_FAILURE (Status))
-    {
-        return_ACPI_STATUS (Status);
-    }
-
-
-    /*
-     * Get the DSDT (We know that the FADT is valid now)
-     */
-    Status = AcpiTbGetTable ((ACPI_PHYSICAL_ADDRESS) ACPI_GET_ADDRESS (AcpiGbl_FADT->XDsdt),
-                                TablePtr, &TableInfo);
-    if (ACPI_FAILURE (Status))
-    {
-        return_ACPI_STATUS (Status);
-    }
-
-    /* Install the DSDT */
-
-    Status = AcpiTbInstallTable (TablePtr, &TableInfo);
-    if (ACPI_FAILURE (Status))
-    {
-        return_ACPI_STATUS (Status);
-    }
-
-    /* Dump the DSDT Header */
-
-    ACPI_DEBUG_PRINT ((ACPI_DB_TABLES, "Hex dump of DSDT Header:\n"));
-    DUMP_BUFFER ((UINT8 *) AcpiGbl_DSDT, sizeof (ACPI_TABLE_HEADER));
-
-    /* Dump the entire DSDT */
-
-    ACPI_DEBUG_PRINT ((ACPI_DB_TABLES,
-        "Hex dump of DSDT (After header), size %d (%x)\n",
-        AcpiGbl_DSDT->Length, AcpiGbl_DSDT->Length));
-    DUMP_BUFFER ((UINT8 *) (AcpiGbl_DSDT + 1), AcpiGbl_DSDT->Length);
-
-    /*
-     * Initialize the capabilities flags.
-     * Assumes that platform supports ACPI_MODE since we have tables!
-     */
-    AcpiGbl_SystemFlags |= AcpiHwGetModeCapabilities ();
-
-
-    /* Always delete the RSDP mapping, we are done with it */
-
-    AcpiTbDeleteAcpiTable (ACPI_TABLE_RSDP);
-
-    return_ACPI_STATUS (Status);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiTbVerifyRsdp
- *
- * PARAMETERS:  NumberOfTables      - Where the table count is placed
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Load and validate the RSDP (ptr) and RSDT (table)
- *
- ******************************************************************************/
-
-ACPI_STATUS
-AcpiTbVerifyRsdp (
-    ACPI_PHYSICAL_ADDRESS   RsdpPhysicalAddress)
-{
-    ACPI_TABLE_DESC         TableInfo;
-    ACPI_STATUS             Status;
-    UINT8                   *TablePtr;
-
-
-    FUNCTION_TRACE ("TbVerifyRsdp");
-
-
-    /*
-     * Obtain access to the RSDP structure
-     */
-    Status = AcpiOsMapMemory (RsdpPhysicalAddress, sizeof (RSDP_DESCRIPTOR),
-                                (void **) &TablePtr);
-    if (ACPI_FAILURE (Status))
-    {
-        return_ACPI_STATUS (Status);
-    }
-
-    /*
-     *  The signature and checksum must both be correct
-     */
-    if (STRNCMP ((NATIVE_CHAR *) TablePtr, RSDP_SIG, sizeof (RSDP_SIG)-1) != 0)
-    {
-        /* Nope, BAD Signature */
-
-        Status = AE_BAD_SIGNATURE;
-        goto Cleanup;
-    }
-
-    if (AcpiTbChecksum (TablePtr, RSDP_CHECKSUM_LENGTH) != 0)
-    {
-        /* Nope, BAD Checksum */
-
-        Status = AE_BAD_CHECKSUM;
-        goto Cleanup;
-    }
-
-    /* TBD: Check extended checksum if table version >= 2 */
-
-    /* The RSDP supplied is OK */
-
-    TableInfo.Pointer      = (ACPI_TABLE_HEADER *) TablePtr;
-    TableInfo.Length       = sizeof (RSDP_DESCRIPTOR);
-    TableInfo.Allocation   = ACPI_MEM_MAPPED;
-    TableInfo.BasePointer  = TablePtr;
-
-    /* Save the table pointers and allocation info */
-
-    Status = AcpiTbInitTableDescriptor (ACPI_TABLE_RSDP, &TableInfo);
-    if (ACPI_FAILURE (Status))
-    {
-        goto Cleanup;
-    }
-
-
-    /* Save the RSDP in a global for easy access */
-
-    AcpiGbl_RSDP = (RSDP_DESCRIPTOR *) TableInfo.Pointer;
-    return_ACPI_STATUS (Status);
-
-
-    /* Error exit */
-Cleanup:
-
-    AcpiOsUnmapMemory (TablePtr, sizeof (RSDP_DESCRIPTOR));
-    return_ACPI_STATUS (Status);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiTbGetRsdtAddress
- *
- * PARAMETERS:  None
- *
- * RETURN:      RSDT physical address
- *
- * DESCRIPTION: Extract the address of the RSDT or XSDT, depending on the
- *              version of the RSDP
- *
- ******************************************************************************/
-
-ACPI_PHYSICAL_ADDRESS
-AcpiTbGetRsdtAddress (void)
-{
-    ACPI_PHYSICAL_ADDRESS   PhysicalAddress;
-
-
-    FUNCTION_ENTRY ();
-
-
-    /*
-     * For RSDP revision 0 or 1, we use the RSDT.
-     * For RSDP revision 2 (and above), we use the XSDT
-     */
-    if (AcpiGbl_RSDP->Revision < 2)
-    {
-#ifdef _IA64
-        /* 0.71 RSDP has 64bit Rsdt address field */
-        PhysicalAddress = ((RSDP_DESCRIPTOR_REV071 *)AcpiGbl_RSDP)->RsdtPhysicalAddress;
-#else
-        PhysicalAddress = (ACPI_PHYSICAL_ADDRESS) AcpiGbl_RSDP->RsdtPhysicalAddress;
-#endif
-    }
-
-    else
-    {
-        PhysicalAddress = (ACPI_PHYSICAL_ADDRESS)
-                            ACPI_GET_ADDRESS (AcpiGbl_RSDP->XsdtPhysicalAddress);
-    }
-
-    return (PhysicalAddress);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiTbValidateRsdt
- *
- * PARAMETERS:  TablePtr        - Addressable pointer to the RSDT.
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Validate signature for the RSDT or XSDT
- *
- ******************************************************************************/
-
-ACPI_STATUS
-AcpiTbValidateRsdt (
-    ACPI_TABLE_HEADER       *TablePtr)
-{
-    UINT32                  NoMatch;
-
-
-    PROC_NAME ("TbValidateRsdt");
-
-
-    /*
-     * For RSDP revision 0 or 1, we use the RSDT.
-     * For RSDP revision 2 (and above), we use the XSDT
-     */
-    if (AcpiGbl_RSDP->Revision < 2)
-    {
-        NoMatch = STRNCMP ((char *) TablePtr, RSDT_SIG,
-                        sizeof (RSDT_SIG) -1);
-    }
-    else
-    {
-        NoMatch = STRNCMP ((char *) TablePtr, XSDT_SIG,
-                        sizeof (XSDT_SIG) -1);
-    }
-
-
-    if (NoMatch)
-    {
-        /* Invalid RSDT or XSDT signature */
-
-        REPORT_ERROR (("Invalid signature where RSDP indicates RSDT/XSDT should be located\n"));
-
-        DUMP_BUFFER (AcpiGbl_RSDP, 20);
-
-        ACPI_DEBUG_PRINT_RAW ((ACPI_DB_ERROR,
-            "RSDT/XSDT signature at %X is invalid\n",
-            AcpiGbl_RSDP->RsdtPhysicalAddress));
-
-        return (AE_BAD_SIGNATURE);
-    }
-
-    return (AE_OK);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiTbGetTablePointer
- *
- * PARAMETERS:  PhysicalAddress     - Address from RSDT
- *              Flags               - virtual or physical addressing
- *              TablePtr            - Addressable address (output)
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Create an addressable pointer to an ACPI table
- *
- ******************************************************************************/
-
-ACPI_STATUS
-AcpiTbGetTablePointer (
-    ACPI_PHYSICAL_ADDRESS   PhysicalAddress,
-    UINT32                  Flags,
-    UINT32                  *Size,
-    ACPI_TABLE_HEADER       **TablePtr)
-{
-    ACPI_STATUS             Status;
-
-
-    FUNCTION_ENTRY ();
-
-
-    if ((Flags & ACPI_MEMORY_MODE) == ACPI_LOGICAL_ADDRESSING)
-    {
-        *Size = SIZE_IN_HEADER;
-        Status = AcpiTbMapAcpiTable (PhysicalAddress, Size, TablePtr);
-    }
-
-    else
-    {
-        *Size = 0;
-        *TablePtr = (ACPI_TABLE_HEADER *) (ACPI_TBLPTR) PhysicalAddress;
-
-        Status = AE_OK;
-    }
-
-    return (Status);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiTbGetTableRsdt
- *
- * PARAMETERS:  NumberOfTables      - Where the table count is placed
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Load and validate the RSDP (ptr) and RSDT (table)
- *
- ******************************************************************************/
-
-ACPI_STATUS
-AcpiTbGetTableRsdt (
-    UINT32                  *NumberOfTables)
-{
-    ACPI_TABLE_DESC         TableInfo;
-    ACPI_STATUS             Status;
-    ACPI_PHYSICAL_ADDRESS   PhysicalAddress;
-
-
-    FUNCTION_TRACE ("TbGetTableRsdt");
-
-
-    /*
-     * Get the RSDT from the RSDP
-     */
-    ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-        "RSDP located at %p, RSDT physical=%8.8lX%8.8lX \n",
-        AcpiGbl_RSDP, HIDWORD(AcpiGbl_RSDP->RsdtPhysicalAddress),
-        LODWORD(AcpiGbl_RSDP->RsdtPhysicalAddress)));
-
-
-    PhysicalAddress = AcpiTbGetRsdtAddress ();
-
-
-    /* Get the RSDT/XSDT */
-
-    Status = AcpiTbGetTable (PhysicalAddress, NULL, &TableInfo);
-    if (ACPI_FAILURE (Status))
-    {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not get the RSDT, %s\n",
-            AcpiFormatException (Status)));
-        return_ACPI_STATUS (Status);
-    }
-
-
-    /* Check the RSDT or XSDT signature */
-
-    Status = AcpiTbValidateRsdt (TableInfo.Pointer);
-    if (ACPI_FAILURE (Status))
-    {
-        return_ACPI_STATUS (Status);
-    }
-
-
-    /*
-     * Valid RSDT signature, verify the checksum.  If it fails, just
-     * print a warning and ignore it.
-     */
-    Status = AcpiTbVerifyTableChecksum (TableInfo.Pointer);
-
-
-    /* Convert and/or copy to an XSDT structure */
-
-    Status = AcpiTbConvertToXsdt (&TableInfo, NumberOfTables);
-    if (ACPI_FAILURE (Status))
-    {
-        return_ACPI_STATUS (Status);
-    }
-
-    /* Save the table pointers and allocation info */
-
-    Status = AcpiTbInitTableDescriptor (ACPI_TABLE_XSDT, &TableInfo);
-    if (ACPI_FAILURE (Status))
-    {
-        return_ACPI_STATUS (Status);
-    }
-
-    AcpiGbl_XSDT = (XSDT_DESCRIPTOR *) TableInfo.Pointer;
-
-    ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "XSDT located at %p\n", AcpiGbl_XSDT));
-
-    return_ACPI_STATUS (Status);
-}
-
-
-/******************************************************************************
- *
- * FUNCTION:    AcpiTbGetTableFacs
- *
- * PARAMETERS:  *BufferPtr              - If BufferPtr is valid, read data from
- *                                        buffer rather than searching memory
- *              *TableInfo              - Where the table info is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Returns a pointer to the FACS as defined in FADT.  This
- *              function assumes the global variable FADT has been
- *              correctly initialized.  The value of FADT->FirmwareCtrl
- *              into a far pointer which is returned.
- *
- *****************************************************************************/
-
-ACPI_STATUS
-AcpiTbGetTableFacs (
-    ACPI_TABLE_HEADER       *BufferPtr,
-    ACPI_TABLE_DESC         *TableInfo)
-{
-    ACPI_TABLE_HEADER       *TablePtr = NULL;
-    UINT32                  Size;
-    UINT8                   Allocation;
-    ACPI_STATUS             Status = AE_OK;
-
-
-    FUNCTION_TRACE ("TbGetTableFacs");
-
-
-    /* Must have a valid FADT pointer */
-
-    if (!AcpiGbl_FADT)
-    {
-        return_ACPI_STATUS (AE_NO_ACPI_TABLES);
-    }
-
-    Size = sizeof (FACS_DESCRIPTOR);
-    if (BufferPtr)
-    {
-        /*
-         * Getting table from a file -- allocate a buffer and
-         * read the table.
-         */
-        TablePtr = ACPI_MEM_ALLOCATE (Size);
-        if(!TablePtr)
-        {
-            return_ACPI_STATUS (AE_NO_MEMORY);
-        }
-
-        MEMCPY (TablePtr, BufferPtr, Size);
-
-        /* Save allocation type */
-
-        Allocation = ACPI_MEM_ALLOCATED;
-    }
-
-    else
-    {
-        /* Just map the physical memory to our address space */
-
-        Status = AcpiTbMapAcpiTable ((ACPI_PHYSICAL_ADDRESS) ACPI_GET_ADDRESS (AcpiGbl_FADT->XFirmwareCtrl),
-                                        &Size, &TablePtr);
-        if (ACPI_FAILURE (Status))
-        {
-            return_ACPI_STATUS (Status);
-        }
-
-        /* Save allocation type */
-
-        Allocation = ACPI_MEM_MAPPED;
-    }
-
-
-    /* Return values */
-
-    TableInfo->Pointer      = TablePtr;
-    TableInfo->Length       = Size;
-    TableInfo->Allocation   = Allocation;
-    TableInfo->BasePointer  = TablePtr;
-
-    return_ACPI_STATUS (Status);
 }
 

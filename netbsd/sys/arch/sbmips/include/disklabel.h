@@ -1,4 +1,4 @@
-/* $NetBSD: disklabel.h,v 1.1 2002/03/06 02:13:41 simonb Exp $ */
+/* $NetBSD: disklabel.h,v 1.4 2003/10/25 13:06:03 simonb Exp $ */
 
 /*
  * Copyright 2000, 2001
@@ -15,10 +15,9 @@
  *    the source file.
  *
  * 2) No right is granted to use any trade name, trademark, or logo of
- *    Broadcom Corporation. Neither the "Broadcom Corporation" name nor any
- *    trademark or logo of Broadcom Corporation may be used to endorse or
- *    promote products derived from this software without the prior written
- *    permission of Broadcom Corporation.
+ *    Broadcom Corporation.  The "Broadcom Corporation" name may not be
+ *    used to endorse or promote products derived from this software
+ *    without the prior written permission of Broadcom Corporation.
  *
  * 3) THIS SOFTWARE IS PROVIDED "AS-IS" AND ANY EXPRESS OR IMPLIED
  *    WARRANTIES, INCLUDING BUT NOT LIMITED TO, ANY IMPLIED WARRANTIES OF
@@ -75,12 +74,12 @@
 
 #ifdef __NetBSD__
 /* Pull in MBR partition definitions. */
-#include <sys/disklabel_mbr.h>
+#include <sys/bootblock.h>
 
 #ifndef __ASSEMBLER__
 #include <sys/dkbad.h>
 struct cpu_disklabel {
-	struct mbr_partition dosparts[NMBRPART];
+	struct mbr_partition dosparts[MBR_PART_COUNT];
 	struct dkbad bad;
 };
 #endif
@@ -116,13 +115,13 @@ struct cpu_disklabel {
 
 
 struct boot_block {
-	uint64_t bb_data[64];		/* data (disklabel, also as below) */
+	uint64_t cfe_bb_data[64];	/* data (disklabel, also as below) */
 };
-#define	bb_magic	bb_data[59]	/* magic number */
-#define	bb_hdrinfo	bb_data[60]	/* header checksum, ver, flags */
-#define	bb_secstart	bb_data[61]	/* secondary start (bytes) */
-#define	bb_secsize	bb_data[62]	/* secondary size (bytes) */
-#define	bb_archinfo	bb_data[63]	/* architecture info */
+#define	cfe_bb_magic	cfe_bb_data[59]	/* magic number */
+#define	cfe_bb_hdrinfo	cfe_bb_data[60]	/* header checksum, ver, flags */
+#define	cfe_bb_secstart	cfe_bb_data[61]	/* secondary start (bytes) */
+#define	cfe_bb_secsize	cfe_bb_data[62]	/* secondary size (bytes) */
+#define	cfe_bb_archinfo	cfe_bb_data[63]	/* architecture info */
 
 #define	BOOT_BLOCK_OFFSET	0	/* offset of boot block. */
 #define	BOOT_BLOCK_BLOCKSIZE	512	/* block size for sec. size/start,

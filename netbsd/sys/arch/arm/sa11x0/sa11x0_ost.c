@@ -1,4 +1,4 @@
-/*	$NetBSD: sa11x0_ost.c,v 1.6 2002/01/08 11:40:56 rjs Exp $	*/
+/*	$NetBSD: sa11x0_ost.c,v 1.11 2003/07/15 00:24:51 lukem Exp $	*/
 
 /*
  * Copyright (c) 1997 Mark Brinicombe.
@@ -36,6 +36,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sa11x0_ost.c,v 1.11 2003/07/15 00:24:51 lukem Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -83,9 +86,8 @@ static struct saost_softc *saost_sc = NULL;
 #define STATHZ	64
 #endif
 
-struct cfattach saost_ca = {
-	sizeof(struct saost_softc), saost_match, saost_attach
-};
+CFATTACH_DECL(saost, sizeof(struct saost_softc),
+    saost_match, saost_attach, NULL, NULL);
 
 static int
 saost_match(parent, match, aux)
@@ -114,7 +116,7 @@ saost_attach(parent, self, aux)
 
 	if(bus_space_map(sa->sa_iot, sa->sa_addr, sa->sa_size, 0, 
 			&sc->sc_ioh))
-		panic("%s: Cannot map registers\n", self->dv_xname);
+		panic("%s: Cannot map registers", self->dv_xname);
 
 	/* disable all channel and clear interrupt status */
 	bus_space_write_4(saost_sc->sc_iot, saost_sc->sc_ioh, SAOST_IR, 0);
@@ -286,7 +288,7 @@ microtime(tvp)
 
 	deltatm = saost_sc->sc_clock_count - tm;
 
-#ifdef DEBUG
+#ifdef OST_DEBUG
 	printf("deltatm = %d\n",deltatm);
 #endif
 

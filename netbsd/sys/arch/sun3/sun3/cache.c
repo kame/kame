@@ -1,4 +1,4 @@
-/*	$NetBSD: cache.c,v 1.14 2001/09/05 13:21:09 tsutsui Exp $	*/
+/*	$NetBSD: cache.c,v 1.16 2003/07/15 03:36:16 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * cache flush operations specific to the Sun3 custom MMU
  * all are done using writes to control space
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cache.c,v 1.16 2003/07/15 03:36:16 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -84,7 +87,7 @@ cache_flush_page(pgva)
 
 	/* Write to control space for each cache line. */
 	va = (char *) pgva;
-	endva = (char *) (pgva + NBPG);
+	endva = (char *) (pgva + PAGE_SIZE);
 	data = VAC_FLUSH_PAGE;
 
 	do {

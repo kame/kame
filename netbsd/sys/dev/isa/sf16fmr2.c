@@ -1,4 +1,4 @@
-/* $NetBSD: sf16fmr2.c,v 1.4 2002/01/07 21:47:15 thorpej Exp $ */
+/* $NetBSD: sf16fmr2.c,v 1.9 2003/07/14 15:47:16 lukem Exp $ */
 /* $OpenBSD: sf16fmr2.c,v 1.3 2001/12/18 18:48:08 mickey Exp $ */
 /* $RuOBSD: sf16fmr2.c,v 1.12 2001/10/18 16:51:36 pva Exp $ */
 
@@ -34,6 +34,9 @@
  * Philips TEA5757H AM/FM Self Tuned Radio:
  *	http://www.semiconductors.philips.com/pip/TEA5757H
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sf16fmr2.c,v 1.9 2003/07/14 15:47:16 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -105,9 +108,8 @@ struct sf2r_softc {
 	struct tea5757_t	tea;
 };
 
-struct cfattach sf2r_ca = {
-	sizeof(struct sf2r_softc), sf2r_probe, sf2r_attach
-};
+CFATTACH_DECL(sf2r, sizeof(struct sf2r_softc),
+    sf2r_probe, sf2r_attach, NULL, NULL);
 
 void	sf2r_set_mute(struct sf2r_softc *);
 int	sf2r_find(bus_space_tag_t, bus_space_handle_t);
@@ -168,6 +170,7 @@ sf2r_attach(struct device *parent, struct device *self, void *aux)
 	struct isa_attach_args *ia = aux;
 
 	sc->tea.iot = ia->ia_iot;
+	sc->tea.flags = 0;
 	sc->mute = 0;
 	sc->vol = 0;
 	sc->freq = MIN_FM_FREQ;
@@ -246,7 +249,7 @@ sf2r_find(bus_space_tag_t iot, bus_space_handle_t ioh)
 		tea5757_set_freq(&sc.tea, sc.stereo, sc.lock, sc.freq);
 		sf2r_set_mute(&sc);
 		freq = sf2r_read_register(iot, ioh, sc.tea.offset);
-		if (tea5757_decode_freq(freq) == sc.freq)
+		if (tea5757_decode_freq(freq, 0) == sc.freq)
 			return 1;
 	}
 
@@ -318,7 +321,7 @@ sf2r_get_info(void *v, struct radio_info *ri)
 	ri->lock = tea5757_decode_lock(sc->lock);
 
 	buf = sf2r_read_register(sc->tea.iot, sc->tea.ioh, sc->tea.offset);
-	ri->freq  = sc->freq = tea5757_decode_freq(buf);
+	ri->freq  = sc->freq = tea5757_decode_freq(buf, 0);
 	ri->info = 3 & (buf >> 24);
 
 	return (0);

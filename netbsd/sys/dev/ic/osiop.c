@@ -1,4 +1,4 @@
-/*	$NetBSD: osiop.c,v 1.9 2002/04/05 18:27:54 bouyer Exp $	*/
+/*	$NetBSD: osiop.c,v 1.18 2004/03/28 19:01:07 mhitch Exp $	*/
 
 /*
  * Copyright (c) 2001 Izumi Tsutsui.  All rights reserved.
@@ -27,7 +27,6 @@
  */
 
 /*
- * Copyright (c) 1994 Michael L. Hitch
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
  *
@@ -42,11 +41,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -66,17 +61,46 @@
  */
 
 /*
+ * Copyright (c) 1994 Michael L. Hitch
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Van Jacobson of Lawrence Berkeley Laboratory.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ *	@(#)siop.c	7.5 (Berkeley) 5/4/91
+ */
+
+/*
  * MI NCR53C710 scsi adaptor driver; based on arch/amiga/dev/siop.c:
  *	NetBSD: siop.c,v 1.43 1999/09/30 22:59:53 thorpej Exp
  *
  * bus_space/bus_dma'fied by Izumi Tsutsui <tsutsui@ceres.dti.ne.jp>
  *
- * The 53c710 datasheet is avaliable at:
+ * The 53c710 datasheet is available at:
  * http://www.lsilogic.com/techlib/techdocs/storage_stand_prod/index.html
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: osiop.c,v 1.9 2002/04/05 18:27:54 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: osiop.c,v 1.18 2004/03/28 19:01:07 mhitch Exp $");
 
 /* #define OSIOP_DEBUG */
 
@@ -123,42 +147,7 @@ void osiop_update_xfer_mode(struct osiop_softc *, int);
 void scsi_period_to_osiop(struct osiop_softc *, int);
 void osiop_timeout(void *);
 
-int osiop_reset_delay = 250;	/* delay after reset, in milleseconds */
-
-#ifdef OSIOP_DEBUG_SYNC
-/*
- * sync period transfer lookup - only valid for 66MHz clock
- */
-static struct {
-	u_int8_t p;	/* period from sync request message */
-	u_int8_t r;	/* siop_period << 4 | sbcl */
-} sync_tab[] = {
-	{ 60/4, 0<<4 | 1},
-	{ 76/4, 1<<4 | 1},
-	{ 92/4, 2<<4 | 1},
-	{ 92/4, 0<<4 | 2},
-	{108/4, 3<<4 | 1},
-	{116/4, 1<<4 | 2},
-	{120/4, 4<<4 | 1},
-	{120/4, 0<<4 | 3},
-	{136/4, 5<<4 | 1},
-	{140/4, 2<<4 | 2},
-	{152/4, 6<<4 | 1},
-	{152/4, 1<<4 | 3},
-	{164/4, 3<<4 | 2},
-	{168/4, 7<<4 | 1},
-	{180/4, 2<<4 | 3},
-	{184/4, 4<<4 | 2},
-	{208/4, 5<<4 | 2},
-	{212/4, 3<<4 | 3},
-	{232/4, 6<<4 | 2},
-	{240/4, 4<<4 | 3},
-	{256/4, 7<<4 | 2},
-	{272/4, 5<<4 | 3},
-	{300/4, 6<<4 | 3},
-	{332/4, 7<<4 | 3}
-};
-#endif
+int osiop_reset_delay = 250;	/* delay after reset, in milliseconds */
 
 #ifdef OSIOP_DEBUG
 #define DEBUG_DMA	0x01
@@ -548,6 +537,7 @@ osiop_poll(sc, acb)
 			i--;
 		}
 		sstat0 = osiop_read_1(sc, OSIOP_SSTAT0);
+		delay(25);
 		dstat = osiop_read_1(sc, OSIOP_DSTAT);
 		if (osiop_checkintr(sc, istat, dstat, sstat0, &status)) {
 			if (acb != sc->sc_nexus)
@@ -885,6 +875,7 @@ osiop_reset(sc)
 	stat = osiop_read_1(sc, OSIOP_ISTAT);
 	if (stat & OSIOP_ISTAT_SIP)
 		osiop_read_1(sc, OSIOP_SSTAT0);
+	delay(25);
 	if (stat & OSIOP_ISTAT_DIP)
 		osiop_read_1(sc, OSIOP_DSTAT);
 
@@ -992,7 +983,7 @@ osiop_start(sc)
 	/*
 	 * Negotiate wide is the initial negotiation state;  since the 53c710
 	 * doesn't do wide transfers, just begin the synchronous transfer
-	 * negotation here.
+	 * negotiation here.
 	 */
 	if (ti->state == NEG_INIT) {
 		if ((ti->flags & TI_NOSYNC) != 0) {
@@ -1104,7 +1095,7 @@ osiop_checkintr(sc, istat, dstat, sstat0, status)
 	int *status;
 {
 	struct osiop_acb *acb = sc->sc_nexus;
-	struct osiop_ds *ds;
+	struct osiop_ds *ds = NULL;	/* XXX */
 	bus_dmamap_t dsdma = sc->sc_dsdma;
 	bus_addr_t scraddr = sc->sc_scrdma->dm_segs[0].ds_addr;
 	int target = 0;
@@ -1425,7 +1416,7 @@ osiop_checkintr(sc, istat, dstat, sstat0, status)
 				n = (n - Ent_dataout) / 16;
 			else
 				n = (n - Ent_datain) / 16;
-			if (n <= 0 && n > OSIOP_NSG)
+			if (n < 0 || n >= OSIOP_NSG)
 				printf("TEMP invalid %ld\n", n);
 			else {
 				acb->curaddr = ds->data[n].addr;
@@ -1487,10 +1478,12 @@ osiop_checkintr(sc, istat, dstat, sstat0, status)
 			    i < OSIOP_NSG && ds->data[i].count > 0;
 			    i++, j++) {
 #ifdef OSIOP_DEBUG
-			if (osiop_debug & DEBUG_DISC)
-				printf("  chain[%d]: %x/%x -> %x/%x\n", j,
-				    ds->data[j].addr, ds->data[j].count,
-				    ds->data[i].addr, ds->data[i].count);
+				if (osiop_debug & DEBUG_DISC)
+					printf("  chain[%d]: %x/%x -> %x/%x\n",
+					    j, ds->data[j].addr,
+					    ds->data[j].count,
+					    ds->data[i].addr,
+					    ds->data[i].count);
 #endif
 				ds->data[j].addr  = ds->data[i].addr;
 				ds->data[j].count = ds->data[i].count;
@@ -1843,37 +1836,15 @@ osiop_update_xfer_mode(sc, target)
 	scsipi_async_event(&sc->sc_channel, ASYNC_EVENT_XFER_MODE, &xm);
 }
 
-/*
- * This is based on the Progressive Peripherals 33Mhz Zeus driver and will
- * not be correct for other 53c710 boards.
- *
- */
 void
 scsi_period_to_osiop(sc, target)
 	struct osiop_softc *sc;
 	int target;
 {
 	int period, offset, sxfer, sbcl;
-#ifdef DEBUG_SYNC
-	int i;
-#endif
 
 	period = sc->sc_tinfo[target].period;
 	offset = sc->sc_tinfo[target].offset;
-#ifdef DEBUG_SYNC
-	sxfer = 0;
-	if (offset <= OSIOP_MAX_OFFSET)
-		sxfer = offset;
-	for (i = 0; i < sizeof(sync_tab) / sizeof(sync_tab[0]); i++) {
-		if (period <= sync_tab[i].p) {
-			sxfer |= sync_tab[i].r & 0x70;
-			sbcl = sync_tab[i].r & 0x03;
-			break;
-		}
-	}
-	printf("osiop sync old: osiop_sxfr %02x, osiop_sbcl %02x\n",
-	    sxfer, sbcl);
-#endif
 	for (sbcl = 1; sbcl < 4; sbcl++) {
 		sxfer = (period * 4 - 1) / sc->sc_tcp[sbcl] - 3;
 		if (sxfer >= 0 && sxfer <= 7)

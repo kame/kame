@@ -1,4 +1,4 @@
-/* $NetBSD: cia.c,v 1.58 2002/05/16 01:01:31 thorpej Exp $ */
+/* $NetBSD: cia.c,v 1.62 2003/06/15 23:08:54 fvdl Exp $ */
 
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -72,7 +72,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: cia.c,v 1.58 2002/05/16 01:01:31 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cia.c,v 1.62 2003/06/15 23:08:54 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -114,9 +114,8 @@ __KERNEL_RCSID(0, "$NetBSD: cia.c,v 1.58 2002/05/16 01:01:31 thorpej Exp $");
 int	ciamatch __P((struct device *, struct cfdata *, void *));
 void	ciaattach __P((struct device *, struct device *, void *));
 
-struct cfattach cia_ca = {
-	sizeof(struct cia_softc), ciamatch, ciaattach,
-};
+CFATTACH_DECL(cia, sizeof(struct cia_softc),
+    ciamatch, ciaattach, NULL, NULL);
 
 extern struct cfdriver cia_cd;
 
@@ -416,6 +415,7 @@ ciaattach(parent, self, aux)
 	pba.pba_memt = &ccp->cc_memt;
 	pba.pba_dmat =
 	    alphabus_dma_get_tag(&ccp->cc_dmat_direct, ALPHA_BUS_PCI);
+	pba.pba_dmat64 = NULL;
 	pba.pba_pc = &ccp->cc_pc;
 	pba.pba_bus = 0;
 	pba.pba_bridgetag = NULL;
@@ -435,8 +435,8 @@ ciaprint(aux, pnp)
 
 	/* only PCIs can attach to CIAs; easy. */
 	if (pnp)
-		printf("%s at %s", pba->pba_busname, pnp);
-	printf(" bus %d", pba->pba_bus);
+		aprint_normal("%s at %s", pba->pba_busname, pnp);
+	aprint_normal(" bus %d", pba->pba_bus);
 	return (UNCONF);
 }
 

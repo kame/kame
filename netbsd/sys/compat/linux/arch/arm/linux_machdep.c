@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_machdep.c,v 1.8 2002/05/20 06:26:46 jdolecek Exp $	*/
+/*	$NetBSD: linux_machdep.c,v 1.13 2003/10/10 14:44:42 matt Exp $	*/
 
 /*-
  * Copyright (c) 1995, 2000 The NetBSD Foundation, Inc.
@@ -38,13 +38,12 @@
 
 #include <sys/param.h>
 
-__KERNEL_RCSID(0, "$NetBSD: linux_machdep.c,v 1.8 2002/05/20 06:26:46 jdolecek Exp $");
+__KERNEL_RCSID(0, "$NetBSD: linux_machdep.c,v 1.13 2003/10/10 14:44:42 matt Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/signalvar.h>
 #include <sys/kernel.h>
-#include <sys/map.h>
 #include <sys/proc.h>
 #include <sys/user.h>
 #include <sys/buf.h>
@@ -59,6 +58,7 @@ __KERNEL_RCSID(0, "$NetBSD: linux_machdep.c,v 1.8 2002/05/20 06:26:46 jdolecek E
 #include <sys/mount.h>
 #include <sys/vnode.h>
 #include <sys/device.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 #include <sys/filedesc.h>
 #include <sys/exec_elf.h>
@@ -77,36 +77,34 @@ __KERNEL_RCSID(0, "$NetBSD: linux_machdep.c,v 1.8 2002/05/20 06:26:46 jdolecek E
 #include <compat/linux/linux_syscallargs.h>
 
 void
-linux_setregs(p, epp, stack)
-	struct proc *p;
+linux_setregs(l, epp, stack)
+	struct lwp *l;
 	struct exec_package *epp;
 	u_long stack;
 {
-/*	struct pcb *pcb = &p->p_addr->u_pcb; */
 
-	setregs(p, epp, stack);
+	setregs(l, epp, stack);
 }
 
 static __inline struct trapframe *
-process_frame(struct proc *p)
+process_frame(struct lwp *l)
 {
 
-	return p->p_addr->u_pcb.pcb_tf;
+	return l->l_addr->u_pcb.pcb_tf;
 }
 
 void
-linux_sendsig(catcher, sig, mask, code)
-	sig_t catcher;
-	int sig;
-	sigset_t *mask;
-	u_long code;
+linux_sendsig(const ksiginfo_t *ksi, const sigset_t *mask)
 {
-	struct proc *p = curproc;
+	struct lwp *l = curlwp;
+	struct proc *p = l->l_proc;
 	struct trapframe *tf;
 	struct linux_sigframe *fp, frame;
 	int onstack;
+	const int sig = ksi->ksi_signo;
+	sig_t catcher = SIGACTION(p, sig).sa_handler;
 
-	tf = process_frame(p);
+	tf = process_frame(l);
 
 	/*
 	 * The Linux version of this code is in
@@ -163,14 +161,14 @@ linux_sendsig(catcher, sig, mask, code)
 	 */
 	frame.sf_sc.sc_trapno = 0;
 	frame.sf_sc.sc_error_code = 0;
-	frame.sf_sc.sc_fault_address = code;
+	frame.sf_sc.sc_fault_address = (u_int32_t) ksi->ksi_addr;
 
 	if (copyout(&frame, fp, sizeof(frame)) != 0) {
 		/*
 		 * Process has trashed its stack; give it an illegal
 		 * instruction to halt it in its tracks.
 		 */
-		sigexit(p, SIGILL);
+		sigexit(l, SIGILL);
 		/* NOTREACHED */
 	}
 	/*
@@ -212,16 +210,17 @@ linux_sys_rt_sigreturn(p, v, retval)
 #endif
 
 int
-linux_sys_sigreturn(p, v, retval)
-	struct proc *p;
+linux_sys_sigreturn(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct linux_sigframe *sfp, frame;
+	struct proc *p = l->l_proc;
 	struct trapframe *tf;
 	sigset_t mask;
 
-	tf = process_frame(p);
+	tf = process_frame(l);
 
 	/*
 	 * The trampoline code hands us the context.
@@ -247,7 +246,7 @@ linux_sys_sigreturn(p, v, retval)
 #endif
 
 	/* Restore register context. */
-	tf = process_frame(p);
+	tf = process_frame(l);
 	tf->tf_r0    = frame.sf_sc.sc_r0;
 	tf->tf_r1    = frame.sf_sc.sc_r1;
 	tf->tf_r2    = frame.sf_sc.sc_r2;
@@ -316,5 +315,6 @@ linux_machdepioctl(p, v, retval)
 		return EINVAL;
 	}
 	SCARG(&bia, com) = com;
-	return sys_ioctl(p, &bia, retval);
+	/* XXX NJWLWP */
+	return sys_ioctl(curlwp, &bia, retval);
 }

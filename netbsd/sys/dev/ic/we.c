@@ -1,4 +1,4 @@
-/*	$NetBSD: we.c,v 1.4.10.1 2003/01/27 05:27:05 jmc Exp $	*/
+/*	$NetBSD: we.c,v 1.5 2003/01/15 22:20:07 bouyer Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -56,7 +56,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: we.c,v 1.4.10.1 2003/01/27 05:27:05 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: we.c,v 1.5 2003/01/15 22:20:07 bouyer Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

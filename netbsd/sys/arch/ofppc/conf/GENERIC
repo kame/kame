@@ -1,4 +1,4 @@
-# $NetBSD: GENERIC,v 1.52.4.2 2002/10/24 09:34:35 lukem Exp $
+# $NetBSD: GENERIC,v 1.62.4.3 2004/07/15 20:18:59 he Exp $
 #
 # GENERIC machine description file
 # 
@@ -22,7 +22,7 @@ include 	"arch/ofppc/conf/std.ofppc"
 
 options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
-#ident 		"GENERIC-$Revision: 1.52.4.2 $"
+#ident 		"GENERIC-$Revision: 1.62.4.3 $"
 
 maxusers	32
 
@@ -30,10 +30,10 @@ maxusers	32
 options 	FIRMWORKSBUGS
 
 # Standard system options
-#options 	UCONSOLE	# users can use TIOCCONS (for xconsole)
 #options 	INSECURE	# disable kernel security checks
 #options 	NTP		# NTP phase/frequency locked loop
 options 	KTRACE		# system call tracing via ktrace(1)
+options 	SYSTRACE	# system call vetting via systrace(1)
 
 options 	SYSVMSG		# System V message queues
 options 	SYSVSEM		# System V semaphores
@@ -43,11 +43,13 @@ options 	SYSVSEM		# System V semaphores
 #options 	SEMMNU=30	# number of undo structures in system
 options 	SYSVSHM		# System V shared memory
 #options 	SHMMAXPGS=1024	# 1024 pages is the default
+options 	P1003_1B_SEMAPHORE # p1003.1b semaphore support
 
 options 	LKM		# loadable kernel modules
 
-#options 	USERCONF	# userconf(4) support
+options 	USERCONF	# userconf(4) support
 #options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
 
 # Diagnostic/debugging support options
 options 	DIAGNOSTIC	# cheap kernel consistency checks
@@ -56,7 +58,7 @@ options 	DDB		# in-kernel debugger
 options 	DDB_HISTORY_SIZE=512	# enable history editing in DDB
 options 	TRAP_PANICWAIT
 
-makeoptions	DEBUG="-g"	# compile fill symbol table
+makeoptions	DEBUG="-g"	# compile full symbol table
 
 # Compatibility option
 options 	COMPAT_09	# NetBSD 0.9,
@@ -121,6 +123,19 @@ options 	IPFILTER_LOG	# ipmon(8) log support
 options 	NMBCLUSTERS=1024
 #options 	TCP_DEBUG	# Record last TCP_NDEBUG packets with SO_DEBUG
 
+#options 	ALTQ		# Manipulate network interfaces' output queues
+#options 	ALTQ_BLUE	# Stochastic Fair Blue
+#options 	ALTQ_CBQ	# Class-Based Queueing
+#options 	ALTQ_CDNR	# Diffserv Traffic Conditioner
+#options 	ALTQ_FIFOQ	# First-In First-Out Queue
+#options 	ALTQ_FLOWVALVE	# RED/flow-valve (red-penalty-box)
+#options 	ALTQ_HFSC	# Hierarchical Fair Service Curve
+#options 	ALTQ_LOCALQ	# Local queueing discipline
+#options 	ALTQ_PRIQ	# Priority Queueing
+#options 	ALTQ_RED	# Random Early Detection
+#options 	ALTQ_RIO	# RED with IN/OUT
+#options 	ALTQ_WFQ	# Weighted Fair Queueing
+
 # Kernel root file system and dump configuration
 config		netbsd	root on ? type ?
 
@@ -151,6 +166,7 @@ ofrtc*		at ofbus?
 
 pseudo-device	vnd		4	# disk-like interface to files
 pseudo-device	ccd		4	# concatenated/striped disk devices
+#pseudo-device	cgd		4	# cryptographic disk devices
 #pesudo-device	raid		8	# RAIDframe disk driver
 #options 	RAID_AUTOCONFIG		# auto-configuration of RAID components
 # Options to enable various other RAIDframe RAID types.
@@ -175,6 +191,13 @@ pseudo-device	gif			# IPv[46] over IPv[46] tunnel (RFC1933)
 #pseudo-device	stf			# 6to4 IPv6 over IPv4 encapsulation
 pseudo-device	vlan			# IEEE 802.1q encapsulation
 pseudo-device	bridge			# simple inter-network bridging
+#options	BRIDGE_IPF		# bridge uses IP/IPv6 pfil hooks too
 pseudo-device	pty			# pseudo-terminals
 pseudo-device	rnd			# /dev/random and in-kernel generator
 pseudo-device	clockctl		# user control of clock subsystem
+pseudo-device	openfirm		# /dev/openfirm
+pseudo-device	ksyms			# /dev/ksyms
+
+options	FIREPOWER_ES			# Firepower ES
+options	FIREPOWER_MX			# Firepower MX
+options	FIREPOWER_LX			# Firepower LX

@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile.booters,v 1.1 2002/02/27 21:02:26 scw Exp $
+#	$NetBSD: Makefile.booters,v 1.4 2003/10/26 07:25:36 lukem Exp $
 
 S?=		${.CURDIR}/../../../..
 MDEC_DIR?=	/usr/mdec
@@ -17,7 +17,7 @@ NOLINT=# defined
 
 INCPATH=-I${.OBJDIR} -I${.CURDIR} -I${.CURDIR}/../libsa -I${.CURDIR}/../libbug \
         -I${.CURDIR}/../../include -I${S} -I${S}/lib/libsa
-CFLAGS= -nostdinc -D_STANDALONE \
+CFLAGS= -nostdinc -ffreestanding -D_STANDALONE \
 	-DLIBSA_USE_MEMSET -DLIBSA_USE_MEMCPY ${INCPATH} ${DEFS}
 BINDIR= ${MDEC_DIR}
 
@@ -26,7 +26,7 @@ SRCS+= vers.c
 CLEANFILES+= vers.c
 
 vers.c: version
-	sh ${S}/conf/newvers_stand.sh -DM ${.CURDIR}/version "mvmeppc"
+	${HOST_SH} ${S}/conf/newvers_stand.sh -DM ${.CURDIR}/version "mvmeppc"
 .endif
 
 CLEANFILES+= machine powerpc
@@ -52,9 +52,10 @@ PROGLINKOBJS?=	${PROGDEPENDS}
 ${PROG}: machine powerpc ${PROGDEPENDS}
 	${LD} -N -Ttext ${RELOC} -o $@ ${PROGLINKOBJS}
 
+.include <bsd.own.mk>
+
 LIB_SA_DIR=	${.CURDIR}/../libsa
-LIBSA_DIR!=cd ${LIB_SA_DIR}; \
-	printf "xxx: .MAKE\n\t@echo \$${.OBJDIR}\n" | ${MAKE} -s -f-
+LIBSA_DIR!=	cd ${LIB_SA_DIR} && ${PRINTOBJDIR}
 LIBSA=${LIBSA_DIR}/libsa.a
 
 .PHONY: ${LIBSA}
@@ -69,8 +70,7 @@ ${SRTOBJ}:
 	@cd ${LIB_SA_DIR} && ${MAKE} srt0.o
 
 #WRTVID_BOOT_DIR=  ${.CURDIR}/../wrtvid
-#WRTVID_DIR!=cd ${WRTVID_BOOT_DIR}; \
-#	printf "xxx: .MAKE\n\t@echo \$${.OBJDIR}\n" | ${MAKE} -s -f-
+#WRTVID_DIR!=	cd ${WRTVID_BOOT_DIR} && ${PRINTOBJDIR}
 #WRTVID=${WRTVID_DIR}/wrtvid
 #
 #.PHONY: ${WRTVID}

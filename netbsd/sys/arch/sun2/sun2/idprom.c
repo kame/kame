@@ -1,4 +1,4 @@
-/*	$NetBSD: idprom.c,v 1.2 2001/11/30 18:06:55 fredette Exp $	*/
+/*	$NetBSD: idprom.c,v 1.4 2003/07/15 03:36:12 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -40,10 +40,15 @@
  * Machine ID PROM - system type and serial number
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: idprom.c,v 1.4 2003/07/15 03:36:12 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/kernel.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/idprom.h>
@@ -143,7 +148,7 @@ idprom_get(dst)
 	len = IDPROM_SIZE;
 	do {
 		x = get_control_byte(src);
-		src += NBPG;
+		src += PAGE_SIZE;
 		*dst++ = x;
 	} while (--len > 0);
 }

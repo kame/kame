@@ -1,4 +1,4 @@
-/*	$NetBSD: if_rtk_pci.c,v 1.12.10.1 2003/04/28 08:05:01 tron Exp $	*/
+/*	$NetBSD: if_rtk_pci.c,v 1.20 2004/02/13 10:05:50 wiz Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998
@@ -35,10 +35,10 @@
  */
 
 /*
- * RealTek 8129/8139 PCI NIC driver
+ * Realtek 8129/8139 PCI NIC driver
  *
  * Supports several extremely cheap PCI 10/100 adapters based on
- * the RealTek chipset. Datasheets can be obtained from
+ * the Realtek chipset. Datasheets can be obtained from
  * www.realtek.com.tw.
  *
  * Written by Bill Paul <wpaul@ctr.columbia.edu>
@@ -47,7 +47,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_rtk_pci.c,v 1.12.10.1 2003/04/28 08:05:01 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_rtk_pci.c,v 1.20 2004/02/13 10:05:50 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -79,7 +79,7 @@ __KERNEL_RCSID(0, "$NetBSD: if_rtk_pci.c,v 1.12.10.1 2003/04/28 08:05:01 tron Ex
  * there appear to be problems with memory mapped mode: it looks like
  * doing too many memory mapped access back to back in rapid succession
  * can hang the bus. I'm inclined to blame this on crummy design/construction
- * on the part of RealTek. Memory mapped mode does appear to work on
+ * on the part of Realtek. Memory mapped mode does appear to work on
  * uniprocessor systems though.
  */
 #ifndef dreamcast		/* XXX */
@@ -100,27 +100,20 @@ struct rtk_pci_softc {
 
 static const struct rtk_type rtk_pci_devs[] = {
 	{ PCI_VENDOR_REALTEK, PCI_PRODUCT_REALTEK_RT8129,
-		"RealTek 8129 10/100BaseTX",
-		RTK_8129 },
+		RTK_8129, "Realtek 8129 10/100BaseTX" },
 	{ PCI_VENDOR_REALTEK, PCI_PRODUCT_REALTEK_RT8139,
-		"RealTek 8139 10/100BaseTX",
-		RTK_8139 },
+		RTK_8139, "Realtek 8139 10/100BaseTX" },
 	{ PCI_VENDOR_ACCTON, PCI_PRODUCT_ACCTON_MPX5030,
-		"Accton MPX 5030/5038 10/100BaseTX",
-		RTK_8139 },
+		RTK_8139, "Accton MPX 5030/5038 10/100BaseTX" },
 	{ PCI_VENDOR_DELTA, PCI_PRODUCT_DELTA_8139,
-		"Delta Electronics 8139 10/100BaseTX",
-		RTK_8139 },
+		RTK_8139, "Delta Electronics 8139 10/100BaseTX" },
 	{ PCI_VENDOR_ADDTRON, PCI_PRODUCT_ADDTRON_8139,
-		"Addtron Technology 8139 10/100BaseTX",
-		RTK_8139 },
+		RTK_8139, "Addtron Technology 8139 10/100BaseTX" },
 	{ PCI_VENDOR_SEGA, PCI_PRODUCT_SEGA_BROADBAND,
-		"SEGA Broadband Adapter",
-		RTK_8139 },
+		RTK_8139, "SEGA Broadband Adapter" },
 	{ PCI_VENDOR_DLINK, PCI_PRODUCT_DLINK_DFE530TXPLUS,
-		"D-Link Systems DFE 530TX+",
-		RTK_8139 },
-	{ 0, 0, NULL, 0 }
+		RTK_8139, "D-Link Systems DFE 530TX+" },
+	{ 0, 0, 0, NULL }
 };
 
 const struct rtk_type *rtk_pci_lookup __P((const struct pci_attach_args *));
@@ -128,9 +121,8 @@ const struct rtk_type *rtk_pci_lookup __P((const struct pci_attach_args *));
 int	rtk_pci_match __P((struct device *, struct cfdata *, void *));
 void	rtk_pci_attach __P((struct device *, struct device *, void *));
 
-struct cfattach rtk_pci_ca = {
-	sizeof(struct rtk_pci_softc), rtk_pci_match, rtk_pci_attach,
-};
+CFATTACH_DECL(rtk_pci, sizeof(struct rtk_pci_softc),
+    rtk_pci_match, rtk_pci_attach, NULL, NULL);
 
 const struct rtk_type *
 rtk_pci_lookup(pa)
@@ -202,11 +194,10 @@ rtk_pci_attach(parent, self, aux)
 			/* Save important PCI config data. */
 			iobase = pci_conf_read(pc, pa->pa_tag, RTK_PCI_LOIO);
 			membase = pci_conf_read(pc, pa->pa_tag, RTK_PCI_LOMEM);
-			irq = pci_conf_read(pc, pa->pa_tag,
-			    PCI_PRODUCT_DELTA_8139);
+			irq = pci_conf_read(pc, pa->pa_tag, PCI_INTERRUPT_REG);
 
 			/* Reset the power state. */
-			printf("%s: chip is is in D%d power mode "
+			printf("%s: chip is in D%d power mode "
 			    "-- setting to D0\n", sc->sc_dev.dv_xname,
 			    command & RTK_PSTATE_MASK);
 			command &= 0xFFFFFFFC;
@@ -215,8 +206,7 @@ rtk_pci_attach(parent, self, aux)
 			/* Restore PCI config data. */
 			pci_conf_write(pc, pa->pa_tag, RTK_PCI_LOIO, iobase);
 			pci_conf_write(pc, pa->pa_tag, RTK_PCI_LOMEM, membase);
-			pci_conf_write(pc, pa->pa_tag,
-			    PCI_PRODUCT_DELTA_8139, irq);
+			pci_conf_write(pc, pa->pa_tag, PCI_INTERRUPT_REG, irq);
 		}
 	}
 
@@ -253,7 +243,7 @@ rtk_pci_attach(parent, self, aux)
 		return;
 	}
 
-	sc->rtk_type = t->rtk_type;
+	sc->rtk_type = t->rtk_basetype;
 
 	printf("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
 

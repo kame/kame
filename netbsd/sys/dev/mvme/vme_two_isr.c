@@ -1,4 +1,4 @@
-/*	$NetBSD: vme_two_isr.c,v 1.2 2002/03/24 17:22:32 scw Exp $	*/
+/*	$NetBSD: vme_two_isr.c,v 1.4 2003/07/14 15:47:21 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001, 2002 The NetBSD Foundation, Inc.
@@ -42,6 +42,9 @@
  * kernel config file (mvme1[67]2 only).
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vme_two_isr.c,v 1.4 2003/07/14 15:47:21 lukem Exp $");
+
 #include "vmetwo.h"
 
 #include <sys/param.h>
@@ -49,6 +52,7 @@
 #include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
+#include <sys/lock.h>
 
 #include <machine/cpu.h>
 #include <machine/bus.h>

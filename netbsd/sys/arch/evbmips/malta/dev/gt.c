@@ -1,4 +1,4 @@
-/*	$NetBSD: gt.c,v 1.2 2002/05/16 01:01:36 thorpej Exp $	*/
+/*	$NetBSD: gt.c,v 1.7 2003/07/15 01:37:34 lukem Exp $	*/
 
 /*
  * Copyright 2002 Wasabi Systems, Inc.
@@ -34,6 +34,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: gt.c,v 1.7 2003/07/15 01:37:34 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -88,9 +91,8 @@ static int	gt_match(struct device *, struct cfdata *, void *);
 static void	gt_attach(struct device *, struct device *, void *);
 static int	gt_print(void *aux, const char *pnp);
 
-struct cfattach gt_ca = {
-	sizeof(struct device), gt_match, gt_attach
-};
+CFATTACH_DECL(gt, sizeof(struct device),
+    gt_match, gt_attach, NULL, NULL);
 
 static int
 gt_match(parent, match, aux)
@@ -120,7 +122,7 @@ gt_attach(parent, self, aux)
 	pba.pba_iot = &mcp->mc_iot;
 	pba.pba_memt = &mcp->mc_memt;
 	pba.pba_dmat = &mcp->mc_pci_dmat;	/* pci_bus_dma_tag */
-	//pba.pba_dmat = &pci_bus_dma_tag;
+	pba.pba_dmat64 = NULL;
 	pba.pba_pc = &mcp->mc_pc;
 
 	config_found(self, &pba, gt_print);

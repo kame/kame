@@ -1,4 +1,4 @@
-/* $NetBSD: wseventvar.h,v 1.4 2001/10/25 14:46:41 augustss Exp $ */
+/* $NetBSD: wseventvar.h,v 1.8 2003/08/07 16:31:29 agc Exp $ */
 
 /*
  * Copyright (c) 1996, 1997 Christopher G. Demetriou.  All rights reserved.
@@ -51,11 +51,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -96,7 +92,7 @@ struct wseventvar {
 #define	splwsevent()	spltty()
 
 #define	WSEVENT_WAKEUP(ev) { \
-	selwakeup(&(ev)->sel); \
+	selnotify(&(ev)->sel, 0); \
 	if ((ev)->wanted) { \
 		(ev)->wanted = 0; \
 		wakeup((ev)); \
@@ -109,6 +105,7 @@ void	wsevent_init(struct wseventvar *);
 void	wsevent_fini(struct wseventvar *);
 int	wsevent_read(struct wseventvar *, struct uio *, int);
 int	wsevent_poll(struct wseventvar *, int, struct proc *);
+int	wsevent_kqfilter(struct wseventvar *ev, struct knote *kn);
 
 /*
  * PWSEVENT is set just above PSOCK, which is just above TTIPRI, on the

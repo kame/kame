@@ -1,8 +1,11 @@
-/*	$NetBSD: sc_wrap.c,v 1.18 2001/11/14 18:15:30 thorpej Exp $	*/
+/*	$NetBSD: sc_wrap.c,v 1.25 2003/07/15 02:59:30 lukem Exp $	*/
 
 /*
  * This driver is slow!  Need to rewrite.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sc_wrap.c,v 1.25 2003/07/15 02:59:30 lukem Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -13,11 +16,14 @@
 #include <sys/buf.h>
 #include <sys/malloc.h>
 
+#include <uvm/uvm_extern.h>
+
 #include <dev/scsipi/scsi_all.h>
 #include <dev/scsipi/scsipi_all.h>
 #include <dev/scsipi/scsiconf.h>
 #include <dev/scsipi/scsi_message.h>
 
+#include <newsmips/dev/hbvar.h>
 #include <newsmips/dev/scsireg.h>
 #include <newsmips/dev/dmac_0448.h>
 #include <newsmips/dev/screg_1185.h>
@@ -31,9 +37,8 @@
 static int cxd1185_match __P((struct device *, struct cfdata *, void *));
 static void cxd1185_attach __P((struct device *, struct device *, void *));
 
-struct cfattach sc_ca = {
-	sizeof(struct sc_softc), cxd1185_match, cxd1185_attach
-};
+CFATTACH_DECL(sc, sizeof(struct sc_softc),
+    cxd1185_match, cxd1185_attach, NULL, NULL);
 
 void cxd1185_init __P((struct sc_softc *));
 static void free_scb __P((struct sc_softc *, struct sc_scb *));
@@ -60,9 +65,9 @@ cxd1185_match(parent, cf, aux)
 	struct cfdata *cf;
 	void *aux;
 {
-	struct confargs *ca = aux;
+	struct hb_attach_args *ha = aux;
 
-	if (strcmp(ca->ca_name, "sc"))
+	if (strcmp(ha->ha_name, "sc"))
 		return 0;
 
 	return 1;
@@ -74,10 +79,11 @@ cxd1185_attach(parent, self, aux)
 	void *aux;
 {
 	struct sc_softc *sc = (void *)self;
+	struct hb_attach_args *ha = aux;
 	struct sc_scb *scb;
 	int i, intlevel;
 
-	intlevel = sc->sc_dev.dv_cfdata->cf_level;
+	intlevel = ha->ha_level;
 	if (intlevel == -1) {
 #if 0
 		printf(": interrupt level not configured\n");
@@ -122,7 +128,7 @@ cxd1185_attach(parent, self, aux)
 	cxd1185_init(sc);
 	DELAY(100000);
 
-	hb_intr_establish(intlevel, IPL_BIO, sc_intr, sc);
+	hb_intr_establish(intlevel, INTEN1_DMA, IPL_BIO, sc_intr, sc);
 
 	config_found(&sc->sc_dev, &sc->sc_channel, scsiprint);
 }
@@ -309,7 +315,7 @@ start:
 	scb->identify = MSG_IDENT | sc_disconnect | (lun & IDT_DRMASK);
 	scb->sc_ctrnscnt = xs->datalen;
 
-	/* make va->pa mapping table for dma */
+	/* make va->pa mapping table for DMA */
 	if (xs->datalen > 0) {
 		int pages, offset;
 		int i, pn;
@@ -320,14 +326,14 @@ start:
 		va = (vaddr_t)xs->data;
 
 		offset = va & PGOFSET;
-		pages = (offset + xs->datalen + NBPG -1 ) >> PGSHIFT;
+		pages = (offset + xs->datalen + PAGE_SIZE -1 ) >> PGSHIFT;
 		if (pages >= NSCMAP)
 			panic("sc_map: Too many pages");
 
 		for (i = 0; i < pages; i++) {
 			pn = kvtophys(va) >> PGSHIFT;
 			sc->sc_map[chan].mp_addr[i] = pn;
-			va += NBPG;
+			va += PAGE_SIZE;
 		}
 
 		sc->sc_map[chan].mp_offset = offset;

@@ -1,23 +1,31 @@
-#	$NetBSD: Makefile.cats.inc,v 1.8.4.1 2003/08/12 18:28:34 tron Exp $
+#	$NetBSD: Makefile.cats.inc,v 1.15.2.1 2004/09/13 17:32:25 tron Exp $
 
-GENASSYM_EXTRAS+=	${ARM}/footbridge/genassym.cf
-LOOSE_PROTOTYPES=	NO
+MACHINE_ARCH=	arm
+CPPFLAGS+=	-D${MACHINE}
 
 .if (${OBJECT_FMT} == "ELF")
-# Need to convert the kernel from ELF to a.out so that OpenFirmware
+
+.if defined(ABLEELF) && (${ABLEELF} == "1")
+# use a standard ELF format, adjusted to align areas
+LINKFLAGS=	-T ${THISARM}/conf/ldscript.elf
+
+.else
+# Need to convert the kernel from ELF to a.out so that the firmware
 # can load it.
 
-# ZMAGIC a.out includes the a.out header in front of the text
-# segment, so if we link the kernel at the normal load address,
-# it will be wrong once the a.out header is stuck in the file.
-# XXX HOWEVER, by linking it +32 bytes to compensate, the resulting
-# XXX ELF kernel cannot be booted itself.
-LOADADDRESS=0xF0000020
+LINKFLAGS=	-T ldscript
+
+SYSTEM_LD_HEAD_EXTRA+=; \
+	( cat ${ARM}/conf/kern.ldscript.head ; \
+	  OBJDUMP=${OBJDUMP} ${HOST_SH} ${ARM}/conf/mkldscript.sh \
+		${SYSTEM_OBJ} ; \
+	  cat ${ARM}/conf/kern.ldscript.tail ) > ldscript
 
 SYSTEM_LD_TAIL_EXTRA+=; \
+	echo "${DBSYM} $@ || true"; \
 	${DBSYM} $@ || true; \
-	echo OBJCOPY=${OBJCOPY:Q} SIZE=${SIZE:Q} \
-	    sh ${ARM}/conf/elf2aout.sh $@ $@.aout; \
-	OBJCOPY=${OBJCOPY:Q} SIZE=${SIZE:Q} \
-	    sh ${ARM}/conf/elf2aout.sh $@ $@.aout
+	echo \
+	 "${OBJCOPY} -O a.out-arm-netbsd -R .ident -R .arm.atpcs -R .comment $@ $@.aout"; \
+	${OBJCOPY} -O a.out-arm-netbsd -R .ident -R .arm.atpcs -R .comment $@ $@.aout
+.endif
 .endif

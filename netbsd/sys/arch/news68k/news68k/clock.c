@@ -1,4 +1,4 @@
-/*      $NetBSD: clock.c,v 1.7 2001/10/11 14:01:36 tsutsui Exp $	*/
+/*      $NetBSD: clock.c,v 1.12 2003/08/07 16:28:51 agc Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by the University of
- *      California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -44,6 +40,9 @@
  *      @(#)clock.c     8.1 (Berkeley) 6/11/93
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.12 2003/08/07 16:28:51 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -56,18 +55,18 @@
 #include <machine/cpu.h>
 
 static	todr_chip_handle_t todr_handle;
-static	void (*cpu_initclocks_hook) __P((int, int));
+static	void (*cpu_initclocks_hook)(int, int);
 
 /*
  * Common parts of todclock autoconfiguration.
  */
 void
-todclock_config(handle)
+todr_attach(handle)
 	todr_chip_handle_t handle;
 {
 
 	if (todr_handle)
-		panic("todclock_config: too many todclocks configured");
+		panic("todr_attach: too many todclocks configured");
 
 	todr_handle = handle;
 }
@@ -161,7 +160,7 @@ microtime(tvp)
  */
 void
 inittodr(base)
-        time_t base;
+	time_t base;
 {
 	int badbase = 0, waszero = (base == 0);
 

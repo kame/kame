@@ -1,4 +1,4 @@
-/*	$NetBSD: depca.c,v 1.4 2001/11/13 13:14:36 lukem Exp $	*/
+/*	$NetBSD: depca.c,v 1.10 2003/08/07 16:31:01 agc Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 2000 The NetBSD Foundation, Inc.
@@ -52,11 +52,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -76,7 +72,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: depca.c,v 1.4 2001/11/13 13:14:36 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: depca.c,v 1.10 2003/08/07 16:31:01 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -112,9 +108,8 @@ struct le_depca_softc {
 int	le_depca_match(struct device *, struct cfdata *, void *);
 void	le_depca_attach(struct device *, struct device *, void *);
 
-struct cfattach le_depca_ca = {
-	sizeof(struct le_depca_softc), le_depca_match, le_depca_attach
-};
+CFATTACH_DECL(le_depca, sizeof(struct le_depca_softc),
+    le_depca_match, le_depca_attach, NULL, NULL);
 
 void	depca_copytobuf(struct lance_softc *, void *, int, int);
 void	depca_copyfrombuf(struct lance_softc *, void *, int, int);
@@ -142,7 +137,7 @@ depca_print(void *aux, const char *pnp)
 	struct depca_attach_args *da = aux;
 
 	if (pnp)
-		printf("%s at %s", da->da_name, pnp);
+		aprint_normal("%s at %s", da->da_name, pnp);
 
 	return (UNCONF);
 }
@@ -244,7 +239,7 @@ le_depca_match(struct device *parent, struct cfdata *match, void *aux)
 {
 	struct depca_attach_args *da = aux;
 
-	return (strcmp(da->da_name, match->cf_driver->cd_name) == 0);
+	return (strcmp(da->da_name, match->cf_name) == 0);
 }
 
 void

@@ -1,4 +1,4 @@
-/*	$NetBSD: nmi_mainbus.c,v 1.1 2000/07/26 11:47:19 ragge Exp $	   */
+/*	$NetBSD: nmi_mainbus.c,v 1.6 2003/07/15 02:15:05 lukem Exp $	   */
 /*
  * Copyright (c) 2000 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -30,6 +30,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: nmi_mainbus.c,v 1.6 2003/07/15 02:15:05 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -59,11 +62,11 @@ nmi_mainbus_print(void *aux, const char *name)
 			c = "mem";
 		else
 			c = "cpu";
-		printf("%s at %s", c, name);
+		aprint_normal("%s at %s", c, name);
 		if (na->slot < 10)
-			printf(" slot %d", na->slot);
+			aprint_normal(" slot %d", na->slot);
 		if (vax_boardtype == VAX_BTYP_8800 && na->slot > 20)
-			printf(" (%s)", ka88_confdata & KA88_LEFTPRIM ?
+			aprint_normal(" (%s)", ka88_confdata & KA88_LEFTPRIM ?
 			    "right" : "left");
 	}
 	return UNCONF;
@@ -118,6 +121,5 @@ nmi_mainbus_attach(struct device *parent, struct device *self, void *aux)
 	}
 }
 
-struct	cfattach nmi_mainbus_ca = {
-	sizeof(struct device), nmi_mainbus_match, nmi_mainbus_attach
-};
+CFATTACH_DECL(nmi_mainbus, sizeof(struct device),
+    nmi_mainbus_match, nmi_mainbus_attach, NULL, NULL);

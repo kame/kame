@@ -1,4 +1,4 @@
-/*	$NetBSD: scsipiconf.c,v 1.17 2002/01/12 16:37:55 tsutsui Exp $	*/
+/*	$NetBSD: scsipiconf.c,v 1.20.4.1 2004/09/11 12:54:14 he Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
@@ -55,7 +55,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: scsipiconf.c,v 1.17 2002/01/12 16:37:55 tsutsui Exp $");
+__KERNEL_RCSID(0, "$NetBSD: scsipiconf.c,v 1.20.4.1 2004/09/11 12:54:14 he Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -71,9 +71,10 @@ __KERNEL_RCSID(0, "$NetBSD: scsipiconf.c,v 1.17 2002/01/12 16:37:55 tsutsui Exp 
 #define	STRVIS_ISWHITE(x) ((x) == ' ' || (x) == '\0' || (x) == (u_char)'\377')
 
 int
-scsipi_command(periph, cmd, cmdlen, data_addr, datalen, retries, timeout, bp,
-     flags)
+scsipi_command(periph, xs, cmd, cmdlen, data_addr, datalen,
+     retries, timeout, bp, flags)
 	struct scsipi_periph *periph;
+	struct scsipi_xfer *xs;
 	struct scsipi_generic *cmd;
 	int cmdlen;
 	u_char *data_addr;
@@ -91,12 +92,12 @@ scsipi_command(periph, cmd, cmdlen, data_addr, datalen, retries, timeout, bp,
 		 * process must NOT be swapped out, as the device will
 		 * be accessing the stack.
 		 */
-		PHOLD(curproc);
+		PHOLD(curlwp);
 	}
 	error = (*periph->periph_channel->chan_bustype->bustype_cmd)(periph,
-	    cmd, cmdlen, data_addr, datalen, retries, timeout, bp, flags);
+	    xs, cmd, cmdlen, data_addr, datalen, retries, timeout, bp, flags);
 	if ((flags & XS_CTL_DATA_ONSTACK) != 0)
-		PRELE(curproc);
+		PRELE(curlwp);
 	return (error);
 }
 
@@ -108,7 +109,7 @@ scsipi_alloc_periph(malloc_flag)
 	int malloc_flag;
 {
 	struct scsipi_periph *periph;
-	int i;
+	u_int i;
 
 	periph = malloc(sizeof(*periph), M_DEVBUF, malloc_flag|M_ZERO);
 	if (periph == NULL)
@@ -193,10 +194,10 @@ scsipi_dtype(type)
 
 	switch (type) {
 	case T_DIRECT:
-		dtype = "direct";
+		dtype = "disk";
 		break;
 	case T_SEQUENTIAL:
-		dtype = "sequential";
+		dtype = "tape";
 		break;
 	case T_PRINTER:
 		dtype = "printer";

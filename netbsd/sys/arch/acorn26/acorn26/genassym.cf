@@ -1,4 +1,4 @@
-# $NetBSD: genassym.cf,v 1.2 2002/03/24 23:37:42 bjh21 Exp $
+# $NetBSD: genassym.cf,v 1.5 2003/09/11 18:58:44 scw Exp $
 #
 # Copyright (c) 1999 Ben Harris
 # All rights reserved.
@@ -31,16 +31,22 @@ include <sys/param.h>
 
 include <sys/proc.h>
 include <sys/user.h>
+include <sys/mbuf.h>
+include <netinet/in.h>
+include <netinet/in_systm.h>
+include <netinet/ip.h>
+include <netinet/ip6.h>
+include <netinet/ip_var.h>
+
 include <machine/pcb.h>
 
 if NECA > 0
-include <sys/mbuf.h>
 include <arch/acorn26/ioc/if_ecavar.h>
 endif
 
 define	U_PCB		offsetof(struct user, u_pcb)
 define	PCB_ONFAULT	offsetof(struct pcb, pcb_onfault)
-define	P_ADDR		offsetof(struct proc, p_addr)
+define	L_ADDR		offsetof(struct lwp, l_addr)
 
 define	TF_SPSR		offsetof(struct trapframe, tf_spsr)
 define	TF_R0		offsetof(struct trapframe, tf_r0)
@@ -50,13 +56,14 @@ define	TF_SIZE		sizeof(struct trapframe)
 define	IF_R15		offsetof(struct irqframe, if_r15)
 define	IF_SIZE		sizeof(struct irqframe)
 
-define	SIGF_SC		offsetof(struct sigframe, sf_sc)
-
-if NECA > 0
+# Constants required for in_cksum() and friends.
 define	M_NEXT		offsetof(struct mbuf, m_next)
 define	M_DATA		offsetof(struct mbuf, m_data)
 define	M_LEN		offsetof(struct mbuf, m_len)
+define	IP_SRC		offsetof(struct ip, ip_src)
+define	IP_DST		offsetof(struct ip, ip_dst)
 
+if NECA > 0
 define	EFS_FIQHANDLER	offsetof(struct eca_fiqstate, efs_fiqhandler)
 define	EFS_RX_CURMBUF	offsetof(struct eca_fiqstate, efs_rx_curmbuf)
 define	EFS_RX_FIQREGS	offsetof(struct eca_fiqstate, efs_rx_fiqregs)

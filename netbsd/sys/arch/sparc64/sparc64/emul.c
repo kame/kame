@@ -1,4 +1,4 @@
-/*	$NetBSD: emul.c,v 1.9 2002/04/18 16:37:26 eeh Exp $	*/
+/*	$NetBSD: emul.c,v 1.12 2003/07/15 03:36:08 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997, 2001 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: emul.c,v 1.12 2003/07/15 03:36:08 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -43,6 +46,7 @@
 #include <machine/instr.h>
 #include <machine/cpu.h>
 #include <machine/psl.h>
+#include <sparc64/sparc64/cache.h>
 
 #define DEBUG_EMUL
 #ifdef DEBUG_EMUL
@@ -53,12 +57,12 @@
 
 #define GPR(tf, i)	((int32_t *)(u_long)&tf->tf_global)[i]
 #define IPR(tf, i)	((int32_t *)(u_long)tf->tf_out[6])[i - 16]
-#define FPR(p, i)	((int32_t) p->p_md.md_fpstate->fs_regs[i])
+#define FPR(l, i)	((int32_t) l->l_md.md_fpstate->fs_regs[i])
 
 static __inline int readgpreg __P((struct trapframe64 *, int, void *));
-static __inline int readfpreg __P((struct proc *, int, void *));
+static __inline int readfpreg __P((struct lwp *, int, void *));
 static __inline int writegpreg __P((struct trapframe64 *, int, const void *));
-static __inline int writefpreg __P((struct proc *, int, const void *));
+static __inline int writefpreg __P((struct lwp *, int, const void *));
 static __inline int decodeaddr __P((struct trapframe64 *, union instr *, void *));
 static int muldiv __P((struct trapframe64 *, union instr *, int32_t *, int32_t *,
     int32_t *));
@@ -105,23 +109,23 @@ writegpreg(tf, i, val)
 	
 
 static __inline int
-readfpreg(p, i, val)
-	struct proc *p;
+readfpreg(l, i, val)
+	struct lwp *l;
 	int i;
 	void *val;
 {
-	*(int32_t *) val = FPR(p, i);
+	*(int32_t *) val = FPR(l, i);
 	return 0;
 }
 
 		
 static __inline int
-writefpreg(p, i, val)
-	struct proc *p;
+writefpreg(l, i, val)
+	struct lwp *l;
 	int i;
 	const void *val;
 {
-	FPR(p, i) = *(const int32_t *) val;
+	FPR(l, i) = *(const int32_t *) val;
 	return 0;
 }
 
@@ -233,8 +237,8 @@ muldiv(tf, code, rd, rs1, rs2)
  */
 
 int
-fixalign(p, tf)
-	struct proc *p;
+fixalign(l, tf)
+	struct lwp *l;
 	struct trapframe64 *tf;
 {
 	static u_char sizedef[] = { 0x4, 0xff, 0x2, 0x8 };
@@ -313,22 +317,22 @@ fixalign(p, tf)
 		uprintf("%c%d\n", REGNAME(code.i_asi.i_rs2));
 #endif
 #ifdef DIAGNOSTIC
-	if (op.bits.fl && p != fpproc)
+	if (op.bits.fl && l != fplwp)
 		panic("fp align without being the FP owning process");
 #endif
 
 	if (op.bits.st) {
 		if (op.bits.fl) {
-			if (p == fpproc) {
-				savefpstate(p->p_md.md_fpstate);
-				fpproc = NULL;
+			if (l == fplwp) {
+				savefpstate(l->l_md.md_fpstate);
+				fplwp = NULL;
 			}
 
-			error = readfpreg(p, code.i_op3.i_rd, &data.i[0]);
+			error = readfpreg(l, code.i_op3.i_rd, &data.i[0]);
 			if (error)
 				return error;
 			if (size == 8) {
-				error = readfpreg(p, code.i_op3.i_rd + 1,
+				error = readfpreg(l, code.i_op3.i_rd + 1,
 				    &data.i[1]);
 				if (error)
 					return error;
@@ -370,17 +374,17 @@ fixalign(p, tf)
 			return error;
 
 		if (op.bits.fl) {
-			error = writefpreg(p, code.i_op3.i_rd, &data.i[0]);
+			error = writefpreg(l, code.i_op3.i_rd, &data.i[0]);
 			if (error)
 				return error;
 			if (size == 8) {
-				error = writefpreg(p, code.i_op3.i_rd + 1,
+				error = writefpreg(l, code.i_op3.i_rd + 1,
 				    &data.i[1]);
 				if (error)
 					return error;
 			}
-			loadfpstate(p->p_md.md_fpstate);
-			fpproc = p;
+			loadfpstate(l->l_md.md_fpstate);
+			fplwp = l;
 		}
 		else {
 			error = writegpreg(tf, code.i_op3.i_rd, &data.i[0]);
@@ -433,8 +437,7 @@ emulinstr(pc, tf)
 
 	switch (code.i_op3.i_op3) {
 	case IOP3_FLUSH:
-		printf("emulinstr: we can't execute a cache flush???");
-/*		cpuinfo.cache_flush((caddr_t)(rs1 + rs2), 4); XXX */
+		blast_icache();		/* XXX overkill */
 		return 0;
 
 	default:

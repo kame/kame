@@ -1,8 +1,6 @@
-/*	$NetBSD: exec.h,v 1.86 2002/04/02 20:20:00 jdolecek Exp $	*/
+/*	$NetBSD: exec.h,v 1.104 2004/02/13 11:36:23 wiz Exp $	*/
 
 /*-
- * Copyright (c) 1994 Christopher G. Demetriou
- * Copyright (c) 1993 Theo de Raadt
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -10,6 +8,60 @@
  * to the University of California by American Telephone and Telegraph
  * Co. or Unix System Laboratories, Inc. and are reproduced herein with
  * the permission of UNIX System Laboratories, Inc.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)exec.h	8.4 (Berkeley) 2/19/95
+ */
+
+/*-
+ * Copyright (c) 1993 Theo de Raadt.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/*-
+ * Copyright (c) 1994 Christopher G. Demetriou
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -79,6 +131,7 @@ struct ps_strings {
  * in creating the new process's vmspace.
  */
 
+struct lwp;
 struct proc;
 struct exec_package;
 struct vnode;
@@ -88,7 +141,7 @@ typedef int (*exec_makecmds_fcn) __P((struct proc *, struct exec_package *));
 
 struct execsw {
 	u_int	es_hdrsz;		/* size of header for this format */
-	exec_makecmds_fcn es_check;	/* function to check exec format */
+	exec_makecmds_fcn es_makecmds;	/* function to setup vmcmds */
 	union {				/* probe function */
 		int (*elf_probe_func) __P((struct proc *,
 			struct exec_package *, void *, char *, vaddr_t *));
@@ -100,14 +153,15 @@ struct execsw {
 	int	es_prio;		/* entry priority */
 	int	es_arglen;		/* Extra argument size in words */
 					/* Copy arguments on the new stack */
-	int	(*es_copyargs) __P((struct exec_package *, struct ps_strings *,
-				    char **, void *));
+	int	(*es_copyargs) __P((struct proc *, struct exec_package *,
+			struct ps_strings *, char **, void *));
 					/* Set registers before execution */
-	void	(*es_setregs) __P((struct proc *, struct exec_package *,
+	void	(*es_setregs) __P((struct lwp *, struct exec_package *,
 				   u_long));
 					/* Dump core */
-	int	(*es_coredump) __P((struct proc *, struct vnode *,
+	int	(*es_coredump) __P((struct lwp *, struct vnode *,
 				    struct ucred *));
+	int	(*es_setup_stack) __P((struct proc *, struct exec_package *));
 };
 
 #define EXECSW_PRIO_ANY		0x000	/* default, no preference */
@@ -158,7 +212,7 @@ struct exec_package {
 #define	EXEC_HASES	0x0040		/* don't update exec switch pointer */
 
 struct exec_vmcmd {
-	int	(*ev_proc) __P((struct proc *p, struct exec_vmcmd *cmd));
+	int	(*ev_proc) __P((struct proc *, struct exec_vmcmd *));
 				/* procedure to run for region of vmspace */
 	u_long	ev_len;		/* length of the segment to map */
 	u_long	ev_addr;	/* address in the vmspace to place it at */
@@ -168,30 +222,44 @@ struct exec_vmcmd {
 	int	ev_flags;
 #define	VMCMD_RELATIVE	0x0001	/* ev_addr is relative to base entry */
 #define	VMCMD_BASE	0x0002	/* marks a base entry */
+#define	VMCMD_FIXED	0x0004	/* entry must be mapped at ev_addr */
 };
 
 #ifdef _KERNEL
+#include <sys/mallocvar.h>
+
+MALLOC_DECLARE(M_EXEC);
+
 /*
- * funtions used either by execve() or the various cpu-dependent execve()
+ * funtions used either by execve() or the various CPU-dependent execve()
  * hooks.
  */
 void	kill_vmcmd		__P((struct exec_vmcmd **));
 int	exec_makecmds		__P((struct proc *, struct exec_package *));
 int	exec_runcmds		__P((struct proc *, struct exec_package *));
 void	vmcmdset_extend		__P((struct exec_vmcmd_set *));
-void	kill_vmcmds		__P((struct exec_vmcmd_set *evsp));
+void	kill_vmcmds		__P((struct exec_vmcmd_set *));
 int	vmcmd_map_pagedvn	__P((struct proc *, struct exec_vmcmd *));
 int	vmcmd_map_readvn	__P((struct proc *, struct exec_vmcmd *));
 int	vmcmd_readvn		__P((struct proc *, struct exec_vmcmd *));
 int	vmcmd_map_zero		__P((struct proc *, struct exec_vmcmd *));
-int	copyargs		__P((struct exec_package *, struct ps_strings *,
-    char **, void *));
-void	setregs			__P((struct proc *, struct exec_package *,
+int	copyargs		__P((struct proc *, struct exec_package *,
+    struct ps_strings *, char **, void *));
+void	setregs			__P((struct lwp *, struct exec_package *,
 				     u_long));
+#ifdef VERIFIED_EXEC
+int	check_veriexec		__P((struct proc *, struct vnode *,
+				     struct exec_package *, int));
+int	check_exec		__P((struct proc *, struct exec_package *,
+				     int));
+#else
 int	check_exec		__P((struct proc *, struct exec_package *));
+#endif
 int	exec_init		__P((int));
 int	exec_read_from		__P((struct proc *, struct vnode *, u_long off,
     void *, size_t));
+int	exec_setup_stack	__P((struct proc *, struct exec_package *));
+
 
 #ifdef LKM
 int	emul_register		__P((const struct emul *, int));
@@ -202,33 +270,13 @@ int	exec_add		__P((struct execsw *, const char *));
 int	exec_remove		__P((const struct execsw *));
 #endif /* LKM */
 
-#ifdef DEBUG
-void	new_vmcmd __P((struct exec_vmcmd_set *evsp,
-		    int (*proc) __P((struct proc *p, struct exec_vmcmd *)),
-		    u_long len, u_long addr, struct vnode *vp, u_long offset,
-		    u_int prot, int flags));
+void	new_vmcmd __P((struct exec_vmcmd_set *,
+		    int (*) __P((struct proc *, struct exec_vmcmd *)),
+		    u_long, u_long, struct vnode *, u_long, u_int, int));
 #define	NEW_VMCMD(evsp,proc,len,addr,vp,offset,prot) \
 	new_vmcmd(evsp,proc,len,addr,vp,offset,prot,0)
 #define	NEW_VMCMD2(evsp,proc,len,addr,vp,offset,prot,flags) \
 	new_vmcmd(evsp,proc,len,addr,vp,offset,prot,flags)
-#else	/* DEBUG */
-#define	NEW_VMCMD(evsp,proc,len,addr,vp,offset,prot) \
-	NEW_VMCMD2(evsp,proc,len,addr,vp,offset,prot,0)
-#define	NEW_VMCMD2(evsp,proc,len,addr,vp,offset,prot,flags) do { \
-	struct exec_vmcmd *vcp; \
-	if ((evsp)->evs_used >= (evsp)->evs_cnt) \
-		vmcmdset_extend(evsp); \
-	vcp = &(evsp)->evs_cmds[(evsp)->evs_used++]; \
-	vcp->ev_proc = (proc); \
-	vcp->ev_len = (len); \
-	vcp->ev_addr = (addr); \
-	if ((vcp->ev_vp = (vp)) != NULLVP) \
-                VREF(vp); \
-        vcp->ev_offset = (offset); \
-        vcp->ev_prot = (prot); \
-	vcp->ev_flags = (flags); \
-} while (/* CONSTCOND */ 0)
-#endif /* EXEC_DEBUG */
 
 #endif /* _KERNEL */
 

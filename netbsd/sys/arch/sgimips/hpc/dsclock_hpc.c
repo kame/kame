@@ -1,4 +1,4 @@
-/*	$NetBSD: dsclock_hpc.c,v 1.3 2002/03/13 13:12:27 simonb Exp $	*/
+/*	$NetBSD: dsclock_hpc.c,v 1.8 2003/07/15 03:35:53 lukem Exp $	*/
 
 /*
  * Copyright (c) 2001 Rafal K. Boni
@@ -33,6 +33,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: dsclock_hpc.c,v 1.8 2003/07/15 03:35:53 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -66,9 +69,8 @@ const struct clockfns dsclock_clockfns = {
 	dsclock_init, dsclock_get, dsclock_set,
 };
 
-struct cfattach dsclock_ca = {
-	sizeof(struct dsclock_softc), dsclock_match, dsclock_attach
-};
+CFATTACH_DECL(dsclock, sizeof(struct dsclock_softc),
+    dsclock_match, dsclock_attach, NULL, NULL);
 
 #define	ds1286_write(dev, reg, datum)					\
     bus_space_write_1(dev->sc_rtct, dev->sc_rtch, reg, datum)
@@ -80,7 +82,7 @@ dsclock_match(struct device *parent, struct cfdata *cf, void *aux)
 {
 	struct hpc_attach_args *ha = aux;
 
-	if (strcmp(ha->ha_name, cf->cf_driver->cd_name) == 0)
+	if (strcmp(ha->ha_name, cf->cf_name) == 0)
 		return (1);
 
 	return (0);
@@ -118,19 +120,19 @@ static void
 dsclock_get(struct device *dev, struct clock_ymdhms * dt)
 {
 	struct dsclock_softc *sc = (struct dsclock_softc *)dev;
-	ds_todregs regs;
+	ds1286_todregs regs;
 	int s;
 
 	s = splhigh();
 	DS1286_GETTOD(sc, &regs)
 	splx(s);
 
-	dt->dt_sec = FROMBCD(regs[DS_SEC]);
-	dt->dt_min = FROMBCD(regs[DS_MIN]);
+	dt->dt_sec = FROMBCD(regs[DS1286_SEC]);
+	dt->dt_min = FROMBCD(regs[DS1286_MIN]);
 
-	if (regs[DS_HOUR] & DS_HOUR_12MODE) {
-		dt->dt_hour = FROMBCD(regs[DS_HOUR] & DS_HOUR_12HR_MASK) +
-			((regs[DS_HOUR] & DS_HOUR_12HR_PM) ? 12 : 0);
+	if (regs[DS1286_HOUR] & DS1286_HOUR_12MODE) {
+		dt->dt_hour = FROMBCD(regs[DS1286_HOUR] & DS1286_HOUR_12HR_MASK) +
+			((regs[DS1286_HOUR] & DS1286_HOUR_12HR_PM) ? 12 : 0);
 
 		/*
 		 * In AM/PM mode, hour range is 01-12, so adding in 12 hours
@@ -140,13 +142,13 @@ dsclock_get(struct device *dev, struct clock_ymdhms * dt)
 		if (dt->dt_hour == 24)
 			dt->dt_hour = 0;
 	} else {
-		 dt->dt_hour = FROMBCD(regs[DS_HOUR] & DS_HOUR_24HR_MASK);
+		 dt->dt_hour = FROMBCD(regs[DS1286_HOUR] & DS1286_HOUR_24HR_MASK);
 	}
 
-	dt->dt_wday = FROMBCD(regs[DS_DOW]);
-	dt->dt_day = FROMBCD(regs[DS_DOM]);
-	dt->dt_mon = FROMBCD(regs[DS_MONTH] & DS_MONTH_MASK);
-	dt->dt_year = FROM_IRIX_YEAR(FROMBCD(regs[DS_YEAR]));
+	dt->dt_wday = FROMBCD(regs[DS1286_DOW]);
+	dt->dt_day = FROMBCD(regs[DS1286_DOM]);
+	dt->dt_mon = FROMBCD(regs[DS1286_MONTH] & DS1286_MONTH_MASK);
+	dt->dt_year = FROM_IRIX_YEAR(FROMBCD(regs[DS1286_YEAR]));
 }
 
 /*
@@ -156,25 +158,25 @@ static void
 dsclock_set(struct device *dev, struct clock_ymdhms * dt)
 {
 	struct dsclock_softc *sc = (struct dsclock_softc *)dev;
-	ds_todregs regs;
+	ds1286_todregs regs;
 	int s;
 
 	s = splhigh();
 	DS1286_GETTOD(sc, &regs);
 	splx(s);
 
-	regs[DS_SUBSEC] = 0;
-	regs[DS_SEC] = TOBCD(dt->dt_sec);
-	regs[DS_MIN] = TOBCD(dt->dt_min);
-	regs[DS_HOUR] = TOBCD(dt->dt_hour) & DS_HOUR_24HR_MASK;
-	regs[DS_DOW] = TOBCD(dt->dt_wday);
-	regs[DS_DOM] = TOBCD(dt->dt_day);
+	regs[DS1286_SUBSEC] = 0;
+	regs[DS1286_SEC] = TOBCD(dt->dt_sec);
+	regs[DS1286_MIN] = TOBCD(dt->dt_min);
+	regs[DS1286_HOUR] = TOBCD(dt->dt_hour) & DS1286_HOUR_24HR_MASK;
+	regs[DS1286_DOW] = TOBCD(dt->dt_wday);
+	regs[DS1286_DOM] = TOBCD(dt->dt_day);
 
 	/* Leave wave-generator bits as set originally */
-	regs[DS_MONTH] &=  ~DS_MONTH_MASK;
-	regs[DS_MONTH] |=  TOBCD(dt->dt_mon) & DS_MONTH_MASK;
+	regs[DS1286_MONTH] &=  ~DS1286_MONTH_MASK;
+	regs[DS1286_MONTH] |=  TOBCD(dt->dt_mon) & DS1286_MONTH_MASK;
 
-	regs[DS_YEAR] = TOBCD(TO_IRIX_YEAR(dt->dt_year));
+	regs[DS1286_YEAR] = TOBCD(TO_IRIX_YEAR(dt->dt_year));
 
 	s = splhigh();
 	DS1286_PUTTOD(sc, &regs);

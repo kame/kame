@@ -1,4 +1,4 @@
-/*	$NetBSD: ess_ofisa.c,v 1.7 2001/11/13 07:29:45 lukem Exp $	*/
+/*	$NetBSD: ess_ofisa.c,v 1.12 2003/05/03 18:11:31 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ess_ofisa.c,v 1.7 2001/11/13 07:29:45 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ess_ofisa.c,v 1.12 2003/05/03 18:11:31 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -61,9 +61,8 @@ __KERNEL_RCSID(0, "$NetBSD: ess_ofisa.c,v 1.7 2001/11/13 07:29:45 lukem Exp $");
 int	ess_ofisa_match __P((struct device *, struct cfdata *, void *));
 void	ess_ofisa_attach __P((struct device *, struct device *, void *));
 
-struct cfattach ess_ofisa_ca = {
-	sizeof(struct ess_softc), ess_ofisa_match, ess_ofisa_attach
-};
+CFATTACH_DECL(ess_ofisa, sizeof(struct ess_softc),
+    ess_ofisa_match, ess_ofisa_attach, NULL, NULL);
 
 int
 ess_ofisa_match(parent, cf, aux)
@@ -72,7 +71,7 @@ ess_ofisa_match(parent, cf, aux)
 	void *aux;
 {
 	struct ofisa_attach_args *aa = aux;
-	const char *compatible_strings[] = {
+	static const char *const compatible_strings[] = {
 		"ESST,es1887-codec",		/* ESS 1887 */
 		"ESST,es1888-codec",		/* ESS 1888 */
 		"ESST,es888-codec",		/* ESS 888 */
@@ -109,7 +108,7 @@ ess_ofisa_attach(parent, self, aux)
 	 *
 	 *	1      i/o register region
 	 *	1 or 2 interrupts
-	 *	2      dma channels
+	 *	2      DMA channels
 	 */
 
 	n = ofisa_reg_get(aa->oba.oba_phandle, &reg, 1);

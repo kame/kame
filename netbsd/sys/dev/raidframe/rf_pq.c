@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_pq.c,v 1.11 2001/11/13 07:11:16 lukem Exp $	*/
+/*	$NetBSD: rf_pq.c,v 1.13 2003/11/16 20:32:05 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rf_pq.c,v 1.11 2001/11/13 07:11:16 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rf_pq.c,v 1.13 2003/11/16 20:32:05 oster Exp $");
 
 #include "rf_archs.h"
 
@@ -115,7 +115,7 @@ rf_PQDagSelect(
 	RF_ASSERT(RF_IO_IS_R_OR_W(type));
 	if (ntfail > 2) {
 		RF_ERRORMSG("more than two disks failed in a single group!  Aborting I/O operation.\n");
-		 /* *infoFunc = */ *createFunc = NULL;
+		*createFunc = NULL;
 		return;
 	}
 	/* ok, we can do this I/O */
@@ -146,7 +146,6 @@ rf_PQDagSelect(
 			break;
 		case 2:
 			/* lost two data units */
-			/* *infoFunc = PQOneTwo; */
 			*createFunc = (RF_VoidFuncPtr) rf_PQ_200_CreateReadDAG;
 			break;
 		}
@@ -568,7 +567,7 @@ rf_RecoveryQFunc(node)
 
 	RF_ETIMER_START(timer);
 	/* start by copying Q into the buffer */
-	bcopy(node->params[node->numParams - 3].p, node->results[0],
+	memcpy(node->results[0], node->params[node->numParams - 3].p,
 	    rf_RaidAddressToByte(raidPtr, failedPDA->numSector));
 	for (i = 0; i < node->numParams - 4; i += 2) {
 		RF_ASSERT(node->params[i + 1].p != node->results[0]);

@@ -1,4 +1,4 @@
-/*	$NetBSD: uipc_usrreq.c,v 1.53 2001/11/12 15:25:34 lukem Exp $	*/
+/*	$NetBSD: uipc_usrreq.c,v 1.74 2004/03/23 13:22:05 junyoung Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -38,9 +38,38 @@
  */
 
 /*
- * Copyright (c) 1997 Christopher G. Demetriou.  All rights reserved.
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)uipc_usrreq.c	8.9 (Berkeley) 5/14/95
+ */
+
+/*
+ * Copyright (c) 1997 Christopher G. Demetriou.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -74,7 +103,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uipc_usrreq.c,v 1.53 2001/11/12 15:25:34 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uipc_usrreq.c,v 1.74 2004/03/23 13:22:05 junyoung Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -103,7 +132,7 @@ __KERNEL_RCSID(0, "$NetBSD: uipc_usrreq.c,v 1.53 2001/11/12 15:25:34 lukem Exp $
 struct	sockaddr_un sun_noname = { sizeof(sun_noname), AF_LOCAL };
 ino_t	unp_ino;			/* prototype for fake inode numbers */
 
-struct mbuf *unp_addsockcred __P((struct proc *, struct mbuf *));
+struct mbuf *unp_addsockcred(struct proc *, struct mbuf *);
 
 int
 unp_output(m, control, unp, p)
@@ -125,7 +154,7 @@ unp_output(m, control, unp, p)
 	    control) == 0) {
 		m_freem(control);
 		m_freem(m);
-		return (EINVAL);
+		return (ENOBUFS);
 	} else {
 		sorwakeup(so2);
 		return (0);
@@ -218,7 +247,7 @@ uipc_usrreq(so, req, m, nam, control, p)
 		break;
 
 	case PRU_CONNECT2:
-		error = unp_connect2(so, (struct socket *)nam);
+		error = unp_connect2(so, (struct socket *)nam, PRU_CONNECT2);
 		break;
 
 	case PRU_DISCONNECT:
@@ -227,6 +256,14 @@ uipc_usrreq(so, req, m, nam, control, p)
 
 	case PRU_ACCEPT:
 		unp_setpeeraddr(unp, nam);
+		/*
+		 * Mark the initiating STREAM socket as connected *ONLY*
+		 * after it's been accepted.  This prevents a client from
+		 * overrunning a server and receiving ECONNREFUSED.
+		 */
+		if (unp->unp_conn != NULL &&
+		    (unp->unp_conn->unp_socket->so_state & SS_ISCONNECTING))
+			soisconnected(unp->unp_conn->unp_socket);
 		break;
 
 	case PRU_SHUTDOWN:
@@ -414,6 +451,7 @@ uipc_ctloutput(op, so, level, optname, mp)
 	case PRCO_SETOPT:
 		switch (optname) {
 		case LOCAL_CREDS:
+		case LOCAL_CONNWAIT:
 			if (m == NULL || m->m_len != sizeof(int))
 				error = EINVAL;
 			else {
@@ -427,6 +465,9 @@ uipc_ctloutput(op, so, level, optname, mp)
 
 				case LOCAL_CREDS:
 					OPTSET(UNP_WANTCRED);
+					break;
+				case LOCAL_CONNWAIT:
+					OPTSET(UNP_CONNWAIT);
 					break;
 				}
 			}
@@ -560,6 +601,7 @@ unp_bind(unp, nam, p)
 {
 	struct sockaddr_un *sun;
 	struct vnode *vp;
+	struct mount *mp;
 	struct vattr vattr;
 	size_t addrlen;
 	int error;
@@ -578,6 +620,7 @@ unp_bind(unp, nam, p)
 	m_copydata(nam, 0, nam->m_len, (caddr_t)sun);
 	*(((char *)sun) + nam->m_len) = '\0';
 
+restart:
 	NDINIT(&nd, CREATE, FOLLOW | LOCKPARENT, UIO_SYSSPACE,
 	    sun->sun_path, p);
 
@@ -585,21 +628,29 @@ unp_bind(unp, nam, p)
 	if ((error = namei(&nd)) != 0)
 		goto bad;
 	vp = nd.ni_vp;
-	if (vp != NULL) {
+	if (vp != NULL || vn_start_write(nd.ni_dvp, &mp, V_NOWAIT) != 0) {
 		VOP_ABORTOP(nd.ni_dvp, &nd.ni_cnd);
 		if (nd.ni_dvp == vp)
 			vrele(nd.ni_dvp);
 		else
 			vput(nd.ni_dvp);
 		vrele(vp);
-		error = EADDRINUSE;
-		goto bad;
+		if (vp != NULL) {
+			error = EADDRINUSE;
+			goto bad;
+		}
+		error = vn_start_write(NULL, &mp,
+		    V_WAIT | V_SLEEPONLY | V_PCATCH);
+		if (error)
+			goto bad;
+		goto restart;
 	}
 	VATTR_NULL(&vattr);
 	vattr.va_type = VSOCK;
 	vattr.va_mode = ACCESSPERMS;
 	VOP_LEASE(nd.ni_dvp, p, p->p_ucred, LEASE_WRITE);
 	error = VOP_CREATE(nd.ni_dvp, &nd.ni_vp, &nd.ni_cnd, &vattr);
+	vn_finished_write(mp, 0);
 	if (error)
 		goto bad;
 	vp = nd.ni_vp;
@@ -678,7 +729,7 @@ unp_connect(so, nam, p)
 		unp3->unp_flags = unp2->unp_flags;
 		so2 = so3;
 	}
-	error = unp_connect2(so, so2);
+	error = unp_connect2(so, so2, PRU_CONNECT);
  bad:
 	vput(vp);
  bad2:
@@ -687,9 +738,10 @@ unp_connect(so, nam, p)
 }
 
 int
-unp_connect2(so, so2)
+unp_connect2(so, so2, req)
 	struct socket *so;
 	struct socket *so2;
+	int req;
 {
 	struct unpcb *unp = sotounpcb(so);
 	struct unpcb *unp2;
@@ -708,7 +760,11 @@ unp_connect2(so, so2)
 
 	case SOCK_STREAM:
 		unp2->unp_conn = unp;
-		soisconnected(so);
+		if (req == PRU_CONNECT &&
+		    ((unp->unp_flags | unp2->unp_flags) & UNP_CONNWAIT))
+			soisconnecting(so);
+		else
+			soisconnected(so);
 		soisconnected(so2);
 		break;
 
@@ -918,8 +974,8 @@ unp_internalize(control, p)
 	struct proc *p;
 {
 	struct filedesc *fdescp = p->p_fd;
-	struct cmsghdr *cm = mtod(control, struct cmsghdr *);
-	struct file **rp;
+	struct cmsghdr *newcm, *cm = mtod(control, struct cmsghdr *);
+	struct file **rp, **files;
 	struct file *fp;
 	int i, fd, *fdp;
 	int nfds;
@@ -935,51 +991,64 @@ unp_internalize(control, p)
 	fdp = (int *)CMSG_DATA(cm);
 	for (i = 0; i < nfds; i++) {
 		fd = *fdp++;
-		if (fd_getfile(fdescp, fd) == NULL)
+		if ((fp = fd_getfile(fdescp, fd)) == NULL)
 			return (EBADF);
+		simple_unlock(&fp->f_slock);
 	}
 
 	/* Make sure we have room for the struct file pointers */
- morespace:
 	neededspace = CMSG_SPACE(nfds * sizeof(struct file *)) -
 	    control->m_len;
 	if (neededspace > M_TRAILINGSPACE(control)) {
 
-		/* if we already have a cluster, the message is just too big */
-		if (control->m_flags & M_EXT)
+		/* allocate new space and copy header into it */
+		newcm = malloc(
+		    CMSG_SPACE(nfds * sizeof(struct file *)),
+		    M_MBUF, M_WAITOK);
+		if (newcm == NULL)
 			return (E2BIG);
-
-		/* allocate a cluster and try again */
-		MCLGET(control, M_WAIT);
-		if ((control->m_flags & M_EXT) == 0)
-			return (ENOBUFS);	/* allocation failed */
-
-		/* copy the data to the cluster */
-		memcpy(mtod(control, char *), cm, cm->cmsg_len);
-		cm = mtod(control, struct cmsghdr *);
-		goto morespace;
+		memcpy(newcm, cm, sizeof(struct cmsghdr));
+		files = (struct file **)CMSG_DATA(newcm);		
+	} else {
+		/* we can convert in-place */
+		newcm = NULL;
+		files = (struct file **)CMSG_DATA(cm);
 	}
-
-	/* adjust message & mbuf to note amount of space actually used. */
-	cm->cmsg_len = CMSG_LEN(nfds * sizeof(struct file *));
-	control->m_len = CMSG_SPACE(nfds * sizeof(struct file *));
 
 	/*
 	 * Transform the file descriptors into struct file pointers, in
 	 * reverse order so that if pointers are bigger than ints, the
 	 * int won't get until we're done.
 	 */
-	fdp = ((int *)CMSG_DATA(cm)) + nfds - 1;
-	rp = ((struct file **)CMSG_DATA(cm)) + nfds - 1;
+	fdp = (int *)CMSG_DATA(cm) + nfds - 1;
+	rp = files + nfds - 1;
 	for (i = 0; i < nfds; i++) {
 		fp = fdescp->fd_ofiles[*fdp--];
-		FILE_USE(fp);
+		simple_lock(&fp->f_slock);
+#ifdef DIAGNOSTIC
+		if (fp->f_iflags & FIF_WANTCLOSE)
+			panic("unp_internalize: file already closed");
+#endif
 		*rp-- = fp;
 		fp->f_count++;
 		fp->f_msgcount++;
-		FILE_UNUSE(fp, NULL);
+		simple_unlock(&fp->f_slock);
 		unp_rights++;
 	}
+
+	if (newcm) {
+		if (control->m_flags & M_EXT)
+			MEXTREMOVE(control);
+		MEXTADD(control, newcm,
+		    CMSG_SPACE(nfds * sizeof(struct file *)),
+		    M_MBUF, NULL, NULL);
+		cm = newcm;
+	}
+
+	/* adjust message & mbuf to note amount of space actually used. */
+	cm->cmsg_len = CMSG_LEN(nfds * sizeof(struct file *));
+	control->m_len = CMSG_SPACE(nfds * sizeof(struct file *));
+
 	return (0);
 }
 
@@ -1001,7 +1070,7 @@ unp_addsockcred(p, control)
 		if (space > MCLBYTES)
 			MEXTMALLOC(m, space, M_WAITOK);
 		else
-			MCLGET(m, M_WAIT);
+			m_clget(m, M_WAIT);
 		if ((m->m_flags & M_EXT) == 0) {
 			m_free(m);
 			return (control);
@@ -1079,7 +1148,7 @@ unp_gc()
 	unp_defer = 0;
 
 	/* Clear mark bits */
-	for (fp = filehead.lh_first; fp != 0; fp = fp->f_list.le_next)
+	LIST_FOREACH(fp, &filehead, f_list)
 		fp->f_flag &= ~(FMARK|FDEFER);
 
 	/*
@@ -1088,7 +1157,7 @@ unp_gc()
 	 * marking for rescan descriptors which are queued on a socket.
 	 */
 	do {
-		for (fp = filehead.lh_first; fp != 0; fp = fp->f_list.le_next) {
+		LIST_FOREACH(fp, &filehead, f_list) {
 			if (fp->f_flag & FDEFER) {
 				fp->f_flag &= ~FDEFER;
 				unp_defer--;
@@ -1133,14 +1202,10 @@ unp_gc()
 			 * mark descriptors referenced from sockets queued on the accept queue as well.
 			 */
 			if (so->so_options & SO_ACCEPTCONN) {
-				for (so1 = so->so_q0.tqh_first;
-				     so1 != 0;
-				     so1 = so1->so_qe.tqe_next) {
+				TAILQ_FOREACH(so1, &so->so_q0, so_qe) {
 					unp_scan(so1->so_rcv.sb_mb, unp_mark, 0);
 				}
-				for (so1 = so->so_q.tqh_first;
-				     so1 != 0;
-				     so1 = so1->so_qe.tqe_next) {
+				TAILQ_FOREACH(so1, &so->so_q, so_qe) {
 					unp_scan(so1->so_rcv.sb_mb, unp_mark, 0);
 				}
 			}
@@ -1154,7 +1219,7 @@ unp_gc()
 	 * that are not otherwise accessible and then free the rights
 	 * that are stored in messages on them.
 	 *
-	 * The bug in the orginal code is a little tricky, so I'll describe
+	 * The bug in the original code is a little tricky, so I'll describe
 	 * what's wrong with it here.
 	 *
 	 * It is incorrect to simply unp_discard each entry for f_msgcount
@@ -1190,19 +1255,21 @@ unp_gc()
 	 * 91/09/19, bsy@cs.cmu.edu
 	 */
 	extra_ref = malloc(nfiles * sizeof(struct file *), M_FILE, M_WAITOK);
-	for (nunref = 0, fp = filehead.lh_first, fpp = extra_ref; fp != 0;
+	for (nunref = 0, fp = LIST_FIRST(&filehead), fpp = extra_ref; fp != 0;
 	    fp = nextfp) {
-		nextfp = fp->f_list.le_next;
-		if (fp->f_count == 0)
-			continue;
-		if (fp->f_count == fp->f_msgcount && !(fp->f_flag & FMARK)) {
+		nextfp = LIST_NEXT(fp, f_list);
+		simple_lock(&fp->f_slock);
+		if (fp->f_count != 0 &&
+		    fp->f_count == fp->f_msgcount && !(fp->f_flag & FMARK)) {
 			*fpp++ = fp;
 			nunref++;
 			fp->f_count++;
 		}
+		simple_unlock(&fp->f_slock);
 	}
 	for (i = nunref, fpp = extra_ref; --i >= 0; ++fpp) {
 		fp = *fpp;
+		simple_lock(&fp->f_slock);
 		FILE_USE(fp);
 		if (fp->f_type == DTYPE_SOCKET)
 			sorflush((struct socket *)fp->f_data);
@@ -1210,6 +1277,7 @@ unp_gc()
 	}
 	for (i = nunref, fpp = extra_ref; --i >= 0; ++fpp) {
 		fp = *fpp;
+		simple_lock(&fp->f_slock);
 		FILE_USE(fp);
 		(void) closef(fp, (struct proc *)0);
 	}
@@ -1229,7 +1297,7 @@ unp_dispose(m)
 void
 unp_scan(m0, op, discard)
 	struct mbuf *m0;
-	void (*op) __P((struct file *));
+	void (*op)(struct file *);
 	int discard;
 {
 	struct mbuf *m;
@@ -1300,8 +1368,10 @@ unp_discard(fp)
 {
 	if (fp == NULL)
 		return;
-	FILE_USE(fp);
+	simple_lock(&fp->f_slock);
+	fp->f_usecount++;	/* i.e. FILE_USE(fp) sans locking */
 	fp->f_msgcount--;
+	simple_unlock(&fp->f_slock);
 	unp_rights--;
 	(void) closef(fp, (struct proc *)0);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_space.c,v 1.4 2002/03/15 05:55:37 gmcgarry Exp $	*/
+/*	$NetBSD: bus_space.c,v 1.9 2003/11/17 14:37:59 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -41,18 +41,18 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: bus_space.c,v 1.4 2002/03/15 05:55:37 gmcgarry Exp $");                                                  
+__KERNEL_RCSID(0, "$NetBSD: bus_space.c,v 1.9 2003/11/17 14:37:59 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/map.h>
+#include <sys/extent.h>
 
+#include <machine/autoconf.h>
 #include <machine/bus.h>
 
 #include <uvm/uvm_extern.h>
 
-extern struct map extiomap[];
-extern caddr_t extiobase;
+extern char *extiobase;
 extern int *nofault;
 
 /* ARGSUSED */
@@ -64,10 +64,11 @@ bus_space_map(t, bpa, size, flags, bshp)
 	int flags;
 	bus_space_handle_t *bshp;
 {
-	int idx, npgs;
-	caddr_t kva;
+	vaddr_t kva;
+	vsize_t offset;
+	int error;
 
-	if (t == HP300_BUS_SPACE_INTIO) {
+	if (t->bustype == HP300_BUS_SPACE_INTIO) {
 		/*
 		 * Intio space is direct-mapped in pmap_bootstrap(); just
 		 * do the translation.
@@ -76,28 +77,29 @@ bus_space_map(t, bpa, size, flags, bshp)
 		return (0);
 	}
 
-	if (t != HP300_BUS_SPACE_DIO)
+	if (t->bustype != HP300_BUS_SPACE_DIO)
 		panic("bus_space_map: bad space tag");
 
 	/*
-	 * Allocate virtual address space from the extio resource map.
+	 * Allocate virtual address space from the extio extent map.
 	 */
-	size = m68k_round_page(size);
-	npgs = btoc(size);
-	idx = rmalloc(extiomap, npgs);
-	if (idx == 0)
-		return (ENOMEM);
-	kva = extiobase + ctob(idx - 1);
+	offset = m68k_page_offset(bpa);
+	size = m68k_round_page(offset + size);
+	error = extent_alloc(extio_ex, size, PAGE_SIZE, 0,
+	    EX_FAST | EX_NOWAIT | (extio_ex_malloc_safe ? EX_MALLOCOK : 0),
+	    &kva);
+	if (error)
+		return (error);
 
 	/*
 	 * Map the range.  The range is always cache-inhibited on the hp300.
 	 */
-	physaccess(kva, (caddr_t)bpa, size, PG_RW|PG_CI);
+	physaccess((caddr_t)kva, (caddr_t)bpa, size, PG_RW|PG_CI);
 
 	/*
 	 * All done.
 	 */
-	*bshp = (bus_space_handle_t)kva;
+	*bshp = (bus_space_handle_t)(kva + offset);
 	return (0);
 }
 
@@ -139,9 +141,10 @@ bus_space_unmap(t, bsh, size)
 	bus_space_handle_t bsh;
 	bus_size_t size;
 {
-	int idx;
+	vaddr_t kva;
+	vsize_t offset;
 
-	if (t == HP300_BUS_SPACE_INTIO) {
+	if (t->bustype == HP300_BUS_SPACE_INTIO) {
 		/*
 		 * Intio space is direct-mapped in pmap_bootstrap(); nothing
 		 * to do
@@ -149,29 +152,31 @@ bus_space_unmap(t, bsh, size)
 		return;
 	}
 
-	if (t != HP300_BUS_SPACE_DIO)
+	if (t->bustype != HP300_BUS_SPACE_DIO)
 		panic("bus_space_map: bad space tag");
 
-	size = m68k_round_page(size);
+	kva = m68k_trunc_page(bsh);
+	offset = m68k_page_offset(bsh);
+	size = m68k_round_page(offset + size);
 
 #ifdef DIAGNOSTIC
-	if (bsh & PGOFSET)
-		panic("bus_space_unmap: unaligned");
 	if ((caddr_t)bsh < extiobase ||
-	    (caddr_t)bsh >= (extiobase + ctob(EIOMAPSIZE)))
+	    (caddr_t)bsh >= (extiobase + ptoa(EIOMAPSIZE)))
 		panic("bus_space_unmap: bad bus space handle");
 #endif
 
 	/*
 	 * Unmap the range.
 	 */
-	physunaccess((caddr_t)bsh, size);
+	physunaccess((caddr_t)kva, size);
 
 	/*
-	 * Free it from the extio resource map.
+	 * Free it from the extio extent map.
 	 */
-	idx = btoc((caddr_t)bsh - extiobase) + 1;
-	rmfree(extiomap, btoc(size), idx);
+	if (extent_free(extio_ex, kva, size,
+	    EX_NOWAIT | (extio_ex_malloc_safe ? EX_MALLOCOK : 0)))
+		printf("bus_space_unmap: kva 0x%lx size 0x%lx: "
+		    "can't free region\n", (u_long) bsh, size);
 }
 
 /* ARGSUSED */
@@ -218,7 +223,7 @@ hp300_bus_space_probe(t, bsh, offset, sz)
 		break;
 
 	default:
-		panic("bus_space_probe: unupported data size %d\n", sz);
+		panic("bus_space_probe: unupported data size %d", sz);
 		/* NOTREACHED */
 	}
 

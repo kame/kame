@@ -1,4 +1,4 @@
-/*	$NetBSD: apbus_subr.c,v 1.3 2000/12/03 01:42:29 matt Exp $	*/
+/*	$NetBSD: apbus_subr.c,v 1.5 2003/07/15 02:59:28 lukem Exp $	*/
 
 /*-
  * Copyright (C) 1999 SHIMIZU Ryo.  All rights reserved.
@@ -25,6 +25,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: apbus_subr.c,v 1.5 2003/07/15 02:59:28 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -88,7 +91,7 @@ apctl_dump(apctl)
 	printf("	softc:		%p\n", apctl->apbc_softc);
 	printf("	Slot:		%d\n", apctl->apbc_sl);
 	printf("\n");
-	
+
 	if (apctl->apbc_link)
 		apctl_dump(apctl->apbc_link);
 }

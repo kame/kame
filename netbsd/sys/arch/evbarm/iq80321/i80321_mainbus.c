@@ -1,4 +1,4 @@
-/*	$NetBSD: i80321_mainbus.c,v 1.1 2002/03/27 21:51:29 thorpej Exp $	*/
+/*	$NetBSD: i80321_mainbus.c,v 1.13 2003/12/17 22:03:24 abs Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002 Wasabi Systems, Inc.
@@ -41,6 +41,9 @@
  * which are all specific to the board the i80321 is wired up to.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: i80321_mainbus.c,v 1.13 2003/12/17 22:03:24 abs Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -60,10 +63,8 @@
 int	i80321_mainbus_match(struct device *, struct cfdata *, void *);
 void	i80321_mainbus_attach(struct device *, struct device *, void *);
 
-struct cfattach iopxs_mainbus_ca = {
-	sizeof(struct i80321_softc), i80321_mainbus_match,
-	    i80321_mainbus_attach,
-};
+CFATTACH_DECL(iopxs_mainbus, sizeof(struct i80321_softc),
+    i80321_mainbus_match, i80321_mainbus_attach, NULL, NULL);
 
 /* There can be only one. */
 int	i80321_mainbus_found;
@@ -82,7 +83,7 @@ i80321_mainbus_match(struct device *parent, struct cfdata *cf, void *aux)
 	/* XXX Shoot arch/arm/mainbus in the head. */
 	return (1);
 #else
-	if (strcmp(cf->cf_driver->cd_name, ma->ma_name) == 0)
+	if (strcmp(cf->cf_name, ma->ma_name) == 0)
 		return (1);
 
 	return (0);
@@ -93,6 +94,7 @@ void
 i80321_mainbus_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct i80321_softc *sc = (void *) self;
+	pcireg_t b0u, b0l, b1u, b1l;
 	paddr_t memstart;
 	psize_t memsize;
 
@@ -113,7 +115,12 @@ i80321_mainbus_attach(struct device *parent, struct device *self, void *aux)
 	 */
 	if (bus_space_subregion(sc->sc_st, sc->sc_sh, VERDE_MCU_BASE,
 	    VERDE_MCU_SIZE, &sc->sc_mcu_sh))
-		panic("%s: unable to subregion MCU registers\n",
+		panic("%s: unable to subregion MCU registers",
+		    sc->sc_dev.dv_xname);
+
+	if (bus_space_subregion(sc->sc_st, sc->sc_sh, VERDE_ATU_BASE,
+	    VERDE_ATU_SIZE, &sc->sc_atu_sh))
+		panic("%s: unable to subregion ATU registers",
 		    sc->sc_dev.dv_xname);
 
 	/*
@@ -122,10 +129,31 @@ i80321_mainbus_attach(struct device *parent, struct device *self, void *aux)
 	 */
 	sc->sc_iow_vaddr = IQ80321_IOW_VBASE;
 
-	/* Some boards are always considered "host". */
-	sc->sc_is_host = 1;		/* XXX */
+	/*
+	 * Check the configuration of the ATU to see if another BIOS
+	 * has configured us.  If a PC BIOS didn't configure us, then:
+	 * 	IQ80321: BAR0 00000000.0000000c BAR1 is 00000000.8000000c.
+	 * 	IQ31244: BAR0 00000000.00000004 BAR1 is 00000000.0000000c.
+	 * If a BIOS has configured us, at least one of those should be
+	 * different.  This is pretty fragile, but it's not clear what
+	 * would work better.
+	 */
+	b0l = bus_space_read_4(sc->sc_st, sc->sc_atu_sh, PCI_MAPREG_START+0x0);
+	b0u = bus_space_read_4(sc->sc_st, sc->sc_atu_sh, PCI_MAPREG_START+0x4);
+	b1l = bus_space_read_4(sc->sc_st, sc->sc_atu_sh, PCI_MAPREG_START+0x8);
+	b1u = bus_space_read_4(sc->sc_st, sc->sc_atu_sh, PCI_MAPREG_START+0xc);
+	b0l &= PCI_MAPREG_MEM_ADDR_MASK;
+	b0u &= PCI_MAPREG_MEM_ADDR_MASK;
+	b1l &= PCI_MAPREG_MEM_ADDR_MASK;
+	b1u &= PCI_MAPREG_MEM_ADDR_MASK;
 
-	printf(": i80321 I/O Processor, acting as PCI %s\n",
+	if ((b0u != b1u) || (b0l != 0) || ((b1l & ~0x80000000U) != 0))
+		sc->sc_is_host = 0;
+	else
+		sc->sc_is_host = 1;
+
+	aprint_naive(": i80321 I/O Processor\n");
+	aprint_normal(": i80321 I/O Processor, acting as PCI %s\n",
 	    sc->sc_is_host ? "host" : "slave");
 
 	i80321_sdram_bounds(sc->sc_st, sc->sc_mcu_sh, &memstart, &memsize);
@@ -156,22 +184,35 @@ i80321_mainbus_attach(struct device *parent, struct device *self, void *aux)
 		    PCI_MAPREG_MEM_PREFETCHABLE_MASK |
 		    PCI_MAPREG_MEM_TYPE_64BIT;
 		sc->sc_iwin[1].iwin_base_hi = 0;
-		sc->sc_iwin[1].iwin_xlate = VERDE_OUT_XLATE_MEM_WIN0_BASE;
-		sc->sc_iwin[1].iwin_size = VERDE_OUT_XLATE_MEM_WIN_SIZE;
 	} else {
-		panic("i80321: iwin[1] slave");
+		sc->sc_iwin[1].iwin_base_lo = 0;
+		sc->sc_iwin[1].iwin_base_hi = 0;
 	}
+	sc->sc_iwin[1].iwin_xlate = VERDE_OUT_XLATE_MEM_WIN0_BASE;
+	sc->sc_iwin[1].iwin_size = VERDE_OUT_XLATE_MEM_WIN_SIZE;
 
 	if (sc->sc_is_host) {
 		sc->sc_iwin[2].iwin_base_lo = memstart |
 		    PCI_MAPREG_MEM_PREFETCHABLE_MASK |
 		    PCI_MAPREG_MEM_TYPE_64BIT;
 		sc->sc_iwin[2].iwin_base_hi = 0;
-		sc->sc_iwin[2].iwin_xlate = memstart;
-		sc->sc_iwin[2].iwin_size = memsize;
 	} else {
-		panic("i80321: iwin[2] slave");
+		sc->sc_iwin[2].iwin_base_lo = 0;
+		sc->sc_iwin[2].iwin_base_hi = 0;
 	}
+	sc->sc_iwin[2].iwin_xlate = memstart;
+	sc->sc_iwin[2].iwin_size = memsize;
+
+	if (sc->sc_is_host) {
+		sc->sc_iwin[3].iwin_base_lo = 0 |
+		    PCI_MAPREG_MEM_PREFETCHABLE_MASK |
+		    PCI_MAPREG_MEM_TYPE_64BIT;
+	} else {
+		sc->sc_iwin[3].iwin_base_lo = 0;
+	}
+	sc->sc_iwin[3].iwin_base_hi = 0;
+	sc->sc_iwin[3].iwin_xlate = 0;
+	sc->sc_iwin[3].iwin_size = 0;
 
 	/*
 	 * We set up the Outbound Windows as follows:

@@ -1,4 +1,4 @@
-/*	$NetBSD: gvpbus.c,v 1.19 2002/01/28 09:56:57 aymeric Exp $ */
+/*	$NetBSD: gvpbus.c,v 1.22 2003/01/01 00:28:58 thorpej Exp $ */
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: gvpbus.c,v 1.19 2002/01/28 09:56:57 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: gvpbus.c,v 1.22 2003/01/01 00:28:58 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -46,9 +46,8 @@ int gvpbusprint(void *auxp, const char *);
 
 extern int sbic_no_dma;		/* Kludge for A1291 - mlh */
 
-struct cfattach gvpbus_ca = {
-	sizeof(struct device), gvpbusmatch, gvpbusattach
-};
+CFATTACH_DECL(gvpbus, sizeof(struct device),
+    gvpbusmatch, gvpbusattach, NULL, NULL);
 
 int
 gvpbusmatch(struct device *pdp, struct cfdata *cfp, void *auxp)
@@ -166,9 +165,9 @@ gvpbusprint(void *auxp, const char *pnp)
 	 * doesn't support io yet.
 	 */
 	if (gap->prod == GVP_IOEXTEND)
-		printf("gio at %s", pnp);
+		aprint_normal("gio at %s", pnp);
 	else
-		printf("gtsc at %s", pnp);
+		aprint_normal("gtsc at %s", pnp);
 	return(UNCONF);
 }
 

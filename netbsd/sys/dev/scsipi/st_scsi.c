@@ -1,4 +1,4 @@
-/*	$NetBSD: st_scsi.c,v 1.7 2001/12/07 11:26:31 yamt Exp $ */
+/*	$NetBSD: st_scsi.c,v 1.10.8.1 2004/09/11 12:59:02 he Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -57,7 +57,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: st_scsi.c,v 1.7 2001/12/07 11:26:31 yamt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: st_scsi.c,v 1.10.8.1 2004/09/11 12:59:02 he Exp $");
 
 #include "opt_scsi.h"
 #include "rnd.h"
@@ -81,10 +81,8 @@ int	st_scsibus_mode_sense __P((struct st_softc *, int));
 int	st_scsibus_mode_select __P((struct st_softc *, int));
 int	st_scsibus_cmprss __P((struct st_softc *, int, int));
 
-struct cfattach st_scsibus_ca = {
-	sizeof(struct st_softc), st_scsibus_match, st_scsibus_attach,
-	stdetach, stactivate
-};
+CFATTACH_DECL(st_scsibus, sizeof(struct st_softc),
+    st_scsibus_match, st_scsibus_attach, stdetach, stactivate);
 
 const struct scsipi_inquiry_pattern st_scsibus_patterns[] = {
 	{T_SEQUENTIAL, T_REMOV,
@@ -167,7 +165,7 @@ st_scsibus_read_block_limits(st, flags)
 	/*
 	 * do the command, update the global values
 	 */
-	error = scsipi_command(periph, (struct scsipi_generic *)&cmd,
+	error = scsipi_command(periph, NULL, (struct scsipi_generic *)&cmd,
 	    sizeof(cmd), (u_char *)&block_limits, sizeof(block_limits),
 	    ST_RETRIES, ST_CTL_TIME, NULL,
 	    flags | XS_CTL_DATA_IN | XS_CTL_DATA_ONSTACK);

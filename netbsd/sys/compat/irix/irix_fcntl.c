@@ -1,4 +1,4 @@
-/*	$NetBSD: irix_fcntl.c,v 1.7 2002/05/04 07:45:07 manu Exp $ */
+/*	$NetBSD: irix_fcntl.c,v 1.12 2003/01/22 12:58:22 rafal Exp $ */
 
 /*-
  * Copyright (c) 2001-2002 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: irix_fcntl.c,v 1.7 2002/05/04 07:45:07 manu Exp $");
+__KERNEL_RCSID(0, "$NetBSD: irix_fcntl.c,v 1.12 2003/01/22 12:58:22 rafal Exp $");
 
 #include <sys/types.h>
 #include <sys/signal.h>
@@ -45,11 +45,13 @@ __KERNEL_RCSID(0, "$NetBSD: irix_fcntl.c,v 1.7 2002/05/04 07:45:07 manu Exp $");
 #include <sys/mount.h>
 #include <sys/proc.h>
 #include <sys/conf.h>
+#include <sys/malloc.h>
 #include <sys/vnode.h>
 #include <sys/file.h>
 #include <sys/filedesc.h>
 #include <sys/systm.h>
 #include <sys/fcntl.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <miscfs/specfs/specdev.h>
@@ -67,11 +69,13 @@ __KERNEL_RCSID(0, "$NetBSD: irix_fcntl.c,v 1.7 2002/05/04 07:45:07 manu Exp $");
 #include <compat/svr4/svr4_fcntl.h>
 #include <compat/svr4/svr4_syscallargs.h>
 
-static int fd_truncate __P((struct proc *, int, int, off_t, register_t *));
+static int fd_truncate __P((struct lwp *, int, int, off_t, register_t *));
+static int bsd_to_irix_fcntl_flags __P((int));
+static int irix_to_bsd_fcntl_flags __P((int));
 
 int
-irix_sys_lseek64(p, v, retval)
-	struct proc *p;
+irix_sys_lseek64(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -102,12 +106,12 @@ irix_sys_lseek64(p, v, retval)
 	SCARG(&cup, offset) = SCARG(uap, offset);
 	SCARG(&cup, whence) = SCARG(uap, whence);
 
-	return sys_lseek(p, (void *)&cup, retval);
+	return sys_lseek(l, (void *)&cup, retval);
 }
 
 int
-irix_sys_fcntl(p, v, retval)
-	struct proc *p;
+irix_sys_fcntl(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -129,7 +133,7 @@ irix_sys_fcntl(p, v, retval)
 		if ((error = copyin(SCARG(uap, arg), &fl, sizeof(fl))) != 0)
 			return error;
 
-		return fd_truncate(p, SCARG(uap, fd), 
+		return fd_truncate(l, SCARG(uap, fd), 
 		    fl.l_whence, fl.l_start, retval);
 		break;
 	}
@@ -141,7 +145,7 @@ irix_sys_fcntl(p, v, retval)
 		if ((error = copyin(SCARG(uap, arg), &fl, sizeof(fl))) != 0)
 			return error;
 
-		return fd_truncate(p, SCARG(uap, fd), 
+		return fd_truncate(l, SCARG(uap, fd), 
 		    fl.l_whence, fl.l_start, retval);
 		break;
 	}
@@ -154,11 +158,34 @@ irix_sys_fcntl(p, v, retval)
 		cmd = SVR4_F_SETLK;
 		break;
 
+	case IRIX_F_GETFL:
+		SCARG(&cup, fd) = SCARG(uap, fd);
+		SCARG(&cup, cmd) = F_GETFL;
+		SCARG(&cup, arg) = SCARG(uap, arg);
+		if ((error = sys_fcntl(l, &cup, retval)) != 0)
+			return error;
+		*retval = bsd_to_irix_fcntl_flags(*retval);
+		return 0;
+		break;
+		
+	case IRIX_F_SETFL:
+		/* 
+		 * All unsupported flags are silently ignored 
+		 * except FDIRECT taht will return EINVAL
+		 */
+		if ((int)SCARG(uap, arg) & IRIX_FDIRECT)
+			return EINVAL;
+
+		SCARG(&cup, fd) = SCARG(uap, fd);
+		SCARG(&cup, arg) = 
+		    (char *)irix_to_bsd_fcntl_flags((int)SCARG(uap, arg));
+		SCARG(&cup, cmd) = F_SETFL;
+		return sys_fcntl(l, &cup, retval);
+		break;
+
 	case SVR4_F_DUPFD:
 	case SVR4_F_GETFD:
 	case SVR4_F_SETFD:
-	case SVR4_F_GETFL:
-	case SVR4_F_SETFL:
 	case SVR4_F_SETLK:
 	case SVR4_F_SETLKW:
 	case SVR4_F_CHKFL:
@@ -208,17 +235,18 @@ irix_sys_fcntl(p, v, retval)
 	SCARG(&cup, fd) = SCARG(uap, fd);
 	SCARG(&cup, cmd) = cmd;
 	SCARG(&cup, arg) = SCARG(uap, arg);
-	return svr4_sys_fcntl(p, &cup, retval);
+	return svr4_sys_fcntl(l, &cup, retval);
 }
 	
 static int
-fd_truncate(p, fd, whence, start, retval)
-	struct proc *p;
+fd_truncate(l, fd, whence, start, retval)
+	struct lwp *l;
 	int fd;
 	int whence;
 	off_t start;
 	register_t *retval;
 {	
+	struct proc *p = l->l_proc;
 	struct filedesc *fdp = p->p_fd;
 	struct file *fp;
 	struct vnode *vp;
@@ -254,48 +282,119 @@ fd_truncate(p, fd, whence, start, retval)
 	}
 
 	SCARG(&ft, fd) = fd;
-	return sys_ftruncate(p, &ft, retval);
+	return sys_ftruncate(l, &ft, retval);
 }
 
 int
-irix_sys_fchmod(p, v, retval)
-	struct proc *p;
+irix_sys_open(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
-	struct irix_sys_fchmod_args /* {
-		syscallarg(int) fd;
-		syscallarg(int) mode;
+	struct irix_sys_open_args /* {
+		syscallarg(char *) path;
+		syscallarg(int) flags;
+		syscallarg(mode_t) mode;
 	} */ *uap = v;
-	struct sys_fchmod_args cup;
-	struct file *fp;
+	extern const struct cdevsw irix_usema_cdevsw;
+	struct proc *p = l->l_proc;
 	int error;
-	int major, minor;
+	int fd;
+	struct file *fp;
 	struct vnode *vp;
+	struct vnode *nvp;
 
-	SCARG(&cup, fd) = SCARG(uap, fd);
-	SCARG(&cup, mode) = SCARG(uap, mode);
-	error = sys_fchmod(p, &cup, retval);
+	if ((error = svr4_sys_open(l, v, retval)) != 0)
+		return error;
 
-	/* getvnode() will use the descriptor for us */
-	if ((error = getvnode(p->p_fd, SCARG(uap, fd), &fp)) != 0)
-		return (error);
+	fd = (int)*retval;
+	if ((fp = fd_getfile(p->p_fd, fd)) == NULL)
+		return EBADF;
+
+	FILE_USE(fp);
+
+	vp = (struct vnode *)fp->f_data;
 
 	/* 
-	 * bug for bug emulation of IRIX: on some device, including
-	 * /dev/usemaclone, fchmod returns 0 on faillure, and libc
-	 * depends on that behavior.
+	 * A special hook for the usemaclone driver: we need to clone
+	 * the vnode, because the driver method need a context for each
+	 * usemaclone open instance, and because we need to overload 
+	 * some vnode operations like setattr.
+	 * The original vnode is stored in the v_data field of the cloned
+	 * vnode.
 	 */
-	vp = (struct vnode *)(fp->f_data);
-	if (vp->v_type == VCHR) {
-		major = major(vp->v_specinfo->si_rdev);
-		minor = minor(vp->v_specinfo->si_rdev);
-		/* XXX is there a better way to identify a given driver ? */
-		if (cdevsw[major].d_open == *irix_usemaopen &&
-		    minor == IRIX_USEMACLNDEV_MINOR)
-			error = 0;
-	}
+	if (vp->v_type == VCHR &&
+	    cdevsw_lookup(vp->v_rdev) == &irix_usema_cdevsw &&
+	    minor(vp->v_rdev) == IRIX_USEMACLNDEV_MINOR) {
+		if ((error = getnewvnode(VCHR, vp->v_mount, 
+		    irix_usema_vnodeop_p, 
+		    (struct vnode **)&fp->f_data)) != 0) {
+			(void) vn_close(vp, fp->f_flag, fp->f_cred, p);
+			FILE_UNUSE(fp, p);
+			ffree(fp);
+			fdremove(p->p_fd, fd);
+			return error;
+		}
+		
+		nvp = (struct vnode *)fp->f_data;
 
+		if (SCARG(uap, flags) & O_RDWR || SCARG(uap, flags) & O_WRONLY)
+			nvp->v_writecount++;
+
+		nvp->v_type = VCHR;
+		nvp->v_specinfo = (void *)malloc(sizeof(struct specinfo), 
+		    M_VNODE, M_WAITOK|M_ZERO);
+		nvp->v_rdev = vp->v_rdev;
+		nvp->v_specmountpoint = vp->v_specmountpoint;
+
+		nvp->v_data = (void *)vp;
+		vref(vp);
+	}
 	FILE_UNUSE(fp, p);
-	return (error);
+
+	return 0;
+}
+
+static int 
+irix_to_bsd_fcntl_flags(flags)
+	int flags;
+{
+	int ret = 0;
+
+	if (flags & IRIX_FNDELAY) ret |= FNDELAY;
+	if (flags & IRIX_FAPPEND) ret |= FAPPEND;
+	if (flags & IRIX_FSYNC) ret |= FFSYNC;
+	if (flags & IRIX_FDSYNC) ret |= FDSYNC;
+	if (flags & IRIX_FASYNC) ret |= FASYNC;
+	if (flags & IRIX_FRSYNC) ret |= FRSYNC;
+	if (flags & IRIX_FNONBLOCK) ret |= FNONBLOCK;
+	if (flags & IRIX_FLARGEFILE)
+		printf("Warning: ignored fcntl IRIX_FLARGEFILE flag");
+	if (flags & IRIX_FDIRECT)
+		printf("Warning: ignored fcntl IRIX_FDIRECT flag");
+	if (flags & IRIX_FBULK)
+		printf("Warning: ignored fcntl IRIX_FBULK flag");
+	if (flags & IRIX_FLCINVAL)
+		printf("Warning: ignored fcntl IRIX_FLCINVAL flag");
+	if (flags & IRIX_FLCFLUSH)
+		printf("Warning: ignored fcntl IRIX_FLCFLUSH flag");
+
+	return ret;
+}
+
+static int 
+bsd_to_irix_fcntl_flags(flags)
+	int flags;
+{
+	int ret = 0;
+
+	if (flags & FNDELAY) ret |= IRIX_FNDELAY;
+	if (flags & FAPPEND) ret |= IRIX_FAPPEND;
+	if (flags & FFSYNC) ret |= IRIX_FSYNC;
+	if (flags & FDSYNC) ret |= IRIX_FDSYNC;
+	if (flags & FRSYNC) ret |= IRIX_FRSYNC;
+	if (flags & FNONBLOCK) ret |= IRIX_FNONBLOCK;
+	if (flags & FASYNC) ret |= IRIX_FASYNC;
+
+	return ret;
 }

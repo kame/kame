@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_machdep.c,v 1.5 2002/05/16 01:33:53 uwe Exp $ */
+/*	$NetBSD: pci_machdep.c,v 1.9 2004/03/17 17:04:59 pk Exp $ */
 
 /*
  * Copyright (c) 1999, 2000 Matthew R. Green
@@ -34,6 +34,9 @@
  * References are to the microSPARC-IIep manual unless noted otherwise.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pci_machdep.c,v 1.9 2004/03/17 17:04:59 pk Exp $");
+
 #if defined(DEBUG) && !defined(SPARC_PCI_DEBUG)
 #define SPARC_PCI_DEBUG
 #endif
@@ -63,7 +66,6 @@ int sparc_pci_debug = 0;
 
 #include <machine/bus.h>
 #include <machine/autoconf.h>
-#include <machine/openfirm.h>
 
 #include <machine/ctlreg.h>
 #include <sparc/sparc/asm.h>
@@ -143,7 +145,7 @@ pci_attach_hook(parent, self, pba)
 	char buf[32];
 	char *model;
 
-	model = PROM_getpropstringA(prom_findroot(), "model",
+	model = prom_getpropstringA(prom_findroot(), "model",
 				    buf, sizeof(buf));
 	if (model == NULL)
 		panic("pci_attach_hook: no \"model\" property");
@@ -445,7 +447,7 @@ pci_intr_establish(pc, ih, level, func, arg)
 	DPRINTF(SPDB_INTR,
 		("pci_intr_establish(line %d, ipl %d)\n", ih, level));
 
-	cookie = bus_intr_establish(sc->sc_memt, ih, level, 0, func, arg);
+	cookie = bus_intr_establish(sc->sc_memt, ih, level, func, arg);
 
 	/*
 	 * TODO: to implement pci_intr_disestablish we need to capture

@@ -1,4 +1,4 @@
-/*	$NetBSD: fb.c,v 1.10 2002/03/17 19:40:46 atatat Exp $	*/
+/*	$NetBSD: fb.c,v 1.18 2003/11/07 19:21:39 dsl Exp $	*/
 
 /*-
  * Copyright (c) 2000 Tsubai Masanari.  All rights reserved.
@@ -26,6 +26,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: fb.c,v 1.18 2003/11/07 19:21:39 dsl Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/ioctl.h>
@@ -35,7 +38,8 @@
 #include <uvm/uvm_extern.h>
 
 #include <machine/adrsmap.h>
-#include <machine/autoconf.h>
+
+#include <newsmips/dev/hbvar.h>
 
 #include <dev/wscons/wsconsio.h>
 #include <dev/wscons/wsdisplayvar.h>
@@ -69,9 +73,8 @@ void fb_cnattach(void);
 
 static void fb253_init(void);
 
-struct cfattach fb_ca = {
-	sizeof(struct fb_softc), fb_match, fb_attach,
-};
+CFATTACH_DECL(fb, sizeof(struct fb_softc),
+    fb_match, fb_attach, NULL, NULL);
 
 struct fb_devconfig fb_console_dc;
 
@@ -112,12 +115,12 @@ fb_match(parent, match, aux)
 	struct cfdata *match;
 	void *aux;
 {
-	struct confargs *ca = aux;
+	struct hb_attach_args *ha = aux;
 
-	if (strcmp(ca->ca_name, "fb") != 0)
+	if (strcmp(ha->ha_name, "fb") != 0)
 		return 0;
 
-	if (badaddr(NWB253_CTLREG, 2) || badaddr(NWB253_CRTREG, 2))
+	if (hb_badaddr(NWB253_CTLREG, 2) || hb_badaddr(NWB253_CRTREG, 2))
 		return 0;
 	if ((*(volatile u_short *)NWB253_CTLREG & 7) != 4)
 		return 0;
@@ -190,6 +193,7 @@ fb_common_init(dc)
 		break;
 	case 1:
 	case 2:
+	default:
 		width = 1024;
 		height = 768;
 		break;
@@ -208,11 +212,11 @@ fb_common_init(dc)
 	xoff = ((width - cols * ri->ri_font->fontwidth) / 2 / 8) & ~3;
 	yoff = (height - rows * ri->ri_font->fontheight) / 2;
 	rasops_reconfig(ri, rows, cols);
- 
+
 	ri->ri_xorigin = xoff;
 	ri->ri_yorigin = yoff;
 	ri->ri_bits = dc->dc_fbbase + xoff + ri->ri_stride * yoff;
- 
+
 	fb_stdscreen.nrows = ri->ri_rows;
 	fb_stdscreen.ncols = ri->ri_cols; 
 	fb_stdscreen.textops = &ri->ri_ops;
@@ -267,6 +271,7 @@ fb_ioctl(v, cmd, data, flag, p)
 
 	case WSDISPLAYIO_GETCMAP:
 	case WSDISPLAYIO_PUTCMAP:
+		break;
 	}
 	return EPASSTHROUGH;
 }
@@ -303,7 +308,7 @@ fb_alloc_screen(v, scrdesc, cookiep, ccolp, crowp, attrp)
 
 	*cookiep = ri;
 	*ccolp = *crowp = 0;
-	(*ri->ri_ops.alloc_attr)(ri, 0, 0, 0, &defattr);
+	(*ri->ri_ops.allocattr)(ri, 0, 0, 0, &defattr);
 	*attrp = defattr;
 	sc->sc_nscreens++;
 
@@ -347,7 +352,7 @@ fb_cnattach()
 	dc->dc_fbbase = NWB253_VRAM;
 	fb_common_init(dc);
 
-	(*ri->ri_ops.alloc_attr)(ri, 0, 0, 0, &defattr);
+	(*ri->ri_ops.allocattr)(ri, 0, 0, 0, &defattr);
 	wsdisplay_cnattach(&fb_stdscreen, ri, 0, ri->ri_rows - 1, defattr);
 }
 

@@ -1,4 +1,4 @@
-/*      $NetBSD: param.h,v 1.50 2002/04/21 21:00:29 ragge Exp $    */
+/*      $NetBSD: param.h,v 1.52 2003/08/07 16:30:11 agc Exp $    */
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
@@ -14,11 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -145,12 +141,12 @@
 
 /* clicks to bytes */
 #define	ctob(x)		((x) << PGSHIFT)
-#define	btoc(x)		(((unsigned)(x) + PGOFSET) >> PGSHIFT)
-#define	btop(x)		(((unsigned)(x)) >> PGSHIFT)
+#define	btoc(x)		(((x) + PGOFSET) >> PGSHIFT)
+#define	btop(x)		((x) >> PGSHIFT)
 
 /* bytes to disk blocks */
-#define	btodb(x)	((unsigned long)(x) >> DEV_BSHIFT)
-#define	dbtob(x)	((unsigned long)(x) << DEV_BSHIFT)
+#define	btodb(x)	((x) >> DEV_BSHIFT)
+#define	dbtob(x)	((x) << DEV_BSHIFT)
 
 /* MD conversion macros */
 #define	vax_btoc(x)	(((unsigned)(x) + VAX_PGOFSET) >> VAX_PGSHIFT)

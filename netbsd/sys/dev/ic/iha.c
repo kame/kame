@@ -1,8 +1,14 @@
-/*	$NetBSD: iha.c,v 1.17 2002/04/05 18:27:52 bouyer Exp $ */
-/*
- * Initio INI-9xxxU/UW SCSI Device Driver
+/*	$NetBSD: iha.c,v 1.24 2003/11/02 11:07:45 wiz Exp $ */
+
+/*-
+ * Device driver for the INI-9XXXU/UW or INIC-940/950 PCI SCSI Controller.
  *
- * Copyright (c) 2000 Ken Westerback
+ *  Written for 386bsd and FreeBSD by
+ *	Winston Hung		<winstonh@initio.com>
+ *
+ * Copyright (c) 1997-1999 Initio Corp.
+ * Copyright (c) 2000, 2001 Ken Westerback
+ * Copyright (c) 2001, 2002 Izumi Tsutsui
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,21 +31,6 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- *-------------------------------------------------------------------------
- *
- * Ported from i91u.c, provided by Initio Corporation, which credits:
- *
- * Device driver for the INI-9XXXU/UW or INIC-940/950 PCI SCSI Controller.
- *
- * FreeBSD
- *
- *  Written for 386bsd and FreeBSD by
- *	Winston Hung		<winstonh@initio.com>
- *
- * Copyright (c) 1997-99 Initio Corp.  All rights reserved.
- *
- *-------------------------------------------------------------------------
  */
 
 /*
@@ -48,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: iha.c,v 1.17 2002/04/05 18:27:52 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: iha.c,v 1.24 2003/11/02 11:07:45 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -638,7 +629,7 @@ iha_alloc_sglist(sc)
 	int error, rseg;
 
 	/*
-	 * Allocate dma-safe memory for the SCB's sglist
+	 * Allocate DMA-safe memory for the SCB's sglist
 	 */
 	if ((error = bus_dmamem_alloc(sc->sc_dmat,
 	    IHA_SG_SIZE * IHA_MAX_SCB,
@@ -741,7 +732,7 @@ iha_scsipi_request(chan, req, arg)
 			     BUS_DMA_READ : BUS_DMA_WRITE));
 
 			if (error) {
-				printf("%s: error %d loading dma map\n",
+				printf("%s: error %d loading DMA map\n",
 				    sc->sc_dev.dv_xname, error);
 				iha_append_free_scb(sc, scb);
 				xs->error = XS_DRIVER_STUFFUP;
@@ -1216,13 +1207,13 @@ iha_exec_scb(sc, scb)
 		ioh = sc->sc_ioh;
 
 		bus_space_write_1(iot, ioh, TUL_IMSK, MASK_ALL);
-		sc->sc_semaph = SEMAPH_IN_MAIN;;
+		sc->sc_semaph = SEMAPH_IN_MAIN;
 
 		splx(s);
 		iha_main(sc);
 		s = splbio();
 
-		sc->sc_semaph = ~SEMAPH_IN_MAIN;;
+		sc->sc_semaph = ~SEMAPH_IN_MAIN;
 		bus_space_write_1(iot, ioh, TUL_IMSK, (MASK_ALL & ~MSCMP));
 	}
 
@@ -1486,7 +1477,7 @@ iha_data_over_run(scb)
 	case 0x59: /* Read Master CUE                 MMC   */
 	case 0x5a: /* Mode Sense (10 byte version)    SPC-2 */
 	case 0x5c: /* Read Buffer Capacity            MMC   */
-	case 0x5e: /* Persistant Reserve In           SPC-2 */
+	case 0x5e: /* Persistent Reserve In           SPC-2 */
 	case 0x84: /* Receive Copy Results            SPC-2 */
 	case 0xa0: /* Report LUNs                     SPC-2 */
 	case 0xa3: /* Various Report requests         SBC-2/SCC-2*/
@@ -1501,16 +1492,14 @@ iha_data_over_run(scb)
 	case 0xbe: /* Report Basic Redundancy         SCC-2 */
 
 		return (HOST_OK);
-		break;
 
 	default:
 		return (HOST_DO_DU);
-		break;
 	}
 }
 
 /*
- * iha_next_state - prcess the current SCB as requested in it's
+ * iha_next_state - process the current SCB as requested in its
  *                  nextstat member.
  */
 static int
@@ -2219,7 +2208,7 @@ iha_resel(sc)
 	}
 
 	target = bus_space_read_1(iot, ioh, TUL_SBID);
-	lun = bus_space_read_1(iot, ioh, TUL_SALVC) & MSG_IDENTIFY_LUNMASK;
+	lun = bus_space_read_1(iot, ioh, TUL_SALVC) & IHA_MSG_IDENTIFY_LUNMASK;
 
 	tcs = &sc->sc_tcs[target];
 
@@ -2705,7 +2694,7 @@ iha_read_eeprom(sc, eeprom)
 
 	/* Read EEProm */
 	if (iha_se2_rd_all(sc, buf) == 0)
-		panic("%s: cannot read EEPROM\n", sc->sc_dev.dv_xname);
+		panic("%s: cannot read EEPROM", sc->sc_dev.dv_xname);
 
 	/* Disable EEProm programming */
 	gctrl = bus_space_read_1(iot, ioh, TUL_GCTRL0) & ~EEPRG;

@@ -1,4 +1,4 @@
-/*	$NetBSD: xy.c,v 1.35 2001/09/05 14:03:49 tsutsui Exp $	*/
+/*	$NetBSD: xy.c,v 1.48 2003/09/29 09:50:22 wiz Exp $	*/
 
 /*
  *
@@ -50,6 +50,9 @@
  *	       [6] David Jones <dej@achilles.net>'s unfinished 450/451 driver
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: xy.c,v 1.48 2003/09/29 09:50:22 wiz Exp $");
 
 #undef XYC_DEBUG		/* full debug */
 #undef XYC_DIAG			/* extra sanity checks */
@@ -180,10 +183,6 @@ void	xyc_xyreset __P((struct xyc_softc *, struct xy_softc *));
 /* machine interrupt hook */
 int	xycintr __P((void *));
 
-/* bdevsw, cdevsw */
-bdev_decl(xy);
-cdev_decl(xy);
-
 /* autoconf */
 static int	xycmatch __P((struct device *, struct cfdata *, void *));
 static void	xycattach __P((struct device *, struct device *, void *));
@@ -200,18 +199,34 @@ int	xygetdisklabel __P((struct xy_softc *, void *));
  * cfattach's: device driver interface to autoconfig
  */
 
-struct cfattach xyc_ca = {
-	sizeof(struct xyc_softc), xycmatch, xycattach
-};
+CFATTACH_DECL(xyc, sizeof(struct xyc_softc),
+    xycmatch, xycattach, NULL, NULL);
 
-struct cfattach xy_ca = {
-	sizeof(struct xy_softc), xymatch, xyattach
-};
+CFATTACH_DECL(xy, sizeof(struct xy_softc),
+    xymatch, xyattach, NULL, NULL);
 
 extern struct cfdriver xy_cd;
 
 struct xyc_attach_args {	/* this is the "aux" args to xyattach */
 	int	driveno;	/* unit number */
+};
+
+dev_type_open(xyopen);
+dev_type_close(xyclose);
+dev_type_read(xyread);
+dev_type_write(xywrite);
+dev_type_ioctl(xyioctl);
+dev_type_strategy(xystrategy);
+dev_type_dump(xydump);
+dev_type_size(xysize);
+
+const struct bdevsw xy_bdevsw = {
+	xyopen, xyclose, xystrategy, xyioctl, xydump, xysize, D_DISK
+};
+
+const struct cdevsw xy_cdevsw = {
+	xyopen, xyclose, xyread, xywrite, xyioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
 };
 
 /*
@@ -242,7 +257,7 @@ xygetdisklabel(xy, b)
 	struct xy_softc *xy;
 	void *b;
 {
-	char *err;
+	const char *err;
 	struct sun_disklabel *sdl;
 
 	/* We already have the label data in `b'; setup for dummy strategy */
@@ -445,10 +460,10 @@ xyc_print(aux, name)
 	struct xyc_attach_args *xa = aux;
 
 	if (name != NULL)
-		printf("%s: ", name);
+		aprint_normal("%s: ", name);
 
 	if (xa->driveno != -1)
-		printf(" drive %d", xa->driveno);
+		aprint_normal(" drive %d", xa->driveno);
 
 	return UNCONF;
 }
@@ -505,7 +520,7 @@ xyattach(parent, self, aux)
 	xy->parent = xyc;
 
 	/* init queue of waiting bufs */
-	BUFQ_INIT(&xy->xyq);
+	bufq_alloc(&xy->xyq, BUFQ_DISKSORT|BUFQ_SORT_RAWBLOCK);
 	xy->xyrq = &xyc->reqs[xa->driveno];
 
 	xy->xy_drive = xa->driveno;
@@ -1015,7 +1030,7 @@ xystrategy(bp)
 
 	lp = xy->sc_dk.dk_label;
 
-	if (bounds_check_with_label(bp, lp,
+	if (bounds_check_with_label(&xy->sc_dk, bp,
 		(xy->flags & XY_WLABEL) != 0) <= 0)
 		goto done;
 
@@ -1036,7 +1051,7 @@ xystrategy(bp)
 
 	s = splbio();		/* protect the queues */
 
-	disksort_blkno(&xy->xyq, bp);	 /* XXX disksort_cylinder */
+	BUFQ_PUT(&xy->xyq, bp);	 /* XXX disksort_cylinder */
 
 	/* start 'em up */
 
@@ -1342,7 +1357,7 @@ xyc_startbuf(xycsc, xysc, bp)
  * [2] we can only be blocked if there is a WAIT type I/O request being
  * run.   since this can only happen when we are crashing, we wait a sec
  * and then steal the IOPB.  for case [3] the process can sleep
- * on the iorq free list until some iopbs are avaliable.
+ * on the iorq free list until some iopbs are available.
  */
 
 
@@ -1392,7 +1407,7 @@ xyc_submit_iorq(xycsc, iorq, type)
 	if (iopb == NULL) { /* nothing doing? */
 		if (type == XY_SUB_NORM || type == XY_SUB_NOQ)
 			return(XY_ERR_AOK);
-		panic("xyc_submit_iorq: xyc_chain failed!\n");
+		panic("xyc_submit_iorq: xyc_chain failed!");
 	}
 	iopbaddr = dvma_kvtopa(iopb, xycsc->bustype);
 
@@ -1645,10 +1660,10 @@ xyc_reset(xycsc, quiet, blastmode, error, xysc)
 				/* Sun3: map/unmap regardless of B_PHYS */
 				dvma_mapout(iorq->dbufbase,
 				            iorq->buf->b_bcount);
-			    BUFQ_REMOVE(&iorq->xy->xyq, iorq->buf);
+			    (void)BUFQ_GET(&iorq->xy->xyq);
 			    disk_unbusy(&iorq->xy->sc_dk,
-					        (iorq->buf->b_bcount -
-					         iorq->buf->b_resid));
+				(iorq->buf->b_bcount - iorq->buf->b_resid),
+				(iorq->buf->b_flags & B_READ));
 			    biodone(iorq->buf);
 			    iorq->mode = XY_SUB_FREE;
 			    break;
@@ -1691,9 +1706,9 @@ xyc_start(xycsc, iorq)
 	if (iorq == NULL) {
 		for (lcv = 0; lcv < XYC_MAXDEV ; lcv++) {
 			if ((xy = xycsc->sc_drives[lcv]) == NULL) continue;
-			if (BUFQ_FIRST(&xy->xyq) == NULL) continue;
+			if (BUFQ_PEEK(&xy->xyq) == NULL) continue;
 			if (xy->xyrq->mode != XY_SUB_FREE) continue;
-			xyc_startbuf(xycsc, xy, BUFQ_FIRST(&xy->xyq));
+			xyc_startbuf(xycsc, xy, BUFQ_PEEK(&xy->xyq));
 		}
 	}
 	xyc_submit_iorq(xycsc, iorq, XY_SUB_NOQ);
@@ -1823,9 +1838,10 @@ xyc_remove_iorq(xycsc)
 			/* Sun3: map/unmap regardless of B_PHYS */
 			dvma_mapout(iorq->dbufbase,
 					    iorq->buf->b_bcount);
-			BUFQ_REMOVE(&iorq->xy->xyq, bp);
+			(void)BUFQ_GET(&iorq->xy->xyq);
 			disk_unbusy(&iorq->xy->sc_dk,
-			    (bp->b_bcount - bp->b_resid));
+			    (bp->b_bcount - bp->b_resid),
+			    (bp->b_flags & B_READ));
 			iorq->mode = XY_SUB_FREE;
 			biodone(bp);
 			break;

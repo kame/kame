@@ -1,4 +1,4 @@
-/*	$NetBSD: pss.c,v 1.60 2002/01/08 17:20:44 christos Exp $	*/
+/*	$NetBSD: pss.c,v 1.64 2003/05/03 18:11:28 wiz Exp $	*/
 
 /* XXX THIS DRIVER IS BROKEN.  IT WILL NOT EVEN COMPILE. */
 
@@ -53,7 +53,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pss.c,v 1.60 2002/01/08 17:20:44 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pss.c,v 1.64 2003/05/03 18:11:28 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -114,7 +114,7 @@ struct pss_softc {
 	void	*sc_ih;			/* interrupt vectoring */
 
 	int	sc_iobase;		/* I/O port base address */
-	int	sc_drq;			/* dma channel */
+	int	sc_drq;			/* DMA channel */
 
 	struct	ad1848_softc *ad1848_sc;
 	
@@ -257,22 +257,18 @@ static u_char wss_interrupt_bits[16] = {
 /* ditto for WSS DMA channel */
 static u_char wss_dma_bits[4] = {1, 2, 0, 3};
 
-struct cfattach pss_ca = {
-	sizeof(struct pss_softc), pssprobe, pssattach
-};
+CFATTACH_DECL(pss, sizeof(struct pss_softc),
+    pssprobe, pssattach, NULL, NULL);
 
-struct cfattach sp_ca = {
-	sizeof(struct ad1848_isa_softc), spprobe, spattach
-};
+CFATTACH_DECL(sp, sizeof(struct ad1848_isa_softc),
+    spprobe, spattach, NULL, NULL);
 
 #ifdef notyet
-struct cfattach mpu_ca = {
-	sizeof(struct mpu_softc), mpuprobe, mpuattach
-};
+CFATTACH_DECL(mpu, sizeof(struct mpu_softc),
+    mpuprobe, mpuattach, NULL, NULL);
 
-struct cfattach pcd_ca = {
-	sizeof(struct pcd_softc), pcdprobe, pcdattach
-};
+CFATTACH_DECL(pcd, sizeof(struct pcd_softc),
+    pcdprobe, pcdattach, NULL, NULL);
 
 #endif
 
@@ -498,7 +494,7 @@ pss_testirq(struct pss_softc *sc, int intNum)
 }
 
 /*
- * This function tests a dma channel to see if
+ * This function tests a DMA channel to see if
  * it is available. It takes the DMA channel button
  * as its argument and returns TRUE if the channel
  * is ok.
@@ -801,7 +797,7 @@ pss_found:
       
     ia->ia_io[0].ir_size = PSS_NPORT;
 
-    /* Initialize PSS irq and dma */
+    /* Initialize PSS irq and DMA */
     pss_setint(ia->ia_irq[0].ir_irq, sc->sc_iobase+PSS_CONFIG);
     pss_setdma(ia->ia_drq[0].ir_drq, sc->sc_iobase+PSS_CONFIG);
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: mfsnode.h,v 1.11 2001/12/06 04:27:43 chs Exp $	*/
+/*	$NetBSD: mfsnode.h,v 1.14 2003/08/07 16:34:41 agc Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -35,6 +31,9 @@
  *	@(#)mfsnode.h	8.3 (Berkeley) 5/19/95
  */
 
+#ifndef _UFS_MFS_MFSNODE_H_
+#define _UFS_MFS_MFSNODE_H_
+
 /*
  * This structure defines the control data for the memory based file system.
  */
@@ -44,7 +43,8 @@ struct mfsnode {
 	caddr_t	mfs_baseoff;		/* base of file system in memory */
 	long	mfs_size;		/* size of memory file system */
 	struct	proc *mfs_proc;		/* supporting process */
-	struct	buf_queue mfs_buflist;	/* list of I/O requests */
+	struct	bufq_state mfs_buflist;	/* list of I/O requests */
+	int	mfs_shutdown;		/* shutdown this mfsnode */
 };
 
 /*
@@ -87,3 +87,5 @@ struct mfsnode {
 #define	mfs_bwrite	vn_bwrite
 #define	mfs_revoke	genfs_revoke
 #define	mfs_putpages	genfs_null_putpages
+
+#endif /* !_UFS_MFS_MFSNODE_H_ */

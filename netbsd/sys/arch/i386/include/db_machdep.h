@@ -1,4 +1,4 @@
-/*	$NetBSD: db_machdep.h,v 1.18 2002/05/12 23:16:52 matt Exp $	*/
+/*	$NetBSD: db_machdep.h,v 1.24 2003/10/27 13:44:20 junyoung Exp $	*/
 
 /* 
  * Mach Operating System
@@ -33,6 +33,9 @@
  * Machine-dependent defines for new kernel debugger.
  */
 
+#if defined(_KERNEL_OPT)
+#include "opt_multiprocessor.h"
+#endif
 #include <sys/param.h>
 #include <uvm/uvm_extern.h>
 #include <machine/trap.h>
@@ -41,15 +44,18 @@ typedef	vaddr_t		db_addr_t;	/* address - unsigned */
 typedef	long		db_expr_t;	/* expression - signed */
 
 typedef struct trapframe db_regs_t;
+#ifndef MULTIPROCESSOR
 extern db_regs_t ddb_regs;	/* register state */
 #define	DDB_REGS	(&ddb_regs)
-
-#if defined(lint)
-#define	PC_REGS(regs)	((regs)->tf_eip)
 #else
-#define	PC_REGS(regs)	((db_addr_t)(regs)->tf_eip)
+extern db_regs_t *ddb_regp;
+#define DDB_REGS	(ddb_regp)
+#define ddb_regs	(*ddb_regp)
 #endif
 
+#define	PC_REGS(regs)	((regs)->tf_eip)
+
+#define	BKPT_ADDR(addr)	(addr)		/* breakpoint address */
 #define	BKPT_INST	0xcc		/* breakpoint instruction */
 #define	BKPT_SIZE	(1)		/* size of breakpoint inst */
 #define	BKPT_SET(inst)	(BKPT_INST)
@@ -90,8 +96,8 @@ extern db_regs_t ddb_regs;	/* register state */
 	 ((user) && (addr) < VM_MAX_ADDRESS))
 
 #if 0
-boolean_t 	db_check_access __P((vaddr_t, int, task_t));
-boolean_t	db_phys_eq __P((task_t, vaddr_t, task_t, vaddr_t));
+boolean_t 	db_check_access(vaddr_t, int, task_t);
+boolean_t	db_phys_eq(task_t, vaddr_t, task_t, vaddr_t);
 #endif
 
 /* macros for printing OS server dependent task name */
@@ -116,7 +122,12 @@ void		db_task_name(/* task_t */);
 
 #define db_thread_fp_used(thread)	((thread)->pcb->ims.ifps != 0)
 
-int kdb_trap __P((int, int, db_regs_t *));
+int kdb_trap(int, int, db_regs_t *);
+
+/*
+ * We define some of our own commands
+ */
+#define DB_MACHINE_COMMANDS
 
 /*
  * We use either a.out or Elf32 symbols in DDB.
@@ -124,5 +135,9 @@ int kdb_trap __P((int, int, db_regs_t *));
 #define	DB_AOUT_SYMBOLS
 #define	DB_ELF_SYMBOLS
 #define	DB_ELFSIZE	32
+
+extern void db_machine_init(void);
+
+extern void cpu_debug_dump(void);
 
 #endif	/* _I386_DB_MACHDEP_H_ */

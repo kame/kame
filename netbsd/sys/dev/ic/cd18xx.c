@@ -1,4 +1,4 @@
-/*	$NetBSD: cd18xx.c,v 1.3 2002/03/17 19:40:56 atatat Exp $	*/
+/*	$NetBSD: cd18xx.c,v 1.9 2003/08/07 16:30:59 agc Exp $	*/
 
 /*
  * Copyright (c) 1998, 2001 Matthew R. Green
@@ -76,11 +76,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -105,7 +101,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cd18xx.c,v 1.3 2002/03/17 19:40:56 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cd18xx.c,v 1.9 2003/08/07 16:30:59 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/conf.h>
@@ -144,9 +140,21 @@ void cdtty_txsoft(struct cd18xx_softc *, struct cdtty_port *, struct tty *);
 void cdtty_stsoft(struct cd18xx_softc *, struct cdtty_port *, struct tty *);
 void cd18xx_softintr(void *);
 
-cdev_decl(cdtty);
+dev_type_open(cdttyopen);
+dev_type_close(cdttyclose);
+dev_type_read(cdttyread);
+dev_type_write(cdttywrite);
+dev_type_ioctl(cdttyioctl);
+dev_type_stop(cdttystop);
+dev_type_tty(cdttytty);
+dev_type_poll(cdttypoll);
 
-static void	cdtty_shutdown(struct cd18xx_softc *, struct cdtty_port*);
+const struct cdevsw cdtty_cdevsw = {
+	cdttyopen, cdttyclose, cdttyread, cdttywrite, cdttyioctl,
+	cdttystop, cdttytty, cdttypoll, nommap, ttykqfilter, D_TTY
+};
+
+static void	cdtty_shutdown(struct cd18xx_softc *, struct cdtty_port *);
 static void	cdttystart(struct tty *);
 static int	cdttyparam(struct tty *, struct termios *);
 static void	cdtty_break(struct cd18xx_softc *, struct cdtty_port *, int);
@@ -198,8 +206,8 @@ cd18xx_wait_ccr(sc)
 	int i = 100000;
 
 	while (--i &&
-	    bus_space_read_1(sc->sc_tag, sc->sc_handle, CD18xx_CCR) == 0)
-		break;
+	    bus_space_read_1(sc->sc_tag, sc->sc_handle, CD18xx_CCR) != 0)
+		;
 	return (i == 0);
 }
 
@@ -347,7 +355,7 @@ cdtty_attach(sc, port)
 }
 
 /*
- * below here are the tty portion device routines.
+ * cdtty_shutdown: called when the device is last closed.
  */
 void
 cdtty_shutdown(sc, p)
@@ -456,7 +464,7 @@ cdttyopen(dev, flag, mode, p)
 			SET(t.c_cflag, MDMBUF);
 
 		/* Make sure param will see changes. */
-		tp->t_ospeed = 0;
+		tp->t_ospeed = 0;	/* XXX set above ignored? */
 		(void)cdttyparam(tp, &t);
 
 		tp->t_iflag = TTYDEF_IFLAG;
@@ -1255,7 +1263,7 @@ cd18xx_tint(sc, ns)
 
 	/* Disable transmit completion interrupts if we ran out of bytes. */
 	if (p->p_tbc == 0) {
-		/* Note that Tx interupts should already be enabled */
+		/* Note that Tx interrupts should already be enabled */
 		if (ISSET(p->p_srer, CD18xx_SRER_Tx)) {
 			DPRINTF(CDD_INTR, (", disabling tx interrupts"));
 			CLR(p->p_srer, CD18xx_SRER_Tx);

@@ -1,4 +1,4 @@
-/*	$NetBSD: gdrom.c,v 1.8 2002/03/25 18:59:39 uch Exp $	*/
+/*	$NetBSD: gdrom.c,v 1.16 2003/07/15 01:31:39 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 Marcus Comstedt
@@ -33,6 +33,7 @@
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
+__KERNEL_RCSID(0, "$NetBSD: gdrom.c,v 1.16 2003/07/15 01:31:39 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -45,24 +46,33 @@
 #include <sys/disk.h>
 #include <sys/cdio.h>
 #include <sys/proc.h>
+#include <sys/conf.h>
 
 #include <machine/sysasicvar.h>
 
 int	gdrommatch(struct device *, struct cfdata *, void *);
 void	gdromattach(struct device *, struct device *, void *);
-int	gdromopen(dev_t, int, int, struct proc *);
-int	gdromclose(dev_t, int, int, struct proc *);
-void	gdromstrategy(struct buf *);
-int	gdromioctl(dev_t, u_long, caddr_t, int, struct proc *);
-int	gdromdump(dev_t, daddr_t, caddr_t, size_t);
-int	gdromsize(dev_t);
-int	gdromread(dev_t, struct uio *, int);
-int	gdromwrite(dev_t, struct uio *, int);
+
+dev_type_open(gdromopen);
+dev_type_close(gdromclose);
+dev_type_read(gdromread);
+dev_type_write(gdromwrite);
+dev_type_ioctl(gdromioctl);
+dev_type_strategy(gdromstrategy);
+
+const struct bdevsw gdrom_bdevsw = {
+	gdromopen, gdromclose, gdromstrategy, gdromioctl, nodump,
+	nosize, D_DISK
+};
+
+const struct cdevsw gdrom_cdevsw = {
+	gdromopen, gdromclose, gdromread, gdromwrite, gdromioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
+};
 
 struct gdrom_softc {
 	struct device sc_dv;	/* generic device info; must come first */
 	struct disk dkdev;	/* generic disk info */
-	struct buf_queue bufq;	/* queue pending I/O operations */
 	struct buf curbuf;	/* state of current I/O operation */
 
 	int is_open, is_busy;
@@ -75,9 +85,8 @@ struct gdrom_softc {
 	int cmd_cond;		/* resulting condition of command */
 };
 
-struct cfattach gdrom_ca = {
-	sizeof(struct gdrom_softc), gdrommatch, gdromattach
-};
+CFATTACH_DECL(gdrom, sizeof(struct gdrom_softc),
+    gdrommatch, gdromattach, NULL, NULL);
 
 struct dkdriver gdromdkdriver = { gdromstrategy };
 
@@ -188,7 +197,7 @@ gdrom_intr(void *arg)
 	}
 
 	splx(s);
-	return (0);
+	return (1);
 }
 
 
@@ -358,7 +367,7 @@ gdrommatch(struct device *parent, struct cfdata *cf, void *aux)
 	static int gdrom_matched = 0;
 
 	/* Allow only once instance. */
-	if (strcmp("gdrom", cf->cf_driver->cd_name) || gdrom_matched)
+	if (gdrom_matched)
 		return (0);
 	gdrom_matched = 1;
 
@@ -372,10 +381,6 @@ gdromattach(struct device *parent, struct device *self, void *aux)
 	u_int32_t p, x;
 
 	sc = (struct gdrom_softc *)self;
-
-	BUFQ_INIT(&sc->bufq);
-
-	printf(": SH4 IRL 9\n");
 
 	/*
 	 * Initialize and attach the disk structure.
@@ -391,7 +396,8 @@ gdromattach(struct device *parent, struct device *self, void *aux)
 	for (p = 0; p < 0x200000 / 4; p++)
 		x = ((__volatile u_int32_t *)0xa0000000)[p];
 
-	sysasic_intr_establish(SYSASIC_EVENT_GDROM, gdrom_intr, sc);
+	printf(": %s\n", sysasic_intr_string(IPL_BIO));
+	sysasic_intr_establish(SYSASIC_EVENT_GDROM, IPL_BIO, gdrom_intr, sc);
 }
 
 int
@@ -559,23 +565,6 @@ gdromioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct proc *p)
 #endif
 }
 
-
-/*
- * Can't dump to CD; read only media...
- */
-int
-gdromdump(dev_t	dev, daddr_t blkno, caddr_t va, size_t size)
-{
-
-	return (EINVAL);
-}
-
-int
-gdromsize(dev_t dev)
-{
-
-	return (-1);
-}
 
 int
 gdromread(dev_t dev, struct uio *uio, int flags)

@@ -1,7 +1,7 @@
 #
 # deafult config file.
 #
-# 	$NetBSD: config.playstation2,v 1.6.12.1 2002/08/01 04:30:27 lukem Exp $
+# 	$NetBSD: config.playstation2,v 1.10 2003/10/18 08:30:14 lukem Exp $
 #
 
 maxusers	16
@@ -44,7 +44,8 @@ ohci*	at sbus?
 wdc*	at spd?
 smap*	at spd?
 
-wd*	at wdc? channel ? drive ? flags 0x0ff0	# disable DMA/UDMA
+atabus* at ata?
+wd*	at atabus? drive ? flags 0x0ff0	# disable DMA/UDMA
 ukphy*	at mii? phy ?	# generic unknown PHYs (IEEE Std. 802.3u)
 
 wsdisplay* at gsfb? console?
@@ -83,3 +84,4 @@ pseudo-device	clockctl		# user control of clock subsystem
 pseudo-device	gif		2	# IPv[46] over IPv[46] tunnel (RFC1933)
 
 pseudo-device	wsmux			# mouse & keyboard multiplexor
+pseudo-device	ksyms			# /dev/ksyms

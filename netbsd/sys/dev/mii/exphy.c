@@ -1,4 +1,4 @@
-/*	$NetBSD: exphy.c,v 1.29 2002/03/25 20:51:24 thorpej Exp $	*/
+/*	$NetBSD: exphy.c,v 1.35 2003/04/29 01:49:33 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -71,13 +71,12 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: exphy.c,v 1.29 2002/03/25 20:51:24 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: exphy.c,v 1.35 2003/04/29 01:49:33 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
-#include <sys/malloc.h>
 #include <sys/socket.h>
 
 #include <net/if.h>
@@ -90,10 +89,8 @@ __KERNEL_RCSID(0, "$NetBSD: exphy.c,v 1.29 2002/03/25 20:51:24 thorpej Exp $");
 int	exphymatch(struct device *, struct cfdata *, void *);
 void	exphyattach(struct device *, struct device *, void *);
 
-struct cfattach exphy_ca = {
-	sizeof(struct mii_softc), exphymatch, exphyattach, mii_phy_detach,
-	    mii_phy_activate
-};
+CFATTACH_DECL(exphy, sizeof(struct mii_softc),
+    exphymatch, exphyattach, mii_phy_detach, mii_phy_activate);
 
 int	exphy_service(struct mii_softc *, struct mii_data *, int);
 void	exphy_reset(struct mii_softc *);
@@ -117,7 +114,7 @@ exphymatch(struct device *parent, struct cfdata *match, void *aux)
 	/*
 	 * Make sure the parent is an `ex'.
 	 */
-	if (strcmp(parent->dv_cfdata->cf_driver->cd_name, "ex") != 0)
+	if (strcmp(parent->dv_cfdata->cf_name, "ex") != 0)
 		return (0);
 
 	return (10);
@@ -130,7 +127,8 @@ exphyattach(struct device *parent, struct device *self, void *aux)
 	struct mii_attach_args *ma = aux;
 	struct mii_data *mii = ma->mii_data;
 
-	printf(": 3Com internal media interface\n");
+	aprint_naive(": Media interface\n");
+	aprint_normal(": 3Com internal media interface\n");
 
 	sc->mii_inst = mii->mii_instance;
 	sc->mii_phy = ma->mii_phyno;
@@ -144,7 +142,7 @@ exphyattach(struct device *parent, struct device *self, void *aux)
 	 * instances!
 	 */
 	if (mii->mii_instance != 0) {
-		printf("%s: ignoring this PHY, non-zero instance\n",
+		aprint_error("%s: ignoring this PHY, non-zero instance\n",
 		    sc->mii_dev.dv_xname);
 		return;
 	}
@@ -154,12 +152,12 @@ exphyattach(struct device *parent, struct device *self, void *aux)
 
 	sc->mii_capabilities =
 	    PHY_READ(sc, MII_BMSR) & ma->mii_capmask;
-	printf("%s: ", sc->mii_dev.dv_xname);
+	aprint_normal("%s: ", sc->mii_dev.dv_xname);
 	if ((sc->mii_capabilities & BMSR_MEDIAMASK) == 0)
-		printf("no media present");
+		aprint_error("no media present");
 	else
 		mii_phy_add_media(sc);
-	printf("\n");
+	aprint_normal("\n");
 }
 
 int

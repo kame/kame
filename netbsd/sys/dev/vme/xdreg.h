@@ -1,4 +1,4 @@
-/*	$NetBSD: xdreg.h,v 1.1 1997/11/01 22:56:26 pk Exp $	*/
+/*	$NetBSD: xdreg.h,v 1.3 2003/05/03 18:11:42 wiz Exp $	*/
 
 /*
  *
@@ -45,7 +45,7 @@
 #define XDC_MAXIOPB   31      /* max number of iopbs that can be active */
 #define XDC_MAXTIME   4*1000000 /* four seconds before we give up and reset */
 #define XDC_MAXTRIES  4       /* max number of times to retry an operation */
-#define XDC_THROTTLE  32      /* dma throttle */
+#define XDC_THROTTLE  32      /* DMA throttle */
 #define XDC_INTERLEAVE 0      /* interleave (for format param) */
 #define XDC_DPARAM     0      /* dparam (drive param) XDDP_EC32 or 0 */
 
@@ -250,7 +250,7 @@ struct xd_iopb_ctrl {
 #define XDPC_ECC1 0x01           /* ECC mode 1 */
 #define XDPC_ECC2 0x02           /* ECC mode 2 */
                                  /* section 4.2.4: byte b */
-  volatile u_char throttle;      /* max dma xfers per master (0==256) */
+  volatile u_char throttle;      /* max DMA xfers per master (0==256) */
                                  /* section 4.2.5: byte c */
   volatile u_char eprom_lvl;     /* EPROM release level */
   volatile u_char delay;         /* delay (see note below) */
@@ -317,7 +317,7 @@ struct xd_iopb_drive {
 struct xd_iopb_format {
   volatile u_char same[6];       /* smae as xd_iopb */
                                  /* section 4.4.1: byte 6 */
-  volatile u_char interleave_ipl;/* (interleave << 4) | interupt level */
+  volatile u_char interleave_ipl;/* (interleave << 4) | interrupt level */
                                  /* interleave ratio 1:1 to 16:1 */
   volatile u_char same1;         /* byte 7: same */
                                  /* section 4.4.2: byte 8 */
@@ -417,7 +417,7 @@ struct xd_iopb_format {
 #define XD_ERR_MT7  0xe7         /* maint test 7 failed (buff. parity) */
 #define XD_ERR_MT8  0xe8         /* maint test 8 failed (fifo) */
 #define XD_ERR_IOCK 0xf0         /* iopb checksume miscompare */
-#define XD_ERR_IODM 0xf1         /* iopb dma fatal */
+#define XD_ERR_IODM 0xf1         /* iopb DMA fatal */
 #define XD_ERR_IOAL 0xf2         /* iopb allignment error */
 #define XD_ERR_FIRM 0xf3         /* firmware error n*/
 #define XD_ERR_MMOD 0xf5         /* illegal maint mode test number */

@@ -1,4 +1,4 @@
-/*	$NetBSD: vrc4172pci.c,v 1.5 2002/05/16 01:01:36 thorpej Exp $	*/
+/*	$NetBSD: vrc4172pci.c,v 1.11 2003/12/27 07:34:21 shin Exp $	*/
 
 /*-
  * Copyright (c) 2002 TAKEMURA Shin
@@ -28,6 +28,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vrc4172pci.c,v 1.11 2003/12/27 07:34:21 shin Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -102,9 +105,8 @@ static int	vrc4172pci_mcr700_intr(void *arg);
 #endif
 #endif
 
-struct cfattach vrc4172pci_ca = {
-	sizeof(struct vrc4172pci_softc), vrc4172pci_match, vrc4172pci_attach
-};
+CFATTACH_DECL(vrc4172pci, sizeof(struct vrc4172pci_softc),
+    vrc4172pci_match, vrc4172pci_attach, NULL, NULL);
 
 static inline void
 vrc4172pci_write(struct vrc4172pci_softc *sc, int offset, u_int32_t val)
@@ -152,7 +154,9 @@ vrc4172pci_attach(struct device *parent, struct device *self, void *aux)
 
 #ifdef VRC4172PCI_MCR700_SUPPORT
 	if (platid_match(&platid, &platid_mask_MACH_NEC_MCR_700) ||
-	    platid_match(&platid, &platid_mask_MACH_NEC_MCR_700A)) {
+	    platid_match(&platid, &platid_mask_MACH_NEC_MCR_700A) ||
+	    platid_match(&platid, &platid_mask_MACH_NEC_MCR_730) ||
+	    platid_match(&platid, &platid_mask_MACH_NEC_MCR_730A)) {
 		/* power USB controller on MC-R700 */
 		sc->sc_iochip = va->va_gpio_chips[VRIP_IOCHIP_VRGIU];
 		hpcio_portwrite(sc->sc_iochip, 45, 1);
@@ -197,6 +201,7 @@ vrc4172pci_attach(struct device *parent, struct device *self, void *aux)
 	pba.pba_iot = sc->sc_iot;
 	pba.pba_memt = sc->sc_iot;
 	pba.pba_dmat = &hpcmips_default_bus_dma_tag.bdt;
+	pba.pba_dmat64 = NULL;
 	pba.pba_bus = 0;
 	pba.pba_bridgetag = NULL;
 	pba.pba_flags = PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED |
@@ -214,9 +219,9 @@ vrc4172pci_print(void *aux, const char *pnp)
 	struct pcibus_attach_args *pba = aux;
 
 	if (pnp != NULL)
-		printf("%s at %s", pba->pba_busname, pnp);
+		aprint_normal("%s at %s", pba->pba_busname, pnp);
 	else
-		printf(" bus %d", pba->pba_bus);
+		aprint_normal(" bus %d", pba->pba_bus);
 
 	return (UNCONF);
 }

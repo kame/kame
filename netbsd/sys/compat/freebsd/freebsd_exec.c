@@ -1,4 +1,4 @@
-/*	$NetBSD: freebsd_exec.c,v 1.17 2001/11/13 02:08:06 lukem Exp $	*/
+/*	$NetBSD: freebsd_exec.c,v 1.25 2003/12/20 19:01:30 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994 Christopher G. Demetriou
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: freebsd_exec.c,v 1.17 2001/11/13 02:08:06 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: freebsd_exec.c,v 1.25 2003/12/20 19:01:30 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -40,6 +40,7 @@ __KERNEL_RCSID(0, "$NetBSD: freebsd_exec.c,v 1.17 2001/11/13 02:08:06 lukem Exp 
 
 #include <compat/freebsd/freebsd_syscall.h>
 #include <compat/freebsd/freebsd_exec.h>
+#include <compat/freebsd/freebsd_signal.h>
 #include <compat/common/compat_util.h>
 
 extern struct sysent freebsd_sysent[];
@@ -50,6 +51,8 @@ void syscall_intern __P((struct proc *));
 void syscall __P((void));
 #endif
 
+struct uvm_object *emul_freebsd_object;
+
 const struct emul emul_freebsd = {
 	"freebsd",
 	"/emul/freebsd",
@@ -57,15 +60,19 @@ const struct emul emul_freebsd = {
 	EMUL_HAS_SYS___syscall,
 	NULL,
 	FREEBSD_SYS_syscall,
-	FREEBSD_SYS_MAXSYSCALL,
+	FREEBSD_SYS_NSYSENT,
 #endif
 	freebsd_sysent,
 	freebsd_syscallnames,
 	freebsd_sendsig,
 	trapsignal,
+	NULL,
 	freebsd_sigcode,
 	freebsd_esigcode,
+	&emul_freebsd_object,
 	freebsd_setregs,
+	NULL,
+	NULL,
 	NULL,
 	NULL,
 	NULL,
@@ -74,4 +81,6 @@ const struct emul emul_freebsd = {
 #else
 	syscall,
 #endif
+	NULL,
+	NULL,
 };

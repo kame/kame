@@ -1,4 +1,4 @@
-/*	$NetBSD: pccons.c,v 1.153 2002/04/14 14:20:33 lukem Exp $	*/
+/*	$NetBSD: pccons.c,v 1.169 2004/03/13 17:31:34 bjh21 Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -51,11 +51,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -83,7 +79,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pccons.c,v 1.153 2002/04/14 14:20:33 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pccons.c,v 1.169 2004/03/13 17:31:34 bjh21 Exp $");
 
 #include "opt_ddb.h"
 #include "opt_xserver.h"
@@ -102,13 +98,14 @@ __KERNEL_RCSID(0, "$NetBSD: pccons.c,v 1.153 2002/04/14 14:20:33 lukem Exp $");
 #include <sys/kernel.h>
 #include <sys/syslog.h>
 #include <sys/device.h>
+#include <sys/conf.h>
 
 #include <dev/cons.h>
 
 #include "pc.h"
-#if (NPCCONSKBD > 0)
 #include <machine/bus.h>
-#include <dev/ic/pckbcvar.h>
+#if (NPCCONSKBD > 0)
+#include <dev/pckbport/pckbportvar.h>
 #else
 /* consistency check: plain pccons can't coexist with pckbc */
 #include "pckbc.h"
@@ -117,10 +114,11 @@ __KERNEL_RCSID(0, "$NetBSD: pccons.c,v 1.153 2002/04/14 14:20:33 lukem Exp $");
 #endif
 #endif /* NPCCONSKBD */
 
-/* consistency check: pccons can't coexist with vga or pcdisplay */
+/* consistency check: pccons can't coexist with vga/ega or pcdisplay */
 #include "vga.h"
+#include "ega.h"
 #include "pcdisplay.h"
-#if (NVGA > 0) || (NPCDISPLAY > 0)
+#if (NVGA > 0) || (NEGA > 0) || (NPCDISPLAY > 0)
 #error "pc and (vga or pcdisplay) can't coexist"
 #endif
 
@@ -128,13 +126,12 @@ __KERNEL_RCSID(0, "$NetBSD: pccons.c,v 1.153 2002/04/14 14:20:33 lukem Exp $");
 #include <machine/intr.h>
 #include <machine/pio.h>
 #include <machine/pccons.h>
-#include <machine/conf.h>
 
 #include <dev/isa/isareg.h>
 #include <dev/isa/isavar.h>
 #include <dev/ic/pcdisplay.h>
 #include <dev/ic/i8042reg.h>
-#include <dev/pckbc/pckbdreg.h>
+#include <dev/pckbport/pckbdreg.h>
 
 #define	XFREE86_BUG_COMPAT
 
@@ -176,8 +173,8 @@ int pc_xmode = 0;
 #endif
 int pccons_is_console = 0;
 #if (NPCCONSKBD > 0)
-static pckbc_tag_t kbctag;
-static pckbc_slot_t kbcslot;
+static pckbport_tag_t kbctag;
+static pckbport_slot_t kbcslot;
 static int kbc_attached;
 #endif
 
@@ -210,9 +207,8 @@ void pcattach __P((struct device *, struct device *, void *));
 int pcintr __P((void *));
 void pcinit __P((void));
 
-struct cfattach pc_ca = {
-	sizeof(struct pc_softc), pcprobe, pcattach
-};
+CFATTACH_DECL(pc, sizeof(struct pc_softc),
+    pcprobe, pcattach, NULL, NULL);
 
 extern struct cfdriver pc_cd;
 
@@ -225,12 +221,26 @@ int pcconskbdprobe __P((struct device *, struct cfdata *, void *));
 void pcconskbdattach __P((struct device *, struct device *, void *));
 void pcinput __P((void *, int));
 
-struct cfattach pcconskbd_ca = {
-	sizeof(struct pcconskbd_softc), pcconskbdprobe, pcconskbdattach
-};
+CFATTACH_DECL(pcconskbd, sizeof(struct pcconskbd_softc), pcconskbdprobe,
+    pcconskbdattach, NULL, NULL);
 
 extern struct cfdriver pcconskbd_cd;
 #endif
+
+dev_type_open(pcopen);
+dev_type_close(pcclose);
+dev_type_read(pcread);
+dev_type_write(pcwrite);
+dev_type_ioctl(pcioctl);
+dev_type_stop(pcstop);
+dev_type_tty(pctty);
+dev_type_poll(pcpoll);
+dev_type_mmap(pcmmap);
+ 
+const struct cdevsw pc_cdevsw = {
+	pcopen, pcclose, pcread, pcwrite, pcioctl,
+	pcstop, pctty, pcpoll, pcmmap, ttykqfilter, D_TTY
+};
 
 #define	COL		80
 #define	ROW		25
@@ -463,7 +473,7 @@ get_cursor_shape()
 	 * real 6845's, as found on, MDA, Hercules or CGA cards, do
 	 * not support reading the cursor shape registers. the 6845
 	 * tri-states it's data bus. This is _normally_ read by the
-	 * cpu as either 0x00 or 0xff.. in which case we just use
+	 * CPU as either 0x00 or 0xff.. in which case we just use
 	 * a line cursor.
 	 */
 	if (cursor_shape == 0x0000 || cursor_shape == 0xffff)
@@ -505,7 +515,7 @@ do_async_update(v)
 	}
 #else
 	/*
-	 * If the mi pckbc driver is used, keyboard commands are handled
+	 * If the mi pckbport driver is used, keyboard commands are handled
 	 * there. The commands are issued synchronously (in update_leds()
 	 * and pcioctl()).
 	 */
@@ -553,7 +563,7 @@ void update_leds()
 	cmd[0] = KBC_MODEIND;
 	cmd[1] = lock_state & 7;
 
-	pckbc_enqueue_cmd(kbctag, kbcslot, cmd, 2, 0, 0, 0);
+	pckbport_enqueue_cmd(kbctag, kbcslot, cmd, 2, 0, 0, 0);
 }
 #endif
 
@@ -604,7 +614,7 @@ pcprobe(parent, match, aux)
 #if (NPCCONSKBD == 0)
 	kbd_flush_input();
 #else
-	pckbc_flush(kbctag, kbcslot);
+	pckbport_flush(kbctag, kbcslot);
 #endif
 	/* Reset the keyboard. */
 #if (NPCCONSKBD == 0)
@@ -623,7 +633,7 @@ pcprobe(parent, match, aux)
 	}
 #else
 	cmd[0] = KBC_RESET;
-	res = pckbc_poll_cmd(kbctag, kbcslot, cmd, 1, 1, resp, 1);
+	res = pckbport_poll_cmd(kbctag, kbcslot, cmd, 1, 1, resp, 1);
 	if (res) {
 		printf("pcprobe: reset error %d\n", 1);
 		/*
@@ -631,7 +641,7 @@ pcprobe(parent, match, aux)
 		 * controller to "translating" anyway in case it is
 		 * connected later. This should be done in attach().
 		 */
-		(void) pckbc_xt_translation(kbctag, kbcslot, 1);
+		(void) pckbport_xt_translation(kbctag, kbcslot, 1);
 		goto lose;
 	}
 	if (resp[0] != KBR_RSTDONE) {
@@ -647,7 +657,7 @@ pcprobe(parent, match, aux)
 #if (NPCCONSKBD == 0)
 	kbd_flush_input();
 #else
-	pckbc_flush(kbctag, kbcslot);
+	pckbport_flush(kbctag, kbcslot);
 #endif
 	/* Just to be sure. */
 #if (NPCCONSKBD == 0)
@@ -657,7 +667,7 @@ pcprobe(parent, match, aux)
 	}
 #else
 	cmd[0] = KBC_ENABLE;
-	res = pckbc_poll_cmd(kbctag, kbcslot, cmd, 1, 0, 0, 0);
+	res = pckbport_poll_cmd(kbctag, kbcslot, cmd, 1, 0, 0, 0);
 	if (res) {
 		printf("pcprobe: reset error %d\n", 3);
 		goto lose;
@@ -692,11 +702,11 @@ pcprobe(parent, match, aux)
 		}
 	}
 #else
-	if (pckbc_xt_translation(kbctag, kbcslot, 1)) {
+	if (pckbport_xt_translation(kbctag, kbcslot, 1)) {
 		/* The 8042 is translating for us; use AT codes. */
 		cmd[0] = KBC_SETTABLE;
 		cmd[1] = 2;
-		res = pckbc_poll_cmd(kbctag, kbcslot, cmd, 2, 0, 0, 0);
+		res = pckbport_poll_cmd(kbctag, kbcslot, cmd, 2, 0, 0, 0);
 		if (res) {
 			printf("pcprobe: reset error %d\n", 4);
 			goto lose;
@@ -705,7 +715,7 @@ pcprobe(parent, match, aux)
 		/* Stupid 8042; set keyboard to XT codes. */
 		cmd[0] = KBC_SETTABLE;
 		cmd[1] = 1;
-		res = pckbc_poll_cmd(kbctag, kbcslot, cmd, 2, 0, 0, 0);
+		res = pckbport_poll_cmd(kbctag, kbcslot, cmd, 2, 0, 0, 0);
 		if (res) {
 			printf("pcprobe: reset error %d\n", 5);
 			goto lose;
@@ -741,9 +751,8 @@ pcattach(parent, self, aux)
 	void *aux;
 {
 	struct pc_softc *sc = (void *)self;
-#if (NPCCONSKBD == 0)
 	struct isa_attach_args *ia = aux;
-#endif
+	bus_space_handle_t ioh;
 
 	if (crtat == 0)
 		pcinit();
@@ -752,29 +761,28 @@ pcattach(parent, self, aux)
 	do_async_update((void *)1);
 
 #if (NPCCONSKBD > 0)
-	pckbc_set_inputhandler(kbctag, kbcslot, pcinput, sc, sc->sc_dev.dv_xname);
+	pckbport_set_inputhandler(kbctag, kbcslot, pcinput, sc, sc->sc_dev.dv_xname);
 #else
 	sc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq[0].ir_irq,
 	    IST_EDGE, IPL_TTY, pcintr, sc);
+#endif
 
 	/*
-	 * Look for children of the keyboard controller.
-	 * XXX Really should decouple keyboard controller
-	 * from the console code.
+	 * Reserve CRTC I/O ports to keep other devices such as PCMCIA
+	 * from using them.
 	 */
-	while (config_found(self, ia->ia_ic, NULL) != NULL) {	/* XXX */
-		/* Will break when no more children. */
-		;
-	}
-#endif
+	if (bus_space_map(ia->ia_iot, addr_6845, 0x2, 0, &ioh))
+		printf("pc: mapping of CRTC registers failed\n");
+
+	if (vs.color)
+		if (bus_space_map(ia->ia_iot, 0x3C0, 0x10, 0, &ioh))
+			printf("pc: mapping of VGA registers failed\n");
 
 	if (pccons_is_console) {
 		int maj;
 
 		/* Locate the major number. */
-		for (maj = 0; maj < nchrdev; maj++)
-			if (cdevsw[maj].d_open == pcopen)
-				break;
+		maj = cdevsw_lookup_major(&pc_cdevsw);
 
 		/* There can be only one, but it can have any unit number. */
 		cn_tab->cn_dev = makedev(maj, sc->sc_dev.dv_unit);
@@ -790,9 +798,9 @@ pcconskbdprobe(parent, match, aux)
 	struct cfdata *match;
 	void *aux;
 {
-	struct pckbc_attach_args *pka = aux;
+	struct pckbport_attach_args *pka = aux;
 
-	if (pka->pa_slot != PCKBC_KBD_SLOT)
+	if (pka->pa_slot != PCKBPORT_KBD_SLOT)
 		return (0);
 	return (1);
 }
@@ -802,7 +810,7 @@ pcconskbdattach(parent, self, aux)
 	struct device *parent, *self;
 	void *aux;
 {
-	struct pckbc_attach_args *pka = aux;
+	struct pckbport_attach_args *pka = aux;
 
 	printf("\n");
 
@@ -813,8 +821,8 @@ pcconskbdattach(parent, self, aux)
 
 int
 pcconskbd_cnattach(tag, slot)
-	pckbc_tag_t tag;
-	pckbc_slot_t slot;
+	pckbport_tag_t tag;
+	pckbport_slot_t slot;
 {
 	kbctag = tag;
 	kbcslot = slot;
@@ -1044,7 +1052,7 @@ pcioctl(dev, cmd, data, flag, p)
 			cmd[0] = KBC_TYPEMATIC;
 			cmd[1] = rate;
 
-			return (pckbc_enqueue_cmd(kbctag, kbcslot, cmd, 2, 0,
+			return (pckbport_enqueue_cmd(kbctag, kbcslot, cmd, 2, 0,
 						  1, 0));
 		}
 #else
@@ -1117,7 +1125,7 @@ int
 pccnattach()
 {
 	static struct consdev pccons = {
-		NULL, NULL, pccngetc, pccnputc, pccnpollc,
+		NULL, NULL, pccngetc, pccnputc, pccnpollc, NULL, NULL,
 		    NULL, NODEV, CN_NORMAL
 	};
 
@@ -1182,7 +1190,7 @@ pccngetc(dev)
 #else
 		int data;
 		do {
-			data = pckbc_poll_data(kbctag, kbcslot);
+			data = pckbport_poll_data(kbctag, kbcslot);
 		} while (data == -1);
 		cp = strans(data);
 #endif
@@ -1200,7 +1208,7 @@ pccnpollc(dev, on)
 
 	polling = on;
 #if (NPCCONSKBD > 0)
-	pckbc_set_poll(kbctag, kbcslot, on);
+	pckbport_set_poll(kbctag, kbcslot, on);
 #else
 	if (on)
 		poll_data = -1;
@@ -2706,7 +2714,7 @@ pcmmap(dev, offset, nprot)
 
 	if (offset > 0x20000)
 		return (-1);
-	return (i386_btop(0xa0000 + offset));
+	return (x86_btop(0xa0000 + offset));
 }
 
 #ifdef XSERVER
@@ -2729,7 +2737,7 @@ pc_xmode_on()
 
 #ifdef COMPAT_10
 	/* This is done by i386_iopl(3) now. */
-	fp = curproc->p_md.md_regs;
+	fp = curlwp->l_md.md_regs;
 	fp->tf_eflags |= PSL_IOPL;
 #endif
 }
@@ -2749,7 +2757,7 @@ pc_xmode_off()
 #endif
 	async_update();
 
-	fp = curproc->p_md.md_regs;
+	fp = curlwp->l_md.md_regs;
 	fp->tf_eflags &= ~PSL_IOPL;
 }
 #endif /* XSERVER */

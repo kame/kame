@@ -1,4 +1,4 @@
-/*	$NetBSD: bus.h,v 1.3 2001/11/30 16:04:25 fredette Exp $	*/
+/*	$NetBSD: bus.h,v 1.6 2003/09/21 14:41:34 cl Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998, 2001 The NetBSD Foundation, Inc.
@@ -80,6 +80,8 @@ typedef	u_long	bus_space_handle_t;
 typedef u_long	bus_type_t;
 typedef u_long	bus_addr_t;
 typedef u_long	bus_size_t;
+
+#define	BUS_ADDR_PADDR(x)	((x)&0xffffffff)
 
 /*
  * Access methods for bus resources and address space.
@@ -1021,6 +1023,7 @@ bus_space_copy_region_8(t, h1, o1, h2, o2, c)
 #define	BUS_DMA_BUS4		0x080
 #define	BUS_DMA_READ		0x100	/* mapping is device -> memory only */
 #define	BUS_DMA_WRITE		0x200	/* mapping is memory -> device only */
+#define	BUS_DMA_NOCACHE		0x400	/* hint: map non-cached memory */
 
 /* For devices that have a 24-bit address space */
 #define BUS_DMA_24BIT		BUS_DMA_BUS1
@@ -1048,6 +1051,8 @@ struct uio;
 
 typedef struct sun68k_bus_dma_tag	*bus_dma_tag_t;
 typedef struct sun68k_bus_dmamap	*bus_dmamap_t;
+
+#define BUS_DMA_TAG_VALID(t)    ((t) != (bus_dma_tag_t)0)
 
 /*
  *	bus_dma_segment_t

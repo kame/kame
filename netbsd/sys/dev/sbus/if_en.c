@@ -1,4 +1,4 @@
-/*	$NetBSD: if_en.c,v 1.14 2002/03/20 20:39:15 eeh Exp $	*/
+/*	$NetBSD: if_en.c,v 1.18 2002/12/10 13:44:47 pk Exp $	*/
 
 /*
  *
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_en.c,v 1.14 2002/03/20 20:39:15 eeh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_en.c,v 1.18 2002/12/10 13:44:47 pk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -86,9 +86,8 @@ static	void en_sbus_attach __P((struct device *, struct device *, void *));
  * SBus autoconfig attachments
  */
 
-struct cfattach en_sbus_ca = {
-	sizeof(struct en_sbus_softc), en_sbus_match, en_sbus_attach,
-};
+CFATTACH_DECL(en_sbus, sizeof(struct en_sbus_softc),
+    en_sbus_match, en_sbus_attach, NULL, NULL);
 
 /***********************************************************************/
 
@@ -144,7 +143,7 @@ en_sbus_attach(parent, self, aux)
 	/* Establish interrupt handler */
 	if (sa->sa_nintr != 0)
 		(void)bus_intr_establish(sa->sa_bustag, sa->sa_pri,
-					 IPL_NET, 0, en_intr, sc);
+					 IPL_NET, en_intr, sc);
 
 	sc->ipl = sa->sa_pri;	/* appropriate? */
 

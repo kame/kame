@@ -1,4 +1,4 @@
-/*	$NetBSD: footbridge_com.c,v 1.4 2002/03/17 19:40:32 atatat Exp $	*/
+/*	$NetBSD: footbridge_com.c,v 1.15 2003/06/29 22:28:09 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1997 Mark Brinicombe
@@ -35,7 +35,11 @@
  * COM driver, using the footbridge UART
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: footbridge_com.c,v 1.15 2003/06/29 22:28:09 fvdl Exp $");
+
 #include "opt_ddb.h"
+#include "opt_ddbparam.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -50,7 +54,6 @@
 #include <sys/termios.h>
 #include <machine/bus.h>
 #include <machine/intr.h>
-#include <arm/conf.h>
 #include <arm/footbridge/dc21285mem.h>
 #include <arm/footbridge/dc21285reg.h>
 #include <arm/footbridge/footbridgevar.h>
@@ -105,7 +108,6 @@ static int  fcom_probe   __P((struct device *, struct cfdata *, void *));
 static void fcom_attach  __P((struct device *, struct device *, void *));
 static void fcom_softintr __P((void *));
 
-int fcomopen __P((dev_t dev, int flag, int mode, struct proc *p));
 static int fcom_rxintr __P((void *));
 /*static int fcom_txintr __P((void *));*/
 
@@ -116,11 +118,23 @@ int	fcomcngetc	__P((dev_t));
 void	fcomcnputc	__P((dev_t, int));
 void	fcomcnpollc	__P((dev_t, int));
 
-struct cfattach fcom_ca = {
-	sizeof(struct fcom_softc), fcom_probe, fcom_attach
-};
+CFATTACH_DECL(fcom, sizeof(struct fcom_softc),
+    fcom_probe, fcom_attach, NULL, NULL);
 
 extern struct cfdriver fcom_cd;
+
+dev_type_open(fcomopen);
+dev_type_close(fcomclose);
+dev_type_read(fcomread);
+dev_type_write(fcomwrite);
+dev_type_ioctl(fcomioctl);
+dev_type_tty(fcomtty);
+dev_type_poll(fcompoll);
+
+const struct cdevsw fcom_cdevsw = {
+	fcomopen, fcomclose, fcomread, fcomwrite, fcomioctl,
+	nostop, fcomtty, fcompoll, nommap, ttykqfilter, D_TTY
+};
 
 void fcominit	 	__P((bus_space_tag_t, bus_space_handle_t, int, int));
 void fcominitcons 	__P((bus_space_tag_t, bus_space_handle_t));
@@ -194,19 +208,17 @@ fcom_attach(parent, self, aux)
 		int major;
 
 		/* locate the major number */
-		for (major = 0; major < nchrdev; ++major)
-			if (cdevsw[major].d_open == fcomopen)
-				break;
+		major = cdevsw_lookup_major(&fcom_cdevsw);
 
 		cn_tab->cn_dev = makedev(major, sc->sc_dev.dv_unit);
 		printf(": console");
 	}
 	printf("\n");
 
-	sc->sc_ih = intr_claim(sc->sc_rx_irq, IPL_SERIAL, "serial rx",
-	    fcom_rxintr, sc);
+	sc->sc_ih = footbridge_intr_claim(sc->sc_rx_irq, IPL_SERIAL,
+		"serial rx", fcom_rxintr, sc);
 	if (sc->sc_ih == NULL)
-		panic("%s: Cannot install rx interrupt handler\n",
+		panic("%s: Cannot install rx interrupt handler",
 		    sc->sc_dev.dv_xname);
 }
 
@@ -285,7 +297,7 @@ fcomclose(dev, flag, mode, p)
 	ttyclose(tp);
 #ifdef DIAGNOSTIC
 	if (sc->sc_rxbuffer[0] == NULL)
-		panic("fcomclose: rx buffers not allocated\n");
+		panic("fcomclose: rx buffers not allocated");
 #endif	/* DIAGNOSTIC */
 	free(sc->sc_rxbuffer[0], M_DEVBUF);
 	free(sc->sc_rxbuffer[1], M_DEVBUF);
@@ -372,13 +384,6 @@ fcomtty(dev)
 	struct fcom_softc *sc = fcom_cd.cd_devs[minor(dev)];
 
 	return sc->sc_tty;
-}
-
-void
-fcomstop(tp, flag)
-	struct tty *tp;
-	int flag;
-{
 }
 
 static void
@@ -600,7 +605,7 @@ fcom_rxintr(arg)
 			break;
 		byte = bus_space_read_4(iot, ioh, UART_DATA);
 		status = bus_space_read_4(iot, ioh, UART_RX_STAT);
-#if DDB_KEYCODE > 0
+#if defined(DDB) && DDB_KEYCODE > 0
 		/*
 		 * Temporary hack so that I can force the kernel into
 		 * the debugger via the serial port
@@ -648,9 +653,7 @@ fcomcnprobe(cp)
 	/* Serial console is always present so no probe */
 
 	/* locate the major number */
-	for (major = 0; major < nchrdev; major++)
-		if (cdevsw[major].d_open == fcomopen)
-			break;
+	major = cdevsw_lookup_major(&fcom_cdevsw);
 
 	/* initialize required fields */
 	cp->cn_dev = makedev(major, CONUNIT);
@@ -678,7 +681,7 @@ fcomcnattach(iobase, rate, cflag)
 {
 	static struct consdev fcomcons = {
 		NULL, NULL, fcomcngetc, fcomcnputc, fcomcnpollc, NULL,
-		    NODEV, CN_NORMAL
+		    NULL, NULL, NODEV, CN_NORMAL
 	};
 
 	fcomconstag = &fcomcons_bs_tag;
@@ -800,7 +803,7 @@ fcomcngetc(dev)
 	c = bus_space_read_4(iot, ioh, UART_DATA);
 	stat = bus_space_read_4(iot, ioh, UART_RX_STAT);
 	(void)splx(s);
-#if DDB_KEYCODE > 0
+#if defined(DDB) && DDB_KEYCODE > 0
 		/*
 		 * Temporary hack so that I can force the kernel into
 		 * the debugger via the serial port

@@ -1,4 +1,4 @@
-/*	$NetBSD: ipkdb_glue.c,v 1.3 2001/12/23 08:25:27 dbj Exp $	*/
+/*	$NetBSD: ipkdb_glue.c,v 1.6 2003/09/27 04:44:42 matt Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -32,6 +32,9 @@
  */
 
 #include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ipkdb_glue.c,v 1.6 2003/09/27 04:44:42 matt Exp $");
+
+#include <sys/cdefs.h>
 #include <sys/param.h>
 
 #include <ipkdb/ipkdb.h>
@@ -41,6 +44,7 @@
 #include <machine/pcb.h>
 #include <machine/psl.h>
 #include <machine/trap.h>
+#include <machine/vmparam.h>
 
 int ipkdbregs[NREG];
 
@@ -52,20 +56,19 @@ int savesr;
 #endif
 
 void
-ipkdbinit()
+ipkdbinit(void)
 {
 }
 
 int
-ipkdb_poll()
+ipkdb_poll(void)
 {
 	/* for now: */
 	return 0;
 }
 
 int
-ipkdb_trap_glue(frame)
-	struct trapframe *frame;
+ipkdb_trap_glue(struct trapframe *frame)
 {
 	if (!(frame->srr1 & PSL_PR)
 	    && (frame->exc == EXC_TRC

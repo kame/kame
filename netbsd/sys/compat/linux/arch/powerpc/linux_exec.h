@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_exec.h,v 1.6 2002/01/17 17:19:03 bjh21 Exp $  */
+/*	$NetBSD: linux_exec.h,v 1.16.2.2 2004/07/26 07:13:32 tron Exp $  */
 
 /*-
  * Copyright (c) 1998, 2001 The NetBSD Foundation, Inc.
@@ -42,7 +42,6 @@
 #include <sys/exec_aout.h>
 #include <sys/exec_elf.h>
 #include <sys/types.h>
-#include <sys/systm.h>
 
 /*
  * From Linux's include/asm-ppc/elf.h
@@ -77,14 +76,6 @@
  */
 #define LINUX_SHIFT 0x0000000FUL
 
-/* 
- * LINUX_SP_WRAP enable the stack pointer wrap before Linux's ld.so 
- * transfers control to the Linux executable. It is set to the size
- * of the stack pointer wrap code, which is defined in 
- * sys/compat/linux/arch/powerpc/linux_sp_wrap.S
- */
-#define LINUX_SP_WRAP 0x30		/* Size of the stack pointer wrap code */
-
 /*
  * Entries in the ELF auxiliary table. This is counted from
  * sys/compat/linux/arc/powerpc/linux_exec_powerpc.c
@@ -94,34 +85,15 @@
 /*
  * Size of the auxiliary ELF table. On the PowerPC we need 16 extra bytes
  * in order to force an alignement on a 16 bytes boundary (this is expected
- * by PowerPC GNU ld.so). If we use LINUX_SP_WRAP, we also need some extra
- * room for the sp_wrap_code.
+ * by PowerPC GNU ld.so).
  */
-#ifdef LINUX_SP_WRAP
 #define LINUX_ELF_AUX_ARGSIZ \
-    ((howmany(ELF_AUX_ENTRIES * sizeof(LinuxAuxInfo), sizeof(Elf32_Addr))) \
-    + 16 + LINUX_SP_WRAP)
-#else
-#define LINUX_ELF_AUX_ARGSIZ \
-    ((howmany(ELF_AUX_ENTRIES * sizeof(LinuxAuxInfo), sizeof(Elf32_Addr))) + 16)
-#endif
+    ((howmany(LINUX_ELF_AUX_ENTRIES * sizeof(Aux32Info), sizeof(Elf32_Addr))) \
+    + 16)
 
-/* XXX should use ELFNAME2 */
-#define LINUX_COPYARGS_FUNCTION linux_elf32_copyargs
+/* we have special powerpc ELF copyargs */
+#define LINUX_MACHDEP_ELF_COPYARGS
 
-typedef struct {
-	Elf32_Sword a_type;
-	Elf32_Word  a_v;
-} LinuxAux32Info;
-#define LinuxAuxInfo LinuxAux32Info
+#define linux_exec_setup_stack	exec_setup_stack
 
-/* NetBSD/powerpc doesn't use e_syscall, so use the default. */
-#define LINUX_SYSCALL_FUNCTION syscall
-
-#ifdef _KERNEL
-__BEGIN_DECLS
-int linux_elf32_copyargs __P((struct exec_package *,
-    struct ps_strings *, char **, void *)); 
-__END_DECLS
-#endif /* _KERNEL */
 #endif /* !_POWERPC_LINUX_EXEC_H */

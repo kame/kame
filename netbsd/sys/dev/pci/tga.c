@@ -1,4 +1,4 @@
-/* $NetBSD: tga.c,v 1.41.6.1 2002/12/01 19:44:35 he Exp $ */
+/* $NetBSD: tga.c,v 1.57 2003/11/13 03:09:29 chs Exp $ */
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tga.c,v 1.41.6.1 2002/12/01 19:44:35 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tga.c,v 1.57 2003/11/13 03:09:29 chs Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -59,20 +59,12 @@ __KERNEL_RCSID(0, "$NetBSD: tga.c,v 1.41.6.1 2002/12/01 19:44:35 he Exp $");
 #include <dev/wsfont/wsfont.h>
 #include <uvm/uvm_extern.h>
 
-#ifdef __alpha__
-#include <machine/pte.h>
-#endif
-#ifdef __mips__
-#include <mips/pte.h>
-#endif
-
 int	tgamatch __P((struct device *, struct cfdata *, void *));
 void	tgaattach __P((struct device *, struct device *, void *));
 int	tgaprint __P((void *, const char *));
 
-struct cfattach tga_ca = {
-	sizeof(struct tga_softc), tgamatch, tgaattach,
-};
+CFATTACH_DECL(tga, sizeof(struct tga_softc),
+    tgamatch, tgaattach, NULL, NULL);
 
 int	tga_identify __P((struct tga_devconfig *));
 const struct tga_conf *tga_getconf __P((int));
@@ -427,7 +419,7 @@ tgaattach(parent, self, aux)
 		    M_WAITOK|M_ZERO);
 		tga_init(pa->pa_memt, pa->pa_pc, pa->pa_tag, sc->sc_dc);
 	}
-	if (sc->sc_dc->dc_vaddr == NULL) {
+	if (sc->sc_dc->dc_vaddr == 0) {
 		printf(": couldn't map memory space; punt!\n");
 		return;
 	}
@@ -703,7 +695,7 @@ tga_alloc_screen(v, type, cookiep, curxp, curyp, attrp)
 	*cookiep = &sc->sc_dc->dc_rinfo; /* one and only for now */
 	*curxp = 0;
 	*curyp = 0;
-	sc->sc_dc->dc_rinfo.ri_ops.alloc_attr(&sc->sc_dc->dc_rinfo, 
+	sc->sc_dc->dc_rinfo.ri_ops.allocattr(&sc->sc_dc->dc_rinfo, 
 		0, 0, 0, &defattr);
 	*attrp = defattr;
 	sc->nscreens++;
@@ -747,7 +739,7 @@ tga_cnattach(iot, memt, pc, bus, device, function)
 	tga_init(memt, pc, pci_make_tag(pc, bus, device, function), dcp);
 
 	/* sanity checks */
-	if (dcp->dc_vaddr == NULL)
+	if (dcp->dc_vaddr == 0)
 		panic("tga_console(%d, %d): couldn't map memory space",
 		    device, function);
 	if (dcp->dc_tgaconf == NULL)
@@ -775,7 +767,7 @@ tga_cnattach(iot, memt, pc, bus, device, function)
 				tga_bt463_rd);
 		}
 	}
-	dcp->dc_rinfo.ri_ops.alloc_attr(&dcp->dc_rinfo, 0, 0, 0, &defattr);
+	dcp->dc_rinfo.ri_ops.allocattr(&dcp->dc_rinfo, 0, 0, 0, &defattr);
 	wsdisplay_cnattach(&tga_stdscreen, &dcp->dc_rinfo, 0, 0, defattr);
 	
 	return(0);
@@ -818,6 +810,7 @@ tga_builtin_set_cursor(dc, cursorp)
 {
 	struct ramdac_funcs *dcrf = dc->dc_ramdac_funcs;
 	struct ramdac_cookie *dcrc = dc->dc_ramdac_cookie;
+	u_char image[512];
 	u_int count, v;
 	int error;
 
@@ -833,8 +826,9 @@ tga_builtin_set_cursor(dc, cursorp)
 			return (EINVAL);
 		/* The cursor is 2 bits deep, and there is no mask */
 		count = (cursorp->size.y * 64 * 2) / NBBY;
-		if (!uvm_useracc(cursorp->image, count, B_READ))
-			return (EFAULT);
+		error = copyin(cursorp->image, image, count);
+		if (error)
+			return error;
 	}
 	if (v & WSDISPLAY_CURSOR_DOHOT)		/* not supported */
 		return EINVAL;
@@ -843,26 +837,28 @@ tga_builtin_set_cursor(dc, cursorp)
 	if (v & WSDISPLAY_CURSOR_DOCUR) {
 		if (cursorp->enable)
 			/* XXX */
-			TGAWREG(dc, TGA_REG_VVVR, TGARREG(dc, TGA_REG_VVVR) | 0x04);
+			TGAWREG(dc, TGA_REG_VVVR,
+				TGARREG(dc, TGA_REG_VVVR) | 0x04);
 		else
 			/* XXX */
-			TGAWREG(dc, TGA_REG_VVVR, TGARREG(dc, TGA_REG_VVVR) & ~0x04);
+			TGAWREG(dc, TGA_REG_VVVR,
+				TGARREG(dc, TGA_REG_VVVR) & ~0x04);
 	}
 	if (v & WSDISPLAY_CURSOR_DOPOS) {
-		TGAWREG(dc, TGA_REG_CXYR, 
-				((cursorp->pos.y & 0xfff) << 12) | (cursorp->pos.x & 0xfff));
+		TGAWREG(dc, TGA_REG_CXYR, ((cursorp->pos.y & 0xfff) << 12) |
+			(cursorp->pos.x & 0xfff));
 	}
 	if (v & WSDISPLAY_CURSOR_DOCMAP) {
-		/* can't fail. */
 		dcrf->ramdac_set_curcmap(dcrc, cursorp);
 	}
 	if (v & WSDISPLAY_CURSOR_DOSHAPE) {
 		count = ((64 * 2) / NBBY) * cursorp->size.y;
 		TGAWREG(dc, TGA_REG_CCBR,
-		    (TGARREG(dc, TGA_REG_CCBR) & ~0xfc00) | (cursorp->size.y << 10));
-		copyin(cursorp->image, (char *)(dc->dc_vaddr +
-		    (TGARREG(dc, TGA_REG_CCBR) & 0x3ff)),
-		    count);				/* can't fail. */
+		    (TGARREG(dc, TGA_REG_CCBR) & ~0xfc00) |
+		     (cursorp->size.y << 10));
+		memcpy((char *)(dc->dc_vaddr +
+				(TGARREG(dc, TGA_REG_CCBR) & 0x3ff)),
+		       image, count);
 	}
 	return (0);
 }
@@ -1114,6 +1110,7 @@ tga_rop_vtov(dst, dx, dy, w, h, rop, src, sx, sy)
 
 	if (xdir == 1) {   /* move to the left */
 
+		if (wb & ~63)
 		for (y = ystart; (ydir * y) <= (ydir * yend); y += yinc) {
 			/* 4*64 byte chunks */
 			for (xleft = wb, x = xstart; xleft >= 4*64;
@@ -1140,13 +1137,14 @@ tga_rop_vtov(dst, dx, dy, w, h, rop, src, sx, sy)
 				TGAWALREG(dc, TGA_REG_GCSR, 0, tga_srcb + y + x + 0 * 64);
 				TGAWALREG(dc, TGA_REG_GCDR, 0, tga_dstb + y + x + 0 * 64);
 			}
-
-			lastx = x; lastleft = xleft;  /* remember for CPU loop */
 		}
+
 		TGAWALREG(dc, TGA_REG_GOPR, 0, 0x0003); /* op -> dst = src */
 		TGAWALREG(dc, TGA_REG_GMOR, 0, 0x0000); /* Simple mode */
 
+		lastleft = wb & 63;
 		if (lastleft) {
+			lastx = xstart + (wb & ~63);
 			for (y = ystart; (ydir * y) <= (ydir * yend); y += yinc) {
 				/* 4 byte granularity */
 				for (x = lastx, xleft = lastleft; xleft >= 4;
@@ -1159,6 +1157,7 @@ tga_rop_vtov(dst, dx, dy, w, h, rop, src, sx, sy)
 	}
 	else {    /* above move to the left, below move to the right */
 
+		if (wb & ~63)
 		for (y = ystart; (ydir * y) <= (ydir * yend); y += yinc) {
 			/* 4*64 byte chunks */
 			for (xleft = wb, x = xstart; xleft >= 4*64;
@@ -1185,13 +1184,14 @@ tga_rop_vtov(dst, dx, dy, w, h, rop, src, sx, sy)
 				TGAWALREG(dc, TGA_REG_GCSR, 0, tga_srcb + y + x - 1 * 64);
 				TGAWALREG(dc, TGA_REG_GCDR, 0, tga_dstb + y + x - 1 * 64);
 			}
-
-			lastx = x; lastleft = xleft;  /* remember for CPU loop */
 		}
+
 		TGAWALREG(dc, TGA_REG_GOPR, 0, 0x0003); /* op -> dst = src */
 		TGAWALREG(dc, TGA_REG_GMOR, 0, 0x0000); /* Simple mode */
 
+		lastleft = wb & 63;
 		if (lastleft) {
+			lastx = xstart - (wb & ~63);
 			for (y = ystart; (ydir * y) <= (ydir * yend); y += yinc) {
 				/* 4 byte granularity */
 				for (x = lastx, xleft = lastleft; xleft >= 4;
@@ -1387,7 +1387,7 @@ tga_ramdac_wr(v, btreg, val)
 	struct tga_devconfig *dc = v;
 
 	if (btreg > BT485_REG_MAX)
-		panic("tga_ramdac_wr: reg %d out of range\n", btreg);
+		panic("tga_ramdac_wr: reg %d out of range", btreg);
 
 	TGAWREG(dc, TGA_REG_EPDR, (btreg << 9) | (0 << 8 ) | val); /* XXX */
 	TGAREGWB(dc, TGA_REG_EPDR, 1);
@@ -1403,7 +1403,7 @@ tga2_ramdac_wr(v, btreg, val)
 	bus_space_handle_t ramdac;
 
 	if (btreg > BT485_REG_MAX)
-		panic("tga_ramdac_wr: reg %d out of range\n", btreg);
+		panic("tga_ramdac_wr: reg %d out of range", btreg);
 
 	bus_space_subregion(dc->dc_memt, dc->dc_memh, TGA2_MEM_RAMDAC + 
 		(0xe << 12) + (btreg << 8), 4, &ramdac);
@@ -1474,7 +1474,7 @@ tga_ramdac_rd(v, btreg)
 	tga_reg_t rdval;
 
 	if (btreg > BT485_REG_MAX)
-		panic("tga_ramdac_rd: reg %d out of range\n", btreg);
+		panic("tga_ramdac_rd: reg %d out of range", btreg);
 
 	TGAWREG(dc, TGA_REG_EPSR, (btreg << 1) | 0x1); /* XXX */
 	TGAREGWB(dc, TGA_REG_EPSR, 1);
@@ -1493,7 +1493,7 @@ tga2_ramdac_rd(v, btreg)
 	u_int8_t retval;
 
 	if (btreg > BT485_REG_MAX)
-		panic("tga_ramdac_rd: reg %d out of range\n", btreg);
+		panic("tga_ramdac_rd: reg %d out of range", btreg);
 
 	bus_space_subregion(dc->dc_memt, dc->dc_memh, TGA2_MEM_RAMDAC + 
 		(0xe << 12) + (btreg << 8), 4, &ramdac);
@@ -1602,7 +1602,7 @@ tga2_ics9110_wr(dc, dotclock)
 	case  14300000:		/* this one is just a ref clock */
 		N = 0x03; M = 0x03; V = 0x1; X = 0x1; R = 0x3; break;
 	default:
-		panic("unrecognized clock rate %d\n", dotclock);
+		panic("unrecognized clock rate %d", dotclock);
 	}
 
 	/* XXX -- hard coded, bad */

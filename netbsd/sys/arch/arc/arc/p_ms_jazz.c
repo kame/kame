@@ -1,4 +1,4 @@
-/*	$NetBSD: p_ms_jazz.c,v 1.1 2001/06/13 15:28:23 soda Exp $	*/
+/*	$NetBSD: p_ms_jazz.c,v 1.5 2003/07/15 00:04:43 lukem Exp $	*/
 /*	$OpenBSD: picabus.c,v 1.11 1999/01/11 05:11:10 millert Exp $	*/
 
 /*
@@ -29,6 +29,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: p_ms_jazz.c,v 1.5 2003/07/15 00:04:43 lukem Exp $");
+
 #include <sys/param.h>
 
 #include <machine/autoconf.h>
@@ -39,12 +42,6 @@
 
 #include "com.h"
 
-#include "asc.h"
-#if NASC > 0
-#include <arc/jazz/ascreg.h>
-#include <arc/jazz/ascvar.h>
-#endif
-
 /* MAGNUM. NEC goes here too. */
 
 #ifndef COM_FREQ_MAGNUM
@@ -54,15 +51,6 @@
 #define COM_FREQ_MAGNUM	8192000	/* 8.192 MHz - NEC RISCstation M402 */
 #endif
 #endif /* COM_FREQ_MAGNUM */
-
-#if NASC > 0
-struct asc_config asc_ms_jazz_conf = {
-	&asc_timing_40mhz,
-
-	/* only if EPL is FE (Feature Enable bit for 53CF94) */
-	ASC_CNFG3_FCLK, /* clock 40MHz */
-};
-#endif
 
 void p_ms_jazz_init __P((void));
 
@@ -88,16 +76,16 @@ struct platform platform_microsoft_jazz = {
 struct pica_dev mips_magnum_r4000_cpu[] = {
 	{{ "timer",	-1, 0, },	(void *)R4030_SYS_IT_VALUE, },
 	{{ "dallas_rtc", -1, 0, },	(void *)PICA_SYS_CLOCK, },
-	{{ "lpt",	0, 0, },	(void *)PICA_SYS_PAR1, },
-	{{ "fdc",	1, 0, },	(void *)PICA_SYS_FLOPPY, },
+	{{ "LPT1",	0, 0, },	(void *)PICA_SYS_PAR1, },
+	{{ "I82077",	1, 0, },	(void *)PICA_SYS_FLOPPY, },
 	{{ "MAGNUM",	2, 0, },	(void *)PICA_SYS_SOUND,},
 	{{ "VXL",	3, 0, },	(void *)PICA_V_LOCAL_VIDEO, },
-	{{ "sonic",	4, 0, },	(void *)PICA_SYS_SONIC, },
-	{{ "asc",	5, 0, },	(void *)PICA_SYS_SCSI, },
-	{{ "pckbd",	6, 0, },	(void *)PICA_SYS_KBD, },
-	{{ "pms",	7, 0, },	(void *)PICA_SYS_KBD, },
-	{{ "com",	8, 0, },	(void *)PICA_SYS_COM1, },
-	{{ "com",	9, 0, },	(void *)PICA_SYS_COM2, },
+	{{ "SONIC",	4, 0, },	(void *)PICA_SYS_SONIC, },
+	{{ "ESP216",	5, 0, },	(void *)PICA_SYS_SCSI, },
+	{{ "I8742",	6, 0, },	(void *)PICA_SYS_KBD, },
+	{{ "pms",	7, 0, },	(void *)PICA_SYS_KBD, }, /* XXX */
+	{{ "COM1",	8, 0, },	(void *)PICA_SYS_COM1, },
+	{{ "COM2",	9, 0, },	(void *)PICA_SYS_COM2, },
 	{{ NULL,	-1, 0, },	(void *)NULL, },
 };
 
@@ -111,10 +99,6 @@ p_ms_jazz_init()
 
 	/* jazzio bus configuration */
 	jazzio_devconfig = mips_magnum_r4000_cpu;
-
-#if NASC > 0
-	asc_conf = &asc_ms_jazz_conf;
-#endif
 
 #if NCOM > 0
 	com_freq = COM_FREQ_MAGNUM;

@@ -1,4 +1,4 @@
-/* $NetBSD: linux_exec_powerpc.c,v 1.6 2001/11/13 02:08:45 lukem Exp $ */
+/* $NetBSD: linux_exec_powerpc.c,v 1.12.4.3 2004/07/26 07:13:11 tron Exp $ */
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
 
 /* 
  * From NetBSD's sys/compat/arch/alpha/linux_exec_alpha.c, with some 
- * powerpc add-ons (ifdef LINUX_SHIFT and LINUX_SP_WRAP).
+ * powerpc add-ons (ifdef LINUX_SHIFT).
  * 
  * This code is to be common to alpha and powerpc. If it works on alpha, it 
  * should be moved to common/linux_exec_elf32.c. Beware that it needs 
@@ -48,7 +48,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: linux_exec_powerpc.c,v 1.6 2001/11/13 02:08:45 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: linux_exec_powerpc.c,v 1.12.4.3 2004/07/26 07:13:11 tron Exp $");
 
 #if defined (__alpha__)
 #define ELFSIZE 64
@@ -65,33 +65,26 @@ __KERNEL_RCSID(0, "$NetBSD: linux_exec_powerpc.c,v 1.6 2001/11/13 02:08:45 lukem
 #include <sys/proc.h>
 #include <sys/exec.h>
 #include <sys/exec_elf.h>
+#include <sys/resourcevar.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <compat/linux/common/linux_exec.h>
 
-#ifdef LINUX_SP_WRAP
-extern int linux_sp_wrap_start;
-extern int linux_sp_wrap_end;
-extern int linux_sp_wrap_entry;
-#endif
 /*
  * Alpha and PowerPC specific linux copyargs function.
  */
 int
-ELFNAME2(linux,copyargs)(pack, arginfo, stackp, argp)
+ELFNAME2(linux,copyargs)(p, pack, arginfo, stackp, argp)
+	struct proc *p;
 	struct exec_package *pack;
 	struct ps_strings *arginfo;
 	char **stackp;
 	void *argp;
 {
 	size_t len;
-	LinuxAuxInfo ai[LINUX_ELF_AUX_ENTRIES], *a;
+	AuxInfo ai[LINUX_ELF_AUX_ENTRIES], *a;
 	struct elf_args *ap;
-	struct proc *p = curproc;
-#ifdef LINUX_SP_WRAP
-	LinuxAuxInfo *prog_entry = NULL;
-	char	linux_sp_wrap_code[LINUX_SP_WRAP];
-	unsigned long*	cga;
-#endif
 	int error;
 
 #ifdef LINUX_SHIFT
@@ -103,7 +96,7 @@ ELFNAME2(linux,copyargs)(pack, arginfo, stackp, argp)
 	*stackp = (char *)(((unsigned long)*stackp - 1) & ~LINUX_SHIFT);
 #endif
 
-	if ((error = copyargs(pack, arginfo, stackp, argp)) != 0)
+	if ((error = copyargs(p, pack, arginfo, stackp, argp)) != 0)
 		return error;
 
 #ifdef LINUX_SHIFT
@@ -116,7 +109,7 @@ ELFNAME2(linux,copyargs)(pack, arginfo, stackp, argp)
 	    & ~LINUX_SHIFT);
 #endif 
 
-	memset(ai, 0, sizeof(LinuxAuxInfo) * LINUX_ELF_AUX_ENTRIES);
+	memset(ai, 0, sizeof(AuxInfo) * LINUX_ELF_AUX_ENTRIES);
 
 	a = ai;
 
@@ -125,21 +118,11 @@ ELFNAME2(linux,copyargs)(pack, arginfo, stackp, argp)
 	 * linked binaries.
 	 */
 	if ((ap = (struct elf_args *)pack->ep_emul_arg)) {
-#ifdef LINUX_SP_WRAP
-		memset(linux_sp_wrap_code, 0, LINUX_SP_WRAP);
-		bcopy(&linux_sp_wrap_start, linux_sp_wrap_code, 
-		    (unsigned long)(&linux_sp_wrap_end) 
-		    - (unsigned long)(&linux_sp_wrap_start));
-		(unsigned long)cga = ((unsigned long)linux_sp_wrap_code) 
-		    + ((unsigned long)(&linux_sp_wrap_entry))
-		    - ((unsigned long)(&linux_sp_wrap_start));	
-		(*cga) = (unsigned long)(ap->arg_entry); 
-#endif
 #if 1
 		/*
 		 * The exec_package doesn't have a proc pointer and it's not
 		 * exactly trivial to add one since the credentials are
-		 * changing. XXX Linux uses curproc's credentials.
+		 * changing. XXX Linux uses curlwp's credentials.
 		 * Why can't we use them too?
 		 */
 		a->a_type = LINUX_AT_EGID;
@@ -161,9 +144,6 @@ ELFNAME2(linux,copyargs)(pack, arginfo, stackp, argp)
 
 		a->a_type = AT_ENTRY;
 		a->a_v = ap->arg_entry;
-#ifdef LINUX_SP_WRAP
-		prog_entry = a;
-#endif
 		a++;
 
 		a->a_type = AT_FLAGS;
@@ -191,7 +171,7 @@ ELFNAME2(linux,copyargs)(pack, arginfo, stackp, argp)
 		a++;
 
 		a->a_type = AT_PAGESZ;
-		a->a_v = NBPG;
+		a->a_v = PAGE_SIZE;
 		a++;
 
 		a->a_type = LINUX_AT_HWCAP;
@@ -206,25 +186,10 @@ ELFNAME2(linux,copyargs)(pack, arginfo, stackp, argp)
 	a->a_v = 0;
 	a++;
 
-	len = (a - ai) * sizeof(LinuxAuxInfo);
-
-#ifdef LINUX_SP_WRAP
-	if (prog_entry != NULL) 
-		prog_entry->a_v = (unsigned long)(*stackp) + len;
-#endif
+	len = (a - ai) * sizeof(AuxInfo);
 
 	if ((error = copyout(ai, *stackp, len)) != 0)
 		return error;
 	*stackp += len; 
-
-#ifdef LINUX_SP_WRAP
-	if (prog_entry != NULL) {
-		if ((error = copyout(linux_sp_wrap_code, *stackp,
-		    LINUX_SP_WRAP)) != 0)
-			return error;
-		*stackp += LINUX_SP_WRAP;
-	}
-#endif
-
 	return 0;
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: hb.c,v 1.5 2001/07/07 06:24:00 tsutsui Exp $	*/
+/*	$NetBSD: hb.c,v 1.12 2003/07/15 02:59:26 lukem Exp $	*/
 
 /*-
  * Copyright (C) 1999 Izumi Tsutsui.  All rights reserved.
@@ -26,6 +26,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hb.c,v 1.12 2003/07/15 02:59:26 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -37,14 +40,13 @@
 #include <news68k/news68k/isr.h>
 #include <news68k/dev/hbvar.h>
 
-static int	hb_match __P((struct device *, struct cfdata *, void *));
-static void	hb_attach __P((struct device *, struct device *, void *));
-static int	hb_search __P((struct device *, struct cfdata *, void *));
-static int	hb_print __P((void *, const char *));
+static int  hb_match(struct device *, struct cfdata *, void *);
+static void hb_attach(struct device *, struct device *, void *);
+static int  hb_search(struct device *, struct cfdata *, void *);
+static int  hb_print(void *, const char *);
 
-struct cfattach hb_ca = {
-	sizeof(struct device), hb_match, hb_attach
-};
+CFATTACH_DECL(hb, sizeof(struct device),
+    hb_match, hb_attach, NULL, NULL);
 
 extern struct cfdriver hb_cd;
 
@@ -87,7 +89,7 @@ hb_search(parent, cf, aux)
 {
 	struct hb_attach_args *ha = aux;
 
-	ha->ha_name = cf->cf_driver->cd_name;
+	ha->ha_name = cf->cf_name;
 	ha->ha_address = cf->cf_addr;
 	ha->ha_ipl = cf->cf_ipl;
 	ha->ha_vect = cf->cf_vect;
@@ -96,7 +98,7 @@ hb_search(parent, cf, aux)
 	ha->ha_bust = ISIIOPA(ha->ha_address) ?
 	    NEWS68K_BUS_SPACE_INTIO : NEWS68K_BUS_SPACE_EIO;
 
-	if ((*cf->cf_attach->ca_match)(parent, cf, ha) > 0)
+	if (config_match(parent, cf, ha) > 0)
 		config_attach(parent, cf, ha, hb_print);
 
 	return 0;
@@ -116,11 +118,11 @@ hb_print(args, name)
 #if 0
 	if (ha->ha_addr > 0)
 #endif
-		printf (" addr 0x%08lx", ha->ha_address);
+		aprint_normal (" addr 0x%08lx", ha->ha_address);
 	if (ha->ha_ipl > 0)
-		printf (" ipl %d", ha->ha_ipl);
+		aprint_normal (" ipl %d", ha->ha_ipl);
 	if (ha->ha_vect > 0) {
-		printf (" vect %d", ha->ha_vect);
+		aprint_normal (" vect %d", ha->ha_vect);
 	}
 
 	return (QUIET);
@@ -132,7 +134,7 @@ hb_print(args, name)
 void
 hb_intr_establish(hbvect, hand, ipl, arg)
 	int hbvect;
-	int (*hand) __P((void *)), ipl;
+	int (*hand)(void *), ipl;
 	void *arg;
 {
 

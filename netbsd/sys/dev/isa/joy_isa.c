@@ -1,11 +1,11 @@
-/*	$NetBSD: joy_isa.c,v 1.1 2002/02/02 18:37:45 jdolecek Exp $	*/
+/*	$NetBSD: joy_isa.c,v 1.5 2003/12/04 12:42:54 keihan Exp $	*/
 
 /*-
  * Copyright (c) 1995 Jean-Marc Zucconi
  * All rights reserved.
  *
  * Ported to NetBSD by Matthieu Herrb <matthieu@laas.fr>.  Additional
- * modification by Jason R. Thorpe <thorpej@NetBSD.ORG>.
+ * modification by Jason R. Thorpe <thorpej@NetBSD.org>.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: joy_isa.c,v 1.1 2002/02/02 18:37:45 jdolecek Exp $");
+__KERNEL_RCSID(0, "$NetBSD: joy_isa.c,v 1.5 2003/12/04 12:42:54 keihan Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,9 +51,8 @@ __KERNEL_RCSID(0, "$NetBSD: joy_isa.c,v 1.1 2002/02/02 18:37:45 jdolecek Exp $")
 int	joy_isa_probe __P((struct device *, struct cfdata *, void *));
 void	joy_isa_attach __P((struct device *, struct device *, void *));
 
-struct cfattach joy_isa_ca = {
-	sizeof(struct joy_softc), joy_isa_probe, joy_isa_attach
-};
+CFATTACH_DECL(joy_isa, sizeof(struct joy_softc),
+    joy_isa_probe, joy_isa_attach, NULL, NULL);
 
 int
 joy_isa_probe(parent, match, aux)

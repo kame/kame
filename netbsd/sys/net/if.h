@@ -1,4 +1,4 @@
-/*	$NetBSD: if.h,v 1.75.6.1 2002/11/01 10:56:03 tron Exp $	*/
+/*	$NetBSD: if.h,v 1.95 2003/12/10 11:46:33 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000, 2001 The NetBSD Foundation, Inc.
@@ -48,11 +48,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -74,8 +70,17 @@
 #ifndef _NET_IF_H_
 #define _NET_IF_H_
 
-#if !defined(_XOPEN_SOURCE)
+#include <sys/featuretest.h>
 
+/*
+ * Length of interface external name, including terminating '\0'.
+ * Note: this is the same size as a generic device's external name.
+ */
+#define IF_NAMESIZE 16
+
+#if defined(_NETBSD_SOURCE)
+
+#include <sys/socket.h>
 #include <sys/queue.h>
 #include <net/dlt.h>
 #include <net/pfil.h>
@@ -127,12 +132,7 @@ struct ether_header;
 struct ifnet;
 struct rt_addrinfo;
 
-/*
- * Length of interface external name, including terminating '\0'.
- * Note: this is the same size as a generic device's external name.
- */
-#define	IFNAMSIZ	16
-#define	IF_NAMESIZE	IFNAMSIZ
+#define	IFNAMSIZ	IF_NAMESIZE
 
 /*
  * Structure describing a `cloning' interface.
@@ -273,7 +273,6 @@ struct ifnet {				/* and the entries */
 	struct ifaltq if_snd;		/* output queue (includes altq) */
 	struct	sockaddr_dl *if_sadl;	/* pointer to our sockaddr_dl */
 	u_int8_t *if_broadcastaddr;	/* linklevel broadcast bytestring */
-	struct ifprefix *if_prefixlist; /* linked list of prefixes per if */
 	void	*if_bridge;		/* bridge glue */
 	int	if_dlt;			/* data link type (<net/dlt.h>) */
 	struct pfil_head if_pfil;	/* filtering point */
@@ -286,6 +285,9 @@ struct ifnet {				/* and the entries */
 	 */
 	int	if_csum_flags_tx;	/* M_CSUM_* flags for Tx */
 	int	if_csum_flags_rx;	/* M_CSUM_* flags for Rx */
+
+	void	*if_afdata[AF_MAX];
+	struct	mowner *if_mowner;	/* who owns mbufs for this interface */
 };
 #define	if_mtu		if_data.ifi_mtu
 #define	if_type		if_data.ifi_type
@@ -331,7 +333,7 @@ struct ifnet {				/* and the entries */
 
 /*
  * Some convenience macros used for setting ifi_baudrate.
- * XXX 1000 vs. 1024? --thorpej@netbsd.org
+ * XXX 1000 vs. 1024? --thorpej@NetBSD.org
  */
 #define	IF_Kbps(x)	((x) * 1000)		/* kilobits/sec. */
 #define	IF_Mbps(x)	(IF_Kbps((x) * 1000))	/* megabits/sec. */
@@ -350,7 +352,7 @@ struct ifnet {				/* and the entries */
  * Output queues (ifp->if_snd) and internetwork datagram level (pup level 1)
  * input routines have queues of messages stored on ifqueue structures
  * (defined above).  Entries are added to and deleted from these structures
- * by these macros, which should be called with ipl raised to splimp().
+ * by these macros, which should be called with ipl raised to splnet().
  */
 #define	IF_QFULL(ifq)		((ifq)->ifq_len >= (ifq)->ifq_maxlen)
 #define	IF_DROP(ifq)		((ifq)->ifq_drops++)
@@ -391,10 +393,12 @@ do {									\
 		else							\
 			m_freem(__m0);					\
 	}								\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 #define	IF_IS_EMPTY(ifq)	((ifq)->ifq_len == 0)
 
+#ifndef IFQ_MAXLEN
 #define	IFQ_MAXLEN	50
+#endif
 #define	IFNET_SLOWHZ	1		/* granularity is 1 second */
 
 /*
@@ -427,20 +431,6 @@ struct ifaddr {
 	int	ifa_metric;		/* cost of going out this interface */
 };
 #define	IFA_ROUTE	RTF_UP /* 0x01 *//* route installed */
-
-/*
- * The prefix structure contains information about one prefix
- * of an interface.  They are maintained by the different address families,
- * are allocated and attached when an prefix or an address is set,
- * and are linked together so all prfefixes for an interface can be located.
- */
-struct ifprefix {
-	struct	sockaddr *ifpr_prefix;	/* prefix of interface */
-	struct	ifnet *ifpr_ifp;	/* back-pointer to interface */
-	struct ifprefix *ifpr_next;
-	u_char	ifpr_plen;		/* prefix length in bits */
-	u_char	ifpr_type;		/* protocol dependent prefix type */
-};
 
 /*
  * Message format for use in obtaining information about interfaces
@@ -597,7 +587,7 @@ struct if_laddrreq {
 
 #include <net/if_arp.h>
 
-#endif /* !_XOPEN_SOURCE */
+#endif /* _NETBSD_SOURCE */
 
 #ifdef _KERNEL
 #ifdef IFAREF_DEBUG
@@ -605,7 +595,7 @@ struct if_laddrreq {
 do {									\
 	printf("IFAREF: %s:%d %p -> %d\n", __FILE__, __LINE__,		\
 	    (ifa), ++(ifa)->ifa_refcnt);				\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define	IFAFREE(ifa)							\
 do {									\
@@ -616,7 +606,7 @@ do {									\
 	    (ifa), --(ifa)->ifa_refcnt);				\
 	if ((ifa)->ifa_refcnt == 0)					\
 		ifafree(ifa);						\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 #else
 #define	IFAREF(ifa)	(ifa)->ifa_refcnt++
 
@@ -628,13 +618,13 @@ do {									\
 		    __LINE__, (ifa));					\
 	if (--(ifa)->ifa_refcnt == 0)					\
 		ifafree(ifa);						\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 #else
 #define	IFAFREE(ifa)							\
 do {									\
 	if (--(ifa)->ifa_refcnt == 0)					\
 		ifafree(ifa);						\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 #endif /* DIAGNOSTIC */
 #endif /* IFAREF_DEBUG */
 
@@ -656,7 +646,7 @@ do {									\
 	}								\
 	if ((err))							\
 		(ifq)->ifq_drops++;					\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define IFQ_DEQUEUE(ifq, m)						\
 do {									\
@@ -666,7 +656,7 @@ do {									\
 		ALTQ_DEQUEUE((ifq), (m));				\
 	else								\
 		IF_DEQUEUE((ifq), (m));					\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define	IFQ_POLL(ifq, m)						\
 do {									\
@@ -676,7 +666,7 @@ do {									\
 		ALTQ_POLL((ifq), (m));					\
 	else								\
 		IF_POLL((ifq), (m));					\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define	IFQ_PURGE(ifq)							\
 do {									\
@@ -684,12 +674,12 @@ do {									\
 		ALTQ_PURGE((ifq));					\
 	else								\
 		IF_PURGE((ifq));					\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define	IFQ_SET_READY(ifq)						\
 do {									\
 	(ifq)->altq_flags |= ALTQF_READY;				\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define	IFQ_CLASSIFY(ifq, m, af, pa)					\
 do {									\
@@ -700,7 +690,7 @@ do {									\
 		(pa)->pattr_af = (af);					\
 		(pa)->pattr_hdr = mtod((m), caddr_t);			\
 	}								\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 #else /* ! ALTQ */
 #define	ALTQ_DECL(x)		/* nothing */
 
@@ -715,7 +705,7 @@ do {									\
 	}								\
 	if ((err))							\
 		(ifq)->ifq_drops++;					\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define	IFQ_DEQUEUE(ifq, m)	IF_DEQUEUE((ifq), (m))
 
@@ -735,18 +725,26 @@ do {									\
 #define	IFQ_INC_DROPS(ifq)		((ifq)->ifq_drops++)
 #define	IFQ_SET_MAXLEN(ifq, len)	((ifq)->ifq_maxlen = (len))
 
+#ifdef _KERNEL
+#include <sys/mallocvar.h>
+MALLOC_DECLARE(M_IFADDR);
+MALLOC_DECLARE(M_IFMADDR);
+#endif
+
 extern struct ifnet_head ifnet;
 extern struct ifnet **ifindex2ifnet;
 #if 0
 struct ifnet loif[];
 #endif
-extern int if_index;
+extern size_t if_indexlim;
 
 char	*ether_sprintf __P((const u_char *));
 
 void	if_alloc_sadl __P((struct ifnet *));
 void	if_free_sadl __P((struct ifnet *));
 void	if_attach __P((struct ifnet *));
+void	if_attachdomain __P((void));
+void	if_attachdomain1 __P((struct ifnet *));
 void	if_deactivate __P((struct ifnet *));
 void	if_detach __P((struct ifnet *));
 void	if_down __P((struct ifnet *));
@@ -807,5 +805,34 @@ char *	if_indextoname __P((unsigned int, char *));
 struct	if_nameindex * if_nameindex __P((void));
 void	if_freenameindex __P((struct if_nameindex *));
 __END_DECLS
+#endif /* _KERNEL */ /* XXX really ALTQ? */
+
+#ifdef _KERNEL
+/*
+ * ifq sysctl support
+ */
+int	sysctl_ifq __P((int *name, u_int namelen, void *oldp,
+		       size_t *oldlenp, void *newp, size_t newlen,
+		       struct ifqueue *ifq));
+/* symbolic names for terminal (per-protocol) CTL_IFQ_ nodes */
+#define IFQCTL_LEN 1
+#define IFQCTL_MAXLEN 2
+#define IFQCTL_PEAK 3
+#define IFQCTL_DROPS 4
+#define IFQCTL_MAXID 5
+
 #endif /* _KERNEL */
+
+#ifdef _NETBSD_SOURCE
+/*
+ * sysctl for ifq (per-protocol packet input queue variant of ifqueue) 
+ */
+#define CTL_IFQ_NAMES  { \
+	{ 0, 0 }, \
+	{ "len", CTLTYPE_INT }, \
+	{ "maxlen", CTLTYPE_INT }, \
+	{ "peak", CTLTYPE_INT }, \
+	{ "drops", CTLTYPE_INT }, \
+}
+#endif /* _NETBSD_SOURCE */
 #endif /* !_NET_IF_H_ */

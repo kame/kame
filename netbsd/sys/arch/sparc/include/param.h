@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.51 2002/02/26 15:13:26 simonb Exp $ */
+/*	$NetBSD: param.h,v 1.62 2003/12/12 14:51:48 martin Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -54,9 +50,7 @@
 #define	MACHINE_ARCH	"sparc"
 #define	MID_MACHINE	MID_SPARC
 
-#ifdef _KERNEL_OPT
-#include "opt_sparc_arch.h"
-#endif
+#include <machine/cpuconf.h>		/* XXX */
 #ifdef _KERNEL				/* XXX */
 #ifndef _LOCORE				/* XXX */
 #include <machine/cpu.h>		/* XXX */
@@ -91,7 +85,16 @@
 extern int nbpg, pgofset, pgshift;
 #endif
 
+#if !(defined(PROM_AT_F0) || defined(MSIIEP))
 #define	KERNBASE	0xf0000000	/* start of kernel virtual space */
+#else
+/*
+ * JS1/OF has prom sitting in f000.0000..f007.ffff, modify kernel VA 
+ * layout to work around that. XXX - kernel should live beyound prom on
+ * those machines.
+ */
+#define	KERNBASE	0xe8000000
+#endif
 #define KERNEND		0xfe000000	/* end of kernel virtual space */
 /* Arbitrarily only use 1/4 of the kernel address space for buffers. */
 #define VM_MAX_KERNEL_BUF	((KERNEND - KERNBASE)/4)
@@ -161,23 +164,11 @@ extern int nbpg, pgofset, pgshift;
  */
 #define	bdbtofsb(bn)	((bn) / (BLKDEV_IOSIZE / DEV_BSIZE))
 
-/*
- * Values for the cputyp variable.
- */
-#define CPU_SUN4	0
-#define CPU_SUN4C	1
-#define CPU_SUN4M	2
-#define CPU_SUN4U	3
-
 #if defined(_KERNEL) || defined(_STANDALONE)
 #ifndef _LOCORE
-
-extern int cputyp;
-
 extern void	delay __P((unsigned int));
 #define	DELAY(n)	delay(n)
 #endif /* _LOCORE */
-
 
 /*
  * microSPARC-IIep is a sun4m but with an integrated PCI controller.
@@ -188,8 +179,8 @@ extern void	delay __P((unsigned int));
  * system.  So insist on SUN4M defined and SUN4 and SUN4C not defined.
  */
 #if defined(MSIIEP)
-#if defined(SUN4) || defined(SUN4C)
-#error "microSPARC-IIep kernels cannot support sun4 or sun4c"
+#if defined(SUN4) || defined(SUN4C) || defined(SUN4D)
+#error "microSPARC-IIep kernels cannot support sun4, sun4c, or sun4d"
 #endif
 #if !defined(SUN4M)
 #error "microSPARC-IIep kernel must have 'options SUN4M'"
@@ -197,91 +188,21 @@ extern void	delay __P((unsigned int));
 #endif /* MSIIEP */
 
 /*
- * Shorthand CPU-type macros. Enumerate all eight cases.
- * Let compiler optimize away code conditional on constants.
- *
- * On a sun4 machine, the page size is 8192, while on a sun4c and sun4m
- * it is 4096. Therefore, in the (SUN4 && (SUN4C || SUN4M)) cases below,
- * NBPG, PGOFSET and PGSHIFT are defined as variables which are initialized
- * early in locore.s after the machine type has been detected.
- *
- * Note that whenever the macros defined below evaluate to expressions
- * involving variables, the kernel will perform slighly worse due to the
- * extra memory references they'll generate.
+ * Sun4 machines have a page size of 8192.  All other machines have a page
+ * size of 4096.  Short cut page size variables if we can.
  */
-#define CPU_ISSUN4U	(0)
-#define CPU_ISSUN4MOR4U	(CPU_ISSUN4M)
-#if   defined(SUN4M) && defined(SUN4C) && defined(SUN4)
-#	define CPU_ISSUN4M	(cputyp == CPU_SUN4M)
-#	define CPU_ISSUN4C	(cputyp == CPU_SUN4C)
-#	define CPU_ISSUN4	(cputyp == CPU_SUN4)
-#	define CPU_ISSUN4OR4C	(cputyp == CPU_SUN4 || cputyp == CPU_SUN4C)
-#	define CPU_ISSUN4COR4M	(cputyp == CPU_SUN4C || cputyp == CPU_SUN4M)
-#	define NBPG		nbpg
-#	define PGOFSET		pgofset
-#	define PGSHIFT		pgshift
-#elif defined(SUN4M) && defined(SUN4C) && !defined(SUN4)
-#	define CPU_ISSUN4M	(cputyp == CPU_SUN4M)
-#	define CPU_ISSUN4C	(cputyp == CPU_SUN4C)
-#	define CPU_ISSUN4	(0)
-#	define CPU_ISSUN4OR4C	(cputyp == CPU_SUN4C)
-#	define CPU_ISSUN4COR4M	(cputyp == CPU_SUN4C || cputyp == CPU_SUN4M)
+#if CPU_NTYPES != 0 && !defined(SUN4)
 #	define NBPG		4096
 #	define PGOFSET		(NBPG-1)
 #	define PGSHIFT		SUN4CM_PGSHIFT
-#elif defined(SUN4M) && !defined(SUN4C) && defined(SUN4)
-#	define CPU_ISSUN4M	(cputyp == CPU_SUN4M)
-#	define CPU_ISSUN4C	(0)
-#	define CPU_ISSUN4	(cputyp == CPU_SUN4)
-#	define CPU_ISSUN4OR4C	(cputyp == CPU_SUN4)
-#	define CPU_ISSUN4COR4M	(cputyp == CPU_SUN4M)
-#	define NBPG		nbpg
-#	define PGOFSET		pgofset
-#	define PGSHIFT		pgshift
-#elif defined(SUN4M) && !defined(SUN4C) && !defined(SUN4)
-#	define CPU_ISSUN4M	(1)
-#	define CPU_ISSUN4C	(0)
-#	define CPU_ISSUN4	(0)
-#	define CPU_ISSUN4OR4C	(0)
-#	define CPU_ISSUN4COR4M	(1)
-#	define NBPG		4096
-#	define PGOFSET		(NBPG-1)
-#	define PGSHIFT		SUN4CM_PGSHIFT
-#elif !defined(SUN4M) && defined(SUN4C) && defined(SUN4)
-#	define CPU_ISSUN4M	(0)
-#	define CPU_ISSUN4C	(cputyp == CPU_SUN4C)
-#	define CPU_ISSUN4	(cputyp == CPU_SUN4)
-#	define CPU_ISSUN4OR4C	(1)
-#	define CPU_ISSUN4COR4M	(cputyp == CPU_SUN4C)
-#	define NBPG		nbpg
-#	define PGOFSET		pgofset
-#	define PGSHIFT		pgshift
-#elif !defined(SUN4M) && defined(SUN4C) && !defined(SUN4)
-#	define CPU_ISSUN4M	(0)
-#	define CPU_ISSUN4C	(1)
-#	define CPU_ISSUN4	(0)
-#	define CPU_ISSUN4OR4C	(1)
-#	define CPU_ISSUN4COR4M	(1)
-#	define NBPG		4096
-#	define PGOFSET		(NBPG-1)
-#	define PGSHIFT		SUN4CM_PGSHIFT
-#elif !defined(SUN4M) && !defined(SUN4C) && defined(SUN4)
-#	define CPU_ISSUN4M	(0)
-#	define CPU_ISSUN4C	(0)
-#	define CPU_ISSUN4	(1)
-#	define CPU_ISSUN4OR4C	(1)
-#	define CPU_ISSUN4COR4M	(0)
+#elif CPU_NTYPES == 1 && defined(SUN4)
 #	define NBPG		8192
 #	define PGOFSET		(NBPG-1)
 #	define PGSHIFT		SUN4_PGSHIFT
-#elif !defined(SUN4M) && !defined(SUN4C) && !defined(SUN4)
-#	define CPU_ISSUN4M	(cputyp == CPU_SUN4M)
-#	define CPU_ISSUN4C	(cputyp == CPU_SUN4C)
-#	define CPU_ISSUN4	(cputyp == CPU_SUN4)
-#	define CPU_ISSUN4OR4C	(cputyp == CPU_SUN4 || cputyp == CPU_SUN4C)
-#	define CPU_ISSUN4COR4M	(cputyp == CPU_SUN4C || cputyp == CPU_SUN4M)
+#else
 #	define NBPG		nbpg
 #	define PGOFSET		pgofset
 #	define PGSHIFT		pgshift
 #endif
+
 #endif /* _KERNEL || _STANDALONE */

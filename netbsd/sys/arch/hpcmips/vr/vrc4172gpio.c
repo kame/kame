@@ -1,4 +1,4 @@
-/*	$NetBSD: vrc4172gpio.c,v 1.3 2002/01/27 14:18:12 takemura Exp $	*/
+/*	$NetBSD: vrc4172gpio.c,v 1.9 2003/10/25 17:59:16 mycroft Exp $	*/
 /*-
  * Copyright (c) 2001 TAKEMRUA Shin. All rights reserved.
  *
@@ -27,6 +27,9 @@
  * SUCH DAMAGE.
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vrc4172gpio.c,v 1.9 2003/10/25 17:59:16 mycroft Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -58,7 +61,7 @@ int	vrc4172gpio_debug = VRC2GPIODEBUG_CONF;
 #define DBG(flag)		(vrc4172gpio_debug & (flag))
 #define	DPRINTF(flag, arg...)	do { \
 					if (DBG(flag)) \
-						printf(##arg); \
+						printf(arg); \
 				} while (0)
 #else
 #define DBG(flag)		(0)
@@ -135,9 +138,8 @@ static int intlv_regs[] = {
 	VRC2_EXGPINTLV1L
 };
 
-struct cfattach vrc4172gpio_ca = {
-	sizeof(struct vrc4172gpio_softc), vrc4172gpio_match, vrc4172gpio_attach
-};
+CFATTACH_DECL(vrc4172gpio, sizeof(struct vrc4172gpio_softc),
+    vrc4172gpio_match, vrc4172gpio_attach, NULL, NULL);
 
 /*
  * regster access method
@@ -206,7 +208,7 @@ vrc4172gpio_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_args = *args; /* structure copy */
 	bus_space_map(sc->sc_iot, loc[HPCIOIFCF_ADDR], loc[HPCIOIFCF_SIZE],
 		      0 /* no cache */, &sc->sc_ioh);
-	if (sc->sc_ioh == NULL) {
+	if (sc->sc_ioh == 0) {
 		printf("%s: can't map bus space\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -487,9 +489,9 @@ vrc4172gpio_intr_establish(
 	s = splhigh();
 
 	if (!CHECK_PORT(port))
-		panic (__FUNCTION__": bogus interrupt line");
+		panic ("%s: bogus interrupt line", __FUNCTION__);
 	if (sc->sc_intr_mode[port] && mode != sc->sc_intr_mode[port])
-		panic (__FUNCTION__": bogus interrupt type");
+		panic ("%s: bogus interrupt type", __FUNCTION__);
 	else
 		sc->sc_intr_mode[port] = mode;
 
@@ -499,7 +501,7 @@ vrc4172gpio_intr_establish(
 
 	ih = malloc(sizeof(struct vrc4172gpio_intr_entry), M_DEVBUF, M_NOWAIT);
 	if (ih == NULL)
-		panic(__FUNCTION__": no memory");
+		panic("%s: no memory", __FUNCTION__);
 
 	ih->ih_port = port;
 	ih->ih_fun = ih_fun;
@@ -602,7 +604,7 @@ vrc4172gpio_intr_disestablish(hpcio_chip_t hc, void *arg)
 			return;
 		}
 	}
-	panic(__FUNCTION__": no such a handle.");
+	panic("%s: no such a handle.", __FUNCTION__);
 	/* NOTREACHED */
 }
 

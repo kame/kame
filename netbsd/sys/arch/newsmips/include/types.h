@@ -1,7 +1,9 @@
-/*	$NetBSD: types.h,v 1.4 2002/03/05 16:13:57 simonb Exp $	*/
+/*	$NetBSD: types.h,v 1.7 2003/05/25 14:40:30 tsutsui Exp $	*/
 
 #include <mips/types.h>
 
-#define	__BROKEN_CONFIG_UNIT_USAGE
+#define	__HAVE_GENERIC_SOFT_INTERRUPTS
 
+/* MIPS specific options */
+#define	__HAVE_BOOTINFO_H
 #define	__HAVE_MIPS_MACHDEP_CACHE_CONFIG

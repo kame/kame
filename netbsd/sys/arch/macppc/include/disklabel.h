@@ -1,4 +1,4 @@
-/*	$NetBSD: disklabel.h,v 1.8 2002/03/23 01:29:35 wrstuden Exp $	*/
+/*	$NetBSD: disklabel.h,v 1.11 2003/05/10 16:12:04 thorpej Exp $	*/
 
 /*-
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -98,11 +98,15 @@
 
 #define	LABELSECTOR	0		/* sector containing label */
 #define	LABELOFFSET	64		/* offset of label in sector */
+#define	MBR_LABELSECTOR	1		/* sector containing label - in MBR */
+#define	MBR_LABELOFFSET	0		/* offset of label in sector - in MBR */
 #define	MAXPARTITIONS	16		/* number of partitions */
 #define	RAW_PART	2		/* raw partition: XX?c */
 
 struct cpu_disklabel {
-	int cd_start;		/* Offset to NetBSD partition in blocks */
+	daddr_t cd_start;	/* Offset to NetBSD partition in blocks */
+	daddr_t cd_labelsector;	/* label sector offset from cd_start */
+	int cd_labeloffset;	/* label byte offset within label sector */
 };
 
 /*
@@ -178,14 +182,18 @@ struct part_map_entry {
 #define PART_TYPE_FWB_COMPONENT	"FWB DRIVER COMPONENTS"
 #define PART_TYPE_FREE		"APPLE_FREE"
 #define PART_TYPE_MAC		"APPLE_HFS"
+#define PART_TYPE_APPLEUFS	"APPLE_UFS"
 #define PART_TYPE_NETBSD	"NETBSD"
 #define PART_TYPE_NBSD_PPCBOOT	"NETBSD/MACPPC"
 #define PART_TYPE_NBSD_68KBOOT	"NETBSD/MAC68K"
 #define PART_TYPE_PATCHES	"APPLE_PATCHES"
 #define PART_TYPE_PARTMAP	"APPLE_PARTITION_MAP"
-#define PART_TYPE_PATCHES	"APPLE_PATCHES"
 #define PART_TYPE_SCRATCH	"APPLE_SCRATCH"
+#define PART_TYPE_BOOT		"APPLE_BOOT"
+#define PART_TYPE_LOADER	"APPLE_LOADER"
 #define PART_TYPE_UNIX		"APPLE_UNIX_SVR2"
+#define PART_TYPE_LINUX	"LINUX"
+#define PART_TYPE_LINUX_SWAP	"LINUX_SWAP"
 
 /*
  * "pmBootArgs" for APPLE_UNIX_SVR2 partition.
@@ -214,10 +222,5 @@ struct blockzeroblock {
 #define BZB_ROOTFS	0x8000
 #define BZB_USRFS	0x4000
 #define BZB_USRFS_NEW	0x0004
-
-#ifdef	_KERNEL
-struct disklabel;
-int bounds_check_with_label __P((struct buf *bp, struct disklabel *lp, int wlabel));
-#endif	/* _KERNEL */
 
 #endif	/* _MACHINE_DISKLABEL_H_ */

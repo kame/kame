@@ -1,4 +1,4 @@
-/*	$NetBSD: freebsd_misc.c,v 1.14 2001/11/13 02:08:09 lukem Exp $	*/
+/*	$NetBSD: freebsd_misc.c,v 1.20 2003/09/18 14:44:09 pooka Exp $	*/
 
 /*
  * Copyright (c) 1995 Frank van der Linden
@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: freebsd_misc.c,v 1.14 2001/11/13 02:08:09 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: freebsd_misc.c,v 1.20 2003/09/18 14:44:09 pooka Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_ntp.h"
@@ -50,10 +50,12 @@ __KERNEL_RCSID(0, "$NetBSD: freebsd_misc.c,v 1.14 2001/11/13 02:08:09 lukem Exp 
 #include <sys/signal.h>
 #include <sys/signalvar.h>
 #include <sys/malloc.h>
+#include <sys/mman.h>
 #ifdef KTRACE
 #include <sys/ktrace.h>
 #endif
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/freebsd/freebsd_syscallargs.h>
@@ -61,10 +63,11 @@ __KERNEL_RCSID(0, "$NetBSD: freebsd_misc.c,v 1.14 2001/11/13 02:08:09 lukem Exp 
 #include <compat/freebsd/freebsd_rtprio.h>
 #include <compat/freebsd/freebsd_timex.h>
 #include <compat/freebsd/freebsd_signal.h>
+#include <compat/freebsd/freebsd_mman.h>
 
 int
-freebsd_sys_msync(p, v, retval)
-	struct proc *p;
+freebsd_sys_msync(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -83,14 +86,67 @@ freebsd_sys_msync(p, v, retval)
 	SCARG(&bma, addr) = SCARG(uap, addr);
 	SCARG(&bma, len) = SCARG(uap, len);
 	SCARG(&bma, flags) = SCARG(uap, flags);
-	return sys___msync13(p, &bma, retval);
+	return sys___msync13(l, &bma, retval);
+}
+
+int
+freebsd_sys_mmap(l, v, retval)
+	struct lwp *l;
+	void *v;
+	register_t *retval;
+{
+	struct freebsd_sys_mmap_args /* {
+		syscallarg(caddr_t) addr;
+		syscallarg(size_t) len;
+		syscallarg(int) prot;
+		syscallarg(int) flags;
+		syscallarg(int) fd;
+		syscallarg(long) pad;
+		syscallarg(off_t) pos;
+	} */ *uap = v;
+	struct sys_mmap_args bma;
+	int flags, prot, fd;
+	off_t pos;
+
+	prot = SCARG(uap, prot);
+	flags = SCARG(uap, flags);
+	fd = SCARG(uap, fd);
+	pos = SCARG(uap, pos);
+
+	/*
+	 * If using MAP_STACK on FreeBSD:
+	 *
+	 * + fd has to be -1
+	 * + prot must have read and write
+	 * + MAP_STACK implies MAP_ANON
+	 * + MAP_STACK implies offset of 0
+	 */
+	if (flags & FREEBSD_MAP_STACK) {
+		if ((fd != -1)
+		    ||((prot & (PROT_READ|PROT_WRITE))!=(PROT_READ|PROT_WRITE)))
+			return (EINVAL);
+
+		flags |= (MAP_ANON | MAP_FIXED);
+		flags &= ~FREEBSD_MAP_STACK;
+
+		pos = 0;
+	}
+
+	SCARG(&bma, addr) = SCARG(uap, addr);
+	SCARG(&bma, len) = SCARG(uap, len);
+	SCARG(&bma, prot) = prot;
+	SCARG(&bma, flags) = flags;
+	SCARG(&bma, fd) = fd;
+	SCARG(&bma, pos) = pos;
+
+	return sys_mmap(l, &bma, retval);
 }
 
 /* just a place holder */
 
 int
-freebsd_sys_rtprio(p, v, retval)
-	struct proc *p;
+freebsd_sys_rtprio(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -107,8 +163,8 @@ freebsd_sys_rtprio(p, v, retval)
 
 #ifdef NTP
 int
-freebsd_ntp_adjtime(p, v, retval)
-	struct proc *p;
+freebsd_ntp_adjtime(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -123,8 +179,8 @@ freebsd_ntp_adjtime(p, v, retval)
 #endif
 
 int
-freebsd_sys_sigaction4(p, v, retval)
-	struct proc *p;
+freebsd_sys_sigaction4(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -133,6 +189,7 @@ freebsd_sys_sigaction4(p, v, retval)
 		syscallarg(const struct freebsd_sigaction4 *) nsa;
 		syscallarg(struct freebsd_sigaction4 *) osa;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct freebsd_sigaction4 nesa, oesa;
 	struct sigaction nbsa, obsa;
 	int error;
@@ -141,18 +198,19 @@ freebsd_sys_sigaction4(p, v, retval)
 		error = copyin(SCARG(uap, nsa), &nesa, sizeof(nesa));
 		if (error)
 			return (error);
-		nbsa.sa_handler = nesa.sa_handler;
-		nbsa.sa_mask    = nesa.sa_mask;
-		nbsa.sa_flags   = nesa.sa_flags;
+		nbsa.sa_handler = nesa.freebsd_sa_handler;
+		nbsa.sa_mask    = nesa.freebsd_sa_mask;
+		nbsa.sa_flags   = nesa.freebsd_sa_flags;
 	}
 	error = sigaction1(p, SCARG(uap, signum),
-	    SCARG(uap, nsa) ? &nbsa : 0, SCARG(uap, osa) ? &obsa : 0);
+	    SCARG(uap, nsa) ? &nbsa : 0, SCARG(uap, osa) ? &obsa : 0,
+	    NULL, 0);
 	if (error)
 		return (error);
 	if (SCARG(uap, osa)) {
-		oesa.sa_handler = obsa.sa_handler;
-		oesa.sa_mask    = obsa.sa_mask;
-		oesa.sa_flags   = obsa.sa_flags;
+		oesa.freebsd_sa_handler = obsa.sa_handler;
+		oesa.freebsd_sa_mask    = obsa.sa_mask;
+		oesa.freebsd_sa_flags   = obsa.sa_flags;
 		error = copyout(&oesa, SCARG(uap, osa), sizeof(oesa));
 		if (error)
 			return (error);
@@ -161,8 +219,8 @@ freebsd_sys_sigaction4(p, v, retval)
 }
 
 int
-freebsd_sys_utrace(p, v, retval)
-	struct proc *p;
+freebsd_sys_utrace(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -171,6 +229,7 @@ freebsd_sys_utrace(p, v, retval)
 		syscallarg(void *) addr;
 		syscallarg(size_t) len;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 
 	if (KTRPOINT(p, KTR_USER))
 		ktruser(p, "FreeBSD utrace", SCARG(uap, addr), SCARG(uap, len),

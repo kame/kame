@@ -1,11 +1,10 @@
-#	$NetBSD: Makefile,v 1.11 2001/11/26 20:41:42 thorpej Exp $
+#	$NetBSD: Makefile,v 1.19 2004/03/13 19:45:11 bjh21 Exp $
 
-KDIR=	/sys/arch/acorn32/include
 INCSDIR= /usr/include/acorn32
 
 INCS=	ansi.h aout_machdep.h asm.h \
 	bswap.h bus.h \
-	cdefs.h conf.h cpu.h \
+	cdefs.h cpu.h \
 	db_machdep.h disklabel.h \
 	elf_machdep.h endian.h endian_machdep.h \
 	float.h fp.h frame.h \
@@ -13,13 +12,13 @@ INCS=	ansi.h aout_machdep.h asm.h \
 	int_const.h int_fmtio.h int_limits.h int_mwgwtypes.h int_types.h \
 	intr.h ipkdb.h \
 	limits.h lock.h \
-	math.h \
-	param.h pcb.h pmap.h proc.h profile.h ptrace.h \
+	math.h mcontext.h \
+	param.h pcb.h pmap.h pmc.h proc.h profile.h ptrace.h \
 	reg.h \
 	setjmp.h signal.h stdarg.h sysarch.h \
 	trap.h types.h \
 	varargs.h vmparam.h
 
-INCS+=	beep.h joystick.h kbd.h mouse.h vconsole.h
+INCS+=	joystick.h kbd.h vconsole.h
 
 .include <bsd.kinc.mk>

@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.2 2002/04/08 14:08:27 simonb Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.4 2003/07/15 01:37:33 lukem Exp $	*/
 
 /*
  * Copyright 2002 Wasabi Systems, Inc.
@@ -34,6 +34,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.4 2003/07/15 01:37:33 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -87,7 +90,7 @@ findroot(void)
 		for (dv = alldevs.tqh_first; dv != NULL;
 		     dv = dv->dv_list.tqe_next)
 			if (dv->dv_class == DV_DISK &&
-			    !strcmp(dv->dv_cfdata->cf_driver->cd_name, "wd"))
+			    !strcmp(dv->dv_cfdata->cf_name, "wd"))
 				    booted_device = dv;
 
 	/*

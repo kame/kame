@@ -1,4 +1,4 @@
-/*	$NetBSD: zs_kgdb.c,v 1.8 2001/09/26 20:53:06 eeh Exp $	*/
+/*	$NetBSD: zs_kgdb.c,v 1.14 2004/03/17 17:04:59 pk Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -46,6 +46,9 @@
  *   (gdb) set remotebaud 19200
  *   (gdb) target remote /dev/ttyb
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zs_kgdb.c,v 1.14 2004/03/17 17:04:59 pk Exp $");
 
 #include "opt_kgdb.h"
 
@@ -147,9 +150,10 @@ zs_kgdb_init()
 	struct zsdevice *zsd;
 	volatile struct zschan *zc;
 	int channel, promzs_unit;
+	extern const struct cdevsw zstty_cdevsw;
 
 	/* printf("zs_kgdb_init: kgdb_dev=0x%x\n", kgdb_dev); */
-	if (major(kgdb_dev) != zs_major)
+	if (cdevsw_lookup(kgdb_dev) != &zstty_cdevsw)
 		return;
 
 	/* Note: (ttya,ttyb) on zs0, and (ttyc,ttyd) on zs2 */
@@ -344,7 +348,7 @@ findzs(zs)
 		 * Have the obio module figure out which virtual
 		 * address the device is mapped to.
 		 */
-		if (obio_find_rom_map(paddr, PMAP_OBIO, NBPG, &bh) != 0)
+		if (obio_find_rom_map(paddr, PMAP_OBIO, PAGE_SIZE, &bh) != 0)
 			return (NULL);
 
 		return ((void *)bh);
@@ -352,7 +356,7 @@ findzs(zs)
 #endif
 
 #if defined(SUN4C) || defined(SUN4M)
-	if (CPU_ISSUN4COR4M) {
+	if (CPU_ISSUN4C || CPU_ISSUN4M) {
 		int node;
 
 		node = firstchild(findroot());
@@ -368,7 +372,7 @@ findzs(zs)
 		while ((node = findnode(node, "zs")) != 0) {
 			int nvaddrs, *vaddrs, vstore[10];
 
-			if (PROM_getpropint(node, "slave", -1) != zs) {
+			if (prom_getpropint(node, "slave", -1) != zs) {
 				node = nextsibling(node);
 				continue;
 			}
@@ -379,8 +383,8 @@ findzs(zs)
 			 */
 			vaddrs = vstore;
 			nvaddrs = sizeof(vstore)/sizeof(vstore[0]);
-			if (PROM_getprop(node, "address", sizeof(int),
-				    &nvaddrs, (void **)&vaddrs) != 0)
+			if (prom_getprop(node, "address", sizeof(int),
+				    &nvaddrs, &vaddrs) != 0)
 				return (NULL);
 
 			return ((void *)vaddrs[0]);

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ae_nubus.c,v 1.31 2001/02/12 18:49:03 thorpej Exp $	*/
+/*	$NetBSD: if_ae_nubus.c,v 1.34 2003/07/15 02:43:23 lukem Exp $	*/
 
 /*
  * Copyright (C) 1997 Scott Reynolds
@@ -39,6 +39,9 @@
  *	Kinetics EtherPort SE/30
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ae_nubus.c,v 1.34 2003/07/15 02:43:23 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/errno.h>
@@ -73,9 +76,8 @@ static void	ae_nb_watchdog __P((struct ifnet *));
 
 void		ae_nubus_intr __P((void *));
 
-struct cfattach ae_nubus_ca = {
-	sizeof(struct dp8390_softc), ae_nubus_match, ae_nubus_attach
-};
+CFATTACH_DECL(ae_nubus, sizeof(struct dp8390_softc),
+    ae_nubus_match, ae_nubus_attach, NULL, NULL);
 
 static int
 ae_nubus_match(parent, cf, aux)

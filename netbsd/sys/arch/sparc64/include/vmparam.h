@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.19.12.1 2002/11/30 13:19:23 he Exp $ */
+/*	$NetBSD: vmparam.h,v 1.26 2003/10/21 12:08:11 kleink Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -52,10 +48,16 @@
 #define VMPARAM_H
 
 /*
- * USRTEXT is the start of the user text/data space, while USRSTACK
- * is the top (end) of the user stack.
+ * We use 8K VM pages on the Sun4U.  Override the PAGE_* definitions
+ * to be compile-time constants.
  */
-#define	USRTEXT		0x2000			/* Start of user text */
+#define	PAGE_SHIFT	13
+#define	PAGE_SIZE	(1 << PAGE_SHIFT)
+#define	PAGE_MASK	(PAGE_SIZE - 1)
+
+/*
+ * USRSTACK is the top (end) of the user stack.
+ */
 #define USRSTACK32	0xffffe000L
 #ifdef __arch64__
 #define USRSTACK	0xffffffffffffe000L
@@ -147,19 +149,32 @@
 #define	VM_NFREELIST		1
 #define	VM_FREELIST_DEFAULT	0
 
-#define	__HAVE_PMAP_PHYSSEG
+#ifdef _KERNEL
+
+#define	__HAVE_VM_PAGE_MD
 
 /*
- * pmap specific data stored in the vm_physmem[] array
+ * For each struct vm_page, there is a list of all currently valid virtual
+ * mappings of that page.  An entry is a pv_entry_t.
  */
+struct pmap;
+typedef struct pv_entry {
+	struct pv_entry	*pv_next;	/* next pv_entry */
+	struct pmap	*pv_pmap;	/* pmap where mapping lies */
+	vaddr_t		pv_va;		/* virtual address for mapping */
+} *pv_entry_t;
+/* PV flags encoded in the low bits of the VA of the first pv_entry */
 
-struct pmap_physseg {
-	struct pv_entry *pvent;
+struct vm_page_md {
+	struct pv_entry mdpg_pvh;
 };
+#define	VM_MDPAGE_INIT(pg)						\
+do {									\
+	(pg)->mdpage.mdpg_pvh.pv_next = NULL;				\
+	(pg)->mdpage.mdpg_pvh.pv_pmap = NULL;				\
+	(pg)->mdpage.mdpg_pvh.pv_va = 0;				\
+} while (/*CONSTCOND*/0)
 
-#if defined (_KERNEL) && !defined(_LOCORE)
-struct vm_map;
-vaddr_t		dvma_mapin __P((struct vm_map *, vaddr_t, int, int));
-void		dvma_mapout __P((vaddr_t, vaddr_t, int));
-#endif
+#endif	/* _KERNEL */
+
 #endif

@@ -1,4 +1,4 @@
-/*	$NetBSD: pcmcia_cis.c,v 1.29.10.1 2003/10/21 03:43:18 jmc Exp $	*/
+/*	$NetBSD: pcmcia_cis.c,v 1.32 2003/10/22 09:13:17 mjl Exp $	*/
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pcmcia_cis.c,v 1.29.10.1 2003/10/21 03:43:18 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pcmcia_cis.c,v 1.32 2003/10/22 09:13:17 mjl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -1081,8 +1081,9 @@ pcmcia_parse_cis_tuple(tuple, arg)
 								idx++;
 								/*
 								 * until
-								 * non-extensi
-								 * on byte
+								 * non-
+								 * extension
+								 * byte
 								 */
 							} while (reg2 & 0x80);
 						}

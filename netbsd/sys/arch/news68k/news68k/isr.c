@@ -1,4 +1,4 @@
-/*	$NetBSD: isr.c,v 1.7 2001/07/07 06:24:00 tsutsui Exp $	*/
+/*	$NetBSD: isr.c,v 1.10 2003/07/15 02:59:27 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -45,6 +45,9 @@
  * Link and dispatch interrupts.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: isr.c,v 1.10 2003/07/15 02:59:27 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -60,8 +63,8 @@
 isr_autovec_list_t isr_autovec[NISRAUTOVEC];
 struct	isr_vectored isr_vectored[NISRVECTORED];
 
-void set_vector_entry __P((int, void *));
-void * get_vector_entry __P((int));
+void set_vector_entry(int, void *);
+void *get_vector_entry(int);
 
 void
 isrinit()
@@ -80,7 +83,7 @@ isrinit()
  */
 void
 isrlink_autovec(func, arg, ipl, priority)
-	int (*func) __P((void *));
+	int (*func)(void *);
 	void *arg;
 	int ipl;
 	int priority;
@@ -155,7 +158,7 @@ isrlink_autovec(func, arg, ipl, priority)
  */
 void
 isrlink_vectored(func, arg, ipl, vec)
-	int (*func) __P((void *));
+	int (*func)(void *);
 	void *arg;
 	int ipl, vec;
 {
@@ -214,7 +217,7 @@ isrdispatch_autovec(evec)
 
 	vec = (evec & 0xfff) >> 2;
 	if ((vec < ISRAUTOVEC) || (vec >= (ISRAUTOVEC + NISRAUTOVEC)))
-		panic("isrdispatch_autovec: bad vec 0x%x\n", vec);
+		panic("isrdispatch_autovec: bad vec 0x%x", vec);
 	ipl = vec - ISRAUTOVEC;
 
 	intrcnt[ipl]++;
@@ -259,7 +262,7 @@ isrdispatch_vectored(pc, evec, frame)
 	uvmexp.intrs++;
 
 	if ((vec < ISRVECTORED) || (vec >= (ISRVECTORED + NISRVECTORED)))
-		panic("isrdispatch_vectored: bad vec 0x%x\n", vec);
+		panic("isrdispatch_vectored: bad vec 0x%x", vec);
 	isr = &isr_vectored[vec - ISRVECTORED];
 
 	if (isr->isr_func == NULL) {
@@ -292,7 +295,7 @@ set_vector_entry(entry, handler)
 	void *handler;
 {
 	if ((entry < 0) || (entry >= NVECTORS))
-		panic("set_vector_entry: setting vector too high or low\n");
+		panic("set_vector_entry: setting vector too high or low");
 	vectab[entry] = handler;
 }
 
@@ -301,7 +304,7 @@ get_vector_entry(entry)
 	int entry;
 {
 	if ((entry < 0) || (entry >= NVECTORS))
-		panic("get_vector_entry: setting vector too high or low\n");
+		panic("get_vector_entry: setting vector too high or low");
 	return ((void *) vectab[entry]);
 }
 

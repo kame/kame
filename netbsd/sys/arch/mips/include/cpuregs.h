@@ -1,4 +1,4 @@
-/*	$NetBSD: cpuregs.h,v 1.50 2002/03/13 13:18:58 simonb Exp $	*/
+/*	$NetBSD: cpuregs.h,v 1.65 2003/10/29 23:41:10 simonb Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -61,6 +57,11 @@
 #define	_MIPS_CPUREGS_H_
 
 #include <sys/cdefs.h>		/* For __CONCAT() */
+
+#if defined(_KERNEL_OPT)
+#include "opt_cputype.h"
+#endif
+
 /*
  * Address space.
  * 32-bit mips CPUS partition their 32-bit address space into four segments:
@@ -88,6 +89,8 @@
 #define	MIPS_PHYS_TO_KSEG0(x)	((unsigned)(x) | MIPS_KSEG0_START)
 #define	MIPS_KSEG1_TO_PHYS(x)	((unsigned)(x) & MIPS_PHYS_MASK)
 #define	MIPS_PHYS_TO_KSEG1(x)	((unsigned)(x) | MIPS_KSEG1_START)
+#define	MIPS_KSEG2_TO_PHYS(x)	((unsigned)(x) & MIPS_PHYS_MASK)
+#define	MIPS_PHYS_TO_KSEG2(x)	((unsigned)(x) | MIPS_KSEG2_START)
 
 /* Map virtual address to index in mips3 r4k virtually-indexed cache */
 #define	MIPS3_VA_TO_CINDEX(x) \
@@ -98,7 +101,8 @@
 #define	MIPS_XKPHYS_TO_PHYS(x)	((x) & 0x0effffffffffffffULL)
 
 /* CPU dependent mtc0 hazard hook */
-#define	COP0_SYNC	/* nothing */
+#define	COP0_SYNC		/* nothing */
+#define	COP0_HAZARD_FPUENABLE	nop; nop; nop; nop;
 
 /*
  * The bits in the cause register.
@@ -125,9 +129,8 @@
  * The bits in the status register.  All bits are active when set to 1.
  *
  *	R3000 status register fields:
- *	MIPS_SR_CO_USABILITY	Control the usability of the four coprocessors.
- *	MIPS_SR_BOOT_EXC_VEC	Use alternate exception vectors.
- *	MIPS_SR_TLB_SHUTDOWN	TLB disabled.
+ *	MIPS_SR_COP_USABILITY	Control the usability of the four coprocessors.
+ *	MIPS_SR_TS		TLB shutdown.
  *
  *	MIPS_SR_INT_IE		Master (current) interrupt enable bit.
  *
@@ -143,8 +146,10 @@
 
 	/* r4k and r3k differences, see below */
 
-#define	MIPS_SR_BOOT_EXC_VEC	0x00400000
-#define	MIPS_SR_TLB_SHUTDOWN	0x00200000
+#define	MIPS_SR_MX		0x01000000	/* MIPS64 */
+#define	MIPS_SR_PX		0x00800000	/* MIPS64 */
+#define	MIPS_SR_BEV		0x00400000	/* Use boot exception vector */
+#define	MIPS_SR_TS		0x00200000
 
 	/* r4k and r3k differences, see below */
 
@@ -201,14 +206,14 @@
  */
 #define	MIPS3_SR_XX		0x80000000
 #define	MIPS3_SR_RP		0x08000000
-#define	MIPS3_SR_FR_32		0x04000000
+#define	MIPS3_SR_FR		0x04000000
 #define	MIPS3_SR_RE		0x02000000
 
 #define	MIPS3_SR_DIAG_DL	0x01000000		/* QED 52xx */
 #define	MIPS3_SR_DIAG_IL	0x00800000		/* QED 52xx */
-#define	MIPS3_SR_DIAG_BEV	0x00400000
-#define	MIPS3_SR_SOFT_RESET	0x00100000
+#define	MIPS3_SR_SR		0x00100000
 #define	MIPS3_SR_EIE		0x00100000		/* TX79/R5900 */
+#define	MIPS3_SR_NMI		0x00080000		/* MIPS32/64 */
 #define	MIPS3_SR_DIAG_CH	0x00040000
 #define	MIPS3_SR_DIAG_CE	0x00020000
 #define	MIPS3_SR_DIAG_PE	0x00010000
@@ -315,6 +320,9 @@
 	((base) << (((config) & (mask)) >> (shift)))
 #endif
 
+/* External cache enable: Controls L2 for R5000/Rm527x and L3 for Rm7000 */
+#define	MIPS3_CONFIG_SE		0x00001000
+
 /* Block ordering: 0: sequential, 1: sub-block */
 #define	MIPS3_CONFIG_EB		0x00002000
 
@@ -356,6 +364,35 @@
 
 /* Master-Checker Mode - 1: enabled */
 #define	MIPS3_CONFIG_CM		0x80000000
+
+/*
+ * The bits in the MIPS4 config register.
+ */
+
+/* kseg0 coherency algorithm - see MIPS3_TLB_ATTR values */
+#define	MIPS4_CONFIG_K0_MASK	MIPS3_CONFIG_K0_MASK
+#define	MIPS4_CONFIG_DN_MASK	0x00000018	/* Device number */
+#define	MIPS4_CONFIG_CT		0x00000020	/* CohPrcReqTar */
+#define	MIPS4_CONFIG_PE		0x00000040	/* PreElmReq */
+#define	MIPS4_CONFIG_PM_MASK	0x00000180	/* PreReqMax */
+#define	MIPS4_CONFIG_EC_MASK	0x00001e00	/* SysClkDiv */
+#define	MIPS4_CONFIG_SB		0x00002000	/* SCBlkSize */
+#define	MIPS4_CONFIG_SK		0x00004000	/* SCColEn */
+#define	MIPS4_CONFIG_BE		0x00008000	/* MemEnd */
+#define	MIPS4_CONFIG_SS_MASK	0x00070000	/* SCSize */
+#define	MIPS4_CONFIG_SC_MASK	0x00380000	/* SCClkDiv */
+#define	MIPS4_CONFIG_RESERVED	0x03c00000	/* Reserved wired 0 */
+#define	MIPS4_CONFIG_DC_MASK	0x1c000000	/* Primary D-Cache size */
+#define	MIPS4_CONFIG_IC_MASK	0xe0000000	/* Primary I-Cache size */
+
+#define	MIPS4_CONFIG_DC_SHIFT	26
+#define	MIPS4_CONFIG_IC_SHIFT	29
+
+#define	MIPS4_CONFIG_CACHE_SIZE(config, mask, base, shift)		\
+	((base) << (((config) & (mask)) >> (shift)))
+
+#define	MIPS4_CONFIG_CACHE_L2_LSIZE(config)				\
+	(((config) & MIPS4_CONFIG_SB) ? 128 : 64)
 
 /*
  * Location of exception vectors.
@@ -446,8 +483,6 @@
 					/* $5 and $6 new with MIPS-III */
 #define	MIPS_COP_0_BAD_VADDR	_(8)
 #define	MIPS_COP_0_TLB_HI	_(10)
-#define	MIPS_COP_0_STATUS_REG	_(12)
-#define	MIPS_COP_0_CAUSE_REG	_(13)
 #define	MIPS_COP_0_STATUS	_(12)
 #define	MIPS_COP_0_CAUSE	_(13)
 #define	MIPS_COP_0_EXC_PC	_(14)
@@ -556,10 +591,6 @@
  */
 #define	MIPS_OPCODE_SHIFT	26
 #define	MIPS_OPCODE_C1		0x11
-#define	MIPS_OPCODE_LWC1	0x31
-#define	MIPS_OPCODE_LDC1	0x35
-#define	MIPS_OPCODE_SWC1	0x39
-#define	MIPS_OPCODE_SDC1	0x3d
 
 
 /*
@@ -696,7 +727,9 @@
 #define	MIPS_TX4900	0x2d	/* Toshiba TX49 family		ISA III */
 #define	MIPS_R5900	0x2e	/* Toshiba R5900 (EECore)	ISA --- */
 #define	MIPS_RC64470	0x30	/* IDT RC64474/RC64475 		ISA III */
+#define	MIPS_TX7900	0x38	/* Toshiba TX79			ISA III+*/
 #define	MIPS_R5400	0x54	/* NEC VR5400 			ISA IV	*/
+#define	MIPS_R5500	0x55	/* NEC VR5500 			ISA IV	*/
 
 /*
  * CPU revision IDs for some prehistoric processors.
@@ -713,24 +746,43 @@
 
 /* For MIPS_R4000 */
 #define	MIPS_REV_R4000_A	0x00
-#define	MIPS_REV_R4000_B	0x30
+#define	MIPS_REV_R4000_B	0x22
+#define	MIPS_REV_R4000_C	0x30
 #define	MIPS_REV_R4400_A	0x40
 #define	MIPS_REV_R4400_B	0x50
 #define	MIPS_REV_R4400_C	0x60
+
+/* For MIPS_TX4900 */
+#define	MIPS_REV_TX4927		0x22
 
 /*
  * CPU processor revision IDs for company ID == 1 (MIPS)
  */
 #define	MIPS_4Kc	0x80	/* MIPS 4Kc			ISA 32  */
 #define	MIPS_5Kc	0x81	/* MIPS 5Kc			ISA 64  */
+#define	MIPS_20Kc	0x82	/* MIPS 20Kc			ISA 64  */
+#define	MIPS_4Kmp	0x83	/* MIPS 4Km/4Kp			ISA 32  */
 #define	MIPS_4KEc	0x84	/* MIPS 4KEc			ISA 32  */
+#define	MIPS_4KEmp	0x85	/* MIPS 4KEm/4KEp		ISA 32  */
 #define	MIPS_4KSc	0x86	/* MIPS 4KSc			ISA 32  */
+#define	MIPS_M4K	0x87	/* MIPS M4K			ISA 32  Rel 2 */
+#define	MIPS_25Kf	0x88	/* MIPS 25Kf			ISA 64  */
+#define	MIPS_5KE	0x89	/* MIPS 5KE			ISA 64  Rel 2 */
+#define	MIPS_4KEc_R2	0x90	/* MIPS 4KEc_R2			ISA 32  Rel 2 */
+#define	MIPS_4KEmp_R2	0x91	/* MIPS 4KEm/4KEp_R2		ISA 32  Rel 2 */
+#define	MIPS_4KSd	0x92	/* MIPS 4KSd			ISA 32  Rel 2 */
 
 /*
- * CPU processor revision IDs for company ID == 3 (Alchemy)
+ * Alchemy (company ID 3) use the processor ID field to donote the CPU core
+ * revision and the company options field do donate the SOC chip type.
  */
-#define	MIPS_AU1000_R1	0x01	/* Alchemy Au1000 (Rev 1)	ISA 32  */
-#define	MIPS_AU1000_R2	0x02	/* Alchemy Au1000 (Rev 2)	ISA 32  */
+/* CPU processor revision IDs */
+#define	MIPS_AU_REV1	0x01	/* Alchemy Au1000 (Rev 1)	ISA 32  */
+#define	MIPS_AU_REV2	0x02	/* Alchemy Au1000 (Rev 2)	ISA 32  */
+/* CPU company options IDs */
+#define	MIPS_AU1000	0x00
+#define	MIPS_AU1500	0x01
+#define	MIPS_AU1100	0x02
 
 /*
  * CPU processor revision IDs for company ID == 4 (SiByte)
@@ -759,6 +811,9 @@
 #endif
 #ifdef MIPS3_5900
 #include <mips/r5900regs.h>
+#endif
+#ifdef MIPS64_SB1
+#include <mips/sb1regs.h>
 #endif
 
 #endif /* _MIPS_CPUREGS_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_tlp_pci.c,v 1.65 2002/04/17 02:19:14 mycroft Exp $	*/
+/*	$NetBSD: if_tlp_pci.c,v 1.76 2004/03/17 13:54:09 martin Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000, 2002 The NetBSD Foundation, Inc.
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_tlp_pci.c,v 1.65 2002/04/17 02:19:14 mycroft Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_tlp_pci.c,v 1.76 2004/03/17 13:54:09 martin Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h> 
@@ -64,6 +64,9 @@ __KERNEL_RCSID(0, "$NetBSD: if_tlp_pci.c,v 1.65 2002/04/17 02:19:14 mycroft Exp 
 
 #include <machine/bus.h>
 #include <machine/intr.h>
+#ifdef __sparc__
+#include <machine/promlib.h>
+#endif
 
 #include <dev/mii/miivar.h>
 #include <dev/mii/mii_bitbang.h>
@@ -112,9 +115,8 @@ struct tulip_pci_softc {
 int	tlp_pci_match __P((struct device *, struct cfdata *, void *));
 void	tlp_pci_attach __P((struct device *, struct device *, void *));
 
-struct cfattach tlp_pci_ca = {
-	sizeof(struct tulip_pci_softc), tlp_pci_match, tlp_pci_attach,
-};
+CFATTACH_DECL(tlp_pci, sizeof(struct tulip_pci_softc),
+    tlp_pci_match, tlp_pci_attach, NULL, NULL);
 
 const struct tulip_pci_product {
 	u_int32_t	tpp_vendor;	/* PCI vendor ID */
@@ -164,6 +166,9 @@ const struct tulip_pci_product {
 	{ PCI_VENDOR_ACCTON,		PCI_PRODUCT_ACCTON_EN2242,
 	  TULIP_CHIP_AN985 },
 
+	{ PCI_VENDOR_3COM,		PCI_PRODUCT_3COM_3C910SOHOB,
+	  TULIP_CHIP_AN985 },
+
 #if 0
 	{ PCI_VENDOR_ASIX,		PCI_PRODUCT_ASIX_AX88140A,
 	  TULIP_CHIP_AX88140 },
@@ -197,6 +202,8 @@ void	tlp_pci_algor_21142_quirks __P((struct tulip_pci_softc *,
 	    const u_int8_t *));
 void	tlp_pci_netwinder_21142_quirks __P((struct tulip_pci_softc *,
 	    const u_int8_t *));
+void	tlp_pci_znyx_21142_quirks __P((struct tulip_pci_softc *,
+	    const u_int8_t *));
 
 void	tlp_pci_adaptec_quirks __P((struct tulip_pci_softc *,
 	    const u_int8_t *));
@@ -219,6 +226,8 @@ void	tlp_pci_asante_21140_quirks __P((struct tulip_pci_softc *,
 	    const u_int8_t *));
 void	tlp_pci_smc_21140_quirks __P((struct tulip_pci_softc *,
 	    const u_int8_t *));
+void	tlp_pci_vpc_21140_quirks __P((struct tulip_pci_softc *,
+	    const u_int8_t *));
 
 const struct tlp_pci_quirks tlp_pci_21140_quirks[] = {
 	{ tlp_pci_dec_quirks,		{ 0x08, 0x00, 0x2b } },
@@ -227,6 +236,7 @@ const struct tlp_pci_quirks tlp_pci_21140_quirks[] = {
 	{ tlp_pci_adaptec_quirks,	{ 0x00, 0x00, 0x92 } },
 	{ tlp_pci_adaptec_quirks,	{ 0x00, 0x00, 0xd1 } },
 	{ tlp_pci_smc_21140_quirks,	{ 0x00, 0x00, 0xc0 } },
+	{ tlp_pci_vpc_21140_quirks,	{ 0x00, 0x03, 0xff } },
 	{ NULL,				{ 0, 0, 0 } }
 };
 
@@ -237,6 +247,7 @@ const struct tlp_pci_quirks tlp_pci_21142_quirks[] = {
 	{ tlp_pci_algor_21142_quirks,	{ 0x00, 0x40, 0xbc } },
 	{ tlp_pci_adaptec_quirks,	{ 0x00, 0x00, 0xd1 } },
 	{ tlp_pci_netwinder_21142_quirks,{ 0x00, 0x10, 0x57 } },
+	{ tlp_pci_znyx_21142_quirks,	{ 0x00, 0xc0, 0x95 } },
 	{ NULL,				{ 0, 0, 0 } }
 };
 
@@ -345,7 +356,7 @@ tlp_pci_attach(parent, self, aux)
 	int ioh_valid, memh_valid, i, j;
 	const struct tulip_pci_product *tpp;
 	u_int8_t enaddr[ETHER_ADDR_LEN];
-	u_int32_t val;
+	u_int32_t val = 0;
 	pcireg_t reg;
 	int pmreg;
 
@@ -506,13 +517,14 @@ tlp_pci_attach(parent, self, aux)
 	}
 
 	if (pci_get_capability(pc, pa->pa_tag, PCI_CAP_PWRMGMT, &pmreg, 0)) {
-		reg = pci_conf_read(pc, pa->pa_tag, pmreg + 4);
+		reg = pci_conf_read(pc, pa->pa_tag, pmreg + PCI_PMCSR);
 		switch (reg & PCI_PMCSR_STATE_MASK) {
 		case PCI_PMCSR_STATE_D1:
 		case PCI_PMCSR_STATE_D2:
-			printf(": waking up from power state D%d\n%s",
+			printf("%s: waking up from power state D%d\n%s",
+			    sc->sc_dev.dv_xname,
 			    reg & PCI_PMCSR_STATE_MASK, sc->sc_dev.dv_xname);
-			pci_conf_write(pc, pa->pa_tag, pmreg + 4,
+			pci_conf_write(pc, pa->pa_tag, pmreg + PCI_PMCSR,
 			    (reg & ~PCI_PMCSR_STATE_MASK) |
 			    PCI_PMCSR_STATE_D0);
 			break;
@@ -521,9 +533,9 @@ tlp_pci_attach(parent, self, aux)
 			 * The card has lost all configuration data in
 			 * this state, so punt.
 			 */
-			printf(": unable to wake up from power state D3, "
-			       "reboot required.\n");
-			pci_conf_write(pc, pa->pa_tag, pmreg + 4,
+			printf("%s: unable to wake up from power state D3, "
+			       "reboot required.\n", sc->sc_dev.dv_xname);
+			pci_conf_write(pc, pa->pa_tag, pmreg + PCI_PMCSR,
 			    (reg & ~PCI_PMCSR_STATE_MASK) |
 			    PCI_PMCSR_STATE_D0);
 			return;
@@ -547,7 +559,8 @@ tlp_pci_attach(parent, self, aux)
 		sc->sc_st = iot;
 		sc->sc_sh = ioh;
 	} else {
-		printf(": unable to map device registers\n");
+		printf("%s: unable to map device registers\n",
+		    sc->sc_dev.dv_xname);
 		return;
 	}
 
@@ -914,8 +927,7 @@ tlp_pci_attach(parent, self, aux)
 #ifdef __sparc__
 			if (!sc->sc_srom[20] && !sc->sc_srom[21] &&
 			    !sc->sc_srom[22]) {
-				extern void myetheraddr __P((u_char *));
-				myetheraddr(enaddr);
+				prom_getether(PCITAG_NODE(pa->pa_tag), enaddr);
 			} else 
 #endif
 			memcpy(enaddr, &sc->sc_srom[20], ETHER_ADDR_LEN);
@@ -1094,6 +1106,60 @@ tlp_pci_znyx_21040_quirks(psc, enaddr)
 	}
 
 	strcpy(sc->sc_name, "ZNYX ZX31x");
+}
+
+void	tlp_pci_znyx_21142_qs6611_reset __P((struct tulip_softc *));
+
+void
+tlp_pci_znyx_21142_quirks(psc, enaddr)
+	struct tulip_pci_softc *psc;
+	const u_int8_t *enaddr;
+{
+	struct tulip_softc *sc = &psc->sc_tulip;
+	pcireg_t subid;
+
+	subid = pci_conf_read(psc->sc_pc, psc->sc_pcitag, PCI_SUBSYS_ID_REG);
+
+	if (PCI_VENDOR(subid) != PCI_VENDOR_ZNYX)
+		return;		/* ? */
+
+	switch (PCI_PRODUCT(subid) & 0xff) {
+	/*
+	 * ZNYX 21143 boards with QS6611 PHY
+	 */
+	case 0x12:	/* ZX345Q */
+	case 0x13:	/* ZX346Q */
+	case 0x14:	/* ZX348Q */
+	case 0x18:	/* ZX414 */
+	case 0x19:	/* ZX412 */
+	case 0x1a:	/* ZX444 */
+	case 0x1b:	/* ZX442 */
+	case 0x23:	/* ZX212 */
+	case 0x24:	/* ZX214 */
+	case 0x29:	/* ZX374 */
+	case 0x2d:	/* ZX372 */
+	case 0x2b:	/* ZX244 */
+	case 0x2c:	/* ZX424 */
+	case 0x2e:	/* ZX422 */
+		printf("%s: QS6611 PHY\n", sc->sc_dev.dv_xname);
+		sc->sc_reset = tlp_pci_znyx_21142_qs6611_reset;
+		break;
+	}
+}
+
+void
+tlp_pci_znyx_21142_qs6611_reset(sc)
+	struct tulip_softc *sc;
+{
+
+	/*
+	 * Reset QS6611 PHY.
+	 */
+	TULIP_WRITE(sc, CSR_SIAGEN,
+	    SIAGEN_CWE | SIAGEN_LGS1 | SIAGEN_ABM | (0xf << 16));
+	delay(200);
+	TULIP_WRITE(sc, CSR_SIAGEN, (0x4 << 16));
+	delay(10000);
 }
 
 void
@@ -1291,6 +1357,23 @@ tlp_smc9332dst_tmsw_init(sc)
 	} else {
 		ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER|IFM_10_T);
 	}
+}
+
+void
+tlp_pci_vpc_21140_quirks(psc, enaddr)
+	struct tulip_pci_softc *psc;
+	const u_int8_t *enaddr;
+{
+	struct tulip_softc *sc = &psc->sc_tulip;
+	char *p1 = (char *) &sc->sc_srom[32];
+	char *p2 = &sc->sc_name[0];
+
+	do {
+		if ((unsigned char) *p1 & 0x80)
+			*p2++ = ' ';
+		else
+			*p2++ = *p1;
+	} while (*p1++);
 }
 
 void	tlp_pci_cobalt_21142_reset __P((struct tulip_softc *));

@@ -1,4 +1,4 @@
-/*	$NetBSD: sbusvar.h,v 1.17.6.1 2002/11/22 17:36:16 tron Exp $ */
+/*	$NetBSD: sbusvar.h,v 1.20 2003/08/01 12:21:59 pk Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -119,7 +119,6 @@ struct sbus_softc {
 	int	sc_burst;		/* burst transfer sizes supported */
 	/* machdep stuff follows here */
 	int	*sc_intr2ipl;		/* Interrupt level translation */
-	int	*sc_intr_compat;	/* `intr' property to sbus compat */
 };
 #endif
 
@@ -136,7 +135,7 @@ struct sbus_softc {
 #define SBUS_BURST_64	0x40
 
 /* We use #defined(SUN4*) here while the ports are in flux */
-#if defined(SUN4) || defined(SUN4C) || defined(SUN4M)
+#if defined(SUN4) || defined(SUN4C) || defined(SUN4M) || defined(SUN4D)
 #include <sparc/dev/sbusvar.h>
 #elif defined(SUN4U)
 #include <sparc64/dev/sbusvar.h>

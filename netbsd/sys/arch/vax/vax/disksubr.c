@@ -1,4 +1,4 @@
-/*	$NetBSD: disksubr.c,v 1.30 2002/03/05 09:40:42 simonb Exp $	*/
+/*	$NetBSD: disksubr.c,v 1.37 2003/08/07 16:30:18 agc Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1988 Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -35,11 +31,15 @@
  *	@(#)ufs_disksubr.c	7.16 (Berkeley) 5/4/91
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: disksubr.c,v 1.37 2003/08/07 16:30:18 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
 #include <sys/dkbad.h>
 #include <sys/disklabel.h>
+#include <sys/disk.h>
 #include <sys/syslog.h>
 #include <sys/proc.h>
 #include <sys/user.h>
@@ -53,14 +53,25 @@
 
 #include <dev/mscp/mscp.h> /* For disk encoding scheme */
 
+#include "opt_compat_ultrix.h"
+#ifdef COMPAT_ULTRIX
+#include <dev/dec/dec_boot.h>
+#include <ufs/ufs/dinode.h>	/* XXX for fs.h */
+#include <ufs/ffs/fs.h>		/* XXX for BBSIZE & SBSIZE */
+
+char *compat_label(dev_t dev, void (*strat)(struct buf *bp),
+	struct disklabel *lp, struct cpu_disklabel *osdep);
+#endif /* COMPAT_ULTRIX */
+
 /*
  * Determine the size of the transfer, and make sure it is
  * within the boundaries of the partition. Adjust transfer
  * if needed, and signal errors or early completion.
  */
 int
-bounds_check_with_label(struct buf *bp, struct disklabel *lp, int wlabel)
+bounds_check_with_label(struct disk *dk, struct buf *bp, int wlabel)
 {
+	struct disklabel *lp = dk->dk_label;
 	struct partition *p = lp->d_partitions + DISKPART(bp->b_dev);
 	int labelsect = lp->d_partitions[2].p_offset;
 	int maxsz = p->p_size,
@@ -105,7 +116,7 @@ bad:
  * (e.g., sector size) must be filled in before calling us.
  * Returns null on success and an error string on failure.
  */
-char *
+const char *
 readdisklabel(dev_t dev, void (*strat)(struct buf *),
     struct disklabel *lp, struct cpu_disklabel *osdep)
 {
@@ -141,8 +152,98 @@ readdisklabel(dev_t dev, void (*strat)(struct buf *),
 		}
 	}
 	brelse(bp);
+
+#ifdef COMPAT_ULTRIX
+	/*
+	 * If no NetBSD label was found, check for an Ultrix label and
+	 * construct tne incore label from the Ultrix partition information.
+	 */
+	if (msg != NULL) {
+		msg = compat_label(dev, strat, lp, osdep);
+		if (msg == NULL) {
+			printf("WARNING: using Ultrix partition information\n");
+			/* set geometry? */
+		}
+	}
+#endif
 	return (msg);
 }
+
+#ifdef COMPAT_ULTRIX
+/*
+ * Given a buffer bp, try and interpret it as an Ultrix disk label,
+ * putting the partition info into a native NetBSD label
+ */
+char *
+compat_label(dev, strat, lp, osdep)
+	dev_t dev;
+	void (*strat)(struct buf *bp);
+	struct disklabel *lp;
+	struct cpu_disklabel *osdep;
+{
+	dec_disklabel *dlp;
+	struct buf *bp = NULL;
+	char *msg = NULL;
+
+	bp = geteblk((int)lp->d_secsize);
+	bp->b_dev = dev;
+	bp->b_blkno = DEC_LABEL_SECTOR;
+	bp->b_bcount = lp->d_secsize;
+	bp->b_flags |= B_READ;
+	bp->b_cylinder = DEC_LABEL_SECTOR / lp->d_secpercyl;
+	(*strat)(bp);
+
+	if (biowait(bp)) {
+		msg = "I/O error";
+		goto done;
+	}
+
+	for (dlp = (dec_disklabel *)bp->b_data;
+	    dlp <= (dec_disklabel *)(bp->b_data+DEV_BSIZE-sizeof(*dlp));
+	    dlp = (dec_disklabel *)((char *)dlp + sizeof(long))) {
+
+		int part;
+
+		if (dlp->magic != DEC_LABEL_MAGIC) {
+			printf("label: %x\n",dlp->magic);
+			msg = ((msg != NULL) ? msg: "no disk label");
+			goto done;
+		}
+
+		lp->d_magic = DEC_LABEL_MAGIC;
+		lp->d_npartitions = 0;
+		strncpy(lp->d_packname, "Ultrix label", 16);
+		lp->d_rpm = 3600;
+		lp->d_interleave = 1;
+		lp->d_flags = 0;
+		lp->d_bbsize = BBSIZE;
+		lp->d_sbsize = SBSIZE;
+		for (part = 0;
+		     part <((MAXPARTITIONS<DEC_NUM_DISK_PARTS) ?
+		            MAXPARTITIONS : DEC_NUM_DISK_PARTS);
+		     part++) {
+			lp->d_partitions[part].p_size = dlp->map[part].num_blocks;
+			lp->d_partitions[part].p_offset = dlp->map[part].start_block;
+			lp->d_partitions[part].p_fsize = 1024;
+			lp->d_partitions[part].p_fstype =
+			    (part==1) ? FS_SWAP : FS_BSDFFS;
+			lp->d_npartitions += 1;
+
+#ifdef DIAGNOSTIC
+			printf(" Ultrix label rz%d%c: start %d len %d\n",
+			       DISKUNIT(dev), "abcdefgh"[part],
+			       lp->d_partitions[part].p_offset,
+			       lp->d_partitions[part].p_size);
+#endif
+		}
+		break;
+	}
+
+done:
+	brelse(bp);
+	return (msg);
+}
+#endif /* COMPAT_ULTRIX */
 
 /*
  * Check new disk label for sensibility
@@ -241,7 +342,6 @@ disk_reallymapin(struct buf *bp, struct pte *map, int reg, int flag)
 	struct proc *p;
 	volatile pt_entry_t *io;
 	pt_entry_t *pte;
-	struct pcb *pcb;
 	int pfnum, npf, o;
 	caddr_t addr;
 
@@ -259,8 +359,12 @@ disk_reallymapin(struct buf *bp, struct pte *map, int reg, int flag)
 		if (p == 0)
 			p = &proc0;
 	} else {
-		pcb = &p->p_addr->u_pcb;
-		pte = uvtopte(addr, pcb);
+		long xaddr = (long)addr;
+		if (xaddr & 0x40000000)
+			pte = &p->p_vmspace->vm_map.pmap->pm_p1br[xaddr &
+			    ~0x40000000];
+		else
+			pte = &p->p_vmspace->vm_map.pmap->pm_p0br[xaddr];
 	}
 
 	if (map) {

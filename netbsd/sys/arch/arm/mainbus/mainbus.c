@@ -1,4 +1,4 @@
-/* $NetBSD: mainbus.c,v 1.3 2001/06/13 17:52:43 nathanw Exp $ */
+/* $NetBSD: mainbus.c,v 1.10 2004/01/03 14:42:12 chris Exp $ */
 
 /*
  * Copyright (c) 1994,1995 Mark Brinicombe.
@@ -41,6 +41,9 @@
  * Created      : 15/12/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.10 2004/01/03 14:42:12 chris Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -72,9 +75,8 @@ static int  mainbussearch __P((struct device *, struct cfdata *, void *));
 
 /* attach and device structures for the device */
 
-struct cfattach mainbus_ca = {
-	sizeof(struct device), mainbusmatch, mainbusattach
-};
+CFATTACH_DECL(mainbus, sizeof(struct device),
+    mainbusmatch, mainbusattach, NULL, NULL);
 
 /*
  * int mainbusmatch(struct device *parent, struct cfdata *cf, void *aux)
@@ -105,13 +107,13 @@ mainbusprint(aux, mainbus)
 	struct mainbus_attach_args *mb = aux;
 
 	if (mb->mb_iobase != MAINBUSCF_BASE_DEFAULT)
-		printf(" base 0x%x", mb->mb_iobase);
+		aprint_normal(" base 0x%x", mb->mb_iobase);
 	if (mb->mb_iosize > 1)
-		printf("-0x%x", mb->mb_iobase + mb->mb_iosize - 1);
+		aprint_normal("-0x%x", mb->mb_iobase + mb->mb_iosize - 1);
 	if (mb->mb_irq != -1)
-		printf(" irq %d", mb->mb_irq);
+		aprint_normal(" irq %d", mb->mb_irq);
 	if (mb->mb_drq != -1)
-		printf(" drq 0x%08x", mb->mb_drq);
+		aprint_normal(" drq 0x%08x", mb->mb_drq);
 
 /* XXXX print flags */
 	return (QUIET);
@@ -140,7 +142,7 @@ mainbussearch(parent, cf, aux)
 			mb.mb_irq = MAINBUSCF_IRQ_DEFAULT;
 		} else {    
 			mb.mb_iobase = cf->cf_loc[MAINBUSCF_BASE];
-#if defined(arm32) /* XXX */
+#if defined(arm32) && !defined(EB7500ATX)
 			mb.mb_iobase += IO_CONF_BASE;
 #endif
 			mb.mb_iosize = 0;
@@ -150,7 +152,7 @@ mainbussearch(parent, cf, aux)
 		mb.mb_iot = &mainbus_bs_tag;
 
 		tryagain = 0;
-		if ((*cf->cf_attach->ca_match)(parent, cf, &mb) > 0) {
+		if (config_match(parent, cf, &mb) > 0) {
 			config_attach(parent, cf, &mb, mainbusprint);
 /*			tryagain = (cf->cf_fstate == FSTATE_STAR);*/
 		}
@@ -171,7 +173,8 @@ mainbusattach(parent, self, aux)
 	struct device *self;
 	void *aux;
 {
-	printf("\n");
+	aprint_naive("\n");
+	aprint_normal("\n");
 
 	config_search(mainbussearch, self, NULL);
 }

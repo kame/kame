@@ -1,4 +1,4 @@
-/*	$NetBSD: clock_pcctwo.c,v 1.1 2002/02/12 20:38:40 scw Exp $	*/
+/*	$NetBSD: clock_pcctwo.c,v 1.5 2003/07/14 15:47:19 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2002 The NetBSD Foundation, Inc.
@@ -42,6 +42,9 @@
  * on the MVME-1[67]7, MVME-1[67]2 and MVME-187 series of boards.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: clock_pcctwo.c,v 1.5 2003/07/14 15:47:19 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -64,9 +67,8 @@ struct clock_pcctwo_softc {
 	u_char sc_clock_lvl;
 };
 
-struct cfattach clock_pcctwo_ca = {
-	sizeof(struct device), clock_pcctwo_match, clock_pcctwo_attach
-};
+CFATTACH_DECL(clock_pcctwo, sizeof(struct device),
+    clock_pcctwo_match, clock_pcctwo_attach, NULL, NULL);
 
 extern struct cfdriver clock_cd;
 

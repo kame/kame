@@ -1,4 +1,4 @@
-/*	$NetBSD: intiovar.h,v 1.1.1.1 1998/06/09 07:53:05 dbj Exp $	*/
+/*	$NetBSD: intiovar.h,v 1.3 2003/10/01 01:25:06 mycroft Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -46,4 +46,13 @@
  */
 struct intio_attach_args {
 	caddr_t	ia_addr;		/* physical address */
+	bus_space_tag_t ia_bst;		/* bus space tag */
+	bus_dma_tag_t ia_dmat;		/* bus dma tag */
 };
+
+extern	vaddr_t intiobase;
+extern  vaddr_t intiolimit;
+extern	vaddr_t monobase;
+extern  vaddr_t monolimit;
+extern	vaddr_t colorbase;
+extern  vaddr_t colorlimit;

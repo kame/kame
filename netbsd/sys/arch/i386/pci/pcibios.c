@@ -1,4 +1,4 @@
-/*	$NetBSD: pcibios.c,v 1.9 2002/01/28 23:53:08 christos Exp $	*/
+/*	$NetBSD: pcibios.c,v 1.14.2.1 2004/04/28 05:19:13 jmc Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -67,7 +67,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pcibios.c,v 1.9 2002/01/28 23:53:08 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pcibios.c,v 1.14.2.1 2004/04/28 05:19:13 jmc Exp $");
 
 #include "opt_pcibios.h"
 
@@ -194,7 +194,7 @@ pcibios_init()
 		/*
 		 * Fixup interrupt routing.
 		 */
-		rv = pci_intr_fixup(NULL, I386_BUS_SPACE_IO, &pciirq);
+		rv = pci_intr_fixup(NULL, X86_BUS_SPACE_IO, &pciirq);
 		switch (rv) {
 		case -1:
 			/* Non-fatal error. */
@@ -242,7 +242,7 @@ pcibios_pir_init()
 		p = (caddr_t)ISA_HOLE_VADDR(pa);
 		if (*(int *)p != BIOS32_MAKESIG('$', 'P', 'I', 'R')) {
 			/*
-			 * XXX: Some laptops (Toshiba/Libretto L series
+			 * XXX: Some laptops (Toshiba/Libretto L series)
 			 * use _PIR instead of $PIR. So we try that too.
 			 */
 			if (*(int *)p != BIOS32_MAKESIG('_', 'P', 'I', 'R'))
@@ -297,7 +297,7 @@ pcibios_pir_init()
 		if (pcibios_pir_header.compat_router != 0) {
 			pci_devinfo(pcibios_pir_header.compat_router, 0, 0,
 			    devinfo);
-			printf(" (%s)", devinfo);
+			printf(" (%s compatible)", devinfo);
 		}
 		printf("\n");
 		pcibios_print_exclirq();
@@ -347,7 +347,7 @@ pcibios_get_status(rev_maj, rev_min, mech1, mech2, scmech1, scmech2, maxbus)
 	u_int32_t edx;
 	int rv;
 
-	__asm __volatile("lcall (%%edi)					; \
+	__asm __volatile("lcall *(%%edi)				; \
 			jc 1f						; \
 			xor %%ah, %%ah					; \
 		1:"
@@ -395,7 +395,7 @@ pcibios_get_intr_routing(table, nentries, exclirq)
 
 	memset(table, 0, args.size);
 
-	__asm __volatile("lcall (%%esi)					; \
+	__asm __volatile("lcall *(%%esi)				; \
 			jc 1f						; \
 			xor %%ah, %%ah					; \
 		1:	movw %w2, %%ds					; \

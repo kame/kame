@@ -1,4 +1,4 @@
-/*	$NetBSD: intreg.c,v 1.17 2001/09/05 13:21:09 tsutsui Exp $	*/
+/*	$NetBSD: intreg.c,v 1.21 2003/07/15 03:36:17 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -41,6 +41,9 @@
  * and the handy software interrupt request register.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: intreg.c,v 1.21 2003/07/15 03:36:17 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -66,9 +69,8 @@ static int  intreg_match __P((struct device *, struct cfdata *, void *));
 static void intreg_attach __P((struct device *, struct device *, void *));
 static int soft1intr __P((void *));
 
-struct cfattach intreg_ca = {
-	sizeof(struct intreg_softc), intreg_match, intreg_attach
-};
+CFATTACH_DECL(intreg, sizeof(struct intreg_softc),
+    intreg_match, intreg_attach, NULL, NULL);
 
 volatile u_char *interrupt_reg;
 int intreg_attached;

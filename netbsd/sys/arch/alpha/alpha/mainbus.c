@@ -1,4 +1,4 @@
-/* $NetBSD: mainbus.c,v 1.27 1998/06/24 01:10:35 ross Exp $ */
+/* $NetBSD: mainbus.c,v 1.31 2003/01/01 00:39:19 thorpej Exp $ */
 
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -29,25 +29,25 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.27 1998/06/24 01:10:35 ross Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.31 2003/01/01 00:39:19 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/reboot.h>
+#include <sys/conf.h>
 
 #include <machine/autoconf.h>
 #include <machine/rpb.h>
-#include <machine/conf.h>
+#include <machine/cpuconf.h>
 
 /* Definition of the mainbus driver. */
 static int	mbmatch __P((struct device *, struct cfdata *, void *));
 static void	mbattach __P((struct device *, struct device *, void *));
 static int	mbprint __P((void *, const char *));
 
-struct cfattach mainbus_ca = {
-	sizeof(struct device), mbmatch, mbattach
-};
+CFATTACH_DECL(mainbus, sizeof(struct device),
+    mbmatch, mbattach, NULL, NULL);
 
 /* There can be only one. */
 int	mainbus_found;
@@ -113,7 +113,7 @@ mbprint(aux, pnp)
 	struct mainbus_attach_args *ma = aux;
 
 	if (pnp)
-		printf("%s at %s", ma->ma_name, pnp);
+		aprint_normal("%s at %s", ma->ma_name, pnp);
 
 	return (UNCONF);
 }

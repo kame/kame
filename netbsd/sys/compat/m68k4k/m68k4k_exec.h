@@ -1,4 +1,4 @@
-/*	$NetBSD: m68k4k_exec.h,v 1.2 1997/10/09 08:30:09 jtc Exp $	*/
+/*	$NetBSD: m68k4k_exec.h,v 1.4 2003/06/29 22:29:33 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.

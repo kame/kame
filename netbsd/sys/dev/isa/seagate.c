@@ -1,4 +1,4 @@
-/*	$NetBSD: seagate.c,v 1.49 2002/04/05 18:27:54 bouyer Exp $	*/
+/*	$NetBSD: seagate.c,v 1.54 2003/04/03 15:36:31 christos Exp $	*/
 
 /*
  * ST01/02, Future Domain TMC-885, TMC-950 SCSI driver
@@ -65,7 +65,7 @@
  */
  
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: seagate.c,v 1.49 2002/04/05 18:27:54 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: seagate.c,v 1.54 2003/04/03 15:36:31 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -298,9 +298,8 @@ void	sea_grow_scb __P((struct sea_softc *));
 int	seaprobe __P((struct device *, struct cfdata *, void *));
 void	seaattach __P((struct device *, struct device *, void *));
 
-struct cfattach sea_ca = {
-	sizeof(struct sea_softc), seaprobe, seaattach
-};
+CFATTACH_DECL(sea, sizeof(struct sea_softc),
+    seaprobe, seaattach, NULL, NULL);
 
 extern struct cfdriver sea_cd;
 
@@ -369,7 +368,7 @@ seaprobe(parent, match, aux)
 	case FDOMAIN:
 		break;
 	default:
-#ifdef DEBUG
+#ifdef SEA_DEBUG
 		printf("seaprobe: board type unknown at address %p\n", maddr);
 #endif
 		return 0;
@@ -1356,7 +1355,7 @@ sea_information_transfer(sea)
 					if (!(phase & STAT_IO)) {
 #ifdef SEA_ASSEMBLER
 						caddr_t junk;
-						asm("cld\n\t\
+						__asm("cld\n\t\
 						    rep\n\t\
 						    movsl" :
 						    "=S" (scb->data),
@@ -1373,7 +1372,7 @@ sea_information_transfer(sea)
 					} else {
 #ifdef SEA_ASSEMBLER
 						caddr_t junk;
-						asm("cld\n\t\
+						__asm("cld\n\t\
 						    rep\n\t\
 						    movsl" :
 						    "=D" (scb->data),

@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.S,v 1.5 2002/01/25 19:19:30 thorpej Exp $	*/
+/*	$NetBSD: locore.S,v 1.8 2004/02/13 11:36:13 wiz Exp $	*/
 
 /*
  * Copyright (C) 1994-1997 Mark Brinicombe
@@ -107,10 +107,8 @@ ENTRY_NP(cpu_reset)
 	ldr	r4, [r4]
 
 	ldr	r0, Lcpufuncs
-	add	lr, pc, #Lboot_cache_purged - . - 8
+	mov	lr, pc
 	ldr	pc, [r0, #CF_IDCACHE_WBINV_ALL]
-
-Lboot_cache_purged:
 
 	/*
  	 * MMU & IDC off, 32 bit program & data space
@@ -123,7 +121,7 @@ Lboot_cache_purged:
 
 	/*
 	 * _cpu_reset_address contains the address to branch to, to complete
-	 * the cpu reset after turning the MMU off
+	 * the CPU reset after turning the MMU off
 	 * This variable is provided by the hardware specific code
 	 */
 
@@ -146,7 +144,7 @@ ENTRY_NP(Execute)
 	mov	ip, r3
 	ldr	r7, return
 	stmfd	sp!, {r0, r7}
-	add	r7, pc, #LExec - . - 8
+	adr	r7, LExec
 	mov	r5, r1
 	mrs	r4, cpsr
 	ldmia	r2, {r0-r3}
@@ -187,34 +185,5 @@ _C_LABEL(esym):	.word	_C_LABEL(end)
 ENTRY_NP(abort)
 	b	_C_LABEL(abort)
 
-
-/*
- * Atomic bit set and clear functions
- */
-
-ENTRY(atomic_set_bit)
-	mrs	r2, cpsr
-	orr	r3, r2, #(I32_bit)
-	msr	cpsr, r3
-
-	ldr	r3, [r0]
-	orr	r3, r3, r1
-	str	r3, [r0]
-
-	msr	cpsr, r2
-	mov	pc, lr
-
-
-ENTRY(atomic_clear_bit)
-	mrs	r2, cpsr
-	orr	r3, r2, #(I32_bit)
-	msr	cpsr, r3
-
-	ldr	r3, [r0]
-	bic	r3, r3, r1
-	str	r3, [r0]
-
-	msr	cpsr, r2
-	mov	pc, lr
 
 /* End of locore.S */

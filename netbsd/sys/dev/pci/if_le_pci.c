@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le_pci.c,v 1.36 2001/11/21 17:33:28 wiz Exp $	*/
+/*	$NetBSD: if_le_pci.c,v 1.40 2003/08/07 16:31:11 agc Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -52,11 +52,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -76,7 +72,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_le_pci.c,v 1.36 2001/11/21 17:33:28 wiz Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_le_pci.c,v 1.40 2003/08/07 16:31:11 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -110,9 +106,8 @@ int le_pci_match __P((struct device *, struct cfdata *, void *));
 void le_pci_attach __P((struct device *, struct device *, void *));
 int le_pci_mediachange __P((struct lance_softc *));
 
-struct cfattach le_pci_ca = {
-	sizeof(struct le_softc), le_pci_match, le_pci_attach
-};
+CFATTACH_DECL(le_pci, sizeof(struct le_softc),
+    le_pci_match, le_pci_attach, NULL, NULL);
 
 #if defined(_KERNEL_OPT)
 #include "opt_ddb.h"

@@ -1,4 +1,4 @@
-/*	$NetBSD: ucbsnd.c,v 1.8 2002/01/29 18:53:13 uch Exp $ */
+/*	$NetBSD: ucbsnd.c,v 1.15 2003/07/15 02:29:31 lukem Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -42,6 +42,9 @@
  *
  * /dev/ucbsnd0 : sampling rate 22.154kHz monoral 16bit straight PCM device.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ucbsnd.c,v 1.15 2003/07/15 02:29:31 lukem Exp $");
 
 #include "opt_use_poll.h"
 
@@ -150,8 +153,6 @@ struct ucbsnd_softc {
 	struct ring_buf sc_rb;
 };
 
-cdev_decl(ucbsnd);
-
 int	ucbsnd_match(struct device*, struct cfdata*, void*);
 void	ucbsnd_attach(struct device*, struct device*, void*);
 
@@ -174,8 +175,17 @@ void	ringbuf_producer_return(struct ring_buf*, size_t);
 void	*ringbuf_consumer_get(struct ring_buf*, size_t*);
 void	ringbuf_consumer_return(struct ring_buf*);
 
-struct cfattach ucbsnd_ca = {
-	sizeof(struct ucbsnd_softc), ucbsnd_match, ucbsnd_attach
+CFATTACH_DECL(ucbsnd, sizeof(struct ucbsnd_softc),
+    ucbsnd_match, ucbsnd_attach, NULL, NULL);
+
+dev_type_open(ucbsndopen);
+dev_type_close(ucbsndclose);
+dev_type_read(ucbsndread);
+dev_type_write(ucbsndwrite);
+
+const struct cdevsw ucbsnd_cdevsw = {
+	ucbsndopen, ucbsndclose, ucbsndread, ucbsndwrite, nullioctl,
+	nostop, notty, nopoll, nullmmap, nokqfilter,
 };
 
 int
@@ -631,36 +641,6 @@ ucbsndwrite(dev_t dev, struct uio *uio, int ioflag)
 	s = splaudio();
 	ringbuf_reset(&sc->sc_rb);
 	splx(s);
-
-	return (error);
-}
-
-int
-ucbsndioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct proc *p)
-{
-	int error = 0;
-
-	/* not coded yet */
-
-	return (error);
-}
-
-int
-ucbsndpoll(dev_t dev, int events, struct proc *p)
-{
-	int error = 0;
-
-	/* not coded yet */
-
-	return (error);
-}
-
-paddr_t
-ucbsndmmap(dev_t dev, off_t off, int prot)
-{
-	int error = 0;
-
-	/* not coded yet */
 
 	return (error);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: ipkdb_glue.c,v 1.1 2002/02/10 01:58:05 thorpej Exp $	*/
+/*	$NetBSD: ipkdb_glue.c,v 1.3 2003/07/15 03:36:03 lukem Exp $	*/
 
 /*
  * Copyright (C) 1994 Wolfgang Solfrank.
@@ -31,6 +31,9 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ipkdb_glue.c,v 1.3 2003/07/15 03:36:03 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -200,6 +203,7 @@ ipkdbsbyte(dst, ch)
 	pteo = ReadWord(ptep);
 	pte = pteo | PT_AP(AP_KRW);
 	WriteWord(ptep, pte);
+	PTE_SYNC(ptep);
 	tlbflush();		/* XXX should be purge */
          
 	*dst = (unsigned char)ch;
@@ -208,6 +212,7 @@ ipkdbsbyte(dst, ch)
 	cpu_cache_syncI_rng((u_int)dst, 4);
 
 	WriteWord(ptep, pteo);
+	PTE_SYNC(ptep);
 	tlbflush();		/* XXX should be purge */
 
 	return 0;

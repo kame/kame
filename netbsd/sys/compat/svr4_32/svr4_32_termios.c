@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_32_termios.c,v 1.2 2001/11/13 02:09:32 lukem Exp $	 */
+/*	$NetBSD: svr4_32_termios.c,v 1.8 2003/06/29 22:29:52 fvdl Exp $	 */
 
 /*-
  * Copyright (c) 1994 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: svr4_32_termios.c,v 1.2 2001/11/13 02:09:32 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: svr4_32_termios.c,v 1.8 2003/06/29 22:29:52 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -53,6 +53,7 @@ __KERNEL_RCSID(0, "$NetBSD: svr4_32_termios.c,v 1.2 2001/11/13 02:09:32 lukem Ex
 #include <net/if.h>
 #include <sys/malloc.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/svr4_32/svr4_32_types.h>
@@ -502,19 +503,20 @@ svr4_32_termios_to_termio(ts, t)
 }
 
 int
-svr4_32_term_ioctl(fp, p, retval, fd, cmd, data)
+svr4_32_term_ioctl(fp, l, retval, fd, cmd, data)
 	struct file *fp;
-	struct proc *p;
+	struct lwp *l;
 	register_t *retval;
 	int fd;
 	u_long cmd;
 	caddr_t data;
 {
+	struct proc *p = l->l_proc;
 	struct termios 		bt;
 	struct svr4_32_termios	st;
 	struct svr4_termio	t;
 	int			error, new;
-	int (*ctl) __P((struct file *, u_long,  caddr_t, struct proc *)) =
+	int (*ctl)(struct file *, u_long, void *, struct proc *) =
 			fp->f_ops->fo_ioctl;
 
 	*retval = 0;
@@ -522,7 +524,7 @@ svr4_32_term_ioctl(fp, p, retval, fd, cmd, data)
 	switch (cmd) {
 	case SVR4_TCGETA:
 	case SVR4_TCGETS:
-		if ((error = (*ctl)(fp, TIOCGETA, (caddr_t) &bt, p)) != 0)
+		if ((error = (*ctl)(fp, TIOCGETA,  &bt, p)) != 0)
 			return error;
 
 		memset(&st, 0, sizeof(st));
@@ -549,7 +551,7 @@ svr4_32_term_ioctl(fp, p, retval, fd, cmd, data)
 	case SVR4_TCSETAF:
 	case SVR4_TCSETSF:
 		/* get full BSD termios so we don't lose information */
-		if ((error = (*ctl)(fp, TIOCGETA, (caddr_t) &bt, p)) != 0)
+		if ((error = (*ctl)(fp, TIOCGETA,  &bt, p)) != 0)
 			return error;
 
 		switch (cmd) {
@@ -600,13 +602,13 @@ svr4_32_term_ioctl(fp, p, retval, fd, cmd, data)
 		print_svr4_32_termios(&st);
 #endif /* DEBUG_SVR4 */
 
-		return (*ctl)(fp, cmd, (caddr_t) &bt, p);
+		return (*ctl)(fp, cmd,  &bt, p);
 
 	case SVR4_TIOCGWINSZ:
 		{
 			struct svr4_winsize ws;
 
-			error = (*ctl)(fp, TIOCGWINSZ, (caddr_t) &ws, p);
+			error = (*ctl)(fp, TIOCGWINSZ,  &ws, p);
 			if (error)
 				return error;
 			return copyout(&ws, data, sizeof(ws));
@@ -618,10 +620,10 @@ svr4_32_term_ioctl(fp, p, retval, fd, cmd, data)
 
 			if ((error = copyin(data, &ws, sizeof(ws))) != 0)
 				return error;
-			return (*ctl)(fp, TIOCSWINSZ, (caddr_t) &ws, p);
+			return (*ctl)(fp, TIOCSWINSZ,  &ws, p);
 		}
 
 	default:
-		return svr4_32_stream_ti_ioctl(fp, p, retval, fd, cmd, data);
+		return svr4_32_stream_ti_ioctl(fp, l, retval, fd, cmd, data);
 	}
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs.h,v 1.33 2002/05/12 23:04:35 matt Exp $	*/
+/*	$NetBSD: nfs.h,v 1.44 2003/12/06 02:48:35 jonathan Exp $	*/
 /*
  * Copyright (c) 1989, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
@@ -14,11 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -61,6 +57,9 @@
 #ifndef NFS_MAXATTRTIMO
 #define	NFS_MAXATTRTIMO 60
 #endif
+#define	NFS_TRYLATERDEL	1		/* Initial try later delay (sec) */
+#define	NFS_TRYLATERDELMAX (1*60)	/* Maximum try later delay (sec) */
+#define	NFS_TRYLATERDELMUL 2		/* Exponential backoff multiplier */
 
 /*
  * These can be overridden through <machine/param.h>, included via
@@ -77,10 +76,25 @@
 #define NFS_READDIRSIZE	8192		/* Def. readdir size */
 #endif
 
+/*
+ * NFS client IO daemon threads. May be overridden by config options.
+ */
+#ifndef NFS_MAXASYNCDAEMON
+#define	NFS_MAXASYNCDAEMON 	128	/* Max. number async_daemons runable */
+#endif
+
+/*
+ * NFS client read-ahead. May be overridden by config options.
+ * Should be no more than NFS_MAXASYNCDAEMON as each read-ahead operation
+ * requires one IO thread.
+ */
+#ifndef NFS_MAXRAHEAD
+#define	NFS_MAXRAHEAD	32		/* Max. read ahead # blocks */
+#endif
 #define	NFS_DEFRAHEAD	2		/* Def. read ahead # blocks */
-#define	NFS_MAXRAHEAD	4		/* Max. read ahead # blocks */
+
 #define	NFS_MAXUIDHASH	64		/* Max. # of hashed uid entries/mp */
-#define	NFS_MAXASYNCDAEMON 	20	/* Max. number async_daemons runable */
+
 #ifdef _KERNEL
 extern int nfs_niothreads;              /* Number of async_daemons desired */
 #ifndef NFS_DEFAULT_NIOTHREADS
@@ -131,8 +145,10 @@ extern int nfs_niothreads;              /* Number of async_daemons desired */
  * The VA_EXCLUSIVE flag should be added for va_vaflags and set for an
  * exclusive create.
  */
+#if 0
 #ifndef VA_EXCLUSIVE
 #define VA_EXCLUSIVE	0
+#endif
 #endif
 
 /*
@@ -154,9 +170,9 @@ extern int nfs_niothreads;              /* Number of async_daemons desired */
  */
 #define	NFS_ATTRTIMEO(np) \
 	((((np)->n_flag & NMODIFIED) || \
-	 (time.tv_sec - (np)->n_mtime) / 10 < NFS_MINATTRTIMO) ? NFS_MINATTRTIMO : \
-	 ((time.tv_sec - (np)->n_mtime) / 10 > NFS_MAXATTRTIMO ? NFS_MAXATTRTIMO : \
-	  (time.tv_sec - (np)->n_mtime) / 10))
+	 (time.tv_sec - (np)->n_mtime.tv_sec) / 10 < NFS_MINATTRTIMO) ? NFS_MINATTRTIMO : \
+	 ((time.tv_sec - (np)->n_mtime.tv_sec) / 10 > NFS_MAXATTRTIMO ? NFS_MAXATTRTIMO : \
+	  (time.tv_sec - (np)->n_mtime.tv_sec) / 10))
 
 /*
  * Expected allocation sizes for major data structures. If the actual size
@@ -300,7 +316,6 @@ struct nfsreq {
 	struct mbuf	*r_md;
 	caddr_t		r_dpos;
 	struct nfsmount *r_nmp;
-	struct vnode	*r_vp;
 	u_int32_t	r_xid;
 	int		r_flags;	/* flags on request, see below */
 	int		r_retry;	/* max retransmission count */
@@ -409,6 +424,7 @@ struct nfsuid {
 
 struct nfssvc_sock {
 	TAILQ_ENTRY(nfssvc_sock) ns_chain;	/* List of all nfssvc_sock's */
+	TAILQ_ENTRY(nfssvc_sock) ns_pending;	/* List of pending sockets */
 	TAILQ_HEAD(, nfsuid) ns_uidlruhead;
 	struct file	*ns_fp;
 	struct socket	*ns_so;
@@ -439,6 +455,7 @@ struct nfssvc_sock {
 #define SLP_ALLFLAGS	0xff
 
 extern TAILQ_HEAD(nfssvc_sockhead, nfssvc_sock) nfssvc_sockhead;
+extern struct nfssvc_sockhead nfssvc_sockpending;
 extern int nfssvc_sockhead_flag;
 #define	SLP_INIT	0x01
 #define	SLP_WANTINIT	0x02
@@ -448,6 +465,7 @@ extern int nfssvc_sockhead_flag;
  */
 struct nfsd {
 	TAILQ_ENTRY(nfsd) nfsd_chain;	/* List of all nfsd's */
+	SLIST_ENTRY(nfsd) nfsd_idle;	/* List of idle nfsd's */
 	int		nfsd_flag;	/* NFSD_ flags */
 	struct nfssvc_sock *nfsd_slp;	/* Current socket */
 	int		nfsd_authlen;	/* Authenticator len */
@@ -504,10 +522,13 @@ struct nfsrv_descript {
 #define ND_KERBFULL	0x40
 #define ND_KERBAUTH	(ND_KERBNICK | ND_KERBFULL)
 
+extern struct simplelock nfsd_slock;
 extern TAILQ_HEAD(nfsdhead, nfsd) nfsd_head;
+extern SLIST_HEAD(nfsdidlehead, nfsd) nfsd_idle_head;
 extern int nfsd_head_flag;
 #define	NFSD_CHECKSLP	0x01
 
+extern struct mowner nfs_mowner;
 extern struct nfsstats nfsstats;
 extern int nfs_numasync;
 

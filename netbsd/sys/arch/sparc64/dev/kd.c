@@ -1,4 +1,4 @@
-/*	$NetBSD: kd.c,v 1.20 2002/03/19 19:47:57 eeh Exp $	*/
+/*	$NetBSD: kd.c,v 1.32 2004/03/21 15:08:24 pk Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -45,6 +45,9 @@
  * Output goes to the screen via PROM printf.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kd.c,v 1.32 2004/03/21 15:08:24 pk Exp $");
+
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
@@ -60,11 +63,10 @@
 #include <machine/cpu.h>
 #include <machine/kbd.h>
 #include <machine/autoconf.h>
-#include <machine/conf.h>
 
 #ifdef RASTERCONSOLE
 #include <dev/sun/fbio.h>
-#include <machine/fbvar.h>
+#include <dev/sun/fbvar.h>
 #endif
 
 
@@ -74,9 +76,21 @@
 #include <dev/sun/kbdvar.h>
 #include <sparc64/dev/cons.h>
 
+dev_type_open(kdopen);
+dev_type_close(kdclose);
+dev_type_read(kdread);
+dev_type_write(kdwrite);
+dev_type_ioctl(kdioctl);
+dev_type_tty(kdtty);
+dev_type_poll(kdpoll);
+
+const struct cdevsw kd_cdevsw = {
+	kdopen, kdclose, kdread, kdwrite, kdioctl,
+	nostop, kdtty, kdpoll, nommap, ttykqfilter, D_TTY
+};
+
 struct	tty *fbconstty = 0;	/* tty structure for frame buffer console */
 
-#define	KDMAJOR 1
 #define PUT_WSIZE	64
 
 struct kd_softc {
@@ -112,15 +126,14 @@ kd_init(kd)
 	struct kd_softc *kd;
 {
 	struct tty *tp;
-	int i;
-	char *prop;
+	char prop[6+1];
 	
 	kd = &kd_softc; 	/* XXX */
 
 	tp = ttymalloc();
 	tp->t_oproc = kdstart;
 	tp->t_param = kdparam;
-	tp->t_dev = makedev(KDMAJOR, 0);
+	tp->t_dev = makedev(cdevsw_lookup_major(&kd_cdevsw), 0);
 
 	tty_attach(tp);
 	kd->kd_tty = tp;
@@ -138,20 +151,12 @@ kd_init(kd)
 	}
 
 	if (kd->rows == 0 &&
-	    (prop = PROM_getpropstring(optionsnode, "screen-#rows"))) {
-		i = 0;
-		while (*prop != '\0')
-			i = i * 10 + *prop++ - '0';
-		kd->rows = (unsigned short)i;
-	}
+	    prom_getoption("screen-#rows", prop, sizeof prop) == 0)
+		kd->rows = strtoul(prop, NULL, 10);
+
 	if (kd->cols == 0 &&
-	    (prop = PROM_getpropstring(optionsnode, "screen-#columns"))) {
-		i = 0;
-		while (*prop != '\0')
-			i = i * 10 + *prop++ - '0';
-		kd->cols = (unsigned short)i;
-	}
-	return;
+	    prom_getoption("screen-#columns", prop, sizeof prop) == 0)
+		kd->cols = strtoul(prop, NULL, 10);
 }
 
 struct tty *
@@ -248,7 +253,7 @@ kdclose(dev, flag, mode, p)
 	ttyclose(tp);
 
 	if ((cc = kd->kd_in) != NULL)
-		(void)(*cc->cc_iclose)(cc->cc_dev);
+		(void)(*cc->cc_iclose)(cc);
 
 	return (0);
 }
@@ -327,15 +332,6 @@ kdioctl(dev, cmd, data, flag, p)
 
 	return EPASSTHROUGH;
 }
-
-void
-kdstop(tp, flag)
-	struct tty *tp;
-	int flag;
-{
-
-}
-
 
 static int
 kdparam(tp, t)
@@ -440,7 +436,7 @@ kd_putfb(tp)
 		while (p < end)
 			*p++ &= 0x7f;
 		/* Now let the PROM print it. */
-		OF_write(OF_stdout(), buf, len);
+		prom_write(prom_stdout(), buf, len);
 	}
 }
 
@@ -533,7 +529,7 @@ cons_attach_input(cc, cn)
 	cn_hw->cn_getc = cn->cn_getc;
 
 	/* Attach us as console. */
-	cn_tab->cn_dev = makedev(KDMAJOR, 0);
+	cn_tab->cn_dev = makedev(cdevsw_lookup_major(&kd_cdevsw), 0);
 	cn_tab->cn_probe = kdcnprobe;
 	cn_tab->cn_init = kdcninit;
 	cn_tab->cn_getc = kdcngetc;
@@ -576,7 +572,7 @@ kdcninit(cn)
 #if 0
 	struct kbd_state *ks = kdcn_state;
 
-	cn->cn_dev = makedev(KDMAJOR, 0);
+	cn->cn_dev = makedev(cdevsw_lookup_major(&kd_cdevsw), 0);
 	cn->cn_pri = CN_INTERNAL;
 
 	/* This prepares kbd_translate() */
@@ -648,7 +644,7 @@ kdcnputc(dev, c)
 	char c0 = (c & 0x7f);
 
 	s = splhigh();
-	OF_write(OF_stdout(), &c0, 1);
+	prom_write(prom_stdout(), &c0, 1);
 	splx(s);
 }
 

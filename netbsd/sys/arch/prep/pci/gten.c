@@ -1,4 +1,4 @@
-/*	$NetBSD: gten.c,v 1.4 2002/03/17 19:40:49 atatat Exp $	*/
+/*	$NetBSD: gten.c,v 1.10 2003/11/13 03:09:28 chs Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: gten.c,v 1.10 2003/11/13 03:09:28 chs Exp $");
+
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/conf.h>
@@ -62,9 +65,8 @@ static	int	gten_match (struct device *, struct cfdata *, void *);
 static	void	gten_attach (struct device *, struct device *, void *);
 static	int	gten_print (void *, const char *);
 
-struct cfattach gten_ca = {
-	sizeof(struct gten_softc), gten_match, gten_attach,
-};
+CFATTACH_DECL(gten, sizeof(struct gten_softc),
+    gten_match, gten_attach, NULL, NULL);
 
 static struct rasops_info gten_console_ri;
 static pcitag_t gten_console_pcitag;
@@ -313,7 +315,7 @@ gten_alloc_screen(v, type, cookiep, curxp, curyp, attrp)
 	*cookiep = ri;			/* one and only for now */
 	*curxp = 0;
 	*curyp = 0;
-	(*ri->ri_ops.alloc_attr)(ri, 0, 0, 0, &defattr);
+	(*ri->ri_ops.allocattr)(ri, 0, 0, 0, &defattr);
 	*attrp = defattr;
 	gt->gt_nscreens++;
 	return 0;
@@ -381,7 +383,7 @@ gten_cnattach(pci_chipset_tag_t pc, bus_space_tag_t memt)
 
 	gten_common_init(ri);
 
-	(*ri->ri_ops.alloc_attr)(ri, 0, 0, 0, &defattr);
+	(*ri->ri_ops.allocattr)(ri, 0, 0, 0, &defattr);
 	wsdisplay_cnattach(&gten_stdscreen, ri, 0, 0, defattr);
 
 	gten_console_pcitag = tag;
@@ -421,30 +423,24 @@ gten_putcmap(gt, cm)
 {
 	int index = cm->index;
 	int count = cm->count;
-	int i;
-	u_char *r, *g, *b;
+	int i, error;
+	u_char rbuf[256], gbuf[256], bbuf[256];
 
 	if (cm->index >= 256 || cm->count > 256 ||
 	    (cm->index + cm->count) > 256)
 		return EINVAL;
-	if (!uvm_useracc(cm->red, cm->count, B_READ) ||
-	    !uvm_useracc(cm->green, cm->count, B_READ) ||
-	    !uvm_useracc(cm->blue, cm->count, B_READ))
-		return EFAULT;
-	copyin(cm->red,   &gt->gt_cmap_red[index],   count);
-	copyin(cm->green, &gt->gt_cmap_green[index], count);
-	copyin(cm->blue,  &gt->gt_cmap_blue[index],  count);
+	error = copyin(cm->red, &rbuf[index], count);
+	if (error)
+		return error;
+	error = copyin(cm->green, &gbuf[index], count);
+	if (error)
+		return error;
+	error = copyin(cm->blue, &bbuf[index], count);
+	if (error)
+		return error;
 
-	r = &gt->gt_cmap_red[index];
-	g = &gt->gt_cmap_green[index];
-	b = &gt->gt_cmap_blue[index];
-
-#if 0
-	for (i = 0; i < count; i++) {
-		OF_call_method_1("color!", dc->dc_ih, 4, *r, *g, *b, index);
-		r++, g++, b++, index++;
-	}
-#endif
-
+	memcpy(&gt->gt_cmap_red[index], &rbuf[index], count);
+	memcpy(&gt->gt_cmap_green[index], &gbuf[index], count);
+	memcpy(&gt->gt_cmap_blue[index], &bbuf[index], count);
 	return 0;
 }

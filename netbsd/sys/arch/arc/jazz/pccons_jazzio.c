@@ -1,4 +1,4 @@
-/* $NetBSD: pccons_jazzio.c,v 1.1 2001/06/13 15:05:46 soda Exp $ */
+/* $NetBSD: pccons_jazzio.c,v 1.4 2003/07/15 00:04:50 lukem Exp $ */
 /* NetBSD: vga_isa.c,v 1.4 2000/08/14 20:14:51 thorpej Exp  */
 
 /*
@@ -28,6 +28,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pccons_jazzio.c,v 1.4 2003/07/15 00:04:50 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -49,10 +52,8 @@
 int	pccons_jazzio_match __P((struct device *, struct cfdata *, void *));
 void	pccons_jazzio_attach __P((struct device *, struct device *, void *));
 
-struct cfattach pc_jazzio_ca = {
-	sizeof(struct pc_softc),
-	pccons_jazzio_match, pccons_jazzio_attach,
-};
+CFATTACH_DECL(pc_jazzio, sizeof(struct pc_softc),
+    pccons_jazzio_match, pccons_jazzio_attach, NULL, NULL);
 
 /*
  * chipset-dependent pccons configuration

@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_bio.c,v 1.25.10.1 2003/06/02 15:15:33 tron Exp $	*/
+/*	$NetBSD: uvm_bio.c,v 1.31.2.1 2004/05/10 14:28:57 tron Exp $	*/
 
 /*
  * Copyright (c) 1998 Chuck Silvers.
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_bio.c,v 1.25.10.1 2003/06/02 15:15:33 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_bio.c,v 1.31.2.1 2004/05/10 14:28:57 tron Exp $");
 
 #include "opt_uvmhist.h"
 
@@ -55,9 +55,9 @@ __KERNEL_RCSID(0, "$NetBSD: uvm_bio.c,v 1.25.10.1 2003/06/02 15:15:33 tron Exp $
  * local functions
  */
 
-int	ubc_fault __P((struct uvm_faultinfo *, vaddr_t, struct vm_page **, int,
-    int, vm_fault_t, vm_prot_t, int));
-struct ubc_map *ubc_find_mapping __P((struct uvm_object *, voff_t));
+int	ubc_fault(struct uvm_faultinfo *, vaddr_t, struct vm_page **, int,
+    int, vm_fault_t, vm_prot_t, int);
+struct ubc_map *ubc_find_mapping(struct uvm_object *, voff_t);
 
 /*
  * local data structues
@@ -208,7 +208,7 @@ ubc_init(void)
 		    ubc_nwins << ubc_winshift, &ubc_object.uobj, 0, (vsize_t)va,
 		    UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_NONE,
 				UVM_ADV_RANDOM, UVM_FLAG_NOMERGE)) != 0) {
-		panic("ubc_init: failed to map ubc_object\n");
+		panic("ubc_init: failed to map ubc_object");
 	}
 	UVMHIST_INIT(ubchist, 300);
 }
@@ -294,22 +294,23 @@ again:
 	va = ufi->orig_rvaddr;
 	eva = ufi->orig_rvaddr + (npages << PAGE_SHIFT);
 
-	/*
-	 * for virtually-indexed, virtually-tagged caches we should avoid
-	 * creating writable mappings when we don't absolutely need them,
-	 * since the "compatible alias" trick doesn't work on such caches.
-	 * otherwise, we can always map the pages writable.
-	 */
-
-#ifdef PMAP_CACHE_VIVT
-	prot = VM_PROT_READ | access_type;
-#else
-	prot = VM_PROT_READ | VM_PROT_WRITE;
-#endif
 	UVMHIST_LOG(ubchist, "va 0x%lx eva 0x%lx", va, eva, 0, 0);
 	simple_lock(&uobj->vmobjlock);
 	uvm_lock_pageq();
 	for (i = 0; va < eva; i++, va += PAGE_SIZE) {
+		/*
+		 * for virtually-indexed, virtually-tagged caches we should
+		 * avoid creating writable mappings when we don't absolutely
+		 * need them, since the "compatible alias" trick doesn't work
+		 * on such caches.  otherwise, we can always map the pages
+		 * writable.
+		 */
+
+#ifdef PMAP_CACHE_VIVT
+		prot = VM_PROT_READ | access_type;
+#else
+		prot = VM_PROT_READ | VM_PROT_WRITE;
+#endif
 		UVMHIST_LOG(ubchist, "pgs[%d] = %p", i, pgs[i], 0, 0);
 		pg = pgs[i];
 
@@ -323,6 +324,21 @@ again:
 		if (pg->flags & PG_RELEASED) {
 			uvm_pagefree(pg);
 			continue;
+		}
+		if (pg->loan_count != 0) {
+			/*
+			 * avoid unneeded loan break if possible.
+			 */
+			if ((access_type & VM_PROT_WRITE) == 0)
+				prot &= ~VM_PROT_WRITE;
+
+			if (prot & VM_PROT_WRITE) {
+				uvm_unlock_pageq();
+				pg = uvm_loanbreak(pg);
+				uvm_lock_pageq();
+				if (pg == NULL)
+					continue; /* will re-fault */
+			}
 		}
 		KASSERT(access_type == VM_PROT_READ ||
 		    (pg->flags & PG_RDONLY) == 0);
@@ -448,6 +464,7 @@ again:
 		struct vm_page *pgs[npages];
 		int gpflags = PGO_SYNCIO|PGO_OVERWRITE|PGO_PASTEOF;
 		int i;
+		KDASSERT(flags & UBC_WRITE);
 
 		if (umap->flags & UMAP_MAPPING_CACHED) {
 			umap->flags &= ~UMAP_MAPPING_CACHED;
@@ -517,12 +534,15 @@ ubc_release(va, flags)
 			KASSERT(rv);
 			pgs[i] = PHYS_TO_VM_PAGE(pa);
 			pgs[i]->flags &= ~(PG_FAKE|PG_CLEAN);
+			KASSERT(pgs[i]->loan_count == 0);
 			uvm_pageactivate(pgs[i]);
 		}
 		uvm_unlock_pageq();
 		pmap_kremove(umapva, ubc_winsize);
 		pmap_update(pmap_kernel());
+		simple_lock(&uobj->vmobjlock);
 		uvm_page_unbusy(pgs, npages);
+		simple_unlock(&uobj->vmobjlock);
 		unmapped = TRUE;
 	} else {
 		unmapped = FALSE;
@@ -572,6 +592,7 @@ ubc_release(va, flags)
 }
 
 
+#if 0 /* notused */
 /*
  * removing a range of mappings from the ubc mapping cache.
  */
@@ -616,3 +637,4 @@ ubc_flush(uobj, start, end)
 	pmap_update(pmap_kernel());
 	simple_unlock(&ubc_object.uobj.vmobjlock);
 }
+#endif /* notused */

@@ -1,4 +1,4 @@
-/*	$NetBSD: isic_supio.c,v 1.10 2002/03/24 20:35:43 martin Exp $ */
+/*	$NetBSD: isic_supio.c,v 1.13.4.1 2004/11/29 06:10:34 jmc Exp $ */
 
 /*
  *   Copyright (c) 1998,2001 Ignatios Souvatzis. All rights reserved.
@@ -47,7 +47,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: isic_supio.c,v 1.10 2002/03/24 20:35:43 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: isic_supio.c,v 1.13.4.1 2004/11/29 06:10:34 jmc Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -80,7 +80,7 @@ __KERNEL_RCSID(0, "$NetBSD: isic_supio.c,v 1.10 2002/03/24 20:35:43 martin Exp $
 #include <dev/ic/isac.h>
 
 /* XXX I think the following line should be elsewhere ... -is */
-extern const struct isdn_layer1_bri_driver isic_std_driver;
+extern const struct isdn_layer1_isdnif_driver isic_std_driver;
 
 /*static*/ int isic_supio_match(struct device *, struct cfdata *, void *);
 /*static*/ void isic_supio_attach(struct device *, struct device *, void *);
@@ -102,9 +102,8 @@ struct isic_supio_softc {
 	struct bus_space_tag	sc_bst;
 };
 
-struct cfattach isic_supio_ca = {
-	sizeof(struct isic_supio_softc), isic_supio_match, isic_supio_attach
-};
+CFATTACH_DECL(isic_supio, sizeof(struct isic_supio_softc),
+    isic_supio_match, isic_supio_attach, NULL, NULL);
 
 /*
  * Probe card
@@ -196,7 +195,7 @@ isic_supio_attach(struct device *parent, struct device *self, void *aux)
 int
 isic_supiointr(void *p)
 {
-	/* XXX should test whether it is our interupt at all */
+	/* XXX should test whether it is our interrupt at all */
         add_sicallback((sifunc_t)isicintr, p, NULL);
 	return 1;
 }

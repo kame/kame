@@ -1,4 +1,4 @@
-/*	$NetBSD: promdev.c,v 1.12 2001/09/26 20:53:10 eeh Exp $ */
+/*	$NetBSD: promdev.c,v 1.15 2003/07/30 15:58:40 mrg Exp $ */
 
 /*
  * Copyright (c) 1993 Paul Kranenburg
@@ -38,7 +38,6 @@
 #include <sys/param.h>
 #include <sys/reboot.h>
 #include <sys/systm.h>
-#include <machine/idprom.h>
 #include <machine/oldmon.h>
 #include <machine/promlib.h>
 #include <machine/ctlreg.h>
@@ -46,7 +45,7 @@
 #include <machine/pte.h>
 
 #include <lib/libsa/stand.h>
-
+#include <lib/libkern/libkern.h>
 #include <sparc/stand/common/promdev.h>
 
 /* OBP V0-3 PROM vector */
@@ -449,65 +448,6 @@ getsecs()
 	return (prom_ticks() / 1000);
 }
 
-
-
-void
-prom_getether(fd, ea)
-	int fd;
-	u_char *ea;
-{
-static	struct idprom idprom;
-
-	switch (prom_version()) {
-	case PROM_OLDMON:
-		if (idprom.id_format == 0) {
-			int len = sizeof(struct idprom);
-			u_char *src = (char *)AC_IDPROM;
-			u_char *dst = (char *)&idprom;
-			do {
-				*dst++ = lduba(src++, ASI_CONTROL);
-			} while (--len > 0);
-		}
-		bcopy(idprom.id_ether, ea, 6);
-		break;
-
-	/*
-	 * XXX - maybe we should simply always look at the `idprom' property
-	 *	 and not bother with `pv_enaddr' or `prom_interpret()' at all.
-	 */
-	case PROM_OBP_V0:
-		if (idprom.id_format == 0) {
-			void *buf = &idprom;
-			int len = sizeof(struct idprom);
-			int node = prom_findroot();
-			if (PROM_getprop(node, "idprom", 1, &len, &buf) != 0) {
-				printf("`idprom' property cannot be read: "
-					"cannot get ethernet address");
-				/*
-				 * Copy ethernet address into `ea' anyway,
-				 * so that it will be zeroed.
-				 */
-			}
-		}
-		bcopy(idprom.id_ether, ea, 6);
-		break;
-
-	case PROM_OBP_V2:
-		(void)(*obpvec->pv_enaddr)(fd, (char *)ea);
-		break;
-
-	case PROM_OPENFIRM:
-	case PROM_OBP_V3:
-		{
-		char buf[64];
-		sprintf(buf, "%lx mac-address drop swap 6 cmove", (u_long)ea);
-		prom_interpret(buf);
-		}
-		break;
-	}
-}
-
-
 /*
  * A number of well-known devices on sun4s.
  */
@@ -724,12 +664,12 @@ oldmon_mapin(physaddr, length, maptype)
 	int i, pa, pte, va;
 
 	if (length > (4*NBPG))
-		panic("oldmon_mapin: length=%d\n", length);
+		panic("oldmon_mapin: length=%d", length);
 
 	for (i = 0; i < oldmon_mapinfo_cnt; i++)
 		if (oldmon_mapinfo[i].maptype == maptype)
 			goto found;
-	panic("oldmon_mapin: invalid maptype %d\n", maptype);
+	panic("oldmon_mapin: invalid maptype %d", maptype);
 
 found:
 	pte = oldmon_mapinfo[i].pgtype;

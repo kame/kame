@@ -1,4 +1,4 @@
-/*	$NetBSD: irix_exec.h,v 1.7 2002/04/20 16:19:22 manu Exp $ */
+/*	$NetBSD: irix_exec.h,v 1.20 2003/08/24 17:52:42 chs Exp $ */
 
 /*-
  * Copyright (c) 2001-2002 The NetBSD Foundation, Inc.
@@ -41,17 +41,32 @@
 
 #include <sys/types.h> 
 #include <sys/exec.h>
+#include <sys/signal.h>
+#include <sys/queue.h>
+#include <sys/lock.h>
 #include <sys/exec_elf.h>
 
 #include <machine/vmparam.h>
 
-/* Address and size of shared arena used by usinit(3) on IRIX */
-#define IRIX_SH_ARENA_ADDR	0x200000
-#define IRIX_SH_ARENA_SZ	PAGE_SIZE
+#include <compat/svr4/svr4_types.h>
+#include <compat/svr4/svr4_signal.h>
 
-/* IRIX specific per-process data */
+/* IRIX specific per-process data, zero'ed on allocation */
 struct irix_emuldata {
-	void *ied_sigtramp;	/* Address of signal trampoline */
+#define ied_startcopy ied_sigtramp
+	void *ied_sigtramp[SVR4_NSIG];	/* Address of signal trampoline */
+#define ied_endcopy ied_termchild
+
+	int ied_termchild;	/* want SIGHUP on parent's exit */
+	int ied_procblk_count;	/* semaphore for blockproc */
+				/* share group proc list head and lock */
+	struct irix_share_group *ied_share_group;
+				/* share group proc list itself */
+	LIST_ENTRY(irix_emuldata) ied_sglist;	
+	struct proc *ied_p;	/* points back to struct proc */
+	int ied_shareaddr;	/* share VM with the group */
+	LIST_HEAD(ied_shared_regions, irix_shared_regions_rec) 
+	    ied_shared_regions;	/* list of (un)shared memory regions */
 };
 
 /* e_flags used by IRIX for ABI selection */
@@ -62,12 +77,14 @@ struct irix_emuldata {
 
 #define IRIX_ELF_AUX_ENTRIES 7
 
+#define irix_check_exec(p)	((p)->p_emul == &emul_irix)
+
 #ifdef EXEC_ELF32
 #define IRIX_AUX_ARGSIZ howmany(IRIX_ELF_AUX_ENTRIES * \
     sizeof(Aux32Info), sizeof (Elf32_Addr))
 
-int irix_elf32_copyargs __P((struct exec_package *, struct ps_strings *,
-    char **, void *));
+int irix_elf32_copyargs __P((struct proc *, struct exec_package *,
+    struct ps_strings *, char **, void *));
 
 int irix_elf32_probe_o32 __P((struct proc *, struct exec_package *, void *,  
     char *, vaddr_t *));
@@ -80,14 +97,15 @@ int irix_elf32_probe_n32 __P((struct proc *, struct exec_package *, void *,
 /* #define IRIX_AUX_ARGSIZ howmany(IRIX_ELF_AUX_ENTRIES * \
     sizeof(Aux64Info), sizeof (Elf64_Addr))  */
 
-int irix_elf64_copyargs __P((struct exec_package *, struct ps_strings *,
-    char **, void *));
+int irix_elf64_copyargs __P((struct proc *, struct exec_package *,
+    struct ps_strings *, char **, void *));
 
 int irix_elf64_probe __P((struct proc *, struct exec_package *, void *,  
     char *, vaddr_t *));
 #endif
 
-extern const struct emul emul_irix_n32;
-extern const struct emul emul_irix_o32;
+void irix_n32_setregs __P((struct lwp *, struct exec_package *, u_long));
+
+extern const struct emul emul_irix;
 
 #endif /* !_IRIX_EXEC_H_ */

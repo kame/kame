@@ -1,10 +1,10 @@
-#	$NetBSD: Makefile,v 1.3 2002/02/20 03:00:27 thorpej Exp $
+#	$NetBSD: Makefile,v 1.6.4.1 2004/08/16 17:46:09 jmc Exp $
 
 S=	${.CURDIR}/../../../../
 
 BASE?= pxeboot_ia32
 PROG= ${BASE}.bin
-MKMAN=	no
+NOMAN=	# defined
 NEWVERSWHAT=	"PXE Boot"
 STARTFILE=	${PXESTART}
 RELOC=		0x0
@@ -15,6 +15,11 @@ RELOC=		0x0
 .endif
 
 SRCS= main.c dev_net.c devopen.c conf.c exec.c pxe.c pxe_call.S
+# use our own nfs implementation
+.PATH: ${.CURDIR}/../libsa
+SRCS+= nfs.c
+
+CPPFLAGS+= -DSLOW	# for libz
 
 .if (${BASE} == "pxeboot_ia32")
 # Various serial line configurations
@@ -34,6 +39,7 @@ CPPFLAGS+= -DSUPPORT_SERIAL=CONSDEV_COM0 -DDIRECT_SERIAL
 CPPFLAGS+= -DSUPPORT_BOOTP -DSUPPORT_DHCP
 CPPFLAGS+= -DSUPPORT_TFTP
 CPPFLAGS+= -DSUPPORT_NFS
+#CPPFLAGS+= -DNFS_NOSYMLINK
 
 CPPFLAGS+= -DPASS_MEMMAP
 
@@ -43,7 +49,9 @@ CFLAGS+= -Wall -Wmissing-prototypes -Wstrict-prototypes -Wno-main
 SAMISCCPPFLAGS+= -DHEAP_START=0x10000 -DHEAP_LIMIT=0x30000
 SAMISCMAKEFLAGS+= SA_USE_CREAD=yes	# Read compressed kernels
 
-I386MISCMAKEFLAGS= I386_INCLUDE_DISK=no
+CPPFLAGS+= -DPASS_BIOSGEOM
+# if you don't use -DPASS_BIOSGEOM, then set I386_INCLUDE_DISK=no
+#I386MISCMAKEFLAGS= I386_INCLUDE_DISK=no
 
 .if (${BASE} == "pxeboot_ia32")
 VERSIONFILE= ${.CURDIR}/version

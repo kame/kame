@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_machdep.c,v 1.7 2002/03/31 22:21:03 christos Exp $	*/
+/*	$NetBSD: svr4_machdep.c,v 1.16 2003/12/04 19:38:21 atatat Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: svr4_machdep.c,v 1.16 2003/12/04 19:38:21 atatat Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -45,6 +48,7 @@
 #include <sys/signal.h>
 #include <sys/signalvar.h>
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 #include <sys/exec_elf.h>
 
@@ -70,24 +74,24 @@ static void	svr4_getsiginfo __P((union svr4_siginfo *, int, unsigned long,
 		    caddr_t));
 
 void
-svr4_setregs(p, epp, stack)
-	struct proc *p;
+svr4_setregs(l, epp, stack)
+	struct lwp *l;
 	struct exec_package *epp;
 	unsigned long stack;
 {
-	struct frame *frame = (struct frame *)p->p_md.md_regs;
+	struct frame *frame = (struct frame *)l->l_md.md_regs;
 
-	setregs(p, epp, stack);
+	setregs(l, epp, stack);
 	frame->f_regs[FP] = (int)stack;
 }
 
 void *
-svr4_getmcontext(p, mc, flags)
-	struct proc *p;
+svr4_getmcontext(l, mc, flags)
+	struct lwp *l;
 	svr4_mcontext_t *mc;
 	unsigned long *flags;
 {
-	struct frame *frame = (struct frame *)p->p_md.md_regs;
+	struct frame *frame = (struct frame *)l->l_md.md_regs;
 	unsigned int format = frame->f_format;
 	svr4_greg_t *r = mc->gregs;
 
@@ -143,12 +147,12 @@ svr4_getmcontext(p, mc, flags)
 }
 
 int
-svr4_setmcontext(p, mc, flags)
-	struct proc *p;
+svr4_setmcontext(l, mc, flags)
+	struct lwp *l;
 	svr4_mcontext_t *mc;
 	unsigned long flags;
 {
-	struct frame *frame = (struct frame *)p->p_md.md_regs;
+	struct frame *frame = (struct frame *)l->l_md.md_regs;
 	unsigned int format = mc->mc_pad.frame.format;
 	svr4_greg_t *r = mc->gregs;
 	int sz;
@@ -244,32 +248,20 @@ svr4_getsiginfo(sip, sig, code, addr)
 }
 
 void
-svr4_sendsig(catcher, sig, mask, code)
-	sig_t catcher;
-	int sig;
-	sigset_t *mask;
-	unsigned long code;
+svr4_sendsig(const ksiginfo_t *ksi, const sigset_t *mask)
 {
-	struct proc *p = curproc;
-	struct frame *frame;
-	struct svr4_sigframe *sfp, sf;
+	u_long code = KSI_TRAPCODE(ksi);
+	int sig = ksi->ksi_signo;
+	struct lwp *l = curlwp;
+	struct proc *p = l->l_proc;
+	struct frame *frame = (struct frame *)l->l_md.md_regs;
 	int onstack;
+	struct svr4_sigframe *sfp = getframe(l, sig, &onstack), sf;
+	sig_t catcher = SIGACTION(p, sig).sa_handler;
 
-	frame = (struct frame *)p->p_md.md_regs;
-
-	onstack =
-	    (p->p_sigctx.ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
-	    (SIGACTION(p, sig).sa_flags & SA_ONSTACK) != 0;
-
-	/* Allocate space for the signal handler context. */
-	if (onstack)
-		sfp = (struct svr4_sigframe *)((caddr_t)p->p_sigctx.ps_sigstk.ss_sp +
-		    p->p_sigctx.ps_sigstk.ss_size);
-	else
-		sfp = (struct svr4_sigframe *)frame->f_regs[SP];
 	sfp--;
 
-	svr4_getcontext(p, &sf.sf_uc, mask);
+	svr4_getcontext(l, &sf.sf_uc);
 	/* Passing the PC is *wrong*! */
 	svr4_getsiginfo(&sf.sf_si, sig, code, (caddr_t)frame->f_pc);
 
@@ -289,13 +281,11 @@ svr4_sendsig(catcher, sig, mask, code)
 		 * Process has trashed its stack; give it an illegal
 		 * instruction to halt it in its tracks.
 		 */
-		sigexit(p, SIGILL);
+		sigexit(l, SIGILL);
 		/* NOTREACHED */
 	}
 
-	/* Set up the registers to return to sigcode. */
-	frame->f_regs[SP] = (int)sfp;
-	frame->f_pc = (int)p->p_sigctx.ps_sigcode;
+	buildcontext(l, p->p_sigctx.ps_sigcode, sfp);
 
 	if (onstack)
 		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
@@ -305,8 +295,8 @@ svr4_sendsig(catcher, sig, mask, code)
  * sysm68k()
  */
 int
-svr4_sys_sysarch(p, v, retval)
-	struct proc *p;
+svr4_sys_sysarch(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -314,9 +304,10 @@ svr4_sys_sysarch(p, v, retval)
 		syscallarg(int) op;
 		syscallarg(void *) a1;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	char tmp[MAXHOSTNAMELEN];
 	size_t len;
-	int error, name;
+	int error, name[2];
 
 	switch (SCARG(uap, op)) {
 	case SVR4_SYSARCH_SETNAME:
@@ -325,9 +316,9 @@ svr4_sys_sysarch(p, v, retval)
 		if ((error = copyinstr(SCARG(uap, a1), tmp, sizeof (tmp), &len))
 		    != 0)
 			return (error);
-		name = KERN_HOSTNAME;
-		return (kern_sysctl(&name, 1, NULL, NULL, SCARG(uap, a1), len,
-		    p));
+		name[0] = CTL_KERN;
+		name[1] = KERN_HOSTNAME;
+		return (old_sysctl(&name[0], 2, NULL, NULL, tmp, len, NULL));
 	default:
 		printf("uninplemented svr4_sysarch(%d), a1 %p\n",
 		    SCARG(uap, op), SCARG(uap, a1));

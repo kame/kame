@@ -1,4 +1,4 @@
-/*	$NetBSD: irix_stat.c,v 1.5 2002/03/16 20:43:52 christos Exp $ */
+/*	$NetBSD: irix_stat.c,v 1.10 2003/06/29 22:29:23 fvdl Exp $ */
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: irix_stat.c,v 1.5 2002/03/16 20:43:52 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: irix_stat.c,v 1.10 2003/06/29 22:29:23 fvdl Exp $");
 
 #include <sys/errno.h>
 #include <sys/types.h>
@@ -48,6 +48,7 @@ __KERNEL_RCSID(0, "$NetBSD: irix_stat.c,v 1.5 2002/03/16 20:43:52 christos Exp $
 #include <sys/stdint.h>
 #include <sys/stat.h>
 #include <sys/systm.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/common/compat_util.h>
@@ -89,7 +90,7 @@ bsd_to_irix_stat(bsp, isp)
 	isp->ist_size = bsp->st_size;
 	isp->ist_blocks = bsp->st_blocks;
 	isp->ist_blksize = bsp->st_blksize;
-	strcpy(isp->ist_fstype, "unknown");
+	strlcpy(isp->ist_fstype, "unknown", sizeof(isp->ist_fstype));
 
 	return;
 }
@@ -121,14 +122,14 @@ bsd_to_irix_stat64(bsp, isp)
 	isp->ist_size = bsp->st_size;
 	isp->ist_blocks = bsp->st_blocks;
 	isp->ist_blksize = bsp->st_blksize;
-	strcpy(isp->ist_fstype, "unknown");
+	strlcpy(isp->ist_fstype, "unknown", sizeof(isp->ist_fstype));
 
 	return;
 }
 
 int
-irix_sys_xstat(p, v, retval)
-	struct proc *p;
+irix_sys_xstat(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -137,6 +138,7 @@ irix_sys_xstat(p, v, retval)
 		syscallarg(const char *) path;
 		syscallarg(struct stat *) buf;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct sys___stat13_args cup;
 	struct stat st;
 	caddr_t sg = stackgap_init(p, 0);
@@ -146,7 +148,7 @@ irix_sys_xstat(p, v, retval)
 	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 	SCARG(&cup, path) = SCARG(uap, path);
 
-	if ((error = sys___stat13(p, &cup, retval)) != 0)
+	if ((error = sys___stat13(l, &cup, retval)) != 0)
 		return error;
 
 	if ((error = copyin(SCARG(&cup, ub), &st, sizeof st)) != 0)
@@ -184,8 +186,8 @@ irix_sys_xstat(p, v, retval)
 }
 
 int
-irix_sys_lxstat(p, v, retval)
-	struct proc *p;
+irix_sys_lxstat(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -194,6 +196,7 @@ irix_sys_lxstat(p, v, retval)
 		syscallarg(const char *) path;
 		syscallarg(struct stat *) buf;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct sys___lstat13_args cup;
 	struct stat st;
 	caddr_t sg = stackgap_init(p, 0);
@@ -203,7 +206,7 @@ irix_sys_lxstat(p, v, retval)
 	CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 	SCARG(&cup, path) = SCARG(uap, path);
 
-	if ((error = sys___lstat13(p, &cup, retval)) != 0)
+	if ((error = sys___lstat13(l, &cup, retval)) != 0)
 		return error;
 
 	if ((error = copyin(SCARG(&cup, ub), &st, sizeof st)) != 0)
@@ -241,8 +244,8 @@ irix_sys_lxstat(p, v, retval)
 }
 
 int
-irix_sys_fxstat(p, v, retval)
-	struct proc *p;
+irix_sys_fxstat(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -251,6 +254,7 @@ irix_sys_fxstat(p, v, retval)
 		syscallarg(const int) fd;
 		syscallarg(struct stat *) buf;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct sys___fstat13_args cup;
 	struct stat st;
 	int error;
@@ -259,7 +263,7 @@ irix_sys_fxstat(p, v, retval)
 	SCARG(&cup, sb) = stackgap_alloc(p, &sg, sizeof(struct stat));
 	SCARG(&cup, fd) = SCARG(uap, fd);
 
-	if ((error = sys___fstat13(p, &cup, retval)) != 0)
+	if ((error = sys___fstat13(l, &cup, retval)) != 0)
 		return error;
 
 	if ((error = copyin(SCARG(&cup, sb), &st, sizeof st)) != 0)

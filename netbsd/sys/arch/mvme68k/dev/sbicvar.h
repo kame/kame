@@ -1,4 +1,4 @@
-/*	$NetBSD: sbicvar.h,v 1.9 2002/05/14 02:03:01 matt Exp $	*/
+/*	$NetBSD: sbicvar.h,v 1.11 2003/08/07 16:28:41 agc Exp $	*/
 
 /*
  * Copyright (c) 1990 The Regents of the University of California.
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *  This product includes software developed by the University of
- *  California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -121,10 +117,10 @@ struct  sbic_softc {
     u_char                  sc_msg[7];
     u_long                  sc_clkfreq;
     u_long                  sc_tcnt;    /* number of bytes transfered */
-    u_short                 sc_dmacmd;  /* used by dma drivers */
-    u_long                  sc_dmamask; /* dma valid mem mask */
+    u_short                 sc_dmacmd;  /* used by DMA drivers */
+    u_long                  sc_dmamask; /* DMA valid mem mask */
 #ifdef DEBUG
-    u_short                 sc_dmatimo; /* dma timeout */
+    u_short                 sc_dmatimo; /* DMA timeout */
 #endif
     struct  dma_chain       *sc_cur;
     struct  dma_chain       *sc_last;
@@ -138,7 +134,7 @@ struct  sbic_softc {
  * sc_flags
  */
 #define SBICF_ALIVE         0x01    /* controller initialized */
-#define SBICF_DCFLUSH       0x02    /* need flush for overlap after dma finishes */
+#define SBICF_DCFLUSH       0x02    /* need flush for overlap after DMA finishes */
 #define SBICF_SELECTED      0x04    /* bus is in selected state. */
 #define SBICF_ICMD          0x08    /* Immediate command in execution */
 #define SBICF_BADDMA        0x10    /* controller can only DMA to ztwobus space */

@@ -1,4 +1,4 @@
-/*	$NetBSD: boot.c,v 1.5 2001/06/19 11:56:28 nonaka Exp $	*/
+/*	$NetBSD: boot.c,v 1.8 2004/03/10 15:17:01 nonaka Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -33,6 +33,7 @@
 
 #include <lib/libsa/stand.h>
 #include <lib/libsa/loadfile.h>
+#include <lib/libkern/libkern.h>
 #include <sys/reboot.h>
 #include <sys/boot_flag.h>
 #include <machine/bootinfo.h>
@@ -61,7 +62,6 @@ struct btinfo_console btinfo_console;
 struct btinfo_clock btinfo_clock;
 
 RESIDUAL residual;
-u_long ladr;
 
 extern u_long ns_per_tick;
 extern char bootprog_name[], bootprog_rev[], bootprog_maker[], bootprog_date[];
@@ -74,10 +74,13 @@ boot(resp, loadaddr)
 	void *resp;
 	u_long loadaddr;
 {
+	extern char _end[], _edata[];
 	int n = 0;
 	int addr, speed;
 	char *name, *cnname, *p;
-	ladr = loadaddr;
+
+	/* Clear all of BSS */
+	memset(_edata, 0, _end - _edata);
 
 	/*
 	 * console init
@@ -114,6 +117,7 @@ boot(resp, loadaddr)
 	btinfo_clock.common.type = BTINFO_CLOCK;
 	btinfo_clock.ticks_per_sec = resp ?
 	    residual.VitalProductData.ProcessorBusHz / 4 : TICKS_PER_SEC;
+	ns_per_tick = 1000000000 / btinfo_clock.ticks_per_sec;
 
 	p = bootinfo;
         memcpy(p, (void *)&btinfo_residual, sizeof(btinfo_residual));
@@ -123,9 +127,9 @@ boot(resp, loadaddr)
         memcpy(p, (void *)&btinfo_clock, sizeof(btinfo_clock));
 
 	/*
-	 * attached kernel check
+	 * load kernel if attached
 	 */
-	init_in();
+	init_in(loadaddr);
 
 	printf("\n");
 	printf(">> %s, Revision %s\n", bootprog_name, bootprog_rev);

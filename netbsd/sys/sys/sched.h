@@ -1,11 +1,11 @@
-/* $NetBSD: sched.h,v 1.14 2001/07/01 18:06:12 thorpej Exp $ */
+/* $NetBSD: sched.h,v 1.19 2003/08/07 16:34:12 agc Exp $ */
 
 /*-
- * Copyright (c) 1999, 2000, 2001 The NetBSD Foundation, Inc.
+ * Copyright (c) 1999, 2000, 2001, 2002 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Ross Harvey and Jason R. Thorpe.
+ * by Ross Harvey, Jason R. Thorpe, and Nathan J. Williams.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -53,11 +53,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -79,17 +75,27 @@
 #ifndef	_SYS_SCHED_H_
 #define	_SYS_SCHED_H_
 
+#include <sys/featuretest.h>
+
 #if defined(_KERNEL_OPT)
 #include "opt_multiprocessor.h"
 #include "opt_lockdebug.h"
 #endif
 
-/*
- * Posix defines a <sched.h> which may want to include <sys/sched.h>
- */
+struct sched_param {
+	int	sched_priority;
+};
 
-#if !defined(_POSIX_SOURCE) && !defined(_XOPEN_SOURCE) && \
-    !defined(_ANSI_SOURCE)
+/*
+ * Scheduling policies required by IEEE Std 1003.1-2001
+ */
+#define	SCHED_OTHER	0	/* Behavior can be FIFO or RR, or not */
+#define	SCHED_FIFO	1
+#define	SCHED_RR	2
+
+/* Other nonstandard policies: */
+
+#if defined(_NETBSD_SOURCE)
 
 #include <sys/time.h>
 
@@ -103,8 +109,8 @@
 #define	SLPQUE_TABLESIZE	128
 #define	SLPQUE_LOOKUP(x)	(((u_long)(x) >> 8) & (SLPQUE_TABLESIZE - 1))
 struct slpque {
-	struct proc *sq_head;
-	struct proc **sq_tailp;
+	struct lwp *sq_head;
+	struct lwp **sq_tailp;
 };
 
 /*
@@ -118,8 +124,8 @@ struct slpque {
  */
 #define	RUNQUE_NQS		32
 struct prochd {
-	struct proc *ph_link;
-	struct proc *ph_rlink;
+	struct lwp *ph_link;
+	struct lwp *ph_rlink;
 };
 
 /*
@@ -196,8 +202,8 @@ extern __volatile u_int32_t sched_whichqs;
 struct proc;
 struct cpu_info;
 
-void schedclock(struct proc *p);
-void sched_wakeup(void *);
+void schedclock(struct lwp *);
+void sched_wakeup(const void *);
 void roundrobin(struct cpu_info *);
 
 /*

@@ -1,4 +1,4 @@
-/* $NetBSD: isp_inline.h,v 1.21 2002/05/17 18:49:43 mjacob Exp $ */
+/* $NetBSD: isp_inline.h,v 1.24 2003/12/04 13:57:30 keihan Exp $ */
 /*
  * This driver, which is contained in NetBSD in the files:
  *
@@ -21,7 +21,7 @@
  *	sys/pci/isp_pci.c
  *	sys/sbus/isp_sbus.c
  *
- * Is being actively maintained by Matthew Jacob (mjacob@netbsd.org).
+ * Is being actively maintained by Matthew Jacob (mjacob@NetBSD.org).
  * This driver also is shared source with FreeBSD, OpenBSD, Linux, Solaris,
  * Linux versions. This tends to be an interesting maintenance problem.
  *
@@ -504,7 +504,7 @@ isp_put_request_t3(struct ispsoftc *isp, ispreqt3_t *tqsrc, ispreqt3_t *tqdst)
 		ISP_IOXPUT_8(isp, tqsrc->req_cdb[i], &tqdst->req_cdb[i]);
 	}
 	ISP_IOXPUT_32(isp, tqsrc->req_totalcnt, &tqdst->req_totalcnt);
-	for (i = 0; i < ISP_RQDSEG_T2; i++) {
+	for (i = 0; i < ISP_RQDSEG_T3; i++) {
 		ISP_IOXPUT_32(isp, tqsrc->req_dataseg[i].ds_base,
 		    &tqdst->req_dataseg[i].ds_base);
 		ISP_IOXPUT_32(isp, tqsrc->req_dataseg[i].ds_basehi,
@@ -1003,7 +1003,7 @@ isp_put_atio2(struct ispsoftc *isp, at2_entry_t *atsrc, at2_entry_t *atdst)
 	ISP_IOXPUT_16(isp, atsrc->at_rxid, &atdst->at_rxid);
 	ISP_IOXPUT_16(isp, atsrc->at_flags, &atdst->at_flags);
 	ISP_IOXPUT_16(isp, atsrc->at_status, &atdst->at_status);
-	ISP_IOXPUT_8(isp, atsrc->at_reserved1, &atdst->at_reserved1);
+	ISP_IOXPUT_8(isp, atsrc->at_crn, &atdst->at_crn);
 	ISP_IOXPUT_8(isp, atsrc->at_taskcodes, &atdst->at_taskcodes);
 	ISP_IOXPUT_8(isp, atsrc->at_taskflags, &atdst->at_taskflags);
 	ISP_IOXPUT_8(isp, atsrc->at_execodes, &atdst->at_execodes);
@@ -1033,7 +1033,7 @@ isp_get_atio2(struct ispsoftc *isp, at2_entry_t *atsrc, at2_entry_t *atdst)
 	ISP_IOXGET_16(isp, &atsrc->at_rxid, atdst->at_rxid);
 	ISP_IOXGET_16(isp, &atsrc->at_flags, atdst->at_flags);
 	ISP_IOXGET_16(isp, &atsrc->at_status, atdst->at_status);
-	ISP_IOXGET_8(isp, &atsrc->at_reserved1, atdst->at_reserved1);
+	ISP_IOXGET_8(isp, &atsrc->at_crn, atdst->at_crn);
 	ISP_IOXGET_8(isp, &atsrc->at_taskcodes, atdst->at_taskcodes);
 	ISP_IOXGET_8(isp, &atsrc->at_taskflags, atdst->at_taskflags);
 	ISP_IOXGET_8(isp, &atsrc->at_execodes, atdst->at_execodes);
@@ -1221,7 +1221,6 @@ isp_put_ctio2(struct ispsoftc *isp, ct2_entry_t *ctsrc, ct2_entry_t *ctdst)
 static INLINE void
 isp_get_ctio2(struct ispsoftc *isp, ct2_entry_t *ctsrc, ct2_entry_t *ctdst)
 {
-	int i;
 	isp_copy_in_hdr(isp, &ctsrc->ct_header, &ctdst->ct_header);
 	ISP_IOXGET_16(isp, &ctsrc->ct_reserved, ctdst->ct_reserved);
 	ISP_IOXGET_16(isp, &ctsrc->ct_fwhandle, ctdst->ct_fwhandle);
@@ -1234,16 +1233,6 @@ isp_get_ctio2(struct ispsoftc *isp, ct2_entry_t *ctsrc, ct2_entry_t *ctdst)
 	ISP_IOXGET_16(isp, &ctsrc->ct_seg_count, ctdst->ct_seg_count);
 	ISP_IOXGET_32(isp, &ctsrc->ct_reloff, ctdst->ct_reloff);
 	ISP_IOXGET_32(isp, &ctsrc->ct_resid, ctdst->ct_resid);
-	for (i = 0; i < 4; i++) {
-		ISP_IOXGET_32(isp, &ctsrc->rsp.fw._reserved[i],
-		    ctdst->rsp.fw._reserved[i]);
-	}
-	ISP_IOXGET_16(isp, &ctsrc->rsp.fw.ct_scsi_status,
-	    ctdst->rsp.fw.ct_scsi_status);
-	for (i = 0; i < QLTM_SENSELEN; i++) {
-		ISP_IOXGET_8(isp, &ctsrc->rsp.fw.ct_sense[i],
-		    ctdst->rsp.fw.ct_sense[i]);
-	}
 }
 
 static INLINE void

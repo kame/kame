@@ -1,4 +1,4 @@
-/*	$NetBSD: bus.h,v 1.5 2002/03/17 21:45:09 simonb Exp $	*/
+/*	$NetBSD: bus.h,v 1.13 2004/01/13 12:57:24 sekiya Exp $	*/
 
 /*
  * Copyright (c) 1996, 1997, 1998, 2001 The NetBSD Foundation, Inc.
@@ -61,6 +61,20 @@ typedef int	bus_space_tag_t;
 typedef u_long	bus_space_handle_t;
 
 /*
+ * Values for sgimips bus space tag, not to be used directly by MI code.
+ */
+#define	SGIMIPS_BUS_SPACE_NORMAL	0
+#define	SGIMIPS_BUS_SPACE_HPC		1
+#define	SGIMIPS_BUS_SPACE_MEM		2
+#define	SGIMIPS_BUS_SPACE_MACE		3
+#define	SGIMIPS_BUS_SPACE_IO		4
+#define SGIMIPS_BUS_SPACE_CRIME		5
+
+/* Initialization for bus_dmamap_sync, which differs from MIPS1 to MIPS3 */
+
+void	sgimips_bus_dma_init(void);
+
+/*
  *	int bus_space_map(bus_space_tag_t t, bus_addr_t addr,
  *	    bus_size_t size, int flags, bus_space_handle_t *bshp);
  *
@@ -119,6 +133,11 @@ void	bus_space_free(bus_space_tag_t t, bus_space_handle_t bsh,
 	    bus_size_t size);
 
 /*
+ * Get kernel virtual address of mapped bus space
+ */
+void *	bus_space_vaddr(bus_space_tag_t t, bus_space_handle_t bsh);
+
+/*
  *	u_intN_t bus_space_read_N(bus_space_tag_t tag,
  *	    bus_space_handle_t bsh, bus_size_t offset);
  *
@@ -128,15 +147,8 @@ void	bus_space_free(bus_space_tag_t t, bus_space_handle_t bsh,
 
 u_int8_t bus_space_read_1(bus_space_tag_t, bus_space_handle_t, bus_size_t);
 u_int16_t bus_space_read_2(bus_space_tag_t, bus_space_handle_t, bus_size_t);
-
-#define	bus_space_read_4(t, h, o)					\
-(wbflush(), /* XXX */							\
-     (void) t, (*(volatile u_int32_t *)((h) + (o))))
-
-/* XXX Make sure to use 64-bit loads. */
-#define	bus_space_read_8(t, h, o)					\
-(wbflush(), /* XXX */							\
-     (void) t, (*(volatile u_int64_t *)((h) + (o))))
+u_int32_t bus_space_read_4(bus_space_tag_t, bus_space_handle_t, bus_size_t);
+u_int64_t bus_space_read_8(bus_space_tag_t, bus_space_handle_t, bus_size_t);
 
 /*
  *	void bus_space_read_multi_N(bus_space_tag_t tag,
@@ -228,21 +240,10 @@ void	bus_space_write_1(bus_space_tag_t, bus_space_handle_t, bus_size_t,
 	    u_int8_t);
 void	bus_space_write_2(bus_space_tag_t, bus_space_handle_t, bus_size_t,
 	    u_int16_t);
-
-#define	bus_space_write_4(t, h, o, v)					\
-do {									\
-	(void) t;							\
-	*(volatile u_int32_t *)((h) + (o)) = (v);			\
-	wbflush(); /* XXX */						\
-} while (0)
-
-/* XXX Make sure to use 64-bit stores. */
-#define	bus_space_write_8(t, h, o, v)					\
-do {									\
-	(void) t;							\
-	*(volatile u_int64_t *)((h) + (o)) = (v);			\
-	wbflush(); /* XXX */						\
-} while (0)
+void	bus_space_write_4(bus_space_tag_t, bus_space_handle_t, bus_size_t,
+	    u_int32_t);
+void	bus_space_write_8(bus_space_tag_t, bus_space_handle_t, bus_size_t,
+	    u_int64_t);
 
 /*
  *	void bus_space_write_multi_N(bus_space_tag_t tag,
@@ -483,6 +484,7 @@ __SGIMIPS_copy_region(4)
 #define	BUS_DMA_BUS4		0x080
 #define	BUS_DMA_READ		0x100	/* mapping is device -> memory only */
 #define	BUS_DMA_WRITE		0x200	/* mapping is memory -> device only */
+#define	BUS_DMA_NOCACHE		0x400	/* hint: map non-cached memory */
 
 #define	SGIMIPS_DMAMAP_COHERENT	0x10000	/* no cache flush necessary on sync */
 
@@ -500,6 +502,8 @@ struct uio;
 
 typedef struct sgimips_bus_dma_tag		*bus_dma_tag_t;
 typedef struct sgimips_bus_dmamap		*bus_dmamap_t;
+
+#define BUS_DMA_TAG_VALID(t)    ((t) != (bus_dma_tag_t)0)
 
 /*
  *	bus_dma_segment_t
@@ -605,6 +609,7 @@ struct sgimips_bus_dmamap {
 	bus_size_t	_dm_maxsegsz;	/* largest possible segment */
 	bus_size_t	_dm_boundary;	/* don't cross this */
 	int		_dm_flags;	/* misc. flags */
+	struct proc	*_dm_proc;	/* proc that owns the mapping */
 
 	/*
 	 * PUBLIC MEMBERS: these are used by machine-independent code.
@@ -615,6 +620,7 @@ struct sgimips_bus_dmamap {
 };
 
 #ifdef _SGIMIPS_BUS_DMA_PRIVATE
+
 int	_bus_dmamap_create(bus_dma_tag_t, bus_size_t, int, bus_size_t,
 	    bus_size_t, int, bus_dmamap_t *);
 void	_bus_dmamap_destroy(bus_dma_tag_t, bus_dmamap_t);
@@ -627,7 +633,9 @@ int	_bus_dmamap_load_uio(bus_dma_tag_t, bus_dmamap_t,
 int	_bus_dmamap_load_raw(bus_dma_tag_t, bus_dmamap_t,
 	    bus_dma_segment_t *, int, bus_size_t, int);
 void	_bus_dmamap_unload(bus_dma_tag_t, bus_dmamap_t);
-void	_bus_dmamap_sync(bus_dma_tag_t, bus_dmamap_t, bus_addr_t,
+void	_bus_dmamap_sync_mips1(bus_dma_tag_t, bus_dmamap_t, bus_addr_t,
+	    bus_size_t, int);
+void	_bus_dmamap_sync_mips3(bus_dma_tag_t, bus_dmamap_t, bus_addr_t,
 	    bus_size_t, int);
 
 int	_bus_dmamem_alloc(bus_dma_tag_t tag, bus_size_t size,

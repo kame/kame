@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_raid5_rotatedspare.c,v 1.6 2001/11/13 07:11:16 lukem Exp $	*/
+/*	$NetBSD: rf_raid5_rotatedspare.c,v 1.8 2003/12/29 02:38:18 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -33,7 +33,7 @@
  **************************************************************************/
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rf_raid5_rotatedspare.c,v 1.6 2001/11/13 07:11:16 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rf_raid5_rotatedspare.c,v 1.8 2003/12/29 02:38:18 oster Exp $");
 
 #include "rf_archs.h"
 
@@ -69,7 +69,6 @@ rf_ConfigureRAID5_RS(
 		return (ENOMEM);
 	layoutPtr->layoutSpecificInfo = (void *) info;
 
-	RF_ASSERT(raidPtr->numRow == 1);
 	RF_ASSERT(raidPtr->numCol >= 3);
 
 	/* the stripe identifier must identify the disks in each stripe, IN
@@ -88,7 +87,6 @@ rf_ConfigureRAID5_RS(
 
 	/* fill in the remaining layout parameters */
 	layoutPtr->numStripe = layoutPtr->stripeUnitsPerDisk;
-	layoutPtr->bytesPerStripeUnit = layoutPtr->sectorsPerStripeUnit << raidPtr->logBytesPerSector;
 	layoutPtr->numDataCol = raidPtr->numCol - 2;
 	layoutPtr->dataSectorsPerStripe = layoutPtr->numDataCol * layoutPtr->sectorsPerStripeUnit;
 	layoutPtr->numParityCol = 1;
@@ -111,14 +109,12 @@ void
 rf_MapSectorRAID5_RS(
     RF_Raid_t * raidPtr,
     RF_RaidAddr_t raidSector,
-    RF_RowCol_t * row,
     RF_RowCol_t * col,
     RF_SectorNum_t * diskSector,
     int remap)
 {
 	RF_StripeNum_t SUID = raidSector / raidPtr->Layout.sectorsPerStripeUnit;
 
-	*row = 0;
 	if (remap) {
 		*col = raidPtr->numCol - 1 - (1 + SUID / raidPtr->Layout.numDataCol) % raidPtr->numCol;
 		*col = (*col + 1) % raidPtr->numCol;	/* spare unit is rotated
@@ -135,14 +131,12 @@ void
 rf_MapParityRAID5_RS(
     RF_Raid_t * raidPtr,
     RF_RaidAddr_t raidSector,
-    RF_RowCol_t * row,
     RF_RowCol_t * col,
     RF_SectorNum_t * diskSector,
     int remap)
 {
 	RF_StripeNum_t SUID = raidSector / raidPtr->Layout.sectorsPerStripeUnit;
 
-	*row = 0;
 	*col = raidPtr->numCol - 1 - (1 + SUID / raidPtr->Layout.numDataCol) % raidPtr->numCol;
 	*diskSector = (SUID / (raidPtr->Layout.numDataCol)) * raidPtr->Layout.sectorsPerStripeUnit +
 	    (raidSector % raidPtr->Layout.sectorsPerStripeUnit);
@@ -154,12 +148,10 @@ void
 rf_IdentifyStripeRAID5_RS(
     RF_Raid_t * raidPtr,
     RF_RaidAddr_t addr,
-    RF_RowCol_t ** diskids,
-    RF_RowCol_t * outRow)
+    RF_RowCol_t ** diskids)
 {
 	RF_StripeNum_t stripeID = rf_RaidAddressToStripeID(&raidPtr->Layout, addr);
 	RF_Raid5RSConfigInfo_t *info = (RF_Raid5RSConfigInfo_t *) raidPtr->Layout.layoutSpecificInfo;
-	*outRow = 0;
 	*diskids = info->stripeIdentifier[stripeID % raidPtr->numCol];
 
 }

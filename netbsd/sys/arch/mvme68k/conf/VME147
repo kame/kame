@@ -1,4 +1,4 @@
-#	$NetBSD: VME147,v 1.40.4.1 2002/08/01 04:26:39 lukem Exp $
+#	$NetBSD: VME147,v 1.43.2.1 2004/07/15 20:16:02 he Exp $
 
 include		"arch/mvme68k/conf/std.mvme68k"
 
@@ -15,8 +15,9 @@ maxusers	4
 #options 	SYSVSHM
 options 	KTRACE
 options 	COMPAT_43
-#options 	USERCONF	# userconf(4) support
+options 	USERCONF	# userconf(4) support
 #options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+#options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
 
 file-system 	FFS
 file-system 	NFS
@@ -39,7 +40,8 @@ options 	INET
 
 options 	COMPAT_AOUT_M68K	# compatibility with NetBSD/m68k a.out
 options 	COMPAT_09, COMPAT_10, COMPAT_11
-options 	COMPAT_12, COMPAT_13, COMPAT_14, COMPAT_15
+options 	COMPAT_12, COMPAT_13, COMPAT_14
+options		COMPAT_15, COMPAT_16
 #options 	COMPAT_SUNOS
 #options 	COMPAT_M68K4K	# compatibility with NetBSD/m68k4k binaries
 #options 	COMPAT_LINUX	# compatibility with Linux/m68k binaries

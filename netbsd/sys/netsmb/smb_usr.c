@@ -1,4 +1,4 @@
-/*	$NetBSD: smb_usr.c,v 1.4 2002/01/04 02:39:46 deberg Exp $	*/
+/*	$NetBSD: smb_usr.c,v 1.9 2004/02/24 15:12:53 wiz Exp $	*/
 
 /*
  * Copyright (c) 2000-2001 Boris Popov
@@ -33,6 +33,10 @@
  *
  * FreeBSD: src/sys/netsmb/smb_usr.c,v 1.1 2001/04/10 07:59:06 bp Exp
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: smb_usr.c,v 1.9 2004/02/24 15:12:53 wiz Exp $");
+ 
 #include <sys/param.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
@@ -159,7 +163,7 @@ out:
 /*
  * Connect to the resource specified by smbioc_ossn structure.
  * It may either find an existing connection or try to establish a new one.
- * If no errors occured smb_vc returned locked and referenced.
+ * If no errors occurred smb_vc returned locked and referenced.
  */
 int
 smb_usr_opensession(struct smbioc_ossn *dp, struct smb_cred *scred,
@@ -213,7 +217,7 @@ int
 smb_usr_simplerequest(struct smb_share *ssp, struct smbioc_rq *dp,
 	struct smb_cred *scred)
 {
-	struct smb_rq rq, *rqp = &rq;
+	struct smb_rq *rqp;
 	struct mbchain *mbp;
 	struct mdchain *mdp;
 	u_int8_t wc;
@@ -232,7 +236,7 @@ smb_usr_simplerequest(struct smb_share *ssp, struct smbioc_rq *dp,
 	    case SMB_COM_TREE_CONNECT_ANDX:
 		return EPERM;
 	}
-	error = smb_rq_init(rqp, SSTOCP(ssp), dp->ioc_cmd, scred);
+	error = smb_rq_alloc(SSTOCP(ssp), dp->ioc_cmd, scred, &rqp);
 	if (error)
 		return error;
 	mbp = &rqp->sr_rq;
@@ -268,9 +272,6 @@ smb_usr_simplerequest(struct smb_share *ssp, struct smbioc_rq *dp,
 	dp->ioc_rbc = bc;
 	error = md_get_mem(mdp, dp->ioc_rpbuf + wc, bc, MB_MUSER);
 bad:
-	dp->ioc_errclass = rqp->sr_errclass;
-	dp->ioc_serror = rqp->sr_serror;
-	dp->ioc_error = rqp->sr_error;
 	smb_rq_done(rqp);
 	return error;
 
@@ -293,14 +294,13 @@ int
 smb_usr_t2request(struct smb_share *ssp, struct smbioc_t2rq *dp,
 	struct smb_cred *scred)
 {
-	struct smb_t2rq t2, *t2p = &t2;
+	struct smb_t2rq *t2p;
 	struct mdchain *mdp;
 	int error, len;
 
-	if (dp->ioc_tparamcnt > 0xffff || dp->ioc_tdatacnt > 0xffff ||
-	    dp->ioc_setupcnt > 3)
+	if (dp->ioc_setupcnt > 3)
 		return EINVAL;
-	error = smb_t2_init(t2p, SSTOCP(ssp), dp->ioc_setup[0], scred);
+	error = smb_t2_alloc(SSTOCP(ssp), dp->ioc_setup[0], scred, &t2p);
 	if (error)
 		return error;
 	len = t2p->t2_setupcount = dp->ioc_setupcnt;

@@ -1,4 +1,4 @@
-/*	$NetBSD: uaudioreg.h,v 1.8 2002/03/07 14:37:03 kent Exp $	*/
+/*	$NetBSD: uaudioreg.h,v 1.11 2002/10/23 02:32:37 christos Exp $	*/
 
 /*
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -39,7 +39,6 @@
 
 #define UAUDIO_VERSION		0x100
 
-#define UDESC_CS_DEVICE		0x21
 #define UDESC_CS_CONFIG		0x22
 #define UDESC_CS_STRING		0x23
 #define UDESC_CS_INTERFACE	0x24
@@ -62,7 +61,7 @@ typedef struct {
 	uByte		bmAttributes;
 	uWord		wMaxPacketSize;
 	uByte		bInterval;
-	/* 
+	/*
 	 * The following two entries are only used by the Audio Class.
 	 * And according to the specs the Audio Class is the only one
 	 * allowed to extend the endpoint descriptor.
@@ -125,6 +124,14 @@ struct usb_audio_cluster {
 	uWord		wChannelConfig;
 	uByte		iChannelNames;
 } UPACKED;
+
+/* Shared by all units and terminals */
+struct usb_audio_unit {
+	uByte		bLength;
+	uByte		bDescriptorType;
+	uByte		bDescriptorSubtype;
+	uByte		bUnitId;
+};
 
 /* UDESCSUB_AC_INPUT */
 struct usb_audio_input_terminal {

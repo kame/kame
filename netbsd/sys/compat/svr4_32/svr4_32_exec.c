@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_32_exec.c,v 1.7 2001/11/13 02:09:27 lukem Exp $	 */
+/*	$NetBSD: svr4_32_exec.c,v 1.14 2003/12/20 19:01:30 fvdl Exp $	 */
 
 /*-
  * Copyright (c) 1994, 2000 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: svr4_32_exec.c,v 1.7 2001/11/13 02:09:27 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: svr4_32_exec.c,v 1.14 2003/12/20 19:01:30 fvdl Exp $");
 
 #define	ELFSIZE		32				/* XXX should die */
 
@@ -60,6 +60,8 @@ extern const char * const svr4_32_syscallnames[];
 void syscall __P((void));
 #endif
 
+struct uvm_object *emul_svr4_32_object;
+
 const struct emul emul_svr4_32 = {
 	"svr4_32",
 	"/emul/svr4_32",
@@ -67,15 +69,19 @@ const struct emul emul_svr4_32 = {
 	0,
 	native_to_svr4_errno,
 	SVR4_32_SYS_syscall,
-	SVR4_32_SYS_MAXSYSCALL,
+	SVR4_32_SYS_NSYSENT,
 #endif
 	svr4_32_sysent,
 	svr4_32_syscallnames,
 	svr4_32_sendsig,
 	trapsignal,
+	NULL,
 	svr4_32_sigcode,
 	svr4_32_esigcode,
+	&emul_svr4_32_object,
 	svr4_32_setregs,
+	NULL,
+	NULL,
 	NULL,
 	NULL,
 	NULL,
@@ -84,4 +90,6 @@ const struct emul emul_svr4_32 = {
 #else
 	syscall,
 #endif
+	NULL,
+	NULL,
 };

@@ -1,4 +1,4 @@
-/*	$NetBSD: grf_rhreg.h,v 1.10 2002/01/26 13:40:55 aymeric Exp $	*/
+/*	$NetBSD: grf_rhreg.h,v 1.13 2004/02/24 15:22:01 wiz Exp $	*/
 
 /*
  * Copyright (c) 1994 Markus Wild
@@ -152,7 +152,7 @@ struct MonDef {
 
 /* The prototypes for C++, prototypes for C (with explanations) below */
 
-"C" unsigned char * RZ3Init         (volatile void * HardWareAdress, struct MonDef * md);
+"C" unsigned char * RZ3Init         (volatile void * HardWareAddress, struct MonDef * md);
 "C" void            RZ3SetCursorPos (unsigned short pos);
 "C" void            RZ3AlphaErase   (unsigned short xd, unsigned short yd,
                                             unsigned short  w, unsigned short  h );
@@ -174,7 +174,7 @@ struct MonDef {
 /* The prototypes for C */
 /* with a little explanation */
 
-	unsigned char * RZ3Init(volatile void * BoardAdress, struct MonDef * md);
+	unsigned char * RZ3Init(volatile void * BoardAddress, struct MonDef * md);
 
 /*
  * This routine initialises the Retina Z3 hardware, opens a
@@ -285,8 +285,8 @@ struct MonDef {
                       unsigned short  w, unsigned short  h  );
 
 /*
- * This Routine utilizes the blitter to perform fast copies
- * in the text-display. The paramters are:
+ * This Routine uses the blitter to perform fast copies
+ * in the text-display. The parameters are:
  *  xs - source x-coordinate
  *  ys - source y-coordinate
  *  xd - destination x-coordinate
@@ -303,7 +303,7 @@ struct MonDef {
                        unsigned short  w, unsigned short  h );
 
 /*
- * RZ3AlphaErase utilizes the blitter to erase portions of
+ * RZ3AlphaErase uses the blitter to erase portions of
  * the text-display. The parameters are:
  *  xd - destination x-coordinate
  *  yd - destination y-coordinate
@@ -324,7 +324,7 @@ struct MonDef {
 	void RZ3BitBlit (struct grf_bitblt * gbb );
 
 /*
- * RZ3BitBlit utilizes the blitter to perform one of 16
+ * RZ3BitBlit uses the blitter to perform one of 16
  * available logical operations on the display memory,
  * among them ordinary fill- and copy operations.
  * The only parameter is a pointer to a struct grf_bitblt:

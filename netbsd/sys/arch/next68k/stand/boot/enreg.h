@@ -1,4 +1,4 @@
-/*	$NetBSD: enreg.h,v 1.1.1.1 1998/06/09 07:53:06 dbj Exp $	*/
+/*	$NetBSD: enreg.h,v 1.3 2002/09/11 02:17:15 mycroft Exp $	*/
 /*
  * Copyright (c) 1997 Rolf Grossmann
  * All rights reserved.

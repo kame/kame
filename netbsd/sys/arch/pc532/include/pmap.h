@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.34 2001/09/10 21:19:21 chris Exp $	*/
+/*	$NetBSD: pmap.h,v 1.40 2004/01/23 04:12:39 simonb Exp $	*/
 
 /*
  *
@@ -83,7 +83,7 @@
  * point (slot #895 as show above).  when the pmap code wants to find the
  * PTE for a virtual address, all it has to do is the following:
  *
- * address of PTE = (895 * 4MB) + (VA / NBPG) * sizeof(pt_entry_t)
+ * address of PTE = (895 * 4MB) + (VA / PAGE_SIZE) * sizeof(pt_entry_t)
  *                = 0xdfc00000 + (VA / 4096) * 4
  *
  * what happens if the pmap layer is asked to perform an operation
@@ -141,9 +141,9 @@
  * the following defines identify the slots used as described above.
  */
 
-#define PDSLOT_PTE	((KERNBASE/NBPD)-1) /* 895: for recursive PDP map */
-#define PDSLOT_KERN	(KERNBASE/NBPD)	    /* 896: start of kernel space */
-#define PDSLOT_APTE	((unsigned)1022) /* 1022: alternative recursive slot */
+#define	PDSLOT_PTE	((KERNBASE/NBPD)-1) /* 895: for recursive PDP map */
+#define	PDSLOT_KERN	(KERNBASE/NBPD)	    /* 896: start of kernel space */
+#define	PDSLOT_APTE	((unsigned)1022) /* 1022: alternative recursive slot */
 
 /*
  * the following defines give the virtual addresses of various MMU
@@ -153,12 +153,12 @@
  * PDP_PDE and APDP_PDE: the VA of the PDE that points back to the PDP/APDP
  */
 
-#define PTE_BASE	((pt_entry_t *)  (PDSLOT_PTE * NBPD) )
-#define APTE_BASE	((pt_entry_t *)  (PDSLOT_APTE * NBPD) )
-#define PDP_BASE ((pd_entry_t *)(((char *)PTE_BASE) + (PDSLOT_PTE * NBPG)))
-#define APDP_BASE ((pd_entry_t *)(((char *)APTE_BASE) + (PDSLOT_APTE * NBPG)))
-#define PDP_PDE		(PDP_BASE + PDSLOT_PTE)
-#define APDP_PDE	(PDP_BASE + PDSLOT_APTE)
+#define	PTE_BASE	((pt_entry_t *)  (PDSLOT_PTE * NBPD) )
+#define	APTE_BASE	((pt_entry_t *)  (PDSLOT_APTE * NBPD) )
+#define	PDP_BASE ((pd_entry_t *)(((char *)PTE_BASE) + (PDSLOT_PTE * PAGE_SIZE)))
+#define	APDP_BASE ((pd_entry_t *)(((char *)APTE_BASE) + (PDSLOT_APTE * PAGE_SIZE)))
+#define	PDP_PDE		(PDP_BASE + PDSLOT_PTE)
+#define	APDP_PDE	(PDP_BASE + PDSLOT_APTE)
 
 /*
  * XXXCDC: tmp xlate from old names:
@@ -175,10 +175,10 @@
  */
 
 #ifndef NKPTP
-#define NKPTP		4	/* 16MB to start */
+#define	NKPTP		4	/* 16MB to start */
 #endif
-#define NKPTP_MIN	4	/* smallest value we allow */
-#define NKPTP_MAX	(1024 - (KERNBASE/NBPD) - 2)
+#define	NKPTP_MIN	4	/* smallest value we allow */
+#define	NKPTP_MAX	(1024 - (KERNBASE/NBPD) - 2)
 				/* largest value (-2 for APTP and i/o space) */
 
 /*
@@ -193,21 +193,21 @@
  *   a PTP's offset is the byte-offset in the PTE space that this PTP is at
  *   a PTP's VA is the first VA mapped by that PTP
  *
- * note that NBPG == number of bytes in a PTP (4096 bytes == 1024 entries)
+ * note that PAGE_SIZE == number of bytes in a PTP (4096 bytes == 1024 entries)
  *           NBPD == number of bytes a PTP can map (4MB)
  */
 
-#define ptp_i2o(I)	((I) * NBPG)	/* index => offset */
-#define ptp_o2i(O)	((O) / NBPG)	/* offset => index */
-#define ptp_i2v(I)	((I) * NBPD)	/* index => VA */
-#define ptp_v2i(V)	((V) / NBPD)	/* VA => index (same as pdei) */
+#define	ptp_i2o(I)	((I) * PAGE_SIZE)	/* index => offset */
+#define	ptp_o2i(O)	((O) / PAGE_SIZE)	/* offset => index */
+#define	ptp_i2v(I)	((I) * NBPD)	/* index => VA */
+#define	ptp_v2i(V)	((V) / NBPD)	/* VA => index (same as pdei) */
 
 /*
  * PG_AVAIL usage: we make use of the ignored bits of the PTE
  */
 
-#define PG_W		PG_AVAIL1	/* "wired" mapping */
-#define PG_PVLIST	PG_AVAIL2	/* mapping has entry on pvlist */
+#define	PG_W		PG_AVAIL1	/* "wired" mapping */
+#define	PG_PVLIST	PG_AVAIL2	/* mapping has entry on pvlist */
 /* PG_AVAIL3 not used */
 
 #ifdef _KERNEL
@@ -281,7 +281,7 @@ struct pv_page_info {
  * (note: won't work on systems where NPBG isn't a constant)
  */
 
-#define PVE_PER_PVPAGE ((NBPG - sizeof(struct pv_page_info)) / \
+#define	PVE_PER_PVPAGE ((PAGE_SIZE - sizeof(struct pv_page_info)) / \
 			sizeof(struct pv_entry))
 
 /*
@@ -298,7 +298,7 @@ struct pv_page {
  * flush TLB.  if we have more than PMAP_RR_MAX then we stop recording.
  */
 
-#define PMAP_RR_MAX	16	/* max of 16 pages (64K) */
+#define	PMAP_RR_MAX	16	/* max of 16 pages (64K) */
 
 struct pmap_remove_record {
 	int prr_npages;
@@ -324,24 +324,22 @@ extern int nkpde;			/* current # of PDEs for kernel */
 #define	pmap_wired_count(pmap)		((pmap)->pm_stats.wired_count)
 #define	pmap_update(pmap)		/* nothing (yet) */
 
-#define pmap_clear_modify(pg)		pmap_change_attrs(pg, 0, PG_M)
-#define pmap_clear_reference(pg)	pmap_change_attrs(pg, 0, PG_U)
-#define pmap_copy(DP,SP,D,L,S)		
-#define pmap_is_modified(pg)		pmap_test_attrs(pg, PG_M)
-#define pmap_is_referenced(pg)		pmap_test_attrs(pg, PG_U)
-#define pmap_move(DP,SP,D,L,S)		
-#define pmap_phys_address(ppn)		ns532_ptob(ppn)
-#define pmap_valid_entry(E) 		((E) & PG_V) /* is PDE or PTE valid? */
+#define	pmap_clear_modify(pg)		pmap_change_attrs(pg, 0, PG_M)
+#define	pmap_clear_reference(pg)	pmap_change_attrs(pg, 0, PG_U)
+#define	pmap_copy(DP,SP,D,L,S)
+#define	pmap_is_modified(pg)		pmap_test_attrs(pg, PG_M)
+#define	pmap_is_referenced(pg)		pmap_test_attrs(pg, PG_U)
+#define	pmap_move(DP,SP,D,L,S)
+#define	pmap_phys_address(ppn)		ns532_ptob(ppn)
+#define	pmap_valid_entry(E) 		((E) & PG_V) /* is PDE or PTE valid? */
 
 
 /*
  * prototypes
  */
 
-void		pmap_activate __P((struct proc *));
 void		pmap_bootstrap __P((vaddr_t));
 boolean_t	pmap_change_attrs __P((struct vm_page *, int, int));
-void		pmap_deactivate __P((struct proc *));
 static void	pmap_page_protect __P((struct vm_page *, vm_prot_t));
 void		pmap_page_remove  __P((struct vm_page *));
 static void	pmap_protect __P((struct pmap *, vaddr_t,
@@ -355,7 +353,7 @@ void		pmap_write_protect __P((struct pmap *, vaddr_t,
 
 vaddr_t reserve_dumppages __P((vaddr_t)); /* XXX: not a pmap fn */
 
-#define PMAP_GROWKERNEL		/* turn on pmap_growkernel interface */
+#define	PMAP_GROWKERNEL		/* turn on pmap_growkernel interface */
 
 /*
  * Do idle page zero'ing uncached to avoid polluting the cache.
@@ -366,6 +364,12 @@ boolean_t	pmap_zero_page_uncached __P((paddr_t));
 /*
  * inline functions
  */
+
+static __inline void
+pmap_remove_all(struct pmap *pmap)
+{
+	/* Nothing. */
+}
 
 /*
  * pmap_update_pg: flush one page from the TLB (or flush the whole thing

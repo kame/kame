@@ -1,4 +1,4 @@
-/*	$NetBSD: boot.c,v 1.17 2001/05/02 15:33:14 matt Exp $ */
+/*	$NetBSD: boot.c,v 1.21 2003/11/01 13:02:04 jdolecek Exp $ */
 /*-
  * Copyright (c) 1982, 1986 The Regents of the University of California.
  * All rights reserved.
@@ -11,11 +11,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -131,6 +127,8 @@ Xmain(void)
 	}
 	skip = 1;
 	printf("\n");
+	if (setjmp(jbuf))
+		askname = 1;
 
 	/* First try to autoboot */
 	if (askname == 0) {
@@ -142,7 +140,8 @@ Xmain(void)
 			if (!filelist[fileindex].quiet)
 				printf("> boot %s\n", filelist[fileindex].name);
 			marks[MARK_START] = 0;
-			err = loadfile(filelist[fileindex].name, marks, LOAD_KERNEL|COUNT_KERNEL);
+			err = loadfile(filelist[fileindex].name, marks,
+			    LOAD_KERNEL|COUNT_KERNEL);
 			if (err == 0) {
 				machdep_start((char *)marks[MARK_ENTRY],
 						      marks[MARK_NSYM],
@@ -175,7 +174,7 @@ Xmain(void)
 		if (c[0] == 0)
 			continue;
 
-		if ((d = index(c, ' ')))
+		if ((d = strchr(c, ' ')))
 			*d++ = 0;
 
 		while (v->namn) {
@@ -209,7 +208,7 @@ boot(char *arg)
 
 		if (*arg != '-') {
 			fn = arg;
-			if ((arg = index(arg, ' '))) {
+			if ((arg = strchr(arg, ' '))) {
 				*arg++ = 0;
 				while (*arg == ' ')
 					arg++;
@@ -258,9 +257,9 @@ load:
 
 #define	extzv(one, two, three,four)	\
 ({			\
-	asm __volatile (" extzv %0,%3,(%1),(%2)+"	\
+	asm __volatile ("extzv %0,%3,%1,%2"	\
 			:			\
-			: "g"(one),"g"(two),"g"(three),"g"(four));	\
+			: "g"(one),"m"(two),"mo>"(three),"g"(four));	\
 })
 
 
@@ -311,7 +310,7 @@ loadpcs()
 	ip = (int *)PCS_PATCHADDR;
 	jp = (int *)0;
 	for (i=0; i < PCS_BITCNT; i++) {
-		extzv(i,jp,ip,1);
+		extzv(i,*jp,*ip++,1);
 	}
 	*((int *)PCS_PATCHBIT) = 0;
 
@@ -321,7 +320,7 @@ loadpcs()
 	ip = (int *)PCS_PCSADDR;
 	jp = (int *)1024;
 	for (i=j=0; j < PCS_MICRONUM * 4; i+=20, j++) {
-		extzv(i,jp,ip,20);
+		extzv(i,*jp,*ip++,20);
 	}
 
 	/*

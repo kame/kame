@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile.amiga,v 1.98.10.1 2002/05/28 19:34:39 tv Exp $
+#	$NetBSD: Makefile.amiga,v 1.101 2002/11/26 18:51:12 thorpej Exp $
 
 # Makefile for NetBSD
 #

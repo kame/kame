@@ -1,4 +1,4 @@
-/*	$NetBSD: ts.c,v 1.3 2001/11/13 07:11:25 lukem Exp $ */
+/*	$NetBSD: ts.c,v 1.11 2003/08/07 16:31:17 agc Exp $ */
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -70,7 +66,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ts.c,v 1.3 2001/11/13 07:11:25 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ts.c,v 1.11 2003/08/07 16:31:17 agc Exp $");
 
 #undef	TSDEBUG
 
@@ -89,7 +85,6 @@ __KERNEL_RCSID(0, "$NetBSD: ts.c,v 1.3 2001/11/13 07:11:25 lukem Exp $");
 #include <sys/conf.h>
 #include <sys/errno.h>
 #include <sys/file.h>
-#include <sys/map.h>
 #include <sys/syslog.h>
 #include <sys/ioctl.h>
 #include <sys/mtio.h>
@@ -130,7 +125,7 @@ struct	ts_softc {
 	struct	ts *sc_bts;		/* Unibus address of ts struct */
 	int	sc_type;		/* TS11 or TS05? */
 	short	sc_waddr;		/* Value to write to TSDB */
-	struct	buf_queue sc_bufq;	/* pending I/O requests */
+	struct	bufq_state sc_bufq;	/* pending I/O requests */
 
 	short	sc_mapped;		/* Unibus map allocated ? */
 	short	sc_state;		/* see below: ST_xxx */
@@ -169,11 +164,24 @@ static	int tsmatch(struct device *, struct cfdata *, void *);
 static	void tsattach(struct device *, struct device *, void *);
 static	int tsready(struct uba_unit *);
 
-cdev_decl(ts);
-bdev_decl(ts);
+CFATTACH_DECL(ts, sizeof(struct ts_softc),
+    tsmatch, tsattach, NULL, NULL);
 
-struct	cfattach ts_ca = {
-	sizeof(struct ts_softc), tsmatch, tsattach
+dev_type_open(tsopen);
+dev_type_close(tsclose);
+dev_type_read(tsread);
+dev_type_write(tswrite);
+dev_type_ioctl(tsioctl);
+dev_type_strategy(tsstrategy);
+dev_type_dump(tsdump);
+
+const struct bdevsw ts_bdevsw = {
+	tsopen, tsclose, tsstrategy, tsioctl, tsdump, nosize, D_TAPE
+};
+
+const struct cdevsw ts_cdevsw = {
+	tsopen, tsclose, tsread, tswrite, tsioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_TAPE
 };
 
 /* Bits in minor device */ 
@@ -241,7 +249,7 @@ tsattach(struct device *parent, struct device *self, void *aux)
 	    0, BUS_DMA_NOWAIT, &sc->sc_dmam)))
 		return printf(": failed create DMA map %d\n", error);
 
-	BUFQ_INIT(&sc->sc_bufq);
+	bufq_alloc(&sc->sc_bufq, BUFQ_FCFS);
 
 	/*
 	 * write the characteristics (again)
@@ -370,7 +378,7 @@ tsstart(struct ts_softc *sc, int isloaded)
 	if (TAILQ_EMPTY(&sc->sc_bufq.bq_head))
 		return 0;
 
-	bp = BUFQ_FIRST(&sc->sc_bufq);
+	bp = BUFQ_PEEK(&sc->sc_bufq);
 #ifdef TSDEBUG
 	printf("buf: %p bcount %ld blkno %d\n", bp, bp->b_bcount, bp->b_blkno);
 #endif
@@ -458,7 +466,7 @@ int
 tsready(struct uba_unit *uu)
 {
 	struct ts_softc *sc = uu->uu_softc;
-	struct buf *bp = BUFQ_FIRST(&sc->sc_bufq);
+	struct buf *bp = BUFQ_PEEK(&sc->sc_bufq);
 
 	if (bus_dmamap_load(sc->sc_dmat, sc->sc_dmam, bp->b_data,
 	    bp->b_bcount, bp->b_proc, BUS_DMA_NOWAIT))
@@ -776,9 +784,7 @@ tsintr(void *arg)
 			sc->sc_dev.dv_xname, sr & TS_TC);
 		tsreset(sc);
 	}
-	if ((bp = TAILQ_FIRST(&sc->sc_bufq.bq_head)) != NULL) {
-		BUFQ_REMOVE(&sc->sc_bufq, bp);
-
+	if ((bp = BUFQ_GET(&sc->sc_bufq)) != NULL) {
 #ifdef TSDEBUG
 		printf("tsintr2: que %p\n", TAILQ_FIRST(&sc->sc_bufq.bq_head));
 #endif
@@ -902,8 +908,8 @@ tsstrategy(struct buf *bp)
 	printf("buf: %p bcount %ld blkno %d\n", bp, bp->b_bcount, bp->b_blkno);
 #endif
 	s = splbio ();
-	empty = TAILQ_EMPTY(&sc->sc_bufq.bq_head);
-	BUFQ_INSERT_TAIL(&sc->sc_bufq, bp);
+	empty = (BUFQ_PEEK(&sc->sc_bufq) == NULL);
+	BUFQ_PUT(&sc->sc_bufq, bp);
 	if (empty)
 		tsstart(sc, 0);
 	splx(s);

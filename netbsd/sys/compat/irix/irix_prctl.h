@@ -1,4 +1,4 @@
-/*	$NetBSD: irix_prctl.h,v 1.2 2002/04/28 17:21:59 manu Exp $ */
+/*	$NetBSD: irix_prctl.h,v 1.8 2002/10/14 21:14:25 manu Exp $ */
 
 /*-
  * Copyright (c) 2001-2002 The NetBSD Foundation, Inc.
@@ -39,6 +39,49 @@
 #ifndef _IRIX_PRCTL_H_
 #define _IRIX_PRCTL_H_
 
+/* IRIX share group structure */
+struct irix_share_group {
+	LIST_HEAD(isg_head, irix_emuldata) isg_head;	/* list head */
+	struct lock isg_lock;				/* list lock */ 
+	int isg_refcount;
+};
+
+/*
+ * List of shared vs unshared regions in the VM space. We need to maintain
+ * this for all processes, not only processes belonging to a share group, 
+ * because a process can request a private mapping (MAP_LOCAL option to
+ * mmap(2)) before becoming the member of a share group.
+ */
+struct irix_shared_regions_rec {
+	vaddr_t	isrr_start;
+	vsize_t	isrr_len;
+	int	isrr_shared;	/* shared or not shared */
+#define IRIX_ISRR_SHARED 1
+#define IRIX_ISRR_PRIVATE 0
+	LIST_ENTRY(irix_shared_regions_rec) isrr_list;
+};
+
+int irix_prda_init __P((struct proc *));
+void irix_vm_sync __P((struct proc *));
+int irix_vm_fault __P((struct proc *, vaddr_t, vm_fault_t, vm_prot_t));
+void irix_isrr_insert __P((vaddr_t, vsize_t, int, struct proc *));
+
+/* macro used to wrap irix_vm_sync calls */
+#define IRIX_VM_SYNC(q,cmd)                                                   \
+if (((struct irix_emuldata *)((q)->p_emuldata))->ied_share_group == NULL ||   \
+    ((struct irix_emuldata *)((q)->p_emuldata))->ied_shareaddr == 0) {        \
+	(cmd);                                                                \
+} else {                                                                      \
+	lockmgr(&((struct irix_emuldata *)                                    \
+	    ((q)->p_emuldata))->ied_share_group->isg_lock,                    \
+	    LK_EXCLUSIVE, NULL);                                              \
+	(cmd);                                                                \
+	irix_vm_sync((q));                                                    \
+	lockmgr(&((struct irix_emuldata *)                                    \
+	    ((q)->p_emuldata))->ied_share_group->isg_lock,                    \
+	    LK_RELEASE, NULL);                                                \
+}
+
 /* From IRIX's <sys/prctl.h> */
 
 #define IRIX_PR_MAXPROCS	1
@@ -62,6 +105,7 @@
 #define IRIX_PR_THREAD_CTL	21
 #define IRIX_PR_LASTSHEXIT	22
 
+/* sproc flags */
 #define IRIX_PR_SPROC		0x00000001
 #define IRIX_PR_SFDS		0x00000002
 #define IRIX_PR_SDIR		0x00000004
@@ -74,5 +118,61 @@
 #define IRIX_PR_NOLIBC		0x02000000
 #define IRIX_PR_EVENT		0x04000000
 
-#define IRIX_SPROC_STACK_OFFSET	0x04000000
-#endif /* _IRIX_IRIX_PRCTL_H_ */
+/* blockproc constants */
+#define IRIX_PR_MAXBLOCKCNT	10000
+#define IRIX_PR_MINBLOCKCNT	-10000
+
+/* This is undocumented */
+#define IRIX_PROCBLK_BLOCK	0
+#define IRIX_PROCBLK_UNBLOCK	1
+#define IRIX_PROCBLK_COUNT	2
+#define IRIX_PROCBLK_BLOCKALL	3
+#define IRIX_PROCBLK_UNBLOCKALL	4
+#define IRIX_PROCBLK_COUNTALL	5
+#define IRIX_PROCBLK_ONLYONE	-3
+
+/* From <sys/prctl.h> */
+#define IRIX_PRDA 		((struct prda *)0x00200000L)
+struct irix_prda_sys {
+	irix_pid_t	t_pid;
+	uint32_t	t_hint;
+	uint32_t	t_dlactseq;
+	uint32_t	t_fpflags;
+	uint32_t	t_prid;
+	uint32_t	t_dlendseq;
+	uint64_t	t_unused1[5];
+	irix_pid_t	t_rpid;
+	int32_t		t_resched;
+	int32_t		t_syserror;
+	int32_t		t_nid;
+	int32_t		t_affinity_nid;
+	uint32_t	t_unused2[5];
+	uint32_t	t_cpu;
+	uint32_t	t_flags;
+	irix_k_sigset_t	t_hold;
+};
+struct irix_prda {
+	char	unused[2048];
+	union {
+		char	fill[512];
+		uint32_t rsvd[8];
+	} sys2_prda;
+	union {
+		char fill[512];
+	} lib2_prda;
+	union {
+		char fill[512];
+	} usr2rda;
+	union {
+		struct irix_prda_sys prda_sys;
+		char fill[128];
+	} sys_prda;
+	union {
+		char fill[256];
+	} lib_prda;
+	union {
+		char fill[128];
+	} usr_prda;
+};
+
+#endif /* _IRIX_PRCTL_H_ */

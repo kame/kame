@@ -1,4 +1,4 @@
-#	$NetBSD: genassym.cf,v 1.34 2002/05/07 02:38:44 uwe Exp $
+#	$NetBSD: genassym.cf,v 1.41.4.1 2004/04/24 18:31:20 jdc Exp $
 
 #
 # Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -81,7 +81,6 @@
 include <sys/param.h>
 include <sys/buf.h>
 include <sys/proc.h>
-include <sys/map.h>
 include <sys/proc.h>
 include <sys/mbuf.h>
 include <sys/msgbuf.h>
@@ -116,25 +115,30 @@ define	BSD		BSD
 define	USRSTACK	USRSTACK
 
 # proc fields and values
-define	P_ADDR		offsetof(struct proc, p_addr)
-define	P_STAT		offsetof(struct proc, p_stat)
-define	P_WCHAN		offsetof(struct proc, p_wchan)
+define	L_ADDR		offsetof(struct lwp, l_addr)
+define	L_PROC		offsetof(struct lwp, l_proc)
+define	L_STAT		offsetof(struct lwp, l_stat)
+define	L_WCHAN		offsetof(struct lwp, l_wchan)
+define	L_CPU		offsetof(struct lwp, l_cpu)
+define	L_PRIORITY	offsetof(struct lwp, l_priority)
 define	P_VMSPACE	offsetof(struct proc, p_vmspace)
-define	P_CPU		offsetof(struct proc, p_cpu)
-define	SRUN		SRUN
-define	SONPROC		SONPROC
+define	LSRUN		LSRUN
+define	LSONPROC	LSONPROC
 
 # VM structure fields
 define	VM_PMAP		offsetof(struct vmspace, vm_map.pmap)
 define	PMAP_CTX	offsetof(struct pmap, pm_ctx)
 define	PMAP_CTXNUM	offsetof(struct pmap, pm_ctxnum)
+define	PMAP_CPUSET	offsetof(struct pmap, pm_cpuset)
 
 define	UVM_PAGE_IDLE_ZERO	offsetof(struct uvm, page_idle_zero)
 
 # interrupt/fault metering
 define	V_SWTCH		offsetof(struct uvmexp, swtch)
 define	V_INTR		offsetof(struct uvmexp, intrs)
+define	V_SOFT		offsetof(struct uvmexp, softs)
 define	V_FAULTS	offsetof(struct uvmexp, faults)
+define	EV_COUNT	offsetof(struct evcnt, ev_count)
 
 # CPU info structure
 define	CPUINFO_STRUCTSIZE	sizeof(struct cpu_info)
@@ -150,9 +154,20 @@ define	CPUINFO_REDZONE		offsetof(struct cpu_info, redzone)
 define	REDSIZE			REDSIZE
 define	CPUINFO_IDLE_U		offsetof(struct cpu_info, idle_u)
 define	CPUINFO_CURPCB		offsetof(struct cpu_info, curpcb)
-define	CPUINFO_CURPROC		offsetof(struct cpu_info, ci_curproc)
+define	CPUINFO_CURLWP		offsetof(struct cpu_info, ci_curlwp)
 define	CPUINFO_SELF		offsetof(struct cpu_info, ci_self)
 define	CPUINFO_FLAGS		offsetof(struct cpu_info, flags)
+define	CPUINFO_WANT_AST	offsetof(struct cpu_info, want_ast)
+define	CPUINFO_WANT_RESCHED	offsetof(struct cpu_info, want_resched)
+define	CPUINFO_TT		offsetof(struct cpu_info, ci_tt)
+define	CPUINFO_CACHE_LINESZ	offsetof(struct cpu_info, cacheinfo.c_linesize)
+define	CPUINFO_CACHE_NLINES	offsetof(struct cpu_info, cacheinfo.c_nlines)
+define	CPUINFO_XMSG_FUNC	offsetof(struct cpu_info, msg.u.xpmsg_func.func)
+define	CPUINFO_XMSG_TRAP	offsetof(struct cpu_info, msg.u.xpmsg_func.trap)
+define	CPUINFO_XMSG_ARG0	offsetof(struct cpu_info, msg.u.xpmsg_func.arg0)
+define	CPUINFO_XMSG_ARG1	offsetof(struct cpu_info, msg.u.xpmsg_func.arg1)
+define	CPUINFO_XMSG_ARG2	offsetof(struct cpu_info, msg.u.xpmsg_func.arg2)
+define	CPUINFO_XMSG_CMPLT	offsetof(struct cpu_info, msg.complete)
 
 # PTE bits and related information
 define	PG_W		PG_W
@@ -160,15 +175,15 @@ define	PG_VSHIFT	PG_VSHIFT
 define	PG_PROTSHIFT	PG_PROTSHIFT
 define	PG_PROTUREAD	PG_PROTUREAD
 define	PG_PROTUWRITE	PG_PROTUWRITE
-if defined(SUN4M)
+
 define	SRMMU_TETYPE	SRMMU_TETYPE
 define	SRMMU_TEPTE	SRMMU_TEPTE
 define	SRMMU_PROT_MASK	SRMMU_PROT_MASK
 define	PPROT_R_RW	PPROT_R_RW
 define	PPROT_RX_RX	PPROT_RX_RX
 define	PPROT_RWX_RWX	PPROT_RWX_RWX
+define	PPROT_X_X	PPROT_X_X
 define	PPROT_WRITE	PPROT_WRITE
-endif
 
 # FPU state
 define	FS_REGS		offsetof(struct fpstate, fs_regs)

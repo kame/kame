@@ -1,4 +1,4 @@
-/*	$NetBSD: awacs.c,v 1.12 2001/10/03 00:04:48 augustss Exp $	*/
+/*	$NetBSD: awacs.c,v 1.20 2003/11/02 00:23:38 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 2000 Tsubai Masanari.  All rights reserved.
@@ -25,6 +25,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: awacs.c,v 1.20 2003/11/02 00:23:38 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/audioio.h>
@@ -57,11 +60,11 @@ struct awacs_softc {
 	struct device sc_dev;
 	int sc_flags;
 
-	void (*sc_ointr)(void *);	/* dma completion intr handler */
+	void (*sc_ointr)(void *);	/* DMA completion intr handler */
 	void *sc_oarg;			/* arg for sc_ointr() */
 	int sc_opages;			/* # of output pages */
 
-	void (*sc_iintr)(void *);	/* dma completion intr handler */
+	void (*sc_iintr)(void *);	/* DMA completion intr handler */
 	void *sc_iarg;			/* arg for sc_iintr() */
 
 	u_int sc_record_source;		/* recording source mask */
@@ -109,14 +112,13 @@ static inline void awacs_write_reg(struct awacs_softc *, int, int);
 void awacs_write_codec(struct awacs_softc *, int);
 void awacs_set_speaker_volume(struct awacs_softc *, int, int);
 void awacs_set_ext_volume(struct awacs_softc *, int, int);
-int awacs_set_rate(struct awacs_softc *, int);
+int awacs_set_rate(struct awacs_softc *, struct audio_params *);
 
 static void mono16_to_stereo16(void *, u_char *, int);
 static void swap_bytes_mono16_to_stereo16(void *, u_char *, int);
 
-struct cfattach awacs_ca = {
-	sizeof(struct awacs_softc), awacs_match, awacs_attach
-};
+CFATTACH_DECL(awacs, sizeof(struct awacs_softc),
+    awacs_match, awacs_attach, NULL, NULL);
 
 struct audio_hw_if awacs_hw_if = {
 	awacs_open,
@@ -212,6 +214,9 @@ awacs_match(parent, match, aux)
 {
 	struct confargs *ca = aux;
 
+	if (strcmp(ca->ca_name, "i2s") == 0)
+		return 1;
+
 	if (strcmp(ca->ca_name, "awacs") != 0 &&
 	    strcmp(ca->ca_name, "davbus") != 0)
 		return 0;
@@ -231,7 +236,7 @@ awacs_attach(parent, self, aux)
 	struct awacs_softc *sc = (struct awacs_softc *)self;
 	struct confargs *ca = aux;
 	int cirq, oirq, iirq, cirq_type, oirq_type, iirq_type;
-
+	
 	ca->ca_reg[0] += ca->ca_baseaddr;
 	ca->ca_reg[2] += ca->ca_baseaddr;
 	ca->ca_reg[4] += ca->ca_baseaddr;
@@ -243,7 +248,26 @@ awacs_attach(parent, self, aux)
 	sc->sc_odmacmd = dbdma_alloc(20 * sizeof(struct dbdma_command));
 	sc->sc_idmacmd = dbdma_alloc(20 * sizeof(struct dbdma_command));
 
-	if (ca->ca_nintr == 24) {
+	if (strcmp(ca->ca_name, "i2s") == 0) {
+		int node, intr[6];
+
+		node = OF_child(ca->ca_node);
+		if (node == 0) {
+			printf("no i2s-a child\n");
+			return;
+		}
+		if (OF_getprop(node, "interrupts", intr, sizeof(intr)) == -1) {
+			printf("no interrupt property\n");
+			return;
+		}
+
+		cirq = intr[0];
+		oirq = intr[2];
+		iirq = intr[4];
+		cirq_type = intr[1] ? IST_LEVEL : IST_EDGE;
+		oirq_type = intr[3] ? IST_LEVEL : IST_EDGE;
+		iirq_type = intr[5] ? IST_LEVEL : IST_EDGE;
+	} else if (ca->ca_nintr == 24) {
 		cirq = ca->ca_intr[0];
 		oirq = ca->ca_intr[2];
 		iirq = ca->ca_intr[4];
@@ -256,6 +280,7 @@ awacs_attach(parent, self, aux)
 		iirq = ca->ca_intr[2];
 		cirq_type = oirq_type = iirq_type = IST_LEVEL;
 	}
+
 	intr_establish(cirq, cirq_type, IPL_AUDIO, awacs_intr, sc);
 	intr_establish(oirq, oirq_type, IPL_AUDIO, awacs_intr, sc);
 	/* intr_establish(iirq, iirq_type, IPL_AUDIO, awacs_intr, sc); */
@@ -472,8 +497,8 @@ awacs_set_params(h, setmode, usemode, play, rec)
 	struct audio_params *play, *rec;
 {
 	struct awacs_softc *sc = h;
-	struct audio_params *p;
-	int mode, rate;
+	struct audio_params *p = NULL;
+	int mode;
 
 	/*
 	 * This device only has one clock, so make the sample rates match.
@@ -573,9 +598,7 @@ awacs_set_params(h, setmode, usemode, play, rec)
 	}
 
 	/* Set the speed */
-	rate = p->sample_rate;
-
-	if (awacs_set_rate(sc, rate))
+	if (p != NULL && awacs_set_rate(sc, p))
 		return EINVAL;
 
 	return 0;
@@ -586,8 +609,8 @@ awacs_round_blocksize(h, size)
 	void *h;
 	int size;
 {
-	if (size < NBPG)
-		size = NBPG;
+	if (size < PAGE_SIZE)
+		size = PAGE_SIZE;
 	return size & ~PGOFSET;
 }
 
@@ -893,7 +916,7 @@ awacs_trigger_output(h, start, end, bsize, intr, arg, param)
 
 	sc->sc_ointr = intr;
 	sc->sc_oarg = arg;
-	sc->sc_opages = ((char *)end - (char *)start) / NBPG;
+	sc->sc_opages = ((char *)end - (char *)start) / PAGE_SIZE;
 
 #ifdef DIAGNOSTIC
 	if (sc->sc_opages > 16)
@@ -903,7 +926,7 @@ awacs_trigger_output(h, start, end, bsize, intr, arg, param)
 	va = (vaddr_t)start;
 	len = 0;
 	for (i = sc->sc_opages; i > 0; i--) {
-		len += NBPG;
+		len += PAGE_SIZE;
 		if (len < bsize)
 			intmode = DBDMA_INT_NEVER;
 		else {
@@ -911,9 +934,9 @@ awacs_trigger_output(h, start, end, bsize, intr, arg, param)
 			intmode = DBDMA_INT_ALWAYS;
 		}
 
-		DBDMA_BUILD(cmd, DBDMA_CMD_OUT_MORE, 0, NBPG, vtophys(va),
+		DBDMA_BUILD(cmd, DBDMA_CMD_OUT_MORE, 0, PAGE_SIZE, vtophys(va),
 			intmode, DBDMA_WAIT_NEVER, DBDMA_BRANCH_NEVER);
-		va += NBPG;
+		va += PAGE_SIZE;
 		cmd++;
 	}
 
@@ -971,14 +994,17 @@ awacs_set_ext_volume(sc, left, right)
 }
 
 int
-awacs_set_rate(sc, rate)
+awacs_set_rate(sc, p)
 	struct awacs_softc *sc;
-	int rate;
+	struct audio_params *p;
 {
 	int c;
 
-	switch (rate) {
-
+	switch (p->sample_rate) {
+	case 48000:
+		p->hw_sample_rate = 44100;
+		c = AWACS_RATE_44100;
+		break;
 	case 44100:
 		c = AWACS_RATE_44100;
 		break;

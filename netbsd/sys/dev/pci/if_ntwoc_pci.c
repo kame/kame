@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ntwoc_pci.c,v 1.6 2001/11/13 07:48:44 lukem Exp $	*/
+/*	$NetBSD: if_ntwoc_pci.c,v 1.13 2003/11/02 10:31:06 wiz Exp $	*/
 
 /*
  * Copyright (c) 1998 Vixie Enterprises
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ntwoc_pci.c,v 1.6 2001/11/13 07:48:44 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ntwoc_pci.c,v 1.13 2003/11/02 10:31:06 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -125,9 +125,8 @@ static	int ntwoc_pci_intr __P((void *));
 static	void ntwoc_pci_setup_dma __P((struct sca_softc *));
 static	void ntwoc_pci_shutdown __P((void *sc));
 
-struct cfattach ntwoc_pci_ca = {
-  sizeof(struct ntwoc_pci_softc), ntwoc_pci_match, ntwoc_pci_attach,
-};
+CFATTACH_DECL(ntwoc_pci, sizeof(struct ntwoc_pci_softc),
+    ntwoc_pci_match, ntwoc_pci_attach, NULL, NULL);
 
 /*
  * Names for daughter card types.  These match the NTWOC_DB_* defines.
@@ -284,7 +283,7 @@ ntwoc_pci_attach(struct device *parent, struct device *self, void *aux)
 			  0x68, 0x10900);
 
 	/*
-	 * pass the dma tag to the SCA
+	 * pass the DMA tag to the SCA
 	 */
 	sca->sc_usedma = 1;
 	sca->scu_dmat = pa->pa_dmat;
@@ -366,7 +365,7 @@ ntwoc_pci_attach(struct device *parent, struct device *self, void *aux)
 		    (flags & NTWOC_FLAGS_CLK1_MASK) >> NTWOC_FLAGS_CLK1_SHIFT,
 		    tmc, rdiv, tdiv);
 
-	/* allocate dma'able memory for card to use */
+	/* allocate DMA'able memory for card to use */
 	ntwoc_pci_alloc_dma(sca);
 	ntwoc_pci_setup_dma(sca);
 
@@ -475,7 +474,7 @@ ntwoc_pci_shutdown(void *aux)
 	sca_shutdown(&sc->sc_sca);
 
 	/*
-	 * disable interupts for the whole card.  Black magic, see comment
+	 * disable interrupts for the whole card.  Black magic, see comment
 	 * above.
 	 */
 	bus_space_write_4(sc->sc_asic_iot, sc->sc_asic_ioh,
@@ -593,7 +592,7 @@ ntwoc_pci_alloc_dma(struct sca_softc *sc)
 	if (bus_dmamem_alloc(sc->scu_dmat,
 			     allocsize,
 			     SCA_DMA_ALIGNMENT,
-			     SCA_DMA_BOUNDRY,
+			     SCA_DMA_BOUNDARY,
 			     &sc->scu_seg, 1, &rsegs, BUS_DMA_NOWAIT) != 0) {
 		printf("Could not allocate DMA memory\n");
 		return 1;
@@ -608,7 +607,7 @@ ntwoc_pci_alloc_dma(struct sca_softc *sc)
 	NTWO_DPRINTF(("DMA memory mapped\n"));
 
 	if (bus_dmamap_create(sc->scu_dmat, allocsize, 2,
-			      allocsize, SCA_DMA_BOUNDRY,
+			      allocsize, SCA_DMA_BOUNDARY,
 			      BUS_DMA_NOWAIT, &sc->scu_dmam) != 0) {
 		printf("Could not create DMA map\n");
 		return 1;
@@ -669,7 +668,7 @@ ntwoc_pci_setup_dma(struct sca_softc *sc)
 
 	scp0->sp_txdesc_p = paddr0;
 	scp0->sp_txdesc = (sca_desc_t *)vaddr0;
-	addroff = sizeof(sca_desc_t) * scp0->sp_ntxdesc;;
+	addroff = sizeof(sca_desc_t) * scp0->sp_ntxdesc;
 
 	/*
 	 * point to the range following the tx descriptors, and

@@ -1,9 +1,9 @@
-/* $NetBSD: bus_dma.h,v 1.1 2002/04/10 04:36:20 briggs Exp $ */
+/* $NetBSD: bus_dma.h,v 1.3 2003/12/04 13:05:16 keihan Exp $ */
 
 /*
  * This file was extracted from from alpha/include/bus.h
  * and should probably be resynced when needed.
- * Darrin B. Jewell <dbj@netbsd.org> Sat Jul 31 06:11:33 UTC 1999
+ * Darrin B. Jewell <dbj@NetBSD.org> Sat Jul 31 06:11:33 UTC 1999
  * original cvs id: NetBSD: bus.h,v 1.29 1999/06/18 04:49:24 cgd Exp
  */
 
@@ -93,6 +93,7 @@
 #define	BUS_DMA_BUS4		0x080
 #define	BUS_DMA_READ		0x100	/* mapping is device -> memory only */
 #define	BUS_DMA_WRITE		0x200	/* mapping is memory -> device only */
+#define	BUS_DMA_NOCACHE		0x400	/* hint: map non-cached memory */
 
 /* Forwards needed by prototypes below. */
 struct mbuf;

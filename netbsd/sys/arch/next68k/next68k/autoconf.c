@@ -1,9 +1,43 @@
-/*	$NetBSD: autoconf.c,v 1.7 1999/09/17 20:04:44 thorpej Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.14 2003/08/07 16:28:55 agc Exp $	*/
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1982, 1986, 1990, 1993
  * 	The Regents of the University of California. All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: autoconf.c 1.36 92/12/20$
+ * 
+ *	@(#)autoconf.c  8.2 (Berkeley) 1/12/94
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -50,11 +84,12 @@
  * and the drivers are initialized.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.14 2003/08/07 16:28:55 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/map.h>
 #include <sys/buf.h>
-#include <sys/dkstat.h>
 #include <sys/conf.h>
 #include <sys/reboot.h>
 #include <sys/device.h>
@@ -66,78 +101,27 @@
 #include <machine/pte.h>
 
 #include <next68k/next68k/isr.h>
+#include <next68k/next68k/nextrom.h>
+
+#include <next68k/dev/intiovar.h>
 
 struct device *booted_device;	/* boot device */
+volatile u_long *intrstat;
+volatile u_long *intrmask;
 
-void mainbus_attach __P((struct device *, struct device *, void *));
-int  mainbus_match __P((struct device *, struct cfdata *, void *));
-int  mainbus_print __P((void *, const char *));
+static struct device *getdevunit __P((char *, int));
+static int devidentparse __P((const char *, int *, int *, int *));
+static int atoi __P((const char *));
 
-struct mainbus_softc {
-	struct device sc_dev;
+struct device_equiv {
+	char *alias;
+	char *real;
 };
-
-struct cfattach mainbus_ca = {
-	sizeof(struct mainbus_softc), mainbus_match, mainbus_attach
+static struct device_equiv device_equiv[] = {
+	{ "en", "xe" },
+	{ "tp", "xe" },
 };
-
-#if 0
-struct cfdriver mainbus_cd = {
-	NULL, "mainbus", DV_DULL, 0
-};
-#endif
-
-static	char *mainbusdevs[] = {
-        "intio",
-        "nextdisplay",
-	NULL
-};
-
-int
-mainbus_match(parent, cf, args)
-	struct device *parent;
-	struct cfdata *cf;
-	void *args;
-{
-	static int mainbus_matched;
-
-	if (mainbus_matched)
-		return (0);
-
-	return ((mainbus_matched = 1));
-}
-
-void
-mainbus_attach(parent, self, args)
-	struct device *parent, *self;
-	void *args;
-{
-	char **devices;
-	int i;
-
-	printf("\n");
-
-	/*
-	 * Attach children.
-	 */
-        devices = mainbusdevs;
-
-	for (i = 0; devices[i] != NULL; ++i)
-		(void)config_found(self, devices[i], mainbus_print);
-}
-
-int
-mainbus_print(aux, cp)
-	void *aux;
-	const char *cp;
-{
-	char *devname = aux;
-
-	if (cp)
-		printf("%s at %s\n", devname, cp);
-
-	return (UNCONF);
-}
+static int ndevice_equivs = (sizeof(device_equiv)/sizeof(device_equiv[0]));
 
 /*
  * Determine mass storage and memory configuration for a machine.
@@ -145,8 +129,34 @@ mainbus_print(aux, cp)
 void
 cpu_configure()
 {
+/* 	int dma_rev; */
+	extern u_int rom_intrmask;
+	extern u_int rom_intrstat;
 
 	booted_device = NULL;	/* set by device drivers (if found) */
+
+#if 0
+	dma_rev = ((volatile u_char *)IIOV(NEXT_P_SCR1))[1];
+	switch (dma_rev) {
+	case 0:
+		intrmask = (volatile u_long *)IIOV(NEXT_P_INTRMASK_0);
+		intrstat = (volatile u_long *)IIOV(NEXT_P_INTRSTAT_0);
+		/* dspreg = (volatile u_long *)IIOV(0x2007000); */
+		break;
+	case 1:
+		intrmask = (volatile u_long *)IIOV(NEXT_P_INTRMASK);
+		intrstat = (volatile u_long *)IIOV(NEXT_P_INTRSTAT);
+		/* dspreg = (volatile u_long *)IIOV(0x2108000); */
+		break;
+	default:
+		panic("unknown DMA chip revision");
+	}
+#else
+	intrmask = (volatile u_long *)IIOV(rom_intrmask);
+	intrstat = (volatile u_long *)IIOV(rom_intrstat);
+	printf ("intrmask: %p\n", intrmask);
+	printf ("intrstat: %p\n", intrstat);
+#endif
 
 	INTR_SETMASK(0);
 
@@ -162,18 +172,23 @@ cpu_configure()
 void
 cpu_rootconf()
 {
+	int count, lun, part;
+	
+	count = lun = part = 0;
 
+	devidentparse (rom_boot_info, &count, &lun, &part);
+	booted_device = getdevunit (rom_boot_dev, count);
+	
 	printf("boot device: %s\n",
 		(booted_device) ? booted_device->dv_xname : "<unknown>");
 
-	setroot(booted_device, 0);
+	setroot(booted_device, part);
 }
 
-#if 0 /* @@@ Does anything use this? Is it a required interface? */
 /*
  * find a device matching "name" and unit number
  */
-struct device *
+static struct device *
 getdevunit(name, unit)
 	char *name;
 	int unit;
@@ -181,6 +196,11 @@ getdevunit(name, unit)
 	struct device *dev = alldevs.tqh_first;
 	char num[10], fullname[16];
 	int lunit;
+	int i;
+
+	for (i = 0; i < ndevice_equivs; i++)
+		if (device_equiv->alias && strcmp (name, device_equiv->alias) == 0)
+			name = device_equiv->real;
 
 	/* compute length of name and decimal expansion of unit number */
 	sprintf(num, "%d", unit);
@@ -198,4 +218,65 @@ getdevunit(name, unit)
 	return dev;
 }
 
-#endif
+/*
+ * Parse a device ident.
+ *
+ * Format:
+ *   (count, lun, part)
+ */
+static int
+devidentparse(spec, count, lun, part)
+	const char *spec;
+	int *count; 
+	int *lun;
+	int *part;
+{
+	int i;
+	const char *args[3];
+
+	if (*spec == '(') {
+		/* tokenize device ident */
+		args[0] = ++spec;
+		for (i = 1; *spec && *spec != ')' && i<3; spec++) {
+			if (*spec == ',')
+				args[i++] = ++spec;
+		}
+		if (*spec != ')')
+			goto baddev;
+	
+		switch(i) {
+		case 3:
+			*count  = atoi(args[0]);
+			*lun  = atoi(args[1]);
+			*part  = atoi(args[2]);
+			break;
+		case 2:
+			*lun  = atoi(args[0]);
+			*part  = atoi(args[1]);
+			break;
+		case 1:
+			*part  = atoi(args[0]);
+			break;
+		case 0:
+			break;
+		}
+	}
+	else
+		goto baddev;
+    
+	return 0;
+    
+ baddev:
+	return ENXIO;
+}
+
+static int
+atoi(s)
+	const char *s;
+{
+	int val = 0;
+	
+	while(isdigit(*s))
+		val = val * 10 + (*s++ - '0');
+	return val;
+}

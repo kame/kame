@@ -1,4 +1,4 @@
-/* $NetBSD: mcbus.c,v 1.8 2001/05/02 01:24:29 thorpej Exp $ */
+/* $NetBSD: mcbus.c,v 1.13 2003/01/01 00:39:20 thorpej Exp $ */
 
 /*
  * Copyright (c) 1998 by Matthew Jacob
@@ -37,7 +37,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: mcbus.c,v 1.8 2001/05/02 01:24:29 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mcbus.c,v 1.13 2003/01/01 00:39:20 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -74,9 +74,8 @@ typedef struct {
 	u_int8_t	mcbus_types[MCBUS_MID_MAX];
 } mcbus_softc_t;
 
-struct cfattach mcbus_ca = {
-	sizeof (mcbus_softc_t), mcbusmatch, mcbusattach
-};
+CFATTACH_DECL(mcbus, sizeof (mcbus_softc_t),
+    mcbusmatch, mcbusattach, NULL, NULL);
 
 /*
  * Tru64 UNIX (formerly Digital UNIX (formerly DEC OSF/1)) probes for MCPCIAs
@@ -97,7 +96,8 @@ mcbusprint(aux, cp)
 	const char *cp;
 {
 	struct mcbus_dev_attach_args *tap = aux;
-	printf(" mid %d: %s", tap->ma_mid, mcbus_node_type_str(tap->ma_type));
+	aprint_normal(" mid %d: %s", tap->ma_mid,
+	    mcbus_node_type_str(tap->ma_type));
 	return (UNCONF);
 }
 
@@ -113,7 +113,7 @@ mcbussbm(parent, cf, aux)
 	if (cf->cf_loc[MCBUSCF_MID] != MCBUSCF_MID_DEFAULT &&
 	    cf->cf_loc[MCBUSCF_MID] != tap->ma_mid)
 		return (0);
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 static int
@@ -142,7 +142,7 @@ mcbusattach(parent, self, aux)
 	struct device *self;
 	void *aux;
 {
-	static const char *bcs[CPU_BCacheMask + 1] = {
+	static const char * const bcs[CPU_BCacheMask + 1] = {
 		"No", "1MB", "2MB", "4MB",
 	};
 	struct mcbus_dev_attach_args ta;

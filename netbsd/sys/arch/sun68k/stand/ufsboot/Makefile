@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.2 2001/12/12 01:50:03 tv Exp $
+#	$NetBSD: Makefile,v 1.4 2003/11/30 05:32:39 tsutsui Exp $
 
 SA_PROG= ufsboot
 

@@ -1,11 +1,11 @@
-/*	$NetBSD: mpu_eso.c,v 1.3 2001/11/13 07:48:46 lukem Exp $	*/
+/*	$NetBSD: mpu_eso.c,v 1.7 2003/12/04 13:57:31 keihan Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@netbsd.org).
+ * by Lennart Augustsson (augustss@NetBSD.org).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mpu_eso.c,v 1.3 2001/11/13 07:48:46 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mpu_eso.c,v 1.7 2003/12/04 13:57:31 keihan Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -63,9 +63,8 @@ __KERNEL_RCSID(0, "$NetBSD: mpu_eso.c,v 1.3 2001/11/13 07:48:46 lukem Exp $");
 static int	mpu_eso_match __P((struct device *, struct cfdata *, void *));
 static void	mpu_eso_attach __P((struct device *, struct device *, void *));
 
-struct cfattach mpu_eso_ca = {
-	sizeof (struct mpu_softc), mpu_eso_match, mpu_eso_attach
-};
+CFATTACH_DECL(mpu_eso, sizeof (struct mpu_softc),
+    mpu_eso_match, mpu_eso_attach, NULL, NULL);
 
 static int
 mpu_eso_match(parent, match, aux)

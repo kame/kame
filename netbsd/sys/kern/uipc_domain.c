@@ -1,4 +1,4 @@
-/*	$NetBSD: uipc_domain.c,v 1.37 2002/05/12 20:36:58 matt Exp $	*/
+/*	$NetBSD: uipc_domain.c,v 1.46.2.1 2004/05/28 07:24:09 tron Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uipc_domain.c,v 1.37 2002/05/12 20:36:58 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uipc_domain.c,v 1.46.2.1 2004/05/28 07:24:09 tron Exp $");
 
 #include "opt_inet.h"
 #include "opt_ipsec.h"
@@ -44,6 +40,7 @@ __KERNEL_RCSID(0, "$NetBSD: uipc_domain.c,v 1.37 2002/05/12 20:36:58 matt Exp $"
 #include "opt_ccitt.h"
 #include "opt_iso.h"
 #include "opt_ns.h"
+#include "opt_mbuftrace.h"
 #include "opt_natm.h"
 #include "arp.h"
 
@@ -59,8 +56,8 @@ __KERNEL_RCSID(0, "$NetBSD: uipc_domain.c,v 1.37 2002/05/12 20:36:58 matt Exp $"
 #include <sys/proc.h>
 #include <sys/sysctl.h>
 
-void	pffasttimo __P((void *));
-void	pfslowtimo __P((void *));
+void	pffasttimo(void *);
+void	pfslowtimo(void *);
 
 struct	domain	*domains;
 
@@ -114,7 +111,7 @@ domaininit()
 #ifdef NETATALK
 	ADDDOMAIN(atalk);
 #endif
-#ifdef IPSEC
+#if defined(IPSEC) || defined(FAST_IPSEC)
 	ADDDOMAIN(key);
 #endif
 #ifdef INET
@@ -128,6 +125,13 @@ domaininit()
 	for (dp = domains; dp; dp = dp->dom_next) {
 		if (dp->dom_init)
 			(*dp->dom_init)();
+#ifdef MBUFTRACE
+		if (dp->dom_mowner.mo_name[0] == '\0') {
+			strncpy(dp->dom_mowner.mo_name, dp->dom_name,
+			    sizeof(dp->dom_mowner.mo_name));
+			MOWNER_ATTACH(&dp->dom_mowner);
+		}
+#endif
 		for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
 			if (pr->pr_init)
 				(*pr->pr_init)();
@@ -201,58 +205,26 @@ pffindproto(family, protocol, type)
 	return (maybe);
 }
 
-int
-net_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
-	struct proc *p;
+SYSCTL_SETUP(sysctl_net_setup, "sysctl net subtree setup")
 {
-	struct domain *dp;
-	struct protosw *pr;
-	int family, protocol;
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "net", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_NET, CTL_EOL);
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "local",
+		       SYSCTL_DESCR("PF_LOCAL related settings"),
+		       NULL, 0, NULL, 0,
+		       CTL_NET, PF_LOCAL, CTL_EOL);
 
 	/*
-	 * All sysctl names at this level are nonterminal.
-	 * PF_KEY: next component is protocol family, and then at least one
-	 *	additional component.
-	 * usually: next two components are protocol family and protocol
-	 *	number, then at least one addition component.
+	 * other protocols are expected to have their own setup
+	 * routines that will do everything.  we end up not having
+	 * anything at all to do.
 	 */
-	if (namelen < 2)
-		return (EISDIR);		/* overloaded */
-	family = name[0];
-
-	if (family == 0)
-		return (0);
-
-	dp = pffinddomain(family);
-	if (dp == NULL)
-		return (ENOPROTOOPT);
-
-	switch (family) {
-#ifdef IPSEC
-	case PF_KEY:
-		pr = dp->dom_protosw;
-		if (pr->pr_sysctl)
-			return ((*pr->pr_sysctl)(name + 1, namelen - 1,
-				oldp, oldlenp, newp, newlen));
-		return (ENOPROTOOPT);
-#endif
-	default:
-		break;
-	}
-	if (namelen < 3)
-		return (EISDIR);		/* overloaded */
-	protocol = name[1];
-	for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
-		if (pr->pr_protocol == protocol && pr->pr_sysctl)
-			return ((*pr->pr_sysctl)(name + 2, namelen - 2,
-			    oldp, oldlenp, newp, newlen));
-	return (ENOPROTOOPT);
 }
 
 void

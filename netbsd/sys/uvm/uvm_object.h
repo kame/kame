@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_object.h,v 1.15.4.1 2002/06/21 00:55:31 lukem Exp $	*/
+/*	$NetBSD: uvm_object.h,v 1.17 2003/11/29 19:06:48 yamt Exp $	*/
 
 /*
  *
@@ -79,6 +79,9 @@ extern struct uvm_pagerops aobj_pager;
 
 #define	UVM_OBJ_IS_VNODE(uobj)						\
 	((uobj)->pgops == &uvm_vnodeops)
+
+#define	UVM_OBJ_IS_DEVICE(uobj)						\
+	((uobj)->pgops == &uvm_deviceops)
 
 #define	UVM_OBJ_IS_VTEXT(uobj)						\
 	((uobj)->pgops == &uvm_vnodeops &&				\

@@ -1,4 +1,4 @@
-/* $NetBSD: isp_target.c,v 1.18 2002/02/21 22:32:42 mjacob Exp $ */
+/* $NetBSD: isp_target.c,v 1.26 2003/12/04 13:57:30 keihan Exp $ */
 /*
  * This driver, which is contained in NetBSD in the files:
  *
@@ -21,7 +21,7 @@
  *	sys/pci/isp_pci.c
  *	sys/sbus/isp_sbus.c
  *
- * Is being actively maintained by Matthew Jacob (mjacob@netbsd.org).
+ * Is being actively maintained by Matthew Jacob (mjacob@NetBSD.org).
  * This driver also is shared source with FreeBSD, OpenBSD, Linux, Solaris,
  * Linux versions. This tends to be an interesting maintenance problem.
  *
@@ -65,7 +65,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: isp_target.c,v 1.18 2002/02/21 22:32:42 mjacob Exp $");
+__KERNEL_RCSID(0, "$NetBSD: isp_target.c,v 1.26 2003/12/04 13:57:30 keihan Exp $");
 
 #ifdef	__NetBSD__
 #include <dev/ic/isp_netbsd.h>
@@ -170,7 +170,7 @@ isp_target_notify(struct ispsoftc *isp, void *vptr, u_int16_t *optrp)
 #define	hdrp		unp.hp
 	} unp;
 	u_int8_t local[QENTRY_LEN];
-	int bus, type, rval = 0;
+	int bus, type, rval = 1;
 
 	type = isp_get_response_type(isp, (isphdr_t *)vptr);
 	unp.vp = vptr;
@@ -247,24 +247,11 @@ isp_target_notify(struct ispsoftc *isp, void *vptr, u_int16_t *optrp)
 		case IN_RSRC_UNAVAIL:
 			isp_prt(isp, ISP_LOGWARN, "Firmware out of ATIOs");
 			break;
-		case IN_ABORT_TASK:
-			isp_prt(isp, ISP_LOGWARN,
-			    "Abort Task from IID %d RX_ID 0x%x",
-			    inot_fcp->in_iid, seqid);
-			(void) isp_async(isp, ISPASYNC_TARGET_ACTION, &bus);
-			break;
 		case IN_PORT_LOGOUT:
-			isp_prt(isp, ISP_LOGWARN,
-			    "Port Logout for Initiator %d RX_ID 0x%x",
-			    inot_fcp->in_iid, seqid);
-			break;
+		case IN_ABORT_TASK:
 		case IN_PORT_CHANGED:
-			isp_prt(isp, ISP_LOGWARN,
-			    "Port Changed for Initiator %d RX_ID 0x%x",
-			    inot_fcp->in_iid, seqid);
-			break;
 		case IN_GLOBAL_LOGO:
-			isp_prt(isp, ISP_LOGWARN, "All ports logged out");
+			(void) isp_async(isp, ISPASYNC_TARGET_ACTION, &local);
 			break;
 		default:
 			isp_prt(isp, ISP_LOGERR,
@@ -296,7 +283,7 @@ isp_target_notify(struct ispsoftc *isp, void *vptr, u_int16_t *optrp)
 	default:
 		isp_prt(isp, ISP_LOGERR,
 		    "Unknown entry type 0x%x in isp_target_notify", type);
-		rval = -1;
+		rval = 0;
 		break;
 	}
 #undef	atiop
@@ -407,7 +394,7 @@ isp_target_put_entry(struct ispsoftc *isp, void *ap)
 		return (-1);
 	}
 
-	ISP_TDQE(isp, "isp_target_put_entry", (int) optr, ap);;
+	ISP_TDQE(isp, "isp_target_put_entry", (int) optr, ap);
 	ISP_ADD_REQUEST(isp, nxti);
 	return (0);
 }
@@ -430,6 +417,8 @@ isp_target_put_atio(struct ispsoftc *isp, void *arg)
 		} else {
 			atun._atio2.at_lun = (u_int8_t) aep->at_lun;
 		}
+		atun._atio2.at_iid = aep->at_iid;
+		atun._atio2.at_rxid = aep->at_rxid;
 		atun._atio2.at_status = CT_OK;
 	} else {
 		at_entry_t *aep = arg;
@@ -532,7 +521,7 @@ isp_endcmd(struct ispsoftc *isp, void *arg, u_int32_t code, u_int16_t hdl)
 	return (isp_target_put_entry(isp, &un));
 }
 
-void
+int
 isp_target_async(struct ispsoftc *isp, int bus, int event)
 {
 	tmd_event_t evt;
@@ -555,12 +544,12 @@ isp_target_async(struct ispsoftc *isp, int bus, int event)
 		 * treat them like SCSI Bus Resets, but that was just plain
 		 * wrong. Let the normal CTIO completion report what occurred.
 		 */
-                return;
+                return (0);
 
 	case ASYNC_BUS_RESET:
 	case ASYNC_TIMEOUT_RESET:
 		if (IS_FC(isp)) {
-			return;	/* we'll be getting an inotify instead */
+			return (0); /* we'll be getting an inotify instead */
 		}
 		evt.ev_bus = bus;
 		evt.ev_event = event;
@@ -581,6 +570,11 @@ isp_target_async(struct ispsoftc *isp, int bus, int event)
 		msg.nt_msg[0] = MSG_BUS_DEV_RESET;
 		(void) isp_async(isp, ISPASYNC_TARGET_MESSAGE, &msg);
 		break;
+	case ASYNC_CTIO_DONE:
+		evt.ev_bus = bus;
+		evt.ev_event = event;
+		(void) isp_async(isp, ISPASYNC_TARGET_EVENT, &evt);
+		return (0);
 	default:
 		isp_prt(isp, ISP_LOGERR,
 		    "isp_target_async: unknown event 0x%x", event);
@@ -588,6 +582,7 @@ isp_target_async(struct ispsoftc *isp, int bus, int event)
 	}
 	if (isp->isp_state == ISP_RUNSTATE)
 		isp_notify_ack(isp, NULL);
+	return(0);
 }
 
 
@@ -654,28 +649,28 @@ isp_got_msg_fc(struct ispsoftc *isp, int bus, in_fcentry_t *inp)
 
 		if (inp->in_task_flags & TASK_FLAGS_ABORT_TASK) {
 			isp_prt(isp, ISP_LOGINFO, f1, "ABORT TASK",
-			    inp->in_iid, msg.nt_lun, inp->in_seqid);
+			    inp->in_iid, lun, inp->in_seqid);
 			msg.nt_msg[0] = MSG_ABORT_TAG;
 		} else if (inp->in_task_flags & TASK_FLAGS_CLEAR_TASK_SET) {
 			isp_prt(isp, ISP_LOGINFO, f1, "CLEAR TASK SET",
-			    inp->in_iid, msg.nt_lun, inp->in_seqid);
+			    inp->in_iid, lun, inp->in_seqid);
 			msg.nt_msg[0] = MSG_CLEAR_QUEUE;
 		} else if (inp->in_task_flags & TASK_FLAGS_TARGET_RESET) {
 			isp_prt(isp, ISP_LOGINFO, f1, "TARGET RESET",
-			    inp->in_iid, msg.nt_lun, inp->in_seqid);
+			    inp->in_iid, lun, inp->in_seqid);
 			msg.nt_msg[0] = MSG_BUS_DEV_RESET;
 		} else if (inp->in_task_flags & TASK_FLAGS_CLEAR_ACA) {
 			isp_prt(isp, ISP_LOGINFO, f1, "CLEAR ACA",
-			    inp->in_iid, msg.nt_lun, inp->in_seqid);
+			    inp->in_iid, lun, inp->in_seqid);
 			/* ???? */
 			msg.nt_msg[0] = MSG_REL_RECOVERY;
 		} else if (inp->in_task_flags & TASK_FLAGS_TERMINATE_TASK) {
 			isp_prt(isp, ISP_LOGINFO, f1, "TERMINATE TASK",
-			    inp->in_iid, msg.nt_lun, inp->in_seqid);
+			    inp->in_iid, lun, inp->in_seqid);
 			msg.nt_msg[0] = MSG_TERM_IO_PROC;
 		} else {
 			isp_prt(isp, ISP_LOGWARN, f2, "task flag",
-			    inp->in_status, msg.nt_lun, inp->in_iid,
+			    inp->in_status, lun, inp->in_iid,
 			    inp->in_task_flags,  inp->in_seqid);
 		}
 		if (msg.nt_msg[0]) {
@@ -755,7 +750,7 @@ isp_handle_atio(struct ispsoftc *isp, at_entry_t *aep)
 	 * The firmware status (except for the QLTM_SVALID bit) indicates
 	 * why this ATIO was sent to us.
 	 *
-	 * If QLTM_SVALID is set, the firware has recommended Sense Data.
+	 * If QLTM_SVALID is set, the firmware has recommended Sense Data.
 	 *
 	 * If the DISCONNECTS DISABLED bit is set in the flags field,
 	 * we're still connected on the SCSI bus - i.e. the initiator
@@ -806,7 +801,7 @@ isp_handle_atio(struct ispsoftc *isp, at_entry_t *aep)
 
 	case AT_RESET:
 		/*
-		 * A bus reset came along an blew away this command. Why
+		 * A bus reset came along and blew away this command. Why
 		 * they do this in addition the async event code stuff,
 		 * I dunno.
 		 *
@@ -842,7 +837,7 @@ isp_handle_atio2(struct ispsoftc *isp, at2_entry_t *aep)
 	 * The firmware status (except for the QLTM_SVALID bit) indicates
 	 * why this ATIO was sent to us.
 	 *
-	 * If QLTM_SVALID is set, the firware has recommended Sense Data.
+	 * If QLTM_SVALID is set, the firmware has recommended Sense Data.
 	 *
 	 * If the DISCONNECTS DISABLED bit is set in the flags field,
 	 * we're still connected on the SCSI bus - i.e. the initiator
@@ -952,7 +947,7 @@ isp_handle_ctio(struct ispsoftc *isp, ct_entry_t *ct)
 		 * Bus Device Reset message received or the SCSI Bus has
 		 * been Reset; the firmware has gone to Bus Free.
 		 *
-		 * The firmware generates an async mailbox interupt to
+		 * The firmware generates an async mailbox interrupt to
 		 * notify us of this and returns outstanding CTIOs with this
 		 * status. These CTIOs are handled in that same way as
 		 * CT_ABORTED ones, so just fall through here.
@@ -1105,7 +1100,7 @@ isp_handle_ctio2(struct ispsoftc *isp, ct2_entry_t *ct)
 		/*
 		 * Target Reset function received.
 		 *
-		 * The firmware generates an async mailbox interupt to
+		 * The firmware generates an async mailbox interrupt to
 		 * notify us of this and returns outstanding CTIOs with this
 		 * status. These CTIOs are handled in that same way as
 		 * CT_ABORTED ones, so just fall through here.
@@ -1154,9 +1149,11 @@ isp_handle_ctio2(struct ispsoftc *isp, ct2_entry_t *ct)
 	case CT_PORTNOTAVAIL:
 		if (fmsg == NULL)
 			fmsg = "Port not available";
+		/*FALLTHROUGH*/
 	case CT_PORTCHANGED:
 		if (fmsg == NULL)
 			fmsg = "Port Changed";
+		/*FALLTHROUGH*/
 	case CT_NOACK:
 		if (fmsg == NULL)
 			fmsg = "unacknowledged Immediate Notify pending";

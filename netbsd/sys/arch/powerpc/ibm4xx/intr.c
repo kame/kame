@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.c,v 1.2 2002/05/13 07:04:24 matt Exp $	*/
+/*	$NetBSD: intr.c,v 1.6 2003/07/15 02:54:43 lukem Exp $	*/
 
 /*
  * Copyright 2002 Wasabi Systems, Inc.
@@ -35,6 +35,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: intr.c,v 1.6 2003/07/15 02:54:43 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
@@ -43,9 +46,20 @@
 
 #include <machine/intr.h>
 #include <machine/psl.h>
-#include <machine/dcr.h>
 
 #include <powerpc/spr.h>
+
+#ifdef PPC_IBM403
+#include <powerpc/ibm4xx/dcr403cgx.h>
+#define INTR_STATUS	DCR_EXISR
+#define INTR_ACK	DCR_EXISR
+#define INTR_ENABLE	DCR_EXIER
+#else
+#include <powerpc/ibm4xx/dcr405gp.h>
+#define INTR_STATUS	DCR_UIC0_MSR
+#define INTR_ACK	DCR_UIC0_SR
+#define INTR_ENABLE	DCR_UIC0_ER
+#endif
 
 static inline void disable_irq(int irq);
 static inline void enable_irq(int irq);
@@ -61,7 +75,6 @@ u_long imask[NIPL];
 
 static int intrtype[ICU_LEN], intrmask[ICU_LEN], intrlevel[ICU_LEN];
 static struct intrhand *intrhand[ICU_LEN];
-
 
 
 static inline int
@@ -103,8 +116,8 @@ ext_intr(void)
 
 	pcpl = cpl;
 	asm volatile ("mfmsr %0" : "=r"(msr));
-	
-	int_state = mfdcr(DCR_UIC0_MSR);	/* Read non-masked interrupt status */
+
+	int_state = mfdcr(INTR_STATUS);	/* Read non-masked interrupt status */
 	bits_to_clear = int_state;
 
 	while (int_state) {
@@ -132,38 +145,38 @@ ext_intr(void)
 			intrcnt[i]++;
 		}
 	}
-	mtdcr(DCR_UIC0_SR, bits_to_clear);	/* Acknowledge all pending interrupts */
-	
+	mtdcr(INTR_ACK, bits_to_clear);	/* Acknowledge all pending interrupts */
+
 	asm volatile ("mtmsr %0" :: "r"(msr | PSL_EE));
 	splx(pcpl);
 	asm volatile ("mtmsr %0" :: "r"(msr));
 }
 
-static inline void 
+static inline void
 disable_irq(int irq)
 {
 	int mask, omask;
 
-	mask = omask = mfdcr(DCR_UIC0_ER);
+	mask = omask = mfdcr(INTR_ENABLE);
 	mask &= ~IRQ_TO_MASK(irq);
 	if (mask == omask)
 		return;
-	mtdcr(DCR_UIC0_ER, mask);
+	mtdcr(INTR_ENABLE, mask);
 #ifdef IRQ_DEBUG
 	printf("irq_disable: irq=%d, mask=%08x\n",irq,mask);
 #endif
 }
 
-static inline void 
+static inline void
 enable_irq(int irq)
 {
 	int mask, omask;
 
-	mask = omask = mfdcr(DCR_UIC0_ER);
+	mask = omask = mfdcr(INTR_ENABLE);
 	mask |= IRQ_TO_MASK(irq);
 	if (mask == omask)
 		return;
-	mtdcr(DCR_UIC0_ER, mask);
+	mtdcr(INTR_ENABLE, mask);
 #ifdef IRQ_DEBUG
 	printf("irq_enable: irq=%d, mask=%08x\n",irq,mask);
 #endif
@@ -310,7 +323,7 @@ intr_calculatemasks(void)
 				irqs |= IRQ_TO_MASK(irq);
 		imask[level] = irqs | SINT_MASK;
 	}
-	
+
 	/*
 	 * IPL_CLOCK should mask clock interrupt even if interrupt handler
 	 * is not registered.
@@ -345,9 +358,9 @@ intr_calculatemasks(void)
 	 * There are tty, network and disk drivers that use free() at interrupt
 	 * time, so imp > (tty | net | bio).
 	 */
-	imask[IPL_IMP] |= imask[IPL_TTY];
+	imask[IPL_VM] |= imask[IPL_TTY];
 
-	imask[IPL_AUDIO] |= imask[IPL_IMP];
+	imask[IPL_AUDIO] |= imask[IPL_VM];
 
 	/*
 	 * Since run queues may be manipulated by both the statclock and tty,
@@ -400,7 +413,7 @@ do_pending_int(void)
 	asm volatile("mtmsr %0" :: "r"(dmsr));
 
 	pcpl = cpl;		/* Turn off all */
-  again:	
+  again:
 	while ((hwpend = ipending & ~pcpl & HWINT_MASK)) {
 		irq = cntlzw(hwpend);
 		enable_irq(irq);

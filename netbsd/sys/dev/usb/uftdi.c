@@ -1,4 +1,4 @@
-/*	$NetBSD: uftdi.c,v 1.10 2002/05/08 18:10:19 scw Exp $	*/
+/*	$NetBSD: uftdi.c,v 1.20 2004/01/28 21:50:28 augustss Exp $	*/
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -46,7 +46,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uftdi.c,v 1.10 2002/05/08 18:10:19 scw Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uftdi.c,v 1.20 2004/01/28 21:50:28 augustss Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -129,7 +129,7 @@ USB_DECLARE_DRIVER(uftdi);
 USB_MATCH(uftdi)
 {
 	USB_MATCH_START(uftdi, uaa);
-	
+
 	if (uaa->iface != NULL)
 		return (UMATCH_NONE);
 
@@ -138,7 +138,11 @@ USB_MATCH(uftdi)
 
 	if (uaa->vendor == USB_VENDOR_FTDI &&
 	    (uaa->product == USB_PRODUCT_FTDI_SERIAL_8U100AX ||
-	     uaa->product == USB_PRODUCT_FTDI_SERIAL_8U232AM))
+	     uaa->product == USB_PRODUCT_FTDI_SERIAL_8U232AM ||
+	     uaa->product == USB_PRODUCT_FTDI_SEMC_DSS20 ||
+	     uaa->product == USB_PRODUCT_FTDI_LCD_LK202_24_USB ||
+	     uaa->product == USB_PRODUCT_FTDI_LCD_MX200_USB ||
+	     uaa->product == USB_PRODUCT_FTDI_CFA_631))
 		return (UMATCH_VENDOR_PRODUCT);
 
 	return (UMATCH_NONE);
@@ -189,7 +193,11 @@ USB_ATTACH(uftdi)
 		sc->sc_hdrlen = 1;
 		break;
 
+	case USB_PRODUCT_FTDI_SEMC_DSS20:
 	case USB_PRODUCT_FTDI_SERIAL_8U232AM:
+	case USB_PRODUCT_FTDI_LCD_LK202_24_USB:
+	case USB_PRODUCT_FTDI_LCD_MX200_USB:
+	case USB_PRODUCT_FTDI_CFA_631:
 		sc->sc_type = UFTDI_TYPE_8U232AM;
 		sc->sc_hdrlen = 0;
 		break;
@@ -207,7 +215,7 @@ USB_ATTACH(uftdi)
 			       ": %s\n", devname, usbd_errstr(err));
 			goto bad;
 		}
-		
+
 		addr = ed->bEndpointAddress;
 		dir = UE_GET_DIR(ed->bEndpointAddress);
 		attr = ed->bmAttributes & UE_XFERTYPE;
@@ -230,7 +238,7 @@ USB_ATTACH(uftdi)
 		       USBDEVNAME(sc->sc_dev));
 		goto bad;
 	}
-	
+
 	uca.portno = FTDI_PIT_SIOA;
 	/* bulkin, bulkout set above */
 	uca.ibufsize = UFTDIIBUFSIZE;
@@ -266,7 +274,6 @@ uftdi_activate(device_ptr_t self, enum devact act)
 	switch (act) {
 	case DVACT_ACTIVATE:
 		return (EOPNOTSUPP);
-		break;
 
 	case DVACT_DEACTIVATE:
 		if (sc->sc_subdev != NULL)
@@ -281,12 +288,11 @@ int
 uftdi_detach(device_ptr_t self, int flags)
 {
 	struct uftdi_softc *sc = (struct uftdi_softc *)self;
-	int rv = 0;
 
 	DPRINTF(("uftdi_detach: sc=%p flags=%d\n", sc, flags));
 	sc->sc_dying = 1;
 	if (sc->sc_subdev != NULL) {
-		rv = config_detach(sc->sc_subdev, flags);
+		config_detach(sc->sc_subdev, flags);
 		sc->sc_subdev = NULL;
 	}
 
@@ -426,7 +432,7 @@ uftdi_param(void *vsc, int portno, struct termios *t)
 	struct uftdi_softc *sc = vsc;
 	usb_device_request_t req;
 	usbd_status err;
-	int rate, data;
+	int rate, data, flow;
 
 	DPRINTF(("uftdi_param: sc=%p\n", sc));
 
@@ -470,6 +476,9 @@ uftdi_param(void *vsc, int portno, struct termios *t)
 			return (EINVAL);
 		}
 		break;
+
+	default:
+		return (EINVAL);
 	}
 	req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
 	req.bRequest = FTDI_SIO_SET_BAUD_RATE;
@@ -522,6 +531,24 @@ uftdi_param(void *vsc, int portno, struct termios *t)
 	if (err)
 		return (EIO);
 
+	if (ISSET(t->c_cflag, CRTSCTS)) {
+		flow = FTDI_SIO_RTS_CTS_HS;
+		USETW(req.wValue, 0);
+	} else if (ISSET(t->c_iflag, IXON|IXOFF)) {
+		flow = FTDI_SIO_XON_XOFF_HS;
+		USETW2(req.wValue, t->c_cc[VSTOP], t->c_cc[VSTART]);
+	} else {
+		flow = FTDI_SIO_DISABLE_FLOW_CTRL;
+		USETW(req.wValue, 0);
+	}
+	req.bmRequestType = UT_WRITE_VENDOR_DEVICE;
+	req.bRequest = FTDI_SIO_SET_FLOW_CTRL;
+	USETW2(req.wIndex, flow, portno);
+	USETW(req.wLength, 0);
+	err = usbd_do_request(sc->sc_udev, &req, NULL);
+	if (err)
+		return (EIO);
+
 	return (0);
 }
 
@@ -547,7 +574,7 @@ uftdi_break(void *vsc, int portno, int onoff)
 	int data;
 
 	DPRINTF(("uftdi_break: sc=%p, port=%d onoff=%d\n", vsc, portno,
-		  onoff)); 
+		  onoff));
 
 	if (onoff) {
 		data = sc->last_lcr | FTDI_SIO_SET_BREAK;

@@ -1,4 +1,4 @@
-/*	$NetBSD: malta_bus_mem.c,v 1.3 2002/04/09 03:40:17 simonb Exp $	*/
+/*	$NetBSD: malta_bus_mem.c,v 1.5 2003/07/15 01:37:33 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -40,12 +40,10 @@
  * Platform-specific PCI bus memory support for the MIPS Malta.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: malta_bus_mem.c,v 1.5 2003/07/15 01:37:33 lukem Exp $");
+
 #include <sys/param.h>
-#include <sys/malloc.h>
-
-#include <uvm/uvm_extern.h>
-
-#include <machine/locore.h>
 
 #include <evbmips/malta/maltareg.h>
 #include <evbmips/malta/maltavar.h>

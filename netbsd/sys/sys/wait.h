@@ -1,4 +1,4 @@
-/*	$NetBSD: wait.h,v 1.17 2001/07/18 19:10:26 thorpej Exp $	*/
+/*	$NetBSD: wait.h,v 1.21 2003/09/20 14:59:56 cl Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993, 1994
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,6 +34,8 @@
 #ifndef _SYS_WAIT_H_
 #define _SYS_WAIT_H_
 
+#include <sys/featuretest.h>
+
 /*
  * This file holds definitions relevent to the wait4 system call
  * and the alternate interfaces that use it (wait, wait3, waitpid).
@@ -47,11 +45,10 @@
  * Macros to test the exit status returned by wait
  * and extract the relevant values.
  */
-#ifdef _POSIX_SOURCE
+#if !( defined(_XOPEN_SOURCE) || defined(_NETBSD_SOURCE) ) || defined(_KERNEL)
 #define	_W_INT(i)	(i)
 #else
 #define	_W_INT(w)	(*(int *)(void *)&(w))	/* convert union wait to int */
-#define	WCOREFLAG	0200
 #endif
 
 #define	_WSTATUS(x)	(_W_INT(x) & 0177)
@@ -62,7 +59,8 @@
 #define WTERMSIG(x)	(_WSTATUS(x))
 #define WIFEXITED(x)	(_WSTATUS(x) == 0)
 #define WEXITSTATUS(x)	((int)(((unsigned int)_W_INT(x)) >> 8) & 0xff)
-#ifndef _POSIX_SOURCE
+#if defined(_XOPEN_SOURCE) || defined(_NETBSD_SOURCE) || defined(_KERNEL)
+#define	WCOREFLAG	0200
 #define WCOREDUMP(x)	(_W_INT(x) & WCOREFLAG)
 
 #define	W_EXITCODE(ret, sig)	((ret) << 8 | (sig))
@@ -81,7 +79,7 @@
 #define WNOHANG		0x00000001	/* don't hang in wait */
 #define WUNTRACED	0x00000002	/* tell about stopped,
 					   untraced children */
-#ifndef _POSIX_SOURCE
+#if defined(_XOPEN_SOURCE) || defined(_NETBSD_SOURCE)
 #define	WALTSIG		0x00000004	/* wait for processes that exit
 					   with an alternate signal (i.e.
 					   not SIGCHLD) */
@@ -95,9 +93,16 @@
  */
 #define	__WCLONE	WALTSIG
 #define	__WALL		WALLSIG
-#endif /* ! _POSIX_SOURCE */
 
-#ifndef _POSIX_SOURCE
+/* 
+ * These bits are used in order to support SVR4 (etc) functionality
+ * without replicating sys_wait4 5 times.
+ */
+#define	WNOWAIT		0x00010000	/* Don't mark child 'P_WAITED' */ 
+#define	WNOZOMBIE	0x00020000	/* Ignore zombies */
+#endif /* _XOPEN_SOURCE || _NETBSD_SOURCE */
+
+#if defined(_XOPEN_SOURCE) || defined(_NETBSD_SOURCE)
 /* POSIX extensions and 4.2/4.3 compatibility: */
 
 /*
@@ -158,7 +163,7 @@ union wait {
 #define w_stopsig	w_S.w_Stopsig
 
 #define	WSTOPPED	_WSTOPPED
-#endif /* _POSIX_SOURCE */
+#endif /* _XOPEN_SOURCE || _NETBSD_SOURCE */
 
 #ifndef _KERNEL
 #include <sys/cdefs.h>
@@ -168,7 +173,7 @@ struct rusage;	/* forward declaration */
 
 pid_t	wait __P((int *));
 pid_t	waitpid __P((pid_t, int *, int));
-#ifndef _POSIX_SOURCE
+#if defined(_XOPEN_SOURCE) || defined(_NETBSD_SOURCE)
 pid_t	wait3 __P((int *, int, struct rusage *));
 pid_t	wait4 __P((pid_t, int *, int, struct rusage *));
 #endif

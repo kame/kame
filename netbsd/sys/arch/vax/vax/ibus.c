@@ -1,4 +1,4 @@
-/*	$NetBSD: ibus.c,v 1.7 2001/02/04 20:36:32 ragge Exp $ */
+/*	$NetBSD: ibus.c,v 1.12 2003/07/15 02:15:03 lukem Exp $ */
 /*
  * Copyright (c) 1999 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -30,6 +30,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ibus.c,v 1.12 2003/07/15 02:15:03 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -43,9 +46,8 @@ static	int ibus_print(void *, const char *);
 static	int ibus_match(struct device *, struct cfdata *, void *);
 static	void ibus_attach(struct device *, struct device *, void*);
 
-struct	cfattach ibus_ca = {
-	sizeof(struct device), ibus_match, ibus_attach
-};
+CFATTACH_DECL(ibus, sizeof(struct device),
+    ibus_match, ibus_attach, NULL, NULL);
 
 int
 ibus_print(void *aux, const char *name)
@@ -53,7 +55,7 @@ ibus_print(void *aux, const char *name)
 	struct bp_conf *bp = aux;
 
 	if (name)
-		printf("device %s at %s", bp->type, name);
+		aprint_normal("device %s at %s", bp->type, name);
 
 	return (UNCONF);
 }

@@ -1,4 +1,4 @@
-/* $NetBSD: cpu.c,v 1.4 2002/03/06 08:02:12 simonb Exp $ */
+/* $NetBSD: cpu.c,v 1.13 2004/02/13 11:36:17 wiz Exp $ */
 
 /*
  * Copyright 2000, 2001
@@ -15,10 +15,9 @@
  *    the source file.
  *
  * 2) No right is granted to use any trade name, trademark, or logo of
- *    Broadcom Corporation. Neither the "Broadcom Corporation" name nor any
- *    trademark or logo of Broadcom Corporation may be used to endorse or
- *    promote products derived from this software without the prior written
- *    permission of Broadcom Corporation.
+ *    Broadcom Corporation.  The "Broadcom Corporation" name may not be
+ *    used to endorse or promote products derived from this software
+ *    without the prior written permission of Broadcom Corporation.
  *
  * 3) THIS SOFTWARE IS PROVIDED "AS-IS" AND ANY EXPRESS OR IMPLIED
  *    WARRANTIES, INCLUDING BUT NOT LIMITED TO, ANY IMPLIED WARRANTIES OF
@@ -32,6 +31,11 @@
  *    WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  *    OR OTHERWISE), EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.13 2004/02/13 11:36:17 wiz Exp $");
+
+#include "opt_multiprocessor.h"
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -53,19 +57,26 @@
 static int	cpu_match(struct device *, struct cfdata *, void *);
 static void	cpu_attach(struct device *, struct device *, void *);
 
-struct cfattach cpu_ca = {
-	sizeof(struct device), cpu_match, cpu_attach
-};
+CFATTACH_DECL(cpu, sizeof(struct device),
+    cpu_match, cpu_attach, NULL, NULL);
+
+static int found = 0;
 
 static int
 cpu_match(struct device *parent, struct cfdata *match, void *aux)
 {
 	struct zbbus_attach_args *zap = aux;
+	int part;
 
 	if (zap->za_locs.za_type != ZBBUS_ENTTYPE_CPU)
 		return (0);
 
-	return 1;
+	/*
+	 * The 3rd hex digit of the part number is the number of CPUs;
+	 * ref Table 26, p38 1250-UM101-R.
+	 */
+	part = G_SYS_PART(READ_REG(MIPS_PHYS_TO_KSEG1(A_SCD_SYSTEM_REVISION)));
+	return (found < ((part >> 8) & 0xf));
 }
 
 static void
@@ -74,11 +85,13 @@ cpu_attach(struct device *parent, struct device *self, void *aux)
 	int plldiv;
 	uint32_t config;
 
-	/* XXX this code must run on the target cpu */
+	/* XXX this code must run on the target CPU */
 	config = mips3_cp0_config_read();
 	config &= ~MIPS3_CONFIG_K0_MASK;
 	config |= 0x05;				/* XXX.  cacheable coherent */
 	mips3_cp0_config_write(config);
+
+	found++;
 
 	/*
 	 * Flush all of the caches, so that any lines marked non-coherent will
@@ -103,37 +116,30 @@ cpu_attach(struct device *parent, struct device *self, void *aux)
 	}
 
 	curcpu()->ci_cpu_freq = 50000000 * plldiv;
-	/* Compute the delay divisor. */
+	/* Compute the delay divisor and reciprical. */
 	curcpu()->ci_divisor_delay = curcpu()->ci_cpu_freq / 1000000;
+	MIPS_SET_CI_RECIPRICAL(curcpu());
 	/* Compute clock cycles per hz */
 	curcpu()->ci_cycles_per_hz = curcpu()->ci_cpu_freq / hz;
-
-	/*
-	 * To implement a more accurate microtime using the CP0 COUNT
-	 * register we need to divide that register by the number of
-	 * cycles per MHz.  But...
-	 *
-	 * DIV and DIVU are expensive on MIPS (eg 75 clocks on the
-	 * R4000).  MULT and MULTU are only 12 clocks on the same CPU.
-	 * On the SB1 these appear to be 40-72 clocks for DIV/DIVU and 3
-	 * clocks for MUL/MULTU.
-	 *
-	 * The strategy we use to to calculate the reciprical of cycles
-	 * per MHz, scaled by 1<<32.  Then we can simply issue a MULTU
-	 * and pluck of the HI register and have the results of the
-	 * division.
-	 */
-	curcpu()->ci_divisor_recip =
-	    0x100000000ULL / curcpu()->ci_divisor_delay;
 
 	printf(": %lu.%02luMHz (hz cycles = %lu, delay divisor = %lu)\n",
 	    curcpu()->ci_cpu_freq / 1000000,
 	    (curcpu()->ci_cpu_freq % 1000000) / 10000,
 	    curcpu()->ci_cycles_per_hz, curcpu()->ci_divisor_delay);
 
-	printf("%s: ", self->dv_xname);
-	cpu_identify();
-
-	/* make sure processor is available for use */
-	/* XXXCGD */
+	/*
+	 * If we're the primary CPU, no more work to do; we're already
+	 * running!
+	 */
+	if (found == 1) {
+		printf("%s: ", self->dv_xname);
+		cpu_identify();
+	} else {
+#if defined(MULTIPROCESSOR)
+# error!
+#else
+		printf("%s: processor off-line; multiprocessor support "
+		    "not present in kernel\n", /* sc->sc_dev. */self->dv_xname);
+#endif
+	}
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: iso_snpac.c,v 1.26 2002/05/12 21:30:36 matt Exp $	*/
+/*	$NetBSD: iso_snpac.c,v 1.30 2003/10/30 01:43:10 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -63,7 +59,7 @@ SOFTWARE.
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: iso_snpac.c,v 1.26 2002/05/12 21:30:36 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: iso_snpac.c,v 1.30 2003/10/30 01:43:10 simonb Exp $");
 
 #include "opt_iso.h"
 #ifdef ISO
@@ -523,7 +519,6 @@ snpac_ioctl(so, cmd, data, p)
 	struct proc *p;
 {
 	struct systype_req *rq = (struct systype_req *) data;
-	int error;
 
 #ifdef ARGO_DEBUG
 	if (argo_debug[D_IOCTL]) {
@@ -536,7 +531,7 @@ snpac_ioctl(so, cmd, data, p)
 #endif
 
 	if (cmd == SIOCSSTYPE) {
-		if (p == 0 || (error = suser(p->p_ucred, &p->p_acflag)))
+		if (p == 0 || suser(p->p_ucred, &p->p_acflag))
 			return (EPERM);
 		if ((rq->sr_type & (SNPA_ES | SNPA_IS)) == (SNPA_ES | SNPA_IS))
 			return (EINVAL);

@@ -1,4 +1,4 @@
-/*	$NetBSD: kbd.c,v 1.1 2001/10/05 22:27:41 reinoud Exp $	*/
+/*	$NetBSD: kbd.c,v 1.6 2003/07/15 00:24:45 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994-1997 Mark Brinicombe.
@@ -43,6 +43,9 @@
  * Created      : 09/10/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kbd.c,v 1.6 2003/07/15 00:24:45 lukem Exp $");
+
 #include "opt_ddb.h"
 #include "opt_pmap_debug.h"
 
@@ -66,8 +69,8 @@
 
 #include <machine/bus.h>
 #include <machine/kbd.h>
-#include <machine/conf.h>
 #include <arm/iomd/kbdvar.h>
+#include <arm/iomd/console/console.h>
 #include "vt.h"
 #include "kbd.h"
 
@@ -142,18 +145,22 @@ void autorepeatstart __P((void *));
 void autorepeat __P((void *));
 
 extern int physconkbd		__P((int key));
-extern void console_switch	__P((u_int number));
-/*extern int console_switchdown	__P((void));
-extern int console_switchup	__P((void));*/
-extern int console_unblank	__P((void));
-extern int console_scrollback	__P((void));
-extern int console_scrollforward	__P((void));
 #ifdef PMAP_DEBUG
 extern void pmap_debug		__P((int level));
 #endif
 extern void halt		__P((void));
 
 extern struct cfdriver kbd_cd;
+
+dev_type_open(kbdopen);
+dev_type_close(kbdclose);
+dev_type_read(kbdread);
+dev_type_ioctl(kbdioctl);
+
+const struct cdevsw kbd_cdevsw = {
+	kbdopen, kbdclose, kbdread, nowrite, kbdioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
 
 /* keyboard commands */
 
@@ -319,33 +326,6 @@ kbdread(dev, uio, flag)
 			break;
 	}
 	return error;
-}
-
-
-int
-kbdpoll(dev, events, p)
-	dev_t dev;
-	int events;
-	struct proc *p;
-{
-	struct kbd_softc *sc = kbd_cd.cd_devs[KBDUNIT(dev)];
-	int revents = 0;
-	int s = spltty();
-
-	if (KBDFLAG(dev) == KBDFLAG_CONUNIT) {
-		splx(s);
-		return(ENXIO);
-	}
-
-	if (events & (POLLIN | POLLRDNORM)) {
-		if (sc->sc_q.c_cc > 0)
-			revents |= events & (POLLIN | POLLRDNORM);
-		else
-			selrecord(p, &sc->sc_rsel);
-	}
-
-	splx(s);
-	return (revents);
 }
 
 
@@ -950,6 +930,7 @@ kbddecodekey(sc, code)
 				case 0x200:
 					console_scrollback();
 					break;
+#if CHUQ
 /*
 				case 0x202:
 					console_switchdown();
@@ -958,6 +939,7 @@ kbddecodekey(sc, code)
 					console_switchup();
 					break;
 */
+#endif
 #endif
 				case 0x204:
 					--kbdautorepeat.ka_rate;

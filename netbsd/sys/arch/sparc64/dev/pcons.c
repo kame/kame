@@ -1,4 +1,4 @@
-/*	$NetBSD: pcons.c,v 1.9 2002/03/17 19:40:51 atatat Exp $	*/
+/*	$NetBSD: pcons.c,v 1.18 2004/03/21 15:08:24 pk Exp $	*/
 
 /*-
  * Copyright (c) 2000 Eduardo E. Horvath
@@ -33,6 +33,9 @@
  * driver(s) are appropriate.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pcons.c,v 1.18 2004/03/21 15:08:24 pk Exp $");
+
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -49,7 +52,6 @@
 
 #include <machine/autoconf.h>
 #include <machine/openfirm.h>
-#include <machine/conf.h>
 #include <machine/cpu.h>
 #include <machine/eeprom.h>
 #include <machine/psl.h>
@@ -61,11 +63,24 @@
 static int pconsmatch __P((struct device *, struct cfdata *, void *));
 static void pconsattach __P((struct device *, struct device *, void *));
 
-struct cfattach pcons_ca = {
-	sizeof(struct pconssoftc), pconsmatch, pconsattach
-};
+CFATTACH_DECL(pcons, sizeof(struct pconssoftc),
+    pconsmatch, pconsattach, NULL, NULL);
 
 extern struct cfdriver pcons_cd;
+
+dev_type_open(pconsopen);
+dev_type_close(pconsclose);
+dev_type_read(pconsread);
+dev_type_write(pconswrite);
+dev_type_ioctl(pconsioctl);
+dev_type_tty(pconstty);
+dev_type_poll(pconspoll);
+
+const struct cdevsw pcons_cdevsw = {
+	pconsopen, pconsclose, pconsread, pconswrite, pconsioctl,
+	nostop, pconstty, pconspoll, nommap, ttykqfilter, D_TTY
+};
+
 static struct cnm_state pcons_cnm_state;
 
 static int pconsprobe __P((void));
@@ -226,13 +241,6 @@ pconstty(dev)
 	return sc->of_tty;
 }
 
-void
-pconsstop(tp, flag)
-	struct tty *tp;
-	int flag;
-{
-}
-
 static void
 pconsstart(tp)
 	struct tty *tp;
@@ -250,7 +258,7 @@ pconsstart(tp)
 	splx(s);
 	cl = &tp->t_outq;
 	len = q_to_b(cl, buf, OFBURSTLEN);
-	OF_write(stdout, buf, len);
+	prom_write(prom_stdout(), buf, len);
 	s = spltty();
 	tp->t_state &= ~TS_BUSY;
 	if (cl->c_cc) {
@@ -286,7 +294,7 @@ pcons_poll(aux)
 	struct tty *tp = sc->of_tty;
 	char ch;
 	
-	while (OF_read(stdin, &ch, 1) > 0) {
+	while (prom_read(prom_stdin(), &ch, 1) > 0) {
 		cn_check_magic(tp->t_dev, ch, pcons_cnm_state);
 		if (tp && (tp->t_state & TS_ISOPEN))
 			(*tp->t_linesw->l_rint)(ch, tp);
@@ -297,10 +305,8 @@ pcons_poll(aux)
 int
 pconsprobe()
 {
-	if (!stdin) stdin = OF_stdin();
-	if (!stdout) stdout = OF_stdout();
 
-	return (stdin && stdout);
+	return (prom_stdin() && prom_stdout());
 }
 
 void

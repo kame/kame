@@ -1,4 +1,4 @@
-#	$NetBSD: files.evbmips,v 1.2 2002/03/13 02:55:11 simonb Exp $
+#	$NetBSD: files.evbmips,v 1.4 2003/07/27 01:19:27 thorpej Exp $
 
 # maxpartitions must be the first item in files.${ARCH}
 maxpartitions 16
@@ -16,7 +16,7 @@ defflag		MIPS_MALTA	# MIPS Malta mips32/64 eval board
 defparam	MEMSIZE
 defparam	ETHADDR
 
-file	dev/clock_subr.c
-
 # Console glue.
 file	dev/cons.c
+
+include	"arch/evbmips/conf/majors.evbmips"

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_hme_sbus.c,v 1.11.6.1 2002/11/22 17:38:09 tron Exp $	*/
+/*	$NetBSD: if_hme_sbus.c,v 1.19 2004/03/17 17:04:58 pk Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_hme_sbus.c,v 1.11.6.1 2002/11/22 17:38:09 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_hme_sbus.c,v 1.19 2004/03/17 17:04:58 pk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -73,9 +73,8 @@ struct hmesbus_softc {
 int	hmematch_sbus __P((struct device *, struct cfdata *, void *));
 void	hmeattach_sbus __P((struct device *, struct device *, void *));
 
-struct cfattach hme_sbus_ca = {
-	sizeof(struct hmesbus_softc), hmematch_sbus, hmeattach_sbus
-};
+CFATTACH_DECL(hme_sbus, sizeof(struct hmesbus_softc),
+    hmematch_sbus, hmeattach_sbus, NULL, NULL);
 
 int
 hmematch_sbus(parent, cf, aux)
@@ -85,7 +84,7 @@ hmematch_sbus(parent, cf, aux)
 {
 	struct sbus_attach_args *sa = aux;
 
-	return (strcmp(cf->cf_driver->cd_name, sa->sa_name) == 0 ||
+	return (strcmp(cf->cf_name, sa->sa_name) == 0 ||
 	    strcmp("SUNW,qfe", sa->sa_name) == 0 ||
 	    strcmp("SUNW,hme", sa->sa_name) == 0);
 }
@@ -101,9 +100,6 @@ hmeattach_sbus(parent, self, aux)
 	struct sbusdev *sd = &hsc->hsc_sbus;
 	u_int32_t burst, sbusburst;
 	int node;
-
-	/* XXX the following declarations should be elsewhere */
-	extern void myetheraddr __P((u_char *));
 
 	node = sa->sa_node;
 
@@ -174,7 +170,7 @@ hmeattach_sbus(parent, self, aux)
 	sd->sd_reset = (void *)hme_reset;
 	sbus_establish(sd, self);
 
-	myetheraddr(sc->sc_enaddr);
+	prom_getether(node, sc->sc_enaddr);
 
 	/*
 	 * Get transfer burst size from PROM and pass it on
@@ -184,7 +180,7 @@ hmeattach_sbus(parent, self, aux)
 	if (sbusburst == 0)
 		sbusburst = SBUS_BURST_32 - 1; /* 1->16 */
 
-	burst = PROM_getpropint(node, "burst-sizes", -1);
+	burst = prom_getpropint(node, "burst-sizes", -1);
 	if (burst == -1)
 		/* take SBus burst sizes */
 		burst = sbusburst;
@@ -201,6 +197,6 @@ hmeattach_sbus(parent, self, aux)
 
 	/* Establish interrupt handler */
 	if (sa->sa_nintr != 0)
-		(void)bus_intr_establish(sa->sa_bustag, sa->sa_pri, IPL_NET, 0,
+		(void)bus_intr_establish(sa->sa_bustag, sa->sa_pri, IPL_NET,
 					 hme_intr, sc);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: netbsd32_socket.c,v 1.6 2001/11/13 02:09:07 lukem Exp $	*/
+/*	$NetBSD: netbsd32_socket.c,v 1.12 2003/10/21 01:38:42 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1998, 2001 Matthew R. Green
@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: netbsd32_socket.c,v 1.6 2001/11/13 02:09:07 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: netbsd32_socket.c,v 1.12 2003/10/21 01:38:42 fvdl Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_ktrace.h"
@@ -47,6 +47,7 @@ __KERNEL_RCSID(0, "$NetBSD: netbsd32_socket.c,v 1.6 2001/11/13 02:09:07 lukem Ex
 #include <sys/ktrace.h>
 #include <sys/file.h>
 #include <sys/filedesc.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 #include <sys/proc.h>
 
@@ -59,8 +60,8 @@ static int recvit32 __P((struct proc *, int, struct netbsd32_msghdr *, struct io
 			 register_t *));
 
 int
-netbsd32_recvmsg(p, v, retval)
-	struct proc *p;
+netbsd32_recvmsg(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -73,8 +74,8 @@ netbsd32_recvmsg(p, v, retval)
 	struct iovec aiov[UIO_SMALLIOV], *uiov, *iov;
 	int error;
 
-	error = copyin((caddr_t)(u_long)SCARG(uap, msg), (caddr_t)&msg,
-		       sizeof(msg));
+	error = copyin((caddr_t)NETBSD32PTR64(SCARG(uap, msg)), (caddr_t)&msg,
+	    sizeof(msg));
 		/* netbsd32_msghdr needs the iov pre-allocated */
 	if (error)
 		return (error);
@@ -89,14 +90,15 @@ netbsd32_recvmsg(p, v, retval)
 	else
 		return (EMSGSIZE);
 	msg.msg_flags = SCARG(uap, flags);
-	uiov = (struct iovec *)(u_long)msg.msg_iov;
+	uiov = (struct iovec *)NETBSD32PTR64(msg.msg_iov);
 	error = netbsd32_to_iovecin((struct netbsd32_iovec *)uiov, 
 				   iov, msg.msg_iovlen);
 	if (error)
 		goto done;
-	if ((error = recvit32(p, SCARG(uap, s), &msg, iov, (caddr_t)0, retval)) == 0) {
-		error = copyout((caddr_t)&msg, (caddr_t)(u_long)SCARG(uap, msg),
-		    sizeof(msg));
+	if ((error = recvit32(l->l_proc, SCARG(uap, s), &msg, iov, (caddr_t)0,
+	    retval)) == 0) {
+		error = copyout((caddr_t)&msg,
+		    (caddr_t)NETBSD32PTR64(SCARG(uap, msg)), sizeof(msg));
 	}
 done:
 	if (iov != aiov)
@@ -189,7 +191,8 @@ recvit32(p, s, mp, iov, namelenp, retsize)
 				len = from->m_len;
 			/* else if len < from->m_len ??? */
 			error = copyout(mtod(from, caddr_t),
-					(caddr_t)(u_long)mp->msg_name, (unsigned)len);
+			    (caddr_t)NETBSD32PTR64(mp->msg_name),
+			    (unsigned)len);
 			if (error)
 				goto out;
 		}
@@ -204,7 +207,7 @@ recvit32(p, s, mp, iov, namelenp, retsize)
 			len = 0;
 		else {
 			struct mbuf *m = control;
-			caddr_t p = (caddr_t)(u_long)mp->msg_control;
+			caddr_t p = (caddr_t)NETBSD32PTR64(mp->msg_control);
 
 			do {
 				i = m->m_len;
@@ -221,7 +224,7 @@ recvit32(p, s, mp, iov, namelenp, retsize)
 				if (error != 0 || len <= 0)
 					break;
 			} while ((m = m->m_next) != NULL);
-			len = p - (caddr_t)(u_long)mp->msg_control;
+			len = p - (caddr_t)NETBSD32PTR64(mp->msg_control);
 		}
 		mp->msg_controllen = len;
 	}
@@ -236,8 +239,8 @@ recvit32(p, s, mp, iov, namelenp, retsize)
 }
 
 int
-netbsd32_sendmsg(p, v, retval)
-	struct proc *p;
+netbsd32_sendmsg(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -251,8 +254,8 @@ netbsd32_sendmsg(p, v, retval)
 	struct iovec aiov[UIO_SMALLIOV], *iov;
 	int error;
 
-	error = copyin((caddr_t)(u_long)SCARG(uap, msg), 
-		       (caddr_t)&msg32, sizeof(msg32));
+	error = copyin((caddr_t)NETBSD32PTR64(SCARG(uap, msg)), (caddr_t)&msg32,
+	    sizeof(msg32));
 	if (error)
 		return (error);
 	netbsd32_to_msghdr(&msg32, &msg);
@@ -272,7 +275,7 @@ netbsd32_sendmsg(p, v, retval)
 		goto done;
 	msg.msg_iov = iov;
 	/* Luckily we can use this directly */
-	error = sendit(p, SCARG(uap, s), &msg, SCARG(uap, flags), retval);
+	error = sendit(l->l_proc, SCARG(uap, s), &msg, SCARG(uap, flags), retval);
 done:
 	if (iov != aiov)
 		FREE(iov, M_IOV);
@@ -280,8 +283,8 @@ done:
 }
 
 int
-netbsd32_recvfrom(p, v, retval)
-	struct proc *p;
+netbsd32_recvfrom(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -298,27 +301,26 @@ netbsd32_recvfrom(p, v, retval)
 	int error;
 
 	if (SCARG(uap, fromlenaddr)) {
-		error = copyin((caddr_t)(u_long)SCARG(uap, fromlenaddr),
-			       (caddr_t)&msg.msg_namelen,
-			       sizeof(msg.msg_namelen));
+		error = copyin((caddr_t)NETBSD32PTR64(SCARG(uap, fromlenaddr)),
+		    (caddr_t)&msg.msg_namelen, sizeof(msg.msg_namelen));
 		if (error)
 			return (error);
 	} else
 		msg.msg_namelen = 0;
 	msg.msg_name = SCARG(uap, from);
-	msg.msg_iov = NULL; /* ignored in recvit32(), uses iov */
+	msg.msg_iov = 0; /* ignored in recvit32(), uses iov */
 	msg.msg_iovlen = 1;
-	aiov.iov_base = (caddr_t)(u_long)SCARG(uap, buf);
+	aiov.iov_base = (caddr_t)NETBSD32PTR64(SCARG(uap, buf));
 	aiov.iov_len = (u_long)SCARG(uap, len);
 	msg.msg_control = 0;
 	msg.msg_flags = SCARG(uap, flags);
-	return (recvit32(p, SCARG(uap, s), &msg, &aiov,
-		       (caddr_t)(u_long)SCARG(uap, fromlenaddr), retval));
+	return (recvit32(l->l_proc, SCARG(uap, s), &msg, &aiov,
+	    (caddr_t)NETBSD32PTR64(SCARG(uap, fromlenaddr)), retval));
 }
 
 int
-netbsd32_sendto(p, v, retval)
-	struct proc *p;
+netbsd32_sendto(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -333,12 +335,12 @@ netbsd32_sendto(p, v, retval)
 	struct msghdr msg;
 	struct iovec aiov;
 
-	msg.msg_name = (caddr_t)(u_long)SCARG(uap, to);		/* XXX kills const */
+	msg.msg_name = (caddr_t)NETBSD32PTR64(SCARG(uap, to)); /* XXX kills const */
 	msg.msg_namelen = SCARG(uap, tolen);
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
 	msg.msg_control = 0;
-	aiov.iov_base = (char *)(u_long)SCARG(uap, buf);	/* XXX kills const */
+	aiov.iov_base = (char *)NETBSD32PTR64(SCARG(uap, buf));	/* XXX kills const */
 	aiov.iov_len = SCARG(uap, len);
-	return (sendit(p, SCARG(uap, s), &msg, SCARG(uap, flags), retval));
+	return (sendit(l->l_proc, SCARG(uap, s), &msg, SCARG(uap, flags), retval));
 }

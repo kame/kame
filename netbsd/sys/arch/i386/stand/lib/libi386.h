@@ -1,4 +1,4 @@
-/*	$NetBSD: libi386.h,v 1.14 2001/06/01 23:26:31 jdolecek Exp $	*/
+/*	$NetBSD: libi386.h,v 1.16 2004/03/24 16:46:28 drochner Exp $	*/
 
 /*
  * Copyright (c) 1996
@@ -12,12 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed for the NetBSD Project
- *	by Matthias Drochner.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -102,3 +96,35 @@ time_t getsecs __P((void));
 /* in "user code": */
 void command_help __P((char *));
 extern const struct bootblk_command commands[];
+
+/* asm bios/dos calls */
+extern int biosdiskreset(int);
+extern int biosextread(int, void *);
+extern int biosgetrtc(u_long *);
+extern int biosgetsystime(void);
+extern int biosread(int, int, int, int, int, void *);
+extern int comgetc(int);
+extern void cominit(int);
+extern int computc(int, int);
+extern int comstatus(int);
+extern int congetc(void);
+extern int coniskey(void);
+extern void conputc(int);
+
+extern int get_diskinfo(int);
+extern int getextmem2(int *);
+extern int getextmemps2(void *);
+extern int getmementry(int *, int *);
+extern int int13_extension(int);
+struct biosdisk_ext13info;
+extern void int13_getextinfo(int, struct biosdisk_ext13info *);
+extern int pcibios_cfgread(unsigned int, int, int *);
+extern int pcibios_cfgwrite(unsigned int, int, int);
+extern int pcibios_finddev(int, int, int, unsigned int *);
+extern int pcibios_present(int *);
+
+extern void dosclose(int);
+extern int doserrno;	/* in dos_file.S */
+extern int dosopen(char *);
+extern int dosread(int, char *, int);
+extern int dosseek(int, int, int);

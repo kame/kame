@@ -1,4 +1,4 @@
-/*	$NetBSD: ieee1212.c,v 1.2 2002/04/02 10:10:54 jmc Exp $	*/
+/*	$NetBSD: ieee1212.c,v 1.7 2003/10/26 20:53:09 fvdl Exp $	*/
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ieee1212.c,v 1.7 2003/10/26 20:53:09 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -78,7 +81,7 @@ int     p1212debug = 1;
  * return -1 on error, or 0 on success and possibly reset *size to a larger
  * value.
  *
- * NOTE: Rom's are guarentee'd per the ISO spec to be contiguous but only the
+ * NOTE: Rom's are guaranteed per the ISO spec to be contiguous but only the
  * first 1k is directly mapped. Anything past 1k is supposed to use a loop
  * around the indirect registers to read in the rom. This code only assumes the
  * buffer passed in represents a total rom regardless of end size. It is the
@@ -753,7 +756,6 @@ p1212_parse_textdir(struct p1212_com *com, u_int32_t *addr)
 	u_int32_t *t, entry, new;
 	u_int16_t crclen, crc, crc1, romcrc;
 	u_int8_t type, val;
-
 	int i, size;
 
 	/*
@@ -763,6 +765,7 @@ p1212_parse_textdir(struct p1212_com *com, u_int32_t *addr)
 	
 	com->text = NULL;
 	size = sizeof(struct p1212_text *);
+	t = addr;
 	
 	crclen = P1212_DIRENT_GET_LEN((ntohl(t[0])));
 	romcrc = P1212_DIRENT_GET_CRC((ntohl(t[0])));
@@ -905,7 +908,7 @@ p1212_find(struct p1212_dir *root, int type, int value, int flags)
 					numkeys++;
 					retkeys = realloc(retkeys,
 					    sizeof(struct p1212_key *) *
-					    (numkeys + 1), M_WAITOK, M_DEVBUF);
+					    (numkeys + 1), M_DEVBUF, M_WAITOK);
 					retkeys[numkeys - 1] = &sdir->com.key;
 					retkeys[numkeys] = NULL;
 					if ((flags & P1212_FIND_RETURNALL)
@@ -924,7 +927,7 @@ p1212_find(struct p1212_dir *root, int type, int value, int flags)
 					numkeys++;
 					retkeys = realloc(retkeys,
 					    sizeof(struct p1212_key *) *
-					    (numkeys + 1), M_WAITOK, M_DEVBUF);
+					    (numkeys + 1), M_DEVBUF, M_WAITOK);
 					retkeys[numkeys - 1] = &data->com.key;
 					retkeys[numkeys] = NULL;
 					if ((flags & P1212_FIND_RETURNALL)
@@ -1233,7 +1236,7 @@ p1212_match_units(struct device *sc, struct p1212_dir *dir,
 	    P1212_FIND_SEARCHALL|P1212_FIND_RETURNALL);
 	
 	if (udirs) {
-		while (*udirs++) {
+		do {
 			dev = config_found_sm(sc, udirs, print, NULL);
 			if (dev && numdev) {
 				devret = realloc(devret,
@@ -1245,7 +1248,8 @@ p1212_match_units(struct device *sc, struct p1212_dir *dir,
 				devret[0] = dev;
 				numdev++;
 			}
-		}
+			udirs++;
+		} while (*udirs);
 	}
 	if (numdev == 0) {
 		free(devret, M_DEVBUF);

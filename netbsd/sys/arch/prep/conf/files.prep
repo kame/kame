@@ -1,4 +1,4 @@
-#	$NetBSD: files.prep,v 1.35 2002/05/16 12:12:30 kleink Exp $
+#	$NetBSD: files.prep,v 1.46 2004/03/13 17:31:34 bjh21 Exp $
 #
 # prep-specific configuration info
 #
@@ -8,14 +8,18 @@ maxusers 2 8 64
 
 defflag	opt_residual.h	RESIDUAL_DATA_DUMP
 
-defflag	opt_platform.h	PLATFORM_IBM_6050
+defflag	opt_platform.h	PLATFORM_IBM_6040
+			PLATFORM_IBM_6050
 			PLATFORM_IBM_7248
+			PLATFORM_IBM_7043_140
 			PLATFORM_MOTOROLA_ULMB60XA
 
 # IBM
 file	arch/prep/prep/ibm_machdep.c
+file	arch/prep/prep/ibm_6040.c	platform_ibm_6040
 file	arch/prep/prep/ibm_6050.c	platform_ibm_6050
 file	arch/prep/prep/ibm_7248.c	platform_ibm_7248
+file	arch/prep/prep/ibm_7043_140.c	platform_ibm_7043_140
 
 # Motorola
 file	arch/prep/prep/mot_machdep.c
@@ -24,34 +28,19 @@ file	arch/prep/prep/mot_ulmb60xa.c	platform_motorola_ulmb60xa
 file	arch/prep/prep/platform.c
 
 file	arch/prep/prep/autoconf.c
-file	arch/prep/prep/bus_space.c
 file	arch/prep/prep/clock.c
-file	arch/prep/prep/conf.c
 file	arch/prep/prep/consinit.c
 file	arch/prep/prep/disksubr.c		disk
 file	arch/prep/prep/extintr.c
 file	arch/prep/prep/machdep.c
-file	arch/prep/prep/procfs_machdep.c		procfs
 file	arch/prep/prep/residual.c		residual_data_dump
 
 file	arch/powerpc/powerpc/bus_dma.c
+file	arch/powerpc/powerpc/bus_space.c
+file	arch/powerpc/powerpc/procfs_machdep.c	procfs
 
 # General files
-file	dev/clock_subr.c
 file	dev/cons.c
-
-#
-# Compatibility modules
-#
-
-# OSS audio driver compatibility
-include "compat/ossaudio/files.ossaudio"
-
-# Linux binary compatibility (COMPAT_LINUX)
-include "compat/linux/files.linux"
-include "compat/linux/arch/powerpc/files.linux_powerpc"
-file arch/powerpc/powerpc/linux_sigcode.S	compat_linux
-file arch/powerpc/powerpc/linux_trap.c		compat_linux
 
 #
 # Machine-independent I2O drivers
@@ -62,26 +51,17 @@ include "dev/i2o/files.i2o"
 # Machine-independent SCSI drivers
 #
 include "dev/scsipi/files.scsipi"
-major	{sd = 4}
-major	{cd = 6}
 
 #
 # Machine-independent ATA drivers
 #
 
 include "dev/ata/files.ata"
-major	{wd = 0}
 
 #
 # Memory Disk for install floppy
 #
 file	dev/md_root.c		memory_disk_hooks
-major	{md = 17}
-
-#
-# RAIDframe
-#
-major	{raid = 18}
 
 #
 # System bus types
@@ -129,7 +109,6 @@ file	arch/prep/pci/gten.c		gten needs-flag
 #
 
 include "dev/isa/files.isa"
-major	{mcd = 7}
 file	arch/prep/isa/isa_machdep.c	isa
 file	arch/prep/isa/isadma_machdep.c	isa
 
@@ -140,9 +119,8 @@ file	arch/prep/isa/isapnp_machdep.c	isapnp
 # clock
 #
 # mc146818 and compat.
-device	mcclock
+device	mcclock: mc146818
 attach	mcclock at isa with mcclock_isa
-file	arch/prep/prep/mcclock.c	mcclock
 file	arch/prep/isa/mcclock_isa.c	mcclock_isa
 
 # mk48t18 and compat.
@@ -150,18 +128,7 @@ device	mkclock: mk48txx
 attach	mkclock at isa with mkclock_isa
 file	arch/prep/isa/mkclock_isa.c	mkclock_isa
 
-# attribute used to represent the "keyboard controller"
-# XXX should be a real device
-define pckbcport { [irq = -1], [port = -1] }
-
-# PC console support a la "pccons"
-device	pc: tty, pckbcport
-attach	pc at isa
-device	pcconskbd
-attach	pcconskbd at pckbc
-file	arch/prep/isa/pccons.c		pc | pcconskbd needs-flag
-
-include "dev/pckbc/files.pckbc"
+include "dev/pckbport/files.pckbport"
 
 # ISA speaker generates keyboard beep
 device	isabeep
@@ -177,7 +144,6 @@ file	dev/isa/fdc_isa.c		fdc_isa
 # Floppy disk controller
 device	fd: disk
 attach	fd at fdc
-major	{fd = 2}
 
 # Game adapter (joystick)
 file	arch/prep/isa/joy_timer.c	joy
@@ -210,3 +176,5 @@ file arch/prep/dev/obio.c		obio needs-flag
 
 attach wdc at obio with wdc_obio
 file arch/prep/dev/wdc_obio.c		wdc_obio needs-flag
+
+include "arch/prep/conf/majors.prep"

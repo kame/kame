@@ -1,4 +1,4 @@
-/*	$NetBSD: asc_vsbus.c,v 1.24.18.1 2002/09/18 19:32:06 thorpej Exp $	*/
+/*	$NetBSD: asc_vsbus.c,v 1.30 2003/10/19 14:54:24 ragge Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -40,7 +40,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: asc_vsbus.c,v 1.24.18.1 2002/09/18 19:32:06 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: asc_vsbus.c,v 1.30 2003/10/19 14:54:24 ragge Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -80,7 +80,7 @@ struct asc_vsbus_softc {
 	bus_space_handle_t sc_dirh;		/* scsi direction handle */
 	bus_space_handle_t sc_adrh;		/* scsi address handle */
 	bus_space_handle_t sc_ncrh;		/* ncr bus space handle */
-	bus_dma_tag_t sc_dmat;			/* bus dma tag */
+	bus_dma_tag_t sc_dmat;			/* bus DMA tag */
 	bus_dmamap_t sc_dmamap;
 	caddr_t *sc_dmaaddr;
 	size_t *sc_dmalen;
@@ -105,9 +105,8 @@ struct asc_vsbus_softc {
 static int asc_vsbus_match(struct device *, struct cfdata *, void *);
 static void asc_vsbus_attach(struct device *, struct device *, void *);
 
-struct cfattach asc_vsbus_ca = {
-	sizeof(struct asc_vsbus_softc), asc_vsbus_match, asc_vsbus_attach
-};
+CFATTACH_DECL(asc_vsbus, sizeof(struct asc_vsbus_softc),
+    asc_vsbus_match, asc_vsbus_attach, NULL, NULL);
 
 /*
  * Functions and the switch for the MI code
@@ -249,17 +248,8 @@ asc_vsbus_attach(struct device *parent, struct device *self, void *aux)
 	error = bus_dmamap_create(asc->sc_dmat, ASC_MAXXFERSIZE, 1, 
 	    ASC_MAXXFERSIZE, 0, BUS_DMA_NOWAIT, &asc->sc_dmamap);
 
-	switch (vax_boardtype) {
-#if VAX46 || VAXANY
-	case VAX_BTYP_46:
-		sc->sc_id = (clk_page[0xbc/2] >> clk_tweak) & 7;
-		break;
-#endif
-	default:
-		sc->sc_id = 6;	/* XXX need to get this from VMB */
-		break;
-	}
-
+	/* SCSI ID is store in the clock NVRAM at magic address 0xbc */
+	sc->sc_id = (clk_page[0xbc/2] >> clk_tweak) & 7;
 	sc->sc_freq = ASC_FREQUENCY;
 
 	/* gimme Mhz */
@@ -425,7 +415,7 @@ asc_vsbus_dma_setup(struct ncr53c9x_softc *sc, caddr_t *addr, size_t *len,
 		asc->sc_flags |= ASC_FROMMEMORY;
 	}
 	if ((vaddr_t) *asc->sc_dmaaddr < VM_MIN_KERNEL_ADDRESS)
-		panic("asc_vsbus_dma_setup: dma address (%p) outside of kernel",
+		panic("asc_vsbus_dma_setup: DMA address (%p) outside of kernel",
 		    *asc->sc_dmaaddr);
 
         NCR_DMA(("%s: start %d@%p,%d\n", sc->sc_dev.dv_xname,
@@ -437,7 +427,7 @@ asc_vsbus_dma_setup(struct ncr53c9x_softc *sc, caddr_t *addr, size_t *len,
 				*asc->sc_dmaaddr, asc->sc_dmasize,
 				NULL /* kernel address */,   
 				BUS_DMA_NOWAIT|VAX_BUS_DMA_SPILLPAGE))
-			panic("%s: cannot load dma map", sc->sc_dev.dv_xname);
+			panic("%s: cannot load DMA map", sc->sc_dev.dv_xname);
 		bus_dmamap_sync(asc->sc_dmat, asc->sc_dmamap,
 				0, asc->sc_dmasize,
 				asc->sc_flags & ASC_FROMMEMORY

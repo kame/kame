@@ -1,4 +1,4 @@
-/* $NetBSD: podulebus.h,v 1.4.18.1 2002/11/01 11:13:56 tron Exp $ */
+/* $NetBSD: podulebus.h,v 1.6 2002/05/22 22:43:14 bjh21 Exp $ */
 
 /*
  * Copyright (c) 1995 Mark Brinicombe.
@@ -57,6 +57,8 @@ struct manufacturer_description {
 };
 
 #include <machine/podulebus_machdep.h>
+
+extern void podulebus_readcmos(struct podulebus_attach_args *, u_int8_t *);
 
 /* Podule loader functions. */
 extern int podulebus_initloader(struct podulebus_attach_args *);

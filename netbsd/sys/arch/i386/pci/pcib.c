@@ -1,4 +1,4 @@
-/*	$NetBSD: pcib.c,v 1.27 2001/11/15 07:03:34 lukem Exp $	*/
+/*	$NetBSD: pcib.c,v 1.32 2003/02/26 22:23:09 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1998 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pcib.c,v 1.27 2001/11/15 07:03:34 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pcib.c,v 1.32 2003/02/26 22:23:09 fvdl Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -58,9 +58,8 @@ __KERNEL_RCSID(0, "$NetBSD: pcib.c,v 1.27 2001/11/15 07:03:34 lukem Exp $");
 int	pcibmatch __P((struct device *, struct cfdata *, void *));
 void	pcibattach __P((struct device *, struct device *, void *));
 
-struct cfattach pcib_ca = {
-	sizeof(struct device), pcibmatch, pcibattach
-};
+CFATTACH_DECL(pcib, sizeof(struct device),
+    pcibmatch, pcibattach, NULL, NULL);
 
 void	pcib_callback __P((struct device *));
 int	pcib_print __P((void *, const char *));
@@ -203,8 +202,8 @@ pcib_callback(self)
 	 */
 	memset(&iba, 0, sizeof(iba));
 	iba.iba_busname = "isa";
-	iba.iba_iot = I386_BUS_SPACE_IO;
-	iba.iba_memt = I386_BUS_SPACE_MEM;
+	iba.iba_iot = X86_BUS_SPACE_IO;
+	iba.iba_memt = X86_BUS_SPACE_MEM;
 #if NISA > 0
 	iba.iba_dmat = &isa_bus_dma_tag;
 #endif
@@ -219,6 +218,6 @@ pcib_print(aux, pnp)
 
 	/* Only ISAs can attach to pcib's; easy. */
 	if (pnp)
-		printf("isa at %s", pnp);
+		aprint_normal("isa at %s", pnp);
 	return (UNCONF);
 }

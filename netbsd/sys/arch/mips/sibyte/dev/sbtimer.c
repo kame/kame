@@ -1,4 +1,4 @@
-/* $NetBSD: sbtimer.c,v 1.3 2002/03/06 07:47:57 simonb Exp $ */
+/* $NetBSD: sbtimer.c,v 1.9 2003/07/15 02:43:41 lukem Exp $ */
 
 /*
  * Copyright 2000, 2001
@@ -15,10 +15,9 @@
  *    the source file.
  *
  * 2) No right is granted to use any trade name, trademark, or logo of
- *    Broadcom Corporation. Neither the "Broadcom Corporation" name nor any
- *    trademark or logo of Broadcom Corporation may be used to endorse or
- *    promote products derived from this software without the prior written
- *    permission of Broadcom Corporation.
+ *    Broadcom Corporation.  The "Broadcom Corporation" name may not be
+ *    used to endorse or promote products derived from this software
+ *    without the prior written permission of Broadcom Corporation.
  *
  * 3) THIS SOFTWARE IS PROVIDED "AS-IS" AND ANY EXPRESS OR IMPLIED
  *    WARRANTIES, INCLUDING BUT NOT LIMITED TO, ANY IMPLIED WARRANTIES OF
@@ -32,6 +31,9 @@
  *    WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  *    OR OTHERWISE), EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sbtimer.c,v 1.9 2003/07/15 02:43:41 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -59,9 +61,8 @@ struct sbtimer_softc {
 static int	sbtimer_match(struct device *, struct cfdata *, void *);
 static void	sbtimer_attach(struct device *, struct device *, void *);
 
-struct cfattach sbtimer_ca = {
-	sizeof(struct sbtimer_softc), sbtimer_match, sbtimer_attach
-};
+CFATTACH_DECL(sbtimer, sizeof(struct sbtimer_softc),
+    sbtimer_match, sbtimer_attach, NULL, NULL);
 
 static void	sbtimer_clockintr(void *arg, uint32_t status, uint32_t pc);
 static void	sbtimer_statclockintr(void *arg, uint32_t status,
@@ -69,8 +70,6 @@ static void	sbtimer_statclockintr(void *arg, uint32_t status,
 static void	sbtimer_miscintr(void *arg, uint32_t status, uint32_t pc);
 
 static void	sbtimer_clock_init(void *arg);
-
-int printticks = 0;
 
 static int
 sbtimer_match(struct device *parent, struct cfdata *match, void *aux)
@@ -173,8 +172,6 @@ sbtimer_clockintr(void *arg, uint32_t status, uint32_t pc)
 	/* clear interrupt, but leave timer enabled and in repeating mode */
 	WRITE_REG(sc->sc_addr_cfg, 0x03);		/* XXX */
 
-	if (printticks)
-		printf("+");
 	cf.pc = pc;
 	cf.sr = status;
 

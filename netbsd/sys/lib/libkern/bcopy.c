@@ -1,4 +1,4 @@
-/*	$NetBSD: bcopy.c,v 1.3 1998/03/27 01:30:00 cgd Exp $	*/
+/*	$NetBSD: bcopy.c,v 1.5 2003/08/07 16:32:07 agc Exp $	*/
 
 /*-
  * Copyright (c) 1990, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)bcopy.c	8.1 (Berkeley) 6/4/93";
 #else
-__RCSID("$NetBSD: bcopy.c,v 1.3 1998/03/27 01:30:00 cgd Exp $");
+__RCSID("$NetBSD: bcopy.c,v 1.5 2003/08/07 16:32:07 agc Exp $");
 #endif
 #endif /* LIBC_SCCS and not lint */
 
@@ -94,7 +90,9 @@ bcopy(src0, dst0, length)
 #define	TLOOP(s) if (t) TLOOP1(s)
 #define	TLOOP1(s) do { s; } while (--t)
 
+#ifndef MEMCOPY
 	if ((unsigned long)dst < (unsigned long)src) {
+#endif
 		/*
 		 * Copy forward.
 		 */
@@ -118,6 +116,7 @@ bcopy(src0, dst0, length)
 		TLOOP(*(word *)dst = *(word *)src; src += wsize; dst += wsize);
 		t = length & wmask;
 		TLOOP(*dst++ = *src++);
+#ifndef MEMCOPY
 	} else {
 		/*
 		 * Copy backwards.  Otherwise essentially the same.
@@ -140,6 +139,8 @@ bcopy(src0, dst0, length)
 		t = length & wmask;
 		TLOOP(*--dst = *--src);
 	}
+#endif	/* MEMCOPY */
+
 done:
 #if defined(MEMCOPY) || defined(MEMMOVE)
 	return (dst0);

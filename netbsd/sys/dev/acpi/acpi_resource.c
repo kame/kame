@@ -1,4 +1,4 @@
-/*	$NetBSD: acpi_resource.c,v 1.2 2001/11/13 13:01:57 lukem Exp $	*/
+/*	$NetBSD: acpi_resource.c,v 1.9 2003/11/03 18:07:10 mycroft Exp $	*/
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -67,19 +67,18 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: acpi_resource.c,v 1.2 2001/11/13 13:01:57 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: acpi_resource.c,v 1.9 2003/11/03 18:07:10 mycroft Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
-#include <sys/malloc.h> 
 
 #include <dev/acpi/acpica.h>
 #include <dev/acpi/acpireg.h>
 #include <dev/acpi/acpivar.h>
 
-#define	_COMPONENT	ACPI_BUS
-MODULE_NAME("RESOURCE")
+#define	_COMPONENT	ACPI_RESOURCE_COMPONENT
+ACPI_MODULE_NAME("RESOURCE")
 
 /*
  * acpi_resource_parse:
@@ -101,7 +100,7 @@ acpi_resource_parse(struct device *dev, struct acpi_devnode *ad,
 	void *context;
 	int i;
 
-	FUNCTION_TRACE(__FUNCTION__);
+	ACPI_FUNCTION_TRACE(__FUNCTION__);
 
 	/*
 	 * XXX Note, this means we only get devices that are currently
@@ -110,9 +109,9 @@ acpi_resource_parse(struct device *dev, struct acpi_devnode *ad,
 	 */
 
 	status = acpi_get(ad->ad_handle, &buf, AcpiGetCurrentResources);
-	if (status != AE_OK) {
-		printf("%s: ACPI: unable to get Current Resources: %d\n",
-		    dev->dv_xname, status);
+	if (ACPI_FAILURE(status)) {
+		printf("%s: ACPI: unable to get Current Resources: %s\n",
+		    dev->dv_xname, AcpiFormatException(status));
 		return_ACPI_STATUS(status);
 	}
 
@@ -230,7 +229,8 @@ acpi_resource_parse(struct device *dev, struct acpi_devnode *ad,
 				ACPI_DEBUG_PRINT((ACPI_DB_RESOURCES,
 				    "IRQ %d\n", res->Data.Irq.Interrupts[i]));
 				(*ops->irq)(dev, context,
-				    res->Data.Irq.Interrupts[i]);
+				    res->Data.Irq.Interrupts[i],
+				    res->Data.Irq.EdgeLevel);
 			}
 			break;
 
@@ -314,8 +314,7 @@ acpi_resource_print(struct device *dev, struct acpi_resources *res)
 
 		sep = "";
 		printf(" io ");
-		for (ar = SIMPLEQ_FIRST(&res->ar_io); ar != NULL;
-		     ar = SIMPLEQ_NEXT(ar, ar_list)) {
+		SIMPLEQ_FOREACH(ar, &res->ar_io, ar_list) {
 			printf("%s0x%x", sep, ar->ar_base);
 			if (ar->ar_length > 1)
 				printf("-0x%x", ar->ar_base +
@@ -331,8 +330,7 @@ acpi_resource_print(struct device *dev, struct acpi_resources *res)
 
 		sep = "";
 		printf(" mem ");
-		for (ar = SIMPLEQ_FIRST(&res->ar_mem); ar != NULL;
-		     ar = SIMPLEQ_NEXT(ar, ar_list)) {
+		SIMPLEQ_FOREACH(ar, &res->ar_mem, ar_list) {
 			printf("%s0x%x", sep, ar->ar_base);
 			if (ar->ar_length > 1)
 				printf("-0x%x", ar->ar_base +
@@ -348,8 +346,7 @@ acpi_resource_print(struct device *dev, struct acpi_resources *res)
 
 		sep = "";
 		printf(" irq ");
-		for (ar = SIMPLEQ_FIRST(&res->ar_irq); ar != NULL;
-		     ar = SIMPLEQ_NEXT(ar, ar_list)) {
+		SIMPLEQ_FOREACH(ar, &res->ar_irq, ar_list) {
 			printf("%s%d", sep, ar->ar_irq);
 			sep = ",";
 		}
@@ -360,8 +357,7 @@ acpi_resource_print(struct device *dev, struct acpi_resources *res)
 
 		sep = "";
 		printf(" drq ");
-		for (ar = SIMPLEQ_FIRST(&res->ar_drq); ar != NULL;
-		     ar = SIMPLEQ_NEXT(ar, ar_list)) {
+		SIMPLEQ_FOREACH(ar, &res->ar_drq, ar_list) {
 			printf("%s%d", sep, ar->ar_drq);
 			sep = ",";
 		}
@@ -459,7 +455,7 @@ static void	acpi_res_parse_memory(struct device *, void *, uint32_t,
 static void	acpi_res_parse_memrange(struct device *, void *, uint32_t,
 		    uint32_t, uint32_t, uint32_t);
 
-static void	acpi_res_parse_irq(struct device *, void *, uint32_t);
+static void	acpi_res_parse_irq(struct device *, void *, uint32_t, uint32_t);
 static void	acpi_res_parse_drq(struct device *, void *, uint32_t);
 
 static void	acpi_res_parse_start_dep(struct device *, void *, int);
@@ -523,6 +519,29 @@ acpi_res_parse_ioport(struct device *dev, void *context, uint32_t base,
 {
 	struct acpi_resources *res = context;
 	struct acpi_io *ar;
+
+	/*
+	 * Check if there is another I/O port directly below/under
+	 * this one.
+	 */
+	SIMPLEQ_FOREACH(ar, &res->ar_io, ar_list) {
+		if (ar->ar_base == base + length ) {
+			/*
+			 * Entry just below existing entry - adjust
+			 * the entry and return.
+			 */
+			ar->ar_base = base;
+			ar->ar_length += length;
+			return;
+		} else if (ar->ar_base + ar->ar_length == base) {
+			/*
+			 * Entry just above existing entry - adjust
+			 * the entry and return.
+			 */
+			ar->ar_length += length;
+			return;
+		}
+	}
 
 	ar = AcpiOsAllocate(sizeof(*ar));
 	if (ar == NULL) {
@@ -610,7 +629,7 @@ acpi_res_parse_memrange(struct device *dev, void *context, uint32_t low,
 }
 
 static void
-acpi_res_parse_irq(struct device *dev, void *context, uint32_t irq)
+acpi_res_parse_irq(struct device *dev, void *context, uint32_t irq, uint32_t type)
 {
 	struct acpi_resources *res = context;
 	struct acpi_irq *ar;
@@ -625,6 +644,7 @@ acpi_res_parse_irq(struct device *dev, void *context, uint32_t irq)
 
 	ar->ar_index = res->ar_nirq++;
 	ar->ar_irq = irq;
+	ar->ar_type = type;
 
 	SIMPLEQ_INSERT_TAIL(&res->ar_irq, ar, ar_list);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: ctlreg.h,v 1.22 2000/05/05 11:07:15 pk Exp $ */
+/*	$NetBSD: ctlreg.h,v 1.25 2004/02/13 11:36:17 wiz Exp $ */
 
 /*
  * Copyright (c) 1996
@@ -100,6 +100,8 @@
 #define ASI_BLOCKFILL	0x1f	/* [4m] hypersparc: hardware block fill */
 #define ASI_BYPASS	0x20	/* [4m] sun ref mmu bypass,
 				        ie. direct phys access */
+#define	ASI_CSR		0x2f	/* [4d] CPU-unit CSR space */
+#define	ASI_ECSR	0x2f	/* [4d] CPU-unit ECSR space */
 #define ASI_HICACHECLR	0x31	/* [4m] hypersparc only: I-cache flash clear */
 #define ASI_ICACHECLR	0x36	/* [4m] ms1 only: I-cache flash clear */
 #define ASI_DCACHECLR	0x37	/* [4m] ms1 only: D-cache flash clear */
@@ -181,7 +183,12 @@
 #define MXCC_STREAM_DATA	0x1c00000	/* Stream data register */
 #define MXCC_STREAM_SRC		0x1c00100	/* Stream source register */
 #define MXCC_STREAM_DST		0x1c00200	/* Stream dest register */
+#define MXCC_BIST		0x1c00800	/* Builtin self test register */
 #define MXCC_CTRLREG		0x1c00a00	/* Control register for MXCC */
+#define MXCC_STATREG		0x1c00b00	/* Status register for MXCC */
+#define MXCC_MRST		0x1c00c00	/* Module reset register */
+#define MXCC_ERROR		0x1c00e00	/* Error register */
+#define MXCC_MBUSPORT		0x1c00f00	/* MBus port register */
 
 /* Bits in MXCC_CTRLREG */
 #define MXCC_CTRLREG_HC		0x1	/* Half cache (Xbus only) */
@@ -193,6 +200,10 @@
 #define MXCC_CTRLREG_WI		0x40	/* Write invalidate (Xbus only) */
 #define MXCC_CTRLREG_BWC_MASK	0x180	/* Bus watch count (Xbus only) */
 #define MXCC_CTRLREG_RC		0x200	/* Read reference count */
+
+/* Bits in MXCC_MRST */
+#define MXCC_MRST_SI		0x00000002	/* Software Internal reset */
+#define MXCC_MRST_WD		0x00000004	/* Watchdog reset */
 
 /*
  * Stream register usage:
@@ -235,6 +246,7 @@
 #define SRMMU_AFSR	0x00000500	/* Asynchronous fault status reg (HS) */
 #define SRMMU_AFAR	0x00000600	/* Asynchronous fault address reg (HS)*/
 #define SRMMU_PCFG	0x00000600	/* Processor configuration reg (TURBO)*/
+#define SRMMU_RST	0x00000700	/* Reset reg */
 #define SRMMU_TLBCTRL	0x00001000	/* TLB replacement control reg */
 
 
@@ -406,6 +418,9 @@
 #define TLBC_DISABLE	0x00000020	/* Disable replacement counter */
 #define TLBC_RCNTMASK	0x0000001f	/* Replacement counter (0-31) */
 
+/* [4m] SRMMU Reset Register bits */
+#define SRMMU_RST_SI	0x00000002	/* Software Internal reset */
+#define SRMMU_RST_WD	0x00000004	/* Watchdog reset */
 
 /*
  * The Ross Hypersparc has an Instruction Cache Control Register (ICCR)

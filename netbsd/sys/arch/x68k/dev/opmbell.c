@@ -1,4 +1,4 @@
-/*	$NetBSD: opmbell.c,v 1.8 2001/12/27 02:23:25 wiz Exp $	*/
+/*	$NetBSD: opmbell.c,v 1.11 2003/07/15 01:44:52 lukem Exp $	*/
 
 /*
  * Copyright (c) 1995 MINOURA Makoto, Takuya Harakawa.
@@ -38,6 +38,9 @@
  * bell device driver
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: opmbell.c,v 1.11 2003/07/15 01:44:52 lukem Exp $");
+
 #include "bell.h"
 #if NBELL > 0
 
@@ -55,6 +58,7 @@
 #include <sys/systm.h>
 #include <sys/callout.h>
 #include <sys/conf.h>
+#include <sys/event.h>
 
 #include <x68k/x68k/iodevice.h>
 #include <machine/opmbellio.h>
@@ -96,7 +100,6 @@ static struct opm_voice vtab[NBELL];
 
 #define UNIT(x)		minor(x)
 
-cdev_decl(bell);
 void bell_on __P((struct bell_softc *sc));
 void bell_off __P((struct bell_softc *sc));
 void opm_bell __P((void));
@@ -106,6 +109,15 @@ int opm_bell_setup __P((struct bell_info *));
 int bellmstohz __P((int));
 
 void bellattach __P((int));
+
+dev_type_open(bellopen);
+dev_type_close(bellclose);
+dev_type_ioctl(bellioctl);
+
+const struct cdevsw bell_cdevsw = {
+	bellopen, bellclose, noread, nowrite, bellioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
 
 void
 bellattach(num)

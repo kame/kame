@@ -1,4 +1,4 @@
-/* $NetBSD: softintr.c,v 1.2 2002/03/17 06:28:57 simonb Exp $ */
+/* $NetBSD: softintr.c,v 1.4 2003/10/25 15:52:38 simonb Exp $ */
 
 /*
  * Copyright 2000, 2001
@@ -15,10 +15,9 @@
  *    the source file.
  *
  * 2) No right is granted to use any trade name, trademark, or logo of
- *    Broadcom Corporation. Neither the "Broadcom Corporation" name nor any
- *    trademark or logo of Broadcom Corporation may be used to endorse or
- *    promote products derived from this software without the prior written
- *    permission of Broadcom Corporation.
+ *    Broadcom Corporation.  The "Broadcom Corporation" name may not be
+ *    used to endorse or promote products derived from this software
+ *    without the prior written permission of Broadcom Corporation.
  *
  * 3) THIS SOFTWARE IS PROVIDED "AS-IS" AND ANY EXPRESS OR IMPLIED
  *    WARRANTIES, INCLUDING BUT NOT LIMITED TO, ANY IMPLIED WARRANTIES OF
@@ -35,11 +34,12 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(0, "$NetBSD: softintr.c,v 1.2 2002/03/17 06:28:57 simonb Exp $");
+__KERNEL_RCSID(0, "$NetBSD: softintr.c,v 1.4 2003/10/25 15:52:38 simonb Exp $");
 
 #include <sys/param.h>
-#include <sys/systm.h>
+#include <sys/device.h>
 #include <sys/malloc.h>
+#include <sys/systm.h>
 
 /* XXX for uvmexp */
 #include <uvm/uvm_extern.h>
@@ -60,6 +60,14 @@ static struct sh **sh_list_tail = &sh_list_head;
 
 static void dosoftnet(void *unused);
 static void dosoftclock(void *unused);
+
+static struct evcnt softclock_ev =
+    EVCNT_INITIALIZER(EVCNT_TYPE_INTR, NULL, "soft", "clock");
+static struct evcnt softnet_ev =
+    EVCNT_INITIALIZER(EVCNT_TYPE_INTR, NULL, "soft", "net");
+
+EVCNT_ATTACH_STATIC(softclock_ev);
+EVCNT_ATTACH_STATIC(softnet_ev);
 
 void *
 softintr_establish(int level, void (*fun)(void *), void *arg)
@@ -151,7 +159,7 @@ static void
 dosoftclock(void *unused)
 {
 
-	intrcnt[SOFTCLOCK_INTR]++;
+	softclock_ev.ev_count++;
 	softclock(NULL);
 }
 
@@ -189,7 +197,7 @@ dosoftnet(void *unused)
 {
 	int n, s;
 
-	intrcnt[SOFTNET_INTR]++;
+	softnet_ev.ev_count++;
 
 	/* XXX could just use netintr! */
 

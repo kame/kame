@@ -1,4 +1,4 @@
-/*	$NetBSD: tx39ir.c,v 1.4 2002/01/29 18:53:17 uch Exp $ */
+/*	$NetBSD: tx39ir.c,v 1.7 2003/07/15 02:29:33 lukem Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -39,6 +39,10 @@
 /*
  * TX39 IR module (connected to UARTB)
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: tx39ir.c,v 1.7 2003/07/15 02:29:33 lukem Exp $");
+
 #undef TX39IRDEBUG
 
 #include <sys/param.h>
@@ -78,9 +82,8 @@ static void	tx39ir_dump(struct tx39ir_softc *);
 static int	tx39ir_intr(void *);
 #endif
 
-struct cfattach tx39ir_ca = {
-	sizeof(struct tx39ir_softc), tx39ir_match, tx39ir_attach
-};
+CFATTACH_DECL(tx39ir, sizeof(struct tx39ir_softc),
+    tx39ir_match, tx39ir_attach, NULL, NULL);
 
 int
 tx39ir_match(struct device *parent, struct cfdata *cf, void *aux)

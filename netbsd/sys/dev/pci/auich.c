@@ -1,4 +1,4 @@
-/*	$NetBSD: auich.c,v 1.17 2002/04/11 10:54:23 augustss Exp $	*/
+/*	$NetBSD: auich.c,v 1.58.2.1 2004/09/22 20:58:09 jmc Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -66,21 +66,59 @@
  *	from OpenBSD: ich.c,v 1.3 2000/08/11 06:17:18 mickey Exp
  */
 
+/*
+ * Copyright (c) 2000 Katsurajima Naoto <raven@katsurajima.seya.yokohama.jp>
+ * Copyright (c) 2001 Cameron Grant <cg@freebsd.org>
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHERIN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THEPOSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * auich_calibrate() was from FreeBSD: ich.c,v 1.22 2002/06/27 22:36:01 scottl Exp 
+ */
+
+
 /* #define	ICH_DEBUG */
 /*
  * AC'97 audio found on Intel 810/820/440MX chipsets.
  *	http://developer.intel.com/design/chipsets/datashts/290655.htm
  *	http://developer.intel.com/design/chipsets/manuals/298028.htm
+ * ICH3:http://www.intel.com/design/chipsets/datashts/290716.htm
+ * ICH4:http://www.intel.com/design/chipsets/datashts/290744.htm
+ * ICH5:http://www.intel.com/design/chipsets/datashts/252516.htm
+ * AMD8111:
+ *	http://www.amd.com/us-en/assets/content_type/white_papers_and_tech_docs/24674.pdf
+ *	http://www.amd.com/us-en/assets/content_type/white_papers_and_tech_docs/25720.pdf
  *
  * TODO:
+ *	- Add support for the dedicated microphone input.
  *
- *	- Probe codecs for supported sample rates.
- *
- *	- Add support for the microphone input.
+ * NOTE:
+ *      - The 440MX B-stepping at running 100MHz has a hardware erratum.
+ *        It causes PCI master abort and hangups until cold reboot.
+ *        http://www.intel.com/design/chipsets/specupdt/245051.htm
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: auich.c,v 1.17 2002/04/11 10:54:23 augustss Exp $");
+__KERNEL_RCSID(0, "$NetBSD: auich.c,v 1.58.2.1 2004/09/22 20:58:09 jmc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -168,7 +206,15 @@ struct auich_softc {
 
 	struct auich_dma *sc_dmas;
 
-	int  sc_fixed_rate;
+#ifdef DIAGNOSTIC
+	pci_chipset_tag_t sc_pc;
+	pcitag_t sc_pt;
+#endif
+	/* SiS 7012 hack */
+	int  sc_sample_size;
+	int  sc_sts_reg;
+	/* 440MX workaround */
+	int  sc_dmamap_flags;
 
 	void (*sc_pintr)(void *);
 	void *sc_parg;
@@ -182,7 +228,14 @@ struct auich_softc {
 	u_int16_t ext_status;
 };
 
-#define FIXED_RATE 48000
+#define IS_FIXED_RATE(codec)	!((codec)->vtbl->get_extcaps(codec) \
+				& AC97_EXT_AUDIO_VRA)
+#define SUPPORTS_4CH(codec)	((codec)->vtbl->get_extcaps(codec) \
+				& AC97_EXT_AUDIO_SDAC)
+#define AC97_6CH_DACS		(AC97_EXT_AUDIO_SDAC | AC97_EXT_AUDIO_CDAC \
+				| AC97_EXT_AUDIO_LDAC)
+#define SUPPORTS_6CH(codec)	(((codec)->vtbl->get_extcaps(codec) \
+				& AC97_6CH_DACS) == AC97_6CH_DACS)
 
 /* Debug */
 #ifdef AUDIO_DEBUG
@@ -199,9 +252,8 @@ int	auich_match(struct device *, struct cfdata *, void *);
 void	auich_attach(struct device *, struct device *, void *);
 int	auich_intr(void *);
 
-struct cfattach auich_ca = {
-	sizeof(struct auich_softc), auich_match, auich_attach
-};
+CFATTACH_DECL(auich, sizeof(struct auich_softc),
+    auich_match, auich_attach, NULL, NULL);
 
 int	auich_open(void *, int);
 void	auich_close(void *);
@@ -215,8 +267,8 @@ int	auich_getdev(void *, struct audio_device *);
 int	auich_set_port(void *, mixer_ctrl_t *);
 int	auich_get_port(void *, mixer_ctrl_t *);
 int	auich_query_devinfo(void *, mixer_devinfo_t *);
-void	*auich_allocm(void *, int, size_t, int, int);
-void	auich_freem(void *, void *, int);
+void	*auich_allocm(void *, int, size_t, struct malloc_type *, int);
+void	auich_freem(void *, void *, struct malloc_type *);
 size_t	auich_round_buffersize(void *, int, size_t);
 paddr_t	auich_mappage(void *, void *, off_t, int);
 int	auich_get_props(void *);
@@ -232,7 +284,9 @@ int	auich_allocmem(struct auich_softc *, size_t, size_t,
 int	auich_freemem(struct auich_softc *, struct auich_dma *);
 
 void	auich_powerhook(int, void *);
-int	auich_set_rate(struct auich_softc *sc, int mode, uint srate);
+int	auich_set_rate(struct auich_softc *, int, u_long);
+void	auich_finish_attach(struct device *);
+void	auich_calibrate(struct auich_softc *);
 
 
 struct audio_hw_if auich_hw_if = {
@@ -268,26 +322,42 @@ struct audio_hw_if auich_hw_if = {
 int	auich_attach_codec(void *, struct ac97_codec_if *);
 int	auich_read_codec(void *, u_int8_t, u_int16_t *);
 int	auich_write_codec(void *, u_int8_t, u_int16_t);
-void	auich_reset_codec(void *);
+int	auich_reset_codec(void *);
 
 static const struct auich_devtype {
+	int	vendor;
 	int	product;
 	const char *name;
-	const char *shortname;
+	const char *shortname;	/* must be less than 11 characters */
 } auich_devices[] = {
-	{ PCI_PRODUCT_INTEL_82801AA_ACA,
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801AA_ACA,
 	    "i82801AA (ICH) AC-97 Audio",	"ICH" },
-	{ PCI_PRODUCT_INTEL_82801AB_ACA,
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801AB_ACA,
 	    "i82801AB (ICH0) AC-97 Audio",	"ICH0" },
-	{ PCI_PRODUCT_INTEL_82801BA_ACA,
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801BA_ACA,
 	    "i82801BA (ICH2) AC-97 Audio",	"ICH2" },
-	{ PCI_PRODUCT_INTEL_82440MX_ACA,
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82440MX_ACA,
 	    "i82440MX AC-97 Audio",		"440MX" },
-	{ PCI_PRODUCT_INTEL_82801CA_AC,
-	    "i82801CA AC-97 Audio",		"i830M" },
-
-	{ 0,
-	    NULL,			NULL },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801CA_AC,
+	    "i82801CA (ICH3) AC-97 Audio",	"ICH3" },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801DB_AC,
+	    "i82801DB/DBM (ICH4/ICH4M) AC-97 Audio",	"ICH4" },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801EB_AC,
+	    "i82801EB (ICH5) AC-97 Audio",   "ICH5" },
+	{ PCI_VENDOR_SIS, PCI_PRODUCT_SIS_7012_AC,
+	    "SiS 7012 AC-97 Audio",		"SiS7012" },
+	{ PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_NFORCE_MCP_AC,
+	    "nForce MCP AC-97 Audio",		"nForce" },
+	{ PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_NFORCE2_MCPT_AC,
+	    "nForce2 MCP-T AC-97 Audio",	"nForce2" },
+	{ PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_NFORCE3_MCPT_AC,
+	    "nForce3 MCP-T AC-97 Audio",	"nForce3" },
+	{ PCI_VENDOR_AMD, PCI_PRODUCT_AMD_PBC768_AC,
+	    "AMD768 AC-97 Audio",		"AMD768" },
+	{ PCI_VENDOR_AMD, PCI_PRODUCT_AMD_PBC8111_AC,
+	    "AMD8111 AC-97 Audio",		"AMD8111" },
+	{ 0, 0,
+	    NULL,				NULL },
 };
 
 static const struct auich_devtype *
@@ -295,11 +365,9 @@ auich_lookup(struct pci_attach_args *pa)
 {
 	const struct auich_devtype *d;
 
-	if (PCI_VENDOR(pa->pa_id) != PCI_VENDOR_INTEL)
-		return (NULL);
-
 	for (d = auich_devices; d->name != NULL; d++) {
-		if (PCI_PRODUCT(pa->pa_id) == d->product)
+		if (PCI_VENDOR(pa->pa_id) == d->vendor
+			&& PCI_PRODUCT(pa->pa_id) == d->product)
 			return (d);
 	}
 
@@ -324,56 +392,117 @@ auich_attach(struct device *parent, struct device *self, void *aux)
 	struct pci_attach_args *pa = aux;
 	pci_intr_handle_t ih;
 	bus_size_t mix_size, aud_size;
-	pcireg_t csr;
+	pcireg_t v;
 	const char *intrstr;
 	const struct auich_devtype *d;
-	u_int16_t ext_id, ext_status;
+
+	aprint_naive(": Audio controller\n");
 
 	d = auich_lookup(pa);
 	if (d == NULL)
 		panic("auich_attach: impossible");
 
-	printf(": %s\n", d->name);
+#ifdef DIAGNOSTIC
+	sc->sc_pc = pa->pa_pc;
+	sc->sc_pt = pa->pa_tag;
+#endif
 
-	if (pci_mapreg_map(pa, ICH_NAMBAR, PCI_MAPREG_TYPE_IO, 0,
-			   &sc->iot, &sc->mix_ioh, NULL, &mix_size)) {
-		printf("%s: can't map codec i/o space\n",
-		    sc->sc_dev.dv_xname);
-		return;
-	}
-	if (pci_mapreg_map(pa, ICH_NABMBAR, PCI_MAPREG_TYPE_IO, 0,
-			   &sc->iot, &sc->aud_ioh, NULL, &aud_size)) {
-		printf("%s: can't map device i/o space\n",
-		    sc->sc_dev.dv_xname);
-		return;
+	aprint_normal(": %s\n", d->name);
+
+	if ((d->vendor == PCI_VENDOR_INTEL
+	     && d->product == PCI_PRODUCT_INTEL_82801DB_AC)
+	    || (d->vendor == PCI_VENDOR_INTEL
+		&& d->product == PCI_PRODUCT_INTEL_82801EB_AC)) {
+		/*
+		 * Use native mode for ICH4/ICH5
+		 */
+		if (pci_mapreg_map(pa, ICH_MMBAR, PCI_MAPREG_TYPE_MEM, 0,
+				   &sc->iot, &sc->mix_ioh, NULL, &mix_size)) {
+			v = pci_conf_read(pa->pa_pc, pa->pa_tag, ICH_CFG);
+			pci_conf_write(pa->pa_pc, pa->pa_tag, ICH_CFG,
+				       v | ICH_CFG_IOSE);
+			if (pci_mapreg_map(pa, ICH_NAMBAR, PCI_MAPREG_TYPE_IO,
+					   0, &sc->iot, &sc->mix_ioh, NULL,
+					   &mix_size)) {
+				aprint_error("%s: can't map codec i/o space\n",
+					     sc->sc_dev.dv_xname);
+				return;
+			}
+		}
+		if (pci_mapreg_map(pa, ICH_MBBAR, PCI_MAPREG_TYPE_MEM, 0,
+				   &sc->iot, &sc->aud_ioh, NULL, &aud_size)) {
+			v = pci_conf_read(pa->pa_pc, pa->pa_tag, ICH_CFG);
+			pci_conf_write(pa->pa_pc, pa->pa_tag, ICH_CFG,
+				       v | ICH_CFG_IOSE);
+			if (pci_mapreg_map(pa, ICH_NABMBAR, PCI_MAPREG_TYPE_IO,
+					   0, &sc->iot, &sc->aud_ioh, NULL,
+					   &aud_size)) {
+				aprint_error("%s: can't map device i/o space\n",
+					     sc->sc_dev.dv_xname);
+				return;
+			}
+		}
+	} else {
+		if (pci_mapreg_map(pa, ICH_NAMBAR, PCI_MAPREG_TYPE_IO, 0,
+				   &sc->iot, &sc->mix_ioh, NULL, &mix_size)) {
+			aprint_error("%s: can't map codec i/o space\n",
+				     sc->sc_dev.dv_xname);
+			return;
+		}
+		if (pci_mapreg_map(pa, ICH_NABMBAR, PCI_MAPREG_TYPE_IO, 0,
+				   &sc->iot, &sc->aud_ioh, NULL, &aud_size)) {
+			aprint_error("%s: can't map device i/o space\n",
+				     sc->sc_dev.dv_xname);
+			return;
+		}
 	}
 	sc->dmat = pa->pa_dmat;
 
 	/* enable bus mastering */
-	csr = pci_conf_read(pa->pa_pc, pa->pa_tag, PCI_COMMAND_STATUS_REG);
+	v = pci_conf_read(pa->pa_pc, pa->pa_tag, PCI_COMMAND_STATUS_REG);
 	pci_conf_write(pa->pa_pc, pa->pa_tag, PCI_COMMAND_STATUS_REG,
-	    csr | PCI_COMMAND_MASTER_ENABLE);
+	    v | PCI_COMMAND_MASTER_ENABLE);
 
 	/* Map and establish the interrupt. */
 	if (pci_intr_map(pa, &ih)) {
-		printf("%s: can't map interrupt\n", sc->sc_dev.dv_xname);
+		aprint_error("%s: can't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}
 	intrstr = pci_intr_string(pa->pa_pc, ih);
 	sc->sc_ih = pci_intr_establish(pa->pa_pc, ih, IPL_AUDIO,
 	    auich_intr, sc);
 	if (sc->sc_ih == NULL) {
-		printf("%s: can't establish interrupt", sc->sc_dev.dv_xname);
+		aprint_error("%s: can't establish interrupt",
+		    sc->sc_dev.dv_xname);
 		if (intrstr != NULL)
-			printf(" at %s", intrstr);
-		printf("\n");
+			aprint_normal(" at %s", intrstr);
+		aprint_normal("\n");
 		return;
 	}
-	printf("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
+	aprint_normal("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
 
-	sprintf(sc->sc_audev.name, "%s AC97", d->shortname);
-	sprintf(sc->sc_audev.version, "0x%02x", PCI_REVISION(pa->pa_class));
-	strcpy(sc->sc_audev.config, sc->sc_dev.dv_xname);
+	snprintf(sc->sc_audev.name, MAX_AUDIO_DEV_LEN, "%s AC97", d->shortname);
+	snprintf(sc->sc_audev.version, MAX_AUDIO_DEV_LEN,
+		 "0x%02x", PCI_REVISION(pa->pa_class));
+	strlcpy(sc->sc_audev.config, sc->sc_dev.dv_xname, MAX_AUDIO_DEV_LEN);
+
+	/* SiS 7012 needs special handling */
+	if (d->vendor == PCI_VENDOR_SIS
+	    && d->product == PCI_PRODUCT_SIS_7012_AC) {
+		sc->sc_sts_reg = ICH_PICB;
+		sc->sc_sample_size = 1;
+	} else {
+		sc->sc_sts_reg = ICH_STS;
+		sc->sc_sample_size = 2;
+	}
+
+	/* Workaround for a 440MX B-stepping erratum */
+	sc->sc_dmamap_flags = BUS_DMA_COHERENT;
+	if (d->vendor == PCI_VENDOR_INTEL
+	    && d->product == PCI_PRODUCT_INTEL_82440MX_ACA) {
+		sc->sc_dmamap_flags |= BUS_DMA_NOCACHE;
+		printf("%s: DMA bug workaround enabled\n", sc->sc_dev.dv_xname);
+	}
 
 	/* Set up DMA lists. */
 	sc->ptr_pcmo = sc->ptr_pcmi = sc->ptr_mici = 0;
@@ -381,9 +510,6 @@ auich_attach(struct device *parent, struct device *self, void *aux)
 
 	DPRINTF(ICH_DEBUG_DMA, ("auich_attach: lists %p %p %p\n",
 	    sc->dmalist_pcmo, sc->dmalist_pcmi, sc->dmalist_mici));
-
-	/* Reset codec and AC'97 */
-	auich_reset_codec(sc);
 
 	sc->host_if.arg = sc;
 	sc->host_if.attach = auich_attach_codec;
@@ -394,31 +520,22 @@ auich_attach(struct device *parent, struct device *self, void *aux)
 	if (ac97_attach(&sc->host_if) != 0)
 		return;
 
-	auich_read_codec(sc, AC97_REG_EXTENDED_ID, &ext_id);
-	if ((ext_id & (AC97_CODEC_DOES_VRA | AC97_CODEC_DOES_MICVRA)) != 0) {
-		auich_read_codec(sc, AC97_REG_EXTENDED_STATUS, &ext_status);
-		if ((ext_id & AC97_CODEC_DOES_VRA) !=0)
-			ext_status |= AC97_ENAB_VRA;
-		if ((ext_id & AC97_CODEC_DOES_MICVRA) !=0)
-			ext_status |= AC97_ENAB_MICVRA;
-		auich_write_codec(sc, AC97_REG_EXTENDED_STATUS, ext_status);
-
-		/* so it claims to do variable rate, let's make sure */
-		if (auich_set_rate(sc, AUMODE_PLAY, 44100) == 44100)
-			sc->sc_fixed_rate = 0;
-		else
-			sc->sc_fixed_rate = FIXED_RATE;
-	} else {
-		sc->sc_fixed_rate = FIXED_RATE;
-	}
-	if (sc->sc_fixed_rate)
-		printf("%s: warning, fixed rate codec\n", sc->sc_dev.dv_xname);
-
-	audio_attach_mi(&auich_hw_if, sc, &sc->sc_dev);
-
 	/* Watch for power change */
 	sc->sc_suspend = PWR_RESUME;
 	sc->sc_powerhook = powerhook_establish(auich_powerhook, sc);
+
+	config_interrupts(self, auich_finish_attach);
+}
+
+void
+auich_finish_attach(struct device *self)
+{
+	struct auich_softc *sc = (void *)self;
+
+	if (!IS_FIXED_RATE(sc->codec_if))
+		auich_calibrate(sc);
+
+	audio_attach_mi(&auich_hw_if, sc, &sc->sc_dev);
 }
 
 #define ICH_CODECIO_INTERVAL	10
@@ -429,11 +546,6 @@ auich_read_codec(void *v, u_int8_t reg, u_int16_t *val)
 	int i;
 	uint32_t status;
 
-	if (!(bus_space_read_4(sc->iot, sc->aud_ioh, ICH_GSTS) & ICH_PCR)) {
-		printf("auich_read_codec: codec is not ready.");
-		*val = 0xffff;
-		return -1;
-	}
 	/* wait for an access semaphore */
 	for (i = ICH_SEMATIMO / ICH_CODECIO_INTERVAL; i-- &&
 	    bus_space_read_1(sc->iot, sc->aud_ioh, ICH_CAS) & 1;
@@ -464,10 +576,6 @@ auich_write_codec(void *v, u_int8_t reg, u_int16_t val)
 	int i;
 
 	DPRINTF(ICH_DEBUG_CODECIO, ("auich_write_codec(%x, %x)\n", reg, val));
-	if (!(bus_space_read_4(sc->iot, sc->aud_ioh, ICH_GSTS) & ICH_PCR)) {
-		printf("auich_write_codec: codec is not ready.");
-		return -1;
-	}
 	/* wait for an access semaphore */
 	for (i = ICH_SEMATIMO / ICH_CODECIO_INTERVAL; i-- &&
 	    bus_space_read_1(sc->iot, sc->aud_ioh, ICH_CAS) & 1;
@@ -492,25 +600,42 @@ auich_attach_codec(void *v, struct ac97_codec_if *cif)
 	return 0;
 }
 
-void
+int
 auich_reset_codec(void *v)
 {
 	struct auich_softc *sc = v;
 	int i;
+	uint32_t control, status;
 
-	bus_space_write_4(sc->iot, sc->aud_ioh, ICH_GCTRL, 0);
-	DELAY(10);
-	bus_space_write_4(sc->iot, sc->aud_ioh, ICH_GCTRL, ICH_CRESET);
+	control = bus_space_read_4(sc->iot, sc->aud_ioh, ICH_GCTRL);
+	control &= ~(ICH_ACLSO | ICH_PCM246_MASK);
+	control |= (control & ICH_CRESET) ? ICH_WRESET : ICH_CRESET;
+	bus_space_write_4(sc->iot, sc->aud_ioh, ICH_GCTRL, control);
 
-	for (i = 500000; i-- &&
-	       !(bus_space_read_4(sc->iot, sc->aud_ioh, ICH_GSTS) & ICH_PCR);
-	     DELAY(1));					/*       or ICH_SCR? */
+	for (i = 500000; i >= 0; i--) {
+		status = bus_space_read_4(sc->iot, sc->aud_ioh, ICH_GSTS);
+		if (status & (ICH_PCR | ICH_SCR | ICH_S2CR))
+			break;
+		DELAY(1);
+	}
+	if (i <= 0) {
+		printf("%s: auich_reset_codec: time out\n", sc->sc_dev.dv_xname);
+		return ETIMEDOUT;
+	}
+#ifdef DEBUG
+	if (status & ICH_SCR)
+		printf("%s: The 2nd codec is ready.\n",
+		       sc->sc_dev.dv_xname);
+	if (status & ICH_S2CR)
+		printf("%s: The 3rd codec is ready.\n",
+		       sc->sc_dev.dv_xname);
+#endif
+	return 0;
 }
 
 int
 auich_open(void *v, int flags)
 {
-
 	return 0;
 }
 
@@ -585,26 +710,28 @@ auich_query_encoding(void *v, struct audio_encoding *aep)
 }
 
 int
-auich_set_rate(struct auich_softc *sc, int mode, uint srate)
+auich_set_rate(struct auich_softc *sc, int mode, u_long srate)
 {
-	u_int16_t val, rate, inout;
+	int ret;
+	u_long ratetmp;
 
-	inout = mode == AUMODE_PLAY ? ICH_PM_PCMO : ICH_PM_PCMI;
-
-	auich_read_codec(sc, AC97_REG_POWER, &val);
-	auich_write_codec(sc, AC97_REG_POWER, val | inout);
-	
-	if (mode == AUMODE_PLAY) {
-		auich_write_codec(sc, AC97_REG_PCM_FRONT_DAC_RATE, srate);
-		auich_read_codec(sc, AC97_REG_PCM_FRONT_DAC_RATE, &rate);
-	} else {
-		auich_write_codec(sc, AC97_REG_PCM_LR_ADC_RATE, srate);
-		auich_read_codec(sc, AC97_REG_PCM_LR_ADC_RATE, &rate);
-	}
-	
-	auich_write_codec(sc, AC97_REG_POWER, val);
-
-	return rate;
+	ratetmp = srate;
+	if (mode == AUMODE_RECORD)
+		return sc->codec_if->vtbl->set_rate(sc->codec_if,
+		    AC97_REG_PCM_LR_ADC_RATE, &ratetmp);
+	ret = sc->codec_if->vtbl->set_rate(sc->codec_if,
+	    AC97_REG_PCM_FRONT_DAC_RATE, &ratetmp);
+	if (ret)
+		return ret;
+	ratetmp = srate;
+	ret = sc->codec_if->vtbl->set_rate(sc->codec_if,
+	    AC97_REG_PCM_SURR_DAC_RATE, &ratetmp);
+	if (ret)
+		return ret;
+	ratetmp = srate;
+	ret = sc->codec_if->vtbl->set_rate(sc->codec_if,
+	    AC97_REG_PCM_LFE_DAC_RATE, &ratetmp);
+	return ret;
 }
 
 int
@@ -614,6 +741,7 @@ auich_set_params(void *v, int setmode, int usemode, struct audio_params *play,
 	struct auich_softc *sc = v;
 	struct audio_params *p;
 	int mode;
+	u_int32_t control;
 
 	for (mode = AUMODE_RECORD; mode != -1;
 	     mode = mode == AUMODE_RECORD ? AUMODE_PLAY : -1) {
@@ -626,8 +754,10 @@ auich_set_params(void *v, int setmode, int usemode, struct audio_params *play,
 
 		if ((p->sample_rate !=  8000) &&
 		    (p->sample_rate != 11025) &&
+		    (p->sample_rate != 12000) &&
 		    (p->sample_rate != 16000) &&
 		    (p->sample_rate != 22050) &&
+		    (p->sample_rate != 24000) &&
 		    (p->sample_rate != 32000) &&
 		    (p->sample_rate != 44100) &&
 		    (p->sample_rate != 48000))
@@ -641,8 +771,33 @@ auich_set_params(void *v, int setmode, int usemode, struct audio_params *play,
 		/* setup hardware formats */
 		p->hw_encoding = AUDIO_ENCODING_SLINEAR_LE;
 		p->hw_precision = 16;
-		if (p->channels < 2)
+
+		if (mode == AUMODE_RECORD) {
+			if (p->channels < 1 || p->channels > 2)
+				return EINVAL;
+		} else {
+			switch (p->channels) {
+			case 1:
+				break;
+			case 2:
+				break;
+			case 4:
+				if (!SUPPORTS_4CH(sc->codec_if))
+					return EINVAL;
+				break;
+			case 6:
+				if (!SUPPORTS_6CH(sc->codec_if))
+					return EINVAL;
+				break;
+			default:
+				return EINVAL;
+			}
+		}
+		/* If monaural is requested, aurateconv expands a monaural
+		 * stream to stereo. */
+		if (p->channels == 1)
 			p->hw_channels = 2;
+
 		switch (p->encoding) {
 		case AUDIO_ENCODING_SLINEAR_BE:
 			if (p->precision == 16) {
@@ -715,11 +870,23 @@ auich_set_params(void *v, int setmode, int usemode, struct audio_params *play,
 			return (EINVAL);
 		}
 
-		if (sc->sc_fixed_rate)
-			p->hw_sample_rate = sc->sc_fixed_rate;
-		else
-			p->hw_sample_rate = auich_set_rate(sc, mode,
-							   p->sample_rate);
+		if (IS_FIXED_RATE(sc->codec_if)) {
+			p->hw_sample_rate = AC97_SINGLE_RATE;
+			/* If hw_sample_rate is changed, aurateconv works. */
+		} else {
+			if (auich_set_rate(sc, mode, p->sample_rate))
+				return EINVAL;
+		}
+		if (mode == AUMODE_PLAY) {
+			control = bus_space_read_4(sc->iot, sc->aud_ioh, ICH_GCTRL);
+			control &= ~ICH_PCM246_MASK;
+			if (p->channels == 4) {
+				control |= ICH_PCM4;
+			} else if (p->channels == 6) {
+				control |= ICH_PCM6;
+			}
+			bus_space_write_4(sc->iot, sc->aud_ioh, ICH_GCTRL, control);
+		}
 	}
 
 	return (0);
@@ -794,7 +961,8 @@ auich_query_devinfo(void *v, mixer_devinfo_t *dp)
 }
 
 void *
-auich_allocm(void *v, int direction, size_t size, int pool, int flags)
+auich_allocm(void *v, int direction, size_t size, struct malloc_type *pool,
+    int flags)
 {
 	struct auich_softc *sc = v;
 	struct auich_dma *p;
@@ -820,7 +988,7 @@ auich_allocm(void *v, int direction, size_t size, int pool, int flags)
 }
 
 void
-auich_freem(void *v, void *ptr, int pool)
+auich_freem(void *v, void *ptr, struct malloc_type *pool)
 {
 	struct auich_softc *sc = v;
 	struct auich_dma *p, **pp;
@@ -865,9 +1033,18 @@ auich_mappage(void *v, void *mem, off_t off, int prot)
 int
 auich_get_props(void *v)
 {
+	struct auich_softc *sc = v;
+	int props;
 
-	return (AUDIO_PROP_MMAP | AUDIO_PROP_INDEPENDENT |
-		AUDIO_PROP_FULLDUPLEX);
+	props = AUDIO_PROP_INDEPENDENT | AUDIO_PROP_FULLDUPLEX;
+	/*
+	 * Even if the codec is fixed-rate, set_param() succeeds for any sample
+	 * rate because of aurateconv.  Applications can't know what rate the
+	 * device can process in the case of mmap().
+	 */
+	if (!IS_FIXED_RATE(sc->codec_if))
+		props |= AUDIO_PROP_MMAP;
+	return props;
 }
 
 int
@@ -876,11 +1053,22 @@ auich_intr(void *v)
 	struct auich_softc *sc = v;
 	int ret = 0, sts, gsts, i, qptr;
 
+#ifdef DIAGNOSTIC
+	int csts;
+#endif
+
+#ifdef DIAGNOSTIC
+	csts = pci_conf_read(sc->sc_pc, sc->sc_pt, PCI_COMMAND_STATUS_REG);
+	if (csts & PCI_STATUS_MASTER_ABORT) {
+		printf("auich_intr: PCI master abort\n");
+	}
+#endif
+
 	gsts = bus_space_read_2(sc->iot, sc->aud_ioh, ICH_GSTS);
 	DPRINTF(ICH_DEBUG_DMA, ("auich_intr: gsts=0x%x\n", gsts));
 
 	if (gsts & ICH_POINT) {
-		sts = bus_space_read_2(sc->iot, sc->aud_ioh, ICH_PCMO+ICH_STS);
+		sts = bus_space_read_2(sc->iot, sc->aud_ioh, ICH_PCMO+sc->sc_sts_reg);
 		DPRINTF(ICH_DEBUG_DMA,
 		    ("auich_intr: osts=0x%x\n", sts));
 
@@ -899,7 +1087,7 @@ auich_intr(void *v)
 				q = &sc->dmalist_pcmo[qptr];
 
 				q->base = sc->pcmo_p;
-				q->len = (sc->pcmo_blksize / 2) | ICH_DMAF_IOC;
+				q->len = (sc->pcmo_blksize / sc->sc_sample_size) | ICH_DMAF_IOC;
 				DPRINTF(ICH_DEBUG_DMA,
 				    ("auich_intr: %p, %p = %x @ 0x%x\n",
 				    &sc->dmalist_pcmo[i], q,
@@ -923,14 +1111,14 @@ auich_intr(void *v)
 			sc->sc_pintr(sc->sc_parg);
 
 		/* int ack */
-		bus_space_write_2(sc->iot, sc->aud_ioh, ICH_PCMO + ICH_STS,
+		bus_space_write_2(sc->iot, sc->aud_ioh, ICH_PCMO + sc->sc_sts_reg,
 		    sts & (ICH_LVBCI | ICH_CELV | ICH_BCIS | ICH_FIFOE));
 		bus_space_write_2(sc->iot, sc->aud_ioh, ICH_GSTS, ICH_POINT);
 		ret++;
 	}
 
 	if (gsts & ICH_PIINT) {
-		sts = bus_space_read_2(sc->iot, sc->aud_ioh, ICH_PCMI+ICH_STS);
+		sts = bus_space_read_2(sc->iot, sc->aud_ioh, ICH_PCMI+sc->sc_sts_reg);
 		DPRINTF(ICH_DEBUG_DMA,
 		    ("auich_intr: ists=0x%x\n", sts));
 
@@ -949,7 +1137,7 @@ auich_intr(void *v)
 				q = &sc->dmalist_pcmi[qptr];
 
 				q->base = sc->pcmi_p;
-				q->len = (sc->pcmi_blksize / 2) | ICH_DMAF_IOC;
+				q->len = (sc->pcmi_blksize / sc->sc_sample_size) | ICH_DMAF_IOC;
 				DPRINTF(ICH_DEBUG_DMA,
 				    ("auich_intr: %p, %p = %x @ 0x%x\n",
 				    &sc->dmalist_pcmi[i], q,
@@ -973,20 +1161,20 @@ auich_intr(void *v)
 			sc->sc_rintr(sc->sc_rarg);
 
 		/* int ack */
-		bus_space_write_2(sc->iot, sc->aud_ioh, ICH_PCMI + ICH_STS,
+		bus_space_write_2(sc->iot, sc->aud_ioh, ICH_PCMI + sc->sc_sts_reg,
 		    sts & (ICH_LVBCI | ICH_CELV | ICH_BCIS | ICH_FIFOE));
-		bus_space_write_2(sc->iot, sc->aud_ioh, ICH_GSTS, ICH_POINT);
+		bus_space_write_2(sc->iot, sc->aud_ioh, ICH_GSTS, ICH_PIINT);
 		ret++;
 	}
 
 	if (gsts & ICH_MIINT) {
-		sts = bus_space_read_2(sc->iot, sc->aud_ioh, ICH_MICI+ICH_STS);
+		sts = bus_space_read_2(sc->iot, sc->aud_ioh, ICH_MICI+sc->sc_sts_reg);
 		DPRINTF(ICH_DEBUG_DMA,
 		    ("auich_intr: ists=0x%x\n", sts));
 		if (sts & ICH_FIFOE)
 			printf("%s: fifo overrun\n", sc->sc_dev.dv_xname);
 
-		/* TODO mic input dma */
+		/* TODO mic input DMA */
 
 		bus_space_write_2(sc->iot, sc->aud_ioh, ICH_GSTS, ICH_MIINT);
 	}
@@ -1002,6 +1190,9 @@ auich_trigger_output(void *v, void *start, void *end, int blksize,
 	struct auich_dmalist *q;
 	struct auich_dma *p;
 	size_t size;
+#ifdef DIAGNOSTIC
+	int csts;
+#endif
 
 	DPRINTF(ICH_DEBUG_DMA,
 	    ("auich_trigger_output(%p, %p, %d, %p, %p, %p)\n",
@@ -1009,6 +1200,12 @@ auich_trigger_output(void *v, void *start, void *end, int blksize,
 
 	sc->sc_pintr = intr;
 	sc->sc_parg = arg;
+#ifdef DIAGNOSTIC
+	csts = pci_conf_read(sc->sc_pc, sc->sc_pt, PCI_COMMAND_STATUS_REG);
+	if (csts & PCI_STATUS_MASTER_ABORT) {
+		printf("auich_trigger_output: PCI master abort\n");
+	}
+#endif
 
 	for (p = sc->sc_dmas; p && KERNADDR(p) != start; p = p->next)
 		;
@@ -1032,7 +1229,7 @@ auich_trigger_output(void *v, void *start, void *end, int blksize,
 	sc->ptr_pcmo = 0;
 	q = &sc->dmalist_pcmo[sc->ptr_pcmo];
 	q->base = sc->pcmo_start;
-	q->len = (blksize / 2) | ICH_DMAF_IOC;
+	q->len = (blksize / sc->sc_sample_size) | ICH_DMAF_IOC;
 	if (++sc->ptr_pcmo == ICH_DMALIST_MAX)
 		sc->ptr_pcmo = 0;
 
@@ -1059,6 +1256,9 @@ auich_trigger_input(v, start, end, blksize, intr, arg, param)
 	struct auich_dmalist *q;
 	struct auich_dma *p;
 	size_t size;
+#ifdef DIAGNOSTIC
+	int csts;
+#endif
 
 	DPRINTF(ICH_DEBUG_DMA,
 	    ("auich_trigger_input(%p, %p, %d, %p, %p, %p)\n",
@@ -1066,6 +1266,13 @@ auich_trigger_input(v, start, end, blksize, intr, arg, param)
 
 	sc->sc_rintr = intr;
 	sc->sc_rarg = arg;
+
+#ifdef DIAGNOSTIC
+	csts = pci_conf_read(sc->sc_pc, sc->sc_pt, PCI_COMMAND_STATUS_REG);
+	if (csts & PCI_STATUS_MASTER_ABORT) {
+		printf("auich_trigger_input: PCI master abort\n");
+	}
+#endif
 
 	for (p = sc->sc_dmas; p && KERNADDR(p) != start; p = p->next)
 		;
@@ -1089,7 +1296,7 @@ auich_trigger_input(v, start, end, blksize, intr, arg, param)
 	sc->ptr_pcmi = 0;
 	q = &sc->dmalist_pcmi[sc->ptr_pcmi];
 	q->base = sc->pcmi_start;
-	q->len = (blksize / 2) | ICH_DMAF_IOC;
+	q->len = (blksize / sc->sc_sample_size) | ICH_DMAF_IOC;
 	if (++sc->ptr_pcmi == ICH_DMALIST_MAX)
 		sc->ptr_pcmi = 0;
 
@@ -1117,7 +1324,7 @@ auich_allocmem(struct auich_softc *sc, size_t size, size_t align,
 		return (error);
 
 	error = bus_dmamem_map(sc->dmat, p->segs, p->nsegs, p->size,
-			       &p->addr, BUS_DMA_NOWAIT|BUS_DMA_COHERENT);
+			       &p->addr, BUS_DMA_NOWAIT|sc->sc_dmamap_flags);
 	if (error)
 		goto free;
 
@@ -1173,7 +1380,7 @@ auich_alloc_cdata(struct auich_softc *sc)
 	if ((error = bus_dmamem_map(sc->dmat, &seg, rseg,
 				    sizeof(struct auich_cdata),
 				    (caddr_t *) &sc->sc_cdata,
-				    BUS_DMA_COHERENT)) != 0) {
+				    sc->sc_dmamap_flags)) != 0) {
 		printf("%s: unable to map control data, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto fail_1;
@@ -1219,7 +1426,7 @@ auich_powerhook(int why, void *addr)
 		/* Power down */
 		DPRINTF(1, ("%s: power down\n", sc->sc_dev.dv_xname));
 		sc->sc_suspend = why;
-		auich_read_codec(sc, AC97_REG_EXTENDED_STATUS, &sc->ext_status);
+		auich_read_codec(sc, AC97_REG_EXT_AUDIO_CTRL, &sc->ext_status);
 		break;
 
 	case PWR_RESUME:
@@ -1235,7 +1442,7 @@ auich_powerhook(int why, void *addr)
 		auich_reset_codec(sc);
 		DELAY(1000);
 		(sc->codec_if->vtbl->restore_ports)(sc->codec_if);
-		auich_write_codec(sc, AC97_REG_EXTENDED_STATUS, sc->ext_status);
+		auich_write_codec(sc, AC97_REG_EXT_AUDIO_CTRL, sc->ext_status);
 		break;
 
 	case PWR_SOFTSUSPEND:
@@ -1243,4 +1450,113 @@ auich_powerhook(int why, void *addr)
 	case PWR_SOFTRESUME:
 		break;
 	}
+}
+
+
+/* -------------------------------------------------------------------- */
+/* Calibrate card (some boards are overclocked and need scaling) */
+
+void
+auich_calibrate(struct auich_softc *sc)
+{
+	struct timeval t1, t2;
+	uint8_t ociv, nciv;
+	uint64_t wait_us;
+	uint32_t actual_48k_rate, bytes, ac97rate;
+	void *temp_buffer;
+	struct auich_dma *p;
+	u_long rate;
+
+	/*
+	 * Grab audio from input for fixed interval and compare how
+	 * much we actually get with what we expect.  Interval needs
+	 * to be sufficiently short that no interrupts are
+	 * generated.
+	 */
+
+	/* Force the codec to a known state first. */
+	sc->codec_if->vtbl->set_clock(sc->codec_if, 48000);
+	rate = 48000;
+	sc->codec_if->vtbl->set_rate(sc->codec_if, AC97_REG_PCM_LR_ADC_RATE,
+	    &rate);
+
+	/* Setup a buffer */
+	bytes = 64000;
+	temp_buffer = auich_allocm(sc, AUMODE_RECORD, bytes, M_DEVBUF, M_WAITOK);
+
+	for (p = sc->sc_dmas; p && KERNADDR(p) != temp_buffer; p = p->next)
+		;
+	if (p == NULL) {
+		printf("auich_calibrate: bad address %p\n", temp_buffer);
+		return;
+	}
+	sc->dmalist_pcmi[0].base = DMAADDR(p);
+	sc->dmalist_pcmi[0].len = (bytes / sc->sc_sample_size);
+
+	/*
+	 * our data format is stereo, 16 bit so each sample is 4 bytes.
+	 * assuming we get 48000 samples per second, we get 192000 bytes/sec.
+	 * we're going to start recording with interrupts disabled and measure
+	 * the time taken for one block to complete.  we know the block size,
+	 * we know the time in microseconds, we calculate the sample rate:
+	 *
+	 * actual_rate [bps] = bytes / (time [s] * 4)
+	 * actual_rate [bps] = (bytes * 1000000) / (time [us] * 4)
+	 * actual_rate [Hz] = (bytes * 250000) / time [us]
+	 */
+
+	/* prepare */
+	ociv = bus_space_read_1(sc->iot, sc->aud_ioh, ICH_PCMI + ICH_CIV);
+	bus_space_write_4(sc->iot, sc->aud_ioh, ICH_PCMI + ICH_BDBAR,
+			  sc->sc_cddma + ICH_PCMI_OFF(0));
+	bus_space_write_1(sc->iot, sc->aud_ioh, ICH_PCMI + ICH_LVI,
+			  (0 - 1) & ICH_LVI_MASK);
+
+	/* start */
+	microtime(&t1);
+	bus_space_write_1(sc->iot, sc->aud_ioh, ICH_PCMI + ICH_CTRL, ICH_RPBM);
+
+	/* wait */
+	nciv = ociv;
+	do {
+		microtime(&t2);
+		if (t2.tv_sec - t1.tv_sec > 1)
+			break;
+		nciv = bus_space_read_1(sc->iot, sc->aud_ioh,
+					ICH_PCMI + ICH_CIV);
+	} while (nciv == ociv);
+	microtime(&t2);
+
+	/* stop */
+	bus_space_write_1(sc->iot, sc->aud_ioh, ICH_PCMI + ICH_CTRL, 0);
+
+	/* reset */
+	DELAY(100);
+	bus_space_write_1(sc->iot, sc->aud_ioh, ICH_PCMI + ICH_CTRL, ICH_RR);
+
+	/* turn time delta into us */
+	wait_us = ((t2.tv_sec - t1.tv_sec) * 1000000) + t2.tv_usec - t1.tv_usec;
+
+	auich_freem(sc, temp_buffer, M_DEVBUF);
+
+	if (nciv == ociv) {
+		printf("%s: ac97 link rate calibration timed out after %"
+		       PRIu64 " us\n", sc->sc_dev.dv_xname, wait_us);
+		return;
+	}
+
+	actual_48k_rate = (bytes * UINT64_C(250000)) / wait_us;
+
+	if (actual_48k_rate < 50000)
+		ac97rate = 48000;
+	else
+		ac97rate = ((actual_48k_rate + 500) / 1000) * 1000;
+
+	printf("%s: measured ac97 link rate at %d Hz",
+	       sc->sc_dev.dv_xname, actual_48k_rate);
+	if (ac97rate != actual_48k_rate)
+		printf(", will use %d Hz", ac97rate);
+	printf("\n");
+
+	sc->codec_if->vtbl->set_clock(sc->codec_if, ac97rate);
 }

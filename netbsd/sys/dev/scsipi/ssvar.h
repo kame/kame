@@ -1,4 +1,4 @@
-/*	$NetBSD: ssvar.h,v 1.8 2001/04/25 17:53:41 bouyer Exp $	*/
+/*	$NetBSD: ssvar.h,v 1.10.2.1 2004/09/11 12:58:07 he Exp $	*/
 
 /*
  * Copyright (c) 1995 Kenneth Stailey.  All rights reserved.
@@ -67,15 +67,18 @@ struct ss_softc {
 #define	SSF_AUTOCONF	0x04	/* set during auto-configuration */
 	struct scsipi_periph *sc_periph; /* contains our targ, lun, etc. */
 	struct scan_io sio;
-	struct buf_queue buf_queue;	/* the queue of pending IO operations */
+	struct bufq_state buf_queue;	/* the queue of pending IO operations */
+	struct callout sc_callout;	/* to restart the buf queue */
 	u_int quirks;			/* scanner is only mildly twisted */
 #define SS_Q_GET_BUFFER_SIZE	0x0001	/* poll for available data in ssread() */
-/* truncate to byte boundry is assumed by default unless one of these is set */
+/* truncate to byte boundary is assumed by default unless one of these is set */
 #define SS_Q_PAD_TO_BYTE	0x0002	/* pad monochrome data to byte boundary */
 #define SS_Q_PAD_TO_WORD	0x0004	/* pad monochrome data to word boundary */
 #define SS_Q_THRESHOLD_FOLLOWS_BRIGHTNESS 0x0008
 	struct ss_special *special;	/* special handlers for spec. devices */
 };
+
+void	ssrestart(void *); 
 
 /*
  * define the special attach routines if configured

@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.2 2001/09/05 16:17:36 matt Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.6 2003/07/15 01:29:18 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -40,6 +40,9 @@
  * Autoconfiguration functions
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.6 2003/07/15 01:29:18 lukem Exp $");
+
 #include "opt_md.h"
 
 #include <sys/param.h>
@@ -69,40 +72,37 @@ static void
 get_device(name)
 	char *name;
 {
-	int loop, unit, part;
-	char buf[32], *cp;
+	int unit, part;
+	char devname[16], buf[32], *cp;
 	struct device *dv;
 
 	if (strncmp(name, "/dev/", 5) == 0)
 		name += 5;
 
-	for (loop = 0; dev_name2blk[loop].d_name != NULL; ++loop) {
-		if (strncmp(name, dev_name2blk[loop].d_name,
-		    strlen(dev_name2blk[loop].d_name)) == 0) {
-			name += strlen(dev_name2blk[loop].d_name);
-			unit = part = 0;
+	if (devsw_name2blk(name, devname, sizeof(devname)) == -1)
+		return;
 
-			cp = name;
-			while (*cp >= '0' && *cp <= '9')
-				unit = (unit * 10) + (*cp++ - '0');
-			if (cp == name)
-				return;
+	name += strlen(devname);
+	unit = part = 0;
 
-			if (*cp >= 'a' && *cp <= ('a' + MAXPARTITIONS))
-				part = *cp - 'a';
-			else if (*cp != '\0' && *cp != ' ')
-				return;
-			sprintf(buf, "%s%d", dev_name2blk[loop].d_name, unit);
-			for (dv = alldevs.tqh_first; dv != NULL;
-			    dv = dv->dv_list.tqe_next) {
-				if (strcmp(buf, dv->dv_xname) == 0) {
-					booted_device = dv;
-					booted_partition = part;
-					return;
-				}
-			}
+	cp = name;
+	while (*cp >= '0' && *cp <= '9')
+		unit = (unit * 10) + (*cp++ - '0');
+	if (cp == name)
+		return;
+
+	if (*cp >= 'a' && *cp <= ('a' + MAXPARTITIONS))
+		part = *cp - 'a';
+	else if (*cp != '\0' && *cp != ' ')
+		return;
+	sprintf(buf, "%s%d", devname, unit);
+	for (dv = alldevs.tqh_first; dv != NULL; dv = dv->dv_list.tqe_next) {
+		if (strcmp(buf, dv->dv_xname) == 0) {
+			booted_device = dv;
+			booted_partition = part;
+			return;
 		}
-	} 
+	}
 }
 
 static void
@@ -136,9 +136,12 @@ cpu_rootconf(void)
  * Configure all the root devices
  * The root devices are expected to configure their own children
  */
+extern int footbridge_imask[NIPL];
+
 void
 cpu_configure(void)
 {
+	softintr_init();
 	/*
 	 * Since various PCI interrupts could be routed via the ICU
 	 * (for PCI devices in the bridge) we need to set up the ICU
@@ -147,16 +150,17 @@ cpu_configure(void)
 	 */
 	isa_intr_init();
 
+
 	config_rootfound("mainbus", NULL);
 
 	/* Debugging information */
 #ifndef TERSE
-	printf("ipl_bio=%08x ipl_net=%08x ipl_tty=%08x ipl_imp=%08x\n",
-	    irqmasks[IPL_BIO], irqmasks[IPL_NET], irqmasks[IPL_TTY],
-	    irqmasks[IPL_IMP]);
+	printf("ipl_bio=%08x ipl_net=%08x ipl_tty=%08x ipl_vm=%08x\n",
+	    footbridge_imask[IPL_BIO], footbridge_imask[IPL_NET],
+	    footbridge_imask[IPL_TTY], footbridge_imask[IPL_VM]);
 	printf("ipl_audio=%08x ipl_imp=%08x ipl_high=%08x ipl_serial=%08x\n",
-	    irqmasks[IPL_AUDIO], irqmasks[IPL_CLOCK], irqmasks[IPL_HIGH],
-	    irqmasks[IPL_SERIAL]);
+	    footbridge_imask[IPL_AUDIO], footbridge_imask[IPL_CLOCK],
+	    footbridge_imask[IPL_HIGH], footbridge_imask[IPL_SERIAL]);
 #endif
 
 	/* Time to start taking interrupts so lets open the flood gates .... */

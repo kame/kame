@@ -1,8 +1,42 @@
-/*	$NetBSD: vm_machdep.c,v 1.102 2001/11/15 07:03:31 lukem Exp $	*/
+/*	$NetBSD: vm_machdep.c,v 1.116 2004/02/06 10:28:03 drochner Exp $	*/
+
+/*-
+ * Copyright (c) 1982, 1986 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department, and William Jolitz.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
+ */
 
 /*-
  * Copyright (c) 1995 Charles M. Hannum.  All rights reserved.
- * Copyright (c) 1982, 1986 The Regents of the University of California.
  * Copyright (c) 1989, 1990 William Jolitz
  * All rights reserved.
  *
@@ -46,11 +80,12 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: vm_machdep.c,v 1.102 2001/11/15 07:03:31 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: vm_machdep.c,v 1.116 2004/02/06 10:28:03 drochner Exp $");
 
 #include "opt_user_ldt.h"
 #include "opt_largepages.h"
 #include "opt_mtrr.h"
+#include "opt_noredzone.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -72,23 +107,29 @@ __KERNEL_RCSID(0, "$NetBSD: vm_machdep.c,v 1.102 2001/11/15 07:03:31 lukem Exp $
 #include <machine/mtrr.h>
 
 #include "npx.h"
-#if NNPX > 0
-extern struct proc *npxproc;
+
+#ifndef NOREDZONE
+static void setredzone(struct lwp *l);
 #endif
 
-void	setredzone __P((u_short *, caddr_t));
+void
+cpu_proc_fork(struct proc *p1, struct proc *p2)
+{
+
+	p2->p_md.md_flags = p1->p_md.md_flags;
+}
 
 /*
- * Finish a fork operation, with process p2 nearly set up.
+ * Finish a new thread operation, with LWP l2 nearly set up.
  * Copy and update the pcb and trap frame, making the child ready to run.
- * 
+ *
  * Rig the child's kernel stack so that it will start out in
- * proc_trampoline() and call child_return() with p2 as an
+ * proc_trampoline() and call child_return() with l2 as an
  * argument. This causes the newly-created child process to go
  * directly to user level with an apparent return value of 0 from
  * fork(), while the parent process returns normally.
  *
- * p1 is the process being forked; if p1 == &proc0, we are creating
+ * l1 is the thread being forked; if l1 == &lwp0, we are creating
  * a kernel thread, and the return path and argument are specified with
  * `func' and `arg'.
  *
@@ -97,42 +138,33 @@ void	setredzone __P((u_short *, caddr_t));
  * accordingly.
  */
 void
-cpu_fork(p1, p2, stack, stacksize, func, arg)
-	register struct proc *p1, *p2;
-	void *stack;
-	size_t stacksize;
-	void (*func) __P((void *));
-	void *arg;
+cpu_lwp_fork(struct lwp *l1, struct lwp *l2, void *stack, size_t stacksize,
+    void (*func)(void *), void *arg)
 {
-	register struct pcb *pcb = &p2->p_addr->u_pcb;
-	register struct trapframe *tf;
-	register struct switchframe *sf;
+	struct pcb *pcb = &l2->l_addr->u_pcb;
+	struct trapframe *tf;
+	struct switchframe *sf;
 
 #if NNPX > 0
 	/*
-	 * If npxproc != p1, then the npx h/w state is irrelevant and the
-	 * state had better already be in the pcb.  This is true for forks
-	 * but not for dumps.
-	 *
-	 * If npxproc == p1, then we have to save the npx h/w state to
-	 * p1's pcb so that we can copy it.
+	 * Save p1's npx h/w state to p1's pcb so that we can copy it.
 	 */
-	if (npxproc == p1)
-		npxsave();
+	if (l1->l_addr->u_pcb.pcb_fpcpu != NULL)
+		npxsave_lwp(l1, 1);
 #endif
 
-	p2->p_md.md_flags = p1->p_md.md_flags;
+	l2->l_md.md_flags = l1->l_md.md_flags;
 
 	/* Copy pcb from proc p1 to p2. */
-	if (p1 == curproc) {
+	if (l1 == curlwp) {
 		/* Sync the PCB before we copy it. */
 		savectx(curpcb);
 	}
 #ifdef DIAGNOSTIC
-	else if (p1 != &proc0)
-		panic("cpu_fork: curproc");
+	else if (l1 != &lwp0)
+		panic("cpu_lwp_fork: curlwp");
 #endif
-	*pcb = p1->p_addr->u_pcb;
+	*pcb = l1->l_addr->u_pcb;
 
 	/*
 	 * Preset these so that gdt_compact() doesn't get confused if called
@@ -141,19 +173,23 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 	 * Note: pcb_ldt_sel is handled in the pmap_activate() call when
 	 * we run the new process.
 	 */
-	p2->p_md.md_tss_sel = GSEL(GNULL_SEL, SEL_KPL);
+	l2->l_md.md_tss_sel = GSEL(GNULL_SEL, SEL_KPL);
 
 	/* Fix up the TSS. */
 	pcb->pcb_tss.tss_ss0 = GSEL(GDATA_SEL, SEL_KPL);
-	pcb->pcb_tss.tss_esp0 = (int)p2->p_addr + USPACE - 16;
-	tss_alloc(p2);
+	pcb->pcb_tss.tss_esp0 = (int)l2->l_addr + USPACE - 16;
+
+	l2->l_md.md_tss_sel = tss_alloc(pcb);
 
 	/*
 	 * Copy the trapframe.
 	 */
-	p2->p_md.md_regs = tf = (struct trapframe *)pcb->pcb_tss.tss_esp0 - 1;
-	*tf = *p1->p_md.md_regs;
+	l2->l_md.md_regs = tf = (struct trapframe *)pcb->pcb_tss.tss_esp0 - 1;
+	*tf = *l1->l_md.md_regs;
 
+#ifndef NOREDZONE
+	setredzone(l2);
+#endif
 	/*
 	 * If specified, give the child a different stack.
 	 */
@@ -161,7 +197,6 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 		tf->tf_esp = (u_int)stack + stacksize;
 
 	sf = (struct switchframe *)tf - 1;
-	sf->sf_ppl = 0;
 	sf->sf_esi = (int)func;
 	sf->sf_ebx = (int)arg;
 	sf->sf_eip = (int)proc_trampoline;
@@ -170,79 +205,79 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 }
 
 void
-cpu_swapout(p)
-	struct proc *p;
+cpu_setfunc(struct lwp *l, void (*func)(void *), void *arg)
+{
+	struct pcb *pcb = &l->l_addr->u_pcb;
+	struct trapframe *tf = l->l_md.md_regs;
+	struct switchframe *sf = (struct switchframe *)tf - 1;
+
+	sf->sf_esi = (int)func;
+	sf->sf_ebx = (int)arg;
+	sf->sf_eip = (int)proc_trampoline;
+	pcb->pcb_esp = (int)sf;
+	pcb->pcb_ebp = 0;
+}	
+
+void
+cpu_swapin(struct lwp *l)
+{
+#ifndef NOREDZONE
+	setredzone(l);
+#endif
+}
+
+void
+cpu_swapout(struct lwp *l)
 {
 
 #if NNPX > 0
 	/*
 	 * Make sure we save the FP state before the user area vanishes.
 	 */
-	if (npxproc == p)
-		npxsave();
+	npxsave_lwp(l, 1);
 #endif
 }
 
 /*
- * cpu_exit is called as the last action during exit.
- *
- * We clean up a little and then call switch_exit() with the old proc as an
- * argument.  switch_exit() first switches to proc0's context, and finally
- * jumps into switch() to wait for another process to wake up.
+ * cpu_lwp_free is called from exit() to let machine-dependent
+ * code free machine-dependent resources that should be cleaned
+ * while we can still block and have process associated with us
  */
 void
-cpu_exit(p)
-	register struct proc *p;
+cpu_lwp_free(struct lwp *l, int proc)
 {
 
 #if NNPX > 0
 	/* If we were using the FPU, forget about it. */
-	if (npxproc == p)
-		npxproc = 0;
+	if (l->l_addr->u_pcb.pcb_fpcpu != NULL)
+		npxsave_lwp(l, 0);
 #endif
 
 #ifdef MTRR
-	if (p->p_md.md_flags & MDP_USEDMTRR)
-		mtrr_clean(p);
+	if (proc && l->l_proc->p_md.md_flags & MDP_USEDMTRR)
+		mtrr_clean(l->l_proc);
 #endif
 
-	/*
-	 * No need to do user LDT cleanup here; it's handled in
-	 * pmap_destroy().
-	 */
-
-	uvmexp.swtch++;
-	switch_exit(p);
-}
-
-/*
- * cpu_wait is called from reaper() to let machine-dependent
- * code free machine-dependent resources that couldn't be freed
- * in cpu_exit().
- */
-void
-cpu_wait(p)
-	struct proc *p;
-{
-
 	/* Nuke the TSS. */
-	tss_free(p);
+	tss_free(l->l_md.md_tss_sel);
+#ifdef DEBUG
+	l->l_md.md_tss_sel = 0xfeedbeed;
+#endif
 }
 
 /*
  * Dump the machine specific segment at the start of a core dump.
- */     
+ */
 struct md_core {
 	struct reg intreg;
 	struct fpreg freg;
 };
+
 int
-cpu_coredump(p, vp, cred, chdr)
-	struct proc *p;
-	struct vnode *vp;
-	struct ucred *cred;
-	struct core *chdr;
+cpu_coredump(struct lwp *l, struct vnode *vp, struct ucred *cred,
+    struct core *chdr)
 {
+	struct proc *p = l->l_proc;
 	struct md_core md_core;
 	struct coreseg cseg;
 	int error;
@@ -253,12 +288,12 @@ cpu_coredump(p, vp, cred, chdr)
 	chdr->c_cpusize = sizeof(md_core);
 
 	/* Save integer registers. */
-	error = process_read_regs(p, &md_core.intreg);
+	error = process_read_regs(l, &md_core.intreg);
 	if (error)
 		return error;
 
 	/* Save floating point registers. */
-	error = process_read_fpregs(p, &md_core.freg);
+	error = process_read_fpregs(l, &md_core.freg);
 	if (error)
 		return error;
 
@@ -282,23 +317,16 @@ cpu_coredump(p, vp, cred, chdr)
 	return 0;
 }
 
-#if 0
+#ifndef NOREDZONE
 /*
  * Set a red zone in the kernel stack after the u. area.
  */
-void
-setredzone(pte, vaddr)
-	u_short *pte;
-	caddr_t vaddr;
+static void
+setredzone(struct lwp *l)
 {
-/* eventually do this by setting up an expand-down stack segment
-   for ss0: selector, allowing stack access down to top of u.
-   this means though that protection violations need to be handled
-   thru a double fault exception that must do an integral task
-   switch to a known good context, within which a dump can be
-   taken. a sensible scheme might be to save the initial context
-   used by sched (that has physical memory mapped 1:1 at bottom)
-   and take the dump while still in mapped mode */
+	pmap_remove(pmap_kernel(), (vaddr_t)l->l_addr + PAGE_SIZE,
+	    (vaddr_t)l->l_addr + 2 * PAGE_SIZE);
+	pmap_update(pmap_kernel());
 }
 #endif
 
@@ -307,11 +335,10 @@ setredzone(pte, vaddr)
  * Both addresses are assumed to reside in the Sysmap.
  */
 void
-pagemove(from, to, size)
-	register caddr_t from, to;
-	size_t size;
+pagemove(register caddr_t from, register caddr_t to, size_t size)
 {
 	register pt_entry_t *fpte, *tpte, ofpte, otpte;
+	int32_t cpumask = 0;
 
 	if (size & PAGE_MASK)
 		panic("pagemove");
@@ -329,57 +356,46 @@ pagemove(from, to, size)
 		ofpte = *fpte;
 		*tpte++ = *fpte;
 		*fpte++ = 0;
-#if defined(I386_CPU)
-		if (cpu_class != CPUCLASS_386)
-#endif
-		{
-			if (otpte & PG_V)
-				pmap_update_pg((vaddr_t) to);
-			if (ofpte & PG_V)
-				pmap_update_pg((vaddr_t) from);
-		}
+		if (otpte & PG_V)
+			pmap_tlb_shootdown(pmap_kernel(),
+			    (vaddr_t)to, otpte, &cpumask);
+		if (ofpte & PG_V)
+			pmap_tlb_shootdown(pmap_kernel(),
+			    (vaddr_t)from, ofpte, &cpumask);
 		from += PAGE_SIZE;
 		to += PAGE_SIZE;
 		size -= PAGE_SIZE;
 	}
-#if defined(I386_CPU)
-	if (cpu_class == CPUCLASS_386)
-		tlbflush();
-#endif
+	pmap_tlb_shootnow(cpumask);
 }
 
 /*
  * Convert kernel VA to physical address
  */
 int
-kvtop(addr)
-	register caddr_t addr;
+kvtop(register caddr_t addr)
 {
 	paddr_t pa;
 
 	if (pmap_extract(pmap_kernel(), (vaddr_t)addr, &pa) == FALSE)
 		panic("kvtop: zero page frame");
-	return((int)pa);
+	return (int)pa;
 }
-
-extern struct vm_map *phys_map;
 
 /*
  * Map a user I/O request into kernel virtual address space.
  * Note: the pages are already locked by uvm_vslock(), so we
- * do not need to pass an access_type to pmap_enter().   
+ * do not need to pass an access_type to pmap_enter().
  */
 void
-vmapbuf(bp, len)
-	struct buf *bp;
-	vsize_t len;
+vmapbuf(struct buf *bp, vsize_t len)
 {
 	vaddr_t faddr, taddr, off;
 	paddr_t fpa;
 
 	if ((bp->b_flags & B_PHYS) == 0)
 		panic("vmapbuf");
-	faddr = trunc_page((vaddr_t)bp->b_saveaddr = bp->b_data);
+	faddr = trunc_page((vaddr_t)(bp->b_saveaddr = bp->b_data));
 	off = (vaddr_t)bp->b_data - faddr;
 	len = round_page(off + len);
 	taddr= uvm_km_valloc_wait(phys_map, len);
@@ -388,7 +404,7 @@ vmapbuf(bp, len)
 	 * The region is locked, so we expect that pmap_pte() will return
 	 * non-NULL.
 	 * XXX: unwise to expect this in a multithreaded environment.
-	 * anything can happen to a pmap between the time we lock a 
+	 * anything can happen to a pmap between the time we lock a
 	 * region, release the pmap lock, and then relock it for
 	 * the pmap_extract().
 	 *
@@ -411,9 +427,7 @@ vmapbuf(bp, len)
  * Unmap a previously-mapped user I/O request.
  */
 void
-vunmapbuf(bp, len)
-	struct buf *bp;
-	vsize_t len;
+vunmapbuf(struct buf *bp, vsize_t len)
 {
 	vaddr_t addr, off;
 

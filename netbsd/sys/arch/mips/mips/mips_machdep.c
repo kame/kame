@@ -1,4 +1,4 @@
-/*	$NetBSD: mips_machdep.c,v 1.129 2002/05/03 03:50:11 rafal Exp $	*/
+/*	$NetBSD: mips_machdep.c,v 1.175.2.1 2004/07/04 12:53:59 he Exp $	*/
 
 /*
  * Copyright 2002 Wasabi Systems, Inc.
@@ -38,23 +38,22 @@
 /*
  * Copyright 2000, 2001
  * Broadcom Corporation. All rights reserved.
- * 
+ *
  * This software is furnished under license and may be used and copied only
  * in accordance with the following terms and conditions.  Subject to these
  * conditions, you may download, copy, install, use, modify and distribute
  * modified or unmodified copies of this software in source and/or binary
  * form. No title or ownership is transferred hereby.
- * 
+ *
  * 1) Any source code used, modified or distributed must reproduce and
  *    retain this copyright notice and list of conditions as they appear in
  *    the source file.
- * 
+ *
  * 2) No right is granted to use any trade name, trademark, or logo of
- *    Broadcom Corporation. Neither the "Broadcom Corporation" name nor any
- *    trademark or logo of Broadcom Corporation may be used to endorse or
- *    promote products derived from this software without the prior written
- *    permission of Broadcom Corporation.
- * 
+ *    Broadcom Corporation.  The "Broadcom Corporation" name may not be
+ *    used to endorse or promote products derived from this software
+ *    without the prior written permission of Broadcom Corporation.
+ *
  * 3) THIS SOFTWARE IS PROVIDED "AS-IS" AND ANY EXPRESS OR IMPLIED
  *    WARRANTIES, INCLUDING BUT NOT LIMITED TO, ANY IMPLIED WARRANTIES OF
  *    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR
@@ -120,38 +119,49 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: mips_machdep.c,v 1.129 2002/05/03 03:50:11 rafal Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mips_machdep.c,v 1.175.2.1 2004/07/04 12:53:59 he Exp $");
 
 #include "opt_cputype.h"
-#include "opt_compat_netbsd.h"
-#include "opt_compat_ultrix.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/proc.h>
 #include <sys/exec.h>
 #include <sys/reboot.h>
 #include <sys/mount.h>			/* fsid_t for syscallargs */
+#include <sys/lwp.h>
 #include <sys/proc.h>
-#include <sys/buf.h>
-#include <sys/clist.h>
-#include <sys/signal.h>
-#include <sys/signalvar.h>
-#include <sys/syscallargs.h>
+#include <sys/sysctl.h>
 #include <sys/user.h>
 #include <sys/msgbuf.h>
 #include <sys/conf.h>
 #include <sys/core.h>
+#include <sys/device.h>
 #include <sys/kcore.h>
-#include <machine/kcore.h>
+#include <sys/pool.h>
+#include <sys/ras.h>
+#include <sys/sa.h>
+#include <sys/savar.h>
 
+#include <sys/ucontext.h>
+#include <machine/kcore.h>
 #include <uvm/uvm_extern.h>
 
+#include <dev/cons.h>
+
 #include <mips/cache.h>
+#include <mips/frame.h>
 #include <mips/regnum.h>
+
 #include <mips/locore.h>
 #include <mips/psl.h>
 #include <mips/pte.h>
 #include <machine/cpu.h>
+#include <mips/userret.h>
+
+#ifdef __HAVE_BOOTINFO_H
+#include <machine/bootinfo.h>
+#endif
 
 #if defined(MIPS32) || defined(MIPS64)
 #include <mips/mipsNN.h>		/* MIPS32/MIPS64 registers */
@@ -200,20 +210,26 @@ int mips_has_r4k_mmu;
 int mips3_pg_cached;
 
 struct	user *proc0paddr;
-struct	proc *fpcurproc;
+struct	lwp  *fpcurlwp;
 struct	pcb  *curpcb;
 struct	segtab *segbase;
 
 caddr_t	msgbufaddr;
 
-#ifdef MIPS3_4100			/* VR4100 core */
+#if defined(MIPS3_4100)			/* VR4100 core */
 int	default_pg_mask = 0x00001800;
 #endif
+
+/* the following is used externally (sysctl_hw) */
+char	machine[] = MACHINE;		/* from <machine/param.h> */
+char	machine_arch[] = MACHINE_ARCH;	/* from <machine/param.h> */
+char	cpu_model[128];
 
 struct pridtab {
 	int	cpu_cid;
 	int	cpu_pid;
 	int	cpu_rev;	/* -1 == wildcard */
+	int	cpu_copts;	/* -1 == wildcard */
 	int	cpu_isa;	/* -1 == probed (mips32/mips64) */
 	int	cpu_ntlb;	/* -1 == unknown, 0 == probed */
 	int	cpu_flags;
@@ -231,67 +247,70 @@ struct pridtab {
  *  - All MIPS3+ have a count register.  MIPS_HAS_CLOCK in <mips/cpu.h>
  *    will need to be revised if this is false.
  */
-#define	MIPS32_FLAGS	CPU_MIPS_R4K_MMU | CPU_MIPS_CAUSE_IV
+#define	MIPS32_FLAGS	CPU_MIPS_R4K_MMU | CPU_MIPS_CAUSE_IV | CPU_MIPS_USE_WAIT
 #define	MIPS64_FLAGS	MIPS32_FLAGS	/* same as MIPS32 flags (for now) */
 
 static const struct pridtab *mycpu;
 
 static const struct pridtab cputab[] = {
-	{ 0, MIPS_R2000, -1,			CPU_ARCH_MIPS1, 64,
-	  0,					"MIPS R2000 CPU"	},
-	{ 0, MIPS_R3000, MIPS_REV_R3000,	CPU_ARCH_MIPS1, 64,
-	  0,					"MIPS R3000 CPU"	},
-	{ 0, MIPS_R3000, MIPS_REV_R3000A,	CPU_ARCH_MIPS1, 64,
-	  0,					"MIPS R3000A CPU"	},
-	{ 0, MIPS_R6000, -1,			CPU_ARCH_MIPS2, 32,
+	{ 0, MIPS_R2000, -1, -1,		CPU_ARCH_MIPS1, 64,
+	  CPU_MIPS_NO_LLSC,			"MIPS R2000 CPU"	},
+	{ 0, MIPS_R3000, MIPS_REV_R3000, -1,	CPU_ARCH_MIPS1, 64,
+	  CPU_MIPS_NO_LLSC,			"MIPS R3000 CPU"	},
+	{ 0, MIPS_R3000, MIPS_REV_R3000A, -1,	CPU_ARCH_MIPS1, 64,
+	  CPU_MIPS_NO_LLSC,			"MIPS R3000A CPU"	},
+	{ 0, MIPS_R6000, -1, -1,		CPU_ARCH_MIPS2, 32,
 	  MIPS_NOT_SUPP,			"MIPS R6000 CPU"	},
 
 	/*
-	 * rev 0x00 and 0x30 are R4000, 0x40, 0x50 and 0x60 are R4400.
+	 * rev 0x00, 0x22 and 0x30 are R4000, 0x40, 0x50 and 0x60 are R4400.
 	 * should we allow ranges and use 0x00 - 0x3f for R4000 and
 	 * 0x40 - 0xff for R4400?
 	 */
-	{ 0, MIPS_R4000, MIPS_REV_R4000_A,	CPU_ARCH_MIPS3, 48,
+	{ 0, MIPS_R4000, MIPS_REV_R4000_A, -1,	CPU_ARCH_MIPS3, 48,
 	  CPU_MIPS_R4K_MMU | CPU_MIPS_DOUBLE_COUNT,
 						"MIPS R4000 CPU"	},
-	{ 0, MIPS_R4000, MIPS_REV_R4000_B,	CPU_ARCH_MIPS3, 48,
+	{ 0, MIPS_R4000, MIPS_REV_R4000_B, -1,	CPU_ARCH_MIPS3, 48,
 	  CPU_MIPS_R4K_MMU | CPU_MIPS_DOUBLE_COUNT,
 						"MIPS R4000 CPU"	},
-	{ 0, MIPS_R4000, MIPS_REV_R4400_A,	CPU_ARCH_MIPS3, 48,
+	{ 0, MIPS_R4000, MIPS_REV_R4000_C, -1,	CPU_ARCH_MIPS3, 48,
+	  CPU_MIPS_R4K_MMU | CPU_MIPS_DOUBLE_COUNT,
+						"MIPS R4000 CPU"	},
+	{ 0, MIPS_R4000, MIPS_REV_R4400_A, -1,	CPU_ARCH_MIPS3, 48,
 	  CPU_MIPS_R4K_MMU | CPU_MIPS_DOUBLE_COUNT,
 						"MIPS R4400 CPU"	},
-	{ 0, MIPS_R4000, MIPS_REV_R4400_B,	CPU_ARCH_MIPS3, 48,
+	{ 0, MIPS_R4000, MIPS_REV_R4400_B, -1,	CPU_ARCH_MIPS3, 48,
 	  CPU_MIPS_R4K_MMU | CPU_MIPS_DOUBLE_COUNT,
 						"MIPS R4400 CPU"	},
-	{ 0, MIPS_R4000, MIPS_REV_R4400_C,	CPU_ARCH_MIPS3, 48,
+	{ 0, MIPS_R4000, MIPS_REV_R4400_C, -1,	CPU_ARCH_MIPS3, 48,
 	  CPU_MIPS_R4K_MMU | CPU_MIPS_DOUBLE_COUNT,
 						"MIPS R4400 CPU"	},
 
-	{ 0, MIPS_R3LSI, -1,			CPU_ARCH_MIPS1, -1,
+	{ 0, MIPS_R3LSI, -1, -1,		CPU_ARCH_MIPS1, -1,
 	  MIPS_NOT_SUPP,			"LSI Logic R3000 derivative" },
-	{ 0, MIPS_R6000A, -1,			CPU_ARCH_MIPS2, 32,
+	{ 0, MIPS_R6000A, -1, -1,		CPU_ARCH_MIPS2, 32,
 	  MIPS_NOT_SUPP,			"MIPS R6000A CPU"	},
-	{ 0, MIPS_R3IDT, -1,			CPU_ARCH_MIPS1, -1,
+	{ 0, MIPS_R3IDT, -1, -1,		CPU_ARCH_MIPS1, -1,
 	  MIPS_NOT_SUPP,			"IDT R3041 or RC36100 CPU" },
-	{ 0, MIPS_R4100, -1,			CPU_ARCH_MIPS3, 32,
+	{ 0, MIPS_R4100, -1, -1,		CPU_ARCH_MIPS3, 32,
 	  CPU_MIPS_R4K_MMU | CPU_MIPS_NO_LLSC,	"NEC VR4100 CPU"	},
-	{ 0, MIPS_R4200, -1,			CPU_ARCH_MIPS3, -1,
+	{ 0, MIPS_R4200, -1, -1,		CPU_ARCH_MIPS3, -1,
 	  MIPS_NOT_SUPP | CPU_MIPS_R4K_MMU,	"NEC VR4200 CPU"	},
-	{ 0, MIPS_R4300, -1,			CPU_ARCH_MIPS3, 32,
+	{ 0, MIPS_R4300, -1, -1,		CPU_ARCH_MIPS3, 32,
 	  CPU_MIPS_R4K_MMU,			"NEC VR4300 CPU"	},
-	{ 0, MIPS_R4600, -1,			CPU_ARCH_MIPS3, 48,
+	{ 0, MIPS_R4600, -1, -1,		CPU_ARCH_MIPS3, 48,
 	  CPU_MIPS_R4K_MMU | CPU_MIPS_DOUBLE_COUNT,			
 						"QED R4600 Orion CPU"	},
-	{ 0, MIPS_R4700, -1,			CPU_ARCH_MIPS3, 48,
+	{ 0, MIPS_R4700, -1, -1,		CPU_ARCH_MIPS3, 48,
 	  CPU_MIPS_R4K_MMU,			"QED R4700 Orion CPU"	},
 
-	{ 0, MIPS_R8000, -1,			CPU_ARCH_MIPS4, 384,
+	{ 0, MIPS_R8000, -1, -1,		CPU_ARCH_MIPS4, 384,
 	  MIPS_NOT_SUPP | CPU_MIPS_R4K_MMU,	"MIPS R8000 Blackbird/TFP CPU" },
-	{ 0, MIPS_R10000, -1,			CPU_ARCH_MIPS4, 64,
+	{ 0, MIPS_R10000, -1, -1,		CPU_ARCH_MIPS4, 64,
 	  MIPS_NOT_SUPP | CPU_MIPS_R4K_MMU,	"MIPS R10000 CPU"	},
-	{ 0, MIPS_R12000, -1,			CPU_ARCH_MIPS4, 64,
+	{ 0, MIPS_R12000, -1, -1,		CPU_ARCH_MIPS4, 64,
 	  MIPS_NOT_SUPP | CPU_MIPS_R4K_MMU,	"MIPS R12000 CPU"	},
-	{ 0, MIPS_R14000, -1,			CPU_ARCH_MIPS4, 64,
+	{ 0, MIPS_R14000, -1, -1,		CPU_ARCH_MIPS4, 64,
 	  MIPS_NOT_SUPP | CPU_MIPS_R4K_MMU,	"MIPS R14000 CPU"	},
 
 	/* XXX
@@ -301,29 +320,29 @@ static const struct pridtab cputab[] = {
 	 * Or maybe put TX39 CPUs first if the revid doesn't overlap with
 	 * the 4650...
 	 */
-	{ 0, MIPS_R4650, 0,			CPU_ARCH_MIPS3, -1,
+	{ 0, MIPS_R4650, 0, -1,			CPU_ARCH_MIPS3, -1,
 	  MIPS_NOT_SUPP /* no MMU! */,		"QED R4650 CPU"	},
-	{ 0, MIPS_TX3900, MIPS_REV_TX3912,	CPU_ARCH_MIPS1, 32,
-	  0,					"Toshiba TX3912 CPU"	},
-	{ 0, MIPS_TX3900, MIPS_REV_TX3922,	CPU_ARCH_MIPS1, 64,
-	  0,					"Toshiba TX3922 CPU"	},
-	{ 0, MIPS_TX3900, MIPS_REV_TX3927,	CPU_ARCH_MIPS1, 64,
-	  0,					"Toshiba TX3927 CPU"	},
-	{ 0, MIPS_R5000, -1,			CPU_ARCH_MIPS4, 48,
+	{ 0, MIPS_TX3900, MIPS_REV_TX3912, -1,	CPU_ARCH_MIPS1, 32,
+	  CPU_MIPS_NO_LLSC,			"Toshiba TX3912 CPU"	},
+	{ 0, MIPS_TX3900, MIPS_REV_TX3922, -1,	CPU_ARCH_MIPS1, 64,
+	  CPU_MIPS_NO_LLSC,			"Toshiba TX3922 CPU"	},
+	{ 0, MIPS_TX3900, MIPS_REV_TX3927, -1,	CPU_ARCH_MIPS1, 64,
+	  CPU_MIPS_NO_LLSC,			"Toshiba TX3927 CPU"	},
+	{ 0, MIPS_R5000, -1, -1,		CPU_ARCH_MIPS4, 48,
 	  CPU_MIPS_R4K_MMU | CPU_MIPS_DOUBLE_COUNT,			
 						"MIPS R5000 CPU"	},
-	{ 0, MIPS_RM5200, -1,			CPU_ARCH_MIPS4, 48,
-	  CPU_MIPS_R4K_MMU | CPU_MIPS_CAUSE_IV | CPU_MIPS_DOUBLE_COUNT,
-						"QED RM5200 CPU"	},
+	{ 0, MIPS_RM5200, -1, -1,		CPU_ARCH_MIPS4, 48,
+	  CPU_MIPS_R4K_MMU | CPU_MIPS_CAUSE_IV | CPU_MIPS_DOUBLE_COUNT |
+	  CPU_MIPS_USE_WAIT,			"QED RM5200 CPU"	},
 
 	/* XXX
 	 * The rm7000 rev 2.0 can have 64 tlbs, and has 6 extra interrupts.  See
 	 *    "Migrating to the RM7000 from other MIPS Microprocessors"
 	 * for more details.
 	 */
-	{ 0, MIPS_RM7000, -1,			CPU_ARCH_MIPS4, 48,
-	  MIPS_NOT_SUPP | CPU_MIPS_CAUSE_IV | CPU_MIPS_DOUBLE_COUNT,
-						"QED RM7000 CPU"	},
+	{ 0, MIPS_RM7000, -1, -1,		CPU_ARCH_MIPS4, 48,
+	  MIPS_NOT_SUPP | CPU_MIPS_CAUSE_IV | CPU_MIPS_DOUBLE_COUNT |
+	  CPU_MIPS_USE_WAIT,			"QED RM7000 CPU"	},
 
 	/* 
 	 * IDT RC32300 core is a 32 bit MIPS2 processor with
@@ -335,56 +354,81 @@ static const struct pridtab cputab[] = {
 	 * for IC and DC (2^9 instead of 2^12).
 	 *
 	 */
-	{ 0, MIPS_RC32300, -1,			CPU_ARCH_MIPS3, 16,
+	{ 0, MIPS_RC32300, -1, -1,		CPU_ARCH_MIPS3, 16,
 	  MIPS_NOT_SUPP | CPU_MIPS_R4K_MMU,	"IDT RC32300 CPU"	},
-	{ 0, MIPS_RC32364, -1,			CPU_ARCH_MIPS3, 16,
+	{ 0, MIPS_RC32364, -1, -1,		CPU_ARCH_MIPS3, 16,
 	  MIPS_NOT_SUPP | CPU_MIPS_R4K_MMU,	"IDT RC32364 CPU"	},
-	{ 0, MIPS_RC64470, -1,			CPU_ARCH_MIPSx, -1,
+	{ 0, MIPS_RC64470, -1, -1,		CPU_ARCH_MIPSx, -1,
 	  MIPS_NOT_SUPP | CPU_MIPS_R4K_MMU,	"IDT RC64474/RC64475 CPU" },
 
-	{ 0, MIPS_R5400, -1,			CPU_ARCH_MIPSx, -1,
+	{ 0, MIPS_R5400, -1, -1,		CPU_ARCH_MIPSx, -1,
 	  MIPS_NOT_SUPP | CPU_MIPS_R4K_MMU,	"NEC VR5400 CPU"	},
-	{ 0, MIPS_R5900, -1,			CPU_ARCH_MIPS3, 48,
-	  CPU_MIPS_R4K_MMU,			"Toshiba R5900 CPU"	},
+	{ 0, MIPS_R5900, -1, -1,		CPU_ARCH_MIPS3, 48,
+	  CPU_MIPS_NO_LLSC | CPU_MIPS_R4K_MMU,	"Toshiba R5900 CPU"	},
+
+	{ 0, MIPS_TX4900, MIPS_REV_TX4927, -1,	CPU_ARCH_MIPS3, 48,
+	  CPU_MIPS_R4K_MMU | CPU_MIPS_DOUBLE_COUNT,
+						"Toshiba TX4927 CPU"	},
+	{ 0, MIPS_TX4900, -1, -1,		CPU_ARCH_MIPS3, 48,
+	  CPU_MIPS_R4K_MMU | CPU_MIPS_DOUBLE_COUNT,
+						"Toshiba TX4900 CPU"	},
 
 #if 0 /* ID collisions : can we use a CU1 test or similar? */
-	{ 0, MIPS_R3SONY, -1,			CPU_ARCH_MIPS1, -1,
+	{ 0, MIPS_R3SONY, -1, -1,		CPU_ARCH_MIPS1, -1,
 	  MIPS_NOT_SUPP,			"SONY R3000 derivative"	},	/* 0x21; crash R4700? */
-	{ 0, MIPS_R3NKK, -1,			CPU_ARCH_MIPS1, -1,
+	{ 0, MIPS_R3NKK, -1, -1,		CPU_ARCH_MIPS1, -1,
 	  MIPS_NOT_SUPP,			"NKK R3000 derivative"	},	/* 0x23; crash R5000? */
 #endif
 
-	{ MIPS_PRID_CID_MTI, MIPS_4Kc, -1,	-1, 0,
+	{ MIPS_PRID_CID_MTI, MIPS_4Kc, -1, -1,	-1, 0,
 	  MIPS32_FLAGS | CPU_MIPS_DOUBLE_COUNT,	"4Kc"			},
-	{ MIPS_PRID_CID_MTI, MIPS_4KEc, -1,	-1, 0,
+	{ MIPS_PRID_CID_MTI, MIPS_4KEc, -1, -1,	-1, 0,
 	  MIPS32_FLAGS | CPU_MIPS_DOUBLE_COUNT,	"4KEc"			},
-	{ MIPS_PRID_CID_MTI, MIPS_4KSc, -1,	-1, 0,
+	{ MIPS_PRID_CID_MTI, MIPS_4KSc, -1, -1,	-1, 0,
 	  MIPS32_FLAGS | CPU_MIPS_DOUBLE_COUNT,	"4KSc"			},
-	{ MIPS_PRID_CID_MTI, MIPS_5Kc, -1,	-1, 0,
+	{ MIPS_PRID_CID_MTI, MIPS_5Kc, -1, -1,	-1, 0,
 	  MIPS64_FLAGS | CPU_MIPS_DOUBLE_COUNT,	"5Kc"			},
+	{ MIPS_PRID_CID_MTI, MIPS_20Kc, -1, -1,	-1, 0,
+	  MIPS64_FLAGS,				"20Kc"			},
 
-	{ MIPS_PRID_CID_ALCHEMY, MIPS_AU1000_R1, -1, -1, 0,
-	  MIPS32_FLAGS,				"Au1000 (Rev 1)"	},
-	{ MIPS_PRID_CID_ALCHEMY, MIPS_AU1000_R2, -1, -1, 0,
-	  MIPS32_FLAGS,				"Au1000 (Rev 2)" 	},
+	{ MIPS_PRID_CID_ALCHEMY, MIPS_AU_REV1, -1, MIPS_AU1000, -1, 0,
+	  MIPS32_FLAGS | CPU_MIPS_NO_WAIT | CPU_MIPS_I_D_CACHE_COHERENT,
+						"Au1000 (Rev 1 core)"	},
+	{ MIPS_PRID_CID_ALCHEMY, MIPS_AU_REV2, -1, MIPS_AU1000, -1, 0,
+	  MIPS32_FLAGS | CPU_MIPS_NO_WAIT | CPU_MIPS_I_D_CACHE_COHERENT,
+						"Au1000 (Rev 2 core)" 	},
 
-	/* The SB1 CPUs use a CCA of 5 - "Cacheable Coherent Shareable" */
-	{ MIPS_PRID_CID_SIBYTE, MIPS_SB1, -1,	-1, 0,
-	  MIPS64_FLAGS | CPU_MIPS_HAVE_SPECIAL_CCA | \
-	  (5 << CPU_MIPS_CACHED_CCA_SHIFT),	"SB1"			},
+	{ MIPS_PRID_CID_ALCHEMY, MIPS_AU_REV1, -1, MIPS_AU1500, -1, 0,
+	  MIPS32_FLAGS | CPU_MIPS_NO_WAIT | CPU_MIPS_I_D_CACHE_COHERENT,
+						"Au1500 (Rev 1 core)"	},
+	{ MIPS_PRID_CID_ALCHEMY, MIPS_AU_REV2, -1, MIPS_AU1500, -1, 0,
+	  MIPS32_FLAGS | CPU_MIPS_NO_WAIT | CPU_MIPS_I_D_CACHE_COHERENT,
+						"Au1500 (Rev 2 core)" 	},
 
-	{ 0, 0, 0,				0, 64,
+	{ MIPS_PRID_CID_ALCHEMY, MIPS_AU_REV1, -1, MIPS_AU1100, -1, 0,
+	  MIPS32_FLAGS | CPU_MIPS_NO_WAIT | CPU_MIPS_I_D_CACHE_COHERENT,
+						"Au1100 (Rev 1 core)"	},
+	{ MIPS_PRID_CID_ALCHEMY, MIPS_AU_REV2, -1, MIPS_AU1100, -1, 0,
+	  MIPS32_FLAGS | CPU_MIPS_NO_WAIT | CPU_MIPS_I_D_CACHE_COHERENT,
+						"Au1100 (Rev 2 core)" 	},
+
+	/* The SB-1 CPU uses a CCA of 5 - "Cacheable Coherent Shareable" */
+	{ MIPS_PRID_CID_SIBYTE, MIPS_SB1, -1,	-1, -1, 0,
+	  MIPS64_FLAGS | CPU_MIPS_D_CACHE_COHERENT |
+	  CPU_MIPS_HAVE_SPECIAL_CCA | (5 << CPU_MIPS_CACHED_CCA_SHIFT),
+						"SB-1"			},
+
+	{ 0, 0, 0,				0, 0, 0,
 	  0,					NULL			}
 };
 
 static const struct pridtab fputab[] = {
-	{ 0, MIPS_SOFT,	-1, 0, 0, 0,	"software emulated floating point" },
-	{ 0, MIPS_R2360, -1, 0, 0, 0,	"MIPS R2360 Floating Point Board" },
-	{ 0, MIPS_R2010, -1, 0, 0, 0,	"MIPS R2010 FPC" },
-	{ 0, MIPS_R3010, -1, 0, 0, 0,	"MIPS R3010 FPC" },
-	{ 0, MIPS_R6010, -1, 0, 0, 0,	"MIPS R6010 FPC" },
-	{ 0, MIPS_R4010, -1, 0, 0, 0,	"MIPS R4010 FPC" },
-	{ 0, MIPS_R10000, -1, 0, 0, 0,	"built-in FPU" },
+	{ 0, MIPS_SOFT,	  -1, 0, 0, 0, 0, "software emulated floating point" },
+	{ 0, MIPS_R2360,  -1, 0, 0, 0, 0, "MIPS R2360 Floating Point Board" },
+	{ 0, MIPS_R2010,  -1, 0, 0, 0, 0, "MIPS R2010 FPC" },
+	{ 0, MIPS_R3010,  -1, 0, 0, 0, 0, "MIPS R3010 FPC" },
+	{ 0, MIPS_R6010,  -1, 0, 0, 0, 0, "MIPS R6010 FPC" },
+	{ 0, MIPS_R4010,  -1, 0, 0, 0, 0, "MIPS R4010 FPC" },
 };
 
 /*
@@ -401,7 +445,7 @@ static const char *cidnames[] = {
 };
 #define	ncidnames (sizeof(cidnames) / sizeof(cidnames[0]))
 
-#ifdef MIPS1
+#if defined(MIPS1)
 /*
  * MIPS-I locore function vector
  */
@@ -508,11 +552,11 @@ mips3_vector_init(void)
 	mips_dcache_wbinv_all();
 
 	/* Clear BEV in SR so we start handling our own exceptions */
-	mips_cp0_status_write(mips_cp0_status_read() & ~MIPS3_SR_DIAG_BEV);
+	mips_cp0_status_write(mips_cp0_status_read() & ~MIPS_SR_BEV);
 }
 #endif /* !MIPS3_5900 */
 
-#ifdef MIPS3_5900	/* XXX */
+#if defined(MIPS3_5900)	/* XXX */
 /*
  * MIPS R5900 locore function vector.
  * Same as MIPS32 - all MMU registers are 32bit.
@@ -557,12 +601,12 @@ r5900_vector_init(void)
 	mips_dcache_wbinv_all();
 
 	/* Clear BEV in SR so we start handling our own exceptions */
-	mips_cp0_status_write(mips_cp0_status_read() & ~MIPS3_SR_DIAG_BEV);
+	mips_cp0_status_write(mips_cp0_status_read() & ~MIPS_SR_BEV);
 }
 #endif /* MIPS3_5900 */
 #endif /* MIPS3 */
 
-#ifdef MIPS32
+#if defined(MIPS32)
 /*
  * MIPS32 locore function vector
  */
@@ -629,11 +673,11 @@ mips32_vector_init(void)
 	mips_dcache_wbinv_all();
 
 	/* Clear BEV in SR so we start handling our own exceptions */
-	mips_cp0_status_write(mips_cp0_status_read() & ~MIPS3_SR_DIAG_BEV);
+	mips_cp0_status_write(mips_cp0_status_read() & ~MIPS_SR_BEV);
 }
 #endif /* MIPS32 */
 
-#ifdef MIPS64
+#if defined(MIPS64)
 /*
  * MIPS64 locore function vector
  */
@@ -706,7 +750,7 @@ mips64_vector_init(void)
 	mips_dcache_wbinv_all();
 
 	/* Clear BEV in SR so we start handling our own exceptions */
-	mips_cp0_status_write(mips_cp0_status_read() & ~MIPS3_SR_DIAG_BEV);
+	mips_cp0_status_write(mips_cp0_status_read() & ~MIPS_SR_BEV);
 }
 #endif /* MIPS64 */
 
@@ -716,7 +760,7 @@ mips64_vector_init(void)
  *
  * The principal purpose of this function is to examine the
  * variable cpu_id, into which the kernel locore start code
- * writes the cpu ID register, and to then copy appropriate
+ * writes the CPU ID register, and to then copy appropriate
  * code into the CPU exception-vector entries and the jump tables
  * used to hide the differences in cache and TLB handling in
  * different MIPS CPUs.
@@ -743,11 +787,13 @@ mips_vector_init(void)
 		if (ct->cpu_rev >= 0 &&
 		    MIPS_PRID_REV(cpu_id) != ct->cpu_rev)
 			continue;
+		if (ct->cpu_copts >= 0 &&
+		    MIPS_PRID_COPTS(cpu_id) != ct->cpu_copts)
+			continue;
 
 		mycpu = ct;
 		cpu_arch = ct->cpu_isa;
 		mips_num_tlb_entries = ct->cpu_ntlb;
-
 		break;
 	}
 
@@ -795,16 +841,16 @@ mips_vector_init(void)
 #endif /* defined(MIPS32) || defined(MIPS64) */
 
 	if (cpu_arch < 1)
-		panic("Unknown CPU ISA for CPU type 0x%x\n", cpu_id);
+		panic("Unknown CPU ISA for CPU type 0x%x", cpu_id);
 	if (mips_num_tlb_entries < 1)
-		panic("Unknown number of TLBs for CPU type 0x%x\n", cpu_id);
+		panic("Unknown number of TLBs for CPU type 0x%x", cpu_id);
 
 	/*
-	 * Check cpu-specific flags.
+	 * Check CPU-specific flags.
 	 */
 	mips_cpu_flags = mycpu->cpu_flags;
 	mips_has_r4k_mmu = mips_cpu_flags & CPU_MIPS_R4K_MMU;
-	mips_has_llsc = !(mips_cpu_flags & CPU_MIPS_NO_LLSC);
+	mips_has_llsc = (mips_cpu_flags & CPU_MIPS_NO_LLSC) == 0;
 
 	if (mycpu->cpu_flags & CPU_MIPS_HAVE_SPECIAL_CCA) {
 		uint32_t cca;
@@ -829,7 +875,7 @@ mips_vector_init(void)
 	 * Now initialize our ISA-dependent function vector.
 	 */
 	switch (cpu_arch) {
-#ifdef MIPS1
+#if defined(MIPS1)
 	case CPU_ARCH_MIPS1:
 		mips1_TBIA(mips_num_tlb_entries);
 		mips1_vector_init();
@@ -839,7 +885,7 @@ mips_vector_init(void)
 #if defined(MIPS3)
 	case CPU_ARCH_MIPS3:
 	case CPU_ARCH_MIPS4:
-#ifdef MIPS3_5900	/* XXX */
+#if defined(MIPS3_5900)	/* XXX */
 		mips3_cp0_wired_write(0);
 		mips5900_TBIA(mips_num_tlb_entries);
 		mips3_cp0_wired_write(MIPS3_TLB_WIRED_UPAGES);
@@ -854,7 +900,7 @@ mips_vector_init(void)
 #endif /* MIPS3_5900 */
 		break;
 #endif
-#ifdef MIPS32
+#if defined(MIPS32)
 	case CPU_ARCH_MIPS32:
 		mips3_cp0_wired_write(0);
 		mips32_TBIA(mips_num_tlb_entries);
@@ -877,39 +923,15 @@ mips_vector_init(void)
 		cpu_reboot(RB_HALT, NULL);
 	}
 
+/* XXX simonb: ugg, another ugly #ifdef check... */
+#if (defined(MIPS3) && !defined(MIPS3_5900)) || defined(MIPS32) || defined(MIPS64)
 	/*
 	 * Install power-saving idle routines.
 	 */
-	switch (MIPS_PRID_CID(cpu_id)) {
-	case MIPS_PRID_CID_PREHISTORIC:
-		switch (MIPS_PRID_IMPL(cpu_id)) {
-#if defined(MIPS3) && !defined(MIPS3_5900)
-		case MIPS_RM5200:
-		case MIPS_RM7000:
-		    {
-			void rm52xx_idle(void);
-
-			CPU_IDLE = (long *) rm52xx_idle;
-			break;
-		    }
-#endif /* MIPS3 && !MIPS3_5900 */
-		default:
-			/* Nothing. */
-			break;
-		}
-#if defined(MIPS32) || defined(MIPS64)
-	default:
-	    {
-		/*
-		 * XXX: wait is valid on all mips32/64, but do we
-		 *	always want to use it?
-		 */
-		void mipsNN_idle(void);
-
-		CPU_IDLE = (long *) mipsNN_idle;
-	    }
-#endif
-	}
+	if ((mips_cpu_flags & CPU_MIPS_USE_WAIT) &&
+	    !(mips_cpu_flags & CPU_MIPS_NO_WAIT))
+		CPU_IDLE = (long *)mips_wait_idle;
+#endif /* (MIPS3 && !MIPS3_5900) || MIPS32 || MIPS64 */
 }
 
 void
@@ -922,7 +944,7 @@ mips_set_wbflush(flush_fn)
 }
 
 /*
- * Identify product revision IDs of cpu and fpu.
+ * Identify product revision IDs of CPU and FPU.
  */
 void
 cpu_identify(void)
@@ -995,7 +1017,7 @@ cpu_identify(void)
 	    MIPS_PRID_RSVD(cpu_id) != 0) {
 		printf("%s: NOTE: top 8 bits of prehistoric PRID not 0!\n",
 		    label);
-		printf("%s: Please mail port-mips@netbsd.org with cpu0 "
+		printf("%s: Please mail port-mips@NetBSD.org with cpu0 "
 		    "dmesg lines.\n", label);
 	}
 
@@ -1005,7 +1027,7 @@ cpu_identify(void)
 	KASSERT(mips_sdcache_ways < nwaynames);
 
 	switch (cpu_arch) {
-#ifdef MIPS1
+#if defined(MIPS1)
 	case CPU_ARCH_MIPS1:
 		if (mips_picache_size)
 			printf("%s: %dKB/%dB %s Instruction cache, "
@@ -1060,245 +1082,91 @@ cpu_identify(void)
  * code by the MIPS elf abi).
  */
 void
-setregs(p, pack, stack)
-	struct proc *p;
+setregs(l, pack, stack)
+	struct lwp *l;
 	struct exec_package *pack;
 	u_long stack;
 {
-	struct frame *f = (struct frame *)p->p_md.md_regs;
+	struct frame *f = (struct frame *)l->l_md.md_regs;
 
 	memset(f, 0, sizeof(struct frame));
-	f->f_regs[SP] = (int) stack;
-	f->f_regs[PC] = (int) pack->ep_entry & ~3;
-	f->f_regs[T9] = (int) pack->ep_entry & ~3; /* abicall requirement */
-	f->f_regs[SR] = PSL_USERSET;
+	f->f_regs[_R_SP] = (int)stack;
+	f->f_regs[_R_PC] = (int)pack->ep_entry & ~3;
+	f->f_regs[_R_T9] = (int)pack->ep_entry & ~3; /* abicall requirement */
+	f->f_regs[_R_SR] = PSL_USERSET;
 	/*
-	 * Set up arguments for the rtld-capable crt0:
-	 *	a0	stack pointer
-	 *	a1	rtld cleanup (filled in by dynamic loader)
-	 *	a2	rtld object (filled in by dynamic loader)
-	 *	a3	ps_strings
+	 * Set up arguments for _start():
+	 *	_start(stack, obj, cleanup, ps_strings);
+	 *
+	 * Notes:
+	 *	- obj and cleanup are the auxiliary and termination
+	 *	  vectors.  They are fixed up by ld.elf_so.
+	 *	- ps_strings is a NetBSD extension.
 	 */
-	f->f_regs[A0] = (int) stack;
-	f->f_regs[A1] = 0;
-	f->f_regs[A2] = 0;
-	f->f_regs[A3] = (int)p->p_psstr;
+	f->f_regs[_R_A0] = (int)stack;
+	f->f_regs[_R_A1] = 0;
+	f->f_regs[_R_A2] = 0;
+	f->f_regs[_R_A3] = (int)l->l_proc->p_psstr;
 
-	if ((p->p_md.md_flags & MDP_FPUSED) && p == fpcurproc)
-		fpcurproc = (struct proc *)0;
-	memset(&p->p_addr->u_pcb.pcb_fpregs, 0, sizeof(struct fpreg));
-	p->p_md.md_flags &= ~MDP_FPUSED;
-	p->p_md.md_ss_addr = 0;
+	if ((l->l_md.md_flags & MDP_FPUSED) && l == fpcurlwp)
+		fpcurlwp = (struct lwp *)0;
+	memset(&l->l_addr->u_pcb.pcb_fpregs, 0, sizeof(struct fpreg));
+	l->l_md.md_flags &= ~MDP_FPUSED;
+	l->l_md.md_ss_addr = 0;
 }
 
+#ifdef __HAVE_BOOTINFO_H
 /*
- * WARNING: code in locore.s assumes the layout shown for sf_signum
- * thru sf_handler so... don't screw with them!
+ * Machine dependent system variables.
  */
-struct sigframe {
-	int	sf_signum;		/* signo for handler */
-	int	sf_code;		/* additional info for handler */
-	struct	sigcontext *sf_scp;	/* context ptr for handler */
-	sig_t	sf_handler;		/* handler addr for u_sigc */
-	struct	sigcontext sf_sc;	/* actual context */
-};
-
-#ifdef DEBUG
-int sigdebug = 0;
-int sigpid = 0;
-#define SDB_FOLLOW	0x01
-#define SDB_KSTACK	0x02
-#define SDB_FPSTATE	0x04
-#endif
-
-/*
- * Send an interrupt to process.
- */
-void
-sendsig(catcher, sig, mask, code)
-	sig_t catcher;
-	int sig;
-	sigset_t *mask;
-	u_long code;
+static int
+sysctl_machdep_booted_kernel(SYSCTLFN_ARGS)
 {
-	struct proc *p = curproc;
-	struct sigframe *fp;
-	struct frame *f;
-	int onstack;
-	struct sigcontext ksc;
+	struct btinfo_bootpath *bibp;
+	struct sysctlnode node;
 
-	f = (struct frame *)p->p_md.md_regs;
+	bibp = lookup_bootinfo(BTINFO_BOOTPATH);
+	if(!bibp)
+		return(ENOENT); /* ??? */
 
-	/* Do we need to jump onto the signal stack? */
-	onstack =
-	    (p->p_sigctx.ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
-	    (SIGACTION(p, sig).sa_flags & SA_ONSTACK) != 0;
-
-	/* Allocate space for the signal handler context. */
-	if (onstack)
-		fp = (struct sigframe *)((caddr_t)p->p_sigctx.ps_sigstk.ss_sp +
-						p->p_sigctx.ps_sigstk.ss_size);
-	else
-		/* cast for _MIPS_BSD_API == _MIPS_BSD_API_LP32_64CLEAN case */
-		fp = (struct sigframe *)(u_int32_t)f->f_regs[SP];
-	fp--;
-
-#ifdef DEBUG
-	if ((sigdebug & SDB_FOLLOW) ||
-	    ((sigdebug & SDB_KSTACK) && p->p_pid == sigpid))
-		printf("sendsig(%d): sig %d ssp %p usp %p scp %p\n",
-		       p->p_pid, sig, &onstack, fp, &fp->sf_sc);
-#endif
-
-	/* Build stack frame for signal trampoline. */
-	ksc.sc_pc = f->f_regs[PC];
-	ksc.mullo = f->f_regs[MULLO];
-	ksc.mulhi = f->f_regs[MULHI];
-
-	/* Save register context. */
-	ksc.sc_regs[ZERO] = 0xACEDBADE;		/* magic number */
-	memcpy(&ksc.sc_regs[1], &f->f_regs[1],
-	    sizeof(ksc.sc_regs) - sizeof(ksc.sc_regs[0]));
-
-	/* Save the floating-pointstate, if necessary, then copy it. */
-#ifndef SOFTFLOAT
-	ksc.sc_fpused = p->p_md.md_flags & MDP_FPUSED;
-	if (ksc.sc_fpused) {
-		/* if FPU has current state, save it first */
-		if (p == fpcurproc)
-			savefpregs(p);
-		*(struct fpreg *)ksc.sc_fpregs = p->p_addr->u_pcb.pcb_fpregs;
-	}
-#else
-	*(struct fpreg *)ksc.sc_fpregs = p->p_addr->u_pcb.pcb_fpregs;
-#endif
-
-	/* Save signal stack. */
-	ksc.sc_onstack = p->p_sigctx.ps_sigstk.ss_flags & SS_ONSTACK;
-
-	/* Save signal mask. */
-	ksc.sc_mask = *mask;
-
-#if defined(COMPAT_13) || defined(COMPAT_ULTRIX)
-	/*
-	 * XXX We always have to save an old style signal mask because
-	 * XXX we might be delivering a signal to a process which will
-	 * XXX escape from the signal in a non-standard way and invoke
-	 * XXX sigreturn() directly.
-	 */
-	native_sigset_to_sigset13(mask, &ksc.__sc_mask13);
-#endif
-
-	if (copyout(&ksc, &fp->sf_sc, sizeof(ksc))) {
-		/*
-		 * Process has trashed its stack; give it an illegal
-		 * instruction to halt it in its tracks.
-		 */
-#ifdef DEBUG
-		if ((sigdebug & SDB_FOLLOW) ||
-		    ((sigdebug & SDB_KSTACK) && p->p_pid == sigpid))
-			printf("sendsig(%d): copyout failed on sig %d\n",
-			    p->p_pid, sig);
-#endif
-		sigexit(p, SIGILL);
-		/* NOTREACHED */
-	}
-
-	/* Set up the registers to return to sigcode. */
-	f->f_regs[A0] = sig;
-	f->f_regs[A1] = code;
-	f->f_regs[A2] = (int)&fp->sf_sc;
-	f->f_regs[A3] = (int)catcher;
-
-	f->f_regs[PC] = (int)catcher;
-	f->f_regs[T9] = (int)catcher;
-	f->f_regs[SP] = (int)fp;
-
-	/* Signal trampoline code is at base of user stack. */
-	f->f_regs[RA] = (int)p->p_sigctx.ps_sigcode;
-
-	/* Remember that we're now on the signal stack. */
-	if (onstack)
-		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
-
-#ifdef DEBUG
-	if ((sigdebug & SDB_FOLLOW) ||
-	    ((sigdebug & SDB_KSTACK) && p->p_pid == sigpid))
-		printf("sendsig(%d): sig %d returns\n",
-		       p->p_pid, sig);
-#endif
+	node = *rnode;
+	node.sysctl_data = bibp->bootpath;
+	node.sysctl_size = sizeof(bibp->bootpath);
+	return (sysctl_lookup(SYSCTLFN_CALL(&node)));
 }
+#endif
 
-/*
- * System call to cleanup state after a signal
- * has been taken.  Reset signal mask and
- * stack state from context left by sendsig (above).
- * Return to previous pc and psl as specified by
- * context left by sendsig. Check carefully to
- * make sure that the user has not modified the
- * psl to gain improper privileges or to cause
- * a machine fault.
- */
-/* ARGSUSED */
-int
-sys___sigreturn14(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+SYSCTL_SETUP(sysctl_machdep_setup, "sysctl machdep subtree setup")
 {
-	struct sys___sigreturn14_args /* {
-		syscallarg(struct sigcontext *) sigcntxp;
-	} */ *uap = v;
-	struct sigcontext *scp, ksc;
-	struct frame *f;
-	int error;
 
-	/*
-	 * The trampoline code hands us the context.
-	 * It is unsafe to keep track of it ourselves, in the event that a
-	 * program jumps out of a signal handler.
-	 */
-	scp = SCARG(uap, sigcntxp);
-#ifdef DEBUG
-	if (sigdebug & SDB_FOLLOW)
-		printf("sigreturn: pid %d, scp %p\n", p->p_pid, scp);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "machdep", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_MACHDEP, CTL_EOL);
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_STRUCT, "console_device", NULL,
+		       sysctl_consdev, 0, NULL, sizeof(dev_t),
+		       CTL_MACHDEP, CPU_CONSDEV, CTL_EOL);
+#ifdef __HAVE_BOOTINFO_H
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_STRING, "booted_kernel", NULL,
+		       sysctl_machdep_booted_kernel, 0, NULL, 0,
+		       CTL_MACHDEP, CPU_BOOTED_KERNEL, CTL_EOL);
 #endif
-	if ((error = copyin(scp, &ksc, sizeof(ksc))) != 0)
-		return (error);
-
-	if ((int) ksc.sc_regs[ZERO] != 0xACEDBADE)	/* magic number */
-		return (EINVAL);
-
-	/* Restore the register context. */
-	f = (struct frame *)p->p_md.md_regs;
-	f->f_regs[PC] = ksc.sc_pc;
-	f->f_regs[MULLO] = ksc.mullo;
-	f->f_regs[MULHI] = ksc.mulhi;
-	memcpy(&f->f_regs[1], &scp->sc_regs[1],
-	    sizeof(scp->sc_regs) - sizeof(scp->sc_regs[0]));
-#ifndef	SOFTFLOAT
-	if (scp->sc_fpused) {
-		/* Disable the FPU to fault in FP registers. */
-		f->f_regs[SR] &= ~MIPS_SR_COP_1_BIT;
-		if (p == fpcurproc) {
-			fpcurproc = (struct proc *)0;
-		}
-		p->p_addr->u_pcb.pcb_fpregs = *(struct fpreg *)scp->sc_fpregs;
-	}
-#else
-	p->p_addr->u_pcb.pcb_fpregs = *(struct fpreg *)scp->sc_fpregs;
-#endif
-
-	/* Restore signal stack. */
-	if (ksc.sc_onstack & SS_ONSTACK)
-		p->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
-	else
-		p->p_sigctx.ps_sigstk.ss_flags &= ~SS_ONSTACK;
-
-	/* Restore signal mask. */
-	(void) sigprocmask1(p, SIG_SETMASK, &ksc.sc_mask, 0);
-
-	return (EJUSTRETURN);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_STRING, "root_device", NULL,
+		       sysctl_root_device, 0, NULL, 0,
+		       CTL_MACHDEP, CPU_ROOT_DEVICE, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_IMMEDIATE,
+                       CTLTYPE_INT, "llsc", NULL,
+                       NULL, MIPS_HAS_LLSC, NULL, 0,
+                       CTL_MACHDEP, CPU_LLSC, CTL_EOL);
 }
 
 /*
@@ -1358,9 +1226,14 @@ cpu_dump(void)
 	kcore_seg_t *segp;
 	cpu_kcore_hdr_t *cpuhdrp;
 	phys_ram_seg_t *memsegp;
+	const struct bdevsw *bdev;
 	int i;
 
-	dump = bdevsw[major(dumpdev)].d_dump;
+	bdev = bdevsw_lookup(dumpdev);
+	if (bdev == NULL)
+		return (ENXIO);
+
+	dump = bdev->d_dump;
 
 	memset(buf, 0, sizeof buf);
 	segp = (kcore_seg_t *)buf;
@@ -1413,17 +1286,17 @@ cpu_dump(void)
 void
 cpu_dumpconf(void)
 {
+	const struct bdevsw *bdev;
 	int nblks, dumpblks;	/* size of dump area */
-	int maj;
 
 	if (dumpdev == NODEV)
 		goto bad;
-	maj = major(dumpdev);
-	if (maj < 0 || maj >= nblkdev)
+	bdev = bdevsw_lookup(dumpdev);
+	if (bdev == NULL)
 		panic("dumpconf: bad dumpdev=0x%x", dumpdev);
-	if (bdevsw[maj].d_psize == NULL)
+	if (bdev->d_psize == NULL)
 		goto bad;
-	nblks = (*bdevsw[maj].d_psize)(dumpdev);
+	nblks = (*bdev->d_psize)(dumpdev);
 	if (nblks <= ctod(1))
 		goto bad;
 
@@ -1450,7 +1323,7 @@ cpu_dumpconf(void)
 /*
  * Dump the kernel's image to the swap partition.
  */
-#define	BYTES_PER_DUMP	NBPG
+#define	BYTES_PER_DUMP	PAGE_SIZE
 
 void
 dumpsys(void)
@@ -1459,6 +1332,7 @@ dumpsys(void)
 	u_long maddr;
 	int psize;
 	daddr_t blkno;
+	const struct bdevsw *bdev;
 	int (*dump)(dev_t, daddr_t, caddr_t, size_t);
 	int error;
 
@@ -1466,6 +1340,9 @@ dumpsys(void)
 	savectx(&dumppcb);
 
 	if (dumpdev == NODEV)
+		return;
+	bdev = bdevsw_lookup(dumpdev);
+	if (bdev == NULL || bdev->d_psize == NULL)
 		return;
 
 	/*
@@ -1482,7 +1359,7 @@ dumpsys(void)
 	printf("\ndumping to dev %u,%u offset %ld\n", major(dumpdev),
 	    minor(dumpdev), dumplo);
 
-	psize = (*bdevsw[major(dumpdev)].d_psize)(dumpdev);
+	psize = (*bdev->d_psize)(dumpdev);
 	printf("dump ");
 	if (psize == -1) {
 		printf("area unavailable\n");
@@ -1496,7 +1373,7 @@ dumpsys(void)
 
 	totalbytesleft = ptoa(cpu_dump_mempagecnt());
 	blkno = dumplo + cpu_dumpsize();
-	dump = bdevsw[major(dumpdev)].d_dump;
+	dump = bdev->d_dump;
 	error = 0;
 
 	for (memcl = 0; memcl < mem_cluster_cnt; memcl++) {
@@ -1588,40 +1465,40 @@ mips_init_msgbuf(void)
 }
 
 void
-savefpregs(p)
-	struct proc *p;
+savefpregs(l)
+	struct lwp *l;
 {
 #ifndef NOFPU
 	u_int32_t status, fpcsr, *fp;
 	struct frame *f;
 
-	if (p == NULL)
+	if (l == NULL)
 		return;
 	/*
 	 * turnoff interrupts enabling CP1 to read FPCSR register.
 	 */
 	__asm __volatile (
-		".set noreorder		;"
-		".set noat		;"
-		"mfc0	%0, $12		;"
-		"li	$1, %2		;"
-		"mtc0	$1, $12		;"
-		"nop; nop; nop; nop	;"
-		"cfc1	%1, $31		;"
-		"cfc1	%1, $31		;"
-		".set reorder		;"
+		".set noreorder					\n\t"
+		".set noat					\n\t"
+		"mfc0	%0, $" ___STRING(MIPS_COP_0_STATUS) "	\n\t"
+		"li	$1, %2					\n\t"
+		"mtc0	$1, $" ___STRING(MIPS_COP_0_STATUS) "	\n\t"
+		___STRING(COP0_HAZARD_FPUENABLE)
+		"cfc1	%1, $31					\n\t"
+		"cfc1	%1, $31					\n\t"
+		".set reorder					\n\t"
 		".set at" 
 		: "=r" (status), "=r"(fpcsr) : "i"(MIPS_SR_COP_1_BIT));
 	/*
 	 * this process yielded FPA.
 	 */
-	f = (struct frame *)p->p_md.md_regs;
-	f->f_regs[SR] &= ~MIPS_SR_COP_1_BIT;
+	f = (struct frame *)l->l_md.md_regs;
+	f->f_regs[_R_SR] &= ~MIPS_SR_COP_1_BIT;
 
 	/*
 	 * save FPCSR and 32bit FP register values.
 	 */
-	fp = (int *)p->p_addr->u_pcb.pcb_fpregs.r_regs;
+	fp = (int *)l->l_addr->u_pcb.pcb_fpregs.r_regs;
 	fp[32] = fpcsr;
 	__asm __volatile (
 		".set noreorder		;"
@@ -1661,37 +1538,37 @@ savefpregs(p)
 	/*
 	 * stop CP1, enable interrupts.
 	 */
-	__asm __volatile ("mtc0 %0, $12" :: "r"(status));
-	return;
+	__asm __volatile ("mtc0 %0, $" ___STRING(MIPS_COP_0_STATUS)
+	    :: "r"(status));
 #endif
 }
 
 void
-loadfpregs(p)
-	struct proc *p;
+loadfpregs(l)
+	struct lwp *l;
 {
 #ifndef NOFPU
 	u_int32_t status, *fp;
 	struct frame *f;
 
-	if (p == NULL)
+	if (l == NULL)
 		panic("loading fpregs for NULL proc");
 
 	/*
 	 * turnoff interrupts enabling CP1 to load FP registers.
 	 */
 	__asm __volatile(
-		".set noreorder		;"
-		".set noat		;"
-		"mfc0	%0, $12		;"
-		"li	$1, %1		;"
-		"mtc0	$1, $12		;"
-		"nop; nop; nop; nop	;"
-		".set reorder		;"
+		".set noreorder					\n\t"
+		".set noat					\n\t"
+		"mfc0	%0, $" ___STRING(MIPS_COP_0_STATUS) "	\n\t"
+		"li	$1, %1					\n\t"
+		"mtc0	$1, $" ___STRING(MIPS_COP_0_STATUS) "	\n\t"
+		___STRING(COP0_HAZARD_FPUENABLE)
+		".set reorder					\n\t"
 		".set at" : "=r"(status) : "i"(MIPS_SR_COP_1_BIT));
 
-	f = (struct frame *)p->p_md.md_regs;
-	fp = (int *)p->p_addr->u_pcb.pcb_fpregs.r_regs;
+	f = (struct frame *)l->l_md.md_regs;
+	fp = (int *)l->l_addr->u_pcb.pcb_fpregs.r_regs;
 	/*
 	 * load 32bit FP registers and establish processes' FP context.
 	 */
@@ -1734,13 +1611,173 @@ loadfpregs(p)
 	 * load FPCSR and stop CP1 again while enabling interrupts.
 	 */
 	__asm __volatile(
-		".set noreorder		;"
-		".set noat		;"
-		"ctc1	%0, $31		;"
-		"mtc0	%1, $12		;"
-		".set reorder		;"
+		".set noreorder					\n\t"
+		".set noat					\n\t"
+		"ctc1	%0, $31					\n\t"
+		"mtc0	%1, $" ___STRING(MIPS_COP_0_STATUS) "	\n\t"
+		".set reorder					\n\t"
 		".set at"
 		:: "r"(fp[32] &~ MIPS_FPU_EXCEPTION_BITS), "r"(status));
-	return;
 #endif
+}
+
+/* 
+ * Start a new LWP
+ */
+void
+startlwp(arg)
+	void *arg;
+{
+	int err;
+	ucontext_t *uc = arg;
+	struct lwp *l = curlwp;
+
+	err = cpu_setmcontext(l, &uc->uc_mcontext, uc->uc_flags);
+#if DIAGNOSTIC
+	if (err) {
+		printf("Error %d from cpu_setmcontext.", err);
+	}
+#endif
+	pool_put(&lwp_uc_pool, uc);
+
+	userret(l);
+}
+
+/*
+ * XXX This is a terrible name.
+ */
+void
+upcallret(struct lwp *l)
+{
+	userret(l);
+}
+
+void 
+cpu_upcall(struct lwp *l, int type, int nevents, int ninterrupted,
+    void *sas, void *ap, void *sp, sa_upcall_t upcall)
+{
+	struct saframe *sf, frame;
+	struct frame *f;
+
+	f = (struct frame *)l->l_md.md_regs;
+
+#if 0 /* First 4 args in regs (see below). */
+	frame.sa_type = type;
+	frame.sa_sas = sas;
+	frame.sa_events = nevents;
+	frame.sa_interrupted = ninterrupted;
+#endif
+	frame.sa_arg = ap;
+	frame.sa_upcall = upcall;
+
+	sf = (struct saframe *)sp - 1;
+	if (copyout(&frame, sf, sizeof(frame)) != 0) {
+		/* Copying onto the stack didn't work. Die. */
+		sigexit(l, SIGILL);
+		/* NOTREACHED */
+	}
+
+	f->f_regs[_R_PC] = (u_int32_t)upcall;
+	f->f_regs[_R_SP] = (u_int32_t)sf;
+	f->f_regs[_R_A0] = type;
+	f->f_regs[_R_A1] = (u_int32_t)sas;
+	f->f_regs[_R_A2] = nevents;
+	f->f_regs[_R_A3] = ninterrupted;
+	f->f_regs[_R_S8] = 0;
+	f->f_regs[_R_RA] = 0;
+	f->f_regs[_R_T9] = (u_int32_t)upcall;  /* t9=Upcall function*/
+}
+
+
+void
+cpu_getmcontext(l, mcp, flags)
+	struct lwp *l;
+	mcontext_t *mcp;
+	unsigned int *flags;
+{
+	const struct frame *f = (struct frame *)l->l_md.md_regs;
+	__greg_t *gr = mcp->__gregs;
+	__greg_t ras_pc;
+
+	/* Save register context. Dont copy R0 - it is always 0 */
+	memcpy(&gr[_REG_AT], &f->f_regs[_R_AST], sizeof(mips_reg_t) * 31);
+
+	gr[_REG_MDLO]  = f->f_regs[_R_MULLO];
+	gr[_REG_MDHI]  = f->f_regs[_R_MULHI];
+	gr[_REG_CAUSE] = f->f_regs[_R_CAUSE];
+	gr[_REG_EPC]   = f->f_regs[_R_PC];
+	gr[_REG_SR]    = f->f_regs[_R_SR];
+
+	if ((ras_pc = (__greg_t)ras_lookup(l->l_proc,
+	    (caddr_t) gr[_REG_EPC])) != -1)
+		gr[_REG_EPC] = ras_pc;
+
+	*flags |= _UC_CPU;
+
+	/* Save floating point register context, if any. */
+	if (l->l_md.md_flags & MDP_FPUSED) {
+		/*
+		 * If this process is the current FP owner, dump its
+		 * context to the PCB first.
+		 */
+		if (l == fpcurlwp)
+			savefpregs(l);
+
+		/*
+		 * The PCB FP regs struct includes the FP CSR, so use the
+		 * size of __fpregs.__fp_r when copying.
+		 */
+		memcpy(&mcp->__fpregs.__fp_r,
+		    &l->l_addr->u_pcb.pcb_fpregs.r_regs,
+		    sizeof(mcp->__fpregs.__fp_r));
+		mcp->__fpregs.__fp_csr = l->l_addr->u_pcb.pcb_fpregs.r_regs[32];
+		*flags |= _UC_FPU;
+	}
+}
+
+int
+cpu_setmcontext(l, mcp, flags)
+	struct lwp *l;
+	const mcontext_t *mcp;
+	unsigned int flags;
+{
+	struct frame *f = (struct frame *)l->l_md.md_regs;
+	__greg_t *gr = mcp->__gregs;
+
+	/* Restore register context, if any. */
+	if (flags & _UC_CPU) {
+		/* Save register context. */
+		/* XXX:  Do we validate the addresses?? */
+		memcpy(&f->f_regs[_R_AST], &gr[_REG_AT],
+		       sizeof(mips_reg_t) * 31);
+
+		f->f_regs[_R_MULLO] = gr[_REG_MDLO];
+		f->f_regs[_R_MULHI] = gr[_REG_MDHI];
+		f->f_regs[_R_CAUSE] = gr[_REG_CAUSE];
+		f->f_regs[_R_PC]    = gr[_REG_EPC];
+		/* Do not restore SR. */
+	}
+
+	/* Restore floating point register context, if any. */
+	if (flags & _UC_FPU) {
+		/* Disable the FPU to fault in FP registers. */
+		f->f_regs[_R_SR] &= ~MIPS_SR_COP_1_BIT;
+		if (l == fpcurlwp)
+			fpcurlwp = NULL;
+
+		/*
+		 * The PCB FP regs struct includes the FP CSR, so use the
+		 * size of __fpregs.__fp_r when copying.
+		 */
+		memcpy(&l->l_addr->u_pcb.pcb_fpregs.r_regs,
+		    &mcp->__fpregs.__fp_r, sizeof(mcp->__fpregs.__fp_r));
+		l->l_addr->u_pcb.pcb_fpregs.r_regs[32] = mcp->__fpregs.__fp_csr;
+	}
+
+	if (flags & _UC_SETSTACK)
+		l->l_proc->p_sigctx.ps_sigstk.ss_flags |= SS_ONSTACK;
+	if (flags & _UC_CLRSTACK)
+		l->l_proc->p_sigctx.ps_sigstk.ss_flags &= ~SS_ONSTACK;
+
+	return (0);
 }

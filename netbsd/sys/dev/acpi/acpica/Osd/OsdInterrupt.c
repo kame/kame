@@ -1,4 +1,4 @@
-/*	$NetBSD: OsdInterrupt.c,v 1.2 2001/11/13 13:01:58 lukem Exp $	*/
+/*	$NetBSD: OsdInterrupt.c,v 1.4 2003/03/05 23:00:57 christos Exp $	*/
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: OsdInterrupt.c,v 1.2 2001/11/13 13:01:58 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: OsdInterrupt.c,v 1.4 2003/03/05 23:00:57 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -54,7 +54,9 @@ __KERNEL_RCSID(0, "$NetBSD: OsdInterrupt.c,v 1.2 2001/11/13 13:01:58 lukem Exp $
 #include <machine/acpi_machdep.h>
 
 #define	_COMPONENT	ACPI_OS_SERVICES
-MODULE_NAME("INTERRUPT")
+ACPI_MODULE_NAME("INTERRUPT")
+
+MALLOC_DEFINE(M_ACPI, "acpi", "Advanced Configuration and Power Interface");
 
 /*
  * We're lucky -- ACPI uses the same convention for interrupt service
@@ -99,14 +101,14 @@ AcpiOsInstallInterruptHandler(UINT32 InterruptNumber,
 	ACPI_STATUS rv;
 	int s;
 
-	FUNCTION_TRACE(__FUNCTION__);
+	ACPI_FUNCTION_TRACE(__FUNCTION__);
 
 	if (InterruptNumber < 0 || InterruptNumber > 255)
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	if (ServiceRoutine == NULL)
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 
-	aih = malloc(sizeof(*aih), M_DEVBUF, M_NOWAIT);
+	aih = malloc(sizeof(*aih), M_ACPI, M_NOWAIT);
 	if (aih == NULL)
 		return_ACPI_STATUS(AE_NO_MEMORY);
 
@@ -120,7 +122,7 @@ AcpiOsInstallInterruptHandler(UINT32 InterruptNumber,
 		LIST_INSERT_HEAD(&acpi_interrupt_list, aih, aih_list);
 		ACPI_INTERRUPT_LIST_UNLOCK(s);
 	} else
-		free(aih, M_DEVBUF);
+		free(aih, M_ACPI);
 
 	return_ACPI_STATUS(rv);
 }
@@ -136,7 +138,7 @@ AcpiOsRemoveInterruptHandler(UINT32 InterruptNumber, OSD_HANDLER ServiceRoutine)
 	struct acpi_interrupt_handler *aih;
 	int s;
 
-	FUNCTION_TRACE(__FUNCTION__);
+	ACPI_FUNCTION_TRACE(__FUNCTION__);
 
 	if (InterruptNumber < 0 || InterruptNumber > 255)
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
@@ -150,7 +152,7 @@ AcpiOsRemoveInterruptHandler(UINT32 InterruptNumber, OSD_HANDLER ServiceRoutine)
 			LIST_REMOVE(aih, aih_list);
 			ACPI_INTERRUPT_LIST_UNLOCK(s);
 			acpi_md_OsRemoveInterruptHandler(aih->aih_ih);
-			free(aih, M_DEVBUF);
+			free(aih, M_ACPI);
 			return_ACPI_STATUS(AE_OK);
 		}
 	}

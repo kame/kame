@@ -1,4 +1,4 @@
-/*	$NetBSD: libkern.h,v 1.39.10.2 2002/12/03 22:11:07 he Exp $	*/
+/*	$NetBSD: libkern.h,v 1.50 2003/08/13 11:34:24 ragge Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -67,134 +63,107 @@ LIBKERN_INLINE int tolower __P((int)) __attribute__((__unused__));
 
 #ifdef LIBKERN_BODY
 LIBKERN_INLINE int
-imax(a, b)
-	int a, b;
+imax(int a, int b)
 {
 	return (a > b ? a : b);
 }
 LIBKERN_INLINE int
-imin(a, b)
-	int a, b;
+imin(int a, int b)
 {
 	return (a < b ? a : b);
 }
 LIBKERN_INLINE long
-lmax(a, b)
-	long a, b;
+lmax(long a, long b)
 {
 	return (a > b ? a : b);
 }
 LIBKERN_INLINE long
-lmin(a, b)
-	long a, b;
+lmin(long a, long b)
 {
 	return (a < b ? a : b);
 }
 LIBKERN_INLINE u_int
-max(a, b)
-	u_int a, b;
+max(u_int a, u_int b)
 {
 	return (a > b ? a : b);
 }
 LIBKERN_INLINE u_int
-min(a, b)
-	u_int a, b;
+min(u_int a, u_int b)
 {
 	return (a < b ? a : b);
 }
 LIBKERN_INLINE u_long
-ulmax(a, b)
-	u_long a, b;
+ulmax(u_long a, u_long b)
 {
 	return (a > b ? a : b);
 }
 LIBKERN_INLINE u_long
-ulmin(a, b)
-	u_long a, b;
+ulmin(u_long a, u_long b)
 {
 	return (a < b ? a : b);
 }
 
 LIBKERN_INLINE int
-abs(j)
-	int j;
+abs(int j)
 {
 	return(j < 0 ? -j : j);
 }
 
 LIBKERN_INLINE int
-isspace(ch)
-	int ch;
+isspace(int ch)
 {
-
 	return (ch == ' ' || (ch >= '\t' && ch <= '\r'));
 }
 
 LIBKERN_INLINE int
-isascii(ch)
-	int ch;
+isascii(int ch)
 {
-
 	return ((ch & ~0x7f) == 0);
 }
 
 LIBKERN_INLINE int
-isupper(ch)
-	int ch;
+isupper(int ch)
 {
-
 	return (ch >= 'A' && ch <= 'Z');
 }
 
 LIBKERN_INLINE int
-islower(ch)
-	int ch;
+islower(int ch)
 {
-
 	return (ch >= 'a' && ch <= 'z');
 }
 
 LIBKERN_INLINE int
-isalpha(ch)
-	int ch;
+isalpha(int ch)
 {
-
 	return (isupper(ch) || islower(ch));
 }
 
 LIBKERN_INLINE int
-isdigit(ch)
-	int ch;
+isdigit(int ch)
 {
-
 	return (ch >= '0' && ch <= '9');
 }
 
 LIBKERN_INLINE int
-isxdigit(ch)
-	int ch;
+isxdigit(int ch)
 {
-
 	return (isdigit(ch) ||
 	    (ch >= 'A' && ch <= 'F') ||
 	    (ch >= 'a' && ch <= 'f'));
 }
 
 LIBKERN_INLINE int
-toupper(ch)
-	int ch;
+toupper(int ch)
 {
-
 	if (islower(ch))
 		return (ch - 0x20);
 	return (ch);
 }
 
 LIBKERN_INLINE int
-tolower(ch)
-	int ch;
+tolower(int ch)
 {
-
 	if (isupper(ch))
 		return (ch + 0x20);
 	return (ch);
@@ -246,7 +215,8 @@ tolower(ch)
 #endif
 
 #ifndef offsetof
-#define	offsetof(type, member)	((size_t)(&((type *)0)->member))
+#define	offsetof(type, member) \
+    ((size_t)(unsigned long)(&(((type *)0)->member)))
 #endif
 
 /* Prototypes for non-quad routines. */
@@ -259,7 +229,7 @@ void	 bzero __P((void *, size_t));
 void	*memcpy __P((void *, const void *, size_t));
 int	 memcmp __P((const void *, const void *, size_t));
 void	*memset __P((void *, int, size_t));
-#if __GNUC_PREREQ__(2, 95)
+#if __GNUC_PREREQ__(2, 95) && !defined(__vax__)
 #define	memcpy(d, s, l)		__builtin_memcpy(d, s, l)
 #define	memcmp(a, b, l)		__builtin_memcmp(a, b, l)
 #define	memset(d, v, l)		__builtin_memset(d, v, l)
@@ -286,6 +256,8 @@ int	 strncmp __P((const char *, const char *, size_t));
 char	*strchr __P((const char *, int));
 char	*strrchr __P((const char *, int));
 
+char	*strstr __P((const char *, const char *));
+
 /*
  * ffs is an instruction on vax.
  */
@@ -303,10 +275,14 @@ char	*intoa __P((u_int32_t));
 void	*memchr __P((const void *, int, size_t));
 void	*memmove __P((void *, const void *, size_t));
 int	 pmatch __P((const char *, const char *, const char **));
+u_int32_t arc4random __P((void));
+void	 arc4randbytes __P((void *, size_t));
 u_long	 random __P((void));
 int	 scanc __P((u_int, const u_char *, const u_char *, int));
 int	 skpc __P((int, size_t, u_char *));
 int	 strcasecmp __P((const char *, const char *));
+size_t	 strlcpy __P((char *, const char *, size_t));
+size_t	 strlcat __P((char *, const char *, size_t));
 int	 strncasecmp __P((const char *, const char *, size_t));
 u_long	 strtoul __P((const char *, char **, int));
 #endif /* !_LIB_LIBKERN_LIBKERN_H_ */

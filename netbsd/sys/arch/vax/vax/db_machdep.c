@@ -1,4 +1,4 @@
-/*	$NetBSD: db_machdep.c,v 1.33 2002/05/13 20:30:13 matt Exp $	*/
+/*	$NetBSD: db_machdep.c,v 1.37 2004/02/13 11:36:20 wiz Exp $	*/
 
 /* 
  * :set tabs=4
@@ -37,6 +37,10 @@
  * Interface to new debugger.
  * Taken from i386 port and modified for vax.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: db_machdep.c,v 1.37 2004/02/13 11:36:20 wiz Exp $");
+
 #include "opt_ddb.h"
 #include "opt_multiprocessor.h"
 
@@ -197,7 +201,7 @@ kdb_trap(struct trapframe *frame)
 		bcopy(frame, &ddb_regs, sizeof(struct trapframe));
 #else
 	bcopy(stopcpu->ci_ddb_regs, &ddb_regs, sizeof(struct trapframe));
-	printf("stopped on cpu %d\n", stopcpu->ci_cpuid);
+	printf("stopped on CPU %d\n", stopcpu->ci_cpuid);
 #endif
 
 	/* XXX Should switch to interrupt stack here, if needed. */
@@ -416,7 +420,8 @@ db_stack_trace_print(addr, have_addr, count, modif, pr)
 	void		(*pr) __P((const char *, ...)); /* Print function */
 {
 	extern vaddr_t	proc0paddr;
-	struct proc	*p = curproc;
+	struct lwp	*l = curlwp;
+	struct proc	*p = l->l_proc;
 	struct user	*uarea;
 	int		trace_proc;
 	pid_t	curpid;
@@ -475,8 +480,8 @@ db_stack_trace_print(addr, have_addr, count, modif, pr)
 		}
 	} else {
 		if (trace_proc) {
-			p = curproc;
-			if (p == NULL) {
+			l = curlwp;
+			if (l == NULL) {
 				(*pr)("trace: no current process! (ignored)\n");
 				return;
 			}
@@ -491,7 +496,7 @@ db_stack_trace_print(addr, have_addr, count, modif, pr)
 		uarea = (struct user *)proc0paddr;
 		curpid = 0;
 	} else {
-		uarea = p->p_addr;
+		uarea = l->l_addr;
 		curpid = p->p_pid;
 	}
 	(*pr)("Process %d\n", curpid);
@@ -631,21 +636,23 @@ db_mach_cpu(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
 	struct cpu_info *ci;
 
 	if ((addr < 0) || (addr >= cpu_cd.cd_ndevs))
-		return db_printf("%ld: cpu out of range\n", addr);
+		return db_printf("%ld: CPU out of range\n", addr);
 	if ((sc = cpu_cd.cd_devs[addr]) == NULL)
-		return db_printf("%ld: cpu not configured\n", addr);
+		return db_printf("%ld: CPU not configured\n", addr);
 
 	ci = &sc->sc_ci;
 	if ((ci != curcpu()) && ((ci->ci_flags & CI_STOPPED) == 0))
-		return db_printf("cpu %ld not stopped???\n", addr);
+		return db_printf("CPU %ld not stopped???\n", addr);
 
 	bcopy(&ddb_regs, stopcpu->ci_ddb_regs, sizeof(struct trapframe));
 	stopcpu = ci;
 	bcopy(stopcpu->ci_ddb_regs, &ddb_regs, sizeof(struct trapframe));
-	db_printf("using cpu %ld", addr);
-	if (ci->ci_curproc)
-		db_printf(" in proc %d (%s)\n", ci->ci_curproc->p_pid,
-		    ci->ci_curproc->p_comm);
+	db_printf("using CPU %ld", addr);
+	if (ci->ci_curlwp)
+		db_printf(" in proc %d.%d (%s)\n",
+		    ci->ci_curlwp->l_proc->p_pid,
+		    ci->ci_curlwp->l_lid,
+		    ci->ci_curlwp->l_proc->p_comm);
 }
 #endif
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: fpu_calcea.c,v 1.13 2001/07/28 13:21:26 tsutsui Exp $	*/
+/*	$NetBSD: fpu_calcea.c,v 1.16 2004/02/13 11:36:14 wiz Exp $	*/
 
 /*
  * Copyright (c) 1995 Gordon W. Ross
@@ -30,6 +30,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: fpu_calcea.c,v 1.16 2004/02/13 11:36:14 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/signal.h>
@@ -69,7 +72,7 @@ fpu_decode_ea(frame, insn, ea, modreg)
 
 #ifdef DEBUG
     if (insn->is_datasize < 0) {
-	panic("decode_ea: called with uninitialized datasize\n");
+	panic("decode_ea: called with uninitialized datasize");
     }
 #endif
 
@@ -371,13 +374,13 @@ fpu_load_ea(frame, insn, ea, dst)
     } else if (ea->ea_flags & EA_DIRECT) {
 	if (len > 4) {
 #ifdef DEBUG
-	    printf("load_ea: operand doesn't fit cpu reg\n");
+	    printf("load_ea: operand doesn't fit CPU reg\n");
 #endif
 	    return SIGILL;
 	}
 	if (ea->ea_moffs > 0) {
 #ifdef DEBUG
-	    printf("load_ea: more than one move from cpu reg\n");
+	    printf("load_ea: more than one move from CPU reg\n");
 #endif
 	    return SIGILL;
 	}
@@ -547,13 +550,13 @@ fpu_store_ea(frame, insn, ea, src)
     } else if (ea->ea_flags & EA_DIRECT) {
 	if (len > 4) {
 #ifdef DEBUG
-	    printf("store_ea: operand doesn't fit cpu reg\n");
+	    printf("store_ea: operand doesn't fit CPU reg\n");
 #endif
 	    return SIGILL;
 	}
 	if (ea->ea_moffs > 0) {
 #ifdef DEBUG
-	    printf("store_ea: more than one move to cpu reg\n");
+	    printf("store_ea: more than one move to CPU reg\n");
 #endif
 	    return SIGILL;
 	}

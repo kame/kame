@@ -1,4 +1,4 @@
-/*	$NetBSD: qe.c,v 1.22.6.1 2002/11/22 17:38:54 tron Exp $	*/
+/*	$NetBSD: qe.c,v 1.32 2004/03/17 17:04:59 pk Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -73,7 +73,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: qe.c,v 1.22.6.1 2002/11/22 17:38:54 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: qe.c,v 1.32 2004/03/17 17:04:59 pk Exp $");
 
 #define QEDEBUG
 
@@ -136,7 +136,7 @@ __KERNEL_RCSID(0, "$NetBSD: qe.c,v 1.22.6.1 2002/11/22 17:38:54 tron Exp $");
 struct qe_softc {
 	struct	device	sc_dev;		/* base device */
 	struct	sbusdev sc_sd;		/* sbus device */
-	bus_space_tag_t	sc_bustag;	/* bus & dma tags */
+	bus_space_tag_t	sc_bustag;	/* bus & DMA tags */
 	bus_dma_tag_t	sc_dmatag;
 	bus_dmamap_t	sc_dmamap;
 	struct	ethercom sc_ethercom;
@@ -187,9 +187,8 @@ static struct mbuf	*qe_get __P((struct qe_softc *, int, int));
 void	qe_ifmedia_sts __P((struct ifnet *, struct ifmediareq *));
 int	qe_ifmedia_upd __P((struct ifnet *));
 
-struct cfattach qe_ca = {
-	sizeof(struct qe_softc), qematch, qeattach
-};
+CFATTACH_DECL(qe, sizeof(struct qe_softc),
+    qematch, qeattach, NULL, NULL);
 
 int
 qematch(parent, cf, aux)
@@ -199,7 +198,7 @@ qematch(parent, cf, aux)
 {
 	struct sbus_attach_args *sa = aux;
 
-	return (strcmp(cf->cf_driver->cd_name, sa->sa_name) == 0);
+	return (strcmp(cf->cf_name, sa->sa_name) == 0);
 }
 
 void
@@ -216,7 +215,6 @@ qeattach(parent, self, aux)
 	bus_dma_segment_t seg;
 	bus_size_t size;
 	int rseg, error;
-	extern void myetheraddr __P((u_char *));
 
 	if (sa->sa_nreg < 2) {
 		printf("%s: only %d register sets\n",
@@ -244,7 +242,7 @@ qeattach(parent, self, aux)
 		return;
 	}
 
-	sc->sc_rev = PROM_getpropint(node, "mace-version", -1);
+	sc->sc_rev = prom_getpropint(node, "mace-version", -1);
 	printf(" rev %x", sc->sc_rev);
 
 	sc->sc_bustag = sa->sa_bustag;
@@ -252,14 +250,14 @@ qeattach(parent, self, aux)
 	sc->sc_qec = qec;
 	sc->sc_qr = qec->sc_regs;
 
-	sc->sc_channel = PROM_getpropint(node, "channel#", -1);
+	sc->sc_channel = prom_getpropint(node, "channel#", -1);
 	sc->sc_burst = qec->sc_burst;
 
 	qestop(sc);
 
 	/* Note: no interrupt level passed */
-	(void)bus_intr_establish(sa->sa_bustag, 0, IPL_NET, 0, qeintr, sc);
-	myetheraddr(sc->sc_enaddr);
+	(void)bus_intr_establish(sa->sa_bustag, 0, IPL_NET, qeintr, sc);
+	prom_getether(node, sc->sc_enaddr);
 
 	/*
 	 * Allocate descriptor ring and buffers.
@@ -825,14 +823,14 @@ qe_eint(sc, why)
 	}
 
 	if (why & QE_CR_STAT_TXPERR) {
-		printf("%s: tx dma parity error\n", sc->sc_dev.dv_xname);
+		printf("%s: tx DMA parity error\n", sc->sc_dev.dv_xname);
 		ifp->if_oerrors++;
 		rst = 1;
 		r |= 1;
 	}
 
 	if (why & QE_CR_STAT_TXSERR) {
-		printf("%s: tx dma sbus error ack\n", sc->sc_dev.dv_xname);
+		printf("%s: tx DMA sbus error ack\n", sc->sc_dev.dv_xname);
 		ifp->if_oerrors++;
 		rst = 1;
 		r |= 1;
@@ -898,14 +896,14 @@ qe_eint(sc, why)
 	}
 
 	if (why & QE_CR_STAT_RXPERR) {
-		printf("%s: rx dma parity error\n", sc->sc_dev.dv_xname);
+		printf("%s: rx DMA parity error\n", sc->sc_dev.dv_xname);
 		ifp->if_ierrors++;
 		r |= 1;
 		rst = 1;
 	}
 
 	if (why & QE_CR_STAT_RXSERR) {
-		printf("%s: rx dma sbus error ack\n", sc->sc_dev.dv_xname);
+		printf("%s: rx DMA sbus error ack\n", sc->sc_dev.dv_xname);
 		ifp->if_ierrors++;
 		r |= 1;
 		rst = 1;
@@ -1173,7 +1171,7 @@ qe_mcreset(sc)
 
 	ETHER_FIRST_MULTI(step, ec, enm);
 	while (enm != NULL) {
-		if (bcmp(enm->enm_addrlo, enm->enm_addrhi,
+		if (memcmp(enm->enm_addrlo, enm->enm_addrhi,
 			 ETHER_ADDR_LEN) != 0) {
 			/*
 			 * We must listen to a range of multicast

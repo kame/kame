@@ -1,4 +1,4 @@
-/*	$NetBSD: vme_machdep.c,v 1.35.6.1 2002/11/22 17:36:31 tron Exp $	*/
+/*	$NetBSD: vme_machdep.c,v 1.49 2004/03/17 17:04:59 pk Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vme_machdep.c,v 1.49 2004/03/17 17:04:59 pk Exp $");
 
 #include <sys/param.h>
 #include <sys/extent.h>
@@ -119,7 +122,9 @@ static void	sparc_vme_iommu_barrier __P(( bus_space_tag_t, bus_space_handle_t,
 /*
  * DMA functions.
  */
+#if defined(SUN4) || defined(SUN4M)
 static void	sparc_vct_dmamap_destroy __P((void *, bus_dmamap_t));
+#endif
 
 #if defined(SUN4)
 static int	sparc_vct4_dmamap_create __P((void *, vme_size_t, vme_am_t,
@@ -130,7 +135,7 @@ static int	sparc_vme4_dmamap_load __P((bus_dma_tag_t, bus_dmamap_t, void *,
 static void	sparc_vme4_dmamap_unload __P((bus_dma_tag_t, bus_dmamap_t));
 static void	sparc_vme4_dmamap_sync __P((bus_dma_tag_t, bus_dmamap_t,
 		    bus_addr_t, bus_size_t, int));
-#endif
+#endif /* SUN4 */
 
 #if defined(SUN4M)
 static int	sparc_vct_iommu_dmamap_create __P((void *, vme_size_t, vme_am_t,
@@ -144,10 +149,13 @@ static int	sparc_vme_iommu_dmamap_load __P((bus_dma_tag_t, bus_dmamap_t,
 static void	sparc_vme_iommu_dmamap_unload __P((bus_dma_tag_t, bus_dmamap_t));
 static void	sparc_vme_iommu_dmamap_sync __P((bus_dma_tag_t, bus_dmamap_t,
 		    bus_addr_t, bus_size_t, int));
-#endif
+#endif /* SUN4M */
 
+#if defined(SUN4) || defined(SUN4M)
 static int	sparc_vme_dmamem_map __P((bus_dma_tag_t, bus_dma_segment_t *,
 		    int, size_t, caddr_t *, int));
+#endif
+
 #if 0
 static void	sparc_vme_dmamap_destroy __P((bus_dma_tag_t, bus_dmamap_t));
 static void	sparc_vme_dmamem_unmap __P((bus_dma_tag_t, caddr_t, size_t));
@@ -157,13 +165,11 @@ static paddr_t	sparc_vme_dmamem_mmap __P((bus_dma_tag_t,
 
 int sparc_vme_mmap_cookie __P((vme_addr_t, vme_am_t, bus_space_handle_t *));
 
-struct cfattach vme_mainbus_ca = {
-	sizeof(struct sparcvme_softc), vmematch_mainbus, vmeattach_mainbus
-};
+CFATTACH_DECL(vme_mainbus, sizeof(struct sparcvme_softc),
+    vmematch_mainbus, vmeattach_mainbus, NULL, NULL);
 
-struct cfattach vme_iommu_ca = {
-	sizeof(struct sparcvme_softc), vmematch_iommu, vmeattach_iommu
-};
+CFATTACH_DECL(vme_iommu, sizeof(struct sparcvme_softc),
+    vmematch_iommu, vmeattach_iommu, NULL, NULL);
 
 int	(*vmeerr_handler) __P((void));
 
@@ -207,10 +213,24 @@ struct extent *vme_dvmamap;
 struct sparc_bus_space_tag sparc_vme_bus_tag = {
 	NULL, /* cookie */
 	NULL, /* parent bus tag */
+	NULL, /* ranges */
+	0,    /* nranges */
 	NULL, /* bus_map */
 	NULL, /* bus_unmap */
 	NULL, /* bus_subregion */
-	NULL  /* barrier */
+	NULL, /* barrier */
+	NULL, /* mmap */
+	NULL, /* intr_establish */
+#if __FULL_SPARC_BUS_SPACE
+	NULL, /* read_1 */
+	NULL, /* read_2 */
+	NULL, /* read_4 */
+	NULL, /* read_8 */
+	NULL, /* write_1 */
+	NULL, /* write_2 */
+	NULL, /* write_4 */
+	NULL  /* write_8 */
+#endif
 };
 
 struct vme_chipset_tag sparc_vme_chipset_tag = {
@@ -443,8 +463,8 @@ vmeattach_iommu(parent, self, aux)
 	/*
 	 * Get "range" property.
 	 */
-	if (PROM_getprop(node, "ranges", sizeof(struct rom_range),
-		    &sc->sc_nrange, (void **)&sc->sc_range) != 0) {
+	if (prom_getprop(node, "ranges", sizeof(struct rom_range),
+		    &sc->sc_nrange, &sc->sc_range) != 0) {
 		panic("%s: can't get ranges property", self->dv_xname);
 	}
 
@@ -465,7 +485,7 @@ vmeattach_iommu(parent, self, aux)
 	       sc->sc_reg->vmebus_cr & VMEBUS_CR_IMPL);
 
 	(void)config_found(self, &vba, 0);
-#endif
+#endif /* SUN4M */
 }
 
 #if defined(SUN4M)
@@ -683,8 +703,10 @@ vmeintr4(arg)
 	}
 
 	for (; ihp; ihp = ihp->next)
-		if (ihp->vec == vec && ihp->ih.ih_fun)
+		if (ihp->vec == vec && ihp->ih.ih_fun) {
+			splx(ihp->ih.ih_classipl);
 			rv |= (ihp->ih.ih_fun)(ihp->ih.ih_arg);
+		}
 
 	return (rv);
 }
@@ -728,10 +750,10 @@ vmeintr4m(arg)
 	int s;
 
 	s = splhigh();
-	if (curproc == NULL)
+	if (curlwp == NULL)
 		xpcb = (struct pcb *)proc0paddr;
 	else
-		xpcb = &curproc->p_addr->u_pcb;
+		xpcb = &curlwp->l_addr->u_pcb;
 
 	saveonfault = (u_long)xpcb->pcb_onfault;
 	vec = fkbyte(addr, xpcb);
@@ -757,8 +779,10 @@ vmeintr4m(arg)
 	}
 
 	for (; ihp; ihp = ihp->next)
-		if (ihp->vec == vec && ihp->ih.ih_fun)
+		if (ihp->vec == vec && ihp->ih.ih_fun) {
+			splx(ihp->ih.ih_classipl);
 			rv |= (ihp->ih.ih_fun)(ihp->ih.ih_arg);
+		}
 
 	return (rv);
 }
@@ -793,10 +817,10 @@ sparc_vme_intr_evcnt(cookie, vih)
 }
 
 void *
-sparc_vme_intr_establish(cookie, vih, pri, func, arg)
+sparc_vme_intr_establish(cookie, vih, level, func, arg)
 	void *cookie;
 	vme_intr_handle_t vih;
-	int pri;
+	int level;
 	int (*func) __P((void *));
 	void *arg;
 {
@@ -804,19 +828,23 @@ sparc_vme_intr_establish(cookie, vih, pri, func, arg)
 	struct sparc_vme_intr_handle *svih =
 			(struct sparc_vme_intr_handle *)vih;
 	struct intrhand *ih;
-	int level;
-
-	/* XXX pri == svih->pri ??? */
+	int pil;
 
 	/* Translate VME priority to processor IPL */
-	level = vme_ipl_to_pil[svih->pri];
+	pil = vme_ipl_to_pil[svih->pri];
+
+	if (level < pil)
+		panic("vme_intr_establish: class lvl (%d) < pil (%d)\n",
+			level, pil);
 
 	svih->ih.ih_fun = func;
 	svih->ih.ih_arg = arg;
+	svih->ih.ih_classipl = level;	/* note: used slightly differently
+						 than in intr.c (no shift) */
 	svih->next = NULL;
 
 	/* ensure the interrupt subsystem will call us at this level */
-	for (ih = intrhand[level]; ih != NULL; ih = ih->ih_next)
+	for (ih = intrhand[pil]; ih != NULL; ih = ih->ih_next)
 		if (ih->ih_fun == sc->sc_vmeintr)
 			break;
 
@@ -828,7 +856,7 @@ sparc_vme_intr_establish(cookie, vih, pri, func, arg)
 		bzero(ih, sizeof *ih);
 		ih->ih_fun = sc->sc_vmeintr;
 		ih->ih_arg = vih;
-		intr_establish(level, ih);
+		intr_establish(pil, 0, ih, NULL);
 	} else {
 		svih->next = (vme_intr_handle_t)ih->ih_arg;
 		ih->ih_arg = vih;
@@ -860,6 +888,7 @@ sparc_vme_intr_disestablish(cookie, a)
  * VME DMA functions.
  */
 
+#if defined(SUN4) || defined(SUN4M)
 static void
 sparc_vct_dmamap_destroy(cookie, map)
 	void *cookie;
@@ -868,6 +897,7 @@ sparc_vct_dmamap_destroy(cookie, map)
 	struct sparcvme_softc *sc = (struct sparcvme_softc *)cookie;
 	bus_dmamap_destroy(sc->sc_dmatag, map);
 }
+#endif
 
 #if defined(SUN4)
 static int
@@ -902,12 +932,13 @@ sparc_vme4_dmamap_load(t, map, buf, buflen, p, flags)
 {
 	bus_addr_t dva;
 	bus_size_t sgsize;
+	u_long ldva;
 	vaddr_t va, voff;
 	pmap_t pmap;
 	int pagesz = PAGE_SIZE;
 	int error;
 
-	cpuinfo.cache_flush(buf, buflen); /* XXX - move to bus_dma_sync */
+	cache_flush(buf, buflen); /* XXX - move to bus_dma_sync */
 
 	va = (vaddr_t)buf;
 	voff = va & (pagesz - 1);
@@ -923,9 +954,10 @@ sparc_vme4_dmamap_load(t, map, buf, buflen, p, flags)
 			     (flags & BUS_DMA_NOWAIT) == 0
 					? EX_WAITOK
 					: EX_NOWAIT,
-			     (u_long *)&dva);
+			     &ldva);
 	if (error != 0)
 		return (error);
+	dva = (bus_addr_t)ldva;
 
 	map->dm_mapsize = buflen;
 	map->dm_nsegs = 1;
@@ -1158,6 +1190,7 @@ sparc_vme_iommu_dmamap_sync(t, map, offset, len, ops)
 }
 #endif /* SUN4M */
 
+#if defined(SUN4) || defined(SUN4M)
 int
 sparc_vme_dmamem_map(t, segs, nsegs, size, kvap, flags)
 	bus_dma_tag_t t;
@@ -1171,3 +1204,4 @@ sparc_vme_dmamem_map(t, segs, nsegs, size, kvap, flags)
 
 	return (bus_dmamem_map(sc->sc_dmatag, segs, nsegs, size, kvap, flags));
 }
+#endif /* SUN4 || SUN4M */

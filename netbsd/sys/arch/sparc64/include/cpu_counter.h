@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu_counter.h,v 1.1.2.1 2003/06/24 09:31:35 grant Exp $	*/
+/*	$NetBSD: cpu_counter.h,v 1.1 2003/02/05 12:06:52 nakayama Exp $	*/
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.

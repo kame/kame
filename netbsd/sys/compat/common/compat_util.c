@@ -1,4 +1,4 @@
-/* 	$NetBSD: compat_util.c,v 1.23 2002/03/17 00:16:07 christos Exp $	*/
+/* 	$NetBSD: compat_util.c,v 1.27 2003/06/29 22:29:13 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1994 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: compat_util.c,v 1.23 2002/03/17 00:16:07 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: compat_util.c,v 1.27 2003/06/29 22:29:13 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -216,6 +216,37 @@ bad:
 }
 
 /*
+ * Search the alternate path for dynamic binary interpreter. If not found
+ * there, check if the interpreter exists in within 'proper' tree.
+ */
+int
+emul_find_interp(struct proc *p, const char *prefix, char *itp)
+{
+	const char *bp;
+	int error;
+
+	if (emul_find(p, NULL, prefix, itp, &bp, CHECK_ALT_FL_EXISTS) == 0) {
+		size_t len;
+
+		if ((error = copystr(bp, itp, MAXPATHLEN, &len)))
+			return error;
+		free((void *)bp, M_TEMP);
+	} else {
+		/* check filename without the emul prefix */
+		struct nameidata nd;
+	
+		NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, itp, p);
+
+		if ((error = namei(&nd)))
+			return error;
+
+		vrele(nd.ni_vp);
+	}
+
+	return (0);
+}
+
+/*
  * Translate one set of flags to another, based on the entries in
  * the given table.  If 'leftover' is specified, it is filled in
  * with any flags which could not be translated.
@@ -266,7 +297,7 @@ stackgap_alloc(p, sgp, sz)
 	
 	sz = ALIGN(sz);
 	nsgp = *sgp + sz;
-	if (nsgp > (((const caddr_t)p->p_psstr) - sigsize))
+	if (nsgp > (((caddr_t)p->p_psstr) - sigsize))
 		return NULL;
 	*sgp = nsgp;
 	return n;

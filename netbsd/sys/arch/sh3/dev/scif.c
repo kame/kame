@@ -1,4 +1,4 @@
-/*	$NetBSD: scif.c,v 1.26 2002/05/19 15:10:47 msaitoh Exp $ */
+/*	$NetBSD: scif.c,v 1.35 2003/08/07 16:29:28 agc Exp $ */
 
 /*-
  * Copyright (C) 1999 T.Horiuchi and SAITOH Masanobu.  All rights reserved.
@@ -74,11 +74,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -102,6 +98,9 @@
  *
  * This code is derived from both z8530tty.c and com.c
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: scif.c,v 1.35 2003/08/07 16:29:28 agc Exp $");
 
 #include "opt_kgdb.h"
 #include "opt_scif.h"
@@ -264,13 +263,24 @@ struct callout scif_soft_ch = CALLOUT_INITIALIZER;
 
 u_int scif_rbuf_size = SCIF_RING_SIZE;
 
-struct cfattach scif_ca = {
-	sizeof(struct scif_softc), scif_match, scif_attach
-};
+CFATTACH_DECL(scif, sizeof(struct scif_softc),
+    scif_match, scif_attach, NULL, NULL);
 
 extern struct cfdriver scif_cd;
 
-cdev_decl(scif);
+dev_type_open(scifopen);
+dev_type_close(scifclose);
+dev_type_read(scifread);
+dev_type_write(scifwrite);
+dev_type_ioctl(scifioctl);
+dev_type_stop(scifstop);
+dev_type_tty(sciftty);
+dev_type_poll(scifpoll);
+
+const struct cdevsw scif_cdevsw = {
+	scifopen, scifclose, scifread, scifwrite, scifioctl,
+	scifstop, sciftty, scifpoll, nommap, ttykqfilter, D_TTY
+};
 
 void InitializeScif (unsigned int);
 
@@ -336,9 +346,6 @@ InitializeScif(unsigned int bps)
 void
 scif_putc(unsigned char c)
 {
-
-	if (c == '\n')
-		scif_putc('\r');
 
 	/* wait for ready */
 	while ((SHREG_SCFDR2 & SCFDR2_TXCNT) == SCFDR2_TXF_FULL)
@@ -412,7 +419,7 @@ static int
 scif_match(struct device *parent, struct cfdata *cfp, void *aux)
 {
 
-	if (strcmp(cfp->cf_driver->cd_name, "scif")
+	if (strcmp(cfp->cf_name, "scif")
 	    || cfp->cf_unit >= SCIF_MAX_UNITS)
 		return 0;
 
@@ -1455,9 +1462,7 @@ scifcnprobe(struct consdev *cp)
 	int maj;
 
 	/* locate the major number */
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == scifopen)
-			break;
+	maj = cdevsw_lookup_major(&scif_cdevsw);
 
 	/* Initialize required fields. */
 	cp->cn_dev = makedev(maj, 0);

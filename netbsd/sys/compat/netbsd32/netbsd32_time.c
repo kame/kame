@@ -1,4 +1,4 @@
-/*	$NetBSD: netbsd32_time.c,v 1.3 2001/11/13 02:09:10 lukem Exp $	*/
+/*	$NetBSD: netbsd32_time.c,v 1.6 2003/10/21 01:44:45 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1998, 2001 Matthew R. Green
@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: netbsd32_time.c,v 1.3 2001/11/13 02:09:10 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: netbsd32_time.c,v 1.6 2003/10/21 01:44:45 fvdl Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_ntp.h"
@@ -41,6 +41,7 @@ __KERNEL_RCSID(0, "$NetBSD: netbsd32_time.c,v 1.3 2001/11/13 02:09:10 lukem Exp 
 #include <sys/time.h>
 #include <sys/timex.h>
 #include <sys/proc.h>
+#include <sys/pool.h>
 #include <sys/resourcevar.h>
 
 #include <compat/netbsd32/netbsd32.h>
@@ -49,8 +50,8 @@ __KERNEL_RCSID(0, "$NetBSD: netbsd32_time.c,v 1.3 2001/11/13 02:09:10 lukem Exp 
 
 #ifdef NTP
 int
-netbsd32_ntp_gettime(p, v, retval)
-	struct proc *p;
+netbsd32_ntp_gettime(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -97,8 +98,8 @@ netbsd32_ntp_gettime(p, v, retval)
 		netbsd32_from_timeval(&ntv.time, &ntv32.time);
 		ntv32.maxerror = (netbsd32_long)ntv.maxerror;
 		ntv32.esterror = (netbsd32_long)ntv.esterror;
-		error = copyout((caddr_t)&ntv32, (caddr_t)(u_long)SCARG(uap, ntvp),
-		    sizeof(ntv32));
+		error = copyout((caddr_t)&ntv32,
+		    (caddr_t)NETBSD32PTR64(SCARG(uap, ntvp)), sizeof(ntv32));
 	}
 	if (!error) {
 
@@ -141,8 +142,8 @@ netbsd32_ntp_gettime(p, v, retval)
 }
 
 int
-netbsd32_ntp_adjtime(p, v, retval)
-	struct proc *p;
+netbsd32_ntp_adjtime(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -154,6 +155,7 @@ netbsd32_ntp_adjtime(p, v, retval)
 	int error = 0;
 	int modes;
 	int s;
+	struct proc *p = l->l_proc;
 	extern long time_freq;		/* frequency offset (scaled ppm) */
 	extern long time_maxerror;
 	extern long time_esterror;
@@ -164,8 +166,8 @@ netbsd32_ntp_adjtime(p, v, retval)
 	extern long time_tolerance;	/* frequency tolerance (scaled ppm) */
 	extern long time_precision;	/* clock precision (us) */
 
-	if ((error = copyin((caddr_t)(u_long)SCARG(uap, tp), (caddr_t)&ntv32,
-			sizeof(ntv32))))
+	if ((error = copyin((caddr_t)NETBSD32PTR64(SCARG(uap, tp)),
+	    (caddr_t)&ntv32, sizeof(ntv32))))
 		return (error);
 	netbsd32_to_timex(&ntv32, &ntv);
 
@@ -229,7 +231,7 @@ netbsd32_ntp_adjtime(p, v, retval)
 	(void)splx(s);
 
 	netbsd32_from_timex(&ntv, &ntv32);
-	error = copyout((caddr_t)&ntv32, (caddr_t)(u_long)SCARG(uap, tp),
+	error = copyout((caddr_t)&ntv32, (caddr_t)NETBSD32PTR64(SCARG(uap, tp)),
 	    sizeof(ntv32));
 	if (!error) {
 
@@ -252,8 +254,8 @@ netbsd32_ntp_adjtime(p, v, retval)
 }
 #else
 int
-netbsd32_ntp_gettime(p, v, retval)
-	struct proc *p;
+netbsd32_ntp_gettime(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -262,8 +264,8 @@ netbsd32_ntp_gettime(p, v, retval)
 }
 
 int
-netbsd32_ntp_adjtime(p, v, retval)
-	struct proc *p;
+netbsd32_ntp_adjtime(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -273,8 +275,8 @@ netbsd32_ntp_adjtime(p, v, retval)
 #endif
 
 int
-netbsd32_setitimer(p, v, retval)
-	struct proc *p;
+netbsd32_setitimer(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -283,50 +285,87 @@ netbsd32_setitimer(p, v, retval)
 		syscallarg(const netbsd32_itimervalp_t) itv;
 		syscallarg(netbsd32_itimervalp_t) oitv;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct netbsd32_itimerval s32it, *itvp;
 	int which = SCARG(uap, which);
 	struct netbsd32_getitimer_args getargs;
 	struct itimerval aitv;
 	int s, error;
+	struct ptimer *pt;
 
 	if ((u_int)which > ITIMER_PROF)
 		return (EINVAL);
-	itvp = (struct netbsd32_itimerval *)(u_long)SCARG(uap, itv);
+	itvp = (struct netbsd32_itimerval *)NETBSD32PTR64(SCARG(uap, itv));
 	if (itvp && (error = copyin(itvp, &s32it, sizeof(s32it))))
 		return (error);
 	netbsd32_to_itimerval(&s32it, &aitv);
-	if (SCARG(uap, oitv) != NULL) {
+	if (SCARG(uap, oitv) != 0) {
 		SCARG(&getargs, which) = which;
 		SCARG(&getargs, itv) = SCARG(uap, oitv);
-		if ((error = netbsd32_getitimer(p, &getargs, retval)) != 0)
+		if ((error = netbsd32_getitimer(l, &getargs, retval)) != 0)
 			return (error);
 	}
 	if (itvp == 0)
 		return (0);
 	if (itimerfix(&aitv.it_value) || itimerfix(&aitv.it_interval))
 		return (EINVAL);
-	s = splclock();
+
+/* XXX there should be a way to share code with kern_time */
+/* XXX just copied some from there */
+	/* 
+	 * Don't bother allocating data structures if the process just
+	 * wants to clear the timer.
+	 */
+	if (!timerisset(&aitv.it_value) && 
+	    ((p->p_timers == NULL) || (p->p_timers->pts_timers[which] == NULL)))
+		return (0);
+
+	if (p->p_timers == NULL)
+		timers_alloc(p);
+	if (p->p_timers->pts_timers[which] == NULL) {
+		pt = pool_get(&ptimer_pool, PR_WAITOK);
+		callout_init(&pt->pt_ch);
+		pt->pt_ev.sigev_notify = SIGEV_SIGNAL;
+		pt->pt_overruns = 0;
+		pt->pt_proc = p;
+		pt->pt_type = which;
+		switch (which) {
+		case ITIMER_REAL:
+			pt->pt_ev.sigev_signo = SIGALRM;
+			break;
+		case ITIMER_VIRTUAL:
+			pt->pt_ev.sigev_signo = SIGVTALRM;
+			break;
+		case ITIMER_PROF:
+			pt->pt_ev.sigev_signo = SIGPROF;
+			break;
+		}
+	} else
+		pt = p->p_timers->pts_timers[which];
+
+	pt->pt_time = aitv;
+	p->p_timers->pts_timers[which] = pt;
 	if (which == ITIMER_REAL) {
-		callout_stop(&p->p_realit_ch);
-		if (timerisset(&aitv.it_value)) {
+		s = splclock();
+		callout_stop(&pt->pt_ch);
+		if (timerisset(&pt->pt_time.it_value)) {
+			timeradd(&pt->pt_time.it_value, &time, 
+			    &pt->pt_time.it_value);
 			/*
 			 * Don't need to check hzto() return value, here.
 			 * callout_reset() does it for us.
 			 */
-			timeradd(&aitv.it_value, &time, &aitv.it_value);
-			callout_reset(&p->p_realit_ch, hzto(&aitv.it_value),
-			    realitexpire, p);
+			callout_reset(&pt->pt_ch, hzto(&pt->pt_time.it_value), 
+			    realtimerexpire, pt);
 		}
-		p->p_realtimer = aitv;
-	} else
-		p->p_stats->p_timer[which] = aitv;
-	splx(s);
+		splx(s);
+	}
 	return (0);
 }
 
 int
-netbsd32_getitimer(p, v, retval)
-	struct proc *p;
+netbsd32_getitimer(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -334,6 +373,7 @@ netbsd32_getitimer(p, v, retval)
 		syscallarg(int) which;
 		syscallarg(netbsd32_itimervalp_t) itv;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	int which = SCARG(uap, which);
 	struct netbsd32_itimerval s32it;
 	struct itimerval aitv;
@@ -341,31 +381,40 @@ netbsd32_getitimer(p, v, retval)
 
 	if ((u_int)which > ITIMER_PROF)
 		return (EINVAL);
-	s = splclock();
-	if (which == ITIMER_REAL) {
-		/*
-		 * Convert from absolute to relative time in .it_value
-		 * part of real time timer.  If time for real time timer
-		 * has passed return 0, else return difference between
-		 * current time and time for the timer to go off.
-		 */
-		aitv = p->p_realtimer;
-		if (timerisset(&aitv.it_value)) {
-			if (timercmp(&aitv.it_value, &time, <))
-				timerclear(&aitv.it_value);
-			else
-				timersub(&aitv.it_value, &time, &aitv.it_value);
-		}
-	} else
-		aitv = p->p_stats->p_timer[which];
-	splx(s);
+
+/* XXX same as setitimer */
+	if ((p->p_timers == NULL) || (p->p_timers->pts_timers[which] == NULL)) {
+		timerclear(&aitv.it_value);
+		timerclear(&aitv.it_interval);
+	} else {
+		s = splclock();
+		if (which == ITIMER_REAL) {
+			/*
+			 * Convert from absolute to relative time in
+			 * .it_value part of real time timer.  If time
+			 * for real time timer has passed return 0,
+			 * else return difference between current time
+			 * and time for the timer to go off.  
+			 */
+			aitv = p->p_timers->pts_timers[ITIMER_REAL]->pt_time;
+			if (timerisset(&aitv.it_value)) {
+				if (timercmp(&aitv.it_value, &time, <))
+					timerclear(&aitv.it_value);
+				else
+					timersub(&aitv.it_value, &time, &aitv.it_value);
+			}
+		} else
+			aitv = p->p_timers->pts_timers[which]->pt_time;
+		splx(s);
+	}
 	netbsd32_from_itimerval(&aitv, &s32it);
-	return (copyout(&s32it, (caddr_t)(u_long)SCARG(uap, itv), sizeof(s32it)));
+	return (copyout(&s32it, (caddr_t)NETBSD32PTR64(SCARG(uap, itv)),
+	    sizeof(s32it)));
 }
 
 int
-netbsd32_gettimeofday(p, v, retval)
-	struct proc *p;
+netbsd32_gettimeofday(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -381,7 +430,8 @@ netbsd32_gettimeofday(p, v, retval)
 	if (SCARG(uap, tp)) {
 		microtime(&atv);
 		netbsd32_from_timeval(&atv, &tv32);
-		error = copyout(&tv32, (caddr_t)(u_long)SCARG(uap, tp), sizeof(tv32));
+		error = copyout(&tv32, (caddr_t)NETBSD32PTR64(SCARG(uap, tp)),
+		    sizeof(tv32));
 		if (error)
 			return (error);
 	}
@@ -392,14 +442,15 @@ netbsd32_gettimeofday(p, v, retval)
 		 */
 		tzfake.tz_minuteswest = 0;
 		tzfake.tz_dsttime = 0;
-		error = copyout(&tzfake, (caddr_t)(u_long)SCARG(uap, tzp), sizeof(tzfake));
+		error = copyout(&tzfake,
+		    (caddr_t)NETBSD32PTR64(SCARG(uap, tzp)), sizeof(tzfake));
 	}
 	return (error);
 }
 
 int
-netbsd32_settimeofday(p, v, retval)
-	struct proc *p;
+netbsd32_settimeofday(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -410,12 +461,14 @@ netbsd32_settimeofday(p, v, retval)
 	struct netbsd32_timeval atv32;
 	struct timeval atv;
 	int error;
+	struct proc *p = l->l_proc;
 
 	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
 		return (error);
 	/* Verify all parameters before changing time. */
-	if (SCARG(uap, tv) && (error = copyin((caddr_t)(u_long)SCARG(uap, tv),
-	    &atv32, sizeof(atv32))))
+	if (SCARG(uap, tv) &&
+	    (error = copyin((caddr_t)NETBSD32PTR64(SCARG(uap, tv)), &atv32,
+	    sizeof(atv32))))
 		return (error);
 	netbsd32_to_timeval(&atv32, &atv);
 	if (SCARG(uap, tv))
@@ -433,8 +486,8 @@ netbsd32_settimeofday(p, v, retval)
 }
 
 int
-netbsd32_adjtime(p, v, retval)
-	struct proc *p;
+netbsd32_adjtime(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -445,13 +498,15 @@ netbsd32_adjtime(p, v, retval)
 	struct netbsd32_timeval atv;
 	int32_t ndelta, ntickdelta, odelta;
 	int s, error;
+	struct proc *p = l->l_proc;
 	extern long bigadj, timedelta;
 	extern int tickdelta;
 
 	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
 		return (error);
 
-	error = copyin((caddr_t)(u_long)SCARG(uap, delta), &atv, sizeof(struct timeval));
+	error = copyin((caddr_t)NETBSD32PTR64(SCARG(uap, delta)), &atv,
+	    sizeof(struct timeval));
 	if (error)
 		return (error);
 	/*
@@ -485,15 +540,15 @@ netbsd32_adjtime(p, v, retval)
 	if (SCARG(uap, olddelta)) {
 		atv.tv_sec = odelta / 1000000;
 		atv.tv_usec = odelta % 1000000;
-		(void) copyout(&atv, (caddr_t)(u_long)SCARG(uap, olddelta),
-		    sizeof(atv));
+		(void) copyout(&atv,
+		    (caddr_t)NETBSD32PTR64(SCARG(uap, olddelta)), sizeof(atv));
 	}
 	return (0);
 }
 
 int
-netbsd32_clock_gettime(p, v, retval)
-	struct proc *p;
+netbsd32_clock_gettime(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -514,12 +569,13 @@ netbsd32_clock_gettime(p, v, retval)
 	TIMEVAL_TO_TIMESPEC(&atv,&ats);
 	netbsd32_from_timespec(&ats, &ts32);
 
-	return copyout(&ts32, (caddr_t)(u_long)SCARG(uap, tp), sizeof(ts32));
+	return copyout(&ts32, (caddr_t)NETBSD32PTR64(SCARG(uap, tp)),
+	    sizeof(ts32));
 }
 
 int
-netbsd32_clock_settime(p, v, retval)
-	struct proc *p;
+netbsd32_clock_settime(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -532,6 +588,7 @@ netbsd32_clock_settime(p, v, retval)
 	struct timeval atv;
 	struct timespec ats;
 	int error;
+	struct proc *p = l->l_proc;
 
 	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
 		return (error);
@@ -540,7 +597,8 @@ netbsd32_clock_settime(p, v, retval)
 	if (clock_id != CLOCK_REALTIME)
 		return (EINVAL);
 
-	if ((error = copyin((caddr_t)(u_long)SCARG(uap, tp), &ts32, sizeof(ts32))) != 0)
+	if ((error = copyin((caddr_t)NETBSD32PTR64(SCARG(uap, tp)), &ts32,
+	    sizeof(ts32))) != 0)
 		return (error);
 
 	netbsd32_to_timespec(&ts32, &ats);
@@ -552,8 +610,8 @@ netbsd32_clock_settime(p, v, retval)
 }
 
 int
-netbsd32_clock_getres(p, v, retval)
-	struct proc *p;
+netbsd32_clock_getres(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -575,15 +633,16 @@ netbsd32_clock_getres(p, v, retval)
 		ts.tv_nsec = 1000000000 / hz;
 
 		netbsd32_from_timespec(&ts, &ts32);
-		error = copyout(&ts, (caddr_t)(u_long)SCARG(uap, tp), sizeof(ts));
+		error = copyout(&ts, (caddr_t)NETBSD32PTR64(SCARG(uap, tp)),
+		    sizeof(ts));
 	}
 
 	return error;
 }
 
 int
-netbsd32_nanosleep(p, v, retval)
-	struct proc *p;
+netbsd32_nanosleep(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -598,8 +657,8 @@ netbsd32_nanosleep(p, v, retval)
 	struct timeval atv, utv;
 	int error, s, timo;
 
-	error = copyin((caddr_t)(u_long)SCARG(uap, rqtp), (caddr_t)&ts32,
-		       sizeof(ts32));
+	error = copyin((caddr_t)NETBSD32PTR64(SCARG(uap, rqtp)), (caddr_t)&ts32,
+	    sizeof(ts32));
 	if (error)
 		return (error);
 
@@ -637,8 +696,8 @@ netbsd32_nanosleep(p, v, retval)
 
 		TIMEVAL_TO_TIMESPEC(&utv,&rmt);
 		netbsd32_from_timespec(&rmt, &ts32);
-		error = copyout((caddr_t)&ts32, (caddr_t)(u_long)SCARG(uap,rmtp),
-			sizeof(ts32));
+		error = copyout((caddr_t)&ts32,
+		    (caddr_t)NETBSD32PTR64(SCARG(uap,rmtp)), sizeof(ts32));
 		if (error)
 			return (error);
 	}

@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_space.c,v 1.1 2001/10/16 15:38:53 uch Exp $	*/
+/*	$NetBSD: bus_space.c,v 1.3 2003/07/15 02:54:37 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -32,6 +32,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bus_space.c,v 1.3 2003/07/15 02:54:37 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -173,7 +176,7 @@ bus_space_create(bus_space_tag_t t, const char *name,
 		    M_DEVBUF, 0, 0, EX_NOWAIT);
 		if (pbs->pbs_extent == 0) {
 			panic("%s:: unable to create bus_space for "
-			    "0x%08lx-%#lx\n", __FUNCTION__, addr, size);
+			    "0x%08lx-%#lx", __FUNCTION__, addr, size);
 		}
 	}
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_sn_jazzio.c,v 1.1 2001/07/05 14:42:35 thorpej Exp $	*/
+/*	$NetBSD: if_sn_jazzio.c,v 1.5 2003/07/15 00:04:49 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -41,6 +41,9 @@
  * Systems-Oriented Network Interface Controller (SONIC).
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_sn_jazzio.c,v 1.5 2003/07/15 00:04:49 lukem Exp $");
+
 #include "bpfilter.h"
 
 #include <sys/param.h>
@@ -71,17 +74,15 @@
 int	sonic_jazzio_match(struct device *, struct cfdata *, void *);
 void	sonic_jazzio_attach(struct device *, struct device *, void *);
 
-struct cfattach sn_jazzio_ca = {
-	sizeof(struct sonic_softc), sonic_jazzio_match,
-	    sonic_jazzio_attach,
-};
+CFATTACH_DECL(sn_jazzio, sizeof(struct sonic_softc),
+    sonic_jazzio_match, sonic_jazzio_attach, NULL, NULL);
 
 int
 sonic_jazzio_match(struct device *parent, struct cfdata *match, void *aux)
 {
 	struct jazzio_attach_args *ja = aux;
 
-	if (strcmp(ja->ja_name, "sonic") != 0)
+	if (strcmp(ja->ja_name, "SONIC") != 0)
 		return (0);
 
 	return (1);

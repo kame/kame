@@ -1,9 +1,44 @@
-/*	$NetBSD: cons.c,v 1.41 2001/11/13 05:32:50 lukem Exp $	*/
+/*	$NetBSD: cons.c,v 1.52 2003/10/18 21:26:22 cdi Exp $	*/
+
+/*
+ * Copyright (c) 1990, 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: cons.c 1.7 92/01/21$
+ *
+ *	@(#)cons.c	8.2 (Berkeley) 1/12/94
+ */
 
 /*
  * Copyright (c) 1988 University of Utah.
- * Copyright (c) 1990, 1993
- *	The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -43,7 +78,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cons.c,v 1.41 2001/11/13 05:32:50 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cons.c,v 1.52 2003/10/18 21:26:22 cdi Exp $");
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -58,17 +93,35 @@ __KERNEL_RCSID(0, "$NetBSD: cons.c,v 1.41 2001/11/13 05:32:50 lukem Exp $");
 
 #include <dev/cons.h>
 
+dev_type_open(cnopen);
+dev_type_close(cnclose);
+dev_type_read(cnread);
+dev_type_write(cnwrite);
+dev_type_ioctl(cnioctl);
+dev_type_poll(cnpoll);
+dev_type_kqfilter(cnkqfilter);
+
+static const struct cdevsw *cn_redirect(dev_t *, int, int *);
+
+const struct cdevsw cons_cdevsw = {
+	cnopen, cnclose, cnread, cnwrite, cnioctl,
+	nostop, notty, cnpoll, nommap, cnkqfilter, D_TTY
+};
+
 struct	tty *constty = NULL;	/* virtual console output device */
 struct	consdev *cn_tab;	/* physical console device info */
-struct	vnode *cn_devvp;	/* vnode for underlying device. */
+struct	vnode *cn_devvp[2];	/* vnode for underlying device. */
 
 int
-cnopen(dev, flag, mode, p)
-	dev_t dev;
-	int flag, mode;
-	struct proc *p;
+cnopen(dev_t dev, int flag, int mode, struct proc *p)
 {
+	const struct cdevsw *cdev;
 	dev_t cndev;
+	int unit;
+
+	unit = minor(dev);
+	if (unit > 1)
+		return ENODEV;
 
 	if (cn_tab == NULL)
 		return (0);
@@ -85,7 +138,7 @@ cnopen(dev, flag, mode, p)
 		 * code. Panicing looks better than jumping into nowhere
 		 * through cdevsw below....
 		 */
-		panic("cnopen: cn_tab->cn_dev == NODEV\n");
+		panic("cnopen: no console device");
 	}
 	if (dev == cndev) {
 		/*
@@ -94,23 +147,27 @@ cnopen(dev, flag, mode, p)
 		 * dev == 0 and cn_dev has not been set, but was probably
 		 * initialised to 0.
 		 */
-		panic("cnopen: cn_tab->cn_dev == dev\n");
+		panic("cnopen: cn_tab->cn_dev == dev");
 	}
+	cdev = cdevsw_lookup(cndev);
+	if (cdev == NULL)
+		return (ENXIO);
 
-	if (cn_devvp == NULLVP) {
+	if (cn_devvp[unit] == NULLVP) {
 		/* try to get a reference on its vnode, but fail silently */
-		cdevvp(cndev, &cn_devvp);
+		cdevvp(cndev, &cn_devvp[unit]);
 	}
-	return ((*cdevsw[major(cndev)].d_open)(cndev, flag, mode, p));
+	return ((*cdev->d_open)(cndev, flag, mode, p));
 }
  
 int
-cnclose(dev, flag, mode, p)
-	dev_t dev;
-	int flag, mode;
-	struct proc *p;
+cnclose(dev_t dev, int flag, int mode, struct proc *p)
 {
+	const struct cdevsw *cdev;
 	struct vnode *vp;
+	int unit;
+
+	unit = minor(dev);
 
 	if (cn_tab == NULL)
 		return (0);
@@ -121,22 +178,24 @@ cnclose(dev, flag, mode, p)
 	 * screw up others who have it open.
 	 */
 	dev = cn_tab->cn_dev;
-	if (cn_devvp != NULLVP) {
+	cdev = cdevsw_lookup(dev);
+	if (cdev == NULL)
+		return (ENXIO);
+	if (cn_devvp[unit] != NULLVP) {
 		/* release our reference to real dev's vnode */
-		vrele(cn_devvp);
-		cn_devvp = NULLVP;
+		vrele(cn_devvp[unit]);
+		cn_devvp[unit] = NULLVP;
 	}
 	if (vfinddev(dev, VCHR, &vp) && vcount(vp))
 		return (0);
-	return ((*cdevsw[major(dev)].d_close)(dev, flag, mode, p));
+	return ((*cdev->d_close)(dev, flag, mode, p));
 }
  
 int
-cnread(dev, uio, flag)
-	dev_t dev;
-	struct uio *uio;
-	int flag;
+cnread(dev_t dev, struct uio *uio, int flag)
 {
+	const struct cdevsw *cdev;
+	int error;
 
 	/*
 	 * If we would redirect input, punt.  This will keep strange
@@ -145,51 +204,30 @@ cnread(dev, uio, flag)
 	 * input (except a shell in single-user mode, but then,
 	 * one wouldn't TIOCCONS then).
 	 */
-	if (constty != NULL && (cn_tab == NULL || cn_tab->cn_pri != CN_REMOTE))
-		return 0;
-	else if (cn_tab == NULL)
-		return ENXIO;
-
-	dev = cn_tab->cn_dev;
-	return ((*cdevsw[major(dev)].d_read)(dev, uio, flag));
+	cdev = cn_redirect(&dev, 1, &error);
+	if (cdev == NULL)
+		return error;
+	return ((*cdev->d_read)(dev, uio, flag));
 }
  
 int
-cnwrite(dev, uio, flag)
-	dev_t dev;
-	struct uio *uio;
-	int flag;
+cnwrite(dev_t dev, struct uio *uio, int flag)
 {
+	const struct cdevsw *cdev;
+	int error;
 
-	/*
-	 * Redirect output, if that's appropriate.
-	 * If there's no real console, return ENXIO.
-	 */
-	if (constty != NULL && (cn_tab == NULL || cn_tab->cn_pri != CN_REMOTE))
-		dev = constty->t_dev;
-	else if (cn_tab == NULL)
-		return ENXIO;
-	else
-		dev = cn_tab->cn_dev;
-	return ((*cdevsw[major(dev)].d_write)(dev, uio, flag));
+	/* Redirect output, if that's appropriate. */
+	cdev = cn_redirect(&dev, 0, &error);
+	if (cdev == NULL)
+		return error;
+
+	return ((*cdev->d_write)(dev, uio, flag));
 }
 
-void
-cnstop(tp, flag)
-	struct tty *tp;
-	int flag;
-{
-
-}
- 
 int
-cnioctl(dev, cmd, data, flag, p)
-	dev_t dev;
-	u_long cmd;
-	caddr_t data;
-	int flag;
-	struct proc *p;
+cnioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 {
+	const struct cdevsw *cdev;
 	int error;
 
 	/*
@@ -210,50 +248,58 @@ cnioctl(dev, cmd, data, flag, p)
 	 * ioctls on /dev/console, then the console is redirected
 	 * out from under it.
 	 */
-	if (constty != NULL && (cn_tab == NULL || cn_tab->cn_pri != CN_REMOTE))
-		dev = constty->t_dev;
-	else if (cn_tab == NULL)
-		return ENXIO;
-	else
-		dev = cn_tab->cn_dev;
-	return ((*cdevsw[major(dev)].d_ioctl)(dev, cmd, data, flag, p));
+	cdev = cn_redirect(&dev, 0, &error);
+	if (cdev == NULL)
+		return error;
+	return ((*cdev->d_ioctl)(dev, cmd, data, flag, p));
 }
 
 /*ARGSUSED*/
 int
-cnpoll(dev, events, p)
-	dev_t dev;
-	int events;
-	struct proc *p;
+cnpoll(dev_t dev, int events, struct proc *p)
 {
+	const struct cdevsw *cdev;
+	int error;
 
 	/*
 	 * Redirect the poll, if that's appropriate.
 	 * I don't want to think of the possible side effects
 	 * of console redirection here.
 	 */
-	if (constty != NULL && (cn_tab == NULL || cn_tab->cn_pri != CN_REMOTE))
-		dev = constty->t_dev;
-	else if (cn_tab == NULL)
-		return ENXIO;
-	else
-		dev = cn_tab->cn_dev;
-	return ((*cdevsw[major(dev)].d_poll)(dev, events, p));
+	cdev = cn_redirect(&dev, 0, &error);
+	if (cdev == NULL)
+		return error;
+	return ((*cdev->d_poll)(dev, events, p));
+}
+
+/*ARGSUSED*/
+int
+cnkqfilter(dev_t dev, struct knote *kn)
+{
+	const struct cdevsw *cdev;
+	int error;
+
+	/*
+	 * Redirect the kqfilter, if that's appropriate.
+	 * I don't want to think of the possible side effects
+	 * of console redirection here.
+	 */
+	cdev = cn_redirect(&dev, 0, &error);
+	if (cdev == NULL)
+		return error;
+	return ((*cdev->d_kqfilter)(dev, kn));
 }
 
 int
-cngetc()
+cngetc(void)
 {
-
 	if (cn_tab == NULL)
 		return (0);
 	return ((*cn_tab->cn_getc)(cn_tab->cn_dev));
 }
 
 int
-cngetsn(cp, size)
-	char *cp;
-	int size;
+cngetsn(char *cp, int size)
 {
 	char *lp;
 	int c, len;
@@ -299,8 +345,7 @@ cngetsn(cp, size)
 }
 
 void
-cnputc(c)
-	int c;
+cnputc(int c)
 {
 
 	if (cn_tab == NULL)
@@ -314,8 +359,7 @@ cnputc(c)
 }
 
 void
-cnpollc(on)
-	int on;
+cnpollc(int on)
 {
 	static int refcount = 0;
 
@@ -330,19 +374,57 @@ cnpollc(on)
 }
 
 void
-nullcnpollc(dev, on)
-	dev_t dev;
-	int on;
+nullcnpollc(dev_t dev, int on)
 {
 
 }
 
 void
-cnbell(pitch, period, volume)
-	u_int pitch, period, volume;
+cnbell(u_int pitch, u_int period, u_int volume)
 {
 
 	if (cn_tab == NULL || cn_tab->cn_bell == NULL)
 		return;
 	(*cn_tab->cn_bell)(cn_tab->cn_dev, pitch, period, volume);
+}
+
+void
+cnflush(void)
+{
+	if (cn_tab == NULL || cn_tab->cn_flush == NULL)
+		return;
+	(*cn_tab->cn_flush)(cn_tab->cn_dev);
+}
+  
+void
+cnhalt(void)
+{
+	if (cn_tab == NULL || cn_tab->cn_halt == NULL)
+		return;
+	(*cn_tab->cn_halt)(cn_tab->cn_dev);
+}
+
+static const struct cdevsw *
+cn_redirect(dev_t *devp, int is_read, int *error)
+{
+	dev_t dev = *devp;
+
+	/*
+	 * Redirect output, if that's appropriate.
+	 * If there's no real console, return ENXIO.
+	 */
+	*error = ENXIO;
+	if (constty != NULL && minor(dev) == 0 &&
+	    (cn_tab == NULL || (cn_tab->cn_pri != CN_REMOTE ))) {
+		if (is_read) {
+			*error = 0;
+			return NULL;
+		}
+		dev = constty->t_dev;
+	} else if (cn_tab == NULL)
+		return NULL;
+	else
+		dev = cn_tab->cn_dev;
+	*devp = dev;
+	return cdevsw_lookup(dev);
 }

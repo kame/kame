@@ -1,4 +1,4 @@
-/*	$NetBSD: fd.c,v 1.37 2001/07/26 22:55:13 wiz Exp $	*/
+/*	$NetBSD: fd.c,v 1.48 2004/01/04 16:19:43 wiz Exp $	*/
 
 /*
  * Copyright (c) 1995 Leo Weppelman.
@@ -47,6 +47,9 @@
  *   - Test it with an HD-drive (Don't have that either)
  *   - Finish ioctl's
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: fd.c,v 1.48 2004/01/04 16:19:43 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -122,7 +125,7 @@ static short	motoron  = 0;		/* motor is spinning		*/
 static short	nopens   = 0;		/* Number of opens executed	*/
 
 static short	fd_state = FLP_IDLE;	/* Current driver state		*/
-static int	lock_stat= 0;		/* dma locking status		*/
+static int	lock_stat= 0;		/* DMA locking status		*/
 static short	fd_cmd   = 0;		/* command being executed	*/
 static char	*fd_error= NULL;	/* error from fd_xfer_ok()	*/
 
@@ -132,7 +135,7 @@ static char	*fd_error= NULL;	/* error from fd_xfer_ok()	*/
 struct fd_softc {
 	struct device	sc_dv;		/* generic device info		*/
 	struct disk	dkdev;		/* generic disk info		*/
-	struct buf_queue bufq;		/* queue of buf's		*/
+	struct bufq_state bufq;		/* queue of buf's		*/
 	struct callout	sc_motor_ch;
 	int		unit;		/* unit for atari controlling hw*/
 	int		nheads;		/* number of heads in use	*/
@@ -192,16 +195,12 @@ static short	def_type = 0;		/* Reflects config-switches	*/
 
 typedef void	(*FPV) __P((void *));
 
-/*
- * {b,c}devsw[] function prototypes
- */
 dev_type_open(fdopen);
 dev_type_close(fdclose);
 dev_type_read(fdread);
 dev_type_write(fdwrite);
 dev_type_ioctl(fdioctl);
-dev_type_size(fdsize);
-dev_type_dump(fddump);
+dev_type_strategy(fdstrategy);
 
 /*
  * Private drive functions....
@@ -271,8 +270,16 @@ static int	fdcmatch __P((struct device *, struct cfdata *, void *));
 static int	fdcprint __P((void *, const char *));
 static void	fdcattach __P((struct device *, struct device *, void *));
 
-struct cfattach fdc_ca = {
-	sizeof(struct device), fdcmatch, fdcattach
+CFATTACH_DECL(fdc, sizeof(struct device),
+    fdcmatch, fdcattach, NULL, NULL);
+
+const struct bdevsw fd_bdevsw = {
+	fdopen, fdclose, fdstrategy, fdioctl, nodump, nosize, D_DISK
+};
+
+const struct cdevsw fd_cdevsw = {
+	fdopen, fdclose, fdread, fdwrite, fdioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
 };
 
 static int
@@ -346,7 +353,7 @@ void	*auxp;
 const char	*pnp;
 {
 	if (pnp != NULL)
-		printf("fd%d at %s:", (int)auxp, pnp);
+		aprint_normal("fd%d at %s:", (int)auxp, pnp);
 	
 	return(UNCONF);
 }
@@ -354,12 +361,10 @@ const char	*pnp;
 static int	fdmatch __P((struct device *, struct cfdata *, void *));
 static void	fdattach __P((struct device *, struct device *, void *));
 
-       void	fdstrategy __P((struct buf *));
 struct dkdriver fddkdriver = { fdstrategy };
 
-struct cfattach fd_ca = {
-	sizeof(struct fd_softc), fdmatch, fdattach
-};
+CFATTACH_DECL(fd, sizeof(struct fd_softc),
+    fdmatch, fdattach, NULL, NULL);
 
 extern struct cfdriver fd_cd;
 
@@ -506,7 +511,7 @@ struct proc	*proc;
 
 		type = FLP_TYPE(dev);
 
-		BUFQ_INIT(&sc->bufq);
+		bufq_alloc(&sc->bufq, BUFQ_DISKSORT|BUFQ_SORT_RAWBLOCK);
 		sc->unit        = DISKUNIT(dev);
 		sc->part        = RAW_PART;
 		sc->nheads	= fdtypes[type].nheads;
@@ -629,7 +634,7 @@ struct buf	*bp;
 	 * queue the buf and kick the low level code
 	 */
 	sps = splbio();
-	disksort_blkno(&sc->bufq, bp);	/* XXX disksort_cylinder */
+	BUFQ_PUT(&sc->bufq, bp);	/* XXX disksort_cylinder */
 	if (!lock_stat) {
 		if (fd_state & FLP_MON)
 			callout_stop(&sc->sc_motor_ch);
@@ -645,29 +650,6 @@ bad:
 done:
 	bp->b_resid = bp->b_bcount;
 	biodone(bp);
-}
-
-/*
- * no dumps to floppy disks thank you.
- */
-int
-fddump(dev, blkno, va, size)
-dev_t	dev;
-daddr_t	blkno;
-caddr_t	va;
-size_t	size;
-{
-	return(ENXIO);
-}
-
-/*
- * no dumps to floppy disks thank you.
- */
-int
-fdsize(dev)
-dev_t dev;
-{
-	return(-1);
 }
 
 int
@@ -704,8 +686,8 @@ struct fd_softc	*sc;
 }
 
 /*
- * Called through the dma-dispatcher. So we know we are the only ones
- * messing with the floppy-controler.
+ * Called through the DMA-dispatcher. So we know we are the only ones
+ * messing with the floppy-controller.
  * Initialize some fields in the fdsoftc for the state-machine and get
  * it going.
  */
@@ -715,7 +697,7 @@ struct fd_softc	*sc;
 {
 	struct buf	*bp;
 
-	bp	     = BUFQ_FIRST(&sc->bufq);
+	bp	     = BUFQ_PEEK(&sc->bufq);
 	sc->sector   = bp->b_blkno;	/* Start sector for I/O		*/
 	sc->io_data  = bp->b_data;	/* KVA base for I/O		*/
 	sc->io_bytes = bp->b_bcount;	/* Transfer size in bytes	*/
@@ -731,7 +713,7 @@ struct fd_softc	*sc;
 
 /*
  * The current transaction is finished (for good or bad). Let go of
- * the dma-resources. Call biodone() to finish the transaction.
+ * the DMA-resources. Call biodone() to finish the transaction.
  * Find a new transaction to work on.
  */
 static void
@@ -743,7 +725,7 @@ register struct fd_softc	*sc;
 	int		i, sps;
 
 	/*
-	 * Give others a chance to use the dma.
+	 * Give others a chance to use the DMA.
 	 */
 	st_dmafree(sc, &lock_stat);
 
@@ -753,10 +735,9 @@ register struct fd_softc	*sc;
 		 * Finish current transaction.
 		 */
 		sps = splbio();
-		bp = BUFQ_FIRST(&sc->bufq);
+		bp = BUFQ_GET(&sc->bufq);
 		if (bp == NULL)
 			panic("fddone");
-		BUFQ_REMOVE(&sc->bufq, bp);
 		splx(sps);
 
 #ifdef FLP_DEBUG
@@ -765,7 +746,8 @@ register struct fd_softc	*sc;
 #endif
 		bp->b_resid = sc->io_bytes;
 
-		disk_unbusy(&sc->dkdev, (bp->b_bcount - bp->b_resid));
+		disk_unbusy(&sc->dkdev, (bp->b_bcount - bp->b_resid),
+		    (bp->b_flags & B_READ));
 
 		biodone(bp);
 	}
@@ -782,7 +764,7 @@ register struct fd_softc	*sc;
 			i = 0;
 		if((sc1 = fd_cd.cd_devs[i]) == NULL)
 			continue;
-		if (BUFQ_FIRST(&sc1->bufq) != NULL)
+		if (BUFQ_PEEK(&sc1->bufq) != NULL)
 			break;
 		if(i == sc->unit) {
 			callout_reset(&sc->sc_motor_ch, FLP_MONDELAY,
@@ -820,7 +802,7 @@ int	drive, head, dense;
 			DMA->dma_drvmode = (FDC_HDSET|FDC_HDSIG);
 			break;
 		default:
-			panic("fdselect: unknown density code\n");
+			panic("fdselect: unknown density code");
 	}
 	if(i != selected) {
 		selected = i;
@@ -1023,7 +1005,7 @@ struct fd_softc	*sc;
 				return;
 			}
 
-			bp = BUFQ_FIRST(&sc->bufq);
+			bp = BUFQ_PEEK(&sc->bufq);
 
 			bp->b_error  = EIO;
 			bp->b_flags |= B_ERROR;
@@ -1101,7 +1083,7 @@ register struct fd_softc	*sc;
 			 */
 			status = read_dmastat();
 			if(!(status & DMAOK)) {
-				fd_error = "Dma error";
+				fd_error = "DMA error";
 				return(X_ERROR);
 			}
 			/*
@@ -1121,7 +1103,7 @@ register struct fd_softc	*sc;
 			 */
 			status = read_dmastat();
 			if(!(status & DMAOK)) {
-				fd_error = "Dma error";
+				fd_error = "DMA error";
 				return(X_ERROR);
 			}
 			/*

@@ -1,4 +1,4 @@
-/*	$NetBSD: lpt_ebus.c,v 1.12 2002/03/21 01:17:08 eeh Exp $	*/
+/*	$NetBSD: lpt_ebus.c,v 1.18 2003/07/15 03:36:05 lukem Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Matthew R. Green
@@ -32,6 +32,9 @@
  * NS Super I/O PC87332VLJ "lpt" to ebus attachment
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: lpt_ebus.c,v 1.18 2003/07/15 03:36:05 lukem Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -48,9 +51,8 @@
 int	lpt_ebus_match __P((struct device *, struct cfdata *, void *));
 void	lpt_ebus_attach __P((struct device *, struct device *, void *));
 
-struct cfattach lpt_ebus_ca = {
-	sizeof(struct lpt_softc), lpt_ebus_match, lpt_ebus_attach
-};
+CFATTACH_DECL(lpt_ebus, sizeof(struct lpt_softc),
+    lpt_ebus_match, lpt_ebus_attach, NULL, NULL);
 
 #define	ROM_LPT_NAME	"ecpp"
 
@@ -79,7 +81,7 @@ lpt_ebus_attach(parent, self, aux)
 
 	sc->sc_iot = ea->ea_bustag;
 	/*
-	 * Addresses that shoud be supplied by the prom:
+	 * Addresses that should be supplied by the prom:
 	 *	- normal lpt registers
 	 *	- ns873xx configuration registers
 	 *	- DMA space
@@ -103,7 +105,7 @@ lpt_ebus_attach(parent, self, aux)
 
 	for (i = 0; i < ea->ea_nintr; i++)
 		bus_intr_establish(ea->ea_bustag, ea->ea_intr[i],
-				   IPL_SERIAL, 0, lptintr, sc);
+				   IPL_SERIAL, lptintr, sc);
 	printf("\n");
 
 	lpt_attach_subr(sc);

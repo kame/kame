@@ -1,4 +1,4 @@
-/*	$NetBSD: smbfs_subr.c,v 1.2 2002/01/09 17:43:28 deberg Exp $	*/
+/*	$NetBSD: smbfs_subr.c,v 1.8 2003/02/25 09:09:31 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 2000-2001, Boris Popov
@@ -33,10 +33,15 @@
  *
  * FreeBSD: src/sys/fs/smbfs/smbfs_subr.c,v 1.1 2001/04/10 07:59:05 bp Exp
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: smbfs_subr.c,v 1.8 2003/02/25 09:09:31 jdolecek Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/mount.h>
 #include <sys/time.h>
 #include <sys/vnode.h>
 #include <sys/sysctl.h>
@@ -52,9 +57,7 @@
 #include <fs/smbfs/smbfs_node.h>
 #include <fs/smbfs/smbfs_subr.h>
 
-#ifndef __NetBSD__
 MALLOC_DEFINE(M_SMBFSDATA, "SMBFS data", "SMBFS private data");
-#endif
 
 /* 
  * Time & date conversion routines taken from msdosfs. Although leap
@@ -86,7 +89,7 @@ MALLOC_DEFINE(M_SMBFSDATA, "SMBFS data", "SMBFS private data");
 /*
  * Total number of days that have passed for each month in a regular year.
  */
-static u_short regyear[] = {
+static const u_short regyear[] = {
 	31, 59, 90, 120, 151, 181,
 	212, 243, 273, 304, 334, 365
 };
@@ -94,7 +97,7 @@ static u_short regyear[] = {
 /*
  * Total number of days that have passed for each month in a leap year.
  */
-static u_short leapyear[] = {
+static const u_short leapyear[] = {
 	31, 60, 91, 121, 152, 182,
 	213, 244, 274, 305, 335, 366
 };
@@ -125,7 +128,7 @@ smb_time_server2local(u_long seconds, int tzoff, struct timespec *tsp)
 /*
  * Number of seconds between 1970 and 1601 year
  */
-int64_t DIFF1970TO1601 = 11644473600ULL;
+static const int64_t DIFF1970TO1601 = 11644473600ULL;
 
 /*
  * Time from server comes as UTC, so no need to use tz
@@ -150,7 +153,7 @@ smb_time_unix2dos(struct timespec *tsp, int tzoff, u_int16_t *ddp,
 	u_int16_t *dtp,	u_int8_t *dhp)
 {
 	u_long t, days, year, month, inc;
-	u_short *months;
+	const u_short *months;
 
 	/*
 	 * If the time from the last conversion is the same as now, then
@@ -220,7 +223,7 @@ smb_dos2unixtime(u_int dd, u_int dt, u_int dh, int tzoff,
 	u_long month;
 	u_long year;
 	u_long days;
-	u_short *months;
+	const u_short *months;
 
 	if (dd == 0) {
 		tsp->tv_sec = 0;
@@ -275,8 +278,6 @@ smb_fphelp(struct mbchain *mbp, struct smb_vc *vcp, struct smbnode *np,
 		*npp++ = np;
 		np = np->n_parent;
 	}
-/*	if (i == 0)
-		return smb_put_dmem(mbp, vcp, "\\", 2, caseopt);*/
 	while (i--) {
 		np = *--npp;
 		error = mb_put_uint8(mbp, '\\');

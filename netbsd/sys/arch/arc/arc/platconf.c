@@ -1,4 +1,4 @@
-/*	$NetBSD: platconf.c,v 1.1 2001/06/13 15:08:05 soda Exp $	*/
+/*	$NetBSD: platconf.c,v 1.3 2003/07/15 00:04:44 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: platconf.c,v 1.3 2003/07/15 00:04:44 lukem Exp $");
+
 #include "opt_platform.h"
 
 #include <sys/param.h>
@@ -72,6 +75,9 @@ struct platform *const plattab[] = {
 #endif
 #ifdef PLATFORM_NEC_JC94
 	&platform_nec_jc94,
+#endif
+#ifdef PLATFORM_NEC_J96A
+	&platform_nec_j96a,
 #endif
 #ifdef PLATFORM_SNI_RM200PCI
 	&platform_sni_rm200pci,

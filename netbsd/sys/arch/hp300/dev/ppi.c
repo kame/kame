@@ -1,4 +1,4 @@
-/*	$NetBSD: ppi.c,v 1.20 2002/03/15 05:55:36 gmcgarry Exp $	*/
+/*	$NetBSD: ppi.c,v 1.28 2003/11/17 14:37:59 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -48,11 +48,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -76,7 +72,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ppi.c,v 1.20 2002/03/15 05:55:36 gmcgarry Exp $");                                                  
+__KERNEL_RCSID(0, "$NetBSD: ppi.c,v 1.28 2003/11/17 14:37:59 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -107,8 +103,8 @@ struct	ppi_softc {
 };
 
 /* sc_flags values */
-#define	PPIF_ALIVE	0x01	
-#define	PPIF_OPEN	0x02	
+#define PPIF_ALIVE	0x01
+#define PPIF_OPEN	0x02
 #define PPIF_UIO	0x04
 #define PPIF_TIMO	0x08
 #define PPIF_DELAY	0x10
@@ -116,11 +112,21 @@ struct	ppi_softc {
 int	ppimatch __P((struct device *, struct cfdata *, void *));
 void	ppiattach __P((struct device *, struct device *, void *));
 
-struct cfattach ppi_ca = {
-	sizeof(struct ppi_softc), ppimatch, ppiattach
-};
+CFATTACH_DECL(ppi, sizeof(struct ppi_softc),
+    ppimatch, ppiattach, NULL, NULL);
 
 extern struct cfdriver ppi_cd;
+
+dev_type_open(ppiopen);
+dev_type_close(ppiclose);
+dev_type_read(ppiread);
+dev_type_write(ppiwrite);
+dev_type_ioctl(ppiioctl);
+
+const struct cdevsw ppi_cdevsw = {
+	ppiopen, ppiclose, ppiread, ppiwrite, ppiioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
 
 void	ppistart __P((void *));
 void	ppinoop __P((void *));
@@ -129,9 +135,6 @@ void	ppitimo __P((void *));
 int	ppirw __P((dev_t, struct uio *));
 int	ppihztoms __P((int));
 int	ppimstohz __P((int));
-
-bdev_decl(ppi);
-cdev_decl(ppi);
 
 #define UNIT(x)		minor(x)
 

@@ -1,4 +1,4 @@
-$NetBSD: miidevs,v 1.37.4.3 2003/01/28 06:27:51 jmc Exp $
+$NetBSD: miidevs,v 1.52 2004/02/07 00:51:05 matt Exp $
 
 /*-
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
@@ -71,16 +71,15 @@ oui TI				0x080028	Texas Instruments
 oui TSC				0x00c039	TDK Semiconductor
 oui XAQTI			0x00e0ae	XaQti Corp.
 
-/* in the 79c873, AMD uses another OUI (which matches reversed Davicom!) */
-oui xxAMD			0x000676	Advanced Micro Devices
-
 /* Some Intel 82553's use an alternative OUI. */
 oui xxINTEL			0x001f00	Intel
 
 /* bad bitorder (bits "g" and "h" (= MSBs byte 1) lost) */
 oui yyAMD			0x000058	Advanced Micro Devices
 oui xxBROADCOM			0x000818	Broadcom Corporation
+oui xxDAVICOM			0x000676	Davicom Semiconductor
 oui yyINTEL			0x005500	Intel
+oui xxMARVELL			0x000ac2	Marvell Semiconductor
 oui xxMYSON			0x00032d	Myson Technology
 oui xxNATSEMI			0x1000e8	National Semiconductor
 oui xxQUALSEMI			0x00068a	Quality Semiconductor
@@ -91,11 +90,8 @@ oui xxLEVEL1			0x782000	Level 1
 oui xxXAQTI			0xace000	XaQti Corp.
 
 /* Don't know what's going on here. */
-oui xxDAVICOM			0x000602	Davicom Semiconductor
 oui xxPMCSIERRA			0x0009c0	PMC-Sierra
 oui xxPMCSIERRA2		0x009057	PMC-Sierra
-
-oui xxMARVELL			0x000ac2	Marvell Semiconductor
 
 /*
  * List of known models.  Grouped by oui.
@@ -105,9 +101,13 @@ oui xxMARVELL			0x000ac2	Marvell Semiconductor
 /* Don't know the model for ACXXX */
 model ALTIMA ACXXX		0x0001 ACXXX 10/100 media interface
 model ALTIMA AC101		0x0021 AC101 10/100 media interface
+model ALTIMA AC101L		0x0012 AC101L 10/100 media interface
+/* AMD Am79C87[45] have ALTIMA OUI */
+model ALTIMA Am79C875		0x0014 Am79C875 10/100 media interface
+model ALTIMA Am79C874		0x0021 Am79C874 10/100 media interface
 
 /* Advanced Micro Devices PHYs */
-model xxAMD 79C873		0x0000 Am79C873 10/100 media interface
+/* see Davicom DM9101 for Am79C873 */
 model yyAMD 79C972_10T		0x0001 Am79C972 internal 10BASE-T interface
 model yyAMD 79c973phy		0x0036 Am79C973 internal 10/100 media interface
 model yyAMD 79c901		0x0037 Am79C901 10BASE-T interface
@@ -117,6 +117,7 @@ model yyAMD 79c901home		0x0039 Am79C901 HomePNA 1.0 interface
 model xxBROADCOM 3C905B		0x0012 Broadcom 3c905B internal PHY
 model xxBROADCOM 3C905C		0x0017 Broadcom 3c905C internal PHY
 model xxBROADCOM BCM5201	0x0021 BCM5201 10/100 media interface
+model xxBROADCOM BCM5214	0x0028 BCM5214 Quad 10/100 media interface
 model xxBROADCOM BCM5221	0x001e BCM5221 10/100 media interface
 model BROADCOM BCM5400		0x0004 BCM5400 1000BASE-T media interface
 model BROADCOM BCM5401		0x0005 BCM5401 1000BASE-T media interface
@@ -125,12 +126,16 @@ model BROADCOM BCM5421		0x000e BCM5421 1000BASE-T media interface
 model BROADCOM BCM5701		0x0011 BCM5701 1000BASE-T media interface
 model BROADCOM BCM5703		0x0016 BCM5703 1000BASE-T media interface
 model BROADCOM BCM5704		0x0019 BCM5704 1000BASE-T media interface
+model BROADCOM BCM5705		0x001a BCM5705 1000BASE-T media interface
 
 /* Davicom Semiconductor PHYs */
-model xxDAVICOM DM9101		0x0000 DM9101 10/100 media interface
+/* AMD Am79C873 seems to be a relabeled DM9101 */
+model xxDAVICOM DM9101		0x0000 DM9101 (AMD Am79C873) 10/100 media interface
 
 /* Integrated Circuit Systems PHYs */
+model ICS 1889			0x0001 ICS1889 10/100 media interface
 model ICS 1890			0x0002 ICS1890 10/100 media interface
+model ICS 1892			0x0003 ICS1892 10/100 media interface
 model ICS 1893			0x0004 ICS1893 10/100 media interface
 
 /* Intel PHYs */
@@ -141,9 +146,14 @@ model yyINTEL I82562EM		0x0032 i82562EM 10/100 media interface
 model yyINTEL I82562ET		0x0033 i82562ET 10/100 media interface
 model yyINTEL I82553		0x0035 i82553 10/100 media interface
 
+model yyINTEL IGP01E1000	0x0038 Intel IGP01E1000 Gigabit PHY
+
 /* Level 1 PHYs */
 model xxLEVEL1 LXT970		0x0000 LXT970 10/100 media interface
-model LEVEL1 LXT971		0x000e LXT971 10/100 media interface
+model LEVEL1 LXT971		0x000e LXT971/2 10/100 media interface
+model LEVEL1 LXT973		0x0021 LXT973 10/100 Dual PHY
+model LEVEL1 LXT974		0x0004 LXT974 10/100 Quad PHY
+model LEVEL1 LXT975		0x0005 LXT975 10/100 Quad PHY
 model LEVEL1 LXT1000_OLD	0x0003 LXT1000 1000BASE-T media interface
 model LEVEL1 LXT1000		0x000c LXT1000 1000BASE-T media interface
 
@@ -154,6 +164,7 @@ model xxMARVELL E1000_5		0x0005 Marvell 88E1000 Gigabit PHY
 
 /* Myson Technology PHYs */
 model xxMYSON MTD972		0x0000 MTD972 10/100 media interface
+model MYSON MTD803		0x0000 MTD803 3-in-1 media interface
 
 /* National Semiconductor PHYs */
 model xxNATSEMI DP83840		0x0000 DP83840 10/100 media interface

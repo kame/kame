@@ -1,9 +1,47 @@
-/*	$NetBSD: z8530sc.c,v 1.16 2001/11/13 13:14:46 lukem Exp $	*/
+/*	$NetBSD: z8530sc.c,v 1.19 2003/08/07 16:31:03 agc Exp $	*/
+
+/*
+ * Copyright (c) 1992, 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * This software was developed by the Computer Systems Engineering group
+ * at Lawrence Berkeley Laboratory under DARPA contract BG 91-66 and
+ * contributed to Berkeley.
+ *
+ * All advertising materials mentioning features or use of this software
+ * must display the following acknowledgement:
+ *	This product includes software developed by the University of
+ *	California, Lawrence Berkeley Laboratory.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)zs.c	8.1 (Berkeley) 7/19/93
+ */
 
 /*
  * Copyright (c) 1994 Gordon W. Ross
- * Copyright (c) 1992, 1993
- *	The Regents of the University of California.  All rights reserved.
  *
  * This software was developed by the Computer Systems Engineering group
  * at Lawrence Berkeley Laboratory under DARPA contract BG 91-66 and
@@ -53,7 +91,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: z8530sc.c,v 1.16 2001/11/13 13:14:46 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: z8530sc.c,v 1.19 2003/08/07 16:31:03 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -132,7 +170,7 @@ void
 zs_loadchannelregs(cs)
 	struct zs_chanstate *cs;
 {
-	u_char *reg;
+	u_char *reg, v;
 
 	zs_write_csr(cs, ZSM_RESET_ERR); /* XXX: reset error condition */
 
@@ -144,8 +182,14 @@ zs_loadchannelregs(cs)
 	zs_iflush(cs);	/* XXX */
 #endif
 
-	if (memcmp((caddr_t)cs->cs_preg, (caddr_t)cs->cs_creg, 16) == 0)
-	    return;	/* only change if values are different */
+	if (cs->cs_ctl_chan != NULL)
+		v = ((cs->cs_ctl_chan->cs_creg[5] & (ZSWR5_RTS | ZSWR5_DTR)) !=
+		    (cs->cs_ctl_chan->cs_preg[5] & (ZSWR5_RTS | ZSWR5_DTR)));
+	else
+		v = 0;
+
+	if (memcmp((caddr_t)cs->cs_preg, (caddr_t)cs->cs_creg, 16) == 0 && !v)
+		return;	/* only change if values are different */
 
 	/* Copy "pending" regs to "current" */
 	memcpy((caddr_t)cs->cs_creg, (caddr_t)cs->cs_preg, 16);
@@ -216,6 +260,13 @@ zs_loadchannelregs(cs)
 	zs_write_reg(cs, 3, reg[3]);
 	zs_write_reg(cs, 5, reg[5]);
 
+	/* Write the status bits on the alternate channel also. */
+	if (cs->cs_ctl_chan != NULL) {
+		v = cs->cs_ctl_chan->cs_preg[5];
+		cs->cs_ctl_chan->cs_creg[5] = v;
+		zs_write_reg(cs->cs_ctl_chan, 5, v);
+	}
+
 	/* interrupt enables: RX, TX, STATUS */
 	zs_write_reg(cs, 1, reg[1]);
 }
@@ -242,6 +293,10 @@ zsc_intr_hard(arg)
 
 	/* First look at channel A. */
 	cs = zsc->zsc_cs[0];
+
+	/* Lock both channels */
+	simple_lock(&cs->cs_lock);
+	simple_lock(&zsc->zsc_cs[1]->cs_lock);
 	/* Note: only channel A has an RR3 */
 	rr3 = zs_read_reg(cs, 3);
 
@@ -263,6 +318,9 @@ zsc_intr_hard(arg)
 			(*cs->cs_ops->zsop_txint)(cs);
 	}
 
+	/* Done with channel A */
+	simple_unlock(&cs->cs_lock);
+
 	/* Now look at channel B. */
 	cs = zsc->zsc_cs[1];
 	if (rr3 & (ZSRR3_IP_B_RX | ZSRR3_IP_B_TX | ZSRR3_IP_B_STAT)) {
@@ -274,6 +332,8 @@ zsc_intr_hard(arg)
 		if (rr3 & ZSRR3_IP_B_TX)
 			(*cs->cs_ops->zsop_txint)(cs);
 	}
+
+	simple_unlock(&cs->cs_lock);
 
 	/* Note: caller will check cs_x->cs_softreq and DTRT. */
 	return (rr3);

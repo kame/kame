@@ -1,11 +1,10 @@
-#	$NetBSD: Makefile,v 1.20 2001/09/19 17:54:44 thorpej Exp $
+#	$NetBSD: Makefile,v 1.26 2003/04/11 13:54:16 jdc Exp $
 
-KDIR=	/sys/arch/sparc/include
 INCSDIR= /usr/include/sparc
 
 INCS=	ansi.h aout_machdep.h apmvar.h asm.h autoconf.h \
 	bswap.h bootinfo.h \
-	cdefs.h cgtworeg.h conf.h cpu.h \
+	cdefs.h cgtworeg.h cpu.h cpuconf.h \
 	disklabel.h \
 	eeprom.h elf_machdep.h endian.h endian_machdep.h \
 	float.h frame.h fsr.h \
@@ -13,9 +12,9 @@ INCS=	ansi.h aout_machdep.h apmvar.h asm.h autoconf.h \
 	int_const.h int_fmtio.h int_limits.h int_mwgwtypes.h int_types.h \
 	kbd.h kbio.h kcore.h \
 	limits.h lock.h \
-	math.h \
+	math.h mcontext.h \
 	oldmon.h openpromio.h \
-	param.h pcb.h pmap.h proc.h profile.h psl.h pte.h ptrace.h \
+	param.h pcb.h pmap.h pmc.h proc.h profile.h psl.h pte.h ptrace.h \
 	reg.h reloc.h \
 	setjmp.h signal.h stdarg.h \
 	tctrl.h trap.h types.h \

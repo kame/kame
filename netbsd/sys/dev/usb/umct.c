@@ -1,4 +1,4 @@
-/*	$NetBSD: umct.c,v 1.7 2001/12/17 14:19:39 ichiro Exp $	*/
+/*	$NetBSD: umct.c,v 1.12.2.1 2004/07/10 13:02:11 tron Exp $	*/
 /*
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -37,12 +37,12 @@
 
 /*
  * MCT USB-RS232 Interface Controller
- * http://www.mct.com.tw/p_u232.html
+ * http://www.mct.com.tw/prod/rs232.html
  * http://www.dlink.com/products/usb/dsbs25
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: umct.c,v 1.7 2001/12/17 14:19:39 ichiro Exp $");
+__KERNEL_RCSID(0, "$NetBSD: umct.c,v 1.12.2.1 2004/07/10 13:02:11 tron Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -151,6 +151,8 @@ static const struct usb_devno umct_devs[] = {
 	{ USB_VENDOR_MCT, USB_PRODUCT_MCT_SITECOM_USB232 },
 	/* D-Link DU-H3SP USB BAY Hub Products */
 	{ USB_VENDOR_MCT, USB_PRODUCT_MCT_DU_H3SP_USB232 },
+	/* BELKIN F5U109 */
+	{ USB_VENDOR_BELKIN, USB_PRODUCT_BELKIN_F5U109 },
 };
 #define umct_lookup(v, p) usb_lookup(umct_devs, v, p)
 
@@ -174,11 +176,11 @@ USB_ATTACH(umct)
 	usb_config_descriptor_t *cdesc;
 	usb_interface_descriptor_t *id;
 	usb_endpoint_descriptor_t *ed;
-	
+
 	char devinfo[1024];
 	char *devname = USBDEVNAME(sc->sc_dev);
 	usbd_status err;
-	int i, found;
+	int i;
 	struct ucom_attach_args uca;
 
         usbd_devinfo(dev, 0, devinfo);
@@ -190,7 +192,7 @@ USB_ATTACH(umct)
 
 	DPRINTF(("\n\numct attach: sc=%p\n", sc));
 
-	/* initialize endpoints */ 
+	/* initialize endpoints */
 	uca.bulkin = uca.bulkout = -1;
 	sc->sc_intr_number = -1;
 	sc->sc_intr_pipe = NULL;
@@ -215,7 +217,7 @@ USB_ATTACH(umct)
 	}
 
 	/* get the interface */
-	err = usbd_device2interface_handle(dev, UMCT_IFACE_INDEX, 
+	err = usbd_device2interface_handle(dev, UMCT_IFACE_INDEX,
 							&sc->sc_iface);
 	if (err) {
 		printf("\n%s: failed to get interface, err=%s\n",
@@ -228,7 +230,6 @@ USB_ATTACH(umct)
 
 	id = usbd_get_interface_descriptor(sc->sc_iface);
 	sc->sc_iface_number = id->bInterfaceNumber;
-	found = 0;
 
 	for (i = 0; i < id->bNumEndpoints; i++) {
 		ed = usbd_interface2endpoint_descriptor(sc->sc_iface, i);
@@ -239,11 +240,15 @@ USB_ATTACH(umct)
 			USB_ATTACH_ERROR_RETURN;
 		}
 
+		/*
+		 * The Bulkin endpoint is marked as an interrupt. Since
+		 * we can't rely on the endpoint descriptor order, we'll
+		 * check the wMaxPacketSize field to differentiate.
+		 */
 		if (UE_GET_DIR(ed->bEndpointAddress) == UE_DIR_IN &&
 		    UE_GET_XFERTYPE(ed->bmAttributes) == UE_INTERRUPT &&
-		    found == 0) {
+		    UGETW(ed->wMaxPacketSize) != 0x2) {
 			uca.bulkin = ed->bEndpointAddress;
-			found = 1;
 		} else if (UE_GET_DIR(ed->bEndpointAddress) == UE_DIR_OUT &&
 		    UE_GET_XFERTYPE(ed->bmAttributes) == UE_BULK) {
 			uca.bulkout = ed->bEndpointAddress;
@@ -338,7 +343,6 @@ umct_activate(device_ptr_t self, enum devact act)
 	switch (act) {
 	case DVACT_ACTIVATE:
 		return (EOPNOTSUPP);
-		break;
 
 	case DVACT_DEACTIVATE:
 		if (sc->sc_subdev != NULL)
@@ -447,7 +451,8 @@ umct_set_baudrate(struct umct_softc *sc, u_int rate)
 	uDWord arate;
 	u_int val;
 
-	if (sc->sc_product == USB_PRODUCT_MCT_SITECOM_USB232) {
+	if (sc->sc_product == USB_PRODUCT_MCT_SITECOM_USB232 ||
+	    sc->sc_product == USB_PRODUCT_BELKIN_F5U109) {
 		switch (rate) {
 		case    300: val = 0x01; break;
 		case    600: val = 0x02; break;
@@ -531,7 +536,7 @@ umct_open(void *addr, int portno)
 {
 	struct umct_softc *sc = addr;
 	int err, lcr_data;
-	
+
 	if (sc->sc_dying)
 		return (EIO);
 
@@ -540,7 +545,7 @@ umct_open(void *addr, int portno)
 	/* initialize LCR */
         lcr_data = LCR_DATA_BITS_8 | LCR_PARITY_NONE |
 	    LCR_STOP_BITS_1;
-        umct_set_lcr(sc, lcr_data);  
+        umct_set_lcr(sc, lcr_data);
 
 	if (sc->sc_intr_number != -1 && sc->sc_intr_pipe == NULL) {
 		sc->sc_status = 0; /* clear status bit */
@@ -560,7 +565,7 @@ umct_open(void *addr, int portno)
 }
 
 void
-umct_close(void *addr, int portno) 
+umct_close(void *addr, int portno)
 {
 	struct umct_softc *sc = addr;
 	int err;
@@ -589,7 +594,7 @@ umct_intr(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 {
 	struct umct_softc *sc = priv;
 	u_char *buf = sc->sc_intr_buf;
-	u_char mstatus, lstatus; 
+	u_char mstatus;
 
 	if (sc->sc_dying)
 		return;
@@ -609,7 +614,6 @@ umct_intr(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 
 	sc->sc_lsr = sc->sc_msr = 0;
 	mstatus = buf[0];
-	lstatus = buf[1];
 	if (ISSET(mstatus, MSR_DSR))
 		sc->sc_msr |= UMSR_DSR;
 	if (ISSET(mstatus, MSR_DCD))

@@ -1,4 +1,4 @@
-/*	$NetBSD: c_nec_jazz.c,v 1.1 2001/06/13 15:21:52 soda Exp $	*/
+/*	$NetBSD: c_nec_jazz.c,v 1.5 2003/07/15 00:04:41 lukem Exp $	*/
 
 /*-
  * Copyright (C) 2000 Shuichiro URATA.  All rights reserved.
@@ -30,6 +30,9 @@
  * for NEC EISA and NEC PCI platforms
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: c_nec_jazz.c,v 1.5 2003/07/15 00:04:41 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -42,48 +45,9 @@
 
 #include <arc/jazz/rd94.h>
 #include <arc/jazz/jazziovar.h>
-#include <arc/dev/mcclockvar.h>
-#include <arc/jazz/mcclock_jazziovar.h>
 #include <arc/jazz/timer_jazziovar.h>
 
 extern int cpu_int_mask;
-
-/*
- * chipset-dependent mcclock routines.
- */
-
-u_int	mc_nec_jazz_read __P((struct mcclock_softc *, u_int));
-void	mc_nec_jazz_write __P((struct mcclock_softc *, u_int, u_int));
-
-struct mcclock_jazzio_config mcclock_nec_jazz_conf = {
-	0x80004000, 2,
-	{ mc_nec_jazz_read, mc_nec_jazz_write }
-};
-
-u_int
-mc_nec_jazz_read(sc, reg)
-	struct mcclock_softc *sc;
-	u_int reg;
-{
-	int i, as;
-
-	as = bus_space_read_1(sc->sc_iot, sc->sc_ioh, 1) & 0x80;
-	bus_space_write_1(sc->sc_iot, sc->sc_ioh, 1, as | reg);
-	i = bus_space_read_1(sc->sc_iot, sc->sc_ioh, 0);
-	return (i);
-}
-
-void
-mc_nec_jazz_write(sc, reg, datum)
-	struct mcclock_softc *sc;
-	u_int reg, datum;
-{
-	int as;
-
-	as = bus_space_read_1(sc->sc_iot, sc->sc_ioh, 1) & 0x80;
-	bus_space_write_1(sc->sc_iot, sc->sc_ioh, 1, as | reg);
-	bus_space_write_1(sc->sc_iot, sc->sc_ioh, 0, datum);
-}
 
 /*
  * chipset-dependent timer routine.
@@ -135,16 +99,16 @@ timer_nec_jazz_init(interval)
 struct pica_dev nec_rd94_cpu[] = {
 	{{ "timer",	-1, 0, },	(void *)RD94_SYS_IT_VALUE, },
 	{{ "dallas_rtc", -1, 0, },	(void *)RD94_SYS_CLOCK, },
-	{{ "lpt",	0, 0, },	(void *)RD94_SYS_PAR1, },
-	{{ "fdc",	1, 0, },	(void *)RD94_SYS_FLOPPY, },
+	{{ "LPT1",	0, 0, },	(void *)RD94_SYS_PAR1, },
+	{{ "I82077",	1, 0, },	(void *)RD94_SYS_FLOPPY, },
 	{{ "AD1848",	2, 0, },	(void *)RD94_SYS_SOUND,},
-	{{ "sonic",	3, 0, },	(void *)RD94_SYS_SONIC, },
+	{{ "SONIC",	3, 0, },	(void *)RD94_SYS_SONIC, },
 	{{ "NCRC700",	4, 0, },	(void *)RD94_SYS_SCSI0, },
 	{{ "NCRC700",	5, 0, },	(void *)RD94_SYS_SCSI1, },
-	{{ "pckbd",	6, 0, },	(void *)RD94_SYS_KBD, },
-	{{ "pms",	7, 0, },	(void *)RD94_SYS_KBD, },
-	{{ "com",	8, 0, },	(void *)RD94_SYS_COM1, },
-	{{ "com",	9, 0, },	(void *)RD94_SYS_COM2, },
+	{{ "I8742",	6, 0, },	(void *)RD94_SYS_KBD, },
+	{{ "pms",	7, 0, },	(void *)RD94_SYS_KBD, }, /* XXX */
+	{{ "COM1",	8, 0, },	(void *)RD94_SYS_COM1, },
+	{{ "COM2",	9, 0, },	(void *)RD94_SYS_COM2, },
 	{{ NULL,	-1, 0, },	(void *)NULL, },
 };
 
@@ -166,8 +130,6 @@ c_nec_jazz_set_intr(mask, int_hand, prio)
 void
 c_nec_jazz_init()
 {
-	/* chipset-dependent mcclock configuration */
-	mcclock_jazzio_conf = &mcclock_nec_jazz_conf;
 
 	/* chipset-dependent timer configuration */
 	timer_jazzio_conf = &timer_nec_jazz_conf;

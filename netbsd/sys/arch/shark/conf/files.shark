@@ -1,4 +1,4 @@
-#	$NetBSD: files.shark,v 1.4 2002/04/19 01:43:48 wiz Exp $
+#	$NetBSD: files.shark,v 1.6 2004/02/10 16:43:22 jdolecek Exp $
 #
 # First try for arm-specific configuration info
 #
@@ -34,7 +34,6 @@ include "dev/wsfont/files.wsfont"
 # Machine-independent ATA drivers
 #
 include "dev/ata/files.ata"
-major	{wd = 16}
 
 # Common OFW files
 include "dev/ofw/files.ofw"
@@ -59,7 +58,7 @@ file	arch/shark/ofw/ofisa_machdep.c		ofisa
 file	arch/shark/ofw/com_ofisa_machdep.c	com_ofisa
 file	arch/shark/ofw/com_ofisa_consolehack.c	com_ofisa	# XXX
 file	arch/shark/ofw/if_cs_ofisa_machdep.c	cs_ofisa
-file	arch/shark/ofw/lpt_ofisa_machdep.c	lpt_ofisa
+file	arch/shark/ofw/lpt_ofisa_machdep.c	lpt_ofisa | atppc_ofisa
 file	arch/shark/ofw/wdc_ofisa_machdep.c	wdc_ofisa
 
 # Glue for OFW ISA device attachment
@@ -76,10 +75,6 @@ file	arch/shark/ofw/ofrom.c			ofrom	needs-flag
 
 # Memory disk driver
 file	dev/md_root.c				md & memory_disk_hooks
-major	{md = 18}
-
-# RAIDframe
-major	{raid = 71}
 
 # attribute used to represent the "keyboard controller" on the shark
 # XXX should be a real device
@@ -100,8 +95,6 @@ file	arch/shark/dev/todclock.c		todclock	needs-count
 #
 
 include "dev/scsipi/files.scsipi"
-major	{sd = 24}
-major	{cd = 26}
 
 # Generic MD files
 file	arch/shark/shark/autoconf.c
@@ -146,3 +139,5 @@ file	arch/shark/shark/pccons.c		pc needs-flag
 device	scr: tty
 file	arch/shark/shark/scr.c			scr needs-flag
 attach	scr at ofisascr
+
+include "arch/shark/conf/majors.shark"

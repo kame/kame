@@ -1,4 +1,4 @@
-/*	$NetBSD: uipc_syscalls_43.c,v 1.18 2002/03/16 20:43:49 christos Exp $	*/
+/*	$NetBSD: uipc_syscalls_43.c,v 1.22 2003/08/07 16:30:36 agc Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1990, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uipc_syscalls_43.c,v 1.18 2002/03/16 20:43:49 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uipc_syscalls_43.c,v 1.22 2003/08/07 16:30:36 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -56,6 +52,7 @@ __KERNEL_RCSID(0, "$NetBSD: uipc_syscalls_43.c,v 1.18 2002/03/16 20:43:49 christ
 #include <sys/mbuf.h>		/* for MLEN */
 
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/common/compat_util.h>
@@ -71,10 +68,7 @@ __KERNEL_RCSID(0, "$NetBSD: uipc_syscalls_43.c,v 1.18 2002/03/16 20:43:49 christ
 static int compat_43_sa_put(caddr_t);
 
 int
-compat_43_sys_accept(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_accept(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_accept_args /* {
 		syscallarg(int) s;
@@ -83,7 +77,7 @@ compat_43_sys_accept(p, v, retval)
 	} */ *uap = v;
 	int error;
 
-	if ((error = sys_accept(p, v, retval)) != 0)
+	if ((error = sys_accept(l, v, retval)) != 0)
 		return error;
 
 	if (SCARG(uap, name)
@@ -94,10 +88,7 @@ compat_43_sys_accept(p, v, retval)
 }
 
 int
-compat_43_sys_getpeername(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_getpeername(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_getpeername_args /* {
 		syscallarg(int) fdes;
@@ -107,7 +98,7 @@ compat_43_sys_getpeername(p, v, retval)
 
 	int error;
 
-	if ((error = sys_getpeername(p, v, retval)) != 0)
+	if ((error = sys_getpeername(l, v, retval)) != 0)
 		return error;
 
 	if ((error = compat_43_sa_put(SCARG(uap, asa))))
@@ -117,10 +108,7 @@ compat_43_sys_getpeername(p, v, retval)
 }
 
 int
-compat_43_sys_getsockname(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_getsockname(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_getsockname_args /* {
 		syscallarg(int) fdes;
@@ -129,7 +117,7 @@ compat_43_sys_getsockname(p, v, retval)
 	} */ *uap = v;
 	int error;
 
-	if ((error = sys_getsockname(p, v, retval)) != 0)
+	if ((error = sys_getsockname(l, v, retval)) != 0)
 		return error;
 
 	if ((error = compat_43_sa_put(SCARG(uap, asa))))
@@ -139,10 +127,7 @@ compat_43_sys_getsockname(p, v, retval)
 }
 
 int
-compat_43_sys_recv(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_recv(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_recv_args /* {
 		syscallarg(int) s;
@@ -159,14 +144,11 @@ compat_43_sys_recv(p, v, retval)
 	SCARG(&bra, from) = NULL;
 	SCARG(&bra, fromlenaddr) = NULL;
 
-	return (sys_recvfrom(p, &bra, retval));
+	return (sys_recvfrom(l, &bra, retval));
 }
 
 int
-compat_43_sys_recvfrom(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_recvfrom(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_recvfrom_args /* {
 		syscallarg(int) s;
@@ -178,7 +160,7 @@ compat_43_sys_recvfrom(p, v, retval)
 	} */ *uap = v;
 	int error;
 
-	if ((error = sys_recvfrom(p, v, retval)))
+	if ((error = sys_recvfrom(l, v, retval)))
 		return (error);
 
 	if (SCARG(uap, from) && (error = compat_43_sa_put(SCARG(uap, from))))
@@ -192,16 +174,14 @@ compat_43_sys_recvfrom(p, v, retval)
  * adjusts results accordingly.
  */
 int
-compat_43_sys_recvmsg(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_recvmsg(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_recvmsg_args /* {
 		syscallarg(int) s;
 		syscallarg(struct omsghdr *) msg;
 		syscallarg(int) flags;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct omsghdr omsg;
 	struct msghdr msg;
 	struct iovec aiov[UIO_SMALLIOV], *iov;
@@ -303,10 +283,7 @@ done:
 }
 
 int
-compat_43_sys_send(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_send(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_send_args /* {
 		syscallarg(int) s;
@@ -323,7 +300,7 @@ compat_43_sys_send(p, v, retval)
 	SCARG(&bsa, to)		= NULL;
 	SCARG(&bsa, tolen)	= 0;
 
-	return (sys_sendto(p, &bsa, retval));
+	return (sys_sendto(l, &bsa, retval));
 }
 
 /*
@@ -331,16 +308,14 @@ compat_43_sys_send(p, v, retval)
  * adjust the results accordingly for old code.
  */
 int
-compat_43_sys_sendmsg(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_sendmsg(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_sendmsg_args /* {
 		syscallarg(int) s;
 		syscallarg(caddr_t) msg;
 		syscallarg(int) flags;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct omsghdr omsg;
 	struct msghdr msg;
 	struct iovec aiov[UIO_SMALLIOV], *iov;

@@ -1,4 +1,4 @@
-/*	$NetBSD: bootmain.c,v 1.4 2001/11/24 16:22:54 minoura Exp $	*/
+/*	$NetBSD: bootmain.c,v 1.6 2003/10/30 22:27:05 he Exp $	*/
 
 /*-
  * Copyright (c) 1993, 1994 Takumi Nakamura.
@@ -44,6 +44,7 @@
 #ifdef SCSI_ADHOC_BOOTPART
 #include <machine/disklabel.h>
 #endif
+#include <lib/libsa/stand.h>
 
 #include "boot_ufs.h"
 #include "readufs.h"
@@ -214,7 +215,7 @@ load_file_ino(ino, fn, addr, header)
 	unsigned int addr;
 	struct exec *header;
 {
-	struct dinode dinode;
+	union ufs_dinode dinode;
 
 	/* look-up the file */
 	if (ino == 0 || ufs_get_inode(ino, &dinode)) {

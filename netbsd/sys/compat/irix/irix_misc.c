@@ -1,4 +1,4 @@
-/*	$NetBSD: irix_misc.c,v 1.1 2002/04/20 07:42:32 manu Exp $ */
+/*	$NetBSD: irix_misc.c,v 1.5 2003/01/22 12:58:22 rafal Exp $ */
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -37,19 +37,29 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: irix_misc.c,v 1.1 2002/04/20 07:42:32 manu Exp $");
+__KERNEL_RCSID(0, "$NetBSD: irix_misc.c,v 1.5 2003/01/22 12:58:22 rafal Exp $");
 
 #include <sys/types.h>
 #include <sys/signal.h>
 #include <sys/systm.h>
 #include <sys/param.h>
+#include <sys/kernel.h>
 #include <sys/proc.h>
 #include <sys/mount.h>
-
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
+
+#include <compat/svr4/svr4_types.h>
+#include <compat/svr4/svr4_lwp.h>
+#include <compat/svr4/svr4_signal.h>
+#include <compat/svr4/svr4_ucontext.h>
+#include <compat/svr4/svr4_utsname.h>
+#include <compat/svr4/svr4_syscallargs.h>
 
 #include <compat/irix/irix_types.h>
 #include <compat/irix/irix_signal.h>
+#include <compat/irix/irix_exec.h>
+#include <compat/irix/irix_sysctl.h>
 #include <compat/irix/irix_syscallargs.h>
 
 /* 
@@ -57,8 +67,8 @@ __KERNEL_RCSID(0, "$NetBSD: irix_misc.c,v 1.1 2002/04/20 07:42:32 manu Exp $");
  * Maybe consider moving this to sys/compat/common/compat_util.c?
  */
 int
-irix_sys_setpgrp(p, v, retval)
-	struct proc *p; 
+irix_sys_setpgrp(l, v, retval)
+	struct lwp *l; 
 	void *v;
 	register_t *retval;
 {
@@ -66,6 +76,7 @@ irix_sys_setpgrp(p, v, retval)
 		syscallarg(int) pid;
 		syscallarg(int) pgid;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
  
 	/*
 	 * difference to our setpgid call is to include backwards  
@@ -75,7 +86,73 @@ irix_sys_setpgrp(p, v, retval)
 	 */
 	if (!SCARG(uap, pgid) &&
 	    (!SCARG(uap, pid) || SCARG(uap, pid) == p->p_pid))
-		return sys_setsid(p, uap, retval);
+		return sys_setsid(l, uap, retval);
 	else
-		return sys_setpgid(p, uap, retval);
+		return sys_setpgid(l, uap, retval);
+}
+
+#define BUF_SIZE 16
+
+int
+irix_sys_uname(l, v, retval)
+	struct lwp *l;
+	void *v;
+	register_t *retval;
+{
+	struct irix_sys_uname_args /* {
+		syscallarg(struct irix_utsname *) name;
+	} */ *uap = v;
+	struct irix_utsname sut;
+	char irix_release[BUF_SIZE + 1];
+	
+	snprintf(irix_release, sizeof(irix_release), "%s.%s", 
+	    irix_si_osrel_maj, irix_si_osrel_min);
+	memset(&sut, 0, sizeof(sut));
+
+	strncpy(sut.sysname, irix_si_os_name, sizeof(sut.sysname));
+	sut.sysname[sizeof(sut.sysname) - 1] = '\0';
+
+	strncpy(sut.nodename, hostname, sizeof(sut.nodename)); 
+	sut.nodename[sizeof(sut.nodename) - 1] = '\0';
+ 
+	strncpy(sut.release, irix_release, sizeof(sut.release));
+	sut.release[sizeof(sut.release) - 1] = '\0';
+
+	strncpy(sut.version, irix_si_version, sizeof(sut.version));
+	sut.version[sizeof(sut.version) - 1] = '\0';
+
+	strncpy(sut.machine, irix_si_hw_name, sizeof(sut.machine));
+	sut.machine[sizeof(sut.machine) - 1] = '\0';
+
+	return copyout((caddr_t) &sut, (caddr_t) SCARG(uap, name),
+	    sizeof(struct irix_utsname));
+}
+
+int
+irix_sys_utssys(l, v, retval)
+	struct lwp *l;
+	void *v;
+	register_t *retval;
+{
+	struct irix_sys_utssys_args /* {
+		syscallarg(void *) a1;
+		syscallarg(void *) a2;
+		syscallarg(int) sel;
+		syscallarg(void) a3;
+	} */ *uap = v;
+ 
+	switch (SCARG(uap, sel)) {
+	case 0: {	/* uname(2)  */
+		struct irix_sys_uname_args ua;
+		SCARG(&ua, name) = SCARG(uap, a1);
+		return irix_sys_uname(l, &ua, retval);
+	}
+	break;
+
+	default:
+		return(svr4_sys_utssys(l, v, retval));
+	break;	
+	}
+
+	return 0;
 }

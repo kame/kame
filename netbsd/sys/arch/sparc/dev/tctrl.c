@@ -1,4 +1,4 @@
-/*	$NetBSD: tctrl.c,v 1.14 2002/03/11 16:27:02 pk Exp $	*/
+/*	$NetBSD: tctrl.c,v 1.26 2004/02/13 11:36:17 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: tctrl.c,v 1.26 2004/02/13 11:36:17 wiz Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/callout.h>
@@ -64,9 +67,18 @@
 #include <sparc/dev/tctrlvar.h>
 #include <sparc/sparc/auxiotwo.h>
 
-cdev_decl(tctrl);
-
 extern struct cfdriver tctrl_cd;
+
+dev_type_open(tctrlopen);
+dev_type_close(tctrlclose);
+dev_type_ioctl(tctrlioctl);
+dev_type_poll(tctrlpoll);
+dev_type_kqfilter(tctrlkqfilter);
+
+const struct cdevsw tctrl_cdevsw = {
+	tctrlopen, tctrlclose, noread, nowrite, tctrlioctl,
+	nostop, notty, tctrlpoll, nommap, tctrlkqfilter,
+};
 
 static const char *tctrl_ext_statuses[16] = {
 	"main power available",
@@ -140,9 +152,8 @@ static int tctrl_apm_record_event __P((struct tctrl_softc *sc,
 	u_int event_type));
 static void tctrl_init_lcd __P((void));
 
-struct cfattach tctrl_ca = {
-	sizeof(struct tctrl_softc), tctrl_match, tctrl_attach
-};
+CFATTACH_DECL(tctrl, sizeof(struct tctrl_softc),
+    tctrl_match, tctrl_attach, NULL, NULL);
 
 extern struct cfdriver tctrl_cd;
 /* XXX wtf is this? see i386/apm.c */
@@ -212,9 +223,9 @@ tctrl_attach(parent, self, aux)
 
 	if (sa->sa_nintr != 0) {
 		(void)bus_intr_establish(sc->sc_memt, sa->sa_pri, IPL_NONE,
-		    0, tctrl_intr, sc);
+					 tctrl_intr, sc);
 		evcnt_attach_dynamic(&sc->sc_intrcnt, EVCNT_TYPE_INTR, NULL,
-		    sc->sc_dev.dv_xname, "intr");
+				     sc->sc_dev.dv_xname, "intr");
 	}
 
 	/* See what the external status is
@@ -586,7 +597,7 @@ tctrl_set_lcd(what, which)
 	sc = (struct tctrl_softc *) tctrl_cd.cd_devs[TCTRL_STD_DEV];
 	s = splts102();
 
-	/* provide a quick exit to save cpu time */
+	/* provide a quick exit to save CPU time */
 	if ((what == 1 && sc->sc_lcdstate & which) ||
 	    (what == 0 && !(sc->sc_lcdstate & which))) {
 		splx(s);
@@ -664,7 +675,7 @@ tctrl_apm_record_event(sc, event_type)
 		sc->sc_event_ptr %= APM_NEVENTS;
 		evp->type = event_type;
 		evp->index = ++tctrl_apm_evindex;
-		selwakeup(&sc->sc_rsel);
+		selnotify(&sc->sc_rsel, 0);
 		return(sc->sc_flags & TCTRL_APM_CTLOPEN) ? 0 : 1;
 	}
 	return(1);
@@ -980,6 +991,7 @@ tctrlioctl(dev, cmd, data, flags, p)
 	case APM_IOC_SUSPEND:
 		return(EOPNOTSUPP); /* for now */
 
+	case OAPM_IOC_GETPOWER:
 	case APM_IOC_GETPOWER:
 		powerp = (struct apm_power_info *)data;
 		req.cmdbuf[0] = TS102_OP_RD_INT_CHARGE_RATE;
@@ -1202,6 +1214,56 @@ tctrlpoll(dev, events, p)
 
 	return (revents);
 }
+
+static void
+filt_tctrlrdetach(struct knote *kn)
+{
+	struct tctrl_softc *sc = kn->kn_hook;
+	int s;
+
+	s = splts102();
+	SLIST_REMOVE(&sc->sc_rsel.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_tctrlread(struct knote *kn, long hint)
+{
+	struct tctrl_softc *sc = kn->kn_hook;
+
+	kn->kn_data = sc->sc_event_count;
+	return (kn->kn_data > 0);
+}
+
+static const struct filterops tctrlread_filtops =
+	{ 1, NULL, filt_tctrlrdetach, filt_tctrlread };
+
+int
+tctrlkqfilter(dev_t dev, struct knote *kn)
+{
+	struct tctrl_softc *sc = tctrl_cd.cd_devs[TCTRL_STD_DEV];
+	struct klist *klist;
+	int s;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &sc->sc_rsel.sel_klist;
+		kn->kn_fop = &tctrlread_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = sc;
+
+	s = splts102();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
+}
+
 /* DO NOT SET THIS OPTION */
 #ifdef TADPOLE_BLINK
 void

@@ -1,3 +1,3 @@
-/*	$NetBSD: akbdmap.h,v 1.4.8.1 2003/06/02 14:42:38 tron Exp $	*/
+/*	$NetBSD: akbdmap.h,v 1.5 2003/02/23 18:09:25 manu Exp $	*/
 
 #include "../../mac68k/dev/akbdmap.h"

@@ -1,4 +1,4 @@
-/*	$NetBSD: obio.c,v 1.1 2002/05/02 15:17:58 nonaka Exp $	*/
+/*	$NetBSD: obio.c,v 1.8 2003/07/15 02:54:50 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: obio.c,v 1.8 2003/07/15 02:54:50 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -59,9 +62,8 @@ static void	obio_attach(struct device *, struct device *, void *);
 static int	obio_print(void *, const char *);
 static int	obio_search(struct device *, struct cfdata *, void *);
 
-struct cfattach obio_ca = {
-	sizeof(struct device), obio_match, obio_attach
-};
+CFATTACH_DECL(obio, sizeof(struct device),
+    obio_match, obio_attach, NULL, NULL);
 
 extern struct cfdriver obio_cd;
 
@@ -96,7 +98,7 @@ obio_search(struct device *parent, struct cfdata *cf, void *aux)
 		return 0;
 
 	for (; *p != NULL; p++) {
-		if (strcmp(cf->cf_driver->cd_name, *p) == 0) {
+		if (strcmp(cf->cf_name, *p) == 0) {
 			oa.oa_iot = &prep_isa_io_space_tag;
 			oa.oa_memt = &prep_isa_mem_space_tag;
 			oa.oa_iobase = cf->cf_iobase;
@@ -105,7 +107,7 @@ obio_search(struct device *parent, struct cfdata *cf, void *aux)
 			oa.oa_msize = cf->cf_msize;
 			oa.oa_irq = cf->cf_irq == 2 ? 9 : cf->cf_irq;
 
-			if ((*cf->cf_attach->ca_match)(parent, cf, &oa) > 0)
+			if (config_match(parent, cf, &oa) > 0)
 				config_attach(parent, cf, &oa, obio_print);
 		}
 	}
@@ -119,15 +121,15 @@ obio_print(void *args, const char *name)
 	struct obio_attach_args *oa = args;
 
 	if (oa->oa_iosize)
-		printf(" port 0x%x", oa->oa_iobase);
+		aprint_normal(" port 0x%x", oa->oa_iobase);
 	if (oa->oa_iosize > 1)
-		printf("-0x%x", oa->oa_iobase + oa->oa_iosize - 1);
+		aprint_normal("-0x%x", oa->oa_iobase + oa->oa_iosize - 1);
 	if (oa->oa_msize)
-		printf(" mem 0x%x", oa->oa_maddr);
+		aprint_normal(" mem 0x%x", oa->oa_maddr);
 	if (oa->oa_msize > 1)
-		printf("-0x%x", oa->oa_maddr + oa->oa_msize - 1);
+		aprint_normal("-0x%x", oa->oa_maddr + oa->oa_msize - 1);
 	if (oa->oa_irq != IRQUNK)
-		printf(" irq %d", oa->oa_irq);
+		aprint_normal(" irq %d", oa->oa_irq);
 	return (UNCONF);
 }
 

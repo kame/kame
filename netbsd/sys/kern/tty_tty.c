@@ -1,4 +1,4 @@
-/*	$NetBSD: tty_tty.c,v 1.17 2001/11/12 15:25:30 lukem Exp $	*/
+/*	$NetBSD: tty_tty.c,v 1.23 2003/10/15 11:29:00 hannken Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1991, 1993, 1995
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -40,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tty_tty.c,v 1.17 2001/11/12 15:25:30 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tty_tty.c,v 1.23 2003/10/15 11:29:00 hannken Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -53,6 +49,18 @@ __KERNEL_RCSID(0, "$NetBSD: tty_tty.c,v 1.17 2001/11/12 15:25:30 lukem Exp $");
 
 
 #define cttyvp(p) ((p)->p_flag & P_CONTROLT ? (p)->p_session->s_ttyvp : NULL)
+
+dev_type_open(cttyopen);
+dev_type_read(cttyread);
+dev_type_write(cttywrite);
+dev_type_ioctl(cttyioctl);
+dev_type_poll(cttypoll);
+dev_type_kqfilter(cttykqfilter);
+
+const struct cdevsw ctty_cdevsw = {
+	cttyopen, nullclose, cttyread, cttywrite, cttyioctl,
+	nullstop, notty, cttypoll, nommap, cttykqfilter, D_TTY
+};
 
 /*ARGSUSED*/
 int
@@ -111,13 +119,19 @@ cttywrite(dev, uio, flag)
 	int flag;
 {
 	struct vnode *ttyvp = cttyvp(uio->uio_procp);
+	struct mount *mp;
 	int error;
 
 	if (ttyvp == NULL)
 		return (EIO);
+	mp = NULL;
+	if (ttyvp->v_type != VCHR &&
+	    (error = vn_start_write(ttyvp, &mp, V_WAIT | V_PCATCH)) != 0)
+		return (error);
 	vn_lock(ttyvp, LK_EXCLUSIVE | LK_RETRY);
 	error = VOP_WRITE(ttyvp, uio, flag, NOCRED);
 	VOP_UNLOCK(ttyvp, 0);
+	vn_finished_write(mp, 0);
 	return (error);
 }
 
@@ -158,4 +172,18 @@ cttypoll(dev, events, p)
 	if (ttyvp == NULL)
 		return (seltrue(dev, events, p));
 	return (VOP_POLL(ttyvp, events, p));
+}
+
+int
+cttykqfilter(dev, kn)
+	dev_t dev;
+	struct knote *kn;
+{
+	/* This is called from filt_fileattach() by the attaching process. */
+	struct proc *p = curproc;
+	struct vnode *ttyvp = cttyvp(p);
+
+	if (ttyvp == NULL)
+		return (1);
+	return (VOP_KQFILTER(ttyvp, kn));
 }

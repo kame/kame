@@ -1,4 +1,4 @@
-/*	$NetBSD: mac68k5380.c,v 1.36 2000/02/14 07:01:47 scottr Exp $	*/
+/*	$NetBSD: mac68k5380.c,v 1.40 2003/07/15 02:43:17 lukem Exp $	*/
 
 /*
  * Copyright (c) 1995 Allen Briggs
@@ -33,13 +33,18 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mac68k5380.c,v 1.40 2003/07/15 02:43:17 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
-#include <sys/dkstat.h>
 #include <sys/syslog.h>
 #include <sys/buf.h>
+
+#include <uvm/uvm_extern.h>
+
 #include <dev/scsipi/scsi_all.h>
 #include <dev/scsipi/scsipi_all.h>
 #include <dev/scsipi/scsi_message.h>
@@ -158,7 +163,7 @@ scsi_mach_init(sc)
 	static int	initted = 0;
 
 	if (initted++)
-		panic("scsi_mach_init called again.\n");
+		panic("scsi_mach_init called again.");
 
 	ncr		= (volatile u_char *)
 			  (SCSIBase + (u_long) ncr);
@@ -313,7 +318,7 @@ extern	u_char	ncr5380_no_parchk;
 			return 1;
 		} else {
 			scsi_show();
-			panic("Spurious interrupt during PDMA xfer.\n");
+			panic("Spurious interrupt during PDMA xfer.");
 		}
 	} else
 		PID("pdma_ready4");
@@ -549,7 +554,7 @@ transfer_pdma(phasep, data, count)
 
 	if (pdma_5380_dir) {
 		panic("ncrscsi: transfer_pdma called when operation already "
-			"pending.\n");
+			"pending.");
 	}
 	PID("transfer_pdma0")
 
@@ -610,7 +615,7 @@ transfer_pdma(phasep, data, count)
 	 */
 	switch (*phasep) {
 	default:
-		panic("Unexpected phase in transfer_pdma.\n");
+		panic("Unexpected phase in transfer_pdma.");
 	case PH_DATAOUT:
 		pdma_5380_dir = 1;
 		SET_5380_REG(NCR5380_ICOM, GET_5380_REG(NCR5380_ICOM)|SC_ADTB);

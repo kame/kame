@@ -1,4 +1,4 @@
-/*	$NetBSD: tp_usrreq.c,v 1.18 2001/11/21 19:14:29 wiz Exp $	*/
+/*	$NetBSD: tp_usrreq.c,v 1.23 2003/08/11 15:17:31 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -69,7 +65,7 @@ SOFTWARE.
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tp_usrreq.c,v 1.18 2001/11/21 19:14:29 wiz Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tp_usrreq.c,v 1.23 2003/08/11 15:17:31 itojun Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -115,7 +111,7 @@ dump_mbuf(n, str)
 
 	printf("dump %s\n", str);
 
-	if (n == MNULL) {
+	if (n == NULL) {
 		printf("EMPTY:\n");
 		return;
 	}
@@ -188,7 +184,7 @@ tp_rcvoob(tpcb, so, m, outflags, inflags)
 #endif
 
 	/* if you use soreceive */
-	if (m == MNULL)
+	if (m == NULL)
 		return ENOBUFS;
 
 restart:
@@ -230,7 +226,7 @@ restart:
 	m->m_len = 0;
 
 	/* Assuming at most one xpd tpdu is in the buffer at once */
-	while (n != MNULL) {
+	while (n != NULL) {
 		m->m_len += n->m_len;
 		bcopy(mtod(n, caddr_t), mtod(m, caddr_t), (unsigned) n->m_len);
 		m->m_data += n->m_len;	/* so mtod() in bcopy() above gives
@@ -330,7 +326,7 @@ tp_sendoob(tpcb, so, xdata, outflags)
 	}
 	if (xdata == (struct mbuf *) 0) {
 		/* empty xpd packet */
-		MGETHDR(xdata, M_WAIT, MT_OOBDATA);
+		xdata = m_gethdr(M_WAIT, MT_OOBDATA);
 		xdata->m_len = 0;
 		xdata->m_pkthdr.len = 0;
 	}

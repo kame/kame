@@ -1,4 +1,4 @@
-/*	$NetBSD: exec_aout.c,v 1.22.10.3 2003/10/02 09:51:28 tron Exp $	*/
+/*	$NetBSD: exec_aout.c,v 1.31 2004/02/13 11:36:22 wiz Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994 Christopher G. Demetriou
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: exec_aout.c,v 1.22.10.3 2003/10/02 09:51:28 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: exec_aout.c,v 1.31 2004/02/13 11:36:22 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -39,6 +39,7 @@ __KERNEL_RCSID(0, "$NetBSD: exec_aout.c,v 1.22.10.3 2003/10/02 09:51:28 tron Exp
 #include <sys/malloc.h>
 #include <sys/vnode.h>
 #include <sys/exec.h>
+#include <sys/exec_aout.h>
 #include <sys/resourcevar.h>
 
 #include <uvm/uvm_extern.h>
@@ -48,7 +49,7 @@ __KERNEL_RCSID(0, "$NetBSD: exec_aout.c,v 1.22.10.3 2003/10/02 09:51:28 tron Exp
  *
  * Given a proc pointer and an exec package pointer, see if the referent
  * of the epp is in a.out format.  First check 'standard' magic numbers for
- * this architecture.  If that fails, try a cpu-dependent hook.
+ * this architecture.  If that fails, try a CPU-dependent hook.
  *
  * This function, in the former case, or the hook, in the latter, is
  * responsible for creating a set of vmcmds which can be used to build
@@ -108,7 +109,7 @@ exec_aout_prep_zmagic(struct proc *p, struct exec_package *epp)
 	struct exec *execp = epp->ep_hdr;
 	int error;
 
-	epp->ep_taddr = USRTEXT;
+	epp->ep_taddr = AOUT_LDPGSZ;
 	epp->ep_tsize = execp->a_text;
 	epp->ep_daddr = epp->ep_taddr + execp->a_text;
 	epp->ep_dsize = execp->a_data + execp->a_bss;
@@ -133,7 +134,7 @@ exec_aout_prep_zmagic(struct proc *p, struct exec_package *epp)
 		    epp->ep_daddr + execp->a_data, NULLVP, 0,
 		    VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 
-	return exec_aout_setup_stack(p, epp);
+	return (*epp->ep_esch->es_setup_stack)(p, epp);
 }
 
 /*
@@ -146,9 +147,9 @@ exec_aout_prep_nmagic(struct proc *p, struct exec_package *epp)
 	struct exec *execp = epp->ep_hdr;
 	long bsize, baddr;
 
-	epp->ep_taddr = USRTEXT;
+	epp->ep_taddr = AOUT_LDPGSZ;
 	epp->ep_tsize = execp->a_text;
-	epp->ep_daddr = roundup(epp->ep_taddr + execp->a_text, __LDPGSZ);
+	epp->ep_daddr = roundup(epp->ep_taddr + execp->a_text, AOUT_LDPGSZ);
 	epp->ep_dsize = execp->a_data + execp->a_bss;
 	epp->ep_entry = execp->a_entry;
 
@@ -169,7 +170,7 @@ exec_aout_prep_nmagic(struct proc *p, struct exec_package *epp)
 		NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_zero, bsize, baddr,
 		    NULLVP, 0, VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 
-	return exec_aout_setup_stack(p, epp);
+	return (*epp->ep_esch->es_setup_stack)(p, epp);
 }
 
 /*
@@ -182,7 +183,7 @@ exec_aout_prep_omagic(struct proc *p, struct exec_package *epp)
 	struct exec *execp = epp->ep_hdr;
 	long dsize, bsize, baddr;
 
-	epp->ep_taddr = USRTEXT;
+	epp->ep_taddr = AOUT_LDPGSZ;
 	epp->ep_tsize = execp->a_text;
 	epp->ep_daddr = epp->ep_taddr + execp->a_text;
 	epp->ep_dsize = execp->a_data + execp->a_bss;
@@ -210,47 +211,5 @@ exec_aout_prep_omagic(struct proc *p, struct exec_package *epp)
 	 */
 	dsize = epp->ep_dsize + execp->a_text - round_page(execp->a_text);
 	epp->ep_dsize = (dsize > 0) ? dsize : 0;
-	return exec_aout_setup_stack(p, epp);
-}
-
-/*
- * exec_aout_setup_stack(): Set up the stack segment for an a.out
- * executable.
- *
- * Note that the ep_ssize parameter must be set to be the current stack
- * limit; this is adjusted in the body of execve() to yield the
- * appropriate stack segment usage once the argument length is
- * calculated.
- *
- * This function returns an int for uniformity with other (future) formats'
- * stack setup functions.  They might have errors to return.
- */
-
-int
-exec_aout_setup_stack(struct proc *p, struct exec_package *epp)
-{
-
-	epp->ep_maxsaddr = USRSTACK - MAXSSIZ;
-	epp->ep_minsaddr = USRSTACK;
-	epp->ep_ssize = p->p_rlimit[RLIMIT_STACK].rlim_cur;
-
-	/*
-	 * set up commands for stack.  note that this takes *two*, one to
-	 * map the part of the stack which we can access, and one to map
-	 * the part which we can't.
-	 *
-	 * arguably, it could be made into one, but that would require the
-	 * addition of another mapping proc, which is unnecessary
-	 *
-	 * note that in memory, things assumed to be: 0 ... ep_maxsaddr
-	 * <stack> ep_minsaddr
-	 */
-	NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_zero,
-	    ((epp->ep_minsaddr - epp->ep_ssize) - epp->ep_maxsaddr),
-	    epp->ep_maxsaddr, NULLVP, 0, VM_PROT_NONE);
-	NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_zero, epp->ep_ssize,
-	    (epp->ep_minsaddr - epp->ep_ssize), NULLVP, 0,
-	    VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
-
-	return 0;
+	return (*epp->ep_esch->es_setup_stack)(p, epp);
 }

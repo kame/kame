@@ -1,4 +1,4 @@
-/*	$NetBSD: esiop.c,v 1.16 2002/05/18 16:09:43 bouyer Exp $	*/
+/*	$NetBSD: esiop.c,v 1.27 2004/03/16 19:10:43 bouyer Exp $	*/
 
 /*
  * Copyright (c) 2002 Manuel Bouyer.
@@ -33,7 +33,7 @@
 /* SYM53c7/8xx PCI-SCSI I/O Processors driver */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: esiop.c,v 1.16 2002/05/18 16:09:43 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: esiop.c,v 1.27 2004/03/16 19:10:43 bouyer Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -87,7 +87,6 @@ void	esiop_unqueue __P((struct esiop_softc *, int, int));
 int	esiop_handle_qtag_reject __P((struct esiop_cmd *));
 static void	esiop_start __P((struct esiop_softc *, struct esiop_cmd *));
 void 	esiop_timeout __P((void *));
-int	esiop_scsicmd __P((struct scsipi_xfer *));
 void	esiop_scsipi_request __P((struct scsipi_channel *,
 			scsipi_adapter_req_t, void *));
 void	esiop_dump_script __P((struct esiop_softc *));
@@ -169,7 +168,7 @@ esiop_attach(sc)
 	TAILQ_INIT(&sc->tag_tblblk);
 	sc->sc_currschedslot = 0;
 #ifdef SIOP_DEBUG
-	printf("%s: script size = %d, PHY addr=0x%x, VIRT=%p\n",
+	aprint_debug("%s: script size = %d, PHY addr=0x%x, VIRT=%p\n",
 	    sc->sc_c.sc_dev.dv_xname, (int)sizeof(esiop_script),
 	    (u_int32_t)sc->sc_c.sc_scriptaddr, sc->sc_c.sc_script);
 #endif
@@ -183,16 +182,16 @@ esiop_attach(sc)
 	 */
 #ifdef DIAGNOSTIC
 	if (ESIOP_NTAG != A_ndone_slots) {
-		printf("%s: size of tag DSA table different from the done"
-		    "ring\n", sc->sc_c.sc_dev.dv_xname);
+		aprint_error("%s: size of tag DSA table different from the done"
+		    " ring\n", sc->sc_c.sc_dev.dv_xname);
 		return;
 	}
 #endif
 	esiop_moretagtbl(sc);
 	tagtbl_donering = TAILQ_FIRST(&sc->free_tagtbl);
 	if (tagtbl_donering == NULL) {
-		printf("%s: no memory for command done ring\n",
-		    "ring\n", sc->sc_c.sc_dev.dv_xname);
+		aprint_error("%s: no memory for command done ring\n",
+		    sc->sc_c.sc_dev.dv_xname);
 		return;
 	}
 	TAILQ_REMOVE(&sc->free_tagtbl, tagtbl_donering, next);
@@ -422,7 +421,7 @@ esiop_intr(v)
 	struct esiop_cmd *esiop_cmd;
 	struct esiop_lun *esiop_lun;
 	struct scsipi_xfer *xs;
-	int istat, sist, sstat1, dstat;
+	int istat, sist, sstat1, dstat = 0; /* XXX: gcc */
 	u_int32_t irqcode;
 	int need_reset = 0;
 	int offset, target, lun, tag;
@@ -542,7 +541,7 @@ none:
 		if (dstat & DSTAT_MDPE)
 			printf(" parity");
 		if (dstat & DSTAT_DFE)
-			printf(" dma fifo empty");
+			printf(" DMA fifo empty");
 		else
 			siop_clearfifo(&sc->sc_c);
 		printf(", DSP=0x%x DSA=0x%x: ",
@@ -562,7 +561,7 @@ none:
 		if (istat & ISTAT_DIP)
 			delay(10);
 		/*
-		 * Can't read sist0 & sist1 independantly, or we have to
+		 * Can't read sist0 & sist1 independently, or we have to
 		 * insert delay
 		 */
 		sist = bus_space_read_2(sc->sc_c.sc_rt, sc->sc_c.sc_rh,
@@ -756,7 +755,7 @@ none:
 			    SIOP_DSP) - 8);
 			return 1;
 		}
-		/* Else it's an unhandled exeption (for now). */
+		/* Else it's an unhandled exception (for now). */
 		printf("%s: unhandled scsi interrupt, sist=0x%x sstat1=0x%x "
 		    "DSA=0x%x DSP=0x%x\n", sc->sc_c.sc_dev.dv_xname, sist,
 		    bus_space_read_1(sc->sc_c.sc_rt, sc->sc_c.sc_rh,
@@ -825,7 +824,7 @@ scintr:
 				if (esiop_cmd->cmd_tables->msg_out[0] & 0x80) {
 					/*
 					 * message was part of a identify +
-					 * something else. Identify shoudl't
+					 * something else. Identify shouldn't
 					 * have been rejected.
 					 */
 					msg =
@@ -925,8 +924,7 @@ scintr:
 				scsipi_printaddr(xs->xs_periph);
 			else
 				printf("%s: ", sc->sc_c.sc_dev.dv_xname);
-			printf("unhandled message 0x%x\n",
-			    esiop_cmd->cmd_tables->msg_in[0]);
+			printf("unhandled message 0x%x\n", msgin);
 			esiop_cmd->cmd_tables->msg_out[0] = MSG_MESSAGE_REJECT;
 			esiop_cmd->cmd_tables->t_msgout.count= htole32(1);
 			esiop_table_sync(esiop_cmd,
@@ -1362,7 +1360,7 @@ esiop_handle_qtag_reject(esiop_cmd)
 
 /*
  * handle a bus reset: reset chip, unqueue all active commands, free all
- * target struct and report loosage to upper layer.
+ * target struct and report lossage to upper layer.
  * As the upper layer may requeue immediatly we have to first store
  * all active commands in a temporary queue.
  */
@@ -1387,7 +1385,7 @@ esiop_handle_reset(sc)
 		scsipi_channel_thaw(&sc->sc_c.sc_chan, 1);
 	}
 	/*
-	 * Process all commands: first commmands completes, then commands
+	 * Process all commands: first commands completes, then commands
 	 * being executed
 	 */
 	esiop_checkdone(sc);
@@ -1790,7 +1788,9 @@ esiop_timeout(v)
 	bus_space_read_1(sc->sc_c.sc_rt, sc->sc_c.sc_rh, SIOP_CTEST2);
 	printf("istat 0x%x\n", bus_space_read_1(sc->sc_c.sc_rt, sc->sc_c.sc_rh, SIOP_ISTAT));
 #else
-	printf("command timeout\n");
+	printf("command timeout, CDB: ");
+	scsipi_print_cdb(esiop_cmd->cmd_c.xs->cmd);
+	printf("\n");
 #endif
 	/* reset the scsi bus */
 	siop_resetbus(&sc->sc_c);
@@ -1992,7 +1992,7 @@ esiop_moretagtbl(sc)
 		goto bad2;
 	}
 	error = bus_dmamem_map(sc->sc_c.sc_dmat, &seg, rseg, PAGE_SIZE,
-	    (caddr_t *)&tbls, BUS_DMA_NOWAIT|BUS_DMA_COHERENT);
+	    (void *)&tbls, BUS_DMA_NOWAIT|BUS_DMA_COHERENT);
 	if (error) {
 		printf("%s: unable to map tbls DMA memory, error = %d\n",
 		    sc->sc_c.sc_dev.dv_xname, error);

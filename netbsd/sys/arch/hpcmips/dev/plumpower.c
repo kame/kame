@@ -1,4 +1,4 @@
-/*	$NetBSD: plumpower.c,v 1.7 2002/01/29 18:53:11 uch Exp $ */
+/*	$NetBSD: plumpower.c,v 1.10 2003/07/15 02:29:30 lukem Exp $ */
 
 /*-
  * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: plumpower.c,v 1.10 2003/07/15 02:29:30 lukem Exp $");
+
 #undef PLUMPOWERDEBUG
 
 #include <sys/param.h>
@@ -70,9 +73,8 @@ struct plumpower_softc {
 	bus_space_handle_t	sc_regh;
 };
 
-struct cfattach plumpower_ca = {
-	sizeof(struct plumpower_softc), plumpower_match, plumpower_attach
-};
+CFATTACH_DECL(plumpower, sizeof(struct plumpower_softc),
+    plumpower_match, plumpower_attach, NULL, NULL);
 
 #ifdef PLUMPOWERDEBUG
 static void	plumpower_dump(struct plumpower_softc *);

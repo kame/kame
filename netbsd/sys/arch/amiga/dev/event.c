@@ -1,4 +1,4 @@
-/*	$NetBSD: event.c,v 1.7 2002/01/28 09:56:54 aymeric Exp $ */
+/*	$NetBSD: event.c,v 1.10 2003/08/07 16:26:41 agc Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -47,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: event.c,v 1.7 2002/01/28 09:56:54 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: event.c,v 1.10 2003/08/07 16:26:41 agc Exp $");
 
 /*
  * Internal `Firm_event' interface for the keyboard and mouse drivers.
@@ -161,4 +157,62 @@ ev_poll(register struct evvar *ev, int events, struct proc *p)
 			selrecord(p, &ev->ev_sel);
 	splx(s);
 	return (revents);
+}
+
+static void
+filt_evrdetach(struct knote *kn)
+{
+	struct evvar *ev = kn->kn_hook;
+	int s;
+
+	s = splev();
+	SLIST_REMOVE(&ev->ev_sel.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_evread(struct knote *kn, long hint)
+{
+	struct evvar *ev = kn->kn_hook;
+
+	if (ev->ev_get == ev->ev_put)
+		return (0);
+
+	if (ev->ev_get < ev->ev_put)
+		kn->kn_data = ev->ev_put - ev->ev_get;
+	else
+		kn->kn_data = (EV_QSIZE - ev->ev_get) +
+		    ev->ev_put;
+
+	kn->kn_data *= sizeof(struct firm_event);
+
+	return (1);
+}
+
+static const struct filterops ev_filtops =
+	{ 1, NULL, filt_evrdetach, filt_evread };
+
+int
+ev_kqfilter(struct evvar *ev, struct knote *kn)
+{
+	struct klist *klist;
+	int s;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &ev->ev_sel.sel_klist;
+		kn->kn_fop = &ev_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = ev;
+
+	s = splev();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
 }

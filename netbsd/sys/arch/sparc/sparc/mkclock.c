@@ -1,4 +1,4 @@
-/*	$NetBSD: mkclock.c,v 1.1 2002/03/28 11:54:17 pk Exp $ */
+/*	$NetBSD: mkclock.c,v 1.11 2004/03/17 17:04:59 pk Exp $ */
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -39,6 +39,10 @@
 /*
  * time-of-day clock driver for sparc machines with the MOSTEK MK48Txx.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mkclock.c,v 1.11 2004/03/17 17:04:59 pk Exp $");
+
 #include "opt_sparc_arch.h"
 
 #include <sys/param.h>
@@ -51,11 +55,12 @@
 #include <machine/bus.h>
 #include <machine/autoconf.h>
 #include <machine/eeprom.h>
+#include <machine/promlib.h>
 #include <machine/cpu.h>
-#include <machine/idprom.h>
 
 #include <dev/clock_subr.h>
 #include <dev/ic/mk48txxreg.h>
+#include <dev/ic/mk48txxvar.h>
 
 /* Location and size of the MK48xx TOD clock, if present */
 static bus_space_handle_t	mk_nvram_base;
@@ -69,21 +74,17 @@ static int	clockmatch_obio(struct device *, struct cfdata *, void *);
 static void	clockattach_mainbus(struct device *, struct device *, void *);
 static void	clockattach_obio(struct device *, struct device *, void *);
 
-static void	clockattach(int, bus_space_tag_t, bus_space_handle_t);
+static void	clockattach(struct mk48txx_softc *, int);
 
-struct cfattach clock_mainbus_ca = {
-	sizeof(struct device), clockmatch_mainbus, clockattach_mainbus
-};
+CFATTACH_DECL(clock_mainbus, sizeof(struct mk48txx_softc),
+    clockmatch_mainbus, clockattach_mainbus, NULL, NULL);
 
-struct cfattach clock_obio_ca = {
-	sizeof(struct device), clockmatch_obio, clockattach_obio
-};
-
+CFATTACH_DECL(clock_obio, sizeof(struct mk48txx_softc),
+    clockmatch_obio, clockattach_obio, NULL, NULL);
 
 /* Imported from clock.c: */
 extern todr_chip_handle_t todr_handle;
 extern int (*eeprom_nvram_wenable)(int);
-void establish_hostid(struct idprom *);
 
 
 /*
@@ -138,28 +139,29 @@ clockattach_mainbus(parent, self, aux)
 	struct device *parent, *self;
 	void *aux;
 {
+	struct mk48txx_softc *sc = (void *)self;
 	struct mainbus_attach_args *ma = aux;
-	bus_space_tag_t bt = ma->ma_bustag;
-	bus_space_handle_t bh;
+
+	sc->sc_bst = ma->ma_bustag;
 
 	/*
 	 * We ignore any existing virtual address as we need to map
 	 * this read-only and make it read-write only temporarily,
 	 * whenever we read or write the clock chip.  The clock also
 	 * contains the ID ``PROM'', and I have already had the pleasure
-	 * of reloading the cpu type, Ethernet address, etc, by hand from
+	 * of reloading the CPU type, Ethernet address, etc, by hand from
 	 * the console FORTH interpreter.  I intend not to enjoy it again.
 	 */
-	if (bus_space_map(bt,
+	if (bus_space_map(sc->sc_bst,
 			   ma->ma_paddr,
 			   ma->ma_size,
 			   BUS_SPACE_MAP_LINEAR,
-			   &bh) != 0) {
+			   &sc->sc_bsh) != 0) {
 		printf("%s: can't map register\n", self->dv_xname);
 		return;
 	}
 
-	clockattach(ma->ma_node, bt, bh);
+	clockattach(sc, ma->ma_node);
 }
 
 static void
@@ -167,9 +169,8 @@ clockattach_obio(parent, self, aux)
 	struct device *parent, *self;
 	void *aux;
 {
+	struct mk48txx_softc *sc = (void *)self;
 	union obio_attach_args *uoba = aux;
-	bus_space_tag_t bt;
-	bus_space_handle_t bh;
 	int node;
 
 	if (uoba->uoba_isobio4 == 0) {
@@ -177,10 +178,10 @@ clockattach_obio(parent, self, aux)
 		struct sbus_attach_args *sa = &uoba->uoba_sbus;
 
 		node = sa->sa_node;
-		bt = sa->sa_bustag;
-		if (sbus_bus_map(bt,
+		sc->sc_bst = sa->sa_bustag;
+		if (sbus_bus_map(sc->sc_bst,
 			sa->sa_slot, sa->sa_offset, sa->sa_size,
-			BUS_SPACE_MAP_LINEAR, &bh) != 0) {
+			BUS_SPACE_MAP_LINEAR, &sc->sc_bsh) != 0) {
 			printf("%s: can't map register\n", self->dv_xname);
 			return;
 		}
@@ -193,73 +194,62 @@ clockattach_obio(parent, self, aux)
 		 * the device address space length to 2048.
 		 */
 		node = 0;
-		bt = oba->oba_bustag;
-		if (bus_space_map(bt,
+		sc->sc_bst = oba->oba_bustag;
+		if (bus_space_map(sc->sc_bst,
 				  oba->oba_paddr,
 				  2048,			/* size */
 				  BUS_SPACE_MAP_LINEAR,	/* flags */
-				  &bh) != 0) {
+				  &sc->sc_bsh) != 0) {
 			printf("%s: can't map register\n", self->dv_xname);
 			return;
 		}
 	}
 
-	clockattach(node, bt, bh);
+	clockattach(sc, node);
 }
 
 static void
-clockattach(node, bt, bh)
+clockattach(sc, node)
+	struct mk48txx_softc *sc;
 	int node;
-	bus_space_tag_t bt;
-	bus_space_handle_t bh;
 {
-	struct idprom *idp;
-	char *model;
 
 	if (CPU_ISSUN4)
-		model = "mk48t02";	/* Hard-coded sun4 clock */
+		sc->sc_model = "mk48t02";	/* Hard-coded sun4 clock */
 	else if (node != 0)
-		model = PROM_getpropstring(node, "model");
+		sc->sc_model = prom_getpropstring(node, "model");
 	else
 		panic("clockattach: node == 0");
 
 	/* Our TOD clock year 0 represents 1968 */
-	todr_handle = mk48txx_attach(bt, bh, model, 1968, NULL, NULL);
-	if (todr_handle == NULL)
-		panic("Cannot attach %s tod clock", model);
+	sc->sc_year0 = 1968;
+	mk48txx_attach(sc);
+
+	/* XXX this should be done by todr_attach() */
+	todr_handle = &sc->sc_handle;
+
+	printf("\n");
 
 	/*
 	 * Store NVRAM base address and size in globals for use
 	 * by mk_nvram_wenable().
 	 */
-	mk_nvram_base = bh;
+	mk_nvram_base = sc->sc_bsh;
 	if (mk48txx_get_nvram_size(todr_handle, &mk_nvram_size) != 0)
-		panic("Cannot get nvram size on %s", model);
+		panic("Cannot get nvram size on %s", sc->sc_model);
 
 	/* Establish clock write-enable method */
 	todr_handle->todr_setwen = mk_clk_wenable;
 
 #if defined(SUN4)
 	if (CPU_ISSUN4) {
-		extern struct idprom sun4_idprom_store;
-		idp = &sun4_idprom_store;
 		if (cpuinfo.cpu_type == CPUTYP_4_300 ||
 		    cpuinfo.cpu_type == CPUTYP_4_400) {
-			eeprom_va = bus_space_vaddr(bt, bh);
+			eeprom_va = bus_space_vaddr(sc->sc_bst, sc->sc_bsh);
 			eeprom_nvram_wenable = mk_nvram_wenable;
 		}
-	} else
-#endif
-	{
-	/*
-	 * Location of IDPROM relative to the end of the NVRAM area
-	 */
-#define MK48TXX_IDPROM_OFFSET (mk_nvram_size - 40)
-
-		idp = (struct idprom *)((u_long)bh + MK48TXX_IDPROM_OFFSET);
 	}
-
-	establish_hostid(idp);
+#endif
 }
 
 /*
@@ -282,8 +272,8 @@ mk_nvram_wenable(onoff)
 {
 	int s;
 	vm_prot_t prot;/* nonzero => change prot */
-	int npages;
 	vaddr_t base;
+	vsize_t size;
 	static int writers;
 
 	s = splhigh();
@@ -293,10 +283,10 @@ mk_nvram_wenable(onoff)
 		prot = --writers == 0 ? VM_PROT_READ : 0;
 	splx(s);
 
-	npages = round_page((vsize_t)mk_nvram_size) << PAGE_SHIFT;
+	size = round_page((vsize_t)mk_nvram_size);
 	base = trunc_page((vaddr_t)mk_nvram_base);
 	if (prot)
-		pmap_changeprot(pmap_kernel(), base, prot, npages);
+		pmap_kprotect(base, size, prot);
 
 	return (0);
 }

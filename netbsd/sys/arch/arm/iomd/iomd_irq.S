@@ -1,4 +1,4 @@
-/*	$NetBSD: iomd_irq.S,v 1.2 2001/12/20 01:20:23 thorpej Exp $	*/
+/*	$NetBSD: iomd_irq.S,v 1.4 2003/11/05 21:10:59 scw Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -96,6 +96,8 @@ Lcurrent_intr_depth:
 Lspl_masks:
 	.word	_C_LABEL(spl_masks)
 
+AST_ALIGNMENT_FAULT_LOCALS
+
 /*
  * Register usage
  *
@@ -117,6 +119,7 @@ ASENTRY_NP(irq_entry)
 	sub	lr, lr, #0x00000004	/* Adjust the lr */
 
 	PUSHFRAMEINSVC			/* Push an interrupt frame */
+	ENABLE_ALIGNMENT_FAULTS
 
 	/* Load r8 with the IOMD interrupt requests */
 
@@ -210,7 +213,7 @@ Lfind_highest_ipl:
 	bic	r0, r0, #I32_bit
 	msr	cpsr_all, r0
 
-	ldr	r7, [pc, #Lirqhandlers - . - 8]
+	ldr	r7, Lirqhandlers
 
 	/* 
 	 * take a copy of the IRQ request so that we can strip bits out of it
@@ -270,7 +273,7 @@ irqloop:
 	
 	teq	r6, #0x00000000		/* Do we have a handler */
 	moveq	r0, r8			/* IRQ requests as arg 0 */
-	addeq	lr, pc, #nextirq - . - 8   /* return Address */
+	adreq	lr, nextirq		/* return Address */
 	beq	_C_LABEL(stray_irqhandler) /* call special handler */
 	
 #ifdef IRQSTATS
@@ -293,12 +296,11 @@ irqloop:
 
 irqchainloop:
 	ldr	r0, [r6, #(IH_ARG)]	/* Get argument pointer */
-	add	lr, pc, #nextinchain - . - 8	/* return address */
 	teq	r0, #0x00000000		/* If arg is zero pass stack frame */
 	addeq	r0, sp, #8		/* ... stack frame [XXX needs care] */
+	mov	lr, pc			/* return address */
 	ldr	pc, [r6, #(IH_FUNC)]	/* Call handler */
 
-nextinchain:
 	ldr	r6, [r6, #(IH_NEXT)]	/* fetch next handler */
 	
 	teq	r0, #0x00000001		/* Was the irq serviced ? */
@@ -324,17 +326,6 @@ exitirq:
 
 	bl	_C_LABEL(dosoftints)	/* Handle the soft interrupts */
 
-	/* Manage AST's. Maybe this should be done as a soft interrupt ? */
-	ldr	r0, [sp]		/* Get the SPSR from stack */
-
-	and	r0, r0, #(PSR_MODE)	/* Test for USR32 mode before the IRQ */
-	teq	r0, #(PSR_USR32_MODE)
-	ldreq	r0, Lastpending		/* Do we have an AST pending ? */
-	ldreq	r1, [r0]
-	teqeq	r1, #0x00000001
-
-	beq	irqast			/* call the AST handler */
-
 	/* Kill IRQ's in preparation for exit */
         mrs     r0, cpsr_all
         orr     r0, r0, #(I32_bit)
@@ -346,50 +337,11 @@ exitirq:
 	sub	r1, r1, #1
 	str	r1, [r0]
 
+	DO_AST_AND_RESTORE_ALIGNMENT_FAULTS
 	PULLFRAMEFROMSVCANDEXIT
 
 	/* NOT REACHED */
 	b	. - 8
-
-	/*
-	 * Ok, snag with current intr depth ...
-	 * If ast() calls mi_sleep() the current_intr_depth will not be
-	 * decremented until the process is woken up. This can result
-	 * in the system believing it is still in the interrupt handler.
-	 * If we are calling ast() then correct the current_intr_depth
-	 * before the call.
-	 */
-irqast:
-	mov	r1, #0x00000000		/* Clear ast_pending */
-	str	r1, [r0]
-
-	/* Kill IRQ's so we atomically decrement current_intr_depth */
-        mrs     r2, cpsr_all
-        orr     r3, r2, #(I32_bit)
-        msr     cpsr_all, r3
-
-	/* Decrement the interrupt nesting count */
-	ldr	r0, Lcurrent_intr_depth
-	ldr	r1, [r0]
-	sub	r1, r1, #1
-	str	r1, [r0]
-
-	/* Restore IRQ's */
-        msr     cpsr_all, r2
-
-	mov	r0, sp
-	bl	_C_LABEL(ast)
-
-	/* Kill IRQ's in preparation for exit */
-        mrs     r0, cpsr_all
-        orr     r0, r0, #(I32_bit)
-        msr     cpsr_all, r0
-
-	PULLFRAMEFROMSVCANDEXIT
-
-	/* NOT REACHED */
-	b	. - 8
-	
 
 Lspl_mask:
 	.word	_C_LABEL(spl_mask)	/* irq's allowed at current spl level */
@@ -454,9 +406,6 @@ Lintrcnt:
 
 Lirqhandlers:
 	.word	_C_LABEL(irqhandlers)	/* Pointer to array of irqhandlers */
-
-Lastpending:
-	.word	_C_LABEL(astpending)
 
 #ifdef IRQSTATS
 /* These symbols are used by vmstat */

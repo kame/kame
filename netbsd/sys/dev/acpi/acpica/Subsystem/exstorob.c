@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exstorob - AML Interpreter object store support, store to object
- *              xRevision: 37 $
+ *              xRevision: 51 $
  *
  *****************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999, 2000, 2001, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -116,26 +116,21 @@
  *****************************************************************************/
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: exstorob.c,v 1.2 2001/11/13 13:02:00 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: exstorob.c,v 1.10 2004/02/14 16:57:24 kochi Exp $");
 
 #define __EXSTOROB_C__
 
 #include "acpi.h"
-#include "acparser.h"
-#include "acdispat.h"
 #include "acinterp.h"
-#include "amlcode.h"
-#include "acnamesp.h"
-#include "actables.h"
 
 
 #define _COMPONENT          ACPI_EXECUTER
-        MODULE_NAME         ("exstorob")
+        ACPI_MODULE_NAME    ("exstorob")
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiExCopyBufferToBuffer
+ * FUNCTION:    AcpiExStoreBufferToBuffer
  *
  * PARAMETERS:  SourceDesc          - Source object to copy
  *              TargetDesc          - Destination object of the copy
@@ -147,7 +142,7 @@ __KERNEL_RCSID(0, "$NetBSD: exstorob.c,v 1.2 2001/11/13 13:02:00 lukem Exp $");
  ******************************************************************************/
 
 ACPI_STATUS
-AcpiExCopyBufferToBuffer (
+AcpiExStoreBufferToBuffer (
     ACPI_OPERAND_OBJECT     *SourceDesc,
     ACPI_OPERAND_OBJECT     *TargetDesc)
 {
@@ -155,7 +150,7 @@ AcpiExCopyBufferToBuffer (
     UINT8                   *Buffer;
 
 
-    PROC_NAME ("ExCopyBufferToBuffer");
+    ACPI_FUNCTION_TRACE_PTR ("ExStoreBufferToBuffer", SourceDesc);
 
 
     /*
@@ -165,17 +160,19 @@ AcpiExCopyBufferToBuffer (
     Length = SourceDesc->Buffer.Length;
 
     /*
-     * If target is a buffer of length zero, allocate a new
-     * buffer of the proper length
+     * If target is a buffer of length zero or is a static buffer,
+     * allocate a new buffer of the proper length
      */
-    if (TargetDesc->Buffer.Length == 0)
+    if ((TargetDesc->Buffer.Length == 0) ||
+        (TargetDesc->Common.Flags & AOPOBJ_STATIC_POINTER))
     {
         TargetDesc->Buffer.Pointer = ACPI_MEM_ALLOCATE (Length);
         if (!TargetDesc->Buffer.Pointer)
         {
-            return (AE_NO_MEMORY);
+            return_ACPI_STATUS (AE_NO_MEMORY);
         }
 
+        TargetDesc->Common.Flags &= ~AOPOBJ_STATIC_POINTER;
         TargetDesc->Buffer.Length = Length;
     }
 
@@ -187,29 +184,31 @@ AcpiExCopyBufferToBuffer (
     {
         /* Clear existing buffer and copy in the new one */
 
-        MEMSET (TargetDesc->Buffer.Pointer, 0, TargetDesc->Buffer.Length);
-        MEMCPY (TargetDesc->Buffer.Pointer, Buffer, Length);
+        ACPI_MEMSET (TargetDesc->Buffer.Pointer, 0, TargetDesc->Buffer.Length);
+        ACPI_MEMCPY (TargetDesc->Buffer.Pointer, Buffer, Length);
     }
-
     else
     {
         /*
          * Truncate the source, copy only what will fit
          */
-        MEMCPY (TargetDesc->Buffer.Pointer, Buffer, TargetDesc->Buffer.Length);
+        ACPI_MEMCPY (TargetDesc->Buffer.Pointer, Buffer, TargetDesc->Buffer.Length);
 
         ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
             "Truncating src buffer from %X to %X\n",
             Length, TargetDesc->Buffer.Length));
     }
 
-    return (AE_OK);
+    /* Copy flags */
+
+    TargetDesc->Buffer.Flags = SourceDesc->Buffer.Flags;
+    return_ACPI_STATUS (AE_OK);
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiExCopyStringToString
+ * FUNCTION:    AcpiExStoreStringToString
  *
  * PARAMETERS:  SourceDesc          - Source object to copy
  *              TargetDesc          - Destination object of the copy
@@ -221,7 +220,7 @@ AcpiExCopyBufferToBuffer (
  ******************************************************************************/
 
 ACPI_STATUS
-AcpiExCopyStringToString (
+AcpiExStoreStringToString (
     ACPI_OPERAND_OBJECT     *SourceDesc,
     ACPI_OPERAND_OBJECT     *TargetDesc)
 {
@@ -229,7 +228,7 @@ AcpiExCopyStringToString (
     UINT8                   *Buffer;
 
 
-    FUNCTION_ENTRY ();
+    ACPI_FUNCTION_TRACE_PTR ("ExStoreStringToString", SourceDesc);
 
 
     /*
@@ -239,20 +238,23 @@ AcpiExCopyStringToString (
     Length = SourceDesc->String.Length;
 
     /*
-     * Setting a string value replaces the old string
+     * Replace existing string value if it will fit and the string
+     * pointer is not a static pointer (part of an ACPI table)
      */
-    if (Length < TargetDesc->String.Length)
+    if ((Length < TargetDesc->String.Length) &&
+       (!(TargetDesc->Common.Flags & AOPOBJ_STATIC_POINTER)))
     {
-        /* Clear old string and copy in the new one */
-
-        MEMSET (TargetDesc->String.Pointer, 0, TargetDesc->String.Length);
-        MEMCPY (TargetDesc->String.Pointer, Buffer, Length);
+        /*
+         * String will fit in existing non-static buffer.
+         * Clear old string and copy in the new one
+         */
+        ACPI_MEMSET (TargetDesc->String.Pointer, 0, (ACPI_SIZE) TargetDesc->String.Length + 1);
+        ACPI_MEMCPY (TargetDesc->String.Pointer, Buffer, Length);
     }
-
     else
     {
         /*
-         * Free the current buffer, then allocate a buffer
+         * Free the current buffer, then allocate a new buffer
          * large enough to hold the value
          */
         if (TargetDesc->String.Pointer &&
@@ -264,17 +266,20 @@ AcpiExCopyStringToString (
             ACPI_MEM_FREE (TargetDesc->String.Pointer);
         }
 
-        TargetDesc->String.Pointer = ACPI_MEM_ALLOCATE (Length + 1);
+        TargetDesc->String.Pointer = ACPI_MEM_CALLOCATE ((ACPI_SIZE) Length + 1);
         if (!TargetDesc->String.Pointer)
         {
-            return (AE_NO_MEMORY);
+            return_ACPI_STATUS (AE_NO_MEMORY);
         }
 
-        TargetDesc->String.Length = Length;
-        MEMCPY (TargetDesc->String.Pointer, Buffer, Length);
+        TargetDesc->Common.Flags &= ~AOPOBJ_STATIC_POINTER;
+        ACPI_MEMCPY (TargetDesc->String.Pointer, Buffer, Length);
     }
 
-    return (AE_OK);
+    /* Set the new target length */
+
+    TargetDesc->String.Length = Length;
+    return_ACPI_STATUS (AE_OK);
 }
 
 

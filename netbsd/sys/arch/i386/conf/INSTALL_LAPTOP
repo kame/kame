@@ -1,4 +1,4 @@
-#	$NetBSD: INSTALL_LAPTOP,v 1.30.2.3 2003/10/20 05:19:12 cyber Exp $
+#	$NetBSD: INSTALL_LAPTOP,v 1.57.2.5 2004/07/24 11:34:41 tron Exp $
 #
 #	INSTALL - Installation kernel.
 #
@@ -17,8 +17,7 @@ include "arch/i386/conf/std.i386"
 options 	MEMORY_DISK_HOOKS
 options 	MEMORY_DISK_IS_ROOT	# force root on memory disk
 options 	MEMORY_DISK_SERVER=0	# no userspace memory disk support
-options 	MEMORY_DISK_ROOT_SIZE=4096	# size of memory disk, in blocks
-#options 	MEMORY_DISK_ROOT_SIZE=2880	# 1.44M, same as a floppy
+options 	MEMORY_DISK_ROOT_SIZE=10000	# size of memory disk, in blocks
 
 makeoptions	COPTS="-Os"		# generates smaller code than -O2, -O1
 
@@ -34,8 +33,6 @@ options 	I686_CPU
 options 	MATH_EMULATE	# floating point emulation
 #options 	VM86		# virtual 8086 emulation
 #options 	USER_LDT	# user-settable LDT; used by WINE
-# eliminate delay no-ops in I/O; recommended on all but very old machines
-#options 	DUMMY_NOPS
 
 # Misc. i386-specific options
 #options 	XSERVER		# X server support in console drivers
@@ -57,7 +54,6 @@ options 	PCIC_ISA_INTR_ALLOC_MASK=0xff5f
 
 # Standard system options
 
-#options 	UCONSOLE	# users can use TIOCCONS (for xconsole)
 options 	INSECURE	# disable kernel security levels
 
 options 	RTC_OFFSET=0	# hardware clock is this many mins. west of GMT
@@ -68,12 +64,14 @@ options 	RTC_OFFSET=0	# hardware clock is this many mins. west of GMT
 #options 	SYSVMSG		# System V-like message queues
 #options 	SYSVSEM		# System V-like semaphores
 #options 	SYSVSHM		# System V-like memory sharing
-#options 	SHMMAXPGS=1024	# 1024 pages is the default
+#options 	SHMMAXPGS=2048	# 2048 pages is the default
 
 #options 	LKM		# loadable kernel modules
 
 options 	USERCONF	# userconf(4) support
-options 	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+options 	PIPE_SOCKETPAIR		# smaller, but slower pipe(2)
+#options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
+options 	MALLOC_NOINLINE		# Not inlining MALLOC saves memory
 
 # Diagnostic/debugging support options
 #options 	DIAGNOSTIC	# expensive kernel consistency checks
@@ -87,14 +85,16 @@ options 	DDB_HISTORY_SIZE=512	# enable history editing in DDB
 #makeoptions	DEBUG="-g"	# compile full symbol table
 
 # Compatibility options
-#options 	COMPAT_NOMID	# compatibility with 386BSD, BSDI, NetBSD 0.8,
-#options 	COMPAT_09	# NetBSD 0.9,
-#options 	COMPAT_10	# NetBSD 1.0,
-#options 	COMPAT_11	# NetBSD 1.1,
-#options 	COMPAT_12	# NetBSD 1.2,
-options 	COMPAT_13	# NetBSD 1.3,
-options 	COMPAT_14	# NetBSD 1.4,
-#options 	COMPAT_43	# and 4.3BSD
+#options 	COMPAT_NOMID	# NetBSD 0.8, 386BSD, and BSDI
+#options 	COMPAT_09	# NetBSD 0.9
+#options 	COMPAT_10	# NetBSD 1.0
+#options 	COMPAT_11	# NetBSD 1.1
+#options 	COMPAT_12	# NetBSD 1.2, 386BSD, and BSDI
+options 	COMPAT_13	# NetBSD 1.3, 386BSD, and BSDI
+options 	COMPAT_14	# NetBSD 1.4
+options 	COMPAT_15	# NetBSD 1.5
+options 	COMPAT_16	# NetBSD 1.6
+#options 	COMPAT_43	# 4.3BSD, 386BSD, and BSDI
 options 	COMPAT_386BSD_MBRPART # recognize old partition ID
 #options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 
@@ -125,7 +125,7 @@ file-system 	KERNFS		# /kern
 #options 	NFSSERVER	# Network File System server
 #options 	EXT2FS_SYSTEM_FLAGS # makes ext2fs file flags (append and
 				# immutable) behave as system flags.
-options 	VNODE_OP_NOINLINE # don't inline vnode op calls
+options 	VNODE_OP_NOINLINE	# Not inlining vnode op calls saves mem
 
 # Networking options
 #options 	GATEWAY		# packet forwarding
@@ -185,6 +185,7 @@ config		netbsd	root on ? type ?
 #
 
 mainbus0 at root
+cpu* at mainbus?
 
 #apm0	at mainbus0			# Advanced power management
 
@@ -328,8 +329,7 @@ ahc* 	at cardbus? dev ? function ?	# Adaptec ADP-1480
 adv*	at cardbus? dev ? function ?	# AdvanSys 1200[A,B], 9xx[U,UA] SCSI
 
 # SCSI bus support
-scsibus* at ahc?
-scsibus* at aic?
+scsibus* at scsi?
 
 # SCSI devices
 sd*	at scsibus? target ? lun ?	# SCSI disk drives
@@ -344,7 +344,21 @@ cd*	at scsibus? target ? lun ?	# SCSI CD-ROM drives
 # The 0x0001 flag force the driver to use DMA, even if the driver doesn't know
 # how to set up DMA modes for this chip. This may work, or may cause
 # a machine hang with some controllers.
-pciide* at pci ? dev ? function ? flags 0x0000
+pciide* 	at pci? dev ? function ? flags 0x0000	# GENERIC pciide driver
+acardide*	at pci? dev ? function ?	# Acard IDE controllers
+aceride* 	at pci? dev ? function ?	# Acer Lab IDE controllers
+artsata*	at pci? dev ? function ?	# Intel i31244 SATA controller
+cmdide* 	at pci? dev ? function ?	# CMD tech IDE controllers
+cypide* 	at pci? dev ? function ?	# Cypress IDE controllers
+#geodeide* 	at pci? dev ? function ?	# AMD Geode IDE controllers
+hptide* 	at pci? dev ? function ?	# Triones/HighPoint IDE controllers
+optiide* 	at pci? dev ? function ?	# Opti IDE controllers
+piixide* 	at pci? dev ? function ?	# Intel IDE controllers
+pdcide* 	at pci? dev ? function ?	# Promise IDE controllers
+satalink*	at pci? dev ? function ?	# SiI SATALink controllers
+siside* 	at pci? dev ? function ?	# SiS IDE controllers
+slide* 		at pci? dev ? function ?	# Symphony Labs IDE controllers
+viaide* 	at pci? dev ? function ?	# VIA/AMD/Nvidia IDE controllers
 
 # ISA Plug-and-Play IDE controllers
 wdc*	at isapnp?
@@ -359,6 +373,9 @@ wdc*	at pcmcia? function ?
 wdc0	at isa? port 0x1f0 irq 14 flags 0x00
 wdc1	at isa? port 0x170 irq 15 flags 0x00
 
+# ATA (IDE) bus support
+atabus* at ata?
+
 # IDE drives
 # Flags are used only with controllers that support DMA operations
 # and mode settings (e.g. some pciide controllers)
@@ -370,12 +387,10 @@ wdc1	at isa? port 0x170 irq 15 flags 0x00
 # 0x0fac means 'use PIO mode 4, DMA mode 2, disable UltraDMA'.
 # (0xc=1100, 0xa=1010, 0xf=1111)
 # 0x0000 means "use whatever the drive claims to support".
-wd*	at wdc? channel ? drive ? flags 0x0000
-wd*	at pciide? channel ? drive ? flags 0x0000
+wd*	at atabus? drive ? flags 0x0000
 
 # ATAPI bus support
-atapibus* at wdc? channel ?
-atapibus* at pciide? channel ?
+atapibus* at atapi?
 
 # ATAPI devices
 # flags have the same meaning as for IDE drives.
@@ -397,12 +412,16 @@ fd*	at fdc? drive ?			# the drives themselves
 # Network Interfaces
 
 # PCI network interfaces
+ath*	at pci? dev ? function ?	# Atheros 5210/5211/5212 802.11
 bce* 	at pci? dev ? function ?	# Broadcom 4401 10/100 Ethernet
+bge* 	at pci? dev ? function ?	# Broadcom 570x gigabit Ethernet
 ex*	at pci? dev ? function ?	# 3Com 90x[BC]
 fxp*	at pci? dev ? function ?	# Intel EtherExpress PRO 10+/100B
 ne* 	at pci? dev ? function ?	# NE2000-compatible Ethernet
+re*	at pci? dev ? function ?	# Realtek 8139C+/8169/8169S/8110S
 rtk* 	at pci? dev ? function ? 	# Realtek 8129/8139
 tlp*	at pci? dev ? function ?	# DECchip 21x4x and clones
+wm*	at pci? dev ? function ?	# Intel 8254x gigabit
 
 # PCMCIA network interfaces
 an*	at pcmcia? function ?		# Aironet PC4500/PC4800 (802.11)
@@ -413,7 +432,7 @@ mbe*	at pcmcia? function ?		# MB8696x based Ethernet
 ne*	at pcmcia? function ?		# NE2000-compatible Ethernet
 ray*	at pcmcia? function ?		# Raytheon Raylink (802.11)
 sm*	at pcmcia? function ?		# Megahertz Ethernet
-wi*	at pcmcia? function ?		# Lucent WaveLan IEEE (802.11)
+wi*	at pcmcia? function ?		# Lucent/Intersil WaveLan IEEE (802.11)
 xi*	at pcmcia? function ?		# Xircom CreditCard Ethernet
 
 mhzc*	at pcmcia? function ?		# Megahertz Ethernet/Modem combo cards
@@ -421,17 +440,22 @@ com*	at mhzc?
 sm*	at mhzc?
 
 # CardBus network cards
+ath*	at cardbus? dev ? function ?	# Atheros 5210/5211/5212 802.11
+atw*	at cardbus? dev ? function ?	# ADMtek ADM8211 (802.11)
 ex* 	at cardbus? dev ? function ?	# 3Com 3C575TX
 fxp* 	at cardbus? dev ? function ? 	# Intel i8255x
 rtk* 	at cardbus? dev ? function ? 	# Realtek 8129/8139
 tlp* 	at cardbus? dev ? function ?	# DECchip 21143
 
 # MII/PHY support
+brgphy*	at mii? phy ?			# Broadcom BCM5400-family PHYs
 exphy*	at mii? phy ?			# 3Com internal PHYs
 icsphy*	at mii? phy ?			# Integrated Circuit Systems ICS189x
+igphy*	at mii? phy ?			# Intel IGP01E1000
 inphy*	at mii? phy ?			# Intel 82555 PHYs
 iophy*	at mii? phy ?			# Intel 82553 PHYs
 lxtphy*	at mii? phy ?			# Level One LXT-970 PHYs
+makphy*	at mii? phy ?			# Marvell Semiconductor 88E1000 PHYs
 nsphy*	at mii? phy ?			# NS83840 PHYs
 nsphyter* at mii? phy ?			# NS83843 PHYs
 qsphy*	at mii? phy ?			# Quality Semiconductor QS6612 PHYs
@@ -444,10 +468,12 @@ ukphy*	at mii? phy ?			# generic unknown PHYs
 # USB Controller and Devices
 
 # PCI USB controllers
+ehci*	at pci?	dev ? function ?	# Enhanced Host Controller
 uhci*	at pci?				# Universal Host Controller (Intel)
 ohci*	at pci?				# Open Host Controller
 
 # USB bus support
+usb*	at ehci?
 usb*	at uhci?
 usb*	at ohci?
 
@@ -474,13 +500,12 @@ uhid*	at uhidev? reportid ?
 
 # USB Mass Storage
 umass*	at uhub? port ? configuration ? interface ?
-atapibus* at umass? channel ?
-scsibus* at umass? channel ?
 
 # USB Ethernet adapters
 aue* 	at uhub? port ?		# ADMtek AN986 Pegasus based adapters
 cue* 	at uhub? port ?		# CATC USB-EL1201A based adapters
 kue* 	at uhub? port ?		# Kawasaki LSI KL5KUSB101B based adapters
+uax*	at uhub? port ?		# ASIX AX88172 based adapters
 url*	at uhub? port ?		# Realtek RTL8150L based adapters
 
 # USB Generic driver
@@ -512,7 +537,7 @@ pseudo-device	pty		2	# pseudo-terminals (Sysinst needs two)
 #pseudo-device	tb		1	# tablet line discipline
 #pseudo-device	sequencer	1	# MIDI sequencer
 # rnd works; RND_COM does not on port i386 yet.
-#pseudo-device	rnd			# /dev/random and in-kernel generator
+pseudo-device	rnd			# /dev/random and in-kernel generator
 #options 	RND_COM			# use "com" randomness as well (BROKEN)
 
 # a pseudo device needed for Coda	# also needs CODA (above)

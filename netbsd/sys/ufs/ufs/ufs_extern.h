@@ -1,4 +1,4 @@
-/*	$NetBSD: ufs_extern.h,v 1.28 2001/12/18 10:57:23 fvdl Exp $	*/
+/*	$NetBSD: ufs_extern.h,v 1.38 2003/08/07 16:34:45 agc Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993, 1994
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -34,6 +30,9 @@
  *
  *	@(#)ufs_extern.h	8.10 (Berkeley) 5/14/95
  */
+
+#ifndef _UFS_UFS_EXTERN_H_
+#define _UFS_UFS_EXTERN_H_
 
 struct buf;
 struct componentname;
@@ -99,9 +98,11 @@ int	ufsfifo_write	__P((void *));
 int	ufsfifo_close	__P((void *));
 
 /* ufs_bmap.c */
-int ufs_bmaparray __P((struct vnode *, ufs_daddr_t, ufs_daddr_t *,
-		       struct indir *, int *, int *));
-int ufs_getlbns __P((struct vnode *, ufs_daddr_t, struct indir *, int *));
+typedef boolean_t (*ufs_issequential_callback_t) __P((const struct ufsmount *, 
+    daddr_t, daddr_t));
+int ufs_bmaparray __P((struct vnode *, daddr_t, daddr_t *, struct indir *,
+			int *, int *, ufs_issequential_callback_t));
+int ufs_getlbns __P((struct vnode *, daddr_t, struct indir *, int *));
 
 /* ufs_ihash.c */
 void ufs_ihashinit __P((void));
@@ -124,16 +125,16 @@ void ufs_makedirentry __P((struct inode *, struct componentname *,
 int ufs_direnter __P((struct vnode *, struct vnode *, struct direct *,
 		      struct componentname *, struct buf *));
 int ufs_dirremove __P((struct vnode *, struct inode *, int, int));
-int ufs_dirrewrite __P((struct inode *, struct inode *, ino_t, int, int));
+int ufs_dirrewrite __P((struct inode *, struct inode *, ino_t, int, int, int));
 int ufs_dirempty __P((struct inode *, ino_t, struct ucred *));
 int ufs_checkpath __P((struct inode *, struct inode *, struct ucred *));
 
 /* ufs_quota.c */
 int getinoquota __P((struct inode *));
-int chkdq __P((struct inode *, long, struct ucred *, int));
-int chkdqchg __P((struct inode *, long, struct ucred *, int));
-int chkiq __P((struct inode *, long, struct ucred *, int));
-int chkiqchg __P((struct inode *, long, struct ucred *, int));
+int chkdq __P((struct inode *, int64_t, struct ucred *, int));
+int chkdqchg __P((struct inode *, int64_t, struct ucred *, int));
+int chkiq __P((struct inode *, int32_t, struct ucred *, int));
+int chkiqchg __P((struct inode *, int32_t, struct ucred *, int));
 void chkdquot __P((struct inode *));
 int quotaon __P((struct proc *, struct mount *, int, caddr_t));
 int quotaoff __P((struct proc *, struct mount *, int));
@@ -164,19 +165,22 @@ void ufs_vinit __P((struct mount *, int (**) __P((void *)),
     int (**) __P((void *)), struct vnode **));
 int ufs_makeinode __P((int, struct vnode *, struct vnode **,
 		       struct componentname *));
+int ufs_gop_alloc __P((struct vnode *, off_t, off_t, int, struct ucred *));
 
 /*
  * Soft dependency function prototypes.
  */
 int   softdep_setup_directory_add __P((struct buf *, struct inode *, off_t,
-                                      long, struct buf *, int));
+                                      ino_t, struct buf *, int));
 void  softdep_change_directoryentry_offset __P((struct inode *, caddr_t,
                                       caddr_t, caddr_t, int));
 void  softdep_setup_remove __P((struct buf *,struct inode *, struct inode *,
                               int));
 void  softdep_setup_directory_change __P((struct buf *, struct inode *,
-                              struct inode *, long, int));
+                              struct inode *, ino_t, int));
 void  softdep_change_linkcnt __P((struct inode *));
 void  softdep_releasefile __P((struct inode *));
 
 __END_DECLS
+
+#endif /* !_UFS_UFS_EXTERN_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_gm.c,v 1.17 2002/03/05 04:12:57 itojun Exp $	*/
+/*	$NetBSD: if_gm.c,v 1.22 2003/08/24 18:02:00 chs Exp $	*/
 
 /*-
  * Copyright (c) 2000 Tsubai Masanari.  All rights reserved.
@@ -25,6 +25,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_gm.c,v 1.22 2003/08/24 18:02:00 chs Exp $");
 
 #include "opt_inet.h"
 #include "opt_ns.h"
@@ -128,9 +131,8 @@ void gmac_mii_writereg __P((struct device *, int, int, int));
 void gmac_mii_statchg __P((struct device *));
 void gmac_mii_tick __P((void *));
 
-struct cfattach gm_ca = {
-	sizeof(struct gmac_softc), gmac_match, gmac_attach
-};
+CFATTACH_DECL(gm, sizeof(struct gmac_softc),
+    gmac_match, gmac_attach, NULL, NULL);
 
 int
 gmac_match(parent, match, aux)
@@ -142,7 +144,8 @@ gmac_match(parent, match, aux)
 
 	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_APPLE &&
 	    (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_APPLE_GMAC ||
-	     PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_APPLE_GMAC2))
+	     PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_APPLE_GMAC2 ||
+	     PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_APPLE_GMAC3))
 		return 1;
 
 	return 0;
@@ -191,7 +194,7 @@ gmac_attach(parent, self, aux)
 		return;
 	}
 
-	/* Setup packet buffers and dma descriptors. */
+	/* Setup packet buffers and DMA descriptors. */
 	p = malloc((NRXBUF + NTXBUF) * 2048 + 3 * 0x800, M_DEVBUF, M_NOWAIT);
 	if (p == NULL) {
 		printf(": cannot malloc buffers\n");

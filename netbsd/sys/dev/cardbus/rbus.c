@@ -1,4 +1,4 @@
-/*	$NetBSD: rbus.c,v 1.14 2002/04/22 19:29:55 matt Exp $	*/
+/*	$NetBSD: rbus.c,v 1.19 2003/11/02 09:56:38 wiz Exp $	*/
 /*
  * Copyright (c) 1999 and 2000
  *     HAYAKAWA Koichi.  All rights reserved.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rbus.c,v 1.14 2002/04/22 19:29:55 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rbus.c,v 1.19 2003/11/02 09:56:38 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -92,11 +92,11 @@ rbus_space_alloc_subregion(rbt, substart, subend, addr, size, mask, align, flags
 	bus_addr_t decodesize = mask + 1;
 	bus_addr_t boundary, search_addr;
 	int val;
-	bus_addr_t result;
+	u_long result;
 	int exflags = EX_FAST | EX_NOWAIT | EX_MALLOCOK;
 
 	DPRINTF(("rbus_space_alloc: addr %lx, size %lx, mask %lx, align %lx\n",
-	    addr, size, mask, align));
+	    (u_long)addr, (u_long)size, (u_long)mask, (u_long)align));
 
 	addr += rbt->rb_offset;
 
@@ -124,14 +124,14 @@ rbus_space_alloc_subregion(rbt, substart, subend, addr, size, mask, align, flags
 
 		if (decodesize == align) {
 			if(extent_alloc_subregion(rbt->rb_ext, substart,
-			    subend, size, align, 0, exflags, (u_long *)&result)) {
+			    subend, size, align, 0, exflags, &result)) {
 				return 1;
 			}
 		} else if (decodesize == 0) {
 			/* maybe, the resister is overflowed. */
       
 			if (extent_alloc_subregion(rbt->rb_ext, addr,
-			    addr + size, size, 1, 0, exflags, (u_long *)&result)) {
+			    addr + size, size, 1, 0, exflags, &result)) {
 				return 1;
 			}
 		} else {
@@ -149,9 +149,10 @@ rbus_space_alloc_subregion(rbt, substart, subend, addr, size, mask, align, flags
 			     search_addr += boundary) {
 				val = extent_alloc_subregion(rbt->rb_ext,
 				    search_addr, search_addr + size, size,
-				    align, 0, exflags, (u_long *)&result);
+				    align, 0, exflags, &result);
 				DPRINTF(("rbus: trying [%lx:%lx] %lx\n",
-				    search_addr, search_addr + size, align));
+				    (u_long)search_addr,
+				    (u_long)search_addr + size, (u_long)align));
 				if (val == 0) {
 					break;
 				}
@@ -173,13 +174,11 @@ rbus_space_alloc_subregion(rbt, substart, subend, addr, size, mask, align, flags
 			*addrp = result + rbt->rb_offset;
 		}
 		return 0;
-
 	} else {
 		/* error!! */
 		DPRINTF(("rbus: no rbus type\n"));
 		return 1;
 	}
-	return 1;
 }
 
 
@@ -240,7 +239,7 @@ rbus_new_body(bt, parent, ex, start, end, offset, flags)
 		if (start < parent->rb_start || end > parent->rb_end) {
 			/*
 			 * out of range: [start, size] should be
-			 * containd in parent space
+			 * contained in parent space
 			 */
 			return 0;
 			/* Should I invoke panic? */
@@ -260,7 +259,8 @@ rbus_new_body(bt, parent, ex, start, end, offset, flags)
 	rb->rb_flags = flags;
 	rb->rb_ext = ex;
 
-	DPRINTF(("rbus_new_body: [%lx, %lx] type %s name [%s]\n", start, end,
+	DPRINTF(("rbus_new_body: [%lx, %lx] type %s name [%s]\n",
+	    (u_long)start, (u_long)end,
 	    flags == RBUS_SPACE_SHARE ? "share" :
 	    flags == RBUS_SPACE_DEDICATE ? "dedicated" :
 	    flags == RBUS_SPACE_ASK_PARENT ? "parent" : "invalid",
@@ -366,7 +366,7 @@ rbus_new_root_share(bt, ex, start, size, offset)
 	/* sanity check */
 	if (start < ex->ex_start || start + size > ex->ex_end) {
 		/*
-		 * out of range: [start, size] should be containd in
+		 * out of range: [start, size] should be contained in
 		 * parent space
 		 */
 		return 0;

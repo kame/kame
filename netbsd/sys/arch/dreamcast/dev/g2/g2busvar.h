@@ -1,4 +1,4 @@
-/*	$NetBSD: g2busvar.h,v 1.2 2002/03/24 18:21:24 uch Exp $	*/
+/*	$NetBSD: g2busvar.h,v 1.4 2002/12/27 11:34:05 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 2001 Marcus Comstedt
@@ -64,5 +64,6 @@ struct g2bus_softc {
 };
 
 void	g2bus_bus_mem_init(struct g2bus_softc *);
+void	g2bus_set_bus_mem_sparse(bus_space_tag_t);
 
-#endif /* _DREAMCAST_SHBVAR_H_ */
+#endif /* _DREAMCAST_G2BUSVAR_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: asc.c,v 1.39 2000/07/30 21:40:49 briggs Exp $	*/
+/*	$NetBSD: asc.c,v 1.45 2003/07/15 02:43:24 lukem Exp $	*/
 
 /*
  * Copyright (C) 1997 Scott Reynolds
@@ -63,6 +63,9 @@
  * ASC driver code and console bell support
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: asc.c,v 1.45 2003/07/15 02:43:24 lukem Exp $");
+
 #include <sys/types.h>
 #include <sys/cdefs.h>
 #include <sys/errno.h>
@@ -70,7 +73,7 @@
 #include <sys/systm.h>
 #include <sys/param.h>
 #include <sys/device.h>
-#include <sys/poll.h>
+#include <sys/conf.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -106,11 +109,22 @@ static void	asc_intr __P((void *));
 static int	ascmatch __P((struct device *, struct cfdata *, void *));
 static void	ascattach __P((struct device *, struct device *, void *));
 
-struct cfattach asc_ca = {
-	sizeof(struct asc_softc), ascmatch, ascattach
-};
+CFATTACH_DECL(asc, sizeof(struct asc_softc),
+    ascmatch, ascattach, NULL, NULL);
 
 extern struct cfdriver asc_cd;
+
+dev_type_open(ascopen);
+dev_type_close(ascclose);
+dev_type_read(ascread);
+dev_type_write(ascwrite);
+dev_type_ioctl(ascioctl);
+dev_type_mmap(ascmmap);
+
+const struct cdevsw asc_cdevsw = {
+	ascopen, ascclose, ascread, ascwrite, ascioctl,
+	nostop, notty, nopoll, ascmmap, nokqfilter,
+};
 
 static int
 ascmatch(parent, cf, aux)
@@ -257,7 +271,7 @@ ascwrite(dev, uio, ioflag)
 int
 ascioctl(dev, cmd, data, flag, p)
 	dev_t dev;
-	int cmd;
+	u_long cmd;
 	caddr_t data;
 	int flag;
 	struct proc *p;
@@ -275,15 +289,6 @@ ascioctl(dev, cmd, data, flag, p)
 		break;
 	}
 	return (error);
-}
-
-int
-ascpoll(dev, events, p)
-	dev_t dev;
-	int events;
-	struct proc *p;
-{
-	return (events & (POLLOUT | POLLWRNORM));
 }
 
 paddr_t

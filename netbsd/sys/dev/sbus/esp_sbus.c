@@ -1,4 +1,4 @@
-/*	$NetBSD: esp_sbus.c,v 1.20.6.2 2002/11/22 17:50:36 tron Exp $	*/
+/*	$NetBSD: esp_sbus.c,v 1.29 2004/03/17 17:04:58 pk Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: esp_sbus.c,v 1.20.6.2 2002/11/22 17:50:36 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: esp_sbus.c,v 1.29 2004/03/17 17:04:58 pk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -83,13 +83,11 @@ void	espattach_dma	__P((struct device *, struct device *, void *));
 int	espmatch_sbus	__P((struct device *, struct cfdata *, void *));
 
 
-/* Linkup to the rest of the kernel */
-struct cfattach esp_sbus_ca = {
-	sizeof(struct esp_softc), espmatch_sbus, espattach_sbus
-};
-struct cfattach esp_dma_ca = {
-	sizeof(struct esp_softc), espmatch_sbus, espattach_dma
-};
+CFATTACH_DECL(esp_sbus, sizeof(struct esp_softc),
+    espmatch_sbus, espattach_sbus, NULL, NULL);
+
+CFATTACH_DECL(esp_dma, sizeof(struct esp_softc),
+    espmatch_sbus, espattach_dma, NULL, NULL);
 
 /*
  * Functions and the switch for the MI code.
@@ -147,7 +145,7 @@ espmatch_sbus(parent, cf, aux)
 	if (strcmp("SUNW,fas", sa->sa_name) == 0)
 	        return 1;
 
-	rv = (strcmp(cf->cf_driver->cd_name, sa->sa_name) == 0 ||
+	rv = (strcmp(cf->cf_name, sa->sa_name) == 0 ||
 	    strcmp("ptscII", sa->sa_name) == 0);
 	return (rv);
 }
@@ -166,8 +164,8 @@ espattach_sbus(parent, self, aux)
 	esc->sc_bustag = sa->sa_bustag;
 	esc->sc_dmatag = sa->sa_dmatag;
 
-	sc->sc_id = PROM_getpropint(sa->sa_node, "initiator-id", 7);
-	sc->sc_freq = PROM_getpropint(sa->sa_node, "clock-frequency", -1);
+	sc->sc_id = prom_getpropint(sa->sa_node, "initiator-id", 7);
+	sc->sc_freq = prom_getpropint(sa->sa_node, "clock-frequency", -1);
 	if (sc->sc_freq < 0)
 		sc->sc_freq = ((struct sbus_softc *)
 		    sc->sc_dev.dv_parent)->sc_clockfreq;
@@ -233,7 +231,7 @@ espattach_sbus(parent, self, aux)
 		if (sbusburst == 0)
 			sbusburst = SBUS_BURST_32 - 1; /* 1->16 */
 
-		burst = PROM_getpropint(sa->sa_node, "burst-sizes", -1);
+		burst = prom_getpropint(sa->sa_node, "burst-sizes", -1);
 
 #if ESP_SBUS_DEBUG
 		printf("espattach_sbus: burst 0x%x, sbus 0x%x\n",
@@ -373,8 +371,8 @@ espattach_dma(parent, self, aux)
 	esc->sc_bustag = sa->sa_bustag;
 	esc->sc_dmatag = sa->sa_dmatag;
 
-	sc->sc_id = PROM_getpropint(sa->sa_node, "initiator-id", 7);
-	sc->sc_freq = PROM_getpropint(sa->sa_node, "clock-frequency", -1);
+	sc->sc_id = prom_getpropint(sa->sa_node, "initiator-id", 7);
+	sc->sc_freq = prom_getpropint(sa->sa_node, "clock-frequency", -1);
 
 	esc->sc_dma = (struct lsi64854_softc *)parent;
 	esc->sc_dma->sc_client = sc;
@@ -432,7 +430,7 @@ espattach(esc, gluep)
 	 */
 	sc->sc_glue = gluep;
 
-	/* gimme Mhz */
+	/* gimme MHz */
 	sc->sc_freq /= 1000000;
 
 	/*
@@ -524,7 +522,7 @@ espattach(esc, gluep)
 	}
 
 	/* Establish interrupt channel */
-	icookie = bus_intr_establish(esc->sc_bustag, esc->sc_pri, IPL_BIO, 0,
+	icookie = bus_intr_establish(esc->sc_bustag, esc->sc_pri, IPL_BIO,
 				     ncr53c9x_intr, sc);
 
 	/* register interrupt stats */

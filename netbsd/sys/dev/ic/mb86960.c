@@ -1,4 +1,4 @@
-/*	$NetBSD: mb86960.c,v 1.50 2001/11/13 13:14:41 lukem Exp $	*/
+/*	$NetBSD: mb86960.c,v 1.57 2003/11/02 11:07:45 wiz Exp $	*/
 
 /*
  * All Rights Reserved, Copyright (C) Fujitsu Limited 1995
@@ -32,9 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mb86960.c,v 1.50 2001/11/13 13:14:41 lukem Exp $");
-
-#define FE_VERSION "if_fe.c ver. 0.8"
+__KERNEL_RCSID(0, "$NetBSD: mb86960.c,v 1.57 2003/11/02 11:07:45 wiz Exp $");
 
 /*
  * Device driver for Fujitsu MB86960A/MB86965A based Ethernet cards.
@@ -96,6 +94,7 @@ __KERNEL_RCSID(0, "$NetBSD: mb86960.c,v 1.50 2001/11/13 13:14:41 lukem Exp $");
 #include <dev/ic/mb86960var.h>
 
 #ifndef __BUS_SPACE_HAS_STREAM_METHODS
+#define bus_space_write_stream_2	bus_space_write_2
 #define bus_space_write_multi_stream_2	bus_space_write_multi_2
 #define bus_space_read_multi_stream_2	bus_space_read_multi_2
 #endif /* __BUS_SPACE_HAS_STREAM_METHODS */
@@ -108,16 +107,16 @@ void	mb86960_reset	__P((struct mb86960_softc *));
 void	mb86960_watchdog __P((struct ifnet *));
 
 /* Local functions.  Order of declaration is confused.  FIXME. */
-int	mb86960_get_packet __P((struct mb86960_softc *, int));
+int	mb86960_get_packet __P((struct mb86960_softc *, u_int));
 void	mb86960_stop __P((struct mb86960_softc *));
-void	mb86960_tint __P((struct mb86960_softc *, u_char));
-void	mb86960_rint __P((struct mb86960_softc *, u_char));
+void	mb86960_tint __P((struct mb86960_softc *, u_int8_t));
+void	mb86960_rint __P((struct mb86960_softc *, u_int8_t));
 static __inline__
 void	mb86960_xmit __P((struct mb86960_softc *));
 void	mb86960_write_mbufs __P((struct mb86960_softc *, struct mbuf *));
 static __inline__
 void	mb86960_droppacket __P((struct mb86960_softc *));
-void	mb86960_getmcaf __P((struct ethercom *, u_char *));
+void	mb86960_getmcaf __P((struct ethercom *, u_int8_t *));
 void	mb86960_setmode __P((struct mb86960_softc *));
 void	mb86960_loadmar __P((struct mb86960_softc *));
 
@@ -129,41 +128,37 @@ void	mb86960_dump __P((int, struct mb86960_softc *));
 #endif
 
 void
-mb86960_attach(sc, type, myea)
+mb86960_attach(sc, myea)
 	struct mb86960_softc *sc;
-	enum mb86960_type type;
 	u_int8_t *myea;
 {
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
 
-	sc->type = type;
-
 	/* Register values which depend on board design. */
 	sc->proto_dlcr4 = FE_D4_LBC_DISABLE | FE_D4_CNTRL;
 	sc->proto_dlcr5 = 0;
+	sc->proto_dlcr7 = FE_D7_BYTSWP_LH;
+	if ((sc->sc_flags & FE_FLAGS_MB86960) != 0)
+		sc->proto_dlcr7 |= FE_D7_ED_TEST; /* XXX */
 	sc->proto_bmpr13 = FE_B13_TPTYPE_UTP | FE_B13_PORT_AUTO;
 
-	switch (sc->type) {
-	case MB86960_TYPE_86960:
-		sc->proto_dlcr7 = FE_D7_BYTSWP_LH | FE_D7_IDENT_EC;
-		break;
-	case MB86960_TYPE_86965:
-		sc->proto_dlcr7 = FE_D7_BYTSWP_LH;
-		break;
-	}
-
 	/*
-	 * Program the 86960 as follows:
+	 * Program the 86960 as following defaults:
 	 *	SRAM: 32KB, 100ns, byte-wide access.
 	 *	Transmission buffer: 4KB x 2.
 	 *	System bus interface: 16 bits.
-	 * We cannot change these values but TXBSIZE, because they
-	 * are hard-wired on the board.  Modifying TXBSIZE will affect
+	 * These values except TXBSIZE should be modified as per
+	 * sc_flags which is set in MD attachments, because they
+	 * are hard-wired on the board. Modifying TXBSIZE will affect
 	 * the driver performance.
 	 */
 	sc->proto_dlcr6 = FE_D6_BUFSIZ_32KB | FE_D6_TXBSIZ_2x4KB |
-	    FE_D6_BBW_BYTE | FE_D6_SBW_WORD | FE_D6_SRAM_100ns;
+	    FE_D6_BBW_BYTE | FE_D6_SRAM_100ns;
+	if (sc->sc_flags & FE_FLAGS_SBW_BYTE)
+		sc->proto_dlcr6 |= FE_D6_SBW_BYTE;
+	if (sc->sc_flags & FE_FLAGS_SRAM_150ns)
+		sc->proto_dlcr6 &= ~FE_D6_SRAM_100ns;
 
 	/*
 	 * Minimum initialization of the hardware.
@@ -222,7 +217,7 @@ mb86960_config(sc, media, nmedia, defmedia)
 
 #if FE_SINGLE_TRANSMISSION
 	/* Override txb config to allocate minimum. */
-	sc->proto_dlcr6 &= ~FE_D6_TXBSIZ
+	sc->proto_dlcr6 &= ~FE_D6_TXBSIZ;
 	sc->proto_dlcr6 |=  FE_D6_TXBSIZ_2x2KB;
 #endif
 
@@ -337,7 +332,7 @@ mb86960_config(sc, media, nmedia, defmedia)
 #endif
 
 	/* The attach is successful. */
-	sc->sc_flags |= FE_FLAGS_ATTACHED;
+	sc->sc_stat |= FE_STAT_ATTACHED;
 }
 
 /*
@@ -364,7 +359,7 @@ mb86960_mediastatus(ifp, ifmr)
 {
 	struct mb86960_softc *sc = ifp->if_softc;
 
-	if ((sc->sc_flags & FE_FLAGS_ENABLED) == 0) {
+	if ((sc->sc_stat & FE_STAT_ENABLED) == 0) {
 		ifmr->ifm_active = IFM_ETHER | IFM_NONE;
 		ifmr->ifm_status = 0;
 		return;
@@ -733,7 +728,7 @@ mb86960_start(ifp)
 	 */
 	if (sc->filter_change) {
 		/*
-		 * Filter change requst is delayed only when the DLC is
+		 * Filter change request is delayed only when the DLC is
 		 * working.  DLC soon raise an interrupt after finishing
 		 * the work.
 		 */
@@ -756,7 +751,7 @@ mb86960_start(ifp)
 		 * buffer can hold 130 blocks of 62 bytes long...
 		 */
 		if (sc->txb_free <
-		    (ETHER_MAX_LEN - ETHER_CRC_LEN) + FE_DATA_LEN_LEN) {
+		    (ETHER_MAX_LEN - ETHER_CRC_LEN) + FE_TXLEN_SIZE) {
 			/* No room. */
 			goto indicate_active;
 		}
@@ -825,7 +820,7 @@ indicate_active:
 void
 mb86960_tint(sc, tstat)
 	struct mb86960_softc *sc;
-	u_char tstat;
+	u_int8_t tstat;
 {
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
@@ -966,13 +961,12 @@ mb86960_tint(sc, tstat)
 void
 mb86960_rint(sc, rstat)
 	struct mb86960_softc *sc;
-	u_char rstat;
+	u_int8_t rstat;
 {
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
 	struct ifnet *ifp = &sc->sc_ec.ec_if;
-	int len;
-	u_char status;
+	u_int status, len;
 	int i;
 
 	/*
@@ -992,7 +986,7 @@ mb86960_rint(sc, rstat)
 
 	/*
 	 * MB86960 has a flag indicating "receive queue empty."
-	 * We just loop cheking the flag to pull out all received
+	 * We just loop checking the flag to pull out all received
 	 * packets.
 	 *
 	 * We limit the number of iterrations to avoid infinite loop.
@@ -1006,12 +1000,15 @@ mb86960_rint(sc, rstat)
 			break;
 
 		/*
-		 * Extract A receive status byte.
-		 * As our 86960 is in 16 bit bus access mode, we have to
-		 * use inw() to get the status byte.  The significant
-		 * value is returned in lower 8 bits.
+		 * Extract receive packet status from the receive
+		 * packet header.
 		 */
-		status = (u_char)bus_space_read_2(bst, bsh, FE_BMPR8);
+		if (sc->sc_flags & FE_FLAGS_SBW_BYTE) {
+			status = bus_space_read_1(bst, bsh, FE_BMPR8);
+			(void)bus_space_read_1(bst, bsh, FE_BMPR8);
+		} else
+			status = bus_space_read_2(bst, bsh, FE_BMPR8);
+
 #if FE_DEBUG >= 4
 		log(LOG_INFO, "%s: receive status = %02x\n",
 		    sc->sc_dev.dv_xname, status);
@@ -1022,7 +1019,7 @@ mb86960_rint(sc, rstat)
 		 * the packet, unless the interface is in promiscuous
 		 * mode.
 		 */
-		if ((status & 0xF0) != 0x20) {	/* XXXX ? */
+		if ((status & FE_RXSTAT_GOODPKT) == 0) {
 			if ((ifp->if_flags & IFF_PROMISC) == 0) {
 				ifp->if_ierrors++;
 				mb86960_droppacket(sc);
@@ -1031,11 +1028,15 @@ mb86960_rint(sc, rstat)
 		}
 
 		/*
-		 * Extract the packet length.
+		 * Extract the packet length from the receive packet header.
 		 * It is a sum of a header (14 bytes) and a payload.
 		 * CRC has been stripped off by the 86960.
 		 */
-		len = bus_space_read_2(bst, bsh, FE_BMPR8);
+		if (sc->sc_flags & FE_FLAGS_SBW_BYTE) {
+			len  = bus_space_read_1(bst, bsh, FE_BMPR8);
+			len |= bus_space_read_1(bst, bsh, FE_BMPR8) << 8;
+		} else
+			len = bus_space_read_2(bst, bsh, FE_BMPR8);
 
 		/*
 		 * MB86965 checks the packet length and drop big packet
@@ -1076,7 +1077,7 @@ mb86960_rint(sc, rstat)
 		/*
 		 * Go get a packet.
 		 */
-		if (!mb86960_get_packet(sc, len)) {
+		if (mb86960_get_packet(sc, len) == 0) {
 			/* Skip a packet, updating statistics. */
 #if FE_DEBUG >= 2
 			log(LOG_WARNING,
@@ -1110,9 +1111,9 @@ mb86960_intr(arg)
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
 	struct ifnet *ifp = &sc->sc_ec.ec_if;
-	u_char tstat, rstat;
+	u_int8_t tstat, rstat;
 
-	if ((sc->sc_flags & FE_FLAGS_ENABLED) == 0 ||
+	if ((sc->sc_stat & FE_STAT_ENABLED) == 0 ||
 	    (sc->sc_dev.dv_flags & DVF_ACTIVE) == 0)
 		return (0);
 
@@ -1284,7 +1285,7 @@ mb86960_ioctl(ifp, cmd, data)
 
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
-		if ((sc->sc_flags & FE_FLAGS_ENABLED) == 0) {
+		if ((sc->sc_stat & FE_STAT_ENABLED) == 0) {
 			error = EIO;
 			break;
 		}
@@ -1326,7 +1327,7 @@ mb86960_ioctl(ifp, cmd, data)
 int
 mb86960_get_packet(sc, len)
 	struct mb86960_softc *sc;
-	int len;
+	u_int len;
 {
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
@@ -1350,7 +1351,7 @@ mb86960_get_packet(sc, len)
 	 * least MINCLSIZE (208 bytes) to allocate a cluster.  For a
 	 * packet of a size between (MHLEN - 2) to (MINCLSIZE - 2),
 	 * our code violates the rule...
-	 * On the other hand, the current code is short, simle,
+	 * On the other hand, the current code is short, simple,
 	 * and fast, however.  It does no harmful thing, just waists
 	 * some memory.  Any comments?  FIXME.
 	 */
@@ -1374,8 +1375,12 @@ mb86960_get_packet(sc, len)
 	m->m_len = len;
 
 	/* Get a packet. */
-	bus_space_read_multi_stream_2(bst, bsh, FE_BMPR8, mtod(m, u_int16_t *),
-			       (len + 1) >> 1);
+	if (sc->sc_flags & FE_FLAGS_SBW_BYTE)
+		bus_space_read_multi_1(bst, bsh, FE_BMPR8,
+		    mtod(m, u_int8_t *), len);
+	else
+		bus_space_read_multi_stream_2(bst, bsh, FE_BMPR8,
+		    mtod(m, u_int16_t *), (len + 1) >> 1);
 
 #if NBPFILTER > 0
 	/*
@@ -1414,22 +1419,21 @@ mb86960_write_mbufs(sc, m)
 {
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
-	u_char *data;
-	u_short savebyte;	/* WARNING: Architecture dependent! */
-	int totlen, len, wantbyte;
+	int totlen, len;
 #if FE_DEBUG >= 2
 	struct mbuf *mp;
 #endif
 
-	/* XXX thorpej 960116 - quiet bogus compiler warning. */
-	savebyte = 0;
-
 #if FE_DELAYED_PADDING
 	/* Do the "delayed padding." */
-	len = sc->txb_padding >> 1;
-	if (len > 0) {
-		while (--len >= 0)
-			bus_space_write_2(bst, bsh, FE_BMPR8, 0);
+	if (sc->txb_padding > 0) {
+		if (sc->sc_flags & FE_FLAGS_SBW_BYTE) {
+			for (len = sc->txb_padding; len > 0; len--)
+				bus_space_write_1(bst, bsh, FE_BMPR8, 0);
+		} else {
+			for (len = sc->txb_padding >> 1; len > 0; len--)
+				bus_space_write_2(bst, bsh, FE_BMPR8, 0);
+		}
 		sc->txb_padding = 0;
 	}
 #endif
@@ -1475,15 +1479,22 @@ mb86960_write_mbufs(sc, m)
 	 * packet in the transmission buffer, we can skip the
 	 * padding process.  It may gain performance slightly.  FIXME.
 	 */
-	bus_space_write_2(bst, bsh, FE_BMPR8,
-	    max(totlen, (ETHER_MIN_LEN - ETHER_CRC_LEN)));
+	len = max(totlen, (ETHER_MIN_LEN - ETHER_CRC_LEN));
+	if (sc->sc_flags & FE_FLAGS_SBW_BYTE) {
+		bus_space_write_1(bst, bsh, FE_BMPR8, len);
+		bus_space_write_1(bst, bsh, FE_BMPR8, len >> 8);
+	} else {
+		bus_space_write_2(bst, bsh, FE_BMPR8, len);
+		/* roundup packet length since we will use word access */
+		totlen = (totlen + 1) & ~1;
+	}
 
 	/*
 	 * Update buffer status now.
-	 * Truncate the length up to an even number, since we use outw().
+	 * Truncate the length up to an even number
+	 * if the chip is set in SBW_WORD mode.
 	 */
-	totlen = (totlen + 1) & ~1;
-	sc->txb_free -= FE_DATA_LEN_LEN +
+	sc->txb_free -= FE_TXLEN_SIZE +
 	    max(totlen, (ETHER_MIN_LEN - ETHER_CRC_LEN));
 	sc->txb_count++;
 
@@ -1495,53 +1506,94 @@ mb86960_write_mbufs(sc, m)
 
 	/*
 	 * Transfer the data from mbuf chain to the transmission buffer. 
-	 * MB86960 seems to require that data be transferred as words, and
-	 * only words.  So that we require some extra code to patch
-	 * over odd-length mbufs.
+	 * If the MB86960 is configured in word mode, data needs to be
+	 * transferred as words, and only words.
+	 * So that we require some extra code to patch over odd-length
+	 * or unaligned mbufs.
 	 */
-	wantbyte = 0;
-	for (; m != 0; m = m->m_next) {
-		/* Ignore empty mbuf. */
-		len = m->m_len;
-		if (len == 0)
-			continue;
-
-		/* Find the actual data to send. */
-		data = mtod(m, caddr_t);
-
-		/* Finish the last byte. */
-		if (wantbyte) {
-			bus_space_write_2(bst, bsh, FE_BMPR8,
-			    savebyte | (*data << 8));
-			data++;
-			len--;
-			wantbyte = 0;
+	if (sc->sc_flags & FE_FLAGS_SBW_BYTE) {
+		/* It's simple in byte mode. */
+		for (; m != NULL; m = m->m_next) {
+			if (m->m_len) {
+				bus_space_write_multi_1(bst, bsh, FE_BMPR8,
+				    mtod(m, u_int8_t *), m->m_len);
+			}
 		}
+	} else {
+		/* a bit trickier in word mode. */
+		u_int8_t *data, savebyte[2];
+		int leftover;
 
-		/* Output contiguous words. */
-		if (len > 1)
-			bus_space_write_multi_stream_2(bst, bsh, FE_BMPR8,
-						(u_int16_t *)data, len >> 1);
+		leftover = 0;
+		savebyte[0] = savebyte[1] = 0;
 
-		/* Save remaining byte, if there is one. */
-		if (len & 1) {
-			data += len & ~1;
-			savebyte = *data;
-			wantbyte = 1;
+		for (; m != NULL; m = m->m_next) {
+			len = m->m_len;
+			if (len == 0)
+				continue;
+			data = mtod(m, u_int8_t *);
+			while (len > 0) {
+				if (leftover) {
+					/*
+					 * Data left over (from mbuf or
+					 * realignment). Buffer the next
+					 * byte, and write it and the
+					 * leftover data out.
+					 */
+					savebyte[1] = *data++;
+					len--;
+					bus_space_write_stream_2(bst, bsh,
+					   FE_BMPR8, *(u_int16_t *)savebyte);
+					leftover = 0; 
+				} else if (BUS_SPACE_ALIGNED_POINTER(data,
+				    u_int16_t) == 0) {
+					/*
+					 * Unaligned data; buffer the next byte.
+					 */
+					savebyte[0] = *data++;
+					len--;
+					leftover = 1;
+				} else {
+					/*
+					 * Aligned data; output contiguous
+					 * words as much as we can, then
+					 * buffer the remaining byte, if any.
+					 */
+					leftover = len & 1;
+					len &= ~1;
+					bus_space_write_multi_stream_2(bst, bsh,
+					    FE_BMPR8, (u_int16_t *)data,
+					    len >> 1);
+					data += len;
+					if (leftover)
+						savebyte[0] = *data++;
+					len = 0;
+				}
+			}
+			if (len < 0)
+				panic("mb86960_write_mbufs: negative len");
+		}
+		if (leftover) {
+			savebyte[1] = 0;
+			bus_space_write_stream_2(bst, bsh, FE_BMPR8,
+			    *(u_int16_t *)savebyte);
 		}
 	}
-
-	/* Spit the last byte, if the length is odd. */
-	if (wantbyte)
-		bus_space_write_2(bst, bsh, FE_BMPR8, savebyte);
-
-#if ! FE_DELAYED_PADDING
+#if FE_DELAYED_PADDING == 0
 	/*
 	 * Pad the packet to the minimum length if necessary.
 	 */
-	len = ((ETHER_MIN_LEN - ETHER_CRC_LEN) >> 1) - (totlen >> 1);
-	while (--len >= 0)
-		bus_space_write_2(bst, bsh, FE_BMPR8, 0);
+	len = (ETHER_MIN_LEN - ETHER_CRC_LEN) - totlen;
+	if (len > 0) {
+		if (sc->sc_flags & FE_FLAGS_SBW_BYTE) {
+			while (len-- > 0)
+				bus_space_write_1(bst, bsh, FE_BMPR8, 0);
+		} else {
+			len >>= 1;
+			while (len-- > 0)
+				bus_space_write_2(bst, bsh, FE_BMPR8, 0);
+		}
+	}
 #endif
 }
 
@@ -1552,7 +1604,7 @@ mb86960_write_mbufs(sc, m)
 void
 mb86960_getmcaf(ec, af)
 	struct ethercom *ec;
-	u_char *af;
+	u_int8_t *af;
 {
 	struct ifnet *ifp = &ec->ec_if;
 	struct ether_multi *enm;
@@ -1570,7 +1622,7 @@ mb86960_getmcaf(ec, af)
 	if ((ifp->if_flags & IFF_PROMISC) != 0)
 		goto allmulti;
 
-	af[0] = af[1] = af[2] = af[3] = af[4] = af[5] = af[6] = af[7] = 0x00;
+	memset(af, 0, FE_FILTER_LEN);
 	ETHER_FIRST_MULTI(step, ec, enm);
 	while (enm != NULL) {
 		if (memcmp(enm->enm_addrlo, enm->enm_addrhi,
@@ -1601,7 +1653,7 @@ mb86960_getmcaf(ec, af)
 
 allmulti:
 	ifp->if_flags |= IFF_ALLMULTI;
-	af[0] = af[1] = af[2] = af[3] = af[4] = af[5] = af[6] = af[7] = 0xff;
+	memset(af, 0xff, FE_FILTER_LEN);
 }
 
 /*
@@ -1677,7 +1729,7 @@ mb86960_setmode(sc)
 	 *
 	 * Note that the DLC (Data Linc Control unit, i.e. transmitter
 	 * and receiver) must be stopped when feeding the filter, and
-	 * DLC trushes all packets in both transmission and receive
+	 * DLC trashes all packets in both transmission and receive
 	 * buffers when stopped.
 	 *
 	 * ... Are the above sentenses correct?  I have to check the
@@ -1760,7 +1812,7 @@ mb86960_enable(sc)
 	log(LOG_INFO, "%s: mb86960_enable()\n", sc->sc_dev.dv_xname);
 #endif
 
-	if ((sc->sc_flags & FE_FLAGS_ENABLED) == 0 && sc->sc_enable != NULL) {
+	if ((sc->sc_stat & FE_STAT_ENABLED) == 0 && sc->sc_enable != NULL) {
 		if ((*sc->sc_enable)(sc) != 0) {
 			printf("%s: device enable failed\n",
 			    sc->sc_dev.dv_xname);
@@ -1768,7 +1820,7 @@ mb86960_enable(sc)
 		}
 	}
 
-	sc->sc_flags |= FE_FLAGS_ENABLED;
+	sc->sc_stat |= FE_STAT_ENABLED;
 	return (0);
 }
 
@@ -1784,9 +1836,9 @@ mb86960_disable(sc)
 	log(LOG_INFO, "%s: mb86960_disable()\n", sc->sc_dev.dv_xname);
 #endif
 
-	if ((sc->sc_flags & FE_FLAGS_ENABLED) != 0 && sc->sc_disable != NULL) {
+	if ((sc->sc_stat & FE_STAT_ENABLED) != 0 && sc->sc_disable != NULL) {
 		(*sc->sc_disable)(sc);
-		sc->sc_flags &= ~FE_FLAGS_ENABLED;
+		sc->sc_stat &= ~FE_STAT_ENABLED;
 	}
 }
 
@@ -1801,8 +1853,9 @@ mb86960_activate(self, act)
 	enum devact act;
 {
 	struct mb86960_softc *sc = (struct mb86960_softc *)self;
-	int rv = 0, s;
+	int rv, s;
 
+	rv = 0;
 	s = splnet();
 	switch (act) {
 	case DVACT_ACTIVATE:
@@ -1829,7 +1882,7 @@ mb86960_detach(sc)
 	struct ifnet *ifp = &sc->sc_ec.ec_if;
 
 	/* Succeed now if there's no work to do. */
-	if ((sc->sc_flags & FE_FLAGS_ATTACHED) == 0)
+	if ((sc->sc_stat & FE_STAT_ATTACHED) == 0)
 		return (0);
 
 	/* Delete all media. */
@@ -1846,6 +1899,85 @@ mb86960_detach(sc)
 	return (0);
 }
 
+/*
+ * Routines to read all bytes from the config EEPROM (93C06) through MB86965A.
+ */
+void
+mb86965_read_eeprom(iot, ioh, data)
+	bus_space_tag_t iot;
+	bus_space_handle_t ioh;
+	u_int8_t *data;
+{
+	int addr, op, bit;
+	u_int16_t val;
+
+	/* Read bytes from EEPROM; two bytes per an iteration. */
+	for (addr = 0; addr < FE_EEPROM_SIZE / 2; addr++) {
+		/* Reset the EEPROM interface. */
+		bus_space_write_1(iot, ioh, FE_BMPR16, 0x00);
+		bus_space_write_1(iot, ioh, FE_BMPR17, 0x00);
+		bus_space_write_1(iot, ioh, FE_BMPR16, FE_B16_SELECT);
+
+		/* Send start bit. */
+		bus_space_write_1(iot, ioh, FE_BMPR17, FE_B17_DATA);
+		FE_EEPROM_DELAY();
+		bus_space_write_1(iot, ioh,
+		    FE_BMPR16, FE_B16_SELECT | FE_B16_CLOCK);
+		FE_EEPROM_DELAY();
+		bus_space_write_1(iot, ioh, FE_BMPR16, FE_B16_SELECT);
+
+		/* Send read command and read address. */
+		op = 0x80 | addr;	/* READ instruction */
+		for (bit = 8; bit > 0; bit--) {
+			bus_space_write_1(iot, ioh, FE_BMPR17,
+			    (op & (1 << (bit - 1))) ? FE_B17_DATA : 0);
+			FE_EEPROM_DELAY();
+			bus_space_write_1(iot, ioh,
+			    FE_BMPR16, FE_B16_SELECT | FE_B16_CLOCK);
+			FE_EEPROM_DELAY();
+			bus_space_write_1(iot, ioh, FE_BMPR16, FE_B16_SELECT);
+		}
+		bus_space_write_1(iot, ioh, FE_BMPR17, 0x00);
+
+		/* Read two bytes in each address */
+		val = 0;
+		for (bit = 16; bit > 0; bit--) {
+			FE_EEPROM_DELAY();
+			bus_space_write_1(iot, ioh,
+			    FE_BMPR16, FE_B16_SELECT | FE_B16_CLOCK);
+			FE_EEPROM_DELAY();
+			if (bus_space_read_1(iot, ioh, FE_BMPR17) &
+			    FE_B17_DATA)
+				val |= 1 << (bit - 1);
+			bus_space_write_1(iot, ioh,
+			    FE_BMPR16, FE_B16_SELECT);
+		}
+		data[addr * 2]     = val >> 8;
+		data[addr * 2 + 1] = val & 0xff;
+	}
+
+	/* Make sure the EEPROM is turned off. */
+	bus_space_write_1(iot, ioh, FE_BMPR16, 0);
+	bus_space_write_1(iot, ioh, FE_BMPR17, 0);
+
+#if FE_DEBUG >= 3
+	/* Report what we got. */
+	log(LOG_INFO, "mb86965_read_eeprom: "
+	    " %02x%02x%02x%02x %02x%02x%02x%02x -"
+	    " %02x%02x%02x%02x %02x%02x%02x%02x -"
+	    " %02x%02x%02x%02x %02x%02x%02x%02x -"
+	    " %02x%02x%02x%02x %02x%02x%02x%02x\n",
+	    data[ 0], data[ 1], data[ 2], data[ 3],
+	    data[ 4], data[ 5], data[ 6], data[ 7],
+	    data[ 8], data[ 9], data[10], data[11],
+	    data[12], data[13], data[14], data[15],
+	    data[16], data[17], data[18], data[19],
+	    data[20], data[21], data[22], data[23],
+	    data[24], data[25], data[26], data[27],
+	    data[28], data[29], data[30], data[31]);
+#endif
+}
+
 #if FE_DEBUG >= 1
 void
 mb86960_dump(level, sc)
@@ -1854,7 +1986,7 @@ mb86960_dump(level, sc)
 {
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
-	u_char save_dlcr7;
+	u_int8_t save_dlcr7;
 
 	save_dlcr7 = bus_space_read_1(bst, bsh, FE_DLCR7);
 
@@ -1909,3 +2041,4 @@ mb86960_dump(level, sc)
 	bus_space_write_1(bst, bsh, FE_DLCR7, save_dlcr7);
 }
 #endif
+

@@ -1,4 +1,4 @@
-/*	$NetBSD: pcmcom.c,v 1.8 2002/01/12 16:25:16 tsutsui Exp $	*/
+/*	$NetBSD: pcmcom.c,v 1.14 2003/01/01 00:10:24 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -51,7 +51,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pcmcom.c,v 1.8 2002/01/12 16:25:16 tsutsui Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pcmcom.c,v 1.14 2003/01/01 00:10:24 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -102,10 +102,8 @@ void	pcmcom_attach __P((struct device *, struct device *, void *));
 int	pcmcom_detach __P((struct device *, int));
 int	pcmcom_activate __P((struct device *, enum devact));
 
-struct cfattach pcmcom_ca = {
-	sizeof(struct pcmcom_softc), pcmcom_match, pcmcom_attach,
-	    pcmcom_detach, pcmcom_activate
-};
+CFATTACH_DECL(pcmcom, sizeof(struct pcmcom_softc),
+    pcmcom_match, pcmcom_attach, pcmcom_detach, pcmcom_activate);
 
 const struct pcmcom_product {
 	struct pcmcia_product pp_product;
@@ -185,8 +183,7 @@ pcmcom_attach(parent, self, aux)
 	 * regions they request in order for the card to differentiate
 	 * between serial ports.
 	 */
-	for (cfe = pa->pf->cfe_head.sqh_first; cfe != NULL;
-	     cfe = cfe->cfe_list.sqe_next) {
+	SIMPLEQ_FOREACH(cfe, &pa->pf->cfe_head, cfe_list) {
 		if (pcmcom_check_cfe(sc, cfe)) {
 			/* Found one! */
 			break;
@@ -347,9 +344,9 @@ pcmcom_print(aux, pnp)
 
 	/* only com's can attach to pcmcom's; easy... */
 	if (pnp)
-		printf("com at %s", pnp);
+		aprint_normal("com at %s", pnp);
 
-	printf(" slave %d", pca->pca_slave);
+	aprint_normal(" slave %d", pca->pca_slave);
 
 	return (UNCONF);
 }
@@ -366,7 +363,7 @@ pcmcom_submatch(parent, cf, aux)
 	    cf->cf_loc[PCMCOMCF_SLAVE] != PCMCOMCF_SLAVE_DEFAULT)
 		return (0);
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 int
@@ -432,10 +429,8 @@ int	com_pcmcom_match __P((struct device *, struct cfdata *, void *));
 void	com_pcmcom_attach __P((struct device *, struct device *, void *));
 
 /* No pcmcom-specific goo in the softc; it's all in the parent. */
-struct cfattach com_pcmcom_ca = {
-	sizeof(struct com_softc), com_pcmcom_match, com_pcmcom_attach,
-	    com_detach, com_activate
-};
+CFATTACH_DECL(com_pcmcom, sizeof(struct com_softc),
+    com_pcmcom_match, com_pcmcom_attach, com_detach, com_activate);
 
 int	com_pcmcom_enable __P((struct com_softc *));
 void	com_pcmcom_disable __P((struct com_softc *));

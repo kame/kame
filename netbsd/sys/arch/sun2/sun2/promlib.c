@@ -1,4 +1,4 @@
-/*	$NetBSD: promlib.c,v 1.8 2001/11/30 18:06:55 fredette Exp $	*/
+/*	$NetBSD: promlib.c,v 1.11 2003/07/15 03:36:13 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -36,10 +36,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: promlib.c,v 1.11 2003/07/15 03:36:13 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/reboot.h>
 #include <sys/boot_flag.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/stdarg.h>
 #define _SUN2_PROMLIB_PRIVATE
@@ -86,7 +91,8 @@ _prom_swap_ptes(swapout, swapin)
 	int pte_number;
 	vaddr_t va;
 
-	for(pte_number = 0, va = 0; pte_number < 4; pte_number++, va += NBPG) {
+	for (pte_number = 0, va = 0; pte_number < 4;
+	     pte_number++, va += PAGE_SIZE) {
 		swapout[pte_number] = get_pte(va);
 		set_pte(va, swapin[pte_number]);
 	}
@@ -296,11 +302,13 @@ prom_abort()
 	*(store++) = *vec;
 	*(vec++) = BRAW;
 	*(store++) = *vec;
-	*(vec++) = ((u_long) g0_entry) - ((u_long) vec);
+	*vec = ((u_long) g0_entry) - ((u_long) vec);
+	vec++;
 	*(store++) = *vec;
 	*(vec++) = BRAW;
 	*(store++) = *vec;
-	*(vec++) = ((u_long) g4_entry) - ((u_long) vec);
+	*vec = ((u_long) g4_entry) - ((u_long) vec);
+	vec++;
 #undef	BRAW
 
 	delay(100000);

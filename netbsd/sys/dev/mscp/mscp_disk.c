@@ -1,8 +1,40 @@
-/*	$NetBSD: mscp_disk.c,v 1.30.10.1 2002/11/10 15:44:02 he Exp $	*/
+/*	$NetBSD: mscp_disk.c,v 1.42 2003/08/07 16:31:09 agc Exp $	*/
 /*
- * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
  * Copyright (c) 1988 Regents of the University of California.
  * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Chris Torek.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)uda.c	7.32 (Berkeley) 2/13/91
+ */
+
+/*
+ * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
  *
  * This code is derived from software contributed to Berkeley by
  * Chris Torek.
@@ -49,7 +81,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mscp_disk.c,v 1.30.10.1 2002/11/10 15:44:02 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mscp_disk.c,v 1.42 2003/08/07 16:31:09 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -62,6 +94,7 @@ __KERNEL_RCSID(0, "$NetBSD: mscp_disk.c,v 1.30.10.1 2002/11/10 15:44:02 he Exp $
 #include <sys/reboot.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
+#include <sys/conf.h>
 
 #include <ufs/ufs/dinode.h>
 #include <ufs/ffs/fs.h>
@@ -76,8 +109,6 @@ __KERNEL_RCSID(0, "$NetBSD: mscp_disk.c,v 1.30.10.1 2002/11/10 15:44:02 he Exp $
 #include "locators.h"
 #include "ioconf.h"
 #include "ra.h"
-
-#define RAMAJOR 9	/* RA major device number XXX */
 
 /*
  * Drive status, per drive
@@ -102,18 +133,27 @@ void	rrmakelabel __P((struct disklabel *, long));
 
 int	ramatch __P((struct device *, struct cfdata *, void *));
 void	raattach __P((struct device *, struct device *, void *));
-int	raopen __P((dev_t, int, int, struct proc *));
-int	raclose __P((dev_t, int, int, struct proc *));
-void	rastrategy __P((struct buf *));
-int	raread __P((dev_t, struct uio *));
-int	rawrite __P((dev_t, struct uio *));
-int	raioctl __P((dev_t, int, caddr_t, int, struct proc *));
-int	radump __P((dev_t, daddr_t, caddr_t, size_t));
-int	rasize __P((dev_t));
 int	ra_putonline __P((struct ra_softc *));
 
-struct	cfattach ra_ca = {
-	sizeof(struct ra_softc), ramatch, rxattach
+CFATTACH_DECL(ra, sizeof(struct ra_softc),
+    ramatch, rxattach, NULL, NULL);
+
+dev_type_open(raopen);
+dev_type_close(raclose);
+dev_type_read(raread);
+dev_type_write(rawrite);
+dev_type_ioctl(raioctl);
+dev_type_strategy(rastrategy);
+dev_type_dump(radump);
+dev_type_size(rasize);
+
+const struct bdevsw ra_bdevsw = {
+	raopen, raclose, rastrategy, raioctl, radump, rasize, D_DISK
+};
+
+const struct cdevsw ra_cdevsw = {
+	raopen, raclose, raread, rawrite, raioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
 };
 
 /*
@@ -152,7 +192,8 @@ ra_putonline(ra)
 	struct ra_softc *ra;
 {
 	struct	disklabel *dl;
-	char *msg;
+	const char *msg;
+	int maj;
 
 	if (rx_putonline(ra) != MSCP_DONE)
 		return MSCP_FAILED;
@@ -161,7 +202,8 @@ ra_putonline(ra)
 
 	ra->ra_state = DK_RDLABEL;
 	printf("%s", ra->ra_dev.dv_xname);
-	if ((msg = readdisklabel(MAKEDISKDEV(RAMAJOR, ra->ra_dev.dv_unit,
+	maj = cdevsw_lookup_major(&ra_cdevsw);
+	if ((msg = readdisklabel(MAKEDISKDEV(maj, ra->ra_dev.dv_unit,
 	    RAW_PART), rastrategy, dl, NULL)) != NULL)
 		printf(": %s", msg);
 	else {
@@ -267,7 +309,7 @@ raclose(dev, flags, fmt, p)
 #if notyet
 	if (ra->ra_openpart == 0) {
 		s = spluba();
-		while (BUFQ_FIRST(&udautab[unit]) != NULL)
+		while (BUFQ_PEEK(&udautab[unit]) != NULL)
 			(void) tsleep(&udautab[unit], PZERO - 1,
 			    "raclose", 0);
 		splx(s);
@@ -322,8 +364,7 @@ rastrategy(bp)
 	 * Determine the size of the transfer, and make sure it is
 	 * within the boundaries of the partition.
 	 */
-	if (bounds_check_with_label(bp, ra->ra_disk.dk_label,
-	    ra->ra_wlabel) <= 0)
+	if (bounds_check_with_label(&ra->ra_disk, bp, ra->ra_wlabel) <= 0)
 		goto done;
 
 	/* Make some statistics... /bqt */
@@ -338,18 +379,20 @@ done:
 }
 
 int
-raread(dev, uio)
+raread(dev, uio, flags)
 	dev_t dev;
 	struct uio *uio;
+	int flags;
 {
 
 	return (physio(rastrategy, NULL, dev, B_READ, minphys, uio));
 }
 
 int
-rawrite(dev, uio)
+rawrite(dev, uio, flags)
 	dev_t dev;
 	struct uio *uio;
+	int flags;
 {
 
 	return (physio(rastrategy, NULL, dev, B_WRITE, minphys, uio));
@@ -361,7 +404,7 @@ rawrite(dev, uio)
 int
 raioctl(dev, cmd, data, flag, p)
 	dev_t dev;
-	int cmd;
+	u_long cmd;
 	caddr_t data;
 	int flag;
 	struct proc *p;
@@ -507,17 +550,25 @@ rasize(dev)
 #if NRX
 
 int	rxmatch __P((struct device *, struct cfdata *, void *));
-int	rxopen __P((dev_t, int, int, struct proc *));
-int	rxclose __P((dev_t, int, int, struct proc *));
-void	rxstrategy __P((struct buf *));
-int	rxread __P((dev_t, struct uio *));
-int	rxwrite __P((dev_t, struct uio *));
-int	rxioctl __P((dev_t, int, caddr_t, int, struct proc *));
-int	rxdump __P((dev_t, daddr_t, caddr_t, size_t));
-int	rxsize __P((dev_t));
 
-struct	cfattach rx_ca = {
-	sizeof(struct rx_softc), rxmatch, rxattach
+CFATTACH_DECL(rx, sizeof(struct rx_softc),
+    rxmatch, rxattach, NULL, NULL);
+
+dev_type_open(rxopen);
+dev_type_read(rxread);
+dev_type_write(rxwrite);
+dev_type_ioctl(rxioctl);
+dev_type_strategy(rxstrategy);
+dev_type_dump(rxdump);
+dev_type_size(rxsize);
+
+const struct bdevsw rx_bdevsw = {
+	rxopen, nullclose, rxstrategy, rxioctl, rxdump, rxsize, D_DISK
+};
+
+const struct cdevsw rx_cdevsw = {
+	rxopen, nullclose, rxread, rxwrite, rxioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
 };
 
 /*
@@ -655,16 +706,6 @@ rxopen(dev, flag, fmt, p)
 	return 0;
 }
 
-/* ARGSUSED */
-int
-rxclose(dev, flags, fmt, p)
-	dev_t dev;
-	int flags, fmt;
-	struct	proc *p;
-{
-	return (0);
-}
-
 /*
  * Queue a transfer request, and if possible, hand it to the controller.
  *
@@ -719,18 +760,20 @@ done:
 }
 
 int
-rxread(dev, uio)
+rxread(dev, uio, flag)
 	dev_t dev;
 	struct uio *uio;
+	int flag;
 {
 
 	return (physio(rxstrategy, NULL, dev, B_READ, minphys, uio));
 }
 
 int
-rxwrite(dev, uio)
+rxwrite(dev, uio, flag)
 	dev_t dev;
 	struct uio *uio;
+	int flag;
 {
 
 	return (physio(rxstrategy, NULL, dev, B_WRITE, minphys, uio));
@@ -742,7 +785,7 @@ rxwrite(dev, uio)
 int
 rxioctl(dev, cmd, data, flag, p)
 	dev_t dev;
-	int cmd;
+	u_long cmd;
 	caddr_t data;
 	int flag;
 	struct proc *p;
@@ -857,7 +900,7 @@ rriodone(usc, bp)
 	   already have verified it. Thus, no checks here... /bqt */
 	unit = DISKUNIT(bp->b_dev);
 	ra = ra_cd.cd_devs[unit];
-	disk_unbusy(&ra->ra_disk, bp->b_bcount);
+	disk_unbusy(&ra->ra_disk, bp->b_bcount, (bp->b_flags & B_READ));
 
 	biodone(bp);
 }
@@ -908,7 +951,7 @@ rrmakelabel(dl, type)
 	int n, p = 0;
 
 	dl->d_bbsize = BBSIZE;
-	dl->d_sbsize = SBSIZE;
+	dl->d_sbsize = SBLOCKSIZE;
 
 	/* Create the disk name for disklabel. Phew... */
 	dl->d_typename[p++] = MSCP_MID_CHAR(2, type);
@@ -1019,11 +1062,11 @@ rrfillin(bp, mp)
 	int part = DISKPART(bp->b_dev);
 
 #if NRA
-	if (major(bp->b_dev) == RAMAJOR)
+	if (cdevsw_lookup(bp->b_dev) == &ra_cdevsw)
 		rx = ra_cd.cd_devs[unit];
 #endif
 #if NRX
-	if (major(bp->b_dev) != RAMAJOR)
+	if (cdevsw_lookup(bp->b_dev) == &rx_cdevsw)
 		rx = rx_cd.cd_devs[unit];
 #endif
 	lp = rx->ra_disk.dk_label;

@@ -1,4 +1,4 @@
-/*	$NetBSD: armfpe_init.c,v 1.4 2002/03/10 15:29:54 bjh21 Exp $	*/
+/*	$NetBSD: armfpe_init.c,v 1.7 2004/02/13 11:36:11 wiz Exp $	*/
 
 /*
  * Copyright (C) 1996 Mark Brinicombe
@@ -43,7 +43,7 @@
 
 #include <sys/param.h>
 
-__KERNEL_RCSID(0, "$NetBSD: armfpe_init.c,v 1.4 2002/03/10 15:29:54 bjh21 Exp $");
+__KERNEL_RCSID(0, "$NetBSD: armfpe_init.c,v 1.7 2004/02/13 11:36:11 wiz Exp $");
 
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -83,7 +83,7 @@ static const char *exception_errors[] = {
 
 /*
  * Initialisation point. The kernel calls this during the configuration of
- * the cpu in order to install the FPE.
+ * the CPU in order to install the FPE.
  * The FPE specification needs to be filled in the specified cpu_t structure
  * and the FPE needs to be installed on the CPU undefined instruction vector.
  */
@@ -194,7 +194,7 @@ arm_fpe_postproc(fpframe, frame)
 		/*
 		 * We are being preempted.
 		 */
-		preempt(NULL);
+		preempt(0);
 		while ((sig = (CURSIG(p))) != 0) {
 			postsig(sig);
 		}
@@ -209,7 +209,7 @@ arm_fpe_postproc(fpframe, frame)
 		pc = ReadWord(fpframe + 15*4);
 #ifdef DIAGNOSTIC
 		if (pc < 0x1000 || pc > 0xefc00000)
-			panic("armfpe_postproc: pc=%08x\n", pc);
+			panic("armfpe_postproc: pc=%08x", pc);
 #endif
 		addupc_task(p, pc, (int)(p->p_sticks - p->p_sticks) * psratio);
 	}

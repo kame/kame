@@ -1,4 +1,4 @@
-/*	$NetBSD: xbox.c,v 1.6 2001/11/13 06:58:18 lukem Exp $ */
+/*	$NetBSD: xbox.c,v 1.11 2004/03/17 17:04:59 pk Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: xbox.c,v 1.6 2001/11/13 06:58:18 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: xbox.c,v 1.11 2004/03/17 17:04:59 pk Exp $");
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -102,9 +102,8 @@ int	xbox_match __P((struct device *, struct cfdata *, void *));
 void	xbox_attach __P((struct device *, struct device *, void *));
 int	xbox_print __P(( void *, const char *));
 
-struct cfattach xbox_ca = {
-	sizeof(struct xbox_softc), xbox_match, xbox_attach
-};
+CFATTACH_DECL(xbox, sizeof(struct xbox_softc),
+    xbox_match, xbox_attach, NULL, NULL);
 
 int
 xbox_print(args, busname)
@@ -114,7 +113,7 @@ xbox_print(args, busname)
 	struct xbox_attach_args *xa = args;
 
 	if (busname)
-		printf("%s at %s", xa->xa_name, busname);
+		aprint_normal("%s at %s", xa->xa_name, busname);
 	return (UNCONF);
 }
 
@@ -144,12 +143,12 @@ xbox_attach(parent, self, aux)
 	struct xbox_attach_args xa;
 	char *cp;
 
-	sc->sc_key = PROM_getpropint(node, "write0-key", -1);
+	sc->sc_key = prom_getpropint(node, "write0-key", -1);
 
-	cp = PROM_getpropstring(node, "model");
+	cp = prom_getpropstring(node, "model");
 	printf(": model %s", cp);
 
-	cp = PROM_getpropstring(node, "child-present");
+	cp = prom_getpropstring(node, "child-present");
 	if (strcmp(cp, "true") != 0) {
 		printf(": no sbus devices\n");
 		return;

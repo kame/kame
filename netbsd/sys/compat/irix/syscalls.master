@@ -1,4 +1,4 @@
-	$NetBSD: syscalls.master,v 1.42 2002/05/04 07:45:05 manu Exp $
+	$NetBSD: syscalls.master,v 1.47 2003/01/18 07:44:52 thorpej Exp $
 
 ;	@(#)syscalls.master	8.1 (Berkeley) 7/19/93
 
@@ -43,6 +43,7 @@
 #include <sys/mount.h>
 #include <sys/poll.h>
 #include <sys/ioctl_compat.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/svr4/svr4_types.h>
@@ -63,7 +64,7 @@
 2	NOARGS		{ int sys_fork(void); }
 3	NOARGS		{ int sys_read(int fd, char *buf, u_int nbyte); }
 4	NOARGS		{ int sys_write(int fd, char *buf, u_int nbyte); }
-5	NOARGS		{ int svr4_sys_open(const char *path, int flags, \
+5	STD		{ int irix_sys_open(const char *path, int flags, \
 			    int mode); }
 6	NOARGS		{ int sys_close(int fd); }
 7	OBSOL		wait
@@ -77,7 +78,7 @@
 15	NOARGS		{ int sys_chmod(char *path, int mode); }
 16	NOARGS		{ int sys___posix_chown(char *path, int uid, \
 			    int gid); } chown
-17	NOARGS		{ int svr4_sys_break(caddr_t nsize); }
+17	STD		{ int irix_sys_break(caddr_t nsize); }
 18	OBSOL		stat
 19	NOARGS		{ long compat_43_sys_lseek(int fd, long offset, \
 			    int whence); }
@@ -121,7 +122,7 @@
 50	UNIMPL		sysmips
 51	UNIMPL		acct
 #ifdef SYSVSHM
-52	NOARGS		{ int svr4_sys_shmsys(int what, int a2, int a3, \
+52	STD		{ int irix_sys_shmsys(int what, int a2, int a3, \
 					      int a4); }
 #else
 52	UNIMPL		shmsys
@@ -137,7 +138,7 @@
 55	UNIMPL		uadmin
 56	STD		{ int irix_sys_sysmp(int cmd, void *arg1, void *arg2, \
 			    void *arg3, void *arg4); }
-57	NOARGS		{ int svr4_sys_utssys(void *a1, void *a2, int sel, \
+57	STD		{ int irix_sys_utssys(void *a1, void *a2, int sel, \
 			    void *a3); }
 58	UNIMPL
 59	NOARGS		{ int svr4_sys_execve(const char *path, char **argp, \
@@ -157,9 +158,12 @@
 72	OBSOL		rmount
 73	OBSOL		rumount
 74	OBSOL		rfstart
-75	OBSOL		sigret
-76	OBSOL		rdebug
-77	OBSOL		rfstop
+75	STD		{ int irix_sys_getrlimit64(int resource, \
+			    struct irix_rlimit64 *rlp); }
+76	STD		{ int irix_sys_setrlimit64(int resource, \
+			    const struct irix_rlimit64 *rlp); }
+77	NOARGS		{ int sys_nanosleep(const struct timespec *rqtp, \
+			    struct timespec *rmtp); }
 78	STD		{ irix_off64_t irix_sys_lseek64(int fd, int pad1, \
 			    irix_off64_t offset, int whence, \
 			    int pad2, int pad3, int pad4); }
@@ -248,15 +252,16 @@
 			    unsigned int inh, void *arg); }
 130	STD		{ ptrdiff_t irix_sys_prctl(unsigned int option, \
 			    void *arg1); }
-131	UNIMPL		procblk
+131	STD		{ int irix_sys_procblk(int cmd, pid_t pid, int count); }
 132	STD		{ irix_pid_t irix_sys_sprocsp(void *entry, \
 			    unsigned int inh, void *arg, caddr_t sp, \
 			    irix_size_t len); }
 133	UNIMPL		sgigsc
 134	STD		{ void *irix_sys_mmap(void *addr, irix_size_t len, \
 			    int prot, int flags, int fd, irix_off_t pos); }
-135	NOARGS		{ int sys_munmap(void *addr, int len); }
-136	NOARGS		{ int sys_mprotect(void *addr, int len, int prot); }
+135	STD		{ int irix_sys_munmap(void *addr, int len); }
+136	STD		{ int irix_sys_mprotect(void *addr, \
+			    int len, int prot); }
 137	NOARGS		{ int sys___msync13(void *addr, \
 			    size_t len, int flags); }
 138	UNIMPL		madvise
@@ -269,18 +274,20 @@
 145	UNIMPL		vhangup
 146	NOARGS		{ int sys_fsync(int fd); }
 147	NOARGS		{ int sys_fchdir(int fd); }
-148	UNIMPL		getrlimit
-149	UNIMPL		setrlimit
+148	STD		{ int irix_sys_getrlimit(int resource, \
+			     struct irix_rlimit *rlp); }
+149	STD		{ int irix_sys_setrlimit(int resource, \
+			    const struct irix_rlimit *rlp); }
 150	UNIMPL		cacheflush
 151	UNIMPL		cachectl
 152	NOARGS		{ int sys___posix_fchown(int fd, int uid, int gid); } \
 			    fchown
-153	STD		{ int irix_sys_fchmod(int fd, int mode); }
+153	NOARGS		{ int sys_fchmod(int fd, int mode); }
 154	UNIMPL		wait3
 155	UNIMPL		socketpair
 156	STD		{ long irix_sys_systeminfo(int what, char *buf, \
 			    long len); }
-157	UNIMPL		uname
+157	STD		{ int irix_sys_uname(struct irix_utsname *name); }
 158	STD		{ int irix_sys_xstat(const int version, \
 			    const char *path, struct stat *buf); }
 159	STD		{ int irix_sys_lxstat(const int version, \

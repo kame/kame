@@ -34,23 +34,9 @@
 #ifndef _SYS_MCHAIN_H_
 #define _SYS_MCHAIN_H_
 
-#include <machine/endian.h>
-
-#define htoles(x)	htole16(x)
-#define letohs(x)	le16toh(x)
-#define	htolel(x)	htole32(x)
-#define	letohl(x)	le32toh(x)
-#define	htoleq(x)	htole64(x)
-#define	letohq(x)	le64toh(x)
-
-#define htobes(x)	htobe16(x)
-#define betohs(x)	be16toh(x)
-#define htobel(x)	htobe32(x)
-#define betohl(x)	be32toh(x)
-#define htobeq(x)	htobe64(x)
-#define betohq(x)	be64toh(x)
-
 #ifdef _KERNEL
+
+#include <machine/endian.h>
 
 /*
  * Type of copy for mb_{put|get}_mem()
@@ -64,7 +50,7 @@
 struct mbuf;
 struct mbchain;
 
-typedef int mb_copy_t(struct mbchain *mbp, const caddr_t src, caddr_t dst, int len);
+typedef int mb_copy_t(struct mbchain *mbp, const caddr_t src, caddr_t dst, size_t len);
 
 struct mbchain {
 	struct mbuf *	mb_top;		/* head of mbufs chain */

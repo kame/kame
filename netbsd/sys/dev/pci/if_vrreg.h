@@ -1,4 +1,4 @@
-/*	$NetBSD: if_vrreg.h,v 1.9 1999/02/12 00:37:07 thorpej Exp $	*/
+/*	$NetBSD: if_vrreg.h,v 1.12 2003/10/17 17:42:35 tsutsui Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998
@@ -81,6 +81,11 @@
 #define	VR_CONFIG		0x78
 #define	VR_MPA_CNT		0x7C
 #define	VR_CRC_CNT		0x7E
+#define VR_STICKHW		0x83
+
+/* Misc Registers */
+#define VR_MISC_CR1		0x81
+#define VR_MISCCR1_FORSRST	0x40
 
 /*
  * RX config bits.
@@ -271,6 +276,53 @@
 #define	VR_CFG_DIAG		0x40000000
 #define	VR_CFG_GPIOEN		0x80000000
 
+/* Sticky HW bits */
+#define VR_STICKHW_DS0		0x01
+#define VR_STICKHW_DS1		0x02
+#define VR_STICKHW_WOL_ENB	0x04
+#define VR_STICKHW_WOL_STS	0x08
+#define VR_STICKHW_LEGWOL_ENB	0x80
+
+/*
+ * BCR0 register bits.
+ */
+#define VR_BCR0_DMA_LENGTH	0x07
+#define VR_BCR0_DMA_32BYTES	0x00
+#define VR_BCR0_DMA_64BYTES	0x01
+#define VR_BCR0_DMA_128BYTES	0x02
+#define VR_BCR0_DMA_256BYTES	0x03
+#define VR_BCR0_DMA_512BYTES	0x04
+#define VR_BCR0_DMA_1024BYTES	0x05
+#define VR_BCR0_DMA_STORENFWD	0x07
+
+#define VR_BCR0_RX_THRESH	0x38
+#define VR_BCR0_RXTH_CFG	0x00
+#define VR_BCR0_RXTH_64BYTES	0x08
+#define VR_BCR0_RXTH_128BYTES	0x10
+#define VR_BCR0_RXTH_256BYTES	0x18
+#define VR_BCR0_RXTH_512BYTES	0x20
+#define VR_BCR0_RXTH_1024BYTES	0x28
+#define VR_BCR0_RXTH_STORENFWD	0x38
+
+#define VR_BCR0_EXTLED		0x40
+#define VR_BCR0_MED2		0x80
+
+/*
+ * BCR1 register bits.
+ */
+#define VR_BCR1_POT0		0x01
+#define VR_BCR1_POT1		0x02
+#define VR_BCR1_POT2		0x04
+
+#define VR_BCR1_TX_THRESH	0x38
+#define VR_BCR1_TXTH_CFG	0x00
+#define VR_BCR1_TXTH_64BYTES	0x08
+#define VR_BCR1_TXTH_128BYTES	0x10
+#define VR_BCR1_TXTH_256BYTES	0x18
+#define VR_BCR1_TXTH_512BYTES	0x20
+#define VR_BCR1_TXTH_1024BYTES	0x28
+#define VR_BCR1_TXTH_STORENFWD	0x38
+
 /*
  * Rhine TX/RX list structure.
  */
@@ -335,37 +387,25 @@ struct vr_desc {
 #define	VR_MIN_FRAMELEN		60
 
 /*
+ * VIA Rhine revision IDs
+ */
+
+#define REV_ID_VT3043_E			0x04
+#define REV_ID_VT3071_A			0x20
+#define REV_ID_VT3071_B			0x21
+#define REV_ID_VT3065_A			0x40
+#define REV_ID_VT3065_B			0x41
+#define REV_ID_VT3065_C			0x42
+#define REV_ID_VT3106			0x80
+#define REV_ID_VT3106_J			0x80    /* 0x80-0x8F */
+#define REV_ID_VT3106_S			0x90    /* 0x90-0xA0 */
+
+/*
  * PCI low memory base and low I/O base register, and
  * other PCI registers.
  */
 
-#define	VR_PCI_VENDOR_ID	0x00
-#define	VR_PCI_DEVICE_ID	0x02
-#define	VR_PCI_COMMAND		0x04
-#define	VR_PCI_STATUS		0x06
-#define	VR_PCI_CLASSCODE	0x09
-#define	VR_PCI_LATENCY_TIMER	0x0D
-#define	VR_PCI_HEADER_TYPE	0x0E
 #define	VR_PCI_LOIO		0x10
 #define	VR_PCI_LOMEM		0x14
-#define	VR_PCI_BIOSROM		0x30
-#define	VR_PCI_INTLINE		0x3C
-#define	VR_PCI_INTPIN		0x3D
-#define	VR_PCI_MINGNT		0x3E
-#define	VR_PCI_MINLAT		0x0F
 #define	VR_PCI_RESETOPT		0x48
 #define	VR_PCI_EEPROM_DATA	0x4C
-
-/* power management registers */
-#define	VR_PCI_CAPID		0xDC /* 8 bits */
-#define	VR_PCI_NEXTPTR		0xDD /* 8 bits */
-#define	VR_PCI_PWRMGMTCAP	0xDE /* 16 bits */
-#define	VR_PCI_PWRMGMTCTRL	0xE0 /* 16 bits */
-
-#define	VR_PSTATE_MASK		0x0003
-#define	VR_PSTATE_D0		0x0000
-#define	VR_PSTATE_D1		0x0002
-#define	VR_PSTATE_D2		0x0002
-#define	VR_PSTATE_D3		0x0003
-#define	VR_PME_EN		0x0010
-#define	VR_PME_STATUS		0x8000

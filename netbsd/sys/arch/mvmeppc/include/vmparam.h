@@ -1,3 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.1 2002/02/27 21:02:22 scw Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.3 2003/02/03 17:09:58 matt Exp $	*/
 
-#include <powerpc/mpc6xx/vmparam.h>
+#define	USER_SR	15
+#include <powerpc/oea/vmparam.h>

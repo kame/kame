@@ -1,9 +1,9 @@
-/*	$NetBSD: in_proto.c,v 1.55.8.1 2003/10/04 09:44:12 tron Exp $	*/
+/*	$NetBSD: in_proto.c,v 1.62 2003/12/04 19:38:24 atatat Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -41,11 +41,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -65,7 +61,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: in_proto.c,v 1.55.8.1 2003/10/04 09:44:12 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: in_proto.c,v 1.62 2003/12/04 19:38:24 atatat Exp $");
 
 #include "opt_mrouting.h"
 #include "opt_eon.h"			/* ISO CLNL over IP */
@@ -114,12 +110,18 @@ __KERNEL_RCSID(0, "$NetBSD: in_proto.c,v 1.55.8.1 2003/10/04 09:44:12 tron Exp $
  */
 
 #ifdef IPSEC
+#include <netinet6/ipsec.h>
 #include <netinet6/ah.h>
 #ifdef IPSEC_ESP
 #include <netinet6/esp.h>
 #endif
 #include <netinet6/ipcomp.h>
 #endif /* IPSEC */
+
+#ifdef FAST_IPSEC
+#include <netipsec/ipsec.h>
+#include <netipsec/key.h>
+#endif	/* FAST_IPSEC */
 
 #ifdef NSIP
 #include <netns/ns_var.h>
@@ -146,17 +148,17 @@ struct protosw inetsw[] = {
 { 0,		&inetdomain,	0,		0,
   0,		ip_output,	0,		0,
   0,
-  ip_init,	0,		ip_slowtimo,	ip_drain,	ip_sysctl
+  ip_init,	0,		ip_slowtimo,	ip_drain,	NULL
 },
 { SOCK_DGRAM,	&inetdomain,	IPPROTO_UDP,	PR_ATOMIC|PR_ADDR,
   udp_input,	0,		udp_ctlinput,	ip_ctloutput,
   udp_usrreq,
-  udp_init,	0,		0,		0,		udp_sysctl
+  udp_init,	0,		0,		0,		NULL
 },
 { SOCK_STREAM,	&inetdomain,	IPPROTO_TCP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_LISTEN|PR_ABRTACPTDIS,
   tcp_input,	0,		tcp_ctlinput,	tcp_ctloutput,
   tcp_usrreq,
-  tcp_init,	0,		tcp_slowtimo,	tcp_drain,	tcp_sysctl
+  tcp_init,	0,		tcp_slowtimo,	tcp_drain,	NULL
 },
 { SOCK_RAW,	&inetdomain,	IPPROTO_RAW,	PR_ATOMIC|PR_ADDR,
   rip_input,	rip_output,	rip_ctlinput,	rip_ctloutput,
@@ -166,27 +168,46 @@ struct protosw inetsw[] = {
 { SOCK_RAW,	&inetdomain,	IPPROTO_ICMP,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   icmp_input,	rip_output,	rip_ctlinput,	rip_ctloutput,
   rip_usrreq,
-  icmp_init,	0,		0,		0,		icmp_sysctl
+  icmp_init,	0,		0,		0,		NULL
 },
 #ifdef IPSEC
 { SOCK_RAW,	&inetdomain,	IPPROTO_AH,	PR_ATOMIC|PR_ADDR,
   ah4_input,	0,	 	ah4_ctlinput,	0,
-  0,	  
-  0,		0,		0,		0,		ipsec_sysctl
+  0,
+  0,		0,		0,		0,		NULL
 },
 #ifdef IPSEC_ESP
 { SOCK_RAW,	&inetdomain,	IPPROTO_ESP,	PR_ATOMIC|PR_ADDR,
-  esp4_input,	0,	 	esp4_ctlinput,	0,
-  0,	  
-  0,		0,		0,		0,		ipsec_sysctl
+  esp4_input,
+	0,	 	esp4_ctlinput,	0,
+  0,
+  0,		0,		0,		0,		NULL
 },
 #endif
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPCOMP,	PR_ATOMIC|PR_ADDR,
-  ipcomp4_input, 0,	 	0,		0,
-  0,	  
-  0,		0,		0,		0,		ipsec_sysctl
+  ipcomp4_input,
+ 0,	 	0,		0,
+  0,
+  0,		0,		0,		0,		NULL
 },
 #endif /* IPSEC */
+#ifdef FAST_IPSEC
+{ SOCK_RAW,	&inetdomain,	IPPROTO_AH,	PR_ATOMIC|PR_ADDR,
+  ipsec4_common_input,	0,	 	ah4_ctlinput,	0,
+  0,
+  0,		0,		0,		0,		NULL
+},
+{ SOCK_RAW,	&inetdomain,	IPPROTO_ESP,	PR_ATOMIC|PR_ADDR,
+  ipsec4_common_input,    0,	 	esp4_ctlinput,	0,
+  0,
+  0,		0,		0,		0,		NULL
+},
+{ SOCK_RAW,	&inetdomain,	IPPROTO_IPCOMP,	PR_ATOMIC|PR_ADDR,
+  ipsec4_common_input,    0,	 	0,		0,
+  0,
+  0,		0,		0,		0,		NULL
+},
+#endif /* FAST_IPSEC */
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV4,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   encap4_input,	rip_output, 	rip_ctlinput,	rip_ctloutput,
   rip_usrreq,	/*XXX*/
@@ -196,7 +217,7 @@ struct protosw inetsw[] = {
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   encap4_input,	rip_output, 	rip_ctlinput,	rip_ctloutput,
   rip_usrreq,	/*XXX*/
-  encap_init,		0,		0,		0,
+  encap_init,	0,		0,		0,
 },
 #endif /* INET6 */
 #if NGRE > 0
@@ -255,7 +276,7 @@ struct protosw inetsw[] = {
 };
 
 struct domain inetdomain =
-    { PF_INET, "internet", 0, 0, 0, 
+    { PF_INET, "internet", 0, 0, 0,
       inetsw, &inetsw[sizeof(inetsw)/sizeof(inetsw[0])], 0,
       rn_inithead, 32, sizeof(struct sockaddr_in) };
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.8 2001/06/17 00:11:40 cyber Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.11 2003/09/12 17:55:44 tsutsui Exp $	*/
 
 /*
  * Copyright (c) 2000 Soren S. Jorvang.  All rights reserved.
@@ -25,6 +25,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.11 2003/09/12 17:55:44 tsutsui Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -46,6 +49,9 @@ int		cpuspeed = 100;		/* Until we know more precisely. */
 void
 cpu_configure()
 {
+
+	softintr_init();
+
 	(void)splhigh();
 
 	if (config_rootfound("mainbus", "mainbus") == NULL)
@@ -79,7 +85,7 @@ device_register(dev, aux)
 
 	if ((booted_device == NULL) && (netboot == 0)) {
 		if (dev->dv_class == DV_DISK &&
-		    !strcmp(dev->dv_cfdata->cf_driver->cd_name, "wd")) {
+		    !strcmp(dev->dv_cfdata->cf_name, "wd")) {
 			hd_iterate++;
 			if (hd_iterate == bootunit) {
 				booted_device = dev;

@@ -1,11 +1,11 @@
-/*	$NetBSD: midisyn.c,v 1.10 2002/01/13 19:28:08 tsutsui Exp $	*/
+/*	$NetBSD: midisyn.c,v 1.13 2003/12/04 13:57:30 keihan Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@netbsd.org).
+ * by Lennart Augustsson (augustss@NetBSD.org).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: midisyn.c,v 1.10 2002/01/13 19:28:08 tsutsui Exp $");
+__KERNEL_RCSID(0, "$NetBSD: midisyn.c,v 1.13 2003/12/04 13:57:30 keihan Exp $");
 
 #include <sys/param.h>
 #include <sys/ioctl.h>

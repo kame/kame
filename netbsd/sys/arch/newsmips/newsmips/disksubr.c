@@ -1,4 +1,4 @@
-/*	$NetBSD: disksubr.c,v 1.10 2002/03/05 09:40:41 simonb Exp $	*/
+/*	$NetBSD: disksubr.c,v 1.16 2003/08/07 16:28:54 agc Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1988 Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -35,6 +31,9 @@
  *	@(#)ufs_disksubr.c	7.16 (Berkeley) 5/4/91
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: disksubr.c,v 1.16 2003/08/07 16:28:54 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -50,7 +49,7 @@
  * (e.g., sector size) must be filled in before calling us.
  * Returns null on success and an error string on failure.
  */
-char *
+const char *
 readdisklabel(dev, strat, lp, osdep)
 	dev_t dev;
 	void (*strat) __P((struct buf *bp));
@@ -187,7 +186,7 @@ done:
 	return (error);
 }
 
-/* 
+/*
  * UNTESTED !!
  *
  * Determine the size of the transfer, and make sure it is
@@ -195,26 +194,27 @@ done:
  * if needed, and signal errors or early completion.
  */
 int
-bounds_check_with_label(bp, lp, wlabel)
+bounds_check_with_label(dk, bp, wlabel)
+	struct disk *dk;
 	struct buf *bp;
-	struct disklabel *lp;
 	int wlabel;
 {
-
+	struct disklabel *lp = dk->dk_label;
 	struct partition *p = lp->d_partitions + DISKPART(bp->b_dev);
-	int labelsect = lp->d_partitions[0].p_offset;
+	u_int labelsector = lp->d_partitions[RAW_PART].p_offset + LABELSECTOR;
 	int maxsz = p->p_size;
 	int sz = (bp->b_bcount + DEV_BSIZE - 1) >> DEV_BSHIFT;
 
 	/* overwriting disk label ? */
-	/* XXX should also protect bootstrap in first 8K */ 
-	if (bp->b_blkno + p->p_offset <= LABELSECTOR + labelsect &&
+	/* XXX should also protect bootstrap in first 8K */
+	if (securelevel >= 1 &&
+	    bp->b_blkno + p->p_offset <= labelsector &&
 	    (bp->b_flags & B_READ) == 0 && wlabel == 0) {
 		bp->b_error = EROFS;
 		goto bad;
 	}
 
-	/* beyond partition? */ 
+	/* beyond partition? */
 	if (bp->b_blkno < 0 || bp->b_blkno + sz > maxsz) {
 		/* if exactly at end of disk, return an EOF */
 		if (bp->b_blkno == maxsz) {
@@ -228,7 +228,7 @@ bounds_check_with_label(bp, lp, wlabel)
 			goto bad;
 		}
 		bp->b_bcount = sz << DEV_BSHIFT;
-	}               
+	}
 
 	/* calculate cylinder for disksort to order transfers with */
 	bp->b_resid = (bp->b_blkno + p->p_offset) / lp->d_secpercyl;

@@ -1,4 +1,4 @@
-/*	$NetBSD: zs.c,v 1.20 2002/03/17 19:40:45 atatat Exp $	*/
+/*	$NetBSD: zs.c,v 1.29 2004/03/24 19:42:04 matt Exp $	*/
 
 /*
  * Copyright (c) 1996, 1998 Bill Studenmund
@@ -44,7 +44,7 @@
  * With NetBSD 1.1, port-mac68k started using a port of the port-sparc
  * (port-sun3?) zs.c driver (which was in turn based on code in the
  * Berkeley 4.4 Lite release). Bill Studenmund did the port, with
- * help from Allen Briggs and Gordon Ross <gwr@netbsd.org>. Noud de
+ * help from Allen Briggs and Gordon Ross <gwr@NetBSD.org>. Noud de
  * Brouwer field-tested the driver at a local ISP.
  *
  * Bill Studenmund and Gordon Ross then ported the machine-independant
@@ -52,6 +52,9 @@
  * intermediate version (mac68k using a local, patched version of
  * the m.i. drivers), with NetBSD 1.3 containing a full version.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zs.c,v 1.29 2004/03/24 19:42:04 matt Exp $");
 
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
@@ -91,7 +94,6 @@
  * Some warts needed by z8530tty.c -
  */
 int zs_def_cflag = (CREAD | CS8 | HUPCL);
-int zs_major = 12;
 
 /*
  * abort detection on console will now timeout after iterating on a loop
@@ -162,9 +164,8 @@ static int	zsc_match __P((struct device *, struct cfdata *, void *));
 static void	zsc_attach __P((struct device *, struct device *, void *));
 static int  zsc_print __P((void *, const char *name));
 
-struct cfattach zsc_ca = {
-	sizeof(struct zsc_softc), zsc_match, zsc_attach
-};
+CFATTACH_DECL(zsc, sizeof(struct zsc_softc),
+    zsc_match, zsc_attach, NULL, NULL);
 
 extern struct cfdriver zsc_cd;
 
@@ -271,6 +272,7 @@ zsc_attach(parent, self, aux)
 		cs  = &xcs->xzs_cs;
 		zsc->zsc_cs[channel] = cs;
 
+		simple_lock_init(&cs->cs_lock);
 		cs->cs_channel = channel;
 		cs->cs_private = NULL;
 		cs->cs_ops = &zsops_null;
@@ -393,6 +395,11 @@ zsc_attach(parent, self, aux)
 	intr_establish(intr[1][1], IST_LEVEL, IPL_TTY, zs_txdma_int, (void *)1);
 #endif
 
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+	zsc->zsc_si = softintr_establish(IPL_SOFTSERIAL,
+		(void (*)(void *)) zsc_intr_soft, zsc);
+#endif
+
 	/*
 	 * Set the master interrupt enable and interrupt vector.
 	 * (common to both channels, do it on A)
@@ -414,10 +421,10 @@ zsc_print(aux, name)
 	struct zsc_attach_args *args = aux;
 
 	if (name != NULL)
-		printf("%s: ", name);
+		aprint_normal("%s: ", name);
 
 	if (args->channel != -1)
-		printf(" channel %d", args->channel);
+		aprint_normal(" channel %d", args->channel);
 
 	return UNCONF;
 }
@@ -453,7 +460,9 @@ zsmd_setclock(cs)
 #endif
 }
 
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
 static int zssoftpending;
+#endif
 
 /*
  * Our ZS chips all share a common, autovectored interrupt,
@@ -475,17 +484,22 @@ zshard(arg)
 		if ((zsc->zsc_cs[0]->cs_softreq) ||
 			(zsc->zsc_cs[1]->cs_softreq))
 		{
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+			softintr_schedule(zsc->zsc_si);
+#else
 			/* zsc_req_softint(zsc); */
 			/* We are at splzs here, so no need to lock. */
 			if (zssoftpending == 0) {
 				zssoftpending = 1;
 				setsoftserial();
 			}
+#endif
 		}
 	}
 	return (rval);
 }
 
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
 /*
  * Similar scheme as for zshard (look at all of them)
  */
@@ -514,6 +528,7 @@ zssoft(arg)
 	}
 	return (1);
 }
+#endif
 
 #ifdef ZS_TXDMA
 int
@@ -524,7 +539,6 @@ zs_txdma_int(arg)
 	struct zsc_softc *zsc;
 	struct zs_chanstate *cs;
 	int unit = 0;			/* XXX */
-	extern int zstty_txdma_int();
 
 	zsc = zsc_cd.cd_devs[unit];
 	if (zsc == NULL)
@@ -534,10 +548,14 @@ zs_txdma_int(arg)
 	zstty_txdma_int(cs);
 
 	if (cs->cs_softreq) {
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+		softintr_schedule(zsc->zsc_si);
+#else
 		if (zssoftpending == 0) {
 			zssoftpending = 1;
 			setsoftserial();
 		}
+#endif
 	}
 	return 1;
 }
@@ -1066,6 +1084,7 @@ zscnprobe(cp)
 	int chosen, pkg;
 	int unit = 0;
 	char name[16];
+	extern const struct cdevsw zstty_cdevsw;
 	
 	if ((chosen = OF_finddevice("/chosen")) == -1)
 		return;
@@ -1092,7 +1111,7 @@ zscnprobe(cp)
 	if (strcmp(name, "ch-b") == 0)
 		unit = 1;
 
-	cp->cn_dev = makedev(zs_major, unit);
+	cp->cn_dev = makedev(cdevsw_lookup_major(&zstty_cdevsw), unit);
 	cp->cn_pri = CN_REMOTE;
 }
 

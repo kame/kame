@@ -1,4 +1,4 @@
-/*	$NetBSD: lpt_mvme.c,v 1.1 2002/02/12 20:38:44 scw Exp $	*/
+/*	$NetBSD: lpt_mvme.c,v 1.4 2003/07/14 15:47:19 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2002 The NetBSD Foundation, Inc.
@@ -90,6 +90,9 @@
  * This driver attaches above the board-specific back-end.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: lpt_mvme.c,v 1.4 2003/07/14 15:47:19 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -121,13 +124,6 @@
 int lptdebug = 1;
 #endif
 
-/* {b,c}devsw[] function prototypes */
-dev_type_open(lptopen);
-dev_type_close(lptclose);
-dev_type_write(lptwrite);
-dev_type_ioctl(lptioctl);
-
-
 #define	LPTUNIT(s)	(minor(s) & 0x0f)
 #define	LPTFLAGS(s)	(minor(s) & 0xf0)
 
@@ -136,6 +132,15 @@ static int pushbytes __P((struct lpt_softc *));
 
 extern struct cfdriver lpt_cd;
 
+dev_type_open(lptopen);
+dev_type_close(lptclose);
+dev_type_write(lptwrite);
+dev_type_ioctl(lptioctl);
+
+const struct cdevsw lpt_cdevsw = {
+	lptopen, lptclose, noread, lptwrite, lptioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
 
 void
 lpt_attach_subr(sc)

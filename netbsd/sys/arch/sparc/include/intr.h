@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.3 2001/09/27 02:05:42 mrg Exp $ */
+/*	$NetBSD: intr.h,v 1.7 2003/06/16 20:01:05 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,24 +36,58 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* XXX - arbitrary numbers; no interpretation is defined yet */
+/*
+ * Device class interrupt levels
+ * Note: sun4 and sun4c hardware only has software interrupt available
+ *	 on level 1, 4 or 6. This limits the choice of the various
+ * 	 IPL_SOFT* symbols to one of those three values.
+ */
 #define IPL_NONE	0	/* nothing */
 #define IPL_SOFTCLOCK	1	/* timeouts */
 #define IPL_SOFTNET	1	/* protocol stack */
-#define IPL_BIO		2	/* block I/O */
-#define IPL_NET		3	/* network */
-#define IPL_SOFTSERIAL	4	/* serial */
-#define IPL_TTY		5	/* terminal */
-#define IPL_IMP		6	/* memory allocation */
-#define IPL_AUDIO	7	/* audio */
-#define IPL_CLOCK	8	/* clock */
-#define IPL_SERIAL	9	/* serial */
-#define IPL_HIGH	10	/* everything */
+#define IPL_SOFTAUDIO	4	/* second-level audio */
+#define IPL_SOFTFDC	4	/* second-level floppy */
+#define IPL_BIO		5	/* block I/O */
+#define IPL_TTY		6	/* terminal */
+#define IPL_SOFTSERIAL	6	/* serial */
+#define IPL_VM		7	/* memory allocation */
+#define IPL_NET		7	/* network */
+#define IPL_CLOCK	10	/* clock */
+#define IPL_SCHED	11	/* scheduler */
+#define IPL_AUDIO	13	/* audio */
+#define IPL_SERIAL	13	/* serial */
+#define IPL_STATCLOCK	14	/* statclock */
+#define IPL_HIGH	15	/* everything */
 
+#if defined(_KERNEL) && !defined(_LOCORE)
 void *
-softintr_establish __P((int level, void (*fun)(void *), void *arg));
+softintr_establish(int level, void (*fun)(void *), void *arg);
 
 void
-softintr_disestablish __P((void *cookie));
+softintr_disestablish(void *cookie);
 
-#define softintr_schedule(cookie)	setsoftint()
+/*
+ * NB that softintr_schedule() casts the cookie to an int *.
+ * This is to get the sic_pilreq member of the softintr_cookie
+ * structure, which is otherwise internal to intr.c.
+ */
+#if defined(SUN4M) || defined(SUN4D)
+extern void	raise __P((int, int));
+#if !(defined(SUN4) || defined(SUN4C))
+#define softintr_schedule(cookie)	raise(0, *((int *) (cookie)))
+#else /* both defined */
+#define softintr_schedule(cookie) do {		\
+	if (CPU_ISSUN4M || CPU_ISSUN4D)		\
+		raise(0, *((int *)(cookie)));	\
+	else					\
+		ienab_bis(*((int *)(cookie)));	\
+} while (0)
+#endif	/* SUN4  || SUN4C */
+#else	/* SUN4M || SUN4D */
+#define softintr_schedule(cookie)	ienab_bis(*((int *) (cookie)))
+#endif	/* SUN4M || SUN4D */
+
+#if 0
+void softintr_schedule(void *cookie);
+#endif
+#endif /* KERNEL && !_LOCORE */

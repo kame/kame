@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_var.h,v 1.23 2002/03/17 22:22:40 christos Exp $	*/
+/*	$NetBSD: nfs_var.h,v 1.42.2.2 2004/09/18 19:22:19 he Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -40,6 +40,19 @@
  * XXX needs <nfs/rpcv2.h> and <nfs/nfs.h> because of typedefs
  */
 
+#ifdef _KERNEL
+#include <sys/mallocvar.h>
+#include <sys/pool.h>
+
+MALLOC_DECLARE(M_NFSREQ);
+MALLOC_DECLARE(M_NFSMNT);
+MALLOC_DECLARE(M_NFSUID);
+MALLOC_DECLARE(M_NFSD);
+MALLOC_DECLARE(M_NFSDIROFF);
+MALLOC_DECLARE(M_NFSBIGFH);
+MALLOC_DECLARE(M_NQLEASE);
+extern struct pool nfs_srvdesc_pool;
+
 struct vnode;
 struct uio;
 struct ucred;
@@ -80,11 +93,16 @@ int nfs_doio __P((struct buf *, struct proc *));
 /* nfs_boot.c */
 /* see nfsdiskless.h */
 
+/* nfs_kq.c */
+void nfs_kqinit __P((void));
+
 /* nfs_node.c */
 void nfs_nhinit __P((void));
 void nfs_nhreinit __P((void));
 void nfs_nhdone __P((void));
-int nfs_nget __P((struct mount *, nfsfh_t *, int, struct nfsnode **));
+int nfs_nget1 __P((struct mount *, nfsfh_t *, int, struct nfsnode **, int));
+#define	nfs_nget(mp, fhp, fhsize, npp) \
+	nfs_nget1((mp), (fhp), (fhsize), (npp), 0)
 
 /* nfs_vnops.c */
 int nfs_null __P((struct vnode *, struct ucred *, struct proc *));
@@ -92,7 +110,8 @@ int nfs_setattrrpc __P((struct vnode *, struct vattr *, struct ucred *,
 			struct proc *));
 int nfs_readlinkrpc __P((struct vnode *, struct uio *, struct ucred *));
 int nfs_readrpc __P((struct vnode *, struct uio *));
-int nfs_writerpc __P((struct vnode *, struct uio *, int *, int *));
+int nfs_writerpc __P((struct vnode *, struct uio *, int *, boolean_t,
+			boolean_t *));
 int nfs_mknodrpc __P((struct vnode *, struct vnode **, struct componentname *,
 		      struct vattr *));
 int nfs_removeit __P((struct sillyrename *));
@@ -199,7 +218,7 @@ int nfs_send __P((struct socket *, struct mbuf *, struct mbuf *,
 		  struct nfsreq *));
 int nfs_receive __P((struct nfsreq *, struct mbuf **, struct mbuf **));
 int nfs_reply __P((struct nfsreq *));
-int nfs_request __P((struct vnode *, struct mbuf *, int, struct proc *,
+int nfs_request __P((struct nfsnode *, struct mbuf *, int, struct proc *,
 		     struct ucred *, struct mbuf **, struct mbuf **,
 		     caddr_t *));
 int nfs_rephead __P((int, struct nfsrv_descript *, struct nfssvc_sock *,
@@ -210,7 +229,7 @@ int nfs_sndlock __P((int *, struct nfsreq *));
 void nfs_exit __P((struct proc *, void *));
 void nfs_sndunlock __P((int *));
 int nfs_rcvlock __P((struct nfsreq *));
-void nfs_rcvunlock __P((int *));
+void nfs_rcvunlock __P((struct nfsmount *));
 int nfs_getreq __P((struct nfsrv_descript *, struct nfsd *, int));
 int nfs_msg __P((struct proc *, char *, char *));
 void nfsrv_rcv __P((struct socket *, caddr_t, int));
@@ -227,7 +246,7 @@ void nfsrv_updatecache __P((struct nfsrv_descript *, int, struct mbuf *));
 void nfsrv_cleancache __P((void));
 
 /* nfs_subs.c */
-struct mbuf *nfsm_reqh __P((struct vnode *, u_long, int, caddr_t *));
+struct mbuf *nfsm_reqh __P((struct nfsnode *, u_long, int, caddr_t *));
 struct mbuf *nfsm_rpchead __P((struct ucred *, int, int, int, int, char *, int,
 			       char *, struct mbuf *, int, struct mbuf **,
 			       u_int32_t *));
@@ -238,19 +257,22 @@ int nfs_adv __P((struct mbuf **, caddr_t *, int, int));
 int nfsm_strtmbuf __P((struct mbuf **, char **, const char *, long));
 u_long nfs_dirhash __P((off_t));
 void nfs_initdircache __P((struct vnode *));
+void nfs_initdirxlatecookie __P((struct vnode *));
 struct nfsdircache *nfs_searchdircache __P((struct vnode *, off_t, int, int *));
 struct nfsdircache *nfs_enterdircache __P((struct vnode *, off_t, off_t,						   int, daddr_t));
+void nfs_putdircache __P((struct nfsnode *, struct nfsdircache *));
 void nfs_invaldircache __P((struct vnode *, int));
 void nfs_init __P((void));
 int nfsm_loadattrcache __P((struct vnode **, struct mbuf **, caddr_t *,
-			   struct vattr *));
+			   struct vattr *, int flags));
 int nfs_loadattrcache __P((struct vnode **, struct nfs_fattr *,
-			   struct vattr *));
+			   struct vattr *, int flags));
 int nfs_getattrcache __P((struct vnode *, struct vattr *));
-int nfs_namei __P((struct nameidata *, fhandle_t *, int, struct nfssvc_sock *,
-		   struct mbuf *, struct mbuf **, caddr_t *, struct vnode **,
-		   struct proc *, int, int));
-void nfsm_adj __P((struct mbuf *, int, int));
+void nfs_delayedtruncate __P((struct vnode *));
+int nfs_namei __P((struct nameidata *, fhandle_t *, uint32_t,
+		   struct nfssvc_sock *, struct mbuf *, struct mbuf **,
+		   caddr_t *, struct vnode **, struct proc *, int, int));
+void nfs_zeropad __P((struct mbuf *, int, int));
 void nfsm_srvwcc __P((struct nfsrv_descript *, int, struct vattr *, int,
 		      struct vattr *, struct mbuf **, char **));
 void nfsm_srvpostopattr __P((struct nfsrv_descript *, int, struct vattr *,
@@ -263,6 +285,9 @@ int nfsrv_setpublicfs __P((struct mount *, struct netexport *,
 			   struct export_args *));
 int nfs_ispublicfh __P((fhandle_t *));
 int netaddr_match __P((int, union nethostaddr *, struct mbuf *));
+
+/* flags for nfs_loadattrcache and friends */
+#define	NAC_NOTRUNC	1	/* don't truncate file size */
 
 void nfs_clearcommit __P((struct mount *));
 void nfs_merge_commit_ranges __P((struct vnode *));
@@ -279,15 +304,19 @@ void nfsrv_setcred __P((struct ucred *, struct ucred *));
 void nfs_cookieheuristic __P((struct vnode *, int *, struct proc *,
 			      struct ucred *));
 
+u_int32_t nfs_getxid __P((void));
+void nfs_renewxid __P((struct nfsreq *));
+
 /* nfs_syscalls.c */
-int sys_getfh __P((struct proc *, void *, register_t *));
-int sys_nfssvc __P((struct proc *, void *, register_t *));
+int sys_getfh __P((struct lwp *, void *, register_t *));
+int sys_nfssvc __P((struct lwp *, void *, register_t *));
 int nfssvc_addsock __P((struct file *, struct mbuf *));
-int nfssvc_nfsd __P((struct nfsd_srvargs *, caddr_t, struct proc *));
+int nfssvc_nfsd __P((struct nfsd_srvargs *, caddr_t, struct lwp *));
 void nfsrv_zapsock __P((struct nfssvc_sock *));
 void nfsrv_slpderef __P((struct nfssvc_sock *));
 void nfsrv_init __P((int));
-int nfssvc_iod __P((struct proc *));
+int nfssvc_iod __P((struct lwp *));
+void nfs_iodinit __P((void));
 void start_nfsio __P((void *));
 void nfs_getset_niothreads __P((int));
 int nfs_getauth __P((struct nfsmount *, struct nfsreq *, struct ucred *,
@@ -296,3 +325,4 @@ int nfs_getnickauth __P((struct nfsmount *, struct ucred *, char **, int *,
 			 char *, int));
 int nfs_savenickauth __P((struct nfsmount *, struct ucred *, int, NFSKERBKEY_T,
 			  struct mbuf **, char **, struct mbuf *));
+#endif /* _KERNEL */

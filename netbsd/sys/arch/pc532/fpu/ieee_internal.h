@@ -1,21 +1,21 @@
-/*	$NetBSD: ieee_internal.h,v 1.4 1998/09/02 19:17:13 matthias Exp $	*/
+/*	$NetBSD: ieee_internal.h,v 1.6 2004/01/23 04:12:39 simonb Exp $	*/
 
-/* 
+/*
  * IEEE floating point support for NS32081 and NS32381 fpus.
  * Copyright (c) 1995 Ian Dall
  * All Rights Reserved.
- * 
+ *
  * Permission to use, copy, modify and distribute this software and its
  * documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
+ *
  * IAN DALL ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION.
  * IAN DALL DISCLAIMS ANY LIABILITY OF ANY KIND FOR ANY DAMAGES
  * WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
  */
-/* 
+/*
  *	File:	ieee_internal.h
  *	Author:	Ian Dall
  *	Date:	November 1995
@@ -103,7 +103,7 @@ union t_conv {
 
 #define EXP_DBIAS 1023
 
-#define EXP_FBIAS 127 
+#define EXP_FBIAS 127
 
 enum op_type {op_type_float, op_type_int};
 
@@ -111,11 +111,11 @@ enum op_class {op_class_read, op_class_write, op_class_rmw, op_class_addr};
 
 enum op_where_tag { op_where_register, op_where_memory, op_where_immediate };
 
-static const union t_conv infty = {d_bits: { sign: 0, exp: 0x7ff, mantissa: 0, mantissa2: 0}};
+extern const union t_conv infty;
 
-static const union t_conv snan = {d_bits: { sign: 0, exp: 0x7ff, mantissa: 0x40000, mantissa2: 0}};
+extern const union t_conv snan;
 
-static const union t_conv qnan = {d_bits: { sign: 0, exp: 0x7ff, mantissa: 0x80000, mantissa2: 0}};
+extern const union t_conv qnan;
 
 struct operand {
   enum op_type type;

@@ -1,4 +1,4 @@
-/*	$NetBSD: saio.c,v 1.3 2001/09/24 13:22:33 wiz Exp $	*/
+/*	$NetBSD: saio.c,v 1.6 2003/08/07 16:28:38 agc Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -39,6 +35,7 @@
  */
 
 #include <lib/libsa/stand.h>
+#include <lib/libkern/libkern.h>
 #include <machine/prom.h>
 #include <machine/stdarg.h>
 
@@ -89,7 +86,8 @@ struct sa_iob {
 	char	*i_ma;		/* memory address of i/o buffer */
 	int	i_cc;		/* character count of transfer */
 	int32_t	i_offset;	/* seek offset in file */
-	daddr_t	i_bn;		/* 1st block # of next read */
+	/* XXX ondisk32 */
+	int32_t	i_bn;		/* 1st block # of next read */
 	int	i_fstype;	/* file system type */
 	int	i_errno;	/* error # return */
 	unsigned int	i_devaddr;	/* csr address */

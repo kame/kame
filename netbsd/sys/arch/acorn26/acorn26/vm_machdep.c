@@ -1,4 +1,4 @@
-/* $NetBSD: vm_machdep.c,v 1.2 2002/03/24 23:37:42 bjh21 Exp $ */
+/* $NetBSD: vm_machdep.c,v 1.7 2004/01/04 11:33:29 jdolecek Exp $ */
 
 /*-
  * Copyright (c) 2000, 2001 Ben Harris
@@ -63,10 +63,10 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vm_machdep.c,v 1.7 2004/01/04 11:33:29 jdolecek Exp $");
+
 #include <sys/param.h>
-
-__RCSID("$NetBSD: vm_machdep.c,v 1.2 2002/03/24 23:37:42 bjh21 Exp $");
-
 #include <sys/buf.h>
 #include <sys/mount.h> /* XXX syscallargs.h uses fhandle_t and fsid_t */
 #include <sys/proc.h>
@@ -102,7 +102,7 @@ __RCSID("$NetBSD: vm_machdep.c,v 1.2 2002/03/24 23:37:42 bjh21 Exp $");
  */
 
 void
-cpu_fork(struct proc *p1, struct proc *p2, void *stack, size_t stacksize,
+cpu_lwp_fork(struct lwp *l1, struct lwp *l2, void *stack, size_t stacksize,
     void (*func)(void *), void *arg)
 {
 	struct pcb *pcb;
@@ -113,22 +113,22 @@ cpu_fork(struct proc *p1, struct proc *p2, void *stack, size_t stacksize,
 #if 0
 	printf("cpu_fork: %p -> %p\n", p1, p2);
 #endif
-	pcb = &p2->p_addr->u_pcb;
+	pcb = &l2->l_addr->u_pcb;
 	/* Copy the pcb */
-	*pcb = p1->p_addr->u_pcb;
+	*pcb = l1->l_addr->u_pcb;
 
-	/* pmap_activate(p2); XXX Other ports do.  Why?  */
+	/* pmap_activate(l2); XXX Other ports do.  Why?  */
 
 	/* Set up the kernel stack */
-	stacktop = (char *)p2->p_addr + USPACE;
+	stacktop = (char *)l2->l_addr + USPACE;
 	tf = (struct trapframe *)stacktop - 1;
 	sf = (struct switchframe *)tf - 1;
 	/* Duplicate old process's trapframe (if it had one) */
-	if (p1->p_addr->u_pcb.pcb_tf == NULL)
+	if (l1->l_addr->u_pcb.pcb_tf == NULL)
 		bzero(tf, sizeof(*tf));
 	else
-		*tf = *p1->p_addr->u_pcb.pcb_tf;
-	p2->p_addr->u_pcb.pcb_tf = tf;
+		*tf = *l1->l_addr->u_pcb.pcb_tf;
+	l2->l_addr->u_pcb.pcb_tf = tf;
 	/* Fabricate a new switchframe */
 	bzero(sf, sizeof(*sf));
 	sf->sf_r13 = (register_t)tf; /* Initial stack pointer */
@@ -142,25 +142,49 @@ cpu_fork(struct proc *p1, struct proc *p2, void *stack, size_t stacksize,
 }
 
 void
-cpu_exit(struct proc *p)
+cpu_setfunc(struct lwp *l, void (*func)(void *), void *arg)
 {
-	int s;
+	struct pcb *pcb = &l->l_addr->u_pcb;
+	struct trapframe *tf = pcb->pcb_tf;
+	struct switchframe *sf = (struct switchframe *)tf - 1;
 
-	/* Nothing to do here? */
-	exit2(p); /* I think this is safe on a uniprocessor machine */
-	SCHED_LOCK(s);		/* expected by cpu_switch */
-	cpu_switch(p);
+	sf->sf_r13 = (register_t)tf; /* Initial stack pointer */
+	sf->sf_r14 = (register_t)proc_trampoline | R15_MODE_SVC;
+
+	pcb->pcb_tf = tf;
+	pcb->pcb_sf = sf;
+	pcb->pcb_onfault = NULL;
+	sf->sf_r4 = (register_t)func;
+	sf->sf_r5 = (register_t)arg;
 }
 
 void
-cpu_swapin(struct proc *p)
+cpu_lwp_free(struct lwp *l, int proc)
+{
+
+	/* Nothing to do here? */
+}
+
+void
+cpu_exit(struct lwp *l)
+{
+	int s;
+
+	/* I think this is safe on a uniprocessor machine */
+	lwp_exit2(l);
+	SCHED_LOCK(s);		/* expected by cpu_switch */
+	cpu_switch(l, NULL);
+}
+
+void
+cpu_swapin(struct lwp *l)
 {
 
 	/* Can anyone think of anything I should do here? */
 }
 
 void
-cpu_swapout(struct proc *p)
+cpu_swapout(struct lwp *l)
 {
 
 	/* ... or here, for that matter. */

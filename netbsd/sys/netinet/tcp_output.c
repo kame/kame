@@ -1,9 +1,9 @@
-/*	$NetBSD: tcp_output.c,v 1.79.4.5 2004/02/07 20:06:58 jmc Exp $	*/
+/*	$NetBSD: tcp_output.c,v 1.108.2.1 2004/05/11 13:00:20 tron Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -31,11 +31,11 @@
 
 /*
  *      @(#)COPYRIGHT   1.1 (NRL) 17 January 1995
- * 
+ *
  * NRL grants permission for redistribution and use in source and binary
  * forms, with or without modification, of the software and documentation
  * created at NRL provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
@@ -50,7 +50,7 @@
  * 4. Neither the name of the NRL nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THE SOFTWARE PROVIDED BY NRL IS PROVIDED BY NRL AND CONTRIBUTORS ``AS
  * IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
  * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
@@ -62,7 +62,7 @@
  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  * The views and conclusions contained in the software and documentation
  * are those of the authors and should not be interpreted as representing
  * official policies, either expressed or implied, of the US Naval
@@ -118,11 +118,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -142,7 +138,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tcp_output.c,v 1.79.4.5 2004/02/07 20:06:58 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tcp_output.c,v 1.108.2.1 2004/05/11 13:00:20 tron Exp $");
 
 #include "opt_inet.h"
 #include "opt_ipsec.h"
@@ -173,8 +169,17 @@ __KERNEL_RCSID(0, "$NetBSD: tcp_output.c,v 1.79.4.5 2004/02/07 20:06:58 jmc Exp 
 #include <netinet/in.h>
 #endif
 #include <netinet/ip6.h>
-#include <netinet6/in6_pcb.h>
+#include <netinet6/in6_var.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/in6_pcb.h>
+#include <netinet6/nd6.h>
+#endif
+
+#ifdef FAST_IPSEC
+#include <netipsec/ipsec.h>
+#endif	/* FAST_IPSEC*/
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
 #endif
 
 #include <netinet/tcp.h>
@@ -204,6 +209,8 @@ int	tcp_cwm_burstsize = 4;
 #include <sys/device.h>
 
 extern struct evcnt tcp_output_bigheader;
+extern struct evcnt tcp_output_predict_hit;
+extern struct evcnt tcp_output_predict_miss;
 extern struct evcnt tcp_output_copysmall;
 extern struct evcnt tcp_output_copybig;
 extern struct evcnt tcp_output_refbig;
@@ -228,7 +235,7 @@ tcp_segsize(struct tcpcb *tp, int *txsegsizep, int *rxsegsizep)
 #ifdef INET6
 	struct in6pcb *in6p = tp->t_in6pcb;
 #endif
-	struct socket *so;
+	struct socket *so = NULL;
 	struct rtentry *rt;
 	struct ifnet *ifp;
 	int size;
@@ -316,7 +323,7 @@ tcp_segsize(struct tcpcb *tp, int *txsegsizep, int *rxsegsizep)
 			 * for IPv6, path MTU discovery is always turned on,
 			 * or the node must use packet size <= 1280.
 			 */
-			size = tp->t_mtudisc ? ifp->if_mtu : IPV6_MMTU;
+			size = tp->t_mtudisc ? IN6_LINKMTU(ifp) : IPV6_MMTU;
 			size -= (iphlen + sizeof(struct tcphdr));
 		}
 	}
@@ -334,8 +341,9 @@ tcp_segsize(struct tcpcb *tp, int *txsegsizep, int *rxsegsizep)
 	 */
 #ifdef INET
 	if (inp) {
-#ifdef IPSEC
-		optlen += ipsec4_hdrsiz_tcp(tp);
+#if defined(IPSEC) || defined(FAST_IPSEC)
+		if (! IPSEC_PCB_SKIP_IPSEC(inp->inp_sp, IPSEC_DIR_OUTBOUND))
+			optlen += ipsec4_hdrsiz_tcp(tp);
 #endif
 		optlen += ip_optlen(inp);
 	}
@@ -343,15 +351,17 @@ tcp_segsize(struct tcpcb *tp, int *txsegsizep, int *rxsegsizep)
 #ifdef INET6
 #ifdef INET
 	if (in6p && tp->t_family == AF_INET) {
-#ifdef IPSEC
-		optlen += ipsec4_hdrsiz_tcp(tp);
+#if defined(IPSEC) || defined(FAST_IPSEC)
+		if (! IPSEC_PCB_SKIP_IPSEC(in6p->in6p_sp, IPSEC_DIR_OUTBOUND))
+			optlen += ipsec4_hdrsiz_tcp(tp);
 #endif
 		/* XXX size -= ip_optlen(in6p); */
 	} else
 #endif
 	if (in6p && tp->t_family == AF_INET6) {
 #ifdef IPSEC
-		optlen += ipsec6_hdrsiz_tcp(tp);
+		if (! IPSEC_PCB_SKIP_IPSEC(in6p->in6p_sp, IPSEC_DIR_OUTBOUND))
+			optlen += ipsec6_hdrsiz_tcp(tp);
 #endif
 		optlen += ip6_optlen(in6p);
 	}
@@ -383,7 +393,7 @@ tcp_segsize(struct tcpcb *tp, int *txsegsizep, int *rxsegsizep)
 
 	if (*txsegsizep != tp->t_segsz) {
 		/*
-		 * If the new segment size is larger, we don't want to 
+		 * If the new segment size is larger, we don't want to
 		 * mess up the congestion window, but if it is smaller
 		 * we'll have to reduce the congestion window to ensure
 		 * that we don't get into trouble with initial windows
@@ -392,9 +402,9 @@ tcp_segsize(struct tcpcb *tp, int *txsegsizep, int *rxsegsizep)
 		 * our congestion window will be different.
 		 */
 		if (*txsegsizep < tp->t_segsz) {
-			tp->snd_cwnd = max((tp->snd_cwnd / tp->t_segsz) 
+			tp->snd_cwnd = max((tp->snd_cwnd / tp->t_segsz)
 					   * *txsegsizep, *txsegsizep);
-			tp->snd_ssthresh = max((tp->snd_ssthresh / tp->t_segsz) 
+			tp->snd_ssthresh = max((tp->snd_ssthresh / tp->t_segsz)
 						* *txsegsizep, *txsegsizep);
 		}
 		tp->t_segsz = *txsegsizep;
@@ -411,7 +421,7 @@ int
 tcp_build_datapkt(struct tcpcb *tp, struct socket *so, int off,
     long len, int hdrlen, struct mbuf **mp)
 {
-	struct mbuf *m;
+	struct mbuf *m, *m0;
 
 	if (tp->t_force && len == 1)
 		tcpstat.tcps_sndprobe++;
@@ -435,6 +445,7 @@ tcp_build_datapkt(struct tcpcb *tp, struct socket *so, int off,
 	MGETHDR(m, M_DONTWAIT, MT_HEADER);
 	if (__predict_false(m == NULL))
 		return (ENOBUFS);
+	MCLAIM(m, &tcp_tx_mowner);
 
 	/*
 	 * XXX Because other code assumes headers will fit in
@@ -453,13 +464,49 @@ tcp_build_datapkt(struct tcpcb *tp, struct socket *so, int off,
 
 	m->m_data += max_linkhdr;
 	m->m_len = hdrlen;
+
+	/*
+	 * To avoid traversing the whole sb_mb chain for correct
+	 * data to send, remember last sent mbuf, its offset and
+	 * the sent size.  When called the next time, see if the
+	 * data to send is directly following the previous transfer.
+	 * This is important for large TCP windows.
+	 */
+	if (off == 0 || tp->t_lastm == NULL ||
+	    (tp->t_lastoff + tp->t_lastlen) != off) {
+		TCP_OUTPUT_COUNTER_INCR(&tcp_output_predict_miss);
+		/*
+		 * Either a new packet or a retransmit.
+		 * Start from the beginning.
+		 */
+		tp->t_lastm = so->so_snd.sb_mb;
+		tp->t_inoff = off;
+	} else {
+		TCP_OUTPUT_COUNTER_INCR(&tcp_output_predict_hit);
+		tp->t_inoff += tp->t_lastlen;
+	}
+
+	/* Traverse forward to next packet */
+	while (tp->t_inoff > 0) {
+		if (tp->t_lastm == NULL)
+			panic("tp->t_lastm == NULL");
+		if (tp->t_inoff < tp->t_lastm->m_len)
+			break;
+		tp->t_inoff -= tp->t_lastm->m_len;
+		tp->t_lastm = tp->t_lastm->m_next;
+	}
+
+	tp->t_lastoff = off;
+	tp->t_lastlen = len;
+	m0 = tp->t_lastm;
+	off = tp->t_inoff;
+
 	if (len <= M_TRAILINGSPACE(m)) {
-		m_copydata(so->so_snd.sb_mb, off, (int) len,
-		    mtod(m, caddr_t) + hdrlen);
+		m_copydata(m0, off, (int) len, mtod(m, caddr_t) + hdrlen);
 		m->m_len += len;
 		TCP_OUTPUT_COUNTER_INCR(&tcp_output_copysmall);
 	} else {
-		m->m_next = m_copy(so->so_snd.sb_mb, off, (int) len);
+		m->m_next = m_copy(m0, off, (int) len);
 		if (m->m_next == NULL) {
 			m_freem(m);
 			return (ENOBUFS);
@@ -528,20 +575,20 @@ tcp_output(tp)
 		if (tp->t_in6pcb)
 			break;
 #endif
-		return EINVAL;
+		return (EINVAL);
 #endif
 #ifdef INET6
 	case AF_INET6:
 		if (tp->t_in6pcb)
 			break;
-		return EINVAL;
+		return (EINVAL);
 #endif
 	default:
-		return EAFNOSUPPORT;
+		return (EAFNOSUPPORT);
 	}
 
 	if (tcp_segsize(tp, &txsegsize, &rxsegsize))
-		return EMSGSIZE;
+		return (EMSGSIZE);
 
 	idle = (tp->snd_max == tp->snd_una);
 
@@ -575,8 +622,19 @@ tcp_output(tp)
 			 * expected to clock out any data we send --
 			 * slow start to get ack "clock" running again.
 			 */
+			int ss = tcp_init_win;
+#ifdef INET
+			if (tp->t_inpcb &&
+			    in_localaddr(tp->t_inpcb->inp_faddr))
+				ss = tcp_init_win_local;
+#endif
+#ifdef INET6
+			if (tp->t_in6pcb &&
+			    in6_localaddr(&tp->t_in6pcb->in6p_faddr))
+				ss = tcp_init_win_local;
+#endif
 			tp->snd_cwnd = min(tp->snd_cwnd,
-			    TCP_INITIAL_WINDOW(tcp_init_win, txsegsize));
+			    TCP_INITIAL_WINDOW(ss, txsegsize));
 		}
 	}
 
@@ -703,7 +761,7 @@ again:
 	 * to peer.
 	 */
 	if (win > 0) {
-		/* 
+		/*
 		 * "adv" is the amount we can increase the window,
 		 * taking into account that we are limited by
 		 * TCP_MAXWIN << tp->rcv_scale.
@@ -800,7 +858,7 @@ send:
 #endif
 
 		tp->snd_nxt = tp->iss;
-		tp->t_ourmss = tcp_mss_to_advertise(rt != NULL ? 
+		tp->t_ourmss = tcp_mss_to_advertise(rt != NULL ?
 						    rt->rt_ifp : NULL, af);
 		if ((tp->t_flags & TF_NOOPT) == 0) {
 			opt[0] = TCPOPT_MAXSEG;
@@ -808,7 +866,7 @@ send:
 			opt[2] = (tp->t_ourmss >> 8) & 0xff;
 			opt[3] = tp->t_ourmss & 0xff;
 			optlen = 4;
-	 
+
 			if ((tp->t_flags & TF_REQ_SCALE) &&
 			    ((flags & TH_ACK) == 0 ||
 			    (tp->t_flags & TF_RCVD_SCALE))) {
@@ -820,32 +878,32 @@ send:
 				optlen += 4;
 			}
 		}
- 	}
- 
- 	/*
-	 * Send a timestamp and echo-reply if this is a SYN and our side 
+	}
+
+	/*
+	 * Send a timestamp and echo-reply if this is a SYN and our side
 	 * wants to use timestamps (TF_REQ_TSTMP is set) or both our side
 	 * and our peer have sent timestamps in our SYN's.
- 	 */
- 	if ((tp->t_flags & (TF_REQ_TSTMP|TF_NOOPT)) == TF_REQ_TSTMP &&
- 	     (flags & TH_RST) == 0 &&
- 	    ((flags & (TH_SYN|TH_ACK)) == TH_SYN ||
+	 */
+	if ((tp->t_flags & (TF_REQ_TSTMP|TF_NOOPT)) == TF_REQ_TSTMP &&
+	     (flags & TH_RST) == 0 &&
+	    ((flags & (TH_SYN|TH_ACK)) == TH_SYN ||
 	     (tp->t_flags & TF_RCVD_TSTMP))) {
 		u_int32_t *lp = (u_int32_t *)(opt + optlen);
- 
- 		/* Form timestamp option as shown in appendix A of RFC 1323. */
- 		*lp++ = htonl(TCPOPT_TSTAMP_HDR);
- 		*lp++ = htonl(TCP_TIMESTAMP(tp));
- 		*lp   = htonl(tp->ts_recent);
- 		optlen += TCPOLEN_TSTAMP_APPA;
- 	}
 
- 	hdrlen += optlen;
- 
+		/* Form timestamp option as shown in appendix A of RFC 1323. */
+		*lp++ = htonl(TCPOPT_TSTAMP_HDR);
+		*lp++ = htonl(TCP_TIMESTAMP(tp));
+		*lp   = htonl(tp->ts_recent);
+		optlen += TCPOLEN_TSTAMP_APPA;
+	}
+
+	hdrlen += optlen;
+
 #ifdef DIAGNOSTIC
 	if (len > txsegsize)
 		panic("tcp data to be sent is larger than segment");
- 	if (max_linkhdr + hdrlen > MCLBYTES)
+	if (max_linkhdr + hdrlen > MCLBYTES)
 		panic("tcphdr too big");
 #endif
 
@@ -888,6 +946,7 @@ send:
 			error = ENOBUFS;
 			goto out;
 		}
+		MCLAIM(m, &tcp_tx_mowner);
 		m->m_data += max_linkhdr;
 		m->m_len = hdrlen;
 	}
@@ -955,8 +1014,8 @@ send:
 		win = 0;
 	if (win > (long)TCP_MAXWIN << tp->rcv_scale)
 		win = (long)TCP_MAXWIN << tp->rcv_scale;
-	if (win < (long)(tp->rcv_adv - tp->rcv_nxt))
-		win = (long)(tp->rcv_adv - tp->rcv_nxt);
+	if (win < (long)(int32_t)(tp->rcv_adv - tp->rcv_nxt))
+		win = (long)(int32_t)(tp->rcv_adv - tp->rcv_nxt);
 	th->th_win = htons((u_int16_t) (win>>tp->rcv_scale));
 	if (SEQ_GT(tp->snd_up, tp->snd_nxt)) {
 		u_int32_t urp = tp->snd_up - tp->snd_nxt;
@@ -1071,27 +1130,8 @@ send:
 	/*
 	 * Trace.
 	 */
-	if (so->so_options & SO_DEBUG) {
-		/*
-		 * need to recover version # field, which was overwritten
-		 * on ip_cksum computation.
-		 */
-		struct ip *sip;
-		sip = mtod(m, struct ip *);
-		switch (af) {
-#ifdef INET
-		case AF_INET:
-			sip->ip_v = 4;
-			break;
-#endif
-#ifdef INET6
-		case AF_INET6:
-			sip->ip_v = 6;
-			break;
-#endif
-		}
+	if (so->so_options & SO_DEBUG)
 		tcp_trace(TA_OUTPUT, tp->t_state, tp, m, 0);
-	}
 #endif
 
 	/*
@@ -1105,7 +1145,7 @@ send:
 	switch (af) {
 #ifdef INET
 	case AF_INET:
-		ip->ip_len = m->m_pkthdr.len;
+		ip->ip_len = htons(m->m_pkthdr.len);
 		if (tp->t_inpcb) {
 			ip->ip_ttl = tp->t_inpcb->inp_ip.ip_ttl;
 			ip->ip_tos = tp->t_inpcb->inp_ip.ip_tos;
@@ -1137,14 +1177,6 @@ send:
 #endif
 	}
 
-#ifdef IPSEC
-	if (ipsec_setsocket(m, so) != 0) {
-		m_freem(m);
-		error = ENOBUFS;
-		goto out;
-	}
-#endif /*IPSEC*/
-
 	switch (af) {
 #ifdef INET
 	case AF_INET:
@@ -1158,7 +1190,7 @@ send:
 		error = ip_output(m, opts, ro,
 			(tp->t_mtudisc ? IP_MTUDISC : 0) |
 			(so->so_options & SO_DONTROUTE),
-			0);
+			(struct ip_moptions *)0, so);
 		break;
 	    }
 #endif
@@ -1172,7 +1204,8 @@ send:
 		else
 			opts = NULL;
 		error = ip6_output(m, opts, (struct route_in6 *)ro,
-			so->so_options & SO_DONTROUTE, 0, NULL);
+			so->so_options & SO_DONTROUTE, 
+			(struct ip6_moptions *)0, so, NULL);
 		break;
 	    }
 #endif

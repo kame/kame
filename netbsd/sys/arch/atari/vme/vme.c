@@ -1,4 +1,4 @@
-/*	$NetBSD: vme.c,v 1.3 1998/01/12 18:04:22 thorpej Exp $	*/
+/*	$NetBSD: vme.c,v 1.9 2003/07/15 01:19:56 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -33,6 +33,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vme.c,v 1.9 2003/07/15 01:19:56 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -48,9 +51,8 @@ int vmematch __P((struct device *, struct cfdata *, void *));
 void vmeattach __P((struct device *, struct device *, void *));
 int vmeprint __P((void *, const char *));
 
-struct cfattach vme_ca = {
-	sizeof(struct vme_softc), vmematch, vmeattach
-};
+CFATTACH_DECL(vme, sizeof(struct vme_softc),
+    vmematch, vmeattach, NULL, NULL);
 
 int	vmesearch __P((struct device *, struct cfdata *, void *));
 
@@ -62,7 +64,7 @@ vmematch(parent, cf, aux)
 {
 	struct vmebus_attach_args *vba = aux;
 
-	if (strcmp(vba->vba_busname, cf->cf_driver->cd_name))
+	if (strcmp(vba->vba_busname, cf->cf_name))
 		return (0);
 
         return (1);
@@ -93,15 +95,15 @@ vmeprint(aux, vme)
 	struct vme_attach_args *va = aux;
 
 	if (va->va_iosize)
-		printf(" port 0x%x", va->va_iobase);
+		aprint_normal(" port 0x%x", va->va_iobase);
 	if (va->va_iosize > 1)
-		printf("-0x%x", va->va_iobase + va->va_iosize - 1);
+		aprint_normal("-0x%x", va->va_iobase + va->va_iosize - 1);
 	if (va->va_msize)
-		printf(" iomem 0x%x", va->va_maddr);
+		aprint_normal(" iomem 0x%x", va->va_maddr);
 	if (va->va_msize > 1)
-		printf("-0x%x", va->va_maddr + va->va_msize - 1);
+		aprint_normal("-0x%x", va->va_maddr + va->va_msize - 1);
 	if (va->va_irq != IRQUNK)
-		printf(" irq %d", va->va_irq);
+		aprint_normal(" irq %d", va->va_irq);
 	return (UNCONF);
 }
 
@@ -123,7 +125,7 @@ vmesearch(parent, cf, aux)
 	va.va_msize  = cf->cf_msize;
 	va.va_irq    = cf->cf_irq;
 
-	if ((*cf->cf_attach->ca_match)(parent, cf, &va) > 0)
+	if (config_match(parent, cf, &va) > 0)
 		config_attach(parent, cf, &va, vmeprint);
 	return (0);
 }

@@ -1,4 +1,4 @@
-#	$NetBSD: files.sandpoint,v 1.11 2002/04/16 20:50:22 thorpej Exp $
+#	$NetBSD: files.sandpoint,v 1.17 2004/03/13 17:31:34 bjh21 Exp $
 #
 # Motorola's "SandPoint" evaluation board's specific configuration info
 #
@@ -7,14 +7,14 @@ maxpartitions 16
 maxusers 2 8 64
 
 file	arch/sandpoint/sandpoint/autoconf.c
-file	arch/sandpoint/sandpoint/bus_space.c
 file	arch/sandpoint/sandpoint/clock.c
-file	arch/sandpoint/sandpoint/conf.c
 file	arch/sandpoint/sandpoint/disksubr.c		disk
 file	arch/sandpoint/sandpoint/extintr.c
 file	arch/sandpoint/sandpoint/machdep.c
-file	arch/sandpoint/sandpoint/procfs_machdep.c	procfs
+
 file	arch/powerpc/powerpc/bus_dma.c
+file	arch/powerpc/powerpc/bus_space.c
+file	arch/powerpc/powerpc/procfs_machdep.c		procfs
 
 # General files
 file	dev/cons.c
@@ -23,39 +23,17 @@ file	dev/cons.c
 # Machine-independent SCSI drivers
 #
 include "dev/scsipi/files.scsipi"
-major	{sd = 4}
-major	{cd = 6}
 
 #
 # Machine-independent ATA drivers
 #
 
 include "dev/ata/files.ata"
-major	{wd = 0}
 
 #
 # Memory Disk for install floppy
 #
 file dev/md_root.c	memory_disk_hooks
-major	{md = 17}
-
-#
-# Compatibility modules
-#
-
-# OSS audio driver compatibility
-include "compat/ossaudio/files.ossaudio"
-
-# Linux binary compatibility (COMPAT_LINUX)
-include "compat/linux/files.linux"
-include "compat/linux/arch/powerpc/files.linux_powerpc"
-file arch/powerpc/powerpc/linux_sigcode.S	compat_linux
-file arch/powerpc/powerpc/linux_trap.c		compat_linux
-
-#
-# RAIDframe
-#
-major	{raid = 18}
 
 #
 # System bus types
@@ -91,8 +69,6 @@ file	arch/sandpoint/pci/pcib.c		pcib
 #
 
 include "dev/isa/files.isa"
-major	{mcd = 7}
-#major	{scd = 15}
 
 file	arch/sandpoint/isa/isa_machdep.c	isa
 file	arch/sandpoint/isa/isadma_machdep.c	isa
@@ -103,7 +79,7 @@ file	arch/sandpoint/isa/isaclock.c		isa
 include	"dev/wscons/files.wscons"
 include	"dev/wsfont/files.wsfont"
 
-include "dev/pckbc/files.pckbc"
+include "dev/pckbport/files.pckbport"
 
 # Floppy disk controller
 device	fdc {drive = -1}: isadma
@@ -114,4 +90,5 @@ file	dev/isa/fdc_isa.c		fdc_isa
 
 device	fd: disk
 attach	fd at fdc
-major	{fd = 2}
+
+include "arch/sandpoint/conf/majors.sandpoint"

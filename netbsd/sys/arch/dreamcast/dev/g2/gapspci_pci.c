@@ -1,4 +1,4 @@
-/*	$NetBSD: gapspci_pci.c,v 1.4 2002/05/15 17:09:04 thorpej Exp $	*/
+/*	$NetBSD: gapspci_pci.c,v 1.6 2003/07/15 01:31:38 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 Marcus Comstedt.
@@ -38,6 +38,7 @@
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
+__KERNEL_RCSID(0, "$NetBSD: gapspci_pci.c,v 1.6 2003/07/15 01:31:38 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -199,7 +200,7 @@ const char *
 gaps_intr_string(void *v, pci_intr_handle_t ih)
 {
 
-	return ("SH4 IRL 11");
+	return sysasic_intr_string(IPL_NET);
 }
 
 void *
@@ -207,12 +208,12 @@ gaps_intr_establish(void *v, pci_intr_handle_t ih, int level,
     int (*func)(void *), void *arg)
 {
 
-	return (sysasic_intr_establish(ih, func, arg));
+	return (sysasic_intr_establish(ih, IPL_NET, func, arg));
 }
 
 void
 gaps_intr_disestablish(void *v, void *ih)
 {
 
-	panic("gaps_intr_disestablish: not implemented");
+	return (sysasic_intr_disestablish(ih));
 }

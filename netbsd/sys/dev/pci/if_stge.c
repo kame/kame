@@ -1,4 +1,4 @@
-/*	$NetBSD: if_stge.c,v 1.9 2001/11/13 07:48:44 lukem Exp $	*/
+/*	$NetBSD: if_stge.c,v 1.19 2003/03/01 19:49:45 mjacob Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_stge.c,v 1.9 2001/11/13 07:48:44 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_stge.c,v 1.19 2003/03/01 19:49:45 mjacob Exp $");
 
 #include "bpfilter.h"
 
@@ -81,6 +81,10 @@ __KERNEL_RCSID(0, "$NetBSD: if_stge.c,v 1.9 2001/11/13 07:48:44 lukem Exp $");
 #include <dev/pci/pcidevs.h>
 
 #include <dev/pci/if_stgereg.h>
+
+/* #define	STGE_CU_BUG			1 */
+#define	STGE_VLAN_UNTAG			1
+/* #define	STGE_VLAN_CFI		1 */
 
 /*
  * Transmit descriptor list size.
@@ -298,9 +302,8 @@ void	stge_attach(struct device *, struct device *, void *);
 
 int	stge_copy_small = 0;
 
-struct cfattach stge_ca = {
-	sizeof(struct stge_softc), stge_match, stge_attach,
-};
+CFATTACH_DECL(stge, sizeof(struct stge_softc),
+    stge_match, stge_attach, NULL, NULL);
 
 uint32_t stge_mii_bitbang_read(struct device *);
 void	stge_mii_bitbang_write(struct device *, uint32_t);
@@ -440,8 +443,9 @@ stge_attach(struct device *parent, struct device *self, void *aux)
 
 	/* Get it out of power save mode if needed. */
 	if (pci_get_capability(pc, pa->pa_tag, PCI_CAP_PWRMGMT, &pmreg, 0)) {
-		pmode = pci_conf_read(pc, pa->pa_tag, pmreg + 4) & 0x3;
-		if (pmode == 3) {
+		pmode = pci_conf_read(pc, pa->pa_tag, pmreg + PCI_PMCSR) &
+		    PCI_PMCSR_STATE_MASK;
+		if (pmode == PCI_PMCSR_STATE_D3) {
 			/*
 			 * The card has lost all configuration data in
 			 * this state, so punt.
@@ -453,7 +457,8 @@ stge_attach(struct device *parent, struct device *self, void *aux)
 		if (pmode != 0) {
 			printf("%s: waking up from power state D%d\n",
 			    sc->sc_dev.dv_xname, pmode);
-			pci_conf_write(pc, pa->pa_tag, pmreg + 4, 0);
+			pci_conf_write(pc, pa->pa_tag, pmreg + PCI_PMCSR,
+			    PCI_PMCSR_STATE_D0);
 		}
 	}
 
@@ -591,7 +596,7 @@ stge_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_mii.mii_readreg = stge_mii_readreg;
 	sc->sc_mii.mii_writereg = stge_mii_writereg;
 	sc->sc_mii.mii_statchg = stge_mii_statchg;
-	ifmedia_init(&sc->sc_mii.mii_media, 0, stge_mediachange,
+	ifmedia_init(&sc->sc_mii.mii_media, IFM_IMASK, stge_mediachange,
 	    stge_mediastatus);
 	mii_attach(&sc->sc_dev, &sc->sc_mii, 0xffffffff, MII_PHY_ANY,
 	    MII_OFFSET_ANY, MIIF_DOPAUSE);
@@ -635,7 +640,8 @@ stge_attach(struct device *parent, struct device *self, void *aux)
 	 * XXX a reasonable way on this chip.
 	 */
 	sc->sc_ethercom.ec_capabilities |=
-	    ETHERCAP_VLAN_MTU /* XXX | ETHERCAP_JUMBO_MTU */;
+	    ETHERCAP_VLAN_MTU | /* XXX ETHERCAP_JUMBO_MTU | */
+	    ETHERCAP_VLAN_HWTAGGING;
 
 	/*
 	 * We can do IPv4/TCPv4/UDPv4 checksums in hardware.
@@ -789,6 +795,9 @@ stge_start(struct ifnet *ifp)
 	 * descriptors.
 	 */
 	for (;;) {
+		struct m_tag *mtag;
+		uint64_t tfc;
+
 		/*
 		 * Grab a packet off the queue.
 		 */
@@ -804,6 +813,12 @@ stge_start(struct ifnet *ifp)
 			STGE_EVCNT_INCR(&sc->sc_ev_txstall);
 			break;
 		}
+
+		/*
+		 * See if we have any VLAN stuff.
+		 */
+		mtag = sc->sc_ethercom.ec_nvlans ?
+		    m_tag_find(m0, PACKET_TAG_VLAN, NULL) : NULL;
 
 		/*
 		 * Get the last and next available transmit descriptor.
@@ -893,20 +908,35 @@ stge_start(struct ifnet *ifp)
 		if (m0->m_pkthdr.csum_flags & M_CSUM_TCPv4) {
 			STGE_EVCNT_INCR(&sc->sc_ev_txtcpsum);
 			csum_flags |= htole64(TFD_TCPChecksumEnable);
-		}
-		else if (m0->m_pkthdr.csum_flags & M_CSUM_UDPv4) {
+		} else if (m0->m_pkthdr.csum_flags & M_CSUM_UDPv4) {
 			STGE_EVCNT_INCR(&sc->sc_ev_txudpsum);
 			csum_flags |= htole64(TFD_UDPChecksumEnable);
 		}
 
 		/*
 		 * Initialize the descriptor and give it to the chip.
+		 * Check to see if we have a VLAN tag to insert.
 		 */
-		tfd->tfd_control = htole64(TFD_FrameId(nexttx) |
-		    TFD_WordAlign(/*totlen & */3) |
+
+		tfc = TFD_FrameId(nexttx) | TFD_WordAlign(/*totlen & */3) |
 		    TFD_FragCount(seg) | csum_flags |
 		    (((nexttx & STGE_TXINTR_SPACING_MASK) == 0) ?
-		     TFD_TxDMAIndicate : 0));
+			TFD_TxDMAIndicate : 0);
+		if (mtag) {
+#if	0
+			struct ether_header *eh =
+			    mtod(m0, struct ether_header *);
+			u_int16_t etype = ntohs(eh->ether_type);
+			printf("%s: xmit (tag %d) etype %x\n",
+			   ifp->if_xname, *mtod(n, int *), etype);
+#endif
+			tfc |= TFD_VLANTagInsert |
+#ifdef	STGE_VLAN_CFI
+			    TFD_CFI |
+#endif
+			    TFD_VID((*(u_int *)(mtag + 1)));
+		}
+		tfd->tfd_control = htole64(tfc);
 
 		/* Sync the descriptor. */
 		STGE_CDTXSYNC(sc, nexttx,
@@ -1041,12 +1071,20 @@ stge_intr(void *arg)
 		isr = bus_space_read_2(sc->sc_st, sc->sc_sh, STGE_IntStatusAck);
 		if ((isr & sc->sc_IntEnable) == 0)
 			break;
-		
+
+		/* Host interface errors. */
+		if (isr & IS_HostError) {
+			printf("%s: Host interface error\n",
+			    sc->sc_dev.dv_xname);
+			wantinit = 1;
+			continue;
+		}
+
 		/* Receive interrupts. */
-		if (isr & (IE_RxDMAComplete|IE_RFDListEnd)) {
+		if (isr & (IS_RxDMAComplete|IS_RFDListEnd)) {
 			STGE_EVCNT_INCR(&sc->sc_ev_rxintr);
 			stge_rxintr(sc);
-			if (isr & IE_RFDListEnd) {
+			if (isr & IS_RFDListEnd) {
 				printf("%s: receive ring overflow\n",
 				    sc->sc_dev.dv_xname);
 				/*
@@ -1058,20 +1096,20 @@ stge_intr(void *arg)
 		}
 
 		/* Transmit interrupts. */
-		if (isr & (IE_TxDMAComplete|IE_TxComplete)) {
+		if (isr & (IS_TxDMAComplete|IS_TxComplete)) {
 #ifdef STGE_EVENT_COUNTERS
-			if (isr & IE_TxDMAComplete)
+			if (isr & IS_TxDMAComplete)
 				STGE_EVCNT_INCR(&sc->sc_ev_txdmaintr);
 #endif
 			stge_txintr(sc);
 		}
 
 		/* Statistics overflow. */
-		if (isr & IE_UpdateStats)
+		if (isr & IS_UpdateStats)
 			stge_stats_update(sc);
 
 		/* Transmission errors. */
-		if (isr & IE_TxComplete) {
+		if (isr & IS_TxComplete) {
 			STGE_EVCNT_INCR(&sc->sc_ev_txindintr);
 			for (;;) {
 				txstat = bus_space_read_4(sc->sc_st, sc->sc_sh,
@@ -1094,12 +1132,6 @@ stge_intr(void *arg)
 			wantinit = 1;
 		}
 
-		/* Host interface errors. */
-		if (isr & IE_HostError) {
-			printf("%s: Host interface error\n",
-			    sc->sc_dev.dv_xname);
-			wantinit = 1;
-		}
 	}
 
 	if (wantinit)
@@ -1324,7 +1356,35 @@ stge_rxintr(struct stge_softc *sc)
 		if (ifp->if_bpf)
 			bpf_mtap(ifp->if_bpf, m);
 #endif /* NBPFILTER > 0 */
+#ifdef	STGE_VLAN_UNTAG
+		/*
+		 * Check for VLAN tagged packets
+		 */
+		if (status & RFD_VLANDetected) {
+			struct m_tag *mtag =
+			    m_tag_get(PACKET_TAG_VLAN, sizeof(u_int), M_NOWAIT);
+			if (mtag == NULL) {
+				printf("%s: no mbuf for VLAN tag\n",
+				    ifp->if_xname);
+				m_freem(m);
+				continue;
+			}
+			*(u_int *)(mtag + 1) = RFD_TCI(status);
+			m_tag_prepend(m, mtag);
+		}
+#endif
+#if	0
+		if (status & RFD_VLANDetected) {
+			struct ether_header *eh;
+			u_int16_t etype;
 
+			eh = mtod(m, struct ether_header *);
+			etype = ntohs(eh->ether_type);
+			printf("%s: VLANtag detected (TCI %d) etype %x\n",
+			    ifp->if_xname, (u_int16_t) RFD_TCI(status),
+			    etype);
+		}
+#endif
 		/* Pass it on. */
 		(*ifp->if_input)(ifp, m);
 	}
@@ -1546,8 +1606,8 @@ stge_init(struct ifnet *ifp)
 	/*
 	 * Initialize the interrupt mask.
 	 */
-	sc->sc_IntEnable = IE_HostError | IE_TxComplete | IE_UpdateStats |
-	    IE_TxDMAComplete | IE_RxDMAComplete | IE_RFDListEnd;
+	sc->sc_IntEnable = IS_HostError | IS_TxComplete | IS_UpdateStats |
+	    IS_TxDMAComplete | IS_RxDMAComplete | IS_RFDListEnd;
 	bus_space_write_2(st, sh, STGE_IntStatus, 0xffff);
 	bus_space_write_2(st, sh, STGE_IntEnable, sc->sc_IntEnable);
 
@@ -1584,6 +1644,9 @@ stge_init(struct ifnet *ifp)
 	sc->sc_MACCtrl = MC_IFSSelect(0);
 	bus_space_write_4(st, sh, STGE_MACCtrl, sc->sc_MACCtrl);
 	sc->sc_MACCtrl |= MC_StatisticsEnable | MC_TxEnable | MC_RxEnable;
+#ifdef	STGE_VLAN_UNTAG
+	sc->sc_MACCtrl |= MC_AutoVLANuntagging;
+#endif
 
 	if (sc->sc_rev >= 6) {		/* >= B.2 */
 		/* Multi-frag frame bug work-around. */
@@ -1803,6 +1866,16 @@ stge_set_filter(struct stge_softc *sc)
 	if (ifp->if_flags & IFF_BROADCAST)
 		sc->sc_ReceiveMode |= RM_ReceiveBroadcast;
 
+#ifdef	STGE_CU_BUG
+	/*
+	 * Some cards (Sundance TI, copper) only seem to work
+	 * right now if we put them into promiscuous mode. It
+	 * probably is the Marvell PHY stuff that isn't quite
+	 * right.
+	 */
+	ifp->if_flags |= IFF_PROMISC;
+#endif
+
 	if (ifp->if_flags & IFF_PROMISC) {
 		sc->sc_ReceiveMode |= RM_ReceiveAllFrames;
 		goto allmulti;
@@ -1866,7 +1939,7 @@ stge_set_filter(struct stge_softc *sc)
 		    mchash[1]);
 	}
 
-	bus_space_write_1(sc->sc_st, sc->sc_sh, STGE_ReceiveMode,
+	bus_space_write_2(sc->sc_st, sc->sc_sh, STGE_ReceiveMode,
 	    sc->sc_ReceiveMode);
 }
 

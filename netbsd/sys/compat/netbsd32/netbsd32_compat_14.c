@@ -1,4 +1,4 @@
-/*	$NetBSD: netbsd32_compat_14.c,v 1.7 2001/11/15 09:48:01 lukem Exp $	*/
+/*	$NetBSD: netbsd32_compat_14.c,v 1.9 2003/01/18 08:28:26 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1999 Eduardo E. Horvath
@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: netbsd32_compat_14.c,v 1.7 2001/11/15 09:48:01 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: netbsd32_compat_14.c,v 1.9 2003/01/18 08:28:26 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/ipc.h>
@@ -51,6 +51,7 @@ __KERNEL_RCSID(0, "$NetBSD: netbsd32_compat_14.c,v 1.7 2001/11/15 09:48:01 lukem
 #define	SYSVSHM
 #endif
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 #include <compat/netbsd32/netbsd32.h>
 #include <compat/netbsd32/netbsd32_syscallargs.h>
@@ -223,8 +224,8 @@ native_to_netbsd32_shmid_ds14(shmbuf, oshmbuf)
  * the compat_14 system calls
  */
 int
-compat_14_netbsd32_msgctl(p, v, retval)
-	struct proc *p;
+compat_14_netbsd32_msgctl(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -240,28 +241,28 @@ compat_14_netbsd32_msgctl(p, v, retval)
 	cmd = SCARG(uap, cmd);
 
 	if (cmd == IPC_SET) {
-		error = copyin((caddr_t)(u_long)SCARG(uap, buf), &omsqbuf,
-		    sizeof(omsqbuf));
+		error = copyin((caddr_t)NETBSD32PTR64(SCARG(uap, buf)),
+		    &omsqbuf, sizeof(omsqbuf));
 		if (error) 
 			return (error);
 		netbsd32_msqid_ds14_to_native(&omsqbuf, &msqbuf);
 	}
 
-	error = msgctl1(p, SCARG(uap, msqid), cmd,
+	error = msgctl1(l->l_proc, SCARG(uap, msqid), cmd,
 	    (cmd == IPC_SET || cmd == IPC_STAT) ? &msqbuf : NULL);
 
 	if (error == 0 && cmd == IPC_STAT) {
 		native_to_netbsd32_msqid_ds14(&msqbuf, &omsqbuf);     
-		error = copyout(&omsqbuf, (caddr_t)(u_long)SCARG(uap, buf),
-		    sizeof(omsqbuf));
+		error = copyout(&omsqbuf,
+		    (caddr_t)NETBSD32PTR64(SCARG(uap, buf)), sizeof(omsqbuf));
 	}
 
 	return (error);
 }
 
 int
-compat_14_netbsd32___semctl(p, v, retval)
-	struct proc *p;
+compat_14_netbsd32___semctl(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -293,7 +294,7 @@ compat_14_netbsd32___semctl(p, v, retval)
 	}
 
 	if (pass_arg != NULL) {
-		error = copyin((caddr_t)(u_long)SCARG(uap, arg), &arg,
+		error = copyin((caddr_t)NETBSD32PTR64(SCARG(uap, arg)), &arg,
 		    sizeof(arg));
 		if (error)
 			return (error);  
@@ -305,7 +306,7 @@ compat_14_netbsd32___semctl(p, v, retval)
 		}
 	}
 
-	error = semctl1(p, SCARG(uap, semid), SCARG(uap, semnum), cmd,
+	error = semctl1(l->l_proc, SCARG(uap, semid), SCARG(uap, semnum), cmd,
 	    pass_arg, retval);
 
 	if (error == 0 && cmd == IPC_STAT) {
@@ -317,8 +318,8 @@ compat_14_netbsd32___semctl(p, v, retval)
 }
 
 int
-compat_14_netbsd32_shmctl(p, v, retval)
-	struct proc *p;
+compat_14_netbsd32_shmctl(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -334,20 +335,20 @@ compat_14_netbsd32_shmctl(p, v, retval)
 	cmd = SCARG(uap, cmd);
 
 	if (cmd == IPC_SET) {
-		error = copyin((caddr_t)(u_long)SCARG(uap, buf), &oshmbuf,
-		    sizeof(oshmbuf));
+		error = copyin((caddr_t)NETBSD32PTR64(SCARG(uap, buf)),
+		    &oshmbuf, sizeof(oshmbuf));
 		if (error) 
 			return (error);
 		netbsd32_shmid_ds14_to_native(&oshmbuf, &shmbuf);
 	}
 
-	error = shmctl1(p, SCARG(uap, shmid), cmd,
+	error = shmctl1(l->l_proc, SCARG(uap, shmid), cmd,
 	    (cmd == IPC_SET || cmd == IPC_STAT) ? &shmbuf : NULL);
 
 	if (error == 0 && cmd == IPC_STAT) {
 		native_to_netbsd32_shmid_ds14(&shmbuf, &oshmbuf);     
-		error = copyout(&oshmbuf, (caddr_t)(u_long)SCARG(uap, buf),
-		    sizeof(oshmbuf));
+		error = copyout(&oshmbuf,
+		    (caddr_t)NETBSD32PTR64(SCARG(uap, buf)), sizeof(oshmbuf));
 	}
 
 	return (error);

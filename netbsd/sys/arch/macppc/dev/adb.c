@@ -1,4 +1,4 @@
-/*	$NetBSD: adb.c,v 1.9 2001/06/08 00:32:01 matt Exp $	*/
+/*	$NetBSD: adb.c,v 1.15 2003/07/15 02:43:26 lukem Exp $	*/
 
 /*-
  * Copyright (C) 1994	Bradley A. Grantham
@@ -30,6 +30,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: adb.c,v 1.15 2003/07/15 02:43:26 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/fcntl.h>
@@ -48,6 +51,7 @@
 #include <dev/ofw/openfirm.h>
 
 #include "aed.h"
+#include "apm.h"
 
 /*
  * Function declarations.
@@ -68,11 +72,8 @@ int	adb_debug = 0;		/* Output debugging messages */
 /*
  * Driver definition.
  */
-struct cfattach adb_ca = {
-	sizeof(struct adb_softc), adbmatch, adbattach
-};
-
-extern int adbHardware;
+CFATTACH_DECL(adb, sizeof(struct adb_softc),
+    adbmatch, adbattach, NULL, NULL);
 
 static int
 adbmatch(parent, cf, aux)
@@ -162,6 +163,15 @@ adbattach(parent, self, aux)
 		(void)config_found(self, &aa_args, adbprint);
 	}
 
+#if NAPM > 0
+	/* Magic for signalling the apm driver to match. */
+	aa_args.origaddr = ADBADDR_APM;
+	aa_args.adbaddr = ADBADDR_APM;
+	aa_args.handler_id = ADBADDR_APM;
+
+	(void)config_found(self, &aa_args, NULL);
+#endif
+
 	if (adbHardware == ADB_HW_CUDA)
 		adb_cuda_autopoll();
 	adb_polling = 0;
@@ -179,23 +189,25 @@ adbprint(args, name)
 		rv = UNSUPP; /* most ADB device types are unsupported */
 
 		/* print out what kind of ADB device we have found */
-		printf("%s addr %d: ", name, aa_args->adbaddr);
+		aprint_normal("%s addr %d: ", name, aa_args->adbaddr);
 		switch(aa_args->origaddr) {
 #ifdef DIAGNOSTIC
 		case 0:
-			printf("ADB event device");
+			aprint_normal("ADB event device");
 			rv = UNCONF;
 			break;
 		case ADBADDR_SECURE:
-			printf("security dongle (%d)", aa_args->handler_id);
+			aprint_normal("security dongle (%d)",
+			    aa_args->handler_id);
 			break;
 #endif
 		case ADBADDR_MAP:
-			printf("mapped device (%d)", aa_args->handler_id);
+			aprint_normal("mapped device (%d)",
+			    aa_args->handler_id);
 			rv = UNCONF;
 			break;
 		case ADBADDR_REL:
-			printf("relative positioning device (%d)",
+			aprint_normal("relative positioning device (%d)",
 			    aa_args->handler_id);
 			rv = UNCONF;
 			break;
@@ -203,37 +215,37 @@ adbprint(args, name)
 		case ADBADDR_ABS:
 			switch (aa_args->handler_id) {
 			case ADB_ARTPAD:
-				printf("WACOM ArtPad II");
+				aprint_normal("WACOM ArtPad II");
 				break;
 			default:
-				printf("absolute positioning device (%d)",
+				aprint_normal("absolute positioning device (%d)",
 				    aa_args->handler_id);
 				break;
 			}
 			break;
 		case ADBADDR_DATATX:
-			printf("data transfer device (modem?) (%d)",
+			aprint_normal("data transfer device (modem?) (%d)",
 			    aa_args->handler_id);
 			break;
 		case ADBADDR_MISC:
 			switch (aa_args->handler_id) {
 			case ADB_POWERKEY:
-				printf("Sophisticated Circuits PowerKey");
+				aprint_normal("Sophisticated Circuits PowerKey");
 				break;
 			default:
-				printf("misc. device (remote control?) (%d)",
+				aprint_normal("misc. device (remote control?) (%d)",
 				    aa_args->handler_id);
 				break;
 			}
 			break;
 		default:
-			printf("unknown type device, (handler %d)",
+			aprint_normal("unknown type device, (handler %d)",
 			    aa_args->handler_id);
 			break;
 #endif /* DIAGNOSTIC */
 		}
 	} else		/* a device matched and was configured */
-                printf(" addr %d: ", aa_args->adbaddr);
+                aprint_normal(" addr %d: ", aa_args->adbaddr);
 
 	return rv;
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: pfckbd.c,v 1.7 2002/02/28 01:56:59 uch Exp $	*/
+/*	$NetBSD: pfckbd.c,v 1.12 2003/12/14 04:03:16 uwe Exp $	*/
 
 /*-
  * Copyright (c) 2001, 2002 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pfckbd.c,v 1.12 2003/12/14 04:03:16 uwe Exp $");
 
 #include "debug_hpcsh.h"
 
@@ -85,9 +88,8 @@ STATIC const struct {
 	{ &platid_mask_MACH_HITACHI	, pfckbd_callout_hitachi }
 };
 
-struct cfattach pfckbd_ca = {
-	sizeof(struct device), pfckbd_match, pfckbd_attach
-};
+CFATTACH_DECL(pfckbd, sizeof(struct device),
+    pfckbd_match, pfckbd_attach, NULL, NULL);
 
 STATIC int pfckbd_poll(void *);
 STATIC void pfckbd_ifsetup(struct pfckbd_core *);
@@ -237,41 +239,80 @@ pfckbd_callout_unknown(void *arg)
 void
 pfckbd_callout_hp(void *arg)
 {
+#define PFCKBD_HP_PDCR_MASK 0xcc0c
+#define PFCKBD_HP_PECR_MASK 0xf0cf
+
+	/*
+	 * Disable output on all lines but the n'th line in D.
+	 * Pull the n'th scan line in D low.
+	 */
+#define PD(n)								\
+	{ (u_int16_t)(PFCKBD_HP_PDCR_MASK & (~(1 << (2*(n)+1)))),	\
+	  (u_int16_t)(PFCKBD_HP_PECR_MASK & 0xffff),			\
+	  (u_int8_t)~(1 << (n)),					\
+	  0xff }
+
+	/* Ditto for E */
+#define PE(n)								\
+	{ (u_int16_t)(PFCKBD_HP_PDCR_MASK & 0xffff),			\
+	  (u_int16_t)(PFCKBD_HP_PECR_MASK & (~(1 << (2*(n)+1)))),	\
+	  0xff,								\
+	  (u_int8_t)~(1 << (n)) }
+
 	static const struct {
-		u_int8_t d, e;
+		u_int16_t dc, ec; u_int8_t d, e;
 	} scan[] = {
-		{ 0xfd, 0xff },
-		{ 0xdf, 0xff },
-		{ 0xff, 0xfd },
-		{ 0xff, 0xbf },
-		{ 0xff, 0x7f },
-		{ 0xff, 0xf7 },
-		{ 0xff, 0xfe },
-		{ 0x7f, 0xff },
+		PD(1), PD(5), PE(1), PE(6), PE(7), PE(3), PE(0), PD(7)
 	};
+
+#undef PD
+#undef PE
+
 	struct pfckbd_core *pc = arg;
+	u_int16_t dc, ec;
 	int column;
 	u_int16_t data;
 
 	if (!pc->pc_enabled)
 		goto reinstall;
 
+	/* bits in D/E control regs we do not touch (XXX: can they change?) */
+	dc = _reg_read_2(SH7709_PDCR) & ~PFCKBD_HP_PDCR_MASK;
+	ec = _reg_read_2(SH7709_PECR) & ~PFCKBD_HP_PECR_MASK;
+
 	for (column = 0; column < 8; column++) {
+		/* disable output to all lines except the one we scan */
+		_reg_write_2(SH7709_PDCR, dc | scan[column].dc);
+		_reg_write_2(SH7709_PECR, ec | scan[column].ec);
+		delay(5);
+
+		/* pull the scan line low */
 		_reg_write_1(SH7709_PDDR, scan[column].d);
 		_reg_write_1(SH7709_PEDR, scan[column].e);
 		delay(50);
+
+		/* read sense */
 		data = _reg_read_1(SH7709_PFDR) |
 		    (_reg_read_1(SH7709_PCDR) << 8);
 
 		pfckbd_input(pc->pc_hpckbd, pc->pc_column, data, column);
 	}
 
+	/* scan no lines */
 	_reg_write_1(SH7709_PDDR, 0xff);
 	_reg_write_1(SH7709_PEDR, 0xff);
+
+	/* enable all scan lines */
+	_reg_write_2(SH7709_PDCR, dc | (0x5555 & PFCKBD_HP_PDCR_MASK));
+	_reg_write_2(SH7709_PECR, ec | (0x5555 & PFCKBD_HP_PECR_MASK));
+
+#if 0
+	/* (ignore) extra keys/events (recorder buttons, lid, cable &c) */
 	data = _reg_read_1(SH7709_PGDR) | (_reg_read_1(SH7709_PHDR) << 8);
+#endif
 
  reinstall:
-	callout_reset(&pc->pc_soft_ch, 1, pfckbd_callout_hp, pc);
+	callout_schedule(&pc->pc_soft_ch, 1);
 }
 
 /* HITACH PERSONA (HPW-50PAD) */
@@ -319,5 +360,5 @@ pfckbd_callout_hitachi(void *arg)
 	data = _reg_read_1(SH7709_PGDR) | (_reg_read_1(SH7709_PHDR) << 8);
 
  reinstall:
-	callout_reset(&pc->pc_soft_ch, 1, pfckbd_callout_hitachi, pc);
+	callout_schedule(&pc->pc_soft_ch, 1);
 }

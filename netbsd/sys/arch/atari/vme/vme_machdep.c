@@ -1,4 +1,4 @@
-/*	$NetBSD: vme_machdep.c,v 1.9 2000/06/29 08:28:25 mrg Exp $	*/
+/*	$NetBSD: vme_machdep.c,v 1.12 2003/07/15 01:19:56 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -33,6 +33,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vme_machdep.c,v 1.12 2003/07/15 01:19:56 lukem Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
@@ -54,9 +57,8 @@ static int	vmebusprint __P((void *auxp, const char *));
 static int	vmebusmatch __P((struct device *, struct cfdata *, void *));
 static void	vmebusattach __P((struct device *, struct device *, void *));
 
-struct cfattach avmebus_ca = {
-	sizeof(struct device), vmebusmatch, vmebusattach
-};
+CFATTACH_DECL(avmebus, sizeof(struct device),
+    vmebusmatch, vmebusattach, NULL, NULL);
 
 int
 vmebusmatch(pdp, cfp, auxp)

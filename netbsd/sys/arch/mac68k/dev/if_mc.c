@@ -1,7 +1,7 @@
-/*	$NetBSD: if_mc.c,v 1.19.10.1 2003/06/17 09:27:08 msaitoh Exp $	*/
+/*	$NetBSD: if_mc.c,v 1.23 2004/03/26 12:15:46 wiz Exp $	*/
 
 /*-
- * Copyright (c) 1997 David Huang <khym@bga.com>
+ * Copyright (c) 1997 David Huang <khym@azeotrope.org>
  * All rights reserved.
  *
  * Portions of this code are based on code by Denton Gentry <denny1@home.com>,
@@ -34,6 +34,9 @@
  * ethernet on the Centris/Quadra 660av and Quadra 840av.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_mc.c,v 1.23 2004/03/26 12:15:46 wiz Exp $");
+
 #include "opt_ddb.h"
 #include "opt_inet.h"
 #include "opt_ccitt.h"
@@ -50,6 +53,8 @@
 #include <sys/ioctl.h>
 #include <sys/errno.h>
 #include <sys/device.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -459,7 +464,7 @@ maceput(sc, m)
 		MFREE(m, n);
 	}
 
-	if (totlen > NBPG)
+	if (totlen > PAGE_SIZE)
 		panic("%s: maceput: packet overflow", sc->sc_dev.dv_xname);
 
 #if 0

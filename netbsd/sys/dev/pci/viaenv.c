@@ -1,4 +1,4 @@
-/*	$NetBSD: viaenv.c,v 1.6 2002/03/25 21:29:58 thorpej Exp $	*/
+/*	$NetBSD: viaenv.c,v 1.9 2002/10/02 16:51:59 thorpej Exp $	*/
 
 /*
  * Copyright (c) 2000 Johan Danielsson
@@ -35,7 +35,7 @@
 /* driver for the hardware monitoring part of the VIA VT82C686A */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: viaenv.c,v 1.6 2002/03/25 21:29:58 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: viaenv.c,v 1.9 2002/10/02 16:51:59 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -96,9 +96,8 @@ static int
 static void
         viaenv_attach(struct device * parent, struct device * self, void *aux);
 
-struct cfattach viaenv_ca = {
-	sizeof(struct viaenv_softc), viaenv_match, viaenv_attach
-};
+CFATTACH_DECL(viaenv, sizeof(struct viaenv_softc),
+    viaenv_match, viaenv_attach, NULL, NULL);
 
 static int
 viaenv_match(struct device * parent, struct cfdata * match, void *aux)

@@ -1,4 +1,4 @@
-/*	$NetBSD: ms.c,v 1.11 2001/11/25 16:00:06 minoura Exp $ */
+/*	$NetBSD: ms.c,v 1.19 2003/09/21 19:16:53 jdolecek Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -47,6 +43,9 @@
 /*
  * X68k mouse driver.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ms.c,v 1.19 2003/09/21 19:16:53 jdolecek Exp $");
 
 #include <sys/param.h>
 #include <sys/conf.h>
@@ -134,19 +133,28 @@ struct ms_softc {
 	struct	evvar ms_events;	/* event queue state */
 } ms_softc;
 
-cdev_decl(ms);
-
 static int ms_match __P((struct device*, struct cfdata*, void*));
 static void ms_attach __P((struct device*, struct device*, void*));
 static void ms_trigger __P((struct zs_chanstate*, int));
 void ms_modem __P((void *));
 
-struct cfattach ms_ca = {
-	sizeof(struct ms_softc), ms_match, ms_attach
-};
+CFATTACH_DECL(ms, sizeof(struct ms_softc),
+    ms_match, ms_attach, NULL, NULL);
 
 extern struct zsops zsops_ms;
 extern struct cfdriver ms_cd;
+
+dev_type_open(msopen);
+dev_type_close(msclose);
+dev_type_read(msread);
+dev_type_ioctl(msioctl);
+dev_type_poll(mspoll);
+dev_type_kqfilter(mskqfilter);
+
+const struct cdevsw ms_cdevsw ={
+	msopen, msclose, msread, nowrite, msioctl,
+	nostop, notty, mspoll, nommap, mskqfilter,
+};
 
 /*
  * ms_match: how is this zs channel configured?
@@ -276,17 +284,6 @@ msread(dev, uio, flags)
 	return (ev_read(&ms->ms_events, uio, flags));
 }
 
-/* this routine should not exist, but is convenient to write here for now */
-int
-mswrite(dev, uio, flags)
-	dev_t dev;
-	struct uio *uio;
-	int flags;
-{
-
-	return (EOPNOTSUPP);
-}
-
 int
 msioctl(dev, cmd, data, flag, p)
 	dev_t dev;
@@ -307,6 +304,12 @@ msioctl(dev, cmd, data, flag, p)
 	case FIOASYNC:
 		ms->ms_events.ev_async = *(int *)data != 0;
 		return (0);
+
+	case FIOSETOWN:
+		if (-*(int *)data != ms->ms_events.ev_io->p_pgid
+		    && *(int *)data != ms->ms_events.ev_io->p_pid)
+			return (EPERM);
+		return(0);
 
 	case TIOCSPGRP:
 		if (*(int *)data != ms->ms_events.ev_io->p_pgid)
@@ -338,6 +341,14 @@ mspoll(dev, events, p)
 	return (ev_poll(&ms->ms_events, events, p));
 }
 
+int
+mskqfilter(dev_t dev, struct knote *kn)
+{
+	struct ms_softc *ms;
+
+	ms = ms_cd.cd_devs[minor(dev)];
+	return (ev_kqfilter(&ms->ms_events, kn));
+}
 
 /****************************************************************
  * Middle layer (translator)

@@ -1,10 +1,44 @@
-/*	$NetBSD: arc_trap.c,v 1.20 2001/06/13 15:08:05 soda Exp $	*/
+/*	$NetBSD: arc_trap.c,v 1.27 2003/08/07 16:26:47 agc Exp $	*/
 /*	$OpenBSD: trap.c,v 1.22 1999/05/24 23:08:59 jason Exp $	*/
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department and Ralph Campbell.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah Hdr: trap.c 1.32 91/04/06
+ *
+ *	@(#)trap.c	8.5 (Berkeley) 1/11/94
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -43,6 +77,9 @@
  *	@(#)trap.c	8.5 (Berkeley) 1/11/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: arc_trap.c,v 1.27 2003/08/07 16:26:47 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -63,8 +100,8 @@ int arc_hardware_intr __P((u_int32_t, u_int32_t, u_int32_t, u_int32_t));
 #define	MIPS_INT_LEVELS	8
 
 struct {
-	int	int_mask;
-	int	(*int_hand)(u_int, struct clockframe *);
+	int int_mask;
+	int (*int_hand)(u_int, struct clockframe *);
 } cpu_int_tab[MIPS_INT_LEVELS];
 
 int cpu_int_mask;	/* External cpu interrupt mask */
@@ -76,7 +113,7 @@ arc_hardware_intr(status, cause, pc, ipending)
 	u_int32_t pc;
 	u_int32_t ipending;
 {
-	register int i;
+	int i;
 	struct clockframe cf;
 
 	cf.pc = pc;
@@ -86,8 +123,8 @@ arc_hardware_intr(status, cause, pc, ipending)
 	 *  Check off all enabled interrupts. Called interrupt routine
 	 *  returns mask of interrupts to reenable.
 	 */
-	for(i = 0; i < MIPS_INT_LEVELS; i++) {
-		if(cpu_int_tab[i].int_mask & ipending) {
+	for (i = 0; i < MIPS_INT_LEVELS; i++) {
+		if (cpu_int_tab[i].int_mask & ipending) {
 			cause &= (*cpu_int_tab[i].int_hand)(ipending, &cf);
 		}
 	}
@@ -95,7 +132,7 @@ arc_hardware_intr(status, cause, pc, ipending)
 	/*
 	 *  Reenable all non served hardware levels.
 	 */
-	return ((status & ~cause & MIPS3_HARD_INT_MASK) | MIPS_SR_INT_IE);
+	return (status & ~cause & MIPS3_HARD_INT_MASK) | MIPS_SR_INT_IE;
 }
 
 /*
@@ -104,16 +141,16 @@ arc_hardware_intr(status, cause, pc, ipending)
  */
 void
 arc_set_intr(mask, int_hand, prio)
-	int	mask;
-	int	(*int_hand)(u_int, struct clockframe *);
-	int	prio;
+	int mask;
+	int (*int_hand)(u_int, struct clockframe *);
+	int prio;
 {
-	if(prio > MIPS_INT_LEVELS)
+	if (prio > MIPS_INT_LEVELS)
 		panic("set_intr: to high priority");
 
-	if(cpu_int_tab[prio].int_mask != 0 &&
-	   (cpu_int_tab[prio].int_mask != mask ||
-	    cpu_int_tab[prio].int_hand != int_hand)) {
+	if (cpu_int_tab[prio].int_mask != 0 &&
+	    (cpu_int_tab[prio].int_mask != mask ||
+	     cpu_int_tab[prio].int_hand != int_hand)) {
 		panic("set_intr: int already set");
 	}
 
@@ -124,7 +161,7 @@ arc_set_intr(mask, int_hand, prio)
 
 /*
  * Handle an interrupt.
- * N.B., curproc might be NULL.
+ * N.B., curlwp might be NULL.
  */
 void
 cpu_intr(status, cause, pc, ipending)
@@ -133,15 +170,14 @@ cpu_intr(status, cause, pc, ipending)
 	u_int32_t pc;
 	u_int32_t ipending;		/* pending interrupts & enable mask */
 {
-#if defined(MIPS3) && defined(MIPS_INT_MASK_CLOCK)
-	if ((ipending & MIPS_INT_MASK_CLOCK) && CPUISMIPS3) {
+
+	if (ipending & MIPS_INT_MASK_CLOCK) {
 		/*
 		 *  Writing a value to the Compare register,
 		 *  as a side effect, clears the timer interrupt request.
 		 */
 		mips3_cp0_compare_write(mips3_cp0_count_read());
 	}
-#endif
 
 	uvmexp.intrs++;
 	/* real device interrupt */
@@ -149,28 +185,12 @@ cpu_intr(status, cause, pc, ipending)
 		_splset(arc_hardware_intr(status, cause, pc, ipending));
 	}
 
-#if defined(MIPS1) && defined(INT_MASK_FPU)
-	if ((ipending & INT_MASK_FPU) && CPUISMIPS1) {
-		intrcnt[FPU_INTR]++;
-		if (!USERMODE(status))
-			panic("kernel used FPU: PC %x, CR %x, SR %x",
-			    pc, cause, status);
-		MachFPInterrupt(status, cause, pc, curproc->p_md.md_regs);
-	}
-#endif
+	/* software interrupts */
+	ipending &= (MIPS_SOFT_INT_MASK_1|MIPS_SOFT_INT_MASK_0);
+	if (ipending == 0)
+		return;
 
-	/* 'softnet' interrupt */
-	if (ipending & MIPS_SOFT_INT_MASK_1) {
-		clearsoftnet();
-		uvmexp.softs++;
-		netintr();
-	}
+	_clrsoftintr(ipending);
 
-	/* 'softclock' interrupt */
-	if (ipending & MIPS_SOFT_INT_MASK_0) {
-		clearsoftclock();
-		uvmexp.softs++;
-		intrcnt[SOFTCLOCK_INTR]++;
-		softclock(NULL);
-	}
+	softintr_dispatch(ipending);
 }

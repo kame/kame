@@ -1,4 +1,4 @@
-/*	$NetBSD: mtio.h,v 1.19 2002/04/08 12:09:09 simonb Exp $	*/
+/*	$NetBSD: mtio.h,v 1.21 2003/08/07 16:34:09 agc Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -45,7 +41,7 @@
 /* structure for MTIOCTOP - mag tape op command */
 struct mtop {
 	short	mt_op;		/* operations defined below */
-	daddr_t	mt_count;	/* how many of them */
+	int32_t	mt_count;	/* how many of them */
 };
 
 /* operations */
@@ -78,13 +74,13 @@ struct mtget {
 /* end device-dependent registers */
 	short	mt_resid;	/* residual count */
 /* the following two are not yet implemented by most tape drivers */
-	daddr_t	mt_fileno;	/* file number of current position */
-	daddr_t	mt_blkno;	/* block number of current position */
+	int32_t	mt_fileno;	/* file number of current position */
+	int32_t	mt_blkno;	/* block number of current position */
 /* end not yet implemented */
-	daddr_t	mt_blksiz;	/* current block size */
-	daddr_t	mt_density;	/* current density code */
-	daddr_t	mt_mblksiz[4];	/* block size for different modes */
-	daddr_t mt_mdensity[4];	/* density codes for different modes */
+	int32_t	mt_blksiz;	/* current block size */
+	int32_t	mt_density;	/* current density code */
+	int32_t	mt_mblksiz[4];	/* block size for different modes */
+	int32_t mt_mdensity[4];	/* density codes for different modes */
 };
 
 /*

@@ -1,4 +1,4 @@
-/*	$NetBSD: undefined.c,v 1.15 2002/05/02 22:47:09 rjs Exp $	*/
+/*	$NetBSD: undefined.c,v 1.22 2003/11/29 22:21:29 bjh21 Exp $	*/
 
 /*
  * Copyright (c) 2001 Ben Harris.
@@ -47,10 +47,14 @@
 #define FAST_FPE
 
 #include "opt_ddb.h"
+#include "opt_kgdb.h"
 
 #include <sys/param.h>
+#ifdef KGDB
+#include <sys/kgdb.h>
+#endif
 
-__KERNEL_RCSID(0, "$NetBSD: undefined.c,v 1.15 2002/05/02 22:47:09 rjs Exp $");
+__KERNEL_RCSID(0, "$NetBSD: undefined.c,v 1.22 2003/11/29 22:21:29 bjh21 Exp $");
 
 #include <sys/malloc.h>
 #include <sys/queue.h>
@@ -60,9 +64,11 @@ __KERNEL_RCSID(0, "$NetBSD: undefined.c,v 1.15 2002/05/02 22:47:09 rjs Exp $");
 #include <sys/user.h>
 #include <sys/syslog.h>
 #include <sys/vmmeter.h>
+#include <sys/savar.h>
 #ifdef FAST_FPE
 #include <sys/acct.h>
 #endif
+#include <sys/userret.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -72,6 +78,11 @@ __KERNEL_RCSID(0, "$NetBSD: undefined.c,v 1.15 2002/05/02 22:47:09 rjs Exp $");
 #include <machine/trap.h>
 
 #include <arch/arm/arm/disassem.h>
+
+#ifdef DDB
+#include <ddb/db_output.h>
+#include <machine/db_machdep.h>
+#endif
 
 #ifdef acorn26
 #include <machine/machdep.h>
@@ -121,11 +132,26 @@ remove_coproc_handler(void *cookie)
 static int
 gdb_trapper(u_int addr, u_int insn, struct trapframe *frame, int code)
 {
+	struct lwp *l;
+	l = (curlwp == NULL) ? &lwp0 : curlwp;
 
-	if ((insn == GDB_BREAKPOINT || insn == GDB5_BREAKPOINT) &&
-	    code == FAULT_USER) {
-		trapsignal(curproc, SIGTRAP, 0);
-		return 0;
+	if (insn == GDB_BREAKPOINT || insn == GDB5_BREAKPOINT) {
+		if (code == FAULT_USER) {
+			ksiginfo_t ksi;
+
+			KSI_INIT_TRAP(&ksi);
+			ksi.ksi_signo = SIGTRAP;
+			ksi.ksi_code = TRAP_BRKPT;
+			ksi.ksi_addr = (u_int32_t *)addr;
+			ksi.ksi_trap = 0;
+			KERNEL_PROC_LOCK(l->l_proc);
+			trapsignal(l, &ksi);
+			KERNEL_PROC_UNLOCK(l->l_proc);
+			return 0;
+		}
+#ifdef KGDB
+		return !kgdb_trap(T_BREAKPOINT, frame);
+#endif
 	}
 	return 1;
 }
@@ -150,7 +176,7 @@ undefined_init()
 void
 undefinedinstruction(trapframe_t *frame)
 {
-	struct proc *p;
+	struct lwp *l;
 	u_int fault_pc;
 	int fault_instruction;
 	int fault_code;
@@ -179,6 +205,27 @@ undefinedinstruction(trapframe_t *frame)
 	fault_pc = frame->tf_pc;
 #endif
 
+	/* Get the current lwp/proc structure or lwp0/proc0 if there is none. */
+	l = curlwp == NULL ? &lwp0 : curlwp;
+
+	/*
+	 * Make sure the program counter is correctly aligned so we
+	 * don't take an alignment fault trying to read the opcode.
+	 */
+	if (__predict_false((fault_pc & 3) != 0)) {
+		ksiginfo_t ksi;
+		/* Give the user an illegal instruction signal. */
+		KSI_INIT_TRAP(&ksi);
+		ksi.ksi_signo = SIGILL;
+		ksi.ksi_code = ILL_ILLOPC;
+		ksi.ksi_addr = (u_int32_t *)(intptr_t) fault_pc;
+		KERNEL_PROC_LOCK(l);
+		trapsignal(l, &ksi);
+		KERNEL_PROC_UNLOCK(l);
+		userret(l);
+		return;
+	}
+
 	/*
 	 * Should use fuword() here .. but in the interests of squeezing every
 	 * bit of speed we will just use ReadWord(). We know the instruction
@@ -206,11 +253,6 @@ undefinedinstruction(trapframe_t *frame)
 	else
 		coprocessor = 0;
 
-	/* Get the current proc structure or proc0 if there is none. */
-
-	if ((p = curproc) == 0)
-		p = &proc0;
-
 #ifdef __PROG26
 	if ((frame->tf_r15 & R15_MODE) == R15_MODE_USR) {
 #else
@@ -221,7 +263,7 @@ undefinedinstruction(trapframe_t *frame)
 		 * time of fault.
 		 */
 		fault_code = FAULT_USER;
-		p->p_addr->u_pcb.pcb_tf = frame;
+		l->l_addr->u_pcb.pcb_tf = frame;
 	} else
 		fault_code = 0;
 
@@ -233,6 +275,7 @@ undefinedinstruction(trapframe_t *frame)
 
 	if (uh == NULL) {
 		/* Fault has not been handled */
+		ksiginfo_t ksi; 
 		
 #ifdef VERBOSE_ARM32
 		s = spltty();
@@ -256,13 +299,21 @@ undefinedinstruction(trapframe_t *frame)
 #endif
         
 		if ((fault_code & FAULT_USER) == 0) {
-			printf("Undefined instruction in kernel\n");
 #ifdef DDB
-			Debugger();
+			db_printf("Undefined instruction in kernel\n");
+			kdb_trap(T_FAULT, frame);
+#else
+			panic("undefined instruction in kernel");
 #endif
 		}
-
-		trapsignal(p, SIGILL, fault_instruction);
+		KSI_INIT_TRAP(&ksi);
+		ksi.ksi_signo = SIGILL;
+		ksi.ksi_code = ILL_ILLOPC;
+		ksi.ksi_addr = (u_int32_t *)fault_pc;
+		ksi.ksi_trap = fault_instruction;
+		KERNEL_PROC_LOCK(l);
+		trapsignal(l, &ksi);
+		KERNEL_PROC_UNLOCK(l);
 	}
 
 	if ((fault_code & FAULT_USER) == 0)
@@ -271,15 +322,6 @@ undefinedinstruction(trapframe_t *frame)
 #ifdef FAST_FPE
 	/* Optimised exit code */
 	{
-		int sig;
-
-		/* take pending signals */
-
-		while ((sig = (CURSIG(p))) != 0) {
-			postsig(sig);
-		}
-
-		p->p_priority = p->p_usrpri;
 
 		/*
 		 * Check for reschedule request, at the moment there is only
@@ -290,16 +332,18 @@ undefinedinstruction(trapframe_t *frame)
 			/*
 			 * We are being preempted.
 			 */
-			preempt(NULL);
-			while ((sig = (CURSIG(p))) != 0) {
-				postsig(sig);
-			}
+			preempt(0);
 		}
 
-		curcpu()->ci_schedstate.spc_curpriority = p->p_priority;
+		/* Invoke MI userret code */
+		mi_userret(l);
+
+		l->l_priority = l->l_usrpri;
+
+		curcpu()->ci_schedstate.spc_curpriority = l->l_priority;
 	}
 
 #else
-	userret(p);
+	userret(l);
 #endif
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le_ibus.c,v 1.3 2002/01/08 17:10:28 chs Exp $	*/
+/*	$NetBSD: if_le_ibus.c,v 1.8 2003/07/15 02:54:40 lukem Exp $	*/
 
 /*
  * Copyright 1996 The Board of Trustees of The Leland Stanford
@@ -18,6 +18,10 @@
 /*
  * LANCE on Decstation kn01/kn220(?) baseboard.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_le_ibus.c,v 1.8 2003/07/15 02:54:40 lukem Exp $");
+
 #include "opt_inet.h"
 
 #include <sys/param.h>
@@ -48,18 +52,13 @@ static void le_dec_zerobuf_gap2(struct lance_softc *, int, int);
 static int le_pmax_match(struct device *, struct cfdata *, void *);
 static void le_pmax_attach(struct device *, struct device *, void *);
 
-struct cfattach le_pmax_ca = {
-	sizeof(struct le_softc), le_pmax_match, le_pmax_attach
-};
-extern struct cfdriver ibus_cd;
+CFATTACH_DECL(le_pmax, sizeof(struct le_softc),
+    le_pmax_match, le_pmax_attach, NULL, NULL);
 
 int
 le_pmax_match(struct device *parent, struct cfdata *match, void *aux)
 {
 	struct ibus_attach_args *d = aux;
-
-	if (parent->dv_cfdata->cf_driver != &ibus_cd)
-		return (0);
 
 	if (strcmp("lance", d->ia_name) != 0)
 		return (0);

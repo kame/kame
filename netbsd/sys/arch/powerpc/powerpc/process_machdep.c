@@ -1,4 +1,4 @@
-/*	$NetBSD: process_machdep.c,v 1.7 2001/07/22 11:29:46 wiz Exp $	*/
+/*	$NetBSD: process_machdep.c,v 1.17 2003/09/27 04:44:42 matt Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -31,6 +31,11 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: process_machdep.c,v 1.17 2003/09/27 04:44:42 matt Exp $");
+
+#include "opt_altivec.h"
+
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/user.h>
@@ -41,12 +46,16 @@
 #include <machine/pcb.h>
 #include <machine/reg.h>
 
+#include <uvm/uvm_extern.h>
+
+#ifdef ALTIVEC
+#include <powerpc/altivec.h>
+#endif
+
 int
-process_read_regs(p, regs)
-	struct proc *p;
-	struct reg *regs;
+process_read_regs(struct lwp *l, struct reg *regs)
 {
-	struct trapframe *tf = trapframe(p);
+	struct trapframe * const tf = trapframe(l);
 
 	memcpy(regs->fixreg, tf->fixreg, sizeof(regs->fixreg));
 	regs->lr = tf->lr;
@@ -59,11 +68,9 @@ process_read_regs(p, regs)
 }
 
 int
-process_write_regs(p, regs)
-	struct proc *p;
-	struct reg *regs;
+process_write_regs(struct lwp *l, struct reg *regs)
 {
-	struct trapframe *tf = trapframe(p);
+	struct trapframe * const tf = trapframe(l);
 
 	memcpy(tf->fixreg, regs->fixreg, sizeof(regs->fixreg));
 	tf->lr = regs->lr;
@@ -76,11 +83,9 @@ process_write_regs(p, regs)
 }
 
 int
-process_read_fpregs(p, regs)
-	struct proc *p;
-	struct fpreg *regs;
+process_read_fpregs(struct lwp *l, struct fpreg *regs)
 {
-	struct pcb *pcb = &p->p_addr->u_pcb;
+	struct pcb * const pcb = &l->l_addr->u_pcb;
 
 	/* Is the process using the fpu? */
 	if ((pcb->pcb_flags & PCB_FPU) == 0) {
@@ -89,8 +94,7 @@ process_read_fpregs(p, regs)
 	}
 
 #ifdef PPC_HAVE_FPU
-	if (p == fpuproc)
-		save_fpu(p);
+	save_fpu_lwp(l);
 #endif
 	memcpy(regs, &pcb->pcb_fpu, sizeof (struct fpreg));
 
@@ -98,15 +102,12 @@ process_read_fpregs(p, regs)
 }
 
 int
-process_write_fpregs(p, regs)
-	struct proc *p;
-	struct fpreg *regs;
+process_write_fpregs(struct lwp *l, struct fpreg *regs)
 {
-	struct pcb *pcb = &p->p_addr->u_pcb;
+	struct pcb * const pcb = &l->l_addr->u_pcb;
 
 #ifdef PPC_HAVE_FPU
-	if (p == fpuproc)
-		fpuproc = NULL;
+	save_fpu_lwp(l);
 #endif
 
 	memcpy(&pcb->pcb_fpu, regs, sizeof(struct fpreg));
@@ -121,22 +122,18 @@ process_write_fpregs(p, regs)
  * Set the process's program counter.
  */
 int
-process_set_pc(p, addr)
-	struct proc *p;
-	caddr_t addr;
+process_set_pc(struct lwp *l, caddr_t addr)
 {
-	struct trapframe *tf = trapframe(p);
+	struct trapframe * const tf = trapframe(l);
 	
-	tf->srr0 = (int)addr;
+	tf->srr0 = (register_t)addr;
 	return 0;
 }
 
 int
-process_sstep(p, sstep)
-	struct proc *p;
-	int sstep;
+process_sstep(struct lwp *l, int sstep)
 {
-	struct trapframe *tf = trapframe(p);
+	struct trapframe *tf = trapframe(l);
 	
 	if (sstep)
 		tf->srr1 |= PSL_SE;
@@ -144,3 +141,124 @@ process_sstep(p, sstep)
 		tf->srr1 &= ~PSL_SE;
 	return 0;
 }
+
+
+#ifdef __HAVE_PTRACE_MACHDEP
+static int
+process_machdep_read_vecregs(struct lwp *l, struct vreg *vregs)
+{
+	struct pcb * const pcb = &l->l_addr->u_pcb;
+
+	if (cpu_altivec == 0)
+		return (EINVAL);
+
+	save_vec_lwp(l);
+	*vregs = pcb->pcb_vr;
+
+	return (0);
+}
+
+static int
+process_machdep_write_vecregs(struct lwp *l, struct vreg *vregs)
+{
+	struct pcb * const pcb = &l->l_addr->u_pcb;
+
+	if (cpu_altivec == 0)
+		return (EINVAL);
+
+	save_vec_lwp(l);
+
+	pcb->pcb_vr = *vregs;
+	pcb->pcb_flags |= PCB_ALTIVEC;	/* pcb_vr is initialized now. */
+
+	return (0);
+}
+
+int
+ptrace_machdep_dorequest(struct proc *p, struct lwp *l,
+	int req, caddr_t addr, int data)
+{
+	struct uio uio;
+	struct iovec iov;
+	int write = 0;
+
+	switch (req) {
+	case PT_SETVECREGS:
+		write = 1;
+
+	case PT_GETVECREGS:
+		/* write = 0 done above. */
+		if (!process_machdep_validvecregs(l->l_proc))
+			return (EINVAL);
+		iov.iov_base = addr;
+		iov.iov_len = sizeof(struct vreg);
+		uio.uio_iov = &iov;
+		uio.uio_iovcnt = 1;
+		uio.uio_offset = 0;
+		uio.uio_resid = sizeof(struct vreg);
+		uio.uio_segflg = UIO_USERSPACE;
+		uio.uio_rw = write ? UIO_WRITE : UIO_READ;
+		uio.uio_procp = p;
+		return process_machdep_dovecregs(p, l, &uio);
+	}
+
+#ifdef DIAGNOSTIC
+	panic("ptrace_machdep: impossible");
+#endif
+
+	return (0);
+}
+
+/*
+ * The following functions are used by both ptrace(2) and procfs.
+ */
+
+int
+process_machdep_dovecregs(struct proc *curp, struct lwp *l, struct uio *uio)
+{
+	struct vreg r;
+	int error;
+	char *kv;
+	int kl;
+
+	if ((error = process_checkioperm(curp, l->l_proc)) != 0)
+		return (error);
+
+	kl = sizeof(r);
+	kv = (char *) &r;
+
+	kv += uio->uio_offset;
+	kl -= uio->uio_offset;
+	if (kl > uio->uio_resid)
+		kl = uio->uio_resid;
+
+	PHOLD(l);
+
+	if (kl < 0)
+		error = EINVAL;
+	else
+		error = process_machdep_read_vecregs(l, &r);
+	if (error == 0)
+		error = uiomove(kv, kl, uio);
+	if (error == 0 && uio->uio_rw == UIO_WRITE) {
+		if (l->l_proc->p_stat != SSTOP)
+			error = EBUSY;
+		else
+			error = process_machdep_write_vecregs(l, &r);
+	}
+
+	PRELE(l);
+
+	uio->uio_offset = 0;
+	return (error);
+}
+
+int
+process_machdep_validvecregs(struct proc *p)
+{
+	if (p->p_flag & P_SYSTEM)
+		return (0);
+
+	return (cpu_altivec);
+}
+#endif /* __HAVE_PTRACE_MACHDEP */

@@ -1,4 +1,4 @@
-/*	$NetBSD: iq80321_7seg.c,v 1.2 2002/04/12 20:50:27 thorpej Exp $	*/
+/*	$NetBSD: iq80321_7seg.c,v 1.4 2003/07/15 00:25:04 lukem Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002 Wasabi Systems, Inc.
@@ -39,6 +39,9 @@
  * Support for the 7-segment display on the Intel IQ80321.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: iq80321_7seg.c,v 1.4 2003/07/15 00:25:04 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 
@@ -50,6 +53,32 @@
 #define	WRITE(x, v)	*((__volatile uint8_t *) (x)) = (v)
 
 static int snakestate;
+
+/*
+ * The 7-segment display looks like so:
+ *
+ *         A
+ *	+-----+
+ *	|     |
+ *    F	|     | B
+ *	|  G  |
+ *	+-----+
+ *	|     |
+ *    E	|     | C
+ *	|  D  |
+ *	+-----+ o  DP
+ *
+ * Setting a bit clears the corresponding segment on the
+ * display.
+ */
+#define	SEG_A			(1 << 7)
+#define	SEG_B			(1 << 6)
+#define	SEG_C			(1 << 5)
+#define	SEG_D			(1 << 4)
+#define	SEG_E			(1 << 3)
+#define	SEG_F			(1 << 2)
+#define	SEG_G			(1 << 1)
+#define	SEG_DP			(1 << 0)
 
 static const uint8_t digitmap[] = {
 /*	+#####+

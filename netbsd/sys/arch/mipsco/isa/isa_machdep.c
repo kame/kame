@@ -1,4 +1,4 @@
-/*	$NetBSD: isa_machdep.c,v 1.2 2001/04/02 09:54:16 wdk Exp $	*/
+/*	$NetBSD: isa_machdep.c,v 1.5 2003/07/15 02:43:41 lukem Exp $	*/
 
 /*
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: isa_machdep.c,v 1.5 2003/07/15 02:43:41 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -59,9 +62,8 @@ struct isabus_softc {
 	struct mipsco_isa_chipset sc_isa_ic;
 };
 
-struct cfattach isabus_ca = {
-	sizeof(struct isabus_softc), isabusmatch, isabusattach
-};
+CFATTACH_DECL(isabus, sizeof(struct isabus_softc),
+    isabusmatch, isabusattach, NULL, NULL);
 
 extern struct cfdriver isabus_cd;
 

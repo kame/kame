@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_debugMem.c,v 1.9 2001/11/13 07:11:13 lukem Exp $	*/
+/*	$NetBSD: rf_debugMem.c,v 1.14 2003/12/30 21:59:03 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -29,15 +29,10 @@
 /* debugMem.c:  memory usage debugging stuff.
  * Malloc, Calloc, and Free are #defined everywhere
  * to do_malloc, do_calloc, and do_free.
- *
- * if RF_UTILITY is nonzero, it means were compiling one of the
- * raidframe utility programs, such as rfctrl or smd.  In this
- * case, we eliminate all references to the threads package
- * and to the allocation list stuff.
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rf_debugMem.c,v 1.9 2001/11/13 07:11:13 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rf_debugMem.c,v 1.14 2003/12/30 21:59:03 oster Exp $");
 
 #include <dev/raidframe/raidframevar.h>
 
@@ -45,6 +40,8 @@ __KERNEL_RCSID(0, "$NetBSD: rf_debugMem.c,v 1.9 2001/11/13 07:11:13 lukem Exp $"
 #include "rf_options.h"
 #include "rf_debugMem.h"
 #include "rf_general.h"
+
+#if RF_DEBUG_MEM
 
 static long tot_mem_in_use = 0;
 
@@ -61,16 +58,13 @@ struct mh_struct {
 };
 static struct mh_struct *mh_table[RF_MH_TABLESIZE];
 RF_DECLARE_MUTEX(rf_debug_mem_mutex)
-	static int mh_table_initialized = 0;
+static int mh_table_initialized = 0;
 
-	static void memory_hash_insert(void *addr, int size, int line, char *filen);
-	static int memory_hash_remove(void *addr, int sz);
+static void memory_hash_insert(void *addr, int size, int line, char *filen);
+static int memory_hash_remove(void *addr, int sz);
 
 void 
-rf_record_malloc(p, size, line, filen)
-	void   *p;
-	int     size, line;
-	char   *filen;
+rf_record_malloc(void *p, int size, int line, char *filen)
 {
 	RF_ASSERT(size != 0);
 
@@ -84,9 +78,7 @@ rf_record_malloc(p, size, line, filen)
 }
 
 void 
-rf_unrecord_malloc(p, sz)
-	void   *p;
-	int     sz;
+rf_unrecord_malloc(void *p, int sz)
 {
 	int     size;
 
@@ -120,33 +112,30 @@ rf_print_unfreed()
 		printf("%ld total bytes in use\n", tot_mem_in_use);
 	}
 }
+#endif /* RF_DEBUG_MEM */
 
 int 
-rf_ConfigureDebugMem(listp)
-	RF_ShutdownList_t **listp;
+rf_ConfigureDebugMem(RF_ShutdownList_t **listp)
 {
+#if RF_DEBUG_MEM
 	int     i, rc;
 
-	rc = rf_create_managed_mutex(listp, &rf_debug_mem_mutex);
-	if (rc) {
-		RF_ERRORMSG3("Unable to init mutex file %s line %d rc=%d\n", __FILE__,
-		    __LINE__, rc);
-		return (rc);
-	}
+	rf_mutex_init(&rf_debug_mem_mutex);
 	if (rf_memDebug) {
 		for (i = 0; i < RF_MH_TABLESIZE; i++)
 			mh_table[i] = NULL;
 		mh_table_initialized = 1;
 	}
+#endif
 	return (0);
 }
+
+#if RF_DEBUG_MEM
+
 #define HASHADDR(_a_)      ( (((unsigned long) _a_)>>3) % RF_MH_TABLESIZE )
 
 static void 
-memory_hash_insert(addr, size, line, filen)
-	void   *addr;
-	int     size, line;
-	char   *filen;
+memory_hash_insert(void *addr, int size, int line, char *filen)
 {
 	unsigned long bucket = HASHADDR(addr);
 	struct mh_struct *p;
@@ -175,9 +164,7 @@ memory_hash_insert(addr, size, line, filen)
 }
 
 static int 
-memory_hash_remove(addr, sz)
-	void   *addr;
-	int     sz;
+memory_hash_remove(void *addr, int sz)
 {
 	unsigned long bucket = HASHADDR(addr);
 	struct mh_struct *p;
@@ -201,3 +188,6 @@ memory_hash_remove(addr, sz)
 	p->allocated = 0;
 	return (p->size);
 }
+#endif /* RF_DEBUG_MEM */
+
+

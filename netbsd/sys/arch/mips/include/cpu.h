@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.62 2002/04/05 01:22:16 simonb Exp $	*/
+/*	$NetBSD: cpu.h,v 1.72 2004/01/04 11:33:30 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -47,6 +43,7 @@
  * Exported definitions unique to NetBSD/mips cpu support.
  */
 
+#ifdef _KERNEL
 #ifndef _LOCORE
 #include <sys/sched.h>
 
@@ -59,13 +56,38 @@ struct cpu_info {
 	u_long ci_cpu_freq;		/* CPU frequency */
 	u_long ci_cycles_per_hz;	/* CPU freq / hz */
 	u_long ci_divisor_delay;	/* for delay/DELAY */
-	u_long ci_divisor_recip;	/* scaled reciprocal of previous */
+	u_long ci_divisor_recip;	/* scaled reciprocal of previous;
+					   see below */
 #if defined(DIAGNOSTIC) || defined(LOCKDEBUG)
 	u_long ci_spin_locks;		/* # of spin locks held */
 	u_long ci_simple_locks;		/* # of simple locks held */
 #endif
 };
-#endif /* !defined(_LOCORE) */
+
+/*
+ * To implement a more accurate microtime using the CP0 COUNT register
+ * we need to divide that register by the number of cycles per MHz.
+ * But...
+ *
+ * DIV and DIVU are expensive on MIPS (eg 75 clocks on the R4000).  MULT
+ * and MULTU are only 12 clocks on the same CPU.
+ *
+ * The strategy we use is to calculate the reciprical of cycles per MHz,
+ * scaled by 1<<32.  Then we can simply issue a MULTU and pluck of the
+ * HI register and have the results of the division.
+ */
+#define	MIPS_SET_CI_RECIPRICAL(cpu)					\
+do {									\
+	KASSERT((cpu)->ci_divisor_delay != 0);				\
+	(cpu)->ci_divisor_recip = 0x100000000ULL / (cpu)->ci_divisor_delay; \
+} while (0)
+
+#define	MIPS_COUNT_TO_MHZ(cpu, count, res)				\
+	asm volatile("multu %1,%2 ; mfhi %0"				\
+	    : "=r"((res)) : "r"((count)), "r"((cpu)->ci_divisor_recip))
+
+#endif /* !_LOCORE */
+#endif /* _KERNEL */
 
 /*
  * CTL_MACHDEP definitions.
@@ -73,19 +95,21 @@ struct cpu_info {
 #define CPU_CONSDEV		1	/* dev_t: console terminal device */
 #define CPU_BOOTED_KERNEL	2	/* string: booted kernel name */
 #define CPU_ROOT_DEVICE		3	/* string: root device name */
+#define CPU_LLSC		4	/* OS/CPU supports LL/SC instruction */
 
 /*
  * Platform can override, but note this breaks userland compatibility
  * with other mips platforms.
  */
 #ifndef CPU_MAXID
-#define CPU_MAXID		4	/* number of valid machdep ids */
+#define CPU_MAXID		5	/* number of valid machdep ids */
 
 #define CTL_MACHDEP_NAMES { \
 	{ 0, 0 }, \
 	{ "console_device", CTLTYPE_STRUCT }, \
 	{ "booted_kernel", CTLTYPE_STRING }, \
 	{ "root_device", CTLTYPE_STRING }, \
+	{ "llsc", CTLTYPE_INT }, \
 }
 #endif
 
@@ -95,6 +119,7 @@ extern struct cpu_info cpu_info_store;
 
 #define	curcpu()	(&cpu_info_store)
 #define	cpu_number()	(0)
+#define	cpu_proc_fork(p1, p2)
 #endif /* !_LOCORE */
 
 /*
@@ -133,6 +158,10 @@ extern int mips3_pg_cached;
 #define	CPU_MIPS_CACHED_CCA_MASK	0x0070
 #define	CPU_MIPS_CACHED_CCA_SHIFT	 4
 #define	CPU_MIPS_DOUBLE_COUNT		0x0080	/* 1 cp0 count == 2 clock cycles */
+#define	CPU_MIPS_USE_WAIT		0x0100	/* Use "wait"-based cpu_idle() */
+#define	CPU_MIPS_NO_WAIT		0x0200	/* Inverse of previous, for mips32/64 */
+#define	CPU_MIPS_D_CACHE_COHERENT	0x0400	/* D-cache is fully coherent */
+#define	CPU_MIPS_I_D_CACHE_COHERENT	0x0800	/* I-cache funcs don't need to flush the D-cache */
 #define	MIPS_NOT_SUPP			0x8000
 
 #ifdef _LKM
@@ -191,7 +220,7 @@ extern int mips3_pg_cached;
 # define MIPS_HAS_R4K_MMU	1
 # define MIPS_HAS_CLOCK		1
 # define MIPS_HAS_LLSC		1
-#endif /* MIPS32 */
+#endif /* MIPS64 */
 
 #else /* run-time test */
 
@@ -224,7 +253,6 @@ extern int mips3_pg_cached;
  * definitions of cpu-dependent requirements
  * referenced in generic code
  */
-#define	cpu_wait(p)			/* nothing */
 #define	cpu_swapout(p)			panic("cpu_swapout: can't get here");
 
 void cpu_intr(u_int32_t, u_int32_t, u_int32_t, u_int32_t);
@@ -327,10 +355,12 @@ extern int want_resched;		/* resched() was called */
 /*
  * Misc prototypes and variable declarations.
  */
-struct proc;
+struct lwp;
 struct user;
 
-extern struct proc *fpcurproc;
+extern struct lwp *fpcurlwp;	/* the current FPU owner */
+extern struct pcb *curpcb;	/* the current running pcb */
+extern struct segtab *segbase;	/* current segtab base */
 
 /* trap.c */
 void	netintr(void);
@@ -340,8 +370,8 @@ int	kdbpeek(vaddr_t);
 void	dumpsys(void);
 int	savectx(struct user *);
 void	mips_init_msgbuf(void);
-void	savefpregs(struct proc *);
-void	loadfpregs(struct proc *);
+void	savefpregs(struct lwp *);
+void	loadfpregs(struct lwp *);
 
 /* locore*.S */
 int	badaddr(void *, size_t);

@@ -1,4 +1,4 @@
-/*	$NetBSD: ka660.c,v 1.3 2000/06/29 07:14:27 mrg Exp $	*/
+/*	$NetBSD: ka660.c,v 1.5 2003/07/15 02:15:04 lukem Exp $	*/
 /*
  * Copyright (c) 2000 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -29,6 +29,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ka660.c,v 1.5 2003/07/15 02:15:04 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -62,8 +65,6 @@
 static void    ka660_conf(void);
 static void    ka660_memerr(void);
 static int     ka660_mchk(caddr_t);
-static void    ka660_halt(void);
-static void    ka660_reboot(int);
 static void    ka660_cache_enable(void);
 
 struct vs_cpu *ka660_cpu;
@@ -80,8 +81,8 @@ struct cpu_dep ka660_calls = {
 	generic_clkwrite,
 	6,	/* ~VUPS */
 	2,	/* SCB pages */
-	ka660_halt,
-	ka660_reboot,
+	generic_halt,
+	generic_reboot,
 };
 
 
@@ -89,6 +90,8 @@ void
 ka660_conf()
 {
 	printf("cpu0: KA660, microcode Rev. %d\n", vax_cpudata & 0377);
+
+	cpmbx = (struct cpmbx *)vax_map_physmem(0x20140400, 1);
 }
 
 void
@@ -135,16 +138,3 @@ ka660_mchk(addr)
 	panic("Machine check");
 	return 0;
 }
-
-static void
-ka660_halt()
-{
-	asm("halt");
-}
-
-static void
-ka660_reboot(int arg)
-{
-	asm("halt");
-}
-

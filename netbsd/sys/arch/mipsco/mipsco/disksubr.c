@@ -1,4 +1,4 @@
-/*	$NetBSD: disksubr.c,v 1.10 2002/03/05 09:40:40 simonb Exp $	*/
+/*	$NetBSD: disksubr.c,v 1.15 2003/08/07 16:28:36 agc Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1988 Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -34,6 +30,9 @@
  *
  *	@(#)ufs_disksubr.c	7.16 (Berkeley) 5/4/91
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: disksubr.c,v 1.15 2003/08/07 16:28:36 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -64,7 +63,7 @@ static int mipsvh_cksum __P((struct mips_volheader *));
  * (e.g., sector size) must be filled in before calling us.
  * Returns null on success and an error string on failure.
  */
-char *
+const char *
 readdisklabel(dev, strat, lp, clp)
 	dev_t dev;
 	void (*strat) __P((struct buf *bp));
@@ -255,12 +254,12 @@ ioerror:
  * if needed, and signal errors or early completion.
  */
 int
-bounds_check_with_label(bp, lp, wlabel)
+bounds_check_with_label(dk, bp, wlabel)
+	struct disk *dk;
 	struct buf *bp;
-	struct disklabel *lp;
 	int wlabel;
 {
-
+	struct disklabel *lp = dk->dk_label;
 	struct partition *p = lp->d_partitions + dkpart(bp->b_dev);
 	int labelsect = lp->d_partitions[0].p_offset;
 	int maxsz = p->p_size;
@@ -354,7 +353,7 @@ disklabel_mips_to_bsd(vh, lp)
 	lp->d_secperunit = lp->d_secpercyl * lp->d_ncylinders;
 
 	lp->d_bbsize = BBSIZE;
-	lp->d_sbsize = SBSIZE;
+	lp->d_sbsize = SBLOCKSIZE;
 	lp->d_npartitions = MAXPARTITIONS;
 
 	for (i = 0; i < NPARTMAP; i++) {

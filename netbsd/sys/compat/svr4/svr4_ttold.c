@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_ttold.c,v 1.17 2001/12/02 00:46:03 jdolecek Exp $	 */
+/*	$NetBSD: svr4_ttold.c,v 1.22 2003/06/29 22:29:49 fvdl Exp $	 */
 
 /*-
  * Copyright (c) 1994 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: svr4_ttold.c,v 1.17 2001/12/02 00:46:03 jdolecek Exp $");
+__KERNEL_RCSID(0, "$NetBSD: svr4_ttold.c,v 1.22 2003/06/29 22:29:49 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -54,6 +54,7 @@ __KERNEL_RCSID(0, "$NetBSD: svr4_ttold.c,v 1.17 2001/12/02 00:46:03 jdolecek Exp
 #include <sys/malloc.h>
 #include <sys/ioctl_compat.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/svr4/svr4_types.h>
@@ -155,7 +156,7 @@ svr4_sgttyb_to_bsd_sgttyb(ss, bs)
 	bs->sg_erase  =	ss->sg_erase;	
 	bs->sg_kill   = ss->sg_kill;
 	bs->sg_flags  = ss->sg_flags;
-};
+}
 
 
 static void
@@ -200,16 +201,17 @@ bsd_ltchars_to_svr4_ltchars(bl, sl)
 
 
 int
-svr4_ttold_ioctl(fp, p, retval, fd, cmd, data)
+svr4_ttold_ioctl(fp, l, retval, fd, cmd, data)
 	struct file *fp;
-	struct proc *p;
+	struct lwp *l;
 	register_t *retval;
 	int fd;
 	u_long cmd;
 	caddr_t data;
 {
+	struct proc *p = l->l_proc;
 	int			error;
-	int (*ctl) __P((struct file *, u_long,  caddr_t, struct proc *)) =
+	int (*ctl)(struct file *, u_long, void *, struct proc *) =
 			fp->f_ops->fo_ioctl;
 
 	*retval = 0;

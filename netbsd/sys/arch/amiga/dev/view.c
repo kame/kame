@@ -1,4 +1,4 @@
-/*	$NetBSD: view.c,v 1.20.6.1 2002/08/07 01:31:12 lukem Exp $ */
+/*	$NetBSD: view.c,v 1.24 2002/10/23 09:10:37 jdolecek Exp $ */
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -38,7 +38,7 @@
  * a interface to graphics. */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: view.c,v 1.20.6.1 2002/08/07 01:31:12 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: view.c,v 1.24 2002/10/23 09:10:37 jdolecek Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -48,14 +48,11 @@ __KERNEL_RCSID(0, "$NetBSD: view.c,v 1.20.6.1 2002/08/07 01:31:12 lukem Exp $");
 #include <sys/device.h>
 #include <sys/malloc.h>
 #include <sys/queue.h>
-#include <sys/poll.h>
+#include <sys/conf.h>
 #include <machine/cpu.h>
 #include <amiga/dev/grfabs_reg.h>
 #include <amiga/dev/viewioctl.h>
 #include <amiga/dev/viewvar.h>
-
-#include <sys/conf.h>
-#include <machine/conf.h>
 
 #include "view.h"
 
@@ -76,6 +73,16 @@ int view_default_y;
 int view_default_width = 640;
 int view_default_height = 400;
 int view_default_depth = 2;
+
+dev_type_open(viewopen);
+dev_type_close(viewclose);
+dev_type_ioctl(viewioctl);
+dev_type_mmap(viewmmap);
+
+const struct cdevsw view_cdevsw = {
+	viewopen, viewclose, nullread, nullwrite, viewioctl,
+	nostop, notty, nopoll, viewmmap, nokqfilter,
+};
 
 /*
  *  functions for probeing.
@@ -392,11 +399,4 @@ viewmmap(dev_t dev, off_t off, int prot)
 		return(((paddr_t)bmd_start + off) >> PGSHIFT);
 
 	return(-1);
-}
-
-/*ARGSUSED*/
-int
-viewpoll(dev_t dev, int events, struct proc *p)
-{
-	return(events & (POLLOUT | POLLWRNORM));
 }

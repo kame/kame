@@ -1,4 +1,4 @@
-# $NetBSD: files.sbmips,v 1.3 2002/04/16 20:50:23 thorpej Exp $
+# $NetBSD: files.sbmips,v 1.10 2004/03/25 15:26:35 wiz Exp $
 
 maxpartitions 8
 
@@ -8,17 +8,11 @@ file arch/sbmips/sbmips/autoconf.c
 file arch/sbmips/sbmips/machdep.c
 file arch/sbmips/sbmips/softintr.c
 file arch/sbmips/sbmips/console.c
-file arch/sbmips/sbmips/conf.c
 file arch/sbmips/sbmips/disksubr.c
 file arch/sbmips/sbmips/systemsw.c
-file dev/clock_subr.c
 file dev/cons.c
 
-file arch/sbmips/sbmips/sb1250_icu.c	!ikos
-
-file arch/sbmips/ikos/ikos_clock.c	ikos
-file arch/sbmips/ikos/ikos_icu.c	ikos
-file arch/sbmips/ikos/ikoscons.c	ikos
+file arch/sbmips/sbmips/sb1250_icu.c
 
 file arch/mips/cfe/cfe_api.c
 
@@ -32,22 +26,12 @@ include "dev/i2o/files.i2o"
 
 # Machine-independent SCSI drivers
 include "dev/scsipi/files.scsipi"
-major	{ sd = 8 }
-major	{ cd = 3 }
 
 # Machine-independent ATA drivers
 include "dev/ata/files.ata"
-major	{ wd = 4 }
 
 # Memory Disk
 file	dev/md_root.c			memory_disk_hooks
-major	{ md = 6 }
-
-# RAIDframe
-major	{ raid = 16 }
-
-# Logical disks
-major	{ ld = 17 }
 
 # Raster operations
 include "dev/rasops/files.rasops"
@@ -63,7 +47,7 @@ include "dev/isa/files.isa"
 # XXXCGD machdep isa files
 
 # PC Keyboard Controller support
-include "dev/pckbc/files.pckbc"
+include "dev/pckbport/files.pckbport"
 
 # XXXCGD lots of junk isa devices, e.g. fd
 
@@ -130,3 +114,5 @@ file	arch/sbmips/sbmips/zbbus.c		zbbus
 device	cpu
 attach	cpu at zbbus
 file	arch/sbmips/sbmips/cpu.c		cpu
+
+include "arch/evbmips/conf/majors.evbmips"

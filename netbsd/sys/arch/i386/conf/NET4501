@@ -1,4 +1,4 @@
-# $NetBSD: NET4501,v 1.6.6.4 2003/09/10 16:55:36 grant Exp $
+# $NetBSD: NET4501,v 1.25.2.1 2004/07/15 20:16:09 he Exp $
 #
 # NET4501 -- kernel configuration for a Soekris Engineering net4501
 # single-board computer.
@@ -10,7 +10,7 @@ include 	"arch/i386/conf/std.i386"
 
 #options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
-#ident 		"NET4501-$Revision: 1.6.6.4 $"
+#ident 		"NET4501-$Revision: 1.25.2.1 $"
 
 maxusers	32		# estimated number of users
 
@@ -30,8 +30,6 @@ options 	VNODE_OP_NOINLINE
 #options 	MATH_EMULATE	# floating point emulation
 #options 	VM86		# virtual 8086 emulation
 #options 	USER_LDT	# user-settable LDT; used by WINE
-# eliminate delay no-ops in I/O; recommended on all but very old machines
-options 	DUMMY_NOPS
 
 #options 	MTRR		# memory-type range register syscall support
 #options 	PERFCTRS	# performance-monitoring counters support
@@ -56,7 +54,6 @@ options 	DUMMY_NOPS
 
 # Standard system options
 
-options 	UCONSOLE	# users can use TIOCCONS (for xconsole)
 options 	INSECURE	# disable kernel security levels
 
 options 	RTC_OFFSET=0	# hardware clock is this many mins. west of GMT
@@ -71,33 +68,36 @@ options 	SYSVSEM		# System V-like semaphores
 #options 	SEMUME=10	# max number of undo entries per process
 #options 	SEMMNU=30	# number of undo structures in system
 options 	SYSVSHM		# System V-like memory sharing
-#options 	SHMMAXPGS=1024	# 1024 pages is the default
+#options 	SHMMAXPGS=2048	# 2048 pages is the default
 
 options 	LKM		# loadable kernel modules
 
 options 	USERCONF	# userconf(4) support
 #options 	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+#options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
 
 # Diagnostic/debugging support options
 #options 	DIAGNOSTIC	# expensive kernel consistency checks
 #options 	DEBUG		# expensive debugging checks/support
 #options 	KMEMSTATS	# kernel memory statistics (vmstat -m)
 options 	DDB		# in-kernel debugger
+#options 	DDB_ONPANIC=1	# see also sysctl(8): `ddb.onpanic'
 options 	DDB_HISTORY_SIZE=512	# enable history editing in DDB
 #options 	KGDB		# remote debugger
 #options 	KGDB_DEVNAME="\"com\"",KGDB_DEVADDR=0x3f8,KGDB_DEVRATE=9600
 #makeoptions	DEBUG="-g"	# compile full symbol table
 
 # Compatibility options
-options 	COMPAT_NOMID	# compatibility with 386BSD, BSDI, NetBSD 0.8,
-options 	COMPAT_09	# NetBSD 0.9,
-options 	COMPAT_10	# NetBSD 1.0,
-options 	COMPAT_11	# NetBSD 1.1,
-options 	COMPAT_12	# NetBSD 1.2,
-options 	COMPAT_13	# NetBSD 1.3,
-options 	COMPAT_14	# NetBSD 1.4,
-options 	COMPAT_15	# NetBSD 1.5,
-options 	COMPAT_43	# and 4.3BSD
+options 	COMPAT_NOMID	# NetBSD 0.8, 386BSD, and BSDI
+options 	COMPAT_09	# NetBSD 0.9
+options 	COMPAT_10	# NetBSD 1.0
+options 	COMPAT_11	# NetBSD 1.1
+options 	COMPAT_12	# NetBSD 1.2, 386BSD, and BSDI
+options 	COMPAT_13	# NetBSD 1.3, 386BSD, and BSDI
+options 	COMPAT_14	# NetBSD 1.4
+options 	COMPAT_15	# NetBSD 1.5
+options 	COMPAT_16	# NetBSD 1.6
+options 	COMPAT_43	# 4.3BSD, 386BSD, and BSDI
 options 	COMPAT_386BSD_MBRPART # recognize old partition ID
 #options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 
@@ -175,12 +175,12 @@ config		netbsd	root on ? type ?
 #
 
 mainbus0 at root
+cpu0 	at mainbus0
 
 # Basic Bus Support
 
 # PCI bus support
 pci*	at mainbus? bus ?
-pci*	at pchb? bus ?
 
 # Configure PCI using BIOS information
 #options 	PCIBIOS			# PCI BIOS support
@@ -193,10 +193,22 @@ pci*	at pchb? bus ?
 #options 	PCIINTR_DEBUG		# super-verbose PCI interrupt fixup
 
 # PCI bridges
-pchb*	at pci? dev ? function ?	# PCI-Host bridges
+elansc*	at pci? dev ? function ?	# Elan SC520 System Controller
 
 # ISA bus support
 isa0	at mainbus?
+
+# CardBus bridge support
+cbb*		at pci? dev ? function ?
+cardslot*	at cbb?
+
+# CardBus bus support
+cardbus*	at cardslot?
+pcmcia* 	at cardslot?
+
+# Cardbus NICs
+ath*	at cardbus? dev ? function ?	# Atheros 5210/5211/5212 802.11
+atw*	at cardbus? dev ? function ?	# ADMtek ADM8211 (802.11)
 
 # Coprocessor Support
 
@@ -208,6 +220,9 @@ com0	at isa? port 0x3f8 irq 4	# Standard PC serial ports
 com1	at isa? port 0x2f8 irq 3
 
 # IDE and related devices
+
+# ATA (IDE) bus support
+atabus*	at ata?
 
 # ISA ST506, ESDI, and IDE controllers
 # Use flags 0x01 if you want to try to use 32bits data I/O (the driver will
@@ -226,12 +241,16 @@ wdc0	at isa? port 0x1f0 irq 14 flags 0x00
 # 0x0fac means 'use PIO mode 4, DMA mode 2, disable UltraDMA'.
 # (0xc=1100, 0xa=1010, 0xf=1111)
 # 0x0000 means "use whatever the drive claims to support".
-wd*	at wdc? channel ? drive ? flags 0x0000
+wd*	at atabus? drive ? flags 0x0000
 
 # Network Interfaces
 
 # PCI network interfaces
 sip*	at pci? dev ? function ?	# SiS 900/DP83815 Ethernet
+wi*	at pci? dev ? function ?	# Intersil Prism Mini-PCI (802.11b)
+
+# PCMCIA network interfaces
+wi*	at pcmcia? function ?		# Lucent/Intersil WaveLan IEEE (802.11)
 
 # MII/PHY support
 nsphyter* at mii? phy ?			# NS83843 PHYs

@@ -2,7 +2,7 @@
  *
  * Module Name: nsobject - Utilities for objects attached to namespace
  *                         table entries
- *              xRevision: 63 $
+ *              xRevision: 90 $
  *
  ******************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999, 2000, 2001, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -115,20 +115,18 @@
  *
  *****************************************************************************/
 
+
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: nsobject.c,v 1.2 2001/11/13 13:02:01 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: nsobject.c,v 1.10 2004/02/14 16:57:24 kochi Exp $");
 
 #define __NSOBJECT_C__
 
 #include "acpi.h"
-#include "amlcode.h"
 #include "acnamesp.h"
-#include "acinterp.h"
-#include "actables.h"
 
 
 #define _COMPONENT          ACPI_NAMESPACE
-        MODULE_NAME         ("nsobject")
+        ACPI_MODULE_NAME    ("nsobject")
 
 
 /*******************************************************************************
@@ -143,6 +141,8 @@ __KERNEL_RCSID(0, "$NetBSD: nsobject.c,v 1.2 2001/11/13 13:02:01 lukem Exp $");
  * DESCRIPTION: Record the given object as the value associated with the
  *              name whose ACPI_HANDLE is passed.  If Object is NULL
  *              and Type is ACPI_TYPE_ANY, set the name as having no value.
+ *              Note: Future may require that the Node->Flags field be passed
+ *              as a parameter.
  *
  * MUTEX:       Assumes namespace is locked
  *
@@ -152,34 +152,24 @@ ACPI_STATUS
 AcpiNsAttachObject (
     ACPI_NAMESPACE_NODE     *Node,
     ACPI_OPERAND_OBJECT     *Object,
-    ACPI_OBJECT_TYPE8       Type)
+    ACPI_OBJECT_TYPE        Type)
 {
     ACPI_OPERAND_OBJECT     *ObjDesc;
-    ACPI_OPERAND_OBJECT     *PreviousObjDesc;
-    ACPI_OBJECT_TYPE8       ObjType = ACPI_TYPE_ANY;
-    UINT8                   Flags;
-    UINT16                  Opcode;
+    ACPI_OPERAND_OBJECT     *LastObjDesc;
+    ACPI_OBJECT_TYPE        ObjectType = ACPI_TYPE_ANY;
 
 
-    FUNCTION_TRACE ("NsAttachObject");
+    ACPI_FUNCTION_TRACE ("NsAttachObject");
 
 
     /*
      * Parameter validation
      */
-    if (!AcpiGbl_RootNode)
-    {
-        /* Name space not initialized  */
-
-        REPORT_ERROR (("NsAttachObject: Namespace not initialized\n"));
-        return_ACPI_STATUS (AE_NO_NAMESPACE);
-    }
-
     if (!Node)
     {
         /* Invalid handle */
 
-        REPORT_ERROR (("NsAttachObject: Null NamedObj handle\n"));
+        ACPI_REPORT_ERROR (("NsAttachObject: Null NamedObj handle\n"));
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
 
@@ -187,15 +177,16 @@ AcpiNsAttachObject (
     {
         /* Null object */
 
-        REPORT_ERROR (("NsAttachObject: Null object, but type not ACPI_TYPE_ANY\n"));
+        ACPI_REPORT_ERROR (("NsAttachObject: Null object, but type not ACPI_TYPE_ANY\n"));
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
 
-    if (!VALID_DESCRIPTOR_TYPE (Node, ACPI_DESC_TYPE_NAMED))
+    if (ACPI_GET_DESCRIPTOR_TYPE (Node) != ACPI_DESC_TYPE_NAMED)
     {
         /* Not a name handle */
 
-        REPORT_ERROR (("NsAttachObject: Invalid handle\n"));
+        ACPI_REPORT_ERROR (("NsAttachObject: Invalid handle %p [%s]\n",
+                Node, AcpiUtGetDescriptorName (Node)));
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
 
@@ -209,44 +200,28 @@ AcpiNsAttachObject (
         return_ACPI_STATUS (AE_OK);
     }
 
-
-    /* Get the current flags field of the Node */
-
-    Flags = Node->Flags;
-    Flags &= ~ANOBJ_AML_ATTACHMENT;
-
-
     /* If null object, we will just install it */
 
     if (!Object)
     {
-        ObjDesc = NULL;
-        ObjType = ACPI_TYPE_ANY;
+        ObjDesc    = NULL;
+        ObjectType = ACPI_TYPE_ANY;
     }
 
     /*
-     * If the object is an Node with an attached object,
+     * If the source object is a namespace Node with an attached object,
      * we will use that (attached) object
      */
-    else if (VALID_DESCRIPTOR_TYPE (Object, ACPI_DESC_TYPE_NAMED) &&
+    else if ((ACPI_GET_DESCRIPTOR_TYPE (Object) == ACPI_DESC_TYPE_NAMED) &&
             ((ACPI_NAMESPACE_NODE *) Object)->Object)
     {
         /*
          * Value passed is a name handle and that name has a
          * non-null value.  Use that name's value and type.
          */
-        ObjDesc = ((ACPI_NAMESPACE_NODE *) Object)->Object;
-        ObjType = ((ACPI_NAMESPACE_NODE *) Object)->Type;
-
-        /*
-         * Copy appropriate flags
-         */
-        if (((ACPI_NAMESPACE_NODE *) Object)->Flags & ANOBJ_AML_ATTACHMENT)
-        {
-            Flags |= ANOBJ_AML_ATTACHMENT;
-        }
+        ObjDesc    = ((ACPI_NAMESPACE_NODE *) Object)->Object;
+        ObjectType = ((ACPI_NAMESPACE_NODE *) Object)->Type;
     }
-
 
     /*
      * Otherwise, we will use the parameter object, but we must type
@@ -256,166 +231,46 @@ AcpiNsAttachObject (
     {
         ObjDesc = (ACPI_OPERAND_OBJECT  *) Object;
 
-        /* If a valid type (non-ANY) was given, just use it */
+        /* Use the given type */
 
-        if (ACPI_TYPE_ANY != Type)
-        {
-            ObjType = Type;
-        }
-
-        /*
-         * Type is TYPE_Any, we must try to determinte the
-         * actual type of the object.
-         * Check if value points into the AML code
-         */
-        else if (AcpiTbSystemTablePointer (Object))
-        {
-            /*
-             * Object points into the AML stream.
-             * Set a flag bit in the Node to indicate this
-             */
-            Flags |= ANOBJ_AML_ATTACHMENT;
-
-            /*
-             * The next byte (perhaps the next two bytes)
-             * will be the AML opcode
-             */
-            MOVE_UNALIGNED16_TO_16 (&Opcode, Object);
-
-            /* Check for a recognized Opcode */
-
-            switch ((UINT8) Opcode)
-            {
-
-            case AML_OP_PREFIX:
-
-                if (Opcode != AML_REVISION_OP)
-                {
-                    /*
-                     * OpPrefix is unrecognized unless part
-                     * of RevisionOp
-                     */
-                    break;
-                }
-
-                /* Otherwise, fall through and set the type to Integer */
-
-            case AML_ZERO_OP:
-            case AML_ONES_OP:
-            case AML_ONE_OP:
-            case AML_BYTE_OP:
-            case AML_WORD_OP:
-            case AML_DWORD_OP:
-            case AML_QWORD_OP:
-
-                ObjType = ACPI_TYPE_INTEGER;
-                break;
-
-
-            case AML_STRING_OP:
-
-                ObjType = ACPI_TYPE_STRING;
-                break;
-
-
-            case AML_BUFFER_OP:
-
-                ObjType = ACPI_TYPE_BUFFER;
-                break;
-
-
-            case AML_MUTEX_OP:
-
-                ObjType = ACPI_TYPE_MUTEX;
-                break;
-
-
-            case AML_PACKAGE_OP:
-
-                ObjType = ACPI_TYPE_PACKAGE;
-                break;
-
-
-            default:
-
-                ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                    "AML Opcode/Type [%x] not supported in attach\n",
-                    (UINT8) Opcode));
-
-                return_ACPI_STATUS (AE_TYPE);
-                break;
-            }
-        }
-
-        else
-        {
-            /*
-             * Cannot figure out the type -- set to DefAny which
-             * will print as an error in the name table dump
-             */
-            if (AcpiDbgLevel > 0)
-            {
-                DUMP_PATHNAME (Node,
-                    "NsAttachObject confused: setting bogus type for  ",
-                    ACPI_LV_INFO, _COMPONENT);
-
-                if (AcpiTbSystemTablePointer (Object))
-                {
-                    ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-                        "AML-stream code %02x\n", *(UINT8 *) Object));
-                }
-
-                else if (VALID_DESCRIPTOR_TYPE (Object, ACPI_DESC_TYPE_NAMED))
-                {
-                    DUMP_PATHNAME (Object, "name ", ACPI_LV_INFO, _COMPONENT);
-                }
-
-                else
-                {
-                    DUMP_PATHNAME (Object, "object ", ACPI_LV_INFO, _COMPONENT);
-                    DUMP_STACK_ENTRY (Object);
-                }
-            }
-
-            ObjType = INTERNAL_TYPE_DEF_ANY;
-        }
+        ObjectType = Type;
     }
-
 
     ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Installing %p into Node %p [%4.4s]\n",
-        ObjDesc, Node, &Node->Name));
+        ObjDesc, Node, AcpiUtGetNodeName (Node)));
 
+    /* Detach an existing attached object if present */
 
-    /*
-     * Must increment the new value's reference count
-     * (if it is an internal object)
-     */
-    AcpiUtAddReference (ObjDesc);
-
-    /* Save the existing object (if any) for deletion later */
-
-    PreviousObjDesc = Node->Object;
-
-    /* Install the object and set the type, flags */
-
-    Node->Object   = ObjDesc;
-    Node->Type     = (UINT8) ObjType;
-    Node->Flags    |= Flags;
-
-
-    /*
-     * Delete an existing attached object.
-     */
-    if (PreviousObjDesc)
+    if (Node->Object)
     {
-        /* One for the attach to the Node */
-
-        AcpiUtRemoveReference (PreviousObjDesc);
-
-        /* Now delete */
-
-        AcpiUtRemoveReference (PreviousObjDesc);
+        AcpiNsDetachObject (Node);
     }
+
+    if (ObjDesc)
+    {
+        /*
+         * Must increment the new value's reference count
+         * (if it is an internal object)
+         */
+        AcpiUtAddReference (ObjDesc);
+
+        /*
+         * Handle objects with multiple descriptors - walk
+         * to the end of the descriptor list
+         */
+        LastObjDesc = ObjDesc;
+        while (LastObjDesc->Common.NextObject)
+        {
+            LastObjDesc = LastObjDesc->Common.NextObject;
+        }
+
+        /* Install the object at the front of the object list */
+
+        LastObjDesc->Common.NextObject = Node->Object;
+    }
+
+    Node->Type     = (UINT8) ObjectType;
+    Node->Object   = ObjDesc;
 
     return_ACPI_STATUS (AE_OK);
 }
@@ -425,13 +280,13 @@ AcpiNsAttachObject (
  *
  * FUNCTION:    AcpiNsDetachObject
  *
- * PARAMETERS:  Node           - An object whose Value will be deleted
+ * PARAMETERS:  Node           - An node whose object will be detached
  *
  * RETURN:      None.
  *
- * DESCRIPTION: Delete the Value associated with a namespace object.  If the
- *              Value is an allocated object, it is freed.  Otherwise, the
- *              field is simply cleared.
+ * DESCRIPTION: Detach/delete an object associated with a namespace node.
+ *              if the object is an allocated object, it is freed.
+ *              Otherwise, the field is simply cleared.
  *
  ******************************************************************************/
 
@@ -442,11 +297,13 @@ AcpiNsDetachObject (
     ACPI_OPERAND_OBJECT     *ObjDesc;
 
 
-    FUNCTION_TRACE ("NsDetachObject");
+    ACPI_FUNCTION_TRACE ("NsDetachObject");
 
 
     ObjDesc = Node->Object;
-    if (!ObjDesc)
+
+    if (!ObjDesc ||
+        (ACPI_GET_OBJECT_TYPE (ObjDesc) == ACPI_TYPE_LOCAL_DATA))
     {
         return_VOID;
     }
@@ -454,23 +311,26 @@ AcpiNsDetachObject (
     /* Clear the entry in all cases */
 
     Node->Object = NULL;
-
-    /* Found a valid value */
-
-    ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Object=%p Value=%p Name %4.4s\n",
-        Node, ObjDesc, &Node->Name));
-
-    /*
-     * Not every value is an object allocated via ACPI_MEM_CALLOCATE,
-     * - must check
-     */
-    if (!AcpiTbSystemTablePointer (ObjDesc))
+    if (ACPI_GET_DESCRIPTOR_TYPE (ObjDesc) == ACPI_DESC_TYPE_OPERAND)
     {
-        /* Attempt to delete the object (and all subobjects) */
-
-        AcpiUtRemoveReference (ObjDesc);
+        Node->Object = ObjDesc->Common.NextObject;
+        if (Node->Object &&
+           (ACPI_GET_OBJECT_TYPE (Node->Object) != ACPI_TYPE_LOCAL_DATA))
+        {
+            Node->Object = Node->Object->Common.NextObject;
+        }
     }
 
+    /* Reset the node type to untyped */
+
+    Node->Type = ACPI_TYPE_ANY;
+
+    ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Node %p [%4.4s] Object %p\n",
+        Node, AcpiUtGetNodeName (Node), ObjDesc));
+
+    /* Remove one reference on the object (and all subobjects) */
+
+    AcpiUtRemoveReference (ObjDesc);
     return_VOID;
 }
 
@@ -484,24 +344,223 @@ AcpiNsDetachObject (
  * RETURN:      Current value of the object field from the Node whose
  *              handle is passed
  *
+ * DESCRIPTION: Obtain the object attached to a namespace node.
+ *
  ******************************************************************************/
 
-void *
+ACPI_OPERAND_OBJECT *
 AcpiNsGetAttachedObject (
     ACPI_NAMESPACE_NODE     *Node)
 {
-    FUNCTION_TRACE_PTR ("NsGetAttachedObject", Node);
+    ACPI_FUNCTION_TRACE_PTR ("NsGetAttachedObject", Node);
 
 
     if (!Node)
     {
-        /* handle invalid */
-
         ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Null Node ptr\n"));
         return_PTR (NULL);
     }
 
+    if (!Node->Object ||
+            ((ACPI_GET_DESCRIPTOR_TYPE (Node->Object) != ACPI_DESC_TYPE_OPERAND) &&
+             (ACPI_GET_DESCRIPTOR_TYPE (Node->Object) != ACPI_DESC_TYPE_NAMED))  ||
+        (ACPI_GET_OBJECT_TYPE (Node->Object) == ACPI_TYPE_LOCAL_DATA))
+    {
+        return_PTR (NULL);
+    }
+
     return_PTR (Node->Object);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiNsGetSecondaryObject
+ *
+ * PARAMETERS:  Node             - Parent Node to be examined
+ *
+ * RETURN:      Current value of the object field from the Node whose
+ *              handle is passed.
+ *
+ * DESCRIPTION: Obtain a secondary object associated with a namespace node.
+ *
+ ******************************************************************************/
+
+ACPI_OPERAND_OBJECT *
+AcpiNsGetSecondaryObject (
+    ACPI_OPERAND_OBJECT     *ObjDesc)
+{
+    ACPI_FUNCTION_TRACE_PTR ("NsGetSecondaryObject", ObjDesc);
+
+
+    if ((!ObjDesc)                                                ||
+        (ACPI_GET_OBJECT_TYPE (ObjDesc) == ACPI_TYPE_LOCAL_DATA)  ||
+        (!ObjDesc->Common.NextObject)                             ||
+        (ACPI_GET_OBJECT_TYPE (ObjDesc->Common.NextObject) == ACPI_TYPE_LOCAL_DATA))
+    {
+        return_PTR (NULL);
+    }
+
+    return_PTR (ObjDesc->Common.NextObject);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiNsAttachData
+ *
+ * PARAMETERS:  Node            - Namespace node
+ *              Handler         - Handler to be associated with the data
+ *              Data            - Data to be attached
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Low-level attach data.  Create and attach a Data object.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiNsAttachData (
+    ACPI_NAMESPACE_NODE     *Node,
+    ACPI_OBJECT_HANDLER     Handler,
+    void                    *Data)
+{
+    ACPI_OPERAND_OBJECT     *PrevObjDesc;
+    ACPI_OPERAND_OBJECT     *ObjDesc;
+    ACPI_OPERAND_OBJECT     *DataDesc;
+
+
+    /* We only allow one attachment per handler */
+
+    PrevObjDesc = NULL;
+    ObjDesc = Node->Object;
+    while (ObjDesc)
+    {
+        if ((ACPI_GET_OBJECT_TYPE (ObjDesc) == ACPI_TYPE_LOCAL_DATA) &&
+            (ObjDesc->Data.Handler == Handler))
+        {
+            return (AE_ALREADY_EXISTS);
+        }
+
+        PrevObjDesc = ObjDesc;
+        ObjDesc = ObjDesc->Common.NextObject;
+    }
+
+    /* Create an internal object for the data */
+
+    DataDesc = AcpiUtCreateInternalObject (ACPI_TYPE_LOCAL_DATA);
+    if (!DataDesc)
+    {
+        return (AE_NO_MEMORY);
+    }
+
+    DataDesc->Data.Handler = Handler;
+    DataDesc->Data.Pointer = Data;
+
+    /* Install the data object */
+
+    if (PrevObjDesc)
+    {
+        PrevObjDesc->Common.NextObject = DataDesc;
+    }
+    else
+    {
+        Node->Object = DataDesc;
+    }
+
+    return (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiNsDetachData
+ *
+ * PARAMETERS:  Node            - Namespace node
+ *              Handler         - Handler associated with the data
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Low-level detach data.  Delete the data node, but the caller
+ *              is responsible for the actual data.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiNsDetachData (
+    ACPI_NAMESPACE_NODE     *Node,
+    ACPI_OBJECT_HANDLER     Handler)
+{
+    ACPI_OPERAND_OBJECT     *ObjDesc;
+    ACPI_OPERAND_OBJECT     *PrevObjDesc;
+
+
+    PrevObjDesc = NULL;
+    ObjDesc = Node->Object;
+    while (ObjDesc)
+    {
+        if ((ACPI_GET_OBJECT_TYPE (ObjDesc) == ACPI_TYPE_LOCAL_DATA) &&
+            (ObjDesc->Data.Handler == Handler))
+        {
+            if (PrevObjDesc)
+            {
+                PrevObjDesc->Common.NextObject = ObjDesc->Common.NextObject;
+            }
+            else
+            {
+                Node->Object = ObjDesc->Common.NextObject;
+            }
+
+            AcpiUtRemoveReference (ObjDesc);
+            return (AE_OK);
+        }
+
+        PrevObjDesc = ObjDesc;
+        ObjDesc = ObjDesc->Common.NextObject;
+    }
+
+    return (AE_NOT_FOUND);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiNsGetAttachedData
+ *
+ * PARAMETERS:  Node            - Namespace node
+ *              Handler         - Handler associated with the data
+ *              Data            - Where the data is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Low level interface to obtain data previously associated with
+ *              a namespace node.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiNsGetAttachedData (
+    ACPI_NAMESPACE_NODE     *Node,
+    ACPI_OBJECT_HANDLER     Handler,
+    void                    **Data)
+{
+    ACPI_OPERAND_OBJECT     *ObjDesc;
+
+
+    ObjDesc = Node->Object;
+    while (ObjDesc)
+    {
+        if ((ACPI_GET_OBJECT_TYPE (ObjDesc) == ACPI_TYPE_LOCAL_DATA) &&
+            (ObjDesc->Data.Handler == Handler))
+        {
+            *Data = ObjDesc->Data.Pointer;
+            return (AE_OK);
+        }
+
+        ObjDesc = ObjDesc->Common.NextObject;
+    }
+
+    return (AE_NOT_FOUND);
 }
 
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: mca_machdep.c,v 1.14 2001/12/04 20:00:16 sommerfeld Exp $	*/
+/*	$NetBSD: mca_machdep.c,v 1.22 2003/12/15 08:38:01 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 2000, 2001 The NetBSD Foundation, Inc.
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mca_machdep.c,v 1.14 2001/12/04 20:00:16 sommerfeld Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mca_machdep.c,v 1.22 2003/12/15 08:38:01 jdolecek Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -57,10 +57,9 @@ __KERNEL_RCSID(0, "$NetBSD: mca_machdep.c,v 1.14 2001/12/04 20:00:16 sommerfeld 
 #include <machine/bioscall.h>
 #include <machine/psl.h>
 
-#define _I386_BUS_DMA_PRIVATE
+#define _X86_BUS_DMA_PRIVATE
 #include <machine/bus.h>
 
-#include <i386/isa/icu.h>
 #include <dev/isa/isavar.h>
 #include <dev/isa/isareg.h>
 #include <dev/mca/mcavar.h>
@@ -92,32 +91,15 @@ struct bios_config {
  * Used to encode DMA channel into ISA DMA cookie. We use upper 4 bits of
  * ISA DMA cookie id_flags, it's unused.
  */
-struct i386_isa_dma_cookie {
+struct x86_isa_dma_cookie {
 	int id_flags;
 	/* We don't care about rest */
 };
 
-/* ISA DMA stuff - see i386/isa/isa_machdep.c */
-int	_isa_bus_dmamap_create __P((bus_dma_tag_t, bus_size_t, int,
-	    bus_size_t, bus_size_t, int, bus_dmamap_t *));
-void	_isa_bus_dmamap_destroy __P((bus_dma_tag_t, bus_dmamap_t));
-int	_isa_bus_dmamap_load __P((bus_dma_tag_t, bus_dmamap_t, void *,
-	    bus_size_t, struct proc *, int));
-void	_isa_bus_dmamap_unload __P((bus_dma_tag_t, bus_dmamap_t));
-void	_isa_bus_dmamap_sync __P((bus_dma_tag_t, bus_dmamap_t,
-	    bus_addr_t, bus_size_t, int));
-
-int	_isa_bus_dmamem_alloc __P((bus_dma_tag_t, bus_size_t, bus_size_t,
-	    bus_size_t, bus_dma_segment_t *, int, int *, int));
-
+#ifdef UNUSED
 static void	_mca_bus_dmamap_sync __P((bus_dma_tag_t, bus_dmamap_t,
 		    bus_addr_t, bus_size_t, int));
-static int	_mca_bus_dmamap_load_mbuf __P((bus_dma_tag_t, bus_dmamap_t,
-		    struct mbuf *, int));
-static int	_mca_bus_dmamap_load_uio __P((bus_dma_tag_t, bus_dmamap_t,
-		    struct uio *, int));
-static int	_mca_bus_dmamap_load_raw __P((bus_dma_tag_t, bus_dmamap_t,
-		    bus_dma_segment_t *, int, bus_size_t, int));
+#endif
 
 /*
  * For now, we use MCA DMA to 0-16M always. Some IBM PS/2 have 32bit MCA bus,
@@ -125,17 +107,20 @@ static int	_mca_bus_dmamap_load_raw __P((bus_dma_tag_t, bus_dmamap_t,
  */
 #define	MCA_DMA_BOUNCE_THRESHOLD	(16 * 1024 * 1024)
 
-struct i386_bus_dma_tag mca_bus_dma_tag = {
+struct x86_bus_dma_tag mca_bus_dma_tag = {
 	MCA_DMA_BOUNCE_THRESHOLD,		/* _bounce_thresh */
-	_isa_bus_dmamap_create,
-	_isa_bus_dmamap_destroy,
-	_isa_bus_dmamap_load,
-	_mca_bus_dmamap_load_mbuf,
-	_mca_bus_dmamap_load_uio,
-	_mca_bus_dmamap_load_raw,
-	_isa_bus_dmamap_unload,
-	_mca_bus_dmamap_sync,
-	_isa_bus_dmamem_alloc,
+	0,					/* _bounce_alloc_lo */
+	MCA_DMA_BOUNCE_THRESHOLD,		/* _bounce_alloc_hi */
+	NULL,					/* _may_bounce */
+	_bus_dmamap_create,
+	_bus_dmamap_destroy,
+	_bus_dmamap_load,
+	_bus_dmamap_load_mbuf,
+	_bus_dmamap_load_uio,
+	_bus_dmamap_load_raw,
+	_bus_dmamap_unload,
+	_bus_dmamap_sync,
+	_bus_dmamem_alloc,
 	_bus_dmamem_free,
 	_bus_dmamem_map,
 	_bus_dmamem_unmap,
@@ -245,8 +230,8 @@ mca_intr_establish(mc, ih, level, func, arg)
 	int level, (*func) __P((void *));
 	void *arg;
 {
-	if (ih == 0 || ih >= ICU_LEN || ih == 2)
-		panic("mca_intr_establish: bogus handle 0x%x\n", ih);
+	if (ih == 0 || ih >= NUM_LEGACY_IRQS || ih == 2)
+		panic("mca_intr_establish: bogus handle 0x%x", ih);
 
 	/* MCA interrupts are always level-triggered */
 	return isa_intr_establish(NULL, ih, IST_LEVEL, level, func, arg);
@@ -257,7 +242,7 @@ mca_intr_disestablish(mc, cookie)
 	mca_chipset_tag_t mc;
 	void *cookie;
 {
-	return isa_intr_disestablish(NULL, cookie);
+	isa_intr_disestablish(NULL, cookie);
 }
 	
 
@@ -275,7 +260,7 @@ mca_nmi()
  
 	int 	slot, mcanmi=0;
 
-	/* if there is no MCA bus, call isa_nmi() */
+	/* if there is no MCA bus, call x86_nmi() */
 	if (!MCA_system)
 		goto out;
 
@@ -301,7 +286,7 @@ mca_nmi()
    out:
 	if (!mcanmi) {
 		/* no CHCK bits asserted, assume ISA NMI */
-		return (isa_nmi());
+		return (x86_nmi());
 	} else
 		return(0);
 }
@@ -323,7 +308,7 @@ mca_busprobe()
 	struct bioscallregs regs;
 	struct bios_config *scp;
 	paddr_t             paddr;
-	char buf[50];
+	char buf[80];
 
 	memset(&regs, 0, sizeof(regs));
 	regs.AH = 0xc0;
@@ -340,7 +325,7 @@ mca_busprobe()
 	scp = (struct bios_config *)ISA_HOLE_VADDR(paddr);
 
 #if 1 /* MCAVERBOSE */
-	bitmask_snprintf(((scp->feature2 & 1)<< 8) | scp->feature1,
+	bitmask_snprintf((scp->feature2 << 8) | scp->feature1,
 		"\20"
 		"\01MCA+ISA"
 		"\02MCA"
@@ -350,7 +335,14 @@ mca_busprobe()
 		"\06RTC"
 		"\07IC2"
 		"\010DMA3B"
-		"\011DMA32\n",
+		"\011res"
+		"\012DSTR"
+		"\013n8042"
+		"\014CPUF"
+		"\015MMF"
+		"\016GPDF"
+		"\017KBDF"
+		"\020DMA32\n",
 		buf, sizeof(buf));
 
 	printf("BIOS CFG: Model-SubM-Rev: %02x-%02x-%02x, 0x%s\n",
@@ -389,51 +381,7 @@ mca_disk_unbusy(void)
  * -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
  */
 
-/*
- * Like _mca_bus_dmamap_load(), but for mbufs.
- */
-static int
-_mca_bus_dmamap_load_mbuf(t, map, m0, flags)  
-	bus_dma_tag_t t;
-	bus_dmamap_t map;
-	struct mbuf *m0;
-	int flags;
-{
-
-	panic("_mca_bus_dmamap_load_mbuf: not implemented");
-}
-
-/*
- * Like _mca_bus_dmamap_load(), but for uios.
- */
-static int
-_mca_bus_dmamap_load_uio(t, map, uio, flags)
-	bus_dma_tag_t t;
-	bus_dmamap_t map;
-	struct uio *uio;
-	int flags;
-{
-
-	panic("_mca_bus_dmamap_load_uio: not implemented");
-}
-
-/*
- * Like _mca_bus_dmamap_load(), but for raw memory allocated with
- * bus_dmamem_alloc().
- */
-static int
-_mca_bus_dmamap_load_raw(t, map, segs, nsegs, size, flags)
-	bus_dma_tag_t t;
-	bus_dmamap_t map;
-	bus_dma_segment_t *segs;
-	int nsegs;
-	bus_size_t size;
-	int flags;
-{
-
-	panic("_mca_bus_dmamap_load_raw: not implemented");
-}
-
+#ifdef UNUSED
 /*
  * Synchronize a MCA DMA map.
  */
@@ -445,12 +393,12 @@ _mca_bus_dmamap_sync(t, map, offset, len, ops)
 	bus_size_t len;
 	int ops;
 {
-	struct i386_isa_dma_cookie *cookie;
+	struct x86_isa_dma_cookie *cookie;
 	bus_addr_t phys;
 	bus_size_t cnt;
 	int dmach, mode;
 
-	_isa_bus_dmamap_sync(t, map, offset, len, ops);
+	_bus_dmamap_sync(t, map, offset, len, ops);
 
 	/*
 	 * Don't do anything if not using the DMA controller.
@@ -465,7 +413,7 @@ _mca_bus_dmamap_sync(t, map, offset, len, ops)
 	if (ops != BUS_DMASYNC_PREREAD && ops != BUS_DMASYNC_PREWRITE)
 		return;
 
-	cookie = (struct i386_isa_dma_cookie *)map->_dm_cookie;
+	cookie = (struct x86_isa_dma_cookie *)map->_dm_cookie;
 	dmach = (cookie->id_flags & 0xf0) >> 4;
 
 	phys = map->dm_segs[0].ds_addr;
@@ -494,7 +442,7 @@ _mca_bus_dmamap_sync(t, map, offset, len, ops)
 	 * sequence to setup the controller is taken from Minix.
 	 */
 
-	/* Disable access to dma channel. */
+	/* Disable access to DMA channel. */
 	bus_space_write_1(dmaiot, dmacmdh, 0, DMACMD_MASK | dmach);
 
 	/* Set the transfer mode. */
@@ -517,12 +465,13 @@ _mca_bus_dmamap_sync(t, map, offset, len, ops)
 	/* count bits 8..15    */
 	bus_space_write_1(dmaiot, dmaexech, 0, ((cnt - 1) >> 8) & 0xff);        
 
-	/* Enable access to dma channel. */
+	/* Enable access to DMA channel. */
 	bus_space_write_1(dmaiot, dmacmdh, 0, DMACMD_RESET_MASK | dmach);
 }
+#endif
 
 /*
- * Allocate a dma map, and set up dma channel.
+ * Allocate a DMA map, and set up DMA channel.
  */
 int
 mca_dmamap_create(t, size, flags, dmamp, dmach)
@@ -533,7 +482,7 @@ mca_dmamap_create(t, size, flags, dmamp, dmach)
 	int dmach;
 {
 	int error;
-	struct i386_isa_dma_cookie *cookie;
+	struct x86_isa_dma_cookie *cookie;
 
 #ifdef DEBUG
 	/* Sanity check */
@@ -553,11 +502,26 @@ mca_dmamap_create(t, size, flags, dmamp, dmach)
 	 * MCA DMA transfer can be maximum 65536 bytes long and must
 	 * be in one chunk. No specific boundary constraints are present.
 	 */
-	if ((error = bus_dmamap_create(t, size, 1, 65536, 0, flags, dmamp)))
+	if ((error = _bus_dmamap_create(t, size, 1, 65536, 0, flags, dmamp)))
 		return (error);
 
+	cookie = (struct x86_isa_dma_cookie *) (*dmamp)->_dm_cookie;
+
+	if (cookie == NULL) {
+		/*
+		 * Allocate our cookie if not yet done.
+		 */
+		cookie = malloc(sizeof(struct x86_bus_dma_cookie), M_DMAMAP,
+		    ((flags & BUS_DMA_NOWAIT) ? M_NOWAIT : M_WAITOK) | M_ZERO);
+		if (cookie == NULL) {
+			
+			return ENOMEM;
+		}
+		(*dmamp)->_dm_cookie = cookie;
+	}
+
+
 	/* Encode DMA channel */
-	cookie = (struct i386_isa_dma_cookie *) (*dmamp)->_dm_cookie;
 	cookie->id_flags &= 0x0f;
 	cookie->id_flags |= dmach << 4;
 
@@ -588,6 +552,6 @@ mca_dma_set_ioport(dma, port)
 	bus_space_write_1(dmaiot, dmaexech, 0, port & 0xff);
 	bus_space_write_1(dmaiot, dmaexech, 0, (port >> 8) & 0xff);
 
-	/* Enable access to dma channel. */
+	/* Enable access to DMA channel. */
 	bus_space_write_1(dmaiot, dmacmdh, 0, DMACMD_RESET_MASK | dma);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: stdarg.h,v 1.13 2000/07/01 06:38:53 matt Exp $	*/
+/*	$NetBSD: stdarg.h,v 1.16 2004/03/19 08:38:28 kleink Exp $	*/
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by the University of
- *      California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -64,12 +60,12 @@ typedef _BSD_VA_LIST_	va_list;
 
 #define va_end(ap)	
 
-#define __va_copy(dest, src)	((dest) == (src))
+#define __va_copy(dest, src)	((dest) = (src))
 #endif
 
-#if !defined(_ANSI_SOURCE) && \
-    (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE) || \
-     defined(_ISOC99_SOURCE) || (__STDC_VERSION__ - 0) >= 199901L)
+#if !defined(_ANSI_SOURCE) &&						\
+    (defined(_ISOC99_SOURCE) || (__STDC_VERSION__ - 0) >= 199901L ||	\
+     defined(_NETBSD_SOURCE))
 #define	va_copy(dest, src)	__va_copy(dest, src)
 #endif
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: cache_r4k.h,v 1.7 2002/03/05 14:32:26 simonb Exp $	*/
+/*	$NetBSD: cache_r4k.h,v 1.10 2003/03/08 04:43:26 rafal Exp $	*/
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -55,7 +55,7 @@
 #define	CACHEOP_R4K_HIT_WB		(6 << 2)	/* I, D, SD */
 #define	CACHEOP_R4K_HIT_SET_VIRTUAL	(7 << 2)	/* SI, SD */
 
-#if defined(_KERNEL) && !defined(_LOCORE)
+#if !defined(_LOCORE)
 
 /*
  * cache_r4k_op_line:
@@ -67,6 +67,44 @@ do {									\
 	__asm __volatile(						\
 		".set noreorder					\n\t"	\
 		"cache %1, 0(%0)				\n\t"	\
+		".set reorder"						\
+	    :								\
+	    : "r" (va), "i" (op)					\
+	    : "memory");						\
+} while (/*CONSTCOND*/0)
+
+/*
+ * cache_r4k_op_8lines_16:
+ *
+ *	Perform the specified cache operation on 8 16-byte cache lines.
+ */
+#define	cache_r4k_op_8lines_16(va, op)					\
+do {									\
+	__asm __volatile(						\
+		".set noreorder					\n\t"	\
+		"cache %1, 0x00(%0); cache %1, 0x10(%0)		\n\t"	\
+		"cache %1, 0x20(%0); cache %1, 0x30(%0)		\n\t"	\
+		"cache %1, 0x40(%0); cache %1, 0x50(%0)		\n\t"	\
+		"cache %1, 0x60(%0); cache %1, 0x70(%0)		\n\t"	\
+		".set reorder"						\
+	    :								\
+	    : "r" (va), "i" (op)					\
+	    : "memory");						\
+} while (/*CONSTCOND*/0)
+
+/*
+ * cache_r4k_op_8lines_32:
+ *
+ *	Perform the specified cache operation on 8 32-byte cache lines.
+ */
+#define	cache_r4k_op_8lines_32(va, op)					\
+do {									\
+	__asm __volatile(						\
+		".set noreorder					\n\t"	\
+		"cache %1, 0x00(%0); cache %1, 0x20(%0)		\n\t"	\
+		"cache %1, 0x40(%0); cache %1, 0x60(%0)		\n\t"	\
+		"cache %1, 0x80(%0); cache %1, 0xa0(%0)		\n\t"	\
+		"cache %1, 0xc0(%0); cache %1, 0xe0(%0)		\n\t"	\
 		".set reorder"						\
 	    :								\
 	    : "r" (va), "i" (op)					\
@@ -319,29 +357,6 @@ void	r4k_pdcache_wbinv_range_index_32(vaddr_t, vsize_t);
 void	r4k_pdcache_inv_range_32(vaddr_t, vsize_t);
 void	r4k_pdcache_wb_range_32(vaddr_t, vsize_t);
 
-void	r5k_icache_sync_all_32(void);
-void	r5k_icache_sync_range_32(vaddr_t, vsize_t);
-void	r5k_icache_sync_range_index_32(vaddr_t, vsize_t);
-
-void	r5k_pdcache_wbinv_all_16(void);
-void	r5k_pdcache_wbinv_all_32(void);
-void	r4600v1_pdcache_wbinv_range_32(vaddr_t, vsize_t);
-void	r4600v2_pdcache_wbinv_range_32(vaddr_t, vsize_t);
-void	vr4131v1_pdcache_wbinv_range_16(vaddr_t, vsize_t);
-void	r5k_pdcache_wbinv_range_16(vaddr_t, vsize_t);
-void	r5k_pdcache_wbinv_range_32(vaddr_t, vsize_t);
-void	r5k_pdcache_wbinv_range_index_16(vaddr_t, vsize_t);
-void	r5k_pdcache_wbinv_range_index_32(vaddr_t, vsize_t);
-
-void	r4600v1_pdcache_inv_range_32(vaddr_t, vsize_t);
-void	r4600v2_pdcache_inv_range_32(vaddr_t, vsize_t);
-void	r5k_pdcache_inv_range_16(vaddr_t, vsize_t);
-void	r5k_pdcache_inv_range_32(vaddr_t, vsize_t);
-void	r4600v1_pdcache_wb_range_32(vaddr_t, vsize_t);
-void	r4600v2_pdcache_wb_range_32(vaddr_t, vsize_t);
-void	r5k_pdcache_wb_range_16(vaddr_t, vsize_t);
-void	r5k_pdcache_wb_range_32(vaddr_t, vsize_t);
-
 void	r4k_sdcache_wbinv_all_32(void);
 void	r4k_sdcache_wbinv_range_32(vaddr_t, vsize_t);
 void	r4k_sdcache_wbinv_range_index_32(vaddr_t, vsize_t);
@@ -363,4 +378,4 @@ void	r4k_sdcache_wbinv_range_index_generic(vaddr_t, vsize_t);
 void	r4k_sdcache_inv_range_generic(vaddr_t, vsize_t);
 void	r4k_sdcache_wb_range_generic(vaddr_t, vsize_t);
 
-#endif /* _KERNEL && !_LOCORE */
+#endif /* !_LOCORE */

@@ -1,5 +1,5 @@
 #! /bin/sh -
-#	$NetBSD: makesyscalls.sh,v 1.52 2001/11/12 14:57:02 lukem Exp $
+#	$NetBSD: makesyscalls.sh,v 1.55 2003/09/30 20:34:28 christos Exp $
 #
 # Copyright (c) 1994, 1996, 2000 Christopher G. Demetriou
 # All rights reserved.
@@ -117,7 +117,6 @@ BEGIN {
 	# to allow nested #if/#else/#endif sets
 	savedepth = 0
 	# to track already processed syscalls
-	syscallseen[0] = 0
 
 	sysnames = \"$sysnames\"
 	sysprotos = \"$sysprotos\"
@@ -253,6 +252,8 @@ $1 ~ /^#/ && intable {
 		savedepth--
 	}
 	print > sysent
+	print > sysarghdr
+	print > sysnumhdr
 	print > sysprotos
 	print > sysnamesbottom
 	next
@@ -374,18 +375,34 @@ function parseline() {
 	} else
 		varargc = argc;
 }
+
+function printproto(wrap) {
+	printf("/* syscall: \"%s%s\" ret: \"%s\" args:", wrap, funcalias,
+	    returntype) > sysnumhdr
+	for (i = 1; i <= varargc; i++)
+		printf(" \"%s\"", argtype[i]) > sysnumhdr
+	if (isvarargs)
+		printf(" \"...\"") > sysnumhdr
+	printf(" */\n") > sysnumhdr
+	printf("#define\t%s%s%s\t%d\n\n", constprefix, wrap, funcalias,
+	    syscall) > sysnumhdr
+}
+
 function putent(nodefs, compatwrap) {
 	# output syscall declaration for switch table.  INDIR functions
 	# get none, since they always have sys_nosys() for their table
 	# entries.
 	if (nodefs != "INDIR") {
-		prototype = "(struct proc *, void *, register_t *)"
+		prototype = "(struct lwp *, void *, register_t *)"
 		if (compatwrap == "")
-			printf("int\t%s%s;\n", funcname,
-			    prototype) > sysprotos
+			proto = sprintf("int\t%s%s;\n", funcname, prototype);
 		else
-			printf("int\t%s_%s%s;\n", compatwrap, funcname,
-			    prototype) > sysprotos
+			proto = sprintf("int\t%s_%s%s;\n", compatwrap,
+			    funcname, prototype);
+		if (sysmap[proto] != 1) {
+			sysmap[proto] = 1;
+			print proto > sysprotos;
+		}
 	}
 
 	# output syscall switch entry
@@ -432,30 +449,18 @@ function putent(nodefs, compatwrap) {
 		    funcalias, syscall, compatwrap, funcalias) > sysnamesbottom
 
 	# output syscall number of header, if appropriate
-	if (syscallseen[syscall]) {
-		# nop
-	} else if (nodefs == "" || nodefs == "NOARGS" || nodefs == "INDIR") {
+	if (nodefs == "" || nodefs == "NOARGS" || nodefs == "INDIR") {
 		# output a prototype, to be used to generate lint stubs in
 		# libc.
-		printf("/* syscall: \"%s\" ret: \"%s\" args:", funcalias,
-		    returntype) > sysnumhdr
-		for (i = 1; i <= varargc; i++)
-			printf(" \"%s\"", argtype[i]) > sysnumhdr
-		if (isvarargs)
-			printf(" \"...\"") > sysnumhdr
-		printf(" */\n") > sysnumhdr
+		printproto("")
 
-		printf("#define\t%s%s\t%d\n\n", constprefix, funcalias,
-		    syscall) > sysnumhdr
 	} else if (nodefs == "COMPAT") {
 		# Just define the syscall number with a comment.  These
 		# may be used by compatibility stubs in libc.
-		printf("#define\t%s%s_%s\t%d\n\n",
-		    constprefix, compatwrap, funcalias, syscall) > sysnumhdr
+		printproto(compatwrap "_")
 	} else if (nodefs != "NODEF")
 		printf("\t\t\t\t/* %d is %s %s */\n\n", syscall,
 		    compatwrap, funcalias) > sysnumhdr
-	syscallseen[syscall] = 1
 
 	# output syscall argument structure, if it has arguments
 	if (argc != 0 && nodefs != "NOARGS" && nodefs != "INDIR") {

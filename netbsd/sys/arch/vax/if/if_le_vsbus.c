@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le_vsbus.c,v 1.12 2001/11/28 05:22:48 lukem Exp $	*/
+/*	$NetBSD: if_le_vsbus.c,v 1.19 2003/08/07 16:30:07 agc Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -51,11 +51,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -73,6 +69,9 @@
  *
  *	@(#)if_le.c	8.2 (Berkeley) 11/16/93
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_le_vsbus.c,v 1.19 2003/08/07 16:30:07 agc Exp $");
 
 #include "opt_inet.h"
 #include "bpfilter.h"
@@ -120,9 +119,8 @@ static	void	le_vsbus_attach __P((struct device *, struct device *, void *));
 static	void	lewrcsr __P((struct lance_softc *, u_int16_t, u_int16_t));
 static	u_int16_t lerdcsr __P((struct lance_softc *, u_int16_t));
 
-struct cfattach le_vsbus_ca = {
-	sizeof(struct le_softc), le_vsbus_match, le_vsbus_attach
-};
+CFATTACH_DECL(le_vsbus, sizeof(struct le_softc),
+    le_vsbus_match, le_vsbus_attach, NULL, NULL);
 
 static void
 lewrcsr(ls, port, val)
@@ -238,7 +236,7 @@ le_vsbus_attach(parent, self, aux)
          */
 
 #define ALLOCSIZ (64 * 1024)
-        err = bus_dmamem_alloc(va->va_dmat, ALLOCSIZ, NBPG, 0, 
+        err = bus_dmamem_alloc(va->va_dmat, ALLOCSIZ, PAGE_SIZE, 0, 
             &seg, 1, &rseg, BUS_DMA_NOWAIT);
         if (err) {
                 printf(": unable to alloc buffer block: err %d\n", err);
@@ -255,14 +253,14 @@ le_vsbus_attach(parent, self, aux)
 	err = bus_dmamap_create(va->va_dmat, ALLOCSIZ, rseg, ALLOCSIZ, 
 	    0, BUS_DMA_NOWAIT, &sc->sc_dm);
         if (err) {
-                printf(": unable to create dma map: err %d\n", err);
+                printf(": unable to create DMA map: err %d\n", err);
                 bus_dmamem_free(va->va_dmat, &seg, rseg);
                 return;
         }
 	err = bus_dmamap_load(va->va_dmat, sc->sc_dm, sc->sc_am7990.lsc.sc_mem,
 	    ALLOCSIZ, NULL, BUS_DMA_NOWAIT);
         if (err) {
-                printf(": unable to load dma map: err %d\n", err);
+                printf(": unable to load DMA map: err %d\n", err);
                 bus_dmamap_destroy(va->va_dmat, sc->sc_dm);
                 bus_dmamem_free(va->va_dmat, &seg, rseg);
                 return;

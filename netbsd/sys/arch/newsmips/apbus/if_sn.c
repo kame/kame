@@ -1,4 +1,4 @@
-/*	$NetBSD: if_sn.c,v 1.10 2002/01/16 06:10:00 thorpej Exp $	*/
+/*	$NetBSD: if_sn.c,v 1.14 2003/07/15 02:59:28 lukem Exp $	*/
 
 /*
  * National Semiconductor  DP8393X SONIC Driver
@@ -14,6 +14,9 @@
  *   Yanagisawa Takeshi <yanagisw@aa.ap.titech.ac.jp>
  * did the work to get this running on the Macintosh.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_sn.c,v 1.14 2003/07/15 02:59:28 lukem Exp $");
 
 #include "opt_inet.h"
 
@@ -153,7 +156,7 @@ snsetup(sc, lladdr)
 	 * around problems near the end of 64k !!
 	 */
 	p = sc->space;
-	pp = (u_char *)ROUNDUP ((int)p, NBPG);
+	pp = (u_char *)ROUNDUP ((int)p, PAGE_SIZE);
 	p = pp;
 
 	for (i = 0; i < NRRA; i++) {
@@ -180,29 +183,29 @@ snsetup(sc, lladdr)
 
 	p = (u_char *)SOALIGN(sc, p);
 
-	if ((p - pp) > NBPG) {
+	if ((p - pp) > PAGE_SIZE) {
 		printf ("%s: sizeof RRA (%ld) + CDA (%ld) +"
-		    "TDA (%ld) > NBPG (%d). Punt!\n",
+		    "TDA (%ld) > PAGE_SIZE (%d). Punt!\n",
 		    sc->sc_dev.dv_xname,
 		    (ulong)sc->p_cda - (ulong)sc->p_rra[0],
 		    (ulong)sc->mtda[0].mtd_txp - (ulong)sc->p_cda,
 		    (ulong)p - (ulong)sc->mtda[0].mtd_txp,
-		    NBPG);
+		    PAGE_SIZE);
 		return(1);
 	}
 
-	p = pp + NBPG;
+	p = pp + PAGE_SIZE;
 	pp = p;
 
-	sc->sc_nrda = NBPG / RXPKT_SIZE(sc);
+	sc->sc_nrda = PAGE_SIZE / RXPKT_SIZE(sc);
 	sc->p_rda = (caddr_t) p;
 	sc->v_rda = SONIC_GETDMA(p);
 
-	p = pp + NBPG;
+	p = pp + PAGE_SIZE;
 
 	for (i = 0; i < NRBA; i++) {
 		sc->rbuf[i] = (caddr_t)p;
-		p += NBPG;
+		p += PAGE_SIZE;
 	}
 
 	pp = p;
@@ -555,7 +558,7 @@ sonicput(sc, m0, mtd_next)
 	mtdp = &sc->mtda[sc->mtd_free];
 
 	buff = mtdp->mtd_buf;
-	
+
 	/* this packet goes to mtdnext fill in the TDA */
 	mtdp->mtd_mbuf = m0;
 	txp = mtdp->mtd_txp;
@@ -718,7 +721,7 @@ camprogram(sc)
 		delay(10);
 	if (timeout == 0) {
 		/* XXX */
-		panic("%s: CAM initialisation failed\n", sc->sc_dev.dv_xname);
+		panic("%s: CAM initialisation failed", sc->sc_dev.dv_xname);
 	}
 	timeout = 10000;
 	while (((NIC_GET(sc, SNR_ISR) & ISR_LCD) == 0) && timeout--)
@@ -834,8 +837,8 @@ initialise_rra(sc)
 		v = SONIC_GETDMA(sc->rbuf[i]);
 		SWO(bitmode, sc->p_rra[i], RXRSRC_PTRHI, UPPER(v));
 		SWO(bitmode, sc->p_rra[i], RXRSRC_PTRLO, LOWER(v));
-		SWO(bitmode, sc->p_rra[i], RXRSRC_WCHI, UPPER(NBPG/2));
-		SWO(bitmode, sc->p_rra[i], RXRSRC_WCLO, LOWER(NBPG/2));
+		SWO(bitmode, sc->p_rra[i], RXRSRC_WCHI, UPPER(PAGE_SIZE/2));
+		SWO(bitmode, sc->p_rra[i], RXRSRC_WCLO, LOWER(PAGE_SIZE/2));
 	}
 	sc->sc_rramark = NRBA;
 	NIC_PUT(sc, SNR_RWP, LOWER(sc->v_rra[sc->sc_rramark]));
@@ -964,7 +967,7 @@ sonictxint(sc)
 			ifp->if_oerrors++;
 			printf("%s: Tx packet status=0x%x\n",
 			    sc->sc_dev.dv_xname, txp_status);
-			
+
 			/* XXX - DG This looks bogus */
 			if (mtd_hw != sc->mtd_free) {
 				printf("resubmitting remaining packets\n");

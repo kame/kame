@@ -1,4 +1,4 @@
-/*	$NetBSD: mvmebus.c,v 1.1 2002/02/12 20:38:47 scw Exp $	*/
+/*	$NetBSD: mvmebus.c,v 1.7 2004/02/13 11:36:22 wiz Exp $	*/
 
 /*-
  * Copyright (c) 2000, 2002 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mvmebus.c,v 1.7 2004/02/13 11:36:22 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -593,7 +596,7 @@ mvmebus_dmamap_load_common(sc, map)
 
 	/*
 	 * Traverse the list of segments which make up this map, and
-	 * convert the cpu-relative addresses therein to VMEbus addresses.
+	 * convert the CPU-relative addresses therein to VMEbus addresses.
 	 */
 	for (ds = &map->dm_segs[0]; ds < &map->dm_segs[map->dm_nsegs]; ds++) {
 		/*
@@ -772,7 +775,7 @@ mvmebus_dummy_dmamem_alloc(t, size, align, boundary, segs, nsegs, rsegs, flags)
 	int flags;
 {
 
-	panic("Must use vme_dmamem_alloc() in place of bus_dmamem_alloc()\n");
+	panic("Must use vme_dmamem_alloc() in place of bus_dmamem_alloc()");
 }
 
 /* ARGSUSED */
@@ -840,11 +843,11 @@ mvmebus_dmamem_alloc(vsc, len, am, datasize, swap, segs, nsegs, rsegs, flags)
 	/*
 	 * Allocate physical memory.
 	 *
-	 * Note: This fills in the segments with cpu-relative physical
+	 * Note: This fills in the segments with CPU-relative physical
 	 * addresses. A further call to bus_dmamap_load_raw() (with a
-	 * dma map which specifies the same VMEbus address space and
+	 * DMA map which specifies the same VMEbus address space and
 	 * constraints as the call to here) must be made. The segments
-	 * of the dma map will then contain VMEbus-relative physical
+	 * of the DMA map will then contain VMEbus-relative physical
 	 * addresses of the memory allocated here.
 	 */
 	return _bus_dmamem_alloc_common(sc->sc_dmat, low, high,
@@ -912,28 +915,13 @@ mvmebus_mod_string(addr, len, am, ds)
 	static const char *mode[] = {"BLT64)", "DATA)", "PROG)", "BLT32)"};
 	static const char *dsiz[] = {"(", "(D8,", "(D16,", "(D16-D8,",
 	"(D32,", "(D32,D8,", "(D32-D16,", "(D32-D8,"};
+	static const char *adrfmt[] = { "A32:%08x-%08x ", "USR:%08x-%08x ",
+	    "A16:%04x-%04x ", "A24:%06x-%06x " };
 	static char mstring[40];
-	char *fmt;
 
-	switch (am & VME_AM_ADRSIZEMASK) {
-	case VME_AM_A32:
-		fmt = "A32:%08x-%08x ";
-		break;
-
-	case VME_AM_A24:
-		fmt = "A24:%06x-%06x ";
-		break;
-
-	case VME_AM_A16:
-		fmt = "A16:%04x-%04x ";
-		break;
-
-	case VME_AM_USERDEF:
-		fmt = "USR:%08x-%08x ";
-		break;
-	}
-
-	sprintf(mstring, fmt, addr, addr + len - 1);
+	sprintf(mstring,
+	    adrfmt[(am & VME_AM_ADRSIZEMASK) >> VME_AM_ADRSIZESHIFT],
+	    addr, addr + len - 1);
 	strcat(mstring, dsiz[ds & 0x7]);
 
 	if (MVMEBUS_AM_HAS_CAP(am)) {

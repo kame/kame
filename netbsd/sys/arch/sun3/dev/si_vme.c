@@ -1,4 +1,4 @@
-/*	$NetBSD: si_vme.c,v 1.16 2001/08/20 12:00:51 wiz Exp $	*/
+/*	$NetBSD: si_vme.c,v 1.22 2003/07/15 03:36:15 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -80,6 +80,9 @@
  * VME functions for DMA
  ****************************************************************/
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: si_vme.c,v 1.22 2003/07/15 03:36:15 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
@@ -123,9 +126,8 @@ static void si_vme_reset __P((struct ncr5380_softc *));
 static int	si_vme_match __P((struct device *, struct cfdata *, void *));
 static void	si_vme_attach __P((struct device *, struct device *, void *));
 
-struct cfattach si_vme_ca = {
-	sizeof(struct si_softc), si_vme_match, si_vme_attach
-};
+CFATTACH_DECL(si_vme, sizeof(struct si_softc),
+    si_vme_match, si_vme_attach, NULL, NULL);
 
 /*
  * Options for disconnect/reselect, DMA, and interrupts.
@@ -456,7 +458,7 @@ si_vme_dma_stop(ncr_sc)
 
 	if ((ncr_sc->sc_state & NCR_DOINGDMA) == 0) {
 #ifdef	DEBUG
-		printf("si_dma_stop: dma not running\n");
+		printf("si_dma_stop: DMA not running\n");
 #endif
 		return;
 	}
@@ -489,7 +491,7 @@ si_vme_dma_stop(ncr_sc)
 	 * actually transferred for VME.
 	 *
 	 * SCSI-3 VME interface is a little funny on writes:
-	 * if we have a disconnect, the dma has overshot by
+	 * if we have a disconnect, the DMA has overshot by
 	 * one byte and the resid needs to be incremented.
 	 * Only happens for partial transfers.
 	 * (Thanks to Matt Jacob)

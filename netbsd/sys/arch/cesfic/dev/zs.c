@@ -1,4 +1,4 @@
-/*	$NetBSD: zs.c,v 1.1 2001/05/14 18:23:07 drochner Exp $	*/
+/*	$NetBSD: zs.c,v 1.8 2003/07/15 01:29:21 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -43,6 +43,9 @@
  * Plain tty/async lines use the zs_async slave.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zs.c,v 1.8 2003/07/15 01:29:21 lukem Exp $");
+
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -71,7 +74,6 @@ void zs_putc __P((void*, int));
 
 static struct zs_chanstate zs_conschan_store;
 static int zs_hwflags[2][2];
-int zs_major = 10;
 int zssoftpending;
 
 extern struct cfdriver zsc_cd;
@@ -99,8 +101,11 @@ static int zsc_print __P((void *, const char *));
 int zscngetc __P((dev_t));
 void zscnputc __P((dev_t, int));
 
-static struct consdev zscons = { NULL, NULL,
-	zscngetc, zscnputc, nullcnpollc, 0, NODEV, 1 };
+static struct consdev zscons = {
+	NULL, NULL,
+	zscngetc, zscnputc, nullcnpollc, NULL, NULL, NULL,
+	NODEV, 1
+};
 
 void
 zs_config(zsc, base)
@@ -129,7 +134,7 @@ zs_config(zsc, base)
 			cs = &zs_conschan_store;
 		} else {
 			cs = malloc(sizeof(struct zs_chanstate),
-				    M_DEVBUF, M_NOWAIT);
+				    M_DEVBUF, M_NOWAIT | M_ZERO);
 			if(channel==0){
 				cs->cs_reg_csr  = base+7;
 				cs->cs_reg_data = base+15;
@@ -142,6 +147,7 @@ zs_config(zsc, base)
 			cs->cs_defspeed = 9600;
 		}
 		zsc->zsc_cs[channel] = cs;
+		simple_lock_init(&cs->cs_lock);
 
 		cs->cs_defcflag = CREAD | CS8 | HUPCL;
 
@@ -188,10 +194,10 @@ zsc_print(aux, name)
 	struct zsc_attach_args *args = aux;
 
 	if (name != NULL)
-		printf("%s: ", name);
+		aprint_normal("%s: ", name);
 
 	if (args->channel != -1)
-		printf(" channel %d", args->channel);
+		aprint_normal(" channel %d", args->channel);
 
 	return UNCONF;
 }
@@ -488,8 +494,8 @@ zs_cninit(base)
 	zs_hwflags[0][0] = ZS_HWFLAG_CONSOLE;
 
 	/* Setup temporary chanstate. */
-	cs->cs_reg_csr  = base+7;
-	cs->cs_reg_data = base+15;
+	cs->cs_reg_csr  = (char *)base + 7;
+	cs->cs_reg_data = (char *)base + 15;
 
 	/* Initialize the pending registers. */
 	bcopy(zs_init_reg, cs->cs_preg, 16);

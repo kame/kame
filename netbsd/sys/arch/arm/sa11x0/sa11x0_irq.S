@@ -1,4 +1,4 @@
-/*	$NetBSD: sa11x0_irq.S,v 1.2 2002/04/12 18:50:32 thorpej Exp $	*/
+/*	$NetBSD: sa11x0_irq.S,v 1.6 2003/11/05 21:10:59 scw Exp $	*/
 
 /*
  * Copyright (c) 1998 Mark Brinicombe.
@@ -43,7 +43,7 @@
 #include <machine/asm.h>
 #include <machine/cpu.h>
 #include <machine/frame.h>
-#include <hpcarm/sa11x0/sa11x0_reg.h>
+#include <arm/sa11x0/sa11x0_reg.h>
 
 
 	.text
@@ -67,6 +67,8 @@ Ldbg_str:
 	.asciz	"irq_entry %x %x\n"
 #endif
 
+AST_ALIGNMENT_FAULT_LOCALS
+
 /*
  * Regsister usage
  *
@@ -81,15 +83,16 @@ ASENTRY_NP(irq_entry)
 	sub	lr, lr, #0x00000004	/* Adjust the lr */
 
 	PUSHFRAMEINSVC			/* Push an interrupt frame */
+	ENABLE_ALIGNMENT_FAULTS
 
 	/* Load r8 with the SAIPIC interrupt requests */
 
-	ldr	r10, [pc, #_C_LABEL(saipic_base) - . - 8]
+	ldr	r10, _C_LABEL(saipic_base)
 	ldr	r8, [r10, #(SAIPIC_IP)]	/* Load IRQ pending register */
 
 #ifdef INTR_DEBUG
 	ldr	r2, [r10, #(SAIPIC_MR)]
-	add	r0, pc, #Ldbg_str - . - 8
+	adr	r0, Ldbg_str
 	mov	r1, r8
 	bl	_C_LABEL(printf)
 #endif
@@ -142,7 +145,7 @@ Lfind_highest_ipl:
 
 #ifdef INTR_DEBUG
 	stmfd	sp!, {r0,r1,r2}
-	add	r0, pc, #Ldbg_str - . - 8
+	adr	r0, Ldbg_str
 	mov	r1, #1
 	mov	r2, r9
 	bl	_C_LABEL(printf)
@@ -152,7 +155,7 @@ Lfind_highest_ipl:
 	bic	r0, r0, #I32_bit
 	msr	cpsr_all, r0
 
-	ldr	r7, [pc, #Lirqhandlers - . - 8]
+	ldr	r7, Lirqhandlers
         mov	r9, #0x00000001
 
 irqloop:
@@ -189,18 +192,17 @@ irqloop:
 irqchainloop:
 #ifdef INTR_DEBUG
 	stmfd	sp!, {r0,r1,r2}
-	add	r0, pc, #Ldbg_str - . - 8
+	adr	r0, Ldbg_str
 	mov	r1, #2
 	bl	_C_LABEL(printf)
 	ldmia	sp!, {r0,r1,r2}
 #endif
-	add	lr, pc, #nextinchain - . - 8	/* return address */
 	ldr	r0, [r6, #(IH_ARG)]	/* Get argument pointer */
 	teq	r0, #0x00000000		/* If arg is zero pass stack frame */
 	addeq	r0, sp, #4		/* ... stack frame [XXX needs care] */
+	mov	lr, pc			/* return address */
 	ldr	pc, [r6, #(IH_FUNC)]	/* Call handler */
 
-nextinchain:
 	teq	r0, #0x00000001		/* Was the irq serviced ? */
 	beq	irqdone
 
@@ -224,24 +226,13 @@ nextirq:
 
 	bl	_C_LABEL(dosoftints)	/* Handle the soft interrupts */
 
-	/* Manage AST's. Maybe this should be done as a soft interrupt ? */
-	ldr	r0, [sp]		/* Get the SPSR from stack */
-
-	and	r0, r0, #(PSR_MODE)	/* Test for USR32 mode before the IRQ */
-	teq	r0, #(PSR_USR32_MODE)
-	ldreq	r0, Lastpending		/* Do we have an AST pending ? */
-	ldreq	r1, [r0]
-	teqeq	r1, #0x00000001
-
-	beq	irqast			/* call the AST handler */
-
 	/* Kill IRQ's in preparation for exit */
         mrs     r0, cpsr_all
         orr     r0, r0, #(I32_bit)
         msr     cpsr_all, r0
 
 #ifdef INTR_DEBUG
-	add	r0, pc, #Ldbg_str - . - 8
+	adr	r0, dbg_str
 	mov	r1, #3
 	ldr	r2, [r10, #(SAIPIC_MR)]
 	bl	_C_LABEL(printf)
@@ -253,50 +244,11 @@ nextirq:
 	sub	r1, r1, #1
 	str	r1, [r0]
 
+	DO_AST_AND_RESTORE_ALIGNMENT_FAULTS
 	PULLFRAMEFROMSVCANDEXIT
 
 	/* NOT REACHED */
 	b	. - 8
-
-	/*
-	 * Ok, snag with current intr depth ...
-	 * If ast() calls mi_sleep() the current_intr_depth will not be
-	 * decremented until the process is woken up. This can result
-	 * in the system believing it is still in the interrupt handler.
-	 * If we are calling ast() then correct the current_intr_depth
-	 * before the call.
-	 */
-irqast:
-	mov	r1, #0x00000000		/* Clear ast_pending */
-	str	r1, [r0]
-
-	/* Kill IRQ's so we atomically decrement current_intr_depth */
-        mrs     r2, cpsr_all
-        orr     r3, r2, #(I32_bit)
-        msr     cpsr_all, r3
-
-	/* Decrement the interrupt nesting count */
-	ldr	r0, Lcurrent_intr_depth
-	ldr	r1, [r0]
-	sub	r1, r1, #1
-	str	r1, [r0]
-
-	/* Restore IRQ's */
-        msr     cpsr_all, r2
-
-	mov	r0, sp
-	bl	_C_LABEL(ast)
-
-	/* Kill IRQ's in preparation for exit */
-        mrs     r0, cpsr_all
-        orr     r0, r0, #(I32_bit)
-        msr     cpsr_all, r0
-
-	PULLFRAMEFROMSVCANDEXIT
-
-	/* NOT REACHED */
-	b	. - 8
-	
 
 ENTRY(irq_setmasks)
 	/* Disable interrupts */
@@ -310,7 +262,7 @@ ENTRY(irq_setmasks)
 	ldr	r2, [r2]
 	ldr	r2, [r0, r2, lsl #2]
 
-	ldr	r0, [pc, #_C_LABEL(saipic_base) - . - 8]
+	ldr	r0, _C_LABEL(saipic_base)
 	str	r2, [r0, #(SAIPIC_MR)]	/* Set mask register */
 
 	/* Restore old cpsr and exit */
@@ -328,12 +280,14 @@ Lintrcnt:
 Lirqhandlers:
 	.word	_C_LABEL(irqhandlers)	/* Pointer to array of irqhandlers */
 
-Lastpending:
-	.word	_C_LABEL(astpending)
-
-
 
 #ifdef IRQSTATS
+	.global _C_LABEL(intrnames), _C_LABEL(eintrnames)
+	.global _C_LABEL(eintrcnt)
+_C_LABEL(intrnames): 
+_C_LABEL(eintrnames):
+_C_LABEL(eintrcnt):
+
 	.globl	_C_LABEL(intrcnt), _C_LABEL(sintrcnt)
 
 _C_LABEL(intrcnt):

@@ -1,4 +1,4 @@
-/*      $NetBSD: locore.S,v 1.8 2001/12/03 21:10:48 aymeric Exp $   */
+/*      $NetBSD: locore.S,v 1.12 2004/02/13 11:36:10 wiz Exp $   */
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -41,6 +41,8 @@
 #include "opt_ddb.h"
 #include "opt_ipkdb.h"
 #include "opt_lockdebug.h"
+#include "opt_multiprocessor.h"
+
 #include "assym.h"
 
 #include <sys/syscall.h>
@@ -312,10 +314,10 @@ ENTRY(switchexit)
 	stw	6,_C_LABEL(curpcb)@l(7)
 	addi	1,6,USPACE-16		/* 16 bytes are reserved at stack top */
 	/*
-	 * Schedule the vmspace and stack to be freed (the proc arg is
+	 * Schedule the stack to be freed (the lwp arg is
 	 * already in r3).
 	 */
-	bl	_C_LABEL(exit2)
+	bl	_C_LABEL(lwp_exit2)
 
 #if defined(MULTIPROCESSOR) || defined(LOCKDEBUG)
 	bl	_C_LABEL(sched_lock_idle)
@@ -328,7 +330,7 @@ ENTRY(switchexit)
  * void cpu_switch(struct proc *p)
  * Find a runnable process and switch to it.
  */
-/* XXX noprofile?  --thorpej@netbsd.org */
+/* XXX noprofile?  --thorpej@NetBSD.org */
 ENTRY(cpu_switch)
 	mflr	0			/* save lr */
 	stw	0,4(1)
@@ -339,7 +341,7 @@ ENTRY(cpu_switch)
 	mr	30,3
 	lis	3,_C_LABEL(curproc)@ha
 	xor	31,31,31
-	stw	31,_C_LABEL(curproc)@l(3) /* Zero to not accumulate cpu time */
+	stw	31,_C_LABEL(curproc)@l(3) /* Zero to not accumulate CPU time */
 	lis	3,_C_LABEL(curpcb)@ha
 	lwz	31,_C_LABEL(curpcb)@l(3)
 

@@ -1,5 +1,5 @@
 /*
- * $NetBSD: main.c,v 1.15 2002/01/26 13:18:58 aymeric Exp $
+ * $NetBSD: main.c,v 1.17 2003/01/20 05:29:59 simonb Exp $
  *
  *
  * Copyright (c) 1996,1999 Ignatios Souvatzis
@@ -50,8 +50,8 @@
 #include "samachdep.h"
 #include "loadfile.h"
 
-#undef __LDPGSZ
-#define __LDPGSZ 8192
+#undef AOUT_LDPGSZ
+#define AOUT_LDPGSZ 8192
 #define __PGSZ 8192
 
 #define DRACOREVISION	(*(u_int8_t *)0x02000009)
@@ -321,7 +321,7 @@ again:
 
 		if ((mh->Attribs & (MEMF_CHIP|MEMF_FAST)) == MEMF_CHIP) {
 			size += from;
-			cmemsz = size;;
+			cmemsz = size;
 			from = 0;
 		} else if ((fmemsz < size) && mapped1to1) {
 			fmem = from;

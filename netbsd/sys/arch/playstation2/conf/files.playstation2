@@ -1,4 +1,4 @@
-#	$NetBSD: files.playstation2,v 1.8 2002/04/16 20:50:22 thorpej Exp $
+#	$NetBSD: files.playstation2,v 1.13 2004/03/25 15:26:35 wiz Exp $
 
 maxpartitions 8
 
@@ -20,7 +20,6 @@ file arch/playstation2/playstation2/interrupt.c
 file arch/playstation2/playstation2/bus_space.c
 file arch/playstation2/playstation2/bus_dma.c
 file arch/playstation2/playstation2/clock.c
-file arch/playstation2/playstation2/conf.c
 file arch/playstation2/playstation2/disksubr.c		disk
 file arch/playstation2/playstation2/machdep.c
 file arch/playstation2/playstation2/sifbios.c
@@ -28,7 +27,6 @@ file arch/playstation2/playstation2/sifbios.c
 defparam opt_kloader_kernel_path.h	KLOADER_KERNEL_PATH
 file arch/playstation2/playstation2/kloader.c		kloader_kernel_path
 
-file	dev/clock_subr.c
 #
 #	PlayStation 2 internal devices (not optional)
 #
@@ -79,7 +77,6 @@ file	dev/cninit.c
 
 # Memory Disk for boot tape
 file dev/md_root.c				memory_disk_hooks
-major	{md = 6}
 
 #
 # Workstation Console
@@ -94,13 +91,11 @@ include "dev/usb/files.usb"
 #
 
 include "dev/scsipi/files.scsipi"
-major	{sd = 3}
-major	{st = 4}
-major	{cd = 5}
 
 #
 # Machine-independent ATA drivers
 #
 
 include "dev/ata/files.ata"
-major	{wd = 1}
+
+include "arch/playstation2/conf/majors.playstation2"

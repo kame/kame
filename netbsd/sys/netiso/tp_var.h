@@ -1,4 +1,4 @@
-/*	$NetBSD: tp_var.h,v 1.4 1998/09/13 15:24:39 christos Exp $	*/
+/*	$NetBSD: tp_var.h,v 1.6 2003/06/29 22:32:07 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1995 The NetBSD Foundation, Inc.

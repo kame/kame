@@ -1,4 +1,4 @@
-#	$NetBSD: files.uba,v 1.11 2002/02/25 14:58:08 ad Exp $
+#	$NetBSD: files.uba,v 1.15 2003/08/29 13:50:45 ragge Exp $
 #
 # Config file and device description for machine-independent
 # code for devices Digital Equipment Corp. Unibus and Q22 bus.
@@ -31,6 +31,11 @@ attach	mtc at uba
 device	uda: mscp
 attach	uda at uba
 file	dev/qbus/uda.c				uda | mtc
+
+# DELQA-PLUS Turbo mode Ethernet controller
+device	qt: ifnet, ether, arp
+attach	qt at uba
+file	dev/qbus/if_qt.c			qt
 
 # DEQNA/DELQA Ethernet controller
 device	qe: ifnet, ether, arp
@@ -71,3 +76,23 @@ file	dev/qbus/if_dmc.c			dmc
 device	ts: tape
 attach	ts at uba
 file	dev/qbus/ts.c				ts needs-flag
+
+# DMF32 on UBA
+device	dmf: tty # ifnet, ifuba
+attach	dmf at uba
+file	dev/qbus/dmf.c				dmf needs-flag
+
+# DMZ32 on UBA
+device	dmz: tty
+attach	dmz at uba
+file	dev/qbus/dmz.c				dmz needs-flag
+
+# Common code for dmf/dmz
+file	dev/qbus/dmx.c				dmf | dmz
+
+# RX01/02 floppy disk controller
+device  rfc { drive=-1 }
+attach  rfc at uba
+device  rf: disk
+attach  rf at rfc
+file	dev/qbus/rf.c				rf | rfc needs-flag

@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.c,v 1.2 2001/10/19 05:47:40 shin Exp $	*/
+/*	$NetBSD: cpu.c,v 1.5 2003/07/15 02:54:38 lukem Exp $	*/
 
 /*
  * Copyright (c) 2000 Soren S. Jorvang.  All rights reserved.
@@ -25,6 +25,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.5 2003/07/15 02:54:38 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 
@@ -33,9 +36,8 @@
 static int cpumatch(struct device *, struct cfdata *, void *);
 static void cpuattach(struct device *, struct device *, void *);
 
-struct cfattach cpu_ca = {
-	sizeof (struct device), cpumatch, cpuattach
-};
+CFATTACH_DECL(cpu, sizeof (struct device),
+    cpumatch, cpuattach, NULL, NULL);
 
 extern struct cfdriver cpu_cd;
 static int __attached; /* PlayStation 2 has only one CPU */

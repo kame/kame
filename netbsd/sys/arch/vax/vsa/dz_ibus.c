@@ -1,4 +1,4 @@
-/*	$NetBSD: dz_ibus.c,v 1.24 2002/02/25 14:58:09 ad Exp $ */
+/*	$NetBSD: dz_ibus.c,v 1.32 2003/12/13 23:02:33 ad Exp $ */
 /*
  * Copyright (c) 1998 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -30,7 +30,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: dz_ibus.c,v 1.32 2003/12/13 23:02:33 ad Exp $");
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -67,9 +68,8 @@ static	void	dz_ibus_attach(struct device *, struct device *, void *);
 
 static	vaddr_t idz_regs; /* Used for console */
 
-struct	cfattach dz_ibus_ca = {
-	sizeof(struct dz_softc), dz_ibus_match, dz_ibus_attach
-};
+CFATTACH_DECL(dz_ibus, sizeof(struct dz_softc),
+    dz_ibus_match, dz_ibus_attach, NULL, NULL);
 
 #define REG(name)     short name; short X##name##X;
 static volatile struct ss_dz {/* base address of DZ-controller: 0x200A0000 */
@@ -123,6 +123,9 @@ dz_ibus_attach(parent, self, aux)
 	sc->sc_dr.dr_dcd = 13;
 	sc->sc_dr.dr_ring = 13;
 
+	sc->sc_dr.dr_firstreg = 0;
+	sc->sc_dr.dr_winsize = sizeof(struct ss_dz);
+
 	sc->sc_type = DZ_DZV;
 
 	scb_vecref(0, 0);
@@ -145,17 +148,18 @@ dz_ibus_attach(parent, self, aux)
 
 	printf("\n%s: 4 lines", self->dv_xname);
 
-	dzattach(sc, NULL);
+	dzattach(sc, NULL, minor(cn_tab->cn_dev);
 }
 
 int
 idzcngetc(dev) 
 	dev_t dev;
 {
-	int c = 0;
+	int c = 0, s;
 	int mino = minor(dev);
 	u_short rbuf;
 
+	s = spltty();
 	do {
 		while ((idz->csr & 0x80) == 0)
 			; /* Wait for char */
@@ -164,14 +168,13 @@ idzcngetc(dev)
 			continue;
 		c = rbuf & 0x7f;
 	} while (c == 17 || c == 19);		/* ignore XON/XOFF */
+	splx(s);
 
 	if (c == 13)
 		c = 10;
 
 	return (c);
 }
-
-#define	DZMAJOR 1
 
 void
 idzcnprobe(cndev)
@@ -180,6 +183,7 @@ idzcnprobe(cndev)
 	extern	vaddr_t iospace;
 	int diagcons;
 	paddr_t ioaddr = DZADDR;
+	extern const struct cdevsw dz_cdevsw;
 
 	/* not fine... but for now only KA53 is known to have dz@ibus */
 
@@ -190,7 +194,7 @@ idzcnprobe(cndev)
 
 	diagcons = 3;
 	cndev->cn_pri = CN_NORMAL;
-	cndev->cn_dev = makedev(DZMAJOR, diagcons);
+	cndev->cn_dev = makedev(cdevsw_lookup_major(&dz_cdevsw), diagcons);
 	idz_regs = iospace;
 	ioaccess(iospace, ioaddr, 1);
 }
@@ -215,10 +219,12 @@ idzcnputc(dev,ch)
 	int timeout = 1<<15;		/* don't hang the machine! */
 	int mino = minor(dev);
 	u_short tcr;
+	int s;
 
 	if (mfpr(PR_MAPEN) == 0)
 		return;
 
+	s = spltty();
 	tcr = idz->tcr; /* remember which lines to scan */
 	idz->tcr = (1 << mino);
 
@@ -232,6 +238,7 @@ idzcnputc(dev,ch)
 			break;
 
 	idz->tcr = tcr;
+	splx(s);
 }
 
 void    

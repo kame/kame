@@ -1,7 +1,6 @@
-/*	$NetBSD: freebsd_ptrace.c,v 1.5 2002/03/16 20:43:50 christos Exp $	*/
+/*	$NetBSD: freebsd_ptrace.c,v 1.7 2003/08/07 16:30:39 agc Exp $	*/
 
 /*-
- * Copyright (c) 1994 Christopher G. Demetriou.  All rights reserved.
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -9,6 +8,36 @@
  * to the University of California by American Telephone and Telegraph
  * Co. or Unix System Laboratories, Inc. and are reproduced herein with
  * the permission of UNIX System Laboratories, Inc.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	from: @(#)sys_process.c	8.1 (Berkeley) 6/10/93
+ */
+
+/*-
+ * Copyright (c) 1994 Christopher G. Demetriou.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -42,7 +71,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: freebsd_ptrace.c,v 1.5 2002/03/16 20:43:50 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: freebsd_ptrace.c,v 1.7 2003/08/07 16:30:39 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -52,6 +81,7 @@ __KERNEL_RCSID(0, "$NetBSD: freebsd_ptrace.c,v 1.5 2002/03/16 20:43:50 christos 
 #include <sys/uio.h>
 #include <sys/user.h>
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <machine/reg.h>
@@ -65,8 +95,8 @@ __KERNEL_RCSID(0, "$NetBSD: freebsd_ptrace.c,v 1.5 2002/03/16 20:43:50 christos 
  * Process debugging system call.
  */
 int
-freebsd_sys_ptrace(p, v, retval)
-	struct proc *p;
+freebsd_sys_ptrace(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -76,6 +106,7 @@ freebsd_sys_ptrace(p, v, retval)
 		syscallarg(caddr_t) addr;
 		syscallarg(int) data;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	int error;
 	caddr_t sg;
 	struct {
@@ -92,7 +123,7 @@ freebsd_sys_ptrace(p, v, retval)
 		SCARG(&npa, pid) = SCARG(uap, pid);
 		SCARG(&npa, addr) = SCARG(uap, addr);
 		SCARG(&npa, data) = SCARG(uap, data);
-		return sys_ptrace(p, &npa, retval);
+		return sys_ptrace(l, &npa, retval);
 #endif
 	case FREEBSD_PT_TRACE_ME:
 	case FREEBSD_PT_READ_I:
@@ -102,7 +133,7 @@ freebsd_sys_ptrace(p, v, retval)
 	case FREEBSD_PT_CONTINUE:
 	case FREEBSD_PT_KILL:
 		/* These requests are compatible with NetBSD */
-		return sys_ptrace(p, uap, retval);
+		return sys_ptrace(l, uap, retval);
 
 	case FREEBSD_PT_READ_U:
 	case FREEBSD_PT_WRITE_U:
@@ -112,14 +143,14 @@ freebsd_sys_ptrace(p, v, retval)
 		SCARG(&npa, req) = PT_GETREGS;
 		SCARG(&npa, pid) = SCARG(uap, pid);
 		SCARG(&npa, addr) = (caddr_t)&nrp->regs;
-		if ((error = sys_ptrace(p, &npa, retval)) != 0)
+		if ((error = sys_ptrace(l, &npa, retval)) != 0)
 			return error;
 #endif
 #ifdef PT_GETFPREGS
 		SCARG(&npa, req) = PT_GETFPREGS;
 		SCARG(&npa, pid) = SCARG(uap, pid);
 		SCARG(&npa, addr) = (caddr_t)&nrp->fpregs;
-		if ((error = sys_ptrace(p, &npa, retval)) != 0)
+		if ((error = sys_ptrace(l, &npa, retval)) != 0)
 			return error;
 #endif
 		netbsd_to_freebsd_ptrace_regs(&nrp->regs, &nrp->fpregs, &fr);
@@ -139,14 +170,14 @@ freebsd_sys_ptrace(p, v, retval)
 			SCARG(&npa, req) = PT_SETREGS;
 			SCARG(&npa, pid) = SCARG(uap, pid);
 			SCARG(&npa, addr) = (caddr_t)&nrp->regs;
-			if ((error = sys_ptrace(p, &npa, retval)) != 0)
+			if ((error = sys_ptrace(l, &npa, retval)) != 0)
 				return error;
 #endif
 #ifdef PT_SETFPREGS
 			SCARG(&npa, req) = PT_SETFPREGS;
 			SCARG(&npa, pid) = SCARG(uap, pid);
 			SCARG(&npa, addr) = (caddr_t)&nrp->fpregs;
-			if ((error = sys_ptrace(p, &npa, retval)) != 0)
+			if ((error = sys_ptrace(l, &npa, retval)) != 0)
 				return error;
 #endif
 			return 0;

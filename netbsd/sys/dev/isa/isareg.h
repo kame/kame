@@ -1,4 +1,4 @@
-/*	$NetBSD: isareg.h,v 1.6 1998/03/22 15:44:02 drochner Exp $	*/
+/*	$NetBSD: isareg.h,v 1.8 2003/08/07 16:31:07 agc Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -160,4 +156,10 @@
 #define	IOM_BEGIN	0x0a0000		/* Start of I/O Memory "hole" */
 #define	IOM_END		0x100000		/* End of I/O Memory "hole" */
 #define	IOM_SIZE	(IOM_END - IOM_BEGIN)
+
+/*
+ * ISA DMA works < 16M (24 address lines).
+ */
+#define ISA_DMA_BOUNCE_THRESHOLD	(16 * 1024 * 1024)
+
 #endif /* !IOM_BEGIN */

@@ -1,4 +1,4 @@
-/*	$NetBSD: nubus.c,v 1.53 2002/04/13 17:49:41 briggs Exp $	*/
+/*	$NetBSD: nubus.c,v 1.57 2003/07/15 02:43:24 lukem Exp $	*/
 
 /*
  * Copyright (c) 1995, 1996 Allen Briggs.  All rights reserved.
@@ -28,6 +28,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: nubus.c,v 1.57 2003/07/15 02:43:24 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -74,9 +77,8 @@ static u_int16_t nubus_read_2 __P((bus_space_tag_t, bus_space_handle_t,
 static u_int32_t nubus_read_4 __P((bus_space_tag_t, bus_space_handle_t,
 		    u_int8_t, u_long));
 
-struct cfattach nubus_ca = {
-	sizeof(struct nubus_softc), nubus_match, nubus_attach
-};
+CFATTACH_DECL(nubus, sizeof(struct nubus_softc),
+    nubus_match, nubus_attach, NULL, NULL);
 
 static int
 nubus_match(parent, cf, aux)
@@ -269,24 +271,26 @@ nubus_print(aux, pnp)
 	bus_space_handle_t bsh;
 
 	if (pnp) {
-		printf("%s slot %x", pnp, na->slot);
+		aprint_normal("%s slot %x", pnp, na->slot);
 		if (bus_space_map(bst,
 		    NUBUS_SLOT2PA(na->slot), NBMEMSIZE, 0, &bsh) == 0) {
-			printf(": %s", nubus_get_card_name(bst, bsh, na->fmt));
-			printf(" (Vendor: %s,", nubus_get_vendor(bst, bsh,
+			aprint_normal(": %s",
+			    nubus_get_card_name(bst, bsh, na->fmt));
+			aprint_normal(" (Vendor: %s,",
+			    nubus_get_vendor(bst, bsh,
 			    na->fmt, NUBUS_RSRC_VEND_ID));
-			printf(" Part: %s)", nubus_get_vendor(bst, bsh,
+			aprint_normal(" Part: %s)", nubus_get_vendor(bst, bsh,
 			    na->fmt, NUBUS_RSRC_VEND_PART));
 			bus_space_unmap(bst, bsh, NBMEMSIZE);
 		}
 #ifdef DIAGNOSTIC
 		else
-			printf(":");
-		printf(" Type: %04x %04x %04x %04x",
+			aprint_normal(":");
+		aprint_normal(" Type: %04x %04x %04x %04x",
 		    na->category, na->type, na->drsw, na->drhw);
 #endif
 	} else {
-		printf(" slot %x", na->slot);
+		aprint_normal(" slot %x", na->slot);
 	}
 	return (UNCONF);
 }

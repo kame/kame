@@ -1,4 +1,4 @@
-/*	$NetBSD: drbbc.c,v 1.8 2002/01/28 09:56:53 aymeric Exp $ */
+/*	$NetBSD: drbbc.c,v 1.11 2003/04/01 21:26:31 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -37,12 +37,15 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: drbbc.c,v 1.8 2002/01/28 09:56:53 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: drbbc.c,v 1.11 2003/04/01 21:26:31 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/systm.h>
+
+#include <uvm/uvm_extern.h>
+
 #if 0
 #include <machine/psl.h>
 #endif
@@ -72,11 +75,8 @@ struct drbbc_softc {
 	struct ds_handle sc_dsh;
 };
 
-struct cfattach drbbc_ca = {
-	sizeof(struct drbbc_softc),
-	drbbc_match,
-	drbbc_attach
-};
+CFATTACH_DECL(drbbc, sizeof(struct drbbc_softc),
+    drbbc_match, drbbc_attach, NULL, NULL);
 
 struct drbbc_softc *drbbc_sc;
 
@@ -105,7 +105,7 @@ drbbc_attach(struct device *pdp, struct device *dp, void *auxp)
 	sc->sc_dsh.ds_read_bit = draco_ds_read_bit;
 	sc->sc_dsh.ds_write_bit = draco_ds_write_bit;
 	sc->sc_dsh.ds_reset = draco_ds_reset;
-	sc->sc_dsh.ds_hw_handle = (void *)(DRCCADDR + DRIOCTLPG*NBPG);
+	sc->sc_dsh.ds_hw_handle = (void *)(DRCCADDR + DRIOCTLPG*PAGE_SIZE);
 
 	sc->sc_dsh.ds_reset(sc->sc_dsh.ds_hw_handle);
 

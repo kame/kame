@@ -1,4 +1,4 @@
-/* $NetBSD: isp_sbus.c,v 1.53 2002/05/18 00:48:11 mjacob Exp $ */
+/* $NetBSD: isp_sbus.c,v 1.62 2004/03/17 17:04:58 pk Exp $ */
 /*
  * This driver, which is contained in NetBSD in the files:
  *
@@ -21,7 +21,7 @@
  *	sys/pci/isp_pci.c
  *	sys/sbus/isp_sbus.c
  *
- * Is being actively maintained by Matthew Jacob (mjacob@netbsd.org).
+ * Is being actively maintained by Matthew Jacob (mjacob@NetBSD.org).
  * This driver also is shared source with FreeBSD, OpenBSD, Linux, Solaris,
  * Linux versions. This tends to be an interesting maintenance problem.
  *
@@ -59,7 +59,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: isp_sbus.c,v 1.53 2002/05/18 00:48:11 mjacob Exp $");
+__KERNEL_RCSID(0, "$NetBSD: isp_sbus.c,v 1.62 2004/03/17 17:04:58 pk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -118,9 +118,8 @@ struct isp_sbussoftc {
 
 static int isp_match(struct device *, struct cfdata *, void *);
 static void isp_sbus_attach(struct device *, struct device *, void *);
-struct cfattach isp_sbus_ca = {
-	sizeof (struct isp_sbussoftc), isp_match, isp_sbus_attach
-};
+CFATTACH_DECL(isp_sbus, sizeof (struct isp_sbussoftc),
+    isp_match, isp_sbus_attach, NULL, NULL);
 
 static int
 isp_match(struct device *parent, struct cfdata *cf, void *aux)
@@ -131,7 +130,7 @@ isp_match(struct device *parent, struct cfdata *cf, void *aux)
 #endif
 	struct sbus_attach_args *sa = aux;
 
-	rv = (strcmp(cf->cf_driver->cd_name, sa->sa_name) == 0 ||
+	rv = (strcmp(cf->cf_name, sa->sa_name) == 0 ||
 		strcmp("PTI,ptisp", sa->sa_name) == 0 ||
 		strcmp("ptisp", sa->sa_name) == 0 ||
 		strcmp("SUNW,isp", sa->sa_name) == 0 ||
@@ -176,7 +175,7 @@ isp_sbus_attach(struct device *parent, struct device *self, void *aux)
 	}
 	sbc->sbus_node = sa->sa_node;
 
-	freq = PROM_getpropint(sa->sa_node, "clock-frequency", 0);
+	freq = prom_getpropint(sa->sa_node, "clock-frequency", 0);
 	if (freq) {
 		/*
 		 * Convert from HZ to MHz, rounding up.
@@ -197,7 +196,7 @@ isp_sbus_attach(struct device *parent, struct device *self, void *aux)
 	sbusburst = ((struct sbus_softc *)parent)->sc_burst;
 	if (sbusburst == 0)
 		sbusburst = SBUS_BURST_32 - 1;
-	ispburst = PROM_getpropint(sa->sa_node, "burst-sizes", -1);
+	ispburst = prom_getpropint(sa->sa_node, "burst-sizes", -1);
 	if (ispburst == -1) {
 		ispburst = sbusburst;
 	}
@@ -241,7 +240,7 @@ isp_sbus_attach(struct device *parent, struct device *self, void *aux)
 	sbc->sbus_poff[DMA_BLOCK >> _BLK_REG_SHFT] = DMA_REGS_OFF;
 
 	/* Establish interrupt channel */
-	bus_intr_establish(sbc->sbus_bustag, sbc->sbus_pri, IPL_BIO, 0,
+	bus_intr_establish(sbc->sbus_bustag, sbc->sbus_pri, IPL_BIO,
 	    isp_sbus_intr, sbc);
 	sbus_establish(&sbc->sbus_sd, &sbc->sbus_isp.isp_osinfo._dev);
 
@@ -533,7 +532,7 @@ isp_sbus_dmasetup(struct ispsoftc *isp, XS_T *xs, ispreq_t *rq,
 
 	dmap = sbc->sbus_dmamap[isp_handle_index(rq->req_handle)];
 	if (dmap->dm_nsegs != 0) {
-		panic("%s: dma map already allocated\n", isp->isp_name);
+		panic("%s: DMA map already allocated", isp->isp_name);
 		/* NOTREACHED */
 	}
 	error = bus_dmamap_load(isp->isp_dmatag, dmap, xs->data, xs->datalen,
@@ -602,7 +601,7 @@ isp_sbus_dmateardown(struct ispsoftc *isp, XS_T *xs, u_int16_t handle)
 	dmap = sbc->sbus_dmamap[isp_handle_index(handle)];
 
 	if (dmap->dm_nsegs == 0) {
-		panic("%s: dma map not already allocated\n", isp->isp_name);
+		panic("%s: DMA map not already allocated", isp->isp_name);
 		/* NOTREACHED */
 	}
 	bus_dmamap_sync(isp->isp_dmatag, dmap, 0,

@@ -1,4 +1,4 @@
-/*	$NetBSD: kb.c,v 1.2 2002/03/17 19:40:45 atatat Exp $	*/
+/*	$NetBSD: kb.c,v 1.5 2003/07/15 02:59:26 lukem Exp $	*/
 
 /*
  * Copyright (c) 2001 Izumi Tsutsui.
@@ -27,6 +27,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kb.c,v 1.5 2003/07/15 02:59:26 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -104,7 +107,6 @@ kb_cnattach(conssc_p)
 	return 0;
 }
 
-	
 void
 kb_cngetc(v, type, data)
 	void *v;
@@ -112,7 +114,7 @@ kb_cngetc(v, type, data)
 	int *data;
 {
 	struct console_softc *conssc = v;
-	int nkey;
+	u_int nkey;
 
 	/* set to polling mode */
 	conssc->cs_polling = 1;

@@ -1,4 +1,4 @@
-/* $NetBSD: if_prom.c,v 1.16 2001/07/22 15:17:31 wiz Exp $ */
+/* $NetBSD: if_prom.c,v 1.19 2003/03/13 14:15:58 drochner Exp $ */
 
 /*
  * Copyright (c) 1997 Christopher G. Demetriou.  All rights reserved.
@@ -47,21 +47,15 @@
 #include "stand/common/common.h"
 #include "stand/common/bbinfo.h"
 
-int prom_probe();
-int prom_match();
-void prom_init();
-int prom_get();
-int prom_put();
-void prom_end();
-
 extern struct netif_stats	prom_stats[];
 
 struct netif_dif prom_ifs[] = {
 /*	dif_unit	dif_nsel	dif_stats	dif_private	*/
 {	0,		1,		&prom_stats[0],	0,		},
 };
+#define NPROM_IFS (sizeof(prom_ifs) / sizeof(prom_ifs[0]))
 
-struct netif_stats prom_stats[NENTS(prom_ifs)];
+struct netif_stats prom_stats[NPROM_IFS];
 
 struct netbbinfo netbbinfo = {
 	0xfeedbabedeadbeef,			/* magic number */
@@ -73,43 +67,24 @@ struct netbbinfo netbbinfo = {
 	0xfeedbeefdeadbabe,			/* magic number */
 };
 
-struct netif_driver prom_netif_driver = {
-	"prom",			/* netif_bname */
-	prom_match,		/* netif_match */
-	prom_probe,		/* netif_probe */
-	prom_init,		/* netif_init */
-	prom_get,		/* netif_get */
-	prom_put,		/* netif_put */
-	prom_end,		/* netif_end */
-	prom_ifs,		/* netif_ifs */
-	NENTS(prom_ifs)		/* netif_nifs */
-};
-
 int broken_firmware;
 
-int
-prom_match(nif, machdep_hint)
-	struct netif *nif;
-	void *machdep_hint;
+static int
+prom_match(struct netif *nif, void *machdep_hint)
 {
 
 	return (1);
 }
 
-int
-prom_probe(nif, machdep_hint)
-	struct netif *nif;
-	void *machdep_hint;
+static int
+prom_probe(struct netif *nif, void *machdep_hint)
 {
 
 	return 0;
 }
 
-int
-prom_put(desc, pkt, len)
-	struct iodesc *desc;
-	void *pkt;
-	int len;
+static int
+prom_put(struct iodesc *desc, void *pkt, size_t len)
 {
 
 	prom_write(booted_dev_fd, len, pkt, 0);
@@ -117,13 +92,8 @@ prom_put(desc, pkt, len)
 	return len;
 }
 
-
-int
-prom_get(desc, pkt, len, timeout)
-	struct iodesc *desc;
-	void *pkt;
-	int len;
-	time_t timeout;
+static int
+prom_get(struct iodesc *desc, void *pkt, size_t len, time_t timeout)
 {
 	prom_return_t ret;
 	time_t t;
@@ -149,12 +119,8 @@ prom_get(desc, pkt, len, timeout)
 	return cc;
 }
 
-extern char *strchr();
-
-void
-prom_init(desc, machdep_hint)
-	struct iodesc *desc;
-	void *machdep_hint;
+static void
+prom_init(struct iodesc *desc, void *machdep_hint)
 {
 	int i, netbbinfovalid;
 	const char *enet_addr;
@@ -239,10 +205,21 @@ punt:
 	halt();
 }
 
-void
-prom_end(nif)
-	struct netif *nif;
+static void
+prom_end(struct netif *nif)
 {
 
 	/* nothing to do */
 }
+
+struct netif_driver prom_netif_driver = {
+	"prom",			/* netif_bname */
+	prom_match,		/* netif_match */
+	prom_probe,		/* netif_probe */
+	prom_init,		/* netif_init */
+	prom_get,		/* netif_get */
+	prom_put,		/* netif_put */
+	prom_end,		/* netif_end */
+	prom_ifs,		/* netif_ifs */
+	NPROM_IFS		/* netif_nifs */
+};

@@ -1,4 +1,4 @@
-# $NetBSD: RAWHIDE,v 1.15.4.1 2002/08/01 04:16:22 lukem Exp $
+# $NetBSD: RAWHIDE,v 1.18.4.1 2004/07/15 20:17:31 he Exp $
 #
 # Alpha 4100 stripped for action server kernel.
 #
@@ -9,7 +9,8 @@ options 	DEC_KN300	# KN300:	AlphaServer 4100 and 1200
 options 	KTRACE		# System call tracing support
 options 	DEBUG		# Expensive debugging checks/support
 options 	KMEMSTATS	# Collect kmem usage statistics
-#options 	USERCONF	# userconf(4) support
+options 	USERCONF	# userconf(4) support
+#options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
 options 	DIAGNOSTIC	# Cheap kernel consistency checks
 options 	DDB		# Kernel Dynamic Debugger
 
@@ -41,7 +42,6 @@ options 	EISAVERBOSE
 options 	PCIVERBOSE
 #options 	PCI_CONFIG_DUMP		# verbosely dump PCI config space
 options 	SCSIVERBOSE
-options 	UCONSOLE
 
 config		netbsd	root on ? type ?
 

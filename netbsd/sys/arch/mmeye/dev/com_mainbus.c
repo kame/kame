@@ -1,4 +1,4 @@
-/*	$NetBSD: com_mainbus.c,v 1.1 2002/03/24 18:08:45 uch Exp $	*/
+/*	$NetBSD: com_mainbus.c,v 1.5 2003/07/15 02:43:44 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -32,6 +32,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: com_mainbus.c,v 1.5 2003/07/15 02:43:44 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -68,9 +71,8 @@ void com_mainbus_attach(struct device *, struct device *, void *);
 void comcnprobe(struct consdev *);
 void comcninit(struct consdev *);
 
-struct cfattach com_mainbus_ca = {
-	sizeof(struct com_mainbus_softc), com_mainbus_match, com_mainbus_attach
-};
+CFATTACH_DECL(com_mainbus, sizeof(struct com_mainbus_softc),
+    com_mainbus_match, com_mainbus_attach, NULL, NULL);
 
 int
 com_mainbus_match(struct device *parent, struct cfdata *match, void *aux)
@@ -123,5 +125,6 @@ comcninit(cp)
 	struct consdev *cp;
 {
 
-	comcnattach(0, CONADDR, COMCN_SPEED, COM_FREQ, CONMODE);
+	comcnattach(0, CONADDR, COMCN_SPEED, COM_FREQ, COM_TYPE_NORMAL,
+	    CONMODE);
 }

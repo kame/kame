@@ -1,4 +1,4 @@
-#	$NetBSD: genlintstub.awk,v 1.4 2001/05/16 04:17:04 perry Exp $
+#	$NetBSD: genlintstub.awk,v 1.7 2003/05/20 20:25:31 kristerw Exp $
 #
 # Copyright 2001 Wasabi Systems, Inc.
 # All rights reserved.
@@ -39,6 +39,10 @@
 # general, a .S file should have a special comment for anything with
 # something like an ENTRY designation. The special formats are:
 #
+# /* LINTSTUB: Empty */
+# This is used as an indicator that the file contains no stubs at
+# all. It generates a /* LINTED */ comment to quiet lint.
+#
 # /* LINTSTUB: Func: type function(args) */
 # type must be void, int or long. A return is faked up for ints and longs.
 #
@@ -64,13 +68,17 @@ BEGIN	{
 		printf "/* DO NOT EDIT! DO NOT EDIT! DO NOT EDIT! */\n";
 		printf "/* DO NOT EDIT! DO NOT EDIT! DO NOT EDIT! */\n";
 		printf "/* This file was automatically generated. */\n";
-		printf "/* see genasmstub.awk for details.        */\n";
+		printf "/* see genlintstub.awk for details.       */\n";
 		printf "/* This file was automatically generated. */\n";
 		printf "/* DO NOT EDIT! DO NOT EDIT! DO NOT EDIT! */\n";
 		printf "/* DO NOT EDIT! DO NOT EDIT! DO NOT EDIT! */\n";
 		printf "\n\n";
 	}
 
+/^\/\* LINTSTUB: Empty.*\*\/[ \t]*$/ { 
+		printf "/* LINTED (empty translation unit) */\n";
+		next;
+	}
 
 /^\/\* LINTSTUB: Func:.*\)[ \t]*[;]?[ \t]+\*\/[ \t]*$/ { 
 		if (($4 == "int") || ($4 == "long"))

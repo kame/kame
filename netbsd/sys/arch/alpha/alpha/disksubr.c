@@ -1,4 +1,4 @@
-/* $NetBSD: disksubr.c,v 1.25 2002/03/05 09:40:39 simonb Exp $ */
+/* $NetBSD: disksubr.c,v 1.27 2003/05/10 23:12:29 thorpej Exp $ */
 
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -29,7 +29,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: disksubr.c,v 1.25 2002/03/05 09:40:39 simonb Exp $");
+__KERNEL_RCSID(0, "$NetBSD: disksubr.c,v 1.27 2003/05/10 23:12:29 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -52,7 +52,7 @@ extern struct device *bootdv;
  * (e.g., sector size) must be filled in before calling us.
  * Returns null on success and an error string on failure.
  */
-char *
+const char *
 readdisklabel(dev, strat, lp, clp)
 	dev_t dev;
 	void (*strat) __P((struct buf *));
@@ -262,11 +262,12 @@ done:
  * if needed, and signal errors or early completion.
  */
 int
-bounds_check_with_label(bp, lp, wlabel)
+bounds_check_with_label(dk, bp, wlabel)
+	struct disk *dk;
 	struct buf *bp;
-	struct disklabel *lp;
 	int wlabel;
 {
+	struct disklabel *lp = dk->dk_label;
 	struct partition *p = lp->d_partitions + DISKPART(bp->b_dev);
 	int labelsect = lp->d_partitions[RAW_PART].p_offset;
 	int maxsz = p->p_size;

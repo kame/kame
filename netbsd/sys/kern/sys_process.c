@@ -1,8 +1,6 @@
-/*	$NetBSD: sys_process.c,v 1.74.4.1 2002/07/29 15:37:38 lukem Exp $	*/
+/*	$NetBSD: sys_process.c,v 1.86 2004/03/13 18:43:18 matt Exp $	*/
 
 /*-
- * Copyright (c) 1993 Jan-Simon Pendry.
- * Copyright (c) 1994 Christopher G. Demetriou.  All rights reserved.
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -10,6 +8,40 @@
  * to the University of California by American Telephone and Telegraph
  * Co. or Unix System Laboratories, Inc. and are reproduced herein with
  * the permission of UNIX System Laboratories, Inc.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Jan-Simon Pendry.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	from: @(#)sys_process.c	8.1 (Berkeley) 6/10/93
+ */
+
+/*-
+ * Copyright (c) 1993 Jan-Simon Pendry.
+ * Copyright (c) 1994 Christopher G. Demetriou.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * Jan-Simon Pendry.
@@ -57,7 +89,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sys_process.c,v 1.74.4.1 2002/07/29 15:37:38 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sys_process.c,v 1.86 2004/03/13 18:43:18 matt Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -66,8 +98,10 @@ __KERNEL_RCSID(0, "$NetBSD: sys_process.c,v 1.74.4.1 2002/07/29 15:37:38 lukem E
 #include <sys/ptrace.h>
 #include <sys/uio.h>
 #include <sys/user.h>
+#include <sys/ras.h>
 
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <uvm/uvm_extern.h>
@@ -83,8 +117,8 @@ __KERNEL_RCSID(0, "$NetBSD: sys_process.c,v 1.74.4.1 2002/07/29 15:37:38 lukem E
  * Process debugging system call.
  */
 int
-sys_ptrace(p, v, retval)
-	struct proc *p;
+sys_ptrace(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -94,11 +128,14 @@ sys_ptrace(p, v, retval)
 		syscallarg(caddr_t) addr;
 		syscallarg(int) data;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
+	struct lwp *lt, *lr;
 	struct proc *t;				/* target process */
 	struct uio uio;
 	struct iovec iov;
 	struct ptrace_io_desc piod;
-	int s, error, write, tmp;
+	struct ptrace_lwpinfo pl;
+	int s, error, write, tmp, size;
 
 	/* "A foolish consistency..." XXX */
 	if (SCARG(uap, req) == PT_TRACE_ME)
@@ -121,6 +158,7 @@ sys_ptrace(p, v, retval)
 		break;
 
 	case  PT_ATTACH:
+	case  PT_DUMPCORE:
 		/*
 		 * You can't attach to a process if:
 		 *	(1) it's the process that's doing the attaching,
@@ -174,6 +212,7 @@ sys_ptrace(p, v, retval)
 	case  PT_IO:
 	case  PT_KILL:
 	case  PT_DETACH:
+	case  PT_LWPINFO:
 #ifdef PT_STEP
 	case  PT_STEP:
 #endif
@@ -228,6 +267,17 @@ sys_ptrace(p, v, retval)
 	/* Do single-step fixup if needed. */
 	FIX_SSTEP(t);
 
+	/*
+	 * XXX NJWLWP
+	 *
+	 * The entire ptrace interface needs work to be useful to a
+	 * process with multiple LWPs. For the moment, we'll kluge
+	 * this; memory access will be fine, but register access will
+	 * be weird.
+	 */
+
+	lt = proc_representative_lwp(t);
+
 	/* Now do the operation. */
 	write = 0;
 	*retval = 0;
@@ -242,6 +292,15 @@ sys_ptrace(p, v, retval)
 
 	case  PT_WRITE_I:		/* XXX no separate I and D spaces */
 	case  PT_WRITE_D:
+#if defined(__HAVE_RAS)
+		/*
+		 * Can't write to a RAS
+		 */
+		if (!LIST_EMPTY(&t->p_raslist) &&
+		    (ras_lookup(t, SCARG(uap, addr)) != (caddr_t)-1)) {
+			return (EACCES);
+		}
+#endif
 		write = 1;
 		tmp = SCARG(uap, data);
 	case  PT_READ_I:		/* XXX no separate I and D spaces */
@@ -290,6 +349,9 @@ sys_ptrace(p, v, retval)
 		(void) copyout(&piod, SCARG(uap, addr), sizeof(piod));
 		return (error);
 
+	case  PT_DUMPCORE:
+		return coredump(lt);
+
 #ifdef PT_STEP
 	case  PT_STEP:
 		/*
@@ -317,23 +379,23 @@ sys_ptrace(p, v, retval)
 		if (SCARG(uap, data) < 0 || SCARG(uap, data) >= NSIG)
 			return (EINVAL);
 
-		PHOLD(t);
+		PHOLD(lt);
+
+		/* If the address parameter is not (int *)1, set the pc. */
+		if ((int *)SCARG(uap, addr) != (int *)1)
+			if ((error = process_set_pc(lt, SCARG(uap, addr))) != 0)
+				goto relebad;
 
 #ifdef PT_STEP
 		/*
 		 * Arrange for a single-step, if that's requested and possible.
 		 */
-		error = process_sstep(t, SCARG(uap, req) == PT_STEP);
+		error = process_sstep(lt, SCARG(uap, req) == PT_STEP);
 		if (error)
 			goto relebad;
 #endif
 
-		/* If the address parameter is not (int *)1, set the pc. */
-		if ((int *)SCARG(uap, addr) != (int *)1)
-			if ((error = process_set_pc(t, SCARG(uap, addr))) != 0)
-				goto relebad;
-
-		PRELE(t);
+		PRELE(lt);
 
 		if (SCARG(uap, req) == PT_DETACH) {
 			/* give process back to original parent or init */
@@ -352,7 +414,15 @@ sys_ptrace(p, v, retval)
 		if (t->p_stat == SSTOP) {
 			t->p_xstat = SCARG(uap, data);
 			SCHED_LOCK(s);
-			setrunnable(t);
+			lr = proc_unstop(t);
+			/*
+			 * If the target needs to take a signal, there
+			 * is no running LWP that will see it, and
+			 * there is a LWP sleeping interruptably, then
+			 * get it moving.
+			 */
+			if (lr && (t->p_xstat != 0))
+			    setrunnable(lr);
 			SCHED_UNLOCK(s);
 		} else {
 			if (SCARG(uap, data) != 0)
@@ -361,7 +431,7 @@ sys_ptrace(p, v, retval)
 		return (0);
 
 	relebad:
-		PRELE(t);
+		PRELE(lt);
 		return (error);
 
 	case  PT_KILL:
@@ -387,6 +457,36 @@ sys_ptrace(p, v, retval)
 		SCARG(uap, data) = SIGSTOP;
 		goto sendsig;
 
+	case PT_LWPINFO:
+		size = SCARG(uap, data);
+		if (size < sizeof(lwpid_t))
+			return (EINVAL);
+		error = copyin(SCARG(uap, addr), &pl, sizeof(lwpid_t));
+		if (error)
+			return (error);
+		tmp = pl.pl_lwpid;
+		if (tmp == 0)
+			lt = LIST_FIRST(&t->p_lwps);
+		else {
+			LIST_FOREACH(lt, &t->p_lwps, l_sibling)
+			    if (lt->l_lid == tmp)
+				    break;
+			if (lt == NULL)
+				return (ESRCH);
+			lt = LIST_NEXT(lt, l_sibling);
+		}
+		pl.pl_lwpid = 0;
+		pl.pl_event = 0;
+		if (lt) {
+			pl.pl_lwpid = lt->l_lid;
+			if (lt->l_lid == t->p_sigctx.ps_lwp)
+				pl.pl_event = PL_EVENT_SIGNAL;
+		}
+
+		error = copyout(&pl, SCARG(uap, addr), SCARG(uap, data));
+
+		return (0);
+
 #ifdef PT_SETREGS
 	case  PT_SETREGS:
 		write = 1;
@@ -396,6 +496,14 @@ sys_ptrace(p, v, retval)
 		/* write = 0 done above. */
 #endif
 #if defined(PT_SETREGS) || defined(PT_GETREGS)
+		tmp = SCARG(uap, data);
+		if (tmp != 0 && t->p_nlwps > 1) {
+			LIST_FOREACH(lt, &t->p_lwps, l_sibling)
+			    if (lt->l_lid == tmp)
+				    break;
+			if (lt == NULL)
+				return (ESRCH);
+		}
 		if (!process_validregs(t))
 			return (EINVAL);
 		else {
@@ -408,7 +516,7 @@ sys_ptrace(p, v, retval)
 			uio.uio_segflg = UIO_USERSPACE;
 			uio.uio_rw = write ? UIO_WRITE : UIO_READ;
 			uio.uio_procp = p;
-			return (process_doregs(p, t, &uio));
+			return (process_doregs(p, lt, &uio));
 		}
 #endif
 
@@ -421,6 +529,14 @@ sys_ptrace(p, v, retval)
 		/* write = 0 done above. */
 #endif
 #if defined(PT_SETFPREGS) || defined(PT_GETFPREGS)
+		tmp = SCARG(uap, data);
+		if (tmp != 0 && t->p_nlwps > 1) {
+			LIST_FOREACH(lt, &t->p_lwps, l_sibling)
+			    if (lt->l_lid == tmp)
+				    break;
+			if (lt == NULL)
+				return (ESRCH);
+		}
 		if (!process_validfpregs(t))
 			return (EINVAL);
 		else {
@@ -433,13 +549,13 @@ sys_ptrace(p, v, retval)
 			uio.uio_segflg = UIO_USERSPACE;
 			uio.uio_rw = write ? UIO_WRITE : UIO_READ;
 			uio.uio_procp = p;
-			return (process_dofpregs(p, t, &uio));
+			return (process_dofpregs(p, lt, &uio));
 		}
 #endif
 
 #ifdef __HAVE_PTRACE_MACHDEP
 	PTRACE_MACHDEP_REQUEST_CASES
-		return (ptrace_machdep_dorequest(p, t,
+		return (ptrace_machdep_dorequest(p, lt,
 		    SCARG(uap, req), SCARG(uap, addr),
 		    SCARG(uap, data)));
 #endif
@@ -452,9 +568,9 @@ sys_ptrace(p, v, retval)
 }
 
 int
-process_doregs(curp, p, uio)
+process_doregs(curp, l, uio)
 	struct proc *curp;		/* tracer */
-	struct proc *p;			/* traced */
+	struct lwp *l;			/* traced */
 	struct uio *uio;
 {
 #if defined(PT_GETREGS) || defined(PT_SETREGS)
@@ -463,7 +579,7 @@ process_doregs(curp, p, uio)
 	char *kv;
 	int kl;
 
-	if ((error = process_checkioperm(curp, p)) != 0)
+	if ((error = process_checkioperm(curp, l->l_proc)) != 0)
 		return error;
 
 	kl = sizeof(r);
@@ -471,25 +587,24 @@ process_doregs(curp, p, uio)
 
 	kv += uio->uio_offset;
 	kl -= uio->uio_offset;
-	if (kl > uio->uio_resid)
+	if (kl < 0)
+		return (EINVAL);
+	if ((size_t) kl > uio->uio_resid)
 		kl = uio->uio_resid;
 
-	PHOLD(p);
+	PHOLD(l);
 
-	if (kl < 0)
-		error = EINVAL;
-	else
-		error = process_read_regs(p, &r);
+	error = process_read_regs(l, &r);
 	if (error == 0)
 		error = uiomove(kv, kl, uio);
 	if (error == 0 && uio->uio_rw == UIO_WRITE) {
-		if (p->p_stat != SSTOP)
+		if (l->l_stat != LSSTOP)
 			error = EBUSY;
 		else
-			error = process_write_regs(p, &r);
+			error = process_write_regs(l, &r);
 	}
 
-	PRELE(p);
+	PRELE(l);
 
 	uio->uio_offset = 0;
 	return (error);
@@ -511,9 +626,9 @@ process_validregs(p)
 }
 
 int
-process_dofpregs(curp, p, uio)
+process_dofpregs(curp, l, uio)
 	struct proc *curp;		/* tracer */
-	struct proc *p;			/* traced */
+	struct lwp *l;			/* traced */
 	struct uio *uio;
 {
 #if defined(PT_GETFPREGS) || defined(PT_SETFPREGS)
@@ -522,7 +637,7 @@ process_dofpregs(curp, p, uio)
 	char *kv;
 	int kl;
 
-	if ((error = process_checkioperm(curp, p)) != 0)
+	if ((error = process_checkioperm(curp, l->l_proc)) != 0)
 		return (error);
 
 	kl = sizeof(r);
@@ -530,25 +645,24 @@ process_dofpregs(curp, p, uio)
 
 	kv += uio->uio_offset;
 	kl -= uio->uio_offset;
-	if (kl > uio->uio_resid)
+	if (kl < 0)
+		return (EINVAL);
+	if ((size_t) kl > uio->uio_resid)
 		kl = uio->uio_resid;
 
-	PHOLD(p);
+	PHOLD(l);
 
-	if (kl < 0)
-		error = EINVAL;
-	else
-		error = process_read_fpregs(p, &r);
+	error = process_read_fpregs(l, &r);
 	if (error == 0)
 		error = uiomove(kv, kl, uio);
 	if (error == 0 && uio->uio_rw == UIO_WRITE) {
-		if (p->p_stat != SSTOP)
+		if (l->l_stat != LSSTOP)
 			error = EBUSY;
 		else
-			error = process_write_fpregs(p, &r);
+			error = process_write_fpregs(l, &r);
 	}
 
-	PRELE(p);
+	PRELE(l);
 
 	uio->uio_offset = 0;
 	return (error);
@@ -602,7 +716,7 @@ process_domem(curp, p, uio)
 	uvmspace_free(p->p_vmspace);
 
 #ifdef PMAP_NEED_PROCWR
-	if (uio->uio_rw == UIO_WRITE)
+	if (error == 0 && uio->uio_rw == UIO_WRITE)
 		pmap_procwr(p, addr, len);
 #endif
 	return (error);

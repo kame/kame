@@ -1,4 +1,4 @@
-/* $NetBSD: osf1_exec.c,v 1.29 2002/03/31 22:22:48 christos Exp $ */
+/* $NetBSD: osf1_exec.c,v 1.36 2003/12/20 19:01:30 fvdl Exp $ */
 
 /*
  * Copyright (c) 1999 Christopher G. Demetriou.  All rights reserved.
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: osf1_exec.c,v 1.29 2002/03/31 22:22:48 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: osf1_exec.c,v 1.36 2003/12/20 19:01:30 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -52,6 +52,8 @@ void osf1_syscall_intern __P((struct proc *));
 void syscall __P((void));
 #endif
 
+struct uvm_object *emul_osf1_object;
+
 const struct emul emul_osf1 = {
 	"osf1",
 	"/emul/osf1",
@@ -59,15 +61,19 @@ const struct emul emul_osf1 = {
 	0,
 	(int *)native_to_osf1_errno,
 	OSF1_SYS_syscall,
-	OSF1_SYS_MAXSYSCALL,
+	OSF1_SYS_NSYSENT,
 #endif
 	osf1_sysent,
 	osf1_syscallnames,
 	sendsig,
 	trapsignal,
+	NULL,
 	osf1_sigcode,
 	osf1_esigcode,
+	&emul_osf1_object,
 	setregs,
+	NULL,
+	NULL,
 	NULL,
 	NULL,
 	NULL,
@@ -76,4 +82,6 @@ const struct emul emul_osf1 = {
 #else
 	syscall,
 #endif
+	NULL,
+	NULL,
 };

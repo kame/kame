@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.s,v 1.64 2001/05/30 15:24:36 lukem Exp $	*/
+/*	$NetBSD: locore.s,v 1.76 2004/03/26 21:39:57 drochner Exp $	*/
 
 /*
  * Copyright (c) 1993 Philip A. Nelson.
@@ -42,6 +42,9 @@
 
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
+#include "opt_cpu30mhz.h"
+#include "opt_ns381.h"
+#include "opt_compat_netbsd.h"
 
 #include "assym.h"
 
@@ -49,6 +52,7 @@
 #include <sys/syscall.h>
 
 #include <machine/asm.h>
+#include <machine/intr.h>
 #include <machine/psl.h>
 #include <machine/pte.h>
 #include <machine/trap.h>
@@ -102,7 +106,7 @@ ASENTRY(start)
 
 ENTRY_NOPROFILE(proc_trampoline)
 #if !defined(MRTD)
-	movd	r4,0(sp)	/* There was curproc on the stack */
+	movd	r4,0(sp)	/* There was curlwp on the stack */
 	jsr	0(r3)
 	cmpqd	0,tos
 	br	rei
@@ -145,20 +149,23 @@ KENTRY(delay, 4)		/* bsr  2 cycles;  80 ns */
 /*
  * Signal trampoline; copied to top of user stack.
  */
-
+#ifdef COMPAT_16
 ENTRY_NOPROFILE(sigcode)
-	jsr	0(SIGF_HANDLER(sp))
-	addr	SIGF_SC(sp),tos		/* scp (the call may have clobbered */
-					/* the copy at SIGF_SCP(sp)). */
-	movqd	0,tos			/* Push a fake return address. */
-	movd	SYS___sigreturn14,r0
+	/*
+	 * Handler has returned here as if we called it.  The sigcontext
+	 * is on the stack after the 3 args "we" pushed.
+	 */
+	addr	12(sp),4(sp)		/* get pointer to sigcontext
+					   and put it in the argument slot */
+	movd	SYS_compat_16___sigreturn14,r0
 	svc
-	movd	0,0			/* Illegal instruction. */
+	.long	0x0000a517		/* movd	0,0 -- illegal instruction. */
 GLOBAL(esigcode)
 
 #if defined(PROF) || defined(GPROF) || defined(KGDB) || defined(DDB)
 	/* Just a gap between esigcode and the next label */
 	.long	0
+#endif
 #endif
 
 /****************************************************************************/
@@ -371,13 +378,13 @@ KENTRY(copystr, 16)
 
 	/*
 	 * Terminated due to limit count.
-	 * Return ENAMETOOLONG. 
+	 * Return ENAMETOOLONG.
 	 */
 0:	movd	ENAMETOOLONG,r0
 	br	2f
 
 1:	/*
-	 * Terminated due to match. Adjust 
+	 * Terminated due to match. Adjust
 	 * count and transfer final element.
 	 */
 	addqd	-1,r1
@@ -500,7 +507,7 @@ KENTRY(fuword, 4)
 	movd	S_ARG0,r0
 	/*
 	 * MACH's locore.s code says that
-	 * due to cpu bugs the destination
+	 * due to CPU bugs the destination
 	 * of movusi can't be a register or tos.
 	 */
 	movusd	0(r0),S_ARG0
@@ -660,28 +667,28 @@ KENTRY(longjmp, 4)
  */
 
 /*
- * setrunqueue(struct proc *p);
+ * setrunqueue(struct lwp *p);
  * Insert a process on the appropriate queue.  Should be called at splclock().
  */
 KENTRY(setrunqueue, 4)
 	movd	S_ARG0,r0
 #ifdef DIAGNOSTIC
-	cmpqd	0,P_BACK(r0)		/* should not be on q already */
+	cmpqd	0,L_BACK(r0)		/* should not be on q already */
 	bne	1f
-	cmpqd	0,P_WCHAN(r0)
+	cmpqd	0,L_WCHAN(r0)
 	bne	1f
-	cmpb	SRUN,P_STAT(r0)
+	cmpb	LSRUN,L_STAT(r0)
 	bne	1f
 #endif
-	movzbd	P_PRIORITY(r0),r1
+	movzbd	L_PRIORITY(r0),r1
 	lshd	-2,r1
 	sbitd	r1,_C_LABEL(sched_whichqs)(pc) /* set queue full bit */
 	addr	_C_LABEL(sched_qs)(pc)[r1:q],r1 /* locate q hdr */
-	movd	P_BACK(r1),r2		/* locate q tail */
-	movd	r1,P_FORW(r0)		/* set p->p_forw */
-	movd	r0,P_BACK(r1)		/* update q's p_back */
-	movd	r0,P_FORW(r2)		/* update tail's p_forw */
-	movd    r2,P_BACK(r0)		/* set p->p_back */
+	movd	L_BACK(r1),r2		/* locate q tail */
+	movd	r1,L_FORW(r0)		/* set l->l_forw */
+	movd	r0,L_BACK(r1)		/* update q's l_back */
+	movd	r0,L_FORW(r2)		/* update tail's l_forw */
+	movd    r2,L_BACK(r0)		/* set l->l_back */
 	ret	ARGS
 #ifdef DIAGNOSTIC
 1:	PANIC("setrunqueue")		/* Was on the list! */
@@ -693,17 +700,17 @@ KENTRY(setrunqueue, 4)
  */
 KENTRY(remrunqueue, 4)
 	movd	S_ARG0,r1
-	movzbd	P_PRIORITY(r1),r0
+	movzbd	L_PRIORITY(r1),r0
 #ifdef DIAGNOSTIC
 	lshd	-2,r0
 	tbitd	r0,_C_LABEL(sched_whichqs)(pc)
 	bfc	1f
 #endif
-	movd	P_BACK(r1),r2		/* Address of prev. item */
-	movqd	0,P_BACK(r1)		/* Clear reverse link */
-	movd	P_FORW(r1),r1		/* Addr of next item. */
-	movd	r1,P_FORW(r2)		/* Unlink item. */
-	movd	r2,P_BACK(r1)
+	movd	L_BACK(r1),r2		/* Address of prev. item */
+	movqd	0,L_BACK(r1)		/* Clear reverse link */
+	movd	L_FORW(r1),r1		/* Addr of next item. */
+	movd	r1,L_FORW(r2)		/* Unlink item. */
+	movd	r2,L_BACK(r1)
 	cmpd	r1,r2			/* r1 = r2 => empty queue */
 	bne	2f
 #ifndef DIAGNOSTIC
@@ -736,22 +743,22 @@ ENTRY_NOPROFILE(idle)
 	br	0b
 
 /*
- * void cpu_switch(struct proc *)
+ * int cpu_switch(struct lwp *)
  * Find a runnable process and switch to it.  Wait if necessary.
  */
 KENTRY(cpu_switch, 4)
 	enter	[r3,r4,r5,r6,r7],0
 
-	movd	_C_LABEL(curproc)(pc),r4
+	movd	_C_LABEL(curlwp)(pc),r4
 
 	/*
-	 * Clear curproc so that we don't accumulate system time while idle.
+	 * Clear curlwp so that we don't accumulate system time while idle.
 	 * This also insures that schedcpu() will move the old process to
 	 * the correct queue if it happens to get called from the spl0()
 	 * below and changes the priority.  (See corresponding comment in
 	 * userret()).
 	 */
-	movqd	0,_C_LABEL(curproc)(pc)
+	movqd	0,_C_LABEL(curlwp)(pc)
 
 	movd	_C_LABEL(imask)(pc),tos
 	bsr	_C_LABEL(splx)		/* spl0 - process pending interrupts */
@@ -785,44 +792,49 @@ KENTRY(cpu_switch, 4)
 sw1:	/* Get the process and unlink it from the queue. */
 	addr	_C_LABEL(sched_qs)(pc)[r0:q],r1 /* address of qs entry! */
 
-	movd	P_FORW(r1),r2		/* unlink from front of process q */
+	movd	L_FORW(r1),r2		/* unlink from front of process q */
 #ifdef	DIAGNOSTIC
 	cmpd	r2,r1			/* linked to self (i.e. nothing queued? */
 	beq	_C_LABEL(switch_error)	/* not possible */
 #endif
-	movd	P_FORW(r2),r3
-	movd	r3,P_FORW(r1)
-	movd	r1,P_BACK(r3)
+	movd	L_FORW(r2),r3
+	movd	r3,L_FORW(r1)
+	movd	r1,L_BACK(r3)
 
 	cmpd	r1,r3			/* q empty? */
 	bne	3f
 
 	cbitd	r0,_C_LABEL(sched_whichqs)(pc) /* queue is empty, turn off whichqs. */
 
-3:	movqd	0,_C_LABEL(want_resched)(pc) /* We did a resched! */
-
+3:
 #ifdef	DIAGNOSTIC
 	cmpqd	0,P_WCHAN(r2)		/* Waiting for something? */
 	bne	_C_LABEL(switch_error)	/* Yes; shouldn't be queued. */
-	cmpb	SRUN,P_STAT(r2)		/* In run state? */
+	cmpb	LSRUN,L_STAT(r2)	/* In run state? */
 	bne	_C_LABEL(switch_error)	/* No; shouldn't be queued. */
 #endif
 
 	/* Isolate process. XXX Is this necessary? */
-	movqd	0,P_BACK(r2)
+	movqd	0,L_BACK(r2)
+
+switch_resume:
+	movqd	0,_C_LABEL(want_resched)(pc) /* We did a resched! */
 
 	/* p->p_cpu initialized in fork1() for single-processor */
 
 	/* Record new process. */
-	movb	SONPROC,P_STAT(r2)	/* p->p_stat = SONPROC */
-	movd	r2,_C_LABEL(curproc)(pc)
+	movb	LSONPROC,L_STAT(r2)	/* l->l_stat = LSONPROC */
+	movd	r2,_C_LABEL(curlwp)(pc)
 
 	/* It's okay to take interrupts here. */
 	ints_on
 
 	/* Skip context switch if same process. */
+	movqd	0,r0			/* return "didn't switch" */
 	cmpd	r2,r4
 	beq	_ASM_LABEL(switch_return)
+
+	movqd	1,r0			/* return "did switch" */
 
 	/* If old process exited, don't bother. */
 	cmpqd	0,r4
@@ -836,7 +848,7 @@ sw1:	/* Get the process and unlink it from the queue. */
 	 *   r2 - new process
 	 */
 
-	movd	P_ADDR(r4),r4
+	movd	L_ADDR(r4),r4
 
 	/* save stack and frame pointer registers. */
 	sprd	sp,PCB_KSP(r4)
@@ -853,7 +865,7 @@ ASLOCAL(switch_exited)
 
 	/* No interrupts while loading new state. */
 	ints_off
-	movd	P_ADDR(r2),r1
+	movd	L_ADDR(r2),r1
 
 	/* Switch address space. */
 	lmr	ptb0,PCB_PTB(r1)
@@ -869,9 +881,9 @@ ASLOCAL(switch_exited)
 	/*
 	 * Disable the FPU.
 	 */
-	sprw	cfg,r0
-	andw	~CFG_F,r0
-	lprw	cfg,r0
+	sprw	cfg,r3
+	andw	~CFG_F,r3
+	lprw	cfg,r3
 
 	/* Interrupts are okay again. */
 	ints_on
@@ -892,6 +904,41 @@ switch_return:
 ENTRY(switch_error)
 	PANIC("cpu_switch")
 #endif
+
+/*
+ * void cpu_switchto(struct lwp *old, struct lwp *new)
+ * Switch to to the specified new LWP.
+ */
+KENTRY(cpu_switchto, 4)
+	enter	[r3,r4,r5,r6,r7],0
+
+	movd	8(fp),r4		/* old LWP */
+	movd	12(fp),r2		/* new LWP */
+
+	movd	_C_LABEL(imask)(pc),tos
+	bsr	_C_LABEL(splx)		/* spl0 - process pending interrupts */
+#if !defined(MRTD)
+# if defined(DDB) || defined(KGDB)
+	cmpqd	0,tos
+	movd	r0,tos
+# else
+	movd	r0,0(sp)
+# endif
+#else
+	movd	r0,tos
+#endif
+
+	/*
+	 * Ok, right now we have:
+	 *   r2 - new process
+	 *   r4 - old process
+	 * ...and the stack just the way cpu_switch() wants.  Disable
+	 * interrupts and then jump into the middle of cpu_switch().
+	 *
+	 * XXX This strategy might have problems with MRTD.
+	 */
+	ints_off
+	br	switch_resume
 
 /****************************************************************************/
 
@@ -1025,7 +1072,7 @@ TRAP(trap_dbg,	    T_DBG)	/* 14 debug trap */
 TRAP(trap_reserved, T_RESERVED)	/* 15 reserved */
 
 /*
- * The following handles all synchronous traps and non maskable interupts.
+ * The following handles all synchronous traps and non maskable interrupts.
  */
 ENTRY_NOPROFILE(handle_trap)
 	lprd    sb,0			/* Kernel code expects sb to be 0 */
@@ -1107,16 +1154,17 @@ ASENTRY_NOPROFILE(interrupt)
 	orw	r2,_C_LABEL(Cur_pl)(pc)
 	orw	r2,@ICU_ADR+IMSK
 	movb	@ICU_ADR+HVCT,r2	/* Acknowledge Interrupt */
-	/* 
-	 * Flush pending writes and then enable CPU interrupts. 
+	/*
+	 * Flush pending writes and then enable CPU interrupts.
 	 */
 	ints_off ; ints_on
-	/* 
+	/*
 	 * Increment interrupt counters.
 	 */
 	addqd	1,_C_LABEL(intrcnt)(pc)[r1:d]
 	addqd	1,_C_LABEL(uvmexp)+V_INTR(pc)
-	addqd	1,_C_LABEL(ivt)+IV_CNT(r0)
+	addqd	1,_C_LABEL(ivt)+(IV_EVCNT+EV_COUNT)(r0)
+	addcd	0,_C_LABEL(ivt)+(IV_EVCNT+EV_COUNT+4)(r0)
 
 	movd	_C_LABEL(ivt)+IV_ARG(r0),r1 /* Get argument */
 	cmpqd	0,r1
@@ -1188,7 +1236,7 @@ GLOBAL(inttab)
 /*
  * void *ram_size(void *start);
  * Determine RAM size.
- * 
+ *
  * First attempt: write-and-read-back (WRB) each page from start
  * until WRB fails or get a parity error.  This didn't work because
  * address decoding wraps around.
@@ -1210,7 +1258,7 @@ GLOBAL(inttab)
  * can be held by capacitance on the bus and can be correctly
  * read back if there is no intervening bus cycle.  Hence,
  * read and write two patterns.
- * 
+ *
  * Registers:
  *   r0 - current page, return value
  *   r1 - old config register
@@ -1281,46 +1329,10 @@ KENTRY(ram_size, 4)
 /****************************************************************************/
 
 /*
- * vmstat -i uses the following labels and interrupt even increments the
- * counters. This information is also availiable from ivt[n].iv_use
- * and ivt[n].iv_cnt in much better form.
+ * XXX: Some bogus symbols to keep vmstat -i happy, for now.
  */
-	.text
-GLOBAL(intrnames)
-	ASMSTR "int  0"
-	ASMSTR "int  1"
-	ASMSTR "int  2"
-	ASMSTR "int  3"
-	ASMSTR "int  4"
-	ASMSTR "int  5"
-	ASMSTR "int  6"
-	ASMSTR "int  7"
-	ASMSTR "int  8"
-	ASMSTR "int  9"
-	ASMSTR "int 10"
-	ASMSTR "int 11"
-	ASMSTR "int 12"
-	ASMSTR "int 13"
-	ASMSTR "int 14"
-	ASMSTR "int 15"
-GLOBAL(eintrnames)
-
 	.data
+GLOBAL(intrnames)
+GLOBAL(eintrnames)
 GLOBAL(intrcnt)
-	.long	0
-	.long	0
-	.long	0
-	.long	0
-	.long	0
-	.long	0
-	.long	0
-	.long	0
-	.long	0
-	.long	0
-	.long	0
-	.long	0
-	.long	0
-	.long	0
-	.long	0
-	.long	0
 GLOBAL(eintrcnt)

@@ -1,4 +1,4 @@
-/*	$NetBSD: cy.c,v 1.26 2002/03/17 19:40:57 atatat Exp $	*/
+/*	$NetBSD: cy.c,v 1.36 2003/10/31 14:22:48 reinoud Exp $	*/
 
 /*
  * cy.c
@@ -16,7 +16,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cy.c,v 1.26 2002/03/17 19:40:57 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cy.c,v 1.36 2003/10/31 14:22:48 reinoud Exp $");
 
 #include <sys/param.h>
 #include <sys/ioctl.h>
@@ -54,12 +54,24 @@ int	cy_speed(speed_t, int *, int *, int);
 
 extern struct cfdriver cy_cd;
 
+dev_type_open(cyopen);
+dev_type_close(cyclose);
+dev_type_read(cyread);
+dev_type_write(cywrite);
+dev_type_ioctl(cyioctl);
+dev_type_stop(cystop);
+dev_type_tty(cytty);
+dev_type_poll(cypoll);
+
+const struct cdevsw cy_cdevsw = {
+	cyopen, cyclose, cyread, cywrite, cyioctl,
+	cystop, cytty, cypoll, nommap, ttykqfilter, D_TTY
+};
+
 static int      cy_open = 0;
 static int      cy_events = 0;
 
 int	cy_attached_ttys;
-
-cdev_decl(cy);
 
 struct callout cy_poll_callout = CALLOUT_INITIALIZER;
 
@@ -182,7 +194,7 @@ cy_attach(struct cy_softc *sc)
 			chip -= (CY32_ADDR_FIX << sc->sc_bustype);
 
 #ifdef CY_DEBUG
-		printf("attach CD1400 #%d offset 0x%x\n", cy_chip, chip);
+		aprint_debug("attach CD1400 #%d offset 0x%x\n", cy_chip, chip);
 #endif
 		sc->sc_cd1400_offs[cy_chip] = chip;
 
@@ -215,7 +227,7 @@ cy_attach(struct cy_softc *sc)
 
 	sc->sc_nchannels = port;
 
-	printf("%s: %d channels (ttyCY%03d..ttyCY%03d)\n",
+	aprint_normal("%s: %d channels (ttyCY%03d..ttyCY%03d)\n",
 	    sc->sc_dev.dv_xname, sc->sc_nchannels, cy_attached_ttys,
 	    cy_attached_ttys + (sc->sc_nchannels - 1));
 
@@ -247,17 +259,14 @@ cy_getport(dev_t dev)
 			continue;
 		j += sc->sc_nchannels;
 		if (j > u)
-			break;
+			return (&sc->sc_ports[u - k]);
 	}
 
-	if (i == cy_cd.cd_ndevs)
-		return (NULL);
-	else
-		return (&sc->sc_ports[u - k]);
+	return (NULL);
 }
 
 /*
- * open routine. returns zero if successfull, else error code
+ * open routine. returns zero if successful, else error code
  */
 int
 cyopen(dev_t dev, int flag, int mode, struct proc *p)
@@ -386,7 +395,7 @@ cyopen(dev_t dev, int flag, int mode, struct proc *p)
 }
 
 /*
- * close routine. returns zero if successfull, else error code
+ * close routine. returns zero if successful, else error code
  */
 int
 cyclose(dev_t dev, int flag, int mode, struct proc *p)
@@ -631,7 +640,7 @@ cystop(struct tty *tp, int flag)
 
 /*
  * parameter setting routine.
- * returns 0 if successfull, else returns error code
+ * returns 0 if successful, else returns error code
  */
 int
 cyparam(struct tty *tp, struct termios *t)

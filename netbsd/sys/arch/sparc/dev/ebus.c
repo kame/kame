@@ -1,4 +1,4 @@
-/*	$NetBSD: ebus.c,v 1.6 2002/03/11 23:36:17 uwe Exp $ */ 
+/*	$NetBSD: ebus.c,v 1.16 2004/03/17 17:04:59 pk Exp $ */ 
 
 /*
  * Copyright (c) 1999, 2000 Matthew R. Green
@@ -33,6 +33,9 @@
  * EBus is documented in PCIO manual (Sun Part#: 802-7837-01).
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ebus.c,v 1.16 2004/03/17 17:04:59 pk Exp $");
+
 #if defined(DEBUG) && !defined(EBUS_DEBUG)
 #define EBUS_DEBUG
 #endif
@@ -62,7 +65,6 @@ int ebus_debug = 0;
 #define _SPARC_BUS_DMA_PRIVATE
 #include <machine/bus.h>
 #include <machine/autoconf.h>
-#include <machine/openfirm.h>
 
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
@@ -96,10 +98,8 @@ struct ebus_softc {
 int	ebus_match(struct device *, struct cfdata *, void *);
 void	ebus_attach(struct device *, struct device *, void *);
 
-struct cfattach ebus_ca = {
-	sizeof(struct ebus_softc), ebus_match, ebus_attach
-};
-
+CFATTACH_DECL(ebus, sizeof(struct ebus_softc),
+    ebus_match, ebus_attach, NULL, NULL);
 
 int	ebus_setup_attach_args(struct ebus_softc *, int,
 			       struct ebus_attach_args *);
@@ -107,13 +107,13 @@ void	ebus_destroy_attach_args(struct ebus_attach_args *);
 int	ebus_print(void *, const char *);
 
 /*
- * here are our bus space and bus dma routines.
+ * here are our bus space and bus DMA routines.
  */
 static paddr_t	ebus_bus_mmap(bus_space_tag_t, bus_addr_t, off_t, int, int);
 static int	_ebus_bus_map(bus_space_tag_t, bus_addr_t,
 			      bus_size_t, int, vaddr_t, bus_space_handle_t *);
-static void	*ebus_intr_establish(bus_space_tag_t, int, int, int,
-				     int (*)(void *), void *);
+static void	*ebus_intr_establish(bus_space_tag_t, int, int,
+				     int (*)(void *), void *, void (*)(void));
 
 static bus_space_tag_t	ebus_alloc_bus_tag(struct ebus_softc *);
 static bus_dma_tag_t	ebus_alloc_dma_tag(struct ebus_softc *, bus_dma_tag_t);
@@ -189,7 +189,7 @@ ebus_match(parent, match, aux)
 	if (node == -1)
 		return (0);
 
-	PROM_getpropstringA(node, "name", name, sizeof name);
+	prom_getpropstringA(node, "name", name, sizeof name);
 	if (PCI_CLASS(pa->pa_class) == PCI_CLASS_BRIDGE
 	    && PCI_VENDOR(pa->pa_id) == PCI_VENDOR_SUN
 	    && PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_SUN_EBUS
@@ -214,7 +214,7 @@ ebus_init_wiring_table(sc)
 		return (0);
 	}
 
-	model = PROM_getpropstringA(prom_findroot(), "model",
+	model = prom_getpropstringA(prom_findroot(), "model",
 				    buf, sizeof(buf));
 	if (model == NULL)
 		panic("ebus_init_wiring_table: no \"model\" property");
@@ -269,8 +269,8 @@ ebus_attach(parent, self, aux)
 	 * get by processing "ranges".
 	 * 
 	 */
-	error = PROM_getprop(node, "reg", sizeof(struct ofw_pci_register),
-			     &sc->sc_nreg, (void **)&sc->sc_reg);
+	error = prom_getprop(node, "reg", sizeof(struct ofw_pci_register),
+			     &sc->sc_nreg, &sc->sc_reg);
 	if (error)
 		panic("%s: unable to read ebus registers (error %d)",
 		      self->dv_xname, error);
@@ -280,7 +280,7 @@ ebus_attach(parent, self, aux)
 	 */
 	DPRINTF(EDB_CHILD, ("ebus node %08x, searching children...\n", node));
 	for (node = firstchild(node); node; node = nextsibling(node)) {
-		char *name = PROM_getpropstring(node, "name");
+		char *name = prom_getpropstring(node, "name");
 
 		if (ebus_setup_attach_args(sc, node, &ea) != 0) {
 			printf("ebus_attach: %s: incomplete\n", name);
@@ -303,7 +303,7 @@ ebus_setup_attach_args(sc, node, ea)
 
 	memset(ea, 0, sizeof(struct ebus_attach_args));
 
-	err = PROM_getprop(node, "name", 1, &n, (void **)&ea->ea_name);
+	err = prom_getprop(node, "name", 1, &n, &ea->ea_name);
 	if (err != 0)
 		return (err);
 	ea->ea_name[n] = '\0';
@@ -312,8 +312,8 @@ ebus_setup_attach_args(sc, node, ea)
 	ea->ea_bustag = sc->sc_childbustag;
 	ea->ea_dmatag = sc->sc_dmatag;
 
-	err = PROM_getprop(node, "reg", sizeof(struct ebus_regs),
-			   &ea->ea_nreg, (void **)&ea->ea_reg);
+	err = prom_getprop(node, "reg", sizeof(struct ebus_regs),
+			   &ea->ea_nreg, &ea->ea_reg);
 	if (err != 0)
 		return (err);
 
@@ -330,8 +330,8 @@ ebus_setup_attach_args(sc, node, ea)
 	    }
 
 
-	err = PROM_getprop(node, "address", sizeof(u_int32_t),
-			   &ea->ea_nvaddr, (void **)&ea->ea_vaddr);
+	err = prom_getprop(node, "address", sizeof(u_int32_t),
+			   &ea->ea_nvaddr, &ea->ea_vaddr);
 	if (err != ENOENT) {
 		if (err != 0)
 			return (err);
@@ -381,18 +381,18 @@ ebus_print(aux, p)
 	int i;
 
 	if (p)
-		printf("%s at %s", ea->ea_name, p);
+		aprint_normal("%s at %s", ea->ea_name, p);
 	for (i = 0; i < ea->ea_nreg; ++i)
-		printf("%s bar %x offset 0x%x", i == 0 ? "" : ",",
+		aprint_normal("%s bar %x offset 0x%x", i == 0 ? "" : ",",
 		       ea->ea_reg[i].hi, ea->ea_reg[i].lo);
 	for (i = 0; i < ea->ea_nintr; ++i)
-		printf(" line %d", ea->ea_intr[i]);
+		aprint_normal(" line %d", ea->ea_intr[i]);
 	return (UNCONF);
 }
 
 
 /*
- * bus space and bus dma methods below here
+ * bus space and bus DMA methods below here
  */
 
 bus_space_tag_t
@@ -426,7 +426,7 @@ ebus_alloc_dma_tag(sc, pdt)
 	dt = (bus_dma_tag_t)
 		malloc(sizeof(struct sparc_bus_dma_tag), M_DEVBUF, M_NOWAIT);
 	if (dt == NULL)
-		panic("unable to allocate ebus dma tag");
+		panic("unable to allocate ebus DMA tag");
 
 	memset(dt, 0, sizeof *dt);
 	dt->_cookie = sc;
@@ -534,13 +534,13 @@ ebus_bus_mmap(t, ba, off, prot, flags)
  * Install an interrupt handler for a EBus device.
  */
 void *
-ebus_intr_establish(t, pri, level, flags, handler, arg)
+ebus_intr_establish(t, pri, level, handler, arg, fastvec)
 	bus_space_tag_t t;
 	int pri;
 	int level;
-	int flags;
 	int (*handler)(void *);
 	void *arg;
+	void (*fastvec)(void);	/* ignored */
 {
-	return (bus_intr_establish(t->parent, pri, level, flags, handler, arg));
+	return (bus_intr_establish(t->parent, pri, level, handler, arg));
 }

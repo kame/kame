@@ -1,4 +1,4 @@
-/*	$NetBSD: pm_direct.c,v 1.19 2002/03/05 17:39:26 shiba Exp $	*/
+/*	$NetBSD: pm_direct.c,v 1.22 2003/07/15 02:43:18 lukem Exp $	*/
 
 /*
  * Copyright (C) 1997 Takashi Hamada
@@ -30,6 +30,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /* From: pm_direct.c 1.3 03/18/98 Takashi Hamada */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pm_direct.c,v 1.22 2003/07/15 02:43:18 lukem Exp $");
 
 #include "opt_adb.h"
 
@@ -268,6 +271,8 @@ pm_setup_adb()
 		case MACH_MACPB280:
 		case MACH_MACPB280C:
 		case MACH_MACPB500:
+		case MACH_MACPB190:
+		case MACH_MACPB190CS:
 			pmHardware = PM_HW_PB5XX;
 			break;
 		default:
@@ -901,10 +906,10 @@ pm_pmgrop_mrg(pmdata)
 {
 	u_int32_t rval=0;
 
-	asm("
-		movl	%1,%%a0
-		.word	0xa085
-		movl	%%d0,%0"
+	__asm __volatile(
+	"	movl	%1,%%a0	\n"
+	"	.word	0xa085	\n"
+	"	movl	%%d0,%0"
 		: "=g" (rval)
 		: "g" (pmdata)
 		: "a0","d0");
@@ -1061,6 +1066,8 @@ pm_adb_op(buffer, compRout, data, command)
 		case MACH_MACPB270:
 		case MACH_MACPB280:
 		case MACH_MACPB280C:
+		case MACH_MACPB190:
+		case MACH_MACPB190CS:
 			pm_intr((void *)0);
 			break;
 		default:

@@ -1,4 +1,4 @@
-/*	$NetBSD: edc_mca.c,v 1.16 2002/03/31 10:01:26 jdolecek Exp $	*/
+/*	$NetBSD: edc_mca.c,v 1.23 2003/11/10 08:51:52 wiz Exp $	*/
 
 /*
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -50,7 +50,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: edc_mca.c,v 1.16 2002/03/31 10:01:26 jdolecek Exp $");
+__KERNEL_RCSID(0, "$NetBSD: edc_mca.c,v 1.23 2003/11/10 08:51:52 wiz Exp $");
 
 #include "rnd.h"
 
@@ -119,9 +119,8 @@ struct edc_mca_softc {
 int	edc_mca_probe	__P((struct device *, struct cfdata *, void *));
 void	edc_mca_attach	__P((struct device *, struct device *, void *));
 
-struct cfattach edc_mca_ca = {
-	sizeof(struct edc_mca_softc), edc_mca_probe, edc_mca_attach
-};
+CFATTACH_DECL(edc_mca, sizeof(struct edc_mca_softc),
+    edc_mca_probe, edc_mca_attach, NULL, NULL);
 
 static int	edc_intr __P((void *));
 static void	edc_dump_status_block __P((struct edc_mca_softc *,
@@ -170,7 +169,7 @@ edc_mca_attach(parent, self, aux)
 	 * 
 	 * 7 6 5 4 3 2 1 0
 	 *   \ \____/  \ \__ enable: 0=adapter disabled, 1=adapter enabled
-	 *    \     \   \___ Primary/Alternate Port Adresses:
+	 *    \     \   \___ Primary/Alternate Port Addresses:
 	 *     \     \		0=0x3510-3517 1=0x3518-0x351f
 	 *      \     \_____ DMA Arbitration Level: 0101=5 0110=6 0111=7
 	 *       \              0000=0 0001=1 0011=3 0100=4
@@ -200,7 +199,8 @@ edc_mca_attach(parent, self, aux)
 		typestr = "IBM Integ. ESDI Fixed Disk & Controller";
 		break;
 	default:
-		/* never reached */ ;
+		typestr = NULL;
+		break;
 	}
 		
 	irq = ESDIC_IRQ;
@@ -213,7 +213,7 @@ edc_mca_attach(parent, self, aux)
 #ifdef DIAGNOSTIC
 	/*
 	 * It's not strictly necessary to check this, machine configuration
-	 * utility uses only valid adresses.
+	 * utility uses only valid addresses.
 	 */
 	if (drq == 2 || drq >= 8) {
 		printf("%s: invalid DMA Arbitration Level %d\n",
@@ -855,12 +855,11 @@ edcworker(arg)
 
 			/* Is there a buf for us ? */
 			simple_lock(&ed->sc_q_lock);
-			if ((bp = BUFQ_FIRST(&ed->sc_q)) == NULL) {
+			if ((bp = BUFQ_GET(&ed->sc_q)) == NULL) {
 				simple_unlock(&ed->sc_q_lock);
 				i++;
 				continue;
 			}
-			BUFQ_REMOVE(&ed->sc_q, bp);
 			simple_unlock(&ed->sc_q_lock);
 
 			/* Instrumentation. */
@@ -877,7 +876,8 @@ edcworker(arg)
 				bp->b_resid = sc->sc_resblk * DEV_BSIZE;
 			}
 
-			disk_unbusy(&ed->sc_dk, (bp->b_bcount - bp->b_resid));
+			disk_unbusy(&ed->sc_dk, (bp->b_bcount - bp->b_resid),
+			    (bp->b_flags & B_READ));
 #if NRND > 0
 			rnd_add_uint32(&ed->rnd_source, bp->b_blkno);
 #endif

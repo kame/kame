@@ -1,4 +1,4 @@
-/*	$NetBSD: ess_pnpbios.c,v 1.6 2002/02/15 22:06:50 nathanw Exp $	*/
+/*	$NetBSD: ess_pnpbios.c,v 1.10 2003/10/23 14:28:55 mycroft Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ess_pnpbios.c,v 1.6 2002/02/15 22:06:50 nathanw Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ess_pnpbios.c,v 1.10 2003/10/23 14:28:55 mycroft Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -65,9 +65,8 @@ __KERNEL_RCSID(0, "$NetBSD: ess_pnpbios.c,v 1.6 2002/02/15 22:06:50 nathanw Exp 
 int ess_pnpbios_match __P((struct device *, struct cfdata *, void *));
 void ess_pnpbios_attach __P((struct device *, struct device *, void *));
 
-struct cfattach ess_pnpbios_ca = {
-	sizeof(struct ess_softc), ess_pnpbios_match, ess_pnpbios_attach
-};
+CFATTACH_DECL(ess_pnpbios, sizeof(struct ess_softc),
+    ess_pnpbios_match, ess_pnpbios_attach, NULL, NULL);
 
 int
 ess_pnpbios_match(parent, match, aux)
@@ -84,7 +83,8 @@ ess_pnpbios_match(parent, match, aux)
 	    strcmp(aa->idstr, "CPQB0AB") && /* 1869 */
 	    strcmp(aa->idstr, "CPQB0AC") && /* 1869 */
 	    strcmp(aa->idstr, "CPQB0AD") && /* 1869 */
-	    strcmp(aa->idstr, "CPQB0F1"))   /* 1869 */
+	    strcmp(aa->idstr, "CPQB0F1") && /* 1869 */
+	    strcmp(aa->idstr, "ESS1879"))   /* 1879 */
 		return (0);
 
 	return (1);

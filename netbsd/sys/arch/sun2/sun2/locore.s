@@ -1,12 +1,46 @@
-/*	$NetBSD: locore.s,v 1.11 2001/12/07 05:24:56 fredette Exp $	*/
+/*	$NetBSD: locore.s,v 1.16 2004/03/04 19:53:45 nathanw Exp $	*/
+
+/*
+ * Copyright (c) 1980, 1990, 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	from: Utah $Hdr: locore.s 1.66 92/12/22$
+ *	@(#)locore.s	8.6 (Berkeley) 5/27/94
+ */
 
 /*
  * Copyright (c) 2001 Matthew Fredette
  * Copyright (c) 1994, 1995 Gordon W. Ross
  * Copyright (c) 1993 Adam Glass
  * Copyright (c) 1988 University of Utah.
- * Copyright (c) 1980, 1990, 1993
- *	The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -132,57 +166,19 @@ L_high_code:
 | is finished, to avoid spurrious interrupts.
 
 /*
- * Final preparation for calling main.
- *
- * Create a fake exception frame that returns to user mode,
- * and save its address in p->p_md.md_regs for cpu_fork().
- * The new frames for process 1 and 2 will be adjusted by
- * cpu_set_kpc() to arrange for a call to a kernel function
- * before the new process does its rte out to user mode.
+ * Create a fake exception frame so that cpu_fork() can copy it.
+ * main() nevers returns; we exit to user mode from a forked process
+ * later on.
  */
 	clrw	%sp@-			| tf_format,tf_vector
 	clrl	%sp@-			| tf_pc (filled in later)
 	movw	#PSL_USER,%sp@-		| tf_sr for user mode
 	clrl	%sp@-			| tf_stackadj
 	lea	%sp@(-64),%sp		| tf_regs[16]
-	movl	%sp,%a1			| %a1=trapframe
-	lea	_C_LABEL(proc0),%a0	| proc0.p_md.md_regs = 
-	movl	%a1,%a0@(P_MDREGS)	|   trapframe
-	movl	%a2,%a1@(FR_SP)		| a2 == usp (from above)
-	pea	%a1@			| push &trapframe
+	lea	_C_LABEL(lwp0),%a0	| proc0.p_md.md_regs = 
+	movl	%a1,%a0@(L_MD_REGS)	|   trapframe
 	jbsr	_C_LABEL(main)		| main(&trapframe)
-	addql	#4,%sp			| help DDB backtrace
-	trap	#15			| should not get here
-
-| This is used by cpu_fork() to return to user mode.
-| It is called with SP pointing to a struct trapframe.
-GLOBAL(proc_do_uret)
-	movl	%sp@(FR_SP),%a0		| grab and load
-	movl	%a0,%usp		|   user SP
-	moveml	%sp@+,#0x7FFF		| load most registers (all but SSP)
-	addql	#8,%sp			| pop SSP and stack adjust count
-	rte
-
-/*
- * proc_trampoline:
- * This is used by cpu_set_kpc() to "push" a function call onto the
- * kernel stack of some process, very much like a signal delivery.
- * When we get here, the stack has:
- *
- * SP+8:	switchframe from before cpu_set_kpc
- * SP+4:	void *arg;
- * SP:  	u_long func;
- *
- * On entry, the switchframe pushed by cpu_set_kpc has already been
- * popped off the stack, so all this needs to do is pop the function
- * pointer into a register, call it, then pop the arg, and finally
- * return using the switchframe that remains on the stack.
- */
-GLOBAL(proc_trampoline)
-	movl	%sp@+,%a0		| function pointer
-	jbsr	%a0@			| (*func)(arg)
-	addql	#4,%sp			| toss the arg
-	rts				| as cpu_switch would do
+	PANIC("main() returned")
 
 | That is all the assembly startup code we need on the sun3!
 | The rest of this is like the hp300/locore.s where possible.
@@ -567,209 +563,12 @@ BSS(want_resched,4)
  */
 #include <m68k/m68k/proc_subr.s>
 
-| Message for Lbadsw panic
-Lsw0:
-	.asciz	"cpu_switch"
-	.even
-
-	.data
-GLOBAL(masterpaddr)		| XXX compatibility (debuggers)
-GLOBAL(curpcb)
-	.long	0
-ASBSS(nullpcb,SIZEOF_PCB)
-	.text
-
 /*
- * At exit of a process, do a cpu_switch for the last time.
- * Switch to a safe stack and PCB, and select a new process to run.  The
- * old stack and u-area will be freed by the reaper.
+ * Use common m68k process/lwp switch and context save subroutines.
  */
-ENTRY(switch_exit)
-	movl	%sp@(4),%a0		| struct proc *p
-					| save state into garbage pcb
-	movl	#_ASM_LABEL(nullpcb),_C_LABEL(curpcb)
-	lea	_ASM_LABEL(tmpstk),%sp	| goto a tmp stack
+#undef FPCOPROC
+#include <m68k/m68k/switch_subr.s>
 
-	/* Schedule the vmspace and stack to be freed. */
-	movl	%a0,%sp@-		| exit2(p)
-	jbsr	_C_LABEL(exit2)
-	lea	%sp@(4),%sp		| pop args
-
-#if defined(LOCKDEBUG)
-	/* Acquire sched_lock */
-	jbsr	_C_LABEL(sched_lock_idle)
-#endif
-
-	jra	_C_LABEL(cpu_switch)
-
-/*
- * When no processes are on the runq, cpu_switch() branches to idle
- * to wait for something to come ready.
- */
-Lidle:
-#if defined(LOCKDEBUG)
-	/* Release sched_lock */
-	jbsr	_C_LABEL(sched_unlock_idle)
-#endif
-	stop	#PSL_LOWIPL
-GLOBAL(_Idle)				| See clock.c
-	movw	#PSL_HIGHIPL,%sr
-#if defined(LOCKDEBUG)
-	/* Acquire sched_lock */
-	jbsr	_C_LABEL(sched_lock_idle)
-#endif
-	movl	_C_LABEL(sched_whichqs),%d0
-	jeq	Lidle
-	jra	Lsw1
-
-Lbadsw:
-	movl	#Lsw0,%sp@-
-	jbsr	_C_LABEL(panic)
-	/*NOTREACHED*/
-
-/*
- * cpu_switch()
- * Hacked for sun3
- */
-ENTRY(cpu_switch)
-	movl	_C_LABEL(curpcb),%a0	| current pcb
-	movw	%sr,%a0@(PCB_PS)	| save sr before changing ipl
-#ifdef notyet
-	movl	_C_LABEL(curproc),%sp@-	| remember last proc running
-#endif
-	clrl	_C_LABEL(curproc)
-
-	/*
-	 * Find the highest-priority queue that isn't empty,
-	 * then take the first proc from that queue.
-	 */
-	movl	_C_LABEL(sched_whichqs),%d0
-	jeq	Lidle
-Lsw1:
-	/*
-	 * Interrupts are blocked, sched_lock is held.  If
-	 * we come here via Idle, %d0 contains the contents
-	 * of a non-zero sched_whichqs.
-	 */
-	moveq	#31,%d1
-1:	lsrl	#1,%d0
-	dbcs	%d1,1b
-	eorib	#31,%d1
-
-	movl	%d1,%d0
-	lslb	#3,%d1			| convert queue number to index
-	addl	#_C_LABEL(sched_qs),%d1	| locate queue (q)
-	movl	%d1,%a1
-	movl	%a1@(P_FORW),%a0	| p = q->p_forw
-	cmpal	%d1,%a0			| anyone on queue?
-	jeq	Lbadsw			| no, panic
-#ifdef DIAGNOSTIC
-	tstl	%a0@(P_WCHAN)
-	jne	Lbadsw
-	cmpb	#SRUN,%a0@(P_STAT)
-	jne	Lbadsw
-#endif
-	movl	%a0@(P_FORW),%a1@(P_FORW)	| q->p_forw = p->p_forw
-	movl	%a0@(P_FORW),%a1		| n = p->p_forw
-	movl	%a0@(P_BACK),%a1@(P_BACK)	| n->p_back = q
-	cmpal	%d1,%a1			| anyone left on queue?
-	jne	Lsw2			| yes, skip
-	movl	_C_LABEL(sched_whichqs),%d1
-	bclr	%d0,%d1			| no, clear bit
-	movl	%d1,_C_LABEL(sched_whichqs)
-Lsw2:
-	/* p->p_cpu initialized in fork1() for single-processor */
-	movb	#SONPROC,%a0@(P_STAT)	| p->p_stat = SONPROC
-	movl	%a0,_C_LABEL(curproc)
-	clrl	_C_LABEL(want_resched)
-#ifdef notyet
-	movl	%sp@+,%a1		| XXX - Make this work!
-	cmpl	%a0,%a1			| switching to same proc?
-	jeq	Lswdone			| yes, skip save and restore
-#endif
-	/*
-	 * Save state of previous process in its pcb.
-	 */
-	movl	_C_LABEL(curpcb),%a1
-	moveml	#0xFCFC,%a1@(PCB_REGS)	| save non-scratch registers
-	movl	%usp,%a2		| grab USP (a2 has been saved)
-	movl	%a2,%a1@(PCB_USP)	| and save it
-
-	/*
-	 * Now that we have saved all the registers that must be
-	 * preserved, we are free to use those registers until
-	 * we load the registers for the switched-to process.
-	 * In this section, keep:  %a0=curproc, %a1=curpcb
-	 */
-
-	clrl	%a0@(P_BACK)		| clear back link
-	movl	%a0@(P_ADDR),%a1	| get p_addr
-	movl	%a1,_C_LABEL(curpcb)
-
-#if defined(LOCKDEBUG)
-	/*
-	 * Done mucking with the run queues, release the
-	 * scheduler lock, but keep interrupts out.
-	 */
-	movl	%a0,%sp@-		| not args...
-	movl	%a1,%sp@-		| ...just saving
-	jbsr	_C_LABEL(sched_unlock_idle)
-	movl	%sp@+,%a1
-	movl	%sp@+,%a0
-#endif
-
-	/*
-	 * Load the new VM context (new MMU root pointer)
-	 */
-	movl	%a0@(P_VMSPACE),%a2	| vm = p->p_vmspace
-#ifdef DIAGNOSTIC
-| XXX fredette - tstl with an address register EA not supported
-| on the 68010, too lazy to fix this instance now.
-#if 0
-	tstl	%a2			| vm == VM_MAP_NULL?
-	jeq	Lbadsw			| panic
-#endif
-#endif
-	/*
-	 * Call _pmap_switch().
-	 */
-	movl	%a2@(VM_PMAP),%a2 	| pmap = vm->vm_map.pmap
-	pea	%a2@			| push pmap
-	jbsr	_C_LABEL(_pmap_switch)	| _pmap_switch(pmap)
-	addql	#4,%sp
-	movl	_C_LABEL(curpcb),%a1	| restore p_addr
-| Note: pmap_switch will clear the cache if needed.
-
-	/*
-	 * Reload the registers for the new process.
-	 * After this point we can only use %d0,%d1,%a0,%a1
-	 */
-	moveml	%a1@(PCB_REGS),#0xFCFC	| reload registers
-	movl	%a1@(PCB_USP),%a0
-	movl	%a0,%usp		| and USP
-
-	movw	%a1@(PCB_PS),%d0	| no, restore PS
-#ifdef DIAGNOSTIC
-	btst	#13,%d0			| supervisor mode?
-	jeq	Lbadsw			| no? panic!
-#endif
-	movw	%d0,%sr			| OK, restore PS
-	moveq	#1,%d0			| return 1 (for alternate returns)
-	rts
-
-/*
- * savectx(pcb)
- * Update pcb, saving current processor state.
- */
-ENTRY(savectx)
-	movl	%sp@(4),%a1
-	movw	%sr,%a1@(PCB_PS)
-	movl	%usp,%a0		| grab USP
-	movl	%a0,%a1@(PCB_USP)	| and save it
-	moveml	#0xFCFC,%a1@(PCB_REGS)	| save non-scratch registers
-
-	moveq	#0,%d0			| return 0
-	rts
 
 /*
  * Get callers current SP value.

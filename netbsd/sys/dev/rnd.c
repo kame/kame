@@ -1,4 +1,4 @@
-/*	$NetBSD: rnd.c,v 1.26 2002/03/08 20:48:37 thorpej Exp $	*/
+/*	$NetBSD: rnd.c,v 1.42 2003/06/29 22:30:01 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rnd.c,v 1.26 2002/03/08 20:48:37 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rnd.c,v 1.42 2003/06/29 22:30:01 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/ioctl.h>
@@ -56,7 +56,7 @@ __KERNEL_RCSID(0, "$NetBSD: rnd.c,v 1.26 2002/03/08 20:48:37 thorpej Exp $");
 #include <sys/pool.h>
 
 #ifdef __HAVE_CPU_COUNTER
-#include <machine/rnd.h>
+#include <machine/cpu_counter.h>
 #endif
 
 #ifdef RND_DEBUG
@@ -155,12 +155,18 @@ static rndsource_t rnd_source_no_collect = {
 struct callout rnd_callout = CALLOUT_INITIALIZER;
 
 void	rndattach __P((int));
-int	rndopen __P((dev_t, int, int, struct proc *));
-int	rndclose __P((dev_t, int, int, struct proc *));
-int	rndread __P((dev_t, struct uio *, int));
-int	rndwrite __P((dev_t, struct uio *, int));
-int	rndioctl __P((dev_t, u_long, caddr_t, int, struct proc *));
-int	rndpoll __P((dev_t, int, struct proc *));
+
+dev_type_open(rndopen);
+dev_type_read(rndread);
+dev_type_write(rndwrite);
+dev_type_ioctl(rndioctl);
+dev_type_poll(rndpoll);
+dev_type_kqfilter(rndkqfilter);
+
+const struct cdevsw rnd_cdevsw = {
+	rndopen, nullclose, rndread, rndwrite, rndioctl,
+	nostop, notty, rndpoll, nommap, rndkqfilter,
+};
 
 static inline void	rnd_wakeup_readers(void);
 static inline u_int32_t rnd_estimate_entropy(rndsource_t *, u_int32_t);
@@ -183,11 +189,14 @@ rnd_counter(void)
 
 #ifdef __HAVE_CPU_COUNTER
 	if (cpu_hascounter())
-		return (cpu_counter() & 0xffffffff);
+		return (cpu_counter32());
 #endif
-	microtime(&tv);
-
-	return (tv.tv_sec * 1000000 + tv.tv_usec);
+	if (rnd_ready) {
+		microtime(&tv);
+		return (tv.tv_sec * 1000000 + tv.tv_usec);
+	} 
+	/* when called from rnd_init, its too early to call microtime safely */
+	return (0);
 }
 
 /*
@@ -210,8 +219,13 @@ rnd_wakeup_readers(void)
 			rnd_status &= ~RND_READWAITING;
 			wakeup(&rnd_selq);
 		}
-		selwakeup(&rnd_selq);
+		selnotify(&rnd_selq, 0);
 
+#ifdef RND_VERBOSE
+		if (!rnd_have_entropy)
+			printf("rnd: have initial entropy (%u)\n",
+			       rndpool_get_entropy_count(&rnd_pool));
+#endif
 		/*
 		 * Allow open of /dev/random now, too.
 		 */
@@ -267,22 +281,42 @@ rnd_estimate_entropy(rndsource_t *rs, u_int32_t t)
 }
 
 /*
- * Attach the random device, and initialize the global random pool
- * for our use.
+ * "Attach" the random device. This is an (almost) empty stub, since
+ * pseudo-devices don't get attached until after config, after the
+ * entropy sources will attach. We just use the timing of this event
+ * as another potential source of initial entropy.
  */
 void
 rndattach(int num)
 {
+	u_int32_t c;
 
-	rnd_init();
+	/* Trap unwary players who don't call rnd_init() early */
+	KASSERT(rnd_ready);
+
+	/* mix in another counter */
+	c = rnd_counter();
+	rndpool_add_data(&rnd_pool, &c, sizeof(u_int32_t), 1);
 }
 
+/*
+ * initialize the global random pool for our use.
+ * rnd_init() must be called very early on in the boot process, so
+ * the pool is ready for other devices to attach as sources.
+ */
 void
 rnd_init(void)
 {
+	u_int32_t c;
 
 	if (rnd_ready)
 		return;
+
+	/* 
+	 * take a counter early, hoping that there's some variance in
+	 * the following operations 
+	 */
+	c = rnd_counter();
 
 	LIST_INIT(&rnd_sources);
 	SIMPLEQ_INIT(&rnd_samples);
@@ -292,10 +326,22 @@ rnd_init(void)
 
 	rndpool_init(&rnd_pool);
 
+	/* Mix *something*, *anything* into the pool to help it get started. 
+	 * However, it's not safe for rnd_counter() to call microtime() yet,
+	 * so on some platforms we might just end up with zeros anyway.
+	 * XXX more things to add would be nice.
+	 */ 
+	if (c) {
+		rndpool_add_data(&rnd_pool, &c, sizeof(u_int32_t), 1);
+		c = rnd_counter();
+		rndpool_add_data(&rnd_pool, &c, sizeof(u_int32_t), 1);
+	}
+
 	rnd_ready = 1;
 
 #ifdef RND_VERBOSE
-	printf("Random device ready\n");
+	printf("rnd: initialised (%u)%s", RND_POOLBITS,
+	       c ? " with counter\n" : "\n");
 #endif
 }
 
@@ -325,18 +371,11 @@ rndopen(dev_t dev, int flags, int ifmt, struct proc *p)
 }
 
 int
-rndclose(dev_t dev, int flags, int ifmt, struct proc *p)
-{
-
-	return (0);
-}
-
-int
 rndread(dev_t dev, struct uio *uio, int ioflag)
 {
 	u_int8_t *buf;
-	u_int32_t entcnt, mode, nread;
-	int n, ret, s;
+	u_int32_t entcnt, mode, n, nread;
+	int ret, s;
 
 	DPRINTF(RND_DEBUG_READ,
 	    ("Random:  Read of %d requested, flags 0x%08x\n",
@@ -668,6 +707,68 @@ rndpoll(dev_t dev, int events, struct proc *p)
 	return (revents);
 }
 
+static void
+filt_rnddetach(struct knote *kn)
+{
+	int s;
+
+	s = splsoftclock();
+	SLIST_REMOVE(&rnd_selq.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_rndread(struct knote *kn, long hint)
+{
+	uint32_t entcnt;
+
+	entcnt = rndpool_get_entropy_count(&rnd_pool);
+	if (entcnt >= RND_ENTROPY_THRESHOLD * 8) {
+		kn->kn_data = RND_TEMP_BUFFER_SIZE;
+		return (1);
+	}
+	return (0);
+}
+
+static const struct filterops rnd_seltrue_filtops =
+	{ 1, NULL, filt_rnddetach, filt_seltrue };
+
+static const struct filterops rndread_filtops =
+	{ 1, NULL, filt_rnddetach, filt_rndread };
+
+int
+rndkqfilter(dev_t dev, struct knote *kn)
+{
+	struct klist *klist;
+	int s;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &rnd_selq.sel_klist;
+		if (minor(dev) == RND_DEV_URANDOM)
+			kn->kn_fop = &rnd_seltrue_filtops;
+		else
+			kn->kn_fop = &rndread_filtops;
+		break;
+
+	case EVFILT_WRITE:
+		klist = &rnd_selq.sel_klist;
+		kn->kn_fop = &rnd_seltrue_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = NULL;
+
+	s = splsoftclock();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
+}
+
 static rnd_sample_t *
 rnd_sample_allocate(rndsource_t *source)
 {
@@ -731,7 +832,7 @@ rnd_attach_source(rndsource_element_t *rs, char *name, u_int32_t type,
 
 	ts = rnd_counter();
 
-	strcpy(rs->data.name, name);
+	strlcpy(rs->data.name, name, sizeof(rs->data.name));
 	rs->data.last_time = ts;
 	rs->data.last_delta = 0;
 	rs->data.last_delta2 = 0;
@@ -752,8 +853,22 @@ rnd_attach_source(rndsource_element_t *rs, char *name, u_int32_t type,
 	LIST_INSERT_HEAD(&rnd_sources, rs, list);
 
 #ifdef RND_VERBOSE
-	printf("%s: attached as an entropy source\n", rs->data.name);
+	printf("rnd: %s attached as an entropy source (", rs->data.name);
+	if (!(flags & RND_FLAG_NO_COLLECT)) {
+		printf("collecting");
+		if (flags & RND_FLAG_NO_ESTIMATE)
+			printf(" without estimation");
+	}
+	else
+		printf("off");
+	printf(")\n");
 #endif
+
+	/* 
+	 * Again, put some more initial junk in the pool.
+	 * XXX Bogus, but harder to guess than zeros.
+	 */
+	rndpool_add_data(&rnd_pool, &ts, sizeof(u_int32_t), 1);
 }
 
 /*
@@ -790,6 +905,9 @@ rnd_detach_source(rndsource_element_t *rs)
 	}
 
 	splx(s);
+#ifdef RND_VERBOSE
+	printf("rnd: %s detached as an entropy source\n", rs->data.name);
+#endif
 }
 
 /*
@@ -919,7 +1037,7 @@ rnd_timeout(void *arg)
 
 	sample = SIMPLEQ_FIRST(&rnd_samples);
 	while (sample != NULL) {
-		SIMPLEQ_REMOVE_HEAD(&rnd_samples, sample, next);
+		SIMPLEQ_REMOVE_HEAD(&rnd_samples, next);
 		splx(s);
 
 		source = sample->source;
@@ -958,12 +1076,22 @@ rnd_timeout(void *arg)
 	rnd_wakeup_readers();
 }
 
-int
+u_int32_t
 rnd_extract_data(void *p, u_int32_t len, u_int32_t flags)
 {
 	int retval, s;
+	u_int32_t c;
 
 	s = splsoftclock();
+	if (!rnd_have_entropy) {
+#ifdef RND_VERBOSE
+		printf("rnd: WARNING! initial entropy low (%u).\n",
+		       rndpool_get_entropy_count(&rnd_pool));
+#endif
+		/* Try once again to put something in the pool */
+		c = rnd_counter();
+		rndpool_add_data(&rnd_pool, &c, sizeof(u_int32_t), 1);
+	}
 	retval = rndpool_extract_data(&rnd_pool, p, len, flags);
 	splx(s);
 

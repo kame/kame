@@ -1,4 +1,4 @@
-/* $NetBSD: sb1250_icu.c,v 1.2 2002/03/06 07:51:02 simonb Exp $ */
+/* $NetBSD: sb1250_icu.c,v 1.6 2003/10/25 15:52:38 simonb Exp $ */
 
 /*
  * Copyright 2000, 2001
@@ -15,10 +15,9 @@
  *    the source file.
  *
  * 2) No right is granted to use any trade name, trademark, or logo of
- *    Broadcom Corporation. Neither the "Broadcom Corporation" name nor any
- *    trademark or logo of Broadcom Corporation may be used to endorse or
- *    promote products derived from this software without the prior written
- *    permission of Broadcom Corporation.
+ *    Broadcom Corporation.  The "Broadcom Corporation" name may not be
+ *    used to endorse or promote products derived from this software
+ *    without the prior written permission of Broadcom Corporation.
  *
  * 3) THIS SOFTWARE IS PROVIDED "AS-IS" AND ANY EXPRESS OR IMPLIED
  *    WARRANTIES, INCLUDING BUT NOT LIMITED TO, ANY IMPLIED WARRANTIES OF
@@ -33,8 +32,13 @@
  *    OR OTHERWISE), EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sb1250_icu.c,v 1.6 2003/10/25 15:52:38 simonb Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/device.h>
+#include <sys/malloc.h>
 
 /* XXX for uvmexp */
 #include <uvm/uvm_extern.h>
@@ -52,6 +56,7 @@ struct sb1250_ihand {
 	void	(*fun)(void *, uint32_t, uint32_t);
 	void	*arg;
 	int	level;
+	struct evcnt count;
 };
 static struct sb1250_ihand sb1250_ihands[64];		/* XXX */
 
@@ -67,9 +72,6 @@ static struct sb1250_ihand sb1250_ihands[64];		/* XXX */
 #define	READ_REG(rp)		(mips3_ld((uint64_t *)(rp)))
 #define	WRITE_REG(rp, val)	(mips3_sd((uint64_t *)(rp), (val)))
 
-#undef __inline
-#define	__inline
-
 static void	sb1250_cpu_intr(uint32_t, uint32_t, uint32_t, uint32_t);
 static void	sb1250_cpu_setsoftintr(void);
 static void	*sb1250_intr_establish(u_int, u_int,
@@ -79,10 +81,11 @@ void
 sb1250_icu_init(void)
 {
 	int i;
+	char *name;
 
 	/* zero out the list of used interrupts/lines */
 	memset(ints_for_line, 0, sizeof ints_for_line);
-	imr_all = 0xffffffffffffffff;
+	imr_all = 0xffffffffffffffffULL;
 	memset(sb1250_ihands, 0, sizeof sb1250_ihands);
 
 	systemsw.s_cpu_intr = sb1250_cpu_intr;
@@ -91,8 +94,14 @@ sb1250_icu_init(void)
 
 	WRITE_REG(SB1250_I_IMR_ADDR, imr_all);
 
-	for (i = 0; i < 64; i++)
+	for (i = 0; i < 64; i++) {
 		WRITE_REG(SB1250_I_MAP(i), SB1250_I_MAP_I0);
+		/* XXX add irq name arrays for various CPU models? */
+		name = malloc(8, M_DEVBUF, M_NOWAIT);
+		snprintf(name, 8, "irq %d", i);
+		evcnt_attach_dynamic(&sb1250_ihands[i].count, EVCNT_TYPE_INTR,
+		    NULL, "sb1250", name);	/* XXX "sb1250"? */
+	}
 }
 
 static void
@@ -120,9 +129,11 @@ sb1250_cpu_intr(uint32_t status, uint32_t cause, uint32_t pc, uint32_t ipending)
 			sstatus &= ints_for_line[i];
 			for (j = 0; sstatus != 0 && j < 64; j++) {
 				if (sstatus & ((uint64_t)1 << j)) {
-					struct sb1250_ihand *ihp = &sb1250_ihands[j];
+					struct sb1250_ihand *ihp =
+					    &sb1250_ihands[j];
 					(*ihp->fun)(ihp->arg, status, pc);
 					sstatus &= ~((uint64_t)1 << j);
+					ihp->count.ev_count++;
 				}
 			}
 		}

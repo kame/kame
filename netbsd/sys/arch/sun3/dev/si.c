@@ -1,4 +1,4 @@
-/*	$NetBSD: si.c,v 1.50 2001/04/25 17:53:24 bouyer Exp $	*/
+/*	$NetBSD: si.c,v 1.54 2003/07/15 03:36:15 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -75,6 +75,9 @@
  *
  * The autoconfiguration boilerplate came from Adam Glass.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: si.c,v 1.54 2003/07/15 03:36:15 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -172,7 +175,7 @@ si_attach(sc)
 	sc->sc_dma = (struct si_dma_handle *)
 		malloc(i, M_DEVBUF, M_WAITOK);
 	if (sc->sc_dma == NULL)
-		panic("si: dvma_malloc failed\n");
+		panic("si: dvma_malloc failed");
 	for (i = 0; i < SCI_OPENINGS; i++)
 		sc->sc_dma[i].dh_flags = 0;
 
@@ -198,7 +201,7 @@ si_minphys(struct buf *bp)
 #endif
 		bp->b_bcount = MAX_DMA_LEN;
 	}
-	return (minphys(bp));
+	minphys(bp);
 }
 
 
@@ -288,7 +291,7 @@ si_dma_alloc(ncr_sc)
 
 	/* Make sure our caller checked sc_min_dma_len. */
 	if (xlen < MIN_DMA_LEN)
-		panic("si_dma_alloc: xlen=0x%x\n", xlen);
+		panic("si_dma_alloc: xlen=0x%x", xlen);
 
 	/*
 	 * Never attempt single transfers of more than 63k, because
@@ -404,7 +407,7 @@ si_dma_poll(ncr_sc)
 	 * XXX: I really doubt that is necessary...
 	 */
 
-	/* Wait for any "dma complete" or error bits. */
+	/* Wait for any "DMA complete" or error bits. */
 	tmo = POLL_TIMO;
 	for (;;) {
 		if (si->si_csr & CSR_MASK)

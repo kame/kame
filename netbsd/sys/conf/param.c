@@ -1,4 +1,4 @@
-/*	$NetBSD: param.c,v 1.40 2001/12/17 15:40:43 atatat Exp $	*/
+/*	$NetBSD: param.c,v 1.45 2003/12/31 12:34:22 martin Exp $	*/
 
 /*
  * Copyright (c) 1980, 1986, 1989 Regents of the University of California.
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,10 +37,9 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: param.c,v 1.40 2001/12/17 15:40:43 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: param.c,v 1.45 2003/12/31 12:34:22 martin Exp $");
 
 #include "opt_rtc_offset.h"
-#include "opt_sb_max.h"
 #include "opt_sysv.h"
 #include "opt_sysvparam.h"
 
@@ -112,7 +107,6 @@ int	maxproc = NPROC;
 int	desiredvnodes = NVNODE;
 int	maxfiles = MAXFILES;
 int	ncallout = 16 + NPROC;	/* size of callwheel (rounded to ^2) */
-u_long	sb_max = SB_MAX;	/* maximum socket buffer size */
 int	fscale = FSCALE;	/* kernel uses `FSCALE', user uses `fscale' */
 
 /*
@@ -136,13 +130,13 @@ int	mcllowat = MCLLOWAT;
  */
 #ifdef SYSVSHM
 #ifndef	SHMMAX
-#define	SHMMAX	SHMMAXPGS	/* shminit() performs a `*= NBPG' */
+#define	SHMMAX	SHMMAXPGS	/* shminit() performs a `*= PAGE_SIZE' */
 #endif
 #ifndef	SHMMIN
 #define	SHMMIN	1
 #endif
 #ifndef	SHMMNI
-#define	SHMMNI	128			/* <= SHMMMNI in shm.h */
+#define	SHMMNI	128		/* <64k, see IPCID_TO_IX in ipc.h */
 #endif
 #ifndef	SHMSEG
 #define	SHMSEG	128
@@ -190,14 +184,6 @@ struct	msginfo msginfo = {
 	MSGSEG		/* number of message segments */
 };
 #endif
-
-/*
- * These have to be allocated somewhere; allocating
- * them here forces loader errors if this file is omitted
- * (if they've been externed everywhere else; hah!).
- */
-struct	buf *buf;
-char	*buffers;
 
 /*
  * These control when and to what priority a process gets after a certain

@@ -1,4 +1,4 @@
-/*	$NetBSD: iommu.c,v 1.9 2001/05/27 06:35:03 chs Exp $	*/
+/*	$NetBSD: iommu.c,v 1.13 2003/07/15 03:36:20 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * Set-up functions for the Sun3x DVMA I/O Mapper.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: iommu.c,v 1.13 2003/07/15 03:36:20 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -58,9 +61,8 @@
 static int  iommu_match __P((struct device *, struct cfdata *, void *));
 static void iommu_attach __P((struct device *, struct device *, void *));
 
-struct cfattach iommu_ca = {
-	sizeof(struct device), iommu_match, iommu_attach
-};
+CFATTACH_DECL(iommu, sizeof(struct device),
+    iommu_match, iommu_attach, NULL, NULL);
 
 static iommu_pde_t *iommu_va;
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: vrc4173bcu.c,v 1.8 2002/03/10 10:13:32 takemura Exp $	*/
+/*	$NetBSD: vrc4173bcu.c,v 1.14 2003/07/15 02:29:35 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001,2002 Enami Tsugutomo.
@@ -26,6 +26,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vrc4173bcu.c,v 1.14 2003/07/15 02:29:35 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -44,6 +47,8 @@
 #include <hpcmips/vr/vrc4173bcuvar.h>
 #include <hpcmips/vr/vrc4173icureg.h>
 #include <hpcmips/vr/vrc4173cmureg.h>
+
+#include "locators.h"
 
 #ifdef VRC4173BCU_DEBUG
 #define DPRINTF_ENABLE
@@ -208,9 +213,8 @@ static struct vrc4173bcu_unit vrc4173bcu_units[] = {
 	},
 };
 
-struct cfattach vrc4173bcu_ca = {
-	sizeof(struct vrc4173bcu_softc), vrc4173bcu_match, vrc4173bcu_attach,
-};
+CFATTACH_DECL(vrc4173bcu, sizeof(struct vrc4173bcu_softc),
+    vrc4173bcu_match, vrc4173bcu_attach, NULL, NULL);
 
 static const struct vrip_chipset_tag vrc4173bcu_chipset_methods = {
 	.vc_power		= __vrc4173bcu_power,
@@ -431,13 +435,15 @@ vrc4173bcu_print(void *aux, const char *hoge)
 	struct vrip_attach_args *va = (struct vrip_attach_args*)aux;
 
 	if (va->va_addr != VRIPIFCF_ADDR_DEFAULT)
-		printf(" addr 0x%04lx", va->va_addr);
+		aprint_normal(" addr 0x%04lx", va->va_addr);
 	if (va->va_size != VRIPIFCF_SIZE_DEFAULT)
-		printf("-%04lx", (va->va_addr + va->va_size - 1) & 0xffff);
+		aprint_normal("-%04lx",
+		    (va->va_addr + va->va_size - 1) & 0xffff);
 	if (va->va_addr2 != VRIPIFCF_ADDR2_DEFAULT)
-		printf(", 0x%04lx", va->va_addr2);
+		aprint_normal(", 0x%04lx", va->va_addr2);
 	if (va->va_size2 != VRIPIFCF_SIZE2_DEFAULT)
-		printf("-%04lx", (va->va_addr2 + va->va_size2 - 1) & 0xffff);
+		aprint_normal("-%04lx",
+		    (va->va_addr2 + va->va_size2 - 1) & 0xffff);
 
 	return (UNCONF);
 }
@@ -461,7 +467,7 @@ vrc4173bcu_search(struct device *parent, struct cfdata *cf, void *aux)
 	va.va_cc = sc->sc_chipset.vc_cc;
 	va.va_ac = sc->sc_chipset.vc_ac;
 	va.va_dc = sc->sc_chipset.vc_dc;
-	if (((*cf->cf_attach->ca_match)(parent, cf, &va) == sc->sc_pri))
+	if ((config_match(parent, cf, &va) == sc->sc_pri))
 		config_attach(parent, cf, &va, vrc4173bcu_print);
 
 	return (0);

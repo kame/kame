@@ -1,4 +1,4 @@
-/*	$NetBSD: ld.c,v 1.13 2002/05/08 15:49:07 drochner Exp $	*/
+/*	$NetBSD: ld.c,v 1.27.2.1 2004/07/28 11:27:00 tron Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ld.c,v 1.13 2002/05/08 15:49:07 drochner Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ld.c,v 1.27.2.1 2004/07/28 11:27:00 tron Exp $");
 
 #include "rnd.h"
 
@@ -73,10 +73,28 @@ static void	ldgetdisklabel(struct ld_softc *);
 static int	ldlock(struct ld_softc *);
 static void	ldminphys(struct buf *bp);
 static void	ldshutdown(void *);
-static int	ldstart(struct ld_softc *, struct buf *);
+static void	ldstart(struct ld_softc *);
 static void	ldunlock(struct ld_softc *);
 
 extern struct	cfdriver ld_cd;
+
+dev_type_open(ldopen);
+dev_type_close(ldclose);
+dev_type_read(ldread);
+dev_type_write(ldwrite);
+dev_type_ioctl(ldioctl);
+dev_type_strategy(ldstrategy);
+dev_type_dump(lddump);
+dev_type_size(ldsize);
+
+const struct bdevsw ld_bdevsw = {
+	ldopen, ldclose, ldstrategy, ldioctl, lddump, ldsize, D_DISK
+};
+
+const struct cdevsw ld_cdevsw = {
+	ldopen, ldclose, ldread, ldwrite, ldioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
+};
 
 static struct	dkdriver lddkdriver = { ldstrategy };
 static void	*ld_sdh;
@@ -99,25 +117,33 @@ ldattach(struct ld_softc *sc)
 	if (sc->sc_maxxfer > MAXPHYS)
 		sc->sc_maxxfer = MAXPHYS;
 
-	/* Build synthetic geometry. */
-	if (sc->sc_secperunit <= 528 * 2048)		/* 528MB */
-		sc->sc_nheads = 16;
-	else if (sc->sc_secperunit <= 1024 * 2048)	/* 1GB */
-		sc->sc_nheads = 32;
-	else if (sc->sc_secperunit <= 21504 * 2048)	/* 21GB */
-		sc->sc_nheads = 64;
-	else if (sc->sc_secperunit <= 43008 * 2048)	/* 42GB */
-		sc->sc_nheads = 128;
-	else
-		sc->sc_nheads = 255;
+	/* Build synthetic geometry if necessary. */
+	if (sc->sc_nheads == 0 || sc->sc_nsectors == 0 ||
+	    sc->sc_ncylinders == 0) {
+		uint64_t ncyl;
 
-	sc->sc_nsectors = 63;
-	sc->sc_ncylinders = sc->sc_secperunit / 
-	    (sc->sc_nheads * sc->sc_nsectors);
+		if (sc->sc_secperunit <= 528 * 2048)		/* 528MB */
+			sc->sc_nheads = 16;
+		else if (sc->sc_secperunit <= 1024 * 2048)	/* 1GB */
+			sc->sc_nheads = 32;
+		else if (sc->sc_secperunit <= 21504 * 2048)	/* 21GB */
+			sc->sc_nheads = 64;
+		else if (sc->sc_secperunit <= 43008 * 2048)	/* 42GB */
+			sc->sc_nheads = 128;
+		else
+			sc->sc_nheads = 255;
 
-	format_bytes(buf, sizeof(buf), (u_int64_t)sc->sc_secperunit *
+		sc->sc_nsectors = 63;
+		sc->sc_ncylinders = INT_MAX;
+		ncyl = sc->sc_secperunit / 
+		    (sc->sc_nheads * sc->sc_nsectors);
+		if (ncyl < INT_MAX)
+			sc->sc_ncylinders = (int)ncyl;
+	}
+
+	format_bytes(buf, sizeof(buf), sc->sc_secperunit *
 	    sc->sc_secsize);
-	printf("%s: %s, %d cyl, %d head, %d sec, %d bytes/sect x %d sectors\n",
+	printf("%s: %s, %d cyl, %d head, %d sec, %d bytes/sect x %"PRIu64" sectors\n",
 	    sc->sc_dv.dv_xname, buf, sc->sc_ncylinders, sc->sc_nheads,
 	    sc->sc_nsectors, sc->sc_secsize, sc->sc_secperunit);
 
@@ -130,31 +156,25 @@ ldattach(struct ld_softc *sc)
 	/* Set the `shutdownhook'. */
 	if (ld_sdh == NULL)
 		ld_sdh = shutdownhook_establish(ldshutdown, NULL);
-	BUFQ_INIT(&sc->sc_bufq);
+	bufq_alloc(&sc->sc_bufq, BUFQ_DISK_DEFAULT_STRAT()|BUFQ_SORT_RAWBLOCK);
 }
 
 int
 ldadjqparam(struct ld_softc *sc, int max)
 {
-	int s, rv;
+	int s;
 
 	s = splbio();
 	sc->sc_maxqueuecnt = max;
-	if (sc->sc_queuecnt > max) {
-		sc->sc_flags |= LDF_DRAIN;
-		rv = tsleep(&sc->sc_queuecnt, PRIBIO, "lddrn", 30 * hz);
-		sc->sc_flags &= ~LDF_DRAIN;
-	} else
-		rv = 0;
 	splx(s);
 
-	return (rv);
+	return (0);
 }
 
 int
 ldbegindetach(struct ld_softc *sc, int flags)
 {
-	int s, rv;
+	int s, rv = 0;
 
 	if ((sc->sc_flags & LDF_ENABLED) == 0)
 		return (0);
@@ -163,8 +183,14 @@ ldbegindetach(struct ld_softc *sc, int flags)
 		return (EBUSY);
 
 	s = splbio();
+	sc->sc_maxqueuecnt = 0;
 	sc->sc_flags |= LDF_DETACH;
-	rv = ldadjqparam(sc, 0);
+	while (sc->sc_queuecnt > 0) {
+		sc->sc_flags |= LDF_DRAIN;
+		rv = tsleep(&sc->sc_queuecnt, PRIBIO, "lddrn", 0);
+		if (rv)
+			break;
+	}
 	splx(s);
 
 	return (rv);
@@ -185,22 +211,18 @@ ldenddetach(struct ld_softc *sc)
 			printf("%s: not drained\n", sc->sc_dv.dv_xname);
 
 	/* Locate the major numbers. */
-	for (bmaj = 0; bmaj <= nblkdev; bmaj++)
-		if (bdevsw[bmaj].d_open == ldopen)
-			break;
-	for (cmaj = 0; cmaj <= nchrdev; cmaj++)
-		if (cdevsw[cmaj].d_open == ldopen)
-			break;
+	bmaj = bdevsw_lookup_major(&ld_bdevsw);
+	cmaj = cdevsw_lookup_major(&ld_cdevsw);
 
 	/* Kill off any queued buffers. */
 	s = splbio();
-	while ((bp = BUFQ_FIRST(&sc->sc_bufq)) != NULL) {
-		BUFQ_REMOVE(&sc->sc_bufq, bp);
+	while ((bp = BUFQ_GET(&sc->sc_bufq)) != NULL) {
 		bp->b_error = EIO;
 		bp->b_flags |= B_ERROR;
 		bp->b_resid = bp->b_bcount;
 		biodone(bp);
 	}
+	bufq_free(&sc->sc_bufq);
 	splx(s);
 
 	/* Nuke the vnodes for any open instances. */
@@ -218,11 +240,18 @@ ldenddetach(struct ld_softc *sc)
 	rnd_detach_source(&sc->sc_rnd_source);
 #endif
 
+	/*
+	 * XXX We can't really flush the cache here, beceause the
+	 * XXX device may already be non-existent from the controller's
+	 * XXX perspective.
+	 */
+#if 0
 	/* Flush the device's cache. */
 	if (sc->sc_flush != NULL)
 		if ((*sc->sc_flush)(sc) != 0)
 			printf("%s: unable to flush cache\n",
 			    sc->sc_dv.dv_xname);
+#endif
 }
 
 /* ARGSUSED */
@@ -256,8 +285,11 @@ ldopen(dev_t dev, int flags, int fmt, struct proc *p)
 	part = DISKPART(dev);
 	ldlock(sc);
 
-	if (sc->sc_dk.dk_openmask == 0)
-		ldgetdisklabel(sc);
+	if (sc->sc_dk.dk_openmask == 0) {
+		/* Load the partition info if not already loaded. */
+		if ((sc->sc_flags & LDF_VLABEL) == 0)
+			ldgetdisklabel(sc);
+	}
 
 	/* Check that the partition exists. */
 	if (part != RAW_PART && (part >= sc->sc_dk.dk_label->d_npartitions ||
@@ -305,10 +337,13 @@ ldclose(dev_t dev, int flags, int fmt, struct proc *p)
 	sc->sc_dk.dk_openmask =
 	    sc->sc_dk.dk_copenmask | sc->sc_dk.dk_bopenmask;
 
-	if (sc->sc_dk.dk_openmask == 0 && sc->sc_flush != NULL)
-		if ((*sc->sc_flush)(sc) != 0)
+	if (sc->sc_dk.dk_openmask == 0) {
+		if (sc->sc_flush != NULL && (*sc->sc_flush)(sc) != 0)
 			printf("%s: unable to flush cache\n",
 			    sc->sc_dv.dv_xname);
+		if ((sc->sc_flags & LDF_KLABEL) == 0)
+			sc->sc_flags &= ~LDF_VLABEL;
+	}
 
 	ldunlock(sc);
 	return (0);
@@ -404,6 +439,15 @@ ldioctl(dev_t dev, u_long cmd, caddr_t addr, int32_t flag, struct proc *p)
 		ldunlock(sc);
 		break;
 
+	case DIOCKLABEL:
+		if ((flag & FWRITE) == 0)
+			return (EBADF);
+		if (*(int *)addr)
+			sc->sc_flags |= LDF_KLABEL;
+		else
+			sc->sc_flags &= ~LDF_KLABEL;
+		break;
+
 	case DIOCWLABEL:
 		if ((flag & FWRITE) == 0)
 			return (EBADF);
@@ -438,35 +482,18 @@ void
 ldstrategy(struct buf *bp)
 {
 	struct ld_softc *sc;
-	int s;
+	struct disklabel *lp;
+	daddr_t blkno;
+	int s, part;
 
 	sc = device_lookup(&ld_cd, DISKUNIT(bp->b_dev));
-
-	s = splbio();
-	if (sc->sc_queuecnt >= sc->sc_maxqueuecnt) {
-		BUFQ_INSERT_TAIL(&sc->sc_bufq, bp);
-		splx(s);
-		return;
-	}
-	splx(s);
-	ldstart(sc, bp);
-}
-
-static int
-ldstart(struct ld_softc *sc, struct buf *bp)
-{
-	struct disklabel *lp;
-	int part, s, rv;
+	part = DISKPART(bp->b_dev);
 
 	if ((sc->sc_flags & LDF_DETACH) != 0) {
 		bp->b_error = EIO;
-		bp->b_flags |= B_ERROR;
-		bp->b_resid = bp->b_bcount;
-		biodone(bp);
-		return (-1);
+		goto bad;
 	}
 
-	part = DISKPART(bp->b_dev);
 	lp = sc->sc_dk.dk_label;
 
 	/*
@@ -474,59 +501,95 @@ ldstart(struct ld_softc *sc, struct buf *bp)
 	 * not be negative.
 	 */
 	if ((bp->b_bcount % lp->d_secsize) != 0 || bp->b_blkno < 0) {
-		bp->b_flags |= B_ERROR;
-		biodone(bp);
-		return (-1);
+		bp->b_error = EINVAL;
+		goto bad;
 	}
 
-	/*
-	 * If it's a null transfer, return.
-	 */
-	if (bp->b_bcount == 0) {
-		bp->b_resid = bp->b_bcount;
-		biodone(bp);
-		return (-1);
-	}
+	/* If it's a null transfer, return immediately. */
+	if (bp->b_bcount == 0)
+		goto done;
 
 	/*
 	 * Do bounds checking and adjust the transfer.  If error, process.
 	 * If past the end of partition, just return.
 	 */
 	if (part != RAW_PART &&
-	    bounds_check_with_label(bp, lp,
+	    bounds_check_with_label(&sc->sc_dk, bp,
 	    (sc->sc_flags & (LDF_WLABEL | LDF_LABELLING)) != 0) <= 0) {
-		bp->b_resid = bp->b_bcount;
-		biodone(bp);
-		return (-1);
+		goto done;
 	}
 
 	/*
-	 * Convert the logical block number to a physical one and put it in
-	 * terms of the device's logical block size.
+	 * Convert the block number to absolute and put it in terms
+	 * of the device's logical block size.
 	 */
-	if (lp->d_secsize >= DEV_BSIZE)
-		bp->b_rawblkno = bp->b_blkno / (lp->d_secsize / DEV_BSIZE);
+	if (lp->d_secsize == DEV_BSIZE)
+		blkno = bp->b_blkno;
+	else if (lp->d_secsize > DEV_BSIZE)
+		blkno = bp->b_blkno / (lp->d_secsize / DEV_BSIZE);
 	else
-		bp->b_rawblkno = bp->b_blkno * (DEV_BSIZE / lp->d_secsize);
+		blkno = bp->b_blkno * (DEV_BSIZE / lp->d_secsize);
 
 	if (part != RAW_PART)
-		bp->b_rawblkno += lp->d_partitions[part].p_offset;
+		blkno += lp->d_partitions[part].p_offset;
+
+	bp->b_rawblkno = blkno;
 
 	s = splbio();
-	disk_busy(&sc->sc_dk);
-	sc->sc_queuecnt++;
+	BUFQ_PUT(&sc->sc_bufq, bp);
+	ldstart(sc);
 	splx(s);
+	return;
 
-	if ((rv = (*sc->sc_start)(sc, bp)) != 0) {
-		bp->b_error = rv;
-		bp->b_flags |= B_ERROR;
-		bp->b_resid = bp->b_bcount;
-		s = splbio();
-		lddone(sc, bp);
-		splx(s);
+ bad:
+	bp->b_flags |= B_ERROR;
+ done:
+	bp->b_resid = bp->b_bcount;
+	biodone(bp);
+}
+
+static void
+ldstart(struct ld_softc *sc)
+{
+	struct buf *bp;
+	int error;
+
+	while (sc->sc_queuecnt < sc->sc_maxqueuecnt) {
+		/* See if there is work to do. */
+		if ((bp = BUFQ_PEEK(&sc->sc_bufq)) == NULL)
+			break;
+
+		disk_busy(&sc->sc_dk);
+		sc->sc_queuecnt++;
+
+		if (__predict_true((error = (*sc->sc_start)(sc, bp)) == 0)) {
+			/*
+			 * The back-end is running the job; remove it from
+			 * the queue.
+			 */
+			(void) BUFQ_GET(&sc->sc_bufq);
+		} else  {
+			disk_unbusy(&sc->sc_dk, 0, (bp->b_flags & B_READ));
+			sc->sc_queuecnt--;
+			if (error == EAGAIN) {
+				/*
+				 * Temporary resource shortage in the
+				 * back-end; just defer the job until
+				 * later.
+				 *
+				 * XXX We might consider a watchdog timer
+				 * XXX to make sure we are kicked into action.
+				 */
+				break;
+			} else {
+				(void) BUFQ_GET(&sc->sc_bufq);
+				bp->b_error = error;
+				bp->b_flags |= B_ERROR;
+				bp->b_resid = bp->b_bcount;
+				biodone(bp);
+			}
+		}
 	}
-
-	return (0);
 }
 
 void
@@ -538,20 +601,19 @@ lddone(struct ld_softc *sc, struct buf *bp)
 		printf("\n");
 	}
 
-	disk_unbusy(&sc->sc_dk, bp->b_bcount - bp->b_resid);
+	disk_unbusy(&sc->sc_dk, bp->b_bcount - bp->b_resid,
+	    (bp->b_flags & B_READ));
 #if NRND > 0
 	rnd_add_uint32(&sc->sc_rnd_source, bp->b_rawblkno);
 #endif
 	biodone(bp);
 
 	if (--sc->sc_queuecnt <= sc->sc_maxqueuecnt) {
-		if ((sc->sc_flags & LDF_DRAIN) != 0)
+		if ((sc->sc_flags & LDF_DRAIN) != 0) {
+			sc->sc_flags &= ~LDF_DRAIN;
 			wakeup(&sc->sc_queuecnt);
-		while ((bp = BUFQ_FIRST(&sc->sc_bufq)) != NULL) {
-			BUFQ_REMOVE(&sc->sc_bufq, bp);
-			if (!ldstart(sc, bp))
-				break;
 		}
+		ldstart(sc);
 	}
 }
 
@@ -598,6 +660,9 @@ ldgetdisklabel(struct ld_softc *sc)
 	    ldstrategy, sc->sc_dk.dk_label, sc->sc_dk.dk_cpulabel);
 	if (errstring != NULL)
 		printf("%s: %s\n", sc->sc_dv.dv_xname, errstring);
+
+	/* In-core label now valid. */
+	sc->sc_flags |= LDF_VLABEL;
 }
 
 /*
@@ -615,8 +680,8 @@ ldgetdefaultlabel(struct ld_softc *sc, struct disklabel *lp)
 	lp->d_ncylinders = sc->sc_ncylinders;
 	lp->d_secpercyl = lp->d_ntracks * lp->d_nsectors;
 	lp->d_type = DTYPE_LD;
-	strcpy(lp->d_typename, "unknown");
-	strcpy(lp->d_packname, "fictitious");
+	strlcpy(lp->d_typename, "unknown", sizeof(lp->d_typename));
+	strlcpy(lp->d_packname, "fictitious", sizeof(lp->d_packname));
 	lp->d_secperunit = sc->sc_secperunit;
 	lp->d_rpm = 7200;
 	lp->d_interleave = 1;

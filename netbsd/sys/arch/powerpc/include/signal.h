@@ -1,4 +1,4 @@
-/*	$NetBSD: signal.h,v 1.4 1998/09/14 02:48:34 thorpej Exp $	*/
+/*	$NetBSD: signal.h,v 1.17 2004/03/26 21:39:57 drochner Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -30,34 +30,46 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef	_MACHINE_SIGNAL_H_
-#define	_MACHINE_SIGNAL_H_
+#ifndef	_POWERPC_SIGNAL_H_
+#define	_POWERPC_SIGNAL_H_
+
+#ifndef _LOCORE
+#include <sys/featuretest.h>
 
 typedef int sig_atomic_t;
 
-#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) && \
-    !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 #include <machine/frame.h>
 
 #if defined(__LIBC12_SOURCE__) || defined(_KERNEL)
 struct sigcontext13 {
 	int sc_onstack;			/* saved onstack flag */
 	int sc_mask;			/* saved signal mask (old style) */
-	struct trapframe sc_frame;	/* saved registers */
+	struct utrapframe sc_frame;	/* saved registers */
 };
 #endif /* __LIBC12_SOURCE__ || _KERNEL */
 
+/*
+ * struct sigcontext introduced in NetBSD 1.4
+ */
 struct sigcontext {
 	int sc_onstack;			/* saved onstack flag */
 	int __sc_mask13;		/* saved signal mask (old style) */
-	struct trapframe sc_frame;	/* saved registers */
+	struct utrapframe sc_frame;	/* saved registers */
 	sigset_t sc_mask;		/* saved signal mask (new style) */
 };
 
-struct sigframe {
-	int sf_signum;
-	int sf_code;
-	struct sigcontext sf_sc;
-};
-#endif	/* !_ANSI_SOURCE && !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
-#endif	/* !_MACHINE_SIGNAL_H_ */
+#ifdef _KERNEL
+void	sendsig_sigcontext(int, const sigset_t *, u_long);
+
+#ifdef COMPAT_16
+#define	SIGTRAMP_VALID(vers)	((unsigned)(vers) <= 2)
+#else
+#define	SIGTRAMP_VALID(vers)	((vers) == 2)
+#endif
+
+#endif	/* _KERNEL */
+
+#endif	/* _NETBSD_SOURCE */
+#endif	/* !_LOCORE */
+#endif	/* !_POWERPC_SIGNAL_H_ */

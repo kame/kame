@@ -1,4 +1,4 @@
-/* $NetBSD: locore.S,v 1.3 2002/04/12 18:50:30 thorpej Exp $ */
+/* $NetBSD: locore.S,v 1.7 2003/11/29 22:27:56 bjh21 Exp $ */
 /*
  * Copyright (c) 1998, 1999, 2000 Ben Harris
  * Copyright (C) 1994-1997 Mark Brinicombe
@@ -50,13 +50,9 @@
 
 #include "fiq.h"
 	
-fp	.req	r11
-ip	.req	r12
-sp	.req	r13
-lr	.req	r14
-pc	.req	r15
-
-
+/* LINTSTUB: include <sys/types.h> */
+/* LINTSTUB: include <machine/frame.h> */
+	
 /*
  * MODE_CHANGE_NOP should be inserted between a mode change and a
  * banked register (R8--R15) access.
@@ -122,8 +118,8 @@ _C_LABEL(kernel_text):
  * These take an exception and get up into a state to enter the kernel
  * proper.  This currently involves fixing up the return address (to
  * point to the faulting instruction in all cases), pushing a
- * trapframe onto the stack, calling the C handler restoring the
- * (possibly modified) trapframe and returning to userland.
+ * trapframe onto the stack, calling the C handler, restoring the
+ * (possibly modified) trapframe, and returning to userland.
  */
 #define TRAP_REGS r0-r14	
 	.macro	HANDLER	handler, lr_fixup
@@ -168,9 +164,7 @@ pull_trapframe:
 	bne	3f			/* If not, return */
 	ldr	r4, Lastpending
 1:
-#ifndef __APCS_26__
 	teqp	r15, #(R15_IRQ_DISABLE | R15_MODE_SVC)
-#endif
 	ldr	r1, [r4]
 	cmp	r1, #0			/* AST pending? */
 	beq	2f			/* If not, return */
@@ -360,7 +354,7 @@ ENTRY(int_off)
 ENTRY_NP(int_off_save)
 	mov	r0, r15
 	orrs	r15, r14, #(R15_IRQ_DISABLE)
-/* LINTSTUB: Func: void int_restore(int) */
+/* LINTSTUB: Func: void int_restore(int i) */
 ENTRY_NP(int_restore)
 	tst	r0, #(R15_IRQ_DISABLE)	/* Were IRQs already disabled? */
 	biceqs	r15, r14, #(R15_IRQ_DISABLE)	/* No, enable again */
@@ -423,13 +417,13 @@ ENTRY(proc_trampoline)
 Lproc_trampoline_nofunc:
 	b	pull_trapframe
 
-/* LINTSTUB: Func: int setjmp(label_t *) */
+/* LINTSTUB: Func: int setjmp(label_t *l) */
 ENTRY(setjmp)
 	stmia	r0, {r4-r11, r13-r14}	/* Save relevant registers */
 	mov	r0, #0			/* Return 0 */
 	mov	pc, lr
 
-/* LINTSTUB: Func: void longjmp(label_t *) */
+/* LINTSTUB: Func: void longjmp(label_t *l) */
 ENTRY(longjmp)
 	ldmia	r0, {r4-r11, r13-r14}	/* Restore registers */
 	mov	r0, #1			/* Return 1 through longjmp */
@@ -457,4 +451,4 @@ _C_LABEL(intrcnt):
 	.global	_C_LABEL(eintrcnt)
 _C_LABEL(eintrcnt):
 
-RCSID("$NetBSD: locore.S,v 1.3 2002/04/12 18:50:30 thorpej Exp $")
+RCSID("$NetBSD: locore.S,v 1.7 2003/11/29 22:27:56 bjh21 Exp $")

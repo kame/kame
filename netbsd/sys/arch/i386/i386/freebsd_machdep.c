@@ -1,4 +1,4 @@
-/*	$NetBSD: freebsd_machdep.c,v 1.32 2002/04/02 22:33:19 christos Exp $	*/
+/*	$NetBSD: freebsd_machdep.c,v 1.42 2003/10/27 14:11:46 junyoung Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: freebsd_machdep.c,v 1.32 2002/04/02 22:33:19 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: freebsd_machdep.c,v 1.42 2003/10/27 14:11:46 junyoung Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_vm86.h"
@@ -60,17 +60,18 @@ __KERNEL_RCSID(0, "$NetBSD: freebsd_machdep.c,v 1.32 2002/04/02 22:33:19 christo
 
 #include <compat/freebsd/freebsd_syscallargs.h>
 #include <compat/freebsd/freebsd_exec.h>
+#include <compat/freebsd/freebsd_signal.h>
 #include <compat/freebsd/freebsd_ptrace.h>
 
 void
-freebsd_setregs(p, epp, stack)
-	struct proc *p;
+freebsd_setregs(l, epp, stack)
+	struct lwp *l;
 	struct exec_package *epp;
 	u_long stack;
 {
-	register struct pcb *pcb = &p->p_addr->u_pcb;
+	struct pcb *pcb = &l->l_addr->u_pcb;
 
-	setregs(p, epp, stack);
+	setregs(l, epp, stack);
 	if (i386_use_fxsave)
 		pcb->pcb_savefpu.sv_xmm.sv_env.en_cw = __FreeBSD_NPXCW__;
 	else
@@ -92,30 +93,17 @@ freebsd_setregs(p, epp, stack)
  * specified pc, psl.
  */
 void
-freebsd_sendsig(catcher, sig, mask, code)
-	sig_t catcher;
-	int sig;
-	sigset_t *mask;
-	u_long code;
+freebsd_sendsig(const ksiginfo_t *ksi, const sigset_t *mask)
 {
-	register struct proc *p = curproc;
-	register struct trapframe *tf;
-	struct freebsd_sigframe *fp, frame;
+	int sig = ksi->ksi_signo;
+	u_long code = KSI_TRAPCODE(ksi);
+	struct lwp *l = curlwp;
+	struct proc *p = l->l_proc;
 	int onstack;
+	struct freebsd_sigframe *fp = getframe(l, sig, &onstack), frame;
+	sig_t catcher = SIGACTION(p, sig).sa_handler;
+	struct trapframe *tf = l->l_md.md_regs;
 
-	tf = p->p_md.md_regs;
-
-	/* Do we need to jump onto the signal stack? */
-	onstack =
-	    (p->p_sigctx.ps_sigstk.ss_flags & (SS_DISABLE | SS_ONSTACK)) == 0 &&
-	    (SIGACTION(p, sig).sa_flags & SA_ONSTACK) != 0;
-
-	/* Allocate space for the signal handler context. */
-	if (onstack)
-		fp = (struct freebsd_sigframe *)((caddr_t)p->p_sigctx.ps_sigstk.ss_sp +
-		    p->p_sigctx.ps_sigstk.ss_size);
-	else
-		fp = (struct freebsd_sigframe *)tf->tf_esp;
 	fp--;
 
 	/* Build stack frame for signal trampoline. */
@@ -125,14 +113,14 @@ freebsd_sendsig(catcher, sig, mask, code)
 	frame.sf_addr = (char *)rcr2();
 	frame.sf_handler = catcher;
 
-	/* Save register context. */
+	/* Save context. */
 #ifdef VM86
 	if (tf->tf_eflags & PSL_VM) {
 		frame.sf_sc.sc_gs = tf->tf_vm86_gs;
 		frame.sf_sc.sc_fs = tf->tf_vm86_fs;
 		frame.sf_sc.sc_es = tf->tf_vm86_es;
 		frame.sf_sc.sc_ds = tf->tf_vm86_ds;
-		frame.sf_sc.sc_efl = get_vflags(p);
+		frame.sf_sc.sc_efl = get_vflags(l);
 		(*p->p_emul->e_syscall_intern)(p);
 	} else
 #endif
@@ -168,22 +156,11 @@ freebsd_sendsig(catcher, sig, mask, code)
 		 * Process has trashed its stack; give it an illegal
 		 * instruction to halt it in its tracks.
 		 */
-		sigexit(p, SIGILL);
+		sigexit(l, SIGILL);
 		/* NOTREACHED */
 	}
 
-	/*
-	 * Build context to run handler in.
-	 */
-	tf->tf_gs = GSEL(GUDATA_SEL, SEL_UPL);
-	tf->tf_fs = GSEL(GUDATA_SEL, SEL_UPL);
-	tf->tf_es = GSEL(GUDATA_SEL, SEL_UPL);
-	tf->tf_ds = GSEL(GUDATA_SEL, SEL_UPL);
-	tf->tf_eip = (int)p->p_sigctx.ps_sigcode;
-	tf->tf_cs = GSEL(GUCODE_SEL, SEL_UPL);
-	tf->tf_eflags &= ~(PSL_T|PSL_VM|PSL_AC);
-	tf->tf_esp = (int)fp;
-	tf->tf_ss = GSEL(GUDATA_SEL, SEL_UPL);
+	buildcontext(l, GUCODEBIG_SEL, p->p_sigctx.ps_sigcode, fp);
 
 	/* Remember that we're now on the signal stack. */
 	if (onstack)
@@ -201,16 +178,17 @@ freebsd_sendsig(catcher, sig, mask, code)
  * a machine fault.
  */
 int
-freebsd_sys_sigreturn(p, v, retval)
-	struct proc *p;
+freebsd_sys_sigreturn(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct freebsd_sys_sigreturn_args /* {
 		syscallarg(struct freebsd_sigcontext *) scp;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct freebsd_sigcontext *scp, context;
-	register struct trapframe *tf;
+	struct trapframe *tf;
 	sigset_t mask;
 
 	/*
@@ -223,16 +201,16 @@ freebsd_sys_sigreturn(p, v, retval)
 		return (EFAULT);
 
 	/* Restore register context. */
-	tf = p->p_md.md_regs;
+	tf = l->l_md.md_regs;
 #ifdef VM86
 	if (context.sc_efl & PSL_VM) {
-		void syscall_vm86 __P((struct trapframe));
+		void syscall_vm86(struct trapframe *);
 
 		tf->tf_vm86_gs = context.sc_gs;
 		tf->tf_vm86_fs = context.sc_fs;
 		tf->tf_vm86_es = context.sc_es;
 		tf->tf_vm86_ds = context.sc_ds;
-		set_vflags(p, context.sc_efl);
+		set_vflags(l, context.sc_efl);
 		p->p_md.md_syscall = syscall_vm86;
 	} else
 #endif
@@ -325,7 +303,7 @@ netbsd_to_freebsd_ptrace_regs(nregs, nfpregs, fregs)
 #ifdef DIAGNOSTIC
 	if (sizeof(fregs->freebsd_ptrace_fpregs.sv_pad) <
 	    sizeof(nframe->sv_ex_tw) + sizeof(nframe->sv_pad)) {
-		panic("netbsd_to_freebsd_ptrace_regs: %s\n",
+		panic("netbsd_to_freebsd_ptrace_regs: %s",
 		      "sizeof(freebsd_save87) >= sizeof(save87)");
 	}
 #endif

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ed.c,v 1.39.10.1 2003/01/28 05:42:00 jmc Exp $ */
+/*	$NetBSD: if_ed.c,v 1.45 2004/02/24 15:16:04 wiz Exp $ */
 
 /*
  * Device driver for National Semiconductor DS8390/WD83C690 based ethernet
@@ -19,7 +19,7 @@
 #include "opt_ns.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ed.c,v 1.39.10.1 2003/01/28 05:42:00 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ed.c,v 1.45 2004/02/24 15:16:04 wiz Exp $");
 
 #include "bpfilter.h"
 
@@ -128,9 +128,8 @@ static inline void word_zero(caddr_t, int);
 struct mbuf *ed_ring_to_mbuf(struct ed_softc *, caddr_t, struct mbuf *,
 					u_short);
 
-struct cfattach ed_zbus_ca = {
-	sizeof(struct ed_softc), ed_zbus_match, ed_zbus_attach
-};
+CFATTACH_DECL(ed_zbus, sizeof(struct ed_softc),
+    ed_zbus_match, ed_zbus_attach, NULL, NULL);
 
 static inline void
 NIC_PUT(struct ed_softc *sc, int off, u_char val)
@@ -246,7 +245,7 @@ ed_zbus_attach(struct device *parent, struct device *self, void *aux)
 	    sc->mem_start + ((sc->txb_cnt * ED_TXBUF_SIZE) << ED_PAGE_SHIFT);
 
 	/*
-	 * Interupts must be inactive when reading the prom, as the interupt
+	 * Interrupts must be inactive when reading the prom, as the interrupt
 	 * line is shared with one of its address lines.
 	 */
 

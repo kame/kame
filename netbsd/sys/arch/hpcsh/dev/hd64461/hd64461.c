@@ -1,4 +1,4 @@
-/*	$NetBSD: hd64461.c,v 1.7 2002/03/28 15:26:59 uch Exp $	*/
+/*	$NetBSD: hd64461.c,v 1.13 2003/07/15 02:29:36 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001, 2002 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hd64461.c,v 1.13 2003/07/15 02:29:36 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -70,9 +73,8 @@ STATIC int hd64461_print(void *, const char *);
 STATIC void hd64461_info(void);
 #endif
 
-struct cfattach hd64461if_ca = {
-	sizeof(struct device), hd64461_match, hd64461_attach
-};
+CFATTACH_DECL(hd64461if, sizeof(struct device),
+    hd64461_match, hd64461_attach, NULL, NULL);
 
 int
 hd64461_match(struct device *parent, struct cfdata *cf, void *aux)
@@ -88,7 +90,7 @@ hd64461_match(struct device *parent, struct cfdata *cf, void *aux)
 		break;
 	}
 
-	if (strcmp("hd64461if", cf->cf_driver->cd_name))
+	if (strcmp("hd64461if", cf->cf_name))
 		return (0);
 
 	return (1);
@@ -123,7 +125,7 @@ hd64461_print(void *aux, const char *pnp)
 	struct hd64461_attach_args *ha = aux;
 
 	if (pnp)
-		printf("%s at %s",
+		aprint_normal("%s at %s",
 		    hd64461_modules[ha->ha_module_id].name, pnp);
 
 	return (UNCONF);

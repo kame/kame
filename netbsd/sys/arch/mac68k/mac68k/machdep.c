@@ -1,9 +1,39 @@
-/*	$NetBSD: machdep.c,v 1.273 2002/05/21 07:05:31 scottr Exp $	*/
+/*	$NetBSD: machdep.c,v 1.297.2.1 2004/08/02 07:26:02 tron Exp $	*/
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1982, 1990 The Regents of the University of California.
  * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -76,8 +106,12 @@
  *	@(#)machdep.c	7.16 (Berkeley) 6/3/91
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.297.2.1 2004/08/02 07:26:02 tron Exp $");
+
 #include "opt_adb.h"
 #include "opt_ddb.h"
+#include "opt_ddbparam.h"
 #include "opt_kgdb.h"
 #include "opt_compat_netbsd.h"
 #include "akbd.h"
@@ -87,7 +121,6 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
-#include <sys/clist.h>
 #include <sys/conf.h>
 #include <sys/core.h>
 #include <sys/exec.h>
@@ -104,14 +137,18 @@
 #include <sys/queue.h>
 #include <sys/reboot.h>
 #include <sys/signalvar.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 #include <sys/user.h>
 #include <sys/vnode.h>
+#include <sys/ksyms.h>
 #ifdef	KGDB
 #include <sys/kgdb.h>
 #endif
 #define ELFSIZE 32
 #include <sys/exec_elf.h>
+
+#include <m68k/cacheops.h>
 
 #include <machine/db_machdep.h>
 #include <ddb/db_sym.h>
@@ -143,6 +180,8 @@
 #include <mac68k/dev/macfbvar.h>
 #endif
 #include <mac68k/dev/zs_cons.h>
+
+#include "ksyms.h"
 
 int symsize, end, *ssym, *esym;
 
@@ -290,8 +329,9 @@ mac68k_init()
 	 * high[numranges-1] was decremented in pmap_bootstrap.
 	 */
 	for (i = 0; i < btoc(MSGBUFSIZE); i++)
-		pmap_enter(pmap_kernel(), (vaddr_t)msgbufaddr + i * NBPG,
-		    high[numranges - 1] + i * NBPG, VM_PROT_READ|VM_PROT_WRITE,
+		pmap_enter(pmap_kernel(), (vaddr_t)msgbufaddr + i * PAGE_SIZE,
+		    high[numranges - 1] + i * PAGE_SIZE,
+		    VM_PROT_READ|VM_PROT_WRITE,
 		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 	initmsgbuf(msgbufaddr, m68k_round_page(MSGBUFSIZE));
 	pmap_update(pmap_kernel());
@@ -343,12 +383,12 @@ consinit(void)
 #if NZSC > 0 && defined(KGDB)
 		zs_kgdb_init();
 #endif
-#ifdef  DDB
+#if NKSYMS || defined(DDB) || defined(LKM)
 		/*
 		 * Initialize kernel debugger, if compiled in.
 		 */
 
-		ddb_init(symsize, ssym, esym);
+		ksyms_init(symsize, ssym, esym);
 #endif
 
 		if (boothowto & RB_KDB) {
@@ -369,20 +409,16 @@ consinit(void)
 #define CURRENTBOOTERVER	111
 
 /*
- * cpu_startup: allocate memory for variable-sized tables,
- * initialize cpu, and do autoconfiguration.
+ * cpu_startup: allocate memory for variable-sized tables, make
+ * (most of) kernel text read-only, and other miscellaneous bits
  */
 void
 cpu_startup(void)
 {
 	extern char *start;
 	extern char *etext;
-	caddr_t v;
-	unsigned i;
 	int vers;
-	int base, residual;
 	vaddr_t minaddr, maxaddr;
-	vsize_t size = 0;	/* To avoid compiler warning */
 	int delay;
 	char pbuf[9];
 
@@ -413,56 +449,7 @@ cpu_startup(void)
 	format_bytes(pbuf, sizeof(pbuf), ctob(physmem));
 	printf("total memory = %s\n", pbuf);
 
-	/*
-	 * Find out how much space we need, allocate it,
-	 * and then give everything true virtual addresses.
-	 */
-	size = (vm_size_t)allocsys(NULL, NULL);
-	if ((v = (caddr_t)uvm_km_zalloc(kernel_map, round_page(size))) == 0)
-		panic("startup: no room for tables");
-	if (allocsys(v, NULL) - v != size)
-		panic("startup: table size inconsistency");
-
-	/*
-	 * Now allocate buffers proper.  They are different than the above
-	 * in that they usually occupy more virtual memory than physical.
-	 */
-	size = MAXBSIZE * nbuf;
-	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
-	    NULL, UVM_UNKNOWN_OFFSET, 0,
-	    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE,
-	    UVM_INH_NONE, UVM_ADV_NORMAL, 0)) != 0)
-		panic("startup: cannot allocate VM for buffers");
-	minaddr = (vaddr_t)buffers;
-	base = bufpages / nbuf;
-	residual = bufpages % nbuf;
-	for (i = 0; i < nbuf; i++) {
-		vsize_t curbufsize;
-		vaddr_t curbuf;
-		struct vm_page *pg;
-
-		/*
-		 * Each buffer has MAXBSIZE bytes of VM space allocated.  Of
-		 * that MAXBSIZE space, we allocate and map (base+1) pages
-		 * for the first "residual" buffers, and then we allocate
-		 * "base" pages for the rest.
-		 */
-		curbuf = (vaddr_t) buffers + (i * MAXBSIZE);
-		curbufsize = NBPG * ((i < residual) ? (base+1) : base);
-
-		while (curbufsize) {
-			pg = uvm_pagealloc(NULL, 0, NULL, 0);
-			if (pg == NULL) 
-				panic("cpu_startup: not enough memory for "
-				    "buffer cache");
-			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
-			    VM_PROT_READ|VM_PROT_WRITE);
-			curbuf += PAGE_SIZE;
-			curbufsize -= PAGE_SIZE;
-		}
-	}
-	pmap_update(kernel_map->pmap);
-
+	minaddr = 0;
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
 	 * limits the number of processes exec'ing at any time.
@@ -484,8 +471,6 @@ cpu_startup(void)
 
 	format_bytes(pbuf, sizeof(pbuf), ptoa(uvmexp.free));
 	printf("avail memory = %s\n", pbuf);
-	format_bytes(pbuf, sizeof(pbuf), bufpages * NBPG);
-	printf("using %d buffers containing %s of memory\n", nbuf, pbuf);
 
 	/*
 	 * Tell the VM system that writing to kernel text isn't allowed.
@@ -496,7 +481,7 @@ cpu_startup(void)
 	 * XXX interrupt vectors and such writable for the Mac toolbox.
 	 */
 	if (uvm_map_protect(kernel_map,
-	    m68k_trunc_page(&start + (NBPG - 1)), m68k_round_page(&etext),
+	    m68k_trunc_page(&start + (PAGE_SIZE - 1)), m68k_round_page(&etext),
 	    (UVM_PROT_READ | UVM_PROT_EXEC), TRUE) != 0)
 		panic("can't protect kernel text");
 
@@ -504,11 +489,6 @@ cpu_startup(void)
 	 * Set up CPU-specific registers, cache, etc.
 	 */
 	initcpu();
-
-	/*
-	 * Set up buffers, so they can be used to read disk labels.
-	 */
-	bufinit();
 
 	/* Safe for extent allocation to use malloc now. */
 	iomem_malloc_safe = 1;
@@ -554,12 +534,12 @@ void doboot __P((void))
  * Set registers on exec.
  */
 void
-setregs(p, pack, stack)
-	struct proc *p;
+setregs(l, pack, stack)
+	struct lwp *l;
 	struct exec_package *pack;
 	u_long stack;
 {
-	struct frame *frame = (struct frame *)p->p_md.md_regs;
+	struct frame *frame = (struct frame *)l->l_md.md_regs;
 
 	frame->f_sr = PSL_USERSET;
 	frame->f_pc = pack->ep_entry & ~1;
@@ -573,7 +553,7 @@ setregs(p, pack, stack)
 	frame->f_regs[D7] = 0;
 	frame->f_regs[A0] = 0;
 	frame->f_regs[A1] = 0;
-	frame->f_regs[A2] = (int)p->p_psstr;
+	frame->f_regs[A2] = (int)l->l_proc->p_psstr;
 	frame->f_regs[A3] = 0;
 	frame->f_regs[A4] = 0;
 	frame->f_regs[A5] = 0;
@@ -581,10 +561,10 @@ setregs(p, pack, stack)
 	frame->f_regs[SP] = stack;
 
 	/* restore a null state frame */
-	p->p_addr->u_pcb.pcb_fpregs.fpf_null = 0;
+	l->l_addr->u_pcb.pcb_fpregs.fpf_null = 0;
 
 	if (fputype)
-		m68881_restore(&p->p_addr->u_pcb.pcb_fpregs);
+		m68881_restore(&l->l_addr->u_pcb.pcb_fpregs);
 }
 
 int	waittime = -1;
@@ -601,8 +581,8 @@ cpu_reboot(howto, bootstr)
 	(void)&howto;
 #endif
 	/* take a snap shot before clobbering any registers */
-	if (curproc && curproc->p_addr)
-		savectx(&curproc->p_addr->u_pcb);
+	if (curlwp && curlwp->l_addr)
+		savectx(&curlwp->l_addr->u_pcb);
 
 	/* If system is cold, just halt. */
 	if (cold) {
@@ -691,7 +671,7 @@ cpu_init_kcore_hdr()
 	 * Initialize the `dispatcher' portion of the header.
 	 */
 	strcpy(h->name, machine);
-	h->page_size = NBPG;
+	h->page_size = PAGE_SIZE;
 	h->kernbase = KERNBASE;
 
 	/*
@@ -787,7 +767,7 @@ long	dumplo = 0;		/* blocks */
 
 /*
  * This is called by main to set dumplo and dumpsize.
- * Dumps always skip the first NBPG of disk space in
+ * Dumps always skip the first PAGE_SIZE of disk space in
  * case there might be a disk label stored there.  If there
  * is extra space, put dump at the end to reduce the chance
  * that swapping trashes it.
@@ -797,20 +777,20 @@ cpu_dumpconf()
 {
 	cpu_kcore_hdr_t *h = &cpu_kcore_hdr;
 	struct m68k_kcore_hdr *m = &h->un._m68k;
+	const struct bdevsw *bdev;
 	int chdrsize;	/* size of dump header */
 	int nblks;	/* size of dump area */
-	int maj;
 	int i;
 
 	if (dumpdev == NODEV)
 		return;
 
-	maj = major(dumpdev);
-	if (maj < 0 || maj >= nblkdev)
+	bdev = bdevsw_lookup(dumpdev);
+	if (bdev == NULL)
 		panic("dumpconf: bad dumpdev=0x%x", dumpdev);
-	if (bdevsw[maj].d_psize == NULL)
+	if (bdev->d_psize == NULL)
 		return;
-	nblks = (*bdevsw[maj].d_psize)(dumpdev);
+	nblks = (*bdev->d_psize)(dumpdev);
 	chdrsize = cpu_dumpsize();
 
 	dumpsize = 0;
@@ -819,7 +799,7 @@ cpu_dumpconf()
 
 	/*
 	 * Check to see if we will fit.  Note we always skip the
-	 * first NBPG in case there is a disk label there.
+	 * first PAGE_SIZE in case there is a disk label there.
 	 */
 	if (nblks < (ctod(dumpsize) + chdrsize + ctod(1))) {
 		dumpsize = 0;
@@ -838,6 +818,7 @@ dumpsys()
 {
 	cpu_kcore_hdr_t *h = &cpu_kcore_hdr;
 	struct m68k_kcore_hdr *m = &h->un._m68k;
+	const struct bdevsw *bdev;
 	daddr_t blkno;		/* current block to write */
 				/* dump routine */
 	int (*dump) __P((dev_t, daddr_t, caddr_t, size_t));
@@ -854,6 +835,9 @@ dumpsys()
 	/* Make sure dump device is valid. */
 	if (dumpdev == NODEV)
 		return;
+	bdev = bdevsw_lookup(dumpdev);
+	if (bdev == NULL)
+		return;
 	if (dumpsize == 0) {
 		cpu_dumpconf();
 		if (dumpsize == 0)
@@ -864,7 +848,7 @@ dumpsys()
 		    minor(dumpdev));
 		return;
 	}
-	dump = bdevsw[major(dumpdev)].d_dump;
+	dump = bdev->d_dump;
 	blkno = dumplo;
 
 	printf("\ndumping to dev %u,%u offset %ld\n", major(dumpdev),
@@ -878,7 +862,7 @@ dumpsys()
 		goto bad;
 
 	for (pg = 0; pg < dumpsize; pg++) {
-#define NPGMB	(1024*1024/NBPG)
+#define NPGMB	(1024*1024/PAGE_SIZE)
 		/* print out how many MBs we have dumped */
 		if (pg && (pg % NPGMB) == 0)
 			printf("%d ", pg / NPGMB);
@@ -896,12 +880,12 @@ dumpsys()
 		    VM_PROT_READ, VM_PROT_READ|PMAP_WIRED);
 		pmap_update(pmap_kernel());
 
-		error = (*dump)(dumpdev, blkno, vmmap, NBPG);
+		error = (*dump)(dumpdev, blkno, vmmap, PAGE_SIZE);
  bad:
 		switch (error) {
 		case 0:
-			maddr += NBPG;
-			blkno += btodb(NBPG);
+			maddr += PAGE_SIZE;
+			blkno += btodb(PAGE_SIZE);
 			break;
 
 		case ENXIO:
@@ -1018,34 +1002,20 @@ get_top_of_ram()
 /*
  * machine dependent system variables.
  */
-int
-cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
-	struct proc *p;
+SYSCTL_SETUP(sysctl_machdep_setup, "sysctl machdep subtree setup")
 {
-	dev_t consdev;
 
-	/* all sysctl names at this level are terminal */
-	if (namelen != 1)
-		return (ENOTDIR);	/* overloaded */
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "machdep", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_MACHDEP, CTL_EOL);
 
-	switch (name[0]) {
-	case CPU_CONSDEV:
-		if (cn_tab != NULL)
-			consdev = cn_tab->cn_dev;
-		else
-			consdev = NODEV;
-		return (sysctl_rdstruct(oldp, oldlenp, newp, &consdev,
-			sizeof consdev));
-	default:
-		return (EOPNOTSUPP);
-	}
-	/* NOTREACHED */
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_STRUCT, "console_device", NULL,
+		       sysctl_consdev, 0, NULL, sizeof(dev_t),
+		       CTL_MACHDEP, CPU_CONSDEV, CTL_EOL);
 }
 
 int
@@ -1778,7 +1748,7 @@ static romvec_t romvecs[] =
 		"LC III ROMs",
 		(caddr_t)0x40814912,	/* ADB interrupt */
 		(caddr_t)0x0,		/* PM ADB interrupt */
-		(caddr_t)0x408b2f94,	/* ADBBase + 130 interupt */
+		(caddr_t)0x408b2f94,	/* ADBBase + 130 interrupt */
 		(caddr_t)0x4080a360,	/* CountADBs */
 		(caddr_t)0x4080a37a,	/* GetIndADB */
 		(caddr_t)0x4080a3a6,	/* GetADBInfo */
@@ -1894,7 +1864,7 @@ static romvec_t romvecs[] =
 		"Mac IIfx ROMs",
 		(caddr_t)0x40809f4a,	/* ADB interrupt */
 		(caddr_t)0x0,		/* PM ADB interrupt */
-		(caddr_t)0x4080a4d8,	/* ADBBase + 130 interupt */
+		(caddr_t)0x4080a4d8,	/* ADBBase + 130 interrupt */
 		(caddr_t)0x4080a360,	/* CountADBs */
 		(caddr_t)0x4080a37a,	/* GetIndADB */
 		(caddr_t)0x4080a3a6,	/* GetADBInfo */
@@ -1923,7 +1893,7 @@ static romvec_t romvecs[] =
 		"Performa 580 ROMs",
 		(caddr_t) 0x4089a8be,	/* ADB interrupt */
 		(caddr_t) 0x0,		/* PM ADB interrupt */
-		(caddr_t) 0x408b2f94,	/* ADBBase + 130 interupt */
+		(caddr_t) 0x408b2f94,	/* ADBBase + 130 interrupt */
 		(caddr_t) 0x4080a360,	/* CountADBs */
 		(caddr_t) 0x4080a37a,	/* GetIndADB */
 		(caddr_t) 0x4080a3a6,	/* GetADBInfo */
@@ -2423,10 +2393,11 @@ gray_bar()
    	3) restore regs
 */
 
-	__asm __volatile ("	movl %a0,%sp@-;
-				movl %a1,%sp@-;
-				movl %d0,%sp@-;
-				movl %d1,%sp@-");
+	__asm __volatile (
+			"	movl %a0,%sp@-;"
+			"	movl %a1,%sp@-;"
+			"	movl %d0,%sp@-;"
+			"	movl %d1,%sp@-");
 
 /* check to see if gray bars are turned off */
 	if (mac68k_machine.do_graybars) {
@@ -2438,10 +2409,11 @@ gray_bar()
 			((u_long *)videoaddr)[gray_nextaddr++] = 0x00000000;
 	}
 
-	__asm __volatile ("	movl %sp@+,%d1;
-				movl %sp@+,%d0;
-				movl %sp@+,%a1;
-				movl %sp@+,%a0");
+	__asm __volatile (
+			"	movl %sp@+,%d1;"
+			"	movl %sp@+,%d0;"
+			"	movl %sp@+,%a1;"
+			"	movl %sp@+,%a0");
 }
 #endif
 
@@ -2581,7 +2553,7 @@ get_mapping(void)
 
 	last = 0;
 	for (addr = 0; addr <= lastpage && get_physical(addr, &phys);
-	    addr += NBPG) {
+	    addr += PAGE_SIZE) {
 		if (numranges > 0 && phys != high[last]) {
 			/*
 			 * Attempt to find if this page is already
@@ -2602,7 +2574,7 @@ get_mapping(void)
 
 		if (numranges > 0 && phys == high[last]) {
 			/* Common case:  extend existing segment on high end */
-			high[last] += NBPG;
+			high[last] += PAGE_SIZE;
 		} else {
 			/* This is a new physical segment. */
 			for (last = 0; last < numranges; last++)
@@ -2619,7 +2591,7 @@ get_mapping(void)
 
 			numranges++;
 			low[last] = phys;
-			high[last] = phys + NBPG;
+			high[last] = phys + PAGE_SIZE;
 		}
 
 		/* Coalesce adjoining segments as appropriate */
@@ -2635,7 +2607,7 @@ get_mapping(void)
 	}
 	if (mac68k_machine.do_graybars) {
 		printf("System RAM: %ld bytes in %ld pages.\n",
-		    addr, addr / NBPG);
+		    addr, addr / PAGE_SIZE);
 		for (i = 0; i < numranges; i++) {
 			printf("     Low = 0x%lx, high = 0x%lx\n",
 			    low[i], high[i]);
@@ -2831,17 +2803,19 @@ printstar(void)
 	 * Be careful as we assume that no registers are clobbered
 	 * when we call this from assembly.
 	 */
-	__asm __volatile ("	movl %a0,%sp@-;
-				movl %a1,%sp@-;
-				movl %d0,%sp@-;
-				movl %d1,%sp@-");
+	__asm __volatile (
+			"	movl %a0,%sp@-;"
+			"	movl %a1,%sp@-;"
+			"	movl %d0,%sp@-;"
+			"	movl %d1,%sp@-");
 
 	/* printf("*"); */
 
-	__asm __volatile ("	movl %sp@+,%d1;
-				movl %sp@+,%d0;
-				movl %sp@+,%a1;
-				movl %sp@+,%a0");
+	__asm __volatile (
+			"	movl %sp@+,%d1;"
+			"	movl %sp@+,%d0;"
+			"	movl %sp@+,%a1;"
+			"	movl %sp@+,%a0");
 }
 
 /*

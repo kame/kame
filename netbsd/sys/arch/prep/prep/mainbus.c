@@ -1,4 +1,4 @@
-/*	$NetBSD: mainbus.c,v 1.11 2002/05/16 01:01:39 thorpej Exp $	*/
+/*	$NetBSD: mainbus.c,v 1.17 2003/07/15 02:54:52 lukem Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -30,6 +30,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.17 2003/07/15 02:54:52 lukem Exp $");
+
 #include "opt_pci.h"
 #include "opt_residual.h"
 
@@ -56,9 +59,8 @@
 int	mainbus_match(struct device *, struct cfdata *, void *);
 void	mainbus_attach(struct device *, struct device *, void *);
 
-struct cfattach mainbus_ca = {
-	sizeof(struct device), mainbus_match, mainbus_attach
-};
+CFATTACH_DECL(mainbus, sizeof(struct device),
+    mainbus_match, mainbus_attach, NULL, NULL);
 
 int	mainbus_print(void *, const char *);
 
@@ -144,6 +146,7 @@ mainbus_attach(parent, self, aux)
 	mba.mba_pba.pba_iot = &prep_io_space_tag;
 	mba.mba_pba.pba_memt = &prep_mem_space_tag;
 	mba.mba_pba.pba_dmat = &pci_bus_dma_tag;
+	mba.mba_pba.pba_dmat64 = NULL;
 	mba.mba_pba.pba_pc = &pc;
 	mba.mba_pba.pba_bus = 0;
 	mba.mba_pba.pba_bridgetag = NULL;
@@ -172,9 +175,9 @@ mainbus_print(aux, pnp)
 	union mainbus_attach_args *mba = aux;
 
 	if (pnp)
-		printf("%s at %s", mba->mba_busname, pnp);
+		aprint_normal("%s at %s", mba->mba_busname, pnp);
 	if (!strcmp(mba->mba_busname, "pci"))
-		printf(" bus %d", mba->mba_pba.pba_bus);
+		aprint_normal(" bus %d", mba->mba_pba.pba_bus);
 
 	return (UNCONF);
 }

@@ -1,4 +1,4 @@
-/* $NetBSD: isadma_bounce.c,v 1.4 2001/11/14 18:15:14 thorpej Exp $ */
+/* $NetBSD: isadma_bounce.c,v 1.6 2003/05/05 12:55:42 fvdl Exp $ */
 /* NetBSD: isadma_bounce.c,v 1.2 2000/06/01 05:49:36 thorpej Exp  */
 
 /*-
@@ -40,7 +40,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: isadma_bounce.c,v 1.4 2001/11/14 18:15:14 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: isadma_bounce.c,v 1.6 2003/05/05 12:55:42 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -59,11 +59,6 @@ __KERNEL_RCSID(0, "$NetBSD: isadma_bounce.c,v 1.4 2001/11/14 18:15:14 thorpej Ex
 #include <uvm/uvm_extern.h>
 
 extern paddr_t avail_end;	/* from pmap.c */
-
-/*
- * ISA can only DMA to 0-16M.
- */
-#define	ISA_DMA_BOUNCE_THRESHOLD	(16 * 1024 * 1024)
 
 /*
  * Cookie used by bouncing ISA DMA.  A pointer to one of these is stashed
@@ -312,7 +307,7 @@ isadma_bounce_dmamap_load(bus_dma_tag_t t, bus_dmamap_t map, void *buf,
  */
 int
 isadma_bounce_dmamap_load_mbuf(bus_dma_tag_t t, bus_dmamap_t map,
-    struct mbuf *m0, int flags)  
+    struct mbuf *m0, int flags)
 {
 	struct isadma_bounce_cookie *cookie = map->_dm_cookie;
 	int error;

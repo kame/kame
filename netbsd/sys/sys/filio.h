@@ -1,4 +1,4 @@
-/*	$NetBSD: filio.h,v 1.5 1994/06/29 06:44:14 cgd Exp $	*/
+/*	$NetBSD: filio.h,v 1.8 2003/08/07 16:34:04 agc Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1990, 1993, 1994
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -53,5 +49,10 @@
 #define	FIOASYNC	_IOW('f', 125, int)	/* set/clear async i/o */
 #define	FIOSETOWN	_IOW('f', 124, int)	/* set owner */
 #define	FIOGETOWN	_IOR('f', 123, int)	/* get owner */
+#define	OFIOGETBMAP	_IOWR('f', 122, uint32_t) /* get underlying block no. */
+#define	FIOGETBMAP	_IOWR('f', 122, daddr_t) /* get underlying block no. */
+
+/* Ugly symbol for compatibility with other operating systems */
+#define	FIBMAP		FIOGETBMAP
 
 #endif /* !_SYS_FILIO_H_ */

@@ -1,4 +1,4 @@
-/* $NetBSD: pnpbios.c,v 1.26 2001/11/15 07:03:35 lukem Exp $ */
+/* $NetBSD: pnpbios.c,v 1.40.2.1 2004/07/05 21:37:07 he Exp $ */
 
 /*
  * Copyright (c) 2000 Jason R. Thorpe.  All rights reserved.
@@ -33,7 +33,7 @@
  *
  * http://www.microsoft.com/hwdev/download/respec/pnpbios.zip
  * http://www.microsoft.com/hwdev/download/respec/biosclar.zip
- * http://www.microsoft.com/hwdev/download/respec/devids.txt
+ * http://www.microsoft.com/hwdev/download/resources/specs/devids.txt
  *
  * PNPBIOSEVENTS is unfinished.  After coding what I did I discovered
  * I had no platforms to test on so someone else will need to finish
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pnpbios.c,v 1.26 2001/11/15 07:03:35 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pnpbios.c,v 1.40.2.1 2004/07/05 21:37:07 he Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -62,7 +62,6 @@ __KERNEL_RCSID(0, "$NetBSD: pnpbios.c,v 1.26 2001/11/15 07:03:35 lukem Exp $");
 #include <arch/i386/pnpbios/pnpbiosreg.h>
 
 #include "opt_pnpbiosverbose.h"
-#include "isadma.h"
 #include "locators.h"
 
 #ifdef PNPBIOSVERBOSE
@@ -92,12 +91,13 @@ struct pnpbios_softc {
 	struct device		sc_dev;
 	isa_chipset_tag_t	sc_ic;
 	struct proc		*sc_evthread;
-
-	u_int8_t	*sc_evaddr;
 	int		sc_version;
 	int		sc_control;
+#ifdef PNPBIOSEVENTS
+	u_int8_t	*sc_evaddr;
 	int		sc_threadrun;
 	int		sc_docked;
+#endif
 };
 
 #define	PNPGET4(p)	((p)[0] + ((p)[1] << 8) + \
@@ -111,12 +111,13 @@ static int	pnpbios_setnode		__P((int flags, int idx,
     const u_int8_t *buf, size_t len));
 #endif
 
-static int	pnpbios_getdockinfo	__P((struct pnpdockinfo *di));
 static int	pnpbios_getnode		__P((int flags, int *idxp,
     u_int8_t *buf, size_t len));
 static int	pnpbios_getnumnodes	__P((int *nump, size_t *sizep));
 
 #ifdef PNPBIOSEVENTS
+static int	pnpbios_getdockinfo	__P((struct pnpdockinfo *di));
+
 static void	pnpbios_create_event_thread	__P((void *arg));
 static int	pnpbios_getevent		__P((u_int16_t *event));
 static void	pnpbios_event_thread		__P((void *arg));
@@ -144,7 +145,9 @@ static int	pnpbios_submatch	__P((struct device *parent,
 extern int	pnpbioscall		__P((int));
 
 static void	pnpbios_enumerate(struct pnpbios_softc *sc);
+#ifdef PNPBIOSEVENTS
 static int	pnpbios_update_dock_status __P((struct pnpbios_softc *sc));
+#endif
 
 /* scanning functions */
 static int pnp_compatid __P((struct pnpresources *, const void *, size_t));
@@ -167,7 +170,7 @@ static struct{
 	{0, 5, 6}, /* logical device id */
 	{pnp_compatid, 4, 4}, /* compatible device id */
 	{pnp_newirq, 2, 3}, /* irq  descriptor */
-	{pnp_newdma, 2, 2}, /* dma  descriptor */
+	{pnp_newdma, 2, 2}, /* DMA  descriptor */
 	{0, 0, 1}, /* start dep */
 	{0, 0, 0}, /* end dep */
 	{pnp_newioport, 7, 7}, /* io descriptor */
@@ -181,9 +184,8 @@ static struct{
 };
 
 
-struct cfattach pnpbios_ca = {
-	sizeof(struct pnpbios_softc), pnpbios_match, pnpbios_attach
-};
+CFATTACH_DECL(pnpbios, sizeof(struct pnpbios_softc),
+    pnpbios_match, pnpbios_attach, NULL, NULL);
 
 /*
  * Private stack and return value buffer. Spec (1.0a, ch. 4.3) says that
@@ -271,13 +273,13 @@ pnpbios_mapit(addr, len, prot)
 	u_long startpa, pa, endpa;
 	vaddr_t startva, va;
 
-	pa = startpa = i386_trunc_page(addr);
-	endpa = i386_round_page(addr + len);
+	pa = startpa = x86_trunc_page(addr);
+	endpa = x86_round_page(addr + len);
 
 	va = startva = uvm_km_valloc(kernel_map, endpa - startpa);
 	if (!startva)
 		return (0);
-	for (; pa < endpa; pa += NBPG, va += NBPG)
+	for (; pa < endpa; pa += PAGE_SIZE, va += PAGE_SIZE)
 		pmap_kenter_pa(va, pa, prot);
 	pmap_update(pmap_kernel());
 
@@ -303,10 +305,6 @@ pnpbios_attach(parent, self, aux)
 	pnpbios_softc = sc;
 	sc->sc_ic = paa->paa_ic;
 
-#if NISADMA > 0
-	isa_dmainit(sc->sc_ic, I386_BUS_SPACE_IO, &isa_bus_dma_tag, self);
-#endif
-
 	p = pnpbios_find();
 	if (!p)
 		panic("pnpbios_attach: disappeared");
@@ -328,7 +326,7 @@ pnpbios_attach(parent, self, aux)
 	/* if we have an event mechnism queue a thread to deal with them */
 	evtype = (sc->sc_control & PNP_IC_CONTORL_EVENT_MASK);
 	if (evtype == PNP_IC_CONTROL_EVENT_POLL) {
-		sc->sc_evaddr = pnpbios_mapit(evaddrp, NBPG,
+		sc->sc_evaddr = pnpbios_mapit(evaddrp, PAGE_SIZE,
 			VM_PROT_READ | VM_PROT_WRITE);
 		if (!sc->sc_evaddr)
 			printf("%s: couldn't map event flag 0x%08x\n",
@@ -368,11 +366,11 @@ pnpbios_attach(parent, self, aux)
 #ifdef PNPBIOSEVENTS
 	EDPRINTF(("%s: event flag vaddr 0x%08x\n", sc->sc_dev.dv_xname,
 	    (int)sc->sc_evaddr));
-#endif
 
 	/* Set initial dock status. */
 	sc->sc_docked = -1;
 	(void) pnpbios_update_dock_status(sc);
+#endif
 
 	/* Enumerate the device nodes. */
 	pnpbios_enumerate(sc);
@@ -394,7 +392,7 @@ static void
 pnpbios_enumerate(sc)
 	struct pnpbios_softc *sc;
 {
-	int res, num, i, size, idx;
+	int res, num, i, size, idx, dynidx;
 	struct pnpdevnode *dn;
 	u_int8_t *buf;
 
@@ -431,44 +429,38 @@ pnpbios_enumerate(sc)
 
 	idx = 0;
 	for (i = 0; i < num && idx != 0xff; i++) {
-		int node = idx;
-		int dynidx;
-
 		DPRINTF(("%s: getting info for index %d\n",
-		    sc->sc_dev.dv_xname, node));
+		    sc->sc_dev.dv_xname, idx));
+
+		dynidx = idx;
 
 		res = pnpbios_getnode(PNP_CF_DEVCONF_STATIC, &idx, buf, size);
 		if (res) {
 			printf("%s: index %d error %d "
 			    "getting static configuration\n",
-			    sc->sc_dev.dv_xname, node, res);
+			    sc->sc_dev.dv_xname, idx, res);
 			continue;
 		}
 		dn = (struct pnpdevnode *)buf;
-		if (dn->dn_handle != node)
-			printf("%s: node index mismatch (static): "
-			    "requested %d, got %d\n", sc->sc_dev.dv_xname,
-			    node, dn->dn_handle);
-		if (!pnpbios_attachnode(sc, node, buf, dn->dn_size, 1)) {
-			DPRINTF(("%s index %d: no match from static config\n",
-			    sc->sc_dev.dv_xname, node));
+		if (!pnpbios_attachnode(sc, dn->dn_handle, buf, dn->dn_size, 1)) {
+			DPRINTF(("%s handle %d: no match from static config\n",
+			    sc->sc_dev.dv_xname, dn->dn_handle));
 			continue;
 		}
-		dynidx = node;
-		res = pnpbios_getnode(PNP_CF_DEVCONF_DYNAMIC, &dynidx, buf,
-		    size);
+
+		res = pnpbios_getnode(PNP_CF_DEVCONF_DYNAMIC, &dynidx, buf, size);
 		if (res) {
 			printf("%s: index %d error %d "
 			    "getting dynamic configuration\n",
-			    sc->sc_dev.dv_xname, node, res);
+			    sc->sc_dev.dv_xname, dynidx, res);
 			continue;
 		}
 		dn = (struct pnpdevnode *)buf;
-		if (dn->dn_handle != node)
-			printf("%s: node index mismatch (dynamic): "
-			    "requested %d, got %d\n", sc->sc_dev.dv_xname,
-			    node, dn->dn_handle);
-		pnpbios_attachnode(sc, node, buf, dn->dn_size, 0);
+		if (!pnpbios_attachnode(sc, dn->dn_handle, buf, dn->dn_size, 0)) {
+			DPRINTF(("%s handle %d: no match from dynamic config\n",
+			    sc->sc_dev.dv_xname, dn->dn_handle));
+			continue;
+		}
 	}
 	if (i != num)
 		printf("%s: got only %d nodes\n", sc->sc_dev.dv_xname, i);
@@ -478,6 +470,7 @@ pnpbios_enumerate(sc)
 	free(buf, M_DEVBUF);
 }
 
+#ifdef PNPBIOSEVENTS
 static int
 pnpbios_update_dock_status(sc)
 	struct pnpbios_softc *sc;
@@ -512,6 +505,9 @@ pnpbios_update_dock_status(sc)
 			case PNP_DI_DOCK_STYLE_VCR:
 				style = "controlled";
 				break;
+			default:
+				style = "<style unknown>";
+				break;
 			}
 			switch (di.di_cap & PNP_DI_DOCK_WHEN_MASK) {
 			case PNP_DI_DOCK_WHEN_NO_POWER:
@@ -526,6 +522,9 @@ pnpbios_update_dock_status(sc)
 			case PNP_DI_DOCK_WHEN_RESERVED:
 				when = "<reserved>";
 				break;
+			default:
+				when = "<dock type unknown>";
+					break;
 			}
 			printf(", %s %s docking\n", style, when);
 		}
@@ -533,6 +532,7 @@ pnpbios_update_dock_status(sc)
 
 	return (odocked);
 }
+#endif
 
 static int
 pnpbios_getnumnodes(nump, sizep)
@@ -642,7 +642,6 @@ pnpbios_sendmessage(msg)
 
 	return (pnpbioscall(((caddr_t)help) - pnpbios_scratchbuf));
 }
-#endif /* PNPBIOSEVENTS */
 
 static int
 pnpbios_getdockinfo(di)
@@ -660,6 +659,7 @@ pnpbios_getdockinfo(di)
 	memcpy(di, pnpbios_scratchbuf, sizeof(*di));
 	return (res);
 }
+#endif /* PNPBIOSEVENTS */
 
 #if 0
 /* XXX - pnpbios_getapmtable() is not called. */
@@ -763,7 +763,7 @@ pnpbios_printres(r)
 	if (dma) {
 		if (p)
 			printf(", ");
-		printf("dma");
+		printf("DMA");
 		do {
 			printf(" %d", ffs(dma->mask) - 1);
 		} while ((dma = SIMPLEQ_NEXT(dma, next)));
@@ -780,12 +780,12 @@ pnpbios_print(aux, pnp)
 	if (pnp)
 		return (QUIET);
 
-	printf(" index %d (%s", aa->idx, aa->primid);
+	aprint_normal(" index %d (%s", aa->idx, aa->primid);
 	if (aa->resc->longname)
-		printf(", %s", aa->resc->longname);
+		aprint_normal(", %s", aa->resc->longname);
 	if (aa->idstr != aa->primid)
-		printf(", attached as %s", aa->idstr);
-	printf(")");
+		aprint_normal(", attached as %s", aa->idstr);
+	aprint_normal(")");
 
 	return (0);
 }
@@ -813,7 +813,7 @@ pnpbios_submatch(parent, match, aux)
 	    match->cf_loc[PNPBIOSCF_INDEX] != aa->idx)
 		return (0);
 
-	return ((*match->cf_attach->ca_match)(parent, match, aux));
+	return (config_match(parent, match, aux));
 }
 
 static int
@@ -1205,7 +1205,7 @@ pnp_newdma(r, vres, len)
 
 	res = vres;
 	if (res->r_mask == 0) { /* disabled */
-		DPRINTF(("\ttag dma zeroed\n"));
+		DPRINTF(("\ttag DMA zeroed\n"));
 		return (0);
 	}
 	dma = malloc(sizeof(struct pnp_dma), M_DEVBUF, M_NOWAIT);
@@ -1214,7 +1214,7 @@ pnp_newdma(r, vres, len)
 	SIMPLEQ_INSERT_TAIL(&r->dma, dma, next);
 	r->numdma++;
 
-	DPRINTF(("\ttag dma flags %02x mask %02x\n", dma->flags,dma->mask));
+	DPRINTF(("\ttag DMA flags %02x mask %02x\n", dma->flags,dma->mask));
 
 	return (0);
 }
@@ -1304,7 +1304,7 @@ pnp_debugdump(r, vres, len)
 	const void *vres;
 	size_t len;
 {
-	const u_int8_t *res;
+	const u_int8_t *res = vres;
 	int type, i;
 
 	if (res[0] & ISAPNP_LARGE_TAG) {
@@ -1341,8 +1341,8 @@ pnpbios_io_map(pbt, resc, idx, tagp, hdlp)
 	while (idx--)
 		io = SIMPLEQ_NEXT(io, next);
 
-	*tagp = I386_BUS_SPACE_IO;
-	return (i386_memio_map(I386_BUS_SPACE_IO, io->minbase, io->len,
+	*tagp = X86_BUS_SPACE_IO;
+	return (x86_memio_map(X86_BUS_SPACE_IO, io->minbase, io->len,
 			       0, hdlp));
 }
 
@@ -1363,7 +1363,7 @@ pnpbios_io_unmap(pbt, resc, idx, tag, hdl)
 	while (idx--)
 		io = SIMPLEQ_NEXT(io, next);
 
-	i386_memio_unmap(tag, hdl, io->len);
+	x86_memio_unmap(tag, hdl, io->len);
 }
 
 int
@@ -1384,7 +1384,7 @@ pnpbios_getiobase(pbt, resc, idx, tagp, basep)
 		io = SIMPLEQ_NEXT(io, next);
 
 	if (tagp)
-		*tagp = I386_BUS_SPACE_IO;
+		*tagp = X86_BUS_SPACE_IO;
 	if (basep)
 		*basep = io->minbase;
 	return (0);
@@ -1594,7 +1594,7 @@ start:
 				printf("%s: vendor defined event 0x%04x\n",
 				    sc->sc_dev.dv_xname, event);
 			else
-				printf("%s: unkown event 0x%04x\n",
+				printf("%s: unknown event 0x%04x\n",
 				    sc->sc_dev.dv_xname, event);
 #endif
 			break;

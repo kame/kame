@@ -1,4 +1,4 @@
-/*	$NetBSD: bonito_mainbus.c,v 1.2 2002/05/16 01:01:30 thorpej Exp $	*/
+/*	$NetBSD: bonito_mainbus.c,v 1.8 2003/07/14 22:57:47 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bonito_mainbus.c,v 1.8 2003/07/14 22:57:47 lukem Exp $");
+
 #include "opt_algor_p6032.h"
 
 #include <sys/param.h>
@@ -61,10 +64,8 @@ struct bonito_softc {
 int	bonito_mainbus_match(struct device *, struct cfdata *, void *);
 void	bonito_mainbus_attach(struct device *, struct device *, void *);
 
-struct cfattach bonito_mainbus_ca = {
-	sizeof(struct bonito_softc), bonito_mainbus_match,
-	    bonito_mainbus_attach,
-};
+CFATTACH_DECL(bonito_mainbus, sizeof(struct bonito_softc),
+    bonito_mainbus_match, bonito_mainbus_attach, NULL, NULL);
 extern struct cfdriver bonito_cd;
 
 int	bonito_mainbus_print(void *, const char *);
@@ -114,6 +115,7 @@ bonito_mainbus_attach(struct device *parent, struct device *self, void *aux)
 		pba.pba_iot = &acp->ac_iot;
 		pba.pba_memt = &acp->ac_memt;
 		pba.pba_dmat = &acp->ac_pci_dmat;
+		pba.pba_dmat64 = NULL;
 		pba.pba_pc = &acp->ac_pc;
 	    }
 #endif /* ALGOR_P6032 */
@@ -128,8 +130,8 @@ bonito_mainbus_print(void *aux, const char *pnp)
 
 	/* only PCIs can attach to BONITOs; easy. */
 	if (pnp)
-		printf("%s at %s", pba->pba_busname, pnp);
-	printf(" bus %d", pba->pba_bus);
+		aprint_normal("%s at %s", pba->pba_busname, pnp);
+	aprint_normal(" bus %d", pba->pba_bus);
 
 	return (UNCONF);
 }

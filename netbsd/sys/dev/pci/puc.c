@@ -1,4 +1,4 @@
-/*	$NetBSD: puc.c,v 1.12 2001/11/13 07:48:48 lukem Exp $	*/
+/*	$NetBSD: puc.c,v 1.20 2004/02/03 19:51:39 fredb Exp $	*/
 
 /*
  * Copyright (c) 1996, 1998, 1999
@@ -53,7 +53,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: puc.c,v 1.12 2001/11/13 07:48:48 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: puc.c,v 1.20 2004/02/03 19:51:39 fredb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -66,6 +66,7 @@ __KERNEL_RCSID(0, "$NetBSD: puc.c,v 1.12 2001/11/13 07:48:48 lukem Exp $");
 #include <dev/ic/comreg.h>
 #include <dev/ic/comvar.h>
 
+#include "locators.h"
 #include "opt_puccn.h"
 
 struct puc_softc {
@@ -99,9 +100,8 @@ void	puc_attach __P((struct device *, struct device *, void *));
 int	puc_print __P((void *, const char *));
 int	puc_submatch __P((struct device *, struct cfdata *, void *));
 
-struct cfattach puc_ca = {
-	sizeof(struct puc_softc), puc_match, puc_attach
-};
+CFATTACH_DECL(puc, sizeof(struct puc_softc),
+    puc_match, puc_attach, NULL, NULL);
 
 const struct puc_device_description *
 	puc_find_description __P((pcireg_t, pcireg_t, pcireg_t, pcireg_t));
@@ -279,9 +279,12 @@ puc_attach(parent, self, aux)
 		paa.type = sc->sc_desc->ports[i].type;
 		paa.flags = sc->sc_desc->ports[i].flags;
 		paa.pc = pa->pa_pc;
+		paa.tag = pa->pa_tag;
 		paa.intrhandle = intrhandle;
 		paa.a = sc->sc_bar_mappings[barindex].a;
 		paa.t = sc->sc_bar_mappings[barindex].t;
+		paa.dmat = pa->pa_dmat;
+		paa.dmat64 = pa->pa_dmat64;
 
 		if (
 #ifdef PUCCN
@@ -322,8 +325,8 @@ puc_print(aux, pnp)
 	struct puc_attach_args *paa = aux;
         
 	if (pnp)
-		printf("%s at %s", puc_port_type_name(paa->type), pnp);
-	printf(" port %d", paa->port);
+		aprint_normal("%s at %s", puc_port_type_name(paa->type), pnp);
+	aprint_normal(" port %d", paa->port);
 	return (UNCONF);
 }
 
@@ -338,7 +341,7 @@ puc_submatch(parent, cf, aux)
 	if (cf->cf_loc[PUCCF_PORT] != PUCCF_PORT_DEFAULT &&
 	    cf->cf_loc[PUCCF_PORT] != aa->port)
 		return 0;
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 const struct puc_device_description *

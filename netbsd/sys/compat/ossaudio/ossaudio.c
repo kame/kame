@@ -1,4 +1,4 @@
-/*	$NetBSD: ossaudio.c,v 1.39.10.1 2003/08/17 11:17:14 tron Exp $	*/
+/*	$NetBSD: ossaudio.c,v 1.45 2003/06/29 22:29:41 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ossaudio.c,v 1.39.10.1 2003/08/17 11:17:14 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ossaudio.c,v 1.45 2003/06/29 22:29:41 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -48,6 +48,7 @@ __KERNEL_RCSID(0, "$NetBSD: ossaudio.c,v 1.39.10.1 2003/08/17 11:17:14 tron Exp 
 #include <sys/audioio.h>
 #include <sys/midiio.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/ossaudio/ossaudio.h>
@@ -92,7 +93,7 @@ oss_ioctl_audio(p, uap, retval)
 	u_int u;
 	int idat, idata;
 	int error = 0;
-	int (*ioctlf) __P((struct file *, u_long, caddr_t, struct proc *));
+	int (*ioctlf)(struct file *, u_long, void *, struct proc *);
 
 	fdp = p->p_fd;
 	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
@@ -507,10 +508,13 @@ oss_ioctl_audio(p, uap, retval)
 		if (error)
 			goto out;
 		break;
+	case OSS_SNDCTL_DSP_SETDUPLEX:
+		idat = 1;
+		error = ioctlf(fp, AUDIO_SETFD, (caddr_t)&idat, p);
+		goto out;
 	case OSS_SNDCTL_DSP_MAPINBUF:
 	case OSS_SNDCTL_DSP_MAPOUTBUF:
 	case OSS_SNDCTL_DSP_SETSYNCRO:
-	case OSS_SNDCTL_DSP_SETDUPLEX:
 	case OSS_SNDCTL_DSP_PROFILE:
 		error = EINVAL;
 		goto out;
@@ -622,7 +626,7 @@ getdevinfo(fp, p)
 /*		{ AudioNmixerout,	?? },*/
 		{ 0, -1 }
 	};
-	int (*ioctlf) __P((struct file *, u_long, caddr_t, struct proc *)) =
+	int (*ioctlf)(struct file *, u_long, void *, struct proc *) =
 	    fp->f_ops->fo_ioctl;
 	struct vnode *vp;
 	struct vattr va;
@@ -729,7 +733,7 @@ oss_ioctl_mixer(p, uap, retval)
 	int i;
 	int error;
 	int l, r, n, e;
-	int (*ioctlf) __P((struct file *, u_long, caddr_t, struct proc *));
+	int (*ioctlf)(struct file *, u_long, void *, struct proc *);
 
 	fdp = p->p_fd;
 	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
@@ -933,7 +937,7 @@ oss_ioctl_sequencer(p, uap, retval)
 	struct oss_synth_info osi;
 	struct oss_seq_event_rec oser;
 	int error;
-	int (*ioctlf) __P((struct file *, u_long, caddr_t, struct proc *));
+	int (*ioctlf)(struct file *, u_long, void *, struct proc *);
 
 	fdp = p->p_fd;
 	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)

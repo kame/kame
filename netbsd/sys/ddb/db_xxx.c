@@ -1,4 +1,4 @@
-/*	$NetBSD: db_xxx.c,v 1.16 2002/02/15 07:33:54 simonb Exp $	*/
+/*	$NetBSD: db_xxx.c,v 1.28 2003/09/20 03:02:04 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -40,8 +36,10 @@
  * data structures and functions used by the kernel (proc, callout).
  */
 
+#include "opt_kgdb.h"
+
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: db_xxx.c,v 1.16 2002/02/15 07:33:54 simonb Exp $");
+__KERNEL_RCSID(0, "$NetBSD: db_xxx.c,v 1.28 2003/09/20 03:02:04 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -62,6 +60,9 @@ __KERNEL_RCSID(0, "$NetBSD: db_xxx.c,v 1.16 2002/02/15 07:33:54 simonb Exp $");
 #include <ddb/db_output.h>
 #include <ddb/db_sym.h>
 #include <ddb/db_extern.h>
+#ifdef KGDB
+#include <sys/kgdb.h>
+#endif
 
 void
 db_kill_proc(db_expr_t addr, int haddr, db_expr_t count, char *modif)
@@ -99,22 +100,35 @@ db_kill_proc(db_expr_t addr, int haddr, db_expr_t count, char *modif)
 	psignal(p, (int)sig);
 }
 
+#ifdef KGDB
+void
+db_kgdb_cmd(db_expr_t addr, int haddr, db_expr_t count, char *modif)
+{
+	kgdb_active++;
+	kgdb_trap(db_trap_type, DDB_REGS);
+	kgdb_active--;
+}
+#endif
+
 void
 db_show_all_procs(db_expr_t addr, int haddr, db_expr_t count, char *modif)
 {
 	int i;
+
 	char *mode;
-	struct proc *p, *pp;
+	struct proc *p, *pp, *cp;
+	struct lwp *l, *cl;
 	struct timeval tv[2];
 	const struct proclist_desc *pd;
 
 	if (modif[0] == 0)
 		modif[0] = 'n';			/* default == normal mode */
 
-	mode = strchr("mawn", modif[0]);
+	mode = strchr("mawln", modif[0]);
 	if (mode == NULL || *mode == 'm') {
 		db_printf("usage: show all procs [/a] [/n] [/w]\n");
 		db_printf("\t/a == show process address info\n");
+		db_printf("\t/l == show LWP info\n");
 		db_printf("\t/n == show normal process info [default]\n");
 		db_printf("\t/w == show process wait/emul info\n");
 		return;
@@ -125,9 +139,13 @@ db_show_all_procs(db_expr_t addr, int haddr, db_expr_t count, char *modif)
 		db_printf(" PID       %10s %18s %18s %18s\n",
 		    "COMMAND", "STRUCT PROC *", "UAREA *", "VMSPACE/VM_MAP");
 		break;
+	case 'l':
+		db_printf(" PID        %4s S %9s %18s %18s %-12s\n",
+		    "LID", "FLAGS", "STRUCT LWP *", "UAREA *", "WAIT");
+		break;
 	case 'n':
-		db_printf(" PID       %10s %10s %10s S %7s %16s %7s\n",
-		    "PPID", "PGRP", "UID", "FLAGS", "COMMAND", "WAIT");
+		db_printf(" PID       %8s %8s %10s S %7s %4s %16s %7s\n",
+		    "PPID", "PGRP", "UID", "FLAGS", "LWPS", "COMMAND", "WAIT");
 		break;
 	case 'w':
 		db_printf(" PID       %10s %8s %4s %5s %5s %-12s%s\n",
@@ -138,79 +156,72 @@ db_show_all_procs(db_expr_t addr, int haddr, db_expr_t count, char *modif)
 
 	/* XXX LOCKING XXX */
 	pd = proclists;
+	cp = curproc;
+	cl = curlwp;
 	for (pd = proclists; pd->pd_list != NULL; pd++) {
 		LIST_FOREACH(p, pd->pd_list, p_list) {
 			pp = p->p_pptr;
 			if (p->p_stat == 0) {
 				continue;
 			}
-
-			db_printf("%c%-10d", " >"[curproc == p], p->p_pid);
+			l = LIST_FIRST(&p->p_lwps);
+			db_printf("%c%-10d", " >"[cp == p], p->p_pid);
 
 			switch (*mode) {
 
 			case 'a':
 				db_printf("%10.10s %18p %18p %18p\n",
-				    p->p_comm, p, p->p_addr, p->p_vmspace);
+				    p->p_comm, p,
+				    l != NULL ? l->l_addr : 0,
+				    p->p_vmspace);
 				break;
+			case 'l':
+				 while (l != NULL) {
+					db_printf("%c%4d %d %#9x %18p %18p %s\n",
+					    " >"[cl == l], l->l_lid,
+					    l->l_stat, l->l_flag, l, 
+					    l->l_addr, 
+					    (l->l_wchan && l->l_wmesg) ?
+					    l->l_wmesg : "");
 
+					l = LIST_NEXT(l, l_sibling);
+					if (l)
+						db_printf("%11s","");
+				}
+				break;
 			case 'n':
-				db_printf("%10d %10d %10d %d %#7x %16s %7.7s\n",
+				db_printf("%8d %8d %10d %d %#7x %4d %16s %7.7s\n",
 				    pp ? pp->p_pid : -1, p->p_pgrp->pg_id,
 				    p->p_cred->p_ruid, p->p_stat, p->p_flag,
-				    p->p_comm, (p->p_wchan && p->p_wmesg) ?
-					p->p_wmesg : "");
+				    p->p_nlwps, p->p_comm,
+				    (p->p_nlwps != 1) ? "*" : (
+				    (l->l_wchan && l->l_wmesg) ? 
+				    l->l_wmesg : ""));
 				break;
 
 			case 'w':
 				db_printf("%10s %8s %4d", p->p_comm,
-				    p->p_emul->e_name,p->p_priority);
+				    p->p_emul->e_name,
+				    (l != NULL) ? l->l_priority : -1);
 				calcru(p, &tv[0], &tv[1], NULL);
 				for (i = 0; i < 2; ++i) {
 					db_printf("%4ld.%1ld",
 					    (long)tv[i].tv_sec,
 					    (long)tv[i].tv_usec/100000);
 				}
-				if (p->p_wchan && p->p_wmesg) {
-					db_printf(" %-12s", p->p_wmesg);
-					db_printsym((db_expr_t)p->p_wchan,
+				if (p->p_nlwps == 1) {
+				if (l->l_wchan && l->l_wmesg) {
+					db_printf(" %-12s", l->l_wmesg);
+					db_printsym(
+					    (db_expr_t)(intptr_t)l->l_wchan,
 					    DB_STGY_XTRN, db_printf);
+				} } else {
+					db_printf(" * ");
 				}
 				db_printf("\n");
 				break;
 
 			}
-		}
-	}
-}
-
-void
-db_show_callout(db_expr_t addr, int haddr, db_expr_t count, char *modif)
-{
-	uint64_t hint;
-	int i;
-
-	for (i = 0; i < callwheelsize; i++) {
-		struct callout_queue *bucket = &callwheel[i];
-		struct callout *c = TAILQ_FIRST(&bucket->cq_q);
-
-		if (c) {
-			db_printf("bucket %d (hint %llx):\n", i,
-			    (long long) bucket->cq_hint);
-			hint = UQUAD_MAX;
-			while (c) {
-				if (c->c_time < hint)
-					hint = c->c_time;
-				db_printf("%p: time %llx arg %p flags %x "
-				    "func %p: ", c, (long long) c->c_time,
-				    c->c_arg, c->c_flags, c->c_func);
-				db_printsym((u_long)c->c_func, DB_STGY_PROC,
-				    db_printf);
-				db_printf("\n");
-				c = TAILQ_NEXT(c, c_link);
-			}
-			if (bucket->cq_hint < hint)
-				printf("** HINT IS STALE\n");
 		}
 	}
 }
@@ -219,16 +230,29 @@ void
 db_dmesg(db_expr_t addr, int haddr, db_expr_t count, char *modif)
 {
 	struct kern_msgbuf *mbp;
+	db_expr_t print;
 	int ch, newl, skip, i;
 	char *p, *bufdata;
 
+        if (!msgbufenabled || msgbufp->msg_magic != MSG_MAGIC) {
+		db_printf("message buffer not available\n");
+		return;
+	}
+
 	mbp = msgbufp;
 	bufdata = &mbp->msg_bufc[0];
+
+	if (haddr && addr < mbp->msg_bufs)
+		print = addr;
+	else
+		print = mbp->msg_bufs;
 
 	for (newl = skip = i = 0, p = bufdata + mbp->msg_bufx;
 	    i < mbp->msg_bufs; i++, p++) {
 		if (p == bufdata + mbp->msg_bufs)
 			p = bufdata;
+		if (i < mbp->msg_bufs - print)
+			continue;
 		ch = *p;
 		/* Skip "\n<.*>" syslog sequences. */
 		if (skip) {
@@ -247,4 +271,28 @@ db_dmesg(db_expr_t addr, int haddr, db_expr_t count, char *modif)
 	}
 	if (!newl)
 		db_printf("\n");
+}
+
+void
+db_show_sched_qs(db_expr_t addr, int haddr, db_expr_t count, char *modif)
+{
+	struct prochd *ph;
+	struct lwp *l;
+	int i, first;
+
+	for (i = 0; i < RUNQUE_NQS; i++)
+	{
+		first = 1;
+		ph = &sched_qs[i];
+		for (l = ph->ph_link; l != (struct lwp *)ph; l = l->l_forw) {
+			if (first) {
+				db_printf("%c%d",
+				    (sched_whichqs & (1U << i))
+				    ? ' ' : '!', i);
+				first = 0;
+			}
+			db_printf("\t%d.%d (%s)\n", l->l_proc->p_pid,
+			    l->l_lid, l->l_proc->p_comm);
+		}
+	}
 }

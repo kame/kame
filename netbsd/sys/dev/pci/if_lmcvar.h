@@ -1,4 +1,4 @@
-/*	$NetBSD: if_lmcvar.h,v 1.8 2001/08/27 17:47:36 eeh Exp $	*/
+/*	$NetBSD: if_lmcvar.h,v 1.11 2002/10/01 01:39:38 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1997-1999 LAN Media Corporation (LMC)
@@ -496,7 +496,7 @@ struct lmc___softc {
 #define	LMC_HAVE_STOREFWD	0x00008000	/* have CMD_STOREFWD */
 #define	LMC_HAVE_SIA100		0x00010000	/* has LS100 in SIA status */
 
-static const char * const lmc_system_errors[] = {
+static const char * const lmc_system_errors[] __attribute__((__unused__)) = {
     "parity error",
     "master abort",
     "target abort",
@@ -507,6 +507,7 @@ static const char * const lmc_system_errors[] = {
     "reserved #7",
 };
 
+#if 0
 static const char * const lmc_status_bits[] = {
     NULL,
     "transmit process stopped",
@@ -527,6 +528,7 @@ static const char * const lmc_status_bits[] = {
     NULL,
     NULL,
 };
+#endif
 
 /*
  * This driver supports a maximum of 32 tulip boards.
@@ -634,7 +636,6 @@ extern struct cfdriver lmccd;
 #if defined(__NetBSD__)
 #define	ifnet_ret_t void
 typedef u_long ioctl_cmd_t;
-extern struct cfattach de_ca;
 extern struct cfdriver de_cd;
 #define	LMC_UNIT_TO_SOFTC(unit)	((lmc_softc_t *) de_cd.cd_devs[unit])
 #define LMC_IFP_TO_SOFTC(ifp)	((lmc_softc_t *)((ifp)->if_softc))

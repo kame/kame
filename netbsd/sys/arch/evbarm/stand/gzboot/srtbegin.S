@@ -1,4 +1,4 @@
-/*	$NetBSD: srtbegin.S,v 1.4 2002/02/24 20:44:28 thorpej Exp $	*/
+/*	$NetBSD: srtbegin.S,v 1.6 2003/07/22 04:57:24 briggs Exp $	*/
 
 /*
  * Copyright (c) 2002 Wasabi Systems, Inc.
@@ -59,7 +59,7 @@ ENTRY(start)
 	 * likely running from flash.  Flash is slow, and we'd
 	 * really like to run the code from RAM.  Copy it out.
 	 */
-	add	r1, pc, #(Ltext - . - 8)
+	adr	r1, Ltext
 	ldmia	r1, {r1-r3}
 	cmp	r1, r2			/* __text_store == &start? */
 	beq	relocated		/* yes, in RAM */
@@ -74,7 +74,7 @@ ENTRY(start)
 	 * Okay, we are finished relocating the text segment.  Now
 	 * we need to leap to the next instruction.
 	 */
-	add	r1, pc, #(Lrelocated - . - 8)
+	adr	r1, Lrelocated
 	ldr	pc, [r1]
 
 relocated:
@@ -83,10 +83,13 @@ relocated:
 	 * we're most likely built for running from flash,
 	 * and must copy the data segment out to RAM.
 	 */
-	add	r1, pc, #(Ldata - . - 8)
+	adr	r1, Ldata
 	ldmia	r1, {r1-r3}
 	cmp	r1, r2			/* __data_store == __data_start? */
 	beq	2f			/* yes, in RAM */
+
+	cmp	r2, r3			/* __data_store == _edata? */
+	beq	2f			/* yes, skip copy */
 
 	/* Copy data segment from ROM to RAM */
 1:	ldrb	r0, [r1], #0x01
@@ -96,7 +99,7 @@ relocated:
 
 2:
 	/* Clear the BSS. */
-	add	r1, pc, #(Lbss - . - 8)
+	adr	r1, Lbss
 	ldmia	r1, {r1, r2}
 	sub	r2, r2, r1
 	mov	r3, #0
@@ -106,7 +109,7 @@ relocated:
 	bgt	1b
 
 	/* Set the stack pointer */
-	add	r1, pc, #(Lstack - . - 8)
+	adr	r1, Lstack
 	ldr	r1, [r1]
 	add	sp, r1, #STACKSIZE
 

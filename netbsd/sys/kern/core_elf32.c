@@ -1,4 +1,4 @@
-/*	$NetBSD: core_elf32.c,v 1.3 2001/12/10 02:07:37 thorpej Exp $	*/
+/*	$NetBSD: core_elf32.c,v 1.12 2003/09/14 06:59:13 christos Exp $	*/
 
 /*
  * Copyright (c) 2001 Wasabi Systems, Inc.
@@ -40,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(1, "$NetBSD: core_elf32.c,v 1.3 2001/12/10 02:07:37 thorpej Exp $");
+__KERNEL_RCSID(1, "$NetBSD: core_elf32.c,v 1.12 2003/09/14 06:59:13 christos Exp $");
 
 /* If not included by core_elf64.c, ELFSIZE won't be defined. */
 #ifndef ELFSIZE
@@ -75,22 +75,27 @@ int	ELFNAMEEND(coredump_writeseghdrs)(struct proc *, struct vnode *,
 int	ELFNAMEEND(coredump_writesegs)(struct proc *, struct vnode *,
 	    struct ucred *, struct uvm_coredump_state *);
 
-int	ELFNAMEEND(coredump_notes)(struct proc *, struct vnode *,
-	    struct ucred *, int *, off_t);
+int	ELFNAMEEND(coredump_notes)(struct proc *, struct lwp *, struct vnode *,
+	    struct ucred *, size_t *, off_t);
+int	ELFNAMEEND(coredump_note)(struct proc *, struct lwp *, struct vnode *,
+	    struct ucred *, size_t *, off_t);
 
 #define	ELFROUNDSIZE	4	/* XXX Should it be sizeof(Elf_Word)? */
 #define	elfround(x)	roundup((x), ELFROUNDSIZE)
 
 int
-ELFNAMEEND(coredump)(struct proc *p, struct vnode *vp, struct ucred *cred)
+ELFNAMEEND(coredump)(struct lwp *l, struct vnode *vp, struct ucred *cred)
 {
+	struct proc *p;
 	Elf_Ehdr ehdr;
 	Elf_Phdr phdr;
 	struct countsegs_state cs;
 	struct writesegs_state ws;
 	off_t notestart, secstart;
-	int notesize, error;
+	size_t notesize;
+	int error;
 
+	p = l->l_proc;
 	/*
 	 * We have to make a total of 3 passes across the map:
 	 *
@@ -110,7 +115,7 @@ ELFNAMEEND(coredump)(struct proc *p, struct vnode *vp, struct ucred *cred)
 		return (error);
 
 	/* Get the size of the notes. */
-	error = ELFNAMEEND(coredump_notes)(p, vp, cred, &notesize, 0);
+	error = ELFNAMEEND(coredump_notes)(p, l, vp, cred, &notesize, 0);
 	if (error)
 		return (error);
 
@@ -153,7 +158,7 @@ ELFNAMEEND(coredump)(struct proc *p, struct vnode *vp, struct ucred *cred)
 	notestart = ws.offset + (sizeof(phdr) * cs.npsections);
 	secstart = round_page(notestart + notesize);
 
-	/* Now write the P-section headers. */
+	/* Pass 2: now write the P-section headers. */
 	ws.secoff = secstart;
 	error = uvm_coredump_walkmap(p, vp, cred,
 	    ELFNAMEEND(coredump_writeseghdrs), &ws);
@@ -186,7 +191,7 @@ ELFNAMEEND(coredump)(struct proc *p, struct vnode *vp, struct ucred *cred)
 #endif
 
 	/* Write out the notes. */
-	error = ELFNAMEEND(coredump_notes)(p, vp, cred, &notesize, ws.offset);
+	error = ELFNAMEEND(coredump_notes)(p, l, vp, cred, &notesize, ws.offset);
 
 	ws.offset += notesize;
 
@@ -196,7 +201,7 @@ ELFNAMEEND(coredump)(struct proc *p, struct vnode *vp, struct ucred *cred)
 		    (long long) round_page(ws.offset), (long long) secstart);
 #endif
 
-	/* ...and finally, the sections themselves. */
+	/* Pass 3: finally, write the sections themselves. */
 	ws.secoff = secstart;
 	error = uvm_coredump_walkmap(p, vp, cred,
 	    ELFNAMEEND(coredump_writesegs), &ws);
@@ -281,18 +286,14 @@ ELFNAMEEND(coredump_writesegs)(struct proc *p, struct vnode *vp,
 }
 
 int
-ELFNAMEEND(coredump_notes)(struct proc *p, struct vnode *vp,
-    struct ucred *cred, int *sizep, off_t offset)
+ELFNAMEEND(coredump_notes)(struct proc *p, struct lwp *l, struct vnode *vp,
+    struct ucred *cred, size_t *sizep, off_t offset)
 {
 	struct netbsd_elfcore_procinfo cpi;
 	Elf_Nhdr nhdr;
-	int size, notesize, error;
-	char name[64];
-	int namesize;
-	struct reg intreg;
-#ifdef PT_GETFPREGS
-	struct fpreg freg;
-#endif
+	size_t size, notesize;
+	int error;
+	struct lwp *l0;
 
 	size = 0;
 
@@ -302,8 +303,9 @@ ELFNAMEEND(coredump_notes)(struct proc *p, struct vnode *vp,
 	if (offset) {
 		cpi.cpi_version = NETBSD_ELFCORE_PROCINFO_VERSION;
 		cpi.cpi_cpisize = sizeof(cpi);
-		cpi.cpi_signo = p->p_sigctx.ps_sig;
+		cpi.cpi_signo = p->p_sigctx.ps_signo;
 		cpi.cpi_sigcode = p->p_sigctx.ps_code;
+		cpi.cpi_siglwp = p->p_sigctx.ps_lwp;
 
 		memcpy(&cpi.cpi_sigpend, &p->p_sigctx.ps_siglist,
 		    sizeof(cpi.cpi_sigpend));
@@ -327,8 +329,8 @@ ELFNAMEEND(coredump_notes)(struct proc *p, struct vnode *vp,
 		cpi.cpi_egid = p->p_ucred->cr_gid;
 		cpi.cpi_svgid = p->p_cred->p_svgid;
 
-		cpi.cpi_nlwps = 1;	/* XXX for now */
-		strcpy(cpi.cpi_name, p->p_comm);
+		cpi.cpi_nlwps = p->p_nlwps;
+		strlcpy(cpi.cpi_name, p->p_comm, sizeof(cpi.cpi_name));
 
 		nhdr.n_namesz = sizeof(ELF_NOTE_NETBSD_CORE_NAME);
 		nhdr.n_descsz = sizeof(cpi);
@@ -347,59 +349,99 @@ ELFNAMEEND(coredump_notes)(struct proc *p, struct vnode *vp,
 	/* XXX Add hook for machdep per-proc notes. */
 
 	/*
+	 * Now write the register info for the thread that caused the
+	 * coredump.
+	 */
+	error = ELFNAMEEND(coredump_note)(p, l, vp, cred, &notesize, offset);
+	if (error)
+		return (error);
+	if (offset)
+		offset += notesize;
+	size += notesize;
+
+	/*
 	 * Now, for each LWP, write the register info and any other
 	 * per-LWP notes.
 	 */
-	do {
-		/* XXX Only one LWP for now. */
-		sprintf(name, "%s@%d", ELF_NOTE_NETBSD_CORE_NAME, 1);
-		namesize = strlen(name) + 1;
-
-		notesize = sizeof(nhdr) + elfround(namesize) +
-		    elfround(sizeof(intreg));
-		if (offset) {
-			error = process_read_regs(p, &intreg);
-			if (error)
-				return (error);
-
-			nhdr.n_namesz = namesize;
-			nhdr.n_descsz = sizeof(intreg);
-			nhdr.n_type = PT_GETREGS;
-
-			error = ELFNAMEEND(coredump_writenote)(p, vp, cred,
-			    offset, &nhdr, name, &intreg);
-			if (error)
-				return (error);
-
+	LIST_FOREACH(l0, &p->p_lwps, l_sibling) {
+		if (l0 == l)		/* we've taken care of this thread */
+			continue;
+		error = ELFNAMEEND(coredump_note)(p, l0, vp, cred,
+		    &notesize, offset);
+		if (error)
+			return (error);
+		if (offset)
 			offset += notesize;
-		}
 		size += notesize;
-
-#ifdef PT_GETFPREGS
-		notesize = sizeof(nhdr) + elfround(namesize) +
-		    elfround(sizeof(freg));
-		if (offset) {
-			error = process_read_fpregs(p, &freg);
-			if (error)
-				return (error);
-
-			nhdr.n_namesz = namesize;
-			nhdr.n_descsz = sizeof(freg);
-			nhdr.n_type = PT_GETFPREGS;
-
-			error = ELFNAMEEND(coredump_writenote)(p, vp, cred,
-			    offset, &nhdr, name, &freg);
-			if (error)
-				return (error);
-
-			offset += notesize;
-		}
-		size += notesize;
-#endif
-		/* XXX Add hook for machdep per-LWP notes. */
-	} while (/*CONSTCOND*/0);
+	}
 
 	*sizep = size;
+	return (0);
+}
+
+int
+ELFNAMEEND(coredump_note)(struct proc *p, struct lwp *l, struct vnode *vp,
+    struct ucred *cred, size_t *sizep, off_t offset)
+{
+	Elf_Nhdr nhdr;
+	int size, notesize, error;
+	int namesize;
+	char name[64];
+	struct reg intreg;
+#ifdef PT_GETFPREGS
+	struct fpreg freg;
+#endif
+
+	size = 0;
+
+	sprintf(name, "%s@%d", ELF_NOTE_NETBSD_CORE_NAME, l->l_lid);
+	namesize = strlen(name) + 1;
+
+	notesize = sizeof(nhdr) + elfround(namesize) + elfround(sizeof(intreg));
+	if (offset) {
+		PHOLD(l);
+		error = process_read_regs(l, &intreg);
+		PRELE(l);
+		if (error)
+			return (error);
+
+		nhdr.n_namesz = namesize;
+		nhdr.n_descsz = sizeof(intreg);
+		nhdr.n_type = PT_GETREGS;
+
+		error = ELFNAMEEND(coredump_writenote)(p, vp, cred,
+		    offset, &nhdr, name, &intreg);
+		if (error)
+			return (error);
+
+		offset += notesize;
+	}
+	size += notesize;
+
+#ifdef PT_GETFPREGS
+	notesize = sizeof(nhdr) + elfround(namesize) + elfround(sizeof(freg));
+	if (offset) {
+		PHOLD(l);
+		error = process_read_fpregs(l, &freg);
+		PRELE(l);
+		if (error)
+			return (error);
+
+		nhdr.n_namesz = namesize;
+		nhdr.n_descsz = sizeof(freg);
+		nhdr.n_type = PT_GETFPREGS;
+
+		error = ELFNAMEEND(coredump_writenote)(p, vp, cred,
+		    offset, &nhdr, name, &freg);
+		if (error)
+			return (error);
+
+		offset += notesize;
+	}
+	size += notesize;
+#endif
+	*sizep = size;
+	/* XXX Add hook for machdep per-LWP notes. */
 	return (0);
 }
 

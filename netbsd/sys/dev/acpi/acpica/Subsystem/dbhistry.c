@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dbhistry - debugger HISTORY command
- *              xRevision: 19 $
+ *              xRevision: 29 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999, 2000, 2001, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -114,24 +114,17 @@
  *
  *****************************************************************************/
 
+
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: dbhistry.c,v 1.2 2001/11/13 13:01:58 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dbhistry.c,v 1.10 2004/02/14 16:57:24 kochi Exp $");
 
 #include "acpi.h"
-#include "acparser.h"
-#include "acdispat.h"
-#include "amlcode.h"
-#include "acnamesp.h"
-#include "acparser.h"
-#include "acevents.h"
-#include "acinterp.h"
 #include "acdebug.h"
-#include "actables.h"
 
-#ifdef ENABLE_DEBUGGER
+#ifdef ACPI_DEBUGGER
 
-#define _COMPONENT          ACPI_DEBUGGER
-        MODULE_NAME         ("dbhistry")
+#define _COMPONENT          ACPI_CA_DEBUGGER
+        ACPI_MODULE_NAME    ("dbhistry")
 
 
 #define HI_NO_HISTORY       0
@@ -141,17 +134,17 @@ __KERNEL_RCSID(0, "$NetBSD: dbhistry.c,v 1.2 2001/11/13 13:01:58 lukem Exp $");
 
 typedef struct HistoryInfo
 {
-    NATIVE_CHAR             Command[80];
+    char                    Command[80];
     UINT32                  CmdNum;
 
 } HISTORY_INFO;
 
 
-HISTORY_INFO                AcpiGbl_HistoryBuffer[HISTORY_SIZE];
-UINT16                      AcpiGbl_LoHistory = 0;
-UINT16                      AcpiGbl_NumHistory = 0;
-UINT16                      AcpiGbl_NextHistoryIndex = 0;
-UINT32                      AcpiGbl_NextCmdNum = 1;
+static HISTORY_INFO         AcpiGbl_HistoryBuffer[HISTORY_SIZE];
+static UINT16               AcpiGbl_LoHistory = 0;
+static UINT16               AcpiGbl_NumHistory = 0;
+static UINT16               AcpiGbl_NextHistoryIndex = 0;
+static UINT32               AcpiGbl_NextCmdNum = 1;
 
 
 /*******************************************************************************
@@ -168,13 +161,12 @@ UINT32                      AcpiGbl_NextCmdNum = 1;
 
 void
 AcpiDbAddToHistory (
-    NATIVE_CHAR             *CommandLine)
+    char                    *CommandLine)
 {
-
 
     /* Put command into the next available slot */
 
-    STRCPY (AcpiGbl_HistoryBuffer[AcpiGbl_NextHistoryIndex].Command, CommandLine);
+    ACPI_STRCPY (AcpiGbl_HistoryBuffer[AcpiGbl_NextHistoryIndex].Command, CommandLine);
 
     AcpiGbl_HistoryBuffer[AcpiGbl_NextHistoryIndex].CmdNum = AcpiGbl_NextCmdNum;
 
@@ -196,13 +188,11 @@ AcpiDbAddToHistory (
         AcpiGbl_NextHistoryIndex = 0;
     }
 
-
     AcpiGbl_NextCmdNum++;
     if (AcpiGbl_NumHistory < HISTORY_SIZE)
     {
         AcpiGbl_NumHistory++;
     }
-
 }
 
 
@@ -221,7 +211,7 @@ AcpiDbAddToHistory (
 void
 AcpiDbDisplayHistory (void)
 {
-    NATIVE_UINT             i;
+    ACPI_NATIVE_UINT        i;
     UINT16                  HistoryIndex;
 
 
@@ -256,11 +246,11 @@ AcpiDbDisplayHistory (void)
  *
  ******************************************************************************/
 
-NATIVE_CHAR *
+char *
 AcpiDbGetFromHistory (
-    NATIVE_CHAR             *CommandNumArg)
+    char                    *CommandNumArg)
 {
-    NATIVE_UINT             i;
+    ACPI_NATIVE_UINT        i;
     UINT16                  HistoryIndex;
     UINT32                  CmdNum;
 
@@ -272,9 +262,8 @@ AcpiDbGetFromHistory (
 
     else
     {
-        CmdNum = STRTOUL (CommandNumArg, NULL, 0);
+        CmdNum = ACPI_STRTOUL (CommandNumArg, NULL, 0);
     }
-
 
     /* Search history buffer */
 
@@ -301,5 +290,5 @@ AcpiDbGetFromHistory (
 }
 
 
-#endif /* ENABLE_DEBUGGER */
+#endif /* ACPI_DEBUGGER */
 

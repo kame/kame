@@ -1,4 +1,4 @@
-/*	$NetBSD: sync_subr.c,v 1.11 2001/12/06 04:29:55 chs Exp $	*/
+/*	$NetBSD: sync_subr.c,v 1.16 2004/02/13 11:36:23 wiz Exp $	*/
 
 /*
  * Copyright 1997 Marshall Kirk McKusick. All Rights Reserved.
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sync_subr.c,v 1.11 2001/12/06 04:29:55 chs Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sync_subr.c,v 1.16 2004/02/13 11:36:23 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -65,7 +65,7 @@ static int stat_rush_requests;		/* number of times I/O speeded up */
 static int syncer_delayno = 0;
 static long syncer_last;
 static struct synclist *syncer_workitem_pending;
-struct proc *updateproc = NULL;
+struct lwp *updateproc = NULL;
 
 void
 vn_initialize_syncerd()
@@ -162,10 +162,11 @@ sched_sync(v)
 {
 	struct synclist *slp;
 	struct vnode *vp;
+	struct mount *mp;
 	long starttime;
 	int s;
 
-	updateproc = curproc;
+	updateproc = curlwp;
 	
 	for (;;) {
 		starttime = time.tv_sec;
@@ -184,10 +185,14 @@ sched_sync(v)
 		lockmgr(&syncer_lock, LK_EXCLUSIVE, NULL);
 
 		while ((vp = LIST_FIRST(slp)) != NULL) {
-			if (vn_lock(vp, LK_EXCLUSIVE | LK_NOWAIT) == 0) {
-				(void) VOP_FSYNC(vp, curproc->p_ucred,
-				    FSYNC_LAZY, 0, 0, curproc);
-				VOP_UNLOCK(vp, 0);
+			if (vn_start_write(vp, &mp, V_NOWAIT) == 0) {
+				if (vn_lock(vp, LK_EXCLUSIVE | LK_NOWAIT)
+				    == 0) {
+					(void) VOP_FSYNC(vp, curproc->p_ucred,
+					    FSYNC_LAZY, 0, 0, curproc);
+					VOP_UNLOCK(vp, 0);
+				}
+				vn_finished_write(mp, 0);
 			}
 			s = splbio();
 			if (LIST_FIRST(slp) == vp) {
@@ -243,7 +248,7 @@ sched_sync(v)
 /*
  * Request the syncer daemon to speed up its work.
  * We never push it to speed up more than half of its
- * normal turn time, otherwise it could take over the cpu.
+ * normal turn time, otherwise it could take over the CPU.
  */
 int
 speedup_syncer()

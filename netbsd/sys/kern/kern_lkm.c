@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_lkm.c,v 1.57 2001/11/12 15:25:11 lukem Exp $	*/
+/*	$NetBSD: kern_lkm.c,v 1.72 2004/03/23 13:22:32 junyoung Exp $	*/
 
 /*
  * Copyright (c) 1994 Christopher G. Demetriou
@@ -41,9 +41,10 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kern_lkm.c,v 1.57 2001/11/12 15:25:11 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_lkm.c,v 1.72 2004/03/23 13:22:32 junyoung Exp $");
 
 #include "opt_ddb.h"
+#include "opt_malloclog.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -57,8 +58,10 @@ __KERNEL_RCSID(0, "$NetBSD: kern_lkm.c,v 1.57 2001/11/12 15:25:11 lukem Exp $");
 #include <sys/malloc.h>
 #include <sys/mount.h>
 #include <sys/exec.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 #include <sys/conf.h>
+#include <sys/ksyms.h>
 
 #include <sys/lkm.h>
 #include <sys/syscall.h>
@@ -68,6 +71,11 @@ __KERNEL_RCSID(0, "$NetBSD: kern_lkm.c,v 1.57 2001/11/12 15:25:11 lukem Exp $");
 #endif
 
 #include <uvm/uvm_extern.h>
+
+struct vm_map *lkm_map;
+
+#define	LKM_SPACE_ALLOC(size)		uvm_km_alloc(lkm_map, (size))
+#define	LKM_SPACE_FREE(addr, size)	uvm_km_free(lkm_map, (addr), (size))
 
 #if !defined(DEBUG) && defined(LKMDEBUG)
 # define DEBUG
@@ -82,7 +90,6 @@ int	lkmdebug = 0;
 #define PAGESIZE 1024		/* kmem_alloc() allocation quantum */
 
 #define	LKM_ALLOC	0x01
-#define	LKM_WANT	0x02
 
 #define	LKMS_IDLE	0x00
 #define	LKMS_RESERVED	0x01
@@ -99,16 +106,37 @@ static int	lkm_state = LKMS_IDLE;
 static struct lkm_table	lkmods[MAXLKMS];	/* table of loaded modules */
 static struct lkm_table	*curp;			/* global for in-progress ops */
 
-static void lkmunreserve __P((void));
-static int _lkm_syscall __P((struct lkm_table *, int));
-static int _lkm_vfs __P((struct lkm_table *, int));
-static int _lkm_dev __P((struct lkm_table *, int));
+static void lkmunreserve(void);
+static int _lkm_syscall(struct lkm_table *, int);
+static int _lkm_vfs(struct lkm_table *, int);
+static int _lkm_dev(struct lkm_table *, int);
 #ifdef STREAMS
-static int _lkm_strmod __P((struct lkm_table *, int));
+static int _lkm_strmod(struct lkm_table *, int);
 #endif
-static int _lkm_exec __P((struct lkm_table *, int));
-static int _lkm_compat __P((struct lkm_table *, int));
+static int _lkm_exec(struct lkm_table *, int);
+static int _lkm_compat(struct lkm_table *, int);
 
+static int _lkm_checkver(struct lkm_table *);
+
+dev_type_open(lkmopen);
+dev_type_close(lkmclose);
+dev_type_ioctl(lkmioctl);
+
+const struct cdevsw lkm_cdevsw = {
+	lkmopen, lkmclose, noread, nowrite, lkmioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
+
+void
+lkm_init(void)
+{
+	/*
+	 * If machine-dependent code hasn't initialized the lkm_map
+	 * then just use kernel_map.
+	 */
+	if (lkm_map == NULL)
+		lkm_map = kernel_map;
+}
 
 /*ARGSUSED*/
 int
@@ -131,14 +159,13 @@ lkmopen(dev, flag, devtype, p)
 	while (lkm_v & LKM_ALLOC) {
 		if (flag & FNONBLOCK)		/* don't hang */
 			return (EBUSY);
-		lkm_v |= LKM_WANT;
 		/*
 		 * Sleep pending unlock; we use tsleep() to allow
 		 * an alarm out of the open.
 		 */
 		error = tsleep((caddr_t)&lkm_v, TTIPRI|PCATCH, "lkmopn", 0);
 		if (error)
-			return (error);	/* leave LKM_WANT set -- no problem */
+			return (error);
 	}
 	lkm_v |= LKM_ALLOC;
 
@@ -158,9 +185,7 @@ lkmunreserve()
 		return;
 
 	if (curp && curp->syms) {
-#ifdef DDB
-		db_del_symbol_table(curp->private.lkm_any->lkm_name);
-#endif
+		ksyms_delsymtab(curp->private.lkm_any->lkm_name);
 		uvm_km_free(kernel_map, curp->syms, curp->sym_size);/**/
 		curp->syms = 0;
 	}
@@ -168,9 +193,13 @@ lkmunreserve()
 	 * Actually unreserve the memory
 	 */
 	if (curp && curp->area) {
-		uvm_km_free(kernel_map, curp->area, curp->size);/**/
+		LKM_SPACE_FREE(curp->area, curp->size);
 		curp->area = 0;
 	}
+
+	if (curp && curp->forced)
+		curp->forced = 0;
+
 	lkm_state = LKMS_IDLE;
 }
 
@@ -225,7 +254,6 @@ lkmioctl(dev, cmd, data, flag, p)
 
 	switch(cmd) {
 	case LMRESERV:		/* reserve pages for a module */
-	case LMRESERV_O:	/* reserve pages for a module */
 		if (securelevel > 0)
 			return EPERM;
 
@@ -245,8 +273,6 @@ lkmioctl(dev, cmd, data, flag, p)
 			break;
 		}
 		curp = &lkmods[i];
-		curp->id = i;		/* self reference slot offset */
-		curp->ver = (cmd == LMRESERV) ? LKM_VERSION : LKM_OLDVERSION;
 
 		resrvp->slot = i;		/* return slot */
 
@@ -255,7 +281,7 @@ lkmioctl(dev, cmd, data, flag, p)
 		 */
 		curp->size = resrvp->size;
 
-		curp->area = uvm_km_alloc(kernel_map, curp->size);/**/
+		curp->area = LKM_SPACE_ALLOC(curp->size);
 
 		curp->offset = 0;		/* load offset */
 
@@ -264,7 +290,7 @@ lkmioctl(dev, cmd, data, flag, p)
 		if (cmd == LMRESERV && resrvp->sym_size) {
 			curp->sym_size = resrvp->sym_size;
 			curp->sym_symsize = resrvp->sym_symsize;
-			curp->syms = (u_long)uvm_km_alloc(kernel_map, curp->sym_size);/**/
+			curp->syms = (u_long) LKM_SPACE_ALLOC(curp->sym_size);
 			curp->sym_offset = 0;
 			resrvp->sym_addr = curp->syms; /* ret symbol addr */
 		} else {
@@ -306,7 +332,7 @@ lkmioctl(dev, cmd, data, flag, p)
 		}
 
 		/* copy in buffer full of data */
-		error = copyin(loadbufp->data, 
+		error = copyin(loadbufp->data,
 			       (caddr_t)curp->area + curp->offset, i);
 		if (error)
 			break;
@@ -382,16 +408,36 @@ lkmioctl(dev, cmd, data, flag, p)
 			return ENXIO;
 		}
 
-		if (curp->size - curp->offset > 0) 
+		if (curp->size - curp->offset > 0)
 			/* The remainder must be bss, so we clear it */
 			memset((caddr_t)curp->area + curp->offset, 0,
 			       curp->size - curp->offset);
 
-		curp->entry = (int (*) __P((struct lkm_table *, int, int)))
+		if (curp->syms && curp->sym_offset >= curp->sym_size) {
+			error = ksyms_addsymtab("/lkmtemp/",
+			    (char *)curp->syms, curp->sym_symsize,
+			    (char *)curp->syms + curp->sym_symsize,
+			    curp->sym_size - curp->sym_symsize);
+			if (error)
+				break;
+#ifdef DEBUG
+			if (lkmdebug & LKMDB_INFO)
+				printf( "DDB symbols added!\n" );
+#endif
+		}
+
+		curp->entry = (int (*)(struct lkm_table *, int, int))
 				(*((long *) (data)));
 
 		/* call entry(load)... (assigns "private" portion) */
-		error = (*(curp->entry))(curp, LKM_E_LOAD, curp->ver);
+		error = (*(curp->entry))(curp, LKM_E_LOAD, LKM_VERSION);
+		if (curp->syms && curp->sym_offset >= curp->sym_size) {
+			ksyms_delsymtab("/lkmtemp/");
+			error = ksyms_addsymtab(curp->private.lkm_any->lkm_name,
+			    (char *)curp->syms, curp->sym_symsize,
+			    (char *)curp->syms + curp->sym_symsize,
+			    curp->sym_size - curp->sym_symsize);
+		}
 		if (error) {
 			/*
 			 * Module may refuse loading or may have a
@@ -413,21 +459,6 @@ lkmioctl(dev, cmd, data, flag, p)
 		if (lkmdebug & LKMDB_INFO)
 			printf("LKM: LMREADY\n");
 #endif /* DEBUG */
-#ifdef DDB
-		if (curp->syms && curp->sym_offset >= curp->sym_size) {
-		    db_add_symbol_table((caddr_t)curp->syms,
-					(caddr_t)curp->syms + curp->sym_symsize,
-					curp->private.lkm_any->lkm_name,
-					(caddr_t)curp->syms);
-#ifdef DEBUG
-		    if (lkmdebug & LKMDB_INFO)
-			printf( "DDB symbols added!\n" );
-#endif
-		}
-#endif
-
-
-
 		lkm_state = LKMS_IDLE;
 		break;
 
@@ -478,7 +509,7 @@ lkmioctl(dev, cmd, data, flag, p)
 		}
 
 		/* call entry(unload) */
-		if ((*(curp->entry))(curp, LKM_E_UNLOAD, curp->ver)) {
+		if ((*(curp->entry))(curp, LKM_E_UNLOAD, LKM_VERSION)) {
 			error = EBUSY;
 			break;
 		}
@@ -531,25 +562,42 @@ lkmioctl(dev, cmd, data, flag, p)
 			break;
 		}
 
-		if ((error = (*curp->entry)(curp, LKM_E_STAT, curp->ver)))
+		if ((error = (*curp->entry)(curp, LKM_E_STAT, LKM_VERSION)))
 			break;
 
 		/*
 		 * Copy out stat information for this module...
 		 */
-		statp->id	= curp->id;
+		statp->id	= i;
 		statp->offset	= curp->private.lkm_any->lkm_offset;
 		statp->type	= curp->private.lkm_any->lkm_type;
 		statp->area	= curp->area;
 		statp->size	= curp->size / PAGESIZE;
 		statp->private	= (unsigned long)curp->private.lkm_any;
-		statp->ver	= curp->private.lkm_any->lkm_ver;
-		copystr(curp->private.lkm_any->lkm_name, 
+		statp->ver	= LKM_VERSION;
+		copystr(curp->private.lkm_any->lkm_name,
 			  statp->name,
 			  MAXLKMNAME - 2,
 			  (size_t *)0);
 
 		break;
+
+#ifdef LMFORCE
+	case LMFORCE:		/* stateful, optionally follows LMRESERV */
+		if (securelevel > 0)
+			return EPERM;
+
+		if ((flag & FWRITE) == 0) /* only allow this if writing */
+			return EPERM;
+
+		if (lkm_state != LKMS_RESERVED) {
+			error = EPERM;
+			break;
+		}
+
+		curp->forced = (*(u_long *)data != 0);
+		break;
+#endif /* LMFORCE */
 
 	default:		/* bad ioctl()... */
 		error = ENOTTY;
@@ -566,27 +614,13 @@ lkmioctl(dev, cmd, data, flag, p)
  * Place holder for system call slots reserved for loadable modules.
  */
 int
-sys_lkmnosys(p, v, retval)
-	struct proc *p;
+sys_lkmnosys(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 
-	return (sys_nosys(p, v, retval));
-}
-
-/*
- * Acts like "enodev", but can be identified in cdevsw and bdevsw for
- * dynamic driver major number assignment for a limited number of
- * drivers.
- *
- * Place holder for device switch slots reserved for loadable modules.
- */
-int
-lkmenodev()
-{
-
-	return (enodev());
+	return (sys_nosys(l, v, retval));
 }
 
 /*
@@ -645,7 +679,7 @@ _lkm_syscall(lkmtp, cmd)
 		if (lkmexists(lkmtp))
 			return (EEXIST);
 
-		if ((i = args->lkm_offset) == -1) {	/* auto */
+		if ((i = args->mod.lkm_offset) == -1) {	/* auto */
 			/*
 			 * Search the table looking for a slot...
 			 */
@@ -671,13 +705,13 @@ _lkm_syscall(lkmtp, cmd)
 		memcpy(&sysent[i], args->lkm_sysent, sizeof(struct sysent));
 
 		/* done! */
-		args->lkm_offset = i;	/* slot in sysent[] */
+		args->mod.lkm_offset = i;	/* slot in sysent[] */
 
 		break;
 
 	case LKM_E_UNLOAD:
 		/* current slot... */
-		i = args->lkm_offset;
+		i = args->mod.lkm_offset;
 
 		/* replace current slot contents with old contents */
 		memcpy(&sysent[i], &args->lkm_oldent, sizeof(struct sysent));
@@ -739,8 +773,7 @@ _lkm_dev(lkmtp, cmd)
 	int cmd;
 {
 	struct lkm_dev *args = lkmtp->private.lkm_dev;
-	int i;
-	int error = 0;
+	int error;
 
 	switch(cmd) {
 	case LKM_E_LOAD:
@@ -748,102 +781,27 @@ _lkm_dev(lkmtp, cmd)
 		if (lkmexists(lkmtp))
 			return (EEXIST);
 
-		switch(args->lkm_devtype) {
-		case LM_DT_BLOCK:
-			if ((i = args->lkm_offset) == -1) {	/* auto */
-				/*
-				 * Search the table looking for a slot...
-				 */
-				for (i = 0; i < nblkdev; i++)
-					if (bdevsw[i].d_open == 
-					    (dev_type_open((*))) lkmenodev)
-						break;		/* found it! */
-				/* out of allocable slots? */
-				if (i == nblkdev) {
-					error = ENFILE;
-					break;
-				}
-			} else {				/* assign */
-				if (i < 0 || i >= nblkdev) {
-					error = EINVAL;
-					break;
-				}
-			}
+		error = devsw_attach(args->lkm_devname,
+				     args->lkm_bdev, &args->lkm_bdevmaj,
+				     args->lkm_cdev, &args->lkm_cdevmaj);
+		if (error != 0)
+			return (error);
 
-			/* save old */
-			memcpy(&args->lkm_olddev.bdev, &bdevsw[i], sizeof(struct bdevsw));
-
-			/* replace with new */
-			memcpy(&bdevsw[i], args->lkm_dev.bdev, sizeof(struct bdevsw));
-
-			/* done! */
-			args->lkm_offset = i;	/* slot in bdevsw[] */
-			break;
-
-		case LM_DT_CHAR:
-			if ((i = args->lkm_offset) == -1) {	/* auto */
-				/*
-				 * Search the table looking for a slot...
-				 */
-				for (i = 0; i < nchrdev; i++)
-					if (cdevsw[i].d_open ==
-					    (dev_type_open((*))) lkmenodev)
-						break;		/* found it! */
-				/* out of allocable slots? */
-				if (i == nchrdev) {
-					error = ENFILE;
-					break;
-				}
-			} else {				/* assign */
-				if (i < 0 || i >= nchrdev) {
-					error = EINVAL;
-					break;
-				}
-			}
-
-			/* save old */
-			memcpy(&args->lkm_olddev.cdev, &cdevsw[i], sizeof(struct cdevsw));
-
-			/* replace with new */
-			memcpy(&cdevsw[i], args->lkm_dev.cdev, sizeof(struct cdevsw));
-
-			/* done! */
-			args->lkm_offset = i;	/* slot in cdevsw[] */
-
-			break;
-
-		default:
-			error = ENODEV;
-			break;
-		}
+		args->mod.lkm_offset =
+			LKM_MAKEMAJOR(args->lkm_bdevmaj, args->lkm_cdevmaj);
 		break;
 
 	case LKM_E_UNLOAD:
-		/* current slot... */
-		i = args->lkm_offset;
-
-		switch(args->lkm_devtype) {
-		case LM_DT_BLOCK:
-			/* replace current slot contents with old contents */
-			memcpy(&bdevsw[i], &args->lkm_olddev.bdev, sizeof(struct bdevsw));
-			break;
-
-		case LM_DT_CHAR:
-			/* replace current slot contents with old contents */
-			memcpy(&cdevsw[i], &args->lkm_olddev.cdev, sizeof(struct cdevsw));
-			break;
-
-		default:
-			error = ENODEV;
-			break;
-		}
+		devsw_detach(args->lkm_bdev, args->lkm_cdev);
+		args->lkm_bdevmaj = -1;
+		args->lkm_cdevmaj = -1;
 		break;
 
 	case LKM_E_STAT:	/* no special handling... */
 		break;
 	}
 
-	return (error);
+	return (0);
 }
 
 #ifdef STREAMS
@@ -952,7 +910,7 @@ _lkm_compat(lkmtp, cmd)
  */
 int
 lkmdispatch(lkmtp, cmd)
-	struct lkm_table *lkmtp;	
+	struct lkm_table *lkmtp;
 	int cmd;
 {
 	int error = 0;		/* default = success */
@@ -960,6 +918,12 @@ lkmdispatch(lkmtp, cmd)
 	if (lkmdebug & LKMDB_INFO)
 		printf( "lkmdispatch: %p %d\n", lkmtp, cmd );
 #endif
+
+	/* If loading, check the LKM is compatible */
+	if (cmd == LKM_E_LOAD) {
+		if (_lkm_checkver(lkmtp))
+			return (EPROGMISMATCH);
+	}
 
 	switch(lkmtp->private.lkm_any->lkm_type) {
 	case LM_SYSCALL:
@@ -1000,4 +964,55 @@ lkmdispatch(lkmtp, cmd)
 	}
 
 	return (error);
+}
+
+/*
+ * Check LKM version against current kernel.
+ */
+static int
+_lkm_checkver(struct lkm_table *lkmtp)
+{
+	struct lkm_any *mod = lkmtp->private.lkm_any;
+
+	if (mod->lkm_modver != LKM_VERSION) {
+		printf("LKM '%s': LKM version mismatch - LKM %d, kernel %d\n",
+		    mod->lkm_name, mod->lkm_modver, LKM_VERSION);
+		return (1);
+	}
+
+	if (lkmtp->forced) {
+		printf("LKM '%s': forced load, skipping compatibility checks\n",
+		    mod->lkm_name);
+		return (0);
+	}
+
+	if (mod->lkm_sysver != __NetBSD_Version__) {
+		printf("LKM '%s': kernel version mismatch - LKM %d, kernel %d\n",
+		    mod->lkm_name, mod->lkm_sysver, __NetBSD_Version__);
+		return (2);
+	}
+
+	/*
+	 * Following might eventually be changed to take into account envdep,
+	 * if it's non-NULL.
+	 */
+	if (strcmp(mod->lkm_envver, _LKM_ENV_VERSION) != 0) {
+		const char *kenv = _LKM_ENV_VERSION;
+		const char *envver = mod->lkm_envver;
+
+		if (kenv[0] == ',')
+			kenv++;
+		if (envver[0] == ',')
+			envver++;
+
+		printf("LKM '%s': environment compile options mismatch - LKM '%s', kernel '%s'\n",
+		    mod->lkm_name, envver, kenv);
+		return (3);
+	}
+
+	/*
+	 * Basic parameters match, LKM is hopefully compatible.
+	 * Cross fingers and approve.
+	 */
+	return (0);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_machdep.c,v 1.14 2002/05/20 06:26:47 jdolecek Exp $ */
+/*	$NetBSD: linux_machdep.c,v 1.20.2.1 2004/06/22 08:47:35 tron Exp $ */
 
 /*-
  * Copyright (c) 1995, 2000, 2001 The NetBSD Foundation, Inc.
@@ -37,13 +37,12 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: linux_machdep.c,v 1.14 2002/05/20 06:26:47 jdolecek Exp $");
+__KERNEL_RCSID(0, "$NetBSD: linux_machdep.c,v 1.20.2.1 2004/06/22 08:47:35 tron Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/signalvar.h>
 #include <sys/kernel.h>
-#include <sys/map.h>
 #include <sys/proc.h>
 #include <sys/user.h>
 #include <sys/buf.h>
@@ -58,6 +57,7 @@ __KERNEL_RCSID(0, "$NetBSD: linux_machdep.c,v 1.14 2002/05/20 06:26:47 jdolecek 
 #include <sys/mount.h>
 #include <sys/vnode.h>
 #include <sys/device.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 #include <sys/filedesc.h>
 #include <sys/exec_elf.h>
@@ -102,12 +102,12 @@ __KERNEL_RCSID(0, "$NetBSD: linux_machdep.c,v 1.14 2002/05/20 06:26:47 jdolecek 
  * entry uses NetBSD's native setregs instead of linux_setregs
  */
 void
-linux_setregs(p, pack, stack) 
-	struct proc *p;
+linux_setregs(l, pack, stack) 
+	struct lwp *l;
 	struct exec_package *pack;
 	u_long stack;
 {	
-	setregs(p, pack, stack);
+	setregs(l, pack, stack);
 	return;
 }
 
@@ -121,22 +121,23 @@ linux_setregs(p, pack, stack)
  */
 
 void
-linux_sendsig(catcher, sig, mask, code)  /* XXX Check me */
-	sig_t catcher;
-	int sig;
-	sigset_t *mask;
-	u_long code;
+linux_sendsig(ksi, mask)
+	const ksiginfo_t *ksi;
+	const sigset_t *mask;
 {
-	struct proc *p = curproc;
+	const int sig = ksi->ksi_signo;
+	struct lwp *l = curlwp;
+	struct proc *p = l->l_proc;
 	struct linux_sigframe *fp;
 	struct frame *f;
 	int i,onstack;
+	sig_t catcher = SIGACTION(p, sig).sa_handler;
 	struct linux_sigframe sf;
 
 #ifdef DEBUG_LINUX
 	printf("linux_sendsig()\n");
 #endif /* DEBUG_LINUX */
-	f = (struct frame *)p->p_md.md_regs;
+	f = (struct frame *)l->l_md.md_regs;
 
 	/* 
 	 * Do we need to jump onto the signal stack? 
@@ -160,7 +161,7 @@ linux_sendsig(catcher, sig, mask, code)  /* XXX Check me */
 		    + p->p_sigctx.ps_sigstk.ss_size);
 	else
 		/* cast for _MIPS_BSD_API == _MIPS_BSD_API_LP32_64CLEAN case */
-		fp = (struct linux_sigframe *)(u_int32_t)f->f_regs[SP];
+		fp = (struct linux_sigframe *)(u_int32_t)f->f_regs[_R_SP];
 
 	/* 
 	 * Build stack frame for signal trampoline. 
@@ -178,12 +179,12 @@ linux_sendsig(catcher, sig, mask, code)  /* XXX Check me */
 	for (i=0; i<32; i++) {
 		sf.lsf_sc.lsc_regs[i] = f->f_regs[i];
 	}
-	sf.lsf_sc.lsc_mdhi = f->f_regs[MULHI];
-	sf.lsf_sc.lsc_mdlo = f->f_regs[MULLO];
-	sf.lsf_sc.lsc_pc = f->f_regs[PC];
-	sf.lsf_sc.lsc_status = f->f_regs[SR];
-	sf.lsf_sc.lsc_cause = f->f_regs[CAUSE];
-	sf.lsf_sc.lsc_badvaddr = f->f_regs[BADVADDR];
+	sf.lsf_sc.lsc_mdhi = f->f_regs[_R_MULHI];
+	sf.lsf_sc.lsc_mdlo = f->f_regs[_R_MULLO];
+	sf.lsf_sc.lsc_pc = f->f_regs[_R_PC];
+	sf.lsf_sc.lsc_status = f->f_regs[_R_SR];
+	sf.lsf_sc.lsc_cause = f->f_regs[_R_CAUSE];
+	sf.lsf_sc.lsc_badvaddr = f->f_regs[_R_BADVADDR];
 
 	/* 
 	 * Save signal stack.  XXX broken
@@ -202,24 +203,24 @@ linux_sendsig(catcher, sig, mask, code)  /* XXX Check me */
 #ifdef DEBUG_LINUX
 		printf("linux_sendsig: stack trashed\n");
 #endif /* DEBUG_LINUX */
-		sigexit(p, SIGILL);
+		sigexit(l, SIGILL);
 		/* NOTREACHED */
 	}
 
 	/* Set up the registers to return to sigcode. */
-	f->f_regs[A0] = native_to_linux_signo[sig];
-	f->f_regs[A1] = 0;
-	f->f_regs[A2] = (unsigned long)&fp->lsf_sc;
+	f->f_regs[_R_A0] = native_to_linux_signo[sig];
+	f->f_regs[_R_A1] = 0;
+	f->f_regs[_R_A2] = (unsigned long)&fp->lsf_sc;
 
 #ifdef DEBUG_LINUX
 	printf("sigcontext is at %p\n", &fp->lsf_sc);
 #endif /* DEBUG_LINUX */
 
-	f->f_regs[SP] = (unsigned long)fp;
+	f->f_regs[_R_SP] = (unsigned long)fp;
 	/* Signal trampoline code is at base of user stack. */
-	f->f_regs[RA] = (unsigned long)p->p_sigctx.ps_sigcode;
-	f->f_regs[T9] = (unsigned long)catcher;
-	f->f_regs[PC] = (unsigned long)catcher;
+	f->f_regs[_R_RA] = (unsigned long)p->p_sigctx.ps_sigcode;
+	f->f_regs[_R_T9] = (unsigned long)catcher;
+	f->f_regs[_R_PC] = (unsigned long)catcher;
 
 	/* Remember that we're now on the signal stack. */
 	if (onstack)
@@ -234,14 +235,15 @@ linux_sendsig(catcher, sig, mask, code)  /* XXX Check me */
  * stack state from context left by sendsig (above).
  */
 int
-linux_sys_sigreturn(p, v, retval)
-	struct proc *p;
+linux_sys_sigreturn(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct linux_sys_sigreturn_args /* {
 		syscallarg(struct linux_sigframe *) sf;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct linux_sigframe *sf, ksf;
 	struct frame *f;
 	sigset_t mask;
@@ -262,14 +264,14 @@ linux_sys_sigreturn(p, v, retval)
 		return (error);
 
 	/* Restore the register context. */
-	f = (struct frame *)p->p_md.md_regs;
+	f = (struct frame *)l->l_md.md_regs;
 	for (i=0; i<32; i++)
 		f->f_regs[i] = ksf.lsf_sc.lsc_regs[i];
-	f->f_regs[MULLO] = ksf.lsf_sc.lsc_mdlo;
-	f->f_regs[MULHI] = ksf.lsf_sc.lsc_mdhi;
-	f->f_regs[PC] = ksf.lsf_sc.lsc_pc;
-	f->f_regs[BADVADDR] = ksf.lsf_sc.lsc_badvaddr;
-	f->f_regs[CAUSE] = ksf.lsf_sc.lsc_cause;
+	f->f_regs[_R_MULLO] = ksf.lsf_sc.lsc_mdlo;
+	f->f_regs[_R_MULHI] = ksf.lsf_sc.lsc_mdhi;
+	f->f_regs[_R_PC] = ksf.lsf_sc.lsc_pc;
+	f->f_regs[_R_BADVADDR] = ksf.lsf_sc.lsc_badvaddr;
+	f->f_regs[_R_CAUSE] = ksf.lsf_sc.lsc_cause;
 
 	/* Restore signal stack. */
 	p->p_sigctx.ps_sigstk.ss_flags &= ~SS_ONSTACK;
@@ -283,19 +285,19 @@ linux_sys_sigreturn(p, v, retval)
 
 
 int
-linux_sys_rt_sigreturn(p, v, retval)  
-	struct proc *p;
+linux_sys_rt_sigreturn(l, v, retval)  
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
-	return 0;
+	return (ENOSYS);
 }
 
 
 #if 0
 int
-linux_sys_modify_ldt(p, v, retval)
-	struct proc *p;
+linux_sys_modify_ldt(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -339,8 +341,8 @@ linux_machdepioctl(p, v, retval)
  * just let it have the whole range.
  */
 int
-linux_sys_ioperm(p, v, retval)
-	struct proc *p;
+linux_sys_ioperm(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -357,8 +359,8 @@ linux_sys_ioperm(p, v, retval)
  * wrapper linux_sys_new_uname() -> linux_sys_uname() 
  */
 int	
-linux_sys_new_uname(p, v, retval) 
-	struct proc *p;
+linux_sys_new_uname(l, v, retval) 
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -381,18 +383,18 @@ linux_sys_new_uname(p, v, retval)
 
         return copyout(&luts, SCARG(uap, up), sizeof(luts));
 #else
-	return linux_sys_uname(p, v, retval);
+	return linux_sys_uname(l, v, retval);
 #endif
 }
 
 /*
- * In Linux, cacheflush is icurrently implemented
+ * In Linux, cacheflush is currently implemented
  * as a whole cache flush (arguments are ignored)
  * we emulate this broken beahior.
  */
 int
-linux_sys_cacheflush(p, v, retval)
-	struct proc *p;
+linux_sys_cacheflush(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -406,8 +408,8 @@ linux_sys_cacheflush(p, v, retval)
  * some binaries and some libraries use it.
  */
 int
-linux_sys_sysmips(p, v, retval)
-	struct proc *p;
+linux_sys_sysmips(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -417,12 +419,13 @@ linux_sys_sysmips(p, v, retval)
 		syscallarg(int) arg2;
 		syscallarg(int) arg3;
 	} *uap = v;
+	struct proc *p = l->l_proc;
 	int error;
 	
 	switch (SCARG(uap, cmd)) {
 	case LINUX_SETNAME: {
 		char nodename [LINUX___NEW_UTS_LEN + 1];
-		int name;
+		int name[2];
 		size_t len;
 
 		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
@@ -431,20 +434,18 @@ linux_sys_sysmips(p, v, retval)
 		    LINUX___NEW_UTS_LEN, &len)) != 0)
 			return error;
 
-		name = KERN_HOSTNAME;
-		return (kern_sysctl(&name, 1, 0, 0, nodename, len, p));
+		name[0] = CTL_KERN;
+		name[1] = KERN_HOSTNAME;
+		return (old_sysctl(&name[0], 2, 0, 0, nodename, len, NULL));
 		
 		break;
 	}
 	case LINUX_MIPS_ATOMIC_SET: {
 		void *addr;
 		int s;
+		u_int8_t value = 0;
 
 		addr = (void *)SCARG(uap, arg1);
-
-		if ((uvm_useracc((caddr_t)addr, sizeof(int), 
-		    B_READ | B_WRITE)) != 1)
-			return EFAULT;
 
 		s = splhigh();
 		/*
@@ -452,8 +453,10 @@ linux_sys_sysmips(p, v, retval)
 		 * it like this. The source aknowledge "This is broken"
 		 * in a comment...
 		 */
-		*retval = (register_t)fubyte(addr);
-		error = subyte(addr, SCARG(uap, arg2));
+		(void) copyin(addr, &value, 1);
+		*retval = value;
+		value = (u_int8_t) SCARG(uap, arg2);
+		error = copyout(&value, addr, 1);
 		splx(s);
 
 		return 0;

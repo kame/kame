@@ -1,4 +1,4 @@
-/*	$NetBSD: i82365.c,v 1.65 2001/12/15 13:23:21 soren Exp $	*/
+/*	$NetBSD: i82365.c,v 1.77 2003/12/28 01:21:37 christos Exp $	*/
 
 /*
  * Copyright (c) 2000 Christian E. Hopps.  All rights reserved.
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: i82365.c,v 1.65 2001/12/15 13:23:21 soren Exp $");
+__KERNEL_RCSID(0, "$NetBSD: i82365.c,v 1.77 2003/12/28 01:21:37 christos Exp $");
 
 #define	PCICDEBUG
 
@@ -104,6 +104,9 @@ pcic_ident_ok(ident)
 	if ((ident == 0) || (ident == 0xff) || (ident & PCIC_IDENT_ZERO))
 		return (0);
 
+	if ((ident & PCIC_IDENT_REV_MASK) == 0)
+		return (0);
+
 	if ((ident & PCIC_IDENT_IFTYPE_MASK) != PCIC_IDENT_IFTYPE_MEM_AND_IO) {
 #ifdef DIAGNOSTIC
 		printf("pcic: does not support memory and I/O cards, "
@@ -111,6 +114,7 @@ pcic_ident_ok(ident)
 #endif
 		return (0);
 	}
+
 	return (1);
 }
 
@@ -119,34 +123,67 @@ pcic_vendor(h)
 	struct pcic_handle *h;
 {
 	int reg;
-
-	/*
-	 * the chip_id of the cirrus toggles between 11 and 00 after a write.
-	 * weird.
-	 */
-
-	pcic_write(h, PCIC_CIRRUS_CHIP_INFO, 0);
-	reg = pcic_read(h, -1);
-
-	if ((reg & PCIC_CIRRUS_CHIP_INFO_CHIP_ID) ==
-	    PCIC_CIRRUS_CHIP_INFO_CHIP_ID) {
-		reg = pcic_read(h, -1);
-		if ((reg & PCIC_CIRRUS_CHIP_INFO_CHIP_ID) == 0) {
-			if (reg & PCIC_CIRRUS_CHIP_INFO_SLOTS)
-				return (PCIC_VENDOR_CIRRUS_PD672X);
-			else
-				return (PCIC_VENDOR_CIRRUS_PD6710);
-		}
-	}
+	int vendor;
 
 	reg = pcic_read(h, PCIC_IDENT);
 
-	if ((reg & PCIC_IDENT_REV_MASK) == PCIC_IDENT_REV_I82365SLR0)
-		return (PCIC_VENDOR_I82365SLR0);
-	else
-		return (PCIC_VENDOR_I82365SLR1);
+	if ((reg & PCIC_IDENT_REV_MASK) == 0)
+		return (PCIC_VENDOR_NONE);
 
-	return (PCIC_VENDOR_UNKNOWN);
+	switch (reg) {
+	case 0x00:
+	case 0xff:
+		return (PCIC_VENDOR_NONE);
+	case PCIC_IDENT_ID_INTEL0:
+		vendor = PCIC_VENDOR_I82365SLR0;
+		break;
+	case PCIC_IDENT_ID_INTEL1:
+		vendor = PCIC_VENDOR_I82365SLR1;
+		break;
+	case PCIC_IDENT_ID_INTEL2:
+		vendor = PCIC_VENDOR_I82365SL_DF;
+		break;
+	case PCIC_IDENT_ID_IBM1:
+	case PCIC_IDENT_ID_IBM2:
+		vendor = PCIC_VENDOR_IBM;
+		break;
+	case PCIC_IDENT_ID_IBM3:
+		vendor = PCIC_VENDOR_IBM_KING;
+		break;
+	default:
+		vendor = PCIC_VENDOR_UNKNOWN;
+		break;
+	}
+
+	if (vendor == PCIC_VENDOR_I82365SLR0 ||
+	    vendor == PCIC_VENDOR_I82365SLR1) {
+		/*
+		 * Check for Cirrus PD67xx.
+		 * the chip_id of the cirrus toggles between 11 and 00 after a
+		 * write.  weird.
+		 */
+		pcic_write(h, PCIC_CIRRUS_CHIP_INFO, 0);
+		reg = pcic_read(h, -1);
+		if ((reg & PCIC_CIRRUS_CHIP_INFO_CHIP_ID) ==
+		    PCIC_CIRRUS_CHIP_INFO_CHIP_ID) {
+			reg = pcic_read(h, -1);
+			if ((reg & PCIC_CIRRUS_CHIP_INFO_CHIP_ID) == 0)
+				return (PCIC_VENDOR_CIRRUS_PD67XX);
+		}
+
+		/*
+		 * check for Ricoh RF5C[23]96
+		 */
+		reg = pcic_read(h, PCIC_RICOH_REG_CHIP_ID);
+		switch (reg) {
+		case PCIC_RICOH_CHIP_ID_5C296:
+			return (PCIC_VENDOR_RICOH_5C296);
+		case PCIC_RICOH_CHIP_ID_5C396:
+			return (PCIC_VENDOR_RICOH_5C396);
+		}
+	}
+
+	return (vendor);
 }
 
 char *
@@ -158,10 +195,18 @@ pcic_vendor_to_string(vendor)
 		return ("Intel 82365SL Revision 0");
 	case PCIC_VENDOR_I82365SLR1:
 		return ("Intel 82365SL Revision 1");
-	case PCIC_VENDOR_CIRRUS_PD6710:
-		return ("Cirrus PD6710");
-	case PCIC_VENDOR_CIRRUS_PD672X:
-		return ("Cirrus PD672X");
+	case PCIC_VENDOR_CIRRUS_PD67XX:
+		return ("Cirrus PD6710/2X");
+	case PCIC_VENDOR_I82365SL_DF:
+		return ("Intel 82365SL-DF");
+	case PCIC_VENDOR_RICOH_5C296:
+		return ("Ricoh RF5C296");
+	case PCIC_VENDOR_RICOH_5C396:
+		return ("Ricoh RF5C396");
+	case PCIC_VENDOR_IBM:
+		return ("IBM PCIC");
+	case PCIC_VENDOR_IBM_KING:
+		return ("IBM KING");
 	}
 
 	return ("Unknown controller");
@@ -171,7 +216,7 @@ void
 pcic_attach(sc)
 	struct pcic_softc *sc;
 {
-	int i, reg, chip, socket, intr;
+	int i, reg, chip, socket;
 	struct pcic_handle *h;
 
 	DPRINTF(("pcic ident regs:"));
@@ -193,23 +238,37 @@ pcic_attach(sc)
 		h->ph_write = st_pcic_write;
 		h->ph_bus_t = sc->iot;
 		h->ph_bus_h = sc->ioh;
+		h->flags = 0;
 
 		/* need to read vendor -- for cirrus to report no xtra chip */
 		if (socket == 0)
 			h->vendor = (h+1)->vendor = pcic_vendor(h);
 
-		/*
-		 * During the socket probe, read the ident register twice.
-		 * I don't understand why, but sometimes the clone chips
-		 * in hpcmips boxes read all-0s the first time. -- mycroft
-		 */
-		reg = pcic_read(h, PCIC_IDENT);
-		reg = pcic_read(h, PCIC_IDENT);
-		DPRINTF(("ident reg 0x%02x\n", reg));
-		if (pcic_ident_ok(reg))
-			h->flags = PCIC_FLAG_SOCKETP;
-		else
-			h->flags = 0;
+		switch (h->vendor) {
+		case PCIC_VENDOR_NONE:
+			/* no chip */
+			continue;
+		case PCIC_VENDOR_CIRRUS_PD67XX:
+			reg = pcic_read(h, PCIC_CIRRUS_CHIP_INFO);
+			if (socket == 0 ||
+			    (reg & PCIC_CIRRUS_CHIP_INFO_SLOTS))
+				h->flags = PCIC_FLAG_SOCKETP;
+			break;
+		default: 
+			/*
+			 * During the socket probe, read the ident register
+			 * twice.  I don't understand why, but sometimes the
+			 * clone chips in hpcmips boxes read all-0s the first
+			 * time. -- mycroft
+			 */
+			reg = pcic_read(h, PCIC_IDENT);
+			DPRINTF(("socket %d ident reg 0x%02x\n", i, reg));
+			reg = pcic_read(h, PCIC_IDENT);
+			DPRINTF(("socket %d ident reg 0x%02x\n", i, reg));
+			if (pcic_ident_ok(reg))
+				h->flags = PCIC_FLAG_SOCKETP;
+			break;
+		}
 	}
 
 	for (i = 0; i < PCIC_NSLOTS; i++) {
@@ -218,13 +277,9 @@ pcic_attach(sc)
 		if (h->flags & PCIC_FLAG_SOCKETP) {
 			SIMPLEQ_INIT(&h->events);
 
-			/* disable interrupts -- for now */
+			/* disable interrupts and leave socket in reset */
 			pcic_write(h, PCIC_CSC_INTR, 0);
-			intr = pcic_read(h, PCIC_INTR);
-			DPRINTF(("intr was 0x%02x\n", intr));
-			intr &= ~(PCIC_INTR_RI_ENABLE | PCIC_INTR_ENABLE |
-			    PCIC_INTR_IRQ_MASK);
-			pcic_write(h, PCIC_INTR, intr);
+			pcic_write(h, PCIC_INTR, 0);
 			(void) pcic_read(h, PCIC_CSC);
 		}
 	}
@@ -234,18 +289,21 @@ pcic_attach(sc)
 		h = &sc->handle[i];
 		chip = i / 2;
 
-		printf("%s: controller %d (%s) has ", sc->dev.dv_xname, chip,
-		    pcic_vendor_to_string(sc->handle[i].vendor));
+		if (h->vendor == PCIC_VENDOR_NONE)
+			continue;
+
+		aprint_normal("%s: controller %d (%s) has ", sc->dev.dv_xname,
+		    chip, pcic_vendor_to_string(sc->handle[i].vendor));
 
 		if ((h->flags & PCIC_FLAG_SOCKETP) &&
 		    ((h+1)->flags & PCIC_FLAG_SOCKETP))
-			printf("sockets A and B\n");
+			aprint_normal("sockets A and B\n");
 		else if (h->flags & PCIC_FLAG_SOCKETP)
-			printf("socket A only\n");
+			aprint_normal("socket A only\n");
 		else if ((h+1)->flags & PCIC_FLAG_SOCKETP)
-			printf("socket B only\n");
+			aprint_normal("socket B only\n");
 		else
-			printf("no sockets\n");
+			aprint_normal("no sockets\n");
 	}
 }
 
@@ -396,6 +454,8 @@ pcic_attach_socket_finish(h)
 	/* steer above mgmt interrupt to configured place */
 	intr = pcic_read(h, PCIC_INTR);
 	intr &= ~(PCIC_INTR_IRQ_MASK | PCIC_INTR_ENABLE);
+	if (sc->irq == 0)
+		intr |= PCIC_INTR_ENABLE;
 	pcic_write(h, PCIC_INTR, intr);
 
 	/* power down the socket */
@@ -411,8 +471,7 @@ pcic_attach_socket_finish(h)
 	    h->vendor));
 
 	/* unsleep the cirrus controller */
-	if ((h->vendor == PCIC_VENDOR_CIRRUS_PD6710) ||
-	    (h->vendor == PCIC_VENDOR_CIRRUS_PD672X)) {
+	if (h->vendor == PCIC_VENDOR_CIRRUS_PD67XX) {
 		reg = pcic_read(h, PCIC_CIRRUS_MISC_CTL_2);
 		if (reg & PCIC_CIRRUS_MISC_CTL_2_SUSPEND) {
 			DPRINTF(("%s: socket %02x was suspended\n",
@@ -501,7 +560,7 @@ pcic_event_thread(arg)
 			    "pcicss", hz/4);
 		}
 		s = splhigh();
-		SIMPLEQ_REMOVE_HEAD(&h->events, pe, pe_q);
+		SIMPLEQ_REMOVE_HEAD(&h->events, pe_q);
 		splx(s);
 
 		switch (pe->pe_type) {
@@ -517,11 +576,9 @@ pcic_event_thread(arg)
 				if ((pe2 = SIMPLEQ_NEXT(pe1, pe_q)) == NULL)
 					break;
 				if (pe2->pe_type == PCIC_EVENT_INSERTION) {
-					SIMPLEQ_REMOVE_HEAD(&h->events, pe1,
-					    pe_q);
+					SIMPLEQ_REMOVE_HEAD(&h->events, pe_q);
 					free(pe1, M_TEMP);
-					SIMPLEQ_REMOVE_HEAD(&h->events, pe2,
-					    pe_q);
+					SIMPLEQ_REMOVE_HEAD(&h->events, pe_q);
 					free(pe2, M_TEMP);
 				}
 			}
@@ -544,11 +601,9 @@ pcic_event_thread(arg)
 				if ((pe2 = SIMPLEQ_NEXT(pe1, pe_q)) == NULL)
 					break;
 				if (pe2->pe_type == PCIC_EVENT_REMOVAL) {
-					SIMPLEQ_REMOVE_HEAD(&h->events, pe1,
-					    pe_q);
+					SIMPLEQ_REMOVE_HEAD(&h->events, pe_q);
 					free(pe1, M_TEMP);
-					SIMPLEQ_REMOVE_HEAD(&h->events, pe2,
-					    pe_q);
+					SIMPLEQ_REMOVE_HEAD(&h->events, pe_q);
 					free(pe2, M_TEMP);
 				}
 			}
@@ -635,7 +690,7 @@ pcic_submatch(parent, cf, aux)
 		panic("unknown pcic socket");
 	}
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 int
@@ -648,20 +703,20 @@ pcic_print(arg, pnp)
 
 	/* Only "pcmcia"s can attach to "pcic"s... easy. */
 	if (pnp)
-		printf("pcmcia at %s", pnp);
+		aprint_normal("pcmcia at %s", pnp);
 
 	switch (h->sock) {
 	case C0SA:
-		printf(" controller 0 socket 0");
+		aprint_normal(" controller 0 socket 0");
 		break;
 	case C0SB:
-		printf(" controller 0 socket 1");
+		aprint_normal(" controller 0 socket 1");
 		break;
 	case C1SA:
-		printf(" controller 1 socket 0");
+		aprint_normal(" controller 1 socket 0");
 		break;
 	case C1SB:
-		printf(" controller 1 socket 1");
+		aprint_normal(" controller 1 socket 1");
 		break;
 	default:
 		panic("unknown pcic socket");
@@ -820,6 +875,7 @@ void
 pcic_deactivate_card(h)
 	struct pcic_handle *h;
 {
+	int intr;
 
 	/* call the MI deactivate function */
 	pcmcia_card_deactivate(h->pcmcia);
@@ -828,7 +884,9 @@ pcic_deactivate_card(h)
 	pcic_write(h, PCIC_PWRCTL, 0);
 
 	/* reset the socket */
-	pcic_write(h, PCIC_INTR, 0);
+	intr = pcic_read(h, PCIC_INTR);
+	intr &= PCIC_INTR_ENABLE;
+	pcic_write(h, PCIC_INTR, intr);
 }
 
 int 
@@ -1272,9 +1330,10 @@ pcic_chip_io_map(pch, width, offset, size, pcihp, windowp)
 
 	/* XXX wtf is this doing here? */
 
-	printf(" port 0x%lx", (u_long) ioaddr);
+	printf("%s: port 0x%lx", sc->dev.dv_xname, (u_long) ioaddr);
 	if (size > 1)
 		printf("-0x%lx", (u_long) ioaddr + (u_long) size - 1);
+	printf("\n");
 
 	h->io[win].addr = ioaddr;
 	h->io[win].size = size;
@@ -1347,7 +1406,7 @@ pcic_delay(h, timo, wmesg)
 		printf("called with timeout %d\n", timo);
 		panic("pcic_delay");
 	}
-	if (curproc == NULL) {
+	if (curlwp == NULL) {
 		printf("called in interrupt context\n");
 		panic("pcic_delay");
 	}
@@ -1378,7 +1437,7 @@ pcic_chip_socket_enable(pch)
 
 	/* disable interrupts */
 	intr = pcic_read(h, PCIC_INTR);
-	intr &= ~(PCIC_INTR_IRQ_MASK | PCIC_INTR_ENABLE);
+	intr &= ~PCIC_INTR_IRQ_MASK;
 	pcic_write(h, PCIC_INTR, intr);
 
 	/* power down the socket to reset it, clear the card reset pin */
@@ -1390,6 +1449,27 @@ pcic_chip_socket_enable(pch)
 	 * we are changing Vcc (Toff).
 	 */
 	pcic_delay(h, 300 + 100, "pccen0");
+
+	/*
+	 * power hack for RICOH RF5C[23]96
+	 */
+	switch( h->vendor ) {
+	case PCIC_VENDOR_RICOH_5C296:
+	case PCIC_VENDOR_RICOH_5C396:
+	{
+		int regtmp;
+		regtmp = pcic_read(h, PCIC_RICOH_REG_MCR2);
+#ifdef RICOH_POWER_HACK
+		regtmp |= PCIC_RICOH_MCR2_VCC_DIRECT;
+#else
+		regtmp &= ~(PCIC_RICOH_MCR2_VCC_DIRECT|PCIC_RICOH_MCR2_VCC_SEL_3V);
+#endif
+		pcic_write(h, PCIC_RICOH_REG_MCR2, regtmp);
+	}
+		break;
+	default:
+		break;
+	}
 
 #ifdef VADEM_POWER_HACK
 	bus_space_write_1(sc->iot, sc->ioh, PCIC_REG_INDEX, 0x0e);
@@ -1434,8 +1514,10 @@ pcic_chip_socket_enable(pch)
 	/* wait 20ms as per pc card standard (r2.01) section 4.3.6 */
 	pcic_delay(h, 20, "pccen2");
 
-#ifdef DIAGNOSTIC
+#if defined(DIAGNOSTIC) || defined(PCICDEBUG)
 	reg = pcic_read(h, PCIC_IF_STATUS);
+#endif
+#ifdef DIAGNOSTIC
 	if (!(reg & PCIC_IF_STATUS_POWERACTIVE)) {
 		printf("pcic_chip_socket_enable: status %x\n", reg);
 	}
@@ -1482,7 +1564,7 @@ pcic_chip_socket_disable(pch)
 
 	/* disable interrupts */
 	intr = pcic_read(h, PCIC_INTR);
-	intr &= ~(PCIC_INTR_IRQ_MASK | PCIC_INTR_ENABLE);
+	intr &= ~PCIC_INTR_IRQ_MASK;
 	pcic_write(h, PCIC_INTR, intr);
 
 	/* power down the socket */

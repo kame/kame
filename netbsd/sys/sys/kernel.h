@@ -1,4 +1,4 @@
-/*	$NetBSD: kernel.h,v 1.16 2000/03/23 06:31:51 thorpej Exp $	*/
+/*	$NetBSD: kernel.h,v 1.22 2003/10/02 12:14:00 christos Exp $	*/
 
 /*-
  * Copyright (c) 1990, 1993
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -43,6 +39,7 @@
 #ifndef _SYS_KERNEL_H_
 #define _SYS_KERNEL_H_
 
+#if defined(_KERNEL) || defined(_STANDALONE)
 /* Global variables for the kernel. */
 
 extern long hostid;
@@ -53,13 +50,13 @@ extern int domainnamelen;
 
 extern volatile struct timeval mono_time;
 extern struct timeval boottime;
-extern struct timeval runtime;
 extern volatile struct timeval time;
 
 extern int rtc_offset;		/* offset of rtc from UTC in minutes */
 
 extern int cold;		/* still working on startup */
 extern int tick;		/* usec per tick (1000000 / hz) */
+extern int hardclock_ticks;	/* # of hardclock ticks */
 extern int tickfix;		/* periodic tick adj. tick not integral */
 extern int tickfixinterval;	/* interval at which to apply adjustment */
 extern int tickadj;		/* "standard" clock skew, us./tick */
@@ -68,17 +65,10 @@ extern int stathz;		/* statistics clock's frequency */
 extern int profhz;		/* profiling clock's frequency */
 extern int lbolt;		/* once a second sleep address */
 
-/*
- * These globals indicate the number of times hardlock() has ticked,
- * and the successive attempt of softclock() to catch up with it.  These
- * are large unsigned numbers so that arithmetic can be performed on them
- * with no reasonable worry about an overflow occurring (we get over 500
- * million years with this).
- *
- * IMPORTANT NOTE: you *must* be at splclock() in order to read both
- * hardclock_ticks and softclock_ticks.  This is because the 64-bit
- * quantities may not be readable in an atomic fashion on all CPU types.
- */
-extern u_int64_t hardclock_ticks, softclock_ticks;
+extern int profsrc;		/* profiling source */
+
+#define PROFSRC_CLOCK	0
+
+#endif
 
 #endif /* _SYS_KERNEL_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: le_bus.c,v 1.5 2000/01/19 13:12:55 leo Exp $	*/
+/*	$NetBSD: le_bus.c,v 1.8 2004/02/13 11:36:11 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -35,6 +35,10 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: le_bus.c,v 1.8 2004/02/13 11:36:11 wiz Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -237,9 +241,9 @@ static __inline__ u_int16_t swap16(u_int16_t v)
 
 static __inline__ u_int32_t swap32(u_int32_t v)
 {
-	__asm volatile ("	rolw	#8, %0
-				swap	%0
-				rolw	#8, %0" : "=d"(v) : "0"(v));
+	__asm volatile ("	rolw	#8, %0	\n"
+			"	swap	%0	\n"
+			"	rolw	#8, %0" : "=d"(v) : "0"(v));
 	return(v);
 }
 
@@ -554,7 +558,7 @@ leb_bus_space_write_stream_8(t, h, o, v)
  *
  * Read 'count' 1, 2, 4, or 8 byte values from the bus_space described by
  * tag/handle at `offset' and store them in the address range starting at
- * 'address'. The values are converted to cpu endian order before being
+ * 'address'. The values are converted to CPU endian order before being
  * being stored.
  */
 static void

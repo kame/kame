@@ -1,4 +1,4 @@
-/*	$NetBSD: ka88.c,v 1.2 2001/04/12 06:12:17 thorpej Exp $	*/
+/*	$NetBSD: ka88.c,v 1.6 2003/07/15 02:15:04 lukem Exp $	*/
 
 /*
  * Copyright (c) 2000 Ludd, University of Lule}, Sweden. All rights reserved.
@@ -37,6 +37,9 @@
  * TODO:
  *	- Machine check code
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ka88.c,v 1.6 2003/07/15 02:15:04 lukem Exp $");
 
 #include "opt_multiprocessor.h"
 
@@ -155,9 +158,8 @@ ka88_attach(struct device *parent, struct device *self, void *aux)
 	curcpu()->ci_dev = self;
 }
 
-struct cfattach cpu_nmi_ca = {
-	sizeof(struct ka88_softc), ka88_match, ka88_attach
-};
+CFATTACH_DECL(cpu_nmi, sizeof(struct ka88_softc),
+    ka88_match, ka88_attach, NULL, NULL);
 
 struct mem_nmi_softc {
 	struct device sc_dev;
@@ -184,9 +186,8 @@ ms88_attach(struct device *parent, struct device *self, void *aux)
 	printf("\n");
 }
 
-struct cfattach mem_nmi_ca = {
-	sizeof(struct mem_nmi_softc), ms88_match, ms88_attach
-};
+CFATTACH_DECL(mem_nmi, sizeof(struct mem_nmi_softc),
+    ms88_match, ms88_attach, NULL, NULL);
 
 static void
 ka88_badaddr(void)

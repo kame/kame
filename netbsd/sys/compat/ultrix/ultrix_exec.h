@@ -1,4 +1,4 @@
-/*	$NetBSD: ultrix_exec.h,v 1.1 2000/11/21 00:37:55 jdolecek Exp $	*/
+/*	$NetBSD: ultrix_exec.h,v 1.3 2003/06/29 22:29:52 fvdl Exp $	*/
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.

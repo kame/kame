@@ -1,4 +1,4 @@
-#	$NetBSD: genfth.cf,v 1.1 2000/08/20 14:58:46 mrg Exp $
+#	$NetBSD: genfth.cf,v 1.3.4.1 2004/06/19 04:28:53 grant Exp $
 
 #
 # Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -83,18 +83,23 @@ include <sys/time.h>
 include <ufs/ufs/dinode.h>
 include <ufs/ufs/dir.h>
 include <ufs/ffs/fs.h>
+include <dev/raidframe/raidframevar.h>
 
 #
 # ufs sizing constants
 #
 define	dev_bsize	DEV_BSIZE
 define	maxbsize	MAXBSIZE
-define	bbsize		BBSIZE		
-define	sbsize		SBSIZE		
-define	bboff		BBOFF		
-define	sboff		SBOFF		
-define	bblock		BBLOCK		
-define	sblock		SBLOCK		
+define	bbsize		BBSIZE
+define	sbsize		SBLOCKSIZE
+define	bboff		BBOFF
+define	sboff		SBLOCK_UFS1
+define	bblock		BBLOCK
+# XXX: Will not work for UFS2!
+define	sblock		SBLOCK_UFS1
+
+# RAID1 boot support
+define	rf_protected	RF_PROTECTED_SECTORS
 
 #
 # ufs superblock
@@ -102,12 +107,12 @@ define	sblock		SBLOCK
 struct	fs
 member	fs_magic
 member	fs_bsize
-member	fs_npsect
-member	fs_nsect
-member	fs_interleave
-member	fs_postblformat
-member	fs_nrpos
-member	fs_inodefmt
+member	fs_old_npsect
+member	fs_old_nsect
+member	fs_old_interleave
+member	fs_old_postblformat
+member	fs_old_nrpos
+member	fs_old_inodefmt
 member	fs_maxfilesize
 member	fs_qbmask
 member	fs_qfmask
@@ -119,8 +124,8 @@ member	fs_inopb
 member	fs_fragshift
 member	fs_bshift
 member	fs_fshift
-member	fs_cgoffset
-member	fs_cgmask
+member	fs_old_cgoffset
+member	fs_old_cgmask
 member	fs_dblkno
 member	fs_iblkno
 member	fs_sblkno
@@ -131,14 +136,13 @@ member	fs_frag
 member	fs_maxsymlinklen
 
 #
-# ufs dinode
+# ufs1 dinode
 #
-struct	dinode
+struct	ufs1_dinode
 member	di_size
 member	di_mode
 member	di_db
 member	di_ib
-member  di_shortlink
 
 #
 # ufs direct
@@ -150,7 +154,7 @@ member	d_reclen
 member	d_namlen
 member	d_name
 
-define	fs_magic_value	FS_MAGIC
+define	fs_magic_value	FS_UFS1_MAGIC
 define	fs_42postblfmt	FS_42POSTBLFMT
 define	fs_44inodefmt	FS_44INODEFMT
 define	ndaddr		NDADDR

@@ -1,4 +1,4 @@
-/*	$NetBSD: vrpciu.c,v 1.9 2002/05/16 01:01:36 thorpej Exp $	*/
+/*	$NetBSD: vrpciu.c,v 1.14 2003/07/15 02:29:36 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 Enami Tsugutomo.
@@ -25,6 +25,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vrpciu.c,v 1.14 2003/07/15 02:29:36 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -98,9 +101,8 @@ static void	*vrpciu_intr_establish(pci_chipset_tag_t, pci_intr_handle_t,
 		    int, int (*)(void *), void *);
 static void	vrpciu_intr_disestablish(pci_chipset_tag_t, void *);
 
-struct cfattach vrpciu_ca = {
-	sizeof(struct vrpciu_softc), vrpciu_match, vrpciu_attach
-};
+CFATTACH_DECL(vrpciu, sizeof(struct vrpciu_softc),
+    vrpciu_match, vrpciu_attach, NULL, NULL);
 
 static void
 vrpciu_write(struct vrpciu_softc *sc, int offset, u_int32_t val)
@@ -298,6 +300,7 @@ vrpciu_attach(struct device *parent, struct device *self, void *aux)
 	 */
 	pba.pba_memt = sc->sc_iot;
 	pba.pba_dmat = &hpcmips_default_bus_dma_tag.bdt;
+	pba.pba_dmat64 = NULL;
 	pba.pba_bus = 0;
 	pba.pba_bridgetag = NULL;
 
@@ -334,9 +337,9 @@ vrpciu_print(void *aux, const char *pnp)
 	struct pcibus_attach_args *pba = aux;
 
 	if (pnp != NULL)
-		printf("%s at %s", pba->pba_busname, pnp);
+		aprint_normal("%s at %s", pba->pba_busname, pnp);
 	else
-		printf(" bus %d", pba->pba_bus);
+		aprint_normal(" bus %d", pba->pba_bus);
 
 	return (UNCONF);
 }

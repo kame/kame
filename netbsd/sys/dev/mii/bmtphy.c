@@ -1,4 +1,4 @@
-/*	$NetBSD: bmtphy.c,v 1.7 2002/03/25 20:51:24 thorpej Exp $	*/
+/*	$NetBSD: bmtphy.c,v 1.14 2003/06/06 23:22:56 martin Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000, 2001 The NetBSD Foundation, Inc.
@@ -73,13 +73,12 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: bmtphy.c,v 1.7 2002/03/25 20:51:24 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: bmtphy.c,v 1.14 2003/06/06 23:22:56 martin Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
-#include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/errno.h>
 
@@ -95,10 +94,8 @@ __KERNEL_RCSID(0, "$NetBSD: bmtphy.c,v 1.7 2002/03/25 20:51:24 thorpej Exp $");
 int	bmtphymatch(struct device *, struct cfdata *, void *);
 void	bmtphyattach(struct device *, struct device *, void *);
 
-struct cfattach bmtphy_ca = {
-	sizeof(struct mii_softc), bmtphymatch, bmtphyattach,
-	    mii_phy_detach, mii_phy_activate
-};
+CFATTACH_DECL(bmtphy, sizeof(struct mii_softc),
+    bmtphymatch, bmtphyattach, mii_phy_detach, mii_phy_activate);
 
 int	bmtphy_service(struct mii_softc *, struct mii_data *, int);
 void	bmtphy_status(struct mii_softc *);
@@ -114,6 +111,8 @@ const struct mii_phydesc bmtphys[] = {
 	  MII_STR_xxBROADCOM_3C905C },
 	{ MII_OUI_xxBROADCOM,		MII_MODEL_xxBROADCOM_BCM5201,
 	  MII_STR_xxBROADCOM_BCM5201 },
+	{ MII_OUI_xxBROADCOM,		MII_MODEL_xxBROADCOM_BCM5214,
+	  MII_STR_xxBROADCOM_BCM5214 },
 	{ MII_OUI_xxBROADCOM,		MII_MODEL_xxBROADCOM_BCM5221,
 	  MII_STR_xxBROADCOM_BCM5221 },
 
@@ -141,7 +140,8 @@ bmtphyattach(struct device *parent, struct device *self, void *aux)
 	const struct mii_phydesc *mpd;
 
 	mpd = mii_phy_match(ma, bmtphys);
-	printf(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
+	aprint_naive(": Media interface\n");
+	aprint_normal(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
 
 	sc->mii_inst = mii->mii_instance;
 	sc->mii_phy = ma->mii_phyno;
@@ -158,12 +158,12 @@ bmtphyattach(struct device *parent, struct device *self, void *aux)
 
 	sc->mii_capabilities =
 	    PHY_READ(sc, MII_BMSR) & ma->mii_capmask;
-	printf("%s: ", sc->mii_dev.dv_xname);
+	aprint_normal("%s: ", sc->mii_dev.dv_xname);
 	if ((sc->mii_capabilities & BMSR_MEDIAMASK) == 0)
-		printf("no media present");
+		aprint_error("no media present");
 	else
 		mii_phy_add_media(sc);
-	printf("\n");
+	aprint_normal("\n");
 }
 
 int
@@ -236,7 +236,6 @@ bmtphy_status(struct mii_softc *sc)
 	mii->mii_media_active = IFM_ETHER;
 
 	bmsr = PHY_READ(sc, MII_BMSR) | PHY_READ(sc, MII_BMSR);
-	aux_csr = PHY_READ(sc, MII_BMTPHY_AUX_CSR);
 
 	if (bmsr & BMSR_LINK)
 		mii->mii_media_status |= IFM_ACTIVE;
@@ -262,6 +261,7 @@ bmtphy_status(struct mii_softc *sc)
 			return;
 		}
 
+		aux_csr = PHY_READ(sc, MII_BMTPHY_AUX_CSR);
 		if (aux_csr & AUX_CSR_SPEED)
 			mii->mii_media_active |= IFM_100_TX;
 		else

@@ -1,4 +1,4 @@
-/*	$NetBSD: hpcfb.c,v 1.20.4.1 2002/11/30 13:02:15 he Exp $	*/
+/*	$NetBSD: hpcfb.c,v 1.30 2003/06/29 22:30:07 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1999
@@ -43,19 +43,18 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: hpcfb.c,v 1.20.4.1 2002/11/30 13:02:15 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: hpcfb.c,v 1.30 2003/06/29 22:30:07 fvdl Exp $");
 
 #define FBDEBUG
 static const char _copyright[] __attribute__ ((unused)) =
     "Copyright (c) 1999 Shin Takemura.  All rights reserved.";
 static const char _rcsid[] __attribute__ ((unused)) =
-    "$NetBSD: hpcfb.c,v 1.20.4.1 2002/11/30 13:02:15 he Exp $";
+    "$NetBSD: hpcfb.c,v 1.30 2003/06/29 22:30:07 fvdl Exp $";
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/signalvar.h>
-#include <sys/map.h>
 #include <sys/proc.h>
 #include <sys/kthread.h>
 #include <sys/lock.h>
@@ -205,8 +204,6 @@ static void	hpcfb_power(int, void *);
 static void	hpcfb_cmap_reorder(struct hpcfb_fbconf *,
 		    struct hpcfb_devconfig *);
 
-static int	pow(int, int);
-
 void    hpcfb_cursor(void *, int, int, int);
 int     hpcfb_mapchar(void *, int, unsigned int *);
 void    hpcfb_putchar(void *, int, int, u_int, long);
@@ -215,7 +212,7 @@ void    hpcfb_erasecols(void *, int, int, int, long);
 void    hpcfb_redraw(void *, int, int, int);
 void    hpcfb_copyrows(void *, int, int, int);
 void    hpcfb_eraserows(void *, int, int, long);
-int     hpcfb_alloc_attr(void *, int, int, int, long *);
+int     hpcfb_allocattr(void *, int, int, int, long *);
 void    hpcfb_cursor_raw(void *, int, int, int);
 
 #ifdef HPCFB_JUMP
@@ -232,15 +229,14 @@ struct wsdisplay_emulops hpcfb_emulops = {
 	hpcfb_erasecols,
 	hpcfb_copyrows,
 	hpcfb_eraserows,
-	hpcfb_alloc_attr
+	hpcfb_allocattr
 };
 
 /*
  *  static variables
  */
-struct cfattach hpcfb_ca = {
-	sizeof(struct hpcfb_softc), hpcfbmatch, hpcfbattach,
-};
+CFATTACH_DECL(hpcfb, sizeof(struct hpcfb_softc),
+    hpcfbmatch, hpcfbattach, NULL, NULL);
 
 struct wsscreen_descr hpcfb_stdscreen = {
 	"std",
@@ -286,15 +282,6 @@ struct hpcfb_tvrow hpcfb_console_tvram[HPCFB_MAX_ROW];
 /*
  *  function bodies
  */
-static int
-pow(int x, int n)
-{
-	int res = 1;
-	while (0 < n--) {
-		res *= x;
-	}
-	return (res);
-}
 
 int
 hpcfbmatch(struct device *parent, struct cfdata *match, void *aux)
@@ -319,7 +306,7 @@ hpcfbattach(struct device *parent, struct device *self, void *aux)
 		hpcfb_console_dc.dc_sc = sc;
 		printf(": %dx%d pixels, %d colors, %dx%d chars",
 		    sc->sc_dc->dc_rinfo.ri_width,sc->sc_dc->dc_rinfo.ri_height,
-		    pow(2, sc->sc_dc->dc_rinfo.ri_depth),
+		    (1 << sc->sc_dc->dc_rinfo.ri_depth),
 		    sc->sc_dc->dc_rinfo.ri_cols,sc->sc_dc->dc_rinfo.ri_rows);
 		/* Set video chip dependent CLUT if any. */
 		if (sc->sc_accessops->setclut)
@@ -396,7 +383,7 @@ int
 hpcfbprint(void *aux, const char *pnp)
 {
 	if (pnp)
-		printf("hpcfb at %s", pnp);
+		aprint_normal("hpcfb at %s", pnp);
 
 	return (UNCONF);
 }
@@ -430,8 +417,8 @@ hpcfb_cnattach(struct hpcfb_fbconf *fbconf)
 	hpcfb_console_wsscreen.nrows = hpcfb_console_dc.dc_rows;
 	hpcfb_console_wsscreen.ncols = hpcfb_console_dc.dc_cols;
 	hpcfb_console_wsscreen.capabilities = hpcfb_console_dc.dc_rinfo.ri_caps;
-	hpcfb_alloc_attr(&hpcfb_console_dc,
-			 WSCOL_WHITE, WSCOL_BLACK, 0, &defattr);
+	hpcfb_allocattr(&hpcfb_console_dc,
+			WSCOL_WHITE, WSCOL_BLACK, 0, &defattr);
 	wsdisplay_cnattach(&hpcfb_console_wsscreen, &hpcfb_console_dc,
 	    0, 0, defattr);
 	hpcfbconsole = 1;
@@ -729,7 +716,7 @@ hpcfb_alloc_screen(void *v, const struct wsscreen_descr *type, void **cookiep,
 		sc->sc_accessops->setclut(sc->sc_accessctx, &dc->dc_rinfo);
 	printf("hpcfb: %dx%d pixels, %d colors, %dx%d chars\n",
 	    dc->dc_rinfo.ri_width, dc->dc_rinfo.ri_height,
-	    pow(2, dc->dc_rinfo.ri_depth),
+	    (1 << dc->dc_rinfo.ri_depth),
 	    dc->dc_rinfo.ri_cols, dc->dc_rinfo.ri_rows);
 
 	/*
@@ -758,7 +745,7 @@ hpcfb_alloc_screen(void *v, const struct wsscreen_descr *type, void **cookiep,
 	*curxp = 0;
 	*curyp = 0;
 	*cookiep = dc; 
-	hpcfb_alloc_attr(*cookiep, WSCOL_WHITE, WSCOL_BLACK, 0, attrp);
+	hpcfb_allocattr(*cookiep, WSCOL_WHITE, WSCOL_BLACK, 0, attrp);
 	DPRINTF(("%s(%d): hpcfb_alloc_screen(): 0x%p\n",
 	    __FILE__, __LINE__, dc));
 
@@ -1517,13 +1504,13 @@ hpcfb_eraserows(void *cookie, int row, int nrow, long attr)
 }
 
 /*
- * alloc_attr
+ * allocattr
  */
 int
-hpcfb_alloc_attr(void *cookie, int fg, int bg, int flags, long *attrp)
+hpcfb_allocattr(void *cookie, int fg, int bg, int flags, long *attrp)
 {
 	struct hpcfb_devconfig *dc = (struct hpcfb_devconfig *)cookie;
 	struct rasops_info *ri = &dc->dc_rinfo;
 
-	return (rasops_emul.alloc_attr(ri, fg, bg, flags, attrp));
+	return (rasops_emul.allocattr(ri, fg, bg, flags, attrp));
 }

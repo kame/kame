@@ -1,4 +1,4 @@
-/*	$NetBSD: aic77xx.c,v 1.2 2001/11/13 13:14:33 lukem Exp $	*/
+/*	$NetBSD: aic77xx.c,v 1.4 2003/10/18 07:44:51 tsutsui Exp $	*/
 
 /*
  * Common routines for AHA-27/284X and aic7770 motherboard SCSI controllers.
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: aic77xx.c,v 1.2 2001/11/13 13:14:33 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: aic77xx.c,v 1.4 2003/10/18 07:44:51 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -44,8 +44,8 @@ __KERNEL_RCSID(0, "$NetBSD: aic77xx.c,v 1.2 2001/11/13 13:14:33 lukem Exp $");
 #include <dev/scsipi/scsipi_all.h>
 #include <dev/scsipi/scsiconf.h>
 
-#include <dev/microcode/aic7xxx/aic7xxx_reg.h>
-#include <dev/ic/aic7xxxvar.h>
+#include <dev/ic/aic7xxx_osm.h>
+#include <dev/ic/aic7xxx_inline.h>
 #include <dev/ic/aic77xxreg.h>
 #include <dev/ic/aic77xxvar.h>
 
@@ -87,7 +87,6 @@ int
 ahc_aic77xx_attach(ahc)
 	struct ahc_softc *ahc;
 {
-	char *id_string;
 	u_int8_t sblkctl;
 	u_int8_t sblkctl_orig;
 	u_int8_t hostconf;
@@ -101,16 +100,14 @@ ahc_aic77xx_attach(ahc)
 	ahc_outb(ahc, SBLKCTL, sblkctl);
 	sblkctl = ahc_inb(ahc, SBLKCTL);
 	if (sblkctl != sblkctl_orig) {
-		id_string = "aic7770 >= Rev E, ";
+		printf("%s: aic7770 >= Rev E: R/O autoflush enabled\n",
+		    ahc_name(ahc));
 		/*
 		 * Ensure autoflush is enabled
 		 */
 		sblkctl &= ~AUTOFLUSHDIS;
 		ahc_outb(ahc, SBLKCTL, sblkctl);
-	} else
-		id_string = "aic7770 <= Rev C, ";
-
-	printf("%s: %s", ahc_name(ahc), id_string);
+	}
 
 	/* Setup the FIFO threshold and the bus off time */
 	hostconf = ahc_inb(ahc, HOSTCONF);
@@ -138,4 +135,3 @@ ahc_aic77xx_attach(ahc)
 
 	return 0;
 }
-

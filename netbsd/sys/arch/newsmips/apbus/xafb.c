@@ -1,4 +1,4 @@
-/*	$NetBSD: xafb.c,v 1.2 2002/03/17 19:40:46 atatat Exp $	*/
+/*	$NetBSD: xafb.c,v 1.7 2003/11/13 03:09:28 chs Exp $	*/
 
 /*-
  * Copyright (c) 2000 Tsubai Masanari.  All rights reserved.
@@ -27,6 +27,9 @@
  */
 
 /* "xa" frame buffer driver.  Currently supports 1280x1024x8 only. */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: xafb.c,v 1.7 2003/11/13 03:09:28 chs Exp $");
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -92,9 +95,8 @@ int xafb_putcmap __P((struct xafb_softc *, struct wsdisplay_cmap *));
 
 static __inline void xafb_setcolor(struct xafb_devconfig *, int, int, int, int);
 
-struct cfattach xafb_ca = {
-	sizeof(struct xafb_softc), xafb_match, xafb_attach,
-};
+CFATTACH_DECL(xafb, sizeof(struct xafb_softc),
+    xafb_match, xafb_attach, NULL, NULL);
 
 struct xafb_devconfig xafb_console_dc;
 
@@ -315,7 +317,7 @@ xafb_alloc_screen(v, scrdesc, cookiep, ccolp, crowp, attrp)
 
 	*cookiep = ri;
 	*ccolp = *crowp = 0;
-	(*ri->ri_ops.alloc_attr)(ri, 0, 0, 0, &defattr);
+	(*ri->ri_ops.allocattr)(ri, 0, 0, 0, &defattr);
 	*attrp = defattr;
 	sc->sc_nscreens++;
 
@@ -363,7 +365,7 @@ xafb_cnattach()
 
 	crow = 0;			/* XXX current cursor pos */
 
-	(*ri->ri_ops.alloc_attr)(ri, 0, 0, 0, &defattr);
+	(*ri->ri_ops.allocattr)(ri, 0, 0, 0, &defattr);
 	wsdisplay_cnattach(&xafb_stdscreen, &dc->dc_ri, 0, crow, defattr);
 
 	return 0;
@@ -401,25 +403,31 @@ xafb_putcmap(sc, cm)
 {
 	u_int index = cm->index;
 	u_int count = cm->count;
-	int i;
+	int i, error;
+	u_char rbuf[256], gbuf[256], bbuf[256];
 	u_char *r, *g, *b;
 
-	if (index >= 256 || count > 256 || index + count > 256)
+	if (cm->index >= 256 || cm->count > 256 ||
+	    (cm->index + cm->count) > 256)
 		return EINVAL;
-	if (!uvm_useracc(cm->red,   count, B_READ) ||
-	    !uvm_useracc(cm->green, count, B_READ) ||
-	    !uvm_useracc(cm->blue,  count, B_READ))
-		return EFAULT;
-	copyin(cm->red,   &sc->sc_cmap_red[index],   count);
-	copyin(cm->green, &sc->sc_cmap_green[index], count);
-	copyin(cm->blue,  &sc->sc_cmap_blue[index],  count);
+	error = copyin(cm->red, &rbuf[index], count);
+	if (error)
+		return error;
+	error = copyin(cm->green, &gbuf[index], count);
+	if (error)
+		return error;
+	error = copyin(cm->blue, &bbuf[index], count);
+	if (error)
+		return error;
+
+	memcpy(&sc->sc_cmap_red[index], &rbuf[index], count);
+	memcpy(&sc->sc_cmap_green[index], &gbuf[index], count);
+	memcpy(&sc->sc_cmap_blue[index], &bbuf[index], count);
 
 	r = &sc->sc_cmap_red[index];
 	g = &sc->sc_cmap_green[index];
 	b = &sc->sc_cmap_blue[index];
-
 	for (i = 0; i < count; i++)
 		xafb_setcolor(sc->sc_dc, index++, *r++, *g++, *b++);
-
 	return 0;
 }

@@ -1,4 +1,4 @@
-/* $NetBSD: cpu.h,v 1.58 2001/05/30 12:28:38 mrg Exp $ */
+/* $NetBSD: cpu.h,v 1.62 2004/01/04 11:33:29 jdolecek Exp $ */
 
 /*-
  * Copyright (c) 1998, 1999, 2000, 2001 The NetBSD Foundation, Inc.
@@ -38,9 +38,43 @@
  */
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1982, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: cpu.h 1.16 91/03/25$
+ *
+ *	@(#)cpu.h	8.4 (Berkeley) 1/5/94
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -114,7 +148,7 @@ struct cpu_info {
 	u_long ci_spin_locks;		/* # of spin locks held */
 	u_long ci_simple_locks;		/* # of simple locks held */
 #endif
-	struct proc *ci_curproc;	/* current owner of the processor */
+	struct lwp *ci_curlwp;		/* current owner of the processor */
 	struct cpu_info *ci_next;	/* next cpu_info structure */
 
 	/*
@@ -122,7 +156,7 @@ struct cpu_info {
 	 */
 	struct mchkinfo ci_mcinfo;	/* machine check info */
 	cpuid_t ci_cpuid;		/* our CPU ID */
-	struct proc *ci_fpcurproc;	/* current owner of the FPU */
+	struct lwp *ci_fpcurlwp;	/* current owner of the FPU */
 	paddr_t ci_curpcb;		/* PA of current HW PCB */
 	struct pcb *ci_idle_pcb;	/* our idle PCB */
 	paddr_t ci_idle_pcb_paddr;	/* PA of idle PCB */
@@ -132,12 +166,12 @@ struct cpu_info {
 	struct trapframe *ci_db_regs;	/* registers for debuggers */
 
 	/*
-	 * Variables used by microtime().
+	 * Variables used by cc_microtime().
 	 */
-	struct timeval ci_pcc_time;
-	long ci_pcc_pcc;
-	long ci_pcc_ms_delta;
-	long ci_pcc_denom;
+	struct timeval ci_cc_time;
+	long ci_cc_cc;
+	long ci_cc_ms_delta;
+	long ci_cc_denom;
 
 #if defined(MULTIPROCESSOR)
 	__volatile u_long ci_flags;	/* flags; see below */
@@ -174,16 +208,16 @@ void	cpu_pause_resume_all(int);
 #define	curcpu()	(&cpu_info_primary)
 #endif /* MULTIPROCESSOR */
 
-#define	curproc		curcpu()->ci_curproc
-#define	fpcurproc	curcpu()->ci_fpcurproc
+#define	curlwp		curcpu()->ci_curlwp
+#define	fpcurlwp	curcpu()->ci_fpcurlwp
 #define	curpcb		curcpu()->ci_curpcb
 
 /*
  * definitions of cpu-dependent requirements
  * referenced in generic code
  */
-#define	cpu_wait(p)		/* nothing */
 #define	cpu_number()		alpha_pal_whami()
+#define	cpu_proc_fork(p1, p2)	/* nothing */
 
 /*
  * Arguments to hardclock and gatherstats encapsulate the previous
@@ -210,7 +244,7 @@ struct clockframe {
  * This is used during profiling to integrate system time.  It can safely
  * assume that the process is resident.
  */
-#define	PROC_PC(p)		((p)->p_md.md_tf->tf_regs[FRAME_PC])
+#define	LWP_PC(p)		((l)->l_md.md_tf->tf_regs[FRAME_PC])
 
 /*
  * Preempt the current process if in interrupt from user mode,
@@ -219,8 +253,8 @@ struct clockframe {
 #define	need_resched(ci)						\
 do {									\
 	(ci)->ci_want_resched = 1;					\
-	if ((ci)->ci_curproc != NULL)					\
-		aston((ci)->ci_curproc);				\
+	if ((ci)->ci_curlwp != NULL)					\
+		aston((ci)->ci_curlwp->l_proc);       			\
 } while (/*CONSTCOND*/0)
 
 /*
@@ -280,10 +314,12 @@ struct reg;
 struct rpb;
 struct trapframe;
 
-extern struct timeval microset_time;
+extern struct timeval cc_microset_time;
 
 int	badaddr(void *, size_t);
-void	microset(struct cpu_info *, struct trapframe *);
+#define microtime(tv)	cc_microtime(tv)
+void	cc_microtime __P((struct timeval *));
+void	cc_microset(struct cpu_info *);
 
 #endif /* _KERNEL */
 #endif /* _ALPHA_CPU_H_ */

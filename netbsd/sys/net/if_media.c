@@ -1,4 +1,4 @@
-/*	$NetBSD: if_media.c,v 1.15 2001/11/12 23:49:40 lukem Exp $	*/
+/*	$NetBSD: if_media.c,v 1.21 2004/02/19 11:58:30 ragge Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -83,7 +83,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_media.c,v 1.15 2001/11/12 23:49:40 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_media.c,v 1.21 2004/02/19 11:58:30 ragge Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -190,16 +190,37 @@ void
 ifmedia_set(ifm, target)
 	struct ifmedia *ifm; 
 	int target;
-
 {
 	struct ifmedia_entry *match;
 
 	match = ifmedia_match(ifm, target, ifm->ifm_mask);
 
+	/*
+	 * If we didn't find the requested media, then we try to fall
+	 * back to target-type (IFM_ETHER, e.g.) | IFM_NONE.  If that's
+	 * not on the list, then we add it and set the media to it.
+	 *
+	 * Since ifmedia_set is almost always called with IFM_AUTO or
+	 * with a known-good media, this really should only occur if we:
+	 *
+	 * a) didn't find any PHYs, or
+	 * b) didn't find an autoselect option on the PHY when the
+	 *    parent ethernet driver expected to.
+	 *
+	 * In either case, it makes sense to select no media.
+	 */
 	if (match == NULL) {
 		printf("ifmedia_set: no match for 0x%x/0x%x\n",
 		    target, ~ifm->ifm_mask);
-		panic("ifmedia_set");
+		target = (target & IFM_NMASK) | IFM_NONE;
+		match = ifmedia_match(ifm, target, ifm->ifm_mask);
+		if (match == NULL) {
+			ifmedia_add(ifm, target, 0, NULL);
+			match = ifmedia_match(ifm, target, ifm->ifm_mask);
+			if (match == NULL) {
+				panic("ifmedia_set failed");
+			}
+		}
 	}
 	ifm->ifm_cur = match;
 
@@ -225,10 +246,10 @@ ifmedia_ioctl(ifp, ifr, ifm, cmd)
 {
 	struct ifmedia_entry *match;
 	struct ifmediareq *ifmr = (struct ifmediareq *) ifr;
-	int error = 0, sticky;
+	int error = 0;
 
 	if (ifp == NULL || ifr == NULL || ifm == NULL)
-		return(EINVAL);
+		return (EINVAL);
 
 	switch (cmd) {
 
@@ -238,8 +259,8 @@ ifmedia_ioctl(ifp, ifr, ifm, cmd)
 	case  SIOCSIFMEDIA:
 	{
 		struct ifmedia_entry *oldentry;
-		int oldmedia;
-		int newmedia = ifr->ifr_media;
+		u_int oldmedia;
+		u_int newmedia = ifr->ifr_media;
 
 		match = ifmedia_match(ifm, newmedia, ifm->ifm_mask);
 		if (match == NULL) {
@@ -294,9 +315,10 @@ ifmedia_ioctl(ifp, ifr, ifm, cmd)
 	case  SIOCGIFMEDIA: 
 	{
 		struct ifmedia_entry *ep;
-		int *kptr, count;
+		size_t nwords;
 
-		kptr = NULL;		/* XXX gcc */
+		if (ifmr->ifm_count < 0)
+			return EINVAL;
 
 		ifmr->ifm_active = ifmr->ifm_current = ifm->ifm_cur ?
 		    ifm->ifm_cur->ifm_media : IFM_NONE;
@@ -304,53 +326,36 @@ ifmedia_ioctl(ifp, ifr, ifm, cmd)
 		ifmr->ifm_status = 0;
 		(*ifm->ifm_status)(ifp, ifmr);
 
-		count = 0;
+		/*
+		 * Count them so we know a-priori how much is the max we'll
+		 * need.
+		 */
 		ep = TAILQ_FIRST(&ifm->ifm_list);
+		for (nwords = 0; ep != NULL; ep = TAILQ_NEXT(ep, ifm_list))
+			nwords++;
 
 		if (ifmr->ifm_count != 0) {
-			kptr = (int *)malloc(ifmr->ifm_count * sizeof(int),
+			size_t count;
+			size_t minwords = nwords > (size_t)ifmr->ifm_count 
+			    ? (size_t)ifmr->ifm_count
+			    : nwords;
+			int *kptr = (int *)malloc(minwords * sizeof(int),
 			    M_TEMP, M_WAITOK);
-
 			/*
 			 * Get the media words from the interface's list.
 			 */
-			for (; ep != NULL && count < ifmr->ifm_count;
+			ep = TAILQ_FIRST(&ifm->ifm_list);
+			for (count = 0; ep != NULL && count < minwords;
 			    ep = TAILQ_NEXT(ep, ifm_list), count++)
 				kptr[count] = ep->ifm_media;
 
-			if (ep != NULL)
+			error = copyout(kptr, ifmr->ifm_ulist,
+			    minwords * sizeof(int));
+			if (error == 0 && ep != NULL)
 				error = E2BIG;	/* oops! */
-		}
-
-		/*
-		 * If there are more interfaces on the list, count
-		 * them.  This allows the caller to set ifmr->ifm_count
-		 * to 0 on the first call to know how much space to
-		 * callocate.
-		 */
-		for (; ep != NULL; ep = TAILQ_NEXT(ep, ifm_list))
-			count++;
-
-		/*
-		 * We do the copyout on E2BIG, because that's
-		 * just our way of telling userland that there
-		 * are more.  This is the behavior I've observed
-		 * under BSD/OS 3.0
-		 */
-		sticky = error;
-		if ((error == 0 || error == E2BIG) && ifmr->ifm_count != 0) {
-			error = copyout((caddr_t)kptr,
-			    (caddr_t)ifmr->ifm_ulist,
-			    ifmr->ifm_count * sizeof(int));
-		}
-
-		if (error == 0)
-			error = sticky;
-
-		if (ifmr->ifm_count != 0)
 			free(kptr, M_TEMP);
-
-		ifmr->ifm_count = count;
+		}
+		ifmr->ifm_count = nwords;
 		break;
 	}
 
@@ -367,8 +372,8 @@ ifmedia_ioctl(ifp, ifr, ifm, cmd)
 struct ifmedia_entry *
 ifmedia_match(ifm, target, mask)
 	struct ifmedia *ifm; 
-	int target;
-	int mask;
+	u_int target;
+	u_int mask;
 {
 	struct ifmedia_entry *match, *next;
 
@@ -378,12 +383,14 @@ ifmedia_match(ifm, target, mask)
 	for (next = TAILQ_FIRST(&ifm->ifm_list); next != NULL;
 	     next = TAILQ_NEXT(next, ifm_list)) {
 		if ((next->ifm_media & mask) == (target & mask)) {
-#if defined(IFMEDIA_DEBUG) || defined(DIAGNOSTIC)
 			if (match) {
+#if defined(IFMEDIA_DEBUG) || defined(DIAGNOSTIC)
 				printf("ifmedia_match: multiple match for "
-				    "0x%x/0x%x\n", target, mask);
-			}
+				    "0x%x/0x%x, selected instance %d\n",
+				    target, mask, IFM_INST(match->ifm_media));
 #endif
+				break;
+			}
 			match = next;
 		}
 	}
@@ -397,7 +404,7 @@ ifmedia_match(ifm, target, mask)
 void
 ifmedia_delete_instance(ifm, inst)
 	struct ifmedia *ifm;
-	int inst;
+	u_int inst;
 {
 	struct ifmedia_entry *ife, *nife;
 
@@ -419,9 +426,8 @@ ifmedia_delete_instance(ifm, inst)
 static const struct ifmedia_baudrate ifmedia_baudrate_descriptions[] =
     IFM_BAUDRATE_DESCRIPTIONS;
 
-int
-ifmedia_baudrate(mword)
-	int mword;
+u_quad_t
+ifmedia_baudrate(int mword)
 {
 	int i;
 

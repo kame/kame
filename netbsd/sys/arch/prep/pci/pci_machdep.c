@@ -38,6 +38,9 @@
  * up a few function pointers to access the correct method directly.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pci_machdep.c,v 1.18 2003/07/15 02:54:51 lukem Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
@@ -151,7 +154,7 @@ prep_pci_intr_string(void *v, pci_intr_handle_t ih)
 	static char irqstr[8];		/* 4 + 2 + NULL + sanity */
 
 	if (ih == 0 || ih >= ICU_LEN || ih == IRQ_SLAVE)
-		panic("pci_intr_string: bogus handle 0x%x\n", ih);
+		panic("pci_intr_string: bogus handle 0x%x", ih);
 
 	sprintf(irqstr, "irq %d", ih);
 	return (irqstr);
@@ -172,7 +175,7 @@ prep_pci_intr_establish(void *v, pci_intr_handle_t ih, int level,
 {
 
 	if (ih == 0 || ih >= ICU_LEN || ih == IRQ_SLAVE)
-		panic("pci_intr_establish: bogus handle 0x%x\n", ih);
+		panic("pci_intr_establish: bogus handle 0x%x", ih);
 
 	return isa_intr_establish(NULL, ih, IST_LEVEL, level, func, arg);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: ms_kbc.c,v 1.2 2002/03/17 19:40:45 atatat Exp $	*/
+/*	$NetBSD: ms_kbc.c,v 1.5 2003/07/15 02:59:26 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 Izumi Tsutsui.  All rights reserved.
@@ -27,6 +27,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ms_kbc.c,v 1.5 2003/07/15 02:59:26 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -52,9 +55,8 @@ int ms_kbc_enable(void *);
 void ms_kbc_disable(void *);
 int ms_kbc_ioctl(void *, u_long, caddr_t, int, struct proc *);
 
-struct cfattach ms_kbc_ca = {
-	sizeof(struct ms_softc), ms_kbc_match, ms_kbc_attach
-};
+CFATTACH_DECL(ms_kbc, sizeof(struct ms_softc),
+    ms_kbc_match, ms_kbc_attach, NULL, NULL);
 
 struct wsmouse_accessops ms_kbc_accessops = {
 	ms_kbc_enable,

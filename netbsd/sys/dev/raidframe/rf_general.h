@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_general.h,v 1.9 2001/10/04 15:58:53 oster Exp $	*/
+/*	$NetBSD: rf_general.h,v 1.13 2004/01/01 20:39:58 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -41,7 +41,8 @@
 
 /* error reporting and handling */
 
-#include<sys/systm.h>		/* printf, sprintf, and friends */
+#include <sys/systm.h>		/* printf, sprintf, and friends */
+#include <uvm/uvm_extern.h>	/* PAGE_SIZE, PAGE_MASK */
 
 #define RF_ERRORMSG(s)            printf((s))
 #define RF_ERRORMSG1(s,a)         printf((s),(a))
@@ -50,7 +51,10 @@
 
 void rf_print_panic_message(int, char *);
 void rf_print_assert_panic_message(int, char *, char *);
+void rf_print_unable_to_init_mutex(char *, int, int);
+void rf_print_unable_to_add_shutdown(char *, int, int);
 
+	
 extern char rf_panicbuf[];
 #define RF_PANIC() {rf_print_panic_message(__LINE__,__FILE__); panic(rf_panicbuf);}
 
@@ -75,18 +79,9 @@ extern char rf_panicbuf[];
 /* get time of day */
 #define RF_GETTIME(_t) microtime(&(_t))
 
-/*
- * zero memory- not all memset calls go through here, only
- * those which in the kernel may have a user address
- */
-
-#define RF_BZERO(_bp,_b,_l)  memset(_b,0,_l)	/* XXX This is likely
-						 * incorrect. GO */
-
-
 #define RF_UL(x)           ((unsigned long) (x))
-#define RF_PGMASK          RF_UL(NBPG-1)
-#define RF_BLIP(x)         (NBPG - (RF_UL(x) & RF_PGMASK))	/* bytes left in page */
+#define RF_PGMASK          PAGE_MASK
+#define RF_BLIP(x)         (PAGE_SIZE - (RF_UL(x) & RF_PGMASK))	/* bytes left in page */
 #define RF_PAGE_ALIGNED(x) ((RF_UL(x) & RF_PGMASK) == 0)
 
 #ifdef __STDC__

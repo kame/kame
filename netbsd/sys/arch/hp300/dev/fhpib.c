@@ -1,4 +1,4 @@
-/*	$NetBSD: fhpib.c,v 1.22 2002/03/15 05:55:35 gmcgarry Exp $	*/
+/*	$NetBSD: fhpib.c,v 1.28 2003/11/17 14:37:59 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -48,11 +48,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -76,7 +72,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: fhpib.c,v 1.22 2002/03/15 05:55:35 gmcgarry Exp $");                                                  
+__KERNEL_RCSID(0, "$NetBSD: fhpib.c,v 1.28 2003/11/17 14:37:59 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -88,7 +84,6 @@ __KERNEL_RCSID(0, "$NetBSD: fhpib.c,v 1.22 2002/03/15 05:55:35 gmcgarry Exp $");
 #include <machine/autoconf.h>
 #include <machine/intr.h>
 
-#include <hp300/dev/dioreg.h>
 #include <hp300/dev/diovar.h>
 #include <hp300/dev/diodevs.h>
 
@@ -112,7 +107,7 @@ int	fhpibdebug = 0;
 #define FDB_PPOLL	0x08
 
 int	dopriodma = 0;	/* use high priority DMA */
-int	doworddma = 1;	/* non-zero if we should attempt word dma */
+int	doworddma = 1;	/* non-zero if we should attempt word DMA */
 int	doppollint = 1;	/* use ppoll interrupts instead of watchdog */
 int	fhpibppolldelay = 50;
 #endif
@@ -156,9 +151,8 @@ struct fhpib_softc {
 int	fhpibmatch __P((struct device *, struct cfdata *, void *));
 void	fhpibattach __P((struct device *, struct device *, void *));
 
-struct cfattach fhpib_ca = {
-	sizeof(struct fhpib_softc), fhpibmatch, fhpibattach
-};
+CFATTACH_DECL(fhpib, sizeof(struct fhpib_softc),
+    fhpibmatch, fhpibattach, NULL, NULL);
 
 int
 fhpibmatch(parent, match, aux)
@@ -182,7 +176,6 @@ fhpibattach(parent, self, aux)
 	struct fhpib_softc *sc = (struct fhpib_softc *)self;
 	struct dio_attach_args *da = aux;
 	struct hpibdev_attach_args ha;
-	int ipl;
 
 	sc->sc_regs = (struct fhpibdevice *)iomap(dio_scodetopa(da->da_scode),
 	    da->da_size);
@@ -191,11 +184,10 @@ fhpibattach(parent, self, aux)
 		return;
 	}
 
-	ipl = DIO_IPL(sc->sc_regs);
-	printf(" ipl %d: %s\n", ipl, DIO_DEVICE_DESC_FHPIB);
+	printf(": %s\n", DIO_DEVICE_DESC_FHPIB);
 
 	/* Establish the interrupt handler. */
-	(void) dio_intr_establish(fhpibintr, sc, ipl, IPL_BIO);
+	(void) dio_intr_establish(fhpibintr, sc, da->da_ipl, IPL_BIO);
 
 	callout_init(&sc->sc_dmadone_ch);
 	callout_init(&sc->sc_ppwatch_ch);
@@ -223,7 +215,7 @@ fhpibreset(hs)
 	hd->hpib_data = C_DCL;
 	DELAY(100000);
 	/*
-	 * See if we can do word dma.
+	 * See if we can do word DMA.
 	 * If so, we should be able to write and read back the appropos bit.
 	 */
 	hd->hpib_ie |= IDS_WDMA;
@@ -232,7 +224,7 @@ fhpibreset(hs)
 		hs->sc_flags |= HPIBF_DMA16;
 #ifdef DEBUG
 		if (fhpibdebug & FDB_DMA)
-			printf("fhpibtype: %s has word dma\n",
+			printf("fhpibtype: %s has word DMA\n",
 			    sc->sc_dev.dv_xname);
 
 #endif

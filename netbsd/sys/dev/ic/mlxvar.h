@@ -1,4 +1,4 @@
-/*	$NetBSD: mlxvar.h,v 1.5.14.1 2003/07/28 18:06:45 he Exp $	*/
+/*	$NetBSD: mlxvar.h,v 1.7 2002/09/22 18:59:00 ad Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.

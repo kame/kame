@@ -1,4 +1,4 @@
-/*	$NetBSD: locore_machdep.S,v 1.18 2001/08/27 02:00:19 nisimura Exp $	*/
+/*	$NetBSD: locore_machdep.S,v 1.20 2003/08/07 16:29:14 agc Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -148,11 +144,11 @@ END(CopyFromBuffer)
 LEAF(dec_mips1_wbflush)
 ALEAF(kn230_wbflush)
 ALEAF(kn210_wbflush)
-        mfc0	v0, MIPS_COP_0_STATUS_REG	# save original SR in v0
+        mfc0	v0, MIPS_COP_0_STATUS		# save original SR in v0
 	li	t0, 0x80000000			# set CU3 bit
 	or	v1, v0 ,t0			# v1 = v0 | 0x80000000
 	nop
-	mtc0	v1, MIPS_COP_0_STATUS_REG
+	mtc0	v1, MIPS_COP_0_STATUS
 	nop				/* two  more cycles to complete */
  	nop
 
@@ -160,7 +156,7 @@ ALEAF(kn210_wbflush)
 	bc3f    1b				# until write buffer drained
         nop                     		# (branch delay slot)
 
-        mtc0    v0, MIPS_COP_0_STATUS_REG	# restore SR on exit
+        mtc0    v0, MIPS_COP_0_STATUS		# restore SR on exit
         nop
         j       ra
         nop

@@ -1,4 +1,4 @@
-/*	$NetBSD: mainbus.c,v 1.2 2000/02/08 16:17:34 tsutsui Exp $	*/
+/*	$NetBSD: mainbus.c,v 1.9 2003/07/15 02:59:27 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
@@ -28,6 +28,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.9 2003/07/15 02:59:27 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -42,14 +45,13 @@ struct mainbus_softc {
 };
 
 /* Definition of the mainbus driver. */
-static int	mainbus_match __P((struct device *, struct cfdata *, void *));
-static void	mainbus_attach __P((struct device *, struct device *, void *));
-static int	mainbus_search __P((struct device *, struct cfdata *, void *));
-static int	mainbus_print __P((void *, const char *));
+static int  mainbus_match(struct device *, struct cfdata *, void *);
+static void mainbus_attach(struct device *, struct device *, void *);
+static int  mainbus_search(struct device *, struct cfdata *, void *);
+static int  mainbus_print(void *, const char *);
 
-struct cfattach mainbus_ca = {
-	sizeof(struct mainbus_softc), mainbus_match, mainbus_attach
-};
+CFATTACH_DECL(mainbus, sizeof(struct mainbus_softc),
+    mainbus_match, mainbus_attach, NULL, NULL);
 
 static int mainbus_found;
 
@@ -88,10 +90,10 @@ mainbus_search(parent, cf, aux)
 {
 	struct mainbus_attach_args *ma = aux;
 
-	ma->ma_name = cf->cf_driver->cd_name;
+	ma->ma_name = cf->cf_name;
 	ma->ma_systype = cf->cf_systype;
 
-	if ((*cf->cf_attach->ca_match)(parent, cf, ma) > 0)
+	if (config_match(parent, cf, ma) > 0)
 		config_attach(parent, cf, ma, mainbus_print);
 
 	return 0;
@@ -105,7 +107,7 @@ mainbus_print(aux, cp)
 	struct mainbus_attach_args *ma = aux;
 
 	if (cp)
-		printf("%s at %s", ma->ma_name, cp);
+		aprint_normal("%s at %s", ma->ma_name, cp);
 
 	return (UNCONF);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: sunos.h,v 1.12 2001/02/02 07:11:09 mrg Exp $	*/
+/*	$NetBSD: sunos.h,v 1.18 2004/03/26 15:01:16 drochner Exp $	*/
 
 #ifndef _COMPAT_SUNOS_SUNOS_H_
 #define _COMPAT_SUNOS_SUNOS_H_
@@ -54,7 +54,7 @@ struct sunos_nfs_args {
 
 
 struct sunos_ustat {
-	daddr_t	f_tfree;	/* total free */
+	int32_t	f_tfree;	/* total free */
 	ino_t	f_tinode;	/* total inodes free */
 	char	f_path[6];	/* filsys name */
 	char	f_fpack[6];	/* filsys pack name */
@@ -154,7 +154,7 @@ struct sunos_audio_info {
 
 __BEGIN_DECLS
 /* Defined in arch/<arch>/sunos_machdep.c */
-void	sunos_sendsig __P((sig_t, int, sigset_t *, u_long));
+void	sunos_sendsig __P((const ksiginfo_t *, const sigset_t *));
 __END_DECLS
 
 #endif /* _COMPAT_SUNOS_SUNOS_H_ */

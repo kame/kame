@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.4 2000/06/02 22:09:02 cgd Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.9 2003/08/07 16:29:21 agc Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -46,10 +42,13 @@
  * devices are determined (from possibilities mentioned in ioconf.c),
  * and the drivers are initialized.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.9 2003/08/07 16:29:21 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
-#include <sys/dkstat.h>
 #include <sys/disklabel.h>
 #include <sys/conf.h>
 #include <sys/reboot.h>
@@ -75,8 +74,9 @@ cpu_configure()
 		panic("configure: mainbus not configured");
 
 	printf("biomask %x netmask %x ttymask %x\n",
-	    (u_short)imask[IPL_BIO], (u_short)imask[IPL_NET],
-	    (u_short)imask[IPL_TTY]);
+	    imask[IPL_BIO] & 0x1fffffff,
+	    imask[IPL_NET] & 0x1fffffff,
+	    imask[IPL_TTY] & 0x1fffffff);
 
 	spl0();
 }
@@ -102,9 +102,10 @@ u_long	bootdev = 0;		/* should be dev_t, but not until 32 bits */
 void
 findroot(void)
 {
-	int i, majdev, unit, part;
+	int unit, part;
 	struct device *dv;
 	char buf[32];
+	const char *name;
 
 #if 0
 	printf("howto %x bootdev %x ", boothowto, bootdev);
@@ -113,19 +114,15 @@ findroot(void)
 	if ((bootdev & B_MAGICMASK) != (u_long)B_DEVMAGIC)
 		return;
 
-	majdev = (bootdev >> B_TYPESHIFT) & B_TYPEMASK;
-	for (i = 0; dev_name2blk[i].d_name != NULL; i++)
-		if (majdev == dev_name2blk[i].d_maj)
-			break;
-	if (dev_name2blk[i].d_name == NULL)
+	name = devsw_blk2name((bootdev >> B_TYPESHIFT) & B_TYPEMASK);
+	if (name == NULL)
 		return;
 
 	part = (bootdev >> B_PARTITIONSHIFT) & B_PARTITIONMASK;
 	unit = (bootdev >> B_UNITSHIFT) & B_UNITMASK;
 
-	sprintf(buf, "%s%d", dev_name2blk[i].d_name, unit);
-	for (dv = alldevs.tqh_first; dv != NULL;
-	    dv = dv->dv_list.tqe_next) {
+	sprintf(buf, "%s%d", name, unit);
+	for (dv = alldevs.tqh_first; dv != NULL; dv = dv->dv_list.tqe_next) {
 		if (strcmp(buf, dv->dv_xname) == 0) {
 			booted_device = dv;
 			booted_partition = part;

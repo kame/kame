@@ -1,4 +1,4 @@
-/*	$NetBSD: ucb1200.c,v 1.7 2002/01/29 18:53:12 uch Exp $ */
+/*	$NetBSD: ucb1200.c,v 1.13 2003/07/15 02:29:30 lukem Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -39,6 +39,9 @@
 /*
  * Device driver for PHILIPS UCB1200 Advanced modem/audio analog front-end
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ucb1200.c,v 1.13 2003/07/15 02:29:30 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -87,9 +90,8 @@ int	ucb1200_check_id(u_int16_t, int);
 void	ucb1200_dump(struct ucb1200_softc *);
 #endif
 
-struct cfattach ucb_ca = {
-	sizeof(struct ucb1200_softc), ucb1200_match, ucb1200_attach
-};
+CFATTACH_DECL(ucb, sizeof(struct ucb1200_softc),
+    ucb1200_match, ucb1200_attach, NULL, NULL);
 
 const struct ucb_id {
 	u_int16_t	id;
@@ -154,7 +156,7 @@ ucb1200_search(struct device *parent, struct cfdata *cf, void *aux)
 	ucba.ucba_sib	   = sc->sc_parent;
 	ucba.ucba_ucb	   = parent;
 	
-	if ((*cf->cf_attach->ca_match)(parent, cf, &ucba))
+	if (config_match(parent, cf, &ucba))
 		config_attach(parent, cf, &ucba, ucb1200_print);
 
 	return (0);
@@ -216,7 +218,7 @@ ucb1200_state_idle(dev)
 void
 ucb1200_dump(struct ucb1200_softc *sc)
 {
-        const char *regname[] = {
+	static const char *const regname[] = {
                 "IO_DATA        ",
                 "IO_DIR         ",
                 "POSINTEN       ",
@@ -233,7 +235,7 @@ ucb1200_dump(struct ucb1200_softc *sc)
                 "MODE           ",
                 "RESERVED       ",
                 "NULL           "
-        };
+	};
 	tx_chipset_tag_t tc;
 	u_int16_t reg;
 	int i;

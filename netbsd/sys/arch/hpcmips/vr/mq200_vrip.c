@@ -1,4 +1,4 @@
-/*	$NetBSD: mq200_vrip.c,v 1.7.4.1 2002/11/30 12:59:40 he Exp $	*/
+/*	$NetBSD: mq200_vrip.c,v 1.11 2003/07/15 02:29:34 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2000 Takemura Shin
@@ -29,6 +29,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mq200_vrip.c,v 1.11 2003/07/15 02:29:34 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -55,9 +58,8 @@ struct mq200_vrip_softc {
 static int	mq200_vrip_probe(struct device *, struct cfdata *, void *);
 static void	mq200_vrip_attach(struct device *, struct device *, void *);
 
-struct cfattach mqvideo_vrip_ca = {
-	sizeof(struct mq200_vrip_softc), mq200_vrip_probe, mq200_vrip_attach
-};
+CFATTACH_DECL(mqvideo_vrip, sizeof(struct mq200_vrip_softc),
+    mq200_vrip_probe, mq200_vrip_attach, NULL, NULL);
 
 static int
 mq200_vrip_probe(struct device *parent, struct cfdata *cf, void *aux)

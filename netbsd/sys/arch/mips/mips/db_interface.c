@@ -1,4 +1,4 @@
-/*	$NetBSD: db_interface.c,v 1.42 2002/03/11 16:39:40 uch Exp $	*/
+/*	$NetBSD: db_interface.c,v 1.51 2003/11/26 08:36:49 he Exp $	*/
 
 /*
  * Mach Operating System
@@ -25,6 +25,9 @@
  * any improvements or extensions that they make and grant Carnegie Mellon
  * the rights to redistribute these changes.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: db_interface.c,v 1.51 2003/11/26 08:36:49 he Exp $");
 
 #include "opt_cputype.h"	/* which mips CPUs do we support? */
 #include "opt_ddb.h"
@@ -69,9 +72,9 @@ static void	kdbpoke_2(vaddr_t addr, short newval);
 static void	kdbpoke_1(vaddr_t addr, char newval);
 static short	kdbpeek_2(vaddr_t addr);
 static char	kdbpeek_1(vaddr_t addr);
-extern vaddr_t	MachEmulateBranch(struct frame *, vaddr_t, unsigned, int);
+vaddr_t		MachEmulateBranch(struct frame *, vaddr_t, unsigned, int);
 
-extern paddr_t kvtophys(vaddr_t);
+paddr_t kvtophys(vaddr_t);
 
 #ifdef DDB_TRACE
 int
@@ -172,42 +175,42 @@ kdb_trap(int type, mips_reg_t /* struct trapframe */ *tfp)
 	db_active--;
 
 	if (type & T_USER)
-		*(struct frame *)curproc->p_md.md_regs = *f;
+		*(struct frame *)curlwp->l_md.md_regs = *f;
 	else {
 		/* Synthetic full scale register context when trap happens */
-		tfp[0] = f->f_regs[AST];
-		tfp[1] = f->f_regs[V0];
-		tfp[2] = f->f_regs[V1];
-		tfp[3] = f->f_regs[A0];
-		tfp[4] = f->f_regs[A1];
-		tfp[5] = f->f_regs[A2];
-		tfp[6] = f->f_regs[A3];
-		tfp[7] = f->f_regs[T0];
-		tfp[8] = f->f_regs[T1];
-		tfp[9] = f->f_regs[T2];
-		tfp[10] = f->f_regs[T3];
-		tfp[11] = f->f_regs[T4];
-		tfp[12] = f->f_regs[T5];
-		tfp[13] = f->f_regs[T6];
-		tfp[14] = f->f_regs[T7];
-		tfp[15] = f->f_regs[T8];
-		tfp[16] = f->f_regs[T9];
-		tfp[17] = f->f_regs[RA];
-		tfp[18] = f->f_regs[SR];
-		tfp[19] = f->f_regs[MULLO];
-		tfp[20] = f->f_regs[MULHI];
-		tfp[21] = f->f_regs[PC];
-		kdbaux[0] = f->f_regs[S0];
-		kdbaux[1] = f->f_regs[S1];
-		kdbaux[2] = f->f_regs[S2];
-		kdbaux[3] = f->f_regs[S3];
-		kdbaux[4] = f->f_regs[S4];
-		kdbaux[5] = f->f_regs[S5];
-		kdbaux[6] = f->f_regs[S6];
-		kdbaux[7] = f->f_regs[S7];
-		kdbaux[8] = f->f_regs[SP];
-		kdbaux[9] = f->f_regs[S8];
-		kdbaux[10] = f->f_regs[GP];
+		tfp[TF_AST] = f->f_regs[_R_AST];
+		tfp[TF_V0] = f->f_regs[_R_V0];
+		tfp[TF_V1] = f->f_regs[_R_V1];
+		tfp[TF_A0] = f->f_regs[_R_A0];
+		tfp[TF_A1] = f->f_regs[_R_A1];
+		tfp[TF_A2] = f->f_regs[_R_A2];
+		tfp[TF_A3] = f->f_regs[_R_A3];
+		tfp[TF_T0] = f->f_regs[_R_T0];
+		tfp[TF_T1] = f->f_regs[_R_T1];
+		tfp[TF_T2] = f->f_regs[_R_T2];
+		tfp[TF_T3] = f->f_regs[_R_T3];
+		tfp[TF_TA0] = f->f_regs[_R_TA0];
+		tfp[TF_TA1] = f->f_regs[_R_TA1];
+		tfp[TF_TA2] = f->f_regs[_R_TA2];
+		tfp[TF_TA3] = f->f_regs[_R_TA3];
+		tfp[TF_T8] = f->f_regs[_R_T8];
+		tfp[TF_T9] = f->f_regs[_R_T9];
+		tfp[TF_RA] = f->f_regs[_R_RA];
+		tfp[TF_SR] = f->f_regs[_R_SR];
+		tfp[TF_MULLO] = f->f_regs[_R_MULLO];
+		tfp[TF_MULHI] = f->f_regs[_R_MULHI];
+		tfp[TF_EPC] = f->f_regs[_R_PC];
+		kdbaux[0] = f->f_regs[_R_S0];
+		kdbaux[1] = f->f_regs[_R_S1];
+		kdbaux[2] = f->f_regs[_R_S2];
+		kdbaux[3] = f->f_regs[_R_S3];
+		kdbaux[4] = f->f_regs[_R_S4];
+		kdbaux[5] = f->f_regs[_R_S5];
+		kdbaux[6] = f->f_regs[_R_S6];
+		kdbaux[7] = f->f_regs[_R_S7];
+		kdbaux[8] = f->f_regs[_R_SP];
+		kdbaux[9] = f->f_regs[_R_S8];
+		kdbaux[10] = f->f_regs[_R_GP];
 	}
 
 	return (1);
@@ -217,7 +220,7 @@ void
 cpu_Debugger(void)
 {
 
-	asm("break");
+	__asm("break");
 }
 #endif	/* !KGDB */
 
@@ -229,42 +232,42 @@ db_set_ddb_regs(int type, mips_reg_t *tfp)
 	/* Should switch to kdb`s own stack here. */
 
 	if (type & T_USER)
-		*f = *(struct frame *)curproc->p_md.md_regs;
+		*f = *(struct frame *)curlwp->l_md.md_regs;
 	else {
 		/* Synthetic full scale register context when trap happens */
-		f->f_regs[AST] = tfp[0];
-		f->f_regs[V0] = tfp[1];
-		f->f_regs[V1] = tfp[2];
-		f->f_regs[A0] = tfp[3];
-		f->f_regs[A1] = tfp[4];
-		f->f_regs[A2] = tfp[5];
-		f->f_regs[A3] = tfp[6];
-		f->f_regs[T0] = tfp[7];
-		f->f_regs[T1] = tfp[8];
-		f->f_regs[T2] = tfp[9];
-		f->f_regs[T3] = tfp[10];
-		f->f_regs[T4] = tfp[11];
-		f->f_regs[T5] = tfp[12];
-		f->f_regs[T6] = tfp[13];
-		f->f_regs[T7] = tfp[14];
-		f->f_regs[T8] = tfp[15];
-		f->f_regs[T9] = tfp[16];
-		f->f_regs[RA] = tfp[17];
-		f->f_regs[SR] = tfp[18];
-		f->f_regs[MULLO] = tfp[19];
-		f->f_regs[MULHI] = tfp[20];
-		f->f_regs[PC] = tfp[21];
-		f->f_regs[S0] = kdbaux[0];
-		f->f_regs[S1] = kdbaux[1];
-		f->f_regs[S2] = kdbaux[2];
-		f->f_regs[S3] = kdbaux[3];
-		f->f_regs[S4] = kdbaux[4];
-		f->f_regs[S5] = kdbaux[5];
-		f->f_regs[S6] = kdbaux[6];
-		f->f_regs[S7] = kdbaux[7];
-		f->f_regs[SP] = kdbaux[8];
-		f->f_regs[S8] = kdbaux[9];
-		f->f_regs[GP] = kdbaux[10];
+		f->f_regs[_R_AST] = tfp[TF_AST];
+		f->f_regs[_R_V0] = tfp[TF_V0];
+		f->f_regs[_R_V1] = tfp[TF_V1];
+		f->f_regs[_R_A0] = tfp[TF_A0];
+		f->f_regs[_R_A1] = tfp[TF_A1];
+		f->f_regs[_R_A2] = tfp[TF_A2];
+		f->f_regs[_R_A3] = tfp[TF_A3];
+		f->f_regs[_R_T0] = tfp[TF_T0];
+		f->f_regs[_R_T1] = tfp[TF_T1];
+		f->f_regs[_R_T2] = tfp[TF_T2];
+		f->f_regs[_R_T3] = tfp[TF_T3];
+		f->f_regs[_R_TA0] = tfp[TF_TA0];
+		f->f_regs[_R_TA1] = tfp[TF_TA1];
+		f->f_regs[_R_TA2] = tfp[TF_TA2];
+		f->f_regs[_R_TA3] = tfp[TF_TA3];
+		f->f_regs[_R_T8] = tfp[TF_T8];
+		f->f_regs[_R_T9] = tfp[TF_T9];
+		f->f_regs[_R_RA] = tfp[TF_RA];
+		f->f_regs[_R_SR] = tfp[TF_SR];
+		f->f_regs[_R_MULLO] = tfp[TF_MULLO];
+		f->f_regs[_R_MULHI] = tfp[TF_MULHI];
+		f->f_regs[_R_PC] = tfp[TF_EPC];
+		f->f_regs[_R_S0] = kdbaux[0];
+		f->f_regs[_R_S1] = kdbaux[1];
+		f->f_regs[_R_S2] = kdbaux[2];
+		f->f_regs[_R_S3] = kdbaux[3];
+		f->f_regs[_R_S4] = kdbaux[4];
+		f->f_regs[_R_S5] = kdbaux[5];
+		f->f_regs[_R_S6] = kdbaux[6];
+		f->f_regs[_R_S7] = kdbaux[7];
+		f->f_regs[_R_SP] = kdbaux[8];
+		f->f_regs[_R_S8] = kdbaux[9];
+		f->f_regs[_R_GP] = kdbaux[10];
 	}
 }
 
@@ -401,8 +404,9 @@ db_kvtophys_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
 do {									\
 	uint32_t __val;							\
 									\
-	asm volatile("mfc0 %0,$" ___STRING(reg) : "=r"(__val));		\
-	printf("  %s:%*s %#x\n", name, FLDWIDTH - strlen(name), "", __val); \
+	__asm __volatile("mfc0 %0,$" ___STRING(reg) : "=r"(__val));	\
+	printf("  %s:%*s %#x\n", name, FLDWIDTH - (int) strlen(name),	\
+	    "", __val);							\
 } while (0)
 
 /* XXX not 64-bit ABI safe! */
@@ -410,7 +414,7 @@ do {									\
 do {									\
 	uint64_t __val;							\
 									\
-	asm volatile(							\
+	__asm __volatile(						\
 		".set push 			\n\t"			\
 		".set mips3			\n\t"			\
 		".set noat			\n\t"			\
@@ -420,7 +424,8 @@ do {									\
 		"dsrl %M0,$1,32			\n\t"			\
 		".set pop"						\
 	    : "=r"(__val));						\
-	printf("  %s:%*s %#llx\n", name, FLDWIDTH - strlen(name), "", __val); \
+	printf("  %s:%*s %#llx\n", name, FLDWIDTH - (int) strlen(name),	\
+	    "", __val);							\
 } while (0)
 
 void
@@ -697,7 +702,7 @@ branch_taken(int inst, db_addr_t pc, db_regs_t *regs)
 	vaddr_t ra;
 	unsigned fpucsr;
 
-	fpucsr = curproc ? PCB_FSR(&curproc->p_addr->u_pcb) : 0;
+	fpucsr = curlwp ? PCB_FSR(&curlwp->l_addr->u_pcb) : 0;
 	ra = MachEmulateBranch((struct frame *)regs, pc, fpucsr, 0);
 	return ra;
 }

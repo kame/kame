@@ -1,4 +1,4 @@
-/*	$NetBSD: ebus.c,v 1.31 2002/03/16 14:00:00 mrg Exp $	*/
+/*	$NetBSD: ebus.c,v 1.45 2004/03/21 16:29:42 pk Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000, 2001 Matthew R. Green
@@ -28,6 +28,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ebus.c,v 1.45 2004/03/21 16:29:42 pk Exp $");
+
 #include "opt_ddb.h"
 
 /*
@@ -36,7 +39,7 @@
  * note that this driver is not complete:
  *	- interrupt establish is written and appears to work
  *	- bus map code is written and appears to work
- *	- ebus2 dma code is completely unwritten, we just punt to
+ *	- ebus2 DMA code is completely unwritten, we just punt to
  *	  the iommu.
  */
 
@@ -98,9 +101,8 @@ struct ebus_softc {
 int	ebus_match __P((struct device *, struct cfdata *, void *));
 void	ebus_attach __P((struct device *, struct device *, void *));
 
-struct cfattach ebus_ca = {
-	sizeof(struct ebus_softc), ebus_match, ebus_attach
-};
+CFATTACH_DECL(ebus, sizeof(struct ebus_softc),
+    ebus_match, ebus_attach, NULL, NULL);
 
 bus_space_tag_t ebus_alloc_bus_tag __P((struct ebus_softc *, int));
 
@@ -112,13 +114,13 @@ void	ebus_find_ino __P((struct ebus_softc *, struct ebus_attach_args *));
 int	ebus_find_node __P((struct pci_attach_args *));
 
 /*
- * here are our bus space and bus dma routines.
+ * here are our bus space and bus DMA routines.
  */
 static paddr_t ebus_bus_mmap __P((bus_space_tag_t, bus_addr_t, off_t, int, int));
 static int _ebus_bus_map __P((bus_space_tag_t, bus_addr_t, bus_size_t, int, 
 			      vaddr_t, bus_space_handle_t *));
-static void *ebus_intr_establish __P((bus_space_tag_t, int, int, int,
-				int (*) __P((void *)), void *));
+static void *ebus_intr_establish __P((bus_space_tag_t, int, int,
+				int (*) __P((void *)), void *, void(*)__P((void))));
 
 int
 ebus_match(parent, match, aux)
@@ -127,31 +129,32 @@ ebus_match(parent, match, aux)
 	void *aux;
 {
 	struct pci_attach_args *pa = aux;
-	char name[10];
+	char *name;
 	int node;
 
 	/* Only attach if there's a PROM node. */
 	node = PCITAG_NODE(pa->pa_tag);
-	if (node == -1) return (0);
+	if (node == -1)
+		return (0);
+
+	if (PCI_CLASS(pa->pa_class) != PCI_CLASS_BRIDGE)
+		return (0);
 
 	/* Match a real ebus */
-	OF_getprop(node, "name", &name, sizeof(name));
-	if (PCI_CLASS(pa->pa_class) == PCI_CLASS_BRIDGE &&
-	    PCI_VENDOR(pa->pa_id) == PCI_VENDOR_SUN &&
+	name = prom_getpropstring(node, "name");
+	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_SUN &&
 	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_SUN_EBUS &&
 		strcmp(name, "ebus") == 0)
 		return (1);
 
 	/* Or a real ebus III */
-	if (PCI_CLASS(pa->pa_class) == PCI_CLASS_BRIDGE &&
-	    PCI_VENDOR(pa->pa_id) == PCI_VENDOR_SUN &&
+	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_SUN &&
 	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_SUN_EBUSIII &&
 		strcmp(name, "ebus") == 0)
 		return (1);
 
 	/* Or a PCI-ISA bridge XXX I hope this is on-board. */
-	if (PCI_CLASS(pa->pa_class) == PCI_CLASS_BRIDGE &&
-	    PCI_SUBCLASS(pa->pa_class) == PCI_SUBCLASS_BRIDGE_ISA) {
+	if (PCI_SUBCLASS(pa->pa_class) == PCI_SUBCLASS_BRIDGE_ISA) {
 		return (1);
 	}
 
@@ -196,17 +199,20 @@ ebus_attach(parent, self, aux)
 	 */
 	sc->sc_intmap = NULL;
 	sc->sc_range = NULL;
-	error = PROM_getprop(node, "interrupt-map",
+	sc->sc_nintmap = 0;
+	error = prom_getprop(node, "interrupt-map",
 			sizeof(struct ebus_interrupt_map),
-			&sc->sc_nintmap, (void **)&sc->sc_intmap);
+			&sc->sc_nintmap, &sc->sc_intmap);
 	switch (error) {
 	case 0:
 		immp = &sc->sc_intmapmask;
-		error = PROM_getprop(node, "interrupt-map-mask",
+		nmapmask = sizeof(*immp);
+		error = prom_getprop(node, "interrupt-map-mask",
 			    sizeof(struct ebus_interrupt_map_mask), &nmapmask,
-			    (void **)&immp);
+			    &immp);
 		if (error)
-			panic("could not get ebus interrupt-map-mask");
+			panic("could not get ebus interrupt-map-mask, error %d",
+			    error);
 		if (nmapmask != 1)
 			panic("ebus interrupt-map-mask is broken");
 		break;
@@ -217,8 +223,8 @@ ebus_attach(parent, self, aux)
 		break;
 	}
 
-	error = PROM_getprop(node, "ranges", sizeof(struct ebus_ranges),
-	    &sc->sc_nrange, (void **)&sc->sc_range);
+	error = prom_getprop(node, "ranges", sizeof(struct ebus_ranges),
+	    &sc->sc_nrange, &sc->sc_range);
 	if (error)
 		panic("ebus ranges: error %d", error);
 
@@ -227,7 +233,7 @@ ebus_attach(parent, self, aux)
 	 */
 	DPRINTF(EDB_CHILD, ("ebus node %08x, searching children...\n", node));
 	for (node = firstchild(node); node; node = nextsibling(node)) {
-		char *name = PROM_getpropstring(node, "name");
+		char *name = prom_getpropstring(node, "name");
 
 		if (ebus_setup_attach_args(sc, node, &eba) != 0) {
 			printf("ebus_attach: %s: incomplete\n", name);
@@ -249,8 +255,9 @@ ebus_setup_attach_args(sc, node, ea)
 {
 	int	n, rv;
 
-	bzero(ea, sizeof(struct ebus_attach_args));
-	rv = PROM_getprop(node, "name", 1, &n, (void **)&ea->ea_name);
+	memset(ea, 0, sizeof(struct ebus_attach_args));
+	n = 0;
+	rv = prom_getprop(node, "name", 1, &n, &ea->ea_name);
 	if (rv != 0)
 		return (rv);
 	ea->ea_name[n] = '\0';
@@ -259,13 +266,13 @@ ebus_setup_attach_args(sc, node, ea)
 	ea->ea_bustag = sc->sc_childbustag;
 	ea->ea_dmatag = sc->sc_dmatag;
 
-	rv = PROM_getprop(node, "reg", sizeof(struct ebus_regs), &ea->ea_nreg,
-	    (void **)&ea->ea_reg);
+	rv = prom_getprop(node, "reg", sizeof(struct ebus_regs), &ea->ea_nreg,
+	    &ea->ea_reg);
 	if (rv)
 		return (rv);
 
-	rv = PROM_getprop(node, "address", sizeof(u_int32_t), &ea->ea_nvaddr,
-	    (void **)&ea->ea_vaddr);
+	rv = prom_getprop(node, "address", sizeof(u_int32_t), &ea->ea_nvaddr,
+	    &ea->ea_vaddr);
 	if (rv != ENOENT) {
 		if (rv)
 			return (rv);
@@ -276,8 +283,8 @@ ebus_setup_attach_args(sc, node, ea)
 	} else
 		ea->ea_nvaddr = 0;
 
-	if (PROM_getprop(node, "interrupts", sizeof(u_int32_t), &ea->ea_nintr,
-	    (void **)&ea->ea_intr))
+	if (prom_getprop(node, "interrupts", sizeof(u_int32_t), &ea->ea_nintr,
+	    &ea->ea_intr))
 		ea->ea_nintr = 0;
 	else
 		ebus_find_ino(sc, ea);
@@ -309,13 +316,13 @@ ebus_print(aux, p)
 	int i;
 
 	if (p)
-		printf("%s at %s", ea->ea_name, p);
+		aprint_normal("%s at %s", ea->ea_name, p);
 	for (i = 0; i < ea->ea_nreg; i++)
-		printf("%s %x-%x", i == 0 ? " addr" : ",",
+		aprint_normal("%s %x-%x", i == 0 ? " addr" : ",",
 		    ea->ea_reg[i].lo,
 		    ea->ea_reg[i].lo + ea->ea_reg[i].size - 1);
 	for (i = 0; i < ea->ea_nintr; i++)
-		printf(" ipl %d", ea->ea_intr[i]);
+		aprint_normal(" ipl %d", ea->ea_intr[i]);
 	return (UNCONF);
 }
 
@@ -399,7 +406,7 @@ ebus_alloc_bus_tag(sc, type)
 	if (bt == NULL)
 		panic("could not allocate ebus bus tag");
 
-	bzero(bt, sizeof *bt);
+	memset(bt, 0, sizeof *bt);
 	bt->cookie = sc;
 	bt->parent = sc->sc_memtag;
 	bt->type = type;
@@ -504,14 +511,14 @@ ebus_bus_mmap(t, paddr, off, prot, flags)
  * install an interrupt handler for a ebus device
  */
 void *
-ebus_intr_establish(t, pri, level, flags, handler, arg)
+ebus_intr_establish(t, pri, level, handler, arg, fastvec)
 	bus_space_tag_t t;
 	int pri;
 	int level;
-	int flags;
 	int (*handler) __P((void *));
 	void *arg;
+	void (*fastvec) __P((void));	/* ignored */
 {
 
-	return (bus_intr_establish(t->parent, pri, level, flags, handler, arg));
+	return (bus_intr_establish(t->parent, pri, level, handler, arg));
 }

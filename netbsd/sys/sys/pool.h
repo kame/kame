@@ -1,4 +1,4 @@
-/*	$NetBSD: pool.h,v 1.37 2002/03/13 10:57:19 simonb Exp $	*/
+/*	$NetBSD: pool.h,v 1.42.2.1 2004/06/22 08:59:04 tron Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -52,10 +52,12 @@
 #include <sys/lock.h>
 #include <sys/queue.h>
 #include <sys/time.h>
+#include <sys/tree.h>
 #endif
 
-#define PR_HASHTABSIZE		8
 #define	PCG_NOBJECTS		16
+
+#define	POOL_PADDR_INVALID	((paddr_t) -1)
 
 #ifdef __POOL_EXPOSE
 /* The pool cache group. */
@@ -64,7 +66,10 @@ struct pool_cache_group {
 		pcg_list;	/* link in the pool cache's group list */
 	u_int	pcg_avail;	/* # available objects */
 				/* pointers to the objects */
-	void	*pcg_objects[PCG_NOBJECTS];
+	struct {
+		void *pcgo_va;	/* cache object virtual address */
+		paddr_t pcgo_pa;/* cache object physical address */
+	} pcg_objects[PCG_NOBJECTS];
 };
 
 struct pool_cache {
@@ -95,7 +100,7 @@ struct pool_cache {
 struct pool_allocator {
 	void		*(*pa_alloc)(struct pool *, int);
 	void		(*pa_free)(struct pool *, void *);
-	int		pa_pagesz;
+	unsigned int	pa_pagesz;
 
 	/* The following fields are for internal use only. */
 	struct simplelock pa_slock;
@@ -107,11 +112,17 @@ struct pool_allocator {
 	int		pa_pageshift;
 };
 
+LIST_HEAD(pool_pagelist,pool_item_header);
+
 struct pool {
 	TAILQ_ENTRY(pool)
 			pr_poollist;
-	TAILQ_HEAD(,pool_item_header)
-			pr_pagelist;	/* Allocated pages */
+	struct pool_pagelist
+			pr_emptypages;	/* Empty pages */
+	struct pool_pagelist
+			pr_fullpages;	/* Full pages */
+	struct pool_pagelist
+			pr_partpages;	/* Partially-allocated pages */
 	struct pool_item_header	*pr_curpage;
 	TAILQ_HEAD(,pool_cache)
 			pr_cachelist;	/* Caches for this pool */
@@ -157,8 +168,7 @@ struct pool {
 	 */
 	struct simplelock	pr_slock;
 
-	LIST_HEAD(,pool_item_header)		/* Off-page page headers */
-			pr_hashtab[PR_HASHTABSIZE];
+	SPLAY_HEAD(phtree, pool_item_header) pr_phtree;
 
 	int		pr_maxcolor;	/* Cache colouring */
 	int		pr_curcolor;
@@ -246,12 +256,15 @@ int		pool_chk(struct pool *, const char *);
  * Pool cache routines.
  */
 void		pool_cache_init(struct pool_cache *, struct pool *,
-		    int (*ctor)(void *, void *, int),
-		    void (*dtor)(void *, void *),
+		    int (*)(void *, void *, int),
+		    void (*)(void *, void *),
 		    void *);
 void		pool_cache_destroy(struct pool_cache *);
-void		*pool_cache_get(struct pool_cache *, int);
-void		pool_cache_put(struct pool_cache *, void *);
+void		*pool_cache_get_paddr(struct pool_cache *, int, paddr_t *);
+#define		pool_cache_get(pc, f) pool_cache_get_paddr((pc), (f), NULL)
+void		pool_cache_put_paddr(struct pool_cache *, void *, paddr_t);
+#define		pool_cache_put(pc, o) pool_cache_put_paddr((pc), (o), \
+				          POOL_PADDR_INVALID)
 void		pool_cache_destruct_object(struct pool_cache *, void *);
 void		pool_cache_invalidate(struct pool_cache *);
 #endif /* _KERNEL */

@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.60 2002/01/07 21:47:00 thorpej Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.75.2.1 2004/08/16 17:46:02 jmc Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,21 +37,21 @@
 /*
  * Setup the system to run on the current machine.
  *
- * Configure() is called at boot time and initializes the vba 
+ * Configure() is called at boot time and initializes the vba
  * device tables and the memory controller monitoring.  Available
  * devices are determined (from possibilities mentioned in ioconf.c),
  * and the drivers are initialized.
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.60 2002/01/07 21:47:00 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.75.2.1 2004/08/16 17:46:02 jmc Exp $");
 
 #include "opt_compat_oldboot.h"
+#include "opt_multiprocessor.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
-#include <sys/dkstat.h>
 #include <sys/disklabel.h>
 #include <sys/conf.h>
 #ifdef COMPAT_OLDBOOT
@@ -66,15 +62,30 @@ __KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.60 2002/01/07 21:47:00 thorpej Exp $"
 #include <sys/vnode.h>
 #include <sys/fcntl.h>
 #include <sys/dkio.h>
+#include <sys/proc.h>
+#include <sys/user.h>
 
 #include <machine/pte.h>
 #include <machine/cpu.h>
+#include <machine/gdt.h>
+#include <machine/pcb.h>
 #include <machine/bootinfo.h>
 
-static int match_harddisk __P((struct device *, struct btinfo_bootdisk *));
-static void matchbiosdisks __P((void));
-static void findroot __P((void));
-static int is_valid_disk __P((struct device *));
+#include "ioapic.h"
+#include "lapic.h"
+
+#if NIOAPIC > 0
+#include <machine/i82093var.h>
+#endif
+
+#if NLAPIC > 0
+#include <machine/i82489var.h>
+#endif
+
+static int match_harddisk(struct device *, struct btinfo_bootdisk *);
+static void matchbiosdisks(void);
+static void findroot(void);
+static int is_valid_disk(struct device *);
 
 extern struct disklist *i386_alldisks;
 extern int i386_ndisks;
@@ -91,6 +102,11 @@ extern int i386_ndisks;
 #include <i386/pci/pcibios.h>
 #endif
 
+#include "opt_kvm86.h"
+#ifdef KVM86
+#include <machine/kvm86.h>
+#endif
+
 struct device *booted_device;
 int booted_partition;
 
@@ -98,7 +114,7 @@ int booted_partition;
  * Determine i/o configuration for a machine.
  */
 void
-cpu_configure()
+cpu_configure(void)
 {
 
 	startrtclock();
@@ -110,24 +126,38 @@ cpu_configure()
 	pcibios_init();
 #endif
 
+	/* kvm86 needs a TSS */
+	i386_proc0_tss_ldt_init();
+#ifdef KVM86
+	kvm86_init();
+#endif
+
 	if (config_rootfound("mainbus", NULL) == NULL)
 		panic("configure: mainbus not configured");
 
-	printf("biomask %x netmask %x ttymask %x\n",
-	    (u_short)imask[IPL_BIO], (u_short)imask[IPL_NET],
-	    (u_short)imask[IPL_TTY]);
+#ifdef INTRDEBUG
+	intr_printconfig();
+#endif
+
+#if NIOAPIC > 0
+	lapic_set_lvt();
+	ioapic_enable();
+#endif
+	/* resync cr0 after FPU configuration */
+	lwp0.l_addr->u_pcb.pcb_cr0 = rcr0();
+#ifdef MULTIPROCESSOR
+	/* propagate this to the idle pcb's. */
+	cpu_init_idle_pcbs();
+#endif
 
 	spl0();
-
-	/* Set up proc0's TSS and LDT (after the FPU is configured). */
-	i386_proc0_tss_ldt_init();
-
-	/* XXX Finish deferred buffer cache allocation. */
-	i386_bufinit();
+#if NLAPIC > 0
+	lapic_tpr = 0;
+#endif
 }
 
 void
-cpu_rootconf()
+cpu_rootconf(void)
 {
 	findroot();
 	matchbiosdisks();
@@ -143,21 +173,21 @@ cpu_rootconf()
  * match between BIOS disks and native disks can be done.
  */
 static void
-matchbiosdisks()
+matchbiosdisks(void)
 {
 	struct btinfo_biosgeom *big;
 	struct bi_biosgeom_entry *be;
 	struct device *dv;
-	struct devnametobdevmaj *d;
 	int i, ck, error, m, n;
 	struct vnode *tv;
 	char mbr[DEV_BSIZE];
 	int  dklist_size;
+	int bmajor;
+	int numbig;
 
 	big = lookup_bootinfo(BTINFO_BIOSGEOM);
 
-	if (big == NULL)
-		return;
+	numbig = big ? big->num : 0;
 
 	/*
 	 * First, count all native disks
@@ -166,28 +196,30 @@ matchbiosdisks()
 		if (is_valid_disk(dv))
 			i386_ndisks++;
 
-	if (i386_ndisks == 0)
-		return;
-
 	dklist_size = sizeof (struct disklist) + (i386_ndisks - 1) *
 	    sizeof (struct nativedisk_info);
 
 	/* XXX M_TEMP is wrong */
-	i386_alldisks = malloc(dklist_size, M_TEMP, M_NOWAIT);
+	i386_alldisks = malloc(dklist_size, M_TEMP, M_NOWAIT | M_ZERO);
 	if (i386_alldisks == NULL)
 		return;
 
-	memset(i386_alldisks, 0, dklist_size);
-
 	i386_alldisks->dl_nnativedisks = i386_ndisks;
-	i386_alldisks->dl_nbiosdisks = big->num;
-	for (i = 0; i < big->num; i++) {
+	i386_alldisks->dl_nbiosdisks = numbig;
+	for (i = 0; i < numbig; i++) {
 		i386_alldisks->dl_biosdisks[i].bi_dev = big->disk[i].dev;
 		i386_alldisks->dl_biosdisks[i].bi_sec = big->disk[i].sec;
 		i386_alldisks->dl_biosdisks[i].bi_head = big->disk[i].head;
 		i386_alldisks->dl_biosdisks[i].bi_cyl = big->disk[i].cyl;
 		i386_alldisks->dl_biosdisks[i].bi_lbasecs = big->disk[i].totsec;
 		i386_alldisks->dl_biosdisks[i].bi_flags = big->disk[i].flags;
+#ifdef GEOM_DEBUG
+#ifdef NOTYET
+		printf("disk %x: flags %x, interface %x, device %llx\n",
+			big->disk[i].dev, big->disk[i].flags,
+			big->disk[i].interface_path, big->disk[i].device_path);
+#endif
+#endif
 	}
 
 	/*
@@ -199,21 +231,19 @@ matchbiosdisks()
 			continue;
 #ifdef GEOM_DEBUG
 		printf("matchbiosdisks: trying to match (%s) %s\n",
-		    dv->dv_xname, dv->dv_cfdata->cf_driver->cd_name);
+		    dv->dv_xname, dv->dv_cfdata->cf_name);
 #endif
 		if (is_valid_disk(dv)) {
 			n++;
 			sprintf(i386_alldisks->dl_nativedisks[n].ni_devname,
-			    "%s%d", dv->dv_cfdata->cf_driver->cd_name,
+			    "%s%d", dv->dv_cfdata->cf_name,
 			    dv->dv_unit);
 
-			for (d = dev_name2blk; d->d_name &&
-			   strcmp(d->d_name, dv->dv_cfdata->cf_driver->cd_name);
-			   d++);
-			if (d->d_name == NULL)
+			bmajor = devsw_name2blk(dv->dv_xname, NULL, 0);
+			if (bmajor == -1)
 				return;
 
-			if (bdevvp(MAKEDISKDEV(d->d_maj, dv->dv_unit, RAW_PART),
+			if (bdevvp(MAKEDISKDEV(bmajor, dv->dv_unit, RAW_PART),
 			    &tv))
 				panic("matchbiosdisks: can't alloc vnode");
 
@@ -235,21 +265,21 @@ matchbiosdisks()
 
 			for (ck = i = 0; i < DEV_BSIZE; i++)
 				ck += mbr[i];
-			for (m = i = 0; i < big->num; i++) {
+			for (m = i = 0; i < numbig; i++) {
 				be = &big->disk[i];
 #ifdef GEOM_DEBUG
-				printf("match %s with %d\n", dv->dv_xname, i);
+				printf("match %s with %d ", dv->dv_xname, i);
 				printf("dev ck %x bios ck %x\n", ck, be->cksum);
 #endif
 				if (be->flags & BI_GEOM_INVALID)
 					continue;
 				if (be->cksum == ck &&
-				    !memcmp(&mbr[MBR_PARTOFF], be->dosparts,
-					NMBRPART *
+				    !memcmp(&mbr[MBR_PART_OFFSET], be->dosparts,
+					MBR_PART_COUNT *
 					    sizeof (struct mbr_partition))) {
 #ifdef GEOM_DEBUG
 					printf("matched bios disk %x with %s\n",
-					    be->dev, be->devname);
+					    be->dev, dv->dv_xname);
 #endif
 					i386_alldisks->dl_nativedisks[n].
 					    ni_biosmatches[m++] = i;
@@ -270,15 +300,13 @@ u_long	bootdev = 0;		/* should be dev_t, but not until 32 bits */
  * return nonzero if disk device matches bootinfo
  */
 static int
-match_harddisk(dv, bid)
-	struct device *dv;
-	struct btinfo_bootdisk *bid;
+match_harddisk(struct device *dv, struct btinfo_bootdisk *bid)
 {
-	struct devnametobdevmaj *i;
 	struct vnode *tmpvn;
 	int error;
 	struct disklabel label;
 	int found = 0;
+	int bmajor;
 
 	/*
 	 * A disklabel is required here.  The
@@ -292,18 +320,15 @@ match_harddisk(dv, bid)
 	/*
 	 * lookup major number for disk block device
 	 */
-	i = dev_name2blk;
-	while (i->d_name &&
-	       strcmp(i->d_name, dv->dv_cfdata->cf_driver->cd_name))
-		i++;
-	if (i->d_name == NULL)
+	bmajor = devsw_name2blk(dv->dv_xname, NULL, 0);
+	if (bmajor == -1)
 		return(0); /* XXX panic() ??? */
 
 	/*
 	 * Fake a temporary vnode for the disk, open
 	 * it, and read the disklabel for comparison.
 	 */
-	if (bdevvp(MAKEDISKDEV(i->d_maj, dv->dv_unit, bid->partition), &tmpvn))
+	if (bdevvp(MAKEDISKDEV(bmajor, dv->dv_unit, bid->partition), &tmpvn))
 		panic("findroot can't alloc vnode");
 	error = VOP_OPEN(tmpvn, FREAD, NOCRED, 0);
 	if (error) {
@@ -319,7 +344,7 @@ match_harddisk(dv, bid)
 		vput(tmpvn);
 		return(0);
 	}
-	error = VOP_IOCTL(tmpvn, DIOCGDINFO, (caddr_t)&label, FREAD, NOCRED, 0);
+	error = VOP_IOCTL(tmpvn, DIOCGDINFO, &label, FREAD, NOCRED, 0);
 	if (error) {
 		/*
 		 * XXX can't happen - open() would
@@ -381,11 +406,11 @@ findroot(void)
 		 * boot device.
 		 */
 		for (dv = alldevs.tqh_first; dv != NULL;
-		dv = dv->dv_list.tqe_next) {
+		    dv = dv->dv_list.tqe_next) {
 			if (dv->dv_class != DV_DISK)
 				continue;
 
-			if (!strcmp(dv->dv_cfdata->cf_driver->cd_name, "fd")) {
+			if (!strcmp(dv->dv_cfdata->cf_name, "fd")) {
 				/*
 				 * Assume the configured unit number matches
 				 * the BIOS device number.  (This is the old
@@ -418,8 +443,8 @@ findroot(void)
 found:
 			if (booted_device) {
 				printf("warning: double match for boot "
-				    "device (%s, %s)\n", booted_device->dv_xname,
-				    dv->dv_xname);
+				    "device (%s, %s)\n",
+				    booted_device->dv_xname, dv->dv_xname);
 				continue;
 			}
 			booted_device = dv;
@@ -439,18 +464,15 @@ found:
 		return;
 
 	majdev = (bootdev >> B_TYPESHIFT) & B_TYPEMASK;
-	for (i = 0; dev_name2blk[i].d_name != NULL; i++)
-		if (majdev == dev_name2blk[i].d_maj)
-			break;
-	if (dev_name2blk[i].d_name == NULL)
+	name = devsw_blk2name(majdev);
+	if (name == NULL)
 		return;
 
 	part = (bootdev >> B_PARTITIONSHIFT) & B_PARTITIONMASK;
 	unit = (bootdev >> B_UNITSHIFT) & B_UNITMASK;
 
-	sprintf(buf, "%s%d", dev_name2blk[i].d_name, unit);
-	for (dv = alldevs.tqh_first; dv != NULL;
-	    dv = dv->dv_list.tqe_next) {
+	sprintf(buf, "%s%d", name, unit);
+	for (dv = alldevs.tqh_first; dv != NULL; dv = dv->dv_list.tqe_next) {
 		if (strcmp(buf, dv->dv_xname) == 0) {
 			booted_device = dv;
 			booted_partition = part;
@@ -468,9 +490,7 @@ found:
 #endif
 
 void
-device_register(dev, aux)
-	struct device *dev;
-	void *aux;
+device_register(struct device *dev, void *aux)
 {
 	/*
 	 * Handle network interfaces here, the attachment information is
@@ -491,8 +511,7 @@ device_register(dev, aux)
 		 */
 
 		if (bin->bus == BI_BUS_ISA &&
-		    !strcmp(dev->dv_parent->dv_cfdata->cf_driver->cd_name,
-		    "isa")) {
+		    !strcmp(dev->dv_parent->dv_cfdata->cf_name, "isa")) {
 			struct isa_attach_args *iaa = aux;
 
 			/* compare IO base address */
@@ -503,8 +522,7 @@ device_register(dev, aux)
 		}
 #if NPCI > 0
 		if (bin->bus == BI_BUS_PCI &&
-		    !strcmp(dev->dv_parent->dv_cfdata->cf_driver->cd_name,
-		    "pci")) {
+		    !strcmp(dev->dv_parent->dv_cfdata->cf_name, "pci")) {
 			struct pci_attach_args *paa = aux;
 			int b, d, f;
 
@@ -541,7 +559,7 @@ is_valid_disk(struct device *dv)
 	if (dv->dv_class != DV_DISK)
 		return (0);
 
-	name = dv->dv_cfdata->cf_driver->cd_name;
+	name = dv->dv_cfdata->cf_name;
 
 	return (strcmp(name, "sd") == 0 || strcmp(name, "wd") == 0 ||
 	    strcmp(name, "ld") == 0 || strcmp(name, "ed") == 0);

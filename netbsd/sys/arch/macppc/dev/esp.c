@@ -1,4 +1,4 @@
-/*	$NetBSD: esp.c,v 1.13 2001/04/25 17:53:15 bouyer Exp $	*/
+/*	$NetBSD: esp.c,v 1.18 2003/07/15 02:43:28 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -76,6 +76,9 @@
  * Charles Hannum (mycroft@duality.gnu.ai.mit.edu).  Thanks a million!
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: esp.c,v 1.18 2003/07/15 02:43:28 lukem Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -89,7 +92,7 @@
 #include <sys/queue.h>
 #include <sys/malloc.h>
 
-#include <uvm/uvm_param.h>	/* for trunc_page */
+#include <uvm/uvm_extern.h>
 
 #include <dev/scsipi/scsi_all.h>
 #include <dev/scsipi/scsipi_all.h>
@@ -112,9 +115,8 @@ void	espattach	__P((struct device *, struct device *, void *));
 int	espmatch	__P((struct device *, struct cfdata *, void *));
 
 /* Linkup to the rest of the kernel */
-struct cfattach esp_ca = {
-	sizeof(struct esp_softc), espmatch, espattach
-};
+CFATTACH_DECL(esp, sizeof(struct esp_softc),
+    espmatch, espattach, NULL, NULL);
 
 /*
  * Functions and the switch for the MI code.
@@ -195,7 +197,7 @@ espattach(parent, self, aux)
 	esc->sc_reg =    mapiodev(ca->ca_baseaddr + reg[0], reg[1]);
 	esc->sc_dmareg = mapiodev(ca->ca_baseaddr + reg[2], reg[3]);
 
-	/* Allocate 16-byte aligned dma command space */
+	/* Allocate 16-byte aligned DMA command space */
 	esc->sc_dmacmd = dbdma_alloc(sizeof(dbdma_command_t) * 20);
 
 	/* Other settings */
@@ -254,7 +256,7 @@ espattach(parent, self, aux)
 	sc->sc_adapter.adapt_request = ncr53c9x_scsipi_request;
 	ncr53c9x_attach(sc);
 
-	/* Turn on target selection using the `dma' method */
+	/* Turn on target selection using the `DMA' method */
 	sc->sc_features |= NCR_F_DMASELECT;
 }
 
@@ -331,7 +333,7 @@ esp_dma_setup(sc, addr, len, datain, dmasize)
 
 	count = *dmasize;
 
-	if (count / NBPG > 32)
+	if (count / PAGE_SIZE > 32)
 		panic("esp: transfer size >= 128k");
 
 	esc->sc_dmaaddr = addr;
@@ -343,7 +345,7 @@ esp_dma_setup(sc, addr, len, datain, dmasize)
 
 	/* if va is not page-aligned, setup the first page */
 	if (offset != 0) {
-		int rest = NBPG - offset;	/* the rest of the page */
+		int rest = PAGE_SIZE - offset;	/* the rest of the page */
 
 		if (count > rest) {		/* if continues to next page */
 			DBDMA_BUILD(cmdp, cmd, 0, rest, kvtop((caddr_t)va),
@@ -356,15 +358,15 @@ esp_dma_setup(sc, addr, len, datain, dmasize)
 	}
 
 	/* now va is page-aligned */
-	while (count > NBPG) {
-		DBDMA_BUILD(cmdp, cmd, 0, NBPG, kvtop((caddr_t)va),
+	while (count > PAGE_SIZE) {
+		DBDMA_BUILD(cmdp, cmd, 0, PAGE_SIZE, kvtop((caddr_t)va),
 			DBDMA_INT_NEVER, DBDMA_WAIT_NEVER, DBDMA_BRANCH_NEVER);
-		count -= NBPG;
-		va += NBPG;
+		count -= PAGE_SIZE;
+		va += PAGE_SIZE;
 		cmdp++;
 	}
 
-	/* the last page (count <= NBPG here) */
+	/* the last page (count <= PAGE_SIZE here) */
 	cmd = datain ? DBDMA_CMD_IN_LAST : DBDMA_CMD_OUT_LAST;
 	DBDMA_BUILD(cmdp, cmd , 0, count, kvtop((caddr_t)va),
 		DBDMA_INT_NEVER, DBDMA_WAIT_NEVER, DBDMA_BRANCH_NEVER);

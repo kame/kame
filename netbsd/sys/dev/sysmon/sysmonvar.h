@@ -1,4 +1,4 @@
-/*	$NetBSD: sysmonvar.h,v 1.3 2000/11/05 04:06:14 thorpej Exp $	*/
+/*	$NetBSD: sysmonvar.h,v 1.10 2003/08/11 15:07:14 yamt Exp $	*/
 
 /*-
  * Copyright (c) 2000 Zembu Labs, Inc.
@@ -38,10 +38,20 @@
 
 #include <sys/envsys.h>
 #include <sys/wdog.h>
+#include <sys/power.h>
 #include <sys/queue.h>
+
+struct proc;
+struct knote;
+struct uio;
 
 #define	SYSMON_MINOR_ENVSYS	0
 #define	SYSMON_MINOR_WDOG	1
+#define	SYSMON_MINOR_POWER	2
+
+/*****************************************************************************
+ * Environmental sensor support
+ *****************************************************************************/
 
 struct sysmon_envsys {
 	int32_t sme_envsys_version;	/* ENVSYS API version */
@@ -59,9 +69,24 @@ struct sysmon_envsys {
 
 	u_int sme_fsensor;		/* sensor index base, from sysmon */
 	u_int sme_nsensors;		/* sensor count, from driver */
+	int sme_flags;			/* SME_FLAG_ flags defined below */
 };
 
+#define	SME_FLAG_BUSY	0x00000001		/* sme is busy */
+#define	SME_FLAG_WANTED	0x00000002		/* someone waiting for this */
+
 #define	SME_SENSOR_IDX(sme, idx)	((idx) - (sme)->sme_fsensor)
+
+int	sysmonopen_envsys(dev_t, int, int, struct proc *);
+int	sysmonclose_envsys(dev_t, int, int, struct proc *);
+int	sysmonioctl_envsys(dev_t, u_long, caddr_t, int, struct proc *);
+
+int	sysmon_envsys_register(struct sysmon_envsys *);
+void	sysmon_envsys_unregister(struct sysmon_envsys *);
+
+/*****************************************************************************
+ * Watchdog timer support
+ *****************************************************************************/
 
 struct sysmon_wdog {
 	const char *smw_name;		/* watchdog device name */
@@ -77,20 +102,36 @@ struct sysmon_wdog {
 	pid_t smw_tickler;		/* last process to tickle */
 };
 
-struct proc;
-
-int	sysmonopen_envsys(dev_t, int, int, struct proc *);
-int	sysmonclose_envsys(dev_t, int, int, struct proc *);
-int	sysmonioctl_envsys(dev_t, u_long, caddr_t, int, struct proc *);
-
-int	sysmon_envsys_register(struct sysmon_envsys *);
-void	sysmon_envsys_unregister(struct sysmon_envsys *);
-
 int	sysmonopen_wdog(dev_t, int, int, struct proc *);
 int	sysmonclose_wdog(dev_t, int, int, struct proc *);
 int	sysmonioctl_wdog(dev_t, u_long, caddr_t, int, struct proc *);
 
 int	sysmon_wdog_register(struct sysmon_wdog *);
 void	sysmon_wdog_unregister(struct sysmon_wdog *);
+
+/*****************************************************************************
+ * Power management support
+ *****************************************************************************/
+
+struct sysmon_pswitch {
+	const char *smpsw_name;		/* power switch name */
+	int smpsw_type;			/* power switch type */
+
+	LIST_ENTRY(sysmon_pswitch) smpsw_list;
+};
+
+int	sysmonopen_power(dev_t, int, int, struct proc *);
+int	sysmonclose_power(dev_t, int, int, struct proc *);
+int	sysmonread_power(dev_t, struct uio *, int);
+int	sysmonpoll_power(dev_t, int, struct proc *);
+int	sysmonkqfilter_power(dev_t, struct knote *);
+int	sysmonioctl_power(dev_t, u_long, caddr_t, int, struct proc *);
+
+void	sysmon_power_settype(const char *);
+
+int	sysmon_pswitch_register(struct sysmon_pswitch *);
+void	sysmon_pswitch_unregister(struct sysmon_pswitch *);
+
+void	sysmon_pswitch_event(struct sysmon_pswitch *, int);
 
 #endif /* _DEV_SYSMON_SYSMONVAR_H_ */

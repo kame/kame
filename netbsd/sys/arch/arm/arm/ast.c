@@ -1,4 +1,4 @@
-/*	$NetBSD: ast.c,v 1.3 2002/03/24 16:10:11 bjh21 Exp $	*/
+/*	$NetBSD: ast.c,v 1.6 2003/10/31 16:44:34 cl Exp $	*/
 
 /*
  * Copyright (c) 1994,1995 Mark Brinicombe
@@ -40,6 +40,9 @@
  * Created      : 11/10/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ast.c,v 1.6 2003/10/31 16:44:34 cl Exp $");
+
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -49,7 +52,10 @@
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/signal.h>
+#include <sys/savar.h>
 #include <sys/vmmeter.h>
+#include <sys/userret.h>
+
 #include <machine/cpu.h>
 #include <machine/frame.h>
 #include <machine/cpu.h>
@@ -71,15 +77,13 @@ int want_resched = 0;
 int astpending;
 
 void
-userret(struct proc *p)
+userret(struct lwp *l)
 {
-	int sig;
 
-	/* Take pending signals. */
-	while ((sig = (CURSIG(p))) != 0)
-		postsig(sig);
+	/* Invoke MI userret code */
+	mi_userret(l);
 
-	curcpu()->ci_schedstate.spc_curpriority = p->p_priority = p->p_usrpri;
+	curcpu()->ci_schedstate.spc_curpriority = l->l_priority = l->l_usrpri;
 }
 
 
@@ -92,7 +96,8 @@ userret(struct proc *p)
 void
 ast(struct trapframe *tf)
 {
-	struct proc *p = curproc;
+	struct lwp *l = curlwp;
+	struct proc *p;
 
 #ifdef acorn26
 	/* Enable interrupts if they were enabled before the trap. */
@@ -106,11 +111,13 @@ ast(struct trapframe *tf)
 	uvmexp.softs++;
 
 #ifdef DEBUG
-	if (p == NULL)
-		panic("ast: no curproc!");
-	if (&p->p_addr->u_pcb == 0)
+	if (l == NULL)
+		panic("ast: no curlwp!");
+	if (&l->l_addr->u_pcb == 0)
 		panic("ast: no pcb!");
 #endif	
+
+	p = l->l_proc;
 
 	if (p->p_flag & P_OWEUPC) {
 		p->p_flag &= ~P_OWEUPC;
@@ -119,9 +126,9 @@ ast(struct trapframe *tf)
 
 	/* Allow a forced task switch. */
 	if (want_resched)
-		preempt(NULL);
+		preempt(0);
 
-	userret(p);
+	userret(l);
 }
 
 /* End of ast.c */

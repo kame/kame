@@ -1,4 +1,4 @@
-/*	$NetBSD: zs.c,v 1.12 2000/04/14 10:11:06 tsubai Exp $	*/
+/*	$NetBSD: zs.c,v 1.19 2003/07/15 02:59:30 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -44,6 +44,9 @@
  * Sun keyboard/mouse uses the zs_kbd/zs_ms slaves.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zs.c,v 1.19 2003/07/15 02:59:30 lukem Exp $");
+
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -59,13 +62,6 @@
 
 #define ZS_DELAY() (*zs_delay)()
 
-int zs_print __P((void *, const char *name));
-int zshard __P((void *));
-void zssoft __P((void *));
-int zs_get_speed __P((struct zs_chanstate *));
-void Debugger __P((void));
-void (*zs_delay) __P((void));
-
 extern struct cfdriver zsc_cd;
 
 /*
@@ -74,7 +70,6 @@ extern struct cfdriver zsc_cd;
  * or you can not see messages done with printf during boot-up...
  */
 int zs_def_cflag = (CREAD | CS8 | HUPCL);
-int zs_major = 1;
 
 int
 zs_print(aux, name)
@@ -84,15 +79,13 @@ zs_print(aux, name)
 	struct zsc_attach_args *args = aux;
 
 	if (name != NULL)
-		printf("%s: ", name);
+		aprint_normal("%s: ", name);
 
 	if (args->channel != -1)
-		printf(" channel %d", args->channel);
+		aprint_normal(" channel %d", args->channel);
 
 	return UNCONF;
 }
-
-static volatile int zssoftpending;
 
 /*
  * Our ZS chips all share a common, autovectored interrupt,
@@ -102,23 +95,19 @@ int
 zshard(arg)
 	void *arg;
 {
-	register struct zsc_softc *zsc;
-	register int unit, rval, softreq;
+	struct zsc_softc *zsc;
+	int unit, rval, softreq;
 
-	rval = softreq = 0;
+	rval = 0;
 	for (unit = 0; unit < zsc_cd.cd_ndevs; unit++) {
 		zsc = zsc_cd.cd_devs[unit];
 		if (zsc == NULL)
 			continue;
 		rval |= zsc_intr_hard(zsc);
-		softreq |= zsc->zsc_cs[0]->cs_softreq;
+		softreq =  zsc->zsc_cs[0]->cs_softreq;
 		softreq |= zsc->zsc_cs[1]->cs_softreq;
-	}
-
-	/* We are at splzs here, so no need to lock. */
-	if (softreq && (zssoftpending == 0)) {
-		zssoftpending = 1;
-		setsoftserial();
+		if (softreq)
+			softintr_schedule(zsc->zsc_si);
 	}
 
 	return rval;
@@ -131,21 +120,8 @@ void
 zssoft(arg)
 	void *arg;
 {
-	register struct zsc_softc *zsc;
-	register int s, unit;
-
-	/* This is not the only ISR on this IPL. */
-	if (zssoftpending == 0)
-		return;
-
-	/*
-	 * The soft intr. bit will be set by zshard only if
-	 * the variable zssoftpending is zero.  The order of
-	 * these next two statements prevents our clearing
-	 * the soft intr bit just after zshard has set it.
-	 */
-	/* clearsoftnet(); */
-	zssoftpending = 0;
+	struct zsc_softc *zsc;
+	int s, unit;
 
 	/* Make sure we call the tty layer at spltty. */
 	s = spltty();
@@ -222,7 +198,7 @@ zs_set_modes(cs, cflag)
 	 * Therefore, NEVER set the HFC bit, and instead use the
 	 * status interrupt to detect CTS changes.
 	 */
-	s = splzs();
+	s = splserial();
 	cs->cs_rr0_pps = 0;
 	if ((cflag & (CLOCAL | MDMBUF)) != 0) {
 		cs->cs_rr0_dcd = 0;
@@ -281,7 +257,7 @@ zs_write_reg(cs, reg, val)
 u_char zs_read_csr(cs)
 	struct zs_chanstate *cs;
 {
-	register u_char val;
+	u_char val;
 
 	val = *cs->cs_reg_csr;
 	ZS_DELAY();
@@ -299,7 +275,7 @@ void  zs_write_csr(cs, val)
 u_char zs_read_data(cs)
 	struct zs_chanstate *cs;
 {
-	register u_char val;
+	u_char val;
 
 	val = *cs->cs_reg_data;
 	ZS_DELAY();

@@ -1,4 +1,4 @@
-/*	$NetBSD: pciide_pnpbios.c,v 1.4 2001/11/15 07:03:35 lukem Exp $	*/
+/*	$NetBSD: pciide_pnpbios.c,v 1.14 2004/01/03 22:56:53 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1999 Soren S. Jorvang.  All rights reserved.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pciide_pnpbios.c,v 1.4 2001/11/15 07:03:35 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pciide_pnpbios.c,v 1.14 2004/01/03 22:56:53 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -39,6 +39,7 @@ __KERNEL_RCSID(0, "$NetBSD: pciide_pnpbios.c,v 1.4 2001/11/15 07:03:35 lukem Exp
 
 #include <machine/bus.h>
 
+#include <dev/ic/wdcreg.h>
 #include <dev/isa/isavar.h>
 #include <dev/isa/isadmavar.h>
 
@@ -53,6 +54,7 @@ __KERNEL_RCSID(0, "$NetBSD: pciide_pnpbios.c,v 1.4 2001/11/15 07:03:35 lukem Exp
 
 static int	pciide_pnpbios_match(struct device *, struct cfdata *, void *);
 static void	pciide_pnpbios_attach(struct device *, struct device *, void *);
+void		pciide_pnpbios_setup_channel(struct wdc_channel *);
 
 extern void	pciide_channel_dma_setup(struct pciide_channel *);
 extern int	pciide_dma_init(void *, int, int, void *, size_t, int);
@@ -60,11 +62,8 @@ extern void	pciide_dma_start(void *, int, int);
 extern int	pciide_dma_finish(void *, int, int, int);
 extern int	pciide_compat_intr (void *);
 
-struct cfattach pciide_pnpbios_ca = {
-	sizeof(struct pciide_softc),
-	pciide_pnpbios_match,
-	pciide_pnpbios_attach
-};
+CFATTACH_DECL(pciide_pnpbios, sizeof(struct pciide_softc),
+    pciide_pnpbios_match, pciide_pnpbios_attach, NULL, NULL);
 
 int
 pciide_pnpbios_match(parent, match, aux)
@@ -88,9 +87,10 @@ pciide_pnpbios_attach(parent, self, aux)
 	struct pciide_softc *sc = (void *)self;
 	struct pnpbiosdev_attach_args *aa = aux;
 	struct pciide_channel *cp;
-	struct channel_softc *wdc_cp;
+	struct wdc_channel *wdc_cp;
 	bus_space_tag_t compat_iot;
-	bus_space_handle_t cmd_ioh, ctl_ioh;
+	bus_space_handle_t cmd_baseioh, ctl_ioh;
+	int i;
 
 	printf("\n");
 	pnpbios_print_devres(self, aa);
@@ -103,7 +103,7 @@ pciide_pnpbios_attach(parent, self, aux)
 		return;
 	}
 	if (pnpbios_io_map(aa->pbt, aa->resc, 0, &compat_iot,
-	    &cmd_ioh) != 0) {
+	    &cmd_baseioh) != 0) {
 		printf("%s: unable to map command registers\n", self->dv_xname);
 		return;
 	}
@@ -124,19 +124,20 @@ pciide_pnpbios_attach(parent, self, aux)
 	sc->sc_wdcdev.nchannels = 1;
 	sc->sc_wdcdev.cap |= WDC_CAPABILITY_DATA16 | WDC_CAPABILITY_DATA32;
 	sc->sc_wdcdev.cap |= WDC_CAPABILITY_DMA | WDC_CAPABILITY_UDMA;
-#if 0	/* Need documentation. */
+#if 0 /* XXX */
 	sc->sc_wdcdev.cap |= WDC_CAPABILITY_MODE;
 #endif
         sc->sc_wdcdev.PIO_cap = 4;
         sc->sc_wdcdev.DMA_cap = 2;		/* XXX */
         sc->sc_wdcdev.UDMA_cap = 2;		/* XXX */
+	sc->sc_wdcdev.set_modes = pciide_pnpbios_setup_channel;
 
 	cp = &sc->pciide_channels[0];
 	sc->wdc_chanarray[0] = &cp->wdc_channel;
-	cp->wdc_channel.channel = 0;
-	cp->wdc_channel.wdc = &sc->sc_wdcdev;
-	cp->wdc_channel.ch_queue = malloc(sizeof(struct channel_queue),
-						M_DEVBUF, M_NOWAIT);
+	cp->wdc_channel.ch_channel = 0;
+	cp->wdc_channel.ch_wdc = &sc->sc_wdcdev;
+	cp->wdc_channel.ch_queue = malloc(sizeof(struct ata_queue),
+					  M_DEVBUF, M_NOWAIT);
 	if (cp->wdc_channel.ch_queue == NULL) {
 		printf("%s: unable to allocate memory for command queue\n",
 			self->dv_xname);
@@ -145,17 +146,33 @@ pciide_pnpbios_attach(parent, self, aux)
 
 	wdc_cp = &cp->wdc_channel;
 	wdc_cp->cmd_iot = compat_iot;
-	wdc_cp->cmd_ioh = cmd_ioh;
+	wdc_cp->cmd_baseioh = cmd_baseioh;
+
+	for (i = 0; i < WDC_NREG; i++) {
+		if (bus_space_subregion(wdc_cp->cmd_iot, wdc_cp->cmd_baseioh, i,
+		    i == 0 ? 4 : 1, &wdc_cp->cmd_iohs[i]) != 0) {
+			    printf("%s: unable to subregion control register\n",
+				self->dv_xname);
+			    return;
+		}
+	}
+
 	wdc_cp->ctl_iot = wdc_cp->data32iot = compat_iot;
 	wdc_cp->ctl_ioh = wdc_cp->data32ioh = ctl_ioh;
 
-	cp->hw_ok = 1;				/* XXX */
 	cp->compat = 1;
 
 	cp->ih = pnpbios_intr_establish(aa->pbt, aa->resc, 0, IPL_BIO,
 					pciide_compat_intr, cp);
 
 	wdcattach(wdc_cp);
+}
+
+void
+pciide_pnpbios_setup_channel(chp)
+	struct wdc_channel *chp;
+{
+	struct pciide_channel *cp = (struct pciide_channel *)chp;
 
 	pciide_channel_dma_setup(cp);
 }

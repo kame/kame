@@ -1,4 +1,4 @@
-/*	$NetBSD: obio.c,v 1.52 2002/04/11 11:11:23 pk Exp $	*/
+/*	$NetBSD: obio.c,v 1.64 2003/07/15 00:04:55 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997,1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: obio.c,v 1.64 2003/07/15 00:04:55 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -62,7 +64,7 @@
 struct obio4_softc {
 	struct device	sc_dev;		/* base device */
 	bus_space_tag_t	sc_bustag;	/* parent bus tag */
-	bus_dma_tag_t	sc_dmatag;	/* parent bus dma tag */
+	bus_dma_tag_t	sc_dmatag;	/* parent bus DMA tag */
 };
 
 union obio_softc {
@@ -76,10 +78,8 @@ union obio_softc {
 static	int obiomatch  __P((struct device *, struct cfdata *, void *));
 static	void obioattach __P((struct device *, struct device *, void *));
 
-struct cfattach obio_ca = {
-	sizeof(union obio_softc), obiomatch, obioattach
-};
-
+CFATTACH_DECL(obio, sizeof(union obio_softc),
+    obiomatch, obioattach, NULL, NULL);
 
 /*
  * This `obio4_busattachargs' data structure only exists to pass down
@@ -102,12 +102,24 @@ static	int _obio_bus_map __P((bus_space_tag_t, bus_addr_t,
 static struct sparc_bus_space_tag obio_space_tag = {
 	NULL,				/* cookie */
 	NULL,				/* parent bus tag */
+	NULL,				/* ranges */
+	0,				/* nranges */
 	_obio_bus_map,			/* bus_space_map */ 
 	NULL,				/* bus_space_unmap */
 	NULL,				/* bus_space_subregion */
 	NULL,				/* bus_space_barrier */ 
 	obio_bus_mmap,			/* bus_space_mmap */ 
-	NULL				/* bus_intr_establish */
+	NULL,				/* bus_intr_establish */
+#if __FULL_SPARC_BUS_SPACE
+	NULL,				/* read_1 */
+	NULL,				/* read_2 */
+	NULL,				/* read_4 */
+	NULL,				/* read_8 */
+	NULL,				/* write_1 */
+	NULL,				/* write_2 */
+	NULL,				/* write_4 */
+	NULL,				/* write_8 */
+#endif
 }; 
 #endif
 
@@ -128,7 +140,7 @@ obiomatch(parent, cf, aux)
 {
 	struct mainbus_attach_args *ma = aux;
 
-	return (strcmp(cf->cf_driver->cd_name, ma->ma_name) == 0);
+	return (strcmp(cf->cf_name, ma->ma_name) == 0);
 }
 
 void
@@ -217,9 +229,9 @@ obioprint(args, busname)
 	union obio_attach_args *uoba = args;
 	struct obio4_attach_args *oba = &uoba->uoba_oba4;
 
-	printf(" addr 0x%lx", (u_long)BUS_ADDR_PADDR(oba->oba_paddr));
+	aprint_normal(" addr 0x%lx", (u_long)BUS_ADDR_PADDR(oba->oba_paddr));
 	if (oba->oba_pri != -1)
-		printf(" level %d", oba->oba_pri);
+		aprint_normal(" level %d", oba->oba_pri);
 
 	return (UNCONF);
 }
@@ -266,7 +278,7 @@ obiosearch(parent, cf, aux)
 	struct obio4_attach_args *oba = &uoba.uoba_oba4;
 
 	/* Check whether we're looking for a specifically named device */
-	if (oap->name != NULL && strcmp(oap->name, cf->cf_driver->cd_name) != 0)
+	if (oap->name != NULL && strcmp(oap->name, cf->cf_name) != 0)
 		return (0);
 
 	/*
@@ -294,7 +306,7 @@ obiosearch(parent, cf, aux)
 	oba->oba_paddr = BUS_ADDR(PMAP_OBIO, cf->cf_loc[0]);
 	oba->oba_pri = cf->cf_loc[1];
 
-	if ((*cf->cf_attach->ca_match)(parent, cf, &uoba) == 0)
+	if (config_match(parent, cf, &uoba) == 0)
 		return (0);
 
 	config_attach(parent, cf, &uoba, obioprint);
@@ -318,14 +330,14 @@ obio_find_rom_map(ba, len, hp)
 	int	pgtype;
 	u_long	va, pte;
 
-	if (len > NBPG)
+	if (len > PAGE_SIZE)
 		return (EINVAL);
 
 	pa = BUS_ADDR_PADDR(ba);
 	pf = pa >> PGSHIFT;
 	pgtype = PMAP_T2PTE_4(PMAP_OBIO);
 
-	for (va = OLDMON_STARTVADDR; va < OLDMON_ENDVADDR; va += NBPG) {
+	for (va = OLDMON_STARTVADDR; va < OLDMON_ENDVADDR; va += PAGE_SIZE) {
 		pte = getpte(va);
 		if ((pte & PG_V) == 0 || (pte & PG_TYPE) != pgtype ||
 		    (pte & PG_PFNUM) != pf)

@@ -1,9 +1,43 @@
-/*	$NetBSD: vmparam.h,v 1.8 2001/11/15 18:06:15 soren Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.11 2003/08/07 16:28:50 agc Exp $	*/
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1982, 1986, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: vmparam.h 1.16 91/01/18$
+ *
+ *	@(#)vmparam.h	8.2 (Berkeley) 4/19/94
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -58,23 +92,17 @@
 #define	PAGE_MASK	(PAGE_SIZE - 1)
 
 /*
- * USRTEXT is the start of the user text/data space, while USRSTACK
- * is the top (end) of the user stack.  LOWPAGES and HIGHPAGES are
- * the number of pages from the beginning of the P0 region to the
- * beginning of the text and from the beginning of the P1 region to the
- * beginning of the stack respectively.
+ * USRSTACK is the top (end) of the user stack.
  *
  * NOTE: the ONLY reason that HIGHPAGES is 0x100 instead of UPAGES (3)
  * is for HPUX compatibility.  Why??  Because HPUX's debuggers
  * have the user's stack hard-wired at FFF00000 for post-mortems,
  * and we must be compatible...
  */
-#define	USRTEXT		8192			/* Must equal __LDPGSZ */
-#define	USRSTACK	(-HIGHPAGES*NBPG)	/* Start of user stack */
+#define	USRSTACK	(-HIGHPAGES*PAGE_SIZE)	/* Start of user stack */
 #define	BTOPUSRSTACK	(0x100000-HIGHPAGES)	/* btop(USRSTACK) */
 #define P1PAGES		0x100000
-#define	LOWPAGES	0
-#define HIGHPAGES	(0x100000/NBPG)
+#define HIGHPAGES	(0x100000/PAGE_SIZE)
 
 /*
  * Virtual memory related constants, all in bytes
@@ -130,7 +158,7 @@
 #define VM_MAX_KERNEL_ADDRESS	((vaddr_t)0xFFFFF000)
 
 /* virtual sizes (bytes) for various kernel submaps */
-#define VM_PHYS_SIZE		(USRIOSIZE*NBPG)
+#define VM_PHYS_SIZE		(USRIOSIZE*PAGE_SIZE)
 
 /* # of kernel PT pages (initial only, can grow dynamically) */
 #define VM_KERNEL_PT_PAGES	((vsize_t)2)		/* XXX: SYSPTSIZE */

@@ -1,4 +1,4 @@
-/*	$NetBSD: mbio.c,v 1.7 2001/12/15 22:13:11 fredette Exp $	*/
+/*	$NetBSD: mbio.c,v 1.12 2003/07/15 03:36:13 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mbio.c,v 1.12 2003/07/15 03:36:13 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -61,9 +64,8 @@ struct mbio_softc {
 	bus_dma_tag_t	sc_dmatag;	/* parent bus dma tag */
 };
 
-struct cfattach mbio_ca = {
-	sizeof(struct mbio_softc), mbio_match, mbio_attach
-};
+CFATTACH_DECL(mbio, sizeof(struct mbio_softc),
+    mbio_match, mbio_attach, NULL, NULL);
 
 static	paddr_t mbio_bus_mmap __P((bus_space_tag_t, bus_type_t, bus_addr_t,
 			       off_t, int, int));
@@ -92,7 +94,7 @@ mbio_match(parent, cf, aux)
 {
 	struct mainbus_attach_args *ma = aux;
 
-	return (cpu_has_multibus && (ma->ma_name == NULL || strcmp(cf->cf_driver->cd_name, ma->ma_name) == 0));
+	return (cpu_has_multibus && (ma->ma_name == NULL || strcmp(cf->cf_name, ma->ma_name) == 0));
 }
 
 static void

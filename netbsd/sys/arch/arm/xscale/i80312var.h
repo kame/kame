@@ -1,7 +1,7 @@
-/*	$NetBSD: i80312var.h,v 1.5 2001/11/29 08:27:11 thorpej Exp $	*/
+/*	$NetBSD: i80312var.h,v 1.8 2003/10/06 16:06:05 thorpej Exp $	*/
 
 /*
- * Copyright (c) 2001 Wasabi Systems, Inc.
+ * Copyright (c) 2001, 2002 Wasabi Systems, Inc.
  * All rights reserved.
  *
  * Written by Jason R. Thorpe for Wasabi Systems, Inc.
@@ -152,9 +152,27 @@ struct i80312_softc {
 	struct arm32_bus_dma_tag sc_pci_dmat;
 	struct arm32_pci_chipset sc_pci_chipset;
 
+	/* DMA window info for PCI DMA. */
+	struct arm32_dma_range sc_pci_dma_range;
+
 	/* GPIO state */
 	uint8_t sc_gpio_dir;	/* GPIO pin direction (1 == output) */
 	uint8_t sc_gpio_val;	/* GPIO output pin value */
+
+	/* DMA tag for local devices. */
+	struct arm32_bus_dma_tag sc_local_dmat;
+};
+
+/*
+ * Arguments used to attach IOP built-ins.
+ */
+struct iopxs_attach_args {
+	const char *ia_name;	/* name of device */
+	bus_space_tag_t ia_st;	/* space tag */
+	bus_space_handle_t ia_sh;/* handle of IOP base */
+	bus_dma_tag_t ia_dmat;	/* DMA tag */
+	bus_addr_t ia_offset;	/* offset of device from IOP base */
+	bus_size_t ia_size;	/* size of sub-device */
 };
 
 extern struct bus_space i80312_bs_tag;
@@ -172,8 +190,6 @@ void	i80312_mem_bs_init(bus_space_tag_t, void *);
 void	i80312_gpio_set_direction(uint8_t, uint8_t);
 void	i80312_gpio_set_val(uint8_t, uint8_t);
 uint8_t	i80312_gpio_get_val(void);
-
-void	i80312_pci_dma_init(bus_dma_tag_t, void *);
 
 void	i80312_pci_init(pci_chipset_tag_t, void *);
 

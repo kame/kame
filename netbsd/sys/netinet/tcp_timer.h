@@ -1,4 +1,4 @@
-/*	$NetBSD: tcp_timer.h,v 1.17 2001/11/04 13:42:28 matt Exp $	*/
+/*	$NetBSD: tcp_timer.h,v 1.20 2003/08/07 16:33:19 agc Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -48,11 +48,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -155,17 +151,18 @@ char *tcptimers[] =
  * Init, arm, disarm, and test TCP timers.
  */
 #define	TCP_TIMER_INIT(tp, timer)					\
-	callout_init(&(tp)->t_timer[(timer)])
+	callout_setfunc(&(tp)->t_timer[(timer)],			\
+	    tcp_timer_funcs[(timer)], (tp))
 
 #define	TCP_TIMER_ARM(tp, timer, nticks)				\
-	callout_reset(&(tp)->t_timer[(timer)],				\
-	    (nticks) * (hz / PR_SLOWHZ), tcp_timer_funcs[(timer)], tp)
+	callout_schedule(&(tp)->t_timer[(timer)],			\
+	    (nticks) * (hz / PR_SLOWHZ))
 
 #define	TCP_TIMER_DISARM(tp, timer)					\
 	callout_stop(&(tp)->t_timer[(timer)])
 
 #define	TCP_TIMER_ISARMED(tp, timer)					\
-	callout_active(&(tp)->t_timer[(timer)])
+	callout_pending(&(tp)->t_timer[(timer)])
 
 /*
  * Force a time value to be in a certain range.

@@ -1,4 +1,4 @@
-/* $NetBSD: apecs.c,v 1.39 2002/05/16 01:01:31 thorpej Exp $ */
+/* $NetBSD: apecs.c,v 1.43 2003/06/15 23:08:54 fvdl Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -70,7 +70,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: apecs.c,v 1.39 2002/05/16 01:01:31 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: apecs.c,v 1.43 2003/06/15 23:08:54 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -107,9 +107,8 @@ __KERNEL_RCSID(0, "$NetBSD: apecs.c,v 1.39 2002/05/16 01:01:31 thorpej Exp $");
 int	apecsmatch __P((struct device *, struct cfdata *, void *));
 void	apecsattach __P((struct device *, struct device *, void *));
 
-struct cfattach apecs_ca = {
-	sizeof(struct apecs_softc), apecsmatch, apecsattach,
-};
+CFATTACH_DECL(apecs, sizeof(struct apecs_softc),
+    apecsmatch, apecsattach, NULL, NULL);
 
 extern struct cfdriver apecs_cd;
 
@@ -246,6 +245,7 @@ apecsattach(parent, self, aux)
 	pba.pba_memt = &acp->ac_memt;
 	pba.pba_dmat =
 	    alphabus_dma_get_tag(&acp->ac_dmat_direct, ALPHA_BUS_PCI);
+	pba.pba_dmat64 = NULL;
 	pba.pba_pc = &acp->ac_pc;
 	pba.pba_bus = 0;
 	pba.pba_bridgetag = NULL;
@@ -263,8 +263,8 @@ apecsprint(aux, pnp)
 
 	/* only PCIs can attach to APECSes; easy. */
 	if (pnp)
-		printf("%s at %s", pba->pba_busname, pnp);
-	printf(" bus %d", pba->pba_bus);
+		aprint_normal("%s at %s", pba->pba_busname, pnp);
+	aprint_normal(" bus %d", pba->pba_bus);
 	return (UNCONF);
 }
 

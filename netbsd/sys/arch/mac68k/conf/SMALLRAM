@@ -1,4 +1,4 @@
-#	$NetBSD: SMALLRAM,v 1.1.2.2 2002/10/24 09:34:28 lukem Exp $
+#	$NetBSD: SMALLRAM,v 1.8.2.1 2004/07/15 20:18:18 he Exp $
 #
 # This is an example of how to configure a small, efficient kernel for a
 # system with limited RAM. Even so it's capable of doing quite a bit. The
@@ -13,7 +13,7 @@ include	"arch/mac68k/conf/std.mac68k"
 
 #options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
-#ident 		"SMALLRAM-$Revision: 1.1.2.2 $"
+#ident 		"SMALLRAM-$Revision: 1.8.2.1 $"
 
 maxusers	8
 
@@ -30,7 +30,6 @@ options 	M68030
 
 # Standard system options
 
-#options 	UCONSOLE	# users can use TIOCCONS (for xconsole)
 #options 	INSECURE	# disable kernel security levels
 
 options 	RTC_OFFSET=0	# hardware clock is this many mins. west of GMT
@@ -49,8 +48,9 @@ options 	SYSVSHM		# System V-like memory sharing
 
 #options 	LKM		# loadable kernel modules
 
-#options 	USERCONF	# userconf(4) support
+options 	USERCONF	# userconf(4) support
 #options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+#options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
 
 # Diagnostic/debugging support options
 options 	DIAGNOSTIC	# cheap kernel consistency checks
@@ -72,6 +72,7 @@ options 	COMPAT_12	# NetBSD 1.2,
 options 	COMPAT_13	# NetBSD 1.3,
 options 	COMPAT_14	# NetBSD 1.4,
 options 	COMPAT_15	# NetBSD 1.5,
+options 	COMPAT_16	# NetBSD 1.6,
 #options 	COMPAT_43	# and 4.3BSD
 #options 	TCP_COMPAT_42	# 4.2BSD TCP/IP bug compat. Not recommended.
 
@@ -248,8 +249,8 @@ ae*	at nubus?			# DP8390-based
 #sn*	at nubus?			# SONIC-based (DP83932, DP83916)
 #sm*	at nubus?			# SMC 91cxx-based
 
-nsphy*	at mii? phy ?
-ukphy*	at mii? phy ?
+#nsphy*	at mii? phy ?
+#ukphy*	at mii? phy ?
 
 # Audio Devices
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_filio.c,v 1.8 2001/11/13 02:09:22 lukem Exp $	 */
+/*	$NetBSD: svr4_filio.c,v 1.12.4.1 2004/11/12 06:56:27 jmc Exp $	 */
 
 /*-
  * Copyright (c) 1994 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: svr4_filio.c,v 1.8 2001/11/13 02:09:22 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: svr4_filio.c,v 1.12.4.1 2004/11/12 06:56:27 jmc Exp $");
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -53,6 +53,7 @@ __KERNEL_RCSID(0, "$NetBSD: svr4_filio.c,v 1.8 2001/11/13 02:09:22 lukem Exp $")
 #include <net/if.h>
 #include <sys/malloc.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <compat/svr4/svr4_types.h>
@@ -67,22 +68,25 @@ __KERNEL_RCSID(0, "$NetBSD: svr4_filio.c,v 1.8 2001/11/13 02:09:22 lukem Exp $")
 
 
 int
-svr4_fil_ioctl(fp, p, retval, fd, cmd, data)
+svr4_fil_ioctl(fp, l, retval, fd, cmd, data)
 	struct file *fp;
-	struct proc *p;
+	struct lwp *l;
 	register_t *retval;
 	int fd;
 	u_long cmd;
 	caddr_t data;
 {
+	struct proc *p = l->l_proc;
 	int error;
 	int num;
 	struct filedesc *fdp = p->p_fd;
-	int (*ctl) __P((struct file *, u_long,  caddr_t, struct proc *)) =
+	int (*ctl)(struct file *, u_long, void *, struct proc *) =
 			fp->f_ops->fo_ioctl;
 
 	*retval = 0;
 
+	if ((fp = fd_getfile(fdp, fd)) == NULL)
+                return EBADF;
 	switch (cmd) {
 	case SVR4_FIOCLEX:
 		fdp->fd_ofileflags[fd] |= UF_EXCLOSE;

@@ -1,4 +1,4 @@
-/*	$NetBSD: fdcvar.h,v 1.1 2000/04/23 16:47:45 thorpej Exp $	*/
+/*	$NetBSD: fdcvar.h,v 1.5 2003/09/25 19:06:19 mycroft Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -51,11 +51,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -92,6 +88,7 @@
  */
 
 enum fdc_state {
+	PROBING = -1,
 	DEVIDLE = 0,
 	MOTORWAIT,
 	DOSEEK,
@@ -139,6 +136,10 @@ struct fdc_softc {
 	enum fdc_state sc_state;
 	int sc_errors;			/* number of retries so far */
 	u_char sc_status[7];		/* copy of registers */
+
+	int sc_known;			/* direct configuration if non-zero */
+	int sc_present;			/* bitmap of available fds */
+	const struct fd_type *sc_knownfds[4];	/* drive info known fds */
 };
 
 int	out_fdc __P((bus_space_tag_t iot, bus_space_handle_t ioh, u_char x));

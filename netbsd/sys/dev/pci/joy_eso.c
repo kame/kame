@@ -1,11 +1,11 @@
-/*	$NetBSD: joy_eso.c,v 1.1 2002/04/25 00:52:21 kleink Exp $	*/
+/*	$NetBSD: joy_eso.c,v 1.6 2003/12/04 13:57:31 keihan Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@netbsd.org).
+ * by Lennart Augustsson (augustss@NetBSD.org).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: joy_eso.c,v 1.6 2003/12/04 13:57:31 keihan Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -61,9 +64,8 @@
 static int	joy_eso_match __P((struct device *, struct cfdata *, void *));
 static void	joy_eso_attach __P((struct device *, struct device *, void *));
 
-struct cfattach joy_eso_ca = {
-	sizeof (struct joy_softc), joy_eso_match, joy_eso_attach
-};
+CFATTACH_DECL(joy_eso, sizeof (struct joy_softc),
+    joy_eso_match, joy_eso_attach, NULL, NULL);
 
 static int
 joy_eso_match(parent, match, aux)

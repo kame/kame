@@ -1,4 +1,4 @@
-/*	$NetBSD: rtfps.c,v 1.42 2002/01/07 21:47:12 thorpej Exp $	*/
+/*	$NetBSD: rtfps.c,v 1.46 2003/01/01 00:10:21 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rtfps.c,v 1.42 2002/01/07 21:47:12 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rtfps.c,v 1.46 2003/01/01 00:10:21 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -71,9 +71,8 @@ void rtfpsattach __P((struct device *, struct device *, void *));
 int rtfpsintr __P((void *));
 int rtfpsprint __P((void *, const char *));
 
-struct cfattach rtfps_ca = {
-	sizeof(struct rtfps_softc), rtfpsprobe, rtfpsattach
-};
+CFATTACH_DECL(rtfps, sizeof(struct rtfps_softc),
+    rtfpsprobe, rtfpsattach, NULL, NULL);
 
 int
 rtfpsprobe(parent, self, aux)
@@ -152,8 +151,8 @@ rtfpsprint(aux, pnp)
 	struct commulti_attach_args *ca = aux;
 
 	if (pnp)
-		printf("com at %s", pnp);
-	printf(" slave %d", ca->ca_slave);
+		aprint_normal("com at %s", pnp);
+	aprint_normal(" slave %d", ca->ca_slave);
 	return (UNCONF);
 }
 

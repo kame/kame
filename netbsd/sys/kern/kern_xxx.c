@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_xxx.c,v 1.47.10.2 2003/10/05 12:12:37 tron Exp $	*/
+/*	$NetBSD: kern_xxx.c,v 1.53 2003/08/07 16:31:51 agc Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kern_xxx.c,v 1.47.10.2 2003/10/05 12:12:37 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_xxx.c,v 1.53 2003/08/07 16:31:51 agc Exp $");
 
 #include "opt_syscall_debug.h"
 
@@ -45,14 +41,16 @@ __KERNEL_RCSID(0, "$NetBSD: kern_xxx.c,v 1.47.10.2 2003/10/05 12:12:37 tron Exp 
 #include <sys/kernel.h>
 #include <sys/proc.h>
 #include <sys/reboot.h>
+#include <sys/syscall.h>
 #include <sys/sysctl.h>
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 /* ARGSUSED */
 int
-sys_reboot(p, v, retval)
-	struct proc *p;
+sys_reboot(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -60,6 +58,7 @@ sys_reboot(p, v, retval)
 		syscallarg(int) opt;
 		syscallarg(char *) bootstr;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	int error;
 	char *bootstr, bs[128];
 
@@ -94,10 +93,11 @@ int	scdebug = SCDEBUG_CALLS|SCDEBUG_RETURNS|SCDEBUG_SHOWARGS|SCDEBUG_ALL;
 #endif
 
 void
-scdebug_call(p, code, args)
-	struct proc *p;
+scdebug_call(l, code, args)
+	struct lwp *l;
 	register_t code, args[];
 {
+	struct proc *p = l->l_proc;
 	const struct sysent *sy;
 	const struct emul *em;
 	int i;
@@ -125,8 +125,7 @@ scdebug_call(p, code, args)
 		printf("%ld call: %s", (long)code, em->e_syscallnames[code]);
 		if (scdebug & SCDEBUG_SHOWARGS) {
 			printf("(");
-			for (i = 0; i < sy->sy_argsize / sizeof(register_t);
-			    i++)
+			for (i = 0; i < sy->sy_argsize/sizeof(register_t); i++)
 				printf("%s0x%lx", i == 0 ? "" : ", ",
 				    (long)args[i]);
 			printf(")");
@@ -136,12 +135,13 @@ scdebug_call(p, code, args)
 }
 
 void
-scdebug_ret(p, code, error, retval)
-	struct proc *p;
+scdebug_ret(l, code, error, retval)
+	struct lwp *l;
 	register_t code;
 	int error;
 	register_t retval[];
 {
+	struct proc *p = l->l_proc;
 	const struct sysent *sy;
 	const struct emul *em;
 

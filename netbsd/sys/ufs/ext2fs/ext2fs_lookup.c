@@ -1,4 +1,4 @@
-/*	$NetBSD: ext2fs_lookup.c,v 1.18.10.1 2002/05/30 21:15:46 tv Exp $	*/
+/*	$NetBSD: ext2fs_lookup.c,v 1.28 2003/08/07 16:34:26 agc Exp $	*/
 
 /* 
  * Modified for NetBSD 1.2E
@@ -28,11 +28,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -52,7 +48,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ext2fs_lookup.c,v 1.18.10.1 2002/05/30 21:15:46 tv Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ext2fs_lookup.c,v 1.28 2003/08/07 16:34:26 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -102,12 +98,12 @@ ext2fs_dirconv2ffs( e2dir, ffsdir)
 	ffsdir->d_type = DT_UNKNOWN;		/* don't know more here */
 #ifdef DIAGNOSTIC
 	/*
-	 * XXX Rigth now this can't happen, but if one day
+	 * XXX Right now this can't happen, but if one day
 	 * MAXNAMLEN != E2FS_MAXNAMLEN we should handle this more gracefully !
 	 */
 #if 0
 	if (e2dir->e2d_namlen > MAXNAMLEN)
-		panic("ext2fs: e2dir->e2d_namlen\n");
+		panic("ext2fs: e2dir->e2d_namlen");
 #endif
 #endif
 	strncpy(ffsdir->d_name, e2dir->e2d_name, ffsdir->d_namlen);
@@ -292,6 +288,7 @@ ext2fs_lookup(v)
 	struct ucred *cred = cnp->cn_cred;
 	int flags = cnp->cn_flags;
 	int nameiop = cnp->cn_nameiop;
+	ino_t foundino;
 
 	int	dirblksize = VTOI(ap->a_dvp)->i_e2fs->e2fs_bsize;
 
@@ -450,7 +447,7 @@ searchloop:
 				 * reclen in ndp->ni_ufs area, and release
 				 * directory buffer.
 				 */
-				dp->i_ino = fs2h32(ep->e2d_ino);
+				foundino = fs2h32(ep->e2d_ino);
 				dp->i_reclen = fs2h16(ep->e2d_reclen);
 				brelse(bp);
 				goto found;
@@ -580,12 +577,12 @@ found:
 			dp->i_count = 0;
 		else
 			dp->i_count = dp->i_offset - prevoff;
-		if (dp->i_number == dp->i_ino) {
+		if (dp->i_number == foundino) {
 			VREF(vdp);
 			*vpp = vdp;
 			return (0);
 		}
-		if ((error = VFS_VGET(vdp->v_mount, dp->i_ino, &tdp)) != 0)
+		if ((error = VFS_VGET(vdp->v_mount, foundino, &tdp)) != 0)
 			return (error);
 		/*
 		 * If directory is "sticky", then user must own
@@ -623,9 +620,9 @@ found:
 		 * Careful about locking second inode.
 		 * This can only occur if the target is ".".
 		 */
-		if (dp->i_number == dp->i_ino)
+		if (dp->i_number == foundino)
 			return (EISDIR);
-		error = VFS_VGET(vdp->v_mount, dp->i_ino, &tdp);
+		error = VFS_VGET(vdp->v_mount, foundino, &tdp);
 		if (error)
 			return (error);
 		*vpp = tdp;
@@ -660,7 +657,7 @@ found:
 	if (flags & ISDOTDOT) {
 		VOP_UNLOCK(pdp, 0);	/* race to get the inode */
 		cnp->cn_flags |= PDIRUNLOCK;
-		error = VFS_VGET(vdp->v_mount, dp->i_ino, &tdp);
+		error = VFS_VGET(vdp->v_mount, foundino, &tdp);
 		if (error) {
 			if (vn_lock(pdp, LK_EXCLUSIVE | LK_RETRY) == 0)
 				cnp->cn_flags &= ~PDIRUNLOCK;
@@ -674,11 +671,11 @@ found:
 			cnp->cn_flags &= ~PDIRUNLOCK;
 		}
 		*vpp = tdp;
-	} else if (dp->i_number == dp->i_ino) {
+	} else if (dp->i_number == foundino) {
 		VREF(vdp);	/* we want ourself, ie "." */
 		*vpp = vdp;
 	} else {
-		if ((error = VFS_VGET(vdp->v_mount, dp->i_ino, &tdp)) != 0)
+		if ((error = VFS_VGET(vdp->v_mount, foundino, &tdp)) != 0)
 			return (error);
 		if (!lockparent || !(flags & ISLASTCN)) {
 			VOP_UNLOCK(pdp, 0);
@@ -776,7 +773,7 @@ ext2fs_direnter(ip, dvp, cnp)
 	newdir.e2d_namlen = cnp->cn_namelen;
 	if (ip->i_e2fs->e2fs.e2fs_rev > E2FS_REV0 &&
 	    (ip->i_e2fs->e2fs.e2fs_features_incompat & EXT2F_INCOMPAT_FTYPE)) {
-		newdir.e2d_type = inot2ext2dt(IFTODT(ip->i_ffs_mode));
+		newdir.e2d_type = inot2ext2dt(IFTODT(ip->i_e2fs_mode));
 	} else {
 		newdir.e2d_type = 0;
 	};
@@ -911,7 +908,7 @@ ext2fs_dirremove(dvp, cnp)
 		 * First entry in block: set d_ino to zero.
 		 */
 		error = VOP_BLKATOFF(dvp, (off_t)dp->i_offset,
-		    (char **)&ep, &bp);
+		    (void *)&ep, &bp);
 		if (error != 0)
 			return (error);
 		ep->e2d_ino = 0;
@@ -923,7 +920,7 @@ ext2fs_dirremove(dvp, cnp)
 	 * Collapse new free space into previous entry.
 	 */
 	error = VOP_BLKATOFF(dvp, (off_t)(dp->i_offset - dp->i_count),
-	    (char **)&ep, &bp);
+	    (void *)&ep, &bp);
 	if (error != 0)
 		return (error);
 	ep->e2d_reclen = h2fs16(fs2h16(ep->e2d_reclen) + dp->i_reclen);
@@ -947,13 +944,13 @@ ext2fs_dirrewrite(dp, ip, cnp)
 	struct vnode *vdp = ITOV(dp);
 	int error;
 
-	error = VOP_BLKATOFF(vdp, (off_t)dp->i_offset, (char **)&ep, &bp);
+	error = VOP_BLKATOFF(vdp, (off_t)dp->i_offset, (void *)&ep, &bp);
 	if (error != 0)
 		return (error);
 	ep->e2d_ino = h2fs32(ip->i_number);
 	if (ip->i_e2fs->e2fs.e2fs_rev > E2FS_REV0 &&
 	    (ip->i_e2fs->e2fs.e2fs_features_incompat & EXT2F_INCOMPAT_FTYPE)) {
-		ep->e2d_type = inot2ext2dt(IFTODT(ip->i_ffs_mode));
+		ep->e2d_type = inot2ext2dt(IFTODT(ip->i_e2fs_mode));
 	} else {
 		ep->e2d_type = 0;
 	}

@@ -1,11 +1,11 @@
-/*	$NetBSD: if_sppp.h,v 1.17 2002/04/14 12:24:28 martin Exp $	*/
+/*	$NetBSD: if_sppp.h,v 1.23 2003/12/26 23:39:23 martin Exp $	*/
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Martin Husemann <martin@netbsd.org>.
+ * by Martin Husemann <martin@NetBSD.org>.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -91,18 +91,26 @@ struct spppstatus {
 
 #define	SPPPGETSTATUS	_IOWR('i', 124, struct spppstatus)
 
+struct spppstatusncp {
+	char	ifname[IFNAMSIZ];	/* pppoe interface name */
+	int	phase;			/* one of SPPP_PHASE_* above */
+	int	ncpup;			/* != 0 if at least on NCP is up */
+};
+
+#define	SPPPGETSTATUSNCP	_IOWR('i', 134, struct spppstatusncp)
+
 struct spppidletimeout {
 	char	ifname[IFNAMSIZ];	/* pppoe interface name */
 	time_t	idle_seconds;		/* number of seconds idle before
 					 * disconnect, 0 to disable idle-timeout */
 };
 
-#define	SPPPGETIDLETO	_IOWR('i', 125, struct spppstatus)
-#define	SPPPSETIDLETO	_IOW('i', 126, struct spppstatus)
+#define	SPPPGETIDLETO	_IOWR('i', 125, struct spppidletimeout)
+#define	SPPPSETIDLETO	_IOW('i', 126, struct spppidletimeout)
 
 struct spppauthfailurestats {
 	char	ifname[IFNAMSIZ];	/* pppoe interface name */
-	int	auth_failures;		/* number of LCP failures since last successfull TLU */
+	int	auth_failures;		/* number of LCP failures since last successful TLU */
 	int	max_failures;		/* max. allowed authorization failures */
 };
 
@@ -129,3 +137,15 @@ struct spppdnsaddrs {
 };
 
 #define SPPPGETDNSADDRS		_IOWR('i', 131, struct spppdnsaddrs)
+
+/* set LCP keepalive/timeout options */
+struct spppkeepalivesettings {
+	char	ifname[IFNAMSIZ];	/* pppoe interface name */
+	u_int	maxalive;		/* number of LCP echo req. w/o reply */
+	time_t	max_noreceive;		/* (sec.) grace period before we start
+					   sending LCP echo requests. */
+};
+#define	SPPPSETKEEPALIVE	_IOW('i', 132, struct spppkeepalivesettings)
+#define	SPPPGETKEEPALIVE	_IOWR('i', 133, struct spppkeepalivesettings)
+
+/* 134 already used! */

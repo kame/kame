@@ -1,11 +1,46 @@
-/*	$NetBSD: autoconf.c,v 1.16 2001/06/13 14:36:34 soda Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.21 2003/08/07 16:26:47 agc Exp $	*/
 /*	$OpenBSD: autoconf.c,v 1.9 1997/05/18 13:45:20 pefo Exp $	*/
+
+/*
+ * Copyright (c) 1992, 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department and Ralph Campbell.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah Hdr: autoconf.c 1.31 91/01/21
+ *
+ *	from: @(#)autoconf.c	8.1 (Berkeley) 6/10/93
+ */
 
 /*
  * Copyright (c) 1996 Per Fogelstrom
  * Copyright (c) 1988 University of Utah.
- * Copyright (c) 1992, 1993
- *	The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -52,6 +87,9 @@
  * and the drivers are initialized.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.21 2003/08/07 16:26:47 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -91,6 +129,9 @@ struct bootdev_data *bootdev_data;
 void
 cpu_configure()
 {
+
+	softintr_init();
+
 	(void)splhigh();	/* To be really sure.. */
 	if (config_rootfound("mainbus", "mainbus") == NULL)
 		panic("no mainbus found");
@@ -216,7 +257,7 @@ device_register(dev, aux)
 	struct bootdev_data *b = bootdev_data;
 	struct device *parent = dev->dv_parent;
 	struct cfdata *cf = dev->dv_cfdata;
-	struct cfdriver *cd = cf->cf_driver;
+	const char *name = cf->cf_name;
 
 	static int found = 0, initted = 0, scsiboot = 0;
 	static struct device *scsibusdev = NULL;
@@ -232,7 +273,7 @@ device_register(dev, aux)
 		initted = 1;
 	}
 
-	if (scsiboot && strcmp(cd->cd_name, "scsibus") == 0) {
+	if (scsiboot && strcmp(name, "scsibus") == 0) {
 		if (dev->dv_unit == b->bus) {
 			scsibusdev = dev;
 #if 0
@@ -242,10 +283,10 @@ device_register(dev, aux)
 		return;
 	}
 
-	if (strcmp(b->dev_type, cd->cd_name) != 0)
+	if (strcmp(b->dev_type, name) != 0)
 		return;
 
-	if (strcmp(cd->cd_name, "sd") == 0) {
+	if (strcmp(name, "sd") == 0) {
 		struct scsipibus_attach_args *sa = aux;
 
 		if (scsiboot && scsibusdev && parent == scsibusdev &&

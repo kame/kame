@@ -1,4 +1,4 @@
-/*	$NetBSD: tc5165buf.c,v 1.9 2002/01/29 18:53:12 uch Exp $ */
+/*	$NetBSD: tc5165buf.c,v 1.12 2003/07/15 02:29:30 lukem Exp $ */
 
 /*-
  * Copyright (c) 1999-2001 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * Device driver for TOSHIBA TC5165BFTS, PHILIPS 74ALVC16241/245 
  * buffer chip
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: tc5165buf.c,v 1.12 2003/07/15 02:29:30 lukem Exp $");
 
 #include "opt_use_poll.h"
 
@@ -95,9 +98,8 @@ int	tc5165buf_input_establish(void *, struct hpckbd_if *);
 
 struct tc5165buf_chip tc5165buf_chip;
 
-struct cfattach tc5165buf_ca = {
-	sizeof(struct tc5165buf_softc), tc5165buf_match, tc5165buf_attach
-};
+CFATTACH_DECL(tc5165buf, sizeof(struct tc5165buf_softc),
+    tc5165buf_match, tc5165buf_attach, NULL, NULL);
 
 int
 tc5165buf_match(struct device *parent, struct cfdata *cf, void *aux)

@@ -1,4 +1,4 @@
-/*	$NetBSD: smb_subr.c,v 1.3 2002/01/04 02:39:44 deberg Exp $	*/
+/*	$NetBSD: smb_subr.c,v 1.20 2003/09/27 12:24:25 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 2000-2001 Boris Popov
@@ -31,8 +31,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * FreeBSD: src/sys/netsmb/smb_subr.c,v 1.4 2001/12/02 08:47:29 bp Exp
+ * FreeBSD: src/sys/netsmb/smb_subr.c,v 1.6 2002/04/17 03:14:28 bp Exp
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: smb_subr.c,v 1.20 2003/09/27 12:24:25 jdolecek Exp $");
+ 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -44,6 +48,7 @@
 #include <sys/signal.h>
 #include <sys/signalvar.h>
 #include <sys/mbuf.h>
+#include <sys/socketvar.h>		/* for M_SONAME */
 
 #include <netsmb/iconv.h>
 
@@ -52,16 +57,10 @@
 #include <netsmb/smb_rq.h>
 #include <netsmb/smb_subr.h>
 
-/* freebsd-compatibility macros */
-#ifdef __NetBSD__
-#define p_siglist p_sigctx.ps_siglist
-#define p_sigmask p_sigctx.ps_sigmask
-#define p_sigignore p_sigctx.ps_sigignore
-#define SIGSETNAND(a,b) sigminusset(&(b),&(a))
-#define SIGNOTEMPTY(a) (!sigemptyset(&(a)))
-#endif
+const smb_unichar smb_unieol = 0;
 
-smb_unichar smb_unieol = 0;
+static MALLOC_DEFINE(M_SMBSTR, "smbstr", "SMB strings");
+MALLOC_DEFINE(M_SMBTEMP, "smbtemp", "Temp netsmb data");
 
 void
 smb_makescred(struct smb_cred *scred, struct proc *p, struct ucred *cred)
@@ -78,14 +77,10 @@ smb_makescred(struct smb_cred *scred, struct proc *p, struct ucred *cred)
 int
 smb_proc_intr(struct proc *p)
 {
-	sigset_t tmpset;
-
 	if (p == NULL)
 		return 0;
-	tmpset = p->p_siglist;
-	SIGSETNAND(tmpset, p->p_sigmask);
-	SIGSETNAND(tmpset, p->p_sigignore);
-	if (SIGNOTEMPTY(p->p_siglist) && SMB_SIGMASK(tmpset))
+	if (!sigemptyset(&p->p_sigctx.ps_siglist)
+	    && SMB_SIGMASK(p->p_sigctx.ps_siglist))
                 return EINTR;
 	return 0;
 }
@@ -145,23 +140,6 @@ smb_memdupin(void *umem, int len)
 	return NULL;
 }
 
-/*
- * duplicate memory block in the kernel space.
- */
-void *
-smb_memdup(const void *umem, int len)
-{
-	char *p;
-
-	if (len > 8 * 1024)
-		return NULL;
-	p = malloc(len, M_SMBSTR, M_WAITOK);
-	if (p == NULL)
-		return NULL;
-	bcopy(umem, p, len);
-	return p;
-}
-
 void
 smb_strfree(char *s)
 {
@@ -175,7 +153,7 @@ smb_memfree(void *s)
 }
 
 void *
-smb_zmalloc(unsigned long size, int type, int flags)
+smb_zmalloc(unsigned long size, struct malloc_type *type, int flags)
 {
 
 	return malloc(size, type, flags | M_ZERO);
@@ -185,7 +163,7 @@ void
 smb_strtouni(u_int16_t *dst, const char *src)
 {
 	while (*src) {
-		*dst++ = htoles(*src++);
+		*dst++ = htole16(*src++);
 	}
 	*dst = 0;
 }
@@ -223,11 +201,12 @@ smb_maperror(int eclass, int eno)
 		    case ERRbadformat:
 		    case ERRrmuns:
 			return EINVAL;
+		    case ERRnofiles:
 		    case ERRbadfile:
 		    case ERRbadpath:
 		    case ERRremcd:
-		    case 66:		/* nt returns it when share not available */
-		    case 67:		/* observed from nt4sp6 when sharename wrong */
+		    case ERRnoipc: /* nt returns it when share not available */
+		    case ERRnosuchshare:	/* observed from nt4sp6 when sharename wrong */
 			return ENOENT;
 		    case ERRnofids:
 			return EMFILE;
@@ -249,19 +228,22 @@ smb_maperror(int eclass, int eno)
 			return ENXIO;
 		    case ERRdiffdevice:
 			return EXDEV;
-		    case ERRnofiles:
-			return 0;	/* eeof ? */
-			return ETXTBSY;
 		    case ERRlock:
 			return EDEADLK;
 		    case ERRfilexists:
 			return EEXIST;
-		    case 123:		/* dunno what is it, but samba maps as noent */
+		    case ERRinvalidname:	/* dunno what is it, but samba maps as noent */
 			return ENOENT;
-		    case 145:		/* samba */
+		    case ERRdirnempty:	/* samba */
 			return ENOTEMPTY;
-		    case 183:
+		    case ERRrename:
 			return EEXIST;
+		    case ERRquota:
+			return EDQUOT;
+		    case ERRnotlocked:
+			return EBUSY;
+		    case NT_STATUS_NOTIFY_ENUM_DIR:
+			return EMSGSIZE;
 		}
 		break;
 	    case ERRSRV:
@@ -269,6 +251,8 @@ smb_maperror(int eclass, int eno)
 		    case ERRerror:
 			return EINVAL;
 		    case ERRbadpw:
+		    case ERRpasswordExpired:
+		    case ERRbaduid:
 			return EAUTH;
 		    case ERRaccess:
 			return EACCES;
@@ -277,10 +261,14 @@ smb_maperror(int eclass, int eno)
 		    case ERRinvnetname:
 			SMBERROR("NetBIOS name is invalid\n");
 			return EAUTH;
-		    case 3:		/* reserved and returned */
+		    case ERRbadtype:	/* reserved and returned */
 			return EIO;
-		    case 2239:		/* NT: account exists but disabled */
+		    case ERRaccountExpired:
+		    case ERRbadClient:
+		    case ERRbadLogonTime:
 			return EPERM;
+		    case ERRnosupport:
+			return EBADRPC;
 		}
 		break;
 	    case ERRHRD:
@@ -299,6 +287,9 @@ smb_maperror(int eclass, int eno)
 			return ETXTBSY;
 		    case ERRlock:
 			return EDEADLK;
+		    case ERRgeneral:
+			/* returned e.g. for NT CANCEL SMB by Samba */
+			return ECANCELED;
 		}
 		break;
 	}
@@ -307,9 +298,9 @@ smb_maperror(int eclass, int eno)
 }
 
 static int
-smb_copy_iconv(struct mbchain *mbp, const caddr_t src, caddr_t dst, int len)
+smb_copy_iconv(struct mbchain *mbp, const caddr_t src, caddr_t dst, size_t len)
 {
-	int outlen = len;
+	size_t outlen = len;
 
 	return iconv_conv((struct iconv_drv*)mbp->mb_udata, (const char **)(&src), &len, &dst, &outlen);
 }
@@ -342,6 +333,7 @@ smb_put_dstring(struct mbchain *mbp, struct smb_vc *vcp, const char *src,
 	return mb_put_uint8(mbp, 0);
 }
 
+#if 0
 int
 smb_put_asunistring(struct smb_rq *rqp, const char *src)
 {
@@ -358,6 +350,7 @@ smb_put_asunistring(struct smb_rq *rqp, const char *src)
 	}
 	return mb_put_uint16le(mbp, 0);
 }
+#endif
 
 struct sockaddr *
 dup_sockaddr(struct sockaddr *sa, int canwait)

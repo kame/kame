@@ -1,4 +1,4 @@
-/*	$NetBSD: svr4_signal.c,v 1.45 2002/04/12 17:37:30 manu Exp $	 */
+/*	$NetBSD: svr4_signal.c,v 1.49.4.1 2004/11/12 06:56:31 jmc Exp $	 */
 
 /*-
  * Copyright (c) 1994, 1998 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: svr4_signal.c,v 1.45 2002/04/12 17:37:30 manu Exp $");
+__KERNEL_RCSID(0, "$NetBSD: svr4_signal.c,v 1.49.4.1 2004/11/12 06:56:31 jmc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -52,7 +52,10 @@ __KERNEL_RCSID(0, "$NetBSD: svr4_signal.c,v 1.45 2002/04/12 17:37:30 manu Exp $"
 #include <sys/malloc.h>
 #include <sys/wait.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <compat/svr4/svr4_types.h>
 #include <compat/svr4/svr4_signal.h>
@@ -133,26 +136,26 @@ svr4_to_native_sigaction(ssa, bsa)
 	struct sigaction *bsa;
 {
 
-	bsa->sa_handler = (sig_t) ssa->sa_handler;
-	svr4_to_native_sigset(&ssa->sa_mask, &bsa->sa_mask);
+	bsa->sa_handler = (sig_t) ssa->svr4_sa_handler;
+	svr4_to_native_sigset(&ssa->svr4_sa_mask, &bsa->sa_mask);
 	bsa->sa_flags = 0;
-	if ((ssa->sa_flags & SVR4_SA_ONSTACK) != 0)
+	if ((ssa->svr4_sa_flags & SVR4_SA_ONSTACK) != 0)
 		bsa->sa_flags |= SA_ONSTACK;
-	if ((ssa->sa_flags & SVR4_SA_RESETHAND) != 0)
+	if ((ssa->svr4_sa_flags & SVR4_SA_RESETHAND) != 0)
 		bsa->sa_flags |= SA_RESETHAND;
-	if ((ssa->sa_flags & SVR4_SA_RESTART) != 0)
+	if ((ssa->svr4_sa_flags & SVR4_SA_RESTART) != 0)
 		bsa->sa_flags |= SA_RESTART;
-	if ((ssa->sa_flags & SVR4_SA_SIGINFO) != 0)
+	if ((ssa->svr4_sa_flags & SVR4_SA_SIGINFO) != 0)
 		bsa->sa_flags |= SA_SIGINFO;
-	if ((ssa->sa_flags & SVR4_SA_NODEFER) != 0)
+	if ((ssa->svr4_sa_flags & SVR4_SA_NODEFER) != 0)
 		bsa->sa_flags |= SA_NODEFER;
-	if ((ssa->sa_flags & SVR4_SA_NOCLDWAIT) != 0)
+	if ((ssa->svr4_sa_flags & SVR4_SA_NOCLDWAIT) != 0)
 		bsa->sa_flags |= SA_NOCLDWAIT;
-	if ((ssa->sa_flags & SVR4_SA_NOCLDSTOP) != 0)
+	if ((ssa->svr4_sa_flags & SVR4_SA_NOCLDSTOP) != 0)
 		bsa->sa_flags |= SA_NOCLDSTOP;
-	if ((ssa->sa_flags & ~SVR4_SA_ALLBITS) != 0)
+	if ((ssa->svr4_sa_flags & ~SVR4_SA_ALLBITS) != 0)
 		DPRINTF(("svr4_to_native_sigaction: extra bits %x ignored\n",
-		    ssa->sa_flags & ~SVR4_SA_ALLBITS));
+		    ssa->svr4_sa_flags & ~SVR4_SA_ALLBITS));
 }
 
 void
@@ -161,19 +164,19 @@ native_to_svr4_sigaction(bsa, ssa)
 	struct svr4_sigaction *ssa;
 {
 
-	ssa->sa_handler = (svr4_sig_t) bsa->sa_handler;
-	native_to_svr4_sigset(&bsa->sa_mask, &ssa->sa_mask);
-	ssa->sa_flags = 0;
+	ssa->svr4_sa_handler = (svr4_sig_t) bsa->sa_handler;
+	native_to_svr4_sigset(&bsa->sa_mask, &ssa->svr4_sa_mask);
+	ssa->svr4_sa_flags = 0;
 	if ((bsa->sa_flags & SA_ONSTACK) != 0)
-		ssa->sa_flags |= SVR4_SA_ONSTACK;
+		ssa->svr4_sa_flags |= SVR4_SA_ONSTACK;
 	if ((bsa->sa_flags & SA_RESETHAND) != 0)
-		ssa->sa_flags |= SVR4_SA_RESETHAND;
+		ssa->svr4_sa_flags |= SVR4_SA_RESETHAND;
 	if ((bsa->sa_flags & SA_RESTART) != 0)
-		ssa->sa_flags |= SVR4_SA_RESTART;
+		ssa->svr4_sa_flags |= SVR4_SA_RESTART;
 	if ((bsa->sa_flags & SA_NODEFER) != 0)
-		ssa->sa_flags |= SVR4_SA_NODEFER;
+		ssa->svr4_sa_flags |= SVR4_SA_NODEFER;
 	if ((bsa->sa_flags & SA_NOCLDSTOP) != 0)
-		ssa->sa_flags |= SVR4_SA_NOCLDSTOP;
+		ssa->svr4_sa_flags |= SVR4_SA_NOCLDSTOP;
 }
 
 void
@@ -210,8 +213,8 @@ native_to_svr4_sigaltstack(bss, sss)
 }
 
 int
-svr4_sys_sigaction(p, v, retval)
-	struct proc *p;
+svr4_sys_sigaction(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -220,6 +223,7 @@ svr4_sys_sigaction(p, v, retval)
 		syscallarg(const struct svr4_sigaction *) nsa;
 		syscallarg(struct svr4_sigaction *) osa;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct svr4_sigaction nssa, ossa;
 	struct sigaction nbsa, obsa;
 	int error;
@@ -230,8 +234,9 @@ svr4_sys_sigaction(p, v, retval)
 			return (error);
 		svr4_to_native_sigaction(&nssa, &nbsa);
 	}
-	error = sigaction1(p, svr4_to_native_signo[SCARG(uap, signum)],
-	    SCARG(uap, nsa) ? &nbsa : 0, SCARG(uap, osa) ? &obsa : 0);
+	error = sigaction1(p, svr4_to_native_signo[SVR4_SIGNO(SCARG(uap, signum))],
+	    SCARG(uap, nsa) ? &nbsa : 0, SCARG(uap, osa) ? &obsa : 0,
+	    NULL, 0);
 	if (error)
 		return (error);
 	if (SCARG(uap, osa)) {
@@ -244,8 +249,8 @@ svr4_sys_sigaction(p, v, retval)
 }
 
 int 
-svr4_sys_sigaltstack(p, v, retval)
-	struct proc *p;
+svr4_sys_sigaltstack(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -263,7 +268,7 @@ svr4_sys_sigaltstack(p, v, retval)
 			return (error);
 		svr4_to_native_sigaltstack(&nsss, &nbss);
 	}
-	error = sigaltstack1(p,
+	error = sigaltstack1(l->l_proc,
 	    SCARG(uap, nss) ? &nbss : 0, SCARG(uap, oss) ? &obss : 0);
 	if (error)
 		return (error);
@@ -280,8 +285,8 @@ svr4_sys_sigaltstack(p, v, retval)
  * Stolen from the ibcs2 one
  */
 int
-svr4_sys_signal(p, v, retval)
-	struct proc *p;
+svr4_sys_signal(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -289,6 +294,7 @@ svr4_sys_signal(p, v, retval)
 		syscallarg(int) signum;
 		syscallarg(svr4_sig_t) handler;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	int signum = svr4_to_native_signo[SVR4_SIGNO(SCARG(uap, signum))];
 	struct sigaction nbsa, obsa;
 	sigset_t ss;
@@ -307,7 +313,7 @@ svr4_sys_signal(p, v, retval)
 		nbsa.sa_handler = (sig_t)SCARG(uap, handler);
 		sigemptyset(&nbsa.sa_mask);
 		nbsa.sa_flags = 0;
-		error = sigaction1(p, signum, &nbsa, &obsa);
+		error = sigaction1(p, signum, &nbsa, &obsa, NULL, 0);
 		if (error)
 			return (error);
 		*retval = (u_int)(u_long)obsa.sa_handler;
@@ -328,7 +334,7 @@ svr4_sys_signal(p, v, retval)
 		nbsa.sa_handler = SIG_IGN;
 		sigemptyset(&nbsa.sa_mask);
 		nbsa.sa_flags = 0;
-		return (sigaction1(p, signum, &nbsa, 0));
+		return (sigaction1(p, signum, &nbsa, 0, NULL, 0));
 
 	case SVR4_SIGPAUSE_MASK:
 		ss = p->p_sigctx.ps_sigmask;
@@ -341,8 +347,8 @@ svr4_sys_signal(p, v, retval)
 }
 
 int
-svr4_sys_sigprocmask(p, v, retval)
-	struct proc *p;
+svr4_sys_sigprocmask(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -384,7 +390,7 @@ svr4_sys_sigprocmask(p, v, retval)
 			return error;
 		svr4_to_native_sigset(&nsss, &nbss);
 	}
-	error = sigprocmask1(p, how,
+	error = sigprocmask1(l->l_proc, how,
 	    SCARG(uap, set) ? &nbss : NULL, SCARG(uap, oset) ? &obss : NULL);
 	if (error)
 		return error;
@@ -398,8 +404,8 @@ svr4_sys_sigprocmask(p, v, retval)
 }
 
 int
-svr4_sys_sigpending(p, v, retval)
-	struct proc *p;
+svr4_sys_sigpending(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -412,7 +418,7 @@ svr4_sys_sigpending(p, v, retval)
 
 	switch (SCARG(uap, what)) {
 	case 1:	/* sigpending */
-		sigpending1(p, &bss);
+		sigpending1(l->l_proc, &bss);
 		native_to_svr4_sigset(&bss, &sss);
 		break;
 
@@ -427,8 +433,8 @@ svr4_sys_sigpending(p, v, retval)
 }
 
 int
-svr4_sys_sigsuspend(p, v, retval)
-	struct proc *p;
+svr4_sys_sigsuspend(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -446,22 +452,22 @@ svr4_sys_sigsuspend(p, v, retval)
 		svr4_to_native_sigset(&sss, &bss);
 	}
 
-	return (sigsuspend1(p, SCARG(uap, set) ? &bss : 0));
+	return (sigsuspend1(l->l_proc, SCARG(uap, set) ? &bss : 0));
 }
 
 int
-svr4_sys_pause(p, v, retval)
-	struct proc *p;
+svr4_sys_pause(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 
-	return (sigsuspend1(p, 0));
+	return (sigsuspend1(l->l_proc, 0));
 }
 
 int
-svr4_sys_kill(p, v, retval)
-	struct proc *p;
+svr4_sys_kill(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -472,76 +478,67 @@ svr4_sys_kill(p, v, retval)
 	struct sys_kill_args ka;
 
 	SCARG(&ka, pid) = SCARG(uap, pid);
-	SCARG(&ka, signum) = svr4_to_native_signo[SCARG(uap, signum)];
-	return sys_kill(p, &ka, retval);
+	SCARG(&ka, signum) = svr4_to_native_signo[SVR4_SIGNO(SCARG(uap, signum))];
+	return sys_kill(l, &ka, retval);
 }
 
 void
-svr4_getcontext(p, uc, mask)
-	struct proc *p;
+svr4_getcontext(l, uc)
+	struct lwp *l;
 	struct svr4_ucontext *uc;
-	sigset_t *mask;
 {
-	void *sp;
-	struct svr4_sigaltstack *ss = &uc->uc_stack;
+	sigset_t mask;
+	struct proc *p = l->l_proc;
 
-	memset(uc, 0, sizeof(*uc));
+	svr4_getmcontext(l, &uc->uc_mcontext, &uc->uc_flags);
+	uc->uc_link = l->l_ctxlink;
+	/*
+	 * The (unsupplied) definition of the `current execution stack'
+	 * in the System V Interface Definition appears to allow returning
+	 * the main context stack.
+	 */
+	if ((p->p_sigctx.ps_sigstk.ss_flags & SS_ONSTACK) == 0) {
+		uc->uc_stack.ss_sp = (void *)USRSTACK;
+		uc->uc_stack.ss_size = ctob(p->p_vmspace->vm_ssize);
+		uc->uc_stack.ss_flags = 0;	/* XXX, def. is Very Fishy */
+	} else {
+		/* Simply copy alternate signal execution stack. */
+		uc->uc_stack.ss_sp = p->p_sigctx.ps_sigstk.ss_sp;
+		uc->uc_stack.ss_size = p->p_sigctx.ps_sigstk.ss_size;
+		uc->uc_stack.ss_flags = p->p_sigctx.ps_sigstk.ss_flags;
+	}
 
-	/* get machine context */
-	sp = svr4_getmcontext(p, &uc->uc_mcontext, &uc->uc_flags);
+	(void)sigprocmask1(p, 0, NULL, &mask);
+	native_to_svr4_sigset(&mask, &uc->uc_sigmask);
 
-	/* get link */
-	uc->uc_link = p->p_ctxlink;
-
-	/* get stack state. XXX: solaris appears to do this */
-#if 0
-	svr4_to_native_sigaltstack(&uc->uc_stack, &p->p_sigacts->ps_sigstk);
-#else
-	ss->ss_sp = (void *)(((u_long) sp) & ~(16384 - 1));
-	ss->ss_size = 16384;
-	ss->ss_flags = 0;
-#endif
-	/* get signal mask */
-	native_to_svr4_sigset(mask, &uc->uc_sigmask);
-
-	uc->uc_flags |= SVR4_UC_STACK|SVR4_UC_SIGMASK;
+	uc->uc_flags |= _UC_SIGMASK | _UC_STACK;
 }
 
 
 int
-svr4_setcontext(p, uc)
-	struct proc *p;
+svr4_setcontext(l, uc)
+	struct lwp *l;
 	struct svr4_ucontext *uc;
 {
-	int error;
+	sigset_t mask;
+	struct proc *p = l->l_proc;
 
-	/* set machine context */
-	if ((error = svr4_setmcontext(p, &uc->uc_mcontext, uc->uc_flags)) != 0)
-		return error;
-
-	/* set link */
-	p->p_ctxlink = uc->uc_link;
-
-	/* set signal stack */
-	if (uc->uc_flags & SVR4_UC_STACK) {
-		svr4_to_native_sigaltstack(&uc->uc_stack,
-		    &p->p_sigctx.ps_sigstk);
-	}
-
-	/* set signal mask */
-	if (uc->uc_flags & SVR4_UC_SIGMASK) {
-		sigset_t mask;
-
+	if (uc->uc_flags & _UC_SIGMASK) {
 		svr4_to_native_sigset(&uc->uc_sigmask, &mask);
-		(void)sigprocmask1(p, SIG_SETMASK, &mask, 0);
+		sigprocmask1(p, SIG_SETMASK, &mask, NULL);
 	}
+
+	/* Ignore the stack; see comment in svr4_getcontext. */
+	
+	l->l_ctxlink = uc->uc_link;
+	svr4_setmcontext(l, &uc->uc_mcontext, uc->uc_flags);
 
 	return EJUSTRETURN;
 }
 
 int 
-svr4_sys_context(p, v, retval)
-	struct proc *p;
+svr4_sys_context(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -549,29 +546,28 @@ svr4_sys_context(p, v, retval)
 		syscallarg(int) func;
 		syscallarg(struct svr4_ucontext *) uc;
 	} */ *uap = v;
-	struct svr4_ucontext uc;
 	int error;
+	svr4_ucontext_t uc;
 	*retval = 0;
 
 	switch (SCARG(uap, func)) {
 	case SVR4_GETCONTEXT:
 		DPRINTF(("getcontext(%p)\n", SCARG(uap, uc)));
-		svr4_getcontext(p, &uc, &p->p_sigctx.ps_sigmask);
-		return copyout(&uc, SCARG(uap, uc), sizeof(uc));
+		svr4_getcontext(l, &uc);
+	return (copyout(&uc, SCARG(uap, uc), sizeof (*SCARG(uap, uc))));
+
 
 	case SVR4_SETCONTEXT: 
 		DPRINTF(("setcontext(%p)\n", SCARG(uap, uc)));
-		if (SCARG(uap, uc) == NULL)
-			exit1(p, W_EXITCODE(0, 0));
-		else if ((error = copyin(SCARG(uap, uc), &uc, sizeof(uc))) != 0)
-			return error;
-		else
-			return svr4_setcontext(p, &uc);
-
+		error = copyin(SCARG(uap, uc), &uc, sizeof (uc));
+		if (error)
+			return (error);
+		svr4_setcontext(l, &uc);   
+		return EJUSTRETURN;
+		
 	default:
 		DPRINTF(("context(%d, %p)\n", SCARG(uap, func),
 		    SCARG(uap, uc)));
 		return ENOSYS;
 	}
-	return 0;
 }

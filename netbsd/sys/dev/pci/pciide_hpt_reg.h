@@ -1,4 +1,4 @@
-/*      $NetBSD: pciide_hpt_reg.h,v 1.7.2.1 2002/11/01 16:20:30 tron Exp $       */
+/*      $NetBSD: pciide_hpt_reg.h,v 1.11 2004/03/10 21:55:21 bouyer Exp $       */
 
 /*
  * Copyright (c) 2000 Manuel Bouyer.
@@ -14,9 +14,9 @@
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
  *      This product includes software developed by Manuel Bouyer.
- * 4. Neither the name of the University nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
+ * 4. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
@@ -123,6 +123,8 @@
 #define HPT_SC2_DMARQW		0x04
 #define HPT_SC2_SCLK		0x02
 #define HPT_SC2_MAEN		0x01
+
+#define HPT370_FOUT 		0x7c	/* DPLL output frequency */
 
 static const u_int32_t hpt366_pio[] __attribute__((__unused__)) =
 	{0x00d0a7aa, 0x00c8a753, 0x00c8a742, 0x00c8a731};

@@ -1,4 +1,4 @@
-/*	$NetBSD: ukbdmap.c,v 1.10 2002/03/17 18:01:07 augustss Exp $	*/
+/*	$NetBSD: ukbdmap.c,v 1.12 2003/10/22 17:24:43 augustss Exp $	*/
 
 /*
  * Copyright (c) 1999,2001 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ukbdmap.c,v 1.10 2002/03/17 18:01:07 augustss Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ukbdmap.c,v 1.12 2003/10/22 17:24:43 augustss Exp $");
 
 #include <sys/types.h>
 #include <dev/wscons/wsksymdef.h>
@@ -119,7 +119,7 @@ Static const keysym_t ukbd_keydesc_us[] = {
     KC(70),			KS_Print_Screen,
     KC(71), 			KS_Hold_Screen,
     KC(72),			KS_Pause,
-    KC(73),			KS_Insert, 
+    KC(73),			KS_Insert,
     KC(74),			KS_Home,
     KC(75), 			KS_Prior,
     KC(76),			KS_Delete,
@@ -181,7 +181,46 @@ Static const keysym_t ukbd_keydesc_jp[] = {
     KC(138),			KS_Henkan,
     KC(139),			KS_Muhenkan,
 };
- 
+
+Static const keysym_t ukbd_keydesc_us_dvorak[] = {
+/*  pos      command		normal			shifted */
+    KC(4), 			KS_a,
+    KC(5), 			KS_x,
+    KC(6), 			KS_j,
+    KC(7), 			KS_e,
+    KC(8), 			KS_period,		KS_greater,
+    KC(9), 			KS_u,
+    KC(10), 			KS_i,
+    KC(11), 			KS_d,
+    KC(12), 			KS_c,
+    KC(13), 			KS_h,
+    KC(14), 			KS_t,
+    KC(15), 			KS_n,
+    KC(16), 			KS_m,
+    KC(17), 			KS_b,
+    KC(18), 			KS_r,
+    KC(19), 			KS_l,
+    KC(20), 			KS_apostrophe,		KS_quotedbl,
+    KC(21), 			KS_p,
+    KC(22), 			KS_o,
+    KC(23), 			KS_y,
+    KC(24), 			KS_g,
+    KC(25), 			KS_k,
+    KC(26), 			KS_comma,		KS_less,
+    KC(27), 			KS_q,
+    KC(28), 			KS_f,
+    KC(29), 			KS_semicolon,		KS_colon,
+    KC(45), 			KS_bracketleft,		KS_braceleft,
+    KC(46), 			KS_bracketright,	KS_braceright,
+    KC(47), 			KS_slash,		KS_question,
+    KC(48), 			KS_equal,		KS_plus,
+    KC(51), 			KS_s,
+    KC(52), 			KS_minus,		KS_underscore,
+    KC(54), 			KS_w,
+    KC(55), 			KS_v,
+    KC(56), 			KS_z,
+};
+
 Static const keysym_t ukbd_keydesc_swapctrlcaps[] = {
 /*  pos      command		normal		shifted */
     KC(57), 			KS_Control_L,
@@ -308,7 +347,7 @@ Static const keysym_t ukbd_keydesc_fr[] = {
     KC(39),  KS_agrave,		KS_0,		KS_at,
     KC(45),  KS_parenright,	KS_degree,	KS_bracketright,
     KC(46),  KS_equal,		KS_plus,	KS_braceright,
-    KC(47),  KS_dead_circumflex, KS_dead_diaeresis, 
+    KC(47),  KS_dead_circumflex, KS_dead_diaeresis,
     KC(48),  KS_dollar,		KS_sterling,	KS_currency,
     KC(50),  KS_asterisk,	KS_mu,
     KC(51),  KS_m,
@@ -443,6 +482,7 @@ Static const keysym_t ukbd_keydesc_sf[] = {
 const struct wscons_keydesc ukbd_keydesctab[] = {
 	KBD_MAP(KB_US,			0,	ukbd_keydesc_us),
 	KBD_MAP(KB_US | KB_SWAPCTRLCAPS,KB_US,	ukbd_keydesc_swapctrlcaps),
+	KBD_MAP(KB_US | KB_DVORAK,	KB_US,	ukbd_keydesc_us_dvorak),
 	KBD_MAP(KB_JP,			KB_US,	ukbd_keydesc_jp),
 	KBD_MAP(KB_JP | KB_SWAPCTRLCAPS,KB_JP,	ukbd_keydesc_swapctrlcaps),
 	KBD_MAP(KB_DE,			KB_US,	ukbd_keydesc_de),

@@ -1,4 +1,4 @@
-/*	$NetBSD: ite8181.c,v 1.16.6.1 2002/08/07 02:00:32 lukem Exp $	*/
+/*	$NetBSD: ite8181.c,v 1.20 2003/11/13 03:09:28 chs Exp $	*/
 
 /*-
  * Copyright (c) 2000,2001 SATO Kazumi
@@ -26,6 +26,9 @@
  * SUCH DAMAGE.
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ite8181.c,v 1.20 2003/11/13 03:09:28 chs Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -257,7 +260,7 @@ ite8181_attach(struct ite8181_softc *sc)
 	printf("%s: framebuffer address: 0x%08lx\n", 
 	    sc->sc_dev.dv_xname, (u_long)bootinfo->fb_addr);
 	if (ite8181_lcd_control_disable)
-		printf("%s: ite8181 lcd coontrol is DISABLED.\n", 
+		printf("%s: ite8181 lcd control is DISABLED.\n", 
 		    sc->sc_dev.dv_xname);
 
 	/* set base offsets */
@@ -637,10 +640,11 @@ ite8181_ioctl(v, cmd, data, flag, p)
 	struct hpcfb_dspconf *dspconf;
 	struct wsdisplay_cmap *cmap;
 	struct wsdisplay_param *dispparam;
+	int error;
 
 	switch (cmd) {
 	case WSDISPLAYIO_GETCMAP:
-		cmap = (struct wsdisplay_cmap*)data;
+		cmap = (struct wsdisplay_cmap *)data;
 
 		if (sc->sc_fbconf.hf_class != HPCFB_CLASS_INDEXCOLOR ||
 		    sc->sc_fbconf.hf_pack_width != 8 ||
@@ -648,16 +652,18 @@ ite8181_ioctl(v, cmd, data, flag, p)
 		    256 - cmap->index < cmap->count)
 			return (EINVAL);
 
-		if (!uvm_useracc(cmap->red, cmap->count, B_WRITE) ||
-		    !uvm_useracc(cmap->green, cmap->count, B_WRITE) ||
-		    !uvm_useracc(cmap->blue, cmap->count, B_WRITE))
-			return (EFAULT);
-
 #ifdef ITE8181_WINCE_CMAP
-		copyout(&bivideo_cmap_r[cmap->index], cmap->red, cmap->count);
-		copyout(&bivideo_cmap_g[cmap->index], cmap->green,cmap->count);
-		copyout(&bivideo_cmap_b[cmap->index], cmap->blue, cmap->count);
-		return (0);
+		error = copyout(&bivideo_cmap_r[cmap->index], cmap->red,
+				cmap->count);
+		if (error)
+			return error;
+		error = copyout(&bivideo_cmap_g[cmap->index], cmap->green,
+				cmap->count);
+		if (error)
+			return error;
+		error = copyout(&bivideo_cmap_b[cmap->index], cmap->blue,
+				cmap->count);
+		return error;
 #else /* ITE8181_WINCE_CMAP */
 		return EINVAL;
 #endif /* ITE8181_WINCE_CMAP */

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le_mca.c,v 1.3 2001/11/13 07:46:26 lukem Exp $	*/
+/*	$NetBSD: if_le_mca.c,v 1.7 2003/10/25 18:37:03 christos Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -52,7 +52,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_le_mca.c,v 1.3 2001/11/13 07:46:26 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_le_mca.c,v 1.7 2003/10/25 18:37:03 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -106,9 +106,8 @@ static __inline void le_mca_wrreg __P((struct le_mca_softc *, int, int));
 #define le_mca_set_RAP(sc, reg_number) \
 		le_mca_wrreg(sc, reg_number, RAP | REGWRITE)
 
-struct cfattach le_mca_ca = {
-	sizeof(struct le_mca_softc), le_mca_match, le_mca_attach
-};
+CFATTACH_DECL(le_mca, sizeof(struct le_mca_softc),
+    le_mca_match, le_mca_attach, NULL, NULL);
 
 /* SKNET MC+ POS mapping */
 static const u_int8_t sknet_mcp_irq[] = {
@@ -215,6 +214,10 @@ le_mca_attach(struct device *parent, struct device *self, void *aux)
 		/* Get configured media type */
 		supmedia = sknet_mcp_media[(pos4 & 0xc0) >> 6];
 		break;
+	default:
+		printf("%s: unknown product %d\n", sc->sc_dev.dv_xname,
+		    ma->ma_id);
+		return;
 	}
 
 	lesc->sc_memt = ma->ma_memt;

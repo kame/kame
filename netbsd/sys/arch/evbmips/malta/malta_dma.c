@@ -1,4 +1,4 @@
-/*	$NetBSD: malta_dma.c,v 1.2 2002/03/18 01:21:12 simonb Exp $	*/
+/*	$NetBSD: malta_dma.c,v 1.4 2003/07/15 01:37:33 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * Platform-specific DMA support for the MIPS Malta.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: malta_dma.c,v 1.4 2003/07/15 01:37:33 lukem Exp $");
+
 #include <sys/param.h>
 
 #define	_MIPS_BUS_DMA_PRIVATE
@@ -79,7 +82,7 @@ malta_dma_init(struct malta_config *acp)
 	t->_dmamem_mmap = _bus_dmamem_mmap;
 
 	/*
-	 * Initialize the DMA tag usd for ISA DMA.
+	 * Initialize the DMA tag used for ISA DMA.
 	 */
 	t = &acp->mc_isa_dmat;
 	t->_cookie = acp;

@@ -1,4 +1,4 @@
-/*	$NetBSD: vrip.c,v 1.23 2002/03/22 09:18:09 takemura Exp $	*/
+/*	$NetBSD: vrip.c,v 1.29 2003/07/15 02:29:36 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2002
@@ -29,6 +29,10 @@
  * SUCH DAMAGE.
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vrip.c,v 1.29 2003/07/15 02:29:36 lukem Exp $");
+
 #include "opt_vr41xx.h"
 #include "opt_tx39xx.h"
 
@@ -109,9 +113,8 @@ static const struct vrip_chipset_tag vrip_chipset_methods = {
 };
 
 #ifdef SINGLE_VRIP_BASE
-struct cfattach vrip_ca = {
-	sizeof(struct vrip_softc), vripmatch, vripattach
-};
+CFATTACH_DECL(vrip, sizeof(struct vrip_softc),
+    vripmatch, vripattach, NULL, NULL);
 
 static const struct vrip_unit vrip_units[] = {
 	[VRIP_UNIT_PMU] = { "pmu",
@@ -191,7 +194,7 @@ vripmatch(struct device *parent, struct cfdata *match, void *aux)
 	if (!platid_match(&platid, &platid_mask_CPU_MIPS_VR_41XX))
 		return (0);
 #endif /* SINGLE_VRIP_BASE && TX39XX */
-	if (strcmp(ma->ma_name, match->cf_driver->cd_name))
+	if (strcmp(ma->ma_name, match->cf_name))
 		return (0);
 
 	return (1);
@@ -255,16 +258,17 @@ vrip_print(void *aux, const char *hoge)
 	bus_addr_t endaddr, mask;
 
 	if (va->va_addr != VRIPIFCF_ADDR_DEFAULT)
-		printf(" addr 0x%08lx", va->va_addr);
+		aprint_normal(" addr 0x%08lx", va->va_addr);
 	if (va->va_size != VRIPIFCF_SIZE_DEFAULT) {
 		endaddr = (va->va_addr + va->va_size - 1);
 		mask = ((va->va_addr ^ endaddr) & 0xff0000) ? 0xffffff:0xffff;
-		printf("-%04lx", endaddr & mask);
+		aprint_normal("-%04lx", endaddr & mask);
 	}
 	if (va->va_addr2 != VRIPIFCF_ADDR2_DEFAULT)
-		printf(", 0x%08lx", va->va_addr2);
+		aprint_normal(", 0x%08lx", va->va_addr2);
 	if (va->va_size2 != VRIPIFCF_SIZE2_DEFAULT)
-		printf("-%04lx", (va->va_addr2 + va->va_size2 - 1) & 0xffff);
+		aprint_normal("-%04lx",
+		    (va->va_addr2 + va->va_size2 - 1) & 0xffff);
 
 	return (UNCONF);
 }
@@ -294,7 +298,7 @@ vrip_search(struct device *parent, struct cfdata *cf, void *aux)
 	va.va_cc = sc->sc_chipset.vc_cc;
 	va.va_ac = sc->sc_chipset.vc_ac;
 	va.va_dc = sc->sc_chipset.vc_dc;
-	if (((*cf->cf_attach->ca_match)(parent, cf, &va) == sc->sc_pri))
+	if ((config_match(parent, cf, &va) == sc->sc_pri))
 		config_attach(parent, cf, &va, vrip_print);
 
 	return (0);

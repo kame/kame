@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.42 2002/05/10 20:14:40 uch Exp $	*/
+/*	$NetBSD: machdep.c,v 1.51 2004/03/24 15:34:48 atatat Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -52,11 +52,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -75,6 +71,9 @@
  *	@(#)machdep.c	7.4 (Berkeley) 6/3/91
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.51 2004/03/24 15:34:48 atatat Exp $");
+
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
 #include "opt_memsize.h"
@@ -87,6 +86,7 @@
 #include <sys/mount.h>
 #include <sys/reboot.h>
 #include <sys/sysctl.h>
+#include <sys/ksyms.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -105,6 +105,8 @@
 #include <machine/db_machdep.h>
 #include <ddb/db_extern.h>
 #endif
+
+#include "ksyms.h"
 
 /* the following is used externally (sysctl_hw) */
 char machine[] = MACHINE;		/* evbsh3 */
@@ -129,45 +131,46 @@ cpu_startup()
 /*
  * machine dependent system variables.
  */
-int
-cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
-	struct proc *p;
+static int
+sysctl_machdep_loadandreset(SYSCTLFN_ARGS)
 {
-	dev_t consdev;
 	char *osimage;
+	int error;
 
-	/* all sysctl names at this level are terminal */
-	if (namelen != 1)
-		return (ENOTDIR);		/* overloaded */
+	error = sysctl_lookup(SYSCTLFN_CALL(rnode));
+	if (error || newp == NULL)
+		return (error);
 
-	switch (name[0]) {
-	case CPU_CONSDEV:
-		if (cn_tab != NULL)
-			consdev = cn_tab->cn_dev;
-		else
-			consdev = NODEV;
-		return (sysctl_rdstruct(oldp, oldlenp, newp, &consdev,
-		    sizeof consdev));
+	osimage = (char *)(*(u_long *)newp);
+	LoadAndReset(osimage);
+	/* not reach here */
+	return (0);
+}
 
-	case CPU_LOADANDRESET:
-		if (newp != NULL) {
-			osimage = (char *)(*(u_long *)newp);
+SYSCTL_SETUP(sysctl_machdep_setup, "sysctl machdep subtree setup")
+{
 
-			LoadAndReset(osimage);
-			/* not reach here */
-		}
-		return (0);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "machdep", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_MACHDEP, CTL_EOL);
 
-	default:
-		return (EOPNOTSUPP);
-	}
-	/* NOTREACHED */
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_STRUCT, "console_device", NULL,
+		       sysctl_consdev, 0, NULL, sizeof(dev_t),
+		       CTL_MACHDEP, CPU_CONSDEV, CTL_EOL);
+/*
+<atatat> okay...your turn to play.  
+<atatat> pick a number.
+<kjk> 98752.
+*/
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_IMMEDIATE,
+		       CTLTYPE_INT, "load_and_reset", NULL,
+		       sysctl_machdep_loadandreset, 98752, NULL, 0,
+		       CTL_MACHDEP, CPU_LOADANDRESET, CTL_EOL);
 }
 
 void
@@ -220,11 +223,11 @@ haltsys:
 void
 initSH3(void *pc)	/* XXX return address */
 {
-	extern char edata[], end[];
+	extern char _edata[], _end[];
 	vaddr_t kernend;
 
 	/* Clear bss */
-	memset(edata, 0, end - edata);
+	memset(_edata, 0, _end - _edata);
 
 	/* Initilize CPU ops. */
 #if defined(SH3) && defined(SH4)
@@ -258,7 +261,7 @@ initSH3(void *pc)	/* XXX return address */
 	consinit();
 
 	/* Load memory to UVM */
-	kernend = atop(round_page(SH3_P1SEG_TO_PHYS(end)));
+	kernend = atop(round_page(SH3_P1SEG_TO_PHYS(_end)));
 	physmem = atop(IOM_RAM_SIZE);
 	uvm_page_physload(
 		kernend, atop(IOM_RAM_BEGIN + IOM_RAM_SIZE),
@@ -271,8 +274,8 @@ initSH3(void *pc)	/* XXX return address */
 	/* Initialize pmap and start to address translation */
 	pmap_bootstrap();
 
-#ifdef DDB
-	ddb_init(0, NULL, NULL);
+#if NKSYMS || defined(DDB) || defined(LKM)
+	ksyms_init(0, NULL, NULL);
 #endif
 
 	/*
@@ -282,7 +285,7 @@ initSH3(void *pc)	/* XXX return address */
 	__asm __volatile (
 		"jmp	@%0;"
 		"mov	%1, r15"
-		:: "r"(pc),"r"(proc0.p_md.md_pcb->pcb_sf.sf_r7_bank));
+		:: "r"(pc),"r"(lwp0.l_md.md_pcb->pcb_sf.sf_r7_bank));
 }
 
 /*
@@ -466,7 +469,7 @@ shpcmcia_mem_add_mapping(bpa, size, type, bshp)
 	}
 #undef MODE
 
-	for (; pa < endpa; pa += NBPG, va += NBPG) {
+	for (; pa < endpa; pa += PAGE_SIZE, va += PAGE_SIZE) {
 		pmap_kenter_pa(va, pa, VM_PROT_READ | VM_PROT_WRITE);
 		pte = __pmap_kpte_lookup(va);
 		KDASSERT(pte);
@@ -550,7 +553,7 @@ shpcmcia_memio_subregion(t, bsh, offset, size, nbshp)
 #if !defined(DONT_INIT_BSC)
 /*
  * InitializeBsc
- * : BSC(Bus State Controler)
+ * : BSC(Bus State Controller)
  */
 void InitializeBsc __P((void));
 

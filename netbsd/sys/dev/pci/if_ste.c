@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ste.c,v 1.7.10.2 2003/06/17 10:07:30 msaitoh Exp $	*/
+/*	$NetBSD: if_ste.c,v 1.17.4.1 2004/07/23 22:57:25 he Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ste.c,v 1.7.10.2 2003/06/17 10:07:30 msaitoh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ste.c,v 1.17.4.1 2004/07/23 22:57:25 he Exp $");
 
 #include "bpfilter.h"
 
@@ -212,7 +212,9 @@ void	ste_stop(struct ifnet *, int);
 
 void	ste_shutdown(void *);
 
-void	ste_reset(struct ste_softc *);
+void	ste_reset(struct ste_softc *, u_int32_t);
+void	ste_setthresh(struct ste_softc *);
+void	ste_txrestart(struct ste_softc *, u_int8_t);
 void	ste_rxdrain(struct ste_softc *);
 int	ste_add_rxbuf(struct ste_softc *, int);
 void	ste_read_eeprom(struct ste_softc *, int, uint16_t *);
@@ -238,9 +240,8 @@ void	ste_attach(struct device *, struct device *, void *);
 
 int	ste_copy_small = 0;
 
-struct cfattach ste_ca = {
-	sizeof(struct ste_softc), ste_match, ste_attach,
-};
+CFATTACH_DECL(ste, sizeof(struct ste_softc),
+    ste_match, ste_attach, NULL, NULL);
 
 uint32_t ste_mii_bitbang_read(struct device *);
 void	ste_mii_bitbang_write(struct device *, uint32_t);
@@ -360,8 +361,9 @@ ste_attach(struct device *parent, struct device *self, void *aux)
 
 	/* Get it out of power save mode if needed. */
 	if (pci_get_capability(pc, pa->pa_tag, PCI_CAP_PWRMGMT, &pmreg, 0)) {
-		pmode = pci_conf_read(pc, pa->pa_tag, pmreg + 4) & 0x3;
-		if (pmode == 3) {
+		pmode = pci_conf_read(pc, pa->pa_tag, pmreg + PCI_PMCSR) &
+		    PCI_PMCSR_STATE_MASK;
+		if (pmode == PCI_PMCSR_STATE_D3) {
 			/*
 			 * The card has lost all configuration data in
 			 * this state, so punt.
@@ -370,10 +372,11 @@ ste_attach(struct device *parent, struct device *self, void *aux)
 			    sc->sc_dev.dv_xname);
 			return;
 		}
-		if (pmode != 0) {
+		if (pmode != PCI_PMCSR_STATE_D0) {
 			printf("%s: waking up from power state D%d\n",
 			    sc->sc_dev.dv_xname, pmode);
-			pci_conf_write(pc, pa->pa_tag, pmreg + 4, 0);
+			pci_conf_write(pc, pa->pa_tag, pmreg + PCI_PMCSR,
+			    PCI_PMCSR_STATE_D0);
 		}
 	}
 
@@ -461,7 +464,8 @@ ste_attach(struct device *parent, struct device *self, void *aux)
 	/*
 	 * Reset the chip to a known state.
 	 */
-	ste_reset(sc);
+	ste_reset(sc, AC_GlobalReset | AC_RxReset | AC_TxReset | AC_DMA |
+	    AC_FIFO | AC_Network | AC_Host | AC_AutoInit | AC_RstOut);
 
 	/*
 	 * Read the Ethernet address from the EEPROM.
@@ -482,7 +486,7 @@ ste_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_mii.mii_readreg = ste_mii_readreg;
 	sc->sc_mii.mii_writereg = ste_mii_writereg;
 	sc->sc_mii.mii_statchg = ste_mii_statchg;
-	ifmedia_init(&sc->sc_mii.mii_media, 0, ste_mediachange,
+	ifmedia_init(&sc->sc_mii.mii_media, IFM_IMASK, ste_mediachange,
 	    ste_mediastatus);
 	mii_attach(&sc->sc_dev, &sc->sc_mii, 0xffffffff, MII_PHY_ANY,
 	    MII_OFFSET_ANY, 0);
@@ -504,9 +508,9 @@ ste_attach(struct device *parent, struct device *self, void *aux)
 	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
-	 * Default the transmit threshold to 1504 bytes.
+	 * Default the transmit threshold to 128 bytes.
 	 */
-	sc->sc_txthresh = 1504;
+	sc->sc_txthresh = 128;
 
 	/*
 	 * Disable MWI if the PCI layer tells us to.
@@ -891,17 +895,33 @@ ste_intr(void *arg)
 					    "threshold: %d bytes\n",
 					    sc->sc_dev.dv_xname,
 					    sc->sc_txthresh);
+					ste_reset(sc, AC_TxReset | AC_DMA |
+					    AC_FIFO | AC_Network);
+					ste_setthresh(sc);
+					bus_space_write_1(sc->sc_st, sc->sc_sh,
+					    STE_TxDMAPollPeriod, 127);
+					ste_txrestart(sc,
+					    bus_space_read_1(sc->sc_st,
+						sc->sc_sh, STE_TxFrameId));
 				}
-				if (txstat & TS_TxReleaseError)
+				if (txstat & TS_TxReleaseError) {
 					printf("%s: Tx FIFO release error\n",
 					    sc->sc_dev.dv_xname);
-				if (txstat & TS_MaxCollisions)
+					wantinit = 1;
+				}
+				if (txstat & TS_MaxCollisions) {
 					printf("%s: excessive collisions\n",
 					    sc->sc_dev.dv_xname);
+					wantinit = 1;
+				}
+				if (txstat & TS_TxStatusOverflow) {
+					printf("%s: status overflow\n",
+					    sc->sc_dev.dv_xname);
+					wantinit = 1;
+				}
 				bus_space_write_2(sc->sc_st, sc->sc_sh,
 				    STE_TxStatus, 0);
 			}
-			wantinit = 1;
 		}
 
 		/* Host interface errors. */
@@ -1114,8 +1134,6 @@ ste_stats_update(struct ste_softc *sc)
 	ifp->if_ipackets +=
 	    (u_int) bus_space_read_2(st, sh, STE_FramesReceivedOK);
 
-	(void) bus_space_read_2(st, sh, STE_CarrierSenseErrors);
-
 	ifp->if_collisions +=
 	    (u_int) bus_space_read_1(st, sh, STE_LateCollisions) +
 	    (u_int) bus_space_read_1(st, sh, STE_MultipleColFrames) +
@@ -1128,7 +1146,8 @@ ste_stats_update(struct ste_softc *sc)
 
 	ifp->if_oerrors +=
 	    (u_int) bus_space_read_1(st, sh, STE_FramesWExDeferral) +
-	    (u_int) bus_space_read_1(st, sh, STE_FramesXbortXSColls);
+	    (u_int) bus_space_read_1(st, sh, STE_FramesXbortXSColls) +
+	    bus_space_read_1(st, sh, STE_CarrierSenseErrors);
 
 	(void) bus_space_read_1(st, sh, STE_BcstFramesXmtdOk);
 	(void) bus_space_read_1(st, sh, STE_BcstFramesRcvdOk);
@@ -1142,17 +1161,14 @@ ste_stats_update(struct ste_softc *sc)
  *	Perform a soft reset on the ST-201.
  */
 void
-ste_reset(struct ste_softc *sc)
+ste_reset(struct ste_softc *sc, u_int32_t rstbits)
 {
 	uint32_t ac;
 	int i;
 
 	ac = bus_space_read_4(sc->sc_st, sc->sc_sh, STE_AsicCtrl);
 
-	bus_space_write_4(sc->sc_st, sc->sc_sh, STE_AsicCtrl,
-	    ac | AC_GlobalReset | AC_RxReset | AC_TxReset |
-	    AC_DMA | AC_FIFO | AC_Network | AC_Host | AC_AutoInit |
-	    AC_RstOut);
+	bus_space_write_4(sc->sc_st, sc->sc_sh, STE_AsicCtrl, ac | rstbits);
 
 	delay(50000);
 
@@ -1167,6 +1183,47 @@ ste_reset(struct ste_softc *sc)
 		printf("%s: reset failed to complete\n", sc->sc_dev.dv_xname);
 
 	delay(1000);
+}
+
+/*
+ * ste_setthresh:
+ *
+ * 	set the various transmit threshold registers
+ */
+void
+ste_setthresh(struct ste_softc *sc)
+{
+	/* set the TX threhold */
+	bus_space_write_2(sc->sc_st, sc->sc_sh,
+	    STE_TxStartThresh, sc->sc_txthresh);
+	/* Urgent threshold: set to sc_txthresh / 2 */
+	bus_space_write_2(sc->sc_st, sc->sc_sh, STE_TxDMAUrgentThresh,
+	    sc->sc_txthresh >> 6);
+	/* Burst threshold: use default value (256 bytes) */
+}
+
+/*
+ * restart TX at the given frame ID in the transmitter ring
+ */
+
+void
+ste_txrestart(struct ste_softc *sc, u_int8_t id)
+{
+	u_int32_t control;
+
+	STE_CDTXSYNC(sc, id, BUS_DMASYNC_POSTREAD|BUS_DMASYNC_POSTWRITE);
+	control = le32toh(sc->sc_txdescs[id].tfd_control);
+	control &= ~TFD_TxDMAComplete;
+	sc->sc_txdescs[id].tfd_control = htole32(control);
+	STE_CDTXSYNC(sc, id, BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
+
+	bus_space_write_4(sc->sc_st, sc->sc_sh, STE_TxDMAListPtr, 0);
+	bus_space_write_2(sc->sc_st, sc->sc_sh, STE_MacCtrl1, MC1_TxEnable);
+	bus_space_write_4(sc->sc_st, sc->sc_sh, STE_DMACtrl, DC_TxDMAHalt);
+	ste_dmahalt_wait(sc);
+	bus_space_write_4(sc->sc_st, sc->sc_sh, STE_TxDMAListPtr,
+	    STE_CDTXADDR(sc, id));
+	bus_space_write_4(sc->sc_st, sc->sc_sh, STE_DMACtrl, DC_TxDMAResume);
 }
 
 /*
@@ -1191,7 +1248,8 @@ ste_init(struct ifnet *ifp)
 	/*
 	 * Reset the chip to a known state.
 	 */
-	ste_reset(sc);
+	ste_reset(sc, AC_GlobalReset | AC_RxReset | AC_TxReset | AC_DMA |
+	    AC_FIFO | AC_Network | AC_Host | AC_AutoInit | AC_RstOut);
 
 	/*
 	 * Initialize the transmit descriptor ring.
@@ -1255,27 +1313,23 @@ ste_init(struct ifnet *ifp)
 	bus_space_write_1(st, sh, STE_RxDMAPollPeriod, 64);
 
 	/* Initialize the Tx start threshold. */
-	bus_space_write_2(st, sh, STE_TxStartThresh, sc->sc_txthresh);
+	ste_setthresh(sc);
 
 	/* Set the FIFO release threshold to 512 bytes. */
 	bus_space_write_1(st, sh, STE_TxReleaseThresh, 512 >> 4);
 
+	/* Set maximum packet size for VLAN. */
+	if (sc->sc_ethercom.ec_capenable & ETHERCAP_VLAN_MTU)
+		bus_space_write_2(st, sh, STE_MaxFrameSize, ETHER_MAX_LEN + 4);
+	else
+		bus_space_write_2(st, sh, STE_MaxFrameSize, ETHER_MAX_LEN);
+
 	/*
 	 * Initialize the interrupt mask.
 	 */
-# if 0
 	sc->sc_IntEnable = IE_HostError | IE_TxComplete | IE_UpdateStats |
 	    IE_TxDMAComplete | IE_RxDMAComplete;
-#else
-	/*
-	 * On a Dlink DFE580-TX (DL-1002), attempting to transmit packets
-	 * while the link is down cause the chip to create an IE_UpdateStats
-	 * condition which can't be cleared, causing the driver to enter
-	 * an interrupt loop. workaround: mask IE_UpdateStats
-	 */
-	sc->sc_IntEnable = IE_HostError | IE_TxComplete | /*IE_UpdateStats |*/
-	    IE_TxDMAComplete | IE_RxDMAComplete;
-#endif
+
 	bus_space_write_2(st, sh, STE_IntStatus, 0xffff);
 	bus_space_write_2(st, sh, STE_IntEnable, sc->sc_IntEnable);
 

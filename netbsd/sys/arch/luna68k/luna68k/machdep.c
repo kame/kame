@@ -1,4 +1,4 @@
-/* $NetBSD: machdep.c,v 1.21 2002/03/20 17:59:23 christos Exp $ */
+/* $NetBSD: machdep.c,v 1.38 2004/03/24 15:34:49 atatat Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -38,21 +38,21 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.21 2002/03/20 17:59:23 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.38 2004/03/24 15:34:49 atatat Exp $");
 
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
+#include "opt_compat_sunos.h"
+#include "opt_panicbutton.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/map.h>
 #include <sys/proc.h>
 #include <sys/buf.h>
 #include <sys/reboot.h>
 #include <sys/conf.h>
 #include <sys/file.h>
-#include <sys/clist.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
@@ -65,7 +65,9 @@ __KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.21 2002/03/20 17:59:23 christos Exp $"
 #include <sys/core.h>
 #include <sys/kcore.h>
 #include <sys/vnode.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
+#include <sys/ksyms.h>
 #ifdef	KGDB
 #include <sys/kgdb.h>
 #endif
@@ -88,6 +90,8 @@ __KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.21 2002/03/20 17:59:23 christos Exp $"
 #include <ddb/db_sym.h>
 #include <ddb/db_extern.h>
 #endif
+
+#include "ksyms.h"
 
 /*
  * Info for CTL_HW
@@ -174,8 +178,8 @@ luna68k_init()
 	 * avail_end was pre-decremented in pmap_bootstrap to compensate.
 	 */
 	for (i = 0; i < btoc(MSGBUFSIZE); i++)
-		pmap_enter(pmap_kernel(), (vaddr_t)msgbufaddr + i * NBPG,
-		    avail_end + i * NBPG, VM_PROT_READ|VM_PROT_WRITE,
+		pmap_enter(pmap_kernel(), (vaddr_t)msgbufaddr + i * PAGE_SIZE,
+		    avail_end + i * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE,
 		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 	pmap_update(pmap_kernel());
 	initmsgbuf(msgbufaddr, m68k_round_page(MSGBUFSIZE));
@@ -223,13 +227,15 @@ consinit()
 		ws_cnattach();
 	}
 
-#ifdef DDB
+#if NKSYMS || defined(DDB) || defined(LKM)
 	{
 		extern int end;
 		extern int *esym;
 
-		ddb_init(*(int *)&end, ((int *)&end) + 1, esym);
+		ksyms_init(*(int *)&end, ((int *)&end) + 1, esym);
 	}
+#endif
+#ifdef DDB
 	if (boothowto & RB_KDB)
 		cpu_Debugger();
 #endif
@@ -241,13 +247,12 @@ consinit()
 void
 cpu_startup()
 {
-	int i;
-	caddr_t v;
-	int base, residual;
 	vaddr_t minaddr, maxaddr;
-	vsize_t size;
 	char pbuf[9];
 	extern void greeting __P((void));
+
+	if (fputype != FPU_NONE)
+		m68k_make_fpu_idle_frame();
 
 	/*
 	 * Initialize the kernel crash dump header.
@@ -263,60 +268,7 @@ cpu_startup()
 	format_bytes(pbuf, sizeof(pbuf), ctob(physmem));
 	printf("total memory = %s\n", pbuf);
 
-	/*
-	 * Find out how much space we need, allocate it,
-	 * and then give everything true virtual addresses.
-	 */
-	size = (int)allocsys(NULL, NULL);
-	if ((v = (caddr_t)uvm_km_alloc(kernel_map, round_page(size))) == 0)
-		panic("startup: no room for tables");
-	if (allocsys(v, NULL) - v != size)
-		panic("startup: table size inconsistency");
-
-	/*
-	 * Now allocate buffers proper.  They are different than the above
-	 * in that they usually occupy more virtual memory than physical.
-	 */
-	size = MAXBSIZE * nbuf;
-	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET, 0,
-		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != 0)
-		panic("startup: cannot allocate VM for buffers");
-	minaddr = (vaddr_t)buffers;
-	if ((bufpages / nbuf) >= btoc(MAXBSIZE)) {
-		/* don't want to alloc more physical mem than needed */
-		bufpages = btoc(MAXBSIZE) * nbuf;
-	}
-	base = bufpages / nbuf;
-	residual = bufpages % nbuf;
-	for (i = 0; i < nbuf; i++) {
-		vsize_t curbufsize;
-		vaddr_t curbuf;
-		struct vm_page *pg;
-
-		/*
-		 * Each buffer has MAXBSIZE bytes of VM space allocated.  Of
-		 * that MAXBSIZE space, we allocate and map (base+1) pages
-		 * for the first "residual" buffers, and then we allocate
-		 * "base" pages for the rest.
-		 */
-		curbuf = (vsize_t) buffers + (i * MAXBSIZE);
-		curbufsize = NBPG * ((i < residual) ? (base+1) : base);
-
-		while (curbufsize) {
-			pg = uvm_pagealloc(NULL, 0, NULL, 0);
-			if (pg == NULL) 
-				panic("cpu_startup: not enough memory for "
-				    "buffer cache");
-			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
-					VM_PROT_READ|VM_PROT_WRITE);
-			curbuf += PAGE_SIZE;
-			curbufsize -= PAGE_SIZE;
-		}
-	}
-	pmap_update(pmap_kernel());
-
+	minaddr = 0;
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
 	 * limits the number of processes exec'ing at any time.
@@ -339,8 +291,6 @@ cpu_startup()
 
 	format_bytes(pbuf, sizeof(pbuf), ptoa(uvmexp.free));
 	printf("avail memory = %s\n", pbuf);
-	format_bytes(pbuf, sizeof(pbuf), bufpages * NBPG);
-	printf("using %d buffers containing %s of memory\n", nbuf, pbuf);
 
 	/*
 	 * Tell the VM system that the area before the text segment
@@ -363,11 +313,6 @@ cpu_startup()
 		panic("can't protect kernel text");
 
 	/*
-	 * Set up buffers, so they can be used to read disk labels.
-	 */
-	bufinit();
-
-	/*
 	 * Say "Hi" to the world
 	 */
 	greeting();
@@ -377,12 +322,12 @@ cpu_startup()
  * Set registers on exec.
  */
 void
-setregs(p, pack, stack)
-	register struct proc *p;
+setregs(l, pack, stack)
+	struct lwp *l;
 	struct exec_package *pack;
 	u_long stack;
 {
-	struct frame *frame = (struct frame *)p->p_md.md_regs;
+	struct frame *frame = (struct frame *)l->l_md.md_regs;
 	extern int fputype;
 
 	frame->f_sr = PSL_USERSET;
@@ -397,7 +342,7 @@ setregs(p, pack, stack)
 	frame->f_regs[D7] = 0;
 	frame->f_regs[A0] = 0;
 	frame->f_regs[A1] = 0;
-	frame->f_regs[A2] = (int)p->p_psstr;
+	frame->f_regs[A2] = (int)l->l_proc->p_psstr;
 	frame->f_regs[A3] = 0;
 	frame->f_regs[A4] = 0;
 	frame->f_regs[A5] = 0;
@@ -405,9 +350,9 @@ setregs(p, pack, stack)
 	frame->f_regs[SP] = stack;
 
 	/* restore a null state frame */
-	p->p_addr->u_pcb.pcb_fpregs.fpf_null = 0;
+	l->l_addr->u_pcb.pcb_fpregs.fpf_null = 0;
 	if (fputype)
-		m68881_restore(&p->p_addr->u_pcb.pcb_fpregs);
+		m68881_restore(&l->l_addr->u_pcb.pcb_fpregs);
 }
 
 void
@@ -441,34 +386,20 @@ identifycpu()
 /*
  * machine dependent system variables.
  */
-int
-cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
-	struct proc *p;
+SYSCTL_SETUP(sysctl_machdep_setup, "sysctl machdep subtree setup")
 {
-	dev_t consdev;
 
-	/* all sysctl names at this level are terminal */
-	if (namelen != 1)
-		return (ENOTDIR);		/* overloaded */
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "machdep", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_MACHDEP, CTL_EOL);
 
-	switch (name[0]) {
-	case CPU_CONSDEV:
-		if (cn_tab != NULL)
-			consdev = cn_tab->cn_dev;
-		else
-			consdev = NODEV;
-		return (sysctl_rdstruct(oldp, oldlenp, newp, &consdev,
-		    sizeof consdev));
-	default:
-		return (EOPNOTSUPP);
-	}
-	/* NOTREACHED */
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_STRUCT, "console_device", NULL,
+		       sysctl_consdev, 0, NULL, sizeof(dev_t),
+		       CTL_MACHDEP, CPU_CONSDEV, CTL_EOL);
 }
 
 int	waittime = -1;
@@ -481,8 +412,8 @@ cpu_reboot(howto, bootstr)
 	extern void doboot __P((void));
 
 	/* take a snap shot before clobbering any registers */
-	if (curproc && curproc->p_addr)
-		savectx(&curproc->p_addr->u_pcb);
+	if (curlwp && curlwp->l_addr)
+		savectx(&curlwp->l_addr->u_pcb);
 
 	/* If system is hold, just halt. */
 	if (cold) {
@@ -550,7 +481,7 @@ cpu_init_kcore_hdr()
 	 * Initialize the `dispatcher' portion of the header.
 	 */
 	strcpy(h->name, machine);
-	h->page_size = NBPG;
+	h->page_size = PAGE_SIZE;
 	h->kernbase = KERNBASE;
 
 	/*
@@ -647,7 +578,7 @@ long	dumplo = 0;		/* blocks */
 
 /*
  * This is called by main to set dumplo and dumpsize.
- * Dumps always skip the first NBPG of disk space
+ * Dumps always skip the first PAGE_SIZE of disk space
  * in case there might be a disk label stored there.
  * If there is extra space, put dump at the end to
  * reduce the chance that swapping trashes it.
@@ -655,25 +586,25 @@ long	dumplo = 0;		/* blocks */
 void
 cpu_dumpconf()
 {
+	const struct bdevsw *bdev;
 	int chdrsize;	/* size of dump header */
 	int nblks;	/* size of dump area */
-	int maj;
 
 	if (dumpdev == NODEV)
 		return;
-	maj = major(dumpdev);
-	if (maj < 0 || maj >= nblkdev)
+	bdev = bdevsw_lookup(dumpdev);
+	if (bdev == NULL)
 		panic("dumpconf: bad dumpdev=0x%x", dumpdev);
-	if (bdevsw[maj].d_psize == NULL)
+	if (bdev->d_psize == NULL)
 		return;
-	nblks = (*bdevsw[maj].d_psize)(dumpdev);
+	nblks = (*bdev->d_psize)(dumpdev);
 	chdrsize = cpu_dumpsize();
 
 	dumpsize = btoc(cpu_kcore_hdr.un._m68k.ram_segs[0].size);
 
 	/*
 	 * Check do see if we will fit.  Note we always skip the
-	 * first NBPG in case there is a disk label there.
+	 * first PAGE_SIZE in case there is a disk label there.
 	 */
 	if (nblks < (ctod(dumpsize) + chdrsize + ctod(1))) {
 		dumpsize = 0;
@@ -693,6 +624,7 @@ cpu_dumpconf()
 void
 dumpsys()
 {
+	const struct bdevsw *bdev;
 	daddr_t blkno;		/* current block to write */
 				/* dump routine */
 	int (*dump) __P((dev_t, daddr_t, caddr_t, size_t));
@@ -707,6 +639,9 @@ dumpsys()
 	/* Make sure dump device is valid. */
 	if (dumpdev == NODEV)
 		return;
+	bdev = bdevsw_lookup(dumpdev);
+	if (bdev == NULL)
+		return;
 	if (dumpsize == 0) {
 		cpu_dumpconf();
 		if (dumpsize == 0)
@@ -717,7 +652,7 @@ dumpsys()
 		    minor(dumpdev));
 		return;
 	}
-	dump = bdevsw[major(dumpdev)].d_dump;
+	dump = bdev->d_dump;
 	blkno = dumplo;
 
 	printf("\ndumping to dev %u,%u offset %ld\n", major(dumpdev),
@@ -731,7 +666,7 @@ dumpsys()
 		goto bad;
 
 	for (pg = 0; pg < dumpsize; pg++) {
-#define NPGMB	(1024*1024/NBPG)
+#define NPGMB	(1024*1024/PAGE_SIZE)
 		/* print out how many MBs we have dumped */
 		if (pg && (pg % NPGMB) == 0)
 			printf("%d ", pg / NPGMB);
@@ -740,12 +675,12 @@ dumpsys()
 		    VM_PROT_READ, VM_PROT_READ|PMAP_WIRED);
 
 		pmap_update(pmap_kernel());
-		error = (*dump)(dumpdev, blkno, vmmap, NBPG);
+		error = (*dump)(dumpdev, blkno, vmmap, PAGE_SIZE);
  bad:
 		switch (error) {
 		case 0:
-			maddr += NBPG;
-			blkno += btodb(NBPG);
+			maddr += PAGE_SIZE;
+			blkno += btodb(PAGE_SIZE);
 			break;
 
 		case ENXIO:
@@ -870,7 +805,7 @@ luna68k_abort(cp)
 
 /*
  * cpu_exec_aout_makecmds():
- *	cpu-dependent a.out format hook for execve().
+ *	CPU-dependent a.out format hook for execve().
  * 
  * Determine of the given exec package refers to something which we
  * understand and, if so, set up the vmcmds for it.

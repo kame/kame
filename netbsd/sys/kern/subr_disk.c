@@ -1,4 +1,4 @@
-/*	$NetBSD: subr_disk.c,v 1.37.10.1 2002/07/22 04:39:45 lukem Exp $	*/
+/*	$NetBSD: subr_disk.c,v 1.60 2004/03/09 12:23:07 yamt Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1999, 2000 The NetBSD Foundation, Inc.
@@ -54,11 +54,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -78,7 +74,10 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: subr_disk.c,v 1.37.10.1 2002/07/22 04:39:45 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: subr_disk.c,v 1.60 2004/03/09 12:23:07 yamt Exp $");
+
+#include "opt_compat_netbsd.h"
+#include "opt_bufq.h"
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -88,6 +87,7 @@ __KERNEL_RCSID(0, "$NetBSD: subr_disk.c,v 1.37.10.1 2002/07/22 04:39:45 lukem Ex
 #include <sys/disklabel.h>
 #include <sys/disk.h>
 #include <sys/sysctl.h>
+#include <lib/libkern/libkern.h>
 
 /*
  * A global list of all disks attached to the system.  May grow or
@@ -97,212 +97,11 @@ struct	disklist_head disklist;	/* TAILQ_HEAD */
 int	disk_count;		/* number of drives in global disklist */
 struct simplelock disklist_slock = SIMPLELOCK_INITIALIZER;
 
-/*
- * Seek sort for disks.  We depend on the driver which calls us using b_resid
- * as the current cylinder number.
- *
- * The argument bufq is an I/O queue for the device, on which there are
- * actually two queues, sorted in ascending cylinder order.  The first
- * queue holds those requests which are positioned after the current
- * cylinder (in the first request); the second holds requests which came
- * in after their cylinder number was passed.  Thus we implement a one-way
- * scan, retracting after reaching the end of the drive to the first request
- * on the second queue, at which time it becomes the first queue.
- *
- * A one-way scan is natural because of the way UNIX read-ahead blocks are
- * allocated.
- *
- * This is further adjusted by any `barriers' which may exist in the queue.
- * The bufq points to the last such ordered request.
- */
-void
-disksort_cylinder(struct buf_queue *bufq, struct buf *bp)
-{
-	struct buf *bq, *nbq;
-
-	/*
-	 * If there are ordered requests on the queue, we must start
-	 * the elevator sort after the last of these.
-	 */
-	if ((bq = bufq->bq_barrier) == NULL)
-		bq = BUFQ_FIRST(bufq);
-
-	/*
-	 * If the queue is empty, of if it's an ordered request,
-	 * it's easy; we just go on the end.
-	 */
-	if (bq == NULL || (bp->b_flags & B_ORDERED) != 0) {
-		BUFQ_INSERT_TAIL(bufq, bp);
-		return;
-	}
-
-	/*
-	 * If we lie after the first (currently active) request, then we
-	 * must locate the second request list and add ourselves to it.
-	 */
-	if (bp->b_cylinder < bq->b_cylinder ||
-	    (bp->b_cylinder == bq->b_cylinder &&
-	     bp->b_rawblkno < bq->b_rawblkno)) {
-		while ((nbq = BUFQ_NEXT(bq)) != NULL) {
-			/*
-			 * Check for an ``inversion'' in the normally ascending
-			 * cylinder numbers, indicating the start of the second
-			 * request list.
-			 */
-			if (nbq->b_cylinder < bq->b_cylinder) {
-				/*
-				 * Search the second request list for the first
-				 * request at a larger cylinder number.  We go
-				 * before that; if there is no such request, we
-				 * go at end.
-				 */
-				do {
-					if (bp->b_cylinder < nbq->b_cylinder)
-						goto insert;
-					if (bp->b_cylinder == nbq->b_cylinder &&
-					    bp->b_rawblkno < nbq->b_rawblkno)
-						goto insert;
-					bq = nbq;
-				} while ((nbq = BUFQ_NEXT(bq)) != NULL);
-				goto insert;		/* after last */
-			}
-			bq = nbq;
-		}
-		/*
-		 * No inversions... we will go after the last, and
-		 * be the first request in the second request list.
-		 */
-		goto insert;
-	}
-	/*
-	 * Request is at/after the current request...
-	 * sort in the first request list.
-	 */
-	while ((nbq = BUFQ_NEXT(bq)) != NULL) {
-		/*
-		 * We want to go after the current request if there is an
-		 * inversion after it (i.e. it is the end of the first
-		 * request list), or if the next request is a larger cylinder
-		 * than our request.
-		 */
-		if (nbq->b_cylinder < bq->b_cylinder ||
-		    bp->b_cylinder < nbq->b_cylinder ||
-		    (bp->b_cylinder == nbq->b_cylinder &&
-		     bp->b_rawblkno < nbq->b_rawblkno))
-			goto insert;
-		bq = nbq;
-	}
-	/*
-	 * Neither a second list nor a larger request... we go at the end of
-	 * the first list, which is the same as the end of the whole schebang.
-	 */
-insert:	BUFQ_INSERT_AFTER(bufq, bq, bp);
-}
-
-/*
- * Seek sort for disks.  This version sorts based on b_rawblkno, which
- * indicates the block number.
- *
- * As before, there are actually two queues, sorted in ascendening block
- * order.  The first queue holds those requests which are positioned after
- * the current block (in the first request); the second holds requests which
- * came in after their block number was passed.  Thus we implement a one-way
- * scan, retracting after reaching the end of the driver to the first request
- * on the second queue, at which time it becomes the first queue.
- *
- * A one-way scan is natural because of the way UNIX read-ahead blocks are
- * allocated.
- *
- * This is further adjusted by any `barriers' which may exist in the queue.
- * The bufq points to the last such ordered request.
- */
-void
-disksort_blkno(struct buf_queue *bufq, struct buf *bp)
-{
-	struct buf *bq, *nbq;
-
-	/*
-	 * If there are ordered requests on the queue, we must start
-	 * the elevator sort after the last of these.
-	 */
-	if ((bq = bufq->bq_barrier) == NULL)
-		bq = BUFQ_FIRST(bufq);
-
-	/*
-	 * If the queue is empty, or if it's an ordered request,
-	 * it's easy; we just go on the end.
-	 */
-	if (bq == NULL || (bp->b_flags & B_ORDERED) != 0) {
-		BUFQ_INSERT_TAIL(bufq, bp);
-		return;
-	}
-
-	/*
-	 * If we lie after the first (currently active) request, then we
-	 * must locate the second request list and add ourselves to it.
-	 */
-	if (bp->b_rawblkno < bq->b_rawblkno) {
-		while ((nbq = BUFQ_NEXT(bq)) != NULL) {
-			/*
-			 * Check for an ``inversion'' in the normally ascending
-			 * block numbers, indicating the start of the second
-			 * request list.
-			 */
-			if (nbq->b_rawblkno < bq->b_rawblkno) {
-				/*
-				 * Search the second request list for the first
-				 * request at a larger block number.  We go
-				 * after that; if there is no such request, we
-				 * go at the end.
-				 */
-				do {
-					if (bp->b_rawblkno < nbq->b_rawblkno)
-						goto insert;
-					bq = nbq;
-				} while ((nbq = BUFQ_NEXT(bq)) != NULL);
-				goto insert;		/* after last */
-			}
-			bq = nbq;
-		}
-		/*
-		 * No inversions... we will go after the last, and
-		 * be the first request in the second request list.
-		 */
-		goto insert;
-	}
-	/*
-	 * Request is at/after the current request...
-	 * sort in the first request list.
-	 */
-	while ((nbq = BUFQ_NEXT(bq)) != NULL) {
-		/*
-		 * We want to go after the current request if there is an
-		 * inversion after it (i.e. it is the end of the first
-		 * request list), or if the next request is a larger cylinder
-		 * than our request.
-		 */
-		if (nbq->b_rawblkno < bq->b_rawblkno ||
-		    bp->b_rawblkno < nbq->b_rawblkno)
-			goto insert;
-		bq = nbq;
-	}
-	/*
-	 * Neither a second list nor a larger request... we go at the end of
-	 * the first list, which is the same as the end of the whole schebang.
-	 */
-insert:	BUFQ_INSERT_AFTER(bufq, bq, bp);
-}
-
-/*
- * Seek non-sort for disks.  This version simply inserts requests at
- * the tail of the queue.
- */
-void
-disksort_tail(struct buf_queue *bufq, struct buf *bp)
-{
-
-	BUFQ_INSERT_TAIL(bufq, bp);
-}
+#ifdef NEW_BUFQ_STRATEGY
+int bufq_disk_default_strat = BUFQ_READ_PRIO;
+#else /* NEW_BUFQ_STRATEGY */
+int bufq_disk_default_strat = BUFQ_DISKSORT;
+#endif /* NEW_BUFQ_STRATEGY */
 
 /*
  * Compute checksum for disk label.
@@ -334,6 +133,9 @@ hp0g: hard error reading fsbn 12345 of 12344-12347 (hp0 bn %d cn %d tn %d sn %d)
  * The message should be completed (with at least a newline) with printf
  * or addlog, respectively.  There is no trailing space.
  */
+#ifndef PRIdaddr
+#define PRIdaddr PRId64
+#endif
 void
 diskerr(const struct buf *bp, const char *dname, const char *what, int pri,
     int blkdone, const struct disklabel *lp)
@@ -341,7 +143,11 @@ diskerr(const struct buf *bp, const char *dname, const char *what, int pri,
 	int unit = DISKUNIT(bp->b_dev), part = DISKPART(bp->b_dev);
 	void (*pr)(const char *, ...);
 	char partname = 'a' + part;
-	int sn;
+	daddr_t sn;
+
+	if (/*CONSTCOND*/0)
+		/* Compiler will error this is the format is wrong... */
+		printf("%" PRIdaddr, bp->b_blkno);
 
 	if (pri != LOG_PRINTF) {
 		static const char fmt[] = "";
@@ -353,22 +159,22 @@ diskerr(const struct buf *bp, const char *dname, const char *what, int pri,
 	    bp->b_flags & B_READ ? "read" : "writ");
 	sn = bp->b_blkno;
 	if (bp->b_bcount <= DEV_BSIZE)
-		(*pr)("%d", sn);
+		(*pr)("%" PRIdaddr, sn);
 	else {
 		if (blkdone >= 0) {
 			sn += blkdone;
-			(*pr)("%d of ", sn);
+			(*pr)("%" PRIdaddr " of ", sn);
 		}
-		(*pr)("%d-%d", bp->b_blkno,
+		(*pr)("%" PRIdaddr "-%" PRIdaddr "", bp->b_blkno,
 		    bp->b_blkno + (bp->b_bcount - 1) / DEV_BSIZE);
 	}
 	if (lp && (blkdone >= 0 || bp->b_bcount <= lp->d_secsize)) {
 		sn += lp->d_partitions[part].p_offset;
-		(*pr)(" (%s%d bn %d; cn %d", dname, unit, sn,
-		    sn / lp->d_secpercyl);
+		(*pr)(" (%s%d bn %" PRIdaddr "; cn %" PRIdaddr "",
+		    dname, unit, sn, sn / lp->d_secpercyl);
 		sn %= lp->d_secpercyl;
-		(*pr)(" tn %d sn %d)", sn / lp->d_nsectors,
-		    sn % lp->d_nsectors);
+		(*pr)(" tn %" PRIdaddr " sn %" PRIdaddr ")",
+		    sn / lp->d_nsectors, sn % lp->d_nsectors);
 	}
 }
 
@@ -493,7 +299,7 @@ disk_busy(struct disk *diskp)
  * time, and reset the timestamp.
  */
 void
-disk_unbusy(struct disk *diskp, long bcount)
+disk_unbusy(struct disk *diskp, long bcount, int read)
 {
 	int s;
 	struct timeval dv_time, diff_time;
@@ -512,8 +318,13 @@ disk_unbusy(struct disk *diskp, long bcount)
 
 	diskp->dk_timestamp = dv_time;
 	if (bcount > 0) {
-		diskp->dk_bytes += bcount;
-		diskp->dk_xfer++;
+		if (read) {
+			diskp->dk_rbytes += bcount;
+			diskp->dk_rxfer++;
+		} else {
+			diskp->dk_wbytes += bcount;
+			diskp->dk_wxfer++;
+		}
 	}
 }
 
@@ -528,8 +339,10 @@ disk_resetstat(struct disk *diskp)
 {
 	int s = splbio(), t;
 
-	diskp->dk_xfer = 0;
-	diskp->dk_bytes = 0;
+	diskp->dk_rxfer = 0;
+	diskp->dk_rbytes = 0;
+	diskp->dk_wxfer = 0;
+	diskp->dk_wbytes = 0;
 
 	t = splclock();
 	diskp->dk_attachtime = mono_time;
@@ -541,18 +354,23 @@ disk_resetstat(struct disk *diskp)
 }
 
 int
-sysctl_disknames(void *vwhere, size_t *sizep)
+sysctl_hw_disknames(SYSCTLFN_ARGS)
 {
 	char buf[DK_DISKNAMELEN + 1];
-	char *where = vwhere;
+	char *where = oldp;
 	struct disk *diskp;
 	size_t needed, left, slen;
 	int error, first;
 
+	if (newp != NULL)
+		return (EPERM);
+	if (namelen != 0)
+		return (EINVAL);
+
 	first = 1;
 	error = 0;
 	needed = 0;
-	left = *sizep;
+	left = *oldlenp;
 
 	simple_lock(&disklist_slock);
 	for (diskp = TAILQ_FIRST(&disklist); diskp != NULL;
@@ -583,42 +401,60 @@ sysctl_disknames(void *vwhere, size_t *sizep)
 		}
 	}
 	simple_unlock(&disklist_slock);
-	*sizep = needed;
+	*oldlenp = needed;
 	return (error);
 }
 
 int
-sysctl_diskstats(int *name, u_int namelen, void *vwhere, size_t *sizep)
+sysctl_hw_diskstats(SYSCTLFN_ARGS)
 {
 	struct disk_sysctl sdisk;
 	struct disk *diskp;
-	char *where = vwhere;
+	char *where = oldp;
 	size_t tocopy, left;
 	int error;
 
-	if (where == NULL) {
-		*sizep = disk_count * sizeof(struct disk_sysctl);
-		return (0);
-	}
+	if (newp != NULL)
+		return (EPERM);
 
+	/*
+	 * The original hw.diskstats call was broken and did not require
+	 * the userland to pass in it's size of struct disk_sysctl.  This
+	 * was fixed after NetBSD 1.6 was released, and any applications
+	 * that do not pass in the size are given an error only, unless
+	 * we care about 1.6 compatibility.
+	 */
 	if (namelen == 0)
-		tocopy = sizeof(sdisk);
+#ifdef COMPAT_16
+		tocopy = offsetof(struct disk_sysctl, dk_rxfer);
+#else
+		return (EINVAL);
+#endif
 	else
 		tocopy = name[0];
 
+	if (where == NULL) {
+		*oldlenp = disk_count * tocopy;
+		return (0);
+	}
+
 	error = 0;
-	left = *sizep;
+	left = *oldlenp;
 	memset(&sdisk, 0, sizeof(sdisk));
-	*sizep = 0;
+	*oldlenp = 0;
 
 	simple_lock(&disklist_slock);
 	TAILQ_FOREACH(diskp, &disklist, dk_link) {
-		if (left < sizeof(struct disk_sysctl))
+		if (left < tocopy)
 			break;
 		strncpy(sdisk.dk_name, diskp->dk_name, sizeof(sdisk.dk_name));
-		sdisk.dk_xfer = diskp->dk_xfer;
+		sdisk.dk_xfer = diskp->dk_rxfer + diskp->dk_wxfer;
+		sdisk.dk_rxfer = diskp->dk_rxfer;
+		sdisk.dk_wxfer = diskp->dk_wxfer;
 		sdisk.dk_seek = diskp->dk_seek;
-		sdisk.dk_bytes = diskp->dk_bytes;
+		sdisk.dk_bytes = diskp->dk_rbytes + diskp->dk_wbytes;
+		sdisk.dk_rbytes = diskp->dk_rbytes;
+		sdisk.dk_wbytes = diskp->dk_wbytes;
 		sdisk.dk_attachtime_sec = diskp->dk_attachtime.tv_sec;
 		sdisk.dk_attachtime_usec = diskp->dk_attachtime.tv_usec;
 		sdisk.dk_timestamp_sec = diskp->dk_timestamp.tv_sec;
@@ -631,9 +467,667 @@ sysctl_diskstats(int *name, u_int namelen, void *vwhere, size_t *sizep)
 		if (error)
 			break;
 		where += tocopy;
-		*sizep += tocopy;
+		*oldlenp += tocopy;
 		left -= tocopy;
 	}
 	simple_unlock(&disklist_slock);
 	return (error);
+}
+
+struct bufq_fcfs {
+	TAILQ_HEAD(, buf) bq_head;	/* actual list of buffers */
+};
+
+struct bufq_disksort {
+	TAILQ_HEAD(, buf) bq_head;	/* actual list of buffers */
+};
+
+#define PRIO_READ_BURST		48
+#define PRIO_WRITE_REQ		16
+
+struct bufq_prio {
+	TAILQ_HEAD(, buf) bq_read, bq_write; /* actual list of buffers */
+	struct buf *bq_write_next;	/* next request in bq_write */
+	struct buf *bq_next;		/* current request */
+	int bq_read_burst;		/* # of consecutive reads */
+};
+
+
+static __inline int buf_inorder(const struct buf *, const struct buf *, int);
+
+/*
+ * Check if two buf's are in ascending order.
+ */
+static __inline int
+buf_inorder(const struct buf *bp, const struct buf *bq, int sortby)
+{
+
+	if (bp == NULL || bq == NULL)
+		return (bq == NULL);
+
+	if (sortby == BUFQ_SORT_CYLINDER) {
+		if (bp->b_cylinder != bq->b_cylinder)
+			return bp->b_cylinder < bq->b_cylinder;
+		else
+			return bp->b_rawblkno < bq->b_rawblkno;
+	} else
+		return bp->b_rawblkno < bq->b_rawblkno;
+}
+
+
+/*
+ * First-come first-served sort for disks.
+ *
+ * Requests are appended to the queue without any reordering.
+ */
+static void
+bufq_fcfs_put(struct bufq_state *bufq, struct buf *bp)
+{
+	struct bufq_fcfs *fcfs = bufq->bq_private;
+
+	TAILQ_INSERT_TAIL(&fcfs->bq_head, bp, b_actq);
+}
+
+static struct buf *
+bufq_fcfs_get(struct bufq_state *bufq, int remove)
+{
+	struct bufq_fcfs *fcfs = bufq->bq_private;
+	struct buf *bp;
+
+	bp = TAILQ_FIRST(&fcfs->bq_head);
+
+	if (bp != NULL && remove)
+		TAILQ_REMOVE(&fcfs->bq_head, bp, b_actq);
+
+	return (bp);
+}
+
+
+/*
+ * Seek sort for disks.
+ *
+ * There are actually two queues, sorted in ascendening order.  The first
+ * queue holds those requests which are positioned after the current block;
+ * the second holds requests which came in after their position was passed.
+ * Thus we implement a one-way scan, retracting after reaching the end of
+ * the drive to the first request on the second queue, at which time it
+ * becomes the first queue.
+ *
+ * A one-way scan is natural because of the way UNIX read-ahead blocks are
+ * allocated.
+ */
+static void
+bufq_disksort_put(struct bufq_state *bufq, struct buf *bp)
+{
+	struct bufq_disksort *disksort = bufq->bq_private;
+	struct buf *bq, *nbq;
+	int sortby;
+
+	sortby = bufq->bq_flags & BUFQ_SORT_MASK;
+
+	bq = TAILQ_FIRST(&disksort->bq_head);
+
+	/*
+	 * If the queue is empty it's easy; we just go on the end.
+	 */
+	if (bq == NULL) {
+		TAILQ_INSERT_TAIL(&disksort->bq_head, bp, b_actq);
+		return;
+	}
+
+	/*
+	 * If we lie before the currently active request, then we
+	 * must locate the second request list and add ourselves to it.
+	 */
+	if (buf_inorder(bp, bq, sortby)) {
+		while ((nbq = TAILQ_NEXT(bq, b_actq)) != NULL) {
+			/*
+			 * Check for an ``inversion'' in the normally ascending
+			 * block numbers, indicating the start of the second
+			 * request list.
+			 */
+			if (buf_inorder(nbq, bq, sortby)) {
+				/*
+				 * Search the second request list for the first
+				 * request at a larger block number.  We go
+				 * after that; if there is no such request, we
+				 * go at the end.
+				 */
+				do {
+					if (buf_inorder(bp, nbq, sortby))
+						goto insert;
+					bq = nbq;
+				} while ((nbq =
+				    TAILQ_NEXT(bq, b_actq)) != NULL);
+				goto insert;		/* after last */
+			}
+			bq = nbq;
+		}
+		/*
+		 * No inversions... we will go after the last, and
+		 * be the first request in the second request list.
+		 */
+		goto insert;
+	}
+	/*
+	 * Request is at/after the current request...
+	 * sort in the first request list.
+	 */
+	while ((nbq = TAILQ_NEXT(bq, b_actq)) != NULL) {
+		/*
+		 * We want to go after the current request if there is an
+		 * inversion after it (i.e. it is the end of the first
+		 * request list), or if the next request is a larger cylinder
+		 * than our request.
+		 */
+		if (buf_inorder(nbq, bq, sortby) ||
+		    buf_inorder(bp, nbq, sortby))
+			goto insert;
+		bq = nbq;
+	}
+	/*
+	 * Neither a second list nor a larger request... we go at the end of
+	 * the first list, which is the same as the end of the whole schebang.
+	 */
+insert:	TAILQ_INSERT_AFTER(&disksort->bq_head, bq, bp, b_actq);
+}
+
+static struct buf *
+bufq_disksort_get(struct bufq_state *bufq, int remove)
+{
+	struct bufq_disksort *disksort = bufq->bq_private;
+	struct buf *bp;
+
+	bp = TAILQ_FIRST(&disksort->bq_head);
+
+	if (bp != NULL && remove)
+		TAILQ_REMOVE(&disksort->bq_head, bp, b_actq);
+
+	return (bp);
+}
+
+
+/*
+ * Seek sort for disks.
+ *
+ * There are two queues.  The first queue holds read requests; the second
+ * holds write requests.  The read queue is first-come first-served; the
+ * write queue is sorted in ascendening block order.
+ * The read queue is processed first.  After PRIO_READ_BURST consecutive
+ * read requests with non-empty write queue PRIO_WRITE_REQ requests from
+ * the write queue will be processed.
+ */
+static void
+bufq_prio_put(struct bufq_state *bufq, struct buf *bp)
+{
+	struct bufq_prio *prio = bufq->bq_private;
+	struct buf *bq;
+	int sortby;
+
+	sortby = bufq->bq_flags & BUFQ_SORT_MASK;
+
+	/*
+	 * If it's a read request append it to the list.
+	 */
+	if ((bp->b_flags & B_READ) == B_READ) {
+		TAILQ_INSERT_TAIL(&prio->bq_read, bp, b_actq);
+		return;
+	}
+
+	bq = TAILQ_FIRST(&prio->bq_write);
+
+	/*
+	 * If the write list is empty, simply append it to the list.
+	 */
+	if (bq == NULL) {
+		TAILQ_INSERT_TAIL(&prio->bq_write, bp, b_actq);
+		prio->bq_write_next = bp;
+		return;
+	}
+
+	/*
+	 * If we lie after the next request, insert after this request.
+	 */
+	if (buf_inorder(prio->bq_write_next, bp, sortby))
+		bq = prio->bq_write_next;
+
+	/*
+	 * Search for the first request at a larger block number.
+	 * We go before this request if it exists.
+	 */
+	while (bq != NULL && buf_inorder(bq, bp, sortby))
+		bq = TAILQ_NEXT(bq, b_actq);
+
+	if (bq != NULL)
+		TAILQ_INSERT_BEFORE(bq, bp, b_actq);
+	else
+		TAILQ_INSERT_TAIL(&prio->bq_write, bp, b_actq);
+}
+
+static struct buf *
+bufq_prio_get(struct bufq_state *bufq, int remove)
+{
+	struct bufq_prio *prio = bufq->bq_private;
+	struct buf *bp;
+
+	/*
+	 * If no current request, get next from the lists.
+	 */
+	if (prio->bq_next == NULL) {
+		/*
+		 * If at least one list is empty, select the other.
+		 */
+		if (TAILQ_FIRST(&prio->bq_read) == NULL) {
+			prio->bq_next = prio->bq_write_next;
+			prio->bq_read_burst = 0;
+		} else if (prio->bq_write_next == NULL) {
+			prio->bq_next = TAILQ_FIRST(&prio->bq_read);
+			prio->bq_read_burst = 0;
+		} else {
+			/*
+			 * Both list have requests.  Select the read list up
+			 * to PRIO_READ_BURST times, then select the write
+			 * list PRIO_WRITE_REQ times.
+			 */
+			if (prio->bq_read_burst++ < PRIO_READ_BURST)
+				prio->bq_next = TAILQ_FIRST(&prio->bq_read);
+			else if (prio->bq_read_burst <
+			    PRIO_READ_BURST + PRIO_WRITE_REQ)
+				prio->bq_next = prio->bq_write_next;
+			else {
+				prio->bq_next = TAILQ_FIRST(&prio->bq_read);
+				prio->bq_read_burst = 0;
+			}
+		}
+	}
+
+	bp = prio->bq_next;
+
+	if (bp != NULL && remove) {
+		if ((bp->b_flags & B_READ) == B_READ)
+			TAILQ_REMOVE(&prio->bq_read, bp, b_actq);
+		else {
+			/*
+			 * Advance the write pointer before removing
+			 * bp since it is actually prio->bq_write_next.
+			 */
+			prio->bq_write_next =
+			    TAILQ_NEXT(prio->bq_write_next, b_actq);
+			TAILQ_REMOVE(&prio->bq_write, bp, b_actq);
+			if (prio->bq_write_next == NULL)
+				prio->bq_write_next =
+				    TAILQ_FIRST(&prio->bq_write);
+		}
+
+		prio->bq_next = NULL;
+	}
+
+	return (bp);
+}
+
+
+/*
+ * Cyclical scan (CSCAN)
+ */
+TAILQ_HEAD(bqhead, buf);
+struct cscan_queue {
+	struct bqhead cq_head[2];	/* actual lists of buffers */
+	int cq_idx;			/* current list index */
+	int cq_lastcylinder;		/* b_cylinder of the last request */
+	daddr_t cq_lastrawblkno;	/* b_rawblkno of the last request */
+};
+
+static int __inline cscan_empty(const struct cscan_queue *);
+static void cscan_put(struct cscan_queue *, struct buf *, int);
+static struct buf *cscan_get(struct cscan_queue *, int);
+static void cscan_init(struct cscan_queue *);
+
+static __inline int
+cscan_empty(const struct cscan_queue *q)
+{
+
+	return TAILQ_EMPTY(&q->cq_head[0]) && TAILQ_EMPTY(&q->cq_head[1]);
+}
+
+static void
+cscan_put(struct cscan_queue *q, struct buf *bp, int sortby)
+{
+	struct buf tmp;
+	struct buf *it;
+	struct bqhead *bqh;
+	int idx;
+
+	tmp.b_cylinder = q->cq_lastcylinder;
+	tmp.b_rawblkno = q->cq_lastrawblkno;
+
+	if (buf_inorder(bp, &tmp, sortby))
+		idx = 1 - q->cq_idx;
+	else
+		idx = q->cq_idx;
+
+	bqh = &q->cq_head[idx];
+
+	TAILQ_FOREACH(it, bqh, b_actq)
+		if (buf_inorder(bp, it, sortby))
+			break;
+
+	if (it != NULL)
+		TAILQ_INSERT_BEFORE(it, bp, b_actq);
+	else
+		TAILQ_INSERT_TAIL(bqh, bp, b_actq);
+}
+
+static struct buf *
+cscan_get(struct cscan_queue *q, int remove)
+{
+	int idx = q->cq_idx;
+	struct bqhead *bqh;
+	struct buf *bp;
+
+	bqh = &q->cq_head[idx];
+	bp = TAILQ_FIRST(bqh);
+
+	if (bp == NULL) {
+		/* switch queue */
+		idx = 1 - idx;
+		bqh = &q->cq_head[idx];
+		bp = TAILQ_FIRST(bqh);
+	}
+
+	KDASSERT((bp != NULL && !cscan_empty(q)) ||
+	         (bp == NULL && cscan_empty(q)));
+
+	if (bp != NULL && remove) {
+		q->cq_idx = idx;
+		TAILQ_REMOVE(bqh, bp, b_actq);
+
+		q->cq_lastcylinder = bp->b_cylinder;
+		q->cq_lastrawblkno =
+		    bp->b_rawblkno + (bp->b_bcount >> DEV_BSHIFT);
+	}
+
+	return (bp);
+}
+
+static void
+cscan_init(struct cscan_queue *q)
+{
+
+	TAILQ_INIT(&q->cq_head[0]);
+	TAILQ_INIT(&q->cq_head[1]);
+}
+
+
+/*
+ * Per-prioritiy CSCAN.
+ *
+ * XXX probably we should have a way to raise
+ * priority of the on-queue requests.
+ */
+#define	PRIOCSCAN_NQUEUE	3
+
+struct priocscan_queue {
+	struct cscan_queue q_queue;
+	int q_burst;
+};
+
+struct bufq_priocscan {
+	struct priocscan_queue bq_queue[PRIOCSCAN_NQUEUE];
+
+#if 0
+	/*
+	 * XXX using "global" head position can reduce positioning time
+	 * when switching between queues.
+	 * although it might affect against fairness.
+	 */
+	daddr_t bq_lastrawblkno;
+	int bq_lastcylinder;
+#endif
+};
+
+/*
+ * how many requests to serve when having pending requests on other queues.
+ *
+ * XXX tune
+ */
+const int priocscan_burst[] = {
+	64, 16, 4
+};
+
+static void bufq_priocscan_put(struct bufq_state *, struct buf *);
+static struct buf *bufq_priocscan_get(struct bufq_state *, int);
+static void bufq_priocscan_init(struct bufq_state *);
+static __inline struct cscan_queue *bufq_priocscan_selectqueue(
+    struct bufq_priocscan *, const struct buf *);
+
+static __inline struct cscan_queue *
+bufq_priocscan_selectqueue(struct bufq_priocscan *q, const struct buf *bp)
+{
+	static const int priocscan_priomap[] = {
+		[BPRIO_TIMENONCRITICAL] = 2,
+		[BPRIO_TIMELIMITED] = 1,
+		[BPRIO_TIMECRITICAL] = 0
+	};
+
+	return &q->bq_queue[priocscan_priomap[BIO_GETPRIO(bp)]].q_queue;
+}
+
+static void
+bufq_priocscan_put(struct bufq_state *bufq, struct buf *bp)
+{
+	struct bufq_priocscan *q = bufq->bq_private;
+	struct cscan_queue *cq;
+	const int sortby = bufq->bq_flags & BUFQ_SORT_MASK;
+
+	cq = bufq_priocscan_selectqueue(q, bp);
+	cscan_put(cq, bp, sortby);
+}
+
+static struct buf *
+bufq_priocscan_get(struct bufq_state *bufq, int remove)
+{
+	struct bufq_priocscan *q = bufq->bq_private;
+	struct priocscan_queue *pq, *npq;
+	struct priocscan_queue *first; /* first non-empty queue */
+	const struct priocscan_queue *epq;
+	const struct cscan_queue *cq;
+	struct buf *bp;
+	boolean_t single; /* true if there's only one non-empty queue */
+
+	pq = &q->bq_queue[0];
+	epq = pq + PRIOCSCAN_NQUEUE;
+	for (; pq < epq; pq++) {
+		cq = &pq->q_queue;
+		if (!cscan_empty(cq))
+			break;
+	}
+	if (pq == epq) {
+		/* there's no requests */
+		return NULL;
+	}
+
+	first = pq;
+	single = TRUE;
+	for (npq = first + 1; npq < epq; npq++) {
+		cq = &npq->q_queue;
+		if (!cscan_empty(cq)) {
+			single = FALSE;
+			if (pq->q_burst > 0)
+				break;
+			pq = npq;
+		}
+	}
+	if (single) {
+		/*
+		 * there's only a non-empty queue.  just serve it.
+		 */
+		pq = first;
+	} else if (pq->q_burst > 0) {
+		/*
+		 * XXX account only by number of requests.  is it good enough?
+		 */
+		pq->q_burst--;
+	} else {
+		/*
+		 * no queue was selected due to burst counts
+		 */
+		int i;
+#ifdef DEBUG
+		for (i = 0; i < PRIOCSCAN_NQUEUE; i++) {
+			pq = &q->bq_queue[i];
+			cq = &pq->q_queue;
+			if (!cscan_empty(cq) && pq->q_burst)
+				panic("%s: inconsist", __func__);
+		}
+#endif /* DEBUG */
+
+		/*
+		 * reset burst counts
+		 */
+		for (i = 0; i < PRIOCSCAN_NQUEUE; i++) {
+			pq = &q->bq_queue[i];
+			pq->q_burst = priocscan_burst[i];
+		}
+
+		/*
+		 * serve first non-empty queue.
+		 */
+		pq = first;
+	}
+
+	KDASSERT(!cscan_empty(&pq->q_queue));
+	bp = cscan_get(&pq->q_queue, remove);
+	KDASSERT(bp != NULL);
+	KDASSERT(&pq->q_queue == bufq_priocscan_selectqueue(q, bp));
+
+	return bp;
+}
+
+static void
+bufq_priocscan_init(struct bufq_state *bufq)
+{
+	struct bufq_priocscan *q;
+	int i;
+
+	bufq->bq_get = bufq_priocscan_get;
+	bufq->bq_put = bufq_priocscan_put;
+	bufq->bq_private = malloc(sizeof(struct bufq_priocscan),
+	    M_DEVBUF, M_ZERO);
+
+	q = bufq->bq_private;
+	for (i = 0; i < PRIOCSCAN_NQUEUE; i++) {
+		struct cscan_queue *cq = &q->bq_queue[i].q_queue;
+
+		cscan_init(cq);
+	}
+}
+
+
+/*
+ * Create a device buffer queue.
+ */
+void
+bufq_alloc(struct bufq_state *bufq, int flags)
+{
+	struct bufq_fcfs *fcfs;
+	struct bufq_disksort *disksort;
+	struct bufq_prio *prio;
+
+	bufq->bq_flags = flags;
+
+	switch (flags & BUFQ_SORT_MASK) {
+	case BUFQ_SORT_RAWBLOCK:
+	case BUFQ_SORT_CYLINDER:
+		break;
+	case 0:
+		if ((flags & BUFQ_METHOD_MASK) == BUFQ_FCFS)
+			break;
+		/* FALLTHROUGH */
+	default:
+		panic("bufq_alloc: sort out of range");
+	}
+
+	switch (flags & BUFQ_METHOD_MASK) {
+	case BUFQ_FCFS:
+		bufq->bq_get = bufq_fcfs_get;
+		bufq->bq_put = bufq_fcfs_put;
+		MALLOC(bufq->bq_private, struct bufq_fcfs *,
+		    sizeof(struct bufq_fcfs), M_DEVBUF, M_ZERO);
+		fcfs = (struct bufq_fcfs *)bufq->bq_private;
+		TAILQ_INIT(&fcfs->bq_head);
+		break;
+	case BUFQ_DISKSORT:
+		bufq->bq_get = bufq_disksort_get;
+		bufq->bq_put = bufq_disksort_put;
+		MALLOC(bufq->bq_private, struct bufq_disksort *,
+		    sizeof(struct bufq_disksort), M_DEVBUF, M_ZERO);
+		disksort = (struct bufq_disksort *)bufq->bq_private;
+		TAILQ_INIT(&disksort->bq_head);
+		break;
+	case BUFQ_READ_PRIO:
+		bufq->bq_get = bufq_prio_get;
+		bufq->bq_put = bufq_prio_put;
+		MALLOC(bufq->bq_private, struct bufq_prio *,
+		    sizeof(struct bufq_prio), M_DEVBUF, M_ZERO);
+		prio = (struct bufq_prio *)bufq->bq_private;
+		TAILQ_INIT(&prio->bq_read);
+		TAILQ_INIT(&prio->bq_write);
+		break;
+	case BUFQ_PRIOCSCAN:
+		bufq_priocscan_init(bufq);
+		break;
+	default:
+		panic("bufq_alloc: method out of range");
+	}
+}
+
+/*
+ * Destroy a device buffer queue.
+ */
+void
+bufq_free(struct bufq_state *bufq)
+{
+
+	KASSERT(bufq->bq_private != NULL);
+	KASSERT(BUFQ_PEEK(bufq) == NULL);
+
+	FREE(bufq->bq_private, M_DEVBUF);
+	bufq->bq_get = NULL;
+	bufq->bq_put = NULL;
+}
+
+/*
+ * Bounds checking against the media size, used for the raw partition.
+ * The sector size passed in should currently always be DEV_BSIZE,
+ * and the media size the size of the device in DEV_BSIZE sectors.
+ */
+int
+bounds_check_with_mediasize(struct buf *bp, int secsize, u_int64_t mediasize)
+{
+	int sz;
+
+	sz = howmany(bp->b_bcount, secsize);
+
+	if (bp->b_blkno + sz > mediasize) {
+		sz = mediasize - bp->b_blkno;
+		if (sz == 0) {
+			/* If exactly at end of disk, return EOF. */
+			bp->b_resid = bp->b_bcount;
+			goto done;
+		}
+		if (sz < 0) {
+			/* If past end of disk, return EINVAL. */
+			bp->b_error = EINVAL;
+			goto bad;
+		}
+		/* Otherwise, truncate request. */
+		bp->b_bcount = sz << DEV_BSHIFT;
+	}
+
+	return 1;
+
+bad:
+	bp->b_flags |= B_ERROR;
+done:
+	return 0;
 }

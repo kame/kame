@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ep_mca.c,v 1.7 2001/11/28 20:56:47 jdolecek Exp $	*/
+/*	$NetBSD: if_ep_mca.c,v 1.11 2003/10/25 18:37:03 christos Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -76,7 +76,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ep_mca.c,v 1.7 2001/11/28 20:56:47 jdolecek Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ep_mca.c,v 1.11 2003/10/25 18:37:03 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -109,9 +109,8 @@ __KERNEL_RCSID(0, "$NetBSD: if_ep_mca.c,v 1.7 2001/11/28 20:56:47 jdolecek Exp $
 int ep_mca_match __P((struct device *, struct cfdata *, void *));
 void ep_mca_attach __P((struct device *, struct device *, void *));
 
-struct cfattach ep_mca_ca = {
-	sizeof(struct ep_softc), ep_mca_match, ep_mca_attach
-};
+CFATTACH_DECL(ep_mca, sizeof(struct ep_softc),
+    ep_mca_match, ep_mca_attach, NULL, NULL);
 
 const struct ep_mca_product {
 	u_int32_t	epp_prodid;	/* MCA product ID */
@@ -255,6 +254,10 @@ ep_mca_attach(parent, self, aux)
 		/* BNC */
 		media = IFM_10_2;
 		break;
+	default:
+		printf("%s: cannot determine media\n",
+		    sc->sc_dev.dv_xname);
+		return;
 	}
 	ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER|media);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.9.4.1 2002/12/07 20:42:10 he Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.19 2003/05/22 05:25:48 thorpej Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002 Wasabi Systems, Inc.
@@ -47,7 +47,6 @@
 #include <sys/lock.h>		/* struct simplelock */ 
 #include <arm/arm32/pte.h>	/* pt_entry_t */
 
-#define	USRTEXT		VM_MIN_ADDRESS
 #define	USRSTACK	VM_MAXUSER_ADDRESS
 
 /*
@@ -84,24 +83,23 @@
 #define	PAGE_MASK	(PAGE_SIZE - 1)
 
 /*
- * Linear page table space: number of PTEs required to map the 4G address
- * space * size of each PTE.
- */
-#define	PAGE_TABLE_SPACE	((1 << (32 - PGSHIFT)) * sizeof(pt_entry_t))
-
-/* Address where the page talbles are mapped. */
-#define	PTE_BASE		(KERNEL_BASE - PAGE_TABLE_SPACE)
-
-/*
  * Mach derived constants
  */
 #define	VM_MIN_ADDRESS		((vaddr_t) 0x00001000)
-#define	VM_MAXUSER_ADDRESS	((vaddr_t) (PTE_BASE - UPAGES * NBPG))
-#define	VM_MAX_ADDRESS		((vaddr_t) (PTE_BASE + \
-					    (KERNEL_BASE >> PGSHIFT) * \
-					    sizeof(pt_entry_t)))
-#define	VM_MIN_KERNEL_ADDRESS	((vaddr_t) KERNEL_TEXT_BASE)
+#define	VM_MAXUSER_ADDRESS	((vaddr_t) KERNEL_BASE)
+#define	VM_MAX_ADDRESS		VM_MAXUSER_ADDRESS
+
+#define	VM_MIN_KERNEL_ADDRESS	((vaddr_t) KERNEL_BASE)
 #define	VM_MAX_KERNEL_ADDRESS	((vaddr_t) 0xffffffff)
+
+/* XXX max. amount of KVM to be used by buffers. */
+#ifndef VM_MAX_KERNEL_BUF
+extern vaddr_t virtual_avail;
+extern vaddr_t virtual_end;
+
+#define	VM_MAX_KERNEL_BUF	\
+	((virtual_end - virtual_avail) * 4 / 10)
+#endif
 
 /*
  * pmap-specific data store in the vm_page structure.
@@ -111,12 +109,15 @@ struct vm_page_md {
 	struct pv_entry *pvh_list;		/* pv_entry list */
 	struct simplelock pvh_slock;		/* lock on this head */
 	int pvh_attrs;				/* page attributes */
-#ifdef PMAP_ALIAS_DEBUG
-	u_int ro_mappings;
-	u_int rw_mappings;
-	u_int kro_mappings;
-	u_int krw_mappings;
-#endif /* PMAP_ALIAS_DEBUG */
+	u_int uro_mappings;
+	u_int urw_mappings;
+	union {
+		u_short s_mappings[2];	/* Assume kernel count <= 65535 */
+		u_int i_mappings;
+	} k_u;
+#define	kro_mappings	k_u.s_mappings[0]
+#define	krw_mappings	k_u.s_mappings[1]
+#define	k_mappings	k_u.i_mappings
 };
 
 #define	VM_MDPAGE_INIT(pg)						\
@@ -124,6 +125,9 @@ do {									\
 	(pg)->mdpage.pvh_list = NULL;					\
 	simple_lock_init(&(pg)->mdpage.pvh_slock);			\
 	(pg)->mdpage.pvh_attrs = 0;					\
+	(pg)->mdpage.uro_mappings = 0;					\
+	(pg)->mdpage.urw_mappings = 0;					\
+	(pg)->mdpage.k_mappings = 0;					\
 } while (/*CONSTCOND*/0)
 
 #endif /* _KERNEL */

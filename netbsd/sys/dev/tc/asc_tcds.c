@@ -1,4 +1,4 @@
-/* $NetBSD: asc_tcds.c,v 1.5 2001/11/15 09:48:19 lukem Exp $ */
+/* $NetBSD: asc_tcds.c,v 1.11 2003/05/03 18:11:40 wiz Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -67,12 +67,14 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: asc_tcds.c,v 1.5 2001/11/15 09:48:19 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: asc_tcds.c,v 1.11 2003/05/03 18:11:40 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
 #include <sys/buf.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <dev/scsipi/scsi_all.h>
 #include <dev/scsipi/scsipi_all.h>
@@ -91,7 +93,7 @@ struct asc_softc {
 	struct ncr53c9x_softc sc_ncr53c9x;	/* glue to MI code */
 	bus_space_tag_t sc_bst;			/* bus space tag */
 	bus_space_handle_t sc_scsi_bsh;		/* ASC register handle */
-	bus_dma_tag_t sc_dmat;			/* bus dma tag */
+	bus_dma_tag_t sc_dmat;			/* bus DMA tag */
 	bus_dmamap_t sc_dmamap;			/* bus dmamap */
 	caddr_t *sc_dmaaddr;
 	size_t *sc_dmalen;
@@ -106,10 +108,8 @@ struct asc_softc {
 static int  asc_tcds_match  __P((struct device *, struct cfdata *, void *));
 static void asc_tcds_attach __P((struct device *, struct device *, void *));
 
-/* Linkup to the rest of the kernel */
-struct cfattach asc_tcds_ca = {
-	sizeof(struct asc_softc), asc_tcds_match, asc_tcds_attach
-};
+CFATTACH_DECL(asc_tcds, sizeof(struct asc_softc),
+    asc_tcds_match, asc_tcds_attach, NULL, NULL);
 
 /*
  * Functions and the switch for the MI code.
@@ -150,7 +150,7 @@ asc_tcds_match(parent, cf, aux)
 	return 1;
 }
 
-#define DMAMAX(a)	(NBPG - ((a) & (NBPG - 1)))
+#define DMAMAX(a)	(PAGE_SIZE - ((a) & (PAGE_SIZE - 1)))
 
 /*
  * Attach this instance, and then all the sub-devices
@@ -181,15 +181,15 @@ asc_tcds_attach(parent, self, aux)
 	 * to support 8k transfers.
 	 */
 	asc->sc_dmat = tcdsdev->tcdsda_dmat;
-	if ((error = bus_dmamap_create(asc->sc_dmat, NBPG, 1, NBPG,
-	    NBPG, BUS_DMA_NOWAIT, &asc->sc_dmamap)) < 0) {
-		printf("failed to create dma map, error = %d\n", error);
+	if ((error = bus_dmamap_create(asc->sc_dmat, PAGE_SIZE, 1, PAGE_SIZE,
+	    PAGE_SIZE, BUS_DMA_NOWAIT, &asc->sc_dmamap)) < 0) {
+		printf("failed to create DMA map, error = %d\n", error);
 	}
 
 	sc->sc_id = tcdsdev->tcdsda_id;
 	sc->sc_freq = tcdsdev->tcdsda_freq;
 
-	/* gimme Mhz */
+	/* gimme MHz */
 	sc->sc_freq /= 1000000;
 
 	tcds_intr_establish(parent, tcdsdev->tcdsda_chip, ncr53c9x_intr, sc);
@@ -254,7 +254,7 @@ tcds_dma_reset(sc)
 }
 
 /*
- * start a dma transfer or keep it going
+ * start a DMA transfer or keep it going
  */
 int
 tcds_dma_setup(sc, addr, len, ispullup, dmasize)

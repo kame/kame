@@ -1,4 +1,4 @@
-/*	$NetBSD: vsbus.c,v 1.32 2001/05/16 05:36:56 matt Exp $ */
+/*	$NetBSD: vsbus.c,v 1.44.2.1 2004/05/05 15:31:38 tron Exp $ */
 /*
  * Copyright (c) 1996, 1999 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -32,6 +32,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vsbus.c,v 1.44.2.1 2004/05/05 15:31:38 tron Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -40,9 +43,7 @@
 #include <sys/ioctl.h>
 #include <sys/proc.h>
 #include <sys/user.h>
-#include <sys/map.h>
 #include <sys/device.h>
-#include <sys/dkstat.h>
 #include <sys/disklabel.h>
 #include <sys/syslog.h>
 #include <sys/stat.h>
@@ -98,9 +99,8 @@ static struct vax_bus_dma_tag vsbus_bus_dma_tag = {
 extern struct vax_bus_space vax_mem_bus_space;
 static SIMPLEQ_HEAD(, vsbus_dma) vsbus_dma;
 
-struct	cfattach vsbus_ca = { 
-	sizeof(struct vsbus_softc), vsbus_match, vsbus_attach
-};
+CFATTACH_DECL(vsbus, sizeof(struct vsbus_softc),
+    vsbus_match, vsbus_attach, NULL, NULL);
 
 int
 vsbus_print(aux, name)
@@ -109,7 +109,7 @@ vsbus_print(aux, name)
 {
 	struct vsbus_attach_args *va = aux;
 
-	printf(" csr 0x%lx vec %o ipl %x maskbit %d", va->va_paddr,
+	aprint_normal(" csr 0x%lx vec %o ipl %x maskbit %d", va->va_paddr,
 	    va->va_cvec & 511, va->va_br, va->va_maskno - 1);
 	return(UNCONF); 
 }
@@ -224,7 +224,7 @@ vsbus_search(parent, cf, aux)
 	*sc->sc_intclr = 0xff;
 	scb_vecref(0, 0); /* Clear vector ref */
 
-	i = (*cf->cf_attach->ca_match) (parent, cf, &va);
+	i = config_match(parent, cf, &va);
 	vax_unmap_physmem(va.va_addr, 1);
 	c = *sc->sc_intreq & ~sc->sc_mask;
 	if (i == 0)
@@ -255,7 +255,7 @@ vsbus_search(parent, cf, aux)
 
 fail:
 	printf("%s%d at %s csr 0x%x %s\n",
-	    cf->cf_driver->cd_name, cf->cf_unit, parent->dv_xname,
+	    cf->cf_name, cf->cf_unit, parent->dv_xname,
 	    cf->cf_loc[0], (i ? "zero vector" : "didn't interrupt"));
 forgetit:
 	return 0;
@@ -311,11 +311,20 @@ vsbus_copytoproc(struct proc *p, caddr_t from, caddr_t to, int len)
 		bcopy(from, to, len);
 		return;
 	}
-	pte = uvtopte(trunc_page((vaddr_t)to), &p->p_addr->u_pcb);
+
+#ifdef DIAGNOSTIC
+	if (p == NULL)
+		panic("vsbus_copytoproc: no proc");
+#endif
+
+	if ((vaddr_t)to & 0x40000000)
+		pte = &p->p_vmspace->vm_map.pmap->pm_p1br[vax_btop((vaddr_t)to & ~0x40000000)];
+	else
+		pte = &p->p_vmspace->vm_map.pmap->pm_p0br[vax_btop((vaddr_t)to)];
 	if ((vaddr_t)to & PGOFSET) {
 		int cz = round_page((vaddr_t)to) - (vaddr_t)to;
 
-		pa = (pte->pg_pfn << VAX_PGSHIFT) | (NBPG - cz) | KERNBASE;
+		pa = (pte->pg_pfn << VAX_PGSHIFT) | (PAGE_SIZE - cz) | KERNBASE;
 		bcopy(from, (caddr_t)pa, min(cz, len));
 		from += cz;
 		to += cz;
@@ -324,10 +333,10 @@ vsbus_copytoproc(struct proc *p, caddr_t from, caddr_t to, int len)
 	}
 	while (len > 0) {
 		pa = (pte->pg_pfn << VAX_PGSHIFT) | KERNBASE;
-		bcopy(from, (caddr_t)pa, min(NBPG, len));
-		from += NBPG;
-		to += NBPG;
-		len -= NBPG;
+		bcopy(from, (caddr_t)pa, min(PAGE_SIZE, len));
+		from += PAGE_SIZE;
+		to += PAGE_SIZE;
+		len -= PAGE_SIZE;
 		pte += 8; /* XXX */
 	}
 }
@@ -342,11 +351,20 @@ vsbus_copyfromproc(struct proc *p, caddr_t from, caddr_t to, int len)
 		bcopy(from, to, len);
 		return;
 	}
-	pte = uvtopte(trunc_page((vaddr_t)from), &p->p_addr->u_pcb);
+
+#ifdef DIAGNOSTIC
+	if (p == NULL)
+		panic("vsbus_copyfromproc: no proc");
+#endif
+
+	if ((vaddr_t)from & 0x40000000)
+		pte = &p->p_vmspace->vm_map.pmap->pm_p1br[vax_btop((vaddr_t)from & ~0x40000000)];
+	else
+		pte = &p->p_vmspace->vm_map.pmap->pm_p0br[vax_btop((vaddr_t)from)];
 	if ((vaddr_t)from & PGOFSET) {
 		int cz = round_page((vaddr_t)from) - (vaddr_t)from;
 
-		pa = (pte->pg_pfn << VAX_PGSHIFT) | (NBPG - cz) | KERNBASE;
+		pa = (pte->pg_pfn << VAX_PGSHIFT) | (PAGE_SIZE - cz) | KERNBASE;
 		bcopy((caddr_t)pa, to, min(cz, len));
 		from += cz;
 		to += cz;
@@ -355,10 +373,10 @@ vsbus_copyfromproc(struct proc *p, caddr_t from, caddr_t to, int len)
 	}
 	while (len > 0) {
 		pa = (pte->pg_pfn << VAX_PGSHIFT) | KERNBASE;
-		bcopy((caddr_t)pa, to, min(NBPG, len));
-		from += NBPG;
-		to += NBPG;
-		len -= NBPG;
+		bcopy((caddr_t)pa, to, min(PAGE_SIZE, len));
+		from += PAGE_SIZE;
+		to += PAGE_SIZE;
+		len -= PAGE_SIZE;
 		pte += 8; /* XXX */
 	}
 }
@@ -390,7 +408,7 @@ vsbus_dma_intr(void)
 		return;
 	}
 	vsbus_active = 1;
-	SIMPLEQ_REMOVE_HEAD(&vsbus_dma, vd, vd_q);
+	SIMPLEQ_REMOVE_HEAD(&vsbus_dma, vd_q);
 	(*vd->vd_go)(vd->vd_arg);
 }
 

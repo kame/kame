@@ -1,4 +1,4 @@
-/*	$NetBSD: mach_machdep.c,v 1.3 2001/11/15 07:03:30 lukem Exp $	 */
+/*	$NetBSD: mach_machdep.c,v 1.14 2004/02/13 11:36:13 wiz Exp $	 */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mach_machdep.c,v 1.3 2001/11/15 07:03:30 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mach_machdep.c,v 1.14 2004/02/13 11:36:13 wiz Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_vm86.h"
@@ -57,10 +57,18 @@ __KERNEL_RCSID(0, "$NetBSD: mach_machdep.c,v 1.3 2001/11/15 07:03:30 lukem Exp $
 #include <sys/signalvar.h>
 #include <sys/malloc.h>
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 #include <sys/exec_elf.h>
+#include <sys/exec_macho.h>
+
+#include <uvm/uvm_extern.h>
+#include <uvm/uvm_param.h>
 
 #include <compat/mach/mach_types.h>
+#include <compat/mach/mach_host.h>
+#include <compat/mach/mach_thread.h>
+#include <compat/mach/mach_vm.h>
 
 #include <machine/cpu.h>
 #include <machine/cpufunc.h>
@@ -71,7 +79,7 @@ __KERNEL_RCSID(0, "$NetBSD: mach_machdep.c,v 1.3 2001/11/15 07:03:30 lukem Exp $
 #include <machine/vm86.h>
 #include <machine/vmparam.h>
 
-void mach_trap __P((struct trapframe));
+void mach_trap(struct trapframe);
 
 /*
  * Fast syscall gate trap...
@@ -81,13 +89,14 @@ mach_trap(frame)
 	struct trapframe frame;
 {
 	extern struct emul emul_mach;
-	struct proc *p = curproc;
 
-	p->p_md.md_regs = &frame;
-
-	if (p->p_emul != &emul_mach) {
+	if (curproc->p_emul != &emul_mach) {
+		ksiginfo_t ksi;
 		DPRINTF(("mach trap %d on bad emulation\n", frame.tf_eax));
-		trapsignal(p, SIGBUS, 0);
+		memset(&ksi, 0, sizeof(ksi));
+		ksi.ksi_signo = SIGILL;
+		ksi.ksi_code = ILL_ILLTRP;
+		trapsignal(curlwp, &ksi);
 		return;
 	}
 
@@ -103,3 +112,116 @@ mach_trap(frame)
 		break;
 	}
 }
+
+void
+mach_host_basic_info(info)
+    struct mach_host_basic_info *info;
+{
+	/* XXX fill this  accurately */
+	info->max_cpus = 1;
+	info->avail_cpus = 1;
+	info->memory_size = uvmexp.active + uvmexp.inactive;
+#undef cpu_type
+	info->cpu_type = MACHO_CPU_TYPE_I386;
+	switch (cpu_info_primary.ci_cpu_class) {
+	case CPUCLASS_386:
+		info->cpu_subtype = MACHO_CPU_SUBTYPE_386;
+		break;
+	case CPUCLASS_486:
+		info->cpu_subtype = MACHO_CPU_SUBTYPE_486;
+		break;
+	case CPUCLASS_586:
+		info->cpu_subtype = MACHO_CPU_SUBTYPE_586;
+		break;
+	case CPUCLASS_686:
+		info->cpu_subtype = MACHO_CPU_SUBTYPE_PENTPRO;
+		break;
+	default:
+		uprintf("Undefined CPU class %d",
+		    cpu_info_primary.ci_cpu_class);
+		info->cpu_subtype = MACHO_CPU_SUBTYPE_I386_ALL;
+	}
+}
+
+void
+mach_create_thread_child(arg)
+	void *arg;
+{
+	/* 
+	 * This is a plain copy of the powerpc version. 
+	 * It should be converted to i386 MD bits.
+	 */
+#ifdef notyet
+	struct mach_create_thread_child_args *mctc;
+	struct proc *p;
+	struct trapframe *tf;
+	struct exec_macho_powerpc_thread_state *regs;
+
+	mctc = (struct mach_create_thread_child_args *)arg;
+	p = *mctc->mctc_proc;
+
+	if (mctc->mctc_flavor != MACHO_POWERPC_THREAD_STATE) {
+		mctc->mctc_child_done = 1;
+		wakeup(&mctc->mctc_child_done);	
+		killproc(p, "mach_create_thread_child: unknown flavor");
+	}
+	
+	/*
+	 * Copy right from parent. Will disaprear
+	 * the day we will have struct lwp.  
+	 */
+	mach_copy_right(p->p_pptr, p); 
+
+	tf = trapframe(p);
+	regs = (struct exec_macho_powerpc_thread_state *)mctc->mctc_state;
+
+	/* Security warning */
+	if ((regs->srr1 & PSL_USERSTATIC) != (tf->srr1 & PSL_USERSTATIC))
+		uprintf("mach_create_thread_child: PSL_USERSTATIC change\n");		
+	/* 
+	 * Call child return before setting the register context as it
+	 * affects R3, R4 and CR.
+	 */
+	child_return((void *)p);
+
+	/* Set requested register context */
+	tf->srr0 = regs->srr0;
+	tf->srr1 = ((regs->srr1 & ~PSL_USERSTATIC) | 
+	    (tf->srr1 & PSL_USERSTATIC));
+	memcpy(tf->fixreg, &regs->r0, 32 * sizeof(register_t));
+	tf->cr = regs->cr;
+	tf->xer = regs->xer;
+	tf->lr = regs->lr;
+	tf->ctr = regs->ctr;
+	/* XXX regs->mq ? (601 specific) */
+	tf->vrsave = regs->vrsave;
+
+	/* Wakeup the parent */
+	mctc->mctc_child_done = 1;
+	wakeup(&mctc->mctc_child_done);	
+#else
+	printf("mach_create_thread_child %p\n", arg);
+#endif
+}
+
+int
+mach_thread_get_state_machdep(struct lwp *l, int flavor, void *state,
+    int *size)
+{
+	printf("Unimplemented thread state flavor %d\n", flavor);
+	return EINVAL;
+}
+
+int
+mach_thread_set_state_machdep(struct lwp *l, int flavor, void *state)
+{
+	printf("Unimplemented thread state flavor %d\n", flavor);
+	return EINVAL;
+}
+
+int
+mach_vm_machine_attribute_machdep(struct lwp *l, vaddr_t v, size_t s, int *ip)
+{
+	return 0;
+}
+

@@ -1,4 +1,4 @@
-/*	$NetBSD: ofw_irqhandler.c,v 1.1 2002/02/06 21:30:26 thorpej Exp $	*/
+/*	$NetBSD: ofw_irqhandler.c,v 1.3 2003/07/15 00:24:47 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -40,6 +40,9 @@
  *
  * Created      : 30/09/94
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ofw_irqhandler.c,v 1.3 2003/07/15 00:24:47 lukem Exp $");
 
 #include "opt_irqstats.h"
 
@@ -129,9 +132,9 @@ irq_claim(irq, handler)
 #ifdef DIAGNOSTIC
 	/* Sanity check */
 	if (handler == NULL)
-		panic("NULL interrupt handler\n");
+		panic("NULL interrupt handler");
 	if (handler->ih_func == NULL)
-		panic("Interrupt handler does not have a function\n");
+		panic("Interrupt handler does not have a function");
 #endif	/* DIAGNOSTIC */
 
 	/*
@@ -394,7 +397,7 @@ intr_claim(irq, level, name, ih_func, ih_arg)
 
 	ih = malloc(sizeof(*ih), M_DEVBUF, M_NOWAIT);
 	if (!ih)
-		panic("intr_claim(): Cannot malloc handler memory\n");
+		panic("intr_claim(): Cannot malloc handler memory");
 
 	ih->ih_level = level;
 	ih->ih_name = name;

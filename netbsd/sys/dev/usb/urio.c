@@ -1,4 +1,4 @@
-/*	$NetBSD: urio.c,v 1.11 2002/02/11 15:11:49 augustss Exp $	*/
+/*	$NetBSD: urio.c,v 1.18 2003/11/24 00:00:07 augustss Exp $	*/
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: urio.c,v 1.11 2002/02/11 15:11:49 augustss Exp $");
+__KERNEL_RCSID(0, "$NetBSD: urio.c,v 1.18 2003/11/24 00:00:07 augustss Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -84,7 +84,18 @@ int	uriodebug = 0;
 #endif
 
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__)
+dev_type_open(urioopen);
+dev_type_close(urioclose);
+dev_type_read(urioread);
+dev_type_write(uriowrite);
+dev_type_ioctl(urioioctl);
+
+const struct cdevsw urio_cdevsw = {
+	urioopen, urioclose, urioread, uriowrite, urioioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
+#elif defined(__OpenBSD__)
 cdev_decl(urio);
 #elif defined(__FreeBSD__)
 d_open_t  urioopen;
@@ -132,6 +143,7 @@ static const struct usb_devno urio_devs[] = {
 	{ USB_VENDOR_DIAMOND, USB_PRODUCT_DIAMOND_RIO500USB},
 	{ USB_VENDOR_DIAMOND2, USB_PRODUCT_DIAMOND2_RIO600USB},
 	{ USB_VENDOR_DIAMOND2, USB_PRODUCT_DIAMOND2_RIO800USB},
+	{ USB_VENDOR_DIAMOND2, USB_PRODUCT_DIAMOND2_PSAPLAY120},
 };
 #define urio_lookup(v, p) usb_lookup(urio_devs, v, p)
 
@@ -258,9 +270,13 @@ USB_DETACH(urio)
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	/* locate the major number */
+#if defined(__NetBSD__)
+	maj = cdevsw_lookup_major(&urio_cdevsw);
+#elif defined(__OpenBSD__)
 	for (maj = 0; maj < nchrdev; maj++)
 		if (cdevsw[maj].d_open == urioopen)
 			break;
+#endif
 
 	/* Nuke the vnodes for any open instances (calls close). */
 	mn = self->dv_unit;
@@ -302,7 +318,7 @@ urioopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 
 	USB_GET_SC_OPEN(urio, URIOUNIT(dev), sc);
 
-	DPRINTFN(5, ("urioopen: flag=%d, mode=%d, unit=%d\n", 
+	DPRINTFN(5, ("urioopen: flag=%d, mode=%d, unit=%d\n",
 		     flag, mode, URIOUNIT(dev)));
 
 	if (sc->sc_dying)
@@ -419,7 +435,7 @@ uriowrite(dev_t dev, struct uio *uio, int flag)
 
 	USB_GET_SC(urio, URIOUNIT(dev), sc);
 
-	DPRINTFN(5, ("uriowrite: unit=%d, len=%ld\n", URIOUNIT(dev), 
+	DPRINTFN(5, ("uriowrite: unit=%d, len=%ld\n", URIOUNIT(dev),
 		     (long)uio->uio_resid));
 
 	if (sc->sc_dying)
@@ -462,7 +478,7 @@ uriowrite(dev_t dev, struct uio *uio, int flag)
 	if (--sc->sc_refcnt < 0)
 		usb_detach_wakeup(USBDEV(sc->sc_dev));
 
-	DPRINTFN(5, ("uriowrite: done unit=%d, error=%d\n", URIOUNIT(dev), 
+	DPRINTFN(5, ("uriowrite: done unit=%d, error=%d\n", URIOUNIT(dev),
 		     error));
 
 	return (error);
@@ -511,7 +527,7 @@ urioioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, usb_proc_ptr p)
 	len = rcmd->length;
 
 	DPRINTFN(1,("urio_ioctl: cmd=0x%08lx reqtype=0x%0x req=0x%0x "
-		    "value=0x%0x index=0x%0x len=0x%0x\n", 
+		    "value=0x%0x index=0x%0x len=0x%0x\n",
 		    cmd, requesttype, rcmd->request, rcmd->value,
 		    rcmd->index, len));
 
@@ -532,7 +548,7 @@ urioioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, usb_proc_ptr p)
 		uio.uio_resid = len;
 		uio.uio_offset = 0;
 		uio.uio_segflg = UIO_USERSPACE;
-		uio.uio_rw = req.bmRequestType & UT_READ ? 
+		uio.uio_rw = req.bmRequestType & UT_READ ?
 			     UIO_READ : UIO_WRITE;
 		uio.uio_procp = p;
 		ptr = malloc(len, M_TEMP, M_WAITOK);
@@ -564,11 +580,13 @@ ret:
 	return (error);
 }
 
+#if defined(__OpenBSD__)
 int
-uriopoll(dev_t dev, int events, usb_proc_ptr p)
+urioselect(dev_t dev, int events, usb_proc_ptr p)
 {
 	return (0);
 }
+#endif
 
 #if defined(__FreeBSD__)
 DRIVER_MODULE(urio, uhub, urio_driver, urio_devclass, usbd_driver_load, 0);

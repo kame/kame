@@ -1,4 +1,4 @@
-/*	$NetBSD: neptune.c,v 1.4 2000/01/16 14:20:56 minoura Exp $	*/
+/*	$NetBSD: neptune.c,v 1.10 2003/07/15 01:44:52 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998 NetBSD Foundation, Inc.
@@ -39,6 +39,9 @@
  * Neptune-X -- X68k-ISA Bus Bridge
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: neptune.c,v 1.10 2003/07/15 01:44:52 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -75,9 +78,8 @@ static void neptune_attach __P((struct device *, struct device *, void *));
 static int neptune_search __P((struct device *, struct cfdata *cf, void *));
 static int neptune_print __P((void *, const char *));
 
-struct cfattach neptune_ca = {
-	sizeof(struct neptune_softc), neptune_match, neptune_attach
-};
+CFATTACH_DECL(neptune, sizeof(struct neptune_softc),
+    neptune_match, neptune_attach, NULL, NULL);
 
 static int
 neptune_match(parent, cf, aux)
@@ -149,7 +151,7 @@ neptune_search(parent, cf, aux)
 
 	na->na_addr = cf->neptune_cf_addr;
 
-	return (*cf->cf_attach->ca_match)(parent, cf, na);
+	return config_match(parent, cf, na);
 }
 
 static int
@@ -160,7 +162,7 @@ neptune_print(aux, name)
 	struct neptune_attach_args *na = aux;
 
 /*	if (na->na_addr > 0)	*/
-		printf (" addr 0x%06x", na->na_addr);
+		aprint_normal (" addr 0x%06x", na->na_addr);
 
 	return (QUIET);
 }

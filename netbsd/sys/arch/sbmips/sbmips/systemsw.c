@@ -1,4 +1,4 @@
-/* $NetBSD: systemsw.c,v 1.4 2002/05/03 03:36:51 simonb Exp $ */
+/* $NetBSD: systemsw.c,v 1.9 2003/07/15 03:35:51 lukem Exp $ */
 
 /*
  * Copyright 2000, 2001
@@ -15,10 +15,9 @@
  *    the source file.
  *
  * 2) No right is granted to use any trade name, trademark, or logo of
- *    Broadcom Corporation. Neither the "Broadcom Corporation" name nor any
- *    trademark or logo of Broadcom Corporation may be used to endorse or
- *    promote products derived from this software without the prior written
- *    permission of Broadcom Corporation.
+ *    Broadcom Corporation.  The "Broadcom Corporation" name may not be
+ *    used to endorse or promote products derived from this software
+ *    without the prior written permission of Broadcom Corporation.
  *
  * 3) THIS SOFTWARE IS PROVIDED "AS-IS" AND ANY EXPRESS OR IMPLIED
  *    WARRANTIES, INCLUDING BUT NOT LIMITED TO, ANY IMPLIED WARRANTIES OF
@@ -32,6 +31,9 @@
  *    WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  *    OR OTHERWISE), EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: systemsw.c,v 1.9 2003/07/15 03:35:51 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,8 +53,6 @@ static void	inittodr_triv(void *, time_t);
 static void	microtime_triv(struct timeval *);
 static void	resettodr_triv(void *);
 
-#define	XXXNULL	NULL
-
 /* system function switch */
 struct systemsw systemsw = {
 	cpu_intr_triv,
@@ -64,12 +64,14 @@ struct systemsw systemsw = {
 	NULL,			/* clock intr arg */
 	clock_init_triv,
 
+	NULL,			/* statclock arg */
 	NULL,			/* s_statclock_init: dflt no-op */
 	NULL,			/* s_statclock_setrate: dflt no-op */
 
+	NULL,			/* todr functions arg */
 	inittodr_triv,
 	resettodr_triv,
-	NULL,			/* XXX: s_intr_establish */
+	NULL,			/* intr_establish */
 };
 
 int
@@ -82,6 +84,21 @@ system_set_clockfns(void *arg, void (*init)(void *))
 	systemsw.s_clock_init = init;
 	return 0;
 }
+
+int
+system_set_todrfns(void *arg, void (*init)(void *, time_t),
+    void (*reset)(void *))
+{
+
+	if (systemsw.s_inittodr != inittodr_triv ||
+	    systemsw.s_resettodr != resettodr_triv)
+		return 1;
+	systemsw.s_todr_arg = arg;
+	systemsw.s_inittodr = init;
+	systemsw.s_resettodr = reset;
+	return 0;
+}
+
 
 /* trivial microtime() implementation */
 static void
@@ -118,10 +135,7 @@ clkread_triv(void)
 	uint32_t res, count;
 
 	count = mips3_cp0_count_read();
-
-	asm volatile("multu %1,%2 ; mfhi %0"
-	    : "=r"(res) : "r"(count), "r"(curcpu()->ci_divisor_recip));
-
+	MIPS_COUNT_TO_MHZ(curcpu(), count, res);
 	return (res);
 }
 
@@ -148,6 +162,7 @@ cpu_intr_triv(uint32_t status, uint32_t cause, uint32_t pc, uint32_t ipending)
 void
 cpu_setsoftintr_triv(void)
 {
+
 	panic("cpu_setsoftintr_triv");
 }
 
@@ -168,6 +183,7 @@ microtime(struct timeval *tvp)
 static void
 clock_init_triv(void *arg)
 {
+
 	panic("clock_init_triv");
 }
 
@@ -192,7 +208,7 @@ cpu_initclocks(void)
 	(*systemsw.s_clock_init)(systemsw.s_clock_arg);
 
 	if (systemsw.s_statclock_init != NULL)
-		(*systemsw.s_statclock_init)(XXXNULL);
+		(*systemsw.s_statclock_init)(systemsw.s_statclock_arg);
 
 	/*
 	 * ``Disable'' the compare interrupt by setting it to it's largest
@@ -208,19 +224,20 @@ setstatclockrate(int hzrate)
 {
 
 	if (systemsw.s_statclock_setrate != NULL)
-		(*systemsw.s_statclock_setrate)(XXXNULL, hzrate);
+		(*systemsw.s_statclock_setrate)(systemsw.s_statclock_arg,
+		    hzrate);
 }
 
 void
 inittodr(time_t t)
 {
 
-	(*systemsw.s_inittodr)(XXXNULL, t);
+	(*systemsw.s_inittodr)(systemsw.s_todr_arg, t);
 }
 
 void
 resettodr(void)
 {
 
-	(*systemsw.s_resettodr)(XXXNULL);
+	(*systemsw.s_resettodr)(systemsw.s_todr_arg);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ray.c,v 1.32 2002/03/10 11:32:18 martin Exp $	*/
+/*	$NetBSD: if_ray.c,v 1.44 2003/11/02 11:14:22 wiz Exp $	*/
 /* 
  * Copyright (c) 2000 Christian E. Hopps
  * All rights reserved.
@@ -56,7 +56,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ray.c,v 1.32 2002/03/10 11:32:18 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ray.c,v 1.44 2003/11/02 11:14:22 wiz Exp $");
 
 #include "opt_inet.h"
 #include "bpfilter.h"
@@ -77,7 +77,8 @@ __KERNEL_RCSID(0, "$NetBSD: if_ray.c,v 1.32 2002/03/10 11:32:18 martin Exp $");
 #include <net/if_ether.h>
 #include <net/if_media.h>
 #include <net/if_llc.h>
-#include <net/if_ieee80211.h>
+#include <net80211/ieee80211.h>
+#include <net80211/ieee80211_ioctl.h>
 #include <net/if_media.h>
 
 #ifdef INET
@@ -137,9 +138,9 @@ __KERNEL_RCSID(0, "$NetBSD: if_ray.c,v 1.32 2002/03/10 11:32:18 martin Exp $");
 #endif
 
 /*
- * the number of times the HW is reset in 30s before disabling
- * this is needed becuase resets take ~2s and currently pcmcia
- * spins for the reset
+ * The number of times the HW is reset in 30s before disabling.
+ * This is needed because resets take ~2s and currently pcmcia
+ * spins for the reset.
  */
 #ifndef	RAY_MAX_RESETS
 #define	RAY_MAX_RESETS	3
@@ -464,11 +465,8 @@ static ray_cmd_func_t ray_subcmdtab[] = {
 static int ray_nsubcmdtab = sizeof(ray_subcmdtab) / sizeof(*ray_subcmdtab);
 
 /* autoconf information */
-struct cfattach ray_ca = {
-	sizeof(struct ray_softc), ray_match, ray_attach, ray_detach,
-	ray_activate
-};
-
+CFATTACH_DECL(ray, sizeof(struct ray_softc),
+    ray_match, ray_attach, ray_detach, ray_activate);
 
 /*
  * Config Routines
@@ -518,7 +516,7 @@ ray_attach(parent, self, aux)
 	printf(": %s\n", devinfo);
 
 	/* enable the card */
-	pcmcia_function_init(sc->sc_pf, sc->sc_pf->cfe_head.sqh_first);
+	pcmcia_function_init(sc->sc_pf, SIMPLEQ_FIRST(&sc->sc_pf->cfe_head));
 	if (pcmcia_function_enable(sc->sc_pf)) {
 		printf(": failed to enable the card");
 		return;
@@ -1232,7 +1230,9 @@ ray_intr_start(sc)
 			tmplen = sizeof(struct ieee80211_frame);
 		} else if (et > ETHERMTU) {
 			/* adjust for LLC/SNAP header */
-			tmplen= sizeof(struct ieee80211_frame) - ETHER_ADDR_LEN;
+			tmplen = sizeof(struct ieee80211_frame) - ETHER_ADDR_LEN;
+		} else {
+			tmplen = 0;
 		}
 		/* now get our space for the 802.11 frame */
 		M_PREPEND(m0, tmplen, M_DONTWAIT);
@@ -1325,6 +1325,9 @@ ray_intr_start(sc)
 #endif
 		pcount++;
 		m_freem(m0);
+
+		RAY_DPRINTF_XMIT(("%s: sent packet: len %ld\n", sc->sc_xname,
+		    (u_long)pktlen));
 	}
 
 	if (firsti == RAY_CCS_LINK_NULL)
@@ -1348,9 +1351,6 @@ ray_intr_start(sc)
 	SRAM_WRITE_1(sc, RAY_SCB_CCSI, firsti);
 	RAY_ECF_START_CMD(sc);
 
-	RAY_DPRINTF_XMIT(("%s: sent packet: len %ld\n", sc->sc_xname,
-	    (u_long)pktlen));
-
 	ifp->if_opackets += pcount;
 }
 
@@ -1365,11 +1365,11 @@ ray_recv(sc, ccs)
 	struct ieee80211_frame *frame;
 	struct ether_header *eh;
 	struct mbuf *m;
-	size_t pktlen, fudge, len, lenread;
+	size_t pktlen, fudge, len, lenread = 0;
 	bus_size_t bufp, ebufp, tmp;
 	struct ifnet *ifp;
 	u_int8_t *src, *d;
-	u_int frag, nofrag, ni, i, issnap, first;
+	u_int frag = 0, ni, i, issnap, first;
 	u_int8_t fc0;
 #ifdef RAY_DO_SIGLEV
 	u_int8_t siglev;
@@ -1404,8 +1404,8 @@ ray_recv(sc, ccs)
 	siglev = SRAM_READ_FIELD_1(sc, ccs, ray_cmd_rx, c_siglev);
 #endif
 
-	RAY_DPRINTF(("%s: recv pktlen %ld nofrag %d\n", sc->sc_xname,
-	    (u_long)pktlen, nofrag));
+	RAY_DPRINTF(("%s: recv pktlen %ld frag %d\n", sc->sc_xname,
+	    (u_long)pktlen, frag));
 	RAY_DPRINTF_XMIT(("%s: received packet: len %ld\n", sc->sc_xname,
 	    (u_long)pktlen));
 	if (pktlen > MCLBYTES || pktlen < sizeof(*frame)) {
@@ -1438,8 +1438,6 @@ ray_recv(sc, ccs)
 	d = mtod(m, u_int8_t *);
 
 	RAY_DPRINTF(("%s: recv ccs index %d\n", sc->sc_xname, first));
-	frag = 0;
-	lenread = 0;
 	i = ni = first;
 	while ((i = ni) && i != RAY_CCS_LINK_NULL) {
 		ccs = RAY_GET_CCS(i);
@@ -1855,8 +1853,8 @@ ray_check_ccs(arg)
 {
 	ray_cmd_func_t fp;
 	struct ray_softc *sc;
-	u_int i, cmd, stat;
-	bus_size_t ccs;
+	u_int i, cmd, stat = 0;
+	bus_size_t ccs = 0;
 	int s;
 
 	s = splnet();
@@ -1884,7 +1882,7 @@ ray_check_ccs(arg)
 breakout:
 	/* see if we got one of the commands we are looking for */
 	if (i > RAY_CCS_CMD_LAST)
-		; /* nothign */
+		; /* nothing */
 	else if (stat == RAY_CCS_STATUS_FREE) {
 		stat = RAY_CCS_STATUS_COMPLETE;
 		if ((fp = ray_ccs_done(sc, ccs)))
@@ -1913,7 +1911,7 @@ breakout:
  * to keep the values from being changed while read:  It checks
  * the `own' bit and if zero writes the current internal counter
  * value, it then sets the `own' bit to 1.  If the `own' bit was 1 it
- * incremenets its internal counter.  The user thus reads the counter
+ * increments its internal counter.  The user thus reads the counter
  * if the `own' bit is one and then sets the own bit to 0.
  */
 static void
@@ -1950,11 +1948,9 @@ ray_ccs_done(sc, ccs)
 	struct ray_softc *sc;
 	bus_size_t ccs;
 {
-	struct ifnet *ifp;
 	ray_cmd_func_t rcmd;
 	u_int cmd, stat;
 
-	ifp = &sc->sc_if;
 	cmd = SRAM_READ_FIELD_1(sc, ccs, ray_cmd, c_cmd);
 	stat = SRAM_READ_FIELD_1(sc, ccs, ray_cmd, c_status);
 
@@ -2046,7 +2042,7 @@ done:
 }
 
 /*
- * an unsolicted interrupt, i.e., the ECF is sending us a command
+ * an unsolicited interrupt, i.e., the ECF is sending us a command
  */
 static ray_cmd_func_t
 ray_rccs_intr(sc, ccs)
@@ -2065,7 +2061,7 @@ ray_rccs_intr(sc, ccs)
 	rcmd = 0;
 	switch (cmd) {
 	/*
-	 * unsolicted commands
+	 * unsolicited commands
 	 */
 	case RAY_ECMD_RX_DONE:
 		ray_recv(sc, ccs);
@@ -2277,7 +2273,7 @@ ray_cmd_schedule(sc, cmdf)
 	if ((cmdf & SCP_UPD_MASK) == 0)
 		ray_set_pending(sc, track);
 	else if (ray_cmd_is_running(sc, SCP_UPDATESUBCMD)) {
-		/* don't do timeout mechaniscm if subcmd already going */
+		/* don't do timeout mechanism if subcmd already going */
 		sc->sc_scheduled |= cmdf;
 	} else
 		ray_set_pending(sc, cmdf | SCP_UPDATESUBCMD);
@@ -2451,7 +2447,7 @@ ray_update_subcmd(sc)
 		if (!RAY_ECF_READY(sc))
 			break;
 		/*
-		 * give priority to LSB -- e.g., if previous loop reschuled
+		 * give priority to LSB -- e.g., if previous loop rescheduled
 		 * doing this command after calling the function won't catch
 		 * if a later command sets an earlier bit
 		 */
@@ -2622,7 +2618,7 @@ ray_download_params(sc)
 	sp->sp_promisc = sc->sc_promisc;
 	PUT2(sp->sp_uniq_word, 0x0cbd);
 	if (sc->sc_version == SC_BUILD_4) {
-	/* XXX whats this value anyway.. the std says 50us */
+	/* XXX what is this value anyway..? the std says 50us */
 		/* XXX sp->sp_slot_time = 0x4e; */
 		sp->sp_slot_time = 0x4e;
 #if 1
@@ -2998,9 +2994,9 @@ ray_update_mcast(sc)
  */
 
 /*
- * issue a update params
+ * issue an "update params"
  *
- * expected to be called in sleapable context -- intended for user stuff
+ * expected to be called in sleepable context -- intended for user stuff
  */
 static int
 ray_user_update_params(sc, pr)
@@ -3042,7 +3038,7 @@ ray_user_update_params(sc, pr)
 /*
  * issue a report params
  *
- * expected to be called in sleapable context -- intended for user stuff
+ * expected to be called in sleepable context -- intended for user stuff
  */
 static int
 ray_user_report_params(sc, pr)

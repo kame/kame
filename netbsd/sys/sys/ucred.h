@@ -1,4 +1,4 @@
-/*	$NetBSD: ucred.h,v 1.14 2001/11/29 21:20:00 christos Exp $	*/
+/*	$NetBSD: ucred.h,v 1.18 2003/08/07 16:34:21 agc Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -65,13 +61,27 @@ struct ucred {
 #ifdef _KERNEL
 #define	crhold(cr)	(cr)->cr_ref++
 
+/* flags that control when do_setres{u,g}id will do anything */
+#define	ID_E_EQ_E	0x001		/* effective equals effective */
+#define	ID_E_EQ_R	0x002		/* effective equals real */
+#define	ID_E_EQ_S	0x004		/* effective equals saved */
+#define	ID_R_EQ_E	0x010		/* real equals effective */
+#define	ID_R_EQ_R	0x020		/* real equals real */
+#define	ID_R_EQ_S	0x040		/* real equals saved */
+#define	ID_S_EQ_E	0x100		/* saved equals effective */
+#define	ID_S_EQ_R	0x200		/* saved equals real */
+#define	ID_S_EQ_S	0x400		/* saved equals saved */
 
-struct ucred	*crcopy __P((struct ucred *));
-struct ucred	*crdup __P((struct ucred *));
-void		crfree __P((struct ucred *));
-struct ucred	*crget __P((void));
-int		suser __P((struct ucred *, u_short *));
-void		crcvt __P((struct ucred *, const struct uucred *));
+int		do_setresuid(struct lwp *, uid_t, uid_t, uid_t, u_int);
+int		do_setresgid(struct lwp *, gid_t, gid_t, gid_t, u_int);
+
+struct ucred	*crcopy(struct ucred *);
+struct ucred	*crdup(const struct ucred *);
+void		crfree(struct ucred *);
+struct ucred	*crget(void);
+int		suser(const struct ucred *, u_short *);
+void		crcvt(struct ucred *, const struct uucred *);
+int		crcmp(const struct ucred *, const struct uucred *);
 #endif /* _KERNEL */
 
 #endif /* !_SYS_UCRED_H_ */

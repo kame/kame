@@ -1,4 +1,4 @@
-/*	$NetBSD: pm.c,v 1.36 2001/11/21 19:01:32 wiz Exp $	*/
+/*	$NetBSD: pm.c,v 1.39 2003/08/07 16:29:10 agc Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -56,7 +52,7 @@
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-__KERNEL_RCSID(0, "$NetBSD: pm.c,v 1.36 2001/11/21 19:01:32 wiz Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pm.c,v 1.39 2003/08/07 16:29:10 agc Exp $");
 
 
 #include <sys/param.h>
@@ -110,9 +106,8 @@ static int  pmmatch __P((struct device *, struct cfdata *, void *));
 static void pmattach __P((struct device *, struct device *, void *));
 static int  pminit __P((struct fbinfo *, caddr_t, int));
 
-struct cfattach pm_ds_ca = {
-	sizeof(struct device), pmmatch, pmattach
-};
+CFATTACH_DECL(pm_ds, sizeof(struct device),
+    pmmatch, pmattach, NULL, NULL);
 
 int
 pm_cnattach()

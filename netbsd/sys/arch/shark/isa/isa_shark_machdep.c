@@ -1,4 +1,4 @@
-/*	$NetBSD: isa_shark_machdep.c,v 1.1.12.1 2002/09/30 13:28:57 lukem Exp $	*/
+/*	$NetBSD: isa_shark_machdep.c,v 1.4 2003/07/15 03:36:01 lukem Exp $	*/
 
 /*
  * Copyright 1997
@@ -33,6 +33,9 @@
  *    even if advised of the possibility of such damage.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: isa_shark_machdep.c,v 1.4 2003/07/15 03:36:01 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -53,6 +56,8 @@
 struct arm32_isa_chipset isa_chipset_tag;
 
 unsigned i8259_mask;
+
+void isa_init8259s(void);
 
 /* Notes on the interaction of StrongARM and ISA.  A lot of the nastiness
    is caused by consciously prostituting shark to a low bill of materials.
@@ -112,7 +117,7 @@ unsigned i8259_mask;
  * Initialize the interrupt controllers.
  */
 void
-isa_init8259s()
+isa_init8259s(void)
 {
   /* initialize 8259's */
   outb(IO_ICU1, 0x19);		   /* reset; four bytes, level triggered */

@@ -1,4 +1,4 @@
-/*	$NetBSD: mly.c,v 1.9 2002/01/14 13:23:36 tsutsui Exp $	*/
+/*	$NetBSD: mly.c,v 1.21 2003/06/29 22:30:25 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -77,7 +77,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mly.c,v 1.9 2002/01/14 13:23:36 tsutsui Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mly.c,v 1.21 2003/06/29 22:30:25 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -161,12 +161,18 @@ static void	mly_scsipi_request(struct scsipi_channel *,
 static int	mly_user_command(struct mly_softc *, struct mly_user_command *);
 static int	mly_user_health(struct mly_softc *, struct mly_user_health *);
 
-cdev_decl(mly);
-
 extern struct	cfdriver mly_cd;
 
-struct cfattach mly_ca = {
-	sizeof(struct mly_softc), mly_match, mly_attach
+CFATTACH_DECL(mly, sizeof(struct mly_softc),
+    mly_match, mly_attach, NULL, NULL);
+
+dev_type_open(mlyopen);
+dev_type_close(mlyclose);
+dev_type_ioctl(mlyioctl);
+
+const struct cdevsw mly_cdevsw = {
+	mlyopen, mlyclose, noread, nowrite, mlyioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
 };
 
 struct mly_ident {
@@ -821,7 +827,7 @@ mly_get_eventstatus(struct mly_softc *mly)
 	mh = NULL;
 	mci.sub_ioctl = MDACIOCTL_GETHEALTHSTATUS;
 
-	rv = mly_ioctl(mly, &mci, (void **)&mh, sizeof(*mh), NULL, NULL);
+	rv = mly_ioctl(mly, &mci, (void *)&mh, sizeof(*mh), NULL, NULL);
 	if (rv)
 		return (rv);
 
@@ -1119,7 +1125,7 @@ mly_complete_event(struct mly_softc *mly, struct mly_ccb *mc)
 }
 
 /*
- * Process a controller event.  Called with interupts blocked (i.e., at
+ * Process a controller event.  Called with interrupts blocked (i.e., at
  * interrupt time).
  */
 static void
@@ -1362,7 +1368,7 @@ mly_ccb_enqueue(struct mly_softc *mly, struct mly_ccb *mc)
 	while ((mc = SIMPLEQ_FIRST(&mly->mly_ccb_queue)) != NULL) {
 		if (mly_ccb_submit(mly, mc))
 			break;
-		SIMPLEQ_REMOVE_HEAD(&mly->mly_ccb_queue, mc, mc_link.simpleq);
+		SIMPLEQ_REMOVE_HEAD(&mly->mly_ccb_queue, mc_link.simpleq);
 	}
 
 	splx(s);
@@ -1532,7 +1538,7 @@ mly_intr(void *cookie)
 	/*
 	 * Run the queue.
 	 */
-	if (forus && SIMPLEQ_FIRST(&mly->mly_ccb_queue) != NULL)
+	if (forus && ! SIMPLEQ_EMPTY(&mly->mly_ccb_queue))
 		mly_ccb_enqueue(mly, NULL);
 
 	return (forus);
@@ -1615,11 +1621,11 @@ mly_ccb_free(struct mly_softc *mly, struct mly_ccb *mc)
 }
 
 /*
- * Allocate and initialise command and packet structures.
+ * Allocate and initialize command and packet structures.
  *
  * If the controller supports fewer than MLY_MAX_CCBS commands, limit our
  * allocation to that number.  If we don't yet know how many commands the
- * controller supports, allocate a very small set (suitable for initialisation
+ * controller supports, allocate a very small set (suitable for initialization
  * purposes only).
  */
 static int
@@ -2101,7 +2107,7 @@ mly_scsipi_ioctl(struct scsipi_channel *chan, u_long cmd, caddr_t data,
 }
 
 /*
- * Handshake with the firmware while the card is being initialised.
+ * Handshake with the firmware while the card is being initialized.
  */
 static int
 mly_fwhandshake(struct mly_softc *mly) 
@@ -2111,19 +2117,19 @@ mly_fwhandshake(struct mly_softc *mly)
 
 	spinup = 0;
 
-	/* Set HM_STSACK and let the firmware initialise. */
+	/* Set HM_STSACK and let the firmware initialize. */
 	mly_outb(mly, mly->mly_idbr, MLY_HM_STSACK);
 	DELAY(1000);	/* too short? */
 
-	/* If HM_STSACK is still true, the controller is initialising. */
+	/* If HM_STSACK is still true, the controller is initializing. */
 	if (!mly_idbr_true(mly, MLY_HM_STSACK))
 		return (0);
 
-	printf("%s: controller initialisation started\n",
+	printf("%s: controller initialization started\n",
 	    mly->mly_dv.dv_xname);
 
 	/*
-	 * Spin waiting for initialisation to finish, or for a message to be
+	 * Spin waiting for initialization to finish, or for a message to be
 	 * delivered.
 	 */
 	while (mly_idbr_true(mly, MLY_HM_STSACK)) {
@@ -2167,7 +2173,7 @@ mly_fwhandshake(struct mly_softc *mly)
 			return (ENXIO);
 
 		default:
-			printf("%s: unknown initialisation code 0x%x\n",
+			printf("%s: unknown initialization code 0x%x\n",
 			    mly->mly_dv.dv_xname, error);
 			break;
 		}
@@ -2202,7 +2208,7 @@ mly_dmamem_alloc(struct mly_softc *mly, int size, bus_dmamap_t *dmamap,
 
 	state = 0;
 	
-	if ((rv = bus_dmamem_alloc(mly->mly_dmat, size, NBPG, 0, 
+	if ((rv = bus_dmamem_alloc(mly->mly_dmat, size, PAGE_SIZE, 0, 
 	    seg, 1, &rseg, BUS_DMA_NOWAIT)) != 0) {
 		printf("%s: dmamem_alloc = %d\n", mly->mly_dv.dv_xname, rv);
 		goto bad;

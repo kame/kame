@@ -1,9 +1,44 @@
-/*	$NetBSD: trap.c,v 1.88 2002/02/14 07:08:03 chs Exp $	*/
+/*	$NetBSD: trap.c,v 1.100 2004/03/14 01:08:47 cl Exp $	*/
+
+/*
+ * Copyright (c) 1982, 1986, 1990 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: trap.c 1.32 91/04/06$
+ *
+ *	@(#)trap.c	7.15 (Berkeley) 8/2/91
+ */
 
 /*
  * Copyright (c) 1988 University of Utah.
- * Copyright (c) 1982, 1986, 1990 The Regents of the University of California.
- * All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -45,9 +80,10 @@
 #include "opt_ddb.h"
 #include "opt_execfmt.h"
 #include "opt_compat_sunos.h"
+#include "opt_fpu_emulate.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: trap.c,v 1.88 2002/02/14 07:08:03 chs Exp $");
+__KERNEL_RCSID(0, "$NetBSD: trap.c,v 1.100 2004/03/14 01:08:47 cl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -58,8 +94,10 @@ __KERNEL_RCSID(0, "$NetBSD: trap.c,v 1.88 2002/02/14 07:08:03 chs Exp $");
 #include <sys/resourcevar.h>
 #include <sys/syslog.h>
 #include <sys/syscall.h>
-
+#include <sys/sa.h>
+#include <sys/savar.h>
 #include <sys/user.h>
+#include <sys/userret.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -184,10 +222,10 @@ int mmudebug = 0;
 extern struct pcb *curpcb;
 extern char fubail[], subail[];
 int _write_back(u_int, u_int, u_int, u_int, struct vm_map *);
-static void userret(struct proc *, int, u_quad_t);
+static void userret(struct lwp *, int, u_quad_t);
 void panictrap(int, u_int, u_int, struct frame *);
-void trapcpfault(struct proc *, struct frame *);
-void trapmmufault(int, u_int, u_int, struct frame *, struct proc *,
+void trapcpfault(struct lwp *, struct frame *);
+void trapmmufault(int, u_int, u_int, struct frame *, struct lwp *,
 			u_quad_t);
 void trap(int, u_int, u_int, struct frame);
 #ifdef DDB
@@ -198,26 +236,16 @@ void _wb_fault(void);
 
 
 static void
-userret(p, pc, oticks)
-	struct proc *p;
+userret(l, pc, oticks)
+	struct lwp *l;
 	int pc;
 	u_quad_t oticks;
 {
-	int sig;
+	struct proc *p = l->l_proc;
 
-	while ((sig = CURSIG(p)) != 0)
-		postsig(sig);
+	/* Invoke MI userret code */
+	mi_userret(l);
 
-	p->p_priority = p->p_usrpri;
-
-	if (want_resched) {
-		/*
-		 * We are being preempted.
-		 */
-		preempt(NULL);
-		while ((sig = CURSIG(p)) != 0)
-			postsig(sig);
-	}
 	/*
 	 * If profiling, charge recent system time.
 	 */
@@ -226,23 +254,23 @@ userret(p, pc, oticks)
 
 		addupc_task(p, pc, (int)(p->p_sticks - oticks) * psratio);
 	}
-	curcpu()->ci_schedstate.spc_curpriority = p->p_priority;
+	curcpu()->ci_schedstate.spc_curpriority = l->l_priority = l->l_usrpri;
 }
 
 /*
  * Used by the common m68k syscall() and child_return() functions.
  * XXX: Temporary until all m68k ports share common trap()/userret() code.
  */
-void machine_userret(struct proc *, struct frame *, u_quad_t);
+void machine_userret(struct lwp *, struct frame *, u_quad_t);
 
 void
-machine_userret(p, f, t)
-	struct proc *p;
+machine_userret(l, f, t)
+	struct lwp *l;
 	struct frame *f;
 	u_quad_t t;
 {
 
-	userret(p, f->f_pc, t);
+	userret(l, f->f_pc, t);
 }
 
 void
@@ -270,8 +298,8 @@ panictrap(type, code, v, fp)
  * return to fault handler
  */
 void
-trapcpfault(p, fp)
-	struct proc *p;
+trapcpfault(l, fp)
+	struct lwp *l;
 	struct frame *fp;
 {
 	/*
@@ -282,17 +310,17 @@ trapcpfault(p, fp)
 	 */
 	fp->f_stackadj = exframesize[fp->f_format];
 	fp->f_format = fp->f_vector = 0;
-	fp->f_pc = (int) p->p_addr->u_pcb.pcb_onfault;
+	fp->f_pc = (int) l->l_addr->u_pcb.pcb_onfault;
 }
 
 int donomore = 0;
 
 void
-trapmmufault(type, code, v, fp, p, sticks)
+trapmmufault(type, code, v, fp, l, sticks)
 	int type;
 	u_int code, v;
 	struct frame *fp;
-	struct proc *p;
+	struct lwp *l;
 	u_quad_t sticks;
 {
 #if defined(DEBUG) && defined(M68060)
@@ -300,12 +328,17 @@ trapmmufault(type, code, v, fp, p, sticks)
 	static struct proc *oldp=0;
 #endif
 	extern struct vm_map *kernel_map;
+	struct proc *p = l->l_proc;
 	struct vmspace *vm = NULL;
 	vm_prot_t ftype;
 	vaddr_t va;
 	struct vm_map *map;
+	ksiginfo_t ksi;
 	u_int nss;
 	int rv;
+
+	KSI_INIT_TRAP(&ksi);
+	ksi.ksi_trap = type & ~T_USER;
 
 	/*
 	 * It is only a kernel address space fault iff:
@@ -320,7 +353,7 @@ trapmmufault(type, code, v, fp, p, sticks)
 	 * Print out some data about the fault
 	 */
 #ifdef DEBUG_PAGE0
-	if (v < NBPG)					/* XXX PAGE0 */
+	if (v < PAGE_SIZE)				/* XXX PAGE0 */
 		mmudebug |= 0x100;			/* XXX PAGE0 */
 #endif
 	if (mmudebug && mmutype == MMU_68040) {
@@ -349,7 +382,7 @@ trapmmufault(type, code, v, fp, p, sticks)
 
 
 #ifdef DDB						/* XXX PAGE0 */
-		if (v < NBPG)				/* XXX PAGE0 */
+		if (v < PAGE_SIZE)			/* XXX PAGE0 */
 			Debugger();			/* XXX PAGE0 */
 #endif							/* XXX PAGE0 */
 	}
@@ -362,15 +395,20 @@ trapmmufault(type, code, v, fp, p, sticks)
 		vm = p->p_vmspace;
 
 	if (type == T_MMUFLT &&
-	    (!p || !p->p_addr || p->p_addr->u_pcb.pcb_onfault == 0 || (
+	    (l == &lwp0 || !l->l_addr || l->l_addr->u_pcb.pcb_onfault == 0 || (
 #ifdef M68060
 	     machineid & AMIGA_68060 ? code & FSLW_TM_SV :
 #endif
 	     mmutype == MMU_68040 ? (code & SSW_TMMASK) == FC_SUPERD :
 	     (code & (SSW_DF|FC_SUPERD)) == (SSW_DF|FC_SUPERD))))
 		map = kernel_map;
-	else
+	else {
 		map = &vm->vm_map;
+		if (l->l_flag & L_SA) {
+			l->l_savp->savp_faultaddr = (vaddr_t)v;
+			l->l_flag |= L_SA_PAGEFAULT;
+		}
+	}
 
 	if (
 #ifdef M68060
@@ -485,14 +523,14 @@ trapmmufault(type, code, v, fp, p, sticks)
 			nss = btoc(USRSTACK-(unsigned)va);
 			if (nss > vm->vm_ssize)
 				vm->vm_ssize = nss;
-		} else if (rv == EACCES)
-			rv = EFAULT;
+		}
 	}
 
 	if (rv == 0) {
 		if (type == T_MMUFLT)
 			return;
-		userret(p, fp->f_pc, sticks);
+		l->l_flag &= ~L_SA_PAGEFAULT;
+		userret(l, fp->f_pc, sticks);
 		return;
 	}
 #else /* use hacky 386bsd_code */
@@ -504,14 +542,20 @@ trapmmufault(type, code, v, fp, p, sticks)
 			vm->vm_ssize = nss;
 		if (type == T_MMUFLT)
 			return;
-		userret(p, fp->f_pc, sticks);
+		l->l_flag &= ~L_SA_PAGEFAULT;
+		userret(l, fp->f_pc, sticks);
 		return;
 	}
 nogo:
 #endif
+	if (rv == EACCES) {
+		ksi.ksi_code = SEGV_ACCERR;
+		rv = EFAULT;
+	} else
+		ksi.ksi_code = SEGV_MAPERR;
 	if (type == T_MMUFLT) {
-		if (p->p_addr->u_pcb.pcb_onfault) {
-			trapcpfault(p, fp);
+		if (l->l_addr->u_pcb.pcb_onfault) {
+			trapcpfault(l, fp);
 			return;
 		}
 		printf("uvm_fault(%p, 0x%lx, 0, 0x%x) -> 0x%x\n",
@@ -520,17 +564,20 @@ nogo:
 		       type, code);
 		panictrap(type, code, v, fp);
 	}
+	ksi.ksi_addr = (void *)v;
 	if (rv == ENOMEM) {
 		printf("UVM: pid %d (%s), uid %d killed: out of swap\n",
 		       p->p_pid, p->p_comm,
 		       p->p_cred && p->p_ucred ? p->p_ucred->cr_uid : -1);
-		trapsignal(p, SIGKILL, v);
+		ksi.ksi_signo = SIGKILL;
 	} else {
-		trapsignal(p, SIGSEGV, v);
+		ksi.ksi_signo = SIGSEGV;
 	}
+	trapsignal(l, &ksi);
 	if ((type & T_USER) == 0)
 		return;
-	userret(p, fp->f_pc, sticks);
+	l->l_flag &= ~L_SA_PAGEFAULT;
+	userret(l, fp->f_pc, sticks);
 }
 /*
  * Trap is called from locore to handle most types of processor traps,
@@ -544,19 +591,25 @@ trap(type, code, v, frame)
 	u_int code, v;
 	struct frame frame;
 {
+	struct lwp *l;
 	struct proc *p;
-	u_int ucode;
+	ksiginfo_t ksi;
 	u_quad_t sticks = 0;
-	int i;
 
-	p = curproc;
-	ucode = 0;
+	l = curlwp;
 	uvmexp.traps++;
+
+	KSI_INIT_TRAP(&ksi);
+	ksi.ksi_trap = type & ~T_USER;
+
+	if (l == NULL)
+		l = &lwp0;
+	p = l->l_proc;
 
 	if (USERMODE(frame.f_sr)) {
 		type |= T_USER;
 		sticks = p->p_sticks;
-		p->p_md.md_regs = frame.f_regs;
+		l->l_md.md_regs = frame.f_regs;
 	}
 
 #ifdef DDB
@@ -578,43 +631,52 @@ trap(type, code, v, frame)
 	 * Kernel Bus error
 	 */
 	case T_BUSERR:
-		if (!p || !p->p_addr || !p->p_addr->u_pcb.pcb_onfault)
+		if (!l || !l->l_addr || !l->l_addr->u_pcb.pcb_onfault)
 			panictrap(type, code, v, &frame);
-		trapcpfault(p, &frame);
+		trapcpfault(l, &frame);
 		return;
 	/*
 	 * User Bus/Addr error.
 	 */
 	case T_BUSERR|T_USER:
 	case T_ADDRERR|T_USER:
-		i = SIGBUS;
+		ksi.ksi_addr = (void *)v;
+		ksi.ksi_signo = SIGBUS;
+		ksi.ksi_code = (type == (T_BUSERR|T_USER)) ?
+			BUS_OBJERR : BUS_ADRERR;
 		break;
 	/*
 	 * User illegal/privleged inst fault
 	 */
 	case T_ILLINST|T_USER:
 	case T_PRIVINST|T_USER:
-		ucode = frame.f_format;	/* XXX was ILL_PRIVIN_FAULT */
-		i = SIGILL;
+		ksi.ksi_addr = (void *)(int)frame.f_format;
+				/* XXX was ILL_PRIVIN_FAULT */
+		ksi.ksi_signo = SIGILL;
+		ksi.ksi_code = (type == (T_PRIVINST|T_USER)) ?
+			ILL_PRVOPC : ILL_ILLOPC;
 		break;
 	/*
 	 * divde by zero, CHK/TRAPV inst
 	 */
 	case T_ZERODIV|T_USER:
+		ksi.ksi_code = FPE_FLTDIV;
 	case T_CHKINST|T_USER:
 	case T_TRAPVINST|T_USER:
-		ucode = frame.f_format;
-		i = SIGFPE;
+		ksi.ksi_addr = (void *)(int)frame.f_format;
+		ksi.ksi_signo = SIGFPE;
 		break;
 
 	case T_FPEMULI|T_USER:
 	case T_FPEMULD|T_USER:
 #ifdef FPU_EMULATE
-		i = fpu_emulate(&frame, &p->p_addr->u_pcb.pcb_fpregs);
-		/* XXX - Deal with tracing? (frame.f_sr & PSL_T) */
+		if (fpu_emulate(&frame, &l->l_addr->u_pcb.pcb_fpregs,
+			&ksi) == 0)
+			; /* XXX - Deal with tracing? (frame.f_sr & PSL_T) */
 #else
 		printf("pid %d killed: no floating point support\n", p->p_pid);
-		i = SIGILL;
+		ksi.ksi_signo = SIGILL;
+		ksi.ksi_code = ILL_ILLOPC;
 #endif
 		break;
 
@@ -623,8 +685,9 @@ trap(type, code, v, frame)
 	 * User coprocessor violation
 	 */
 	case T_COPERR|T_USER:
-		ucode = 0;
-		i = SIGFPE;	/* XXX What is a proper response here? */
+	/* XXX What is a proper response here? */
+		ksi.ksi_signo = SIGFPE;
+		ksi.ksi_code = FPE_FLTINV;
 		break;
 	/*
 	 * 6888x exceptions
@@ -640,8 +703,8 @@ trap(type, code, v, frame)
 		 * 3 bits of the status register are defined as 0 so
 		 * there is no clash.
 		 */
-		ucode = code;
-		i = SIGFPE;
+		ksi.ksi_signo = SIGFPE;
+		ksi.ksi_addr = (void *)code;
 		break;
 	/*
 	 * Kernel coprocessor violation
@@ -666,8 +729,11 @@ trap(type, code, v, frame)
 		sigdelset(&p->p_sigctx.ps_sigignore, SIGILL);
 		sigdelset(&p->p_sigctx.ps_sigcatch, SIGILL);
 		sigdelset(&p->p_sigctx.ps_sigmask, SIGILL);
-		i = SIGILL;
-		ucode = frame.f_format;	/* XXX was ILL_RESAD_FAULT */
+		ksi.ksi_signo = SIGILL;
+		ksi.ksi_addr = (void *)(int)frame.f_format;
+				/* XXX was ILL_RESAD_FAULT */
+		ksi.ksi_code = (type == T_COPERR) ?
+			ILL_COPROC : ILL_ILLOPC;
 		break;
 	/*
 	 * Trace traps.
@@ -683,7 +749,7 @@ trap(type, code, v, frame)
 	case T_TRACE:
 	case T_TRAP15:
 		frame.f_sr &= ~PSL_T;
-		i = SIGTRAP;
+		ksi.ksi_signo = SIGTRAP;
 		break;
 	case T_TRACE|T_USER:
 	case T_TRAP15|T_USER:
@@ -699,7 +765,7 @@ trap(type, code, v, frame)
 		}
 #endif
 		frame.f_sr &= ~PSL_T;
-		i = SIGTRAP;
+		ksi.ksi_signo = SIGTRAP;
 		break;
 	/*
 	 * Kernel AST (should not happen)
@@ -716,34 +782,37 @@ trap(type, code, v, frame)
 			p->p_flag &= ~P_OWEUPC;
 			ADDUPROF(p);
 		}
-		userret(p, frame.f_pc, sticks);
+		if (want_resched)
+			preempt(0);
+
+		userret(l, frame.f_pc, sticks);
 		return;
 	/*
 	 * Kernel/User page fault
 	 */
 	case T_MMUFLT:
-		if (p && p->p_addr &&
-		    (p->p_addr->u_pcb.pcb_onfault == (caddr_t)fubail ||
-		    p->p_addr->u_pcb.pcb_onfault == (caddr_t)subail)) {
-			trapcpfault(p, &frame);
+		if (l && l->l_addr &&
+		    (l->l_addr->u_pcb.pcb_onfault == (caddr_t)fubail ||
+		    l->l_addr->u_pcb.pcb_onfault == (caddr_t)subail)) {
+			trapcpfault(l, &frame);
 			return;
 		}
 		/*FALLTHROUGH*/
 	case T_MMUFLT|T_USER:	/* page fault */
-		trapmmufault(type, code, v, &frame, p, sticks);
+		trapmmufault(type, code, v, &frame, l, sticks);
 		return;
 	}
 
 #ifdef DEBUG
-	if (i != SIGTRAP)
-		printf("trapsignal(%d, %d, %d, %x, %x)\n", p->p_pid, i,
-		    ucode, v, frame.f_pc);
+	if (ksi.ksi_signo != SIGTRAP)
+		printf("trapsignal(%d, %d, %d, %x, %x)\n", p->p_pid,
+		    ksi.ksi_signo, ksi.ksi_code, v, frame.f_pc);
 #endif
-	if (i)
-		trapsignal(p, i, ucode);
+	if (ksi.ksi_signo)
+		trapsignal(l, &ksi);
 	if ((type & T_USER) == 0)
 		return;
-	userret(p, frame.f_pc, sticks);
+	userret(l, frame.f_pc, sticks);
 }
 
 /*

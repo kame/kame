@@ -1,4 +1,4 @@
-/*	$NetBSD: genfs.h,v 1.15 2001/12/18 07:49:36 chs Exp $	*/
+/*	$NetBSD: genfs.h,v 1.17 2003/04/10 21:53:32 jdolecek Exp $	*/
 
 int	genfs_badop		__P((void *));
 int	genfs_nullop		__P((void *));
@@ -6,13 +6,13 @@ int	genfs_enoioctl		__P((void *));
 int	genfs_enoextops		__P((void *));
 int	genfs_einval		__P((void *));
 int	genfs_eopnotsupp	__P((void *));
-int	genfs_eopnotsupp_rele	__P((void *));
 int	genfs_ebadf		__P((void *));
 int	genfs_nolock		__P((void *));
 int	genfs_noislocked	__P((void *));
 int	genfs_nounlock		__P((void *));
 
 int	genfs_poll		__P((void *));
+int	genfs_kqfilter		__P((void *));
 int	genfs_fcntl		__P((void *));
 int	genfs_fsync		__P((void *));
 int	genfs_seek		__P((void *));

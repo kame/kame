@@ -1,5 +1,5 @@
 /*	$OpenBSD: usb_port.h,v 1.18 2000/09/06 22:42:10 rahnds Exp $ */
-/*	$NetBSD: usb_port.h,v 1.54 2002/03/28 21:49:19 ichiro Exp $	*/
+/*	$NetBSD: usb_port.h,v 1.62 2003/02/15 18:33:30 augustss Exp $	*/
 /*	$FreeBSD: src/sys/dev/usb/usb_port.h,v 1.21 1999/11/17 22:33:47 n_hibma Exp $	*/
 
 /*
@@ -42,7 +42,7 @@
 #ifndef _USB_PORT_H
 #define _USB_PORT_H
 
-/* 
+/*
  * Macro's to cope with the differences between operating systems.
  */
 
@@ -52,6 +52,15 @@
  */
 
 #include "opt_usbverbose.h"
+
+#if defined(_KERNEL)
+#include <sys/mallocvar.h>
+
+MALLOC_DECLARE(M_USB);
+MALLOC_DECLARE(M_USBDEV);
+MALLOC_DECLARE(M_USBHC);
+
+#endif
 
 #define USB_USE_SOFTINTR
 
@@ -86,6 +95,8 @@
 #define USTIR_DEBUG 1
 #define UISDATA_DEBUG 1
 #define UDSBR_DEBUG 1
+#define UBT_DEBUG 1
+#define UAX_DEBUG 1
 #define Static
 #else
 #define Static static
@@ -118,13 +129,14 @@ typedef struct callout usb_callout_t;
 #define usb_kthread_create1	kthread_create1
 #define usb_kthread_create	kthread_create
 
-typedef int usb_malloc_type;
+typedef struct malloc_type *usb_malloc_type;
 
 #define Ether_ifattach ether_ifattach
 #define IF_INPUT(ifp, m) (*(ifp)->if_input)((ifp), (m))
 
 #define logprintf printf
 
+#define	USB_DNAME(dname)	dname
 #define USB_DECLARE_DRIVER(dname)  \
 int __CONCAT(dname,_match)(struct device *, struct cfdata *, void *); \
 void __CONCAT(dname,_attach)(struct device *, struct device *, void *); \
@@ -133,13 +145,12 @@ int __CONCAT(dname,_activate)(struct device *, enum devact); \
 \
 extern struct cfdriver __CONCAT(dname,_cd); \
 \
-struct cfattach __CONCAT(dname,_ca) = { \
-	sizeof(struct __CONCAT(dname,_softc)), \
-	__CONCAT(dname,_match), \
-	__CONCAT(dname,_attach), \
-	__CONCAT(dname,_detach), \
-	__CONCAT(dname,_activate), \
-}
+CFATTACH_DECL(USB_DNAME(dname), \
+    sizeof(struct ___CONCAT(dname,_softc)), \
+    ___CONCAT(dname,_match), \
+    ___CONCAT(dname,_attach), \
+    ___CONCAT(dname,_detach), \
+    ___CONCAT(dname,_activate))
 
 #define USB_MATCH(dname) \
 int __CONCAT(dname,_match)(struct device *parent, struct cfdata *match, void *aux)
@@ -268,7 +279,6 @@ typedef int usb_malloc_type;
 #define	usbpoll			usbselect
 #define	uhidpoll		uhidselect
 #define	ugenpoll		ugenselect
-#define	uriopoll		urioselect
 #define uscannerpoll		uscannerselect
 
 #define powerhook_establish(fn, sc) (fn)
@@ -316,7 +326,7 @@ struct cfdriver __CONCAT(dname,_cd) = { \
 	NULL, #dname, DV_DULL \
 }; \
 \
-struct cfattach __CONCAT(dname,_ca) = { \
+const struct cfattach __CONCAT(dname,_ca) = { \
 	sizeof(struct __CONCAT(dname,_softc)), \
 	__CONCAT(dname,_match), \
 	__CONCAT(dname,_attach), \
@@ -497,13 +507,7 @@ __CONCAT(dname,_detach)(device_t self)
 	(device_probe_and_attach((bdev)) == 0 ? (bdev) : 0)
 
 /* conversion from one type of queue to the other */
-/* XXX In FreeBSD SIMPLEQ_REMOVE_HEAD only removes the head element.
- */
-#define SIMPLEQ_REMOVE_HEAD(h, e, f)	do {				\
-		if ( (e) != SIMPLEQ_FIRST((h)) )			\
-			panic("Removing other than first element");	\
-		STAILQ_REMOVE_HEAD(h, f);				\
-} while (0)
+#define SIMPLEQ_REMOVE_HEAD	STAILQ_REMOVE_HEAD
 #define SIMPLEQ_INSERT_HEAD	STAILQ_INSERT_HEAD
 #define SIMPLEQ_INSERT_TAIL	STAILQ_INSERT_TAIL
 #define SIMPLEQ_NEXT		STAILQ_NEXT

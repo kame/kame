@@ -1,4 +1,4 @@
-/*	$NetBSD: asc.c,v 1.5.6.1 2002/11/01 11:13:55 tron Exp $	*/
+/*	$NetBSD: asc.c,v 1.13 2003/08/07 16:26:29 agc Exp $	*/
 
 /*
  * Copyright (c) 2001 Richard Earnshaw
@@ -25,10 +25,34 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * POSSIBILITY OF SUCH DAMAGE.
  *
- *
- * Copyright (c) 1996 Mark Brinicombe
  * Copyright (c) 1982, 1990 The Regents of the University of California.
  * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * Copyright (c) 1996 Mark Brinicombe
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -74,7 +98,7 @@
 
 #include <sys/param.h>
 
-__KERNEL_RCSID(0, "$NetBSD: asc.c,v 1.5.6.1 2002/11/01 11:13:55 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: asc.c,v 1.13 2003/08/07 16:26:29 agc Exp $");
 
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -113,8 +137,6 @@ int  asc_dmanext	(void *, bus_dma_tag_t, struct sbic_acb *, int);
 void asc_dmastop	(void *, bus_dma_tag_t, struct sbic_acb *);
 void asc_dmafinish	(void *, bus_dma_tag_t, struct sbic_acb *);
 
-void asc_scsi_request	(struct scsipi_channel *,
-			 scsipi_adapter_req_t, void *);
 int  asc_intr		(void *);
 void asc_minphys	(struct buf *);
 
@@ -124,9 +146,8 @@ void asc_dump		(void);
 int	asc_dmadebug = 0;
 #endif
 
-struct cfattach asc_ca = {
-	sizeof(struct asc_softc), ascmatch, ascattach
-};
+CFATTACH_DECL(asc, sizeof(struct asc_softc),
+    ascmatch, ascattach, NULL, NULL);
 
 extern struct cfdriver asc_cd;
 
@@ -191,7 +212,7 @@ ascattach(struct device *pdp, struct device *dp, void *auxp)
 	if (bus_space_map (sbic->sc_sbicp.sc_sbiciot,
 	    sc->sc_podule->mod_base + ASC_SBIC, ASC_SBIC_SPACE, 0,
 	    &sbic->sc_sbicp.sc_sbicioh))
-		panic("%s: Cannot map SBIC\n", dp->dv_xname);
+		panic("%s: Cannot map SBIC", dp->dv_xname);
 
 	sbic->sc_clkfreq = sbic_clock_override ? sbic_clock_override : 143;
 
@@ -201,7 +222,7 @@ ascattach(struct device *pdp, struct device *dp, void *auxp)
 	sbic->sc_adapter.adapt_max_periph = 1;
 	sbic->sc_adapter.adapt_ioctl = NULL; 
 	sbic->sc_adapter.adapt_minphys = asc_minphys;
-	sbic->sc_adapter.adapt_request = asc_scsi_request;
+	sbic->sc_adapter.adapt_request = sbic_scsi_request;
 
 	sbic->sc_channel.chan_adapter = &sbic->sc_adapter;
 	sbic->sc_channel.chan_bustype = &scsi_bustype;
@@ -221,8 +242,10 @@ ascattach(struct device *pdp, struct device *dp, void *auxp)
 		get_bootconf_option(boot_args, "ascpoll", BOOTOPT_TYPE_BOOLEAN,
 		    &asc_poll);
 
-	if (asc_poll)
+	if (asc_poll) {
+		sbic->sc_adapter.adapt_flags |= SCSIPI_ADAPT_POLL_ONLY;
 		printf(" polling");
+	}
 #endif
 	printf("\n");
 
@@ -249,7 +272,7 @@ ascattach(struct device *pdp, struct device *dp, void *auxp)
 		sc->sc_ih = podulebus_irq_establish(pa->pa_ih, IPL_BIO,
 		    asc_intr, sc, &sc->sc_intrcnt);
 		if (sc->sc_ih == NULL)
-			panic("%s: Cannot claim podule IRQ\n", dp->dv_xname);
+			panic("%s: Cannot claim podule IRQ", dp->dv_xname);
 	}
 
 	/*
@@ -281,7 +304,7 @@ asc_dmasetup (void *dma_h, bus_dma_tag_t dma_t, struct sbic_acb *acb, int dir)
 #ifdef DDB
 	Debugger();
 #else
-	panic("Hit a brick wall\n");
+	panic("Hit a brick wall");
 #endif
 	return 0;
 }
@@ -293,7 +316,7 @@ asc_dmanext (void *dma_h, bus_dma_tag_t dma_t, struct sbic_acb *acb, int dir)
 #ifdef DDB
 	Debugger();
 #else
-	panic("Hit a brick wall\n");
+	panic("Hit a brick wall");
 #endif
 	return 0;
 }
@@ -319,33 +342,6 @@ asc_dump(void)
 		if (asc_cd.cd_devs[i])
 			sbic_dump(asc_cd.cd_devs[i]);
 }
-
-void
-asc_scsi_request(struct scsipi_channel *chan, scsipi_adapter_req_t req,
-    void *arg)
-{
-	struct scsipi_xfer *xs;
-
-	switch (req) {
-	case ADAPTER_REQ_RUN_XFER:
-		xs = arg;
-
-#if ASC_POLL > 0
-		/* ensure command is polling for the moment */
-
-		if (asc_poll)
-			xs->xs_control |= XS_CTL_POLL;
-#endif
-
-/*		printf("id=%d lun=%dcmdlen=%d datalen=%d opcode=%02x flags=%08x status=%02x blk=%02x %02x\n",
-		    xs->xs_periph->periph_target, xs->xs_periph->periph_lun, xs->cmdlen, xs->datalen, xs->cmd->opcode,
-		    xs->xs_control, xs->status, xs->cmd->bytes[0], xs->cmd->bytes[1]);*/
-
-	default:
-	}
-	sbic_scsi_request(chan, req, arg);
-}
-
 
 int
 asc_intr(void *arg)
@@ -374,7 +370,7 @@ asc_minphys(struct buf *bp)
 	 * We must limit the DMA xfer size
 	 */
 	if (bp->b_bcount > MAX_DMA_LEN) {
-		printf("asc: Reducing dma length\n");
+		printf("asc: Reducing DMA length\n");
 		bp->b_bcount = MAX_DMA_LEN;
 	}
 #endif

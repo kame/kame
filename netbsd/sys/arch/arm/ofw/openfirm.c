@@ -1,4 +1,4 @@
-/*	$NetBSD: openfirm.c,v 1.1 2002/02/06 21:30:27 thorpej Exp $	*/
+/*	$NetBSD: openfirm.c,v 1.3 2003/07/15 00:24:48 lukem Exp $	*/
 
 /*
  * Copyright 1997
@@ -63,6 +63,10 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: openfirm.c,v 1.3 2003/07/15 00:24:48 lukem Exp $");
+
 #include <sys/param.h>
 
 #include <machine/stdarg.h>
@@ -704,15 +708,15 @@ OF_exit()
 }
 
 void
-(*OF_set_callback(newfunc))()
-	void (*newfunc)();
+(*OF_set_callback(newfunc))(void *)
+	void (*newfunc)(void *);
 {
 	static struct {
 		char *name;
 		int nargs;
 		int nreturns;
-		void (*newfunc)();
-		void (*oldfunc)();
+		void (*newfunc)(void *);
+		void (*oldfunc)(void *);
 	} args = {
 		"set-callback",
 		1,

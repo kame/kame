@@ -1,4 +1,4 @@
-/*	$NetBSD: devopen.c,v 1.2 2002/02/17 20:14:08 thorpej Exp $	*/
+/*	$NetBSD: devopen.c,v 1.5 2003/11/12 18:44:08 drochner Exp $	*/
 
 /*
  * Copyright 2001, 2002 Wasabi Systems, Inc.
@@ -37,6 +37,9 @@
 
 #include <sys/param.h>
 #include <stand.h>
+#include <netinet/in.h>
+#include <netinet/in_systm.h>
+#include <net.h>
 
 #include <libi386.h>
 #ifdef _STANDALONE
@@ -50,7 +53,6 @@
 
 #ifdef _STANDALONE
 struct btinfo_bootpath bibp;
-extern char bootfile[];
 #endif
 
 /*
@@ -79,6 +81,10 @@ devopen(struct open_file *f, const char *fname, char **file)
 	/* Set the default boot file system. */
 	bcopy(pxeboot_fstab[0].fst_ops, file_system, sizeof(struct fs_ops));
 
+	/* if we got passed a filename, pass it to the BOOTP server */
+	if (fname)
+		strncpy(bootfile, fname, FNAME_SIZE);
+
 	/* Open the device; this might give us a boot file name. */
 	error = (*dp->dv_open)(f, NULL);
 	if (error)
@@ -86,11 +92,20 @@ devopen(struct open_file *f, const char *fname, char **file)
 
 	f->f_dev = dp;
 
-	/* If the DHCP server provided a file name, use it. */
-	if (bootfile[0] != '\0')
+	/*
+	 * If the DHCP server provided a file name:
+	 * - If it contains a ":", assume it points to a NetBSD kernel.
+	 * - If not, assume that the DHCP server was not able to pass
+	 *   a separate filename for the kernel. (The name probably
+	 *   was the same as used to load "pxeboot".) Ignore it and
+	 *   use the default in this case.
+	 * So we cater to simple DHCP servers while being able to
+	 * use the power of conditional behaviour in modern ones.
+	 */
+	if (strchr(bootfile, ':'))
 		fname = bootfile;
 
-	filename = strchr(fname, ':');
+	filename = (fname ? strchr(fname, ':') : NULL);
 	if (filename != NULL) {
 		fsnamelen = (size_t)((const char *)filename - fname);
 		for (i = 0; i < npxeboot_fstab; i++) {

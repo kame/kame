@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.3 2002/05/13 07:04:24 matt Exp $	*/
+/*	$NetBSD: cpu.h,v 1.6 2003/09/23 15:14:03 shige Exp $	*/
 
 /*
  * Copyright 2002 Wasabi Systems, Inc.
@@ -50,10 +50,22 @@
 #define	PVR_403			0x00200000
 
 #define PVR_405GP      		0x40110000 
+#define PVR_405GP_PASS1 	0x40110000	/* RevA */ 
+#define PVR_405GP_PASS2 	0x40110040	/* RevB */ 
+#define PVR_405GP_PASS2_1 	0x40110082	/* RevC */ 
+#define PVR_405GP_PASS3 	0x401100c4	/* RevD */ 
+#define PVR_405GPR     		0x50910000
+#define PVR_405GPR_REVB		0x50910951
 
 #if defined(_KERNEL)
 extern char bootpath[];
 
+void ibm4xx_init_board_data(void *, u_int);
+void ibm4xx_init(void (*)(void));
+void ibm4xx_startup(const char *);
+void ibm4xx_setup_propdb(void);
+void ibm4xx_dumpsys(void);
+void ibm4xx_install_extint(void (*)(void));
 void calc_delayconst(void);
 void ppc4xx_reset(void) __attribute__((__noreturn__));
 #endif /* _KERNEL */

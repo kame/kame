@@ -1,4 +1,4 @@
-/*	$NetBSD: vrdsu.c,v 1.4.10.1 2002/12/12 22:54:18 he Exp $	*/
+/*	$NetBSD: vrdsu.c,v 1.8 2003/07/15 02:29:35 lukem Exp $	*/
 
 /*
  * Copyright (c) 1999 Shin Takemura All rights reserved.
@@ -26,6 +26,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vrdsu.c,v 1.8 2003/07/15 02:29:35 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -49,9 +52,8 @@ static void vrdsuattach(struct device *, struct device *, void *);
 static void vrdsu_write(struct vrdsu_softc *, int, unsigned short);
 static unsigned short vrdsu_read(struct vrdsu_softc *, int);
 
-struct cfattach vrdsu_ca = {
-	sizeof(struct vrdsu_softc), vrdsumatch, vrdsuattach
-};
+CFATTACH_DECL(vrdsu, sizeof(struct vrdsu_softc),
+    vrdsumatch, vrdsuattach, NULL, NULL);
 
 struct vrdsu_softc *the_dsu_sc = NULL;
 

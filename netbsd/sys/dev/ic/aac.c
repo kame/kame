@@ -1,4 +1,4 @@
-/*	$NetBSD: aac.c,v 1.1 2002/04/26 02:05:11 ad Exp $	*/
+/*	$NetBSD: aac.c,v 1.11 2004/03/20 21:16:55 christos Exp $	*/
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -77,7 +77,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: aac.c,v 1.1 2002/04/26 02:05:11 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: aac.c,v 1.11 2004/03/20 21:16:55 christos Exp $");
 
 #include "locators.h"
 
@@ -184,7 +184,8 @@ aac_attach(struct aac_softc *sc)
 	sc->sc_ccbs = malloc(sizeof(*ac) * AAC_NCCBS, M_DEVBUF,
 	    M_NOWAIT | M_ZERO);
 	if (sc->sc_ccbs == NULL) {
-		printf("%s: memory allocation failure\n", sc->sc_dv.dv_xname);
+		aprint_error("%s: memory allocation failure\n",
+		    sc->sc_dv.dv_xname);
 		return (ENOMEM);
 	}
 	state = 0;
@@ -192,28 +193,29 @@ aac_attach(struct aac_softc *sc)
 
 	if ((rv = bus_dmamap_create(sc->sc_dmat, size, 1, size,
 	    0, BUS_DMA_NOWAIT | BUS_DMA_ALLOCNOW, &sc->sc_fibs_dmamap)) != 0) {
-		printf("%s: cannot create fibs dmamap\n",
+		aprint_error("%s: cannot create fibs dmamap\n",
 		    sc->sc_dv.dv_xname);
 		goto bail_out;
 	}
 	state++;
 	if ((rv = bus_dmamem_alloc(sc->sc_dmat, size, PAGE_SIZE, 0,
 	    &sc->sc_fibs_seg, 1, &nsegs, BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: can't allocate fibs structure\n",
+		aprint_error("%s: can't allocate fibs structure\n",
 		    sc->sc_dv.dv_xname);
 		goto bail_out;
 	}
 	state++;
 	if ((rv = bus_dmamem_map(sc->sc_dmat, &sc->sc_fibs_seg, nsegs, size,
 	    (caddr_t *)&sc->sc_fibs, 0)) != 0) {
-		printf("%s: can't map fibs structure\n",
+		aprint_error("%s: can't map fibs structure\n",
 		    sc->sc_dv.dv_xname);
 		goto bail_out;
 	}
 	state++;
 	if ((rv = bus_dmamap_load(sc->sc_dmat, sc->sc_fibs_dmamap, sc->sc_fibs,
 	    size, NULL, BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: cannot load fibs dmamap\n", sc->sc_dv.dv_xname);
+		aprint_error("%s: cannot load fibs dmamap\n",
+		    sc->sc_dv.dv_xname);
 		goto bail_out;
 	}
 	state++;
@@ -230,7 +232,7 @@ aac_attach(struct aac_softc *sc)
 			while (--ac >= sc->sc_ccbs)
 				bus_dmamap_destroy(sc->sc_dmat,
 				    ac->ac_dmamap_xfer);
-			printf("%s: cannot create ccb dmamap (%d)",
+			aprint_error("%s: cannot create ccb dmamap (%d)",
 			    sc->sc_dv.dv_xname, rv);
 			goto bail_out;
 		}
@@ -291,8 +293,8 @@ aac_print(void *aux, const char *pnp)
 	aaca = aux;
 
 	if (pnp != NULL)
-		printf("block device at %s", pnp);
-	printf(" unit %d", aaca->aaca_unit);
+		aprint_normal("block device at %s", pnp);
+	aprint_normal(" unit %d", aaca->aaca_unit);
 	return (UNCONF);
 }
 
@@ -310,7 +312,7 @@ aac_submatch(struct device *parent, struct cfdata *cf, void *aux)
 	    cf->aaccf_unit != aaca->aaca_unit)
 		return (0);
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 /*
@@ -340,25 +342,25 @@ aac_describe_controller(struct aac_softc *sc)
 	arg = 0;
 	if (aac_sync_fib(sc, RequestAdapterInfo, 0, &arg, sizeof(arg), &buf,
 	    &bufsize)) {
-		printf("%s: RequestAdapterInfo failed\n", sc->sc_dv.dv_xname);
+		aprint_error("%s: RequestAdapterInfo failed\n",
+		    sc->sc_dv.dv_xname);
 		return;
 	}
 	if (bufsize != sizeof(*info)) {
-		printf("%s: "
+		aprint_error("%s: "
 		    "RequestAdapterInfo returned wrong data size (%d != %d)\n",
 		    sc->sc_dv.dv_xname, bufsize, sizeof(*info));
 		return;
 	}
 	info = (struct aac_adapter_info *)&buf[0];
 
-	printf("%s: %s at %dMHz, %dMB cache, %s, kernel %d.%d-%d\n",
+	aprint_normal("%s: %s at %dMHz, %dMB cache, %s, kernel %d.%d-%d\n",
 	    sc->sc_dv.dv_xname,
 	    aac_describe_code(aac_cpu_variant, le32toh(info->CpuVariant)),
 	    le32toh(info->ClockSpeed),
 	    le32toh(info->BufferMem) / (1024 * 1024),
 	    aac_describe_code(aac_battery_platform,
-	    le32toh(info->batteryPlatform)),
-	    le32toh(info->batteryPlatform),
+			      le32toh(info->batteryPlatform)),
 	    info->KernelRevision.external.comp.major,
 	    info->KernelRevision.external.comp.minor,
 	    info->KernelRevision.external.comp.dash);
@@ -379,7 +381,7 @@ aac_check_firmware(struct aac_softc *sc)
 	if ((sc->sc_quirks & AAC_QUIRK_PERC2QC) != 0) {
 		if (aac_sync_command(sc, AAC_MONKER_GETKERNVER, 0, 0, 0, 0,
 		    NULL)) {
-			printf("%s: error reading firmware version\n",
+			aprint_error("%s: error reading firmware version\n",
 			    sc->sc_dv.dv_xname);
 			return (1);
 		}
@@ -388,7 +390,8 @@ aac_check_firmware(struct aac_softc *sc)
 		major = (AAC_GETREG4(sc, AAC_SA_MAILBOX + 4) & 0xff) - 0x30;
 		minor = (AAC_GETREG4(sc, AAC_SA_MAILBOX + 8) & 0xff) - 0x30;
 		if (major == 1) {
-			printf("%s: firmware version %d.%d not supported.\n",
+			aprint_error(
+			    "%s: firmware version %d.%d not supported.\n",
 			    sc->sc_dv.dv_xname, major, minor);
 			return (1);
 		}
@@ -413,12 +416,12 @@ aac_init(struct aac_softc *sc)
 	for (i = 0; i < AAC_BOOT_TIMEOUT * 1000; i++) {
 		code = AAC_GET_FWSTATUS(sc);
 		if ((code & AAC_SELF_TEST_FAILED) != 0) {
-			printf("%s: FATAL: selftest failed\n",
+			aprint_error("%s: FATAL: selftest failed\n",
 			    sc->sc_dv.dv_xname);
 			return (ENXIO);
 		}
 		if ((code & AAC_KERNEL_PANIC) != 0) {
-			printf("%s: FATAL: controller kernel panic\n",
+			aprint_error("%s: FATAL: controller kernel panic\n",
 			    sc->sc_dv.dv_xname);
 			return (ENXIO);
 		}
@@ -427,7 +430,8 @@ aac_init(struct aac_softc *sc)
 		DELAY(1000);
 	}
 	if (i == AAC_BOOT_TIMEOUT * 1000) {
-		printf("%s: FATAL: controller not coming ready, status %x\n",
+		aprint_error(
+		    "%s: FATAL: controller not coming ready, status %x\n",
 		    sc->sc_dv.dv_xname, code);
 		return (ENXIO);
 	}
@@ -435,21 +439,21 @@ aac_init(struct aac_softc *sc)
 	if ((rv = bus_dmamap_create(sc->sc_dmat, sizeof(*sc->sc_common), 1,
 	    sizeof(*sc->sc_common), 0, BUS_DMA_NOWAIT | BUS_DMA_ALLOCNOW,
 	    &sc->sc_common_dmamap)) != 0) {
-		printf("%s: cannot create common dmamap\n",
+		aprint_error("%s: cannot create common dmamap\n",
 		    sc->sc_dv.dv_xname);
 		return (rv);
 	}
 	if ((rv = bus_dmamem_alloc(sc->sc_dmat, sizeof(*sc->sc_common),
 	    PAGE_SIZE, 0, &sc->sc_common_seg, 1, &nsegs,
 	    BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: can't allocate common structure\n",
+		aprint_error("%s: can't allocate common structure\n",
 		    sc->sc_dv.dv_xname);
 		goto bail_out;
 	}
 	state++;
 	if ((rv = bus_dmamem_map(sc->sc_dmat, &sc->sc_common_seg, nsegs,
 	    sizeof(*sc->sc_common), (caddr_t *)&sc->sc_common, 0)) != 0) {
-		printf("%s: can't map common structure\n",
+		aprint_error("%s: can't map common structure\n",
 		    sc->sc_dv.dv_xname);
 		goto bail_out;
 	}
@@ -457,7 +461,8 @@ aac_init(struct aac_softc *sc)
 	if ((rv = bus_dmamap_load(sc->sc_dmat, sc->sc_common_dmamap,
 	    sc->sc_common, sizeof(*sc->sc_common), NULL,
 	    BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: cannot load common dmamap\n", sc->sc_dv.dv_xname);
+		aprint_error("%s: cannot load common dmamap\n",
+		    sc->sc_dv.dv_xname);
 		goto bail_out;
 	}
 	state++;
@@ -590,7 +595,7 @@ aac_init(struct aac_softc *sc)
 	if (aac_sync_command(sc, AAC_MONKER_INITSTRUCT, 
 	    sc->sc_common_seg.ds_addr + offsetof(struct aac_common, ac_init),
 	    0, 0, 0, NULL)) {
-		printf("%s: error establishing init structure\n",
+		aprint_error("%s: error establishing init structure\n",
 		    sc->sc_dv.dv_xname);
 		rv = EIO;
 		goto bail_out;
@@ -626,23 +631,24 @@ aac_startup(struct aac_softc *sc)
 	/*
 	 * Loop over possible containers.
 	 */
-	mi.Command = htole32(VM_NameServe);
-	mi.MntType = htole32(FT_FILESYS);
 	hd = sc->sc_hdr;
 
 	for (i = 0; i < AAC_MAX_CONTAINERS; i++, hd++) {
 		/*
 		 * Request information on this container.
 		 */
+		memset(&mi, 0, sizeof(mi));
+		mi.Command = htole32(VM_NameServe);
+		mi.MntType = htole32(FT_FILESYS);
 		mi.MntCount = htole32(i);
 		if (aac_sync_fib(sc, ContainerCommand, 0, &mi, sizeof(mi), &mir,
 		    &rsize)) {
-			printf("%s: error probing container %d\n",
+			aprint_error("%s: error probing container %d\n",
 			    sc->sc_dv.dv_xname, i);
 			continue;
 		}
 		if (rsize != sizeof(mir)) {
-			printf("%s: container info response wrong size "
+			aprint_error("%s: container info response wrong size "
 			    "(%d should be %d)\n",
 			    sc->sc_dv.dv_xname, rsize, sizeof(mir));
 			continue;
@@ -685,6 +691,7 @@ aac_shutdown(void *cookie)
 		 * talk to it anymore.  We've been closed and all I/O
 		 * completed already
 		 */
+		memset(&cc, 0, sizeof(cc));
 		cc.Command = htole32(VM_CloseAll);
 		cc.ContainerId = 0xffffffff;
 		if (aac_sync_fib(sc, ContainerCommand, 0, &cc, sizeof(cc),
@@ -851,7 +858,7 @@ aac_host_response(struct aac_softc *sc)
 	 * Deal with any completed commands.
 	 */
 	while ((ac = SIMPLEQ_FIRST(&sc->sc_ccb_complete)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(&sc->sc_ccb_complete, ac, ac_chain);
+		SIMPLEQ_REMOVE_HEAD(&sc->sc_ccb_complete, ac_chain);
 		ac->ac_flags |= AAC_CCB_COMPLETED;
 
 		if (ac->ac_intr != NULL)
@@ -861,7 +868,7 @@ aac_host_response(struct aac_softc *sc)
 	/*
 	 * Try to submit more commands.
 	 */
-	if (SIMPLEQ_FIRST(&sc->sc_ccb_queue) != NULL)
+	if (! SIMPLEQ_EMPTY(&sc->sc_ccb_queue))
 		aac_ccb_enqueue(sc, NULL);
 }
 
@@ -890,7 +897,7 @@ aac_sync_command(struct aac_softc *sc, u_int32_t command, u_int32_t arg0,
 
 	/* Spin waiting for the command to complete. */
 	for (i = 0; i < AAC_IMMEDIATE_TIMEOUT * 1000; i++) {
-		if (AAC_GET_ISTATUS(sc) & AAC_DB_SYNC_COMMAND);
+		if (AAC_GET_ISTATUS(sc) & AAC_DB_SYNC_COMMAND)
 			break;
 		DELAY(1000);
 	}
@@ -989,7 +996,7 @@ aac_ccb_alloc(struct aac_softc *sc, int flags)
 	if (ac == NULL)
 		panic("aac_ccb_get: no free CCBS");
 #endif
-	SIMPLEQ_REMOVE_HEAD(&sc->sc_ccb_free, ac, ac_chain);
+	SIMPLEQ_REMOVE_HEAD(&sc->sc_ccb_free, ac_chain);
 	splx(s);
 
 	ac->ac_flags = flags;
@@ -1043,9 +1050,9 @@ aac_ccb_map(struct aac_softc *sc, struct aac_ccb *ac)
 	if (error) {
 		printf("%s: aac_ccb_map: ", sc->sc_dv.dv_xname);
 		if (error == EFBIG)
-			printf("more than %d dma segs\n", AAC_MAX_SGENTRIES);
+			printf("more than %d DMA segs\n", AAC_MAX_SGENTRIES);
 		else
-			printf("error %d loading dma map\n", error);
+			printf("error %d loading DMA map\n", error);
 		return (error);
 	}
 
@@ -1095,7 +1102,7 @@ aac_ccb_enqueue(struct aac_softc *sc, struct aac_ccb *ac)
 	while ((ac = SIMPLEQ_FIRST(&sc->sc_ccb_queue)) != NULL) {
 		if (aac_ccb_submit(sc, ac))
 			break;
-		SIMPLEQ_REMOVE_HEAD(&sc->sc_ccb_queue, ac, ac_chain);
+		SIMPLEQ_REMOVE_HEAD(&sc->sc_ccb_queue, ac_chain);
 	}
 
 	splx(s);

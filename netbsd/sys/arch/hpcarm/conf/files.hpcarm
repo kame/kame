@@ -1,4 +1,4 @@
-#	$NetBSD: files.hpcarm,v 1.42 2002/04/16 20:50:20 thorpej Exp $
+#	$NetBSD: files.hpcarm,v 1.49 2003/08/08 12:29:23 bsh Exp $
 #
 # First try for arm-specific configuration info
 #
@@ -16,9 +16,6 @@ define todservice {}
 
 # Memory disk driver
 file	dev/md_root.c				memory_disk_hooks
-major	{md = 18}
-
-file	arch/arm/arm32/conf.c
 
 # Standard keyboard driver
 #device	kbd
@@ -34,36 +31,24 @@ file	arch/hpcarm/hpcarm/stubs.c
 # HPCARM specific files
 file	arch/hpcarm/hpcarm/hpc_machdep.c
 
-# SA11[01]0 integrated peripherals
-# parent to sacom, gpio, fb, saost,  XXX
-# also provides irq and timer services
-device saip { [addr=-1], [size=0], [membase=-1], [memsize=0], [intr=-1] }
-attach saip at mainbus
-file	arch/hpcarm/sa11x0/sa11x0.c		saip needs-flag
-file	arch/hpcarm/sa11x0/sa11x0_io.c		saip
-file	arch/hpcarm/sa11x0/sa11x0_io_asm.S	saip
-file	arch/hpcarm/sa11x0/sa11x0_irq.S		saip
-file	arch/hpcarm/sa11x0/sa11x0_irqhandler.c	saip
+# Include hpcarm/StrongARM config definitions.
+include "arch/arm/conf/files.sa11x0"
 
-# clock device
-device	saost
-attach	saost at saip
-file	arch/hpcarm/sa11x0/sa11x0_ost.c		saost needs-flag
+# SA11[01]1 companion chips
+file	arch/hpcarm/dev/sacc_hpcarm.c		sacc
 
-device	sacom: tty
-attach	sacom at saip
-file	arch/hpcarm/sa11x0/sa11x0_com.c		sacom needs-flag
+# platform dependent part of PCMCIA support.
+file	arch/hpcarm/dev/j720pcic.c	sacpcic
 
-
-# SA11[01]0 companion chips
-device	sacc { [addr=-1], [size=0], [membase=-1], [memsize=0], [intr=-1] }
-attach	sacc at saip
-file	arch/hpcarm/sa11x0/sa1111.c		sacc
-
-# iPAQ Virtual bus
+# XXX iPAQ Virtual bus
 device	ipaqbus {}
 attach	ipaqbus at saip
-file	arch/hpcarm/dev/ipaq_saip.c			ipaqbus
+file	arch/hpcarm/dev/ipaq_saip.c		ipaqbus
+
+# IPAC PCMCIA
+device	ipaqpcic: pcmciabus
+attach	ipaqpcic at ipaqbus
+file	arch/hpcarm/dev/ipaq_pcic.c		ipaqpcic needs-flag
 
 #
 # H/PC Platform common files.
@@ -84,33 +69,17 @@ device	sed: hpcfbif
 attach	sed at saip
 file	arch/hpcarm/dev/sed_saip.c		sed
 
-#
-# Workstation Console
-#
-include "dev/wscons/files.wscons"
-
-device	j720ssp: wskbddev
+device	j720ssp {}: wskbddev, wsmousedev, tpcalib
 attach	j720ssp at saip
 file	arch/hpcarm/dev/j720ssp.c		j720ssp
 file	arch/hpcarm/dev/j720kbdmap.c		j720ssp
 
 file	dev/cninit.c
 
-# XXX this is a hack to use dev/pcmcia without fdc.c
-device	fdc
-
-# PCMCIA
-include "dev/pcmcia/files.pcmcia"
-
-device	sacpcic: pcmciabus
-attach	sacpcic at sacc
-file	arch/hpcarm/sa11x0/sa11x1_pcic.c	sacpcic needs-flag
-
-device	ipaqpcic: pcmciabus
-attach	ipaqpcic at ipaqbus
-file	arch/hpcarm/dev/ipaq_pcic.c		ipaqpcic needs-flag
-
-file	arch/hpcarm/sa11x0/sa11xx_pcic.c	sacpcic | ipaqpcic
+# APM
+device	apm
+attach	apm at j720ssp
+file	arch/hpcarm/dev/apm.c		apm needs-count
 
 # Atmel microcontroller
 device	atmelgpioif {}
@@ -129,12 +98,9 @@ include "dev/isa/files.isa"
 
 # Include ATA stuff
 include "dev/ata/files.ata"
-major	{wd = 16}
 
 # Include SCSI/ATAPI stuff
 include "dev/scsipi/files.scsipi"
-major	{sd = 24}
-major	{cd = 26}
 
 # Machine-independent I2O drivers.
 include "dev/i2o/files.i2o"
@@ -142,5 +108,4 @@ include "dev/i2o/files.i2o"
 # Include PCI stuff
 include "dev/pci/files.pci"
 
-# Include USB stuff
-include "dev/usb/files.usb"
+include "arch/arm/conf/majors.arm32"

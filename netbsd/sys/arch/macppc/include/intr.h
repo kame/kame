@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.13 2001/06/08 00:32:03 matt Exp $	*/
+/*	$NetBSD: intr.h,v 1.21 2004/03/24 19:42:04 matt Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -39,6 +39,10 @@
 #ifndef _MACPPC_INTR_H_
 #define _MACPPC_INTR_H_
 
+#ifdef _KERNEL_OPT
+#include "opt_multiprocessor.h"
+#endif
+
 /* Interrupt priority `levels'. */
 #define	IPL_NONE	9	/* nothing */
 #define	IPL_SOFTCLOCK	8	/* timeouts */
@@ -47,7 +51,7 @@
 #define	IPL_NET		5	/* network */
 #define	IPL_SOFTSERIAL	4	/* serial */
 #define	IPL_TTY		3	/* terminal */
-#define	IPL_IMP		3	/* memory allocation */
+#define	IPL_VM		3	/* memory allocation */
 #define	IPL_AUDIO	2	/* audio */
 #define	IPL_CLOCK	1	/* clock */
 #define	IPL_HIGH	1	/* everything */
@@ -61,6 +65,9 @@
 #define	IST_LEVEL	3	/* level-triggered */
 
 #ifndef _LOCORE
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+#include <powerpc/softintr.h>
+#endif
 
 /*
  * Interrupt handler chains.  intr_establish() inserts a handler into
@@ -69,15 +76,12 @@
 struct intrhand {
 	int	(*ih_fun) __P((void *));
 	void	*ih_arg;
-	u_long	ih_count;
 	struct	intrhand *ih_next;
 	int	ih_level;
 	int	ih_irq;
 };
 
-void clearsoftclock __P((void));
-void clearsoftnet __P((void));
-void softnet __P((void));
+void softnet __P((int));
 void softserial __P((void));
 
 int splraise __P((int));
@@ -123,7 +127,7 @@ extern int imask[];
 /*
  * Miscellaneous
  */
-#define splvm()		splraise(imask[IPL_IMP])
+#define splvm()		splraise(imask[IPL_VM])
 #define	splhigh()	splraise(imask[IPL_HIGH])
 #define	splsched()	splhigh()
 #define	spllock()	splhigh()
@@ -133,21 +137,16 @@ extern int imask[];
 #define	setsoftnet()	softintr(SIR_NET)
 #define	setsoftserial()	softintr(SIR_SERIAL)
 
-extern long intrcnt[];
-
-#define CNT_IRQ0	0
-#define CNT_CLOCK	64
-#define CNT_SOFTCLOCK	65
-#define CNT_SOFTNET	66
-#define CNT_SOFTSERIAL	67
-
-#define MACPPC_IPI_HALT		0x01
-#define MACPPC_IPI_FLUSH_FPU	0x02
-
 #ifdef MULTIPROCESSOR
+#define MACPPC_IPI_HALT		0x0001
+#define MACPPC_IPI_FLUSH_FPU	0x0002
+#define MACPPC_IPI_FLUSH_VEC	0x0004
+
 struct cpu_info;
-void macppc_send_ipi(volatile struct cpu_info *, int);
+void macppc_send_ipi(volatile struct cpu_info *, u_long);
 #endif
+
+#define	CLKF_BASEPRI(frame)	((frame)->pri == 0)
 
 #endif /* _LOCORE */
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: sys_socket.c,v 1.32 2001/11/12 15:25:25 lukem Exp $	*/
+/*	$NetBSD: sys_socket.c,v 1.39 2003/09/21 19:17:08 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1990, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sys_socket.c,v 1.32 2001/11/12 15:25:25 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sys_socket.c,v 1.39 2003/09/21 19:17:08 jdolecek Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -53,8 +49,10 @@ __KERNEL_RCSID(0, "$NetBSD: sys_socket.c,v 1.32 2001/11/12 15:25:25 lukem Exp $"
 #include <net/if.h>
 #include <net/route.h>
 
-struct	fileops socketops =
-    { soo_read, soo_write, soo_ioctl, soo_fcntl, soo_poll, soo_stat, soo_close};
+struct	fileops socketops = {
+	soo_read, soo_write, soo_ioctl, soo_fcntl, soo_poll,
+	soo_stat, soo_close, soo_kqfilter
+};
 
 /* ARGSUSED */
 int
@@ -88,7 +86,7 @@ int
 soo_ioctl(fp, cmd, data, p)
 	struct file *fp;
 	u_long cmd;
-	caddr_t data;
+	void *data;
 	struct proc *p;
 {
 	struct socket *so = (struct socket *)fp->f_data;
@@ -119,12 +117,14 @@ soo_ioctl(fp, cmd, data, p)
 		return (0);
 
 	case SIOCSPGRP:
-		so->so_pgid = *(int *)data;
-		return (0);
+	case FIOSETOWN:
+	case TIOCSPGRP:
+		return fsetown(p, &so->so_pgid, cmd, data);
 
 	case SIOCGPGRP:
-		*(int *)data = so->so_pgid;
-		return (0);
+	case FIOGETOWN:
+	case TIOCGPGRP:
+		return fgetown(p, so->so_pgid, cmd, data);
 
 	case SIOCATMARK:
 		*(int *)data = (so->so_state&SS_RCVATMARK) != 0;
@@ -147,7 +147,7 @@ int
 soo_fcntl(fp, cmd, data, p)
 	struct file *fp;
 	u_int cmd;
-	caddr_t data;
+	void *data;
 	struct proc *p;
 {
 	if (cmd == F_SETFL)
@@ -171,7 +171,7 @@ soo_poll(fp, events, p)
 			revents |= events & (POLLIN | POLLRDNORM);
 
 	if (events & (POLLOUT | POLLWRNORM))
-		if (sowriteable(so))
+		if (sowritable(so))
 			revents |= events & (POLLOUT | POLLWRNORM);
 
 	if (events & (POLLPRI | POLLRDBAND))

@@ -1,4 +1,4 @@
-/*	$NetBSD: i82586.c,v 1.42.10.2 2003/01/28 05:30:00 jmc Exp $	*/
+/*	$NetBSD: i82586.c,v 1.48 2003/11/02 11:07:45 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -144,12 +144,9 @@ Mode of operation:
 */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: i82586.c,v 1.42.10.2 2003/01/28 05:30:00 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: i82586.c,v 1.48 2003/11/02 11:07:45 wiz Exp $");
 
 #include "bpfilter.h"
-
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: i82586.c,v 1.42.10.2 2003/01/28 05:30:00 jmc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -1454,11 +1451,11 @@ i82586_setup_bufs(sc)
 	sc->nframes = n / r;
 
 	if (sc->nframes <= 0)
-		panic("ie: bogus buffer calc\n");
+		panic("ie: bogus buffer calc");
 
 	sc->nrxbuf = sc->nframes * B_PER_F;
 
-	/* The receice frame descriptors */
+	/* The receive frame descriptors */
 	sc->rframes = ptr;
 	ptr += sc->nframes * IE_RFRAME_SZ;
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: ukphy.c,v 1.18 2002/03/25 20:51:26 thorpej Exp $	*/
+/*	$NetBSD: ukphy.c,v 1.23 2003/04/29 01:49:34 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -71,7 +71,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ukphy.c,v 1.18 2002/03/25 20:51:26 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ukphy.c,v 1.23 2003/04/29 01:49:34 thorpej Exp $");
 
 #include "opt_mii.h"
 
@@ -79,7 +79,6 @@ __KERNEL_RCSID(0, "$NetBSD: ukphy.c,v 1.18 2002/03/25 20:51:26 thorpej Exp $");
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
-#include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/errno.h>
 
@@ -102,10 +101,8 @@ struct mii_knowndev {
 int	ukphymatch(struct device *, struct cfdata *, void *);
 void	ukphyattach(struct device *, struct device *, void *);
 
-struct cfattach ukphy_ca = {
-	sizeof(struct mii_softc), ukphymatch, ukphyattach, mii_phy_detach,
-	    mii_phy_activate
-};
+CFATTACH_DECL(ukphy, sizeof(struct mii_softc),
+    ukphymatch, ukphyattach, mii_phy_detach, mii_phy_activate);
 
 int	ukphy_service(struct mii_softc *, struct mii_data *, int);
 
@@ -136,19 +133,20 @@ ukphyattach(struct device *parent, struct device *self, void *aux)
 	int i;
 #endif
 
-	printf(": Generic IEEE 802.3u media interface\n");
+	aprint_naive(": Media interface\n");
+	aprint_normal(": Generic IEEE 802.3u media interface\n");
 #ifdef MIIVERBOSE
 	for (i = 0; mii_knowndevs[i].descr != NULL; i++)
 		if (mii_knowndevs[i].oui == oui &&
 		    mii_knowndevs[i].model == model)
 			break;
 	if (mii_knowndevs[i].descr != NULL)
-		printf("%s: %s (OUI 0x%06x, model 0x%04x), rev. %d\n",
+		aprint_normal("%s: %s (OUI 0x%06x, model 0x%04x), rev. %d\n",
 		       sc->mii_dev.dv_xname, mii_knowndevs[i].descr,
 		       oui, model, rev);
 	else
 #endif
-		printf("%s: OUI 0x%06x, model 0x%04x, rev. %d\n",
+		aprint_normal("%s: OUI 0x%06x, model 0x%04x, rev. %d\n",
 		       sc->mii_dev.dv_xname, oui, model, rev);
 
 	sc->mii_inst = mii->mii_instance;
@@ -169,13 +167,13 @@ ukphyattach(struct device *parent, struct device *self, void *aux)
 	    PHY_READ(sc, MII_BMSR) & ma->mii_capmask;
 	if (sc->mii_capabilities & BMSR_EXTSTAT)
 		sc->mii_extcapabilities = PHY_READ(sc, MII_EXTSR);
-	printf("%s: ", sc->mii_dev.dv_xname);
+	aprint_normal("%s: ", sc->mii_dev.dv_xname);
 	if ((sc->mii_capabilities & BMSR_MEDIAMASK) == 0 &&
 	    (sc->mii_extcapabilities & EXTSR_MEDIAMASK) == 0)
-		printf("no media present");
+		aprint_error("no media present");
 	else
 		mii_phy_add_media(sc);
-	printf("\n");
+	aprint_normal("\n");
 }
 
 int

@@ -1,4 +1,4 @@
-/*	$NetBSD: ioblix_zbus.c,v 1.6 2002/01/28 09:56:59 aymeric Exp $ */
+/*	$NetBSD: ioblix_zbus.c,v 1.11 2003/01/06 13:04:58 wiz Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ioblix_zbus.c,v 1.6 2002/01/28 09:56:59 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ioblix_zbus.c,v 1.11 2003/01/06 13:04:58 wiz Exp $");
 
 /* IOBlix Zorro driver */
 /* XXX to be done: we need to probe the com clock speed! */
@@ -50,7 +50,6 @@ __KERNEL_RCSID(0, "$NetBSD: ioblix_zbus.c,v 1.6 2002/01/28 09:56:59 aymeric Exp 
 #include <sys/param.h>
 
 #include <machine/bus.h>
-#include <machine/conf.h>
 
 #include <amiga/include/cpu.h>
 
@@ -71,9 +70,8 @@ void iobzattach(struct device *, struct device *, void *);
 int iobzprint(void *auxp, const char *);
 void iobz_shutdown(void *);
 
-struct cfattach iobl_zbus_ca = {
-	sizeof(struct iobz_softc), iobzmatch, iobzattach
-};
+CFATTACH_DECL(iobl_zbus, sizeof(struct iobz_softc),
+    iobzmatch, iobzattach, NULL, NULL);
 
 int
 iobzmatch(struct device *parent, struct cfdata *cfp, void *auxp)
@@ -158,14 +156,14 @@ iobzprint(void *auxp, const char *pnp)
 	if (pnp == NULL)
 		return(QUIET);
 
-	printf("%s at %s port 0x%02x",
+	aprint_normal("%s at %s port 0x%02x",
 	    supa->supio_name, pnp, supa->supio_iobase);
 
 	return(UNCONF);
 }
 
 /*
- * Disable board interupts at shutdown time.
+ * Disable board interrupts at shutdown time.
  */
 
 void

@@ -1,4 +1,4 @@
-/*	$NetBSD: puccn.c,v 1.4 2001/11/13 07:48:48 lukem Exp $ */
+/*	$NetBSD: puccn.c,v 1.6 2003/06/14 17:01:06 thorpej Exp $ */
 
 /*
  * Derived from  pci.c
@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: puccn.c,v 1.4 2001/11/13 07:48:48 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: puccn.c,v 1.6 2003/06/14 17:01:06 thorpej Exp $");
 
 #include "opt_kgdb.h"
 
@@ -76,7 +76,7 @@ int
 cpu_comcnprobe(struct consdev *cn, struct pci_attach_args *pa)
 {
 	pci_mode_detect();
-	pa->pa_iot = I386_BUS_SPACE_IO;
+	pa->pa_iot = X86_BUS_SPACE_IO;
 	pa->pa_pc = 0;
 	pa->pa_tag = pci_make_tag(0, 0, 31, 0);
 	return 0;
@@ -201,7 +201,8 @@ comgdbinit(struct consdev *cn)
 	if (pucgdbbase == 0) {
 		return;
 	}
-	com_kgdb_attach(puctag, pucgdbbase, CONSPEED, COM_FREQ, CONMODE);
+	com_kgdb_attach(puctag, pucgdbbase, CONSPEED, COM_FREQ,
+	    COM_TYPE_NORMAL, CONMODE);
 }
 #endif
 
@@ -217,7 +218,8 @@ comcninit(struct consdev *cn)
 	if (puccnbase == 0) {
 		return;
 	}
-	comcnattach(puctag, puccnbase, CONSPEED, COM_FREQ, CONMODE);
+	comcnattach(puctag, puccnbase, CONSPEED, COM_FREQ, COM_TYPE_NORMAL,
+	    CONMODE);
 }
 
 /* comcngetc, comcnputc, comcnpollc provided by dev/ic/com.c */

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ne_neptune.c,v 1.4 2001/02/21 05:44:32 minoura Exp $	*/
+/*	$NetBSD: if_ne_neptune.c,v 1.9 2004/02/13 10:05:49 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ne_neptune.c,v 1.9 2004/02/13 10:05:49 wiz Exp $");
 
 #include "opt_inet.h"
 #include "opt_ns.h"
@@ -93,9 +96,8 @@ static int ne_neptune_intr __P((void *));
 
 #define ne_neptune_softc ne2000_softc
 
-struct cfattach ne_neptune_ca = {
-	sizeof(struct ne_neptune_softc), ne_neptune_match, ne_neptune_attach
-};
+CFATTACH_DECL(ne_neptune, sizeof(struct ne_neptune_softc),
+    ne_neptune_match, ne_neptune_attach, NULL, NULL);
 
 int
 ne_neptune_match(parent, match, aux)
@@ -182,7 +184,7 @@ ne_neptune_attach(parent, self, aux)
 	case NE2000_TYPE_NE2000:
 		typestr = "NE2000";
 		/*
-		 * Check for a RealTek 8019.
+		 * Check for a Realtek 8019.
 		 */
 		bus_space_write_1(nict, nich, ED_P0_CR,
 		    ED_CR_PAGE_0 | ED_CR_STP);

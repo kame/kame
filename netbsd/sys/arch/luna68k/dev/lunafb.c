@@ -1,4 +1,4 @@
-/* $NetBSD: lunafb.c,v 1.7.6.1 2002/08/07 01:48:34 lukem Exp $ */
+/* $NetBSD: lunafb.c,v 1.12 2003/11/13 03:09:28 chs Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: lunafb.c,v 1.7.6.1 2002/08/07 01:48:34 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: lunafb.c,v 1.12 2003/11/13 03:09:28 chs Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -84,7 +84,7 @@ struct bt458 {
 #define	OMFB_FB_RADDR	0xB10C0008	/* plane #0 */
 #define	OMFB_ROPFUNC	0xB12C0000	/* ROP function code */
 #define	OMFB_RAMDAC	0xC1100000	/* Bt454/Bt458 RAMDAC */
-#define	OMFB_SIZE	(0xB1300000 - 0xB1080000 + NBPG)
+#define	OMFB_SIZE	(0xB1300000 - 0xB1080000 + PAGE_SIZE)
 
 struct om_hwdevconfig {
 	int	dc_wid;			/* width of frame buffer */
@@ -154,9 +154,8 @@ static const struct wsdisplay_accessops omfb_accessops = {
 static int  omfbmatch __P((struct device *, struct cfdata *, void *));
 static void omfbattach __P((struct device *, struct device *, void *));
 
-const struct cfattach fb_ca = {
-	sizeof(struct omfb_softc), omfbmatch, omfbattach
-};
+CFATTACH_DECL(fb, sizeof(struct omfb_softc),
+    omfbmatch, omfbattach, NULL, NULL);
 extern struct cfdriver fb_cd;
 
 extern int hwplanemask;	/* hardware planemask; retrieved at boot */
@@ -224,7 +223,7 @@ omfb_cnattach()
 	long defattr;
 
 	omfb_getdevconfig(OMFB_FB_WADDR, dc);
-	(*omfb_emulops.alloc_attr)(&dc->dc_rcons, 0, 0, 0, &defattr);
+	(*omfb_emulops.allocattr)(&dc->dc_rcons, 0, 0, 0, &defattr);
 	wsdisplay_cnattach(&omfb_stdscreen, &dc->dc_rcons, 0, 0, defattr);
 	omfb_console = 1;
 	return (0);
@@ -296,22 +295,20 @@ omgetcmap(sc, p)
 	struct wsdisplay_cmap *p;
 {
 	u_int index = p->index, count = p->count;
-        int cmsize;
+	int cmsize, error;
 
 	cmsize = sc->sc_dc->dc_cmsize;
 	if (index >= cmsize || count > cmsize - index)
 		return (EINVAL);
 
-	if (!uvm_useracc(p->red, count, B_WRITE) ||
-	    !uvm_useracc(p->green, count, B_WRITE) ||
-	    !uvm_useracc(p->blue, count, B_WRITE))
-		return (EFAULT);
-
-	copyout(&sc->sc_cmap.r[index], p->red, count);
-	copyout(&sc->sc_cmap.g[index], p->green, count);
-	copyout(&sc->sc_cmap.b[index], p->blue, count);
-
-	return (0);
+	error = copyout(&sc->sc_cmap.r[index], p->red, count);
+	if (error)
+		return error;
+	error = copyout(&sc->sc_cmap.g[index], p->green, count);
+	if (error)
+		return error;
+	error = copyout(&sc->sc_cmap.b[index], p->blue, count);
+	return error;
 }
 
 static int
@@ -319,22 +316,27 @@ omsetcmap(sc, p)
 	struct omfb_softc *sc;
 	struct wsdisplay_cmap *p;
 {
+	struct hwcmap cmap;
 	u_int index = p->index, count = p->count;
-        int cmsize, i;
+	int cmsize, i, error;
 
 	cmsize = sc->sc_dc->dc_cmsize;
 	if (index >= cmsize || (index + count) > cmsize)
 		return (EINVAL);
 
-	if (!uvm_useracc(p->red, count, B_READ) ||
-	    !uvm_useracc(p->green, count, B_READ) ||
-	    !uvm_useracc(p->blue, count, B_READ))
-		return (EFAULT);
+	error = copyin(p->red, &cmap.r[index], count);
+	if (error)
+		return error;
+	error = copyin(p->green, &cmap.g[index], count);
+	if (error)
+		return error;
+	error = copyin(p->blue, &cmap.b[index], count);
+	if (error)
+		return error;
 
-	copyin(p->red, &sc->sc_cmap.r[index], count);
-	copyin(p->green, &sc->sc_cmap.g[index], count);
-	copyin(p->blue, &sc->sc_cmap.b[index], count);
-
+	memcpy(&sc->sc_cmap.r[index], &cmap.r[index], count);
+	memcpy(&sc->sc_cmap.g[index], &cmap.g[index], count);
+	memcpy(&sc->sc_cmap.b[index], &cmap.b[index], count);
 	if (hwplanemask == 0x0f) {
 		struct bt454 *odac = (struct bt454 *)OMFB_RAMDAC;
 		odac->bt_addr = index;
@@ -471,7 +473,7 @@ omfb_alloc_screen(v, type, cookiep, curxp, curyp, attrp)
 	*cookiep = &sc->sc_dc->dc_rcons; /* one and only for now */
 	*curxp = 0;
 	*curyp = 0;
-	(*omfb_emulops.alloc_attr)(&sc->sc_dc->dc_rcons, 0, 0, 0, &defattr);
+	(*omfb_emulops.allocattr)(&sc->sc_dc->dc_rcons, 0, 0, 0, &defattr);
 	*attrp = defattr;
 	sc->nscreens++;
 	return (0);

@@ -23,6 +23,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vrdcu.c,v 1.4 2003/07/15 02:29:35 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -54,9 +57,8 @@ struct vrdcu_softc {
 int vrdcu_match(struct device *, struct cfdata *, void *);
 void vrdcu_attach(struct device *, struct device *, void *);
 
-struct cfattach vrdcu_ca = {
-	sizeof(struct vrdcu_softc), vrdcu_match, vrdcu_attach
-};
+CFATTACH_DECL(vrdcu, sizeof(struct vrdcu_softc),
+    vrdcu_match, vrdcu_attach, NULL, NULL);
 
 int vrdcu_enable_aiuin(vrdcu_chipset_tag_t);
 int vrdcu_enable_aiuout(vrdcu_chipset_tag_t);

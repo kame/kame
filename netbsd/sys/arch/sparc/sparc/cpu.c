@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.c,v 1.126 2002/01/25 17:40:45 pk Exp $ */
+/*	$NetBSD: cpu.c,v 1.181.2.2 2004/05/10 14:40:47 tron Exp $ */
 
 /*
  * Copyright (c) 1996
@@ -51,6 +51,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.181.2.2 2004/05/10 14:40:47 tron Exp $");
+
 #include "opt_multiprocessor.h"
 #include "opt_lockdebug.h"
 #include "opt_ddb.h"
@@ -61,9 +64,11 @@
 #include <sys/device.h>
 #include <sys/malloc.h>
 #include <sys/lock.h>
+#include <sys/kernel.h>
 
 #include <uvm/uvm.h>
 
+#include <machine/promlib.h>
 #include <machine/autoconf.h>
 #include <machine/cpu.h>
 #include <machine/reg.h>
@@ -72,13 +77,17 @@
 #include <machine/pcb.h>
 #include <machine/pmap.h>
 
-#include <machine/oldmon.h>
-#include <machine/idprom.h>
+#if defined(MULTIPROCESSOR) && defined(DDB)
+#include <machine/db_machdep.h>
+#endif
 
 #include <sparc/sparc/cache.h>
 #include <sparc/sparc/asm.h>
 #include <sparc/sparc/cpuvar.h>
 #include <sparc/sparc/memreg.h>
+#if defined(SUN4D)
+#include <sparc/sparc/cpuunitvar.h>
+#endif
 
 struct cpu_softc {
 	struct device	sc_dv;		/* generic device info */
@@ -88,25 +97,36 @@ struct cpu_softc {
 /* The following are used externally (sysctl_hw). */
 char	machine[] = MACHINE;		/* from <machine/param.h> */
 char	machine_arch[] = MACHINE_ARCH;	/* from <machine/param.h> */
-char	cpu_model[100];
+int	cpu_arch;			/* sparc architecture version */
+char	cpu_model[100];			/* machine model (primary CPU) */
+extern char machine_model[];
 
 int	ncpu;				/* # of CPUs detected by PROM */
 struct	cpu_info **cpus;
-#define CPU_MID2CPUNO(mid) ((mid) - 8)
+u_int	cpu_ready_mask;			/* the set of CPUs marked as READY */
 static	int cpu_instance;		/* current # of CPUs wired by us */
 
 
 /* The CPU configuration driver. */
-static void cpu_attach __P((struct device *, struct device *, void *));
-int  cpu_match __P((struct device *, struct cfdata *, void *));
+static void cpu_mainbus_attach __P((struct device *, struct device *, void *));
+int  cpu_mainbus_match __P((struct device *, struct cfdata *, void *));
 
-struct cfattach cpu_ca = {
-	sizeof(struct cpu_softc), cpu_match, cpu_attach
-};
+CFATTACH_DECL(cpu_mainbus, sizeof(struct cpu_softc),
+    cpu_mainbus_match, cpu_mainbus_attach, NULL, NULL);
+
+#if defined(SUN4D)
+static int cpu_cpuunit_match(struct device *, struct cfdata *, void *);
+static void cpu_cpuunit_attach(struct device *, struct device *, void *);
+
+CFATTACH_DECL(cpu_cpuunit, sizeof(struct cpu_softc),
+    cpu_cpuunit_match, cpu_cpuunit_attach, NULL, NULL);
+#endif /* SUN4D */
+
+static void cpu_attach(struct cpu_softc *, int, int);
 
 static char *fsrtoname __P((int, int, int));
 void cache_print __P((struct cpu_softc *));
-void cpu_setup __P((struct cpu_softc *));
+void cpu_setup __P((void));
 void fpu_init __P((struct cpu_info *));
 
 #define	IU_IMPL(psr)	((u_int)(psr) >> 28)
@@ -115,12 +135,13 @@ void fpu_init __P((struct cpu_info *));
 #define SRMMU_IMPL(mmusr)	((u_int)(mmusr) >> 28)
 #define SRMMU_VERS(mmusr)	(((mmusr) >> 24) & 0xf)
 
+int bootmid;		/* Module ID of boot CPU */
 #if defined(MULTIPROCESSOR)
-void cpu_spinup __P((struct cpu_softc *));
+void cpu_spinup __P((struct cpu_info *));
 struct cpu_info *alloc_cpuinfo_global_va __P((int, vsize_t *));
 struct cpu_info	*alloc_cpuinfo __P((void));
 
-int go_smp_cpus = 0;	/* non-primary cpu's wait for this to go */
+int go_smp_cpus = 0;	/* non-primary CPUs wait for this to go */
 
 /* lock this to send IPI's */
 struct simplelock xpmsg_lock = SIMPLELOCK_INITIALIZER;
@@ -143,7 +164,7 @@ alloc_cpuinfo_global_va(ismaster, sizep)
 	 * NOTE: we're using the cache properties of the boot CPU to
 	 * determine the alignment (XXX).
 	 */
-	align = NBPG;
+	align = PAGE_SIZE;
 	if (CACHEINFO.c_totalsize > align)
 		/* Assumes `c_totalsize' is power of two */
 		align = CACHEINFO.c_totalsize;
@@ -153,14 +174,14 @@ alloc_cpuinfo_global_va(ismaster, sizep)
 	if (ismaster == 0) {
 		/*
 		 * While we're here, allocate a per-CPU idle PCB and
-		 * interrupt stack as well.
+		 * interrupt stack as well (8KB + 16KB).
 		 */
 		sz += USPACE;		/* `idle' u-area for this CPU */
 		sz += INT_STACK_SIZE;	/* interrupt stack for this CPU */
 	}
 
-	sz = (sz + NBPG - 1) & -NBPG;
-	esz = sz + align - NBPG;
+	sz = (sz + PAGE_SIZE - 1) & -PAGE_SIZE;
+	esz = sz + align - PAGE_SIZE;
 
 	if ((sva = uvm_km_valloc(kernel_map, esz)) == 0)
 		panic("alloc_cpuinfo_global_va: no virtual space");
@@ -195,22 +216,32 @@ alloc_cpuinfo()
 
 	/* Allocate physical pages */
 	low = vm_first_phys;
-	high = vm_first_phys + vm_num_phys - NBPG;
-	TAILQ_INIT(&mlist);
-	if (uvm_pglistalloc(sz, low, high, NBPG, 0, &mlist, 1, 0) != 0)
+	high = vm_first_phys + vm_num_phys - PAGE_SIZE;
+	if (uvm_pglistalloc(sz, low, high, PAGE_SIZE, 0, &mlist, 1, 0) != 0)
 		panic("alloc_cpuinfo: no pages");
 
 	/* Map the pages */
 	for (m = TAILQ_FIRST(&mlist); m != NULL; m = TAILQ_NEXT(m, pageq)) {
 		paddr_t pa = VM_PAGE_TO_PHYS(m);
 		pmap_kenter_pa(va, pa, VM_PROT_READ | VM_PROT_WRITE);
-		va += NBPG;
+		va += PAGE_SIZE;
 	}
 	pmap_update(pmap_kernel());
 
 	bzero((void *)cpi, sz);
-	cpi->eintstack = (void *)((vaddr_t)cpi + sz);
-	cpi->idle_u = (void *)((vaddr_t)cpi + sz - INT_STACK_SIZE - USPACE);
+
+	/*
+	 * Arrange pcb, idle stack and interrupt stack in the same
+	 * way as is done for the boot CPU in locore.
+	 */
+	cpi->eintstack = cpi->idle_u = (void *)((vaddr_t)cpi + sz - USPACE);
+
+	/* Allocate virtual space for pmap page_copy/page_zero */
+	if ((va = uvm_km_valloc(kernel_map, 2*PAGE_SIZE)) == 0)
+		panic("alloc_cpuinfo: no virtual space");
+
+	cpi->vpage[0] = (caddr_t)(va + 0);
+	cpi->vpage[1] = (caddr_t)(va + PAGE_SIZE);
 
 	return (cpi);
 }
@@ -256,15 +287,121 @@ static char *iu_vendor[16] = {
  */
 
 int
-cpu_match(parent, cf, aux)
+cpu_mainbus_match(parent, cf, aux)
 	struct device *parent;
 	struct cfdata *cf;
 	void *aux;
 {
 	struct mainbus_attach_args *ma = aux;
 
-	return (strcmp(cf->cf_driver->cd_name, ma->ma_name) == 0);
+	return (strcmp(cf->cf_name, ma->ma_name) == 0);
 }
+
+static void
+cpu_mainbus_attach(parent, self, aux)
+	struct device *parent;
+	struct device *self;
+	void *aux;
+{
+	struct mainbus_attach_args *ma = aux;
+	struct { u_int32_t va; u_int32_t size; } *mbprop = NULL;
+	struct openprom_addr *rrp = NULL;
+	struct cpu_info *cpi;
+	int mid, node;
+	int error, n;
+
+	node = ma->ma_node;
+	mid = (node != 0) ? prom_getpropint(node, "mid", 0) : 0;
+	cpu_attach((struct cpu_softc *)self, node, mid);
+
+	cpi = ((struct cpu_softc *)self)->sc_cpuinfo;
+	if (cpi == NULL)
+		return;
+
+	/*
+	 * Map CPU mailbox if available
+	 */
+	if (node != 0 && (error = prom_getprop(node, "mailbox-virtual",
+					sizeof(*mbprop),
+					&n, &mbprop)) == 0) {
+		cpi->mailbox = mbprop->va;
+		free(mbprop, M_DEVBUF);
+	} else if (node != 0 && (error = prom_getprop(node, "mailbox",
+					sizeof(struct openprom_addr),
+					&n, &rrp)) == 0) {
+		/* XXX - map cached/uncached? If cached, deal with
+		 *	 cache congruency!
+		 */
+		if (rrp[0].oa_space == 0)
+			printf("%s: mailbox in mem space\n", self->dv_xname);
+
+		if (bus_space_map(ma->ma_bustag,
+				BUS_ADDR(rrp[0].oa_space, rrp[0].oa_base),
+				rrp[0].oa_size,
+				BUS_SPACE_MAP_LINEAR, 
+				&cpi->mailbox) != 0)
+			panic("%s: can't map CPU mailbox", self->dv_xname);
+		free(rrp, M_DEVBUF);
+	}
+
+	/*
+	 * Map Module Control Space if available
+	 */
+	if (cpi->mxcc == 0)
+		/* We only know what it means on MXCCs */
+		return;
+
+	rrp = NULL;
+	if (node == 0 || (error = prom_getprop(node, "reg",
+					sizeof(struct openprom_addr),
+					&n, &rrp)) != 0)
+		return;
+
+	/* register set #0 is the MBus port register */
+	if (bus_space_map(ma->ma_bustag,
+			BUS_ADDR(rrp[0].oa_space, rrp[0].oa_base),
+			rrp[0].oa_size,
+			BUS_SPACE_MAP_LINEAR, 
+			&cpi->ci_mbusport) != 0) {
+		panic("%s: can't map CPU regs", self->dv_xname);
+	}
+	/* register set #1: MCXX control */
+	if (bus_space_map(ma->ma_bustag,
+			BUS_ADDR(rrp[1].oa_space, rrp[1].oa_base),
+			rrp[1].oa_size,
+			BUS_SPACE_MAP_LINEAR, 
+			&cpi->ci_mxccregs) != 0) {
+		panic("%s: can't map CPU regs", self->dv_xname);
+	}
+	/* register sets #3 and #4 are E$ cache data and tags */
+
+	free(rrp, M_DEVBUF);
+}
+
+#if defined(SUN4D)
+static int
+cpu_cpuunit_match(parent, cf, aux)
+	struct device *parent;
+	struct cfdata *cf;
+	void *aux;
+{
+	struct cpuunit_attach_args *cpua = aux;
+
+	return (strcmp(cf->cf_name, cpua->cpua_type) == 0);
+}
+
+static void
+cpu_cpuunit_attach(parent, self, aux)
+	struct device *parent;
+	struct device *self;
+	void *aux;
+{
+	struct cpuunit_attach_args *cpua = aux;
+
+	cpu_attach((struct cpu_softc *)self, cpua->cpua_node,
+	    cpua->cpua_device_id);
+}
+#endif /* SUN4D */
 
 /*
  * Attach the CPU.
@@ -272,32 +409,17 @@ cpu_match(parent, cf, aux)
  * (slightly funny place to do it, but this is where it is to be found).
  */
 static void
-cpu_attach(parent, self, aux)
-	struct device *parent;
-	struct device *self;
-	void *aux;
+cpu_attach(struct cpu_softc *sc, int node, int mid)
 {
-static	struct cpu_softc *bootcpu;
-	struct mainbus_attach_args *ma = aux;
-	struct cpu_softc *sc = (struct cpu_softc *)self;
 	struct cpu_info *cpi;
-	int node, mid;
-
-	node = ma->ma_node;
-
-#if defined(MULTIPROCESSOR)
-	mid = (node != 0) ? PROM_getpropint(node, "mid", 0) : 0;
-#else
-	mid = 0;
-#endif
 
 	/*
-	 * First, find out if we're attaching the boot CPU.
+	 * The first CPU we're attaching must be the boot CPU.
+	 * (see autoconf.c and cpuunit.c)
 	 */
-	if (bootcpu == NULL) {
+	if (cpus == NULL) {
 		extern struct pcb idle_u[];
 
-		bootcpu = sc;
 		cpus = malloc(ncpu * sizeof(cpi), M_DEVBUF, M_NOWAIT);
 		bzero(cpus, ncpu * sizeof(cpi));
 
@@ -314,8 +436,8 @@ static	struct cpu_softc *bootcpu;
 		pmap_globalize_boot_cpuinfo(cpi);
 		cpuinfo.ci_self = cpi;
 
-		/* XXX - fixup proc0.p_cpu */
-		proc0.p_cpu = cpi;
+		/* XXX - fixup lwp.l_cpu */
+		lwp0.l_cpu = cpi;
 #else
 		/* The `local' VA is global for uniprocessor. */
 		cpi = sc->sc_cpuinfo = (struct cpu_info *)CPUINFO_VA;
@@ -324,6 +446,14 @@ static	struct cpu_softc *bootcpu;
 		cpi->eintstack = eintstack;
 		cpi->idle_u = idle_u;
 		/* Note: `curpcb' is set to `proc0' in locore */
+
+		/*
+		 * If we haven't been able to determine the Id of the
+		 * boot CPU, set it now. In this case we can only boot
+		 * from CPU #0 (see also the CPU attach code in autoconf.c)
+		 */
+		if (bootmid == 0)
+			bootmid = mid;
 	} else {
 #if defined(MULTIPROCESSOR)
 		cpi = sc->sc_cpuinfo = alloc_cpuinfo();
@@ -336,6 +466,7 @@ static	struct cpu_softc *bootcpu;
 		 */
 		getcpuinfo(cpi, node);
 #else
+		sc->sc_cpuinfo = NULL;
 		printf(": no SMP support in kernel\n");
 		return;
 #endif
@@ -345,20 +476,31 @@ static	struct cpu_softc *bootcpu;
 	cpi->redzone = (void *)((long)cpi->idle_u + REDSIZE);
 #endif
 
+	/*
+	 * Allocate a slot in the cpus[] array such that the following
+	 * invariant holds: cpus[cpi->ci_cpuid] == cpi;
+	 */
 	cpus[cpu_instance] = cpi;
 	cpi->ci_cpuid = cpu_instance++;
 	cpi->mid = mid;
 	cpi->node = node;
-	simple_lock_init(&cpi->msg.lock);
 
-	if (ncpu > 1)
+	if (ncpu > 1) {
 		printf(": mid %d", mid);
+		if (mid == 0)
+			printf("[WARNING: mid should not be 0]");
+	}
+
 
 	if (cpi->master) {
-		cpu_setup(sc);
-		sprintf(cpu_model, "%s @ %s MHz, %s FPU",
+		char buf[100];
+
+		cpu_setup();
+		snprintf(buf, sizeof buf, "%s @ %s MHz, %s FPU",
 			cpi->cpu_name, clockfreq(cpi->hz), cpi->fpu_name);
-		printf(": %s\n", cpu_model);
+		snprintf(cpu_model, sizeof cpu_model, "%s (%s)",
+			machine_model, buf);
+		printf(": %s\n", buf);
 		cache_print(sc);
 		return;
 	}
@@ -369,7 +511,7 @@ static	struct cpu_softc *bootcpu;
 		(PI_INTR_VA + (_MAXNBPG * CPU_MID2CPUNO(mid)));
 
 	/* Now start this CPU */
-	cpu_spinup(sc);
+	cpu_spinup(cpi);
 	printf(": %s @ %s MHz, %s FPU\n", cpi->cpu_name,
 		clockfreq(cpi->hz), cpi->fpu_name);
 
@@ -387,7 +529,6 @@ static	struct cpu_softc *bootcpu;
 				continue;
 #define SET_CACHE_FUNC(x) \
 	if (cpi->x != __CONCAT(noop_,x)) cpi->x = __CONCAT(smp_,x)
-			SET_CACHE_FUNC(cache_flush);
 			SET_CACHE_FUNC(vcache_flush_page);
 			SET_CACHE_FUNC(vcache_flush_segment);
 			SET_CACHE_FUNC(vcache_flush_region);
@@ -412,41 +553,42 @@ cpu_boot_secondary_processors()
 		return;
 	}
 
-	if (cpus == NULL)
-		return;
-
 	printf("cpu0: booting secondary processors:");
 	for (n = 0; n < ncpu; n++) {
 		struct cpu_info *cpi = cpus[n];
 
-		if (cpi == NULL || cpuinfo.mid == cpi->mid)
+		if (cpi == NULL || cpuinfo.mid == cpi->mid ||
+			(cpi->flags & CPUFLG_HATCHED) == 0)
 			continue;
+
+		/*
+		 * XXX - the first process run on this CPU will be charged
+		 *	 with the leading idle time.
+		 */
+		cpi->ci_schedstate.spc_runtime = time;
 
 		printf(" cpu%d", cpi->ci_cpuid);
 		cpi->flags |= CPUFLG_READY;
+		cpu_ready_mask |= (1 << n);
 	}
+
+	/* Mark the boot CPU as ready */
+	cpuinfo.flags |= CPUFLG_READY;
+	cpu_ready_mask |= (1 << 0);
 
 	/* Tell the other CPU's to start up.  */
 	go_smp_cpus = 1;
 
-	/* OK, we're done. */
-	cpuinfo.flags |= CPUFLG_READY;
 	printf("\n");
 }
 #endif /* MULTIPROCESSOR */
-
-/* */
-void *cpu_hatchstack = 0;
-void *cpu_hatch_sc = 0;
-volatile int cpu_hatched = 0;
 
 /*
  * Finish CPU attach.
  * Must be run by the CPU which is being attached.
  */
 void
-cpu_setup(sc)
-	struct cpu_softc *sc;
+cpu_setup()
 {
 
 	if (cpuinfo.hotfix)
@@ -458,11 +600,7 @@ cpu_setup(sc)
 	/* Enable the cache */
 	cpuinfo.cache_enable();
 
-	cpu_hatched = 1;
-#if 0
-	/* Flush cache line */
-	cpuinfo.cache_flush((caddr_t)&cpu_hatched, sizeof(cpu_hatched));
-#endif
+	cpuinfo.flags |= CPUFLG_HATCHED;
 }
 
 #if defined(MULTIPROCESSOR)
@@ -470,10 +608,9 @@ cpu_setup(sc)
  * Allocate per-CPU data, then start up this CPU using PROM.
  */
 void
-cpu_spinup(sc)
-	struct cpu_softc *sc;
+cpu_spinup(cpi)
+	struct cpu_info *cpi;
 {
-	struct cpu_info *cpi = sc->sc_cpuinfo;
 	int n;
 extern void cpu_hatch __P((void));	/* in locore.s */
 	caddr_t pc = (caddr_t)cpu_hatch;
@@ -482,9 +619,7 @@ extern void cpu_hatch __P((void));	/* in locore.s */
 	/* Setup CPU-specific MMU tables */
 	pmap_alloc_cpu(cpi);
 
-	cpu_hatched = 0;
-	cpu_hatchstack = cpi->idle_u;
-	cpu_hatch_sc = sc;
+	cpi->flags &= ~CPUFLG_HATCHED;
 
 	/*
 	 * The physical address of the context table is passed to
@@ -505,139 +640,133 @@ extern void cpu_hatch __P((void));	/* in locore.s */
 	 * Wait for this CPU to spin up.
 	 */
 	for (n = 10000; n != 0; n--) {
-		cpuinfo.cache_flush((caddr_t)&cpu_hatched, sizeof(cpu_hatched));
-		if (cpu_hatched != 0) {
+		cache_flush((caddr_t)&cpi->flags, sizeof(cpi->flags));
+		if (cpi->flags & CPUFLG_HATCHED)
 			return;
-		}
 		delay(100);
 	}
 	printf("CPU did not spin up\n");
 }
 
-/* 
- * Calls raise_ipi(), waits for the remote CPU to notice the message, and
- * unlocks this CPU's message lock, which we expect was locked at entry.
- */
-void
-raise_ipi_wait_and_unlock(cpi)
-	struct cpu_info *cpi;
-{
-	int i;
-
-	raise_ipi(cpi);
-	i = 0;
-	while ((cpi->flags & CPUFLG_GOTMSG) == 0) {
-		if (i++ > 500000) {
-			printf("raise_ipi_wait_and_unlock(cpu%d): couldn't ping cpu%d\n",
-			    cpuinfo.ci_cpuid, cpi->ci_cpuid);
-			break;
-		}
-	}
-	simple_unlock(&cpi->msg.lock);
-}
-
 /*
- * Call a function on every CPU.  One must hold xpmsg_lock around
- * this function.
+ * Call a function on some CPUs.  `cpuset' can be set to CPUSET_ALL
+ * to call every CPU, or `1 << cpi->ci_cpuid' for each CPU to call.
  */
 void
-cross_call(func, arg0, arg1, arg2, arg3, cpuset)
-	int	(*func)(int, int, int, int);
-	int	arg0, arg1, arg2, arg3;
-	int	cpuset;	/* XXX unused; cpus to send to: we do all */
+xcall(func, trap, arg0, arg1, arg2, cpuset)
+	xcall_func_t func;
+	xcall_trap_t trap;
+	int	arg0, arg1, arg2;
+	u_int	cpuset;
 {
-	int n, i, not_done;
-	struct xpmsg_func *p;
+	int s, n, i, done, callself, mybit;
+	volatile struct xpmsg_func *p;
+	int fasttrap;
+
+	/* XXX - note p->retval is probably no longer useful */
+
+	mybit = (1 << cpuinfo.ci_cpuid);
+	callself = func && (cpuset & mybit) != 0;
+	cpuset &= ~mybit;
 
 	/*
 	 * If no cpus are configured yet, just call ourselves.
 	 */
 	if (cpus == NULL) {
 		p = &cpuinfo.msg.u.xpmsg_func;
-		p->func = func;
-		p->arg0 = arg0;
-		p->arg1 = arg1;
-		p->arg2 = arg2;
-		p->arg3 = arg3;
-		p->retval = (*p->func)(p->arg0, p->arg1, p->arg2, p->arg3); 
+		if (callself)
+			p->retval = (*func)(arg0, arg1, arg2); 
 		return;
 	}
+
+	/* Mask any CPUs that are not ready */
+	cpuset &= cpu_ready_mask;
+
+	/* prevent interrupts that grab the kernel lock */
+	s = splsched();
+#ifdef DEBUG
+	if (!cold) {
+		u_int pc, lvl = ((u_int)s & PSR_PIL) >> 8;
+		if (lvl > IPL_SCHED) {
+			__asm("mov %%i7, %0" : "=r" (pc) : );
+			printf_nolog("%d: xcall at lvl %u from 0x%x\n",
+				cpu_number(), lvl, pc);
+		}
+	}
+#endif
+	LOCK_XPMSG();
 
 	/*
 	 * Firstly, call each CPU.  We do this so that they might have
 	 * finished by the time we start looking.
 	 */
+	fasttrap = trap != NULL ? 1 : 0;
 	for (n = 0; n < ncpu; n++) {
 		struct cpu_info *cpi = cpus[n];
 
-		if (CPU_READY(cpi))
+		/* Note: n == cpi->ci_cpuid */
+		if ((cpuset & (1 << n)) == 0)
 			continue;
-		
-		simple_lock(&cpi->msg.lock);
+
 		cpi->msg.tag = XPMSG_FUNC;
+		cpi->msg.complete = 0;
 		p = &cpi->msg.u.xpmsg_func;
 		p->func = func;
+		p->trap = trap;
 		p->arg0 = arg0;
 		p->arg1 = arg1;
 		p->arg2 = arg2;
-		p->arg3 = arg3;
-		cpi->flags &= ~CPUFLG_GOTMSG;
-		raise_ipi(cpi);
+		/* Fast cross calls use interrupt level 14 */
+		raise_ipi(cpi,13+fasttrap);/*xcall_cookie->pil*/
 	}
 
 	/*
 	 * Second, call ourselves.
 	 */
-
 	p = &cpuinfo.msg.u.xpmsg_func;
-
-	/* Call this on me first. */
-	p->func = func;
-	p->arg0 = arg0;
-	p->arg1 = arg1;
-	p->arg2 = arg2;
-	p->arg3 = arg3;
-
-	p->retval = (*p->func)(p->arg0, p->arg1, p->arg2, p->arg3); 
+	if (callself)
+		p->retval = (*func)(arg0, arg1, arg2); 
 
 	/*
-	 * Lastly, start looping, waiting for all cpu's to register that they
+	 * Lastly, start looping, waiting for all CPUs to register that they
 	 * have completed (bailing if it takes "too long", being loud about
 	 * this in the process).
 	 */
-	i = 0;
-	while (not_done) {
-		not_done = 0;
+	done = 0;
+	i = 100000;	/* time-out, not too long, but still an _AGE_ */
+	while (!done) {
+		if (--i < 0) {
+			printf_nolog("xcall(cpu%d,%p): couldn't ping cpus:",
+			    cpu_number(), func);
+		}
+
+		done = 1;
 		for (n = 0; n < ncpu; n++) {
 			struct cpu_info *cpi = cpus[n];
 
-			if (CPU_READY(cpi))
+			if ((cpuset & (1 << n)) == 0)
 				continue;
 
-			if ((cpi->flags & CPUFLG_GOTMSG) != 0)
-				not_done = 1;
+			if (cpi->msg.complete == 0) {
+				if (i < 0) {
+					printf_nolog(" cpu%d", cpi->ci_cpuid);
+				} else {
+					done = 0;
+					break;
+				}
+			}
 		}
-		if (not_done && i++ > 100000) {
-			printf("cross_call(cpu%d): couldn't ping cpus:",
-			    cpuinfo.ci_cpuid);
-			break;
-		}
-		if (not_done == 0)
-			break;
 	}
-	for (n = 0; n < ncpu; n++) {
-		struct cpu_info *cpi = cpus[n];
+	if (i < 0)
+		printf_nolog("\n");
 
-		if (CPU_READY(cpi))
-			continue;
-		simple_unlock(&cpi->msg.lock);
-		if ((cpi->flags & CPUFLG_GOTMSG) != 0)
-			printf(" cpu%d", cpi->ci_cpuid);
-	}
-	if (not_done)
-		printf("\n");
+	UNLOCK_XPMSG();
+	splx(s);
 }
 
+/*
+ * Tell all CPUs other than the current one to enter the PROM idle loop.
+ */
 void
 mp_pause_cpus()
 {
@@ -646,23 +775,99 @@ mp_pause_cpus()
 	if (cpus == NULL)
 		return;
 
-	LOCK_XPMSG();
 	for (n = 0; n < ncpu; n++) {
 		struct cpu_info *cpi = cpus[n];
 
-		if (CPU_READY(cpi))
+		if (cpi == NULL || cpuinfo.mid == cpi->mid)
 			continue;
 
-		simple_lock(&cpi->msg.lock);
-		cpi->msg.tag = XPMSG_PAUSECPU;
-		cpi->flags &= ~CPUFLG_GOTMSG;
-		raise_ipi_wait_and_unlock(cpi);
+		/*
+		 * This PROM utility will put the OPENPROM_MBX_ABORT
+		 * message (0xfc) in the target CPU's mailbox and then
+		 * send it a level 15 soft interrupt.
+		 */
+		if (prom_cpuidle(cpi->node) != 0)
+			printf("cpu%d could not be paused\n", cpi->ci_cpuid);
 	}
-	UNLOCK_XPMSG();
+}
+
+/*
+ * Resume all idling CPUs.
+ */
+void
+mp_resume_cpus()
+{
+	int n;
+
+	if (cpus == NULL)
+		return;
+
+	for (n = 0; n < ncpu; n++) {
+		struct cpu_info *cpi = cpus[n];
+
+		if (cpi == NULL || cpuinfo.mid == cpi->mid)
+			continue;
+
+		/*
+		 * This PROM utility makes the target CPU return
+		 * from its prom_cpuidle(0) call (see intr.c:nmi_soft()).
+		 */
+		if (prom_cpuresume(cpi->node) != 0)
+			printf("cpu%d could not be resumed\n", cpi->ci_cpuid);
+	}
+}
+
+/*
+ * Tell all CPUs except the current one to hurry back into the prom
+ */
+void
+mp_halt_cpus()
+{
+	int n;
+
+	if (cpus == NULL)
+		return;
+
+	for (n = 0; n < ncpu; n++) {
+		struct cpu_info *cpi = cpus[n];
+		int r;
+
+		if (cpi == NULL || cpuinfo.mid == cpi->mid)
+			continue;
+
+		/*
+		 * This PROM utility will put the OPENPROM_MBX_STOP
+		 * message (0xfb) in the target CPU's mailbox and then
+		 * send it a level 15 soft interrupt.
+		 */
+		r = prom_cpustop(cpi->node);
+		printf("cpu%d %shalted\n", cpi->ci_cpuid,
+			r == 0 ? "" : "(boot CPU?) can not be ");
+	}
+}
+
+#if defined(DDB)
+void
+mp_pause_cpus_ddb()
+{
+	int n;
+
+	if (cpus == NULL)
+		return;
+
+	for (n = 0; n < ncpu; n++) {
+		struct cpu_info *cpi = cpus[n];
+
+		if (cpi == NULL || cpi->mid == cpuinfo.mid)
+			continue;
+
+		cpi->msg_lev15.tag = XPMSG15_PAUSECPU;
+		raise_ipi(cpi,15);	/* high priority intr */
+	}
 }
 
 void
-mp_resume_cpus()
+mp_resume_cpus_ddb()
 {
 	int n;
 
@@ -679,6 +884,7 @@ mp_resume_cpus()
 		cpi->flags &= ~CPUFLG_PAUSED;
 	}
 }
+#endif /* DDB */
 #endif /* MULTIPROCESSOR */
 
 /*
@@ -784,6 +990,7 @@ void cpumatch_turbosparc __P((struct cpu_info *, struct module_info *, int));
 void getcacheinfo_sun4 __P((struct cpu_info *, int node));
 void getcacheinfo_sun4c __P((struct cpu_info *, int node));
 void getcacheinfo_obp __P((struct cpu_info *, int node));
+void getcacheinfo_sun4d __P((struct cpu_info *, int node));
 
 void sun4_hotfix __P((struct cpu_info *));
 void viking_hotfix __P((struct cpu_info *));
@@ -807,6 +1014,14 @@ int srmmu_get_asyncflt __P((u_int *, u_int *));
 int hypersparc_get_asyncflt __P((u_int *, u_int *));
 int cypress_get_asyncflt __P((u_int *, u_int *));
 int no_asyncflt_regs __P((u_int *, u_int *));
+
+int hypersparc_getmid(void);
+/* cypress and hypersparc can share this function, see ctlreg.h */
+#define cypress_getmid	hypersparc_getmid
+int viking_getmid(void);
+
+int	(*moduleerr_handler) __P((void));
+int viking_module_error(void);
 
 struct module_info module_unknown = {
 	CPUTYP_UNKNOWN,
@@ -836,14 +1051,16 @@ struct module_info module_sun4 = {
 	sun4_hotfix,
 	0,
 	sun4_cache_enable,
+	0,
 	0,			/* ncontext set in `match' function */
 	0,			/* get_syncflt(); unused in sun4c */
 	0,			/* get_asyncflt(); unused in sun4c */
 	sun4_cache_flush,
-	sun4_vcache_flush_page,
-	sun4_vcache_flush_segment,
-	sun4_vcache_flush_region,
-	sun4_vcache_flush_context,
+	sun4_vcache_flush_page, NULL,
+	sun4_vcache_flush_segment, NULL,
+	sun4_vcache_flush_region, NULL,
+	sun4_vcache_flush_context, NULL,
+	NULL, NULL,
 	noop_pcache_flush_page,
 	noop_pure_vcache_flush,
 	noop_cache_flush_all,
@@ -870,7 +1087,7 @@ getcacheinfo_sun4(sc, node)
 		ci->c_nlines = 0;
 
 		/* Override cache flush functions */
-		sc->sp_cache_flush = noop_cache_flush;
+		sc->cache_flush = noop_cache_flush;
 		sc->sp_vcache_flush_page = noop_vcache_flush_page;
 		sc->sp_vcache_flush_segment = noop_vcache_flush_segment;
 		sc->sp_vcache_flush_region = noop_vcache_flush_region;
@@ -883,7 +1100,7 @@ getcacheinfo_sun4(sc, node)
 		ci->c_linesize = 16;
 		ci->c_l2linesize = 4;
 		ci->c_split = 0;
-		ci->c_nlines = ci->c_totalsize << ci->c_l2linesize;
+		ci->c_nlines = ci->c_totalsize >> ci->c_l2linesize;
 		break;
 	case CPUTYP_4_300:
 		ci->c_vactype = VAC_WRITEBACK;
@@ -892,7 +1109,7 @@ getcacheinfo_sun4(sc, node)
 		ci->c_linesize = 16;
 		ci->c_l2linesize = 4;
 		ci->c_split = 0;
-		ci->c_nlines = ci->c_totalsize << ci->c_l2linesize;
+		ci->c_nlines = ci->c_totalsize >> ci->c_l2linesize;
 		sc->flags |= CPUFLG_SUN4CACHEBUG;
 		break;
 	case CPUTYP_4_400:
@@ -902,13 +1119,10 @@ getcacheinfo_sun4(sc, node)
 		ci->c_linesize = 32;
 		ci->c_l2linesize = 5;
 		ci->c_split = 0;
-		ci->c_nlines = ci->c_totalsize << ci->c_l2linesize;
+		ci->c_nlines = ci->c_totalsize >> ci->c_l2linesize;
 		break;
 	}
 }
-
-struct	idprom sun4_idprom_store;
-void	getidprom __P((struct idprom *, int size));
 
 void
 cpumatch_sun4(sc, mp, node)
@@ -916,15 +1130,9 @@ cpumatch_sun4(sc, mp, node)
 	struct module_info *mp;
 	int	node;
 {
-	extern struct idprom *idprom;
-	/*
-	 * XXX - for e.g. myetheraddr(), which in sun4 can be called
-	 *	 before the clock attaches.
-	 */
-	idprom = &sun4_idprom_store;
+	struct idprom *idp = prom_getidprom();
 
-	getidprom(&sun4_idprom_store, sizeof(struct idprom));
-	switch (sun4_idprom_store.id_machine) {
+	switch (idp->id_machine) {
 	case ID_SUN4_100:
 		sc->cpu_type = CPUTYP_4_100;
 		sc->classlvl = 100;
@@ -969,14 +1177,16 @@ struct module_info module_sun4c = {
 	sun4_hotfix,
 	0,
 	sun4_cache_enable,
+	0,
 	0,			/* ncontext set in `match' function */
 	0,			/* get_syncflt(); unused in sun4c */
 	0,			/* get_asyncflt(); unused in sun4c */
 	sun4_cache_flush,
-	sun4_vcache_flush_page,
-	sun4_vcache_flush_segment,
-	sun4_vcache_flush_region,
-	sun4_vcache_flush_context,
+	sun4_vcache_flush_page, NULL,
+	sun4_vcache_flush_segment, NULL,
+	sun4_vcache_flush_region, NULL,
+	sun4_vcache_flush_context, NULL,
+	NULL, NULL,
 	noop_pcache_flush_page,
 	noop_pure_vcache_flush,
 	noop_cache_flush_all,
@@ -995,11 +1205,11 @@ cpumatch_sun4c(sc, mp, node)
 
 	rnode = findroot();
 	sc->mmu_npmeg = sc->mmu_nsegment =
-		PROM_getpropint(rnode, "mmu-npmg", 128);
-	sc->mmu_ncontext = PROM_getpropint(rnode, "mmu-nctx", 8);
-                              
+		prom_getpropint(rnode, "mmu-npmg", 128);
+	sc->mmu_ncontext = prom_getpropint(rnode, "mmu-nctx", 8);
+
 	/* Get clock frequency */ 
-	sc->hz = PROM_getpropint(rnode, "clock-frequency", 0);
+	sc->hz = prom_getpropint(rnode, "clock-frequency", 0);
 }
 
 void
@@ -1016,23 +1226,23 @@ getcacheinfo_sun4c(sc, node)
 
 	/* Sun4c's have only virtually-addressed caches */
 	ci->c_physical = 0; 
-	ci->c_totalsize = PROM_getpropint(node, "vac-size", 65536);
+	ci->c_totalsize = prom_getpropint(node, "vac-size", 65536);
 	/*
 	 * Note: vac-hwflush is spelled with an underscore
 	 * on the 4/75s.
 	 */
 	ci->c_hwflush =
-		PROM_getpropint(node, "vac_hwflush", 0) |
-		PROM_getpropint(node, "vac-hwflush", 0);
+		prom_getpropint(node, "vac_hwflush", 0) |
+		prom_getpropint(node, "vac-hwflush", 0);
 
-	ci->c_linesize = l = PROM_getpropint(node, "vac-linesize", 16);
+	ci->c_linesize = l = prom_getpropint(node, "vac-linesize", 16);
 	for (i = 0; (1 << i) < l; i++)
 		/* void */;
 	if ((1 << i) != l)
 		panic("bad cache line size %d", l);
 	ci->c_l2linesize = i;
 	ci->c_associativity = 1;
-	ci->c_nlines = ci->c_totalsize << i;
+	ci->c_nlines = ci->c_totalsize >> i;
 
 	ci->c_vactype = VAC_WRITETHROUGH;
 
@@ -1041,7 +1251,7 @@ getcacheinfo_sun4c(sc, node)
 	 * chip that affects traps.  (I wish I knew more about this
 	 * mysterious buserr-type variable....)
 	 */
-	if (PROM_getpropint(node, "buserr-type", 0) == 1)
+	if (prom_getpropint(node, "buserr-type", 0) == 1)
 		sc->flags |= CPUFLG_SUN4CACHEBUG;
 }
 #endif /* SUN4C */
@@ -1079,7 +1289,7 @@ getcacheinfo_obp(sc, node)
 	 */
 	ci->c_physical = node_has_property(node, "cache-physical?");
 
-	if (PROM_getpropint(node, "ncaches", 1) == 2)
+	if (prom_getpropint(node, "ncaches", 1) == 2)
 		ci->c_split = 1;
 	else
 		ci->c_split = 0;
@@ -1091,28 +1301,28 @@ getcacheinfo_obp(sc, node)
 	    node_has_property(node, "dcache-nlines") &&
 	    ci->c_split) {
 		/* Harvard architecture: get I and D cache sizes */
-		ci->ic_nlines = PROM_getpropint(node, "icache-nlines", 0);
+		ci->ic_nlines = prom_getpropint(node, "icache-nlines", 0);
 		ci->ic_linesize = l =
-			PROM_getpropint(node, "icache-line-size", 0);
+			prom_getpropint(node, "icache-line-size", 0);
 		for (i = 0; (1 << i) < l && l; i++)
 			/* void */;
 		if ((1 << i) != l && l)
 			panic("bad icache line size %d", l);
 		ci->ic_l2linesize = i;
 		ci->ic_associativity =
-			PROM_getpropint(node, "icache-associativity", 1);
+			prom_getpropint(node, "icache-associativity", 1);
 		ci->ic_totalsize = l * ci->ic_nlines * ci->ic_associativity;
 	
-		ci->dc_nlines = PROM_getpropint(node, "dcache-nlines", 0);
+		ci->dc_nlines = prom_getpropint(node, "dcache-nlines", 0);
 		ci->dc_linesize = l =
-			PROM_getpropint(node, "dcache-line-size",0);
+			prom_getpropint(node, "dcache-line-size",0);
 		for (i = 0; (1 << i) < l && l; i++)
 			/* void */;
 		if ((1 << i) != l && l)
 			panic("bad dcache line size %d", l);
 		ci->dc_l2linesize = i;
 		ci->dc_associativity =
-			PROM_getpropint(node, "dcache-associativity", 1);
+			prom_getpropint(node, "dcache-associativity", 1);
 		ci->dc_totalsize = l * ci->dc_nlines * ci->dc_associativity;
 
 		ci->c_l2linesize = min(ci->ic_l2linesize, ci->dc_l2linesize);
@@ -1120,30 +1330,32 @@ getcacheinfo_obp(sc, node)
 		ci->c_totalsize = ci->ic_totalsize + ci->dc_totalsize;
 	} else {
 		/* unified I/D cache */
-		ci->c_nlines = PROM_getpropint(node, "cache-nlines", 128);
+		ci->c_nlines = prom_getpropint(node, "cache-nlines", 128);
 		ci->c_linesize = l = 
-			PROM_getpropint(node, "cache-line-size", 0);
+			prom_getpropint(node, "cache-line-size", 0);
 		for (i = 0; (1 << i) < l && l; i++)
 			/* void */;
 		if ((1 << i) != l && l)
 			panic("bad cache line size %d", l);
 		ci->c_l2linesize = i;
-		ci->c_totalsize = l *
-			ci->c_nlines *
-			PROM_getpropint(node, "cache-associativity", 1);
+		ci->c_associativity =
+			prom_getpropint(node, "cache-associativity", 1);
+		ci->dc_associativity = ci->ic_associativity =
+			ci->c_associativity;
+		ci->c_totalsize = l * ci->c_nlines * ci->c_associativity;
 	}
 	
 	if (node_has_property(node, "ecache-nlines")) {
 		/* we have a L2 "e"xternal cache */
-		ci->ec_nlines = PROM_getpropint(node, "ecache-nlines", 32768);
-		ci->ec_linesize = l = PROM_getpropint(node, "ecache-line-size", 0);
+		ci->ec_nlines = prom_getpropint(node, "ecache-nlines", 32768);
+		ci->ec_linesize = l = prom_getpropint(node, "ecache-line-size", 0);
 		for (i = 0; (1 << i) < l && l; i++)
 			/* void */;
 		if ((1 << i) != l && l)
 			panic("bad ecache line size %d", l);
 		ci->ec_l2linesize = i;
 		ci->ec_associativity =
-			PROM_getpropint(node, "ecache-associativity", 1);
+			prom_getpropint(node, "ecache-associativity", 1);
 		ci->ec_totalsize = l * ci->ec_nlines * ci->ec_associativity;
 	}
 	if (ci->c_totalsize == 0)
@@ -1173,14 +1385,16 @@ struct module_info module_ms1 = {
 	0,
 	ms1_mmu_enable,
 	ms1_cache_enable,
+	0,
 	64,
 	ms1_get_syncflt,
 	no_asyncflt_regs,
 	ms1_cache_flush,
-	noop_vcache_flush_page,
-	noop_vcache_flush_segment,
-	noop_vcache_flush_region,
-	noop_vcache_flush_context,
+	noop_vcache_flush_page, NULL,
+	noop_vcache_flush_segment, NULL,
+	noop_vcache_flush_region, NULL,
+	noop_vcache_flush_context, NULL,
+	noop_vcache_flush_range, NULL,
 	noop_pcache_flush_page,
 	noop_pure_vcache_flush,
 	ms1_cache_flush_all,
@@ -1217,14 +1431,16 @@ struct module_info module_ms2 = {		/* UNTESTED */
 	0,
 	0,
 	swift_cache_enable,
+	0,
 	256,
 	srmmu_get_syncflt,
 	srmmu_get_asyncflt,
 	srmmu_cache_flush,
-	srmmu_vcache_flush_page,
-	srmmu_vcache_flush_segment,
-	srmmu_vcache_flush_region,
-	srmmu_vcache_flush_context,
+	srmmu_vcache_flush_page, NULL,
+	srmmu_vcache_flush_segment, NULL,
+	srmmu_vcache_flush_region, NULL,
+	srmmu_vcache_flush_context, NULL,
+	srmmu_vcache_flush_range, NULL,
 	noop_pcache_flush_page,
 	noop_pure_vcache_flush,
 	srmmu_cache_flush_all,
@@ -1242,14 +1458,16 @@ struct module_info module_swift = {
 	swift_hotfix,
 	0,
 	swift_cache_enable,
+	0,
 	256,
 	swift_get_syncflt,
 	no_asyncflt_regs,
 	srmmu_cache_flush,
-	srmmu_vcache_flush_page,
-	srmmu_vcache_flush_segment,
-	srmmu_vcache_flush_region,
-	srmmu_vcache_flush_context,
+	srmmu_vcache_flush_page, NULL,
+	srmmu_vcache_flush_segment, NULL,
+	srmmu_vcache_flush_region, NULL,
+	srmmu_vcache_flush_context, NULL,
+	srmmu_vcache_flush_range, NULL,
 	noop_pcache_flush_page,
 	noop_pure_vcache_flush,
 	srmmu_cache_flush_all,
@@ -1274,90 +1492,6 @@ swift_mmu_enable()
 {
 }
 
-struct module_info module_viking = {
-	CPUTYP_UNKNOWN,		/* set in cpumatch() */
-	VAC_NONE,
-	cpumatch_viking,
-	getcacheinfo_obp,
-	viking_hotfix,
-	viking_mmu_enable,
-	viking_cache_enable,
-	4096,
-	viking_get_syncflt,
-	no_asyncflt_regs,
-	/* supersparcs use cached DVMA, no need to flush */
-	noop_cache_flush,
-	noop_vcache_flush_page,
-	noop_vcache_flush_segment,
-	noop_vcache_flush_region,
-	noop_vcache_flush_context,
-	viking_pcache_flush_page,
-	noop_pure_vcache_flush,
-	noop_cache_flush_all,
-	viking_memerr,
-	pmap_zero_page4m,
-	pmap_copy_page4m
-};
-
-void
-cpumatch_viking(sc, mp, node)
-	struct cpu_info *sc;
-	struct module_info *mp;
-	int	node;
-{
-	if (node == 0)
-		viking_hotfix(sc);
-}
-
-void
-viking_hotfix(sc)
-	struct cpu_info *sc;
-{
-	int pcr = lda(SRMMU_PCR, ASI_SRMMU);
-
-	/* Test if we're directly on the MBus */
-	if ((pcr & VIKING_PCR_MB) == 0) {
-		sc->mxcc = 1;
-		sc->flags |= CPUFLG_CACHE_MANDATORY;
-		sc->zero_page = pmap_zero_page_viking_mxcc;
-		sc->copy_page = pmap_copy_page_viking_mxcc;
-		/*
-		 * Ok to cache PTEs; set the flag here, so we don't
-		 * uncache in pmap_bootstrap().
-		 */
-		if ((pcr & VIKING_PCR_TC) == 0)
-			printf("[viking: PCR_TC is off]");
-		else
-			sc->flags |= CPUFLG_CACHEPAGETABLES;
-	} else {
-		sc->cache_flush = viking_cache_flush;
-	}
-
-	/* XXX! */
-	if (sc->mxcc)
-		sc->cpu_type = CPUTYP_SS1_MBUS_MXCC;
-	else
-		sc->cpu_type = CPUTYP_SS1_MBUS_NOMXCC;
-}
-
-void
-viking_mmu_enable()
-{
-	int pcr;
-
-	pcr = lda(SRMMU_PCR, ASI_SRMMU);
-
-	if (cpuinfo.mxcc) {
-		if ((pcr & VIKING_PCR_TC) == 0) {
-			printf("[viking: turn on PCR_TC]");
-		}
-		pcr |= VIKING_PCR_TC;
-		cpuinfo.flags |= CPUFLG_CACHEPAGETABLES;
-	} else
-		pcr &= ~VIKING_PCR_TC;
-	sta(SRMMU_PCR, ASI_SRMMU, pcr);
-}
-
 
 /* ROSS Hypersparc */
 struct module_info module_hypersparc = {
@@ -1368,14 +1502,16 @@ struct module_info module_hypersparc = {
 	0,
 	hypersparc_mmu_enable,
 	hypersparc_cache_enable,
+	hypersparc_getmid,
 	4096,
 	hypersparc_get_syncflt,
 	hypersparc_get_asyncflt,
 	srmmu_cache_flush,
-	srmmu_vcache_flush_page,
-	srmmu_vcache_flush_segment,
-	srmmu_vcache_flush_region,
-	srmmu_vcache_flush_context,
+	srmmu_vcache_flush_page, ft_srmmu_vcache_flush_page,
+	srmmu_vcache_flush_segment, ft_srmmu_vcache_flush_segment,
+	srmmu_vcache_flush_region, ft_srmmu_vcache_flush_region,
+	srmmu_vcache_flush_context, ft_srmmu_vcache_flush_context,
+	srmmu_vcache_flush_range, ft_srmmu_vcache_flush_range,
 	noop_pcache_flush_page,
 	hypersparc_pure_vcache_flush,
 	hypersparc_cache_flush_all,
@@ -1391,8 +1527,15 @@ cpumatch_hypersparc(sc, mp, node)
 	int	node;
 {
 	sc->cpu_type = CPUTYP_HS_MBUS;/*XXX*/
-	if (node == 0)
+
+	if (node == 0) {
+		/* Flush I-cache */
 		sta(0, ASI_HICACHECLR, 0);
+
+		/* Disable `unimplemented flush' traps during boot-up */
+		wrasr(rdasr(HYPERSPARC_ASRNUM_ICCR) | HYPERSPARC_ICCR_FTD,
+			HYPERSPARC_ASRNUM_ICCR);
+	}
 }
 
 void
@@ -1409,6 +1552,14 @@ hypersparc_mmu_enable()
 #endif
 }
 
+int
+hypersparc_getmid(void)
+{
+	u_int pcr = lda(SRMMU_PCR, ASI_SRMMU);
+	return ((pcr & HYPERSPARC_PCR_MID) >> 15);
+}
+
+
 /* Cypress 605 */
 struct module_info module_cypress = {
 	CPUTYP_CYPRESS,
@@ -1418,14 +1569,16 @@ struct module_info module_cypress = {
 	0,
 	0,
 	cypress_cache_enable,
+	cypress_getmid,
 	4096,
 	cypress_get_syncflt,
 	cypress_get_asyncflt,
 	srmmu_cache_flush,
-	srmmu_vcache_flush_page,
-	srmmu_vcache_flush_segment,
-	srmmu_vcache_flush_region,
-	srmmu_vcache_flush_context,
+	srmmu_vcache_flush_page, ft_srmmu_vcache_flush_page,
+	srmmu_vcache_flush_segment, ft_srmmu_vcache_flush_segment,
+	srmmu_vcache_flush_region, ft_srmmu_vcache_flush_region,
+	srmmu_vcache_flush_context, ft_srmmu_vcache_flush_context,
+	srmmu_vcache_flush_range, ft_srmmu_vcache_flush_range,
 	noop_pcache_flush_page,
 	noop_pure_vcache_flush,
 	cypress_cache_flush_all,
@@ -1433,6 +1586,7 @@ struct module_info module_cypress = {
 	pmap_zero_page4m,
 	pmap_copy_page4m
 };
+
 
 /* Fujitsu Turbosparc */
 struct module_info module_turbosparc = {
@@ -1443,14 +1597,16 @@ struct module_info module_turbosparc = {
 	turbosparc_hotfix,
 	0,
 	turbosparc_cache_enable,
+	0,
 	256,
 	turbosparc_get_syncflt,
 	no_asyncflt_regs,
 	srmmu_cache_flush,
-	srmmu_vcache_flush_page,
-	srmmu_vcache_flush_segment,
-	srmmu_vcache_flush_region,
-	srmmu_vcache_flush_context,
+	srmmu_vcache_flush_page, NULL,
+	srmmu_vcache_flush_segment, NULL,
+	srmmu_vcache_flush_region, NULL,
+	srmmu_vcache_flush_context, NULL,
+	srmmu_vcache_flush_range, NULL,
 	noop_pcache_flush_page,
 	noop_pure_vcache_flush,
 	srmmu_cache_flush_all,
@@ -1486,7 +1642,7 @@ cpumatch_turbosparc(sc, mp, node)
 	sc->mmu_enable = 0;
 	sc->cache_enable = 0;
 	sc->get_syncflt = 0;
-	sc->sp_cache_flush = 0;
+	sc->cache_flush = 0;
 	sc->sp_vcache_flush_page = 0;
 	sc->sp_vcache_flush_segment = 0;
 	sc->sp_vcache_flush_region = 0;
@@ -1509,6 +1665,233 @@ turbosparc_hotfix(sc)
 }
 #endif /* SUN4M */
 
+#if defined(SUN4M)
+struct module_info module_viking = {
+	CPUTYP_UNKNOWN,		/* set in cpumatch() */
+	VAC_NONE,
+	cpumatch_viking,
+	getcacheinfo_obp,
+	viking_hotfix,
+	viking_mmu_enable,
+	viking_cache_enable,
+	viking_getmid,
+	4096,
+	viking_get_syncflt,
+	no_asyncflt_regs,
+	/* supersparcs use cached DVMA, no need to flush */
+	noop_cache_flush,
+	noop_vcache_flush_page, NULL,
+	noop_vcache_flush_segment, NULL,
+	noop_vcache_flush_region, NULL,
+	noop_vcache_flush_context, NULL,
+	noop_vcache_flush_range, NULL,
+	viking_pcache_flush_page,
+	noop_pure_vcache_flush,
+	noop_cache_flush_all,
+	viking_memerr,
+	pmap_zero_page4m,
+	pmap_copy_page4m
+};
+#endif /* SUN4M */
+
+#if defined(SUN4M) || defined(SUN4D)
+void
+cpumatch_viking(sc, mp, node)
+	struct cpu_info *sc;
+	struct module_info *mp;
+	int	node;
+{
+	if (node == 0)
+		viking_hotfix(sc);
+}
+
+void
+viking_hotfix(sc)
+	struct cpu_info *sc;
+{
+static	int mxcc = -1;
+	int pcr = lda(SRMMU_PCR, ASI_SRMMU);
+
+	/* Test if we're directly on the MBus */
+	if ((pcr & VIKING_PCR_MB) == 0) {
+		sc->mxcc = 1;
+		sc->flags |= CPUFLG_CACHE_MANDATORY;
+		sc->zero_page = pmap_zero_page_viking_mxcc;
+		sc->copy_page = pmap_copy_page_viking_mxcc;
+		moduleerr_handler = viking_module_error;
+
+		/*
+		 * Ok to cache PTEs; set the flag here, so we don't
+		 * uncache in pmap_bootstrap().
+		 */
+		if ((pcr & VIKING_PCR_TC) == 0)
+			printf("[viking: PCR_TC is off]");
+		else
+			sc->flags |= CPUFLG_CACHEPAGETABLES;
+	} else {
+		sc->cache_flush = viking_cache_flush;
+	}
+
+	/* Check all modules have the same MXCC configuration */
+	if (mxcc != -1 && sc->mxcc != mxcc)
+		panic("MXCC module mismatch");
+
+	mxcc = sc->mxcc;
+
+	/* XXX! */
+	if (sc->mxcc)
+		sc->cpu_type = CPUTYP_SS1_MBUS_MXCC;
+	else
+		sc->cpu_type = CPUTYP_SS1_MBUS_NOMXCC;
+}
+
+void
+viking_mmu_enable()
+{
+	int pcr;
+
+	pcr = lda(SRMMU_PCR, ASI_SRMMU);
+
+	if (cpuinfo.mxcc) {
+		if ((pcr & VIKING_PCR_TC) == 0) {
+			printf("[viking: turn on PCR_TC]");
+		}
+		pcr |= VIKING_PCR_TC;
+		cpuinfo.flags |= CPUFLG_CACHEPAGETABLES;
+	} else
+		pcr &= ~VIKING_PCR_TC;
+	sta(SRMMU_PCR, ASI_SRMMU, pcr);
+}
+
+int
+viking_getmid(void)
+{
+	if (cpuinfo.mxcc) {
+		u_int v = ldda(MXCC_MBUSPORT, ASI_CONTROL) & 0xffffffff;
+		return ((v >> 24) & 0xf);
+	}
+	return (0);
+}
+
+int
+viking_module_error(void)
+{
+	u_int64_t v;
+	int n, fatal = 0;
+
+	/* Report on MXCC error registers in each module */
+	for (n = 0; n < ncpu; n++) {
+		struct cpu_info *cpi = cpus[n];
+
+		if (cpi == NULL)
+			continue;
+
+		if (cpi->ci_mxccregs == 0) {
+			printf("\tMXCC registers not mapped\n");
+			continue;
+		}
+
+		printf("module%d:\n", cpi->ci_cpuid);
+		v = *((u_int64_t *)(cpi->ci_mxccregs + 0xe00));
+		printf("\tmxcc error 0x%llx\n", v);
+		v = *((u_int64_t *)(cpi->ci_mxccregs + 0xb00));
+		printf("\tmxcc status 0x%llx\n", v);
+		v = *((u_int64_t *)(cpi->ci_mxccregs + 0xc00));
+		printf("\tmxcc reset 0x%llx", v);
+		if (v & MXCC_MRST_WD)
+			printf(" (WATCHDOG RESET)"), fatal = 1;
+		if (v & MXCC_MRST_SI)
+			printf(" (SOFTWARE RESET)"), fatal = 1;
+		printf("\n");
+	}
+	return (fatal);
+}
+#endif /* SUN4M || SUN4D */
+
+#if defined(SUN4D)
+void
+getcacheinfo_sun4d(sc, node)
+	struct	cpu_info *sc;
+	int	node;
+{
+	struct cacheinfo *ci = &sc->cacheinfo;
+	int i, l;
+
+	if (node == 0)
+		/* Bootstrapping */
+		return;
+
+	/*
+	 * The Sun4d always has TI TMS390Z55 Viking CPUs; we hard-code
+	 * much of the cache information here.
+	 */
+
+	ci->c_physical = 1;
+	ci->c_split = 1;
+
+	/* hwflush is used only by sun4/4c code */
+	ci->c_hwflush = 0; 
+
+	ci->ic_nlines = 0x00000040;
+	ci->ic_linesize = 0x00000040;
+	ci->ic_l2linesize = 6;
+	ci->ic_associativity = 0x00000005;
+	ci->ic_totalsize = ci->ic_linesize * ci->ic_nlines *
+	    ci->ic_associativity;
+
+	ci->dc_nlines = 0x00000080;
+	ci->dc_linesize = 0x00000020;
+	ci->dc_l2linesize = 5;
+	ci->dc_associativity = 0x00000004;
+	ci->dc_totalsize = ci->dc_linesize * ci->dc_nlines *
+	    ci->dc_associativity;
+
+	ci->c_l2linesize = min(ci->ic_l2linesize, ci->dc_l2linesize);
+	ci->c_linesize = min(ci->ic_linesize, ci->dc_linesize);
+	ci->c_totalsize = ci->ic_totalsize + ci->dc_totalsize;
+
+	if (node_has_property(node, "ecache-nlines")) {
+		/* we have a L2 "e"xternal cache */
+		ci->ec_nlines = prom_getpropint(node, "ecache-nlines", 32768);
+		ci->ec_linesize = l = prom_getpropint(node, "ecache-line-size", 0);
+		for (i = 0; (1 << i) < l && l; i++)
+			/* void */;
+		if ((1 << i) != l && l)
+			panic("bad ecache line size %d", l);
+		ci->ec_l2linesize = i;
+		ci->ec_associativity =
+			prom_getpropint(node, "ecache-associativity", 1);
+		ci->ec_totalsize = l * ci->ec_nlines * ci->ec_associativity;
+	}
+}
+
+struct module_info module_viking_sun4d = {
+	CPUTYP_UNKNOWN,		/* set in cpumatch() */
+	VAC_NONE,
+	cpumatch_viking,
+	getcacheinfo_sun4d,
+	viking_hotfix,
+	viking_mmu_enable,
+	viking_cache_enable,
+	viking_getmid,
+	4096,
+	viking_get_syncflt,
+	no_asyncflt_regs,
+	/* supersparcs use cached DVMA, no need to flush */
+	noop_cache_flush,
+	noop_vcache_flush_page, NULL,
+	noop_vcache_flush_segment, NULL,
+	noop_vcache_flush_region, NULL,
+	noop_vcache_flush_context, NULL,
+	noop_vcache_flush_range, NULL,
+	viking_pcache_flush_page,
+	noop_pure_vcache_flush,
+	noop_cache_flush_all,
+	viking_memerr,
+	pmap_zero_page4m,
+	pmap_copy_page4m
+};
+#endif /* SUN4D */
 
 #define	ANY	-1	/* match any version */
 
@@ -1552,6 +1935,11 @@ struct cpu_conf {
 	{ CPU_SUN4M, 4, 4, ANY, ANY, "TI_4_4", &module_viking },
 #endif
 
+#if defined(SUN4D)
+	{ CPU_SUN4D, 4, 0, 0, ANY, "TMS390Z50 v0 or TMS390Z55",
+	  &module_viking_sun4d },
+#endif
+
 	{ ANY, ANY, ANY, ANY, ANY, "Unknown", &module_unknown }
 };
 
@@ -1575,22 +1963,22 @@ getcpuinfo(sc, node)
 		i = getpsr();
 		if (node == 0 ||
 		    (cpu_impl =
-		     PROM_getpropint(node, "psr-implementation", -1)) == -1)
+		     prom_getpropint(node, "psr-implementation", -1)) == -1)
 			cpu_impl = IU_IMPL(i);
 
 		if (node == 0 ||
-		    (cpu_vers = PROM_getpropint(node, "psr-version", -1)) == -1)
+		    (cpu_vers = prom_getpropint(node, "psr-version", -1)) == -1)
 			cpu_vers = IU_VERS(i);
 
-		if (CPU_ISSUN4M) {
+		if (CPU_HAS_SRMMU) {
 			i = lda(SRMMU_PCR, ASI_SRMMU);
 			if (node == 0 ||
 			    (mmu_impl =
-			     PROM_getpropint(node, "implementation", -1)) == -1)
+			     prom_getpropint(node, "implementation", -1)) == -1)
 				mmu_impl = SRMMU_IMPL(i);
 
 			if (node == 0 ||
-			    (mmu_vers = PROM_getpropint(node, "version", -1)) == -1)
+			    (mmu_vers = prom_getpropint(node, "version", -1)) == -1)
 				mmu_vers = SRMMU_VERS(i);
 		} else {
 			mmu_impl = ANY;
@@ -1601,16 +1989,14 @@ getcpuinfo(sc, node)
 		 * Get CPU version/implementation from ROM. If not
 		 * available, assume same as boot CPU.
 		 */
-		cpu_impl = PROM_getpropint(node, "psr-implementation", -1);
-		if (cpu_impl == -1)
-			cpu_impl = cpuinfo.cpu_impl;
-		cpu_vers = PROM_getpropint(node, "psr-version", -1);
-		if (cpu_vers == -1)
-			cpu_vers = cpuinfo.cpu_vers;
+		cpu_impl = prom_getpropint(node, "psr-implementation",
+					   cpuinfo.cpu_impl);
+		cpu_vers = prom_getpropint(node, "psr-version",
+					   cpuinfo.cpu_vers);
 
 		/* Get MMU version/implementation from ROM always */
-		mmu_impl = PROM_getpropint(node, "implementation", -1);
-		mmu_vers = PROM_getpropint(node, "version", -1);
+		mmu_impl = prom_getpropint(node, "implementation", -1);
+		mmu_vers = prom_getpropint(node, "version", -1);
 	}
 
 	for (mp = cpu_conf; ; mp++) {
@@ -1652,15 +2038,18 @@ getcpuinfo(sc, node)
 		mp->minfo->getcacheinfo(sc, node);
 
 		if (node && sc->hz == 0 && !CPU_ISSUN4/*XXX*/) {
-			sc->hz = PROM_getpropint(node, "clock-frequency", 0);
+			sc->hz = prom_getpropint(node, "clock-frequency", 0);
 			if (sc->hz == 0) {
 				/*
 				 * Try to find it in the OpenPROM root...
 				 */     
-				sc->hz = PROM_getpropint(findroot(),
+				sc->hz = prom_getpropint(findroot(),
 						    "clock-frequency", 0);
 			}
 		}
+
+		if (sc->master && mp->minfo->getmid != NULL)
+			bootmid = mp->minfo->getmid();
 
 		/*
 		 * Copy CPU/MMU/Cache specific routines into cpu_info.
@@ -1671,11 +2060,17 @@ getcpuinfo(sc, node)
 		MPCOPY(cache_enable);
 		MPCOPY(get_syncflt);
 		MPCOPY(get_asyncflt);
-		MPCOPY(sp_cache_flush);
+		MPCOPY(cache_flush);
 		MPCOPY(sp_vcache_flush_page);
 		MPCOPY(sp_vcache_flush_segment);
 		MPCOPY(sp_vcache_flush_region);
 		MPCOPY(sp_vcache_flush_context);
+		MPCOPY(sp_vcache_flush_range);
+		MPCOPY(ft_vcache_flush_page);
+		MPCOPY(ft_vcache_flush_segment);
+		MPCOPY(ft_vcache_flush_region);
+		MPCOPY(ft_vcache_flush_context);
+		MPCOPY(ft_vcache_flush_range);
 		MPCOPY(pcache_flush_page);
 		MPCOPY(pure_vcache_flush);
 		MPCOPY(cache_flush_all);
@@ -1687,7 +2082,6 @@ getcpuinfo(sc, node)
 		 * Use the single-processor cache flush functions until
 		 * all CPUs are initialized.
 		 */
-		sc->cache_flush = sc->sp_cache_flush;
 		sc->vcache_flush_page = sc->sp_vcache_flush_page;
 		sc->vcache_flush_segment = sc->sp_vcache_flush_segment;
 		sc->vcache_flush_region = sc->sp_vcache_flush_region;
@@ -1714,6 +2108,7 @@ struct info {
 	char	*name;
 };
 
+/* XXX trim this table on a per-ARCH basis */
 /* NB: table order matters here; specific numbers must appear before ANY. */
 static struct info fpu_types[] = {
 	/*
@@ -1786,7 +2181,7 @@ fsrtoname(impl, vers, fver)
 void cpu_debug_dump(void);
 
 /*
- * Dump cpu information from ddb.
+ * Dump CPU information from ddb.
  */
 void
 cpu_debug_dump(void)
@@ -1794,14 +2189,16 @@ cpu_debug_dump(void)
 	struct cpu_info *ci;
 	CPU_INFO_ITERATOR cii;
 
-	db_printf("addr		cpuid	flags	curproc		fpproc\n");
+	db_printf("%-4s %-10s %-8s %-10s %-10s %-10s\n",
+		    "CPU#", "CPUINFO", "FLAGS", "CURLWP", "CURPROC", "FPLWP");
 	for (CPU_INFO_FOREACH(cii, ci)) {
-		db_printf("%p	%d	%x	%10p	%10p\n",
-		    ci,
+		db_printf("%-4d %-10p %-8x %-10p %-10p %-10p\n",
 		    ci->ci_cpuid,
+		    ci,
 		    ci->flags,
-		    ci->ci_curproc,
-		    ci->fpproc);
+		    ci->ci_curlwp,
+		    ci->ci_curlwp == NULL ? NULL : ci->ci_curlwp->l_proc,
+		    ci->fplwp);
 	}
 }
 #endif

@@ -1,7 +1,8 @@
-/*	$NetBSD: bktr_reg.h,v 1.10 2001/09/18 18:15:53 wiz Exp $	*/
+/* $SourceForge: bktr_reg.h,v 1.3 2003/03/11 23:11:27 thomasklausner Exp $ */
 
+/*	$NetBSD: bktr_reg.h,v 1.13 2003/03/12 00:14:41 wiz Exp $	*/
 /*
- * FreeBSD: src/sys/dev/bktr/bktr_reg.h,v 1.42 2000/10/31 13:09:56 roger Exp
+ * $FreeBSD: src/sys/dev/bktr/bktr_reg.h,v 1.42 2000/10/31 13:09:56 roger Exp$
  *
  * Copyright (c) 1999 Roger Hardiman
  * Copyright (c) 1998 Amancio Hasty
@@ -19,7 +20,7 @@
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
  *	This product includes software developed by Mark Tinguely and Jim Lowe
- * 4. The name of the author may not be used to endorse or promote products 
+ * 4. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
@@ -387,8 +388,8 @@ struct bt848_registers {
 #define BKTR_GPIO_DATA			0x200
 #define BKTR_I2C_DATA_CTL		0x110
 #define BKTR_TGCTRL			0x084
-#define BKTR_PLL_F_LO			0x0F0 
-#define BKTR_PLL_F_HI			0x0F4 
+#define BKTR_PLL_F_LO			0x0F0
+#define BKTR_PLL_F_HI			0x0F4
 #define BKTR_PLL_F_XCI			0x0F8
 
 /*
@@ -410,9 +411,9 @@ struct TUNER {
 	char*		name;
 	u_char		type;
 	u_char		pllControl[4];
-	u_char		bandLimits[ 2 ];
-	u_char		bandAddrs[ 4 ];        /* 3 first for the 3 TV 
-					       ** bands. Last for radio 
+	u_char		bandLimits[2];
+	u_char		bandAddrs[4];        /* 3 first for the 3 TV
+					       ** bands. Last for radio
 					       ** band (0x00=NoRadio).
 					       */
 
@@ -430,7 +431,7 @@ struct CARDTYPE {
 	u_char			dpl3518a;	/* Has dpl3518a chip? */
 	u_char			eepromAddr;
 	u_char			eepromSize;	/* bytes / EEPROMBLOCKSIZE */
-	u_int			audiomuxs[ 5 ];	/* tuner, ext (line-in) */
+	u_int			audiomuxs[5];	/* tuner, ext (line-in) */
 						/* int/unused (radio) */
 						/* mute, present */
 	u_int			gpio_mux_bits;	/* GPIO mask for audio mux */
@@ -464,17 +465,41 @@ struct bktr_i2c_softc {
 /* Bt848/878 register access
  * The registers can either be access via a memory mapped structure
  * or accessed via bus_space.
- * bus_0pace access allows cross platform support, where as the
+ * bus_space access allows cross platform support, where as the
  * memory mapped structure method only works on 32 bit processors
  * with the right type of endianness.
  */
-#if defined(__NetBSD__) || ( defined(__FreeBSD__) && (__FreeBSD_version >=300000) )
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && (__FreeBSD_version >=300000))
+
+#if defined(__NetBSD__)
+
+struct bktr_softc;
+
+u_int8_t bktr_INB(struct bktr_softc *, int);
+u_int16_t bktr_INW(struct bktr_softc *, int);
+u_int32_t bktr_INL(struct bktr_softc *, int);
+void bktr_OUTB(struct bktr_softc *, int, u_int8_t);
+void bktr_OUTW(struct bktr_softc *, int, u_int16_t);
+void bktr_OUTL(struct bktr_softc *, int, u_int32_t);
+
+#define INB(bktr,offset)	bktr_INB(bktr,offset)
+#define INW(bktr,offset)	bktr_INW(bktr,offset)
+#define INL(bktr,offset)	bktr_INL(bktr,offset)
+#define OUTB(bktr,offset,value)	bktr_OUTB(bktr,offset,value)
+#define OUTW(bktr,offset,value)	bktr_OUTW(bktr,offset,value)
+#define OUTL(bktr,offset,value)	bktr_OUTL(bktr,offset,value)
+
+#else
+
 #define INB(bktr,offset)	bus_space_read_1((bktr)->memt,(bktr)->memh,(offset))
 #define INW(bktr,offset)	bus_space_read_2((bktr)->memt,(bktr)->memh,(offset))
 #define INL(bktr,offset)	bus_space_read_4((bktr)->memt,(bktr)->memh,(offset))
 #define OUTB(bktr,offset,value) bus_space_write_1((bktr)->memt,(bktr)->memh,(offset),(value))
 #define OUTW(bktr,offset,value) bus_space_write_2((bktr)->memt,(bktr)->memh,(offset),(value))
 #define OUTL(bktr,offset,value) bus_space_write_4((bktr)->memt,(bktr)->memh,(offset),(value))
+
+#endif /* __NetBSD__ */
+
 #else
 #define INB(bktr,offset)	*(volatile unsigned char*) ((int)((bktr)->memh)+(offset))
 #define INW(bktr,offset)	*(volatile unsigned short*)((int)((bktr)->memh)+(offset))
@@ -585,7 +610,7 @@ struct bktr_softc {
     u_long	vbi_sequence_number;	/* sequence number for VBI */
     int		vbi_read_blocked;	/* user process blocked on read() from /dev/vbi */
     struct selinfo vbi_select;	/* Data used by select() on /dev/vbi */
-    
+
 
     struct proc	*proc;		/* process to receive raised signal */
     int		signal;		/* signal to send to process */
@@ -619,7 +644,7 @@ struct bktr_softc {
     u_short     bktr_cap_ctl;
     volatile u_int	flags;
 #define	METEOR_INITIALIZED	0x00000001
-#define	METEOR_OPEN		0x00000002 
+#define	METEOR_OPEN		0x00000002
 #define	METEOR_MMAP		0x00000004
 #define	METEOR_INTR		0x00000008
 #define	METEOR_READ		0x00000010	/* XXX never gets referenced */
@@ -656,10 +681,9 @@ struct bktr_softc {
 #define	METEOR_OUTPUT_FMT_MASK	0x040f0000
 #define	METEOR_WANT_TS		0x08000000	/* time-stamp a frame */
 #define METEOR_RGB		0x20000000	/* meteor rgb unit */
-#define METEOR_FIELD_MODE	0x80000000
     u_char	tflags;				/* Tuner flags (/dev/tuner) */
 #define	TUNER_INITIALIZED	0x00000001
-#define	TUNER_OPEN		0x00000002 
+#define	TUNER_OPEN		0x00000002
     u_char      vbiflags;			/* VBI flags (/dev/vbi) */
 #define VBI_INITIALIZED         0x00000001
 #define VBI_OPEN                0x00000002

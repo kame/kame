@@ -1,4 +1,4 @@
-/*	$NetBSD: mlx.c,v 1.16.4.1 2003/07/28 18:08:37 he Exp $	*/
+/*	$NetBSD: mlx.c,v 1.28 2003/06/29 22:30:13 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -74,7 +74,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mlx.c,v 1.16.4.1 2003/07/28 18:08:37 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mlx.c,v 1.28 2003/06/29 22:30:13 fvdl Exp $");
 
 #include "ld.h"
 
@@ -135,7 +135,14 @@ static int	mlx_user_command(struct mlx_softc *, struct mlx_usercommand *);
 
 static __inline__ time_t	mlx_curtime(void);
 
-cdev_decl(mlx);
+dev_type_open(mlxopen);
+dev_type_close(mlxclose);
+dev_type_ioctl(mlxioctl);
+
+const struct cdevsw mlx_cdevsw = {
+	mlxopen, mlxclose, noread, nowrite, mlxioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
 
 extern struct	cfdriver mlx_cd; 
 static struct	proc *mlx_periodic_proc;
@@ -595,7 +602,6 @@ mlx_configure(struct mlx_softc *mlx, int waitok)
 	if (mes == NULL) {
 		printf("%s: error fetching drive status\n",
 		    mlx->mlx_dv.dv_xname);
-		free(me, M_DEVBUF);
 		goto out;
 	}
 
@@ -655,8 +661,8 @@ mlx_print(void *aux, const char *pnp)
 	mlxa = (struct mlx_attach_args *)aux;
 
 	if (pnp != NULL)
-		printf("block device at %s", pnp);
-	printf(" unit %d", mlxa->mlxa_unit);
+		aprint_normal("block device at %s", pnp);
+	aprint_normal(" unit %d", mlxa->mlxa_unit);
 	return (UNCONF);
 }
 
@@ -674,7 +680,7 @@ mlx_submatch(struct device *parent, struct cfdata *cf, void *aux)
 	    cf->mlxacf_unit != mlxa->mlxa_unit)
 		return (0);
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 /*
@@ -1885,6 +1891,7 @@ mlx_ccb_alloc(struct mlx_softc *mlx, struct mlx_ccb **mcp, int control)
 	int s;
 
 	s = splbio();
+	mc = SLIST_FIRST(&mlx->mlx_ccb_freelist);
 	if (control) {
 		if (mlx->mlx_nccbs_ctrl >= MLX_NCCBS_CONTROL) {
 			splx(s);
@@ -1894,7 +1901,6 @@ mlx_ccb_alloc(struct mlx_softc *mlx, struct mlx_ccb **mcp, int control)
 		mc->mc_flags |= MC_CONTROL;
 		mlx->mlx_nccbs_ctrl++;
 	}
-	mc = SLIST_FIRST(&mlx->mlx_ccb_freelist);
 	SLIST_REMOVE_HEAD(&mlx->mlx_ccb_freelist, mc_chain.slist);
 	splx(s);
 
@@ -1936,7 +1942,7 @@ mlx_ccb_enqueue(struct mlx_softc *mlx, struct mlx_ccb *mc)
 	while ((mc = SIMPLEQ_FIRST(&mlx->mlx_ccb_queue)) != NULL) {
 		if (mlx_ccb_submit(mlx, mc) != 0)
 			break;
-		SIMPLEQ_REMOVE_HEAD(&mlx->mlx_ccb_queue, mc, mc_chain.simpleq);
+		SIMPLEQ_REMOVE_HEAD(&mlx->mlx_ccb_queue, mc_chain.simpleq);
 		TAILQ_INSERT_TAIL(&mlx->mlx_ccb_worklist, mc, mc_chain.tailq);
 	}
 
@@ -2212,7 +2218,7 @@ mlx_fw_message(struct mlx_softc *mlx, int error, int param1, int param2)
 			    mlx->mlx_dv.dv_xname);
 			mlx->mlx_flags |= MLXF_SPINUP_REPORTED;
 		}
-		break;
+		return (0);
 
 	case 0x30:
 		fmt = "configuration checksum error";
@@ -2243,7 +2249,8 @@ mlx_fw_message(struct mlx_softc *mlx, int error, int param1, int param2)
 		break;
 
 	case 0xf0:
-		fmt = "FATAL MEMORY PARITY ERROR";
+		printf("%s: FATAL MEMORY PARITY ERROR\n",
+		    mlx->mlx_dv.dv_xname);
 		return (1);
 
 	default:

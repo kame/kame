@@ -1,4 +1,4 @@
-/*	$NetBSD: irix_exec.c,v 1.14 2002/04/20 16:19:22 manu Exp $ */
+/*	$NetBSD: irix_exec.c,v 1.37.2.1 2004/08/15 13:54:13 tron Exp $ */
 
 /*-
  * Copyright (c) 2001-2002 The NetBSD Foundation, Inc.
@@ -37,34 +37,36 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: irix_exec.c,v 1.14 2002/04/20 16:19:22 manu Exp $");
+__KERNEL_RCSID(0, "$NetBSD: irix_exec.c,v 1.37.2.1 2004/08/15 13:54:13 tron Exp $");
 
-#ifndef ELFSIZE
-#define ELFSIZE		32	/* XXX should die */
+#ifdef _KERNEL_OPT
+#include "opt_syscall_debug.h"
 #endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
+#include <sys/lock.h>
 #include <sys/exec.h>
-#include <sys/exec_elf.h>
+#include <sys/types.h>
 #include <sys/malloc.h>
 
-#include <uvm/uvm_extern.h>
-
 #include <machine/regnum.h>
-
-#include <compat/common/compat_util.h>
+#include <uvm/uvm_extern.h>
 
 #include <compat/irix/irix_syscall.h>
 #include <compat/irix/irix_types.h>
 #include <compat/irix/irix_exec.h>
+#include <compat/irix/irix_prctl.h>
 #include <compat/irix/irix_signal.h>
 #include <compat/irix/irix_errno.h>
+#include <compat/irix/irix_sysctl.h>
+#include <compat/irix/irix_usema.h>
 
-static void setregs_n32 __P((struct proc *, struct exec_package *, u_long));
+extern const int native_to_svr4_signo[];
+
 static void irix_e_proc_exec __P((struct proc *, struct exec_package *));
-static void irix_e_proc_fork __P((struct proc *, struct proc *));
+static void irix_e_proc_fork __P((struct proc *, struct proc *, int));
 static void irix_e_proc_exit __P((struct proc *));
 static void irix_e_proc_init __P((struct proc *, struct vmspace *));
 
@@ -77,14 +79,22 @@ void irix_syscall __P((void));
 void irix_syscall_intern __P((struct proc *));
 #endif
 
-const struct emul emul_irix_o32 = {
-	"irix o32",
+/* 
+ * Fake sigcode. COMPAT_IRIX does not use it, since the 
+ * signal trampoline is provided by libc. However, some
+ * other part of the kernel will be happier if we still
+ * provide non NULL sigcode and esigcode. 
+ */
+char irix_sigcode[] = { 0 };
+
+const struct emul emul_irix = {
+	"irix",
 	"/emul/irix",
 #ifndef __HAVE_MINIMAL_EMUL
 	0,
 	native_to_irix_errno,
 	IRIX_SYS_syscall,
-	IRIX_SYS_MAXSYSCALL,
+	IRIX_SYS_NSYSENT,
 #endif
 	irix_sysent,
 #ifdef SYSCALL_DEBUG
@@ -95,152 +105,37 @@ const struct emul emul_irix_o32 = {
 	irix_sendsig,
 	trapsignal,
 	NULL,
+	irix_sigcode,
+	irix_sigcode,
 	NULL,
 	setregs,
 	irix_e_proc_exec,
 	irix_e_proc_fork,
 	irix_e_proc_exit,
+	NULL,
+	NULL,
 #ifdef __HAVE_SYSCALL_INTERN
 	irix_syscall_intern,
 #else
 	irix_syscall,
 #endif
+	NULL,
+	irix_vm_fault,
 };
-
-const struct emul emul_irix_n32 = {
-	"irix n32",
-	"/emul/irix",
-#ifndef __HAVE_MINIMAL_EMUL
-	0,
-	native_to_irix_errno,
-	IRIX_SYS_syscall,
-	IRIX_SYS_MAXSYSCALL,
-#endif
-	irix_sysent,
-#ifdef SYSCALL_DEBUG
-	irix_syscallnames,
-#else
-	NULL,
-#endif
-	irix_sendsig,
-	trapsignal,
-	NULL,
-	NULL,
-	setregs_n32,
-	irix_e_proc_exec,
-	irix_e_proc_fork,
-	irix_e_proc_exit,
-#ifdef __HAVE_SYSCALL_INTERN
-	irix_syscall_intern,
-#else
-	irix_syscall,
-#endif
-};
-
-/*
- * IRIX o32 ABI probe function
- */
-int
-ELFNAME2(irix,probe_o32)(p, epp, eh, itp, pos)
-	struct proc *p;
-	struct exec_package *epp;
-	void *eh;
-	char *itp; 
-	vaddr_t *pos; 
-{
-	const char *bp;
-	int error;
-	size_t len;
-
-#ifdef DEBUG_IRIX
-	printf("irix_probe_o32()\n");
-#endif
-	if ((((Elf_Ehdr *)epp->ep_hdr)->e_flags & IRIX_EF_IRIX_ABI_MASK) !=
-	    IRIX_EF_IRIX_ABIO32)
-		return error;
-
-	if (itp[0]) {
-		/* o32 binaries use /lib/libc.so.1 */
-		if (strncmp(itp, "/lib/libc.so", 12) && 
-		    strncmp(itp, "/usr/lib/libc.so", 16))
-			return ENOEXEC;
-		if ((error = emul_find(p, NULL, epp->ep_esch->es_emul->e_path,
-		    itp, &bp, 0)))
-			return error;
-		if ((error = copystr(bp, itp, MAXPATHLEN, &len)))
-			return error;
-		free((void *)bp, M_TEMP);
-	}
-	*pos = ELF_NO_ADDR;
-#ifdef DEBUG_IRIX
-	printf("irix_probe_o32: returning 0\n");
-	printf("epp->ep_vm_minaddr = 0x%lx\n", epp->ep_vm_minaddr);
-#endif
-	epp->ep_vm_minaddr = epp->ep_vm_minaddr & ~0xfUL;
-	return 0;
-}
-
-/*
- * IRIX n32 ABI probe function
- */
-int
-ELFNAME2(irix,probe_n32)(p, epp, eh, itp, pos)
-	struct proc *p;
-	struct exec_package *epp;
-	void *eh;
-	char *itp; 
-	vaddr_t *pos; 
-{
-	const char *bp;
-	int error;
-	size_t len;
-
-#ifdef DEBUG_IRIX
-	printf("irix_probe_n32()\n");
-#endif
-	if ((((Elf_Ehdr *)epp->ep_hdr)->e_flags & IRIX_EF_IRIX_ABI_MASK) !=
-	    IRIX_EF_IRIX_ABIN32)
-		return error;
-
-	if (itp[0]) {
-		/* n32 binaries use /lib32/libc.so.1 */
-		if (strncmp(itp, "/lib32/libc.so", 14) &&
-		    strncmp(itp, "/usr/lib32/libc.so", 18))
-			return ENOEXEC;
-		if ((error = emul_find(p, NULL, epp->ep_esch->es_emul->e_path,
-		    itp, &bp, 0)))
-			return error;
-		if ((error = copystr(bp, itp, MAXPATHLEN, &len)))
-			return error;
-		free((void *)bp, M_TEMP);
-	}
-	*pos = ELF_NO_ADDR;
-#ifdef DEBUG_IRIX
-	printf("irix_probe_n32: returning 0\n");
-	printf("epp->ep_vm_minaddr = 0x%lx\n", epp->ep_vm_minaddr);
-#endif
-	epp->ep_vm_minaddr = epp->ep_vm_minaddr & ~0xfUL;
-	return 0;
-}
 
 /*
  * set registers on exec for N32 applications 
  */
 void
-setregs_n32(p, pack, stack)
-	struct proc *p;
+irix_n32_setregs(l, pack, stack)
+	struct lwp *l;
 	struct exec_package *pack;
 	u_long stack;
 {
-	struct frame *f = (struct frame *)p->p_md.md_regs;
+	struct frame *f = (struct frame *)l->l_md.md_regs;
 	
-	/* Use regular setregs */
-	setregs(p, pack, stack);
-
 	/* Enable 64 bit instructions (eg: sd) */
-	f->f_regs[SR] |= MIPS3_SR_UX; 
-
-	return;
+	f->f_regs[_R_SR] |= MIPS3_SR_UX; 
 }
 
 /*
@@ -251,9 +146,21 @@ irix_e_proc_init(p, vmspace)
 	struct proc *p;
 	struct vmspace *vmspace;
 {
+	struct irix_emuldata *ied;
+	vaddr_t vm_min;
+	vsize_t vm_len;
+
 	if (!p->p_emuldata)
-		MALLOC(p->p_emuldata, void *, sizeof(struct irix_emuldata),
-			M_EMULDATA, M_WAITOK | M_ZERO);
+		p->p_emuldata = malloc(sizeof(struct irix_emuldata), 
+		    M_EMULDATA, M_WAITOK | M_ZERO);
+
+	ied = p->p_emuldata;
+	ied->ied_p = p;
+
+	LIST_INIT(&ied->ied_shared_regions);
+	vm_min = vm_map_min(&vmspace->vm_map);
+	vm_len = vm_map_max(&vmspace->vm_map) - vm_min;
+	irix_isrr_insert(vm_min, vm_len, IRIX_ISRR_SHARED, p);
 }  
 
 /* 
@@ -265,26 +172,14 @@ irix_e_proc_exec(p, epp)
 	struct exec_package *epp;
 {
 	int error;
-	struct exec_vmcmd evc;
 
 	irix_e_proc_init(p, p->p_vmspace);
 
-	/* 
-	 * On IRIX, usinit(3) expects the kernel to prepare one page of 
-	 * memory mapped at address 0x200000. It is used for shared 
-	 * semaphores and locks.
-	 */
-	bzero(&evc, sizeof(evc));
-	evc.ev_addr = IRIX_SH_ARENA_ADDR;
-	evc.ev_len = IRIX_SH_ARENA_SZ;
-	evc.ev_prot = UVM_PROT_RW;
-	evc.ev_proc = *vmcmd_map_zero;
-
-	error = (*evc.ev_proc)(p, &evc);
+	/* Initialize the process private area (PRDA) */
+	error = irix_prda_init(p);
 #ifdef DEBUG_IRIX
-	printf("irix_e_proc_init(): uvm_map() returned %d\n", error);
 	if (error != 0)
-		printf("irix_e_proc_init(): IRIX_SHARED_ARENA map failed ");
+		printf("irix_e_proc_exec(): PRDA map failed ");
 #endif
 }
 
@@ -295,7 +190,79 @@ static void
 irix_e_proc_exit(p)
 	struct proc *p;
 {
-	FREE(p->p_emuldata, M_EMULDATA);
+	struct proc *pp;
+	struct irix_emuldata *ied;
+	struct irix_share_group *isg;
+	struct irix_shared_regions_rec *isrr;
+
+	/* 
+	 * Send SIGHUP to child process as requested using prctl(2)
+	 */
+	proclist_lock_read();
+	LIST_FOREACH(pp, &allproc, p_list) {
+		/* Select IRIX processes */
+		if (irix_check_exec(pp) == 0)
+			continue;
+
+		ied = (struct irix_emuldata *)(pp->p_emuldata);
+		if (ied->ied_termchild && pp->p_pptr == p)
+			psignal(pp, native_to_svr4_signo[SIGHUP]);
+	}
+	proclist_unlock_read();
+
+	/*
+	 * Remove the process from share group processes list, if revelant.
+	 */
+	ied = (struct irix_emuldata *)(p->p_emuldata);
+
+	if ((isg = ied->ied_share_group) != NULL) {
+		lockmgr(&isg->isg_lock, LK_EXCLUSIVE, NULL);
+		LIST_REMOVE(ied, ied_sglist);
+		isg->isg_refcount--;
+	
+		if (isg->isg_refcount == 0) {
+			/* 
+		 	 * This was the last process in the share group.
+			 * Call irix_usema_exit_cleanup() to free in-kernel 
+			 * structures hold by the share group through
+			 * the irix_usync_cntl system call. 
+			 */
+			irix_usema_exit_cleanup(p, NULL);
+			 /* 
+			  * Free the share group structure (no need to free
+			  * the lock since we destroy it now).
+			  */
+			free(isg, M_EMULDATA);
+			ied->ied_share_group = NULL;
+		} else {
+			/* 
+			 * There are other processes remaining in the share
+			 * group. Call irix_usema_exit_cleanup() to set the 
+			 * first of them as the owner of the structures 
+			 * hold in the kernel by the share group.
+			 */
+			irix_usema_exit_cleanup(p, 
+			    LIST_FIRST(&isg->isg_head)->ied_p);
+			lockmgr(&isg->isg_lock, LK_RELEASE, NULL);
+		}
+	
+	} else {
+		/* 
+		 * The process is not part of a share group. Call 
+		 * irix_usema_exit_cleanup() to free in-kernel structures hold 
+		 * by the process through the irix_usync_cntl system call.
+		 */
+		irix_usema_exit_cleanup(p, NULL);
+	}
+
+	/* Free (un)shared region list */
+	while (!LIST_EMPTY(&ied->ied_shared_regions)) {
+		isrr = LIST_FIRST(&ied->ied_shared_regions);
+		LIST_REMOVE(isrr , isrr_list);
+		free(isrr, M_EMULDATA);
+	}
+
+	free(p->p_emuldata, M_EMULDATA);
 	p->p_emuldata = NULL;
 }
 
@@ -303,11 +270,21 @@ irix_e_proc_exit(p)
  * fork() hook used to allocate per process structures
  */
 static void
-irix_e_proc_fork(p, parent)
+irix_e_proc_fork(p, parent, forkflags)
         struct proc *p, *parent;
+	int forkflags;
 {
+	struct irix_emuldata *ied1;
+	struct irix_emuldata *ied2;
+
         p->p_emuldata = NULL;
 
-	/* Use parent's vmspace beacause our vmspace may not be setup yet) */
+	/* Use parent's vmspace because our vmspace may not be setup yet */
         irix_e_proc_init(p, parent->p_vmspace);
+
+	ied1 = p->p_emuldata;
+	ied2 = parent->p_emuldata;
+
+	(void) memcpy(ied1, ied2, (unsigned)
+	    ((caddr_t)&ied1->ied_endcopy - (caddr_t)&ied1->ied_startcopy));
 }

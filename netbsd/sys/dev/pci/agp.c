@@ -1,4 +1,4 @@
-/*	$NetBSD: agp.c,v 1.14.10.3 2003/06/16 12:48:34 grant Exp $	*/
+/*	$NetBSD: agp.c,v 1.32 2004/02/13 11:36:22 wiz Exp $	*/
 
 /*-
  * Copyright (c) 2000 Doug Rabson
@@ -65,7 +65,7 @@
 
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: agp.c,v 1.14.10.3 2003/06/16 12:48:34 grant Exp $");
+__KERNEL_RCSID(0, "$NetBSD: agp.c,v 1.32 2004/02/13 11:36:22 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -88,18 +88,28 @@ __KERNEL_RCSID(0, "$NetBSD: agp.c,v 1.14.10.3 2003/06/16 12:48:34 grant Exp $");
 
 #include <machine/bus.h>
 
+MALLOC_DEFINE(M_AGP, "AGP", "AGP memory");
+
 /* Helper functions for implementing chipset mini drivers. */
 /* XXXfvdl get rid of this one. */
 
 extern struct cfdriver agp_cd;
-cdev_decl(agp);
+
+dev_type_open(agpopen);
+dev_type_close(agpclose);
+dev_type_ioctl(agpioctl);
+dev_type_mmap(agpmmap);
+
+const struct cdevsw agp_cdevsw = {
+	agpopen, agpclose, noread, nowrite, agpioctl,
+	nostop, notty, nopoll, agpmmap, nokqfilter,
+};
 
 int agpmatch(struct device *, struct cfdata *, void *);
 void agpattach(struct device *, struct device *, void *);
 
-struct cfattach agp_ca = {
-	sizeof(struct agp_softc), agpmatch, agpattach
-};
+CFATTACH_DECL(agp, sizeof(struct agp_softc),
+    agpmatch, agpattach, NULL, NULL);
 
 static int agp_info_user(struct agp_softc *, agp_info *);
 static int agp_setup_user(struct agp_softc *, agp_setup *);
@@ -143,11 +153,14 @@ const struct agp_product {
 	  NULL,			agp_i810_attach },
 	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82840_HB,
 	  NULL,			agp_i810_attach },
-#if 0
-/* XXX needs somewhat different driver */
 	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82830MP_IO_1,
 	  NULL,			agp_i810_attach },
-#endif
+	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82845G_DRAM,
+	  NULL,			agp_i810_attach },
+	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82855GM_MCH,
+	  NULL,			agp_i810_attach },
+	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82865_HB,
+	  NULL,			agp_i810_attach },
 #endif
 
 #if NAGP_INTEL > 0
@@ -252,6 +265,8 @@ agpattach(struct device *parent, struct device *self, void *aux)
 		panic("agpattach: impossible");
 	}
 
+	aprint_naive(": AGP controller\n");
+
 	sc->as_dmat = pa->pa_dmat;
 	sc->as_pc = pa->pa_pc;
 	sc->as_tag = pa->pa_tag;
@@ -280,17 +295,18 @@ agpattach(struct device *parent, struct device *self, void *aux)
 
 	ret = (*ap->ap_attach)(parent, self, pa);
 	if (ret == 0)
-		printf(": aperture at 0x%lx, size 0x%lx\n",
+		aprint_normal(": aperture at 0x%lx, size 0x%lx\n",
 		    (unsigned long)sc->as_apaddr,
 		    (unsigned long)AGP_GET_APERTURE(sc));
 	else
 		sc->as_chipc = NULL;
 }
+
 int
 agp_map_aperture(struct pci_attach_args *pa, struct agp_softc *sc)
 {
 	/*
-	 * Find and the aperture. Don't map it (yet), this would
+	 * Find the aperture. Don't map it (yet), this would
 	 * eat KVA.
 	 */
 	if (pci_mapreg_info(pa->pa_pc, pa->pa_tag, AGP_APBASE,
@@ -593,7 +609,7 @@ agp_generic_bind_memory(struct agp_softc *sc, struct agp_memory *mem,
 	}
 
 	/*
-	 * Flush the cpu cache since we are providing a new mapping
+	 * Flush the CPU cache since we are providing a new mapping
 	 * for these pages.
 	 */
 	agp_flush_cache();

@@ -1,4 +1,4 @@
-/*	$NetBSD: com_isa.c,v 1.17 2002/01/07 21:47:04 thorpej Exp $	*/
+/*	$NetBSD: com_isa.c,v 1.21 2003/08/07 16:31:05 agc Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -48,11 +48,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -72,7 +68,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: com_isa.c,v 1.17 2002/01/07 21:47:04 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: com_isa.c,v 1.21 2003/08/07 16:31:05 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -106,9 +102,8 @@ int com_isa_probe __P((struct device *, struct cfdata *, void *));
 void com_isa_attach __P((struct device *, struct device *, void *));
 void com_isa_cleanup __P((void *));
 
-struct cfattach com_isa_ca = {
-	sizeof(struct com_isa_softc), com_isa_probe, com_isa_attach
-};
+CFATTACH_DECL(com_isa, sizeof(struct com_isa_softc),
+    com_isa_probe, com_isa_attach, NULL, NULL);
 
 int
 com_isa_probe(parent, match, aux)

@@ -1,9 +1,12 @@
-/*	$NetBSD: lk201.c,v 1.19 2000/01/10 03:24:32 simonb Exp $	*/
+/*	$NetBSD: lk201.c,v 1.21 2003/07/15 02:54:39 lukem Exp $	*/
 
 /*
  * The LK201 keycode mapping routine is here, along with initialization
  * functions for the keyboard and mouse.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: lk201.c,v 1.21 2003/07/15 02:54:39 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -404,7 +407,7 @@ lk_getc(dev)
 
 #ifdef DIAGNOSTIC
 	if (raw_kbd_getc == NULL) {
-		panic("Reading from LK-201 before kbd driver diverted\n");
+		panic("Reading from LK-201 before kbd driver diverted");
 		return (-1);
 	}
 #endif

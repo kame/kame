@@ -1,4 +1,4 @@
-/*	$NetBSD: siopreg.h,v 1.12.4.1 2002/11/24 16:22:07 tron Exp $	*/
+/*	$NetBSD: siopreg.h,v 1.15 2003/11/02 11:07:46 wiz Exp $	*/
 
 /*
  * Copyright (c) 2000 Manuel Bouyer.
@@ -81,27 +81,27 @@ struct scf_period {
 };
 
 static const struct scf_period scf_period[] __attribute__((__unused__)) = {
-	{250, 25, 1}, /* 10.0 Mhz */
-	{250, 37, 2}, /* 6.67 Mhz */
-	{250, 50, 3},  /* 5.00 Mhz */
-	{250, 75, 4},  /* 3.33 Mhz */
-	{125, 12, 1},  /* 20.0 Mhz */
-	{125, 18, 2},  /* 13.3 Mhz */
-	{125, 25, 3},  /* 10.0 Mhz */
-	{125, 37, 4},  /* 6.67 Mhz */
-	{125, 50, 5},  /* 5.0 Mhz */
-	{ 62, 10, 1},  /* 40.0 Mhz */
-	{ 62, 12, 3},  /* 20.0 Mhz */
-	{ 62, 18, 4},  /* 13.3 Mhz */
-	{ 62, 25, 5},  /* 10.0 Mhz */
+	{250, 25, 1}, /* 10.0 MHz */
+	{250, 37, 2}, /* 6.67 MHz */
+	{250, 50, 3},  /* 5.00 MHz */
+	{250, 75, 4},  /* 3.33 MHz */
+	{125, 12, 1},  /* 20.0 MHz */
+	{125, 18, 2},  /* 13.3 MHz */
+	{125, 25, 3},  /* 10.0 MHz */
+	{125, 37, 4},  /* 6.67 MHz */
+	{125, 50, 5},  /* 5.0 MHz */
+	{ 62, 10, 1},  /* 40.0 MHz */
+	{ 62, 12, 3},  /* 20.0 MHz */
+	{ 62, 18, 4},  /* 13.3 MHz */
+	{ 62, 25, 5},  /* 10.0 MHz */
 };
 
 static const struct scf_period dt_scf_period[] __attribute__((__unused__)) = {
-	{ 62,  9, 1},  /* 80.0 Mhz */
-	{ 62, 10, 3},  /* 40.0 Mhz */
-	{ 62, 12, 5},  /* 20.0 Mhz */
-	{ 62, 18, 6},  /* 13.3 Mhz */
-	{ 62, 25, 7},  /* 10.0 Mhz */
+	{ 62,  9, 1},  /* 80.0 MHz */
+	{ 62, 10, 3},  /* 40.0 MHz */
+	{ 62, 12, 5},  /* 20.0 MHz */
+	{ 62, 18, 6},  /* 13.3 MHz */
+	{ 62, 25, 7},  /* 10.0 MHz */
 };
 
 #define SIOP_SCID	0x04 /* SCSI chip ID R/W */
@@ -116,7 +116,7 @@ static const struct scf_period dt_scf_period[] __attribute__((__unused__)) = {
 #define SXFER_MO_SHIFT  0
 #define SXFER_MO_MASK  0x3f
 
-#define SIOP_SDID	0x06 /* SCSI destiation ID, R/W */
+#define SIOP_SDID	0x06 /* SCSI destination ID, R/W */
 #define SDID_ENCID_SHIFT 0
 #define SDID_ENCID_MASK	0x07
 
@@ -298,7 +298,7 @@ static const struct scf_period dt_scf_period[] __attribute__((__unused__)) = {
 #define SIST0_RST	0x02
 #define SIST0_PAR	0x01
 
-#define SIOP_SIST1	0x43 /* SCSI interrut status 1, RO */
+#define SIOP_SIST1	0x43 /* SCSI interrupt status 1, RO */
 #define SIST1_SBMC	0x10 /* 895 only */
 #define SIST1_STO	0x04
 #define SIST1_GEN	0x02

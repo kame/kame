@@ -1,4 +1,4 @@
-/*	$NetBSD: aic6915.c,v 1.6 2002/05/03 00:04:07 thorpej Exp $	*/
+/*	$NetBSD: aic6915.c,v 1.10 2003/10/25 18:35:42 christos Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: aic6915.c,v 1.6 2002/05/03 00:04:07 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: aic6915.c,v 1.10 2003/10/25 18:35:42 christos Exp $");
 
 #include "bpfilter.h"
 
@@ -103,8 +103,6 @@ void	sf_tick(void *);
 
 int	sf_mediachange(struct ifnet *);
 void	sf_mediastatus(struct ifnet *, struct ifmediareq *);
-
-int	sf_copy_small = 0;
 
 #define	sf_funcreg_read(sc, reg)					\
 	bus_space_read_4((sc)->sc_st, (sc)->sc_sh_func, (reg))
@@ -273,7 +271,7 @@ sf_attach(struct sf_softc *sc)
 	sc->sc_mii.mii_readreg = sf_mii_read;
 	sc->sc_mii.mii_writereg = sf_mii_write;
 	sc->sc_mii.mii_statchg = sf_mii_statchg;
-	ifmedia_init(&sc->sc_mii.mii_media, 0, sf_mediachange,
+	ifmedia_init(&sc->sc_mii.mii_media, IFM_IMASK, sf_mediachange,
 	    sf_mediastatus);
 	mii_attach(&sc->sc_dev, &sc->sc_mii, 0xffffffff, MII_PHY_ANY,
 	    MII_OFFSET_ANY, 0);
@@ -362,7 +360,7 @@ sf_start(struct ifnet *ifp)
 	struct sf_txdesc0 *txd;
 	struct sf_descsoft *ds;
 	bus_dmamap_t dmamap;
-	int error, producer, last, opending, seg;
+	int error, producer, last = -1, opending, seg;
 
 	/*
 	 * Remember the previous number of pending transmits.
@@ -483,6 +481,7 @@ sf_start(struct ifnet *ifp)
 	}
 
 	if (sc->sc_txpending != opending) {
+		KASSERT(last != -1);
 		/*
 		 * We enqueued packets.  Cause a transmit interrupt to
 		 * happen on the last packet we enqueued, and give the
@@ -863,7 +862,7 @@ sf_stats_update(struct sf_softc *sc)
 	struct sf_stats stats;
 	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
 	uint32_t *p;
-	int i;
+	u_int i;
 
 	p = &stats.TransmitOKFrames;
 	for (i = 0; i < (sizeof(stats) / sizeof(uint32_t)); i++) {
@@ -943,7 +942,8 @@ sf_init(struct ifnet *ifp)
 {
 	struct sf_softc *sc = ifp->if_softc;
 	struct sf_descsoft *ds;
-	int i, error = 0;
+	int error = 0;
+	u_int i;
 
 	/*
 	 * Cancel any pending I/O.

@@ -1,4 +1,4 @@
-/*	$NetBSD: zs_kgdb.c,v 1.1 2002/01/06 00:36:38 dbj Exp $	*/
+/*	$NetBSD: zs_kgdb.c,v 1.3 2003/07/15 02:43:31 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -46,6 +46,9 @@
  *   (gdb) set remotebaud 19200
  *   (gdb) target remote /dev/ttyb
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zs_kgdb.c,v 1.3 2003/07/15 02:43:31 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -125,6 +128,7 @@ char *zs_kgdb_devname = KGDB_DEVNAME;
 void
 zs_kgdb_init()
 {
+	extern const struct cdevsw zstty_cdevsw;
 	struct zs_chanstate cs;
 	volatile struct zschan *zc;
 	int escc, escc_ch, obio, zs_offset;
@@ -160,7 +164,7 @@ zs_kgdb_init()
 		return;
 	zc = (struct zschan *)(reg[2] + zs_offset);
 
-	kgdb_dev = makedev(zs_major, channel);
+	kgdb_dev = makedev(cdevsw_lookup_major(&zstty_cdevsw), channel);
 
 	printf("zs_kgdb_init: attaching tty%02d at %d baud\n",
 		channel, kgdb_rate);

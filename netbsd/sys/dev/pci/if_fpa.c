@@ -1,4 +1,4 @@
-/*	$NetBSD: if_fpa.c,v 1.38 2002/01/14 13:39:15 tsutsui Exp $	*/
+/*	$NetBSD: if_fpa.c,v 1.43 2003/01/31 00:07:42 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1996 Matt Thomas <matt@3am-software.com>
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_fpa.c,v 1.38 2002/01/14 13:39:15 tsutsui Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_fpa.c,v 1.43 2003/01/31 00:07:42 thorpej Exp $");
 
 #ifdef __NetBSD__
 #include "opt_inet.h"
@@ -128,7 +128,6 @@ extern struct cfdriver fpacd;
 #define	PDQ_PCI_UNIT_TO_SOFTC(unit)	((pdq_softc_t *)fpacd.cd_devs[unit])
 
 #elif defined(__NetBSD__)
-extern struct cfattach fpa_ca;
 extern struct cfdriver fpa_cd;
 #define	PDQ_PCI_UNIT_TO_SOFTC(unit)	((pdq_softc_t *)fpa_cd.cd_devs[unit])
 #define	pdq_pci_ifwatchdog		NULL
@@ -422,6 +421,8 @@ pdq_pci_attach(
     bus_space_handle_t ioh, memh;
     int ioh_valid, memh_valid;
 
+    aprint_naive(": FDDI controller\n");
+
     data = pci_conf_read(pa->pa_pc, pa->pa_tag, PCI_CFLT);
     if ((data & 0xFF00) < (DEFPA_LATENCY << 8)) {
 	data &= ~0xFF00;
@@ -457,7 +458,7 @@ pdq_pci_attach(
     }
 #endif /* DEFPA_IOMAPPED */
     else {
-        printf(": unable to map device registers\n");
+        aprint_error(": unable to map device registers\n");
         return;
     }
 
@@ -473,35 +474,34 @@ pdq_pci_attach(
 				sc->sc_if.if_xname, 0,
 				(void *) sc, PDQ_DEFPA);
     if (sc->sc_pdq == NULL) {
-	printf("%s: initialization failed\n", sc->sc_dev.dv_xname);
+	aprint_error("%s: initialization failed\n", sc->sc_dev.dv_xname);
 	return;
     }
 
     pdq_ifattach(sc, pdq_pci_ifwatchdog);
 
     if (pci_intr_map(pa, &intrhandle)) {
-	printf("%s: couldn't map interrupt\n", self->dv_xname);
+	aprint_error("%s: couldn't map interrupt\n", self->dv_xname);
 	return;
     }
     intrstr = pci_intr_string(pa->pa_pc, intrhandle);
     sc->sc_ih = pci_intr_establish(pa->pa_pc, intrhandle, IPL_NET, pdq_pci_ifintr, sc);
     if (sc->sc_ih == NULL) {
-	printf("%s: couldn't establish interrupt", self->dv_xname);
+	aprint_error("%s: couldn't establish interrupt", self->dv_xname);
 	if (intrstr != NULL)
-	    printf(" at %s", intrstr);
-	printf("\n");
+	    aprint_normal(" at %s", intrstr);
+	aprint_normal("\n");
 	return;
     }
 
     sc->sc_ats = shutdownhook_establish((void (*)(void *)) pdq_hwreset, sc->sc_pdq);
     if (sc->sc_ats == NULL)
-	printf("%s: warning: couldn't establish shutdown hook\n", self->dv_xname);
+	aprint_error("%s: warning: couldn't establish shutdown hook\n", self->dv_xname);
     if (intrstr != NULL)
-	printf("%s: interrupting at %s\n", self->dv_xname, intrstr);
+	aprint_normal("%s: interrupting at %s\n", self->dv_xname, intrstr);
 }
 
-struct cfattach fpa_ca = {
-    sizeof(pdq_softc_t), pdq_pci_match, pdq_pci_attach
-};
+CFATTACH_DECL(fpa, sizeof(pdq_softc_t),
+    pdq_pci_match, pdq_pci_attach, NULL, NULL);
 
 #endif /* __NetBSD__ */

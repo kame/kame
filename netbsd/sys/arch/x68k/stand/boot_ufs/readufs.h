@@ -1,11 +1,54 @@
-/*	from Id: readufs.h,v 1.7 2002/01/26 15:55:51 itohy Exp 	*/
+/*	$NetBSD: readufs.h,v 1.6 2003/12/04 13:05:17 keihan Exp $	*/
+/*	from Id: readufs.h,v 1.9 2003/10/15 14:16:58 itohy Exp 	*/
 
 /*
- * Written by ITOH, Yasufumi (itohy@netbsd.org)
+ * Written in 1999, 2002, 2003 by ITOH Yasufumi (itohy@NetBSD.org).
  * Public domain.
  */
 
+#include <sys/types.h>
+#include <sys/param.h>
+#include <ufs/ufs/dinode.h>
 #include <ufs/ufs/dir.h>
+
+/*
+ * UFS1 / UFS2
+ */
+union ufs_dinode {
+#ifdef USE_UFS1
+	struct ufs1_dinode di1;
+#endif
+#ifdef USE_UFS2
+	struct ufs2_dinode di2;
+#endif
+};
+
+/* short-cut for common fields (di_mode, di_nlink) */
+#ifdef USE_UFS1
+# define di_common	di1
+#elif defined USE_UFS2
+# define di_common	di2
+#endif
+
+/* for fields of same names and different locations */
+#if !(defined(USE_UFS1) && defined(USE_UFS2))
+# ifdef USE_UFS1
+#  define di_thisver	di1
+# endif
+# ifdef USE_UFS2
+#  define di_thisver	di2
+# endif
+#endif
+
+/* this is a size hack */
+#if defined(USE_UFS1) && defined(USE_UFS2)
+# define DI_SIZE(di)	((di)->di1.di_size)
+#else
+# define DI_SIZE(di)	((di)->di_thisver.di_size)
+#endif
+/* and may break following fields on UFS2 */
+#define di_gid		di_gid__is_not_available
+#define di_blksize	di_blksize__is_not_available
 
 /*
  * filesystem information
@@ -20,7 +63,12 @@ struct ufs_info {
 		, UFSTYPE_LFS
 #endif
 	} fstype;
-	int (*get_inode) __P((ino_t ino, struct dinode *dibuf));
+#if defined(USE_UFS1) && defined(USE_UFS2)
+	enum ufs_ufstype {
+		UFSTYPE_UFS1, UFSTYPE_UFS2
+	} ufstype;
+#endif
+	int (*get_inode) __P((ino_t ino, union ufs_dinode *dibuf));
 
 	/* superblock information */
 	u_int32_t bsize;	/* fs block size */
@@ -29,19 +77,20 @@ struct ufs_info {
 	union {
 #ifdef USE_FFS
 		struct {
-			ufs_daddr_t iblkno;	/* inode-block offset */
-			int32_t cgoffset;	/* cylinder group offset */
-			int32_t cgmask;		/* cylinder group mask */
+			daddr_t iblkno;		/* inode-block offset */
+			int32_t old_cgoffset;	/* cylinder group offset */
+			int32_t old_cgmask;	/* cylinder group mask */
 			int32_t fragshift;	/* block to fragmentation */
 			int32_t inopb;		/* # inodes per block */
 			int32_t ipg;		/* # inodes per group */
 			int32_t fpg;		/* # inodes per group * frag */
+			int32_t magic;		/* FS_UFSx_MAGIC */
 		} u_ffs;
 #endif
 #ifdef USE_LFS
 		struct {
 			u_int32_t version;	/* LFS version # */
-			ufs_daddr_t idaddr;	/* ifile inode disk address */
+			daddr_t idaddr;		/* ifile inode disk address */
 			u_int32_t inopb;	/* inodes per block (v1) */
 						/* inodes per frag (v2) */
 			u_int32_t ifpb;		/* inode addrs / ifile block */
@@ -56,9 +105,10 @@ struct ufs_info {
 extern struct ufs_info	ufs_info;
 #define ufs_get_inode(ino, di)	((*ufs_info.get_inode)((ino), (di)))
 
-void RAW_READ __P((void *buf, ufs_daddr_t blkpos, size_t bytelen));
+void RAW_READ __P((void *buf, daddr_t blkpos, size_t bytelen));
 
-size_t ufs_read __P((struct dinode *di, void *buf, unsigned off, size_t count));
+size_t ufs_read __P((union ufs_dinode *di, void *buf, unsigned off,
+    size_t count));
 ino_t ufs_lookup __P((ino_t dirino, const char *fn));
 ino_t ufs_lookup_path __P((const char *path));
 size_t ufs_load_file __P((void *buf, ino_t dirino, const char *fn));
@@ -78,4 +128,13 @@ int try_lfs __P((void));
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#endif
+
+#ifdef __GNUC__
+# ifndef alloca
+#  define alloca(n)	__builtin_alloca(n)
+# endif
+# ifndef strcmp
+#  define strcmp(p, q)	__builtin_strcmp(p, q)
+# endif
 #endif

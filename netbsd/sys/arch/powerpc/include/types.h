@@ -1,4 +1,4 @@
-/*	$NetBSD: types.h,v 1.13 2002/02/28 03:17:35 simonb Exp $	*/
+/*	$NetBSD: types.h,v 1.24 2003/09/26 22:46:01 nathanw Exp $	*/
 
 /*-
  * Copyright (C) 1995 Wolfgang Solfrank.
@@ -35,22 +35,38 @@
 #define	_MACHTYPES_H_
 
 #include <sys/cdefs.h>
+#include <sys/featuretest.h>
 #include <powerpc/int_types.h>
 
-#if defined(_KERNEL)
-typedef struct label_t {
-        int val[40]; /* double check this XXX */
-} label_t;
-#endif
-
 /* NB: This should probably be if defined(_KERNEL) */
-#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 typedef	unsigned long	paddr_t, vaddr_t;
 typedef	unsigned long	psize_t, vsize_t;
 #endif
 
-typedef int		register_t;
+#ifdef _LP64
+/*
+ * Because lwz etal don't sign extend, it's best to make registers unsigned.
+ */
+typedef unsigned long	register_t;
+typedef unsigned int	register32_t;
+#else
+typedef long	register_t;
+#endif
 
+#if defined(_KERNEL)
+typedef struct label_t {
+	register_t val[40]; /* double check this XXX */
+} label_t;
+#endif
+
+typedef __volatile int __cpu_simple_lock_t;
+
+#define __SIMPLELOCK_LOCKED	1
+#define __SIMPLELOCK_UNLOCKED	0
+
+#define	__HAVE_BIGENDIAN_BITOPS		/* for cntlzw in locore_subr.S */
 #define	__HAVE_CPU_COUNTER
+#define	__HAVE_SYSCALL_INTERN
 
 #endif	/* _MACHTYPES_H_ */

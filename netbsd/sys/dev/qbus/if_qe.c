@@ -1,4 +1,4 @@
-/*      $NetBSD: if_qe.c,v 1.49.10.3 2003/01/29 01:40:56 jmc Exp $ */
+/*      $NetBSD: if_qe.c,v 1.57 2003/01/17 15:45:59 bouyer Exp $ */
 /*
  * Copyright (c) 1999 Ludd, University of Lule}, Sweden. All rights reserved.
  *
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_qe.c,v 1.49.10.3 2003/01/29 01:40:56 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_qe.c,v 1.57 2003/01/17 15:45:59 bouyer Exp $");
 
 #include "opt_inet.h"
 #include "bpfilter.h"
@@ -115,9 +115,8 @@ static	int	qe_add_rxbuf(struct qe_softc *, int);
 static	void	qe_setup(struct qe_softc *);
 static	void	qetimeout(struct ifnet *);
 
-struct	cfattach qe_ca = {
-	sizeof(struct qe_softc), qematch, qeattach
-};
+CFATTACH_DECL(qe, sizeof(struct qe_softc),
+    qematch, qeattach, NULL, NULL);
 
 #define	QE_WCSR(csr, val) \
 	bus_space_write_2(sc->sc_iot, sc->sc_ioh, csr, val)
@@ -748,7 +747,7 @@ qe_add_rxbuf(struct qe_softc *sc, int i)
 	error = bus_dmamap_load(sc->sc_dmat, sc->sc_rcvmap[i],
 	    m->m_ext.ext_buf, m->m_ext.ext_size, NULL, BUS_DMA_NOWAIT);
 	if (error)
-		panic("%s: can't load rx DMA map %d, error = %d\n",
+		panic("%s: can't load rx DMA map %d, error = %d",
 		    sc->sc_dev.dv_xname, i, error);
 	sc->sc_rxmbuf[i] = m;
 
@@ -805,7 +804,7 @@ qe_setup(struct qe_softc *sc)
 	ifp->if_flags &= ~IFF_ALLMULTI;
 	ETHER_FIRST_MULTI(step, &sc->sc_ec, enm);
 	while (enm != NULL) {
-		if (bcmp(enm->enm_addrlo, enm->enm_addrhi, 6)) {
+		if (memcmp(enm->enm_addrlo, enm->enm_addrhi, 6)) {
 			ifp->if_flags |= IFF_ALLMULTI;
 			break;
 		}

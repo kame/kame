@@ -1,4 +1,4 @@
-/*	$NetBSD: com.c,v 1.24 2002/03/17 19:40:52 atatat Exp $	*/
+/*	$NetBSD: com.c,v 1.32 2003/08/07 16:30:21 agc Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -48,11 +48,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -75,6 +71,9 @@
  * COM driver, based on HP dca driver
  * uses National Semiconductor NS16450/NS16550AF UART
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: com.c,v 1.32 2003/08/07 16:30:21 agc Exp $");
 
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
@@ -152,7 +151,6 @@ struct callout com_poll_ch = CALLOUT_INITIALIZER;
 
 int comprobe __P((struct device *, struct cfdata *, void *));
 void comattach __P((struct device *, struct device *, void *));
-cdev_decl(com);
 
 static int comprobe1 __P((int));
 static void comdiag __P((void *));
@@ -165,11 +163,24 @@ static int comspeed __P((long));
 
 static u_char tiocm_xxx2mcr __P((int));
 
-struct cfattach xcom_ca = {
-	sizeof(struct com_softc), comprobe, comattach,
-};
+CFATTACH_DECL(xcom, sizeof(struct com_softc),
+    comprobe, comattach, NULL, NULL);
 
 extern struct cfdriver xcom_cd;
+
+dev_type_open(comopen);
+dev_type_close(comclose);
+dev_type_read(comread);
+dev_type_write(comwrite);
+dev_type_ioctl(comioctl);
+dev_type_stop(comstop);
+dev_type_tty(comtty);
+dev_type_poll(compoll);
+
+const struct cdevsw xcom_cdevsw = {
+	comopen, comclose, comread, comwrite, comioctl,
+	comstop, comtty, compoll, nommap, ttykqfilter, D_TTY
+};
 
 #define	outb(addr, val)		*(u_char *)(addr) = (val)
 #define	inb(addr)		*(u_char *)(addr)
@@ -183,7 +194,6 @@ int	comdefaultrate = TTYDEF_SPEED;
 int	comconsole = -1;
 #endif
 int	comconsinit;
-int	commajor;
 int	comsopen = 0;
 int	comevents = 0;
 
@@ -224,7 +234,7 @@ comspeed(speed)
 		return -1;
 	return x;
 
-#undef	divrnd(n, q)
+#undef	divrnd
 }
 
 static int
@@ -400,7 +410,7 @@ comattach(parent, dev, aux)
 		    comintr, sc);
 
 #ifdef KGDB
-	if (kgdb_dev == makedev(commajor, unit)) {
+	if (kgdb_dev == makedev(cdevsw_lookup_major(&xcom_cdevsw), unit)) {
 		if (comconsole == unit)
 			kgdb_dev = -1;	/* can't debug over console port */
 		else {
@@ -1177,6 +1187,7 @@ void
 comcnprobe(cp)
 	struct consdev *cp;
 {
+	int maj;
 
 	if (!comprobe1(CONADDR)) {
 		cp->cn_pri = CN_DEAD;
@@ -1184,12 +1195,10 @@ comcnprobe(cp)
 	}
 
 	/* locate the major number */
-	for (commajor = 0; commajor < nchrdev; commajor++)
-		if (cdevsw[commajor].d_open == comopen)
-			break;
+	maj = cdevsw_lookup_major(&xcom_cdevsw);
 
 	/* initialize required fields */
-	cp->cn_dev = makedev(commajor, CONUNIT);
+	cp->cn_dev = makedev(maj, CONUNIT);
 #ifdef	COMCONSOLE
 	cp->cn_pri = CN_REMOTE;		/* Force a serial port console */
 #else

@@ -1,5 +1,6 @@
-/*	$NetBSD: ka680.c,v 1.7 2002/02/24 01:04:27 matt Exp $	*/
+/*	$NetBSD: ka680.c,v 1.9 2003/07/15 02:15:04 lukem Exp $	*/
 /*
+ * Copyright (c) 2002 Hugh Graham.
  * Copyright (c) 2000 Ludd, University of Lule}, Sweden.
  * All rights reserved.
  *
@@ -33,6 +34,9 @@
 /* Done by Michael Kukat (michael@unixiron.org) */
 /* minor modifications for KA690 cache support by isildur@vaxpower.org */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ka680.c,v 1.9 2003/07/15 02:15:04 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/device.h>
@@ -56,8 +60,6 @@ static void	ka680_hardmem __P((void *));
 static void	ka680_steal_pages __P((void));
 static void	ka680_memerr __P((void));
 static int	ka680_mchk __P((caddr_t));
-static void	ka680_halt __P((void));
-static void	ka680_reboot __P((int));
  
 /*
  * KA680-specific IPRs. KA680 has the funny habit to control all caches
@@ -95,8 +97,8 @@ struct cpu_dep ka680_calls = {
 	generic_clkwrite,
 	24,	 /* ~VUPS */
 	2,	/* SCB pages */
-	ka680_halt,
-	ka680_reboot,
+	generic_halt,
+	generic_reboot,
 	NULL,
 	NULL,
 	CPU_RAISEIPL,
@@ -113,6 +115,8 @@ ka680_conf()
 	volatile int *hej = (void *)mfpr(PR_ISP);
 	*hej = *hej;
 	hej[-1] = hej[-1];
+
+	cpmbx = (struct cpmbx *)vax_map_physmem(0x20140400, 1);
 
 	switch(vax_boardtype) {
 		case VAX_BTYP_680: switch((vax_siedata & 0xff00) >> 8) {
@@ -286,16 +290,3 @@ ka680_mchk(caddr_t addr)
 	panic("Machine check");
 	return 0;
 }
-
-static void
-ka680_halt()
-{
-	asm("halt");
-}
-
-static void
-ka680_reboot(int arg)
-{
-	asm("halt");
-}
-

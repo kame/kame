@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-#	$NetBSD: osrelease.sh,v 1.75.6.21 2004/01/30 10:07:06 he Exp $
+#	$NetBSD: osrelease.sh,v 1.107 2003/10/04 06:59:56 jdolecek Exp $
 #
 # Copyright (c) 1997 The NetBSD Foundation, Inc.
 # All rights reserved.
@@ -38,11 +38,12 @@
 #
 
 # Release number to use.
-# If you change this, also check:
-#	sys/sys/param.h:	__NetBSD_Version__
-#	share/tmac/doc-common:	ds oS
-#
-release=1.6.2
+# We use the number specified in <sys/param.h>
+
+AWK=${AWK:-awk}
+GREP=${GREP:-grep}
+PARAMH="`dirname $0`"/../sys/param.h
+release=`$AWK '/^#define[ 	]*__NetBSD_Version__/ { print $6 }' $PARAMH`
 
 case $1 in
 -s)

@@ -1,4 +1,4 @@
-/*	$NetBSD: cs4231_ebus.c,v 1.6 2002/04/04 17:41:09 uwe Exp $ */
+/*	$NetBSD: cs4231_ebus.c,v 1.13 2003/09/10 10:40:40 uwe Exp $ */
 
 /*
  * Copyright (c) 2002 Valeriy E. Ushakov
@@ -26,6 +26,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cs4231_ebus.c,v 1.13 2003/09/10 10:40:40 uwe Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -66,12 +69,11 @@ struct cs4231_ebus_softc {
 void	cs4231_ebus_attach(struct device *, struct device *, void *);
 int	cs4231_ebus_match(struct device *, struct cfdata *, void *);
 
-struct cfattach audiocs_ebus_ca = {
-	sizeof(struct cs4231_ebus_softc), cs4231_ebus_match, cs4231_ebus_attach
-};
+CFATTACH_DECL(audiocs_ebus, sizeof(struct cs4231_ebus_softc),
+    cs4231_ebus_match, cs4231_ebus_attach, NULL, NULL);
 
-
-/* audio_hw_if methods specific to ebus dma */
+/* audio_hw_if methods specific to ebus DMA */
+static int	cs4231_ebus_round_blocksize(void *, int);
 static int	cs4231_ebus_trigger_output(void *, void *, void *, int,
 					   void (*)(void *), void *,
 					   struct audio_params *);
@@ -87,7 +89,7 @@ struct audio_hw_if audiocs_ebus_hw_if = {
 	NULL,			/* drain */
 	ad1848_query_encoding,
 	ad1848_set_params,
-	cs4231_round_blocksize,
+	cs4231_ebus_round_blocksize,
 	ad1848_commit_settings,
 	NULL,			/* init_output */
 	NULL,			/* init_input */
@@ -103,7 +105,7 @@ struct audio_hw_if audiocs_ebus_hw_if = {
 	cs4231_query_devinfo,
 	cs4231_malloc,
 	cs4231_free,
-	cs4231_round_buffersize,
+	NULL,			/* round_buffersize */
 	NULL,			/* mappage */
 	cs4231_get_props,
 	cs4231_ebus_trigger_output,
@@ -200,7 +202,7 @@ cs4231_ebus_attach(parent, self, aux)
 	/* establish interrupt channels */
 	for (i = 0; i < ea->ea_nintr; ++i)
 		bus_intr_establish(ea->ea_bustag,
-				   ea->ea_intr[i], IPL_AUDIO, 0,
+				   ea->ea_intr[i], IPL_AUDIO,
 				   cs4231_ebus_intr, ebsc);
 
 	cs4231_common_attach(sc, bh);
@@ -208,6 +210,17 @@ cs4231_ebus_attach(parent, self, aux)
 
 	/* XXX: todo: move to cs4231_common_attach, pass hw_if as arg? */
 	audio_attach_mi(&audiocs_ebus_hw_if, sc, &sc->sc_ad1848.sc_dev);
+}
+
+
+static int
+cs4231_ebus_round_blocksize(addr, blk)
+	void *addr;
+	int blk;
+{
+
+	/* we want to use DMA burst size of 16 words */
+	return (blk & -64);
 }
 
 
@@ -220,7 +233,7 @@ cs4231_ebus_regdump(label, ebsc)
 	/* char bits[128]; */
 
 	printf("cs4231regdump(%s): regs:", label);
-	/* XXX: dump ebus dma and aux registers */
+	/* XXX: dump ebus DMA and aux registers */
 	ad1848_dump_regs(&ebsc->sc_cs4231.sc_ad1848);
 }
 #endif /* AUDIO_DEBUG */
@@ -275,7 +288,7 @@ cs4231_ebus_dma_advance(t, dt, dh)
 
 
 /*
- * Trigger transfer "t" using DMA controller "dmac".
+ * Trigger transfer "t" using DMA controller at "dt"/"dh".
  * "iswrite" defines direction of the transfer.
  */
 static int
@@ -310,7 +323,8 @@ cs4231_ebus_trigger_transfer(sc, t, dt, dh, iswrite,
 	csr = bus_space_read_4(dt, dh, EBUS_DMAC_DCSR);
 	bus_space_write_4(dt, dh, EBUS_DMAC_DCSR,
 			  csr | EBDMA_EN_NEXT | (iswrite ? EBDMA_WRITE : 0)
-			  | EBDMA_EN_DMA | EBDMA_EN_CNT | EBDMA_INT_EN);
+			  | EBDMA_EN_DMA | EBDMA_EN_CNT | EBDMA_INT_EN
+			  | EBDMA_BURST_SIZE_16);
 
 	/* first load: propagated to DACR/DBCR */
 	bus_space_write_4(dt, dh, EBUS_DMAC_DNBR, (u_int32_t)dmasize);
@@ -471,7 +485,7 @@ cs4231_ebus_dma_intr(t, dt, dh)
 
 	cs4231_ebus_dma_advance(t, dt, dh);
 
-	/* call audio(9) framework while dma is chugging along */
+	/* call audio(9) framework while DMA is chugging along */
 	if (t->t_intr != NULL)
 		(*t->t_intr)(t->t_arg);
 	return (1);

@@ -1,4 +1,4 @@
-/*	$NetBSD: installboot.c,v 1.7 2000/12/09 22:33:24 scw Exp $ */
+/*	$NetBSD: installboot.c,v 1.9 2003/04/07 11:45:55 he Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -76,7 +76,8 @@ struct nlist nl[] = {
 
 int *block_size_p;		/* block size var. in prototype image */
 int *block_count_p;		/* block count var. in prototype image */
-daddr_t	*block_table;		/* block number array in prototype image */
+/* XXX ondisk32 */
+int32_t	*block_table;		/* block number array in prototype image */
 int	maxblocknum;		/* size of this array */
 
 
@@ -160,7 +161,7 @@ main(argc, argv)
 		return 0;
 
 	/* Write patched proto bootblocks into the superblock */
-	if (protosize > SBSIZE - DEV_BSIZE)
+	if (protosize > SBLOCKSIZE - DEV_BSIZE)
 		errx(1, "proto bootblocks too big");
 
 	/* The primary bootblock needs to be written to the raw partition */
@@ -215,7 +216,8 @@ loadprotoblocks(fname, size)
 	/* Calculate the symbols' locations within the proto file */
 	block_size_p  =   (int *) (bp + (nl[X_BLOCK_SIZE ].n_value - offs));
 	block_count_p =   (int *) (bp + (nl[X_BLOCK_COUNT].n_value - offs));
-	block_table = (daddr_t *) (bp + (nl[X_BLOCK_TABLE].n_value - offs));
+	/* XXX ondisk32 */
+	block_table = (int32_t *) (bp + (nl[X_BLOCK_TABLE].n_value - offs));
 	maxblocknum = *block_count_p;
 
 	if (verbose) {
@@ -247,7 +249,7 @@ devread(fd, buf, blk, size, msg)
 		err(1, "%s: devread: read", msg);
 }
 
-static char sblock[SBSIZE];
+static char sblock[SBLOCKSIZE];
 
 int
 loadblocknums(boot, devfd)
@@ -260,7 +262,7 @@ int	devfd;
 	struct fs	*fs;
 	char		*buf;
 	daddr_t		blk, *ap;
-	struct dinode	*ip;
+	struct ufs1_dinode *ip;
 	int		ndb;
 
 	/*
@@ -291,12 +293,13 @@ int	devfd;
 	close(fd);
 
 	/* Read superblock */
-	devread(devfd, sblock, SBLOCK, SBSIZE, "superblock");
+	devread(devfd, sblock, (daddr_t)(BBSIZE / DEV_BSIZE),
+	    SBLOCKSIZE, "superblock");
 	fs = (struct fs *)sblock;
 
 	/* Sanity-check super-block. */
-	if (fs->fs_magic != FS_MAGIC)
-		errx(1, "Bad magic number in superblock");
+	if (fs->fs_magic != FS_UFS1_MAGIC)
+		errx(1, "Bad magic number in superblock, must be UFS1");
 	if (fs->fs_inopb <= 0)
 		err(1, "Bad inopb=%d in superblock", fs->fs_inopb);
 
@@ -306,7 +309,7 @@ int	devfd;
 
 	blk = fsbtodb(fs, ino_to_fsba(fs, statbuf.st_ino));
 	devread(devfd, buf, blk, fs->fs_bsize, "inode");
-	ip = (struct dinode *)(buf) + ino_to_fsbo(fs, statbuf.st_ino);
+	ip = (struct ufs1_dinode *)(buf) + ino_to_fsbo(fs, statbuf.st_ino);
 
 	/*
 	 * Have the inode.  Figure out how many blocks we need.
@@ -339,7 +342,8 @@ int	devfd;
 	 */
 	blk = fsbtodb(fs, ip->di_ib[0]);
 	devread(devfd, buf, blk, fs->fs_bsize, "indirect block");
-	ap = (daddr_t *)buf;
+	/* XXX ondisk32 */
+	ap = (int32_t *)buf;
 	for (; i < NINDIR(fs) && *ap && ndb; i++, ap++, ndb--) {
 		blk = fsbtodb(fs, *ap);
 		if (verbose)

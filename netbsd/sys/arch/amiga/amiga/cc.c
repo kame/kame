@@ -1,4 +1,4 @@
-/*	$NetBSD: cc.c,v 1.15 2002/04/25 09:20:26 aymeric Exp $	*/
+/*	$NetBSD: cc.c,v 1.18 2003/05/03 18:10:42 wiz Exp $	*/
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -31,11 +31,13 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cc.c,v 1.15 2002/04/25 09:20:26 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cc.c,v 1.18 2003/05/03 18:10:42 wiz Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/queue.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <amiga/amiga/custom.h>
 #include <amiga/amiga/cc.h>
@@ -342,7 +344,7 @@ cc_init_audio()
 	int i;
 
 	/*
-	 * disable all audio interupts
+	 * disable all audio interrupts
 	 */
 	custom.intena = INTF_AUD0|INTF_AUD1|INTF_AUD2|INTF_AUD3;
 
@@ -375,12 +377,12 @@ audio_handler()
 	audio_dma &= (DMAF_AUD0|DMAF_AUD1|DMAF_AUD2|DMAF_AUD3);
 
 	/*
-	 * disable all audio interupts with DMA set
+	 * disable all audio interrupts with DMA set
 	 */
 	custom.intena = (audio_dma << INTB_AUD0) & AUCC_ALLINTF;
 
 	/*
-	 * if no audio dma enabled then exit quick.
+	 * if no audio DMA enabled then exit quick.
 	 */
 	if (!audio_dma) {
 		/*
@@ -425,7 +427,7 @@ audio_handler()
 
 out:
 	/*
-	 * enable audio interupts with dma still set.
+	 * enable audio interrupts with DMA still set.
 	 */
 	audio_dma = custom.dmaconr;
 	audio_dma &= (DMAF_AUD0|DMAF_AUD1|DMAF_AUD2|DMAF_AUD3);
@@ -465,7 +467,7 @@ play_sample(len, data, period, volume, channels, count)
 		channel[ch].play_count = count;
 	}
 	/*
-	 * turn on interrupts and enable dma for channels and
+	 * turn on interrupts and enable DMA for channels and
 	 */
 	custom.intena = INTF_SETCLR | (dmabits << INTB_AUD0);
 	custom.dmacon = DMAF_SETCLR | DMAF_MASTER |dmabits;
@@ -486,7 +488,7 @@ cc_init_chipmem()
 	int s = splhigh ();
 	struct mem_node *mem;
 
-	chip_size = chipmem_end - (chipmem_start + NBPG);
+	chip_size = chipmem_end - (chipmem_start + PAGE_SIZE);
 	chip_total = chip_size - sizeof(*mem);
 
 	mem = (struct mem_node *)chipmem_steal(chip_size);

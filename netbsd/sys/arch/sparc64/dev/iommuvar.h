@@ -1,4 +1,4 @@
-/*	$NetBSD: iommuvar.h,v 1.11.6.1 2002/06/21 06:25:57 lukem Exp $	*/
+/*	$NetBSD: iommuvar.h,v 1.12 2002/06/20 18:26:24 eeh Exp $	*/
 
 /*
  * Copyright (c) 1999 Matthew R. Green

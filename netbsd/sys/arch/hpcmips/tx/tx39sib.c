@@ -1,4 +1,4 @@
-/*	$NetBSD: tx39sib.c,v 1.9 2002/01/29 18:53:18 uch Exp $ */
+/*	$NetBSD: tx39sib.c,v 1.14 2003/07/15 02:29:33 lukem Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -39,6 +39,10 @@
 /*
  * TX39 SIB (Serial Interface Bus) module.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: tx39sib.c,v 1.14 2003/07/15 02:29:33 lukem Exp $");
+
 #undef TX39SIBDEBUG
 
 #include <sys/param.h>
@@ -137,9 +141,8 @@ __inline int	__txsibsf0_ready(tx_chipset_tag_t);
 void	tx39sib_dump(struct tx39sib_softc *);
 #endif
 
-struct cfattach tx39sib_ca = {
-	sizeof(struct tx39sib_softc), tx39sib_match, tx39sib_attach
-};
+CFATTACH_DECL(tx39sib, sizeof(struct tx39sib_softc),
+    tx39sib_match, tx39sib_attach, NULL, NULL);
 
 int
 tx39sib_match(struct device *parent, struct cfdata *cf, void *aux)
@@ -291,7 +294,7 @@ tx39sib_search(struct device *parent, struct cfdata *cf, void *aux)
 	}
 	
 	if (!(sc->sc_attached & (1 << sa.sa_slot)) &&/* not attached slot */
-	    (*cf->cf_attach->ca_match)(parent, cf, &sa)) {
+	    config_match(parent, cf, &sa)) {
 		config_attach(parent, cf, &sa, tx39sib_print);
 		sc->sc_attached |= (1 << sa.sa_slot);
 	}
@@ -304,7 +307,7 @@ tx39sib_print(void *aux, const char *pnp)
 {
 	struct txsib_attach_args *sa = aux;
 
-	printf(" slot %d", sa->sa_slot);
+	aprint_normal(" slot %d", sa->sa_slot);
 
 	return (QUIET);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: autri.c,v 1.4 2002/02/05 01:51:51 eeh Exp $	*/
+/*	$NetBSD: autri.c,v 1.18.2.1 2004/09/22 20:58:12 jmc Exp $	*/
 
 /*
  * Copyright (c) 2001 SOMEYA Yoshihiko and KUROSAWA Takahiro.
@@ -33,6 +33,9 @@
  * Documentation links:
  * - ftp://ftp.alsa-project.org/pub/manuals/trident/
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: autri.c,v 1.18.2.1 2004/09/22 20:58:12 jmc Exp $");
 
 #include "midi.h"
 
@@ -98,7 +101,8 @@ static __inline void autri_reg_clear_4(struct autri_softc *, int, uint32_t);
 int	autri_attach_codec(void *sc, struct ac97_codec_if *);
 int	autri_read_codec(void *sc, u_int8_t a, u_int16_t *d);
 int	autri_write_codec(void *sc, u_int8_t a, u_int16_t d);
-void	autri_reset_codec(void *sc);
+int	autri_reset_codec(void *sc);
+enum ac97_host_flags	autri_flags_codec(void *sc);
 
 static void autri_powerhook(int why,void *addr);
 static int  autri_init(void *sc);
@@ -114,9 +118,8 @@ static void autri_enable_loop_interrupt(void *sc);
 static void autri_disable_loop_interrupt(void *sc);
 #endif
 
-struct cfattach autri_ca = {
-	sizeof(struct autri_softc), autri_match, autri_attach
-};
+CFATTACH_DECL(autri, sizeof(struct autri_softc),
+    autri_match, autri_attach, NULL, NULL);
 
 int	autri_open(void *, int);
 void	autri_close(void *);
@@ -133,8 +136,8 @@ int	autri_halt_input(void *);
 int	autri_getdev(void *, struct audio_device *);
 int	autri_mixer_set_port(void *, mixer_ctrl_t *);
 int	autri_mixer_get_port(void *, mixer_ctrl_t *);
-void*	autri_malloc(void *, int, size_t, int, int);
-void	autri_free(void *, void *, int);
+void*	autri_malloc(void *, int, size_t, struct malloc_type *, int);
+void	autri_free(void *, void *, struct malloc_type *);
 size_t	autri_round_buffersize(void *, int, size_t);
 paddr_t autri_mappage(void *, void *, off_t, int);
 int	autri_get_props(void *);
@@ -363,7 +366,7 @@ autri_write_codec(void *sc_, u_int8_t index, u_int16_t data)
 	return 0;
 }
 
-void
+int
 autri_reset_codec(void *sc_)
 {
 	struct autri_codec_softc *codec = sc_;
@@ -398,12 +401,12 @@ autri_reset_codec(void *sc_)
 		ready = AUTRI_NX_ACR0_CODEC_READY;
 		break;
 	case AUTRI_DEVICE_ID_SIS_7018:
-		/* warm reset AC'97 codec */
-		autri_reg_set_4(sc, AUTRI_SIS_SCTRL, 1);
-		delay(100);
+		/* cold reset AC'97 codec */
+		autri_reg_set_4(sc, AUTRI_SIS_SCTRL, 2);
+		delay(1000);
 		/* release reset (warm & cold) */
 		autri_reg_clear_4(sc, AUTRI_SIS_SCTRL, 3);
-		delay(100);
+		delay(2000);
 
 		addr = AUTRI_SIS_SCTRL;
 		ready = AUTRI_SIS_SCTRL_CODEC_READY;
@@ -419,6 +422,10 @@ autri_reset_codec(void *sc_)
 		addr = AUTRI_ALI_SCTRL;
 		ready = AUTRI_ALI_SCTRL_CODEC_READY;
 		break;
+	default:
+		printf("%s: autri_reset_codec : unknown device\n",
+		       sc->sc_dev.dv_xname);
+		return EOPNOTSUPP;
 	}
 
 	/* wait for 'Codec Ready' */
@@ -429,9 +436,18 @@ autri_reset_codec(void *sc_)
 		delay(1000);
 	}
 
-	if (count == 0)
+	if (count == 0) {
 		printf("%s: Codec timeout. AC'97 is not ready for operation.\n",
 		       sc->sc_dev.dv_xname);
+		return ETIMEDOUT;
+	}
+	return 0;
+}
+
+enum ac97_host_flags
+autri_flags_codec(void *sc_)
+{
+	return AC97_HOST_DONT_READ;
 }
 
 /*
@@ -482,36 +498,40 @@ autri_attach(struct device *parent, struct device *self, void *aux)
 	int i, r;
 	u_int32_t reg;
 
+	aprint_naive(": Audio controller\n");
+
 	sc->sc_devid = pa->pa_id;
 	sc->sc_class = pa->pa_class;
 
 	pci_devinfo(pa->pa_id, pa->pa_class, 0, devinfo);
 	sc->sc_revision = PCI_REVISION(pa->pa_class);
-	printf(": %s (rev. 0x%02x)\n", devinfo, sc->sc_revision);
+	aprint_normal(": %s (rev. 0x%02x)\n", devinfo, sc->sc_revision);
 
 	/* map register to memory */
 	if (pci_mapreg_map(pa, AUTRI_PCI_MEMORY_BASE,
 	    PCI_MAPREG_TYPE_MEM, 0, &sc->memt, &sc->memh, NULL, NULL)) {
-		printf("%s: can't map memory space\n", sc->sc_dev.dv_xname);
+		aprint_error("%s: can't map memory space\n",
+		    sc->sc_dev.dv_xname);
 		return;
 	}
 
 	/* map and establish the interrupt */
 	if (pci_intr_map(pa, &ih)) {
-		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
+		aprint_error("%s: couldn't map interrupt\n",
+		    sc->sc_dev.dv_xname);
 		return;
 	}
 	intrstr = pci_intr_string(pc, ih);
 	sc->sc_ih = pci_intr_establish(pc, ih, IPL_AUDIO, autri_intr, sc);
 	if (sc->sc_ih == NULL) {
-		printf("%s: couldn't establish interrupt",
+		aprint_error("%s: couldn't establish interrupt",
 		    sc->sc_dev.dv_xname);
 		if (intrstr != NULL)
-			printf(" at %s", intrstr);
-		printf("\n");
+			aprint_normal(" at %s", intrstr);
+		aprint_normal("\n");
 		return;
 	}
-	printf("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
+	aprint_normal("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
 
 	sc->sc_dmatag = pa->pa_dmat;
 	sc->sc_pc = pc;
@@ -535,9 +555,10 @@ autri_attach(struct device *parent, struct device *self, void *aux)
 	codec->host_if.reset = autri_reset_codec;
 	codec->host_if.read = autri_read_codec;
 	codec->host_if.write = autri_write_codec;
+	codec->host_if.flags = autri_flags_codec;
 
 	if ((r = ac97_attach(&codec->host_if)) != 0) {
-		printf("%s: can't attach codec (error 0x%X)\n",
+		aprint_error("%s: can't attach codec (error 0x%X)\n",
 		    sc->sc_dev.dv_xname, r);
 		return;
 	}
@@ -725,10 +746,10 @@ autri_enable_loop_interrupt(void *sc_)
 
 	/*reg = (ENDLP_IE | MIDLP_IE);*/
 	reg = ENDLP_IE;
-#if 0
+
 	if (sc->sc_devid == AUTRI_DEVICE_ID_SIS_7018)
 		reg |= BANK_B_EN;
-#endif
+
 	autri_reg_set_4(sc,AUTRI_LFO_GC_CIR,reg);
 }
 
@@ -775,9 +796,9 @@ autri_intr(void *p)
 			mask = 1 << (ch & 0x1f);
 			if (active[(ch & 0x20) ? 1 : 0] & mask) {
 
-				/* clear interupt */
+				/* clear interrupt */
 				TWRITE4(sc, (ch & 0x20) ? AUTRI_AIN_B : AUTRI_AIN_A, mask);
-				/* disable interupt */
+				/* disable interrupt */
 				autri_reg_clear_4(sc,(ch & 0x20) ? AUTRI_AINTEN_B : AUTRI_AINTEN_A, mask);
 #if 0
 				reg = TREAD4(sc,AUTRI_LFO_GC_CIR) & ~0x0000003f;
@@ -1099,7 +1120,8 @@ autri_get_portnum_by_name(struct autri_softc *sc, char *class,
 }
 
 void *
-autri_malloc(void *addr, int direction, size_t size, int pool, int flags)
+autri_malloc(void *addr, int direction, size_t size,
+    struct malloc_type *pool, int flags)
 {
 	struct autri_softc *sc = addr;
 	struct autri_dma *p;
@@ -1124,7 +1146,7 @@ autri_malloc(void *addr, int direction, size_t size, int pool, int flags)
 }
 
 void
-autri_free(void *addr, void *ptr, int pool)
+autri_free(void *addr, void *ptr, struct malloc_type *pool)
 {
 	struct autri_softc *sc = addr;
 	struct autri_dma **pp, *p;
@@ -1219,27 +1241,29 @@ autri_setup_channel(struct autri_softc *sc, int mode,
 	if (delta > 48000)
 		delta = 48000;
 
+	attribute = 0;
+
 	dch[1] = ((delta << 12) / 48000) & 0x0000ffff;
 	if (mode == AUMODE_PLAY) {
 		chst = &sc->sc_play;
 		dch[0] = ((delta << 12) / 48000) & 0x0000ffff;
-		if (sc->sc_devid != AUTRI_DEVICE_ID_SIS_7018)
-			ctrl |= AUTRI_CTRL_WAVEVOL;
-/*
-		if (sc->sc_devid == AUTRI_DEVICE_ID_ALI_M5451)
-			ctrl |= 0x80000000;
-*/
+		ctrl |= AUTRI_CTRL_WAVEVOL;
 	} else {
 		chst = &sc->sc_rec;
 		dch[0] = ((48000 << 12) / delta) & 0x0000ffff;
-		ctrl |= AUTRI_CTRL_MUTE;
+		if (sc->sc_devid == AUTRI_DEVICE_ID_SIS_7018) {
+			ctrl |= AUTRI_CTRL_MUTEVOL_SIS;
+			attribute = AUTRI_ATTR_PCMREC_SIS;
+			if (delta != 48000)
+				attribute |= AUTRI_ATTR_ENASRC_SIS;
+		} else
+			ctrl |= AUTRI_CTRL_MUTEVOL;
 	}
 
 	dmaaddr = DMAADDR(chst->dma);
 	cso = alpha_fms = 0;
 	rvol = cvol = 0x7f;
 	fm_vol = 0x0 | ((rvol & 0x7f) << 7) | (cvol & 0x7f);
-	attribute = 0;
 
 	for (ch=0; ch<2; ch++) {
 
@@ -1248,7 +1272,11 @@ autri_setup_channel(struct autri_softc *sc, int mode,
 		else {
 			/* channel for interrupt */
 			dmalen = (chst->blksize >> factor);
-			ctrl |= AUTRI_CTRL_MUTE;
+			if (sc->sc_devid == AUTRI_DEVICE_ID_SIS_7018)
+				ctrl |= AUTRI_CTRL_MUTEVOL_SIS;
+			else
+				ctrl |= AUTRI_CTRL_MUTEVOL;
+			attribute = 0;
 		}
 
 		eso = dmalen - 1;
@@ -1272,7 +1300,7 @@ autri_setup_channel(struct autri_softc *sc, int mode,
 			cr[0] = (cso << 16) | (alpha_fms & 0x0000ffff);
 			cr[1] = dmaaddr;
 			cr[2] = (eso << 16) | (dch[ch] & 0x0000ffff); 
-			cr[3] = (attribute << 16) | (fm_vol & 0x0000ffff);
+			cr[3] = attribute;
 			cr[4] = ctrl;
 			break;
 		case AUTRI_DEVICE_ID_ALI_M5451:
@@ -1436,6 +1464,7 @@ autri_startch(struct autri_softc *sc, int ch, int ch_intr)
 
 	reg = (ch & 0x20) ? AUTRI_START_B : AUTRI_START_A;
 	ch &= 0x1f;
+	ch_intr &= 0x1f;
 	chmask = (1 << ch) | (1 << ch_intr);
 
 	autri_reg_set_4(sc, reg, chmask);
@@ -1449,6 +1478,7 @@ autri_stopch(struct autri_softc *sc, int ch, int ch_intr)
 
 	reg = (ch & 0x20) ? AUTRI_STOP_B : AUTRI_STOP_A;
 	ch &= 0x1f;
+	ch_intr &= 0x1f;
 	chmask = (1 << ch) | (1 << ch_intr);
 
 	autri_reg_set_4(sc, reg, chmask);

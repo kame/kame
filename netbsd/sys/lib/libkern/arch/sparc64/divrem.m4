@@ -1,4 +1,4 @@
-/*	$NetBSD: divrem.m4,v 1.1.1.1 1998/06/20 05:18:14 eeh Exp $	*/
+/*	$NetBSD: divrem.m4,v 1.4 2003/08/07 16:32:22 agc Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,20 +32,20 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * Header: divrem.m4,v 1.4 92/06/25 13:23:57 torek Exp
+ * from: Header: divrem.m4,v 1.4 92/06/25 13:23:57 torek Exp
  */
+
+#include <machine/asm.h>
+#include <machine/trap.h>
 
 /*
  * Division and remainder, from Appendix E of the Sparc Version 8
  * Architecture Manual, with fixes from Gordon Irlam.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-#ifdef notdef
-	.asciz "@(#)divrem.m4	8.1 (Berkeley) 6/4/93"
+#if defined(LIBC_SCCS)
+	RCSID("$NetBSD: divrem.m4,v 1.4 2003/08/07 16:32:22 agc Exp $")
 #endif
-	.asciz "$NetBSD: divrem.m4,v 1.1.1.1 1998/06/20 05:18:14 eeh Exp $"
-#endif /* LIBC_SCCS and not lint */
 
 /*
  * Input: dividend and divisor in %o0 and %o1 respectively.
@@ -97,7 +93,7 @@ define(V, `%o5')
 
 /* m4 reminder: ifelse(a,b,c,d) => if a is b, then c, else d */
 define(T, `%g1')
-define(SC, `%g7')
+define(SC, `%g5')
 ifelse(S, `true', `define(SIGN, `%g6')')
 
 /*
@@ -131,9 +127,6 @@ L.$1.eval(TWOSUPN+$2):
 		add	Q, ($2*2-1), Q
 	', `	DEVELOP_QUOTIENT_BITS(incr($1), `eval(2*$2-1)')')
 	ifelse($1, 1, `9:')')
-
-#include "DEFS.h"
-#include <machine/trap.h>
 
 FUNC(NAME)
 ifelse(S, `true',

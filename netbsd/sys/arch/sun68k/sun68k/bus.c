@@ -1,12 +1,46 @@
-/*	$NetBSD: bus.c,v 1.4 2001/11/30 17:49:10 fredette Exp $	*/
+/*	$NetBSD: bus.c,v 1.11 2003/08/07 16:30:01 agc Exp $	*/
+
+/*
+ * Copyright (c) 1982, 1986, 1990, 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	from: Utah Hdr: machdep.c 1.74 92/12/20
+ *	from: @(#)machdep.c	8.10 (Berkeley) 4/20/94
+ */
 
 /*
  * Copyright (c) 2001 Matthew Fredette.
  * Copyright (c) 1994, 1995 Gordon W. Ross
  * Copyright (c) 1993 Adam Glass
  * Copyright (c) 1988 University of Utah.
- * Copyright (c) 1982, 1986, 1990, 1993
- *	The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -125,10 +159,12 @@
  *	@(#)machdep.c	8.6 (Berkeley) 1/14/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bus.c,v 1.11 2003/08/07 16:30:01 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/map.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
@@ -245,7 +281,6 @@ extern	paddr_t avail_end;
 	/*
 	 * Allocate physical pages from the VM system.
 	 */
-	TAILQ_INIT(mlist);
 	error = uvm_pglistalloc(size, low, high, 0, 0,
 				mlist, nsegs, (flags & BUS_DMA_NOWAIT) == 0);
 	if (error)
@@ -263,7 +298,7 @@ extern	paddr_t avail_end;
 	/*
 	 * We now have physical pages, but no DVMA addresses yet. These
 	 * will be allocated in bus_dmamap_load*() routines. Hence we
-	 * save any alignment and boundary requirements in this dma
+	 * save any alignment and boundary requirements in this DMA
 	 * segment.
 	 */
 	segs[0].ds_addr = 0;
@@ -552,7 +587,7 @@ sun68k_find_prom_map(pa, iospace, len, hp)
 	/*
 	 * The mapping must fit entirely within one page.
 	 */
-	if ((((u_long)pa & PGOFSET) + len) > NBPG)
+	if ((((u_long)pa & PGOFSET) + len) > PAGE_SIZE)
 		return (EINVAL);
 
 	pf = PA_PGNUM(pa);
@@ -577,7 +612,7 @@ sun68k_find_prom_map(pa, iospace, len, hp)
 		/*
 		 * Walk the pages of this segment.
 		 */
-		for(eva = va + NBSG; va < eva; va += NBPG) {
+		for(eva = va + NBSG; va < eva; va += PAGE_SIZE) {
 			pte = get_pte(va);
 
 			if ((pte & (PG_VALID | PG_TYPE)) ==
@@ -678,7 +713,7 @@ sun68k_bus_unmap(t, bh, size)
 #ifdef	DIAGNOSTIC
 	if ((va >= SUN_MONSTART && va < SUN_MONEND) !=
 	    ((va + size) >= SUN_MONSTART && (va + size) < SUN_MONEND))
-		panic("sun_bus_unmap: bad PROM mapping\n");
+		panic("sun_bus_unmap: bad PROM mapping");
 #endif
 	if (va >= SUN_MONSTART && va < SUN_MONEND)
 		return (0);
@@ -749,7 +784,7 @@ sun68k_bus_peek(tag, handle, offset, size, vp)
 			*((u_int32_t *) vp) = bus_space_read_4(tag, handle, offset);
 			break;
 		default:
-			panic("_bus_space_peek: bad size\n");
+			panic("_bus_space_peek: bad size");
 		}
 		result = 0;
 	}
@@ -784,7 +819,7 @@ sun68k_bus_poke(tag, handle, offset, size, v)
 			bus_space_write_4(tag, handle, offset, (u_int32_t) v);
 			break;
 		default:
-			panic("_bus_space_poke: bad size\n");
+			panic("_bus_space_poke: bad size");
 		}
 		result = 0;
 	}

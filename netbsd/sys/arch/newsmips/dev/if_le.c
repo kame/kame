@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le.c,v 1.7 2001/05/30 12:28:47 mrg Exp $	*/
+/*	$NetBSD: if_le.c,v 1.12 2003/07/15 02:59:29 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_le.c,v 1.12 2003/07/15 02:59:29 lukem Exp $");
+
 #include "opt_inet.h"
 #include "bpfilter.h"
 
@@ -55,7 +58,6 @@
 #include <netinet/if_inarp.h>
 #endif
 
-#include <machine/autoconf.h>
 #include <machine/cpu.h>
 #include <machine/adrsmap.h>
 
@@ -63,6 +65,8 @@
 #include <dev/ic/lancevar.h>
 #include <dev/ic/am7990reg.h>
 #include <dev/ic/am7990var.h>
+
+#include <newsmips/dev/hbvar.h>
 
 /*
  * LANCE registers.
@@ -86,9 +90,8 @@ struct	le_softc {
 static int	le_match __P((struct device *, struct cfdata *, void *));
 static void	le_attach __P((struct device *, struct device *, void *));
 
-struct cfattach le_ca = {
-	sizeof(struct le_softc), le_match, le_attach
-};
+CFATTACH_DECL(le, sizeof(struct le_softc),
+    le_match, le_attach, NULL, NULL);
 
 #if defined(_KERNEL_OPT)
 #include "opt_ddb.h"
@@ -135,12 +138,12 @@ le_match(parent, cf, aux)
 	struct cfdata *cf;
 	void *aux;
 {
-	struct confargs *ca = aux;
+	struct hb_attach_args *ha = aux;
 
-	if (strcmp(ca->ca_name, "le"))
+	if (strcmp(ha->ha_name, "le"))
 		return 0;
 
-	if (badaddr((void *)cf->cf_addr, 1))
+	if (hb_badaddr((void *)ha->ha_addr, 1)) /* XXX */
 		return 0;
 
 	return 1;
@@ -153,30 +156,33 @@ le_attach(parent, self, aux)
 {
 	struct le_softc *lesc = (struct le_softc *)self;
 	struct lance_softc *sc = &lesc->sc_am7990.lsc;
-	struct cfdata *cf = self->dv_cfdata;
-	int intlevel;
+	struct hb_attach_args *ha = aux;
+	int intlevel, intmask;
 	u_char *p;
 
-	intlevel = cf->cf_level;
+	intlevel = ha->ha_level;
 	if (intlevel == -1) {
 		printf(": interrupt level not configured\n");
 		return;
 	}
 	printf(" level %d", intlevel);
 
-	switch (cf->cf_addr) {
+	switch (ha->ha_addr) {
 
 	case LANCE_PORT:
 		sc->sc_mem = (void *)LANCE_MEMORY;
 		p = (u_char *)(ETHER_ID+16);
+		intmask = INTST1_LANCE;
 		break;
 	case LANCE_PORT1:
 		sc->sc_mem = (void *)LANCE_MEMORY1;
 		p = (u_char *)(ETHER_ID1+16);
+		intmask = INTST1_SLOT3; /* XXX not tested */
 		break;
 	case LANCE_PORT2:
 		sc->sc_mem = (void *)LANCE_MEMORY2;
 		p = (u_char *)(ETHER_ID2+16);
+		intmask = INTST1_SLOT3; /* XXX not tested */
 		break;
 
 	default:
@@ -184,7 +190,7 @@ le_attach(parent, self, aux)
 		return;
 	}
 
-	lesc->sc_r1 = (void *)cf->cf_addr;
+	lesc->sc_r1 = (void *)ha->ha_addr;
 
 	sc->sc_memsize = 0x4000;	/* 16K */
 	sc->sc_addr = (int)sc->sc_mem & 0x00ffffff;
@@ -214,5 +220,5 @@ le_attach(parent, self, aux)
 	sc->sc_hwinit = NULL;
 
 	am7990_config(&lesc->sc_am7990);
-	hb_intr_establish(intlevel, IPL_NET, am7990_intr, sc);
+	hb_intr_establish(intlevel, intmask, IPL_NET, am7990_intr, sc);
 }

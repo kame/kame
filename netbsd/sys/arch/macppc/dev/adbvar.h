@@ -1,4 +1,4 @@
-/*	$NetBSD: adbvar.h,v 1.5 2001/06/08 00:32:02 matt Exp $	*/
+/*	$NetBSD: adbvar.h,v 1.7 2003/04/09 01:55:14 thorpej Exp $	*/
 
 /*-
  * Copyright (C) 1994	Bradley A. Grantham
@@ -41,11 +41,6 @@ struct adb_attach_args {
 	int	handler_id;
 };
 
-#define ADB_MAXTRACE	(NBPG / sizeof(int) - 1)
-extern int adb_traceq[ADB_MAXTRACE];
-extern int adb_traceq_tail;
-extern int adb_traceq_len;
-
 typedef struct adb_trace_xlate_s {
 	int     params;
 	char   *string;
@@ -82,6 +77,9 @@ struct adb_softc {
 	struct device sc_dev;
 	char *sc_regbase;
 };
+
+/* adb_direct.c */
+extern int adbHardware;
 
 /* types of adb hardware that we (will eventually) support */
 #define ADB_HW_UNKNOWN		0x01	/* don't know */

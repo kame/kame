@@ -1,7 +1,6 @@
-/*	$NetBSD: ext2fs_vfsops.c,v 1.49 2002/03/08 20:48:45 thorpej Exp $	*/
+/*	$NetBSD: ext2fs_vfsops.c,v 1.66.2.1 2004/05/29 09:03:35 tron Exp $	*/
 
 /*
- * Copyright (c) 1997 Manuel Bouyer.
  * Copyright (c) 1989, 1991, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -37,8 +32,40 @@
  * Modified for ext2fs by Manuel Bouyer.
  */
 
+/*
+ * Copyright (c) 1997 Manuel Bouyer.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by Manuel Bouyer.
+ * 4. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ *	@(#)ffs_vfsops.c	8.14 (Berkeley) 11/28/94
+ * Modified for ext2fs by Manuel Bouyer.
+ */
+
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ext2fs_vfsops.c,v 1.49 2002/03/08 20:48:45 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ext2fs_vfsops.c,v 1.66.2.1 2004/05/29 09:03:35 tron Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
@@ -46,6 +73,7 @@ __KERNEL_RCSID(0, "$NetBSD: ext2fs_vfsops.c,v 1.49 2002/03/08 20:48:45 thorpej E
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/sysctl.h>
 #include <sys/namei.h>
 #include <sys/proc.h>
 #include <sys/kernel.h>
@@ -62,6 +90,7 @@ __KERNEL_RCSID(0, "$NetBSD: ext2fs_vfsops.c,v 1.49 2002/03/08 20:48:45 thorpej E
 #include <sys/malloc.h>
 #include <sys/pool.h>
 #include <sys/lock.h>
+#include <sys/conf.h>
 
 #include <miscfs/specfs/specdev.h>
 
@@ -105,7 +134,7 @@ struct vfsops ext2fs_vfsops = {
 	ext2fs_init,
 	ext2fs_reinit,
 	ext2fs_done,
-	ext2fs_sysctl,
+	NULL,
 	ext2fs_mountroot,
 	ufs_check_export,
 	ext2fs_vnodeopv_descs,
@@ -118,6 +147,7 @@ struct genfs_ops ext2fs_genfsops = {
 };
 
 struct pool ext2fs_inode_pool;
+struct pool ext2fs_dinode_pool;
 
 extern u_long ext2gennumber;
 
@@ -131,6 +161,8 @@ ext2fs_init()
 	 */
 	pool_init(&ext2fs_inode_pool, sizeof(struct inode), 0, 0, 0,
 	    "ext2fsinopl", &pool_allocator_nointr);
+	pool_init(&ext2fs_dinode_pool, sizeof(struct ext2fs_dinode), 0, 0, 0,
+	    "ext2dinopl", &pool_allocator_nointr);
 }
 
 void
@@ -224,7 +256,16 @@ ext2fs_mount(mp, path, data, ndp, p)
 	int error, flags;
 	mode_t accessmode;
 
-	error = copyin(data, (caddr_t)&args, sizeof (struct ufs_args));
+	if (mp->mnt_flag & MNT_GETARGS) {
+		ump = VFSTOUFS(mp);
+		if (ump == NULL)
+			return EIO;
+		args.fspec = NULL;
+		vfs_showexport(mp, &args.export, &ump->um_export);
+		return copyout(&args, data, sizeof(args));
+	}
+
+	error = copyin(data, &args, sizeof (struct ufs_args));
 	if (error)
 		return (error);
 	/*
@@ -254,7 +295,7 @@ ext2fs_mount(mp, path, data, ndp, p)
 			if (error)
 				return (error);
 		}
-		if (fs->e2fs_ronly && (mp->mnt_flag & MNT_WANTRDWR)) {
+		if (fs->e2fs_ronly && (mp->mnt_iflag & IMNT_WANTRDWR)) {
 			/*
 			 * If upgrade to read-write by non-root, then verify
 			 * that user has necessary permissions on the device.
@@ -295,7 +336,7 @@ ext2fs_mount(mp, path, data, ndp, p)
 		vrele(devvp);
 		return (ENOTBLK);
 	}
-	if (major(devvp->v_rdev) >= nblkdev) {
+	if (bdevsw_lookup(devvp->v_rdev) == NULL) {
 		vrele(devvp);
 		return (ENXIO);
 	}
@@ -329,8 +370,10 @@ ext2fs_mount(mp, path, data, ndp, p)
 	}
 	ump = VFSTOUFS(mp);
 	fs = ump->um_e2fs;
-	(void) copyinstr(path, fs->e2fs_fsmnt, sizeof(fs->e2fs_fsmnt) - 1,
-	    &size);
+	error = set_statfs_info(path, UIO_USERSPACE, args.fspec,
+	    UIO_USERSPACE, mp, p);
+	(void) copystr(mp->mnt_stat.f_mntonname, fs->e2fs_fsmnt,
+	    sizeof(fs->e2fs_fsmnt) - 1, &size);
 	memset(fs->e2fs_fsmnt + size, 0, sizeof(fs->e2fs_fsmnt) - size);
 	if (fs->e2fs.e2fs_rev > E2FS_REV0) {
 		(void) copystr(mp->mnt_stat.f_mntonname, fs->e2fs.e2fs_fsmnt,
@@ -338,10 +381,6 @@ ext2fs_mount(mp, path, data, ndp, p)
 		memset(fs->e2fs.e2fs_fsmnt, 0,
 		    sizeof(fs->e2fs.e2fs_fsmnt) - size);
 	}
-	memcpy(mp->mnt_stat.f_mntonname, fs->e2fs_fsmnt, MNAMELEN);
-	(void) copyinstr(args.fspec, mp->mnt_stat.f_mntfromname, MNAMELEN - 1, 
-		&size);
-	memset(mp->mnt_stat.f_mntfromname + size, 0, MNAMELEN - size);
 	if (fs->e2fs_fmod != 0) {	/* XXX */
 		fs->e2fs_fmod = 0;
 		if (fs->e2fs.e2fs_state == 0)
@@ -351,7 +390,7 @@ ext2fs_mount(mp, path, data, ndp, p)
 				mp->mnt_stat.f_mntfromname);
 		(void) ext2fs_cgupdate(ump, MNT_WAIT);
 	}
-	return (0);
+	return error;
 }
 
 /*
@@ -396,11 +435,11 @@ ext2fs_reload(mountp, cred, p)
 	/*
 	 * Step 2: re-read superblock from disk.
 	 */
-	if (VOP_IOCTL(devvp, DIOCGPART, (caddr_t)&dpart, FREAD, NOCRED, p) != 0)
+	if (VOP_IOCTL(devvp, DIOCGPART, &dpart, FREAD, NOCRED, p) != 0)
 		size = DEV_BSIZE;
 	else
 		size = dpart.disklab->d_secsize;
-	error = bread(devvp, (ufs_daddr_t)(SBOFF / size), SBSIZE, NOCRED, &bp);
+	error = bread(devvp, (daddr_t)(SBOFF / size), SBSIZE, NOCRED, &bp);
 	if (error) {
 		brelse(bp);
 		return (error);
@@ -483,7 +522,7 @@ loop:
 		}
 		cp = (caddr_t)bp->b_data +
 		    (ino_to_fsbo(fs, ip->i_number) * EXT2_DINODE_SIZE);
-		e2fs_iload((struct ext2fs_dinode *)cp, &ip->i_din.e2fs_din);
+		e2fs_iload((struct ext2fs_dinode *)cp, ip->i_din.e2fs_din);
 		brelse(bp);
 		vput(vp);
 		simple_lock(&mntvnode_slock);
@@ -533,7 +572,7 @@ ext2fs_mountfs(devvp, mp, p)
 	error = VOP_OPEN(devvp, ronly ? FREAD : FREAD|FWRITE, FSCRED, p);
 	if (error)
 		return (error);
-	if (VOP_IOCTL(devvp, DIOCGPART, (caddr_t)&dpart, FREAD, cred, p) != 0)
+	if (VOP_IOCTL(devvp, DIOCGPART, &dpart, FREAD, cred, p) != 0)
 		size = DEV_BSIZE;
 	else
 		size = dpart.disklab->d_secsize;
@@ -553,9 +592,10 @@ ext2fs_mountfs(devvp, mp, p)
 	if (error)
 		goto out;
 	ump = malloc(sizeof *ump, M_UFSMNT, M_WAITOK);
-	memset((caddr_t)ump, 0, sizeof *ump);
+	memset(ump, 0, sizeof *ump);
+	ump->um_fstype = UFS1;
 	ump->um_e2fs = malloc(sizeof(struct m_ext2fs), M_UFSMNT, M_WAITOK);
-	memset((caddr_t)ump->um_e2fs, 0, sizeof(struct m_ext2fs));
+	memset(ump->um_e2fs, 0, sizeof(struct m_ext2fs));
 	e2fs_sbload((struct ext2fs*)bp->b_data, &ump->um_e2fs->e2fs);
 	brelse(bp);
 	bp = NULL;
@@ -602,7 +642,7 @@ ext2fs_mountfs(devvp, mp, p)
 		bp = NULL;
 	}
 
-	mp->mnt_data = (qaddr_t)ump;
+	mp->mnt_data = ump;
 	mp->mnt_stat.f_fsid.val[0] = (long)dev;
 	mp->mnt_stat.f_fsid.val[1] = makefstype(MOUNT_EXT2FS);
 	mp->mnt_maxsymlinklen = EXT2_MAXSYMLINKLEN;
@@ -629,7 +669,7 @@ out:
 	if (ump) {
 		free(ump->um_e2fs, M_UFSMNT);
 		free(ump, M_UFSMNT);
-		mp->mnt_data = (qaddr_t)0;
+		mp->mnt_data = NULL;
 	}
 	return (error);
 }
@@ -669,7 +709,7 @@ ext2fs_unmount(mp, mntflags, p)
 	free(fs->e2fs_gd, M_UFSMNT);
 	free(fs, M_UFSMNT);
 	free(ump, M_UFSMNT);
-	mp->mnt_data = (qaddr_t)0;
+	mp->mnt_data = NULL;
 	mp->mnt_flag &= ~MNT_LOCAL;
 	return (error);
 }
@@ -743,11 +783,7 @@ ext2fs_statfs(mp, sbp, p)
 	sbp->f_bavail = sbp->f_bfree - fs->e2fs.e2fs_rbcount;
 	sbp->f_files =  fs->e2fs.e2fs_icount;
 	sbp->f_ffree = fs->e2fs.e2fs_ficount;
-	if (sbp != &mp->mnt_stat) {
-		memcpy(sbp->f_mntonname, mp->mnt_stat.f_mntonname, MNAMELEN);
-		memcpy(sbp->f_mntfromname, mp->mnt_stat.f_mntfromname, MNAMELEN);
-	}
-	strncpy(sbp->f_fstypename, mp->mnt_op->vfs_name, MFSNAMELEN);
+	copy_statfs_info(sbp, mp);
 	return (0);
 }
 
@@ -881,6 +917,7 @@ ext2fs_vget(mp, ino, vpp)
 	memset(ip, 0, sizeof(struct inode));
 	vp->v_data = ip;
 	ip->i_vnode = vp;
+	ip->i_ump = ump;
 	ip->i_e2fs = fs = ump->um_e2fs;
 	ip->i_dev = dev;
 	ip->i_number = ino;
@@ -916,7 +953,8 @@ ext2fs_vget(mp, ino, vpp)
 	}
 	cp = (caddr_t)bp->b_data +
 	    (ino_to_fsbo(fs, ino) * EXT2_DINODE_SIZE);
-	e2fs_iload((struct ext2fs_dinode *)cp, &ip->i_din.e2fs_din);
+	ip->i_din.e2fs_din = pool_get(&ext2fs_dinode_pool, PR_WAITOK);
+	e2fs_iload((struct ext2fs_dinode *)cp, ip->i_din.e2fs_din);
 	brelse(bp);
 
 	/* If the inode was deleted, reset all fields */
@@ -1022,17 +1060,25 @@ ext2fs_vptofh(vp, fhp)
 	return (0);
 }
 
-int
-ext2fs_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
-	struct proc *p;
+SYSCTL_SETUP(sysctl_vfs_ext2fs_setup, "sysctl vfs.ext2fs subtree setup")
 {
-	return (EOPNOTSUPP);
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "vfs", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_VFS, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "ext2fs",
+		       SYSCTL_DESCR("Linux EXT2FS file system"),
+		       NULL, 0, NULL, 0,
+		       CTL_VFS, 17, CTL_EOL);
+	/*
+	 * XXX the "17" above could be dynamic, thereby eliminating
+	 * one more instance of the "number to vfs" mapping problem,
+	 * but "17" is the order as taken from sys/mount.h
+	 */
 }
 
 /*

@@ -1,4 +1,4 @@
-#	$NetBSD: std.netwinder,v 1.8 2001/12/09 05:00:47 atatat Exp $
+#	$NetBSD: std.netwinder,v 1.12 2003/06/14 18:54:57 uwe Exp $
 #
 # standard NetBSD/netwinder options
 
@@ -11,5 +11,10 @@ options 	EXEC_ELF32
 # To support easy transit to ../arch/arm/arm32
 options 	ARM32
 
+options 	ARM_INTR_IMPL="<arm/footbridge/footbridge_intr.h>"
+
 makeoptions	LOADADDRESS="0xF000C000"
 makeoptions	ENTRYPOINT="nwstart"
+
+# Firmware leaves pckbc uninited
+options 	PCKBC_CNATTACH_SELFTEST

@@ -1,4 +1,4 @@
-/*	$NetBSD: bsd_fdintr.s,v 1.19.18.1 2002/06/24 11:53:41 lukem Exp $ */
+/*	$NetBSD: bsd_fdintr.s,v 1.24 2004/02/13 11:36:17 wiz Exp $ */
 
 /*
  * Copyright (c) 1995 Paul Kranenburg
@@ -35,6 +35,7 @@
 #include "assym.h"
 #include <machine/param.h>
 #include <machine/asm.h>
+#include <machine/intr.h>
 #include <machine/psl.h>
 #include <sparc/sparc/intreg.h>
 #include <sparc/sparc/auxreg.h>
@@ -48,9 +49,9 @@
 	or	%l6, IE_L4, %l6;			\
 	stb	%l6, [%l5 + %lo(INTRREG_VA)]
 
-! raise(0,PIL_FDSOFT)	! NOTE: CPU#0 and PIL_FDSOFT=4
+! raise(0,IPL_SOFTFDC)	! NOTE: CPU#0
 #define FD_SET_SWINTR_4M				\
-	sethi	%hi(PINTR_SINTRLEV(PIL_FDSOFT)), %l5;	\
+	sethi	%hi(PINTR_SINTRLEV(IPL_SOFTFDC)), %l5;	\
 	set	ICR_PI_SET, %l6;			\
 	st	%l5, [%l6]
 
@@ -161,7 +162,6 @@ _C_LABEL(fdciop):
 	.seg	"text"
 	.align	4
 
-/* XXXSMP: kernel lock perimeter? */
 _ENTRY(_C_LABEL(fdchwintr))
 	set	save_l, %l7
 	std	%l0, [%l7]
@@ -307,6 +307,7 @@ resultphase1:
 ssi:
 	! set software interrupt
 	! enter here with status in %l7
+	! SMP: consider which CPU to ping?
 	st	%l7, [R_fdc + FDC_ISTATUS]
 	FD_SET_SWINTR
 

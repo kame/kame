@@ -2,7 +2,7 @@
  *
  * Module Name: dbfileio - Debugger file I/O commands.  These can't usually
  *              be used when running the debugger in Ring 0 (Kernel mode)
- *              xRevision: 47 $
+ *              xRevision: 76 $
  *
  ******************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999, 2000, 2001, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -115,73 +115,32 @@
  *
  *****************************************************************************/
 
+
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: dbfileio.c,v 1.3 2001/11/13 13:01:58 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dbfileio.c,v 1.11 2004/02/14 16:57:24 kochi Exp $");
 
 #include "acpi.h"
 #include "acdebug.h"
 #include "acnamesp.h"
-#include "acparser.h"
-#include "acevents.h"
 #include "actables.h"
 
-#ifdef ENABLE_DEBUGGER
+#if (defined ACPI_DEBUGGER || defined ACPI_DISASSEMBLER)
 
-#define _COMPONENT          ACPI_DEBUGGER
-        MODULE_NAME         ("dbfileio")
+#define _COMPONENT          ACPI_CA_DEBUGGER
+        ACPI_MODULE_NAME    ("dbfileio")
 
 
+/*
+ * NOTE: this is here for lack of a better place.  It is used in all
+ * flavors of the debugger, need LCD file
+ */
 #ifdef ACPI_APPLICATION
 #include <stdio.h>
 FILE                        *AcpiGbl_DebugFile = NULL;
 #endif
 
 
-/*
- * NOTE: this is here for lack of a better place.  It is used in all
- *  flavors of the debugger, need LCD file
- */
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiDbMatchArgument
- *
- * PARAMETERS:  UserArgument            - User command line
- *              Arguments               - Array of commands to match against
- *
- * RETURN:      Index into command array or ACPI_TYPE_NOT_FOUND if not found
- *
- * DESCRIPTION: Search command array for a command match
- *
- ******************************************************************************/
-
-ACPI_OBJECT_TYPE8
-AcpiDbMatchArgument (
-    NATIVE_CHAR             *UserArgument,
-    ARGUMENT_INFO           *Arguments)
-{
-    UINT32                  i;
-
-
-    if (!UserArgument || UserArgument[0] == 0)
-    {
-        return (ACPI_TYPE_NOT_FOUND);
-    }
-
-    for (i = 0; Arguments[i].Name; i++)
-    {
-        if (STRSTR (Arguments[i].Name, UserArgument) == Arguments[i].Name)
-        {
-            return ((ACPI_OBJECT_TYPE8) i);
-        }
-    }
-
-    /* Argument not recognized */
-
-    return (ACPI_TYPE_NOT_FOUND);
-}
-
-
+#ifdef ACPI_DEBUGGER
 /*******************************************************************************
  *
  * FUNCTION:    AcpiDbCloseDebugFile
@@ -209,7 +168,6 @@ AcpiDbCloseDebugFile (
        AcpiOsPrintf ("Debug output file %s closed\n", AcpiGbl_DbDebugFilename);
     }
 #endif
-
 }
 
 
@@ -227,7 +185,7 @@ AcpiDbCloseDebugFile (
 
 void
 AcpiDbOpenDebugFile (
-    NATIVE_CHAR             *Name)
+    char                    *Name)
 {
 
 #ifdef ACPI_APPLICATION
@@ -237,7 +195,7 @@ AcpiDbOpenDebugFile (
     if (AcpiGbl_DebugFile)
     {
         AcpiOsPrintf ("Debug output file %s opened\n", Name);
-        STRCPY (AcpiGbl_DbDebugFilename, Name);
+        ACPI_STRCPY (AcpiGbl_DbDebugFilename, Name);
         AcpiGbl_DbOutputToFile = TRUE;
     }
     else
@@ -247,16 +205,87 @@ AcpiDbOpenDebugFile (
 
 #endif
 }
+#endif
 
 
 #ifdef ACPI_APPLICATION
+
 /*******************************************************************************
  *
- * FUNCTION:    AcpiDbLoadTable
+ * FUNCTION:    AcpiDbCheckTextModeCorruption
+ *
+ * PARAMETERS:  Table           - Table buffer
+ *              TableLength     - Length of table from the table header
+ *              FileLength      - Length of the file that contains the table
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Check table for text mode file corruption where all linefeed
+ *              characters (LF) have been replaced by carriage return linefeed
+ *              pairs (CR/LF).
+ *
+ ******************************************************************************/
+
+static ACPI_STATUS
+AcpiDbCheckTextModeCorruption (
+    UINT8                   *Table,
+    UINT32                  TableLength,
+    UINT32                  FileLength)
+{
+    UINT32                  i;
+    UINT32                  Pairs = 0;
+
+
+    if (TableLength != FileLength)
+    {
+        ACPI_REPORT_WARNING (("File length (0x%X) is not the same as the table length (0x%X)\n",
+                FileLength, TableLength));
+    }
+
+    /* Scan entire table to determine if each LF has been prefixed with a CR */
+
+    for (i = 1; i < FileLength; i++)
+    {
+        if (Table[i] == 0x0A)
+        {
+            if (Table[i - 1] != 0x0D)
+            {
+                /* the LF does not have a preceeding CR, table is not corrupted */
+
+                return (AE_OK);
+            }
+            else
+            {
+                /* Found a CR/LF pair */
+
+                Pairs++;
+            }
+            i++;
+        }
+    }
+
+    /*
+     * Entire table scanned, each CR is part of a CR/LF pair --
+     * meaning that the table was treated as a text file somewhere.
+     *
+     * NOTE: We can't "fix" the table, because any existing CR/LF pairs in the
+     * original table are left untouched by the text conversion process --
+     * meaning that we cannot simply replace CR/LF pairs with LFs.
+     */
+    AcpiOsPrintf ("Table has been corrupted by text mode conversion\n");
+    AcpiOsPrintf ("All LFs (%d) were changed to CR/LF pairs\n", Pairs);
+    AcpiOsPrintf ("Table cannot be repaired!\n");
+    return (AE_BAD_VALUE);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiDbReadTable
  *
  * PARAMETERS:  fp              - File that contains table
- *              TablePtr        - Return value, buffer with table
- *              TableLenght     - Return value, length of table
+ *              Table           - Return value, buffer with table
+ *              TableLength     - Return value, length of table
  *
  * RETURN:      Status
  *
@@ -264,18 +293,21 @@ AcpiDbOpenDebugFile (
  *
  ******************************************************************************/
 
-ACPI_STATUS
-AcpiDbLoadTable(
+static ACPI_STATUS
+AcpiDbReadTable (
     FILE                    *fp,
-    ACPI_TABLE_HEADER       **TablePtr,
+    ACPI_TABLE_HEADER       **Table,
     UINT32                  *TableLength)
 {
     ACPI_TABLE_HEADER       TableHeader;
-    UINT8                   *AmlPtr;
-    UINT32                  AmlLength;
     UINT32                  Actual;
     ACPI_STATUS             Status;
+    UINT32                  FileSize;
 
+
+    fseek (fp, 0, SEEK_END);
+    FileSize = ftell (fp);
+    fseek (fp, 0, SEEK_SET);
 
     /* Read the table header */
 
@@ -285,66 +317,67 @@ AcpiDbLoadTable(
         return (AE_BAD_SIGNATURE);
     }
 
-
     /* Validate the table header/length */
 
     Status = AcpiTbValidateTableHeader (&TableHeader);
     if ((ACPI_FAILURE (Status)) ||
-        (TableHeader.Length > 524288))  /* 1/2 Mbyte should be enough */
+        (TableHeader.Length > 0x800000))  /* 8 Mbyte should be enough */
     {
         AcpiOsPrintf ("Table header is invalid!\n");
         return (AE_ERROR);
     }
 
-
     /* We only support a limited number of table types */
 
-    if (STRNCMP ((char *) TableHeader.Signature, DSDT_SIG, 4) &&
-        STRNCMP ((char *) TableHeader.Signature, PSDT_SIG, 4) &&
-        STRNCMP ((char *) TableHeader.Signature, SSDT_SIG, 4))
+    if (ACPI_STRNCMP ((char *) TableHeader.Signature, DSDT_SIG, 4) &&
+        ACPI_STRNCMP ((char *) TableHeader.Signature, PSDT_SIG, 4) &&
+        ACPI_STRNCMP ((char *) TableHeader.Signature, SSDT_SIG, 4))
     {
         AcpiOsPrintf ("Table signature is invalid\n");
-        DUMP_BUFFER (&TableHeader, sizeof (ACPI_TABLE_HEADER));
+        ACPI_DUMP_BUFFER (&TableHeader, sizeof (ACPI_TABLE_HEADER));
         return (AE_ERROR);
     }
 
     /* Allocate a buffer for the table */
 
     *TableLength = TableHeader.Length;
-    *TablePtr = ACPI_MEM_ALLOCATE ((size_t) *TableLength);
-    if (!*TablePtr)
+    *Table = AcpiOsAllocate ((size_t) (FileSize));
+    if (!*Table)
     {
         AcpiOsPrintf ("Could not allocate memory for ACPI table %4.4s (size=%X)\n",
                     TableHeader.Signature, TableHeader.Length);
         return (AE_NO_MEMORY);
     }
 
-
-    AmlPtr      = (UINT8 *) *TablePtr + sizeof (TableHeader);
-    AmlLength   = *TableLength - sizeof (TableHeader);
-
-    /* Copy the header to the buffer */
-
-    MEMCPY (*TablePtr, &TableHeader, sizeof (TableHeader));
-
     /* Get the rest of the table */
 
-    Actual = fread (AmlPtr, 1, (size_t) AmlLength, fp);
-    if (Actual == AmlLength)
+    fseek (fp, 0, SEEK_SET);
+    Actual = fread (*Table, 1, (size_t) FileSize, fp);
+    if (Actual == FileSize)
     {
+        /* Now validate the checksum */
+
+        Status = AcpiTbVerifyTableChecksum (*Table);
+
+        if (Status == AE_BAD_CHECKSUM)
+        {
+            Status = AcpiDbCheckTextModeCorruption ((UINT8 *) *Table,
+                        FileSize, (*Table)->Length);
+            return (Status);
+        }
         return (AE_OK);
     }
 
     if (Actual > 0)
     {
-        AcpiOsPrintf ("Warning - reading table, asked for %X got %X\n", AmlLength, Actual);
-       return (AE_OK);
+        AcpiOsPrintf ("Warning - reading table, asked for %X got %X\n",
+            FileSize, Actual);
+        return (AE_OK);
     }
 
-
     AcpiOsPrintf ("Error - could not read the table file\n");
-    ACPI_MEM_FREE (*TablePtr);
-    *TablePtr = NULL;
+    AcpiOsFree (*Table);
+    *Table = NULL;
     *TableLength = 0;
 
     return (AE_ERROR);
@@ -356,7 +389,7 @@ AcpiDbLoadTable(
  *
  * FUNCTION:    AeLocalLoadTable
  *
- * PARAMETERS:  TablePtr        - pointer to a buffer containing the entire
+ * PARAMETERS:  Table           - pointer to a buffer containing the entire
  *                                table to be loaded
  *
  * RETURN:      Status
@@ -366,31 +399,34 @@ AcpiDbLoadTable(
  *              a valid header.  The header fields will be verified, and if it
  *              is determined that the table is invalid, the call will fail.
  *
- *              If the call fails an appropriate status will be returned.
- *
  ******************************************************************************/
 
-#if 0 /* XXX unused -- thorpej@wasabisystems.com */
 ACPI_STATUS
 AeLocalLoadTable (
-    ACPI_TABLE_HEADER       *TablePtr)
+    ACPI_TABLE_HEADER       *Table)
 {
     ACPI_STATUS             Status;
     ACPI_TABLE_DESC         TableInfo;
 
 
-    FUNCTION_TRACE ("AeLocalLoadTable");
+    ACPI_FUNCTION_TRACE ("AeLocalLoadTable");
 
-    if (!TablePtr)
+
+    if (!Table)
     {
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
 
+    TableInfo.Pointer = Table;
+    Status = AcpiTbRecognizeTable (&TableInfo, ACPI_TABLE_ALL);
+    if (ACPI_FAILURE (Status))
+    {
+        return_ACPI_STATUS (Status);
+    }
+
     /* Install the new table into the local data structures */
 
-    TableInfo.Pointer = TablePtr;
-
-    Status = AcpiTbInstallTable (NULL, &TableInfo);
+    Status = AcpiTbInstallTable (&TableInfo);
     if (ACPI_FAILURE (Status))
     {
         /* Free table allocated by AcpiTbGetTable */
@@ -399,44 +435,44 @@ AeLocalLoadTable (
         return_ACPI_STATUS (Status);
     }
 
+#if (!defined (ACPI_NO_METHOD_EXECUTION) && !defined (ACPI_CONSTANT_EVAL_ONLY))
 
-#ifndef PARSER_ONLY
     Status = AcpiNsLoadTable (TableInfo.InstalledDesc, AcpiGbl_RootNode);
     if (ACPI_FAILURE (Status))
     {
         /* Uninstall table and free the buffer */
 
-        AcpiTbUninstallTable (TableInfo.InstalledDesc);
+        AcpiTbDeleteTablesByType (ACPI_TABLE_DSDT);
         return_ACPI_STATUS (Status);
     }
 #endif
 
     return_ACPI_STATUS (Status);
 }
-#endif /* 0 */
 
 
+#ifdef ACPI_APPLICATION
 /*******************************************************************************
  *
- * FUNCTION:    AcpiDbLoadAcpiTable
+ * FUNCTION:    AcpiDbReadTableFromFile
  *
- * PARAMETERS:  Filname         - File where table is located
+ * PARAMETERS:  Filename         - File where table is located
+ *              Table            - Where a pointer to the table is returned
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Load an ACPI table from a file
+ * DESCRIPTION: Get an ACPI table from a file
  *
  ******************************************************************************/
 
 ACPI_STATUS
-AcpiDbLoadAcpiTable (
-    NATIVE_CHAR             *Filename)
+AcpiDbReadTableFromFile (
+    char                    *Filename,
+    ACPI_TABLE_HEADER       **Table)
 {
-#ifdef ACPI_APPLICATION
     FILE                    *fp;
-    ACPI_STATUS             Status;
-    ACPI_TABLE_HEADER       *TablePtr;
     UINT32                  TableLength;
+    ACPI_STATUS             Status;
 
 
     /* Open the file */
@@ -444,15 +480,14 @@ AcpiDbLoadAcpiTable (
     fp = fopen (Filename, "rb");
     if (!fp)
     {
-        AcpiOsPrintf ("Could not open file %s\n", Filename);
+        AcpiOsPrintf ("Could not open input file %s\n", Filename);
         return (AE_ERROR);
     }
 
-
     /* Get the entire file */
 
-    AcpiOsPrintf ("Loading Acpi table from file %s\n", Filename);
-    Status = AcpiDbLoadTable (fp, &TablePtr, &TableLength);
+    fprintf (stderr, "Loading Acpi table from file %s\n", Filename);
+    Status = AcpiDbReadTable (fp, Table, &TableLength);
     fclose(fp);
 
     if (ACPI_FAILURE (Status))
@@ -461,37 +496,72 @@ AcpiDbLoadAcpiTable (
         return (Status);
     }
 
+    return (AE_OK);
+ }
+#endif
 
-    /* Attempt to recognize and install the table */
-    Status = AeLocalLoadTable (TablePtr);
 
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiDbGetTableFromFile
+ *
+ * PARAMETERS:  Filename         - File where table is located
+ *              Table            - Where a pointer to the table is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Load an ACPI table from a file
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiDbGetTableFromFile (
+    char                    *Filename,
+    ACPI_TABLE_HEADER       **ReturnTable)
+{
+#ifdef ACPI_APPLICATION
+    ACPI_STATUS             Status;
+    ACPI_TABLE_HEADER       *Table;
+
+
+    Status = AcpiDbReadTableFromFile (Filename, &Table);
     if (ACPI_FAILURE (Status))
     {
-        if (Status == AE_EXIST)
+        return (Status);
+    }
+
+   /* Attempt to recognize and install the table */
+
+    Status = AeLocalLoadTable (Table);
+    if (ACPI_FAILURE (Status))
+    {
+        if (Status == AE_ALREADY_EXISTS)
         {
             AcpiOsPrintf ("Table %4.4s is already installed\n",
-                            &TablePtr->Signature);
+                            Table->Signature);
         }
-
         else
         {
             AcpiOsPrintf ("Could not install table, %s\n",
                             AcpiFormatException (Status));
         }
 
-        ACPI_MEM_FREE (TablePtr);
         return (Status);
     }
 
-    AcpiOsPrintf ("%4.4s at %p successfully installed and loaded\n",
-                                &TablePtr->Signature, TablePtr);
+    fprintf (stderr, "Acpi table [%4.4s] successfully installed and loaded\n",
+                                Table->Signature);
 
     AcpiGbl_AcpiHardwarePresent = FALSE;
+    if (ReturnTable)
+    {
+        *ReturnTable = Table;
+    }
+
 
 #endif  /* ACPI_APPLICATION */
     return (AE_OK);
 }
 
-
-#endif  /* ENABLE_DEBUGGER */
+#endif  /* ACPI_DEBUGGER */
 

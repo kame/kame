@@ -1,4 +1,4 @@
-/*	$NetBSD: cpc700reg.h,v 1.1 2002/05/21 02:58:25 augustss Exp $	*/
+/*	$NetBSD: cpc700reg.h,v 1.3 2003/11/07 17:03:42 augustss Exp $	*/
 
 /*
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -54,6 +54,14 @@
 #define CPC_PCI_BRDGERR		0x48
 #define CPC_PCI_CLEARERR	0x0000ff00
 
+#define CPC_BRIDGE_OPTIONS2	0x60
+#define  CPC_BRIDGE_O2_ILAT_MASK	0x00f8
+#define  CPC_BRIDGE_O2_ILAT_SHIFT	3
+#define  CPC_BRIDGE_O2_ILAT_PRIM_ASYNC	18
+#define  CPC_BRIDGE_O2_SLAT_MASK	0x0f00
+#define  CPC_BRIDGE_O2_SLAT_SHIFT	8
+#define  CPC_BRIDGE_O2_2LAT_PRIM_ASYNC	2
+
 /* PCI interrupt acknowledge & special cycle */
 #define CPC_INTR_ACK		0xfed00000
 
@@ -79,7 +87,29 @@
 #define CPC_COM1		0xff600400
 #define CPC_COM_SPEED(bus)	((bus) / (2 * 4))
 
-/* interrup controller */
+/* processor interface registers */
+#define CPC_PIF_CFGADR		0xff500000
+#define  CPC_PIF_CFG_PRIFOPT1		0x00
+#define  CPC_PIF_CFG_ERRDET1		0x04
+#define  CPC_PIF_CFG_ERREN1		0x08
+#define  CPC_PIF_CFG_CPUERAD		0x0c
+#define  CPC_PIF_CFG_CPUERAT		0x10
+#define  CPC_PIF_CFG_PLBMIFOPT		0x18
+#define  CPC_PIF_CFG_PLBMTLSA1		0x20
+#define  CPC_PIF_CFG_PLBMTLEA1		0x24
+#define  CPC_PIF_CFG_PLBMTLSA2		0x28
+#define  CPC_PIF_CFG_PLBMTLEA2		0x2c
+#define  CPC_PIF_CFG_PLBMTLSA3		0x30
+#define  CPC_PIF_CFG_PLBMTLEA3		0x34
+#define  CPC_PIF_CFG_PLBSNSSA0		0x38
+#define  CPC_PIF_CFG_PLBSNSEA0		0x3c
+#define  CPC_PIF_CFG_BESR		0x40
+#define  CPC_PIF_CFG_BESRSET		0x44
+#define  CPC_PIF_CFG_BEAR		0x4c
+#define  CPC_PIF_CFG_PLBSWRINT		0x80
+#define CPC_PIF_CFGDATA		0xff500004
+
+/* interrupt controller */
 #define CPC_UIC_BASE		0xff500880
 #define CPC_UIC_SIZE		0x00000024
 #define CPC_UIC_SR		0x00000000 /* UIC status (read/clear) */

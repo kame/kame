@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_dag.h,v 1.4 2001/10/04 15:58:51 oster Exp $	*/
+/*	$NetBSD: rf_dag.h,v 1.15.2.1 2004/04/11 11:19:03 tron Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -43,7 +43,7 @@
 #include "rf_layout.h"
 #include "rf_dagflags.h"
 #include "rf_acctrace.h"
-#include "rf_memchunk.h"
+#include "rf_desc.h"
 
 #define RF_THREAD_CONTEXT   0	/* we were invoked from thread context */
 #define RF_INTR_CONTEXT     1	/* we were invoked from interrupt context */
@@ -52,16 +52,11 @@
 #include <sys/buf.h>
 
 struct RF_PropHeader_s {	/* structure for propagation of results */
-	int     resultNum;	/* bind result # resultNum */
 	int     paramNum;	/* to parameter # paramNum */
 	RF_PropHeader_t *next;	/* linked list for multiple results/params */
 };
 
 typedef enum RF_NodeStatus_e {
-	rf_bwd1,		/* node is ready for undo logging (backward
-				 * error recovery only) */
-	rf_bwd2,		/* node has completed undo logging (backward
-				 * error recovery only) */
 	rf_wait,		/* node is waiting to be executed */
 	rf_fired,		/* node is currently executing its do function */
 	rf_good,		/* node successfully completed execution of
@@ -123,7 +118,8 @@ struct RF_DagNode_s {
 	RF_DagHeader_t *dagHdr;	/* ptr to head of dag containing this node */
 	void   *dagFuncData;	/* dag execution func uses this for whatever
 				 * it wants */
-	RF_DagNode_t *next;
+	RF_DagNode_t *next;     /* next in terms of propagating results */
+	RF_DagNode_t *list_next; /* next in the list of DAG nodes for this DAG */
 	int     nodeNum;	/* used by PrintDAG for debug only */
 	int     visited;	/* used to avoid re-visiting nodes on DAG
 				 * walks */
@@ -131,6 +127,8 @@ struct RF_DagNode_s {
 	 * IT FINISHES, ALL VISITED FLAGS IN THE DAG ARE IDENTICAL */
 	char   *name;		/* debug only */
 	RF_DagNodeFlags_t flags;/* see below */
+	RF_DagNode_t *big_dag_ptrs;  /* used in cases where the cache below isn't big enough */
+	RF_DagParam_t *big_dag_params; /* used when the cache below isn't big enough */
 	RF_DagNode_t *dag_ptrs[RF_DAG_PTRCACHESIZE];	/* cache for performance */
 	RF_DagParam_t dag_params[RF_DAG_PARAMCACHESIZE];	/* cache for performance */
 };
@@ -152,8 +150,6 @@ typedef enum RF_DagStatus_e {
 }       RF_DagStatus_t;
 #define RF_MAX_HDR_SUCC 1
 
-#define RF_MAXCHUNKS 10
-
 struct RF_DagHeader_s {
 	RF_DagStatus_t status;	/* status of this DAG */
 	int     numSuccedents;	/* DAG may be a tree, i.e. may have > 1 root */
@@ -169,30 +165,21 @@ struct RF_DagHeader_s {
 						 * to be freed */
 	int     nodeNum;	/* used by PrintDAG for debug only */
 	int     numNodesCompleted;
+#if RF_ACC_TRACE > 0
 	RF_AccTraceEntry_t *tracerec;	/* perf mon only */
-
+#endif
 	void    (*cbFunc) (void *);	/* function to call when the dag
 					 * completes */
 	void   *cbArg;		/* argument for cbFunc */
 	char   *creator;	/* name of function used to create this dag */
-
+	RF_DagNode_t *nodes;    /* linked list of nodes used in this DAG */
+	RF_PhysDiskAddr_t *pda_cleanup_list; /* for PDAs that can't get 
+						cleaned up any other way... */
 	RF_Raid_t *raidPtr;	/* the descriptor for the RAID device this DAG
 				 * is for */
+	RF_RaidAccessDesc_t *desc;	/* ptr to descriptor for this access */
 	void   *bp;		/* the bp for this I/O passed down from the
 				 * file system. ignored outside kernel */
-
-	RF_ChunkDesc_t *memChunk[RF_MAXCHUNKS];	/* experimental- Chunks of
-						 * memory to be retained upon
-						 * DAG free for re-use */
-	int     chunkIndex;	/* the idea is to avoid calls to alloc and
-				 * free */
-
-	RF_ChunkDesc_t **xtraMemChunk;	/* escape hatch which allows
-					 * SelectAlgorithm to merge memChunks
-					 * from several dags */
-	int     xtraChunkIndex;	/* number of ptrs to valid chunks */
-	int     xtraChunkCnt;	/* number of ptrs to chunks allocated */
-
 };
 
 struct RF_DagList_s {
@@ -206,21 +193,8 @@ struct RF_DagList_s {
 	RF_RaidAccessDesc_t *desc;	/* ptr to descriptor for this access */
 	RF_AccTraceEntry_t tracerec;	/* perf mon info for dags (not user
 					 * info) */
+	struct RF_DagList_s *next;     /* next DagList, if any */
 };
-/* resets a node so that it can be fired again */
-#define RF_ResetNode(_n_)  { \
-  (_n_)->status = rf_wait;   \
-  (_n_)->numAntDone = 0;     \
-  (_n_)->numSuccFired = 0;   \
-  (_n_)->numSuccDone = 0;    \
-  (_n_)->next = NULL;        \
-}
-
-#define RF_ResetDagHeader(_h_) { \
-  (_h_)->numNodesCompleted = 0;  \
-  (_h_)->numCommits = 0;         \
-  (_h_)->status = rf_enable;     \
-}
 
 /* convience macro for declaring a create dag function */
 

@@ -1,8 +1,38 @@
-/*	$NetBSD: dzvar.h,v 1.1 2002/02/25 14:58:08 ad Exp $	*/
+/*	$NetBSD: dzvar.h,v 1.6 2003/08/07 16:30:55 agc Exp $	*/
 /*
- * Copyright (c) 1996  Ken C. Wellsch.  All rights reserved.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Ralph Campbell and Rick Macklem.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+/*
+ * Copyright (c) 1996  Ken C. Wellsch.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * Ralph Campbell and Rick Macklem.
@@ -36,7 +66,10 @@
  * SUCH DAMAGE.
  */
 
-/* A DZ-11 has 8 ports while a DZV/DZQ-11 has only 4. We use 8 by default */
+#ifndef _DEV_DEC_DZVAR_H_
+#define _DEV_DEC_DZVAR_H_
+
+/* A DZ-11 has 8 ports while a DZV/DZQ-11 has only 4. */
 
 #define	NDZLINE 	8
 
@@ -56,12 +89,13 @@ struct	dz_softc {
 	bus_space_tag_t	sc_iot;
 	bus_space_handle_t sc_ioh;
 	int		sc_type;	/* DZ11 or DZV11? */
+	int		sc_consline;	/* console line, or -1 */
 	int		sc_rxint;	/* Receive interrupt count XXX */
 	u_char		sc_brk;		/* Break asserted on some lines */
 	u_char		sc_dsr;		/* DSR set bits if no mdm ctrl */
 	struct dz_linestate {
 		struct	dz_softc *dz_sc;	/* backpointer to softc */
-		int		dz_line;	/* sub-driver unit number */
+		int		dz_line;	/* channel number */
 		void		*dz_private;	/* sub-driver data pointer */
 		int		(*dz_catch) __P((void *, int)); /* Fast catch recv */
 		struct	tty *	dz_tty;		/* what we work on */
@@ -72,7 +106,9 @@ struct	dz_softc {
 	} sc_dz[NDZLINE];
 };
 
-void	dzattach(struct dz_softc *, struct evcnt *);
+void	dzattach(struct dz_softc *, struct evcnt *, int);
 void	dzrint(void *);
 void	dzxint(void *);
 void	dzreset(struct device *);
+
+#endif /* _DEV_DEC_DZVAR_H_ */

@@ -1,4 +1,4 @@
-/* $NetBSD: pcdisplay.c,v 1.17 2002/03/17 19:40:59 atatat Exp $ */
+/* $NetBSD: pcdisplay.c,v 1.25 2004/03/24 17:26:53 drochner Exp $ */
 
 /*
  * Copyright (c) 1998
@@ -12,12 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed for the NetBSD Project
- *	by Matthias Drochner.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -33,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pcdisplay.c,v 1.17 2002/03/17 19:40:59 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pcdisplay.c,v 1.25 2004/03/24 17:26:53 drochner Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -86,11 +80,10 @@ static int pcdisplay_probe_mono __P((bus_space_tag_t, bus_space_tag_t));
 static void pcdisplay_init __P((struct pcdisplay_config *,
 			     bus_space_tag_t, bus_space_tag_t,
 			     int));
-static int pcdisplay_alloc_attr __P((void *, int, int, int, long *));
+static int pcdisplay_allocattr __P((void *, int, int, int, long *));
 
-struct cfattach pcdisplay_ca = {
-	sizeof(struct pcdisplay_softc), pcdisplay_match, pcdisplay_attach,
-};
+CFATTACH_DECL(pcdisplay, sizeof(struct pcdisplay_softc),
+    pcdisplay_match, pcdisplay_attach, NULL, NULL);
 
 const struct wsdisplay_emulops pcdisplay_emulops = {
 	pcdisplay_cursor,
@@ -100,7 +93,7 @@ const struct wsdisplay_emulops pcdisplay_emulops = {
 	pcdisplay_erasecols,
 	pcdisplay_copyrows,
 	pcdisplay_eraserows,
-	pcdisplay_alloc_attr
+	pcdisplay_allocattr
 };
 
 const struct wsscreen_descr pcdisplay_scr = {
@@ -221,8 +214,8 @@ pcdisplay_init(dc, iot, memt, mono)
 
 	dc->pcs.dispoffset = 0;
 
-	dc->pcs.vc_crow = cpos / pcdisplay_scr.ncols;
-	dc->pcs.vc_ccol = cpos % pcdisplay_scr.ncols;
+	dc->pcs.cursorrow = cpos / pcdisplay_scr.ncols;
+	dc->pcs.cursorcol = cpos % pcdisplay_scr.ncols;
 	pcdisplay_cursor_init(&dc->pcs, 1);
 }
 
@@ -362,8 +355,8 @@ pcdisplay_cnattach(iot, memt)
 	pcdisplay_init(&pcdisplay_console_dc, iot, memt, mono);
 
 	wsdisplay_cnattach(&pcdisplay_scr, &pcdisplay_console_dc,
-			   pcdisplay_console_dc.pcs.vc_ccol,
-			   pcdisplay_console_dc.pcs.vc_crow,
+			   pcdisplay_console_dc.pcs.cursorcol,
+			   pcdisplay_console_dc.pcs.cursorrow,
 			   FG_LIGHTGREY | BG_BLACK);
 
 	pcdisplayconsole = 1;
@@ -456,7 +449,7 @@ pcdisplay_show_screen(v, cookie, waitok, cb, cbarg)
 }
 
 static int
-pcdisplay_alloc_attr(id, fg, bg, flags, attrp)
+pcdisplay_allocattr(id, fg, bg, flags, attrp)
 	void *id;
 	int fg, bg;
 	int flags;

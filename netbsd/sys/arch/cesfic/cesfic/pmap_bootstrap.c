@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap_bootstrap.c,v 1.1 2001/05/14 18:23:03 drochner Exp $	*/
+/*	$NetBSD: pmap_bootstrap.c,v 1.5 2003/08/07 16:27:15 agc Exp $	*/
 
 /* 
  * Copyright (c) 1991, 1993
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,6 +34,9 @@
  *
  *	@(#)pmap_bootstrap.c	8.1 (Berkeley) 6/10/93
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pmap_bootstrap.c,v 1.5 2003/08/07 16:27:15 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/msgbuf.h>
@@ -129,14 +128,14 @@ pmap_bootstrap(nextpa, firstpa)
 	else
 		kstsize = 1;
 	kstpa = nextpa;
-	nextpa += kstsize * NBPG;
+	nextpa += kstsize * PAGE_SIZE;
 	kptpa = nextpa;
 	nptpages = RELOC(Sysptsize, int);
-	nextpa += nptpages * NBPG;
+	nextpa += nptpages * PAGE_SIZE;
 	kptmpa = nextpa;
-	nextpa += NBPG;
+	nextpa += PAGE_SIZE;
 	lkptpa = nextpa;
-	nextpa += NBPG;
+	nextpa += PAGE_SIZE;
 	p0upa = nextpa;
 	nextpa += USPACE;
 
@@ -237,7 +236,7 @@ pmap_bootstrap(nextpa, firstpa)
 		protopte = kptpa | PG_RW | PG_CI | PG_V;
 		while (pte < epte) {
 			*pte++ = protopte;
-			protopte += NBPG;
+			protopte += PAGE_SIZE;
 		}
 
 		/*
@@ -266,8 +265,8 @@ pmap_bootstrap(nextpa, firstpa)
 		while (pte < epte) {
 			*ste++ = protoste;
 			*pte++ = protopte;
-			protoste += NBPG;
-			protopte += NBPG;
+			protoste += PAGE_SIZE;
+			protopte += PAGE_SIZE;
 		}
 		/*
 		 * Invalidate all but the last remaining entries in both.
@@ -311,7 +310,7 @@ pmap_bootstrap(nextpa, firstpa)
 	protopte = firstpa | PG_RO | PG_V;
 	while (pte < epte) {
 		*pte++ = protopte;
-		protopte += NBPG;
+		protopte += PAGE_SIZE;
 	}
 	/*
 	 * Validate PTEs for kernel data/bss, dynamic data allocated
@@ -328,7 +327,7 @@ pmap_bootstrap(nextpa, firstpa)
 
 	while (pte < epte) {
 		*pte++ = protopte;
-		protopte += NBPG;
+		protopte += PAGE_SIZE;
 	}
 
 	/*
@@ -385,7 +384,7 @@ pmap_bootstrap(nextpa, firstpa)
 	RELOC(avail_end, vm_offset_t) = firstpa
 	  + m68k_ptob(RELOC(physmem, int))
 	  - m68k_round_page(MSGBUFSIZE)
-	  - NBPG; /* if that start of last page??? */
+	  - PAGE_SIZE; /* if that start of last page??? */
 	RELOC(virtual_avail, vm_offset_t) =
 		KERNBASE + (nextpa - firstpa);
 	RELOC(virtual_end, vm_offset_t) = VM_MAX_KERNEL_ADDRESS;
@@ -451,13 +450,19 @@ pmap_bootstrap(nextpa, firstpa)
 		vm_offset_t va = RELOC(virtual_avail, vm_offset_t);
 
 		RELOC(CADDR1, caddr_t) = (caddr_t)va;
-		va += NBPG;
+		va += PAGE_SIZE;
 		RELOC(CADDR2, caddr_t) = (caddr_t)va;
-		va += NBPG;
+		va += PAGE_SIZE;
 		RELOC(vmmap, caddr_t) = (caddr_t)va;
-		va += NBPG;
+		va += PAGE_SIZE;
 		RELOC(msgbufaddr, caddr_t) = (caddr_t)va;
 		va += m68k_round_page(MSGBUFSIZE);
 		RELOC(virtual_avail, vm_offset_t) = va;
 	}
+}
+
+void
+pmap_init_md(void)
+{
+	/* Nothing here. */
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: spc.c,v 1.21 1999/03/24 14:07:39 minoura Exp $	*/
+/*	$NetBSD: spc.c,v 1.26 2003/07/15 01:44:52 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: spc.c,v 1.26 2003/07/15 01:44:52 lukem Exp $");
+
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -60,10 +63,8 @@
 static int spc_intio_match __P((struct device *, struct cfdata *, void *));
 static void spc_intio_attach __P((struct device *, struct device *, void *));
 
-struct cfattach spc_intio_ca = {
-	sizeof (struct spc_softc), spc_intio_match, spc_intio_attach
-};
-
+CFATTACH_DECL(spc_intio, sizeof (struct spc_softc),
+    spc_intio_match, spc_intio_attach, NULL, NULL);
 
 static int
 spc_intio_match(parent, cf, aux)
@@ -115,8 +116,8 @@ spc_intio_attach(parent, self, aux)
 	sc->sc_ioh = ioh;
 	sc->sc_initiator = IODEVbase->io_sram[0x70] & 0x7; /* XXX */
 
-	if (intio_intr_establish(ia->ia_intr, "spc", spcintr, sc))
+	if (intio_intr_establish(ia->ia_intr, "spc", spc_intr, sc))
 		panic ("spcattach: interrupt vector busy");
 
-	spcattach(sc);
+	spc_attach(sc);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: amiga_init.c,v 1.77.4.3 2003/06/30 03:22:24 grant Exp $	*/
+/*	$NetBSD: amiga_init.c,v 1.87 2003/06/29 22:28:06 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1994 Michael L. Hitch
@@ -33,9 +33,10 @@
 
 #include "opt_amigaccgrf.h"
 #include "opt_p5ppc68kboard.h"
+#include "opt_devreload.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amiga_init.c,v 1.77.4.3 2003/06/30 03:22:24 grant Exp $");
+__KERNEL_RCSID(0, "$NetBSD: amiga_init.c,v 1.87 2003/06/29 22:28:06 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -129,11 +130,13 @@ int shift_nosync;
 
 void  start_c(int, u_int, u_int, u_int, char *, u_int, u_long, u_long);
 void rollcolor(int);
+#ifdef DEVRELOAD
 static int kernel_image_magic_size(void);
 static void kernel_image_magic_copy(u_char *);
 int kernel_reload_write(struct uio *);
 extern void kernel_reload(char *, u_long, u_long, u_long, u_long,
 	u_long, u_long, u_long, u_long, u_long, u_long);
+#endif
 extern void etext(void);
 void start_c_finish(void);
 
@@ -195,7 +198,8 @@ alloc_z2mem(amount)
 int kernel_copyback = 1;
 
 void
-start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part)
+start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync,
+								boot_part)
 	int id;
 	u_int fphystart, fphysize, cphysize;
 	char *esym_addr;
@@ -298,10 +302,11 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 			    RELOC(use_z2_mem, int) * 7;
 			RELOC(NZTWOMEMPG, u_int) =
 			    (RELOC(z2mem_end, paddr_t) -
-			    RELOC(z2mem_start, paddr_t)) / NBPG;
+			    RELOC(z2mem_start, paddr_t)) / PAGE_SIZE;
 			if ((RELOC(z2mem_end, paddr_t) -
 			    RELOC(z2mem_start, paddr_t)) > sp->ms_size) {
-				RELOC(NZTWOMEMPG, u_int) = sp->ms_size / NBPG;
+				RELOC(NZTWOMEMPG, u_int) = sp->ms_size /
+				    PAGE_SIZE;
 				RELOC(z2mem_start, paddr_t) =
 				    RELOC(z2mem_end, paddr_t) - sp->ms_size;
 			}
@@ -360,9 +365,9 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 	 */
 	RELOC(Sysseg_pa, u_int) = pstart;
 	RELOC(Sysseg, u_int) = vstart;
-	vstart += NBPG * kstsize;
-	pstart += NBPG * kstsize;
-	avail -= NBPG * kstsize;
+	vstart += PAGE_SIZE * kstsize;
+	pstart += PAGE_SIZE * kstsize;
+	avail -= PAGE_SIZE * kstsize;
 
 	/*
 	 * allocate initial page table pages
@@ -391,9 +396,9 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 	 */
 	RELOC(Sysptmap, u_int) = vstart;
 	Sysptmap_pa = pstart;
-	vstart += NBPG;
-	pstart += NBPG;
-	avail -= NBPG;
+	vstart += PAGE_SIZE;
+	pstart += PAGE_SIZE;
+	avail -= PAGE_SIZE;
 
 	/*
 	 * pt maps the first N megs of ram Sysptmap comes directly
@@ -406,10 +411,10 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 	 * pt[0] maps address 0 so:
 	 *
 	 *		ptsize
-	 * Sysmap  =	------ * NBPG
+	 * Sysmap  =	------ * PAGE_SIZE
 	 *		  4
 	 */
-	RELOC(Sysmap, u_int *) = (u_int *)(ptsize * (NBPG / 4));
+	RELOC(Sysmap, u_int *) = (u_int *)(ptsize * (PAGE_SIZE / 4));
 
 	/*
 	 * initialize segment table and page table map
@@ -463,12 +468,12 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 		pg_proto = ptpa | PG_RW | PG_CI | PG_V;
 		while (sg < esg) {
 			*sg++ = pg_proto;
-			pg_proto += NBPG;
+			pg_proto += PAGE_SIZE;
 		}
 		/*
 		 * Invalidate rest of Sysptmap page
 		 */
-		esg = (u_int *)(Sysptmap_pa + NBPG);
+		esg = (u_int *)(Sysptmap_pa + PAGE_SIZE);
 		while (sg < esg)
 			*sg++ = SG_NV;
 	} else
@@ -487,13 +492,13 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 		while (pg < esg) {
 			*sg++ = sg_proto;
 			*pg++ = pg_proto;
-			sg_proto += NBPG;
-			pg_proto += NBPG;
+			sg_proto += PAGE_SIZE;
+			pg_proto += PAGE_SIZE;
 		}
 		/*
 		 * invalidate the remainder of each table
 		 */
-		esg = (u_int *)(Sysptmap_pa + NBPG);
+		esg = (u_int *)(Sysptmap_pa + PAGE_SIZE);
 		while (pg < esg) {
 			*sg++ = SG_NV;
 			*pg++ = PG_NV;
@@ -506,8 +511,9 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 	pg_proto = fphystart | PG_RO | PG_V;	/* text pages are RO */
 	pg       = (u_int *) ptpa;
 	*pg++ = PG_NV;				/* Make page 0 invalid */
-	pg_proto += NBPG;
-	for (i = NBPG; i < (u_int) etext; i += NBPG, pg_proto += NBPG)
+	pg_proto += PAGE_SIZE;
+	for (i = PAGE_SIZE; i < (u_int) etext;
+	     i += PAGE_SIZE, pg_proto += PAGE_SIZE)
 		*pg++ = pg_proto;
 
 	/*
@@ -531,11 +537,12 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 		 * of the kernel are contiguously allocated, start at
 		 * Sysseg and end at the current value of vstart.
 		 */
-		for (; i<RELOC(Sysseg, u_int); i+= NBPG, pg_proto += NBPG)
+		for (; i<RELOC(Sysseg, u_int);
+		     i+= PAGE_SIZE, pg_proto += PAGE_SIZE)
 			*pg++ = pg_proto;
 
-		pg_proto = (pg_proto &= ~PG_CCB) | PG_CI;
-		for (; i < vstart; i += NBPG, pg_proto += NBPG)
+		pg_proto = (pg_proto & ~PG_CCB) | PG_CI;
+		for (; i < vstart; i += PAGE_SIZE, pg_proto += PAGE_SIZE)
 			*pg++ = pg_proto;
 
 		pg_proto = (pg_proto & ~PG_CI);
@@ -547,7 +554,7 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 	 * go till end of data allocated so far
 	 * plus proc0 u-area (to be allocated)
 	 */
-	for (; i < vstart + USPACE; i += NBPG, pg_proto += NBPG)
+	for (; i < vstart + USPACE; i += PAGE_SIZE, pg_proto += PAGE_SIZE)
 		*pg++ = pg_proto;
 	/*
 	 * invalidate remainder of kernel PT
@@ -585,7 +592,7 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 						/* CI needed here?? */
 		while (pg_proto < CHIPMEMTOP) {
 			*pg++     = pg_proto;
-			pg_proto += NBPG;
+			pg_proto += PAGE_SIZE;
 		}
 	}
 	if (RELOC(z2mem_end, paddr_t)) {			/* XXX */
@@ -593,7 +600,7 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 		    PG_RW | PG_V;				/* XXX */
 		while (pg_proto < RELOC(z2mem_end, paddr_t)) { /* XXX */
 			*pg++ = pg_proto;			/* XXX */
-			pg_proto += NBPG;			/* XXX */
+			pg_proto += PAGE_SIZE;			/* XXX */
 		}						/* XXX */
 	}							/* XXX */
 #ifdef DRACO
@@ -603,12 +610,12 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 		pg_proto = CIABASE | PG_RW | PG_CI | PG_V;
 		while (pg_proto < CIATOP) {
 			*pg++     = pg_proto;
-			pg_proto += NBPG;
+			pg_proto += PAGE_SIZE;
 		}
 		pg_proto  = ZTWOROMBASE | PG_RW | PG_CI | PG_V;
 		while (pg_proto < ZTWOROMTOP) {
 			*pg++     = pg_proto;
-			pg_proto += NBPG;
+			pg_proto += PAGE_SIZE;
 		}
 	}
 
@@ -656,21 +663,21 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 #ifdef DRACO
 	if ((id >> 24) == 0x7D) {
 		RELOC(DRCCADDR, u_int) =
-		    (u_int)RELOC(Sysmap, u_int) - ptextra * NBPG;
+		    (u_int)RELOC(Sysmap, u_int) - ptextra * PAGE_SIZE;
 
 		RELOC(CIAADDR, vaddr_t) =
-		    RELOC(DRCCADDR, u_int) + DRCIAPG * NBPG;
+		    RELOC(DRCCADDR, u_int) + DRCIAPG * PAGE_SIZE;
 
 		if (RELOC(z2mem_end, vaddr_t)) {		/* XXX */
 			RELOC(ZTWOMEMADDR, vaddr_t) =
-			    RELOC(DRCCADDR, u_int) + NDRCCPG * NBPG;
+			    RELOC(DRCCADDR, u_int) + NDRCCPG * PAGE_SIZE;
 
 			RELOC(ZBUSADDR, vaddr_t) =
 			    RELOC(ZTWOMEMADDR, vaddr_t) +
-			    RELOC(NZTWOMEMPG, u_int)*NBPG;
+			    RELOC(NZTWOMEMPG, u_int)*PAGE_SIZE;
 		} else {
 			RELOC(ZBUSADDR, vaddr_t) =
-			    RELOC(DRCCADDR, u_int) + NDRCCPG * NBPG;
+			    RELOC(DRCCADDR, u_int) + NDRCCPG * PAGE_SIZE;
 		}
 
 		/*
@@ -681,21 +688,24 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 #endif
 	{
 		RELOC(CHIPMEMADDR, vaddr_t) =
-		    (u_int)RELOC(Sysmap, u_int) - ptextra * NBPG;
+		    (u_int)RELOC(Sysmap, u_int) - ptextra * PAGE_SIZE;
 		if (RELOC(z2mem_end, u_int) == 0)
 			RELOC(CIAADDR, vaddr_t) =
-			    RELOC(CHIPMEMADDR, vaddr_t) + NCHIPMEMPG * NBPG;
+			    RELOC(CHIPMEMADDR, vaddr_t) +
+			    NCHIPMEMPG * PAGE_SIZE;
 		else {
 			RELOC(ZTWOMEMADDR, vaddr_t) =
-			    RELOC(CHIPMEMADDR, vaddr_t) + NCHIPMEMPG * NBPG;
-			RELOC(CIAADDR, vaddr_t) =
-			    RELOC(ZTWOMEMADDR, vaddr_t) + RELOC(NZTWOMEMPG, u_int) * NBPG;
+			    RELOC(CHIPMEMADDR, vaddr_t) +
+			    NCHIPMEMPG * PAGE_SIZE;
+			RELOC(CIAADDR, vaddr_t) = RELOC(ZTWOMEMADDR, vaddr_t) +
+				RELOC(NZTWOMEMPG, u_int) * PAGE_SIZE;
 		}
 		RELOC(ZTWOROMADDR, vaddr_t)  =
-		    RELOC(CIAADDR, vaddr_t) + NCIAPG * NBPG;
+		    RELOC(CIAADDR, vaddr_t) + NCIAPG * PAGE_SIZE;
 		RELOC(ZBUSADDR, vaddr_t) =
-		    RELOC(ZTWOROMADDR, vaddr_t) + NZTWOROMPG * NBPG;
-		RELOC(CIAADDR, vaddr_t) += NBPG/2;	/* not on 8k boundery :-( */
+		    RELOC(ZTWOROMADDR, vaddr_t) + NZTWOROMPG * PAGE_SIZE;
+		/* not on 8k boundary :-( */
+		RELOC(CIAADDR, vaddr_t) += PAGE_SIZE/2;
 		RELOC(CUSTOMADDR, vaddr_t)  =
 		    RELOC(ZTWOROMADDR, vaddr_t) - ZTWOROMBASE + CUSTOMBASE;
 		/*
@@ -712,7 +722,7 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync, boot_part
 	 * the `real' place too. protorp[0] is already preset to the
 	 * CRP setting.
 	 */
-	RELOC(protorp[1], u_int) = RELOC(Sysseg_pa, u_int);	/* + segtable address */
+	RELOC(protorp[1], u_int) = RELOC(Sysseg_pa, u_int);
 
 	RELOC(start_c_fphystart, u_int) = fphystart;
 	RELOC(start_c_pstart, u_int) = pstart;
@@ -786,8 +796,8 @@ void
 start_c_finish()
 {
 	extern u_int32_t delaydivisor;
-#ifdef P5PPC68KBOARD
-	struct cfdev *cdp, *ecdp;
+#ifdef	P5PPC68KBOARD
+        struct cfdev *cdp, *ecdp;
 #endif
 
 #ifdef DEBUG_KERNEL_START
@@ -795,7 +805,7 @@ start_c_finish()
 	if ((id >> 24) == 0x7D) { /* mapping on, is_draco() is valid */
 		int i;
 		/* XXX experimental Altais register mapping only */
-		altaiscolpt = (volatile u_int8_t *)(DRCCADDR+NBPG*9+0x3c8);
+		altaiscolpt = (volatile u_int8_t *)(DRCCADDR+PAGE_SIZE*9+0x3c8);
 		altaiscol = altaiscolpt + 1;
 		for (i=0; i<140000; i++) {
 			*altaiscolpt = 0;
@@ -820,10 +830,10 @@ start_c_finish()
 #ifdef DRACO
 	if (is_draco()) {
 		draco_intena = (volatile u_int8_t *)DRCCADDR+1;
-		draco_intpen = draco_intena + NBPG;
-		draco_intfrc = draco_intpen + NBPG;
-		draco_misc = draco_intfrc + NBPG;
-		draco_ioct = (struct drioct *)(DRCCADDR + DRIOCTLPG*NBPG);
+		draco_intpen = draco_intena + PAGE_SIZE;
+		draco_intfrc = draco_intpen + PAGE_SIZE;
+		draco_misc = draco_intfrc + PAGE_SIZE;
+		draco_ioct = (struct drioct *)(DRCCADDR + DRIOCTLPG*PAGE_SIZE);
 	} else
 #endif
 	{
@@ -838,7 +848,7 @@ start_c_finish()
 
 	/* XXX is: this MUST NOT BE DONE before the pmap_bootstrap() call */
 	if (z2mem_end) {
-		z2mem_end = ZTWOMEMADDR + NZTWOMEMPG * NBPG;
+		z2mem_end = ZTWOMEMADDR + NZTWOMEMPG * PAGE_SIZE;
 		z2mem_start = ZTWOMEMADDR;
 	}
 
@@ -848,7 +858,7 @@ start_c_finish()
 #endif
 
 	/*
-	 * disable all interupts but enable allow them to be enabled
+	 * disable all interrupts but enable allow them to be enabled
 	 * by specific driver code (global int enable bit)
 	 */
 #ifdef DRACO
@@ -867,10 +877,10 @@ start_c_finish()
 		    ~(DRSTAT2_PARIRQENA|DRSTAT2_TMRINTENA); /* some more */
 
 		*(volatile u_int8_t *)(DRCCADDR + 1 +
-		    DRSUPIOPG*NBPG + 4*(0x3F8 + 1)) = 0; /* and com0 */
+		    DRSUPIOPG*PAGE_SIZE + 4*(0x3F8 + 1)) = 0; /* and com0 */
 
 		*(volatile u_int8_t *)(DRCCADDR + 1 +
-		    DRSUPIOPG*NBPG + 4*(0x2F8 + 1)) = 0; /* and com1 */
+		    DRSUPIOPG*PAGE_SIZE + 4*(0x2F8 + 1)) = 0; /* and com1 */
 
 		draco_ioct->io_control |= DRCNTRL_WDOGDIS; /* stop Fido */
 		*draco_misc &= ~1/*DRMISC_FASTZ2*/;
@@ -921,7 +931,6 @@ start_c_finish()
 			}
         }
 #endif
-
 	/*
 	 * preliminary delay divisor value
 	 */
@@ -955,6 +964,7 @@ rollcolor(color)
 	splx(s);
 }
 
+#ifdef DEVRELOAD
 /*
  * Kernel reloading code
  */
@@ -995,8 +1005,8 @@ kernel_image_magic_copy(dest)
 	    + memlist->m_nseg * sizeof(struct boot_memseg) + 4);
 }
 
-#undef __LDPGSZ
-#define __LDPGSZ 8192 /* XXX ??? */
+#undef AOUT_LDPGSZ
+#define AOUT_LDPGSZ 8192 /* XXX ??? */
 
 int
 kernel_reload_write(uio)
@@ -1029,7 +1039,7 @@ kernel_reload_write(uio)
 		 * Looks good - allocate memory for a kernel image.
 		 */
 		kernel_text_size = (kernel_exec.a_text
-			+ __LDPGSZ - 1) & (-__LDPGSZ);
+			+ AOUT_LDPGSZ - 1) & (-AOUT_LDPGSZ);
 		/*
 		 * Estimate space needed for symbol names, since we don't
 		 * know how big it really is.
@@ -1146,3 +1156,4 @@ kernel_reload_write(uio)
 	}
 	return(0);
 }
+#endif

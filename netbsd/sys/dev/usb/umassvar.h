@@ -1,4 +1,4 @@
-/*	$NetBSD: umassvar.h,v 1.15 2002/02/07 13:52:55 augustss Exp $	*/
+/*	$NetBSD: umassvar.h,v 1.23 2004/03/22 14:55:42 tls Exp $	*/
 /*-
  * Copyright (c) 1999 MAEKAWA Masahide <bishop@rr.iij4u.or.jp>,
  *		      Nick Hibma <n_hibma@freebsd.org>
@@ -58,8 +58,6 @@ extern int umassdebug;
 #define DIR_NONE	0
 #define DIR_IN		1
 #define DIR_OUT		2
-
-#define MS_TO_TICKS(ms) ((ms) * hz / 1000)			      
 
 /* Endpoints for umass */
 #define	UMASS_BULKIN	0
@@ -178,11 +176,8 @@ struct umass_softc {
 #define UMASS_CPROTO_ISD_ATA	5
 
 	u_int32_t		sc_quirks;
-#define	UMASS_QUIRK_RS_NO_CLEAR_UA	0x00000002
-#define	UMASS_QUIRK_NO_START_STOP	0x00000004
-#define	UMASS_QUIRK_FORCE_SHORT_INQUIRY	0x00000008
-#define	UMASS_QUIRK_WRONG_CSWSIG	0x00000010
-#define UMASS_QUIRK_NO_MAX_LUN		0x00000020
+#define	UMASS_QUIRK_WRONG_CSWSIG         0x00000001
+#define	UMASS_QUIRK_WRONG_CSWTAG         0x00000002
 
 	u_int32_t		sc_busquirks;
 
@@ -190,7 +185,7 @@ struct umass_softc {
 	umass_bbb_cbw_t		cbw;	/* command block wrapper */
 	umass_bbb_csw_t		csw;	/* command status wrapper*/
 	/* CBI specific variables for transfers in progress */
-	umass_cbi_cbl_t		cbl;	/* command block */ 
+	umass_cbi_cbl_t		cbl;	/* command block */
 	umass_cbi_sbl_t		sbl;	/* status block */
 
 	/* xfer handles
@@ -208,7 +203,7 @@ struct umass_softc {
 #define XFER_BBB_RESET1		6
 #define XFER_BBB_RESET2		7
 #define XFER_BBB_RESET3		8
-	
+
 #define XFER_CBI_CB		0	/* CBI */
 #define XFER_CBI_DATA		1
 #define XFER_CBI_STATUS		2
@@ -227,7 +222,7 @@ struct umass_softc {
 	int			transfer_dir;		/* data direction */
 	void			*transfer_data;		/* data buffer */
 	int			transfer_datalen;	/* (maximum) length */
-	int			transfer_actlen;	/* actual length */ 
+	int			transfer_actlen;	/* actual length */
 	umass_callback		transfer_cb;		/* callback */
 	void			*transfer_priv;		/* for callback */
 	int			transfer_status;
@@ -264,8 +259,10 @@ struct umass_softc {
 
 	int			sc_xfer_flags;
 	char			sc_dying;
+	int			sc_refcnt;
+	int			sc_sense;
 
 	struct umassbus_softc	*bus;		 /* bus dependent data */
 };
 
-#define UMASS_MAX_TRANSFER_SIZE	MAXBSIZE
+#define UMASS_MAX_TRANSFER_SIZE	MAXPHYS

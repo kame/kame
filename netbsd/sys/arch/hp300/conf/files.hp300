@@ -1,4 +1,4 @@
-#	$NetBSD: files.hp300,v 1.55 2002/02/23 21:52:25 gmcgarry Exp $
+#	$NetBSD: files.hp300,v 1.69 2003/11/08 11:18:33 tsutsui Exp $
 #
 # hp300-specific configuration info
 
@@ -13,6 +13,8 @@ defflag	opt_spuconf.h	HP320 HP330 HP340 HP345 HP350 HP360 HP370
 
 # Misc. options.
 defflag			USELEDS		# make the lights twinkle
+defflag			PANICBUTTON	# enable panic on ctl+shift+reset ...
+					# ... unless we're doing DDB
 
 # NOTE!  The order of these lines is significant!  Don't change them
 # unless you absolutely know what you're doing!
@@ -55,15 +57,19 @@ attach	hil at intio
 file	arch/hp300/dev/hil.c			hil	needs-flag
 file	arch/hp300/dev/hil_keymaps.c		hil
 
+# 98620 DMA controller
+device	dma
+attach	dma at intio
+file	arch/hp300/dev/dma.c			dma
+
 # Apollo Utilility Chip (a.k.a. "Frodo") found on 4xx workstations
 device	frodo { offset = -1 }
 attach	frodo at intio
 file	arch/hp300/dev/frodo.c		frodo
 
 # Apollo APCI 8250-like UARTs
-device	apci: tty
-attach	apci at frodo
-file	arch/hp300/dev/apci.c		apci needs-flag
+attach	com at frodo with com_frodo
+file	arch/hp300/dev/com_frodo.c	com_frodo needs-flag
 
 # Frame buffer attribute
 define	grfdev { }
@@ -114,9 +120,8 @@ attach	rbox at dio with rbox_dio
 attach	topcat at dio with topcat_dio
 
 # DCA serial interface
-device	dca: tty
-attach	dca at dio
-file	arch/hp300/dev/dca.c		dca needs-flag
+attach	com at dio with com_dio
+file	arch/hp300/dev/com_dio.c	com_dio needs-flag
 
 # DCM serial interface
 device	dcm: tty
@@ -131,7 +136,8 @@ file	arch/hp300/dev/if_le.c		le
 define	hpibdev { }
 
 device	nhpib: hpibdev
-attach	nhpib at dio
+attach	nhpib at intio with nhpib_intio
+attach	nhpib at dio with nhpib_dio
 file	arch/hp300/dev/nhpib.c		nhpib
 
 device	fhpib: hpibdev
@@ -156,38 +162,21 @@ device	rd: disk
 attach	rd at hpibbus
 file	arch/hp300/dev/rd.c		rd needs-flag
 file	arch/hp300/dev/rd_compat.c	rd		# XXX
-major	{rd = 2}
 
 device	ppi
 attach	ppi at hpibbus
 file	arch/hp300/dev/ppi.c		ppi needs-flag
 
-# Old HP SCSI layer
-device	oscsi { target = -1, lun = -1 }
-attach	oscsi at dio
-file	arch/hp300/dev/scsi.c		oscsi
+# MI SCSI
+include "dev/scsipi/files.scsipi"
 
-# Old HP SCSI devices
-device	sd: disk
-attach	sd at oscsi
-file	arch/hp300/dev/sd.c		sd needs-flag
-file	arch/hp300/dev/sd_compat.c	sd		# XXX
-major	{sd = 4}
-
-device	st: tape
-attach	st at oscsi
-file	arch/hp300/dev/st.c		st needs-flag
-
-device	ac
-attach	ac at oscsi
-file	arch/hp300/dev/ac.c		ac needs-flag
-
-# RAIDframe
-major	{raid = 15}
+device	spc: scsi
+attach	spc at dio
+file	arch/hp300/dev/spc.c		spc needs-flag
+file	dev/ic/mb89352.c		spc
 
 # Memory Disk for ramdisk
 file	dev/md_root.c			memory_disk_hooks
-major	{md = 14}
 
 #
 # Non-device files
@@ -196,25 +185,23 @@ major	{md = 14}
 file	arch/hp300/hp300/autoconf.c
 file	arch/hp300/hp300/bus_space.c
 file	arch/hp300/hp300/clock.c
-file	arch/hp300/hp300/conf.c
-file	arch/hp300/hp300/db_memrw.c		ddb | kgdb
 file	arch/hp300/hp300/dkbad.c
-file	arch/hp300/hp300/kgdb_machdep.c		kgdb
 file	arch/hp300/hp300/machdep.c
 file	arch/hp300/hp300/intr.c
 file	arch/hp300/hp300/leds.c			useleds
 file	arch/hp300/hp300/mem.c
-file	arch/hp300/hp300/pmap.c
 file	arch/hp300/hp300/pmap_bootstrap.c	compile-with "${NOPROF_C}"
 file	arch/hp300/hp300/procfs_machdep.c	procfs
 file	arch/hp300/hp300/softintr.c
-file	arch/hp300/hp300/sys_machdep.c
 file	arch/hp300/hp300/trap.c
-file	arch/hp300/hp300/vm_machdep.c
 file	arch/hp300/hp300/disksubr.c
-file	arch/hp300/dev/dma.c
+file	arch/m68k/m68k/cacheops.c
+file	arch/m68k/m68k/db_memrw.c		ddb | kgdb
+file	arch/m68k/m68k/kgdb_machdep.c		kgdb
+file	arch/m68k/m68k/pmap_motorola.c
+file	arch/m68k/m68k/sys_machdep.c
+file	arch/m68k/m68k/vm_machdep.c
 
-file	dev/clock_subr.c
 file	dev/cons.c
 
 #
@@ -243,3 +230,5 @@ include "compat/aout/files.aout"
 
 # OSS audio driver compatibility
 include "compat/ossaudio/files.ossaudio"
+
+include	"arch/hp300/conf/majors.hp300"

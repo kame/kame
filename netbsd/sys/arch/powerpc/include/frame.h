@@ -1,4 +1,4 @@
-/*	$NetBSD: frame.h,v 1.4 2002/04/21 22:05:45 kleink Exp $	*/
+/*	$NetBSD: frame.h,v 1.17 2003/08/27 20:20:08 matt Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -30,8 +30,8 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef	_MACHINE_FRAME_H_
-#define	_MACHINE_FRAME_H_
+#ifndef	_POWERPC_FRAME_H_
+#define	_POWERPC_FRAME_H_
 
 #include <machine/types.h>
 
@@ -45,6 +45,19 @@
  *
  * Change ordering to cluster together these register_t's.		XXX
  */
+struct utrapframe {
+	register_t fixreg[32];
+	register_t lr;
+	int cr;
+	int xer;
+	register_t ctr;
+	register_t srr0;
+	register_t srr1;
+	int vrsave;
+	int mq;
+	int spare;
+};
+
 struct trapframe {
 	register_t fixreg[32];
 	register_t lr;
@@ -53,21 +66,48 @@ struct trapframe {
 	register_t ctr;
 	register_t srr0;
 	register_t srr1;
-	register_t dar;			/* dar & dsisr are only filled on a DSI trap */
+	/*
+	 * DAR is the OEA name.  On IBM4xx is DAR is really DEAR.
+	 */
+	register_t dar;		/* dar & dsisr are only filled on a DSI trap */
 	int dsisr;
 	int exc;
+	int tf_xtra[2];
 };
+#define	TF_VRSAVE	0
+#define	TF_MQ		1
+#define	TF_ESR		0
+#define	TF_PID		1
+
+#if defined(_KERNEL) || defined(_LKM)
+#ifdef _LP64
+struct utrapframe32 {
+	register32_t fixreg[32];
+	register32_t lr;
+	int cr;
+	int xer;
+	register32_t ctr;
+	register32_t srr0;
+	register32_t srr1;
+	int vrsave;
+	int mq;
+	int spare;
+};
+#endif
+#endif /* _KERNEL || _LKM */
+
 /*
  * This is to ensure alignment of the stackpointer
  */
-#define	FRAMELEN	roundup(sizeof(struct trapframe) + 8, 16)
-#define	trapframe(p)	((struct trapframe *)((char *)(p)->p_addr + USPACE - FRAMELEN + 8))
+#define	FRAMELEN	roundup(sizeof(struct trapframe) + 2*sizeof(register_t), CALLFRAMELEN)
+#define	trapframe(l)	((struct trapframe *)((char *)(l)->l_addr + USPACE - FRAMELEN + 2*sizeof(register_t)))
 
+#define	SFRAMELEN	roundup(sizeof(struct switchframe), CALLFRAMELEN)
 struct switchframe {
 	register_t sp;
-	int fill;
-	int user_sr;
-	int cr;
+	register_t lr;
+	register_t user_sr;		/* VSID on IBM4XX */
+	register_t cr;			/* why?  CR is volatile. */
 	register_t fixreg2;
 	register_t fixreg[19];		/* R13-R31 */
 };
@@ -82,6 +122,7 @@ struct clockframe {
 /*
  * Call frame for PowerPC used during fork.
  */
+#define	CALLFRAMELEN	sizeof(struct callframe)
 struct callframe {
 	register_t sp;
 	register_t lr;
@@ -89,7 +130,13 @@ struct callframe {
 	register_t r31;
 };
 
-#define	IFRAMELEN	sizeof(struct intrframe)
+struct saframe {
+	register_t r1;		/* stack pointer */
+	register_t lr;		/* Callee lr save area */
+	register_t fill[2];	/* Pad to multiple of 16 bytes */
+};
+
+#define	IFRAMELEN	roundup(sizeof(struct intrframe), CALLFRAMELEN)
 struct intrframe {
 	register_t r1;			/*  0 */
 	register_t _pad4;		/*  4 */
@@ -99,8 +146,8 @@ struct intrframe {
 	register_t srr1;		/*  8 */
 	register_t srr0;		/* 12 */
 	int pri;			/* 16 */
-	int intr_depth;			/* 20 */
-	register_t vrsave;		/* 24 */
+	int intrdepth;			/* 20 */
+	register_t pid;			/* 24 */
 	register_t ctr;			/* 28 */
 	register_t xer;			/* 32 */
 	register_t cr;			/* 36 */
@@ -118,21 +165,4 @@ struct intrframe {
 	register_t r0;			/* 84 */
 };
 
-#define	SPFRAMELEN	sizeof(struct spillframe)
-struct spillframe {
-	register_t	r1;		/*  0 */
-	register_t	_pad4;		/*  4 */
-	register_t	r12;		/*  8 */
-	register_t	r11;		/* 12 */
-	register_t	r10;		/* 16 */
-	register_t	r9;		/* 20 */
-	register_t	r8;		/* 24 */
-	register_t	r7;		/* 28 */
-	register_t	r6;		/* 32 */
-	register_t	r5;		/* 36 */
-	register_t	r4;		/* 40 */
-	register_t	r3;		/* 44 */
-	register_t	r0;		/* 48 */
-};
-
-#endif	/* _MACHINE_FRAME_H_ */
+#endif	/* _POWERPC_FRAME_H_ */

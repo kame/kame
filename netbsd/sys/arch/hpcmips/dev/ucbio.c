@@ -1,4 +1,4 @@
-/*	$NetBSD: ucbio.c,v 1.5 2002/01/29 18:53:12 uch Exp $	*/
+/*	$NetBSD: ucbio.c,v 1.8 2003/07/15 02:29:30 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -41,6 +41,9 @@
  *	General Purpose I/O part.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ucbio.c,v 1.8 2003/07/15 02:29:30 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -75,9 +78,8 @@ struct ucbio_softc {
 	struct hpcio_chip sc_hc;
 };
 
-struct cfattach ucbio_ca = {
-	sizeof(struct ucbio_softc), ucbio_match, ucbio_attach
-};
+CFATTACH_DECL(ucbio, sizeof(struct ucbio_softc),
+    ucbio_match, ucbio_attach, NULL, NULL);
 
 /* I/O */
 static int betty_in(hpcio_chip_t, int);

@@ -1,4 +1,4 @@
-/*	$NetBSD: am79c950.c,v 1.12.10.1 2003/06/17 09:28:02 msaitoh Exp $	*/
+/*	$NetBSD: am79c950.c,v 1.15 2003/07/15 02:43:27 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997 David Huang <khym@bga.com>
@@ -33,6 +33,10 @@
  * Driver for the AMD Am79C940 (MACE) ethernet chip, used for onboard
  * ethernet on the Centris/Quadra 660av and Quadra 840av.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: am79c950.c,v 1.15 2003/07/15 02:43:27 lukem Exp $");
+
 #include "opt_inet.h"
 #include "opt_ccitt.h"
 #include "opt_llc.h"
@@ -48,6 +52,8 @@
 #include <sys/ioctl.h>
 #include <sys/errno.h>
 #include <sys/device.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -473,7 +479,7 @@ maceput(sc, m)
 		MFREE(m, n);
 	}
 
-	if (totlen > NBPG)
+	if (totlen > PAGE_SIZE)
 		panic("%s: maceput: packet overflow", sc->sc_dev.dv_xname);
 
 #if 0

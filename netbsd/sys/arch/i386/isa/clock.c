@@ -1,9 +1,40 @@
-/*	$NetBSD: clock.c,v 1.70 2002/01/01 09:14:14 perry Exp $	*/
+/*	$NetBSD: clock.c,v 1.81 2003/08/07 16:28:01 agc Exp $	*/
 
 /*-
- * Copyright (c) 1993, 1994 Charles M. Hannum.
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * William Jolitz and Don Ahn.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)clock.c	7.2 (Berkeley) 5/12/91
+ */
+/*-
+ * Copyright (c) 1993, 1994 Charles M. Hannum.
  *
  * This code is derived from software contributed to Berkeley by
  * William Jolitz and Don Ahn.
@@ -90,10 +121,12 @@ WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.70 2002/01/01 09:14:14 perry Exp $");
+__KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.81 2003/08/07 16:28:01 agc Exp $");
 
 /* #define CLOCKDEBUG */
 /* #define CLOCK_PARANOIA */
+
+#include "opt_multiprocessor.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -109,9 +142,12 @@ __KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.70 2002/01/01 09:14:14 perry Exp $");
 #include <dev/isa/isareg.h>
 #include <dev/isa/isavar.h>
 #include <dev/ic/mc146818reg.h>
+#include <dev/ic/i8253reg.h>
 #include <i386/isa/nvram.h>
-#include <i386/isa/timerreg.h>
 #include <dev/clock_subr.h>
+#include <machine/specialreg.h> 
+
+#include "config_time.h"		/* for CONFIG_TIME */
 
 #include "mca.h"
 #if NMCA > 0
@@ -132,16 +168,15 @@ int clock_debug = 0;
 int sysbeepmatch __P((struct device *, struct cfdata *, void *));
 void sysbeepattach __P((struct device *, struct device *, void *));
 
-struct cfattach sysbeep_ca = {
-	sizeof(struct device), sysbeepmatch, sysbeepattach
-};
+CFATTACH_DECL(sysbeep, sizeof(struct device),
+    sysbeepmatch, sysbeepattach, NULL, NULL);
 
 static int ppi_attached;
 static pcppi_tag_t ppicookie;
 #endif /* PCPPI */
 
 void	spinwait __P((int));
-int	clockintr __P((void *));
+int	clockintr __P((void *, struct intrframe));
 int	gettick __P((void));
 void	sysbeep __P((int, int));
 void	rtcinit __P((void));
@@ -150,7 +185,6 @@ void	rtcput __P((mc_todregs *));
 int 	bcdtobin __P((int));
 int	bintobcd __P((int));
 
-static void check_clock_bug __P((void));
 static inline int gettick_broken_latch __P((void));
 
 
@@ -177,35 +211,18 @@ mc146818_write(sc, reg, datum)
 	outb(IO_RTC+1, datum);
 }
 
-static u_long rtclock_tval;
-static int clock_broken_latch = 0;
+u_long rtclock_tval;
+int clock_broken_latch = 0;
 
 #ifdef CLOCK_PARANOIA
 static int ticks[6];
 #endif
-
 /*
  * i8254 latch check routine:
  *     National Geode (formerly Cyrix MediaGX) has a serious bug in
  *     its built-in i8254-compatible clock module.
- *     Set the variable 'clock_broken_latch' to indicate it.
- *     XXX check only cpu_id
+ *     machdep sets the variable 'clock_broken_latch' to indicate it.
  */
-static void
-check_clock_bug()
-{
-	extern int cpu_id;
-
-	switch (cpu_id) {
-	case 0x440:     /* Cyrix MediaGX */
-	case 0x540:     /* GXm */
-		clock_broken_latch = 1;
-		break;
-	default:
-		clock_broken_latch = 0;
-		break;
-	}
-}
 
 int
 gettick_broken_latch()
@@ -219,12 +236,12 @@ gettick_broken_latch()
 	ef = read_eflags();
 	disable_intr();
 
-	v1 = inb(TIMER_CNTR0);
-	v1 |= inb(TIMER_CNTR0) << 8;
-	v2 = inb(TIMER_CNTR0);
-	v2 |= inb(TIMER_CNTR0) << 8;
-	v3 = inb(TIMER_CNTR0);
-	v3 |= inb(TIMER_CNTR0) << 8;
+	v1 = inb(IO_TIMER1+TIMER_CNTR0);
+	v1 |= inb(IO_TIMER1+TIMER_CNTR0) << 8;
+	v2 = inb(IO_TIMER1+TIMER_CNTR0);
+	v2 |= inb(IO_TIMER1+TIMER_CNTR0) << 8;
+	v3 = inb(IO_TIMER1+TIMER_CNTR0);
+	v3 |= inb(IO_TIMER1+TIMER_CNTR0) << 8;
 
 	write_eflags(ef);
 
@@ -293,15 +310,13 @@ initrtclock()
 	tval = (tval / 2) + (tval & 0x1);
 
 	/* initialize 8253 clock */
-	outb(TIMER_MODE, TIMER_SEL0|TIMER_RATEGEN|TIMER_16BIT);
+	outb(IO_TIMER1+TIMER_MODE, TIMER_SEL0|TIMER_RATEGEN|TIMER_16BIT);
 
 	/* Correct rounding will buy us a better precision in timekeeping */
-	outb(IO_TIMER1, tval % 256);
-	outb(IO_TIMER1, tval / 256);
+	outb(IO_TIMER1+TIMER_CNTR0, tval % 256);
+	outb(IO_TIMER1+TIMER_CNTR0, tval / 256);
 
 	rtclock_tval = tval;
-
-	check_clock_bug();
 }
 
 /*
@@ -405,12 +420,32 @@ startrtclock()
 }
 
 int
-clockintr(arg)
-	void *arg;
+clockintr(void *arg, struct intrframe frame)
 {
-	struct clockframe *frame = arg;		/* not strictly necessary */
+#if defined(I586_CPU) || defined(I686_CPU)
+	static int microset_iter; /* call cc_microset once/sec */
+	struct cpu_info *ci = curcpu();
+	
+	/*
+	 * If we have a cycle counter, do the microset thing.
+	 */
+	if (ci->ci_feature_flags & CPUID_TSC) {
+		if (
+#if defined(MULTIPROCESSOR)
+		    CPU_IS_PRIMARY(ci) &&
+#endif
+		    (microset_iter--) == 0) {
+			cc_microset_time = time;
+			microset_iter = hz - 1;
+#if defined(MULTIPROCESSOR)
+			x86_broadcast_ipi(X86_IPI_MICROSET);
+#endif
+			cc_microset(ci);
+		}
+	}
+#endif
 
-	hardclock(frame);
+	hardclock((struct clockframe *)&frame);
 
 #if NMCA > 0
 	if (MCA_system) {
@@ -434,9 +469,9 @@ gettick()
 	ef = read_eflags();
 	disable_intr();
 	/* Select counter 0 and latch it. */
-	outb(TIMER_MODE, TIMER_SEL0 | TIMER_LATCH);
-	lo = inb(TIMER_CNTR0);
-	hi = inb(TIMER_CNTR0);
+	outb(IO_TIMER1+TIMER_MODE, TIMER_SEL0 | TIMER_LATCH);
+	lo = inb(IO_TIMER1+TIMER_CNTR0);
+	hi = inb(IO_TIMER1+TIMER_CNTR0);
 	write_eflags(ef);
 	return ((hi << 8) | lo);
 }
@@ -450,7 +485,7 @@ gettick()
  * Don't rely on this being particularly accurate.
  */
 void
-delay(n)
+i8254_delay(n)
 	int n;
 {
 	int tick, otick;
@@ -564,14 +599,15 @@ sysbeep(pitch, period)
 }
 
 void
-cpu_initclocks()
+i8254_initclocks()
 {
 
 	/*
 	 * XXX If you're doing strange things with multiple clocks, you might
 	 * want to keep track of clock handlers.
 	 */
-	(void)isa_intr_establish(NULL, 0, IST_PULSE, IPL_CLOCK, clockintr, 0);
+	(void)isa_intr_establish(NULL, 0, IST_PULSE, IPL_CLOCK,
+	    (int (*)(void *))clockintr, 0);
 }
 
 void
@@ -747,7 +783,9 @@ inittodr(base)
 	mc_todregs rtclk;
 	struct clock_ymdhms dt;
 	int s;
-
+#if defined(I586_CPU) || defined(I686_CPU)
+	struct cpu_info *ci = curcpu();
+#endif
 	/*
 	 * We mostly ignore the suggested time (which comes from the
 	 * file system) and go for the RTC clock time stored in the
@@ -759,14 +797,12 @@ inittodr(base)
 	 */
 
 	/*
-	 * XXX Traditionally, the dates in this code snippet get
-	 * updated every few years. It would be neater if they could
-	 * somehow be automatically set when the kernel was built.
+	 * if the file system time is more than a year older than the
+	 * kernel, warn and then set the base time to the CONFIG_TIME.
 	 */
-	if (base && base < 30*SECYR) {	/* if before 2000, something's odd. */
+	if (base && base < (CONFIG_TIME-SECYR)) {
 		printf("WARNING: preposterous time in file system\n");
-		/* Since the fs time is silly, set the base time to 2002 */
-		base = 32*SECYR;
+		base = CONFIG_TIME;
 	}
 
 	s = splclock();
@@ -811,6 +847,12 @@ inittodr(base)
 	time.tv_sec = clock_ymdhms_to_secs(&dt) + rtc_offset * 60;
 #ifdef DEBUG_CLOCK
 	printf("readclock: %ld (%ld)\n", time.tv_sec, base);
+#endif
+#if defined(I586_CPU) || defined(I686_CPU)
+	if (ci->ci_feature_flags & CPUID_TSC) {
+		cc_microset_time = time;
+		cc_microset(ci);
+	}
 #endif
 
 	if (base != 0 && base < time.tv_sec - 5*SECYR)
@@ -858,7 +900,7 @@ resettodr()
 	rtclk[MC_SEC] = bintobcd(dt.dt_sec);
 	rtclk[MC_MIN] = bintobcd(dt.dt_min);
 	rtclk[MC_HOUR] = bintobcd(dt.dt_hour);
-	rtclk[MC_DOW] = dt.dt_wday;
+	rtclk[MC_DOW] = dt.dt_wday + 1;
 	rtclk[MC_YEAR] = bintobcd(dt.dt_year % 100);
 	rtclk[MC_MONTH] = bintobcd(dt.dt_mon);
 	rtclk[MC_DOM] = bintobcd(dt.dt_day);

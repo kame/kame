@@ -1,4 +1,4 @@
-/*	$NetBSD: pchb.c,v 1.3 2000/05/29 15:43:50 soren Exp $	*/
+/*	$NetBSD: pchb.c,v 1.6 2003/07/15 01:29:23 lukem Exp $	*/
 
 /*
  * Copyright (c) 2000 Soren S. Jorvang.  All rights reserved.
@@ -25,6 +25,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pchb.c,v 1.6 2003/07/15 01:29:23 lukem Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -40,9 +43,8 @@
 static int	pchb_match(struct device *, struct cfdata *, void *);
 static void	pchb_attach(struct device *, struct device *, void *);
 
-struct cfattach pchb_ca = {
-	sizeof(struct device), pchb_match, pchb_attach
-};
+CFATTACH_DECL(pchb, sizeof(struct device),
+    pchb_match, pchb_attach, NULL, NULL);
 
 static int
 pchb_match(parent, match, aux)

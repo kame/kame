@@ -1,9 +1,44 @@
-/*	$NetBSD: vm_43.c,v 1.7 2001/11/13 02:08:06 lukem Exp $	*/
+/*	$NetBSD: vm_43.c,v 1.9.2.1 2004/11/12 06:55:56 jmc Exp $	*/
+
+/*
+ * Copyright (c) 1991, 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: vm_mmap.c 1.6 91/10/21$
+ *
+ *	@(#)vm_mmap.c	8.5 (Berkeley) 5/19/94
+ */
 
 /*
  * Copyright (c) 1988 University of Utah.
- * Copyright (c) 1991, 1993
- *	The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -47,7 +82,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: vm_43.c,v 1.7 2001/11/13 02:08:06 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: vm_43.c,v 1.9.2.1 2004/11/12 06:55:56 jmc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -59,16 +94,14 @@ __KERNEL_RCSID(0, "$NetBSD: vm_43.c,v 1.7 2001/11/13 02:08:06 lukem Exp $");
 #include <sys/mman.h>
 
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <miscfs/specfs/specdev.h>
 
 /* ARGSUSED */
 int
-compat_43_sys_getpagesize(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_getpagesize(struct lwp *l, void *v, register_t *retval)
 {
 
 	*retval = PAGE_SIZE;
@@ -76,10 +109,7 @@ compat_43_sys_getpagesize(p, v, retval)
 }
 
 int
-compat_43_sys_mmap(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_mmap(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_mmap_args /* {
 		syscallarg(caddr_t) addr;
@@ -116,6 +146,7 @@ compat_43_sys_mmap(p, v, retval)
 
 	SCARG(&nargs, addr) = SCARG(uap, addr);
 	SCARG(&nargs, len) = SCARG(uap, len);
+	/* Note: index using prot is sign-safe due to mask */
 	SCARG(&nargs, prot) = cvtbsdprot[SCARG(uap, prot)&0x7];
 	SCARG(&nargs, flags) = 0;
 	if (SCARG(uap, flags) & OMAP_ANON)
@@ -132,5 +163,5 @@ compat_43_sys_mmap(p, v, retval)
 		SCARG(&nargs, flags) |= MAP_INHERIT;
 	SCARG(&nargs, fd) = SCARG(uap, fd);
 	SCARG(&nargs, pos) = SCARG(uap, pos);
-	return (sys_mmap(p, &nargs, retval));
+	return (sys_mmap(l, &nargs, retval));
 }

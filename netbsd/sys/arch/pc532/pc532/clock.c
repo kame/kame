@@ -1,4 +1,4 @@
-/*	$NetBSD: clock.c,v 1.22 1998/01/12 19:55:44 thorpej Exp $	*/
+/*	$NetBSD: clock.c,v 1.26 2003/08/07 16:29:01 agc Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,6 +34,9 @@
  *	@(#)clock.c	7.2 (Berkeley) 5/12/91
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.26 2003/08/07 16:29:01 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/time.h>
@@ -70,16 +69,14 @@ static void	write_rtc __P((u_char *));
 static int  clock_match __P((struct device *, struct cfdata *, void *args));
 static void clock_attach __P((struct device *, struct device *, void *));
 
-struct cfattach clock_ca = {
-	sizeof(struct device), clock_match, clock_attach
-};
+CFATTACH_DECL(clock, sizeof(struct device),
+    clock_match, clock_attach, NULL, NULL);
 
 static int  rtc_match __P((struct device *, struct cfdata *, void *args));
 static void rtc_attach __P((struct device *, struct device *, void *));
 
-struct cfattach rtc_ca = {
-	sizeof(struct device), rtc_match, rtc_attach
-};
+CFATTACH_DECL(rtc, sizeof(struct device),
+    rtc_match, rtc_attach, NULL, NULL);
 
 static int
 clock_match(parent, cf, aux)

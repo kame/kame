@@ -1,4 +1,4 @@
-/* $NetBSD: wsevent.c,v 1.10 2002/01/12 16:41:02 tsutsui Exp $ */
+/* $NetBSD: wsevent.c,v 1.16 2003/08/07 16:31:29 agc Exp $ */
 
 /*
  * Copyright (c) 1996, 1997 Christopher G. Demetriou.  All rights reserved.
@@ -51,11 +51,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -79,7 +75,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: wsevent.c,v 1.10 2002/01/12 16:41:02 tsutsui Exp $");
+__KERNEL_RCSID(0, "$NetBSD: wsevent.c,v 1.16 2003/08/07 16:31:29 agc Exp $");
 
 #include <sys/param.h>
 #include <sys/fcntl.h>
@@ -100,12 +96,12 @@ void
 wsevent_init(struct wseventvar *ev)
 {
 
-#ifdef DIAGNOSTIC
 	if (ev->q != NULL) {
+#ifdef DIAGNOSTIC
 		printf("wsevent_init: already init\n");
+#endif
 		return;
 	}
-#endif
 	ev->get = ev->put = 0;
 	ev->q = malloc((u_long)WSEVENT_QSIZE * sizeof(struct wscons_event),
 		       M_DEVBUF, M_WAITOK|M_ZERO);
@@ -117,7 +113,12 @@ wsevent_init(struct wseventvar *ev)
 void
 wsevent_fini(struct wseventvar *ev)
 {
-
+	if (ev->q == NULL) {
+#ifdef DIAGNOSTIC
+		printf("wsevent_fini: already fini\n");
+#endif
+		return;
+	}
 	free(ev->q, M_DEVBUF);
 	ev->q = NULL;
 }
@@ -196,4 +197,62 @@ wsevent_poll(struct wseventvar *ev, int events, struct proc *p)
 
 	splx(s);
 	return (revents);
+}
+
+static void
+filt_wseventrdetach(struct knote *kn)
+{
+	struct wseventvar *ev = kn->kn_hook;
+	int s;
+
+	s = splwsevent();
+	SLIST_REMOVE(&ev->sel.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_wseventread(struct knote *kn, long hint)
+{
+	struct wseventvar *ev = kn->kn_hook;
+
+	if (ev->get == ev->put)
+		return (0);
+
+	if (ev->get < ev->put)
+		kn->kn_data = ev->put - ev->get;
+	else
+		kn->kn_data = (WSEVENT_QSIZE - ev->get) +
+		    ev->put;
+
+	kn->kn_data *= sizeof(struct wscons_event);
+
+	return (1);
+}
+
+static const struct filterops wsevent_filtops =
+	{ 1, NULL, filt_wseventrdetach, filt_wseventread };
+
+int
+wsevent_kqfilter(struct wseventvar *ev, struct knote *kn)
+{
+	struct klist *klist;
+	int s;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &ev->sel.sel_klist;
+		kn->kn_fop = &wsevent_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = ev;
+
+	s = splwsevent();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
 }

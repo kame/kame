@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_xxx_12.c,v 1.3 2001/11/13 02:08:02 lukem Exp $	*/
+/*	$NetBSD: kern_xxx_12.c,v 1.5 2003/08/07 16:30:36 agc Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -37,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kern_xxx_12.c,v 1.3 2001/11/13 02:08:02 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_xxx_12.c,v 1.5 2003/08/07 16:30:36 agc Exp $");
 
 /*#ifdef COMPAT_12*/
 
@@ -46,18 +42,17 @@ __KERNEL_RCSID(0, "$NetBSD: kern_xxx_12.c,v 1.3 2001/11/13 02:08:02 lukem Exp $"
 #include <sys/proc.h>
 #include <sys/reboot.h>
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 /* ARGSUSED */
 int
-compat_12_sys_reboot(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_12_sys_reboot(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_12_sys_reboot_args /* {
 		syscallarg(int) opt;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	int error;
 
 	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)

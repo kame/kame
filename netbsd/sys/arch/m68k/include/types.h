@@ -1,4 +1,4 @@
-/*	$NetBSD: types.h,v 1.14 2001/04/28 15:41:31 kleink Exp $	*/
+/*	$NetBSD: types.h,v 1.22 2004/01/18 18:23:19 martin Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,6 +34,7 @@
 #define	_M68K_TYPES_H_
 
 #include <sys/cdefs.h>
+#include <sys/featuretest.h>
 #include <m68k/int_types.h>
 
 #if defined(_KERNEL)
@@ -47,7 +44,7 @@ typedef struct label_t {		/* consistent with HP-UX */
 #endif
 
 /* NB: This should probably be if defined(_KERNEL) */
-#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 typedef	unsigned long	vm_offset_t;
 typedef	unsigned long	vm_size_t;
 
@@ -58,5 +55,17 @@ typedef vm_size_t	vsize_t;
 #endif
 
 typedef int		register_t;
+
+typedef	__volatile unsigned char __cpu_simple_lock_t;
+
+#define	__SIMPLELOCK_LOCKED	0x80	/* result of `tas' insn */
+#define	__SIMPLELOCK_UNLOCKED	0
+
+#define	__HAVE_SYSCALL_INTERN
+#define	__HAVE_MD_RUNQUEUE
+
+#if defined(_KERNEL)
+#define	__HAVE_RAS
+#endif
 
 #endif	/* !_M68K_TYPES_H_ */

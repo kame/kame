@@ -1,4 +1,4 @@
-/*	$NetBSD: icsphy.c,v 1.26 2002/03/25 20:51:24 thorpej Exp $	*/
+/*	$NetBSD: icsphy.c,v 1.33 2003/07/01 22:51:13 msaitoh Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -67,18 +67,17 @@
  */
 
 /*
- * driver for Integrated Circuit Systems' ICS1890 ethernet 10/100 PHY
+ * driver for Integrated Circuit Systems' ICS1889-1893 ethernet 10/100 PHY
  * datasheet from www.icst.com
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: icsphy.c,v 1.26 2002/03/25 20:51:24 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: icsphy.c,v 1.33 2003/07/01 22:51:13 msaitoh Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
-#include <sys/malloc.h>
 #include <sys/socket.h>
 
 #include <net/if.h>
@@ -93,10 +92,8 @@ __KERNEL_RCSID(0, "$NetBSD: icsphy.c,v 1.26 2002/03/25 20:51:24 thorpej Exp $");
 int	icsphymatch(struct device *, struct cfdata *, void *);
 void	icsphyattach(struct device *, struct device *, void *);
 
-struct cfattach icsphy_ca = {
-	sizeof(struct mii_softc), icsphymatch, icsphyattach, mii_phy_detach,
-	    mii_phy_activate
-};
+CFATTACH_DECL(icsphy, sizeof(struct mii_softc),
+    icsphymatch, icsphyattach, mii_phy_detach, mii_phy_activate);
 
 int	icsphy_service(struct mii_softc *, struct mii_data *, int);
 void	icsphy_status(struct mii_softc *);
@@ -107,8 +104,14 @@ const struct mii_phy_funcs icsphy_funcs = {
 };
 
 const struct mii_phydesc icsphys[] = {
+	{ MII_OUI_ICS,		MII_MODEL_ICS_1889,
+	  MII_STR_ICS_1889 },
+
 	{ MII_OUI_ICS,		MII_MODEL_ICS_1890,
 	  MII_STR_ICS_1890 },
+
+	{ MII_OUI_ICS,		MII_MODEL_ICS_1892,
+	  MII_STR_ICS_1892 },
 
 	{ MII_OUI_ICS,		MII_MODEL_ICS_1893,
 	  MII_STR_ICS_1893 },
@@ -137,8 +140,10 @@ icsphyattach(struct device *parent, struct device *self, void *aux)
 	const struct mii_phydesc *mpd;
 
 	mpd = mii_phy_match(ma, icsphys);
-	printf(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
+	aprint_naive(": Media interface\n");
+	aprint_normal(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
 
+	sc->mii_mpd_model = MII_MODEL(ma->mii_id2);
 	sc->mii_inst = mii->mii_instance;
 	sc->mii_phy = ma->mii_phyno;
 	sc->mii_funcs = &icsphy_funcs;
@@ -150,12 +155,12 @@ icsphyattach(struct device *parent, struct device *self, void *aux)
 
 	sc->mii_capabilities =
 	    PHY_READ(sc, MII_BMSR) & ma->mii_capmask;
-	printf("%s: ", sc->mii_dev.dv_xname);
+	aprint_normal("%s: ", sc->mii_dev.dv_xname);
 	if ((sc->mii_capabilities & BMSR_MEDIAMASK) == 0)
-		printf("no media present");
+		aprint_error("no media present");
 	else
 		mii_phy_add_media(sc);
-	printf("\n");
+	aprint_normal("\n");
 }
 
 int
@@ -273,5 +278,23 @@ icsphy_reset(sc)
 {
 
 	mii_phy_reset(sc);
-	PHY_WRITE(sc, MII_ICSPHY_ECR2, ECR2_10TPROT|ECR2_Q10T);
+	/* set powerdown feature */
+	switch (sc->mii_mpd_model) {
+		case MII_MODEL_ICS_1890:
+		case MII_MODEL_ICS_1893:
+			PHY_WRITE(sc, MII_ICSPHY_ECR2, ECR2_100AUTOPWRDN);
+			break;
+		case MII_MODEL_ICS_1892:
+			PHY_WRITE(sc, MII_ICSPHY_ECR2,
+			    ECR2_10AUTOPWRDN|ECR2_100AUTOPWRDN);
+			break;
+		default:
+			/* 1889 have no ECR2 */
+			break;
+	}
+	/*
+	 * There is no description that the reset do auto-negotiation in the
+	 * data sheet.
+	 */
+	PHY_WRITE(sc, MII_BMCR, BMCR_S100|BMCR_STARTNEG|BMCR_FDX);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: gphyter.c,v 1.7 2002/03/25 20:51:24 thorpej Exp $	*/
+/*	$NetBSD: gphyter.c,v 1.12 2003/04/29 01:49:33 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000, 2001 The NetBSD Foundation, Inc.
@@ -75,13 +75,12 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: gphyter.c,v 1.7 2002/03/25 20:51:24 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: gphyter.c,v 1.12 2003/04/29 01:49:33 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
-#include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/errno.h>
 
@@ -97,10 +96,8 @@ __KERNEL_RCSID(0, "$NetBSD: gphyter.c,v 1.7 2002/03/25 20:51:24 thorpej Exp $");
 int	gphytermatch(struct device *, struct cfdata *, void *);
 void	gphyterattach(struct device *, struct device *, void *);
 
-struct cfattach gphyter_ca = {
-	sizeof(struct mii_softc), gphytermatch, gphyterattach,
-	    mii_phy_detach, mii_phy_activate
-};
+CFATTACH_DECL(gphyter, sizeof(struct mii_softc),
+    gphytermatch, gphyterattach, mii_phy_detach, mii_phy_activate);
 
 int	gphyter_service(struct mii_softc *, struct mii_data *, int);
 void	gphyter_status(struct mii_softc *);
@@ -141,7 +138,8 @@ gphyterattach(struct device *parent, struct device *self, void *aux)
 	int anar, strap;
 
 	mpd = mii_phy_match(ma, gphyters);
-	printf(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
+	aprint_naive(": Media interface\n");
+	aprint_normal(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
 
 	sc->mii_inst = mii->mii_instance;
 	sc->mii_phy = ma->mii_phyno;
@@ -170,20 +168,20 @@ gphyterattach(struct device *parent, struct device *self, void *aux)
 	if (anar & ANAR_10_FD)
 		sc->mii_capabilities |= (BMSR_10TFDX & ma->mii_capmask);
 
-	printf("%s: ", sc->mii_dev.dv_xname);
+	aprint_normal("%s: ", sc->mii_dev.dv_xname);
 	if ((sc->mii_capabilities & BMSR_MEDIAMASK) == 0 &&
 	    (sc->mii_extcapabilities & EXTSR_MEDIAMASK) == 0)
-		printf("no media present");
+		aprint_error("no media present");
 	else
 		mii_phy_add_media(sc);
-	printf("\n");
+	aprint_normal("\n");
 
 	strap = PHY_READ(sc, MII_GPHYTER_STRAP);
-	printf("%s: strapped to %s mode", sc->mii_dev.dv_xname,
+	aprint_normal("%s: strapped to %s mode", sc->mii_dev.dv_xname,
 	    (strap & STRAP_MS_VAL) ? "master" : "slave");
 	if (strap & STRAP_NC_MODE)
-		printf(", pre-C5 BCM5400 compat enabled");
-	printf("\n");
+		aprint_normal(", pre-C5 BCM5400 compat enabled");
+	aprint_normal("\n");
 }
 
 int

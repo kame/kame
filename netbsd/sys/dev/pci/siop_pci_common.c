@@ -1,4 +1,4 @@
-/*	$NetBSD: siop_pci_common.c,v 1.17 2002/05/04 18:11:06 bouyer Exp $	*/
+/*	$NetBSD: siop_pci_common.c,v 1.22 2004/03/10 22:02:53 bouyer Exp $	*/
 
 /*
  * Copyright (c) 2000 Manuel Bouyer.
@@ -32,7 +32,7 @@
 /* SYM53c8xx PCI-SCSI I/O Processors driver: PCI front-end */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: siop_pci_common.c,v 1.17 2002/05/04 18:11:06 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: siop_pci_common.c,v 1.22 2004/03/10 22:02:53 bouyer Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -40,6 +40,8 @@ __KERNEL_RCSID(0, "$NetBSD: siop_pci_common.c,v 1.17 2002/05/04 18:11:06 bouyer 
 #include <sys/malloc.h>
 #include <sys/buf.h>
 #include <sys/kernel.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/endian.h>
 
@@ -190,6 +192,7 @@ const struct siop_product_desc siop_products[] = {
 	SF_PCI_RL | SF_PCI_CLS | SF_PCI_WRI | SF_PCI_RM |
 	SF_CHIP_LEDC | SF_CHIP_FIFO | SF_CHIP_PF | SF_CHIP_RAM |
 	SF_CHIP_LS | SF_CHIP_10REGS | SF_CHIP_DFBC | SF_CHIP_DBLR | SF_CHIP_DT |
+	SF_CHIP_AAIP |
 	SF_BUS_ULTRA3 | SF_BUS_WIDE, 
 	7, 62, 0, 62, 8192
 	},
@@ -247,10 +250,12 @@ siop_pci_attach_common(pci_sc, siop_sc, pa, intr)
 	int memh_valid, ioh_valid;
 	bus_addr_t ioaddr, memaddr;
 
+	aprint_naive(": SCSI controller\n");
+
 	pci_sc->sc_pp =
 	    siop_lookup_product(pa->pa_id, PCI_REVISION(pa->pa_class));
 	if (pci_sc->sc_pp == NULL) {
-		printf("sym: broken match/attach!!\n");
+		aprint_error("sym: broken match/attach!!\n");
 		return 0;
 	}
 	/* copy interesting infos about the chip */
@@ -265,7 +270,7 @@ siop_pci_attach_common(pci_sc, siop_sc, pa, intr)
 	siop_sc->ram_size = pci_sc->sc_pp->ram_size;
 
 	siop_sc->sc_reset = siop_pci_reset;
-	printf(": %s\n", pci_sc->sc_pp->name);
+	aprint_normal(": %s\n", pci_sc->sc_pp->name);
 	pci_sc->sc_pc = pc;
 	pci_sc->sc_tag = tag;
 	siop_sc->sc_dmat = pa->pa_dmat;
@@ -293,7 +298,7 @@ siop_pci_attach_common(pci_sc, siop_sc, pa, intr)
 		siop_sc->sc_rh = ioh;
 		siop_sc->sc_raddr = ioaddr;
 	} else {
-		printf("%s: unable to map device registers\n",
+		aprint_error("%s: unable to map device registers\n",
 		    siop_sc->sc_dev.dv_xname);
 		return 0;
 	}
@@ -307,21 +312,25 @@ siop_pci_attach_common(pci_sc, siop_sc, pa, intr)
 		case PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_64BIT:
 			bar = 0x1c;
 			break;
+		default:
+			aprint_error("%s: invalid memory type %d\n",
+			    siop_sc->sc_dev.dv_xname, memtype);
+			return 0;
 		}
 		if (pci_mapreg_map(pa, bar, memtype, 0,
                     &siop_sc->sc_ramt, &siop_sc->sc_ramh,
 		    &siop_sc->sc_scriptaddr, NULL) == 0) {
-			printf("%s: using on-board RAM\n",
+			aprint_normal("%s: using on-board RAM\n",
 			    siop_sc->sc_dev.dv_xname);
 		} else {
-			printf("%s: can't map on-board RAM\n",
+			aprint_error("%s: can't map on-board RAM\n",
 			    siop_sc->sc_dev.dv_xname);
 			siop_sc->features &= ~SF_CHIP_RAM;
 		}
 	}
 
 	if (pci_intr_map(pa, &intrhandle) != 0) {
-		printf("%s: couldn't map interrupt\n",
+		aprint_error("%s: couldn't map interrupt\n",
 		    siop_sc->sc_dev.dv_xname);
 		return 0;
 	}
@@ -329,15 +338,15 @@ siop_pci_attach_common(pci_sc, siop_sc, pa, intr)
 	pci_sc->sc_ih = pci_intr_establish(pa->pa_pc, intrhandle, IPL_BIO,
 	    intr, siop_sc);
 	if (pci_sc->sc_ih != NULL) {
-		printf("%s: interrupting at %s\n",
+		aprint_normal("%s: interrupting at %s\n",
 		    siop_sc->sc_dev.dv_xname,
 		    intrstr ? intrstr : "unknown interrupt");
 	} else {
-		printf("%s: couldn't establish interrupt",
+		aprint_error("%s: couldn't establish interrupt",
 		    siop_sc->sc_dev.dv_xname);
 		if (intrstr != NULL)
-			printf(" at %s", intrstr);
-		printf("\n");
+			aprint_normal(" at %s", intrstr);
+		aprint_normal("\n");
 		return 0;
 	}
 	return 1;

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_media.h,v 1.26 2001/06/30 21:23:39 kleink Exp $	*/
+/*	$NetBSD: if_media.h,v 1.38 2004/03/10 14:42:10 keihan Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2000, 2001 The NetBSD Foundation, Inc.
@@ -93,16 +93,16 @@
 /*
  * Driver callbacks for media status and change requests.
  */
-typedef	int (*ifm_change_cb_t) __P((struct ifnet *ifp));
-typedef	void (*ifm_stat_cb_t) __P((struct ifnet *ifp, struct ifmediareq *req));
+typedef	int (*ifm_change_cb_t) __P((struct ifnet *));
+typedef	void (*ifm_stat_cb_t) __P((struct ifnet *, struct ifmediareq *));
 
 /*
  * In-kernel representation of a single supported media type.
  */
 struct ifmedia_entry {
 	TAILQ_ENTRY(ifmedia_entry) ifm_list;
-	int	ifm_media;	/* description of this media attachment */
-	int	ifm_data;	/* for driver-specific use */
+	u_int	ifm_media;	/* description of this media attachment */
+	u_int	ifm_data;	/* for driver-specific use */
 	void	*ifm_aux;	/* for driver-specific use */
 };
 
@@ -111,8 +111,8 @@ struct ifmedia_entry {
  * It is used to keep general media state.
  */
 struct ifmedia {
-	int	ifm_mask;	/* mask of changes we don't care about */
-	int	ifm_media;	/* current user-set media word */
+	u_int	ifm_mask;	/* mask of changes we don't care about */
+	u_int	ifm_media;	/* current user-set media word */
 	struct ifmedia_entry *ifm_cur;	/* currently selected media */
 	TAILQ_HEAD(, ifmedia_entry) ifm_list; /* list of all supported media */
 	ifm_change_cb_t	ifm_change;	/* media change driver callback */
@@ -120,32 +120,30 @@ struct ifmedia {
 };
 
 /* Initialize an interface's struct if_media field. */
-void	ifmedia_init __P((struct ifmedia *ifm, int dontcare_mask,
-	    ifm_change_cb_t change_callback, ifm_stat_cb_t status_callback));
+void	ifmedia_init __P((struct ifmedia *, int, ifm_change_cb_t,
+	    ifm_stat_cb_t));
 
 /* Add one supported medium to a struct ifmedia. */
-void	ifmedia_add __P((struct ifmedia *ifm, int mword, int data, void *aux));
+void	ifmedia_add __P((struct ifmedia *, int, int, void *));
 
 /* Add an array (of ifmedia_entry) media to a struct ifmedia. */
-void	ifmedia_list_add(struct ifmedia *mp, struct ifmedia_entry *lp,
-	    int count);
+void	ifmedia_list_add(struct ifmedia *, struct ifmedia_entry *, int);
 
 /* Set default media type on initialization. */
 void	ifmedia_set __P((struct ifmedia *ifm, int mword));
 
 /* Common ioctl function for getting/setting media, called by driver. */
-int	ifmedia_ioctl __P((struct ifnet *ifp, struct ifreq *ifr,
-	    struct ifmedia *ifm, u_long cmd));
+int	ifmedia_ioctl __P((struct ifnet *, struct ifreq *, struct ifmedia *,
+	    u_long));
 
 /* Look up a media entry. */
-struct ifmedia_entry *ifmedia_match __P((struct ifmedia *ifm, int flags,
-	    int mask));
+struct ifmedia_entry *ifmedia_match __P((struct ifmedia *, u_int, u_int));
 
 /* Delete all media for a given media instance */
-void	ifmedia_delete_instance __P((struct ifmedia *, int));
+void	ifmedia_delete_instance __P((struct ifmedia *, u_int));
 
 /* Compute baudrate for a given media. */
-int	ifmedia_baudrate __P((int));
+u_quad_t	ifmedia_baudrate(int);
 #endif /*_KERNEL */
 
 /*
@@ -155,7 +153,8 @@ int	ifmedia_baudrate __P((int));
  *	0-4	Media subtype		MAX SUBTYPE == 31!
  *	5-7	Media type
  *	8-15	Type specific options
- *	16-19	RFU
+ *	16-18	Mode (for multi-mode devices)
+ *	19	RFU
  *	20-27	Shared (global) options
  *	28-31	Instance
  */
@@ -179,6 +178,7 @@ int	ifmedia_baudrate __P((int));
 #define	IFM_1000_CX	15		/* 1000baseCX - 150ohm STP */
 #define	IFM_1000_T	16		/* 1000baseT - 4 pair cat 5 */
 #define	IFM_HPNA_1	17		/* HomePNA 1.0 (1Mb/s) */
+#define	IFM_10G_LR	18		/* 10GbaseLR - single-mode fiber */
 
 #define	IFM_ETH_MASTER	0x00000100	/* master mode (1000baseT) */
 
@@ -213,8 +213,27 @@ int	ifmedia_baudrate __P((int));
 #define	IFM_IEEE80211_DS5	6	/* Direct Sequence 5Mbps*/
 #define	IFM_IEEE80211_DS11	7	/* Direct Sequence 11Mbps*/
 #define	IFM_IEEE80211_DS1	8	/* Direct Sequence 1Mbps */
+#define	IFM_IEEE80211_DS22	9	/* Direct Sequence 22Mbps */
+#define	IFM_IEEE80211_OFDM6	10	/* OFDM 6Mbps */
+#define	IFM_IEEE80211_OFDM9	11	/* OFDM 9Mbps */
+#define	IFM_IEEE80211_OFDM12	12	/* OFDM 12Mbps */
+#define	IFM_IEEE80211_OFDM18	13	/* OFDM 18Mbps */
+#define	IFM_IEEE80211_OFDM24	14	/* OFDM 24Mbps */
+#define	IFM_IEEE80211_OFDM36	15	/* OFDM 36Mbps */
+#define	IFM_IEEE80211_OFDM48	16	/* OFDM 48Mbps */
+#define	IFM_IEEE80211_OFDM54	17	/* OFDM 54Mbps */
+#define	IFM_IEEE80211_OFDM72	18	/* OFDM 72Mbps */
 
-#define	IFM_IEEE80211_ADHOC	0x00000100	/* Operate in Adhoc mode */
+#define	IFM_IEEE80211_ADHOC	 0x00000100	/* Operate in Adhoc mode */
+#define	IFM_IEEE80211_HOSTAP	 0x00000200	/* Operate in Host AP mode */
+#define	IFM_IEEE80211_MONITOR	 0x00000400	/* Operate in Monitor mode */
+#define	IFM_IEEE80211_TURBO	 0x00000800	/* Operate in Turbo mode */
+
+/* operating mode for multi-mode devices */
+#define	IFM_IEEE80211_11A	0x00010000	/* 5Ghz, OFDM mode */
+#define	IFM_IEEE80211_11B	0x00020000	/* Direct Sequence mode */
+#define	IFM_IEEE80211_11G	0x00030000	/* 2Ghz, CCK mode */
+#define	IFM_IEEE80211_FH	0x00040000	/* 2Ghz, GFSK mode */
 
 /*
  * Shared media sub-types
@@ -242,6 +261,8 @@ int	ifmedia_baudrate __P((int));
 #define	IFM_IMASK	0xf0000000	/* Instance */
 #define	IFM_ISHIFT	28		/* Instance shift */
 #define	IFM_OMASK	0x0000ff00	/* Type specific options */
+#define	IFM_MMASK	0x00070000	/* Mode */
+#define	IFM_MSHIFT	16		/* Mode shift */
 #define	IFM_GMASK	0x0ff00000	/* Global options */
 
 #define	IFM_NMIN	IFM_ETHER	/* lowest Network type */
@@ -269,15 +290,18 @@ int	ifmedia_baudrate __P((int));
 #define	IFM_SUBTYPE(x)	((x) & IFM_TMASK)
 #define	IFM_INST(x)	(((x) & IFM_IMASK) >> IFM_ISHIFT)
 #define	IFM_OPTIONS(x)	((x) & (IFM_OMASK|IFM_GMASK))
+#define	IFM_MODE(x)	((x) & IFM_MMASK)
 
 #define	IFM_INST_MAX	IFM_INST(IFM_IMASK)
-#define	IFM_INST_ANY	-1
+#define	IFM_INST_ANY	((u_int) -1)
 
 /*
  * Macro to create a media word.
  */
 #define	IFM_MAKEWORD(type, subtype, options, instance)			\
 	((type) | (subtype) | (options) | ((instance) << IFM_ISHIFT))
+#define	IFM_MAKEMODE(mode) \
+	(((mode) << IFM_MSHIFT) & IFM_MMASK)
 
 /*
  * NetBSD extension not defined in the BSDI API.  This is used in various
@@ -320,40 +344,57 @@ struct ifmedia_description {
 	{ IFM_ETHER|IFM_10_T,		"10baseT/UTP" },		\
 	{ IFM_ETHER|IFM_10_T,		"UTP" },			\
 	{ IFM_ETHER|IFM_10_T,		"10UTP" },			\
+	{ IFM_ETHER|IFM_10_T,		"10BASE-T" },			\
 	{ IFM_ETHER|IFM_10_2,		"10base2" },			\
 	{ IFM_ETHER|IFM_10_2,		"10base2/BNC" },		\
 	{ IFM_ETHER|IFM_10_2,		"BNC" },			\
 	{ IFM_ETHER|IFM_10_2,		"10BNC" },			\
+	{ IFM_ETHER|IFM_10_2,		"10BASE2" },			\
 	{ IFM_ETHER|IFM_10_5,		"10base5" },			\
 	{ IFM_ETHER|IFM_10_5,		"10base5/AUI" },		\
 	{ IFM_ETHER|IFM_10_5,		"AUI" },			\
 	{ IFM_ETHER|IFM_10_5,		"10AUI" },			\
+	{ IFM_ETHER|IFM_10_5,		"10BASE5" },			\
 	{ IFM_ETHER|IFM_100_TX,		"100baseTX" },			\
 	{ IFM_ETHER|IFM_100_TX,		"100TX" },			\
+	{ IFM_ETHER|IFM_100_TX,		"100BASE-TX" },			\
 	{ IFM_ETHER|IFM_100_FX,		"100baseFX" },			\
 	{ IFM_ETHER|IFM_100_FX,		"100FX" },			\
+	{ IFM_ETHER|IFM_100_FX,		"100BASE-FX" },			\
 	{ IFM_ETHER|IFM_100_T4,		"100baseT4" },			\
 	{ IFM_ETHER|IFM_100_T4,		"100T4" },			\
+	{ IFM_ETHER|IFM_100_T4,		"100BASE-T4" },			\
 	{ IFM_ETHER|IFM_100_VG,		"100baseVG" },			\
 	{ IFM_ETHER|IFM_100_VG,		"100VG" },			\
+	{ IFM_ETHER|IFM_100_VG,		"100VG-AnyLAN" },		\
 	{ IFM_ETHER|IFM_100_T2,		"100baseT2" },			\
 	{ IFM_ETHER|IFM_100_T2,		"100T2" },			\
+	{ IFM_ETHER|IFM_100_T2,		"100BASE-T2" },			\
 	{ IFM_ETHER|IFM_1000_SX,	"1000baseSX" },			\
 	{ IFM_ETHER|IFM_1000_SX,	"1000SX" },			\
+	{ IFM_ETHER|IFM_1000_SX,	"1000BASE-SX" },		\
 	{ IFM_ETHER|IFM_10_STP,		"10baseSTP" },			\
 	{ IFM_ETHER|IFM_10_STP,		"STP" },			\
 	{ IFM_ETHER|IFM_10_STP,		"10STP" },			\
+	{ IFM_ETHER|IFM_10_STP,		"10BASE-STP" },			\
 	{ IFM_ETHER|IFM_10_FL,		"10baseFL" },			\
 	{ IFM_ETHER|IFM_10_FL,		"FL" },				\
 	{ IFM_ETHER|IFM_10_FL,		"10FL" },			\
+	{ IFM_ETHER|IFM_10_FL,		"10BASE-FL" },			\
 	{ IFM_ETHER|IFM_1000_LX,	"1000baseLX" },			\
 	{ IFM_ETHER|IFM_1000_LX,	"1000LX" },			\
+	{ IFM_ETHER|IFM_1000_LX,	"1000BASE-LX" },		\
 	{ IFM_ETHER|IFM_1000_CX,	"1000baseCX" },			\
 	{ IFM_ETHER|IFM_1000_CX,	"1000CX" },			\
+	{ IFM_ETHER|IFM_1000_CX,	"1000BASE-CX" },		\
 	{ IFM_ETHER|IFM_1000_T,		"1000baseT" },			\
 	{ IFM_ETHER|IFM_1000_T,		"1000T" },			\
+	{ IFM_ETHER|IFM_1000_T,		"1000BASE-T" },			\
 	{ IFM_ETHER|IFM_HPNA_1,		"HomePNA1" },			\
 	{ IFM_ETHER|IFM_HPNA_1,		"HPNA1" },			\
+	{ IFM_ETHER|IFM_10G_LR,		"10GbaseLR" },			\
+	{ IFM_ETHER|IFM_10G_LR,		"10GLR" },			\
+	{ IFM_ETHER|IFM_10G_LR,		"10GBASE-LR" },			\
 									\
 	{ IFM_TOKEN|IFM_TOK_STP4,	"DB9/4Mbit" },			\
 	{ IFM_TOKEN|IFM_TOK_STP4,	"4STP" },			\
@@ -375,18 +416,40 @@ struct ifmedia_description {
 	 * Short-hand for common media+option combos.			\
 	 */								\
 	{ IFM_ETHER|IFM_10_T|IFM_FDX,	"10baseT-FDX" },		\
+	{ IFM_ETHER|IFM_10_T|IFM_FDX,	"10BASE-T-FDX" },		\
 	{ IFM_ETHER|IFM_100_TX|IFM_FDX,	"100baseTX-FDX" },		\
+	{ IFM_ETHER|IFM_100_TX|IFM_FDX,	"100BASE-TX-FDX" },		\
 									\
 	/*								\
 	 * IEEE 802.11							\
 	 */								\
-	{ IFM_IEEE80211|IFM_IEEE80211_FH1,	"FH1"	},		\
-	{ IFM_IEEE80211|IFM_IEEE80211_FH2,	"FH2"	},		\
-	{ IFM_IEEE80211|IFM_IEEE80211_DS1,	"DS1"	},		\
-	{ IFM_IEEE80211|IFM_IEEE80211_DS2,	"DS2"	},		\
-	{ IFM_IEEE80211|IFM_IEEE80211_DS5,	"DS5"	},		\
-	{ IFM_IEEE80211|IFM_IEEE80211_DS11,	"DS11"	},		\
+	{ IFM_IEEE80211|IFM_IEEE80211_FH1,	"FH1" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_FH2,	"FH2" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_DS1,	"DS1" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_DS2,	"DS2" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_DS5,	"DS5" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_DS11,	"DS11" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_DS22,	"DS22" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM6,	"OFDM6" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM9,	"OFDM9" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM12,	"OFDM12" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM18,	"OFDM18" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM24,	"OFDM24" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM36,	"OFDM36" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM48,	"OFDM48" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM54,	"OFDM54" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM72,	"OFDM72" },		\
 									\
+	{ 0, NULL },							\
+}
+
+#define IFM_MODE_DESCRIPTIONS {						\
+	{ IFM_AUTO,				"autoselect" },		\
+	{ IFM_AUTO,				"auto" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_11A,	"11a" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_11B,	"11b" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_11G,	"11g" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_FH,	"fh" },			\
 	{ 0, NULL },							\
 }
 
@@ -415,6 +478,10 @@ struct ifmedia_description {
 	{ IFM_FDDI|IFM_FDDI_DA,		"das" },			\
 									\
 	{ IFM_IEEE80211|IFM_IEEE80211_ADHOC,	"adhoc" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_ADHOC,	"ibss" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_HOSTAP,	"hostap" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_MONITOR,	"monitor" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_TURBO,	"turbo" },		\
 									\
 	{ 0, NULL },							\
 }
@@ -424,7 +491,7 @@ struct ifmedia_description {
  */
 struct ifmedia_baudrate {
 	int	ifmb_word;		/* media word */
-	int	ifmb_baudrate;		/* corresponding baudrate */
+	u_quad_t	ifmb_baudrate;		/* corresponding baudrate */
 };
 
 #define	IFM_BAUDRATE_DESCRIPTIONS {					\
@@ -443,6 +510,7 @@ struct ifmedia_baudrate {
 	{ IFM_ETHER|IFM_1000_CX,	IF_Mbps(1000) },		\
 	{ IFM_ETHER|IFM_1000_T,		IF_Mbps(1000) },		\
 	{ IFM_ETHER|IFM_HPNA_1,		IF_Mbps(1) },			\
+	{ IFM_ETHER|IFM_10G_LR,		IF_Gbps(10ULL) },			\
 									\
 	{ IFM_TOKEN|IFM_TOK_STP4,	IF_Mbps(4) },			\
 	{ IFM_TOKEN|IFM_TOK_STP16,	IF_Mbps(16) },			\
@@ -453,12 +521,22 @@ struct ifmedia_baudrate {
 	{ IFM_FDDI|IFM_FDDI_MMF,	IF_Mbps(100) },			\
 	{ IFM_FDDI|IFM_FDDI_UTP,	IF_Mbps(100) },			\
 									\
-	{ IFM_IEEE80211|IFM_IEEE80211_FH1, IF_Mbps(1) },		\
-	{ IFM_IEEE80211|IFM_IEEE80211_FH2, IF_Mbps(2) },		\
-	{ IFM_IEEE80211|IFM_IEEE80211_DS2, IF_Mbps(2) },		\
-	{ IFM_IEEE80211|IFM_IEEE80211_DS5, IF_Mbps(5) },		\
-	{ IFM_IEEE80211|IFM_IEEE80211_DS11, IF_Mbps(11) },		\
-	{ IFM_IEEE80211|IFM_IEEE80211_DS1, IF_Mbps(1) },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_FH1,	IF_Mbps(1) },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_FH2,	IF_Mbps(2) },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_DS2,	IF_Mbps(2) },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_DS5,	IF_Kbps(5500) },	\
+	{ IFM_IEEE80211|IFM_IEEE80211_DS11,	IF_Mbps(11) },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_DS1,	IF_Mbps(1) },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_DS22,	IF_Mbps(22) },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM6,	IF_Mbps(6) },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM9,	IF_Mbps(9) },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM12,	IF_Mbps(12) },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM18,	IF_Mbps(18) },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM24,	IF_Mbps(24) },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM36,	IF_Mbps(36) },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM48,	IF_Mbps(48) },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM54,	IF_Mbps(54) },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM72,	IF_Mbps(72) },		\
 									\
 	{ 0, 0 },							\
 }

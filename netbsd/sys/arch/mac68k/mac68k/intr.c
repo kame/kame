@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.c,v 1.17 2001/04/12 18:26:26 thorpej Exp $	*/
+/*	$NetBSD: intr.c,v 1.19 2003/07/15 02:43:20 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -39,6 +39,9 @@
 /*
  * Link and dispatch interrupts.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: intr.c,v 1.19 2003/07/15 02:43:20 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -257,7 +260,7 @@ intr_dispatch(evec)
 	vec = (evec & 0xfff) >> 2;
 #ifdef DIAGNOSTIC
 	if ((vec < ISRLOC) || (vec >= (ISRLOC + NISR)))
-		panic("intr_dispatch: bad vec 0x%x\n", vec);
+		panic("intr_dispatch: bad vec 0x%x", vec);
 #endif
 	ipl = vec - ISRLOC;
 

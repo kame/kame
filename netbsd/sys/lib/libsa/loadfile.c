@@ -1,4 +1,4 @@
-/* $NetBSD: loadfile.c,v 1.20 2001/10/31 17:20:50 thorpej Exp $ */
+/* $NetBSD: loadfile.c,v 1.23 2003/08/07 16:32:27 agc Exp $ */
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -52,11 +52,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -94,12 +90,42 @@
 #include "loadfile.h"
 
 /*
- * Open 'filename', read in program and and return 0 if ok 1 on error.
+ * Open 'filename', read in program and return the opened file
+ * descriptor if ok, or -1 on error.
  * Fill in marks
  */
 int
 loadfile(fname, marks, flags)
 	const char *fname;
+	u_long *marks;
+	int flags;
+{
+	int fd, error;
+
+	/* Open the file. */
+	if ((fd = open(fname, 0)) < 0) {
+		WARN(("open %s", fname ? fname : "<default>"));
+		return (-1);
+	}
+
+	/* Load it; save the value of errno across the close() call */
+	if ((error = fdloadfile(fd, marks, flags)) != 0) {
+		(void)close(fd);
+		errno = error;
+		return (-1);
+	}
+
+	return (fd);
+}
+
+/*
+ * Read in program from the given file descriptor.
+ * Return error code (0 on success).
+ * Fill in marks.
+ */
+int
+fdloadfile(fd, marks, flags)
+	int fd;
 	u_long *marks;
 	int flags;
 {
@@ -118,15 +144,11 @@ loadfile(fname, marks, flags)
 #endif
 	} hdr;
 	ssize_t nr;
-	int fd, rval;
-
-	/* Open the file. */
-	if ((fd = open(fname, 0)) < 0) {
-		WARN(("open %s", fname ? fname : "<default>"));
-		return -1;
-	}
+	int rval;
 
 	/* Read the exec header. */
+	if (lseek(fd, 0, SEEK_SET) == (off_t)-1)
+		goto err;
 	if ((nr = read(fd, &hdr, sizeof(hdr))) != sizeof(hdr)) {
 		WARN(("read header"));
 		goto err;
@@ -161,14 +183,14 @@ loadfile(fname, marks, flags)
 	{
 		rval = 1;
 		errno = EFTYPE;
-		WARN(("%s", fname ? fname : "<default>"));
 	}
 
 	if (rval == 0) {
-		PROGRESS(("=0x%lx\n", marks[MARK_END] - marks[MARK_START]));
-		return fd;
+		if ((flags & LOAD_ALL) != 0)
+			PROGRESS(("=0x%lx\n",
+				  marks[MARK_END] - marks[MARK_START]));
+		return (0);
 	}
 err:
-	(void)close(fd);
-	return -1;
+	return (errno);
 }

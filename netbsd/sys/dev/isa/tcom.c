@@ -1,4 +1,4 @@
-/*	$NetBSD: tcom.c,v 1.3 2002/01/07 21:47:13 thorpej Exp $	*/
+/*	$NetBSD: tcom.c,v 1.7 2003/01/01 00:10:21 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -77,7 +77,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tcom.c,v 1.3 2002/01/07 21:47:13 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tcom.c,v 1.7 2003/01/01 00:10:21 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -115,9 +115,8 @@ void tcomattach __P((struct device *, struct device *, void *));
 int tcomintr __P((void *));
 int tcomprint __P((void *, const char *));
 
-struct cfattach tcom_ca = {
-	sizeof(struct tcom_softc), tcomprobe, tcomattach
-};
+CFATTACH_DECL(tcom, sizeof(struct tcom_softc),
+    tcomprobe, tcomattach, NULL, NULL);
 
 int
 tcomprobe(parent, self, aux)
@@ -199,8 +198,8 @@ tcomprint(aux, pnp)
 	struct commulti_attach_args *ca = aux;
 
 	if (pnp)
-		printf("com at %s", pnp);
-	printf(" slave %d", ca->ca_slave);
+		aprint_normal("com at %s", pnp);
+	aprint_normal(" slave %d", ca->ca_slave);
 	return (UNCONF);
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: coda_psdev.c,v 1.19 2001/11/23 17:42:48 perry Exp $	*/
+/*	$NetBSD: coda_psdev.c,v 1.26 2003/06/29 22:29:09 fvdl Exp $	*/
 
 /*
  * 
@@ -43,16 +43,18 @@
  * University.  Contributers include David Steere, James Kistler, and
  * M. Satyanarayanan.  */
 
-/* These routines define the psuedo device for communication between
+/* These routines define the pseudo device for communication between
  * Coda's Venus and Minicache in Mach 2.6. They used to be in cfs_subr.c, 
  * but I moved them to make it easier to port the Minicache without 
  * porting coda. -- DCS 10/12/94
+ *
+ * Following code depends on file-system CODA.
  */
 
 /* These routines are the device entry points for Venus. */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: coda_psdev.c,v 1.19 2001/11/23 17:42:48 perry Exp $");
+__KERNEL_RCSID(0, "$NetBSD: coda_psdev.c,v 1.26 2003/06/29 22:29:09 fvdl Exp $");
 
 extern int coda_nc_initialized;    /* Set if cache has been initialized */
 
@@ -72,6 +74,7 @@ extern int coda_nc_initialized;    /* Set if cache has been initialized */
 #include <sys/ioctl.h>
 #include <sys/poll.h>
 #include <sys/select.h>
+#include <sys/conf.h>
 
 #include <miscfs/syncfs/syncfs.h>
 
@@ -79,7 +82,6 @@ extern int coda_nc_initialized;    /* Set if cache has been initialized */
 #include <coda/cnode.h>
 #include <coda/coda_namecache.h>
 #include <coda/coda_io.h>
-#include <coda/coda_psdev.h>
 
 #define CTL_C
 
@@ -95,6 +97,19 @@ int coda_pcatch = PCATCH;
 #define ENTRY if(coda_psdev_print_entry) myprintf(("Entered %s\n",__func__))
 
 void vcodaattach(int n);
+
+dev_type_open(vc_nb_open);
+dev_type_close(vc_nb_close);
+dev_type_read(vc_nb_read);
+dev_type_write(vc_nb_write);
+dev_type_ioctl(vc_nb_ioctl);
+dev_type_poll(vc_nb_poll);
+dev_type_kqfilter(vc_nb_kqfilter);
+
+const struct cdevsw vcoda_cdevsw = {
+	vc_nb_open, vc_nb_close, vc_nb_read, vc_nb_write, vc_nb_ioctl,
+	nostop, notty, vc_nb_poll, nommap, vc_nb_kqfilter,
+};
 
 struct vmsg {
     struct queue vm_chain;
@@ -481,13 +496,69 @@ vc_nb_poll(dev, events, p)
     return(0);
 }
 
+static void
+filt_vc_nb_detach(struct knote *kn)
+{
+	struct vcomm *vcp = kn->kn_hook;
+
+	SLIST_REMOVE(&vcp->vc_selproc.sel_klist, kn, knote, kn_selnext);
+}
+
+static int
+filt_vc_nb_read(struct knote *kn, long hint)
+{
+	struct vcomm *vcp = kn->kn_hook; 
+	struct vmsg *vmp;
+
+	if (EMPTY(vcp->vc_requests))
+		return (0);
+
+	vmp = (struct vmsg *)GETNEXT(vcp->vc_requests);
+
+	kn->kn_data = vmp->vm_inSize;
+	return (1);
+}
+
+static const struct filterops vc_nb_read_filtops =
+	{ 1, NULL, filt_vc_nb_detach, filt_vc_nb_read };
+
+int
+vc_nb_kqfilter(dev_t dev, struct knote *kn)
+{
+	struct vcomm *vcp;
+	struct klist *klist;
+
+	ENTRY;
+    
+	if (minor(dev) >= NVCODA || minor(dev) < 0)
+		return(ENXIO);
+    
+	vcp = &coda_mnttbl[minor(dev)].mi_vcomm;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &vcp->vc_selproc.sel_klist;
+		kn->kn_fop = &vc_nb_read_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = vcp;
+
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+
+	return (0);
+}
+
 /*
  * Statistics
  */
 struct coda_clstat coda_clstat;
 
 /* 
- * Key question: whether to sleep interuptably or uninteruptably when
+ * Key question: whether to sleep interruptably or uninterruptably when
  * waiting for Venus.  The former seems better (cause you can ^C a
  * job), but then GNU-EMACS completion breaks. Use tsleep with no
  * timeout, and no longjmp happens. But, when sleeping
@@ -539,7 +610,7 @@ coda_call(mntinfo, inSize, outSize, buffer)
 
 	/* Append msg to request queue and poke Venus. */
 	INSQUE(vmp->vm_chain, vcp->vc_requests);
-	selwakeup(&(vcp->vc_selproc));
+	selnotify(&(vcp->vc_selproc), 0);
 
 	/* We can be interrupted while we wait for Venus to process
 	 * our request.  If the interrupt occurs before Venus has read
@@ -662,7 +733,7 @@ coda_call(mntinfo, inSize, outSize, buffer)
 		
 		/* insert at head of queue! */
 		INSQUE(svmp->vm_chain, vcp->vc_requests);
-		selwakeup(&(vcp->vc_selproc));
+		selnotify(&(vcp->vc_selproc), 0);
 	    }
 	}
 

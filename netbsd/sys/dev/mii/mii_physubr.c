@@ -1,4 +1,4 @@
-/*	$NetBSD: mii_physubr.c,v 1.33 2002/05/12 21:39:46 thorpej Exp $	*/
+/*	$NetBSD: mii_physubr.c,v 1.37 2003/09/10 05:25:22 briggs Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000, 2001 The NetBSD Foundation, Inc.
@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mii_physubr.c,v 1.33 2002/05/12 21:39:46 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mii_physubr.c,v 1.37 2003/09/10 05:25:22 briggs Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -114,7 +114,8 @@ mii_phy_setmedia(struct mii_softc *sc)
 	int bmcr, anar, gtcr;
 
 	if (IFM_SUBTYPE(ife->ifm_media) == IFM_AUTO) {
-		if ((PHY_READ(sc, MII_BMCR) & BMCR_AUTOEN) == 0)
+		if ((PHY_READ(sc, MII_BMCR) & BMCR_AUTOEN) == 0 ||
+		    (sc->mii_flags & MIIF_FORCEANEG))
 			(void) mii_phy_auto(sc, 1);
 		return;
 	}
@@ -308,7 +309,17 @@ mii_phy_reset(struct mii_softc *sc)
 		reg = BMCR_RESET | BMCR_ISO;
 	PHY_WRITE(sc, MII_BMCR, reg);
 
-	/* Wait 100ms for it to complete. */
+	/*
+	 * It is best to allow a little time for the reset to settle
+	 * in before we start polling the BMCR again.  Notably, the
+	 * DP83840A manual states that there should be a 500us delay
+	 * between asserting software reset and attempting MII serial
+	 * operations.  Also, a DP83815 can get into a bad state on
+	 * cable removal and reinsertion if we do not delay here.
+	 */
+	delay(500);
+
+	/* Wait another 100ms for it to complete. */
 	for (i = 0; i < 100; i++) {
 		reg = PHY_READ(sc, MII_BMCR); 
 		if ((reg & BMCR_RESET) == 0)
@@ -364,7 +375,8 @@ mii_phy_statusmsg(struct mii_softc *sc)
 {
 	struct mii_data *mii = sc->mii_pdata;
 	struct ifnet *ifp = mii->mii_ifp;
-	int baudrate, link_state, announce = 0;
+	int link_state, announce = 0;
+	u_int baudrate;
 
 	if (mii->mii_media_status & IFM_AVALID) {
 		if (mii->mii_media_status & IFM_ACTIVE)
@@ -406,7 +418,7 @@ mii_phy_add_media(struct mii_softc *sc)
 	const char *sep = "";
 
 #define	ADD(m, c)	ifmedia_add(&mii->mii_media, (m), (c), NULL)
-#define	PRINT(n)	printf("%s%s", sep, (n)); sep = ", "
+#define	PRINT(n)	aprint_normal("%s%s", sep, (n)); sep = ", "
 
 	if ((sc->mii_flags & MIIF_NOISOLATE) == 0)
 		ADD(IFM_MAKEWORD(IFM_ETHER, IFM_NONE, 0, sc->mii_inst),

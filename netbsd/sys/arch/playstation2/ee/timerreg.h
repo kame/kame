@@ -1,4 +1,4 @@
-/*	$NetBSD: timerreg.h,v 1.1 2001/10/16 15:38:40 uch Exp $	*/
+/*	$NetBSD: timerreg.h,v 1.3 2004/02/24 15:12:51 wiz Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -41,10 +41,10 @@
  *	source: BUSCLK, H-BLNK
  */
 
-#define TIMER_MIN		0
-#define TIMER_MAX		3
+#define EE_TIMER_MIN		0
+#define EE_TIMER_MAX		3
 #define LEGAL_TIMER(x)							\
-	(((x) >= TIMER_MIN) && ((x) <= TIMER_MAX))
+	(((x) >= EE_TIMER_MIN) && ((x) <= EE_TIMER_MAX))
 
 /* Register address. all registers are 32bit wide */
 #define TIMER_REGBASE		0x10000000
@@ -58,7 +58,7 @@
 	TIMER_OFS * (x) + 0x20))
 /* 
  * timer0, timer1 have `hold register'. 
- * (save T_COUNT when SBUS interrupt occured)
+ * (save T_COUNT when SBUS interrupt occurred)
  */
 #define T_HOLD_REG(x)	(TIMER_REGBASE + TIMER_OFS * (x) + 0x30)
 

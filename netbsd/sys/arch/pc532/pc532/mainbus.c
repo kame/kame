@@ -1,4 +1,4 @@
-/*	$NetBSD: mainbus.c,v 1.8 2001/01/15 20:19:56 thorpej Exp $	*/
+/*	$NetBSD: mainbus.c,v 1.15 2003/07/15 02:54:35 lukem Exp $	*/
 
 /*
  * Copyright (c) 1997 Matthias Pfaller.
@@ -30,12 +30,15 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.15 2003/07/15 02:54:35 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
+#include <sys/conf.h>
 
 #include <machine/autoconf.h>
-#include <machine/conf.h>
 #include <machine/icu.h>
 
 static int	mbprobe __P((struct device *, struct cfdata *, void *));
@@ -43,9 +46,8 @@ static void	mbattach __P((struct device *, struct device *, void *));
 static int	mbsearch __P((struct device *, struct cfdata *, void *));
 static int	mbprint __P((void *, const char *));
 
-struct cfattach mainbus_ca = {
-	sizeof(struct device), mbprobe, mbattach
-};
+CFATTACH_DECL(mainbus, sizeof(struct device),
+    mbprobe, mbattach, NULL, NULL);
 
 static int
 mbprobe(parent, cf, aux)
@@ -53,7 +55,7 @@ mbprobe(parent, cf, aux)
 	struct cfdata *cf;
 	void *aux;
 {
-	return(strcmp(cf->cf_driver->cd_name, "mainbus") == 0);
+	return(strcmp(cf->cf_name, "mainbus") == 0);
 }
 
 static void
@@ -102,15 +104,15 @@ mbprint(aux, pnp)
 	struct confargs *ca = aux;
 
 	if (ca->ca_addr != -1) {
-		printf(" addr 0x%x", ca->ca_addr);
+		aprint_normal(" addr 0x%x", ca->ca_addr);
 		delim = ",";
 	} else
 		delim = "";
 
 	if (ca->ca_irq != -1) {
-		printf("%s irq %d", delim, ca->ca_irq & 15);
+		aprint_normal("%s irq %d", delim, ca->ca_irq & 15);
 		if (ca->ca_irq & 0xf0)
-			printf(", %d", ca->ca_irq >> 4);
+			aprint_normal(", %d", ca->ca_irq >> 4);
 	}
 
 	return(UNCONF);
@@ -128,7 +130,7 @@ mbsearch(parent, cf, aux)
 	ca.ca_irq   = cf->cf_irq;
 	ca.ca_flags = cf->cf_flags;
 
-	while ((*cf->cf_attach->ca_match)(parent, cf, &ca) > 0) {
+	while (config_match(parent, cf, &ca) > 0) {
 		config_attach(parent, cf, &ca, mbprint);
 		if (cf->cf_fstate != FSTATE_STAR)
 			break;

@@ -1,4 +1,4 @@
-/* $NetBSD: podulebus.c,v 1.2 2002/03/24 23:37:45 bjh21 Exp $ */
+/* $NetBSD: podulebus.c,v 1.10 2003/07/14 22:48:23 lukem Exp $ */
 
 /*-
  * Copyright (c) 2000 Ben Harris
@@ -27,10 +27,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: podulebus.c,v 1.10 2003/07/14 22:48:23 lukem Exp $");
+
 #include <sys/param.h>
-
-__RCSID("$NetBSD: podulebus.c,v 1.2 2002/03/24 23:37:45 bjh21 Exp $");
-
 #include <sys/device.h>
 #include <sys/malloc.h>
 #include <sys/systm.h>
@@ -38,6 +38,7 @@ __RCSID("$NetBSD: podulebus.c,v 1.2 2002/03/24 23:37:45 bjh21 Exp $");
 #include <machine/bus.h>
 #include <machine/intr.h>
 #include <machine/irq.h>
+#include <machine/machdep.h>
 #include <machine/memcreg.h>
 
 #include <arch/acorn26/iobus/iocreg.h>
@@ -73,9 +74,8 @@ struct podulebus_softc {
 	struct	ioc_attach_args sc_ioc;
 };
 
-struct cfattach podulebus_ca = {
-	sizeof(struct podulebus_softc), podulebus_match, podulebus_attach
-};
+CFATTACH_DECL(podulebus, sizeof(struct podulebus_softc),
+    podulebus_match, podulebus_attach, NULL, NULL);
 
 /* ARGSUSED */
 static int
@@ -333,13 +333,13 @@ podulebus_print(void *aux, char const *pnp)
 				if (*p >= 32 && *p < 126)
 					*q++ = *p;
 			*q++ = 0;
-			printf("%s", pa->pa_descr);
+			aprint_normal("%s", pa->pa_descr);
 		} else
-			printf("podule");
-		printf(" <%04x:%04x> at %s",
+			aprint_normal("podule");
+		aprint_normal(" <%04x:%04x> at %s",
 		       pa->pa_manufacturer, pa->pa_product, pnp);
 	}
-	printf(" slot %d", pa->pa_slotnum);
+	aprint_normal(" slot %d", pa->pa_slotnum);
 	return UNCONF;
 }	
 
@@ -350,7 +350,7 @@ podulebus_submatch(struct device *parent, struct cfdata *cf, void *aux)
 
 	if (cf->cf_loc[PODULEBUSCF_SLOT] == PODULEBUSCF_SLOT_DEFAULT ||
 	    cf->cf_loc[PODULEBUSCF_SLOT] == pa->pa_slotnum)
-		return (*cf->cf_attach->ca_match)(parent, cf, aux);
+		return config_match(parent, cf, aux);
 	return 0;
 }
 
@@ -366,4 +366,14 @@ podulebus_irq_establish(podulebus_intr_handle_t slot, int ipl,
 		    ev);
 #endif
 	return irq_establish(IRQ_PIRQ, ipl, func, arg, ev);
+}
+
+void
+podulebus_readcmos(struct podulebus_attach_args *pa, u_int8_t *c)
+{
+	int i;
+
+	for (i = 0; i < 4; i++)
+		c[i] = cmos_read(PODULE_CMOS_BASE +
+		    pa->pa_slotnum * PODULE_CMOS_PERSLOT + i);
 }

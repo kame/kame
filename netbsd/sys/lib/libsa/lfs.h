@@ -1,4 +1,4 @@
-/* $NetBSD: lfs.h,v 1.1 1999/08/18 20:04:40 cgd Exp $ */
+/* $NetBSD: lfs.h,v 1.4 2003/08/18 15:45:28 dsl Exp $ */
 
 /*-
  * Copyright (c) 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -35,11 +31,5 @@
  *	@(#)ufs.h	8.1 (Berkeley) 6/11/93
  */
 
-int	lfs_open __P((char *path, struct open_file *f));
-int	lfs_close __P((struct open_file *f));
-int	lfs_read __P((struct open_file *f, void *buf,
-		size_t size, size_t *resid));
-int	lfs_write __P((struct open_file *f, void *buf,
-		size_t size, size_t *resid));
-off_t	lfs_seek __P((struct open_file *f, off_t offset, int where));
-int	lfs_stat __P((struct open_file *f, struct stat *sb));
+FS_DEF(lfsv1);
+FS_DEF(lfsv2);

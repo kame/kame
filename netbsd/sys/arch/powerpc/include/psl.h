@@ -1,4 +1,4 @@
-/*	$NetBSD: psl.h,v 1.5 2000/11/19 19:52:37 matt Exp $	*/
+/*	$NetBSD: psl.h,v 1.8 2003/07/31 01:25:38 matt Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -30,8 +30,8 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef	_MACHINE_PSL_H_
-#define	_MACHINE_PSL_H_
+#ifndef	_POWERPC_PSL_H_
+#define	_POWERPC_PSL_H_
 
 /*
  * Machine State Register (MSR)
@@ -44,6 +44,7 @@
  */
 #define	PSL_VEC		0x02000000	/* AltiVec vector unit available */
 #define	PSL_POW		0x00040000	/* power management */
+#define	PSL_TGPR	0x00020000	/* temp. gpr remapping (mpc603e) */
 #define	PSL_ILE		0x00010000	/* interrupt endian mode (1 == le) */
 #define	PSL_EE		0x00008000	/* external interrupt enable */
 #define	PSL_PR		0x00004000	/* privilege mode (1 == user) */
@@ -56,6 +57,7 @@
 #define	PSL_IP		0x00000040	/* interrupt prefix */
 #define	PSL_IR		0x00000020	/* instruction address relocation */
 #define	PSL_DR		0x00000010	/* data address relocation */
+#define	PSL_PM		0x00000008	/* Performance monitor marked mode */
 #define	PSL_RI		0x00000002	/* recoverable interrupt */
 #define	PSL_LE		0x00000001	/* endian mode (1 == le) */
 
@@ -80,4 +82,4 @@
 
 #define	PSL_USERSTATIC	(PSL_USERSET | PSL_IP | 0x87c0008c)
 
-#endif	/* _MACHINE_PSL_H_ */
+#endif	/* _POWERPC_PSL_H_ */

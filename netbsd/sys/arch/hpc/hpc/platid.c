@@ -1,4 +1,4 @@
-/*	$NetBSD: platid.c,v 1.3 2001/09/27 16:31:23 uch Exp $	*/
+/*	$NetBSD: platid.c,v 1.5 2003/12/16 17:16:43 uwe Exp $	*/
 
 /*-
  * Copyright (c) 1999-2001
@@ -33,6 +33,11 @@
  * SUCH DAMAGE.
  *
  */
+
+#include <sys/cdefs.h>
+#if !defined(_WIN32)	/* XXX: hpcboot.exe */
+__KERNEL_RCSID(0, "$NetBSD: platid.c,v 1.5 2003/12/16 17:16:43 uwe Exp $");
+#endif
 
 #include <sys/types.h>
 #include <sys/param.h>

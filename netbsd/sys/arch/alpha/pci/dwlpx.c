@@ -1,4 +1,4 @@
-/* $NetBSD: dwlpx.c,v 1.24 2002/05/16 01:01:31 thorpej Exp $ */
+/* $NetBSD: dwlpx.c,v 1.28 2003/06/15 23:08:54 fvdl Exp $ */
 
 /*
  * Copyright (c) 1997 by Matthew Jacob
@@ -32,7 +32,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: dwlpx.c,v 1.24 2002/05/16 01:01:31 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dwlpx.c,v 1.28 2003/06/15 23:08:54 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -62,9 +62,8 @@ __KERNEL_RCSID(0, "$NetBSD: dwlpx.c,v 1.24 2002/05/16 01:01:31 thorpej Exp $");
 
 static int	dwlpxmatch __P((struct device *, struct cfdata *, void *));
 static void	dwlpxattach __P((struct device *, struct device *, void *));
-struct cfattach dwlpx_ca = {
-	sizeof(struct dwlpx_softc), dwlpxmatch, dwlpxattach
-};
+CFATTACH_DECL(dwlpx, sizeof(struct dwlpx_softc),
+    dwlpxmatch, dwlpxattach, NULL, NULL);
 
 extern struct cfdriver dwlpx_cd;
 
@@ -80,8 +79,8 @@ dwlpxprint(aux, pnp)
 	register struct pcibus_attach_args *pba = aux;
 	/* only PCIs can attach to DWLPX's; easy. */
 	if (pnp)
-		printf("%s at %s", pba->pba_busname, pnp);
-	printf(" bus %d", pba->pba_bus);
+		aprint_normal("%s at %s", pba->pba_busname, pnp);
+	aprint_normal(" bus %d", pba->pba_bus);
 	return (UNCONF);
 }
 
@@ -172,6 +171,7 @@ dwlpxattach(parent, self, aux)
 	pba.pba_memt = &sc->dwlpx_cc.cc_memt;
 	pba.pba_dmat =	/* start with direct, may change... */
 	    alphabus_dma_get_tag(&sc->dwlpx_cc.cc_dmat_direct, ALPHA_BUS_PCI);
+	pba.pba_dmat64 = NULL;
 	pba.pba_pc = &sc->dwlpx_cc.cc_pc;
 	pba.pba_bus = 0;
 	pba.pba_bridgetag = NULL;

@@ -1,10 +1,10 @@
-#	$NetBSD: Makefile,v 1.3 2001/12/12 11:49:06 lukem Exp $
+#	$NetBSD: Makefile,v 1.5 2002/11/29 17:11:21 jdolecek Exp $
 
 .include "../Makefile.inc"
 
 .PATH:	$S/compat/linux/common
 
-CPPFLAGS+=	-nostdinc -I$S -D_KERNEL -DEXEC_ELF32 -DEXEC_ELF64
+CPPFLAGS+=	-nostdinc -D_KERNEL -DEXEC_ELF32 -DEXEC_ELF64
 
 KMOD=	exec_linux_elf
 
@@ -18,6 +18,7 @@ SRCS+=	linux_exec_elf32.c
 
 # compat_util.c symbol redifinitions
 CPPFLAGS+=	-Demul_find=linux_elf_emul_find			\
+		-Demul_find_interp=linux_emul_find_interp	\
 		-Dstackgap_init=linux_stackgap_init 		\
 		-Demul_flags_translate=linux_elf_emul_flags_translate \
 		-Dstackgap_alloc=linux_elf_stackgap_alloc 	\

@@ -27,7 +27,7 @@
  *	i4b_ctl.c - i4b system control port driver
  *	------------------------------------------
  *
- *	$Id: i4b_ctl.c,v 1.9 2002/05/16 19:32:03 wiz Exp $
+ *	$Id: i4b_ctl.c,v 1.12 2003/10/03 16:38:44 pooka Exp $
  *
  * $FreeBSD$
  *
@@ -36,7 +36,7 @@
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: i4b_ctl.c,v 1.9 2002/05/16 19:32:03 wiz Exp $");
+__KERNEL_RCSID(0, "$NetBSD: i4b_ctl.c,v 1.12 2003/10/03 16:38:44 pooka Exp $");
 
 #include "isdnctl.h"
 
@@ -152,6 +152,13 @@ int isdnctlopen __P((dev_t dev, int flag, int fmt, struct proc *p));
 int isdnctlclose __P((dev_t dev, int flag, int fmt, struct proc *p));
 int isdnctlioctl __P((dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p));
 #endif	/* !FreeBSD */
+
+#ifdef __NetBSD__
+const struct cdevsw isdnctl_cdevsw = {
+	isdnctlopen, isdnctlclose, noread, nowrite, isdnctlioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
+#endif /* __NetBSD__ */
 
 #if BSD > 199306 && defined(__FreeBSD__)
 /*---------------------------------------------------------------------------*
@@ -293,7 +300,7 @@ isdnctlioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
                         struct chipstat *cst;
 			l2_softc_t * scl2;
 			cst = (struct chipstat *)data;
-			scl2 = (l2_softc_t*)isdn_find_softc_by_bri(cst->driver_unit);
+			scl2 = (l2_softc_t*)isdn_find_softc_by_isdnif(cst->driver_unit);
 			scl2->driver->mph_command_req(scl2->l1_token, CMR_GCST, cst);
                         break;
                 }
@@ -303,7 +310,7 @@ isdnctlioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
                         struct chipstat *cst;
 			l2_softc_t * scl2;
 			cst = (struct chipstat *)data;
-			scl2 = (l2_softc_t*)isdn_find_softc_by_bri(cst->driver_unit);
+			scl2 = (l2_softc_t*)isdn_find_softc_by_isdnif(cst->driver_unit);
 			scl2->driver->mph_command_req(scl2->l1_token, CMR_CCST, cst);
                         break;
                 }
@@ -314,7 +321,7 @@ isdnctlioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
                         l2_softc_t *sc;
                         l2s = (l2stat_t *)data;
 
-                        sc = (l2_softc_t*)isdn_find_softc_by_bri(l2s->unit);
+                        sc = (l2_softc_t*)isdn_find_softc_by_isdnif(l2s->unit);
                         if (sc == NULL) {
                         	error = EINVAL;
 				break;
@@ -330,7 +337,7 @@ isdnctlioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
                         l2_softc_t *sc;
                         up = (int *)data;
 
-                        sc = (l2_softc_t*)isdn_find_softc_by_bri(*up);
+                        sc = (l2_softc_t*)isdn_find_softc_by_isdnif(*up);
                         if (sc == NULL) {
                         	error = EINVAL;
 				break;

@@ -1,4 +1,4 @@
-/*	$NetBSD: tx39uart.c,v 1.5 2002/01/29 18:53:18 uch Exp $ */
+/*	$NetBSD: tx39uart.c,v 1.10 2003/07/15 02:29:33 lukem Exp $ */
 
 /*-
  * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: tx39uart.c,v 1.10 2003/07/15 02:29:33 lukem Exp $");
+
 #include "opt_tx39uart_debug.h"
 
 #include <sys/param.h>
@@ -61,9 +64,8 @@ struct tx39uart_softc {
 	int sc_enabled;
 };
 
-struct cfattach tx39uart_ca = {
-	sizeof(struct tx39uart_softc), tx39uart_match, tx39uart_attach
-};
+CFATTACH_DECL(tx39uart, sizeof(struct tx39uart_softc),
+    tx39uart_match, tx39uart_attach, NULL, NULL);
 
 int
 tx39uart_match(struct device *parent, struct cfdata *cf, void *aux)
@@ -99,7 +101,7 @@ tx39uart_search(struct device *parent, struct cfdata *cf, void *aux)
 	}
 	
 	if (!(sc->sc_enabled & (1 << ua.ua_slot)) && /* not attached slot */
-	    (*cf->cf_attach->ca_match)(parent, cf, &ua)) {
+	    config_match(parent, cf, &ua)) {
 		config_attach(parent, cf, &ua, tx39uart_print);
 		sc->sc_enabled |= (1 << ua.ua_slot);
 	}
@@ -112,7 +114,7 @@ tx39uart_print(void *aux, const char *pnp)
 {
 	struct tx39uart_attach_args *ua = aux;
 	
-	printf(" slot %d", ua->ua_slot);
+	aprint_normal(" slot %d", ua->ua_slot);
 
 	return QUIET;
 }

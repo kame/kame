@@ -1,4 +1,4 @@
-/*	$NetBSD: memecc.c,v 1.3 2002/03/11 16:27:04 pk Exp $	*/
+/*	$NetBSD: memecc.c,v 1.8 2004/03/22 12:37:43 pk Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * ECC memory control.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: memecc.c,v 1.8 2004/03/22 12:37:43 pk Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -63,9 +66,8 @@ static int	memecc_error  __P((void));
 
 int	(*memerr_handler) __P((void));
 
-struct cfattach eccmemctl_ca = {
-	sizeof(struct memecc_softc), memecc_match, memecc_attach
-};
+CFATTACH_DECL(eccmemctl, sizeof(struct memecc_softc),
+    memecc_match, memecc_attach, NULL, NULL);
 
 int
 memecc_match(parent, cf, aux)
@@ -140,6 +142,8 @@ memecc_error()
 	printf("\tMBus transaction: %s\n",
 		bitmask_snprintf(efar0, ECC_AFR_BITS, bits, sizeof(bits)));
 	printf("\taddress: 0x%x%x\n", efar0 & ECC_AFR_PAH, efar1);
+	printf("\tmodule location: %s\n",
+		prom_pa_location(efar1, efar0 & ECC_AFR_PAH));
 
 	/* Unlock registers and clear interrupt */
 	bus_space_write_4(memecc_sc->sc_bt, bh, ECC_FSR_REG, efsr);

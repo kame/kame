@@ -1,4 +1,4 @@
-/*	$NetBSD: ast.c,v 1.48 2002/01/07 21:47:04 thorpej Exp $	*/
+/*	$NetBSD: ast.c,v 1.52 2003/01/01 00:10:20 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ast.c,v 1.48 2002/01/07 21:47:04 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ast.c,v 1.52 2003/01/01 00:10:20 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -69,9 +69,8 @@ void astattach __P((struct device *, struct device *, void *));
 int astintr __P((void *));
 int astprint __P((void *, const char *));
 
-struct cfattach ast_ca = {
-	sizeof(struct ast_softc), astprobe, astattach
-};
+CFATTACH_DECL(ast, sizeof(struct ast_softc),
+    astprobe, astattach, NULL, NULL);
 
 int
 astprobe(parent, self, aux)
@@ -154,8 +153,8 @@ astprint(aux, pnp)
 	struct commulti_attach_args *ca = aux;
 
 	if (pnp)
-		printf("com at %s", pnp);
-	printf(" slave %d", ca->ca_slave);
+		aprint_normal("com at %s", pnp);
+	aprint_normal(" slave %d", ca->ca_slave);
 	return (UNCONF);
 }
 

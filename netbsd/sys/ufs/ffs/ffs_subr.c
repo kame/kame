@@ -1,4 +1,4 @@
-/*	$NetBSD: ffs_subr.c,v 1.22 2002/04/10 08:05:13 mycroft Exp $	*/
+/*	$NetBSD: ffs_subr.c,v 1.32 2003/12/30 12:33:24 pk Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -35,20 +31,18 @@
  *	@(#)ffs_subr.c	8.5 (Berkeley) 3/21/95
  */
 
-#include <sys/cdefs.h>
-#if defined(__KERNEL_RCSID)
-__KERNEL_RCSID(0, "$NetBSD: ffs_subr.c,v 1.22 2002/04/10 08:05:13 mycroft Exp $");
+#if HAVE_NBTOOL_CONFIG_H
+#include "nbtool_config.h"
 #endif
 
-#if HAVE_CONFIG_H
-#include "config.h"
-#endif
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ffs_subr.c,v 1.32 2003/12/30 12:33:24 pk Exp $");
 
 #include <sys/param.h>
 
 /* in ffs_tables.c */
-extern int inside[], around[];
-extern u_char *fragtbl[];
+extern const int inside[], around[];
+extern const u_char * const fragtbl[];
 
 #ifndef _KERNEL
 #include <ufs/ufs/dinode.h>
@@ -63,6 +57,8 @@ void    panic __P((const char *, ...))
 #include <sys/vnode.h>
 #include <sys/mount.h>
 #include <sys/buf.h>
+#include <sys/inttypes.h>
+#include <sys/pool.h>
 #include <ufs/ufs/inode.h>
 #include <ufs/ufs/ufsmount.h>
 #include <ufs/ufs/ufs_extern.h>
@@ -88,7 +84,7 @@ ffs_blkatoff(v)
 	struct inode *ip;
 	struct fs *fs;
 	struct buf *bp;
-	ufs_daddr_t lbn;
+	daddr_t lbn;
 	int bsize, error;
 
 	ip = VTOI(ap->a_vp);
@@ -106,6 +102,57 @@ ffs_blkatoff(v)
 	*ap->a_bpp = bp;
 	return (0);
 }
+
+
+/*
+ * Load up the contents of an inode and copy the appropriate pieces
+ * to the incore copy.
+ */
+void
+ffs_load_inode(bp, ip, fs, ino)
+	struct buf *bp;
+	struct inode *ip;
+	struct fs *fs;
+	ino_t ino;
+{
+	struct ufs1_dinode *dp1;
+	struct ufs2_dinode *dp2;
+
+	if (ip->i_ump->um_fstype == UFS1) {
+		dp1 = (struct ufs1_dinode *)bp->b_data + ino_to_fsbo(fs, ino);
+#ifdef FFS_EI
+		if (UFS_FSNEEDSWAP(fs))
+			ffs_dinode1_swap(dp1, ip->i_din.ffs1_din);
+		else
+#endif
+		*ip->i_din.ffs1_din = *dp1;
+
+		ip->i_mode = ip->i_ffs1_mode;
+		ip->i_nlink = ip->i_ffs1_nlink;
+		ip->i_size = ip->i_ffs1_size;
+		ip->i_flags = ip->i_ffs1_flags;
+		ip->i_gen = ip->i_ffs1_gen;
+		ip->i_uid = ip->i_ffs1_uid;
+		ip->i_gid = ip->i_ffs1_gid;
+	} else {
+		dp2 = (struct ufs2_dinode *)bp->b_data + ino_to_fsbo(fs, ino);
+#ifdef FFS_EI
+		if (UFS_FSNEEDSWAP(fs))
+			ffs_dinode2_swap(dp2, ip->i_din.ffs2_din);
+		else
+#endif
+		*ip->i_din.ffs2_din = *dp2;
+
+		ip->i_mode = ip->i_ffs2_mode;
+		ip->i_nlink = ip->i_ffs2_nlink;
+		ip->i_size = ip->i_ffs2_size;
+		ip->i_flags = ip->i_ffs2_flags;
+		ip->i_gen = ip->i_ffs2_gen;
+		ip->i_uid = ip->i_ffs2_uid;
+		ip->i_gid = ip->i_ffs2_gid;
+	}
+}
+
 #endif	/* _KERNEL */
 
 /*
@@ -152,8 +199,9 @@ ffs_checkoverlap(bp, ip)
 	struct buf *bp;
 	struct inode *ip;
 {
+#if 0
 	struct buf *ebp, *ep;
-	ufs_daddr_t start, last;
+	daddr_t start, last;
 	struct vnode *vp;
 
 	ebp = &buf[nbuf];
@@ -172,11 +220,15 @@ ffs_checkoverlap(bp, ip)
 		    ep->b_blkno + btodb(ep->b_bcount) <= start)
 			continue;
 		vprint("Disk overlap", vp);
-		printf("\tstart %d, end %d overlap start %d, end %ld\n",
+		printf("\tstart %" PRId64 ", end %" PRId64 " overlap start "
+		    "%" PRId64 ", end %" PRId64 "\n",
 		    start, last, ep->b_blkno,
 		    ep->b_blkno + btodb(ep->b_bcount) - 1);
 		panic("Disk buffer overlap");
 	}
+#else
+	printf("ffs_checkoverlap disabled due to buffer cache implementation changes\n");
+#endif
 }
 #endif /* _KERNEL && DIAGNOSTIC */
 
@@ -184,12 +236,14 @@ ffs_checkoverlap(bp, ip)
  * block operations
  *
  * check if a block is available
+ *  returns true if all the correponding bits in the free map are 1
+ *  returns false if any corresponding bit in the free map is 0 
  */
 int
 ffs_isblock(fs, cp, h)
 	struct fs *fs;
 	u_char *cp;
-	ufs_daddr_t h;
+	int32_t h;
 {
 	u_char mask;
 
@@ -212,13 +266,15 @@ ffs_isblock(fs, cp, h)
 }
 
 /*
- * check if a block is free
+ * check if a block is completely allocated
+ *  returns true if all the corresponding bits in the free map are 0
+ *  returns false if any corresponding bit in the free map is 1
  */
 int
 ffs_isfreeblock(fs, cp, h)
 	struct fs *fs;
 	u_char *cp;
-	ufs_daddr_t h;
+	int32_t h;
 {
 
 	switch ((int)fs->fs_fragshift) {
@@ -243,7 +299,7 @@ void
 ffs_clrblock(fs, cp, h)
 	struct fs *fs;
 	u_char *cp;
-	ufs_daddr_t h;
+	int32_t h;
 {
 
 	switch ((int)fs->fs_fragshift) {
@@ -272,7 +328,7 @@ void
 ffs_setblock(fs, cp, h)
 	struct fs *fs;
 	u_char *cp;
-	ufs_daddr_t h;
+	int32_t h;
 {
 
 	switch ((int)fs->fs_fragshift) {

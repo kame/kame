@@ -1,4 +1,4 @@
-/*	$NetBSD: grf_obio.c,v 1.47 2000/12/04 06:25:19 scottr Exp $	*/
+/*	$NetBSD: grf_obio.c,v 1.50 2003/07/15 02:43:25 lukem Exp $	*/
 
 /*
  * Copyright (C) 1998 Scott Reynolds
@@ -59,6 +59,9 @@
  * that don't map it into a fake nubus card.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: grf_obio.c,v 1.50 2003/07/15 02:43:25 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/ioctl.h>
@@ -89,9 +92,8 @@ static int	grfiv_mode __P((struct grf_softc *gp, int cmd, void *arg));
 static int	grfiv_match __P((struct device *, struct cfdata *, void *));
 static void	grfiv_attach __P((struct device *, struct device *, void *));
 
-struct cfattach intvid_ca = {
-	sizeof(struct grfbus_softc), grfiv_match, grfiv_attach
-};
+CFATTACH_DECL(intvid, sizeof(struct grfbus_softc),
+    grfiv_match, grfiv_attach, NULL, NULL);
 
 #define	DAFB_BASE		0xf9000000
 #define DAFB_CONTROL_BASE	0xf9800000

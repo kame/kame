@@ -1,4 +1,4 @@
-/*	$NetBSD: select.h,v 1.11 2001/02/26 16:26:54 lukem Exp $	*/
+/*	$NetBSD: select.h,v 1.18 2003/08/07 16:34:13 agc Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,21 +34,33 @@
 #ifndef _SYS_SELECT_H_
 #define	_SYS_SELECT_H_
 
+#include <sys/types.h>
+#include <sys/event.h>		/* for struct klist */
+
 /*
  * Used to maintain information about processes that wish to be
  * notified when I/O becomes possible.
  */
 struct selinfo {
-	pid_t		si_pid;		/* process to be notified */
-	short		si_flags;	/* see below */
+	struct klist	sel_klist;	/* knotes attached to this selinfo */
+	pid_t		sel_pid;	/* process to be notified */
+	uint8_t		sel_collision;	/* non-zero if a collision occurred */
 };
-#define	SI_COLL		0x0001		/* collision occurred */
 
 #ifdef _KERNEL
 struct proc;
 
 void	selrecord(struct proc *selector, struct selinfo *);
 void	selwakeup(struct selinfo *);
+
+static __inline void
+selnotify(struct selinfo *sip, long knhint)
+{
+
+	if (sip->sel_pid != 0)
+		selwakeup(sip);
+	KNOTE(&sip->sel_klist, knhint);
+}
 #endif
 
 #endif /* !_SYS_SELECT_H_ */

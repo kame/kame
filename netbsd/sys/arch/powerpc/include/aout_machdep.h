@@ -1,4 +1,4 @@
-/*	$NetBSD: aout_machdep.h,v 1.3 2001/02/09 15:54:18 wiz Exp $	*/
+/*	$NetBSD: aout_machdep.h,v 1.5 2002/12/10 17:14:17 thorpej Exp $	*/
 
 /*-
  * Copyright (C) 1995 Wolfgang Solfrank.
@@ -30,8 +30,8 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef	_MACH_EXEC_H_
-#define	_MACH_EXEC_H_
+#ifndef	_POWERPC_AOUT_MACHDEP_H_
+#define	_POWERPC_AOUT_MACHDEP_H_
 
 #include <machine/reloc.h>
 
@@ -49,6 +49,6 @@ struct relocation_info_ppc {
 };
 #define relocation_info	relocation_info_ppc
 
-#define	__LDPGSZ	4096
+#define	AOUT_LDPGSZ	4096
 
-#endif	/* _MACH_EXEC_H_ */
+#endif	/* _POWERPC_AOUT_MACHDEP_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: mainbus.c,v 1.1 2002/03/07 14:44:05 simonb Exp $	*/
+/*	$NetBSD: mainbus.c,v 1.7 2003/07/15 01:37:34 lukem Exp $	*/
 
 /*
  * Copyright 2002 Wasabi Systems, Inc.
@@ -35,6 +35,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.7 2003/07/15 01:37:34 lukem Exp $");
+
 #include "opt_pci.h"
 
 #include <sys/param.h>
@@ -69,9 +72,8 @@ static void	mainbus_attach(struct device *, struct device *, void *);
 static int	mainbus_submatch(struct device *, struct cfdata *, void *);
 static int	mainbus_print(void *, const char *);
 
-struct cfattach mainbus_ca = {
-	sizeof(struct device), mainbus_match, mainbus_attach
-};
+CFATTACH_DECL(mainbus, sizeof(struct device),
+    mainbus_match, mainbus_attach, NULL, NULL);
 
 /* There can be only one. */
 int	mainbus_found;
@@ -173,7 +175,7 @@ mainbus_submatch(struct device *parent, struct cfdata *cf, void *aux)
 	    cf->cf_loc[MAINBUSCF_ADDR] != ma->ma_addr)
 		return (0);
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 static int
@@ -185,9 +187,9 @@ mainbus_print(void *aux, const char *pnp)
 		return QUIET;
 
 	if (pnp)
-		printf("%s at %s", ma->ma_name, pnp);
+		aprint_normal("%s at %s", ma->ma_name, pnp);
 	if (ma->ma_addr != MAINBUSCF_ADDR_DEFAULT)
-		printf(" addr 0x%lx", ma->ma_addr);
+		aprint_normal(" addr 0x%lx", ma->ma_addr);
 
 	return (UNCONF);
 }

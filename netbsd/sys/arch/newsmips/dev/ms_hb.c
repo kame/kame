@@ -1,4 +1,4 @@
-/*	$NetBSD: ms_hb.c,v 1.2 2002/03/17 19:40:46 atatat Exp $	*/
+/*	$NetBSD: ms_hb.c,v 1.8 2003/07/15 02:59:29 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2000 Tsubai Masanari.  All rights reserved.
@@ -26,6 +26,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ms_hb.c,v 1.8 2003/07/15 02:59:29 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -33,8 +36,9 @@
 #include <dev/wscons/wsconsio.h>
 #include <dev/wscons/wsmousevar.h>
 
-#include <machine/autoconf.h>
 #include <machine/adrsmap.h>
+
+#include <newsmips/dev/hbvar.h>
 
 struct msreg {
 	u_char ms_data;
@@ -59,9 +63,8 @@ int ms_hb_enable(void *);
 int ms_hb_ioctl(void *, u_long, caddr_t, int, struct proc *);
 void ms_hb_disable(void *);
 
-struct cfattach ms_hb_ca = {
-	sizeof(struct ms_hb_softc), ms_hb_match, ms_hb_attach
-};
+CFATTACH_DECL(ms_hb, sizeof(struct ms_hb_softc),
+    ms_hb_match, ms_hb_attach, NULL, NULL);
 
 struct wsmouse_accessops ms_hb_accessops = {
 	ms_hb_enable,
@@ -75,9 +78,9 @@ ms_hb_match(parent, cf, aux)
 	struct cfdata *cf;
 	void *aux;
 {
-	struct confargs *ca = aux;
+	struct hb_attach_args *ha = aux;
 
-	if (strcmp(ca->ca_name, "ms") == 0)
+	if (strcmp(ha->ha_name, "ms") == 0)
 		return 1;
 
 	return 0;
@@ -89,20 +92,25 @@ ms_hb_attach(parent, self, aux)
 	void *aux;
 {
 	struct ms_hb_softc *sc = (void *)self;
-	volatile struct msreg *reg = (void *)self->dv_cfdata->cf_addr;
-	int intr = self->dv_cfdata->cf_level;
+	struct hb_attach_args *ha = aux;
+	volatile struct msreg *reg;
 	struct wsmousedev_attach_args aa;
+	int intr;
+
+	reg = (struct msreg *)ha->ha_addr;
+	intr = ha->ha_level;
 
 	if (intr == -1)
 		intr = 2;
 
 	sc->sc_reg = reg;
+
 	reg->ms_reset = 0x01;
 	reg->ms_init = 0x80;	/* 1200 bps */
 
 	printf(" level %d\n", intr);
 
-	hb_intr_establish(intr, IPL_TTY, ms_hb_intr, sc);
+	hb_intr_establish(intr, INTEN0_MSINT, IPL_TTY, ms_hb_intr, sc);
 
 	aa.accessops = &ms_hb_accessops;
 	aa.accesscookie = sc;

@@ -1,4 +1,4 @@
-/*	$NetBSD: coda_vnops.h,v 1.6 2001/07/03 06:46:52 chs Exp $	*/
+/*	$NetBSD: coda_vnops.h,v 1.9 2003/06/29 22:29:11 fvdl Exp $	*/
 
 /*
  * 

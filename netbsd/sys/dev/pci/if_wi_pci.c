@@ -1,4 +1,4 @@
-/*      $NetBSD: if_wi_pci.c,v 1.7.4.1 2003/07/28 19:06:35 he Exp $  */
+/*      $NetBSD: if_wi_pci.c,v 1.31 2004/03/28 09:44:59 nakayama Exp $  */
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_wi_pci.c,v 1.7.4.1 2003/07/28 19:06:35 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_wi_pci.c,v 1.31 2004/03/28 09:44:59 nakayama Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -56,7 +56,11 @@ __KERNEL_RCSID(0, "$NetBSD: if_wi_pci.c,v 1.7.4.1 2003/07/28 19:06:35 he Exp $")
 #include <net/if.h>
 #include <net/if_ether.h>
 #include <net/if_media.h>
-#include <net/if_ieee80211.h>
+
+#include <net80211/ieee80211_var.h>
+#include <net80211/ieee80211_compat.h>
+#include <net80211/ieee80211_radiotap.h>
+#include <net80211/ieee80211_rssadapt.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -69,6 +73,7 @@ __KERNEL_RCSID(0, "$NetBSD: if_wi_pci.c,v 1.7.4.1 2003/07/28 19:06:35 he Exp $")
 #include <dev/ic/wireg.h>
 #include <dev/ic/wivar.h>
 
+#define WI_PCI_CBMA		0x10	/* Configuration Base Memory Address */
 #define WI_PCI_PLX_LOMEM	0x10	/* PLX chip membase */
 #define WI_PCI_PLX_LOIO		0x14	/* PLX chip iobase */
 #define WI_PCI_LOMEM		0x18	/* ISA membase */
@@ -76,6 +81,7 @@ __KERNEL_RCSID(0, "$NetBSD: if_wi_pci.c,v 1.7.4.1 2003/07/28 19:06:35 he Exp $")
 
 #define CHIP_PLX_OTHER		0x01
 #define CHIP_PLX_9052		0x02
+#define CHIP_TMD_7160		0x03
 
 #define WI_PLX_COR_OFFSET       0x3E0
 #define WI_PLX_COR_VALUE        0x41
@@ -85,7 +91,7 @@ struct wi_pci_softc {
 
 	/* PCI-specific goo */
 	pci_intr_handle_t psc_ih;	
-	struct pci_attach_args *psc_pa;  
+	pci_chipset_tag_t psc_pc;
 
 	void *sc_powerhook;		/* power hook descriptor */
 };
@@ -100,15 +106,14 @@ static void	wi_pci_powerhook __P((int, void *));
 static const struct wi_pci_product
 	*wi_pci_lookup __P((struct pci_attach_args *));
 
-struct cfattach wi_pci_ca = {
-	sizeof(struct wi_pci_softc), wi_pci_match, wi_pci_attach
-};
+CFATTACH_DECL(wi_pci, sizeof(struct wi_pci_softc),
+    wi_pci_match, wi_pci_attach, NULL, NULL);
 
 const struct wi_pci_product {
 	pci_vendor_id_t		wpp_vendor;	/* vendor ID */
 	pci_product_id_t	wpp_product;	/* product ID */
 	const char		*wpp_name;	/* product name */
-	int			wpp_plx;	/* uses PLX chip */
+	int			wpp_chip;	/* uses other chip */
 } wi_pci_products[] = {
 	{ PCI_VENDOR_GLOBALSUN,		PCI_PRODUCT_GLOBALSUN_GL24110P,
 	  NULL, CHIP_PLX_OTHER },
@@ -122,6 +127,12 @@ const struct wi_pci_product {
 	  NULL, CHIP_PLX_OTHER },
 	{ PCI_VENDOR_INTERSIL,		PCI_PRODUCT_INTERSIL_MINI_PCI_WLAN,
 	  "Intersil Prism2.5", 0 },
+	{ PCI_VENDOR_NDC,		PCI_PRODUCT_NDC_NCP130,
+	  NULL, CHIP_PLX_9052 },
+	{ PCI_VENDOR_USR2,		PCI_PRODUCT_USR2_2415,
+	  NULL, CHIP_PLX_OTHER },
+	{ PCI_VENDOR_NDC,		PCI_PRODUCT_NDC_NCP130A2,
+	  NULL, CHIP_TMD_7160 },
 	{ 0,				0,
 	  NULL, 0},
 };
@@ -133,7 +144,7 @@ wi_pci_enable(sc)
 	struct wi_pci_softc *psc = (struct wi_pci_softc *)sc;
 
 	/* establish the interrupt. */
-	sc->sc_ih = pci_intr_establish(psc->psc_pa->pa_pc, 
+	sc->sc_ih = pci_intr_establish(psc->psc_pc, 
 					psc->psc_ih, IPL_NET, wi_intr, sc);
 	if (sc->sc_ih == NULL) {
 		printf("%s: couldn't establish interrupt\n",
@@ -142,7 +153,8 @@ wi_pci_enable(sc)
 	}
 
 	/* reset HFA3842 MAC core */
-	wi_pci_reset(sc);
+	if (sc->sc_reset != NULL)
+		wi_pci_reset(sc);
 
 	return (0);
 }
@@ -153,19 +165,39 @@ wi_pci_disable(sc)
 {
 	struct wi_pci_softc *psc = (struct wi_pci_softc *)sc;
 
-	pci_intr_disestablish(psc->psc_pa->pa_pc, sc->sc_ih);
+	pci_intr_disestablish(psc->psc_pc, sc->sc_ih);
 }
 
 static void
 wi_pci_reset(sc)
 	struct wi_softc		*sc;
 {
-	bus_space_write_2(sc->sc_iot, sc->sc_ioh,
-			  WI_PCI_COR, WI_PCI_SOFT_RESET);
-	DELAY(100*1000); /* 100 m sec */
+	int i, secs, usecs;
 
-	bus_space_write_2(sc->sc_iot, sc->sc_ioh, WI_PCI_COR, 0x0);
-	DELAY(100*1000); /* 100 m sec */
+	bus_space_write_2(sc->sc_iot, sc->sc_ioh,
+	    WI_PCI_COR, WI_COR_SOFT_RESET);
+	DELAY(250*1000); /* 1/4 second */
+
+	bus_space_write_2(sc->sc_iot, sc->sc_ioh,
+	    WI_PCI_COR, WI_COR_CLEAR);
+	DELAY(500*1000); /* 1/2 second */
+
+	/* wait 2 seconds for firmware to complete initialization. */
+
+	for (i = 200000; i--; DELAY(10))
+		if (!(CSR_READ_2(sc, WI_COMMAND) & WI_CMD_BUSY))
+			break;
+ 
+	if (i < 0) {
+		printf("%s: PCI reset timed out\n", sc->sc_dev.dv_xname);
+	} else if (sc->sc_if.if_flags & IFF_DEBUG) {
+		usecs = (200000 - i) * 10;
+		secs = usecs / 1000000;
+		usecs %= 1000000;
+
+		printf("%s: PCI reset in %d.%06d seconds\n",
+                       sc->sc_dev.dv_xname, secs, usecs);
+	}
 
 	return;
 }
@@ -209,10 +241,10 @@ wi_pci_attach(parent, self, aux)
 	const char *intrstr;
 	const struct wi_pci_product *wpp;
 	pci_intr_handle_t ih;
-	bus_space_tag_t memt, iot, plxt;
-	bus_space_handle_t memh, ioh, plxh;
+	bus_space_tag_t memt, iot, plxt, tmdt;
+	bus_space_handle_t memh, ioh, plxh, tmdh;
 
-	psc->psc_pa = pa;
+	psc->psc_pc = pc;
 
 	wpp = wi_pci_lookup(pa);
 #ifdef DIAGNOSTIC
@@ -222,7 +254,9 @@ wi_pci_attach(parent, self, aux)
 	}
 #endif
 
-	if (wpp->wpp_plx) {
+	switch (wpp->wpp_chip) {
+	case CHIP_PLX_OTHER:
+	case CHIP_PLX_9052:
 		/* Map memory and I/O registers. */
 		if (pci_mapreg_map(pa, WI_PCI_LOMEM, PCI_MAPREG_TYPE_MEM, 0,
 		    &memt, &memh, NULL, NULL) != 0) {
@@ -235,7 +269,7 @@ wi_pci_attach(parent, self, aux)
 			return;
 		}
 
-		if (wpp->wpp_plx == CHIP_PLX_OTHER) {
+		if (wpp->wpp_chip == CHIP_PLX_OTHER) {
 			/* The PLX 9052 doesn't have IO at 0x14.  Perhaps
 			   other chips have, so we'll make this conditional. */
 			if (pci_mapreg_map(pa, WI_PCI_PLX_LOIO,
@@ -245,7 +279,26 @@ wi_pci_attach(parent, self, aux)
 					return;
 				}
 		}
-	} else {
+		break;
+	case CHIP_TMD_7160:
+		/* Used instead of PLX on at least one revision of
+		 * the National Datacomm Corporation NCP130. Values
+		 * for registers acquired from OpenBSD, which in
+		 * turn got them from a Linux driver.
+		 */   
+		/* Map COR and I/O registers. */
+		if (pci_mapreg_map(pa, WI_TMD_COR, PCI_MAPREG_TYPE_IO, 0,
+		    &tmdt, &tmdh, NULL, NULL) != 0) {
+			printf(": can't map TMD\n");
+			return;
+		}
+		if (pci_mapreg_map(pa, WI_TMD_IO, PCI_MAPREG_TYPE_IO, 0,
+		    &iot, &ioh, NULL, NULL) != 0) {
+			printf(": can't map I/O space\n");
+			return;
+		}
+		break;
+	default:
 		if (pci_mapreg_map(pa, WI_PCI_CBMA,
 		    PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT,
 		    0, &iot, &ioh, NULL, NULL) != 0) {
@@ -256,6 +309,7 @@ wi_pci_attach(parent, self, aux)
 		memt = iot;
 		memh = ioh;
 		sc->sc_pci = 1;
+		break;
 	}
 
 	if (wpp->wpp_name != NULL) {
@@ -272,18 +326,13 @@ wi_pci_attach(parent, self, aux)
 	sc->sc_enable = wi_pci_enable;
 	sc->sc_disable = wi_pci_disable;
 
-	/* Enable the card. */
-	pci_conf_write(pc, pa->pa_tag, PCI_COMMAND_STATUS_REG,
-		pci_conf_read(pc, pa->pa_tag, PCI_COMMAND_STATUS_REG) |
-		PCI_COMMAND_MASTER_ENABLE);
-
 	sc->sc_iot = iot;
 	sc->sc_ioh = ioh;
 	/* Make sure interrupts are disabled. */
 	CSR_WRITE_2(sc, WI_INT_EN, 0);
 	CSR_WRITE_2(sc, WI_EVENT_ACK, 0xFFFF);
 
-	if (wpp->wpp_plx == CHIP_PLX_OTHER) {
+	if (wpp->wpp_chip == CHIP_PLX_OTHER) {
 		uint32_t command;
 #define	WI_LOCAL_INTCSR		0x4c
 #define	WI_LOCAL_INTEN		0x40	/* poke this into INTCSR */
@@ -313,26 +362,38 @@ wi_pci_attach(parent, self, aux)
 
 	printf("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
 
-	if (wpp->wpp_plx) {
+	switch (wpp->wpp_chip) {
+	case CHIP_PLX_OTHER:
+	case CHIP_PLX_9052:
 		/*
 		 * Setup the PLX chip for level interrupts and config index 1
 		 * XXX - should really reset the PLX chip too.
 		 */
 		bus_space_write_1(memt, memh,
 		    WI_PLX_COR_OFFSET, WI_PLX_COR_VALUE);
-	} else {
+		break;
+	case CHIP_TMD_7160:
+		/* Enable I/O mode and level interrupts on the embedded
+		 * card. The card's COR is the first byte of BAR 0.
+		 */
+		bus_space_write_1(tmdt, tmdh, 0, WI_COR_IOMODE);
+		break;
+	default:
 		/* reset HFA3842 MAC core */
 		wi_pci_reset(sc);
+		break;
 	}
 
 	printf("%s:", sc->sc_dev.dv_xname);
-	sc->sc_ifp = &sc->sc_ethercom.ec_if;
 	if (wi_attach(sc) != 0) {
 		printf("%s: failed to attach controller\n",
 			sc->sc_dev.dv_xname);
 		pci_intr_disestablish(pa->pa_pc, sc->sc_ih);
 		return;
 	}
+
+	if (!wpp->wpp_chip)
+		sc->sc_reset = wi_pci_reset;
 
 	/* Add a suspend hook to restore PCI config state */
 	psc->sc_powerhook = powerhook_establish(wi_pci_powerhook, psc);

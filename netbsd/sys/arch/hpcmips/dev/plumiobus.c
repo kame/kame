@@ -1,4 +1,4 @@
-/*	$NetBSD: plumiobus.c,v 1.5 2002/01/29 18:53:11 uch Exp $ */
+/*	$NetBSD: plumiobus.c,v 1.9 2003/07/15 02:29:30 lukem Exp $ */
 
 /*-
  * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: plumiobus.c,v 1.9 2003/07/15 02:29:30 lukem Exp $");
 
 #define PLUMIOBUSDEBUG
 
@@ -85,9 +88,8 @@ struct plumiobus_softc {
 	struct plumisa_resource	sc_isa[PLUM_IOBUS_IO5CSMAX];
 };
 
-struct cfattach plumiobus_ca = {
-	sizeof(struct plumiobus_softc), plumiobus_match, plumiobus_attach
-};
+CFATTACH_DECL(plumiobus, sizeof(struct plumiobus_softc),
+    plumiobus_match, plumiobus_attach, NULL, NULL);
 
 bus_space_tag_t __plumiobus_subregion(bus_space_tag_t, bus_addr_t,
     bus_size_t);
@@ -209,7 +211,7 @@ plumiobus_search(struct device *parent, struct cfdata *cf, void *aux)
 	pba.pba_busname	= "plumisab";
 	
 	if (!(sc->sc_isa[slot].pr_enabled) && /* not attached slot */
-	    (*cf->cf_attach->ca_match)(parent, cf, &pba)) {
+	    config_match(parent, cf, &pba)) {
 		config_attach(parent, cf, &pba, plumiobus_print);
 		sc->sc_isa[slot].pr_enabled = 1;
 	}

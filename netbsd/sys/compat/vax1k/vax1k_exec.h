@@ -1,4 +1,4 @@
-/*	$NetBSD: vax1k_exec.h,v 1.1 1998/08/21 13:25:47 ragge Exp $	*/
+/*	$NetBSD: vax1k_exec.h,v 1.3 2003/06/29 22:29:54 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.

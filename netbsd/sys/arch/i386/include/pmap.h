@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.62 2001/12/23 23:08:41 thorpej Exp $	*/
+/*	$NetBSD: pmap.h,v 1.79 2004/02/20 17:35:01 yamt Exp $	*/
 
 /*
  *
@@ -61,11 +61,7 @@
  * (the following assumes that KERNBASE is 0xc0000000)
  *
  * PDE#s	VA range		usage
- * 0->767	0x0 -> 0xbfc00000	user address space, note that the
- *					max user address is 0xbfbfe000
- *					the final two pages in the last 4MB
- *					used to be reserved for the UAREA
- *					but now are no longer used
+ * 0->766	0x0 -> 0xbfc00000	user address space
  * 767		0xbfc00000->		recursive mapping of PDP (used for
  *			0xc0000000	linear mapping of PTPs)
  * 768->1023	0xc0000000->		kernel address space (constant
@@ -91,7 +87,7 @@
  * point (slot #767 as show above).  when the pmap code wants to find the
  * PTE for a virtual address, all it has to do is the following:
  *
- * address of PTE = (767 * 4MB) + (VA / NBPG) * sizeof(pt_entry_t)
+ * address of PTE = (767 * 4MB) + (VA / PAGE_SIZE) * sizeof(pt_entry_t)
  *                = 0xbfc00000 + (VA / 4096) * 4
  *
  * what happens if the pmap layer is asked to perform an operation
@@ -131,7 +127,7 @@
  *   |1023|
  *   +----+
  *
- * note that mapping of the PDP at PTP#959's VA (0xeffbf000) is
+ * note that mapping of the PDP at PTP#767's VA (0xbffbf000) is
  * defined as "PDP_BASE".... within that mapping there are two
  * defines:
  *   "PDP_PDE" (0xbfeffbfc) is the VA of the PDE in the PDP
@@ -144,6 +140,7 @@
  * note that in the APTE_BASE space, the APDP appears at VA
  * "APDP_BASE" (0xfffff000).
  */
+/* XXX MP should we allocate one APDP_PDE per processor?? */
 
 /*
  * the following defines identify the slots used as described above.
@@ -163,8 +160,8 @@
 
 #define PTE_BASE	((pt_entry_t *)  (PDSLOT_PTE * NBPD) )
 #define APTE_BASE	((pt_entry_t *)  (PDSLOT_APTE * NBPD) )
-#define PDP_BASE ((pd_entry_t *)(((char *)PTE_BASE) + (PDSLOT_PTE * NBPG)))
-#define APDP_BASE ((pd_entry_t *)(((char *)APTE_BASE) + (PDSLOT_APTE * NBPG)))
+#define PDP_BASE ((pd_entry_t *)(((char *)PTE_BASE) + (PDSLOT_PTE * PAGE_SIZE)))
+#define APDP_BASE ((pd_entry_t *)(((char *)APTE_BASE) + (PDSLOT_APTE * PAGE_SIZE)))
 #define PDP_PDE		(PDP_BASE + PDSLOT_PTE)
 #define APDP_PDE	(PDP_BASE + PDSLOT_APTE)
 
@@ -194,12 +191,12 @@
  *   a PTP's offset is the byte-offset in the PTE space that this PTP is at
  *   a PTP's VA is the first VA mapped by that PTP
  *
- * note that NBPG == number of bytes in a PTP (4096 bytes == 1024 entries)
+ * note that PAGE_SIZE == number of bytes in a PTP (4096 bytes == 1024 entries)
  *           NBPD == number of bytes a PTP can map (4MB)
  */
 
-#define ptp_i2o(I)	((I) * NBPG)	/* index => offset */
-#define ptp_o2i(O)	((O) / NBPG)	/* offset => index */
+#define ptp_i2o(I)	((I) * PAGE_SIZE)	/* index => offset */
+#define ptp_o2i(O)	((O) / PAGE_SIZE)	/* offset => index */
 #define ptp_i2v(I)	((I) * NBPD)	/* index => VA */
 #define ptp_v2i(V)	((V) / NBPD)	/* VA => index (same as pdei) */
 
@@ -209,7 +206,13 @@
 
 #define PG_W		PG_AVAIL1	/* "wired" mapping */
 #define PG_PVLIST	PG_AVAIL2	/* mapping has entry on pvlist */
-/* PG_AVAIL3 not used */
+#define PG_X		PG_AVAIL3	/* executable mapping */
+
+/*
+ * Number of PTE's per cache line.  4 byte pte, 32-byte cache line
+ * Used to avoid false sharing of cache lines.
+ */
+#define NPTECL			8
 
 #ifdef _KERNEL
 /*
@@ -230,6 +233,9 @@ LIST_HEAD(pmap_head, pmap); /* struct pmap_head: head of a pmap list */
  *
  * note that the pm_obj contains the simple_lock, the reference count,
  * page list, and number of PTPs within the pmap.
+ *
+ * XXX If we ever support processor numbers higher than 31, we'll have
+ * XXX to rethink the CPU mask.
  */
 
 struct pmap {
@@ -241,11 +247,13 @@ struct pmap {
 	struct vm_page *pm_ptphint;	/* pointer to a PTP in our pmap */
 	struct pmap_statistics pm_stats;  /* pmap stats (lck by object lock) */
 
+	vaddr_t pm_hiexec;		/* highest executable mapping */
 	int pm_flags;			/* see below */
 
 	union descriptor *pm_ldt;	/* user-set LDT */
 	int pm_ldt_len;			/* number of LDT entries */
 	int pm_ldt_sel;			/* LDT selector */
+	u_int32_t pm_cpus;		/* mask of CPUs using pmap */
 };
 
 /* pm_flags */
@@ -259,15 +267,8 @@ struct pmap {
  * describes one mapping).
  */
 
-struct pv_entry;
-
-struct pv_head {
-	struct simplelock pvh_lock;	/* locks every pv on this list */
-	struct pv_entry *pvh_list;	/* head of list (locked by pvh_lock) */
-};
-
 struct pv_entry {			/* locked by its list's pvh_lock */
-	struct pv_entry *pv_next;	/* next entry */
+	SPLAY_ENTRY(pv_entry) pv_node;	/* splay-tree node */
 	struct pmap *pv_pmap;		/* the pmap */
 	vaddr_t pv_va;			/* the virtual address */
 	struct vm_page *pv_ptp;		/* the vm_page of the PTP */
@@ -291,7 +292,7 @@ struct pv_page_info {
  * (note: won't work on systems where NPBG isn't a constant)
  */
 
-#define PVE_PER_PVPAGE ((NBPG - sizeof(struct pv_page_info)) / \
+#define PVE_PER_PVPAGE ((PAGE_SIZE - sizeof(struct pv_page_info)) / \
 			sizeof(struct pv_entry))
 
 /*
@@ -301,18 +302,6 @@ struct pv_page_info {
 struct pv_page {
 	struct pv_page_info pvinfo;
 	struct pv_entry pvents[PVE_PER_PVPAGE];
-};
-
-/*
- * pmap_remove_record: a record of VAs that have been unmapped, used to
- * flush TLB.  if we have more than PMAP_RR_MAX then we stop recording.
- */
-
-#define PMAP_RR_MAX	16	/* max of 16 pages (64K) */
-
-struct pmap_remove_record {
-	int prr_npages;
-	vaddr_t prr_vas[PMAP_RR_MAX];
 };
 
 /*
@@ -335,13 +324,13 @@ extern int pmap_pg_g;			/* do we support PG_G? */
 #define	pmap_wired_count(pmap)		((pmap)->pm_stats.wired_count)
 #define	pmap_update(pmap)		/* nothing (yet) */
 
-#define pmap_clear_modify(pg)		pmap_change_attrs(pg, 0, PG_M)
-#define pmap_clear_reference(pg)	pmap_change_attrs(pg, 0, PG_U)
-#define pmap_copy(DP,SP,D,L,S)		
+#define pmap_clear_modify(pg)		pmap_clear_attrs(pg, PG_M)
+#define pmap_clear_reference(pg)	pmap_clear_attrs(pg, PG_U)
+#define pmap_copy(DP,SP,D,L,S)
 #define pmap_is_modified(pg)		pmap_test_attrs(pg, PG_M)
 #define pmap_is_referenced(pg)		pmap_test_attrs(pg, PG_U)
-#define pmap_move(DP,SP,D,L,S)		
-#define pmap_phys_address(ppn)		i386_ptob(ppn)
+#define pmap_move(DP,SP,D,L,S)
+#define pmap_phys_address(ppn)		x86_ptob(ppn)
 #define pmap_valid_entry(E) 		((E) & PG_V) /* is PDE or PTE valid? */
 
 
@@ -349,29 +338,43 @@ extern int pmap_pg_g;			/* do we support PG_G? */
  * prototypes
  */
 
-void		pmap_activate __P((struct proc *));
-void		pmap_bootstrap __P((vaddr_t));
-boolean_t	pmap_change_attrs __P((struct vm_page *, int, int));
-void		pmap_deactivate __P((struct proc *));
-void		pmap_page_remove  __P((struct vm_page *));
-void		pmap_remove __P((struct pmap *, vaddr_t, vaddr_t));
-boolean_t	pmap_test_attrs __P((struct vm_page *, int));
-void		pmap_write_protect __P((struct pmap *, vaddr_t,
-				vaddr_t, vm_prot_t));
+void		pmap_activate(struct lwp *);
+void		pmap_bootstrap(vaddr_t);
+boolean_t	pmap_clear_attrs(struct vm_page *, int);
+void		pmap_deactivate(struct lwp *);
+void		pmap_deactivate2(struct lwp *);
+void		pmap_page_remove (struct vm_page *);
+void		pmap_remove(struct pmap *, vaddr_t, vaddr_t);
+boolean_t	pmap_test_attrs(struct vm_page *, int);
+void		pmap_write_protect(struct pmap *, vaddr_t, vaddr_t, vm_prot_t);
+int		pmap_exec_fixup(struct vm_map *, struct trapframe *,
+		    struct pcb *);
+void		pmap_load(void);
 
-vaddr_t reserve_dumppages __P((vaddr_t)); /* XXX: not a pmap fn */
+vaddr_t reserve_dumppages(vaddr_t); /* XXX: not a pmap fn */
+
+void	pmap_tlb_shootdown(pmap_t, vaddr_t, pt_entry_t, int32_t *);
+void	pmap_tlb_shootnow(int32_t);
+void	pmap_do_tlb_shootdown(struct cpu_info *);
 
 #define PMAP_GROWKERNEL		/* turn on pmap_growkernel interface */
 
 /*
  * Do idle page zero'ing uncached to avoid polluting the cache.
  */
-boolean_t			pmap_pageidlezero __P((paddr_t));
+boolean_t			pmap_pageidlezero(paddr_t);
 #define	PMAP_PAGEIDLEZERO(pa)	pmap_pageidlezero((pa))
 
 /*
  * inline functions
  */
+
+/*ARGSUSED*/
+static __inline void
+pmap_remove_all(struct pmap *pmap)
+{
+	/* Nothing. */
+}
 
 /*
  * pmap_update_pg: flush one page from the TLB (or flush the whole thing
@@ -411,7 +414,7 @@ pmap_update_2pg(vaddr_t va, vaddr_t vb)
  * pmap_page_protect: change the protection of all recorded mappings
  *	of a managed page
  *
- * => this function is a frontend for pmap_page_remove/pmap_change_attrs
+ * => this function is a frontend for pmap_page_remove/pmap_clear_attrs
  * => we only have to worry about making the page more protected.
  *	unprotecting a page is done on-demand at fault time.
  */
@@ -421,7 +424,7 @@ pmap_page_protect(struct vm_page *pg, vm_prot_t prot)
 {
 	if ((prot & VM_PROT_WRITE) == 0) {
 		if (prot & (VM_PROT_READ|VM_PROT_EXECUTE)) {
-			(void) pmap_change_attrs(pg, PG_RO, PG_RW);
+			(void) pmap_clear_attrs(pg, PG_RW);
 		} else {
 			pmap_page_remove(pg);
 		}
@@ -465,7 +468,7 @@ vtopte(vaddr_t va)
 
 	KASSERT(va < (PDSLOT_KERN << PDSHIFT));
 
-	return (PTE_BASE + i386_btop(va));
+	return (PTE_BASE + x86_btop(va));
 }
 
 static __inline pt_entry_t * __attribute__((__unused__))
@@ -484,16 +487,24 @@ kvtopte(vaddr_t va)
 	}
 #endif
 
-	return (PTE_BASE + i386_btop(va));
+	return (PTE_BASE + x86_btop(va));
 }
 
-paddr_t vtophys __P((vaddr_t));
-vaddr_t	pmap_map __P((vaddr_t, paddr_t, paddr_t, vm_prot_t));
+#define pmap_cpu_has_pg_n()		(cpu_class != CPUCLASS_386)
+#define pmap_cpu_has_invlpg()		(cpu_class != CPUCLASS_386)
+
+paddr_t vtophys(vaddr_t);
+vaddr_t	pmap_map(vaddr_t, paddr_t, paddr_t, vm_prot_t);
 
 #if defined(USER_LDT)
-void	pmap_ldt_cleanup __P((struct proc *));
+void	pmap_ldt_cleanup(struct lwp *);
 #define	PMAP_FORK
 #endif /* USER_LDT */
+
+/* 
+ * Hooks for the pool allocator.
+ */
+#define	POOL_VTOPHYS(va)	vtophys((vaddr_t) (va))
 
 #endif /* _KERNEL */
 #endif	/* _I386_PMAP_H_ */

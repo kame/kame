@@ -1,4 +1,4 @@
-/*	$NetBSD: addcom_isa.c,v 1.4 2002/01/07 21:47:03 thorpej Exp $	*/
+/*	$NetBSD: addcom_isa.c,v 1.9 2003/12/04 13:57:30 keihan Exp $	*/
 
 /*
  * Copyright (c) 2000 Michael Graff.  All rights reserved.
@@ -51,11 +51,11 @@
  * The addresses which are documented are 0x108, 0x1108, 0x1d08, and
  * 0x8508, for the base (port 0) address.
  *
- * --Michael <explorer@netbsd.org> -- April 21, 2000
+ * --Michael <explorer@NetBSD.org> -- April 21, 2000
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: addcom_isa.c,v 1.4 2002/01/07 21:47:03 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: addcom_isa.c,v 1.9 2003/12/04 13:57:30 keihan Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -110,9 +110,8 @@ void addcomattach __P((struct device *, struct device *, void *));
 int addcomintr __P((void *));
 int addcomprint __P((void *, const char *));
 
-struct cfattach addcom_isa_ca = {
-	sizeof(struct addcom_softc), addcomprobe, addcomattach,
-};
+CFATTACH_DECL(addcom_isa, sizeof(struct addcom_softc),
+    addcomprobe, addcomattach, NULL, NULL);
 
 int
 addcomprobe(struct device *parent, struct cfdata *self, void *aux)
@@ -191,8 +190,8 @@ addcomprint(void *aux, const char *pnp)
 	struct commulti_attach_args *ca = aux;
 
 	if (pnp)
-		printf("com at %s", pnp);
-	printf(" slave %d", ca->ca_slave);
+		aprint_normal("com at %s", pnp);
+	aprint_normal(" slave %d", ca->ca_slave);
 	return (UNCONF);
 }
 

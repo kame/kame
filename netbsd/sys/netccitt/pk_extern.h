@@ -1,4 +1,4 @@
-/*	$NetBSD: pk_extern.h,v 1.10 2001/05/01 16:39:00 lukem Exp $	*/
+/*	$NetBSD: pk_extern.h,v 1.12 2003/06/29 22:31:55 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1995 The NetBSD Foundation, Inc.

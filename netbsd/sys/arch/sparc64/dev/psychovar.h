@@ -1,4 +1,4 @@
-/*	$NetBSD: psychovar.h,v 1.7.6.1 2002/06/21 06:26:27 lukem Exp $	*/
+/*	$NetBSD: psychovar.h,v 1.12 2004/01/21 07:16:07 petrov Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Matthew R. Green
@@ -31,6 +31,8 @@
 #ifndef _SPARC64_DEV_PSYCHOVAR_H_
 #define _SPARC64_DEV_PSYCHOVAR_H_
 
+#include <dev/sysmon/sysmonvar.h>
+
 /* per real PCI bus info */
 struct psycho_softc;
 
@@ -51,6 +53,16 @@ struct psycho_pbm {
 	int				pp_nrange;
 	int				pp_nintmap;
 
+	/* extents for free bus space */
+	struct extent			*pp_exmem;
+	struct extent			*pp_exio;
+
+	/* PCI Bus Module A or PCI Bus Module B */
+	int				pp_id;
+#define PSYCHO_PBM_UNKNOWN	0
+#define PSYCHO_PBM_A		1
+#define PSYCHO_PBM_B		2
+
 	/* chipset tag for this instance */
 	pci_chipset_tag_t		pp_pc;
 
@@ -59,6 +71,12 @@ struct psycho_pbm {
 	bus_space_tag_t			pp_iot;
 	bus_dma_tag_t			pp_dmat;
 	int				pp_bus;
+	int				pp_busmax;
+	struct pp_busnode {
+		int	node;
+		int	(*valid) __P((void *));
+		void	*arg;
+	}				(*pp_busnode)[256];
 	int				pp_flags;
 
 	/* and pointers into the psycho regs for our bits */
@@ -111,9 +129,15 @@ struct psycho_softc {
 #define	PSYCHO_MODE_PSYCHO	2	/* i'm a psycho (w*nker) */
 
 	struct iommu_state		*sc_is;
+
+	struct sysmon_pswitch		*sc_smcontext;	/* power switch definition */
+	int				sc_powerpressed;/* already signaled */
 };
 
-/* config space is per-psycho.  mem/io/dma are per-pci bus */
+/* get a PCI offset address from bus_space_handle_t */
+bus_addr_t psycho_bus_offset __P((bus_space_tag_t, bus_space_handle_t *));
+
+/* config space is per-psycho.  mem/io/DMA are per-pci bus */
 bus_dma_tag_t psycho_alloc_dma_tag __P((struct psycho_pbm *));
 bus_space_tag_t psycho_alloc_bus_tag __P((struct psycho_pbm *, int));
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: mainbus.c,v 1.1 2001/10/16 15:38:56 uch Exp $	*/
+/*	$NetBSD: mainbus.c,v 1.6 2003/07/15 02:54:38 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -33,6 +33,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.6 2003/07/15 02:54:38 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 
@@ -43,9 +46,8 @@ static void mainbus_attach(struct device *, struct device *, void *);
 static int mainbus_search(struct device *, struct cfdata *, void *);
 static int mainbus_print(void *, const char *);
 
-struct cfattach mainbus_ca = {
-	sizeof(struct device), mainbus_match, mainbus_attach
-};
+CFATTACH_DECL(mainbus, sizeof(struct device),
+    mainbus_match, mainbus_attach, NULL, NULL);
 
 static int
 mainbus_match(struct device *parent, struct cfdata *cf, void *aux)
@@ -72,8 +74,8 @@ mainbus_search(struct device *parent, struct cfdata *cf, void *aux)
 {
 	struct mainbus_attach_args ma;
 
-	ma.ma_name = cf->cf_driver->cd_name;
-	if ((*cf->cf_attach->ca_match)(parent, cf, &ma))
+	ma.ma_name = cf->cf_name;
+	if (config_match(parent, cf, &ma))
 		config_attach(parent, cf, &ma, mainbus_print);
 	
 	return (0);

@@ -1,4 +1,4 @@
-/*	$NetBSD: mainbus.c,v 1.4 2000/01/23 15:58:04 tsubai Exp $	*/
+/*	$NetBSD: mainbus.c,v 1.8 2003/07/15 02:59:31 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
@@ -28,6 +28,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.8 2003/07/15 02:59:31 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -45,9 +48,8 @@ static int	mbmatch __P((struct device *, struct cfdata *, void *));
 static void	mbattach __P((struct device *, struct device *, void *));
 static int	mbprint __P((void *, const char *));
 
-struct cfattach mainbus_ca = {
-	sizeof(struct mainbus_softc), mbmatch, mbattach
-};
+CFATTACH_DECL(mainbus, sizeof(struct mainbus_softc),
+    mbmatch, mbattach, NULL, NULL);
 
 /* There can be only one. */
 static int mainbus_found;
@@ -77,9 +79,6 @@ mbattach(parent, self, aux)
 	printf("\n");
 
 	nca.ca_name = "cpu";
-	nca.ca_slot = 0;
-	nca.ca_offset = 0;
-	nca.ca_addr = 0;
 	config_found(mb, &nca, mbprint);
 
 	/* XXX */

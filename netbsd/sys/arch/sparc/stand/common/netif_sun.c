@@ -1,4 +1,4 @@
-/*	$NetBSD: netif_sun.c,v 1.4 1999/11/08 23:29:05 pk Exp $	*/
+/*	$NetBSD: netif_sun.c,v 1.7 2004/03/15 23:57:27 pk Exp $	*/
 
 /*
  * Copyright (c) 1995 Gordon W. Ross
@@ -50,6 +50,7 @@
 #include <lib/libsa/netif.h>
 #include <lib/libkern/libkern.h>
 
+#include <machine/promlib.h>
 #include <sparc/stand/common/promdev.h>
 
 static struct netif netif_prom;
@@ -76,6 +77,7 @@ netif_open(machdep_hint)
 {
 	struct promdata *pd = machdep_hint;
 	struct iodesc *io;
+	int node;
 
 	/* find a free socket */
 	io = sockets;
@@ -92,7 +94,16 @@ netif_open(machdep_hint)
 	io->io_netif = &netif_prom;
 
 	/* Put our ethernet address in io->myea */
-	prom_getether(pd->fd, io->myea);
+	switch (prom_version()) {
+	case PROM_OBP_V2:
+	case PROM_OBP_V3:
+	case PROM_OPENFIRM:
+		node = prom_instance_to_package(pd->fd);
+		break;
+	default:
+		node = 0;
+	}
+	prom_getether(node, io->myea);
 
 	return(0);
 }
@@ -132,7 +143,7 @@ netif_put(desc, pkt, len)
 	ssize_t rv;
 	size_t sendlen;
 
-	pd = (struct promdata *)desc->io_netif->nif_devdata;
+	pd = (struct promdata *)((struct netif *)desc->io_netif)->nif_devdata;
 
 #ifdef NETIF_DEBUG
 	if (netif_debug) {
@@ -180,7 +191,7 @@ netif_get(desc, pkt, maxlen, timo)
 	int tick0;
 	ssize_t len;
 
-	pd = (struct promdata *)desc->io_netif->nif_devdata;
+	pd = (struct promdata *)((struct netif *)desc->io_netif)->nif_devdata;
 
 #ifdef NETIF_DEBUG
 	if (netif_debug)

@@ -1,4 +1,4 @@
-/*	$NetBSD: ofdev.c,v 1.6 2001/10/23 03:31:26 thorpej Exp $	*/
+/*	$NetBSD: ofdev.c,v 1.11 2003/10/08 04:25:45 lukem Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -34,91 +34,107 @@
  * Device I/O routines using Open Firmware
  */
 
+#include "ofdev.h"
+
 #include <sys/param.h>
 #include <sys/disklabel.h>
-#include <sys/disklabel_mbr.h>
+#include <sys/bootblock.h>
 
 #include <netinet/in.h>
 
-#include <lib/libsa/stand.h>
+#include <lib/libkern/libkern.h>
+
+#include <lib/libsa/byteorder.h>
 #include <lib/libsa/ufs.h>
 #include <lib/libsa/cd9660.h>
 #include <lib/libsa/dosfs.h>
 #include <lib/libsa/nfs.h>
 
-#include "ofdev.h"
+#include "net.h"
+#include "openfirm.h"
 
 extern char bootdev[];
 
 #ifdef DEBUG
 # define DPRINTF printf
-#else 
+#else
 # define DPRINTF while (0) printf
-#endif  
+#endif
 
 static char *
-filename(str, ppart)
-	char *str;
-	char *ppart;
+filename(char *str, char *ppart)
 {
 	char *cp, *lp;
 	char savec;
 	int dhandle;
 	char devtype[16];
-	
+
 	lp = str;
 	devtype[0] = 0;
 	*ppart = 0;
 	for (cp = str; *cp; lp = cp) {
+
 		/* For each component of the path name... */
-		while (*++cp && *cp != '/');
+		while (*++cp && *cp != '/')
+			;
 		savec = *cp;
 		*cp = 0;
+
 		/* ...look whether there is a device with this name */
 		dhandle = OF_finddevice(str);
 		*cp = savec;
 		if (dhandle == -1) {
-			/* if not, lp is the delimiter between device and path */
-			/* if the last component was a block device... */
+
+			/*
+			 * if not, lp is the delimiter between device and path
+			 * if the last component was a block device.
+			 */
+
 			if (!strcmp(devtype, "block")) {
+
 				/* search for arguments */
 				for (cp = lp;
-				     --cp >= str && *cp != '/' && *cp != ':';);
+				     --cp >= str && *cp != '/' && *cp != ':';)
+					;
 				if (cp >= str && *cp == ':') {
-					/* found arguments, make firmware ignore them */
+
+					/*
+					 * found some arguments,
+					 * make OFW ignore them.
+					 */
+
 					*cp = 0;
-					for (cp = lp; *--cp && *cp != ',';);
-					if (*++cp >= 'a' && *cp <= 'a' + MAXPARTITIONS)
+					for (cp = lp; *--cp && *cp != ',';)
+						;
+					if (*++cp >= 'a' &&
+					    *cp < 'a' + MAXPARTITIONS)
 						*ppart = *cp;
 				}
 			}
 			return lp;
-		} else if (OF_getprop(dhandle, "device_type", devtype, sizeof devtype) < 0)
+		}
+		if (OF_getprop(dhandle, "device_type", devtype,
+		    sizeof devtype) < 0)
 			devtype[0] = 0;
 	}
 	return 0;
 }
 
 static int
-strategy(devdata, rw, blk, size, buf, rsize)
-	void *devdata;
-	int rw;
-	daddr_t blk;
-	size_t size;
-	void *buf;
-	size_t *rsize;
+strategy(void *devdata, int rw, daddr_t blk, size_t size, void *buf,
+	 size_t *rsize)
 {
 	struct of_dev *dev = devdata;
 	u_quad_t pos;
 	int n;
-	
+
 	if (rw != F_READ)
 		return EPERM;
 	if (dev->type != OFDEV_DISK)
 		panic("strategy");
-	
-	pos = (u_quad_t)(blk + dev->partoff) * dev->bsize;
-	
+
+	pos = (u_quad_t)((blk + dev->partoff) * dev->bsize);
+
 	for (;;) {
 		if (OF_seek(dev->handle, pos) < 0)
 			break;
@@ -134,23 +150,24 @@ strategy(devdata, rw, blk, size, buf, rsize)
 }
 
 static int
-devclose(of)
-	struct open_file *of;
+devopen_dummy(struct open_file *of, ...) {
+	return -1;
+}
+
+static int
+devclose(struct open_file *of)
 {
 	struct of_dev *op = of->f_devdata;
-	
+
 	if (op->type == OFDEV_NET)
 		net_close(op);
 	OF_close(op->handle);
 	op->handle = -1;
+	return 0;
 }
 
 static struct devsw devsw[1] = {
-	"OpenFirmware",
-	strategy,
-	(int (*)__P((struct open_file *, ...)))nodev,
-	devclose,
-	noioctl
+	{ "OpenFirmware", strategy, devopen_dummy, devclose, noioctl }
 };
 int ndevs = sizeof devsw / sizeof devsw[0];
 
@@ -180,11 +197,10 @@ char opened_name[256];
 int floppyboot;
 
 static u_long
-get_long(p)
-	const void *p;
+get_long(const void *p)
 {
 	const unsigned char *cp = p;
-	
+
 	return cp[0] | (cp[1] << 8) | (cp[2] << 16) | (cp[3] << 24);
 }
 
@@ -192,33 +208,29 @@ get_long(p)
  * Find a valid disklabel.
  */
 static int
-search_label(devp, off, buf, lp, off0)
-	struct of_dev *devp;
-	u_long off;
-	char *buf;
-	struct disklabel *lp;
-	u_long off0;
+search_label(struct of_dev *devp, u_long off, char *buf, struct disklabel *lp,
+								u_long off0)
 {
 	size_t read;
 	struct mbr_partition *p;
 	int i;
 	u_long poff;
 	static int recursion;
-	
+
 	if (strategy(devp, F_READ, off, DEV_BSIZE, buf, &read)
 	    || read != DEV_BSIZE)
 		return ERDLAB;
-	
-	if (buf[510] != 0x55 || buf[511] != 0xaa)
+
+	if (*(u_int16_t *)&buf[MBR_MAGIC_OFFSET] != sa_htole16(MBR_MAGIC))
 		return ERDLAB;
 
 	if (recursion++ <= 1)
 		off0 += off;
-	for (p = (struct mbr_partition *)(buf + MBR_PARTOFF), i = 4;
-	     --i >= 0; p++) {
-		if (p->mbrp_typ == MBR_PTYPE_NETBSD
+	for (p = (struct mbr_partition *)(buf + MBR_PART_OFFSET), i = 0;
+	     i < MBR_PART_COUNT; i++, p++) {
+		if (p->mbrp_type == MBR_PTYPE_NETBSD
 #ifdef COMPAT_386BSD_MBRPART
-		    || (p->mbrp_typ == MBR_PTYPE_386BSD &&
+		    || (p->mbrp_type == MBR_PTYPE_386BSD &&
 			(printf("WARNING: old BSD partition ID!\n"), 1)
 			/* XXX XXX - libsa printf() is void */ )
 #endif
@@ -237,7 +249,7 @@ search_label(devp, off, buf, lp, off0)
 				recursion--;
 				return ERDLAB;
 			}
-		} else if (p->mbrp_typ == MBR_PTYPE_EXT) {
+		} else if (p->mbrp_type == MBR_PTYPE_EXT) {
 			poff = get_long(&p->mbrp_start);
 			if (!search_label(devp, poff, buf, lp, off0)) {
 				recursion--;
@@ -250,15 +262,13 @@ search_label(devp, off, buf, lp, off0)
 			}
 		}
 	}
+
 	recursion--;
 	return ERDLAB;
 }
 
 int
-devopen(of, name, file)
-	struct open_file *of;
-	const char *name;
-	char **file;
+devopen(struct open_file *of, const char *name, char **file)
 {
 	char *cp;
 	char partition;
@@ -296,6 +306,9 @@ devopen(of, name, file)
 		strcat(opened_name, "/");
 	strcat(opened_name, buf);
 	*file = opened_name + strlen(fname) + 1;
+	if (partition) {
+		*file += 2;
+	}
 	if ((handle = OF_finddevice(fname)) == -1) {
 		DPRINTF("OF_finddevice(\"%s\") failed\n", fname);
 		return ENOENT;
@@ -305,9 +318,15 @@ devopen(of, name, file)
 	floppyboot = !strcmp(buf, "floppy");
 	if (OF_getprop(handle, "device_type", buf, sizeof buf) < 0)
 		return ENXIO;
-	if (!strcmp(buf, "block"))
-		/* For block devices, indicate raw partition (:0 in OpenFirmware) */
+	if (!strcmp(buf, "block")) {
+
+		/*
+		 * For block devices, indicate raw partition
+		 * (:0 in OpenFirmware)
+		 */
+
 		strcat(fname, ":0");
+	}
 	if ((handle = OF_open(fname)) == -1)
 		return ENXIO;
 	memset(&ofdev, 0, sizeof ofdev);
@@ -315,11 +334,13 @@ devopen(of, name, file)
 	if (!strcmp(buf, "block")) {
 		ofdev.type = OFDEV_DISK;
 		ofdev.bsize = DEV_BSIZE;
+
 		/* First try to find a disklabel without MBR partitions */
 		if (strategy(&ofdev, F_READ,
 			     LABELSECTOR, DEV_BSIZE, buf, &read) != 0
 		    || read != DEV_BSIZE
 		    || getdisklabel(buf, &label)) {
+
 			/* Else try MBR partitions */
 			error = search_label(&ofdev, 0, buf, &label, 0);
 			if (error && error != ERDLAB)
@@ -327,22 +348,29 @@ devopen(of, name, file)
 		}
 
 		if (error == ERDLAB) {
-			if (partition)
-				/* User specified a parititon, but there is none */
+			if (partition) {
+
+				/*
+				 * User specified a parititon,
+				 * but there is none.
+				 */
+
 				goto bad;
-			/* No, label, just use complete disk */
+			}
+
+			/* No label, just use complete disk */
 			ofdev.partoff = 0;
 		} else {
 			part = partition ? partition - 'a' : 0;
 			ofdev.partoff = label.d_partitions[part].p_offset;
 		}
-		
+
 		of->f_dev = devsw;
 		of->f_devdata = &ofdev;
 		file_system[0] = file_system_ufs;
 		file_system[1] = file_system_cd9660;
-		file_system[1] = file_system_dosfs;
-		nfsys = 2;
+		file_system[2] = file_system_dosfs;
+		nfsys = 3;
 		return 0;
 	}
 	if (!strcmp(buf, "network")) {
@@ -351,7 +379,7 @@ devopen(of, name, file)
 		of->f_devdata = &ofdev;
 		file_system[0] = file_system_nfs;
 		nfsys = 1;
-		if (error = net_open(&ofdev))
+		if ((error = net_open(&ofdev)) != 0)
 			goto bad;
 		return 0;
 	}

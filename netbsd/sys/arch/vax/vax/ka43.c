@@ -1,4 +1,4 @@
-/*	$NetBSD: ka43.c,v 1.24 2000/08/09 03:02:53 tv Exp $ */
+/*	$NetBSD: ka43.c,v 1.26 2003/07/15 02:15:03 lukem Exp $ */
 /*
  * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -31,6 +31,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ka43.c,v 1.26 2003/07/15 02:15:03 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -156,7 +159,7 @@ ka43_mchk(addr)
 	 */
 	if (mfpr(PR_PCSTS) & KA43_PCS_TRAP2) {
 		printf("TRAP2 (double error) in ka43_mchk.\n");
-		panic("unrecoverable state in ka43_mchk.\n");
+		panic("unrecoverable state in ka43_mchk.");
 		return (-1);
 	}
 	if ((mcf->mc43_code & KA43_MC_RESTART) || 

@@ -1,4 +1,4 @@
-/*	$NetBSD: cmu.c,v 1.9 2002/02/02 10:50:08 takemura Exp $	*/
+/*	$NetBSD: cmu.c,v 1.12 2003/07/15 02:29:34 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999 SASAKI Takesi
@@ -35,6 +35,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cmu.c,v 1.12 2003/07/15 02:29:34 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -68,9 +71,8 @@ void	vrcmu_attach(struct device *, struct device *, void *);
 int	vrcmu_supply(vrcmu_chipset_tag_t, u_int16_t, int);
 int	vrcmu_hardpower(void *, int, long, void *);
 
-struct cfattach vrcmu_ca = {
-	sizeof(struct vrcmu_softc), vrcmu_match, vrcmu_attach
-};
+CFATTACH_DECL(vrcmu, sizeof(struct vrcmu_softc),
+    vrcmu_match, vrcmu_attach, NULL, NULL);
 
 int
 vrcmu_match(struct device *parent, struct cfdata *cf, void *aux)

@@ -1,4 +1,4 @@
-/*	$NetBSD: ugen.c,v 1.58 2002/02/20 20:30:12 christos Exp $	*/
+/*	$NetBSD: ugen.c,v 1.66.2.1 2004/07/02 17:15:24 he Exp $	*/
 /*	$FreeBSD: src/sys/dev/usb/ugen.c,v 1.26 1999/11/17 22:33:41 n_hibma Exp $	*/
 
 /*
@@ -40,7 +40,7 @@
 
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ugen.c,v 1.58 2002/02/20 20:30:12 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ugen.c,v 1.66.2.1 2004/07/02 17:15:24 he Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -122,7 +122,20 @@ struct ugen_softc {
 	u_char sc_dying;
 };
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__)
+dev_type_open(ugenopen);
+dev_type_close(ugenclose);
+dev_type_read(ugenread);
+dev_type_write(ugenwrite);
+dev_type_ioctl(ugenioctl);
+dev_type_poll(ugenpoll);
+dev_type_kqfilter(ugenkqfilter);
+
+const struct cdevsw ugen_cdevsw = {
+	ugenopen, ugenclose, ugenread, ugenwrite, ugenioctl,
+	nostop, notty, ugenpoll, nommap, ugenkqfilter,
+};
+#elif defined(__OpenBSD__)
 cdev_decl(ugen);
 #elif defined(__FreeBSD__)
 d_open_t  ugenopen;
@@ -193,7 +206,7 @@ USB_ATTACH(ugen)
 	char devinfo[1024];
 	usbd_status err;
 	int conf;
-	
+
 	usbd_devinfo(uaa->device, 0, devinfo);
 	USB_ATTACH_SETUP;
 	printf("%s: %s\n", USBDEVNAME(sc->sc_dev), devinfo);
@@ -466,7 +479,7 @@ ugenclose(dev_t dev, int flag, int mode, usb_proc_ptr p)
 			continue;
 		DPRINTFN(5, ("ugenclose: endpt=%d dir=%d sce=%p\n",
 			     endpt, dir, sce));
-		
+
 		usbd_abort_pipe(sce->pipeh);
 		usbd_close_pipe(sce->pipeh);
 		sce->pipeh = NULL;
@@ -630,7 +643,7 @@ ugen_do_read(struct ugen_softc *sc, int endpt, struct uio *uio, int flag)
 		splx(s);
 		break;
 
-		
+
 	default:
 		return (ENXIO);
 	}
@@ -737,7 +750,6 @@ ugen_activate(device_ptr_t self, enum devact act)
 	switch (act) {
 	case DVACT_ACTIVATE:
 		return (EOPNOTSUPP);
-		break;
 
 	case DVACT_DEACTIVATE:
 		sc->sc_dying = 1;
@@ -783,9 +795,13 @@ USB_DETACH(ugen)
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	/* locate the major number */
+#if defined(__NetBSD__)
+	maj = cdevsw_lookup_major(&ugen_cdevsw);
+#elif defined(__OpenBSD__)
 	for (maj = 0; maj < nchrdev; maj++)
 		if (cdevsw[maj].d_open == ugenopen)
 			break;
+#endif
 
 	/* Nuke the vnodes for any open instances (calls close). */
 	mn = self->dv_unit * USB_MAX_ENDPOINTS;
@@ -827,13 +843,13 @@ ugenintr(usbd_xfer_handle xfer, usbd_private_handle addr, usbd_status status)
 		     ibuf[0], ibuf[1], ibuf[2]));
 
 	(void)b_to_q(ibuf, count, &sce->q);
-		
+
 	if (sce->state & UGEN_ASLP) {
 		sce->state &= ~UGEN_ASLP;
 		DPRINTFN(5, ("ugen_intr: waking %p\n", sce));
 		wakeup(sce);
 	}
-	selwakeup(&sce->rsel);
+	selnotify(&sce->rsel, 0);
 }
 
 Static void
@@ -850,8 +866,8 @@ ugen_isoc_rintr(usbd_xfer_handle xfer, usbd_private_handle addr,
 		return;
 
 	usbd_get_xfer_status(xfer, NULL, NULL, &count, NULL);
-	DPRINTFN(5,("ugen_isoc_rintr: xfer %d, count=%d\n", req - sce->isoreqs,
-		    count));
+	DPRINTFN(5,("ugen_isoc_rintr: xfer %ld, count=%d\n",
+	    (long)(req - sce->isoreqs), count));
 
 	/* throw away oldest input if the buffer is full */
 	if(sce->fill < sce->cur && sce->cur <= sce->fill + count) {
@@ -892,7 +908,7 @@ ugen_isoc_rintr(usbd_xfer_handle xfer, usbd_private_handle addr,
 		DPRINTFN(5, ("ugen_isoc_rintr: waking %p\n", sce));
 		wakeup(sce);
 	}
-	selwakeup(&sce->rsel);
+	selnotify(&sce->rsel, 0);
 }
 
 Static usbd_status
@@ -912,7 +928,7 @@ ugen_set_interface(struct ugen_softc *sc, int ifaceidx, int altno)
 		return (err);
 	if (ifaceidx < 0 || ifaceidx >= niface)
 		return (USBD_INVAL);
-	
+
 	err = usbd_device2interface_handle(sc->sc_udev, ifaceidx, &iface);
 	if (err)
 		return (err);
@@ -1035,7 +1051,7 @@ ugen_do_ioctl(struct ugen_softc *sc, int endpt, u_long cmd,
 		return (0);
 	case USB_SET_TIMEOUT:
 		sce = &sc->sc_endpoints[endpt][IN];
-		if (sce == NULL 
+		if (sce == NULL
 		    /* XXX this shouldn't happen, but the distinction between
 		       input and output pipes isn't clear enough.
 		       || sce->pipeh == NULL */
@@ -1186,13 +1202,15 @@ ugen_do_ioctl(struct ugen_softc *sc, int endpt, u_long cmd,
 		free(cdesc, M_TEMP);
 		return (error);
 	}
-	case USB_GET_STRING_DESC:
+	case USB_GET_STRING_DESC: {
+		int len;
 		si = (struct usb_string_desc *)addr;
 		err = usbd_get_string_desc(sc->sc_udev, si->usd_string_index,
-			  si->usd_language_id, &si->usd_desc);
+			  si->usd_language_id, &si->usd_desc, &len);
 		if (err)
 			return (EINVAL);
 		break;
+	}
 	case USB_DO_REQUEST:
 	{
 		struct usb_ctl_request *ur = (void *)addr;
@@ -1339,6 +1357,127 @@ ugenpoll(dev_t dev, int events, usb_proc_ptr p)
 	}
 	splx(s);
 	return (revents);
+}
+
+static void
+filt_ugenrdetach(struct knote *kn)
+{
+	struct ugen_endpoint *sce = kn->kn_hook;
+	int s;
+
+	s = splusb();
+	SLIST_REMOVE(&sce->rsel.sel_klist, kn, knote, kn_selnext);
+	splx(s);
+}
+
+static int
+filt_ugenread_intr(struct knote *kn, long hint)
+{
+	struct ugen_endpoint *sce = kn->kn_hook;
+
+	kn->kn_data = sce->q.c_cc;
+	return (kn->kn_data > 0);
+}
+
+static int
+filt_ugenread_isoc(struct knote *kn, long hint)
+{
+	struct ugen_endpoint *sce = kn->kn_hook;
+
+	if (sce->cur == sce->fill)
+		return (0);
+
+	if (sce->cur < sce->fill)
+		kn->kn_data = sce->fill - sce->cur;
+	else
+		kn->kn_data = (sce->limit - sce->cur) +
+		    (sce->fill - sce->ibuf);
+
+	return (1);
+}
+
+static const struct filterops ugenread_intr_filtops =
+	{ 1, NULL, filt_ugenrdetach, filt_ugenread_intr };
+
+static const struct filterops ugenread_isoc_filtops =
+	{ 1, NULL, filt_ugenrdetach, filt_ugenread_isoc };
+
+static const struct filterops ugen_seltrue_filtops =
+	{ 1, NULL, filt_ugenrdetach, filt_seltrue };
+
+int
+ugenkqfilter(dev_t dev, struct knote *kn)
+{
+	struct ugen_softc *sc;
+	struct ugen_endpoint *sce;
+	struct klist *klist;
+	int s;
+
+	USB_GET_SC(ugen, UGENUNIT(dev), sc);
+
+	if (sc->sc_dying)
+		return (1);
+
+	/* XXX always IN */
+	sce = &sc->sc_endpoints[UGENENDPOINT(dev)][IN];
+	if (sce == NULL)
+		return (1);
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		klist = &sce->rsel.sel_klist;
+		switch (sce->edesc->bmAttributes & UE_XFERTYPE) {
+		case UE_INTERRUPT:
+			kn->kn_fop = &ugenread_intr_filtops;
+			break;
+		case UE_ISOCHRONOUS:
+			kn->kn_fop = &ugenread_isoc_filtops;
+			break;
+		case UE_BULK:
+			/* 
+			 * We have no easy way of determining if a read will
+			 * yield any data or a write will happen.
+			 * So, emulate "seltrue".
+			 */
+			kn->kn_fop = &ugen_seltrue_filtops;
+			break;
+		default:
+			return (1);
+		}
+		break;
+
+	case EVFILT_WRITE:
+		klist = &sce->rsel.sel_klist;
+		switch (sce->edesc->bmAttributes & UE_XFERTYPE) {
+		case UE_INTERRUPT:
+		case UE_ISOCHRONOUS:
+			/* XXX poll doesn't support this */
+			return (1);
+
+		case UE_BULK:
+			/*
+			 * We have no easy way of determining if a read will
+			 * yield any data or a write will happen.
+			 * So, emulate "seltrue".
+			 */
+			kn->kn_fop = &ugen_seltrue_filtops;
+			break;
+		default:
+			return (1);
+		}
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = sce;
+
+	s = splusb();
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+	splx(s);
+
+	return (0);
 }
 
 #if defined(__FreeBSD__)

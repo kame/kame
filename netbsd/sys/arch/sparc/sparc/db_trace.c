@@ -1,4 +1,4 @@
-/*	$NetBSD: db_trace.c,v 1.16 2000/05/26 03:34:29 jhawk Exp $ */
+/*	$NetBSD: db_trace.c,v 1.21 2003/09/07 00:30:40 uwe Exp $ */
 
 /*
  * Mach Operating System
@@ -26,6 +26,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: db_trace.c,v 1.21 2003/09/07 00:30:40 uwe Exp $");
+
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/user.h>
@@ -37,6 +40,10 @@
 #include <ddb/db_output.h>
 
 #define INKERNEL(va)	(((vaddr_t)(va)) >= USRSTACK)
+#define ONINTSTACK(fr)	(						\
+	(u_int)(fr) <  (u_int)ddb_cpuinfo->eintstack &&		 	\
+	(u_int)(fr) >= (u_int)ddb_cpuinfo->eintstack - INT_STACK_SIZE	\
+)
 
 void
 db_stack_trace_print(addr, have_addr, count, modif, pr)
@@ -44,12 +51,16 @@ db_stack_trace_print(addr, have_addr, count, modif, pr)
 	int             have_addr;
 	db_expr_t       count;
 	char            *modif;
-	void		(*pr) __P((const char *, ...));
+	void		(*pr)(const char *, ...);
 {
-	struct frame	*frame;
+	struct frame	*frame, *prevframe;
+	db_addr_t	pc;
 	boolean_t	kernel_only = TRUE;
 	boolean_t	trace_thread = FALSE;
 	char		c, *cp = modif;
+
+	if (ddb_cpuinfo == NULL)
+		ddb_cpuinfo = curcpu();
 
 	while ((c = *cp++) != 0) {
 		if (c == 't')
@@ -58,27 +69,32 @@ db_stack_trace_print(addr, have_addr, count, modif, pr)
 			kernel_only = FALSE;
 	}
 
-	if (!have_addr)
+	if (!have_addr) {
 		frame = (struct frame *)DDB_TF->tf_out[6];
-	else {
+		pc = DDB_TF->tf_pc;
+	} else {
 		if (trace_thread) {
 			struct proc *p;
 			struct user *u;
+			struct lwp *l;
 			(*pr)("trace: pid %d ", (int)addr);
 			p = pfind(addr);
 			if (p == NULL) {
 				(*pr)("not found\n");
 				return;
-			}	
-			if ((p->p_flag & P_INMEM) == 0) {
+			}
+			l = LIST_FIRST(&p->p_lwps);	/* XXX NJWLWP */
+			if ((l->l_flag & L_INMEM) == 0) {
 				(*pr)("swapped out\n");
 				return;
 			}
-			u = p->p_addr;
+			u = l->l_addr;
 			frame = (struct frame *)u->u_pcb.pcb_sp;
+			pc = u->u_pcb.pcb_pc;
 			(*pr)("at %p\n", frame);
 		} else {
 			frame = (struct frame *)addr;
+			pc = 0;
 		}
 	}
 
@@ -86,44 +102,50 @@ db_stack_trace_print(addr, have_addr, count, modif, pr)
 		int		i;
 		db_expr_t	offset;
 		char		*name;
-		db_addr_t	pc;
+		db_addr_t	prevpc;
+
+#define FR(framep,field) (INKERNEL(framep)			\
+				? (u_int)(framep)->field	\
+				: fuword(&(framep)->field))
+
+		/* Fetch return address and arguments frame */
+		prevpc = (db_addr_t)FR(frame, fr_pc);
+		prevframe = (struct frame *)FR(frame, fr_fp);
 
 		/*
 		 * Switch to frame that contains arguments
 		 */
-
-		pc = frame->fr_pc;
-		frame = frame->fr_fp;
-
-		if (!INKERNEL(pc) || !INKERNEL(frame)) {
-			if (!kernel_only) {
-				count++;
-				while (count--) {
-					(*pr)("0x%lx()\n", pc);
-					pc = fuword(&frame->fr_pc);
-					frame = (void *)fuword(&frame->fr_fp);
-					if (pc == 0 || frame == NULL) {
-						return;
-					}
-				}
-			}
+		if (prevframe == NULL || (!INKERNEL(prevframe) && kernel_only))
 			return;
+
+		if ((ONINTSTACK(frame) && !ONINTSTACK(prevframe)) ||
+		    (INKERNEL(frame) && !INKERNEL(prevframe))) {
+			/* We're crossing a trap frame; pc = %l1 */
+			prevpc = (db_addr_t)FR(frame, fr_local[1]);
 		}
 
-		db_find_sym_and_offset(pc, &name, &offset);
+		name = NULL;
+		if (INKERNEL(pc))
+			db_find_sym_and_offset(pc, &name, &offset);
 		if (name == NULL)
-			name = "?";
-
-		(*pr)("%s(", name);
+			(*pr)("0x%lx(", pc);
+		else
+			(*pr)("%s(", name);
 
 		/*
 		 * Print %i0..%i5, hope these still reflect the
 		 * actual arguments somewhat...
 		 */
-		for (i=0; i < 5; i++)
-			(*pr)("0x%x, ", frame->fr_arg[i]);
-		(*pr)("0x%x) at ", frame->fr_arg[i]);
-		db_printsym(pc, DB_STGY_PROC, pr);
+		for (i = 0; i < 6; i++)
+			(*pr)("0x%x%s", FR(frame, fr_arg[i]),
+				(i < 5) ? ", " : ") at ");
+		if (INKERNEL(prevpc))
+			db_printsym(prevpc, DB_STGY_PROC, pr);
+		else
+			(*pr)("0x%lx", prevpc);
 		(*pr)("\n");
+
+		pc = prevpc;
+		frame = prevframe;
 	}
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: asm.h,v 1.32 2002/05/13 06:11:52 simonb Exp $	*/
+/*	$NetBSD: asm.h,v 1.35 2003/08/07 16:28:27 agc Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -113,8 +109,7 @@
 	alias = sym
 
 /*
- * WARN_REFERENCES: create a warning if the specified symbol is referenced
- * (ELF only, and thus, no leading underscores).
+ * WARN_REFERENCES: create a warning if the specified symbol is referenced.
  */
 #ifdef __STDC__
 #define	WARN_REFERENCES(_sym,_msg)				\
@@ -149,11 +144,29 @@ _C_LABEL(x): ;				\
 	.frame	sp, 0, ra
 
 /*
+ * STATIC_LEAF
+ *	Declare a local leaf function.
+ */
+#define STATIC_LEAF(x)			\
+	.ent	_C_LABEL(x), 0;		\
+_C_LABEL(x): ;				\
+	.frame sp, 0, ra;		\
+	MCOUNT
+
+/*
  * XLEAF
  *	declare alternate entry to leaf routine
  */
 #define XLEAF(x)			\
 	.globl	_C_LABEL(x);		\
+	AENT (_C_LABEL(x));		\
+_C_LABEL(x):
+
+/*
+ * STATIC_XLEAF
+ *	declare alternate entry to a static leaf routine
+ */
+#define STATIC_XLEAF(x)			\
 	AENT (_C_LABEL(x));		\
 _C_LABEL(x):
 

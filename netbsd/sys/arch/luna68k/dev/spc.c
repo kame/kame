@@ -1,4 +1,4 @@
-/* $NetBSD: spc.c,v 1.1 2000/01/05 08:48:56 nisimura Exp $ */
+/* $NetBSD: spc.c,v 1.4 2003/07/05 19:00:17 tsutsui Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: spc.c,v 1.1 2000/01/05 08:48:56 nisimura Exp $");
+__KERNEL_RCSID(0, "$NetBSD: spc.c,v 1.4 2003/07/05 19:00:17 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -58,16 +58,15 @@ __KERNEL_RCSID(0, "$NetBSD: spc.c,v 1.1 2000/01/05 08:48:56 nisimura Exp $");
 
 #include <luna68k/luna68k/isr.h>
 
-static int  spc_match __P((struct device *, struct cfdata *, void *));
-static void spc_attach __P((struct device *, struct device *, void *));
+static int  spc_mainbus_match __P((struct device *, struct cfdata *, void *));
+static void spc_mainbus_attach __P((struct device *, struct device *, void *));
 
-const struct cfattach spc_ca = {
-	sizeof(struct spc_softc), spc_match, spc_attach
-};
+CFATTACH_DECL(spc, sizeof(struct spc_softc),
+    spc_mainbus_match, spc_mainbus_attach, NULL, NULL);
 extern struct cfdriver spc_cd;
 
 static int
-spc_match(parent, cf, aux)
+spc_mainbus_match(parent, cf, aux)
 	struct device *parent;
 	struct cfdata *cf;
 	void *aux;
@@ -85,7 +84,7 @@ spc_match(parent, cf, aux)
 }
 
 static void
-spc_attach(parent, self, aux)
+spc_mainbus_attach(parent, self, aux)
 	struct device *parent, *self;
 	void *aux;
 {
@@ -98,7 +97,7 @@ spc_attach(parent, self, aux)
 	sc->sc_ioh = ma->ma_addr;
 	sc->sc_initiator = 7;
 
-	isrlink_autovec(spcintr, (void *)sc, ma->ma_ilvl, ISRPRI_BIO);
+	isrlink_autovec(spc_intr, (void *)sc, ma->ma_ilvl, ISRPRI_BIO);
 
-	spcattach(sc);
+	spc_attach(sc);
 }

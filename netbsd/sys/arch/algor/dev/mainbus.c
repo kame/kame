@@ -1,4 +1,4 @@
-/*	$NetBSD: mainbus.c,v 1.8 2002/01/02 14:48:09 thorpej Exp $	*/
+/*	$NetBSD: mainbus.c,v 1.14 2003/07/14 22:57:47 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.14 2003/07/14 22:57:47 lukem Exp $");
+
 #include "opt_algor_p4032.h"
 #include "opt_algor_p5064.h"
 #include "opt_algor_p6032.h"
@@ -70,9 +73,8 @@
 int	mainbus_match(struct device *, struct cfdata *, void *);
 void	mainbus_attach(struct device *, struct device *, void *);
 
-struct cfattach mainbus_ca = {
-	sizeof(struct device), mainbus_match, mainbus_attach,
-};
+CFATTACH_DECL(mainbus, sizeof(struct device),
+    mainbus_match, mainbus_attach, NULL, NULL);
 
 int	mainbus_print(void *, const char *);
 int	mainbus_submatch(struct device *, struct cfdata *, void *);
@@ -243,9 +245,9 @@ mainbus_print(void *aux, const char *pnp)
 	struct mainbus_attach_args *ma = aux;
 
 	if (pnp)
-		printf("%s at %s", ma->ma_name, pnp);
+		aprint_normal("%s at %s", ma->ma_name, pnp);
 	if (ma->ma_addr != (bus_addr_t) -1)
-		printf(" %s 0x%lx", mainbuscf_locnames[MAINBUSCF_ADDR],
+		aprint_normal(" %s 0x%lx", mainbuscf_locnames[MAINBUSCF_ADDR],
 		    ma->ma_addr);
 
 	return (UNCONF);
@@ -260,5 +262,5 @@ mainbus_submatch(struct device *parent, struct cfdata *cf, void *aux)
 	    cf->cf_loc[MAINBUSCF_ADDR] != ma->ma_addr)
 		return (0);
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }

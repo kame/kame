@@ -1,4 +1,4 @@
-/*	$NetBSD: isa_machdep.h,v 1.6 2000/06/20 08:26:54 soda Exp $	*/
+/*	$NetBSD: isa_machdep.h,v 1.9 2004/02/13 11:36:10 wiz Exp $	*/
 /*      $OpenBSD: isa_machdep.h,v 1.5 1997/04/19 17:20:00 pefo Exp $  */
 
 /*
@@ -40,7 +40,7 @@ typedef struct arc_isa_bus *isa_chipset_tag_t;
 /*
  *      I/O macros to access isa bus ports/memory.
  *      At the first glance theese macros may seem inefficient.
- *      However, the cpu executes an instruction every 7.5ns
+ *      However, the CPU executes an instruction every 7.5ns
  *      so the bus is much slower so it doesn't matter, really.
  */
 #define isa_outb(x,y)   outb(arc_bus_io.bs_vbase + (x)- arc_bus_io.bs_start, y)
@@ -106,6 +106,10 @@ struct arc_isa_bus {
 	_isa_dmamem_unmap(&(ic)->ic_dmastate, (c), (k), (s))
 #define	isa_dmamem_mmap(ic, c, a, s, o, p, f)				\
 	_isa_dmamem_mmap(&(ic)->ic_dmastate, (c), (a), (s), (o), (p), (f))
+#define isa_drq_alloc(ic, c)						\
+	_isa_drq_alloc(&(ic)->ic_dmastate, c)
+#define isa_drq_free(ic, c)						\
+	_isa_drq_free(&(ic)->ic_dmastate, c)
 #define	isa_drq_isfree(ic, c)						\
 	_isa_drq_isfree(&(ic)->ic_dmastate, (c))
 #define	isa_malloc(ic, c, s, p, f)					\
@@ -114,6 +118,8 @@ struct arc_isa_bus {
 	_isa_free((a), (p))
 #define	isa_mappage(m, o, p)						\
 	_isa_mappage((m), (o), (p))
+
+int isa_intr_alloc(isa_chipset_tag_t, int, int, int *);
 
 void sysbeepstop(void *);
 void sysbeep(int, int);

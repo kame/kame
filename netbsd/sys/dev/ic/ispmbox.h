@@ -1,4 +1,4 @@
-/* $NetBSD: ispmbox.h,v 1.41 2002/05/17 18:49:43 mjacob Exp $ */
+/* $NetBSD: ispmbox.h,v 1.47 2003/12/04 13:57:30 keihan Exp $ */
 /*
  * This driver, which is contained in NetBSD in the files:
  *
@@ -21,7 +21,7 @@
  *	sys/pci/isp_pci.c
  *	sys/sbus/isp_sbus.c
  *
- * Is being actively maintained by Matthew Jacob (mjacob@netbsd.org).
+ * Is being actively maintained by Matthew Jacob (mjacob@NetBSD.org).
  * This driver also is shared source with FreeBSD, OpenBSD, Linux, Solaris,
  * Linux versions. This tends to be an interesting maintenance problem.
  *
@@ -139,6 +139,9 @@
 #define		FW_FEATURE_LVD_NOTIFY	0x2
 #define		FW_FEATURE_RIO_32BIT	0x4
 #define		FW_FEATURE_RIO_16BIT	0x8
+
+#define	MBOX_INIT_REQ_QUEUE_A64		0x0052
+#define	MBOX_INIT_RES_QUEUE_A64		0x0053
 
 #define	MBOX_ENABLE_TARGET_MODE		0x0055
 #define		ENABLE_TARGET_FLAG	0x8000
@@ -368,6 +371,9 @@ typedef struct {
 	u_int8_t	req_cdb[12];
 	ispds_t		req_dataseg[ISP_RQDSEG];
 } ispreq_t;
+
+#define	ispreq64_t	ispreqt3_t	/* same as.... */
+#define	ISP_RQDSEG_A64	2
 
 /*
  * A request packet can also be a marker packet.
@@ -674,11 +680,16 @@ typedef struct isp_icb {
 #define	ICBXOPT_LOOP_2_PTP	(2 << 4)
 #define	ICBXOPT_PTP_2_LOOP	(3 << 4)
 
+/*
+ * The lower 4 bits of the xfwoptions field are the OPERATION MODE bits.
+ * RIO is not defined for the 23XX cards
+ */
 #define	ICBXOPT_RIO_OFF		0
 #define	ICBXOPT_RIO_16BIT	1
 #define	ICBXOPT_RIO_32BIT	2
 #define	ICBXOPT_RIO_16BIT_IOCB	3
 #define	ICBXOPT_RIO_32BIT_IOCB	4
+#define	ICBXOPT_ZIO		5	
 
 #define	ICBZOPT_ENA_RDXFR_RDY	0x01
 #define	ICBZOPT_ENA_OOF		(1 << 6) /* out of order frame handling */
@@ -834,6 +845,7 @@ typedef struct {
 
 #define	FC4_IP		5 /* ISO/EEC 8802-2 LLC/SNAP "Out of Order Delivery" */
 #define	FC4_SCSI	8 /* SCSI-3 via Fivre Channel Protocol (FCP) */
+#define	FC4_FC_SVC	0x20	/* Fibre Channel Services */
 
 #define	SNS_GA_NXT	0x100
 #define	SNS_GPN_ID	0x112

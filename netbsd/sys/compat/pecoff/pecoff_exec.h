@@ -1,4 +1,4 @@
-/*	$NetBSD: pecoff_exec.h,v 1.3 2001/07/29 21:28:46 christos Exp $	*/
+/*	$NetBSD: pecoff_exec.h,v 1.6.4.1 2004/07/19 09:01:54 tron Exp $	*/
 
 /*
  * Copyright (c) 2000 Masaru OKI
@@ -92,8 +92,9 @@ struct pecoff_opthdr {
 
 #define PECOFF_HDR_SIZE (COFF_HDR_SIZE + sizeof(struct pecoff_opthdr))
 
+#define NETBSDPE_ABI_VERSION	0x00000002
 
-struct pecoff_args {
+struct pecoff_args1 {		/* obsoleted */
 	u_long a_base;
 	u_long a_entry;
 	u_long a_end;
@@ -102,12 +103,21 @@ struct pecoff_args {
 	u_long a_ldbase;
 	u_long a_ldexport;
 };
+struct pecoff_args {
+	u_long a_abiversion;
+	u_long a_zero;		/* always 0 */
+	u_long a_entry;
+	u_long a_end;
+	u_long a_ldbase;
+	u_long a_ldexport;
+	struct pecoff_opthdr a_opthdr;
+};
 
 extern const struct emul emul_pecoff;
 
 struct exec_package;
 int     exec_pecoff_makecmds __P((struct proc *, struct exec_package *));
-int	pecoff_copyargs __P((struct exec_package *, struct ps_strings *,
-    char **, void *));
+int	pecoff_copyargs __P((struct proc *, struct exec_package *,
+    struct ps_strings *, char **, void *));
 
 #endif

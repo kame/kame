@@ -1,4 +1,4 @@
-/*	$NetBSD: arcbios.c,v 1.10 2001/11/22 12:17:00 tsutsui Exp $	*/
+/*	$NetBSD: arcbios.c,v 1.12 2003/07/15 00:04:39 lukem Exp $	*/
 /*	$OpenBSD: arcbios.c,v 1.3 1998/06/06 06:33:33 mickey Exp $	*/
 
 /*-
@@ -29,6 +29,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: arcbios.c,v 1.12 2003/07/15 00:04:39 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -131,7 +134,8 @@ void biosputc __P((dev_t, int));
 
 /* this is to fake out the console routines, while booting. */
 struct consdev bioscons = {
-	NULL, NULL, biosgetc, biosputc, nullcnpollc, NULL, NODEV, CN_DEAD
+	NULL, NULL, biosgetc, biosputc, nullcnpollc, NULL, NULL,
+	    NULL, NODEV, CN_DEAD
 };
 
 int

@@ -1,4 +1,4 @@
-/*	$NetBSD: signal.h,v 1.15 2002/03/05 14:17:16 simonb Exp $	*/
+/*	$NetBSD: signal.h,v 1.23 2004/03/26 21:39:57 drochner Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,9 +37,18 @@
 #ifndef	_MIPS_SIGNAL_H_
 #define	_MIPS_SIGNAL_H_
 
+#include <sys/featuretest.h>
+
 #include <machine/cdefs.h>	/* for API selection */
 
+#ifdef COMPAT_16 
+#define SIGTRAMP_VALID(vers) ((unsigned)(vers) <= 2)
+#else
+#define SIGTRAMP_VALID(vers) ((vers) == 2)
+#endif 
+
 #if !defined(__ASSEMBLER__)
+
 
 /*
  * Machine-dependent signal definitions
@@ -51,8 +56,7 @@
 
 typedef int sig_atomic_t;
 
-#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) && \
-    !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 /*
  * Information pushed on stack when a signal is delivered.
  * This is used by the kernel to restore state following
@@ -89,7 +93,7 @@ struct sigcontext {
 	sigset_t sc_mask;	/* signal mask to restore (new style) */
 };
 
-#endif	/* !_ANSI_SOURCE && !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
+#endif	/* _NETBSD_SOURCE */
 
 #endif	/* !_LANGUAGE_ASSEMBLY */
 #if !defined(_KERNEL)

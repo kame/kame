@@ -1,4 +1,4 @@
-/*	$NetBSD: bcu_vrip.c,v 1.16 2002/02/10 13:23:55 takemura Exp $	*/
+/*	$NetBSD: bcu_vrip.c,v 1.25 2004/02/13 11:36:13 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1999-2001 SATO Kazumi. All rights reserved.
@@ -34,6 +34,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bcu_vrip.c,v 1.25 2004/02/13 11:36:13 wiz Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -68,9 +71,8 @@ int	vr_major=-1;
 int	vr_minor=-1;
 int	vr_cpuid=-1;
 
-struct cfattach vrbcu_ca = {
-	sizeof(struct vrbcu_softc), vrbcu_match, vrbcu_attach
-};
+CFATTACH_DECL(vrbcu, sizeof(struct vrbcu_softc),
+    vrbcu_match, vrbcu_attach, NULL, NULL);
 
 struct vrbcu_softc *the_bcu_sc = NULL;
 
@@ -81,7 +83,7 @@ static bus_addr_t vrbcu_addr(void);
 static bus_addr_t
 vrbcu_addr()
 {
-	static bus_addr_t addr = NULL;
+	static bus_addr_t addr = 0;
 	static struct platid_data addrs[] = {
 		{ &platid_mask_CPU_MIPS_VR_4102, (void *)VR4102_BCU_ADDR },
 		{ &platid_mask_CPU_MIPS_VR_4111, (void *)VR4102_BCU_ADDR },
@@ -93,9 +95,9 @@ vrbcu_addr()
 	};
 	struct platid_data *p;
 
-	if (addr == NULL) {
+	if (addr == 0) {
 		if ((p = platid_search_data(&platid, addrs)) == NULL)
-			panic("%s: can't find VR BCU address\n", __FUNCTION__);
+			panic("%s: can't find VR BCU address", __FUNCTION__);
 		addr = (bus_addr_t)p->data;
 	}
 
@@ -146,7 +148,7 @@ vrbcu_dump_regs()
 	struct vrbcu_softc *sc = the_bcu_sc;
 	int cpuclock = 0, tclock = 0, vtclock = 0, cpuid;
 #if !defined(ONLY_VR4102)
-	int spdreg;
+	int spdreg = 0;	/* XXX gcc doesn't stand a chance of tracking this! */
 #endif
 #ifdef VRBCUDEBUG
 	int reg;
@@ -251,13 +253,13 @@ vrbcu_dump_regs()
 		break;
 	}
 	if (tclock)
-		printf("%s: cpu %d.%03dMHz, bus %d.%03dMHz, ram %d.%03dMHz\n",
+		printf("%s: CPU %d.%03dMHz, bus %d.%03dMHz, ram %d.%03dMHz\n",
 		    sc->sc_dev.dv_xname,
 		    cpuclock/1000000, (cpuclock%1000000)/1000,
 		    tclock/1000000, (tclock%1000000)/1000,
 		    vtclock/1000000, (vtclock%1000000)/1000);
 	else {
-		printf("%s: cpu %d.%03dMHz\n",
+		printf("%s: CPU %d.%03dMHz\n",
 		    sc->sc_dev.dv_xname,
 		    cpuclock/1000000, (cpuclock%1000000)/1000);
 		printf("%s: UNKNOWN BUS CLOCK SPEED:"
@@ -407,7 +409,7 @@ vrbcu_vrip_getcpuminor(void)
 int
 vrbcu_vrip_getcpuclock(void)
 {
-	u_int16_t clksp;
+	u_int16_t clksp = 0;
 	int cpuid, cpuclock;
 
 	cpuid = vrbcu_vrip_getcpuid();
@@ -459,7 +461,7 @@ vrbcu_vrip_getcpuclock(void)
 		cpuspeed = (cpuclock / 3 + MHZ / 2) / MHZ;
 		break;
 	default:
-		panic("unknown CPU type %d\n", cpuid);
+		panic("unknown CPU type %d", cpuid);
 		break;
 	}
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: paud_isa.c,v 1.2 2001/10/03 00:04:48 augustss Exp $	*/
+/*	$NetBSD: paud_isa.c,v 1.6 2003/07/15 02:54:51 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: paud_isa.c,v 1.6 2003/07/15 02:54:51 lukem Exp $");
 
 #include "audio.h"
 #if NAUDIO > 0
@@ -79,9 +82,8 @@
 static void paud_attach_isa (struct device *, struct device *, void *);
 static int  paud_match_isa (struct device *, struct cfdata *, void *);
 
-struct cfattach paud_isa_ca = {
-	sizeof(struct ad1848_isa_softc), paud_match_isa, paud_attach_isa
-};
+CFATTACH_DECL(paud_isa, sizeof(struct ad1848_isa_softc),
+    paud_match_isa, paud_attach_isa, NULL, NULL);
 
 /*
  * Define our interface to the higher level audio driver.

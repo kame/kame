@@ -1,4 +1,4 @@
-/*	$NetBSD: obio.c,v 1.11 2002/04/10 05:13:09 briggs Exp $	*/
+/*	$NetBSD: obio.c,v 1.16 2003/07/15 02:43:25 lukem Exp $	*/
 
 /*
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: obio.c,v 1.16 2003/07/15 02:43:25 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -49,9 +52,8 @@ static void	obio_attach __P((struct device *, struct device *, void *));
 static int	obio_print __P((void *, const char *));
 static int	obio_search __P((struct device *, struct cfdata *, void *));
 
-struct cfattach obio_ca = {
-	sizeof(struct device), obio_match, obio_attach
-};
+CFATTACH_DECL(obio, sizeof(struct device),
+    obio_match, obio_attach, NULL, NULL);
 
 static int
 obio_match(parent, cf, aux)
@@ -89,7 +91,7 @@ obio_print(args, name)
 	struct obio_attach_args *oa = (struct obio_attach_args *)args;
 
 	if (oa->oa_addr != (-1))
-		printf(" addr %x", oa->oa_addr);
+		aprint_normal(" addr %x", oa->oa_addr);
 
 	return (UNCONF);
 }
@@ -109,7 +111,7 @@ obio_search(parent, cf, aux)
 	oa.oa_tag = mba->mba_bst;
 	oa.oa_dmat = mba->mba_dmat;
 
-	if ((*cf->cf_attach->ca_match)(parent, cf, &oa) > 0)
+	if (config_match(parent, cf, &oa) > 0)
 		config_attach(parent, cf, &oa, obio_print);
 
 	return (0);

@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.2 2002/01/30 03:59:40 thorpej Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.8 2003/07/15 00:24:58 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.8 2003/07/15 00:24:58 lukem Exp $");
+
 #include "opt_md.h"
 
 #include <sys/param.h>
@@ -53,13 +56,15 @@
 struct device *booted_device;
 int booted_partition;
 
+void	(*evbarm_device_register)(struct device *, void *);
+
 /*
  * Set up the root device from the boot args
  */
 void
 cpu_rootconf(void)
 {
-	printf("boot device: %s\n",
+	aprint_normal("boot device: %s\n",
 	    booted_device != NULL ? booted_device->dv_xname : "<unknown>");
 	setroot(booted_device, booted_partition);
 }
@@ -75,6 +80,9 @@ void
 cpu_configure(void)
 {
 	struct mainbus_attach_args maa;
+
+	(void) splhigh();
+	(void) splserial();	/* XXX need an splextreme() */
 
 #ifndef __OLD_INTERRUPT_CODE
 	/* Initialize software interrupts. */
@@ -92,4 +100,7 @@ cpu_configure(void)
 void
 device_register(struct device *dev, void *aux)
 {
+
+	if (evbarm_device_register != NULL)
+		(*evbarm_device_register)(dev, aux);
 }

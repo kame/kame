@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le.c,v 1.21 2001/11/28 05:22:48 lukem Exp $	*/
+/*	$NetBSD: if_le.c,v 1.26 2003/08/07 16:30:07 agc Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -52,11 +52,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -74,6 +70,9 @@
  *
  *	@(#)if_le.c	8.2 (Berkeley) 11/16/93
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_le.c,v 1.26 2003/08/07 16:30:07 agc Exp $");
 
 #include "opt_inet.h"
 #include "bpfilter.h"
@@ -123,9 +122,8 @@ void	lance_copytobuf_gap2 __P((struct lance_softc *, void *, int, int));
 void	lance_copyfrombuf_gap2 __P((struct lance_softc *, void *, int, int));
 void	lance_zerobuf_gap2 __P((struct lance_softc *, int, int));
 
-struct cfattach le_ibus_ca = {
-	sizeof(struct le_softc), le_ibus_match, le_ibus_attach
-};
+CFATTACH_DECL(le_ibus, sizeof(struct le_softc),
+    le_ibus_match, le_ibus_attach, NULL, NULL);
 
 void
 lewrcsr(ls, port, val)

@@ -1,7 +1,7 @@
-/*	$NetBSD: if_mcvar.h,v 1.6 1998/12/22 08:47:05 scottr Exp $	*/
+/*	$NetBSD: if_mcvar.h,v 1.8 2004/03/26 12:15:46 wiz Exp $	*/
 
 /*-
- * Copyright (c) 1997 David Huang <khym@bga.com>
+ * Copyright (c) 1997 David Huang <khym@azeotrope.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -51,7 +51,7 @@
 #error Must have at least two buffers for DMA!
 #endif
 
-#define	MC_NPAGES	((MC_RXDMABUFS * 0x800 + NBPG - 1) / NBPG)
+#define	MC_NPAGES	((MC_RXDMABUFS * 0x800 + PAGE_SIZE - 1) / PAGE_SIZE)
 
 struct mc_rxframe {
 	u_int8_t	rx_rcvcnt;

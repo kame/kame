@@ -1,9 +1,43 @@
-/*	$NetBSD: clock.c,v 1.11 2001/03/15 06:10:53 chs Exp $	*/
+/*	$NetBSD: clock.c,v 1.17 2003/08/07 16:30:28 agc Exp $	*/
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1982, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: clock.c 1.18 91/01/21$
+ *
+ *	@(#)clock.c	8.2 (Berkeley) 1/12/94
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -42,6 +76,9 @@
  *	@(#)clock.c	8.2 (Berkeley) 1/12/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.17 2003/08/07 16:30:28 agc Exp $");
+
 #include "clock.h"
 
 #if NCLOCK > 0
@@ -68,10 +105,8 @@ struct clock_softc {
 static int clock_match __P((struct device *, struct cfdata *, void *));
 static void clock_attach __P((struct device *, struct device *, void *));
 
-struct cfattach clock_ca = {
-	sizeof(struct clock_softc), clock_match, clock_attach
-};
-
+CFATTACH_DECL(clock, sizeof(struct clock_softc),
+    clock_match, clock_attach, NULL, NULL);
 
 static int
 clock_match(parent, cf, aux)
@@ -98,10 +133,14 @@ clock_attach(parent, self, aux)
 }
 
 
-/* We're using a 100 Hz clock. */
+/*
+ * MFP of X68k uses 4MHz clock always and we use 1/200 prescaler here.
+ * Therefore, clock interval is 50 usec.
+ */
+#define CLK_RESOLUTION	(50)
+#define CLOCKS_PER_SEC	(1000000 / CLK_RESOLUTION)
 
-#define CLK_INTERVAL 200
-#define CLOCKS_PER_SEC 100
+static int clkint;		/* clock interval */
 
 static int clkread __P((void));
 
@@ -130,10 +169,17 @@ static int clkread __P((void));
 void
 cpu_initclocks()
 {
-	mfp_set_tcdcr(mfp_get_tcdcr() & 0x0f); /* stop timer C */
-	mfp_set_tcdr(CLK_INTERVAL);
+	if (CLOCKS_PER_SEC % hz ||
+	    hz <= (CLOCKS_PER_SEC / 256) || hz > CLOCKS_PER_SEC) {
+		printf("cannot set %d Hz clock. using 100 Hz\n", hz);
+		hz = 100;
+	}
+	clkint = CLOCKS_PER_SEC / hz;
 
+	mfp_set_tcdcr(mfp_get_tcdcr() & 0x0f); /* stop timer C */
 	mfp_set_tcdcr(mfp_get_tcdcr() | 0x70); /* 1/200 delay mode */
+
+	mfp_set_tcdr(clkint);
 	mfp_bit_set_ierb(MFP_INTR_TIMER_C);
 }
 
@@ -155,7 +201,7 @@ setstatclockrate(hz)
 int
 clkread()
 {
-	return (mfp_get_tcdr() * CLOCKS_PER_SEC) / CLK_INTERVAL;
+	return (clkint - mfp_get_tcdr()) * CLK_RESOLUTION;
 }
 
 

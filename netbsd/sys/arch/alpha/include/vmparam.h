@@ -1,9 +1,43 @@
-/* $NetBSD: vmparam.h,v 1.24 2001/11/15 18:06:12 soren Exp $ */
+/* $NetBSD: vmparam.h,v 1.28 2004/03/22 05:25:22 matt Exp $ */
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department and Ralph Campbell.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: vmparam.h 1.16 91/01/18$
+ *
+ *	@(#)vmparam.h	8.2 (Berkeley) 4/22/94
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -50,15 +84,21 @@
  */
 
 /*
- * USRTEXT is the start of the user text/data space, while USRSTACK
- * is the top (end) of the user stack.
+ * All systypes currently supported by NetBSD/alpha have an 8K pages.
+ * Override the PAGE_* definitions to be compile-time constants.
+ */
+#define	PAGE_SHIFT	13
+#define	PAGE_SIZE	(1 << PAGE_SHIFT)
+#define	PAGE_MASK	(PAGE_SIZE - 1)
+
+/*
+ * USRSTACK is the top (end) of the user stack.
  *
  * Digital UNIX (formerly DEC OSF/1) places the stack below the
  * text segment (i.e. growing downward from 4G).  We may want to
  * consider doing that at some point, but it might require changes
  * to the exec code.
  */
-#define	USRTEXT		NBPG
 #define	USRSTACK	((vaddr_t)0x0000000200000000)		/* 8G */
 
 /*
@@ -68,7 +108,7 @@
 #define	MAXTSIZ		(1<<30)			/* max text size (1G) */
 #endif
 #ifndef DFLDSIZ
-#define	DFLDSIZ		(1<<27)			/* initial data size (128M) */
+#define	DFLDSIZ		(1<<28)			/* initial data size (256M) */
 #endif
 #ifndef MAXDSIZ
 #define	MAXDSIZ		(1<<30)			/* max data size (1G) */
@@ -108,7 +148,7 @@
 #define VM_MAX_KERNEL_ADDRESS	trunc_page((vaddr_t)ALPHA_K1SEG_END)
 
 /* virtual sizes (bytes) for various kernel submaps */
-#define VM_PHYS_SIZE		(USRIOSIZE*NBPG)
+#define VM_PHYS_SIZE		(USRIOSIZE*PAGE_SIZE)
 
 /* some Alpha-specific constants */
 #define	VPTBASE		((vaddr_t)0xfffffffc00000000)	/* Virt. pg table */

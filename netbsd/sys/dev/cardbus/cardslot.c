@@ -1,4 +1,4 @@
-/*	$NetBSD: cardslot.c,v 1.16 2001/11/15 09:48:02 lukem Exp $	*/
+/*	$NetBSD: cardslot.c,v 1.24 2003/11/02 09:56:38 wiz Exp $	*/
 
 /*
  * Copyright (c) 1999 and 2000
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cardslot.c,v 1.16 2001/11/15 09:48:02 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cardslot.c,v 1.24 2003/11/02 09:56:38 wiz Exp $");
 
 #include "opt_cardslot.h"
 
@@ -74,10 +74,8 @@ STATIC int cardslot_cb_print __P((void *aux, const char *pcic));
 static int cardslot_16_print __P((void *, const char *));
 static int cardslot_16_submatch __P((struct device *, struct cfdata *,void *));
 
-struct cfattach cardslot_ca = {
-	sizeof(struct cardslot_softc), cardslotmatch, cardslotattach
-};
-
+CFATTACH_DECL(cardslot, sizeof(struct cardslot_softc),
+    cardslotmatch, cardslotattach, NULL, NULL);
 
 STATIC int
 cardslotmatch(parent, cf, aux)
@@ -109,8 +107,8 @@ cardslotattach(parent, self, aux)
 	struct cbslot_attach_args *cba = caa->caa_cb_attach;
 	struct pcmciabus_attach_args *pa = caa->caa_16_attach;
 
-	struct cardbus_softc *csc;
-	struct pcmcia_softc *psc;
+	struct cardbus_softc *csc = NULL;
+	struct pcmcia_softc *psc = NULL;
 
 	sc->sc_slot = sc->sc_dev.dv_unit;
 	sc->sc_cb_softc = NULL;
@@ -171,7 +169,8 @@ cardslot_cb_print(aux, pnp)
 	struct cbslot_attach_args *cba = aux;
 
 	if (pnp) {
-		printf("cardbus at %s subordinate bus %d", pnp, cba->cba_bus);
+		aprint_normal("cardbus at %s subordinate bus %d",
+		    pnp, cba->cba_bus);
 	}
 
 	return UNCONF;
@@ -191,7 +190,7 @@ cardslot_16_submatch(parent, cf, aux)
 	}
 
 	if ((cf->cf_loc[PCMCIABUSCF_CONTROLLER] == PCMCIABUSCF_CONTROLLER_DEFAULT)) {
-		return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+		return (config_match(parent, cf, aux));
 	}
 
 	return 0;
@@ -206,7 +205,7 @@ cardslot_16_print(arg, pnp)
 {
 
 	if (pnp) {
-		printf("pcmciabus at %s", pnp);
+		aprint_normal("pcmciabus at %s", pnp);
 	}
 
 	return UNCONF;
@@ -301,11 +300,11 @@ cardslot_event_thread(arg)
 			(void) tsleep(&sc->sc_events, PWAIT, "cardslotev", 0);
 			continue;
 		}
-		SIMPLEQ_REMOVE_HEAD(&sc->sc_events, ce, ce_q);
+		SIMPLEQ_REMOVE_HEAD(&sc->sc_events, ce_q);
 		splx(s);
 
 		if (IS_CARDSLOT_INSERT_REMOVE_EV(ce->ce_type)) {
-			/* Chattering supression */
+			/* Chattering suppression */
 			s = spltty();
 			while (1) {
 				struct cardslot_event *ce1, *ce2;
@@ -320,9 +319,11 @@ cardslot_event_thread(arg)
 					break;
 				}
 				if (ce2->ce_type == ce->ce_type) {
-					SIMPLEQ_REMOVE_HEAD(&sc->sc_events, ce1, ce_q);
+					SIMPLEQ_REMOVE_HEAD(&sc->sc_events,
+					    ce_q);
 					free(ce1, M_TEMP);
-					SIMPLEQ_REMOVE_HEAD(&sc->sc_events, ce2, ce_q);
+					SIMPLEQ_REMOVE_HEAD(&sc->sc_events,
+					    ce_q);
 					free(ce2, M_TEMP);
 				}
 			}

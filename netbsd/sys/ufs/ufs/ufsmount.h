@@ -1,4 +1,4 @@
-/*	$NetBSD: ufsmount.h,v 1.8 2000/11/27 08:40:02 chs Exp $	*/
+/*	$NetBSD: ufsmount.h,v 1.15 2004/01/09 19:10:22 dbj Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -34,6 +30,9 @@
  *
  *	@(#)ufsmount.h	8.6 (Berkeley) 3/30/95
  */
+
+#ifndef _UFS_UFS_UFSMOUNT_H_
+#define _UFS_UFS_UFSMOUNT_H_
 
 /*
  * Arguments to mount UFS-based filesystems
@@ -54,6 +53,11 @@ struct mfs_args {
 };
 
 #ifdef _KERNEL
+
+#if defined(_KERNEL_OPT)
+#include "opt_ffs.h"
+#endif
+
 struct buf;
 struct inode;
 struct nameidata;
@@ -68,6 +72,7 @@ struct ufsmount {
 	struct	mount *um_mountp;		/* filesystem vfs structure */
 	dev_t	um_dev;				/* device mounted */
 	struct	vnode *um_devvp;		/* block device mounted vnode */
+	u_long	um_fstype;
 	u_int32_t um_flags;			/* UFS-specific flags - see below */
 	union {					/* pointer to superblock */
 		struct	fs *fs;			/* FFS */
@@ -89,11 +94,19 @@ struct ufsmount {
 	time_t	um_itime[MAXQUOTAS];		/* inode quota time limit */
 	char	um_qflags[MAXQUOTAS];		/* quota specific flags */
 	struct	netexport um_export;		/* export information */
-	u_int64_t um_savedmaxfilesize;		/* XXX - limit maxfilesize */
+	void	*um_oldfscompat;			/* save 4.2 rotbl */
 };
 
 /* UFS-specific flags */
 #define UFS_NEEDSWAP	0x01	/* filesystem metadata need byte-swapping */
+#define UFS_ISAPPLEUFS	0x02	/* filesystem is Apple UFS */
+
+/*
+ * Filesystem types
+ */
+#define UFS1  1
+#define UFS2  2
+
 
 /*
  * Flags describing the state of quotas.
@@ -104,11 +117,18 @@ struct ufsmount {
 /* Convert mount ptr to ufsmount ptr. */
 #define VFSTOUFS(mp)	((struct ufsmount *)((mp)->mnt_data))
 
+#ifdef APPLE_UFS
+#define UFS_MPISAPPLEUFS(mp)	(VFSTOUFS(mp)->um_flags & UFS_ISAPPLEUFS)
+#else
+#define UFS_MPISAPPLEUFS(mp)	(0)
+#endif
+
 /*
  * Macros to access file system parameters in the ufsmount structure.
  * Used by ufs_bmap.
  */
 #define MNINDIR(ump)			((ump)->um_nindir)
 #define	blkptrtodb(ump, b)		((b) << (ump)->um_bptrtodb)
-#define	is_sequential(ump, a, b)	((b) == (a) + ump->um_seqinc)
 #endif /* _KERNEL */
+
+#endif /* !_UFS_UFS_UFSMOUNT_H_ */

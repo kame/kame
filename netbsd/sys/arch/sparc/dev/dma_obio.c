@@ -1,4 +1,4 @@
-/*	$NetBSD: dma_obio.c,v 1.4 2002/03/11 16:27:02 pk Exp $ */
+/*	$NetBSD: dma_obio.c,v 1.8 2003/07/15 00:04:53 lukem Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: dma_obio.c,v 1.8 2003/07/15 00:04:53 lukem Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -56,9 +59,8 @@
 int	dmamatch_obio	__P((struct device *, struct cfdata *, void *));
 void	dmaattach_obio	__P((struct device *, struct device *, void *));
 
-struct cfattach dma_obio_ca = {
-	sizeof(struct lsi64854_softc), dmamatch_obio, dmaattach_obio
-};
+CFATTACH_DECL(dma_obio, sizeof(struct lsi64854_softc),
+    dmamatch_obio, dmaattach_obio, NULL, NULL);
 
 int
 dmamatch_obio(parent, cf, aux)

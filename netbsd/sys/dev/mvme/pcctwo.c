@@ -1,4 +1,4 @@
-/*	$NetBSD: pcctwo.c,v 1.1 2002/02/12 20:38:49 scw Exp $	*/
+/*	$NetBSD: pcctwo.c,v 1.3 2003/07/14 15:47:20 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2002 The NetBSD Foundation, Inc.
@@ -39,6 +39,9 @@
 /*
  * PCCchip2 and MCchip Driver
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pcctwo.c,v 1.3 2003/07/14 15:47:20 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -124,11 +127,11 @@ pcctwoprint(aux, cp)
 	pa = aux;
 
 	if (cp)
-		printf("%s at %s", pa->pa_name, cp);
+		aprint_normal("%s at %s", pa->pa_name, cp);
 
-	printf(" offset 0x%lx", pa->pa_offset - pa->_pa_base);
+	aprint_normal(" offset 0x%lx", pa->pa_offset - pa->_pa_base);
 	if (pa->pa_ipl != -1)
-		printf(" ipl %d", pa->pa_ipl);
+		aprint_normal(" ipl %d", pa->pa_ipl);
 
 	return (UNCONF);
 }

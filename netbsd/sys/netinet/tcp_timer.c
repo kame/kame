@@ -1,9 +1,9 @@
-/*	$NetBSD: tcp_timer.c,v 1.57.10.2 2003/10/22 06:06:05 jmc Exp $	*/
+/*	$NetBSD: tcp_timer.c,v 1.66 2004/01/02 15:51:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -78,11 +78,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -102,7 +98,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tcp_timer.c,v 1.57.10.2 2003/10/22 06:06:05 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tcp_timer.c,v 1.66 2004/01/02 15:51:04 itojun Exp $");
 
 #include "opt_inet.h"
 #include "opt_tcp_debug.h"
@@ -286,18 +282,16 @@ tcp_timer_rexmt(void *arg)
 	uint32_t rto;
 	int s;
 #ifdef TCP_DEBUG
-	struct socket *so;
+	struct socket *so = NULL;
 	short ostate;
 #endif
 
 	s = splsoftnet();
-	callout_ack(&tp->t_timer[TCPT_KEEP]);
+	callout_ack(&tp->t_timer[TCPT_REXMT]);
 	if (tcp_isdead(tp)) {
 		splx(s);
 		return;
 	}
-
-	callout_deactivate(&tp->t_timer[TCPT_REXMT]);
 
 #ifdef TCP_DEBUG
 #ifdef INET
@@ -332,7 +326,7 @@ tcp_timer_rexmt(void *arg)
 	    tp->t_rttmin, TCPTV_REXMTMAX);
 	TCP_TIMER_ARM(tp, TCPT_REXMT, tp->t_rxtcur);
 
-	/* 
+	/*
 	 * If we are losing and we are trying path MTU discovery,
 	 * try turning it off.  This will avoid black holes in
 	 * the network which suppress or fail to send "packet
@@ -402,7 +396,7 @@ tcp_timer_rexmt(void *arg)
 	 * size increase exponentially with time.  If the
 	 * window is larger than the path can handle, this
 	 * exponential growth results in dropped packet(s)
-	 * almost immediately.  To get more time between 
+	 * almost immediately.  To get more time between
 	 * drops but still "push" the network to take advantage
 	 * of improving conditions, we switch from exponential
 	 * to linear window opening at some threshhold size.
@@ -437,10 +431,10 @@ void
 tcp_timer_persist(void *arg)
 {
 	struct tcpcb *tp = arg;
-	struct socket *so;
 	uint32_t rto;
 	int s;
 #ifdef TCP_DEBUG
+	struct socket *so = NULL;
 	short ostate;
 #endif
 
@@ -451,8 +445,7 @@ tcp_timer_persist(void *arg)
 		return;
 	}
 
-	callout_deactivate(&tp->t_timer[TCPT_PERSIST]);
-
+#ifdef TCP_DEBUG
 #ifdef INET
 	if (tp->t_inpcb)
 		so = tp->t_inpcb->inp_socket;
@@ -462,9 +455,8 @@ tcp_timer_persist(void *arg)
 		so = tp->t_in6pcb->in6p_socket;
 #endif
 
-#ifdef TCP_DEBUG
 	ostate = tp->t_state;
-#endif
+#endif /* TCP_DEBUG */
 
 	/*
 	 * Persistance timer into zero window.
@@ -507,7 +499,7 @@ void
 tcp_timer_keep(void *arg)
 {
 	struct tcpcb *tp = arg;
-	struct socket *so;
+	struct socket *so = NULL;	/* Quell compiler warning */
 	int s;
 #ifdef TCP_DEBUG
 	short ostate;
@@ -519,8 +511,6 @@ tcp_timer_keep(void *arg)
 		splx(s);
 		return;
 	}
-
-	callout_deactivate(&tp->t_timer[TCPT_KEEP]);
 
 #ifdef TCP_DEBUG
 	ostate = tp->t_state;
@@ -596,9 +586,9 @@ void
 tcp_timer_2msl(void *arg)
 {
 	struct tcpcb *tp = arg;
-	struct socket *so;
 	int s;
 #ifdef TCP_DEBUG
+	struct socket *so = NULL;
 	short ostate;
 #endif
 
@@ -609,8 +599,7 @@ tcp_timer_2msl(void *arg)
 		return;
 	}
 
-	callout_deactivate(&tp->t_timer[TCPT_2MSL]);
-
+#ifdef TCP_DEBUG
 #ifdef INET
 	if (tp->t_inpcb)
 		so = tp->t_inpcb->inp_socket;
@@ -620,9 +609,8 @@ tcp_timer_2msl(void *arg)
 		so = tp->t_in6pcb->in6p_socket;
 #endif
 
-#ifdef TCP_DEBUG
 	ostate = tp->t_state;
-#endif
+#endif /* TCP_DEBUG */
 
 	/*
 	 * 2 MSL timeout in shutdown went off.  If we're closed but

@@ -1,4 +1,4 @@
-/*	$NetBSD: eeprom.c,v 1.1 2002/03/28 11:54:17 pk Exp $ */
+/*	$NetBSD: eeprom.c,v 1.5 2003/07/15 00:05:04 lukem Exp $ */
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -45,6 +45,10 @@
  * On the 300/400 models, the eeprom will be dealt with when the clock
  * is attached.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: eeprom.c,v 1.5 2003/07/15 00:05:04 lukem Exp $");
+
 #include "opt_sparc_arch.h"
 
 #include <sys/param.h>
@@ -64,10 +68,8 @@ extern char	*eeprom_va;
 static int	eeprom_match(struct device *, struct cfdata *, void *);
 static void	eeprom_attach(struct device *, struct device *, void *);
 
-struct cfattach eeprom_ca = {
-	sizeof(struct device), eeprom_match, eeprom_attach
-};
-
+CFATTACH_DECL(eeprom, sizeof(struct device),
+    eeprom_match, eeprom_attach, NULL, NULL);
 
 /* We support only one eeprom device */
 static int eeprom_attached;

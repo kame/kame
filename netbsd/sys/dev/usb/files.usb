@@ -1,4 +1,4 @@
-#	$NetBSD: files.usb,v 1.44 2002/04/22 09:41:23 augustss Exp $
+#	$NetBSD: files.usb,v 1.52 2003/10/08 20:58:00 bouyer Exp $
 #
 # Config file and device description for machine-independent USB code.
 # Included by ports that need it.  Ports that use it must provide
@@ -90,7 +90,7 @@ file	dev/usb/ulpt.c			ulpt			needs-flag
 
 
 # Mass storage
-device	umass: scsi, atapi, ata
+device	umass: scsi, atapi, ata_hl
 attach	umass at uhub
 file	dev/usb/umass.c			umass
 file	dev/usb/umass_isdata.c		umass & wd
@@ -103,11 +103,21 @@ device	uirda: irbus
 attach	uirda at uhub
 file	dev/usb/uirda.c			uirda
 
-
 # SigmaTel IrDA bridge
 device	ustir: irbus, irdasir
 attach	ustir at uhub
 file	dev/usb/ustir.c			ustir
+
+
+# Bluetooth bridges
+device	ubt: btbus
+attach	ubt at uhub
+file	dev/usb/ubt.c			ubt
+
+# BCM2033 firmware download
+device	ubtbcmfw
+attach	ubtbcmfw at uhub
+file	dev/usb/ubtbcmfw.c		ubtbcmfw		needs-flag
 
 
 # Misc
@@ -158,6 +168,16 @@ device	url: arp, ether, ifnet, mii
 attach	url at uhub
 file	dev/usb/if_url.c		url
 
+# ASIX AX88172
+device	uax: arp, ether, ifnet, mii, mii_phy
+attach	uax at uhub
+file	dev/usb/if_uax.c		uax
+
+# DAVICOM DM9601
+device	udav: arp, ether, ifnet, mii, mii_phy
+attach	udav at uhub
+file	dev/usb/if_udav.c		udav
+
 
 # Serial drivers
 # Modems
@@ -184,6 +204,11 @@ file	dev/usb/umct.c			umct
 device	uvscom: ucombus
 attach	uvscom at uhub
 file	dev/usb/uvscom.c		uvscom
+
+# Belkin & other serial driver
+device	ubsa: ucombus
+attach	ubsa at uhub
+file	dev/usb/ubsa.c			ubsa
 
 
 # Scanners

@@ -1,4 +1,4 @@
-/*	$NetBSD: compat_13_machdep.c,v 1.3 2001/05/28 00:15:10 matt Exp $	*/
+/*	$NetBSD: compat_13_machdep.c,v 1.8 2003/09/27 04:44:42 matt Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -31,25 +31,28 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: compat_13_machdep.c,v 1.8 2003/09/27 04:44:42 matt Exp $");
+
+#include "opt_ppcarch.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/signalvar.h>
 #include <sys/kernel.h>
-#include <sys/map.h>
 #include <sys/proc.h>
 #include <sys/user.h>
 #include <sys/mount.h>  
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 int
-compat_13_sys_sigreturn(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_13_sys_sigreturn(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_13_sys_sigreturn_args /* {
 		syscallarg(struct sigcontext13 *) sigcntxp;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct sigcontext13 sc;
 	struct trapframe *tf;
 	int error;
@@ -64,10 +67,24 @@ compat_13_sys_sigreturn(p, v, retval)
 		return (error);
 
 	/* Restore the register context. */
-	tf = trapframe(p);
+	tf = trapframe(l);
 	if ((sc.sc_frame.srr1 & PSL_USERSTATIC) != (tf->srr1 & PSL_USERSTATIC))
 		return (EINVAL);
-	*tf = sc.sc_frame;
+
+	/* Restore register context. */
+	memcpy(tf->fixreg, sc.sc_frame.fixreg, sizeof(tf->fixreg));
+	tf->lr   = sc.sc_frame.lr;
+	tf->cr   = sc.sc_frame.cr;
+	tf->xer  = sc.sc_frame.xer;
+	tf->ctr  = sc.sc_frame.ctr;
+	tf->srr0 = sc.sc_frame.srr0;
+	tf->srr1 = sc.sc_frame.srr1;
+#ifdef PPC_OEA
+	tf->tf_xtra[TF_VRSAVE] = sc.sc_frame.vrsave;
+	tf->tf_xtra[TF_MQ] = sc.sc_frame.mq;
+#endif
+
+	/* Restore signal stack. */
 
 	/* Restore signal stack. */
 	if (sc.sc_onstack & SS_ONSTACK)

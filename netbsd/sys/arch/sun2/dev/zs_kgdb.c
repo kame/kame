@@ -1,4 +1,4 @@
-/*	$NetBSD: zs_kgdb.c,v 1.1 2002/03/22 00:23:54 fredette Exp $	*/
+/*	$NetBSD: zs_kgdb.c,v 1.4 2003/07/15 03:36:12 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -46,6 +46,9 @@
  *   (gdb) set remotebaud 19200
  *   (gdb) target remote /dev/ttyb
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zs_kgdb.c,v 1.4 2003/07/15 03:36:12 lukem Exp $");
 
 #include "opt_kgdb.h"
 
@@ -108,7 +111,7 @@ zs_setparam(cs, iena, rate)
 {
 	int s, tconst;
 
-	bcopy(zs_kgdb_regs, cs->cs_preg, 16);
+	memcpy(cs->cs_preg, zs_kgdb_regs, 16);
 
 	if (iena) {
 		cs->cs_preg[1] = ZSWR1_RIE | ZSWR1_SIE;
@@ -137,9 +140,10 @@ zs_kgdb_init()
 	struct zsdevice *zsd;
 	volatile struct zschan *zc;
 	int channel, promzs_unit;
+	extern const struct cdevsw zstty_cdevsw;
 
 	/* printf("zs_kgdb_init: kgdb_dev=0x%x\n", kgdb_dev); */
-	if (major(kgdb_dev) != zs_major)
+	if (cdevsw_lookup(kgdb_dev) != &zstty_cdevsw)
 		return;
 
 	/* Note: (ttya,ttyb) on zs0, and (ttyc,ttyd) on zs2 */
@@ -149,7 +153,7 @@ zs_kgdb_init()
 		   'a' + (kgdb_dev & 3), kgdb_rate);
 
 	/* Setup temporary chanstate. */
-	bzero((caddr_t)&cs, sizeof(cs));
+	memset((caddr_t)&cs, 0, sizeof(cs));
 	zsd = zs_find_prom(promzs_unit);
 	if (zsd == NULL) {
 		printf("zs_kgdb_init: zs not mapped.\n");

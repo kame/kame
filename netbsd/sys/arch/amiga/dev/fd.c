@@ -1,4 +1,4 @@
-/*	$NetBSD: fd.c,v 1.50 2002/01/28 09:56:54 aymeric Exp $ */
+/*	$NetBSD: fd.c,v 1.62 2003/07/14 15:57:39 aymeric Exp $ */
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: fd.c,v 1.50 2002/01/28 09:56:54 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: fd.c,v 1.62 2003/07/14 15:57:39 aymeric Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -48,14 +48,15 @@ __KERNEL_RCSID(0, "$NetBSD: fd.c,v 1.50 2002/01/28 09:56:54 aymeric Exp $");
 #include <sys/disk.h>
 #include <sys/dkbad.h>
 #include <sys/proc.h>
+#include <sys/conf.h>
+
+#include <uvm/uvm_extern.h>
+
 #include <machine/cpu.h>
 #include <amiga/amiga/device.h>
 #include <amiga/amiga/custom.h>
 #include <amiga/amiga/cia.h>
 #include <amiga/amiga/cc.h>
-
-#include <sys/conf.h>
-#include <machine/conf.h>
 
 #include "locators.h"
 
@@ -98,8 +99,8 @@ bunghole :-) */
 
 #define DISKLEN_READ	(0)	/* fake mask for reading */
 #define DISKLEN_WRITE	(1 << 14)	/* bit for writing */
-#define DISKLEN_DMAEN	(1 << 15)	/* dma go */
-#define DMABUFSZ ((DISKLEN_WRITE - 1) * 2)	/* largest dma possible */
+#define DISKLEN_DMAEN	(1 << 15)	/* DMA go */
+#define DMABUFSZ ((DISKLEN_WRITE - 1) * 2)	/* largest DMA possible */
 
 #define FDMFMSYNC	(0x4489)
 #define FDMFMID		(0x5554)
@@ -146,7 +147,7 @@ struct fdtype {
 struct fd_softc {
 	struct device sc_dv;	/* generic device info; must come first */
 	struct disk dkdev;	/* generic disk info */
-	struct buf_queue bufq;	/* queue pending I/O operations */
+	struct bufq_state bufq;	/* queue pending I/O operations */
 	struct buf curbuf;	/* state of current I/O operation */
 	struct callout calibrate_ch;
 	struct callout motor_ch;
@@ -197,7 +198,6 @@ void	fdattach(struct device *, struct device *, void *);
 
 void	fdintr(int);
 void	fdidxintr(void);
-void	fdstrategy(struct buf *);
 int	fdloaddisk(struct fd_softc *);
 void	fdgetdefaultlabel(struct fd_softc *, struct disklabel *, int);
 int	fdgetdisklabel(struct fd_softc *, dev_t);
@@ -227,12 +227,10 @@ u_long	*mfmblkdecode(u_long *, u_long *, u_long *, int);
 u_short	*msblkdecode(u_short *, u_char *, int);
 u_short	*msblkencode(u_short *, u_char *, int, u_short *);
 
-struct dkdriver fddkdriver = { fdstrategy };
-
 /*
  * read size is (nsectors + 1) * mfm secsize + gap bytes + 2 shorts
  * write size is nsectors * mfm secsize + gap bytes + 3 shorts
- * the extra shorts are to deal with a dma hw bug in the controller
+ * the extra shorts are to deal with a DMA hw bug in the controller
  * they are probably too much (I belive the bug is 1 short on write and
  * 3 bits on read) but there is no need to be cheap here.
  */
@@ -244,15 +242,31 @@ struct fdtype fdtype[] = {
 };
 int nfdtype = sizeof(fdtype) / sizeof(*fdtype);
 
-struct cfattach fd_ca = {
-	sizeof(struct fd_softc), fdmatch, fdattach
-};
+CFATTACH_DECL(fd, sizeof(struct fd_softc),
+    fdmatch, fdattach, NULL, NULL);
 
 extern struct cfdriver fd_cd;
 
-struct cfattach fdc_ca = {
-	sizeof(struct device), fdcmatch, fdcattach
+dev_type_open(fdopen);
+dev_type_close(fdclose);
+dev_type_read(fdread);
+dev_type_write(fdwrite);
+dev_type_ioctl(fdioctl);
+dev_type_strategy(fdstrategy);
+
+const struct bdevsw fd_bdevsw = {
+	fdopen, fdclose, fdstrategy, fdioctl, nodump, nosize, D_DISK
 };
+
+const struct cdevsw fd_cdevsw = {
+	fdopen, fdclose, fdread, fdwrite, fdioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
+};
+
+struct dkdriver fddkdriver = { fdstrategy };
+
+CFATTACH_DECL(fdc, sizeof(struct device),
+    fdcmatch, fdcattach, NULL, NULL);
 
 /*
  * all hw access through macros, this helps to hide the active low
@@ -320,7 +334,7 @@ fdcmatch(struct device *pdp, struct cfdata *cfp, void *auxp)
 	if (matchname("fdc", auxp) == 0 || fdc_matched)
 		return(0);
 	if ((fdc_dmap = alloc_chipmem(DMABUFSZ)) == NULL) {
-		printf("fdc: unable to allocate dma buffer\n");
+		printf("fdc: unable to allocate DMA buffer\n");
 		return(0);
 	}
 
@@ -354,7 +368,7 @@ fdcprint(void *auxp, const char *pnp)
 
 	fcp = auxp;
 	if (pnp)
-		printf("fd%d at %s unit %d:", fcp->unit, pnp,
+		aprint_normal("fd%d at %s unit %d:", fcp->unit, pnp,
 			fcp->type->driveid);
 	return(UNCONF);
 }
@@ -383,7 +397,7 @@ fdattach(struct device *pdp, struct device *dp, void *auxp)
 	ap = auxp;
 	sc = (struct fd_softc *)dp;
 
-	BUFQ_INIT(&sc->bufq);
+	bufq_alloc(&sc->bufq, BUFQ_DISKSORT|BUFQ_SORT_CYLINDER);
 	callout_init(&sc->calibrate_ch);
 	callout_init(&sc->motor_ch);
 
@@ -591,15 +605,6 @@ fdioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct proc *p)
 	}
 }
 
-/*
- * no dumps to floppy disks thank you.
- */
-int
-fdsize(dev_t dev)
-{
-	return(-1);
-}
-
 int
 fdread(dev_t dev, struct uio *uio, int flags)
 {
@@ -649,7 +654,7 @@ fdstrategy(struct buf *bp)
 	sc = getsoftc(fd_cd, unit);
 
 #ifdef FDDEBUG
-	printf("fdstrategy: 0x%x\n", bp);
+	printf("fdstrategy: %p\n", bp);
 #endif
 	/*
 	 * check for valid partition and bounds
@@ -659,7 +664,7 @@ fdstrategy(struct buf *bp)
 		bp->b_error = EIO;
 		goto bad;
 	}
-	if (bounds_check_with_label(bp, lp, sc->wlabel) <= 0)
+	if (bounds_check_with_label(&sc->dkdev, bp, sc->wlabel) <= 0)
 		goto done;
 
 	/*
@@ -675,7 +680,7 @@ fdstrategy(struct buf *bp)
 	 * queue the buf and kick the low level code
 	 */
 	s = splbio();
-	disksort_cylinder(&sc->bufq, bp);
+	BUFQ_PUT(&sc->bufq, bp);
 	fdstart(sc);
 	splx(s);
 	return;
@@ -864,10 +869,10 @@ fdsetdisklabel(struct fd_softc *sc, struct disklabel *lp)
 	 * make sure selected partition is within bounds
 	 * XXX on the second check, its to handle a bug in
 	 * XXX the cluster routines as they require mutliples
-	 * XXX of NBPG currently
+	 * XXX of PAGE_SIZE currently
 	 */
 	if ((pp->p_offset + pp->p_size >= lp->d_secperunit) ||
-	    (pp->p_frag * pp->p_fsize % NBPG))
+	    (pp->p_frag * pp->p_fsize % PAGE_SIZE))
 		return(EINVAL);
 done:
 	bcopy(lp, clp, sizeof(struct disklabel));
@@ -903,7 +908,7 @@ fdputdisklabel(struct fd_softc *sc, dev_t dev)
 	if ((error = biowait(bp)) != 0)
 		goto done;
 	/*
-	 * copy disklabel to buf and write it out syncronous
+	 * copy disklabel to buf and write it out synchronous
 	 */
 	dlp = (struct disklabel *)(bp->b_data + LABELOFFSET);
 	bcopy(lp, dlp, sizeof(struct disklabel));
@@ -987,7 +992,7 @@ fdmotoroff(void *arg)
 	if ((sc->flags & FDF_MOTORON) == 0)
 		goto done;
 	/*
-	 * if we have a timeout on a dma operation let fddmadone()
+	 * if we have a timeout on a DMA operation let fddmadone()
 	 * deal with it.
 	 */
 	if (fdc_indma == sc) {
@@ -1007,7 +1012,7 @@ fdmotoroff(void *arg)
 		printf("  flushing dirty buffer first\n");
 #endif
 		/*
-		 * if dma'ing done for now, fddone() will call us again
+		 * if DMA'ing done for now, fddone() will call us again
 		 */
 		if (fdc_indma)
 			goto done;
@@ -1167,7 +1172,7 @@ fdstart(struct fd_softc *sc)
 #endif
 
 	/*
-	 * if dma'ing just return. we must have been called from fdstartegy.
+	 * if DMA'ing just return. we must have been called from fdstartegy.
 	 */
 	if (fdc_indma)
 		return;
@@ -1176,7 +1181,7 @@ fdstart(struct fd_softc *sc)
 	 * get next buf if there.
 	 */
 	dp = &sc->curbuf;
-	if ((bp = BUFQ_FIRST(&sc->bufq)) == NULL) {
+	if ((bp = BUFQ_PEEK(&sc->bufq)) == NULL) {
 #ifdef FDDEBUG
 		printf("  nothing to do\n");
 #endif
@@ -1207,17 +1212,17 @@ printf("fdstart: disk changed\n");
 #endif
 		sc->flags &= ~FDF_HAVELABEL;
 		for (;;) {
+			bp = BUFQ_GET(&sc->bufq);
 			bp->b_flags |= B_ERROR;
 			bp->b_error = EIO;
-			if (BUFQ_NEXT(bp) == NULL)
+			if (BUFQ_PEEK(&sc->bufq) == NULL)
 				break;
 			biodone(bp);
-			bp = BUFQ_NEXT(bp);
 		}
 		/*
 		 * do fddone() on last buf to allow other units to start.
 		 */
-		BUFQ_INSERT_HEAD(&sc->bufq, bp);
+		BUFQ_PUT(&sc->bufq, bp);
 		fddone(sc);
 		return;
 	}
@@ -1249,7 +1254,7 @@ printf("fdstart: disk changed\n");
 
 	/*
 	 * check to see if same as currently cached track
-	 * if so we need to do no dma read.
+	 * if so we need to do no DMA read.
 	 */
 	if (trk == sc->cachetrk) {
 		fddone(sc);
@@ -1272,7 +1277,7 @@ printf("fdstart: disk changed\n");
 	}
 
 	/*
-	 * start dma read of `trk'
+	 * start DMA read of `trk'
 	 */
 	fddmastart(sc, trk);
 	return;
@@ -1293,7 +1298,7 @@ fdcont(struct fd_softc *sc)
 	int trk, write;
 
 	dp = &sc->curbuf;
-	bp = BUFQ_FIRST(&sc->bufq);
+	bp = BUFQ_PEEK(&sc->bufq);
 	dp->b_data += (dp->b_bcount - bp->b_resid);
 	dp->b_blkno += (dp->b_bcount - bp->b_resid) / FDSECSIZE;
 	dp->b_bcount = bp->b_resid;
@@ -1324,7 +1329,7 @@ fdcont(struct fd_softc *sc)
 		}
 	}
 	/*
-	 * start dma read of `trk'
+	 * start DMA read of `trk'
 	 */
 	fddmastart(sc, trk);
 	return;
@@ -1381,7 +1386,7 @@ fddmastart(struct fd_softc *sc, int trk)
 
 	/*
 	 * If writing an MSDOS track, activate disk index pulse
-	 * interrupt, dma will be started in the intr routine fdidxintr()
+	 * interrupt, DMA will be started in the intr routine fdidxintr()
 	 * Otherwise, start the DMA here.
 	 */
 	if (write && sc->openpart == FDMSDOSPART) {
@@ -1394,7 +1399,7 @@ fddmastart(struct fd_softc *sc, int trk)
 	}
 
 #ifdef FDDEBUG
-	printf("  dma started\n");
+	printf("  DMA started\n");
 #endif
 }
 
@@ -1424,7 +1429,7 @@ fdcalibrate(void *arg)
 	else
 		fdsetpos(sc, sc->cachetrk + FDNHEADS, 0);
 	/*
-	 * trk++, trk, trk++, trk, trk++, trk, trk++, trk and dma
+	 * trk++, trk, trk++, trk, trk++, trk, trk++, trk and DMA
 	 */
 	if (loopcnt < 8)
 		callout_reset(&sc->calibrate_ch, hz / 8, fdcalibrate, sc);
@@ -1457,13 +1462,13 @@ fddmadone(struct fd_softc *sc, int timeo)
 
 	if ((sc->flags & FDF_MOTOROFF) == 0) {
 		/*
-		 * motor runs for 1.5 seconds after last dma
+		 * motor runs for 1.5 seconds after last DMA
 		 */
 		callout_reset(&sc->motor_ch, 3 * hz / 2, fdmotoroff, sc);
 	}
 	if (sc->flags & FDF_DIRTY) {
 		/*
-		 * if buffer dirty, the last dma cleaned it
+		 * if buffer dirty, the last DMA cleaned it
 		 */
 		sc->flags &= ~FDF_DIRTY;
 		if (timeo)
@@ -1472,7 +1477,7 @@ fddmadone(struct fd_softc *sc, int timeo)
 		if (sc->flags & FDF_JUSTFLUSH) {
 			sc->flags &= ~FDF_JUSTFLUSH;
 			/*
-			 * we are done dma'ing
+			 * we are done DMA'ing
 			 */
 			fddone(sc);
 			return;
@@ -1533,7 +1538,7 @@ fddone(struct fd_softc *sc)
 		goto nobuf;
 
 	dp = &sc->curbuf;
-	if ((bp = BUFQ_FIRST(&sc->bufq)) == NULL)
+	if ((bp = BUFQ_PEEK(&sc->bufq)) == NULL)
 		panic ("fddone");
 	/*
 	 * check for an error that may have occurred
@@ -1573,9 +1578,10 @@ fddone(struct fd_softc *sc)
 	/*
 	 * remove from queue.
 	 */
-	BUFQ_REMOVE(&sc->bufq, bp);
+	(void)BUFQ_GET(&sc->bufq);
 
-	disk_unbusy(&sc->dkdev, (bp->b_bcount - bp->b_resid));
+	disk_unbusy(&sc->dkdev, (bp->b_bcount - bp->b_resid),
+	    (bp->b_flags & B_READ));
 
 	biodone(bp);
 nobuf:
@@ -1618,7 +1624,7 @@ fdfindwork(int unit)
 		 * and it has no buf's queued do it now
 		 */
 		if (sc->flags & FDF_MOTOROFF) {
-			if (BUFQ_FIRST(&sc->bufq) == NULL)
+			if (BUFQ_PEEK(&sc->bufq) == NULL)
 				fdmotoroff(sc);
 			else {
 				/*
@@ -1628,7 +1634,7 @@ fdfindwork(int unit)
 				sc->flags &= ~FDF_MOTOROFF;
 			}
 			/*
-			 * if we now have dma unit must have needed
+			 * if we now have DMA unit must have needed
 			 * flushing, quit
 			 */
 			if (fdc_indma)
@@ -1638,7 +1644,7 @@ fdfindwork(int unit)
 		 * if we have no start unit and the current unit has
 		 * io waiting choose this unit to start.
 		 */
-		if (ssc == NULL && BUFQ_FIRST(&sc->bufq) != NULL)
+		if (ssc == NULL && BUFQ_PEEK(&sc->bufq) != NULL)
 			ssc = sc;
 	}
 	if (ssc)
@@ -1663,17 +1669,17 @@ fdminphys(struct buf *bp)
 	toff = sec * FDSECSIZE;
 	tsz = sc->nsectors * FDSECSIZE;
 #ifdef FDDEBUG
-	printf("fdminphys: before %d", bp->b_bcount);
+	printf("fdminphys: before %ld", bp->b_bcount);
 #endif
 	bp->b_bcount = min(bp->b_bcount, tsz - toff);
 #ifdef FDDEBUG
-	printf(" after %d\n", bp->b_bcount);
+	printf(" after %ld\n", bp->b_bcount);
 #endif
 	minphys(bp);
 }
 
 /*
- * encode the track cache into raw MFM ready for dma
+ * encode the track cache into raw MFM ready for DMA
  * when we go to multiple disk formats, this will call type dependent
  * functions
  */
@@ -1686,7 +1692,7 @@ void fdcachetoraw(struct fd_softc *sc)
 }
 
 /*
- * decode raw MFM from dma into units track cache.
+ * decode raw MFM from DMA into units track cache.
  * when we go to multiple disk formats, this will call type dependent
  * functions
  */
@@ -1805,7 +1811,7 @@ again:
 		rp = mfmblkdecode(rp, &cktmp, NULL, 1);
 		if (cktmp != hcksum) {
 #ifdef FDDEBUG
-			printf("  info 0x%x hchksum 0x%x trkhcksum 0x%x\n",
+			printf("  info 0x%lx hchksum 0x%lx trkhcksum 0x%lx\n",
 			    info, hcksum, cktmp);
 #endif
 			goto again;
@@ -1818,7 +1824,7 @@ again:
 			goto again;
 		}
 #ifdef FDDEBUG
-		printf("  info 0x%x\n", info);
+		printf("  info 0x%lx\n", info);
 #endif
 
 		rp = mfmblkdecode(rp, &cktmp, NULL, 1);
@@ -1827,7 +1833,7 @@ again:
 		crp = mfmblkdecode(rp, dp, &dcksum, FDSECLWORDS);
 		if (cktmp != dcksum) {
 #ifdef FDDEBUG
-			printf("  info 0x%x dchksum 0x%x trkdcksum 0x%x\n",
+			printf("  info 0x%lx dchksum 0x%lx trkdcksum 0x%lx\n",
 			    info, dcksum, cktmp);
 #endif
 			goto again;
@@ -2152,10 +2158,4 @@ msblkencode(u_short *rp, u_char *cp, int len, u_short *crc)
 		*crc = mycrc;
 
 	return(rp);
-}
-
-int
-fddump(dev_t dev, daddr_t blkno, caddr_t va, size_t size)
-{
-	return (EINVAL);
 }

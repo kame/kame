@@ -1,4 +1,4 @@
-/*	$NetBSD: userret.h,v 1.2 2000/12/10 19:29:31 mycroft Exp $	*/
+/*	$NetBSD: userret.h,v 1.6 2003/10/31 16:44:35 cl Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -51,11 +51,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -73,21 +69,21 @@
  *
  */
 
-static __inline void userret __P((register struct proc *));
+#include <sys/userret.h>
+
+static __inline void userret(register struct lwp *);
 
 /*
  * Define the code needed before returning to user mode, for
  * trap and syscall.
  */
 static __inline void
-userret(p)
-	register struct proc *p;
+userret(l)
+	register struct lwp *l;
 {
-	int sig;
 
-	/* Take pending signals. */
-	while ((sig = CURSIG(p)) != 0)
-		postsig(sig);
+	/* Invoke MI userret code */
+	mi_userret(l);
 
-	curcpu()->ci_schedstate.spc_curpriority = p->p_priority = p->p_usrpri;
+	curcpu()->ci_schedstate.spc_curpriority = l->l_priority = l->l_usrpri;
 }

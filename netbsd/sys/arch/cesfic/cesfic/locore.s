@@ -1,10 +1,45 @@
-/*	$NetBSD: locore.s,v 1.5 2002/05/19 21:34:16 jdolecek Exp $	*/
+/*	$NetBSD: locore.s,v 1.12 2004/03/04 19:53:44 nathanw Exp $	*/
+
+/*
+ * Copyright (c) 1980, 1990, 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: locore.s 1.66 92/12/22$
+ *
+ *	@(#)locore.s	8.6 (Berkeley) 5/27/94
+ */
 
 /*
  * Copyright (c) 1994, 1995 Gordon W. Ross
  * Copyright (c) 1988 University of Utah.
- * Copyright (c) 1980, 1990, 1993
- *	The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -48,7 +83,9 @@
 #include "opt_compat_sunos.h"
 #include "opt_ddb.h"
 #include "opt_fpsp.h"
+#include "opt_fpu_emulate.h"
 
+#include "ksyms.h"
 #include "assym.h"
 #include <machine/asm.h>
 #include <machine/trap.h>
@@ -67,7 +104,7 @@ GLOBAL(kernel_text)
  * our text segment.
  */
 	.data
-	.space	NBPG
+	.space	PAGE_SIZE
 ASLOCAL(tmpstk)
 
 #include <cesfic/cesfic/vectors.s>
@@ -207,16 +244,16 @@ Lmemok:
 	subl	%d0,%d1			| compute amount of RAM present
 	RELOC(physmem, %a0)
 	movl	%d1,%a0@		| and physmem
-/* configure kernel and proc0 VA space so we can get going */
+/* configure kernel and lwp0 VA space so we can get going */
 	.globl	_Sysseg, _pmap_bootstrap, _avail_start
-#ifdef DDB
+#if NKSYMS || defined(DDB) || defined(LKM)
 	RELOC(esym,%a0)			| end of static kernel test/data/syms
 	movl	%a0@,%d5
 	jne	Lstart2
 #endif
 	movl	#_C_LABEL(end),%d5	| end of static kernel text/data
 Lstart2:
-	addl	#NBPG-1,%d5
+	addl	#PAGE_SIZE-1,%d5
 	andl	#PG_FRAME,%d5		| round to a page
 	movl	%d5,%a4
 	addl	%a5,%a4			| convert to PA
@@ -298,13 +335,13 @@ Lenab1:
 	lea	_ASM_LABEL(tmpstk),%sp	| temporary stack
 	jbsr	_C_LABEL(uvm_setpagesize)  | select software page size
 /* set kernel stack, user SP, and initial pcb */
-	movl	_C_LABEL(proc0paddr),%a1   | get proc0 pcb addr
+	movl	_C_LABEL(proc0paddr),%a1   | get lwp0 pcb addr
 	lea	%a1@(USPACE-4),%sp	| set kernel stack to end of area
-	lea	_C_LABEL(proc0),%a2	| initialize proc0.p_addr so that
-	movl	%a1,%a2@(P_ADDR)	|   we don't deref NULL in trap()
+	lea	_C_LABEL(lwp0),%a2	| initialize lwp0.l_addr so that
+	movl	%a1,%a2@(L_ADDR)	|   we don't deref NULL in trap()
 	movl	#USRSTACK-4,%a2
 	movl	%a2,%usp		| init user SP
-	movl	%a1,_C_LABEL(curpcb)	| proc0 is running
+	movl	%a1,_C_LABEL(curpcb)	| lwp0 is running
 
 	tstl	_C_LABEL(fputype)	| Have an FPU?
 	jeq	Lenab2			| No, skip.
@@ -315,7 +352,7 @@ Lenab1:
 Lenab2:
 
 /* flush TLB and turn on caches */
-	jbsr	_C_LABEL(TBIA)		| invalidate TLB
+	jbsr	_C_LABEL(_TBIA)		| invalidate TLB
 	cmpl	#MMU_68040,_C_LABEL(mmutype)	| 68040?
 	jeq	Lnocache0		| yes, cache already on
 	movl	#CACHE_ON,%d0
@@ -335,8 +372,8 @@ Lnocache0:
 	movw	#PSL_USER,%sp@-		| in user mode
 	clrl	%sp@-			| stack adjust count and padding
 	lea	%sp@(-64),%sp		| construct space for D0-D7/A0-A7
-	lea	_C_LABEL(proc0),%a0	| save pointer to frame
-	movl	%sp,%a0@(P_MD_REGS)	|   in proc0.p_md.md_regs
+	lea	_C_LABEL(lwp0),%a0	| save pointer to frame
+	movl	%sp,%a0@(L_MD_REGS)	|   in lwp0.l_md.md_regs
 
 	jra	_C_LABEL(main)		| main()
 
@@ -346,17 +383,6 @@ Lnocache0:
 Lmainreturned:
 	.asciz	"main() returned"
 	.even
-
-GLOBAL(proc_trampoline)
-	movl	%a3,%sp@-
-	jbsr	%a2@
-	addql	#4,%sp
-	movl	%sp@(FR_SP),%a0		| grab and load
-	movl	%a0,%usp		|   user SP
-	moveml	%sp@+,#0x7FFF		| restore most user regs
-	addql	#8,%sp			| toss SP and stack adjust
-	jra	_ASM_LABEL(rei)		| and return
-
 
 /*
  * Trap/interrupt vector routines
@@ -675,7 +701,8 @@ Ltrap1:
  * command in d0, addr in a1, length in d1
  */
 ENTRY_NOPROFILE(trap12)
-	movl	_C_LABEL(curproc),%sp@-	| push current proc pointer
+	movl	_C_LABEL(curlwp),%a0
+	movl	%a0@(L_PROC),%sp@-	| push current proc pointer
 	movl	%d1,%sp@-			| push length
 	movl	%a1,%sp@-			| push addr
 	movl	%d0,%sp@-			| push command
@@ -934,196 +961,12 @@ Ldorte:
  */
 #include <m68k/m68k/proc_subr.s>
 
-	.data
-GLOBAL(curpcb)
-GLOBAL(masterpaddr)		| XXX compatibility (debuggers)
-	.long	0
-
-ASLOCAL(mdpflag)
-	.byte	0		| copy of proc md_flags low byte
-#ifdef __ELF__
-	.align	4
-#else
-	.align	2
-#endif
-
-ASBSS(nullpcb,SIZEOF_PCB)
-
 /*
- * At exit of a process, do a switch for the last time.
- * Switch to a safe stack and PCB, and deallocate the process's resources.
+ * Use common m68k process/lwp switch and context save subroutines.
  */
-ENTRY(switch_exit)
-	movl	%sp@(4),%a0
-	/* save state into garbage pcb */
-	movl	#_ASM_LABEL(nullpcb),_C_LABEL(curpcb)
-	lea	_ASM_LABEL(tmpstk),%sp	| goto a tmp stack
+#define	FPCOPROC	/* XXX: Temporarily required */
+#include <m68k/m68k/switch_subr.s>
 
-	/* Schedule the vmspace and stack to be freed. */
-	movl	%a0,%sp@-			| exit2(p)
-	jbsr	_C_LABEL(exit2)
-	lea	%sp@(4),%sp		| pop args
-
-	jra	_C_LABEL(cpu_switch)
-
-/*
- * When no processes are on the runq, Swtch branches to Idle
- * to wait for something to come ready.
- */
-ASENTRY_NOPROFILE(Idle)
-	stop	#PSL_LOWIPL
-	movw	#PSL_HIGHIPL,%sr
-	movl	_C_LABEL(sched_whichqs),%d0
-	jeq	_ASM_LABEL(Idle)
-	jra	Lsw1
-
-Lbadsw:
-	PANIC("switch")
-	/*NOTREACHED*/
-
-/*
- * cpu_switch()
- *
- * NOTE: On the mc68851 (318/319/330) we attempt to avoid flushing the
- * entire ATC.  The effort involved in selective flushing may not be
- * worth it, maybe we should just flush the whole thing?
- *
- * NOTE 2: With the new VM layout we now no longer know if an inactive
- * user's PTEs have been changed (formerly denoted by the SPTECHG p_flag
- * bit).  For now, we just always flush the full ATC.
- */
-ENTRY(cpu_switch)
-	movl	_C_LABEL(curpcb),%a0	| current pcb
-	movw	%sr,%a0@(PCB_PS)		| save %sr before changing ipl
-#ifdef notyet
-	movl	_C_LABEL(curproc),%sp@-	| remember last proc running
-#endif
-	clrl	_C_LABEL(curproc)
-
-	/*
-	 * Find the highest-priority queue that isn't empty,
-	 * then take the first proc from that queue.
-	 */
-	movw	#PSL_HIGHIPL,%sr		| lock out interrupts
-	movl	_C_LABEL(sched_whichqs),%d0
-	jeq	_ASM_LABEL(Idle)
-Lsw1:
-	movl	%d0,%d1
-	negl	%d0
-	andl	%d1,%d0
-	bfffo	%d0{#0:#32},%d1
-	eorib	#31,%d1
-
-	movl	%d1,%d0
-	lslb	#3,%d1			| convert queue number to index
-	addl	#_C_LABEL(sched_qs),%d1	| locate queue (q)
-	movl	%d1,%a1
-	movl	%a1@(P_FORW),%a0		| p = q->p_forw
-	cmpal	%d1,%a0			| anyone on queue?
-	jeq	Lbadsw			| no, panic
-	movl	%a0@(P_FORW),%a1@(P_FORW)	| q->p_forw = p->p_forw
-	movl	%a0@(P_FORW),%a1		| n = p->p_forw
-	movl	%d1,%a1@(P_BACK)		| n->p_back = q
-	cmpal	%d1,%a1			| anyone left on queue?
-	jne	Lsw2			| yes, skip
-	movl	_C_LABEL(sched_whichqs),%d1
-	bclr	%d0,%d1			| no, clear bit
-	movl	%d1,_C_LABEL(sched_whichqs)
-Lsw2:
-	/* p->p_cpu initialized in fork1() for single-processor */
-	movb	#SONPROC,%a0@(P_STAT)	| p->p_stat = SONPROC
-	movl	%a0,_C_LABEL(curproc)
-	clrl	_C_LABEL(want_resched)
-#ifdef notyet
-	movl	%sp@+,%a1
-	cmpl	%a0,%a1			| switching to same proc?
-	jeq	Lswdone			| yes, skip save and restore
-#endif
-	/*
-	 * Save state of previous process in its pcb.
-	 */
-	movl	_C_LABEL(curpcb),%a1
-	moveml	#0xFCFC,%a1@(PCB_REGS)	| save non-scratch registers
-	movl	%usp,%a2			| grab USP (%a2 has been saved)
-	movl	%a2,%a1@(PCB_USP)		| and save it
-
-	tstl	_C_LABEL(fputype)	| Do we have an FPU?
-	jeq	Lswnofpsave		| No  Then don't attempt save.
-	lea	%a1@(PCB_FPCTX),%a2	| pointer to FP save area
-	fsave	%a2@			| save FP state
-	tstb	%a2@			| null state frame?
-	jeq	Lswnofpsave		| yes, all done
-	fmovem	%fp0-%fp7,%a2@(216)	| save FP general registers
-	fmovem	%fpcr/%fpsr/%fpi,%a2@(312)	| save FP control registers
-Lswnofpsave:
-
-	clrl	%a0@(P_BACK)		| clear back link
-	movb	%a0@(P_MD_FLAGS+3),mdpflag | low byte of p_md.md_flags
-	movl	%a0@(P_ADDR),%a1		| get p_addr
-	movl	%a1,_C_LABEL(curpcb)
-
-	/*
-	 * Activate process's address space.
-	 * XXX Should remember the last USTP value loaded, and call this
-	 * XXX only if it has changed.
-	 */
-	pea	%a0@			| push proc
-	jbsr	_C_LABEL(pmap_activate)	| pmap_activate(p)
-	addql	#4,%sp
-	movl	_C_LABEL(curpcb),%a1	| restore p_addr
-
-	lea	_ASM_LABEL(tmpstk),%sp	| now goto a tmp stack for NMI
-
-	moveml	%a1@(PCB_REGS),#0xFCFC	| and registers
-	movl	%a1@(PCB_USP),%a0
-	movl	%a0,%usp			| and USP
-
-	tstl	_C_LABEL(fputype)	| If we don't have an FPU,
-	jeq	Lnofprest		|  don't try to restore it.
-	lea	%a1@(PCB_FPCTX),%a0	| pointer to FP save area
-	tstb	%a0@			| null state frame?
-	jeq	Lresfprest		| yes, easy
-#if defined(M68040)
-#if defined(M68020) || defined(M68030)
-	cmpl	#MMU_68040,_C_LABEL(mmutype) | 68040?
-	jne	Lresnot040		| no, skip
-#endif
-	clrl	%sp@-			| yes...
-	frestore %sp@+			| ...magic!
-Lresnot040:
-#endif
-	fmovem	%a0@(312),%fpcr/%fpsr/%fpi	| restore FP control registers
-	fmovem	%a0@(216),%fp0-%fp7	| restore FP general registers
-Lresfprest:
-	frestore %a0@			| restore state
-
-Lnofprest:
-	movw	%a1@(PCB_PS),%sr		| no, restore PS
-	moveq	#1,%d0			| return 1 (for alternate returns)
-	rts
-
-/*
- * savectx(pcb)
- * Update pcb, saving current processor state.
- */
-ENTRY(savectx)
-	movl	%sp@(4),%a1
-	movw	%sr,%a1@(PCB_PS)
-	movl	%usp,%a0			| grab USP
-	movl	%a0,%a1@(PCB_USP)		| and save it
-	moveml	#0xFCFC,%a1@(PCB_REGS)	| save non-scratch registers
-
-	tstl	_C_LABEL(fputype)	| Do we have FPU?
-	jeq	Lsvnofpsave		| No?  Then don't save state.
-	lea	%a1@(PCB_FPCTX),%a0	| pointer to FP save area
-	fsave	%a0@			| save FP state
-	tstb	%a0@			| null state frame?
-	jeq	Lsvnofpsave		| yes, all done
-	fmovem	%fp0-%fp7,%a0@(216)	| save FP general registers
-	fmovem	%fpcr/%fpsr/%fpi,%a0@(312)	| save FP control registers
-Lsvnofpsave:
-	moveq	#0,%d0			| return 0
-	rts
 
 #if defined(M68040)
 ENTRY(suline)
@@ -1152,297 +995,6 @@ Lsldone:
 	clrl	%a1@(PCB_ONFAULT) 	| clear fault address
 	rts
 #endif
-
-/*
- * Invalidate entire TLB.
- */
-ENTRY(TBIA)
-_C_LABEL(_TBIA):
-#if defined(M68040)
-	cmpl	#MMU_68040,_C_LABEL(mmutype) | 68040?
-	jne	Lmotommu3		| no, skip
-	.word	0xf518			| yes, pflusha
-	rts
-Lmotommu3:
-#endif
-#if defined(M68K_MMU_MOTOROLA)
-	tstl	_C_LABEL(mmutype)	| HP MMU?
-	jeq	Lhpmmu6			| yes, skip
-	pflusha				| flush entire TLB
-	jpl	Lmc68851a		| 68851 implies no d-cache
-	movl	#DC_CLEAR,%d0
-	movc	%d0,%cacr			| invalidate on-chip d-cache
-Lmc68851a:
-	rts
-Lhpmmu6:
-#endif
-#if defined(M68K_MMU_HP)
-	MMUADDR(%a0)
-	movl	%a0@(MMUTBINVAL),%sp@-	| do not ask me, this
-	addql	#4,%sp			|   is how hpux does it
-#ifdef DEBUG
-	tstl	_ASM_LABEL(fullcflush)
-	jne	_C_LABEL(_DCIA)		| XXX: invalidate entire cache
-#endif
-#endif
-	rts
-
-/*
- * Invalidate any TLB entry for given VA (TB Invalidate Single)
- */
-ENTRY(TBIS)
-#ifdef DEBUG
-	tstl	_ASM_LABEL(fulltflush)	| being conservative?
-	jne	_C_LABEL(_TBIA)		| yes, flush entire TLB
-#endif
-#if defined(M68040)
-	cmpl	#MMU_68040,_C_LABEL(mmutype) | 68040?
-	jne	Lmotommu4		| no, skip
-	movl	%sp@(4),%a0
-	movc	%dfc,%d1
-	moveq	#1,%d0			| user space
-	movc	%d0,%dfc
-	.word	0xf508			| pflush %a0@
-	moveq	#5,%d0			| super space
-	movc	%d0,%dfc
-	.word	0xf508			| pflush %a0@
-	movc	%d1,%dfc
-	rts
-Lmotommu4:
-#endif
-#if defined(M68K_MMU_MOTOROLA)
-	tstl	_C_LABEL(mmutype)	| HP MMU?
-	jeq	Lhpmmu5			| yes, skip
-	movl	%sp@(4),%a0		| get addr to flush
-	jpl	Lmc68851b		| is 68851?
-	pflush	#0,#0,%a0@		| flush address from both sides
-	movl	#DC_CLEAR,%d0
-	movc	%d0,%cacr			| invalidate on-chip data cache
-	rts
-Lmc68851b:
-	pflushs	#0,#0,%a0@		| flush address from both sides
-	rts
-Lhpmmu5:
-#endif
-#if defined(M68K_MMU_HP)
-	movl	%sp@(4),%d0		| VA to invalidate
-	bclr	#0,%d0			| ensure even
-	movl	%d0,%a0
-	movw	%sr,%d1			| go critical
-	movw	#PSL_HIGHIPL,%sr		|   while in purge space
-	moveq	#FC_PURGE,%d0		| change address space
-	movc	%d0,%dfc			|   for destination
-	moveq	#0,%d0			| zero to invalidate?
-	movsl	%d0,%a0@			| hit it
-	moveq	#FC_USERD,%d0		| back to old
-	movc	%d0,%dfc			|   address space
-	movw	%d1,%sr			| restore IPL
-#endif
-	rts
-
-/*
- * Invalidate supervisor side of TLB
- */
-ENTRY(TBIAS)
-#ifdef DEBUG
-	tstl	_ASM_LABEL(fulltflush)	| being conservative?
-	jne	_C_LABEL(_TBIA)		| yes, flush everything
-#endif
-#if defined(M68040)
-	cmpl	#MMU_68040,_C_LABEL(mmutype) | 68040?
-	jne	Lmotommu5		| no, skip
-	.word	0xf518			| yes, pflusha (for now) XXX
-	rts
-Lmotommu5:
-#endif
-#if defined(M68K_MMU_MOTOROLA)
-	tstl	_C_LABEL(mmutype)	| HP MMU?
-	jeq	Lhpmmu7			| yes, skip
-	jpl	Lmc68851c		| 68851?
-	pflush #4,#4			| flush supervisor TLB entries
-	movl	#DC_CLEAR,%d0
-	movc	%d0,%cacr			| invalidate on-chip d-cache
-	rts
-Lmc68851c:
-	pflushs #4,#4			| flush supervisor TLB entries
-	rts
-Lhpmmu7:
-#endif
-#if defined(M68K_MMU_HP)
-	MMUADDR(%a0)
-	movl	#0x8000,%d0		| more
-	movl	%d0,%a0@(MMUTBINVAL)	|   HP magic
-#ifdef DEBUG
-	tstl	_ASM_LABEL(fullcflush)
-	jne	_C_LABEL(_DCIS)		| XXX: invalidate entire sup. cache
-#endif
-#endif
-	rts
-
-/*
- * Invalidate user side of TLB
- */
-ENTRY(TBIAU)
-#ifdef DEBUG
-	tstl	_ASM_LABEL(fulltflush)	| being conservative?
-	jne	_C_LABEL(_TBIA)		| yes, flush everything
-#endif
-#if defined(M68040)
-	cmpl	#MMU_68040,_C_LABEL(mmutype) | 68040?
-	jne	Lmotommu6		| no, skip
-	.word	0xf518			| yes, pflusha (for now) XXX
-	rts
-Lmotommu6:
-#endif
-#if defined(M68K_MMU_MOTOROLA)
-	tstl	_C_LABEL(mmutype)	| HP MMU?
-	jeq	Lhpmmu8			| yes, skip
-	jpl	Lmc68851d		| 68851?
-	pflush	#0,#4			| flush user TLB entries
-	movl	#DC_CLEAR,%d0
-	movc	%d0,%cacr			| invalidate on-chip d-cache
-	rts
-Lmc68851d:
-	pflushs	#0,#4			| flush user TLB entries
-	rts
-Lhpmmu8:
-#endif
-#if defined(M68K_MMU_HP)
-	MMUADDR(%a0)
-	moveq	#0,%d0			| more
-	movl	%d0,%a0@(MMUTBINVAL)	|   HP magic
-#ifdef DEBUG
-	tstl	_ASM_LABEL(fullcflush)
-	jne	_C_LABEL(_DCIU)		| XXX: invalidate entire user cache
-#endif
-#endif
-	rts
-
-/*
- * Invalidate instruction cache
- */
-ENTRY(ICIA)
-#if defined(M68040)
-ENTRY(ICPA)
-	cmpl	#MMU_68040,_C_LABEL(mmutype) | 68040
-	jne	Lmotommu7		| no, skip
-	.word	0xf498			| cinva ic
-	rts
-Lmotommu7:
-#endif
-	movl	#IC_CLEAR,%d0
-	movc	%d0,%cacr			| invalidate i-cache
-	rts
-
-/*
- * Invalidate data cache.
- * HP external cache allows for invalidation of user/supervisor portions.
- * NOTE: we do not flush 68030 on-chip cache as there are no aliasing
- * problems with DC_WA.  The only cases we have to worry about are context
- * switch and TLB changes, both of which are handled "in-line" in resume
- * and TBI*.
- */
-ENTRY(DCIA)
-__DCIA:
-#if defined(M68040)
-	cmpl	#MMU_68040,_C_LABEL(mmutype) | 68040
-	jne	Lmotommu8		| no, skip
-	/* XXX implement */
-	rts
-Lmotommu8:
-#endif
-#if defined(M68K_MMU_HP)
-	tstl	_C_LABEL(ectype)	| got external VAC?
-	jle	Lnocache2		| no, all done
-	MMUADDR(%a0)
-	andl	#~MMU_CEN,%a0@(MMUCMD)	| disable cache in MMU control reg
-	orl	#MMU_CEN,%a0@(MMUCMD)	| reenable cache in MMU control reg
-Lnocache2:
-#endif
-	rts
-
-ENTRY(DCIS)
-_C_LABEL(_DCIS):
-#if defined(M68040)
-	cmpl	#MMU_68040,_C_LABEL(mmutype) | 68040
-	jne	Lmotommu9		| no, skip
-	/* XXX implement */
-	rts
-Lmotommu9:
-#endif
-#if defined(M68K_MMU_HP)
-	tstl	_C_LABEL(ectype)	| got external VAC?
-	jle	Lnocache3		| no, all done
-	MMUADDR(%a0)
-	movl	%a0@(MMUSSTP),%d0		| read the supervisor STP
-	movl	%d0,%a0@(MMUSSTP)		| write it back
-Lnocache3:
-#endif
-	rts
-
-ENTRY(DCIU)
-_C_LABEL(_DCIU):
-#if defined(M68040)
-	cmpl	#MMU_68040,_C_LABEL(mmutype) | 68040
-	jne	LmotommuA		| no, skip
-	/* XXX implement */
-	rts
-LmotommuA:
-#endif
-#if defined(M68K_MMU_HP)
-	tstl	_C_LABEL(ectype)	| got external VAC?
-	jle	Lnocache4		| no, all done
-	MMUADDR(%a0)
-	movl	%a0@(MMUUSTP),%d0		| read the user STP
-	movl	%d0,%a0@(MMUUSTP)		| write it back
-Lnocache4:
-#endif
-	rts
-
-#if defined(M68040)
-ENTRY(ICPL)
-	movl	%sp@(4),%a0		| address
-	.word	0xf488			| cinvl ic,%a0@
-	rts
-ENTRY(ICPP)
-	movl	%sp@(4),%a0		| address
-	.word	0xf490			| cinvp ic,%a0@
-	rts
-ENTRY(DCPL)
-	movl	%sp@(4),%a0		| address
-	.word	0xf448			| cinvl dc,%a0@
-	rts
-ENTRY(DCPP)
-	movl	%sp@(4),%a0		| address
-	.word	0xf450			| cinvp dc,%a0@
-	rts
-ENTRY(DCPA)
-	.word	0xf458			| cinva dc
-	rts
-ENTRY(DCFL)
-	movl	%sp@(4),%a0		| address
-	.word	0xf468			| cpushl dc,%a0@
-	rts
-ENTRY(DCFP)
-	movl	%sp@(4),%a0		| address
-	.word	0xf470			| cpushp dc,%a0@
-	rts
-#endif
-
-ENTRY(PCIA)
-#if defined(M68040)
-ENTRY(DCFA)
-	cmpl	#MMU_68040,_C_LABEL(mmutype)	| 68040
-	jne	LmotommuB		| no, skip
-	.word	0xf478			| cpusha dc
-	rts
-LmotommuB:
-#endif
-#if defined(M68K_MMU_MOTOROLA)
-	movl	#DC_CLEAR,%d0
-	movc	%d0,%cacr		| invalidate on-chip d-cache
-#endif
-	rts
 
 ENTRY_NOPROFILE(getsfc)
 	movc	%sfc,%d0
@@ -1592,7 +1144,7 @@ GLOBAL(want_resched)
 	.long	0
 
 GLOBAL(proc0paddr)
-	.long	0		| KVA of proc0 u-area
+	.long	0		| KVA of lwp0 u-area
 #ifdef DEBUG
 	.globl	fulltflush, fullcflush
 fulltflush:

@@ -1,4 +1,4 @@
-/*	$NetBSD: cs4280.c,v 1.19 2001/11/15 09:48:11 lukem Exp $	*/
+/*	$NetBSD: cs4280.c,v 1.26.4.1 2004/09/22 20:58:18 jmc Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Tatoku Ogaito.  All rights reserved.
@@ -52,7 +52,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cs4280.c,v 1.19 2001/11/15 09:48:11 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cs4280.c,v 1.26.4.1 2004/09/22 20:58:18 jmc Exp $");
 
 #include "midi.h"
 
@@ -102,7 +102,7 @@ int  cs4280_trigger_output(void *, void *, void *, int, void (*)(void *),
 int  cs4280_trigger_input(void *, void *, void *, int, void (*)(void *),
                           void *, struct audio_params *);
 
-void cs4280_reset_codec(void *);
+int cs4280_reset_codec(void *);
 
 /* For PowerHook */
 void cs4280_power(int, void *);
@@ -170,9 +170,8 @@ struct midi_hw_if cs4280_midi_hw_if = {
 };
 #endif
 
-struct cfattach clcs_ca = {
-	sizeof(struct cs428x_softc), cs4280_match, cs4280_attach
-};
+CFATTACH_DECL(clcs, sizeof(struct cs428x_softc),
+    cs4280_match, cs4280_attach, NULL, NULL);
 
 struct audio_device cs4280_device = {
 	"CS4280",
@@ -217,20 +216,23 @@ cs4280_attach(parent, self, aux)
 	u_int32_t mem;
 	int pci_pwrmgmt_cap_reg, pci_pwrmgmt_csr_reg;
 
+	aprint_naive(": Audio controller\n");
+
 	pci_devinfo(pa->pa_id, pa->pa_class, 0, devinfo);
-	printf(": %s (rev. 0x%02x)\n", devinfo, PCI_REVISION(pa->pa_class));
+	aprint_normal(": %s (rev. 0x%02x)\n", devinfo,
+	    PCI_REVISION(pa->pa_class));
 
 	/* Map I/O register */
 	if (pci_mapreg_map(pa, PCI_BA0, 
 	    PCI_MAPREG_TYPE_MEM|PCI_MAPREG_MEM_TYPE_32BIT, 0,
 	    &sc->ba0t, &sc->ba0h, NULL, NULL)) {
-		printf("%s: can't map BA0 space\n", sc->sc_dev.dv_xname);
+		aprint_error("%s: can't map BA0 space\n", sc->sc_dev.dv_xname);
 		return;
 	}
 	if (pci_mapreg_map(pa, PCI_BA1,
 	    PCI_MAPREG_TYPE_MEM|PCI_MAPREG_MEM_TYPE_32BIT, 0,
 	    &sc->ba1t, &sc->ba1h, NULL, NULL)) {
-		printf("%s: can't map BA1 space\n", sc->sc_dev.dv_xname);
+		aprint_error("%s: can't map BA1 space\n", sc->sc_dev.dv_xname);
 		return;
 	}
 
@@ -239,7 +241,7 @@ cs4280_attach(parent, self, aux)
 	/* Check and set Power State */
 	if (pci_get_capability(pa->pa_pc, pa->pa_tag, PCI_CAP_PWRMGMT,
 	    &pci_pwrmgmt_cap_reg, 0)) {
-		pci_pwrmgmt_csr_reg = pci_pwrmgmt_cap_reg + 4;
+		pci_pwrmgmt_csr_reg = pci_pwrmgmt_cap_reg + PCI_PMCSR;
 		reg = pci_conf_read(pa->pa_pc, pa->pa_tag,
 		    pci_pwrmgmt_csr_reg);
 		DPRINTF(("%s: Power State is %d\n", 
@@ -266,20 +268,22 @@ cs4280_attach(parent, self, aux)
 	
 	/* Map and establish the interrupt. */
 	if (pci_intr_map(pa, &ih)) {
-		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
+		aprint_error("%s: couldn't map interrupt\n",
+		    sc->sc_dev.dv_xname);
 		return;
 	}
 	intrstr = pci_intr_string(pc, ih);
 
 	sc->sc_ih = pci_intr_establish(pc, ih, IPL_AUDIO, cs4280_intr, sc);
 	if (sc->sc_ih == NULL) {
-		printf("%s: couldn't establish interrupt",sc->sc_dev.dv_xname);
+		aprint_error("%s: couldn't establish interrupt",
+		    sc->sc_dev.dv_xname);
 		if (intrstr != NULL)
-			printf(" at %s", intrstr);
-		printf("\n");
+			aprint_normal(" at %s", intrstr);
+		aprint_normal("\n");
 		return;
 	}
-	printf("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
+	aprint_normal("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
 
 	/* Initialization */
 	if(cs4280_init(sc, 1) != 0)
@@ -301,7 +305,7 @@ cs4280_attach(parent, self, aux)
 	sc->host_if.write  = cs428x_write_codec;
 	sc->host_if.reset  = cs4280_reset_codec;
 	if (ac97_attach(&sc->host_if) != 0) {
-		printf("%s: ac97_attach failed\n", sc->sc_dev.dv_xname);
+		aprint_error("%s: ac97_attach failed\n", sc->sc_dev.dv_xname);
 		return;
 	}
 
@@ -339,9 +343,9 @@ cs4280_intr(p)
 	/*
 	 * XXX
 	 *
-	 * Since CS4280 has only 4kB dma buffer and
+	 * Since CS4280 has only 4kB DMA buffer and
 	 * interrupt occurs every 2kB block, I create dummy buffer
-	 * which returns to audio driver and actual dma buffer
+	 * which returns to audio driver and actual DMA buffer
 	 * using in DMA transfer.
 	 *
 	 *
@@ -352,8 +356,8 @@ cs4280_intr(p)
 	 *	|	|	|	|	|	| <- call audio_intp every
 	 *						     sc->sc_[pr]_count time.
 	 *
-	 *  actual dma buffer is pointed by KERNADDR
-	 *	 <-> dma buffer size = 4kB
+	 *  actual DMA buffer is pointed by KERNADDR
+	 *	 <-> DMA buffer size = 4kB
 	 *	|= =|
 	 *
 	 *
@@ -733,7 +737,7 @@ cs4280_trigger_output(addr, start, end, blksize, intr, arg, param)
 	}
 	if (DMAADDR(p) % sc->dma_align != 0 ) {
 		printf("cs4280_trigger_output: DMAADDR(p)=0x%lx does not start"
-		       "4kB align\n", DMAADDR(p));
+		       "4kB align\n", (ulong)DMAADDR(p));
 		return EINVAL;
 	}
 
@@ -753,7 +757,7 @@ cs4280_trigger_output(addr, start, end, blksize, intr, arg, param)
 		memcpy(sc->sc_pbuf, start, sc->hw_blocksize);
 	}
 
-	/* initiate playback dma */
+	/* initiate playback DMA */
 	BA1WRITE4(sc, CS4280_PBA, DMAADDR(p));
 
 	/* set PFIE */
@@ -817,7 +821,7 @@ cs4280_trigger_input(addr, start, end, blksize, intr, arg, param)
 	}
 	if (DMAADDR(p) % sc->dma_align != 0) {
 		printf("cs4280_trigger_input: DMAADDR(p)=0x%lx does not start"
-		       "4kB align\n", DMAADDR(p));
+		       "4kB align\n", (ulong)DMAADDR(p));
 		return EINVAL;
 	}
 
@@ -829,7 +833,7 @@ cs4280_trigger_input(addr, start, end, blksize, intr, arg, param)
 	sc->sc_ri = 0;
 	sc->sc_rn = sc->sc_rs;
 
-	/* initiate capture dma */
+	/* initiate capture DMA */
 	BA1WRITE4(sc, CS4280_CBA, DMAADDR(p));
 
 	/* setup format information for internal converter */
@@ -937,7 +941,7 @@ cs4280_power(why, v)
 }
 
 /* control AC97 codec */
-void
+int
 cs4280_reset_codec(void *addr)
 {
 	struct cs428x_softc *sc;
@@ -968,9 +972,10 @@ cs4280_reset_codec(void *addr)
 		delay(1000);
 		if (++n > 1000) {
 			printf("reset_codec: AC97 inputs slot ready timeout\n");
-			return;
+			return ETIMEDOUT;
 		}
 	}
+	return 0;
 }
 
 

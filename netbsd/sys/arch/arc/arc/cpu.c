@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.c,v 1.9 2000/06/29 08:34:09 mrg Exp $	*/
+/*	$NetBSD: cpu.c,v 1.12 2003/07/15 00:04:41 lukem Exp $	*/
 /*	$OpenBSD: cpu.c,v 1.8 1997/04/19 17:19:41 pefo Exp $ */
 
 /*
@@ -33,6 +33,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.12 2003/07/15 00:04:41 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -49,9 +52,8 @@
 static int	cpumatch(struct device *, struct cfdata *, void *);
 static void	cpuattach(struct device *, struct device *, void *);
 
-struct cfattach cpu_ca = {
-	sizeof(struct device), cpumatch, cpuattach
-};
+CFATTACH_DECL(cpu, sizeof(struct device),
+    cpumatch, cpuattach, NULL, NULL);
 extern struct cfdriver cpu_cd;
 
 static int

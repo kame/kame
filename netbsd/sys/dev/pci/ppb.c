@@ -1,4 +1,4 @@
-/*	$NetBSD: ppb.c,v 1.21 2002/05/16 01:01:30 thorpej Exp $	*/
+/*	$NetBSD: ppb.c,v 1.27 2003/12/09 19:51:39 briggs Exp $	*/
 
 /*
  * Copyright (c) 1996, 1998 Christopher G. Demetriou.  All rights reserved.
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ppb.c,v 1.21 2002/05/16 01:01:30 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ppb.c,v 1.27 2003/12/09 19:51:39 briggs Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,9 +51,8 @@ struct ppb_softc {
 int	ppbmatch __P((struct device *, struct cfdata *, void *));
 void	ppbattach __P((struct device *, struct device *, void *));
 
-struct cfattach ppb_ca = {
-	sizeof(struct ppb_softc), ppbmatch, ppbattach
-};
+CFATTACH_DECL(ppb, sizeof(struct ppb_softc),
+    ppbmatch, ppbattach, NULL, NULL);
 
 int	ppbprint __P((void *, const char *pnp));
 
@@ -90,7 +89,9 @@ ppbattach(parent, self, aux)
 	char devinfo[256];
 
 	pci_devinfo(pa->pa_id, pa->pa_class, 0, devinfo);
-	printf(": %s (rev. 0x%02x)\n", devinfo, PCI_REVISION(pa->pa_class));
+	aprint_normal(": %s (rev. 0x%02x)\n", devinfo,
+	    PCI_REVISION(pa->pa_class));
+	aprint_naive("\n");
 
 	sc->sc_pc = pc;
 	sc->sc_tag = pa->pa_tag;
@@ -98,7 +99,7 @@ ppbattach(parent, self, aux)
 	busdata = pci_conf_read(pc, pa->pa_tag, PPB_REG_BUSINFO);
 
 	if (PPB_BUSINFO_SECONDARY(busdata) == 0) {
-		printf("%s: not configured by system firmware\n",
+		aprint_normal("%s: not configured by system firmware\n",
 		    self->dv_xname);
 		return;
 	}
@@ -125,6 +126,7 @@ ppbattach(parent, self, aux)
 	pba.pba_iot = pa->pa_iot;
 	pba.pba_memt = pa->pa_memt;
 	pba.pba_dmat = pa->pa_dmat;
+	pba.pba_dmat64 = pa->pa_dmat64;
 	pba.pba_pc = pc;
 	pba.pba_flags = pa->pa_flags & ~PCI_FLAGS_MRM_OKAY;
 	pba.pba_bus = PPB_BUSINFO_SECONDARY(busdata);
@@ -144,7 +146,7 @@ ppbprint(aux, pnp)
 
 	/* only PCIs can attach to PPBs; easy. */
 	if (pnp)
-		printf("pci at %s", pnp);
-	printf(" bus %d", pba->pba_bus);
+		aprint_normal("pci at %s", pnp);
+	aprint_normal(" bus %d", pba->pba_bus);
 	return (UNCONF);
 }

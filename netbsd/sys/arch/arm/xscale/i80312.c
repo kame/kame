@@ -1,7 +1,7 @@
-/*	$NetBSD: i80312.c,v 1.9 2002/05/16 01:01:33 thorpej Exp $	*/
+/*	$NetBSD: i80312.c,v 1.16 2003/10/06 16:06:05 thorpej Exp $	*/
 
 /*
- * Copyright (c) 2001 Wasabi Systems, Inc.
+ * Copyright (c) 2001, 2002 Wasabi Systems, Inc.
  * All rights reserved.
  *
  * Written by Jason R. Thorpe for Wasabi Systems, Inc.
@@ -39,10 +39,14 @@
  * Autoconfiguration support for the Intel i80312 Companion I/O chip.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: i80312.c,v 1.16 2003/10/06 16:06:05 thorpej Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
 
+#define	_ARM32_BUS_DMA_PRIVATE
 #include <machine/bus.h>
 
 #include <arm/xscale/i80312reg.h>
@@ -63,7 +67,25 @@ struct bus_space i80312_bs_tag;
  */
 struct i80312_softc *i80312_softc;
 
-int	i80312_pcibus_print(void *, const char *);
+static void i80312_pci_dma_init(struct i80312_softc *);
+static void i80312_local_dma_init(struct i80312_softc *);
+
+static int i80312_iopxs_print(void *, const char *);
+static int i80312_pcibus_print(void *, const char *);
+
+/* Built-in devices. */
+static const struct iopxs_device {
+	const char *id_name;
+	bus_addr_t id_offset;
+	bus_size_t id_size;
+} iopxs_devices[] = {
+/*	{ "iopaau",	I80312_AAU_BASE,	I80312_AAU_SIZE }, */
+/*	{ "iopdma",	I80312_DMA_BASE0,	I80312_DMA_SIZE }, */
+/*	{ "iopdma",	I80312_DMA_BASE1,	I80312_DMA_SIZE }, */
+	{ "iopiic",	I80312_IIC_BASE,	I80312_IIC_SIZE },
+/*	{ "iopmu",	I80312_MSG_BASE,	I80312_MU_SIZE }, */
+	{ NULL,		0,			0 }
+};
 
 /*
  * i80312_attach:
@@ -74,6 +96,8 @@ void
 i80312_attach(struct i80312_softc *sc)
 {
 	struct pcibus_attach_args pba;
+	const struct iopxs_device *id;
+	struct iopxs_attach_args ia;
 	uint32_t atucr;
 	pcireg_t preg;
 
@@ -85,17 +109,17 @@ i80312_attach(struct i80312_softc *sc)
 
 	if (bus_space_subregion(sc->sc_st, sc->sc_sh, I80312_PPB_BASE,
 	    I80312_PPB_SIZE, &sc->sc_ppb_sh))
-		panic("%s: unable to subregion PPB registers\n",
+		panic("%s: unable to subregion PPB registers",
 		    sc->sc_dev.dv_xname);
 
 	if (bus_space_subregion(sc->sc_st, sc->sc_sh, I80312_ATU_BASE,
 	    I80312_ATU_SIZE, &sc->sc_atu_sh))
-		panic("%s: unable to subregion ATU registers\n",
+		panic("%s: unable to subregion ATU registers",
 		    sc->sc_dev.dv_xname);
 
 	if (bus_space_subregion(sc->sc_st, sc->sc_sh, I80312_INTC_BASE,
 	    I80312_INTC_SIZE, &sc->sc_intc_sh))
-		panic("%s: unable to subregion INTC registers\n",
+		panic("%s: unable to subregion INTC registers",
 		    sc->sc_dev.dv_xname);
 
 	/* We expect the Memory Controller to be already sliced off. */
@@ -251,13 +275,30 @@ i80312_attach(struct i80312_softc *sc)
 		    (1 << PCI_BRIDGE_BUS_SUBORDINATE_SHIFT));
 	}
 
-	/*
-	 * Initialize the bus space and DMA tags and the PCI chipset tag.
-	 */
+	/* Initialize the bus space tags. */
 	i80312_io_bs_init(&sc->sc_pci_iot, sc);
 	i80312_mem_bs_init(&sc->sc_pci_memt, sc);
-	i80312_pci_dma_init(&sc->sc_pci_dmat, sc);
+
+	/* Initialize the PCI chipset tag. */
 	i80312_pci_init(&sc->sc_pci_chipset, sc);
+
+	/* Initialize the DMA tags. */
+	i80312_pci_dma_init(sc);
+	i80312_local_dma_init(sc);
+
+	/*
+	 * Attach all the IOP built-ins.
+	 */
+	for (id = iopxs_devices; id->id_name != NULL; id++) {
+		ia.ia_name = id->id_name;
+		ia.ia_st = sc->sc_st;
+		ia.ia_sh = sc->sc_sh;
+		ia.ia_dmat = &sc->sc_local_dmat;
+		ia.ia_offset = id->id_offset;
+		ia.ia_size = id->id_size;
+
+		(void) config_found(&sc->sc_dev, &ia, i80312_iopxs_print);
+	}
 
 	/*
 	 * Attach the PCI bus.
@@ -271,6 +312,7 @@ i80312_attach(struct i80312_softc *sc)
 	pba.pba_iot = &sc->sc_pci_iot;
 	pba.pba_memt = &sc->sc_pci_memt;
 	pba.pba_dmat = &sc->sc_pci_dmat;
+	pba.pba_dmat64 = NULL;
 	pba.pba_pc = &sc->sc_pci_chipset;
 	pba.pba_bus = PPB_BUSINFO_SECONDARY(preg);
 	pba.pba_bridgetag = NULL;
@@ -283,20 +325,98 @@ i80312_attach(struct i80312_softc *sc)
 }
 
 /*
+ * i80312_iopxs_print:
+ *
+ *	Autoconfiguration cfprint routine when attaching
+ *	to the "iopxs" device.
+ */
+static int
+i80312_iopxs_print(void *aux, const char *pnp)
+{
+
+	return (QUIET);
+}
+
+/*
  * i80312_pcibus_print:
  *
  *	Autoconfiguration cfprint routine when attaching
  *	to the "pcibus" attribute.
  */
-int
+static int
 i80312_pcibus_print(void *aux, const char *pnp)
 {
 	struct pcibus_attach_args *pba = aux;
 
 	if (pnp)
-		printf("%s at %s", pba->pba_busname, pnp);
+		aprint_normal("%s at %s", pba->pba_busname, pnp);
 
-	printf(" bus %d", pba->pba_bus);
+	aprint_normal(" bus %d", pba->pba_bus);
 
 	return (UNCONF);
+}
+
+/*
+ * i80312_pci_dma_init:
+ *
+ *	Initialize the PCI DMA tag.
+ */
+static void
+i80312_pci_dma_init(struct i80312_softc *sc)
+{
+	bus_dma_tag_t dmat = &sc->sc_pci_dmat;
+	struct arm32_dma_range *dr = &sc->sc_pci_dma_range;
+ 
+	dr->dr_sysbase = sc->sc_sin_xlate;
+	dr->dr_busbase = sc->sc_sin_base;
+	dr->dr_len = sc->sc_sin_size; 
+
+	dmat->_ranges = dr;
+	dmat->_nranges = 1;
+
+	dmat->_dmamap_create = _bus_dmamap_create;
+	dmat->_dmamap_destroy = _bus_dmamap_destroy;
+	dmat->_dmamap_load = _bus_dmamap_load;
+	dmat->_dmamap_load_mbuf = _bus_dmamap_load_mbuf;
+	dmat->_dmamap_load_uio = _bus_dmamap_load_uio;
+	dmat->_dmamap_load_raw = _bus_dmamap_load_raw;
+	dmat->_dmamap_unload = _bus_dmamap_unload;
+	dmat->_dmamap_sync_pre = _bus_dmamap_sync;
+	dmat->_dmamap_sync_post = NULL;
+
+	dmat->_dmamem_alloc = _bus_dmamem_alloc;
+	dmat->_dmamem_free = _bus_dmamem_free;
+	dmat->_dmamem_map = _bus_dmamem_map;
+	dmat->_dmamem_unmap = _bus_dmamem_unmap;
+	dmat->_dmamem_mmap = _bus_dmamem_mmap;
+}
+
+/*
+ * i80312_local_dma_init:
+ *
+ *	Initialize the local DMA tag.
+ */
+static void
+i80312_local_dma_init(struct i80312_softc *sc)
+{
+	bus_dma_tag_t dmat = &sc->sc_local_dmat;
+ 
+	dmat->_ranges = NULL;
+	dmat->_nranges = 0;
+
+	dmat->_dmamap_create = _bus_dmamap_create;
+	dmat->_dmamap_destroy = _bus_dmamap_destroy;
+	dmat->_dmamap_load = _bus_dmamap_load;
+	dmat->_dmamap_load_mbuf = _bus_dmamap_load_mbuf;
+	dmat->_dmamap_load_uio = _bus_dmamap_load_uio;
+	dmat->_dmamap_load_raw = _bus_dmamap_load_raw;
+	dmat->_dmamap_unload = _bus_dmamap_unload;
+	dmat->_dmamap_sync_pre = _bus_dmamap_sync;
+	dmat->_dmamap_sync_post = NULL;
+
+	dmat->_dmamem_alloc = _bus_dmamem_alloc;
+	dmat->_dmamem_free = _bus_dmamem_free;
+	dmat->_dmamem_map = _bus_dmamem_map;
+	dmat->_dmamem_unmap = _bus_dmamem_unmap;
+	dmat->_dmamem_mmap = _bus_dmamem_mmap;
 }

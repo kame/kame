@@ -1,4 +1,4 @@
-/*	$NetBSD: hd64465pcmcia.c,v 1.5 2002/05/09 12:37:59 uch Exp $	*/
+/*	$NetBSD: hd64465pcmcia.c,v 1.14 2003/11/03 20:32:17 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 2001, 2002 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hd64465pcmcia.c,v 1.14 2003/11/03 20:32:17 jdolecek Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -180,10 +183,8 @@ STATIC void hd64465pcmcia_attach(struct device *, struct device *, void *);
 STATIC int hd64465pcmcia_print(void *, const char *);
 STATIC int hd64465pcmcia_submatch(struct device *, struct cfdata *, void *);
 
-struct cfattach hd64465pcmcia_ca = {
-	sizeof(struct hd64465pcmcia_softc), hd64465pcmcia_match,
-	hd64465pcmcia_attach
-};
+CFATTACH_DECL(hd64465pcmcia, sizeof(struct hd64465pcmcia_softc),
+    hd64465pcmcia_match, hd64465pcmcia_attach, NULL, NULL);
 
 STATIC void hd64465pcmcia_attach_channel(struct hd64465pcmcia_softc *, int);
 /* hot plug */
@@ -225,7 +226,7 @@ hd64465pcmcia_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_area5 = __sh_hd64465_map_2page(0x14000000); /* area 5 */
 	sc->sc_area6 = __sh_hd64465_map_2page(0x18000000); /* area 6 */
 
-	if (sc->sc_area5 == NULL || sc->sc_area6 == NULL) {
+	if (sc->sc_area5 == 0 || sc->sc_area6 == 0) {
 		printf("%s: can't map memory.\n", sc->sc_dev.dv_xname);
 		if (sc->sc_area5)
 			uvm_km_free(kernel_map, sc->sc_area5, 0x03000000);
@@ -282,7 +283,7 @@ hd64465pcmcia_event_thread(void *arg)
 				break;
 			}
 			s = splhigh();
-			SIMPLEQ_REMOVE_HEAD(&sc->sc_event_head, pe, pe_link);
+			SIMPLEQ_REMOVE_HEAD(&sc->sc_event_head, pe_link);
 			pe->__queued = 0;
 		}
 		splx(s);
@@ -295,7 +296,7 @@ hd64465pcmcia_print(void *arg, const char *pnp)
 {
 
 	if (pnp)
-		printf("pcmcia at %s", pnp);
+		aprint_normal("pcmcia at %s", pnp);
 
 	return (UNCONF);
 }
@@ -320,7 +321,7 @@ hd64465pcmcia_submatch(struct device *parent, struct cfdata *cf, void *aux)
 	}
 	paa->pct = (pcmcia_chipset_tag_t)&hd64465pcmcia_functions;
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 void
@@ -798,7 +799,7 @@ __sh_hd64465_map_2page(paddr_t pa)
 
 	/* allocate kernel virtual */
 	v = va = uvm_km_valloc(kernel_map, 0x03000000);
-	if (va == NULL) {
+	if (va == 0) {
 		PRINTF("can't allocate virtual for paddr 0x%08x\n",
 		    (unsigned)pa);
 
@@ -832,8 +833,8 @@ __sh_hd64465_map(vaddr_t va, paddr_t pa, size_t sz, u_int32_t flags)
 		KDASSERT(pte);
 		*pte |= flags;  /* PTEA PCMCIA assistant bit */
 		sh_tlb_update(0, va, *pte);
-		pa += NBPG;
-		va += NBPG;
+		pa += PAGE_SIZE;
+		va += PAGE_SIZE;
 	}
 
 	return (0);

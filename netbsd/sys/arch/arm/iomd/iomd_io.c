@@ -1,4 +1,4 @@
-/*	$NetBSD: iomd_io.c,v 1.1 2001/10/05 22:27:41 reinoud Exp $	*/
+/*	$NetBSD: iomd_io.c,v 1.3 2003/07/15 00:24:45 lukem Exp $	*/
 
 /*
  * Copyright (c) 1997 Mark Brinicombe.
@@ -36,6 +36,9 @@
 /*
  * bus_space I/O functions for iomd
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: iomd_io.c,v 1.3 2003/07/15 00:24:45 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -154,7 +157,7 @@ iomd_bs_alloc(t, rstart, rend, size, alignment, boundary, cacheable,
 	bus_addr_t *bpap;
 	bus_space_handle_t *bshp;
 {
-	panic("iomd_alloc(): Help!\n");
+	panic("iomd_alloc(): Help!");
 }
 
 
@@ -176,7 +179,7 @@ iomd_bs_free(t, bsh, size)
 	bus_size_t size;
 {
 
-	panic("iomd_free(): Help!\n");
+	panic("iomd_free(): Help!");
 	/* iomd_unmap() does all that we need to do. */
 /*	iomd_unmap(t, bsh, size);*/
 }

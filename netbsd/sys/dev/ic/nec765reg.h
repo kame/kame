@@ -1,4 +1,4 @@
-/*	$NetBSD: nec765reg.h,v 1.4 1995/10/20 00:02:20 pk Exp $	*/
+/*	$NetBSD: nec765reg.h,v 1.6 2003/08/07 16:31:02 agc Exp $	*/
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -43,7 +39,7 @@
 #define NE7_DAB	0x01	/* Diskette drive A is seeking, thus busy */
 #define NE7_DBB	0x02	/* Diskette drive B is seeking, thus busy */
 #define NE7_CB	0x10	/* Diskette Controller Busy */
-#define NE7_NDM	0x20	/* Diskette Controller in Non Dma Mode */
+#define NE7_NDM	0x20	/* Diskette Controller in Non DMA Mode */
 #define NE7_DIO	0x40	/* Diskette Controller Data register I/O */
 #define NE7_RQM	0x80	/* Diskette Controller ReQuest for Master */
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: types.h,v 1.4 2002/02/28 03:17:25 simonb Exp $	*/
+/*	$NetBSD: types.h,v 1.11 2004/01/18 18:23:19 martin Exp $	*/
 
 /*
  * Copyright (c) 1990 The Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -39,6 +35,7 @@
 #define	_ARM_TYPES_H_
 
 #include <sys/cdefs.h>
+#include <sys/featuretest.h>
 #include <arm/int_types.h>
 
 #if defined(_KERNEL)
@@ -48,7 +45,7 @@ typedef struct label_t {	/* Used by setjmp & longjmp */
 #endif
          
 /* NB: This should probably be if defined(_KERNEL) */
-#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 typedef	unsigned long	vm_offset_t;
 typedef	unsigned long	vm_size_t;
 
@@ -58,8 +55,22 @@ typedef vm_offset_t	vaddr_t;
 typedef vm_size_t	vsize_t;
 #endif
 
+typedef unsigned long	pmc_evid_t;
+#define PMC_INVALID_EVID	(-1)
+typedef unsigned long	pmc_ctr_t;
+
 typedef int		register_t;
 
+typedef	__volatile int		__cpu_simple_lock_t;
+
+#define	__SIMPLELOCK_LOCKED	1
+#define	__SIMPLELOCK_UNLOCKED	0
+
+#define	__HAVE_SYSCALL_INTERN
 #define	__HAVE_MINIMAL_EMUL
+
+#if defined(_KERNEL)
+#define	__HAVE_RAS
+#endif
 
 #endif	/* _ARM_TYPES_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.7 2001/11/30 17:52:34 fredette Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.10 2003/04/02 07:53:57 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -46,16 +46,21 @@
  */
 
 /*
+ * The Sun2 has 2K pages.  Override PAGE_* to be compile-time constants.
+ */
+#define	PAGE_SHIFT	11
+#define	PAGE_SIZE	(1 << PAGE_SHIFT)
+#define	PAGE_MASK	(PAGE_SIZE - 1)
+
+/*
  * We definitely need a small pager map.
  */
 #undef	PAGER_MAP_SIZE
 #define	PAGER_MAP_SIZE (1 * 1024 * 1024)
 
 /*
- * USRTEXT is the start of the user text/data space, while
  * USRSTACK is the top (end) of the user stack.
  */
-#define	USRTEXT 	NBPG		/* Start of user text */
 #define	USRSTACK	0x1000000	/* High end of user stack */
 
 /*
@@ -109,7 +114,7 @@
 #define VM_MAX_KERNEL_ADDRESS	((vaddr_t)KERN_END)
 
 /* virtual sizes (bytes) for various kernel submaps */
-#define VM_PHYS_SIZE		(USRIOSIZE*NBPG)
+#define VM_PHYS_SIZE		(USRIOSIZE*PAGE_SIZE)
 
 #define VM_PHYSSEG_STRAT	VM_PSTRAT_BSEARCH
 #define VM_PHYSSEG_NOADD	/* can't add RAM after vm_mem_init */

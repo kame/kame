@@ -3,7 +3,7 @@
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Martin Husemann <martin@netbsd.org>.
+ * by Martin Husemann <martin@NetBSD.org>.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: daic.c,v 1.12 2002/04/14 12:24:26 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: daic.c,v 1.18 2004/02/24 15:22:01 wiz Exp $");
 
 /*
  * daic.c: MI driver for Diehl active ISDN cards (S, SX, SXn, SCOM, QUADRO)
@@ -68,7 +68,7 @@ __KERNEL_RCSID(0, "$NetBSD: daic.c,v 1.12 2002/04/14 12:24:26 martin Exp $");
 #ifdef NetBSD1_3
 #if NetBSD1_3 < 2
 /* the device is MI, only the attach struct is in the bus
-   dependend frontend. And only on old versions... */
+   dependent frontend. And only on old versions... */
 struct cfdriver daic_cd = {
 	NULL, "daic", DV_DULL
 };
@@ -125,7 +125,7 @@ static u_int8_t parm_none[] = { 0 };
 
 /* assign request for the global d-channel instance */
 static u_int8_t parm_global_assign[] = {
-/*	BC	len	cap	rate	a-law	*/
+/*	BC	len	cap	rate	A-law	*/
 	0x04,	0x03,	0x80,	0x90,	0xa3,	/* 64k speech */
 	0x04,	0x02,	0x88,	0x90,		/* 64k data */
 	0x04,	0x03,	0x89,	0x90,	0xa3,	/* restricted digital info */
@@ -700,8 +700,8 @@ daic_register_port(struct daic_softc *sc, int port)
 	else
 		strcpy(devname, sc->sc_dev.dv_xname);
 	sprintf(cardname, "EICON.Diehl %s", cardtypename(sc->sc_cardtype));
-	l3drv = isdn_attach_bri(
-	    devname, cardname, &sc->sc_port[port], &daic_l3_functions);
+	l3drv = isdn_attach_isdnif(
+	    devname, cardname, &sc->sc_port[port], &daic_l3_functions, 2);
 	sc->sc_port[port].du_l3 = l3drv;
 
 	/* initialize linktabs for this port */
@@ -714,7 +714,7 @@ daic_register_port(struct daic_softc *sc, int port)
 	}
 	TAILQ_INIT(&sc->sc_outcalls[port]);
 
-	isdn_bri_ready(l3drv->bri);
+	isdn_isdnif_ready(l3drv->isdnif);
 }
 
 /*---------------------------------------------------------------------------*
@@ -782,7 +782,7 @@ daic_assign(
 	struct daic_softc *sc,	/* our state and port no */
 	int port,
 	u_int classid,		/* Diehl calls this "global instance id" */
-	bus_size_t parmsize, 	/* sizeof paramter arra */
+	bus_size_t parmsize, 	/* sizeof parameter arra */
 	const u_int8_t *parms)	/* task instance parameters */
 {
 	static char wchan[] = "daic assign";
@@ -1018,7 +1018,7 @@ daic_connect_request(struct call_desc *cd)
 	id = daic_assign(sc, port, DAIC_GLOBALID_DCHAN, p - parms, parms);
 
 	/* map it to the call descriptor id */
-	assoc = malloc(sizeof(struct outcallentry), 0, M_DEVBUF);
+	assoc = malloc(sizeof(struct outcallentry), M_DEVBUF, 0);
 	assoc->cdid = cd->cdid;
 	assoc->dchan_id = id;
 	x = splnet();

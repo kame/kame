@@ -1,4 +1,4 @@
-/*	$NetBSD: scsirom.c,v 1.6 2000/01/16 14:20:57 minoura Exp $	*/
+/*	$NetBSD: scsirom.c,v 1.10 2003/07/15 01:44:52 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999 NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * Used to probe the board.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: scsirom.c,v 1.10 2003/07/15 01:44:52 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -69,9 +72,8 @@ static int scsirom_find __P((struct device *, struct intio_attach_args *));
 static int scsirom_match __P((struct device *, struct cfdata *, void *));
 static void scsirom_attach __P((struct device *, struct device *, void *));
 
-struct cfattach scsirom_ca = {
-	sizeof(struct scsirom_softc), scsirom_match, scsirom_attach
-};
+CFATTACH_DECL(scsirom, sizeof(struct scsirom_softc),
+    scsirom_match, scsirom_attach, NULL, NULL);
 
 static int
 scsirom_find (parent, ia)

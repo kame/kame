@@ -1,4 +1,4 @@
-/* $NetBSD: tcdsreg.h,v 1.1 2000/07/04 02:22:20 nisimura Exp $ */
+/* $NetBSD: tcdsreg.h,v 1.4 2004/02/24 15:16:05 wiz Exp $ */
 
 /*
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
@@ -156,11 +156,11 @@ void tcds_scsi_reset __P((int));
 #define SCSI_CIR_xxx0		0x00200000 /* RESERVED */
 #define SCSI_CIR_xxx1		0x00100000 /* RESERVED */
 #else
-#define SCSI_CIR_PREF1		0x00200000 /* 53C94 prefetch interupt */
-#define SCSI_CIR_PREF0		0x00100000 /* 53C94 prefetch interupt */
+#define SCSI_CIR_PREF1		0x00200000 /* 53C94 prefetch interrupt */
+#define SCSI_CIR_PREF0		0x00100000 /* 53C94 prefetch interrupt */
 #endif
-#define SCSI_CIR_53C94_INT1	0x00080000 /* SCSI[1] 53C94 Interupt */
-#define SCSI_CIR_53C94_INT0	0x00040000 /* SCSI[0] 53C94 Interupt */
+#define SCSI_CIR_53C94_INT1	0x00080000 /* SCSI[1] 53C94 Interrupt */
+#define SCSI_CIR_53C94_INT0	0x00040000 /* SCSI[0] 53C94 Interrupt */
 #define SCSI_CIR_53C94_DREQ1	0x00020000 /* SCSI[1] 53C94 DREQ */
 #define SCSI_CIR_53C94_DREQ0	0x00010000 /* SCSI[0] 53C94 DREQ */
 #define SCSI_CIR_TC_PAR_TEST	0x00008000 /* TC parity test mode */
@@ -197,14 +197,14 @@ void tcds_scsi_reset __P((int));
 
 #define KN15AA_REG_SCSI_IMER	(KN15AA_SYS_SCSI + 0x80008)
 
-/* these are the bits that were unalligned at the beginning of the dma */
+/* these are the bits that were unalligned at the beginning of the DMA */
 #define KN15AA_REG_SCSI_DUDB0	(KN15AA_SYS_SCSI + 0x82010)
 #define KN15AA_REG_SCSI_DUDB1	(KN15AA_SYS_SCSI + 0x82210)
 #	define SCSI_DUDB_MASK01	0x00000001 /* Mask bit for byte[01] */
 #	define SCSI_DUDB_MASK10	0x00000002 /* Mask bit for byte[10] */
 #	define SCSI_DUDB_MASK11	0x00000004 /* Mask bit for byte[11] */
 
-/* these are the bits that were unalligned at the end of the dma */
+/* these are the bits that were unalligned at the end of the DMA */
 #define KN15AA_REG_SCSI_DUDE0	(KN15AA_SYS_SCSI + 0x82018)
 #define KN15AA_REG_SCSI_DUDE1	(KN15AA_SYS_SCSI + 0x82218)
 #	define SCSI_DUDE_MASK00	0x1000000 /* Mask bit for byte[00] */

@@ -1,4 +1,4 @@
-/*	$NetBSD: sockio.h,v 1.18.16.1 2002/11/01 10:55:45 tron Exp $	*/
+/*	$NetBSD: sockio.h,v 1.21 2003/08/07 16:34:15 agc Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1990, 1993, 1994
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -112,8 +108,8 @@
 #define	SIOCSIFMTU	 _IOW('i', 127, struct ifreq)	/* set ifnet mtu */
 #define	SIOCGIFMTU	_IOWR('i', 126, struct ifreq)	/* get ifnet mtu */
 
-#define	SIOCSIFASYNCMAP  _IOW('i', 125, struct ifreq)	/* set ppp asyncmap */
-#define	SIOCGIFASYNCMAP _IOWR('i', 124, struct ifreq)	/* get ppp asyncmap */
+/* 125 was SIOCSIFASYNCMAP */
+/* 124 was SIOCGIFASYNCMAP */
 
 #define	SIOCSDRVSPEC     _IOW('i', 123, struct ifdrv)   /* set driver-specific
 							   parameters */

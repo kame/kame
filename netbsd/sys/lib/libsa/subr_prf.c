@@ -1,4 +1,4 @@
-/*	$NetBSD: subr_prf.c,v 1.5 2002/02/17 23:19:00 thorpej Exp $	*/
+/*	$NetBSD: subr_prf.c,v 1.10 2003/08/07 16:32:30 agc Exp $	*/
 
 /*-
  * Copyright (c) 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -37,47 +33,24 @@
 
 /*
  * Scaled down version of printf(3).
- *
- * One additional format:
- *
- * The format %b is supported to decode error registers.
- * Its usage is:
- *
- *	printf("reg=%b\n", regval, "<base><arg>*");
- *
- * where <base> is the output base expressed as a control character, e.g.
- * \10 gives octal; \20 gives hex.  Each arg is a sequence of characters,
- * the first of which gives the bit number to be inspected (origin 1), and
- * the next characters (up to a control character, i.e. a character <= 32),
- * give the name of the register.  Thus:
- *
- *	printf("reg=%b\n", 3, "\10\2BITTWO\1BITONE\n");
- *
- * would produce output:
- *
- *	reg=3<BITTWO,BITONE>
  */
 
 #include <sys/cdefs.h>
 #include <sys/types.h>
-#ifdef __STDC__
 #include <machine/stdarg.h>
-#else
-#include <machine/varargs.h>
-#endif
 
 #include "stand.h"
 
-static void kprintn __P((void (*)(int), u_long, int));
-static void sputchar __P((int));
-static void kdoprnt __P((void (*)(int), const char *, va_list));
+static void kprintn(void (*)(int), u_long, int);
+static void sputchar(int);
+static void kdoprnt(void (*)(int), const char *, va_list);
 
 static char *sbuf, *ebuf;
 
 static void
-sputchar(c)
-	int c;
+sputchar(int c)
 {
+
 	if (sbuf < ebuf)
 		*sbuf++ = c;
 }
@@ -101,15 +74,12 @@ vsnprintf(char *buf, size_t size, const char *fmt, va_list ap)
 }
 
 static void
-kdoprnt(put, fmt, ap)
-	void (*put)__P((int));
-	const char *fmt;
-	va_list ap;
+kdoprnt(void (*put)(int), const char *fmt, va_list ap)
 {
 	char *p;
-	int ch, n;
+	int ch;
 	unsigned long ul;
-	int lflag, set;
+	int lflag;
 
 	for (;;) {
 		while ((ch = *fmt++) != '%') {
@@ -119,32 +89,9 @@ kdoprnt(put, fmt, ap)
 		}
 		lflag = 0;
 reswitch:	switch (ch = *fmt++) {
-		case '\0':
-			/* XXX print the last format character? */
-			return;
 		case 'l':
 			lflag = 1;
 			goto reswitch;
-		case 'b':
-			ul = va_arg(ap, int);
-			p = va_arg(ap, char *);
-			kprintn(put, ul, *p++);
-
-			if (!ul)
-				break;
-
-			for (set = 0; (n = *p++);) {
-				if (ul & (1 << (n - 1))) {
-					put(set ? ',' : '<');
-					for (; (n = *p) > ' '; ++p)
-						put(n);
-					set = 1;
-				} else
-					for (; *p > ' '; ++p);
-			}
-			if (set)
-				put('>');
-			break;
 		case 'c':
 			ch = va_arg(ap, int);
 				put(ch & 0x7f);
@@ -187,16 +134,15 @@ reswitch:	switch (ch = *fmt++) {
 			put('%');
 			if (lflag)
 				put('l');
+			if (ch == '\0')
+				return;
 			put(ch);
 		}
 	}
 }
 
 static void
-kprintn(put, ul, base)
-	void (*put)__P((int));
-	unsigned long ul;
-	int base;
+kprintn(void (*put)(int), unsigned long ul, int base)
 {
 					/* hold a long in base 8 */
 	char *p, buf[(sizeof(long) * NBBY / 3) + 1];

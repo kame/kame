@@ -1,9 +1,8 @@
-#	$NetBSD: files.x68k,v 1.46 2002/04/22 09:41:21 augustss Exp $
+#	$NetBSD: files.x68k,v 1.56 2004/01/08 12:32:03 minoura Exp $
 #
 # new style config file for x68k architecture
 #
 
-defflag				FPU_EMULATE
 defflag				M060SP
 
 defflag	opt_m680x0.h		M68020 M68030 M68040 M68060
@@ -33,15 +32,15 @@ file	arch/x68k/x68k/disksubr.c	disk
 file	arch/x68k/x68k/machdep.c
 file	arch/x68k/x68k/mem.c
 file	arch/x68k/x68k/pmap_bootstrap.c	compile-with "${NOPROF_C}"
-file	arch/x68k/x68k/pmap.c
 file	arch/x68k/x68k/procfs_machdep.c	procfs
-file	arch/x68k/x68k/sys_machdep.c
 file	arch/x68k/x68k/trap.c
-file	arch/x68k/x68k/vm_machdep.c
-file	arch/x68k/x68k/db_memrw.c	ddb
 file	arch/x68k/x68k/fpu.c
 file	arch/x68k/x68k/bus.c
 file	arch/m68k/m68k/cacheops.c
+file	arch/m68k/m68k/db_memrw.c	ddb
+file	arch/m68k/m68k/pmap_motorola.c
+file	arch/m68k/m68k/sys_machdep.c
+file	arch/m68k/m68k/vm_machdep.c
 
 file	dev/cons.c
 file	dev/cninit.c
@@ -101,7 +100,6 @@ file	arch/x68k/dev/kbd.c		kbd needs-flag
 device rtc
 attach	rtc at intio
 file	arch/x68k/dev/rtclock.c		rtc
-file	dev/clock_subr.c		rtc
 
 device dmac
 attach	dmac at intio
@@ -143,7 +141,6 @@ attach	fdc at intio
 device	fd: disk
 attach	fd at fdc
 file	arch/x68k/dev/fd.c		fd needs-flag
-major	{fd = 2}
 
 device	par
 attach	par at intio
@@ -153,8 +150,6 @@ file	arch/x68k/dev/par.c		par needs-flag
 # SCSI drivers
 #
 include "dev/scsipi/files.scsipi"
-major	{cd = 7}
-major	{sd = 4}
 
 device scsirom {}
 attach	scsirom at intio
@@ -181,12 +176,17 @@ file	arch/x68k/dev/pow.c		pow needs-count
 attach	ne at intio with ne_intio: rtl80x9
 file	arch/x68k/dev/if_ne_intio.c	ne_intio
 
+# Nereid USB
+attach	slhci at intio with slhci_intio
+file	arch/x68k/dev/slhci_intio.c	slhci_intio
+
+# Nereid Bank Memory Disk
+device	bmd
+attach	bmd at intio
+file	arch/x68k/dev/bmd.c		bmd needs-flag
+
 # memory disk
 file	dev/md_root.c			memory_disk_hooks
-major	{md = 8}
-
-# RAIDframe
-major	{raid = 16}
 
 # NetBSD m68k a.out Binary Compatibility (COMPAT_AOUT_M68K)
 include "compat/aoutm68k/files.aoutm68k"
@@ -194,6 +194,10 @@ include "compat/aoutm68k/files.aoutm68k"
 # SunOS Binary Compatibility (COMPAT_SUNOS)
 include	"compat/sunos/files.sunos"
 file	arch/m68k/m68k/sunos_machdep.c	compat_sunos
+
+# HP-UX Binary Compatibility (COMPAT_HPUX)
+include	"compat/hpux/files.hpux"
+file	arch/m68k/m68k/hpux_machdep.c	compat_hpux
 
 # SVR4 Binary Compatibility (COMPAT_SVR4)
 include "compat/svr4/files.svr4"
@@ -205,3 +209,8 @@ file arch/m68k/m68k/linux_trap.c	compat_linux
 
 # OSS audio driver compatibility
 include "compat/ossaudio/files.ossaudio"
+
+# USB support
+include "dev/usb/files.usb"
+
+include "arch/x68k/conf/majors.x68k"

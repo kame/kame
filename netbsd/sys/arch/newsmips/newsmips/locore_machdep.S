@@ -1,4 +1,4 @@
-/*	$NetBSD: locore_machdep.S,v 1.7 1999/12/22 05:55:26 tsubai Exp $	*/
+/*	$NetBSD: locore_machdep.S,v 1.13 2003/08/07 16:28:54 agc Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -67,8 +63,8 @@
 	.set	noreorder
 
 LEAF(to_monitor)
-	li	v0, MIPS_SR_BOOT_EXC_VEC	# no interrupt and
-	mtc0	v0, MIPS_COP_0_STATUS_REG	# boot strap exception vector
+	li	v0, MIPS_SR_BEV			# no interrupt and
+	mtc0	v0, MIPS_COP_0_STATUS		# boot strap exception vector
 	nop
 	nop
 	nop
@@ -80,91 +76,6 @@ LEAF(to_monitor)
 	nop
 END(to_monitor)
 
-/*
- * nesting interrupt masks.
- */
-#define MIPS_INT_MASK_SPL_SOFT0	MIPS_SOFT_INT_MASK_0
-#define MIPS_INT_MASK_SPL_SOFT1	(MIPS_SOFT_INT_MASK_1|MIPS_INT_MASK_SPL_SOFT0)
-#define MIPS_INT_MASK_SPL0	(MIPS_INT_MASK_0|MIPS_INT_MASK_SPL_SOFT1)
-#define MIPS_INT_MASK_SPL1	(MIPS_INT_MASK_1|MIPS_INT_MASK_SPL0)
-#define MIPS_INT_MASK_SPL2	(MIPS_INT_MASK_2|MIPS_INT_MASK_SPL1)
-#define MIPS_INT_MASK_SPL3	(MIPS_INT_MASK_3|MIPS_INT_MASK_SPL2)
-#define MIPS_INT_MASK_SPL4	(MIPS_INT_MASK_4|MIPS_INT_MASK_SPL3)
-#define MIPS_INT_MASK_SPL5	(MIPS_INT_MASK_5|MIPS_INT_MASK_SPL4)
-
-/*
- * hardware-level spls for hardware where the device interrupt priorites
- * are ordered, and map onto mips interrupt pins in increasing priority.
- * This maps directly onto BSD spl levels.
- */
-
-/*
- * Block out int2 (hardware interrupt 0) and lower mips levels.
- */
-LEAF(cpu_spl0)
-	mfc0	v0, MIPS_COP_0_STATUS_REG	# read status register
-	li	t0, ~(MIPS_INT_MASK_SPL0)
-	and	t0, t0, v0
-	mtc0	t0, MIPS_COP_0_STATUS_REG	# save it
-	nop					# 3 ins to disable on r4x00
-	j	ra
-	and	v0, v0, (MIPS_INT_MASK | MIPS_SR_INT_IE)
-END(cpu_spl0)
-
-/*
- * Block out Int3 (hardware interrupt 1) and lower mips levels.
- */
-LEAF(cpu_spl1)
-	mfc0	v0, MIPS_COP_0_STATUS_REG	# read status register
-	li	t0, ~(MIPS_INT_MASK_SPL1)
-	and	t0, t0, v0
-	mtc0	t0, MIPS_COP_0_STATUS_REG	# save it
-	nop					# 3 ins to disable on r4x00
-	j	ra
-	and	v0, v0, (MIPS_INT_MASK | MIPS_SR_INT_IE)
-END(cpu_spl1)
-
-LEAF(cpu_spl2)
-	mfc0	v0, MIPS_COP_0_STATUS_REG	# read status register
-	li	t0, ~(MIPS_INT_MASK_SPL2)
-	and	t0, t0, v0
-	mtc0	t0, MIPS_COP_0_STATUS_REG	# save it
-	nop					# 3 ins to disable on r4x00
-	j	ra
-	and	v0, v0, (MIPS_INT_MASK | MIPS_SR_INT_IE)
-END(cpu_spl2)
-
-LEAF(cpu_spl3)
-	mfc0	v0, MIPS_COP_0_STATUS_REG	# read status register
-	li	t0, ~(MIPS_INT_MASK_SPL3)
-	and	t0, t0, v0
-	mtc0	t0, MIPS_COP_0_STATUS_REG	# save it
-	nop					# 3 ins to disable on r4x00
-	j	ra
-	and	v0, v0, (MIPS_INT_MASK | MIPS_SR_INT_IE)
-END(cpu_spl3)
-
-LEAF(cpu_spl4)
-	mfc0	v0, MIPS_COP_0_STATUS_REG	# read status register
-	li	t0, ~(MIPS_INT_MASK_SPL4)
-
-	and	t0, t0, v0
-	mtc0	t0, MIPS_COP_0_STATUS_REG	# save it
-	nop					# 3 ins to disable
-	j	ra
-	and	v0, v0, (MIPS_INT_MASK | MIPS_SR_INT_IE)
-END(cpu_spl4)
-
-LEAF(cpu_spl5)
-	mfc0	v0, MIPS_COP_0_STATUS_REG	# read status register
-	li	t0, ~(MIPS_INT_MASK_SPL5)
-	and	t0, t0, v0
-	mtc0	t0, MIPS_COP_0_STATUS_REG	# save it
-	nop					# 3 ins to disable
-	j	ra
-	and	v0, v0, (MIPS_INT_MASK | MIPS_SR_INT_IE)
-END(cpu_spl5)
-
 #ifdef MIPS3
 	.set	mips3
 	.set	noat
@@ -175,6 +86,7 @@ checkromwork:
 	li	k1, 0xfff00000			# NEWS5000 ROM Work: 0xFFF00000~0xFFFFFFFF (1Mbyte)
 	sltu	k1, k0, k1
 	bne	k1, zero, outofworld
+	nop
 
 	li	k1, 0x000fe000			# XXX (depend on 4k page)
 	and	k1, k0, k1			# k1 = (VADDR - 0xFFF00000) & 0xffffe000
@@ -225,8 +137,6 @@ outofworld:
 	.globl _C_LABEL(intrnames)
 	.globl _C_LABEL(eintrnames)
 _C_LABEL(intrnames):
-	.asciiz	"softclock"
-	.asciiz	"softnet"
 	.asciiz	"serial0"
 	.asciiz	"serial1"
 	.asciiz	"serial2"
@@ -245,7 +155,7 @@ _C_LABEL(intrnames):
 _C_LABEL(eintrnames):
 	.align	2
 _C_LABEL(intrcnt):
-	.word	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0
+	.word	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0
 _C_LABEL(eintrcnt):
 	.word	0	# This shouldn't be needed but with 4.4bsd's as, the eintrcnt
 			#  label ends end up in a different section otherwise.

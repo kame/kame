@@ -1,4 +1,4 @@
-/*	$NetBSD: pcb.h,v 1.3 2001/11/23 17:39:04 thorpej Exp $	*/
+/*	$NetBSD: pcb.h,v 1.11 2003/10/25 19:44:42 scw Exp $	*/
 
 /*
  * Copyright (c) 2001 Matt Thomas <matt@3am-software.com>.
@@ -44,7 +44,16 @@
 struct trapframe;
 
 struct pcb_arm32 {
-	pd_entry_t *pcb32_pagedir;		/* PT hooks */
+	paddr_t	pcb32_pagedir;			/* PT hooks */
+	pd_entry_t *pcb32_pl1vec;		/* PTR to vector_base L1 entry*/
+	pd_entry_t pcb32_l1vec;			/* Value to stuff on ctx sw */
+	u_int	pcb32_dacr;			/* Domain Access Control Reg */
+	void	*pcb32_cstate;			/* &pmap->pm_cstate */
+	/*
+	 * WARNING!
+	 * cpuswitch.S relies on pcb32_r8 being quad-aligned in struct pcb
+	 * (due to the use of "strd" when compiled for XSCALE)
+	 */
 	u_int	pcb32_r8;			/* used */
 	u_int	pcb32_r9;			/* used */
 	u_int	pcb32_r10;			/* used */
@@ -56,15 +65,24 @@ struct pcb_arm32 {
 	u_int	pcb32_und_sp;
 };
 #define	pcb_pagedir	pcb_un.un_32.pcb32_pagedir
+#define	pcb_pl1vec	pcb_un.un_32.pcb32_pl1vec
+#define	pcb_l1vec	pcb_un.un_32.pcb32_l1vec
+#define	pcb_dacr	pcb_un.un_32.pcb32_dacr
+#define	pcb_cstate	pcb_un.un_32.pcb32_cstate
 
 struct pcb_arm26 {
 	struct	switchframe *pcb26_sf;
 };
 #define	pcb_sf	pcb_un.un_26.pcb26_sf
 
+/*
+ * WARNING!
+ * See warning for struct pcb_arm32, above, before changing struct pcb!
+ */
 struct pcb {
 	u_int	pcb_flags;
 #define	PCB_OWNFPU	0x00000001
+#define	PCB_NOALIGNFLT	0x00000002		/* For COMPAT_15/EXEC_AOUT */
 	struct	trapframe *pcb_tf;
 	caddr_t	pcb_onfault;			/* On fault handler */
 	union	{
@@ -83,7 +101,14 @@ struct md_coredump {
 };
 
 #ifdef _KERNEL
+#ifdef _KERNEL_OPT
+#include "opt_multiprocessor.h"
+#endif
+#ifdef MULTIPROCESSOR
+#define curpcb	(curcpu()->ci_curpcb)
+#else
 extern struct pcb *curpcb;
+#endif
 #endif	/* _KERNEL */
 
 #endif	/* _ARM_PCB_H_ */

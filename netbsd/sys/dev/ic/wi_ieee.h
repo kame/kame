@@ -1,4 +1,4 @@
-/*	$NetBSD: wi_ieee.h,v 1.15 2002/04/18 05:24:29 onoe Exp $	*/
+/*	$NetBSD: wi_ieee.h,v 1.22 2003/11/02 11:07:46 wiz Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -129,6 +129,13 @@ struct wi_80211_hdr {
 #define WI_STYPE_MGMT_AUTH	0x00B0	/* authentication */
 #define WI_STYPE_MGMT_DEAUTH	0x00C0	/* deauthentication */
 
+#define	WI_STYPE_CTL_PSPOLL	0x00A0
+#define	WI_STYPE_CTL_RTS	0x00B0
+#define	WI_STYPE_CTL_CTS	0x00C0
+#define	WI_STYPE_CTL_ACK	0x00D0
+#define	WI_STYPE_CTL_CFEND	0x00E0
+#define	WI_STYPE_CTL_CFENDACK	0x00F0
+
 struct wi_mgmt_hdr {
 	u_int16_t		frame_ctl;
 	u_int16_t		duration;
@@ -227,8 +234,12 @@ struct wi_counters {
 #define	 IV_EVERY100_FRAME	0x60	/* every 100 frame IV reuse */
 #define	 HOST_DECRYPT		0x80
 #define WI_RID_WEP_MAPTABLE	0xFC29
-#define WI_RID_AUTH_CNTL	0xFC2A
+#define WI_RID_CNFAUTHMODE	0xFC2A
 #define WI_RID_ROAMING_MODE	0xFC2D
+#define	WI_RID_ALT_RETRY_COUNT	0xFC32 /* retry count if WI_TXCNTL_ALTRTRY */
+#define WI_RID_OWN_BEACON_INT	0xFC33 /* beacon xmit time for BSS creation */
+#define WI_RID_SET_TIM		0xFC40
+#define WI_RID_DBM_ADJUST	0xFC46 /* RSSI - WI_RID_DBM_ADJUST ~ dBm */
 #define WI_RID_BASIC_RATE	0xFCB3
 #define WI_RID_SUPPORT_RATE	0xFCB4
 
@@ -293,7 +304,7 @@ struct wi_ltv_keys {
 #define WI_RID_CARD_ID		0xFD0B /* card identification */
 #define WI_RID_MFI_SUP_RANGE	0xFD0C /* modem supplier compatibility */
 #define WI_RID_CFI_SUP_RANGE	0xFD0D /* controller sup. compatibility */
-#define WI_RID_CHANNEL_LIST	0xFD10 /* allowd comm. frequencies. */
+#define WI_RID_CHANNEL_LIST	0xFD10 /* allowed comm. frequencies. */
 #define WI_RID_REG_DOMAINS	0xFD11 /* list of intendted regulatory doms */
 #define WI_RID_TEMP_TYPE	0xFD12 /* hw temp range code */
 #define WI_RID_CIS		0xFD13 /* PC card info struct */
@@ -314,7 +325,7 @@ struct wi_ltv_keys {
 #define WI_RID_CURRENT_BSSID	0xFD42 /* ID of actually connected BSS */
 #define WI_RID_COMMS_QUALITY	0xFD43 /* quality of BSS connection */
 #define WI_RID_CUR_TX_RATE	0xFD44 /* current TX rate */
-#define WI_RID_OWN_BEACON_INT	0xFD45 /* beacon xmit time for BSS creation */
+#define WI_RID_CUR_BEACON_INT	0xFD45 /* current beacon interval */
 #define WI_RID_CUR_SCALE_THRESH	0xFD46 /* actual system scane thresh setting */
 #define WI_RID_PROT_RESP_TIME	0xFD47 /* time to wait for resp to req msg */
 #define WI_RID_SHORT_RTR_LIM	0xFD48 /* max tx attempts for short frames */

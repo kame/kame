@@ -1,4 +1,4 @@
-/*	$NetBSD: time.h,v 1.34 2002/01/31 00:13:08 simonb Exp $	*/
+/*	$NetBSD: time.h,v 1.41 2003/09/06 22:01:21 christos Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,13 @@
 #ifndef _SYS_TIME_H_
 #define	_SYS_TIME_H_
 
+#include <sys/featuretest.h>
 #include <sys/types.h>
+#ifdef _KERNEL
+#include <sys/callout.h>
+#include <sys/signal.h>
+#include <sys/queue.h>
+#endif
 
 /*
  * Structure returned by gettimeofday(2) system call,
@@ -141,6 +143,15 @@ struct	itimerval {
 };
 
 /*
+ * Structure defined by POSIX.1b to be like a itimerval, but with
+ * timespecs. Used in the timer_*() system calls.
+ */
+struct	itimerspec {
+	struct	timespec it_interval;
+	struct	timespec it_value;
+};
+
+/*
  * Getkerninfo clock information structure
  */
 struct clockinfo {
@@ -160,8 +171,47 @@ struct clockinfo {
 #define	TIMER_ABSTIME	0x1	/* absolute timer */
 
 #ifdef _KERNEL
+/*
+ * Structure used to manage timers in a process.
+ */
+struct 	ptimer {
+	union {
+		struct	callout	pt_ch;
+		struct {
+			LIST_ENTRY(ptimer)	pt_list;
+			int	pt_active;
+		} pt_nonreal;
+	} pt_data;
+	struct	sigevent pt_ev;
+	struct	itimerval pt_time;
+	struct	ksiginfo pt_info;
+	int	pt_overruns;	/* Overruns currently accumulating */
+	int	pt_poverruns;	/* Overruns associated w/ a delivery */
+	int	pt_type;
+	int	pt_entry;
+	struct proc *pt_proc; 
+};
+
+#define pt_ch	pt_data.pt_ch
+#define pt_list	pt_data.pt_nonreal.pt_list
+#define pt_active	pt_data.pt_nonreal.pt_active
+
+#define	TIMER_MAX	32	/* See ptimers->pts_fired if you enlarge this */
+#define	TIMERS_ALL	0
+#define	TIMERS_POSIX	1
+
+LIST_HEAD(ptlist, ptimer);
+
+struct	ptimers {
+	struct ptlist pts_virtual;
+	struct ptlist pts_prof;
+	struct ptimer *pts_timers[TIMER_MAX];
+	int pts_fired;
+};
+
 int	itimerfix __P((struct timeval *tv));
-int	itimerdecr __P((struct itimerval *itp, int usec));
+int	itimerdecr __P((struct ptimer *, int));
+void	itimerfire __P((struct ptimer *));
 void	microtime __P((struct timeval *tv));
 int	settime __P((struct timeval *));
 int	ratecheck __P((struct timeval *, const struct timeval *));
@@ -170,12 +220,17 @@ int	settimeofday1 __P((const struct timeval *, const struct timezone *,
 	    struct proc *));
 int	adjtime1 __P((const struct timeval *, struct timeval *, struct proc *));
 int	clock_settime1 __P((clockid_t, const struct timespec *));
+void	timer_settime __P((struct ptimer *));
+void	timer_gettime __P((struct ptimer *, struct itimerval *));
+void	timers_alloc __P((struct proc *));
+void	timers_free __P((struct proc *, int));
+void	realtimerexpire __P((void *));
 #else /* !_KERNEL */
 
 #ifndef _STANDALONE
 #include <time.h>
 
-#ifndef _POSIX_SOURCE
+#if defined(_XOPEN_SOURCE) || defined(_NETBSD_SOURCE)
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
@@ -188,7 +243,7 @@ int	setitimer __P((int, const struct itimerval *, struct itimerval *));
 int	settimeofday __P((const struct timeval *, const struct timezone *));
 int	utimes __P((const char *, const struct timeval *));
 __END_DECLS
-#endif /* !POSIX */
+#endif /* _XOPEN_SOURCE || _NETBSD_SOURCE */
 
 #endif	/* !_STANDALONE */
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_machdep.c,v 1.5 2002/03/13 13:12:28 simonb Exp $	*/
+/*	$NetBSD: pci_machdep.c,v 1.13 2004/01/18 00:50:08 sekiya Exp $	*/
 
 /*
  * Copyright (c) 2000 Soren S. Jorvang
@@ -15,7 +15,7 @@
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
  *          This product includes software developed for the
- *          NetBSD Project.  See http://www.netbsd.org/ for
+ *          NetBSD Project.  See http://www.NetBSD.org/ for
  *          information about NetBSD.
  * 4. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
@@ -32,6 +32,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pci_machdep.c,v 1.13 2004/01/18 00:50:08 sekiya Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
@@ -44,6 +47,7 @@
 #define _SGIMIPS_BUS_DMA_PRIVATE
 #include <machine/bus.h>
 #include <machine/intr.h>
+#include <machine/sysconf.h>
 
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
@@ -61,7 +65,7 @@ struct sgimips_bus_dma_tag pci_bus_dma_tag = {
 	_bus_dmamap_load_uio,
 	_bus_dmamap_load_raw,
 	_bus_dmamap_unload,
-	_bus_dmamap_sync,
+	_bus_dmamap_sync_mips3,
 	_bus_dmamem_alloc,
 	_bus_dmamem_free,
 	_bus_dmamem_map,
@@ -84,11 +88,11 @@ pci_bus_maxdevs(pc, busno)
 	pci_chipset_tag_t pc;
 	int busno;
 {
-#if 0
-	return 32;
-#else
-	return 4;		/* XXX O2 master aborts.. */
-#endif
+
+	if (busno == 0)
+		return 5;	/* 2 on-board SCSI chips, slots 0, 1 and 2 */
+	else
+		return 0;	/* XXX */
 }
 
 pcitag_t
@@ -96,6 +100,7 @@ pci_make_tag(pc, bus, device, function)
 	pci_chipset_tag_t pc;
 	int bus, device, function;
 {
+
 	return (bus << 16) | (device << 11) | (function << 8);
 }
 
@@ -105,6 +110,7 @@ pci_decompose_tag(pc, tag, bp, dp, fp)
 	pcitag_t tag;
 	int *bp, *dp, *fp;
 {
+
 	if (bp != NULL)
 		*bp = (tag >> 16) & 0xff;
 	if (dp != NULL)
@@ -119,6 +125,7 @@ pci_conf_read(pc, tag, reg)
 	pcitag_t tag;
 	int reg;
 {
+
 	return (*pc->pc_conf_read)(pc, tag, reg);
 }
 
@@ -129,6 +136,7 @@ pci_conf_write(pc, tag, reg, data)
 	int reg;
 	pcireg_t data;
 {
+
 	(*pc->pc_conf_write)(pc, tag, reg, data);
 }
 
@@ -137,18 +145,42 @@ pci_intr_map(pa, ihp)
 	struct pci_attach_args *pa;
 	pci_intr_handle_t *ihp;
 {
-	int line = pa->pa_intrline;
-#if 0
 	pci_chipset_tag_t pc = pa->pa_pc;
 	pcitag_t intrtag = pa->pa_intrtag;
 	int pin = pa->pa_intrpin;
-	int bus, dev, func;
+	int bus, dev, func, start;
 
 	pci_decompose_tag(pc, intrtag, &bus, &dev, &func);
-#endif
 
-	*ihp = line;
+	if (dev < 3 && pin != PCI_INTERRUPT_PIN_A)
+		panic("SCSI0 and SCSI1 must be hardwired!");
 
+	switch (pin) {
+	default:
+	case PCI_INTERRUPT_PIN_NONE:
+		return -1;
+
+	case PCI_INTERRUPT_PIN_A:
+		/*
+		 * Each of SCSI{0,1}, & slots 0 - 2 has dedicated interrupt
+		 * for pin A?
+		 */
+		*ihp = dev + 7;
+		return 0;
+
+	case PCI_INTERRUPT_PIN_B:
+		start = 0;
+		break;
+	case PCI_INTERRUPT_PIN_C:
+		start = 1;
+		break;
+	case PCI_INTERRUPT_PIN_D:
+		start = 2;
+		break;
+	}
+
+	/* Pins B,C,D are mapped to PCI_SHARED0 - PCI_SHARED2 interrupts */
+	*ihp = 13 /* PCI_SHARED0 */ + (start + dev - 3) % 3;
 	return 0;
 }
 
@@ -157,14 +189,9 @@ pci_intr_string(pc, ih)
 	pci_chipset_tag_t pc;
 	pci_intr_handle_t ih;
 {
-	static char irqstr[8];
+	static char irqstr[32];
 
-#if 0
-	sprintf(irqstr, "mace %d", ih);
-#else
-	sprintf(irqstr, "mace");
-#endif
-
+	sprintf(irqstr, "crime interrupt %d", ih);
 	return irqstr;
 }
 
@@ -178,8 +205,6 @@ pci_intr_evcnt(pc, ih)
 	return NULL;
 }
 
-extern void *	crime_intr_establish(int, int, int, int (*)(void *), void *);
-
 void *
 pci_intr_establish(pc, ih, level, func, arg)
 	pci_chipset_tag_t pc;
@@ -187,9 +212,8 @@ pci_intr_establish(pc, ih, level, func, arg)
 	int level, (*func)(void *);
 	void *arg;
 {
-	crime_intr_establish(0, 0, 0, func, arg);
 
-	return (void *)-1;	/* XXX */
+	return (void *)(*platform.intr_establish)(ih, 0, func, arg);
 }
 
 void
@@ -197,7 +221,6 @@ pci_intr_disestablish(pc, cookie)
 	pci_chipset_tag_t pc;
 	void *cookie;
 {
-	panic("pci_intr_disestablish: not implemented");
 
-	return;
+	panic("pci_intr_disestablish: not implemented");
 }

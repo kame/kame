@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.h,v 1.7 2002/05/09 12:25:41 uch Exp $	*/
+/*	$NetBSD: locore.h,v 1.9 2003/10/01 21:51:15 uwe Exp $	*/
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -59,7 +59,7 @@
  *	+ change bank from 1 to 0
  *	+ set BANK0 (r4, r5, r6) = (ssr, spc, ssp)
  */
-#define	__EXCEPTION_ENTRY							;\
+#define	__EXCEPTION_ENTRY						;\
 	/* Check kernel/user mode. */					;\
 	mov	#0x40,	r3						;\
 	swap.b	r3,	r3						;\
@@ -198,9 +198,9 @@
 	ldc	Rm,	sr	/* unmask all interrupt */
 
 #ifndef _LOCORE
-void sh3_switch_setup(struct proc *);
-void sh4_switch_setup(struct proc *);
-void sh3_switch_resume(struct proc *);
-void sh4_switch_resume(struct proc *);
-extern void (*__sh_switch_resume)(struct proc *);
+void sh3_switch_setup(struct lwp *);
+void sh4_switch_setup(struct lwp *);
+void sh3_switch_resume(struct lwp *);
+void sh4_switch_resume(struct lwp *);
+extern void (*__sh_switch_resume)(struct lwp *);
 #endif /* !_LOCORE */

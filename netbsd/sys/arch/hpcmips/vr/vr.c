@@ -1,4 +1,4 @@
-/*	$NetBSD: vr.c,v 1.39.10.1 2002/12/12 22:53:52 he Exp $	*/
+/*	$NetBSD: vr.c,v 1.44 2003/10/25 18:04:34 mycroft Exp $	*/
 
 /*-
  * Copyright (c) 1999-2002
@@ -33,6 +33,9 @@
  * SUCH DAMAGE.
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vr.c,v 1.44 2003/10/25 18:04:34 mycroft Exp $");
 
 #include "opt_vr41xx.h"
 #include "opt_tx39xx.h"
@@ -350,7 +353,7 @@ vr_find_dram(paddr_t addr, paddr_t end)
 		end = VR_FIND_DRAMLIM;
 #endif /* VR_FIND_DRAMLIM */
 	n = mem_cluster_cnt;
-	for (; addr < end; addr += NBPG) {
+	for (; addr < end; addr += PAGE_SIZE) {
 
 		page = (void *)MIPS_PHYS_TO_KSEG1(addr);
 		if (badaddr(page, 4))
@@ -374,25 +377,25 @@ vr_find_dram(paddr_t addr, paddr_t end)
 
 #ifdef NARLY_MEMORY_PROBE
 		x = random();
-		for (i = 0; i < NBPG; i += 4)
+		for (i = 0; i < PAGE_SIZE; i += 4)
 			*(volatile int *)(page+i) = (x ^ i);
 		wbflush();
-		for (i = 0; i < NBPG; i += 4)
+		for (i = 0; i < PAGE_SIZE; i += 4)
 			if (*(volatile int *)(page+i) != (x ^ i))
 				goto bad;
 
 		x = random();
-		for (i = 0; i < NBPG; i += 4)
+		for (i = 0; i < PAGE_SIZE; i += 4)
 			*(volatile int *)(page+i) = (x ^ i);
 		wbflush();
-		for (i = 0; i < NBPG; i += 4)
+		for (i = 0; i < PAGE_SIZE; i += 4)
 			if (*(volatile int *)(page+i) != (x ^ i))
 				goto bad;
 #endif /* NARLY_MEMORY_PROBE */
 
 		if (!mem_clusters[n].size)
 			mem_clusters[n].start = addr;
-		mem_clusters[n].size += NBPG;
+		mem_clusters[n].size += PAGE_SIZE;
 		continue;
 
 	bad:
@@ -514,7 +517,7 @@ vr_reboot(int howto, char *bootstr)
 		splhigh();
 #endif
 		__asm(".set noreorder");
-		__asm(__CONCAT(".word	",___STRING(VR_OPCODE_SUSPEND)));
+		__asm(".word	" ___STRING(VR_OPCODE_SUSPEND));
 		__asm("nop");
 		__asm("nop");
 		__asm("nop");

@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.8 2001/12/12 12:24:26 lukem Exp $
+#	$NetBSD: Makefile,v 1.10 2003/10/26 07:25:37 lukem Exp $
 
 NOMAN=		# defined
 
@@ -27,7 +27,7 @@ SRCS=	boot_ustar.S
 SRCS+=		vers.c
 CLEANFILES+=	vers.c
 vers.c:	${VERSIONFILE}
-	sh ${S}/conf/newvers_stand.sh -DM ${.ALLSRC} ${MACHINE} ${NEWVERSWHAT}
+	${HOST_SH} ${S}/conf/newvers_stand.sh -DM ${.ALLSRC} ${MACHINE} ${NEWVERSWHAT}
 
 CPPFLAGS+= -DTEXTADDR="0x$(TEXT)" -DBOOT_TEXTADDR="0x$(BOOT_TEXT)"
 CPPFLAGS+= -DBOOT=\"$(BOOT)\" -DBOOT_VERS=\"$(VERSION)\"
@@ -57,7 +57,7 @@ ${PROG}: $(OBJS)
 	    rm $(PROG) ; exit 1; 					   \
 	fi
 	@if [ `(echo ibase=16; 						   \
-	    sed -n 's/^.*0x\([0-9a-f]*\).* _edata=\.$$/\1-$(TEXT)-2000/p' \
+	    sed -n 's/^.*0x\([0-9a-f]*\).* _edata *= *\.$$/\1-$(TEXT)-2000/p' \
 		$(PROG).map | 						   \
 	    tr a-f A-F) | bc` -gt 0 ]; 					   \
 	then echo '$(BOOT): text+data is too large';			   \

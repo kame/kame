@@ -1,11 +1,11 @@
-/*	$NetBSD: wss_isapnp.c,v 1.11 2001/11/13 07:56:43 lukem Exp $	*/
+/*	$NetBSD: wss_isapnp.c,v 1.15 2003/12/04 13:57:30 keihan Exp $	*/
 
 /*
  * Copyright (c) 1997, 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@netbsd.org).
+ * by Lennart Augustsson (augustss@NetBSD.org).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: wss_isapnp.c,v 1.11 2001/11/13 07:56:43 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: wss_isapnp.c,v 1.15 2003/12/04 13:57:30 keihan Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -65,10 +65,8 @@ __KERNEL_RCSID(0, "$NetBSD: wss_isapnp.c,v 1.11 2001/11/13 07:56:43 lukem Exp $"
 int	wss_isapnp_match __P((struct device *, struct cfdata *, void *));
 void	wss_isapnp_attach __P((struct device *, struct device *, void *));
 
-struct cfattach wss_isapnp_ca = {
-	sizeof(struct wss_softc), wss_isapnp_match, wss_isapnp_attach
-};
-
+CFATTACH_DECL(wss_isapnp, sizeof(struct wss_softc),
+    wss_isapnp_match, wss_isapnp_attach, NULL, NULL);
 
 /*
  * Probe / attach routines.

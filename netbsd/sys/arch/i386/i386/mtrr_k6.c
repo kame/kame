@@ -1,4 +1,4 @@
-/*	$NetBSD: mtrr_k6.c,v 1.2.14.1 2002/11/24 15:58:57 tron Exp $	*/
+/*	$NetBSD: mtrr_k6.c,v 1.7 2003/02/19 05:38:58 simonb Exp $	*/
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -40,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mtrr_k6.c,v 1.2.14.1 2002/11/24 15:58:57 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mtrr_k6.c,v 1.7 2003/02/19 05:38:58 simonb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -152,6 +152,7 @@ k6_mtrr_init_first(void)
 	    malloc(MTRR_K6_NVAR * sizeof(struct mtrr), M_TEMP, M_NOWAIT);
 	if (mtrr_var == NULL)
 		panic("can't allocate variable MTRR array");
+	mtrr_funcs = &k6_mtrr_funcs;
 
 	k6_raw2soft();
 }
@@ -320,6 +321,11 @@ k6_mtrr_set(struct mtrr *mtrrp, int *n, struct proc *p, int flags)
 	struct mtrr mtrr;
 	int i, error;
 
+	if (*n > MTRR_K6_NVAR) {
+		*n = 0;
+		return EINVAL;
+	}
+
 	error = 0;
 	for (i = 0; i < *n; i++) {
 		if (flags & MTRR_GETSET_USER) {
@@ -350,6 +356,8 @@ k6_mtrr_get(struct mtrr *mtrrp, int *n, struct proc *p, int flags)
 		*n = MTRR_K6_NVAR;
 		return (0);
 	}
+
+	error = 0;
 
 	for (i = 0; i < MTRR_K6_NVAR && i < *n; i++) {
 		if (flags & MTRR_GETSET_USER) {

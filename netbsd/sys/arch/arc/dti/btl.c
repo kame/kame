@@ -1,4 +1,4 @@
-/*	$NetBSD: btl.c,v 1.8 2002/04/05 18:27:45 bouyer Exp $	*/
+/*	$NetBSD: btl.c,v 1.14 2003/07/15 00:04:46 lukem Exp $	*/
 /*	NetBSD: bt.c,v 1.10 1996/05/12 23:51:54 mycroft Exp 	*/
 
 #undef BTDIAG
@@ -49,6 +49,9 @@
  * on the understanding that TFS is not responsible for the correct
  * functioning of this software in any circumstances.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: btl.c,v 1.14 2003/07/15 00:04:46 lukem Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -167,9 +170,8 @@ int	btprobe __P((struct device *, struct cfdata *, void *));
 void	btattach __P((struct device *, struct device *, void *));
 int	btprint __P((void *, const char *));
 
-struct cfattach btl_ca = {
-	sizeof(struct bt_softc), btprobe, btattach
-};
+CFATTACH_DECL(btl, sizeof(struct bt_softc),
+    btprobe, btattach, NULL, NULL);
 
 #define BT_RESET_TIMEOUT	2000	/* time to wait for reset (mSec) */
 #define	BT_ABORT_TIMEOUT	2000	/* time to wait for abort (mSec) */
@@ -187,7 +189,7 @@ struct btl_config *btl_conf = NULL;
  *    wait:   number of seconds to wait for response
  *
  * Performs an adapter command through the ports.  Not to be confused with a
- * scsi command, which is read in via the dma; one of the adapter commands
+ * scsi command, which is read in via the DMA; one of the adapter commands
  * tells it to read in a scsi command.
  */
 int
@@ -198,7 +200,7 @@ bt_cmd(iobase, sc, icnt, ibuf, ocnt, obuf)
 	u_char *ibuf, *obuf;
 {
 	const char *name;
-	register int i;
+	int i;
 	int wait;
 	u_char sts;
 	u_char opcode = ibuf[0];
@@ -321,7 +323,7 @@ btprobe(parent, match, aux)
 	struct cfdata *match;
 	void *aux;
 {
-	register struct isa_attach_args *ia = aux;
+	struct isa_attach_args *ia = aux;
 
 #ifdef NEWCONFIG
 	if (ia->ia_iobase == IOBASEUNK)
@@ -885,7 +887,7 @@ bt_done(sc, ccb)
 
 	if((datalen = xs->datalen) != 0) {
 		thiskv = (int)xs->data;
-		sg = ccb->scat_gath;       
+		sg = ccb->scat_gath;
 		seg = phystol(ccb->data_length) / sizeof(struct bt_scat_gath);
 
 		while (seg) {
@@ -955,7 +957,7 @@ bt_find(ia, sc)
 #ifndef notyet
 	/*
 	 * The BusLogic cards implement an Adaptec 1542 (aha)-compatible
-	 * interface. The native bha interface is not compatible with 
+	 * interface. The native bha interface is not compatible with
 	 * an aha. 1542. We need to ensure that we never match an
 	 * Adaptec 1542. We must also avoid sending Adaptec-compatible
 	 * commands to a real bha, lest it go into 1542 emulation mode.
@@ -1013,7 +1015,7 @@ bt_find(ia, sc)
 	}
 
 	/*
-	 * Assume we have a board at this stage setup dma channel from
+	 * Assume we have a board at this stage setup DMA channel from
 	 * jumpers and save int level
 	 */
 	delay(1000);
@@ -1357,7 +1359,7 @@ bt_scsi_cmd(xs)
 	return COMPLETE;
 
 badbuf:
-	sg = ccb->scat_gath;       
+	sg = ccb->scat_gath;
 	while (seg) {
 		thisbounce = PHYSTOKV(phystol(sg->seg_addr));
 		bt_free_buf(sc, (struct bt_buf *)thisbounce);

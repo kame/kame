@@ -1,4 +1,4 @@
-/*	$NetBSD: qec.c,v 1.19.6.1 2002/11/22 17:37:14 tron Exp $ */
+/*	$NetBSD: qec.c,v 1.28 2004/03/17 17:04:59 pk Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: qec.c,v 1.19.6.1 2002/11/22 17:37:14 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: qec.c,v 1.28 2004/03/17 17:04:59 pk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -70,13 +70,12 @@ static void *qec_intr_establish __P((
 		bus_space_tag_t,
 		int,			/*bus interrupt priority*/
 		int,			/*`device class' interrupt level*/
-		int,			/*flags*/
 		int (*) __P((void *)),	/*handler*/
-		void *));		/*arg*/
+		void *,			/*arg*/
+		void (*) __P((void))));	/*optional fast trap handler*/
 
-struct cfattach qec_ca = {
-	sizeof(struct qec_softc), qecmatch, qecattach
-};
+CFATTACH_DECL(qec, sizeof(struct qec_softc),
+    qecmatch, qecattach, NULL, NULL);
 
 int
 qecprint(aux, busname)
@@ -101,7 +100,7 @@ qecmatch(parent, cf, aux)
 {
 	struct sbus_attach_args *sa = aux;
 
-	return (strcmp(cf->cf_driver->cd_name, sa->sa_name) == 0);
+	return (strcmp(cf->cf_name, sa->sa_name) == 0);
 }
 
 /*
@@ -156,7 +155,7 @@ qecattach(parent, self, aux)
 	sc->sc_bufsiz = (bus_size_t)sa->sa_reg[1].oa_size;
 
 	/* Get number of on-board channels */
-	sc->sc_nchannels = PROM_getpropint(node, "#channels", -1);
+	sc->sc_nchannels = prom_getpropint(node, "#channels", -1);
 	if (sc->sc_nchannels == -1) {
 		printf(": no channels\n");
 		return;
@@ -169,7 +168,7 @@ qecattach(parent, self, aux)
 	if (sbusburst == 0)
 		sbusburst = SBUS_BURST_32 - 1; /* 1->16 */
 
-	sc->sc_burst = PROM_getpropint(node, "burst-sizes", -1);
+	sc->sc_burst = prom_getpropint(node, "burst-sizes", -1);
 	if (sc->sc_burst == -1)
 		/* take SBus burst sizes */
 		sc->sc_burst = sbusburst;
@@ -182,8 +181,8 @@ qecattach(parent, self, aux)
 	/*
 	 * Collect address translations from the OBP.
 	 */
-	error = PROM_getprop(node, "ranges", sizeof(struct openprom_range),
-			 &sc->sc_nrange, (void **)&sc->sc_range);
+	error = prom_getprop(node, "ranges", sizeof(struct openprom_range),
+			 &sc->sc_nrange, &sc->sc_range);
 	switch (error) {
 	case 0:
 		break;
@@ -260,13 +259,13 @@ qec_bus_map(t, baddr, size, flags, va, hp)
 }
 
 void *
-qec_intr_establish(t, pri, level, flags, handler, arg)
+qec_intr_establish(t, pri, level, handler, arg, fastvec)
 	bus_space_tag_t t;
 	int pri;
 	int level;
-	int flags;
 	int (*handler) __P((void *));
 	void *arg;
+	void (*fastvec) __P((void));	/* ignored */
 {
 	struct qec_softc *sc = t->cookie;
 
@@ -283,7 +282,7 @@ qec_intr_establish(t, pri, level, flags, handler, arg)
 		pri = sc->sc_intr->oi_pri;
 	}
 
-	return (bus_intr_establish(t->parent, pri, level, flags, handler, arg));
+	return (bus_intr_establish(t->parent, pri, level, handler, arg));
 }
 
 void

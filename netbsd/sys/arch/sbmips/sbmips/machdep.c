@@ -1,4 +1,4 @@
-/* $NetBSD: machdep.c,v 1.4 2002/03/17 11:37:55 simonb Exp $ */
+/* $NetBSD: machdep.c,v 1.24 2004/02/13 11:36:17 wiz Exp $ */
 
 /*
  * Copyright 2000, 2001
@@ -15,10 +15,9 @@
  *    the source file.
  *
  * 2) No right is granted to use any trade name, trademark, or logo of
- *    Broadcom Corporation. Neither the "Broadcom Corporation" name nor any
- *    trademark or logo of Broadcom Corporation may be used to endorse or
- *    promote products derived from this software without the prior written
- *    permission of Broadcom Corporation.
+ *    Broadcom Corporation.  The "Broadcom Corporation" name may not be
+ *    used to endorse or promote products derived from this software
+ *    without the prior written permission of Broadcom Corporation.
  *
  * 3) THIS SOFTWARE IS PROVIDED "AS-IS" AND ANY EXPRESS OR IMPLIED
  *    WARRANTIES, INCLUDING BUT NOT LIMITED TO, ANY IMPLIED WARRANTIES OF
@@ -58,13 +57,15 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.24 2004/02/13 11:36:17 wiz Exp $");
+
 #include "opt_ddb.h"
 #include "opt_execfmt.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/map.h>
 #include <sys/proc.h>
 #include <sys/buf.h>
 #include <sys/reboot.h>
@@ -76,10 +77,11 @@
 #include <sys/device.h>
 #include <sys/user.h>
 #include <sys/exec.h>
-#include <sys/sysctl.h>
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 #include <sys/kcore.h>
+#include <sys/ksyms.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -92,7 +94,6 @@
 #include <machine/swarm.h>
 #include <mips/locore.h>
 
-#include <mips/cfe/cfe_xiocb.h>
 #include <mips/cfe/cfe_api.h>
 
 #if 0 /* XXXCGD */
@@ -100,7 +101,9 @@
 #endif /* XXXCGD */
 #include <machine/leds.h>
 
-#ifdef DDB
+#include "ksyms.h"
+
+#if NKSYMS || defined(DDB) || defined(LKM)
 #include <machine/db_machdep.h>
 #include <ddb/db_access.h>
 #include <ddb/db_sym.h>
@@ -114,14 +117,13 @@
 
 #include <dev/cons.h>
 
-#ifdef IKOS
-#include <sbmips/ikos/ikosvar.h>
+#if NKSYMS || defined(DDB) || defined(LKM)
+/* start and end of kernel symbol table */
+void	*ksym_start, *ksym_end;
 #endif
 
-/* For sysctl. */
-char machine[] = MACHINE;
-char machine_arch[] = MACHINE_ARCH;
-char cpu_model[] = "sb1250";
+/* For sysctl_hw. */
+extern char cpu_model[];
 
 /* Our exported CPU info.  Only one for now */
 struct cpu_info cpu_info_store;
@@ -143,7 +145,7 @@ phys_ram_seg_t mem_clusters[VM_PHYSSEG_MAX];
 int mem_cluster_cnt;
 
 void	configure(void);
-void	mach_init(long,long,long,long);
+void	mach_init(long, long, long, long);
 
 /*
  * safepri is a safe priority for sleep to set for a spin-wait during
@@ -158,50 +160,22 @@ extern struct user *proc0paddr;
  * Do all the stuff that locore normally does before calling main().
  */
 void
-mach_init(fwhandle,magic,bootdata,reserved)
-	long fwhandle;
-	long magic;
-	long bootdata;
-	long reserved;
+mach_init(long fwhandle, long magic, long bootdata, long reserved)
 {
-	caddr_t kernend, v, p0;
+	caddr_t kernend, p0;
 	u_long first, last;
-	vsize_t size;
 	extern char edata[], end[];
 	int i;
-	u_int memsize;
 	uint32_t config;
 
-	/* XXX this code must run on the target cpu */
+	/* XXX this code must run on the target CPU */
 	config = mips3_cp0_config_read();
 	config &= ~MIPS3_CONFIG_K0_MASK;
 	config |= 0x05;				/* XXX.  cacheable coherent */
 	mips3_cp0_config_write(config);
 
-	/* XXXCGD */
-#ifdef SBMIPS_MEM_SIZE
-	memsize = SBMIPS_MEM_SIZE;
-#else
-	memsize = 32 * 1024 * 1024;
-#endif
-	memsize += MIPS_KSEG0_START;
-
-	/*
-	 * Clear the BSS segment.
-	 */
-#ifdef DDB
-	if (memcmp(((Elf_Ehdr *)end)->e_ident, ELFMAG, SELFMAG) == 0 &&
-	    ((Elf_Ehdr *)end)->e_ident[EI_CLASS] == ELFCLASS) {
-		esym = end;
-		esym += ((Elf_Ehdr *)end)->e_entry;
-		kernend = (caddr_t)mips_round_page(esym);
-		bzero(edata, end - edata);
-	} else
-#endif
-	{
-		kernend = (caddr_t)mips_round_page(end);
-		memset(edata, 0, kernend - edata);
-	}
+	/* Zero BSS.  XXXCGD: uh, is this really necessary still?  */
+	memset(edata, 0, end - edata);
 
 	/*
 	 * Copy the bootinfo structure from the boot loader.
@@ -209,9 +183,8 @@ mach_init(fwhandle,magic,bootdata,reserved)
 	 * called because we may need CFE's TLB handler
 	 */
 
-	cfe_present = 0;
 	if (magic == BOOTINFO_MAGIC)
-		bcopy((struct bootinfo_v1 *)bootdata, &bootinfo,
+		memcpy(&bootinfo, (struct bootinfo_v1 *)bootdata,
 		    sizeof bootinfo);
 	else if (reserved == CFE_EPTSEAL) {
 		magic = BOOTINFO_MAGIC;
@@ -219,26 +192,18 @@ mach_init(fwhandle,magic,bootdata,reserved)
 		bootinfo.version = BOOTINFO_VERSION;
 		bootinfo.fwhandle = fwhandle;
 		bootinfo.fwentry = bootdata;
+		bootinfo.ssym = (vaddr_t)end;
+		bootinfo.esym = (vaddr_t)end;
 	}
 
-#ifdef IKOS
-	ikoscons_output_bufsize = IKOSCONS_OUTPUT_BUFSIZE;
-	memsize -= ikoscons_output_bufsize;
-	ikoscons_output_buf =
-	    (void *)MIPS_PHYS_TO_KSEG1(MIPS_KSEG0_TO_PHYS(memsize));
-	memset(ikoscons_output_buf, 0, ikoscons_output_bufsize);
+	kernend = (caddr_t)mips_round_page(end);
+#if NKSYMS || defined(DDB) || defined(LKM)
+	if (magic == BOOTINFO_MAGIC) {
+		ksym_start = (void *)bootinfo.ssym;
+		ksym_end   = (void *)bootinfo.esym;
+		kernend = (caddr_t)mips_round_page((vaddr_t)ksym_end);
+	}
 #endif
-
-	/*
-	 * physmem is measured in pages
-	 * XXX does this need to be set for 'consinit', 'uvm_setpagesize',
-	 * XXX or 'mips_vector_init'?  not that I can tell right now...
-	 * XXX if CFE is present, this will be recalculated.
-	 * XXX
-	 * XXX Does 'physmem' want to be the total amount of RAM in the
-	 * XXX system, or the amount that is available to us?
-	 */
-	physmem = btoc(memsize - MIPS_KSEG0_START);
 
 	consinit();
 
@@ -251,25 +216,25 @@ mach_init(fwhandle,magic,bootdata,reserved)
 	 */
 	mips_vector_init();
 
-#if 0
-*(unsigned long long *)0xb0020440 = 3;
+#ifdef DEBUG
+	printf("fwhandle=%08X magic=%08X bootdata=%08X reserved=%08X\n",
+	    (u_int)fwhandle, (u_int)magic, (u_int)bootdata, (u_int)reserved);
 #endif
 
-	printf("fwhandle=%08X magic=%08X bootdata=%08X reserved=%08X\n",
-	    (u_int) fwhandle,(u_int) magic,(u_int) bootdata,(u_int) reserved);
+	strcpy(cpu_model, "sb1250");
 
 	if (magic == BOOTINFO_MAGIC) {
 		int idx;
 		int added;
-		cfe_xuint_t start,len,type;
+		uint64_t start, len, type;
 
-		cfe_init(fwhandle);
+		cfe_init(bootinfo.fwhandle, bootinfo.fwentry);
 		cfe_present = 1;
 
 		idx = 0;
 		physmem = 0;
 		mem_cluster_cnt = 0;
-		while (cfe_getmeminfo(idx,&start,&len,&type) == 0) {
+		while (cfe_enummem(idx, 0, &start, &len, &type) == 0) {
 			added = 0;
 			printf("Memory Block #%d start %08llX len %08llX: %s: ",
 			    idx, start, len, (type == CFE_MI_AVAILABLE) ?
@@ -301,6 +266,8 @@ mach_init(fwhandle,magic,bootdata,reserved)
 		/*
 		 * Handle the case of not being called from the firmware.
 		 */
+		/* XXX hardwire to 32MB; should be kernel config option */
+		physmem = 32 * 1024 * 1024 / 4096;
 		mem_clusters[0].start = 0;
 		mem_clusters[0].size = ctob(physmem);
 		mem_cluster_cnt = 1;
@@ -330,13 +297,6 @@ mach_init(fwhandle,magic,bootdata,reserved)
 				i++;
 			}
 		}
-		if (memcmp("single", &bootinfo.boot_flags[i], 5) == 0)
-			boothowto |= RB_SINGLE;
-		if (memcmp("nfsroot=", &bootinfo.boot_flags[i], 8) == 0)
-			netboot = 1;
-		/*
-		 * XXX Select root device from 'root=/dev/hd[abcd][1234]' too.
-		 */
 	}
 
 	/*
@@ -365,29 +325,19 @@ mach_init(fwhandle,magic,bootdata,reserved)
 	 * Allocate space for proc0's USPACE
 	 */
 	p0 = (caddr_t)pmap_steal_memory(USPACE, NULL, NULL);
-	proc0.p_addr = proc0paddr = (struct user *)p0;
-	proc0.p_md.md_regs = (struct frame *)(p0 + USPACE) - 1;
-	curpcb = &proc0.p_addr->u_pcb;
+	lwp0.l_addr = proc0paddr = (struct user *)p0;
+	lwp0.l_md.md_regs = (struct frame *)(p0 + USPACE) - 1;
+	curpcb = &lwp0.l_addr->u_pcb;
 	curpcb->pcb_context[11] = MIPS_INT_MASK | MIPS_SR_INT_IE; /* SR */
-
-	/*
-	 * Allocate space for system data structures.  These data structures
-	 * are allocated here instead of cpu_startup() because physical
-	 * memory is directly addressable.  We don't have to map these into
-	 * virtual address space.
-	 */
-	size = (vsize_t)allocsys(NULL, NULL);
-	v = (caddr_t)pmap_steal_memory(size, NULL, NULL);
-	if ((allocsys(v, NULL) - v) != size)
-		panic("mach_init: table size inconsistency");
 
 	pmap_bootstrap();
 
 	/*
 	 * Initialize debuggers, and break into them, if appropriate.
 	 */
-#if defined(DDB)
-	ddb_init(0, 0, 0);
+#if NKSYMS || defined(DDB) || defined(LKM)
+	ksyms_init(((uintptr_t)ksym_end - (uintptr_t)ksym_start),
+	    ksym_start, ksym_end);
 #endif
 
 	if (boothowto & RB_KDB) {
@@ -401,12 +351,9 @@ mach_init(fwhandle,magic,bootdata,reserved)
  * Allocate memory for variable-sized tables,
  */
 void
-cpu_startup()
+cpu_startup(void)
 {
-	unsigned i;
-	int base, residual;
 	vaddr_t minaddr, maxaddr;
-	vsize_t size;
 	char pbuf[9];
 
 	/*
@@ -416,46 +363,7 @@ cpu_startup()
 	format_bytes(pbuf, sizeof(pbuf), ctob(physmem));
 	printf("%s memory", pbuf);
 
-	/*
-	 * Allocate virtual address space for file I/O buffers.
-	 * Note they are different than the array of headers, 'buf',
-	 * and usually occupy more virtual memory than physical.
-	 */
-	size = MAXBSIZE * nbuf;
-	if (uvm_map(kernel_map, (vaddr_t *)&buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET, 0,
-		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-		    UVM_ADV_NORMAL, 0)) != 0)
-		panic("startup: cannot allocate VM for buffers");
-	minaddr = (vaddr_t)buffers;
-	base = bufpages / nbuf;
-	residual = bufpages % nbuf;
-	for (i = 0; i < nbuf; i++) {
-		vsize_t curbufsize;
-		vaddr_t curbuf;
-		struct vm_page *pg;
-
-		/*
-		 * Each buffer has MAXBSIZE bytes of VM space allocated.  Of
-		 * that MAXBSIZE space, we allocate and map (base+1) pages
-		 * for the first "residual" buffers, and then we allocate
-		 * "base" pages for the rest.
-		 */
-		curbuf = (vaddr_t) buffers + (i * MAXBSIZE);
-		curbufsize = NBPG * ((i < residual) ? (base + 1) : base);
-
-		while (curbufsize) {
-			pg = uvm_pagealloc(NULL, 0, NULL, 0);
-			if (pg == NULL)
-				panic("cpu_startup: not enough memory for "
-					"buffer cache");
-			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
-			    VM_PROT_READ|VM_PROT_WRITE);
-			curbuf += PAGE_SIZE;
-			curbufsize -= PAGE_SIZE;
-		}
-	}
-
+	minaddr = 0;
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
 	 * limits the number of processes exec'ing at any time.
@@ -477,44 +385,16 @@ cpu_startup()
 
 	format_bytes(pbuf, sizeof(pbuf), ptoa(uvmexp.free));
 	printf(", %s free", pbuf);
-	format_bytes(pbuf, sizeof(pbuf), bufpages * NBPG);
-	printf(", %s in %d buffers\n", pbuf, nbuf);
-
-	/*
-	 * Set up buffers, so they can be used to read disk labels.
-	 */
-	bufinit();
-}
-
-int
-cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
-	struct proc *p;
-{
-	/* All sysctl names at this level are terminal. */
-	if (namelen != 1)
-		return ENOTDIR;
-
-	switch (name[0]) {
-	default:
-		return EOPNOTSUPP;
-	}
 }
 
 int	waittime = -1;
 
 void
-cpu_reboot(howto, bootstr)
-	int howto;
-	char *bootstr;
+cpu_reboot(int howto, char *bootstr)
 {
+
 	/* Take a snapshot before clobbering any registers. */
-	if (curproc)
+	if (curlwp)
 		savectx((struct user *)curpcb);
 
 	if (cold) {
@@ -558,24 +438,14 @@ haltsys:
 	printf("rebooting...\n\n");
 
 	if (cfe_present) {
-		cfe_exit(1, (howto & RB_DUMP) ? 1 : 0);
+		/*
+		 * XXX
+		 * For some reason we can't return to CFE with
+		 * and do a warm start.  Need to look into this...
+		 */
+		cfe_exit(0, (howto & RB_DUMP) ? 1 : 0);
 		printf("cfe_exit didn't!\n");
 	}
-
-	delay(500000);
-
-#if defined(IKOS) && defined(REALLY_IKOS)
-	*(volatile char *)MIPS_PHYS_TO_KSEG1(0x408000) = 0;
-#else
-    {
-	static int broken;
-
-	if (!broken) {
-		broken = 1;
-		__asm__ ( "move $4, %0 ; break 0x3ff" : : "r"(howto) );
-	}
-    }
-#endif
 
 	printf("WARNING: reboot failed!\n");
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: irix_swap.c,v 1.7 2002/03/29 09:06:54 manu Exp $ */
+/*	$NetBSD: irix_swap.c,v 1.11.2.1 2004/11/12 06:56:21 jmc Exp $ */
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: irix_swap.c,v 1.7 2002/03/29 09:06:54 manu Exp $");
+__KERNEL_RCSID(0, "$NetBSD: irix_swap.c,v 1.11.2.1 2004/11/12 06:56:21 jmc Exp $");
 
 #include <sys/types.h>
 #include <sys/signal.h> 
@@ -49,6 +49,7 @@ __KERNEL_RCSID(0, "$NetBSD: irix_swap.c,v 1.7 2002/03/29 09:06:54 manu Exp $");
 #include <sys/swap.h>
 #include <sys/vnode.h>
 #include <sys/namei.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <uvm/uvm_page.h>
@@ -65,8 +66,8 @@ __KERNEL_RCSID(0, "$NetBSD: irix_swap.c,v 1.7 2002/03/29 09:06:54 manu Exp $");
 extern struct lock swap_syscall_lock;
 
 int
-irix_sys_swapctl(p, v, retval)
-	struct proc *p;
+irix_sys_swapctl(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -110,7 +111,7 @@ irix_sys_swapctl(p, v, retval)
 		SCARG(&cup, arg) = isr.sr_name;
 		SCARG(&cup, misc) = 
 		    (SCARG(uap, cmd) == IRIX_SC_SGIADD) ? isr.sr_pri : 0;
-		return sys_swapctl(p, &cup, retval);
+		return sys_swapctl(l, &cup, retval);
 		break;
 	}
 
@@ -119,7 +120,7 @@ irix_sys_swapctl(p, v, retval)
 		SCARG(&cup, cmd) = SWAP_NSWAP;
 		SCARG(&cup, arg) = NULL;
 		SCARG(&cup, misc) = 0;
-		return sys_swapctl(p, &cup, retval);
+		return sys_swapctl(l, &cup, retval);
 		break;
 
 	case IRIX_SC_LIST: { /* Get swap list */
@@ -189,21 +190,18 @@ bad:
 		struct swapent *sep;
 		int i, dontcare, sum = 0;
 
-		if (!uvm_useracc((caddr_t)SCARG(uap, arg), 
-		    sizeof(sum), B_WRITE))
-			return EACCES;
-
 		SCARG(&cup, cmd) = SWAP_NSWAP;
 		SCARG(&cup, arg) = NULL;
 		SCARG(&cup, misc) = 0;
-		if ((error = sys_swapctl(p, &cup, (register_t *)&entries)) != 0)
+		if ((error = sys_swapctl(l, &cup,
+					 (register_t *)(void *)&entries)) != 0)
 			return error;
 
 		sep = (struct swapent *)malloc(
 		    sizeof(struct swapent) * entries, M_TEMP, M_WAITOK);
 		lockmgr(&swap_syscall_lock, LK_EXCLUSIVE, NULL);
 		uvm_swap_stats(SWAP_STATS, sep, entries, 
-		    (register_t *)&dontcare);
+		    (register_t *)(void *)&dontcare);
 		lockmgr(&swap_syscall_lock, LK_RELEASE, NULL);
 
 		if (SCARG(uap, cmd) == IRIX_SC_GETFREESWAP)
@@ -224,6 +222,7 @@ bad:
 	default:
 		printf("irix_sys_swapctl(): unsupported command %d\n", 
 		    SCARG(uap, cmd));
+		return EINVAL;
 		break;
 	}
 	return 0;

@@ -1,7 +1,6 @@
-/*	$NetBSD: ext2fs_readwrite.c,v 1.24 2002/03/25 02:23:55 chs Exp $	*/
+/*	$NetBSD: ext2fs_readwrite.c,v 1.32 2004/03/22 19:23:08 bouyer Exp $	*/
 
 /*-
- * Copyright (c) 1997 Manuel Bouyer.
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -37,8 +32,40 @@
  * Modified for ext2fs by Manuel Bouyer.
  */
 
+/*-
+ * Copyright (c) 1997 Manuel Bouyer.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by Manuel Bouyer.
+ * 4. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ *	@(#)ufs_readwrite.c	8.8 (Berkeley) 8/4/94
+ * Modified for ext2fs by Manuel Bouyer.
+ */
+
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ext2fs_readwrite.c,v 1.24 2002/03/25 02:23:55 chs Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ext2fs_readwrite.c,v 1.32 2004/03/22 19:23:08 bouyer Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -48,13 +75,13 @@ __KERNEL_RCSID(0, "$NetBSD: ext2fs_readwrite.c,v 1.24 2002/03/25 02:23:55 chs Ex
 #include <sys/stat.h>
 #include <sys/buf.h>
 #include <sys/proc.h>
-#include <sys/conf.h>
 #include <sys/mount.h>
 #include <sys/vnode.h>
 #include <sys/malloc.h>
 #include <sys/signalvar.h>
 
 #include <ufs/ufs/inode.h>
+#include <ufs/ufs/ufs_extern.h>
 #include <ufs/ext2fs/ext2fs.h>
 #include <ufs/ext2fs/ext2fs_extern.h>
 
@@ -83,7 +110,7 @@ ext2fs_read(v)
 	struct buf *bp;
 	void *win;
 	vsize_t bytelen;
-	ufs_daddr_t lbn, nextlbn;
+	daddr_t lbn, nextlbn;
 	off_t bytesinfile;
 	long size, xfersize, blkoffset;
 	int error;
@@ -205,13 +232,14 @@ ext2fs_write(v)
 	struct m_ext2fs *fs;
 	struct buf *bp;
 	struct proc *p;
-	ufs_daddr_t lbn;
+	daddr_t lbn;
 	off_t osize;
 	int blkoffset, error, flags, ioflag, resid, xfersize;
 	vsize_t bytelen;
 	void *win;
 	off_t oldoff;
 	boolean_t async;
+	int extended=0;
 
 	ioflag = ap->a_ioflag;
 	uio = ap->a_uio;
@@ -272,7 +300,7 @@ ext2fs_write(v)
 			bytelen = MIN(fs->e2fs_bsize - blkoffset,
 			    uio->uio_resid);
 
-			error = ext2fs_balloc_range(vp, uio->uio_offset,
+			error = ufs_balloc_range(vp, uio->uio_offset,
 			    bytelen, ap->a_cred, 0);
 			if (error) {
 				break;
@@ -292,6 +320,7 @@ ext2fs_write(v)
 
 			if (vp->v_size < uio->uio_offset) {
 				uvm_vnp_setsize(vp, uio->uio_offset);
+				extended = 1;
 			}
 
 			/*
@@ -340,6 +369,7 @@ ext2fs_write(v)
 
 		if (vp->v_size < uio->uio_offset) {
 			uvm_vnp_setsize(vp, uio->uio_offset);
+			extended = 1;
 		}
 
 		if (ioflag & IO_SYNC)
@@ -362,6 +392,8 @@ out:
 	ip->i_flag |= IN_CHANGE | IN_UPDATE;
 	if (resid > uio->uio_resid && ap->a_cred && ap->a_cred->cr_uid != 0)
 		ip->i_e2fs_mode &= ~(ISUID | ISGID);
+	if (resid > uio->uio_resid)
+		VN_KNOTE(vp, NOTE_WRITE | (extended ? NOTE_EXTEND : 0));
 	if (error) {
 		(void) VOP_TRUNCATE(vp, osize, ioflag & IO_SYNC, ap->a_cred,
 		    uio->uio_procp);

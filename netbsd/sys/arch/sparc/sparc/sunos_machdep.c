@@ -1,4 +1,4 @@
-/*	$NetBSD: sunos_machdep.c,v 1.9 2001/06/07 17:49:51 mrg Exp $	*/
+/*	$NetBSD: sunos_machdep.c,v 1.14 2003/10/05 21:13:23 pk Exp $	*/
 
 /*
  * Copyright (c) 1995 Matthew R. Green
@@ -28,6 +28,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sunos_machdep.c,v 1.14 2003/10/05 21:13:23 pk Exp $");
+
 #if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
 #endif
@@ -41,6 +44,7 @@
 #include <sys/signal.h>
 #include <sys/signalvar.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 #include <compat/sunos/sunos.h>
 #include <compat/sunos/sunos_syscallargs.h>
@@ -64,20 +68,19 @@ struct sunos_sigframe {
 	struct	sigcontext13 sf_sc;	/* actual sigcontext */
 };
 
-void
-sunos_sendsig(catcher, sig, mask, code)
-	sig_t catcher;
-	int sig;
-	sigset_t *mask;
-	u_long code;
+void sunos_sendsig(const ksiginfo_t *ksi, const sigset_t *mask)
 {
-	struct proc *p = curproc;
+	struct lwp *l = curlwp;
+	struct proc *p = l->l_proc;
 	struct sunos_sigframe *fp;
 	struct trapframe *tf;
 	int addr, onstack, oldsp, newsp;
+	int sig = ksi->ksi_signo;
+	u_long code = ksi->ksi_code;
+	sig_t catcher = SIGACTION(p, sig).sa_handler;
 	struct sunos_sigframe sf;
 
-	tf = p->p_md.md_tf;
+	tf = l->l_md.md_tf;
 	oldsp = tf->tf_out[6];
 
 	/*
@@ -134,7 +137,7 @@ sunos_sendsig(catcher, sig, mask, code)
 	 */
 	newsp = (int)fp - sizeof(struct rwindow);
 	write_user_windows();
-	if (rwindow_save(p) || copyout((caddr_t)&sf, (caddr_t)fp, sizeof sf) ||
+	if (rwindow_save(l) || copyout((caddr_t)&sf, (caddr_t)fp, sizeof sf) ||
 	    suword(&((struct rwindow *)newsp)->rw_in[6], oldsp)) {
 		/*
 		 * Process has trashed its stack; give it an illegal
@@ -144,7 +147,7 @@ sunos_sendsig(catcher, sig, mask, code)
 		if ((sunos_sigdebug & SDB_KSTACK) && p->p_pid == sunos_sigpid)
 			printf("sendsig: window save or copyout error\n");
 #endif
-		sigexit(p, SIGILL);
+		sigexit(l, SIGILL);
 		/* NOTREACHED */
 	}
 #ifdef DEBUG
@@ -172,13 +175,13 @@ sunos_sendsig(catcher, sig, mask, code)
 }
 
 int
-sunos_sys_sigreturn(p, v, retval)
-        register struct proc *p;
+sunos_sys_sigreturn(l, v, retval)
+        register struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct sunos_sys_sigreturn_args *uap = v;
 
-	return (compat_13_sys_sigreturn(p,
+	return (compat_13_sys_sigreturn(l,
 			(struct compat_13_sys_sigreturn_args *)uap, retval));
 }

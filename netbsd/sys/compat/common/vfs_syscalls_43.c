@@ -1,4 +1,4 @@
-/*	$NetBSD: vfs_syscalls_43.c,v 1.20 2001/11/13 02:08:05 lukem Exp $	*/
+/*	$NetBSD: vfs_syscalls_43.c,v 1.27 2003/11/19 16:43:38 christos Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: vfs_syscalls_43.c,v 1.20 2001/11/13 02:08:05 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: vfs_syscalls_43.c,v 1.27 2003/11/19 16:43:38 christos Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "fs_union.h"
@@ -59,14 +55,15 @@ __KERNEL_RCSID(0, "$NetBSD: vfs_syscalls_43.c,v 1.20 2001/11/13 02:08:05 lukem E
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/stat.h>
+#include <sys/malloc.h>
 #include <sys/ioctl.h>
 #include <sys/fcntl.h>
-#include <sys/malloc.h>
 #include <sys/syslog.h>
 #include <sys/unistd.h>
 #include <sys/resourcevar.h>
 
 #include <sys/mount.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 static void cvtstat __P((struct stat *, struct stat43 *));
@@ -105,15 +102,13 @@ cvtstat(st, ost)
  */
 /* ARGSUSED */
 int
-compat_43_sys_stat(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_stat(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_stat_args /* {
 		syscallarg(char *) path;
 		syscallarg(struct stat43 *) ub;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct stat sb;
 	struct stat43 osb;
 	int error;
@@ -137,15 +132,13 @@ compat_43_sys_stat(p, v, retval)
  */
 /* ARGSUSED */
 int
-compat_43_sys_lstat(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_lstat(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_lstat_args /* {
 		syscallarg(char *) path;
 		syscallarg(struct ostat *) ub;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct vnode *vp, *dvp;
 	struct stat sb, sb1;
 	struct stat43 osb;
@@ -211,15 +204,13 @@ again:
  */
 /* ARGSUSED */
 int
-compat_43_sys_fstat(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_fstat(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_fstat_args /* {
 		syscallarg(int) fd;
 		syscallarg(struct stat43 *) sb;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	int fd = SCARG(uap, fd);
 	struct filedesc *fdp = p->p_fd;
 	struct file *fp;
@@ -250,10 +241,7 @@ compat_43_sys_fstat(p, v, retval)
  */
 /* ARGSUSED */
 int
-compat_43_sys_ftruncate(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_ftruncate(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_ftruncate_args /* {
 		syscallarg(int) fd;
@@ -267,7 +255,7 @@ compat_43_sys_ftruncate(p, v, retval)
 
 	SCARG(&nuap, fd) = SCARG(uap, fd);
 	SCARG(&nuap, length) = SCARG(uap, length);
-	return (sys_ftruncate(p, &nuap, retval));
+	return (sys_ftruncate(l, &nuap, retval));
 }
 
 /*
@@ -275,10 +263,7 @@ compat_43_sys_ftruncate(p, v, retval)
  */
 /* ARGSUSED */
 int
-compat_43_sys_truncate(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_truncate(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_truncate_args /* {
 		syscallarg(char *) path;
@@ -292,7 +277,7 @@ compat_43_sys_truncate(p, v, retval)
 
 	SCARG(&nuap, path) = SCARG(uap, path);
 	SCARG(&nuap, length) = SCARG(uap, length);
-	return (sys_truncate(p, &nuap, retval));
+	return (sys_truncate(l, &nuap, retval));
 }
 
 
@@ -300,10 +285,7 @@ compat_43_sys_truncate(p, v, retval)
  * Reposition read/write file offset.
  */
 int
-compat_43_sys_lseek(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_lseek(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_lseek_args /* {
 		syscallarg(int) fd;
@@ -322,7 +304,7 @@ compat_43_sys_lseek(p, v, retval)
 	SCARG(&nuap, fd) = SCARG(uap, fd);
 	SCARG(&nuap, offset) = SCARG(uap, offset);
 	SCARG(&nuap, whence) = SCARG(uap, whence);
-	error = sys_lseek(p, &nuap, (register_t *)&qret);
+	error = sys_lseek(l, &nuap, (void *)&qret);
 	*(long *)retval = qret;
 	return (error);
 }
@@ -332,10 +314,7 @@ compat_43_sys_lseek(p, v, retval)
  * Create a file.
  */
 int
-compat_43_sys_creat(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_creat(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_creat_args /* {
 		syscallarg(char *) path;
@@ -350,15 +329,12 @@ compat_43_sys_creat(p, v, retval)
 	SCARG(&nuap, path) = SCARG(uap, path);
 	SCARG(&nuap, mode) = SCARG(uap, mode);
 	SCARG(&nuap, flags) = O_WRONLY | O_CREAT | O_TRUNC;
-	return (sys_open(p, &nuap, retval));
+	return (sys_open(l, &nuap, retval));
 }
 
 /*ARGSUSED*/
 int
-compat_43_sys_quota(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_quota(struct lwp *l, void *v, register_t *retval)
 {
 
 	return (ENOSYS);
@@ -369,10 +345,7 @@ compat_43_sys_quota(p, v, retval)
  * Read a block of directory entries in a file system independent format.
  */
 int
-compat_43_sys_getdirentries(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+compat_43_sys_getdirentries(struct lwp *l, void *v, register_t *retval)
 {
 	struct compat_43_sys_getdirentries_args /* {
 		syscallarg(int) fd;
@@ -380,12 +353,15 @@ compat_43_sys_getdirentries(p, v, retval)
 		syscallarg(u_int) count;
 		syscallarg(long *) basep;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct vnode *vp;
 	struct file *fp;
 	struct uio auio, kuio;
 	struct iovec aiov, kiov;
 	struct dirent *dp, *edp;
 	caddr_t dirbuf;
+	size_t count = min(MAXBSIZE, (size_t)SCARG(uap, count));
+
 	int error, eofflag, readcnt;
 	long loff;
 
@@ -403,13 +379,13 @@ unionread:
 		goto out;
 	}
 	aiov.iov_base = SCARG(uap, buf);
-	aiov.iov_len = SCARG(uap, count);
+	aiov.iov_len = count;
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_rw = UIO_READ;
 	auio.uio_segflg = UIO_USERSPACE;
 	auio.uio_procp = p;
-	auio.uio_resid = SCARG(uap, count);
+	auio.uio_resid = count;
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 	loff = auio.uio_offset = fp->f_offset;
 #	if (BYTE_ORDER != LITTLE_ENDIAN)
@@ -423,14 +399,14 @@ unionread:
 		kuio = auio;
 		kuio.uio_iov = &kiov;
 		kuio.uio_segflg = UIO_SYSSPACE;
-		kiov.iov_len = SCARG(uap, count);
-		MALLOC(dirbuf, caddr_t, SCARG(uap, count), M_TEMP, M_WAITOK);
+		kiov.iov_len = count;
+		dirbuf = malloc(count, M_TEMP, M_WAITOK);
 		kiov.iov_base = dirbuf;
 		error = VOP_READDIR(vp, &kuio, fp->f_cred, &eofflag,
 			    (off_t **)0, (int *)0);
 		fp->f_offset = kuio.uio_offset;
 		if (error == 0) {
-			readcnt = SCARG(uap, count) - kuio.uio_resid;
+			readcnt = count - kuio.uio_resid;
 			edp = (struct dirent *)&dirbuf[readcnt];
 			for (dp = (struct dirent *)dirbuf; dp < edp; ) {
 #				if (BYTE_ORDER == LITTLE_ENDIAN)
@@ -461,7 +437,7 @@ unionread:
 			if (dp >= edp)
 				error = uiomove(dirbuf, readcnt, &auio);
 		}
-		FREE(dirbuf, M_TEMP);
+		free(dirbuf, M_TEMP);
 	}
 	VOP_UNLOCK(vp, 0);
 	if (error)
@@ -472,7 +448,7 @@ unionread:
 	extern int (**union_vnodeop_p) __P((void *));
 	extern struct vnode *union_dircache __P((struct vnode *));
 
-	if ((SCARG(uap, count) == auio.uio_resid) &&
+	if ((count == auio.uio_resid) &&
 	    (vp->v_op == union_vnodeop_p)) {
 		struct vnode *lvp;
 
@@ -511,7 +487,7 @@ unionread:
 }
 #endif /* UNION */
 
-	if ((SCARG(uap, count) == auio.uio_resid) &&
+	if ((count == auio.uio_resid) &&
 	    (vp->v_flag & VROOT) &&
 	    (vp->v_mount->mnt_flag & MNT_UNION)) {
 		struct vnode *tvp = vp;
@@ -524,7 +500,7 @@ unionread:
 	}
 	error = copyout((caddr_t)&loff, (caddr_t)SCARG(uap, basep),
 	    sizeof(long));
-	*retval = SCARG(uap, count) - auio.uio_resid;
+	*retval = count - auio.uio_resid;
  out:
 	FILE_UNUSE(fp, p);
 	return (error);

@@ -1,4 +1,4 @@
-/*	$NetBSD: ioctl_compat.h,v 1.12 2001/11/11 00:00:15 perry Exp $	*/
+/*	$NetBSD: ioctl_compat.h,v 1.14 2003/08/07 16:34:05 agc Exp $	*/
 
 /*
  * Copyright (c) 1990, 1993
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -40,11 +36,11 @@
  *	@(#)ioctl_compat.h	8.4 (Berkeley) 1/21/94
  */
 
-#ifndef _SYS_IOCTL_COMPAT_H_
-#define	_SYS_IOCTL_COMPAT_H_
-
 #include <sys/ttychars.h>
 #include <sys/ttydev.h>
+
+#ifndef _SYS_IOCTL_COMPAT_H_
+#define	_SYS_IOCTL_COMPAT_H_
 
 struct tchars {
 	char	t_intrc;	/* interrupt */

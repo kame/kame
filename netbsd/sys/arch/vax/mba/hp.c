@@ -1,4 +1,4 @@
-/*	$NetBSD: hp.c,v 1.24 2000/06/04 18:04:38 ragge Exp $ */
+/*	$NetBSD: hp.c,v 1.36 2003/12/29 16:23:58 pk Exp $ */
 /*
  * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -40,6 +40,10 @@
  *  Handle disk media changes.
  *  Dual-port operations should be supported.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hp.c,v 1.36 2003/12/29 16:23:58 pk Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -53,6 +57,7 @@
 #include <sys/syslog.h>
 #include <sys/reboot.h>
 #include <sys/conf.h>
+#include <sys/event.h>
 
 #include <machine/bus.h>
 #include <machine/trap.h>
@@ -81,11 +86,25 @@ void    hpattach(struct device *, struct device *, void *);
 void	hpstart(struct mba_device *);
 int	hpattn(struct mba_device *);
 enum	xfer_action hpfinish(struct mba_device *, int, int *);
-bdev_decl(hp);
-cdev_decl(hp);
 
-struct	cfattach hp_ca = {
-	sizeof(struct hp_softc), hpmatch, hpattach
+CFATTACH_DECL(hp, sizeof(struct hp_softc),
+    hpmatch, hpattach, NULL, NULL);
+
+dev_type_open(hpopen);
+dev_type_close(hpclose);
+dev_type_read(hpread);
+dev_type_write(hpwrite);
+dev_type_ioctl(hpioctl);
+dev_type_strategy(hpstrategy);
+dev_type_size(hpsize);
+
+const struct bdevsw hp_bdevsw = {
+	hpopen, hpclose, hpstrategy, hpioctl, nulldump, hpsize, D_DISK
+};
+
+const struct cdevsw hp_cdevsw = {
+	hpopen, hpclose, hpread, hpwrite, hpioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
 };
 
 #define HP_WCSR(reg, val) \
@@ -123,14 +142,14 @@ hpattach(struct device *parent, struct device *self, void *aux)
 	struct	mba_softc *ms = (void *)parent;
 	struct	disklabel *dl;
 	struct  mba_attach_args *ma = aux;
-	char	*msg;
+	const char	*msg;
 
 	sc->sc_iot = ma->ma_iot;
 	sc->sc_ioh = ma->ma_ioh;
 	/*
 	 * Init the common struct for both the adapter and its slaves.
 	 */
-	BUFQ_INIT(&sc->sc_md.md_q);
+	bufq_alloc(&sc->sc_md.md_q, BUFQ_DISKSORT|BUFQ_SORT_CYLINDER);
 	sc->sc_md.md_softc = (void *)sc;	/* Pointer to this softc */
 	sc->sc_md.md_mba = (void *)parent;	/* Pointer to parent softc */
 	sc->sc_md.md_start = hpstart;		/* Disk start routine */
@@ -177,8 +196,8 @@ hpstrategy(struct buf *bp)
 	sc = hp_cd.cd_devs[unit];
 	lp = sc->sc_disk.dk_label;
 
-	err = bounds_check_with_label(bp, lp, sc->sc_wlabel);
-	if (err < 0)
+	err = bounds_check_with_label(&sc->sc_disk, bp, sc->sc_wlabel);
+	if (err <= 0)
 		goto done;
 
 	bp->b_rawblkno =
@@ -187,8 +206,8 @@ hpstrategy(struct buf *bp)
 
 	s = splbio();
 
-	gp = BUFQ_FIRST(&sc->sc_md.md_q);
-	disksort_cylinder(&sc->sc_md.md_q, bp);
+	gp = BUFQ_PEEK(&sc->sc_md.md_q);
+	BUFQ_PUT(&sc->sc_md.md_q, bp);
 	if (gp == 0)
 		mbaqueue(&sc->sc_md);
 
@@ -208,7 +227,7 @@ hpstart(struct	mba_device *md)
 {
 	struct	hp_softc *sc = md->md_softc;
 	struct	disklabel *lp = sc->sc_disk.dk_label;
-	struct	buf *bp = BUFQ_FIRST(&md->md_q);
+	struct	buf *bp = BUFQ_PEEK(&md->md_q);
 	unsigned bn, cn, sn, tn;
 
 	/*
@@ -346,7 +365,7 @@ enum xfer_action
 hpfinish(struct mba_device *md, int mbasr, int *attn)
 {
 	struct	hp_softc *sc = md->md_softc;
-	struct	buf *bp = BUFQ_FIRST(&md->md_q);
+	struct	buf *bp = BUFQ_PEEK(&md->md_q);
 	int er1, er2, bc;
 	unsigned byte;
 
@@ -365,7 +384,7 @@ hper1:
 		bc = bus_space_read_4(md->md_mba->sc_iot,
 		    md->md_mba->sc_ioh, MBA_BC);
 		byte = ~(bc >> 16);
-		diskerr(buf, hp_cd.cd_name, "soft ecc", LOG_PRINTF,
+		diskerr(bp, hp_cd.cd_name, "soft ecc", LOG_PRINTF,
 		    btodb(bp->b_bcount - byte), sc->sc_disk.dk_label);
 		er1 &= ~(1<<HPER1_DCK);
 		break;
@@ -385,8 +404,9 @@ hper2:
 		printf("massbuss error :%s %x\n",
 		    sc->sc_dev.dv_xname, mbasr);
 
-	BUFQ_FIRST(&md->md_q)->b_resid = 0;
-	disk_unbusy(&sc->sc_disk, BUFQ_FIRST(&md->md_q)->b_bcount);
+	BUFQ_PEEK(&md->md_q)->b_resid = 0;
+	disk_unbusy(&sc->sc_disk, BUFQ_PEEK(&md->md_q)->b_bcount,
+	    (bp->b_flags & B_READ));
 	return XFER_FINISH;
 }
 
@@ -422,12 +442,6 @@ hpsize(dev_t dev)
 	    (sc->sc_disk.dk_label->d_secsize / DEV_BSIZE);
 
 	return size;
-}
-
-int
-hpdump(dev_t dev, daddr_t blkno, caddr_t va, size_t size)
-{
-	return 0;
 }
 
 int

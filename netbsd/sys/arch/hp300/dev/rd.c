@@ -1,4 +1,4 @@
-/*	$NetBSD: rd.c,v 1.49 2002/04/08 21:41:44 gmcgarry Exp $	*/
+/*	$NetBSD: rd.c,v 1.62 2003/11/17 14:37:59 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -37,9 +37,43 @@
  */
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1982, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: rd.c 1.44 92/12/26$
+ *
+ *	@(#)rd.c	8.2 (Berkeley) 5/19/94
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -83,7 +117,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rd.c,v 1.49 2002/04/08 21:41:44 gmcgarry Exp $");                                                  
+__KERNEL_RCSID(0, "$NetBSD: rd.c,v 1.62 2003/11/17 14:37:59 tsutsui Exp $");
 
 #include "opt_useleds.h"
 #include "rnd.h"
@@ -256,9 +290,6 @@ struct rdidentinfo rdidentinfo[] = {
 };
 int numrdidentinfo = sizeof(rdidentinfo) / sizeof(rdidentinfo[0]);
 
-bdev_decl(rd);
-cdev_decl(rd);
-
 int	rdident __P((struct device *, struct rd_softc *,
 	    struct hpibbus_attach_args *));
 void	rdreset __P((struct rd_softc *));
@@ -283,11 +314,28 @@ void	rdprinterr __P((char *, short, char **));
 int	rdmatch __P((struct device *, struct cfdata *, void *));
 void	rdattach __P((struct device *, struct device *, void *));
 
-struct cfattach rd_ca = {
-	sizeof(struct rd_softc), rdmatch, rdattach
-};
+CFATTACH_DECL(rd, sizeof(struct rd_softc),
+    rdmatch, rdattach, NULL, NULL);
 
 extern struct cfdriver rd_cd;
+
+dev_type_open(rdopen);
+dev_type_close(rdclose);
+dev_type_read(rdread);
+dev_type_write(rdwrite);
+dev_type_ioctl(rdioctl);
+dev_type_strategy(rdstrategy);
+dev_type_dump(rddump);
+dev_type_size(rdsize);
+
+const struct bdevsw rd_bdevsw = {
+	rdopen, rdclose, rdstrategy, rdioctl, rddump, rdsize, D_DISK
+};
+
+const struct cdevsw rd_cdevsw = {
+	rdopen, rdclose, rdread, rdwrite, rdioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
+};
 
 int
 rdmatch(parent, match, aux)
@@ -326,7 +374,7 @@ rdattach(parent, self, aux)
 	struct rd_softc *sc = (struct rd_softc *)self;
 	struct hpibbus_attach_args *ha = aux;
 
-	BUFQ_INIT(&sc->sc_tab);
+	bufq_alloc(&sc->sc_tab, BUFQ_DISKSORT|BUFQ_SORT_RAWBLOCK);
 
 	if (rdident(parent, sc, ha) == 0) {
 		printf("\n%s: didn't respond to describe command!\n",
@@ -410,7 +458,7 @@ rdident(parent, sc, ha)
 	hpibsend(ctlr, slave, C_CMD, cmd, sizeof(cmd));
 	hpibrecv(ctlr, slave, C_EXEC, desc, 37);
 	hpibrecv(ctlr, slave, C_QSTAT, &stat, sizeof(stat));
-	memset(name, 0, sizeof(name)); 
+	memset(name, 0, sizeof(name));
 	if (stat == 0) {
 		n = desc->d_name;
 		for (i = 5; i >= 0; i--) {
@@ -530,7 +578,7 @@ rdgetinfo(dev)
 	struct rd_softc *rs = rd_cd.cd_devs[unit];
 	struct disklabel *lp = rs->sc_dkdev.dk_label;
 	struct partition *pi;
-	char *msg;
+	const char *msg;
 
 	/*
 	 * Set some default values to use while reading the label
@@ -714,7 +762,7 @@ rdstrategy(bp)
 	}
 	bp->b_rawblkno = bn + offset;
 	s = splbio();
-	disksort_blkno(&rs->sc_tab, bp);
+	BUFQ_PUT(&rs->sc_tab, bp);
 	if (rs->sc_active == 0) {
 		rs->sc_active = 1;
 		rdustart(rs);
@@ -745,7 +793,7 @@ rdustart(rs)
 {
 	struct buf *bp;
 
-	bp = BUFQ_FIRST(&rs->sc_tab);
+	bp = BUFQ_PEEK(&rs->sc_tab);
 	rs->sc_addr = bp->b_data;
 	rs->sc_resid = bp->b_bcount;
 	if (hpibreq(rs->sc_dev.dv_parent, &rs->sc_hq))
@@ -759,11 +807,11 @@ rdfinish(rs, bp)
 {
 
 	rs->sc_errcnt = 0;
-	BUFQ_REMOVE(&rs->sc_tab, bp);
+	(void)BUFQ_GET(&rs->sc_tab);
 	bp->b_resid = 0;
 	biodone(bp);
 	hpibfree(rs->sc_dev.dv_parent, &rs->sc_hq);
-	if ((bp = BUFQ_FIRST(&rs->sc_tab)) != NULL)
+	if ((bp = BUFQ_PEEK(&rs->sc_tab)) != NULL)
 		return (bp);
 	rs->sc_active = 0;
 	if (rs->sc_flags & RDF_WANTED) {
@@ -778,7 +826,7 @@ rdstart(arg)
 	void *arg;
 {
 	struct rd_softc *rs = arg;
-	struct buf *bp = BUFQ_FIRST(&rs->sc_tab);
+	struct buf *bp = BUFQ_PEEK(&rs->sc_tab);
 	int part, ctlr, slave;
 
 	ctlr = rs->sc_dev.dv_parent->dv_unit;
@@ -838,7 +886,7 @@ again:
 	rdreset(rs);
 	if (rs->sc_errcnt++ < RDRETRY)
 		goto again;
-	printf("%s: rdstart err: cmd 0x%x sect %ld blk %d len %d\n",
+	printf("%s: rdstart err: cmd 0x%x sect %ld blk %" PRId64 " len %d\n",
 	       rs->sc_dev.dv_xname, rs->sc_ioc.c_cmd, rs->sc_ioc.c_addr,
 	       bp->b_blkno, rs->sc_resid);
 	bp->b_flags |= B_ERROR;
@@ -857,7 +905,7 @@ rdgo(arg)
 	void *arg;
 {
 	struct rd_softc *rs = arg;
-	struct buf *bp = BUFQ_FIRST(&rs->sc_tab);
+	struct buf *bp = BUFQ_PEEK(&rs->sc_tab);
 	int rw, ctlr, slave;
 
 	ctlr = rs->sc_dev.dv_parent->dv_unit;
@@ -881,7 +929,7 @@ rdintr(arg)
 {
 	struct rd_softc *rs = arg;
 	int unit = rs->sc_dev.dv_unit;
-	struct buf *bp = BUFQ_FIRST(&rs->sc_tab);
+	struct buf *bp = BUFQ_PEEK(&rs->sc_tab);
 	u_char stat = 13;	/* in case hpibrecv fails */
 	int rv, restart, ctlr, slave;
 
@@ -897,7 +945,8 @@ rdintr(arg)
 		return;
 	}
 #endif
-	disk_unbusy(&rs->sc_dkdev, (bp->b_bcount - bp->b_resid));
+	disk_unbusy(&rs->sc_dkdev, (bp->b_bcount - bp->b_resid),
+	    (bp->b_flags & B_READ));
 
 	if (rs->sc_flags & RDF_SEEK) {
 		rs->sc_flags &= ~RDF_SEEK;
@@ -1053,7 +1102,7 @@ rderror(unit)
 	 * Note that not all errors report a block number, in that case
 	 * we just use b_blkno.
  	 */
-	bp = BUFQ_FIRST(&rs->sc_tab);
+	bp = BUFQ_PEEK(&rs->sc_tab);
 	pbn = rs->sc_dkdev.dk_label->d_partitions[rdpart(bp->b_dev)].p_offset;
 	if ((sp->c_fef & FEF_CU) || (sp->c_fef & FEF_DR) ||
 	    (sp->c_ief & IEF_RRMASK)) {
@@ -1069,7 +1118,7 @@ rderror(unit)
 	 * out b_blkno which is just the beginning block number
 	 * of the transfer, not necessary where the error occurred.
 	 */
-	printf("%s%c: hard error sn%d\n", rs->sc_dev.dv_xname,
+	printf("%s%c: hard error sn%" PRId64 "\n", rs->sc_dev.dv_xname,
 	    'a'+rdpart(bp->b_dev), pbn);
 	/*
 	 * Now report the status as returned by the hardware with
@@ -1211,7 +1260,7 @@ rdgetdefaultlabel(sc, lp)
 	lp->d_ncylinders = rdidentinfo[type].ri_ncyl;
 	lp->d_secperunit = rdidentinfo[type].ri_nblocks;
 	lp->d_secpercyl = lp->d_ntracks * lp->d_nsectors;
-	
+
 	strncpy(lp->d_typename, rdidentinfo[type].ri_desc, 16);
 	strncpy(lp->d_packname, "fictitious", 16);
 	lp->d_rpm = 3000;
@@ -1283,7 +1332,7 @@ rdprinterr(str, err, tab)
 static int rddoingadump;	/* simple mutex */
 
 /*
- * Non-interrupt driven, non-dma dump routine.
+ * Non-interrupt driven, non-DMA dump routine.
  */
 int
 rddump(dev, blkno, va, size)

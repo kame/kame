@@ -1,4 +1,4 @@
-/* $NetBSD: macfb.c,v 1.6 2002/03/17 19:40:43 atatat Exp $ */
+/* $NetBSD: macfb.c,v 1.10 2003/07/15 02:43:18 lukem Exp $ */
 /*
  * Copyright (c) 1998 Matt DeBergalis
  * All rights reserved.
@@ -29,6 +29,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: macfb.c,v 1.10 2003/07/15 02:43:18 lukem Exp $");
+
 #include "opt_wsdisplay_compat.h"
 #include "grf.h"
 
@@ -56,11 +59,8 @@
 int macfb_match __P((struct device *, struct cfdata *, void *));
 void macfb_attach __P((struct device *, struct device *, void *));
 
-struct cfattach macfb_ca = {
-	sizeof(struct macfb_softc), 
-	macfb_match,
-	macfb_attach,
-};
+CFATTACH_DECL(macfb, sizeof(struct macfb_softc),
+    macfb_match, macfb_attach, NULL, NULL);
 
 const struct wsdisplay_emulops macfb_emulops = {
 	rcons_cursor,
@@ -70,7 +70,7 @@ const struct wsdisplay_emulops macfb_emulops = {
 	rcons_erasecols,
 	rcons_copyrows,
 	rcons_eraserows,
-	rcons_alloc_attr
+	rcons_allocattr
 };
 
 struct wsscreen_descr macfb_stdscreen = {
@@ -330,7 +330,7 @@ macfb_alloc_screen(v, type, cookiep, curxp, curyp, defattrp)
 	*cookiep = &sc->sc_dc->dc_rcons; /* one and only for now */
 	*curxp = 0;
 	*curyp = 0;
-	rcons_alloc_attr(&sc->sc_dc->dc_rcons, 0, 0, 0, &defattr);
+	rcons_allocattr(&sc->sc_dc->dc_rcons, 0, 0, 0, &defattr);
 	*defattrp = defattr;
 	sc->nscreens++;
 	return (0);
@@ -382,7 +382,7 @@ macfb_cnattach(addr)
 	/* set up the display */
 	macfb_init(&macfb_console_dc);
 
-	rcons_alloc_attr(&dc->dc_rcons, 0, 0, 0, &defattr);
+	rcons_allocattr(&dc->dc_rcons, 0, 0, 0, &defattr);
 
 	wsdisplay_cnattach(&macfb_stdscreen, &dc->dc_rcons,
 			0, 0, defattr);

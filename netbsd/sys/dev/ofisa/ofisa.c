@@ -1,4 +1,4 @@
-/*	$NetBSD: ofisa.c,v 1.8 2001/11/13 07:29:45 lukem Exp $	*/
+/*	$NetBSD: ofisa.c,v 1.13 2003/01/01 00:10:22 thorpej Exp $	*/
 
 /*
  * Copyright 1997, 1998
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ofisa.c,v 1.8 2001/11/13 07:29:45 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ofisa.c,v 1.13 2003/01/01 00:10:22 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -54,9 +54,8 @@ __KERNEL_RCSID(0, "$NetBSD: ofisa.c,v 1.8 2001/11/13 07:29:45 lukem Exp $");
 static int	ofisamatch __P((struct device *, struct cfdata *, void *));
 static void	ofisaattach __P((struct device *, struct device *, void *));
 
-struct cfattach ofisa_ca = {
-	sizeof(struct device), ofisamatch, ofisaattach
-};
+CFATTACH_DECL(ofisa, sizeof(struct device),
+    ofisamatch, ofisaattach, NULL, NULL);
 
 extern struct cfdriver ofisa_cd;
 
@@ -72,9 +71,9 @@ ofisaprint(aux, pnp)
 
 	(void)of_packagename(oba->oba_phandle, name, sizeof name);
 	if (pnp)
-		printf("%s at %s", name, pnp);
+		aprint_normal("%s at %s", name, pnp);
 	else
-		printf(" (%s)", name);
+		aprint_normal(" (%s)", name);
 	return UNCONF;
 }
 
@@ -85,7 +84,7 @@ ofisamatch(parent, cf, aux)
 	void *aux;
 {
 	struct ofbus_attach_args *oba = aux;
-	const char *compatible_strings[] = { "pnpPNP,a00", NULL };
+	static const char *const compatible_strings[] = { "pnpPNP,a00", NULL };
 	int rv = 0;
 
 	if (of_compatible(oba->oba_phandle, compatible_strings) != -1)

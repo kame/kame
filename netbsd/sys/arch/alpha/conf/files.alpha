@@ -1,4 +1,4 @@
-# $NetBSD: files.alpha,v 1.155.4.1 2003/06/30 02:52:09 grant Exp $
+# $NetBSD: files.alpha,v 1.166 2004/03/13 17:31:33 bjh21 Exp $
 #
 # alpha-specific configuration info
 
@@ -32,9 +32,6 @@ defflag		API_UP1000	# EV6		Alpha Processor, Inc. UP1000
 # Miscellaneous CPU-specific option headers
 defflag		FIX_UNALIGNED_VAX_FP
 defflag		ZS_IOASIC_DMA
-
-# XXX Temporary, until integration is finished.
-defflag		NEW_SCC_DRIVER
 
 # realtime clock compatible to OSF/1
 defflag		CLOCK_COMPAT_OSF1
@@ -70,25 +67,15 @@ include "dev/i2o/files.i2o"
 #
 
 include "dev/scsipi/files.scsipi"
-major { cd = 3 }
-major { sd = 8 }
 
 #
 # Machine-independent ATA drivers
 #
 
 include "dev/ata/files.ata"
-major { wd = 4 }
 
 # Memory Disk
 file	dev/md_root.c			memory_disk_hooks
-major { md = 6 }
-
-# RAIDframe
-major { raid = 16 }
-
-# Logical disks
-major { ld = 17 }
 
 # Raster operations
 include "dev/rasops/files.rasops"
@@ -199,11 +186,6 @@ device	pxg: wsemuldisplaydev, stic
 attach	pxg at tc
 file	dev/tc/pxg.c			pxg		needs-flag
 
-# 8530 UARTs
-device	scc: tty
-attach	scc at ioasic
-file	arch/alpha/tc/scc.c		scc		needs-count
-
 # 8530 UARTs using the MI 8530 driver
 device	zsc { channel = -1 }
 attach	zsc at ioasic with zsc_ioasic
@@ -241,7 +223,7 @@ file	arch/alpha/isa/isa_machdep.c	isa
 define	isadma_bounce
 file	arch/alpha/isa/isadma_bounce.c	isadma_bounce
 
-include "dev/pckbc/files.pckbc"
+include "dev/pckbport/files.pckbport"
 
 # ISA speaker generates keyboard beep
 device isabeep
@@ -256,7 +238,6 @@ file	dev/isa/fdc_isa.c		fdc_isa
 
 device	fd: disk
 attach	fd at fdc
-major	{ fd = 0 }
 
 # ISA Plug 'n Play devices
 file	arch/alpha/isa/isapnp_machdep.c	isapnp
@@ -293,7 +274,7 @@ file	arch/alpha/jensenio/pckbc_jensenio.c	pckbc_jensenio
 
 # include "dev/pci/files.pci" XXX SEE ABOVE
 
-file	arch/alpha/pci/pciide_machdep.c		pciide
+file	arch/alpha/pci/pciide_machdep.c		pciide_common
 
 define	alpha_pci_sgmap_pte32
 file	arch/alpha/pci/pci_sgmap_pte32.c	alpha_pci_sgmap_pte32
@@ -435,7 +416,6 @@ attach	pceb at pci
 file	arch/alpha/pci/sio.c		sio | pceb	needs-flag
 file	arch/alpha/pci/sio_pic.c	sio | pceb
 
-
 #
 # A12 if_de hack
 #
@@ -480,15 +460,13 @@ file	arch/alpha/jensenio/mcclock_jensenio.c	mcclock_jensenio
 #
 file	arch/alpha/alpha/autoconf.c
 file	arch/alpha/alpha/clock.c
-file	dev/clock_subr.c
-file	arch/alpha/alpha/conf.c
 file	arch/alpha/alpha/cpuconf.c
 file	arch/alpha/alpha/interrupt.c
 file	arch/alpha/alpha/ipifuncs.c		multiprocessor
 file	arch/alpha/alpha/machdep.c
 file	arch/alpha/alpha/mainbus.c
 file	arch/alpha/alpha/mem.c
-file	arch/alpha/alpha/microtime.c
+file	kern/kern_microtime.c
 file	arch/alpha/alpha/pmap.c
 file	arch/alpha/alpha/process_machdep.c
 file	arch/alpha/alpha/procfs_machdep.c	procfs
@@ -539,6 +517,7 @@ file	arch/alpha/alpha/kgdb_machdep.c		kgdb
 
 # Binary compatibility with previous NetBSD releases (COMPAT_XX)
 file	arch/alpha/alpha/compat_13_machdep.c	compat_13 | compat_osf1
+file	arch/alpha/alpha/compat_16_machdep.c	compat_16 | compat_osf1
 
 # OSF/1 Binary Compatibility (COMPAT_OSF1)
 include "compat/osf1/files.osf1"
@@ -600,3 +579,5 @@ include "dev/usb/files.usb"
 # Machine-independent IEEE 1394 device support
 #
 include "dev/ieee1394/files.ieee1394"
+
+include	"arch/alpha/conf/majors.alpha"

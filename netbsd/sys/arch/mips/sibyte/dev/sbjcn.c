@@ -1,4 +1,4 @@
-/* $NetBSD: sbjcn.c,v 1.1 2002/03/05 23:46:42 simonb Exp $ */
+/* $NetBSD: sbjcn.c,v 1.8 2003/08/07 16:28:35 agc Exp $ */
 
 /*
  * Copyright 2000, 2001
@@ -15,10 +15,9 @@
  *    the source file.
  *
  * 2) No right is granted to use any trade name, trademark, or logo of
- *    Broadcom Corporation. Neither the "Broadcom Corporation" name nor any
- *    trademark or logo of Broadcom Corporation may be used to endorse or
- *    promote products derived from this software without the prior written
- *    permission of Broadcom Corporation.
+ *    Broadcom Corporation.  The "Broadcom Corporation" name may not be
+ *    used to endorse or promote products derived from this software
+ *    without the prior written permission of Broadcom Corporation.
  *
  * 3) THIS SOFTWARE IS PROVIDED "AS-IS" AND ANY EXPRESS OR IMPLIED
  *    WARRANTIES, INCLUDING BUT NOT LIMITED TO, ANY IMPLIED WARRANTIES OF
@@ -32,8 +31,6 @@
  *    WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  *    OR OTHERWISE), EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#define	SBJCN_DEBUG
 
 /* from: $NetBSD: com.c,v 1.172 2000/05/03 19:19:04 thorpej Exp */
 
@@ -85,11 +82,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -115,6 +108,11 @@
  *  if there's a matching program outside to communicate with.
  *  If nobody is there, things will be very quiet.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sbjcn.c,v 1.8 2003/08/07 16:28:35 agc Exp $");
+
+#define	SBJCN_DEBUG
 
 #include "opt_ddb.h"
 
@@ -154,7 +152,6 @@ int	sbjcn_speed(long, long *);
 static int cflag2modes(tcflag_t, u_char *, u_char *);
 int	sbjcn_param(struct tty *, struct termios *);
 void	sbjcn_start(struct tty *);
-void	sbjcnstop(struct tty *, int);
 int	sbjcn_hwiflow(struct tty *, int);
 
 void	sbjcn_loadchannelregs(struct sbjcn_channel *);
@@ -169,14 +166,24 @@ int	sbjcn_init(u_long addr, int chan, int rate, tcflag_t cflag);
 int	sbjcn_common_getc(u_long addr, int chan);
 void	sbjcn_common_putc(u_long addr, int chan, int c);
 
-/* XXX: These belong elsewhere */
-cdev_decl(sbjcn);
-
 int	sbjcn_cngetc(dev_t dev);
 void	sbjcn_cnputc(dev_t dev, int c);
 void	sbjcn_cnpollc(dev_t dev, int on);
 
 extern struct cfdriver sbjcn_cd;
+
+dev_type_open(sbjcnopen);
+dev_type_close(sbjcnclose);
+dev_type_read(sbjcnread);
+dev_type_write(sbjcnwrite);
+dev_type_ioctl(sbjcnioctl);
+dev_type_stop(sbjcnstop);
+dev_type_tty(sbjcntty);
+
+const struct cdevsw sbjcn_cdevsw = {
+	sbjcnopen, sbjcnclose, sbjcnread, sbjcnwrite, sbjcnioctl,
+	sbjcnstop, sbjcntty, nopoll, nommap, ttykqfilter, D_TTY
+};
 
 #define	integrate	static inline
 integrate void sbjcn_rxsoft(struct sbjcn_channel *, struct tty *);
@@ -221,9 +228,8 @@ void	sbjcn_kgdb_putc(void *, int);
 static int	sbjcn_match(struct device *, struct cfdata *, void *);
 static void	sbjcn_attach(struct device *, struct device *, void *);
 
-const struct cfattach sbjcn_ca = {
-	sizeof(struct sbjcn_softc), sbjcn_match, sbjcn_attach,
-};
+CFATTACH_DECL(sbjcn, sizeof(struct sbjcn_softc),
+    sbjcn_match, sbjcn_attach, NULL, NULL);
 
 #define	READ_REG(rp)		(mips3_ld((uint64_t *)(rp)))
 #define	WRITE_REG(rp, val)	(mips3_sd((uint64_t *)(rp), (val)))
@@ -325,9 +331,7 @@ sbjcn_attach_channel(struct sbjcn_softc *sc, int chan, int intr)
 		int maj;
 
 		/* locate the major number */
-		for (maj = 0; maj < nchrdev; maj++)
-			if (cdevsw[maj].d_open == sbjcnopen)
-				break;
+		maj = cdevsw_lookup_major(&sbjcn_cdevsw);
 
 		cn_tab->cn_dev = makedev(maj, (sc->sc_dev.dv_unit << 1) + chan);
 

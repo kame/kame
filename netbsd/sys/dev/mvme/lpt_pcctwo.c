@@ -1,4 +1,4 @@
-/*	$NetBSD: lpt_pcctwo.c,v 1.1 2002/02/12 20:38:44 scw Exp $	*/
+/*	$NetBSD: lpt_pcctwo.c,v 1.5 2003/07/14 15:47:19 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2002 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * Device Driver back-end for the PCCChip2's parallel printer port
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: lpt_pcctwo.c,v 1.5 2003/07/14 15:47:19 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -59,9 +62,8 @@
 int lpt_pcctwo_match __P((struct device *, struct cfdata *, void *));
 void lpt_pcctwo_attach __P((struct device *, struct device *, void *));
 
-struct cfattach lpt_pcctwo_ca = {
-	sizeof(struct lpt_softc), lpt_pcctwo_match, lpt_pcctwo_attach
-};
+CFATTACH_DECL(lpt_pcctwo, sizeof(struct lpt_softc),
+    lpt_pcctwo_match, lpt_pcctwo_attach, NULL, NULL);
 
 extern struct cfdriver lpt_cd;
 

@@ -1,4 +1,4 @@
-/*      $NetBSD: ipaq_pcic.c,v 1.6 2001/08/01 13:18:44 ichiro Exp $        */
+/*      $NetBSD: ipaq_pcic.c,v 1.12 2003/07/15 00:25:07 lukem Exp $        */
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ipaq_pcic.c,v 1.12 2003/07/15 00:25:07 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/types.h>
@@ -53,9 +56,10 @@
 #include <hpcarm/dev/ipaq_saipvar.h>
 #include <hpcarm/dev/ipaq_pcicreg.h>
 #include <hpcarm/dev/ipaq_gpioreg.h>
-#include <hpcarm/sa11x0/sa11x0_gpioreg.h>
-#include <hpcarm/sa11x0/sa11x0_var.h>
-#include <hpcarm/sa11x0/sa11xx_pcicvar.h>
+
+#include <arm/sa11x0/sa11x0_gpioreg.h>
+#include <arm/sa11x0/sa11x0_var.h>
+#include <arm/sa11x0/sa11xx_pcicvar.h>
 
 #include "ipaqpcic.h"
 
@@ -90,9 +94,8 @@ static struct sapcic_tag ipaqpcic_functions = {
 	ipaqpcic_intr_disestablish
 };
 
-struct cfattach ipaqpcic_ca = {
-	sizeof(struct ipaqpcic_softc), ipaqpcic_match, ipaqpcic_attach
-};
+CFATTACH_DECL(ipaqpcic, sizeof(struct ipaqpcic_softc),
+    ipaqpcic_match, ipaqpcic_attach, NULL, NULL);
 
 static int
 ipaqpcic_match(parent, cf, aux)
@@ -171,7 +174,7 @@ ipaqpcic_submatch(parent, cf, aux)
 	struct cfdata *cf;
 	void *aux;
 {
-	return (*cf->cf_attach->ca_match)(parent, cf, aux);
+	return config_match(parent, cf, aux);
 }
 
 static void
@@ -219,7 +222,7 @@ ipaqpcic_read(so, reg)
 				GPIO_H3600_PCMCIA_IRQ1);
 		return (bit & cr);
 	default:
-		panic("ipaqpcic_read: bogus register\n");
+		panic("ipaqpcic_read: bogus register");
 	}
 }
 
@@ -271,7 +274,7 @@ ipaqpcic_set_power(so, arg)
 			EGPIO_H3600_OPT_NVRAM_ON | EGPIO_H3600_OPT_ON;
 		break;
 	default:
-		panic("ipaqpcic_set_power: bogus arg\n");
+		panic("ipaqpcic_set_power: bogus arg");
 	}
 	bus_space_write_2(sc->sc_pc.sc_iot, sc->sc_parent->sc_egpioh,
 			  0, sc->sc_parent->ipaq_egpio);

@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_interdecluster.c,v 1.7 2001/11/13 07:11:14 lukem Exp $	*/
+/*	$NetBSD: rf_interdecluster.c,v 1.9 2003/01/20 05:30:08 simonb Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -33,7 +33,7 @@
  ************************************************************/
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rf_interdecluster.c,v 1.7 2001/11/13 07:11:14 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rf_interdecluster.c,v 1.9 2003/01/20 05:30:08 simonb Exp $");
 
 #include "rf_archs.h"
 
@@ -106,7 +106,6 @@ rf_ConfigureInterDecluster(
 	info->stripeUnitsPerSparingRegion = raidPtr->numCol * (raidPtr->numCol - 1);
 	info->mirrorStripeOffset = info->numSparingRegions * (raidPtr->numCol + 1);
 	layoutPtr->numStripe = info->numSparingRegions * info->stripeUnitsPerSparingRegion;
-	layoutPtr->bytesPerStripeUnit = layoutPtr->sectorsPerStripeUnit << raidPtr->logBytesPerSector;
 	layoutPtr->numDataCol = 1;
 	layoutPtr->dataSectorsPerStripe = layoutPtr->numDataCol * layoutPtr->sectorsPerStripeUnit;
 	layoutPtr->numParityCol = 1;
@@ -170,7 +169,7 @@ rf_MapSectorInterDecluster(
 	col_before_remap = index_within_region / (raidPtr->numCol - 1);
 
 	if (!remap) {
-		*col = col_before_remap;;
+		*col = col_before_remap;
 		*diskSector = (su_offset_into_disk + ((raidPtr->numCol - 1) * sparing_region_id)) *
 		    raidPtr->Layout.sectorsPerStripeUnit;
 		*diskSector += (raidSector % raidPtr->Layout.sectorsPerStripeUnit);

@@ -1,4 +1,4 @@
-/*	$NetBSD: grf_cv3d.c,v 1.10.6.1 2002/08/07 01:35:25 lukem Exp $ */
+/*	$NetBSD: grf_cv3d.c,v 1.16 2003/11/10 08:51:51 wiz Exp $ */
 
 /*
  * Copyright (c) 1995 Michael Teske
@@ -33,7 +33,7 @@
 #include "opt_amigacons.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: grf_cv3d.c,v 1.10.6.1 2002/08/07 01:35:25 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: grf_cv3d.c,v 1.16 2003/11/10 08:51:51 wiz Exp $");
 
 #include "grfcv3d.h"
 #if NGRFCV3D > 0
@@ -264,9 +264,8 @@ static volatile caddr_t cv3d_special_register_base;
 long cv3d_memclk = 55000000;
 
 /* standard driver stuff */
-struct cfattach grfcv3d_ca = {
-	sizeof(struct grf_softc), grfcv3dmatch, grfcv3dattach
-};
+CFATTACH_DECL(grfcv3d, sizeof(struct grf_softc),
+    grfcv3dmatch, grfcv3dattach, NULL, NULL);
 
 static struct cfdata *cfdata;
 
@@ -440,7 +439,7 @@ int
 grfcv3dprint(void *auxp, const char *pnp)
 {
 	if (pnp)
-		printf("ite at %s: ", pnp);
+		aprint_normal("ite at %s: ", pnp);
 	return (UNCONF);
 }
 
@@ -535,7 +534,7 @@ cv3d_boardinit(struct grf_softc *gp)
 
 	/*
 	 * bit 0=1: enable enhanced mode functions
-	 * bit 4=1: enable linear adressing
+	 * bit 4=1: enable linear addressing
 	 */
 	vgaw32(cv3d_memory_io_base, MR_ADVANCED_FUNCTION_CONTROL, 0x00000011);
 
@@ -621,7 +620,7 @@ cv3d_boardinit(struct grf_softc *gp)
 	WCrt(ba, CRT_ID_CURSOR_START, 0x00);
 	WCrt(ba, CRT_ID_CURSOR_END, 0x00);
 
-	/* Display start adress */
+	/* Display start address */
 	WCrt(ba, CRT_ID_START_ADDR_HIGH, 0x00);
 	WCrt(ba, CRT_ID_START_ADDR_LOW, 0x00);
 
@@ -1495,7 +1494,7 @@ cv3d_inittextmode(struct grf_softc *gp)
 
 	/* load text font into beginning of display memory.
 	 * Each character cell is 32 bytes long (enough for 4 planes)
-	 * In linear adressing text mode, the memory is organized
+	 * In linear addressing text mode, the memory is organized
 	 * so, that the Bytes of all 4 planes are interleaved.
 	 * 1st byte plane 0, 1st byte plane 1, 1st byte plane 2,
 	 * 1st byte plane 3, 2nd byte plane 0, 2nd byte plane 1,...
@@ -1714,10 +1713,10 @@ cv3d_setup_hwc(struct grf_softc *gp)
 	/* reset colour stack */
 #if 0
 	test = RCrt(ba, CRT_ID_HWGC_MODE);
-	asm volatile("nop");
+	__asm __volatile("nop");
 #else
 	/* do it in assembler, the above does't seem to work */
-	asm volatile ("moveb #0x45, %1@(0x3d4); \
+	__asm __volatile ("moveb #0x45, %1@(0x3d4); \
 		moveb %1@(0x3d5),%0" : "=r" (test) : "a" (ba));
 #endif
 
@@ -1729,10 +1728,10 @@ cv3d_setup_hwc(struct grf_softc *gp)
 
 #if 0
 	test = RCrt(ba, CRT_ID_HWGC_MODE);
-	asm volatile("nop");
+	__asm __volatile("nop");
 #else
 	/* do it in assembler, the above does't seem to work */
-	asm volatile ("moveb #0x45, %1@(0x3d4); \
+	__asm __volatile ("moveb #0x45, %1@(0x3d4); \
 		moveb %1@(0x3d5),%0" : "=r" (test) : "a" (ba));
 #endif
 	switch (gp->g_display.gd_planes) {
@@ -1960,7 +1959,7 @@ cv3d_setspriteinfo(struct grf_softc *gp, struct grf_spriteinfo *info)
 
 		/* reset colour stack */
 		test = RCrt(ba, CRT_ID_HWGC_MODE);
-		asm volatile("nop");
+		__asm __volatile("nop");
 		switch (depth) {
 		    case 8:
 		    case 15:
@@ -1979,7 +1978,7 @@ cv3d_setspriteinfo(struct grf_softc *gp, struct grf_spriteinfo *info)
 		}
 
 		test = RCrt(ba, CRT_ID_HWGC_MODE);
-		asm volatile("nop");
+		__asm __volatile("nop");
 		switch (depth) {
 		    case 8:
 			WCrt (ba, CRT_ID_HWGC_BG_STACK, 1);

@@ -1,4 +1,4 @@
-/*	$NetBSD: isa_machdep.h,v 1.2 2001/09/15 01:17:47 wdk Exp $	*/
+/*	$NetBSD: isa_machdep.h,v 1.5 2003/10/25 16:33:00 chs Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -52,11 +52,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -159,6 +155,10 @@ void	isa_mem_free(bus_space_tag_t, bus_space_handle_t, bus_size_t);
 	_isa_dmamem_unmap(&(ic)->ic_dmastate, (c), (k), (s))
 #define	isa_dmamem_mmap(ic, c, a, s, o, p, f)				\
 	_isa_dmamem_mmap(&(ic)->ic_dmastate, (c), (a), (s), (o), (p), (f))
+#define isa_drq_alloc(ic, c)						\
+	_isa_drq_alloc(&(ic)->ic_dmastate, c)
+#define isa_drq_free(ic, c)						\
+	_isa_drq_free(&(ic)->ic_dmastate, c)
 #define	isa_drq_isfree(ic, c)						\
 	_isa_drq_isfree(&(ic)->ic_dmastate, (c))
 #define	isa_malloc(ic, c, s, p, f)					\

@@ -1,4 +1,4 @@
-/*	$NetBSD: fpu.h,v 1.6 2002/05/19 16:55:43 jdolecek Exp $	*/
+/*	$NetBSD: fpu.h,v 1.11 2003/06/23 11:01:35 martin Exp $	*/
 
 /*-
  * Copyright (C) 1996 Wolfgang Solfrank.
@@ -30,8 +30,8 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef	_MACHINE_FPU_H_
-#define	_MACHINE_FPU_H_
+#ifndef	_POWERPC_FPU_H_
+#define	_POWERPC_FPU_H_
 
 #define	FPSCR_FX	0x80000000	/* Exception Summary */
 #define	FPSCR_FEX	0x40000000	/* Enabled Exception Summary */
@@ -70,16 +70,20 @@
 
 #if defined(_KERNEL_OPT)
 #include "opt_ppcarch.h"
+#include "opt_multiprocessor.h"
 #endif
 
 /* List of PowerPC architectures that support FPUs. */
-#if defined(PPC_MPC6XX)
+#if defined(PPC_OEA)
 #define PPC_HAVE_FPU
 
-void	enable_fpu(struct proc *);
-void	save_fpu(struct proc *);
-void	save_fpu_proc(struct proc *);
+void	enable_fpu(void);
+void	save_fpu_cpu(void);
+void	save_fpu_lwp(struct lwp *);
+#ifdef MULTIPROCESSOR
+void	mp_save_fpu_lwp(struct lwp *);
+#endif
 #endif /* PPC_HAVE_FPU */
 #endif /* _KERNEL */
 
-#endif	/* _MACHINE_FPU_H_ */
+#endif	/* _POWERPC_FPU_H_ */

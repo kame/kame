@@ -1,4 +1,4 @@
-/*	$NetBSD: ashrdi3.c,v 1.7 1999/09/10 13:21:15 drochner Exp $	*/
+/*	$NetBSD: ashrdi3.c,v 1.9 2003/08/07 16:32:06 agc Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -42,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)ashrdi3.c	8.1 (Berkeley) 6/4/93";
 #else
-__RCSID("$NetBSD: ashrdi3.c,v 1.7 1999/09/10 13:21:15 drochner Exp $");
+__RCSID("$NetBSD: ashrdi3.c,v 1.9 2003/08/07 16:32:06 agc Exp $");
 #endif
 #endif /* LIBC_SCCS and not lint */
 
@@ -61,24 +57,24 @@ __ashrdi3(a, shift)
 	if (shift == 0)
 		return(a);
 	aa.q = a;
-	if (shift >= LONG_BITS) {
-		long s;
+	if (shift >= INT_BITS) {
+		int s;
 
 		/*
 		 * Smear bits rightward using the machine's right-shift
 		 * method, whether that is sign extension or zero fill,
 		 * to get the `sign word' s.  Note that shifting by
-		 * LONG_BITS is undefined, so we shift (LONG_BITS-1),
+		 * INT_BITS is undefined, so we shift (INT_BITS-1),
 		 * then 1 more, to get our answer.
 		 */
 		/* LINTED inherits machine dependency */
-		s = (aa.sl[H] >> (LONG_BITS - 1)) >> 1;
+		s = (aa.sl[H] >> (INT_BITS - 1)) >> 1;
 		/* LINTED inherits machine dependency*/
-		aa.ul[L] = aa.sl[H] >> (shift - LONG_BITS);
+		aa.ul[L] = aa.sl[H] >> (shift - INT_BITS);
 		aa.ul[H] = s;
 	} else {
 		aa.ul[L] = (aa.ul[L] >> shift) |
-		    (aa.ul[H] << (LONG_BITS - shift));
+		    (aa.ul[H] << (INT_BITS - shift));
 		/* LINTED inherits machine dependency */
 		aa.sl[H] >>= shift;
 	}

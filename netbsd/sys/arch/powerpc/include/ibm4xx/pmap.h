@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.3 2002/03/13 00:47:59 eeh Exp $	*/
+/*	$NetBSD: pmap.h,v 1.8 2003/08/17 18:07:11 chs Exp $	*/
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -114,14 +114,14 @@
  * Definitions for sizes of 1st and 2nd level page tables.
  *
  */
-#define	PTSZ		(NBPG / 4)
-#define	PTMAP		(PTSZ * NBPG)
+#define	PTSZ		(PAGE_SIZE / 4)
+#define	PTMAP		(PTSZ * PAGE_SIZE)
 #define	PTMSK		((PTMAP - 1) & ~(PGOFSET))
 
 #define	PTIDX(v)	(((v) & PTMSK) >> PGSHIFT)
 
 /* 2nd level tables map in any bits not mapped by 1st level tables. */
-#define	STSZ		((0xffffffffU / (NBPG * PTSZ)) + 1)
+#define	STSZ		((0xffffffffU / (PAGE_SIZE * PTSZ)) + 1)
 #define	STMAP		(0xffffffffU)
 #define	STMSK		(~(PTMAP - 1))
 
@@ -134,6 +134,7 @@
  */
 #define	PME_NOCACHE	0x100
 #define	PME_WRITETHROUG	0x200
+#define	PMAP_NC		PME_NOCACHE	/* XXX: OEA pmap compat. for bus_dma */
 
 #ifndef _LOCORE
 
@@ -167,9 +168,14 @@ void pmap_unwire(struct pmap *pm, vaddr_t va);
 void pmap_bootstrap(u_int kernelstart, u_int kernelend);
 boolean_t pmap_extract(struct pmap *, vaddr_t, paddr_t *);
 boolean_t check_attr(struct vm_page *, u_int, int);
-int ptereadonly(struct vm_page *);
 void pmap_real_memory(paddr_t *, psize_t *);
 int pmap_tlbmiss(vaddr_t va, int ctx);
+
+static __inline void
+pmap_remove_all(struct pmap *pmap)
+{
+	/* Nothing. */
+}
 
 int	ctx_alloc(struct pmap*);
 void	ctx_free(struct pmap*);

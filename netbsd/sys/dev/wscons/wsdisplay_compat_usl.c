@@ -1,4 +1,4 @@
-/* $NetBSD: wsdisplay_compat_usl.c,v 1.18 2002/03/17 19:41:05 atatat Exp $ */
+/* $NetBSD: wsdisplay_compat_usl.c,v 1.24 2004/03/24 17:26:53 drochner Exp $ */
 
 /*
  * Copyright (c) 1998
@@ -12,12 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed for the NetBSD Project
- *	by Matthias Drochner.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -33,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: wsdisplay_compat_usl.c,v 1.18 2002/03/17 19:41:05 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: wsdisplay_compat_usl.c,v 1.24 2004/03/24 17:26:53 drochner Exp $");
 
 #include "opt_compat_freebsd.h"
 #include "opt_compat_netbsd.h"
@@ -153,11 +147,11 @@ usl_sync_check(struct usl_syncdata *sd)
 static struct usl_syncdata *
 usl_sync_get(struct wsscreen *scr)
 {
-	struct usl_syncdata *sd;
+	void *sd;
 
-	if (wsscreen_lookup_sync(scr, &usl_syncops, (void **)&sd))
+	if (wsscreen_lookup_sync(scr, &usl_syncops, &sd))
 		return (0);
-	return (sd);
+	return (struct usl_syncdata *)sd;
 }
 
 static int
@@ -345,8 +339,6 @@ wsdisplay_usl_ioctl1(struct wsdisplay_softc *sc, u_long cmd, caddr_t data,
 	    default:
 		return (EPASSTHROUGH);
 	}
-
-	return (0);
 }
 
 int
@@ -401,7 +393,6 @@ wsdisplay_usl_ioctl2(struct wsdisplay_softc *sc, struct wsscreen *scr,
 			return (EINVAL);
 		}
 #undef d
-		return (0);
 
 	    case KDENABIO:
 		if (suser(p->p_ucred, &p->p_acflag) || securelevel > 1)
@@ -411,7 +402,8 @@ wsdisplay_usl_ioctl2(struct wsdisplay_softc *sc, struct wsscreen *scr,
 #if defined(__i386__)
 #if defined(COMPAT_10) || defined(COMPAT_11) || defined(COMPAT_FREEBSD)
 		{
-		struct trapframe *fp = (struct trapframe *)p->p_md.md_regs;
+			/* XXX NJWLWP */
+		struct trapframe *fp = (struct trapframe *)curlwp->l_md.md_regs;
 		if (cmd == KDENABIO)
 			fp->tf_eflags |= PSL_IOPL;
 		else

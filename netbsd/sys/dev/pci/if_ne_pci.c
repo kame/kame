@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ne_pci.c,v 1.21 2001/11/13 07:48:44 lukem Exp $	*/
+/*	$NetBSD: if_ne_pci.c,v 1.25 2004/02/13 10:05:50 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ne_pci.c,v 1.21 2001/11/13 07:48:44 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ne_pci.c,v 1.25 2004/02/13 10:05:50 wiz Exp $");
 
 #include "opt_ipkdb.h"
 
@@ -83,9 +83,8 @@ struct ne_pci_softc {
 int ne_pci_match __P((struct device *, struct cfdata *, void *));
 void ne_pci_attach __P((struct device *, struct device *, void *));
 
-struct cfattach ne_pci_ca = {
-	sizeof(struct ne_pci_softc), ne_pci_match, ne_pci_attach
-};
+CFATTACH_DECL(ne_pci, sizeof(struct ne_pci_softc),
+    ne_pci_match, ne_pci_attach, NULL, NULL);
 
 #ifdef IPKDB_NE_PCI
 static struct ne_pci_softc ipkdb_softc;
@@ -112,7 +111,7 @@ const struct ne_pci_product {
 	{ PCI_VENDOR_REALTEK,		PCI_PRODUCT_REALTEK_RT8029,
 	  rtl80x9_mediachange,		rtl80x9_mediastatus,
 	  rtl80x9_init_card,		rtl80x9_media_init,
-	  "RealTek 8029" },
+	  "Realtek 8029" },
 
 	{ PCI_VENDOR_WINBOND,		PCI_PRODUCT_WINBOND_W89C940F,
 	  NULL,				NULL,

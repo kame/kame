@@ -1,4 +1,4 @@
-/*	$NetBSD: trap.c,v 1.59 2002/05/19 06:35:45 augustss Exp $	*/
+/*	$NetBSD: trap.c,v 1.99 2004/03/25 18:50:50 matt Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -31,18 +31,22 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: trap.c,v 1.99 2004/03/25 18:50:50 matt Exp $");
+
 #include "opt_altivec.h"
 #include "opt_ddb.h"
-#include "opt_ktrace.h"
 #include "opt_multiprocessor.h"
 
 #include <sys/param.h>
+#include <sys/pool.h>
 #include <sys/proc.h>
+#include <sys/ras.h>
 #include <sys/reboot.h>
-#include <sys/syscall.h>
+#include <sys/sa.h>
+#include <sys/savar.h>
 #include <sys/systm.h>
 #include <sys/user.h>
-#include <sys/ktrace.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -56,48 +60,42 @@
 #include <machine/pmap.h>
 #include <machine/psl.h>
 #include <machine/trap.h>
+#include <powerpc/altivec.h>
 #include <powerpc/spr.h>
+#include <powerpc/userret.h>
 
-/* These definitions should probably be somewhere else			XXX */
-#define	FIRSTARG	3		/* first argument is in reg 3 */
-#define	NARGREG		8		/* 8 args are in registers */
-#define	MOREARGS(sp)	((caddr_t)((int)(sp) + 8)) /* more args go here */
+static int fix_unaligned(struct lwp *l, struct trapframe *frame);
+static __inline vaddr_t setusr(vaddr_t, size_t *);
+static __inline void unsetusr(void);
 
-#ifndef MULTIPROCESSOR
-volatile int astpending;
-volatile int want_resched;
-extern int intr_depth;
-#endif
-
-void *syscall = NULL;	/* XXX dummy symbol for emul_netbsd */
-
-static int fix_unaligned __P((struct proc *p, struct trapframe *frame));
-static inline void setusr __P((int));
-
-void trap __P((struct trapframe *));	/* Called from locore / trap_subr */
-int setfault __P((faultbuf));	/* defined in locore.S */
+void trap(struct trapframe *);	/* Called from locore / trap_subr */
 /* Why are these not defined in a header? */
-int badaddr __P((void *, size_t));
-int badaddr_read __P((void *, size_t, int *));
+int badaddr(void *, size_t);
+int badaddr_read(void *, size_t, int *);
 
 void
-trap(frame)
-	struct trapframe *frame;
+trap(struct trapframe *frame)
 {
-	struct proc *p = curproc;
+	struct cpu_info * const ci = curcpu();
+	struct lwp *l = curlwp;
+	struct proc *p = l ? l->l_proc : NULL;
+	struct pcb *pcb = curpcb;
+	struct vm_map *map;
+	struct faultbuf *onfault;
+	ksiginfo_t ksi;
 	int type = frame->exc;
 	int ftype, rv;
 
-	curcpu()->ci_ev_traps.ev_count++;
+	ci->ci_ev_traps.ev_count++;
 
-	if (frame->srr1 & PSL_PR)
+	if (frame->srr1 & PSL_PR) {
 		type |= EXC_USER;
-
 #ifdef DIAGNOSTIC
-	if (curpcb->pcb_pmreal != curpm)
-		panic("trap: curpm (%p) != curpcb->pcb_pmreal (%p)",
-		    curpm, curpcb->pcb_pmreal);
+		if (l == NULL || p == NULL)
+			panic("trap: user trap %d with lwp = %p, proc = %p",
+			    type, l, p);
 #endif
+	}
 
 	uvmexp.traps++;
 
@@ -105,47 +103,88 @@ trap(frame)
 	case EXC_RUNMODETRC|EXC_USER:
 		/* FALLTHROUGH */
 	case EXC_TRC|EXC_USER:
-		KERNEL_PROC_LOCK(p);
 		frame->srr1 &= ~PSL_SE;
-		trapsignal(p, SIGTRAP, EXC_TRC);
-		KERNEL_PROC_UNLOCK(p);
+		if (LIST_EMPTY(&p->p_raslist) ||
+		    ras_lookup(p, (caddr_t)frame->srr0) == (caddr_t) -1) {
+			KSI_INIT_TRAP(&ksi);
+			ksi.ksi_signo = SIGTRAP;
+			ksi.ksi_trap = EXC_TRC;
+			ksi.ksi_addr = (void *)frame->srr0;
+			ksi.ksi_code = TRAP_TRACE;
+			KERNEL_PROC_LOCK(l);
+			(*p->p_emul->e_trapsignal)(l, &ksi);
+			KERNEL_PROC_UNLOCK(l);
+		}
 		break;
 	case EXC_DSI: {
-		faultbuf *fb;
+		struct faultbuf *fb;
+		vaddr_t va = frame->dar;
+		ci->ci_ev_kdsi.ev_count++;
+
 		/*
-		 * Only query UVM if no interrupts are active (this applies
-		 * "on-fault" as well.
+		 * Only query UVM if no interrupts are active.
 		 */
-		curcpu()->ci_ev_kdsi.ev_count++;
-		if (intr_depth < 0) {
-			struct vm_map *map;
-			vaddr_t va;
-
+		if (ci->ci_intrdepth < 0) {
 			KERNEL_LOCK(LK_CANRECURSE|LK_EXCLUSIVE);
-			map = kernel_map;
-			va = frame->dar;
-			if ((va >> ADDR_SR_SHFT) == USER_SR) {
-				sr_t user_sr;
-
-				asm ("mfsr %0, %1"
-				     : "=r"(user_sr) : "K"(USER_SR));
+			if ((va >> ADDR_SR_SHFT) == pcb->pcb_kmapsr) {
 				va &= ADDR_PIDX | ADDR_POFF;
-				va |= user_sr << ADDR_SR_SHFT;
-				/* KERNEL_PROC_LOCK(p); XXX */
+				va |= pcb->pcb_umapsr << ADDR_SR_SHFT;
 				map = &p->p_vmspace->vm_map;
+				/* KERNEL_PROC_LOCK(l); */
+#ifdef PPC_OEA64
+				if ((frame->dsisr & DSISR_NOTFOUND) &&
+				    vm_map_pmap(map)->pm_ste_evictions > 0 &&
+				    pmap_ste_spill(vm_map_pmap(map),
+					    trunc_page(va), FALSE)) {
+					/* KERNEL_PROC_UNLOCK(l); */
+					KERNEL_UNLOCK();
+					return;
+				}
+#endif
+
+				if ((frame->dsisr & DSISR_NOTFOUND) &&
+				    vm_map_pmap(map)->pm_evictions > 0 &&
+				    pmap_pte_spill(vm_map_pmap(map),
+					    trunc_page(va), FALSE)) {
+					/* KERNEL_PROC_UNLOCK(l); */
+					KERNEL_UNLOCK();
+					return;
+				}
+				if (l->l_flag & L_SA) {
+					l->l_savp->savp_faultaddr = va;
+					l->l_flag |= L_SA_PAGEFAULT;
+				}
+#if defined(DIAGNOSTIC) && defined(PPC_OEA)
+			} else if ((va >> ADDR_SR_SHFT) == USER_SR) {
+				printf("trap: kernel %s DSI trap @ %#lx by %#lx"
+				    " (DSISR %#x): USER_SR unset\n",
+				    (frame->dsisr & DSISR_STORE)
+					? "write" : "read",
+				    va, frame->srr0, frame->dsisr);
+				goto brain_damage2;
+#endif
+			} else {
+				map = kernel_map;
 			}
+
 			if (frame->dsisr & DSISR_STORE)
 				ftype = VM_PROT_WRITE;
 			else
 				ftype = VM_PROT_READ;
+
+			onfault = pcb->pcb_onfault;
+			pcb->pcb_onfault = NULL;
 			rv = uvm_fault(map, trunc_page(va), 0, ftype);
+			pcb->pcb_onfault = onfault;
+
 			if (map != kernel_map) {
 				/*
 				 * Record any stack growth...
 				 */
 				if (rv == 0)
 					uvm_grow(p, trunc_page(va));
-				/* KERNEL_PROC_UNLOCK(p); XXX */
+				l->l_flag &= ~L_SA_PAGEFAULT;
+				/* KERNEL_PROC_UNLOCK(l); */
 			}
 			KERNEL_UNLOCK();
 			if (rv == 0)
@@ -153,268 +192,314 @@ trap(frame)
 			if (rv == EACCES)
 				rv = EFAULT;
 		} else {
+			/*
+			 * Note that this implies that access to the USER
+			 * segment is not allowed in interrupt context.
+			 */
 			rv = EFAULT;
 		}
-		if ((fb = p->p_addr->u_pcb.pcb_onfault) != NULL) {
-			frame->srr0 = (*fb)[0];
-			frame->fixreg[1] = (*fb)[1];
-			frame->fixreg[2] = (*fb)[2];
+		if ((fb = pcb->pcb_onfault) != NULL) {
+			frame->srr0 = fb->fb_pc;
+			frame->fixreg[1] = fb->fb_sp;
+			frame->fixreg[2] = fb->fb_r2;
 			frame->fixreg[3] = rv;
-			frame->cr = (*fb)[3];
-			memcpy(&frame->fixreg[13], &(*fb)[4],
-				      19 * sizeof(register_t));
+			frame->cr = fb->fb_cr;
+			memcpy(&frame->fixreg[13], fb->fb_fixreg,
+			    sizeof(fb->fb_fixreg));
 			return;
 		}
-		printf("trap: kernel %s DSI @ %#x by %#x (DSISR %#x, err=%d)\n",
-		    (frame->dsisr & DSISR_STORE) ? "write" : "read",
-		    frame->dar, frame->srr0, frame->dsisr, rv);
+		printf("trap: kernel %s DSI trap @ %#lx by %#lx (DSISR %#x, err"
+		    "=%d)\n", (frame->dsisr & DSISR_STORE) ? "write" : "read",
+		    va, frame->srr0, frame->dsisr, rv);
 		goto brain_damage2;
 	}
 	case EXC_DSI|EXC_USER:
-		KERNEL_PROC_LOCK(p);
-		curcpu()->ci_ev_udsi.ev_count++;
+		KERNEL_PROC_LOCK(l);
+		ci->ci_ev_udsi.ev_count++;
 		if (frame->dsisr & DSISR_STORE)
 			ftype = VM_PROT_WRITE;
 		else
 			ftype = VM_PROT_READ;
-		rv = uvm_fault(&p->p_vmspace->vm_map, trunc_page(frame->dar),
-		    0, ftype);
+
+		/*
+		 * Try to spill an evicted pte into the page table
+		 * if this wasn't a protection fault and the pmap
+		 * has some evicted pte's.
+		 */
+		map = &p->p_vmspace->vm_map;
+#ifdef PPC_OEA64
+		if ((frame->dsisr & DSISR_NOTFOUND) &&
+		    vm_map_pmap(map)->pm_ste_evictions > 0 &&
+		    pmap_ste_spill(vm_map_pmap(map), trunc_page(frame->dar),
+				   FALSE)) {
+			KERNEL_PROC_UNLOCK(l);
+			break;
+		}
+#endif
+
+		if ((frame->dsisr & DSISR_NOTFOUND) &&
+		    vm_map_pmap(map)->pm_evictions > 0 &&
+		    pmap_pte_spill(vm_map_pmap(map), trunc_page(frame->dar),
+				   FALSE)) {
+			KERNEL_PROC_UNLOCK(l);
+			break;
+		}
+
+		if (l->l_flag & L_SA) {
+			l->l_savp->savp_faultaddr = (vaddr_t)frame->dar;
+			l->l_flag |= L_SA_PAGEFAULT;
+		}
+		rv = uvm_fault(map, trunc_page(frame->dar), 0, ftype);
 		if (rv == 0) {
 			/*
 			 * Record any stack growth...
 			 */
 			uvm_grow(p, trunc_page(frame->dar));
-			KERNEL_PROC_UNLOCK(p);
+			l->l_flag &= ~L_SA_PAGEFAULT;
+			KERNEL_PROC_UNLOCK(l);
 			break;
 		}
-		curcpu()->ci_ev_udsi_fatal.ev_count++;
+		ci->ci_ev_udsi_fatal.ev_count++;
 		if (cpu_printfataltraps) {
-			printf("trap: pid %d (%s): user %s DSI @ %#x "
-			    "by %#x (DSISR %#x, err=%d)\n",
-			    p->p_pid, p->p_comm,
+			printf("trap: pid %d.%d (%s): user %s DSI trap @ %#lx "
+			    "by %#lx (DSISR %#x, err=%d)\n",
+			    p->p_pid, l->l_lid, p->p_comm,
 			    (frame->dsisr & DSISR_STORE) ? "write" : "read",
 			    frame->dar, frame->srr0, frame->dsisr, rv);
 		}
+		KSI_INIT_TRAP(&ksi);
+		ksi.ksi_signo = SIGSEGV;
+		ksi.ksi_trap = EXC_DSI;
+		ksi.ksi_addr = (void *)frame->dar;
+		ksi.ksi_code =
+		    (frame->dsisr & DSISR_PROTECT ? SEGV_ACCERR : SEGV_MAPERR);
 		if (rv == ENOMEM) {
-			printf("UVM: pid %d (%s), uid %d killed: "
+			printf("UVM: pid %d.%d (%s), uid %d killed: "
 			       "out of swap\n",
-			       p->p_pid, p->p_comm,
+			       p->p_pid, l->l_lid, p->p_comm,
 			       p->p_cred && p->p_ucred ?
 			       p->p_ucred->cr_uid : -1);
-			trapsignal(p, SIGKILL, EXC_DSI);
-		} else {
-			trapsignal(p, SIGSEGV, EXC_DSI);
+			ksi.ksi_signo = SIGKILL;
 		}
-		KERNEL_PROC_UNLOCK(p);
+		(*p->p_emul->e_trapsignal)(l, &ksi);
+		l->l_flag &= ~L_SA_PAGEFAULT;
+		KERNEL_PROC_UNLOCK(l);
 		break;
+
 	case EXC_ISI:
-		printf("trap: kernel ISI by %#x (SRR1 %#x)\n",
+		ci->ci_ev_kisi.ev_count++;
+
+		printf("trap: kernel ISI by %#lx (SRR1 %#lx)\n",
 		    frame->srr0, frame->srr1);
 		goto brain_damage2;
+
 	case EXC_ISI|EXC_USER:
-		KERNEL_PROC_LOCK(p);
-		curcpu()->ci_ev_isi.ev_count++;
-		ftype = VM_PROT_READ | VM_PROT_EXECUTE;
-		rv = uvm_fault(&p->p_vmspace->vm_map, trunc_page(frame->srr0),
-		    0, ftype);
-		if (rv == 0) {
-			KERNEL_PROC_UNLOCK(p);
+		KERNEL_PROC_LOCK(l);
+		ci->ci_ev_isi.ev_count++;
+
+		/*
+		 * Try to spill an evicted pte into the page table
+		 * if this wasn't a protection fault and the pmap
+		 * has some evicted pte's.
+		 */
+		map = &p->p_vmspace->vm_map;
+#ifdef PPC_OEA64
+		if (vm_map_pmap(map)->pm_ste_evictions > 0 &&
+		    pmap_ste_spill(vm_map_pmap(map), trunc_page(frame->srr0),
+				   TRUE)) {
+			KERNEL_PROC_UNLOCK(l);
 			break;
 		}
-		curcpu()->ci_ev_isi_fatal.ev_count++;
+#endif
+
+		if (vm_map_pmap(map)->pm_evictions > 0 &&
+		    pmap_pte_spill(vm_map_pmap(map), trunc_page(frame->srr0),
+				   TRUE)) {
+			KERNEL_PROC_UNLOCK(l);
+			break;
+		}
+
+		if (l->l_flag & L_SA) {
+			l->l_savp->savp_faultaddr = (vaddr_t)frame->srr0;
+			l->l_flag |= L_SA_PAGEFAULT;
+		}
+		ftype = VM_PROT_EXECUTE;
+		rv = uvm_fault(map, trunc_page(frame->srr0), 0, ftype);
+		if (rv == 0) {
+			l->l_flag &= ~L_SA_PAGEFAULT;
+			KERNEL_PROC_UNLOCK(l);
+			break;
+		}
+		ci->ci_ev_isi_fatal.ev_count++;
 		if (cpu_printfataltraps) {
-			printf("trap: pid %d (%s): user ISI trap @ %#x "
-			    "(SSR1=%#x)\n",
-			    p->p_pid, p->p_comm, frame->srr0, frame->srr1);
+			printf("trap: pid %d.%d (%s): user ISI trap @ %#lx "
+			    "(SRR1=%#lx)\n", p->p_pid, l->l_lid, p->p_comm,
+			    frame->srr0, frame->srr1);
 		}
-		trapsignal(p, SIGSEGV, EXC_ISI);
-		KERNEL_PROC_UNLOCK(p);
-		break;
-	case EXC_SC|EXC_USER:
-		curcpu()->ci_ev_scalls.ev_count++;
-		{
-			const struct sysent *callp;
-			size_t argsize;
-			register_t code, error;
-			register_t *params, rval[2];
-			int n;
-			register_t args[10];
-
-			KERNEL_PROC_LOCK(p);
-
-			uvmexp.syscalls++;
-
-			code = frame->fixreg[0];
-			callp = p->p_emul->e_sysent;
-			params = frame->fixreg + FIRSTARG;
-			n = NARGREG;
-
-			switch (code) {
-			case SYS_syscall:
-				/*
-				 * code is first argument,
-				 * followed by actual args.
-				 */
-				code = *params++;
-				n -= 1;
-				break;
-			case SYS___syscall:
-				params++;
-				code = *params++;
-				n -= 2;
-				break;
-			default:
-				break;
-			}
-
-			code &= (SYS_NSYSENT - 1);
-			callp += code;
-			argsize = callp->sy_argsize;
-
-			if (argsize > n * sizeof(register_t)) {
-				memcpy(args, params, n * sizeof(register_t));
-				error = copyin(MOREARGS(frame->fixreg[1]),
-					       args + n,
-					       argsize - n * sizeof(register_t));
-				if (error)
-					goto syscall_bad;
-				params = args;
-			}
-
-#ifdef	KTRACE
-			if (KTRPOINT(p, KTR_SYSCALL))
-				ktrsyscall(p, code, argsize, params);
-#endif
-
-			rval[0] = 0;
-			rval[1] = 0;
-
-			error = (*callp->sy_call)(p, params, rval);
-			switch (error) {
-			case 0:
-				frame->fixreg[FIRSTARG] = rval[0];
-				frame->fixreg[FIRSTARG + 1] = rval[1];
-				frame->cr &= ~0x10000000;
-				break;
-			case ERESTART:
-				/*
-				 * Set user's pc back to redo the system call.
-				 */
-				frame->srr0 -= 4;
-				break;
-			case EJUSTRETURN:
-				/* nothing to do */
-				break;
-			default:
-syscall_bad:
-				if (p->p_emul->e_errno)
-					error = p->p_emul->e_errno[error];
-				frame->fixreg[FIRSTARG] = error;
-				frame->cr |= 0x10000000;
-				break;
-			}
-
-#ifdef	KTRACE
-			if (KTRPOINT(p, KTR_SYSRET))
-				ktrsysret(p, code, error, rval[0]);
-#endif
-		}
-		KERNEL_PROC_UNLOCK(p);
+		KSI_INIT_TRAP(&ksi);
+		ksi.ksi_signo = SIGSEGV;
+		ksi.ksi_trap = EXC_ISI;
+		ksi.ksi_addr = (void *)frame->srr0;
+		ksi.ksi_code = (rv == EACCES ? SEGV_ACCERR : SEGV_MAPERR);
+		(*p->p_emul->e_trapsignal)(l, &ksi);
+		l->l_flag &= ~L_SA_PAGEFAULT;
+		KERNEL_PROC_UNLOCK(l);
 		break;
 
 	case EXC_FPU|EXC_USER:
-		curcpu()->ci_ev_fpu.ev_count++;
-		if (fpuproc) {
-			curcpu()->ci_ev_fpusw.ev_count++;
-			save_fpu(fpuproc);
+		ci->ci_ev_fpu.ev_count++;
+		if (pcb->pcb_fpcpu) {
+			save_fpu_lwp(l);
 		}
-#if defined(MULTIPROCESSOR)
-		if (p->p_addr->u_pcb.pcb_fpcpu)
-			save_fpu_proc(p);
-#endif
-		fpuproc = p;
-		p->p_addr->u_pcb.pcb_fpcpu = curcpu();
-		enable_fpu(p);
+		enable_fpu();
 		break;
-
-#ifdef ALTIVEC
-	case EXC_VEC|EXC_USER:
-		curcpu()->ci_ev_vec.ev_count++;
-		if (vecproc) {
-			curcpu()->ci_ev_vecsw.ev_count++;
-			save_vec(vecproc);
-		}
-		vecproc = p;
-		enable_vec(p);
-		break;
-#endif
 
 	case EXC_AST|EXC_USER:
-		astpending = 0;		/* we are about to do it */
-		KERNEL_PROC_LOCK(p);
+		ci->ci_astpending = 0;		/* we are about to do it */
+		KERNEL_PROC_LOCK(l);
 		uvmexp.softs++;
 		if (p->p_flag & P_OWEUPC) {
 			p->p_flag &= ~P_OWEUPC;
 			ADDUPROF(p);
 		}
 		/* Check whether we are being preempted. */
-		if (want_resched)
-			preempt(NULL);
-		KERNEL_PROC_UNLOCK(p);
+		if (ci->ci_want_resched)
+			preempt(0);
+		KERNEL_PROC_UNLOCK(l);
 		break;
 
 	case EXC_ALI|EXC_USER:
-		KERNEL_PROC_LOCK(p);
-		curcpu()->ci_ev_ali.ev_count++;
-		if (fix_unaligned(p, frame) != 0) {
-			curcpu()->ci_ev_ali_fatal.ev_count++;
+		KERNEL_PROC_LOCK(l);
+		ci->ci_ev_ali.ev_count++;
+		if (fix_unaligned(l, frame) != 0) {
+			ci->ci_ev_ali_fatal.ev_count++;
 			if (cpu_printfataltraps) {
-				printf("trap: pid %d (%s): user ALI trap @ %#x "
-				    "(SSR1=%#x)\n",
-				    p->p_pid, p->p_comm, frame->srr0,
-				    frame->srr1);
+				printf("trap: pid %d.%d (%s): user ALI trap @ "
+				    "%#lx by %#lx (DSISR %#x)\n",
+				    p->p_pid, l->l_lid, p->p_comm,
+				    frame->dar, frame->srr0, frame->dsisr);
 			}
-			trapsignal(p, SIGBUS, EXC_ALI);
+			KSI_INIT_TRAP(&ksi);
+			ksi.ksi_signo = SIGBUS;
+			ksi.ksi_trap = EXC_ALI;
+			ksi.ksi_addr = (void *)frame->dar;
+			ksi.ksi_code = BUS_ADRALN;
+			(*p->p_emul->e_trapsignal)(l, &ksi);
 		} else
 			frame->srr0 += 4;
-		KERNEL_PROC_UNLOCK(p);
+		KERNEL_PROC_UNLOCK(l);
 		break;
 
-	case EXC_PGM|EXC_USER:
-/* XXX temporarily */
-		KERNEL_PROC_LOCK(p);
-		curcpu()->ci_ev_pgm.ev_count++;
+	case EXC_PERF|EXC_USER:
+		/* Not really, but needed due to how trap_subr.S works */
+	case EXC_VEC|EXC_USER:
+		ci->ci_ev_vec.ev_count++;
+#ifdef ALTIVEC
+		if (pcb->pcb_veccpu)
+			save_vec_lwp(l);
+		enable_vec();
+		break;
+#else
+		KERNEL_PROC_LOCK(l);
 		if (cpu_printfataltraps) {
-			printf("trap: pid %d (%s): user PGM trap @ %#x "
-			    "(SSR1=%#x)\n",
+			printf("trap: pid %d.%d (%s): user VEC trap @ %#lx "
+			    "(SRR1=%#lx)\n",
+			    p->p_pid, l->l_lid, p->p_comm,
+			    frame->srr0, frame->srr1);
+		}
+		KSI_INIT_TRAP(&ksi);
+		ksi.ksi_signo = SIGILL;
+		ksi.ksi_trap = EXC_PGM;
+		ksi.ksi_addr = (void *)frame->srr0;
+		ksi.ksi_code = ILL_ILLOPC;
+		(*p->p_emul->e_trapsignal)(l, &ksi);
+		KERNEL_PROC_UNLOCK(l);
+		break;
+#endif
+	case EXC_MCHK|EXC_USER:
+		ci->ci_ev_umchk.ev_count++;
+		KERNEL_PROC_LOCK(l);
+		if (cpu_printfataltraps) {
+			printf("trap: pid %d (%s): user MCHK trap @ %#lx "
+			    "(SRR1=%#lx)\n",
 			    p->p_pid, p->p_comm, frame->srr0, frame->srr1);
 		}
-		if (frame->srr1 & 0x00020000)	/* Bit 14 is set if trap */
-			trapsignal(p, SIGTRAP, EXC_PGM);
-		else
-			trapsignal(p, SIGILL, EXC_PGM);
-		KERNEL_PROC_UNLOCK(p);
+		KSI_INIT_TRAP(&ksi);
+		ksi.ksi_signo = SIGBUS;
+		ksi.ksi_trap = EXC_MCHK;
+		ksi.ksi_addr = (void *)frame->srr0;
+		ksi.ksi_code = BUS_OBJERR;
+		(*p->p_emul->e_trapsignal)(l, &ksi);
+		KERNEL_PROC_UNLOCK(l);
+
+	case EXC_PGM|EXC_USER:
+		ci->ci_ev_pgm.ev_count++;
+		KERNEL_PROC_LOCK(l);
+		if (frame->srr1 & 0x00020000) {	/* Bit 14 is set if trap */
+			if (LIST_EMPTY(&p->p_raslist) ||
+			    ras_lookup(p, (caddr_t)frame->srr0) == (caddr_t) -1) {
+				KSI_INIT_TRAP(&ksi);
+				ksi.ksi_signo = SIGTRAP;
+				ksi.ksi_trap = EXC_PGM;
+				ksi.ksi_addr = (void *)frame->srr0;
+				ksi.ksi_code = TRAP_BRKPT;
+				(*p->p_emul->e_trapsignal)(l, &ksi);
+			} else {
+				/* skip the trap instruction */
+				frame->srr0 += 4;
+			}
+		} else {
+			if (cpu_printfataltraps)
+				printf("trap: pid %d.%d (%s): user PGM trap @"
+				    " %#lx (SRR1=%#lx)\n", p->p_pid, l->l_lid,
+				    p->p_comm, frame->srr0, frame->srr1);
+			KSI_INIT_TRAP(&ksi);
+			ksi.ksi_signo = SIGILL;
+			ksi.ksi_trap = EXC_PGM;
+			ksi.ksi_addr = (void *)frame->srr0;
+			if (frame->srr1 & 0x100000) {
+				ksi.ksi_signo = SIGFPE;
+				ksi.ksi_code = 0;
+			} else if (frame->srr1 & 0x40000) {
+				ksi.ksi_code = ILL_PRVOPC;
+			} else
+				ksi.ksi_code = ILL_ILLOPC;
+			(*p->p_emul->e_trapsignal)(l, &ksi);
+		}
+		KERNEL_PROC_UNLOCK(l);
 		break;
 
 	case EXC_MCHK: {
-		faultbuf *fb;
+		struct faultbuf *fb;
 
-		if ((fb = p->p_addr->u_pcb.pcb_onfault) != NULL) {
-			frame->srr0 = (*fb)[0];
-			frame->fixreg[1] = (*fb)[1];
-			frame->fixreg[2] = (*fb)[2];
+		if ((fb = pcb->pcb_onfault) != NULL) {
+			frame->srr0 = fb->fb_pc;
+			frame->fixreg[1] = fb->fb_sp;
+			frame->fixreg[2] = fb->fb_r2;
 			frame->fixreg[3] = EFAULT;
-			frame->cr = (*fb)[3];
-			memcpy(&frame->fixreg[13], &(*fb)[4],
-			      19 * sizeof(register_t));
+			frame->cr = fb->fb_cr;
+			memcpy(&frame->fixreg[13], fb->fb_fixreg,
+			    sizeof(fb->fb_fixreg));
 			return;
 		}
-		goto brain_damage;
+		printf("trap: pid %d.%d (%s): kernel MCHK trap @"
+		    " %#lx (SRR1=%#lx)\n", p->p_pid, l->l_lid,
+		    p->p_comm, frame->srr0, frame->srr1);
+		goto brain_damage2;
 	}
+	case EXC_ALI:
+		printf("trap: pid %d.%d (%s): kernel ALI trap @ %#lx by %#lx "
+		    "(DSISR %#x)\n", p->p_pid, l->l_lid, p->p_comm,
+		    frame->dar, frame->srr0, frame->dsisr);
+		goto brain_damage2;
+	case EXC_PGM:
+		printf("trap: pid %d.%d (%s): kernel PGM trap @"
+		    " %#lx (SRR1=%#lx)\n", p->p_pid, l->l_lid,
+		    p->p_comm, frame->srr0, frame->srr1);
+		goto brain_damage2;
 
 	default:
-brain_damage:
-		printf("trap type %x at %x\n", type, frame->srr0);
+		printf("trap type %x at %lx\n", type, frame->srr0);
 brain_damage2:
 #ifdef DDBX
 		if (kdb_trap(type, frame))
@@ -428,125 +513,101 @@ brain_damage2:
 #endif
 		panic("trap");
 	}
-
-	/* Take pending signals. */
-	{
-		int sig;
-
-		while ((sig = CURSIG(p)) != 0)
-			postsig(sig);
-	}
-
-	/*
-	 * If someone stole the fp or vector unit while we were away,
-	 * disable it
-	 */
-	if (p != fpuproc || p->p_addr->u_pcb.pcb_fpcpu != curcpu())
-		frame->srr1 &= ~PSL_FP;
-#ifdef ALTIVEC
-	if (p != vecproc)
-		frame->srr1 &= ~PSL_VEC;
-#endif
-
-	curcpu()->ci_schedstate.spc_curpriority = p->p_priority = p->p_usrpri;
+	userret(l, frame);
 }
 
-void
-child_return(arg)
-	void *arg;
+#ifdef _LP64
+static inline vaddr_t
+setusr(vaddr_t uva, size_t *len_p)
 {
-	struct proc *p = arg;
-	struct trapframe *tf = trapframe(p);
-
-	KERNEL_PROC_UNLOCK(p);
-
-	tf->fixreg[FIRSTARG] = 0;
-	tf->fixreg[FIRSTARG + 1] = 1;
-	tf->cr &= ~0x10000000;
-	tf->srr1 &= ~(PSL_FP|PSL_VEC);	/* Disable FP & AltiVec, as we can't
-					   be them. */
-	p->p_addr->u_pcb.pcb_fpcpu = NULL;
-#ifdef	KTRACE
-	if (KTRPOINT(p, KTR_SYSRET)) {
-		KERNEL_PROC_LOCK(p);
-		ktrsysret(p, SYS_fork, 0, 0);
-		KERNEL_PROC_UNLOCK(p);
-	}
-#endif
-	/* Profiling?							XXX */
-	curcpu()->ci_schedstate.spc_curpriority = p->p_priority;
+	*len_p = SEGMENT_LENGTH - (uva & ~SEGMENT_MASK);
+	return pmap_setusr(uva) + (uva & ~SEGMENT_MASK);
 }
-
-static inline void
-setusr(content)
-	int content;
+static void
+unsetusr(void)
 {
-	asm volatile ("isync; mtsr %0,%1; isync"
-		      :: "n"(USER_SR), "r"(content));
+	pmap_unsetusr();
 }
+#else
+static inline vaddr_t
+setusr(vaddr_t uva, size_t *len_p)
+{
+	struct pcb *pcb = curpcb;
+	vaddr_t p;
+	KASSERT(pcb != NULL);
+	KASSERT(pcb->pcb_kmapsr == 0);
+	pcb->pcb_kmapsr = USER_SR;
+	pcb->pcb_umapsr = uva >> ADDR_SR_SHFT;
+	*len_p = SEGMENT_LENGTH - (uva & ~SEGMENT_MASK);
+	p = (USER_SR << ADDR_SR_SHFT) + (uva & ~SEGMENT_MASK);
+	__asm __volatile ("isync; mtsr %0,%1; isync"
+	    ::	"n"(USER_SR), "r"(pcb->pcb_pm->pm_sr[pcb->pcb_umapsr]));
+	return p;
+}
+
+static void
+unsetusr(void)
+{
+	curpcb->pcb_kmapsr = 0;
+	__asm __volatile ("isync; mtsr %0,%1; isync"
+	    ::	"n"(USER_SR), "r"(EMPTY_SEGMENT));
+}
+#endif
 
 int
-copyin(udaddr, kaddr, len)
-	const void *udaddr;
-	void *kaddr;
-	size_t len;
+copyin(const void *udaddr, void *kaddr, size_t len)
 {
-	const char *up = udaddr;
+	vaddr_t uva = (vaddr_t) udaddr;
 	char *kp = kaddr;
-	char *p;
+	struct faultbuf env;
 	int rv;
-	size_t l;
-	faultbuf env;
 
-	if ((rv = setfault(env)) != 0) {
-		curpcb->pcb_onfault = 0;
-		return rv;
-	}
+	if ((rv = setfault(&env)) != 0)
+		goto out;
+
 	while (len > 0) {
-		p = (char *)USER_ADDR + ((u_int)up & ~SEGMENT_MASK);
-		l = ((char *)USER_ADDR + SEGMENT_LENGTH) - p;
-		if (l > len)
-			l = len;
-		setusr(curpcb->pcb_pm->pm_sr[(u_int)up >> ADDR_SR_SHFT]);
-		memcpy(kp, p, l);
-		up += l;
-		kp += l;
-		len -= l;
+		size_t seglen;
+		vaddr_t p = setusr(uva, &seglen);
+		if (seglen > len)
+			seglen = len;
+		memcpy(kp, (const char *) p, seglen);
+		uva += seglen;
+		kp += seglen;
+		len -= seglen;
 	}
+
+  out:
+	unsetusr();
 	curpcb->pcb_onfault = 0;
-	return 0;
+	return rv;
 }
 
 int
-copyout(kaddr, udaddr, len)
-	const void *kaddr;
-	void *udaddr;
-	size_t len;
+copyout(const void *kaddr, void *udaddr, size_t len)
 {
 	const char *kp = kaddr;
-	char *up = udaddr;
-	char *p;
+	vaddr_t uva = (vaddr_t) udaddr;
+	struct faultbuf env;
 	int rv;
-	size_t l;
-	faultbuf env;
 
-	if ((rv = setfault(env)) != 0) {
-		curpcb->pcb_onfault = 0;
-		return rv;
-	}
+	if ((rv = setfault(&env)) != 0)
+		goto out;
+
 	while (len > 0) {
-		p = (char *)USER_ADDR + ((u_int)up & ~SEGMENT_MASK);
-		l = ((char *)USER_ADDR + SEGMENT_LENGTH) - p;
-		if (l > len)
-			l = len;
-		setusr(curpcb->pcb_pm->pm_sr[(u_int)up >> ADDR_SR_SHFT]);
-		memcpy(p, kp, l);
-		up += l;
-		kp += l;
-		len -= l;
+		size_t seglen;
+		vaddr_t p = setusr(uva, &seglen);
+		if (seglen > len)
+			seglen = len;
+		memcpy((char *)p, kp, seglen);
+		uva += seglen;
+		kp += seglen;
+		len -= seglen;
 	}
+
+  out:
+	unsetusr();
 	curpcb->pcb_onfault = 0;
-	return 0;
+	return rv;
 }
 
 /*
@@ -560,47 +621,36 @@ copyout(kaddr, udaddr, len)
  * page fault.
  */
 int
-kcopy(src, dst, len)
-	const void *src;
-	void *dst;
-	size_t len;
+kcopy(const void *src, void *dst, size_t len)
 {
-	faultbuf env, *oldfault;
+	struct faultbuf env, *oldfault;
 	int rv;
 
 	oldfault = curpcb->pcb_onfault;
-	if ((rv = setfault(env)) != 0) {
-		curpcb->pcb_onfault = oldfault;
-		return rv;
-	}
 
-	memcpy(dst, src, len);
+	if ((rv = setfault(&env)) == 0)
+		memcpy(dst, src, len);
 
 	curpcb->pcb_onfault = oldfault;
-	return 0;
+	return rv;
 }
 
 int
-badaddr(addr, size)
-	void *addr;
-	size_t size;
+badaddr(void *addr, size_t size)
 {
 	return badaddr_read(addr, size, NULL);
 }
 
 int
-badaddr_read(addr, size, rptr)
-	void *addr;
-	size_t size;
-	int *rptr;
+badaddr_read(void *addr, size_t size, int *rptr)
 {
-	faultbuf env;
+	struct faultbuf env;
 	int x;
 
 	/* Get rid of any stale machine checks that have been waiting.  */
 	__asm __volatile ("sync; isync");
 
-	if (setfault(env)) {
+	if (setfault(&env)) {
 		curpcb->pcb_onfault = 0;
 		__asm __volatile ("sync");
 		return 1;
@@ -619,7 +669,7 @@ badaddr_read(addr, size, rptr)
 		x = *(volatile int32_t *)addr;
 		break;
 	default:
-		panic("badaddr: invalid size (%d)", size);
+		panic("badaddr: invalid size (%lu)", (u_long) size);
 	}
 
 	/* Make sure we took the machine check, if we caused one. */
@@ -642,9 +692,7 @@ badaddr_read(addr, size, rptr)
  */
 
 static int
-fix_unaligned(p, frame)
-	struct proc *p;
-	struct trapframe *frame;
+fix_unaligned(struct lwp *l, struct trapframe *frame)
 {
 	int indicator = EXC_ALI_OPCODE_INDICATOR(frame->dsisr);
 
@@ -672,24 +720,22 @@ fix_unaligned(p, frame)
 	case EXC_ALI_STFD:
 		{
 			int reg = EXC_ALI_RST(frame->dsisr);
-			double *fpr = &p->p_addr->u_pcb.pcb_fpu.fpr[reg];
+			double *fpr = &curpcb->pcb_fpu.fpr[reg];
 
-			/* Juggle the FPU to ensure that we've initialized
+			/*
+			 * Juggle the FPU to ensure that we've initialized
 			 * the FPRs, and that their current state is in
 			 * the PCB.
 			 */
-			if (fpuproc != p) {
-				if (fpuproc)
-					save_fpu(fpuproc);
-				enable_fpu(p);
-			}
-			save_fpu(p);
 
+			save_fpu_lwp(l);
+			enable_fpu();
+			save_fpu_cpu();
 			if (indicator == EXC_ALI_LFD) {
 				if (copyin((void *)frame->dar, fpr,
 				    sizeof(double)) != 0)
 					return -1;
-				enable_fpu(p);
+				enable_fpu();
 			} else {
 				if (copyout(fpr, (void *)frame->dar,
 				    sizeof(double)) != 0)
@@ -701,4 +747,105 @@ fix_unaligned(p, frame)
 	}
 
 	return -1;
+}
+
+int
+copyinstr(const void *udaddr, void *kaddr, size_t len, size_t *done)
+{
+	vaddr_t uva = (vaddr_t) udaddr;
+	char *kp = kaddr;
+	struct faultbuf env;
+	int rv;
+
+	if ((rv = setfault(&env)) != 0)
+		goto out2;
+
+	while (len > 0) {
+		size_t seglen;
+		vaddr_t p = setusr(uva, &seglen);
+		if (seglen > len)
+			seglen = len;
+		len -= seglen;
+		uva += seglen;
+		for (; seglen-- > 0; p++) {
+			if ((*kp++ = *(char *)p) == 0)
+				goto out;
+		}
+	}
+	rv = ENAMETOOLONG;
+
+ out:
+	if (done != NULL)
+		*done = kp - (char *) kaddr;
+ out2:
+	unsetusr();
+	curpcb->pcb_onfault = 0;
+	return rv;
+}
+
+
+int
+copyoutstr(const void *kaddr, void *udaddr, size_t len, size_t *done)
+{
+	const char *kp = kaddr;
+	vaddr_t uva = (vaddr_t) udaddr;
+	struct faultbuf env;
+	int rv;
+
+	if ((rv = setfault(&env)) != 0)
+		goto out2;
+
+	while (len > 0) {
+		size_t seglen;
+		vaddr_t p = setusr(uva, &seglen);
+		if (seglen > len)
+			seglen = len;
+		len -= seglen;
+		uva += seglen;
+		for (; seglen-- > 0; p++) {
+			if ((*(char *)p = *kp++) == 0)
+				goto out;
+		}
+	}
+	rv = ENAMETOOLONG;
+
+ out:
+	if (done != NULL)
+		*done = kp - (char *) kaddr;
+ out2:
+	unsetusr();
+	curpcb->pcb_onfault = 0;
+	return rv;
+}
+
+/* 
+ * Start a new LWP
+ */
+void
+startlwp(void *arg)
+{
+	int err;
+	ucontext_t *uc = arg;
+	struct lwp *l = curlwp;
+
+	err = cpu_setmcontext(l, &uc->uc_mcontext, uc->uc_flags);
+#if DIAGNOSTIC
+	if (err) {
+		printf("Error %d from cpu_setmcontext.", err);
+	}
+#endif
+	pool_put(&lwp_uc_pool, uc);
+
+	upcallret((void *) l);
+}
+
+/*
+ * XXX This is a terrible name.
+ */
+void
+upcallret(struct lwp *l)
+{
+	struct trapframe *frame = trapframe(l);
+
+	userret(l, frame);
 }

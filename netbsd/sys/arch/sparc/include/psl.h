@@ -1,4 +1,4 @@
-/*	$NetBSD: psl.h,v 1.29 2001/06/08 01:33:32 uwe Exp $ */
+/*	$NetBSD: psl.h,v 1.34 2003/08/07 16:29:40 agc Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -77,20 +73,14 @@
 #define PSR_BITS "\20\16EC\15EF\10S\7PS\6ET"
 
 /* Interesting spl()s */
-#define PIL_SCSI	3
-#define PIL_FDSOFT	4
-#define PIL_AUSOFT	4
-#define PIL_BIO		5
-#define PIL_VIDEO	5
-#define PIL_TTY		6
-#define PIL_LPT		6
-#define PIL_NET		7
+#define PIL_FDSOFT	IPL_SOFTFDC	/* compat */
+#define PIL_AUSOFT	IPL_SOFTAUDIO	/* compat */
+#define PIL_TTY		6		/* compat */
 #define PIL_CLOCK	10
 #define PIL_FD		11
 #define PIL_SER		13
 #define	PIL_AUD		13
 #define PIL_HIGH	15
-#define PIL_SCHED	PIL_CLOCK
 #define PIL_LOCK	PIL_HIGH
 
 /* 
@@ -345,43 +335,49 @@ _SPLRAISE(splsoftint, 1)
 
 
 /* audio software interrupts */
-_SPLRAISE(splausoft, PIL_AUSOFT)
+_SPLRAISE(splausoft, IPL_SOFTAUDIO)
 
 /* floppy software interrupts */
-_SPLRAISE(splfdsoft, PIL_FDSOFT)
+_SPLRAISE(splfdsoft, IPL_SOFTFDC)
 
 /* Block devices */
-_SPLRAISE(splbio, 5)
+_SPLRAISE(splbio, IPL_BIO)
 
 /* tty input runs at software level 6 */
-_SPLRAISE(spltty, PIL_TTY)
+_SPLRAISE(spltty, IPL_TTY)
 
 /* network hardware interrupts are at level 7 */
-_SPLRAISE(splnet, PIL_NET)
+_SPLRAISE(splnet, IPL_NET)
 
 /*
  * Memory allocation (must be as high as highest network, tty, or disk device)
  */
-_SPLRAISE(splvm, 7)
+_SPLRAISE(splvm, IPL_VM)
 
 /* clock interrupts at level 10 */
-_SPLRAISE(splclock, PIL_CLOCK)
+_SPLRAISE(splclock, IPL_CLOCK)
+
+_SPLRAISE(splsched, IPL_SCHED)
+_SPLSET(spllowerschedclock, IPL_SCHED)
 
 /* fd hardware, ts102, and tadpole microcontoller interrupts are at level 11 */
 _SPLRAISE(splfd, 11)
 _SPLRAISE(splts102, 11)
 
-/* zs hardware interrupts are at level 12 */
+/*
+ * zs hardware interrupts are at level 12
+ * su (com) hardware interrupts are at level 13
+ * IPL_SERIAL must protect them all.
+ */
 _SPLRAISE(splzs, 12)
 
-/* su (com) hardware interrupts are at level 13 (protects zs as well) */
-_SPLRAISE(splserial, 13)
+_SPLRAISE(splserial, IPL_SERIAL)
 
 /* audio hardware interrupts are at level 13 */
-_SPLRAISE(splaudio, 13)
+_SPLRAISE(splaudio, IPL_AUDIO)
 
 /* second sparc timer interrupts at level 14 */
-_SPLRAISE(splstatclock, 14)
+_SPLRAISE(splstatclock, IPL_STATCLOCK)
 
 static __inline int splhigh()
 {
@@ -394,7 +390,6 @@ static __inline int splhigh()
 	return (oldipl);
 }
 
-#define	splsched()	splhigh()
 #define	spllock()	splhigh()
 
 /* splx does not have a return value */

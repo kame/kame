@@ -2,7 +2,7 @@
 # Distribution kernel (TOSHIBA TX3912 based model) kernel config file
 
 #
-#	$NetBSD: TX3912,v 1.42.4.1 2002/08/01 04:21:14 lukem Exp $
+#	$NetBSD: TX3912,v 1.49.2.2 2004/07/15 20:15:50 he Exp $
 #
 include		"arch/hpcmips/conf/std.hpcmips"
 
@@ -11,6 +11,7 @@ include		"arch/hpcmips/conf/std.hpcmips"
 maxusers	16
 
 include		"arch/hpcmips/conf/std.hpcmips.tx39"
+makeoptions	CPUFLAGS="-mips2"	# CPU codegen options
 options 	TX391X			# Product TMPR3912
 
 options 	TX39_DEBUG
@@ -47,10 +48,10 @@ options 	SCSIVERBOSE	# human readable SCSI error messages
 options 	PCMCIAVERBOSE	# verbose PCMCIA configuration messages
 
 options 	NTP			# network time protocol
-#options 	UCONSOLE		# users can redirect console (unsafe)
 
-#options 	USERCONF	# userconf(4) support
+options 	USERCONF	# userconf(4) support
 #options	PIPE_SOCKETPAIR	# smaller, but slower pipe(2)
+#options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
 
 # File systems
 file-system 	FFS		# UFS
@@ -91,7 +92,7 @@ options 	VNODE_OP_NOINLINE # don't inline vnode op calls
 options 	NFS_BOOT_DHCP
 
 # compile options
-makeoptions	DEFGP="-G 14"
+#makeoptions	DEFGP="-G 14"
 
 config		netbsd		root on ? type ?
 
@@ -199,10 +200,15 @@ pcmcia* at it8368e? controller ? socket ?
 
 # PCMCIA IDE disk
 wdc*	at pcmcia? function ?
-wd*	at wdc? channel ? drive ? flags 0x0000
+
+# ATA (IDE) bus support
+atabus* at ata?
+
+# IDE drives
+wd*	at atabus? drive ? flags 0x0000
 
 # ATAPI bus support
-atapibus* at wdc? channel ?
+atapibus* at atapi?
 
 # ATAPI devices
 # flags have the same meaning as for IDE drives.

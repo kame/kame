@@ -1,11 +1,17 @@
-#	$NetBSD: Makefile.arc.inc,v 1.7 2002/03/19 00:57:53 atatat Exp $
+#	$NetBSD: Makefile.arc.inc,v 1.11.2.1 2004/09/01 18:20:16 tron Exp $
 
-CFLAGS+=	-mips2 -mcpu=r4000
+CFLAGS+=	-mips2
 AFLAGS+=	-mips2
+
+LINKFORMAT=	-N
 
 # XXX
 SYSTEM_LD_TAIL_EXTRA=; \
-	echo ${OBJCOPY} -O ecoff-littlemips -R .mdebug -R .ident $@ $@.ecoff; \
-	${OBJCOPY} -O ecoff-littlemips -R .mdebug -R .ident $@ $@.ecoff
+	echo "${DBSYM} $@ || true"; \
+	${DBSYM} $@ || true; \
+	echo ${OBJCOPY} -O ecoff-littlemips \
+	    -R .pdr -R .mdebug.abi32 -R .comment -R .ident $@ $@.ecoff; \
+	${OBJCOPY} -O ecoff-littlemips \
+	    -R .pdr -R .mdebug.abi32 -R .comment -R .ident $@ $@.ecoff
 
 EXTRA_KERNELS+= ${KERNELS:@.KERNEL.@${.KERNEL.}.ecoff@}

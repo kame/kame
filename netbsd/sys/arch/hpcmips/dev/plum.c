@@ -1,4 +1,4 @@
-/*	$NetBSD: plum.c,v 1.3 2002/01/29 18:53:10 uch Exp $ */
+/*	$NetBSD: plum.c,v 1.9 2003/11/07 23:04:15 he Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: plum.c,v 1.9 2003/11/07 23:04:15 he Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -64,9 +67,8 @@ struct plum_softc {
 	int			sc_pri;
 };
 
-struct cfattach plum_ca = {
-	sizeof(struct plum_softc), plum_match, plum_attach
-};
+CFATTACH_DECL(plum, sizeof(struct plum_softc),
+    plum_match, plum_attach, NULL, NULL);
 
 plumreg_t plum_idcheck(bus_space_tag_t);
 
@@ -80,6 +82,7 @@ plum_match(struct device *parent, struct cfdata *cf, void *aux)
 		return (0);
 	case PLUM2_1:
 	case PLUM2_2:
+		/* nothing */;
 	}
 
 	return (1);
@@ -97,7 +100,7 @@ plum_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_csmemt	= ca->ca_csmem.cstag;
 	sc->sc_irq	= ca->ca_irq1;
 
-	switch (plum_idcheck(sc->sc_csregt)) {
+	switch (reg = plum_idcheck(sc->sc_csregt)) {
 	default:
 		printf(": unknown revision %#x\n", reg);
 		return;
@@ -165,7 +168,7 @@ plum_search(struct device *parent, struct cfdata *cf, void *aux)
 	pa.pa_memt	= sc->sc_csmemt;
 	pa.pa_irq	= sc->sc_irq;
 
-	if ((*cf->cf_attach->ca_match)(parent, cf, &pa) == sc->sc_pri) {
+	if (config_match(parent, cf, &pa) == sc->sc_pri) {
 		config_attach(parent, cf, &pa, plum_print);
 	}
 

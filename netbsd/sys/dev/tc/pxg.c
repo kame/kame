@@ -1,4 +1,4 @@
-/* 	$NetBSD: pxg.c,v 1.10 2002/03/17 19:41:02 atatat Exp $	*/
+/* 	$NetBSD: pxg.c,v 1.17 2003/10/27 07:07:35 chs Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000, 2001 The NetBSD Foundation, Inc.
@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pxg.c,v 1.10 2002/03/17 19:41:02 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pxg.c,v 1.17 2003/10/27 07:07:35 chs Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -104,9 +104,8 @@ struct pxg_softc {
 	struct	stic_info *pxg_si;
 };
 
-struct cfattach pxg_ca = {
-	sizeof(struct pxg_softc), pxg_match, pxg_attach
-};
+CFATTACH_DECL(pxg, sizeof(struct pxg_softc),
+    pxg_match, pxg_attach, NULL, NULL);
 
 static const char *pxg_types[] = {
 	"PMAG-DA ",
@@ -146,7 +145,7 @@ pxg_attach(struct device *parent, struct device *self, void *aux)
 		si = &stic_consinfo;
 		console = 1;
 	} else {
-		if (stic_consinfo.si_slotbase == NULL)
+		if (stic_consinfo.si_slotbase == 0)
 			si = &stic_consinfo;
 		else {
 			si = malloc(sizeof(*si), M_DEVBUF, M_NOWAIT|M_ZERO);
@@ -361,7 +360,7 @@ pxg_ioctl(struct stic_info *si, u_long cmd, caddr_t data, int flag,
 	  struct proc *p)
 {
 	struct stic_xinfo *sxi;
-	volatile u_int32_t *ptr;
+	volatile u_int32_t *ptr = NULL;
 	int rv, s;
 
 	switch (cmd) {

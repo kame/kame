@@ -1,4 +1,4 @@
-/*	$NetBSD: bootp.c,v 1.22 2002/03/20 23:10:39 thorpej Exp $	*/
+/*	$NetBSD: bootp.c,v 1.25 2003/08/31 22:40:47 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1992 Regents of the University of California.
@@ -51,7 +51,6 @@
 
 #include "stand.h"
 #include "net.h"
-#include "netif.h"
 #include "bootp.h"
 
 struct in_addr servip;
@@ -225,15 +224,6 @@ bootp(sock)
 		printf("'native netmask' is %s\n", intoa(nmask));
 #endif
 
-	/* Check subnet mask against net mask; toss if bogus */
-	if ((nmask & smask) != nmask) {
-#ifdef BOOTP_DEBUG
-		if (debug)
-			printf("subnet mask (%s) bad\n", intoa(smask));
-#endif
-		smask = 0;
-	}
-
 	/* Get subnet (or natural net) mask */
 	netmask = nmask;
 	if (smask)
@@ -316,7 +306,7 @@ bootprecv(d, pkt, len, tleft)
 #endif
 
 	n = readudp(d, pkt, len, tleft);
-	if (n == -1 || n < sizeof(struct bootp) - BOOTP_VENDSIZE)
+	if (n == -1 || (size_t)n < sizeof(struct bootp) - BOOTP_VENDSIZE)
 		goto bad;
 
 	bp = (struct bootp *)pkt;

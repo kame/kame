@@ -1,4 +1,4 @@
-/*	$NetBSD: openpicreg.h,v 1.3 2001/08/30 03:08:52 briggs Exp $	*/
+/*	$NetBSD: openpicreg.h,v 1.5 2004/02/13 11:36:17 wiz Exp $	*/
 
 /*-
  * Copyright (c) 2000 Tsubai Masanari.  All rights reserved.
@@ -75,7 +75,7 @@
 #define  OPENPIC_PRIORITY_SHIFT			16
 #define  OPENPIC_VECTOR_MASK			0x000000ff
 
-/* interrupt destination cpu */
+/* interrupt destination CPU */
 #ifndef OPENPIC_IDEST
 #define OPENPIC_IDEST(irq)		(0x10010 + (irq) * 0x20)
 #endif
@@ -85,7 +85,8 @@
  */
 
 /* IPI command reg */
-#define OPENPIC_IPI(cpu, ipi)		(0x20040 + (cpu) * 0x1000 + (ipi))
+#define OPENPIC_IPI(cpu, ipi)		(0x20040 + (cpu) * 0x1000 + \
+					 (ipi) * 0x10)
 
 /* current task priority reg */
 #define OPENPIC_CPU_PRIORITY(cpu)	(0x20080 + (cpu) * 0x1000)

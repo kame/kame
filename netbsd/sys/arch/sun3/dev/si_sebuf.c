@@ -1,4 +1,4 @@
-/*	$NetBSD: si_sebuf.c,v 1.14 2001/08/20 12:00:51 wiz Exp $	*/
+/*	$NetBSD: si_sebuf.c,v 1.21 2003/07/15 03:36:15 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -42,6 +42,9 @@
  *
  * XXX - Mostly from the si driver.  Merge?
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: si_sebuf.c,v 1.21 2003/07/15 03:36:15 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -138,9 +141,8 @@ static void se_reset __P((struct ncr5380_softc *));
 static int	se_match __P((struct device *, struct cfdata *, void *));
 static void	se_attach __P((struct device *, struct device *, void *));
 
-struct cfattach si_sebuf_ca = {
-	sizeof(struct se_softc), se_match, se_attach
-};
+CFATTACH_DECL(si_sebuf, sizeof(struct se_softc),
+    se_match, se_attach, NULL, NULL);
 
 static void	se_minphys __P((struct buf *));
 
@@ -262,7 +264,7 @@ se_attach(parent, self, args)
 	sc->sc_dma = (struct se_dma_handle *)
 		malloc(i, M_DEVBUF, M_WAITOK);
 	if (sc->sc_dma == NULL)
-		panic("se: dma_malloc failed\n");
+		panic("se: dma_malloc failed");
 	for (i = 0; i < SCI_OPENINGS; i++)
 		sc->sc_dma[i].dh_flags = 0;
 
@@ -469,7 +471,7 @@ se_dma_stop(ncr_sc)
 
 	if ((ncr_sc->sc_state & NCR_DOINGDMA) == 0) {
 #ifdef	DEBUG
-		printf("se_dma_stop: dma not running\n");
+		printf("se_dma_stop: DMA not running\n");
 #endif
 		return;
 	}
@@ -533,7 +535,7 @@ se_minphys(struct buf *bp)
 	if (bp->b_bcount > MAX_DMA_LEN)
 		bp->b_bcount = MAX_DMA_LEN;
 
-	return (minphys(bp));
+	minphys(bp);
 }
 
 
@@ -603,7 +605,7 @@ se_dma_alloc(ncr_sc)
 
 	/* Make sure our caller checked sc_min_dma_len. */
 	if (xlen < MIN_DMA_LEN)
-		panic("se_dma_alloc: xlen=0x%x\n", xlen);
+		panic("se_dma_alloc: xlen=0x%x", xlen);
 
 	/*
 	 * Never attempt single transfers of more than 63k, because
@@ -705,7 +707,7 @@ se_dma_poll(ncr_sc)
 	 * XXX: I really doubt that is necessary...
 	 */
 
-	/* Wait for any "dma complete" or error bits. */
+	/* Wait for any "DMA complete" or error bits. */
 	tmo = POLL_TIMO;
 	for (;;) {
 		if (se->se_csr & CSR_MASK)

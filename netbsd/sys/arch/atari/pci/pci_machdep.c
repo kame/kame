@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_machdep.c,v 1.35 2002/05/16 01:01:34 thorpej Exp $	*/
+/*	$NetBSD: pci_machdep.c,v 1.41 2003/11/10 08:51:51 wiz Exp $	*/
 
 /*
  * Copyright (c) 1996 Leo Weppelman.  All rights reserved.
@@ -31,7 +31,11 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pci_machdep.c,v 1.41 2003/11/10 08:51:51 wiz Exp $");
+
 #include "opt_mbtype.h"
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
@@ -125,9 +129,8 @@ static void insert_into_list __P((PCI_MEMREG *head, struct pci_memreg *elem));
 static int overlap_pci_areas __P((struct pci_memreg *p,
 	struct pci_memreg *self, u_int addr, u_int size, u_int what));
 
-struct cfattach pcibus_ca = {
-	sizeof(struct device), pcibusmatch, pcibusattach
-};
+CFATTACH_DECL(pcib, sizeof(struct device),
+    pcibusmatch, pcibusattach, NULL, NULL);
 
 /*
  * We need some static storage to probe pci-busses for VGA cards during
@@ -143,7 +146,7 @@ void		*auxp;
 {
 	static int	nmatched = 0;
 
-	if (strcmp((char *)auxp, "pcibus"))
+	if (strcmp((char *)auxp, "pcib"))
 		return (0);	/* Wrong number... */
 
 	if(atari_realconfig == 0)
@@ -463,7 +466,7 @@ enable_pci_devices()
     }
 
     /*
-     * second step: calculate the memory and I/O adresses beginning from
+     * second step: calculate the memory and I/O addresses beginning from
      * PCI_MEM_START and PCI_IO_START. Care about already mapped areas.
      *
      * begin with memory list
@@ -696,7 +699,7 @@ pci_intr_string(pc, ih)
 	static char irqstr[8];		/* 4 + 2 + NULL + sanity */
 
 	if (ih == -1)
-		panic("pci_intr_string: bogus handle 0x%x\n", ih);
+		panic("pci_intr_string: bogus handle 0x%x", ih);
 
 	sprintf(irqstr, "irq %d", ih);
 	return (irqstr);

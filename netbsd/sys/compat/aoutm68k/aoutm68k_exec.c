@@ -1,4 +1,4 @@
-/*	$NetBSD: aoutm68k_exec.c,v 1.8 2001/11/13 02:07:55 lukem Exp $	*/
+/*	$NetBSD: aoutm68k_exec.c,v 1.17 2003/12/20 19:01:29 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: aoutm68k_exec.c,v 1.8 2001/11/13 02:07:55 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: aoutm68k_exec.c,v 1.17 2003/12/20 19:01:29 fvdl Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_syscall_debug.h"
@@ -51,21 +51,25 @@ __KERNEL_RCSID(0, "$NetBSD: aoutm68k_exec.c,v 1.8 2001/11/13 02:07:55 lukem Exp 
 #include <sys/signalvar.h>
 
 #include <compat/aoutm68k/aoutm68k_syscall.h>
- 
+
 extern struct sysent aoutm68k_sysent[];
 #ifdef SYSCALL_DEBUG
 extern const char * const aoutm68k_syscallnames[];
 #endif
 extern char sigcode[], esigcode[];
-void syscall __P((void));
+void aoutm68k_syscall_intern __P((struct proc *));
 
-struct emul emul_netbsd_aoutm68k = {
+struct uvm_object *emul_netbsd_aoutm68k_object;
+
+const struct emul emul_netbsd_aoutm68k = {
 	"aoutm68k",
 	"/emul/aout",
+#ifndef __HAVE_MINIMAL_EMUL
 	EMUL_HAS_SYS___syscall,
 	NULL,
 	AOUTM68K_SYS_syscall,
-	AOUTM68K_SYS_MAXSYSCALL,
+	AOUTM68K_SYS_NSYSENT,
+#endif
 	aoutm68k_sysent,
 #ifdef SYSCALL_DEBUG
 	aoutm68k_syscallnames,
@@ -74,11 +78,17 @@ struct emul emul_netbsd_aoutm68k = {
 #endif
 	sendsig,
 	trapsignal,
+	NULL,
 	sigcode,
 	esigcode,
+	&emul_netbsd_aoutm68k_object,
 	setregs,
 	NULL,
 	NULL,
 	NULL,
-	syscall
+	NULL,
+	NULL,
+	aoutm68k_syscall_intern,
+	NULL,
+	NULL,
 };

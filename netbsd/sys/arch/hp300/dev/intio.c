@@ -1,4 +1,4 @@
-/*	$NetBSD: intio.c,v 1.11 2002/05/05 22:55:49 gmcgarry Exp $	*/
+/*	$NetBSD: intio.c,v 1.18 2003/11/17 14:37:59 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1998, 2001 The NetBSD Foundation, Inc.
@@ -41,24 +41,28 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: intio.c,v 1.11 2002/05/05 22:55:49 gmcgarry Exp $");                                                  
+__KERNEL_RCSID(0, "$NetBSD: intio.c,v 1.18 2003/11/17 14:37:59 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/device.h> 
+#include <sys/device.h>
 
 #include <machine/hp300spu.h>
 
-#include <hp300/dev/intioreg.h> 
+#include <hp300/dev/intioreg.h>
 #include <hp300/dev/intiovar.h>
+
+struct intio_softc {
+	struct device sc_dev;
+	struct bus_space_tag sc_tag;
+};
 
 int	intiomatch(struct device *, struct cfdata *, void *);
 void	intioattach(struct device *, struct device *, void *);
 int	intioprint(void *, const char *);
 
-const struct cfattach intio_ca = {
-	sizeof(struct device), intiomatch, intioattach
-};
+CFATTACH_DECL(intio, sizeof(struct intio_softc),
+    intiomatch, intioattach, NULL, NULL);
 
 #if defined(HP320) || defined(HP330) || defined(HP340) || defined(HP345) || \
     defined(HP350) || defined(HP360) || defined(HP370) || defined(HP375) || \
@@ -66,6 +70,8 @@ const struct cfattach intio_ca = {
 const struct intio_builtins intio_3xx_builtins[] = {
 	{ "rtc",	0x020000,	-1},
 	{ "hil",	0x028000,	1},
+	{ "hpib",	0x078000,	3},
+	{ "dma",	0x100000,	1},
 	{ "fb",		0x160000,	-1},
 };
 #define nintio_3xx_builtins \
@@ -77,12 +83,15 @@ const struct intio_builtins intio_4xx_builtins[] = {
 	{ "rtc",	0x020000,	-1},
 	{ "frodo",	0x01c000,	5},
 	{ "hil",	0x028000,	1},
+	{ "hpib",	0x078000,	3},
+	{ "dma",	0x100000,	1},
 };
 #define nintio_4xx_builtins \
 	(sizeof(intio_4xx_builtins) / sizeof(intio_4xx_builtins[0]))
 #endif
 
 static int intio_matched = 0;
+extern caddr_t internalhpib;
 
 int
 intiomatch(parent, match, aux)
@@ -103,12 +112,17 @@ intioattach(parent, self, aux)
 	struct device *parent, *self;
 	void *aux;
 {
+	struct intio_softc *sc = (struct intio_softc *)self;
 	struct intio_attach_args ia;
 	const struct intio_builtins *ib;
+	bus_space_tag_t bst = &sc->sc_tag;
 	int ndevs;
 	int i;
 
 	printf("\n");
+
+	memset(bst, 0, sizeof(struct bus_space_tag));
+	bst->bustype = HP300_BUS_SPACE_INTIO;
 
 	switch (machineid) {
 #if defined(HP320) || defined(HP330) || defined(HP340) || defined(HP345) || \
@@ -142,10 +156,18 @@ intioattach(parent, self, aux)
 
 	memset(&ia, 0, sizeof(ia));
 
-	for (i=0; i<ndevs; i++) {
+	for (i = 0; i < ndevs; i++) {
+
+		/*
+		 * Internal HP-IB doesn't always return a device ID,
+		 * so we rely on the sysflags.
+		 */
+		if (ib[i].ib_offset == 0x078000 && !internalhpib)
+			continue;
+
 		strncpy(ia.ia_modname, ib[i].ib_modname, INTIO_MOD_LEN);
 		ia.ia_modname[INTIO_MOD_LEN] = '\0';
-		ia.ia_bst = HP300_BUS_SPACE_INTIO;
+		ia.ia_bst = bst;
 		ia.ia_iobase = ib[i].ib_offset;
 		ia.ia_addr = (bus_addr_t)(intiobase + ib[i].ib_offset);
 		ia.ia_ipl = ib[i].ib_ipl;
@@ -161,11 +183,11 @@ intioprint(aux, pnp)
 	struct intio_attach_args *ia = aux;
 
 	if (pnp != NULL)
-		printf("%s at %s", ia->ia_modname, pnp);
-	if (ia->ia_iobase != 0) {
-                printf(" addr 0x%lx", INTIOBASE + ia->ia_iobase);
-		if (ia->ia_ipl != -1 && pnp != NULL)
-			printf(" ipl %d", ia->ia_ipl);
+		aprint_normal("%s at %s", ia->ia_modname, pnp);
+	if (ia->ia_iobase != 0 && pnp == NULL) {
+		aprint_normal(" addr 0x%lx", INTIOBASE + ia->ia_iobase);
+		if (ia->ia_ipl != -1)
+			aprint_normal(" ipl %d", ia->ia_ipl);
 	}
 	return (UNCONF);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs.c,v 1.3 2001/07/07 22:57:58 perry Exp $	*/
+/*	$NetBSD: nfs.c,v 1.8 2003/08/31 22:40:15 fvdl Exp $	*/
 
 /*-
  *  Copyright (c) 1993 John Brezak
@@ -100,6 +100,13 @@ struct nfs_iodesc {
 	struct nfsv2_fattrs fa;	/* all in network order */
 };
 
+int	nfs_getrootfh __P((struct iodesc *, char *, u_char *));
+int	nfs_lookupfh __P((struct nfs_iodesc *, const char *, int,
+	    struct nfs_iodesc *));
+#ifndef NFS_NOSYMLINK
+int	nfs_readlink __P((struct nfs_iodesc *, char *));
+#endif
+ssize_t	nfs_readdata __P((struct nfs_iodesc *, off_t, void *, size_t));
 
 /*
  * Fetch the root file handle (call mount daemon)
@@ -107,11 +114,11 @@ struct nfs_iodesc {
  */
 int
 nfs_getrootfh(d, path, fhp)
-	register struct iodesc *d;
+	struct iodesc *d;
 	char *path;
 	u_char *fhp;
 {
-	register int len;
+	size_t len;
 	struct args {
 		n_long	len;
 		char	path[FNAME_SIZE];
@@ -128,7 +135,7 @@ nfs_getrootfh(d, path, fhp)
 		n_long	h[RPC_HEADER_WORDS];
 		struct repl d;
 	} rdata;
-	size_t cc;
+	ssize_t cc;
 	
 #ifdef NFS_DEBUG
 	if (debug)
@@ -165,12 +172,13 @@ nfs_getrootfh(d, path, fhp)
  * Return zero or error number.
  */
 int
-nfs_lookupfh(d, name, newfd)
+nfs_lookupfh(d, name, len, newfd)
 	struct nfs_iodesc *d;
-	char *name;
+	const char *name;
+	int len;
 	struct nfs_iodesc *newfd;
 {
-	register int len, rlen;
+	int rlen;
 	struct args {
 		u_char	fh[NFS_FHSIZE];
 		n_long	len;
@@ -201,8 +209,7 @@ nfs_lookupfh(d, name, newfd)
 
 	memset(args, 0, sizeof(*args));
 	memcpy(args->fh, d->fh, sizeof(args->fh));
-	len = strlen(name);
-	if (len > sizeof(args->name))
+	if ((size_t)len > sizeof(args->name))
 		len = sizeof(args->name);
 	memcpy(args->name, name, len);
 	args->len = htonl(len);
@@ -294,7 +301,7 @@ nfs_readdata(d, off, addr, len)
 		n_long	h[RPC_HEADER_WORDS];
 		struct nfs_read_repl d;
 	} rdata;
-	size_t cc;
+	ssize_t cc;
 	long x;
 	int hlen, rlen;
 
@@ -329,7 +336,7 @@ nfs_readdata(d, off, addr, len)
 	if (rlen < x) {
 		printf("nfsread: short packet, %d < %ld\n", rlen, x);
 		errno = EBADRPC;
-		return(-1);
+		return (-1);
 	}
 	memcpy(addr, repl->data, x);
 	return (x);
@@ -341,17 +348,18 @@ nfs_readdata(d, off, addr, len)
  */
 int
 nfs_open(path, f)
-	char *path;
+	const char *path;
 	struct open_file *f;
 {
 	static struct nfs_iodesc nfs_root_node;
 	struct iodesc *desc;
 	struct nfs_iodesc *currfd;
+	const char *cp;
 #ifndef NFS_NOSYMLINK
 	struct nfs_iodesc *newfd;
 	struct nfsv2_fattrs *fa;
-	register char *cp, *ncp;
-	register int c;
+	const char *ncp;
+	int c;
 	char namebuf[NFS_MAXPATHLEN + 1];
 	char linkbuf[NFS_MAXPATHLEN + 1];
 	int nlinks = 0;
@@ -368,7 +376,7 @@ nfs_open(path, f)
 	}
 
 	if (!(desc = socktodesc(*(int *)(f->f_devdata))))
-		return(EINVAL);
+		return (EINVAL);
 
 	/* Bind to a reserved port. */
 	desc->myport = htons(--rpc_port);
@@ -414,7 +422,7 @@ nfs_open(path, f)
 		 * Get next component of path name.
 		 */
 		{
-			register int len = 0;
+			int len = 0;
 			
 			ncp = cp;
 			while ((c = *cp) != '\0' && c != '/') {
@@ -424,12 +432,10 @@ nfs_open(path, f)
 				}
 				cp++;
 			}
-			*cp = '\0';
 		}
 		
 		/* lookup a file handle */
-		error = nfs_lookupfh(currfd, ncp, newfd);
-		*cp = c;
+		error = nfs_lookupfh(currfd, ncp, cp - ncp, newfd);
 		if (error)
 			goto out;
 		
@@ -489,7 +495,16 @@ out:
         currfd->iodesc = desc;
         currfd->off = 0;
 
-        error = nfs_lookupfh(&nfs_root_node, path, currfd);
+	cp = path;
+	/*
+	 * Remove extra separators
+	 */
+	while (*cp == '/')
+		cp++;
+
+	/* XXX: Check for empty path here? */
+
+        error = nfs_lookupfh(&nfs_root_node, cp, strlen(cp), currfd);
 #endif
 	if (!error) {
 		f->f_fsdata = (void *)currfd;
@@ -513,7 +528,7 @@ int
 nfs_close(f)
 	struct open_file *f;
 {
-	register struct nfs_iodesc *fp = (struct nfs_iodesc *)f->f_fsdata;
+	struct nfs_iodesc *fp = (struct nfs_iodesc *)f->f_fsdata;
 
 #ifdef NFS_DEBUG
 	if (debug)
@@ -537,17 +552,19 @@ nfs_read(f, buf, size, resid)
 	size_t size;
 	size_t *resid;	/* out */
 {
-	register struct nfs_iodesc *fp = (struct nfs_iodesc *)f->f_fsdata;
-	register ssize_t cc;
-	register char *addr = buf;
+	struct nfs_iodesc *fp = (struct nfs_iodesc *)f->f_fsdata;
+	ssize_t cc;
+	char *addr = buf;
 	
 #ifdef NFS_DEBUG
 	if (debug)
 		printf("nfs_read: size=%lu off=%d\n", (u_long)size,
-		       (int)fp->off);
+		    (int)fp->off);
 #endif
 	while ((int)size > 0) {
+#if !defined(LIBSA_NO_TWIDDLE)
 		twiddle();
+#endif
 		cc = nfs_readdata(fp, fp->off, (void *)addr, size);
 		/* XXX maybe should retry on certain errors */
 		if (cc == -1) {
@@ -585,6 +602,7 @@ nfs_write(f, buf, size, resid)
 	size_t size;
 	size_t *resid;	/* out */
 {
+
 	return (EROFS);
 }
 
@@ -594,7 +612,7 @@ nfs_seek(f, offset, where)
 	off_t offset;
 	int where;
 {
-	register struct nfs_iodesc *d = (struct nfs_iodesc *)f->f_fsdata;
+	struct nfs_iodesc *d = (struct nfs_iodesc *)f->f_fsdata;
 	n_long size = ntohl(d->fa.fa_size);
 
 	switch (where) {
@@ -615,7 +633,7 @@ nfs_seek(f, offset, where)
 }
 
 /* NFNON=0, NFREG=1, NFDIR=2, NFBLK=3, NFCHR=4, NFLNK=5 */
-int nfs_stat_types[8] = {
+const int nfs_stat_types[8] = {
 	0, S_IFREG, S_IFDIR, S_IFBLK, S_IFCHR, S_IFLNK, 0 };
 
 int
@@ -624,7 +642,7 @@ nfs_stat(f, sb)
 	struct stat *sb;
 {
 	struct nfs_iodesc *fp = (struct nfs_iodesc *)f->f_fsdata;
-	register n_long ftype, mode;
+	n_long ftype, mode;
 
 	ftype = ntohl(fp->fa.fa_type);
 	mode  = ntohl(fp->fa.fa_mode);

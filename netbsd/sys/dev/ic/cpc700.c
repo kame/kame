@@ -1,4 +1,4 @@
-/*	$NetBSD: cpc700.c,v 1.1 2002/05/21 02:58:25 augustss Exp $	*/
+/*	$NetBSD: cpc700.c,v 1.7 2003/11/07 17:06:42 augustss Exp $	*/
 
 /*
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -56,6 +56,9 @@
  * XXX This driver assumes that there is only one instance of it.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cpc700.c,v 1.7 2003/11/07 17:06:42 augustss Exp $");
+
 #include "pci.h"
 #include "opt_pci.h"
 
@@ -99,11 +102,11 @@ cpc_print(void *aux, const char *pnp)
 	struct cpcbus_attach_args *caa = aux;
 
 	if (pnp)
-		printf("%s at %s", caa->cpca_name, pnp);
+		aprint_normal("%s at %s", caa->cpca_name, pnp);
 
-	printf(" addr 0x%08x", caa->cpca_addr);
+	aprint_normal(" addr 0x%08x", caa->cpca_addr);
 	if (caa->cpca_irq != CPCBUSCF_IRQ_DEFAULT)
-		printf(" irq %d", caa->cpca_irq);
+		aprint_normal(" irq %d", caa->cpca_irq);
 
 	return (UNCONF);
 }
@@ -114,7 +117,7 @@ cpcpci_print(void *aux, const char *pnp)
 	union attach_args *aa = aux;
 
 	if (pnp)
-		printf("%s at %s", aa->busname, pnp);
+		aprint_normal("%s at %s", aa->busname, pnp);
 
 	return (UNCONF);
 }
@@ -127,7 +130,7 @@ cpc_submatch(struct device *parent, struct cfdata *cf, void *aux)
 	if (cf->cf_loc[CPCBUSCF_ADDR] != caa->cpca_addr)
 		return (0);
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 /*
@@ -142,16 +145,17 @@ cpc_attach(struct device *self, pci_chipset_tag_t pc, bus_space_tag_t mem,
 	int i;
 	pcitag_t tag; 
 	pcireg_t erren;
+	pcireg_t v;
 	static struct {
 		const char *name;
 		bus_addr_t addr;
 		int irq;
 	} devs[] = {
-		{ "com", CPC_COM0, CPC_IB_UART_0 },
-		{ "com", CPC_COM1, CPC_IB_UART_1 },
-		{ "timer", CPC_TIMER, CPCBUSCF_IRQ_DEFAULT },
-		{ "iic", CPC_IIC0, CPC_IB_IIC_0 },
-		{ "iic", CPC_IIC1, CPC_IB_IIC_1 },
+		{ "com",    CPC_COM0, CPC_IB_UART_0 },
+		{ "com",    CPC_COM1, CPC_IB_UART_1 },
+		{ "cpctim", CPC_TIMER, CPCBUSCF_IRQ_DEFAULT },
+		{ "cpciic", CPC_IIC0, CPC_IB_IIC_0 },
+		{ "cpciic", CPC_IIC1, CPC_IB_IIC_1 },
 		{ NULL, 0 }
 	};
 #if NPCI > 0 && defined(PCI_NETBSD_CONFIGURE)
@@ -193,7 +197,15 @@ cpc_attach(struct device *self, pci_chipset_tag_t pc, bus_space_tag_t mem,
 
 	/* Save PCI error condition reg. */
 	erren = pci_conf_read(pc, tag, CPC_PCI_BRDGERR);
+	/* Don't generate errors during probe. */
 	pci_conf_write(pc, tag, CPC_PCI_BRDGERR, 0);
+
+	/* Program MITL */
+	v = pci_conf_read(pc, tag, CPC_BRIDGE_OPTIONS2);
+	v &= ~(CPC_BRIDGE_O2_ILAT_MASK | CPC_BRIDGE_O2_SLAT_MASK);
+	v |= (CPC_BRIDGE_O2_ILAT_PRIM_ASYNC << CPC_BRIDGE_O2_ILAT_SHIFT) |
+	  (CPC_BRIDGE_O2_2LAT_PRIM_ASYNC << CPC_BRIDGE_O2_SLAT_SHIFT);
+	pci_conf_write(pc, tag, CPC_BRIDGE_OPTIONS2, v);
 
 #if NPCI > 0 && defined(PCI_NETBSD_CONFIGURE)
 	ioext  = extent_create("pciio",  CPC_PCI_IO_START, CPC_PCI_IO_END,
@@ -201,7 +213,6 @@ cpc_attach(struct device *self, pci_chipset_tag_t pc, bus_space_tag_t mem,
 	memext = extent_create("pcimem", CPC_PCI_MEM_BASE, CPC_PCI_MEM_END,
 	    M_DEVBUF, NULL, 0, EX_NOWAIT);
 
-	printf("WARNING: PCI_NETBSD_CONFIGURE is broken\n");
 	pci_configure_bus(0, ioext, memext, NULL, 0, 32);
 
 	extent_destroy(ioext);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2002 Greg Hughes (greg@netbsd.org). All rights reserved.
+ * Copyright (c) 2001, 2002 Greg Hughes (greg@NetBSD.org). All rights reserved.
  * Copyright (c) 1999 PocketBSD Project. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,10 +26,13 @@
 
 /*
  * Wscons mouse driver for DSIU TrackPoint on IBM WorkPad z50 by
- * Greg Hughes (greg@netbsd.org).
+ * Greg Hughes (greg@NetBSD.org).
  *
  * Template for interrupt/device registration taken from vrdsu.c.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vrdsiu_mouse.c,v 1.6 2003/12/04 13:05:16 keihan Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -94,9 +97,8 @@ const struct wsmouse_accessops vrdsiu_accessops = {
 	vrdsiu_mouse_disable
 };
 
-struct cfattach vrdsiu_mouse_ca = {
-	sizeof(struct vrdsiu_softc), vrdsiu_match, vrdsiu_attach
-};
+CFATTACH_DECL(vrdsiu_mouse, sizeof(struct vrdsiu_softc),
+    vrdsiu_match, vrdsiu_attach, NULL, NULL);
 
 static inline void
 vrdsiu_write(sc, port, val)
@@ -137,7 +139,7 @@ vrdsiu_attach(parent, self, aux)
 
 	bus_space_tag_t iot = va->va_iot;
 
-        if (va->va_parent_ioh != NULL)
+        if (va->va_parent_ioh != 0)
                 res = bus_space_subregion(iot, va->va_parent_ioh, va->va_addr,
                     va->va_size, &sc->sc_ioh);
         else

@@ -1,4 +1,4 @@
-/*	$NetBSD: sram.c,v 1.7 2001/12/27 02:23:25 wiz Exp $	*/
+/*	$NetBSD: sram.c,v 1.10 2003/07/15 01:44:52 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994 Kazuhisa Shimizu.
@@ -30,12 +30,16 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sram.c,v 1.10 2003/07/15 01:44:52 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/ioctl.h>
 #include <sys/file.h>
 #include <sys/malloc.h>
 #include <sys/systm.h>
+#include <sys/conf.h>
 
 #include <machine/sram.h>
 #include <x68k/dev/sramvar.h>
@@ -52,9 +56,15 @@ int sramdebug = SRAM_DEBUG_IOCTL;
 #endif
 
 void sramattach __P((int));
-int sramopen __P((dev_t, int));
-void sramclose __P((dev_t, int));
-int sramioctl __P((dev_t, u_long, caddr_t, int, struct proc *));
+
+dev_type_open(sramopen);
+dev_type_close(sramclose);
+dev_type_ioctl(sramioctl);
+
+const struct cdevsw sram_cdevsw = {
+	sramopen, sramclose, noread, nowrite, sramioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
 
 /* 
  *  functions for probeing.
@@ -75,9 +85,10 @@ sramattach(num)
 
 /*ARGSUSED*/
 int
-sramopen(dev, flags)
+sramopen(dev, flags, mode, p)
 	dev_t dev;
-	int flags;
+	int flags, mode;
+	struct proc *p;
 {
 	struct sram_softc *su = &sram_softc;
 
@@ -103,10 +114,11 @@ sramopen(dev, flags)
 }
 
 /*ARGSUSED*/
-void
-sramclose (dev, flags)
+int
+sramclose(dev, flags, mode, p)
 	dev_t dev;
-	int flags;
+	int flags, mode;
+	struct proc *p;
 {
 	struct sram_softc *su = &sram_softc;
 
@@ -119,10 +131,9 @@ sramclose (dev, flags)
 		su->flags = 0;
 	}
 	su->flags &= ~(SRF_READ|SRF_WRITE);
+
+	return (0);
 }
-
-
-extern 
 
 /*ARGSUSED*/
 int

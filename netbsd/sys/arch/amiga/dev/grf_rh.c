@@ -1,4 +1,4 @@
-/*	$NetBSD: grf_rh.c,v 1.35.6.1 2002/08/07 01:30:07 lukem Exp $ */
+/*	$NetBSD: grf_rh.c,v 1.42 2003/05/31 03:05:45 kristerw Exp $ */
 
 /*
  * Copyright (c) 1994 Markus Wild
@@ -34,7 +34,7 @@
 #include "opt_retina.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: grf_rh.c,v 1.35.6.1 2002/08/07 01:30:07 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: grf_rh.c,v 1.42 2003/05/31 03:05:45 kristerw Exp $");
 
 #include "grfrh.h"
 #if NGRFRH > 0
@@ -121,16 +121,16 @@ extern unsigned char kernel_font_8x11[];
 
 /* Convert big-endian long into little-endian long. */
 
-#define M2I(val)                                                     \
-	asm volatile (" rorw #8,%0   ;                               \
-			swap %0      ;                               \
-			rorw #8,%0   ; " : "=d" (val) : "0" (val));
+#define M2I(val)                                                         \
+	__asm __volatile (" rorw #8,%0   ;                               \
+			    swap %0      ;                               \
+			    rorw #8,%0   ; " : "=d" (val) : "0" (val));
 
-#define M2INS(val)                                                   \
-	asm volatile (" rorw #8,%0   ;                               \
-			swap %0      ;                               \
-			rorw #8,%0   ;                               \
- 			swap %0	     ; " : "=d" (val) : "0" (val));
+#define M2INS(val)                                                       \
+	__asm __volatile (" rorw #8,%0   ;                               \
+			    swap %0      ;                               \
+			    rorw #8,%0   ;                               \
+ 			    swap %0	     ; " : "=d" (val) : "0" (val));
 
 #define ACM_OFFSET	(0x00b00000)
 #define LM_OFFSET	(0x00c00000)
@@ -722,7 +722,7 @@ rh_load_mon(struct grf_softc *gp, struct MonDef *md)
 	unsigned short *c, z;
 	const unsigned char *f;
 
-	ba = gp->g_regkva;;
+	ba = gp->g_regkva;
 	fb = gp->g_fbkva;
 
 	/* provide all needed information in grf device-independant
@@ -732,10 +732,6 @@ rh_load_mon(struct grf_softc *gp, struct MonDef *md)
 	gi->gd_regsize		= LM_OFFSET;
 	gi->gd_fbaddr		= (caddr_t) kvtop (fb);
 	gi->gd_fbsize		= MEMSIZE *1024*1024;
-#ifdef BANKEDDEVPAGER
-	/* we're not using banks NO MORE! */
-	gi->gd_bank_size	= 0;
-#endif
 	gi->gd_colors		= 1 << md->DEP;
 	gi->gd_planes		= md->DEP;
 
@@ -1524,9 +1520,8 @@ void grfrhattach(struct device *, struct device *, void *);
 int  grfrhprint(void *, const char *);
 int  grfrhmatch(struct device *, struct cfdata *, void *);
 
-struct cfattach grfrh_ca = {
-	sizeof(struct grf_softc), grfrhmatch, grfrhattach
-};
+CFATTACH_DECL(grfrh, sizeof(struct grf_softc),
+    grfrhmatch, grfrhattach, NULL, NULL);
 
 static struct cfdata *cfdata;
 
@@ -1608,7 +1603,7 @@ int
 grfrhprint(void *auxp, const char *pnp)
 {
 	if (pnp)
-		printf("ite at %s", pnp);
+		aprint_normal("ite at %s", pnp);
 	return(UNCONF);
 }
 
@@ -1732,12 +1727,6 @@ rh_mode(register struct grf_softc *gp, u_long cmd, void *arg, u_long a2,
 		*(int *)arg = rh_mon_max;
 		return(0);
 
-#ifdef BANKEDDEVPAGER
-	    case GM_GRFGETBANK:
-	    case GM_GRFGETCURBANK:
-	    case GM_GRFSETBANK:
-		return(EINVAL);
-#endif
 	    case GM_GRFIOCTL:
 		return(rh_ioctl (gp, a2, arg));
 

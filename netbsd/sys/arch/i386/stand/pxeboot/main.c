@@ -1,4 +1,4 @@
-/*	$NetBSD: main.c,v 1.4 2002/02/20 03:00:27 thorpej Exp $	*/
+/*	$NetBSD: main.c,v 1.7 2003/06/23 14:48:37 martin Exp $	*/
 
 /*
  * Copyright (c) 1996
@@ -45,7 +45,6 @@
 
 int errno;
 int debug;
-int try_bootp = 1;
 
 extern char	bootprog_name[], bootprog_rev[], bootprog_date[],
 		bootprog_maker[];

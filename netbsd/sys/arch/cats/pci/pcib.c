@@ -1,4 +1,4 @@
-/*	$NetBSD: pcib.c,v 1.1 2002/02/09 12:14:02 chris Exp $	*/
+/*	$NetBSD: pcib.c,v 1.5 2003/07/15 01:29:19 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1998 The NetBSD Foundation, Inc.
@@ -38,6 +38,9 @@
  * 	from:  i386/pci/pcib.c,v 1.12
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pcib.c,v 1.5 2003/07/15 01:29:19 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -56,9 +59,8 @@
 int	pcibmatch __P((struct device *, struct cfdata *, void *));
 void	pcibattach __P((struct device *, struct device *, void *));
 
-struct cfattach pcib_ca = {
-	sizeof(struct device), pcibmatch, pcibattach
-};
+CFATTACH_DECL(pcib, sizeof(struct device),
+    pcibmatch, pcibattach, NULL, NULL);
 
 void	pcib_callback __P((struct device *));
 int	pcib_print __P((void *, const char *));
@@ -135,6 +137,6 @@ pcib_print(aux, pnp)
 
 	/* Only ISAs can attach to pcib's; easy. */
 	if (pnp)
-		printf("isa at %s", pnp);
+		aprint_normal("isa at %s", pnp);
 	return (UNCONF);
 }

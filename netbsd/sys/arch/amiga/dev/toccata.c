@@ -1,4 +1,4 @@
-/* $NetBSD: toccata.c,v 1.3 2002/03/27 16:39:51 christos Exp $ */
+/* $NetBSD: toccata.c,v 1.7 2004/01/10 21:38:32 is Exp $ */
 
 /*-
  * Copyright (c) 1998, 1999, 2001, 2002 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: toccata.c,v 1.3 2002/03/27 16:39:51 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: toccata.c,v 1.7 2004/01/10 21:38:32 is Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -188,7 +188,7 @@ struct audio_hw_if audiocs_hw_if = {
 	toccata_close,
 	0,	/*
 		 * XXX toccata_drain could be written:
-		 * sleep for play interupt. This loses less then 512 bytes of
+		 * sleep for play interrupt. This loses less then 512 bytes of
 		 * sample data, otherwise up to 1024.
 		 */
 	ad1848_query_encoding,
@@ -233,9 +233,8 @@ struct toccata_softc {
 int toccata_match (struct device *, struct cfdata *, void *);
 void toccata_attach (struct device *, struct device *, void *);
 
-struct cfattach toccata_ca = {
-        sizeof(struct toccata_softc), toccata_match, toccata_attach
-};
+CFATTACH_DECL(toccata, sizeof(struct toccata_softc),
+    toccata_match, toccata_attach, NULL, NULL);
 
 int
 toccata_match(struct device *parent, struct cfdata *cfp, void *aux) {
@@ -292,7 +291,7 @@ toccata_attach(struct device *parent, struct device *self, void *aux) {
 
 }
 
-/* interupt handler */
+/* interrupt handler */
 
 int
 toccata_intr(void *tag) {
@@ -332,13 +331,13 @@ toccata_intr(void *tag) {
 	}
 
 	/*
-	 * Something is wrong; switch interupts off to avoid wedging the
+	 * Something is wrong; switch interrupts off to avoid wedging the
 	 * machine, and notify the alpha tester.
 	 * Normally, the halt_* functions should have switched off the 
-	 * FIFO interupt.
+	 * FIFO interrupt.
 	 */
 #ifdef DEBUG
-	printf("%s: got unexpected interupt %x\n", sc->sc_ad.sc_dev.dv_xname,
+	printf("%s: got unexpected interrupt %x\n", sc->sc_ad.sc_dev.dv_xname,
 	    status);
 #endif
 	*sc->sc_boardp = TOCC_ACT;
@@ -363,7 +362,7 @@ toccata_writereg(struct ad1848_softc *asc, int offset, int value) {
 		offset * (TOCC_CODEC_REG - TOCC_CODEC_ADDR)) = value;
 }
 
-/* our own copy of open/close; we don't ever enable the ad1848 interupts */
+/* our own copy of open/close; we don't ever enable the ad1848 interrupts */
 int
 toccata_open(void *addr, int flags) {
 	struct toccata_softc *sc;
@@ -597,8 +596,6 @@ toccata_get_port(void *addr, mixer_ctrl_t *cp) {
 
 int
 toccata_query_devinfo(void *addr, mixer_devinfo_t *dip) {
-
-	printf("toccata_query_devinfo(%2d)\n", dip->index);
 
 	switch(dip->index) {
 	case TOCCATA_MIC_IN_LVL:	/* Microphone */

@@ -1,4 +1,4 @@
-/*	$NetBSD: db_interface.c,v 1.2 2002/05/13 20:30:07 matt Exp $	*/
+/*	$NetBSD: db_interface.c,v 1.5 2003/07/14 22:48:20 lukem Exp $	*/
 
 /* 
  * Copyright (c) 1996 Scott K. Stevens
@@ -33,6 +33,10 @@
 /*
  * Interface to new debugger.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: db_interface.c,v 1.5 2003/07/14 22:48:20 lukem Exp $");
+
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -61,7 +65,6 @@ u_int db_fetch_reg __P((int, db_regs_t *));
 int db_trapper __P((u_int addr, u_int inst, struct trapframe *frame,
     int fault_code));
 
-static int db_validate_address __P((vm_offset_t));
 static void db_write_text __P((unsigned char *,	int ch));
 
 const struct db_variable db_regs[] = {
@@ -166,7 +169,7 @@ kdb_trap(type, regs)
 }
 
 
-static int
+int
 db_validate_address(addr)
 	vm_offset_t addr;
 {
@@ -278,29 +281,7 @@ static struct undefined_handler db_uh;
 void
 db_machine_init()
 {
-#ifndef acorn26
-	struct exec *kernexec = (struct exec *)KERNEL_TEXT_BASE;
-	int len;
 
-	/*
-	 * The boot loader currently loads the kernel with the a.out
-	 * header still attached.
-	 */
-
-	if (kernexec->a_syms == 0) {
-		printf("ddb: No symbol table\n");
-	} else {
-		/* cover the symbols themselves (what is the int for?? XXX) */
-		esym = (int)&end + kernexec->a_syms + sizeof(int);
-
-		/*
-		 * and the string table.  (int containing size of string
-		 * table is included in string table size).
-		 */
-		len = *((u_int *)esym);
-		esym += (len + (sizeof(u_int) - 1)) & ~(sizeof(u_int) - 1);
-	}
-#endif
 	/*
 	 * We get called before malloc() is available, so supply a static
 	 * struct undefined_handler.

@@ -1,4 +1,4 @@
-/*	$NetBSD: ams.c,v 1.13 2002/03/17 19:40:44 atatat Exp $	*/
+/*	$NetBSD: ams.c,v 1.16 2003/07/15 02:43:28 lukem Exp $	*/
 
 /*
  * Copyright (C) 1998	Colin Wood
@@ -30,6 +30,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ams.c,v 1.16 2003/07/15 02:43:28 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/fcntl.h>
@@ -59,9 +62,8 @@ static void	ems_init __P((struct ams_softc *));
 static void	ms_processevent __P((adb_event_t *event, struct ams_softc *));
 
 /* Driver definition. */
-struct cfattach ams_ca = {
-	sizeof(struct ams_softc), amsmatch, amsattach
-};
+CFATTACH_DECL(ams, sizeof(struct ams_softc),
+    amsmatch, amsattach, NULL, NULL);
 
 int ams_enable __P((void *));
 int ams_ioctl __P((void *, u_long, caddr_t, int, struct proc *));

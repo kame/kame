@@ -1,4 +1,4 @@
-/*	$NetBSD: pnaphy.c,v 1.4.4.1 2002/12/07 22:04:27 he Exp $	*/
+/*	$NetBSD: pnaphy.c,v 1.10 2003/04/29 01:49:34 thorpej Exp $	*/
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -47,13 +47,12 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pnaphy.c,v 1.4.4.1 2002/12/07 22:04:27 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pnaphy.c,v 1.10 2003/04/29 01:49:34 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
-#include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/errno.h>
 
@@ -67,10 +66,8 @@ __KERNEL_RCSID(0, "$NetBSD: pnaphy.c,v 1.4.4.1 2002/12/07 22:04:27 he Exp $");
 int	pnaphymatch(struct device *, struct cfdata *, void *);
 void	pnaphyattach(struct device *, struct device *, void *);
 
-struct cfattach pnaphy_ca = {
-	sizeof(struct mii_softc), pnaphymatch, pnaphyattach,
-	    mii_phy_detach, mii_phy_activate
-};
+CFATTACH_DECL(pnaphy, sizeof(struct mii_softc),
+    pnaphymatch, pnaphyattach, mii_phy_detach, mii_phy_activate);
 
 int	pnaphy_service(struct mii_softc *, struct mii_data *, int);
 void	pnaphy_status(struct mii_softc *);
@@ -112,7 +109,8 @@ pnaphyattach(struct device *parent, struct device *self, void *aux)
 	const struct mii_phydesc *mpd;
 
 	mpd = mii_phy_match(ma, pnaphys);
-	printf(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
+	aprint_naive(": Media interface\n");
+	aprint_normal(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
 
 	sc->mii_inst = mii->mii_instance;
 	sc->mii_phy = ma->mii_phyno;
@@ -125,12 +123,12 @@ pnaphyattach(struct device *parent, struct device *self, void *aux)
 
 	sc->mii_capabilities =
 	    PHY_READ(sc, MII_BMSR) & ma->mii_capmask;
-	printf("%s: ", sc->mii_dev.dv_xname);
+	aprint_normal("%s: ", sc->mii_dev.dv_xname);
 	if ((sc->mii_capabilities & BMSR_MEDIAMASK) == 0)
-		printf("no media present");
+		aprint_error("no media present");
 	else
 		mii_phy_add_media(sc);
-	printf("\n");
+	aprint_normal("\n");
 }
 
 int

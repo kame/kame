@@ -1,4 +1,4 @@
-/*	$NetBSD: int_types.h,v 1.5 2001/04/28 15:41:32 kleink Exp $	*/
+/*	$NetBSD: int_types.h,v 1.7 2003/08/07 16:28:27 agc Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -56,6 +52,9 @@ typedef	unsigned int	       __uint32_t;
 #ifdef __COMPILER_INT64__
 typedef	__COMPILER_INT64__	__int64_t;
 typedef	__COMPILER_UINT64__    __uint64_t;
+#elif defined(_LP64)
+typedef long int		__int64_t;
+typedef unsigned long int      __uint64_t;
 #else
 /* LONGLONG */
 typedef	long long int		__int64_t;
@@ -67,7 +66,12 @@ typedef	unsigned long long int __uint64_t;
 
 /* 7.18.1.4 Integer types capable of holding object pointers */
 
+#ifdef _LP64
+typedef long int	       __intptr_t;
+typedef unsigned long int     __uintptr_t;
+#else
 typedef	int		       __intptr_t;
 typedef	unsigned int	      __uintptr_t;
+#endif
 
 #endif	/* !_MIPS_INT_TYPES_H_ */

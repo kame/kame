@@ -1,4 +1,4 @@
-/*	$NetBSD: keyboard.h,v 1.1.42.2 2003/06/25 09:50:53 grant Exp $	*/
+/*	$NetBSD: keyboard.h,v 1.5 2003/06/11 07:35:40 hamajima Exp $	*/
 
 /*-
  * Copyright (C) 1993	Allen K. Briggs, Chris P. Caputo,

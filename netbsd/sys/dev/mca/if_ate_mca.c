@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ate_mca.c,v 1.3 2001/11/13 07:46:25 lukem Exp $	*/
+/*	$NetBSD: if_ate_mca.c,v 1.10 2003/02/23 04:11:51 simonb Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ate_mca.c,v 1.3 2001/11/13 07:46:25 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ate_mca.c,v 1.10 2003/02/23 04:11:51 simonb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -58,11 +58,9 @@ __KERNEL_RCSID(0, "$NetBSD: if_ate_mca.c,v 1.3 2001/11/13 07:46:25 lukem Exp $")
 
 #include <dev/ic/mb86960reg.h>
 #include <dev/ic/mb86960var.h>
-#include <dev/ic/ate_subr.h>
 
 #include <dev/mca/mcavar.h>
 #include <dev/mca/mcadevs.h>
-#include <dev/isa/if_fereg.h>	/* XXX */
 
 int	ate_mca_match __P((struct device *, struct cfdata *, void *));
 void	ate_mca_attach __P((struct device *, struct device *, void *));
@@ -78,9 +76,8 @@ struct ate_softc {
 	void	*sc_ih;				/* interrupt cookie */
 };
 
-struct cfattach ate_mca_ca = {
-	sizeof(struct ate_softc), ate_mca_match, ate_mca_attach
-};
+CFATTACH_DECL(ate_mca, sizeof(struct ate_softc),
+    ate_mca_match, ate_mca_attach, NULL, NULL);
 
 static const struct ate_mca_product {
 	u_int32_t	at_prodid;	/* MCA product ID */
@@ -142,7 +139,7 @@ ate_mca_attach(parent, self, aux)
 	bus_space_tag_t iot = ma->ma_iot;
 	bus_space_handle_t ioh;
 	u_int8_t myea[ETHER_ADDR_LEN];
-	int type, pos3, pos4;
+	int pos3, pos4;
 	int iobase, irq;
 	const struct ate_mca_product *atp;
 
@@ -196,17 +193,16 @@ ate_mca_attach(parent, self, aux)
 	sc->sc_bst = iot;
 	sc->sc_bsh = ioh;
 
-	/* Determine the card type and get ethernet address. */
+	/* Get ethernet address. */
 	ate_mca_detect(iot, ioh, myea);
-	type = atp->at_type;
 
 	/* This interface is always enabled. */
-	sc->sc_flags |= FE_FLAGS_ENABLED;
+	sc->sc_stat |= FE_STAT_ENABLED;
 
 	/*
 	 * Do generic MB86960 attach.
 	 */
-	mb86960_attach(sc, MB86960_TYPE_86965, myea);
+	mb86960_attach(sc, myea);
 
 	mb86960_config(sc, NULL, 0, 0);
 
@@ -230,9 +226,9 @@ ate_mca_detect(iot, ioh, enaddr)
 	bus_space_handle_t ioh;
 	u_int8_t enaddr[ETHER_ADDR_LEN];
 {
-	u_char eeprom[FE_EEPROM_SIZE];
+	u_int8_t eeprom[FE_EEPROM_SIZE];
 
 	/* Get our station address from EEPROM. */
-	ate_read_eeprom(iot, ioh, eeprom);
-	bcopy(eeprom + FE_ATI_EEP_ADDR, enaddr, ETHER_ADDR_LEN);
+	mb86965_read_eeprom(iot, ioh, eeprom);
+	memcpy(enaddr, eeprom + FE_ATI_EEP_ADDR, ETHER_ADDR_LEN);
 }

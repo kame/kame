@@ -1,4 +1,4 @@
-/*	$NetBSD: csa.c,v 1.2.12.1 2002/11/01 11:13:07 tron Exp $	*/
+/*	$NetBSD: csa.c,v 1.7 2003/07/14 22:48:26 lukem Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -39,6 +39,9 @@
 /*
  * Cumana SCSI 1 driver using the generic NCR5380 driver
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: csa.c,v 1.7 2003/07/14 22:48:26 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -97,9 +100,8 @@ struct csa_softc {
 	volatile u_char		*sc_data;
 };
 
-struct cfattach csa_ca = {
-	sizeof(struct csa_softc), csa_match, csa_attach
-};
+CFATTACH_DECL(csa, sizeof(struct csa_softc),
+    csa_match, csa_attach, NULL, NULL);
 
 int csa_intr		 __P((void *arg));
 

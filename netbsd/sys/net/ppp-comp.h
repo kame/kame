@@ -1,32 +1,38 @@
-/*	$NetBSD: ppp-comp.h,v 1.5 2001/02/23 21:16:19 christos Exp $	*/
+/*	$NetBSD: ppp-comp.h,v 1.10 2003/07/08 07:13:52 itojun Exp $	*/
 
 /*
  * ppp-comp.h - Definitions for doing PPP packet compression.
  *
- * Copyright (c) 1994 The Australian National University.
- * All rights reserved.
+ * Copyright (c) 1989-2002 Paul Mackerras. All rights reserved.
  *
- * Permission to use, copy, modify, and distribute this software and its
- * documentation is hereby granted, provided that the above copyright
- * notice appears in all copies.  This software is provided without any
- * warranty, express or implied. The Australian National University
- * makes no representations about the suitability of this software for
- * any purpose.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
  *
- * IN NO EVENT SHALL THE AUSTRALIAN NATIONAL UNIVERSITY BE LIABLE TO ANY
- * PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
- * ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
- * THE AUSTRALIAN NATIONAL UNIVERSITY HAVE BEEN ADVISED OF THE POSSIBILITY
- * OF SUCH DAMAGE.
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
  *
- * THE AUSTRALIAN NATIONAL UNIVERSITY SPECIFICALLY DISCLAIMS ANY WARRANTIES,
- * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
- * ON AN "AS IS" BASIS, AND THE AUSTRALIAN NATIONAL UNIVERSITY HAS NO
- * OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
- * OR MODIFICATIONS.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in
+ *    the documentation and/or other materials provided with the
+ *    distribution.
  *
- * Id: ppp-comp.h,v 1.10 1996/09/26 06:30:11 paulus Exp 
+ * 3. The name(s) of the authors of this software must not be used to
+ *    endorse or promote products derived from this software without
+ *    prior written permission.
+ *
+ * 4. Redistributions of any form whatsoever must retain the following
+ *    acknowledgment:
+ *    "This product includes software developed by Paul Mackerras
+ *     <paulus@samba.org>".
+ *
+ * THE AUTHORS OF THIS SOFTWARE DISCLAIM ALL WARRANTIES WITH REGARD TO
+ * THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS, IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY
+ * SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+ * AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
+ * OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
 #ifndef _NET_PPP_COMP_H
@@ -46,6 +52,13 @@
 #define DO_PREDICTOR_2	0
 
 /*
+ * How many entries to make available in the compressors table
+ */
+#ifndef PPP_COMPRESSORS_MAX
+#define PPP_COMPRESSORS_MAX	8
+#endif
+
+/*
  * Structure giving methods for compression/decompression.
  */
 #ifdef PACKETPTR
@@ -53,36 +66,32 @@ struct compressor {
 	int	compress_proto;	/* CCP compression protocol number */
 
 	/* Allocate space for a compressor (transmit side) */
-	void	*(*comp_alloc) __P((u_char *options, int opt_len));
+	void	*(*comp_alloc) __P((u_char *, int));
 	/* Free space used by a compressor */
-	void	(*comp_free) __P((void *state));
+	void	(*comp_free) __P((void *));
 	/* Initialize a compressor */
-	int	(*comp_init) __P((void *state, u_char *options, int opt_len,
-				  int unit, int hdrlen, int debug));
+	int	(*comp_init) __P((void *, u_char *, int, int, int, int));
 	/* Reset a compressor */
-	void	(*comp_reset) __P((void *state));
+	void	(*comp_reset) __P((void *));
 	/* Compress a packet */
-	int	(*compress) __P((void *state, PACKETPTR *mret,
-				 PACKETPTR mp, int orig_len, int max_len));
+	int	(*compress) __P((void *, PACKETPTR *, PACKETPTR, int, int));
 	/* Return compression statistics */
-	void	(*comp_stat) __P((void *state, struct compstat *stats));
+	void	(*comp_stat) __P((void *, struct compstat *));
 
 	/* Allocate space for a decompressor (receive side) */
-	void	*(*decomp_alloc) __P((u_char *options, int opt_len));
+	void	*(*decomp_alloc) __P((u_char *, int));
 	/* Free space used by a decompressor */
-	void	(*decomp_free) __P((void *state));
+	void	(*decomp_free) __P((void *));
 	/* Initialize a decompressor */
-	int	(*decomp_init) __P((void *state, u_char *options, int opt_len,
-				    int unit, int hdrlen, int mru, int debug));
+	int	(*decomp_init) __P((void *, u_char *, int, int, int, int, int));
 	/* Reset a decompressor */
-	void	(*decomp_reset) __P((void *state));
+	void	(*decomp_reset) __P((void *));
 	/* Decompress a packet. */
-	int	(*decompress) __P((void *state, PACKETPTR mp,
-				   PACKETPTR *dmpp));
+	int	(*decompress) __P((void *, PACKETPTR, PACKETPTR *));
 	/* Update state for an incompressible packet received */
-	void	(*incomp) __P((void *state, PACKETPTR mp));
+	void	(*incomp) __P((void *, PACKETPTR));
 	/* Return decompression statistics */
-	void	(*decomp_stat) __P((void *state, struct compstat *stats));
+	void	(*decomp_stat) __P((void *, struct compstat *));
 };
 #endif /* PACKETPTR */
 
@@ -103,6 +112,8 @@ struct compressor {
  */
 #define CCP_CONFREQ	1
 #define CCP_CONFACK	2
+#define	CCP_CONFNAK	3
+#define	CCP_CONFREJ	4
 #define CCP_TERMREQ	5
 #define CCP_TERMACK	6
 #define CCP_RESETREQ	14

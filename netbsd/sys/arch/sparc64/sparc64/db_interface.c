@@ -1,4 +1,4 @@
-/*	$NetBSD: db_interface.c,v 1.64 2002/05/14 02:34:15 eeh Exp $ */
+/*	$NetBSD: db_interface.c,v 1.76 2004/03/21 14:15:35 pk Exp $ */
 
 /*
  * Copyright (c) 1996-2002 Eduardo Horvath.  All rights reserved.
@@ -32,6 +32,10 @@
 /*
  * Interface to new debugger.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: db_interface.c,v 1.76 2004/03/21 14:15:35 pk Exp $");
+
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -55,14 +59,14 @@
 
 #include <machine/instr.h>
 #include <machine/cpu.h>
-#include <machine/openfirm.h>
+#include <machine/promlib.h>
 #include <machine/ctlreg.h>
 #include <machine/pmap.h>
 
 #include "fb.h"
 #include "esp_sbus.h"
 
-extern void OF_enter __P((void));
+db_regs_t		ddb_regs;
 
 extern struct traptrace {
 	unsigned short tl:3,	/* Trap level */
@@ -148,7 +152,7 @@ const struct db_variable db_regs[] = {
 	{ "npc", (long *)&DDB_TF->tf_npc, FCN_NULL, },
 	{ "ipl", (long *)&DDB_TF->tf_oldpil, db__char_value, },
 	{ "y", (long *)&DDB_TF->tf_y, db__int_value, },
-	{ "g0", (long *)&nil, FCN_NULL, },
+	{ "g0", (void *)&nil, FCN_NULL, },
 	{ "g1", (long *)&DDB_TF->tf_global[1], FCN_NULL, },
 	{ "g2", (long *)&DDB_TF->tf_global[2], FCN_NULL, },
 	{ "g3", (long *)&DDB_TF->tf_global[3], FCN_NULL, },
@@ -224,6 +228,7 @@ extern char *trap_type[];
 
 void kdb_kbd_trap __P((struct trapframe64 *));
 void db_prom_cmd __P((db_expr_t, int, db_expr_t, char *));
+void db_lwp_cmd __P((db_expr_t, int, db_expr_t, char *));
 void db_proc_cmd __P((db_expr_t, int, db_expr_t, char *));
 void db_ctx_cmd __P((db_expr_t, int, db_expr_t, char *));
 void db_dump_window __P((db_expr_t, int, db_expr_t, char *));
@@ -235,7 +240,9 @@ void db_dump_pcb __P((db_expr_t, int, db_expr_t, char *));
 void db_dump_pv __P((db_expr_t, int, db_expr_t, char *));
 void db_setpcb __P((db_expr_t, int, db_expr_t, char *));
 void db_dump_dtlb __P((db_expr_t, int, db_expr_t, char *));
+void db_dump_itlb __P((db_expr_t, int, db_expr_t, char *));
 void db_dump_dtsb __P((db_expr_t, int, db_expr_t, char *));
+void db_dump_itsb __P((db_expr_t, int, db_expr_t, char *));
 void db_pmap_kernel __P((db_expr_t, int, db_expr_t, char *));
 void db_pload_cmd __P((db_expr_t, int, db_expr_t, char *));
 void db_pmap_cmd __P((db_expr_t, int, db_expr_t, char *));
@@ -244,10 +251,12 @@ void db_traptrace __P((db_expr_t, int, db_expr_t, char *));
 void db_dump_buf __P((db_expr_t, int, db_expr_t, char *));
 void db_dump_espcmd __P((db_expr_t, int, db_expr_t, char *));
 void db_watch __P((db_expr_t, int, db_expr_t, char *));
+void db_pm_extract __P((db_expr_t, int, db_expr_t, char *));
+void db_cpus_cmd __P((db_expr_t, int, db_expr_t, char *));
 
-static void db_dump_pmap __P((struct pmap*));
+#ifdef DDB
+static void db_dump_pmap __P((struct pmap *));
 static void db_print_trace_entry __P((struct traptrace *, int));
-
 
 /*
  * Received keyboard interrupt sequence.
@@ -293,9 +302,9 @@ kdb_trap(type, tf)
 	default:
 		printf("kernel trap %x: %s\n", type, trap_type[type & 0x1ff]);
 		if (db_recover != 0) {
-			OF_enter();
+			prom_abort();
 			db_error("Faulted in DDB; continuing...\n");
-			OF_enter();
+			prom_abort();
 			/*NOTREACHED*/
 		}
 		db_recover = (label_t *)1;
@@ -305,10 +314,10 @@ kdb_trap(type, tf)
 	write_all_windows();
 
 	ddb_regs.ddb_tf = *tf;
-	if (fpproc) {
-		savefpstate(fpproc->p_md.md_fpstate);
-		ddb_regs.ddb_fpstate = *fpproc->p_md.md_fpstate;
-		loadfpstate(fpproc->p_md.md_fpstate);
+	if (fplwp) {
+		savefpstate(fplwp->l_md.md_fpstate);
+		ddb_regs.ddb_fpstate = *fplwp->l_md.md_fpstate;
+		loadfpstate(fplwp->l_md.md_fpstate);
 	}
 	/* We should do a proper copyin and xlate 64-bit stack frames, but... */
 /*	if (tf->tf_tstate & TSTATE_PRIV) { */
@@ -340,6 +349,7 @@ kdb_trap(type, tf)
 
 	s = splhigh();
 	db_active++;
+	sparc64_ipi_pause_cpus();
 	cnpollc(TRUE);
 	/* Need to do spl stuff till cnpollc works */
 	tl = ddb_regs.ddb_tl = savetstate(ts);
@@ -348,11 +358,12 @@ kdb_trap(type, tf)
 	restoretstate(tl,ts);
 	cnpollc(FALSE);
 	db_active--;
+	sparc64_ipi_resume_cpus();
 	splx(s);
 
-	if (fpproc) {	
-		*fpproc->p_md.md_fpstate = ddb_regs.ddb_fpstate;
-		loadfpstate(fpproc->p_md.md_fpstate);
+	if (fplwp) {	
+		*fplwp->l_md.md_fpstate = ddb_regs.ddb_fpstate;
+		loadfpstate(fplwp->l_md.md_fpstate);
 	}
 #if 0
 	/* We will not alter the machine's running state until we get everything else working */
@@ -364,6 +375,7 @@ kdb_trap(type, tf)
 
 	return (1);
 }
+#endif	/* DDB */
 
 /*
  * Read bytes from kernel address space for debugger.
@@ -414,6 +426,7 @@ db_write_bytes(addr, size, data)
 
 }
 
+#ifdef DDB
 void
 Debugger()
 {
@@ -428,7 +441,8 @@ db_prom_cmd(addr, have_addr, count, modif)
 	db_expr_t count;
 	char *modif;
 {
-	OF_enter();
+
+	prom_abort();
 }
 
 void
@@ -464,6 +478,43 @@ db_dump_dtlb(addr, have_addr, count, modif)
 	} else {
 #ifdef DEBUG
 		print_dtlb();
+#endif
+	}
+}
+
+void
+db_dump_itlb(addr, have_addr, count, modif)
+	db_expr_t addr;
+	int have_addr;
+	db_expr_t count;
+	char *modif;
+{
+	extern void print_itlb __P((void));
+
+	if (have_addr) {
+		int i;
+		int64_t* p = (int64_t*)addr;
+		static int64_t buf[128];
+		extern void dump_itlb(int64_t *);
+		
+		dump_itlb(buf);
+		p = buf;
+		for (i=0; i<64;) {
+#ifdef __arch64__
+			db_printf("%2d:%16.16lx %16.16lx ", i++, p[0], p[1]);
+			p += 2;
+			db_printf("%2d:%16.16lx %16.16lx\n", i++, p[0], p[1]);
+			p += 2;
+#else
+			db_printf("%2d:%16.16qx %16.16qx ", i++, p[0], p[1]);
+			p += 2;
+			db_printf("%2d:%16.16qx %16.16qx\n", i++, p[0], p[1]);
+			p += 2;
+#endif
+		}
+	} else {
+#ifdef DEBUG
+		print_itlb();
 #endif
 	}
 }
@@ -509,35 +560,38 @@ int64_t pseg_get __P((struct pmap *, vaddr_t));
 
 void
 db_dump_pmap(pm)
-struct pmap* pm;
+	struct pmap *pm;
 {
 	/* print all valid pages in the kernel pmap */
-	long i, j, k, n;
+	unsigned long long i, j, k, n, data0, data1;
 	paddr_t *pdir, *ptbl;
-	/* Almost the same as pmap_collect() */
 	
 	n = 0;
-	for (i=0; i<STSZ; i++) {
-		if((pdir = (paddr_t *)(u_long)ldxa((vaddr_t)&pm->pm_segs[i], ASI_PHYS_CACHED))) {
-			db_printf("pdir %ld at %lx:\n", i, (long)pdir);
-			for (k=0; k<PDSZ; k++) {
-				if ((ptbl = (paddr_t *)(u_long)ldxa((vaddr_t)&pdir[k], ASI_PHYS_CACHED))) {
-					db_printf("\tptable %ld:%ld at %lx:\n", i, k, (long)ptbl);
-					for (j=0; j<PTSZ; j++) {
-						int64_t data0, data1;
-						data0 = ldxa((vaddr_t)&ptbl[j], ASI_PHYS_CACHED);
-						j++;
-						data1 = ldxa((vaddr_t)&ptbl[j], ASI_PHYS_CACHED);
-						if (data0 || data1) {
-							db_printf("%llx: %llx\t",
-								  (unsigned long long)(((u_int64_t)i<<STSHIFT)|(k<<PDSHIFT)|((j-1)<<PTSHIFT)),
-								  (unsigned long long)(data0));
-							db_printf("%llx: %llx\n",
-								  (unsigned long long)(((u_int64_t)i<<STSHIFT)|(k<<PDSHIFT)|(j<<PTSHIFT)),
-								  (unsigned long long)(data1));
-						}
-					}
+	for (i = 0; i < STSZ; i++) {
+		pdir = (paddr_t *)(u_long)ldxa((vaddr_t)&pm->pm_segs[i], ASI_PHYS_CACHED);
+		if (!pdir) {
+			continue;
+		}
+		db_printf("pdir %lld at %lx:\n", i, (long)pdir);
+		for (k = 0; k < PDSZ; k++) {
+			ptbl = (paddr_t *)(u_long)ldxa((vaddr_t)&pdir[k], ASI_PHYS_CACHED);
+			if (!ptbl) {
+				continue;
+			}
+			db_printf("\tptable %lld:%lld at %lx:\n", i, k, (long)ptbl);
+			for (j = 0; j < PTSZ; j++) {
+				data0 = ldxa((vaddr_t)&ptbl[j], ASI_PHYS_CACHED);
+				j++;
+				data1 = ldxa((vaddr_t)&ptbl[j], ASI_PHYS_CACHED);
+				if (!data0 && !data1) {
+					continue;
 				}
+				db_printf("%016llx: %016llx\t",
+					  (i << STSHIFT) | (k << PDSHIFT) | ((j - 1) << PTSHIFT),
+					  data0);
+				db_printf("%016llx: %016llx\n",
+					  (i << STSHIFT) | (k << PDSHIFT) | (j << PTSHIFT),
+					  data1);
 			}
 		}
 	}
@@ -588,6 +642,23 @@ db_pmap_kernel(addr, have_addr, count, modif)
 	}
 }
 
+void
+db_pm_extract(addr, have_addr, count, modif)
+	db_expr_t addr;
+	int have_addr;
+	db_expr_t count;
+	char *modif;
+{
+	if (have_addr) {
+		paddr_t pa;
+
+		if (pmap_extract(pmap_kernel(), addr, &pa))
+			db_printf("pa = %llx\n", (long long)pa);
+		else
+			db_printf("%p not found\n", (void *)addr);
+	} else
+		db_printf("pmap_extract: no address\n");
+}
 
 void
 db_pmap_cmd(addr, have_addr, count, modif)
@@ -606,7 +677,7 @@ db_pmap_cmd(addr, have_addr, count, modif)
 				if (c == 'f')
 					full = 1;
 	}
-	if (curproc && curproc->p_vmspace)
+	if (curlwp && curproc->p_vmspace)
 		pm = curproc->p_vmspace->vm_map.pmap;
 	if (have_addr) {
 		pm = (struct pmap*)addr;
@@ -654,6 +725,12 @@ db_lock(addr, have_addr, count, modif)
 #endif
 }
 
+#define TSBENTS (512 << tsbsize)
+extern pte_t *tsb_dmmu, *tsb_immu;
+extern int tsbsize;
+
+void db_dump_tsb_common(pte_t *);
+
 void
 db_dump_dtsb(addr, have_addr, count, modif)
 	db_expr_t addr;
@@ -661,22 +738,43 @@ db_dump_dtsb(addr, have_addr, count, modif)
 	db_expr_t count;
 	char *modif;
 {
-	extern pte_t *tsb;
-	extern int tsbsize;
-#define TSBENTS (512<<tsbsize)
+
+	db_printf("DTSB:\n");
+	db_dump_tsb_common(tsb_dmmu);
+}
+
+void
+db_dump_itsb(addr, have_addr, count, modif)
+	db_expr_t addr;
+	int have_addr;
+	db_expr_t count;
+	char *modif;
+{
+
+	db_printf("ITSB:\n");
+	db_dump_tsb_common(tsb_immu);
+}
+
+void
+db_dump_tsb_common(pte_t *tsb)
+{
+	uint64_t tag, data;
 	int i;
 
-	db_printf("TSB:\n");
-	for (i=0; i<TSBENTS; i++) {
-		db_printf("%4d:%4d:%08x %08x:%08x ", i, 
-			  (int)((tsb[i].tag&TSB_TAG_G)?-1:TSB_TAG_CTX(tsb[i].tag)),
-			  (int)((i<<13)|TSB_TAG_VA(tsb[i].tag)),
-			  (int)(tsb[i].data>>32), (int)tsb[i].data);
+	for (i = 0; i < TSBENTS; i++) {
+		tag = tsb[i].tag;
+		data = tsb[i].data;
+		db_printf("%4d:%4d:%08x %08x:%08x ", i,
+			  (int)((tag & TSB_TAG_G) ? -1 : TSB_TAG_CTX(tag)),
+			  (int)((i << 13) | TSB_TAG_VA(tag)),
+			  (int)(data >> 32), (int)data);
 		i++;
+		tag = tsb[i].tag;
+		data = tsb[i].data;
 		db_printf("%4d:%4d:%08x %08x:%08x\n", i,
-			  (int)((tsb[i].tag&TSB_TAG_G)?-1:TSB_TAG_CTX(tsb[i].tag)),
-			  (int)((i<<13)|TSB_TAG_VA(tsb[i].tag)),
-			  (int)(tsb[i].data>>32), (int)tsb[i].data);
+			  (int)((tag & TSB_TAG_G) ? -1 : TSB_TAG_CTX(tag)),
+			  (int)((i << 13) | TSB_TAG_VA(tag)),
+			  (int)(data >> 32), (int)data);
 	}
 }
 
@@ -698,6 +796,29 @@ db_page_cmd(addr, have_addr, count, modif)
 	    PHYS_TO_VM_PAGE(addr));
 }
 
+void
+db_lwp_cmd(addr, have_addr, count, modif)
+	db_expr_t addr;
+	int have_addr;
+	db_expr_t count;
+	char *modif;
+{
+	struct lwp *l;
+
+	l = curlwp;
+	if (have_addr) 
+		l = (struct lwp*) addr;
+	if (l == NULL) {
+		db_printf("no current lwp\n");
+		return;
+	}
+	db_printf("lwp %p: lid %d\n", l, l->l_lid);
+	db_printf("wchan:%p pri:%d upri:%d tf:%p\n",
+		  l->l_wchan, l->l_priority, l->l_usrpri, l->l_md.md_tf);
+	db_printf("pcb: %p fpstate: %p\n", &l->l_addr->u_pcb, 
+		l->l_md.md_fpstate);
+	return;
+}
 
 void
 db_proc_cmd(addr, have_addr, count, modif)
@@ -706,9 +827,10 @@ db_proc_cmd(addr, have_addr, count, modif)
 	db_expr_t count;
 	char *modif;
 {
-	struct proc *p;
+	struct proc *p = NULL;
 
-	p = curproc;
+	if (curlwp)
+		p = curproc;
 	if (have_addr) 
 		p = (struct proc*) addr;
 	if (p == NULL) {
@@ -716,20 +838,15 @@ db_proc_cmd(addr, have_addr, count, modif)
 		return;
 	}
 	db_printf("process %p:", p);
-	db_printf("pid:%d vmspace:%p pmap:%p ctx:%x wchan:%p pri:%d upri:%d\n",
+	db_printf("pid:%d vmspace:%p pmap:%p ctx:%x\n",
 		  p->p_pid, p->p_vmspace, p->p_vmspace->vm_map.pmap, 
-		  p->p_vmspace->vm_map.pmap->pm_ctx,
-		  p->p_wchan, p->p_priority, p->p_usrpri);
-	db_printf("thread @ %p = %p tf:%p ", &p->p_thread, p->p_thread,
-		  p->p_md.md_tf);
+		  p->p_vmspace->vm_map.pmap->pm_ctx);
 	db_printf("maxsaddr:%p ssiz:%dpg or %llxB\n",
 		  p->p_vmspace->vm_maxsaddr, p->p_vmspace->vm_ssize, 
 		  (unsigned long long)ctob(p->p_vmspace->vm_ssize));
 	db_printf("profile timer: %ld sec %ld usec\n",
 		  p->p_stats->p_timer[ITIMER_PROF].it_value.tv_sec,
 		  p->p_stats->p_timer[ITIMER_PROF].it_value.tv_usec);
-	db_printf("pcb: %p fpstate: %p\n", &p->p_addr->u_pcb, 
-		p->p_md.md_fpstate);
 	return;
 }
 
@@ -741,18 +858,22 @@ db_ctx_cmd(addr, have_addr, count, modif)
 	char *modif;
 {
 	struct proc *p;
+	struct lwp *l;
 
 	/* XXX LOCKING XXX */
-	for (p = allproc.lh_first; p != 0; p = p->p_list.le_next) {
+	LIST_FOREACH(p, &allproc, p_list) {
 		if (p->p_stat) {
 			db_printf("process %p:", p);
-			db_printf("pid:%d pmap:%p ctx:%x tf:%p fpstate %p "
-				"lastcall:%s\n",
+			db_printf("pid:%d pmap:%p ctx:%x\n",
 				p->p_pid, p->p_vmspace->vm_map.pmap,
-				p->p_vmspace->vm_map.pmap->pm_ctx,
-				p->p_md.md_tf, p->p_md.md_fpstate,
-				(p->p_addr->u_pcb.lastcall)?
-				p->p_addr->u_pcb.lastcall : "Null");
+				p->p_vmspace->vm_map.pmap->pm_ctx);
+			LIST_FOREACH(l, &p->p_lwps, l_sibling) {
+				db_printf("\tlwp %p: lid:%d tf:%p fpstate %p "
+					"lastcall:%s\n",
+					l, l->l_lid, l->l_md.md_tf, l->l_md.md_fpstate,
+					(l->l_addr->u_pcb.lastcall)?
+					l->l_addr->u_pcb.lastcall : "Null");
+			}
 		}
 	}
 	return;
@@ -765,11 +886,10 @@ db_dump_pcb(addr, have_addr, count, modif)
 	db_expr_t count;
 	char *modif;
 {
-	extern struct pcb *cpcb;
 	struct pcb *pcb;
 	int i;
 
-	pcb = cpcb;
+	pcb = curpcb;
 	if (have_addr) 
 		pcb = (struct pcb*) addr;
 
@@ -814,18 +934,21 @@ db_setpcb(addr, have_addr, count, modif)
 {
 	struct proc *p, *pp;
 
-	extern struct pcb *cpcb;
-
 	if (!have_addr) {
 		db_printf("What PID do you want to map in?\n");
 		return;
 	}
     
-	for (p = allproc.lh_first; p != 0; p = p->p_list.le_next) {
+	LIST_FOREACH(p, &allproc, p_list) {
 		pp = p->p_pptr;
 		if (p->p_stat && p->p_pid == addr) {
-			curproc = p;
+#if 0
+/* XXX Do we need to do the following too?: */
+			extern struct pcb *cpcb;
+
+			curlwp = p;
 			cpcb = (struct pcb*)p->p_addr;
+#endif
 			if (p->p_vmspace->vm_map.pmap->pm_ctx) {
 				switchtoctx(p->p_vmspace->vm_map.pmap->pm_ctx);
 				return;
@@ -850,7 +973,7 @@ db_print_trace_entry(te, i)
 	db_printsym((u_long)te->tpc, DB_STGY_PROC, db_printf);
 	db_printf(": ");
 	if ((te->tpc && !(te->tpc&0x3)) &&
-	    curproc &&
+	    curlwp &&
 	    (curproc->p_pid == te->pid)) {
 		db_disasm((u_long)te->tpc, 0);
 	} else db_printf("\n");
@@ -911,7 +1034,11 @@ db_traptrace(addr, have_addr, count, modif)
 }
 
 /* 
- * Use physical or virtual watchpoint registers -- ugh
+ * Use physical or virtul watchpoint registers -- ugh
+ *
+ * UltraSPARC I and II have both a virtual and physical
+ * watchpoint register.  They are controlled by the LSU 
+ * control register.  
  */
 void
 db_watch(addr, have_addr, count, modif)
@@ -921,42 +1048,104 @@ db_watch(addr, have_addr, count, modif)
 	char *modif;
 {
 	int phys = 0;
+	int read = 0;
+	int width = 8; /* Default to 8 bytes */
+	int64_t mask = 0xff;
 
-#define WATCH_VR	(1L<<22)
-#define WATCH_VW	(1L<<21)
-#define WATCH_PR	(1L<<24)
-#define WATCH_PW	(1L<<23)
-#define WATCH_PM	(((u_int64_t)0xffffL)<<33)
-#define WATCH_VM	(((u_int64_t)0xffffL)<<25)
+#define	WATCH_VR	(1L<<22)
+#define	WATCH_VW	(1L<<21)
+#define	WATCH_PR	(1L<<24)
+#define	WATCH_PW	(1L<<23)
+#define	WATCH_PM_SHIFT	33
+#define	WATCH_PM	(((u_int64_t)0xffffL)<<WATCH_PM_SHIFT)
+#define	WATCH_VM_SHIFT	25
+#define	WATCH_VM	(((u_int64_t)0xffffL)<<WATCH_VM_SHIFT)
 
 	{
 		register char c, *cp = modif;
 		if (modif)
 			while ((c = *cp++) != 0)
-				if (c == 'p')
+				switch (c) {
+				case 'p':
+					/* Physical watchpoint */
 					phys = 1;
+					break;
+				case 'r':
+					/* Trap reads too */
+					read = 1;
+					break;
+				case 'b':
+					width = 1;
+					mask = 0x1 << (addr & 0x7);
+					break;
+				case 'h':
+					width = 2;
+					mask = 0x3 << (addr & 0x6);
+					break;
+				case 'l':
+					width = 4;
+					mask = 0x7 << (addr & 0x4);
+					break;
+				case 'L':
+					width = 8;
+					mask = 0xf;
+					break;
+				default:
+					break;
+				}
 	}
+
 	if (have_addr) {
 		/* turn on the watchpoint */
 		int64_t tmp = ldxa(0, ASI_MCCR);
 		
 		if (phys) {
-			tmp &= ~(WATCH_PM|WATCH_PR|WATCH_PW);
+			tmp &= ~WATCH_PM;
+			tmp |= WATCH_PW | (mask << WATCH_PM_SHIFT);
+			if (read) tmp |= WATCH_PR;
+
 			stxa(PHYSICAL_WATCHPOINT, ASI_DMMU, addr);
+			db_printf("Setting physical watchpoint to %llx-%llx\n",
+				(long long)addr, (long long)addr + width);
 		} else {
-			tmp &= ~(WATCH_VM|WATCH_VR|WATCH_VW);
+			tmp &= ~WATCH_VM;
+			tmp |= WATCH_VW | (mask << WATCH_VM_SHIFT);
+			if (read) tmp |= WATCH_VR;
+
 			stxa(VIRTUAL_WATCHPOINT, ASI_DMMU, addr);
+			db_printf("Setting virtual watchpoint to %llx-%llx\n",
+				(long long)addr, (long long)addr + width);
 		}
 		stxa(0, ASI_MCCR, tmp);
 	} else {
 		/* turn off the watchpoint */
 		int64_t tmp = ldxa(0, ASI_MCCR);
-		if (phys) tmp &= ~(WATCH_PM);
-		else tmp &= ~(WATCH_VM);
+		if (phys) {
+			tmp &= ~(WATCH_PM|WATCH_PR|WATCH_PW);
+			db_printf("Disabling physical watchpoint\n");
+		} else {
+			tmp &= ~(WATCH_VM|WATCH_VR|WATCH_VW);
+			db_printf("Disabling virtual watchpoint\n");
+		}
 		stxa(0, ASI_MCCR, tmp);
 	}
 }
 
+void
+db_cpus_cmd(addr, have_addr, count, modif)
+	db_expr_t addr;
+	int have_addr;
+	db_expr_t count;
+	char *modif;
+{
+	struct cpu_info *ci;
+
+	for (ci = cpus; ci; ci = ci->ci_next) {
+		db_printf("cpu%d: self 0x%08lx lwp 0x%08lx pcb 0x%08lx\n",
+			  ci->ci_number, (u_long)ci->ci_self,
+			  (u_long)ci->ci_curlwp, (u_long)ci->ci_cpcb);
+	}
+}
 
 #include <uvm/uvm.h>
 
@@ -972,7 +1161,7 @@ db_uvmhistdump(addr, have_addr, count, modif)
 	char *modif;
 {
 
-	uvmhist_dump(uvm_histories.lh_first);
+	uvmhist_dump(LIST_FIRST(&uvm_histories));
 }
 
 #if NESP_SBUS
@@ -982,13 +1171,17 @@ extern void db_esp(db_expr_t, int, db_expr_t, char*);
 const struct db_command db_machine_command_table[] = {
 	{ "ctx",	db_ctx_cmd,	0,	0 },
 	{ "dtlb",	db_dump_dtlb,	0,	0 },
+	{ "itlb",	db_dump_itlb,	0,	0 },
 	{ "dtsb",	db_dump_dtsb,	0,	0 },
+	{ "itsb",	db_dump_itsb,	0,	0 },
 #if NESP_SBUS
 	{ "esp",	db_esp,		0,	0 },
 #endif
+	{ "extract",	db_pm_extract,	0,	0 },
 	{ "fpstate",	db_dump_fpstate,0,	0 },
 	{ "kmap",	db_pmap_kernel,	0,	0 },
 	{ "lock",	db_lock,	0,	0 },
+	{ "lwp",	db_lwp_cmd,	0,	0 },
 	{ "pcb",	db_dump_pcb,	0,	0 },
 	{ "pctx",	db_setpcb,	0,	0 },
 	{ "page",	db_page_cmd,	0,	0 },
@@ -1004,8 +1197,11 @@ const struct db_command db_machine_command_table[] = {
 	{ "uvmdump",	db_uvmhistdump,	0,	0 },
 	{ "watch",	db_watch,	0,	0 },
 	{ "window",	db_dump_window,	0,	0 },
-	{ (char *)0, }
+	{ "cpus",	db_cpus_cmd,	0,	0 },
+	{ NULL, }
 };
+
+#endif	/* DDB */
 
 /*
  * support for SOFTWARE_SSTEP:

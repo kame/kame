@@ -1,4 +1,4 @@
-/*	$NetBSD: tx39power.c,v 1.10 2002/01/29 18:53:17 uch Exp $ */
+/*	$NetBSD: tx39power.c,v 1.13 2003/07/15 02:29:33 lukem Exp $ */
 
 /*-
  * Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: tx39power.c,v 1.13 2003/07/15 02:29:33 lukem Exp $");
 
 #include "opt_tx39power_debug.h"
 #define TX39POWERDEBUG 
@@ -77,9 +80,8 @@ struct tx39power_softc {
 	txreg_t sc_icu_state[TX39_INTRSET_MAX + 1];
 };
 
-struct cfattach tx39power_ca = {
-	sizeof(struct tx39power_softc), tx39power_match, tx39power_attach
-};
+CFATTACH_DECL(tx39power, sizeof(struct tx39power_softc),
+    tx39power_match, tx39power_attach, NULL, NULL);
 
 void tx39power_suspend_cpu(void); /* automatic hardware resume */
 

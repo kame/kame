@@ -1,4 +1,4 @@
-/*	$NetBSD: clock.c,v 1.9 2001/08/26 02:47:35 matt Exp $	*/
+/*	$NetBSD: clock.c,v 1.12 2003/07/15 01:26:29 lukem Exp $	*/
 /*      $OpenBSD: clock.c,v 1.3 1997/10/13 13:42:53 pefo Exp $  */
 
 /*
@@ -31,6 +31,9 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.12 2003/07/15 01:26:29 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -111,19 +114,9 @@ void
 cpu_initclocks(void)
 {
 	ticks_per_intr = ticks_per_sec / hz;
+	cpu_timebase = ticks_per_sec;
 	asm volatile ("mftb %0" : "=r"(lasttb));
 	asm volatile ("mtdec %0" :: "r"(ticks_per_intr));
-}
-
-static inline u_quad_t
-mftb(void)
-{
-	u_long scratch;
-	u_quad_t tb;
-	
-	asm ("1: mftbu %0; mftb %0+1; mftbu %1; cmpw %0,%1; bne 1b"
-	    : "=r"(tb), "=r"(scratch));
-	return tb;
 }
 
 /*

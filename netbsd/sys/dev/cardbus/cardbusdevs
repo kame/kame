@@ -1,4 +1,4 @@
-$NetBSD: cardbusdevs,v 1.21.10.1 2002/12/11 18:05:30 he Exp $
+$NetBSD: cardbusdevs,v 1.27.2.2 2004/08/30 09:31:08 tron Exp $
 
 /*
  * Copyright (C) 1999  Hayakawa Koichi.
@@ -48,12 +48,15 @@ vendor ADVSYS		0x10cd	Advanced System Products
 vendor REALTEK		0x10ec	Realtek Semiconductor
 vendor IODATA		0x10fc	IO Data
 vendor ACCTON		0x1113	Accton Technology
+vendor WORKBIT		0x1145	Workbit
 vendor XIRCOM		0x115d	Xircom
 vendor DLINK		0x1186	D-Link Systems
 vendor COREGA		0x1259	Corega
 vendor ALLIEDTELESYN	0x1259	Allied Telesyn International
+vendor NETGEAR		0x1317	NetGear, Inc.
 vendor ABOCOM		0x13d1	AboCom Systems
 vendor PLANEX		0x14ea	Planex Communications Inc
+vendor ATHEROS		0x168c	Atheros Communications, Inc.
 vendor HAWKING		0x17b3	Hawking Technology
 vendor INTEL		0x8086	Intel
 vendor ADP		0x9004	Adaptec
@@ -78,8 +81,11 @@ product 3COM 3C575TX	0x5057	3c575-TX
 product 3COM 3C575BTX	0x5157  3CCFE575BT
 product 3COM 3C575CTX	0x5257	3CCFE575CT
 product 3COM 3C656_E	0x6560	3CCFEM656 10/100 Ethernet
+product 3COM 3C656_M	0x6561	3CCFEM656 56k Modem
 product 3COM 3C656B_E	0x6562	3CCFEM656B 10/100 Ethernet
+product 3COM 3C656B_M	0x6563	3CCFEM656B 56k Modem
 product 3COM 3C656C_E	0x6564	3CXFEM656C 10/100 Ethernet
+product 3COM 3C656C_M	0x6565	3CXFEM656C 56k Modem
 
 /* Advanced System Products products */
 product ADVSYS ULTRA	0x1300	Ultra SCSI
@@ -90,6 +96,7 @@ product REALTEK RT8139	0x8139	8139 Ethernet
 
 /* IO Data products */
 product IODATA CBIDE2	0x0003	CBIDE2 IDE controller
+product IODATA CBSCII	0x0005	CBSCII NinjaSCSI-32Bi SCSI
 
 /* Accton products */
 product ACCTON MPX5030  0x1211  MPX 5030/5038 Ethernet
@@ -108,13 +115,22 @@ product DLINK	DFE_690TXD	0x1340	DFE-690TXD 10/100 Ethernet
 
 /* Corega products */
 product COREGA CB_TXD	0xa117	FEther CB-TXD 10/100 Ethernet
+product	COREGA 2CB_TXD	0xa11e	FEther II CB-TXD 10/100 Ethernet
+
+/* NetGear products */
+product NETGEAR FA511	0x1985	FA511 10/100 Ethernet
 
 /* AboCom products */
 product ABOCOM FE2500	0xab02	FE2500 10/100 Ethernet
 product ABOCOM PCM200	0xab03	FE2500 10/100 Ethernet
+product ABOCOM FE2500MX	0xab08	FE2500MX 10/100 Ethernet
+
+/* OEM: AboCom FE2000VX 10/100 Ethernet */
+product ABOCOM FE2000VX	0xab06	IO-DATA CBET100-CL 10/100 Ethernet
 
 /* Planex products */
 product PLANEX FNW_3603_TX 0xab06 FNW-3603-TX 10/100 Ethernet
+product PLANEX FNW_3800_TX 0xab07 FNW-3800-TX 10/100 Ethernet
 
 /* Hawking Technology products */
 product HAWKING PN672TX	0xab08	PN672TX 10/100 Ethernet
@@ -126,3 +142,11 @@ product INTEL MODEM56	0x1002	56k Modem
 
 /* Adaptec products */
 product ADP 1480        0x6075  APA-1480
+
+/* Atheros Communications, Inc. products */
+product	ATHEROS AR5001	0x0013	AR5001 Wireless LAN 802.11a/b/g CardBus Card
+
+/* Workbit products */
+product WORKBIT NJSC32BI		0x8007	NinjaSCSI-32Bi SCSI
+product WORKBIT NJSC32UDE		0x8009	NinjaSCSI-32UDE SCSI
+product WORKBIT NJSC32BI_KME		0xf007	NinjaSCSI-32Bi SCSI (KME)

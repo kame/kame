@@ -1,4 +1,4 @@
-/*	$NetBSD: footbridge_com_io.c,v 1.3 2002/04/12 19:12:31 thorpej Exp $	*/
+/*	$NetBSD: footbridge_com_io.c,v 1.5 2003/03/23 14:12:25 chris Exp $	*/
 
 /*
  * Copyright (c) 1997 Mark Brinicombe.
@@ -41,6 +41,9 @@
 /*
  * bus_space I/O functions for mainbus
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: footbridge_com_io.c,v 1.5 2003/03/23 14:12:25 chris Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -159,7 +162,7 @@ fcomcons_bs_alloc(t, rstart, rend, size, alignment, boundary, cacheable,
 	bus_addr_t *bpap;
 	bus_space_handle_t *bshp;
 {
-	panic("fcomcons_alloc(): Help!\n");
+	panic("fcomcons_alloc(): Help!");
 }
 
 
@@ -181,7 +184,7 @@ fcomcons_bs_free(t, bsh, size)
 	bus_size_t size;
 {
 
-	panic("fcomcons_free(): Help!\n");
+	panic("fcomcons_free(): Help!");
 	/* fcomcons_unmap() does all that we need to do. */
 /*	fcomcons_unmap(t, bsh, size);*/
 }

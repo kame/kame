@@ -1,4 +1,4 @@
-/*	$NetBSD: if_arcsubr.c,v 1.39 2002/03/05 04:12:59 itojun Exp $	*/
+/*	$NetBSD: if_arcsubr.c,v 1.45 2004/03/25 10:53:46 is Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995 Ignatios Souvatzis
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -39,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_arcsubr.c,v 1.39 2002/03/05 04:12:59 itojun Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_arcsubr.c,v 1.45 2004/03/25 10:53:46 is Exp $");
 
 #include "opt_inet.h"
 
@@ -135,7 +131,7 @@ arc_output(ifp, m0, dst, rt0)
 	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING)) 
-		return(ENETDOWN); /* m, m1 aren't initialized yet */
+		return (ENETDOWN); /* m, m1 aren't initialized yet */
 
 	error = newencoding = 0;
 	ac = (struct arccom *)ifp;
@@ -209,8 +205,7 @@ arc_output(ifp, m0, dst, rt0)
 
 		arph->ar_hrd = htons(ARPHRD_ARCNET);
 
-		switch(ntohs(arph->ar_op)) {
-
+		switch (ntohs(arph->ar_op)) {
 		case ARPOP_REVREQUEST:
 		case ARPOP_REVREPLY:
 			if (!(ifp->if_flags & IFF_LINK0)) {
@@ -249,7 +244,7 @@ arc_output(ifp, m0, dst, rt0)
 #ifdef INET6
 	case AF_INET6:
 		if (!nd6_storelladdr(ifp, rt, m, dst, (u_char *)&adst))
-			return(0); /* it must be impossible, but... */
+			return (0); /* it must be impossible, but... */
 		atype = htons(ARCTYPE_INET6);
 		newencoding = 1;
 		break;
@@ -408,7 +403,7 @@ arc_defrag(ifp, m)
 	struct mbuf *m1;
 	char *s;
 	int newflen;
-	u_char src,dst,typ;
+	u_char src, dst, typ;
 	
 	ac = (struct arccom *)ifp;
 
@@ -502,7 +497,7 @@ arc_defrag(ifp, m)
 		if (ah->arc_flag == af->af_lastseen + 2) {
 			/* ok, this is next fragment */
 			af->af_lastseen = ah->arc_flag;
-			m_adj(m,ARC_HDRNEWLEN);
+			m_adj(m, ARC_HDRNEWLEN);
 
 			/* 
 			 * m_cat might free the first mbuf (with pkthdr)
@@ -511,14 +506,14 @@ arc_defrag(ifp, m)
 
 			newflen = m->m_pkthdr.len;	
 
-			m_cat(m1,m);
+			m_cat(m1, m);
 
 			m1->m_pkthdr.len += newflen;
 
 			/* is it the last one? */
 			if (af->af_lastseen > af->af_maxflag) {
 				af->af_packet = NULL;
-				return(m1);
+				return (m1);
 			} else
 				return NULL;
 		}
@@ -570,7 +565,6 @@ arc_input(ifp, m)
 	struct ifqueue *inq;
 	u_int8_t atype;
 	int s;
-	struct arphdr *arph;
 
 	if ((ifp->if_flags & IFF_UP) == 0) {
 		m_freem(m);
@@ -619,7 +613,6 @@ arc_input(ifp, m)
 		m_adj(m, ARC_HDRLEN);
 		schednetisr(NETISR_ARP);
 		inq = &arpintrq;
-		arph = mtod(m, struct arphdr *);
 #ifdef ARCNET_ALLOW_BROKEN_ARP
 		mtod(m, struct arphdr *)->ar_pro = htons(ETHERTYPE_IP);
 #endif

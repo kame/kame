@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ecosubr.c,v 1.10 2001/11/12 23:49:37 lukem Exp $	*/
+/*	$NetBSD: if_ecosubr.c,v 1.13 2003/08/07 16:32:51 agc Exp $	*/
 
 /*-
  * Copyright (c) 2001 Ben Harris
@@ -38,11 +38,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -62,14 +58,15 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ecosubr.c,v 1.10 2001/11/12 23:49:37 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ecosubr.c,v 1.13 2003/08/07 16:32:51 agc Exp $");
 
 #include "bpfilter.h"
 #include "opt_inet.h"
+#include "opt_pfil_hooks.h"
 
 #include <sys/param.h>
 
-__KERNEL_RCSID(0, "$NetBSD: if_ecosubr.c,v 1.10 2001/11/12 23:49:37 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ecosubr.c,v 1.13 2003/08/07 16:32:51 agc Exp $");
 
 #include <sys/errno.h>
 #include <sys/kernel.h>
@@ -184,7 +181,7 @@ eco_output(struct ifnet *ifp, struct mbuf *m0, struct sockaddr *dst,
 	int hdrcmplt;
 	size_t len;
 	int delay, count;
-	struct mbuf *maux;
+	struct m_tag *mtag;
 	struct eco_retryparms *erp;
 #ifdef INET
 	struct mbuf *m1;
@@ -321,13 +318,13 @@ eco_output(struct ifnet *ifp, struct mbuf *m0, struct sockaddr *dst,
 
 	if ((m->m_flags & M_BCAST) == 0) {
 		/* Attach retry info to packet. */
-		maux = m_aux_add(m, AF_LINK, ECO_MAUX_RETRYPARMS);
-		if (maux == NULL)
+		mtag = m_tag_get(PACKET_TAG_ECO_RETRYPARMS,
+		    sizeof(struct eco_retryparms), M_NOWAIT);
+		if (mtag == NULL)
 			senderr(ENOBUFS);
-		erp = mtod(maux, struct eco_retryparms *);
+		erp = (struct eco_retryparms *)(mtag + 1);
 		erp->erp_delay = delay;
 		erp->erp_count = count;
-		maux->m_len = sizeof(struct eco_retryparms);
 	}
 
 #ifdef PFIL_HOOKS
@@ -527,9 +524,6 @@ eco_start(struct ifnet *ifp)
 		} else {
 			ec->ec_packet = m;
 			m = m_copym(m, 0, ECO_HDR_LEN, M_DONTWAIT);
-			/* m_copym moves the aux ptr.  Move it back. */
-			ec->ec_packet->m_pkthdr.aux = m->m_pkthdr.aux;
-			m->m_pkthdr.aux = NULL;
 			if (m == NULL) {
 				m_freem(ec->ec_packet);
 				ec->ec_packet = NULL;
@@ -696,14 +690,10 @@ eco_inputframe(struct ifnet *ifp, struct mbuf *m)
 		m_freem(m);
 		/* Chop out the control and port bytes. */
 		m0 = m_copym(ec->ec_packet, 0, ECO_SHDR_LEN, M_DONTWAIT);
-		/* Put the aux ptr back where it belongs. */
-		ec->ec_packet->m_pkthdr.aux = m0->m_pkthdr.aux;
-		m0->m_pkthdr.aux = NULL;
 		if (m0 == NULL) {
 			m_freem(ec->ec_packet);
 			return NULL;
 		}
-		/* m_copypacket moves the aux ptr, hence this little dance. */
 		m = ec->ec_packet;
 		ec->ec_packet = m_copypacket(m, M_DONTWAIT);
 		if (ec->ec_packet == NULL) {
@@ -801,7 +791,8 @@ void
 eco_inputidle(struct ifnet *ifp)
 {
 	struct ecocom *ec = (void *)ifp;
-	struct mbuf *m, *maux;
+	struct mbuf *m;
+	struct m_tag *mtag;
 	struct eco_retryparms *erp;
 
 	switch (ec->ec_state) {
@@ -811,17 +802,15 @@ eco_inputidle(struct ifnet *ifp)
 		/* Outgoing packet failed.  Check if we should retry. */
 		m = ec->ec_packet;
 		ec->ec_packet = NULL;
-		maux = m_aux_find(m, AF_LINK, ECO_MAUX_RETRYPARMS);
-		if (maux == NULL)
+		mtag = m_tag_find(m, PACKET_TAG_ECO_RETRYPARMS, NULL);
+		if (mtag == NULL)
 			m_freem(m);
 		else {
-			erp = mtod(maux, struct eco_retryparms *);
+			erp = (struct eco_retryparms *)(mtag + 1);
 			if (--erp->erp_count > 0)
 				eco_defer(ifp, m, erp->erp_delay);
-			else {
+			else
 				printf("%s: pkt failed\n", ifp->if_xname);
-				m_freem(m);
-			}
 		}
 		break;
 	case ECO_SCOUT_RCVD:

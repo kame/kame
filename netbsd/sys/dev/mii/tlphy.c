@@ -1,4 +1,4 @@
-/*	$NetBSD: tlphy.c,v 1.34 2002/03/25 20:51:26 thorpej Exp $	*/
+/*	$NetBSD: tlphy.c,v 1.40 2003/09/30 09:35:15 tron Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -71,7 +71,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tlphy.c,v 1.34 2002/03/25 20:51:26 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tlphy.c,v 1.40 2003/09/30 09:35:15 tron Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -91,8 +91,6 @@ __KERNEL_RCSID(0, "$NetBSD: tlphy.c,v 1.34 2002/03/25 20:51:26 thorpej Exp $");
 #include <dev/mii/miivar.h>
 #include <dev/mii/miidevs.h>
 
-#include <dev/i2c/i2c_bus.h>
-
 #include <dev/mii/tlphyreg.h>
 #include <dev/mii/tlphyvar.h>
 
@@ -108,10 +106,8 @@ struct tlphy_softc {
 int	tlphymatch(struct device *, struct cfdata *, void *);
 void	tlphyattach(struct device *, struct device *, void *);
 
-struct cfattach tlphy_ca = {
-	sizeof(struct tlphy_softc), tlphymatch, tlphyattach, mii_phy_detach,
-	    mii_phy_activate
-};
+CFATTACH_DECL(tlphy, sizeof(struct tlphy_softc),
+    tlphymatch, tlphyattach, mii_phy_detach, mii_phy_activate);
 
 int	tlphy_service(struct mii_softc *, struct mii_data *, int);
 int	tlphy_auto(struct tlphy_softc *, int);
@@ -152,7 +148,8 @@ tlphyattach(struct device *parent, struct device *self, void *aux)
 	const char *sep = "";
 
 	mpd = mii_phy_match(ma, tlphys);
-	printf(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
+	aprint_naive(": Media interface\n");
+	aprint_normal(": %s, rev. %d\n", mpd->mpd_name, MII_REV(ma->mii_id2));
 
 	sc->sc_mii.mii_inst = mii->mii_instance;
 	sc->sc_mii.mii_phy = ma->mii_phyno;
@@ -179,9 +176,9 @@ tlphyattach(struct device *parent, struct device *self, void *aux)
 
 
 #define	ADD(m, c)	ifmedia_add(&mii->mii_media, (m), (c), NULL)
-#define	PRINT(s)	printf("%s%s", sep, s); sep = ", "
+#define	PRINT(str)	aprint_normal("%s%s", sep, str); sep = ", "
 
-	printf("%s: ", sc->sc_mii.mii_dev.dv_xname);
+	aprint_normal("%s: ", sc->sc_mii.mii_dev.dv_xname);
 	if (sc->sc_tlphycap) {
 		if (sc->sc_tlphycap & TLPHY_MEDIA_10_2) {
 			ADD(IFM_MAKEWORD(IFM_ETHER, IFM_10_2, 0,
@@ -194,12 +191,12 @@ tlphyattach(struct device *parent, struct device *self, void *aux)
 		}
 	}
 	if (sc->sc_mii.mii_capabilities & BMSR_MEDIAMASK) {
-		printf("%s", sep);
+		aprint_normal("%s", sep);
 		mii_phy_add_media(&sc->sc_mii);
 	} else if ((sc->sc_tlphycap &
 		    (TLPHY_MEDIA_10_2 | TLPHY_MEDIA_10_5)) == 0)
-		printf("no media present");
-	printf("\n");
+		aprint_error("no media present");
+	aprint_normal("\n");
 #undef ADD
 #undef PRINT
 }

@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile.inc,v 1.35 2001/11/21 22:10:54 jmc Exp $
+#	$NetBSD: Makefile.inc,v 1.37 2003/11/07 23:34:28 dsl Exp $
 #
 #	Configuration variables (default values are below):
 #
@@ -30,6 +30,9 @@ KERNLIB=	${KERNDST}/libkern.a
 KERNLIB_PROF=	${KERNDST}/libkern_p.a
 .endif
 
+LIBKERNLNBN=	llib-lkern.ln
+KERNLIBLN=	${KERNDST}/${LIBKERNLNBN}
+
 KERNMAKE= \
 	cd ${KERNDST} && ${MAKE} -f ${KERNDIR:Q}/Makefile \
 	    KERNDIR=${KERNDIR:Q} \
@@ -43,6 +46,7 @@ KERNMAKE= \
 	    MACHINE=${MACHINE} MACHINE_ARCH=${MACHINE_ARCH:Q} \
 	    KERNCPPFLAGS=${CPPFLAGS:S@^-I.@-I${KERNDOTDIR}@g:Q} \
 	    KERNMISCCPPFLAGS=${KERNMISCCPPFLAGS:Q} \
+	    LINTFLAGS=${KERNLINTFLAGS:Q} \
 	    ${KERNMISCMAKEFLAGS}
 
 ${KERNLIB}:		.NOTMAIN .MAKE __always_make_kernlib
@@ -61,6 +65,10 @@ ${KERNLIB_PROF}:	.NOTMAIN .MAKE __always_make_kernlib
 	@${KERNMAKE} libkern.po
 .endif
 
+${KERNLIBLN}:		.NOTMAIN .MAKE __always_make_kernlib
+	@echo making sure the kern lint library is up to date...
+	@${KERNMAKE} ${LIBKERNLNBN}
+
 clean:			.NOTMAIN cleankernlib
 cleankernlib:		.NOTMAIN 
 	@echo cleaning the kern library objects
@@ -71,7 +79,7 @@ cleandirkernlib:	.NOTMAIN
 	@echo cleandiring the kern library objects
 	@if [ -d "${KERNDST}" ]; then ${KERNMAKE} cleandir; fi
 
-depend:			.NOTMAIN dependkernlib
+dependall depend:	.NOTMAIN dependkernlib
 dependkernlib:		.NOTMAIN .MAKE __always_make_kernlib
 	@echo depending the kern library objects
 	@${KERNMAKE} depend

@@ -1,4 +1,4 @@
-/*	$NetBSD: proc.h,v 1.14 2001/09/10 10:11:21 fvdl Exp $	*/
+/*	$NetBSD: proc.h,v 1.26 2004/02/21 04:31:40 junyoung Exp $	*/
 
 /*
  * Copyright (c) 1991 Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -35,19 +31,44 @@
  *	@(#)proc.h	7.1 (Berkeley) 5/15/91
  */
 
+#ifndef _I386_PROC_H_
+#define _I386_PROC_H_
+
+#ifdef _KERNEL_OPT
+#include "opt_noredzone.h"
+#endif
+
 #include <machine/frame.h>
 
 /*
  * Machine-dependent part of the proc structure for i386.
  */
-struct mdproc {
+struct mdlwp {
 	struct	trapframe *md_regs;	/* registers on current frame */
 	int	md_flags;		/* machine-dependent flags */
 	int	md_tss_sel;		/* TSS selector */
-					/* Syscall handling function */
-	void	(*md_syscall) __P((struct trapframe));
 };
 
 /* md_flags */
-#define	MDP_USEDFPU	0x0001	/* has used the FPU */
+#define	MDL_USEDFPU	0x0001	/* has used the FPU */
+
+struct mdproc {
+	int	md_flags;
+	void	(*md_syscall)(struct trapframe *);
+					/* Syscall handling function */
+	__volatile int md_astpending;	/* AST pending for this process */
+};
+
+/* md_flags */
 #define MDP_USEDMTRR	0x0002	/* has set volatile MTRRs */
+
+/* kernel stack params */
+#ifndef NOREDZONE
+/* override default for redzone */
+#define	KSTACK_LOWEST_ADDR(l)	\
+	((caddr_t)(l)->l_addr + PAGE_SIZE*2)
+#define	KSTACK_SIZE	\
+	(USPACE - PAGE_SIZE*2)
+#endif
+
+#endif /* _I386_PROC_H_ */

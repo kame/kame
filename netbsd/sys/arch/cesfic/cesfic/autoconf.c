@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.2 2001/07/26 15:45:51 drochner Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.9 2003/07/15 01:29:19 lukem Exp $	*/
 
 /*
  * Copyright (c) 1997, 1999
@@ -26,6 +26,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.9 2003/07/15 01:29:19 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -34,7 +37,6 @@
 #include <sys/device.h>
 #include <sys/disklabel.h>
 #include <sys/malloc.h>
-#include <sys/map.h>
 #include <sys/mount.h>
 #include <sys/queue.h>
 #include <sys/reboot.h>
@@ -48,6 +50,7 @@
 #include <machine/cpu.h>
 #include <machine/pmap.h>
 #include <machine/pte.h>
+#include <m68k/cacheops.h>
 
 #include <cesfic/cesfic/isr.h>
 
@@ -62,9 +65,8 @@ int	mainbusmatch __P((struct device *, struct cfdata *, void *));
 void	mainbusattach __P((struct device *, struct device *, void *));
 int	mainbussearch __P((struct device *, struct cfdata *, void *));
 
-struct cfattach mainbus_ca = {
-	sizeof(struct device), mainbusmatch, mainbusattach
-};
+CFATTACH_DECL(mainbus, sizeof(struct device),
+    mainbusmatch, mainbusattach, NULL, NULL);
 
 int
 mainbusmatch(parent, match, aux)
@@ -106,7 +108,7 @@ mainbussearch(parent, cf, aux)
 	void *aux;
 {
 
-	if ((*cf->cf_attach->ca_match)(parent, cf, NULL) > 0)
+	if (config_match(parent, cf, NULL) > 0)
 		config_attach(parent, cf, NULL, NULL);
 	return (0);
 }
@@ -135,7 +137,7 @@ mainbus_map(physaddr, size, cacheable, virtaddr)
 		return (ENOMEM);
 
 	*virtaddr = (void*)(va + (physaddr & PGOFSET));
-	for (; pa < endpa; pa += NBPG, va += NBPG) {
+	for (; pa < endpa; pa += PAGE_SIZE, va += PAGE_SIZE) {
 		pmap_kenter_pa(va, pa, VM_PROT_READ | VM_PROT_WRITE);
 		if (!cacheable) {
 			pt_entry_t *pte = kvtopte(va);
@@ -143,6 +145,7 @@ mainbus_map(physaddr, size, cacheable, virtaddr)
 			*pte &= ~PG_CCB;
 		}
 	}
+	TBIAS();
 
 	return (0);
 }

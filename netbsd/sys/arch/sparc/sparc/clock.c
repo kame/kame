@@ -1,4 +1,4 @@
-/*	$NetBSD: clock.c,v 1.89 2002/05/02 13:01:45 martin Exp $ */
+/*	$NetBSD: clock.c,v 1.93 2003/07/15 00:05:02 lukem Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -87,6 +87,9 @@
  * have a spare timer device).
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.93 2003/07/15 00:05:02 lukem Exp $");
+
 #include "opt_sparc_arch.h"
 
 #include <sys/param.h>
@@ -100,7 +103,6 @@
 #include <machine/autoconf.h>
 #include <machine/eeprom.h>
 #include <machine/cpu.h>
-#include <machine/idprom.h>
 
 #include <dev/clock_subr.h>
 
@@ -137,49 +139,8 @@ static void	eeprom_give(void);
 static int	eeprom_update(char *, int, int);
 #endif
 
-/* Global TOD clock handle & idprom pointer */
+/* Global TOD clock handle */
 todr_chip_handle_t todr_handle;
-struct idprom *idprom;
-
-void establish_hostid(struct idprom *);
-void myetheraddr(u_char *);
-
-
-/*
- * XXX this belongs elsewhere
- */
-void
-myetheraddr(cp)
-	u_char *cp;
-{
-	struct idprom *idp = idprom;
-
-	cp[0] = idp->id_ether[0];
-	cp[1] = idp->id_ether[1];
-	cp[2] = idp->id_ether[2];
-	cp[3] = idp->id_ether[3];
-	cp[4] = idp->id_ether[4];
-	cp[5] = idp->id_ether[5];
-}
-
-void
-establish_hostid(idp)
-	struct idprom *idp;
-{
-	u_long h;
-
-	h = idp->id_machine << 24;
-	h |= idp->id_hostid[0] << 16;
-	h |= idp->id_hostid[1] << 8;
-	h |= idp->id_hostid[2];
-
-	printf(": hostid %lx\n", h);
-
-	/* Save IDPROM pointer and Host ID in globals */
-	idprom = idp;
-	hostid = h;
-}
-
 
 /*
  * Set up the real-time and statistics clocks.
@@ -213,6 +174,15 @@ cpu_initclocks()
 
 	if (timer_init != NULL)
 		(*timer_init)();
+
+	/*
+	 * The scheduler clock runs every 8 statclock ticks,
+	 * assuming stathz == 100. If it's not, compute a mask
+	 * for use in the various statintr() functions approx.
+	 * like this:
+	 *	mask = round_power2(stathz / schedhz) - 1
+	 */
+	schedhz = 12;
 }
 
 /*
@@ -226,6 +196,19 @@ setstatclockrate(newhz)
 	/* nothing */
 }
 
+
+/*
+ * Scheduler pseudo-clock interrupt handler.
+ * Runs off a soft interrupt at IPL_SCHED, scheduled by statintr().
+ */
+void schedintr(void *v)
+{
+	struct lwp *l = curlwp;
+
+	/* XXX - should consult a cpuinfo.schedtickpending */
+	if (l != NULL)
+		schedclock(l);
+}
 
 /*
  * `sparc_clock_time_is_ok' is used in cpu_reboot() to determine

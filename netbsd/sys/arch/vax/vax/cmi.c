@@ -1,4 +1,4 @@
-/*	$NetBSD: cmi.c,v 1.3 2000/06/04 18:02:35 ragge Exp $ */
+/*	$NetBSD: cmi.c,v 1.8 2003/07/15 02:15:03 lukem Exp $ */
 /*
  * Copyright (c) 1999 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -30,6 +30,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cmi.c,v 1.8 2003/07/15 02:15:03 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -44,9 +47,8 @@ static	int cmi_print(void *, const char *);
 static	int cmi_match(struct device *, struct cfdata *, void *);
 static	void cmi_attach(struct device *, struct device *, void*);
 
-struct	cfattach cmi_ca = {
-	sizeof(struct device), cmi_match, cmi_attach
-};
+CFATTACH_DECL(cmi, sizeof(struct device),
+    cmi_match, cmi_attach, NULL, NULL);
 
 int
 cmi_print(void *aux, const char *name)
@@ -54,9 +56,9 @@ cmi_print(void *aux, const char *name)
 	struct sbi_attach_args *sa = (struct sbi_attach_args *)aux;
 
 	if (name)
-		printf("unknown device 0x%x at %s", sa->sa_type, name);
+		aprint_normal("unknown device 0x%x at %s", sa->sa_type, name);
 
-	printf(" tr%d", sa->sa_nexnum);
+	aprint_normal(" tr%d", sa->sa_nexnum);
 	return (UNCONF);
 }
 

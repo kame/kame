@@ -1,12 +1,12 @@
-# $NetBSD: ALPHA,v 1.164.4.2 2002/10/24 09:34:11 lukem Exp $
+# $NetBSD: ALPHA,v 1.191.2.2 2004/07/15 20:22:03 he Exp $
 #
 # Alpha kernel with all the options you'd want, and more.
 
-include	"arch/alpha/conf/std.alpha"
+include 	"arch/alpha/conf/std.alpha"
 
 options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
-ident		"ALPHA-$Revision: 1.164.4.2 $"
+ident		"ALPHA-$Revision: 1.191.2.2 $"
 
 maxusers 32
 
@@ -33,7 +33,12 @@ options 	API_UP1000	# EV6:		Alpha Processor, Inc. UP1000
 
 # Standard system options
 options 	KTRACE			# System call tracing support
+options 	SYSTRACE		# System call vetting via systrace(1)
 options 	NTP			# kernel PLL for NTP
+
+# Enable experimental buffer queue strategy for better responsiveness under
+# high disk I/O load. Use it with caution - it's not proven to be stable yet.
+#options 	NEW_BUFQ_STRATEGY
 
 # Diagnostic/debugging support options
 options 	DIAGNOSTIC		# Cheap kernel consistency checks
@@ -42,6 +47,12 @@ options 	KMEMSTATS		# Collect kmem usage statistics
 options 	DDB			# kernel debugger
 #options 	DDB_HISTORY_SIZE=100	# Enable history editing in DDB
 #makeoptions	DEBUG="-g"
+#makeoptions	DEBUGLIST="pattern1 pattern2 ..."
+
+#options 	KGDB			# Remote kernel GDB support
+#options 	KGDB_DEVNAME="\"com\""	# device to use for KGDB
+#options 	KGDB_DEVADDR=0x2f8	# at this address
+#options 	KGDB_DEVRATE=57600	# at this comm. rate
 
 # File systems
 file-system	FFS		# Fast file system
@@ -61,12 +72,13 @@ file-system	UMAPFS		# User-mapping file system layer
 file-system	PROCFS		# Process file system (/proc)
 file-system	UNION		# union file system
 file-system	CODA		# CODA distributed file system
+file-system	SMBFS		# experimental - CIFS; also needs nsmb (below)
 
 # File system options
 options 	QUOTA		# User and group quotas for the FFS
-options 	NFSSERVER	# Sun NFS-compatible file system server
 #options 	FFS_EI		# FFS Endian Independant support
 options 	SOFTDEP		# FFS soft updates support.
+options 	NFSSERVER	# Sun NFS-compatible file system server
 
 # Networking options
 options 	INET		# Internet protocol suite
@@ -99,6 +111,7 @@ options 	COMPAT_11
 options 	COMPAT_12
 options 	COMPAT_13
 options 	COMPAT_14
+options 	COMPAT_16
 
 # OSF/1 binary compatibility
 options 	COMPAT_OSF1
@@ -111,6 +124,10 @@ options 	SYSVMSG
 
 # System V-like semaphores
 options 	SYSVSEM
+#options 	SEMMNI=10	# number of semaphore identifiers
+#options 	SEMMNS=60	# number of semaphores in system
+#options 	SEMUME=10	# max number of undo entries per process
+#options 	SEMMNU=30	# number of undo structures in system
 
 # System V-like shared memory
 options 	SYSVSHM
@@ -130,12 +147,14 @@ options 	MIIVERBOSE		# verbose PHY autoconfig messages
 options 	SCSIVERBOSE		# Verbose SCSI errors
 options 	TCVERBOSE		# recognize "unknown" TC devices
 #options 	PCMCIAVERBOSE		# verbose PCMCIA configuration messages
-options 	UCONSOLE		# users can use TIOCCONS (for xconsole)
 #options 	EXTENT_DEBUG		# extent alloc/dealloc code debugging
 options 	FIX_UNALIGNED_VAX_FP	# fix unaligned VAX FP loads & stores
 #options 	NO_KERNEL_RCSIDS	# don't include kernel file RCS IDs
-#options 	USERCONF		# userconf(4) support
-#options	PIPE_SOCKETPAIR		# smaller, but slower pipe(2)
+options 	PCMCIAVERBOSE
+options 	USERCONF		# userconf(4) support
+#options 	PIPE_SOCKETPAIR		# smaller, but slower pipe(2)
+options 	SYSCTL_INCLUDE_DESCR	# Include sysctl descriptions in kernel
+options 	FONT_GALLANT12x22	# Console font for TC devices
 
 # The Alpha console firmware network boots using the BOOTP
 # protocol, so we ask the NFS code to use BOOTP/DHCP as well,
@@ -192,17 +211,27 @@ tc*	at	tcasic?
 ioasic*	at	tc? slot ? offset ?
 mcclock* at	ioasic? offset ?
 le*	at	ioasic? offset ?
-scc0	at	ioasic? offset ?
-scc1	at	ioasic? offset ?
+zsc0	at	ioasic? offset 0x100000
+zsc1	at	ioasic? offset 0x180000
 bba0	at	ioasic? offset ?
 audio*	at	bba?
 tcds*	at	tc? slot ? offset ?
 asc*	at	tcds? chip ?
 asc*	at	tc? slot ? offset ?
-#cfb*	at	tc? slot ? offset ?
-#sfb*	at	tc? slot ? offset ?
 le*	at	tc? slot ? offset ?
 fta*	at	tc? slot ? offset ?		# DEC DEFTA FDDI cards
+cfb*	at	tc? slot ? offset ?
+mfb*	at	tc? slot ? offset ?
+tfb*	at	tc? slot ? offset ?
+sfb*	at	tc? slot ? offset ?
+#sfbp*	at	tc? slot ? offset ?
+px*	at	tc? slot ? offset ?
+pxg*	at	tc? slot ? offset ?
+
+# TurboChannel serial attachments
+zstty*	at	zsc? channel ?			# serial ports on B channels
+lkkbd0	at	zsc1 channel ?			# keyboard port on A channels
+vsms0	at	zsc0 channel ?			# mouse port on A channels
 
 # PCI host bus adapter support
 apecs*	at	mainbus?
@@ -239,10 +268,11 @@ agp*	at	irongate?
 # PCI devices
 adv*	at	pci? dev ? function ?		# AdvanSys SCSI
 adw*	at	pci? dev ? function ?		# AdvanSys Wide SCSI
-#options 	ADW_WDTR_DISABLE		# 	disable WDTR
-#options 	ADW_SDTR_DISABLE		# 	disable SDTR
-#options 	ADW_TAGQ_DISABLE		# 	disable Tag Queuing
+#options 	SCSI_ADW_WDTR_DISABLE		# 	disable WDTR
+#options 	SCSI_ADW_SDTR_DISABLE		# 	disable SDTR
+#options 	SCSI_ADW_TAGQ_DISABLE		# 	disable Tag Queuing
 ahc*	at	pci? dev ? function ?		# Adaptec [23]94x, aic78x0 SCSI
+autri*	at	pci? dev ? function ?		# Trident 4DWAVE based AC'97 Audio
 bha*	at	pci? dev ? function ?		# BusLogic 9xx SCSI (untested)
 cac*	at	pci? dev ? function ?		# Compaq array controller (untested)
 cmpci*	at	pci? dev ? function ?		# C-Media CMI8338/8738 Audio
@@ -264,16 +294,33 @@ isp*	at	pci? dev ? function ?		# Qlogic ISP 10x0 SCSI
 le*	at	pci? dev ? function ?		# PCI LANCE Ethernet (untested)
 sf*	at	pci? dev ? function ?		# Adaptec AIC-6915 Ethernet
 siop*	at	pci? dev ? function ?		# Symbios 53c8xx SCSI
+esiop*	at	pci? dev ? function ?		# Symbios 53c875 SCSI and newer
 mlx*	at	pci? dev ? function ?		# Mylex DAC960 / DEC SWXCR (untested)
+mpt*	at	pci? dev ? function ?		# LSI Fusion SCSI/FC
 ne*	at	pci? dev ? function ?		# NE2000-compatible Ethernet
 ohci*	at	pci? dev ? function ?		# USB Open Host Controller
 pceb*	at	pci? dev ? function ?		# Intel PCI-EISA Bridges
-pciide*	at	pci? dev ? function ?		# PCI IDE controllers
+pciide* at pci? dev ? function ? flags 0x0000	# GENERIC pciide driver
+acardide*at pci? dev ? function ?		# Acard IDE controllers
+aceride* at pci? dev ? function ?		# Acer Lab IDE controllers
+artsata* at pci? dev ? function ?		# Intel i31244 SATA controller
+cmdide* at pci? dev ? function ?		# CMD tech IDE controllers
+cypide* at pci? dev ? function ?		# Cypress IDE controllers
+hptide* at pci? dev ? function ?		# Triones/HighPoint IDE controllers
+optiide* at pci? dev ? function ?		# Opti IDE controllers
+piixide* at pci? dev ? function ?		# Intel IDE controllers
+pdcide* at pci? dev ? function ?		# Promise IDE controllers
+satalink* at pci? dev ? function ?		# SiI SATALink controllers
+siside* at pci? dev ? function ?		# SiS IDE controllers
+slide*  at pci? dev ? function ?		# Symphony Labs IDE controllers
+viaide* at pci? dev ? function ?		# VIA/AMD/Nvidia IDE controllers
 pcscp*	at	pci? dev ? function ?		# AMD Am53c974 PCscsi-PCI
 ppb*	at	pci? dev ? function ?		# PCI-PCI Bridges
-rtk*	at	pci? dev ? function ?		# RealTek 8129/8139 Ethernet
+puc*	at 	pci? dev ? function ?		# PCI "universal" comm. cards
+rtk*	at	pci? dev ? function ?		# Realtek 8129/8139 Ethernet
 sio*	at	pci? dev ? function ?		# Intel PCI-ISA Bridges
 sip*	at	pci? dev ? function ?		# SiS 900 Ethernet
+stge*	at	pci? dev ? function ?		# Sundance/Tamarack TC9021 GigE
 sv*	at	pci? dev ? function ?		# S3 SonicVibes
 tga*	at	pci? dev ? function ?		# DEC ZLXp-E[123] Graphics
 ti*	at	pci? dev ? function ?		# Alteon Tigon Gig-E
@@ -282,6 +329,7 @@ tlp*	at	pci? dev ? function ?		# DECchip 21x4x and clones
 uhci*	at	pci? dev ? function ?		# USB Univ. Host Controller
 vga*	at	pci? dev ? function ?		# PCI VGA Graphics
 vr*	at	pci? dev ? function ?		# VIA Rhine Fast Ethernet
+wi*	at	pci? dev ? function ?		# Lucent/Intersil WaveLAN/IEEE
 yds*	at	pci? dev ? function ?		# Yamaha DS-1 PCI Audio
 
 audio*	at	cmpci?
@@ -398,23 +446,14 @@ mbe*	at	pcmcia? function ?		# MB8696x based Ethernet
 ne*	at	pcmcia? function ?		# NE2000-compatible Eth.
 sm*	at	pcmcia? function ?		# Megahertz Ethernet
 ray*	at	pcmcia? function ?		# Raytheon Raylink (802.11)
-wi*	at	pcmcia? function ?		# Lucent WaveLAN/IEEE
+wi*	at	pcmcia? function ?		# Lucent/Intersil WaveLAN/IEEE
+
+# PUC devices
+com*	at puc? port ?			# 16x50s on "universal" comm boards
+lpt*	at puc? port ?			# || ports on "universal" comm boards
 
 # SCSI bus support
-scsibus* at	adv?
-scsibus* at	adw?
-scsibus* at	aha?
-scsibus* at	ahb?
-scsibus* at	ahc?
-scsibus* at	aic?
-scsibus* at	asc?
-scsibus* at	bha?
-scsibus* at	dpt?
-scsibus* at	iha?
-scsibus* at	isp?
-scsibus* at	siop?
-scsibus* at	pcscp?
-scsibus* at	uha?
+scsibus* at	scsi?
 
 # SCSI devices
 cd*	at	scsibus? target ? lun ?		# SCSI CD-ROM drives
@@ -426,13 +465,14 @@ ss*	at	scsibus? target ? lun ?		# SCSI scanners
 st*	at	scsibus? target ? lun ?		# SCSI tape drives
 uk*	at	scsibus? target ? lun ?		# SCSI unknown
 
-# ST506/ESDI/IDE devices
-wd*	at	pciide? channel ?
-wd*	at	wdc? drive ?
+# ATA (IDE) bus support
+atabus* at ata?
+
+# IDE drives
+wd*	at	atabus? drive ?
 
 # ATAPI bus support
-atapibus* at	pciide? channel ?
-atapibus* at	wdc?
+atapibus* at	atapi?
 
 # ATAPI devices
 sd*	at	atapibus? drive ?		# ATAPI disk devices
@@ -476,7 +516,7 @@ ucom*	at umodem?
 
 # USB Mass Storage
 umass*	at uhub? port ? configuration ? interface ?
-atapibus* at umass? channel ?
+atapibus* at umass?
 scsibus* at umass? channel ?
 
 # USB audio
@@ -487,6 +527,8 @@ audio*	at uaudio?
 aue*	at uhub? port ?		# ADMtek AN986 Pegasus based adapters
 cue*	at uhub? port ?		# CATC USB-EL1201A based adapters
 kue*	at uhub? port ?		# Kawasaki LSI KL5KUSB101B based adapters
+uax*	at uhub? port ?		# ASIX AX88172 based adapters
+url*	at uhub? port ?		# Realtek RTL8150L based adapters
 
 # Serial adapters
 # FTDI FT8U100AX serial adapter
@@ -499,25 +541,46 @@ uscanner* at uhub? port ?
 # Y@P firmware loader
 uyap* at uhub? port ?
 
+# D-Link DSB-R100 USB FM radio tuner
+udsbr* at uhub? port ?
+radio* at udsbr?
+
 # USB Generic driver
 ugen*	at uhub? port ?
 
 # Workstation Console attachments
-#wsdisplay*	at	cfb?
+wsdisplay*	at	cfb?
+wsdisplay*	at	mfb?
+wsdisplay*	at	tfb?
+wsdisplay*	at	sfb?
+#wsdisplay*	at	sfbp?
+wsdisplay*	at	px?
+wsdisplay*	at	pxg?
 wsdisplay*	at	vga?
-#wsdisplay*	at	sfb?
 wsdisplay*	at	tga?
+wskbd*		at	lkkbd? console ?
+wsmouse*	at	vsms?
 wskbd*		at	pckbd?
 wsmouse*	at	pms?
 
 pseudo-device	bpfilter	16
 pseudo-device	ccd		4
-#pseudo-device	raid		4	# RAIDframe disk driver
-#options 	RAID_AUTOCONFIG		# auto-configuration of RAID components
+pseudo-device	cgd		4	# cryptographic disk devices
+pseudo-device	raid		8	# RAIDframe disk driver
+options 	RAID_AUTOCONFIG		# auto-configuration of RAID components
+# Options to enable various other RAIDframe RAID types.
+# options 	RF_INCLUDE_EVENODD=1
+# options 	RF_INCLUDE_RAID5_RS=1
+# options 	RF_INCLUDE_PARITYLOGGING=1
+# options 	RF_INCLUDE_CHAINDECLUSTER=1
+# options 	RF_INCLUDE_INTERDECLUSTER=1
+# options 	RF_INCLUDE_PARITY_DECLUSTERING=1
+# options 	RF_INCLUDE_PARITY_DECLUSTERING_DS=1
 pseudo-device	ipfilter	1
 pseudo-device	loop		1
 pseudo-device	md		1
 pseudo-device	ppp		4
+pseudo-device	pppoe			# PPP over Ethernet (RFC 2516)
 pseudo-device	pty			# pseudo-terminals
 pseudo-device	sl		4
 pseudo-device	strip		4
@@ -528,9 +591,15 @@ pseudo-device	gif		4	# IPv[46] over IPv[46] tunnel (RFC1933)
 #pseudo-device	faith		1	# IPv[46] tcp relay translation i/f
 #pseudo-device	stf		1	# 6to4 IPv6 over IPv4 encapsulation
 pseudo-device	vlan			# IEEE 802.1q encapsulation
+pseudo-device	bridge			# simple inter-network bridging
+#options 	BRIDGE_IPF		# bridge uses IP/IPv6 pfil hooks too
 pseudo-device	sequencer	1	# MIDI sequencer
 pseudo-device	rnd			# /dev/random and in-kernel generator
 #options 	RND_COM			# use "com" randomness too
 # a pseudo device needed for Coda	# also needs CODA (above)
 pseudo-device	vcoda		4	# coda minicache <-> venus comm.
+# a pseudo device needed for SMBFS
+pseudo-device	nsmb			# experimental - SMB requester
 pseudo-device	clockctl		# user control of clock subsystem
+pseudo-device	wsfont
+pseudo-device	ksyms			# /dev/ksyms

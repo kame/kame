@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_space.c,v 1.19 2002/05/04 05:13:28 takemura Exp $	*/
+/*	$NetBSD: bus_space.c,v 1.22 2003/07/15 02:29:31 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bus_space.c,v 1.22 2003/07/15 02:29:31 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -211,7 +214,7 @@ hpcmips_init_bus_space(struct bus_space_tag_hpcmips *t,
 		    (unsigned int)t->base, (unsigned int)va, t->size));
 		t->base = va; /* kseg2 addr */
 				
-		for (; pa < endpa; pa += NBPG, va += NBPG) {
+		for (; pa < endpa; pa += PAGE_SIZE, va += PAGE_SIZE) {
 			pmap_kenter_pa(va, pa, VM_PROT_READ | VM_PROT_WRITE);
 		}
 		pmap_update(pmap_kernel());
@@ -241,7 +244,7 @@ __hpcmips_cacheable(struct bus_space_tag_hpcmips *t, bus_addr_t bpa,
 		
 		mips_dcache_wbinv_range(va, endva - va);
 
-		for (; va < endva; va += NBPG) {
+		for (; va < endva; va += PAGE_SIZE) {
 			pte = kvtopte(va);
 			opte = pte->pt_entry;
 			if (cacheable) {
@@ -397,7 +400,7 @@ __bs_peek(bus_space_tag_t t, bus_space_handle_t bsh, bus_size_t offset,
 		*((u_int32_t *)ptr) = bus_space_read_4(t, bsh, offset);
 		break;
 	default:
-		panic("bus_space_peek: bad size, %d\n", size);
+		panic("bus_space_peek: bad size, %d", size);
 	}
 
 	return (0);
@@ -422,7 +425,7 @@ __bs_poke(bus_space_tag_t t, bus_space_handle_t bsh, bus_size_t offset,
 		bus_space_write_4(t, bsh, offset, val);
 		break;
 	default:
-		panic("bus_space_poke: bad size, %d\n", size);
+		panic("bus_space_poke: bad size, %d", size);
 	}
 
 	return (0);

@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_glue.c,v 1.58 2002/05/15 06:57:49 matt Exp $	*/
+/*	$NetBSD: uvm_glue.c,v 1.78 2004/03/24 07:50:48 junyoung Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -67,10 +67,10 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_glue.c,v 1.58 2002/05/15 06:57:49 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_glue.c,v 1.78 2004/03/24 07:50:48 junyoung Exp $");
 
 #include "opt_kgdb.h"
-#include "opt_sysv.h"
+#include "opt_kstack.h"
 #include "opt_uvmhist.h"
 
 /*
@@ -83,9 +83,6 @@ __KERNEL_RCSID(0, "$NetBSD: uvm_glue.c,v 1.58 2002/05/15 06:57:49 matt Exp $");
 #include <sys/resourcevar.h>
 #include <sys/buf.h>
 #include <sys/user.h>
-#ifdef SYSVSHM
-#include <sys/shm.h>
-#endif
 
 #include <uvm/uvm.h>
 
@@ -95,15 +92,18 @@ __KERNEL_RCSID(0, "$NetBSD: uvm_glue.c,v 1.58 2002/05/15 06:57:49 matt Exp $");
  * local prototypes
  */
 
-static void uvm_swapout __P((struct proc *));
+static void uvm_swapout(struct lwp *);
+
+#define UVM_NUAREA_MAX 16
+void *uvm_uareas;
+int uvm_nuarea;
+struct simplelock uvm_uareas_slock = SIMPLELOCK_INITIALIZER;
+
+static void uvm_uarea_free(vaddr_t);
 
 /*
  * XXXCDC: do these really belong here?
  */
-
-int readbuffers = 0;		/* allow KGDB to read kern buffer pool */
-				/* XXX: see uvm_kernacc */
-
 
 /*
  * uvm_kernacc: can the kernel access a region of memory
@@ -126,45 +126,6 @@ uvm_kernacc(addr, len, rw)
 	vm_map_lock_read(kernel_map);
 	rv = uvm_map_checkprot(kernel_map, saddr, eaddr, prot);
 	vm_map_unlock_read(kernel_map);
-
-	/*
-	 * XXX there are still some things (e.g. the buffer cache) that
-	 * are managed behind the VM system's back so even though an
-	 * address is accessible in the mind of the VM system, there may
-	 * not be physical pages where the VM thinks there is.  This can
-	 * lead to bogus allocation of pages in the kernel address space
-	 * or worse, inconsistencies at the pmap level.  We only worry
-	 * about the buffer cache for now.
-	 */
-	if (!readbuffers && rv && (eaddr > (vaddr_t)buffers &&
-			     saddr < (vaddr_t)buffers + MAXBSIZE * nbuf))
-		rv = FALSE;
-	return(rv);
-}
-
-/*
- * uvm_useracc: can the user access it?
- *
- * - called from physio() and sys___sysctl().
- */
-
-boolean_t
-uvm_useracc(addr, len, rw)
-	caddr_t addr;
-	size_t len;
-	int rw;
-{
-	struct vm_map *map;
-	boolean_t rv;
-	vm_prot_t prot = rw == B_READ ? VM_PROT_READ : VM_PROT_WRITE;
-
-	/* XXX curproc */
-	map = &curproc->p_vmspace->vm_map;
-
-	vm_map_lock_read(map);
-	rv = uvm_map_checkprot(map, trunc_page((vaddr_t)addr),
-	    round_page((vaddr_t)addr + len), prot);
-	vm_map_unlock_read(map);
 
 	return(rv);
 }
@@ -249,72 +210,90 @@ uvm_vsunlock(p, addr, len)
 }
 
 /*
- * uvm_fork: fork a virtual address space
+ * uvm_proc_fork: fork a virtual address space
  *
  * - the address space is copied as per parent map's inherit values
+ */
+void
+uvm_proc_fork(p1, p2, shared)
+	struct proc *p1, *p2;
+	boolean_t shared;
+{
+
+	if (shared == TRUE) {
+		p2->p_vmspace = NULL;
+		uvmspace_share(p1, p2);
+	} else {
+		p2->p_vmspace = uvmspace_fork(p1->p_vmspace);
+	}
+
+	cpu_proc_fork(p1, p2);
+}
+
+
+/*
+ * uvm_lwp_fork: fork a thread
+ *
  * - a new "user" structure is allocated for the child process
  *	[filled in by MD layer...]
  * - if specified, the child gets a new user stack described by
  *	stack and stacksize
  * - NOTE: the kernel stack may be at a different location in the child
  *	process, and thus addresses of automatic variables may be invalid
- *	after cpu_fork returns in the child process.  We do nothing here
- *	after cpu_fork returns.
+ *	after cpu_lwp_fork returns in the child process.  We do nothing here
+ *	after cpu_lwp_fork returns.
  * - XXXCDC: we need a way for this to return a failure value rather
  *   than just hang
  */
 void
-uvm_fork(p1, p2, shared, stack, stacksize, func, arg)
-	struct proc *p1, *p2;
-	boolean_t shared;
+uvm_lwp_fork(l1, l2, stack, stacksize, func, arg)
+	struct lwp *l1, *l2;
 	void *stack;
 	size_t stacksize;
-	void (*func) __P((void *));
+	void (*func)(void *);
 	void *arg;
 {
-	struct user *up = p2->p_addr;
+	struct user *up = l2->l_addr;
 	int error;
-
-	if (shared == TRUE) {
-		p2->p_vmspace = NULL;
-		uvmspace_share(p1, p2);
-	} else
-		p2->p_vmspace = uvmspace_fork(p1->p_vmspace);
 
 	/*
 	 * Wire down the U-area for the process, which contains the PCB
-	 * and the kernel stack.  Wired state is stored in p->p_flag's
-	 * P_INMEM bit rather than in the vm_map_entry's wired count
-	 * to prevent kernel_map fragmentation.
+	 * and the kernel stack.  Wired state is stored in l->l_flag's
+	 * L_INMEM bit rather than in the vm_map_entry's wired count
+	 * to prevent kernel_map fragmentation.  If we reused a cached U-area,
+	 * L_INMEM will already be set and we don't need to do anything.
 	 *
-	 * Note the kernel stack gets read/write accesses right off
-	 * the bat.
+	 * Note the kernel stack gets read/write accesses right off the bat.
 	 */
-	error = uvm_fault_wire(kernel_map, (vaddr_t)up, (vaddr_t)up + USPACE,
-	    VM_FAULT_WIRE, VM_PROT_READ | VM_PROT_WRITE);
-	if (error)
-		panic("uvm_fork: uvm_fault_wire failed: %d", error);
+
+	if ((l2->l_flag & L_INMEM) == 0) {
+		error = uvm_fault_wire(kernel_map, (vaddr_t)up,
+		    (vaddr_t)up + USPACE, VM_FAULT_WIRE,
+		    VM_PROT_READ | VM_PROT_WRITE);
+		if (error)
+			panic("uvm_lwp_fork: uvm_fault_wire failed: %d", error);
+#ifdef PMAP_UAREA
+		/* Tell the pmap this is a u-area mapping */
+		PMAP_UAREA((vaddr_t)up);
+#endif
+		l2->l_flag |= L_INMEM;
+	}
+
+#ifdef KSTACK_CHECK_MAGIC
+	/*
+	 * fill stack with magic number
+	 */
+	kstack_setup_magic(l2);
+#endif
 
 	/*
-	 * p_stats currently points at a field in the user struct.  Copy
-	 * parts of p_stats, and zero out the rest.
-	 */
-	p2->p_stats = &up->u_stats;
-	memset(&up->u_stats.pstat_startzero, 0,
-	       ((caddr_t)&up->u_stats.pstat_endzero -
-		(caddr_t)&up->u_stats.pstat_startzero));
-	memcpy(&up->u_stats.pstat_startcopy, &p1->p_stats->pstat_startcopy,
-	       ((caddr_t)&up->u_stats.pstat_endcopy -
-		(caddr_t)&up->u_stats.pstat_startcopy));
-
-	/*
-	 * cpu_fork() copy and update the pcb, and make the child ready
-	 * to run.  If this is a normal user fork, the child will exit
+	 * cpu_lwp_fork() copy and update the pcb, and make the child ready
+ 	 * to run.  If this is a normal user fork, the child will exit
 	 * directly to user mode via child_return() on its first time
 	 * slice and will not return here.  If this is a kernel thread,
 	 * the specified entry point will be executed.
 	 */
-	cpu_fork(p1, p2, stack, stacksize, func, arg);
+	cpu_lwp_fork(l1, l2, stack, stacksize, func, arg);
 }
 
 /*
@@ -322,19 +301,106 @@ uvm_fork(p1, p2, shared, stack, stacksize, func, arg)
  *
  * - the process passed to us is a dead (pre-zombie) process; we
  *   are running on a different context now (the reaper).
- * - we must run in a separate thread because freeing the vmspace
+ * - borrow proc0's address space because freeing the vmspace
  *   of the dead process may block.
  */
+
 void
-uvm_exit(p)
+uvm_proc_exit(p)
 	struct proc *p;
 {
-	vaddr_t va = (vaddr_t)p->p_addr;
+	struct lwp *l = curlwp; /* XXX */
+	struct vmspace *ovm;
 
-	uvmspace_free(p->p_vmspace);
-	p->p_flag &= ~P_INMEM;
-	uvm_km_free(kernel_map, va, USPACE);
-	p->p_addr = NULL;
+	KASSERT(p == l->l_proc);
+	ovm = p->p_vmspace;
+
+	/*
+	 * borrow proc0's address space.
+	 */
+	pmap_deactivate(l);
+	p->p_vmspace = proc0.p_vmspace;
+	pmap_activate(l);
+
+	uvmspace_free(ovm);
+}
+
+void
+uvm_lwp_exit(struct lwp *l)
+{
+	vaddr_t va = (vaddr_t)l->l_addr;
+
+	l->l_flag &= ~L_INMEM;
+	uvm_uarea_free(va);
+	l->l_addr = NULL;
+}
+
+/*
+ * uvm_uarea_alloc: allocate a u-area
+ */
+
+boolean_t
+uvm_uarea_alloc(vaddr_t *uaddrp)
+{
+	vaddr_t uaddr;
+
+#ifndef USPACE_ALIGN
+#define USPACE_ALIGN    0
+#endif
+
+	simple_lock(&uvm_uareas_slock);
+	if (uvm_nuarea > 0) {
+		uaddr = (vaddr_t)uvm_uareas;
+		uvm_uareas = *(void **)uvm_uareas;
+		uvm_nuarea--;
+		simple_unlock(&uvm_uareas_slock);
+		*uaddrp = uaddr;
+		return TRUE;
+	} else {
+		simple_unlock(&uvm_uareas_slock);
+		*uaddrp = uvm_km_valloc_align(kernel_map, USPACE, USPACE_ALIGN);
+		return FALSE;
+	}
+}
+
+/*
+ * uvm_uarea_free: free a u-area; never blocks
+ */
+
+static void
+uvm_uarea_free(vaddr_t uaddr)
+{
+	simple_lock(&uvm_uareas_slock);
+	*(void **)uaddr = uvm_uareas;
+	uvm_uareas = (void *)uaddr;
+	uvm_nuarea++;
+	simple_unlock(&uvm_uareas_slock);
+}
+
+/*
+ * uvm_uarea_drain: return memory of u-areas over limit
+ * back to system
+ */
+
+void
+uvm_uarea_drain(boolean_t empty)
+{
+	int leave = empty ? 0 : UVM_NUAREA_MAX;
+	vaddr_t uaddr;
+
+	if (uvm_nuarea <= leave)
+		return;
+
+	simple_lock(&uvm_uareas_slock);
+	while(uvm_nuarea > leave) {
+		uaddr = (vaddr_t)uvm_uareas;
+		uvm_uareas = *(void **)uvm_uareas;
+		uvm_nuarea--;
+		simple_unlock(&uvm_uareas_slock);
+		uvm_km_free(kernel_map, uaddr, USPACE);
+		simple_lock(&uvm_uareas_slock);
+	}
+	simple_unlock(&uvm_uareas_slock);
 }
 
 /*
@@ -342,6 +408,7 @@ uvm_exit(p)
  *
  * - called for process 0 and then inherited by all others.
  */
+
 void
 uvm_init_limits(p)
 	struct proc *p;
@@ -374,14 +441,14 @@ int	swapdebug = 0;
  */
 
 void
-uvm_swapin(p)
-	struct proc *p;
+uvm_swapin(l)
+	struct lwp *l;
 {
 	vaddr_t addr;
 	int s, error;
 
-	addr = (vaddr_t)p->p_addr;
-	/* make P_INMEM true */
+	addr = (vaddr_t)l->l_addr;
+	/* make L_INMEM true */
 	error = uvm_fault_wire(kernel_map, addr, addr + USPACE, VM_FAULT_WIRE,
 	    VM_PROT_READ | VM_PROT_WRITE);
 	if (error) {
@@ -392,13 +459,13 @@ uvm_swapin(p)
 	 * Some architectures need to be notified when the user area has
 	 * moved to new physical page(s) (e.g.  see mips/mips/vm_machdep.c).
 	 */
-	cpu_swapin(p);
+	cpu_swapin(l);
 	SCHED_LOCK(s);
-	if (p->p_stat == SRUN)
-		setrunqueue(p);
-	p->p_flag |= P_INMEM;
+	if (l->l_stat == LSRUN)
+		setrunqueue(l);
+	l->l_flag |= L_INMEM;
 	SCHED_UNLOCK(s);
-	p->p_swtime = 0;
+	l->l_swtime = 0;
 	++uvmexp.swapins;
 }
 
@@ -413,9 +480,8 @@ uvm_swapin(p)
 void
 uvm_scheduler()
 {
-	struct proc *p;
+	struct lwp *l, *ll;
 	int pri;
-	struct proc *pp;
 	int ppri;
 
 loop:
@@ -423,17 +489,17 @@ loop:
 	while (!enableswap)
 		tsleep(&proc0, PVM, "noswap", 0);
 #endif
-	pp = NULL;		/* process to choose */
+	ll = NULL;		/* process to choose */
 	ppri = INT_MIN;	/* its priority */
 	proclist_lock_read();
-	LIST_FOREACH(p, &allproc, p_list) {
 
+	LIST_FOREACH(l, &alllwp, l_list) {
 		/* is it a runnable swapped out process? */
-		if (p->p_stat == SRUN && (p->p_flag & P_INMEM) == 0) {
-			pri = p->p_swtime + p->p_slptime -
-			    (p->p_nice - NZERO) * 8;
+		if (l->l_stat == LSRUN && (l->l_flag & L_INMEM) == 0) {
+			pri = l->l_swtime + l->l_slptime -
+			    (l->l_proc->p_nice - NZERO) * 8;
 			if (pri > ppri) {   /* higher priority?  remember it. */
-				pp = p;
+				ll = l;
 				ppri = pri;
 			}
 		}
@@ -446,12 +512,12 @@ loop:
 
 #ifdef DEBUG
 	if (swapdebug & SDB_FOLLOW)
-		printf("scheduler: running, procp %p pri %d\n", pp, ppri);
+		printf("scheduler: running, procp %p pri %d\n", ll, ppri);
 #endif
 	/*
 	 * Nothing to do, back to sleep
 	 */
-	if ((p = pp) == NULL) {
+	if ((l = ll) == NULL) {
 		tsleep(&proc0, PVM, "scheduler", 0);
 		goto loop;
 	}
@@ -467,9 +533,9 @@ loop:
 #ifdef DEBUG
 		if (swapdebug & SDB_SWAPIN)
 			printf("swapin: pid %d(%s)@%p, pri %d free %d\n",
-	     p->p_pid, p->p_comm, p->p_addr, ppri, uvmexp.free);
+	     l->l_proc->p_pid, l->l_proc->p_comm, l->l_addr, ppri, uvmexp.free);
 #endif
-		uvm_swapin(p);
+		uvm_swapin(l);
 		goto loop;
 	}
 	/*
@@ -479,7 +545,7 @@ loop:
 #ifdef DEBUG
 	if (swapdebug & SDB_FOLLOW)
 		printf("scheduler: no room for pid %d(%s), free %d\n",
-	   p->p_pid, p->p_comm, uvmexp.free);
+	   l->l_proc->p_pid, l->l_proc->p_comm, uvmexp.free);
 #endif
 	uvm_wait("schedpwait");
 #ifdef DEBUG
@@ -490,12 +556,13 @@ loop:
 }
 
 /*
- * swappable: is process "p" swappable?
+ * swappable: is LWP "l" swappable?
  */
 
-#define	swappable(p)							\
-	(((p)->p_flag & (P_SYSTEM | P_INMEM | P_WEXIT)) == P_INMEM &&	\
-	 (p)->p_holdcnt == 0)
+#define	swappable(l)							\
+	(((l)->l_flag & (L_INMEM)) &&					\
+	 ((((l)->l_proc->p_flag) & (P_SYSTEM | P_WEXIT)) == 0) &&	\
+	 (l)->l_holdcnt == 0)
 
 /*
  * swapout_threads: find threads that can be swapped and unwire their
@@ -507,11 +574,12 @@ loop:
  *   are swapped... otherwise the longest-sleeping or stopped process
  *   is swapped, otherwise the longest resident process...
  */
+
 void
 uvm_swapout_threads()
 {
-	struct proc *p;
-	struct proc *outp, *outp2;
+	struct lwp *l;
+	struct lwp *outl, *outl2;
 	int outpri, outpri2;
 	int didswap = 0;
 	extern int maxslp;
@@ -523,32 +591,35 @@ uvm_swapout_threads()
 #endif
 
 	/*
-	 * outp/outpri  : stop/sleep process with largest sleeptime < maxslp
-	 * outp2/outpri2: the longest resident process (its swap time)
+	 * outl/outpri  : stop/sleep thread with largest sleeptime < maxslp
+	 * outl2/outpri2: the longest resident thread (its swap time)
 	 */
-	outp = outp2 = NULL;
+	outl = outl2 = NULL;
 	outpri = outpri2 = 0;
 	proclist_lock_read();
-	LIST_FOREACH(p, &allproc, p_list) {
-		if (!swappable(p))
+	LIST_FOREACH(l, &alllwp, l_list) {
+		if (!swappable(l))
 			continue;
-		switch (p->p_stat) {
-		case SRUN:
-		case SONPROC:
-			if (p->p_swtime > outpri2) {
-				outp2 = p;
-				outpri2 = p->p_swtime;
+		switch (l->l_stat) {
+		case LSONPROC:
+			KDASSERT(l->l_cpu != curcpu());
+			continue;
+
+		case LSRUN:
+			if (l->l_swtime > outpri2) {
+				outl2 = l;
+				outpri2 = l->l_swtime;
 			}
 			continue;
 
-		case SSLEEP:
-		case SSTOP:
-			if (p->p_slptime >= maxslp) {
-				uvm_swapout(p);
+		case LSSLEEP:
+		case LSSTOP:
+			if (l->l_slptime >= maxslp) {
+				uvm_swapout(l);
 				didswap++;
-			} else if (p->p_slptime > outpri) {
-				outp = p;
-				outpri = p->p_slptime;
+			} else if (l->l_slptime > outpri) {
+				outl = l;
+				outpri = l->l_slptime;
 			}
 			continue;
 		}
@@ -562,19 +633,19 @@ uvm_swapout_threads()
 	 * it (USPACE bytes).
 	 */
 	if (didswap == 0 && uvmexp.free <= atop(round_page(USPACE))) {
-		if ((p = outp) == NULL)
-			p = outp2;
+		if ((l = outl) == NULL)
+			l = outl2;
 #ifdef DEBUG
 		if (swapdebug & SDB_SWAPOUT)
-			printf("swapout_threads: no duds, try procp %p\n", p);
+			printf("swapout_threads: no duds, try procp %p\n", l);
 #endif
-		if (p)
-			uvm_swapout(p);
+		if (l)
+			uvm_swapout(l);
 	}
 }
 
 /*
- * uvm_swapout: swap out process "p"
+ * uvm_swapout: swap out lwp "l"
  *
  * - currently "swapout" means "unwire U-area" and "pmap_collect()"
  *   the pmap.
@@ -582,42 +653,48 @@ uvm_swapout_threads()
  */
 
 static void
-uvm_swapout(p)
-	struct proc *p;
+uvm_swapout(l)
+	struct lwp *l;
 {
 	vaddr_t addr;
 	int s;
+	struct proc *p = l->l_proc;
 
 #ifdef DEBUG
 	if (swapdebug & SDB_SWAPOUT)
-		printf("swapout: pid %d(%s)@%p, stat %x pri %d free %d\n",
-	   p->p_pid, p->p_comm, p->p_addr, p->p_stat,
-	   p->p_slptime, uvmexp.free);
+		printf("swapout: lid %d.%d(%s)@%p, stat %x pri %d free %d\n",
+	   p->p_pid, l->l_lid, p->p_comm, l->l_addr, l->l_stat,
+	   l->l_slptime, uvmexp.free);
 #endif
-
-	/*
-	 * Do any machine-specific actions necessary before swapout.
-	 * This can include saving floating point state, etc.
-	 */
-	cpu_swapout(p);
 
 	/*
 	 * Mark it as (potentially) swapped out.
 	 */
 	SCHED_LOCK(s);
-	p->p_flag &= ~P_INMEM;
-	if (p->p_stat == SRUN)
-		remrunqueue(p);
+	if (l->l_stat == LSONPROC) {
+		KDASSERT(l->l_cpu != curcpu());
+		SCHED_UNLOCK(s);
+		return;
+	}
+	l->l_flag &= ~L_INMEM;
+	if (l->l_stat == LSRUN)
+		remrunqueue(l);
 	SCHED_UNLOCK(s);
-	p->p_swtime = 0;
+	l->l_swtime = 0;
 	p->p_stats->p_ru.ru_nswap++;
 	++uvmexp.swapouts;
 
 	/*
+	 * Do any machine-specific actions necessary before swapout.
+	 * This can include saving floating point state, etc.
+	 */
+	cpu_swapout(l);
+
+	/*
 	 * Unwire the to-be-swapped process's user struct and kernel stack.
 	 */
-	addr = (vaddr_t)p->p_addr;
-	uvm_fault_unwire(kernel_map, addr, addr + USPACE); /* !P_INMEM */
+	addr = (vaddr_t)l->l_addr;
+	uvm_fault_unwire(kernel_map, addr, addr + USPACE); /* !L_INMEM */
 	pmap_collect(vm_map_pmap(&p->p_vmspace->vm_map));
 }
 
@@ -644,8 +721,16 @@ uvm_coredump_walkmap(p, vp, cred, func, cookie)
 
 	maxstack = trunc_page(USRSTACK - ctob(vm->vm_ssize));
 
-	for (entry = map->header.next; entry != &map->header;
-	     entry = entry->next) {  
+	entry = NULL;
+	vm_map_lock_read(map);
+	for (;;) {
+		if (entry == NULL)
+			entry = map->header.next;
+		else if (!uvm_map_lookup_entry(map, state.end, &entry))
+			entry = entry->next;
+		if (entry == &map->header)
+			break;
+
 		/* Should never happen for a user process. */
 		if (UVM_ET_ISSUBMAP(entry))
 			panic("uvm_coredump_walkmap: user process with "
@@ -657,7 +742,7 @@ uvm_coredump_walkmap(p, vp, cred, func, cookie)
 		state.prot = entry->protection;
 		state.flags = 0;
 
-		if (state.start >= VM_MAXUSER_ADDRESS)  
+		if (state.start >= VM_MAXUSER_ADDRESS)
 			continue;
 
 		if (state.end > VM_MAXUSER_ADDRESS)
@@ -675,13 +760,16 @@ uvm_coredump_walkmap(p, vp, cred, func, cookie)
 			state.flags |= UVM_COREDUMP_NODUMP;
 
 		if (entry->object.uvm_obj != NULL &&
-		    entry->object.uvm_obj->pgops == &uvm_deviceops)
+		    UVM_OBJ_IS_DEVICE(entry->object.uvm_obj))
 			state.flags |= UVM_COREDUMP_NODUMP;
 
+		vm_map_unlock_read(map);
 		error = (*func)(p, vp, cred, &state);
 		if (error)
 			return (error);
+		vm_map_lock_read(map);
 	}
+	vm_map_unlock_read(map);
 
 	return (0);
 }

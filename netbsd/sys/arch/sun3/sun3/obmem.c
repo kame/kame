@@ -1,4 +1,4 @@
-/*	$NetBSD: obmem.c,v 1.15 1998/02/05 04:57:46 gwr Exp $	*/
+/*	$NetBSD: obmem.c,v 1.19 2003/07/15 03:36:18 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -41,6 +41,9 @@
  * Used by frame buffers...
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: obmem.c,v 1.19 2003/07/15 03:36:18 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -51,9 +54,8 @@
 static int  obmem_match __P((struct device *, struct cfdata *, void *));
 static void obmem_attach __P((struct device *, struct device *, void *));
 
-struct cfattach obmem_ca = {
-	sizeof(struct device), obmem_match, obmem_attach
-};
+CFATTACH_DECL(obmem, sizeof(struct device),
+    obmem_match, obmem_attach, NULL, NULL);
 
 static int
 obmem_match(parent, cf, aux)

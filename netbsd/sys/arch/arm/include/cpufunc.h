@@ -1,4 +1,4 @@
-/*	$NetBSD: cpufunc.h,v 1.23.4.1 2002/11/18 02:14:55 he Exp $	*/
+/*	$NetBSD: cpufunc.h,v 1.30 2004/01/26 15:54:16 rearnsha Exp $	*/
 
 /*
  * Copyright (c) 1997 Mark Brinicombe.
@@ -313,28 +313,58 @@ void	arm9_setttb		__P((u_int));
 
 void	arm9_tlb_flushID_SE	__P((u_int va));
 
-void	arm9_cache_flushID	__P((void));
-void	arm9_cache_flushID_SE	__P((u_int));
-void	arm9_cache_flushI	__P((void));
-void	arm9_cache_flushI_SE	__P((u_int));
-void	arm9_cache_flushD	__P((void));
-void	arm9_cache_flushD_SE	__P((u_int));
+void	arm9_icache_sync_all	__P((void));
+void	arm9_icache_sync_range	__P((vaddr_t, vsize_t));
 
-void	arm9_cache_cleanID	__P((void));
+void	arm9_dcache_wbinv_all	__P((void));
+void	arm9_dcache_wbinv_range __P((vaddr_t, vsize_t));
+void	arm9_dcache_inv_range	__P((vaddr_t, vsize_t));
+void	arm9_dcache_wb_range	__P((vaddr_t, vsize_t));
 
-void	arm9_cache_syncI	__P((void));
-void	arm9_cache_flushID_rng	__P((vaddr_t, vsize_t));
-void	arm9_cache_flushD_rng	__P((vaddr_t, vsize_t));
-void	arm9_cache_syncI_rng	__P((vaddr_t, vsize_t));
+void	arm9_idcache_wbinv_all	__P((void));
+void	arm9_idcache_wbinv_range __P((vaddr_t, vsize_t));
 
 void	arm9_context_switch	__P((void));
 
 void	arm9_setup		__P((char *string));
+
+extern unsigned arm9_dcache_sets_max;
+extern unsigned arm9_dcache_sets_inc;
+extern unsigned arm9_dcache_index_max;
+extern unsigned arm9_dcache_index_inc;
 #endif
 
-#if defined(CPU_ARM9) || defined(CPU_SA110) || defined(CPU_SA1100) || \
-    defined(CPU_SA1110) || defined(CPU_XSCALE_80200) || \
-    defined(CPU_XSCALE_80321) || defined(CPU_XSCALE_PXA2X0)
+#ifdef CPU_ARM10
+void	arm10_setttb		__P((u_int));
+
+void	arm10_tlb_flushID_SE	__P((u_int));
+void	arm10_tlb_flushI_SE	__P((u_int));
+
+void	arm10_icache_sync_all	__P((void));
+void	arm10_icache_sync_range	__P((vaddr_t, vsize_t));
+
+void	arm10_dcache_wbinv_all	__P((void));
+void	arm10_dcache_wbinv_range __P((vaddr_t, vsize_t));
+void	arm10_dcache_inv_range	__P((vaddr_t, vsize_t));
+void	arm10_dcache_wb_range	__P((vaddr_t, vsize_t));
+
+void	arm10_idcache_wbinv_all	__P((void));
+void	arm10_idcache_wbinv_range __P((vaddr_t, vsize_t));
+
+void	arm10_context_switch	__P((void));
+
+void	arm10_setup		__P((char *string));
+
+extern unsigned arm10_dcache_sets_max;
+extern unsigned arm10_dcache_sets_inc;
+extern unsigned arm10_dcache_index_max;
+extern unsigned arm10_dcache_index_inc;
+#endif
+
+#if defined(CPU_ARM9) || defined(CPU_ARM10) || defined(CPU_SA110) || \
+    defined(CPU_SA1100) || defined(CPU_SA1110) || \
+    defined(CPU_XSCALE_80200) || defined(CPU_XSCALE_80321) || \
+    defined(CPU_XSCALE_PXA2X0) || defined(CPU_XSCALE_IXP425)
 
 void	armv4_tlb_flushID	__P((void));
 void	armv4_tlb_flushI	__P((void));
@@ -344,8 +374,14 @@ void	armv4_tlb_flushD_SE	__P((u_int va));
 void	armv4_drain_writebuf	__P((void));
 #endif
 
+#if defined(CPU_IXP12X0)
+void	ixp12x0_drain_readbuf	__P((void));
+void	ixp12x0_context_switch	__P((void));
+void	ixp12x0_setup		__P((char *string));
+#endif
+
 #if defined(CPU_XSCALE_80200) || defined(CPU_XSCALE_80321) || \
-    defined(CPU_XSCALE_PXA2X0)
+    defined(CPU_XSCALE_PXA2X0) || defined(CPU_XSCALE_IXP425)
 void	xscale_cpwait		__P((void));
 
 void	xscale_cpu_sleep	__P((int mode));
@@ -383,7 +419,7 @@ void	xscale_cache_flushD_rng	__P((vaddr_t start, vsize_t end));
 void	xscale_context_switch	__P((void));
 
 void	xscale_setup		__P((char *string));
-#endif	/* CPU_XSCALE_80200 || CPU_XSCALE_80321 || CPU_XSCALE_PXA2X0 */
+#endif	/* CPU_XSCALE_80200 || CPU_XSCALE_80321 || CPU_XSCALE_PXA2X0 || CPU_XSCALE_IXP425 */
 
 #define tlb_flush	cpu_tlb_flushID
 #define setttb		cpu_setttb
@@ -393,14 +429,33 @@ void	xscale_setup		__P((char *string));
  * Macros for manipulating CPU interrupts
  */
 #ifdef __PROG32
+static __inline u_int32_t __set_cpsr_c(u_int bic, u_int eor) __attribute__((__unused__));
+
+static __inline u_int32_t
+__set_cpsr_c(u_int bic, u_int eor)
+{
+	u_int32_t	tmp, ret;
+
+	__asm __volatile(
+		"mrs     %0, cpsr\n"	/* Get the CPSR */
+		"bic	 %1, %0, %2\n"	/* Clear bits */
+		"eor	 %1, %1, %3\n"	/* XOR bits */
+		"msr     cpsr_c, %1\n"	/* Set the control field of CPSR */
+	: "=&r" (ret), "=&r" (tmp)
+	: "r" (bic), "r" (eor));
+
+	return ret;
+}
+
 #define disable_interrupts(mask)					\
-	(SetCPSR((mask) & (I32_bit | F32_bit), (mask) & (I32_bit | F32_bit)))
+	(__set_cpsr_c((mask) & (I32_bit | F32_bit), \
+		      (mask) & (I32_bit | F32_bit)))
 
 #define enable_interrupts(mask)						\
-	(SetCPSR((mask) & (I32_bit | F32_bit), 0))
+	(__set_cpsr_c((mask) & (I32_bit | F32_bit), 0))
 
 #define restore_interrupts(old_cpsr)					\
-	(SetCPSR((I32_bit | F32_bit), (old_cpsr) & (I32_bit | F32_bit)))
+	(__set_cpsr_c((I32_bit | F32_bit), (old_cpsr) & (I32_bit | F32_bit)))
 #else /* ! __PROG32 */
 #define	disable_interrupts(mask)					\
 	(set_r15((mask) & (R15_IRQ_DISABLE | R15_FIQ_DISABLE),		\
@@ -449,19 +504,19 @@ void cpu_reset		__P((void)) __attribute__((__noreturn__));
  */
 
 /* PRIMARY CACHE VARIABLES */
-int	arm_picache_size;
-int	arm_picache_line_size;
-int	arm_picache_ways;
+extern int	arm_picache_size;
+extern int	arm_picache_line_size;
+extern int	arm_picache_ways;
 
-int	arm_pdcache_size;	/* and unified */
-int	arm_pdcache_line_size;
-int	arm_pdcache_ways; 
+extern int	arm_pdcache_size;	/* and unified */
+extern int	arm_pdcache_line_size;
+extern int	arm_pdcache_ways; 
 
-int	arm_pcache_type;
-int	arm_pcache_unified;
+extern int	arm_pcache_type;
+extern int	arm_pcache_unified;
 
-int	arm_dcache_align;
-int	arm_dcache_align_mask;
+extern int	arm_dcache_align;
+extern int	arm_dcache_align_mask;
 
 #endif	/* _KERNEL */
 #endif	/* _ARM32_CPUFUNC_H_ */

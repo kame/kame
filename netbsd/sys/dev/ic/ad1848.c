@@ -1,4 +1,4 @@
-/*	$NetBSD: ad1848.c,v 1.14 2002/03/23 23:40:32 itohy Exp $	*/
+/*	$NetBSD: ad1848.c,v 1.17 2003/02/21 17:14:06 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -102,7 +102,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ad1848.c,v 1.14 2002/03/23 23:40:32 itohy Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ad1848.c,v 1.17 2003/02/21 17:14:06 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -464,6 +464,7 @@ const struct ad1848_mixerinfo {
   { CS_LEFT_LINE_CONTROL, CS_RIGHT_LINE_CONTROL, LINE_INPUT_ATTEN_BITS,
     LINE_INPUT_ATTEN_MASK },
   { CS_MONO_IO_CONTROL, 0, MONO_INPUT_ATTEN_BITS, MONO_INPUT_ATTEN_MASK },
+  { CS_MONO_IO_CONTROL, 0, 0, 0 },
   { SP_DIGITAL_MIX, 0, OUTPUT_ATTEN_BITS, MIX_ATTEN_MASK }
 };
 
@@ -490,7 +491,10 @@ ad1848_mute_channel(sc, device, mute)
 				ad1848_mute_wave_output(sc, WAVE_UNMUTE1, 0);
 			ad_write(sc, mixer_channel_info[device].left_reg,
 				 reg & ~DIGITAL_MIX1_ENABLE);
-		} else
+		} else if (device == AD1848_OUT_CHANNEL)
+			ad_write(sc, mixer_channel_info[device].left_reg,
+				 reg | MONO_OUTPUT_MUTE);
+		else
 			ad_write(sc, mixer_channel_info[device].left_reg,
 				 reg | 0x80);
 	} else if (!(sc->mute[device] & MUTE_LEFT)) {
@@ -499,7 +503,10 @@ ad1848_mute_channel(sc, device, mute)
 				 reg | DIGITAL_MIX1_ENABLE);
 			if (sc->open_mode & FREAD)
 				ad1848_mute_wave_output(sc, WAVE_UNMUTE1, 1);
-		} else
+		} else if (device == AD1848_OUT_CHANNEL)
+			ad_write(sc, mixer_channel_info[device].left_reg,
+				 reg & ~MONO_OUTPUT_MUTE);
+		else
 			ad_write(sc, mixer_channel_info[device].left_reg,
 				 reg & ~0x80);
 	}
@@ -1162,7 +1169,7 @@ ad1848_commit_settings(addr)
 		 */
 		(void)ADREAD(sc, AD1848_IDATA);
 		(void)ADREAD(sc, AD1848_IDATA);
-		/* Write to I8 starts resyncronization. Wait for completion. */
+		/* Write to I8 starts resynchronization. Wait for completion. */
 		timeout = 100000;
 		while (timeout > 0 && ADREAD(sc, AD1848_IADDR) == SP_IN_INIT)
 			timeout--;
@@ -1173,7 +1180,7 @@ ad1848_commit_settings(addr)
 		/* Now wait for resync for capture side of the house */
 	}
 	/*
-	 * Write to I8 starts resyncronization. Wait until it completes.
+	 * Write to I8 starts resynchronization. Wait until it completes.
 	 */
 	timeout = 100000;
 	while (timeout > 0 && ADREAD(sc, AD1848_IADDR) == SP_IN_INIT) {
@@ -1231,7 +1238,7 @@ ad1848_set_speed(sc, argp)
 {
 	/*
 	 * The sampling speed is encoded in the least significant nible of I8.
-	 * The LSB selects the clock source (0=24.576 MHz, 1=16.9344 Mhz) and
+	 * The LSB selects the clock source (0=24.576 MHz, 1=16.9344 MHz) and
 	 * other three bits select the divisor (indirectly):
 	 *
 	 * The available speeds are in the following table. Keep the speeds in

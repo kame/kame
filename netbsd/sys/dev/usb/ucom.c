@@ -1,4 +1,4 @@
-/*	$NetBSD: ucom.c,v 1.42 2002/03/17 19:41:04 atatat Exp $	*/
+/*	$NetBSD: ucom.c,v 1.52 2003/11/24 19:47:07 nathanw Exp $	*/
 
 /*
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ucom.c,v 1.42 2002/03/17 19:41:04 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ucom.c,v 1.52 2003/11/24 19:47:07 nathanw Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -133,7 +133,19 @@ struct ucom_softc {
 #endif
 };
 
-cdev_decl(ucom);
+dev_type_open(ucomopen);
+dev_type_close(ucomclose);
+dev_type_read(ucomread);
+dev_type_write(ucomwrite);
+dev_type_ioctl(ucomioctl);
+dev_type_stop(ucomstop);
+dev_type_tty(ucomtty);
+dev_type_poll(ucompoll);
+
+const struct cdevsw ucom_cdevsw = {
+	ucomopen, ucomclose, ucomread, ucomwrite, ucomioctl,
+	ucomstop, ucomtty, ucompoll, nommap, ttykqfilter, D_TTY
+};
 
 Static void	ucom_cleanup(struct ucom_softc *);
 Static void	ucom_hwiflow(struct ucom_softc *);
@@ -205,7 +217,7 @@ USB_DETACH(ucom)
 	int maj, mn;
 	int s;
 
-	DPRINTF(("ucom_detach: sc=%p flags=%d tp=%p, pipe=%d,%d\n", 
+	DPRINTF(("ucom_detach: sc=%p flags=%d tp=%p, pipe=%d,%d\n",
 		 sc, flags, tp, sc->sc_bulkin_no, sc->sc_bulkout_no));
 
 	sc->sc_dying = 1;
@@ -229,9 +241,7 @@ USB_DETACH(ucom)
 	splx(s);
 
 	/* locate the major number */
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == ucomopen)
-			break;
+	maj = cdevsw_lookup_major(&ucom_cdevsw);
 
 	/* Nuke the vnodes for any open instances. */
 	mn = self->dv_unit;
@@ -265,7 +275,6 @@ ucom_activate(device_ptr_t self, enum devact act)
 	switch (act) {
 	case DVACT_ACTIVATE:
 		return (EOPNOTSUPP);
-		break;
 
 	case DVACT_DEACTIVATE:
 		sc->sc_dying = 1;
@@ -299,7 +308,7 @@ ucomopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 	struct tty *tp;
 	int s;
 	int error;
- 
+
 	if (unit >= ucom_cd.cd_ndevs)
 		return (ENXIO);
 	sc = ucom_cd.cd_devs[unit];
@@ -334,7 +343,7 @@ ucomopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 		return (EIO);
 	}
 	sc->sc_opening = 1;
-	
+
 	if (!ISSET(tp->t_state, TS_ISOPEN) && tp->t_wopen == 0) {
 		struct termios t;
 
@@ -395,8 +404,8 @@ ucomopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 		err = usbd_open_pipe(sc->sc_iface, sc->sc_bulkin_no, 0,
 				     &sc->sc_bulkin_pipe);
 		if (err) {
-			DPRINTF(("%s: open bulk out error (addr %d), err=%s\n",
-				 USBDEVNAME(sc->sc_dev), sc->sc_bulkin_no, 
+			DPRINTF(("%s: open bulk in error (addr %d), err=%s\n",
+				 USBDEVNAME(sc->sc_dev), sc->sc_bulkin_no,
 				 usbd_errstr(err)));
 			error = EIO;
 			goto fail_0;
@@ -404,13 +413,13 @@ ucomopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 		err = usbd_open_pipe(sc->sc_iface, sc->sc_bulkout_no,
 				     USBD_EXCLUSIVE_USE, &sc->sc_bulkout_pipe);
 		if (err) {
-			DPRINTF(("%s: open bulk in error (addr %d), err=%s\n",
+			DPRINTF(("%s: open bulk out error (addr %d), err=%s\n",
 				 USBDEVNAME(sc->sc_dev), sc->sc_bulkout_no,
 				 usbd_errstr(err)));
 			error = EIO;
 			goto fail_1;
 		}
-		
+
 		/* Allocate a request and an input buffer and start reading. */
 		sc->sc_ixfer = usbd_alloc_xfer(sc->sc_udev);
 		if (sc->sc_ixfer == NULL) {
@@ -517,7 +526,7 @@ ucomclose(dev_t dev, int flag, int mode, usb_proc_ptr p)
 
 	return (0);
 }
- 
+
 int
 ucomread(dev_t dev, struct uio *uio, int flag)
 {
@@ -527,14 +536,14 @@ ucomread(dev_t dev, struct uio *uio, int flag)
 
 	if (sc->sc_dying)
 		return (EIO);
- 
+
 	sc->sc_refcnt++;
 	error = ((*tp->t_linesw->l_read)(tp, uio, flag));
 	if (--sc->sc_refcnt < 0)
 		usb_detach_wakeup(USBDEV(sc->sc_dev));
 	return (error);
 }
- 
+
 int
 ucomwrite(dev_t dev, struct uio *uio, int flag)
 {
@@ -544,7 +553,7 @@ ucomwrite(dev_t dev, struct uio *uio, int flag)
 
 	if (sc->sc_dying)
 		return (EIO);
- 
+
 	sc->sc_refcnt++;
 	error = ((*tp->t_linesw->l_write)(tp, uio, flag));
 	if (--sc->sc_refcnt < 0)
@@ -561,7 +570,7 @@ ucompoll(dev_t dev, int events, usb_proc_ptr p)
 
 	if (sc->sc_dying)
 		return (EIO);
- 
+
 	sc->sc_refcnt++;
 	error = ((*tp->t_linesw->l_poll)(tp, events, p));
 	if (--sc->sc_refcnt < 0)
@@ -601,7 +610,7 @@ ucom_do_ioctl(struct ucom_softc *sc, u_long cmd, caddr_t data,
 
 	if (sc->sc_dying)
 		return (EIO);
- 
+
 	DPRINTF(("ucomioctl: cmd=0x%08lx\n", cmd));
 
 	error = (*tp->t_linesw->l_ioctl)(tp, cmd, data, flag, p);
@@ -646,7 +655,7 @@ ucom_do_ioctl(struct ucom_softc *sc, u_long cmd, caddr_t data,
 		break;
 
 	case TIOCSFLAGS:
-		error = suser(p->p_ucred, &p->p_acflag); 
+		error = suser(p->p_ucred, &p->p_acflag);
 		if (error)
 			break;
 		sc->sc_swflags = *(int *)data;
@@ -682,7 +691,7 @@ tiocm_to_ucom(struct ucom_softc *sc, u_long how, int ttybits)
 		SET(combits, UMCR_DTR);
 	if (ISSET(ttybits, TIOCM_RTS))
 		SET(combits, UMCR_RTS);
- 
+
 	switch (how) {
 	case TIOCMBIC:
 		CLR(sc->sc_mcr, combits);
@@ -753,7 +762,7 @@ ucom_dtr(struct ucom_softc *sc, int onoff)
 	DPRINTF(("ucom_dtr: onoff=%d\n", onoff));
 
 	if (sc->sc_methods->ucom_set != NULL)
-		sc->sc_methods->ucom_set(sc->sc_parent, sc->sc_portno, 
+		sc->sc_methods->ucom_set(sc->sc_parent, sc->sc_portno,
 		    UCOM_SET_DTR, onoff);
 }
 
@@ -763,7 +772,7 @@ ucom_rts(struct ucom_softc *sc, int onoff)
 	DPRINTF(("ucom_rts: onoff=%d\n", onoff));
 
 	if (sc->sc_methods->ucom_set != NULL)
-		sc->sc_methods->ucom_set(sc->sc_parent, sc->sc_portno, 
+		sc->sc_methods->ucom_set(sc->sc_parent, sc->sc_portno,
 		    UCOM_SET_RTS, onoff);
 }
 
@@ -932,7 +941,7 @@ ucomstart(struct tty *tp)
 		memcpy(sc->sc_obuf, data, cnt);
 
 	DPRINTFN(4,("ucomstart: %d chars\n", cnt));
-	usbd_setup_xfer(sc->sc_oxfer, sc->sc_bulkout_pipe, 
+	usbd_setup_xfer(sc->sc_oxfer, sc->sc_bulkout_pipe,
 			(usbd_private_handle)sc, sc->sc_obuf, cnt,
 			USBD_NO_COPY, USBD_NO_TIMEOUT, ucomwritecb);
 	/* What can we do on error? */
@@ -1015,8 +1024,8 @@ ucomstartread(struct ucom_softc *sc)
 	usbd_status err;
 
 	DPRINTFN(5,("ucomstartread: start\n"));
-	usbd_setup_xfer(sc->sc_ixfer, sc->sc_bulkin_pipe, 
-			(usbd_private_handle)sc, 
+	usbd_setup_xfer(sc->sc_ixfer, sc->sc_bulkin_pipe,
+			(usbd_private_handle)sc,
 			sc->sc_ibuf, sc->sc_ibufsize,
 			USBD_SHORT_XFER_OK | USBD_NO_COPY,
 			USBD_NO_TIMEOUT, ucomreadcb);
@@ -1027,7 +1036,7 @@ ucomstartread(struct ucom_softc *sc)
 	}
 	return (USBD_NORMAL_COMPLETION);
 }
- 
+
 Static void
 ucomreadcb(usbd_xfer_handle xfer, usbd_private_handle p, usbd_status status)
 {
@@ -1058,7 +1067,7 @@ ucomreadcb(usbd_xfer_handle xfer, usbd_private_handle p, usbd_status status)
 		return;
 	}
 
-	usbd_get_xfer_status(xfer, NULL, (void **)&cp, &cc, NULL);
+	usbd_get_xfer_status(xfer, NULL, (void *)&cp, &cc, NULL);
 #if defined(__NetBSD__) && NRND > 0
 	rnd_add_uint32(&sc->sc_rndsource, cc);
 #endif
@@ -1121,9 +1130,9 @@ ucomprint(void *aux, const char *pnp)
 	struct ucom_attach_args *uca = aux;
 
 	if (pnp)
-		printf("ucom at %s", pnp);
+		aprint_normal("ucom at %s", pnp);
 	if (uca->portno != UCOM_UNK_PORTNO)
-		printf(" portno %d", uca->portno);
+		aprint_normal(" portno %d", uca->portno);
 	return (UNCONF);
 }
 
@@ -1136,5 +1145,5 @@ ucomsubmatch(struct device *parent, struct cfdata *cf, void *aux)
 	    cf->ucomcf_portno != UCOM_UNK_PORTNO &&
 	    cf->ucomcf_portno != uca->portno)
 		return (0);
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }

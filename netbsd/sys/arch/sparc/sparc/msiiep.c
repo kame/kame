@@ -1,4 +1,4 @@
-/*	$NetBSD: msiiep.c,v 1.9 2002/05/16 01:01:40 thorpej Exp $ */
+/*	$NetBSD: msiiep.c,v 1.20 2004/03/17 17:04:59 pk Exp $ */
 
 /*
  * Copyright (c) 2001 Valeriy E. Ushakov
@@ -27,7 +27,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: msiiep.c,v 1.9 2002/05/16 01:01:40 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: msiiep.c,v 1.20 2004/03/17 17:04:59 pk Exp $");
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -41,7 +41,6 @@ __KERNEL_RCSID(0, "$NetBSD: msiiep.c,v 1.9 2002/05/16 01:01:40 thorpej Exp $");
 #include <machine/bus.h>
 #include <machine/autoconf.h>
 #include <machine/promlib.h>
-#include <machine/idprom.h>
 
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcidevs.h>
@@ -68,13 +67,8 @@ static int	msiiep_match(struct device *, struct cfdata *, void *);
 static void	msiiep_attach(struct device *, struct device *, void *);
 /* static int	msiiep_print(void *, const char *); */
 
-struct cfattach msiiep_ca = {
-	sizeof(struct device), msiiep_match, msiiep_attach
-};
-
-static struct idprom	msiiep_idprom_store;
-static void		msiiep_getidprom(void);
-
+CFATTACH_DECL(msiiep, sizeof(struct device),
+    msiiep_match, msiiep_attach, NULL, NULL);
 
 /*
  * The real thing.
@@ -83,10 +77,8 @@ static int	mspcic_match(struct device *, struct cfdata *, void *);
 static void	mspcic_attach(struct device *, struct device *, void *);
 static int	mspcic_print(void *, const char *);
 
-struct cfattach mspcic_ca = {
-	sizeof(struct mspcic_softc), mspcic_match, mspcic_attach
-};
-
+CFATTACH_DECL(mspcic, sizeof(struct mspcic_softc),
+    mspcic_match, mspcic_attach, NULL, NULL);
 
 /**
  * ms-IIep PCIC registers are mapped at fixed VA
@@ -122,7 +114,7 @@ static struct mspcic_pci_map mspcic_pci_iomap[2] = {
 
 /* fixed mem and two sets of mem cycle translation registers */
 static struct mspcic_pci_map mspcic_pci_memmap[3] = {
-	{ 0x30100000, 0x30100000, 0x00f00000 }	/* fixed mem (pass through) */
+	{ 0x30100000, 0x00100000, 0x00f00000 }	/* fixed mem (pass through) */
 };
 
 struct mspcic_cookie {
@@ -147,29 +139,53 @@ static void	mspcic_pci_map_print(struct mspcic_pci_map *, const char *);
 static int	mspcic_bus_map(bus_space_tag_t, bus_addr_t, bus_size_t,
 			       int, vaddr_t, bus_space_handle_t *);
 static paddr_t	mspcic_bus_mmap(bus_space_tag_t, bus_addr_t, off_t, int, int);
-static void	*mspcic_intr_establish(bus_space_tag_t, int, int, int,
-				       int (*)(void *), void *);
+static void	*mspcic_intr_establish(bus_space_tag_t, int, int,
+				       int (*)(void *), void *, void (*)(void));
 
 static struct sparc_bus_space_tag mspcic_io_tag = {
 	&mspcic_io_cookie,	/* cookie */
 	NULL,			/* parent bus tag */
+	NULL,			/* ranges */
+	0,			/* nranges */
 	mspcic_bus_map,		/* bus_space_map */
 	NULL,			/* bus_space_unmap */
 	NULL,			/* bus_space_subregion */
 	NULL,			/* bus_space_barrier */
 	mspcic_bus_mmap,	/* bus_space_mmap */
-	mspcic_intr_establish	/* bus_intr_establish */
+	mspcic_intr_establish,	/* bus_intr_establish */
+#if __FULL_SPARC_BUS_SPACE
+	NULL,			/* read_1 */
+	NULL,			/* read_2 */
+	NULL,			/* read_4 */
+	NULL,			/* read_8 */
+	NULL,			/* write_1 */
+	NULL,			/* write_2 */
+	NULL,			/* write_4 */
+	NULL			/* write_8 */
+#endif
 };
 
 static struct sparc_bus_space_tag mspcic_mem_tag = {
 	&mspcic_mem_cookie,	/* cookie */
 	NULL,			/* parent bus tag */
+	NULL,			/* ranges */
+	0,			/* nranges */
 	mspcic_bus_map,		/* bus_space_map */ 
 	NULL,			/* bus_space_unmap */
 	NULL,			/* bus_space_subregion */
 	NULL,			/* bus_space_barrier */
 	mspcic_bus_mmap,	/* bus_space_mmap */
 	mspcic_intr_establish	/* bus_intr_establish */
+#if __FULL_SPARC_BUS_SPACE
+	NULL,			/* read_1 */
+	NULL,			/* read_2 */
+	NULL,			/* read_4 */
+	NULL,			/* read_8 */
+	NULL,			/* write_1 */
+	NULL,			/* write_2 */
+	NULL,			/* write_4 */
+	NULL			/* write_8 */
+#endif
 };
 
 
@@ -242,12 +258,7 @@ msiiep_attach(parent, self, aux)
 	struct mainbus_attach_args *ma = aux;
 	struct msiiep_attach_args msa;
 
-	/*
-	 * Ok, we know that we are on ms-IIep and the easy way to get
-	 * idprom is to read it from root property (try this at prom:
-	 * "see idprom@ seeprom see ee-read" if you don't believe me ;-).
-	 */
-	msiiep_getidprom();
+	aprint_normal("\n");
 
 	/* pass on real mainbus_attach_args */
 	msa.msa_ma = ma;
@@ -260,29 +271,6 @@ msiiep_attach(parent, self, aux)
 	msa.msa_name = "pcic";
 	config_found(self, &msa, NULL);
 }
-
-
-/*
- * idprom is in /pci/ebus/gpio but it's a pain to access.
- * fortunately the PROM sets "idprom" property on the root node.
- * XXX: the idprom stuff badly needs to be factored out....
- */
-static void
-msiiep_getidprom()
-{
-	extern void establish_hostid(struct idprom *); /* clock.c */
-	struct idprom *idp;
-	int nitems;
-
-	idp = &msiiep_idprom_store;
-	nitems = 1;
-	if (PROM_getprop(prom_findroot(), "idprom",
-			 sizeof(struct idprom), &nitems,
-			 (void **)&idp) != 0)
-		panic("unable to get \"idprom\" property from root node");
-	establish_hostid(idp);
-}
-
 
 /*
  * Turn PCIC endian swapping on/off.  The kernel runs with endian
@@ -342,7 +330,7 @@ mspcic_attach(parent, self, aux)
 	struct pcibus_attach_args pba;
 
 	sc->sc_node = node;
-	sc->sc_clockfreq = PROM_getpropint(node, "clock-frequency", 33333333);
+	sc->sc_clockfreq = prom_getpropint(node, "clock-frequency", 33333333);
 
 	/* copy parent tags */
 	sc->sc_bustag = ma->ma_bustag;
@@ -380,6 +368,7 @@ mspcic_attach(parent, self, aux)
 	pba.pba_iot = sc->sc_iot;
 	pba.pba_memt = sc->sc_memt;
 	pba.pba_dmat = sc->sc_dmat;
+	pba.pba_dmat64 = NULL;
 	pba.pba_pc = &mspcic_pc_tag;
 	pba.pba_flags = PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED;
 
@@ -580,17 +569,17 @@ mspcic_bus_mmap(t, ba, off, prot, flags)
  * Install an interrupt handler.
  *
  * Bus-specific interrupt argument is 'line', an interrupt input line
- * for ms-IIep.  The PIL for is programmable via pcic interrupt
+ * for ms-IIep.  The PIL for each line is programmable via pcic interrupt
  * assignment select registers (but we use existing assignments).
  */
 static void *
-mspcic_intr_establish(t, line, ipl, flags, handler, arg)
+mspcic_intr_establish(t, line, ipl, handler, arg, fastvec)
 	bus_space_tag_t t;
 	int line;
 	int ipl;
-	int flags;
 	int (*handler)(void *);
 	void *arg;
+	void (*fastvec)(void);
 {
 	struct intrhand *ih;
 	int pil;
@@ -607,7 +596,7 @@ mspcic_intr_establish(t, line, ipl, flags, handler, arg)
 
 	ih->ih_fun = handler;
 	ih->ih_arg = arg;
-	intr_establish(pil, ih);
+	intr_establish(pil, ipl, ih, fastvec);
 
 	return(ih);
 }

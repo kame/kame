@@ -1,4 +1,4 @@
-/*	$NetBSD: zs.c,v 1.11 2001/11/20 08:43:29 lukem Exp $	*/
+/*	$NetBSD: zs.c,v 1.17 2003/07/15 02:43:44 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996, 2000 The NetBSD Foundation, Inc.
@@ -43,6 +43,9 @@
  * Plain tty/async lines use the zs_async slave.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zs.c,v 1.17 2003/07/15 02:43:44 lukem Exp $");
+
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
 
@@ -82,7 +85,6 @@
  * or you can not see messages done with printf during boot-up...
  */
 int zs_def_cflag = (CREAD | CS8 | HUPCL);
-int zs_major = 1;
 
 
 #define PCLK		10000000	/* PCLK pin input clock rate */
@@ -158,9 +160,8 @@ static int	zs_match __P((struct device *, struct cfdata *, void *));
 static void	zs_attach __P((struct device *, struct device *, void *));
 static int	zs_print __P((void *, const char *name));
 
-struct cfattach zsc_ca = {
-	sizeof(struct zsc_softc), zs_match, zs_attach
-};
+CFATTACH_DECL(zsc, sizeof(struct zsc_softc),
+    zs_match, zs_attach, NULL, NULL);
 
 extern struct	cfdriver zsc_cd;
 
@@ -234,6 +235,7 @@ zs_attach(parent, self, aux)
 		ch = &zsc->zsc_cs_store[channel];
 		cs = zsc->zsc_cs[channel] = (struct zs_chanstate *)ch;
 
+		simple_lock_init(&cs->cs_lock);
 		cs->cs_reg_csr = NULL;
 		cs->cs_reg_data = NULL;
 		cs->cs_channel = channel;
@@ -316,10 +318,10 @@ zs_print(aux, name)
 	struct zsc_attach_args *args = aux;
 
 	if (name != NULL)
-		printf("%s: ", name);
+		aprint_normal("%s: ", name);
 
 	if (args->channel != -1)
-		printf(" channel %d", args->channel);
+		aprint_normal(" channel %d", args->channel);
 
 	return UNCONF;
 }
@@ -671,8 +673,10 @@ void
 zscninit(cn)
 	struct consdev *cn;
 {
+	extern const struct cdevsw zstty_cdevsw;
+
 	cons_port = prom_getconsole(); 
-	cn->cn_dev = makedev(zs_major, cons_port);
+	cn->cn_dev = makedev(cdevsw_lookup_major(&zstty_cdevsw), cons_port);
 	cn->cn_pri = CN_REMOTE;
 	zs_hwflags[0][cons_port] = ZS_HWFLAG_CONSOLE;
 }

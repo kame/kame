@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ex_cardbus.c,v 1.23 2001/11/13 12:51:13 lukem Exp $	*/
+/*	$NetBSD: if_ex_cardbus.c,v 1.28.2.1 2004/07/23 22:10:25 he Exp $	*/
 
 /*
  * CardBus specific routines for 3Com 3C575-family CardBus ethernet adapter
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ex_cardbus.c,v 1.23 2001/11/13 12:51:13 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ex_cardbus.c,v 1.28.2.1 2004/07/23 22:10:25 he Exp $");
 
 /* #define EX_DEBUG 4 */	/* define to report information for debugging */
 
@@ -121,10 +121,8 @@ struct ex_cardbus_softc {
 	
 };
 
-struct cfattach ex_cardbus_ca = {
-	sizeof(struct ex_cardbus_softc), ex_cardbus_match,
-	    ex_cardbus_attach, ex_cardbus_detach, ex_activate
-};
+CFATTACH_DECL(ex_cardbus, sizeof(struct ex_cardbus_softc),
+    ex_cardbus_match, ex_cardbus_attach, ex_cardbus_detach, ex_activate);
 
 const struct ex_cardbus_product {
 	u_int32_t	ecp_prodid;	/* CardBus product ID */
@@ -154,6 +152,30 @@ const struct ex_cardbus_product {
 	      CARDBUS_COMMAND_MASTER_ENABLE,
 	  EX_CB_CYCLONE,
 	  "3c575CT Ethernet" },
+
+	{ CARDBUS_PRODUCT_3COM_3C656_E,
+	  EX_CONF_90XB | EX_CONF_PHY_POWER | EX_CONF_EEPROM_OFF |
+	    EX_CONF_EEPROM_8BIT | EX_CONF_INV_LED_POLARITY,
+	  CARDBUS_COMMAND_IO_ENABLE | CARDBUS_COMMAND_MEM_ENABLE |
+	      CARDBUS_COMMAND_MASTER_ENABLE,
+	  EX_CB_CYCLONE,
+	  "3c656-TX Ethernet" },
+
+	{ CARDBUS_PRODUCT_3COM_3C656B_E,
+	  EX_CONF_90XB | EX_CONF_PHY_POWER | EX_CONF_EEPROM_OFF |
+	    EX_CONF_EEPROM_8BIT | EX_CONF_INV_LED_POLARITY,
+	  CARDBUS_COMMAND_IO_ENABLE | CARDBUS_COMMAND_MEM_ENABLE |
+	      CARDBUS_COMMAND_MASTER_ENABLE,
+	  EX_CB_CYCLONE,
+	  "3c656B-TX Ethernet" },
+
+	{ CARDBUS_PRODUCT_3COM_3C656C_E,
+	  EX_CONF_90XB | EX_CONF_PHY_POWER | EX_CONF_EEPROM_OFF |
+	    EX_CONF_EEPROM_8BIT,
+	  CARDBUS_COMMAND_IO_ENABLE | CARDBUS_COMMAND_MEM_ENABLE |
+	      CARDBUS_COMMAND_MASTER_ENABLE,
+	  EX_CB_CYCLONE,
+	  "3c656C-TX Ethernet" },
 
 	{ 0,
 	  0,
@@ -311,7 +333,7 @@ ex_cardbus_detach(self, arg)
 
 #if defined(DIAGNOSTIC)
 	if (ct == NULL) {
-		panic("%s: data structure lacks\n", sc->sc_dev.dv_xname);
+		panic("%s: data structure lacks", sc->sc_dev.dv_xname);
 	}
 #endif
 
@@ -456,7 +478,7 @@ ex_cardbus_setup(csc)
 	    reg);
   
  	/*
-	 * set latency timmer
+	 * set latency timer
 	 */
 	reg = cardbus_conf_read(cc, cf, csc->sc_tag, CARDBUS_BHLC_REG);
 	if (CARDBUS_LATTIMER(reg) < 0x20) {

@@ -1,11 +1,42 @@
-/*	$NetBSD: alloc.c,v 1.15 2000/03/30 12:19:47 augustss Exp $	*/
+/*	$NetBSD: alloc.c,v 1.17 2003/08/07 16:32:25 agc Exp $	*/
 
 /*
+ * Copyright (c) 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * The Mach Operating System project at Carnegie-Mellon University.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)alloc.c	8.1 (Berkeley) 6/11/93
+ *  
+ *
  * Copyright (c) 1997 Christopher G. Demetriou.  All rights reserved.
  * Copyright (c) 1996
  *	Matthias Drochner.  All rights reserved.
- * Copyright (c) 1993
- *	The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * The Mach Operating System project at Carnegie-Mellon University.
@@ -114,8 +145,7 @@ struct fl {
 
 #ifdef HEAP_VARIABLE
 static char *top, *heapstart, *heaplimit;
-void setheap(start, limit)
-void *start, *limit;
+void setheap(void *start, void *limit)
 {
     heapstart = top = start;
     heaplimit = limit;
@@ -131,8 +161,7 @@ static char *top = (char*)HEAP_START;
 #endif /* HEAP_VARIABLE */
 
 void *
-alloc(size)
-	unsigned size;
+alloc(u_int size)
 {
 	struct fl **f = &freelist, **bestf = NULL;
 #ifndef ALLOC_FIRST_FIT
@@ -209,9 +238,7 @@ found:
 }
 
 void
-free(ptr, size)
-	void *ptr;
-	unsigned size; /* only for consistence check */
+free(void *ptr, u_int size)
 {
 	struct fl *f =
 	    (struct fl *)((char*)ptr - ALIGN(sizeof(unsigned)));

@@ -1,4 +1,4 @@
-/*	$NetBSD: frame.h,v 1.7 1998/04/11 17:30:40 matthias Exp $	*/
+/*	$NetBSD: frame.h,v 1.12 2004/01/23 04:03:38 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -39,7 +35,7 @@
  */
 
 #ifndef _NS532_FRAME_H_
-#define _NS532_FRAME_H_
+#define	_NS532_FRAME_H_
 
 #include <sys/signal.h>
 #include <machine/reg.h>
@@ -87,18 +83,37 @@ struct switchframe {
 	long	sf_r3;
 	long	sf_fp;
 	int	sf_pc;
-	struct	proc *sf_p;
+	struct	lwp *sf_lwp;
 };
 
 /*
  * Signal frame
  */
 struct sigframe {
-	int	sf_signum;
-	int	sf_code;
-	struct	sigcontext *sf_scp;
-	sig_t	sf_handler;
-	struct	sigcontext sf_sc;
+	int	sf_ra;			/* return address for handler */
+	int	sf_signum;		/* "signum" argument for handler */
+	int	sf_code;		/* "code" argument for handler */
+	struct	sigcontext *sf_scp;	/* "scp" argument for handler */
+	struct	sigcontext sf_sc;	/* actual saved context */
 };
+
+/*
+ * Scheduler Activation upcall frame
+ */
+struct saframe {
+	int		sa_ra;
+	int		sa_type;
+	struct sa_t**	sa_sas;
+	int		sa_events;
+	int		sa_interrupted;
+	void*		sa_arg;
+};
+
+#ifdef _KERNEL
+void *getframe(struct lwp *, int, int *);
+#ifdef COMPAT_16
+void sendsig_sigcontext(const ksiginfo_t *, const sigset_t *);
+#endif
+#endif
 
 #endif /* _NS532_FRAME_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: hd64465uart.c,v 1.4 2002/03/28 15:27:02 uch Exp $	*/
+/*	$NetBSD: hd64465uart.c,v 1.10 2003/07/15 02:29:37 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001, 2002 The NetBSD Foundation, Inc.
@@ -32,6 +32,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hd64465uart.c,v 1.10 2003/07/15 02:29:37 lukem Exp $");
 
 #include "opt_kgdb.h"
 
@@ -74,17 +77,14 @@ struct hd64465uart_softc {
 };
 
 /* boot console */
-cdev_decl(com);
 void hd64465uartcnprobe(struct consdev *);
 void hd64465uartcninit(struct consdev *);
 
 STATIC int hd64465uart_match(struct device *, struct cfdata *, void *);
 STATIC void hd64465uart_attach(struct device *, struct device *, void *);
 
-struct cfattach hd64465uart_ca = {
-	sizeof(struct hd64465uart_softc), hd64465uart_match,
-	hd64465uart_attach
-};
+CFATTACH_DECL(hd64465uart, sizeof(struct hd64465uart_softc),
+    hd64465uart_match, hd64465uart_attach, NULL, NULL);
 
 STATIC void hd64465uart_init(void);
 STATIC u_int8_t hd64465uart_read_1(void *, bus_space_handle_t, bus_size_t);
@@ -99,12 +99,11 @@ STATIC void hd64465uart_write_1(void *, bus_space_handle_t, bus_size_t,
 void
 hd64465uartcnprobe(struct consdev *cp)
 {
+	extern struct cdevsw com_cdevsw;
 	int maj;
 
 	/* locate the major number */
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == comopen)
-			break;
+	maj = cdevsw_lookup_major(&com_cdevsw);
 
 	/* Initialize required fields. */
 	cp->cn_dev = makedev(maj, 0);
@@ -118,7 +117,7 @@ hd64465uartcninit(struct consdev *cp)
 	hd64465uart_init();
 
 	comcnattach(hd64465uart_chip.io_tag, 0x0, COMCN_SPEED, COM_FREQ,
-	    CONMODE);	
+	    COM_TYPE_NORMAL, CONMODE);	
 
 	hd64465uart_chip.console = 1;
 }
@@ -137,7 +136,7 @@ hd64465uart_kgdb_init()
 	hd64465uart_init();
 
 	if (com_kgdb_attach(hd64465uart_chip.io_tag, 0x0, kgdb_rate,
-	    COM_FREQ, CONMODE) != 0) {
+	    COM_FREQ, COM_TYPE_NORMAL, CONMODE) != 0) {
 		printf("%s: KGDB console open failed.\n", __FUNCTION__);
 		return (1);
 	}

@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.13 2002/03/09 23:35:59 chs Exp $	*/
+/*	$NetBSD: param.h,v 1.17 2003/03/04 07:50:58 matt Exp $	*/
 
 /*-
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -35,6 +35,9 @@
 #define	_POWERPC_PARAM_H
 
 #ifdef	_KERNEL
+#if defined(_KERNEL_OPT)
+#include "opt_ppcarch.h"
+#endif
 #ifndef	_LOCORE
 #include <machine/cpu.h>
 #endif	/* _LOCORE */
@@ -50,23 +53,30 @@
 #define	MID_MACHINE	MID_POWERPC
 
 #define	ALIGNBYTES		(sizeof(double) - 1)
-#define	ALIGN(p)		(((u_int)(p) + ALIGNBYTES) & ~ALIGNBYTES)
-#define ALIGNED_POINTER(p,t)	((((u_long)(p)) & (sizeof(t)-1)) == 0)
+#define	ALIGN(p)		(((u_long)(p) + ALIGNBYTES) & ~ALIGNBYTES)
+#define	ALIGNED_POINTER(p,t)	((((u_long)(p)) & (sizeof(t)-1)) == 0)
 
+#ifdef PPC_IBM4XX
+#define	PGSHIFT		14	/* Use 16KB to reduce TLB thrashing */
+#define	UPAGES		1
+#else
 #define	PGSHIFT		12
+#define	UPAGES		4
+#endif
 #define	NBPG		(1 << PGSHIFT)	/* Page size */
 #define	PGOFSET		(NBPG - 1)
 
 #define	DEV_BSHIFT	9		/* log2(DEV_BSIZE) */
 #define	DEV_BSIZE	(1 << DEV_BSHIFT)
 #define	BLKDEV_IOSIZE	NBPG
+#ifndef MAXPHYS
 #define	MAXPHYS		(64 * 1024)	/* max raw I/O transfer size */
+#endif
 
-#define	UPAGES		4
 #define	USPACE		(UPAGES * NBPG)
 
 #ifndef	MSGBUFSIZE
-#define	MSGBUFSIZE	NBPG		/* default message buffer size */
+#define	MSGBUFSIZE	(2*NBPG)	/* default message buffer size */
 #endif
 
 #ifndef KERNBASE
@@ -124,30 +134,5 @@
  */
 #define	dbtob(x)	((x) << DEV_BSHIFT)
 #define	btodb(x)	((x) >> DEV_BSHIFT)
-
-#ifdef OLDPMAP
-/*
- * Segment handling stuff
- */
-#define	SEGMENT_LENGTH	0x10000000
-#define	SEGMENT_MASK	0xf0000000
-
-/*
- * Fixed segments
- */
-#define	USER_SR		13
-#define	KERNEL_SR	14
-#define	KERNEL_SEGMENT	(0xf00000 + KERNEL_SR)
-#define	EMPTY_SEGMENT	0xfffff0
-#define	USER_ADDR	((void *)(USER_SR << ADDR_SR_SHFT))
-
-/*
- * Some system constants
- */
-#ifndef	NPMAPS
-#define	NPMAPS		32768	/* Number of pmaps in system */
-#endif
-
-#endif /* OLDPMAP */
 
 #endif /* _POWERPC_PARAM_H_ */

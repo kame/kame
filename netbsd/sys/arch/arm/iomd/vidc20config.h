@@ -1,4 +1,4 @@
-/* $NetBSD: vidc20config.h,v 1.1.16.1 2002/06/21 14:50:55 lukem Exp $ */
+/* $NetBSD: vidc20config.h,v 1.4 2002/06/17 21:00:13 bjh21 Exp $ */
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.

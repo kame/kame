@@ -1,21 +1,21 @@
-/*	$NetBSD: ieee_handler.c,v 1.11 2001/02/05 10:42:40 chs Exp $	*/
+/*	$NetBSD: ieee_handler.c,v 1.17 2004/01/23 04:12:39 simonb Exp $	*/
 
-/* 
+/*
  * IEEE floating point support for NS32081 and NS32381 fpus.
  * Copyright (c) 1995 Ian Dall
  * All Rights Reserved.
- * 
+ *
  * Permission to use, copy, modify and distribute this software and its
  * documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
+ *
  * IAN DALL ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" CONDITION.
  * IAN DALL DISCLAIMS ANY LIABILITY OF ANY KIND FOR ANY DAMAGES
  * WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
  */
-/* 
+/*
  *	File:	ieee_handler.c
  *	Author:	Ian Dall
  *	Date:	November 1995
@@ -51,6 +51,9 @@
  *	First release.
  * */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ieee_handler.c,v 1.17 2004/01/23 04:12:39 simonb Exp $");
+
 #include <sys/types.h>
 #include "ieee_internal.h"
 
@@ -83,8 +86,9 @@
 
 #ifdef MACH
 /* Mach only defines this if KERNEL, NetBSD defines it always */
-# define ns532_round_page(addr) (((addr) + NBPG - 1) & ~(NBPG - 1))
+# define ns532_round_page(addr) (((addr) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1))
 #endif
+
 
 static void get_fstate(state *state) {
   asm("sfsr %0" : "=g" (state->FSR));
@@ -132,9 +136,18 @@ int ieee_sig(int sig, int code, struct sigcontext *scp)
 
 int ieee_handler_debug = 0;
 
+const union t_conv infty =
+    {d_bits: { sign: 0, exp: 0x7ff, mantissa: 0, mantissa2: 0}};
+
+const union t_conv snan =
+    {d_bits: { sign: 0, exp: 0x7ff, mantissa: 0x40000, mantissa2: 0}};
+
+const union t_conv qnan =
+    {d_bits: { sign: 0, exp: 0x7ff, mantissa: 0x80000, mantissa2: 0}};
+
 #define COPYIN(U,K,N) ({if (copyin((AT)U, (AT)K, N) != 0) longjmp(copyin_buffer.copyfail, 1);0;})
 
-/* Adressing modes.  */
+/* Addressing modes.  */
 #define Adrmod_index_byte 0x1c
 #define Adrmod_index_word 0x1d
 #define Adrmod_index_doubleword 0x1e
@@ -494,8 +507,8 @@ static int get_operand(char **buf, unsigned char gen, unsigned char index, struc
       state->SP -= op->size;
       addr =  state->SP;
       break;
-    default:
-      /* Keep gcc quit */
+    default: ;
+      /* Keep gcc quiet */
     }
     break;
   case 0x18:

@@ -1,4 +1,4 @@
-/*	$NetBSD: com_hpcio.c,v 1.3 2002/04/14 07:59:56 takemura Exp $	*/
+/*	$NetBSD: com_hpcio.c,v 1.7 2003/07/15 02:29:28 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2002 TAKEMRUA Shin. All rights reserved.
@@ -28,6 +28,9 @@
  * SUCH DAMAGE.
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: com_hpcio.c,v 1.7 2003/07/15 02:29:28 lukem Exp $");
 
 #include "opt_kgdb.h"
 
@@ -78,9 +81,8 @@ bus_space_protos(bs_notimpl);
 bus_space_protos(bs_through);
 bus_space_protos(com_hpcio);
 
-struct cfattach com_hpcio_ca = {
-	sizeof(struct com_hpcio_softc), com_hpcio_probe, com_hpcio_attach
-};
+CFATTACH_DECL(com_hpcio, sizeof(struct com_hpcio_softc),
+    com_hpcio_probe, com_hpcio_attach, NULL, NULL);
 
 struct bus_space_ops com_hpcio_bs_ops = {
 	/* mapping/unmapping */
@@ -221,11 +223,11 @@ com_hpcio_cndb_attach(bus_space_tag_t iot, int iobase, int rate,
 #ifdef KGDB
 	if (kgdb)
 		return (com_kgdb_attach(com_hpcio_cniot, iobase, rate,
-		    frequency, cflag));
+		    frequency, COM_TYPE_NORMAL, cflag));
 	else
 #endif
 		return (comcnattach(com_hpcio_cniot, iobase, rate,
-		    frequency, cflag));
+		    frequency, COM_TYPE_NORMAL, cflag));
 }
 
 static int

@@ -1,4 +1,4 @@
-/*	$NetBSD: com_ofisa_consolehack.c,v 1.1 2002/02/10 01:57:56 thorpej Exp $	*/
+/*	$NetBSD: com_ofisa_consolehack.c,v 1.4 2003/07/15 03:36:02 lukem Exp $	*/
 
 /*
  * Copyright 1997
@@ -37,6 +37,9 @@
  *  OFW Attachment for 'com' serial driver
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: com_ofisa_consolehack.c,v 1.4 2003/07/15 03:36:02 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -53,6 +56,9 @@
 #include <machine/isa_machdep.h>	/* XXX for space tags */
 
 #include <dev/cons.h>
+
+void comcnprobe(struct consdev *);
+void comcninit(struct consdev *);
 
 void
 comcnprobe(cp)
@@ -75,6 +81,7 @@ comcninit(cp)
 #define CONMODE ((TTYDEF_CFLAG & ~(CSIZE | CSTOPB | PARENB)) | CS8) /* 8N1 */
 #endif
 
-	if (comcnattach(&isa_io_bs_tag, 0x3f8, 9600, COM_FREQ, CONMODE))
+	if (comcnattach(&isa_io_bs_tag, 0x3f8, 9600, COM_FREQ, COM_TYPE_NORMAL,
+	    CONMODE))
 		panic("can't init serial console @%x", 0x3f8);
 }

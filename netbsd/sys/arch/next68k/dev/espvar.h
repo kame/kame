@@ -1,4 +1,4 @@
-/*	$NetBSD: espvar.h,v 1.12 2001/09/14 18:29:08 jdolecek Exp $	*/
+/*	$NetBSD: espvar.h,v 1.15 2003/05/03 18:10:55 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -39,7 +39,7 @@
 
 struct esp_softc {
 	struct ncr53c9x_softc sc_ncr53c9x;	/* glue to MI code */
-	struct nextdma_config sc_scsi_dma;
+	struct nextdma_softc *sc_dma;
 	bus_space_tag_t	sc_bst;				
 	bus_space_handle_t sc_bsh;	/* the device registers */
 
@@ -63,11 +63,11 @@ struct esp_softc {
 	caddr_t       sc_begin;		/* pointer to start io buf, NULL if invalid */
 	size_t        sc_begin_size;	/*  */
 
-	bus_dmamap_t  sc_main_dmamap;	/* i/o dma map */
+	bus_dmamap_t  sc_main_dmamap;	/* I/O DMA map */
 	caddr_t       sc_main;		/* pointer to main io buf, NULL if invalid */
 	size_t        sc_main_size;	/* aligned length of main io buf we are using */
 
-	/* To deal with end alignment problems, we copy the end of the dma
+	/* To deal with end alignment problems, we copy the end of the DMA
 	 * buffer into a "tail" buffer that we can control more carefully.
 	 * We then chain this extra buffer onto the end.
 	 */
@@ -79,3 +79,7 @@ struct esp_softc {
 	size_t  sc_tail_size;	/* aligned length of tailbuf we are using */
 	u_char sc_tailbuf[ESP_DMA_TAILBUFSIZE];
 };
+
+#ifndef ESP_MAX_DMASIZE
+#define ESP_MAX_DMASIZE MAX_DMASIZE
+#endif

@@ -1,4 +1,4 @@
-/*	$NetBSD: zs_pcc.c,v 1.1 2001/05/14 18:23:07 drochner Exp $	*/
+/*	$NetBSD: zs_pcc.c,v 1.5 2003/09/28 22:00:26 cl Exp $	*/
 
 /*
  * Copyright (c) 1997, 1999
@@ -25,6 +25,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: zs_pcc.c,v 1.5 2003/09/28 22:00:26 cl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -56,9 +59,8 @@ static void	zsc_pcc_attach __P((struct device *, struct device *, void *));
 
 static char *zsbase;
 
-struct cfattach zsc_pcc_ca = {
-	sizeof(struct zsc_softc), zsc_pcc_match, zsc_pcc_attach
-};
+CFATTACH_DECL(zsc_pcc, sizeof(struct zsc_softc),
+    zsc_pcc_match, zsc_pcc_attach, NULL, NULL);
 
 static int
 zsc_pcc_match(parent, cf, aux)
@@ -79,7 +81,7 @@ zsc_pcc_attach(parent, self, aux)
 	static int didintr;
 
 	if (!zsbase)
-		mainbus_map(0x58000000, 0x10000, 0, (void **)&zsbase);
+		mainbus_map(0x58000000, 0x10000, 0, (void *)&zsbase);
 
 	/* Do common parts of SCC configuration. */
 	zs_config(zsc, zsbase);

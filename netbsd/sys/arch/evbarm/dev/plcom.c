@@ -1,4 +1,4 @@
-/*	$NetBSD: plcom.c,v 1.3 2002/03/17 19:40:37 atatat Exp $	*/
+/*	$NetBSD: plcom.c,v 1.9 2003/08/07 16:27:20 agc Exp $	*/
 
 /*-
  * Copyright (c) 2001 ARM Ltd
@@ -75,11 +75,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -104,9 +100,14 @@
  * Derived from the NS16550AF com driver.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: plcom.c,v 1.9 2003/08/07 16:27:20 agc Exp $");
+
 #include "opt_plcom.h"
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
+#include "opt_lockdebug.h"
+#include "opt_multiprocessor.h"
 
 #include "rnd.h"
 #if NRND > 0 && defined(RND_COM)
@@ -175,8 +176,14 @@ void	plcom_common_putc (dev_t, bus_space_tag_t, bus_space_handle_t, int);
 int	plcominit	(bus_space_tag_t, bus_addr_t, int, int, tcflag_t,
 			    bus_space_handle_t *);
 
-/* XXX: This belongs elsewhere */
-cdev_decl(plcom);
+dev_type_open(plcomopen);
+dev_type_close(plcomclose);
+dev_type_read(plcomread);
+dev_type_write(plcomwrite);
+dev_type_ioctl(plcomioctl);
+dev_type_stop(plcomstop);
+dev_type_tty(plcomtty);
+dev_type_poll(plcompoll);
 
 int	plcomcngetc	(dev_t);
 void	plcomcnputc	(dev_t, int);
@@ -200,6 +207,11 @@ integrate void plcom_schedrx	(struct plcom_softc *);
 void	plcomdiag		(void *);
 
 extern struct cfdriver plcom_cd;
+
+const struct cdevsw plcom_cdevsw = {
+	plcomopen, plcomclose, plcomread, plcomwrite, plcomioctl,
+	plcomstop, plcomtty, plcompoll, nommap, ttykqfilter, D_TTY
+};
 
 /*
  * Make this an option variable one can patch.
@@ -434,9 +446,7 @@ plcom_attach_subr(struct plcom_softc *sc)
 		int maj;
 
 		/* locate the major number */
-		for (maj = 0; maj < nchrdev; maj++)
-			if (cdevsw[maj].d_open == plcomopen)
-				break;
+		maj = cdevsw_lookup_major(&plcom_cdevsw);
 
 		cn_tab->cn_dev = makedev(maj, sc->sc_dev.dv_unit);
 
@@ -498,9 +508,7 @@ plcom_detach(self, flags)
 	int maj, mn;
 
 	/* locate the major number */
-	for (maj = 0; maj < nchrdev; maj++)
-		if (cdevsw[maj].d_open == plcomopen)
-			break;
+	maj = cdevsw_lookup_major(&plcom_cdevsw);
 
 	/* Nuke the vnodes for any open instances. */
 	mn = self->dv_unit;
@@ -2146,7 +2154,7 @@ plcominit(bus_space_tag_t iot, bus_addr_t iobase, int rate, int frequency,
  */
 struct consdev plcomcons = {
 	NULL, NULL, plcomcngetc, plcomcnputc, plcomcnpollc, NULL,
-	NODEV, CN_NORMAL
+	NULL, NULL, NODEV, CN_NORMAL
 };
 
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: iommuvar.h,v 1.5.22.1 2002/11/22 17:38:22 tron Exp $	*/
+/*	$NetBSD: iommuvar.h,v 1.7 2002/08/25 16:02:54 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -49,8 +49,5 @@ struct iommu_attach_args {
 	struct openprom_addr *iom_reg;
 	int		iom_nreg;
 };
-
-void	iommu_enter __P((bus_addr_t, paddr_t));
-void	iommu_remove __P((bus_addr_t, bus_size_t));
 
 #endif /* _IOMMU_VAR_H */

@@ -1,4 +1,4 @@
-/*	$NetBSD: view.c,v 1.18 2002/03/17 19:40:35 atatat Exp $	*/
+/*	$NetBSD: view.c,v 1.22 2003/07/15 01:19:52 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -37,6 +37,9 @@
  * refered to by open/close/ioctl.  This device serves as
  * a interface to graphics. */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: view.c,v 1.22 2003/07/15 01:19:52 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -46,7 +49,6 @@
 #include <sys/malloc.h>
 #include <sys/queue.h>
 #include <sys/conf.h>
-#include <sys/poll.h>
 #include <machine/cpu.h>
 #include <atari/dev/grfabs_reg.h>
 #include <atari/dev/viewioctl.h>
@@ -67,6 +69,16 @@ int view_default_y;
 int view_default_width  = 640;
 int view_default_height = 400;
 int view_default_depth  = 1;
+
+dev_type_open(viewopen);
+dev_type_close(viewclose);
+dev_type_ioctl(viewioctl);
+dev_type_mmap(viewmmap);
+
+const struct cdevsw view_cdevsw = {
+	viewopen, viewclose, nullread, nullwrite, viewioctl,
+	nostop, notty, nopoll, viewmmap, nokqfilter,
+};
 
 /* 
  *  functions for probeing.
@@ -434,20 +446,6 @@ viewmmap(dev, off, prot)
 		return(((paddr_t)bmd_start - bmd_lin + off) >> PGSHIFT);
 
 	return(-1);
-}
-
-/*ARGSUSED*/
-int
-viewpoll(dev, events, p)
-dev_t		dev;
-int		events;
-struct proc	*p;
-{
-	int revents = 0;
-
-	if (events & (POLLOUT | POLLWRNORM))
-		revents |= events & (POLLOUT | POLLWRNORM);
-	return (revents);
 }
 
 view_t	*

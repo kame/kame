@@ -1,4 +1,4 @@
-/*	$NetBSD: moxa_isa.c,v 1.3 2002/01/07 21:47:11 thorpej Exp $	*/
+/*	$NetBSD: moxa_isa.c,v 1.8 2003/10/27 07:14:25 chs Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: moxa_isa.c,v 1.3 2002/01/07 21:47:11 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: moxa_isa.c,v 1.8 2003/10/27 07:14:25 chs Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -69,9 +69,8 @@ void moxa_isaattach __P((struct device *, struct device *, void *));
 int moxa_isaintr __P((void *));
 int moxa_isaprint __P((void *, const char *));
 
-struct cfattach moxa_isa_ca = {
-	sizeof(struct moxa_isa_softc), moxa_isaprobe, moxa_isaattach
-};
+CFATTACH_DECL(moxa_isa, sizeof(struct moxa_isa_softc),
+    moxa_isaprobe, moxa_isaattach, NULL, NULL);
 
 int
 moxa_isaprobe(parent, self, aux)
@@ -153,8 +152,8 @@ moxa_isaprint(aux, pnp)
 	struct commulti_attach_args *ca = aux;
 
 	if (pnp)
-		printf("com at %s", pnp);
-	printf(" slave %d", ca->ca_slave);
+		aprint_normal("com at %s", pnp);
+	aprint_normal(" slave %d", ca->ca_slave);
 	return (UNCONF);
 }
 
@@ -207,7 +206,7 @@ moxa_isaintr(arg)
 {
 	struct moxa_isa_softc *sc = arg;
 	int bits;
-	int rv;
+	int rv = 0;
 
 	bits = sc->sc_alive;
 	if (bits == 0)

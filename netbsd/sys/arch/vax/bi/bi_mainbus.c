@@ -1,4 +1,4 @@
-/*	$NetBSD: bi_mainbus.c,v 1.4 2000/07/26 11:53:30 ragge Exp $	   */
+/*	$NetBSD: bi_mainbus.c,v 1.8 2003/07/15 02:15:00 lukem Exp $	   */
 /*
  * Copyright (c) 1999 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -30,6 +30,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bi_mainbus.c,v 1.8 2003/07/15 02:15:00 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 
@@ -46,9 +49,8 @@
 static	int bi_mainbus_match __P((struct device *, struct cfdata *, void *));
 static	void bi_mainbus_attach __P((struct device *, struct device *, void *));
 
-struct	cfattach bi_mainbus_ca = {
-	sizeof(struct bi_softc), bi_mainbus_match, bi_mainbus_attach
-};
+CFATTACH_DECL(bi_mainbus, sizeof(struct bi_softc),
+    bi_mainbus_match, bi_mainbus_attach, NULL, NULL);
 
 extern	struct vax_bus_space vax_mem_bus_space;
 extern	struct vax_bus_dma_tag vax_bus_dma_tag;

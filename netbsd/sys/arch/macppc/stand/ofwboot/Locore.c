@@ -1,4 +1,4 @@
-/*	$NetBSD: Locore.c,v 1.10.4.1 2002/09/30 13:39:16 lukem Exp $	*/
+/*	$NetBSD: Locore.c,v 1.16 2004/03/17 23:32:22 wrstuden Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -38,65 +38,79 @@
 
 #include "openfirm.h"
 
-static int (*openfirmware) __P((void *));
+static int (*openfirmware)(void *);
 
-static void startup __P((void *, int, int (*)(void *), char *, int));
-static void setup __P((void));
+static void startup(void *, int, int (*)(void *), char *, int);
+static void setup(void);
 
 static int stack[8192/4 + 4];
 
 #ifdef XCOFF_GLUE
-asm("
-	.text
-	.globl	_entry
-_entry:
-	.long	_start,0,0
-");
+asm(
+"	.text			\n"
+"	.globl	_entry		\n"
+"_entry:			\n"
+"	.long	_start,0,0	\n"
+);
 #endif
 
-asm("
-	.text
-	.globl	_start
-_start:
-	sync
-	isync
-
-	lis	1,stack@ha
-	addi	1,1,stack@l
-	addi	1,1,8192
-
-	mfmsr	8
-	li	0,0
-	mtmsr	0
-	isync
-
-	mtibatu	0,0
-	mtibatu	1,0
-	mtibatu	2,0
-	mtibatu	3,0
-	mtdbatu	0,0
-	mtdbatu	1,0
-	mtdbatu	2,0
-	mtdbatu	3,0
-
-	li	9,0x12		/* BATL(0, BAT_M, BAT_PP_RW) */
-	mtibatl	0,9
-	mtdbatl	0,9
-	li	9,0x1ffe	/* BATU(0, BAT_BL_256M, BAT_Vs) */
-	mtibatu	0,9
-	mtdbatu	0,9
-	isync
-
-	mtmsr	8
-	isync
-
-	b	startup
-");
+asm(
+"	.text			\n"
+"	.globl	_start		\n"
+"_start:			\n"
+"	sync			\n"
+"	isync			\n"
+"	lis	%r1,stack@ha	\n"
+"	addi	%r1,%r1,stack@l	\n"
+"	addi	%r1,%r1,8192	\n"
+"				\n"
+"	mfmsr	%r8		\n"
+"	li	%r0,0		\n"
+"	mtmsr	%r0		\n"
+"	isync			\n"
+"				\n"
+"	mtibatu	0,%r0		\n"
+"	mtibatu	1,%r0		\n"
+"	mtibatu	2,%r0		\n"
+"	mtibatu	3,%r0		\n"
+"	mtdbatu	0,%r0		\n"
+"	mtdbatu	1,%r0		\n"
+"	mtdbatu	2,%r0		\n"
+"	mtdbatu	3,%r0		\n"
+"				\n"
+"	li	%r9,0x12	\n" 	/* BATL(0, BAT_M, BAT_PP_RW) */
+"	mtibatl	0,%r9		\n"
+"	mtdbatl	0,%r9		\n"
+"	li	%r9,0x1ffe	\n"	/* BATU(0, BAT_BL_256M, BAT_Vs) */
+"	mtibatu	0,%r9		\n"
+"	mtdbatu	0,%r9		\n"
+"	isync			\n"
+"				\n"
+"	mtmsr	%r8		\n"
+"	isync			\n"
+"				\n"
+	/*
+	 * Make sure that .bss is zeroed
+	 */
+"				\n"
+"	li	%r0,0		\n"
+"	lis	%r8,_edata@ha	\n"
+"	addi	%r8,%r8,_edata@l\n"
+"	lis	%r9,_end@ha	\n"
+"	addi	%r9,%r9,_end@l	\n"
+"				\n"
+"5:	cmpw	0,%r8,%r9	\n"
+"	bge	6f		\n"
+"	stw	%r0,0(%r8)	\n"
+"	addi	%r8,%r8,4	\n"
+"	b	5b		\n"
+"				\n"
+"6:	b	startup		\n"
+);
 
 #if 0
 static int
-openfirmware(arg)
-	void *arg;
+openfirmware(void *arg)
 {
 
 	asm volatile ("sync; isync");
@@ -106,16 +120,10 @@ openfirmware(arg)
 #endif
 
 static void
-startup(vpd, res, openfirm, arg, argl)
-	void *vpd;
-	int res;
-	int (*openfirm)(void *);
-	char *arg;
-	int argl;
+startup(void *vpd, int res, int (*openfirm)(void *), char *arg, int argl)
 {
 	extern char etext[], _end[], _edata[];
 
-	memset(_edata, 0, (_end - _edata));
 	openfirmware = openfirm;
 	setup();
 	main();
@@ -123,7 +131,7 @@ startup(vpd, res, openfirm, arg, argl)
 }
 
 __dead void
-OF_exit()
+OF_exit(void)
 {
 	static struct {
 		char *name;
@@ -140,8 +148,7 @@ OF_exit()
 }
 
 int
-OF_finddevice(name)
-	char *name;
+OF_finddevice(char *name)
 {
 	static struct {
 		char *name;
@@ -162,8 +169,7 @@ OF_finddevice(name)
 }
 
 int
-OF_instance_to_package(ihandle)
-	int ihandle;
+OF_instance_to_package(int ihandle)
 {
 	static struct {
 		char *name;
@@ -184,11 +190,7 @@ OF_instance_to_package(ihandle)
 }
 
 int
-OF_getprop(handle, prop, buf, buflen)
-	int handle;
-	char *prop;
-	void *buf;
-	int buflen;
+OF_getprop(int handle, char *prop, void *buf, int buflen)
 {
 	static struct {
 		char *name;
@@ -216,11 +218,7 @@ OF_getprop(handle, prop, buf, buflen)
 
 #ifdef	__notyet__	/* Has a bug on FirePower */
 int
-OF_setprop(handle, prop, buf, len)
-	int handle;
-	char *prop;
-	void *buf;
-	int len;
+OF_setprop(int handle, char *prop, void *buf, int len)
 {
 	static struct {
 		char *name;
@@ -248,8 +246,7 @@ OF_setprop(handle, prop, buf, len)
 #endif
 
 int
-OF_open(dname)
-	char *dname;
+OF_open(char *dname)
 {
 	static struct {
 		char *name;
@@ -281,8 +278,7 @@ OF_open(dname)
 }
 
 void
-OF_close(handle)
-	int handle;
+OF_close(int handle)
 {
 	static struct {
 		char *name;
@@ -303,10 +299,7 @@ OF_close(handle)
 }
 
 int
-OF_write(handle, addr, len)
-	int handle;
-	void *addr;
-	int len;
+OF_write(int handle, void *addr, int len)
 {
 	static struct {
 		char *name;
@@ -324,7 +317,7 @@ OF_write(handle, addr, len)
 
 #ifdef OFW_DEBUG
 	if (len != 1)
-		printf("OF_write(%d, %x, %x) -> ", handle, addr, len);
+		printf("OF_write(%d, %p, %x) -> ", handle, addr, len);
 #endif
 	args.ihandle = handle;
 	args.addr = addr;
@@ -343,10 +336,7 @@ OF_write(handle, addr, len)
 }
 
 int
-OF_read(handle, addr, len)
-	int handle;
-	void *addr;
-	int len;
+OF_read(int handle, void *addr, int len)
 {
 	static struct {
 		char *name;
@@ -364,7 +354,7 @@ OF_read(handle, addr, len)
 
 #ifdef OFW_DEBUG
 	if (len != 1)
-		printf("OF_read(%d, %x, %x) -> ", handle, addr, len);
+		printf("OF_read(%d, %p, %x) -> ", handle, addr, len);
 #endif
 	args.ihandle = handle;
 	args.addr = addr;
@@ -383,9 +373,7 @@ OF_read(handle, addr, len)
 }
 
 int
-OF_seek(handle, pos)
-	int handle;
-	u_quad_t pos;
+OF_seek(int handle, u_quad_t pos)
 {
 	static struct {
 		char *name;
@@ -420,10 +408,7 @@ OF_seek(handle, pos)
 }
 
 void *
-OF_claim(virt, size, align)
-	void *virt;
-	u_int size;
-	u_int align;
+OF_claim(void *virt, u_int size, u_int align)
 {
 	static struct {
 		char *name;
@@ -440,7 +425,7 @@ OF_claim(virt, size, align)
 	};
 
 #ifdef OFW_DEBUG
-	printf("OF_claim(%x, %x, %x) -> ", virt, size, align);
+	printf("OF_claim(%p, %x, %x) -> ", virt, size, align);
 #endif
 	args.virt = virt;
 	args.size = size;
@@ -452,15 +437,13 @@ OF_claim(virt, size, align)
 		return (void *)-1;
 	}
 #ifdef OFW_DEBUG
-	printf("%x\n", args.baseaddr);
+	printf("%p\n", args.baseaddr);
 #endif
 	return args.baseaddr;
 }
 
 void
-OF_release(virt, size)
-	void *virt;
-	u_int size;
+OF_release(void *virt, u_int size)
 {
 	static struct {
 		char *name;
@@ -475,7 +458,7 @@ OF_release(virt, size)
 	};
 
 #ifdef OFW_DEBUG
-	printf("OF_release(%x, %x)\n", virt, size);
+	printf("OF_release(%p, %x)\n", virt, size);
 #endif
 	args.virt = virt;
 	args.size = size;
@@ -483,7 +466,7 @@ OF_release(virt, size)
 }
 
 int
-OF_milliseconds()
+OF_milliseconds(void)
 {
 	static struct {
 		char *name;
@@ -502,12 +485,7 @@ OF_milliseconds()
 
 #ifdef	__notyet__
 void
-OF_chain(virt, size, entry, arg, len)
-	void *virt;
-	u_int size;
-	void (*entry)();
-	void *arg;
-	u_int len;
+OF_chain(void *virt, u_int size, void (*entry)(), void *arg, u_int len)
 {
 	static struct {
 		char *name;
@@ -533,12 +511,7 @@ OF_chain(virt, size, entry, arg, len)
 }
 #else
 void
-OF_chain(virt, size, entry, arg, len)
-	void *virt;
-	u_int size;
-	void (*entry)();
-	void *arg;
-	u_int len;
+OF_chain(void *virt, u_int size, boot_entry_t entry, void *arg, u_int len)
 {
 	/*
 	 * This is a REALLY dirty hack till the firmware gets this going
@@ -551,16 +524,7 @@ OF_chain(virt, size, entry, arg, len)
 #endif
 
 int
-#ifdef	__STDC__
 OF_call_method(char *method, int ihandle, int nargs, int nreturns, ...)
-#else
-OF_call_method(method, ihandle, nargs, nreturns, va_alist)
-	char *method;
-	int ihandle;
-	int nargs;
-	int nreturns;
-	va_dcl
-#endif
 {
 	va_list ap;
 	static struct {
@@ -605,7 +569,7 @@ static int stdin;
 static int stdout;
 
 static void
-setup()
+setup(void)
 {
 	int chosen;
 
@@ -619,8 +583,7 @@ setup()
 }
 
 void
-putchar(c)
-	int c;
+putchar(int c)
 {
 	char ch = c;
 
@@ -630,7 +593,7 @@ putchar(c)
 }
 
 int
-getchar()
+getchar(void)
 {
 	unsigned char ch = '\0';
 	int l;

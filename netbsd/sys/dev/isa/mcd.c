@@ -1,4 +1,4 @@
-/*	$NetBSD: mcd.c,v 1.74 2002/01/07 21:47:11 thorpej Exp $	*/
+/*	$NetBSD: mcd.c,v 1.85 2003/11/07 04:10:57 mycroft Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994, 1995 Charles M. Hannum.  All rights reserved.
@@ -56,7 +56,7 @@
 /*static char COPYRIGHT[] = "mcd-driver (C)1993 by H.Veit & B.Moore";*/
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mcd.c,v 1.74 2002/01/07 21:47:11 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mcd.c,v 1.85 2003/11/07 04:10:57 mycroft Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -121,6 +121,7 @@ struct mcd_mbx {
 struct mcd_softc {
 	struct	device sc_dev;
 	struct	disk sc_dk;
+	struct	lock sc_lock;
 	void *sc_ih;
 
 	struct callout sc_pintr_ch;
@@ -132,8 +133,6 @@ struct mcd_softc {
 
 	char	*type;
 	int	flags;
-#define	MCDF_LOCKED	0x01
-#define	MCDF_WANTED	0x02
 #define	MCDF_WLABEL	0x04	/* label is writable */
 #define	MCDF_LABELLING	0x08	/* writing label */
 #define	MCDF_LOADED	0x10	/* parameters loaded */
@@ -149,17 +148,12 @@ struct mcd_softc {
 #define	MCD_MD_UNKNOWN	-1
 	int	lastupc;
 #define	MCD_UPC_UNKNOWN	-1
-	struct buf_queue buf_queue;
+	struct bufq_state buf_queue;
 	int	active;
 	u_char	readcmd;
 	u_char	debug;
 	u_char	probe;
 };
-
-/* prototypes */
-/* XXX does not belong here */
-cdev_decl(mcd);
-bdev_decl(mcd);
 
 static int bcd2bin __P((bcd_t));
 static bcd_t bin2bcd __P((int));
@@ -196,19 +190,33 @@ int mcd_find __P((bus_space_tag_t, bus_space_handle_t, struct mcd_softc *));
 int mcdprobe __P((struct device *, struct cfdata *, void *));
 void mcdattach __P((struct device *, struct device *, void *));
 
-struct cfattach mcd_ca = {
-	sizeof(struct mcd_softc), mcdprobe, mcdattach
-};
+CFATTACH_DECL(mcd, sizeof(struct mcd_softc),
+    mcdprobe, mcdattach, NULL, NULL);
 
 extern struct cfdriver mcd_cd;
+
+dev_type_open(mcdopen);
+dev_type_close(mcdclose);
+dev_type_read(mcdread);
+dev_type_write(mcdwrite);
+dev_type_ioctl(mcdioctl);
+dev_type_strategy(mcdstrategy);
+dev_type_dump(mcddump);
+dev_type_size(mcdsize);
+
+const struct bdevsw mcd_bdevsw = {
+	mcdopen, mcdclose, mcdstrategy, mcdioctl, mcddump, mcdsize, D_DISK
+};
+
+const struct cdevsw mcd_cdevsw = {
+	mcdopen, mcdclose, mcdread, mcdwrite, mcdioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_DISK
+};
 
 void	mcdgetdefaultlabel __P((struct mcd_softc *, struct disklabel *));
 void	mcdgetdisklabel __P((struct mcd_softc *));
 int	mcd_get_parms __P((struct mcd_softc *));
-void	mcdstrategy __P((struct buf *));
 void	mcdstart __P((struct mcd_softc *));
-int	mcdlock __P((struct mcd_softc *));
-void	mcdunlock __P((struct mcd_softc *));
 void	mcd_pseudointr __P((void *));
 
 struct dkdriver mcddkdriver = { mcdstrategy };
@@ -240,6 +248,8 @@ mcdattach(parent, self, aux)
 		return;
 	}
 
+	lockinit(&sc->sc_lock, PRIBIO | PCATCH, "mcdlock", 0, 0);
+
 	sc->sc_iot = iot;
 	sc->sc_ioh = ioh;
 
@@ -251,7 +261,7 @@ mcdattach(parent, self, aux)
 		return;
 	}
 
-	BUFQ_INIT(&sc->buf_queue);
+	bufq_alloc(&sc->buf_queue, BUFQ_DISKSORT|BUFQ_SORT_RAWBLOCK);
 	callout_init(&sc->sc_pintr_ch);
 
 	/*
@@ -278,42 +288,6 @@ mcdattach(parent, self, aux)
 	    IST_EDGE, IPL_BIO, mcdintr, sc);
 }
 
-/*
- * Wait interruptibly for an exclusive lock.
- *
- * XXX
- * Several drivers do this; it should be abstracted and made MP-safe.
- */
-int
-mcdlock(sc)
-	struct mcd_softc *sc;
-{
-	int error;
-
-	while ((sc->flags & MCDF_LOCKED) != 0) {
-		sc->flags |= MCDF_WANTED;
-		if ((error = tsleep(sc, PRIBIO | PCATCH, "mcdlck", 0)) != 0)
-			return error;
-	}
-	sc->flags |= MCDF_LOCKED;
-	return 0;
-}
-
-/*
- * Unlock and wake up any waiters.
- */
-void
-mcdunlock(sc)
-	struct mcd_softc *sc;
-{
-
-	sc->flags &= ~MCDF_LOCKED;
-	if ((sc->flags & MCDF_WANTED) != 0) {
-		sc->flags &= ~MCDF_WANTED;
-		wakeup(sc);
-	}
-}
-
 int
 mcdopen(dev, flag, fmt, p)
 	dev_t dev;
@@ -327,7 +301,7 @@ mcdopen(dev, flag, fmt, p)
 	if (sc == NULL)
 		return ENXIO;
 
-	if ((error = mcdlock(sc)) != 0)
+	if ((error = lockmgr(&sc->sc_lock, LK_EXCLUSIVE, NULL)) != 0)
 		return error;
 
 	if (sc->sc_dk.dk_openmask != 0) {
@@ -397,7 +371,7 @@ mcdopen(dev, flag, fmt, p)
 	}
 	sc->sc_dk.dk_openmask = sc->sc_dk.dk_copenmask | sc->sc_dk.dk_bopenmask;
 
-	mcdunlock(sc);
+	lockmgr(&sc->sc_lock, LK_RELEASE, NULL);
 	return 0;
 
 bad2:
@@ -412,7 +386,7 @@ bad:
 	}
 
 bad3:
-	mcdunlock(sc);
+	lockmgr(&sc->sc_lock, LK_RELEASE, NULL);
 	return error;
 }
 
@@ -428,7 +402,7 @@ mcdclose(dev, flag, fmt, p)
 	
 	MCD_TRACE("close: partition=%d\n", part, 0, 0, 0);
 
-	if ((error = mcdlock(sc)) != 0)
+	if ((error = lockmgr(&sc->sc_lock, LK_EXCLUSIVE, NULL)) != 0)
 		return error;
 
 	switch (fmt) {
@@ -450,7 +424,7 @@ mcdclose(dev, flag, fmt, p)
 		(void) mcd_setlock(sc, MCD_LK_UNLOCK);
 	}
 
-	mcdunlock(sc);
+	lockmgr(&sc->sc_lock, LK_RELEASE, NULL);
 	return 0;
 }
 
@@ -490,7 +464,7 @@ mcdstrategy(bp)
 	 * If end of partition, just return.
 	 */
 	if (MCDPART(bp->b_dev) != RAW_PART &&
-	    bounds_check_with_label(bp, lp,
+	    bounds_check_with_label(&sc->sc_dk, bp,
 	    (sc->flags & (MCDF_WLABEL|MCDF_LABELLING)) != 0) <= 0)
 		goto done;
 
@@ -506,7 +480,7 @@ mcdstrategy(bp)
 
 	/* Queue it. */
 	s = splbio();
-	disksort_blkno(&sc->buf_queue, bp);
+	BUFQ_PUT(&sc->buf_queue, bp);
 	splx(s);
 	if (!sc->active)
 		mcdstart(sc);
@@ -529,16 +503,15 @@ mcdstart(sc)
 loop:
 	s = splbio();
 
-	if ((bp = BUFQ_FIRST(&sc->buf_queue)) == NULL) {
+	if ((bp = BUFQ_GET(&sc->buf_queue)) == NULL) {
 		/* Nothing to do. */
 		sc->active = 0;
 		splx(s);
 		return;
 	}
 
-	/* Block found to process; dequeue. */
+	/* Block found to process. */
 	MCD_TRACE("start: found block bp=0x%x\n", bp, 0, 0, 0);
-	BUFQ_REMOVE(&sc->buf_queue, bp);
 	splx(s);
 
 	/* Changed media? */
@@ -652,7 +625,7 @@ mcdioctl(dev, cmd, addr, flag, p)
 #endif
 		lp = (struct disklabel *)addr;
 
-		if ((error = mcdlock(sc)) != 0)
+		if ((error = lockmgr(&sc->sc_lock, LK_EXCLUSIVE, NULL)) != 0)
 			return error;
 		sc->flags |= MCDF_LABELLING;
 
@@ -663,7 +636,7 @@ mcdioctl(dev, cmd, addr, flag, p)
 		}
 
 		sc->flags &= ~MCDF_LABELLING;
-		mcdunlock(sc);
+		lockmgr(&sc->sc_lock, LK_RELEASE, NULL);
 		return error;
 	}
 
@@ -1314,7 +1287,7 @@ mcdintr(arg)
 
 		/* Return buffer. */
 		bp->b_resid = 0;
-		disk_unbusy(&sc->sc_dk, bp->b_bcount);
+		disk_unbusy(&sc->sc_dk, bp->b_bcount, (bp->b_flags & B_READ));
 		biodone(bp);
 
 		mcdstart(sc);
@@ -1347,7 +1320,8 @@ changed:
 	/* Invalidate the buffer. */
 	bp->b_flags |= B_ERROR;
 	bp->b_resid = bp->b_bcount - mbx->skip;
-	disk_unbusy(&sc->sc_dk, (bp->b_bcount - bp->b_resid));
+	disk_unbusy(&sc->sc_dk, (bp->b_bcount - bp->b_resid),
+	    (bp->b_flags & B_READ));
 	biodone(bp);
 
 	mcdstart(sc);

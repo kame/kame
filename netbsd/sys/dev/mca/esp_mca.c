@@ -1,4 +1,4 @@
-/*	$NetBSD: esp_mca.c,v 1.3 2001/12/04 20:51:23 jdolecek Exp $	*/
+/*	$NetBSD: esp_mca.c,v 1.7 2003/07/14 15:47:18 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -43,6 +43,9 @@
  * from Tymm Twillman <tymm@computer.org>'s Linux MCA NC53c90 driver,
  * in drivers/scsi/mca_53c9x.c
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: esp_mca.c,v 1.7 2003/07/14 15:47:18 lukem Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -93,10 +96,8 @@ static int esp_mca_debug = 0;
 static void	esp_mca_attach	__P((struct device *, struct device *, void *));
 static int	esp_mca_match	__P((struct device *, struct cfdata *, void *));
 
-/* Linkup to the rest of the kernel */
-struct cfattach esp_mca_ca = {
-	sizeof(struct esp_softc), esp_mca_match, esp_mca_attach
-};
+CFATTACH_DECL(esp_mca, sizeof(struct esp_softc),
+    esp_mca_match, esp_mca_attach, NULL, NULL);
 
 /*
  * Functions and the switch for the MI code.

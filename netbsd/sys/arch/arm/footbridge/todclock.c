@@ -1,4 +1,4 @@
-/*	$NetBSD: todclock.c,v 1.1 2002/02/10 12:26:00 chris Exp $	*/
+/*	$NetBSD: todclock.c,v 1.5 2003/03/23 14:12:25 chris Exp $	*/
 
 /*
  * Copyright (c) 1994-1997 Mark Brinicombe.
@@ -42,6 +42,9 @@
  *
  * Created      : 29/09/94
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: todclock.c,v 1.5 2003/03/23 14:12:25 chris Exp $");
 
 /* Include header files */
 
@@ -92,9 +95,8 @@ static struct todclock_softc *todclock_sc = NULL;
 
 /* driver and attach structures */
 
-struct cfattach todclock_ca = {
-	sizeof(struct todclock_softc), todclockmatch, todclockattach
-};
+CFATTACH_DECL(todclock, sizeof(struct todclock_softc),
+    todclockmatch, todclockattach, NULL, NULL);
 
 /*
  * int todclockmatch(struct device *parent, struct cfdata *cf, void *aux)
@@ -198,11 +200,7 @@ resettodr()
 
 	/* We need a todclock device and should always have one */
 	if (!todclock_sc)
-#ifdef NC
 		return;
-#else
-		panic("resettodr: No todclock device attached\n");
-#endif /* NC */
 
 	/* Abort early if there is not actually an RTC write routine */
 	if (todclock_sc->sc_rtc_write == NULL)
@@ -278,18 +276,12 @@ inittodr(base)
 	 * RTC is we can.
 	 */
 
-	/* We expect a todclock device */
-#ifndef NC
-	if (!todclock_sc)
-		panic("inittodr: No todclock device attached\n");
-#endif /* NC */
-
 	/* Use the suggested time as a fall back */
 	time.tv_sec = base;
 	time.tv_usec = 0;
 
 	/* Can we read an RTC ? */
-	if (todclock_sc->sc_rtc_read) {
+	if (todclock_sc != NULL && todclock_sc->sc_rtc_read) {
 		s = splclock();
 		if (todclock_sc->sc_rtc_read(todclock_sc->sc_rtc_arg, &rtc) == 0) {
 			(void)splx(s);

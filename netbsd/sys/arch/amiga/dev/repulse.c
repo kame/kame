@@ -1,4 +1,4 @@
-/*	$NetBSD: repulse.c,v 1.4 2002/01/28 09:57:02 aymeric Exp $ */
+/*	$NetBSD: repulse.c,v 1.8.4.1 2004/09/22 20:58:01 jmc Exp $ */
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: repulse.c,v 1.4 2002/01/28 09:57:02 aymeric Exp $");
+__KERNEL_RCSID(0, "$NetBSD: repulse.c,v 1.8.4.1 2004/09/22 20:58:01 jmc Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -75,7 +75,7 @@ __KERNEL_RCSID(0, "$NetBSD: repulse.c,v 1.4 2002/01/28 09:57:02 aymeric Exp $");
 int repac_attach(void *, struct ac97_codec_if *);
 int repac_read(void *, u_int8_t, u_int16_t *);
 int repac_write(void *, u_int8_t, u_int16_t);
-void repac_reset(void *);
+int repac_reset(void *);
 enum ac97_host_flag repac_flags(void *);
 
 /* audio attachment functions */
@@ -233,9 +233,8 @@ struct repulse_softc {
 int repulse_match (struct device *, struct cfdata *, void *);
 void repulse_attach (struct device *, struct device *, void *);
 
-struct cfattach repulse_ca = {
-	sizeof(struct repulse_softc), repulse_match, repulse_attach
-};
+CFATTACH_DECL(repulse, sizeof(struct repulse_softc),
+    repulse_match, repulse_attach, NULL, NULL);
 
 int
 repulse_match(struct device *parent, struct cfdata *cfp, void *aux) {
@@ -336,16 +335,13 @@ repulse_attach(struct device *parent, struct device *self, void *aux) {
 	 * XXX this should be a panic(). OTOH, audio codec speed is not
 	 * important enough to do this.
 	 */
-	if (repac_read(sc, AC97_REG_EXTENDED_ID, &a)
-		|| !(a & AC97_CODEC_DOES_VRA)) {
+	a = sc->sc_codec_if->vtbl->get_extcaps(sc->sc_codec_if);
+	if (!(a & AC97_EXT_AUDIO_VRA)) {
 		printf("%s: warning: codec doesn't support "
 		    "hardware AC'97 2.0 Variable Rate Audio\n",
 			sc->sc_dev.dv_xname);
 	}
 #endif
-	/* enable VRA */
-	repac_write(sc, AC97_REG_EXTENDED_STATUS,
-		AC97_ENAB_VRA | AC97_ENAB_MICVRA);
 
 	/*
 	 * from auvia.c: disable mutes ...
@@ -385,7 +381,7 @@ Initerr:
 
 }
 
-void repac_reset(void *arg) {
+int repac_reset(void *arg) {
 	struct repulse_softc *sc = arg;
 	struct repulse_hw *bp = sc->sc_boardp;
 
@@ -407,6 +403,7 @@ void repac_reset(void *arg) {
 	a = bp->rhw_status;
 	a &= ~REPSTATUS_CODECRESET;
 	bp->rhw_status = a;
+	return 0;
 }
 
 int repac_read(void *arg, u_int8_t reg, u_int16_t *valuep) {
@@ -705,7 +702,7 @@ rep_set_params(void *addr, int setmode, int usemode,
 			else if (p->precision == 16 && p->channels == 2)
 				sc->sc_captfun = rep_read_16_stereo;
 		}
-		/* TBD: ulaw, alaw */
+		/* TBD: mu-law, A-law */
 	}
 	return 0;
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: subr_prf.c,v 1.83 2001/11/21 00:55:39 enami Exp $	*/
+/*	$NetBSD: subr_prf.c,v 1.94 2004/03/23 13:22:04 junyoung Exp $	*/
 
 /*-
  * Copyright (c) 1986, 1988, 1991, 1993
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,12 +37,13 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: subr_prf.c,v 1.83 2001/11/21 00:55:39 enami Exp $");
+__KERNEL_RCSID(0, "$NetBSD: subr_prf.c,v 1.94 2004/03/23 13:22:04 junyoung Exp $");
 
 #include "opt_ddb.h"
 #include "opt_ipkdb.h"
 #include "opt_kgdb.h"
 #include "opt_multiprocessor.h"
+#include "opt_dump.h"
 
 #include <sys/param.h>
 #include <sys/stdint.h>
@@ -63,6 +60,7 @@ __KERNEL_RCSID(0, "$NetBSD: subr_prf.c,v 1.83 2001/11/21 00:55:39 enami Exp $");
 #include <sys/syslog.h>
 #include <sys/malloc.h>
 #include <sys/lock.h>
+#include <sys/kprintf.h>
 
 #include <dev/cons.h>
 
@@ -79,26 +77,6 @@ __KERNEL_RCSID(0, "$NetBSD: subr_prf.c,v 1.83 2001/11/21 00:55:39 enami Exp $");
 
 #if defined(MULTIPROCESSOR)
 struct simplelock kprintf_slock = SIMPLELOCK_INITIALIZER;
-
-/*
- * Use cpu_simple_lock() and cpu_simple_unlock().  These are the actual
- * atomic locking operations, and never attempt to print debugging
- * information.
- */
-#define	KPRINTF_MUTEX_ENTER(s)						\
-do {									\
-	(s) = splhigh();						\
-	__cpu_simple_lock(&kprintf_slock.lock_data);			\
-} while (0)
-
-#define	KPRINTF_MUTEX_EXIT(s)						\
-do {									\
-	__cpu_simple_unlock(&kprintf_slock.lock_data);			\
-	splx((s));							\
-} while (0)
-#else /* ! MULTIPROCESSOR */
-#define	KPRINTF_MUTEX_ENTER(s)	(s) = splhigh()
-#define	KPRINTF_MUTEX_EXIT(s)	splx((s))
 #endif /* MULTIPROCESSOR */
 
 /*
@@ -122,13 +100,6 @@ do {									\
  * defines
  */
 
-/* flags for kprintf */
-#define TOCONS		0x01	/* to the console */
-#define TOTTY		0x02	/* to the process' tty */
-#define TOLOG		0x04	/* to the kernel message buffer */
-#define TOBUFONLY	0x08	/* to the buffer (only) [for snprintf] */
-#define TODDB		0x10	/* to ddb console */
-
 /* max size buffer kprintf needs to print quad_t [size in base 8 + \0] */
 #define KPRINTF_BUFSIZE		(sizeof(quad_t) * NBBY / 3 + 2)
 
@@ -137,10 +108,7 @@ do {									\
  * local prototypes
  */
 
-static int	 kprintf __P((const char *, int, void *, 
-				char *, va_list));
-static void	 putchar __P((int, int, struct tty *));
-static void	 klogpri __P((int));
+static void	 putchar(int, int, struct tty *);
 
 
 /*
@@ -155,6 +123,11 @@ long	panicstart, panicend;	/* position in the msgbuf of the start and
 				   end of the formatted panicstr. */
 int	doing_shutdown;	/* set to indicate shutdown in progress */
 
+#ifndef	DUMP_ON_PANIC
+#define	DUMP_ON_PANIC	1
+#endif
+int	dumponpanic = DUMP_ON_PANIC;
+
 /*
  * v_putc: routine to putc on virtual console
  *
@@ -162,7 +135,8 @@ int	doing_shutdown;	/* set to indicate shutdown in progress */
  * [e.g. to a "virtual console"].
  */
 
-void (*v_putc) __P((int)) = cnputc;	/* start with cnputc (normal cons) */
+void (*v_putc)(int) = cnputc;	/* start with cnputc (normal cons) */
+void (*v_flush)(void) = cnflush;	/* start with cnflush (normal cons) */
 
 
 /*
@@ -184,6 +158,25 @@ tablefull(tab, hint)
 }
 
 /*
+ * twiddle: spin a little propellor on the console.
+ */
+
+void
+twiddle(void)
+{
+	static const char twiddle_chars[] = "|/-\\";
+	static int pos;
+	int s;
+
+	KPRINTF_MUTEX_ENTER(s);
+
+	putchar(twiddle_chars[pos++ & 3], TOCONS, NULL);
+	putchar('\b', TOCONS, NULL);
+
+	KPRINTF_MUTEX_EXIT(s);
+}
+
+/*
  * panic: handle an unresolvable fatal error
  *
  * prints "panic: <message>" and reboots.   if called twice (i.e. recursive
@@ -192,18 +185,14 @@ tablefull(tab, hint)
  */
 
 void
-#ifdef __STDC__
 panic(const char *fmt, ...)
-#else
-panic(fmt, va_alist)
-	char *fmt;
-	va_dcl
-#endif
 {
 	int bootopt;
 	va_list ap;
 
-	bootopt = RB_AUTOBOOT | RB_DUMP;
+	bootopt = RB_AUTOBOOT;
+	if (dumponpanic)
+		bootopt |= RB_DUMP;
 	if (doing_shutdown)
 		bootopt |= RB_NOSYNC;
 	if (!panicstr)
@@ -242,7 +231,7 @@ panic(fmt, va_alist)
 			intrace=1;
 			printf("Begin traceback...\n");
 			db_stack_trace_print(
-			    (db_expr_t)__builtin_frame_address(0),
+			    (db_expr_t)(intptr_t)__builtin_frame_address(0),
 			    TRUE, 65535, "", printf);
 			printf("End traceback...\n");
 			intrace=0;
@@ -265,14 +254,7 @@ panic(fmt, va_alist)
  */
 
 void
-#ifdef __STDC__
 log(int level, const char *fmt, ...)
-#else
-log(level, fmt, va_alist)
-	int level;
-	char *fmt;
-	va_dcl
-#endif
 {
 	int s;
 	va_list ap;
@@ -336,7 +318,7 @@ logpri(level)
 /*
  * Note: we must be in the mutex here!
  */
-static void
+void
 klogpri(level)
 	int level;
 {
@@ -355,13 +337,7 @@ klogpri(level)
  */
 
 void
-#ifdef __STDC__
 addlog(const char *fmt, ...)
-#else
-addlog(fmt, va_alist)
-	char *fmt;
-	va_dcl
-#endif
 {
 	int s;
 	va_list ap;
@@ -404,7 +380,8 @@ putchar(c, flags, tp)
 		tp = constty;
 		flags |= TOTTY;
 	}
-	if ((flags & TOTTY) && tp && tputchar(c, tp) < 0 &&
+	if ((flags & TOTTY) && tp &&
+	    tputchar(c, flags, tp) < 0 &&
 	    (flags & TOCONS) && tp == constty)
 		constty = NULL;
 	if ((flags & TOLOG) &&
@@ -450,13 +427,7 @@ putchar(c, flags, tp)
  */
 
 void
-#ifdef __STDC__
 uprintf(const char *fmt, ...)
-#else
-uprintf(fmt, va_alist)
-	char *fmt;
-	va_dcl
-#endif
 {
 	struct proc *p = curproc;
 	va_list ap;
@@ -516,14 +487,7 @@ tprintf_close(sess)
  * => also sends message to /dev/klog
  */
 void
-#ifdef __STDC__
 tprintf(tpr_t tpr, const char *fmt, ...)
-#else
-tprintf(tpr, fmt, va_alist)
-	tpr_t tpr;
-	char *fmt;
-	va_dcl
-#endif
 {
 	struct session *sess = (struct session *)tpr;
 	struct tty *tp = NULL;
@@ -556,14 +520,7 @@ tprintf(tpr, fmt, va_alist)
  *    use tprintf]
  */
 void
-#ifdef __STDC__
 ttyprintf(struct tty *tp, const char *fmt, ...)
-#else
-ttyprintf(tp, fmt, va_alist)
-	struct tty *tp;
-	char *fmt;
-	va_dcl
-#endif
 {
 	va_list ap;
 
@@ -580,13 +537,7 @@ ttyprintf(tp, fmt, va_alist)
  */
 
 void
-#ifdef __STDC__
 db_printf(const char *fmt, ...)
-#else
-db_printf(fmt, va_alist)
-	char *fmt;
-	va_dcl
-#endif
 {
 	va_list ap;
 
@@ -596,8 +547,182 @@ db_printf(fmt, va_alist)
 	va_end(ap);
 }
 
+void
+db_vprintf(fmt, ap)
+	const char *fmt;
+	va_list ap;
+{
+
+	/* No mutex needed; DDB pauses all processors. */
+	kprintf(fmt, TODDB, NULL, NULL, ap);
+}
+
 #endif /* DDB */
 
+/*
+ * Device autoconfiguration printf routines.  These change their
+ * behavior based on the AB_* flags in boothowto.  If AB_SILENT
+ * is set, messages never go to the console (but they still always
+ * go to the log).  AB_VERBOSE overrides AB_SILENT.
+ */
+
+/*
+ * aprint_normal: Send to console unless AB_QUIET.  Always goes
+ * to the log.
+ */
+void
+aprint_normal(const char *fmt, ...)
+{
+	va_list ap;
+	int s, flags = TOLOG;
+
+	if ((boothowto & (AB_SILENT|AB_QUIET)) == 0 ||
+	    (boothowto & AB_VERBOSE) != 0)
+		flags |= TOCONS;
+ 
+	KPRINTF_MUTEX_ENTER(s);
+
+	va_start(ap, fmt);
+	kprintf(fmt, flags, NULL, NULL, ap);
+	va_end(ap);
+
+	KPRINTF_MUTEX_EXIT(s);
+        
+	if (!panicstr)
+		logwakeup();
+}
+
+/*
+ * aprint_error: Send to console unless AB_QUIET.  Always goes
+ * to the log.  Also counts the number of times called so other
+ * parts of the kernel can report the number of errors during a
+ * given phase of system startup.
+ */
+static int aprint_error_count;
+
+int
+aprint_get_error_count(void)
+{
+	int count, s;
+
+	KPRINTF_MUTEX_ENTER(s);
+
+	count = aprint_error_count;
+	aprint_error_count = 0;
+
+	KPRINTF_MUTEX_EXIT(s);
+
+	return (count);
+}
+
+void
+aprint_error(const char *fmt, ...)
+{
+	va_list ap;
+	int s, flags = TOLOG;
+
+	if ((boothowto & (AB_SILENT|AB_QUIET)) == 0 ||
+	    (boothowto & AB_VERBOSE) != 0)
+		flags |= TOCONS;
+ 
+	KPRINTF_MUTEX_ENTER(s);
+
+	aprint_error_count++;
+
+	va_start(ap, fmt);
+	kprintf(fmt, flags, NULL, NULL, ap);
+	va_end(ap);
+
+	KPRINTF_MUTEX_EXIT(s);
+        
+	if (!panicstr)
+		logwakeup();
+}
+
+/*
+ * aprint_naive: Send to console only if AB_QUIET.  Never goes
+ * to the log.
+ */
+void
+aprint_naive(const char *fmt, ...)
+{
+	va_list ap;
+	int s;
+
+	if ((boothowto & (AB_QUIET|AB_SILENT|AB_VERBOSE)) == AB_QUIET) {
+		KPRINTF_MUTEX_ENTER(s);
+
+		va_start(ap, fmt);
+		kprintf(fmt, TOCONS, NULL, NULL, ap);
+		va_end(ap);
+
+		KPRINTF_MUTEX_EXIT(s);
+	}
+}
+
+/*
+ * aprint_verbose: Send to console only if AB_VERBOSE.  Always
+ * goes to the log.
+ */
+void
+aprint_verbose(const char *fmt, ...)
+{
+	va_list ap;
+	int s, flags = TOLOG;
+
+	if (boothowto & AB_VERBOSE)
+		flags |= TOCONS;
+ 
+	KPRINTF_MUTEX_ENTER(s);
+
+	va_start(ap, fmt);
+	kprintf(fmt, flags, NULL, NULL, ap);
+	va_end(ap);
+
+	KPRINTF_MUTEX_EXIT(s);
+        
+	if (!panicstr)
+		logwakeup();
+}
+
+/*
+ * aprint_debug: Send to console and log only if AB_DEBUG.
+ */
+void
+aprint_debug(const char *fmt, ...)
+{
+	va_list ap;
+	int s;
+
+	if (boothowto & AB_DEBUG) {
+		KPRINTF_MUTEX_ENTER(s);
+
+		va_start(ap, fmt);
+		kprintf(fmt, TOCONS | TOLOG, NULL, NULL, ap);
+		va_end(ap);
+
+		KPRINTF_MUTEX_EXIT(s);
+	}
+}
+
+/*
+ * printf_nolog: Like printf(), but does not send message to the log.
+ */
+
+void
+printf_nolog(const char *fmt, ...)
+{
+	va_list ap;
+	int s;
+
+	KPRINTF_MUTEX_ENTER(s);
+
+	va_start(ap, fmt);
+	kprintf(fmt, TOCONS, NULL, NULL, ap);
+	va_end(ap);
+
+	KPRINTF_MUTEX_EXIT(s);
+}
 
 /*
  * normal kernel printf functions: printf, vprintf, snprintf, vsnprintf
@@ -607,13 +732,7 @@ db_printf(fmt, va_alist)
  * printf: print a message to the console and the log
  */
 void
-#ifdef __STDC__
 printf(const char *fmt, ...)
-#else
-printf(fmt, va_alist)
-	char *fmt;
-	va_dcl
-#endif
 {
 	va_list ap;
 	int s;
@@ -656,14 +775,7 @@ vprintf(fmt, ap)
  * sprintf: print a message to a buffer
  */
 int
-#ifdef __STDC__
 sprintf(char *buf, const char *fmt, ...)
-#else
-sprintf(buf, fmt, va_alist)
-        char *buf;
-        const char *cfmt;
-        va_dcl
-#endif
 {
 	int retval;
 	va_list ap;
@@ -696,15 +808,7 @@ vsprintf(buf, fmt, ap)
  * snprintf: print a message to a buffer
  */
 int
-#ifdef __STDC__
 snprintf(char *buf, size_t size, const char *fmt, ...)
-#else
-snprintf(buf, size, fmt, va_alist)
-        char *buf;
-        size_t size;
-        const char *cfmt;
-        va_dcl
-#endif
 {
 	int retval;
 	va_list ap;
@@ -797,7 +901,7 @@ bitmask_snprintf(val, p, buf, buflen)
 	*(b)++ = (c);		\
 	if (--(l) == 0)		\
 		goto out;	\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 #define PUTSTR(b, p, l) do {		\
 	int c;				\
 	while ((c = *(p)++) != 0) {	\
@@ -805,7 +909,7 @@ bitmask_snprintf(val, p, buf, buflen)
 		if (--(l) == 0)		\
 			goto out;	\
 	}				\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 	/*
 	 * Chris Torek's new bitmask format is identified by a leading \177
@@ -950,7 +1054,7 @@ out:
 /*
  * Guts of kernel printf.  Note, we already expect to be in a mutex!
  */
-static int
+int
 kprintf(fmt0, oflags, vp, sbuf, ap)
 	const char *fmt0;
 	int oflags;
@@ -1319,6 +1423,7 @@ number:			if ((dprec = prec) >= 0)
 done:
 	if ((oflags == TOBUFONLY) && (vp != NULL))
 		*(char **)vp = sbuf;
+	(*v_flush)();
 overflow:
 	return (ret);
 	/* NOTREACHED */

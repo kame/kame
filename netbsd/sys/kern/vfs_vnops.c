@@ -1,4 +1,4 @@
-/*	$NetBSD: vfs_vnops.c,v 1.54.6.1 2003/10/02 09:51:51 tron Exp $	*/
+/*	$NetBSD: vfs_vnops.c,v 1.77 2004/02/14 00:00:56 hannken Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: vfs_vnops.c,v 1.54.6.1 2003/10/02 09:51:51 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: vfs_vnops.c,v 1.77 2004/02/14 00:00:56 hannken Exp $");
 
 #include "fs_union.h"
 
@@ -52,6 +48,7 @@ __KERNEL_RCSID(0, "$NetBSD: vfs_vnops.c,v 1.54.6.1 2003/10/02 09:51:51 tron Exp 
 #include <sys/stat.h>
 #include <sys/buf.h>
 #include <sys/proc.h>
+#include <sys/malloc.h>
 #include <sys/mount.h>
 #include <sys/namei.h>
 #include <sys/vnode.h>
@@ -59,17 +56,38 @@ __KERNEL_RCSID(0, "$NetBSD: vfs_vnops.c,v 1.54.6.1 2003/10/02 09:51:51 tron Exp 
 #include <sys/tty.h>
 #include <sys/poll.h>
 
+#include <miscfs/specfs/specdev.h>
+
 #include <uvm/uvm_extern.h>
 
 #ifdef UNION
-#include <miscfs/union/union.h>
+#include <fs/union/union.h>
 #endif
 
-static int  vn_statfile __P((struct file *fp, struct stat *sb, struct proc *p));
+#if defined(LKM) || defined(UNION)
+int (*vn_union_readdir_hook) (struct vnode **, struct file *, struct proc *);
+#endif
+
+#ifdef VERIFIED_EXEC
+#include <sys/verified_exec.h>
+
+extern LIST_HEAD(veriexec_devhead, veriexec_dev_list) veriexec_dev_head;
+extern struct veriexec_devhead veriexec_file_dev_head;
+#endif
+
+static int vn_read(struct file *fp, off_t *offset, struct uio *uio,
+	    struct ucred *cred, int flags);
+static int vn_write(struct file *fp, off_t *offset, struct uio *uio,
+	    struct ucred *cred, int flags);
+static int vn_closefile(struct file *fp, struct proc *p);
+static int vn_poll(struct file *fp, int events, struct proc *p);
+static int vn_fcntl(struct file *fp, u_int com, void *data, struct proc *p);
+static int vn_statfile(struct file *fp, struct stat *sb, struct proc *p);
+static int vn_ioctl(struct file *fp, u_long com, void *data, struct proc *p);
 
 struct 	fileops vnops = {
 	vn_read, vn_write, vn_ioctl, vn_fcntl, vn_poll,
-	vn_statfile, vn_closefile
+	vn_statfile, vn_closefile, vn_kqfilter
 };
 
 /*
@@ -82,16 +100,23 @@ vn_open(ndp, fmode, cmode)
 	int fmode, cmode;
 {
 	struct vnode *vp;
+	struct mount *mp;
 	struct proc *p = ndp->ni_cnd.cn_proc;
 	struct ucred *cred = p->p_ucred;
 	struct vattr va;
 	int error;
+#ifdef VERIFIED_EXEC
+	char got_dev;
+	struct veriexec_inode_list *veriexec_node;
+	char fingerprint[MAXFINGERPRINTLEN];
+#endif
 
+restart:
 	if (fmode & O_CREAT) {
 		ndp->ni_cnd.cn_nameiop = CREATE;
 		ndp->ni_cnd.cn_flags = LOCKPARENT | LOCKLEAF;
 		if ((fmode & O_EXCL) == 0 &&
-		    ((fmode & FNOSYMLINK) == 0))
+		    ((fmode & O_NOFOLLOW) == 0))
 			ndp->ni_cnd.cn_flags |= FOLLOW;
 		if ((error = namei(ndp)) != 0)
 			return (error);
@@ -101,9 +126,18 @@ vn_open(ndp, fmode, cmode)
 			va.va_mode = cmode;
 			if (fmode & O_EXCL)
 				 va.va_vaflags |= VA_EXCLUSIVE;
+			if (vn_start_write(ndp->ni_dvp, &mp, V_NOWAIT) != 0) {
+				VOP_ABORTOP(ndp->ni_dvp, &ndp->ni_cnd);
+				vput(ndp->ni_dvp);
+				if ((error = vn_start_write(NULL, &mp,
+				    V_WAIT | V_SLEEPONLY | V_PCATCH)) != 0)
+					return (error);
+				goto restart;
+			}
 			VOP_LEASE(ndp->ni_dvp, p, cred, LEASE_WRITE);
 			error = VOP_CREATE(ndp->ni_dvp, &ndp->ni_vp,
 					   &ndp->ni_cnd, &va);
+			vn_finished_write(mp, 0);
 			if (error)
 				return (error);
 			fmode &= ~O_TRUNC;
@@ -120,15 +154,13 @@ vn_open(ndp, fmode, cmode)
 				error = EEXIST;
 				goto bad;
 			}
-			if (ndp->ni_vp->v_type == VLNK) {
-				error = EFTYPE;
-				goto bad;
-			}
 			fmode &= ~O_CREAT;
 		}
 	} else {
 		ndp->ni_cnd.cn_nameiop = LOOKUP;
-		ndp->ni_cnd.cn_flags = FOLLOW | LOCKLEAF;
+		ndp->ni_cnd.cn_flags = LOCKLEAF;
+		if ((fmode & O_NOFOLLOW) == 0)
+			ndp->ni_cnd.cn_flags |= FOLLOW;
 		if ((error = namei(ndp)) != 0)
 			return (error);
 		vp = ndp->ni_vp;
@@ -137,10 +169,80 @@ vn_open(ndp, fmode, cmode)
 		error = EOPNOTSUPP;
 		goto bad;
 	}
+	if (ndp->ni_vp->v_type == VLNK) {
+		error = EFTYPE;
+		goto bad;
+	}
+
+#ifdef VERIFIED_EXEC
+	veriexec_node = NULL;
+
+	if ((error = VOP_GETATTR(vp, &va, cred, p)) != 0)
+		goto bad;
+#endif
+
 	if ((fmode & O_CREAT) == 0) {
+#ifdef VERIFIED_EXEC
+		  /*
+		   * Look for the file on the fingerprint lists iff
+		   * it has not been seen before.
+		   */
+		if ((vp->fp_status == FINGERPRINT_INVALID) ||
+		    (vp->fp_status == FINGERPRINT_NODEV)) {
+			  /* check the file list for the finger print */
+			veriexec_node = get_veriexec_inode(&veriexec_file_dev_head,
+						     va.va_fsid,
+						     va.va_fileid,
+						     &got_dev);
+			if (veriexec_node == NULL) {
+				/* failing that, check the exec list */
+				veriexec_node = get_veriexec_inode(
+					&veriexec_dev_head, va.va_fsid,
+					va.va_fileid, &got_dev);
+			}
+
+			if ((veriexec_node == NULL) && (got_dev == 1))
+				vp->fp_status = FINGERPRINT_NOENTRY;
+
+			if (veriexec_node != NULL) {
+				if ((error = evaluate_fingerprint(vp,
+						veriexec_node, p, va.va_size,
+						fingerprint)) != 0)
+					goto bad;
+
+				if (fingerprintcmp(veriexec_node,
+						   fingerprint) == 0) {
+					  /* fingerprint ok */
+					vp->fp_status =	FINGERPRINT_VALID;
+#ifdef VERIFIED_EXEC_DEBUG
+					printf(
+			"file fingerprint matches for dev %lu, file %lu\n",
+						va.va_fsid, va.va_fileid);
+#endif
+				} else {
+					vp->fp_status =	FINGERPRINT_NOMATCH;
+				}
+			}
+		}
+#endif
+		
 		if (fmode & FREAD) {
 			if ((error = VOP_ACCESS(vp, VREAD, cred, p)) != 0)
 				goto bad;
+
+#ifdef VERIFIED_EXEC
+				/* file is on finger print list */
+			if (vp->fp_status == FINGERPRINT_NOMATCH) {
+				  /* fingerprint bad */
+				printf(
+		"file fingerprint does not match on dev %lu, file %lu\n",
+					va.va_fsid, va.va_fileid);
+				if (securelevel > 2) {
+					error = EPERM;
+					goto bad;
+				}
+			}
+#endif
 		}
 		if (fmode & (FWRITE | O_TRUNC)) {
 			if (vp->v_type == VDIR) {
@@ -150,15 +252,41 @@ vn_open(ndp, fmode, cmode)
 			if ((error = vn_writechk(vp)) != 0 ||
 			    (error = VOP_ACCESS(vp, VWRITE, cred, p)) != 0)
 				goto bad;
+#ifdef VERIFIED_EXEC
+			  /*
+			   * If file has a fingerprint then
+			   * deny the write request, otherwise
+			   * invalidate the status so we don't
+			   * keep checking for the file having
+			   * a fingerprint.
+			   */
+			if (vp->fp_status == FINGERPRINT_VALID) {
+				printf(
+		      "writing to fingerprinted file for dev %lu, file %lu\n",
+		      va.va_fsid, va.va_fileid);
+				if (securelevel > 2) {
+					error = EPERM;
+					goto bad;
+				} else {
+					vp->fp_status =	FINGERPRINT_INVALID;
+				}
+			}
+#endif
 		}
 	}
 	if (fmode & O_TRUNC) {
 		VOP_UNLOCK(vp, 0);			/* XXX */
+		if ((error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH)) != 0) {
+			vput(vp);
+			return (error);
+		}
 		VOP_LEASE(vp, p, cred, LEASE_WRITE);
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);	/* XXX */
 		VATTR_NULL(&va);
 		va.va_size = 0;
-		if ((error = VOP_SETATTR(vp, &va, cred, p)) != 0)
+		error = VOP_SETATTR(vp, &va, cred, p);
+		vn_finished_write(mp, 0);
+		if (error != 0)
 			goto bad;
 	}
 	if ((error = VOP_OPEN(vp, fmode, cred, p)) != 0)
@@ -267,12 +395,17 @@ vn_rdwr(rw, vp, base, len, offset, segflg, ioflg, cred, aresid, p)
 {
 	struct uio auio;
 	struct iovec aiov;
+	struct mount *mp;
 	int error;
 
 	if ((ioflg & IO_NODELOCKED) == 0) {
 		if (rw == UIO_READ) {
 			vn_lock(vp, LK_SHARED | LK_RETRY);
-		} else {
+		} else /* UIO_WRITE */ {
+			if (vp->v_type != VCHR &&
+			    (error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH))
+			    != 0)
+				return (error);
 			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 		}
 	}
@@ -295,8 +428,11 @@ vn_rdwr(rw, vp, base, len, offset, segflg, ioflg, cred, aresid, p)
 	else
 		if (auio.uio_resid && error == 0)
 			error = EIO;
-	if ((ioflg & IO_NODELOCKED) == 0)
+	if ((ioflg & IO_NODELOCKED) == 0) {
+		if (rw == UIO_WRITE)
+			vn_finished_write(mp, 0);
 		VOP_UNLOCK(vp, 0);
+	}
 	return (error);
 }
 
@@ -334,53 +470,24 @@ unionread:
 	if (error)
 		return (error);
 
-#ifdef UNION
-{
-	extern struct vnode *union_dircache __P((struct vnode *));
+#if defined(UNION) || defined(LKM)
+	if (count == auio.uio_resid && vn_union_readdir_hook) {
+		struct vnode *ovp = vp;
 
-	if (count == auio.uio_resid && (vp->v_op == union_vnodeop_p)) {
-		struct vnode *lvp;
-
-		lvp = union_dircache(vp);
-		if (lvp != NULLVP) {
-			struct vattr va;
-
-			/*
-			 * If the directory is opaque,
-			 * then don't show lower entries
-			 */
-			error = VOP_GETATTR(vp, &va, fp->f_cred, p);
-			if (va.va_flags & OPAQUE) {
-				vput(lvp);
-				lvp = NULL;
-			}
-		}
-		
-		if (lvp != NULLVP) {
-			error = VOP_OPEN(lvp, FREAD, fp->f_cred, p);
-			if (error) {
-				vput(lvp);
-				return (error);
-			}
-			VOP_UNLOCK(lvp, 0);
-			fp->f_data = (caddr_t) lvp;
-			fp->f_offset = 0;
-			error = vn_close(vp, FREAD, fp->f_cred, p);
-			if (error)
-				return (error);
-			vp = lvp;
+		error = (*vn_union_readdir_hook)(&vp, fp, p);
+		if (error)
+			return (error);
+		if (vp != ovp)
 			goto unionread;
-		}
 	}
-}
-#endif /* UNION */
+#endif /* UNION || LKM */
 
 	if (count == auio.uio_resid && (vp->v_flag & VROOT) &&
 	    (vp->v_mount->mnt_flag & MNT_UNION)) {
 		struct vnode *tvp = vp;
 		vp = vp->v_mount->mnt_vnodecovered;
 		VREF(vp);
-		fp->f_data = (caddr_t) vp;
+		fp->f_data = vp;
 		fp->f_offset = 0;
 		vrele(tvp);
 		goto unionread;
@@ -392,7 +499,7 @@ unionread:
 /*
  * File table vnode read routine.
  */
-int
+static int
 vn_read(fp, offset, uio, cred, flags)
 	struct file *fp;
 	off_t *offset;
@@ -423,7 +530,7 @@ vn_read(fp, offset, uio, cred, flags)
 /*
  * File table vnode write routine.
  */
-int
+static int
 vn_write(fp, offset, uio, cred, flags)
 	struct file *fp;
 	off_t *offset;
@@ -432,6 +539,7 @@ vn_write(fp, offset, uio, cred, flags)
 	int flags;
 {
 	struct vnode *vp = (struct vnode *)fp->f_data;
+	struct mount *mp;
 	int count, error, ioflag = IO_UNIT;
 
 	if (vp->v_type == VREG && (fp->f_flag & O_APPEND))
@@ -445,6 +553,10 @@ vn_write(fp, offset, uio, cred, flags)
 		ioflag |= IO_DSYNC;
 	if (fp->f_flag & FALTIO)
 		ioflag |= IO_ALTSEMANTICS;
+	mp = NULL;
+	if (vp->v_type != VCHR &&
+	    (error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH)) != 0)
+		return (error);
 	VOP_LEASE(vp, uio->uio_procp, cred, LEASE_WRITE);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 	uio->uio_offset = *offset;
@@ -457,6 +569,7 @@ vn_write(fp, offset, uio, cred, flags)
 			*offset += count - uio->uio_resid;
 	}
 	VOP_UNLOCK(vp, 0);
+	vn_finished_write(mp, 0);
 	return (error);
 }
 
@@ -475,12 +588,11 @@ vn_statfile(fp, sb, p)
 }
 
 int
-vn_stat(fdata, sb, p)
-	void *fdata;
+vn_stat(vp, sb, p)
+	struct vnode *vp;
 	struct stat *sb;
 	struct proc *p;
 {
-	struct vnode *vp = fdata;
 	struct vattr va;
 	int error;
 	mode_t mode;
@@ -528,6 +640,7 @@ vn_stat(fdata, sb, p)
 	sb->st_atimespec = va.va_atime;
 	sb->st_mtimespec = va.va_mtime;
 	sb->st_ctimespec = va.va_ctime;
+	sb->st_birthtimespec = va.va_birthtime;
 	sb->st_blksize = va.va_blocksize;
 	sb->st_flags = va.va_flags;
 	sb->st_gen = 0;
@@ -538,11 +651,11 @@ vn_stat(fdata, sb, p)
 /*
  * File table vnode fcntl routine.
  */
-int
+static int
 vn_fcntl(fp, com, data, p)
 	struct file *fp;
 	u_int com;
-	caddr_t data;
+	void *data;
 	struct proc *p;
 {
 	struct vnode *vp = ((struct vnode *)fp->f_data);
@@ -557,11 +670,11 @@ vn_fcntl(fp, com, data, p)
 /*
  * File table vnode ioctl routine.
  */
-int
+static int
 vn_ioctl(fp, com, data, p)
 	struct file *fp;
 	u_long com;
-	caddr_t data;
+	void *data;
 	struct proc *p;
 {
 	struct vnode *vp = ((struct vnode *)fp->f_data);
@@ -579,13 +692,27 @@ vn_ioctl(fp, com, data, p)
 			*(int *)data = vattr.va_size - fp->f_offset;
 			return (0);
 		}
+		if (com == FIOGETBMAP) {
+			daddr_t *block;
+
+			if (*(daddr_t *)data < 0)
+				return (EINVAL);
+			block = (daddr_t *)data;
+			return (VOP_BMAP(vp, *block, NULL, block, NULL));
+		}
+		if (com == OFIOGETBMAP) {
+			daddr_t ibn, obn;
+
+			if (*(int32_t *)data < 0)
+				return (EINVAL);
+			ibn = (daddr_t)*(int32_t *)data;
+			error = VOP_BMAP(vp, ibn, NULL, &obn, NULL);
+			*(int32_t *)data = (int32_t)obn;
+			return error;
+		}
 		if (com == FIONBIO || com == FIOASYNC)	/* XXX */
 			return (0);			/* XXX */
 		/* fall into ... */
-
-	default:
-		return (EPASSTHROUGH);
-
 	case VFIFO:
 	case VCHR:
 	case VBLK:
@@ -597,13 +724,16 @@ vn_ioctl(fp, com, data, p)
 			VREF(vp);
 		}
 		return (error);
+
+	default:
+		return (EPASSTHROUGH);
 	}
 }
 
 /*
  * File table vnode poll routine.
  */
-int
+static int
 vn_poll(fp, events, p)
 	struct file *fp;
 	int events;
@@ -611,6 +741,18 @@ vn_poll(fp, events, p)
 {
 
 	return (VOP_POLL(((struct vnode *)fp->f_data), events, p));
+}
+
+/*
+ * File table vnode kqfilter routine.
+ */
+int
+vn_kqfilter(fp, kn)
+	struct file *fp;
+	struct knote *kn;
+{
+
+	return (VOP_KQFILTER((struct vnode *)fp->f_data, kn));
 }
 
 /*
@@ -649,7 +791,7 @@ vn_lock(vp, flags)
 /*
  * File table vnode close routine.
  */
-int
+static int
 vn_closefile(fp, p)
 	struct file *fp;
 	struct proc *p;
@@ -685,4 +827,61 @@ vn_restorerecurse(vp, flags)
 
 	lkp->lk_flags &= ~LK_CANRECURSE;
 	lkp->lk_flags |= flags;
+}
+
+int
+vn_cow_establish(struct vnode *vp,
+    void (*func)(void *, struct buf *), void *cookie)
+{
+	int s;
+	struct spec_cow_entry *e;
+
+	MALLOC(e, struct spec_cow_entry *, sizeof(struct spec_cow_entry),
+	    M_DEVBUF, M_WAITOK);
+	e->ce_func = func;
+	e->ce_cookie = cookie;
+
+	SPEC_COW_LOCK(vp->v_specinfo, s);
+	vp->v_spec_cow_req++;
+	while (vp->v_spec_cow_count > 0)
+		ltsleep(&vp->v_spec_cow_req, PRIBIO, "cowlist", 0,
+		    &vp->v_spec_cow_slock);
+
+	SLIST_INSERT_HEAD(&vp->v_spec_cow_head, e, ce_list);
+
+	vp->v_spec_cow_req--;
+	if (vp->v_spec_cow_req == 0)
+		wakeup(&vp->v_spec_cow_req);
+	SPEC_COW_UNLOCK(vp->v_specinfo, s);
+
+	return 0;
+}
+
+int
+vn_cow_disestablish(struct vnode *vp,
+    void (*func)(void *, struct buf *), void *cookie)
+{
+	int s;
+	struct spec_cow_entry *e;
+
+	SPEC_COW_LOCK(vp->v_specinfo, s);
+	vp->v_spec_cow_req++;
+	while (vp->v_spec_cow_count > 0)
+		ltsleep(&vp->v_spec_cow_req, PRIBIO, "cowlist", 0,
+		    &vp->v_spec_cow_slock);
+
+	SLIST_FOREACH(e, &vp->v_spec_cow_head, ce_list)
+		if (e->ce_func == func && e->ce_cookie == cookie) {
+			SLIST_REMOVE(&vp->v_spec_cow_head, e,
+			    spec_cow_entry, ce_list);
+			FREE(e, M_DEVBUF);
+			break;
+		}
+
+	vp->v_spec_cow_req--;
+	if (vp->v_spec_cow_req == 0)
+		wakeup(&vp->v_spec_cow_req);
+	SPEC_COW_UNLOCK(vp->v_specinfo, s);
+
+	return e ? 0 : EINVAL;
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: sio16.c,v 1.4 2002/03/20 20:39:15 eeh Exp $	*/
+/*	$NetBSD: sio16.c,v 1.12 2004/03/17 17:04:59 pk Exp $	*/
 
 /*
  * Copyright (c) 1998, 2001 Matthew R. Green
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sio16.c,v 1.4 2002/03/20 20:39:15 eeh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sio16.c,v 1.12 2004/03/17 17:04:59 pk Exp $");
 
 #include <sys/param.h>
 #include <sys/conf.h>
@@ -46,7 +46,6 @@ __KERNEL_RCSID(0, "$NetBSD: sio16.c,v 1.4 2002/03/20 20:39:15 eeh Exp $");
 #include <sys/systm.h>
 
 #include <machine/autoconf.h>
-#include <machine/conf.h>
 
 #include <dev/ic/cd18xxvar.h>
 #include <dev/ic/cd18xxreg.h>
@@ -92,9 +91,8 @@ struct sio16_softc {
 
 };
 
-struct cfattach siosixteen_ca = {
-	sizeof(struct sio16_softc), sio16_match, sio16_attach
-};
+CFATTACH_DECL(siosixteen, sizeof(struct sio16_softc),
+    sio16_match, sio16_attach, NULL, NULL);
 
 struct sio16_attach_args {
 	bus_space_tag_t		cd_tag;
@@ -141,7 +139,7 @@ sio16_attach(parent, self, aux)
 	int i;
 
 	if (sa->sa_nreg != 4)
-		panic("sio16_attach: got %d registers intead of 4\n",
+		panic("sio16_attach: got %d registers intead of 4",
 		    sa->sa_nreg);
 
 	/* copy our bus tag, we will need it */
@@ -153,9 +151,9 @@ sio16_attach(parent, self, aux)
 	 * a 4 byte region for interrupt acknowledgement.
 	 */
 	if (sbus_bus_map(sa->sa_bustag,
-			 sa->sa_reg[0].sbr_slot,
-			 sa->sa_reg[0].sbr_offset,
-			 sa->sa_reg[0].sbr_size,
+			 sa->sa_reg[0].oa_space,
+			 sa->sa_reg[0].oa_base,
+			 sa->sa_reg[0].oa_size,
 			 0, &h) != 0) {
 		printf("%s at sbus: can not map registers 0\n",
 		    self->dv_xname);
@@ -193,14 +191,14 @@ sio16_attach(parent, self, aux)
 	}
 	sc->sc_ack = h;
 
-	mode = PROM_getpropstring(sa->sa_node, "mode");
+	mode = prom_getpropstring(sa->sa_node, "mode");
 	if (mode)
 		printf(", %s mode", mode);
 
 	/* get the clock frequency */
-	sc->sc_clk = PROM_getpropint(sa->sa_node, "clk", 24000);
+	sc->sc_clk = prom_getpropint(sa->sa_node, "clk", 24000);
 
-	model = PROM_getpropstring(sa->sa_node, "model");
+	model = prom_getpropstring(sa->sa_node, "model");
 	if (model == 0) {
 		printf(", no model property, bailing\n");
 		return;
@@ -219,7 +217,7 @@ sio16_attach(parent, self, aux)
 	sbus_establish(&sc->sc_sd, &sc->sc_dev);
 
 	/* establish interrupt channel */
-	(void)bus_intr_establish(sa->sa_bustag, sa->sa_pri, IPL_TTY, 0,
+	(void)bus_intr_establish(sa->sa_bustag, sa->sa_pri, IPL_TTY,
 	    cd18xx_hardintr, sc);
 
 	/* reset the board, and turn on interrupts and I/O */
@@ -282,9 +280,8 @@ sio16_ackfunc(v, who)
 static int	clcd_match(struct device *, struct cfdata *, void *);
 static void	clcd_attach(struct device *, struct device *, void *);
 
-struct cfattach clcd_ca = {
-	sizeof(struct cd18xx_softc), clcd_match, clcd_attach
-};
+CFATTACH_DECL(clcd, sizeof(struct cd18xx_softc),
+    clcd_match, clcd_attach, NULL, NULL);
 
 static int
 clcd_match(parent, cf, aux)

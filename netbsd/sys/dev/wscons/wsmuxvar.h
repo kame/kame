@@ -1,4 +1,4 @@
-/*	$NetBSD: wsmuxvar.h,v 1.7 2002/03/02 08:22:28 takemura Exp $	*/
+/*	$NetBSD: wsmuxvar.h,v 1.9 2003/06/29 22:31:06 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.

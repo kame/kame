@@ -1,4 +1,4 @@
-/*	$NetBSD: amps.c,v 1.2.12.1 2002/11/01 11:13:06 tron Exp $	*/
+/*	$NetBSD: amps.c,v 1.9 2003/07/14 22:48:25 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -42,6 +42,9 @@
 /*
  * Thanks to Martin Coulson, Atomwide, for providing the hardware
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: amps.c,v 1.9 2003/07/14 22:48:25 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -90,13 +93,14 @@ struct amps_softc {
 	bus_space_tag_t		sc_iot;			/* Bus tag */
 };
 
-int	amps_probe	__P((struct device *, struct cfdata *, void *));
-void	amps_attach	__P((struct device *, struct device *, void *));
-void	amps_shutdown	__P((void *arg));
+int	amps_probe(struct device *, struct cfdata *, void *);
+void	amps_attach(struct device *, struct device *, void *);
 
-struct cfattach amps_ca = {
-	sizeof(struct amps_softc), amps_probe, amps_attach
-};
+CFATTACH_DECL(amps, sizeof(struct amps_softc),
+    amps_probe, amps_attach, NULL, NULL);
+
+int	amps_print(void *, const char *);
+void	amps_shutdown(void *);
 
 /*
  * Attach arguments for child devices.
@@ -124,7 +128,7 @@ amps_print(aux, name)
 	struct amps_attach_args *aa = aux;
 
 	if (!name)
-		printf(", port %d", aa->aa_port);
+		aprint_normal(", port %d", aa->aa_port);
 
 	return(QUIET);
 }
@@ -229,9 +233,8 @@ static void com_amps_attach  __P((struct device *, struct device *, void *));
 
 /* device attach structure */
 
-struct cfattach com_amps_ca = {
-	sizeof(struct com_amps_softc), com_amps_probe, com_amps_attach
-};
+CFATTACH_DECL(com_amps, sizeof(struct com_amps_softc),
+	com_amps_probe, com_amps_attach, NULL, NULL);
 
 /*
  * Controller probe function

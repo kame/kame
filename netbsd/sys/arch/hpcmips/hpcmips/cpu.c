@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.c,v 1.10 2001/09/16 15:45:43 uch Exp $	*/
+/*	$NetBSD: cpu.c,v 1.13 2003/07/15 02:29:31 lukem Exp $	*/
 /*-
  * Copyright (c) 1999 Shin Takemura, All rights reserved.
  * Copyright (c) 1999-2001 SATO Kazumi, All rights reserved.
@@ -55,6 +55,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.13 2003/07/15 02:29:31 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 
@@ -66,9 +69,8 @@
 static int	cpumatch(struct device *, struct cfdata *, void *);
 static void	cpuattach(struct device *, struct device *, void *);
 
-struct cfattach cpu_ca = {
-	sizeof (struct device), cpumatch, cpuattach
-};
+CFATTACH_DECL(cpu, sizeof (struct device),
+    cpumatch, cpuattach, NULL, NULL);
 
 extern struct cfdriver cpu_cd;
 

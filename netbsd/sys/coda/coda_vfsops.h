@@ -1,4 +1,4 @@
-/*	$NetBSD: coda_vfsops.h,v 1.5 2000/03/16 18:08:21 jdolecek Exp $	*/
+/*	$NetBSD: coda_vfsops.h,v 1.9.2.1 2004/05/23 10:45:45 tron Exp $	*/
 
 /*
  * 
@@ -40,7 +40,7 @@
 struct cfid {
     u_short	cfid_len;
     u_short     padding;
-    ViceFid	cfid_fid;
+    CodaFid	cfid_fid;
 };
 
 struct mount;
@@ -63,3 +63,7 @@ void coda_done(void);
 int coda_sysctl(int *, u_int, void *, size_t *, void *, size_t,
 		    struct proc *);
 int getNewVnode(struct vnode **vpp);
+
+#ifdef SYSCTL_SETUP_PROTO
+SYSCTL_SETUP_PROTO(sysctl_vfs_coda_setup);
+#endif /* SYSCTL_SETUP_PROTO */

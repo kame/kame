@@ -1,4 +1,4 @@
-/*	$NetBSD: footbridge_pci.c,v 1.4 2001/09/05 16:17:35 matt Exp $	*/
+/*	$NetBSD: footbridge_pci.c,v 1.10 2003/07/30 17:28:19 he Exp $	*/
 
 /*
  * Copyright (c) 1997,1998 Mark Brinicombe.
@@ -34,6 +34,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: footbridge_pci.c,v 1.10 2003/07/30 17:28:19 he Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -55,10 +58,6 @@
 #include <dev/isa/isavar.h>
 #endif
 
-#ifdef netwinder
-void		netwinder_pci_attach_hook __P((struct device *,
-		    struct device *, struct pcibus_attach_args *));
-#endif
 void		footbridge_pci_attach_hook __P((struct device *,
 		    struct device *, struct pcibus_attach_args *));
 int		footbridge_pci_bus_maxdevs __P((void *, int));
@@ -71,11 +70,10 @@ void		footbridge_pci_conf_write __P((void *, pcitag_t, int,
 int		footbridge_pci_intr_map __P((struct pci_attach_args *,
 		    pci_intr_handle_t *));
 const char	*footbridge_pci_intr_string __P((void *, pci_intr_handle_t));
-const struct evcnt *footbridge_pci_intr_evcnt __P((void *, pci_intr_handle_t));
 void		*footbridge_pci_intr_establish __P((void *, pci_intr_handle_t,
 		    int, int (*)(void *), void *));
 void		footbridge_pci_intr_disestablish __P((void *, void *));
-
+const struct evcnt *footbridge_pci_intr_evcnt __P((void *, pci_intr_handle_t));
 
 struct arm32_pci_chipset footbridge_pci_chipset = {
 	NULL,	/* conf_v */
@@ -104,6 +102,7 @@ struct arm32_pci_chipset footbridge_pci_chipset = {
 struct arm32_bus_dma_tag footbridge_pci_bus_dma_tag = {
 	0,
 	0,
+	NULL,
 	_bus_dmamap_create, 
 	_bus_dmamap_destroy,
 	_bus_dmamap_load,
@@ -111,7 +110,8 @@ struct arm32_bus_dma_tag footbridge_pci_bus_dma_tag = {
 	_bus_dmamap_load_uio,
 	_bus_dmamap_load_raw,
 	_bus_dmamap_unload,
-	_bus_dmamap_sync,
+	_bus_dmamap_sync,	/* pre */
+	NULL,			/* post */
 	_bus_dmamem_alloc,
 	_bus_dmamem_free,
 	_bus_dmamem_map,
@@ -343,7 +343,7 @@ footbridge_pci_intr_string(pcv, ih)
 	printf("footbridge_pci_intr_string(pcv=0x%p, ih=0x%lx)\n", pcv, ih);
 #endif
 	if (ih == 0)
-		panic("footbridge_pci_intr_string: bogus handle 0x%lx\n", ih);
+		panic("footbridge_pci_intr_string: bogus handle 0x%lx", ih);
 
 #if NISA > 0
 	if (ih >= 0x80 && ih <= 0x8f) {
@@ -353,16 +353,6 @@ footbridge_pci_intr_string(pcv, ih)
 #endif
 	sprintf(irqstr, "irq %ld", ih);
 	return(irqstr);	
-}
-
-const struct evcnt *
-footbridge_pci_intr_evcnt(pcv, ih)
-	void *pcv;
-	pci_intr_handle_t ih;
-{
-
-	/* XXX for now, no evcnt parent reported */
-	return NULL;
 }
 
 void *
@@ -398,7 +388,7 @@ footbridge_pci_intr_establish(pcv, ih, level, func, arg)
 		    level, func, arg);
 	} else
 #endif
-	intr = intr_claim(ih, level, string, func, arg);
+	intr = footbridge_intr_claim(ih, level, string, func, arg);
 
 	return(intr);
 }
@@ -413,6 +403,5 @@ footbridge_pci_intr_disestablish(pcv, cookie)
 	    pcv, cookie);
 #endif
 	/* XXXX Need to free the string */
-
-	intr_release(cookie);
+	footbridge_intr_disestablish(cookie);
 }

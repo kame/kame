@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.48.10.1 2003/08/13 13:27:12 grant Exp $	*/
+/*	$NetBSD: param.h,v 1.57 2003/08/08 20:13:04 christos Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -37,6 +33,9 @@
  *
  *	@(#)param.h	5.8 (Berkeley) 6/28/91
  */
+
+#ifndef _I386_PARAM_H_
+#define _I386_PARAM_H_
 
 /*
  * Machine dependent constants for Intel 386.
@@ -77,11 +76,22 @@
 #define	PGOFSET		(NBPG-1)	/* byte offset into page */
 #define	NPTEPG		(NBPG/(sizeof (pt_entry_t)))
 
-#ifndef KERNBASE
-#define	KERNBASE	0xc0000000	/* start of kernel virtual space */
+/*
+ * Unfortunately the assembler does not understand 0xf00UL, so we
+ * have KERNBASE_LOCORE
+ */
+#ifdef KERNBASE
+#error "You should only re-define KERNBASE_LOCORE"
 #endif
-#define	KERNTEXTOFF	(KERNBASE + 0x100000) /* start of kernel text */
-#define	BTOPKERNBASE	((u_long)KERNBASE >> PGSHIFT)
+
+#ifndef	KERNBASE_LOCORE
+#define	KERNBASE_LOCORE	0xc0000000	/* start of kernel virtual space */
+#endif
+
+#define	KERNBASE	((u_long)KERNBASE_LOCORE)
+
+#define	KERNTEXTOFF	(KERNBASE_LOCORE + 0x100000) /* start of kernel text */
+#define	BTOPKERNBASE	(KERNBASE >> PGSHIFT)
 
 #define	DEV_BSHIFT	9		/* log2(DEV_BSIZE) */
 #define	DEV_BSIZE	(1 << DEV_BSHIFT)
@@ -92,11 +102,19 @@
 
 #define	SSIZE		1		/* initial stack size/NBPG */
 #define	SINCR		1		/* increment of stack/NBPG */
+
+#ifdef _KERNEL_OPT
+#include "opt_noredzone.h"
+#endif
+#ifdef NOREDZONE
 #define	UPAGES		2		/* pages of u-area */
+#else
+#define UPAGES		4
+#endif
 #define	USPACE		(UPAGES * NBPG)	/* total size of u-area */
 
 #ifndef MSGBUFSIZE
-#define MSGBUFSIZE	2*NBPG		/* default message buffer size */
+#define MSGBUFSIZE	4*NBPG		/* default message buffer size */
 #endif
 
 /*
@@ -164,11 +182,13 @@
 /*
  * Mach derived conversion macros
  */
-#define	i386_round_pdr(x)	((((unsigned)(x)) + PDOFSET) & ~PDOFSET)
-#define	i386_trunc_pdr(x)	((unsigned)(x) & ~PDOFSET)
-#define	i386_btod(x)		((unsigned)(x) >> PDSHIFT)
-#define	i386_dtob(x)		((unsigned)(x) << PDSHIFT)
-#define	i386_round_page(x)	((((unsigned)(x)) + PGOFSET) & ~PGOFSET)
-#define	i386_trunc_page(x)	((unsigned)(x) & ~PGOFSET)
-#define	i386_btop(x)		((unsigned)(x) >> PGSHIFT)
-#define	i386_ptob(x)		((unsigned)(x) << PGSHIFT)
+#define	x86_round_pdr(x)	((((unsigned)(x)) + PDOFSET) & ~PDOFSET)
+#define	x86_trunc_pdr(x)	((unsigned)(x) & ~PDOFSET)
+#define	x86_btod(x)		((unsigned)(x) >> PDSHIFT)
+#define	x86_dtob(x)		((unsigned)(x) << PDSHIFT)
+#define	x86_round_page(x)	((((unsigned)(x)) + PGOFSET) & ~PGOFSET)
+#define	x86_trunc_page(x)	((unsigned)(x) & ~PGOFSET)
+#define	x86_btop(x)		((unsigned)(x) >> PGSHIFT)
+#define	x86_ptob(x)		((unsigned)(x) << PGSHIFT)
+
+#endif /* _I386_PARAM_H_ */

@@ -1,4 +1,4 @@
-/* $NetBSD: bus_space_alignstride_chipdep.c,v 1.2 2002/03/23 14:20:41 simonb Exp $ */
+/* $NetBSD: bus_space_alignstride_chipdep.c,v 1.6 2003/07/15 02:43:36 lukem Exp $ */
 
 /*-
  * Copyright (c) 1998, 2000, 2001 The NetBSD Foundation, Inc.
@@ -81,7 +81,17 @@
  *			for the memory or I/O memory space extent.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bus_space_alignstride_chipdep.c,v 1.6 2003/07/15 02:43:36 lukem Exp $");
+
+#ifdef CHIP_EXTENT
 #include <sys/extent.h>
+#endif
+#include <sys/malloc.h>
+
+#include <machine/locore.h>
+
+#include <uvm/uvm_extern.h>
 
 #define	__C(A,B)	__CONCAT(A,B)
 #define	__S(S)		__STRING(S)
@@ -324,7 +334,7 @@ __BS(init)(bus_space_tag_t t, void *v)
 	}
 
 #ifdef EXTENT_DEBUG
-	printf("xxx: freeing from 0x%lx to 0x%lx\n", CHIP_W1_BUS_START(v),
+	printf("xxx: freeing from 0x%x to 0x%x\n", CHIP_W1_BUS_START(v),
 	    CHIP_W1_BUS_END(v));
 #endif
 	extent_free(ex, CHIP_W1_BUS_START(v),
@@ -334,14 +344,14 @@ __BS(init)(bus_space_tag_t t, void *v)
 	if (CHIP_W2_BUS_START(v) != CHIP_W1_BUS_START(v)) {
 #ifdef EXTENT_DEBUG
 		printf("xxx: freeing from 0x%lx to 0x%lx\n",
-		    CHIP_W2_BUS_START(v), CHIP_W2_BUS_END(v));
+		    (u_long)CHIP_W2_BUS_START(v), (u_long)CHIP_W2_BUS_END(v));
 #endif
 		extent_free(ex, CHIP_W2_BUS_START(v),
 		    CHIP_W2_BUS_END(v) - CHIP_W2_BUS_START(v) + 1, EX_NOWAIT);
 	} else {
 #ifdef EXTENT_DEBUG
 		printf("xxx: window 2 (0x%lx to 0x%lx) overlaps window 1\n",
-		    CHIP_W2_BUS_START(v), CHIP_W2_BUS_END(v));
+		    (u_long)CHIP_W2_BUS_START(v), (u_long)CHIP_W2_BUS_END(v));
 #endif
 	}
 #endif
@@ -350,14 +360,14 @@ __BS(init)(bus_space_tag_t t, void *v)
 	    CHIP_W3_BUS_START(v) != CHIP_W2_BUS_START(v)) {
 #ifdef EXTENT_DEBUG
 		printf("xxx: freeing from 0x%lx to 0x%lx\n",
-		    CHIP_W3_BUS_START(v), CHIP_W3_BUS_END(v));
+		    (u_long)CHIP_W3_BUS_START(v), (u_long)CHIP_W3_BUS_END(v));
 #endif
 		extent_free(ex, CHIP_W3_BUS_START(v),
 		    CHIP_W3_BUS_END(v) - CHIP_W3_BUS_START(v) + 1, EX_NOWAIT);
 	} else {
 #ifdef EXTENT_DEBUG
 		printf("xxx: window 2 (0x%lx to 0x%lx) overlaps window 1\n",
-		    CHIP_W2_BUS_START(v), CHIP_W2_BUS_END(v));
+		    (u_long)CHIP_W2_BUS_START(v), (u_long)CHIP_W2_BUS_END(v));
 #endif
 	}
 #endif
@@ -402,19 +412,16 @@ __BS(translate)(void *v, bus_addr_t addr, bus_size_t len, int flags,
 #ifdef EXTENT_DEBUG
 	printf("\n");
 #ifdef CHIP_W1_BUS_START
-	printf("%s: window[1]=0x%lx-0x%lx\n",
-	    __S(__BS(map)), CHIP_W1_BUS_START(v),
-	    CHIP_W1_BUS_END(v));
+	printf("%s: window[1]=0x%lx-0x%lx\n", __S(__BS(map)),
+	    (u_long)CHIP_W1_BUS_START(v), (u_long)CHIP_W1_BUS_END(v));
 #endif
 #ifdef CHIP_W2_BUS_START
-	printf("%s: window[2]=0x%lx-0x%lx\n",
-	    __S(__BS(map)), CHIP_W2_BUS_START(v),
-	    CHIP_W2_BUS_END(v));
+	printf("%s: window[2]=0x%lx-0x%lx\n", __S(__BS(map)),
+	    (u_long)CHIP_W2_BUS_START(v), (u_long)CHIP_W2_BUS_END(v));
 #endif
 #ifdef CHIP_W3_BUS_START
-	printf("%s: window[3]=0x%lx-0x%lx\n",
-	    __S(__BS(map)), CHIP_W3_BUS_START(v),
-	    CHIP_W3_BUS_END(v));
+	printf("%s: window[3]=0x%lx-0x%lx\n", __S(__BS(map)),
+	    (u_long)CHIP_W3_BUS_START(v), (u_long)CHIP_W3_BUS_END(v));
 #endif
 #endif /* EXTENT_DEBUG */
 	/* No translation. */
@@ -548,18 +555,18 @@ __BS(unmap)(void *v, bus_space_handle_t h, bus_size_t size, int acct)
 		printf("\n");
 #ifdef CHIP_W1_BUS_START
 		printf("%s: sys window[1]=0x%lx-0x%lx\n",
-		    __S(__BS(map)), CHIP_W1_SYS_START(v),
-		    CHIP_W1_SYS_END(v));
+		    __S(__BS(map)), (u_long)CHIP_W1_SYS_START(v),
+		    (u_long)CHIP_W1_SYS_END(v));
 #endif
 #ifdef CHIP_W2_BUS_START
 		printf("%s: sys window[2]=0x%lx-0x%lx\n",
-		    __S(__BS(map)), CHIP_W2_SYS_START(v),
-		    CHIP_W2_SYS_END(v));
+		    __S(__BS(map)), (u_long)CHIP_W2_SYS_START(v),
+		    (u_long)CHIP_W2_SYS_END(v));
 #endif
 #ifdef CHIP_W3_BUS_START
 		printf("%s: sys window[3]=0x%lx-0x%lx\n",
-		    __S(__BS(map)), CHIP_W3_SYS_START(v),
-		    CHIP_W3_SYS_END(v));
+		    __S(__BS(map)), (u_long)CHIP_W3_SYS_START(v),
+		    (u_long)CHIP_W3_SYS_END(v));
 #endif
 		panic("%s: don't know how to unmap %lx", __S(__BS(unmap)), h);
 	}
@@ -709,30 +716,51 @@ __BS(barrier)(void *v, bus_space_handle_t h, bus_size_t o, bus_size_t l, int f)
 inline uint8_t
 __BS(read_1)(void *v, bus_space_handle_t h, bus_size_t off)
 {
-	uint8_t *ptr = (void *)(h + (off << CHIP_ALIGN_STRIDE));
+#ifdef CHIP_ACCESSTYPE
+	volatile CHIP_ACCESSTYPE *ptr = (void *)(h + (off << CHIP_ALIGN_STRIDE));
+	CHIP_ACCESSTYPE rval;
+
+	rval = *ptr;
+	return (rval & 0xff);		/* XXX BigEndian safe? */
+#else	/* !CHIP_ACCESSTYPE */
+	volatile uint8_t *ptr = (void *)(h + (off << CHIP_ALIGN_STRIDE));
 
 	return (*ptr);
+#endif	/* !CHIP_ACCESSTYPE */
 }
 
 inline uint16_t
 __BS(read_2)(void *v, bus_space_handle_t h, bus_size_t off)
 {
-#if CHIP_ALIGN_STRIDE >= 1
-	uint16_t *ptr = (void *)(h + (off << (CHIP_ALIGN_STRIDE - 1)));
+#ifdef CHIP_ACCESSTYPE
+#if CHIP_ALIGN_STRIDE >= 1 
+	volatile CHIP_ACCESSTYPE *ptr = (void *)(h + (off << (CHIP_ALIGN_STRIDE - 1)));
 #else
-	uint16_t *ptr = (void *)(h + off);
+	volatile CHIP_ACCESSTYPE *ptr = (void *)(h + off);
+#endif
+	CHIP_ACCESSTYPE rval;
+
+	rval = *ptr;
+	return (rval & 0xffff);		/* XXX BigEndian safe? */
+#else	/* !CHIP_ACCESSTYPE */
+#if CHIP_ALIGN_STRIDE >= 1
+	volatile uint16_t *ptr = (void *)(h + (off << (CHIP_ALIGN_STRIDE - 1)));
+#else
+	volatile uint16_t *ptr = (void *)(h + off);
 #endif
 
 	return (*ptr);
+#endif	/* !CHIP_ACCESSTYPE */
 }
 
 inline uint32_t
 __BS(read_4)(void *v, bus_space_handle_t h, bus_size_t off)
 {
+	/* XXX XXX XXX should use CHIP_ACCESSTYPE if it's > 32bits */
 #if CHIP_ALIGN_STRIDE >= 2
-	uint32_t *ptr = (void *)(h + (off << (CHIP_ALIGN_STRIDE - 2)));
+	volatile uint32_t *ptr = (void *)(h + (off << (CHIP_ALIGN_STRIDE - 2)));
 #else
-	uint32_t *ptr = (void *)(h + off);
+	volatile uint32_t *ptr = (void *)(h + off);
 #endif
 
 	return (*ptr);
@@ -782,30 +810,51 @@ CHIP_read_region_N(8,uint64_t)
 inline void
 __BS(write_1)(void *v, bus_space_handle_t h, bus_size_t off, uint8_t val)
 {
-	uint8_t *ptr = (void *)(h + (off << CHIP_ALIGN_STRIDE));
+#ifdef CHIP_ACCESSTYPE
+	volatile CHIP_ACCESSTYPE *ptr = (void *)(h + (off << CHIP_ALIGN_STRIDE));
+	CHIP_ACCESSTYPE wval;
+
+	wval = val & 0xff;		/* XXX BigEndian safe? */
+	*ptr = wval;
+#else	/* !CHIP_ACCESSTYPE */
+	volatile uint8_t *ptr = (void *)(h + (off << CHIP_ALIGN_STRIDE));
 
 	*ptr = val;
+#endif	/* !CHIP_ACCESSTYPE */
 }
 
 inline void
 __BS(write_2)(void *v, bus_space_handle_t h, bus_size_t off, uint16_t val)
 {
+#ifdef CHIP_ACCESSTYPE
 #if CHIP_ALIGN_STRIDE >= 1
-	uint16_t *ptr = (void *)(h + (off << (CHIP_ALIGN_STRIDE - 1)));
+	volatile CHIP_ACCESSTYPE *ptr = (void *)(h + (off << (CHIP_ALIGN_STRIDE - 1)));
 #else
-	uint16_t *ptr = (void *)(h + off);
+	volatile CHIP_ACCESSTYPE *ptr = (void *)(h + off);
+#endif
+	CHIP_ACCESSTYPE wval;
+
+	wval = val & 0xffff;		/* XXX BigEndian safe? */
+	*ptr = wval;
+#else	/* !CHIP_ACCESSTYPE */
+#if CHIP_ALIGN_STRIDE >= 1
+	volatile uint16_t *ptr = (void *)(h + (off << (CHIP_ALIGN_STRIDE - 1)));
+#else
+	volatile uint16_t *ptr = (void *)(h + off);
 #endif
 
 	*ptr = val;
+#endif	/* !CHIP_ACCESSTYPE */
 }
 
 inline void
 __BS(write_4)(void *v, bus_space_handle_t h, bus_size_t off, uint32_t val)
 {
+	/* XXX XXX XXX should use CHIP_ACCESSTYPE if it's > 32bits */
 #if CHIP_ALIGN_STRIDE >= 2
-	uint32_t *ptr = (void *)(h + (off << (CHIP_ALIGN_STRIDE - 2)));
+	volatile uint32_t *ptr = (void *)(h + (off << (CHIP_ALIGN_STRIDE - 2)));
 #else
-	uint32_t *ptr = (void *)(h + off);
+	volatile uint32_t *ptr = (void *)(h + off);
 #endif
 
 	*ptr = val;

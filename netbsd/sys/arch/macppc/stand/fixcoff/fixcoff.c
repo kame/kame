@@ -1,4 +1,4 @@
-/*	$NetBSD: fixcoff.c,v 1.3 2001/02/19 22:48:58 cgd Exp $ */
+/*	$NetBSD: fixcoff.c,v 1.8 2003/12/11 00:27:42 matt Exp $ */
 
 /*
  * Copyright (c) 1999 National Aeronautics & Space Administration
@@ -41,12 +41,68 @@
  * Partially inspired by hack-coff, written by Paul Mackerras.
  */
 
+#if HAVE_NBTOOL_CONFIG_H
+#include "nbtool_config.h"
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/endian.h>
 
-#include "../../../../../gnu/dist/include/coff/rs6000.h"
+struct filehdr {
+#define U802WRMAGIC     0730
+#define U802ROMAGIC     0735
+#define U802TOCMAGIC    0737
+	char f_magic[2];
+	char f_nsect[2];
+	char f_time[4];
+	char f_symtab[4];
+	char f_nsyms[4];
+	char f_opthdr[2];
+	char f_flags[2];
+};
+
+struct sectionhdr {
+	char	s_name[8];
+	char	s_paddr[4];
+	char	s_vaddr[4];
+	char	s_size[4];
+	char	s_section[4];
+	char	s_reloc[4];
+	char	s_lineno[4];
+	char	s_nreloc[2];
+	char	s_nlineno[2];
+	char	s_flags[4];
+};
+
+struct aouthdr {
+	char	magic[2];
+	char	vstamp[2];
+	char	tsize[4];
+	char	dsize[4];
+	char	bsize[4];
+	char	entry[4];
+	char	text_start[4];
+	char	data_start[4];
+#define SMALL_AOUTSZ	28
+	char	o_toc[4];
+	char	o_snentry[2];
+	char	o_sntext[2];
+	char	o_sndata[2];
+	char	o_sntoc[2];
+	char	o_snloader[2];
+	char	o_snbss[2];
+	char	o_algntext[2];
+	char	o_algndata[2];
+	char	o_modtype[2];
+	char	o_cputype[2];
+	char	o_maxstack[4];
+	char	o_maxdata[4];
+	char	o_resv2[12];
+};
+#define RS6K_AOUTHDR_ZMAGIC     0x010B
 
 void
 usage(prog)
@@ -59,7 +115,7 @@ void
 help(prog)
 	char	*prog;
 {
-	fprintf(stderr, "%s\tis designed to fix the xcoff headers in a\n", prog);
+	fprintf(stderr, "%s\tis designed to fix the xcoff headers in a\n",prog);
 	fprintf(stderr,
 "\tbinary generated using objcopy from a non-xcoff source.\n");
 	usage(prog);
@@ -71,9 +127,9 @@ main(argc, argv)
 	char * const	*argv;
 {
 	int	fd, i, n, ch;
-	struct	external_filehdr	efh;
-	AOUTHDR				aoh;
-	struct	external_scnhdr		shead;
+	struct	filehdr	fh;
+	struct	aouthdr aoh;
+	struct	sectionhdr sh;
 
 	while ((ch = getopt(argc, argv, "h")) != -1)
 	    switch (ch) {
@@ -95,43 +151,43 @@ main(argc, argv)
 	/*
 	 * Make sure it looks like an xcoff file..
 	 */
-	if (read(fd, &efh, sizeof(efh)) != sizeof(efh))
+	if (read(fd, &fh, sizeof(fh)) != sizeof(fh))
 		err(1, "%s reading header", argv[0]);
 
-	i = ntohs(*(u_int16_t *)efh.f_magic);
+	i = be16toh(*(uint16_t *)fh.f_magic);
 	if ((i != U802WRMAGIC) && (i != U802ROMAGIC) && (i != U802TOCMAGIC))
 		errx(1, "%s: not a valid xcoff file", argv[0]);
 
-	/* Does the AOUT "Optional header" make sence? */
-	i = ntohs(*(u_int16_t *)efh.f_opthdr);
+	/* Does the AOUT "Optional header" make sense? */
+	i = be16toh(*(uint16_t *)fh.f_opthdr);
 
 	if (i == SMALL_AOUTSZ)
 		errx(1, "%s: file has small \"optional\" header, inappropriate for use with %s", argv[0], getprogname());
-	else if (i != AOUTSZ)
+	else if (i != sizeof(aoh))
 		errx(1, "%s: invalid \"optional\" header", argv[0]);
 
 	if (read(fd, &aoh, i) != i)
 		err(1, "%s reading \"optional\" header", argv[0]);
 
 	/* Now start filing in the AOUT header */
-	*(u_int16_t *)aoh.magic = htons(RS6K_AOUTHDR_ZMAGIC);
-	n = ntohs(*(u_int16_t *)efh.f_nscns);
+	*(uint16_t *)aoh.magic = htobe16(RS6K_AOUTHDR_ZMAGIC);
+	n = be16toh(*(uint16_t *)fh.f_nsect);
 
 	for (i = 0; i < n; i++) {
-		if (read(fd, &shead, sizeof(shead)) != sizeof(shead))
+		if (read(fd, &sh, sizeof(sh)) != sizeof(sh))
 			err(1, "%s reading section headers", argv[0]);
-		if (strcmp(shead.s_name, ".text") == 0) {
-			*(u_int16_t *)(aoh.o_snentry) = htons(i+1);
-			*(u_int16_t *)(aoh.o_sntext) = htons(i+1);
-		} else if (strcmp(shead.s_name, ".data") == 0) {
-			*(u_int16_t *)(aoh.o_sndata) = htons(i+1);
-		} else if (strcmp(shead.s_name, ".bss") == 0) {
-			*(u_int16_t *)(aoh.o_snbss) = htons(i+1);
+		if (strcmp(sh.s_name, ".text") == 0) {
+			*(uint16_t *)(aoh.o_snentry) = htobe16(i+1);
+			*(uint16_t *)(aoh.o_sntext) = htobe16(i+1);
+		} else if (strcmp(sh.s_name, ".data") == 0) {
+			*(uint16_t *)(aoh.o_sndata) = htobe16(i+1);
+		} else if (strcmp(sh.s_name, ".bss") == 0) {
+			*(uint16_t *)(aoh.o_snbss) = htobe16(i+1);
 		}
 	}
 
 	/* now write it out */
-	if (pwrite(fd, &aoh, sizeof(aoh), sizeof(struct external_filehdr))
+	if (pwrite(fd, &aoh, sizeof(aoh), sizeof(struct filehdr))
 			!= sizeof(aoh))
 		err(1, "%s writing modified header", argv[0]);
 	close(fd);

@@ -1,4 +1,4 @@
-/*	$NetBSD: scc.c,v 1.71 2002/03/17 19:40:49 atatat Exp $	*/
+/*	$NetBSD: scc.c,v 1.83 2003/09/28 17:25:07 chs Exp $	*/
 
 /*
  * Copyright (c) 1991,1990,1989,1994,1995,1996 Carnegie Mellon University
@@ -42,11 +42,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -66,7 +62,7 @@
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-__KERNEL_RCSID(0, "$NetBSD: scc.c,v 1.71 2002/03/17 19:40:49 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: scc.c,v 1.83 2003/09/28 17:25:07 chs Exp $");
 
 /*
  * Intel 82530 dual usart chip driver. Supports the serial port(s) on the
@@ -91,13 +87,12 @@ __KERNEL_RCSID(0, "$NetBSD: scc.c,v 1.71 2002/03/17 19:40:49 atatat Exp $");
 #include <sys/syslog.h>
 #include <sys/device.h>
 
+#include <dev/cons.h>
 #include <dev/dec/lk201.h>
 #include <dev/ic/z8530reg.h>
 
-#include <machine/conf.h>
 #include <machine/pmioctl.h>		/* XXX for pmEventQueue typedef */
 
-#include <pmax/pmax/cons.h>
 #include <pmax/pmax/pmaxtype.h>
 #include <pmax/pmax/maxine.h>
 #include <pmax/dev/sccreg.h>
@@ -114,13 +109,14 @@ void	ttrstrt __P((void *));
 
 
 /*
- * True iff the console unit is diverted throught this SCC device.
+ * True iff the console unit is diverted through this SCC device.
  * (used to just test if cn_tab->cn_getc was sccGetc, but that
  * breaks with the new-style glass-tty framebuffer console input.
  */
 
 #define CONSOLE_ON_UNIT(unit) \
-  (major(cn_tab->cn_dev) == SCCDEV && SCCUNIT(cn_tab->cn_dev) == (unit))
+  (major(cn_tab->cn_dev) == cdevsw_lookup_major(&scc_cdevsw) && \
+   SCCUNIT(cn_tab->cn_dev) == (unit))
 
 
 /*
@@ -207,11 +203,24 @@ static int	sccmatch  __P((struct device *parent, struct cfdata *cf,
 static void	sccattach __P((struct device *parent, struct device *self,
 		    void *aux));
 
-struct cfattach scc_ca = {
-	sizeof (struct scc_softc), sccmatch, sccattach,
-};
+CFATTACH_DECL(scc, sizeof (struct scc_softc),
+    sccmatch, sccattach, NULL, NULL);
 
 extern struct cfdriver scc_cd;
+
+dev_type_open(sccopen);
+dev_type_close(sccclose);
+dev_type_read(sccread);
+dev_type_write(sccwrite);
+dev_type_ioctl(sccioctl);
+dev_type_stop(sccstop);
+dev_type_tty(scctty);
+dev_type_poll(sccpoll);
+
+const struct cdevsw scc_cdevsw = {
+	sccopen, sccclose, sccread, sccwrite, sccioctl,
+	sccstop, scctty, sccpoll, nommap, ttykqfilter, D_TTY
+};
 
 /* QVSS-compatible in-kernel X input event parser, pointer tracker */
 void	(*sccDivertXInput) __P((int));
@@ -249,8 +258,11 @@ static int	sccintr __P((void *));
 scc_regmap_t *scc_cons_addr = 0;
 static struct scc_softc coldcons_softc;
 static struct consdev scccons = {
-	NULL, NULL, sccGetc, sccPutc, sccPollc, NULL, NODEV, 0
+	NULL, NULL, sccGetc, sccPutc, sccPollc, NULL, NULL, NULL,
+	NODEV, 0
 };
+
+static boolean_t scc_getc_dotimeout;
 
 void
 scc_cnattach(base, offset)
@@ -286,7 +298,7 @@ scc_cnattach(base, offset)
 	sccreset(sc);
 
 	cn_tab = &scccons;
-	cn_tab->cn_dev = makedev(SCCDEV, dev);
+	cn_tab->cn_dev = makedev(cdevsw_lookup_major(&scc_cdevsw), dev);
 	cn_tab->cn_pri = CN_NORMAL;
 	sc->scc_softCAR |= 1 << SCCLINE(cn_tab->cn_dev);
 	scc_tty_init(sc, cn_tab->cn_dev);
@@ -300,7 +312,7 @@ scc_lk201_cnattach(base, offset)
 {
 	dev_t dev;
 
-	dev = makedev(SCCDEV, SCCKBD_PORT);
+	dev = makedev(cdevsw_lookup_major(&scc_cdevsw), SCCKBD_PORT);
 	lk_divert(sccGetc, dev);
 
 	cn_tab = &scccons;
@@ -320,16 +332,8 @@ sccmatch(parent, cf, aux)
 	struct cfdata *cf;
 	void *aux;
 {
-	extern struct cfdriver ioasic_cd;		/* XXX */
 	struct ioasicdev_attach_args *d = aux;
 	void *sccaddr;
-
-	if (parent->dv_cfdata->cf_driver != &ioasic_cd) {
-#ifdef DIAGNOSTIC
-		printf("Cannot attach scc on %s\n", parent->dv_xname);
-#endif
-		return (0);
-	}
 
 	/* Make sure that we're looking for this type of device. */
 	if ((strncmp(d->iada_modname, "z8530   ", TC_ROM_LLEN) != 0) &&
@@ -412,7 +416,6 @@ sccattach(parent, self, aux)
 	 */
 	sccreset(sc);
 
-
 	/*
 	 * Special handling for consoles.
 	 */
@@ -420,7 +423,7 @@ sccattach(parent, self, aux)
 		/*
 		 * We were using PROM callbacks for console I/O,
 		 * and we just reset the chip under the console.
-		 * Re-wire  this unit up as console ASAP.
+		 * Re-wire this unit up as console ASAP.
 		 */
 		sc->scc_softCAR |= 1 << SCCLINE(cn_tab->cn_dev);
 		scc_tty_init(sc, cn_tab->cn_dev);
@@ -432,13 +435,15 @@ sccattach(parent, self, aux)
 	printf("\n");
 
 
-	/* Wire up any childre, like keyboards or mice. */
+	/* Wire up any children, like keyboards or mice. */
 #if NRASTERCONSOLE > 0
 	if (systype != DS_MAXINE) {
+		int maj;
+		maj = cdevsw_lookup_major(&scc_cdevsw);
 		if (unit == 1) {
-			scc_kbd_init(sc, makedev(SCCDEV, SCCKBD_PORT));
+			scc_kbd_init(sc, makedev(maj, SCCKBD_PORT));
 		} else if (unit == 0) {
-			scc_mouse_init(sc, makedev(SCCDEV, SCCMOUSE_PORT));
+			scc_mouse_init(sc, makedev(maj, SCCMOUSE_PORT));
 		}
 	}
 #endif /* NRASTERCONSOLE > 0 */
@@ -509,6 +514,9 @@ scc_mouse_init(sc, dev)
 	struct termios cterm;
 	struct tty ctty;
 	int s;
+#if NRASTERCONSOLE > 0
+	extern const struct cdevsw rcons_cdevsw;
+#endif
 
 	s = spltty();
 	ctty.t_dev = dev;
@@ -521,11 +529,13 @@ scc_mouse_init(sc, dev)
 	 * or failing that, a line discipline to do the inkernel DEC
 	 * mouse tracking required by Xservers.
 	 */
-	if (major(cn_tab->cn_dev) != RCONSDEV)
+	if (cdevsw_lookup(cn_tab->cn_dev) != &rcons_cdevsw)
 		goto done;
 
 	DELAY(10000);
+	scc_getc_dotimeout = TRUE;
 	lk_mouseinit(ctty.t_dev, sccPutc, sccGetc);
+	scc_getc_dotimeout = FALSE;
 	DELAY(10000);
 
 done:
@@ -1058,7 +1068,8 @@ scc_rxintr(sc, chan, regs, unit)
 	/*
 	 * Keyboard needs special treatment.
 	 */
-	if (tp == scctty(makedev(SCCDEV, SCCKBD_PORT))) {
+	if (tp == scctty(makedev(cdevsw_lookup_major(&scc_cdevsw),
+				 SCCKBD_PORT))) {
 #if defined(DDB) && defined(LK_DO)
 			if (cc == LK_DO) {
 				spl0();
@@ -1083,7 +1094,8 @@ scc_rxintr(sc, chan, regs, unit)
 	/*
 	 * Now for mousey
 	 */
-	} else if (tp == scctty(makedev(SCCDEV, SCCMOUSE_PORT)) &&
+	} else if (tp == scctty(makedev(cdevsw_lookup_major(&scc_cdevsw),
+				SCCMOUSE_PORT)) &&
 	    sccMouseButtons) {
 #if NRASTERCONSOLE > 0
 		/*XXX*/
@@ -1152,7 +1164,7 @@ sccintr(xxxsc)
 	 */
 
 	/*
-	 * At elast some, maybe all DECstation chips have modem
+	 * At least some, maybe all DECstation chips have modem
 	 * leads crosswired: the data comes in one channel and the
 	 * bulkead modem signals for that port are wired to the
 	 * _other_ channel of the chip. Yes, really.
@@ -1401,9 +1413,8 @@ sccGetc(dev)
 	dev_t dev;
 {
 	scc_regmap_t *regs;
-	int c, line;
+	int s, c, line, timeout;
 	u_char value;
-	int s;
 
 	line = SCCLINE(dev);
 	if (cold && scc_cons_addr) {
@@ -1418,6 +1429,7 @@ sccGetc(dev)
 		return (0);
 	/*s = spltty(); */	/* XXX  why different spls? */
 	s = splhigh();
+	timeout = 500000;
 	for (;;) {
 		SCC_READ_REG(regs, line, SCC_RR0, value);
 		if (value & ZSRR0_RX_READY) {
@@ -1434,8 +1446,14 @@ sccGetc(dev)
 				splx(s);
 				return (c & 0xff);
 			}
-		} else
+			timeout = 500000;
+		} else {
 			DELAY(10);
+			if (scc_getc_dotimeout && --timeout == 0) {
+				splx(s);
+				return (-1);
+			}
+		}
 	}
 }
 

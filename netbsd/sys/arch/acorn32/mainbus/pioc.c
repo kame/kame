@@ -1,4 +1,4 @@
-/*	$NetBSD: pioc.c,v 1.1 2001/10/05 22:27:53 reinoud Exp $	*/     
+/*	$NetBSD: pioc.c,v 1.7 2003/07/14 22:48:25 lukem Exp $	*/     
 
 /*
  * Copyright (c) 1997 Mark Brinicombe.
@@ -39,6 +39,9 @@
  */
 
 /*#define PIOC_DEBUG*/
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pioc.c,v 1.7 2003/07/14 22:48:25 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -100,9 +103,8 @@ static void piocgetid	 __P((bus_space_tag_t iot, bus_space_handle_t ioh,
 
 /* device attach and driver structure */
 
-struct cfattach pioc_ca = {
-	sizeof(struct pioc_softc), piocmatch, piocattach
-};
+CFATTACH_DECL(pioc, sizeof(struct pioc_softc),
+    piocmatch, piocattach, NULL, NULL);
 
 /*
  * void piocgetid(bus_space_tag_t iot, bus_space_handle_t ioh,
@@ -194,13 +196,14 @@ piocprint(aux, name)
 
 	if (!name) {
 		if (pa->pa_offset)
-			printf(" offset 0x%x", pa->pa_offset >> 2);
+			aprint_normal(" offset 0x%x", pa->pa_offset >> 2);
 		if (pa->pa_iosize > 1)
-			printf("-0x%x", ((pa->pa_offset >> 2) + pa->pa_iosize) - 1);
+			aprint_normal("-0x%x",
+			    ((pa->pa_offset >> 2) + pa->pa_iosize) - 1);
 		if (pa->pa_irq != -1)
-			printf(" irq %d", pa->pa_irq);
+			aprint_normal(" irq %d", pa->pa_irq);
 		if (pa->pa_drq != -1)
-			printf(" drq 0x%08x", pa->pa_drq);
+			aprint_normal(" drq 0x%08x", pa->pa_drq);
 	}
 
 /* XXX print flags */
@@ -243,7 +246,7 @@ piocsearch(parent, cf, aux)
 		}
 
 		tryagain = 0;
-		if ((*cf->cf_attach->ca_match)(parent, cf, &pa) > 0) {
+		if (config_match(parent, cf, &pa) > 0) {
 			config_attach(parent, cf, &pa, piocprint);
 /*			tryagain = (cf->cf_fstate == FSTATE_STAR);*/
 		}
@@ -279,7 +282,7 @@ piocsubmatch(parent, cf, aux)
 		if (pa->pa_irq == -1)
 			pa->pa_irq = cf->cf_loc[2];
 		tryagain = 0;
-		if ((*cf->cf_attach->ca_match)(parent, cf, pa) > 0) {
+		if (config_match(parent, cf, pa) > 0) {
 			config_attach(parent, cf, pa, piocprint);
 /*			tryagain = (cf->cf_fstate == FSTATE_STAR);*/
 		}

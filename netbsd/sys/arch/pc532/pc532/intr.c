@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.c,v 1.24 2001/12/04 17:56:36 wiz Exp $	*/
+/*	$NetBSD: intr.c,v 1.28 2003/07/15 02:54:34 lukem Exp $	*/
 
 /*
  * Copyright (c) 1994 Matthias Pfaller.
@@ -30,9 +30,13 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: intr.c,v 1.28 2003/07/15 02:54:34 lukem Exp $");
+
 #define DEFINE_SPLX
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/device.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -131,7 +135,7 @@ check_sir(arg)
 			if ((cirpending & mask) != 0) {
 				register int s;
 				uvmexp.softs++;
-				iv->iv_cnt++;
+				iv->iv_evcnt.ev_count++;
 				s = splraise(iv->iv_mask);
 				iv->iv_vec(iv->iv_arg);
 				splx(s);
@@ -159,9 +163,10 @@ intr_establish(intr, vector, arg, use, blevel, rlevel, mode)
 	int rlevel;
 	int mode;
 {
-	int i;
+	int i, soft;
 
 	di();
+	soft = intr == SOFTINT;
 	if (rlevel < IPL_ZERO || rlevel >= NIPL ||
 	    blevel < IPL_ZERO || blevel >= NIPL)
 		panic("Illegal interrupt level for %s in intr_establish", use);
@@ -171,7 +176,7 @@ intr_establish(intr, vector, arg, use, blevel, rlevel, mode)
 		intr = next_sir++;
 	} else {
 		if (ivt[intr].iv_vec != badhard)
-			panic("Interrupt %d already allocated\n", intr);
+			panic("Interrupt %d already allocated", intr);
 		switch (mode) {
 		case RISING_EDGE:
 			ICUW(TPL)  |=  (1 << intr);
@@ -195,9 +200,10 @@ intr_establish(intr, vector, arg, use, blevel, rlevel, mode)
 	}
 	ivt[intr].iv_vec   = vector;
 	ivt[intr].iv_arg   = arg;
-	ivt[intr].iv_cnt   = 0;
 	ivt[intr].iv_use   = use;
 	ivt[intr].iv_level = rlevel;
+	evcnt_attach_dynamic(&ivt[intr].iv_evcnt, EVCNT_TYPE_INTR, NULL,
+	    soft ? "soft" : "intr", use);
 	ei();
 	imask[blevel] |= 1 << intr;
 
@@ -211,7 +217,7 @@ intr_establish(intr, vector, arg, use, blevel, rlevel, mode)
 	 * There are tty, network and disk drivers that use free() at interrupt
 	 * time, so imp > (tty | net | bio).
 	 */
-	imask[IPL_IMP] |= imask[IPL_TTY] | imask[IPL_NET] | imask[IPL_BIO];
+	imask[IPL_VM] |= imask[IPL_TTY] | imask[IPL_NET] | imask[IPL_BIO];
 
 	/*
 	 * Enforce a hierarchy that gives slow devices a better chance at not

@@ -1,4 +1,4 @@
-/*	$NetBSD: tx3912video.c,v 1.28 2002/04/13 09:29:54 takemura Exp $ */
+/*	$NetBSD: tx3912video.c,v 1.35 2003/11/13 03:09:28 chs Exp $ */
 
 /*-
  * Copyright (c) 1999-2002 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: tx3912video.c,v 1.35 2003/11/13 03:09:28 chs Exp $");
 
 #define TX3912VIDEO_DEBUG
 
@@ -115,10 +118,8 @@ void	tx3912video_clut_get(struct tx3912video_softc *, u_int32_t *, int,
 static int __get_color8(int);
 static int __get_color4(int);
 
-struct cfattach tx3912video_ca = {
-	sizeof(struct tx3912video_softc), tx3912video_match, 
-	tx3912video_attach
-};
+CFATTACH_DECL(tx3912video, sizeof(struct tx3912video_softc),
+    tx3912video_match, tx3912video_attach, NULL, NULL);
 
 struct hpcfb_accessops tx3912video_ha = {
 	tx3912video_ioctl, tx3912video_mmap, 0, 0, 0, 0,
@@ -136,7 +137,7 @@ tx3912video_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct tx3912video_softc *sc = (void *)self;
 	struct video_chip *chip;
-	const char *depth_print[] = { 
+	static const char *const depth_print[] = { 
 		[TX3912_VIDEOCTRL1_BITSEL_MONOCHROME] = "monochrome",
 		[TX3912_VIDEOCTRL1_BITSEL_2BITGREYSCALE] = "2bit greyscale",
 		[TX3912_VIDEOCTRL1_BITSEL_4BITGREYSCALE] = "4bit greyscale",
@@ -274,7 +275,7 @@ tx3912video_hpcfbinit(sc)
 
 	switch (chip->vc_fbdepth) {
 	default:
-		panic("tx3912video_hpcfbinit: not supported color depth\n");
+		panic("tx3912video_hpcfbinit: not supported color depth");
 		/* NOTREACHED */
 	case 2:
 		fb->hf_class = HPCFB_CLASS_GRAYSCALE;
@@ -516,38 +517,34 @@ tx3912video_ioctl(void *v, u_long cmd, caddr_t data, int flag, struct proc *p)
 
 	switch (cmd) {
 	case WSDISPLAYIO_GETCMAP:
-		cmap = (struct wsdisplay_cmap*)data;
+		cmap = (struct wsdisplay_cmap *)data;
 		cnt = cmap->count;
 		idx = cmap->index;
 
 		if (sc->sc_fbconf.hf_class != HPCFB_CLASS_INDEXCOLOR ||
 		    sc->sc_fbconf.hf_pack_width != 8 ||
 		    !LEGAL_CLUT_INDEX(idx) ||
-		    !LEGAL_CLUT_INDEX(idx + cnt -1)) {
+		    !LEGAL_CLUT_INDEX(idx + cnt - 1)) {
 			return (EINVAL);
 		}
 
-		if (!uvm_useracc(cmap->red, cnt, B_WRITE) ||
-		    !uvm_useracc(cmap->green, cnt, B_WRITE) ||
-		    !uvm_useracc(cmap->blue, cnt, B_WRITE)) {
-			return (EFAULT);
-		}
-
 		error = cmap_work_alloc(&r, &g, &b, &rgb, cnt);
-		if (error != 0) {
-			cmap_work_free(r, g, b, rgb);
-			return  (ENOMEM);
-		}
+		if (error)
+			goto out;
 		tx3912video_clut_get(sc, rgb, idx, cnt);
 		rgb24_decompose(rgb, r, g, b, cnt);
 
-		copyout(r, cmap->red, cnt);
-		copyout(g, cmap->green,cnt);
-		copyout(b, cmap->blue, cnt);
+		error = copyout(r, cmap->red, cnt);
+		if (error)
+			goto out;
+		error = copyout(g, cmap->green,cnt);
+		if (error)
+			goto out;
+		error = copyout(b, cmap->blue, cnt);
 
+out:
 		cmap_work_free(r, g, b, rgb);
-
-		return (0);
+		return error;
 		
 	case WSDISPLAYIO_PUTCMAP:
 		/*
@@ -703,7 +700,7 @@ void
 tx3912video_clut_install(void *ctx, struct rasops_info *ri)
 {
 	struct tx3912video_softc *sc = ctx;
-	const int system_cmap[0x10] = {
+	static const int system_cmap[0x10] = {
 		TX3912VIDEO_BLACK,
 		TX3912VIDEO_RED,
 		TX3912VIDEO_GREEN,

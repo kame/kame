@@ -1,4 +1,4 @@
-/*	$NetBSD: urlphy.c,v 1.1 2002/03/28 21:07:53 ichiro Exp $	*/
+/*	$NetBSD: urlphy.c,v 1.9 2003/09/04 15:17:38 tsutsui Exp $	*/
 /*
  * Copyright (c) 2001, 2002
  *     Shingo WATANABE <nabe@nabechan.org>.  All rights reserved.
@@ -11,10 +11,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Shingo WATANABE.
- * 4. Neither the name of the author nor the names of any co-contributors
+ * 3. Neither the name of the author nor the names of any co-contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -37,13 +34,12 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: urlphy.c,v 1.1 2002/03/28 21:07:53 ichiro Exp $");
+__KERNEL_RCSID(0, "$NetBSD: urlphy.c,v 1.9 2003/09/04 15:17:38 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
-#include <sys/malloc.h>
 #include <sys/socket.h>
 
 #include <net/if.h>
@@ -54,7 +50,6 @@ __KERNEL_RCSID(0, "$NetBSD: urlphy.c,v 1.1 2002/03/28 21:07:53 ichiro Exp $");
 #include <dev/mii/miidevs.h>
 #include <dev/mii/urlphyreg.h>
 
-#define	URLPHY_DEBUG	0
 #ifdef URLPHY_DEBUG
 #define DPRINTF(x)	if (urlphydebug) printf x
 #define DPRINTFN(n,x)	if (urlphydebug>(n)) printf x
@@ -67,10 +62,8 @@ int urlphydebug = URLPHY_DEBUG;
 int urlphy_match(struct device *, struct cfdata *, void *);
 void urlphy_attach(struct device *, struct device *, void *);
 
-struct cfattach urlphy_ca = {
-	sizeof(struct mii_softc), urlphy_match, urlphy_attach, mii_phy_detach,
-	mii_phy_activate
-};
+CFATTACH_DECL(urlphy, sizeof(struct mii_softc),
+    urlphy_match, urlphy_attach, mii_phy_detach, mii_phy_activate);
 
 int urlphy_service(struct mii_softc *, struct mii_data *, int);
 void urlphy_status(struct mii_softc *);
@@ -94,7 +87,7 @@ urlphy_match(struct device *parent, struct cfdata *match, void *aux)
 	/*
 	 * Make sure the parent is an 'url' device.
 	 */
-	if (strcmp(parent->dv_cfdata->cf_driver->cd_name, "url") != 0)
+	if (strcmp(parent->dv_cfdata->cf_name, "url") != 0)
 		return(0);
 
 	return (10);
@@ -107,7 +100,8 @@ urlphy_attach(struct device *parent, struct device *self, void *aux)
 	struct mii_attach_args *ma = aux;
 	struct mii_data *mii = ma->mii_data;
 
-	printf(": Realtek RTL8150L internal media interface\n");
+	aprint_naive(": Media interface\n");
+	aprint_normal(": Realtek RTL8150L internal media interface\n");
 
 	DPRINTF(("%s: %s: enter\n", sc->mii_dev.dv_xname, __FUNCTION__));
 
@@ -124,19 +118,19 @@ urlphy_attach(struct device *parent, struct device *self, void *aux)
 	sc->mii_flags |= MIIF_NOISOLATE;
 
 	if (mii->mii_instance != 0) {
-		printf("%s: ignoring this PHY, non-zero instance\n",
+		aprint_error("%s: ignoring this PHY, non-zero instance\n",
 		       sc->mii_dev.dv_xname);
 		return;
 	}
 	PHY_RESET(sc);
 
 	sc->mii_capabilities = PHY_READ(sc, MII_BMSR) & ma->mii_capmask;
-	printf("%s: ", sc->mii_dev.dv_xname);
+	aprint_normal("%s: ", sc->mii_dev.dv_xname);
 	if ((sc->mii_capabilities & BMSR_MEDIAMASK) == 0)
-		printf("no media present");
+		aprint_error("no media present");
 	else
 		mii_phy_add_media(sc);
-	printf("\n");
+	aprint_normal("\n");
 }
 
 int

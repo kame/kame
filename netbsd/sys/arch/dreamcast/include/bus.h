@@ -1,4 +1,4 @@
-/*	$NetBSD: bus.h,v 1.6 2002/03/25 18:59:40 uch Exp $	*/
+/*	$NetBSD: bus.h,v 1.8 2003/06/15 23:08:58 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 2000, 2001 The NetBSD Foundation, Inc.
@@ -464,6 +464,7 @@ do {									\
 #define	BUS_DMA_BUS4		0x080
 #define	BUS_DMA_READ		0x100	/* mapping is device -> memory only */
 #define	BUS_DMA_WRITE		0x200	/* mapping is memory -> device only */
+#define	BUS_DMA_NOCACHE		0x400	/* hint: map non-cached memory */
 
 /* Forwards needed by prototypes below. */
 struct mbuf;
@@ -479,6 +480,8 @@ struct uio;
 
 typedef struct dreamcast_bus_dma_tag		*bus_dma_tag_t;
 typedef struct dreamcast_bus_dmamap		*bus_dmamap_t;
+
+#define BUS_DMA_TAG_VALID(t)    ((t) != (bus_dma_tag_t)0)
 
 /*
  *	bus_dma_segment_t

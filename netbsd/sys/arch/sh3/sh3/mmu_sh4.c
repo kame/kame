@@ -1,4 +1,4 @@
-/*	$NetBSD: mmu_sh4.c,v 1.5 2002/05/09 12:27:04 uch Exp $	*/
+/*	$NetBSD: mmu_sh4.c,v 1.7 2003/07/15 03:35:57 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mmu_sh4.c,v 1.7 2003/07/15 03:35:57 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 
@@ -45,9 +48,9 @@
 
 #define	SH4_MMU_HAZARD	__asm__ __volatile__("nop;nop;nop;nop;nop;nop;nop;nop;")
 
-extern __inline__ void __sh4_itlb_invalidate_all(void);
+static __inline__ void __sh4_itlb_invalidate_all(void);
 
-void
+static __inline__ void
 __sh4_itlb_invalidate_all()
 {
 
@@ -129,8 +132,14 @@ sh4_tlb_invalidate_all()
 	for (e = 0; e < eend; e++) {
 		a = SH4_UTLB_AA | (e << SH4_UTLB_E_SHIFT);
 		_reg_write_4(a, 0);
+		a = SH4_UTLB_DA1 | (e << SH4_UTLB_E_SHIFT);
+		_reg_write_4(a, 0);
 	}
 	__sh4_itlb_invalidate_all();
+	_reg_write_4(SH4_ITLB_DA1, 0);
+	_reg_write_4(SH4_ITLB_DA1 | (1 << SH4_ITLB_E_SHIFT), 0);
+	_reg_write_4(SH4_ITLB_DA1 | (2 << SH4_ITLB_E_SHIFT), 0);
+	_reg_write_4(SH4_ITLB_DA1 | (3 << SH4_ITLB_E_SHIFT), 0);
 	RUN_P1;
 }
 

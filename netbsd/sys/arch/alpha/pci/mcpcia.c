@@ -1,4 +1,4 @@
-/* $NetBSD: mcpcia.c,v 1.13 2002/05/16 01:01:32 thorpej Exp $ */
+/* $NetBSD: mcpcia.c,v 1.17 2003/06/15 23:08:55 fvdl Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -74,7 +74,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: mcpcia.c,v 1.13 2002/05/16 01:01:32 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mcpcia.c,v 1.17 2003/06/15 23:08:55 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -105,9 +105,8 @@ __KERNEL_RCSID(0, "$NetBSD: mcpcia.c,v 1.13 2002/05/16 01:01:32 thorpej Exp $");
 
 static int	mcpciamatch __P((struct device *, struct cfdata *, void *));
 static void	mcpciaattach __P((struct device *, struct device *, void *));
-struct cfattach mcpcia_ca = {
-	sizeof(struct mcpcia_softc), mcpciamatch, mcpciaattach
-};
+CFATTACH_DECL(mcpcia, sizeof(struct mcpcia_softc),
+    mcpciamatch, mcpciaattach, NULL, NULL);
 
 static int	mcpciaprint __P((void *, const char *));
 
@@ -131,8 +130,8 @@ mcpciaprint(aux, pnp)
 	register struct pcibus_attach_args *pba = aux;
 	/* only PCIs can attach to MCPCIA for now */
 	if (pnp)
-		printf("%s at %s", pba->pba_busname, pnp);
-	printf(" bus %d", pba->pba_bus);
+		aprint_normal("%s at %s", pba->pba_busname, pnp);
+	aprint_normal(" bus %d", pba->pba_bus);
 	return (UNCONF);
 }
 
@@ -213,6 +212,7 @@ mcpciaattach(parent, self, aux)
 	pba.pba_memt = &ccp->cc_memt;
 	pba.pba_dmat =	/* start with direct, may change... */
 	    alphabus_dma_get_tag(&ccp->cc_dmat_direct, ALPHA_BUS_PCI);
+	pba.pba_dmat64 = NULL;
 	pba.pba_pc = &ccp->cc_pc;
 	pba.pba_bus = 0;
 	pba.pba_bridgetag = NULL;

@@ -1,4 +1,4 @@
-/*	$NetBSD: i8253reg.h,v 1.5 1998/01/19 11:38:00 drochner Exp $	*/
+/*	$NetBSD: i8253reg.h,v 1.8 2003/08/07 16:31:01 agc Exp $	*/
 
 /*-
  * Copyright (c) 1993 The Regents of the University of California.
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by the University of
- *      California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -60,7 +56,7 @@
  * The outputs of the three timers are connected as follows:
  *
  *	 timer 0 -> irq 0
- *	 timer 1 -> dma chan 0 (for dram refresh)
+ *	 timer 1 -> DMA chan 0 (for dram refresh)
  * 	 timer 2 -> speaker (via keyboard controller)
  *
  * Timer 0 is used to call hardclock.
@@ -69,7 +65,7 @@
 
 /*
  * Frequency of all three count-down timers; (TIMER_FREQ/freq) is the
- * appropriate count to generate a frequency of freq hz.
+ * appropriate count to generate a frequency of freq Hz.
  */
 #ifndef TIMER_FREQ
 #define	TIMER_FREQ	1193182

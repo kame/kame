@@ -1,4 +1,4 @@
-/*	$NetBSD: db_examine.c,v 1.23 2002/02/15 07:33:50 simonb Exp $	*/
+/*	$NetBSD: db_examine.c,v 1.26 2003/11/09 20:52:18 scw Exp $	*/
 
 /*
  * Mach Operating System
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: db_examine.c,v 1.23 2002/02/15 07:33:50 simonb Exp $");
+__KERNEL_RCSID(0, "$NetBSD: db_examine.c,v 1.26 2003/11/09 20:52:18 scw Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -64,7 +64,7 @@ void
 db_examine_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
 {
 	if (modif[0] != '\0')
-		db_strcpy(db_examine_format, modif);
+		strlcpy(db_examine_format, modif, sizeof(db_examine_format));
 
 	if (count == -1)
 		count = 1;
@@ -112,7 +112,7 @@ db_examine(db_addr_t addr, char *fmt, int count)
 				width = 12 * (sizeof value / 4);
 				break;
 			case 'a':	/* address */
-				db_printf("= 0x%lx\n", addr);
+				db_printf("= 0x%lx\n", (long)addr);
 				break;
 			case 'r':	/* signed, current radix */
 				value = db_get_value(addr, size, TRUE);
@@ -123,7 +123,8 @@ db_examine(db_addr_t addr, char *fmt, int count)
 			case 'x':	/* unsigned hex */
 				value = db_get_value(addr, size, FALSE);
 				addr += size;
-				db_printf("%-*lx", width, value);
+				db_printf(DB_EXPR_T_IS_QUAD ? "%-*qx" : "%-*lx",
+				    width, value);
 				break;
 			case 'm':	/* hex dump */
 				/*
@@ -139,7 +140,9 @@ db_examine(db_addr_t addr, char *fmt, int count)
 						value =
  						    db_get_value(addr+bytes, 1,
 							FALSE);
-						db_printf("%02lx", value);
+						db_printf(
+						    DB_EXPR_T_IS_QUAD ? "%02qx":
+						    "%02lx", value);
 						bytes++;
 						if (!(bytes % 4))
 							db_printf(" ");
@@ -168,17 +171,20 @@ db_examine(db_addr_t addr, char *fmt, int count)
 			case 'd':	/* signed decimal */
 				value = db_get_value(addr, size, TRUE);
 				addr += size;
-				db_printf("%-*ld", width, value);
+				db_printf(DB_EXPR_T_IS_QUAD ? "%-*qd" : "%-*ld",
+				    width, value);
 				break;
 			case 'u':	/* unsigned decimal */
 				value = db_get_value(addr, size, FALSE);
 				addr += size;
-				db_printf("%-*lu", width, value);
+				db_printf(DB_EXPR_T_IS_QUAD ? "%-*qu" : "%-*lu",
+				    width, value);
 				break;
 			case 'o':	/* unsigned octal */
 				value = db_get_value(addr, size, FALSE);
 				addr += size;
-				db_printf("%-*lo", width, value);
+				db_printf(DB_EXPR_T_IS_QUAD ? "%-*qo" : "%-*lo",
+				    width, value);
 				break;
 			case 'c':	/* character */
 				value = db_get_value(addr, 1, FALSE);
@@ -186,7 +192,7 @@ db_examine(db_addr_t addr, char *fmt, int count)
 				if (value >= ' ' && value <= '~')
 					db_printf("%c", (char)value);
 				else
-					db_printf("\\%03lo", value);
+					db_printf("\\%03o", (int)value);
 				break;
 			case 's':	/* null-terminated string */
 				for (;;) {
@@ -197,7 +203,7 @@ db_examine(db_addr_t addr, char *fmt, int count)
 					if (value >= ' ' && value <= '~')
 						db_printf("%c", (char)value);
 					else
-						db_printf("\\%03lo", value);
+						db_printf("\\%03o", (int)value);
 				}
 				break;
 			case 'i':	/* instruction */
@@ -243,7 +249,7 @@ db_print_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
 			break;
 		}
 	case 'x':
-		db_printf("%8lx", addr);
+		db_printf(DB_EXPR_T_IS_QUAD ? "%16qx" : "%8lx", addr);
 		break;
 	case 'z':
 		{
@@ -254,20 +260,20 @@ db_print_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
 			break;
 		}
 	case 'd':
-		db_printf("%11ld", addr);
+		db_printf(DB_EXPR_T_IS_QUAD ? "%11qd" : "%11ld", addr);
 		break;
 	case 'u':
-		db_printf("%11lu", addr);
+		db_printf(DB_EXPR_T_IS_QUAD ? "%11qu" : "%11lu", addr);
 		break;
 	case 'o':
-		db_printf("%16lo", addr);
+		db_printf(DB_EXPR_T_IS_QUAD ? "%15qo" : "%16lo", addr);
 		break;
 	case 'c':
 		value = addr & 0xFF;
 		if (value >= ' ' && value <= '~')
 			db_printf("%c", (char)value);
 		else
-			db_printf("\\%03lo", value);
+			db_printf("\\%03o", (int)value);
 		break;
 	}
 	db_printf("\n");
@@ -280,14 +286,6 @@ db_print_loc_and_inst(db_addr_t loc)
 	db_printsym(loc, DB_STGY_PROC, db_printf);
 	db_printf(":\t");
 	(void) db_disasm(loc, FALSE);
-}
-
-void
-db_strcpy(char *dst, char *src)
-{
-
-	while ((*dst++ = *src++) != '\0')
-		;
 }
 
 /*

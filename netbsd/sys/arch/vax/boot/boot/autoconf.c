@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.16.10.1 2002/06/02 01:20:51 tv Exp $ */
+/*	$NetBSD: autoconf.c,v 1.21 2003/12/08 07:33:12 matt Exp $ */
 /*
  * Copyright (c) 1994, 1998 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -51,7 +51,7 @@ void consinit(void);
 void scbinit(void);
 int getsecs(void);
 void scb_stray(void *);
-void longjmp(int *);
+void longjmp(int *, int);
 void rtimer(void *);
 
 long *bootregs;
@@ -135,6 +135,17 @@ getsecs()
 struct ivec_dsp **scb;
 struct ivec_dsp *scb_vec;
 extern struct ivec_dsp idsptch;
+extern int jbuf[10];
+
+static void
+mcheck(void *arg)
+{
+	int off, *mfp = (int *)(void *)&arg;
+
+	off = (mfp[7]/4 + 8);
+	printf("Machine check, pc=%x, psl=%x\n", mfp[off], mfp[off+1]);
+	longjmp(jbuf, 1);
+}
 
 /*
  * Init the SCB and set up a handler for all vectors in the lower space,
@@ -165,14 +176,15 @@ scbinit()
 		scb_vec[i].ev = NULL;
 	}
 	scb_vec[0xc0/4].hoppaddr = rtimer;
+	scb_vec[4/4].hoppaddr = mcheck;
 
-	mtpr(-10000, PR_NICR);		/* Load in count register */
+	if (vax_boardtype != VAX_BTYP_VXT)
+		mtpr(-10000, PR_NICR);		/* Load in count register */
 	mtpr(0x800000d1, PR_ICCS);	/* Start clock and enable interrupt */
 
 	mtpr(20, PR_IPL);
 }
 
-extern int jbuf[10];
 extern int sluttid, senast, skip;
 
 void
@@ -189,7 +201,7 @@ rtimer(void *arg)
 		int nu = sluttid - getsecs();
 		if (senast != nu) {
 			mtpr(20, PR_IPL);
-			longjmp(jbuf);
+			longjmp(jbuf, 1);
 		}
 	}
 }
@@ -204,26 +216,26 @@ rtimer(void *arg)
 #define	CMN_IDSPTCH "_cmn_idsptch"
 #endif
 
-asm("
-	.text
-	.align	2
-	.globl  " IDSPTCH ", " EIDSPTCH "
-" IDSPTCH ":
-	pushr   $0x3f
-	.word	0x9f16
-	.long   " CMN_IDSPTCH "
-	.long	0
-	.long	0
-	.long	0
-" EIDSPTCH ":
+asm(
+"	.text;"
+"	.align	2;"
+"	.globl  " IDSPTCH ", " EIDSPTCH ";"
+IDSPTCH ":;"
+"	pushr   $0x3f;"
+"	.word	0x9f16;"
+"	.long   " CMN_IDSPTCH ";"
+"	.long	0;"
+"	.long	0;"
+"	.long	0;"
+EIDSPTCH ":;"
 
-" CMN_IDSPTCH ":
-	movl	(%sp)+,%r0
-	pushl	4(%r0)
-	calls	$1,*(%r0)
-	popr	$0x3f
-	rei
-");
+CMN_IDSPTCH ":;"
+"	movl	(%sp)+,%r0;"
+"	pushl	4(%r0);"
+"	calls	$1,*(%r0);"
+"	popr	$0x3f;"
+"	rei;"
+);
 
 /*
  * Stray interrupt handler.

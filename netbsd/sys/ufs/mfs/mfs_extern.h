@@ -1,4 +1,4 @@
-/*	$NetBSD: mfs_extern.h,v 1.12 2001/09/15 16:13:06 chs Exp $	*/
+/*	$NetBSD: mfs_extern.h,v 1.18.2.1 2004/05/23 10:45:22 tron Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -34,6 +30,12 @@
  *
  *	@(#)mfs_extern.h	8.4 (Berkeley) 3/30/95
  */
+
+#ifndef _UFS_MFS_MFS_EXTERN_H_
+#define _UFS_MFS_MFS_EXTERN_H_
+
+#include <sys/mallocvar.h>
+MALLOC_DECLARE(M_MFSNODE);
 
 struct buf;
 struct mount;
@@ -53,8 +55,6 @@ int	mfs_mount	__P((struct mount *, const char *, void *,
 			     struct nameidata *, struct proc *));
 int	mfs_start	__P((struct mount *, int, struct proc *));
 int	mfs_statfs	__P((struct mount *, struct statfs *, struct proc *));
-int	mfs_sysctl	__P((int *, u_int, void *, size_t *, void *, size_t,
-			     struct proc *));
 
 void	mfs_init	__P((void));
 void	mfs_reinit	__P((void));
@@ -70,4 +70,10 @@ int	mfs_inactive	__P((void *));
 int	mfs_reclaim	__P((void *));
 int	mfs_print	__P((void *));
 
+#ifdef SYSCTL_SETUP_PROTO
+SYSCTL_SETUP_PROTO(sysctl_vfs_mfs_setup);
+#endif /* SYSCTL_SETUP_PROTO */
+
 __END_DECLS
+
+#endif /* !_UFS_MFS_MFS_EXTERN_H_ */

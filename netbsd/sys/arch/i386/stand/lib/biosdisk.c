@@ -1,4 +1,4 @@
-/*	$NetBSD: biosdisk.c,v 1.15 2001/07/07 22:57:57 perry Exp $	*/
+/*	$NetBSD: biosdisk.c,v 1.20 2004/03/24 16:34:29 drochner Exp $	*/
 
 /*
  * Copyright (c) 1996, 1998
@@ -12,12 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed for the NetBSD Project
- *	by Matthias Drochner.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -37,6 +31,8 @@
  * needs lowlevel parts from bios_disk.S and biosdisk_ll.c
  * partly from netbsd:sys/arch/i386/boot/disk.c
  * no bad144 handling!
+ *
+ * A lot of this must match sys/kern/subr_disk_mbr.c
  */
 
 /*
@@ -95,6 +91,8 @@ static struct btinfo_bootdisk bi_disk;
 
 #define	RF_PROTECTED_SECTORS	64	/* XXX refer to <.../rf_optnames.h> */
 
+int boot_biossector;	/* disk sector partition might have started in */
+
 int 
 biosdiskstrategy(devdata, flag, dblk, size, buf, rsize)
 	void           *devdata;
@@ -135,6 +133,192 @@ biosdiskstrategy(devdata, flag, dblk, size, buf, rsize)
 	return (0);
 }
 
+static struct biosdisk *
+alloc_biosdisk(int dev)
+{
+	struct biosdisk *d;
+
+	d = (struct biosdisk *)alloc(sizeof *d);
+	if (!d)
+		return NULL;
+	memset(d, 0, sizeof *d);
+
+	d->ll.dev = dev;;
+	if (set_geometry(&d->ll, NULL)) {
+#ifdef DISK_DEBUG
+		printf("no geometry information\n");
+#endif
+		free(d, sizeof *d);
+		return NULL;
+	}
+	return d;
+}
+
+#ifndef NO_DISKLABEL
+static int
+check_label(struct biosdisk *d, int sector)
+{
+	struct disklabel *lp;
+
+	/* find partition in NetBSD disklabel */
+	if (readsects(&d->ll, sector + LABELSECTOR, 1, d->buf, 0)) {
+#ifdef DISK_DEBUG
+		printf("Error reading disklabel\n");
+#endif
+		return EIO;
+	}
+	lp = (struct disklabel *) (d->buf + LABELOFFSET);
+	if (lp->d_magic != DISKMAGIC || dkcksum(lp)) {
+#ifdef DISK_DEBUG
+		printf("warning: no disklabel\n");
+#endif
+		return -1;
+	}
+
+	d->boff = sector;
+	return 0;
+}
+
+static int
+read_label(struct biosdisk *d)
+{
+	struct disklabel dflt_lbl;
+	struct mbr_partition mbr[MBR_PART_COUNT];
+	struct partition *p;
+	int sector, i;
+	int error;
+	int typ;
+	int ext_base, this_ext, next_ext;
+#ifdef COMPAT_386BSD_MBRPART
+	int sector_386bsd = -1;
+#endif
+
+	memset(&dflt_lbl, 0, sizeof dflt_lbl);
+	dflt_lbl.d_npartitions = 8;
+
+	d->boff = 0;
+
+	if (!(d->ll.dev & 0x80)) /* floppy */
+		/* No label on floppy */
+		return -1;
+
+	/*
+	 * find NetBSD Partition in DOS partition table
+	 * XXX check magic???
+	 */
+	ext_base = 0;
+	next_ext = 0;
+	for (;;) {
+		this_ext = ext_base + next_ext;
+		next_ext = 0;
+		if (readsects(&d->ll, this_ext, 1, d->buf, 0)) {
+#ifdef DISK_DEBUG
+			printf("error reading MBR sector %d\n", this_ext);
+#endif
+			return EIO;
+		}
+		memcpy(&mbr, ((struct mbr_sector *)d->buf)->mbr_parts, sizeof mbr);
+		/* Look for NetBSD partition ID */
+		for (i = 0; i < MBR_PART_COUNT; i++) {
+			typ = mbr[i].mbrp_type;
+			if (typ == 0)
+				continue;
+			sector = this_ext + mbr[i].mbrp_start;
+			if (typ == MBR_PTYPE_NETBSD) {
+				error = check_label(d, sector);
+				if (error >= 0)
+					return error;
+			}
+			if (MBR_IS_EXTENDED(typ)) {
+				next_ext = mbr[i].mbrp_start;
+				continue;
+			}
+#ifdef COMPAT_386BSD_MBRPART
+			if (this_ext == 0 && typ == MBR_PTYPE_386BSD)
+				sector_386bsd = sector;
+#endif
+			if (this_ext != 0) {
+				if (dflt_lbl.d_npartitions >= MAXPARTITIONS)
+					continue;
+				p = &dflt_lbl.d_partitions[dflt_lbl.d_npartitions++];
+			} else
+				p = &dflt_lbl.d_partitions[i];
+			p->p_offset = sector;
+			p->p_size = mbr[i].mbrp_size;
+			p->p_fstype = xlat_mbr_fstype(typ);
+		}
+		if (next_ext == 0)
+			break;
+		if (ext_base == 0) {
+			ext_base = next_ext;
+			next_ext = 0;
+		}
+	}
+
+	sector = 0;
+#ifdef COMPAT_386BSD_MBRPART
+	if (sector_386bsd != -1) {
+		printf("old BSD partition ID!\n");
+		sector = sector_386bsd;
+	}
+#endif
+
+	/*
+	 * One of two things:
+	 * 	1. no MBR
+	 *	2. no NetBSD partition in MBR
+	 *
+	 * We simply default to "start of disk" in this case and
+	 * press on.
+	 */
+	error = check_label(d, sector);
+	if (error >= 0)
+		return error;
+
+	/*
+	 * Nothing at start of disk, return info from mbr partitions.
+	 */
+	/* XXX fill it to make checksum match kernel one */
+	dflt_lbl.d_checksum = dkcksum(&dflt_lbl);
+	memcpy(d->buf, &dflt_lbl, sizeof dflt_lbl);
+	return -1;
+}
+#endif /* NO_DISKLABEL */
+
+/* Determine likely partition for possible sector number of dos
+ * partition.
+ */
+
+u_int
+biosdiskfindptn(int biosdev, u_int sector)
+{
+#ifdef NO_DISKLABEL
+	return 0;
+#else
+	struct biosdisk *d;
+	u_int partition = 0;
+	struct disklabel *lp;
+
+	/* Look for netbsd partition that is the dos boot one */
+	d = alloc_biosdisk(biosdev);
+	if (d == NULL)
+		return 0;
+
+	if (read_label(d) == 0) {
+		lp = (struct disklabel *)(d->buf + LABELOFFSET);
+		for (partition = lp->d_npartitions; --partition;){
+			if (lp->d_partitions[partition].p_fstype == FS_UNUSED)
+				continue;
+			if (lp->d_partitions[partition].p_offset == sector)
+				break;
+		}
+	}
+
+	free(d, sizeof *d);
+	return partition;
+}
+#endif /* NO_DISKLABEL */
+
 int 
 biosdiskopen(struct open_file *f, ...)
 /* file, biosdev, partition */
@@ -143,30 +327,17 @@ biosdiskopen(struct open_file *f, ...)
 	struct biosdisk *d;
 	int partition;
 #ifndef NO_DISKLABEL
-	struct mbr_partition *dptr;
-	int sector, i;
 	struct disklabel *lp;
 #endif
 	int error = 0;
 
-	d = (struct biosdisk *) alloc(sizeof(struct biosdisk));
-	if (!d) {
-#ifdef DEBUG
-		printf("biosdiskopen: no memory\n");
-#endif
-		return (ENOMEM);
-	}
 	va_start(ap, f);
-	d->ll.dev = va_arg(ap, int);
-	if (set_geometry(&d->ll, NULL)) {
-#ifdef DISK_DEBUG
-		printf("no geometry information\n");
-#endif
+	d = alloc_biosdisk(va_arg(ap, int));
+	if (!d) {
 		error = ENXIO;
 		goto out;
 	}
 
-	d->boff = 0;
 	partition = va_arg(ap, int);
 #ifdef _STANDALONE
 	bi_disk.biosdev = d->ll.dev;
@@ -175,85 +346,34 @@ biosdiskopen(struct open_file *f, ...)
 #endif
 
 #ifndef NO_DISKLABEL
-	if (!(d->ll.dev & 0x80) /* floppy */
-	    || partition == RAW_PART)
+	if (partition == RAW_PART)
 		goto nolabel;
-
-	/*
-	 * find NetBSD Partition in DOS partition table
-	 * XXX check magic???
-	 */
-	if (readsects(&d->ll, 0, 1, d->buf, 0)) {
-#ifdef DISK_DEBUG
-		printf("error reading MBR\n");
-#endif
-		error = EIO;
+	error = read_label(d);
+	if (error == -1) {
+		error = 0;
+		goto nolabel;
+	}
+	if (error)
 		goto out;
-	}
-	sector = -1;
-	dptr = (struct mbr_partition *) & d->buf[MBR_PARTOFF];
-	/* Look for NetBSD partition ID */
-	for (i = 0; i < NMBRPART; i++, dptr++)
-		if (dptr->mbrp_typ == MBR_PTYPE_NETBSD) {
-			sector = dptr->mbrp_start;
-			break;
-		}
-#ifdef COMPAT_386BSD_MBRPART
-	if (sector == -1) {
-		/* If we didn't find one, look for 386BSD partition ID */
-		dptr = (struct mbr_partition *) & d->buf[MBR_PARTOFF];
-		for (i = 0; i < NMBRPART; i++, dptr++)
-			if (dptr->mbrp_typ == MBR_PTYPE_386BSD) {
-				printf("old BSD partition ID!\n");
-				sector = dptr->mbrp_start;
-				break;
-			}
-	}
-#endif
-	if (sector == -1) {
-		/*
-		 * One of two things:
-		 * 	1. no MBR
-		 *	2. no NetBSD partition in MBR
-		 *
-		 * We simply default to "start of disk" in this case and
-		 * press on.
-		 */
-		sector = 0;
-	}
 
-	/* find partition in NetBSD disklabel */
-	if (readsects(&d->ll, sector + LABELSECTOR, 1, d->buf, 0)) {
-#ifdef DISK_DEBUG
-		printf("Error reading disklabel\n");
-#endif
-		error = EIO;
-		goto out;
-	}
 	lp = (struct disklabel *) (d->buf + LABELOFFSET);
-	if (lp->d_magic != DISKMAGIC) {
-#ifdef DISK_DEBUG
-		printf("warning: no disklabel\n");
-#endif
-		d->boff = sector;
-	} else if (partition >= lp->d_npartitions ||
-		   lp->d_partitions[partition].p_fstype == FS_UNUSED) {
+	if (partition >= lp->d_npartitions ||
+	   lp->d_partitions[partition].p_fstype == FS_UNUSED) {
 #ifdef DISK_DEBUG
 		printf("illegal partition\n");
 #endif
 		error = EPART;
 		goto out;
-	} else {
-		d->boff = lp->d_partitions[partition].p_offset;
-		if (lp->d_partitions[partition].p_fstype == FS_RAID)
-			d->boff += RF_PROTECTED_SECTORS;
-#ifdef _STANDALONE
-		bi_disk.labelsector = sector + LABELSECTOR;
-		bi_disk.label.type = lp->d_type;
-		memcpy(bi_disk.label.packname, lp->d_packname, 16);
-		bi_disk.label.checksum = lp->d_checksum;
-#endif
 	}
+#ifdef _STANDALONE
+	bi_disk.labelsector = d->boff + LABELSECTOR;
+	bi_disk.label.type = lp->d_type;
+	memcpy(bi_disk.label.packname, lp->d_packname, 16);
+	bi_disk.label.checksum = lp->d_checksum;
+#endif
+	d->boff = lp->d_partitions[partition].p_offset;
+	if (lp->d_partitions[partition].p_fstype == FS_RAID)
+		d->boff += RF_PROTECTED_SECTORS;
 nolabel:
 #endif /* NO_DISKLABEL */
 

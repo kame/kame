@@ -1,4 +1,4 @@
-/*	$NetBSD: OsdMemory.c,v 1.2 2001/11/13 13:01:58 lukem Exp $	*/
+/*	$NetBSD: OsdMemory.c,v 1.6 2003/11/02 18:29:46 matt Exp $	*/
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: OsdMemory.c,v 1.2 2001/11/13 13:01:58 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: OsdMemory.c,v 1.6 2003/11/02 18:29:46 matt Exp $");
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -51,13 +51,15 @@ __KERNEL_RCSID(0, "$NetBSD: OsdMemory.c,v 1.2 2001/11/13 13:01:58 lukem Exp $");
 
 #include <machine/acpi_machdep.h>
 
+MALLOC_DECLARE(M_ACPI);
+
 /*
  * AcpiOsMapMemory:
  *
  *	Map physical memory into the caller's address space.
  */
 ACPI_STATUS
-AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS PhysicalAddress, UINT32 Length,
+AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS PhysicalAddress, ACPI_SIZE Length,
     void **LogicalAddress)
 {
 
@@ -70,7 +72,7 @@ AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS PhysicalAddress, UINT32 Length,
  *	Remove a physical to logical memory mapping.
  */
 void
-AcpiOsUnmapMemory(void *LogicalAddress, UINT32 Length)
+AcpiOsUnmapMemory(void *LogicalAddress, ACPI_SIZE Length)
 {
 
 	acpi_md_OsUnmapMemory(LogicalAddress, Length);
@@ -95,25 +97,10 @@ AcpiOsGetPhysicalAddress(void *LogicalAddress,
  *	Allocate memory from the dynamic memory pool.
  */
 void *
-AcpiOsAllocate(UINT32 Size)
+AcpiOsAllocate(ACPI_SIZE Size)
 {
 
-	return (malloc(Size, M_DEVBUF, M_NOWAIT));
-}
-
-/*
- * AcpiOsCallocate:
- *
- *	Allocate and initialize memory.
- */
-void *
-AcpiOsCallocate(UINT32 Size)
-{
-	void *rv;
-
-	if ((rv = malloc(Size, M_DEVBUF, M_NOWAIT)) != NULL)
-		memset(rv, 0, Size);
-	return (rv);
+	return (malloc(Size, M_ACPI, M_NOWAIT));
 }
 
 /*
@@ -125,7 +112,7 @@ void
 AcpiOsFree(void *Memory)
 {
 
-	free(Memory, M_DEVBUF);
+	free(Memory, M_ACPI);
 }
 
 
@@ -135,7 +122,7 @@ AcpiOsFree(void *Memory)
  *	Check if a memory region is readable.
  */
 BOOLEAN
-AcpiOsReadable(void *Pointer, UINT32 Length)
+AcpiOsReadable(void *Pointer, ACPI_SIZE Length)
 {
 
 	return (acpi_md_OsReadable(Pointer, Length));
@@ -147,7 +134,7 @@ AcpiOsReadable(void *Pointer, UINT32 Length)
  *	Check if a memory region is writable (and readable).
  */
 BOOLEAN
-AcpiOsWritable(void *Pointer, UINT32 Length)
+AcpiOsWritable(void *Pointer, ACPI_SIZE Length)
 {
 
 	return (acpi_md_OsWritable(Pointer, Length));

@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.14 2001/11/22 03:08:01 simonb Exp $	*/
+/*	$NetBSD: machdep.c,v 1.26 2003/12/30 12:33:13 pk Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -37,9 +37,43 @@
  */
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department, The Mach Operating System project at
+ * Carnegie-Mellon University and Ralph Campbell.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)machdep.c   8.3 (Berkeley) 1/12/94
+ *	from: Utah Hdr: machdep.c 1.63 91/04/24
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -78,6 +112,9 @@
  *	from: Utah Hdr: machdep.c 1.63 91/04/24
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.26 2003/12/30 12:33:13 pk Exp $");
+
 #include "opt_algor_p4032.h"
 #include "opt_algor_p5064.h" 
 #include "opt_algor_p6032.h"
@@ -98,7 +135,7 @@
 #include <sys/kcore.h>
 #include <sys/boot_flag.h>
 #include <sys/termios.h>
-#include <sys/sysctl.h>
+#include <sys/ksyms.h>
 
 #include <net/if.h>
 #include <net/if_ether.h>
@@ -117,6 +154,8 @@
 #include <machine/pmon.h>
 
 #include <algor/pci/vtpbcvar.h>
+
+#include "ksyms.h"
 
 #include "com.h"
 #if NCOM > 0
@@ -152,9 +191,7 @@ struct p6032_config p6032_configuration;
 #endif 
 
 /* The following are used externally (sysctl_hw). */
-char	machine[] = MACHINE;		/* from <machine/param.h> */
-char	machine_arch[] = MACHINE_ARCH;	/* from <machine/param.h> */
-char	cpu_model[64];
+extern char	cpu_model[];
 
 struct	user *proc0paddr;
 
@@ -250,7 +287,7 @@ mach_init(int argc, char *argv[], char *envp[])
 		led_display('c', 'o', 'n', 's');
 		DELAY(160000000 / comcnrate);
 		if (comcnattach(&acp->ac_lociot, P4032_COM1, comcnrate,
-		    COM_FREQ,
+		    COM_FREQ, COM_TYPE_NORMAL,
 		    (TTYDEF_CFLAG & ~(CSIZE | PARENB)) | CS8) != 0)
 			panic("p4032: unable to initialize serial console");
 #else
@@ -294,7 +331,7 @@ mach_init(int argc, char *argv[], char *envp[])
 		led_display('c', 'o', 'n', 's');
 		DELAY(160000000 / comcnrate);  
 		if (comcnattach(&acp->ac_iot, 0x3f8, comcnrate,
-		    COM_FREQ,
+		    COM_FREQ, COM_TYPE_NORMAL,
 		    (TTYDEF_CFLAG & ~(CSIZE | PARENB)) | CS8) != 0)
 			panic("p5064: unable to initialize serial console");
 #else
@@ -336,7 +373,7 @@ mach_init(int argc, char *argv[], char *envp[])
 		led_display('c','o','n','s');
 		DELAY(160000000 / comcnrate);
 		if (comcnattach(&acp->ac_iot, 0x3f8, comcnrate,
-		    COM_FREQ,
+		    COM_FREQ, COM_TYPE_NORMAL,
 		    (TTYDEF_CFLAG & ~(CSIZE | PARENB)) | CS8) != 0)
 			panic("p6032: unable to initialize serial console");
 #else
@@ -453,7 +490,7 @@ mach_init(int argc, char *argv[], char *envp[])
 	} else
 		printf("Memory size: 0x%08lx\n", size);
 
-	mem_clusters[mem_cluster_cnt].start = NBPG;
+	mem_clusters[mem_cluster_cnt].start = PAGE_SIZE;
 	mem_clusters[mem_cluster_cnt].size =
 	    size - mem_clusters[mem_cluster_cnt].start;
 	mem_cluster_cnt++;
@@ -529,46 +566,30 @@ mach_init(int argc, char *argv[], char *envp[])
 	mips_init_msgbuf();
 
 	/*
-	 * Compute the size of system data structures.  pmap_bootstrap()
-	 * needs some of this information.
-	 */
-	size = (vsize_t) allocsys(NULL, NULL);
-
-	/*
 	 * Initialize the virtual memory system.
 	 */
 	led_display('p', 'm', 'a', 'p');
 	pmap_bootstrap();
 
 	/*
-	 * Init mapping for u page(s) for proc0.
+	 * Init mapping for u page(s) for lwp0.
 	 */
 	led_display('u', 's', 'p', 'c');
 	v = (caddr_t) uvm_pageboot_alloc(USPACE);
-	proc0.p_addr = proc0paddr = (struct user *) v;
-	proc0.p_md.md_regs = (struct frame *)(v + USPACE) - 1;
-	curpcb = &proc0.p_addr->u_pcb;
+	lwp0.l_addr = proc0paddr = (struct user *) v;
+	lwp0.l_md.md_regs = (struct frame *)(v + USPACE) - 1;
+	curpcb = &lwp0.l_addr->u_pcb;
 	curpcb->pcb_context[11] = MIPS_INT_MASK | MIPS_SR_INT_IE; /* SR */
-
-	/*
-	 * Allocate space for system data structures.  These data structures
-	 * are allocated here instead of cpu_startup() because physical
-	 * memory is directly addressable.  We don't have to map these into
-	 * the virtual address space.
-	 */
-	v = (caddr_t) uvm_pageboot_alloc(size);
-	if ((allocsys(v, NULL) - v) != size)
-		panic("mach_init: table size inconsistency");
 
 	/*
 	 * Initialize debuggers, and break into them, if appropriate.
 	 */
-#if defined(DDB)
+#if NKSYMS || defined(DDB) || defined(LKM)
 	/*
 	 * XXX Loader doesn't give us symbols the way we like.  Need
 	 * XXX dbsym(1) support for ELF.
 	 */
-	ddb_init(0, 0, 0);
+	ksyms_init(0, 0, 0);
 #endif
 
 	if (boothowto & RB_KDB) {
@@ -592,11 +613,8 @@ consinit(void)
 void
 cpu_startup(void)
 {
-	vsize_t size;
-	int base, residual;
 	vaddr_t minaddr, maxaddr;
 	char pbuf[9];
-	u_int i;
 #ifdef DEBUG
 	extern int pmapdebug;
 	int opmapdebug = pmapdebug;
@@ -636,45 +654,7 @@ cpu_startup(void)
 	    }
 #endif
 
-	/*
-	 * Allocate virtual address space for file I/O buffers.
-	 * Note they are different than the array of headers, 'buf',
-	 * and usually occupy more virtual memory than physical.
-	 */
-	size = MAXBSIZE * nbuf;
-	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET, 0,
-		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != 0)
-		panic("cpu_startup: cannot allocate VM for buffers");
-	base = bufpages / nbuf;
-	residual = bufpages % nbuf;
-	for (i = 0; i < nbuf; i++) {
-		vsize_t curbufsize;
-		vaddr_t curbuf;
-		struct vm_page *pg;
-
-		/*
-		 * Each buffer has MAXBSIZE bytes of VM space allocated.  Of
-		 * that MAXBSIZE space, we allocate and map (base+1) pages
-		 * for the first "residual" buffers, and then we allocate
-		 * "base" pages for the rest.
-		 */
-		curbuf = (vaddr_t) buffers + (i * MAXBSIZE);
-		curbufsize = NBPG * ((i < residual) ? (base+1) : base);
-
-		while (curbufsize) {
-			pg = uvm_pagealloc(NULL, 0, NULL, 0);
-			if (pg == NULL)
-				panic("cpu_startup: not enough memory for "
-				    "buffer cache"); 
-			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
-			    VM_PROT_READ|VM_PROT_WRITE);
-			curbuf += PAGE_SIZE;
-			curbufsize -= PAGE_SIZE;
-		}
-	}
-	pmap_update(pmap_kernel());
+	minaddr = 0;
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
@@ -700,40 +680,6 @@ cpu_startup(void)
 #endif
 	format_bytes(pbuf, sizeof(pbuf), ptoa(uvmexp.free));
 	printf("avail memory = %s\n", pbuf);
-	format_bytes(pbuf, sizeof(pbuf), bufpages * NBPG);
-	printf("using %d buffers containing %s of memory\n", nbuf, pbuf);
-
-	/*
-	 * Set up buffers, so they can be used to read disklabels.
-	 */
-	bufinit();
-}
-
-/*
- * Machine-dependent system variables.
- */
-int
-cpu_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp,
-    void *newp, size_t newlen, struct proc *p)
-{
-	dev_t consdev;
-
-	/* All sysctl names at this level are terminal. */
-	if (namelen != 1)
-		return (ENOTDIR);		/* overloaded */
-
-	switch (name[0]) {
-	case CPU_CONSDEV:
-		if (cn_tab != NULL)
-			consdev = cn_tab->cn_dev;
-		else
-			consdev = NODEV;
-		return (sysctl_rdstruct(oldp, oldlenp, newp, &consdev,
-		    sizeof consdev));
-	default:
-		return (EOPNOTSUPP);
-	}
-	/* NOTREACHED */
 }
 
 int	waittime = -1;
@@ -745,7 +691,7 @@ cpu_reboot(int howto, char *bootstr)
 	int tmp;
 
 	/* Take a snapshot before clobbering any registers. */
-	if (curproc)
+	if (curlwp)
 		savectx((struct user *) curpcb);
 
 	/* If "always halt" was specified as a boot flag, obey. */
@@ -832,6 +778,7 @@ algor_get_ethaddr(struct pci_attach_args *pa, u_int8_t *buf)
 	 * XXX doesn't completely suck.
 	 */
 	pa->pa_dmat = &p4032_configuration.ac_pci_pf_dmat;
+	pa->pa_dmat64 = NULL;
 #endif
 	return (1);
 }

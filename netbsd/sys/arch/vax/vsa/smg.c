@@ -1,4 +1,4 @@
-/*	$NetBSD: smg.c,v 1.29.6.1 2002/06/11 01:56:56 lukem Exp $ */
+/*	$NetBSD: smg.c,v 1.37 2003/07/15 02:15:07 lukem Exp $ */
 /*
  * Copyright (c) 1998 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -29,6 +29,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: smg.c,v 1.37 2003/07/15 02:15:07 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -116,9 +119,8 @@ struct	smg_softc {
 	struct	device ss_dev;
 };
 
-struct cfattach smg_ca = {
-	sizeof(struct smg_softc), smg_match, smg_attach,
-};
+CFATTACH_DECL(smg, sizeof(struct smg_softc),
+    smg_match, smg_attach, NULL, NULL);
 
 static void	smg_cursor(void *, int, int, int);
 static int	smg_mapchar(void *, int, unsigned int *);
@@ -127,7 +129,7 @@ static void	smg_copycols(void *, int, int, int,int);
 static void	smg_erasecols(void *, int, int, int, long);
 static void	smg_copyrows(void *, int, int, int);
 static void	smg_eraserows(void *, int, int, long);
-static int	smg_alloc_attr(void *, int, int, int, long *);
+static int	smg_allocattr(void *, int, int, int, long *);
 
 const struct wsdisplay_emulops smg_emulops = {
 	smg_cursor,
@@ -137,7 +139,7 @@ const struct wsdisplay_emulops smg_emulops = {
 	smg_erasecols,
 	smg_copyrows,
 	smg_eraserows,
-	smg_alloc_attr
+	smg_allocattr
 };
 
 const struct wsscreen_descr smg_stdscreen = {
@@ -401,7 +403,7 @@ smg_eraserows(void *id, int startrow, int nrows, long fillattr)
 }
 
 static int
-smg_alloc_attr(void *id, int fg, int bg, int flags, long *attrp)
+smg_allocattr(void *id, int fg, int bg, int flags, long *attrp)
 {
 	*attrp = flags;
 	return 0;
@@ -410,7 +412,8 @@ smg_alloc_attr(void *id, int fg, int bg, int flags, long *attrp)
 static void
 setcursor(struct wsdisplay_cursor *v)
 {
-	u_short red, green, blue, curfg[16], curmask[16];
+	u_short red, green, blue;
+	u_int32_t curfg[16], curmask[16];
 	int i;
 
 	/* Enable cursor */
@@ -442,12 +445,13 @@ setcursor(struct wsdisplay_cursor *v)
 		WRITECUR(CUR_CMD, curcmd | CUR_CMD_LODSA);
 		copyin(v->image, curfg, sizeof(curfg));
 		copyin(v->mask, curmask, sizeof(curmask));
-		for (i = 0; i < sizeof(curfg)/2; i++) {
-			WRITECUR(CUR_LOAD, (curfg[i] & fgmask) |
-			    ((curmask[i] & ~curfg[i]) & bgmask));
+		for (i = 0; i < sizeof(curfg)/sizeof(curfg[0]); i++) {
+			WRITECUR(CUR_LOAD, ((u_int16_t)curfg[i] & fgmask) |
+			    (((u_int16_t)curmask[i] & (u_int16_t)~curfg[i])
+			    & bgmask));
 		}
-		for (i = 0; i < sizeof(curmask)/2; i++) {
-			WRITECUR(CUR_LOAD, curmask[i]);
+		for (i = 0; i < sizeof(curmask)/sizeof(curmask[0]); i++) {
+			WRITECUR(CUR_LOAD, (u_int16_t)curmask[i]);
 		}
 		WRITECUR(CUR_CMD, curcmd);
 	}
@@ -501,6 +505,11 @@ smg_ioctl(void *v, u_long cmd, caddr_t data, int flag, struct proc *p)
 	case WSDISPLAYIO_GCURPOS:
 		((struct wsdisplay_curpos *)data)->x = curx;
 		((struct wsdisplay_curpos *)data)->y = cury;
+		break;
+
+	case WSDISPLAYIO_GCURMAX:
+		((struct wsdisplay_curpos *)data)->x = 16;
+		((struct wsdisplay_curpos *)data)->y = 16;
 		break;
 
 	default:
@@ -564,7 +573,6 @@ smg_show_screen(void *v, void *cookie, int waitok,
 }
 
 cons_decl(smg);
-cdev_decl(wsdisplay);
 
 void
 smgcninit(cndev)
@@ -596,6 +604,7 @@ smgcnprobe(cndev)
 	struct  consdev *cndev;
 {
 	extern vaddr_t virtual_avail;
+	extern const struct cdevsw wsdisplay_cdevsw;
 
 	switch (vax_boardtype) {
 	case VAX_BTYP_410:
@@ -608,7 +617,8 @@ smgcnprobe(cndev)
 		virtual_avail += SMSIZE;
 		ioaccess((vaddr_t)sm_addr, SMADDR, (SMSIZE/VAX_NBPG));
 		cndev->cn_pri = CN_INTERNAL;
-		cndev->cn_dev = makedev(getmajor(wsdisplayopen), 0);
+		cndev->cn_dev = makedev(cdevsw_lookup_major(&wsdisplay_cdevsw),
+					0);
 		break;
 
 	default:

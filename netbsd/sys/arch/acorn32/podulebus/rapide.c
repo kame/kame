@@ -1,4 +1,4 @@
-/*	$NetBSD: rapide.c,v 1.2.12.1 2002/11/01 11:13:07 tron Exp $	*/
+/*	$NetBSD: rapide.c,v 1.19 2004/01/03 22:56:52 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1997-1998 Mark Brinicombe
@@ -60,12 +60,15 @@
  * A structure is used to hold the information about the addressing etc.
  * An array of these structures holds the information for the primary and
  * secondary connectors. This needs to be extended to hold this information
- * for both issues. Then the indexing of this structures will utilise the
+ * for both issues. Then the indexing of these structures will use the
  * card version number.
  *
  * Opps just noticed a mistake. The interrupt request register is different
  * between cards so the card level attach routine will need to consider this.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rapide.c,v 1.19 2004/01/03 22:56:52 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -83,6 +86,7 @@
 #include <acorn32/podulebus/rapidereg.h>
 
 #include <dev/ata/atavar.h>
+#include <dev/ic/wdcreg.h>
 #include <dev/ic/wdcvar.h>
 #include <dev/podulebus/podules.h>
 
@@ -106,7 +110,7 @@
 
 struct rapide_softc {
 	struct wdc_softc	sc_wdcdev;	/* common wdc definitions */
-	struct channel_softc	*wdc_chanarray[2]; /* channels definition */
+	struct wdc_channel	*wdc_chanarray[2]; /* channels definition */
 	podule_t 		*sc_podule;		/* Our podule info */
 	int 			sc_podule_number;	/* Our podule number */
 	int			sc_intr_enable_mask;	/* Global intr mask */
@@ -114,7 +118,8 @@ struct rapide_softc {
 	bus_space_tag_t		sc_ctliot;		/* Bus tag */
 	bus_space_handle_t	sc_ctlioh;		/* control handler */
 	struct rapide_channel {
-		struct channel_softc wdc_channel; /* generic part */
+		struct wdc_channel wdc_channel;	/* generic part */
+		struct ata_queue wdc_chqueue;		/* channel queue */
 		irqhandler_t	rc_ih;			/* interrupt handler */
 		int		rc_irqmask;	/* IRQ mask for this channel */
 	} rapide_channels[2];
@@ -125,9 +130,8 @@ void	rapide_attach	__P((struct device *, struct device *, void *));
 void	rapide_shutdown	__P((void *arg));
 int	rapide_intr	__P((void *));
 
-struct cfattach rapide_ca = {
-	sizeof(struct rapide_softc), rapide_probe, rapide_attach
-};
+CFATTACH_DECL(rapide, sizeof(struct rapide_softc),
+    rapide_probe, rapide_attach, NULL, NULL);
 
 /*
  * We have a private bus space tag.
@@ -194,9 +198,9 @@ rapide_attach(parent, self, aux)
 	bus_space_tag_t iot;
 	bus_space_handle_t ctlioh;
 	u_int iobase;
-	int channel;
+	int channel, i;
 	struct rapide_channel *rcp;
-	struct channel_softc *cp;
+	struct wdc_channel *cp;
 	irqhandler_t *ihp;
 
 	/* Note the podule number and validate */
@@ -221,7 +225,7 @@ rapide_attach(parent, self, aux)
 
 	if (bus_space_map(iot, pa->pa_podule->easi_base +
 	    CONTROL_REGISTERS_OFFSET, CONTROL_REGISTER_SPACE, 0, &ctlioh))
-		panic("%s: Cannot map control registers\n", self->dv_xname);
+		panic("%s: Cannot map control registers", self->dv_xname);
 
 	sc->sc_ctlioh = ctlioh;
 	sc->sc_version = bus_space_read_1(iot, ctlioh, VERSION_REGISTER_OFFSET) & VERSION_REGISTER_MASK;
@@ -251,32 +255,33 @@ rapide_attach(parent, self, aux)
 		sc->wdc_chanarray[channel] = &rcp->wdc_channel;
 		cp = &rcp->wdc_channel;
 
-		cp->channel = channel;
-		cp->wdc = &sc->sc_wdcdev;
-		cp->ch_queue = malloc(sizeof(struct channel_queue),
-		    M_DEVBUF, M_NOWAIT);
-		if (cp->ch_queue == NULL) {
-			printf("%s %s channel: can't allocate memory for "
-			    "command queue", self->dv_xname,
-			    (channel == 0) ? "primary" : "secondary");
-			continue;
-		}
+		cp->ch_channel = channel;
+		cp->ch_wdc = &sc->sc_wdcdev;
+		cp->ch_queue = &rcp->wdc_chqueue;
 		cp->cmd_iot = iot;
 		cp->ctl_iot = iot;
 		cp->data32iot = iot;
 
 		if (bus_space_map(iot, iobase + rapide_info[channel].registers,
-		    DRIVE_REGISTERS_SPACE, 0, &cp->cmd_ioh))
+		    DRIVE_REGISTERS_SPACE, 0, &cp->cmd_baseioh))
 			continue;
+		for (i = 0; i < DRIVE_REGISTERS_SPACE; i++) {
+			if (bus_space_subregion(cp->cmd_iot, cp->cmd_baseioh,
+				i, i == 0 ? 4 : 1, &cp->cmd_iohs[i]) != 0) {
+				bus_space_unmap(iot, cp->cmd_baseioh,
+				    DRIVE_REGISTERS_SPACE);
+				continue;
+			}
+		}
 		if (bus_space_map(iot, iobase +
 		    rapide_info[channel].aux_register, 4, 0, &cp->ctl_ioh)) {
-			bus_space_unmap(iot, cp->cmd_ioh,
+			bus_space_unmap(iot, cp->cmd_baseioh,
 			   DRIVE_REGISTERS_SPACE);
 			continue;
 		}
 		if (bus_space_map(iot, iobase +
 		    rapide_info[channel].data_register, 4, 0, &cp->data32ioh)) {
-			bus_space_unmap(iot, cp->cmd_ioh,
+			bus_space_unmap(iot, cp->cmd_baseioh,
 			   DRIVE_REGISTERS_SPACE);
 			bus_space_unmap(iot, cp->ctl_ioh, 4);
 			continue;
@@ -287,7 +292,6 @@ rapide_attach(parent, self, aux)
 		bus_space_write_1(iot, sc->sc_ctlioh, IRQ_MASK_REGISTER_OFFSET,
 		    sc->sc_intr_enable_mask);
 		/* XXX - Issue 1 cards will need to clear any pending interrupts */
-		wdcattach(cp);
 		ihp = &rcp->rc_ih;
 		ihp->ih_func = rapide_intr;
 		ihp->ih_arg = rcp;
@@ -296,13 +300,14 @@ rapide_attach(parent, self, aux)
 		ihp->ih_maskaddr = pa->pa_podule->irq_addr;
 		ihp->ih_maskbits = rcp->rc_irqmask;
 		if (irq_claim(sc->sc_podule->interrupt, ihp))
-			panic("%s: Cannot claim interrupt %d\n",
+			panic("%s: Cannot claim interrupt %d",
 			    self->dv_xname, sc->sc_podule->interrupt);
 		/* clear any pending interrupts and enable interrupts */
 		sc->sc_intr_enable_mask |= rcp->rc_irqmask;
 		bus_space_write_1(iot, sc->sc_ctlioh,
 		    IRQ_MASK_REGISTER_OFFSET, sc->sc_intr_enable_mask);
 		/* XXX - Issue 1 cards will need to clear any pending interrupts */
+		wdcattach(cp);
 	}
 }
 

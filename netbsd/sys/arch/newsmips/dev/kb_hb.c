@@ -1,4 +1,4 @@
-/*	$NetBSD: kb_hb.c,v 1.2 2002/03/17 19:40:46 atatat Exp $	*/
+/*	$NetBSD: kb_hb.c,v 1.7 2003/07/15 02:59:29 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2000 Tsubai Masanari.  All rights reserved.
@@ -26,6 +26,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kb_hb.c,v 1.7 2003/07/15 02:59:29 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -35,8 +38,9 @@
 #include <dev/wscons/wsksymdef.h>
 #include <dev/wscons/wsksymvar.h>
 
-#include <machine/autoconf.h>
 #include <machine/adrsmap.h>
+
+#include <newsmips/dev/hbvar.h>
 
 struct kbreg {
 	u_char kb_data;
@@ -65,9 +69,8 @@ int kb_hb_ioctl(void *, u_long, caddr_t, int, struct proc *);
 
 extern struct wscons_keydesc newskb_keydesctab[];
 
-struct cfattach kb_hb_ca = {
-	sizeof(struct kb_hb_softc), kb_hb_match, kb_hb_attach
-};
+CFATTACH_DECL(kb_hb, sizeof(struct kb_hb_softc),
+    kb_hb_match, kb_hb_attach, NULL, NULL);
 
 struct wskbd_accessops kb_hb_accessops = {
 	kb_hb_enable,
@@ -91,9 +94,9 @@ kb_hb_match(parent, cf, aux)
 	struct cfdata *cf;
 	void *aux;
 {
-	struct confargs *ca = aux;
+	struct hb_attach_args *ha = aux;
 
-	if (strcmp(ca->ca_name, "kb") == 0)
+	if (strcmp(ha->ha_name, "kb") == 0)
 		return 1;
 
 	return 0;
@@ -105,11 +108,14 @@ kb_hb_attach(parent, self, aux)
 	void *aux;
 {
 	struct kb_hb_softc *sc = (void *)self;
-	volatile struct kbreg *reg = (void *)self->dv_cfdata->cf_addr;
-	int intr = self->dv_cfdata->cf_level;
+	struct hb_attach_args *ha = aux;
+	volatile struct kbreg *reg;
 	volatile int *dipsw = (void *)DIP_SWITCH;
 	struct wskbddev_attach_args aa;
-	int cons = 0;
+	int intr, cons;
+
+	reg = (struct kbreg *)ha->ha_addr;
+	intr = ha->ha_level;
 
 	if (intr == -1)
 		intr = 2;
@@ -119,13 +125,14 @@ kb_hb_attach(parent, self, aux)
 	reg->kb_init = 0xf0;	/* 9600 bps */
 
 	printf(" level %d", intr);
+	cons = 0;
 	if (*dipsw & 7) {
 		cons = 1;
 		printf(" (console)");
 	}
 	printf("\n");
 
-	hb_intr_establish(intr, IPL_TTY, kb_hb_intr, sc);
+	hb_intr_establish(intr, INTEN0_KBDINT, IPL_TTY, kb_hb_intr, sc);
 
 	aa.console = cons;
 	aa.keymap = &kb_hb_keymapdata;

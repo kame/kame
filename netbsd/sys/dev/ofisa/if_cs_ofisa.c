@@ -1,4 +1,4 @@
-/*	$NetBSD: if_cs_ofisa.c,v 1.6 2001/11/26 19:17:07 yamt Exp $	*/
+/*	$NetBSD: if_cs_ofisa.c,v 1.11 2003/05/03 18:11:32 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_cs_ofisa.c,v 1.6 2001/11/26 19:17:07 yamt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_cs_ofisa.c,v 1.11 2003/05/03 18:11:32 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -73,9 +73,8 @@ __KERNEL_RCSID(0, "$NetBSD: if_cs_ofisa.c,v 1.6 2001/11/26 19:17:07 yamt Exp $")
 int	cs_ofisa_match __P((struct device *, struct cfdata *, void *));
 void	cs_ofisa_attach __P((struct device *, struct device *, void *));
 
-struct cfattach cs_ofisa_ca = {
-	sizeof(struct cs_softc_isa), cs_ofisa_match, cs_ofisa_attach
-};
+CFATTACH_DECL(cs_ofisa, sizeof(struct cs_softc_isa),
+    cs_ofisa_match, cs_ofisa_attach, NULL, NULL);
 
 int
 cs_ofisa_match(parent, cf, aux)
@@ -84,7 +83,7 @@ cs_ofisa_match(parent, cf, aux)
 	void *aux;
 {
 	struct ofisa_attach_args *aa = aux;
-	const char *compatible_strings[] = {
+	static const char *const compatible_strings[] = {
 		"CRUS,CS8900",
 		/* XXX CS8920, CS8920M? */
 		/* XXX PNP names? */
@@ -131,7 +130,7 @@ cs_ofisa_attach(parent, self, aux)
 	 *	1 i/o register region
 	 *	0 or 1 memory region
 	 *	1 interrupt
-	 *	0 or 1 dma channel
+	 *	0 or 1 DMA channel
 	 */
 
 	io_addr = mem_addr = -1;

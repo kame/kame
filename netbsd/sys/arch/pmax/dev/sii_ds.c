@@ -1,4 +1,4 @@
-/*	$NetBSD: sii_ds.c,v 1.18 2001/08/26 11:47:23 simonb Exp $	*/
+/*	$NetBSD: sii_ds.c,v 1.21 2003/07/15 02:54:39 lukem Exp $	*/
 
 /*
  * Copyright 1996 The Board of Trustees of The Leland Stanford
@@ -14,6 +14,9 @@
  *
  * this driver contributed by Jonathan Stone
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sii_ds.c,v 1.21 2003/07/15 02:54:39 lukem Exp $");
 
 #include "sii.h"
 
@@ -57,9 +60,8 @@ static int	sii_ds_match __P((struct device* parent, struct cfdata *match,
 static void	sii_ds_attach __P((struct device *parent, struct device *self,
 		    void *aux));
 
-struct cfattach sii_ds_ca = {
-	sizeof(struct siisoftc), sii_ds_match, sii_ds_attach
-};
+CFATTACH_DECL(sii_ds, sizeof(struct siisoftc),
+    sii_ds_match, sii_ds_attach, NULL, NULL);
 
 /* define a safe address in the SCSI buffer for doing status & message DMA */
 #define SII_BUF_ADDR	(MIPS_PHYS_TO_KSEG1(KN01_SYS_SII_B_START) \

@@ -1,4 +1,4 @@
-/*	$NetBSD: ether.c,v 1.15 2000/03/30 12:19:48 augustss Exp $	*/
+/*	$NetBSD: ether.c,v 1.18 2003/08/31 22:40:48 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1992 Regents of the University of California.
@@ -52,11 +52,9 @@
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
-#include <netinet/ip.h>
 
 #include "stand.h"
 #include "net.h"
-#include "netif.h"
 
 /* Caller must leave room for ethernet header in front!! */
 ssize_t
@@ -83,7 +81,7 @@ sendether(d, pkt, len, dea, etype)
 	eh->ether_type = htons(etype);
 
 	n = netif_put(d, eh, len);
-	if (n == -1 || n < sizeof(*eh))
+	if (n == -1 || (size_t)n < sizeof(*eh))
 		return (-1);
 
 	n -= sizeof(*eh);
@@ -115,7 +113,7 @@ readether(d, pkt, len, tleft, etype)
 	len += sizeof(*eh);
 
 	n = netif_get(d, eh, len, tleft);
-	if (n == -1 || n < sizeof(*eh))
+	if (n == -1 || (size_t)n < sizeof(*eh))
 		return (-1);
 
 	/* Validate Ethernet address. */
@@ -132,25 +130,4 @@ readether(d, pkt, len, tleft, etype)
 
 	n -= sizeof(*eh);
 	return (n);
-}
-
-/*
- * Convert Ethernet address to printable (loggable) representation.
- */
-static char digits[] = "0123456789abcdef";
-char *
-ether_sprintf(ap)
-        u_char *ap;
-{
-	int i;
-	static char etherbuf[18];
-	char *cp = etherbuf;
-
-	for (i = 0; i < 6; i++) {
-		*cp++ = digits[*ap >> 4];
-		*cp++ = digits[*ap++ & 0xf];
-		*cp++ = ':';
-	}
-	*--cp = 0;
-	return (etherbuf);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: acct.h,v 1.19 2002/05/12 20:35:15 matt Exp $	*/
+/*	$NetBSD: acct.h,v 1.23 2003/08/07 16:33:59 agc Exp $	*/
 
 /*-
  * Copyright (c) 1990, 1993, 1994
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -78,7 +74,7 @@ struct acct {
 
 #ifdef _KERNEL
 void	acct_init __P((void));
-int	acct_process __P((struct proc *p));
+int	acct_process __P((struct proc *));
 #endif
 
 #endif /* !_SYS_ACCT_H_ */

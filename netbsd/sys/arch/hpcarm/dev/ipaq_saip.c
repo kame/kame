@@ -1,4 +1,4 @@
-/*	$NetBSD: ipaq_saip.c,v 1.8 2001/08/01 07:02:54 ichiro Exp $	*/
+/*	$NetBSD: ipaq_saip.c,v 1.14 2003/07/15 00:25:07 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001, The NetBSD Foundation, Inc.  All rights reserved.
@@ -22,6 +22,10 @@
  *    contributors may be used to endorse or promote products derived
  *    from this software without specific prior written permission.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ipaq_saip.c,v 1.14 2003/07/15 00:25:07 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/types.h>
@@ -34,12 +38,13 @@
 #include <machine/cpu.h>
 #include <machine/bus.h>
 
-#include <hpcarm/sa11x0/sa11x0_var.h>
-#include <hpcarm/sa11x0/sa11x0_reg.h>
-#include <hpcarm/sa11x0/sa11x0_dmacreg.h>
-#include <hpcarm/sa11x0/sa11x0_ppcreg.h>
-#include <hpcarm/sa11x0/sa11x0_gpioreg.h>
-#include <hpcarm/sa11x0/sa11x0_sspreg.h>
+#include <arm/sa11x0/sa11x0_var.h>
+#include <arm/sa11x0/sa11x0_reg.h>
+#include <arm/sa11x0/sa11x0_dmacreg.h>
+#include <arm/sa11x0/sa11x0_ppcreg.h>
+#include <arm/sa11x0/sa11x0_gpioreg.h>
+#include <arm/sa11x0/sa11x0_sspreg.h>
+
 #include <hpcarm/dev/ipaq_saipvar.h>
 #include <hpcarm/dev/ipaq_gpioreg.h>
 
@@ -50,9 +55,8 @@ static int 	ipaq_search(struct device *, struct cfdata *, void *);
 static int	ipaq_print(void *, const char *);
 
 /* attach structures */
-struct cfattach ipaqbus_ca = {
-	sizeof(struct ipaq_softc), ipaq_match, ipaq_attach
-};
+CFATTACH_DECL(ipaqbus, sizeof(struct ipaq_softc),
+    ipaq_match, ipaq_attach, NULL, NULL);
 
 static int
 ipaq_print(aux, name)
@@ -88,7 +92,7 @@ ipaq_attach(parent, self, aux)
 
 	/* Map the Extended GPIO registers */
 	if (bus_space_map(sc->sc_iot, SAEGPIO_BASE, 1, 0, &sc->sc_egpioh))
-		panic("%s: unable to map Extended GPIO registers\n",
+		panic("%s: unable to map Extended GPIO registers",
 			self->dv_xname);
 
 	sc->ipaq_egpio = EGPIO_INIT;
@@ -96,7 +100,7 @@ ipaq_attach(parent, self, aux)
 
 	/* Map the SSP registers */
 	if (bus_space_map(sc->sc_iot, SASSP_BASE, SASSP_NPORTS, 0, &sc->sc_ssph))
-		panic("%s: unable to map SSP registers\n",
+		panic("%s: unable to map SSP registers",
 			self->dv_xname);
 
 	sc->sc_ppch = psc->sc_ppch;
@@ -114,7 +118,7 @@ ipaq_search(parent, cf, aux)
 	struct cfdata *cf;
 	void *aux;
 {
-	if ((*cf->cf_attach->ca_match)(parent, cf, NULL) > 0)
+	if (config_match(parent, cf, NULL) > 0)
 		config_attach(parent, cf, NULL, ipaq_print);
 
         return 0;

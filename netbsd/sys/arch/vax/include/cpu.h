@@ -1,4 +1,4 @@
-/*      $NetBSD: cpu.h,v 1.62 2002/03/10 22:32:31 ragge Exp $      */
+/*      $NetBSD: cpu.h,v 1.69 2004/03/19 20:17:51 matt Exp $      */
 
 /*
  * Copyright (c) 1994 Ludd, University of Lule}, Sweden
@@ -38,9 +38,24 @@
 #include "opt_lockdebug.h"
 #endif
 
+#define	CPU_PRINTFATALTRAPS	1
+#define	CPU_CONSDEV		2
+#define	CPU_BOOTED_DEVICE	3
+#define	CPU_BOOTED_KERNEL	4
+#define CPU_MAXID		5
+
+#define	CTL_MACHDEP_NAMES { \
+	{ 0, 0 }, \
+	{ "printfataltraps", CTLTYPE_INT }, \
+	{ "console_device", CTLTYPE_STRUCT }, \
+	{ "booted_device", CTLTYPE_STRING }, \
+	{ "booted_kernel", CTLTYPE_STRING }, \
+}
+
 #ifdef _KERNEL
 
 #include <sys/cdefs.h>
+#include <sys/queue.h>
 #include <sys/device.h>
 #include <sys/lock.h>
 #include <sys/sched.h>
@@ -51,7 +66,6 @@
 #include <machine/psl.h>
 
 #define enablertclock()
-#define	cpu_wait(p)
 
 /*
  * All cpu-dependent info is kept in this struct. Pointer to the
@@ -120,7 +134,7 @@ struct cpu_info {
 	u_long ci_simple_locks;         /* # of simple locks held */
 #endif
 
-	struct proc *ci_curproc;        /* current owner of the processor */
+	struct lwp *ci_curlwp;          /* current owner of the processor */
 
 	/*
 	 * Private members.
@@ -134,11 +148,14 @@ struct cpu_info {
 	int ci_flags;			/* See below */
 	long ci_ipimsgs;		/* Sent IPI bits */
 	struct trapframe *ci_ddb_regs;	/* Used by DDB */
+	SIMPLEQ_ENTRY(cpu_info) ci_next; /* next cpu_info */
 #endif
 };
 #define	CI_MASTERCPU	1		/* Set if master CPU */
 #define	CI_RUNNING	2		/* Set when a slave CPU is running */
 #define	CI_STOPPED	4		/* Stopped (in debugger) */
+
+extern int cpu_printfataltraps;
 
 #if defined(MULTIPROCESSOR)
 /*
@@ -151,14 +168,26 @@ struct cpu_mp_softc {
 };
 #endif /* defined(MULTIPROCESSOR) */
 
-#define	curcpu() ((struct cpu_info *)mfpr(PR_SSP))
-#define	curproc	(curcpu()->ci_curproc)
-#define	cpu_number() (curcpu()->ci_dev->dv_unit)
-#define	ci_cpuid ci_dev->dv_unit
-#define	need_resched(ci) {(ci)->ci_want_resched++; mtpr(AST_OK,PR_ASTLVL); }
+#define	ci_cpuid		ci_dev->dv_unit
+#define	curcpu()		((struct cpu_info *)mfpr(PR_SSP))
+#define	curlwp			(curcpu()->ci_curlwp)
+#define	cpu_number()		(curcpu()->ci_cpuid)
+#define	need_resched(ci)			\
+	do {					\
+		(ci)->ci_want_resched = 1;	\
+		mtpr(AST_OK,PR_ASTLVL);		\
+	} while (/*CONSTCOND*/ 0)
+#define	cpu_proc_fork(x, y)	do { } while (/*CONSCOND*/0)
+#define	cpu_lwp_free(l, f)	do { } while (/*CONSCOND*/0)
 #if defined(MULTIPROCESSOR)
 #define	CPU_IS_PRIMARY(ci)	((ci)->ci_flags & CI_MASTERCPU)
 
+#define	CPU_INFO_ITERATOR	int
+#define	CPU_INFO_FOREACH(cii, ci)	cii = 0, ci = SIMPLEQ_FIRST(&cpus); \
+					ci != NULL; \
+					ci = SIMPLEQ_NEXT(ci, ci_next)
+
+extern SIMPLEQ_HEAD(cpu_info_qh, cpu_info) cpus;
 extern char tramp;
 #endif
 
@@ -183,6 +212,8 @@ extern char tramp;
 #define	IOSPSZ	((64*1024) / VAX_NBPG)	/* 64k == 128 pages */
 
 struct device;
+struct buf;
+struct pte;
 
 /* Some low-level prototypes */
 #if defined(MULTIPROCESSOR)
@@ -192,7 +223,6 @@ void	cpu_send_ipi(int, int);
 void	cpu_handle_ipi(void);
 #endif
 int	badaddr(caddr_t, int);
-void	cpu_swapin(struct proc *);
 void	dumpconf(void);
 void	dumpsys(void);
 void	swapconf(void);
@@ -203,7 +233,6 @@ void	vax_unmap_physmem(vaddr_t, int);
 void	ioaccess(vaddr_t, paddr_t, int);
 void	iounaccess(vaddr_t, int);
 void	findcpu(void);
-int	getmajor(void *);
 #ifdef DDB
 int	kdbrint(int);
 #endif

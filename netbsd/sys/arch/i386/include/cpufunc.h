@@ -1,4 +1,4 @@
-/*	$NetBSD: cpufunc.h,v 1.20 2001/07/31 18:28:59 thorpej Exp $	*/
+/*	$NetBSD: cpufunc.h,v 1.28 2004/01/14 11:31:55 yamt Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -46,7 +46,27 @@
 #include <sys/cdefs.h>
 #include <sys/types.h>
 
+#include <machine/specialreg.h>
+
+static __inline void
+x86_pause(void)
+{
+	__asm __volatile("pause");
+}
+
+static __inline void
+x86_lfence(void)
+{
+
+	/*
+	 * XXX it's better to use real lfence insn if available.
+	 */
+	__asm __volatile("lock; addl $0, 0(%%esp)" : : : "memory");
+}
+
 #ifdef _KERNEL
+
+extern unsigned int cpu_feature;
 
 static __inline void 
 invlpg(u_int addr)
@@ -126,14 +146,66 @@ static __inline void
 tlbflush(void)
 {
 	u_int val;
-	__asm __volatile("movl %%cr3,%0" : "=r" (val));
-	__asm __volatile("movl %0,%%cr3" : : "r" (val));
+	val = rcr3();
+	lcr3(val);
 }
 
+static __inline void
+tlbflushg(void)
+{
+	/*
+	 * Big hammer: flush all TLB entries, including ones from PTE's
+	 * with the G bit set.  This should only be necessary if TLB
+	 * shootdown falls far behind.
+	 *
+	 * Intel Architecture Software Developer's Manual, Volume 3,
+	 *	System Programming, section 9.10, "Invalidating the
+	 * Translation Lookaside Buffers (TLBS)":
+	 * "The following operations invalidate all TLB entries, irrespective
+	 * of the setting of the G flag:
+	 * ...
+	 * "(P6 family processors only): Writing to control register CR4 to
+	 * modify the PSE, PGE, or PAE flag."
+	 *
+	 * (the alternatives not quoted above are not an option here.)
+	 *
+	 * If PGE is not in use, we reload CR3 for the benefit of
+	 * pre-P6-family processors.
+	 */
+
+#if defined(I686_CPU)
+	if (cpu_feature & CPUID_PGE) {
+		u_int cr4 = rcr4();
+		lcr4(cr4 & ~CR4_PGE);
+		lcr4(cr4);
+	} else
+#endif
+		tlbflush();
+}
+
+
 #ifdef notyet
-void	setidt	__P((int idx, /*XXX*/caddr_t func, int typ, int dpl));
+void	setidt(int idx, /*XXX*/caddr_t func, int typ, int dpl);
 #endif
 
+/* debug register */
+void dr0(caddr_t, u_int32_t, u_int32_t, u_int32_t);
+
+static __inline u_int
+rdr6(void)
+{
+	u_int val;
+
+	__asm __volatile("movl %%dr6,%0" : "=r" (val));
+	return val;
+}
+
+static __inline void
+ldr6(u_int val)
+{
+
+	__asm __volatile("movl %0,%%dr6" : : "r" (val));
+}
 
 /* XXXX ought to be in psl.h with spl() functions */
 
@@ -209,6 +281,9 @@ breakpoint(void)
 {
 	__asm __volatile("int $3");
 }
+
+#define read_psl()	read_eflags()
+#define write_psl(x)	write_eflags(x)
 
 /*
  * XXX Maybe these don't belong here...

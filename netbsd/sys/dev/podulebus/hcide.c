@@ -1,4 +1,4 @@
-/*	$NetBSD: hcide.c,v 1.2 2001/11/13 07:23:15 lukem Exp $	*/
+/*	$NetBSD: hcide.c,v 1.12 2004/01/03 22:56:53 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 2000, 2001 Ben Harris
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: hcide.c,v 1.2 2001/11/13 07:23:15 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: hcide.c,v 1.12 2004/01/03 22:56:53 thorpej Exp $");
 
 #include <sys/param.h>
 
@@ -45,21 +45,21 @@ __KERNEL_RCSID(0, "$NetBSD: hcide.c,v 1.2 2001/11/13 07:23:15 lukem Exp $");
 #include <dev/podulebus/hcidereg.h>
 
 #include <dev/ata/atavar.h>
+#include <dev/ic/wdcreg.h>
 #include <dev/ic/wdcvar.h>
 
 struct hcide_softc {
 	struct wdc_softc sc_wdc;
-	struct channel_softc *sc_chp[HCIDE_NCHANNELS];/* pointers to sc_chan */
-	struct channel_softc sc_chan[HCIDE_NCHANNELS];
-	struct channel_queue sc_chq[HCIDE_NCHANNELS];
+	struct wdc_channel *sc_chp[HCIDE_NCHANNELS];/* pointers to sc_chan */
+	struct wdc_channel sc_chan[HCIDE_NCHANNELS];
+	struct ata_queue sc_chq[HCIDE_NCHANNELS];
 };
 
-static void hcide_attach (struct device *, struct device *, void *);
 static int  hcide_match  (struct device *, struct cfdata *, void *);
+static void hcide_attach (struct device *, struct device *, void *);
 
-struct cfattach hcide_ca = {
-	sizeof(struct hcide_softc), hcide_match, hcide_attach
-};
+CFATTACH_DECL(hcide, sizeof(struct hcide_softc),
+    hcide_match, hcide_attach, NULL, NULL);
 
 static const int hcide_cmdoffsets[] = { HCIDE_CMD0, HCIDE_CMD1, HCIDE_CMD2 };
 static const int hcide_ctloffsets[] = { HCIDE_CTL, HCIDE_CTL, HCIDE_CTL };
@@ -80,7 +80,8 @@ hcide_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct hcide_softc *sc = (void *)self;
 	struct podulebus_attach_args *pa = aux;
-	int i;
+	struct wdc_channel *ch;
+	int i, j;
 
 	sc->sc_wdc.cap = WDC_CAPABILITY_DATA16 | WDC_CAPABILITY_NOIRQ;
 	sc->sc_wdc.PIO_cap = 0; /* XXX correct? */
@@ -90,18 +91,22 @@ hcide_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_wdc.channels = sc->sc_chp;
 	printf("\n");
 	for (i = 0; i < HCIDE_NCHANNELS; i++) {
-		sc->sc_chp[i] = &sc->sc_chan[i];
-		sc->sc_chan[i].channel = i;
-		sc->sc_chan[i].wdc = &sc->sc_wdc;
-		sc->sc_chan[i].cmd_iot = pa->pa_mod_t;
-		sc->sc_chan[i].ctl_iot = pa->pa_mod_t;
-		sc->sc_chan[i].ch_queue = &sc->sc_chq[i];
+		ch = sc->sc_chp[i] = &sc->sc_chan[i];
+		ch->ch_channel = i;
+		ch->ch_wdc = &sc->sc_wdc;
+		ch->cmd_iot = pa->pa_mod_t;
+		ch->ctl_iot = pa->pa_mod_t;
+		ch->ch_queue = &sc->sc_chq[i];
 		bus_space_map(pa->pa_fast_t,
 		    pa->pa_fast_base + hcide_cmdoffsets[i], 0, 8,
-		    &sc->sc_chan[i].cmd_ioh);
+		    &ch->cmd_baseioh);
+		for (j = 0; j < WDC_NREG; j++)
+			bus_space_subregion(ch->cmd_iot, ch->cmd_baseioh,
+			    j, j == 0 ? 4 : 1, &ch->cmd_iohs[j]);
 		bus_space_map(pa->pa_fast_t,
 		    pa->pa_fast_base + hcide_ctloffsets[i], 0, 8,
-		    &sc->sc_chan[i].ctl_ioh);
-		wdcattach(&sc->sc_chan[i]);
+		    &ch->ctl_ioh);
+		wdcattach(ch);
 	}
+
 }

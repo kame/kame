@@ -1,4 +1,4 @@
-/*	$NetBSD: dir.h,v 1.13 2002/02/06 15:44:49 lukem Exp $	*/
+/*	$NetBSD: dir.h,v 1.17 2003/08/07 16:34:42 agc Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -40,8 +36,8 @@
  *	@(#)dir.h	8.5 (Berkeley) 4/27/95
  */
 
-#ifndef _DIR_H_
-#define	_DIR_H_
+#ifndef _UFS_UFS_DIR_H_
+#define	_UFS_UFS_DIR_H_
 
 /*
  * Theoretically, directories can be more than 2Gb in length, however, in
@@ -60,8 +56,8 @@
  * structures, which are of variable length.  Each directory entry has
  * a struct direct at the front of it, containing its inode number,
  * the length of the entry, and the length of the name contained in
- * the entry.  These are followed by the name padded to a 4 byte boundary
- * with null bytes.  All names are guaranteed null terminated.
+ * the entry.  These are followed by the name padded to a 4 byte boundary.
+ * All names are guaranteed null terminated.
  * The maximum length of a name in a directory is MAXNAMLEN.
  *
  * The macro DIRSIZ(fmt, dp) gives the amount of space required to represent
@@ -80,6 +76,7 @@
 #define	DIRBLKSIZ	DEV_BSIZE
 #undef	MAXNAMLEN
 #define	MAXNAMLEN	255
+#define APPLEUFS_DIRBLKSIZ 1024
 
 struct	direct {
 	u_int32_t d_ino;		/* inode number of entry */
@@ -160,4 +157,4 @@ struct odirtemplate {
 	u_int16_t	dotdot_namlen;
 	char		dotdot_name[4];	/* ditto */
 };
-#endif /* !_DIR_H_ */
+#endif /* !_UFS_UFS_DIR_H_ */

@@ -1,5 +1,6 @@
-/*	$NetBSD: ka53.c,v 1.7 2002/02/24 01:04:27 matt Exp $	*/
+/*	$NetBSD: ka53.c,v 1.9 2003/07/15 02:15:04 lukem Exp $	*/
 /*
+ * Copyright (c) 2002 Hugh Graham.
  * Copyright (c) 2000 Ludd, University of Lule}, Sweden.
  * All rights reserved.
  *
@@ -36,6 +37,9 @@
  * and his useful hints for the console of these machines
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ka53.c,v 1.9 2003/07/15 02:15:04 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/systm.h>
@@ -50,13 +54,10 @@
 static void    ka53_conf(void);
 static void    ka53_memerr(void);
 static int     ka53_mchk(caddr_t);
-static void    ka53_halt(void);
-static void    ka53_reboot(int);
 static void    ka53_softmem(void *);
 static void    ka53_hardmem(void *);
 static void    ka53_steal_pages(void);
 static void    ka53_cache_enable(void);
-static void    ka53_halt(void);
 
 /* 
  * Declaration of 53-specific calls.
@@ -70,13 +71,12 @@ struct cpu_dep ka53_calls = {
 	generic_clkwrite,
 	32,	 /* ~VUPS */
 	2,	/* SCB pages */
-	ka53_halt,
-	ka53_reboot,
+	generic_halt,
+	generic_reboot,
 	NULL,
 	NULL,
 	CPU_RAISEIPL,
 };
-
 
 void
 ka53_conf()
@@ -87,6 +87,8 @@ ka53_conf()
 	volatile int *hej = (void *)mfpr(PR_ISP);
 	*hej = *hej;
 	hej[-1] = hej[-1];
+
+	cpmbx = (struct cpmbx *)vax_map_physmem(0x20140400, 1);
 
 	switch((vax_siedata & 0xff00) >> 8) {
 		case VAX_STYP_51: cpuname = "KA51"; break;
@@ -233,16 +235,3 @@ ka53_steal_pages()
 	/* Turn on caches (to speed up execution a bit) */
 	ka53_cache_enable();
 }
-
-static void
-ka53_halt()
-{
-	asm("halt");
-}
-
-static void
-ka53_reboot(int arg)
-{
-	asm("halt");
-}
-

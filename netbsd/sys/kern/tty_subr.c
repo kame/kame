@@ -1,4 +1,4 @@
-/*	$NetBSD: tty_subr.c,v 1.22 2001/12/27 02:27:50 ad Exp $	*/
+/*	$NetBSD: tty_subr.c,v 1.27 2004/03/23 13:22:05 junyoung Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994 Theo de Raadt
@@ -15,11 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Theo de Raadt.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -34,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tty_subr.c,v 1.22 2001/12/27 02:27:50 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tty_subr.c,v 1.27 2004/03/23 13:22:05 junyoung Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -43,11 +38,13 @@ __KERNEL_RCSID(0, "$NetBSD: tty_subr.c,v 1.22 2001/12/27 02:27:50 ad Exp $");
 #include <sys/tty.h>
 #include <sys/malloc.h>
 
+MALLOC_DEFINE(M_TTYS, "ttys", "allocated tty structures");
+
 /*
  * At compile time, choose:
  * There are two ways the TTY_QUOTE bit can be stored. If QBITS is
  * defined we allocate an array of bits -- 1/8th as much memory but
- * setbit(), clrbit(), and isset() take more cpu. If QBITS is
+ * setbit(), clrbit(), and isset() take more CPU. If QBITS is
  * undefined, we just use an array of bytes.
  * 
  * If TTY_QUOTE functionality isn't required by a line discipline,
@@ -64,18 +61,9 @@ __KERNEL_RCSID(0, "$NetBSD: tty_subr.c,v 1.22 2001/12/27 02:27:50 ad Exp $");
 #define QMEM(n)		(n)
 #endif
 
-void	cinit __P((void));
 #ifdef QBITS
-void	clrbits __P((u_char *, int, int));
+void	clrbits(u_char *, int, int);
 #endif
-
-/*
- * Initialize clists.
- */
-void
-cinit()
-{
-}
 
 /*
  * Initialize a particular clist. Ok, they are really ring buffers,

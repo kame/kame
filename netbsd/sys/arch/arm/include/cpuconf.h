@@ -1,7 +1,7 @@
-/*	$NetBSD: cpuconf.h,v 1.2 2002/05/03 03:28:49 thorpej Exp $	*/
+/*	$NetBSD: cpuconf.h,v 1.8 2003/09/06 08:55:42 rearnsha Exp $	*/
 
 /*
- * Copyright (c 2002 Wasabi Systems, Inc.
+ * Copyright (c) 2002 Wasabi Systems, Inc.
  * All rights reserved.
  *
  * Written by Jason R. Thorpe for Wasabi Systems, Inc.
@@ -43,6 +43,12 @@
 #endif /* _KERNEL_OPT */
 
 /*
+ * IF YOU CHANGE THIS FILE, MAKE SURE TO UPDATE THE DEFINITION OF
+ * "PMAP_NEEDS_PTE_SYNC" IN <arm/arm32/pmap.h> FOR THE CPU TYPE
+ * YOU ARE ADDING SUPPORT FOR.
+ */
+
+/*
  * Step 1: Count the number of CPU types configured into the kernel.
  */
 #if defined(_KERNEL_OPT)
@@ -51,11 +57,14 @@
 			 defined(CPU_ARM6) + defined(CPU_ARM7) +	\
 			 defined(CPU_ARM7TDMI) +			\
 			 defined(CPU_ARM8) + defined(CPU_ARM9) +	\
+			 defined(CPU_ARM10) +				\
 			 defined(CPU_SA110) + defined(CPU_SA1100) +	\
 			 defined(CPU_SA1110) +				\
+			 defined(CPU_IXP12X0) +				\
 			 defined(CPU_XSCALE_80200) +			\
 			 defined(CPU_XSCALE_80321) +			\
-			 defined(CPU_XSCALE_PXA2X0))
+			 defined(CPU_XSCALE_PXA2X0) + 			\
+			 defined(CPU_XSCALE_IXP425))
 #else
 #define	CPU_NTYPES	2
 #endif /* _KERNEL_OPT */
@@ -79,7 +88,8 @@
 
 #if !defined(_KERNEL_OPT) ||						\
     (defined(CPU_ARM7TDMI) || defined(CPU_ARM8) || defined(CPU_ARM9) ||	\
-     defined(CPU_SA110) || defined(CPU_SA1100) || defined(CPU_SA1110))
+     defined(CPU_ARM10) || defined(CPU_SA110) || defined(CPU_SA1100) || \
+     defined(CPU_SA1110) || defined(CPU_IXP12X0) || defined(CPU_XSCALE_IXP425))
 #define	ARM_ARCH_4	1
 #else
 #define	ARM_ARCH_4	0
@@ -106,6 +116,9 @@
  *
  *	ARM_MMU_GENERIC		Generic ARM MMU, compatible with ARM6.
  *
+ *	ARM_MMU_SA1		StrongARM SA-1 MMU.  Compatible with generic
+ *				ARM MMU, but has no write-through cache mode.
+ *
  *	ARM_MMU_XSCALE		XScale MMU.  Compatible with generic ARM
  *				MMU, but also has several extensions which
  *				require different PTE layout to use.
@@ -119,25 +132,45 @@
 
 #if !defined(_KERNEL_OPT) ||						\
     (defined(CPU_ARM6) || defined(CPU_ARM7) || defined(CPU_ARM7TDMI) ||	\
-     defined(CPU_ARM8) || defined(CPU_ARM9) || defined(CPU_SA110) ||	\
-     defined(CPU_SA1100) || defined(CPU_SA1110))
+     defined(CPU_ARM8) || defined(CPU_ARM9) || defined(CPU_ARM10))
 #define	ARM_MMU_GENERIC		1
 #else
 #define	ARM_MMU_GENERIC		0
 #endif
 
 #if !defined(_KERNEL_OPT) ||						\
+    (defined(CPU_SA110) || defined(CPU_SA1100) || defined(CPU_SA1110) ||\
+     defined(CPU_IXP12X0))
+#define	ARM_MMU_SA1		1
+#else
+#define	ARM_MMU_SA1		0
+#endif
+
+#if !defined(_KERNEL_OPT) ||						\
     (defined(CPU_XSCALE_80200) || defined(CPU_XSCALE_80321) ||		\
-     defined(CPU_XSCALE_PXA2X0))
+     defined(CPU_XSCALE_PXA2X0) || defined(CPU_XSCALE_IXP425))
 #define	ARM_MMU_XSCALE		1
 #else
 #define	ARM_MMU_XSCALE		0
 #endif
 
 #define	ARM_NMMUS		(ARM_MMU_MEMC + ARM_MMU_GENERIC +	\
-				 ARM_MMU_XSCALE)
+				 ARM_MMU_SA1 + ARM_MMU_XSCALE)
 #if ARM_NMMUS == 0
 #error ARM_NMMUS is 0
+#endif
+
+/*
+ * Step 4: Define features that may be present on a subset of CPUs
+ *
+ *	ARM_XSCALE_PMU		Performance Monitoring Unit on 80200 and 80321
+ */
+
+#if !defined(_KERNEL_OPT) ||						\
+    (defined(CPU_XSCALE_80200) || defined(CPU_XSCALE_80321))
+#define ARM_XSCALE_PMU	1
+#else
+#define ARM_XSCALE_PMU	0
 #endif
 
 #endif /* _ARM_CPUCONF_H_ */

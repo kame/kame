@@ -1,4 +1,4 @@
-/*	$NetBSD: irix_ioctl.c,v 1.1 2002/03/03 20:12:17 manu Exp $ */
+/*	$NetBSD: irix_ioctl.c,v 1.6 2003/01/22 12:58:22 rafal Exp $ */
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -37,16 +37,25 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: irix_ioctl.c,v 1.1 2002/03/03 20:12:17 manu Exp $");
+__KERNEL_RCSID(0, "$NetBSD: irix_ioctl.c,v 1.6 2003/01/22 12:58:22 rafal Exp $");
 
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
+#include <sys/mount.h>
 #include <sys/file.h>
 #include <sys/filio.h>
 #include <sys/filedesc.h>
 #include <sys/ioctl.h>
+#include <sys/vnode.h>
 #include <sys/types.h>
+#include <sys/sa.h>
+#include <sys/syscallargs.h>
+#include <sys/conf.h>
+
+#include <miscfs/specfs/specdev.h>
+
+#include <compat/common/compat_util.h>
 
 #include <compat/svr4/svr4_types.h>
 #include <compat/svr4/svr4_lwp.h>
@@ -56,13 +65,15 @@ __KERNEL_RCSID(0, "$NetBSD: irix_ioctl.c,v 1.1 2002/03/03 20:12:17 manu Exp $");
 #include <compat/svr4/svr4_syscallargs.h>
 
 #include <compat/irix/irix_ioctl.h>
+#include <compat/irix/irix_usema.h>
 #include <compat/irix/irix_signal.h>
 #include <compat/irix/irix_types.h>
+#include <compat/irix/irix_exec.h>
 #include <compat/irix/irix_syscallargs.h>
 
 int
-irix_sys_ioctl(p, v, retval)
-	struct proc *p;
+irix_sys_ioctl(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -71,9 +82,18 @@ irix_sys_ioctl(p, v, retval)
 		syscallarg(u_long) com;
 		syscallarg(caddr_t) data;
 	} */ *uap = v;
+	extern const struct cdevsw irix_usema_cdevsw;
+	struct proc *p = l->l_proc;
 	u_long	cmd;
+	caddr_t data;
 	struct file *fp;
 	struct filedesc *fdp;
+	struct vnode *vp;
+	struct vattr vattr;
+	struct irix_ioctl_usrdata iiu;
+	struct irix_ioctl_usrdata *iiup;
+	caddr_t sg = stackgap_init(p, 0);
+	int error, val;
 
 	/* 
 	 * This duplicates 6 lines from svr4_sys_ioctl() 
@@ -81,6 +101,7 @@ irix_sys_ioctl(p, v, retval)
 	 */
 	fdp = p->p_fd;
 	cmd = SCARG(uap, com);
+	data = SCARG(uap, data);
 	
 	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return EBADF;
@@ -88,15 +109,87 @@ irix_sys_ioctl(p, v, retval)
 	if ((fp->f_flag & (FREAD | FWRITE)) == 0)
 		return EBADF;
 
+	/*
+	 * A special hook for /dev/usemaclone ioctls. Some of the ioctl
+	 * commands need to set the return value, which is normally
+	 * impossible in the file methods and lower. We do the job by
+	 * copying the retval address and the data argument to a 
+	 * struct irix_ioctl_usrdata in the stackgap. The data argument
+	 * is set to the address of the structure, and the underlying 
+	 * code will be able to retreive both data and the retval address
+	 * by fetching the struct irix_ioctl_usrdata.
+	 *
+	 * We also bypass the checks in sys_ioctl() because theses ioctl
+	 * are defined _IO but really are _IOR. XXX need security review.
+	 */
+	if ((cmd & IRIX_UIOC_MASK) == IRIX_UIOC) {
+		if (fp->f_type != DTYPE_VNODE)
+			return ENOTTY;
+		FILE_USE(fp);
+		vp = (struct vnode*)fp->f_data;
+		if (vp->v_type != VCHR ||
+		    cdevsw_lookup(vp->v_rdev) != &irix_usema_cdevsw ||
+		    minor(vp->v_rdev) != IRIX_USEMACLNDEV_MINOR) {
+			error = ENOTTY;
+			goto out;
+		}
+
+		iiup = stackgap_alloc(p, &sg, sizeof(iiu));	
+		iiu.iiu_data = data;
+		iiu.iiu_retval = retval;
+		data = (caddr_t)iiup;
+		if ((error = copyout(&iiu, iiup, sizeof(iiu))) != 0) 
+			goto out;
+
+		error = (*fp->f_ops->fo_ioctl)(fp, cmd, data, p);
+out:
+		FILE_UNUSE(fp, p);
+		return error;
+	}
+
 	switch (cmd) {
 	case IRIX_SIOCNREAD: /* number of bytes to read */
 		return (*(fp->f_ops->fo_ioctl))(fp, FIONREAD, 
 		    SCARG(uap, data), p);
 		break;	
 
+	case IRIX_MTIOCGETBLKSIZE: /* get tape block size in 512B units */
+		if (fp->f_type != DTYPE_VNODE)
+			return ENOSYS;
+
+		FILE_USE(fp);
+		vp = (struct vnode*)fp->f_data;
+
+		switch (vp->v_type) {
+		case VREG:
+		case VLNK:
+		case VDIR:
+			error = ENOTTY;
+			break;
+		case VCHR:
+		case VFIFO:
+			error = EINVAL;
+			break;
+		case VBLK:
+			error = VOP_GETATTR(vp, &vattr, p->p_ucred, p);
+			if (error == 0) {
+				val = vattr.va_blocksize / 512;
+				error = copyout(&val, data, sizeof(int));
+			}
+
+		default:
+			error = ENOSYS;
+			break;
+		}
+
+		FILE_UNUSE(fp, p);
+		return error;
+		break;
+
 	default: /* Fallback to the standard SVR4 ioctl's */
-		return svr4_sys_ioctl(p, v, retval);
+		error = svr4_sys_ioctl(l, v, retval);
+		break;
 	}
-	/* NOTREACHED */
-	return 0;
+
+	return error;
 }

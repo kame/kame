@@ -1,4 +1,4 @@
-/*	$NetBSD: ddp_output.c,v 1.4.10.1 2003/06/19 09:36:58 grant Exp $	 */
+/*	$NetBSD: ddp_output.c,v 1.7 2003/05/27 22:27:21 itojun Exp $	 */
 
 /*
  * Copyright (c) 1990,1991 Regents of The University of Michigan.
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ddp_output.c,v 1.4.10.1 2003/06/19 09:36:58 grant Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ddp_output.c,v 1.7 2003/05/27 22:27:21 itojun Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

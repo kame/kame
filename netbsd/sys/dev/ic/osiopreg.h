@@ -1,4 +1,4 @@
-/*	$NetBSD: osiopreg.h,v 1.1 2001/04/30 04:47:51 tsutsui Exp $	*/
+/*	$NetBSD: osiopreg.h,v 1.4 2003/11/02 11:07:45 wiz Exp $	*/
 
 /*
  * Copyright (c) 1990 The Regents of the University of California.
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -286,7 +282,7 @@
 #define OSIOP_CTEST4_MUX	0x80	/* Host bus multiplex mode */
 #define OSIOP_CTEST4_ZMOD	0x40	/* High-impedance outputs */
 #define OSIOP_CTEST4_SZM	0x20	/* ditto, SCSI "outputs" */
-#define OSIOP_CTEST4_SLBE	0x10	/* SCSI loobpack enable */
+#define OSIOP_CTEST4_SLBE	0x10	/* SCSI loopback enable */
 #define OSIOP_CTEST4_SFWR	0x08	/* SCSI FIFO write enable (from sodl) */
 #define OSIOP_CTEST4_FBL	0x07	/* DMA FIFO Byte Lane select
 					   (from ctest6) 4->0, .. 7->3 */
@@ -366,10 +362,10 @@
 /* DMA control register (dcntl) */
 
 #define OSIOP_DCNTL_CF_MASK	0xc0	/* Clock frequency dividers: */
-#define  OSIOP_DCNTL_CF_2	0x00	/*  0 --> 37.51..50.00 Mhz, div=2 */
-#define  OSIOP_DCNTL_CF_1_5	0x40	/*  1 --> 25.01..37.50 Mhz, div=1.5 */
-#define  OSIOP_DCNTL_CF_1	0x80	/*  2 --> 16.67..25.00 Mhz, div=1 */
-#define  OSIOP_DCNTL_CF_3	0xc0	/*  3 --> 50.01..66.67 Mhz, div=3 */
+#define  OSIOP_DCNTL_CF_2	0x00	/*  0 --> 37.51..50.00 MHz, div=2 */
+#define  OSIOP_DCNTL_CF_1_5	0x40	/*  1 --> 25.01..37.50 MHz, div=1.5 */
+#define  OSIOP_DCNTL_CF_1	0x80	/*  2 --> 16.67..25.00 MHz, div=1 */
+#define  OSIOP_DCNTL_CF_3	0xc0	/*  3 --> 50.01..66.67 MHz, div=3 */
 #define OSIOP_DCNTL_EA		0x20	/* Enable ACK */
 #define OSIOP_DCNTL_SSM		0x10	/* Single step mode */
 #define OSIOP_DCNTL_LLM		0x08	/* Enable SCSI Low-level mode */

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_tr_pcmcia.c,v 1.7 2001/12/15 13:23:22 soren Exp $	*/
+/*	$NetBSD: if_tr_pcmcia.c,v 1.11 2002/10/02 16:52:16 thorpej Exp $	*/
 
 /*
  * Copyright (c) 2000 Soren S. Jorvang.  All rights reserved.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_tr_pcmcia.c,v 1.7 2001/12/15 13:23:22 soren Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_tr_pcmcia.c,v 1.11 2002/10/02 16:52:16 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -102,13 +102,8 @@ static void	tr_pcmcia_mediastatus(struct tr_softc *, struct ifmediareq *);
 static void	tr_pcmcia_disable(struct tr_softc *);
 static void	tr_pcmcia_setup(struct tr_softc *);
 
-struct cfattach tr_pcmcia_ca = {
-	sizeof(struct tr_pcmcia_softc),
-	tr_pcmcia_match,
-	tr_pcmcia_attach,
-	tr_pcmcia_detach,
-	tr_activate
-};
+CFATTACH_DECL(tr_pcmcia, sizeof(struct tr_pcmcia_softc),
+    tr_pcmcia_match, tr_pcmcia_attach, tr_pcmcia_detach, tr_activate);
 
 static int
 tr_pcmcia_match(parent, match, aux)
@@ -140,7 +135,7 @@ tr_pcmcia_attach(parent, self, aux)
 	bus_size_t offset;
 
 	psc->sc_pf = pa->pf;
-	cfe = pa->pf->cfe_head.sqh_first;
+	cfe = SIMPLEQ_FIRST(&pa->pf->cfe_head);
 
 	pcmcia_function_init(pa->pf, cfe);
 

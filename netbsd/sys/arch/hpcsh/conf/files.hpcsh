@@ -1,4 +1,4 @@
-#	$NetBSD: files.hpcsh,v 1.27 2002/04/16 20:50:20 thorpej Exp $
+#	$NetBSD: files.hpcsh,v 1.36 2004/03/25 15:26:35 wiz Exp $
 #
 maxpartitions 8
 
@@ -11,7 +11,6 @@ defflag debug_hpcsh.h	BUS_SPACE_DEBUG
 
 defparam opt_memsize.h	IOM_ROM_BEGIN IOM_ROM_SIZE IOM_RAM_BEGIN IOM_RAM_SIZE
 
-file	arch/hpcsh/hpcsh/conf.c
 file	arch/hpcsh/hpcsh/machdep.c
 file	arch/hpcsh/hpcsh/console.c
 file	arch/hpcsh/hpcsh/autoconf.c
@@ -42,19 +41,14 @@ file	arch/hpcsh/hpcsh/debug.c
 # Machine-independent SCSI drivers
 #
 include "dev/scsipi/files.scsipi"
-major	{sd = 3}
-major	{st = 4}
-major	{cd = 5}
 
 #
 # Machine-independent ATA drivers
 #
 include "dev/ata/files.ata"
-major	{wd = 1}
 
 # Memory Disk for install floppy
 file dev/md_root.c				memory_disk_hooks
-major	{md = 6}
 
 #
 # System bus types
@@ -68,6 +62,26 @@ file	arch/sh3/sh3/cpu.c			cpu
 
 include	"arch/sh3/conf/files.shb"
 
+device	j6x0lcd
+attach	j6x0lcd at shb
+file	arch/hpcsh/dev/j6x0lcd.c		j6x0lcd
+
+device	j6x0pwr
+attach	j6x0pwr at adc
+file	arch/hpcsh/dev/j6x0pwr.c		j6x0pwr
+
+include "dev/hpc/files.hpctp"
+
+device	j6x0tp: tpcalib, wsmousedev, wskbddev
+attach	j6x0tp at adc
+file	arch/hpcsh/dev/j6x0tp.c			j6x0tp
+defflag	opt_j6x0tp.h		J6X0TP_DEBUG
+				J6X0TP_WSMOUSE_EXCLUSIVE
+defparam opt_j6x0tp.h		J6X0TP_SETTINGS_ICON_KEYSYM
+				J6X0TP_PGUP_ICON_KEYSYM
+				J6X0TP_PGDN_ICON_KEYSYM
+				J6X0TP_SWITCH_ICON_KEYSYM
+
 device	pfckbd: hpckbdif
 attach	pfckbd at mainbus
 file	arch/hpcsh/dev/pfckbd.c			pfckbd	needs-flag
@@ -75,8 +89,7 @@ file	arch/hpcsh/dev/pfckbd.c			pfckbd	needs-flag
 #
 # HD64461
 #
-define	hd64461if {}
-device	hd64461if: hd64461if
+device	hd64461if {}
 attach	hd64461if at shb
 file	arch/hpcsh/dev/hd64461/hd64461.c		hd64461if
 file	arch/hpcsh/dev/hd64461/hd64461_machdep.c	hd64461if
@@ -96,8 +109,7 @@ file	dev/hpc/video_subr.c			hd64461video
 #
 # HD64465
 #
-define	hd64465if {}
-device	hd64465if: hd64465if
+device	hd64465if {}
 attach	hd64465if at shb
 file	arch/hpcsh/dev/hd64465/hd64465.c	hd64465if	needs-flag
 
@@ -125,3 +137,5 @@ include	"dev/wscons/files.wscons"
 #
 device	fdc {drive = -1}	# files.pcmcia requires.
 include "dev/pcmcia/files.pcmcia"
+
+include "arch/hpcsh/conf/majors.hpcsh"

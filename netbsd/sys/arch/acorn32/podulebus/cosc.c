@@ -1,4 +1,4 @@
-/*	$NetBSD: cosc.c,v 1.3.12.1 2002/11/01 11:13:20 tron Exp $	*/
+/*	$NetBSD: cosc.c,v 1.12 2003/07/14 22:48:26 lukem Exp $	*/
 
 /*
  * Copyright (c) 1996 Mark Brinicombe
@@ -41,10 +41,16 @@
  * Thanks to Andreas Gandor <andi@knipp.de> for some technical information
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cosc.c,v 1.12 2003/07/14 22:48:26 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
+
+#include <uvm/uvm_extern.h>
+
 #include <dev/scsipi/scsi_all.h>
 #include <dev/scsipi/scsipi_all.h>
 #include <dev/scsipi/scsiconf.h>
@@ -59,28 +65,25 @@
 #include <acorn32/podulebus/coscvar.h>
 #include <dev/podulebus/podules.h>
 
-void coscattach	__P((struct device *, struct device *, void *));
-int coscmatch	__P((struct device *, struct cfdata *, void *));
-void cosc_scsi_request	__P((struct scsipi_channel *,
-				scsipi_adapter_req_t, void *));
+void coscattach(struct device *, struct device *, void *);
+int coscmatch(struct device *, struct cfdata *, void *);
 
-struct cfattach cosc_ca = {
-	sizeof(struct cosc_softc), coscmatch, coscattach
-};
+CFATTACH_DECL(cosc, sizeof(struct cosc_softc),
+    coscmatch, coscattach, NULL, NULL);
 
-int cosc_intr		 __P((void *arg));
-int cosc_setup_dma	 __P((struct esc_softc *sc, void *ptr, int len,
-			      int mode));
-int cosc_build_dma_chain __P((struct esc_softc *sc,
-			      struct esc_dma_chain *chain, void *p, int l));
-int cosc_need_bump	 __P((struct esc_softc *sc, void *ptr, int len));
-
-void cosc_led		 __P((struct esc_softc *sc, int mode));
+int cosc_intr(void *);
+int cosc_setup_dma(struct esc_softc *, void *, int, int);
+int cosc_build_dma_chain(struct esc_softc *, struct esc_dma_chain *, void *,
+			 int);
+int cosc_need_bump(struct esc_softc *, void *, int);
+void cosc_led(struct esc_softc *, int);
+void cosc_set_dma_adr(struct esc_softc *, void *);
+void cosc_set_dma_tc(struct esc_softc *, unsigned int);
+void cosc_set_dma_mode(struct esc_softc *, int);
 
 #if COSC_POLL > 0
 int cosc_poll = 1;
 #endif
-
 
 int
 coscmatch(pdp, cf, auxp)
@@ -229,11 +232,13 @@ coscattach(pdp, dp, auxp)
 		get_bootconf_option(boot_args, "coscpoll",
 		    BOOTOPT_TYPE_BOOLEAN, &cosc_poll);
 
-	if (cosc_poll)
+	if (cosc_poll) {
 		printf(" polling");
+		sc->sc_softc.sc_adapter.adapt_flags |= SCSIPI_ADAPT_POLL_ONLY;
+	}
 #endif
 
-	sc->sc_softc.sc_bump_sz = NBPG;
+	sc->sc_softc.sc_bump_sz = PAGE_SIZE;
 	sc->sc_softc.sc_bump_pa = 0x0;
 
 	escinitialize((struct esc_softc *)sc);
@@ -244,7 +249,7 @@ coscattach(pdp, dp, auxp)
 	sc->sc_softc.sc_adapter.adapt_max_periph = 1;
 	sc->sc_softc.sc_adapter.adapt_ioctl = NULL;
 	sc->sc_softc.sc_adapter.adapt_minphys = esc_minphys;
-	sc->sc_softc.sc_adapter.adapt_request = cosc_scsi_request;
+	sc->sc_softc.sc_adapter.adapt_request = esc_scsi_request;
 
 	sc->sc_softc.sc_channel.chan_adapter = &sc->sc_softc.sc_adapter;
 	sc->sc_softc.sc_channel.chan_bustype = &scsi_bustype;
@@ -275,7 +280,7 @@ coscattach(pdp, dp, auxp)
 		sc->sc_ih = podulebus_irq_establish(pa->pa_ih, IPL_BIO,
 		    cosc_intr, sc, &sc->sc_intrcnt);
 		if (sc->sc_ih == NULL)
-			panic("%s: Cannot install IRQ handler\n",
+			panic("%s: Cannot install IRQ handler",
 			    dp->dv_xname);
 	}
 
@@ -429,32 +434,4 @@ cosc_build_dma_chain(sc, chain, p, l)
 {
 	printf("cosc_build_dma_chain()\n");
 	return(0);
-}
-
-
-void
-cosc_scsi_request(chan, req, arg)
-	struct scsipi_channel *chan;
-	scsipi_adapter_req_t req;
-	void *arg;
-{
-	struct scsipi_xfer *xs;
-
-	switch (req) {
-	case ADAPTER_REQ_RUN_XFER:
-		xs = arg;
-
-#if COSC_POLL > 0
-		if (cosc_poll)
-			xs->xs_control |= XS_CTL_POLL;
-#endif
-#if 0
-		if (periph->periph_lun == 0)
-		printf("id=%d lun=%d cmdlen=%d datalen=%d opcode=%02x flags=%08x status=%02x blk=%02x %02x\n",
-		    xs->xs_periph->periph_target, xs->xs_periph->periph_lun, xs->cmdlen, xs->datalen, xs->cmd->opcode,
-		    xs->xs_control, xs->status, xs->cmd->bytes[0], xs->cmd->bytes[1]);
-#endif
-	default:
-	}
-	esc_scsi_request(chan, req, arg);
 }

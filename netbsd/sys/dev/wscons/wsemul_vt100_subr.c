@@ -1,4 +1,4 @@
-/* $NetBSD: wsemul_vt100_subr.c,v 1.10.10.1 2003/06/25 22:15:04 grant Exp $ */
+/* $NetBSD: wsemul_vt100_subr.c,v 1.15 2004/03/24 17:26:53 drochner Exp $ */
 
 /*
  * Copyright (c) 1998
@@ -12,12 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed for the NetBSD Project
- *	by Matthias Drochner.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -33,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: wsemul_vt100_subr.c,v 1.10.10.1 2003/06/25 22:15:04 grant Exp $");
+__KERNEL_RCSID(0, "$NetBSD: wsemul_vt100_subr.c,v 1.15 2004/03/24 17:26:53 drochner Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -42,6 +36,8 @@ __KERNEL_RCSID(0, "$NetBSD: wsemul_vt100_subr.c,v 1.10.10.1 2003/06/25 22:15:04 
 #include <dev/wscons/wsdisplayvar.h>
 #include <dev/wscons/wsemulvar.h>
 #include <dev/wscons/wsemul_vt100var.h>
+
+#include "opt_wsemul.h"
 
 static int vt100_selectattribute(struct wsemul_vt100_emuldata *,
 				      int, int, int, long *, long *);
@@ -218,11 +214,11 @@ wsemul_vt100_handle_csi(struct wsemul_vt100_emuldata *edp, u_char c)
 	    case A3('\0', '\0', 'l'): /* RM */
 		for (n = 0; n < edp->nargs; n++)
 			vt100_ansimode(edp, ARG(n), VTMODE_RESET);
-		break;;
+		break;
 	    case A3('?', '\0', 'l'): /* DECRM */
 		for (n = 0; n < edp->nargs; n++)
 			vt100_decmode(edp, ARG(n), VTMODE_RESET);
-		break;;
+		break;
 	    case A3('\0', '$', 'p'): /* DECRQM request mode ANSI */
 		vt100_ansimode(edp, ARG(0), VTMODE_REPORT);
 		break;
@@ -633,8 +629,8 @@ vt100_selectattribute(struct wsemul_vt100_emuldata *edp,
 		printf("colors ignored (impossible)\n");
 #endif
 	}
-	error = (*edp->emulops->alloc_attr)(edp->emulcookie, fgcol, bgcol,
-					    flags & WSATTR_WSCOLORS, bkgdattr);
+	error = (*edp->emulops->allocattr)(edp->emulcookie, fgcol, bgcol,
+					   flags & WSATTR_WSCOLORS, bkgdattr);
 	if (error)
 		return (error);
 
@@ -642,7 +638,14 @@ vt100_selectattribute(struct wsemul_vt100_emuldata *edp,
 	    !(edp->scrcapabilities & WSSCREEN_HILIT)) {
 		flags &= ~WSATTR_HILIT;
 		if (edp->scrcapabilities & WSSCREEN_WSCOLORS) {
+#if defined(WSEMUL_VT100_HILIT_FG) && WSEMUL_VT100_HILIT_FG != -1
+			fgcol = WSEMUL_VT100_HILIT_FG;
+#elif !defined(WSEMUL_VT100_HILIT_FG)
 			fgcol = WSCOL_RED;
+#endif
+#if defined(WSEMUL_VT100_HILIT_BG) && WSEMUL_VT100_HILIT_BG != -1
+			bgcol = WSEMUL_VT100_HILIT_BG;
+#endif
 			flags |= WSATTR_WSCOLORS;
 		} else {
 #ifdef VT100_DEBUG
@@ -654,8 +657,14 @@ vt100_selectattribute(struct wsemul_vt100_emuldata *edp,
 	    !(edp->scrcapabilities & WSSCREEN_UNDERLINE)) {
 		flags &= ~WSATTR_UNDERLINE;
 		if (edp->scrcapabilities & WSSCREEN_WSCOLORS) {
+#if defined(WSEMUL_VT100_UNDERLINE_FG) && WSEMUL_VT100_UNDERLINE_FG != -1
+			fgcol = WSEMUL_VT100_UNDERLINE_FG;
+#endif
+#if defined(WSEMUL_VT100_UNDERLINE_BG) && WSEMUL_VT100_UNDERLINE_BG != -1
+			bgcol = WSEMUL_VT100_UNDERLINE_BG;
+#elif !defined(WSEMUL_VT100_UNDERLINE_BG)
 			bgcol = WSCOL_BROWN;
-			flags &= ~WSATTR_UNDERLINE;
+#endif
 			flags |= WSATTR_WSCOLORS;
 		} else {
 #ifdef VT100_DEBUG
@@ -685,8 +694,8 @@ vt100_selectattribute(struct wsemul_vt100_emuldata *edp,
 #endif
 		}
 	}
-	error = (*edp->emulops->alloc_attr)(edp->emulcookie, fgcol, bgcol,
-					    flags, attr);
+	error = (*edp->emulops->allocattr)(edp->emulcookie, fgcol, bgcol,
+					   flags, attr);
 	if (error)
 		return (error);
 

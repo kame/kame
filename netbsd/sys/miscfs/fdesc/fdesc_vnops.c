@@ -1,4 +1,4 @@
-/*	$NetBSD: fdesc_vnops.c,v 1.69 2002/04/02 17:46:06 jdolecek Exp $	*/
+/*	$NetBSD: fdesc_vnops.c,v 1.79 2003/09/13 08:32:16 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -45,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: fdesc_vnops.c,v 1.69 2002/04/02 17:46:06 jdolecek Exp $");
+__KERNEL_RCSID(0, "$NetBSD: fdesc_vnops.c,v 1.79 2003/09/13 08:32:16 jdolecek Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -89,8 +85,8 @@ LIST_HEAD(fdhashhead, fdescnode) *fdhashtbl;
 u_long fdhash;
 
 int	fdesc_lookup	__P((void *));
-#define	fdesc_create	genfs_eopnotsupp_rele
-#define	fdesc_mknod	genfs_eopnotsupp_rele
+#define	fdesc_create	genfs_eopnotsupp
+#define	fdesc_mknod	genfs_eopnotsupp
 int	fdesc_open	__P((void *));
 #define	fdesc_close	genfs_nullop
 #define	fdesc_access	genfs_nullop
@@ -100,15 +96,16 @@ int	fdesc_read	__P((void *));
 int	fdesc_write	__P((void *));
 int	fdesc_ioctl	__P((void *));
 int	fdesc_poll	__P((void *));
+int	fdesc_kqfilter	__P((void *));
 #define	fdesc_mmap	genfs_eopnotsupp
 #define	fdesc_fcntl	genfs_fcntl
 #define	fdesc_fsync	genfs_nullop
 #define	fdesc_seek	genfs_seek
-#define	fdesc_remove	genfs_eopnotsupp_rele
+#define	fdesc_remove	genfs_eopnotsupp
 int	fdesc_link	__P((void *));
-#define	fdesc_rename	genfs_eopnotsupp_rele
-#define	fdesc_mkdir	genfs_eopnotsupp_rele
-#define	fdesc_rmdir	genfs_eopnotsupp_rele
+#define	fdesc_rename	genfs_eopnotsupp
+#define	fdesc_mkdir	genfs_eopnotsupp
+#define	fdesc_rmdir	genfs_eopnotsupp
 int	fdesc_symlink	__P((void *));
 int	fdesc_readdir	__P((void *));
 int	fdesc_readlink	__P((void *));
@@ -150,6 +147,7 @@ const struct vnodeopv_entry_desc fdesc_vnodeop_entries[] = {
 	{ &vop_ioctl_desc, fdesc_ioctl },		/* ioctl */
 	{ &vop_fcntl_desc, fdesc_fcntl },		/* fcntl */
 	{ &vop_poll_desc, fdesc_poll },			/* poll */
+	{ &vop_kqfilter_desc, fdesc_kqfilter },		/* kqfilter */
 	{ &vop_revoke_desc, fdesc_revoke },		/* revoke */
 	{ &vop_mmap_desc, fdesc_mmap },			/* mmap */
 	{ &vop_fsync_desc, fdesc_fsync },		/* fsync */
@@ -186,6 +184,8 @@ const struct vnodeopv_entry_desc fdesc_vnodeop_entries[] = {
 const struct vnodeopv_desc fdesc_vnodeop_opv_desc =
 	{ &fdesc_vnodeop_p, fdesc_vnodeop_entries };
 
+extern const struct cdevsw ctty_cdevsw;
+
 /*
  * Initialise cache headers
  */
@@ -195,9 +195,7 @@ fdesc_init()
 	int cttymajor;
 
 	/* locate the major number */
-	for (cttymajor = 0; cttymajor < nchrdev; cttymajor++)
-		if (cdevsw[cttymajor].d_open == cttyopen)
-			break;
+	cttymajor = cdevsw_lookup_major(&ctty_cdevsw);
 	devctty = makedev(cttymajor, 0);
 	fdhashtbl = hashinit(NFDCACHE, HASH_LIST, M_CACHE, M_NOWAIT, &fdhash);
 }
@@ -444,18 +442,18 @@ fdesc_open(v)
 	switch (VTOFDESC(vp)->fd_type) {
 	case Fdesc:
 		/*
-		 * XXX Kludge: set p->p_dupfd to contain the value of the
+		 * XXX Kludge: set dupfd to contain the value of the
 		 * the file descriptor being sought for duplication. The error 
 		 * return ensures that the vnode for this device will be
 		 * released by vn_open. Open will detect this special error and
 		 * take the actions in dupfdopen.  Other callers of vn_open or
 		 * VOP_OPEN will simply report the error.
 		 */
-		ap->a_p->p_dupfd = VTOFDESC(vp)->fd_fd;	/* XXX */
+		curlwp->l_dupfd = VTOFDESC(vp)->fd_fd;	/* XXX */
 		return (ENODEV);
 
 	case Fctty:
-		return (cttyopen(devctty, ap->a_mode, 0, ap->a_p));
+		return ((*ctty_cdevsw.d_open)(devctty, ap->a_mode, 0, ap->a_p));
 	case Froot:
 	case Fdevfd:
 	case Flink:
@@ -482,6 +480,7 @@ fdesc_attr(fd, vap, cred, p)
 
 	switch (fp->f_type) {
 	case DTYPE_VNODE:
+		simple_unlock(&fp->f_slock);
 		error = VOP_GETATTR((struct vnode *) fp->f_data, vap, cred, p);
 		if (error == 0 && vap->va_type == VDIR) {
 			/*
@@ -652,6 +651,7 @@ fdesc_setattr(v)
 	 *      On vnode's this will cause truncation and socket/pipes make
 	 *      no sense.
 	 */
+	simple_unlock(&fp->f_slock);
 	return (0);
 }
 
@@ -850,7 +850,7 @@ fdesc_read(v)
 	switch (VTOFDESC(vp)->fd_type) {
 	case Fctty:
 		VOP_UNLOCK(vp, 0);
-		error = cttyread(devctty, ap->a_uio, ap->a_ioflag);
+		error = (*ctty_cdevsw.d_read)(devctty, ap->a_uio, ap->a_ioflag);
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 		break;
 
@@ -878,7 +878,8 @@ fdesc_write(v)
 	switch (VTOFDESC(vp)->fd_type) {
 	case Fctty:
 		VOP_UNLOCK(vp, 0);
-		error = cttywrite(devctty, ap->a_uio, ap->a_ioflag);
+		error = (*ctty_cdevsw.d_write)(devctty, ap->a_uio,
+					       ap->a_ioflag);
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 		break;
 
@@ -906,8 +907,9 @@ fdesc_ioctl(v)
 
 	switch (VTOFDESC(ap->a_vp)->fd_type) {
 	case Fctty:
-		error = cttyioctl(devctty, ap->a_command, ap->a_data,
-				  ap->a_fflag, ap->a_p);
+		error = (*ctty_cdevsw.d_ioctl)(devctty, ap->a_command,
+					       ap->a_data, ap->a_fflag,
+					       ap->a_p);
 		break;
 
 	default:
@@ -931,7 +933,7 @@ fdesc_poll(v)
 
 	switch (VTOFDESC(ap->a_vp)->fd_type) {
 	case Fctty:
-		revents = cttypoll(devctty, ap->a_events, ap->a_p);
+		revents = (*ctty_cdevsw.d_poll)(devctty, ap->a_events, ap->a_p);
 		break;
 
 	default:
@@ -940,6 +942,41 @@ fdesc_poll(v)
 	}
 
 	return (revents);
+}
+
+int
+fdesc_kqfilter(v)
+	void *v;
+{
+	struct vop_kqfilter_args /* {
+		struct vnode *a_vp;
+		struct knote *a_kn;
+	} */ *ap = v;
+	int error;
+	struct proc *p;
+	struct file *fp;
+
+	switch (VTOFDESC(ap->a_vp)->fd_type) {
+	case Fctty:
+		error = (*ctty_cdevsw.d_kqfilter)(devctty, ap->a_kn);
+		break;
+
+	case Fdesc:
+		/* just invoke kqfilter for the underlying descriptor */
+		p = curproc;	/* XXX hopefully ok to use curproc here */
+		if ((fp = fd_getfile(p->p_fd, VTOFDESC(ap->a_vp)->fd_fd)) == NULL)
+			return (1);
+			
+		FILE_USE(fp);
+		error = (*fp->f_ops->fo_kqfilter)(fp, ap->a_kn);
+		FILE_UNUSE(fp, p);
+		break;
+
+	default:
+		return (genfs_kqfilter(v));
+	}
+
+	return (error);
 }
 
 int

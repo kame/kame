@@ -1,4 +1,4 @@
-/*	$NetBSD: compat_exec.c,v 1.5.10.2 2003/10/02 09:52:42 tron Exp $	*/
+/*	$NetBSD: compat_exec.c,v 1.11 2003/11/19 15:48:21 christos Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994 Christopher G. Demetriou
@@ -31,12 +31,11 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: compat_exec.c,v 1.5.10.2 2003/10/02 09:52:42 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: compat_exec.c,v 1.11 2003/11/19 15:48:21 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
-#include <sys/malloc.h>
 #include <sys/vnode.h>
 #include <sys/exec.h>
 #include <sys/resourcevar.h>
@@ -70,13 +69,13 @@ exec_aout_prep_oldzmagic(p, epp)
 
 	/* set up command for text segment */
 	NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_pagedvn, execp->a_text,
-	    epp->ep_taddr, epp->ep_vp, NBPG, /* XXX should NBPG be CLBYTES? */
+	    epp->ep_taddr, epp->ep_vp, PAGE_SIZE, /* XXX CLBYTES? */
 	    VM_PROT_READ|VM_PROT_EXECUTE);
 
 	/* set up command for data segment */
 	NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_pagedvn, execp->a_data,
 	    epp->ep_daddr, epp->ep_vp,
-	    execp->a_text + NBPG, /* XXX should NBPG be CLBYTES? */
+	    execp->a_text + PAGE_SIZE, /* XXX CLBYTES? */
 	    VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 
 	/* set up command for bss segment */
@@ -84,7 +83,7 @@ exec_aout_prep_oldzmagic(p, epp)
 	    epp->ep_daddr + execp->a_data, NULLVP, 0,
 	    VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 
-	return exec_aout_setup_stack(p, epp);
+	return (*epp->ep_esch->es_setup_stack)(p, epp);
 }
 
 
@@ -107,7 +106,7 @@ exec_aout_prep_oldnmagic(p, epp)
 
 	epp->ep_taddr = 0;
 	epp->ep_tsize = execp->a_text;
-	epp->ep_daddr = roundup(epp->ep_taddr + execp->a_text, __LDPGSZ);
+	epp->ep_daddr = roundup(epp->ep_taddr + execp->a_text, AOUT_LDPGSZ);
 	epp->ep_dsize = execp->a_data + execp->a_bss;
 	epp->ep_entry = execp->a_entry;
 
@@ -122,13 +121,13 @@ exec_aout_prep_oldnmagic(p, epp)
 	    VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 
 	/* set up command for bss segment */
-	baddr = roundup(epp->ep_daddr + execp->a_data, NBPG);
+	baddr = roundup(epp->ep_daddr + execp->a_data, PAGE_SIZE);
 	bsize = epp->ep_daddr + epp->ep_dsize - baddr;
 	if (bsize > 0)
 		NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_zero, bsize, baddr,
 		    NULLVP, 0, VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 
-	return exec_aout_setup_stack(p, epp);
+	return (*epp->ep_esch->es_setup_stack)(p, epp);
 }
 
 
@@ -161,7 +160,7 @@ exec_aout_prep_oldomagic(p, epp)
 	    sizeof(struct exec), VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 
 	/* set up command for bss segment */
-	baddr = roundup(epp->ep_daddr + execp->a_data, NBPG);
+	baddr = roundup(epp->ep_daddr + execp->a_data, PAGE_SIZE);
 	bsize = epp->ep_daddr + epp->ep_dsize - baddr;
 	if (bsize > 0)
 		NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_zero, bsize, baddr,
@@ -175,7 +174,8 @@ exec_aout_prep_oldomagic(p, epp)
 	 * Compensate `ep_dsize' for the amount of data covered by the last
 	 * text page. 
 	 */
-	dsize = epp->ep_dsize + execp->a_text - roundup(execp->a_text, NBPG);
+	dsize = epp->ep_dsize + execp->a_text - roundup(execp->a_text,
+							PAGE_SIZE);
 	epp->ep_dsize = (dsize > 0) ? dsize : 0;
-	return exec_aout_setup_stack(p, epp);
+	return (*epp->ep_esch->es_setup_stack)(p, epp);
 }

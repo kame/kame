@@ -1,4 +1,4 @@
-/*	$NetBSD: boca.c,v 1.36 2002/01/07 21:47:04 thorpej Exp $	*/
+/*	$NetBSD: boca.c,v 1.41 2003/01/01 00:10:20 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: boca.c,v 1.36 2002/01/07 21:47:04 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: boca.c,v 1.41 2003/01/01 00:10:20 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -73,9 +73,8 @@ int bocaintr __P((void *));
 void boca_fixup __P((void *));
 int bocaprint __P((void *, const char *));
 
-struct cfattach boca_ca = {
-	sizeof(struct boca_softc), bocaprobe, bocaattach,
-};
+CFATTACH_DECL(boca, sizeof(struct boca_softc),
+    bocaprobe, bocaattach, NULL, NULL);
 
 int
 bocaprobe(parent, self, aux)
@@ -109,6 +108,8 @@ bocaprobe(parent, self, aux)
 	if (ia->ia_irq[0].ir_irq == ISACF_IRQ_DEFAULT)
 		return (0);
 
+	iobase = ia->ia_io[0].ir_addr;
+
 	/* if the first port is in use as console, then it. */
 	if (com_is_console(iot, iobase, 0))
 		goto checkmappings;
@@ -123,7 +124,7 @@ bocaprobe(parent, self, aux)
 		goto out;
 
 checkmappings:
-	for (i = 1, iobase = ia->ia_io[0].ir_addr; i < NSLAVES; i++) {
+	for (i = 1; i < NSLAVES; i++) {
 		iobase += COM_NPORTS;
 
 		if (com_is_console(iot, iobase, 0))
@@ -157,8 +158,8 @@ bocaprint(aux, pnp)
 	struct commulti_attach_args *ca = aux;
 
 	if (pnp)
-		printf("com at %s", pnp);
-	printf(" slave %d", ca->ca_slave);
+		aprint_normal("com at %s", pnp);
+	aprint_normal(" slave %d", ca->ca_slave);
 	return (UNCONF);
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: mlxreg.h,v 1.3.16.1 2003/07/28 18:08:09 he Exp $	*/
+/*	$NetBSD: mlxreg.h,v 1.4 2002/08/31 05:18:03 ad Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.

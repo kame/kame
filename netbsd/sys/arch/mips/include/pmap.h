@@ -1,9 +1,41 @@
-/*	$NetBSD: pmap.h,v 1.38 2002/03/05 15:37:32 simonb Exp $	*/
+/*	$NetBSD: pmap.h,v 1.44 2003/08/07 16:28:28 agc Exp $	*/
+
+/*
+ * Copyright (c) 1992, 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Ralph Campbell.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)pmap.h	8.1 (Berkeley) 6/10/93
+ */
 
 /*
  * Copyright (c) 1987 Carnegie-Mellon University
- * Copyright (c) 1992, 1993
- *	The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * Ralph Campbell.
@@ -39,8 +71,8 @@
  *	@(#)pmap.h	8.1 (Berkeley) 6/10/93
  */
 
-#ifndef	_PMAP_MACHINE_
-#define	_PMAP_MACHINE_
+#ifndef	_MIPS_PMAP_H_
+#define	_MIPS_PMAP_H_
 
 #include <mips/cpuregs.h>	/* for KSEG0 below */
 
@@ -118,6 +150,12 @@ extern struct pmap kernel_pmap_store;
 
 #define	pmap_update(pmap)	/* nothing (yet) */
 
+static __inline void
+pmap_remove_all(struct pmap *pmap)
+{
+	/* Nothing. */
+}
+
 /*
  *	Bootstrap the system enough to run with virtual memory.
  */
@@ -146,9 +184,14 @@ void	pmap_prefer(vaddr_t, vaddr_t *);
 #define	PMAP_UNMAP_POOLPAGE(va)	MIPS_KSEG0_TO_PHYS((va))
 
 /*
+ * Other hooks for the pool allocator.
+ */
+#define	POOL_VTOPHYS(va)	MIPS_KSEG0_TO_PHYS((vaddr_t)(va))
+
+/*
  * Select CCA to use for unmanaged pages.
  */
 #define	PMAP_CCA_FOR_PA(pa)	2		/* uncached */
 
 #endif	/* _KERNEL */
-#endif	/* _PMAP_MACHINE_ */
+#endif	/* _MIPS_PMAP_H_ */

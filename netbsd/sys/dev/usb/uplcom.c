@@ -1,4 +1,4 @@
-/*	$NetBSD: uplcom.c,v 1.27 2002/03/16 16:10:19 ichiro Exp $	*/
+/*	$NetBSD: uplcom.c,v 1.34.2.3 2004/07/28 10:40:40 tron Exp $	*/
 /*
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -36,15 +36,12 @@
  */
 
 /*
- * Simple datasheet
- * http://www.prolific.com.tw/download/DataSheet/pl2303_ds11.PDF
- * http://www.nisseisg.co.jp/jyouhou/_cp/@gif/2303.pdf
- * 	(english)
- *
+ * General information: http://www.prolific.com.tw/fr_pl2303.htm
+ * http://www.hitachi-hitec.com/jyouhou/prolific/2303.pdf
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uplcom.c,v 1.27 2002/03/16 16:10:19 ichiro Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uplcom.c,v 1.34.2.3 2004/07/28 10:40:40 tron Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -56,7 +53,6 @@ __KERNEL_RCSID(0, "$NetBSD: uplcom.c,v 1.27 2002/03/16 16:10:19 ichiro Exp $");
 #include <sys/file.h>
 #include <sys/select.h>
 #include <sys/proc.h>
-#include <sys/vnode.h>
 #include <sys/device.h>
 #include <sys/poll.h>
 
@@ -88,6 +84,15 @@ int	uplcomdebug = 0;
 #define RSAQ_STATUS_DSR		0x02
 #define RSAQ_STATUS_DCD		0x01
 
+#define	UPLCOM_FLOW_OUT_CTS	0x0001
+#define	UPLCOM_FLOW_OUT_DSR	0x0002
+#define	UPLCOM_FLOW_IN_DSR	0x0004
+#define	UPLCOM_FLOW_IN_DTR	0x0008
+#define	UPLCOM_FLOW_IN_RTS	0x0010
+#define	UPLCOM_FLOW_OUT_RTS	0x0020
+#define	UPLCOM_FLOW_OUT_XON	0x0080
+#define	UPLCOM_FLOW_IN_XON	0x0100
+
 struct	uplcom_softc {
 	USBBASEDEVICE		sc_dev;		/* base device */
 	usbd_device_handle	sc_udev;	/* USB device */
@@ -101,9 +106,8 @@ struct	uplcom_softc {
 	int			sc_isize;
 
 	usb_cdc_line_state_t	sc_line_state;	/* current line state */
-	u_char			sc_dtr;		/* current DTR state */
-	u_char			sc_rts;		/* current RTS state */
-	u_char			sc_status;
+	int			sc_dtr;		/* current DTR state */
+	int			sc_rts;		/* current RTS state */
 
 	device_ptr_t		sc_subdev;	/* ucom device */
 
@@ -159,6 +163,8 @@ static const struct usb_devno uplcom_devs[] = {
 	{ USB_VENDOR_ATEN, USB_PRODUCT_ATEN_UC232A },
 	/* IOGEAR/ATEN UC-232A */
 	{ USB_VENDOR_PROLIFIC, USB_PRODUCT_PROLIFIC_PL2303 },
+	/* IOGEAR/ATENTRIPPLITE */
+	{ USB_VENDOR_TRIPPLITE, USB_PRODUCT_TRIPPLITE_U209 },
 	/* ELECOM UC-SGT */
 	{ USB_VENDOR_ELECOM, USB_PRODUCT_ELECOM_UCSGT },
 	/* RATOC REX-USB60 */
@@ -167,8 +173,19 @@ static const struct usb_devno uplcom_devs[] = {
 	{ USB_VENDOR_TDK, USB_PRODUCT_TDK_UHA6400 },
 	/* TDK USB-PDC Adapter UPA9664 */
 	{ USB_VENDOR_TDK, USB_PRODUCT_TDK_UPA9664 },
+	/* Sony Ericsson USB Cable */
+	{ USB_VENDOR_SONYERICSSON, USB_PRODUCT_SONYERICSSON_DCU10 },
+	/* SOURCENEXT KeikaiDenwa 8 */
+	{ USB_VENDOR_SOURCENEXT, USB_PRODUCT_SOURCENEXT_KEIKAI8 },
+	/* SOURCENEXT KeikaiDenwa 8 with charger */
+	{ USB_VENDOR_SOURCENEXT, USB_PRODUCT_SOURCENEXT_KEIKAI8_CHG },
+	/* HAL Corporation Crossam2+USB */
+	{ USB_VENDOR_HAL, USB_PRODUCT_HAL_IMR001 },
+	/* Sitecom USB to serial cable */
+	{ USB_VENDOR_SITECOM, USB_PRODUCT_SITECOM_SERIAL },
 };
 #define uplcom_lookup(v, p) usb_lookup(uplcom_devs, v, p)
+
 
 USB_DECLARE_DRIVER(uplcom);
 
@@ -190,7 +207,7 @@ USB_ATTACH(uplcom)
 	usb_config_descriptor_t *cdesc;
 	usb_interface_descriptor_t *id;
 	usb_endpoint_descriptor_t *ed;
-	
+
 	char devinfo[1024];
 	char *devname = USBDEVNAME(sc->sc_dev);
 	usbd_status err;
@@ -205,7 +222,7 @@ USB_ATTACH(uplcom)
 
 	DPRINTF(("\n\nuplcom attach: sc=%p\n", sc));
 
-	/* initialize endpoints */ 
+	/* initialize endpoints */
 	uca.bulkin = uca.bulkout = -1;
 	sc->sc_intr_number = -1;
 	sc->sc_intr_pipe = NULL;
@@ -230,7 +247,7 @@ USB_ATTACH(uplcom)
 	}
 
 	/* get the (first/common) interface */
-	err = usbd_device2interface_handle(dev, UPLCOM_IFACE_INDEX, 
+	err = usbd_device2interface_handle(dev, UPLCOM_IFACE_INDEX,
 							&sc->sc_iface);
 	if (err) {
 		printf("\n%s: failed to get interface, err=%s\n",
@@ -257,7 +274,7 @@ USB_ATTACH(uplcom)
 		    UE_GET_XFERTYPE(ed->bmAttributes) == UE_INTERRUPT) {
 			sc->sc_intr_number = ed->bEndpointAddress;
 			sc->sc_isize = UGETW(ed->wMaxPacketSize);
-		} 
+		}
 	}
 
 	if (sc->sc_intr_number== -1) {
@@ -279,11 +296,11 @@ USB_ATTACH(uplcom)
 	 *  Interrupt(0x81) | Interrupt(0x81)
 	 * -----------------+ BulkIN(0x02)
 	 * Interface 1	    | BulkOUT(0x83)
-	 *   BulkIN(0x02)   | 
+	 *   BulkIN(0x02)   |
 	 *   BulkOUT(0x83)  |
 	 */
 	if (cdesc->bNumInterface == 2) {
-		err = usbd_device2interface_handle(dev, 
+		err = usbd_device2interface_handle(dev,
 				UPLCOM_SECOND_IFACE_INDEX, &sc->sc_iface);
 		if (err) {
 			printf("\n%s: failed to get second interface, err=%s\n",
@@ -291,7 +308,7 @@ USB_ATTACH(uplcom)
 			sc->sc_dying = 1;
 			USB_ATTACH_ERROR_RETURN;
 		}
-	} 
+	}
 
 	/* Find the bulk{in,out} endpoints */
 
@@ -397,7 +414,6 @@ uplcom_activate(device_ptr_t self, enum devact act)
 	switch (act) {
 	case DVACT_ACTIVATE:
 		return (EOPNOTSUPP);
-		break;
 
 	case DVACT_DEACTIVATE:
 		if (sc->sc_subdev != NULL)
@@ -418,9 +434,9 @@ uplcom_reset(struct uplcom_softc *sc)
         req.bRequest = UPLCOM_SET_REQUEST;
         USETW(req.wValue, 0);
         USETW(req.wIndex, sc->sc_iface_number);
-        USETW(req.wLength, 0); 
- 
-        err = usbd_do_request(sc->sc_udev, &req, 0); 
+        USETW(req.wLength, 0);
+
+        err = usbd_do_request(sc->sc_udev, &req, 0);
 	if (err)
 		return (EIO);
 
@@ -433,8 +449,15 @@ uplcom_set_line_state(struct uplcom_softc *sc)
 	usb_device_request_t req;
 	int ls;
 
-	ls = (sc->sc_dtr ? UCDC_LINE_DTR : 0) |
-		(sc->sc_rts ? UCDC_LINE_RTS : 0);
+	/* make sure we have initialized state for sc_dtr and sc_rts */
+	if (sc->sc_dtr == -1)
+		sc->sc_dtr = 0;
+	if (sc->sc_rts == -1)
+		sc->sc_rts = 0;
+
+	ls = (sc->sc_dtr ? UPLCOM_FLOW_OUT_DSR : 0) |
+		(sc->sc_rts ? UPLCOM_FLOW_OUT_CTS : 0);
+
 	req.bmRequestType = UT_WRITE_CLASS_INTERFACE;
 	req.bRequest = UCDC_SET_CONTROL_LINE_STATE;
 	USETW(req.wValue, ls);
@@ -471,9 +494,10 @@ uplcom_dtr(struct uplcom_softc *sc, int onoff)
 
 	DPRINTF(("uplcom_dtr: onoff=%d\n", onoff));
 
-	if (sc->sc_dtr == onoff)
+	if (sc->sc_dtr != -1 && !sc->sc_dtr == !onoff)
 		return;
-	sc->sc_dtr = onoff;
+
+	sc->sc_dtr = !!onoff;
 
 	uplcom_set_line_state(sc);
 }
@@ -483,9 +507,10 @@ uplcom_rts(struct uplcom_softc *sc, int onoff)
 {
 	DPRINTF(("uplcom_rts: onoff=%d\n", onoff));
 
-	if (sc->sc_rts == onoff)
+	if (sc->sc_rts != -1 && !sc->sc_rts == !onoff)
 		return;
-	sc->sc_rts = onoff;
+
+	sc->sc_rts = !!onoff;
 
 	uplcom_set_line_state(sc);
 }
@@ -608,6 +633,9 @@ uplcom_param(void *addr, int portno, struct termios *t)
 	if (ISSET(t->c_cflag, CRTSCTS))
 		uplcom_set_crtscts(sc);
 
+	if (sc->sc_rts == -1 || sc->sc_dtr == -1)
+		uplcom_set_line_state(sc);
+
 	if (err) {
 		DPRINTF(("uplcom_param: err=%s\n", usbd_errstr(err)));
 		return (EIO);
@@ -621,14 +649,13 @@ uplcom_open(void *addr, int portno)
 {
 	struct uplcom_softc *sc = addr;
 	int err;
-	
+
 	if (sc->sc_dying)
 		return (EIO);
 
 	DPRINTF(("uplcom_open: sc=%p\n", sc));
 
 	if (sc->sc_intr_number != -1 && sc->sc_intr_pipe == NULL) {
-		sc->sc_status = 0; /* clear status bit */
 		sc->sc_intr_buf = malloc(sc->sc_isize, M_USBDEV, M_WAITOK);
 		err = usbd_open_pipe_intr(sc->sc_intr_iface, sc->sc_intr_number,
 			USBD_SHORT_XFER_OK, &sc->sc_intr_pipe, sc,
@@ -645,7 +672,7 @@ uplcom_open(void *addr, int portno)
 }
 
 void
-uplcom_close(void *addr, int portno) 
+uplcom_close(void *addr, int portno)
 {
 	struct uplcom_softc *sc = addr;
 	int err;

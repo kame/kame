@@ -1,4 +1,4 @@
-/* $NetBSD: cs89x0isa.c,v 1.3 2001/12/31 22:07:58 thorpej Exp $ */
+/* $NetBSD: cs89x0isa.c,v 1.7 2003/05/09 23:51:28 fvdl Exp $ */
 
 /*
  * Copyright 1997
@@ -33,10 +33,10 @@
  *    even if advised of the possibility of such damage.
  */
 
-/* isa dma routines for cs89x0 */
+/* isa DMA routines for cs89x0 */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cs89x0isa.c,v 1.3 2001/12/31 22:07:58 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cs89x0isa.c,v 1.7 2003/05/09 23:51:28 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -89,8 +89,14 @@ cs_isa_dma_attach(struct cs_softc *sc)
 			goto after_dma_block;
 		}
 
+		if (isa_drq_alloc(isc->sc_ic, isc->sc_drq) != 0) {
+			printf("%s: unable to reserve drq %d\n",
+			    sc->sc_dev.dv_xname, isc->sc_drq);
+			goto after_dma_block;
+		}
+
 		if (isa_dmamap_create(isc->sc_ic, isc->sc_drq,
-		    CS8900_DMASIZE, BUS_DMA_NOWAIT) != 0) {
+		    CS8900_DMASIZE, BUS_DMA_NOWAIT|BUS_DMA_ALLOCNOW) != 0) {
 			printf("%s: unable to create ISA DMA map\n",
 			    sc->sc_dev.dv_xname);
 			goto after_dma_block;
@@ -133,7 +139,7 @@ void cs_isa_dma_chipinit(struct cs_softc *sc)
 		    isc->sc_dmasize, NULL, DMAMODE_READ | DMAMODE_LOOPDEMAND,
 		    BUS_DMA_NOWAIT)) {
 			/* XXX XXX XXX */
-			panic("%s: unable to start DMA\n", sc->sc_dev.dv_xname);
+			panic("%s: unable to start DMA", sc->sc_dev.dv_xname);
 		}
 		isc->sc_dmacur = isc->sc_dmabase;
 
@@ -188,7 +194,7 @@ void cs_process_rx_dma(struct cs_softc *sc)
 		dma_mem_ptr = isc->sc_dmacur;
 
 		/*
-		 * process all of the dma frames in memory
+		 * process all of the DMA frames in memory
 		 * 
 		 * This loop relies on the dma_mem_ptr variable being set to the
 		 * next frames start address.
@@ -197,7 +203,7 @@ void cs_process_rx_dma(struct cs_softc *sc)
 
 			/*
 			 * Get the length and status of the packet. Only the
-			 * status is guarenteed to be at dma_mem_ptr, ie need
+			 * status is guaranteed to be at dma_mem_ptr, ie need
 			 * to check for wraparound before reading the length
 			 */
 			status = *((unsigned short *) dma_mem_ptr)++;
@@ -215,7 +221,7 @@ void cs_process_rx_dma(struct cs_softc *sc)
 				 */
 				/*
 				 * should increment the error count and reset
-				 * the dma operation.
+				 * the DMA operation.
 				 */
 				printf("%s: cs_process_rx_dma: DMA buffer out of sync about to reset\n",
 				    sc->sc_dev.dv_xname);
@@ -256,7 +262,7 @@ void cs_process_rx_dma(struct cs_softc *sc)
 				}
 				/*
 				 * save processing by always using a mbuf
-				 * cluster, guarenteed to fit packet
+				 * cluster, guaranteed to fit packet
 				 */
 				MCLGET(m, M_DONTWAIT);
 				if ((m->m_flags & M_EXT) == 0) {

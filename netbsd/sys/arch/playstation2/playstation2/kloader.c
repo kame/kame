@@ -1,4 +1,4 @@
-/*	$NetBSD: kloader.c,v 1.2 2001/11/23 16:09:11 uch Exp $	*/
+/*	$NetBSD: kloader.c,v 1.8 2003/07/15 02:54:38 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -32,6 +32,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kloader.c,v 1.8 2003/07/15 02:54:38 lukem Exp $");
 
 #include "debug_playstation2.h"
 
@@ -213,20 +216,15 @@ kloader_load()
 int
 kloader_alloc_memory(size_t sz)
 {
-	int i, n, error;
+	int n, error;
 
 	n = (sz + BUCKET_SIZE - 1) / BUCKET_SIZE + 1; /* 2nd loader */
 
-	TAILQ_INIT(&kloader.pg_head);
-
-	for (i = 0; i < n; i++) {
-		error = uvm_pglistalloc(PAGE_SIZE, avail_start, avail_end,
-		    PAGE_SIZE, PAGE_SIZE, &kloader.pg_head, 0, 0);
-		if (error) {
-			uvm_pglistfree(&kloader.pg_head);
-			DPRINTF("can't allocate memory.\n");
-			return (1);
-		}
+	error = uvm_pglistalloc(n * PAGE_SIZE, avail_start, avail_end,
+				PAGE_SIZE, 0, &kloader.pg_head, n, 0);
+	if (error) {
+		DPRINTF("can't allocate memory.\n");
+		return (1);
 	}
 
 	kloader.cur_pg = TAILQ_FIRST(&kloader.pg_head);
@@ -292,7 +290,7 @@ kloader_load_bucket(vaddr_t kv, off_t ofs, size_t sz)
 struct vnode *
 kloader_open(const char *filename)
 {
-	struct proc *p = curproc;
+	struct proc *p = curlwp->l_proc;
 	struct nameidata nid;
 
 	NDINIT(&nid, LOOKUP, FOLLOW, UIO_SYSSPACE, filename, p);
@@ -313,7 +311,7 @@ kloader_open(const char *filename)
 void
 kloader_close()
 {
-	struct proc *p = curproc;
+	struct proc *p = curlwp->l_proc;
 	struct vnode *vp = kloader.vp;
 
 	VOP_UNLOCK(vp, 0);
@@ -323,7 +321,7 @@ kloader_close()
 int
 kloader_read(size_t ofs, size_t size, void *buf)
 {
-	struct proc *p = curproc;
+	struct proc *p = curlwp->l_proc;
 	struct vnode *vp = kloader.vp;
 	size_t resid;
 	int error;

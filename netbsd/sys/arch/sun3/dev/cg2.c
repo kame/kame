@@ -1,4 +1,4 @@
-/*	$NetBSD: cg2.c,v 1.16.14.1 2002/08/07 01:29:42 lukem Exp $	*/
+/*	$NetBSD: cg2.c,v 1.24 2003/08/07 16:29:54 agc Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -52,6 +48,9 @@
  * XXX should defer colormap updates to vertical retrace interrupts
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: cg2.c,v 1.24 2003/08/07 16:29:54 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -70,8 +69,6 @@
 #include <machine/cg2reg.h>
 
 #include "fbvar.h"
-
-cdev_decl(cg2);
 
 #define	CMSIZE 256
 
@@ -99,11 +96,19 @@ struct cg2_softc {
 static void	cg2attach __P((struct device *, struct device *, void *));
 static int	cg2match __P((struct device *, struct cfdata *, void *));
 
-struct cfattach cgtwo_ca = {
-	sizeof(struct cg2_softc), cg2match, cg2attach
-};
+CFATTACH_DECL(cgtwo, sizeof(struct cg2_softc),
+    cg2match, cg2attach, NULL, NULL);
 
 extern struct cfdriver cgtwo_cd;
+
+dev_type_open(cg2open);
+dev_type_ioctl(cg2ioctl);
+dev_type_mmap(cg2mmap);
+
+const struct cdevsw cgtwo_cdevsw = {
+	cg2open, nullclose, noread, nowrite, cg2ioctl,
+	nostop, notty, nopoll, cg2mmap, nokqfilter,
+};
 
 static int  cg2gattr __P((struct fbdevice *,  void *));
 static int  cg2gvideo __P((struct fbdevice *, void *));
@@ -112,7 +117,7 @@ static int	cg2getcmap __P((struct fbdevice *, void *));
 static int	cg2putcmap __P((struct fbdevice *, void *));
 
 static struct fbdriver cg2fbdriver = {
-	cg2open, cg2close, cg2mmap, cg2gattr,
+	cg2open, nullclose, cg2mmap, nokqfilter, cg2gattr,
 	cg2gvideo, cg2svideo,
 	cg2getcmap, cg2putcmap };
 
@@ -204,16 +209,6 @@ cg2open(dev, flags, mode, p)
 
 	if (unit >= cgtwo_cd.cd_ndevs || cgtwo_cd.cd_devs[unit] == NULL)
 		return (ENXIO);
-	return (0);
-}
-
-int
-cg2close(dev, flags, mode, p)
-	dev_t dev;
-	int flags, mode;
-	struct proc *p;
-{
-
 	return (0);
 }
 

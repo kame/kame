@@ -1,4 +1,4 @@
-/*	$NetBSD: hat.c,v 1.1 2002/02/10 01:58:03 thorpej Exp $	*/
+/*	$NetBSD: hat.c,v 1.3 2003/07/15 03:36:03 lukem Exp $	*/
 
 /*
  * Copyright 1997
@@ -40,6 +40,10 @@
  *
  * Created      : 19/05/97
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hat.c,v 1.3 2003/07/15 03:36:03 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
@@ -60,19 +64,21 @@
 
 #include <shark/shark/shark_fiq.h>
 #include <shark/shark/sequoia.h>
+#include <shark/shark/hat.h>
 
 static int hatOn = 0;
 
 /* interface to high-availability timer */
 
-static void hatClkCount(int count);
-static void hatEnableSWTCH();
+static void hatClkCount(int);
+static void hatEnableSWTCH(void);
 
 static void (*hatWedgeFn)(int);
 
 extern struct fiqregs shark_fiqregs;
 
-int hatClkOff(void)
+int
+hatClkOff(void)
 {
 	u_int16_t    seqReg;
 
@@ -101,13 +107,14 @@ int hatClkOff(void)
 	return 0;
 }
 
-
-int hatClkOn(int count, void (*hatFn)(int), int arg,
-	     unsigned char *stack, void (*wedgeFn)(int))
+int
+hatClkOn(int count, void (*hatFn)(int), int arg,
+	 unsigned char *stack, void (*wedgeFn)(int))
 {
 	u_int16_t    seqReg;
 
-	if (hatOn) return -1;
+	if (hatOn)
+		return -1;
 
 	hatWedgeFn = wedgeFn;
 
@@ -144,9 +151,11 @@ int hatClkOn(int count, void (*hatFn)(int), int arg,
 }
 
 
-int hatClkAdjust(int count)
+int
+hatClkAdjust(int count)
 {
-	if (!hatOn) return -1;
+	if (!hatOn)
+		return -1;
 
 	hatClkCount(count);
 	hatEnableSWTCH();
@@ -155,37 +164,41 @@ int hatClkAdjust(int count)
 }
 
 static void 
-hatEnableSWTCH()
+hatEnableSWTCH(void)
 {
-    u_int16_t    seqReg;
+	u_int16_t    seqReg;
 
-    /* SWTCH input causes PMI, not automatic switch to standby mode! */
-    /* clearing bit 9 is bad news.  seems to enable PMI from secondary
-       activity timeout! */
-    /* first setting, then clearing this bit seems to unwedge the edge
-       detect logic in the sequoia */
+	/* SWTCH input causes PMI, not automatic switch to standby mode! */
+	/* clearing bit 9 is bad news.  seems to enable PMI from secondary
+	   activity timeout! */
+	/* first setting, then clearing this bit seems to unwedge the edge
+	   detect logic in the sequoia */
 
-    sequoiaRead(PMC_PMIMCR_REG, &seqReg);
-    sequoiaWrite(PMC_PMIMCR_REG, seqReg |  (PMIMCR_M_IMSKSWSTBY));
-    sequoiaWrite(PMC_PMIMCR_REG, seqReg & ~(PMIMCR_M_IMSKSWSTBY));
+	sequoiaRead(PMC_PMIMCR_REG, &seqReg);
+	sequoiaWrite(PMC_PMIMCR_REG, seqReg |  (PMIMCR_M_IMSKSWSTBY));
+	sequoiaWrite(PMC_PMIMCR_REG, seqReg & ~(PMIMCR_M_IMSKSWSTBY));
 }
 
-void hatUnwedge()
+void
+hatUnwedge(void)
 {
-  static int   lastFiqsHappened = -1;
-  extern int   fiqs_happened;
+	static int   lastFiqsHappened = -1;
+	extern int   fiqs_happened;
 
-  if (!hatOn) return;
+	if (!hatOn)
+		return;
 
-  if (lastFiqsHappened == fiqs_happened) {
-    hatEnableSWTCH();
-    if (hatWedgeFn) (*hatWedgeFn)(fiqs_happened);
-  } else {
-    lastFiqsHappened = fiqs_happened;
-  }
+	if (lastFiqsHappened == fiqs_happened) {
+		hatEnableSWTCH();
+		if (hatWedgeFn)
+			(*hatWedgeFn)(fiqs_happened);
+	} else {
+		lastFiqsHappened = fiqs_happened;
+	}
 }
 
-static void hatClkCount(int count)
+static void
+hatClkCount(int count)
 {
         u_int savedints;
   

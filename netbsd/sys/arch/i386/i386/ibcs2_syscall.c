@@ -1,4 +1,4 @@
-/*	$NetBSD: ibcs2_syscall.c,v 1.16 2001/11/15 07:03:29 lukem Exp $	*/
+/*	$NetBSD: ibcs2_syscall.c,v 1.26 2004/02/13 18:57:19 drochner Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -37,21 +37,26 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ibcs2_syscall.c,v 1.16 2001/11/15 07:03:29 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ibcs2_syscall.c,v 1.26 2004/02/13 18:57:19 drochner Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_syscall_debug.h"
 #include "opt_vm86.h"
 #include "opt_ktrace.h"
+#include "opt_systrace.h"
 #endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
+#include <sys/savar.h>
 #include <sys/user.h>
 #include <sys/signal.h>
 #ifdef KTRACE
 #include <sys/ktrace.h>
+#endif
+#ifdef SYSTRACE
+#include <sys/systrace.h>
 #endif
 #include <sys/syscall.h>
 
@@ -66,21 +71,27 @@ __KERNEL_RCSID(0, "$NetBSD: ibcs2_syscall.c,v 1.16 2001/11/15 07:03:29 lukem Exp
 #include <compat/ibcs2/ibcs2_syscall.h>
 #include <machine/ibcs2_machdep.h>
 
-void ibcs2_syscall_plain __P((struct trapframe));
-void ibcs2_syscall_fancy __P((struct trapframe));
+void ibcs2_syscall_plain(struct trapframe *);
+void ibcs2_syscall_fancy(struct trapframe *);
 extern struct sysent ibcs2_sysent[];
 
 void
 ibcs2_syscall_intern(p)
 	struct proc *p;
 {
-
 #ifdef KTRACE
-	if (p->p_traceflag & (KTRFAC_SYSCALL | KTRFAC_SYSRET))
+	if (p->p_traceflag & (KTRFAC_SYSCALL | KTRFAC_SYSRET)) {
 		p->p_md.md_syscall = ibcs2_syscall_fancy;
-	else
+		return;
+	}
 #endif
-		p->p_md.md_syscall = ibcs2_syscall_plain;
+#ifdef SYSTRACE
+	if (ISSET(p->p_flag, P_SYSTRACE)) {
+		p->p_md.md_syscall = ibcs2_syscall_fancy;
+		return;
+	} 
+#endif
+	p->p_md.md_syscall = ibcs2_syscall_plain;
 }
 
 /*
@@ -90,23 +101,23 @@ ibcs2_syscall_intern(p)
  */
 void
 ibcs2_syscall_plain(frame)
-	struct trapframe frame;
+	struct trapframe *frame;
 {
 	register caddr_t params;
 	register const struct sysent *callp;
-	register struct proc *p;
+	struct lwp *l;
 	int error;
 	size_t argsize;
 	register_t code, args[8], rval[2];
 
 	uvmexp.syscalls++;
-	p = curproc;
+	l = curlwp;
 
-	code = frame.tf_eax;
+	code = frame->tf_eax;
 	if (IBCS2_HIGH_SYSCALL(code))
 		code = IBCS2_CVT_HIGH_SYSCALL(code);
 	callp = ibcs2_sysent;
-	params = (caddr_t)frame.tf_esp + sizeof(int);
+	params = (caddr_t)frame->tf_esp + sizeof(int);
 
 	switch (code) {
 	case SYS_syscall:
@@ -130,17 +141,21 @@ ibcs2_syscall_plain(frame)
 	}
 
 #ifdef SYSCALL_DEBUG
-	scdebug_call(p, code, args);
+	scdebug_call(l, code, args);
 #endif /* SYSCALL_DEBUG */
 
 	rval[0] = 0;
 	rval[1] = 0;
-	error = (*callp->sy_call)(p, args, rval);
+
+	KERNEL_PROC_LOCK(l);
+	error = (*callp->sy_call)(l, args, rval);
+	KERNEL_PROC_UNLOCK(l);	
+
 	switch (error) {
 	case 0:
-		frame.tf_eax = rval[0];
-		frame.tf_edx = rval[1];
-		frame.tf_eflags &= ~PSL_C;	/* carry bit */
+		frame->tf_eax = rval[0];
+		frame->tf_edx = rval[1];
+		frame->tf_eflags &= ~PSL_C;	/* carry bit */
 		break;
 	case ERESTART:
 		/*
@@ -148,7 +163,7 @@ ibcs2_syscall_plain(frame)
 		 * the kernel through the trap or call gate.  We pushed the
 		 * size of the instruction into tf_err on entry.
 		 */
-		frame.tf_eip -= frame.tf_err;
+		frame->tf_eip -= frame->tf_err;
 		break;
 	case EJUSTRETURN:
 		/* nothing to do */
@@ -156,15 +171,15 @@ ibcs2_syscall_plain(frame)
 	default:
 	bad:
 		error = native_to_ibcs2_errno[error];
-		frame.tf_eax = error;
-		frame.tf_eflags |= PSL_C;	/* carry bit */
+		frame->tf_eax = error;
+		frame->tf_eflags |= PSL_C;	/* carry bit */
 		break;
 	}
 
 #ifdef SYSCALL_DEBUG
-	scdebug_ret(p, code, error, rval);
+	scdebug_ret(l, code, error, rval);
 #endif /* SYSCALL_DEBUG */
-	userret(p);
+	userret(l);
 }
 
 /*
@@ -174,23 +189,23 @@ ibcs2_syscall_plain(frame)
  */
 void
 ibcs2_syscall_fancy(frame)
-	struct trapframe frame;
+	struct trapframe *frame;
 {
 	register caddr_t params;
 	register const struct sysent *callp;
-	register struct proc *p;
+	struct lwp *l;
 	int error;
 	size_t argsize;
 	register_t code, args[8], rval[2];
 
 	uvmexp.syscalls++;
-	p = curproc;
+	l = curlwp;
 
-	code = frame.tf_eax;
+	code = frame->tf_eax;
 	if (IBCS2_HIGH_SYSCALL(code))
 		code = IBCS2_CVT_HIGH_SYSCALL(code);
 	callp = ibcs2_sysent;
-	params = (caddr_t)frame.tf_esp + sizeof(int);
+	params = (caddr_t)frame->tf_esp + sizeof(int);
 
 	switch (code) {
 	case SYS_syscall:
@@ -213,22 +228,22 @@ ibcs2_syscall_fancy(frame)
 			goto bad;
 	}
 
-#ifdef SYSCALL_DEBUG
-	scdebug_call(p, code, args);
-#endif /* SYSCALL_DEBUG */
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSCALL))
-		ktrsyscall(p, code, argsize, args);
-#endif /* KTRACE */
+	KERNEL_PROC_LOCK(l);
+	if ((error = trace_enter(l, code, code, NULL, args)) != 0) {
+		KERNEL_PROC_UNLOCK(l);
+		goto bad;
+	}
 
 	rval[0] = 0;
 	rval[1] = 0;
-	error = (*callp->sy_call)(p, args, rval);
+	error = (*callp->sy_call)(l, args, rval);
+	KERNEL_PROC_UNLOCK(l);
+	
 	switch (error) {
 	case 0:
-		frame.tf_eax = rval[0];
-		frame.tf_edx = rval[1];
-		frame.tf_eflags &= ~PSL_C;	/* carry bit */
+		frame->tf_eax = rval[0];
+		frame->tf_edx = rval[1];
+		frame->tf_eflags &= ~PSL_C;	/* carry bit */
 		break;
 	case ERESTART:
 		/*
@@ -236,7 +251,7 @@ ibcs2_syscall_fancy(frame)
 		 * the kernel through the trap or call gate.  We pushed the
 		 * size of the instruction into tf_err on entry.
 		 */
-		frame.tf_eip -= frame.tf_err;
+		frame->tf_eip -= frame->tf_err;
 		break;
 	case EJUSTRETURN:
 		/* nothing to do */
@@ -244,17 +259,12 @@ ibcs2_syscall_fancy(frame)
 	default:
 	bad:
 		error = native_to_ibcs2_errno[error];
-		frame.tf_eax = error;
-		frame.tf_eflags |= PSL_C;	/* carry bit */
+		frame->tf_eax = error;
+		frame->tf_eflags |= PSL_C;	/* carry bit */
 		break;
 	}
 
-#ifdef SYSCALL_DEBUG
-	scdebug_ret(p, code, error, rval);
-#endif /* SYSCALL_DEBUG */
-	userret(p);
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p, code, error, rval[0]);
-#endif /* KTRACE */
+	trace_exit(l, code, args, rval, error);
+
+	userret(l);
 }

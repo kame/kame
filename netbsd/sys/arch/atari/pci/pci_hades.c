@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_hades.c,v 1.2 2002/01/09 21:33:49 leo Exp $	*/
+/*	$NetBSD: pci_hades.c,v 1.5 2003/07/15 01:19:54 lukem Exp $	*/
 
 /*
  * Copyright (c) 1996 Leo Weppelman.  All rights reserved.
@@ -31,10 +31,15 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pci_hades.c,v 1.5 2003/07/15 01:19:54 lukem Exp $");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
 
@@ -61,7 +66,7 @@ pci_bus_maxdevs(pc, busno)
 static int pci_config_offset __P((pcitag_t));
 
 /*
- * Atari_init.c maps the config areas NBPG bytes apart....
+ * Atari_init.c maps the config areas PAGE_SIZE bytes apart....
  */
 static int pci_config_offset(tag)
 pcitag_t	tag;
@@ -69,7 +74,7 @@ pcitag_t	tag;
 	int	device;
 
 	device = (tag >> 11) & 0x1f;
-	return(device * NBPG);
+	return(device * PAGE_SIZE);
 }
 
 pcireg_t
@@ -155,7 +160,7 @@ pci_intr_establish(pc, ih, level, ih_fun, ih_arg)
 	iinfo_p = &iinfo[slot];
 
 	if (iinfo_p->ipl > 0)
-	    panic("pci_intr_establish: interrupt was already established\n");
+	    panic("pci_intr_establish: interrupt was already established");
 
 	ihand = intr_establish((slot == 3) ? 23 : 16 + slot, USER_VEC, 0,
 				(hw_ifun_t)iifun, (void *)slot);
@@ -184,7 +189,7 @@ pci_intr_disestablish(pc, cookie)
 	pci_intr_info_t *iinfo_p = (pci_intr_info_t *)cookie;
 
 	if (iinfo->ipl < 0)
-	    panic("pci_intr_disestablish: interrupt was not established\n");
+	    panic("pci_intr_disestablish: interrupt was not established");
 
 	MFP2->mf_imrb &= ~iinfo->imask;
 	MFP2->mf_ierb &= ~iinfo->imask;

@@ -1,13 +1,47 @@
-/*	$NetBSD: mappedcopy.c,v 1.15 2001/09/10 21:19:16 chris Exp $	*/
+/*	$NetBSD: mappedcopy.c,v 1.19 2003/12/04 13:05:16 keihan Exp $	*/
 
 /*
- * XXX This doesn't work yet.  Soon.  --thorpej@netbsd.org
+ * XXX This doesn't work yet.  Soon.  --thorpej@NetBSD.org
  */
 
 /*
- * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1982, 1986, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * the Systems Programming Group of the University of Utah Computer
+ * Science Department.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * from: Utah $Hdr: vm_machdep.c 1.21 91/04/06$
+ *
+ *	@(#)vm_machdep.c	8.6 (Berkeley) 1/12/94
+ */
+/*
+ * Copyright (c) 1988 University of Utah.
  *
  * This code is derived from software contributed to Berkeley by
  * the Systems Programming Group of the University of Utah Computer
@@ -46,6 +80,9 @@
  *	@(#)vm_machdep.c	8.6 (Berkeley) 1/12/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mappedcopy.c,v 1.19 2003/12/04 13:05:16 keihan Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -71,10 +108,6 @@ u_int	mappedcopysize = -1;
 
 static caddr_t caddr1 = 0;
 
-/*
- * N.B. Both of these routines assume PAGE_SIZE == NBPG.
- */
-
 int
 mappedcopyin(f, t, count)
 	void *f, *t;
@@ -96,7 +129,7 @@ mappedcopyin(f, t, count)
 #endif
 
 	if (CADDR1 == 0)
-		CADDR1 = (caddr_t) uvm_km_valloc(kernel_map, NBPG);
+		CADDR1 = (caddr_t) uvm_km_valloc(kernel_map, PAGE_SIZE);
 
 	kva = (vaddr_t)CADDR1;
 	off = (int)((u_long)fromp & PAGE_MASK);
@@ -155,7 +188,7 @@ mappedcopyout(f, t, count)
 #endif
 
 	if (CADDR2 == 0)
-		CADDR2 = (caddr_t) uvm_km_valloc(kernel_map, NBPG);
+		CADDR2 = (caddr_t) uvm_km_valloc(kernel_map, PAGE_SIZE);
 
 	kva = (vaddr_t) CADDR2;
 	off = (int)((u_long)top & PAGE_MASK);

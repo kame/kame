@@ -1,4 +1,4 @@
-/*	$NetBSD: npx.h,v 1.18 2001/08/03 01:46:08 thorpej Exp $	*/
+/*	$NetBSD: npx.h,v 1.20 2003/08/07 16:27:59 agc Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -179,10 +175,10 @@ struct emcsts {
 
 #ifdef _KERNEL
 
-void	probeintr __P((void));
-void	probetrap __P((void));
-int	npx586bug1 __P((int, int));
-
+void	probeintr(void);
+void	probetrap(void);
+int	npx586bug1(int, int);
+void 	npxinit(struct cpu_info *);
 void	process_xmm_to_s87(const struct savexmm *, struct save87 *);
 void	process_s87_to_xmm(const struct save87 *, struct savexmm *);
 

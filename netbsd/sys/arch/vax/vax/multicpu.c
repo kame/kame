@@ -1,4 +1,4 @@
-/*	$NetBSD: multicpu.c,v 1.9 2001/06/04 21:37:11 ragge Exp $	*/
+/*	$NetBSD: multicpu.c,v 1.16 2004/03/19 20:17:51 matt Exp $	*/
 
 /*
  * Copyright (c) 2000 Ludd, University of Lule}, Sweden. All rights reserved.
@@ -34,6 +34,9 @@
  * CPU-type independent code to spin up other VAX CPU's.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: multicpu.c,v 1.16 2004/03/19 20:17:51 matt Exp $");
+
 #include "opt_multiprocessor.h"
 
 #include <sys/param.h>
@@ -63,6 +66,7 @@ struct cpuq {
 SIMPLEQ_HEAD(, cpuq) cpuq = SIMPLEQ_HEAD_INITIALIZER(cpuq);
 
 extern long avail_start, avail_end, proc0paddr;
+struct cpu_info_qh cpus = SIMPLEQ_HEAD_INITIALIZER(cpus);
 
 void
 cpu_boot_secondary_processors()
@@ -70,7 +74,7 @@ cpu_boot_secondary_processors()
 	struct cpuq *q;
 
 	while ((q = SIMPLEQ_FIRST(&cpuq))) {
-		SIMPLEQ_REMOVE_HEAD(&cpuq, q, cq_q);
+		SIMPLEQ_REMOVE_HEAD(&cpuq, cq_q);
 		(*mp_dep_call->cpu_startslave)(q->cq_dev, q->cq_ci);
 		free(q, M_TEMP);
 	}
@@ -94,7 +98,6 @@ cpu_slavesetup(struct device *dev)
 	int error;
 
 	/* Get an UAREA */
-	TAILQ_INIT(&mlist);
 	error = uvm_pglistalloc(USPACE, avail_start, avail_end, 0, 0,
 	    &mlist, 1, 1);
 	if (error)
@@ -122,11 +125,12 @@ cpu_slavesetup(struct device *dev)
 	ci = &sc->sc_ci;
 	ci->ci_dev = dev;
 	ci->ci_exit = scratch;
-	(u_long)ci->ci_pcb = (u_long)pcb & ~KERNBASE;
-	ci->ci_istack = istackbase + NBPG;
-	pcb->KSP = (u_long)pcb + USPACE; /* Idle kernel stack */
-	pcb->SSP = (u_long)ci;
-	pcb->PC = (u_long)slaverun + 2;
+	ci->ci_pcb = (void *)((intptr_t)pcb & ~KERNBASE);
+	ci->ci_istack = istackbase + PAGE_SIZE;
+	SIMPLEQ_INSERT_TAIL(&cpus, ci, ci_next);
+	pcb->KSP = (uintptr_t)pcb + USPACE; /* Idle kernel stack */
+	pcb->SSP = (uintptr_t)ci;
+	pcb->PC = (uintptr_t)slaverun + 2;
 	pcb->PSL = 0;
 
 	cq = malloc(sizeof(*cq), M_TEMP, M_NOWAIT);
@@ -152,7 +156,7 @@ slaverun()
 		;
 	splsched();
 	sched_lock_idle();
-	cpu_switch(0);
+	cpu_switch(NULL,NULL);
 }
 
 /*
@@ -225,7 +229,7 @@ cpu_handle_ipi()
 			Debugger();
 			break;
 		default:
-			panic("cpu_handle_ipi: bad bit %x\n", bitno);
+			panic("cpu_handle_ipi: bad bit %x", bitno);
 		}
 	}
 }

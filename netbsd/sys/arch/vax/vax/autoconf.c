@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.71 2002/03/23 18:13:04 ragge Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.80 2004/01/06 17:01:48 matt Exp $	*/
 
 /*
  * Copyright (c) 1994 Ludd, University of Lule}, Sweden.
@@ -29,6 +29,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.80 2004/01/06 17:01:48 matt Exp $");
 
 #include "opt_compat_netbsd.h"
 
@@ -125,7 +128,7 @@ mainbus_print(aux, hej)
 	const char *hej;
 {
 	if (hej)
-		printf("nothing at %s", hej);
+		aprint_normal("nothing at %s", hej);
 	return (UNCONF);
 }
 
@@ -168,9 +171,8 @@ mainbus_attach(parent, self, hej)
 
 }
 
-struct	cfattach mainbus_ca = {
-	sizeof(struct device), mainbus_match, mainbus_attach
-};
+CFATTACH_DECL(mainbus, sizeof(struct device),
+    mainbus_match, mainbus_attach, NULL, NULL);
 
 #include "sd.h"
 #include "cd.h"
@@ -182,6 +184,7 @@ struct	cfattach mainbus_ca = {
 static int ubtest(void *);
 static int jmfr(char *, struct device *, int);
 static int booted_qe(struct device *, void *);
+static int booted_qt(struct device *, void *);
 static int booted_le(struct device *, void *);
 static int booted_ze(struct device *, void *);
 static int booted_de(struct device *, void *);
@@ -204,6 +207,7 @@ static int booted_rd(struct device *, void *);
 
 int (*devreg[])(struct device *, void *) = {
 	booted_qe,
+	booted_qt,
 	booted_le,
 	booted_ze,
 	booted_de,
@@ -254,7 +258,7 @@ jmfr(char *n, struct device *dev, int nr)
 {
 	if (rpb.devtyp != nr)
 		return 1;
-	return strcmp(n, dev->dv_cfdata->cf_driver->cd_name);
+	return strcmp(n, dev->dv_cfdata->cf_name);
 }
 
 #include <dev/qbus/ubavar.h>
@@ -311,6 +315,15 @@ booted_ze(struct device *dev, void *aux)
 	return 1;
 }
 
+int
+booted_qt(struct device *dev, void *aux)
+{
+	if (jmfr("qt", dev, BDEV_QE) || ubtest(aux))
+		return 0;
+
+	return 1;
+}
+
 #if 1 /* NQE */
 int
 booted_qe(struct device *dev, void *aux)
@@ -332,21 +345,24 @@ booted_sd(struct device *dev, void *aux)
 	struct device *ppdev;
 
 	/* Is this a SCSI device? */
-	if (jmfr("sd", dev, BDEV_SD) && jmfr("cd", dev, BDEV_SD))
+	if (jmfr("sd", dev, BDEV_SD) && jmfr("sd", dev, BDEV_SDN) &&
+	    jmfr("cd", dev, BDEV_SD) && jmfr("cd", dev, BDEV_SDN))
 		return 0;
 
 	if (sa->sa_periph->periph_channel->chan_bustype->bustype_type !=
 	    SCSIPI_BUSTYPE_SCSI)
 		return 0; /* ``Cannot happen'' */
 
-	if (sa->sa_periph->periph_target != rpb.unit)
+	if (sa->sa_periph->periph_target != (rpb.unit/100) ||
+	    sa->sa_periph->periph_lun != (rpb.unit % 100))
 		return 0; /* Wrong unit */
 
 	ppdev = dev->dv_parent->dv_parent;
 
 	/* VS3100 NCR 53C80 (si) & VS4000 NCR 53C94 (asc) */
-	if (((jmfr("si",  ppdev, BDEV_SD) == 0) ||	/* new name */
-	     (jmfr("asc", ppdev, BDEV_SD) == 0)) &&
+	if ((jmfr("si",  ppdev, BDEV_SD) == 0 ||	/* new name */
+	     jmfr("asc", ppdev, BDEV_SD) == 0 ||
+	     jmfr("asc", ppdev, BDEV_SDN) == 0) &&
 	    (ppdev->dv_cfdata->cf_loc[0] == rpb.csrphy))
 			return 1;
 

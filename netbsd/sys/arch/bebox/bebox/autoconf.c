@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.8 2001/06/06 17:42:29 matt Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.13 2003/08/07 16:27:08 agc Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -46,17 +42,20 @@
  * devices are determined (from possibilities mentioned in ioconf.c),
  * and the drivers are initialized.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.13 2003/08/07 16:27:08 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
-#include <sys/dkstat.h>
 #include <sys/disklabel.h>
 #include <sys/conf.h>
 #include <sys/reboot.h>
 #include <sys/device.h>
 
-#include <powerpc/mpc6xx/pte.h>
 #include <machine/intr.h>
+#include <powerpc/pte.h>
 
 struct device *booted_device;
 int booted_partition;
@@ -102,8 +101,9 @@ u_long	bootdev = 0;		/* should be dev_t, but not until 32 bits */
 void
 findroot(void)
 {
-	int i, majdev, unit, part;
+	int majdev, unit, part;
 	struct device *dv;
+	const char *name;
 	char buf[32];
 
 #if 0
@@ -114,18 +114,15 @@ findroot(void)
 		return;
 
 	majdev = (bootdev >> B_TYPESHIFT) & B_TYPEMASK;
-	for (i = 0; dev_name2blk[i].d_name != NULL; i++)
-		if (majdev == dev_name2blk[i].d_maj)
-			break;
-	if (dev_name2blk[i].d_name == NULL)
+	name = devsw_blk2name(majdev);
+	if (name == NULL)
 		return;
 
 	part = (bootdev >> B_PARTITIONSHIFT) & B_PARTITIONMASK;
 	unit = (bootdev >> B_UNITSHIFT) & B_UNITMASK;
 
-	sprintf(buf, "%s%d", dev_name2blk[i].d_name, unit);
-	for (dv = alldevs.tqh_first; dv != NULL;
-	    dv = dv->dv_list.tqe_next) {
+	sprintf(buf, "%s%d", name, unit);
+	for (dv = alldevs.tqh_first; dv != NULL; dv = dv->dv_list.tqe_next) {
 		if (strcmp(buf, dv->dv_xname) == 0) {
 			booted_device = dv;
 			booted_partition = part;

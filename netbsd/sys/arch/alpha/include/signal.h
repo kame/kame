@@ -1,4 +1,4 @@
-/* $NetBSD: signal.h,v 1.5 1998/09/13 01:51:30 thorpej Exp $ */
+/* $NetBSD: signal.h,v 1.11 2004/03/26 21:39:57 drochner Exp $ */
 
 /*
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
@@ -30,10 +30,17 @@
 #ifndef _ALPHA_SIGNAL_H_
 #define	_ALPHA_SIGNAL_H_
 
+#include <sys/featuretest.h>
+
 typedef long	sig_atomic_t;
 
-#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) && \
-    !defined(_XOPEN_SOURCE)
+#ifdef COMPAT_16
+#define SIGTRAMP_VALID(vers)	((unsigned)(vers) <= 2)
+#else
+#define SIGTRAMP_VALID(vers)	((vers) == 2)
+#endif
+
+#if defined(_NETBSD_SOURCE)
 /*
  * Information pushed on stack when a signal is delivered.
  * This is used by the kernel to restore state following
@@ -77,5 +84,5 @@ struct sigcontext {
 	sigset_t sc_mask;		/* signal mask to restore (new style) */
 };
 
-#endif /* !_ANSI_SOURCE && !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
+#endif /* _NETBSD_SOURCE */
 #endif /* !_ALPHA_SIGNAL_H_*/

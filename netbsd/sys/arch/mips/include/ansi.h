@@ -1,4 +1,4 @@
-/*	$NetBSD: ansi.h,v 1.14 2001/01/03 10:09:00 takemura Exp $	*/
+/*	$NetBSD: ansi.h,v 1.19 2003/10/25 18:14:48 mycroft Exp $	*/
 
 /*-
  * Copyright (c) 1990, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,6 +34,7 @@
 #ifndef	_ANSI_H_
 #define	_ANSI_H_
 
+#include <sys/cdefs.h>
 #include <machine/int_types.h>
 
 /*
@@ -50,11 +47,22 @@
  *	#endif
  */
 #define	_BSD_CLOCK_T_		unsigned long	/* clock() */
+#ifdef _LP64
+#define	_BSD_PTRDIFF_T_		long		/* ptr1 - ptr2 */
+#define	_BSD_SIZE_T_		unsigned long	/* sizeof() */
+#define	_BSD_SSIZE_T_		long		/* byte count or error */
+#define	_BSD_TIME_T_		int		/* time() */
+#else
 #define	_BSD_PTRDIFF_T_		int		/* ptr1 - ptr2 */
 #define	_BSD_SIZE_T_		unsigned int	/* sizeof() */
 #define	_BSD_SSIZE_T_		int		/* byte count or error */
 #define	_BSD_TIME_T_		long		/* time() */
+#endif /* _LP64 */
+#if __GNUC_PREREQ__(3, 0)
+#define	_BSD_VA_LIST_		__builtin_va_list /* GCC builtin type */
+#else
 #define	_BSD_VA_LIST_		char *		/* va_list */
+#endif
 #define	_BSD_CLOCKID_T_		int		/* clockid_t */
 #define	_BSD_TIMER_T_		int		/* timer_t */
 #define	_BSD_SUSECONDS_T_	int		/* suseconds_t */
@@ -80,6 +88,8 @@
 #define	_BSD_WCHAR_T_		int		/* wchar_t */
 #define	_BSD_WINT_T_		int		/* wint_t */
 #define	_BSD_RUNE_T_		int		/* rune_t */
+#define	_BSD_WCTRANS_T_		void *		/* wctrans_t */
+#define	_BSD_WCTYPE_T_		void *		/* wctype_t */
 
 /*
  * mbstate_t is an opaque object to keep conversion state, during multibyte

@@ -1,4 +1,4 @@
-/*	$NetBSD: file.h,v 1.31 2001/12/18 22:29:25 jdolecek Exp $	*/
+/*	$NetBSD: file.h,v 1.48 2003/09/22 13:00:04 christos Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -42,12 +38,18 @@
 #include <sys/unistd.h>
 
 #ifdef _KERNEL
+#include <sys/mallocvar.h>
 #include <sys/queue.h>
+#include <sys/lock.h>
+
+MALLOC_DECLARE(M_FILE);
+MALLOC_DECLARE(M_IOCTLOPS);
 
 struct proc;
 struct uio;
 struct iovec;
 struct stat;
+struct knote;
 
 /*
  * Kernel descriptor table.
@@ -60,30 +62,32 @@ struct file {
 #define	DTYPE_VNODE	1		/* file */
 #define	DTYPE_SOCKET	2		/* communications endpoint */
 #define	DTYPE_PIPE	3		/* pipe */
+#define	DTYPE_KQUEUE	4		/* event queue */
+#define	DTYPE_MISC	5		/* misc file descriptor type */
+#define	DTYPE_CRYPTO	6		/* crypto */
 	int		f_type;		/* descriptor type */
 	u_int		f_count;	/* reference count */
 	u_int		f_msgcount;	/* references from message queue */
 	int		f_usecount;	/* number active users */
 	struct ucred	*f_cred;	/* creds associated with descriptor */
 	struct fileops {
-		int	(*fo_read)	(struct file *fp, off_t *offset,
-					    struct uio *uio,
-					    struct ucred *cred, int flags);
-		int	(*fo_write)	(struct file *fp, off_t *offset,
-					    struct uio *uio,
-					    struct ucred *cred, int flags);
-		int	(*fo_ioctl)	(struct file *fp, u_long com,
-					    caddr_t data, struct proc *p);
-		int	(*fo_fcntl)	(struct file *fp, u_int com,
-					    caddr_t data, struct proc *p);
-		int	(*fo_poll)	(struct file *fp, int events,
-					    struct proc *p);
-		int	(*fo_stat)	(struct file *fp, struct stat *sp,
-					    struct proc *p);
-		int	(*fo_close)	(struct file *fp, struct proc *p);
+		int	(*fo_read)	(struct file *, off_t *, struct uio *,
+					    struct ucred *, int);
+		int	(*fo_write)	(struct file *, off_t *, struct uio *,
+					    struct ucred *, int);
+		int	(*fo_ioctl)	(struct file *, u_long, void *,
+					    struct proc *);
+		int	(*fo_fcntl)	(struct file *, u_int, void *,
+					    struct proc *);
+		int	(*fo_poll)	(struct file *, int, struct proc *);
+		int	(*fo_stat)	(struct file *, struct stat *,
+					    struct proc *);
+		int	(*fo_close)	(struct file *, struct proc *);
+		int	(*fo_kqfilter)	(struct file *, struct knote *);
 	} *f_ops;
 	off_t		f_offset;
-	caddr_t		f_data;		/* descriptor data, e.g. vnode/socket */
+	void		*f_data;	/* descriptor data, e.g. vnode/socket */
+	struct simplelock f_slock;
 };
 
 #define	FIF_WANTCLOSE		0x01	/* a close is waiting for usecount */
@@ -107,21 +111,31 @@ do {									\
 #define	FILE_USE_CHECK(fp, str)		/* nothing */
 #endif
 
+/*
+ * FILE_USE() must be called with the file lock held.
+ * (Typical usage is: `fp = fd_getfile(..); FILE_USE(fp);'
+ * and fd_getfile() returns the file locked)
+ */
 #define	FILE_USE(fp)							\
 do {									\
 	(fp)->f_usecount++;						\
 	FILE_USE_CHECK((fp), "f_usecount overflow");			\
+	simple_unlock(&(fp)->f_slock);					\
 } while (/* CONSTCOND */ 0)
 
 #define	FILE_UNUSE(fp, p)						\
 do {									\
+	simple_lock(&(fp)->f_slock);					\
 	if ((fp)->f_iflags & FIF_WANTCLOSE) {				\
+		simple_unlock(&(fp)->f_slock);				\
 		/* Will drop usecount */				\
 		(void) closef((fp), (p));				\
+		break;							\
 	} else {							\
 		(fp)->f_usecount--;					\
 		FILE_USE_CHECK((fp), "f_usecount underflow");		\
 	}								\
+	simple_unlock(&(fp)->f_slock);					\
 } while (/* CONSTCOND */ 0)
 
 /*
@@ -147,6 +161,10 @@ int	dofilewritev(struct proc *, int, struct file *,
 	    const struct iovec *, int, off_t *, int, register_t *);
 
 void	finit(void);
+
+int	fsetown(struct proc *, pid_t *, int, const void *);
+int	fgetown(struct proc *, pid_t, int, void *);
+void	fownsignal(pid_t, int, int, int, void *);
 
 #endif /* _KERNEL */
 

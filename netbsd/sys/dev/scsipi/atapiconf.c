@@ -1,4 +1,4 @@
-/*	$NetBSD: atapiconf.c,v 1.48 2002/04/01 20:37:41 bouyer Exp $	*/
+/*	$NetBSD: atapiconf.c,v 1.63 2003/10/17 00:19:46 mycroft Exp $	*/
 
 /*
  * Copyright (c) 1996, 2001 Manuel Bouyer.  All rights reserved.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: atapiconf.c,v 1.48 2002/04/01 20:37:41 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: atapiconf.c,v 1.63 2003/10/17 00:19:46 mycroft Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -65,10 +65,8 @@ int	atapibussubmatch __P((struct device *, struct cfdata *, void *));
 
 int	atapi_probe_bus __P((struct atapibus_softc *, int));
 
-struct cfattach atapibus_ca = {
-	sizeof(struct atapibus_softc), atapibusmatch, atapibusattach,
-	atapibusdetach, atapibusactivate,
-};
+CFATTACH_DECL(atapibus, sizeof(struct atapibus_softc),
+    atapibusmatch, atapibusattach, atapibusdetach, atapibusactivate);
 
 extern struct cfdriver atapibus_cd;
 
@@ -77,10 +75,6 @@ int atapibusprint __P((void *, const char *));
 const struct scsi_quirk_inquiry_pattern atapi_quirk_patterns[] = {
 	{{T_CDROM, T_REMOV,
 	 "ALPS ELECTRIC CO.,LTD. DC544C", "", "SW03D"},	PQUIRK_NOTUR},
-	{{T_CDROM, T_REMOV,
-	 "BCD-16X 1997-04-25", "", "VER 2.2"},	PQUIRK_NOSTARTUNIT},
-	{{T_CDROM, T_REMOV,
-	 "BCD-24X 1997-06-27", "", "VER 2.0"},	PQUIRK_NOSTARTUNIT},
 	{{T_CDROM, T_REMOV,
 	 "CR-2801TE", "", "1.07"},		PQUIRK_NOSENSE},
 	{{T_CDROM, T_REMOV,
@@ -109,16 +103,6 @@ const struct scsi_quirk_inquiry_pattern atapi_quirk_patterns[] = {
 	 "CD-ROM  CDR-S1", "", "1.70"},		PQUIRK_NOCAPACITY}, /* Sanyo */
 	{{T_CDROM, T_REMOV,
 	 "CD-ROM  CDR-N16", "", "1.25"},	PQUIRK_NOCAPACITY}, /* Sanyo */
-	{{T_CDROM, T_REMOV,
-	 "UJDCD8730", "", "1.14"},		PQUIRK_NODOORLOCK}, /* Acer */
-	{{T_DIRECT, T_REMOV,		/* Panasonic MultiMediaCard */
-	  "04DA", "1B00", "0010"},		PQUIRK_BYTE5_ZERO |
-	 					PQUIRK_NO_FLEX_PAGE },
-	{{T_DIRECT, T_REMOV,		/* ZiO! MultiMediaCard */
-	  "eUSB", "MultiMediaCard", ""},	PQUIRK_NO_FLEX_PAGE },
-	{{T_DIRECT, T_REMOV,
-	  "FUJIFILM", "USB-DRIVEUNIT", "1.00"},	PQUIRK_NO_FLEX_PAGE |
-						PQUIRK_NOSENSE },
 };
 
 int
@@ -126,10 +110,8 @@ atapiprint(aux, pnp)
 	void *aux;
 	const char *pnp; 
 {
-	struct scsipi_channel *chan = aux;
 	if (pnp)
-		printf("atapibus at %s", pnp);
-	printf(" channel %d", chan->chan_channel);
+		aprint_normal("atapibus at %s", pnp);
 	return (UNCONF);
 }
 
@@ -147,10 +129,6 @@ atapibusmatch(parent, cf, aux)
 	if (chan->chan_bustype->bustype_type != SCSIPI_BUSTYPE_ATAPI)
 		return (0);
 
-	if (cf->cf_loc[ATAPICF_CHANNEL] != chan->chan_channel &&
-	    cf->cf_loc[ATAPICF_CHANNEL] != ATAPICF_CHANNEL_DEFAULT)
-		return (0);
-
 	return (1);
 }
 
@@ -166,7 +144,7 @@ atapibussubmatch(parent, cf, aux)
 	if (cf->cf_loc[ATAPIBUSCF_DRIVE] != ATAPIBUSCF_DRIVE_DEFAULT &&
 	    cf->cf_loc[ATAPIBUSCF_DRIVE] != periph->periph_target)
 		return (0);
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 void
@@ -186,6 +164,8 @@ atapibusattach(parent, self, aux)
 	printf(": %d targets\n", chan->chan_ntargets);
 
 	/* Initialize the channel. */
+	chan->chan_init_cb = NULL;
+	chan->chan_init_cb_arg = NULL;
 	scsipi_channel_init(chan);
 
 	/* Probe the bus for devices. */
@@ -340,14 +320,14 @@ atapibusprint(aux, pnp)
 	char *dtype;
 
 	if (pnp != NULL)
-		printf("%s", pnp);
+		aprint_normal("%s", pnp);
 
 	inqbuf = &sa->sa_inqbuf;
 
 	dtype = scsipi_dtype(inqbuf->type & SID_TYPE);
-	printf(" drive %d: <%s, %s, %s> type %d %s %s",
-	    sa->sa_periph->periph_target ,inqbuf->vendor,
-	    inqbuf->product, inqbuf->revision, inqbuf->type, dtype,
+	aprint_normal(" drive %d: <%s, %s, %s> %s %s",
+	    sa->sa_periph->periph_target, inqbuf->vendor,
+	    inqbuf->product, inqbuf->revision, dtype,
 	    inqbuf->removable ? "removable" : "fixed");
 	return (UNCONF);
 }

@@ -1,7 +1,7 @@
-/*	$NetBSD: dptreg.h,v 1.10.16.2 2003/07/28 18:19:02 he Exp $	*/
+/*	$NetBSD: dptreg.h,v 1.15 2003/12/04 13:57:30 keihan Exp $	*/
 
 /*
- * Copyright (c) 1999, 2000, 2001 Andrew Doran <ad@netbsd.org>
+ * Copyright (c) 1999, 2000, 2001 Andrew Doran <ad@NetBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -107,7 +107,7 @@ struct eata_cp {
 } __attribute__ ((__packed__));
 
 struct eata_ucp {
-	u_int8_t	ucp_cp[sizeof(struct eata_cp) - 5*4];	/* XXX */;
+	u_int8_t	ucp_cp[sizeof(struct eata_cp) - 5*4];	/* XXX */
 	u_long		ucp_datalen;
 	u_long		ucp_ccbid;
 	caddr_t		ucp_dataaddr;
@@ -157,7 +157,7 @@ struct eata_sp {
 	u_int8_t	sp_hba_status;		/* Host adapter status */
 	u_int8_t	sp_scsi_status;		/* SCSI bus status */
 	u_int8_t	sp_reserved[2];		/* Reserved */
-	u_int32_t	sp_inv_residue;		/* Bytes not transfered */
+	u_int32_t	sp_inv_residue;		/* Bytes not transferred */
 	u_int32_t	sp_ccbid;		/* ID of software CCB */
 	u_int8_t	sp_id_message;
 	u_int8_t	sp_que_message;

@@ -1,4 +1,4 @@
-/*	$NetBSD: ofw_irq.S,v 1.1 2002/02/06 21:30:26 thorpej Exp $	*/
+/*	$NetBSD: ofw_irq.S,v 1.3 2003/11/05 21:10:59 scw Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -95,6 +95,8 @@ Lirq_entry:
 Lofwirqstk:			/* hack */
 	.word	ofwirqstk + 4096
 
+AST_ALIGNMENT_FAULT_LOCALS
+
 /*
  * Regsister usage
  *
@@ -147,8 +149,8 @@ ASENTRY_NP(irq_entry)
 
 	/* Now we're in IRQ mode. */
 	/* Restore contents of ofw_ticktmp. */
-	add	r0, pc, #(Lofwirqstk - . - 8)	/* Bummer!  Mitch hasn't left me a stack. */
-	ldr	sp, [r0]			/* I'll use my own for now... */
+	adr	r0, Lofwirqstk    /* Bummer!  Mitch hasn't left me a stack. */
+	ldr	sp, [r0]		/* I'll use my own for now... */
 	ldr	r0, Lofw_ticktmp	/* r0 now points to ofw_ticktmp[0] */
 	ldr	r1, [r0], #(4*3)	/* skip over saved {r0, r1} */
 	msr	spsr_all, r1		/* restore spsr */
@@ -187,6 +189,11 @@ ASENTRY_NP(irq_entry)
  	 *  which follows it.
 	 */
 ofwtakeint:
+#if defined(COMPAT_15) && defined(EXEC_AOUT)
+	ldr	r0, [sp]		/* Fetch SPSR */
+#endif
+	ENABLE_ALIGNMENT_FAULTS
+
 	mov	r8, #0x00000001		/* timer interrupt pending! */
 	mov	r8, r8, lsl #IRQ_TIMER0
 
@@ -250,7 +257,7 @@ Lfind_highest_ipl:
 	bic	r0, r0, #I32_bit
 	msr	cpsr_all, r0
 
-	ldr	r7, [pc, #Lirqhandlers - . - 8]
+	ldr	r7, Lirqhandlers
         mov	r9, #0x00000001
 
 irqloop:
@@ -285,13 +292,12 @@ irqloop:
 #endif	/* IRQSTATS */
 
 irqchainloop:
-	add	lr, pc, #nextinchain - . - 8	/* return address */
 	ldr	r0, [r6, #(IH_ARG)]	/* Get argument pointer */
 	teq	r0, #0x00000000		/* If arg is zero pass stack frame */
 	addeq	r0, sp, #8		/* ... stack frame */
+	mov	lr, pc			/* return address */
 	ldr	pc, [r6, #(IH_FUNC)]	/* Call handler */
 
-nextinchain:
 	teq	r0, #0x00000001		/* Was the irq serviced ? */
 	beq	irqdone
 
@@ -318,17 +324,6 @@ nextirq:
 
 	bl	_C_LABEL(dosoftints)	/* Handle the soft interrupts */
 
-	/* Manage AST's. Maybe this should be done as a soft interrupt ? */
-	ldr	r0, [sp]		/* Get the SPSR from stack */
-
-	and	r0, r0, #(PSR_MODE)	/* Test for USR32 mode before the IRQ */
-	teq	r0, #(PSR_USR32_MODE)
-	ldreq	r0, Lastpending		/* Do we have an AST pending ? */
-	ldreq	r1, [r0]
-	teqeq	r1, #0x00000001
-
-	beq	irqast			/* call the AST handler */
-
 	/* Kill IRQ's in preparation for exit */
         mrs     r0, cpsr_all
         orr     r0, r0, #(I32_bit)
@@ -340,51 +335,9 @@ nextirq:
 	sub	r1, r1, #1
 	str	r1, [r0]
 
+	DO_AST_AND_RESTORE_ALIGNMENT_FAULTS
 	PULLFRAMEFROMSVCANDEXIT
-
 	movs	pc, lr			/* Exit */
-
-	/*
-	 * Ok, snag with current intr depth ...
-	 * If ast() calls mi_sleep() the current_intr_depth will not be
-	 * decremented until the process is woken up. This can result
-	 * in the system believing it is still in the interrupt handler.
-	 * If we are calling ast() then correct the current_intr_depth
-	 * before the call.
-	 */
-irqast:
-	mov	r1, #0x00000000		/* Clear ast_pending */
-	str	r1, [r0]
-
-	/* Kill IRQ's so we atomically decrement current_intr_depth */
-
-        mrs     r2, cpsr_all
-        orr     r3, r2, #(I32_bit)
-        msr     cpsr_all, r3
-
-	/* Decrement the nest count */
-
-	ldr	r0, Lcurrent_intr_depth
-	ldr	r1, [r0]
-	sub	r1, r1, #1
-	str	r1, [r0]
-
-	/* Restore IRQ's */
-        msr     cpsr_all, r2
-
-	mov	r0, sp
-	bl	_C_LABEL(ast)
-
-/* Kill IRQ's in preparation for exit */
-
-        mrs     r0, cpsr_all
-        orr     r0, r0, #(I32_bit)
-        msr     cpsr_all, r0
-
-	PULLFRAMEFROMSVCANDEXIT
-
-	movs	pc, lr			/* Exit */
-	
 
 Lspl_mask:
 	.word	_C_LABEL(spl_mask)	/* irq's allowed at current spl level */
@@ -407,9 +360,6 @@ Lintrcnt:
 
 Lirqhandlers:
 	.word	_C_LABEL(irqhandlers)	/* Pointer to array of irqhandlers */
-
-Lastpending:
-	.word	_C_LABEL(astpending)
 
 	.text
 	.global	_C_LABEL(dotickgrovelling)
@@ -524,7 +474,7 @@ _C_LABEL(dotickgrovelling):
 	str	r5, [r0, #(4*14)]		/* plug sp */
 	str	r4, [r0, #(4*15)]		/* plug lr */
 
-	ldr	r1, [pc, #(Lirq_entry - . - 8)]
+	ldr	r1, Lirq_entry
 	str	r1, [r0, #(4*16)]		/* plug pc */
 
 	ldmfd	sp!, {r1-r5}

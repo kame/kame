@@ -1,4 +1,4 @@
-/*	$NetBSD: db_memrw.c,v 1.21 2001/09/05 13:21:09 tsutsui Exp $	*/
+/*	$NetBSD: db_memrw.c,v 1.23 2003/07/15 03:36:17 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -52,6 +52,9 @@
  * make sure to do the correct sized pointer access.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: db_memrw.c,v 1.23 2003/07/15 03:36:17 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -60,6 +63,7 @@
 
 #include <machine/db_machdep.h>
 #include <machine/pte.h>
+#include <m68k/cacheops.h>
 
 #include <sun3/sun3/machdep.h>
 

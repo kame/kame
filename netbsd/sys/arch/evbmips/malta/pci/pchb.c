@@ -1,4 +1,4 @@
-/*	$NetBSD: pchb.c,v 1.1 2002/03/07 14:44:05 simonb Exp $	*/
+/*	$NetBSD: pchb.c,v 1.6 2003/07/15 01:37:34 lukem Exp $	*/
 
 /*
  * Copyright 2002 Wasabi Systems, Inc.
@@ -35,7 +35,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/types.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pchb.c,v 1.6 2003/07/15 01:37:34 lukem Exp $");
+
+#include <sys/param.h>
 #include <sys/device.h>
 
 #include <dev/pci/pcivar.h>
@@ -44,9 +47,8 @@
 static int	pchb_match(struct device *, struct cfdata *, void *);
 static void	pchb_attach(struct device *, struct device *, void *);
 
-struct cfattach pchb_ca = {
-	sizeof(struct device), pchb_match, pchb_attach
-};
+CFATTACH_DECL(pchb, sizeof(struct device),
+    pchb_match, pchb_attach, NULL, NULL);
 
 static int pcifound = 0;
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: isa_irqhandler.c,v 1.2 2002/04/03 21:06:21 thorpej Exp $	*/
+/*	$NetBSD: isa_irqhandler.c,v 1.6 2003/07/15 03:36:01 lukem Exp $	*/
 
 /*
  * Copyright 1997
@@ -74,6 +74,9 @@
  * Created      : 30/09/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: isa_irqhandler.c,v 1.6 2003/07/15 03:36:01 lukem Exp $");
+
 #include "opt_irqstats.h"
 
 #include <sys/param.h>
@@ -102,9 +105,9 @@ extern char *_intrnames;
 
 /* Prototypes */
 
-extern void set_spl_masks	__P((void));
-
-void irq_calculatemasks __P((void));
+extern void set_spl_masks(void);
+void irq_calculatemasks(void);
+void stray_irqhandler(u_int);
 
 #define WriteWord(a, b) *((volatile unsigned int *)(a)) = (b)
 
@@ -162,9 +165,9 @@ irq_claim(irq, handler)
 #ifdef DIAGNOSTIC
 	/* Sanity check */
 	if (handler == NULL)
-		panic("NULL interrupt handler\n");
+		panic("NULL interrupt handler");
 	if (handler->ih_func == NULL)
-		panic("Interrupt handler does not have a function\n");
+		panic("Interrupt handler does not have a function");
 #endif	/* DIAGNOSTIC */
 
 	/*
@@ -339,9 +342,9 @@ irq_calculatemasks()
 	 * There are tty, network and disk drivers that use free() at interrupt
 	 * time, so imp > (tty | net | bio).
 	 */
-	irqmasks[IPL_IMP] &= irqmasks[IPL_TTY];
+	irqmasks[IPL_VM] &= irqmasks[IPL_TTY];
 
-	irqmasks[IPL_AUDIO] &= irqmasks[IPL_IMP];
+	irqmasks[IPL_AUDIO] &= irqmasks[IPL_VM];
 
 	/*
 	 * Since run queues may be manipulated by both the statclock and tty,
@@ -391,7 +394,7 @@ intr_claim(irq, level, name, ih_func, ih_arg)
 
 	ih = malloc(sizeof(*ih), M_DEVBUF, M_NOWAIT);
 	if (!ih)
-		panic("intr_claim(): Cannot malloc handler memory\n");
+		panic("intr_claim(): Cannot malloc handler memory");
 
 	ih->ih_level = level;
 	ih->ih_name = name;

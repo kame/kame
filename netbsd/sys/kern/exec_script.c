@@ -1,4 +1,4 @@
-/*	$NetBSD: exec_script.c,v 1.30.10.1 2003/08/17 13:41:00 tron Exp $	*/
+/*	$NetBSD: exec_script.c,v 1.36 2003/06/29 22:31:16 fvdl Exp $	*/
 
 /*
  * Copyright (c) 1993, 1994, 1996 Christopher G. Demetriou
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: exec_script.c,v 1.30.10.1 2003/08/17 13:41:00 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: exec_script.c,v 1.36 2003/06/29 22:31:16 fvdl Exp $");
 
 #if defined(SETUIDSCRIPTS) && !defined(FDSCRIPTS)
 #define FDSCRIPTS		/* Need this for safe set-id scripts. */
@@ -205,10 +205,10 @@ check_shell:
 	MALLOC(shellargp, char **, 4 * sizeof(char *), M_EXEC, M_WAITOK);
 	tmpsap = shellargp;
 	MALLOC(*tmpsap, char *, shellnamelen + 1, M_EXEC, M_WAITOK);
-	strcpy(*tmpsap++, shellname);
+	strlcpy(*tmpsap++, shellname, shellnamelen + 1);
 	if (shellarg != NULL) {
 		MALLOC(*tmpsap, char *, shellarglen + 1, M_EXEC, M_WAITOK);
-		strcpy(*tmpsap++, shellarg);
+		strlcpy(*tmpsap++, shellarg, shellarglen + 1);
 	}
 	MALLOC(*tmpsap, char *, MAXPATHLEN, M_EXEC, M_WAITOK);
 #ifdef FDSCRIPTS
@@ -219,7 +219,7 @@ check_shell:
 		    (size_t *)0);
 #ifdef DIAGNOSTIC
 		if (error != 0)
-			panic("exec_script: copyinstr couldn't fail\n");
+			panic("exec_script: copyinstr couldn't fail");
 #endif
 #ifdef FDSCRIPTS
 	} else
@@ -240,7 +240,11 @@ check_shell:
 	scriptvp = epp->ep_vp;
 	oldpnbuf = epp->ep_ndp->ni_cnd.cn_pnbuf;
 
+#ifdef VERIFIED_EXEC
+	if ((error = check_exec(p, epp, 0)) == 0) {
+#else
 	if ((error = check_exec(p, epp)) == 0) {
+#endif
 		/* note that we've clobbered the header */
 		epp->ep_flags |= EXEC_DESTR|EXEC_HASES;
 

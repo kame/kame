@@ -1,4 +1,4 @@
-/*	$NetBSD: ahc_isa.c,v 1.16 2002/01/07 21:47:01 thorpej Exp $	*/
+/*	$NetBSD: ahc_isa.c,v 1.24 2003/12/04 12:42:54 keihan Exp $	*/
 
 /*
  * Product specific probe and attach routines for:
@@ -112,12 +112,12 @@
  * Note: there isn't any #ifdef for FreeBSD in this file, since the
  * FreeBSD EISA driver handles all cases of the 284X.
  *
- *	-- Jason R. Thorpe <thorpej@NetBSD.ORG>
+ *	-- Jason R. Thorpe <thorpej@NetBSD.org>
  *	   July 12, 1996
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ahc_isa.c,v 1.16 2002/01/07 21:47:01 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ahc_isa.c,v 1.24 2003/12/04 12:42:54 keihan Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -140,8 +140,8 @@ __KERNEL_RCSID(0, "$NetBSD: ahc_isa.c,v 1.16 2002/01/07 21:47:01 thorpej Exp $")
 #include <dev/eisa/eisavar.h>
 #include <dev/eisa/eisadevs.h>
 
-#include <dev/microcode/aic7xxx/aic7xxx_reg.h>
-#include <dev/ic/aic7xxxvar.h>
+#include <dev/ic/aic7xxx_osm.h>
+#include <dev/ic/aic7xxx_inline.h>
 #include <dev/ic/aic77xxreg.h>
 #include <dev/ic/aic77xxvar.h>
 #include <dev/ic/smc93cx6var.h>
@@ -172,10 +172,10 @@ int	ahc_isa_match __P((struct isa_attach_args *, bus_addr_t));
 int	ahc_isa_probe __P((struct device *, struct cfdata *, void *));
 void	ahc_isa_attach __P((struct device *, struct device *, void *));
 void	aha2840_load_seeprom __P((struct ahc_softc *ahc));
+static int verify_seeprom_cksum(struct seeprom_config *sc);
 
-struct cfattach ahc_isa_ca = {
-	sizeof(struct ahc_softc), ahc_isa_probe, ahc_isa_attach
-};
+CFATTACH_DECL(ahc_isa, sizeof(struct ahc_softc),
+    ahc_isa_probe, ahc_isa_attach, NULL, NULL);
 
 /*
  * This keeps track of which slots are to be checked next if the
@@ -386,6 +386,7 @@ ahc_isa_attach(parent, self, aux)
 	int irq, intrtype;
 	const char *intrtypestr;
 	char idstring[EISA_IDSTRINGLEN];
+	u_char intdef;
 
 	if (bus_space_map(iot, ia->ia_io[0].ir_addr, ia->ia_io[0].ir_size,
 	    0, &ioh)) {
@@ -410,39 +411,45 @@ ahc_isa_attach(parent, self, aux)
 		goto free_io;
 	}
 
-	if (ahc_alloc(ahc, ioh, iot, ia->ia_dmat,
-	    AHC_AIC7770|AHC_VL, AHC_AIC7770_FE, AHC_FNONE))
-		goto free_io;
-
 	/*
-	 * Tell the bus-dma interface that we can do 32bit dma
+	 * Tell the bus-DMA interface that we can do 32bit DMA
 	 * NOTE: this variable is first referenced in ahc_init().
 	 */
 	ahc->sc_dmaflags = ISABUS_DMA_32BIT;
 
+	ahc_set_name(ahc, ahc->sc_dev.dv_xname);
+	ahc->parent_dmat = ia->ia_dmat;
 	ahc->channel = 'A';
-	ahc->channel_b = 'B';
-	if (ahc_reset(ahc) != 0)
-		goto free_ahc;
+	ahc->chip =  AHC_AIC7770|AHC_VL;
+	ahc->features = AHC_AIC7770_FE;
+	ahc->bugs |= AHC_TMODE_WIDEODD_BUG;
+	ahc->flags |= AHC_PAGESCBS;
+	ahc->tag = iot;
+	ahc->bsh = ioh;
 
-	/*
-	 * The IRQMS bit enables level sensitive interrupts. Only allow
-	 * IRQ sharing if it's set.
-	 * NOTE: ahc->pause is initialized in ahc_alloc().
-	 */
-	if (ahc->pause & IRQMS) {
-		intrtype = IST_LEVEL;
-		intrtypestr = "level sensitive";
-	} else {
+	if (ahc_softc_init(ahc) != 0)
+		goto free_io;
+
+	ahc_intr_enable(ahc, FALSE);
+
+	if (ahc_reset(ahc) != 0)
+		goto free_io;
+
+	intdef = bus_space_read_1(iot, ioh, INTDEF);
+
+	if (intdef & EDGE_TRIG) {
 		intrtype = IST_EDGE;
 		intrtypestr = "edge triggered";
+	} else {
+		intrtype = IST_LEVEL;
+		intrtypestr = "level sensitive";
 	}
 	ahc->ih = isa_intr_establish(ia->ia_ic, irq,
 	    intrtype, IPL_BIO, ahc_intr, ahc);
 	if (ahc->ih == NULL) {
 		printf("%s: couldn't establish %s interrupt\n",
 		       ahc->sc_dev.dv_xname, intrtypestr);
-		goto free_ahc;
+		goto free_io;
 	}
 
 	/*
@@ -466,8 +473,6 @@ ahc_isa_attach(parent, self, aux)
 
 	/* failed */
 	isa_intr_disestablish(ia->ia_ic, ahc->ih);
-free_ahc:
-	ahc_free(ahc);
 free_io:
 	bus_space_unmap(iot, ioh, ia->ia_io[0].ir_size);
 }
@@ -480,7 +485,6 @@ aha2840_load_seeprom(struct ahc_softc *ahc)
 {
 	struct	  seeprom_descriptor sd;
 	struct	  seeprom_config sc;
-	u_int16_t checksum = 0;
 	u_int8_t  scsi_conf;
 	int	  have_seeprom;
 
@@ -499,20 +503,11 @@ aha2840_load_seeprom(struct ahc_softc *ahc)
 
 	if (bootverbose)
 		printf("%s: Reading SEEPROM...", ahc_name(ahc));
-	have_seeprom = read_seeprom(&sd,
-				    (u_int16_t *)&sc,
-				    /*start_addr*/0,
-				    sizeof(sc)/2);
+	have_seeprom = read_seeprom(&sd, (u_int16_t *)&sc,
+				    /*start_addr*/0, sizeof(sc)/2);
 
 	if (have_seeprom) {
-		/* Check checksum */
-		int i;
-		int maxaddr = (sizeof(sc)/2) - 1;
-		u_int16_t *scarray = (u_int16_t *)&sc;
-
-		for (i = 0; i < maxaddr; i++)
-			checksum = checksum + scarray[i];
-		if (checksum != sc.checksum) {
+		if (verify_seeprom_cksum(&sc) == 0) {
 			if(bootverbose)
 				printf ("checksum error\n");
 			have_seeprom = 0;
@@ -564,5 +559,27 @@ aha2840_load_seeprom(struct ahc_softc *ahc)
 
 		if (sc.adapter_control & CF284XSTERM)
 			ahc->flags |= AHC_TERM_ENB_A;
+	}
+}
+
+static int
+verify_seeprom_cksum(struct seeprom_config *sc)
+{
+	int i;
+	int maxaddr;
+	uint32_t checksum;
+	uint16_t *scarray;
+
+	maxaddr = (sizeof(*sc)/2) - 1;
+	checksum = 0;
+	scarray = (uint16_t *)sc;
+
+	for (i = 0; i < maxaddr; i++)
+		checksum = checksum + scarray[i];
+	if (checksum == 0
+	 || (checksum & 0xFFFF) != sc->checksum) {
+		return (0);
+	} else {
+		return(1);
 	}
 }

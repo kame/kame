@@ -1,4 +1,4 @@
-/*	$NetBSD: sequoia.c,v 1.1 2002/02/10 01:58:09 thorpej Exp $	*/
+/*	$NetBSD: sequoia.c,v 1.3 2003/07/15 03:36:04 lukem Exp $	*/
 
 /*
  * Copyright 1997
@@ -38,6 +38,9 @@
 **  INCLUDE FILES
 **
 */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sequoia.c,v 1.3 2003/07/15 03:36:04 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -587,7 +590,7 @@ static void ledSetBiled(int color)
             break;
     
         default:
-            panic("invalid color %x\n",color);
+            panic("invalid color %x",color);
             break;
     }
     sequoiaWrite(PMC_FOMPCR_REG, seqReg);
@@ -719,7 +722,7 @@ void ledSetDebug(int command)
             break;
 
         default:
-            panic("ledSetDebug: invalid command %d\n",command);
+            panic("ledSetDebug: invalid command %d",command);
             break;
     }
     sequoiaWrite(PMC_FOMPCR_REG, seqReg);

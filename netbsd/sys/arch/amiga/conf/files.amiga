@@ -1,12 +1,15 @@
-#	$NetBSD: files.amiga,v 1.121.4.1 2002/05/28 19:34:47 tv Exp $
+#	$NetBSD: files.amiga,v 1.133 2004/01/20 19:58:00 jdolecek Exp $
 
 # maxpartitions must be first item in files.${ARCH}.newconf
 maxpartitions 16			# NOTE THAT AMIGA IS SPECIAL!
 
+defflag	opt_m060sp.h		M060SP
+defflag				PANICBUTTON	# panic on kbd NMI if not DDB
+
 maxusers 2 8 64
 
-defflag	opt_amigaccgrf.h	GRF_PAL	:GRF_NTSC	# temporary workaround
 defflag	opt_amigaccgrf.h	GRF_NTSC
+defflag	opt_amigaccgrf.h	GRF_PAL	:GRF_NTSC	# temporary workaround
 defflag	opt_amigaccgrf.h	GRF_ECS GRF_AGA
 defflag	opt_amigaccgrf.h	GRF_A2024:GRF_ECS
 defflag	opt_amigaccgrf.h	GRF_AGA_VGA:GRF_AGA
@@ -28,6 +31,7 @@ defflag	opt_retina.h		RETINA_SPEED_HACK
 defflag				BB060STUPIDROM
 defflag				P5PPC68KBOARD
 defflag				LEV6_DEFER
+defflag				DEVRELOAD
 
 defparam			IOBZCLOCK
 
@@ -65,7 +69,6 @@ file	arch/amiga/dev/event.c		event
 device	clock
 attach	clock at mainbus
 file	arch/amiga/dev/clock.c
-file	dev/clock_subr.c
 
 # A2000 internal hwc
 device	a2kbbc
@@ -111,7 +114,7 @@ attach	toccata at zbus
 file	arch/amiga/dev/toccata.c	toccata
 
 # mouse
-device	ms: event
+device	ms: event, wsmousedev
 attach	ms at mainbus
 file	arch/amiga/dev/ms.c		ms needs-flag
 
@@ -122,7 +125,6 @@ attach	fdc at mainbus
 device	fd: disk
 attach	fd at fdc
 file	arch/amiga/dev/fd.c		fd needs-flag
-major	{fd = 2}
 
 # graphic devices
 define	grfbus {}
@@ -288,15 +290,10 @@ device	gvpbus {}
 attach	gvpbus at zbus
 file	arch/amiga/dev/gvpbus.c		gvpbus
 
-device	lpt
-file	dev/ic/lpt.c			lpt needs-flag
-
 attach	lpt at supio with lpt_supio
 file	arch/amiga/dev/lpt_supio.c	lpt_supio
 
 include "dev/scsipi/files.scsipi"
-major	{sd = 4}
-major	{cd = 7}
 
 # wd 33c93 contrllers
 define	sbic
@@ -436,8 +433,8 @@ include	"arch/m68k/060sp/files.060sp"
 
 # list of standard files...
 
-file	dev/cons.c			ite | ser
-file	dev/cninit.c			ite | ser
+file	dev/cons.c
+file	dev/cninit.c
 file	arch/amiga/amiga/amiga_init.c
 file	arch/amiga/amiga/autoconf.c
 file	arch/amiga/amiga/cia.c
@@ -448,13 +445,13 @@ file	arch/amiga/amiga/machdep.c
 file	arch/amiga/amiga/mem.c
 file	arch/amiga/amiga/pmap.c
 file	arch/amiga/amiga/procfs_machdep.c	procfs
-file	arch/amiga/amiga/sys_machdep.c
 file	arch/amiga/amiga/trap.c
-file	arch/amiga/amiga/vm_machdep.c
 file	arch/amiga/amiga/cc.c
-file	arch/amiga/amiga/db_memrw.c	ddb
 file	dev/md_root.c			memory_disk_hooks
 file	arch/m68k/m68k/cacheops.c
+file	arch/m68k/m68k/db_memrw.c	ddb
+file	arch/m68k/m68k/sys_machdep.c
+file	arch/m68k/m68k/vm_machdep.c
 
 define	gayle
 file	arch/amiga/amiga/gayle.c		gayle
@@ -466,14 +463,10 @@ attach	pccard at mainbus
 include "dev/pcmcia/files.pcmcia"
 
 include "dev/ata/files.ata"
-major	{wd = 17}
 
 # Amiga 4000/1200 IDE using MI wdc
 attach	wdc at mainbus with wdc_amiga: gayle
 file	arch/amiga/dev/wdc_amiga.c	wdc_amiga
-
-major	{md = 15}	# Memory disk (for mini-kernel)
-major	{raid = 16}	# RAIDframe
 
 # Compatibility modules
 
@@ -494,3 +487,5 @@ file arch/m68k/m68k/linux_trap.c		compat_linux
 
 # OSS audio driver compatibility
 include "compat/ossaudio/files.ossaudio"
+
+include "arch/amiga/conf/majors.amiga"

@@ -1,11 +1,40 @@
-/*	$NetBSD: ptsc.c,v 1.2 2001/11/27 00:53:12 thorpej Exp $	*/
+/*	$NetBSD: ptsc.c,v 1.12 2003/08/07 16:26:30 agc Exp $	*/
+
+/*
+ * Copyright (c) 1982, 1990 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)ptsc.c
+ */
 
 /*
  * Copyright (c) 1995 Scott Stevens
  * Copyright (c) 1995 Daniel Widenfalk
  * Copyright (c) 1994 Christian E. Hopps
- * Copyright (c) 1982, 1990 The Regents of the University of California.
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -45,15 +74,19 @@
  * programming information.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ptsc.c,v 1.12 2003/08/07 16:26:30 agc Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
+
+#include <uvm/uvm_extern.h>
+
 #include <dev/scsipi/scsi_all.h>
 #include <dev/scsipi/scsipi_all.h>
 #include <dev/scsipi/scsiconf.h>
-#include <uvm/uvm_extern.h>
-#include <machine/pmap.h>
 #include <machine/io.h>
 #include <machine/intr.h>
 #include <machine/bootconfig.h>
@@ -65,22 +98,21 @@
 #include <dev/podulebus/podules.h>
 #include <dev/podulebus/powerromreg.h>
 
-void ptscattach __P((struct device *, struct device *, void *));
 int  ptscmatch  __P((struct device *, struct cfdata *, void *));
-void ptsc_scsi_request __P((struct scsipi_channel *,
-				scsipi_adapter_req_t, void *));
+void ptscattach __P((struct device *, struct device *, void *));
 
-struct cfattach ptsc_ca = {
-	sizeof(struct ptsc_softc), ptscmatch, ptscattach
-};
+CFATTACH_DECL(ptsc, sizeof(struct ptsc_softc),
+    ptscmatch, ptscattach, NULL, NULL);
 
-int ptsc_intr		 __P((void *arg));
-int ptsc_setup_dma	 __P((struct sfas_softc *sc, void *ptr, int len,
-			      int mode));
-int ptsc_build_dma_chain __P((struct sfas_softc *sc,
-			      struct sfas_dma_chain *chain, void *p, int l));
-int ptsc_need_bump	 __P((struct sfas_softc *sc, void *ptr, int len));
-void ptsc_led		 __P((struct sfas_softc *sc, int mode));
+int ptsc_intr(void *);
+int ptsc_setup_dma(void *, void *, int, int);
+int ptsc_build_dma_chain(void *, void *, void *, int);
+int ptsc_need_bump(void *, void *, int);
+void ptsc_led(void *, int);
+
+void ptsc_set_dma_adr(struct sfas_softc *, void *);
+void ptsc_set_dma_tc(struct sfas_softc *, unsigned int);
+void ptsc_set_dma_mode(struct sfas_softc *, int);
 
 /*
  * if we are a Power-tec SCSI-2 card
@@ -166,7 +198,7 @@ ptscattach(pdp, dp, auxp)
 	sc->sc_softc.sc_config_flags = SFAS_NO_DMA /*| SFAS_NF_DEBUG*/;
 	sc->sc_softc.sc_host_id      = 7;    /* Should check the jumpers */
 
-	sc->sc_softc.sc_bump_sz = NBPG;
+	sc->sc_softc.sc_bump_sz = PAGE_SIZE;
 	sc->sc_softc.sc_bump_pa = 0x0;
 
 	sfasinitialize((struct sfas_softc *)sc);
@@ -177,7 +209,7 @@ ptscattach(pdp, dp, auxp)
 	sc->sc_softc.sc_adapter.adapt_max_periph = 1;
 	sc->sc_softc.sc_adapter.adapt_ioctl = NULL;
 	sc->sc_softc.sc_adapter.adapt_minphys = sfas_minphys;
-	sc->sc_softc.sc_adapter.adapt_request = ptsc_scsi_request;
+	sc->sc_softc.sc_adapter.adapt_request = sfas_scsi_request;
 
 	sc->sc_softc.sc_channel.chan_adapter = &sc->sc_softc.sc_adapter;
 	sc->sc_softc.sc_channel.chan_bustype = &scsi_bustype;
@@ -203,9 +235,10 @@ ptscattach(pdp, dp, auxp)
 	sc->sc_softc.sc_ih = podulebus_irq_establish(pa->pa_ih, IPL_BIO,
 	    ptsc_intr, &sc->sc_softc, &sc->sc_softc.sc_intrcnt);
 	if (sc->sc_softc.sc_ih == NULL)
-	    panic("%s: Cannot install IRQ handler\n", dp->dv_xname);
+	    panic("%s: Cannot install IRQ handler", dp->dv_xname);
 #else
 	printf(" polling");
+	sc->sc_softc.sc_adapter.adapt_flags = SCSIPI_ADAPT_POLL_ONLY;
 #endif
 	
 	printf("\n");
@@ -245,7 +278,7 @@ ptsc_intr(arg)
 	return(0);	/* Pass interrupt on down the chain */
 }
 
-/* Load transfer address into dma register */
+/* Load transfer address into DMA register */
 void
 ptsc_set_dma_adr(sc, ptr)
 	struct sfas_softc *sc;
@@ -302,22 +335,22 @@ ptsc_set_dma_mode(sc, mode)
 
 /* Initialize DMA for transfer */
 int
-ptsc_setup_dma(sc, ptr, len, mode)
-	struct sfas_softc *sc;
-	void		 *ptr;
-	int		  len;
-	int		  mode;
+ptsc_setup_dma(v, ptr, len, mode)
+	void	*v;
+	void	*ptr;
+	int	len;
+	int	mode;
 {
+	return(0);
+
+#if 0
+	struct sfas_softc *sc = v;
 	int	retval;
 
 	retval = 0;
 
-#if 0
 	printf("ptsc_setup_dma(sc, ptr = 0x%08x, len = 0x%08x, mode = 0x%08x)\n", (u_int)ptr, len, mode);
-#endif
-	return(0);
 
-#if 0
 	switch(mode) {
 	case SFAS_DMA_READ:
 	case SFAS_DMA_WRITE:
@@ -349,10 +382,10 @@ ptsc_setup_dma(sc, ptr, len, mode)
 
 /* Check if address and len is ok for DMA transfer */
 int
-ptsc_need_bump(sc, ptr, len)
-	struct sfas_softc *sc;
-	void		 *ptr;
-	int		  len;
+ptsc_need_bump(v, ptr, len)
+	void	*v;
+	void	*ptr;
+	int	len;
 {
 	int	p;
 
@@ -370,11 +403,7 @@ ptsc_need_bump(sc, ptr, len)
 
 /* Interrupt driven routines */
 int
-ptsc_build_dma_chain(sc, chain, p, l)
-	struct sfas_softc	*sc;
-	struct sfas_dma_chain	*chain;
-	void			*p;
-	int			 l;
+ptsc_build_dma_chain(void *v1, void *v2, void *p, int l)
 {
 #if 0
 	vm_offset_t  pa, lastpa;
@@ -423,7 +452,7 @@ do { chain[n].ptr = (p); chain[n].len = (l); chain[n++].flg = (f); } while(0)
 		lastpa = 0;
 		while(len > 3) {
 			pa = kvtop(ptr);
-			max_t = NBPG - (pa & PGOFSET);
+			max_t = PAGE_SIZE - (pa & PGOFSET);
 			if (max_t > len)
 			  max_t = len;
 
@@ -450,10 +479,9 @@ do { chain[n].ptr = (p); chain[n].len = (l); chain[n++].flg = (f); } while(0)
 
 /* Turn on/off led */
 void
-ptsc_led(sc, mode)
-	struct sfas_softc *sc;
-	int		  mode;
+ptsc_led(void *v, int mode)
 {
+	struct sfas_softc	*sc = v;
 	ptsc_regmap_p		rp;
 
 	rp = (ptsc_regmap_p)sc->sc_fas;
@@ -465,27 +493,4 @@ ptsc_led(sc, mode)
 			sc->sc_led_status--;
 	}
 	*rp->led = (sc->sc_led_status?1:0);
-}
-
-void
-ptsc_scsi_request(chan, req, arg)
-	struct scsipi_channel *chan;
-	scsipi_adapter_req_t req;
-	void *arg;
-{
-	struct scsipi_xfer *xs;
-
-	switch (req) {
-	case ADAPTER_REQ_RUN_XFER:
-		xs = arg;
-		/* ensure command is polling for the moment */
-#if PTSC_POLL > 0
-		xs->xs_control |= XS_CTL_POLL;
-#endif
-#if 0
-		printf("Opcode %d\n", (int)(xs->cmd->opcode));
-#endif
-	default:
-	}
-	sfas_scsi_request(chan, req, arg);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: siop_common.c,v 1.28.4.1 2002/11/24 16:32:48 tron Exp $	*/
+/*	$NetBSD: siop_common.c,v 1.33 2004/03/10 22:02:53 bouyer Exp $	*/
 
 /*
  * Copyright (c) 2000, 2002 Manuel Bouyer.
@@ -33,7 +33,7 @@
 /* SYM53c7/8xx PCI-SCSI I/O Processors driver */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: siop_common.c,v 1.28.4.1 2002/11/24 16:32:48 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: siop_common.c,v 1.33 2004/03/10 22:02:53 bouyer Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -78,7 +78,8 @@ siop_common_attach(sc)
 		error = bus_dmamem_alloc(sc->sc_dmat, PAGE_SIZE, 
 		    PAGE_SIZE, 0, &seg, 1, &rseg, BUS_DMA_NOWAIT);
 		if (error) {
-			printf("%s: unable to allocate script DMA memory, "
+			aprint_error(
+			    "%s: unable to allocate script DMA memory, "
 			    "error = %d\n", sc->sc_dev.dv_xname, error);
 			return error;
 		}
@@ -86,21 +87,21 @@ siop_common_attach(sc)
 		    (caddr_t *)&sc->sc_script,
 		    BUS_DMA_NOWAIT|BUS_DMA_COHERENT);
 		if (error) {
-			printf("%s: unable to map script DMA memory, "
+			aprint_error("%s: unable to map script DMA memory, "
 			    "error = %d\n", sc->sc_dev.dv_xname, error);
 			return error;
 		}
 		error = bus_dmamap_create(sc->sc_dmat, PAGE_SIZE, 1,
 		    PAGE_SIZE, 0, BUS_DMA_NOWAIT, &sc->sc_scriptdma);
 		if (error) {
-			printf("%s: unable to create script DMA map, "
+			aprint_error("%s: unable to create script DMA map, "
 			    "error = %d\n", sc->sc_dev.dv_xname, error);
 			return error;
 		}
 		error = bus_dmamap_load(sc->sc_dmat, sc->sc_scriptdma,
 		    sc->sc_script, PAGE_SIZE, NULL, BUS_DMA_NOWAIT);
 		if (error) {
-			printf("%s: unable to load script DMA map, "
+			aprint_error("%s: unable to load script DMA map, "
 			    "error = %d\n", sc->sc_dev.dv_xname, error);
 			return error;
 		}
@@ -146,7 +147,7 @@ siop_common_attach(sc)
 			sc->st_minsync = scf_period[i].period;
 	}
 	if (sc->st_maxsync == 255 || sc->st_minsync == 0)
-		panic("siop: can't find my sync parameters\n");
+		panic("siop: can't find my sync parameters");
 	for (i = 0; i < sizeof(dt_scf_period) / sizeof(dt_scf_period[0]); i++) {
 		if (sc->clock_period != dt_scf_period[i].clock)
 			continue;
@@ -156,7 +157,7 @@ siop_common_attach(sc)
 			sc->dt_minsync = dt_scf_period[i].period;
 	}
 	if (sc->dt_maxsync == 255 || sc->dt_minsync == 0)
-		panic("siop: can't find my sync parameters\n");
+		panic("siop: can't find my sync parameters");
 	return 0;
 }
 
@@ -192,6 +193,9 @@ siop_common_reset(sc)
 	    1 << sc->sc_chan.chan_id);
 	bus_space_write_1(sc->sc_rt, sc->sc_rh, SIOP_DCNTL,
 	    (sc->features & SF_CHIP_PF) ? DCNTL_COM | DCNTL_PFEN : DCNTL_COM);
+	if (sc->features & SF_CHIP_AAIP)
+		bus_space_write_1(sc->sc_rt, sc->sc_rh,
+		    SIOP_AIPCNTL1, AIPCNTL1_DIS);
 
 	/* enable clock doubler or quadruler if appropriate */
 	if (sc->features & (SF_CHIP_DBLR | SF_CHIP_QUAD)) {
@@ -278,7 +282,7 @@ siop_setuptables(siop_cmd)
 			scsipi_printaddr(xs->xs_periph);
 			printf(": tagged command type %d id %d\n",
 			    siop_cmd->xs->xs_tag_type, siop_cmd->xs->xs_tag_id);
-			panic("tagged command for non-tagging device\n");
+			panic("tagged command for non-tagging device");
 		}
 		siop_cmd->flags |= CMDFL_TAG;
 		siop_cmd->siop_tables->msg_out[1] = siop_cmd->xs->xs_tag_type;
@@ -351,7 +355,7 @@ siop_wdtr_neg(siop_cmd)
 		/* FALLTHROUH */
 		default:
 			/*
- 			 * hum, we got more than what we can handle, shoudn't
+ 			 * hum, we got more than what we can handle, shouldn't
 			 * happen. Reject, and stay async
 			 */
 			siop_target->flags &= ~TARF_ISWIDE;

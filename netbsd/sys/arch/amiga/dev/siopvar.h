@@ -1,4 +1,4 @@
-/*	$NetBSD: siopvar.h,v 1.21 2002/05/14 00:08:22 matt Exp $	*/
+/*	$NetBSD: siopvar.h,v 1.23 2003/08/07 16:26:45 agc Exp $	*/
 
 /*
  * Copyright (c) 1990 The Regents of the University of California.
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -42,11 +38,11 @@
 
 /*
  * The largest single request will be MAXPHYS bytes which will require
- * at most MAXPHYS/NBPG+1 chain elements to describe, i.e. if none of
- * the buffer pages are physically contiguous (MAXPHYS/NBPG) and the
+ * at most MAXPHYS/PAGE_SIZE+1 chain elements to describe, i.e. if none of
+ * the buffer pages are physically contiguous (MAXPHYS/PAGE_SIZE) and the
  * buffer is not page aligned (+1).
  */
-#define	DMAMAXIO	(MAXPHYS/NBPG+1)
+#define	DMAMAXIO	(MAXPHYS/PAGE_SIZE+1)
 
 /*
  * Data Structure for SCRIPTS program

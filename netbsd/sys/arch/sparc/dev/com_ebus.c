@@ -1,4 +1,4 @@
-/*	$NetBSD: com_ebus.c,v 1.4 2002/04/12 19:34:24 thorpej Exp $ */
+/*	$NetBSD: com_ebus.c,v 1.11 2003/07/15 00:04:53 lukem Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: com_ebus.c,v 1.11 2003/07/15 00:04:53 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
@@ -45,12 +48,9 @@
 #include <machine/autoconf.h>
 #include <machine/intr.h>
 
-#include <dev/pci/pcireg.h>	/* XXX: for PCI_INTERRUPT_PIN */
-
 #include <dev/ebus/ebusreg.h>
 #include <dev/ebus/ebusvar.h>
 
-#include <dev/ic/ns16550reg.h>
 #include <dev/ic/comreg.h>
 #include <dev/ic/comvar.h>
 
@@ -63,9 +63,8 @@ struct com_ebus_softc {
 static int com_ebus_match(struct device *, struct cfdata *, void *);
 static void com_ebus_attach(struct device *, struct device *, void *);
 
-struct cfattach com_ebus_ca = {
-	sizeof(struct com_ebus_softc), com_ebus_match, com_ebus_attach
-};
+CFATTACH_DECL(com_ebus, sizeof(struct com_ebus_softc),
+    com_ebus_match, com_ebus_attach, NULL, NULL);
 
 static int
 com_ebus_match(parent, cf, aux)
@@ -112,7 +111,8 @@ com_ebus_attach(parent, self, aux)
 	 */
 	if (prom_instance_to_package(prom_stdin()) == ea->ea_node)
 		comcnattach(sc->sc_iot, sc->sc_iobase,
-			    B9600, sc->sc_frequency, (CLOCAL | CREAD | CS8));
+			    B9600, sc->sc_frequency, COM_TYPE_NORMAL,
+			    (CLOCAL | CREAD | CS8));
 
 	if (!com_is_console(sc->sc_iot, sc->sc_iobase, &sc->sc_ioh)
 	    && bus_space_map(sc->sc_iot, sc->sc_iobase, ea->ea_reg[0].size,
@@ -126,6 +126,6 @@ com_ebus_attach(parent, self, aux)
 
 	if (ea->ea_nintr != 0)
 		(void)bus_intr_establish(sc->sc_iot,
-					 ea->ea_intr[0], IPL_SERIAL, 0,
+					 ea->ea_intr[0], IPL_SERIAL,
 					 comintr, sc);
 }

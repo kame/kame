@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_space_notimpl.c,v 1.3 2002/04/14 07:59:59 takemura Exp $	*/
+/*	$NetBSD: bus_space_notimpl.c,v 1.5 2003/07/15 02:29:31 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2001 TAKEMURA Shin. All rights reserved.
@@ -29,6 +29,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bus_space_notimpl.c,v 1.5 2003/07/15 02:29:31 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/cdefs.h>
@@ -38,7 +41,7 @@ bus_space_protos(bs_notimpl);
 
 #define C(a,b)	__CONCAT(a,b)
 #define __NOTIMPL(f) C(C(bs_,f),_proto)(bs_notimpl)	\
-	{ panic("%s isn't implemented\n", __FUNCTION__); }
+	{ panic("%s isn't implemented", __FUNCTION__); }
 
 __NOTIMPL(map)
 __NOTIMPL(unmap)

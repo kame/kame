@@ -1,4 +1,4 @@
-/*	$NetBSD: isa_machdep.c,v 1.24 2002/01/31 17:56:35 uch Exp $	*/
+/*	$NetBSD: isa_machdep.c,v 1.28 2003/07/15 02:29:32 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -35,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: isa_machdep.c,v 1.28 2003/07/15 02:29:32 lukem Exp $");
 
 #include "opt_vr41xx.h"
 
@@ -98,9 +101,8 @@ struct vrisab_softc {
 	struct hpcmips_isa_chipset sc_isa_ic;
 };
 
-struct cfattach vrisab_ca = {
-	sizeof(struct vrisab_softc), vrisabmatch, vrisabattach
-};
+CFATTACH_DECL(vrisab, sizeof(struct vrisab_softc),
+    vrisabmatch, vrisabattach, NULL, NULL);
 
 #ifdef DEBUG_FIND_PCIC
 #include <mips/cpuregs.h>
@@ -123,7 +125,7 @@ vrisabmatch(struct device *parent, struct cfdata *match, void *aux)
 	platid_mask_t mask;
 	int n;
 
-	if (strcmp(haa->haa_busname, match->cf_driver->cd_name))
+	if (strcmp(haa->haa_busname, match->cf_name))
 		return (0);
 
 	if (match->cf_loc[HPCIOIFCF_PLATFORM] == HPCIOIFCF_PLATFORM_DEFAULT) 

@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.S,v 1.6 2002/04/25 23:23:23 thorpej Exp $	*/
+/*	$NetBSD: locore.S,v 1.15 2004/02/13 11:36:11 wiz Exp $	*/
 
 /*
  * Copyright (C) 1994-1997 Mark Brinicombe
@@ -54,15 +54,15 @@
 ENTRY_NP(kernel_text)
 
 ASENTRY_NP(start)
-	add	r1, pc, #(Lstart - . - 8)
+	adr	r1, .Lstart
 	ldmia	r1, {r1, r2, sp}	/* Set initial stack and */
 	sub	r2, r2, r1		/* get zero init data */
 	mov	r3, #0
 
-L1:
+.L1:
 	str	r3, [r1], #0x0004	/* Zero the bss */
 	subs	r2, r2, #4
-	bgt	L1
+	bgt	.L1
 
 	mov	fp, #0x00000000		/* trace back starts here */
 	bl	_C_LABEL(initarm)	/* Off we go */
@@ -77,16 +77,16 @@ L1:
 
 	bl	_C_LABEL(main)		/* call main()! */
 
-	add	r0, pc, #Lmainreturned - . - 8
+	adr	r0, .Lmainreturned
 	b	_C_LABEL(panic)
 	/* NOTEACHED */
 
-Lstart:
+.Lstart:
 	.word	_edata
 	.word	_end
 	.word	svcstk + INIT_ARM_STACK_SIZE
 
-Lmainreturned:
+.Lmainreturned:
 	.asciz	"main() returned"
 	.align	0
 
@@ -100,33 +100,32 @@ svcstk:
 #ifndef OFW
 	/* OFW based systems will used OF_boot() */
 	
-Lcpufuncs:	
+.Lcpufuncs:	
 	.word	_C_LABEL(cpufuncs)
 
 ENTRY_NP(cpu_reset)
-	mrs     r2, cpsr_all
+	mrs     r2, cpsr
 	bic	r2, r2, #(PSR_MODE)
 	orr     r2, r2, #(PSR_SVC32_MODE)
 	orr	r2, r2, #(I32_bit | F32_bit)
 	msr     cpsr_all, r2
 
-	ldr	r4, Lcpu_reset_address
+	ldr	r4, .Lcpu_reset_address
 	ldr	r4, [r4]
 
-	ldr	r0, Lcpufuncs
-	add	lr, pc, #Lboot_cache_purged - . - 8
+	ldr	r0, .Lcpufuncs
+	mov	lr, pc
 	ldr	pc, [r0, #CF_IDCACHE_WBINV_ALL]
-
-Lboot_cache_purged:
 
 	/*
 	 * Load the cpu_reset_needs_v4_MMU_disable flag to determine if it's
 	 * necessary.
 	 */
 
-	ldr	r1, Lcpu_reset_needs_v4_MMU_disable
+	ldr	r1, .Lcpu_reset_needs_v4_MMU_disable
 	ldr	r1, [r1]
 	cmp	r1, #0
+	mov	r2, #0
 
 	/*
  	 * MMU & IDC off, 32 bit program & data space
@@ -134,15 +133,15 @@ Lboot_cache_purged:
 	 */
 	mov	r0, #(CPU_CONTROL_32BP_ENABLE | CPU_CONTROL_32BD_ENABLE)
 	mcr     15, 0, r0, c1, c0, 0
-	mcrne   15, 0, r0, c8, c7, 0 	/* nail I+D TLB on ARMv4 and greater */
+	mcrne   15, 0, r2, c8, c7, 0 	/* nail I+D TLB on ARMv4 and greater */
 	mov     pc, r4
 
 	/*
 	 * _cpu_reset_address contains the address to branch to, to complete
-	 * the cpu reset after turning the MMU off
+	 * the CPU reset after turning the MMU off
 	 * This variable is provided by the hardware specific code
 	 */
-Lcpu_reset_address:
+.Lcpu_reset_address:
 	.word	_C_LABEL(cpu_reset_address)
 
 	/*
@@ -151,7 +150,7 @@ Lcpu_reset_address:
 	 * on f.e. ARM6/7 that locks up the computer in an endless illegal
 	 * instruction / data-abort / reset loop.
 	 */
-Lcpu_reset_needs_v4_MMU_disable:
+.Lcpu_reset_needs_v4_MMU_disable:
 	.word	_C_LABEL(cpu_reset_needs_v4_MMU_disable)
 
 #endif	/* OFW */
@@ -170,18 +169,18 @@ ENTRY_NP(Execute)
 	stmfd	sp!, {r2, r4-r7, fp, ip, lr, pc}
 	sub	fp, ip, #4
 	mov	ip, r3
-	ldr	r7, return
+	ldr	r7, .Lreturn
 	stmfd	sp!, {r0, r7}
-	add	r7, pc, #LExec - . - 8
+	adr	r7, #.LExec
 	mov	r5, r1
-	mrs	r4, cpsr_all
+	mrs	r4, cpsr
 	ldmia	r2, {r0-r3}
 	mov	r6, sp
 	mov	sp, ip
 	msr	cpsr_all, r5
 	mov	pc, r6
-LExec:
-	mrs	r5, cpsr_all
+.LExec:
+	mrs	r5, cpsr
 /* XXX Cannot switch thus easily back from user mode */
 	msr	cpsr_all, r4
 	add	sp, r6, #8
@@ -189,7 +188,7 @@ LExec:
 	stmia	r6, {r0-r3}
 	mov	r0, r5
 	ldmdb	fp, {r4-r7, fp, sp, pc}
-return:
+.Lreturn:
 	mov	pc, r7
 #endif
 
@@ -213,34 +212,5 @@ _C_LABEL(esym):	.word	_C_LABEL(end)
 ENTRY_NP(abort)
 	b	_C_LABEL(abort)
 
-
-/*
- * Atomic bit set and clear functions
- */
-
-ENTRY(atomic_set_bit)
-	mrs	r2, cpsr_all
-	orr	r3, r2, #(I32_bit)
-	msr	cpsr_all, r3
-
-	ldr	r3, [r0]
-	orr	r3, r3, r1
-	str	r3, [r0]
-
-	msr	cpsr_all, r2
-	mov	pc, lr
-
-
-ENTRY(atomic_clear_bit)
-	mrs	r2, cpsr_all
-	orr	r3, r2, #(I32_bit)
-	msr	cpsr_all, r3
-
-	ldr	r3, [r0]
-	bic	r3, r3, r1
-	str	r3, [r0]
-
-	msr	cpsr_all, r2
-	mov	pc, lr
 
 /* End of locore.S */

@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_uselib.c,v 1.6.6.1 2003/10/02 09:52:42 tron Exp $	*/
+/*	$NetBSD: linux_uselib.c,v 1.12 2003/06/29 22:29:33 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1998 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: linux_uselib.c,v 1.6.6.1 2003/10/02 09:52:42 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: linux_uselib.c,v 1.12 2003/06/29 22:29:33 fvdl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,6 +51,7 @@ __KERNEL_RCSID(0, "$NetBSD: linux_uselib.c,v 1.6.6.1 2003/10/02 09:52:42 tron Ex
 #include <sys/exec_elf.h>
 
 #include <sys/mman.h>
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <machine/cpu.h>
@@ -77,7 +78,7 @@ __KERNEL_RCSID(0, "$NetBSD: linux_uselib.c,v 1.6.6.1 2003/10/02 09:52:42 tron Ex
  * a_entry. Read in the header, set up some VM commands and run them.
  *
  * Yes, both text and data are mapped at once, so we're left with
- * writeable text for the shared libs. The Linux crt0 seemed to break
+ * writable text for the shared libs. The Linux crt0 seemed to break
  * sometimes when data was mapped separately. It munmapped a uselib()
  * of ld.so by hand, which failed with shared text and data for ld.so
  * Yuck.
@@ -88,14 +89,15 @@ __KERNEL_RCSID(0, "$NetBSD: linux_uselib.c,v 1.6.6.1 2003/10/02 09:52:42 tron Ex
  */
 
 int
-linux_sys_uselib(p, v, retval)
-	struct proc *p;
+linux_sys_uselib(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct linux_sys_uselib_args /* {
 		syscallarg(const char *) path;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	caddr_t sg;
 	long bsize, dsize, tsize, taddr, baddr, daddr;
 	struct nameidata ni;
@@ -131,7 +133,7 @@ linux_sys_uselib(p, v, retval)
 		return ENOEXEC;
 
 	magic = LINUX_N_MAGIC(&hdr);
-	taddr = hdr.a_entry & (~(NBPG - 1));
+	taddr = hdr.a_entry & (~(PAGE_SIZE - 1));
 	tsize = hdr.a_text;
 	daddr = taddr + tsize;
 	dsize = hdr.a_data + hdr.a_bss;
@@ -149,7 +151,7 @@ linux_sys_uselib(p, v, retval)
 		  vp, LINUX_N_TXTOFF(hdr, magic),
 		  VM_PROT_READ|VM_PROT_EXECUTE|VM_PROT_WRITE);
 
-	baddr = roundup(daddr + hdr.a_data, NBPG);
+	baddr = roundup(daddr + hdr.a_data, PAGE_SIZE);
 	bsize = daddr + dsize - baddr;
         if (bsize > 0) {
                 NEW_VMCMD(&vcset, vmcmd_map_zero, bsize, baddr,

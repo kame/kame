@@ -1,4 +1,4 @@
-/*	$NetBSD: ns_input.c,v 1.18 2002/05/12 20:23:49 matt Exp $	*/
+/*	$NetBSD: ns_input.c,v 1.20 2003/09/30 00:01:18 christos Exp $	*/
 
 /*
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ns_input.c,v 1.18 2002/05/12 20:23:49 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ns_input.c,v 1.20 2003/09/30 00:01:18 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -269,7 +265,7 @@ idp_ctlinput(cmd, sa, arg)
 	struct ns_errp *errp = NULL;
 	int type;
 
-	if (cmd < 0 || cmd > PRC_NCMDS)
+	if ((unsigned)cmd >= PRC_NCMDS)
 		return NULL;
 	if (nsctlerrmap[cmd] == 0)
 		return NULL;		/* XXX */

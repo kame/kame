@@ -1,4 +1,4 @@
-/*	$NetBSD: nvram.h,v 1.5 1995/05/05 22:08:43 mycroft Exp $	*/
+/*	$NetBSD: nvram.h,v 1.7 2003/08/07 16:28:02 agc Exp $	*/
 
 /*-
  * Copyright (c) 1990, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -53,6 +49,7 @@
 
 #define	NVRAM_RESET_RST		0x00		/* normal reset */
 #define	NVRAM_RESET_LOAD 	0x04		/* load system */
+#define NVRAM_RESET_JUMP	0x0a		/* jump through 40:67 */
 
 /* NVRAM byte 2: diskette drive type in upper/lower nibble */
 #define NVRAM_DISKETTE	(MC_NVRAM_START + 2)	/* RTC offset 0x10 */

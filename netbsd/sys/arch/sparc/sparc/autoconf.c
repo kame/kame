@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.168.4.3 2003/02/11 08:42:00 jmc Exp $ */
+/*	$NetBSD: autoconf.c,v 1.203.2.1 2004/05/30 11:54:06 tron Exp $ */
 
 /*
  * Copyright (c) 1996
@@ -46,6 +46,10 @@
  *
  *	@(#)autoconf.c	8.4 (Berkeley) 10/1/93
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.203.2.1 2004/05/30 11:54:06 tron Exp $");
+
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
 #include "opt_multiprocessor.h"
@@ -54,15 +58,14 @@
 #include "scsibus.h"
 
 #include <sys/param.h>
+#include <sys/kernel.h>
 #include <sys/systm.h>
 #include <sys/endian.h>
 #include <sys/proc.h>
-#include <sys/map.h>
 #include <sys/buf.h>
 #include <sys/disklabel.h>
 #include <sys/device.h>
 #include <sys/disk.h>
-#include <sys/dkstat.h>
 #include <sys/conf.h>
 #include <sys/reboot.h>
 #include <sys/socket.h>
@@ -71,6 +74,7 @@
 #include <sys/msgbuf.h>
 #include <sys/user.h>
 #include <sys/boot_flag.h>
+#include <sys/ksyms.h>
 
 #include <net/if.h>
 
@@ -80,12 +84,9 @@
 
 #include <machine/bus.h>
 #include <machine/promlib.h>
-#include <machine/openfirm.h>
 #include <machine/autoconf.h>
 #include <machine/bootinfo.h>
 
-#include <machine/oldmon.h>
-#include <machine/idprom.h>
 #include <sparc/sparc/memreg.h>
 #include <machine/cpu.h>
 #include <machine/ctlreg.h>
@@ -105,20 +106,20 @@
 #include <ddb/ddbvar.h>
 #endif
 
+#include "ksyms.h"
 
 /*
  * The following several variables are related to
  * the configuration process, and are used in initializing
  * the machine.
  */
-int	optionsnode;	/* node ID of ROM's options */
 
 #ifdef KGDB
 extern	int kgdb_debug_panic;
 #endif
 extern void *bootinfo;
 
-#ifndef DDB
+#if !NKSYMS && !defined(DDB) && !defined(LKM)
 void bootinfo_relocate(void *);
 #endif
 
@@ -126,6 +127,7 @@ static	char *str2hex __P((char *, int *));
 static	int mbprint __P((void *, const char *));
 static	void crazymap __P((char *, int *));
 int	st_crazymap __P((int));
+int	sd_crazymap __P((int));
 void	sync_crash __P((void));
 int	mainbus_match __P((struct device *, struct cfdata *, void *));
 static	void mainbus_attach __P((struct device *, struct device *, void *));
@@ -137,6 +139,7 @@ static	void bootpath_fake __P((struct bootpath *, char *));
 static	void bootpath_print __P((struct bootpath *));
 static	struct bootpath	*bootpath_store __P((int, struct bootpath *));
 int	find_cpus __P((void));
+char	machine_model[100];
 
 #ifdef DEBUG
 #define ACDB_BOOTDEV	0x1
@@ -157,30 +160,46 @@ matchbyname(parent, cf, aux)
 	struct cfdata *cf;
 	void *aux;
 {
-	printf("%s: WARNING: matchbyname\n", cf->cf_driver->cd_name);
+	printf("%s: WARNING: matchbyname\n", cf->cf_name);
 	return (0);
 }
 
+/*
+ * Get the number of CPUs in the system and the CPUs' SPARC architecture
+ * version. We need this information early in the boot process.
+ */
 int
 find_cpus()
 {
-#if defined(MULTIPROCESSOR)
-	int node, n;
+	int n;
+#if defined(SUN4M) || defined(SUN4D)
+	int node;
+#endif
 
-	/* We only consider sun4m class multi-processor machines */
-	if (!CPU_ISSUN4M)
+	/*
+	 * Set default processor architecture version
+	 *
+	 * All sun4 and sun4c platforms have v7 CPUs;
+	 * sun4m may have v7 (Cyrus CY7C601 modules) or v8 CPUs (all
+	 * other models, presumably).
+	 */
+	cpu_arch = 7;
+
+	/* On sun4 and sun4c we support only one CPU */
+	if (!CPU_ISSUN4M && !CPU_ISSUN4D)
 		return (1);
 
 	n = 0;
+#if defined(SUN4M) || defined(SUN4D)
 	node = findroot();
 	for (node = firstchild(node); node; node = nextsibling(node)) {
-		if (strcmp(PROM_getpropstring(node, "device_type"), "cpu") == 0)
-			n++;
+		if (strcmp(prom_getpropstring(node, "device_type"), "cpu") != 0)
+			continue;
+		if (n++ == 0)
+			cpu_arch = prom_getpropint(node, "sparc-version", 7);
 	}
+#endif /* SUN4M || SUN4D */
 	return (n);
-#else
-	return (1);
-#endif
 }
 
 /*
@@ -230,9 +249,10 @@ void
 bootstrap()
 {
 	extern struct user *proc0paddr;
-	extern int end[];
-#ifdef DDB
+#if NKSYMS || defined(DDB) || defined(LKM)
 	struct btinfo_symtab *bi_sym;
+#else
+	extern int end[];
 #endif
 
 	prom_init();
@@ -241,12 +261,20 @@ bootstrap()
 	ncpu = find_cpus();
 
 	/* Attach user structure to proc0 */
-	proc0.p_addr = proc0paddr;
+	lwp0.l_addr = proc0paddr;
 
 	cpuinfo.master = 1;
 	getcpuinfo(&cpuinfo, 0);
 
-#ifndef DDB
+#if defined(SUN4M) || defined(SUN4D)
+	/* Switch to sparc v8 multiply/divide functions on v8 machines */
+	if (cpu_arch == 8) {
+		extern void sparc_v8_muldiv(void);
+		sparc_v8_muldiv();
+	}
+#endif /* SUN4M || SUN4D */
+
+#if !NKSYMS && !defined(DDB) && !defined(LKM)
 	/*
 	 * We want to reuse the memory where the symbols were stored
 	 * by the loader. Relocate the bootinfo array which is loaded
@@ -272,18 +300,15 @@ bootstrap()
 	initmsgbuf((caddr_t)KERNBASE, 8192);
 #endif
 
-#ifdef DDB
+#if NKSYMS || defined(DDB) || defined(LKM)
 	if ((bi_sym = lookup_bootinfo(BTINFO_SYMTAB)) != NULL) {
-		bi_sym->ssym += KERNBASE;
-		bi_sym->esym += KERNBASE;
-		ddb_init(bi_sym->nsym, (int *)bi_sym->ssym,
+		if (bi_sym->ssym < KERNBASE) {
+			/* Assume low-loading boot loader */
+			bi_sym->ssym += KERNBASE;
+			bi_sym->esym += KERNBASE;
+		}
+		ksyms_init(bi_sym->nsym, (int *)bi_sym->ssym,
 		    (int *)bi_sym->esym);
-	} else {
-		/*
-		 * Compatibility, will go away.
-		 */
-		extern char *kernel_top;
-		ddb_init(*(int *)end, ((int *)end) + 1, (int *)kernel_top);
 	}
 #endif
 
@@ -302,7 +327,7 @@ bootstrap()
 #endif /* SUN4M */
 
 #if defined(SUN4) || defined(SUN4C)
-	if (CPU_ISSUN4OR4C) {
+	if (CPU_ISSUN4 || CPU_ISSUN4C) {
 		/* Map Interrupt Enable Register */
 		pmap_kenter_pa(INTRREG_VA,
 		    INT_ENABLE_REG_PHYSADR | PMAP_NC | PMAP_OBIO,
@@ -344,8 +369,8 @@ bootstrap4m()
 
 	vaddrs = vstore;
 	nvaddrs = sizeof(vstore)/sizeof(vstore[0]);
-	if (PROM_getprop(node, "address", sizeof(int),
-		    &nvaddrs, (void **)&vaddrs) != 0) {
+	if (prom_getprop(node, "address", sizeof(int),
+		    &nvaddrs, &vaddrs) != 0) {
 		printf("bootstrap: could not get interrupt properties");
 		prom_halt();
 	}
@@ -367,7 +392,8 @@ bootstrap4m()
 		/* Duplicate existing mapping */
 		setpte4m(PI_INTR_VA + (_MAXNBPG * i), pte);
 	}
-	cpuinfo.intreg_4m = (struct icr_pi *)(PI_INTR_VA);
+	cpuinfo.intreg_4m = (struct icr_pi *)
+		(PI_INTR_VA + (_MAXNBPG * CPU_MID2CPUNO(bootmid)));
 
 	/*
 	 * That was the processor register...now get system register;
@@ -382,10 +408,10 @@ bootstrap4m()
 	setpte4m(SI_INTR_VA, pte);
 
 	/* Now disable interrupts */
-	ienab_bis(SINTR_MA);
+	icr_si_bis(SINTR_MA);
 
 	/* Send all interrupts to primary processor */
-	*((u_int *)ICR_ITR) = 0;
+	*((u_int *)ICR_ITR) = CPU_MID2CPUNO(bootmid);
 
 #ifdef DEBUG
 /*	printf("SINTR: mask: 0x%x, pend: 0x%x\n", *(int*)ICR_SI_MASK,
@@ -816,8 +842,7 @@ crazymap(prop, map)
 	int *map;
 {
 	int i;
-	char *propval;
-	char buf[32];
+	char propval[8+2];
 
 	if (!CPU_ISSUN4 && prom_version() < 2) {
 		/*
@@ -825,8 +850,8 @@ crazymap(prop, map)
 		 * which contains the mapping for us to use. v2 proms do not
 		 * require remapping.
 		 */
-		propval = PROM_getpropstringA(optionsnode, prop, buf, sizeof(buf));
-		if (propval == NULL || strlen(propval) != 8) {
+		if (prom_getoption(prop, propval, sizeof propval) != 0 ||
+		    propval[0] == '\0' || strlen(propval) != 8) {
  build_default_map:
 			printf("WARNING: %s map is bogus, using default\n",
 				prop);
@@ -910,7 +935,7 @@ cpu_configure()
 			/* Clear top bits of physical address on 4/100 */
 			paddr &= ~0xf0000000;
 
-		if (obio_find_rom_map(paddr, NBPG, &bh) != 0)
+		if (obio_find_rom_map(paddr, PAGE_SIZE, &bh) != 0)
 			panic("configure: ROM hasn't mapped memreg!");
 
 		par_err_reg = (volatile int *)bh;
@@ -920,9 +945,9 @@ cpu_configure()
 	if (CPU_ISSUN4C) {
 		char *cp, buf[32];
 		int node = findroot();
-		cp = PROM_getpropstringA(node, "device_type", buf, sizeof buf);
+		cp = prom_getpropstringA(node, "device_type", buf, sizeof buf);
 		if (strcmp(cp, "cpu") != 0)
-			panic("PROM root device type = %s (need CPU)\n", cp);
+			panic("PROM root device type = %s (need CPU)", cp);
 	}
 #endif
 
@@ -932,7 +957,7 @@ cpu_configure()
 #if defined(SUN4M)
 #if !defined(MSIIEP)
 	if (CPU_ISSUN4M)
-		ienab_bic(SINTR_MA);
+		icr_si_bic(SINTR_MA);
 #else
 	if (CPU_ISSUN4M)
 		/* nothing for ms-IIep so far */;
@@ -940,7 +965,7 @@ cpu_configure()
 #endif /* SUN4M */
 
 #if defined(SUN4) || defined(SUN4C)
-	if (CPU_ISSUN4OR4C)
+	if (CPU_ISSUN4 || CPU_ISSUN4C)
 		ienab_bis(IE_ALLIE);
 #endif
 
@@ -1017,13 +1042,13 @@ mbprint(aux, name)
 	struct mainbus_attach_args *ma = aux;
 
 	if (name)
-		printf("%s at %s", ma->ma_name, name);
+		aprint_normal("%s at %s", ma->ma_name, name);
 	if (ma->ma_paddr)
-		printf(" %saddr 0x%lx",
+		aprint_normal(" %saddr 0x%lx",
 			BUS_ADDR_IOSPACE(ma->ma_paddr) ? "io" : "",
 			(u_long)BUS_ADDR_PADDR(ma->ma_paddr));
 	if (ma->ma_pri)
-		printf(" ipl %d", ma->ma_pri);
+		aprint_normal(" ipl %d", ma->ma_pri);
 	return (UNCONF);
 }
 
@@ -1040,12 +1065,12 @@ mainbus_match(parent, cf, aux)
 /*
  * Helper routines to get some of the more common properties. These
  * only get the first item in case the property value is an array.
- * Drivers that "need to know it all" can call PROM_getprop() directly.
+ * Drivers that "need to know it all" can call prom_getprop() directly.
  */
-#if defined(SUN4C) || defined(SUN4M)
-static int	PROM_getprop_reg1 __P((int, struct openprom_addr *));
-static int	PROM_getprop_intr1 __P((int, int *));
-static int	PROM_getprop_address1 __P((int, void **));
+#if defined(SUN4C) || defined(SUN4M) || defined(SUN4D)
+static int	prom_getprop_reg1 __P((int, struct openprom_addr *));
+static int	prom_getprop_intr1 __P((int, int *));
+static int	prom_getprop_address1 __P((int, void **));
 #endif
 
 /*
@@ -1065,7 +1090,7 @@ extern struct sparc_bus_space_tag mainbus_space_tag;
 
 	struct mainbus_attach_args ma;
 	char namebuf[32];
-#if defined(SUN4C) || defined(SUN4M)
+#if defined(SUN4C) || defined(SUN4M) || defined(SUN4D)
 	const char *const *ssp, *sp = NULL;
 	int node0, node;
 	const char *const *openboot_special;
@@ -1123,12 +1148,40 @@ extern struct sparc_bus_space_tag mainbus_space_tag;
 #else
 #define openboot_special4m	((void *)0)
 #endif
+#if defined(SUN4D)
+	static const char *const openboot_special4d[] = {
+		"",
+
+		/* ignore these (end with NULL) */
+		/*
+		 * These are _root_ devices to ignore. Others must be handled
+		 * elsewhere.
+		 */
+		"mem-unit",	/* XXX might need this for memory errors */
+		"boards",
+		"openprom",
+		"virtual-memory",
+		"memory",
+		"aliases",
+		"options",
+		"packages",
+		NULL
+	};
+#else
+#define	openboot_special4d	((void *)0)
+#endif
+
 
 	if (CPU_ISSUN4)
-		printf(": SUN-4/%d series\n", cpuinfo.classlvl);
+		snprintf(machine_model, sizeof machine_model, "SUN-4/%d series",
+		    cpuinfo.classlvl);
 	else
-		printf(": %s\n", PROM_getpropstringA(findroot(), "name",
-						namebuf, sizeof(namebuf)));
+		snprintf(machine_model, sizeof machine_model, "%s",
+		    prom_getpropstringA(findroot(), "name", namebuf,
+		    sizeof(namebuf)));
+
+	prom_getidprom();
+	printf(": %s: hostid %lx\n", machine_model, hostid);
 
 	/* Establish the first component of the boot path */
 	bootpath_store(1, bootpath);
@@ -1168,48 +1221,63 @@ extern struct sparc_bus_space_tag mainbus_space_tag;
 /*
  * The rest of this routine is for OBP machines exclusively.
  */
-#if defined(SUN4C) || defined(SUN4M)
+#if defined(SUN4C) || defined(SUN4M) || defined(SUN4D)
 
-	openboot_special = CPU_ISSUN4M
-				? openboot_special4m
-				: openboot_special4c;
+	if (CPU_ISSUN4D)
+		openboot_special = openboot_special4d;
+	else if (CPU_ISSUN4M)
+		openboot_special = openboot_special4m;
+	else
+		openboot_special = openboot_special4c;
 
-	node = findroot();
+	node0 = firstchild(findroot());
 
-	/* the first early device to be configured is the cpu */
+	/* The first early device to be configured is the cpu */
 	if (CPU_ISSUN4M) {
-		/* XXX - what to do on multiprocessor machines? */
 		const char *cp;
+		int mid, bootnode = 0;
 
-		for (node = firstchild(node); node; node = nextsibling(node)) {
-			cp = PROM_getpropstringA(node, "device_type",
+		/*
+		 * Configure all CPUs.
+		 * Make sure to configure the boot CPU as cpu0.
+		 */
+	rescan:
+		for (node = node0; node; node = nextsibling(node)) {
+			cp = prom_getpropstringA(node, "device_type",
 					    namebuf, sizeof namebuf);
-			if (strcmp(cp, "cpu") == 0) {
-				bzero(&ma, sizeof(ma));
-				ma.ma_bustag = &mainbus_space_tag;
-				ma.ma_dmatag = &mainbus_dma_tag;
-				ma.ma_node = node;
-				ma.ma_name = "cpu";
-				config_found(dev, (void *)&ma, mbprint);
+			if (strcmp(cp, "cpu") != 0)
+				continue;
+
+			mid = prom_getpropint(node, "mid", -1);
+			if (bootnode == 0) {
+				/* We're looking for the boot CPU */
+				if (bootmid != 0 && mid != bootmid)
+					continue;
+				bootnode = node;
+			} else {
+				if (node == bootnode)
+					continue;
+			}
+
+			bzero(&ma, sizeof(ma));
+			ma.ma_bustag = &mainbus_space_tag;
+			ma.ma_dmatag = &mainbus_dma_tag;
+			ma.ma_node = node;
+			ma.ma_name = "cpu";
+			config_found(dev, (void *)&ma, mbprint);
+			if (node == bootnode && bootmid != 0) {
+				/* Re-enter loop to find all remaining CPUs */
+				goto rescan;
 			}
 		}
 	} else if (CPU_ISSUN4C) {
 		bzero(&ma, sizeof(ma));
 		ma.ma_bustag = &mainbus_space_tag;
 		ma.ma_dmatag = &mainbus_dma_tag;
-		ma.ma_node = node;
+		ma.ma_node = findroot();
 		ma.ma_name = "cpu";
 		config_found(dev, (void *)&ma, mbprint);
 	}
-
-
-	node = findroot();	/* re-init root node */
-
-	/* Find the "options" node */
-	node0 = firstchild(node);
-	optionsnode = findnode(node0, "options");
-	if (optionsnode == 0)
-		panic("no options in OPENPROM");
 
 	for (ssp = openboot_special; *(sp = *ssp) != 0; ssp++) {
 		struct openprom_addr romreg;
@@ -1222,18 +1290,18 @@ extern struct sparc_bus_space_tag mainbus_space_tag;
 		bzero(&ma, sizeof ma);
 		ma.ma_bustag = &mainbus_space_tag;
 		ma.ma_dmatag = &mainbus_dma_tag;
-		ma.ma_name = PROM_getpropstringA(node, "name",
+		ma.ma_name = prom_getpropstringA(node, "name",
 					    namebuf, sizeof namebuf);
 		ma.ma_node = node;
-		if (PROM_getprop_reg1(node, &romreg) != 0)
+		if (prom_getprop_reg1(node, &romreg) != 0)
 			continue;
 
 		ma.ma_paddr = (bus_addr_t)
 			BUS_ADDR(romreg.oa_space, romreg.oa_base);
 		ma.ma_size = romreg.oa_size;
-		if (PROM_getprop_intr1(node, &ma.ma_pri) != 0)
+		if (prom_getprop_intr1(node, &ma.ma_pri) != 0)
 			continue;
-		if (PROM_getprop_address1(node, &ma.ma_promvaddr) != 0)
+		if (prom_getprop_address1(node, &ma.ma_promvaddr) != 0)
 			continue;
 
 		if (config_found(dev, (void *)&ma, mbprint) == NULL)
@@ -1252,13 +1320,13 @@ extern struct sparc_bus_space_tag mainbus_space_tag;
 		DPRINTF(ACDB_PROBE, ("Node: %x", node));
 #if defined(SUN4M)
 		if (CPU_ISSUN4M) {	/* skip the CPUs */
-			if (strcmp(PROM_getpropstringA(node, "device_type",
+			if (strcmp(prom_getpropstringA(node, "device_type",
 						  namebuf, sizeof namebuf),
 				   "cpu") == 0)
 				continue;
 		}
 #endif
-		cp = PROM_getpropstringA(node, "name", namebuf, sizeof namebuf);
+		cp = prom_getpropstringA(node, "name", namebuf, sizeof namebuf);
 		DPRINTF(ACDB_PROBE, (" name %s\n", namebuf));
 		for (ssp = openboot_special; (sp = *ssp) != NULL; ssp++)
 			if (strcmp(cp, sp) == 0)
@@ -1269,7 +1337,7 @@ extern struct sparc_bus_space_tag mainbus_space_tag;
 		bzero(&ma, sizeof ma);
 		ma.ma_bustag = &mainbus_space_tag;
 		ma.ma_dmatag = &mainbus_dma_tag;
-		ma.ma_name = PROM_getpropstringA(node, "name",
+		ma.ma_name = prom_getpropstringA(node, "name",
 					    namebuf, sizeof namebuf);
 		ma.ma_node = node;
 
@@ -1294,169 +1362,30 @@ extern struct sparc_bus_space_tag mainbus_space_tag;
 		}
 #endif /* SUN4M */
 
-		if (PROM_getprop_reg1(node, &romreg) != 0)
+		if (prom_getprop_reg1(node, &romreg) != 0)
 			continue;
 
 		ma.ma_paddr = BUS_ADDR(romreg.oa_space, romreg.oa_base);
 		ma.ma_size = romreg.oa_size;
 
-		if (PROM_getprop_intr1(node, &ma.ma_pri) != 0)
+		if (prom_getprop_intr1(node, &ma.ma_pri) != 0)
 			continue;
 
-		if (PROM_getprop_address1(node, &ma.ma_promvaddr) != 0)
+		if (prom_getprop_address1(node, &ma.ma_promvaddr) != 0)
 			continue;
 
 		(void) config_found(dev, (void *)&ma, mbprint);
 	}
-#endif /* SUN4C || SUN4M */
+#endif /* SUN4C || SUN4M || SUN4D */
 }
 
-struct cfattach mainbus_ca = {
-	sizeof(struct device), mainbus_match, mainbus_attach
-};
+CFATTACH_DECL(mainbus, sizeof(struct device),
+    mainbus_match, mainbus_attach, NULL, NULL);
 
 
+#if defined(SUN4C) || defined(SUN4M) || defined(SUN4D)
 int
-makememarr(ap, max, which)
-	struct memarr *ap;
-	int max, which;
-{
-	struct v2rmi {
-		int	zero;
-		int	addr;
-		int	len;
-	} v2rmi[200];		/* version 2 rom meminfo layout */
-#define	MAXMEMINFO ((int)sizeof(v2rmi) / (int)sizeof(*v2rmi))
-	void *p;
-
-	struct v0mlist *mp;
-	int i, node, len;
-	char *prop;
-
-	switch (prom_version()) {
-		struct promvec *promvec;
-		struct om_vector *oldpvec;
-	case PROM_OLDMON:
-		oldpvec = (struct om_vector *)PROM_BASE;
-		switch (which) {
-		case MEMARR_AVAILPHYS:
-			ap[0].addr = 0;
-			ap[0].len = *oldpvec->memoryAvail;
-			break;
-		case MEMARR_TOTALPHYS:
-			ap[0].addr = 0;
-			ap[0].len = *oldpvec->memorySize;
-			break;
-		default:
-			printf("pre_panic: makememarr");
-			break;
-		}
-		i = (1);
-		break;
-
-	case PROM_OBP_V0:
-		/*
-		 * Version 0 PROMs use a linked list to describe these
-		 * guys.
-		 */
-		promvec = romp;
-		switch (which) {
-		case MEMARR_AVAILPHYS:
-			mp = *promvec->pv_v0mem.v0_physavail;
-			break;
-
-		case MEMARR_TOTALPHYS:
-			mp = *promvec->pv_v0mem.v0_phystot;
-			break;
-
-		default:
-			panic("makememarr");
-		}
-		for (i = 0; mp != NULL; mp = mp->next, i++) {
-			if (i >= max)
-				goto overflow;
-			ap->addr = (u_int)mp->addr;
-			ap->len = mp->nbytes;
-			ap++;
-		}
-		break;
-
-	default:
-		printf("makememarr: hope version %d PROM is like version 2\n",
-			prom_version());
-		/* FALLTHROUGH */
-
-        case PROM_OBP_V3:
-	case PROM_OBP_V2:
-		/*
-		 * Version 2 PROMs use a property array to describe them.
-		 */
-
-		/* Consider emulating `OF_finddevice' */
-		node = findnode(firstchild(findroot()), "memory");
-		goto case_common;
-
-	case PROM_OPENFIRM:
-		node = OF_finddevice("/memory");
-		if (node == -1)
-		    node = 0;
-
-	case_common:
-		if (node == 0)
-			panic("makememarr: cannot find \"memory\" node");
-
-		if (max > MAXMEMINFO) {
-			printf("makememarr: limited to %d\n", MAXMEMINFO);
-			max = MAXMEMINFO;
-		}
-
-		switch (which) {
-		case MEMARR_AVAILPHYS:
-			prop = "available";
-			break;
-
-		case MEMARR_TOTALPHYS:
-			prop = "reg";
-			break;
-
-		default:
-			panic("makememarr");
-		}
-
-		len = MAXMEMINFO;
-		p = v2rmi;
-		if (PROM_getprop(node, prop, sizeof(struct v2rmi), &len, &p) != 0)
-			panic("makememarr: cannot get property");
-
-		for (i = 0; i < len; i++) {
-			if (i >= max)
-				goto overflow;
-			ap->addr = v2rmi[i].addr;
-			ap->len = v2rmi[i].len;
-			ap++;
-		}
-		break;
-	}
-
-	/*
-	 * Success!  (Hooray)
-	 */
-	if (i == 0)
-		panic("makememarr: no memory found");
-	return (i);
-
-overflow:
-	/*
-	 * Oops, there are more things in the PROM than our caller
-	 * provided space for.  Truncate any extras.
-	 */
-	printf("makememarr: WARNING: lost some memory\n");
-	return (i);
-}
-
-#if defined(SUN4C) || defined(SUN4M)
-int
-PROM_getprop_reg1(node, rrp)
+prom_getprop_reg1(node, rrp)
 	int node;
 	struct openprom_addr *rrp;
 {
@@ -1464,11 +1393,11 @@ PROM_getprop_reg1(node, rrp)
 	struct openprom_addr *rrp0 = NULL;
 	char buf[32];
 
-	error = PROM_getprop(node, "reg", sizeof(struct openprom_addr),
-			&n, (void **)&rrp0);
+	error = prom_getprop(node, "reg", sizeof(struct openprom_addr),
+			&n, &rrp0);
 	if (error != 0) {
 		if (error == ENOENT &&
-		    strcmp(PROM_getpropstringA(node, "device_type", buf, sizeof buf),
+		    strcmp(prom_getpropstringA(node, "device_type", buf, sizeof buf),
 			   "hierarchical") == 0) {
 			bzero(rrp, sizeof(struct openprom_addr));
 			error = 0;
@@ -1482,15 +1411,15 @@ PROM_getprop_reg1(node, rrp)
 }
 
 int
-PROM_getprop_intr1(node, ip)
+prom_getprop_intr1(node, ip)
 	int node;
 	int *ip;
 {
 	int error, n;
 	struct rom_intr *rip = NULL;
 
-	error = PROM_getprop(node, "intr", sizeof(struct rom_intr),
-			&n, (void **)&rip);
+	error = prom_getprop(node, "intr", sizeof(struct rom_intr),
+			&n, &rip);
 	if (error != 0) {
 		if (error == ENOENT) {
 			*ip = 0;
@@ -1505,14 +1434,14 @@ PROM_getprop_intr1(node, ip)
 }
 
 int
-PROM_getprop_address1(node, vpp)
+prom_getprop_address1(node, vpp)
 	int node;
 	void **vpp;
 {
 	int error, n;
 	void **vp = NULL;
 
-	error = PROM_getprop(node, "address", sizeof(u_int32_t), &n, (void **)&vp);
+	error = prom_getprop(node, "address", sizeof(u_int32_t), &n, &vp);
 	if (error != 0) {
 		if (error == ENOENT) {
 			*vpp = 0;
@@ -1525,7 +1454,7 @@ PROM_getprop_address1(node, vpp)
 	free(vp, M_DEVBUF);
 	return (0);
 }
-#endif
+#endif /* SUN4C || SUN4M || SUN4D */
 
 #ifdef RASTERCONSOLE
 /*
@@ -1555,7 +1484,7 @@ romgetcursoraddr(rowp, colp)
 	prom_interpret(buf);
 	return (*rowp == NULL || *colp == NULL);
 }
-#endif
+#endif /* RASTERCONSOLE */
 
 /*
  * find a device matching "name" and unit number
@@ -1671,14 +1600,14 @@ static int
 bus_class(dev)
 	struct device *dev;
 {
-	char *name;
+	const char *name;
 	int i, class;
 
 	class = BUSCLASS_NONE;
 	if (dev == NULL)
 		return (class);
 
-	name = dev->dv_cfdata->cf_driver->cd_name;
+	name = dev->dv_cfdata->cf_name;
 	for (i = sizeof(bus_class_tab)/sizeof(bus_class_tab[0]); i-- > 0;) {
 		if (strcmp(name, bus_class_tab[i].name) == 0) {
 			class = bus_class_tab[i].class;
@@ -1826,7 +1755,8 @@ device_register(dev, aux)
 	void *aux;
 {
 	struct bootpath *bp = bootpath_store(0, NULL);
-	char *dvname, *bpname;
+	const char *dvname;
+	char *bpname;
 
 	/*
 	 * If device name does not match current bootpath component
@@ -1839,7 +1769,7 @@ device_register(dev, aux)
 	 * Translate PROM name in case our drivers are named differently
 	 */
 	bpname = bus_compatible(bp->name);
-	dvname = dev->dv_cfdata->cf_driver->cd_name;
+	dvname = dev->dv_cfdata->cf_name;
 
 	DPRINTF(ACDB_BOOTDEV,
 	    ("\n%s: device_register: dvname %s(%s) bpname %s(%s)\n",
@@ -1999,7 +1929,7 @@ lookup_bootinfo(type)
 	return (NULL);
 }
 
-#ifndef DDB
+#if !NKSYMS && !defined(DDB) && !defined(LKM)
 /*
  * Move bootinfo from the current kernel top to the proposed
  * location. As a side-effect, `kernel_top' is adjusted to point

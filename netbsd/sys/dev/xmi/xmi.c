@@ -1,4 +1,4 @@
-/*	$NetBSD: xmi.c,v 1.2 2001/11/13 06:08:32 lukem Exp $	*/
+/*	$NetBSD: xmi.c,v 1.5 2003/04/01 02:08:01 thorpej Exp $	*/
 
 /*
  * Copyright (c) 2000 Ludd, University of Lule}, Sweden. All rights reserved.
@@ -35,11 +35,13 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: xmi.c,v 1.2 2001/11/13 06:08:32 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: xmi.c,v 1.5 2003/04/01 02:08:01 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
 #include <machine/cpu.h>
@@ -71,13 +73,13 @@ xmi_print(void *aux, const char *name)
 
 	if (name) {
 		if (xl->xl_nr == 0)
-			printf("unknown device 0x%x",
+			aprint_normal("unknown device 0x%x",
 			    bus_space_read_2(xa->xa_iot, xa->xa_ioh, 0));
 		else
-			printf(xl->xl_name);
-		printf(" at %s", name);
+			aprint_normal(xl->xl_name);
+		aprint_normal(" at %s", name);
 	}
-	printf(" node %d", xa->xa_nodenr);
+	aprint_normal(" node %d", xa->xa_nodenr);
 	return xl->xl_havedriver ? UNCONF : UNSUPP;
 }
 
@@ -105,13 +107,13 @@ xmi_attach(struct xmi_softc *sc)
 	 */
 	for (nodenr = 0; nodenr < NNODEXMI; nodenr++) {
 		if (bus_space_map(sc->sc_iot, sc->sc_addr + XMI_NODE(nodenr),
-		    NBPG, 0, &xa.xa_ioh)) {
+		    PAGE_SIZE, 0, &xa.xa_ioh)) {
 			printf("xmi_attach: bus_space_map failed, node %d\n", 
 			    nodenr);
 			return;
 		}
 		if (badaddr((caddr_t)xa.xa_ioh, 4)) {
-			bus_space_unmap(sc->sc_iot, xa.xa_ioh, NBPG);
+			bus_space_unmap(sc->sc_iot, xa.xa_ioh, PAGE_SIZE);
 			continue;
 		}
 		xa.xa_nodenr = nodenr;

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_sn_obio.c,v 1.19 1999/09/29 06:14:03 scottr Exp $	*/
+/*	$NetBSD: if_sn_obio.c,v 1.23 2003/07/15 02:43:25 lukem Exp $	*/
 
 /*
  * Copyright (C) 1997 Allen Briggs
@@ -30,6 +30,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_sn_obio.c,v 1.23 2003/07/15 02:43:25 lukem Exp $");
+
 #include "opt_inet.h"
 
 #include <sys/param.h>
@@ -39,6 +42,8 @@
 #include <sys/socket.h>
 #include <sys/syslog.h>
 #include <sys/systm.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <net/if.h>
 #include <net/if_ether.h>
@@ -66,9 +71,8 @@ static void	sn_obio_attach __P((struct device *, struct device *, void *));
 static int	sn_obio_getaddr __P((struct sn_softc *, u_int8_t *));
 static int	sn_obio_getaddr_kludge __P((struct sn_softc *, u_int8_t *));
 
-struct cfattach sn_obio_ca = {
-	sizeof(struct sn_softc), sn_obio_match, sn_obio_attach
-};
+CFATTACH_DECL(sn_obio, sizeof(struct sn_softc),
+    sn_obio_match, sn_obio_attach, NULL, NULL);
 
 static int
 sn_obio_match(parent, cf, aux)
@@ -202,20 +206,20 @@ sn_obio_getaddr(sc, lladdr)
 {
 	bus_space_handle_t bsh;
 
-	if (bus_space_map(sc->sc_regt, SONIC_PROM_BASE, NBPG, 0, &bsh)) {
+	if (bus_space_map(sc->sc_regt, SONIC_PROM_BASE, PAGE_SIZE, 0, &bsh)) {
 		printf(": failed to map space to read SONIC address.\n%s",
 		    sc->sc_dev.dv_xname);
 		return (-1);
 	}
 
 	if (!mac68k_bus_space_probe(sc->sc_regt, bsh, 0, 1)) {
-		bus_space_unmap(sc->sc_regt, bsh, NBPG);
+		bus_space_unmap(sc->sc_regt, bsh, PAGE_SIZE);
 		return (-1);
 	}
 
 	sn_get_enaddr(sc->sc_regt, bsh, 0, lladdr);
 
-	bus_space_unmap(sc->sc_regt, bsh, NBPG);
+	bus_space_unmap(sc->sc_regt, bsh, PAGE_SIZE);
 
 	return 0;
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_subr.c,v 1.23 2001/09/11 20:37:13 chs Exp $	*/
+/*	$NetBSD: bus_subr.c,v 1.25 2003/07/15 03:36:19 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * bus_xxx support functions, Sun3X-specific part.
  * The common stuff is in autoconf.c
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: bus_subr.c,v 1.25 2003/07/15 03:36:19 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -125,7 +128,7 @@ void bus_tmapout(vp)
 		return;
 
 	s = splvm();
-	pmap_kremove(pgva, NBPG);
+	pmap_kremove(pgva, PAGE_SIZE);
 	pmap_update(pmap_kernel());
 	--tmp_vpages_inuse;
 	splx(s);

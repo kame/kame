@@ -1,4 +1,4 @@
-/*	$NetBSD: bus.h,v 1.2 2002/03/17 21:45:08 simonb Exp $	*/
+/*	$NetBSD: bus.h,v 1.5 2003/06/15 23:09:03 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 2000, 2001 The NetBSD Foundation, Inc.
@@ -329,7 +329,7 @@ static __TYPENAME(BITS)							\
 PREFIX##_read_##BYTES(void *tag, bus_space_handle_t bsh,		\
     bus_size_t offset)							\
 {									\
-	return __read_##BYTES##(VADDR(bsh, offset));			\
+	return __read_##BYTES(VADDR(bsh, offset));			\
 }
 
 #define _BUS_SPACE_READ_MULTI(PREFIX, BYTES, BITS)			\
@@ -342,7 +342,7 @@ PREFIX##_read_multi_##BYTES(void *tag, bus_space_handle_t bsh,		\
 {									\
 	bus_addr_t a = VADDR(bsh, offset);				\
 	while (count--)							\
-		*addr++ = __read_##BYTES##(a);				\
+		*addr++ = __read_##BYTES(a);				\
 }
 
 #define _BUS_SPACE_READ_REGION(PREFIX, BYTES, BITS)			\
@@ -354,7 +354,7 @@ PREFIX##_read_region_##BYTES(void *tag, bus_space_handle_t bsh,		\
     bus_size_t offset, __TYPENAME(BITS) *addr, bus_size_t count)	\
 {									\
 	while (count--) {						\
-		*addr++ = __read_##BYTES##(VADDR(bsh, offset));		\
+		*addr++ = __read_##BYTES(VADDR(bsh, offset));		\
 		offset += BYTES;					\
 	}								\
 }
@@ -367,7 +367,7 @@ static void								\
 PREFIX##_write_##BYTES(void *tag, bus_space_handle_t bsh,		\
     bus_size_t offset, __TYPENAME(BITS) value)				\
 {									\
-	__write_##BYTES##(VADDR(bsh, offset), value);			\
+	__write_##BYTES(VADDR(bsh, offset), value);			\
 }
 
 #define _BUS_SPACE_WRITE_MULTI(PREFIX, BYTES, BITS)			\
@@ -380,7 +380,7 @@ PREFIX##_write_multi_##BYTES(void *tag, bus_space_handle_t bsh,		\
 {									\
 	bus_addr_t a = VADDR(bsh, offset);				\
 	while (count--) {						\
-		__write_##BYTES##(a, *addr++);				\
+		__write_##BYTES(a, *addr++);				\
 	}								\
 }
 
@@ -393,7 +393,7 @@ PREFIX##_write_region_##BYTES(void *tag, bus_space_handle_t bsh,	\
     bus_size_t offset, const __TYPENAME(BITS) *addr, bus_size_t count)	\
 {									\
 	while (count--) {						\
-		__write_##BYTES##(VADDR(bsh, offset), *addr++);		\
+		__write_##BYTES(VADDR(bsh, offset), *addr++);		\
 		offset += BYTES;					\
 	}								\
 }
@@ -408,7 +408,7 @@ PREFIX##_set_multi_##BYTES(void *tag, bus_space_handle_t bsh,		\
 {									\
 	bus_addr_t a = VADDR(bsh, offset);				\
 	while (count--) {						\
-		__write_##BYTES##(a, value);				\
+		__write_##BYTES(a, value);				\
 	}								\
 }
 
@@ -421,7 +421,7 @@ PREFIX##_set_region_##BYTES(void *tag, bus_space_handle_t bsh,		\
     bus_size_t offset, __TYPENAME(BITS) value, bus_size_t count)	\
 {									\
 	while (count--) {						\
-		__write_##BYTES##(VADDR(bsh, offset), value);		\
+		__write_##BYTES(VADDR(bsh, offset), value);		\
 		offset += BYTES;					\
 	}								\
 }
@@ -438,13 +438,13 @@ PREFIX##_copy_region_##BYTES(void *t, bus_space_handle_t h1,		\
 	if ((h1 + o1) >= (h2 + o2)) {					\
 		/* src after dest: copy forward */			\
 		for (o = 0; c != 0; c--, o += BYTES)			\
-			__write_##BYTES##(VADDR(h2, o2 + o),		\
-			    __read_##BYTES##(VADDR(h1, o1 + o)));	\
+			__write_##BYTES(VADDR(h2, o2 + o),		\
+			    __read_##BYTES(VADDR(h1, o1 + o)));	\
 	} else {							\
 		/* dest after src: copy backwards */			\
 		for (o = (c - 1) * BYTES; c != 0; c--, o -= BYTES)	\
-			__write_##BYTES##(VADDR(h2, o2 + o),		\
-			    __read_##BYTES##(VADDR(h1, o1 + o)));	\
+			__write_##BYTES(VADDR(h2, o2 + o),		\
+			    __read_##BYTES(VADDR(h1, o1 + o)));	\
 	}								\
 }
 
@@ -736,6 +736,7 @@ void bus_space_destroy(bus_space_tag_t);
 #define	BUS_DMA_BUS4		0x080
 #define	BUS_DMA_READ		0x100	/* mapping is device -> memory only */
 #define	BUS_DMA_WRITE		0x200	/* mapping is memory -> device only */
+#define	BUS_DMA_NOCACHE		0x400	/* hint: map non-cached memory */
 
 #define	PLAYSTATION2_DMAMAP_COHERENT	0x10000	/* no cache flush necessary on sync */
 
@@ -753,6 +754,8 @@ struct uio;
 
 typedef struct playstation2_bus_dma_tag		*bus_dma_tag_t;
 typedef struct playstation2_bus_dmamap		*bus_dmamap_t;
+
+#define BUS_DMA_TAG_VALID(t)    ((t) != (bus_dma_tag_t)0)
 
 /*
  *	bus_dma_segment_t

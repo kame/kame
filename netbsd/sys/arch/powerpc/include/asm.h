@@ -1,4 +1,4 @@
-/*	$NetBSD: asm.h,v 1.8 2001/06/13 06:01:48 simonb Exp $	*/
+/*	$NetBSD: asm.h,v 1.15 2003/08/08 07:14:26 matt Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -69,6 +69,8 @@
 #endif
 
 #define	ENTRY(y)	_ENTRY(_C_LABEL(y)); _PROF_PROLOGUE
+#define	ENTRY_NOPROFILE(y) _ENTRY(_C_LABEL(y))
+
 #define	ASENTRY(y)	_ENTRY(_ASM_LABEL(y)); _PROF_PROLOGUE
 #define	GLOBAL(y)	_GLOBAL(_C_LABEL(y))
 
@@ -90,8 +92,48 @@
 	.section .gnu.warning./**/_sym ; .ascii _msg ; .text
 #endif /* __STDC__ */
 
+#ifdef _KERNEL
+/*
+ * Get cpu_info pointer for current processor.  Always in SPRG0. *ALWAYS*
+ */
+#define	GET_CPUINFO(r)		mfsprg r,0
+/*
+ * IN:
+ *	R4[er] = first free byte beyond end/esym.
+ *
+ * OUT:
+ *	R1[sp] = new kernel stack
+ *	R4[er] = kernelend
+ */
+
+#define	INIT_CPUINFO(er,sp,tmp1,tmp2) 					\
+	li	tmp1,PGOFSET;						\
+	add	er,er,tmp1;						\
+	andc	er,er,tmp1;		/* page align */		\
+	lis	tmp1,_C_LABEL(cpu_info)@ha;				\
+	addi	tmp1,tmp1,_C_LABEL(cpu_info)@l;				\
+	mtsprg0	tmp1;			/* save for later use */	\
+	addi	er,er,INTSTK;						\
+	stptr	er,CI_INTSTK(tmp1);					\
+	stptr	er,CI_IDLE_PCB(tmp1);					\
+	addi	er,er,USPACE;		/* space for idle_u */		\
+	li	tmp2,-1;						\
+	stint	tmp2,CI_INTRDEPTH(tmp1);				\
+	li	tmp2,0;							\
+	stptr	tmp2,-CALLFRAMELEN(er);	/* terminate idle stack chain */\
+	lis	tmp1,_C_LABEL(proc0paddr)@ha;				\
+	stptr	er,_C_LABEL(proc0paddr)@l(tmp1);			\
+	addi	er,er,USPACE;		/* stackpointer for proc0 */	\
+	addi	sp,er,-FRAMELEN;	/* stackpointer for proc0 */	\
+		/* er = end of mem reserved for kernel */		\
+	stptru	tmp2,-CALLFRAMELEN(sp)	/* end of stack chain */
+
+#endif
+
 /* Condition Register Bit Fields */
 
+#if !defined(_NOREGNAMES)
+#if defined(_KERNEL) || defined(_STANDALONE)
 #define cr0     0
 #define cr1     1
 #define cr2     2
@@ -100,9 +142,11 @@
 #define cr5     5
 #define cr6     6
 #define cr7     7
+#endif
 
 /* General Purpose Registers (GPRs) */
 
+#if defined(_KERNEL) || defined(_STANDALONE)
 #define r0      0
 #define r1      1
 #define r2      2
@@ -135,9 +179,11 @@
 #define r29     29
 #define r30     30
 #define r31     31
+#endif
 
 /* Floating Point Registers (FPRs) */
 
+#if defined(_KERNEL) || defined(_STANDALONE)
 #define fr0     0
 #define fr1     1
 #define fr2     2
@@ -170,5 +216,48 @@
 #define fr29    29
 #define fr30    30
 #define fr31    31
+#endif
+#endif /* !_NOREGNAMES */
+
+/*
+ * Add some psuedo instructions to made sharing of assembly versions of
+ * ILP32 and LP64 code possible.
+ */
+#define ldint	lwz		/* not needed but for completeness */
+#define ldintu	lwzu		/* not needed but for completeness */
+#define stint	stw		/* not needed but for completeness */
+#define stintu	stwu		/* not needed but for completeness */
+#ifndef _LP64
+#define ldlong	lwz		/* load "C" long */
+#define ldlongu	lwzu		/* load "C" long with udpate */
+#define stlong	stw		/* load "C" long */
+#define stlongu	stwu		/* load "C" long with udpate */
+#define ldptr	lwz		/* load "C" pointer */
+#define ldptru	lwzu		/* load "C" pointer with udpate */
+#define stptr	stw		/* load "C" pointer */
+#define stptru	stwu		/* load "C" pointer with udpate */
+#define	ldreg	lwz		/* load PPC general register */
+#define	ldregu	lwzu		/* load PPC general register with udpate */
+#define	streg	stw		/* load PPC general register */
+#define	stregu	stwu		/* load PPC general register with udpate */
+#define	SZREG	4		/* 4 byte registers */
+#else
+#define ldlong	ld		/* load "C" long */
+#define ldlongu	ldu		/* load "C" long with update */
+#define stlong	std		/* store "C" long */
+#define stlongu	stdu		/* store "C" long with update */
+#define ldptr	ld		/* load "C" pointer */
+#define ldptru	ldu		/* load "C" pointer with update */
+#define stptr	std		/* store "C" pointer */
+#define stptru	stdu		/* store "C" pointer with update */
+#define	ldreg	ld		/* load PPC general register */
+#define	ldregu	ldu		/* load PPC general register with update */
+#define	streg	std		/* store PPC general register */
+#define	stregu	stdu		/* store PPC general register with update */
+/* redefined this to force an error on PPC64 to catch their use.  */
+#define	lmw	lmd		/* load multiple PPC general registers */
+#define	stmw	stmd		/* store multiple PPC general registers */
+#define	SZREG	8		/* 8 byte registers */
+#endif
 
 #endif /* !_PPC_ASM_H_ */

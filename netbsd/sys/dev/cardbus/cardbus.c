@@ -1,4 +1,4 @@
-/*	$NetBSD: cardbus.c,v 1.40 2001/11/23 10:20:47 enami Exp $	*/
+/*	$NetBSD: cardbus.c,v 1.47.4.1 2004/07/23 22:15:16 he Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999 and 2000
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cardbus.c,v 1.40 2001/11/23 10:20:47 enami Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cardbus.c,v 1.47.4.1 2004/07/23 22:15:16 he Exp $");
 
 #include "opt_cardbus.h"
 
@@ -87,9 +87,8 @@ static int cardbus_read_tuples(struct cardbus_attach_args *,
 static void enable_function(struct cardbus_softc *, int, int);
 static void disable_function(struct cardbus_softc *, int);
 
-struct cfattach cardbus_ca = {
-	sizeof(struct cardbus_softc), cardbusmatch, cardbusattach
-};
+CFATTACH_DECL(cardbus, sizeof(struct cardbus_softc),
+    cardbusmatch, cardbusattach, NULL, NULL);
 
 #ifndef __NetBSD_Version__
 struct cfdriver cardbus_cd = {
@@ -103,9 +102,9 @@ cardbusmatch(struct device *parent, struct cfdata *cf, void *aux)
 {
 	struct cbslot_attach_args *cba = aux;
 
-	if (strcmp(cba->cba_busname, cf->cf_driver->cd_name)) {
+	if (strcmp(cba->cba_busname, cf->cf_name)) {
 		DPRINTF(("cardbusmatch: busname differs %s <=> %s\n",
-		    cba->cba_busname, cf->cf_driver->cd_name));
+		    cba->cba_busname, cf->cf_name));
 		return (0);
 	}
 
@@ -235,8 +234,7 @@ cardbus_read_tuples(struct cardbus_attach_args *ca, cardbusreg_t cis_ptr,
 			    &rom_image))
 				goto out;
 
-			for (p = SIMPLEQ_FIRST(&rom_image); p != NULL;
-			    p = SIMPLEQ_NEXT(p, next)) {
+			SIMPLEQ_FOREACH(p, &rom_image, next) {
 				if (p->rom_image ==
 				    CARDBUS_CIS_ASI_ROM_IMAGE(cis_ptr)) {
 					bus_space_read_region_1(p->romt,
@@ -247,7 +245,7 @@ cardbus_read_tuples(struct cardbus_attach_args *ca, cardbusreg_t cis_ptr,
 				break;
 			}
 			while ((p = SIMPLEQ_FIRST(&rom_image)) != NULL) {
-				SIMPLEQ_REMOVE_HEAD(&rom_image, p, next);
+				SIMPLEQ_REMOVE_HEAD(&rom_image, next);
 				free(p, M_DEVBUF);
 			}
 		out:
@@ -537,13 +535,15 @@ cardbus_attach_card(struct cardbus_softc *sc)
 
 		ca.ca_intrline = sc->sc_intrline;
 
-		if (cardbus_read_tuples(&ca, cis_ptr, tuple, sizeof(tuple))) {
-			printf("cardbus_attach_card: failed to read CIS\n");
-		} else {
+		if (cis_ptr != 0) {
+			if (cardbus_read_tuples(&ca, cis_ptr, tuple, sizeof(tuple))) {
+				printf("cardbus_attach_card: failed to read CIS\n");
+			} else {
 #ifdef CARDBUS_DEBUG
-			decode_tuples(tuple, 2048, print_tuple, NULL);
+				decode_tuples(tuple, 2048, print_tuple, NULL);
 #endif
-			decode_tuples(tuple, 2048, parse_tuple, &ca.ca_cis);
+				decode_tuples(tuple, 2048, parse_tuple, &ca.ca_cis);
+			}
 		}
 
 		if ((csc = config_found_sm((void *)sc, &ca, cardbusprint,
@@ -582,7 +582,7 @@ cardbussubmatch(struct device *parent, struct cfdata *cf, void *aux)
 		return (0);
 	}
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 static int
@@ -598,18 +598,15 @@ cardbusprint(void *aux, const char *pnp)
 			if (ca->ca_cis.cis1_info[i] == NULL)
 				break;
 			if (i)
-				printf(", ");
-			printf("%s", ca->ca_cis.cis1_info[i]);
+				aprint_normal(", ");
+			aprint_normal("%s", ca->ca_cis.cis1_info[i]);
 		}
-		if (bootverbose) {
-			if (i)
-				printf(" ");
-			printf("(manufacturer 0x%x, product 0x%x)",
-			       ca->ca_cis.manufacturer, ca->ca_cis.product);
-		}
-		printf(" %s at %s", devinfo, pnp);
+		aprint_verbose("%s(manufacturer 0x%x, product 0x%x)",
+		       i ? " " : "",
+		       ca->ca_cis.manufacturer, ca->ca_cis.product);
+		aprint_normal(" %s at %s", devinfo, pnp);
 	}
-	printf(" dev %d function %d", ca->ca_device, ca->ca_function);
+	aprint_normal(" dev %d function %d", ca->ca_device, ca->ca_function);
 
 	return (UNCONF);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: disklabel.h,v 1.70.4.3 2003/09/09 20:07:50 tron Exp $	*/
+/*	$NetBSD: disklabel.h,v 1.88 2003/11/14 12:07:42 lukem Exp $	*/
 
 /*
  * Copyright (c) 1987, 1988, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 
 #ifndef _SYS_DISKLABEL_H_
-#define _SYS_DISKLABEL_H_
+#define	_SYS_DISKLABEL_H_
 
 /*
  * We need <machine/types.h> for __HAVE_OLD_DISKLABEL
@@ -92,7 +88,7 @@
 #define	MAKEDISKDEV(maj, unit, part) \
     (makedev((maj), DISKMINOR((unit), (part))))
 
-#define DISKMAGIC	((u_int32_t)0x82564557)	/* The disk magic number */
+#define	DISKMAGIC	((u_int32_t)0x82564557)	/* The disk magic number */
 
 #ifndef _LOCORE
 struct disklabel {
@@ -116,9 +112,9 @@ struct disklabel {
 			char *un_d_boot1;	/* secondary bootstrap name */
 		} un_b;
 	} d_un;
-#define d_packname	d_un.un_d_packname
-#define d_boot0		d_un.un_b.un_d_boot0
-#define d_boot1		d_un.un_b.un_d_boot1
+#define	d_packname	d_un.un_d_packname
+#define	d_boot0		d_un.un_b.un_d_boot0
+#define	d_boot1		d_un.un_b.un_d_boot1
 
 			/* disk geometry: */
 	u_int32_t d_secsize;		/* # of bytes per sector */
@@ -166,9 +162,9 @@ struct disklabel {
 	u_int32_t d_headswitch;		/* head switch time, usec */
 	u_int32_t d_trkseek;		/* track-to-track seek, usec */
 	u_int32_t d_flags;		/* generic flags */
-#define NDDATA 5
+#define	NDDATA 5
 	u_int32_t d_drivedata[NDDATA];	/* drive-type specific information */
-#define NSPARE 5
+#define	NSPARE 5
 	u_int32_t d_spare[NSPARE];	/* reserved for future use */
 	u_int32_t d_magic2;		/* the magic number (again) */
 	u_int16_t d_checksum;		/* xor of data incl. partitions */
@@ -180,7 +176,13 @@ struct disklabel {
 	struct	partition {		/* the partition table */
 		u_int32_t p_size;	/* number of sectors in partition */
 		u_int32_t p_offset;	/* starting sector */
-		u_int32_t p_fsize;	/* filesystem basic fragment size */
+		union {
+			u_int32_t fsize; /* FFS, ADOS:
+					    filesystem basic fragment size */
+			u_int32_t cdsession; /* ISO9660: session offset */
+		} __partition_u2;
+#define	p_fsize		__partition_u2.fsize
+#define	p_cdsession	__partition_u2.cdsession
 		u_int8_t p_fstype;	/* filesystem type, see below */
 		u_int8_t p_frag;	/* filesystem fragments per block */
 		union {
@@ -235,7 +237,10 @@ struct olddisklabel {
 	struct	opartition {
 		u_int32_t p_size;
 		u_int32_t p_offset;
-		u_int32_t p_fsize;
+		union {
+			u_int32_t fsize;
+			u_int32_t cdsession;
+		} __partition_u2;
 		u_int8_t p_fstype;
 		u_int8_t p_frag;
 		union {
@@ -270,11 +275,12 @@ struct olddisklabel {
 #define	DTYPE_FLOPPY		10		/* floppy */
 #define	DTYPE_CCD		11		/* concatenated disk device */
 #define	DTYPE_VND		12		/* vnode pseudo-disk */
-#define DTYPE_ATAPI		13		/* ATAPI */
+#define	DTYPE_ATAPI		13		/* ATAPI */
 #define	DTYPE_RAID		14		/* RAIDframe */
 #define	DTYPE_LD		15		/* logical disk */
 #define	DTYPE_JFS2		16		/* IBM JFS2 */
-#define DTYPE_CGD		17		/* cryptographic pseudo-disk */
+#define	DTYPE_CGD		17		/* cryptographic pseudo-disk */
+#define	DTYPE_VINUM		18		/* vinum volume */
 
 #ifdef DKTYPENAMES
 static const char *const dktypenames[] = {
@@ -296,15 +302,18 @@ static const char *const dktypenames[] = {
 	"ld",
 	"jfs",
 	"cgd",
+	"vinum",
 	NULL
 };
-#define DKMAXTYPES	(sizeof(dktypenames) / sizeof(dktypenames[0]) - 1)
+#define	DKMAXTYPES	(sizeof(dktypenames) / sizeof(dktypenames[0]) - 1)
 #endif
 
 /*
  * Filesystem type and version.
  * Used to interpret other filesystem-specific
  * per-partition information.
+ *
+ * These are used only for COMPAT_09 support.
  */
 #define	FS_UNUSED	0		/* unused */
 #define	FS_SWAP		1		/* swap */
@@ -328,8 +337,11 @@ static const char *const dktypenames[] = {
 #define	FS_RAID		19		/* RAIDframe component */
 #define	FS_CCD		20		/* concatenated disk component */
 #define	FS_JFS2		21		/* IBM JFS2 */
+#define	FS_APPLEUFS	22		/* Apple UFS */
+/* XXX this is not the same as FreeBSD.  How to solve? */
+#define	FS_VINUM	23		/* Vinum */
 
-/* Adjust the FSMAXTYPES def below if you add something after JFS2 */
+/* Adjust the FSMAXTYPES def below if you add something after APPLEUFS */
 
 #ifdef	FSTYPENAMES
 static const char *const fstypenames[] = {
@@ -355,11 +367,13 @@ static const char *const fstypenames[] = {
 	"RAID",
 	"ccd",
 	"jfs",
+	"Apple UFS",
+	"vinum",
 	NULL
 };
-#define FSMAXTYPES	(sizeof(fstypenames) / sizeof(fstypenames[0]) - 1)
+#define	FSMAXTYPES	(sizeof(fstypenames) / sizeof(fstypenames[0]) - 1)
 #else
-#define FSMAXTYPES	(FS_JFS2 + 1)
+#define	FSMAXTYPES	(FS_VINUM + 1)
 #endif
 
 #ifdef FSCKNAMES
@@ -387,9 +401,10 @@ static const char *const fscknames[] = {
 	NULL,		/* RAID Component */
 	NULL,		/* concatenated disk component */
 	NULL,		/* IBM JFS2 */
+	"ffs",		/* Apple UFS */
 	NULL		/* NULL */
 };
-#define FSMAXNAMES	(sizeof(fscknames) / sizeof(fscknames[0]) - 1)
+#define	FSMAXNAMES	(sizeof(fscknames) / sizeof(fscknames[0]) - 1)
 
 #endif
 
@@ -418,9 +433,10 @@ static const char *const mountnames[] = {
 	NULL,		/* RAID Component */
 	NULL,		/* concatenated disk component */
 	NULL,		/* IBM JFS2 */
+	"ffs",		/* Apple UFS */
 	NULL		/* NULL */
 };
-#define FSMAXMOUNTNAMES	(sizeof(mountnames) / sizeof(mountnames[0]) - 1)
+#define	FSMAXMOUNTNAMES	(sizeof(mountnames) / sizeof(mountnames[0]) - 1)
 
 #endif
 
@@ -445,8 +461,8 @@ static const char *const mountnames[] = {
 /*
  * Drive data for ST506.
  */
-#define d_precompcyl	d_drivedata[0]
-#define d_gap3		d_drivedata[1]		/* used only when formatting */
+#define	d_precompcyl	d_drivedata[0]
+#define	d_gap3		d_drivedata[1]		/* used only when formatting */
 
 /*
  * Drive data for SCSI.
@@ -457,7 +473,7 @@ static const char *const mountnames[] = {
 /*
  * Structure used to perform a format or other raw operation,
  * returning data and/or register values.  Register identification
- * and format are device- and driver-dependent.
+ * and format are device- and driver-dependent. Currently unused.
  */
 struct format_op {
 	char	*df_buf;
@@ -476,21 +492,20 @@ struct partinfo {
 };
 
 #ifdef _KERNEL
-struct buf_queue;
+
+struct disk;
 
 void	 diskerr __P((const struct buf *, const char *, const char *, int,
 	    int, const struct disklabel *));
-void	 disksort_cylinder __P((struct buf_queue *, struct buf *));
-void	 disksort_blkno __P((struct buf_queue *, struct buf *));
-void	 disksort_tail __P((struct buf_queue *, struct buf *));
 u_int	 dkcksum __P((struct disklabel *));
 int	 setdisklabel __P((struct disklabel *, struct disklabel *, u_long,
 	    struct cpu_disklabel *));
-char	*readdisklabel __P((dev_t, void (*)(struct buf *), struct disklabel *,
-	    struct cpu_disklabel *));
+const char *readdisklabel __P((dev_t, void (*)(struct buf *),
+	    struct disklabel *, struct cpu_disklabel *));
 int	 writedisklabel __P((dev_t, void (*)(struct buf *), struct disklabel *,
 	    struct cpu_disklabel *));
-int	 bounds_check_with_label __P((struct buf *, struct disklabel *, int));
+int	 bounds_check_with_label __P((struct disk *, struct buf *, int));
+int	 bounds_check_with_mediasize __P((struct buf *, int, u_int64_t));
 #endif
 #endif /* _LOCORE */
 

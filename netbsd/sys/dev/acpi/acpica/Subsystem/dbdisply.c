@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbdisply - debug display commands
- *              xRevision: 50 $
+ *              xRevision: 100 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999, 2000, 2001, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -114,25 +114,25 @@
  *
  *****************************************************************************/
 
+
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: dbdisply.c,v 1.3 2001/11/13 13:01:58 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dbdisply.c,v 1.12 2004/02/14 16:57:24 kochi Exp $");
 
 #include "acpi.h"
-#include "acparser.h"
 #include "amlcode.h"
 #include "acdispat.h"
 #include "acnamesp.h"
 #include "acparser.h"
-#include "acevents.h"
 #include "acinterp.h"
 #include "acdebug.h"
+#include "acdisasm.h"
 
 
-#ifdef ENABLE_DEBUGGER
+#ifdef ACPI_DEBUGGER
 
 
-#define _COMPONENT          ACPI_DEBUGGER
-        MODULE_NAME         ("dbdisply")
+#define _COMPONENT          ACPI_CA_DEBUGGER
+        ACPI_MODULE_NAME    ("dbdisply")
 
 
 /******************************************************************************
@@ -147,14 +147,14 @@ __KERNEL_RCSID(0, "$NetBSD: dbdisply.c,v 1.3 2001/11/13 13:01:58 lukem Exp $");
  *
  *****************************************************************************/
 
-static void *
+void *
 AcpiDbGetPointer (
     void                    *Target)
 {
     void                    *ObjPtr;
 
 
-#ifdef _IA16
+#if ACPI_MACHINE_WIDTH == 16
 #include <stdio.h>
 
     /* Have to handle 16-bit pointers of the form segment:offset */
@@ -169,8 +169,7 @@ AcpiDbGetPointer (
 
     /* Simple flat pointer */
 
-    ObjPtr = (void *) STRTOUL (Target, NULL, 16);
-
+    ObjPtr = ACPI_TO_POINTER (ACPI_STRTOUL (Target, NULL, 16));
 #endif
 
     return (ObjPtr);
@@ -189,23 +188,23 @@ AcpiDbGetPointer (
  *
  ******************************************************************************/
 
-static void
+void
 AcpiDbDumpParserDescriptor (
     ACPI_PARSE_OBJECT       *Op)
 {
     const ACPI_OPCODE_INFO  *Info;
 
 
-    Info = AcpiPsGetOpcodeInfo (Op->Opcode);
+    Info = AcpiPsGetOpcodeInfo (Op->Common.AmlOpcode);
 
     AcpiOsPrintf ("Parser Op Descriptor:\n");
-    AcpiOsPrintf ("%20.20s : %4.4X\n", "Opcode", Op->Opcode);
+    AcpiOsPrintf ("%20.20s : %4.4X\n", "Opcode", Op->Common.AmlOpcode);
 
-    DEBUG_ONLY_MEMBERS (AcpiOsPrintf ("%20.20s : %s\n", "Opcode Name", Info->Name));
+    ACPI_DEBUG_ONLY_MEMBERS (AcpiOsPrintf ("%20.20s : %s\n", "Opcode Name", Info->Name));
 
-    AcpiOsPrintf ("%20.20s : %p\n", "Value/ArgList", Op->Value);
-    AcpiOsPrintf ("%20.20s : %p\n", "Parent", Op->Parent);
-    AcpiOsPrintf ("%20.20s : %p\n", "NextOp", Op->Next);
+    AcpiOsPrintf ("%20.20s : %p\n", "Value/ArgList", Op->Common.Value.Arg);
+    AcpiOsPrintf ("%20.20s : %p\n", "Parent", Op->Common.Parent);
+    AcpiOsPrintf ("%20.20s : %p\n", "NextOp", Op->Common.Next);
 }
 
 
@@ -225,13 +224,14 @@ AcpiDbDumpParserDescriptor (
 
 void
 AcpiDbDecodeAndDisplayObject (
-    NATIVE_CHAR             *Target,
-    NATIVE_CHAR             *OutputType)
+    char                    *Target,
+    char                    *OutputType)
 {
     void                    *ObjPtr;
     ACPI_NAMESPACE_NODE     *Node;
+    ACPI_OPERAND_OBJECT     *ObjDesc;
     UINT32                  Display = DB_BYTE_DISPLAY;
-    NATIVE_CHAR             Buffer[80];
+    char                    Buffer[80];
     ACPI_BUFFER             RetBuf;
     ACPI_STATUS             Status;
     UINT32                  Size;
@@ -246,7 +246,7 @@ AcpiDbDecodeAndDisplayObject (
 
     if (OutputType)
     {
-        STRUPR (OutputType);
+        ACPI_STRUPR (OutputType);
         if (OutputType[0] == 'W')
         {
             Display = DB_WORD_DISPLAY;
@@ -260,7 +260,6 @@ AcpiDbDecodeAndDisplayObject (
             Display = DB_QWORD_DISPLAY;
         }
     }
-
 
     RetBuf.Length = sizeof (Buffer);
     RetBuf.Pointer = Buffer;
@@ -278,9 +277,11 @@ AcpiDbDecodeAndDisplayObject (
 
         /* Decode the object type */
 
-        if (VALID_DESCRIPTOR_TYPE ((ObjPtr), ACPI_DESC_TYPE_NAMED))
+        switch (ACPI_GET_DESCRIPTOR_TYPE (ObjPtr))
         {
-            /* This is a Node */
+        case ACPI_DESC_TYPE_NAMED:
+
+            /* This is a namespace Node */
 
             if (!AcpiOsReadable (ObjPtr, sizeof (ACPI_NAMESPACE_NODE)))
             {
@@ -290,11 +291,11 @@ AcpiDbDecodeAndDisplayObject (
 
             Node = ObjPtr;
             goto DumpNte;
-        }
 
-        else if (VALID_DESCRIPTOR_TYPE ((ObjPtr), ACPI_DESC_TYPE_INTERNAL))
-        {
-            /* This is an ACPI OBJECT */
+
+        case ACPI_DESC_TYPE_OPERAND:
+
+            /* This is a ACPI OPERAND OBJECT */
 
             if (!AcpiOsReadable (ObjPtr, sizeof (ACPI_OPERAND_OBJECT)))
             {
@@ -304,11 +305,12 @@ AcpiDbDecodeAndDisplayObject (
 
             AcpiUtDumpBuffer (ObjPtr, sizeof (ACPI_OPERAND_OBJECT), Display, ACPI_UINT32_MAX);
             AcpiExDumpObjectDescriptor (ObjPtr, 1);
-        }
+            break;
 
-        else if (VALID_DESCRIPTOR_TYPE ((ObjPtr), ACPI_DESC_TYPE_PARSER))
-        {
-            /* This is an Parser Op object */
+
+        case ACPI_DESC_TYPE_PARSER:
+
+            /* This is a Parser Op object */
 
             if (!AcpiOsReadable (ObjPtr, sizeof (ACPI_PARSE_OBJECT)))
             {
@@ -316,13 +318,15 @@ AcpiDbDecodeAndDisplayObject (
                 return;
             }
 
-
             AcpiUtDumpBuffer (ObjPtr, sizeof (ACPI_PARSE_OBJECT), Display, ACPI_UINT32_MAX);
             AcpiDbDumpParserDescriptor ((ACPI_PARSE_OBJECT *) ObjPtr);
-        }
+            break;
 
-        else
-        {
+
+        default:
+
+            /* Is not a recognizeable object */
+
             Size = 16;
             if (AcpiOsReadable (ObjPtr, 64))
             {
@@ -332,11 +336,11 @@ AcpiDbDecodeAndDisplayObject (
             /* Just dump some memory */
 
             AcpiUtDumpBuffer (ObjPtr, Size, Display, ACPI_UINT32_MAX);
+            break;
         }
 
         return;
     }
-
 
     /* The parameter is a name string that must be resolved to a Named obj */
 
@@ -358,7 +362,7 @@ DumpNte:
 
     else
     {
-        AcpiOsPrintf ("Object Pathname:  %s\n", RetBuf.Pointer);
+        AcpiOsPrintf ("Object (%p) Pathname:  %s\n", Node, (char *) RetBuf.Pointer);
     }
 
     if (!AcpiOsReadable (Node, sizeof (ACPI_NAMESPACE_NODE)))
@@ -370,211 +374,19 @@ DumpNte:
     AcpiUtDumpBuffer ((void *) Node, sizeof (ACPI_NAMESPACE_NODE), Display, ACPI_UINT32_MAX);
     AcpiExDumpNode (Node, 1);
 
-    if (Node->Object)
+    ObjDesc = AcpiNsGetAttachedObject (Node);
+    if (ObjDesc)
     {
-        AcpiOsPrintf ("\nAttached Object (%p):\n", Node->Object);
-        if (!AcpiOsReadable (Node->Object, sizeof (ACPI_OPERAND_OBJECT)))
+        AcpiOsPrintf ("\nAttached Object (%p):\n", ObjDesc);
+        if (!AcpiOsReadable (ObjDesc, sizeof (ACPI_OPERAND_OBJECT)))
         {
-            AcpiOsPrintf ("Invalid internal ACPI Object at address %p\n", Node->Object);
+            AcpiOsPrintf ("Invalid internal ACPI Object at address %p\n", ObjDesc);
             return;
         }
 
-        AcpiUtDumpBuffer (Node->Object, sizeof (ACPI_OPERAND_OBJECT), Display, ACPI_UINT32_MAX);
-        AcpiExDumpObjectDescriptor (Node->Object, 1);
+        AcpiUtDumpBuffer ((void *) ObjDesc, sizeof (ACPI_OPERAND_OBJECT), Display, ACPI_UINT32_MAX);
+        AcpiExDumpObjectDescriptor (ObjDesc, 1);
     }
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiDbDecodeInternalObject
- *
- * PARAMETERS:  ObjDesc         - Object to be displayed
- *
- * RETURN:      None
- *
- * DESCRIPTION: Short display of an internal object.  Numbers and Strings.
- *
- ******************************************************************************/
-
-void
-AcpiDbDecodeInternalObject (
-    ACPI_OPERAND_OBJECT     *ObjDesc)
-{
-    UINT32                  i;
-
-
-    if (!ObjDesc)
-    {
-        return;
-    }
-
-    AcpiOsPrintf (" %s", AcpiUtGetTypeName (ObjDesc->Common.Type));
-
-    switch (ObjDesc->Common.Type)
-    {
-    case ACPI_TYPE_INTEGER:
-
-        AcpiOsPrintf (" %.8X%.8X", HIDWORD (ObjDesc->Integer.Value),
-                                   LODWORD (ObjDesc->Integer.Value));
-        break;
-
-
-    case ACPI_TYPE_STRING:
-
-        AcpiOsPrintf ("(%d) \"%.24s",
-                ObjDesc->String.Length, ObjDesc->String.Pointer);
-
-        if (ObjDesc->String.Length > 24)
-        {
-            AcpiOsPrintf ("...");
-        }
-        else
-        {
-            AcpiOsPrintf ("\"");
-        }
-        break;
-
-
-    case ACPI_TYPE_BUFFER:
-
-        AcpiOsPrintf ("(%d)", ObjDesc->Buffer.Length);
-        for (i = 0; (i < 8) && (i < ObjDesc->Buffer.Length); i++)
-        {
-            AcpiOsPrintf (" %2.2X", ObjDesc->Buffer.Pointer[i]);
-        }
-        break;
-    }
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiDbDisplayInternalObject
- *
- * PARAMETERS:  ObjDesc         - Object to be displayed
- *              WalkState       - Current walk state
- *
- * RETURN:      None
- *
- * DESCRIPTION: Short display of an internal object
- *
- ******************************************************************************/
-
-void
-AcpiDbDisplayInternalObject (
-    ACPI_OPERAND_OBJECT     *ObjDesc,
-    ACPI_WALK_STATE         *WalkState)
-{
-    UINT8                   Type;
-
-
-    AcpiOsPrintf ("%p ", ObjDesc);
-
-    if (!ObjDesc)
-    {
-        AcpiOsPrintf ("<NullObj>\n");
-        return;
-    }
-
-
-    /* Decode the object type */
-
-    else if (VALID_DESCRIPTOR_TYPE (ObjDesc, ACPI_DESC_TYPE_PARSER))
-    {
-        AcpiOsPrintf ("<Parser>  ");
-    }
-
-    else if (VALID_DESCRIPTOR_TYPE (ObjDesc, ACPI_DESC_TYPE_NAMED))
-    {
-        AcpiOsPrintf ("<Node>            Name %4.4s Type-%s",
-                        &((ACPI_NAMESPACE_NODE *)ObjDesc)->Name,
-                        AcpiUtGetTypeName (((ACPI_NAMESPACE_NODE *) ObjDesc)->Type));
-        if (((ACPI_NAMESPACE_NODE *) ObjDesc)->Flags & ANOBJ_METHOD_ARG)
-        {
-            AcpiOsPrintf (" [Method Arg]");
-        }
-        if (((ACPI_NAMESPACE_NODE *) ObjDesc)->Flags & ANOBJ_METHOD_LOCAL)
-        {
-            AcpiOsPrintf (" [Method Local]");
-        }
-    }
-
-    else if (VALID_DESCRIPTOR_TYPE (ObjDesc, ACPI_DESC_TYPE_INTERNAL))
-    {
-        AcpiOsPrintf ("<Obj> ");
-        Type = ObjDesc->Common.Type;
-        if (Type > INTERNAL_TYPE_MAX)
-        {
-            AcpiOsPrintf (" Type %x [Invalid Type]", Type);
-            return;
-        }
-
-        /* Decode the ACPI object type */
-
-        switch (ObjDesc->Common.Type)
-        {
-        case INTERNAL_TYPE_REFERENCE:
-            switch (ObjDesc->Reference.Opcode)
-            {
-            case AML_ZERO_OP:
-                AcpiOsPrintf ("[Const]     Zero (0) [Null Target]", 0);
-                break;
-
-            case AML_ONES_OP:
-                AcpiOsPrintf ("[Const]     Ones (0xFFFFFFFFFFFFFFFF) [No Limit]");
-                break;
-
-            case AML_ONE_OP:
-                AcpiOsPrintf ("[Const]     One (1)");
-                break;
-
-            case AML_LOCAL_OP:
-                AcpiOsPrintf ("[Local%d]   ", ObjDesc->Reference.Offset);
-                if (WalkState)
-                {
-                    ObjDesc = WalkState->LocalVariables[ObjDesc->Reference.Offset].Object;
-                    AcpiDbDecodeInternalObject (ObjDesc);
-                }
-                break;
-
-            case AML_ARG_OP:
-                AcpiOsPrintf ("[Arg%d]     ", ObjDesc->Reference.Offset);
-                if (WalkState)
-                {
-                    ObjDesc = WalkState->Arguments[ObjDesc->Reference.Offset].Object;
-                    AcpiDbDecodeInternalObject (ObjDesc);
-                }
-                break;
-
-            case AML_DEBUG_OP:
-                AcpiOsPrintf ("[Debug]  ");
-                break;
-
-            case AML_INDEX_OP:
-                AcpiOsPrintf ("[Index]     ");
-                AcpiDbDecodeInternalObject (ObjDesc->Reference.Object);
-                break;
-
-            default:
-                break;
-
-            }
-            break;
-
-        default:
-            AcpiOsPrintf ("           ");
-            AcpiDbDecodeInternalObject (ObjDesc);
-            break;
-        }
-    }
-
-    else
-    {
-        AcpiOsPrintf ("<Not a valid ACPI Object Descriptor> ");
-    }
-
-    AcpiOsPrintf ("\n");
 }
 
 
@@ -619,19 +431,21 @@ AcpiDbDisplayMethodInfo (
     }
 
     ObjDesc = WalkState->MethodDesc;
-    Node = WalkState->MethodNode;
+    Node    = WalkState->MethodNode;
 
-    NumArgs = ObjDesc->Method.ParamCount;
+    NumArgs     = ObjDesc->Method.ParamCount;
     Concurrency = ObjDesc->Method.Concurrency;
 
-    AcpiOsPrintf ("Currently executing control method is [%4.4s]\n", &Node->Name);
-    AcpiOsPrintf ("%X arguments, max concurrency = %X\n", NumArgs, Concurrency);
+    AcpiOsPrintf ("Currently executing control method is [%4.4s]\n",
+            AcpiUtGetNodeName (Node));
+    AcpiOsPrintf ("%X arguments, max concurrency = %X\n",
+            NumArgs, Concurrency);
 
 
     RootOp = StartOp;
-    while (RootOp->Parent)
+    while (RootOp->Common.Parent)
     {
-        RootOp = RootOp->Parent;
+        RootOp = RootOp->Common.Parent;
     }
 
     Op = RootOp;
@@ -649,24 +463,12 @@ AcpiDbDisplayMethodInfo (
             NumRemainingOps++;
         }
 
-        OpInfo = AcpiPsGetOpcodeInfo (Op->Opcode);
-        if (ACPI_GET_OP_TYPE (OpInfo) != ACPI_OP_TYPE_OPCODE)
-        {
-            /* Bad opcode or ASCII character */
-
-            continue;
-        }
-
-
         /* Decode the opcode */
 
-        switch (ACPI_GET_OP_CLASS (OpInfo))
+        OpInfo = AcpiPsGetOpcodeInfo (Op->Common.AmlOpcode);
+        switch (OpInfo->Class)
         {
-        case OPTYPE_CONSTANT:           /* argument type only */
-        case OPTYPE_LITERAL:            /* argument type only */
-        case OPTYPE_DATA_TERM:          /* argument type only */
-        case OPTYPE_LOCAL_VARIABLE:     /* argument type only */
-        case OPTYPE_METHOD_ARGUMENT:    /* argument type only */
+        case AML_CLASS_ARGUMENT:
             if (CountRemaining)
             {
                 NumRemainingOperands++;
@@ -674,6 +476,11 @@ AcpiDbDisplayMethodInfo (
 
             NumOperands++;
             break;
+
+        case AML_CLASS_UNKNOWN:
+            /* Bad opcode or ASCII character */
+
+            continue;
 
         default:
             if (CountRemaining)
@@ -684,7 +491,6 @@ AcpiDbDisplayMethodInfo (
             NumOperators++;
             break;
         }
-
 
         Op = AcpiPsGetDepthNext (StartOp, Op);
     }
@@ -712,10 +518,7 @@ AcpiDbDisplayMethodInfo (
 void
 AcpiDbDisplayLocals (void)
 {
-    UINT32                  i;
     ACPI_WALK_STATE         *WalkState;
-    ACPI_OPERAND_OBJECT     *ObjDesc;
-    ACPI_NAMESPACE_NODE     *Node;
 
 
     WalkState = AcpiDsGetCurrentWalkState (AcpiGbl_CurrentWalkList);
@@ -725,18 +528,7 @@ AcpiDbDisplayLocals (void)
         return;
     }
 
-    ObjDesc = WalkState->MethodDesc;
-    Node = WalkState->MethodNode;
-
-
-    AcpiOsPrintf ("Local Variables for method [%4.4s]:\n", &Node->Name);
-
-    for (i = 0; i < MTH_NUM_LOCALS; i++)
-    {
-        ObjDesc = WalkState->LocalVariables[i].Object;
-        AcpiOsPrintf ("Local%d: ", i);
-        AcpiDbDisplayInternalObject (ObjDesc, WalkState);
-    }
+    AcpiDmDisplayLocals (WalkState);
 }
 
 
@@ -755,12 +547,7 @@ AcpiDbDisplayLocals (void)
 void
 AcpiDbDisplayArguments (void)
 {
-    UINT32                  i;
     ACPI_WALK_STATE         *WalkState;
-    ACPI_OPERAND_OBJECT     *ObjDesc;
-    UINT32                  NumArgs;
-    UINT32                  Concurrency;
-    ACPI_NAMESPACE_NODE     *Node;
 
 
     WalkState = AcpiDsGetCurrentWalkState (AcpiGbl_CurrentWalkList);
@@ -770,20 +557,7 @@ AcpiDbDisplayArguments (void)
         return;
     }
 
-    ObjDesc = WalkState->MethodDesc;
-    Node = WalkState->MethodNode;
-
-    NumArgs = ObjDesc->Method.ParamCount;
-    Concurrency = ObjDesc->Method.Concurrency;
-
-    AcpiOsPrintf ("Method [%4.4s] has %X arguments, max concurrency = %X\n", &Node->Name, NumArgs, Concurrency);
-
-    for (i = 0; i < NumArgs; i++)
-    {
-        ObjDesc = WalkState->Arguments[i].Object;
-        AcpiOsPrintf ("Arg%d: ", i);
-        AcpiDbDisplayInternalObject (ObjDesc, WalkState);
-    }
+    AcpiDmDisplayArguments (WalkState);
 }
 
 
@@ -817,20 +591,21 @@ AcpiDbDisplayResults (void)
     }
 
     ObjDesc = WalkState->MethodDesc;
-    Node = WalkState->MethodNode;
+    Node    = WalkState->MethodNode;
 
     if (WalkState->Results)
     {
         NumResults = WalkState->Results->Results.NumResults;
     }
 
-    AcpiOsPrintf ("Method [%4.4s] has %X stacked result objects\n", &Node->Name, NumResults);
+    AcpiOsPrintf ("Method [%4.4s] has %X stacked result objects\n",
+            AcpiUtGetNodeName (Node), NumResults);
 
     for (i = 0; i < NumResults; i++)
     {
         ObjDesc = WalkState->Results->Results.ObjDesc[i];
         AcpiOsPrintf ("Result%d: ", i);
-        AcpiDbDisplayInternalObject (ObjDesc, WalkState);
+        AcpiDmDisplayInternalObject (ObjDesc, WalkState);
     }
 }
 
@@ -850,7 +625,6 @@ AcpiDbDisplayResults (void)
 void
 AcpiDbDisplayCallingTree (void)
 {
-    UINT32                  i;
     ACPI_WALK_STATE         *WalkState;
     ACPI_NAMESPACE_NODE     *Node;
 
@@ -863,16 +637,67 @@ AcpiDbDisplayCallingTree (void)
     }
 
     Node = WalkState->MethodNode;
-
     AcpiOsPrintf ("Current Control Method Call Tree\n");
 
-    for (i = 0; WalkState; i++)
+    while (WalkState)
     {
         Node = WalkState->MethodNode;
 
-        AcpiOsPrintf ("    [%4.4s]\n", &Node->Name);
+        AcpiOsPrintf ("    [%4.4s]\n", AcpiUtGetNodeName (Node));
 
         WalkState = WalkState->Next;
+    }
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiDbDisplayObjectType
+ *
+ * PARAMETERS:  ObjectArg       - User entered NS node handle
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Display type of an arbitrary NS node
+ *
+ ******************************************************************************/
+
+void
+AcpiDbDisplayObjectType (
+    char                    *ObjectArg)
+{
+    ACPI_HANDLE             Handle;
+    ACPI_BUFFER             Buffer;
+    ACPI_DEVICE_INFO        *Info;
+    ACPI_STATUS             Status;
+    ACPI_NATIVE_UINT        i;
+
+
+    Handle = ACPI_TO_POINTER (ACPI_STRTOUL (ObjectArg, NULL, 16));
+    Buffer.Length = ACPI_ALLOCATE_LOCAL_BUFFER;
+
+    Status = AcpiGetObjectInfo (Handle, &Buffer);
+    if (ACPI_SUCCESS (Status))
+    {
+        Info = Buffer.Pointer;
+        AcpiOsPrintf ("HID: %s, ADR: %8.8X%8.8X, Status %8.8X\n",
+                        Info->HardwareId.Value,
+                        ACPI_FORMAT_UINT64 (Info->Address),
+                        Info->CurrentStatus);
+
+        if (Info->Valid & ACPI_VALID_CID)
+        {
+            for (i = 0; i < Info->CompatibilityId.Count; i++)
+            {
+                AcpiOsPrintf ("CID #%d: %s\n", (UINT32) i, Info->CompatibilityId.Id[i].Value);
+            }
+        }
+
+        ACPI_MEM_FREE (Info);
+    }
+    else
+    {
+        AcpiOsPrintf ("%s\n", AcpiFormatException (Status));
     }
 }
 
@@ -888,6 +713,10 @@ AcpiDbDisplayCallingTree (void)
  *
  * DESCRIPTION: Display the result of an AML opcode
  *
+ * Note: Curently only displays the result object if we are single stepping.
+ * However, this output may be useful in other contexts and could be enabled
+ * to do so if needed.
+ *
  ******************************************************************************/
 
 void
@@ -896,17 +725,15 @@ AcpiDbDisplayResultObject (
     ACPI_WALK_STATE         *WalkState)
 {
 
-    /* TBD: [Future] We don't always want to display the result.
-     * For now, only display if single stepping
-     * however, this output is very useful in other contexts also
-     */
+    /* Only display if single stepping */
+
     if (!AcpiGbl_CmSingleStep)
     {
         return;
     }
 
     AcpiOsPrintf ("ResultObj: ");
-    AcpiDbDisplayInternalObject (ObjDesc, WalkState);
+    AcpiDmDisplayInternalObject (ObjDesc, WalkState);
     AcpiOsPrintf ("\n");
 }
 
@@ -930,15 +757,57 @@ AcpiDbDisplayArgumentObject (
     ACPI_WALK_STATE         *WalkState)
 {
 
-
     if (!AcpiGbl_CmSingleStep)
     {
         return;
     }
 
     AcpiOsPrintf ("ArgObj:    ");
-    AcpiDbDisplayInternalObject (ObjDesc, WalkState);
+    AcpiDmDisplayInternalObject (ObjDesc, WalkState);
 }
 
-#endif /* ENABLE_DEBUGGER */
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiDbDisplayGpes
+ *
+ * PARAMETERS:  None
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Display the current GPE structures
+ *
+ ******************************************************************************/
+
+void
+AcpiDbDisplayGpes (void)
+{
+    ACPI_GPE_BLOCK_INFO     *GpeBlock;
+    ACPI_GPE_XRUPT_INFO     *GpeXruptInfo;
+    UINT32                  i = 0;
+
+
+    GpeXruptInfo = AcpiGbl_GpeXruptListHead;
+    while (GpeXruptInfo)
+    {
+        GpeBlock = GpeXruptInfo->GpeBlockListHead;
+        while (GpeBlock)
+        {
+            AcpiOsPrintf ("Block %d - %p\n", i, GpeBlock);
+            AcpiOsPrintf ("    Registers:    %d\n", GpeBlock->RegisterCount);
+            AcpiOsPrintf ("    GPE range:    %d to %d\n", GpeBlock->BlockBaseNumber,
+                            GpeBlock->BlockBaseNumber + (GpeBlock->RegisterCount * 8) -1);
+            AcpiOsPrintf ("    RegisterInfo: %p\n", GpeBlock->RegisterInfo);
+            AcpiOsPrintf ("    EventInfo:    %p\n", GpeBlock->EventInfo);
+            i++;
+
+            GpeBlock = GpeBlock->Next;
+        }
+
+        GpeXruptInfo = GpeXruptInfo->Next;
+    }
+}
+
+
+#endif /* ACPI_DEBUGGER */
 

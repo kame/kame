@@ -1,4 +1,4 @@
-/*	$NetBSD: pceb.c,v 1.6 2001/11/15 07:03:33 lukem Exp $	*/
+/*	$NetBSD: pceb.c,v 1.12 2003/02/26 22:23:07 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1998 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pceb.c,v 1.6 2001/11/15 07:03:33 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pceb.c,v 1.12 2003/02/26 22:23:07 fvdl Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -60,9 +60,8 @@ __KERNEL_RCSID(0, "$NetBSD: pceb.c,v 1.6 2001/11/15 07:03:33 lukem Exp $");
 int	pcebmatch __P((struct device *, struct cfdata *, void *));
 void	pcebattach __P((struct device *, struct device *, void *));
 
-struct cfattach pceb_ca = {
-	sizeof(struct device), pcebmatch, pcebattach
-};
+CFATTACH_DECL(pceb, sizeof(struct device),
+    pcebmatch, pcebattach, NULL, NULL);
 
 void	pceb_callback __P((struct device *));
 int	pceb_print __P((void *, const char *));
@@ -82,7 +81,16 @@ pcebmatch(parent, match, aux)
 	struct pci_attach_args *pa = aux;
 
 	/*
-	 * Match all known PCI-EISA bridges.
+	 * Match anything which claims to be PCI-EISA bridge.
+	 */
+	if (PCI_CLASS(pa->pa_class) == PCI_CLASS_BRIDGE &&
+	    PCI_SUBCLASS(pa->pa_class) == PCI_SUBCLASS_BRIDGE_EISA)
+		return (1);
+
+	/*
+	 * Match some known PCI-EISA bridges explicitly.
+	 * XXX this is probably not necessary, should be matched by above
+	 * condition
 	 */
 	switch (PCI_VENDOR(pa->pa_id)) {
 	case PCI_VENDOR_INTEL:
@@ -128,8 +136,8 @@ pceb_callback(self)
 	 */
 	memset(&ea, 0, sizeof(ea));
 	ea.ea_eba.eba_busname = "eisa";
-	ea.ea_eba.eba_iot = I386_BUS_SPACE_IO;
-	ea.ea_eba.eba_memt = I386_BUS_SPACE_MEM;
+	ea.ea_eba.eba_iot = X86_BUS_SPACE_IO;
+	ea.ea_eba.eba_memt = X86_BUS_SPACE_MEM;
 #if NEISA > 0
 	ea.ea_eba.eba_dmat = &eisa_bus_dma_tag;
 #endif
@@ -140,8 +148,8 @@ pceb_callback(self)
 	 */
 	memset(&ea, 0, sizeof(ea));
 	ea.ea_iba.iba_busname = "isa";
-	ea.ea_iba.iba_iot = I386_BUS_SPACE_IO;
-	ea.ea_iba.iba_memt = I386_BUS_SPACE_MEM;
+	ea.ea_iba.iba_iot = X86_BUS_SPACE_IO;
+	ea.ea_iba.iba_memt = X86_BUS_SPACE_MEM;
 #if NISA > 0
 	ea.ea_iba.iba_dmat = &isa_bus_dma_tag;
 #endif
@@ -156,6 +164,6 @@ pceb_print(aux, pnp)
 	union pceb_attach_args *ea = aux;
 
 	if (pnp)
-		printf("%s at %s", ea->ea_name, pnp);
+		aprint_normal("%s at %s", ea->ea_name, pnp);
 	return (UNCONF);
 }

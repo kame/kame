@@ -1,4 +1,4 @@
-/*	$NetBSD: mt.c,v 1.16 2002/03/15 05:55:36 gmcgarry Exp $	*/
+/*	$NetBSD: mt.c,v 1.24 2003/11/17 14:37:59 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -36,7 +36,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* 
+/*
  * Copyright (c) 1992, The University of Utah and
  * the Computer Systems Laboratory at the University of Utah (CSL).
  * All rights reserved.
@@ -67,7 +67,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mt.c,v 1.16 2002/03/15 05:55:36 gmcgarry Exp $");                                                  
+__KERNEL_RCSID(0, "$NetBSD: mt.c,v 1.24 2003/11/17 14:37:59 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -116,7 +116,7 @@ struct	mt_softc {
 	short	sc_type;	/* tape drive model (hardware IDs) */
 	struct	hpibqueue sc_hq; /* HPIB device queue member */
 	tpr_t	sc_ttyp;
-	struct buf_queue sc_tab;/* buf queue */
+	struct bufq_state sc_tab;/* buf queue */
 	int	sc_active;
 	struct buf sc_bufstore;	/* XXX buffer storage */
 };
@@ -136,11 +136,26 @@ int	mtdebug = 0;
 int	mtmatch __P((struct device *, struct cfdata *, void *));
 void	mtattach __P((struct device *, struct device *, void *));
 
-struct cfattach mt_ca = {
-	sizeof(struct mt_softc), mtmatch, mtattach
-};
+CFATTACH_DECL(mt, sizeof(struct mt_softc),
+    mtmatch, mtattach, NULL, NULL);
 
 extern struct cfdriver mt_cd;
+
+dev_type_open(mtopen);
+dev_type_close(mtclose);
+dev_type_read(mtread);
+dev_type_write(mtwrite);
+dev_type_ioctl(mtioctl);
+dev_type_strategy(mtstrategy);
+
+const struct bdevsw mt_bdevsw = {
+	mtopen, mtclose, mtstrategy, mtioctl, nodump, nosize, D_TAPE
+};
+
+const struct cdevsw mt_cdevsw = {
+	mtopen, mtclose, mtread, mtwrite, mtioctl,
+	nostop, notty, nopoll, nommap, nokqfilter, D_TAPE
+};
 
 int	mtident __P((struct mt_softc *, struct hpibbus_attach_args *));
 void	mtustart __P((struct mt_softc *));
@@ -152,9 +167,6 @@ void	spl_mtstart __P((void *));
 void	mtstart __P((void *));
 void	mtgo __P((void *));
 void	mtintr __P((void *));
-
-bdev_decl(mt);
-cdev_decl(mt);
 
 int
 mtmatch(parent, match, aux)
@@ -185,7 +197,7 @@ mtattach(parent, self, aux)
 	hpibno = parent->dv_unit;
 	slave = ha->ha_slave;
 
-	BUFQ_INIT(&sc->sc_tab);
+	bufq_alloc(&sc->sc_tab, BUFQ_FCFS);
 	callout_init(&sc->sc_start_ch);
 	callout_init(&sc->sc_intr_ch);
 
@@ -513,7 +525,7 @@ mtstrategy(bp)
 		}
 	}
 	s = splbio();
-	BUFQ_INSERT_TAIL(&sc->sc_tab, bp);
+	BUFQ_PUT(&sc->sc_tab, bp);
 	if (sc->sc_active == 0) {
 		sc->sc_active = 1;
 		mtustart(sc);
@@ -564,7 +576,7 @@ mtstart(arg)
 
 	dlog(LOG_DEBUG, "%s start", sc->sc_dev.dv_xname);
 	sc->sc_flags &= ~MTF_WRT;
-	bp = BUFQ_FIRST(&sc->sc_tab);
+	bp = BUFQ_PEEK(&sc->sc_tab);
 	if ((sc->sc_flags & MTF_ALIVE) == 0 &&
 	    ((bp->b_flags & B_CMD) == 0 || bp->b_cmd != MTRESET))
 		goto fatalerror;
@@ -745,10 +757,10 @@ errdone:
 	bp->b_flags |= B_ERROR;
 done:
 	sc->sc_flags &= ~(MTF_HITEOF | MTF_HITBOF);
-	BUFQ_REMOVE(&sc->sc_tab, bp);
+	(void)BUFQ_GET(&sc->sc_tab);
 	biodone(bp);
 	hpibfree(sc->sc_dev.dv_parent, &sc->sc_hq);
-	if ((bp = BUFQ_FIRST(&sc->sc_tab)) == NULL)
+	if ((bp = BUFQ_PEEK(&sc->sc_tab)) == NULL)
 		sc->sc_active = 0;
 	else
 		mtustart(sc);
@@ -768,7 +780,7 @@ mtgo(arg)
 	int rw;
 
 	dlog(LOG_DEBUG, "%s go", sc->sc_dev.dv_xname);
-	bp = BUFQ_FIRST(&sc->sc_tab);
+	bp = BUFQ_PEEK(&sc->sc_tab);
 	rw = bp->b_flags & B_READ;
 	hpibgo(sc->sc_hpibno, sc->sc_slave, rw ? MTT_READ : MTL_WRITE,
 	    bp->b_data, bp->b_bcount, rw, rw != 0);
@@ -783,7 +795,7 @@ mtintr(arg)
 	int i;
 	u_char cmdbuf[4];
 
-	bp = BUFQ_FIRST(&sc->sc_tab);
+	bp = BUFQ_PEEK(&sc->sc_tab);
 	if (bp == NULL) {
 		log(LOG_ERR, "%s intr: bp == NULL", sc->sc_dev.dv_xname);
 		return;
@@ -930,10 +942,10 @@ mtintr(arg)
 	cmdbuf[0] = MTE_COMPLETE | MTE_IDLE;
 	(void) hpibsend(sc->sc_hpibno, sc->sc_slave, MTL_ECMD, cmdbuf, 1);
 	bp->b_flags &= ~B_CMD;
-	BUFQ_REMOVE(&sc->sc_tab, bp);
+	(void)BUFQ_GET(&sc->sc_tab);
 	biodone(bp);
 	hpibfree(sc->sc_dev.dv_parent, &sc->sc_hq);
-	if (BUFQ_FIRST(&sc->sc_tab) == NULL)
+	if (BUFQ_PEEK(&sc->sc_tab) == NULL)
 		sc->sc_active = 0;
 	else
 		mtustart(sc);
@@ -1004,15 +1016,4 @@ mtioctl(dev, cmd, data, flag, p)
 		return (EINVAL);
 	}
 	return (0);
-}
-
-/*ARGSUSED*/
-int
-mtdump(dev, blkno, va, size)
-	dev_t dev;
-	daddr_t blkno;
-	caddr_t va;
-	size_t size;
-{
-	return (ENODEV);
 }

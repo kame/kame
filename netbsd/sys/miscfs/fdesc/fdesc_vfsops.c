@@ -1,4 +1,4 @@
-/*	$NetBSD: fdesc_vfsops.c,v 1.36 2001/11/15 09:48:21 lukem Exp $	*/
+/*	$NetBSD: fdesc_vfsops.c,v 1.46.2.1 2004/05/29 09:05:21 tron Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993, 1995
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -45,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: fdesc_vfsops.c,v 1.36 2001/11/15 09:48:21 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: fdesc_vfsops.c,v 1.46.2.1 2004/05/29 09:05:21 tron Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
@@ -53,6 +49,7 @@ __KERNEL_RCSID(0, "$NetBSD: fdesc_vfsops.c,v 1.36 2001/11/15 09:48:21 lukem Exp 
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/sysctl.h>
 #include <sys/time.h>
 #include <sys/proc.h>
 #include <sys/resourcevar.h>
@@ -76,8 +73,6 @@ int	fdesc_fhtovp __P((struct mount *, struct fid *, struct vnode **));
 int	fdesc_checkexp __P((struct mount *, struct mbuf *, int *,
 			    struct ucred **));
 int	fdesc_vptofh __P((struct vnode *, struct fid *));
-int	fdesc_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
-			  struct proc *));
 
 /*
  * Mount the per-process file descriptors (/dev/fd)
@@ -91,10 +86,11 @@ fdesc_mount(mp, path, data, ndp, p)
 	struct proc *p;
 {
 	int error = 0;
-	size_t size;
 	struct fdescmount *fmp;
 	struct vnode *rvp;
 
+	if (mp->mnt_flag & MNT_GETARGS)
+		return 0;
 	/*
 	 * Update is a no-op
 	 */
@@ -111,15 +107,13 @@ fdesc_mount(mp, path, data, ndp, p)
 	rvp->v_flag |= VROOT;
 	fmp->f_root = rvp;
 	mp->mnt_flag |= MNT_LOCAL;
-	mp->mnt_data = (qaddr_t)fmp;
+	mp->mnt_data = fmp;
 	vfs_getnewfsid(mp);
 
-	(void) copyinstr(path, mp->mnt_stat.f_mntonname, MNAMELEN - 1, &size);
-	memset(mp->mnt_stat.f_mntonname + size, 0, MNAMELEN - size);
-	memset(mp->mnt_stat.f_mntfromname, 0, MNAMELEN);
-	memcpy(mp->mnt_stat.f_mntfromname, "fdesc", sizeof("fdesc"));
+	error = set_statfs_info(path, UIO_USERSPACE, "fdesc", UIO_SYSSPACE,
+	    mp, p);
 	VOP_UNLOCK(rvp, 0);
-	return (0);
+	return error;
 }
 
 int
@@ -245,12 +239,7 @@ fdesc_statfs(mp, sbp, p)
 #else
 	sbp->f_type = 0;
 #endif
-	if (sbp != &mp->mnt_stat) {
-		memcpy(&sbp->f_fsid, &mp->mnt_stat.f_fsid, sizeof(sbp->f_fsid));
-		memcpy(sbp->f_mntonname, mp->mnt_stat.f_mntonname, MNAMELEN);
-		memcpy(sbp->f_mntfromname, mp->mnt_stat.f_mntfromname, MNAMELEN);
-	}
-	strncpy(sbp->f_fstypename, mp->mnt_op->vfs_name, MFSNAMELEN);
+	copy_statfs_info(sbp, mp);
 	return (0);
 }
 
@@ -313,17 +302,25 @@ fdesc_vptofh(vp, fhp)
 	return (EOPNOTSUPP);
 }
 
-int
-fdesc_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
-	struct proc *p;
+SYSCTL_SETUP(sysctl_vfs_fdesc_setup, "sysctl vfs.fdesc subtree setup")
 {
-	return (EOPNOTSUPP);
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "vfs", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_VFS, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "fdesc",
+		       SYSCTL_DESCR("File-descriptor file system"),
+		       NULL, 0, NULL, 0,
+		       CTL_VFS, 7, CTL_EOL);
+	/*
+	 * XXX the "7" above could be dynamic, thereby eliminating one
+	 * more instance of the "number to vfs" mapping problem, but
+	 * "7" is the order as taken from sys/mount.h
+	 */
 }
 
 extern const struct vnodeopv_desc fdesc_vnodeop_opv_desc;
@@ -348,7 +345,7 @@ struct vfsops fdesc_vfsops = {
 	fdesc_init,
 	NULL,
 	fdesc_done,
-	fdesc_sysctl,
+	NULL,
 	NULL,				/* vfs_mountroot */
 	fdesc_checkexp,
 	fdesc_vnodeopv_descs,

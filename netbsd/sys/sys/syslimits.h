@@ -1,4 +1,4 @@
-/*	$NetBSD: syslimits.h,v 1.19 2001/03/28 08:45:34 mrg Exp $	*/
+/*	$NetBSD: syslimits.h,v 1.22 2003/08/07 16:34:16 agc Exp $	*/
 
 /*
  * Copyright (c) 1988, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -40,9 +36,12 @@
 
 #include <sys/featuretest.h>
 
-#if !defined(_ANSI_SOURCE)
+#if defined(_POSIX_C_SOURCE) || defined(_XOPEN_SOURCE) || \
+    defined(_NETBSD_SOURCE)
 #define	ARG_MAX		 (256 * 1024)	/* max bytes for an exec function */
+#ifndef CHILD_MAX
 #define	CHILD_MAX		  160	/* max simultaneous processes */
+#endif
 #define	GID_MAX		   2147483647U	/* max value for a gid_t (2^31-2) */
 #define	LINK_MAX		32767	/* max file link count */
 #define	MAX_CANON		  255	/* max bytes in term canon input line */
@@ -50,7 +49,9 @@
 #define	NAME_MAX		  255	/* max bytes in a file name */
 #define	NGROUPS_MAX		   16	/* max supplemental group id's */
 #define	UID_MAX		   2147483647U	/* max value for a uid_t (2^31-2) */
+#ifndef OPEN_MAX
 #define	OPEN_MAX		   64	/* max open files per process */
+#endif
 #define	PATH_MAX		 1024	/* max bytes in pathname */
 #define	PIPE_BUF		  512	/* max bytes for atomic pipe writes */
 
@@ -66,18 +67,18 @@
 /*
  * IEEE Std 1003.1c-95, adopted in X/Open CAE Specification Issue 5 Version 2
  */
-#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
-    (_POSIX_C_SOURCE - 0) >= 199506L || (_XOPEN_SOURCE - 0) >= 500
+#if (_POSIX_C_SOURCE - 0) >= 199506L || (_XOPEN_SOURCE - 0) >= 500 || \
+    defined(_NETBSD_SOURCE)
 #define	LOGIN_NAME_MAX		   17	/* max login name length incl. NUL */
 #endif
 
 /*
  * X/Open CAE Specification Issue 5 Version 2
  */
-#if !defined(_POSIX_C_SOURCE) || defined(_XOPEN_SOURCE)
+#if defined(_XOPEN_SOURCE) || defined(_NETBSD_SOURCE)
 #define	IOV_MAX			 1024	/* max # of iovec's for readv(2) etc. */
 #define	NZERO			   20	/* default "nice" */
-#endif /* !_POSIX_C_SOURCE || _XOPEN_SOURCE */
+#endif /* _XOPEN_SOURCE || _NETBSD_SOURCE */
 
 #endif /* !_ANSI_SOURCE */
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: cgthree_sbus.c,v 1.6 2002/03/11 16:00:55 pk Exp $ */
+/*	$NetBSD: cgthree_sbus.c,v 1.14 2004/03/17 17:04:58 pk Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -57,11 +57,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -89,7 +85,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cgthree_sbus.c,v 1.6 2002/03/11 16:00:55 pk Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cgthree_sbus.c,v 1.14 2004/03/17 17:04:58 pk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -125,10 +121,8 @@ struct cgthree_sbus_softc {
 static int	cgthreematch_sbus(struct device *, struct cfdata *, void *);
 static void	cgthreeattach_sbus(struct device *, struct device *, void *);
 
-struct cfattach cgthree_sbus_ca = {
-	sizeof(struct cgthree_softc), cgthreematch_sbus, cgthreeattach_sbus
-};
-
+CFATTACH_DECL(cgthree_sbus, sizeof(struct cgthree_softc),
+    cgthreematch_sbus, cgthreeattach_sbus, NULL, NULL);
 
 /*
  * Match a cgthree.
@@ -141,7 +135,7 @@ cgthreematch_sbus(parent, cf, aux)
 {
 	struct sbus_attach_args *sa = aux;
 
-	return (strcmp(cf->cf_driver->cd_name, sa->sa_name) == 0);
+	return (strcmp(cf->cf_name, sa->sa_name) == 0);
 }
 
 /*
@@ -186,10 +180,12 @@ cgthreeattach_sbus(parent, self, args)
 		printf("%s: cannot map control registers\n", self->dv_xname);
 		return;
 	}
-	sc->sc_fbc = (struct fbcontrol *)bh;
+	sc->sc_fbc = (struct fbcontrol *)bus_space_vaddr(sa->sa_bustag, bh);
 
 	isconsole = fb_is_console(node);
-	name = PROM_getpropstring(node, "model");
+	name = prom_getpropstring(node, "model");
+	if (name == NULL)
+		name = "cgthree";
 
 	if (sa->sa_npromvaddrs != 0)
 		fb->fb_pixels = (caddr_t)(u_long)sa->sa_promvaddrs[0];
@@ -203,7 +199,7 @@ cgthreeattach_sbus(parent, self, args)
 			printf("%s: cannot map pixels\n", self->dv_xname);
 			return;
 		}
-		fb->fb_pixels = (char *)bh;
+		fb->fb_pixels = (char *)bus_space_vaddr(sa->sa_bustag, bh);
 	}
 
 	sbus_establish(sd, &sc->sc_dev);

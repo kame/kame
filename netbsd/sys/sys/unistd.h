@@ -1,4 +1,4 @@
-/*	$NetBSD: unistd.h,v 1.19 2002/01/31 00:32:48 kleink Exp $	*/
+/*	$NetBSD: unistd.h,v 1.30 2003/11/15 01:19:38 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -85,7 +81,20 @@
 #define	_POSIX_MEMORY_PROTECTION 1
 				/* monotonic clock */
 #define	_POSIX_MONOTONIC_CLOCK	200112L
-
+				/* threads */
+#define	_POSIX_THREADS		200112L
+				/* semaphores */
+#define	_POSIX_SEMAPHORES	0
+				/* barriers */
+#define	_POSIX_BARRIERS		200112L
+				/* timers */
+#define	_POSIX_TIMERS		200112L
+				/* spin locks */
+#define	_POSIX_SPIN_LOCKS	200112L
+				/* read/write locks */
+#define	_POSIX_READER_WRITER_LOCKS	200112L
+				/* XPG4.2 shared memory */
+#define	_XOPEN_SHM		0
 
 /* access function */
 #define	F_OK		0	/* test for existence of file */
@@ -98,11 +107,22 @@
 #define	SEEK_CUR	1	/* set file offset to current plus offset */
 #define	SEEK_END	2	/* set file offset to EOF plus offset */
 
-#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 /* whence values for lseek(2); renamed by POSIX 1003.1 */
 #define	L_SET		SEEK_SET
 #define	L_INCR		SEEK_CUR
 #define	L_XTND		SEEK_END
+
+/*
+ * fsync_range values.
+ *
+ * Note the following flag values were chosen to not overlap
+ * values for SEEK_XXX flags.  While not currently implemented,
+ * it is possible to extend this call to respect SEEK_CUR and
+ * SEEK_END offset addressing modes.
+ */
+#define	FDATASYNC	0x0010	/* sync data and minimal metadata */
+#define	FFILESYNC	0x0020	/* sync data and metadata */
 #endif
 
 /* configurable pathname variables */
@@ -119,9 +139,13 @@
 #define	_PC_FILESIZEBITS	11
 
 /* configurable system variables */
+/*
+ * XXX The value of _SC_CLK_TCK is embedded in <time.h>.
+ * XXX The value of _SC_PAGESIZE is embedded in <sys/shm.h>.
+ */
 #define	_SC_ARG_MAX		 1
 #define	_SC_CHILD_MAX		 2
-#define	_SC_CLK_TCK		 3
+#define	_O_SC_CLK_TCK		 3 /* Old version, always 100 */
 #define	_SC_NGROUPS_MAX		 4
 #define	_SC_OPEN_MAX		 5
 #define	_SC_JOB_CONTROL		 6
@@ -158,6 +182,14 @@
 #define	_SC_MEMORY_PROTECTION	36
 #define	_SC_LOGIN_NAME_MAX	37
 #define	_SC_MONOTONIC_CLOCK	38
+#define	_SC_CLK_TCK		39 /* New, variable version */
+#define	_SC_ATEXIT_MAX		40
+#define	_SC_THREADS		41
+#define	_SC_SEMAPHORES		42
+#define	_SC_BARRIERS		43
+#define	_SC_TIMERS		44
+#define	_SC_SPIN_LOCKS		45
+#define	_SC_READER_WRITER_LOCKS	46
 
 /* configurable system strings */
 #define	_CS_PATH		 1

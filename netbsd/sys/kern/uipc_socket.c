@@ -1,4 +1,4 @@
-/*	$NetBSD: uipc_socket.c,v 1.66.4.2 2002/11/08 09:31:35 tron Exp $	*/
+/*	$NetBSD: uipc_socket.c,v 1.97.2.1 2004/05/26 20:14:40 he Exp $	*/
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -48,11 +48,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -72,10 +68,12 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uipc_socket.c,v 1.66.4.2 2002/11/08 09:31:35 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uipc_socket.c,v 1.97.2.1 2004/05/26 20:14:40 he Exp $");
 
 #include "opt_sock_counters.h"
 #include "opt_sosend_loan.h"
+#include "opt_mbuftrace.h"
+#include "opt_somaxkva.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -91,10 +89,15 @@ __KERNEL_RCSID(0, "$NetBSD: uipc_socket.c,v 1.66.4.2 2002/11/08 09:31:35 tron Ex
 #include <sys/signalvar.h>
 #include <sys/resourcevar.h>
 #include <sys/pool.h>
+#include <sys/event.h>
+#include <sys/poll.h>
 
 #include <uvm/uvm.h>
 
 struct pool	socket_pool;
+
+MALLOC_DEFINE(M_SOOPTS, "soopts", "socket options");
+MALLOC_DEFINE(M_SONAME, "soname", "socket name");
 
 extern int	somaxconn;			/* patchable (XXX sysctl) */
 int		somaxconn = SOMAXCONN;
@@ -123,6 +126,10 @@ void
 soinit(void)
 {
 
+	/* Set the initial adjusted socket buffer size. */
+	if (sb_max_set(sb_max))
+		panic("bad initial sb_max value: %lu\n", sb_max);
+
 	pool_init(&socket_pool, sizeof(struct socket), 0, 0, 0,
 	    "sockpl", NULL);
 
@@ -134,25 +141,129 @@ soinit(void)
 #endif /* SOSEND_COUNTERS */
 }
 
-#ifdef SOSEND_LOAN
-int use_sosend_loan = 1;
-#else
+#ifdef SOSEND_NO_LOAN
 int use_sosend_loan = 0;
+#else
+int use_sosend_loan = 1;
 #endif
 
+struct simplelock so_pendfree_slock = SIMPLELOCK_INITIALIZER;
 struct mbuf *so_pendfree;
 
-int somaxkva = 16 * 1024 * 1024;
+#ifndef SOMAXKVA
+#define	SOMAXKVA (16 * 1024 * 1024)
+#endif
+int somaxkva = SOMAXKVA;
 int socurkva;
 int sokvawaiters;
 
 #define	SOCK_LOAN_THRESH	4096
 #define	SOCK_LOAN_CHUNK		65536
 
-static void
-sodoloanfree(caddr_t buf, u_int size)
+static size_t sodopendfree(struct socket *);
+static size_t sodopendfreel(struct socket *);
+static __inline void sokvareserve(struct socket *, vsize_t);
+static __inline void sokvaunreserve(vsize_t);
+
+static __inline void
+sokvareserve(struct socket *so, vsize_t len)
 {
-	struct vm_page **pgs;
+	int s;
+
+	s = splvm();
+	simple_lock(&so_pendfree_slock);
+	while (socurkva + len > somaxkva) {
+		size_t freed;
+
+		/*
+		 * try to do pendfree.
+		 */
+
+		freed = sodopendfreel(so);
+
+		/*
+		 * if some kva was freed, try again.
+		 */
+
+		if (freed)
+			continue;
+
+		SOSEND_COUNTER_INCR(&sosend_kvalimit);
+		sokvawaiters++;
+		(void) ltsleep(&socurkva, PVM, "sokva", 0, &so_pendfree_slock);
+		sokvawaiters--;
+	}
+	socurkva += len;
+	simple_unlock(&so_pendfree_slock);
+	splx(s);
+}
+
+static __inline void
+sokvaunreserve(vsize_t len)
+{
+	int s;
+
+	s = splvm();
+	simple_lock(&so_pendfree_slock);
+	socurkva -= len;
+	if (sokvawaiters)
+		wakeup(&socurkva);
+	simple_unlock(&so_pendfree_slock);
+	splx(s);
+}
+
+/*
+ * sokvaalloc: allocate kva for loan.
+ */
+
+vaddr_t
+sokvaalloc(vsize_t len, struct socket *so)
+{
+	vaddr_t lva;
+
+	/*
+	 * reserve kva.
+	 */
+
+	sokvareserve(so, len);
+
+	/*
+	 * allocate kva.
+	 */
+
+	lva = uvm_km_valloc_wait(kernel_map, len);
+	if (lva == 0) {
+		sokvaunreserve(len);
+		return (0);
+	}
+
+	return lva;
+}
+
+/*
+ * sokvafree: free kva for loan.
+ */
+
+void
+sokvafree(vaddr_t sva, vsize_t len)
+{
+
+	/*
+	 * free kva.
+	 */
+
+	uvm_km_free(kernel_map, sva, len);
+
+	/*
+	 * unreserve kva.
+	 */
+
+	sokvaunreserve(len);
+}
+
+static void
+sodoloanfree(struct vm_page **pgs, caddr_t buf, size_t size)
+{
 	vaddr_t va, sva, eva;
 	vsize_t len;
 	paddr_t pa;
@@ -163,79 +274,110 @@ sodoloanfree(caddr_t buf, u_int size)
 	len = eva - sva;
 	npgs = len >> PAGE_SHIFT;
 
-	pgs = alloca(npgs * sizeof(*pgs));
+	if (__predict_false(pgs == NULL)) {
+		pgs = alloca(npgs * sizeof(*pgs));
 
-	for (i = 0, va = sva; va < eva; i++, va += PAGE_SIZE) {
-		if (pmap_extract(pmap_kernel(), va, &pa) == FALSE)
-			panic("sodoloanfree: va 0x%lx not mapped", va);
-		pgs[i] = PHYS_TO_VM_PAGE(pa);
+		for (i = 0, va = sva; va < eva; i++, va += PAGE_SIZE) {
+			if (pmap_extract(pmap_kernel(), va, &pa) == FALSE)
+				panic("sodoloanfree: va 0x%lx not mapped", va);
+			pgs[i] = PHYS_TO_VM_PAGE(pa);
+		}
 	}
 
 	pmap_kremove(sva, len);
 	pmap_update(pmap_kernel());
 	uvm_unloan(pgs, npgs, UVM_LOAN_TOPAGE);
-	uvm_km_free(kernel_map, sva, len);
-	socurkva -= len;
-	if (sokvawaiters)
-		wakeup(&socurkva);
+	sokvafree(sva, len);
 }
 
 static size_t
 sodopendfree(struct socket *so)
 {
-	struct mbuf *m;
-	size_t rv = 0;
 	int s;
+	size_t rv;
 
 	s = splvm();
+	simple_lock(&so_pendfree_slock);
+	rv = sodopendfreel(so);
+	simple_unlock(&so_pendfree_slock);
+	splx(s);
+
+	return rv;
+}
+
+/*
+ * sodopendfreel: free mbufs on "pendfree" list.
+ * unlock and relock so_pendfree_slock when freeing mbufs.
+ *
+ * => called with so_pendfree_slock held.
+ * => called at splvm.
+ */
+
+static size_t
+sodopendfreel(struct socket *so)
+{
+	size_t rv = 0;
+
+	LOCK_ASSERT(simple_lock_held(&so_pendfree_slock));
 
 	for (;;) {
+		struct mbuf *m;
+		struct mbuf *next;
+
 		m = so_pendfree;
 		if (m == NULL)
 			break;
-		so_pendfree = m->m_next;
-		splx(s);
+		so_pendfree = NULL;
+		simple_unlock(&so_pendfree_slock);
+		/* XXX splx */
 
-		rv += m->m_ext.ext_size;
-		sodoloanfree(m->m_ext.ext_buf, m->m_ext.ext_size);
-		s = splvm();
-		pool_cache_put(&mbpool_cache, m);
+		for (; m != NULL; m = next) {
+			next = m->m_next;
+
+			rv += m->m_ext.ext_size;
+			sodoloanfree((m->m_flags & M_EXT_PAGES) ?
+			    m->m_ext.ext_pgs : NULL, m->m_ext.ext_buf,
+			    m->m_ext.ext_size);
+			pool_cache_put(&mbpool_cache, m);
+		}
+
+		/* XXX splvm */
+		simple_lock(&so_pendfree_slock);
 	}
 
-	for (;;) {
-		m = so->so_pendfree;
-		if (m == NULL)
-			break;
-		so->so_pendfree = m->m_next;
-		splx(s);
-
-		rv += m->m_ext.ext_size;
-		sodoloanfree(m->m_ext.ext_buf, m->m_ext.ext_size);
-		s = splvm();
-		pool_cache_put(&mbpool_cache, m);
-	}
-
-	splx(s);
 	return (rv);
 }
 
-static void
-soloanfree(struct mbuf *m, caddr_t buf, u_int size, void *arg)
+void
+soloanfree(struct mbuf *m, caddr_t buf, size_t size, void *arg)
 {
-	struct socket *so = arg;
 	int s;
 
 	if (m == NULL) {
-		sodoloanfree(buf, size);
+
+		/*
+		 * called from MEXTREMOVE.
+		 */
+
+		sodoloanfree(NULL, buf, size);
 		return;
 	}
 
+	/*
+	 * postpone freeing mbuf.
+	 *
+	 * we can't do it in interrupt context
+	 * because we need to put kva back to kernel_map.
+	 */
+
 	s = splvm();
-	m->m_next = so->so_pendfree;
-	so->so_pendfree = m;
-	splx(s);
+	simple_lock(&so_pendfree_slock);
+	m->m_next = so_pendfree;
+	so_pendfree = m;
 	if (sokvawaiters)
 		wakeup(&socurkva);
+	simple_unlock(&so_pendfree_slock);
+	splx(s);
 }
 
 static long
@@ -244,9 +386,8 @@ sosend_loan(struct socket *so, struct uio *uio, struct mbuf *m, long space)
 	struct iovec *iov = uio->uio_iov;
 	vaddr_t sva, eva;
 	vsize_t len;
-	struct vm_page **pgs;
 	vaddr_t lva, va;
-	int npgs, s, i, error;
+	int npgs, i, error;
 
 	if (uio->uio_segflg != UIO_USERSPACE)
 		return (0);
@@ -261,39 +402,29 @@ sosend_loan(struct socket *so, struct uio *uio, struct mbuf *m, long space)
 	len = eva - sva;
 	npgs = len >> PAGE_SHIFT;
 
-	while (socurkva + len > somaxkva) {
-		if (sodopendfree(so))
-			continue;
-		SOSEND_COUNTER_INCR(&sosend_kvalimit);
-		s = splvm();
-		sokvawaiters++;
-		(void) tsleep(&socurkva, PVM, "sokva", 0);
-		sokvawaiters--;
-		splx(s);
-	}
+	/* XXX KDASSERT */
+	KASSERT(npgs <= M_EXT_MAXPAGES);
 
-	lva = uvm_km_valloc_wait(kernel_map, len);
+	lva = sokvaalloc(len, so);
 	if (lva == 0)
-		return (0);
-	socurkva += len;
-
-	pgs = alloca(npgs * sizeof(*pgs));
+		return 0;
 
 	error = uvm_loan(&uio->uio_procp->p_vmspace->vm_map, sva, len,
-	    pgs, UVM_LOAN_TOPAGE);
+	    m->m_ext.ext_pgs, UVM_LOAN_TOPAGE);
 	if (error) {
-		uvm_km_free(kernel_map, lva, len);
-		socurkva -= len;
+		sokvafree(lva, len);
 		return (0);
 	}
 
 	for (i = 0, va = lva; i < npgs; i++, va += PAGE_SIZE)
-		pmap_kenter_pa(va, VM_PAGE_TO_PHYS(pgs[i]), VM_PROT_READ);
+		pmap_kenter_pa(va, VM_PAGE_TO_PHYS(m->m_ext.ext_pgs[i]),
+		    VM_PROT_READ);
 	pmap_update(pmap_kernel());
 
 	lva += (vaddr_t) iov->iov_base & PAGE_MASK;
 
 	MEXTADD(m, (caddr_t) lva, space, M_MBUF, soloanfree, so);
+	m->m_flags |= M_EXT_PAGES | M_EXT_ROMAP;
 
 	uio->uio_resid -= space;
 	/* uio_offset not updated, not set/used for write(2) */
@@ -341,6 +472,11 @@ socreate(int dom, struct socket **aso, int type, int proto)
 	so->so_proto = prp;
 	so->so_send = sosend;
 	so->so_receive = soreceive;
+#ifdef MBUFTRACE
+	so->so_rcv.sb_mowner = &prp->pr_domain->dom_mowner;
+	so->so_snd.sb_mowner = &prp->pr_domain->dom_mowner;
+	so->so_mowner = &prp->pr_domain->dom_mowner;
+#endif
 	if (p != 0)
 		so->so_uid = p->p_ucred->cr_uid;
 	error = (*prp->pr_usrreq)(so, PRU_ATTACH, (struct mbuf *)0,
@@ -392,7 +528,6 @@ solisten(struct socket *so, int backlog)
 void
 sofree(struct socket *so)
 {
-	struct mbuf *m;
 
 	if (so->so_pcb || (so->so_state & SS_NOFDREF) == 0)
 		return;
@@ -407,11 +542,6 @@ sofree(struct socket *so)
 	}
 	sbrelease(&so->so_snd);
 	sorflush(so);
-	while ((m = so->so_pendfree) != NULL) {
-		so->so_pendfree = m->m_next;
-		m->m_next = so_pendfree;
-		so_pendfree = m;
-	}
 	pool_put(&socket_pool, so);
 }
 
@@ -653,7 +783,7 @@ sosend(struct socket *so, struct mbuf *addr, struct uio *uio, struct mbuf *top,
 		if ((atomic && resid > so->so_snd.sb_hiwat) ||
 		    clen > so->so_snd.sb_hiwat)
 			snderr(EMSGSIZE);
-		if (space < resid + clen && uio &&
+		if (space < resid + clen &&
 		    (atomic || space < so->so_snd.sb_lowat || space < clen)) {
 			if (so->so_state & SS_NBIO)
 				snderr(EWOULDBLOCK);
@@ -677,14 +807,15 @@ sosend(struct socket *so, struct mbuf *addr, struct uio *uio, struct mbuf *top,
 					top->m_flags |= M_EOR;
 			} else do {
 				if (top == 0) {
-					MGETHDR(m, M_WAIT, MT_DATA);
+					m = m_gethdr(M_WAIT, MT_DATA);
 					mlen = MHLEN;
 					m->m_pkthdr.len = 0;
 					m->m_pkthdr.rcvif = (struct ifnet *)0;
 				} else {
-					MGET(m, M_WAIT, MT_DATA);
+					m = m_get(M_WAIT, MT_DATA);
 					mlen = MLEN;
 				}
+				MCLAIM(m, so->so_snd.sb_mowner);
 				if (use_sosend_loan &&
 				    uio->uio_iov->iov_len >= SOCK_LOAN_THRESH &&
 				    space >= SOCK_LOAN_THRESH &&
@@ -696,7 +827,7 @@ sosend(struct socket *so, struct mbuf *addr, struct uio *uio, struct mbuf *top,
 				}
 				if (resid >= MINCLSIZE && space >= MCLBYTES) {
 					SOSEND_COUNTER_INCR(&sosend_copy_big);
-					MCLGET(m, M_WAIT);
+					m_clget(m, M_WAIT);
 					if ((m->m_flags & M_EXT) == 0)
 						goto nopages;
 					mlen = MCLBYTES;
@@ -894,6 +1025,8 @@ soreceive(struct socket *so, struct mbuf **paddr, struct uio *uio,
 			error = EWOULDBLOCK;
 			goto release;
 		}
+		SBLASTRECORDCHK(&so->so_rcv, "soreceive sbwait 1");
+		SBLASTMBUFCHK(&so->so_rcv, "soreceive sbwait 1");
 		sbunlock(&so->so_rcv);
 		error = sbwait(&so->so_rcv);
 		splx(s);
@@ -902,10 +1035,18 @@ soreceive(struct socket *so, struct mbuf **paddr, struct uio *uio,
 		goto restart;
 	}
  dontblock:
+	/*
+	 * On entry here, m points to the first record of the socket buffer.
+	 * While we process the initial mbufs containing address and control
+	 * info, we save a copy of m->m_nextpkt into nextrecord.
+	 */
 #ifdef notyet /* XXXX */
 	if (uio->uio_procp)
 		uio->uio_procp->p_stats->p_ru.ru_msgrcv++;
 #endif
+	KASSERT(m == so->so_rcv.sb_mb);
+	SBLASTRECORDCHK(&so->so_rcv, "soreceive 1");
+	SBLASTMBUFCHK(&so->so_rcv, "soreceive 1");
 	nextrecord = m->m_nextpkt;
 	if (pr->pr_flags & PR_ADDR) {
 #ifdef DIAGNOSTIC
@@ -958,13 +1099,39 @@ soreceive(struct socket *so, struct mbuf **paddr, struct uio *uio,
 			controlp = &(*controlp)->m_next;
 		}
 	}
+
+	/*
+	 * If m is non-NULL, we have some data to read.  From now on,
+	 * make sure to keep sb_lastrecord consistent when working on
+	 * the last packet on the chain (nextrecord == NULL) and we
+	 * change m->m_nextpkt.
+	 */
 	if (m) {
-		if ((flags & MSG_PEEK) == 0)
+		if ((flags & MSG_PEEK) == 0) {
 			m->m_nextpkt = nextrecord;
+			/*
+			 * If nextrecord == NULL (this is a single chain),
+			 * then sb_lastrecord may not be valid here if m
+			 * was changed earlier.
+			 */
+			if (nextrecord == NULL) {
+				KASSERT(so->so_rcv.sb_mb == m);
+				so->so_rcv.sb_lastrecord = m;
+			}
+		}
 		type = m->m_type;
 		if (type == MT_OOBDATA)
 			flags |= MSG_OOB;
+	} else {
+		if ((flags & MSG_PEEK) == 0) {
+			KASSERT(so->so_rcv.sb_mb == m);
+			so->so_rcv.sb_mb = nextrecord;
+			SB_EMPTY_FIXUP(&so->so_rcv);
+		}
 	}
+	SBLASTRECORDCHK(&so->so_rcv, "soreceive 2");
+	SBLASTMBUFCHK(&so->so_rcv, "soreceive 2");
+
 	moff = 0;
 	offset = 0;
 	while (m && uio->uio_resid > 0 && error == 0) {
@@ -992,6 +1159,8 @@ soreceive(struct socket *so, struct mbuf **paddr, struct uio *uio,
 		 * block interrupts again.
 		 */
 		if (mp == 0) {
+			SBLASTRECORDCHK(&so->so_rcv, "soreceive uiomove");
+			SBLASTMBUFCHK(&so->so_rcv, "soreceive uiomove");
 			splx(s);
 			error = uiomove(mtod(m, caddr_t) + moff, (int)len, uio);
 			s = splsoftnet();
@@ -1033,8 +1202,21 @@ soreceive(struct socket *so, struct mbuf **paddr, struct uio *uio,
 					MFREE(m, so->so_rcv.sb_mb);
 					m = so->so_rcv.sb_mb;
 				}
-				if (m)
+				/*
+				 * If m != NULL, we also know that
+				 * so->so_rcv.sb_mb != NULL.
+				 */
+				KASSERT(so->so_rcv.sb_mb == m);
+				if (m) {
 					m->m_nextpkt = nextrecord;
+					if (nextrecord == NULL)
+						so->so_rcv.sb_lastrecord = m;
+				} else {
+					so->so_rcv.sb_mb = nextrecord;
+					SB_EMPTY_FIXUP(&so->so_rcv);
+				}
+				SBLASTRECORDCHK(&so->so_rcv, "soreceive 3");
+				SBLASTMBUFCHK(&so->so_rcv, "soreceive 3");
 			}
 		} else {
 			if (flags & MSG_PEEK)
@@ -1090,6 +1272,8 @@ soreceive(struct socket *so, struct mbuf **paddr, struct uio *uio,
 				    (struct mbuf *)(long)flags,
 				    (struct mbuf *)0,
 				    (struct proc *)0);
+			SBLASTRECORDCHK(&so->so_rcv, "soreceive sbwait 2");
+			SBLASTMBUFCHK(&so->so_rcv, "soreceive sbwait 2");
 			error = sbwait(&so->so_rcv);
 			if (error) {
 				sbunlock(&so->so_rcv);
@@ -1107,8 +1291,21 @@ soreceive(struct socket *so, struct mbuf **paddr, struct uio *uio,
 			(void) sbdroprecord(&so->so_rcv);
 	}
 	if ((flags & MSG_PEEK) == 0) {
-		if (m == 0)
+		if (m == 0) {
+			/*
+			 * First part is an inline SB_EMPTY_FIXUP().  Second
+			 * part makes sure sb_lastrecord is up-to-date if
+			 * there is still data in the socket buffer.
+			 */
 			so->so_rcv.sb_mb = nextrecord;
+			if (so->so_rcv.sb_mb == NULL) {
+				so->so_rcv.sb_mbtail = NULL;
+				so->so_rcv.sb_lastrecord = NULL;
+			} else if (nextrecord->m_nextpkt == NULL)
+				so->so_rcv.sb_lastrecord = nextrecord;
+		}
+		SBLASTRECORDCHK(&so->so_rcv, "soreceive 4");
+		SBLASTMBUFCHK(&so->so_rcv, "soreceive 4");
 		if (pr->pr_flags & PR_WANTRCVD && so->so_pcb)
 			(*pr->pr_usrreq)(so, PRU_RCVD, (struct mbuf *)0,
 			    (struct mbuf *)(long)flags, (struct mbuf *)0,
@@ -1161,7 +1358,12 @@ sorflush(struct socket *so)
 	socantrcvmore(so);
 	sbunlock(sb);
 	asb = *sb;
-	memset((caddr_t)sb, 0, sizeof(*sb));
+	/*
+	 * Clear most of the sockbuf structure, but leave some of the
+	 * fields valid.
+	 */
+	memset(&sb->sb_startzero, 0,
+	    sizeof(*sb) - offsetof(struct sockbuf, sb_startzero));
 	splx(s);
 	if (pr->pr_flags & PR_RIGHTS && pr->pr_domain->dom_dispose)
 		(*pr->pr_domain->dom_dispose)(asb.sb_mb);
@@ -1274,11 +1476,13 @@ sosetopt(struct socket *so, int level, int optname, struct mbuf *m0)
 				goto bad;
 			}
 			tv = mtod(m, struct timeval *);
-			if (tv->tv_sec * hz + tv->tv_usec / tick > SHRT_MAX) {
+			if (tv->tv_sec > (SHRT_MAX - tv->tv_usec / tick) / hz) {
 				error = EDOM;
 				goto bad;
 			}
 			val = tv->tv_sec * hz + tv->tv_usec / tick;
+			if (val == 0 && tv->tv_usec != 0)
+				val = 1;
 
 			switch (optname) {
 
@@ -1394,11 +1598,175 @@ sogetopt(struct socket *so, int level, int optname, struct mbuf **mp)
 void
 sohasoutofband(struct socket *so)
 {
-	struct proc *p;
-
-	if (so->so_pgid < 0)
-		gsignal(-so->so_pgid, SIGURG);
-	else if (so->so_pgid > 0 && (p = pfind(so->so_pgid)) != 0)
-		psignal(p, SIGURG);
+	fownsignal(so->so_pgid, SIGURG, POLL_PRI, POLLPRI|POLLRDBAND, so);
 	selwakeup(&so->so_rcv.sb_sel);
+}
+
+static void
+filt_sordetach(struct knote *kn)
+{
+	struct socket	*so;
+
+	so = (struct socket *)kn->kn_fp->f_data;
+	SLIST_REMOVE(&so->so_rcv.sb_sel.sel_klist, kn, knote, kn_selnext);
+	if (SLIST_EMPTY(&so->so_rcv.sb_sel.sel_klist))
+		so->so_rcv.sb_flags &= ~SB_KNOTE;
+}
+
+/*ARGSUSED*/
+static int
+filt_soread(struct knote *kn, long hint)
+{
+	struct socket	*so;
+
+	so = (struct socket *)kn->kn_fp->f_data;
+	kn->kn_data = so->so_rcv.sb_cc;
+	if (so->so_state & SS_CANTRCVMORE) {
+		kn->kn_flags |= EV_EOF; 
+		kn->kn_fflags = so->so_error;
+		return (1);
+	}
+	if (so->so_error)	/* temporary udp error */
+		return (1);
+	if (kn->kn_sfflags & NOTE_LOWAT)
+		return (kn->kn_data >= kn->kn_sdata);
+	return (kn->kn_data >= so->so_rcv.sb_lowat);
+}
+
+static void
+filt_sowdetach(struct knote *kn)
+{
+	struct socket	*so;
+
+	so = (struct socket *)kn->kn_fp->f_data;
+	SLIST_REMOVE(&so->so_snd.sb_sel.sel_klist, kn, knote, kn_selnext);
+	if (SLIST_EMPTY(&so->so_snd.sb_sel.sel_klist))
+		so->so_snd.sb_flags &= ~SB_KNOTE;
+}
+
+/*ARGSUSED*/
+static int
+filt_sowrite(struct knote *kn, long hint)
+{
+	struct socket	*so;
+
+	so = (struct socket *)kn->kn_fp->f_data;
+	kn->kn_data = sbspace(&so->so_snd);
+	if (so->so_state & SS_CANTSENDMORE) {
+		kn->kn_flags |= EV_EOF; 
+		kn->kn_fflags = so->so_error;
+		return (1);
+	}
+	if (so->so_error)	/* temporary udp error */
+		return (1);
+	if (((so->so_state & SS_ISCONNECTED) == 0) &&
+	    (so->so_proto->pr_flags & PR_CONNREQUIRED))
+		return (0);
+	if (kn->kn_sfflags & NOTE_LOWAT)
+		return (kn->kn_data >= kn->kn_sdata);
+	return (kn->kn_data >= so->so_snd.sb_lowat);
+}
+
+/*ARGSUSED*/
+static int
+filt_solisten(struct knote *kn, long hint)
+{
+	struct socket	*so;
+
+	so = (struct socket *)kn->kn_fp->f_data;
+
+	/*
+	 * Set kn_data to number of incoming connections, not
+	 * counting partial (incomplete) connections.
+	 */ 
+	kn->kn_data = so->so_qlen;
+	return (kn->kn_data > 0);
+}
+
+static const struct filterops solisten_filtops =
+	{ 1, NULL, filt_sordetach, filt_solisten };
+static const struct filterops soread_filtops =
+	{ 1, NULL, filt_sordetach, filt_soread };
+static const struct filterops sowrite_filtops =
+	{ 1, NULL, filt_sowdetach, filt_sowrite };
+
+int
+soo_kqfilter(struct file *fp, struct knote *kn)
+{
+	struct socket	*so;
+	struct sockbuf	*sb;
+
+	so = (struct socket *)kn->kn_fp->f_data;
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		if (so->so_options & SO_ACCEPTCONN)
+			kn->kn_fop = &solisten_filtops;
+		else
+			kn->kn_fop = &soread_filtops;
+		sb = &so->so_rcv;
+		break;
+	case EVFILT_WRITE:
+		kn->kn_fop = &sowrite_filtops;
+		sb = &so->so_snd;
+		break;
+	default:
+		return (1);
+	}
+	SLIST_INSERT_HEAD(&sb->sb_sel.sel_klist, kn, kn_selnext);
+	sb->sb_flags |= SB_KNOTE;
+	return (0);
+}
+
+#include <sys/sysctl.h>
+
+static int sysctl_kern_somaxkva(SYSCTLFN_PROTO);
+
+/*
+ * sysctl helper routine for kern.somaxkva.  ensures that the given
+ * value is not too small.
+ * (XXX should we maybe make sure it's not too large as well?)
+ */
+static int
+sysctl_kern_somaxkva(SYSCTLFN_ARGS)
+{
+	int error, new_somaxkva;
+	struct sysctlnode node;
+	int s;
+
+	new_somaxkva = somaxkva;
+	node = *rnode;
+	node.sysctl_data = &new_somaxkva;
+	error = sysctl_lookup(SYSCTLFN_CALL(&node));
+	if (error || newp == NULL)
+		return (error);
+
+	if (new_somaxkva < (16 * 1024 * 1024)) /* sanity */
+		return (EINVAL);
+
+	s = splvm();
+	simple_lock(&so_pendfree_slock);
+	somaxkva = new_somaxkva;
+	wakeup(&socurkva);
+	simple_unlock(&so_pendfree_slock);
+	splx(s);
+
+	return (error);
+}
+
+SYSCTL_SETUP(sysctl_kern_somaxkva_setup, "sysctl kern.somaxkva setup")
+{
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "kern", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_KERN, CTL_EOL);
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "somaxkva",
+		       SYSCTL_DESCR("Maximum amount of kernel memory to be "
+				    "used for socket buffers"),
+		       sysctl_kern_somaxkva, 0, NULL, 0,
+		       CTL_KERN, KERN_SOMAXKVA, CTL_EOL);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: esp_obio.c,v 1.11 2002/03/11 16:27:02 pk Exp $	*/
+/*	$NetBSD: esp_obio.c,v 1.16 2003/07/15 00:04:54 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -36,6 +36,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: esp_obio.c,v 1.16 2003/07/15 00:04:54 lukem Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -75,9 +78,8 @@ void	espattach_obio	__P((struct device *, struct device *, void *));
 int	espmatch_obio	__P((struct device *, struct cfdata *, void *));
 
 /* Linkup to the rest of the kernel */
-struct cfattach esp_obio_ca = {
-	sizeof(struct esp_softc), espmatch_obio, espattach_obio
-};
+CFATTACH_DECL(esp_obio, sizeof(struct esp_softc),
+    espmatch_obio, espattach_obio, NULL, NULL);
 
 /*
  * Functions and the switch for the MI code.
@@ -253,7 +255,7 @@ espattach_obio(parent, self, aux)
 	}
 
 	/* Establish interrupt channel */
-	bus_intr_establish(esc->sc_bustag, oba->oba_pri, IPL_BIO, 0,
+	bus_intr_establish(esc->sc_bustag, oba->oba_pri, IPL_BIO,
 			   ncr53c9x_intr, sc);
 
 	/* register interrupt stats */

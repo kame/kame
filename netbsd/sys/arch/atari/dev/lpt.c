@@ -1,4 +1,4 @@
-/*	$NetBSD: lpt.c,v 1.18 2001/01/16 21:13:09 thomas Exp $ */
+/*	$NetBSD: lpt.c,v 1.23 2003/07/15 01:19:51 lukem Exp $ */
 
 /*
  * Copyright (c) 1996 Leo Weppelman
@@ -54,6 +54,9 @@
  * ON-LINE 386BSD USER MANUAL BEFORE USE. A BOOK DISCUSSING THE INTERNALS 
  * OF 386BSD ENTITLED "386BSD FROM THE INSIDE OUT" WILL BE AVAILABLE LATE 1992.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: lpt.c,v 1.23 2003/07/15 01:19:51 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -127,11 +130,15 @@ int lpthwintr __P((struct lpt_softc *, int));
 static void lpattach __P((struct device *, struct device *, void *));
 static int  lpmatch __P((struct device *, struct cfdata *, void *));
 
-struct cfattach lp_ca = {
-	sizeof(struct lpt_softc), lpmatch, lpattach
-};
+CFATTACH_DECL(lp, sizeof(struct lpt_softc),
+    lpmatch, lpattach, NULL, NULL);
 
 extern struct cfdriver lp_cd;
+
+const struct cdevsw lp_cdevsw = {
+	lpopen, lpclose, noread, lpwrite, lpioctl,
+	nostop, notty, nopoll, nommap, nokqfilter,
+};
 
 /*ARGSUSED*/
 static	int

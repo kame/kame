@@ -1,4 +1,4 @@
-/*	$NetBSD: ioat66.c,v 1.2 2001/11/13 08:01:21 lukem Exp $	*/
+/*	$NetBSD: ioat66.c,v 1.7 2003/01/06 13:05:14 wiz Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ioat66.c,v 1.2 2001/11/13 08:01:21 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ioat66.c,v 1.7 2003/01/06 13:05:14 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -73,9 +73,8 @@ void ioat66attach __P((struct device *, struct device *, void *));
 int ioat66intr __P((void *));
 int ioat66print __P((void *, const char *));
 
-struct cfattach ioat_ca = {
-	sizeof(struct ioat66_softc), ioat66probe, ioat66attach,
-};
+CFATTACH_DECL(ioat, sizeof(struct ioat_softc),
+    ioat66probe, ioat66attach, NULL, NULL);
 
 int
 ioat66probe(parent, self, aux)
@@ -141,8 +140,8 @@ ioat66print(aux, pnp)
 	struct commulti_attach_args *ca = aux;
 
 	if (pnp)
-		printf("com at %s", pnp);
-	printf(" slave %d", ca->ca_slave);
+		aprint_normal("com at %s", pnp);
+	aprint_normal(" slave %d", ca->ca_slave);
 	return (UNCONF);
 }
 
@@ -174,7 +173,7 @@ ioat66attach(parent, self, aux)
 	}
 
 	if(bus_space_map(iot, IOAT66SHARED, 1, 0, &sc->sc_intmasq)) {
-	  printf("%s: can't map shared interupt mask\n", 
+	  printf("%s: can't map shared interrupt mask\n", 
 	 	 sc->sc_dev.dv_xname);
 	  return;
 	}

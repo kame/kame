@@ -1,4 +1,4 @@
-/* $NetBSD: isp_netbsd.c,v 1.53.4.1 2002/09/01 23:39:46 lukem Exp $ */
+/* $NetBSD: isp_netbsd.c,v 1.64 2003/12/04 13:57:30 keihan Exp $ */
 /*
  * This driver, which is contained in NetBSD in the files:
  *
@@ -21,7 +21,7 @@
  *	sys/pci/isp_pci.c
  *	sys/sbus/isp_sbus.c
  *
- * Is being actively maintained by Matthew Jacob (mjacob@netbsd.org).
+ * Is being actively maintained by Matthew Jacob (mjacob@NetBSD.org).
  * This driver also is shared source with FreeBSD, OpenBSD, Linux, Solaris,
  * Linux versions. This tends to be an interesting maintenance problem.
  *
@@ -59,7 +59,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: isp_netbsd.c,v 1.53.4.1 2002/09/01 23:39:46 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: isp_netbsd.c,v 1.64 2003/12/04 13:57:30 keihan Exp $");
 
 #include <dev/ic/isp_netbsd.h>
 #include <sys/scsiio.h>
@@ -130,6 +130,9 @@ isp_attach(struct ispsoftc *isp)
 	isp->isp_osinfo._chan.chan_nluns = min(isp->isp_maxluns, 8);
 
 	if (IS_FC(isp)) {
+#if 0	/* XXX channel "settle" time seems to sidestep some nasty race */
+        	isp->isp_osinfo._chan.chan_flags = SCSIPI_CHAN_NOSETTLE;
+#endif
 		isp->isp_osinfo._chan.chan_ntargets = MAX_FC_TARG;
 		isp->isp_osinfo._chan.chan_id = MAX_FC_TARG;
 		isp->isp_osinfo.threadwork = 1;
@@ -275,40 +278,6 @@ ispioctl(struct scsipi_channel *chan, u_long cmd, caddr_t addr, int flag,
 		retval = 0;
 		break;
 #endif
-	case ISP_GET_STATS:
-	{
-		isp_stats_t *sp = (isp_stats_t *) addr;
-
-		MEMZERO(sp, sizeof (*sp));
-		sp->isp_stat_version = ISP_STATS_VERSION;
-		sp->isp_type = isp->isp_type;
-		sp->isp_revision = isp->isp_revision;
-		ISP_LOCK(isp);
-		sp->isp_stats[ISP_INTCNT] = isp->isp_intcnt;
-		sp->isp_stats[ISP_INTBOGUS] = isp->isp_intbogus;
-		sp->isp_stats[ISP_INTMBOXC] = isp->isp_intmboxc;
-		sp->isp_stats[ISP_INGOASYNC] = isp->isp_intoasync;
-		sp->isp_stats[ISP_RSLTCCMPLT] = isp->isp_rsltccmplt;
-		sp->isp_stats[ISP_FPHCCMCPLT] = isp->isp_fphccmplt;
-		sp->isp_stats[ISP_RSCCHIWAT] = isp->isp_rscchiwater;
-		sp->isp_stats[ISP_FPCCHIWAT] = isp->isp_fpcchiwater;
-		ISP_UNLOCK(isp);
-		retval = 0;
-		break;
-	}
-	case ISP_CLR_STATS:
-		ISP_LOCK(isp);
-		isp->isp_intcnt = 0;
-		isp->isp_intbogus = 0;
-		isp->isp_intmboxc = 0;
-		isp->isp_intoasync = 0;
-		isp->isp_rsltccmplt = 0;
-		isp->isp_fphccmplt = 0;
-		isp->isp_rscchiwater = 0;
-		isp->isp_fpcchiwater = 0;
-		ISP_UNLOCK(isp);
-		retval = 0;
-		break;
 	case ISP_SDBLEV:
 	{
 		int olddblev = isp->isp_dblev;
@@ -368,6 +337,56 @@ ispioctl(struct scsipi_channel *chan, u_long cmd, caddr_t addr, int flag,
 		ISP_UNLOCK(isp);
 		break;
 	}
+	case ISP_GET_STATS:
+	{
+		isp_stats_t *sp = (isp_stats_t *) addr;
+
+		MEMZERO(sp, sizeof (*sp));
+		sp->isp_stat_version = ISP_STATS_VERSION;
+		sp->isp_type = isp->isp_type;
+		sp->isp_revision = isp->isp_revision;
+		ISP_LOCK(isp);
+		sp->isp_stats[ISP_INTCNT] = isp->isp_intcnt;
+		sp->isp_stats[ISP_INTBOGUS] = isp->isp_intbogus;
+		sp->isp_stats[ISP_INTMBOXC] = isp->isp_intmboxc;
+		sp->isp_stats[ISP_INGOASYNC] = isp->isp_intoasync;
+		sp->isp_stats[ISP_RSLTCCMPLT] = isp->isp_rsltccmplt;
+		sp->isp_stats[ISP_FPHCCMCPLT] = isp->isp_fphccmplt;
+		sp->isp_stats[ISP_RSCCHIWAT] = isp->isp_rscchiwater;
+		sp->isp_stats[ISP_FPCCHIWAT] = isp->isp_fpcchiwater;
+		ISP_UNLOCK(isp);
+		retval = 0;
+		break;
+	}
+	case ISP_CLR_STATS:
+		ISP_LOCK(isp);
+		isp->isp_intcnt = 0;
+		isp->isp_intbogus = 0;
+		isp->isp_intmboxc = 0;
+		isp->isp_intoasync = 0;
+		isp->isp_rsltccmplt = 0;
+		isp->isp_fphccmplt = 0;
+		isp->isp_rscchiwater = 0;
+		isp->isp_fpcchiwater = 0;
+		ISP_UNLOCK(isp);
+		retval = 0;
+		break;
+	case ISP_FC_GETHINFO:
+	{
+		struct isp_hba_device *hba = (struct isp_hba_device *) addr;
+		MEMZERO(hba, sizeof (*hba));
+		ISP_LOCK(isp);
+		hba->fc_speed = FCPARAM(isp)->isp_gbspeed;
+		hba->fc_scsi_supported = 1;
+		hba->fc_topology = FCPARAM(isp)->isp_topo + 1;
+		hba->fc_loopid = FCPARAM(isp)->isp_loopid;
+		hba->nvram_node_wwn = FCPARAM(isp)->isp_nodewwn;
+		hba->nvram_port_wwn = FCPARAM(isp)->isp_portwwn;
+		hba->active_node_wwn = ISP_NODEWWN(isp);
+		hba->active_port_wwn = ISP_PORTWWN(isp);
+		ISP_UNLOCK(isp);
+		break;
+	}
 	case SCBUSIORESET:
 		ISP_LOCK(isp);
 		if (isp_control(isp, ISPCTL_RESET_BUS, &chan->chan_channel))
@@ -392,6 +411,7 @@ ispcmd(struct ispsoftc *isp, XS_T *xs)
 		if (isp->isp_state != ISP_INITSTATE) {
 			ENABLE_INTS(isp);
 			ISP_UNLOCK(isp);
+			isp_prt(isp, ISP_LOGERR, "isp not at init state");
 			XS_SETERR(xs, HBA_BOTCH);
 			scsipi_done(xs);
 			return;
@@ -610,6 +630,7 @@ isp_polled_cmd(struct ispsoftc *isp, XS_T *xs)
 			isp_reinit(isp);
 		}
 		if (XS_NOERR(xs)) {
+			isp_prt(isp, ISP_LOGERR, "polled command timed out");
 			XS_SETERR(xs, HBA_BOTCH);
 		}
 	}
@@ -642,6 +663,10 @@ isp_done(XS_T *xs)
 				scsipi_channel_timed_thaw(&isp->isp_chanB);
 			}
 		}
+if (xs->error == XS_DRIVER_STUFFUP) {
+isp_prt(isp, ISP_LOGERR, "BOTCHED cmd for %d.%d.%d cmd 0x%x datalen %ld",
+XS_CHANNEL(xs), XS_TGT(xs), XS_LUN(xs), XS_CDBP(xs)[0], (long) XS_XFRLEN(xs));
+}
 		scsipi_done(xs);
 	}
 }
@@ -698,7 +723,7 @@ isp_dog(void *arg)
 			(void) isp_control(isp, ISPCTL_ABORT_CMD, arg);
 
 			/*
-			 * After this point, the comamnd is really dead.
+			 * After this point, the command is really dead.
 			 */
 			if (XS_XFRLEN(xs)) {
 				ISP_DMAFREE(isp, xs, handle);
@@ -714,7 +739,7 @@ isp_dog(void *arg)
 			    "possible command timeout on handle %x", handle);
 			XS_CMD_C_WDOG(xs);
 			callout_reset(&xs->xs_callout, hz, isp_dog, xs);
-			if (isp_getrqentry(isp, &nxti, &optr, (void **) &qe)) {
+			if (isp_getrqentry(isp, &nxti, &optr, (void *) &qe)) {
 				ISP_UNLOCK(isp);
 				return;
 			}
@@ -764,7 +789,7 @@ isp_fc_worker(void *arg)
 		s = splbio();
 		while (isp->isp_osinfo.threadwork) {
 			isp->isp_osinfo.threadwork = 0;
-			if (isp_fc_runstate(isp, 10 * 1000000) == 0) {
+			if (isp_fc_runstate(isp, 250000) == 0) {
 				break;
 			}
 			if  (isp->isp_osinfo.loop_checked &&
@@ -772,6 +797,7 @@ isp_fc_worker(void *arg)
 				splx(s);
 				goto skip;
 			}
+			isp->isp_osinfo.loop_checked = 1;
 			isp->isp_osinfo.threadwork = 1;
 			splx(s);
 			delay(500 * 1000);
@@ -914,9 +940,9 @@ isp_async(struct ispsoftc *isp, ispasync_t cmd, void *arg)
 		break;
 	case ISPASYNC_PROMENADE:
 	if (IS_FC(isp) && isp->isp_dblev) {
-		const char fmt[] = "Target %d (Loop 0x%x) Port ID 0x%x "
+		static const char fmt[] = "Target %d (Loop 0x%x) Port ID 0x%x "
 		    "(role %s) %s\n Port WWN 0x%08x%08x\n Node WWN 0x%08x%08x";
-		const static char *roles[4] = {
+		const static char *const roles[4] = {
 		    "None", "Target", "Initiator", "Target/Initiator"
 		};
 		fcparam *fcp = isp->isp_param;
@@ -1088,7 +1114,17 @@ isp_async(struct ispsoftc *isp, ispasync_t cmd, void *arg)
                 isp_prt(isp, ISP_LOGERR,
                     "Internal Firmware Error on bus %d @ RISC Address 0x%x",
                     mbox6, mbox1);
+#ifdef	ISP_FW_CRASH_DUMP
+		if (IS_FC(isp)) {
+			if (isp->isp_osinfo.blocked == 0) {
+				isp->isp_osinfo.blocked = 1;
+				scsipi_channel_freeze(&isp->isp_chanA, 1);
+			}
+			isp_fw_dump(isp);
+		}
 		isp_reinit(isp);
+		isp_async(isp, ISPASYNC_FW_RESTART, NULL);
+#endif
 		break;
 	}
 	default:

@@ -1,7 +1,6 @@
-/*	$NetBSD: ext2fs_inode.c,v 1.27 2001/11/08 02:39:07 lukem Exp $	*/
+/*	$NetBSD: ext2fs_inode.c,v 1.40 2004/03/22 19:23:08 bouyer Exp $	*/
 
 /*
- * Copyright (c) 1997 Manuel Bouyer.
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -37,8 +32,40 @@
  * Modified for ext2fs by Manuel Bouyer.
  */
 
+/*
+ * Copyright (c) 1997 Manuel Bouyer.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by Manuel Bouyer.
+ * 4. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ *	@(#)ffs_inode.c	8.8 (Berkeley) 10/19/94
+ * Modified for ext2fs by Manuel Bouyer.
+ */
+
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ext2fs_inode.c,v 1.27 2001/11/08 02:39:07 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ext2fs_inode.c,v 1.40 2004/03/22 19:23:08 bouyer Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -61,8 +88,8 @@ __KERNEL_RCSID(0, "$NetBSD: ext2fs_inode.c,v 1.27 2001/11/08 02:39:07 lukem Exp 
 
 extern int prtactive;
 
-static int ext2fs_indirtrunc __P((struct inode *, ufs_daddr_t, ufs_daddr_t,
-				  ufs_daddr_t, int, long *));
+static int ext2fs_indirtrunc __P((struct inode *, daddr_t, daddr_t,
+				  daddr_t, int, long *));
 
 /*
  * Last reference to an inode.  If necessary, write or delete it.
@@ -77,6 +104,7 @@ ext2fs_inactive(v)
 	} */ *ap = v;
 	struct vnode *vp = ap->a_vp;
 	struct inode *ip = VTOI(vp);
+	struct mount *mp;
 	struct proc *p = ap->a_p;
 	struct timespec ts;
 	int error = 0;
@@ -89,6 +117,7 @@ ext2fs_inactive(v)
 
 	error = 0;
 	if (ip->i_e2fs_nlink == 0 && (vp->v_mount->mnt_flag & MNT_RDONLY) == 0) {
+		vn_start_write(vp, &mp, V_WAIT | V_LOWER);
 		if (ip->i_e2fs_size != 0) {
 			error = VOP_TRUNCATE(vp, (off_t)0, 0, NOCRED, NULL);
 		}
@@ -96,9 +125,14 @@ ext2fs_inactive(v)
 		ip->i_e2fs_dtime = ts.tv_sec;
 		ip->i_flag |= IN_CHANGE | IN_UPDATE;
 		VOP_VFREE(vp, ip->i_number, ip->i_e2fs_mode);
+		vn_finished_write(mp, V_LOWER);
 	}
-	if (ip->i_flag & (IN_ACCESS | IN_CHANGE | IN_UPDATE | IN_MODIFIED | IN_ACCESSED))
+	if (ip->i_flag &
+	    (IN_ACCESS | IN_CHANGE | IN_UPDATE | IN_MODIFIED | IN_ACCESSED)) {
+		vn_start_write(vp, &mp, V_WAIT | V_LOWER);
 		VOP_UPDATE(vp, NULL, NULL, 0);
+		vn_finished_write(mp, V_LOWER);
+	}
 out:
 	VOP_UNLOCK(vp, 0);
 	/*
@@ -160,7 +194,7 @@ ext2fs_update(v)
 	ip->i_flag &= ~(IN_MODIFIED | IN_ACCESSED);
 	cp = (caddr_t)bp->b_data +
 	    (ino_to_fsbo(fs, ip->i_number) * EXT2_DINODE_SIZE);
-	e2fs_isave(&ip->i_din.e2fs_din, (struct ext2fs_dinode *)cp);
+	e2fs_isave(ip->i_din.e2fs_din, (struct ext2fs_dinode *)cp);
 	if ((ap->a_flags & (UPDATE_WAIT|UPDATE_DIROP)) != 0 &&
 	    (flags & IN_MODIFIED) != 0 &&
 	    (ap->a_vp->v_mount->mnt_flag & MNT_ASYNC) == 0)
@@ -190,10 +224,11 @@ ext2fs_truncate(v)
 		struct proc *a_p;
 	} */ *ap = v;
 	struct vnode *ovp = ap->a_vp;
-	ufs_daddr_t lastblock;
+	daddr_t lastblock;
 	struct inode *oip;
-	ufs_daddr_t bn, lastiblock[NIADDR], indir_lbn[NIADDR];
-	ufs_daddr_t oldblks[NDADDR + NIADDR], newblks[NDADDR + NIADDR];
+	daddr_t bn, lastiblock[NIADDR], indir_lbn[NIADDR];
+	/* XXX ondisk32 */
+	int32_t oldblks[NDADDR + NIADDR], newblks[NDADDR + NIADDR];
 	off_t length = ap->a_length;
 	struct m_ext2fs *fs;
 	int offset, size, level;
@@ -214,7 +249,7 @@ ext2fs_truncate(v)
 		if (length != 0)
 			panic("ext2fs_truncate: partial truncate of symlink");
 #endif
-		memset((char *)&oip->i_din.e2fs_din.e2di_shortlink, 0,
+		memset((char *)&oip->i_din.e2fs_din->e2di_shortlink, 0,
 			(u_int)oip->i_e2fs_size);
 		oip->i_e2fs_size = 0;
 		oip->i_flag |= IN_CHANGE | IN_UPDATE;
@@ -236,7 +271,7 @@ ext2fs_truncate(v)
 		if (length > fs->fs_maxfilesize)
 			return (EFBIG);
 #endif
-		ext2fs_balloc_range(ovp, length - 1, 1, ap->a_cred,
+		ufs_balloc_range(ovp, length - 1, 1, ap->a_cred,
 		    ap->a_flags & IO_SYNC ? B_SYNC : 0);
 		oip->i_flag |= IN_CHANGE | IN_UPDATE;
 		return (VOP_UPDATE(ovp, NULL, NULL, 1));
@@ -309,6 +344,7 @@ ext2fs_truncate(v)
 	indir_lbn[DOUBLE] = indir_lbn[SINGLE] - NINDIR(fs) -1;
 	indir_lbn[TRIPLE] = indir_lbn[DOUBLE] - NINDIR(fs) * NINDIR(fs) - 1;
 	for (level = TRIPLE; level >= SINGLE; level--) {
+		/* XXX ondisk32 */
 		bn = fs2h32(oip->i_e2fs_blocks[NDADDR + level]);
 		if (bn != 0) {
 			error = ext2fs_indirtrunc(oip, indir_lbn[level],
@@ -330,6 +366,7 @@ ext2fs_truncate(v)
 	 * All whole direct blocks or frags.
 	 */
 	for (i = NDADDR - 1; i > lastblock; i--) {
+		/* XXX ondisk32 */
 		bn = fs2h32(oip->i_e2fs_blocks[i]);
 		if (bn == 0)
 			continue;
@@ -373,17 +410,18 @@ done:
 static int
 ext2fs_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
 	struct inode *ip;
-	ufs_daddr_t lbn, lastbn;
-	ufs_daddr_t dbn;
+	daddr_t lbn, lastbn;
+	daddr_t dbn;
 	int level;
 	long *countp;
 {
 	int i;
 	struct buf *bp;
 	struct m_ext2fs *fs = ip->i_e2fs;
-	ufs_daddr_t *bap;
+	int32_t *bap;	/* XXX ondisk32 */
 	struct vnode *vp;
-	ufs_daddr_t *copy = NULL, nb, nlbn, last;
+	daddr_t nb, nlbn, last;
+	int32_t *copy = NULL;	/* XXX ondisk32 */
 	long blkcount, factor;
 	int nblocks, blocksreleased = 0;
 	int error = 0, allerror = 0;
@@ -420,7 +458,7 @@ ext2fs_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
 		if (bp->b_bcount > bp->b_bufsize)
 			panic("ext2fs_indirtrunc: bad buffer size");
 		bp->b_blkno = dbn;
-		VOP_STRATEGY(bp);
+		VOP_STRATEGY(vp, bp);
 		error = biowait(bp);
 	}
 	if (error) {
@@ -429,9 +467,10 @@ ext2fs_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
 		return (error);
 	}
 
-	bap = (ufs_daddr_t *)bp->b_data;
+	bap = (int32_t *)bp->b_data;	/* XXX ondisk32 */
 	if (lastbn >= 0) {
-		MALLOC(copy, ufs_daddr_t *, fs->e2fs_bsize, M_TEMP, M_WAITOK);
+		/* XXX ondisk32 */
+		MALLOC(copy, int32_t *, fs->e2fs_bsize, M_TEMP, M_WAITOK);
 		memcpy((caddr_t)copy, (caddr_t)bap, (u_int)fs->e2fs_bsize);
 		memset((caddr_t)&bap[last + 1], 0,
 			(u_int)(NINDIR(fs) - (last + 1)) * sizeof (u_int32_t));
@@ -447,12 +486,13 @@ ext2fs_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
 	for (i = NINDIR(fs) - 1,
 		nlbn = lbn + 1 - i * factor; i > last;
 		i--, nlbn += factor) {
+		/* XXX ondisk32 */
 		nb = fs2h32(bap[i]);
 		if (nb == 0)
 			continue;
 		if (level > SINGLE) {
 			error = ext2fs_indirtrunc(ip, nlbn, fsbtodb(fs, nb),
-						   (ufs_daddr_t)-1, level - 1,
+						   (daddr_t)-1, level - 1,
 						   &blkcount);
 			if (error)
 				allerror = error;
@@ -467,6 +507,7 @@ ext2fs_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
 	 */
 	if (level > SINGLE && lastbn >= 0) {
 		last = lastbn % factor;
+		/* XXX ondisk32 */
 		nb = fs2h32(bap[i]);
 		if (nb != 0) {
 			error = ext2fs_indirtrunc(ip, nlbn, fsbtodb(fs, nb),

@@ -1,4 +1,4 @@
-/*	$NetBSD: umap_vnops.c,v 1.22 2002/01/04 07:19:34 chs Exp $	*/
+/*	$NetBSD: umap_vnops.c,v 1.24.2.4 2004/07/02 17:55:02 he Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -43,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: umap_vnops.c,v 1.22 2002/01/04 07:19:34 chs Exp $");
+__KERNEL_RCSID(0, "$NetBSD: umap_vnops.c,v 1.24.2.4 2004/07/02 17:55:02 he Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -88,8 +84,9 @@ const struct vnodeopv_entry_desc umap_vnodeop_entries[] = {
 	{ &vop_open_desc,	layer_open },
 	{ &vop_setattr_desc,	layer_setattr },
 	{ &vop_access_desc,	layer_access },
+	{ &vop_remove_desc,	layer_remove },
+	{ &vop_rmdir_desc,	layer_rmdir },
 
-	{ &vop_strategy_desc,	layer_strategy },
 	{ &vop_bwrite_desc,	layer_bwrite },
 	{ &vop_bmap_desc,	layer_bmap },
 	{ &vop_getpages_desc,	layer_getpages },
@@ -367,6 +364,7 @@ umap_lookup(v)
 	ap->a_dvp = ldvp;
 	error = VCALL(ldvp, ap->a_desc->vdesc_offset, ap);
 	vp = *ap->a_vpp;
+	*ap->a_vpp = NULL;
 
 	if (error == EJUSTRETURN && (cnf & ISLASTCN) &&
 	    (dvp->v_mount->mnt_flag & MNT_RDONLY) &&
@@ -512,6 +510,7 @@ umap_rename(v)
 	struct componentname *compnamep;
 	struct ucred *compcredp, *savecompcredp;
 	struct vnode *vp;
+	struct vnode *tvp;
 
 	/*
 	 * Rename is irregular, having two componentname structures.
@@ -539,7 +538,19 @@ umap_rename(v)
 		printf("umap_rename: rename component credit user now %d, group %d\n", 
 		    compcredp->cr_uid, compcredp->cr_gid);
 
+	tvp = ap->a_tvp;
+	if (tvp) {
+		if (tvp->v_mount != vp->v_mount)
+			tvp = NULL;
+		else
+			vref(tvp);
+	}
 	error = umap_bypass(ap);
+	if (tvp) {
+		if (error == 0)
+			VTOLAYER(tvp)->layer_flags |= LAYERFS_REMOVED;
+		vrele(tvp);
+	}
 	
 	/* Restore the additional mapped componentname cred structure. */
 

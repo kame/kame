@@ -1,4 +1,4 @@
-/*	$NetBSD: icmp_var.h,v 1.19 2001/10/30 06:41:09 kml Exp $	*/
+/*	$NetBSD: icmp_var.h,v 1.22 2003/08/07 16:33:08 agc Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -49,7 +45,7 @@ struct	icmpstat {
 	u_quad_t icps_oldicmp;		/* no error 'cuz old was icmp */
 	u_quad_t icps_outhist[ICMP_MAXTYPE + 1];
 /* statistics related to input messages processed */
- 	u_quad_t icps_badcode;		/* icmp_code out of range */
+	u_quad_t icps_badcode;		/* icmp_code out of range */
 	u_quad_t icps_tooshort;		/* packet < ICMP_MINLEN */
 	u_quad_t icps_checksum;		/* bad checksum */
 	u_quad_t icps_badlen;		/* calculated bound mismatch */
@@ -83,6 +79,12 @@ struct	icmpstat {
 
 #ifdef _KERNEL
 struct	icmpstat icmpstat;
+
+#ifdef __NO_STRICT_ALIGNMENT
+#define	ICMP_HDR_ALIGNED_P(ic)	1
+#else
+#define	ICMP_HDR_ALIGNED_P(ic)	((((vaddr_t) (ic)) & 3) == 0)
 #endif
+#endif /* _KERNEL_ */
 
 #endif /* _NETINET_ICMP_VAR_H_ */

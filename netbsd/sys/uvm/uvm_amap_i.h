@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_amap_i.h,v 1.17.16.1 2002/08/24 03:17:10 lukem Exp $	*/
+/*	$NetBSD: uvm_amap_i.h,v 1.20 2002/12/20 18:21:13 atatat Exp $	*/
 
 /*
  *
@@ -34,9 +34,6 @@
  * from: Id: uvm_amap_i.h,v 1.1.2.4 1998/01/05 18:12:57 chuck Exp
  */
 
-#ifndef _UVM_UVM_AMAP_I_H_
-#define _UVM_UVM_AMAP_I_H_
-
 /*
  * uvm_amap_i.h
  */
@@ -45,8 +42,9 @@
  * if inlines are enabled always pull in these functions, otherwise
  * pull them in only once (when we are compiling uvm_amap.c).
  */
-
 #if defined(UVM_AMAP_INLINE) || defined(UVM_AMAP_C)
+#ifndef _UVM_UVM_AMAP_I_H_
+#define _UVM_UVM_AMAP_I_H_
 
 /*
  * amap_lookup: look up a page in an amap
@@ -211,7 +209,7 @@ amap_ref(amap, offset, len, flags)
 #ifdef UVM_AMAP_PPREF
 	if (amap->am_ppref == NULL && (flags & AMAP_REFALL) == 0 &&
 	    len != amap->am_nslot)
-		amap_pp_establish(amap);
+		amap_pp_establish(amap, offset);
 #endif
 	amap->am_ref++;
 #ifdef UVM_AMAP_PPREF
@@ -270,7 +268,7 @@ amap_unref(amap, offset, len, all)
 		amap->am_flags &= ~AMAP_SHARED;	/* clear shared flag */
 #ifdef UVM_AMAP_PPREF
 	if (amap->am_ppref == NULL && all == 0 && len != amap->am_nslot)
-		amap_pp_establish(amap);
+		amap_pp_establish(amap, offset);
 	if (amap->am_ppref && amap->am_ppref != PPREF_NONE) {
 		if (all)
 			amap_pp_adjref(amap, 0, amap->am_nslot, -1);
@@ -283,6 +281,7 @@ amap_unref(amap, offset, len, all)
 	UVMHIST_LOG(maphist,"<- done!", 0, 0, 0, 0);
 }
 
+#endif /* _UVM_UVM_AMAP_I_H_ */
+
 #endif /* defined(UVM_AMAP_INLINE) || defined(UVM_AMAP_C) */
 
-#endif /* _UVM_UVM_AMAP_I_H_ */

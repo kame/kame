@@ -35,14 +35,14 @@
  *	Fritz!Card PCI driver
  *	------------------------------------------------
  *
- *	$Id: ifpci.c,v 1.9 2002/05/21 10:31:12 martin Exp $
+ *	$Id: ifpci.c,v 1.15 2003/10/28 17:01:19 pooka Exp $
  *
  *      last edit-date: [Fri Jan  5 11:38:58 2001]
  *
  *---------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ifpci.c,v 1.9 2002/05/21 10:31:12 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ifpci.c,v 1.15 2003/10/28 17:01:19 pooka Exp $");
 
 
 #include <sys/param.h>
@@ -90,7 +90,7 @@ void n_disconnect_request(struct call_desc *cd, int cause);
 void n_alert_request(struct call_desc *cd);
 void n_mgmt_command(struct isdn_l3_driver *drv, int cmd, void *parm);
 
-extern const struct isdn_layer1_bri_driver isic_std_driver;
+extern const struct isdn_layer1_isdnif_driver isic_std_driver;
 
 const struct isdn_l3_driver_functions
 ifpci_l3_driver = {
@@ -138,10 +138,8 @@ static void ifpci_attach(struct device *parent, struct device *self, void *aux);
 static int ifpci_detach(struct device *self, int flags);
 static int ifpci_activate(struct device *self, enum devact act);
 
-struct cfattach ifpci_ca = {
-	sizeof(struct ifpci_softc), ifpci_match, ifpci_attach,
-	ifpci_detach, ifpci_activate
-};
+CFATTACH_DECL(ifpci, sizeof(struct ifpci_softc),
+    ifpci_match, ifpci_attach, ifpci_detach, ifpci_activate);
 
 /*---------------------------------------------------------------------------*
  *	AVM PCI Fritz!Card special registers
@@ -387,14 +385,14 @@ ifpci_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_freeflag2 = 0;
 
 	/* init higher protocol layers */
-	drv = isdn_attach_bri(sc->sc_dev.dv_xname,
-	    "AVM Fritz!PCI", &sc->sc_l2, &ifpci_l3_driver);
+	drv = isdn_attach_isdnif(sc->sc_dev.dv_xname,
+	    "AVM Fritz!PCI", &sc->sc_l2, &ifpci_l3_driver, NBCH_BRI);
 	sc->sc_l3token = drv;
 	sc->sc_l2.driver = &isic_std_driver;
 	sc->sc_l2.l1_token = sc;
 	sc->sc_l2.drv = drv;
 	isdn_layer2_status_ind(&sc->sc_l2, drv, STI_ATTACH, 1);
-	isdn_bri_ready(drv->bri);
+	isdn_isdnif_ready(drv->isdnif);
 }
 
 static int
@@ -428,7 +426,7 @@ ifpci_activate(self, act)
 	case DVACT_DEACTIVATE:
 		psc->sc_isic.sc_intr_valid = ISIC_INTR_DYING;
 		isdn_layer2_status_ind(&psc->sc_isic.sc_l2, psc->sc_isic.sc_l3token, STI_ATTACH, 0);
-		isdn_detach_bri(psc->sc_isic.sc_l3token);
+		isdn_detach_isdnif(psc->sc_isic.sc_l3token);
 		psc->sc_isic.sc_l3token = NULL;
 		break;
 	}
@@ -702,7 +700,7 @@ avma1pp_hscx_intr(int h_chan, u_int stat, struct isic_softc *sc)
 			if(chan->in_mbuf == NULL)
 			{
 				if((chan->in_mbuf = i4b_Bgetmbuf(BCH_MAX_DATALEN)) == NULL)
-					panic("L1 avma1pp_hscx_intr: RME, cannot allocate mbuf!\n");
+					panic("L1 avma1pp_hscx_intr: RME, cannot allocate mbuf!");
 				chan->in_cbptr = chan->in_mbuf->m_data;
 				chan->in_len = 0;
 			}
@@ -793,7 +791,7 @@ avma1pp_hscx_intr(int h_chan, u_int stat, struct isic_softc *sc)
 					  /* alloc new buffer */
 				
 					  if((chan->in_mbuf = i4b_Bgetmbuf(BCH_MAX_DATALEN)) == NULL)
-						 panic("L1 avma1pp_hscx_intr: RPF, cannot allocate new mbuf!\n");
+						 panic("L1 avma1pp_hscx_intr: RPF, cannot allocate new mbuf!");
 	
 					  /* setup new data ptr */
 				
@@ -1273,6 +1271,7 @@ isic_hscx_fifo(l1_bchan_state_t *chan, struct isic_softc *sc)
 	u_char scrbuf[HSCX_FIFO_LEN];
 
 	len = 0;
+	cmd = 0;
 
 	/*
 	 * fill the HSCX tx fifo with data from the current mbuf. if

@@ -1,6 +1,5 @@
-#	$NetBSD: Makefile,v 1.1 2002/03/24 15:46:52 bjh21 Exp $
+#	$NetBSD: Makefile,v 1.4 2003/01/17 21:55:25 thorpej Exp $
 
-KDIR=	/sys/arch/acorn26/include
 INCSDIR= /usr/include/acorn26
 
 INCS=	ansi.h aout_machdep.h asm.h \
@@ -13,8 +12,8 @@ INCS=	ansi.h aout_machdep.h asm.h \
 	int_const.h int_fmtio.h int_limits.h int_mwgwtypes.h int_types.h \
 	intr.h ipkdb.h irq.h \
 	limits.h lock.h \
-	math.h \
-	param.h pcb.h pmap.h proc.h profile.h ptrace.h \
+	math.h mcontext.h \
+	param.h pcb.h pmap.h pmc.h proc.h profile.h ptrace.h \
 	reg.h \
 	setjmp.h signal.h stdarg.h sysarch.h \
 	trap.h types.h \

@@ -1,4 +1,4 @@
-/*	$NetBSD: vm_machdep.c,v 1.37 2002/03/09 23:35:59 chs Exp $	*/
+/*	$NetBSD: vm_machdep.c,v 1.58 2004/01/04 11:33:31 jdolecek Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -31,6 +31,9 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: vm_machdep.c,v 1.58 2004/01/04 11:33:31 jdolecek Exp $");
+
 #include "opt_altivec.h"
 #include "opt_multiprocessor.h"
 #include "opt_ppcarch.h"
@@ -45,12 +48,11 @@
 
 #include <uvm/uvm_extern.h>
 
+#ifdef ALTIVEC
+#include <powerpc/altivec.h>
+#endif
 #include <machine/fpu.h>
 #include <machine/pcb.h>
-
-#if !defined(MULTIPROCESSOR) && defined(PPC_HAVE_FPU)
-#define save_fpu_proc(p) save_fpu(p)		/* XXX */
-#endif
 
 #ifdef PPC_IBM4XX
 vaddr_t vmaprange(struct proc *, vaddr_t, vsize_t, int);
@@ -58,16 +60,16 @@ void vunmaprange(vaddr_t, vsize_t);
 #endif
 
 /*
- * Finish a fork operation, with process p2 nearly set up.
+ * Finish a fork operation, with execution context l2 nearly set up.
  * Copy and update the pcb and trap frame, making the child ready to run.
  *
  * Rig the child's kernel stack so that it will start out in
- * fork_trampoline() and call child_return() with p2 as an
+ * fork_trampoline() and call child_return() with l2 as an
  * argument. This causes the newly-created child process to go
  * directly to user level with an apparent return value of 0 from
  * fork(), while the parent process returns normally.
  *
- * p1 is the process being forked; if p1 == &proc0, we are creating
+ * l1 is the execution context being forked; if l1 == &lwp0, we are creating
  * a kernel thread, and the return path and argument are specified with
  * `func' and `arg'.
  *
@@ -76,128 +78,158 @@ void vunmaprange(vaddr_t, vsize_t);
  * accordingly.
  */
 void
-cpu_fork(p1, p2, stack, stacksize, func, arg)
-	struct proc *p1, *p2;
-	void *stack;
-	size_t stacksize;
-	void (*func)(void *);
-	void *arg;
+cpu_lwp_fork(struct lwp *l1, struct lwp *l2, void *stack, size_t stacksize,
+	void (*func)(void *), void *arg)
 {
 	struct trapframe *tf;
 	struct callframe *cf;
 	struct switchframe *sf;
 	caddr_t stktop1, stktop2;
 	void fork_trampoline(void);
-	struct pcb *pcb = &p2->p_addr->u_pcb;
+	struct pcb *pcb = &l2->l_addr->u_pcb;
 
 #ifdef DIAGNOSTIC
 	/*
-	 * if p1 != curproc && p1 == &proc0, we're creating a kernel thread.
+	 * if p1 != curlwp && p1 == &proc0, we're creating a kernel thread.
 	 */
-	if (p1 != curproc && p1 != &proc0)
-		panic("cpu_fork: curproc");
+	if (l1 != curlwp && l1 != &lwp0)
+		panic("cpu_lwp_fork: curlwp");
 #endif
 
 #ifdef PPC_HAVE_FPU
-	if (p1->p_addr->u_pcb.pcb_fpcpu)
-		save_fpu_proc(p1);
+	if (l1->l_addr->u_pcb.pcb_fpcpu)
+		save_fpu_lwp(l1);
 #endif
-	*pcb = p1->p_addr->u_pcb;
 #ifdef ALTIVEC
-	if (p1->p1_addr->u_pcb.pcb_vr != NULL) {
-		if (p1 == vecproc)
-			save_vec(p1);
-		pcb->pcb_vr = pool_get(vecpl, POOL_WAITOK);
-		*pcb->pcb_vr = *p1->p1_addr->u_ucb.pcb_vr;
-	}
+	if (l1->l_addr->u_pcb.pcb_veccpu)
+		save_vec_lwp(l1);
 #endif
+	*pcb = l1->l_addr->u_pcb;
 
-	pcb->pcb_pm = p2->p_vmspace->vm_map.pmap;
-#ifndef OLDPMAP
-	pcb->pcb_pmreal = pcb->pcb_pm;		/* XXX */
-#else
-	(void) pmap_extract(pmap_kernel(), (vaddr_t)pcb->pcb_pm,
-	    (paddr_t *)&pcb->pcb_pmreal);
-#endif
+	pcb->pcb_pm = l2->l_proc->p_vmspace->vm_map.pmap;
 
 	/*
 	 * Setup the trap frame for the new process
 	 */
-	stktop1 = (caddr_t)trapframe(p1);
-	stktop2 = (caddr_t)trapframe(p2);
+	stktop1 = (caddr_t)trapframe(l1);
+	stktop2 = (caddr_t)trapframe(l2);
 	memcpy(stktop2, stktop1, sizeof(struct trapframe));
 
 	/*
 	 * If specified, give the child a different stack.
 	 */
 	if (stack != NULL) {
-		tf = trapframe(p2);
+		tf = trapframe(l2);
 		tf->fixreg[1] = (register_t)stack + stacksize;
 	}
 
-	stktop2 = (caddr_t)((u_long)stktop2 & ~15);	/* Align stack pointer */
+	/*
+	 * Align stack pointer
+	 * Since sizeof(struct trapframe) is 41 words, this will
+	 * give us 12 bytes on the stack, which pad us somewhat
+	 * for an extra call frame (or at least space for callee
+	 * to store LR).
+	 */
+	stktop2 = (caddr_t)((uintptr_t)stktop2 & ~(CALLFRAMELEN-1));
 
 	/*
 	 * There happens to be a callframe, too.
 	 */
 	cf = (struct callframe *)stktop2;
-	cf->lr = (int)fork_trampoline;
+	cf->sp = (register_t)(stktop2 + CALLFRAMELEN);
+	cf->lr = (register_t)fork_trampoline;
 
 	/*
 	 * Below the trap frame, there is another call frame:
 	 */
-	stktop2 -= 16;
+	stktop2 -= CALLFRAMELEN;
 	cf = (struct callframe *)stktop2;
+	cf->sp = (register_t)(stktop2 + CALLFRAMELEN);
 	cf->r31 = (register_t)func;
 	cf->r30 = (register_t)arg;
 
 	/*
 	 * Below that, we allocate the switch frame:
 	 */
-	stktop2 -= roundup(sizeof *sf, 16);	/* must match SFRAMELEN in genassym */
+	stktop2 -= SFRAMELEN;		/* must match SFRAMELEN in genassym */
 	sf = (struct switchframe *)stktop2;
 	memset((void *)sf, 0, sizeof *sf);		/* just in case */
-	sf->sp = (int)cf;
+	sf->sp = (register_t)cf;
 #ifndef PPC_IBM4XX
 	sf->user_sr = pmap_kernel()->pm_sr[USER_SR]; /* again, just in case */
 #endif
-	pcb->pcb_sp = (int)stktop2;
-	pcb->pcb_spl = 0;
+	pcb->pcb_sp = (register_t)stktop2;
+	pcb->pcb_kmapsr = 0;
+	pcb->pcb_umapsr = 0;
 }
 
 void
-cpu_swapin(p)
-	struct proc *p;
+cpu_setfunc(struct lwp *l, void (*func)(void *), void *arg)
 {
-	struct pcb *pcb = &p->p_addr->u_pcb;
+	extern void fork_trampoline(void);
+	struct pcb *pcb = &l->l_addr->u_pcb;
+	struct trapframe *tf;
+	struct callframe *cf;
+	struct switchframe *sf;
 
-#ifndef OLDPMAP
-	pcb->pcb_pmreal = pcb->pcb_pm;		/* XXX */
-#else
-	(void) pmap_extract(pmap_kernel(), (vaddr_t)pcb->pcb_pm,
-	    (paddr_t *)&pcb->pcb_pmreal);
+	tf = trapframe(l);
+	cf = (struct callframe *) ((uintptr_t)tf & ~(CALLFRAMELEN-1));
+	cf->lr = (register_t) fork_trampoline;
+	cf--;
+	cf->sp = (register_t) (cf+1);
+	cf->r31 = (register_t) func;
+	cf->r30 = (register_t) arg;
+	sf = (struct switchframe *) ((uintptr_t) cf - SFRAMELEN);
+	memset((void *)sf, 0, sizeof *sf);		/* just in case */
+	sf->sp = (register_t) cf;
+#ifdef PPC_OEA
+	sf->user_sr = pmap_kernel()->pm_sr[USER_SR]; /* again, just in case */
 #endif
+	pcb->pcb_sp = (register_t)sf;
+	pcb->pcb_kmapsr = 0;
+	pcb->pcb_umapsr = 0;
+}
+
+void
+cpu_swapin(struct lwp *l)
+{
 }
 
 /*
  * Move pages from one kernel virtual address to another.
  */
 void
-pagemove(from, to, size)
-	caddr_t from, to;
-	size_t size;
+pagemove(caddr_t from, caddr_t to, size_t size)
 {
 	paddr_t pa;
 	vaddr_t va;
 
-	for (va = (vaddr_t)from; size > 0; size -= NBPG) {
+	for (va = (vaddr_t)from; size > 0; size -= PAGE_SIZE) {
 		(void) pmap_extract(pmap_kernel(), va, &pa);
-		pmap_kremove(va, NBPG);
+		pmap_kremove(va, PAGE_SIZE);
 		pmap_kenter_pa((vaddr_t)to, pa, VM_PROT_READ|VM_PROT_WRITE);
-		va += NBPG;
-		to += NBPG;
+		va += PAGE_SIZE;
+		to += PAGE_SIZE;
 	}
 	pmap_update(pmap_kernel());
+}
+
+void
+cpu_lwp_free(struct lwp *l, int proc)
+{
+#if defined(PPC_HAVE_FPU) || defined(ALTIVEC)
+	struct pcb *pcb = &l->l_addr->u_pcb;
+#endif
+
+#ifdef PPC_HAVE_FPU
+	if (pcb->pcb_fpcpu)			/* release the FPU */
+		save_fpu_lwp(l);
+#endif
+#ifdef ALTIVEC
+	if (pcb->pcb_veccpu)			/* release the AltiVEC */
+		save_vec_lwp(l);
+#endif
+
 }
 
 /*
@@ -209,42 +241,26 @@ pagemove(from, to, size)
  * run.
  */
 void
-cpu_exit(p)
-	struct proc *p;
+cpu_exit(struct lwp *l)
 {
-	void switchexit(struct proc *);		/* Defined in locore.S */
-#ifdef ALTIVEC
-	struct pcb *pcb = &p->p_addr->u_pcb;
-#endif
-
-#ifdef PPC_HAVE_FPU
-	if (p->p_addr->u_pcb.pcb_fpcpu)		/* release the FPU */
-		fpuproc = NULL;
-#endif
-#ifdef ALTIVEC
-	if (p == vecproc)			/* release the AltiVEC */
-		vecproc = NULL;
-	if (pcb->pcb_vr != NULL)
-		pool_put(vecpl, pcb->pcb_vr);
-#endif
+	/* This is in locore_subr.S */
+	void switch_exit(struct lwp *, void (*)(struct lwp *));
 
 	splsched();
-	switchexit(p);
+	switch_exit(l, lwp_exit2);
 }
 
 /*
  * Write the machine-dependent part of a core dump.
  */
 int
-cpu_coredump(p, vp, cred, chdr)
-	struct proc *p;
-	struct vnode *vp;
-	struct ucred *cred;
-	struct core *chdr;
+cpu_coredump(struct lwp *l, struct vnode *vp, struct ucred *cred,
+	struct core *chdr)
 {
 	struct coreseg cseg;
 	struct md_coredump md_core;
-	struct pcb *pcb = &p->p_addr->u_pcb;
+	struct proc *p = l->l_proc;
+	struct pcb *pcb = &l->l_addr->u_pcb;
 	int error;
 
 	CORE_SETMAGIC(*chdr, COREMAGIC, MID_POWERPC, 0);
@@ -252,22 +268,22 @@ cpu_coredump(p, vp, cred, chdr)
 	chdr->c_seghdrsize = ALIGN(sizeof cseg);
 	chdr->c_cpusize = sizeof md_core;
 
-	md_core.frame = *trapframe(p);
+	md_core.frame = *trapframe(l);
 	if (pcb->pcb_flags & PCB_FPU) {
 #ifdef PPC_HAVE_FPU
-		if (p->p_addr->u_pcb.pcb_fpcpu)
-			save_fpu_proc(p);
+		if (l->l_addr->u_pcb.pcb_fpcpu)
+			save_fpu_lwp(l);
 #endif
 		md_core.fpstate = pcb->pcb_fpu;
 	} else
 		memset(&md_core.fpstate, 0, sizeof(md_core.fpstate));
 
 #ifdef ALTIVEC
-	if (pcb->pcb_flags & PCB_ALTIVEC) {
-		if (p == vecproc)
-			save_vec(p);
-		md_core.vstate = *pcb->pcb_vr;
-	} else
+	if (pcb->pcb_veccpu)
+		save_vec_lwp(l);
+	if (pcb->pcb_flags & PCB_ALTIVEC)
+		md_core.vstate = pcb->pcb_vr;
+	else
 #endif
 		memset(&md_core.vstate, 0, sizeof(md_core.vstate));
 
@@ -293,11 +309,7 @@ cpu_coredump(p, vp, cred, chdr)
  * Map a range of user addresses into the kernel.
  */
 vaddr_t
-vmaprange(p, uaddr, len, prot)
-	struct proc *p;
-	vaddr_t uaddr;
-	vsize_t len;
-	int prot;
+vmaprange(struct proc *p, vaddr_t uaddr, vsize_t len, int prot)
 {
 	vaddr_t faddr, taddr, kaddr;
 	vsize_t off;
@@ -308,12 +320,12 @@ vmaprange(p, uaddr, len, prot)
 	len = round_page(off + len);
 	taddr = uvm_km_valloc_wait(phys_map, len);
 	kaddr = taddr + off;
-	for (; len > 0; len -= NBPG) {
+	for (; len > 0; len -= PAGE_SIZE) {
 		(void) pmap_extract(vm_map_pmap(&p->p_vmspace->vm_map),
 		    faddr, &pa);
 		pmap_kenter_pa(taddr, pa, prot);
-		faddr += NBPG;
-		taddr += NBPG;
+		faddr += PAGE_SIZE;
+		taddr += PAGE_SIZE;
 	}
 	return (kaddr);
 }
@@ -322,9 +334,7 @@ vmaprange(p, uaddr, len, prot)
  * Undo vmaprange.
  */
 void
-vunmaprange(kaddr, len)
-	vaddr_t kaddr;
-	vsize_t len;
+vunmaprange(vaddr_t kaddr, vsize_t len)
 {
 	vaddr_t addr;
 	vsize_t off;
@@ -342,13 +352,12 @@ vunmaprange(kaddr, len)
  * Note: these pages have already been locked by uvm_vslock.
  */
 void
-vmapbuf(bp, len)
-	struct buf *bp;
-	vsize_t len;
+vmapbuf(struct buf *bp, vsize_t len)
 {
 	vaddr_t faddr, taddr;
 	vsize_t off;
 	paddr_t pa;
+	int prot = VM_PROT_READ | ((bp->b_flags & B_READ) ? VM_PROT_WRITE : 0);
 
 #ifdef	DIAGNOSTIC
 	if (!(bp->b_flags & B_PHYS))
@@ -357,17 +366,22 @@ vmapbuf(bp, len)
 	/*
 	 * XXX Reimplement this with vmaprange (on at least PPC_IBM4XX CPUs).
 	 */
-	faddr = trunc_page((vaddr_t)bp->b_saveaddr = bp->b_data);
+	bp->b_saveaddr = bp->b_data;
+	faddr = trunc_page((vaddr_t)bp->b_saveaddr);
 	off = (vaddr_t)bp->b_data - faddr;
 	len = round_page(off + len);
 	taddr = uvm_km_valloc_wait(phys_map, len);
 	bp->b_data = (caddr_t)(taddr + off);
-	for (; len > 0; len -= NBPG) {
+	for (; len > 0; len -= PAGE_SIZE) {
 		(void) pmap_extract(vm_map_pmap(&bp->b_proc->p_vmspace->vm_map),
 		    faddr, &pa);
-		pmap_kenter_pa(taddr, pa, VM_PROT_READ|VM_PROT_WRITE);
-		faddr += NBPG;
-		taddr += NBPG;
+		/*
+		 * Use pmap_enter so the referenced and modified bits are
+		 * appropriately set.
+		 */
+		pmap_kenter_pa(taddr, pa, prot);
+		faddr += PAGE_SIZE;
+		taddr += PAGE_SIZE;
 	}
 	pmap_update(pmap_kernel());
 }
@@ -376,9 +390,7 @@ vmapbuf(bp, len)
  * Unmap a previously-mapped user I/O request.
  */
 void
-vunmapbuf(bp, len)
-	struct buf *bp;
-	vsize_t len;
+vunmapbuf(struct buf *bp, vsize_t len)
 {
 	vaddr_t addr;
 	vsize_t off;
@@ -390,6 +402,10 @@ vunmapbuf(bp, len)
 	addr = trunc_page((vaddr_t)bp->b_data);
 	off = (vaddr_t)bp->b_data - addr;
 	len = round_page(off + len);
+	/*
+	 * Since the pages were entered by pmap_enter, use pmap_remove
+	 * to remove them.
+	 */
 	pmap_kremove(addr, len);
 	pmap_update(pmap_kernel());
 	uvm_km_free_wakeup(phys_map, addr, len);

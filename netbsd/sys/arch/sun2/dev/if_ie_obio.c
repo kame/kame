@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ie_obio.c,v 1.2 2001/10/01 01:53:31 fredette Exp $	*/
+/*	$NetBSD: if_ie_obio.c,v 1.7 2003/07/15 03:36:12 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -84,6 +84,9 @@
  * driver.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ie_obio.c,v 1.7 2003/07/15 03:36:12 lukem Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
@@ -133,9 +136,8 @@ static void ie_obrun __P((struct ie_softc *));
 int ie_obio_match __P((struct device *, struct cfdata *, void *));
 void ie_obio_attach __P((struct device *, struct device *, void *));
 
-struct cfattach ie_obio_ca = {
-	sizeof(struct ie_softc), ie_obio_match, ie_obio_attach
-};
+CFATTACH_DECL(ie_obio, sizeof(struct ie_softc),
+    ie_obio_match, ie_obio_attach, NULL, NULL);
 
 /* Supported media */
 static int media[] = {
@@ -372,13 +374,13 @@ ie_obio_attach(parent, self, aux)
 	 * (a side-effect of this double-map is that the ISCP and SCB
 	 * structures also get aliased there, but we ignore this). The
 	 * first page at `maddr' is only used for ISCP, SCB and the aliased
-	 * SCP; the actual buffers start at maddr+NBPG.
+	 * SCP; the actual buffers start at maddr+PAGE_SIZE.
 	 *
 	 * In a picture:
 
 	|---//--- ISCP-SCB-----scp-|--//- buffers -//-|... |iscp-scb-----SCP-|
 	|         |                |                  |    |             |   |
-	|         |<----- NBPG --->|                  |    |<----- NBPG -+-->|
+	|         |<---PAGE_SIZE-->|                  |    |<--PAGE_SIZE-+-->|
 	|         |<------------- msize ------------->|    |       ^     |
 	|         |                                                |     |
 	|         \@maddr                                 (last page dbl mapped)
@@ -416,8 +418,8 @@ ie_obio_attach(parent, self, aux)
 	 * Rest of first page is unused (wasted!); the other pages
 	 * are used for buffers.
 	 */
-	sc->buf_area = NBPG;
-	sc->buf_area_sz = msize - NBPG;
+	sc->buf_area = PAGE_SIZE;
+	sc->buf_area_sz = msize - PAGE_SIZE;
 
 	if (i82586_proberam(sc) == 0) {
 		printf(": memory probe failed\n");

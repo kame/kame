@@ -1,4 +1,4 @@
-/*	$NetBSD: lancevar.h,v 1.4 2001/06/18 11:06:26 jdolecek Exp $	*/
+/*	$NetBSD: lancevar.h,v 1.7 2004/02/13 11:36:22 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -90,7 +90,7 @@ struct lance_softc {
 	 * Media-supported by this interface.  If this is NULL,
 	 * the only supported media is assumed to be "manual".
 	 */
-	int	*sc_supmedia;
+	const int	*sc_supmedia;
 	int	sc_nsupmedia;
 	int	sc_defaultmedia;
 
@@ -141,7 +141,7 @@ void lance_read __P((struct lance_softc *, int, int));
 void lance_setladrf __P((struct ethercom *, u_int16_t *));
 
 /*
- * The following functions are only useful on certain cpu/bus
+ * The following functions are only useful on certain CPU/bus
  * combinations.  They should be written in assembly language for
  * maximum efficiency, but machine-independent versions are provided
  * for drivers that have not yet been optimized.

@@ -1,4 +1,4 @@
-/*	$NetBSD: ms_ap.c,v 1.2 2002/03/17 19:40:46 atatat Exp $	*/
+/*	$NetBSD: ms_ap.c,v 1.5 2003/07/15 02:59:28 lukem Exp $	*/
 
 /*-
  * Copyright (c) 2000 Tsubai Masanari.  All rights reserved.
@@ -25,6 +25,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ms_ap.c,v 1.5 2003/07/15 02:59:28 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -60,9 +63,8 @@ int ms_ap_enable(void *);
 int ms_ap_ioctl(void *, u_long, caddr_t, int, struct proc *);
 void ms_ap_disable(void *);
 
-struct cfattach ms_ap_ca = {
-	sizeof(struct ms_ap_softc), ms_ap_match, ms_ap_attach
-};
+CFATTACH_DECL(ms_ap, sizeof(struct ms_ap_softc),
+    ms_ap_match, ms_ap_attach, NULL, NULL);
 
 struct wsmouse_accessops ms_ap_accessops = {
 	ms_ap_enable,

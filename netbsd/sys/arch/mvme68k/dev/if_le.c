@@ -1,4 +1,4 @@
-/*	$NetBSD: if_le.c,v 1.25 2001/05/31 18:46:07 scw Exp $	*/
+/*	$NetBSD: if_le.c,v 1.30 2003/08/07 16:28:40 agc Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -51,11 +51,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -74,6 +70,9 @@
  *	@(#)if_le.c	8.2 (Berkeley) 11/16/93
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_le.c,v 1.30 2003/08/07 16:28:40 agc Exp $");
+
 #include "opt_inet.h"
 #include "bpfilter.h"
 
@@ -83,6 +82,8 @@
 #include <sys/syslog.h>
 #include <sys/socket.h>
 #include <sys/device.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <net/if.h>
 #include <net/if_ether.h>
@@ -112,9 +113,8 @@
 int le_pcc_match __P((struct device *, struct cfdata *, void *));
 void le_pcc_attach __P((struct device *, struct device *, void *));
 
-struct cfattach le_pcc_ca = {
-	sizeof(struct le_softc), le_pcc_match, le_pcc_attach
-};
+CFATTACH_DECL(le_pcc, sizeof(struct le_softc),
+    le_pcc_match, le_pcc_attach, NULL, NULL);
 
 extern struct cfdriver le_cd;
 
@@ -194,7 +194,7 @@ le_pcc_attach(parent, self, aux)
 	bus_space_map(pa->pa_bust, pa->pa_offset, 4, 0, &lsc->sc_bush);
 
 	/* Get contiguous DMA-able memory for the lance */
-	if (bus_dmamem_alloc(pa->pa_dmat, ether_data_buff_size, NBPG, 0,
+	if (bus_dmamem_alloc(pa->pa_dmat, ether_data_buff_size, PAGE_SIZE, 0,
 	    &seg, 1, &rseg,
 	    BUS_DMA_NOWAIT | BUS_DMA_ONBOARD_RAM | BUS_DMA_24BIT)) {
 		printf("%s: Failed to allocate ether buffer\n", self->dv_xname);

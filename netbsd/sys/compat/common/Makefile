@@ -1,14 +1,15 @@
-#	$NetBSD: Makefile,v 1.28.4.1 2002/06/19 00:03:07 lukem Exp $
+#	$NetBSD: Makefile,v 1.32 2003/10/15 13:32:14 fvdl Exp $
 
-LIB=	compat
-NOPIC=	# defined
+LIB=		compat
+NOPIC=		# defined
+LLIBS=		# defined
 
 CPPFLAGS=	${COMPATCPPFLAGS}
 
 .PATH.c: ${COMPATDIR}
 
 # Common compatibility code, used by all emulations
-SRCS=	compat_exec.c compat_util.c
+SRCS=	compat_exec.c compat_util.c compat_file.c
 
 # Compatibility code for 4.3BSD
 SRCS+=	kern_exit_43.c kern_info_43.c kern_resource_43.c kern_sig_43.c \
@@ -30,14 +31,6 @@ SRCS+=	sysv_ipc_14.c sysv_msg_14.c sysv_shm_14.c sysv_sem_14.c
 .if (${MACHINE_ARCH} != "alpha" && ${MACHINE_ARCH} != "sparc64" \
   && ${MACHINE_ARCH} != "x86_64")
 SRCS+=	kern_ipc_10.c 
-.endif
-
-# Compatibility code for 32-bit emulations on 64-bit platforms
-.if (${MACHINE_ARCH} == "sparc64" || ${MACHINE_ARCH} == "x86_64")
-SRCS+=	netbsd32_compat_09.c netbsd32_compat_10.c netbsd32_compat_10.c \
-	netbsd32_compat_12.c netbsd32_compat_13.c netbsd32_compat_14.c \
-	netbsd32_compat_43.c
-.PATH.c: ${COMPATDIR}/../netbsd32
 .endif
 
 # only needed during build

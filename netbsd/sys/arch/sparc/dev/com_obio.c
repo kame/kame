@@ -1,4 +1,4 @@
-/*	$NetBSD: com_obio.c,v 1.9 2002/03/11 16:27:01 pk Exp $	*/
+/*	$NetBSD: com_obio.c,v 1.17 2003/10/28 15:25:27 chs Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -48,11 +48,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -70,6 +66,9 @@
  *
  *	@(#)com.c	7.5 (Berkeley) 5/16/91
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: com_obio.c,v 1.17 2003/10/28 15:25:27 chs Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -108,9 +107,8 @@ static int com_obio_match __P((struct device *, struct cfdata *, void *));
 static void com_obio_attach __P((struct device *, struct device *, void *));
 static void com_obio_cleanup __P((void *));
 
-struct cfattach com_obio_ca = {
-	sizeof(struct com_obio_softc), com_obio_match, com_obio_attach
-};
+CFATTACH_DECL(com_obio, sizeof(struct com_obio_softc),
+    com_obio_match, com_obio_attach, NULL, NULL);
 
 static int
 com_obio_match(parent, cf, aux)
@@ -123,13 +121,14 @@ com_obio_match(parent, cf, aux)
 	int tadpole = 0;
 	int need_probe = 0;
 	int rv = 0;
-	u_int8_t auxregval;
+	uint8_t auxregval = 0;
 
 	if (uoba->uoba_isobio4 != 0) {
 		return (0);
 	}
 
-	/* Tadpole 3GX/3GS uses "modem" for a 16450 port
+	/*
+	 * Tadpole 3GX/3GS uses "modem" for a 16450 port
 	 * (We need to enable it before probing)
 	 */
 	if (strcmp("modem", sa->sa_name) == 0) {
@@ -140,7 +139,8 @@ com_obio_match(parent, cf, aux)
 		need_probe = 1;
 	}
 
-	/* Sun JavaStation 1 uses "su" for a 16550 port
+	/*
+	 * Sun JavaStation 1 uses "su" for a 16550 port
 	 */
 	if (strcmp("su", sa->sa_name) == 0) {
 		need_probe = 1;
@@ -197,7 +197,8 @@ com_obio_attach(parent, self, aux)
 	 */
 	if (prom_instance_to_package(prom_stdin()) == sa->sa_node)
 		comcnattach(sc->sc_iot, sc->sc_iobase,
-			    B9600, sc->sc_frequency, (CLOCAL | CREAD | CS8));
+			    B9600, sc->sc_frequency, COM_TYPE_NORMAL,
+			    (CLOCAL | CREAD | CS8));
 
 	if (!com_is_console(sc->sc_iot, sc->sc_iobase, &sc->sc_ioh) &&
 	    sbus_bus_map(sc->sc_iot,
@@ -223,7 +224,7 @@ com_obio_attach(parent, self, aux)
 
 	if (sa->sa_nintr != 0) {
 		(void)bus_intr_establish(sc->sc_iot, sa->sa_pri, IPL_SERIAL,
-					 0, comintr, sc);
+					 comintr, sc);
 		evcnt_attach_dynamic(&osc->osc_intrcnt, EVCNT_TYPE_INTR, NULL,
 		    osc->osc_com.sc_dev.dv_xname, "intr");
 	}

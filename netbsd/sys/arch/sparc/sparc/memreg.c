@@ -1,4 +1,4 @@
-/*	$NetBSD: memreg.c,v 1.32 2002/03/11 16:27:04 pk Exp $ */
+/*	$NetBSD: memreg.c,v 1.38 2004/03/22 12:37:43 pk Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -45,6 +45,10 @@
  *
  *	@(#)memreg.c	8.1 (Berkeley) 6/11/93
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: memreg.c,v 1.38 2004/03/22 12:37:43 pk Exp $");
+
 #include "opt_sparc_arch.h"
 
 #include <sys/param.h>
@@ -60,6 +64,7 @@
 #include <sparc/sparc/asm.h>
 #include <sparc/sparc/cpuvar.h>
 
+#include <machine/pte.h>
 #include <machine/reg.h>	/* for trapframe */
 #include <machine/trap.h>	/* for trap types */
 
@@ -72,13 +77,11 @@ static void	memregattach_mainbus
 static void	memregattach_obio
 			__P((struct device *, struct device *, void *));
 
-struct cfattach memreg_mainbus_ca = {
-	sizeof(struct device), memregmatch_mainbus, memregattach_mainbus
-};
+CFATTACH_DECL(memreg_mainbus, sizeof(struct device),
+    memregmatch_mainbus, memregattach_mainbus, NULL, NULL);
 
-struct cfattach memreg_obio_ca = {
-	sizeof(struct device), memregmatch_obio, memregattach_obio
-};
+CFATTACH_DECL(memreg_obio, sizeof(struct device),
+    memregmatch_obio, memregattach_obio, NULL, NULL);
 
 #if defined(SUN4M)
 static void hardmemerr4m __P((unsigned, u_int, u_int, u_int, u_int));
@@ -190,6 +193,7 @@ memerr4_4c(issync, ser, sva, aer, ava, tf)
 	struct trapframe *tf;	/* XXX - unused/invalid */
 {
 	char bits[64];
+	u_int pte;
 
 	printf("%ssync mem arr: ser=%s sva=0x%x ",
 		issync ? "" : "a",
@@ -197,6 +201,21 @@ memerr4_4c(issync, ser, sva, aer, ava, tf)
 		sva);
 	printf("aer=%s ava=0x%x\n", bitmask_snprintf(aer & 0xff,
 		AER_BITS, bits, sizeof(bits)), ava);
+
+	pte = getpte4(sva);
+	if ((pte & PG_V) != 0 && (pte & PG_TYPE) == PG_OBMEM) {
+		u_int pa = (pte & PG_PFNUM) << PGSHIFT;
+		printf(" spa=0x%x, module location: %s\n", pa,
+			prom_pa_location(pa, 0));
+	}
+
+	pte = getpte4(ava);
+	if ((pte & PG_V) != 0 && (pte & PG_TYPE) == PG_OBMEM) {
+		u_int pa = (pte & PG_PFNUM) << PGSHIFT;
+		printf(" apa=0x%x, module location: %s\n", pa,
+			prom_pa_location(pa, 0));
+	}
+
 	if (par_err_reg)
 		printf("parity error register = %s\n",
 			bitmask_snprintf(*par_err_reg, PER_BITS,
@@ -259,7 +278,7 @@ hypersparc_memerr(type, sfsr, sfva, tf)
 	u_int afva;
 
 	if ((tf->tf_psr & PSR_PS) == 0)
-		KERNEL_PROC_LOCK(curproc);
+		KERNEL_PROC_LOCK(curlwp);
 	else
 		KERNEL_LOCK(LK_CANRECURSE|LK_EXCLUSIVE);
 
@@ -278,7 +297,7 @@ hypersparc_memerr(type, sfsr, sfva, tf)
 	}
 out:
 	if ((tf->tf_psr & PSR_PS) == 0)
-		KERNEL_PROC_UNLOCK(curproc);
+		KERNEL_PROC_UNLOCK(curlwp);
 	else
 		KERNEL_UNLOCK();
 	return;
@@ -299,7 +318,7 @@ viking_memerr(type, sfsr, sfva, tf)
 	u_int afva=0;
 
 	if ((tf->tf_psr & PSR_PS) == 0)
-		KERNEL_PROC_LOCK(curproc);
+		KERNEL_PROC_LOCK(curlwp);
 	else
 		KERNEL_LOCK(LK_CANRECURSE|LK_EXCLUSIVE);
 
@@ -337,7 +356,7 @@ viking_memerr(type, sfsr, sfva, tf)
 
 out:
 	if ((tf->tf_psr & PSR_PS) == 0)
-		KERNEL_PROC_UNLOCK(curproc);
+		KERNEL_PROC_UNLOCK(curlwp);
 	else
 		KERNEL_UNLOCK();
 	return;
@@ -358,7 +377,7 @@ memerr4m(type, sfsr, sfva, tf)
 	u_int afva;
 
 	if ((tf->tf_psr & PSR_PS) == 0)
-		KERNEL_PROC_LOCK(curproc);
+		KERNEL_PROC_LOCK(curlwp);
 	else
 		KERNEL_LOCK(LK_CANRECURSE|LK_EXCLUSIVE);
 
@@ -371,7 +390,7 @@ memerr4m(type, sfsr, sfva, tf)
 
 	hardmemerr4m(type, sfsr, sfva, afsr, afva);
 	if ((tf->tf_psr & PSR_PS) == 0)
-		KERNEL_PROC_UNLOCK(curproc);
+		KERNEL_PROC_UNLOCK(curlwp);
 	else
 		KERNEL_UNLOCK();
 }

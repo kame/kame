@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ie_obio.c,v 1.24 2002/03/11 16:27:02 pk Exp $	*/
+/*	$NetBSD: if_ie_obio.c,v 1.31 2004/03/15 23:51:12 pk Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -84,6 +84,9 @@
  * driver.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ie_obio.c,v 1.31 2004/03/15 23:51:12 pk Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
@@ -132,9 +135,8 @@ static void ie_obrun __P((struct ie_softc *));
 int ie_obio_match __P((struct device *, struct cfdata *, void *));
 void ie_obio_attach __P((struct device *, struct device *, void *));
 
-struct cfattach ie_obio_ca = {
-	sizeof(struct ie_softc), ie_obio_match, ie_obio_attach
-};
+CFATTACH_DECL(ie_obio, sizeof(struct ie_softc),
+    ie_obio_match, ie_obio_attach, NULL, NULL);
 
 /* Supported media */
 static int media[] = {
@@ -289,7 +291,6 @@ ie_obio_attach(parent, self, aux)
 	bus_size_t msize;
 	u_long iebase;
 	u_int8_t myaddr[ETHER_ADDR_LEN];
-extern	void myetheraddr(u_char *);	/* should be elsewhere */
 
 	sc->bt = oba->oba_bustag;
 
@@ -366,13 +367,13 @@ extern	void myetheraddr(u_char *);	/* should be elsewhere */
 	 * (a side-effect of this double-map is that the ISCP and SCB
 	 * structures also get aliased there, but we ignore this). The
 	 * first page at `maddr' is only used for ISCP, SCB and the aliased
-	 * SCP; the actual buffers start at maddr+NBPG.
+	 * SCP; the actual buffers start at maddr+PAGE_SIZE.
 	 *
 	 * In a picture:
 
 	|---//--- ISCP-SCB-----scp-|--//- buffers -//-|... |iscp-scb-----SCP-|
 	|         |                |                  |    |             |   |
-	|         |<----- NBPG --->|                  |    |<----- NBPG -+-->|
+	|         |<---PAGE_SIZE-->|                  |    |<--PAGE_SIZE-+-->|
 	|         |<------------- msize ------------->|    |       ^     |
 	|         |                                                |     |
 	|         \@maddr                                 (last page dbl mapped)
@@ -411,19 +412,19 @@ extern	void myetheraddr(u_char *);	/* should be elsewhere */
 	 * Rest of first page is unused (wasted!); the other pages
 	 * are used for buffers.
 	 */
-	sc->buf_area = NBPG;
-	sc->buf_area_sz = msize - NBPG;
+	sc->buf_area = PAGE_SIZE;
+	sc->buf_area_sz = msize - PAGE_SIZE;
 
 	if (i82586_proberam(sc) == 0) {
 		printf(": memory probe failed\n");
 		return;
 	}
 
-	myetheraddr(myaddr);
+	prom_getether(0, myaddr);
 	i82586_attach(sc, "onboard", myaddr, media, NMEDIA, media[0]);
 
 	/* Establish interrupt channel */
 	ih = bus_intr_establish(oba->oba_bustag,
-				oba->oba_pri, IPL_NET, 0,
+				oba->oba_pri, IPL_NET,
 				i82586_intr, sc);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: types.h,v 1.30 2002/03/05 15:41:14 simonb Exp $	*/
+/*	$NetBSD: types.h,v 1.40 2004/01/18 18:23:19 martin Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -42,6 +38,7 @@
 #define	_MACHTYPES_H_
 
 #include <sys/cdefs.h>
+#include <sys/featuretest.h>
 #include <mips/int_types.h>
 
 /*
@@ -64,15 +61,9 @@ typedef unsigned long	mips_ureg_t;
 typedef	long		mips_fpreg_t;
 #endif
 
-#if defined(_KERNEL)
-typedef struct label_t {
-	mips_reg_t val[12];
-} label_t;
-#endif
-
 /* NB: This should probably be if defined(_KERNEL) */
-#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
-#ifdef _MIPS_PADDR_T_64BIT
+#if defined(_NETBSD_SOURCE)
+#if defined(_MIPS_PADDR_T_64BIT) && !defined(_LP64)
 typedef unsigned long long	paddr_t;
 typedef unsigned long long	psize_t;
 #else
@@ -83,7 +74,23 @@ typedef unsigned long	vaddr_t;
 typedef unsigned long	vsize_t;
 #endif
 
-typedef int		register_t;
+/* Make sure this is signed; we need pointers to be sign-extended. */
+#if defined(__mips_n32)
+typedef long long	register_t;
+#else
+typedef long		register_t;
+#endif /* __mips_n32 */
+
+#if defined(_KERNEL)
+typedef struct label_t {
+	register_t val[12];
+} label_t;
+#endif
+
+typedef	__volatile int		__cpu_simple_lock_t;
+
+#define	__SIMPLELOCK_LOCKED	1
+#define	__SIMPLELOCK_UNLOCKED	0
 
 #define	__SWAP_BROKEN
 
@@ -91,6 +98,10 @@ typedef int		register_t;
 #define	__HAVE_SYSCALL_INTERN
 #ifdef MIPS3_PLUS	/* XXX bogus! */
 #define	__HAVE_CPU_COUNTER
+#endif
+
+#if defined(_KERNEL)
+#define	__HAVE_RAS
 #endif
 
 #endif	/* _MACHTYPES_H_ */

@@ -1,4 +1,4 @@
-/*	$NetBSD: pvr.c,v 1.12 2002/05/03 04:42:08 thorpej Exp $	*/
+/*	$NetBSD: pvr.c,v 1.18 2003/12/10 10:36:02 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 2001 Marcus Comstedt.
@@ -65,7 +65,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: pvr.c,v 1.12 2002/05/03 04:42:08 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pvr.c,v 1.18 2003/12/10 10:36:02 tsutsui Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -188,9 +188,8 @@ struct pvr_softc {
 int	pvr_match(struct device *, struct cfdata *, void *);
 void	pvr_attach(struct device *, struct device *, void *);
 
-struct cfattach pvr_ca = {
-	sizeof(struct pvr_softc), pvr_match, pvr_attach,
-};
+CFATTACH_DECL(pvr, sizeof(struct pvr_softc),
+    pvr_match, pvr_attach, NULL, NULL);
 
 void	pvr_getdevconfig(struct fb_devconfig *);
 
@@ -238,9 +237,6 @@ int	pvr_is_console;
 int
 pvr_match(struct device *parent, struct cfdata *match, void *aux)
 {
-
-	if (strcmp("pvr", match->cf_driver->cd_name) != 0)
-		return (0);
 
 	return (1);
 }
@@ -368,7 +364,27 @@ pvrioctl(void *v, u_long cmd, caddr_t data, int flag, struct proc *p)
 		return (EPASSTHROUGH);	/* XXX Colormap */
 
 	case WSDISPLAYIO_SVIDEO:
-		return (EPASSTHROUGH);	/* XXX */
+		switch (*(u_int *)data) {
+		case WSDISPLAYIO_VIDEO_OFF:
+			if (!dc->dc_blanked) {
+				dc->dc_blanked = 1;
+				PVR_REG_WRITE(dc, PVRREG_DIWMODE,
+				    PVR_REG_READ(dc, PVRREG_DIWMODE) &
+				    ~DIWMODE_DE);
+			}
+			break;
+		case WSDISPLAYIO_VIDEO_ON:
+			if (dc->dc_blanked) {
+				dc->dc_blanked = 0;
+				PVR_REG_WRITE(dc, PVRREG_DIWMODE,
+				    PVR_REG_READ(dc, PVRREG_DIWMODE) |
+				    DIWMODE_DE);
+			}
+			break;
+		default:
+			return (EPASSTHROUGH);	/* XXX */
+		}
+		return (0);
 
 	case WSDISPLAYIO_GVIDEO:
 		*(u_int *)data = dc->dc_blanked ?
@@ -421,7 +437,7 @@ pvr_alloc_screen(void *v, const struct wsscreen_descr *type,
 	*cookiep = &sc->sc_dc->rinfo; /* one and only for now */
 	*curxp = 0;
 	*curyp = 0;
-	(*sc->sc_dc->rinfo.ri_ops.alloc_attr)(&sc->sc_dc->rinfo, 0, 0, 0,
+	(*sc->sc_dc->rinfo.ri_ops.allocattr)(&sc->sc_dc->rinfo, 0, 0, 0,
 	    &defattr);
 	*attrp = defattr;
 	sc->nscreens++;
@@ -596,7 +612,7 @@ pvrcninit(struct consdev *cndev)
 	long defattr;
 
 	pvr_getdevconfig(dcp);
-	(*dcp->rinfo.ri_ops.alloc_attr)(&dcp->rinfo, 0, 0, 0, &defattr);
+	(*dcp->rinfo.ri_ops.allocattr)(&dcp->rinfo, 0, 0, 0, &defattr);
 	wsdisplay_cnattach(&pvr_stdscreen, &dcp->rinfo, 0, 0, defattr);
 
 	pvr_is_console = 1;
@@ -613,17 +629,15 @@ pvrcnprobe(struct consdev *cndev)
 {
 #if NWSDISPLAY > 0
 	int maj, unit;
+	extern const struct cdevsw wsdisplay_cdevsw;
 #endif
 	cndev->cn_dev = NODEV;
 	cndev->cn_pri = CN_NORMAL;
 
 #if NWSDISPLAY > 0
 	unit = 0;
-	for (maj = 0; maj < nchrdev; maj++) {
-		if (cdevsw[maj].d_open == wsdisplayopen)
-			break;
-	}
-	if (maj != nchrdev) {
+	maj = cdevsw_lookup_major(&wsdisplay_cdevsw);
+	if (maj != -1) {
 		cndev->cn_pri = CN_INTERNAL;
 		cndev->cn_dev = makedev(maj, unit);
 	}
