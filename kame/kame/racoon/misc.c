@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.16 2000/09/22 08:13:06 itojun Exp $	*/
+/*	$KAME: misc.c,v 1.17 2000/09/23 07:01:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: misc.c,v 1.16 2000/09/22 08:13:06 itojun Exp $ */
+/* YIPS @(#)$Id: misc.c,v 1.17 2000/09/23 07:01:24 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -42,9 +42,6 @@
 #include "var.h"
 #include "misc.h"
 #include "debug.h"
-#ifdef GC
-#include "gcmalloc.h"
-#endif
 
 #ifndef NOUSE_PLOG
 #include "plog.h"
