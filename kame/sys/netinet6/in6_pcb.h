@@ -1,4 +1,4 @@
-/*	$KAME$	*/
+/*	$KAME: in6_pcb.h,v 1.20 2000/02/22 14:04:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -163,6 +163,8 @@ int	in6_pcbsetport __P((struct in6_addr *, struct in6pcb *));
 void	in6_rtchange __P((struct in6pcb *, int));
 void	in6_setpeeraddr __P((struct in6pcb *, struct mbuf *));
 void	in6_setsockaddr __P((struct in6pcb *, struct mbuf *));
+
+/* in in6_src.c */
 struct 	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
 				     struct ip6_pktopts *,
 				     struct ip6_moptions *,
