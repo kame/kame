@@ -281,7 +281,9 @@ intpr(interval, ifnetaddr, pfunc)
 						kread(multiaddr, (char *)&inm,
 						   sizeof inm);
 						memset(&sin6, 0, sizeof(sin6));
-						sin6 = inm.in6m_sa;
+						sin6.sin6_len = sizeof(sin6);
+						sin6.sin6_family = AF_INET6;
+						sin6 = inm.in6m_sa.sin6_addr;
 						/* XXX: KAME embeds zone ID */
 						sin6.sin6_addr.s6_addr[2] = 0;
 						sin6.sin6_addr.s6_addr[3] = 0;
