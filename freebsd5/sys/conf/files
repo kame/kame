@@ -1255,6 +1255,7 @@ net/if_fddisubr.c	optional fddi
 net/if_fwsubr.c		optional fwip
 net/if_gif.c		count gif
 net/if_gre.c		optional gre
+net/if_ist.c		count ist
 net/if_iso88025subr.c	optional token
 net/if_loop.c		count loop
 net/if_media.c		standard
