@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.14 1999/12/02 16:17:29 itojun Exp $
+#	$NetBSD: Makefile,v 1.15 2001/07/01 16:23:42 itojun Exp $
 #	from: @(#)Makefile	8.1 (Berkeley) 6/6/93
 
 PROG=	syslogd
@@ -14,5 +14,9 @@ LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
 	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
+
+CPPFLAGS+=-DLIBWRAP
+LDADD+=	-lwrap
+DPADD+=	${LIBWRAP}
 
 .include <bsd.prog.mk>
