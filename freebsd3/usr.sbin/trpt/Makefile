@@ -5,4 +5,6 @@ MAN8=	trpt.8
 BINGRP=	kmem
 BINMODE=2555
 
+CFLAGS+=-DINET6
+
 .include <bsd.prog.mk>

@@ -102,7 +102,15 @@ static const char rcsid[] =
  *	server program arguments	maximum of MAXARGS
  *
  * Comment lines are indicated by a `#' in column 1.
+ *
+ * #ifdef IPSEC
+ * Comment lines that start with "#@" denote IPsec policy string, as described
+ * in ipsec_set_policy(3).  This will affect all the following items in
+ * inetd.conf(8).  To reset the policy, just use "#@" line.  By default,
+ * there's no IPsec policy.
+ * #endif
  */
+
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
@@ -112,6 +120,7 @@ static const char rcsid[] =
 #include <sys/resource.h>
 
 #include <netinet/in.h>
+#include <netinet/ip6.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <rpc/rpc.h>
@@ -131,6 +140,7 @@ static const char rcsid[] =
 #include <unistd.h>
 #include <libutil.h>
 #include <sysexits.h>
+#include <ctype.h>
 
 #ifdef LIBWRAP
 # include <tcpd.h>
@@ -159,6 +169,13 @@ int deny_severity = LIBWRAP_DENY_FACILITY|LIBWRAP_DENY_SEVERITY;
 #endif
 
 #include "pathnames.h"
+
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#ifndef IPSEC_POLICY_IPSEC	/* no ipsec support on old ipsec */
+#undef IPSEC
+#endif
+#endif
 
 #ifndef	MAXCHILD
 #define	MAXCHILD	-1		/* maximum number of this service
@@ -189,12 +206,15 @@ int	maxchild = MAXCPM;
 int	maxcpm = MAXCHILD;
 struct	servent *sp;
 struct	rpcent *rpc;
-struct	in_addr bind_address;
-int	signalpipe[2];
+struct	in_addr bind_address4;
+struct	in6_addr bind_address6;
+extern	struct in6_addr in6addr_any;
+int     signalpipe[2];
 
 struct	servtab {
 	char	*se_service;		/* name of service */
 	int	se_socktype;		/* type of socket to use */
+	int	se_family;		/* address family */
 	char	*se_proto;		/* protocol used */
 	int	se_maxchild;		/* max number of children */
 	int	se_maxcpm;		/* max connects per IP per minute */
@@ -210,8 +230,19 @@ struct	servtab {
 	char	*se_server_name;	/* server program without path */
 #define	MAXARGV 20
 	char	*se_argv[MAXARGV+1];	/* program arguments */
+#ifdef IPSEC
+	char	*se_policy;		/* IPsec poilcy string */
+#endif
 	int	se_fd;			/* open descriptor */
-	struct	sockaddr_in se_ctrladdr;/* bound address */
+	union {				/* bound address */
+		struct	sockaddr se_un_ctrladdr;
+		struct	sockaddr_in se_un_ctrladdr4;
+		struct	sockaddr_in6 se_un_ctrladdr6;
+	} se_un;
+#define se_ctrladdr	se_un.se_un_ctrladdr
+#define se_ctrladdr4	se_un.se_un_ctrladdr4
+#define se_ctrladdr6	se_un.se_un_ctrladdr6
+  	int	se_ctrladdr_size;
 	u_char	se_type;		/* type: normal, mux, or mux+ */
 	u_char	se_checked;		/* looked at during merge */
 	u_char	se_accept;		/* i.e., wait/nowait mode */
@@ -222,12 +253,14 @@ struct	servtab {
 	int	se_count;		/* number started since se_time */
 	struct	timeval se_time;	/* start of se_count */
 	struct	servtab *se_next;
+	u_char	se_nomapped;		/* don't accept (af != socket af) */
 } *servtab;
 
 #define NORM_TYPE	0
 #define MUX_TYPE	1
 #define MUXPLUS_TYPE	2
 #define TTCP_TYPE	3
+#define FAITH_TYPE	4
 #define ISMUX(sep)	(((sep)->se_type == MUX_TYPE) || \
 			 ((sep)->se_type == MUXPLUS_TYPE))
 #define ISMUXPLUS(sep)	((sep)->se_type == MUXPLUS_TYPE)
@@ -237,9 +270,7 @@ struct	servtab {
 void		chargen_dg __P((int, struct servtab *));
 void		chargen_stream __P((int, struct servtab *));
 void		close_sep __P((struct servtab *));
-void		flag_signal __P((char));
-void		flag_config __P((int));
-void		config __P((void));
+void		config __P((int));
 void		daytime_dg __P((int, struct servtab *));
 void		daytime_stream __P((int, struct servtab *));
 void		discard_dg __P((int, struct servtab *));
@@ -250,21 +281,21 @@ void		endconfig __P((void));
 struct servtab *enter __P((struct servtab *));
 void		freeconfig __P((struct servtab *));
 struct servtab *getconfigent __P((void));
-void		ident_stream __P((int, struct servtab *));
 void		machtime_dg __P((int, struct servtab *));
 void		machtime_stream __P((int, struct servtab *));
 char	       *newstr __P((char *));
 char	       *nextline __P((FILE *));
 void		print_service __P((char *, struct servtab *));
 void		addchild __P((struct servtab *, int));
-void		flag_reapchild __P((int));
-void		reapchild __P((void));
+void		reapchild __P((int));
 void		enable __P((struct servtab *));
 void		disable __P((struct servtab *));
-void		flag_retry __P((int));
-void		retry __P((void));
+void		retry __P((int));
 int		setconfig __P((void));
 void		setup __P((struct servtab *));
+#ifdef IPSEC
+void		ipsecsetup __P((struct servtab *));
+#endif
 char	       *sskip __P((char **));
 char	       *skip __P((char **));
 struct servtab *tcpmux __P((int));
@@ -300,8 +331,6 @@ struct biltin {
 	{ "chargen",	SOCK_DGRAM,	0, 0,	chargen_dg },
 
 	{ "tcpmux",	SOCK_STREAM,	1, 0,	(void (*)())tcpmux },
-
-	{ "ident",	SOCK_STREAM,	1, 0,	ident_stream },
 
 	{ NULL }
 };
@@ -344,7 +373,14 @@ main(argc, argv, envp)
 	int tmpint, ch, dofork;
 	pid_t pid;
 	char buf[50];
-	struct  sockaddr_in peer;
+	union {
+		struct sockaddr peer_un;
+		struct sockaddr_in peer_un4;
+		struct sockaddr_in6 peer_un6;
+	} p_un;
+#define peer	p_un.peer_un
+#define peer4	p_un.peer_un4
+#define peer6	p_un.peer_un6
 	int i;
 #ifdef LOGIN_CAP
 	login_cap_t *lc = NULL;
@@ -367,7 +403,8 @@ main(argc, argv, envp)
 
 	openlog("inetd", LOG_PID | LOG_NOWAIT, LOG_DAEMON);
 
-	bind_address.s_addr = htonl(INADDR_ANY);
+	bind_address4.s_addr = htonl(INADDR_ANY);
+	bind_address6 = in6addr_any;
 	while ((ch = getopt(argc, argv, "dlR:a:c:C:p:")) != -1)
 		switch(ch) {
 		case 'd':
@@ -390,7 +427,8 @@ main(argc, argv, envp)
 				"-C %s: bad value for maximum children/minute");
 			break;
 		case 'a':
-			if (!inet_aton(optarg, &bind_address)) {
+			if ((inet_pton(AF_INET6, optarg, &bind_address6) <= 0) &&
+			    !inet_aton(optarg, &bind_address4)) {
 				syslog(LOG_ERR,
 			         "-a %s: invalid IP address", optarg);
 				exit(EX_USAGE);
@@ -440,12 +478,12 @@ main(argc, argv, envp)
 	sigaddset(&sa.sa_mask, SIGALRM);
 	sigaddset(&sa.sa_mask, SIGCHLD);
 	sigaddset(&sa.sa_mask, SIGHUP);
-	sa.sa_handler = flag_retry;
+	sa.sa_handler = retry;
 	sigaction(SIGALRM, &sa, (struct sigaction *)0);
-	config();
-	sa.sa_handler = flag_config;
+	config(SIGHUP);
+	sa.sa_handler = config;
 	sigaction(SIGHUP, &sa, (struct sigaction *)0);
-	sa.sa_handler = flag_reapchild;
+	sa.sa_handler = reapchild;
 	sigaction(SIGCHLD, &sa, (struct sigaction *)0);
 	sa.sa_handler = SIG_IGN;
 	sigaction(SIGPIPE, &sa, &sapipe);
@@ -486,34 +524,6 @@ main(argc, argv, envp)
 		    }
 		    continue;
 	    }
-	    /* handle any queued signal flags */
-	    if (FD_ISSET(signalpipe[0], &readable)) {
-		int n;
-		if (ioctl(signalpipe[0], FIONREAD, &n) != 0) {
-		    syslog(LOG_ERR, "ioctl: %m");
-		    exit(EX_OSERR);
-		}
-		while (--n >= 0) {
-		    char c;
-		    if (read(signalpipe[0], &c, 1) != 1) {
-			syslog(LOG_ERR, "read: %m");
-			exit(EX_OSERR);
-		    }
-		    if (debug)
-			warnx("Handling signal flag %c", c);
-		    switch(c) {
-		    case 'A': /* sigalrm */
-			retry();
-			break;
-		    case 'C': /* sigchld */
-			reapchild();
-			break;
-		    case 'H': /* sighup */
-			config();
-			break;
-		    }
-		}
-	    }
 	    for (sep = servtab; n && sep; sep = sep->se_next)
 	        if (sep->se_fd != -1 && FD_ISSET(sep->se_fd, &readable)) {
 		    n--;
@@ -539,9 +549,10 @@ main(argc, argv, envp)
 				continue;
 			    }
 			    if (log) {
-				i = sizeof peer;
-				if (getpeername(ctrl, (struct sockaddr *)
-						&peer, &i)) {
+				char pname[64];
+
+				i = sizeof peer6;
+				if (getpeername(ctrl, &peer, &i)) {
 					syslog(LOG_WARNING,
 						"getpeername(for %s): %m",
 						sep->se_service);
@@ -550,7 +561,12 @@ main(argc, argv, envp)
 				}
 				syslog(LOG_INFO,"%s from %s",
 					sep->se_service,
-					inet_ntoa(peer.sin_addr));
+				        peer.sa_family == AF_INET6 ?
+				           inet_ntop(AF_INET6,
+						     &peer6.sin6_addr,
+						     pname,
+						     sizeof(pname)) :
+				           inet_ntoa(peer4.sin_addr));
 			    }
 		    } else
 			    ctrl = sep->se_fd;
@@ -631,10 +647,10 @@ main(argc, argv, envp)
 				fromhost(&req);
 				denied = !hosts_access(&req);
 				if (denied || log) {
-				    sp = getservbyport(sep->se_ctrladdr.sin_port, sep->se_proto);
+				    sp = getservbyport(sep->se_ctrladdr4.sin_port, sep->se_proto);
 				    if (sp == NULL) {
 					(void)snprintf(buf, sizeof buf, "%d",
-					   ntohs(sep->se_ctrladdr.sin_port));
+					   ntohs(sep->se_ctrladdr4.sin_port));
 					service = buf;
 				    } else
 					service = sp->s_name;
@@ -756,19 +772,6 @@ main(argc, argv, envp)
 }
 
 /*
- * Add a signal flag to the signal flag queue for later handling
- */
-
-void flag_signal(c)
-    char c;
-{
-	if (write(signalpipe[1], &c, 1) != 1) {
-		syslog(LOG_ERR, "write: %m");
-		exit(EX_OSERR);
-	}
-}
-
-/*
  * Record a new child pid for this service. If we've reached the
  * limit on children, then stop accepting incoming requests.
  */
@@ -795,14 +798,8 @@ addchild(struct servtab *sep, pid_t pid)
  */
 
 void
-flag_reapchild(signo)
+reapchild(signo)
 	int signo;
-{
-	flag_signal('C');
-}
-
-void
-reapchild()
 {
 	int k, status;
 	pid_t pid;
@@ -833,13 +830,8 @@ reapchild()
 }
 
 void
-flag_config(signo)
+config(signo)
 	int signo;
-{
-	flag_signal('H');
-}
-
-void config()
 {
 	struct servtab *sep, *new, **sepp;
 	long omask;
@@ -881,6 +873,16 @@ void config()
 
 #define SWAP(a, b) { typeof(a) c = a; a = b; b = c; }
 			omask = sigblock(SIGBLOCK);
+
+			if (sep->se_family != new->se_family) {
+				sep->se_family = new->se_family;
+				memset(&sep->se_un, 0, sizeof(sep->se_un));
+			}
+			if (sep->se_nomapped != new->se_nomapped) {
+				sep->se_nomapped = new->se_nomapped;
+				memset(&sep->se_un, 0, sizeof(sep->se_un));
+			}
+
 			/* copy over outstanding child pids */
 			if (sep->se_maxchild && new->se_maxchild) {
 				new->se_numchild = sep->se_numchild;
@@ -913,6 +915,10 @@ void config()
 			SWAP(sep->se_server, new->se_server);
 			for (i = 0; i < MAXARGV; i++)
 				SWAP(sep->se_argv[i], new->se_argv[i]);
+#ifdef IPSEC
+			SWAP(sep->se_policy, new->se_policy);
+			ipsecsetup(sep);
+#endif
 			sigsetmask(omask);
 			freeconfig(new);
 			if (debug)
@@ -927,7 +933,12 @@ void config()
 			sep->se_fd = -1;
 			continue;
 		}
-		if (!sep->se_rpc) {
+		switch (sep->se_family) {
+		case AF_INET:
+			sep->se_ctrladdr4.sin_family = AF_INET;
+			sep->se_ctrladdr_size = sizeof sep->se_ctrladdr4;
+			if (sep->se_rpc)
+				goto rpc;
 			sp = getservbyname(sep->se_service, sep->se_proto);
 			if (sp == 0) {
 				syslog(LOG_ERR, "%s/%s: unknown service",
@@ -935,14 +946,43 @@ void config()
 				sep->se_checked = 0;
 				continue;
 			}
-			if (sp->s_port != sep->se_ctrladdr.sin_port) {
-				sep->se_ctrladdr.sin_family = AF_INET;
-				sep->se_ctrladdr.sin_addr = bind_address;
-				sep->se_ctrladdr.sin_port = sp->s_port;
+			if (sp->s_port != sep->se_ctrladdr4.sin_port) {
+				sep->se_ctrladdr4.sin_port = sp->s_port;
+				sep->se_ctrladdr4.sin_family = AF_INET;
+				sep->se_ctrladdr4.sin_addr = bind_address4;
+				sep->se_ctrladdr4.sin_port = sp->s_port;
 				if (sep->se_fd >= 0)
 					close_sep(sep);
 			}
-		} else {
+			break;
+		case AF_INET6:
+			sep->se_ctrladdr6.sin6_family = AF_INET6;
+			sep->se_ctrladdr_size = sizeof sep->se_ctrladdr6;
+#ifdef SIN6_LEN
+			sep->se_ctrladdr6.sin6_len = sep->se_ctrladdr_size;
+#endif
+#if 0
+			if (sep->se_socktype == SOCK_STREAM)
+				sep->se_ctrladdr6.sin6_flowinfo =
+					IPV6_PRIORITY_INTERACTIVE;
+#endif
+			if (sep->se_rpc)
+				goto rpc;
+			sp = getservbyname(sep->se_service, sep->se_proto);
+			if (sp == 0) {
+				syslog(LOG_ERR, "%s/%s: unknown service",
+			    	sep->se_service, sep->se_proto);
+				sep->se_checked = 0;
+				continue;
+			}
+			if (sp->s_port != sep->se_ctrladdr6.sin6_port) {
+				sep->se_ctrladdr6.sin6_port = sp->s_port;
+				sep->se_ctrladdr6.sin6_addr = bind_address6;
+				if (sep->se_fd >= 0)
+					close_sep(sep);
+			}
+			break;
+		rpc:
 			rpc = getrpcbyname(sep->se_service);
 			if (rpc == 0) {
 				syslog(LOG_ERR, "%s/%s unknown RPC service.",
@@ -952,7 +992,8 @@ void config()
 				sep->se_fd = -1;
 					continue;
 			}
-			if (rpc->r_number != sep->se_rpc_prog) {
+			if (rpc->r_number != sep->se_rpc_prog ||
+			    sep->se_ctrladdr6.sin6_port == 0) {
 				if (sep->se_rpc_prog)
 					unregisterrpc(sep);
 				sep->se_rpc_prog = rpc->r_number;
@@ -1017,14 +1058,8 @@ unregisterrpc(sep)
 }
 
 void
-flag_retry(signo)
+retry(signo)
 	int signo;
-{
-	flag_signal('A');
-}
-
-void
-retry()
 {
 	struct servtab *sep;
 
@@ -1040,7 +1075,7 @@ setup(sep)
 {
 	int on = 1;
 
-	if ((sep->se_fd = socket(AF_INET, sep->se_socktype, 0)) < 0) {
+	if ((sep->se_fd = socket(sep->se_family, sep->se_socktype, 0)) < 0) {
 		if (debug)
 			warn("socket failed on %s/%s",
 				sep->se_service, sep->se_proto);
@@ -1059,13 +1094,37 @@ setsockopt(fd, SOL_SOCKET, opt, (char *)&on, sizeof (on))
 	if (turnon(sep->se_fd, SO_PRIVSTATE) < 0)
 		syslog(LOG_ERR, "setsockopt (SO_PRIVSTATE): %m");
 #endif
+	/* tftpd opens a new connection then needs more infos */
+	if ((sep->se_family == AF_INET6) &&
+	    (strcmp(sep->se_proto, "udp") == 0) &&
+	    (sep->se_accept == 0) &&
+	    (setsockopt(sep->se_fd, IPPROTO_IPV6, IPV6_PKTINFO,
+			(char *)&on, sizeof (on)) < 0))
+		syslog(LOG_ERR, "setsockopt (IPV6_RECVPKTINFO): %m");
+#ifdef IPV6_BINDV6ONLY
+	if ((sep->se_family == AF_INET6) &&
+	    (sep->se_nomapped != 0) &&
+	    (setsockopt(sep->se_fd, IPPROTO_IPV6, IPV6_BINDV6ONLY,
+			(char *)&on, sizeof (on)) < 0))
+		syslog(LOG_ERR, "setsockopt (IPV6_BINDV6ONLY): %m");
+#endif /* IPV6_BINDV6ONLY */
 #undef turnon
 	if (sep->se_type == TTCP_TYPE)
 		if (setsockopt(sep->se_fd, IPPROTO_TCP, TCP_NOPUSH,
 		    (char *)&on, sizeof (on)) < 0)
 			syslog(LOG_ERR, "setsockopt (TCP_NOPUSH): %m");
-	if (bind(sep->se_fd, (struct sockaddr *)&sep->se_ctrladdr,
-	    sizeof (sep->se_ctrladdr)) < 0) {
+#ifdef IPV6_FAITH
+	if (sep->se_type == FAITH_TYPE) {
+		if (setsockopt(sep->se_fd, IPPROTO_IPV6, IPV6_FAITH, &on,
+				sizeof(on)) < 0) {
+			syslog(LOG_ERR, "setsockopt (IPV6_FAITH): %m");
+		}
+	}
+#endif
+#ifdef IPSEC
+	ipsecsetup(sep);
+#endif
+	if (bind(sep->se_fd, &sep->se_ctrladdr, sep->se_ctrladdr_size) < 0) {
 		if (debug)
 			warn("bind failed on %s/%s",
 				sep->se_service, sep->se_proto);
@@ -1080,10 +1139,9 @@ setsockopt(fd, SOL_SOCKET, opt, (char *)&on, sizeof (on))
 		return;
 	}
         if (sep->se_rpc) {
-                int i, len = sizeof(struct sockaddr);
+                int i, len = sep->se_ctrladdr_size;
 
-                if (getsockname(sep->se_fd,
-				(struct sockaddr*)&sep->se_ctrladdr, &len) < 0){
+                if (getsockname(sep->se_fd, &sep->se_ctrladdr, &len) < 0){
                         syslog(LOG_ERR, "%s/%s: getsockname: %m",
                                sep->se_service, sep->se_proto);
                         (void) close(sep->se_fd);
@@ -1097,7 +1155,7 @@ setsockopt(fd, SOL_SOCKET, opt, (char *)&on, sizeof (on))
                         pmap_set(sep->se_rpc_prog, i,
                                  (sep->se_socktype == SOCK_DGRAM)
                                  ? IPPROTO_UDP : IPPROTO_TCP,
-                                 ntohs(sep->se_ctrladdr.sin_port));
+                                 ntohs(sep->se_ctrladdr4.sin_port));
                 }
 
         }
@@ -1109,6 +1167,38 @@ setsockopt(fd, SOL_SOCKET, opt, (char *)&on, sizeof (on))
 			sep->se_server, sep->se_fd);
 	}
 }
+
+#ifdef IPSEC
+void
+ipsecsetup(sep)
+	struct servtab *sep;
+{
+	int len;
+	char *buf;
+	char *policy;
+	int level = (sep->se_family == AF_INET6) ? IPPROTO_IPV6 : IPPROTO_IP;
+	int optname = (sep->se_family == AF_INET6) ? IPV6_IPSEC_POLICY
+						   : IP_IPSEC_POLICY;
+	char *optname_string = (sep->se_family == AF_INET6)
+			               ? "IPV6_IPSEC_POLICY"
+				       : "IP_IPSEC_POLICY";
+
+	if (!sep->se_policy || sep->se_policy[0] == '\0')
+		policy = "entrust";
+	else
+		policy = sep->se_policy;
+
+	len = ipsec_get_policylen(policy);
+	if (len >= 0 && (buf = (char *)malloc(len)) != NULL) {
+		ipsec_set_policy(buf, len, policy);
+		if (setsockopt(sep->se_fd, level, optname, buf, len) < 0)
+			syslog(LOG_ERR, "setsockopt (%s, %s): %m",
+			       optname_string, policy);
+		free(buf);
+	} else
+		syslog(LOG_ERR, "invalid security policy \"%s\"", policy);
+}
+#endif
 
 /*
  * Finish with a service and its socket.
@@ -1244,10 +1334,38 @@ getconfigent()
 	char *versp;
 	static char TCPMUX_TOKEN[] = "tcpmux/";
 #define MUX_LEN		(sizeof(TCPMUX_TOKEN)-1)
+#ifdef IPSEC
+	char *policy = NULL;
+#endif
 
 more:
-	while ((cp = nextline(fconfig)) && (*cp == '#' || *cp == '\0'))
-		;
+	while ((cp = nextline(fconfig)) != NULL) {
+#ifdef IPSEC
+		/* lines starting with #@ is not a comment, but the policy */
+		if (cp[0] == '#' && cp[1] == '@') {
+			char *p;
+			for (p = cp + 2; p && *p && isspace(*p); p++)
+				;
+			if (*p == '\0') {
+				if (policy)
+					free(policy);
+				policy = NULL;
+			} else if (ipsec_get_policylen(p) >= 0) {
+				if (policy)
+					free(policy);
+				policy = newstr(p);
+			} else {
+				syslog(LOG_ERR,
+					"%s: invalid ipsec policy \"%s\"",
+					CONFIG, p);
+				exit(EX_CONFIG);
+			}
+		}
+#endif
+		if (*cp == '#' || *cp == '\0')
+			continue;
+		break;
+	}
 	if (cp == NULL)
 		return ((struct servtab *)0);
 	/*
@@ -1290,8 +1408,40 @@ more:
 	if (strcmp(arg, "tcp/ttcp") == 0) {
 		sep->se_type = TTCP_TYPE;
 		sep->se_proto = newstr("tcp");
-	} else {
+	} else if (strcmp(arg, "tcp46/ttcp") == 0) {
+		sep->se_type = TTCP_TYPE;
+		sep->se_proto = newstr("tcp46");
+	} else if (strcmp(arg, "tcp4/ttcp") == 0) {
+		sep->se_type = TTCP_TYPE;
+		sep->se_proto = newstr("tcp4");
+	} else if (strcmp(arg, "tcp6/ttcp") == 0) {
+		sep->se_type = TTCP_TYPE;
+		sep->se_proto = newstr("tcp6");
+	} else if (strcmp(arg, "tcp/faith") == 0) {
+		sep->se_type = FAITH_TYPE;
+		sep->se_proto = newstr("tcp");
+	} else if (strcmp(arg, "tcp46/faith") == 0) {
+		sep->se_type = FAITH_TYPE;
+		sep->se_proto = newstr("tcp46");
+	} else if (strcmp(arg, "tcp4/faith") == 0) {
+		sep->se_type = FAITH_TYPE;
+		sep->se_proto = newstr("tcp4");
+	} else if (strcmp(arg, "tcp6/faith") == 0) {
+		sep->se_type = FAITH_TYPE;
+		sep->se_proto = newstr("tcp6");
+	} else
 		sep->se_proto = newstr(arg);
+	sep->se_family = AF_INET6;
+	sep->se_nomapped = 0;
+	if (sep->se_proto[strlen(sep->se_proto) - 1] == '6') {
+		sep->se_proto[strlen(sep->se_proto) - 1] = 0;
+		if (sep->se_proto[strlen(sep->se_proto) - 2] == '4')
+			sep->se_proto[strlen(sep->se_proto) - 2] = 0;
+		else
+			sep->se_nomapped = 1;
+	} else if (sep->se_proto[strlen(sep->se_proto) - 1] == '4') {
+		sep->se_proto[strlen(sep->se_proto) - 1] = 0;
+		sep->se_family = AF_INET;
 	}
         if (strncmp(sep->se_proto, "rpc/", 4) == 0) {
                 memmove(sep->se_proto, sep->se_proto + 4,
@@ -1299,9 +1449,6 @@ more:
                 sep->se_rpc = 1;
                 sep->se_rpc_prog = sep->se_rpc_lowvers =
 			sep->se_rpc_lowvers = 0;
-                sep->se_ctrladdr.sin_family = AF_INET;
-                sep->se_ctrladdr.sin_port = 0;
-                sep->se_ctrladdr.sin_addr = bind_address;
                 if ((versp = rindex(sep->se_service, '/'))) {
                         *versp++ = '\0';
                         switch (sscanf(versp, "%d-%d",
@@ -1434,6 +1581,9 @@ more:
 		}
 	while (argc <= MAXARGV)
 		sep->se_argv[argc++] = NULL;
+#ifdef IPSEC
+	sep->se_policy = policy ? newstr(policy) : NULL;
+#endif
 	return (sep);
 }
 
@@ -1462,6 +1612,10 @@ freeconfig(cp)
 	for (i = 0; i < MAXARGV; i++)
 		if (cp->se_argv[i])
 			free(cp->se_argv[i]);
+#ifdef IPSEC
+	if (cp->se_policy)
+		free(cp->se_policy);
+#endif
 }
 
 
@@ -1552,15 +1706,23 @@ inetd_setproctitle(a, s)
 {
 	int size;
 	char *cp;
-	struct sockaddr_in sin;
-	char buf[80];
+	union {
+		struct sockaddr peer_un;
+		struct sockaddr_in peer_un4;
+		struct sockaddr_in6 peer_un6;
+	} p_un;
+	char buf[80], pbuf[50];
 
 	cp = Argv[0];
-	size = sizeof(sin);
-	if (getpeername(s, (struct sockaddr *)&sin, &size) == 0)
-		(void) sprintf(buf, "-%s [%s]", a, inet_ntoa(sin.sin_addr));
+	size = sizeof(peer6);
+	if (getpeername(s, &peer, &size) == 0)
+		(void) sprintf(buf, "-%.20s [%.50s]", a,
+			       peer.sa_family == AF_INET6 ?
+				inet_ntop(AF_INET6, &peer6.sin6_addr,
+					  pbuf, sizeof(pbuf)) :
+			        inet_ntoa(peer4.sin_addr));
 	else
-		(void) sprintf(buf, "-%s", a);
+		(void) sprintf(buf, "-%.60s", a);
 	strncpy(cp, buf, LastArg - cp);
 	cp += strlen(cp);
 	while (cp < LastArg)
@@ -1573,14 +1735,22 @@ inetd_setproctitle(a, s)
 	int s;
 {
 	int size;
-	struct sockaddr_in sin;
-	char buf[80];
+	union {
+		struct sockaddr peer_un;
+		struct sockaddr_in peer_un4;
+		struct sockaddr_in6 peer_un6;
+	} p_un;
+	char buf[80], pbuf[50];
 
-	size = sizeof(sin);
-	if (getpeername(s, (struct sockaddr *)&sin, &size) == 0)
-		(void) sprintf(buf, "%s [%s]", a, inet_ntoa(sin.sin_addr));
+	size = sizeof(peer6);
+	if (getpeername(s, &peer, &size) == 0)
+		(void) sprintf(buf, "%.20s [%.50s]", a,
+			       peer.sa_family == AF_INET6 ?
+				inet_ntop(AF_INET6, &peer6.sin6_addr,
+					  pbuf, sizeof(pbuf)) :
+			        inet_ntoa(peer4.sin_addr));
 	else
-		(void) sprintf(buf, "%s", a);
+		(void) sprintf(buf, "%.60s", a);
 	setproctitle("%s", buf);
 }
 #endif
@@ -1590,34 +1760,12 @@ inetd_setproctitle(a, s)
  * Internet services provided internally by inetd:
  */
 #define	BUFSIZE	8192
+#define	SA(s)	((struct sockaddr *)s)
 
-#define IDENT_RESPONSE ":ERROR:HIDDEN-USER\r\n"
+/*
+ * Note: *_dg should use a message for options!
+ */
 
-/* ARGSUSED */
-void
-ident_stream(s, sep)		/* Ident service */
-	int s;
-	struct servtab *sep;
-{
-	char buffer[BUFSIZE];
-	int i, j;
-
-	inetd_setproctitle(sep->se_service, s);
-	j = 0;
-	while ((i = read(s, buffer + j, sizeof(buffer) - j)) > 0) {
-		j += i;
-		buffer[j] = '\0';
-		if (strchr(buffer, '\n'))
-			break;
-		if (strchr(buffer, '\r'))
-			break;
-	}
-	while (j > 0 && (buffer[j-1] == '\n' || buffer[j-1] == '\r'))
-		j--;
-	write(s, buffer, j);
-	write(s, IDENT_RESPONSE, strlen(IDENT_RESPONSE));
-	exit(0);
-}
 /* ARGSUSED */
 void
 echo_stream(s, sep)		/* Echo service -- echo data back */
@@ -1635,21 +1783,25 @@ echo_stream(s, sep)		/* Echo service -- echo data back */
 }
 
 int check_loop(sin, sep)
-	struct sockaddr_in *sin;
+	struct sockaddr_in6 *sin;
 	struct servtab *sep;
 {
 	struct servtab *se2;
+	char hname[64];
 
 	for (se2 = servtab; se2; se2 = se2->se_next) {
 		if (!se2->se_bi || se2->se_socktype != SOCK_DGRAM)
 			continue;
 
-		if (sin->sin_port == se2->se_ctrladdr.sin_port) {
+		if (sin->sin6_port == se2->se_ctrladdr6.sin6_port) {
 			syslog(LOG_WARNING,
 			       "%s/%s:%s/%s loop request REFUSED from %s",
 			       sep->se_service, sep->se_proto,
 			       se2->se_service, se2->se_proto,
-			       inet_ntoa(sin->sin_addr));
+			       sin->sin6_family == AF_INET6 ?
+				inet_ntop(AF_INET6, &sin->sin6_addr,
+					  hname, sizeof(hname)) :
+				inet_ntoa(((struct sockaddr_in *)sin)->sin_addr));
 			return 1;
 		}
 	}
@@ -1664,18 +1816,16 @@ echo_dg(s, sep)			/* Echo service -- echo data back */
 {
 	char buffer[BUFSIZE];
 	int i, size;
-	struct sockaddr_in sin;
+	struct sockaddr_in6 sin;
 
 	size = sizeof(sin);
-	if ((i = recvfrom(s, buffer, sizeof(buffer), 0,
-			  (struct sockaddr *)&sin, &size)) < 0)
+	if ((i = recvfrom(s, buffer, sizeof(buffer), 0, SA(&sin), &size)) < 0)
 		return;
 
 	if (check_loop(&sin, sep))
 		return;
 
-	(void) sendto(s, buffer, i, 0, (struct sockaddr *)&sin,
-		      sizeof(sin));
+	(void) sendto(s, buffer, i, 0, SA(&sin), size);
 }
 
 /* ARGSUSED */
@@ -1764,7 +1914,7 @@ chargen_dg(s, sep)		/* Character generator */
 	int s;
 	struct servtab *sep;
 {
-	struct sockaddr_in sin;
+	struct sockaddr_in6 sin;
 	static char *rs;
 	int len, size;
 	char text[LINESIZ+2];
@@ -1775,8 +1925,7 @@ chargen_dg(s, sep)		/* Character generator */
 	}
 
 	size = sizeof(sin);
-	if (recvfrom(s, text, sizeof(text), 0,
-		     (struct sockaddr *)&sin, &size) < 0)
+	if (recvfrom(s, text, sizeof(text), 0, SA(&sin), &size) < 0)
 		return;
 
 	if (check_loop(&sin, sep))
@@ -1792,8 +1941,7 @@ chargen_dg(s, sep)		/* Character generator */
 		rs = ring;
 	text[LINESIZ] = '\r';
 	text[LINESIZ + 1] = '\n';
-	(void) sendto(s, text, sizeof(text), 0,
-		      (struct sockaddr *)&sin, sizeof(sin));
+	(void) sendto(s, text, sizeof(text), 0, SA(&sin), size);
 }
 
 /*
@@ -1804,7 +1952,7 @@ chargen_dg(s, sep)		/* Character generator */
  * some seventy years Bell Labs was asleep.
  */
 
-unsigned long
+long
 machtime()
 {
 	struct timeval tv;
@@ -1825,7 +1973,7 @@ machtime_stream(s, sep)
 	int s;
 	struct servtab *sep;
 {
-	unsigned long result;
+	long result;
 
 	result = machtime();
 	(void) write(s, (char *) &result, sizeof(result));
@@ -1837,21 +1985,21 @@ machtime_dg(s, sep)
 	int s;
 	struct servtab *sep;
 {
-	unsigned long result;
-	struct sockaddr_in sin;
+	long result;
+	struct sockaddr_in6 sin;
 	int size;
 
 	size = sizeof(sin);
-	if (recvfrom(s, (char *)&result, sizeof(result), 0,
-		     (struct sockaddr *)&sin, &size) < 0)
+	if (recvfrom(s, (char *)&result, sizeof(result),
+		     0, SA(&sin), &size) < 0)
 		return;
 
 	if (check_loop(&sin, sep))
 		return;
 
 	result = machtime();
-	(void) sendto(s, (char *) &result, sizeof(result), 0,
-		      (struct sockaddr *)&sin, sizeof(sin));
+	(void) sendto(s, (char *) &result, sizeof(result),
+		      0, SA(&sin), size);
 }
 
 /* ARGSUSED */
@@ -1877,22 +2025,20 @@ daytime_dg(s, sep)		/* Return human-readable time of day */
 {
 	char buffer[256];
 	time_t clock;
-	struct sockaddr_in sin;
+	struct sockaddr_in6 sin;
 	int size;
 
 	clock = time((time_t *) 0);
 
 	size = sizeof(sin);
-	if (recvfrom(s, buffer, sizeof(buffer), 0,
-		     (struct sockaddr *)&sin, &size) < 0)
+	if (recvfrom(s, buffer, sizeof(buffer), 0, SA(&sin), &size) < 0)
 		return;
 
 	if (check_loop(&sin, sep))
 		return;
 
 	(void) sprintf(buffer, "%.24s\r\n", ctime(&clock));
-	(void) sendto(s, buffer, strlen(buffer), 0,
-		      (struct sockaddr *)&sin, sizeof(sin));
+	(void) sendto(s, buffer, strlen(buffer), 0, SA(&sin), size);
 }
 
 /*
@@ -1905,17 +2051,25 @@ print_service(action, sep)
 	struct servtab *sep;
 {
 	fprintf(stderr,
+	    "%s: %s proto=%s accept=%d max=%d user=%s group=%s"
 #ifdef LOGIN_CAP
-	    "%s: %s proto=%s accept=%d max=%d user=%s group=%s class=%s builtin=%p server=%s\n",
-#else
-	    "%s: %s proto=%s accept=%d max=%d user=%s group=%s builtin=%p server=%s\n",
+	    " class=%s"
 #endif
+	    " builtin=%p server=%s"
+#ifdef IPSEC
+	    " policy=\"%s\""
+#endif
+	    "\n",
 	    action, sep->se_service, sep->se_proto,
 	    sep->se_accept, sep->se_maxchild, sep->se_user, sep->se_group,
 #ifdef LOGIN_CAP
 	    sep->se_class,
 #endif
-	    (void *) sep->se_bi, sep->se_server);
+	    (void *) sep->se_bi, sep->se_server
+#ifdef IPSEC
+	    , (sep->se_policy ? sep->se_policy : "")
+#endif
+	    );
 }
 
 /*
@@ -2017,7 +2171,13 @@ typedef struct CTime {
 } CTime;
 
 typedef struct CHash {
-	struct in_addr	ch_Addr;
+	union {
+		struct in_addr	c4_Addr;
+		struct in6_addr	c6_Addr;
+	} cu_Addr;
+#define ch_Addr4	cu_Addr.c4_Addr
+#define ch_Addr6	cu_Addr.c6_Addr
+	int		ch_Family;
 	time_t		ch_LTime;
 	char		*ch_Service;
 	CTime		ch_Times[CHTSIZE];
@@ -2030,7 +2190,14 @@ cpmip(sep, ctrl)
 	struct servtab *sep;
 	int ctrl;
 {
-	struct sockaddr_in rsin;
+	union {
+		struct sockaddr rs_un;
+		struct sockaddr_in rs_un4;
+		struct sockaddr_in6 rs_un6;
+	} rsin;
+#define rsun	rsin.rs_un
+#define rsin4	rsin.rs_un4
+#define rsin6	rsin.rs_un6
 	int rsinLen = sizeof(rsin);
 	int r = 0;
 
@@ -2040,7 +2207,7 @@ cpmip(sep, ctrl)
 	 */
 
 	if (sep->se_maxcpm > 0 && 
-	    getpeername(ctrl, (struct sockaddr *)&rsin, &rsinLen) == 0 ) {
+	    getpeername(ctrl, &rsun, &rsinLen) == 0 ) {
 		time_t t = time(NULL);
 		int hv = 0xABC3D20F;
 		int i;
@@ -2048,12 +2215,22 @@ cpmip(sep, ctrl)
 		CHash *chBest = NULL;
 		unsigned int ticks = t / CHTGRAN;
 
-		{
+		if (rsun.sa_family == AF_INET) {
 			char *p;
 			int i;
 
-			for (i = 0, p = (char *)&rsin.sin_addr; 
-			    i < sizeof(rsin.sin_addr); 
+			for (i = 0, p = (char *)&rsin4.sin_addr; 
+			    i < sizeof(rsin4.sin_addr); 
+			    ++i, ++p) {
+				hv = (hv << 5) ^ (hv >> 23) ^ *p;
+			}
+			hv = (hv ^ (hv >> 16));
+		} else {
+			char *p;
+			int i;
+
+			for (i = 0, p = (char *)&rsin6.sin6_addr; 
+			    i < sizeof(rsin6.sin6_addr); 
 			    ++i, ++p) {
 				hv = (hv << 5) ^ (hv >> 23) ^ *p;
 			}
@@ -2062,7 +2239,18 @@ cpmip(sep, ctrl)
 		for (i = 0; i < 5; ++i) {
 			CHash *ch = &CHashAry[(hv + i) & CPMHMASK];
 
-			if (rsin.sin_addr.s_addr == ch->ch_Addr.s_addr &&
+			if (rsun.sa_family == AF_INET &&
+			    ch->ch_Family == AF_INET &&
+			    rsin4.sin_addr.s_addr == ch->ch_Addr4.s_addr &&
+			    ch->ch_Service && strcmp(sep->se_service,
+			    ch->ch_Service) == 0) {
+				chBest = ch;
+				break;
+			}
+			if (rsun.sa_family == AF_INET6 &&
+			    ch->ch_Family == AF_INET6 &&
+			    memcmp(&rsin6.sin6_addr, &ch->ch_Addr6,
+			    sizeof(struct in6_addr)) == 0 &&
 			    ch->ch_Service && strcmp(sep->se_service,
 			    ch->ch_Service) == 0) {
 				chBest = ch;
@@ -2073,15 +2261,32 @@ cpmip(sep, ctrl)
 				chBest = ch;
 			}
 		}
-		if (rsin.sin_addr.s_addr != chBest->ch_Addr.s_addr ||
-		    chBest->ch_Service == NULL ||
-		    strcmp(sep->se_service, chBest->ch_Service) != 0) {
-			chBest->ch_Addr = rsin.sin_addr;
+		if (rsun.sa_family == AF_INET &&
+		    (chBest->ch_Family != AF_INET ||
+		     rsin4.sin_addr.s_addr != chBest->ch_Addr4.s_addr ||
+		     chBest->ch_Service == NULL ||
+		     strcmp(sep->se_service, chBest->ch_Service) != 0)) {
+			chBest->ch_Family = rsun.sa_family;
+			chBest->ch_Addr4 = rsin4.sin_addr;
 			if (chBest->ch_Service)
 				free(chBest->ch_Service);
 			chBest->ch_Service = strdup(sep->se_service);
 			bzero(chBest->ch_Times, sizeof(chBest->ch_Times));
-		} 
+		}
+		if (rsun.sa_family == AF_INET6 &&
+		    (chBest->ch_Family != AF_INET6 ||
+		     memcmp(&rsin6.sin6_addr, &chBest->ch_Addr6,
+			    sizeof(struct in6_addr)) != 0 ||
+		     chBest->ch_Service == NULL ||
+		     strcmp(sep->se_service, chBest->ch_Service) != 0)) {
+			chBest->ch_Family = rsun.sa_family;
+			memmove(&chBest->ch_Addr6, &rsin6.sin6_addr,
+				sizeof(struct in6_addr));
+			if (chBest->ch_Service)
+				free(chBest->ch_Service);
+			chBest->ch_Service = strdup(sep->se_service);
+			bzero(chBest->ch_Times, sizeof(chBest->ch_Times));
+		}
 		chBest->ch_LTime = t;
 		{
 			CTime *ct = &chBest->ch_Times[ticks % CHTSIZE];
@@ -2099,11 +2304,16 @@ cpmip(sep, ctrl)
 			}
 		}
 		if (cnt * (CHTSIZE * CHTGRAN) / 60 > sep->se_maxcpm) {
+			char name[64];
 			r = -1;
 			syslog(LOG_ERR,
 			    "%s from %s exceeded counts/min (limit %d/min)",
-			    sep->se_service, inet_ntoa(rsin.sin_addr), 
-			    sep->se_maxcpm);
+			    sep->se_service,
+			    rsun.sa_family == AF_INET ?
+				inet_ntoa(rsin4.sin_addr) :
+				inet_ntop(AF_INET6, &rsin6.sin6_addr,
+					  name, sizeof(name)),
+			    sep->se_maxcpm );
 		}
 	}
 	return(r);

@@ -111,27 +111,32 @@ static void       reapchild __P((int));
 static void       mcleanup __P((int));
 static void       doit __P((void));
 static void       startup __P((void));
-static void       chkhost __P((struct sockaddr_in *));
+static void       chkhost __P((struct sockaddr *));
 static int	  ckqueue __P((struct printer *));
 static void	  usage __P((void));
 /* From rcmd.c: */
-int		  __ivaliduser __P((FILE *, u_long, const char *, 
-				    const char *));
+extern int __ivaliduser_af __P((FILE *, const void *, const char *,
+	const char *, int, int));
+
 
 uid_t	uid, euid;
+
+u_char family = AF_INET;
 
 int
 main(argc, argv)
 	int argc;
 	char **argv;
 {
-	int f, funix, finet, options, fromlen, i, errs;
+	int f, funix, finet, finet6, options, fromlen, i, errs;
 	fd_set defreadfds;
 	struct sockaddr_un un, fromunix;
 	struct sockaddr_in sin, frominet;
+	struct sockaddr_in6 sin6, frominet6;
 	int lfd;
 	sigset_t omask, nmask;
 	struct servent *sp, serv;
+	int inet_flag = 0, inet6_flag = 0;
 
 	euid = geteuid();	/* these shouldn't be different */
 	uid = getuid();
@@ -144,7 +149,7 @@ main(argc, argv)
 		errx(EX_NOPERM,"must run as root");
 
 	errs = 0;
-	while ((i = getopt(argc, argv, "dl")) != -1)
+	while ((i = getopt(argc, argv, "dl46")) != -1)
 		switch (i) {
 		case 'd':
 			options |= SO_DEBUG;
@@ -152,9 +157,19 @@ main(argc, argv)
 		case 'l':
 			lflag++;
 			break;
+		case '4':
+			family = AF_INET;
+			inet_flag++;
+			break;
+		case '6':
+			family = AF_INET6;
+			inet6_flag++;
+			break;
 		default:
 			errs++;
 		}
+	if (inet_flag && inet6_flag)
+		family = AF_UNSPEC;
 	argc -= optind;
 	argv += optind;
 	if (errs)
@@ -278,7 +293,9 @@ main(argc, argv)
 	FD_ZERO(&defreadfds);
 	FD_SET(funix, &defreadfds);
 	listen(funix, 5);
-	finet = socket(AF_INET, SOCK_STREAM, 0);
+	finet = -1;
+	if (family == AF_INET || family == AF_UNSPEC)
+		finet = socket(AF_INET, SOCK_STREAM, 0);
 	if (finet >= 0) {
 		if (options & SO_DEBUG)
 			if (setsockopt(finet, SOL_SOCKET, SO_DEBUG, 0, 0) < 0) {
@@ -295,16 +312,36 @@ main(argc, argv)
 		FD_SET(finet, &defreadfds);
 		listen(finet, 5);
 	}
+	finet6 = -1;
+	if (family == AF_INET6 || family == AF_UNSPEC)
+		finet6 = socket(AF_INET6, SOCK_STREAM, 0);
+	if (finet6 >= 0) {
+		if (options & SO_DEBUG)
+			if (setsockopt(finet6, SOL_SOCKET, SO_DEBUG, 0, 0) < 0) {
+				syslog(LOG_ERR, "setsockopt (SO_DEBUG): %m");
+				mcleanup(0);
+			}
+		memset(&sin6, 0, sizeof(sin6));
+		sin6.sin6_family = AF_INET6;
+		sin6.sin6_port = sp->s_port;
+		if (bind(finet6, (struct sockaddr *)&sin6, sizeof(sin6)) < 0) {
+			syslog(LOG_ERR, "bind: %m");
+ 			mcleanup(0);
+		}
+		FD_SET(finet6, &defreadfds);
+		listen(finet6, 5);
+	}
 	/*
 	 * Main loop: accept, do a request, continue.
 	 */
 	memset(&frominet, 0, sizeof(frominet));
+	memset(&frominet6, 0, sizeof(frominet6));
 	memset(&fromunix, 0, sizeof(fromunix));
 	/*
 	 * XXX - should be redone for multi-protocol
 	 */
 	for (;;) {
-		int domain, nfds, s;
+		int domain = -1, nfds, s = -1;
 		fd_set readfds;
 
 		FD_COPY(&defreadfds, &readfds);
@@ -318,7 +355,15 @@ main(argc, argv)
 			domain = AF_UNIX, fromlen = sizeof(fromunix);
 			s = accept(funix,
 			    (struct sockaddr *)&fromunix, &fromlen);
-		} else /* if (FD_ISSET(finet, &readfds)) */  {
+		} else if (finet6 >= 0 && FD_ISSET(finet6, &readfds))  {
+			domain = AF_INET6, fromlen = sizeof(frominet6);
+			s = accept(finet6,
+			    (struct sockaddr *)&frominet6, &fromlen);
+			if (frominet6.sin6_port == htons(20)) {
+				close(s);
+				continue;
+			}
+		} else if (finet >= 0 && FD_ISSET(finet, &readfds)) {
 			domain = AF_INET, fromlen = sizeof(frominet);
 			s = accept(finet,
 			    (struct sockaddr *)&frominet, &fromlen);
@@ -339,12 +384,17 @@ main(argc, argv)
 			signal(SIGQUIT, SIG_IGN);
 			signal(SIGTERM, SIG_IGN);
 			(void) close(funix);
-			(void) close(finet);
+			if (finet >= 0)
+				(void) close(finet);
+			if (finet6 >= 0)
+				(void) close(finet6);
 			dup2(s, 1);
 			(void) close(s);
-			if (domain == AF_INET) {
+			if (domain == AF_INET || domain == AF_INET6) {
 				from_remote = 1;
-				chkhost(&frominet);
+				chkhost((domain == AF_INET ?
+					(struct sockaddr *) &frominet :
+					(struct sockaddr *) &frominet6));
 			} else
 				from_remote = 0;
 			doit();
@@ -575,43 +625,50 @@ ckqueue(pp)
  */
 static void
 chkhost(f)
-	struct sockaddr_in *f;
+	struct sockaddr *f;
 {
 	register struct hostent *hp;
 	register FILE *hostf;
 	int first = 1;
 	int good = 0;
+	int err;
+	char numerichost[INET6_ADDRSTRLEN];
+	caddr_t addr = f->sa_family == AF_INET ?
+			(caddr_t) &((struct sockaddr_in *) f)->sin_addr :
+			(caddr_t) &((struct sockaddr_in6 *) f)->sin6_addr;
 
 	/* Need real hostname for temporary filenames */
-	hp = gethostbyaddr((char *)&f->sin_addr,
-	    sizeof(struct in_addr), f->sin_family);
-	if (hp == NULL)
+	err = getnameinfo(f, f->sa_len, numerichost, sizeof(numerichost), 0, 0, NI_NUMERICHOST);
+	if (err) {
+		syslog(LOG_ERR, "getnameinfo: failed %d", err);
+		exit(1);
+	}
+	err = getnameinfo(f, f->sa_len, fromb, sizeof(fromb), 0, 0, NI_NAMEREQD);
+	if (err)
 		fatal(0, "Host name for your address (%s) unknown",
-			inet_ntoa(f->sin_addr));
-
-	(void) strncpy(fromb, hp->h_name, sizeof(fromb) - 1);
-	from[sizeof(fromb) - 1] = '\0';
+		      numerichost);
 	from = fromb;
 
 	/* Check for spoof, ala rlogind */
-	hp = gethostbyname(fromb);
+	hp = gethostbyname2(fromb, f->sa_family);
 	if (!hp)
 		fatal(0, "hostname for your address (%s) unknown",
-		    inet_ntoa(f->sin_addr));
+		      numerichost);
 	for (; good == 0 && hp->h_addr_list[0] != NULL; hp->h_addr_list++) {
-		if (!bcmp(hp->h_addr_list[0], (caddr_t)&f->sin_addr,
-		    sizeof(f->sin_addr)))
+		if (!bcmp(hp->h_addr_list[0], addr, hp->h_length))
 			good = 1;
 	}
-	if (good == 0)
+	if (good == 0) {
 		fatal(0, "address for your hostname (%s) not matched",
-		    inet_ntoa(f->sin_addr));
+		      numerichost);
+  	}
 
 	hostf = fopen(_PATH_HOSTSEQUIV, "r");
 again:
 	if (hostf) {
-		if (__ivaliduser(hostf, f->sin_addr.s_addr,
-		    DUMMY, DUMMY) == 0) {
+		if (__ivaliduser_af(hostf, addr,
+		    DUMMY, DUMMY,
+		    hp->h_addrtype, hp->h_length) == 0) {
 			(void) fclose(hostf);
 			return;
 		}

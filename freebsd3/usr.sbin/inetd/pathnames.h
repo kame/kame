@@ -36,5 +36,5 @@
 
 #include <paths.h>
 
-#define	_PATH_INETDCONF	"/etc/inetd.conf"
-#define _PATH_INETDPID	_PATH_VARRUN "inetd.pid"
+#define	_PATH_INETDCONF	"/usr/local/v6/etc/inet6d.conf"
+#define _PATH_INETDPID	_PATH_VARRUN "inet46d.pid"
