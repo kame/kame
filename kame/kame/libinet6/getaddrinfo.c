@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.143 2003/03/22 05:50:17 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.144 2003/04/08 03:35:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -194,10 +194,18 @@ static const struct explore explore[] = {
 #ifdef INET6
 	{ PF_INET6, SOCK_DGRAM, IPPROTO_UDP, "udp", 0x07 },
 	{ PF_INET6, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x07 },
+#if 0	/*???*/
+	{ PF_INET6, SOCK_DGRAM, IPPROTO_SCTP, "sctp", 0x07 },
+#endif
+	{ PF_INET6, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x07 },
 	{ PF_INET6, SOCK_RAW, ANY, NULL, 0x05 },
 #endif
 	{ PF_INET, SOCK_DGRAM, IPPROTO_UDP, "udp", 0x07 },
 	{ PF_INET, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x07 },
+#if 0	/*???*/
+	{ PF_INET, SOCK_DGRAM, IPPROTO_SCTP, "sctp", 0x07 },
+#endif
+	{ PF_INET, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x07 },
 	{ PF_INET, SOCK_RAW, ANY, NULL, 0x05 },
 	{ -1, 0, 0, NULL, 0 },
 };
