@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.88 2001/02/01 16:33:31 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.89 2001/02/02 04:39:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -31,6 +31,9 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#ifdef __NetBSD__
+#include <sys/callout.h>
+#endif
 #include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
@@ -76,9 +79,10 @@ unsigned long in6_maxmtu = 0;
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 static int get_hostid_ifid __P((struct ifnet *, struct in6_addr *));
+struct callout in6_tmpaddrtimer_ch;
 #endif
 static int get_rand_ifid __P((struct ifnet *, struct in6_addr *));
-static int generate_anon_ifid __P((u_int8_t *, u_int8_t *, u_int8_t *));
+static int generate_tmp_ifid __P((u_int8_t *, u_int8_t *, u_int8_t *));
 static int get_hw_ifid __P((struct ifnet *, struct in6_addr *));
 static int get_ifid __P((struct ifnet *, struct ifnet *, struct in6_addr *));
 static int in6_ifattach_linklocal __P((struct ifnet *, struct ifnet *));
@@ -183,7 +187,7 @@ get_rand_ifid(ifp, in6)
 }
 
 static int
-generate_anon_ifid(seed0, curid, ret)
+generate_tmp_ifid(seed0, curid, ret)
 	u_int8_t *seed0, *curid, *ret;
 {
 	MD5_CTX ctxt;
@@ -213,6 +217,15 @@ generate_anon_ifid(seed0, curid, ret)
 	/* XXX assumption on the size of IFID */
 	bcopy(curid, &seed[8], 8);
 
+	{			/* print it for debug */
+		int i;
+
+		printf("generate_tmp_ifid: new randomized ID from: ");
+		for (i = 0; i < 16; i++)
+			printf("%02x", seed[i]);
+		printf(" ");
+	}
+
 	/* generate 8 bytes of pseudo-random value. */
 	bzero(&ctxt, sizeof(ctxt));
 	MD5Init(&ctxt);
@@ -238,7 +251,7 @@ generate_anon_ifid(seed0, curid, ret)
 	{			/* print it for debug */
 		int i;
 
-		printf("generate_anon_ifid: new randomized ID: ");
+		printf("to: ");
 		for (i = 0; i < 16; i++)
 			printf("%02x", digest[i]);
 		printf("\n");
@@ -1199,7 +1212,7 @@ in6_ifdetach(ifp)
 #endif
 
 void
-in6_get_randifid(ifp, buf, generate, curid)
+in6_get_tmpifid(ifp, buf, generate, curid)
 	struct ifnet *ifp;
 	u_int8_t *buf;
 	const u_int8_t *curid;
@@ -1210,17 +1223,53 @@ in6_get_randifid(ifp, buf, generate, curid)
 
 	bzero(nullbuf, sizeof(nullbuf));
 	if (bcmp(ndi->randomid, nullbuf, sizeof(nullbuf)) == 0) {
-		/*
-		 * we've never created a random ID.  Create a new one, and
-		 * start a timer for regeneration.
-		 * XXX: implement timer.
-		 */
+		/* we've never created a random ID.  Create a new one. */
 		bcopy(curid, ndi->randomid, sizeof(ndi->randomid));
 		generate = 1;
 	}
 
 	if (generate) {
-		/* generate_anon_ifid will update seedn and buf */
-		(void)generate_anon_ifid(ndi->randomseed, ndi->randomid, buf);
+		/* generate_tmp_ifid will update seedn and buf */
+		(void)generate_tmp_ifid(ndi->randomseed, ndi->randomid, buf);
+	} else
+		bcopy(ndi->randomid, buf, 8);
+}
+
+void
+in6_tmpaddrtimer(ignored_arg)
+	void *ignored_arg;
+{
+	int i;
+	struct nd_ifinfo *ndi;
+	u_int8_t nullbuf[8];
+#ifdef __NetBSD__
+	int s = splsoftnet();
+#else
+	int s = splnet();
+#endif
+
+#ifdef __NetBSD__
+	callout_reset(&in6_tmpaddrtimer_ch,
+		      (ip6_anon_preferred_lifetime - ip6_anon_delay) * hz,
+		      in6_tmpaddrtimer, NULL);
+#else
+	timeout(in6_tmpaddrtimer, (caddr_t)0,
+		(ip6_anon_preferred_lifetime - ip6_anon_delay) * hz);
+#endif
+
+	bzero(nullbuf, sizeof(nullbuf));
+	for (i = 1; i < if_index + 1; i++) {
+		ndi = &nd_ifinfo[i];
+		if (bcmp(ndi->randomid, nullbuf, sizeof(nullbuf)) != 0) {
+			/*
+			 * We've been generating random ID on this interface.
+			 * Create a new one.
+			 */
+			(void )generate_tmp_ifid(ndi->randomseed,
+						 ndi->randomid,
+						 ndi->randomseed);
+		}
 	}
+
+	splx(s);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.32 2001/02/01 13:36:54 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.33 2001/02/02 04:39:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -84,7 +84,6 @@ struct nd_ifinfo {
 	/* the followings are for privacy extension for addrconf */
 	u_int8_t randomseed[8];
 	u_int8_t randomid[8];
-	int randomdelay; /* random delay to generate rand ID in seconds */
 };
 
 #define ND6_IFF_PERFORMNUD	0x1
@@ -269,6 +268,8 @@ extern struct callout nd6_timer_ch;
 /* nd6_rtr.c */
 extern struct ifnet *nd6_defifp;  /* XXXYYY */
 extern int nd6_defifindex;
+extern int ip6_anon_delay;	/* seconds */
+extern int ip6_anon_preferred_lifetime; /* seconds */
 
 union nd_opts {
 	struct nd_opt_hdr *nd_opt_array[9];	/*max = home agent info*/

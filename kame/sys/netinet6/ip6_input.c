@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.150 2001/01/23 10:50:44 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.151 2001/02/02 04:39:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -317,8 +317,11 @@ ip6_init()
 	 */
 	microtime(&tv);
 	ip6_flow_seq = random() ^ tv.tv_usec;
+	microtime(&tv);
+	ip6_anon_delay = (random() ^ tv.tv_usec) % MAX_ANON_RANDOM_DELAY;
 #else
 	ip6_flow_seq = arc4random();
+	ip6_anon_delay = arc4random() % MAX_ANON_RANDOM_DELAY;
 #endif
 
 #ifndef __FreeBSD__

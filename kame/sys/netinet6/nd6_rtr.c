@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.79 2001/02/01 13:36:54 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.80 2001/02/02 04:39:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -104,8 +104,14 @@ int ip6_tmpaddr = IPV6TMPADDR;
 int ip6_tmpaddr = 0;
 #endif
 
-static int anon_valid_lifetime = DEF_ANON_VALID_LIFETIME;
-static int anon_preferred_lifetime = DEF_ANON_PREFERRED_LIFETIME;
+int ip6_anon_delay;
+int ip6_anon_preferred_lifetime = DEF_ANON_PREFERRED_LIFETIME;
+static int ip6_anon_valid_lifetime = DEF_ANON_VALID_LIFETIME;
+/*
+ * shorter lifetimes for debugging purposes.
+int ip6_anon_preferred_lifetime = 1200;
+static int ip6_anon_valid_lifetime = 7200;
+*/
 
 #ifdef MIP6
 void (*mip6_select_defrtr_hook)(struct nd_prefix *,
@@ -1019,7 +1025,7 @@ prelist_update(new, dr, m)
 	int error = 0;
 	int newprefix = 0;
 	int auth;
-	struct in6_addrlifetime *lt6;
+	struct in6_addrlifetime lt6_tmp;
 
 	auth = 0;
 	if (m) {
@@ -1034,7 +1040,8 @@ prelist_update(new, dr, m)
 	}
 
 	if ((pr = nd6_prefix_lookup(new)) != NULL) {
-		newprefix = 1;
+		if (new->ndpr_raf_onlink == 0)
+			goto addrconf;
 
 		/*
 		 * nd6_prefix_lookup() ensures that pr and new have the same
@@ -1048,7 +1055,7 @@ prelist_update(new, dr, m)
 			 * configured, the code below will be executed.
 			 */
 			if (pr == (*mip6_get_home_prefix_hook)())
-				goto noautoconf1;
+				goto afteraddrconf;
 		}
 #endif /* MIP6 */
 
@@ -1085,11 +1092,29 @@ prelist_update(new, dr, m)
 	} else {
 		struct nd_prefix *newpr = NULL;
 
-		if (new->ndpr_vltime == 0) goto end;
+		newprefix = 1;
+
+		if (new->ndpr_vltime == 0)
+			goto end;
+		if (new->ndpr_raf_onlink == 0 && new->ndpr_raf_auto == 0)
+			goto end;
 
 		bzero(&new->ndpr_addr, sizeof(struct in6_addr));
 
 		error = nd6_prelist_add(new, dr, &newpr);
+
+		/*
+		 * XXX: we the ND point of view, we can ignore a prefix
+		 * with the on-link bit being zero.  However, we need a
+		 * prefix structure for references from autoconfigured
+		 * addresses.  Thus, we explicitly make the prefix itself
+		 * expires now.
+		 */
+		if (newpr->ndpr_raf_onlink == 0) {
+			newpr->ndpr_vltime = 0;
+			newpr->ndpr_pltime = 0;
+			in6_init_prefix_ltimes(newpr);
+		}
 
 		if (error != 0 || newpr == NULL) {
 			log(LOG_NOTICE, "prelist_update: "
@@ -1103,13 +1128,14 @@ prelist_update(new, dr, m)
 		pr = newpr;
 	}
 
+  addrconf:
 	/*
 	 * Address autoconfiguration based on Section 5.5.3 of RFC 2462.
 	 * Note that pr must be non NULL at this point.
 	 */
 
 	/* 5.5.3 (a). Ignore the prefix without the A bit set. */
-	if (!pr->ndpr_raf_auto)
+	if (!new->ndpr_raf_auto)
 		goto end;
 
 	/*
@@ -1157,9 +1183,9 @@ prelist_update(new, dr, m)
 			continue;
 		
 		ifa_plen = in6_mask2len(&ifa6->ia_prefixmask.sin6_addr, NULL);
-		if (ifa_plen != pr->ndpr_plen ||
+		if (ifa_plen != new->ndpr_plen ||
 		    !in6_are_prefix_equal(&ifa6->ia_addr.sin6_addr,
-					  &pr->ndpr_prefix.sin6_addr,
+					  &new->ndpr_prefix.sin6_addr,
 					  ifa_plen))
 			continue;
 
@@ -1173,17 +1199,17 @@ prelist_update(new, dr, m)
 		 * An already autoconfigured address matched.  Now that we
 		 * are sure there is at least one matched address, we can
 		 * proceed to 5.5.3. (e): update the lifetimes according to the
-		 * "two hours" rule.
+		 * "two hours" rule and the privacy extension.
 		 */
 #define TWOHOUR		(120*60)
-		lt6 = &ifa6->ia6_lifetime;
+		lt6_tmp = ifa6->ia6_lifetime;
 
-		storedlifetime = lt6->ia6t_expire > time_second ?
-			lt6->ia6t_expire - time_second : 0;
+		storedlifetime = lt6_tmp.ia6t_expire > time_second ?
+			lt6_tmp.ia6t_expire - time_second : 0;
 
-		if (TWOHOUR < pr->ndpr_vltime ||
-		    storedlifetime < pr->ndpr_vltime) {
-			lt6->ia6t_vltime = pr->ndpr_vltime;
+		if (TWOHOUR < new->ndpr_vltime ||
+		    storedlifetime < new->ndpr_vltime) {
+			lt6_tmp.ia6t_vltime = new->ndpr_vltime;
 		} else if (storedlifetime <= TWOHOUR
 #if 0
 			   /*
@@ -1191,38 +1217,61 @@ prelist_update(new, dr, m)
 			    * omit it.
 			    * See IPng 6712, 6717, and 6721.
 			    */
-			   && pr->ndpr_vltime <= storedlifetime
+			   && new->ndpr_vltime <= storedlifetime
 #endif
 			) {
 			if (auth) {
-				lt6->ia6t_vltime = pr->ndpr_vltime;
+				lt6_tmp.ia6t_vltime = new->ndpr_vltime;
 			}
 		} else {
 			/*
-			 * pr->ndpr_vltime <= TWOHOUR &&
+			 * new->ndpr_vltime <= TWOHOUR &&
 			 * TWOHOUR < storedlifetime
 			 */
-			lt6->ia6t_vltime = TWOHOUR;
+			lt6_tmp.ia6t_vltime = TWOHOUR;
 		}
 
 		/* The 2 hour rule is not imposed for preferred lifetime. */
-		lt6->ia6t_pltime = pr->ndpr_pltime;
+		lt6_tmp.ia6t_pltime = new->ndpr_pltime;
 
-		in6_init_address_ltimes(pr, lt6);
+		/*
+		 * When adjusting the lifetimes of an existing temporary
+		 * address, only lower the lifetimes.
+		 * addrconf-privacy-04 3.3. (1).
+		 */
+		if ((ifa6->ia6_flags & IN6_IFF_TEMPORARY) != 0) {
+			if (lt6_tmp.ia6t_pltime >
+			    ifa6->ia6_lifetime.ia6t_pltime) {
+				lt6_tmp.ia6t_pltime =
+					ifa6->ia6_lifetime.ia6t_pltime;
+			}
+			if (lt6_tmp.ia6t_vltime >
+			    ifa6->ia6_lifetime.ia6t_vltime) {
+				lt6_tmp.ia6t_vltime =
+					ifa6->ia6_lifetime.ia6t_vltime;
+			}
+		}
+
+		in6_init_address_ltimes(pr, &lt6_tmp);
 
 		/*
 		 * This update might re-validate an already deprecated address.
 		 * XXX: should this check be centralized?
 		 */
-		if (lt6->ia6t_vltime != 0)
+		if (lt6_tmp.ia6t_vltime != 0)
 			ifa6->ia6_flags &= ~IN6_IFF_DEPRECATED;
+
+		ifa6->ia6_lifetime = lt6_tmp;
 	}
-	if (ia6_match == NULL && pr->ndpr_vltime) {
+	if (ia6_match == NULL && new->ndpr_vltime) {
 		/*
 		 * No address matched and the valid lifetime is non-zero.
 		 * Create a new address.
 		 */
-		if ((ia6 = in6_ifadd(pr)) != NULL) {
+		if ((ia6 = in6_ifadd(new)) != NULL) {
+			/*
+			 * note that we should use pr (not new) for reference.
+			 */
 			pr->ndpr_refcnt++;
 			ia6->ia6_ndpr = pr;
 
@@ -1254,6 +1303,7 @@ prelist_update(new, dr, m)
 	}
 
 #ifdef MIP6
+  afteraddrconf:
 	if (newprefix) {
 		onlink = (pr->ndpr_stateflags & NDPRF_ONLINK); /* for MIP6 */
 
@@ -1820,7 +1870,7 @@ in6_tmpifadd(ia0)
 	struct ifnet *ifp = ia0->ia_ifa.ifa_ifp;
 	struct in6_ifaddr *newia;
 	struct in6_aliasreq ifra;
-	int forcegen = 0, error;
+	int i, forcegen = 0, error;
 	int trylimit = 3;	/* XXX: adhoc value */
 	u_int32_t randid[2];
 
@@ -1829,15 +1879,15 @@ in6_tmpifadd(ia0)
 	ifra.ifra_addr = ia0->ia_addr;
 	/* copy prefix mask */
 	ifra.ifra_prefixmask = ia0->ia_prefixmask;
-	/* clear old IFID */
-	ifra.ifra_addr.sin6_addr.s6_addr32[2]
-		&= ~(ifra.ifra_prefixmask.sin6_addr.s6_addr32[2]);
-	ifra.ifra_addr.sin6_addr.s6_addr32[3]
-		&= ~(ifra.ifra_prefixmask.sin6_addr.s6_addr32[3]);
+	/* clear the old IFID */
+	for (i = 0; i < 4; i++) {
+		ifra.ifra_addr.sin6_addr.s6_addr32[i]
+			&= ifra.ifra_prefixmask.sin6_addr.s6_addr32[i];
+	}
 
   again:
-	in6_get_randifid(ifp, (u_int8_t *)randid, forcegen,
-			 (const u_int8_t *)&ia0->ia_addr.sin6_addr.s6_addr[8]);
+	in6_get_tmpifid(ifp, (u_int8_t *)randid, forcegen,
+			(const u_int8_t *)&ia0->ia_addr.sin6_addr.s6_addr[8]);
 	ifra.ifra_addr.sin6_addr.s6_addr32[2]
 		|= (randid[0] & ~(ifra.ifra_prefixmask.sin6_addr.s6_addr32[2]));
 	ifra.ifra_addr.sin6_addr.s6_addr32[3]
@@ -1866,17 +1916,24 @@ in6_tmpifadd(ia0)
          * of the public address or ANON_PREFERRED_LIFETIME -
          * RANDOM_DELAY.
 	 */
-	if (ia0->ia6_lifetime.ia6t_vltime < anon_valid_lifetime)
+	if (ia0->ia6_lifetime.ia6t_vltime < ip6_anon_valid_lifetime)
 		ifra.ifra_lifetime.ia6t_vltime = ia0->ia6_lifetime.ia6t_vltime;
 	else
-		ifra.ifra_lifetime.ia6t_vltime = anon_valid_lifetime;
-	if (ia0->ia6_lifetime.ia6t_pltime < anon_preferred_lifetime -
-	    nd_ifinfo[ifp->if_index].randomdelay)
+		ifra.ifra_lifetime.ia6t_vltime = ip6_anon_valid_lifetime;
+	if (ia0->ia6_lifetime.ia6t_pltime <
+	    ip6_anon_preferred_lifetime - ip6_anon_delay) {
 		ifra.ifra_lifetime.ia6t_pltime = ia0->ia6_lifetime.ia6t_pltime;
-	else {
-		ifra.ifra_lifetime.ia6t_pltime = anon_preferred_lifetime -
-			nd_ifinfo[ifp->if_index].randomdelay;
+	} else {
+		ifra.ifra_lifetime.ia6t_pltime =
+			ip6_anon_preferred_lifetime - ip6_anon_delay;
 	}
+
+	/*
+	 * A temporary address is created only if this calculated Preferred
+	 * Lifetime is greater than REGEN_ADVANCE time units.
+	 */
+	if (ifra.ifra_lifetime.ia6t_pltime <= ANON_REGEN_ADVANCE)
+		return(0);
 
 	/* XXX: scope zone ID? */
 

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.154 2001/02/01 05:17:40 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.155 2001/02/02 04:39:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -808,6 +808,23 @@ in6_control(so, cmd, data, ifp)
 			    ia->ia6_ndpr == NULL) { /* new autoconfed addr */
 				ia->ia6_ndpr = pr;
 				pr->ndpr_refcnt++;
+
+				/*
+				 * If this is the first autoconf address from
+				 * the prefix, create a temporary address
+				 * as well (when specified).
+				 */
+				if (ip6_tmpaddr &&
+				    pr->ndpr_refcnt == 1) {
+					int e;
+					if ((e = in6_tmpifadd(ia)) != 0) {
+						log(LOG_NOTICE, "in6_control: "
+						    "failed to create a "
+						    "temporary address, "
+						    "errno=%d\n",
+						    e);
+					}
+				}
 			}
 
 			/*
@@ -2455,6 +2472,7 @@ in6_ifawithscope(oifp, dst)
 			 * A non-deprecated address is always preferred
 			 * to a deprecated one regardless of scopes and
 			 * address matching.
+			 * XXX: is this true???
 			 */
 			if ((ifa_best->ia6_flags & IN6_IFF_DEPRECATED) &&
 			    (((struct in6_ifaddr *)ifa)->ia6_flags &
@@ -2533,7 +2551,27 @@ in6_ifawithscope(oifp, dst)
 
 			/*
 			 * At last both dscopecmp and bscopecmp must be 0.
-			 * We need address matching against dst for
+			 */
+
+			/*
+			 * If we prefer temporary addresses, and we've found
+			 * a non-deprecated temporary one, replace the
+			 * candidate with it.
+			 */
+			if (ip6_tmpaddr) {
+				struct in6_ifaddr *ifat;
+
+				ifat = (struct in6_ifaddr *)ifa;
+				if ((ifa_best->ia6_flags & IN6_IFF_TEMPORARY)
+				    == 0 &&
+				    (ifat->ia6_flags & IN6_IFF_TEMPORARY)
+				    != 0 &&
+				    ifat->ia6_lifetime.ia6t_pltime > 0)
+					goto replace;
+			}
+
+			/*
+			 * Now we need address matching against dst for
 			 * tiebreaking.
 			 */
 			tlen = in6_matchlen(IFA_IN6(ifa), dst);

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.94 2001/01/30 14:06:20 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.95 2001/02/02 04:39:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -93,6 +93,7 @@
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
+#include <netinet6/in6_ifattach.h>
 #include <netinet6/in6_prefix.h>
 #include <netinet/icmp6.h>
 
@@ -149,6 +150,7 @@ void (*mip6_expired_defrouter_hook)(struct nd_defrouter *dr) = 0;
 #ifdef __NetBSD__
 struct callout nd6_slowtimo_ch;
 struct callout nd6_timer_ch;
+extern struct callout in6_tmpaddrtimer_ch;
 #endif
 
 void
@@ -179,6 +181,16 @@ nd6_init()
 #else
 	timeout(nd6_slowtimo, (caddr_t)0, ND6_SLOWTIMER_INTERVAL * hz);
 #endif
+
+#ifdef __NetBSD__
+	callout_reset(&in6_tmpaddrtimer_ch,
+		      (ip6_anon_preferred_lifetime - ip6_anon_delay) * hz,
+		      in6_tmpaddrtimer, NULL);
+#else
+	timeout(in6_tmpaddrtimer, (caddr_t)0,
+		(ip6_anon_preferred_lifetime - ip6_anon_delay) * hz);
+#endif
+
 }
 
 void
@@ -613,10 +625,64 @@ nd6_timer(ignored_arg)
 		nia6 = ia6->ia_next;
 		/* check address lifetime */
 		lt6 = &ia6->ia6_lifetime;
-		if (lt6->ia6t_preferred && lt6->ia6t_preferred < time_second)
-			ia6->ia6_flags |= IN6_IFF_DEPRECATED;
 		if (lt6->ia6t_expire && lt6->ia6t_expire < time_second)
 			in6_purgeaddr(&ia6->ia_ifa);
+		else if (lt6->ia6t_preferred &&
+			 lt6->ia6t_preferred < time_second) {
+			int oldflags = ia6->ia6_flags;
+
+			ia6->ia6_flags |= IN6_IFF_DEPRECATED;
+
+			/*
+			 * If a temporary address has just become deprecated
+			 * and there is a non-deprecated public address,
+			 * create a new temporary address.
+			 */
+			if ((ia6->ia6_flags & IN6_IFF_TEMPORARY) != 0 &&
+			    (oldflags & IN6_IFF_DEPRECATED) == 0 &&
+			    ip6_tmpaddr) {
+				struct ifaddr *ifa;
+				struct ifnet *ifp;
+
+				ifp = ia6->ia_ifa.ifa_ifp;
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+				for (ifa = ifp->if_addrlist; ifa;
+				     ifa = ifa->ifa_next)
+#else
+				for (ifa = ifp->if_addrlist.tqh_first;
+				     ifa;
+				     ifa = ifa->ifa_list.tqe_next)
+#endif
+				{
+					struct in6_ifaddr *it6;
+
+					if (ifa->ifa_addr->sa_family !=
+					    AF_INET6)
+						continue;
+
+					it6 = (struct in6_ifaddr *)ifa;
+					if ((it6->ia6_flags &
+					     IN6_IFF_AUTOCONF) == 0)
+						continue;
+
+					if (it6->ia6_ndpr != NULL &&
+					    it6->ia6_ndpr == ia6->ia6_ndpr &&
+					    it6->ia6_lifetime.ia6t_preferred
+					    > time_second) {
+						int e;
+
+						if ((e = in6_tmpifadd(it6))
+						    != 0) {
+							log(LOG_NOTICE,
+							    "nd6_timer: failed"
+							    " to create a new"
+							    " tmp addr (%d)\n",
+							    e);
+						}
+					}
+				}
+			}
+		}
 	}
 
 	/* expire prefix list */
