@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.135 2004/02/03 07:25:22 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.136 2004/02/04 01:04:19 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1145,14 +1145,14 @@ in6_pcbsetport(laddr, inp, p)
 				 * Undo any address bind that may have
 				 * occurred above.
 				 */
-				sa6_copy_addr(&sa6_any, &inp->in6p_lsa);
+				inp->in6p_laddr = in6addr_any;
 				return (EAGAIN);
 			}
 			--*lastport;
 			if (*lastport > first || *lastport < last)
 				*lastport = first;
 			lport = htons(*lastport);
-		} while (in6_pcblookup_local(pcbinfo, &inp->in6p_lsa,
+		} while (in6_pcblookup_local(pcbinfo, &inp->in6p_laddr,
 					     lport, wild));
 	} else {
 		/*
@@ -1166,7 +1166,7 @@ in6_pcbsetport(laddr, inp, p)
 				 * Undo any address bind that may have
 				 * occurred above.
 				 */
-				sa6_copy_addr(&sa6_any, &inp->in6p_lsa);
+				inp->in6p_laddr = in6addr_any;
 				return (EAGAIN);
 			}
 			++*lastport;
@@ -1174,12 +1174,12 @@ in6_pcbsetport(laddr, inp, p)
 				*lastport = first;
 			lport = htons(*lastport);
 		} while (in6_pcblookup_local(pcbinfo,
-					     &inp->in6p_lsa, lport, wild));
+					     &inp->in6p_laddr, lport, wild));
 	}
 
 	inp->inp_lport = lport;
 	if (in_pcbinshash(inp) != 0) {
-		sa6_copy_addr(&sa6_any, &inp->in6p_lsa);
+		inp->in6p_laddr = in6addr_any;
 		inp->inp_lport = 0;
 		return (EAGAIN);
 	}

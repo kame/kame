@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.359 2004/02/03 22:56:27 suz Exp $	*/
+/*	$KAME: in6.c,v 1.360 2004/02/04 01:04:19 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3851,20 +3851,18 @@ ip6_sprintf(addr)
 
 #if defined(__FreeBSD__) || defined(__bsdi__)
 int
-in6_localaddr(sa6)
-	struct sockaddr_in6 *sa6;
+in6_localaddr(in6)
+	struct in6_addr *in6;
 {
 	struct in6_ifaddr *ia;
 
-	if (IN6_IS_ADDR_LOOPBACK(&sa6->sin6_addr) ||
-	    IN6_IS_ADDR_LINKLOCAL(&sa6->sin6_addr)) {
+	if (IN6_IS_ADDR_LOOPBACK(in6) || IN6_IS_ADDR_LINKLOCAL(in6)) {
 		return 1;
 	}
 
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
-		if (sa6->sin6_scope_id == ia->ia_addr.sin6_scope_id &&
-		    IN6_ARE_MASKED_ADDR_EQUAL(&sa6->sin6_addr,
-		    &ia->ia_addr.sin6_addr, &ia->ia_prefixmask.sin6_addr)) {
+		if (IN6_ARE_MASKED_ADDR_EQUAL(in6, &ia->ia_addr.sin6_addr,
+		    &ia->ia_prefixmask.sin6_addr)) {
 			return 1;
 		}
 	}
