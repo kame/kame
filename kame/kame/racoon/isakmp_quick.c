@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.69 2000/12/15 13:43:56 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.70 2001/01/04 06:41:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1887,8 +1887,11 @@ get_proposal_r(iph2)
 	plog(LLV_DEBUG, LOCATION, NULL,
 		"suitable SP found:%s\n", spidx2str(&spidx));
 
-	/* require IPsec ? */
-	if (!(sp->policy == IPSEC_POLICY_IPSEC && sp_out->policy == IPSEC_POLICY_IPSEC)) {
+	/*
+	 * In the responder side, the inbound policy should be using IPSec.
+	 * outbound policy is not checked currently.
+	 */
+	if (sp->policy != IPSEC_POLICY_IPSEC) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"policy found, but no IPsec required: %s\n",
 			spidx2str(&spidx));
