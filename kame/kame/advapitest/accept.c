@@ -1,4 +1,4 @@
-/*	$KAME: accept.c,v 1.19 2001/09/18 10:49:56 jinmei Exp $ */
+/*	$KAME: accept.c,v 1.20 2001/09/18 10:59:18 jinmei Exp $ */
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -148,7 +148,7 @@ main(argc, argv)
 #endif
 
 		ai_raw.ai_addrlen = sizeof(sa6_raw);
-		ai_raw.ai_addr = &sa6_raw;
+		ai_raw.ai_addr = (struct sockaddr *)&sa6_raw;
 
 		res = &ai_raw;
 
