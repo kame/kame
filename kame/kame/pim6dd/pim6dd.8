@@ -1,4 +1,4 @@
-.\"	$KAME: pim6dd.8,v 1.9 2000/12/04 06:36:04 itojun Exp $
+.\"	$KAME: pim6dd.8,v 1.10 2001/03/02 02:22:21 jinmei Exp $
 .\"
 .\" Copyright (C) 1998 WIDE Project.
 .\" All rights reserved.
@@ -69,7 +69,7 @@ and
 .Nm
 automatically configures itself to forward on all multicast-capable
 interfaces, i.e., interfaces that have the IFF_MULTICAST flag set (excluding
-the "loopback interface").
+the "loopback interface" and interaces that do not have an IPv6 address).
 To override the default configuration,
 configuration commands may be placed in
 .Pa /usr/local/v6/etc/pim6dd.conf
@@ -78,6 +78,10 @@ or an alternative file, specified by the
 .Sq Fl c
 option
 .Pc .
+Note that
+.Nm
+ignores interfaces that do not have an IPv6 address.
+Such interfaces should not appear in the configuration file.
 .\"
 .Sh FILES
 .Bl -tag -width /usr/local/v6/etc/pim6dd.conf -compact
