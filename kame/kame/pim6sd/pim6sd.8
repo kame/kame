@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: pim6sd.8,v 1.2 1999/09/27 05:19:38 jinmei Exp $
+.\"     $Id: pim6sd.8,v 1.3 1999/12/03 08:54:52 jinmei Exp $
 .\"
 .Dd June 10, 1999
 .Dt PIM6SD 8
@@ -82,11 +82,44 @@ To override the default configuration,
 configuration commands may be placed in
 .Pa /usr/local/v6/etc/pim6sd.conf
 (or an alternative file, specified by the "\-c" option).
+.Pp
+The
+.Nm
+program dumps its current routing information to a dump file when
+it receives a SIGUSR1 signal.
+The information includes a list of PIM neighbors,
+.Nm
+internal multicast routing table, and
+BSR and RP related information. Also, the program dumps its internal
+statistics to a file when it receives a SIGINFO signal.
+.Pp
+When
+.Nm
+receives a SIGUSR2 signal, it rereads the configuration file and
+reset its debug level.
+.Pp
+The
+.Nm
+program puts its logs to a separate file
+.Pa (/var/log/pim6sd.log).
+The log level can be configured by the
+.Fl d
+command line option or the configuration file.
 .\"
 .Sh FILES
 .Bl -tag -width /usr/local/v6/etc/pim6sd.conf -compact
 .It Pa /usr/local/v6/etc/pim6sd.conf
 The default configuration file.
+.It Pa /var/tmp/pim6sd.dump
+The file to which
+.Nm
+dumps its internal status.
+.It Pa /var/tmp/pim6sd.stat
+The file to which
+.Nm
+dumps its internal statistics.
+.It Pa /var/log/pim6sd.log
+The pim6sd specific log file.
 .El
 .Sh SEE ALSO
 .Xr daemon 3 ,
