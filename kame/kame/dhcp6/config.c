@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.4 2002/05/01 15:20:29 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.5 2002/05/08 06:12:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -29,10 +29,14 @@
  * SUCH DAMAGE.
  */
 #include <sys/types.h>
+#include <sys/socket.h>
+
+#include <net/if_dl.h>
 
 #include <syslog.h>
 #include <stdio.h>
 #include <string.h>
+#include <ifaddrs.h>
 
 #include <dhcp6.h>
 #include <config.h>
@@ -50,6 +54,7 @@ static int add_options __P((struct dhcp6_ifconf *, struct dhcp6_optconf **,
 static void clear_ifconf __P((struct dhcp6_ifconf *));
 static void clear_prefixifconf __P((struct prefix_ifconf *));
 static void clear_options __P((struct dhcp6_optconf *));
+static int get_default_ifid __P((struct prefix_ifconf *));
 
 void
 ifinit(ifname)
@@ -175,17 +180,20 @@ configure_prefix_interface(iflist)
 		pif->next = prefix_ifconflist0;
 		prefix_ifconflist0 = pif;
 
-		/* validate ifname */
+		/* validate and copy ifname */
 		if (if_nametoindex(ifp->ifname) == 0) {
 			dprintf(LOG_ERR, "invalid interface (%s): %s",
 				ifp->ifname, strerror(errno));
 			goto bad;
 		}
-
 		if ((pif->ifname = strdup(ifp->ifname)) == NULL) {
 			dprintf(LOG_ERR, "failed to copy ifname");
 			goto bad;
 		}
+
+		pif->ifid_len = IFID_LEN_DEFAULT;
+		if (get_default_ifid(pif))
+			goto bad;
 
 		for (cfl = ifp->params; cfl; cfl = cfl->next) {
 			switch(cfl->type) {
@@ -205,6 +213,60 @@ configure_prefix_interface(iflist)
   bad:
 	clear_prefixifconf(prefix_ifconflist);
 	prefix_ifconflist = NULL;
+	return(-1);
+}
+
+/* we currently only construct EUI-64 based interface ID */
+static int
+get_default_ifid(pif)
+	struct prefix_ifconf *pif;
+{
+	struct ifaddrs *ifa, *ifap;
+	struct sockaddr_dl *sdl;
+
+	if (pif->ifid_len < 64) {
+		dprintf(LOG_NOTICE, "get_default_ifid: ID length too short");
+		return -1;
+	}
+
+	if (getifaddrs(&ifap) < 0)
+		return -1;
+	
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		char *cp;
+
+		if (strcmp(ifa->ifa_name, pif->ifname) != 0)
+			continue;
+
+		if (ifa->ifa_addr->sa_family != AF_LINK)
+			continue;
+
+		sdl = (struct sockaddr_dl *)ifa->ifa_addr;
+		if (sdl->sdl_alen < 6) {
+			dprintf(LOG_NOTICE, "get_default_ifid: "
+				"link layer address is too short (%s)",
+				pif->ifname);
+			goto fail;
+		}
+
+		memset(pif->ifid, 0, sizeof(pif->ifid));
+		cp = (char *)(sdl->sdl_data + sdl->sdl_nlen);
+		pif->ifid[8] = cp[0];
+		pif->ifid[8] ^= 0x02; /* reverse the u/l bit*/
+		pif->ifid[9] = cp[1];
+		pif->ifid[10] = cp[2];
+		pif->ifid[11] = 0xff;
+		pif->ifid[12] = 0xfe;
+		pif->ifid[13] = cp[3];
+		pif->ifid[14] = cp[4];
+		pif->ifid[15] = cp[5];
+	}
+
+	freeifaddrs(ifap);
+	return(0);
+
+  fail:
+	freeifaddrs(ifap);
 	return(-1);
 }
 
