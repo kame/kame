@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.87 2000/07/17 01:34:56 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.88 2000/07/26 03:50:34 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -134,7 +134,8 @@ static u_char r_ck0[] = { 0,0,0,0,0,0,0,0 }; /* used to verify the r_ck. */
 static int isakmp_main __P((vchar_t *, struct sockaddr *, struct sockaddr *));
 static int ph1_main __P((struct ph1handle *, vchar_t *));
 static int quick_main __P((struct ph2handle *, vchar_t *));
-static int isakmp_ph1begin_r __P((vchar_t *, struct sockaddr *, u_int8_t));
+static int isakmp_ph1begin_r __P((vchar_t *,
+	struct sockaddr *, struct sockaddr *, u_int8_t));
 static int isakmp_ph2begin_r __P((struct ph1handle *, vchar_t *));
 static int etypesw1 __P((int));
 static int etypesw2 __P((int));
@@ -370,7 +371,7 @@ isakmp_main(msg, remote, local)
 				/* XXX to be acceptable check of version */
 
 				/* it must be responder's 1st exchange. */
-				if (isakmp_ph1begin_r(msg, remote,
+				if (isakmp_ph1begin_r(msg, remote, local,
 					isakmp->etype) < 0)
 					return -1;
 				break;
@@ -719,7 +720,7 @@ isakmp_ph1begin_i(rmconf, remote)
 	iph1->ph2cnt = 0;
 
 	/* XXX copy remote address */
-	if (copy_ph1addresses(iph1, rmconf, remote) < 0)
+	if (copy_ph1addresses(iph1, rmconf, remote, NULL) < 0)
 		return -1;
 
 	YIPSDEBUG(DEBUG_NOTIFY,
@@ -766,9 +767,9 @@ isakmp_ph1begin_i(rmconf, remote)
 
 /* new negotiation of phase 1 for responder */
 static int
-isakmp_ph1begin_r(msg, remote, etype)
+isakmp_ph1begin_r(msg, remote, local, etype)
 	vchar_t *msg;
-	struct sockaddr *remote;
+	struct sockaddr *remote, *local;
 	u_int8_t etype;
 {
 	struct isakmp *isakmp = (struct isakmp *)msg->v;
@@ -817,7 +818,7 @@ isakmp_ph1begin_r(msg, remote, etype)
 	iph1->msgid = 0;
 
 	/* copy remote address */
-	if (copy_ph1addresses(iph1, rmconf, remote) < 0)
+	if (copy_ph1addresses(iph1, rmconf, remote, local) < 0)
 		return -1;
 
 	YIPSDEBUG(DEBUG_NOTIFY,
@@ -2036,10 +2037,10 @@ doit:
 
 /* XXX for anonymous configuration. */
 int
-copy_ph1addresses(iph1, rmconf, remote)
+copy_ph1addresses(iph1, rmconf, remote, local)
 	struct ph1handle *iph1;
 	struct remoteconf *rmconf;
-	struct sockaddr *remote;
+	struct sockaddr *remote, *local;
 {
 	u_short *port = NULL;
 
@@ -2084,7 +2085,10 @@ copy_ph1addresses(iph1, rmconf, remote)
 		return -1;
 	}
 
-	iph1->local = getlocaladdr(iph1->remote);
+	if (local == NULL)
+		iph1->local = getlocaladdr(iph1->remote);
+	else
+		iph1->local = dupsaddr(local);
 	if (iph1->local == NULL) {
 		delph1(iph1);
 		return -1;
