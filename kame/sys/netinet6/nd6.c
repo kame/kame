@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.160 2001/07/18 11:51:57 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.161 2001/07/18 12:30:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -152,7 +152,7 @@ static struct sockaddr_in6 all1_sa;
 
 static void nd6_slowtimo __P((void *));
 static int regen_tmpaddr __P((struct in6_ifaddr *));
-static struct llinfo_nd6 *nd6_free __P((struct rtentry *));
+static struct llinfo_nd6 *nd6_free __P((struct rtentry *, int));
 
 #ifdef __NetBSD__
 struct callout nd6_slowtimo_ch = CALLOUT_INITIALIZER;
@@ -571,7 +571,7 @@ nd6_timer(ignored_arg)
 						    ICMP6_DST_UNREACH_ADDR, 0);
 					ln->ln_hold = NULL;
 				}
-				next = nd6_free(rt);
+				next = nd6_free(rt, 0);
 			}
 			break;
 		case ND6_LLINFO_REACHABLE:
@@ -584,7 +584,7 @@ nd6_timer(ignored_arg)
 		case ND6_LLINFO_STALE:
 			/* Garbage Collection(RFC 2461 5.3) */
 			if (ln->ln_expire)
-				next = nd6_free(rt);
+				next = nd6_free(rt, 1);
 			break;
 
 		case ND6_LLINFO_DELAY:
@@ -610,7 +610,7 @@ nd6_timer(ignored_arg)
 				nd6_ns_output(ifp, &dst->sin6_addr,
 					       &dst->sin6_addr, ln, 0);
 			} else {
-				next = nd6_free(rt);
+				next = nd6_free(rt, 0);
 			}
 			break;
 		}
@@ -876,7 +876,7 @@ nd6_purge(ifp)
 		    rt->rt_gateway->sa_family == AF_LINK) {
 			sdl = (struct sockaddr_dl *)rt->rt_gateway;
 			if (sdl->sdl_index == ifp->if_index)
-				nln = nd6_free(rt);
+				nln = nd6_free(rt, 0);
 		}
 		ln = nln;
 	}
@@ -1043,12 +1043,16 @@ nd6_is_addr_neighbor(addr, ifp)
  * Free an nd6 llinfo entry.
  */
 static struct llinfo_nd6 *
-nd6_free(rt)
+nd6_free(rt, gc)
 	struct rtentry *rt;
+	int gc;
 {
 	struct llinfo_nd6 *ln = (struct llinfo_nd6 *)rt->rt_llinfo, *next;
 	struct in6_addr in6 = ((struct sockaddr_in6 *)rt_key(rt))->sin6_addr;
 	struct nd_defrouter *dr;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	/*
 	 * we used to have pfctlinput(PRC_HOSTDEAD) here. 
@@ -1064,6 +1068,25 @@ nd6_free(rt)
 #endif
 		dr = defrouter_lookup(&((struct sockaddr_in6 *)rt_key(rt))->sin6_addr,
 				      rt->rt_ifp);
+
+		if (dr != NULL && dr->expire &&
+		    ln->ln_state == ND6_LLINFO_STALE && gc) {
+			/*
+			 * If the reason for the deletion is just garbage
+			 * collection, and the neighbor is an active default
+			 * router, do not delete it.  Instead, reset the GC
+			 * timer using the router's lifetime.
+			 * Simply deleting the entry would affect default
+			 * address selection, which is not necessarily a good
+			 * thing, especially when we're using router preference
+			 * values.
+			 * XXX: the check for ln_state would be redundant,
+			 *      but we intentionally keep it just in case. 
+			 */
+			ln->ln_expire = dr->expire;
+			splx(s);
+			return(ln->ln_next);
+		}
 
 		if (ln->ln_router || dr) {
 			/*
@@ -1783,7 +1806,7 @@ nd6_cache_lladdr(ifp, from, lladdr, lladdrlen, type, code)
 		return NULL;
 	if ((rt->rt_flags & (RTF_GATEWAY | RTF_LLINFO)) != RTF_LLINFO) {
 fail:
-		(void)nd6_free(rt);
+		(void)nd6_free(rt, 0);
 		return NULL;
 	}
 	ln = (struct llinfo_nd6 *)rt->rt_llinfo;
