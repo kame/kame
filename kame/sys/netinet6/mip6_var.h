@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.77 2003/01/09 10:59:01 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.78 2003/01/10 08:53:13 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -402,8 +402,8 @@ int mip6_exthdr_create(struct mbuf *, struct ip6_pktopts *,
 int mip6_ip6mu_create(struct ip6_mobility **, struct sockaddr_in6 *,
     struct sockaddr_in6 *, struct hif_softc *);
 int mip6_ip6ma_create(struct ip6_mobility **, struct sockaddr_in6 *,
-    struct sockaddr_in6 *, u_int8_t, u_int16_t, u_int32_t, u_int32_t,
-    struct mip6_mobility_options *);
+    struct sockaddr_in6 *, struct sockaddr_in6 *, u_int8_t, u_int16_t, 
+    u_int32_t, u_int32_t, struct mip6_mobility_options *);
 int mip6_ip6me_create(struct ip6_mobility **, struct sockaddr_in6 *,
     struct sockaddr_in6 *, u_int8_t, struct sockaddr_in6 *);
 int mip6_process_hrbu(struct mip6_bc *);

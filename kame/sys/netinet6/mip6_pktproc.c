@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.92 2003/01/09 10:59:01 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.93 2003/01/10 08:53:13 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1328,7 +1328,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh, mopt)
 		return (ENOMEM);
 	}
 
-	error =  mip6_ip6ma_create(&opt.ip6po_mobility, src, dst,
+	error =  mip6_ip6ma_create(&opt.ip6po_mobility, src, dst, dstcoa,
 				   status, seqno, lifetime, refresh, mopt);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -1666,10 +1666,11 @@ mip6_hexdump("MN: Kbm: ", sizeof(key_bm), key_bm);
 }
 
 int
-mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, mopt)
+mip6_ip6ma_create(pktopt_mobility, src, dst, dstcoa, status, seqno, lifetime, refresh, mopt)
 	struct ip6_mobility **pktopt_mobility;
 	struct sockaddr_in6 *src;
 	struct sockaddr_in6 *dst;
+	struct sockaddr_in6 *dstcoa;
 	u_int8_t status;
 	u_int16_t seqno;
 	u_int32_t lifetime;
@@ -1698,7 +1699,7 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 	}
 	if (mopt && 
 	    (mopt->valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA)) &&
-	    mip6_calculate_kbm_from_index(dst, src, 
+	    mip6_calculate_kbm_from_index(dst, dstcoa, 
 		mopt->mopt_ho_nonce_idx, mopt->mopt_co_nonce_idx, 
 		key_bm) == 0) {
 		need_auth = 1;
@@ -1766,7 +1767,7 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 		mopt_auth->ip6moau_type = IP6MOPT_AUTHDATA;
 		mopt_auth->ip6moau_len = AUTH_SIZE - 2;
 		mip6_calculate_authenticator(key_bm, (caddr_t)(mopt_auth + 1),
-			&dst->sin6_addr, &src->sin6_addr,
+			&dstcoa->sin6_addr, &src->sin6_addr,
 			(caddr_t)ip6ma, ip6ma_size,
 			ba_size + refresh_size + sizeof(struct ip6m_opt_authdata),
 			AUTH_SIZE - 2);

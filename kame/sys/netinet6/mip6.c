@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.190 2003/01/09 10:59:01 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.191 2003/01/10 08:53:13 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2746,7 +2746,7 @@ mip6_get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
 	return (EINVAL);
 }
 
-/* Generatie keygen */
+/* Generate keygen */
 void
 mip6_create_keygen_token(addr, nodekey, nonce, hc, cookie)
 	struct in6_addr *addr;
