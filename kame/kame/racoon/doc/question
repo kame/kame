@@ -1,4 +1,4 @@
-$Id: question,v 1.25 2000/09/27 23:32:32 sakane Exp $
+$Id: question,v 1.26 2000/09/28 01:47:36 itojun Exp $
 
 Q: how may policy matters are.  can we interoperate ?
 
@@ -563,6 +563,8 @@ Q: IPComp SA with wellknown CPI in CPI field.  how to handle it?
       no lifetime management on the IPComp SA.
   (2) install IPComp SA with fabricated (local) CPI, with RAWCPI option flag
       raised.  confusing...
+  (3) use topmost 16 bits to turn wellknown CPI into unique numbers.
+      how to assign numbers?
   the problem is not unique to racoon, it is a generic problem.
   protocol-wise, we could have couple of fixes:
   (1) never negotiate an IPComp SA with a wellknown CPI.
