@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.35 2001/01/30 14:06:20 jinmei Exp $	*/
+/*	$KAME: mip6.c,v 1.36 2001/02/03 09:16:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -1650,7 +1650,9 @@ mip6_tunnel_output(mp, bc)
 	struct sockaddr_in6 dst;
 	const struct encaptab *ep = bc->ep;
 	struct mbuf *m = *mp;
+	/* LINTED const cast */
 	struct sockaddr_in6 *sin6_src = (struct sockaddr_in6 *)&ep->src;
+	/* LINTED const cast */
 	struct sockaddr_in6 *sin6_dst = (struct sockaddr_in6 *)&ep->dst;
 	struct ip6_hdr *ip6;
 	u_int8_t itos;
@@ -2333,7 +2335,7 @@ int              use_link_opt;  /* Include Target link layer address option or
 			if ((mip6_config.eager_md && 
 			     (LIST_FIRST(&pr->ndpr_advrtrs) == NULL)) ||
 			    (!mip6_config.eager_md && 
-			     !pr->ndpr_stateflags.onlink))
+			     !(pr->ndpr_stateflags & NDPRF_ONLINK)))
 				continue;
 			if (in6_are_prefix_equal(home_addr,
 						 &pr->ndpr_prefix.sin6_addr,

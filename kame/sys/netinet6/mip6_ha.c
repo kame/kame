@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.13 2001/01/28 09:44:53 itojun Exp $	*/
+/*	$KAME: mip6_ha.c,v 1.14 2001/02/03 09:16:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -270,7 +270,7 @@ caddr_t               icmp6msg;  /* icmp6 message */
 int                   icmp6len;  /* Length of icmp6 message */
 {
 	struct mip6_addr_list     *ap;   /* Address list entry */
-	struct nd_opt_hai         *hai;  /* Home Agent information option */
+	struct nd_opt_homeagent_info *hai;  /* Home Agent information option */
 	struct nd_opt_advinterval *ai;   /* Advertisement Interval option */
 	struct nd_opt_prefix_info *pi;   /* Ptr to prefix information */
 	u_int8_t                  *optp; /* Ptr to current option in RA */
@@ -289,7 +289,7 @@ int                   icmp6len;  /* Length of icmp6 message */
 			}
 
 			if (!(pi->nd_opt_pi_flags_reserved &
-			      ND_OPT_PI_FLAG_RTADDR)) {
+			      ND_OPT_PI_FLAG_ROUTER)) {
 				cur_off += 4 * 8;
 				continue;
 			}
@@ -343,13 +343,13 @@ int                   icmp6len;  /* Length of icmp6 message */
 			continue;
 		} else if (*optp == ND_OPT_HOMEAGENT_INFO) {
 			/* Check the home agent information option */
-			hai = (struct nd_opt_hai *)optp;
+			hai = (struct nd_opt_homeagent_info *)optp;
 			if (hai->nd_opt_hai_len != 1) {
 				ip6stat.ip6s_badoptions++;
 				return IPPROTO_DONE;
 			}
 
-			halp->pref = ntohs(hai->nd_opt_hai_pref);
+			halp->pref = ntohs(hai->nd_opt_hai_preference);
 			halp->lifetime = ntohs(hai->nd_opt_hai_lifetime);
 			cur_off += 8;
 			continue;

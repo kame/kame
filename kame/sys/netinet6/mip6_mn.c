@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mn.c,v 1.20 2001/01/28 09:44:53 itojun Exp $	*/
+/*	$KAME: mip6_mn.c,v 1.21 2001/02/03 09:16:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -900,7 +900,7 @@ int           off;  /* Offset from start of mbuf to start of RA */
 	struct ip6_hdr            *ip6;  /* IPv6 header */
 	struct nd_router_advert   *ra;   /* Router Advertisement */
 	struct mip6_esm           *esp;  /* Event-state machine */
-	struct nd_opt_hai         *hai;  /* Home Agent information option */
+	struct nd_opt_homeagent_info *hai;  /* Home Agent information option */
 	struct nd_opt_prefix_info *pi;   /* Ptr to prefix information */
 	u_int8_t        *opt_ptr;        /* Ptr to current option in RA */
 	int              cur_off;        /* Cur offset from start of RA */
@@ -949,13 +949,13 @@ int           off;  /* Offset from start of mbuf to start of RA */
 		opt_ptr = ((caddr_t)icmp6msg + cur_off);
 		if (*opt_ptr == ND_OPT_HOMEAGENT_INFO) {
 			/* Check the home agent information option */
-			hai = (struct nd_opt_hai *)opt_ptr;
+			hai = (struct nd_opt_homeagent_info *)opt_ptr;
 			if (hai->nd_opt_hai_len != 1) {
 				ip6stat.ip6s_badoptions++;
 				return IPPROTO_DONE;
 			}
 
-			tmp_pref = ntohs(hai->nd_opt_hai_pref);
+			tmp_pref = ntohs(hai->nd_opt_hai_preference);
 			tmp_lifetime = ntohs(hai->nd_opt_hai_lifetime);
 			cur_off += 8;
 			continue;
@@ -982,7 +982,7 @@ int           off;  /* Offset from start of mbuf to start of RA */
 			}
 
 			if (!(pi->nd_opt_pi_flags_reserved &
-			      ND_OPT_PI_FLAG_RTADDR)) {
+			      ND_OPT_PI_FLAG_ROUTER)) {
 				cur_off += 4 * 8;
 				continue;
 			}
