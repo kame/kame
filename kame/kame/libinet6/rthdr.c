@@ -242,9 +242,9 @@ inet6_rthdr_segments(cmsg)
 }
 
 struct in6_addr *
-inet6_rthdr_getaddr(cmsg, index)
+inet6_rthdr_getaddr(cmsg, idx)
     struct cmsghdr *cmsg;
-    int index;
+    int idx;
 {
     register struct ip6_rthdr *rthdr;
 
@@ -264,13 +264,13 @@ inet6_rthdr_getaddr(cmsg, index)
 	    return NULL;
 	}
 	naddr = (rt0->ip6r0_len * 8) / sizeof(struct in6_addr);
-	if (index <= 0 || naddr < index) {
+	if (idx <= 0 || naddr < idx) {
 #ifdef DEBUG
-	    fprintf(stderr, "inet6_rthdr_getaddr: invalid index(%d)\n", index);
+	    fprintf(stderr, "inet6_rthdr_getaddr: invalid idx(%d)\n", idx);
 #endif 
 	    return NULL;
 	}
-	return(((struct in6_addr *)(rt0 + 1)) + index - 1);
+	return(((struct in6_addr *)(rt0 + 1)) + idx - 1);
       }
 
     default:
@@ -283,9 +283,9 @@ inet6_rthdr_getaddr(cmsg, index)
 }
 
 int
-inet6_rthdr_getflags(cmsg, index)
+inet6_rthdr_getflags(cmsg, idx)
     const struct cmsghdr *cmsg;
-    int index;
+    int idx;
 {
     register struct ip6_rthdr *rthdr;
 
@@ -305,14 +305,14 @@ inet6_rthdr_getflags(cmsg, index)
 	    return -1;
 	}
 	naddr = (rt0->ip6r0_len * 8) / sizeof(struct in6_addr);
-	if (index < 0 || naddr < index) {
+	if (idx < 0 || naddr < idx) {
 #ifdef DEBUG
-	    fprintf(stderr, "inet6_rthdr_getflags: invalid index(%d)\n", index);
+	    fprintf(stderr, "inet6_rthdr_getflags: invalid idx(%d)\n", idx);
 #endif 
 	    return -1;
 	}
 #ifdef COMPAT_RFC1883		/* XXX */
-	if (rt0->ip6r0_slmap[index / 8] & (0x80 >> (index % 8)))
+	if (rt0->ip6r0_slmap[idx / 8] & (0x80 >> (idx % 8)))
 	    return IPV6_RTHDR_STRICT;
 	else
 	    return IPV6_RTHDR_LOOSE;
@@ -503,7 +503,7 @@ inet6_rth_segments(const void *bp)
 
 /*
  * This function returns a pointer to the IPv6 address specified by
- * index (which must have a value between 0 and one less than the value
+ * idx (which must have a value between 0 and one less than the value
  * returned by inet6_rth_segments()) in the Routing header described by
  * bp. An application should first call inet6_rth_segments() to obtain
  * the number of segments in the Routing header.
@@ -511,7 +511,7 @@ inet6_rth_segments(const void *bp)
  * Upon an error the return value of the function is NULL.
  */
 struct in6_addr *
-inet6_rth_getaddr(const void *bp, int index)
+inet6_rth_getaddr(const void *bp, int idx)
 {
 	struct ip6_rthdr *rh = (struct ip6_rthdr *)bp;
 	struct ip6_rthdr0 *rh0;
@@ -530,10 +530,10 @@ inet6_rth_getaddr(const void *bp, int index)
 		    (addrs = (rthlen >> 1)) < rh0->ip6r0_segleft)
 			return(NULL);
 
-		if (index < 0 || addrs <= index)
+		if (idx < 0 || addrs <= idx)
 			return(NULL);
 
-		return(((struct in6_addr *)(rh0 + 1)) + index);
+		return(((struct in6_addr *)(rh0 + 1)) + idx);
 	default:
 		return(NULL);	/* unknown type */
 		break;
