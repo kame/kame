@@ -1,0 +1,9 @@
+--- src/Makefile.in-	Wed Nov 15 23:54:19 2000
++++ src/Makefile.in	Wed Nov 15 23:54:31 2000
+@@ -32,4 +32,4 @@
+ 	${INSTALL} -m 555 ${PROG} ${bindir}/`echo ${PROG}|sed '$(transform)'`
+-	-mkdir -p ${mandircat1}
+-	${INSTALL} -m 444 ${srcdir}/${PROG}.cat1 ${mandircat1}/`echo ${PROG}|sed '$(transform)'`.1
++#	-mkdir -p ${mandircat1}
++#	${INSTALL} -m 444 ${srcdir}/${PROG}.cat1 ${mandircat1}/`echo ${PROG}|sed '$(transform)'`.1
+ 
