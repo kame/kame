@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.19 2001/09/12 16:52:40 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.20 2001/10/18 05:32:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -258,18 +258,16 @@ in6_addr2zoneid(ifp, addr)
 {
 	int scope;
 
-	if (scope6_ids == NULL) { /* should not happen */
 #ifdef DIAGNOSTIC
+	if (scope6_ids == NULL) { /* should not happen */
 		panic("in6_addr2zoneid: scope array is NULL");
-#endif
-		return(-1);	/* XXX */
+		/* NOTREACHED */
 	}
 	if (ifp->if_index >= if_indexlim) {
-#ifdef DIAGNOSTIC
 		panic("in6_addr2zoneid: invalid interface");
-#endif
-		return(-1);	/* XXX */
+		/* NOTREACHED */
 	}
+#endif
 
 	/*
 	 * special case: the loopback address can only belong to a loopback
