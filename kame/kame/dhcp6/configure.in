@@ -94,4 +94,10 @@ AC_FUNC_SETPGRP
 AC_TYPE_SIGNAL
 AC_CHECK_FUNCS(mktime select socket)
 
+dnl Checks for optinal parameters
+AC_MSG_CHECKING(if --enable-mediator option is specified)
+AC_ARG_WITH(mediator, [  --with-mediator       build with mediator],
+	[CFLAGS="-DMEDIATOR $CFLAGS"; with_mediator=yes], [with_mediator=no])
+AC_MSG_RESULT($with_mediator);
+
 AC_OUTPUT(Makefile)

@@ -64,6 +64,23 @@ struct servtab {
 	u_int16_t st_xid;
 };
 
+#ifdef MEDIATOR
+#ifndef MEDIATOR_CTRL_PORT
+#define MEDIATOR_CTRL_PORT 13863
+#endif
+#ifndef MEDIATOR_CTRL_VERSION
+#define MEDIATOR_CTRL_VERSION 1
+#endif
+
+/* control structure to communicate with mediator */
+struct mediatro_control_msg {
+	int version;
+	int lifetime;
+	char serveraddr[128];
+};
+struct mediatro_control_msg mediator_msg;
+#endif 
+
 static int debug = 0;
 
 #ifndef dprintf
@@ -702,16 +719,27 @@ client6_recvreply(s, serv)
 	if ((dh6r->dh6rep_flagandstat & DH6REP_CLIPRESENT) != 0)
 		cp += sizeof(struct in6_addr);
 	ep = rbuf + len;
-	while (cp < ep) {
+	for (; cp < ep; cp += elen + 4) {
+		if (cp + 4 >= ep) {
+			dprintf((stderr,
+				 "client6_recvreply: malformed extension\n"));
+			break;
+		}
+
 		code = ntohs(*(u_int16_t *)&cp[0]);
 		if (code != 65535)
 			elen = ntohs(*(u_int16_t *)&cp[2]);
 		else
 			elen = 0;
+		if (cp + 4 + elen >= ep) {
+			dprintf((stderr,
+				 "client6_recvreply: malformed extension\n"));
+			break;
+		}
+		
 		p = dhcp6opttab_bycode(code);
 		if (p == NULL) {
 			printf("unknown, len=%d\n", len);
-			cp += elen + 4;
 			continue;
 		}
 
@@ -734,6 +762,58 @@ client6_recvreply(s, serv)
 		}
 
 		printf("%s, ", p->name);
+
+		switch(code) {
+#ifdef MEDIATOR
+		case OC6_DNS:
+		{
+			struct sockaddr_in to_mediator;
+			struct in6_addr in6;
+			int s = -1, i;
+			char *ap;
+
+			if ( (s = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
+				warn("client6_recvreply: socket");
+				break;
+			}
+
+			bzero((char *)&to_mediator, sizeof(to_mediator));
+			to_mediator.sin_family = AF_INET;
+			to_mediator.sin_len = sizeof(to_mediator);
+			to_mediator.sin_port= htons(MEDIATOR_CTRL_PORT);
+			inet_aton("127.0.0.1", &to_mediator.sin_addr);
+
+			mediator_msg.version = htonl(MEDIATOR_CTRL_VERSION);
+			mediator_msg.lifetime = -1; /* XXX: never expire */
+
+			for (ap = cp + 4; ap < cp + 4 + elen;
+			     ap += sizeof(struct in6_addr)) {
+				/*
+				 * use a separate pointer to avoid alignment
+				 * issues.
+				 */
+				memcpy(&in6, ap, sizeof(struct in6_addr));
+
+				/* is strcpy safe enough? */
+				strcpy(mediator_msg.serveraddr,
+				       in6addr2str(&in6, 0));
+			       
+				dprintf((stderr,
+					 "Notifing to mediator: server %s",
+					 mediator_msg.serveraddr));
+				if (sendto(s, &mediator_msg,
+					   sizeof(mediator_msg), 0,
+					   (struct sockaddr *)(&to_mediator),
+					   sizeof(to_mediator)) < 0) {
+					warn("client6_recvreply: "
+					     "sendto mediator");
+				}
+			}
+		}
+		break;
+#endif /* MEDIATOR */
+		}
+
 		switch (p->type) {
 		case OT6_V6:
 			for (i = 0; i < elen; i += 16) {
@@ -757,7 +837,6 @@ client6_recvreply(s, serv)
 				printf("%02x", cp[4 + i] & 0xff);
 		}
 		printf("\n");
-		cp += elen + 4;
 	}
 
 	return 0;
