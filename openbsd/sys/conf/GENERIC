@@ -104,4 +104,3 @@ option		BOOT_CONFIG	# add support for boot -c
 # KAME
 # these options are mandatory.
 option		NEW_STRUCT_ROUTE
-option		FAKE_LOOPBACK_IF
