@@ -753,6 +753,20 @@ udp6_ctlinput(cmd, sa, d)
 		bzero(&uh, sizeof(uh));
 		m_copydata(m, off, sizeof(*uhp), (caddr_t)&uh);
 
+		bzero(&sa6_src, sizeof(sa6_src));
+		sa6_src.sin6_family = AF_INET6;
+		sa6_src.sin6_len = sizeof(sa6_src);
+		sa6_src.sin6_addr = ip6->ip6_src;
+		sa6_src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
+							 &ip6->ip6_src);
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(&sa6_src.sin6_addr, &sa6_src, NULL, NULL)) {
+			/* should be impossbile */
+			printf("udp6_ctlinput: in6_embedscope failed\n");
+			return;
+		}
+#endif
+
 		if (cmd == PRC_MSGSIZE) {
 			int updatemtu;
 
@@ -764,10 +778,11 @@ udp6_ctlinput(cmd, sa, d)
 			 * payload.
 			 */
 			if (in6_pcbhashlookup(&udbtable, &finaldst,
-			    uh.uh_dport, &s, uh.uh_sport))
+			    uh.uh_dport, &sa6_src.sin6_addr, uh.uh_sport))
 				updatemtu = 1;
 			else if (in_pcblookup(&udbtable, &sa6.sin6_addr,
-			    uh.uh_dport, &s, uh.uh_sport, INPLOOKUP_IPV6))
+			    uh.uh_dport, &sa6_src.sin6_addr, uh.uh_sport,
+			    INPLOOKUP_IPV6))
 				updatemtu = 1;
 #if 0
 			/*
@@ -778,7 +793,7 @@ udp6_ctlinput(cmd, sa, d)
 			 * is really ours.
 			 */
 			else if (in_pcblookup(&udbtable, &sa6.sin6_addr,
-			    uh.uh_dport, &s, uh.uh_sport,
+			    uh.uh_dport, &sa6_src.sin6_addr, uh.uh_sport,
 			    INPLOOKUP_WILDCARD | INPLOOKUP_IPV6))
 				updatemtu = 1;
 #endif
@@ -801,20 +816,6 @@ udp6_ctlinput(cmd, sa, d)
 			 * destination and want to know the path MTU.
 			 */
 		}
-
-		bzero(&sa6_src, sizeof(sa6_src));
-		sa6_src.sin6_family = AF_INET6;
-		sa6_src.sin6_len = sizeof(sa6_src);
-		sa6_src.sin6_addr = ip6->ip6_src;
-		sa6_src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
-							 &ip6->ip6_src);
-#ifndef SCOPEDROUTING
-		if (in6_embedscope(&ip6->ip6_src, &sa6_src, NULL, NULL)) {
-			/* should be impossbile */
-			printf("udp6_ctlinput: in6_embedscope failed\n");
-			return;
-		}
-#endif
 
 		(void) in6_pcbnotify(&udbtable, (struct sockaddr *)&sa6,
 				     uh.uh_dport, &sa6_src.sin6_addr,

@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.75 2000/11/30 04:10:19 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.76 2000/11/30 04:46:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -582,6 +582,20 @@ udp6_ctlinput(cmd, sa, d)
 		bzero(&uh, sizeof(uh));
 		m_copydata(m, off, sizeof(*uhp), (caddr_t)&uh);
 
+		bzero(&sa6, sizeof(sa6_src));
+		sa6_src.sin6_family = AF_INET6;
+		sa6_src.sin6_len = sizeof(sa6_src);
+		sa6_src.sin6_addr = ip6->ip6_src;
+		sa6_src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
+							 &ip6->ip6_src);
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(&sa6_src.sin6_addr, &sa6_src, NULL, NULL)) {
+			/* should be impossbile */
+			printf("udp6_ctlinput: in6_embedscope failed\n");
+			return;
+		}
+#endif
+
 #ifdef __NetBSD__
 		if (cmd == PRC_MSGSIZE) {
 			int updatemtu;
@@ -594,7 +608,7 @@ udp6_ctlinput(cmd, sa, d)
 			 * payload.
 			 */
 			if (in6_pcblookup_connect(&udb6, &sa6.sin6_addr,
-			    uh.uh_dport, &s, uh.uh_sport, 0))
+			    uh.uh_dport, &sa6_src.sin6_addr, uh.uh_sport, 0))
 				updatemtu = 1;
 #if 0
 			/*
@@ -626,20 +640,6 @@ udp6_ctlinput(cmd, sa, d)
 			 * some unconnected sockets may share the same
 			 * destination and want to know the path MTU.
 			 */
-		}
-#endif
-
-		bzero(&sa6, sizeof(sa6_src));
-		sa6_src.sin6_family = AF_INET6;
-		sa6_src.sin6_len = sizeof(sa6_src);
-		sa6_src.sin6_addr = ip6->ip6_src;
-		sa6_src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
-							 &ip6->ip6_src);
-#ifndef SCOPEDROUTING
-		if (in6_embedscope(&ip6->ip6_src, &sa6_src, NULL, NULL)) {
-			/* should be impossbile */
-			printf("udp6_ctlinput: in6_embedscope failed\n");
-			return;
 		}
 #endif
 
