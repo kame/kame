@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.105 2002/04/25 07:44:10 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.106 2002/04/25 10:18:18 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -2669,9 +2669,6 @@ natpt_composeIPv4Hdr(struct pcv *cv6, struct pAddr *pad, struct ip *ip4)
 		ip4->ip_off = (offlg & 0xfff8) >> 3;
 		if (offlg & 0x0001)
 			ip4->ip_off |= IP_MF;
-		ip4->ip_p = (fh6.ip6f_nxt == IPPROTO_ICMPV6)
-			? IPPROTO_ICMP
-			: fh6.ip6f_nxt;
 	} else {
 		ip4->ip_off |= IP_DF;	/* RFC2765 4.1 */
 	}
