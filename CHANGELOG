@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.90 1999/09/02 12:11:01 itojun Exp $
+$Id: CHANGELOG,v 1.91 1999/09/02 13:25:44 sakane Exp $
 
 
 <199909>
@@ -18,6 +18,52 @@ Thu Sep  2 17:35:13 JST 1999  itojun@iijlab.net
 	segment in order to reflect IPV6_UNICAST_HOPS setsockopt and
 	current hop limit adverised via router advertisements.
 
+Thu Sep  1 17:00:14 JST 1999 sakane@ydc.co.jp
+	* kame/kame/ping6,traceroute,traceroute6,rrenumd,mchat and so on.
+	Fixed policy specification due to the modification of policy
+	management.
+	XXX In rrenumd, not implemented to specify inbound policy.
+	    I must consider rrenumd's behavior.
+	XXX In inetd, What should i take deal of in/out ?  #@ in/out ?
+
+Thu Sep  1 16:53:14 JST 1999 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	Fixed argument of pfkey function call due to the modification
+	of libipsec.  But I have not tested, so probably racoon can't run.
+
+Thu Sep  1 16:50:14 JST 1999 sakane@ydc.co.jp
+	* kame/kame/setkey,libipsec
+	- Changed SA specification,
+	  NEW; add a::1 b::1 esp 0x1111 ...
+	  OLD; add a::1 b::1 0x1111 -p esp ...
+	- Changed SP specification,
+	  NEW; spdadd a::1/64[32] b::1/64[24] tcp
+		-P in ipsec esp/transport/::1-::1/require ;
+	NOTE: SEE SAMPLE.CF FOR DETAIL.
+	- Changed some function in libipsec due to above modification.
+	- Added some function into libipsec for policy management.
+
+Thu Sep  1 16:43:14 JST 1999 sakane@ydc.co.jp
+	Modifyed IPsec policy management.  As this modification, it's
+	enabled to,
+	1. make a SA to use both transport mode and tunnel mode.
+	2. make a SA to assign multiple SP entries.
+	3. check separately inbound SP and outbound SP.
+
+	Abstract of modification is	
+	- Deleted a policy holder from pcb, alternatively added two policy
+	  holderes that are inbound and outbound respectively.
+	- IP{V6,}_IPSEC_POLICY is devided two optname, IP{V6,}_IPSEC_POLICY_IN
+	  and IP{V6,}_IPSEC_POLICY_OUT
+	- "proxy" address has gone away.  SA is always specified by both
+	  source and destination address without prefix, port number and
+	  upper layer protocol.
+	- It's always use IPPROTO_XX as security protocol type internal.
+	  So when using PF_KEY I/F, must map internal type to SADB_SATYPE_XX.
+	- changed the meaning of value of protocol and port.  0 is one of
+	  the number of each value.
+	- Begin to add IPsec processing into ip6_forward.
+					    
 Wed Sep  1 14:14:43 JST 1999  itojun@iijlab.net
 	* usr.bin/ftp (all platforms): On data connection establishment,
 	  warn if scoped address is used.  If peer (ftp daemon) does not
