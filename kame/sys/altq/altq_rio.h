@@ -1,4 +1,4 @@
-/*	$KAME: altq_rio.h,v 1.7 2002/11/29 04:36:24 kjc Exp $	*/
+/*	$KAME: altq_rio.h,v 1.8 2003/02/13 11:59:41 kjc Exp $	*/
 
 /*
  * Copyright (C) 1998-2002
@@ -132,7 +132,6 @@ extern void rio_getstats(rio_t *, struct redstats *);
 extern int rio_addq(rio_t *, class_queue_t *, struct mbuf *,
 		    struct altq_pktattr *);
 extern struct mbuf *rio_getq(rio_t *, class_queue_t *);
-extern int rio_set_meter(rio_t *, int, int, int);
 
 #endif /* _KERNEL */
 
