@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.29 2000/08/31 17:26:57 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.30 2000/12/20 05:44:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1104,6 +1104,9 @@ getanswer(answer, anslen, qname, qtype, pai)
 	switch (qtype) {
 	case T_A:
 	case T_AAAA:
+#ifdef T_A6
+	case T_A6:
+#endif
 	case T_ANY:	/*use T_ANY only for T_A/T_AAAA lookup*/
 		name_ok = res_hnok;
 		break;
@@ -1129,7 +1132,12 @@ getanswer(answer, anslen, qname, qtype, pai)
 		return (NULL);
 	}
 	cp += n + QFIXEDSZ;
-	if (qtype == T_A || qtype == T_AAAA || qtype == T_ANY) {
+#ifdef T_A6
+	if (qtype == T_A || qtype == T_AAAA || qtype == T_A6 || qtype == T_ANY)
+#else
+	if (qtype == T_A || qtype == T_AAAA || qtype == T_ANY)
+#endif
+	{
 		/* res_send() has already verified that the query name is the
 		 * same as the one we sent; this just gets the expanded name
 		 * (i.e., with the succeeding search-domain tacked on).
@@ -1165,8 +1173,14 @@ getanswer(answer, anslen, qname, qtype, pai)
 			cp += n;
 			continue;		/* XXX - had_error++ ? */
 		}
+#ifdef T_A6
+		if ((qtype == T_A || qtype == T_AAAA || qtype == T_A6 ||
+		     qtype == T_ANY) && type == T_CNAME)
+#else
 		if ((qtype == T_A || qtype == T_AAAA || qtype == T_ANY) &&
-		    type == T_CNAME) {
+		    type == T_CNAME)
+#endif
+		{
 			n = dn_expand(answer->buf, eom, cp, tbuf, sizeof tbuf);
 			if ((n < 0) || !(*name_ok)(tbuf)) {
 				had_error++;
@@ -1186,7 +1200,12 @@ getanswer(answer, anslen, qname, qtype, pai)
 			continue;
 		}
 		if (qtype == T_ANY) {
-			if (!(type == T_A || type == T_AAAA)) {
+#ifdef T_A6
+			if (!(type == T_A || type == T_AAAA || type == T_A6))
+#else
+			if (!(type == T_A || type == T_AAAA))
+#endif
+			{
 				cp += n;
 				continue;
 			}
@@ -1202,6 +1221,9 @@ getanswer(answer, anslen, qname, qtype, pai)
 		switch (type) {
 		case T_A:
 		case T_AAAA:
+#ifdef T_A6
+		case T_A6:
+#endif
 			if (strcasecmp(canonname, bp) != 0) {
 				syslog(LOG_NOTICE|LOG_AUTH,
 				       AskedForGot, canonname, bp);
@@ -1216,6 +1238,18 @@ getanswer(answer, anslen, qname, qtype, pai)
 				cp += n;
 				continue;
 			}
+#ifdef T_A6
+			/*
+			 * we only have partial support.  A6 record has
+			 * fixed length for "A6 0 <128bit>"
+			 */
+			if (type == T_A6) {
+				if (n != IN6ADDRSZ + 1 || cp[0] != 0) {
+					cp += n;
+					continue;
+				}
+			}
+#endif
 #ifdef FILTER_V4MAPPED
 			if (type == T_AAAA) {
 				struct in6_addr in6;
@@ -1225,6 +1259,16 @@ getanswer(answer, anslen, qname, qtype, pai)
 					continue;
 				}
 			}
+#ifdef T_A6
+			if (type == T_A6) {
+				struct in6_addr in6;
+				memcpy(&in6, cp + 1, sizeof(in6));
+				if (IN6_IS_ADDR_V4MAPPED(&in6)) {
+					cp += n;
+					continue;
+				}
+			}
+#endif
 #endif
 			if (!haveanswer) {
 				int nn;
@@ -1237,13 +1281,37 @@ getanswer(answer, anslen, qname, qtype, pai)
 
 			/* don't overwrite pai */
 			ai = *pai;
-			ai.ai_family = (type == T_A) ? AF_INET : AF_INET6;
+			switch (type) {
+			case T_A:
+				ai.ai_family = AF_INET;
+				break;
+			case T_AAAA:
+				ai.ai_family = AF_INET6;
+				break;
+#ifdef T_A6
+			case T_A6:
+				ai.ai_family = AF_INET6;
+				break;
+#endif
+			}
 			afd = find_afd(ai.ai_family);
 			if (afd == NULL) {
 				cp += n;
 				continue;
 			}
-			cur->ai_next = get_ai(&ai, afd, (const char *)cp);
+			switch (type) {
+			case T_A:
+			case T_AAAA:
+				cur->ai_next = get_ai(&ai, afd,
+				    (const char *)cp);
+				break;
+#ifdef T_A6
+			case T_A6:
+				cur->ai_next = get_ai(&ai, afd,
+				    (const char *)cp + 1);
+				break;
+#endif
+			}
 			if (cur->ai_next == NULL)
 				had_error++;
 			while (cur && cur->ai_next)
@@ -1277,32 +1345,46 @@ _dns_getaddrinfo(rv, cb_data, ap)
 	va_list	 ap;
 {
 	struct addrinfo *ai;
-	querybuf buf, buf2;
+	querybuf buf, buf2, buf3, *bp;
 	const char *name;
 	const struct addrinfo *pai;
 	struct addrinfo sentinel, *cur;
-	struct res_target q, q2;
+	struct res_target q, q2, q3, *p;
 
 	name = va_arg(ap, char *);
 	pai = va_arg(ap, const struct addrinfo *);
 
 	memset(&q, 0, sizeof(q2));
 	memset(&q2, 0, sizeof(q2));
+	memset(&q3, 0, sizeof(q3));
 	memset(&sentinel, 0, sizeof(sentinel));
 	cur = &sentinel;
 
 	switch (pai->ai_family) {
 	case AF_UNSPEC:
 		/* prefer IPv6 */
+#ifdef T_A6
 		q.qclass = C_IN;
-		q.qtype = T_AAAA;
+		q.qtype = T_A6;
 		q.answer = buf.buf;
 		q.anslen = sizeof(buf);
 		q.next = &q2;
 		q2.qclass = C_IN;
-		q2.qtype = T_A;
+		q2.qtype = T_AAAA;
 		q2.answer = buf2.buf;
 		q2.anslen = sizeof(buf2);
+		q2.next = &q3;
+#else
+		q.qclass = C_IN;
+		q.qtype = T_AAAA;
+		q.answer = buf.buf;
+		q.anslen = sizeof(buf);
+		q.next = &q3;
+#endif
+		q3.qclass = C_IN;
+		q3.qtype = T_A;
+		q3.answer = buf3.buf;
+		q3.anslen = sizeof(buf3);
 		break;
 	case AF_INET:
 		q.qclass = C_IN;
@@ -1311,26 +1393,50 @@ _dns_getaddrinfo(rv, cb_data, ap)
 		q.anslen = sizeof(buf);
 		break;
 	case AF_INET6:
+#ifdef T_A6
+		q.qclass = C_IN;
+		q.qtype = T_A6;
+		q.answer = buf.buf;
+		q.anslen = sizeof(buf);
+		q.next = &q2;
+		q2.qclass = C_IN;
+		q2.qtype = T_AAAA;
+		q2.answer = buf2.buf;
+		q2.anslen = sizeof(buf2);
+#else
 		q.qclass = C_IN;
 		q.qtype = T_AAAA;
 		q.answer = buf.buf;
 		q.anslen = sizeof(buf);
+#endif
 		break;
 	default:
 		return NS_UNAVAIL;
 	}
 	if (res_searchN(name, &q) < 0)
 		return NS_NOTFOUND;
-	ai = getanswer(&buf, q.n, q.name, q.qtype, pai);
-	if (ai) {
-		cur->ai_next = ai;
-		while (cur && cur->ai_next)
-			cur = cur->ai_next;
-	}
-	if (q.next) {
-		ai = getanswer(&buf2, q2.n, q2.name, q2.qtype, pai);
-		if (ai)
+	p = &q;
+	while (p) {
+		/* ugly... */
+		if (p == &q)
+			bp = &buf;
+		else if (p == &q2)
+			bp = &buf2;
+		else if (p == &q3)
+			bp = &buf3;
+		else {
+			/* XXX should be abort() */
+			p = p->next;
+			continue;
+		}
+
+		ai = getanswer(bp, p->n, p->name, p->qtype, pai);
+		if (ai) {
 			cur->ai_next = ai;
+			while (cur && cur->ai_next)
+				cur = cur->ai_next;
+		}
+		p = p->next;
 	}
 	if (sentinel.ai_next == NULL)
 		switch (h_errno) {
