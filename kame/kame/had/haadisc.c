@@ -1,4 +1,4 @@
-/*	$KAME: haadisc.c,v 1.4 2002/02/22 08:17:53 k-sugyou Exp $	*/
+/*	$KAME: haadisc.c,v 1.5 2002/04/03 07:17:14 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: haadisc.c,v 1.4 2002/02/22 08:17:53 k-sugyou Exp $
+ * $Id: haadisc.c,v 1.5 2002/04/03 07:17:14 k-sugyou Exp $
  */
 
 /*
@@ -902,7 +902,7 @@ haad_request_input(len, haad_req, pi, src, type)
 	goto err;
     }
 
-    /* send hoem agent address discovery response message */
+    /* send home agent address discovery response message */
     haad_reply_output(msgid, src,
 #ifdef MIP6_DRAFT13
 		      &(haad_req->ha_dreq_home),
