@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1785 2001/07/20 18:42:35 itojun Exp $
+$KAME: CHANGELOG,v 1.1786 2001/07/20 18:55:45 itojun Exp $
 
 <200107>
 Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
@@ -11,13 +11,15 @@ Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
 	    if "options RADIX_MPATH" is specified.
 	  - even with multipath enabled, there's no behavior change if you
 	    operate it normally.
-	  - multiple route entries with the same rt_key will coexist
-	    in the routing table.  first one to get added will appear
-	    at the top of rn_dupedkey.
-	  - on route deletion, it is required to specify rt_gateway, if
+	  - if you issue multiple RTM_ADD requests with the same rt_key, they
+	    will coexist in the routing table (4.4BSD behavior: the latter one
+	    gets rejected with EEXIST).  first one to get added will appear
+	    at the top of rn_dupedkey, so on normal lookups first one got
+	    added will be picked up (i.e. fewer behavior change).
+	  - on route deletion, it is now required to specify rt_gateway, if
 	    there are multiple route entries with the same rt_key.
-	    (if there's only one, no need for rt_gateway - preserves original
-	    behavior).
+	    if there's only one entry, no need for rt_gateway (preserves
+	    original behavior for non-multipath case).
 
 	  DEMO:
 	  (adding multipath routes)
@@ -27,6 +29,9 @@ Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
 	  (removing only one of them)
 	  # route delete -inet 10.1.0.0 10.0.0.2
 	  (it will raise error as there are two routes with the same rt_key)
+	  # route delete -inet 10.1.0.0
+	  # route delete -inet 10.1.0.0 10.0.0.3
+	  (now you can erase the route without rt_gateway, as there's only one)
 	  # route delete -inet 10.1.0.0
 
 	  CAVEATS: there will be some warning raised from nd6_rtrequest,
