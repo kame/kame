@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.147 2002/06/12 01:31:17 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.148 2002/06/12 01:37:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -490,10 +490,9 @@ ipsec4_getpolicybysock(m, dir, so, error)
 
 		case IPSEC_POLICY_ENTRUST:
 			/* look for a policy in SPD */
-
-			/* SP found */
 			if (ipsec_setspidx_mbuf(&spidx, AF_INET, m, 0) == 0 &&
 			    (kernsp = key_allocsp(&spidx, dir)) != NULL) {
+				/* SP found */
 				KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 					printf("DP ipsec4_getpolicybysock called "
 					       "to allocate SP:%p\n", kernsp));
@@ -589,6 +588,7 @@ ipsec4_getpolicybyaddr(m, dir, flag, error)
 	if (m == NULL || error == NULL)
 		panic("ipsec4_getpolicybyaddr: NULL pointer was passed.\n");
 
+	/* get a policy entry matched with the packet */
     {
 	struct secpolicyindex spidx;
 
