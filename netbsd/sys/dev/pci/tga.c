@@ -1,4 +1,4 @@
-/* $NetBSD: tga.c,v 1.25.2.1 2000/06/30 16:27:51 simonb Exp $ */
+/* $NetBSD: tga.c,v 1.25.2.3 2001/06/25 16:27:54 he Exp $ */
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -261,6 +261,17 @@ tga_getdevconfig(memt, pc, tag, dc)
 	default:
 		dc->dc_wid = (TGARREG(dc, TGA_REG_VHCR) & 0x1ff) * 4; /* XXX */
 		break;
+	}
+
+	/*
+	 * XXX XXX Turning off "odd" shouldn't be necessary,
+	 * XXX XXX but I can't make X work with the weird size.
+	 */
+	if ((TGARREG(dc, TGA_REG_VHCR) & 0x00000001) != 0 &&	/* XXX */
+	    (TGARREG(dc, TGA_REG_VHCR) & 0x80000000) != 0) {	/* XXX */
+		TGAWREG(dc, TGA_REG_VHCR,
+		    (TGARREG(dc, TGA_REG_VHCR) & ~0x80000001));
+		dc->dc_wid -= 4;
 	}
 
 	dc->dc_rowbytes = dc->dc_wid * (dc->dc_tgaconf->tgac_phys_depth / 8);
@@ -595,8 +606,11 @@ tga_intr(v)
 			return 0;
 		}
 	}
-	dc->dc_ramdac_intr(dcrc);
-	dc->dc_ramdac_intr = NULL;
+	/* if we have something to do, do it */
+	if (dc->dc_ramdac_intr) {
+		dc->dc_ramdac_intr(dcrc);
+		dc->dc_ramdac_intr = NULL;
+	}
 	TGAWREG(dc, TGA_REG_SISR, 0x00000001);
 	TGAREGWB(dc, TGA_REG_SISR, 1);
 	return (1);

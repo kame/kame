@@ -1,4 +1,4 @@
-#	$NetBSD$
+#	$NetBSD: VME162,v 1.1.2.1 2000/10/17 19:43:57 scw Exp $
 
 include		"arch/mvme68k/conf/std.mvme68k"
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: udp_usrreq.c,v 1.66.4.1 2000/07/28 16:58:10 sommerfeld Exp $	*/
+/*	$NetBSD: udp_usrreq.c,v 1.66.4.5 2001/05/09 19:37:41 he Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,6 +108,11 @@
 /* always need ip6.h for IP6_EXTHDR_GET */
 #include <netinet/ip6.h>
 #endif
+#endif
+
+#include "faith.h"
+#if defined(NFAITH) && NFAITH > 0
+#include <net/if_faith.h>
 #endif
 
 #include <machine/stdarg.h>
@@ -325,23 +330,21 @@ udp6_input(mp, offp, proto)
 	struct udphdr *uh;
 	u_int32_t plen, ulen;
 
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, sizeof(struct udphdr), IPPROTO_DONE);
+#endif
+	ip6 = mtod(m, struct ip6_hdr *);
+
 #if defined(NFAITH) && 0 < NFAITH
-	if (m->m_pkthdr.rcvif) {
-		if (m->m_pkthdr.rcvif->if_type == IFT_FAITH) {
-			/* send icmp6 host unreach? */
-			m_freem(m);
-			return IPPROTO_DONE;
-		}
+	if (faithprefix(&ip6->ip6_dst)) {
+		/* send icmp6 host unreach? */
+		m_freem(m);
+		return IPPROTO_DONE;
 	}
 #endif
 
 	udp6stat.udp6s_ipackets++;
 
-#ifndef PULLDOWN_TEST
-	IP6_EXTHDR_CHECK(m, off, sizeof(struct udphdr), IPPROTO_DONE);
-#endif
-
-	ip6 = mtod(m, struct ip6_hdr *);
 	/* check for jumbogram is done in ip6_input.  we can trust pkthdr.len */
 	plen = m->m_pkthdr.len - off;
 #ifndef PULLDOWN_TEST
@@ -554,7 +557,7 @@ udp4_realinput(src, dst, m, off)
 	dst4 = &dst->sin_addr;
 	dport = &dst->sin_port;
 
-	if (IN_MULTICAST(src4->s_addr) ||
+	if (IN_MULTICAST(dst4->s_addr) ||
 	    in_broadcast(*dst4, m->m_pkthdr.rcvif)) {
 		struct inpcb *last;
 		/*
@@ -703,7 +706,7 @@ udp6_realinput(af, src, dst, m, off)
 	u_int16_t *sport, *dport;
 	int rcvcnt;
 	struct in6_addr *src6, *dst6;
-	struct in_addr *src4;
+	struct in_addr *dst4;
 	struct in6pcb *in6p;
 
 	rcvcnt = 0;
@@ -718,10 +721,10 @@ udp6_realinput(af, src, dst, m, off)
 	sport = &src->sin6_port;
 	dst6 = &dst->sin6_addr;
 	dport = &dst->sin6_port;
-	src4 = (struct in_addr *)&src->sin6_addr.s6_addr32[12];
+	dst4 = (struct in_addr *)&dst->sin6_addr.s6_addr32[12];
 
 	if (IN6_IS_ADDR_MULTICAST(dst6)
-	 || (af == AF_INET && IN_MULTICAST(src4->s_addr))) {
+	 || (af == AF_INET && IN_MULTICAST(dst4->s_addr))) {
 		struct in6pcb *last;
 		/*
 		 * Deliver a multicast or broadcast datagram to *all* sockets
@@ -1254,7 +1257,10 @@ udp_output(m, va_alist)
 	udpstat.udps_opackets++;
 
 #ifdef IPSEC
-	ipsec_setsocket(m, inp->inp_socket);
+	if (ipsec_setsocket(m, inp->inp_socket) != 0) {
+		error = ENOBUFS;
+		goto release;
+	}
 #endif /*IPSEC*/
 
 	return (ip_output(m, inp->inp_options, &inp->inp_route,

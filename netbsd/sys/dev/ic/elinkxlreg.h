@@ -1,4 +1,4 @@
-/*	$NetBSD: elinkxlreg.h,v 1.2 1999/09/01 21:03:03 fvdl Exp $	*/
+/*	$NetBSD: elinkxlreg.h,v 1.2.12.3 2001/05/03 21:23:10 he Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -46,6 +46,8 @@
 #define EEPROM_SUBSYSID		0x18	/* Subsys id */
 #define EEPROM_MEDIA		0x19	/* Media options (90xB) */
 #define EEPROM_CHECKSUM_ELXL	0x20	/* EEPROM checksum */
+
+#define READ_EEPROM8		0x0200	/* 8 bit EEPROM read command */
 
 /*
  * Flat address space registers (outside the windows)
@@ -101,6 +103,13 @@
 #	define ELINK_MEDIACAP_10BASE5	0x0020
 #	define ELINK_MEDIACAP_MII	0x0040
 #	define ELINK_MEDIACAP_10BASEFL	0x0080
+
+/*
+ * Reset options for the 90xB
+ */
+#define ELINK_W2_RESET_OPTIONS	0x0c
+#	define ELINK_RESET_OPT_LEDPOLAR	0x0010
+#	define ELINK_RESET_OPT_PHYPOWER	0x4000
 
 /*
  * Window 4, offset 8 is defined for MII/PHY access for EtherLink XL
@@ -203,8 +212,8 @@ struct ex_fraghdr {
 #define EX_FR_LENMASK	0x00001fff	/* mask for length in fr_len field */
 #define EX_FR_LAST	0x80000000	/* indicates last fragment */
 
-#define EX_NDPD		128
-#define EX_NUPD		64
+#define EX_NDPD		256
+#define EX_NUPD		128
 
 /*
  * Note: the number of receive fragments in an UPD is 1, since we're
@@ -311,3 +320,4 @@ struct ex_txdesc {
 #define EX_UPD_UDPCKSUMERR	0x08000000	/* UDP cksum error (90xB) */
 
 #define EX_UPD_ERR		0x001f4000	/* Errors we check for */
+#define EX_UPD_ERR_VLAN		0x000f0000	/* same for 802.1q */

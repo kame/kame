@@ -1,4 +1,4 @@
-/*	$NetBSD: ffs_softdep.c,v 1.2.2.3 2000/08/17 18:50:53 fvdl Exp $	*/
+/*	$NetBSD: ffs_softdep.c,v 1.2.2.5 2001/04/21 21:28:33 he Exp $	*/
 
 /*
  * Copyright 1998 Marshall Kirk McKusick. All Rights Reserved.
@@ -636,7 +636,7 @@ softdep_flushfiles(oldmnt, flags, p)
 				break;
 		}
 		vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY);
-		error = VOP_FSYNC(devvp, p->p_ucred, FSYNC_WAIT, p);
+		error = VOP_FSYNC(devvp, p->p_ucred, FSYNC_WAIT, 0, 0, p);
 		VOP_UNLOCK(devvp, 0);
 		if (error)
 			break;
@@ -1557,7 +1557,7 @@ softdep_setup_freeblocks(ip, length)
 	struct vnode *vp;
 	struct buf *bp;
 	struct fs *fs = ip->i_fs;
-	int i, error;
+	int i, error, delay;
 #ifdef FFS_EI
 	const int needswap = UFS_FSNEEDSWAP(fs);
 #endif
@@ -1610,6 +1610,16 @@ softdep_setup_freeblocks(ip, length)
 	if ((inodedep->id_state & IOSTARTED) != 0)
 		panic("softdep_setup_freeblocks: inode busy");
 	/*
+	 * Add the freeblks structure to the list of operations that
+	 * must await the zero'ed inode being written to disk. If we
+	 * still have a bitmap dependency (delay == 0), then the inode
+	 * has never been written to disk, so we can process the
+	 * freeblks below once we have deleted the dependencies.
+	 */
+	delay = (inodedep->id_state & DEPCOMPLETE);
+	if (delay)
+		WORKLIST_INSERT(&inodedep->id_bufwait, &freeblks->fb_list);
+	/*
 	 * Because the file length has been truncated to zero, any
 	 * pending block allocation dependency structures associated
 	 * with this inode are obsolete and can simply be de-allocated.
@@ -1639,23 +1649,16 @@ softdep_setup_freeblocks(ip, length)
 		brelse(bp);
 		ACQUIRE_LOCK(&lk);
 	}
+	if (inodedep_lookup(fs, ip->i_number, 0, &inodedep) != 0)
+		(void) free_inodedep(inodedep);
+	FREE_LOCK(&lk);
 	/*
-	 * Add the freeblks structure to the list of operations that
-	 * must await the zero'ed inode being written to disk. If we
-	 * still have a bitmap dependency, then the inode has never been
-	 * written to disk, so we can process the freeblks immediately.
-	 * If the inodedep does not exist, then the zero'ed inode has
-	 * been written and we can also proceed.
+	 * If the inode has never been written to disk (delay == 0),
+	 * then we can process the freeblks now that we have deleted
+	 * the dependencies.
 	 */
-	if (inodedep_lookup(fs, ip->i_number, 0, &inodedep) == 0 ||
-	    free_inodedep(inodedep) ||
-	    (inodedep->id_state & DEPCOMPLETE) == 0) {
-		FREE_LOCK(&lk);
+	if (!delay)
 		handle_workitem_freeblocks(freeblks);
-	} else {
-		WORKLIST_INSERT(&inodedep->id_bufwait, &freeblks->fb_list);
-		FREE_LOCK(&lk);
-	}
 }
 
 /*
@@ -3869,6 +3872,8 @@ softdep_sync_metadata(v)
 		struct vnode *a_vp;
 		struct ucred *a_cred;
 		int a_waitfor;
+		off_t offhi;
+		off_t offlo;
 		struct proc *a_p;
 	} */ *ap = v;
 	struct vnode *vp = ap->a_vp;
@@ -4279,8 +4284,8 @@ flush_pagedep_deps(pvp, mp, diraddhdp)
 			ipflag = vn_setrecurse(pvp);	/* XXX */
 			if ((error = VFS_VGET(mp, inum, &vp)) != 0)
 				break;
-			if ((error = VOP_FSYNC(vp, p->p_ucred, 0, p)) ||
-			    (error = VOP_FSYNC(vp, p->p_ucred, 0, p))) {
+			if ((error = VOP_FSYNC(vp, p->p_ucred, 0, 0, 0, p)) ||
+			    (error = VOP_FSYNC(vp, p->p_ucred, 0, 0, 0, p))) {
 				vput(vp);
 				break;
 			}
@@ -4470,7 +4475,7 @@ clear_remove(p)
 				softdep_error("clear_remove: vget", error);
 				return;
 			}
-			if ((error = VOP_FSYNC(vp, p->p_ucred, 0, p)))
+			if ((error = VOP_FSYNC(vp, p->p_ucred, 0, 0, 0, p)))
 				softdep_error("clear_remove: fsync", error);
 			drain_output(vp, 0);
 			vput(vp);
@@ -4539,10 +4544,11 @@ clear_inodedeps(p)
 			return;
 		}
 		if (ino == lastino) {
-			if ((error = VOP_FSYNC(vp, p->p_ucred, FSYNC_WAIT, p)))
+			if ((error = VOP_FSYNC(vp, p->p_ucred, FSYNC_WAIT,
+				    0, 0, p)))
 				softdep_error("clear_inodedeps: fsync1", error);
 		} else {
-			if ((error = VOP_FSYNC(vp, p->p_ucred, 0, p)))
+			if ((error = VOP_FSYNC(vp, p->p_ucred, 0, 0, 0, p)))
 				softdep_error("clear_inodedeps: fsync2", error);
 			drain_output(vp, 0);
 		}

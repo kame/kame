@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ne_pcmcia.c,v 1.62.4.1 2000/11/05 01:14:39 tv Exp $	*/
+/*	$NetBSD: if_ne_pcmcia.c,v 1.62.4.5 2001/06/16 19:18:50 he Exp $	*/
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -99,6 +99,11 @@ struct ne2000dev {
 #define	NE2000DVF_DL10019	0x0001		/* chip is D-Link DL10019 */
 #define	NE2000DVF_AX88190	0x0002		/* chip is ASIX AX88190 */
 } ne2000devs[] = {
+    { PCMCIA_STR_SYNERGY21_S21810,
+      PCMCIA_VENDOR_INVALID, PCMCIA_PRODUCT_INVALID,
+      PCMCIA_CIS_SYNERGY21_S21810,
+      0, -1, { 0x00, 0x48, 0x54 } },
+
     { PCMCIA_STR_AMBICOM_AMB8002T,
       PCMCIA_VENDOR_INVALID, PCMCIA_PRODUCT_INVALID,
       PCMCIA_CIS_AMBICOM_AMB8002T,
@@ -314,10 +319,25 @@ struct ne2000dev {
       PCMCIA_CIS_SMC_EZCARD,
       0, 0x01c0, { 0x00, 0xe0, 0x29 } },
 
-    { PCMCIA_STR_SOCEKT_LP_ETHER_CF,
-      PCMCIA_VENDOR_SOCKET, PCMCIA_PRODUCT_SOCEKT_LP_ETHER_CF,
-      PCMCIA_CIS_SOCEKT_LP_ETHER_CF,
-      0, -1, { 0x00, 0xc0, 0x1b} },
+    { PCMCIA_STR_SOCKET_EA_ETHER,
+      PCMCIA_VENDOR_SOCKET, PCMCIA_PRODUCT_SOCKET_EA_ETHER,
+      PCMCIA_CIS_SOCKET_EA_ETHER,
+      0, -1, { 0x00, 0xc0, 0x1b } },
+
+    { PCMCIA_STR_SOCKET_LP_ETHER_CF,
+      PCMCIA_VENDOR_SOCKET, PCMCIA_PRODUCT_SOCKET_LP_ETHER_CF,
+      PCMCIA_CIS_SOCKET_LP_ETHER_CF,
+      0, -1, { 0x00, 0xc0, 0x1b } },
+
+    { PCMCIA_STR_SOCKET_LP_ETHER,
+      PCMCIA_VENDOR_SOCKET, PCMCIA_PRODUCT_SOCKET_LP_ETHER,
+      PCMCIA_CIS_SOCKET_LP_ETHER,
+      0, -1, { 0x00, 0xc0, 0x1b } },
+
+    { PCMCIA_STR_KINGSTON_KNE2,
+      PCMCIA_VENDOR_KINGSTON, PCMCIA_PRODUCT_KINGSTON_KNE2,
+      PCMCIA_CIS_KINGSTON_KNE2,
+      0, -1, { 0x00, 0xc0, 0xf0 } },
 
     { PCMCIA_STR_XIRCOM_CFE_10,
       PCMCIA_VENDOR_XIRCOM, PCMCIA_PRODUCT_XIRCOM_CFE_10,
@@ -394,9 +414,6 @@ struct ne2000dev {
     { "Kingston KNE-PCM/x",
       0x0000, 0x0000, NULL, NULL, 0,
       0x0ff0, { 0xe2, 0x0c, 0x0f } },
-    { "Kingston KNE-PC2",
-      0x0000, 0x0000, NULL, NULL, 0,
-      0x0180, { 0x00, 0xc0, 0xf0 } },
     { "Longshine LCS-8534",
       0x0000, 0x0000, NULL, NULL, 0,
       0x0000, { 0x08, 0x00, 0x00 } },
@@ -418,9 +435,6 @@ struct ne2000dev {
     { "SCM Ethernet",
       0x0000, 0x0000, NULL, NULL, 0,
       0x0ff0, { 0x00, 0x20, 0xcb } },
-    { "Socket EA",
-      0x0000, 0x0000, NULL, NULL, 0,
-      0x4000, { 0x00, 0xc0, 0x1b } },
     { "Volktek NPL-402CT",
       0x0000, 0x0000, NULL, NULL, 0,
       0x0060, { 0x00, 0x40, 0x05 } },

@@ -1,4 +1,4 @@
-/*	$NetBSD: tulip.c,v 1.68.4.3 2000/10/17 21:43:45 tv Exp $	*/
+/*	$NetBSD: tulip.c,v 1.68.4.7 2001/05/06 15:05:36 he Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -244,6 +244,8 @@ tlp_attach(sc, enaddr)
 		break;
 
 	case TULIP_CHIP_AL981:
+	case TULIP_CHIP_AN983:
+	case TULIP_CHIP_AN985:
 		sc->sc_filter_setup = tlp_al981_filter_setup;
 		break;
 
@@ -499,6 +501,11 @@ tlp_attach(sc, enaddr)
 	ifp->if_ioctl = tlp_ioctl;
 	ifp->if_start = tlp_start;
 	ifp->if_watchdog = tlp_watchdog;
+
+	/*
+	 * We can support 802.1Q VLAN-sized frames.
+	 */
+	sc->sc_ethercom.ec_capabilities |= ETHERCAP_VLAN_MTU;
 
 	/*
 	 * Attach the interface.
@@ -1340,8 +1347,13 @@ tlp_rxintr(sc)
 		 * If an error occured, update stats, clear the status
 		 * word, and leave the packet buffer in place.  It will
 		 * simply be reused the next time the ring comes around.
+	 	 * If 802.1Q VLAN MTU is enabled, ignore the Frame Too Long
+		 * error.
 		 */
-		if (rxstat & TDSTAT_ES) {
+		if (rxstat & TDSTAT_ES &&
+		    ((sc->sc_ethercom.ec_capenable & ETHERCAP_VLAN_MTU) == 0 ||
+		     (rxstat & (TDSTAT_Rx_DE | TDSTAT_Rx_RF |
+				TDSTAT_Rx_DB | TDSTAT_Rx_CE)) != 0)) {
 #define	PRINTERR(bit, str)						\
 			if (rxstat & (bit))				\
 				printf("%s: receive error: %s\n",	\
@@ -1883,6 +1895,8 @@ tlp_init(sc)
 	    }
 
 	case TULIP_CHIP_AL981:
+	case TULIP_CHIP_AN983:
+	case TULIP_CHIP_AN985:
 	    {
 		u_int32_t reg;
 		u_int8_t *enaddr = LLADDR(ifp->if_sadl);
@@ -1987,14 +2001,24 @@ tlp_power(why, arg)
 	int s;
 
 	s = splnet();
-	if (why != PWR_RESUME) {
+	switch (why) {
+	case PWR_SUSPEND:
+	case PWR_STANDBY:
 		tlp_stop(sc, 0);
 		if (sc->sc_power != NULL)
 			(*sc->sc_power)(sc, why);
-	} else if (ifp->if_flags & IFF_UP) {
-		if (sc->sc_power != NULL)
-			(*sc->sc_power)(sc, why);
-		tlp_init(sc);
+		break;
+	case PWR_RESUME:
+		if (ifp->if_flags & IFF_UP) {
+			if (sc->sc_power != NULL)
+				(*sc->sc_power)(sc, why);
+			tlp_init(sc);
+		}
+		break;
+	case PWR_SOFTSUSPEND:
+	case PWR_SOFTSTANDBY:
+	case PWR_SOFTRESUME:
+		break;
 	}
 	splx(s);
 }
@@ -2854,10 +2878,19 @@ tlp_al981_filter_setup(sc)
 	struct ether_multistep step;
 	u_int32_t hash, mchash[2];
 
+	/*
+	 * If the chip is running, we need to reset the interface,
+	 * and will revisit here (with IFF_RUNNING) clear.  The
+	 * chip seems to really not like to have its multicast
+	 * filter programmed without a reset.
+	 */
+	if (ifp->if_flags & IFF_RUNNING) {
+		(void) tlp_init(sc);
+		return;
+	}
+
 	DPRINTF(sc, ("%s: tlp_al981_filter_setup: sc_flags 0x%08x\n",
 	    sc->sc_dev.dv_xname, sc->sc_flags));
-
-	tlp_idle(sc, OPMODE_ST|OPMODE_SR);
 
 	sc->sc_opmode &= ~(OPMODE_PR|OPMODE_PM);
 
@@ -2894,8 +2927,8 @@ tlp_al981_filter_setup(sc)
 	mchash[0] = mchash[1] = 0xffffffff;
 
  setit:
-	TULIP_WRITE(sc, CSR_ADM_MAR0, mchash[0]);
-	TULIP_WRITE(sc, CSR_ADM_MAR1, mchash[1]);
+	bus_space_write_4(sc->sc_st, sc->sc_sh, CSR_ADM_MAR0, mchash[0]);
+	bus_space_write_4(sc->sc_st, sc->sc_sh, CSR_ADM_MAR1, mchash[1]);
 	TULIP_WRITE(sc, CSR_OPMODE, sc->sc_opmode);
 	DPRINTF(sc, ("%s: tlp_al981_filter_setup: returning\n",
 	    sc->sc_dev.dv_xname));
@@ -2986,15 +3019,26 @@ tlp_idle(sc, bits)
 	csr = TULIP_READ(sc, CSR_STATUS);
 	if ((csr & ackmask) != ackmask) {
 		if ((bits & OPMODE_ST) != 0 && (csr & STATUS_TPS) == 0 &&
-		    (csr & STATUS_TS) != STATUS_TS_STOPPED)
+		    (csr & STATUS_TS) != STATUS_TS_STOPPED) {
 			printf("%s: transmit process failed to idle: "
 			    "state %s\n", sc->sc_dev.dv_xname,
 			    tx_state_names[(csr & STATUS_TS) >> 20]);
+		}
 		if ((bits & OPMODE_SR) != 0 && (csr & STATUS_RPS) == 0 &&
-		    (csr & STATUS_RS) != STATUS_RS_STOPPED)
-			printf("%s: receive process failed to idle: "
-			    "state %s\n", sc->sc_dev.dv_xname,
-			    rx_state_names[(csr & STATUS_RS) >> 17]);
+		    (csr & STATUS_RS) != STATUS_RS_STOPPED) {
+			switch (sc->sc_chip) {
+			case TULIP_CHIP_AN983:
+			case TULIP_CHIP_AN985:
+				/*
+				 * Filter the message out on noisy chips.
+				 */
+				break;
+			default:
+				printf("%s: receive process failed to idle: "
+				    "state %s\n", sc->sc_dev.dv_xname,
+				    rx_state_names[(csr & STATUS_RS) >> 17]);
+			}
+		}
 	}
 	TULIP_WRITE(sc, CSR_STATUS, ackmask);
 }
@@ -5572,6 +5616,42 @@ tlp_al981_tmsw_init(sc)
 	ifmedia_init(&sc->sc_mii.mii_media, 0, tlp_mediachange,
 	    tlp_mediastatus);
 	mii_attach(&sc->sc_dev, &sc->sc_mii, 0xffffffff, MII_PHY_ANY,
+	    MII_OFFSET_ANY, 0);
+	if (LIST_FIRST(&sc->sc_mii.mii_phys) == NULL) {
+		ifmedia_add(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE, 0, NULL);
+		ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE);
+	} else {
+		sc->sc_flags |= TULIPF_HAS_MII;
+		sc->sc_tick = tlp_mii_tick;
+		ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER|IFM_AUTO);
+	}
+}
+
+/*
+ * ADMtek AN983/985 media switch.  Only has internal PHY, but
+ * on an SIO-like interface.  Unfortunately, we can't use the
+ * standard SIO media switch, because the AN985 "ghosts" the
+ * singly PHY at every address.
+ */
+void	tlp_an985_tmsw_init __P((struct tulip_softc *));
+
+const struct tulip_mediasw tlp_an985_mediasw = {
+	tlp_an985_tmsw_init, tlp_mii_getmedia, tlp_mii_setmedia
+};
+
+void
+tlp_an985_tmsw_init(sc)
+	struct tulip_softc *sc;
+{
+	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
+
+	sc->sc_mii.mii_ifp = ifp;
+	sc->sc_mii.mii_readreg = tlp_bitbang_mii_readreg;
+	sc->sc_mii.mii_writereg = tlp_bitbang_mii_writereg;
+	sc->sc_mii.mii_statchg = sc->sc_statchg;
+	ifmedia_init(&sc->sc_mii.mii_media, 0, tlp_mediachange,
+	    tlp_mediastatus);
+	mii_attach(&sc->sc_dev, &sc->sc_mii, 0xffffffff, 1,
 	    MII_OFFSET_ANY, 0);
 	if (LIST_FIRST(&sc->sc_mii.mii_phys) == NULL) {
 		ifmedia_add(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE, 0, NULL);

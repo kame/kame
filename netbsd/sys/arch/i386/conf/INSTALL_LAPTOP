@@ -1,4 +1,4 @@
-#	$NetBSD: INSTALL_LAPTOP,v 1.4.2.3 2000/11/01 02:52:54 tv Exp $
+#	$NetBSD: INSTALL_LAPTOP,v 1.4.2.6 2001/04/25 09:07:03 he Exp $
 #
 #	INSTALL - Installation kernel.
 #
@@ -71,7 +71,7 @@ options 	RTC_OFFSET=0	# hardware clock is this many mins. west of GMT
 #options 	LKM		# loadable kernel modules
 
 # Diagnostic/debugging support options
-#options 	DIAGNOSTIC	# cheap kernel consistency checks
+#options 	DIAGNOSTIC	# expensive kernel consistency checks
 #options 	DEBUG		# expensive debugging checks/support
 #options 	KMEMSTATS	# kernel memory statistics (vmstat -m)
 options 	DDB		# in-kernel debugger
@@ -372,8 +372,14 @@ ex*	at pci? dev ? function ?	# 3Com 90x[B]
 fxp*	at pci? dev ? function ?	# Intel EtherExpress PRO 10+/100B
 ne* 	at pci? dev ? function ?	# NE2000-compatible Ethernet
 rtk* 	at pci? dev ? function ? 	# Realtek 8129/8139
+tlp*	at pci? dev ? function ?	# DECchip 21x4x (and clones) Ethernet
+#options       TLP_MATCH_21040
+#options       TLP_MATCH_21041
+#options       TLP_MATCH_21140
+#options       TLP_MATCH_21142
 
 # PCMCIA network interfaces
+an*	at pcmcia? function ?		# Aironet PC4500/PC4800 (802.11)
 awi*	at pcmcia? function ?		# BayStack 650 (802.11FH)
 cnw*	at pcmcia? function ?		# Xircom/Netwave AirSurfer
 ep*	at pcmcia? function ?		# 3Com 3c589 and 3c562 Ethernet

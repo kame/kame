@@ -1,4 +1,4 @@
-/*	$NetBSD: raw_ip.c,v 1.53 2000/03/30 13:25:04 augustss Exp $	*/
+/*	$NetBSD: raw_ip.c,v 1.53.4.2 2001/04/06 00:25:38 he Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -175,6 +175,14 @@ rip_input(m, va_alist)
 			continue;
 		if (last) {
 			struct mbuf *n;
+
+#ifdef IPSEC
+			/* check AH/ESP integrity. */
+			if (ipsec4_in_reject_so(m, last->inp_socket)) {
+				ipsecstat.in_polvio++;
+				/* do not inject data to pcb */
+			} else
+#endif /*IPSEC*/
 			if ((n = m_copy(m, 0, (int)M_COPYALL)) != NULL) {
 				if (last->inp_flags & INP_CONTROLOPTS ||
 				    last->inp_socket->so_options & SO_TIMESTAMP)
@@ -192,6 +200,15 @@ rip_input(m, va_alist)
 		}
 		last = inp;
 	}
+#ifdef IPSEC
+	/* check AH/ESP integrity. */
+	if (last && ipsec4_in_reject_so(m, last->inp_socket)) {
+		m_freem(m);
+		ipsecstat.in_polvio++;
+		ipstat.ips_delivered--;
+		/* do not inject data to pcb */
+	} else
+#endif /*IPSEC*/
 	if (last) {
 		if (last->inp_flags & INP_CONTROLOPTS ||
 		    last->inp_socket->so_options & SO_TIMESTAMP)
@@ -279,7 +296,10 @@ rip_output(m, va_alist)
 		ipstat.ips_rawout++;
 	}
 #ifdef IPSEC
-	ipsec_setsocket(m, inp->inp_socket);
+	if (ipsec_setsocket(m, inp->inp_socket) != 0) {
+		m_freem(m);
+		return ENOBUFS;
+	}
 #endif /*IPSEC*/
 	return (ip_output(m, opts, &inp->inp_route, flags, inp->inp_moptions, &inp->inp_errormtu));
 }

@@ -1,4 +1,4 @@
-$NetBSD: pcmciadevs,v 1.93.2.3 2000/08/09 23:15:58 gmcgarry Exp $
+$NetBSD: pcmciadevs,v 1.93.2.7 2001/06/16 19:19:12 he Exp $
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -63,6 +63,7 @@ vendor SIMPLETECH		0x014d	Simple Technology
 vendor LUCENT			0x0156	Lucent Technologies
 vendor AIRONET			0x015f	Aironet Wireless Communications
 vendor COMPAQ2			0x0183	Compaq
+vendor KINGSTON			0x0186	Kingston
 vendor DAYNA			0x0194	Dayna Corporation
 vendor RAYTHEON			0x01a6	Raytheon
 vendor BAY			0x01eb  Bay Networks
@@ -120,6 +121,9 @@ product FUJITSU SCSI600		0x0401 Fujitsu SCSI 600 Interface
 /* Motorola Products */
 product MOTOROLA POWER144	0x0105 Motorola Power 14.4 Modem
 product MOTOROLA PM100C		0x0302 Motorola Personal Messenger 100C CDPD Modem
+
+/* Kingston Products */         
+product KINGSTON KNE2		0x0100 Kingston KNE-PC2 Ethernet
 
 /* Fujitsu Products */
 product FUJITSU LA501		0x2000 Fujitsu Towa LA501 Ethernet
@@ -185,9 +189,11 @@ product SIMPLETECH COMMUNICATOR288 0x0100 Simple Technology 28.8 Communicator
 product SIMPLETECH SPECTRUM24 0x801 Symbol Spectrum24 WLAN Adapter
 
 /* Socket Communications Products */
+product SOCKET EA_ETHER		0x0000 Socket Communications EA
 product SOCKET PAGECARD		0x0003 Socket Communications PageCard
 product SOCKET DUAL_RS232	0x0006 Socket Communications Dual RS232
-product SOCEKT LP_ETHER_CF	0x0075 Socket Communications Low Power Ethernet CF
+product SOCKET LP_ETHER_CF	0x0075 Socket Communications LP-E CF
+product SOCKET LP_ETHER		0x000d Socket Communications LP-E
 
 /* TDK Products */
 product TDK LAK_CD021BX		0x0200 TDK LAK-CD021BX Ethernet
@@ -256,6 +262,7 @@ vendor ICOM			-1	ICOM Inc
 vendor BILLIONTON		-1	Billionton Systems Inc.
 vendor AMD			-1	AMD
 vendor INTERSIL			-1	Intersil
+vendor SYNERGY21		-1	Synergy 21
 
 product MEGAHERTZ XJ2288 	{ "MEGAHERTZ", "MODEM&spXJ2288", NULL, NULL } Megahertz XJ2288 Modem
 product PREMAX PE200		{ "PMX&sp&sp&sp", "PE-200", NULL, NULL } PreMax PE-200
@@ -296,3 +303,4 @@ product XIRCOM CFE_10		{ "Xircom", "CompactCard&spEthernet", "CFE-10", "1.00" } 
 product BILLIONTON LNT10TN	{ "PCMCIA", "LNT-10TN", NULL, NULL } Billionton Systems Inc. LNT-10TN NE2000 Compatible Card
 product NDC ND5100_E		{ "NDC", "Ethernet", "A", NULL } Sohoware ND5100E NE2000 Compatible Card
 product INTERSIL PRISM2		{ "INTERSIL", "HFA384x/IEEE", "Version 01.02", NULL} Intersil Prism II
+product SYNERGY21 S21810	{ "PCMCIA", "Ethernet", "A", "004743118001" } Synergy 21 S21810+ NE2000 Compatible Card

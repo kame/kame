@@ -1,4 +1,4 @@
-/*	$NetBSD: if_wi.c,v 1.21.2.7 2000/10/17 00:56:32 tv Exp $	*/
+/*	$NetBSD: if_wi.c,v 1.21.2.9 2001/05/26 16:10:03 he Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -384,7 +384,7 @@ wi_attach(parent, self, aux)
 	    sizeof(WI_DEFAULT_IBSS) - 1);
 
 	sc->wi_portnum = WI_DEFAULT_PORT;
-	sc->wi_ptype = WI_PORTTYPE_ADHOC;
+	sc->wi_ptype = WI_PORTTYPE_BSS;
 	sc->wi_ap_density = WI_DEFAULT_AP_DENSITY;
 	sc->wi_rts_thresh = WI_DEFAULT_RTS_THRESH;
 	sc->wi_tx_rate = WI_DEFAULT_TX_RATE;
@@ -497,6 +497,10 @@ static void wi_rxeof(sc)
 		ifp->if_ierrors++;
 		return;
 	}
+
+	/* Align the data after the ethernet header */
+	m->m_data = (caddr_t) ALIGN(m->m_data + sizeof(struct ether_header)) 
+	    - sizeof(struct ether_header);
 
 	eh = mtod(m, struct ether_header *);
 	m->m_pkthdr.rcvif = ifp;

@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_icmp.c,v 1.47.2.3 2000/08/16 01:22:22 itojun Exp $	*/
+/*	$NetBSD: ip_icmp.c,v 1.47.2.5 2001/04/06 00:24:30 he Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -378,13 +378,6 @@ icmp_input(m, va_alist)
 	if (icmpprintfs)
 		printf("icmp_input, type %d code %d\n", icp->icmp_type,
 		    icp->icmp_code);
-#endif
-#ifdef IPSEC
-	/* drop it if it does not match the policy */
-	if (ipsec4_in_reject(m, NULL)) {
-		ipsecstat.in_polvio++;
-		goto freeit;
-	}
 #endif
 	if (icp->icmp_type > ICMP_MAXTYPE)
 		goto raw;
@@ -808,7 +801,7 @@ icmp_send(m, opts)
 #endif
 #ifdef IPSEC
 	/* Don't lookup socket */
-	ipsec_setsocket(m, NULL);
+	(void)ipsec_setsocket(m, NULL);
 #endif
 	(void) ip_output(m, opts, NULL, 0, NULL);
 }

@@ -1,4 +1,4 @@
-#	$NetBSD: files.pci,v 1.96.2.5 2000/08/03 17:15:41 bouyer Exp $
+#	$NetBSD: files.pci,v 1.96.2.9 2001/05/06 15:14:14 he Exp $
 #
 # Config file and device description for machine-independent PCI code.
 # Included by ports that need it.  Requires that the SCSI files be
@@ -200,6 +200,14 @@ device clcs: audio, auconv, mulaw, ac97, midibus
 attach  clcs at pci
 file dev/pci/cs4280.c			clcs
 
+# Cirrus Logic CrystalClear PCI Audio CS4281
+device clct: audio, auconv, mulaw, ac97
+attach  clct at pci
+file dev/pci/cs4281.c			clct
+
+# Shared code for Cirrus Logic CrystalClear PCI Audio CS4280 and CS4281
+file dev/pci/cs428x.c                  clcs | clct
+
 # Forte Media FM801
 device  fms { }: audio, auconv, mulaw, ac97, midibus
 attach  fms at pci
@@ -221,6 +229,11 @@ device  auvia: audio, auconv, mulaw, ac97
 attach  auvia at pci
 file    dev/pci/auvia.c			auvia
 
+# NeoMagic 256 AC'97 Audio
+device	neo: audio, auconv, mulaw, ac97
+attach	neo at pci
+file	dev/pci/neo.c			neo
+
 # ESS Solo-1 PCI AudioDrive
 device	eso { }: audio, auconv, mulaw, midibus
 attach	eso at pci
@@ -231,6 +244,11 @@ file	dev/pci/opl_eso.c		opl_eso
 
 attach	mpu at eso with mpu_eso
 file	dev/pci/mpu_eso.c		mpu_eso
+
+# ESS Maestro-1/2/2e PCI AC97 Audio Accelerator
+device	esm: audio, auconv, mulaw, ac97
+attach	esm at pci
+file	dev/pci/esm.c			esm
 
 # S3 SonicVibes (S3 617)
 device	sv { }: audio, auconv, mulaw, midibus
@@ -244,6 +262,17 @@ file	dev/pci/opl_sv.c		opl_sv
 device	cmpci { }: audio, auconv, mulaw
 attach	cmpci at pci
 file	dev/pci/cmpci.c			cmpci
+
+# Yamaha YMF724/740/744/754 PCI audio controller
+device	yds { }: audio, auconv, mulaw, ac97
+attach	yds at pci
+file	dev/pci/yds.c			yds
+
+attach	opl at yds with opl_yds
+file	dev/pci/opl_yds.c		opl_yds
+
+attach	mpu at yds with mpu_yds
+file	dev/pci/mpu_yds.c		mpu_yds
 
 # SMC EPIC/100 Fast Ethernet on PCI
 attach	epic at pci with epic_pci

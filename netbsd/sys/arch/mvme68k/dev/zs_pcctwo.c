@@ -1,4 +1,4 @@
-/*	$NetBSD$	*/
+/*	$NetBSD: zs_pcctwo.c,v 1.1.2.1 2000/10/17 19:54:48 scw Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.

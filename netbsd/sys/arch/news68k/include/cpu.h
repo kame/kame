@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.4 2000/05/26 21:20:00 thorpej Exp $	*/
+/*	$NetBSD: cpu.h,v 1.4.4.2 2001/03/13 20:48:58 he Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -58,7 +58,6 @@
  */
 #include <m68k/cpu.h>
 
-#ifdef news1700
 /*
  * XXX news1700 L2 cache would be corrupted with DC_BE and IC_BE...
  * XXX Should these be defined in machine/cpu.h?
@@ -72,7 +71,8 @@
 #define IC_CLEAR	(DC_WA|DC_ENABLE|IC_CLR|IC_ENABLE)
 #define DC_CLEAR	(DC_WA|DC_CLR|DC_ENABLE|IC_ENABLE)
 
-#endif
+#define DCIC_CLR	(DC_CLR|IC_CLR)
+#define CACHE_BE	(DC_BE|IC_BE)
 
 /*
  * Get interrupt glue.
@@ -183,7 +183,7 @@ extern int systype;
 #define NEWS1200	1
 
 extern int cpuspeed;
-extern char *intiobase, *intiolimit;
+extern char *intiobase, *intiolimit, *extiobase;
 extern u_int intiobase_phys, intiotop_phys;
 extern u_int extiobase_phys, extiotop_phys;
 extern u_int intrcnt[];

@@ -1,4 +1,4 @@
-/*	$NetBSD: mb8795.c,v 1.17 1999/08/29 05:51:45 dbj Exp $	*/
+/*	$NetBSD: mb8795.c,v 1.17.12.2 2001/06/16 20:30:29 he Exp $	*/
 /*
  * Copyright (c) 1998 Darrin B. Jewell
  * All rights reserved.
@@ -169,11 +169,6 @@ mb8795_config(sc)
   if_attach(ifp);
   ether_ifattach(ifp, sc->sc_enaddr);
 
-	/* decrease the mtu on this interface to deal with
-	 * alignment problems
-	 */
-	ifp->if_mtu -= 16;
-
 #if NBPFILTER > 0
   bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
 #endif
@@ -341,6 +336,9 @@ mb8795_rint(sc)
 			 */
 			m->m_pkthdr.len = map->dm_segs[0].ds_xfer_len-4;
 			m->m_len = map->dm_segs[0].ds_xfer_len-4;
+			if (m->m_pkthdr.len > ETHER_MAX_LEN-ETHER_CRC_LEN) {
+				m->m_pkthdr.len = m->m_len = ETHER_MAX_LEN-ETHER_CRC_LEN;
+			}
 			m->m_pkthdr.rcvif = ifp;
 
 			bus_dmamap_unload(sc->sc_rx_dmat, map);
@@ -773,12 +771,6 @@ mb8795_start(ifp)
 		/* Fix runt packets,  @@@ memory overrun */
 		if (buflen < ETHERMIN+sizeof(struct ether_header)) {
 			buflen = ETHERMIN+sizeof(struct ether_header);
-		}
-
-		buflen += 15;
-		REALIGN_DMABUF(buf,buflen);
-		if (buflen > 1520) {
-			panic("%s: packet too long\n",sc->sc_dev.dv_xname);
 		}
 
 		{

@@ -1,10 +1,10 @@
-/*	$NetBSD: pcmciadevs_data.h,v 1.92.2.3 2000/08/09 23:30:03 gmcgarry Exp $	*/
+/*	$NetBSD: pcmciadevs_data.h,v 1.92.2.7 2001/06/16 19:19:37 he Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: pcmciadevs,v 1.93.2.3 2000/08/09 23:15:58 gmcgarry Exp 
+ *	NetBSD: pcmciadevs,v 1.93.2.6 2001/05/26 16:16:05 he Exp 
  */
 
 /*-
@@ -183,6 +183,13 @@ struct pcmcia_knowndev pcmcia_knowndevs[] = {
 	    0,
 	    "Motorola Corporation",
 	    "Motorola Personal Messenger 100C CDPD Modem"	},
+	},
+	{
+	    PCMCIA_VENDOR_KINGSTON, PCMCIA_PRODUCT_KINGSTON_KNE2,
+	    PCMCIA_CIS_KINGSTON_KNE2,
+	    0,
+	    "Kingston",
+	    "Kingston KNE-PC2 Ethernet"	},
 	},
 	{
 	    PCMCIA_VENDOR_FUJITSU, PCMCIA_PRODUCT_FUJITSU_LA501,
@@ -409,6 +416,13 @@ struct pcmcia_knowndev pcmcia_knowndevs[] = {
 	    "Symbol Spectrum24 WLAN Adapter"	},
 	},
 	{
+	    PCMCIA_VENDOR_SOCKET, PCMCIA_PRODUCT_SOCKET_EA_ETHER,
+	    PCMCIA_CIS_SOCKET_EA_ETHER,
+	    0,
+	    "Socket Communications",
+	    "Socket Communications EA"	},
+	},
+	{
 	    PCMCIA_VENDOR_SOCKET, PCMCIA_PRODUCT_SOCKET_PAGECARD,
 	    PCMCIA_CIS_SOCKET_PAGECARD,
 	    0,
@@ -423,11 +437,18 @@ struct pcmcia_knowndev pcmcia_knowndevs[] = {
 	    "Socket Communications Dual RS232"	},
 	},
 	{
-	    PCMCIA_VENDOR_SOCEKT, PCMCIA_PRODUCT_SOCEKT_LP_ETHER_CF,
-	    PCMCIA_CIS_SOCEKT_LP_ETHER_CF,
+	    PCMCIA_VENDOR_SOCKET, PCMCIA_PRODUCT_SOCKET_LP_ETHER_CF,
+	    PCMCIA_CIS_SOCKET_LP_ETHER_CF,
 	    0,
-	    "",
-	    "Socket Communications Low Power Ethernet CF"	},
+	    "Socket Communications",
+	    "Socket Communications LP-E CF"	},
+	},
+	{
+	    PCMCIA_VENDOR_SOCKET, PCMCIA_PRODUCT_SOCKET_LP_ETHER,
+	    PCMCIA_CIS_SOCKET_LP_ETHER,
+	    0,
+	    "Socket Communications",
+	    "Socket Communications LP-E"	},
 	},
 	{
 	    PCMCIA_VENDOR_TDK, PCMCIA_PRODUCT_TDK_LAK_CD021BX,
@@ -836,6 +857,13 @@ struct pcmcia_knowndev pcmcia_knowndevs[] = {
 	    "Intersil Prism II"	},
 	},
 	{
+	    PCMCIA_VENDOR_UNKNOWN, PCMCIA_PRODUCT_SYNERGY21_S21810,
+	    PCMCIA_CIS_SYNERGY21_S21810,
+	    0,
+	    "Synergy 21",
+	    "Synergy 21 S21810+ NE2000 Compatible Card"	},
+	},
+	{
 	    PCMCIA_VENDOR_FUJITSU, 0,
 	    PCMCIA_KNOWNDEV_NOPROD,
 	    PCMCIA_CIS_INVALID,
@@ -994,6 +1022,13 @@ struct pcmcia_knowndev pcmcia_knowndevs[] = {
 	    PCMCIA_KNOWNDEV_NOPROD,
 	    PCMCIA_CIS_INVALID,
 	    "Compaq",
+	    NULL,
+	},
+	{
+	    PCMCIA_VENDOR_KINGSTON, 0,
+	    PCMCIA_KNOWNDEV_NOPROD,
+	    PCMCIA_CIS_INVALID,
+	    "Kingston",
 	    NULL,
 	},
 	{
@@ -1218,6 +1253,13 @@ struct pcmcia_knowndev pcmcia_knowndevs[] = {
 	    PCMCIA_KNOWNDEV_NOPROD,
 	    PCMCIA_CIS_INVALID,
 	    "Intersil",
+	    NULL,
+	},
+	{
+	    PCMCIA_VENDOR_SYNERGY21, 0,
+	    PCMCIA_KNOWNDEV_NOPROD,
+	    PCMCIA_CIS_INVALID,
+	    "Synergy 21",
 	    NULL,
 	},
 	{ 0, 0, { NULL, NULL, NULL, NULL }, 0, NULL, NULL, }

@@ -1,4 +1,4 @@
-/*	$NetBSD: sys_machdep.c,v 1.48 1999/05/12 19:28:29 thorpej Exp $	*/
+/*	$NetBSD: sys_machdep.c,v 1.48.14.3 2001/06/17 22:27:10 he Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -89,6 +89,7 @@
 #include <sys/buf.h>
 #include <sys/trace.h>
 #include <sys/signal.h>
+#include <sys/malloc.h>
 
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
@@ -236,9 +237,8 @@ i386_set_ldt(p, args, retval)
 	int error, i, n;
 	struct pcb *pcb = &p->p_addr->u_pcb;
 	pmap_t pmap = p->p_vmspace->vm_map.pmap;
-	int fsslot, gsslot;
 	struct i386_set_ldt_args ua;
-	union descriptor desc;
+	union descriptor *descv;
 
 	if ((error = copyin(args, &ua, sizeof(ua))) != 0)
 		return (error);
@@ -253,6 +253,13 @@ i386_set_ldt(p, args, retval)
 	if (ua.start > 8192 || (ua.start + ua.num) > 8192)
 		return (EINVAL);
 
+	descv = malloc(sizeof (*descv) * ua.num, M_TEMP, M_NOWAIT);
+	if (descv == NULL)
+		return (ENOMEM);
+
+	if ((error = copyin(ua.desc, descv, sizeof (*descv) * ua.num)) != 0)
+		goto out;
+	
 	/*
 	 * XXX LOCKING
 	 */
@@ -300,34 +307,42 @@ i386_set_ldt(p, args, retval)
 #endif
 	}
 
-	if (pcb == curpcb)
-		savectx(curpcb);
-	fsslot = IDXSEL(pcb->pcb_fs);
-	gsslot = IDXSEL(pcb->pcb_gs);
 	error = 0;
 
 	/* Check descriptors for access violations. */
 	for (i = 0, n = ua.start; i < ua.num; i++, n++) {
-		if ((error = copyin(&ua.desc[i], &desc, sizeof(desc))) != 0)
-			return (error);
+		union descriptor *desc = &descv[i];
 
-		switch (desc.sd.sd_type) {
+		switch (desc->sd.sd_type) {
 		case SDT_SYSNULL:
-			desc.sd.sd_p = 0;
+			desc->sd.sd_p = 0;
 			break;
 		case SDT_SYS286CGT:
 		case SDT_SYS386CGT:
-			/* Can't replace in use descriptor with gate. */
-			if (n == fsslot || n == gsslot)
-				return (EBUSY);
+			/*
+			 * Only allow call gates targeting a segment
+			 * in the LDT or a user segment in the fixed
+			 * part of the gdt.  Segments in the LDT are
+			 * constrained (below) to be user segments.
+			 */
+			if (desc->gd.gd_p != 0 &&
+			    !ISLDT(desc->gd.gd_selector) &&
+			    ((IDXSEL(desc->gd.gd_selector) >= NGDT) ||
+			     (gdt[IDXSEL(desc->gd.gd_selector)].sd.sd_dpl !=
+				 SEL_UPL))) {
+				error = EACCES;
+				goto out;
+			}
 			break;
 		case SDT_MEMEC:
 		case SDT_MEMEAC:
 		case SDT_MEMERC:
 		case SDT_MEMERAC:
 			/* Must be "present" if executable and conforming. */
-			if (desc.sd.sd_p == 0)
-				return (EACCES);
+			if (desc->sd.sd_p == 0) {
+				error = EACCES;
+				goto out;
+			}
 			break;
 		case SDT_MEMRO:
 		case SDT_MEMROA:
@@ -341,34 +356,34 @@ i386_set_ldt(p, args, retval)
 		case SDT_MEMERA:
 			break;
 		default:
-			/* Only care if it's present. */
-			if (desc.sd.sd_p != 0)
-				return (EACCES);
+			/*
+			 * Make sure that unknown descriptor types are
+			 * not marked present.
+			 */
+			if (desc->sd.sd_p != 0) {
+				error = EACCES;
+				goto out;
+			}
 			break;
 		}
 
-		if (desc.sd.sd_p != 0) {
+		if (desc->sd.sd_p != 0) {
 			/* Only user (ring-3) descriptors may be present. */
-			if (desc.sd.sd_dpl != SEL_UPL)
-				return (EACCES);
-		} else {
-			/* Must be "present" if in use. */
-			if (n == fsslot || n == gsslot)
-				return (EBUSY);
+			if (desc->sd.sd_dpl != SEL_UPL) {
+				error = EACCES;
+				goto out;
+			}
 		}
 	}
 
 	/* Now actually replace the descriptors. */
-	for (i = 0, n = ua.start; i < ua.num; i++, n++) {
-		if ((error = copyin(&ua.desc[i], &desc, sizeof(desc))) != 0)
-			goto out;
-
-		pmap->pm_ldt[n] = desc;
-	}
+	for (i = 0, n = ua.start; i < ua.num; i++, n++)
+		pmap->pm_ldt[n] = descv[i];
 
 	*retval = ua.start;
 
 out:
+	free(descv, M_TEMP);
 	return (error);
 }
 #endif	/* USER_LDT */

@@ -1,10 +1,10 @@
-/*	$NetBSD: pcmciadevs.h,v 1.92.2.3 2000/08/09 23:30:02 gmcgarry Exp $	*/
+/*	$NetBSD: pcmciadevs.h,v 1.92.2.7 2001/06/16 19:19:37 he Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: pcmciadevs,v 1.93.2.3 2000/08/09 23:15:58 gmcgarry Exp 
+ *	NetBSD: pcmciadevs,v 1.93.2.6 2001/05/26 16:16:05 he Exp 
  */
 
 /*-
@@ -70,6 +70,7 @@
 #define	PCMCIA_VENDOR_LUCENT	0x0156	/* Lucent Technologies */
 #define	PCMCIA_VENDOR_AIRONET	0x015f	/* Aironet Wireless Communications */
 #define	PCMCIA_VENDOR_COMPAQ2	0x0183	/* Compaq */
+#define	PCMCIA_VENDOR_KINGSTON	0x0186	/* Kingston */
 #define	PCMCIA_VENDOR_DAYNA	0x0194	/* Dayna Corporation */
 #define	PCMCIA_VENDOR_RAYTHEON	0x01a6	/* Raytheon */
 #define	PCMCIA_VENDOR_BAY	0x01eb	/* Bay Networks */
@@ -167,6 +168,11 @@
 #define	PCMCIA_CIS_MOTOROLA_PM100C	{ NULL, NULL, NULL, NULL }
 #define	PCMCIA_PRODUCT_MOTOROLA_PM100C	0x0302
 #define	PCMCIA_STR_MOTOROLA_PM100C	"Motorola Personal Messenger 100C CDPD Modem"
+
+/* Kingston Products */         
+#define	PCMCIA_CIS_KINGSTON_KNE2	{ NULL, NULL, NULL, NULL }
+#define	PCMCIA_PRODUCT_KINGSTON_KNE2	0x0100
+#define	PCMCIA_STR_KINGSTON_KNE2	"Kingston KNE-PC2 Ethernet"
 
 /* Fujitsu Products */
 #define	PCMCIA_CIS_FUJITSU_LA501	{ NULL, NULL, NULL, NULL }
@@ -296,15 +302,21 @@
 #define	PCMCIA_STR_SIMPLETECH_SPECTRUM24	"Symbol Spectrum24 WLAN Adapter"
 
 /* Socket Communications Products */
+#define	PCMCIA_CIS_SOCKET_EA_ETHER	{ NULL, NULL, NULL, NULL }
+#define	PCMCIA_PRODUCT_SOCKET_EA_ETHER	0x0000
+#define	PCMCIA_STR_SOCKET_EA_ETHER	"Socket Communications EA"
 #define	PCMCIA_CIS_SOCKET_PAGECARD	{ NULL, NULL, NULL, NULL }
 #define	PCMCIA_PRODUCT_SOCKET_PAGECARD	0x0003
 #define	PCMCIA_STR_SOCKET_PAGECARD	"Socket Communications PageCard"
 #define	PCMCIA_CIS_SOCKET_DUAL_RS232	{ NULL, NULL, NULL, NULL }
 #define	PCMCIA_PRODUCT_SOCKET_DUAL_RS232	0x0006
 #define	PCMCIA_STR_SOCKET_DUAL_RS232	"Socket Communications Dual RS232"
-#define	PCMCIA_CIS_SOCEKT_LP_ETHER_CF	{ NULL, NULL, NULL, NULL }
-#define	PCMCIA_PRODUCT_SOCEKT_LP_ETHER_CF	0x0075
-#define	PCMCIA_STR_SOCEKT_LP_ETHER_CF	"Socket Communications Low Power Ethernet CF"
+#define	PCMCIA_CIS_SOCKET_LP_ETHER_CF	{ NULL, NULL, NULL, NULL }
+#define	PCMCIA_PRODUCT_SOCKET_LP_ETHER_CF	0x0075
+#define	PCMCIA_STR_SOCKET_LP_ETHER_CF	"Socket Communications LP-E CF"
+#define	PCMCIA_CIS_SOCKET_LP_ETHER	{ NULL, NULL, NULL, NULL }
+#define	PCMCIA_PRODUCT_SOCKET_LP_ETHER	0x000d
+#define	PCMCIA_STR_SOCKET_LP_ETHER	"Socket Communications LP-E"
 
 /* TDK Products */
 #define	PCMCIA_CIS_TDK_LAK_CD021BX	{ NULL, NULL, NULL, NULL }
@@ -427,6 +439,7 @@
 #define	PCMCIA_VENDOR_BILLIONTON	-1	/* Billionton Systems Inc. */
 #define	PCMCIA_VENDOR_AMD	-1	/* AMD */
 #define	PCMCIA_VENDOR_INTERSIL	-1	/* Intersil */
+#define	PCMCIA_VENDOR_SYNERGY21	-1	/* Synergy 21 */
 
 #define	PCMCIA_CIS_MEGAHERTZ_XJ2288	{ "MEGAHERTZ", "MODEM XJ2288", NULL, NULL }
 #define	PCMCIA_PRODUCT_MEGAHERTZ_XJ2288	-1
@@ -529,3 +542,6 @@
 #define	PCMCIA_CIS_INTERSIL_PRISM2	{ "INTERSIL", "HFA384x/IEEE", "Version 01.02", NULL}
 #define	PCMCIA_PRODUCT_INTERSIL_PRISM2	-1
 #define	PCMCIA_STR_INTERSIL_PRISM2	"Intersil Prism II"
+#define	PCMCIA_CIS_SYNERGY21_S21810	{ "PCMCIA", "Ethernet", "A", "004743118001" }
+#define	PCMCIA_PRODUCT_SYNERGY21_S21810	-1
+#define	PCMCIA_STR_SYNERGY21_S21810	"Synergy 21 S21810+ NE2000 Compatible Card"

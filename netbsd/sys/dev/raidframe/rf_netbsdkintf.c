@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_netbsdkintf.c,v 1.92.2.7 2000/10/20 17:48:32 tv Exp $	*/
+/*	$NetBSD: rf_netbsdkintf.c,v 1.92.2.9 2001/05/01 12:27:33 he Exp $	*/
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -783,6 +783,9 @@ raidioctl(dev, cmd, data, flag, p)
 	RF_SingleComponent_t component;
 	RF_ProgressInfo_t progressInfo, **progressInfoPtr;
 	int i, j, d;
+#ifdef __HAVE_OLD_DISKLABEL
+	struct disklabel newlabel;
+#endif
 
 	if (unit >= numraid)
 		return (ENXIO);
@@ -796,6 +799,10 @@ raidioctl(dev, cmd, data, flag, p)
 	switch (cmd) {
 	case DIOCSDINFO:
 	case DIOCWDINFO:
+#ifdef __HAVE_OLD_DISKLABEL
+	case ODIOCWDINFO:
+	case ODIOCSDINFO:
+#endif
 	case DIOCWLABEL:
 		if ((flag & FWRITE) == 0)
 			return (EBADF);
@@ -806,6 +813,12 @@ raidioctl(dev, cmd, data, flag, p)
 	case DIOCGDINFO:
 	case DIOCSDINFO:
 	case DIOCWDINFO:
+#ifdef __HAVE_OLD_DISKLABEL
+	case ODIOCGDINFO:
+	case ODIOCWDINFO:
+	case ODIOCSDINFO:
+	case ODIOCGDEFLABEL:
+#endif
 	case DIOCGPART:
 	case DIOCWLABEL:
 	case DIOCGDEFLABEL:
@@ -1441,6 +1454,14 @@ raidioctl(dev, cmd, data, flag, p)
 	case DIOCGDINFO:
 		*(struct disklabel *) data = *(rs->sc_dkdev.dk_label);
 		break;
+#ifdef __HAVE_OLD_DISKLABEL
+	case ODIOCGDINFO:
+		newlabel = *(rs->sc_dkdev.dk_label);
+		if (newlabel.d_npartitions > OLDMAXPARTITIONS)
+			return ENOTTY;
+		memcpy(data, &newlabel, sizeof (struct olddisklabel));
+		break;
+#endif
 
 	case DIOCGPART:
 		((struct partinfo *) data)->disklab = rs->sc_dkdev.dk_label;
@@ -1450,15 +1471,34 @@ raidioctl(dev, cmd, data, flag, p)
 
 	case DIOCWDINFO:
 	case DIOCSDINFO:
+#ifdef __HAVE_OLD_DISKLABEL
+	case ODIOCWDINFO:
+	case ODIOCSDINFO:
+#endif
+	{
+		struct disklabel *lp;
+#ifdef __HAVE_OLD_DISKLABEL
+		if (cmd == ODIOCSDINFO || cmd == ODIOCWDINFO) {
+			memset(&newlabel, 0, sizeof newlabel);
+			memcpy(&newlabel, data, sizeof (struct olddisklabel));
+			lp = &newlabel;
+		} else
+#endif
+		lp = (struct disklabel *)data;
+
 		if ((error = raidlock(rs)) != 0)
 			return (error);
 
 		rs->sc_flags |= RAIDF_LABELLING;
 
 		error = setdisklabel(rs->sc_dkdev.dk_label,
-		    (struct disklabel *) data, 0, rs->sc_dkdev.dk_cpulabel);
+		    lp, 0, rs->sc_dkdev.dk_cpulabel);
 		if (error == 0) {
-			if (cmd == DIOCWDINFO)
+			if (cmd == DIOCWDINFO
+#ifdef __HAVE_OLD_DISKLABEL
+			    || cmd == ODIOCWDINFO
+#endif
+			   )
 				error = writedisklabel(RAIDLABELDEV(dev),
 				    raidstrategy, rs->sc_dkdev.dk_label,
 				    rs->sc_dkdev.dk_cpulabel);
@@ -1470,6 +1510,7 @@ raidioctl(dev, cmd, data, flag, p)
 		if (error)
 			return (error);
 		break;
+	}
 
 	case DIOCWLABEL:
 		if (*(int *) data != 0)
@@ -1479,9 +1520,17 @@ raidioctl(dev, cmd, data, flag, p)
 		break;
 
 	case DIOCGDEFLABEL:
-		raidgetdefaultlabel(raidPtr, rs,
-		    (struct disklabel *) data);
+		raidgetdefaultlabel(raidPtr, rs, (struct disklabel *) data);
 		break;
+
+#ifdef __HAVE_OLD_DISKLABEL
+	case ODIOCGDEFLABEL:
+		raidgetdefaultlabel(raidPtr, rs, &newlabel);
+		if (newlabel.d_npartitions > OLDMAXPARTITIONS)
+			return ENOTTY;
+		memcpy(data, &newlabel, sizeof (struct olddisklabel));
+		break;
+#endif
 
 	default:
 		retcode = ENOTTY;
@@ -1937,7 +1986,7 @@ raidgetdefaultlabel(raidPtr, rs, lp)
 	lp->d_secperunit = raidPtr->totalSectors;
 	lp->d_secsize = raidPtr->bytesPerSector;
 	lp->d_nsectors = raidPtr->Layout.dataSectorsPerStripe;
-	lp->d_ntracks = 1;
+	lp->d_ntracks = 4 * raidPtr->numCol;
 	lp->d_ncylinders = raidPtr->totalSectors / 
 		(lp->d_nsectors * lp->d_ntracks);
 	lp->d_secpercyl = lp->d_ntracks * lp->d_nsectors;

@@ -1,4 +1,4 @@
-/*	$NetBSD: uipc_syscalls.c,v 1.52 2000/05/27 00:40:47 sommerfeld Exp $	*/
+/*	$NetBSD: uipc_syscalls.c,v 1.52.4.2 2001/07/02 13:41:41 jhawk Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1990, 1993
@@ -138,7 +138,7 @@ sys_bind(p, v, retval)
 		FILE_UNUSE(fp, p);
 		return (error);
 	}
-	error = sobind((struct socket *)fp->f_data, nam);
+	error = sobind((struct socket *)fp->f_data, nam, p);
 	m_freem(nam);
 	FILE_UNUSE(fp, p);
 	return (error);
@@ -1113,9 +1113,10 @@ sockargs(mp, buf, buflen, type)
 
 	/*
 	 * We can't allow socket names > UCHAR_MAX in length, since that
-	 * will overflow sa_len.
+	 * will overflow sa_len.   Control data more than a page size in
+	 * length is just too much.
 	 */
-	if (type == MT_SONAME && (u_int)buflen > UCHAR_MAX)
+	if ((u_int)buflen > (type == MT_SONAME ? UCHAR_MAX : PAGE_SIZE))
 		return (EINVAL);
 
 	/* Allocate an mbuf to hold the arguments. */

@@ -1,4 +1,4 @@
-#	$NetBSD: files,v 1.373.2.6 2000/10/04 17:39:36 itojun Exp $
+#	$NetBSD: files,v 1.373.2.9 2001/03/30 21:51:22 he Exp $
 
 #	@(#)files.newconf	7.5 (Berkeley) 5/10/93
 
@@ -268,6 +268,10 @@ file dev/ic/siop.c			siop
 device	uha: scsi
 file	dev/ic/uha.c			uha
 
+# Aironet PC4500/PC4800
+device	an: arp, ether, ifnet
+file	dev/ic/an.c			an
+
 # AMD 79c930-based 802.11 cards
 device	awi: arp, wlan, ifnet
 file	dev/ic/awi.c			awi
@@ -533,6 +537,7 @@ defpseudo sl: ifnet
 defpseudo ppp: ifnet
 defpseudo sppp: ifnet
 defpseudo tun: ifnet
+defpseudo vlan: ifnet, ether
 defpseudo bpfilter: ifnet
 defpseudo strip: ifnet
 defpseudo ipfilter: ifnet
@@ -762,6 +767,7 @@ file miscfs/portal/portal_vnops.c	portal
 file miscfs/procfs/procfs_cmdline.c	procfs
 file miscfs/procfs/procfs_ctl.c		procfs
 file miscfs/procfs/procfs_fpregs.c
+file miscfs/procfs/procfs_linux.c	procfs
 file miscfs/procfs/procfs_map.c
 file miscfs/procfs/procfs_mem.c
 file miscfs/procfs/procfs_note.c	procfs
@@ -791,7 +797,8 @@ file net/bsd-comp.c			ppp & ppp_bsdcomp
 file net/if.c
 file net/if_arcsubr.c			arc			needs-flag
 file net/if_atmsubr.c			atm
-file net/if_ethersubr.c			ether | fddi | netatalk | token | wlan
+file net/if_ethersubr.c			ether | fddi | netatalk | token |
+					    wlan | vlan
 file net/if_faith.c			faith			needs-count
 file net/if_fddisubr.c			fddi			needs-flag
 file net/if_gif.c			gif			needs-count
@@ -806,6 +813,7 @@ file net/if_spppsubr.c			sppp
 file net/if_strip.c			strip			needs-count
 file net/if_tokensubr.c			token			needs-flag
 file net/if_tun.c			tun			needs-count
+file net/if_vlan.c			vlan			needs-flag
 file net/net_osdep.c
 file net/pfil.c				pfil_hooks | ipfilter
 file net/ppp-deflate.c			ppp & ppp_deflate

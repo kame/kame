@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.389.2.2 2000/08/17 18:52:55 fvdl Exp $	*/
+/*	$NetBSD: machdep.c,v 1.389.2.6 2001/06/25 16:11:34 he Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -192,7 +192,9 @@ int	dumpmem_low;
 int	dumpmem_high;
 int	boothowto;
 int	cpu_class;
-int	i386_fpu_present = 0;
+int	i386_fpu_present;
+int	i386_fpu_exception;
+int	i386_fpu_fdivbug;
 
 #define	CPUID2MODEL(cpuid)	(((cpuid) >> 4) & 15)
 
@@ -219,12 +221,28 @@ extern	paddr_t hole_start, hole_end;
 phys_ram_seg_t mem_clusters[VM_PHYSSEG_MAX];
 int	mem_cluster_cnt;
 
+/*
+ * The number of CPU cycles in one second.
+ */
+u_int64_t cpu_tsc_freq;
+
 int	cpu_dump __P((void));
 int	cpu_dumpsize __P((void));
 u_long	cpu_dump_mempagecnt __P((void));
 void	dumpsys __P((void));
 void	identifycpu __P((void));
 void	init386 __P((paddr_t));
+
+/*
+ * Map Brand ID from cpuid instruction to brand name.
+ * Source: Intel Processor Identification and the CPUID Instruction, AP-485
+ */
+const char * const i386_p3_brand[] = {
+	"",		/* Unsupported */
+	"Celeron",	/* Intel (R) Celeron (TM) processor */
+	"",		/* Intel (R) Pentium (R) III processor */	
+	"Xeon",		/* Intel (R) Pentium (R) III Xeon (TM) processor */
+};
 
 #ifdef COMPAT_NOMID
 static int exec_nomid	__P((struct proc *, struct exec_package *));
@@ -279,7 +297,11 @@ cpu_startup()
 
 	printf(version);
 
-	printf("cpu0: %s\n", cpu_model);
+	printf("cpu0: %s", cpu_model);
+	if (cpu_tsc_freq != 0)
+		printf(", %qd.%02qd MHz", (cpu_tsc_freq + 4999) / 1000000,
+		    ((cpu_tsc_freq + 4999) / 10000) % 100);
+	printf("\n");
 
 	format_bytes(pbuf, sizeof(pbuf), ptoa(physmem));
 	printf("total memory = %s\n", pbuf);
@@ -462,7 +484,7 @@ char	cpu_model[120];
  * Note: these are just the ones that may not have a cpuid instruction.
  * We deal with the rest in a different way.
  */
-struct cpu_nocpuid_nameclass i386_nocpuid_cpus[] = {
+const struct cpu_nocpuid_nameclass i386_nocpuid_cpus[] = {
 	{ CPUVENDOR_INTEL, "Intel", "386SX",	CPUCLASS_386,
 		NULL},				/* CPU_386SX */
 	{ CPUVENDOR_INTEL, "Intel", "386DX",	CPUCLASS_386,
@@ -493,7 +515,7 @@ const char *modifiers[] = {
 	""
 };
 
-struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
+const struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 	{
 		"GenuineIntel",
 		CPUVENDOR_INTEL,
@@ -528,10 +550,12 @@ struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 			{
 				"Pentium Pro (A-step)", "Pentium Pro", 0,
 				"Pentium II (Klamath)", "Pentium Pro",
-				"Pentium II (Deschutes)",
-				"Pentium II (Celeron)",
-				"Pentium III", "Pentium III (E)",
-				0, 0, 0, 0, 0, 0, 0,
+				"Pentium II/Celeron (Deschutes)",
+				"Celeron (Mendocino)",
+				"Pentium III (Katmai)",
+				"Pentium III (Coppermine)",
+				0, "Pentium III (Cascades)", 0, 0,
+				0, 0,
 				"Pentium Pro, II or III"	/* Default */
 			},
 			NULL
@@ -560,7 +584,8 @@ struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 			CPUCLASS_586,
 			{
 				"K5", "K5", "K5", "K5", 0, 0, "K6",
-				"K6", "K6-2", "K6-III", 0, 0, 0, 0, 0, 0,
+				"K6", "K6-2", "K6-III", 0, 0, 0,
+				"K6-2+/III+", 0, 0,
 				"K5 or K6"		/* Default */
 			},
 			NULL
@@ -569,8 +594,9 @@ struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 		{
 			CPUCLASS_686,
 			{
-				0, "K7 (Athlon)", 0, 0, 0, 0, 0,
-				0, 0, 0, 0, 0, 0, 0, 0, 0,
+				0, "Athlon Model 1", "Athlon Model 2",
+				"Duron", "Athlon Model 4 (Thunderbird)",
+				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 				"K7 (Athlon)"	/* Default */
 			},
 			NULL
@@ -691,10 +717,11 @@ identifycpu()
 {
 	extern char cpu_vendor[];
 	extern int cpu_id;
-	const char *name, *modifier, *vendorname;
+	extern int cpu_brand_id;
+	const char *name, *modifier, *vendorname, *brand = "";
 	int class = CPUCLASS_386, vendor, i, max;
 	int family, model, step, modif;
-	struct cpu_cpuid_nameclass *cpup = NULL;
+	const struct cpu_cpuid_nameclass *cpup = NULL;
 	void (*cpu_setup) __P((void));
 
 	if (cpuid_level == -1) {
@@ -757,10 +784,19 @@ identifycpu()
 			    name = cpup->cpu_family[i].cpu_models[CPU_DEFMODEL];
 			class = cpup->cpu_family[i].cpu_class;
 			cpu_setup = cpup->cpu_family[i].cpu_setup;
+
+			/*
+			 * Intel processors family >= 6, model 8 allow to
+			 * recognize brand by Brand ID value.
+			 */
+			if (vendor == CPUVENDOR_INTEL && family >= 6
+			    && model >= 8 && cpu_brand_id && cpu_brand_id <= 3)
+				brand = i386_p3_brand[cpu_brand_id];
 		}
 	}
 
-	sprintf(cpu_model, "%s %s%s (%s-class)", vendorname, modifier, name,
+	sprintf(cpu_model, "%s %s%s%s%s (%s-class)", vendorname, modifier, name,
+		(*brand) ? " " : "", brand,
 		classnames[class]);
 
 	cpu_class = class;
@@ -830,6 +866,20 @@ identifycpu()
 	 */
 	if (cpu_class >= CPUCLASS_486)
 		lcr0(rcr0() | CR0_WP);
+#endif
+
+#if defined(I586_CPU) || defined(I686_CPU)
+	/*
+	 * If we have a cycle counter, compute the approximate
+	 * CPU speed in MHz.
+	 */
+	if (cpu_feature & CPUID_TSC) {
+		u_int64_t last_tsc;
+
+		last_tsc = rdtsc();
+		delay(100000);
+		cpu_tsc_freq = (rdtsc() - last_tsc) * 10;
+	}
 #endif
 }
 
@@ -946,8 +996,8 @@ sendsig(catcher, sig, mask, code)
 	} else
 #endif
 	{
-		__asm("movl %%gs,%w0" : "=r" (frame.sf_sc.sc_gs));
-		__asm("movl %%fs,%w0" : "=r" (frame.sf_sc.sc_fs));
+		frame.sf_sc.sc_gs = tf->tf_gs;
+		frame.sf_sc.sc_fs = tf->tf_fs;
 		frame.sf_sc.sc_es = tf->tf_es;
 		frame.sf_sc.sc_ds = tf->tf_ds;
 		frame.sf_sc.sc_eflags = tf->tf_eflags;
@@ -994,8 +1044,8 @@ sendsig(catcher, sig, mask, code)
 	/*
 	 * Build context to run handler in.
 	 */
-	__asm("movl %w0,%%gs" : : "r" (GSEL(GUDATA_SEL, SEL_UPL)));
-	__asm("movl %w0,%%fs" : : "r" (GSEL(GUDATA_SEL, SEL_UPL)));
+	tf->tf_gs = GSEL(GUDATA_SEL, SEL_UPL);
+	tf->tf_fs = GSEL(GUDATA_SEL, SEL_UPL);
 	tf->tf_es = GSEL(GUDATA_SEL, SEL_UPL);
 	tf->tf_ds = GSEL(GUDATA_SEL, SEL_UPL);
 	tf->tf_eip = (int)psp->ps_sigcode;
@@ -1062,7 +1112,8 @@ sys___sigreturn14(p, v, retval)
 		    !USERMODE(context.sc_cs, context.sc_eflags))
 			return (EINVAL);
 
-		/* %fs and %gs were restored by the trampoline. */
+		tf->tf_gs = context.sc_gs;
+		tf->tf_fs = context.sc_fs;
 		tf->tf_es = context.sc_es;
 		tf->tf_ds = context.sc_ds;
 		tf->tf_eflags = context.sc_eflags;
@@ -1447,8 +1498,8 @@ setregs(p, pack, stack)
 	pcb->pcb_savefpu.sv_env.en_cw = __NetBSD_NPXCW__;
 
 	tf = p->p_md.md_regs;
-	__asm("movl %w0,%%gs" : : "r" (LSEL(LUDATA_SEL, SEL_UPL)));
-	__asm("movl %w0,%%fs" : : "r" (LSEL(LUDATA_SEL, SEL_UPL)));
+	tf->tf_gs = LSEL(LUDATA_SEL, SEL_UPL);
+	tf->tf_fs = LSEL(LUDATA_SEL, SEL_UPL);
 	tf->tf_es = LSEL(LUDATA_SEL, SEL_UPL);
 	tf->tf_ds = LSEL(LUDATA_SEL, SEL_UPL);
 	tf->tf_edi = 0;

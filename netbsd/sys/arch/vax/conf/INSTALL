@@ -1,4 +1,4 @@
-#	$NetBSD: INSTALL,v 1.6 2000/06/19 04:22:16 matt Exp $
+#	$NetBSD: INSTALL,v 1.6.2.2 2001/03/20 18:28:50 he Exp $
 #
 # INSTALL kernel; all supported devices but nothing fancy.
 #
@@ -12,6 +12,7 @@ options 	"VAX780"
 options 	"VAX750"
 options 	"VAX630"	# MV II
 options 	"VAX650"	# MV III, 3600, 3800, 3900
+options 	"VAX660"	# VAX 4000/200
 options 	"VAX670"	# VAX 4000/300
 options 	"VAX410"	# VS 2000
 options 	"VAX43"		# VS 3100/76
@@ -150,7 +151,7 @@ mt*		at mscpbus? drive?	# MSCP tape
 
 # SCSI controllers.
 asc0		at vsbus0 csr 0x200c0080 # VS4000/{60,VLC} SCSI-controller
-#asc0		at vsbus0 csr 0x26000080 # VS4000/90 SCSI-controller
+asc0		at vsbus0 csr 0x26000080 # VS4000/90 SCSI-controller
 si0		at vsbus0 csr 0x200c0080 # VS2000/3100 SCSI-controller (5380)
 si1		at vsbus0 csr 0x200c0180 # VS2000/3100 SCSI-controller (5380)
 scsibus*	at asc?

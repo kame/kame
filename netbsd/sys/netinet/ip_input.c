@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_input.c,v 1.114.4.3 2000/10/17 00:59:49 tv Exp $	*/
+/*	$NetBSD: ip_input.c,v 1.114.4.6 2001/04/24 22:21:20 he Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -207,6 +207,8 @@ u_int16_t	ip_id;
 
 struct ipqhead ipq;
 int	ipq_locked;
+int	ip_nfragpackets = 0;
+int	ip_maxfragpackets = 200;
 
 static __inline int ipq_lock_try __P((void));
 static __inline void ipq_unlock __P((void));
@@ -459,6 +461,14 @@ ip_input(struct mbuf *m)
 #endif
 
 #ifdef PFIL_HOOKS
+#ifdef IPSEC
+	/*
+	 * let ipfilter look at packet on the wire,
+	 * not the decapsulated packet.
+	 */
+	if (ipsec_gethist(m, NULL))
+		goto nofilt;
+#endif
 	/*
 	 * Run through list of hooks for input packets.  If there are any
 	 * filters which require that additional packets in the flow are
@@ -479,6 +489,9 @@ ip_input(struct mbuf *m)
 				return;
 			ip = mtod(m, struct ip *);
 		}
+#ifdef IPSEC
+nofilt:;
+#endif
 #endif /* PFIL_HOOKS */
 
 	/*
@@ -687,6 +700,19 @@ found:
 		IPQ_UNLOCK();
 	}
 
+#ifdef IPSEC
+	/*
+	 * enforce IPsec policy checking if we are seeing last header.
+	 * note that we do not visit this with protocols with pcb layer
+	 * code - like udp/tcp/raw ip.
+	 */
+	if ((inetsw[ip_protox[ip->ip_p]].pr_flags & PR_LASTHDR) != 0 &&
+	    ipsec4_in_reject(m, NULL)) {
+		ipsecstat.in_polvio++;
+		goto bad;
+	}
+#endif
+
 	/*
 	 * Switch out to protocol's input routine.
 	 */
@@ -735,6 +761,17 @@ ip_reass(ipqe, fp)
 	 * If first fragment to arrive, create a reassembly queue.
 	 */
 	if (fp == 0) {
+		/*
+		 * Enforce upper bound on number of fragmented packets
+		 * for which we attempt reassembly;
+		 * If maxfrag is 0, never accept fragments.
+		 * If maxfrag is -1, accept all fragments without limitation.
+		 */
+		if (ip_maxfragpackets < 0)
+			;
+		else if (ip_nfragpackets >= ip_maxfragpackets)
+			goto dropfrag;
+		ip_nfragpackets++;
 		MALLOC(fp, struct ipq *, sizeof (struct ipq),
 		    M_FTABLE, M_NOWAIT);
 		if (fp == NULL)
@@ -850,6 +887,7 @@ insert:
 	ip->ip_dst = fp->ipq_dst;
 	LIST_REMOVE(fp, ipq_q);
 	FREE(fp, M_FTABLE);
+	ip_nfragpackets--;
 	m->m_len += (ip->ip_hl << 2);
 	m->m_data -= (ip->ip_hl << 2);
 	/* some debugging cruft by sklower, below, will go away soon */
@@ -888,6 +926,7 @@ ip_freef(fp)
 	}
 	LIST_REMOVE(fp, ipq_q);
 	FREE(fp, M_FTABLE);
+	ip_nfragpackets--;
 }
 
 /*
@@ -908,6 +947,17 @@ ip_slowtimo()
 			ipstat.ips_fragtimeout++;
 			ip_freef(fp);
 		}
+	}
+	/*
+	 * If we are over the maximum number of fragments
+	 * (due to the limit being lowered), drain off
+	 * enough to get down to the new limit.
+	 */
+	if (ip_maxfragpackets < 0)
+		;
+	else {
+		while (ip_nfragpackets > ip_maxfragpackets && ipq.lh_first)
+			ip_freef(ipq.lh_first);
 	}
 	IPQ_UNLOCK();
 #ifdef GATEWAY
@@ -1439,7 +1489,7 @@ ip_forward(m, srcrt)
 
 #ifdef IPSEC
 	/* Don't lookup socket in forwading case */
-	ipsec_setsocket(m, NULL);
+	(void)ipsec_setsocket(m, NULL);
 #endif
 	error = ip_output(m, (struct mbuf *)0, &ipforward_rt,
 	    (IP_FORWARDING | (ip_directedbcast ? IP_ALLOWBROADCAST : 0)), 0);
@@ -1744,6 +1794,10 @@ ip_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		}
 		return (error);
 #endif
+
+	case IPCTL_MAXFRAGPACKETS:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+		    &ip_maxfragpackets));
 
 	default:
 		return (EOPNOTSUPP);

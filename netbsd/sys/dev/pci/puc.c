@@ -1,4 +1,4 @@
-/*	$NetBSD: puc.c,v 1.4 2000/04/17 16:45:04 cgd Exp $	*/
+/*	$NetBSD: puc.c,v 1.4.4.2 2001/03/22 03:13:47 he Exp $	*/
 
 /*
  * Copyright (c) 1996, 1998, 1999
@@ -95,8 +95,6 @@ struct cfattach puc_ca = {
 	sizeof(struct puc_softc), puc_match, puc_attach
 };
 
-static const struct puc_device_description *
-	puc_find_description __P((pcireg_t, pcireg_t, pcireg_t, pcireg_t));
 static const char *
 	puc_port_type_name __P((int));
 
@@ -131,9 +129,13 @@ puc_match(parent, match, aux)
 	 * Match class/subclass, so we can tell people to compile kernel
 	 * with options that cause this driver to spew.
 	 */
-	if (PCI_CLASS(pa->pa_class) == PCI_CLASS_COMMUNICATIONS &&
-	    PCI_SUBCLASS(pa->pa_class) == PCI_SUBCLASS_BRIDGE_PCI)
-		return (1);
+	if (PCI_CLASS(pa->pa_class) == PCI_CLASS_COMMUNICATIONS) {
+		switch (PCI_SUBCLASS(pa->pa_class)) {
+		case PCI_SUBCLASS_COMMUNICATIONS_SERIAL:
+		case PCI_SUBCLASS_COMMUNICATIONS_MODEM:
+			return (1);
+		}
+	}
 #endif
 
 	return (0);
@@ -257,6 +259,7 @@ puc_attach(parent, self, aux)
 		/* set up to configure the child device */
 		paa.port = i;
 		paa.type = sc->sc_desc->ports[i].type;
+		paa.flags = sc->sc_desc->ports[i].flags;
 		paa.pc = pa->pa_pc;
 		paa.intrhandle = intrhandle;
 		paa.a = sc->sc_bar_mappings[barindex].a;
@@ -314,7 +317,7 @@ puc_submatch(parent, cf, aux)
 	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
 }
 
-static const struct puc_device_description *
+const struct puc_device_description *
 puc_find_description(vend, prod, svend, sprod)
 	pcireg_t vend, prod, svend, sprod;
 {

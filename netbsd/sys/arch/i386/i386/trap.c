@@ -1,4 +1,4 @@
-/*	$NetBSD: trap.c,v 1.139 2000/06/06 18:52:36 soren Exp $	*/
+/*	$NetBSD: trap.c,v 1.139.2.2 2001/06/17 22:29:37 he Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -252,7 +252,9 @@ trap(frame)
 	u_quad_t sticks;
 	struct pcb *pcb = NULL;
 	extern char fusubail[],
-		    resume_iret[], resume_pop_ds[], resume_pop_es[];
+		    resume_iret[], resume_pop_ds[], resume_pop_es[],
+		    resume_pop_fs[], resume_pop_gs[];
+		    
 	struct trapframe *vframe;
 	int resume;
 
@@ -326,6 +328,21 @@ trap(frame)
 		 * specific instructions we recognize only happen when
 		 * returning from a trap, syscall, or interrupt.
 		 *
+		 * At this point, there are (at least) two trap frames on
+		 * the kernel stack; we presume here that we faulted while
+		 * loading our registers out of the outer one.
+		 *
+		 * The inner frame does not involve a ring crossing, so it
+		 * ends right before &frame.tf_esp.  The outer frame has
+		 * been partially consumed by the INTRFASTEXIT; exactly
+		 * how much depends which register we were popping when we
+		 * faulted, so we compute the outer frame address based on
+		 * register-dependant offsets computed from &frame.tf_esp
+		 * below.  To decide whether this was a kernel-mode or
+		 * user-mode error, we look at this outer frame's tf_cs
+		 * and tf_eflags, which are (fortunately) not consumed until
+		 * the final instruction of INTRFASTEXIT.
+		 *
 		 * XXX
 		 * The heuristic used here will currently fail for the case of
 		 * one of the 2 pop instructions faulting when returning from a
@@ -336,16 +353,33 @@ trap(frame)
 		 */
 		switch (*(u_char *)frame.tf_eip) {
 		case 0xcf:	/* iret */
-			vframe = (void *)((int)&frame.tf_esp - 44);
+			vframe = (void *)((int)&frame.tf_esp -
+			    offsetof(struct trapframe, tf_eip));
 			resume = (int)resume_iret;
 			break;
 		case 0x1f:	/* popl %ds */
-			vframe = (void *)((int)&frame.tf_esp - 4);
+			vframe = (void *)((int)&frame.tf_esp -
+			    offsetof(struct trapframe, tf_ds));
 			resume = (int)resume_pop_ds;
 			break;
 		case 0x07:	/* popl %es */
-			vframe = (void *)((int)&frame.tf_esp - 0);
+			vframe = (void *)((int)&frame.tf_esp -
+			    offsetof(struct trapframe, tf_es));
 			resume = (int)resume_pop_es;
+			break;
+		case 0x0f:	/* 0x0f prefix */
+			switch (*(u_char *)(frame.tf_eip+1)) {
+			case 0xa1:		/* popl %fs */
+				vframe = (void *)((int)&frame.tf_esp - 
+				    offsetof(struct trapframe, tf_fs));
+				resume = (int)resume_pop_fs;
+				break;
+			case 0xa9:		/* popl %gs */
+				vframe = (void *)((int)&frame.tf_esp -
+				    offsetof(struct trapframe, tf_gs));
+				resume = (int)resume_pop_gs;
+				break;
+			}
 			break;
 		default:
 			goto we_re_toast;

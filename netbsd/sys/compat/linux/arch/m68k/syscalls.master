@@ -1,4 +1,4 @@
-	$NetBSD: syscalls.master,v 1.14 2000/03/18 22:16:46 erh Exp $
+	$NetBSD: syscalls.master,v 1.14.4.2 2001/05/01 08:56:18 he Exp $
 
 ;	@(#)syscalls.master	8.1 (Berkeley) 7/19/93
 
@@ -51,7 +51,7 @@
 #include <compat/linux/linux_syscallargs.h>
 
 
-0	NOARGS		{ int sys_nosys(void); } syscall
+0	NOARGS		{ int linux_sys_nosys(void); } syscall
 1	NOARGS		{ int sys_exit(int rval); }
 2	NOARGS		{ int sys_fork(void); }
 3	NOARGS		{ int sys_read(int fd, char *buf, u_int nbyte); }
@@ -62,7 +62,7 @@
 7	STD		{ int linux_sys_waitpid(int pid, int *status, \
 			    int options);}
 8	STD		{ int linux_sys_creat(const char *path, int mode); }
-9	NOARGS		{ int sys_link(const char *path, const char *link); }
+9	STD		{ int linux_sys_link(const char *path, const char *link); }
 10	STD		{ int linux_sys_unlink(const char *path); }
 11	STD		{ int linux_sys_execve(const char *path, char **argp, \
 			    char **envp); }

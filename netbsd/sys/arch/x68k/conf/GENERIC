@@ -1,4 +1,4 @@
-#	$NetBSD: GENERIC,v 1.46.2.4 2000/10/04 08:24:28 itojun Exp $
+#	$NetBSD: GENERIC,v 1.46.2.8 2001/05/06 14:05:11 he Exp $
 
 #
 #	GENERIC
@@ -6,7 +6,7 @@
 
 include "arch/x68k/conf/std.x68k"
 
-#ident 		"GENERIC-$Revision: 1.46.2.4 $"
+#ident 		"GENERIC-$Revision: 1.46.2.8 $"
 
 maxusers	8
 
@@ -18,6 +18,10 @@ maxusers	8
 options 	M68030
 options 	M68040
 options 	M68060
+## If you want an optimized kernel for a specific processor, use either:
+#makeoptions	CMACHFLAGS="-m68030"
+#makeoptions	CMACHFLAGS="-m68040 -Wa,-m68030 -Wa,-m68851"
+#makeoptions	CMACHFLAGS="-m68060 -Wa,-m68030 -Wa,-m68851"
 
 
 #### System options specific to the x68k port
@@ -26,7 +30,7 @@ options 	EXTENDED_MEMORY		# support for >16MB memory
 options 	FPU_EMULATE		# software fpu emulation for MC68030
 options 	FPSP			# floating point emulation for MC68040
 options 	M060SP			# int/fp emulation for MC68060
-options 	JUPITER			# support for "Jupiter-X" accelerator
+#options 	JUPITER			# support for "Jupiter-X" accelerator
 #options 	MAPPEDCOPY		# use page mapping for large copyin/copyout
 #options 	ZSCONSOLE,ZSCN_SPEED="9600"	# use serial console
 
@@ -300,6 +304,9 @@ pseudo-device	bpfilter	4
 pseudo-device	gif		1	# IPv[46] over IPv[46] tunnel (RFC1933)
 #pseudo-device	faith		1	# IPv[46] tcp relay translation i/f
 #pseudo-device	stf		1	# 6to4 IPv6 over IPv4 encapsulation
+
+## IEEE 802.1Q Virtual LAN encapsulation, see vlan(4).
+pseudo-device	vlan
 
 #### Other device configuration
 

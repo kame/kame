@@ -1,4 +1,4 @@
-/*	$NetBSD: elinkxl.c,v 1.34.2.1 2000/09/01 00:54:06 haya Exp $	*/
+/*	$NetBSD: elinkxl.c,v 1.34.2.4 2001/05/15 21:34:06 he Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -218,16 +218,14 @@ ex_config(sc)
 	printf("%s: MAC address %s\n", sc->sc_dev.dv_xname,
 	    ether_sprintf(macaddr));
 
-	if (sc->intr_ack != NULL) { /* CardBus card specific */
-	    GO_WINDOW(2);
-	    if (sc->ex_conf & EX_CONF_INV_LED_POLARITY) {
-		    bus_space_write_2(sc->sc_iot, ioh, 12,
-			0x10|bus_space_read_2(sc->sc_iot, ioh, 12));
-	    }
-	    if (sc->ex_conf & EX_CONF_PHY_POWER) {
-		    bus_space_write_2(sc->sc_iot, ioh, 12,
-			0x4000|bus_space_read_2(sc->sc_iot, ioh, 12));
-	    }
+	if (sc->ex_conf & (EX_CONF_INV_LED_POLARITY|EX_CONF_PHY_POWER)) {
+		GO_WINDOW(2);
+		val = bus_space_read_2(iot, ioh, ELINK_W2_RESET_OPTIONS);
+		if (sc->ex_conf & EX_CONF_INV_LED_POLARITY)
+			val |= ELINK_RESET_OPT_LEDPOLAR;
+		if (sc->ex_conf & EX_CONF_PHY_POWER)
+			val |= ELINK_RESET_OPT_PHYPOWER;
+		bus_space_write_2(iot, ioh, ELINK_W2_RESET_OPTIONS, val);
 	}
 
 	attach_stage = 0;
@@ -436,6 +434,11 @@ ex_config(sc)
 	ifp->if_watchdog = ex_watchdog;
 	ifp->if_flags =
 	    IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
+
+	/*
+	 * We can support 802.1Q VLAN-sized frames.
+	 */
+	sc->sc_ethercom.ec_capabilities |= ETHERCAP_VLAN_MTU;
 
 	if_attach(ifp);
 	ether_ifattach(ifp, macaddr);
@@ -1208,8 +1211,10 @@ ex_intr(arg)
 					struct ether_header *eh;
 					u_int16_t total_len;
 
-
-					if (pktstat & EX_UPD_ERR) {
+					if (pktstat &
+					    ((sc->sc_ethercom.ec_capenable &
+					    ETHERCAP_VLAN_MTU) ?
+					    EX_UPD_ERR_VLAN : EX_UPD_ERR)) {
 						ifp->if_ierrors++;
 						m_freem(m);
 						goto rcvloop;
@@ -1459,8 +1464,17 @@ void
 ex_reset(sc)
 	struct ex_softc *sc;
 {
-	bus_space_write_2(sc->sc_iot, sc->sc_ioh, ELINK_COMMAND, GLOBAL_RESET);
-	delay(400);
+	u_int16_t val = GLOBAL_RESET;
+
+	if (sc->ex_conf & EX_CONF_RESETHACK)
+		val |= 0x10;
+	bus_space_write_2(sc->sc_iot, sc->sc_ioh, ELINK_COMMAND, val);
+	/*
+	 * XXX apparently the command in progress bit can't be trusted
+	 * during a reset, so we just always wait this long. Fortunately
+	 * we normally only reset the chip during autoconfig.
+	 */
+	delay(100000);
 	ex_waitcmd(sc);
 }
 
@@ -1656,21 +1670,17 @@ ex_read_eeprom(sc, offset)
 {
 	bus_space_tag_t iot = sc->sc_iot;
 	bus_space_handle_t ioh = sc->sc_ioh;
-	u_int16_t data = 0;
+	u_int16_t data = 0, cmd = READ_EEPROM;
+	int off;
+
+	off = sc->ex_conf & EX_CONF_EEPROM_OFF ? 0x30 : 0;
+	cmd = sc->ex_conf & EX_CONF_EEPROM_8BIT ? READ_EEPROM8 : READ_EEPROM;
 
 	GO_WINDOW(0);
 	if (ex_eeprom_busy(sc))
 		goto out;
-	switch (sc->ex_bustype) {
-	case EX_BUS_PCI:
-		bus_space_write_1(iot, ioh, ELINK_W0_EEPROM_COMMAND,
- 		    READ_EEPROM | (offset & 0x3f));
-		break;
-	case EX_BUS_CARDBUS:
-		bus_space_write_2(iot, ioh, ELINK_W0_EEPROM_COMMAND,
-		    0x230 + (offset & 0x3f));
-		break;
-	}
+	bus_space_write_2(iot, ioh, ELINK_W0_EEPROM_COMMAND,
+	    cmd | (off + (offset & 0x3f)));
 	if (ex_eeprom_busy(sc))
 		goto out;
 	data = bus_space_read_2(iot, ioh, ELINK_W0_EEPROM_DATA);
