@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.131 2002/09/11 02:40:49 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.132 2002/09/11 07:35:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -331,7 +331,7 @@ rip6_input(mp, offp, proto)
 			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_protounknown);
 			icmp6_error(m, ICMP6_PARAM_PROB,
 			    ICMP6_PARAMPROB_NEXTHEADER,
-			    prvnxtp - mtod(m, char *));
+			    prvnxtp - mtod(m, u_int8_t *));
 		}
 		ip6stat.ip6s_delivered--;
 	}
