@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.17 2001/01/23 08:17:30 itojun Exp $	*/
+/*	$KAME: dest6.c,v 1.18 2001/01/23 08:23:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -168,12 +168,6 @@ dest6_input(mp, offp, proto)
 			    sizeof(ip6a->ip6a_careof));
 			ip6a->ip6a_flags |= IP6A_HASEEN;
 			break;
-
-#if 0 /* just for testing */
-		case IP6OPT_BINDING_UPDATE:
-			optlen = *(opt + 1) + 2;
-			break;
-#endif
 #endif
 #ifdef MIP6
 		case IP6OPT_BINDING_UPDATE:
