@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.1 2000/09/17 04:23:00 itojun Exp $
+$KAME: sandiego0009-result.en,v 1.2 2000/09/17 04:26:37 itojun Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -6,3 +6,21 @@ Paradise Point Hotel, San Diego, CA
 Goals:
 - kernel IPsec: rijndael-cbc, twofish-cbc, blowfish-cbc
 - racoon: <TBD>
+
+Things to look at during tests:
+- behavior against large packet (> MTU)
+- TCP behavior (fragmentation)
+- interpretation of phase 2 proposal.  if we want "IP AH ESP IP payload", 
+  is it "AH tunnel + ESP tunnel", or "AH transport + ESP tunnel"?
+
+Result template:
+-->8
+vs XXX
+	phase 1: preshared, 3des-cbc, sha1, DH group 1
+	phase 2: DH group 1, PFS
+		ESP blowfish-cbc, transport mode
+	IPsec: 
+	    (flood) ping with small packet
+	    (flood) ping with large packet (>1500)
+	    tcp session (look at fragmentation issue)
+-->8
