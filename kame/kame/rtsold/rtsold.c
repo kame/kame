@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.73 2003/10/06 03:59:05 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.74 2003/10/23 04:55:28 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -82,7 +82,6 @@ char *otherconf_script;
  * XXX: should be configurable 
  */
 #define PROBE_INTERVAL 60
-#define ISATAP_PROBE_INTERVAL 900 /* draft-ietf-ngtrans-isatap-09.txt 6.2.4 */
 
 /* utility macros */
 /* a < b */
@@ -425,14 +424,6 @@ ifconfig(char *ifname)
 
 	strlcpy(ifinfo->ifname, ifname, sizeof(ifinfo->ifname));
 
-#ifdef ISATAP
-	if (is_6to4(ifinfo)) {
-		warnmsg(LOG_ERR, __func__,
-			"you cannot solicit RA on 6to4 interface");
-		goto bad;
-	}
-#endif
-
 	/* construct a router solicitation message */
 	if (make_packet(ifinfo))
 		goto bad;
@@ -456,16 +447,8 @@ ifconfig(char *ifname)
 		/*
 		 * probe routers periodically even if the link status
 		 * does not change.
-		 * (ISATAP router cannot send unsolicited RA)
 		 */
-#ifdef ISATAP
-		if (is_isatap(ifinfo))
-			ifinfo->probeinterval = ISATAP_PROBE_INTERVAL;
-		else
-			ifinfo->probeinterval = PROBE_INTERVAL;
-#else
 		ifinfo->probeinterval = PROBE_INTERVAL;
-#endif
 	}
 
 	/* activate interface: interface_up returns 0 on success */
@@ -713,14 +696,7 @@ rtsol_timer_update(struct ifinfo *ifinfo)
 		if (mobile_node) {
 			/* XXX should be configurable */
 			ifinfo->timer.tv_sec = 3;
-		}
-#ifdef ISATAP
-		else if (is_isatap(ifinfo)) {
-			/* don't have to consider I/F updown in ISATAP */
-			ifinfo->timer.tv_sec = 60;
-		}
-#endif
-		else
+		} else
 			ifinfo->timer = tm_max;	/* stop timer(valid?) */
 		break;
 	case IFS_DELAY:

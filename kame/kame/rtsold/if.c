@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.28 2003/10/21 08:06:40 itojun Exp $	*/
+/*	$KAME: if.c,v 1.29 2003/10/23 04:55:28 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -68,18 +68,12 @@
 #include <limits.h>
 #include <ifaddrs.h>
 #include "rtsold.h"
-#ifdef ISATAP
-#include <net/if_stf.h>
-#endif
 
 extern int rssock;
 static int ifsock;
 
 static int get_llflag __P((const char *));
 static void get_rtaddrs __P((int, struct sockaddr *, struct sockaddr **));
-#ifdef ISATAP
-static int get_isatap_mode __P((struct ifinfo *ifinfo));
-#endif
 
 int
 ifinit(void)
@@ -379,73 +373,4 @@ get_rtaddrs(int addrs, struct sockaddr *sa, struct sockaddr **rti_info)
 		} else
 			rti_info[i] = NULL;
 	}
-}
-
-#ifdef ISATAP
-static int
-get_isatap_mode(struct ifinfo *ifinfo)
-{
-	struct ifreq ifr;
-	int s;
-	static struct in_addr addr;
-
-	memset(&addr, 0, sizeof(addr));
-	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
-		warnmsg(LOG_ERR, __func__, "socket: %s", strerror(errno));
-		exit(1);
-	}
-
-	memset(&ifr, 0, sizeof(ifr));
-	memcpy(ifr.ifr_name, ifinfo->ifname, sizeof(ifr.ifr_name));
-	if (ioctl(s, SIOCGSTFMODE, (caddr_t)&ifr) < 0) {
-		warnmsg(LOG_DEBUG, __func__,
-			"ioctl:SIOCGSTFMODE: failed for %s", ifr.ifr_name);
-		close(s);
-		return -1;
-	}
-	close(s);
-	return ((int) ifr.ifr_data);
-}
-#endif /* ISATAP */
-
-#ifdef ISATAP
-int
-is_isatap(struct ifinfo *ifinfo)
-{
-	return (get_isatap_mode(ifinfo) == STFM_ISATAP);
-}
-
-int
-is_6to4(struct ifinfo *ifinfo)
-{
-	return (get_isatap_mode(ifinfo) == STFM_6TO4);
-}
-#endif
-
-size_t
-get_isatap_router(struct ifinfo *ifinfo, void **buf)
-{
-#ifndef ISATAP
-	return 0;
-#else
-	size_t needed;
-	int mib[4] = {CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_ISATAPRTR};
-
-	/* get ISATAP router list */
-	if (!is_isatap(ifinfo))
-		return 0;
-	if (sysctl(mib, 4, NULL, &needed, NULL, 0) < 0)
-		return 0;
-	if (needed == 0)
-		return 0;
-	if ((*buf = malloc(needed)) == NULL) {
-		warnmsg(LOG_ERR, __func__, "malloc failed");
-		exit(1);
-	}
-	if (sysctl(mib, 4, *buf, &needed, NULL, 0) < 0) {
-		warnmsg(LOG_ERR, __func__,  "sysctl failed");
-		exit(1);
-	}
-	return needed;
-#endif /* ISATAP */
 }
