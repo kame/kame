@@ -1,4 +1,4 @@
-/*	$KAME: vif.h,v 1.21 2002/10/11 14:26:29 suz Exp $	*/
+/*	$KAME: vif.h,v 1.22 2002/10/30 06:27:34 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -126,13 +126,18 @@ struct listaddr {
 	struct sockaddr_in6 al_addr; /* local group or neighbor address */
 	struct listaddr *sources; /* list of sources for this group */
 
-	/* al_timer is not used in PIM-SSM; the source timer is used */
-	u_long al_timer; /* for timing out group or neighbor */
+	/* 
+	 * al_timer is used for many purposes.
+	 *	- last-listener-query timer (MLDv1)
+	 *	- old-listener-present timer (MLDv2)
+	 *	- PIM neighboring timeout (PIM)
+	 */
+	u_long al_timer;
 	time_t al_ctime; /* entry creation time */
 
 	/* filter_mode is not used in PIM-SSM, because it is always INCLUDE */
 	u_int16 filter_mode; /* filter mode for mldv2 */
-	u_int16 comp_mode; /* compatibility mode (not yet) */
+	u_int16 comp_mode; /* compatibility mode */
 	union {
 		u_int32 alu_genid; /* generation id for neighbor */
 		/* a host which reported membership */

@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.h,v 1.8 2002/10/11 14:26:29 suz Exp $	*/
+/*	$KAME: mld6_proto.h,v 1.9 2002/10/30 06:27:34 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -62,7 +62,7 @@ typedef struct
  * Constans for Multicast Listener Discovery protocol for IPv6.
  */
 
-#define	MLD6_DEFAULT_VERSION	1
+#define	MLD6_DEFAULT_VERSION	MLDv1
 #define MLD6_DEFAULT_ROBUSTNESS_VARIABLE        2
 #define MLD6_DEFAULT_QUERY_INTERVAL 125 /* in seconds */
 #define MLD6_DEFAULT_QUERY_RESPONSE_INTERVAL 10000 /* in milliseconds */
@@ -110,6 +110,13 @@ extern void     accept_listener_done    __P((struct sockaddr_in6 *src,
 extern int      check_multicast_listener __P((struct uvif *v,
                                               struct sockaddr_in6 *group));
 
-
+extern void     recv_listener_report	__P((mifi_t,
+					     struct sockaddr_in6 *src,
+                                             struct sockaddr_in6 *group));
+extern void     recv_listener_done      __P((mifi_t,
+					     struct sockaddr_in6 *src,
+                                             struct sockaddr_in6 *group,
+					     int));
+extern void	DelVif __P((void *));
 
 #endif

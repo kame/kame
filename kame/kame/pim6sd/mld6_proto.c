@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.27 2002/10/11 14:26:29 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.28 2002/10/30 06:27:34 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -109,6 +109,7 @@
 #include "mld6.h"
 #include "vif.h"
 #include "mld6_proto.h"
+#include "mld6v2.h"
 #include "mld6v2_proto.h"
 #include "debug.h"
 #include "inet6.h"
@@ -125,7 +126,6 @@ extern struct in6_addr in6addr_any;
 /*
  * Forward declarations.
  */
-static void DelVif __P((void *arg));
 static int SetTimer __P((int mifi, struct listaddr * g));
 static int DeleteTimer __P((int id));
 static void SendQuery __P((void *arg));
@@ -284,13 +284,11 @@ accept_listener_query(src, dst, group, tmo)
 void
 accept_listener_report(src, dst, group)
 	struct sockaddr_in6 *src;
-	struct in6_addr *dst,
-		*group;
+	struct in6_addr *dst, *group;
 {
-	register mifi_t mifi;
-	register struct uvif *v;
-	register struct listaddr *g;
-	struct sockaddr_in6 group_sa = {sizeof(group_sa), AF_INET6};
+	mifi_t mifi;
+	struct uvif *v = NULL;
+	struct sockaddr_in6 group_sa;
 
 	if (IN6_IS_ADDR_MC_LINKLOCAL(group)) {
 		IF_DEBUG(DEBUG_MLD)
@@ -308,12 +306,21 @@ accept_listener_report(src, dst, group)
 	}
 
 	v = &uvifs[mifi];
-	if (v->uv_mld_version & MLDv2) {
-		log(LOG_WARNING, 0,
-		    "Mif %s configured in MLDv2 received MLDv1 report (src %s)!"
-		    "(compat mode not implemented)",
-		    v->uv_name, sa6_fmt(src));
+	bzero(&group_sa, sizeof(group_sa));
+	group_sa.sin6_addr = *group;
+	group_sa.sin6_scope_id = inet6_uvif2scopeid(&group_sa, v);
+
+	if (v->uv_mld_version & MLDv1 == 0) {
+		log(LOG_DEBUG, 0,
+		    "ignores MLDv1 report for %s on non-MLDv1 Mif %s",
+		    inet6_fmt(group), v->uv_name);
 		return;
+	}
+	if (v->uv_mld_version & MLDv2) {
+		log(LOG_DEBUG, 0,
+		    "shift to MLDv1 compat-mode for %s on Mif %s",
+		    inet6_fmt(group), v->uv_name);
+		mld_shift_to_v1mode(mifi, src, &group_sa);
 	}
 
 	IF_DEBUG(DEBUG_MLD)
@@ -324,81 +331,84 @@ accept_listener_report(src, dst, group)
 
 	v->uv_in_mld_report++;
 
-	/*
-	 * Look for the group in our group list; if found, reset its timer.
-	 */
+	recv_listener_report(mifi, src, &group_sa);
+}
 
-	group_sa.sin6_addr = *group;
-	group_sa.sin6_scope_id = inet6_uvif2scopeid(&group_sa, v);
-
-	for (g = v->uv_groups; g != NULL; g = g->al_next)
-	{
-		if (inet6_equal(&group_sa, &g->al_addr))
-		{
-			IF_DEBUG(DEBUG_MLD)
-				log(LOG_DEBUG,0,
-				    "The group already exist");
-
-			g->al_reporter = *src;
-
-			/* delete old timers, set a timer for expiration */
-
-			g->al_timer = MLD6_LISTENER_INTERVAL;
-			if (g->al_query)
-				g->al_query = DeleteTimer(g->al_query);
-			if (g->al_timerid)
-				g->al_timerid = DeleteTimer(g->al_timerid);
-			g->al_timerid = SetTimer(mifi, g);
-			add_leaf(mifi, NULL, &group_sa);
-			break;
-		}
-	}
+/* shared with MLDv1-compat mode in mld6v2_proto.c */
+void
+recv_listener_report(mifi, src, grp)
+	mifi_t mifi;
+	struct sockaddr_in6 *src, *grp;
+{
+	struct uvif *v = &uvifs[mifi];
+	register struct listaddr *g;
 
 	/*
-	 * If not found, add it to the list and update kernel cache.
+	 * Look for the group in our group list; if found, just reset its timer
 	 */
-	if (g == NULL)
-	{
+	for (g = v->uv_groups; g != NULL; g = g->al_next) {
+		if (!inet6_equal(grp, &g->al_addr))
+			continue;
+
 		IF_DEBUG(DEBUG_MLD)
-			log(LOG_DEBUG,0,
-			    "The group don't exist , trying to add it");	
+			log(LOG_DEBUG,0, "The group already exists");
 
-		g = (struct listaddr *) malloc(sizeof(struct listaddr));
-		if (g == NULL)
-			log(LOG_ERR, 0, "ran out of memory");	/* fatal */
-
-		g->al_addr = group_sa;
-		g->sources = NULL;
-
-		/** set a timer for expiration **/
-		g->al_query = 0;
-		g->al_timer = MLD6_LISTENER_INTERVAL;
 		g->al_reporter = *src;
+
+		/* delete old timers, set a timer for expiration */
+
+		g->al_timer = MLD6_LISTENER_INTERVAL;
+		if (g->al_query)
+			g->al_query = DeleteTimer(g->al_query);
+		if (g->al_timerid)
+			g->al_timerid = DeleteTimer(g->al_timerid);
 		g->al_timerid = SetTimer(mifi, g);
-		g->al_next = v->uv_groups;
-		v->uv_groups = g;
-		time(&g->al_ctime);
-	
-		add_leaf(mifi, NULL, &group_sa);
+		add_leaf(mifi, NULL, grp);
+		return;
 	}
+
+	if (g != NULL)
+		/* impossible! */
+		return;
+
+	/* add it to the list and update kernel cache. */
+	IF_DEBUG(DEBUG_MLD)
+		log(LOG_DEBUG,0,
+		    "The group doesn't exist , trying to add it");
+
+	g = (struct listaddr *) malloc(sizeof(struct listaddr));
+	if (g == NULL)
+		log(LOG_ERR, 0, "ran out of memory");	/* fatal */
+
+	g->al_addr = *grp;
+	g->sources = NULL;
+
+	/** set a timer for expiration **/
+	g->al_query = 0;
+	g->al_timer = MLD6_LISTENER_INTERVAL;
+	g->al_reporter = *src;
+	g->al_timerid = SetTimer(mifi, g);
+	g->al_next = v->uv_groups;
+	g->comp_mode = MLDv1;
+	v->uv_groups = g;
+	time(&g->al_ctime);
+
+	add_leaf(mifi, NULL, grp);
 }
 
 /* TODO: send PIM prune message if the last member? */
 void
 accept_listener_done(src, dst, group)
 	struct sockaddr_in6 *src;
-	struct in6_addr *dst,
-		*group;
+	struct in6_addr *dst, *group;
 {
-	register mifi_t mifi;
-	register struct uvif *v;
-	register struct listaddr *g;
-	struct sockaddr_in6 group_sa = {sizeof(group_sa), AF_INET6};
+	mifi_t mifi;
+	struct uvif *v = NULL;
+	struct sockaddr_in6 group_sa;
 
 	/* Don't create routing entries for the LAN scoped addresses */
-
-	if (IN6_IS_ADDR_MC_NODELOCAL(group)) /* sanity? */
-	{
+	/* sanity? */
+	if (IN6_IS_ADDR_MC_NODELOCAL(group)) {
 		IF_DEBUG(DEBUG_MLD)
 			log(LOG_DEBUG, 0,
 			    "accept_listener_done: address multicast node "
@@ -406,8 +416,7 @@ accept_listener_done(src, dst, group)
 		return;
 	}
 
-	if (IN6_IS_ADDR_MC_LINKLOCAL(group))
-	{
+	if (IN6_IS_ADDR_MC_LINKLOCAL(group)) {
 		IF_DEBUG(DEBUG_MLD)
 			log(LOG_DEBUG, 0,
 			    "accept_listener_done: address multicast "
@@ -415,8 +424,7 @@ accept_listener_done(src, dst, group)
 		return;
 	}
 
-	if ((mifi = find_vif_direct_local(src)) == NO_VIF)
-	{
+	if ((mifi = find_vif_direct_local(src)) == NO_VIF) {
 		IF_DEBUG(DEBUG_MLD)
 			log(LOG_INFO, 0,
 			    "accept_listener_done: can't find a mif");
@@ -424,11 +432,21 @@ accept_listener_done(src, dst, group)
 	}
 
 	v = &uvifs[mifi];
-	if (v->uv_mld_version & MLDv2) {
-		log(LOG_WARNING, 0,
-		    "Mif %s configured in MLDv2 received MLDv1 done (src %s)!"
-		    "(compat mode not implemented)",
-		    v->uv_name, sa6_fmt(src));
+	bzero(&group_sa, sizeof(group_sa));
+	group_sa.sin6_addr = *group;
+	group_sa.sin6_scope_id = inet6_uvif2scopeid(&group_sa, v);
+
+	/*
+	 * MLD done does not affeect mld-compatibility;
+	 * draft-vida-mld-v2-05.txt section 7.3.2 says:
+	 *  The Multicast Address Compatibility Mode variable is based 
+	 *  on whether an older version report was heard in the last 
+	 *  Older Version Host Present Timeout seconds.
+	 */
+	if (v->uv_mld_version & MLDv1 == 0) {
+		log(LOG_DEBUG, 0,
+		    "ignores MLDv1 done for %s on non-MLDv1 Mif %s",
+		    inet6_fmt(group), v->uv_name);
 		return;
 	}
 
@@ -438,6 +456,20 @@ accept_listener_done(src, dst, group)
 		    sa6_fmt(src), inet6_fmt(dst), inet6_fmt(group));
 	v->uv_in_mld_done++;
 
+	recv_listener_done(mifi, src, &group_sa, MLDv1);
+}
+
+
+/* shared with MLDv1-compat mode in mld6v2_proto.c */
+void
+recv_listener_done(mifi, src, grp, query_type)
+	mifi_t mifi;
+	struct sockaddr_in6 *src, *grp;
+	int query_type;
+{
+	struct uvif *v = &uvifs[mifi];
+	register struct listaddr *g;
+
 	if (!(v->uv_flags & (VIFF_QUERIER | VIFF_DR)))
 		return;
 
@@ -445,55 +477,72 @@ accept_listener_done(src, dst, group)
 	 * Look for the group in our group list in order to set up a
 	 * short-timeout query.
 	 */
-	group_sa.sin6_addr = *group;
-	group_sa.sin6_scope_id = inet6_uvif2scopeid(&group_sa, v);
-	for (g = v->uv_groups; g != NULL; g = g->al_next)
-	{
-		if (inet6_equal(&group_sa, &g->al_addr))
-		{
-			IF_DEBUG(DEBUG_MLD)
-				log(LOG_DEBUG, 0,
-				    "[accept_done_message] %ld\n",
-				    g->al_query);
+	for (g = v->uv_groups; g != NULL; g = g->al_next) {
+		if (!inet6_equal(grp, &g->al_addr))
+			continue;
 
-			/*
-			 * still waiting for a reply to a query, ignore the
-			 * done.
-			 */
-			if (g->al_query)
-				return;
+		IF_DEBUG(DEBUG_MLD)
+			log(LOG_DEBUG, 0, "[accept_done_message] %ld\n",
+			    g->al_query);
 
-			/* delete old timer set a timer for expiration */
-			if (g->al_timerid)
-				g->al_timerid = DeleteTimer(g->al_timerid);
+		/* still waiting for a reply to a query, ignore the done */
+		if (g->al_query)
+			return;
 
-			/* send a group specific query */
-			g->al_timer = (MLD6_LAST_LISTENER_QUERY_INTERVAL /
-				       MLD6_TIMER_SCALE) *
-				(MLD6_LAST_LISTENER_QUERY_COUNT + 1);
-			if (v->uv_flags & VIFF_QUERIER &&
-			    (v->uv_flags & VIFF_NOLISTENER) == 0) {
-				send_mld6(MLD_LISTENER_QUERY, 0,
-					  &v->uv_linklocal->pa_addr, NULL,
-					  &g->al_addr.sin6_addr,
-					  v->uv_ifindex,
-					  MLD6_LAST_LISTENER_QUERY_INTERVAL,
-					  0, 1);
-				v->uv_out_mld_query++;
-			}
-			g->al_query = SetQueryTimer(g, mifi,
-						    MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE,
-						    MLD6_LAST_LISTENER_QUERY_INTERVAL);
-			g->al_timerid = SetTimer(mifi, g);
+		/* delete old timer set a timer for expiration */
+		if (g->al_timerid)
+			g->al_timerid = DeleteTimer(g->al_timerid);
+
+		/* send a group specific query */
+		g->al_timer = (MLD6_LAST_LISTENER_QUERY_INTERVAL /
+			       MLD6_TIMER_SCALE) * 
+			       (MLD6_LAST_LISTENER_QUERY_COUNT + 1);
+
+		if ((v->uv_flags & VIFF_QUERIER) == 0 ||
+		    (v->uv_flags & VIFF_NOLISTENER) != 0)
+			goto set_timer;
+
+		/*
+		 * if called from MLDv2, query is done by MLDv2,
+		 * regardless of compat-mode.
+		 * (draft-vida-mld-v2-05.txt section 7.3.2 page 39)
+		 *
+		 * if called from MLDv1, query is done by MLDv1.
+		 */
+		switch (query_type) {
+		case MLDv1:
+			send_mld6(MLD_LISTENER_QUERY, 0,
+				  &v->uv_linklocal->pa_addr, NULL,
+				  &g->al_addr.sin6_addr,
+				  v->uv_ifindex,
+				  MLD6_LAST_LISTENER_QUERY_INTERVAL, 0, 1);
+			break;
+		case MLDv2:
+		default:
+			send_mld6v2(MLD_LISTENER_QUERY, 0,
+				    &v->uv_linklocal->pa_addr, NULL,
+				    &g->al_addr,
+				    v->uv_ifindex,
+				    MLD6_QUERY_RESPONSE_INTERVAL,
+				    0, TRUE, SFLAGNO, v->uv_mld_robustness,
+				    v->uv_mld_query_interval);
 			break;
 		}
+		v->uv_out_mld_query++;
+
+	set_timer:
+		g->al_query = SetQueryTimer(g, mifi,
+					    MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE,
+					    MLD6_LAST_LISTENER_QUERY_INTERVAL);
+		g->al_timerid = SetTimer(mifi, g);
+		break;
 	}
 }
 
 /*
  * Time out record of a group membership on a vif
  */
-static void
+void
 DelVif(arg)
 	void *arg;
 {
