@@ -1,11 +1,12 @@
-$Id: CHANGELOG,v 1.503 2000/01/31 16:53:08 sumikawa Exp $
+$Id: CHANGELOG,v 1.504 2000/01/31 17:01:06 sumikawa Exp $
 
 <200002>
 Tue Feb  1 01:52:20 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/echoping: echoping 2.2.0 with IPv6 support.
 
 Tue Feb  1 01:11:34 JST 2000  itojun@iijlab.net
-	* netbsd/pkgsrc/mail/solidpop3d: pop3 daemon from poland.
+	* {netbsd/pkgsrc/mail,freebsd3/ports}/soldpop3d: pop3 daemon from
+	  poland.
 	* kame/racoon: simplify the configure process.  allow it to be compiled
 	  on openssl-integrated platform (netbsd15), even without rsa headers/
 	  libraries (cert support will automatically be disabled).
