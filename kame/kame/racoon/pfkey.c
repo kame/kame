@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.99 2001/01/31 09:09:34 itojun Exp $	*/
+/*	$KAME: pfkey.c,v 1.100 2001/02/01 15:51:16 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1016,7 +1016,7 @@ pk_sendupdate(iph2)
 		 */
 		if (backupsa_to_file(satype, mode, iph2->dst, iph2->src,
 				pr->spi, pr->reqid_in, 4,
-				pr->keymat_p->v,
+				pr->keymat->v,
 				e_type, e_keylen, a_type, a_keylen, flags,
 				0, iph2->approval->lifebyte * 1024,
 				iph2->approval->lifetime, 0,

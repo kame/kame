@@ -1,4 +1,4 @@
-/*	$KAME: backupsa.c,v 1.6 2001/02/01 15:41:26 sakane Exp $	*/
+/*	$KAME: backupsa.c,v 1.7 2001/02/01 15:51:16 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -307,6 +307,7 @@ do { \
 			free(keymat);
 			continue;
 		}
+		l_addtime -= current - created;
 
 		if (pfkey_send_add(
 				lcconf->sock_pfkey,
