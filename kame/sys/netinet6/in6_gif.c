@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.46 2001/02/20 10:40:03 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.47 2001/02/20 10:41:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -240,7 +240,7 @@ in6_gif_output(ifp, family, m, rt)
 #if defined(__NetBSD__) && defined(ISO)
 	case AF_ISO:
 		proto = IPPROTO_EON;
-		tos = 0;
+		itos = 0;
 		break;
 #endif
 	default:
