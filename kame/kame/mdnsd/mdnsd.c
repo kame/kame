@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.38 2001/06/23 01:54:22 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.39 2001/07/04 05:00:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -133,6 +133,10 @@ main(argc, argv)
 			mflag++;
 			break;
 		case 'N':
+			if (geteuid() != 0) {
+				errx(1, "must be root to use -N");
+				/*NOTREACHED*/
+			}
 			Nflag++;
 			break;
 		case 'p':

@@ -1,4 +1,4 @@
-.\"	$KAME: mdnsd.8,v 1.40 2001/06/30 05:57:33 itojun Exp $
+.\"	$KAME: mdnsd.8,v 1.41 2001/07/04 05:00:13 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -136,6 +136,8 @@ With the option, it is highly possible for
 .Nm
 to respond with link-local addresses in DNS packet.
 Experimental.
+.Nm
+must be run under root privilege to use this option.
 .It Fl p Ar inport
 .Nm
 listens to UDP port
