@@ -102,6 +102,8 @@
 
 #include "bpfilter.h"
 
+#include <net/net_osdep.h>
+
 #ifdef __FreeBSD__
 static int faithioctl __P((struct ifnet *, int, caddr_t));
 #else
