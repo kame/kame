@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.23 2001/06/25 04:54:28 itojun Exp $	*/
+/*	$KAME: config.c,v 1.24 2001/07/31 14:09:45 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -150,7 +150,7 @@ config_vifs_from_kernel()
 		 * XXX: how about a deprecated, tentative, duplicated or
 		 * detached address?
 		 */
-		memcpy(ifr6.ifr_name, ifa->ifa_name, sizeof(ifr6.ifr_name));
+		strncpy(ifr6.ifr_name, ifa->ifa_name, sizeof(ifr6.ifr_name));
 		ifr6.ifr_addr = *(struct sockaddr_in6 *)ifa->ifa_addr;
 		if (ioctl(udp_socket, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
 			log(LOG_ERR, errno, "ioctl SIOCGIFAFLAG_IN6 for %s",
