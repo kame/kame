@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.97 2002/03/15 09:35:59 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.98 2002/03/17 01:57:35 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1019,6 +1019,7 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	struct ip6_pktopts opts;
 #endif /* MIP6 */
 
+	mac = NULL;
 	bzero(&ro, sizeof(ro));
 
 	/* estimate the size of message */
@@ -1124,7 +1125,6 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	 * target lladdr option SHOULD NOT be included.
 	 */
 	if (tlladdr) {
-		mac = NULL;
 		/*
 		 * sdl0 != NULL indicates proxy NA.  If we do proxy, use
 		 * lladdr in sdl0.  If we are not proxying (sending NA for
