@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.245 2004/02/11 10:30:56 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.246 2004/02/11 10:32:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1490,7 +1490,7 @@ prelist_update(new, dr, m)
 			storedlifetime = 0;
 		} else
 			storedlifetime = lt6_tmp.ia6t_vltime -
-				(time_second - ifa6->ia6_updatetime);
+			    (time_second - ifa6->ia6_updatetime);
 
 		/* when not updating, keep the current stored lifetime. */
 		lt6_tmp.ia6t_vltime = storedlifetime;
