@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.193 2001/02/08 14:26:24 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.194 2001/02/08 15:19:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1244,15 +1244,16 @@ icmp6_mtudisc_update(ip6cp, validated)
 	 */
 	rtcount = rt_timer_count(icmp6_mtudisc_timeout_q);
 	if (validated) {
-		if (rtcount > icmp6_mtudisc_hiwat)
+		if (0 <= icmp6_mtudisc_hiwat && rtcount > icmp6_mtudisc_hiwat)
 			return;
-		else if (rtcount > icmp6_mtudisc_lowat) {
+		else if (0 <= icmp6_mtudisc_lowat &&
+		    rtcount > icmp6_mtudisc_lowat) {
 			/*
 			 * XXX nuke a victim, install the new one.
 			 */
 		}
 	} else {
-		if (rtcount > icmp6_mtudisc_lowat)
+		if (0 <= icmp6_mtudisc_lowat && rtcount > icmp6_mtudisc_lowat)
 			return;
 	}
 #else
@@ -2578,9 +2579,10 @@ icmp6_redirect_input(m, off)
 		 * (there will be additional hops, though).
 		 */
 		rtcount = rt_timer_count(icmp6_redirect_timeout_q);
-		if (rtcount > icmp6_redirect_hiwat)
+		if (0 <= icmp6_redirect_hiwat && rtcount > icmp6_redirect_hiwat)
 			return;
-		else if (rtcount > icmp6_redirect_lowat) {
+		else if (0 <= icmp6_redirect_lowat &&
+		    rtcount > icmp6_redirect_lowat) {
 			/*
 			 * XXX nuke a victim, install the new one.
 			 */
