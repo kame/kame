@@ -554,6 +554,14 @@ in_pcbdetach(v)
 	else 
 #endif
 		ip_freemoptions(inp->inp_moptions);
+#ifdef INET6
+	ip6_freepcbopts(inp->inp_outputopts6);
+	/* Free all received options. */
+	if (inp->inp_inputopts6) {
+		m_freem(inp->inp_inputopts6->head); /* this is safe */
+		FREE(inp->inp_inputopts6, M_IP6OPT);
+	}
+#endif /* INET6 */
 #ifdef IPSEC
 	/* XXX IPsec cleanup here */
 	s = spltdb();
