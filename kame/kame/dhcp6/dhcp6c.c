@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.91 2002/06/21 06:58:34 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.92 2002/06/21 10:23:33 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -73,7 +73,9 @@
 #include <prefixconf.h>
 
 static int debug = 0;
-static int signaled = 0;
+static u_long sig_flags = 0;
+#define SIGF_TERM 0x1
+#define SIGF_HUP 0x2
 
 const dhcp6_mode_t dhcp6_mode = DHCP6_MODE_CLIENT;
 
@@ -83,15 +85,13 @@ int insock;	/* inbound udp port */
 int outsock;	/* outbound udp port */
 int rtsock;	/* routing socket */
 
-#define LINK_LOCAL_PLEN 10
-#define SITE_LOCAL_PLEN 10
-#define GLOBAL_PLEN 3
-
 static const struct sockaddr_in6 *sa6_allagent;
 static struct duid client_duid;
 
 static void usage __P((void));
 static void client6_init __P((void));
+static void client6_ifinit __P((void));
+static void free_resources __P((void));
 static void client6_mainloop __P((void));
 static struct dhcp6_serverinfo *find_server __P((struct dhcp6_if *,
 						 struct duid *));
@@ -102,7 +102,7 @@ static int client6_recvadvert __P((struct dhcp6_if *, struct dhcp6 *,
 				   ssize_t, struct dhcp6_optinfo *));
 static int client6_recvreply __P((struct dhcp6_if *, struct dhcp6 *,
 				  ssize_t, struct dhcp6_optinfo *));
-void client6_hup __P((int));
+static void client6_signal __P((int));
 static struct dhcp6_event *find_event_withid __P((struct dhcp6_if *,
 						  u_int32_t));
 static int sa2plen __P((struct sockaddr_in6 *));
@@ -123,8 +123,6 @@ main(argc, argv)
 	int ch, pid;
 	char *progname, *conffile = DHCP6C_CONF;
 	FILE *pidfp;
-	struct dhcp6_if *ifp;
-	struct dhcp6_event *ev;
 
 	srandom(time(NULL) & getpid());
 
@@ -184,22 +182,7 @@ main(argc, argv)
 	}
 
 	client6_init();
-
-	for (ifp = dhcp6_if; ifp; ifp = ifp->next) {
-		/* create an event for the initial delay */
-		if ((ev = dhcp6_create_event(ifp, DHCP6S_INIT)) == NULL) {
-			dprintf(LOG_ERR, "%s" "failed to create an event",
-				FNAME);
-			exit(1);
-		}
-		TAILQ_INSERT_TAIL(&ifp->event_list, ev, link);
-		if ((ev->timer = dhcp6_add_timer(client6_timo, ev)) == NULL) {
-			dprintf(LOG_ERR, "%s" "failed to add a timer for %s",
-				FNAME, ifp->ifname);
-			exit(1);
-		}
-		dhcp6_reset_timer(ev);
-	}
+	client6_ifinit();
 
 	client6_mainloop();
 	exit(0);
@@ -376,10 +359,70 @@ client6_init()
 
 	prefix6_init();
 
-	if (signal(SIGHUP, client6_hup) == SIG_ERR) {
+	if (signal(SIGHUP, client6_signal) == SIG_ERR) {
 		dprintf(LOG_WARNING, "%s" "failed to set signal: %s",
 			FNAME, strerror(errno));
-		/* XXX: assert? */
+		exit(1);
+	}
+	if (signal(SIGTERM, client6_signal) == SIG_ERR) {
+		dprintf(LOG_WARNING, "%s" "failed to set signal: %s",
+			FNAME, strerror(errno));
+		exit(1);
+	}
+}
+
+static void
+client6_ifinit()
+{
+	struct dhcp6_if *ifp;
+	struct dhcp6_event *ev;
+
+	for (ifp = dhcp6_if; ifp; ifp = ifp->next) {
+		/* create an event for the initial delay */
+		if ((ev = dhcp6_create_event(ifp, DHCP6S_INIT)) == NULL) {
+			dprintf(LOG_ERR, "%s" "failed to create an event",
+				FNAME);
+			exit(1);
+		}
+		TAILQ_INSERT_TAIL(&ifp->event_list, ev, link);
+		if ((ev->timer = dhcp6_add_timer(client6_timo, ev)) == NULL) {
+			dprintf(LOG_ERR, "%s" "failed to add a timer for %s",
+				FNAME, ifp->ifname);
+			exit(1);
+		}
+		dhcp6_reset_timer(ev);
+	}
+}
+
+static void
+free_resources()
+{
+	struct dhcp6_if *ifp;
+
+	/* release delegated prefixes (should send DHCPv6 release?) */
+	prefix6_remove_all();
+
+	for (ifp = dhcp6_if; ifp; ifp = ifp->next) {
+		struct dhcp6_event *ev, *ev_next;
+		struct dhcp6_serverinfo *sp, *sp_next;
+
+		/* cancel all outstanding events for each interface */
+		for (ev = TAILQ_FIRST(&ifp->event_list); ev; ev = ev_next) {
+			ev_next = TAILQ_NEXT(ev, link);
+			dhcp6_remove_event(ev);
+		}
+
+		/* free all servers we've seen so far */
+		for (sp = ifp->servers; sp; sp = sp_next) {
+			sp_next = sp->next;
+
+			dprintf(LOG_DEBUG, "%s" "removing server (ID: %s)",
+			    FNAME, duidstr(&sp->optinfo.serverID));
+			dhcp6_clear_options(&sp->optinfo);
+			free(sp);
+		}
+		ifp->servers = NULL;
+		ifp->current_server = NULL;
 	}
 }
 
@@ -391,6 +434,21 @@ client6_mainloop()
 	fd_set r;
 
 	while(1) {
+		if (sig_flags) {
+			if ((sig_flags & SIGF_TERM)) {
+				dprintf(LOG_INFO, FNAME "exiting");
+				free_resources();
+				exit(0);
+			}
+			if ((sig_flags & SIGF_HUP)) {
+				dprintf(LOG_INFO, FNAME "restarting");
+				free_resources();
+				client6_ifinit();
+			}
+
+			sig_flags = 0;
+		}
+
 		w = dhcp6_check_timer();
 
 		FD_ZERO(&r);
@@ -400,9 +458,12 @@ client6_mainloop()
 
 		switch (ret) {
 		case -1:
-			dprintf(LOG_ERR, "%s" "select: %s",
-				FNAME, strerror(errno));
-			exit(1); /* XXX: signal case? */
+			if (errno != EINTR) {
+				dprintf(LOG_ERR, "%s" "select: %s",
+				    FNAME, strerror(errno));
+				exit(1);
+			}
+			break;
 		case 0:	/* timeout */
 			break;	/* dhcp6_check_timer() will treat the case */
 		default: /* received a packet */
@@ -497,15 +558,21 @@ select_server(ifp)
 	return(NULL);
 }
 
-/* sleep until an event to activiate myself occurs */
-/* ARGSUSED */
-void
-client6_hup(sig)
+static void
+client6_signal(sig)
 	int sig;
 {
 
-	dprintf(LOG_INFO, "%s" "received a SIGHUP", FNAME);
-	signaled = 1;
+	dprintf(LOG_INFO, FNAME "received a signal (%d)", sig);
+
+	switch (sig) {
+	case SIGTERM:
+		sig_flags |= SIGF_TERM;
+		break;
+	case SIGHUP:
+		sig_flags |= SIGF_HUP;
+		break;
+	}
 }
 
 static int
@@ -967,7 +1034,6 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 	struct dhcp6_optinfo *optinfo0;
 {
 	struct dhcp6_serverinfo *newserver, *s, **sp;
-	struct dhcp6_optinfo optinfo;
 	struct dhcp6_event *ev;
 
 	/* find the corresponding event based on the received xid */
@@ -1017,20 +1083,20 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 	}
 
 	/* keep the server */
-	dhcp6_init_options(&optinfo);
-	if (dhcp6_copy_options(optinfo0, &optinfo)) {
-		dprintf(LOG_ERR, "%s" "failed to copy options", FNAME);
-		return -1;
-	}
 	if ((newserver = malloc(sizeof(*newserver))) == NULL) {
 		dprintf(LOG_ERR, "%s" "memory allocation failed for server",
 			FNAME);
 		return -1;
 	}
 	memset(newserver, 0, sizeof(*newserver));
+	dhcp6_init_options(&newserver->optinfo);
+	if (dhcp6_copy_options(&newserver->optinfo, optinfo0)) {
+		dprintf(LOG_ERR, "%s" "failed to copy options", FNAME);
+		free(newserver);
+		return -1;
+	}
 	if (optinfo0->pref != DH6OPT_PREF_UNDEF)
 		newserver->pref = optinfo0->pref;
-	newserver->optinfo = optinfo;
 	newserver->active = 1;
 	for (sp = &ifp->servers; *sp; sp = &(*sp)->next) {
 		if ((*sp)->pref != DH6OPT_PREF_MAX &&

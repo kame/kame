@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.h,v 1.2 2002/05/22 14:16:47 jinmei Exp $	*/
+/*	$KAME: prefixconf.h,v 1.3 2002/06/21 10:23:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -49,6 +49,7 @@ struct dhcp6_siteprefix {
 };
 
 extern void prefix6_init __P((void));
+extern void prefix6_remove_all __P((void));
 extern int prefix6_add __P((struct dhcp6_if *, struct dhcp6_prefix *,
 			       struct duid *));
 extern int prefix6_update __P((struct dhcp6_event *, struct dhcp6_list *,

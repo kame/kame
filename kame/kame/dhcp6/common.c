@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.62 2002/06/14 15:32:55 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.63 2002/06/21 10:23:32 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -741,8 +741,8 @@ dhcp6_clear_options(optinfo)
 }
 
 int
-dhcp6_copy_options(src, dst)
-	struct dhcp6_optinfo *src, *dst;
+dhcp6_copy_options(dst, src)
+	struct dhcp6_optinfo *dst, *src;
 {
 	if (duidcpy(&dst->clientID, &src->clientID))
 		goto fail;

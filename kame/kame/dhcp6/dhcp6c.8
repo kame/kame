@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.8,v 1.15 2002/05/23 08:51:23 jinmei Exp $
+.\"	$KAME: dhcp6c.8,v 1.16 2002/06/21 10:23:33 jinmei Exp $
 .\"
 .\" Copyright (C) 1998 and 1999 WIDE Project.
 .\" All rights reserved.
@@ -73,10 +73,13 @@ option is specified.
 .Pp
 Upon receipt of the
 .Dv SIGHUP
-signal,
+or
+.Dv SIGTERM
+signals,
 .Nm
-will reinvoke itself, unless it is still soliciting servers or
-requesting resources.
+will release all stateful resources from the system.
+In the former case the daemon will then stop running, while it will
+reinvoke itself in the latter case.
 .\"
 .Sh FILES
 .Bl -tag -width /usr/local/v6/etc/dhcp6c.conf -compact
@@ -91,13 +94,14 @@ is the default file to store the client's DUID.
 .\"
 .Sh SEE ALSO
 .Xr daemon 3 ,
+.Xr dhcp6c.conf 5 ,
 .Xr dhcp6s 8
 .Rs
 .%A Ralph Droms, Editor
-.%D 22 Apr 2002
+.%D 2002
 .%T Dynamic Host Configuration Protocol for IPv6 (DHCPv6)
 .%R internet draft
-.%N draft-ietf-dhc-dhcpv6-24.txt
+.%N draft-ietf-dhc-dhcpv6-26.txt
 .%O work in progress material
 .Re
 .\"
@@ -109,12 +113,7 @@ command first appeared in WIDE/KAME IPv6 protocol stack kit.
 .Sh BUGS
 .Nm
 is incomplete and violates DHCPv6 protocol spec, in several aspects.
-To name a few:
-.Bl -enum
-.It
-it does not handle resource allocations
-.Pq such as IPv6 address ,
-.It
-it does not install information it gets from DHCPv6 server into the system
-.Pq such as DNS server, DNS domain name, timezone .
-.El
+In particular, it does not handle address allocation via DHCPv6.
+This is, however, rather intentional;
+the authors believe stateless address autoconfiguration is enough for
+IPv6 and will not implement the stateful method in the future.

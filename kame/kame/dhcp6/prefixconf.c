@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.5 2002/05/24 02:01:36 jinmei Exp $	*/
+/*	$KAME: prefixconf.c,v 1.6 2002/06/21 10:23:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -77,7 +77,8 @@ typedef enum { IFADDRCONF_ADD, IFADDRCONF_REMOVE } ifaddrconf_cmd_t;
 static int ifaddrconf __P((ifaddrconf_cmd_t, struct dhcp6_ifprefix *));
 static struct dhcp6_siteprefix *find_siteprefix6 __P((struct dhcp6_prefix *));
 static struct dhcp6_timer *prefix6_timo __P((void *));
-static int add_ifprefix __P((struct dhcp6_prefix *, struct prefix_ifconf *));
+static int add_ifprefix __P((struct dhcp6_siteprefix *,
+    struct dhcp6_prefix *, struct prefix_ifconf *));
 static void prefix6_remove __P((struct dhcp6_siteprefix *));
 static int update __P((struct dhcp6_siteprefix *, struct dhcp6_prefix *,
 			  struct duid *));
@@ -89,6 +90,18 @@ void
 prefix6_init()
 {
 	TAILQ_INIT(&siteprefix_listhead);
+}
+
+void
+prefix6_remove_all()
+{
+	struct dhcp6_siteprefix *sp, *sp_next;
+
+	for (sp = TAILQ_FIRST(&siteprefix_listhead); sp; sp = sp_next) {
+		sp_next = TAILQ_NEXT(sp, link);
+
+		prefix6_remove(sp);
+	}
 }
 
 int
@@ -159,7 +172,7 @@ prefix6_add(ifp, prefix, serverid)
 		if (strcmp(pif->ifname, ifp->ifname) == 0)
 			continue;
 
-		add_ifprefix(prefix, pif);
+		add_ifprefix(sp, prefix, pif);
 	}
 
 	TAILQ_INSERT_TAIL(&siteprefix_listhead, sp, link);
@@ -447,7 +460,8 @@ prefix6_timo(arg)
 }
 
 static int
-add_ifprefix(prefix, pconf)
+add_ifprefix(siteprefix, prefix, pconf)
+	struct dhcp6_siteprefix *siteprefix;
 	struct dhcp6_prefix *prefix;
 	struct prefix_ifconf *pconf;
 {
@@ -458,8 +472,8 @@ add_ifprefix(prefix, pconf)
 	int b, i;
 
 	if ((ifpfx = malloc(sizeof(*ifpfx))) == NULL) {
-		dprintf(LOG_ERR, "%s" "failed to allocate memory for ifprefix",
-			FNAME);
+		dprintf(LOG_ERR, FNAME
+		    "failed to allocate memory for ifprefix");
 		return -1;
 	}
 	memset(ifpfx, 0, sizeof(*ifpfx));
@@ -474,13 +488,13 @@ add_ifprefix(prefix, pconf)
 	 * XXX: our current implementation assumes ifid len is a multiple of 8
 	 */
 	if ((pconf->ifid_len % 8) != 0) {
-		dprintf(LOG_NOTICE, "add_ifprefix: "
-			"assumption failure on the length of interface ID");
+		dprintf(LOG_NOTICE, FNAME
+		    "assumption failure on the length of interface ID");
 		goto bad;
 	}
 	if (ifpfx->plen + pconf->ifid_len < 0 ||
 	    ifpfx->plen + pconf->ifid_len > 128) {
-		dprintf(LOG_INFO, "add_ifprefix: "
+		dprintf(LOG_INFO, FNAME
 			"invalid prefix length %d + %d + %d",
 			prefix->plen, ifpfx->plen, pconf->ifid_len);
 		goto bad;
@@ -507,6 +521,8 @@ add_ifprefix(prefix, pconf)
 		goto bad;
 
 	/* TODO: send a control message for other processes */
+
+	TAILQ_INSERT_TAIL(&siteprefix->ifprefix_list, ifpfx, plink);
 
 	return 0;
 
