@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.78 2001/11/19 07:50:06 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.79 2001/11/19 10:54:48 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -317,6 +317,7 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 	struct mip6_subnet_ha *msha = NULL;
 	struct mip6_prefix tmpmpfx, *mpfx;
 	struct mip6_ha *mha;
+	struct in6_addr lladdr;
 	int mpfx_is_new, mha_is_new;
 	int error = 0;
 
@@ -327,12 +328,15 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 			 __FILE__, __LINE__, ip6_sprintf(rtaddr)));
 		return (0);
 	}
+	lladdr = *rtaddr;
+	/* XXX: KAME link-local hack; remove ifindex */
+	lladdr.s6_addr16[1] = 0;
 
 	hsbypfx = hif_subnet_list_find_withprefix(&sc->hif_hs_list_home,
 						  &ndpr->ndpr_prefix.sin6_addr,
 						  ndpr->ndpr_plen);
 	hsbyha =  hif_subnet_list_find_withhaaddr(&sc->hif_hs_list_home,
-						  rtaddr);
+						  &lladdr);
 
 	if (hsbypfx) {
 		/* we are home. */
@@ -387,7 +391,7 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 
 	/* update mip6_ha_list. */
 	mha_is_new = 0;
-	mha = mip6_ha_list_find_withaddr(&mip6_ha_list, rtaddr);
+	mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &lladdr);
 	if (mha) {
 		/* an entry exists.  update information. */
 		if (ndpr->ndpr_raf_router) {
@@ -398,7 +402,7 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 		/* this is a new ha. */
 		mha_is_new = 1;
 		
-		mha = mip6_ha_create(rtaddr, 
+		mha = mip6_ha_create(&lladdr, 
 				     ndpr->ndpr_raf_router ?
 				     &ndpr->ndpr_prefix.sin6_addr : NULL,
 				     dr->flags, 0, dr->rtlifetime);
@@ -446,7 +450,7 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 	 */
 	if (mpfx_is_new && (mha_is_new == 0)) {
 		ms = mip6_subnet_list_find_withhaaddr(&mip6_subnet_list,
-						      rtaddr);
+						      &lladdr);
 		if (ms == NULL) {
 			/* must not happen. */
 			mip6log((LOG_ERR,
