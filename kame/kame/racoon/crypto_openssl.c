@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.65 2001/08/16 21:44:22 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.66 2001/08/17 10:48:26 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -718,10 +718,18 @@ eay_check_x509sign(source, sig, cert)
 	bp = cert->v;
 
 	x509 = d2i_X509(NULL, &bp, cert->l);
-	if (x509 == NULL)
+	if (x509 == NULL) {
+#ifndef EAYDEBUG
+		plog(LLV_ERROR, LOCATION, NULL, "%s\n", eay_strerror());
+#endif
 		return -1;
+	}
 
 	evp = X509_get_pubkey(x509);
+#ifndef EAYDEBUG
+	if (evp == NULL)
+		plog(LLV_ERROR, LOCATION, NULL, "%s\n", eay_strerror());
+#endif
 	X509_free(x509);
 	if (evp == NULL)
 		return -1;
@@ -733,12 +741,19 @@ eay_check_x509sign(source, sig, cert)
 
 	xbuf = vmalloc(len);
 	if (xbuf == NULL) {
+#ifndef EAYDEBUG
+		plog(LLV_ERROR, LOCATION, NULL, "%s\n", eay_strerror());
+#endif
 		EVP_PKEY_free(evp);
 		return -1;
 	}
 
 	len = RSA_public_decrypt(sig->l, sig->v, xbuf->v,
 				evp->pkey.rsa, RSA_PKCS1_PADDING);
+#ifndef EAYDEBUG
+	if (len == 0 || len != source->l)
+		plog(LLV_ERROR, LOCATION, NULL, "%s\n", eay_strerror());
+#endif
 	EVP_PKEY_free(evp);
 	if (len == 0 || len != source->l) {
 		vfree(xbuf);
