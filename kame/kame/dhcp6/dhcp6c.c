@@ -30,7 +30,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
-#include <sys/errno.h>
+#include <errno.h>
 #if TIME_WITH_SYS_TIME
 # include <sys/time.h>
 # include <time.h>
