@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.120 2003/11/02 23:04:02 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.121 2003/11/03 04:20:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -191,8 +191,6 @@ struct	ip6_pktopts {
 #endif
 #define IP6PO_DONTFRAG	0x04	/* disable fragmentation (IPV6_DONTFRAG) */
 #define IP6PO_USECOA	0x08	/* use care of address */
-
-	int	needfree;	/* members dynamically allocated */
 };
 
 struct	ip6stat {
@@ -444,7 +442,7 @@ int	ip6_raw_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 #endif
 void	ip6_initpktopts __P((struct ip6_pktopts *));
 int	ip6_setpktopts __P((struct mbuf *, struct ip6_pktopts *,
-    struct ip6_pktopts *, int, int, int));
+    struct ip6_pktopts *, int, int));
 void	ip6_clearpktopts __P((struct ip6_pktopts *, int));
 struct ip6_pktopts *ip6_copypktopts __P((struct ip6_pktopts *, int));
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) /* fbsd3 || HAVE_NRL_INPCB */
