@@ -249,7 +249,7 @@ rip_pcbnotify(table, faddr, laddr, proto, errno, notify)
 	for (inp = table->inpt_queue.cqh_first;
 	    inp != (struct inpcb *)&table->inpt_queue;
 	    inp = ninp) {
-		ninp = inp->inp_hash.le_next;
+		ninp = inp->inp_queue.cqe_next;
 		if (inp->inp_ip.ip_p && inp->inp_ip.ip_p != proto)
 			continue;
 		if (in_hosteq(inp->inp_faddr, faddr) &&
