@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.107 2000/10/04 17:41:00 itojun Exp $	*/
+/*	$KAME: isakmp.c,v 1.108 2000/11/06 12:12:59 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -424,7 +424,7 @@ isakmp_main(msg, remote, local)
 	case ISAKMP_ETYPE_INFO:
 	case ISAKMP_ETYPE_ACKINFO:
 		/*
-		 * iph1 must be present for Inoformation message.
+		 * iph1 must be present for Information message.
 		 * if iph1 is null then trying to get the phase1 status
 		 * as the packet from responder againt initiator's 1st
 		 * exchange in phase 1.
