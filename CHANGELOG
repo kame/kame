@@ -1,13 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1384 2000/11/09 11:13:20 sakane Exp $
+$KAME: CHANGELOG,v 1.1385 2000/11/10 02:46:41 sakane Exp $
 
 <200011>
 Thu Nov  9 20:14:00 JST 2000 sakane@ydc.co.jp
 	* racoon:
 	check the address is suitable or not before using them when grabing
 	all addresses on each interfaces.  tentative, duplicated and
-	detached are unshitable at the moment.
+	detached are unsuitable at the moment.
 
 Thu Nov  9 15:30:42 JST 2000 sakane@ydc.co.jp
 	* racoon:
