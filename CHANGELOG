@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1744 2001/06/27 10:51:53 sakane Exp $
+$KAME: CHANGELOG,v 1.1745 2001/06/27 13:13:19 sakane Exp $
 
 <200106>
+Wed Jun 27 22:10:43 JST 2001 sakane@kame.net
+	* sys/netkey/key.c:
+	* kame/libipsec/pfkey_dump.c:
+	the lifetime information of the SP entry will send to the userland
+	from the kernel through pfkey when of spddump.  And they can be
+	displayed by setkey -DP.
+
 Wed Jun 27 19:47:19 JST 2001 sakane@kame.net
 	* sys/net/pfkeyv2.h:
 	* sys/netkey/key.c,key_debug.c:
