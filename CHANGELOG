@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1980 2001/11/14 14:50:48 jinmei Exp $
+$KAME: CHANGELOG,v 1.1981 2001/11/15 03:32:22 fujisawa Exp $
 
 <200111>
+2001-11-15 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_rule.c:
+	- Adapt a translation rule when packet is TCP and only SYN
+	  flag is set.  Until now, this NAT-PT starts translation
+	  even if TCP packet with no SYN flag is coming.  However,
+	  this behavior seems no good, action was changed in this way.
+
 2001-11-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/raw_ip6.c (rip6_usrreq):
 	* freebsd4/sys/netinet6/raw_ip6.c (rip6_send):
