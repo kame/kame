@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1796 2001/07/21 04:40:19 itojun Exp $
+$KAME: CHANGELOG,v 1.1797 2001/07/21 04:48:18 itojun Exp $
 
 <200107>
 Sat Jul 21 13:30:21 JST 2001  itojun@iijlab.net
@@ -51,6 +51,8 @@ Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
 	  # route delete -inet 10.1.0.0 10.0.0.3
 	  (now you can erase the route without rt_gateway, as there's only one)
 	  # route delete -inet 10.1.0.0
+
+	  routing todo: reject same key/gw pair on RTM_ADD
 
 	  L3 TODO: more clever hash/gw selection policy (-> RFC2991/2992),
 	  avoid faulty gateways/nonworking paths, revisit issues with cached
