@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.23 1999/08/17 10:50:40 itojun Exp $
+$Id: CHANGELOG,v 1.24 1999/08/17 12:27:37 jinmei Exp $
 
 <199908>
+1999-08-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/libinet6/ip6opt.c (inet6_option_append, inet6_option_alloc): 
+	adjust pad length to avoid unnecessary pad.
+	Thanks to Frederic SOULIER to pointed it out.
+
 Tue Aug 17 19:46:52 JST 1999  itojun@iijlab.net
 	* sys/netinet6/in6.h: make IN6_IS_SCOPE_LINKLOCAL() invisible from
 	  userland.
