@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.11 2002/05/23 02:27:51 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.12 2002/05/23 11:08:57 jinmei Exp $	*/
 
 %{
 /*
@@ -72,6 +72,7 @@ static void cfdebug_print __P((char *, char *, int));
 /* abbreviations */
 nl		\n
 ws		[ \t]+
+comma		,
 comment		\#.*
 semi		\;
 string		[a-zA-Z0-9:\._][a-zA-Z0-9:\._]*
@@ -137,8 +138,11 @@ ecl		\}
 <S_CNF>send { DECHO; return(SEND); }
 
 	/* DHCP options */
+<S_CNF>option { DECHO; return(OPTION); }
+
 <S_CNF>rapid-commit { DECHO; return(RAPID_COMMIT); }
 <S_CNF>prefix-delegation { DECHO; return(PREFIX_DELEGATION); }
+<S_CNF>domain-name-servers { DECHO; return(DNS_SERVERS); }
 
 	/* generic options */
 <S_CNF>information-only { DECHO; return(INFO_ONLY); }
@@ -162,6 +166,7 @@ ecl		\}
 	return(NUMBER);
 }
 {slash} { DECHO; return(SLASH); }
+{comma} { DECHO; return(COMMA); }
 {semi} { DP("end of sentence"); return(EOS); }
 {bcl} { DP("begin of closure"); return(BCL); }
 {ecl} { DP("end of closure"); return(ECL); }

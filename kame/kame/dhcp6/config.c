@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.16 2002/05/23 03:30:08 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.17 2002/05/23 11:08:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -49,15 +49,17 @@
 extern int errno;
 
 struct dhcp6_if *dhcp6_if;
-
 struct prefix_ifconf *prefix_ifconflist;
+struct dhcp6_list dnslist;
 
 static struct dhcp6_ifconf *dhcp6_ifconflist;
 static struct prefix_ifconf *prefix_ifconflist0;
 static struct host_conf *host_conflist0, *host_conflist;
+static struct dhcp6_list dnslist0; 
 
 enum { DHCPOPTCODE_SEND, DHCPOPTCODE_REQUEST, DHCPOPTCODE_ALLOW };
 
+extern struct cf_list *cf_dns_list;
 extern char *configfilename;
 
 static int add_options __P((int, struct dhcp6_ifconf *, struct cf_list *));
@@ -353,6 +355,41 @@ configure_host(hostlist)
 	return(-1);
 }
 
+int
+configure_global_option()
+{
+	struct cf_list *cl;
+
+	/* DNS servers */
+	if (cf_dns_list && dhcp6_mode != DHCP6_MODE_SERVER) {
+		dprintf(LOG_INFO, "%s" "%s:%d server-only configuration",
+		    FNAME, configfilename, cf_dns_list->line);
+		goto bad;
+	}
+	TAILQ_INIT(&dnslist0);
+	for (cl = cf_dns_list; cl; cl = cl->next) {
+		/* duplication check */
+		if (dhcp6_find_listval(&dnslist0, cl->ptr,
+			DHCP6_LISTVAL_ADDR6)) {
+			dprintf(LOG_INFO, "%s"
+			    "%s:%d duplicated DNS server: %s", FNAME,
+			    configfilename, cl->line,
+			    in6addr2str((struct in6_addr *)cl->ptr, 0));
+			goto bad;
+		}
+		if (dhcp6_add_listval(&dnslist0, cl->ptr,
+			DHCP6_LISTVAL_ADDR6) == NULL) {
+			dprintf(LOG_ERR, "%s" "failed to add a DNS server");
+			goto bad;
+		}
+	}
+
+	return 0;
+
+  bad:
+	return -1;
+}
+
 static int
 configure_duid(str, duid)
 	char *str;		/* this is a valid DUID string */
@@ -480,6 +517,8 @@ configure_cleanup()
 	prefix_ifconflist0 = NULL;
 	clear_hostconf(host_conflist0);
 	host_conflist0 = NULL;
+	dhcp6_clear_list(&dnslist0);
+	TAILQ_INIT(&dnslist0);
 }
 
 void
@@ -524,6 +563,13 @@ configure_commit()
 	}
 	host_conflist = host_conflist0;
 	host_conflist0 = NULL;
+
+	/* commit DNS addresses */
+	if (!TAILQ_EMPTY(&dnslist)) {
+		dhcp6_clear_list(&dnslist);
+	}
+	dnslist = dnslist0;
+	TAILQ_INIT(&dnslist0);
 }
 
 static void

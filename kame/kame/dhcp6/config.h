@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.15 2002/05/22 14:16:46 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.16 2002/05/23 11:08:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -182,7 +182,8 @@ struct cf_list {
 enum {DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY, DECL_REQUEST, DECL_DUID,
       DECL_PREFIX, DECL_PREFERENCE,
       IFPARAM_SLA_ID,
-      DHCPOPT_RAPID_COMMIT, DHCPOPT_PREFIX_DELEGATION};
+      DHCPOPT_RAPID_COMMIT, DHCPOPT_PREFIX_DELEGATION,
+      ADDRESS_LIST_ENT };
 
 typedef enum {DHCP6_MODE_SERVER, DHCP6_MODE_CLIENT, DHCP6_MODE_RELAY }
 dhcp6_mode_t;
@@ -192,11 +193,13 @@ extern const dhcp6_mode_t dhcp6_mode;
 extern struct dhcp6_if *dhcp6_if;
 extern struct dhcp6_ifconf *dhcp6_iflist;
 extern struct prefix_ifconf *prefix_ifconflist;
+extern struct dhcp6_list dnslist;
 
 extern void ifinit __P((char *));
 extern int configure_interface __P((struct cf_namelist *));
 extern int configure_prefix_interface __P((struct cf_namelist *));
 extern int configure_host __P((struct cf_namelist *));
+extern int configure_global_option __P((void));
 extern void configure_cleanup __P((void));
 extern void configure_commit __P((void));
 extern int cfparse __P((char *));

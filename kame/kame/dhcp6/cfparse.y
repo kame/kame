@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.11 2002/05/22 12:42:41 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.12 2002/05/23 11:08:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -71,6 +71,7 @@ extern int cfdebug;
 	} while (0)
 
 static struct cf_namelist *iflist_head, *piflist_head, *hostlist_head; 
+struct cf_list *cf_dns_list;
 
 extern int yylex __P((void));
 static void cleanup __P((void));
@@ -82,9 +83,10 @@ static void cleanup_cflist __P((struct cf_list *));
 %token PREFIX_INTERFACE SLA_ID DUID_ID
 %token REQUEST SEND ALLOW PREFERENCE
 %token HOST HOSTNAME DUID
-%token RAPID_COMMIT PREFIX_DELEGATION
+%token OPTION RAPID_COMMIT PREFIX_DELEGATION DNS_SERVERS
 %token INFO_ONLY
 %token NUMBER SLASH EOS BCL ECL STRING PREFIX INFINITE
+%token COMMA
 
 %union {
 	long long num;
@@ -96,6 +98,7 @@ static void cleanup_cflist __P((struct cf_list *));
 %type <str> IFNAME HOSTNAME DUID_ID STRING
 %type <num> NUMBER duration
 %type <list> declaration declarations dhcpoption ifparam ifparams
+%type <list> address_list address_list_ent
 %type <prefix> prefixparam
 
 %%
@@ -108,6 +111,7 @@ statement:
 		interface_statement
 	|	prefix_interface_statement
 	|	host_statement
+	|	option_statement
 	;
 
 interface_statement:
@@ -145,6 +149,61 @@ host_statement:
 			return(-1);
 	}
 	;
+
+option_statement:
+	OPTION DNS_SERVERS address_list EOS
+	{
+		if (cf_dns_list == NULL) {
+			$3->next = NULL;
+			$3->tail = $3;
+			cf_dns_list = $3;
+		} else {
+			cf_dns_list->tail->next = $3;
+			cf_dns_list->tail = $3;
+		}
+	}
+	;
+
+address_list:
+		{ $$ = NULL; }
+	|	address_list address_list_ent
+		{
+			struct cf_list *head;
+
+			if ((head = $1) == NULL) {
+				$2->next = NULL;
+				$2->tail = $2;
+				head = $2;
+			} else {
+				head->tail->next = $2;
+				head->tail = $2;
+			}
+
+			$$ = head;
+		}
+	;
+
+address_list_ent:
+	STRING
+	{
+		struct cf_list *l;
+		struct in6_addr a0, *a;
+
+		if (inet_pton(AF_INET6, $1, &a0) != 1) {
+			yywarn("invalid IPv6 address: %s", $1);
+			free($1);
+			return(-1);
+		}
+		if ((a = malloc(sizeof(*a))) == NULL) {
+			yywarn("can't allocate memory");
+			return(-1);
+		}
+		*a = a0;
+
+		MAKE_CFLIST(l, ADDRESS_LIST_ENT, a, NULL);
+
+		$$ = l;
+	}
 
 declarations:
 		{ $$ = NULL; }
@@ -344,6 +403,8 @@ cleanup()
 	cleanup_namelist(iflist_head);
 	cleanup_namelist(piflist_head);
 	cleanup_namelist(hostlist_head);
+
+	cleanup_cflist(cf_dns_list);
 }
 
 static void
@@ -392,6 +453,9 @@ cf_post_config()
 		config_fail();
 
 	if (configure_host(hostlist_head))
+		config_fail();
+
+	if (configure_global_option())
 		config_fail();
 
 	configure_commit();

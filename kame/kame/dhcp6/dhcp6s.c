@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.84 2002/05/23 08:51:23 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.85 2002/05/23 11:08:57 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -97,7 +97,7 @@ static char rdatabuf[BUFSIZ];
 static int rmsgctllen;
 static char *rmsgctlbuf;
 static struct duid server_duid;
-static struct dhcp6_list dnslist;
+static struct dhcp6_list arg_dnslist;
 
 #define LINK_LOCAL_PLEN 10
 #define SITE_LOCAL_PLEN 10
@@ -158,7 +158,7 @@ main(argc, argv)
 	else
 		progname++;
 
-	TAILQ_INIT(&dnslist);
+	TAILQ_INIT(&arg_dnslist);
 
 	srandom(time(NULL) & getpid());
 	while ((ch = getopt(argc, argv, "c:dDfn:")) != -1) {
@@ -176,6 +176,8 @@ main(argc, argv)
 			foreground++;
 			break;
 		case 'n':
+			warnx("-n dnsserv option was obsoleted.  "
+			    "use configuration file.");
 			if (inet_pton(AF_INET6, optarg, &a) != 1) {
 				errx(1, "invalid DNS server %s", optarg);
 				/* NOTREACHED */
@@ -185,7 +187,7 @@ main(argc, argv)
 				/* NOTREACHED */
 			}
 			dlv->val_addr6 = a;
-			TAILQ_INSERT_TAIL(&dnslist, dlv, link);
+			TAILQ_INSERT_TAIL(&arg_dnslist, dlv, link);
 			break;
 		default:
 			usage();
@@ -215,6 +217,17 @@ main(argc, argv)
 			FNAME);
 		exit(1);
 	}
+	/* prohibit a mixture of old and new style of DNS server config */
+	if (!TAILQ_EMPTY(&arg_dnslist)) {
+		if (!TAILQ_EMPTY(&dnslist)) {
+			dprintf(LOG_INFO, "%s" "do not specify DNS servers "
+			    "both by command line and by configuration file.",
+			    FNAME);
+			exit(1);
+		}
+		dnslist = arg_dnslist;
+		TAILQ_INIT(&arg_dnslist);
+	}
 
 	server6_init();
 
@@ -226,7 +239,7 @@ static void
 usage()
 {
 	fprintf(stderr,
-		"usage: dhcp6s [-c configfile] [-dDf] [-n dnsserv] intface\n");
+		"usage: dhcp6s [-c configfile] [-dDf] intface\n");
 	exit(0);
 }
 
