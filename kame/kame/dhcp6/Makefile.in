@@ -1,12 +1,12 @@
 #
-# $Id: Makefile.in,v 1.9 2001/12/27 08:09:35 itojun Exp $
+# $Id: Makefile.in,v 1.10 2002/04/30 14:49:08 jinmei Exp $
 #
 
 srcdir=	@srcdir@
 CFLAGS=	@CFLAGS@ @DEFS@
 LDFLAGS=@LDFLAGS@
 LIBOBJS=@LIBOBJS@
-LIBS=	@LIBS@
+LIBS=	@LIBS@ -ly -ll
 CC=	@CC@
 TARGET=	dhcp6c dhcp6s
 
@@ -19,7 +19,10 @@ bindir=	@bindir@
 sbindir=@sbindir@
 mandir=	@mandir@
 
-CLIENTOBJS=	dhcp6c.o common.o
+GENSRCS = cftoken.c cfparse.c
+CLEANFILES = $(GENSRC) lex.yy.c y.tab.c y.tab.h
+
+CLIENTOBJS=	dhcp6c.o common.o config.o $(GENSRCS:%.c=%.o)
 SERVOBJS=	dhcp6s.o common.o
 RELAYOBJS =	dhcp6relay.o common.o
 
@@ -30,6 +33,14 @@ dhcp6s:	$(SERVOBJS) $(LIBOBJS)
 	$(CC) $(LDFLAGS) -o dhcp6s $(SERVOBJS) $(LIBOBJS) $(LIBS) 
 dhcp6relay: $(RELAYOBJS) $(LIBOBJS)
 	$(CC) $(LDFLAGS) -o $@ $(RELAYOBJS) $(LIBOBJS) $(LIBS) 
+
+cfparse.c y.tab.h: cfparse.y
+	yacc -d cfparse.y
+	mv y.tab.c cfparse.c
+
+cftoken.c: cftoken.l y.tab.h
+	lex cftoken.l
+	mv lex.yy.c $@	
 
 getaddrinfo.o:	$(srcdir)/missing/getaddrinfo.c
 getnameinfo.o:	$(srcdir)/missing/getnameinfo.c
@@ -48,7 +59,7 @@ install::
 includes::
 
 clean::
-	/bin/rm -f *.o $(TARGET)
+	/bin/rm -f *.o $(TARGET) $(CLEANFILES)
 
 distclean:: clean
 	/bin/rm -f Makefile config.cache config.log config.status .depend

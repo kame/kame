@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.17 2002/04/24 14:31:32 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.18 2002/04/30 14:49:08 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -42,6 +42,7 @@
 #define DH6ERR_OPTUNAVAIL	20
 
 /* Message type */
+#define DH6_SOLICIT	1
 #define DH6_REPLY	7
 #define DH6_INFORM_REQ	11
 
@@ -52,6 +53,10 @@
 #define DH6PORT_UPSTREAM	"547"
 
 /* Protocol constants */
+#define MIN_SOL_DELAY	1000	/* msec */
+#define MAX_SOL_DELAY	5000	/* msec */
+#define SOL_TIMEOUT	500	/* msec */
+#define SOL_MAX_RT	30000	/* msec */
 #define INF_TIMEOUT	500	/* msec */
 #define INF_MAX_RT	30000	/* msec */
 
@@ -83,10 +88,12 @@ struct dhcp6_duid_type1 {
 	/* link-layer address follows */
 } __attribute__ ((__packed__));
 
-/* option */
-#define DH6OPT_CLIENTID	1	/* TBD */
-#define DH6OPT_SERVERID	2	/* TBD */
-#define DH6OPT_DNS	11	/* TBD */
+/* options: TBD */
+#define DH6OPT_CLIENTID	1
+#define DH6OPT_SERVERID	2
+#define DH6OPT_DNS	11
+#define DH6OPT_RAPID_COMMIT 14
+
 struct dhcp6opt {
 	u_int16_t dh6opt_type;
 	u_int16_t dh6opt_len;

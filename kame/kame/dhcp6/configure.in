@@ -111,4 +111,6 @@ AC_ARG_ENABLE(pedant, [  --enable-pedant         pedantic compilation],
 	fi], [enableval=no])
 AC_MSG_RESULT($enableval);
 
+AC_CHECK_HEADERS(stdarg.h)
+
 AC_OUTPUT(Makefile)
