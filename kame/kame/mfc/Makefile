@@ -35,6 +35,10 @@ LDADD+=-ly -ll
 SRCS= mfc.c cfparse.y cftoken.l
 YACC= yacc -tv
 
+.if (${OPSYS} == "NetBSD")
+YFLAGS+=-d
+.endif
+
 CC=gcc
 .if (${OPSYS} != "NetBSD")
 CFLAGS+=-g -Wall
