@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.144 2004/09/04 09:26:38 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.145 2004/09/04 09:27:55 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -217,7 +217,7 @@ usage()
 {
 
 	fprintf(stderr, "usage: dhcp6c [-c configfile] [-dDf] "
-	    "[-p pid-file] interface\n");
+	    "[-p pid-file] interface [interfaces...]\n");
 }
 
 /*------------------------------------------------------------*/
