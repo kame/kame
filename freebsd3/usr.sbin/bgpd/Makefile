@@ -7,7 +7,7 @@ MAN5=	bgpd.conf.5
 MAN8=	bgpd.8
 
 CFLAGS+=	-Wall
-CFLAGS+=	-DADVANCEDAPI -DINET6 -DUSE_RFC2292BIS
+CFLAGS+=	-DADVANCEDAPI -DINET6 -DUSE_RFC2292BIS -DWITHOUT_LEX_YACC
 
 LDADD+=	-L${.OBJDIR}/../../lib/libinet6 \
 	-L/usr/local/v6/lib -linet6 -lcompat

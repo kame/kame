@@ -5,8 +5,9 @@ SRCS=	main.c if.c rt_table.c task.c parse.c in6.c router.c \
 
 MAN=	bgpd.conf.5 bgpd.8
 
-CFLAGS+=	-Wall
-CPPFLAGS+=	-DADVANCEDAPI -DINET6 -DUSE_RFC2292BIS -DHAVE_SEARCH_H=1 
+CFLAGS+=-Wall
+CPPFLAGS+=-DADVANCEDAPI -DINET6 -DUSE_RFC2292BIS -DHAVE_SEARCH_H=1 \
+	-DWITHOUT_LEX_YACC
 
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6 -lcompat
