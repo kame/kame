@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2064 2002/01/28 08:28:31 keiichi Exp $
+$KAME: CHANGELOG,v 1.2065 2002/01/29 14:18:16 fujisawa Exp $
 
 <200201>
+2002-01-29 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_{defs,rule,soctl,usrreq}.[ch]:
+	* kame/kame/natptconfig/misc.c:
+	- Change NATPT related ioctl macro name which begin with
+	  "SIOC" to name which begin with "NATPT".  "SIOC" as ioctl
+	  macro name prefix is too general.
+
 Mon Jan 28 17:19:19 JST 2002 keiichi@iij.ad.jp
 	* kame/sys/netnet6/{mip6.c,mip6_binding.c,mip6.h}
 	- fix a bug in the processing routine of the authentication data
