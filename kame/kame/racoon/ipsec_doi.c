@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.162 2003/06/27 07:32:38 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.163 2003/10/22 02:50:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -371,11 +371,11 @@ get_ph1approvalx(p, proposal, sap)
 		 * if responder side and peer's key length in proposal
 		 * is bigger than mine, it might be accepted.
 		 */
-		if(tsap->enctype == s->enctype 
-		 && tsap->authmethod == s->authmethod
-		 && tsap->hashtype == s->hashtype
-		 && tsap->dh_group == s->dh_group
-		 && tsap->encklen == s->encklen)
+		if(tsap->enctype == s->enctype &&
+		    tsap->authmethod == s->authmethod &&
+		    tsap->hashtype == s->hashtype &&
+		    tsap->dh_group == s->dh_group &&
+		    tsap->encklen == s->encklen)
 			break;
 	}
 
@@ -1163,8 +1163,8 @@ get_proppair(sa, mode)
 			vfree(pbuf);
 			return NULL;
 		}
-		if (mode == IPSECDOI_TYPE_PH1
-		 && pa != (struct isakmp_parse_t *)pbuf->v) {
+		if (mode == IPSECDOI_TYPE_PH1 &&
+		    pa != (struct isakmp_parse_t *)pbuf->v) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				"Only a single proposal payload is allowed "
 				"during phase 1 processing.\n");
@@ -1313,8 +1313,8 @@ get_transform(prop, pair, num_p, mode)
 				"Invalid payload type=%u\n", pa->type);
 			break;
 		}
-		if (mode == IPSECDOI_TYPE_PH1
-		 && pa != (struct isakmp_parse_t *)pbuf->v) {
+		if (mode == IPSECDOI_TYPE_PH1 &&
+		    pa != (struct isakmp_parse_t *)pbuf->v) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				"Only a single transform payload is allowed "
 				"during phase 1 processing.\n");
@@ -2117,8 +2117,8 @@ check_attr_ipsec(proto_id, trns)
 
 			switch (lorv) {
 			case IPSECDOI_ATTR_AUTH_HMAC_MD5:
-				if (proto_id == IPSECDOI_PROTO_IPSEC_AH
-				 && trns->t_id != IPSECDOI_AH_MD5) {
+				if (proto_id == IPSECDOI_PROTO_IPSEC_AH &&
+				    trns->t_id != IPSECDOI_AH_MD5) {
 ahmismatch:
 					plog(LLV_ERROR, LOCATION, NULL,
 						"auth algorithm %u conflicts "
@@ -2227,16 +2227,16 @@ ahmismatch:
 		}
 	}
 
-	if (proto_id == IPSECDOI_PROTO_IPSEC_AH
-	 && !attrseen[IPSECDOI_ATTR_AUTH]) {
+	if (proto_id == IPSECDOI_PROTO_IPSEC_AH &&
+	    !attrseen[IPSECDOI_ATTR_AUTH]) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"attr AUTH must be present for AH.\n", type);
 		return -1;
 	}
 
-	if (proto_id == IPSECDOI_PROTO_IPSEC_ESP
-	 && trns->t_id == IPSECDOI_ESP_NULL
-	 && !attrseen[IPSECDOI_ATTR_AUTH]) {
+	if (proto_id == IPSECDOI_PROTO_IPSEC_ESP &&
+	    trns->t_id == IPSECDOI_ESP_NULL &&
+	    !attrseen[IPSECDOI_ATTR_AUTH]) {
 		plog(LLV_ERROR, LOCATION, NULL,
 		    "attr AUTH must be present for ESP NULL encryption.\n");
 		return -1;
@@ -2370,8 +2370,8 @@ check_attr_ipcomp(trns)
 	}
 
 #if 0
-	if (proto_id == IPSECDOI_PROTO_IPCOMP
-	 && !attrseen[IPSECDOI_ATTR_AUTH]) {
+	if (proto_id == IPSECDOI_PROTO_IPCOMP &&
+	    !attrseen[IPSECDOI_ATTR_AUTH]) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"attr AUTH must be present for AH.\n", type);
 		return -1;
@@ -2999,8 +2999,8 @@ ipsecdoi_checkid1(iph1)
 	id_b = (struct ipsecdoi_id_b *)iph1->id_p->v;
 
 	/* In main mode with pre-shared key, only address type can be used. */
-	if (iph1->etype == ISAKMP_ETYPE_IDENT
-	 && iph1->approval->authmethod == OAKLEY_ATTR_AUTH_METHOD_PSKEY) {
+	if (iph1->etype == ISAKMP_ETYPE_IDENT &&
+	    iph1->approval->authmethod == OAKLEY_ATTR_AUTH_METHOD_PSKEY) {
 		 if (id_b->type != IPSECDOI_ID_IPV4_ADDR
 		  && id_b->type != IPSECDOI_ID_IPV6_ADDR) {
 			plog(LLV_ERROR, LOCATION, NULL,
@@ -3023,8 +3023,8 @@ ipsecdoi_checkid1(iph1)
 	}
 
 	/* if phase 1 ID payload conformed RFC2407 4.6.2. */
-	if (id_b->type == IPSECDOI_ID_IPV4_ADDR
-	 && id_b->type == IPSECDOI_ID_IPV6_ADDR) {
+	if (id_b->type == IPSECDOI_ID_IPV4_ADDR &&
+	    id_b->type == IPSECDOI_ID_IPV6_ADDR) {
 
 		if (id_b->proto_id == 0 && ntohs(id_b->port) != 0) {
 			plog(LLV_WARNING, LOCATION, NULL,
@@ -3772,8 +3772,8 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 			break;
 
 		case IPSECDOI_ATTR_ENC_MODE:
-			if (pr->encmode
-			 && pr->encmode != (u_int16_t)ntohs(d->lorv)) {
+			if (pr->encmode &&
+			    pr->encmode != (u_int16_t)ntohs(d->lorv)) {
 				plog(LLV_ERROR, LOCATION, NULL,
 					"multiple encmode exist "
 					"in a transform.\n");
