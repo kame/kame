@@ -1,4 +1,4 @@
-.\"	$KAME: ndp.8,v 1.30 2004/08/11 10:29:57 jinmei Exp $
+.\"	$KAME: ndp.8,v 1.31 2004/10/26 06:40:39 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -144,11 +144,9 @@ list; install the top entry of the list into the kernel routing table.
 Shows the default interface used as the default route when
 there is no default router.
 .It Fl I Ar interface
-Specifies the default interface used as the default route when
-there is no default router.
-The 
+Specifies the default
 .Ar interface
-will be used as the default.
+to be used when there is no interface specified even though required.
 .It Fl I Li delete
 The current default interface will be deleted from the kernel.
 .It Fl i Ar interface Op Ar flags ...
