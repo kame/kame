@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.75 2001/07/26 14:08:19 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.76 2001/07/30 23:38:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -286,6 +286,7 @@ recv_dns0(sd, vclen)
 			printnsdb(ns);
 			printf("ns %p reachable\n", ns);
 		}
+		ns->nresponse++;
 	}
 
 	if (ismyaddr((struct sockaddr *)&from)) {
@@ -1486,6 +1487,7 @@ relay_dns(sd, buf, len, from)
 	size_t rbuflen = PACKETSZ;
 	int edns0len = -1;
 	char *edns0;
+	struct timeval tv;
 
 	if (sizeof(*hp) > len)
 		return -1;
@@ -1566,6 +1568,20 @@ relay_dns(sd, buf, len, from)
 				break;
 			}
 
+			gettimeofday(&tv, 0);
+			if (ns->dormant.tv_sec != -1) {
+				if (tv.tv_sec > ns->dormant.tv_sec) {
+					if (dflag)
+						printf("ns %p dormant\n", ns);
+					continue;
+				} else {
+					/* reset dormant flags */
+					ns->dormant.tv_sec = -1;
+					ns->dormant.tv_usec = -1;
+					ns->nquery = ns->nresponse = 0;
+				}
+			}
+
 			if (0 > edns0len && len > PACKETSZ) {
 				/* no EDNS0 on big message -> use TCP */
 				if (multicast)
@@ -1600,6 +1616,7 @@ relay_dns(sd, buf, len, from)
 #endif
 				sent++;
 				gettimeofday(&ns->lasttx, NULL);
+				ns->nquery++;
 			}
 		}
 

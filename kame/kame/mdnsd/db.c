@@ -1,4 +1,4 @@
-/*	$KAME: db.c,v 1.11 2001/07/26 14:08:19 itojun Exp $	*/
+/*	$KAME: db.c,v 1.12 2001/07/30 23:38:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -120,6 +120,16 @@ dbtimeo()
 		if (dflag)
 			printnsdb(ns);
 #endif
+
+		if (ns->dormant.tv_sec == -1 && ns->dormant.tv_usec == -1 &&
+		    ns->nquery > ns->nresponse + dormantcount) {
+			if (dflag)
+				printf("ns %p dormant: %d > %d + %d\n",
+				    ns, ns->nquery, ns->nresponse,
+				    dormantcount);
+			gettimeofday(&ns->dormant, 0);
+			ns->dormant.tv_sec += dormanttime;
+		}
 
 		if (ns->expire.tv_sec == -1 && ns->expire.tv_usec == -1)
 			continue;
@@ -245,6 +255,8 @@ newnsdb(addr, comment)
 	memcpy(ns->addr, addr, addr->sa_len);
 	if (comment)
 		ns->comment = strdup(comment);
+
+	ns->dormant.tv_sec = ns->dormant.tv_usec = -1;
 
 	LIST_INSERT_HEAD(&nsdb, ns, link);
 	return ns;

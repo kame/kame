@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.h,v 1.20 2001/06/23 01:54:22 itojun Exp $	*/
+/*	$KAME: mdnsd.h,v 1.21 2001/07/30 23:38:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -48,6 +48,8 @@ extern int Nflag;
 extern struct timeval hz;
 extern const int niflags;
 extern int signo;
+extern int dormantcount;
+extern int dormanttime;
 
 /* mdnsd.c */
 extern int addserv __P((const char *, int, const char *));

@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.41 2001/07/26 14:14:41 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.42 2001/07/30 23:38:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -77,6 +77,8 @@ const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
 const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
 #endif
 int signo = 0;
+int dormantcount = 5;
+int dormanttime = 5;
 
 int main __P((int, char **));
 static void usage __P((void));
@@ -232,7 +234,7 @@ main(argc, argv)
 				/*NOTREACHED*/
 			}
 			if (setif(sd->s, sd->af, intface) < 0) {
-				errx(1, "setif");
+				errx(1, "interface %s unusable", intface);
 				/*NOTREACHED*/
 			}
 			break;
@@ -243,7 +245,7 @@ main(argc, argv)
 				/*NOTREACHED*/
 			}
 			if (setif(sd->s, sd->af, intface) < 0) {
-				errx(1, "setif");
+				errx(1, "interface %s unusable", intface);
 				/*NOTREACHED*/
 			}
 			break;
