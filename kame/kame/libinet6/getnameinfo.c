@@ -36,6 +36,9 @@
  *   we need to truncate the result.  We obey RFC2553 (and X/Open should be
  *   modified).
  */
+/*
+ * NI_NOFQDN/NO
+ */
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -285,11 +288,17 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 #endif
 
 		if (hp) {
+#if 0
+			/*
+			 * commented out, since "for local host" is not
+			 * implemented here - see RFC2553 p30
+			 */
 			if (flags & NI_NOFQDN) {
 				p = strchr(hp->h_name, '.');
 				if (p)
 					*p = '\0';
 			}
+#endif
 			if (strlen(hp->h_name) > hostlen) {
 #ifdef USE_GETIPNODEBY
 				freehostent(hp);
