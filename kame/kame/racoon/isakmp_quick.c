@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.45 2000/07/21 15:51:19 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.46 2000/08/09 19:39:13 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1114,6 +1114,7 @@ quick_r2send(iph2, msg)
 	int tlen;
 	int error = ISAKMP_INTERNAL_ERROR;
 	int pfsgroup;
+	u_int8_t *np_p = NULL;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -1172,6 +1173,7 @@ quick_r2send(iph2, msg)
 	p = set_isakmp_payload(body->v, iph2->sa_ret, ISAKMP_NPTYPE_NONCE);
 
 	/* add NONCE payload */
+	np_p = &((struct isakmp_gen *)p)->np;	/* XXX */
 	p = set_isakmp_payload(p, iph2->nonce,
 		(iph2->dhpub_p != NULL && pfsgroup != 0)
 				? ISAKMP_NPTYPE_KE
@@ -1181,6 +1183,7 @@ quick_r2send(iph2, msg)
 
 	/* add KE payload if need. */
 	if (iph2->dhpub_p != NULL && pfsgroup != 0) {
+		np_p = &((struct isakmp_gen *)p)->np;	/* XXX */
 		p = set_isakmp_payload(p, iph2->dhpub,
 			(iph2->id_p == NULL)
 				? ISAKMP_NPTYPE_NONE
@@ -1192,8 +1195,51 @@ quick_r2send(iph2, msg)
 		/* IDci */
 		p = set_isakmp_payload(p, iph2->id_p, ISAKMP_NPTYPE_ID);
 		/* IDcr */
+		np_p = &((struct isakmp_gen *)p)->np;	/* XXX */
 		p = set_isakmp_payload(p, iph2->id, ISAKMP_NPTYPE_NONE);
 	}
+
+	/* add a RESPONDER-LIFETIME notify payload if needed */
+    {
+	vchar_t *data = NULL;
+	struct saprop *pp = iph2->approval;
+	struct saproto *pr;
+
+	if (pp->claim & IPSECDOI_ATTR_SA_LD_TYPE_SEC) {
+		u_int32_t v = htonl((u_int32_t)pp->lifetime);
+		data = isakmp_add_attr_l(data, IPSECDOI_ATTR_SA_LD_TYPE,
+					IPSECDOI_ATTR_SA_LD_TYPE_SEC);
+		if (!data)
+			goto end;
+		data = isakmp_add_attr_v(data, IPSECDOI_ATTR_SA_LD,
+					(caddr_t)&v, sizeof(v));
+		if (!data)
+			goto end;
+	}
+	if (pp->claim & IPSECDOI_ATTR_SA_LD_TYPE_KB) {
+		u_int32_t v = htonl((u_int32_t)pp->lifebyte);
+		data = isakmp_add_attr_l(data, IPSECDOI_ATTR_SA_LD_TYPE,
+					IPSECDOI_ATTR_SA_LD_TYPE_KB);
+		if (!data)
+			goto end;
+		data = isakmp_add_attr_v(data, IPSECDOI_ATTR_SA_LD,
+					(caddr_t)&v, sizeof(v));
+		if (!data)
+			goto end;
+	}
+
+	/*
+	 * XXX RESPONDER-LIFETIME is only one payload in a IKE message even
+	 * in the case of SA bundle case is ?
+	 */
+	for (pr = pp->head; pr; pr = pr->next) {
+		body = isakmp_add_pl_n(body, &np_p,
+				ISAKMP_NTYPE_RESPONDER_LIFETIME, pr, data);
+		if (!body)
+			return error;	/* XXX */
+	}
+	vfree(data);
+    }
 
 	/* generate HASH(2) */
     {
