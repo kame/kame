@@ -97,7 +97,7 @@ o Anonymous client on IPSec transport mode
 		spdadd net/pl S any -P in ipsec esp/transport//require;
 
 	Server's racoon.conf:
-		no particular twists
+		anonymous { passive on; }
 
 	due to the absense of phase 2 ID, IPSec SA will be installed for
 	A <--> S, not for net/pl <--> S.
@@ -133,7 +133,7 @@ o anonymous client allocated IP address dynamically and having a internal
 		Nothing
 
 	Server's racoon.conf:
-		no particular twists
+		anonymous { passive on; }
 
 o anonymous client allocated IP address dynamically.
 
@@ -164,4 +164,4 @@ o anonymous client allocated IP address dynamically.
 		Nothing
 
 	Server's racoon.conf:
-		no particular twists
+		anonymous { passive on; }
