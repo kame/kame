@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2637 2004/07/06 10:33:33 jinmei Exp $
+$KAME: CHANGELOG,v 1.2638 2004/07/07 10:34:14 suz Exp $
 
 <200407>
+2004-07-07  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/sys/netinet6/{in6.c, in6_src.c, nd6.c, nd6_rtr.c): freebsd5+kame 
+	starts up properly (other behavior is to be confirmed).
+
 2004-07-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netkey/key.c (key_spddump, key_dump): fixed possible
 	infinite loops.
