@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.14 2004/03/30 03:37:54 itojun Exp $	*/
+/*	$KAME: mldv2.c,v 1.15 2004/04/03 03:00:04 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -139,6 +139,8 @@
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
 #include <netinet/in_pcb.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
@@ -947,8 +949,13 @@ mld_sendpkt(in6m, type, dst)
 		break;
 	}
 
+#ifdef __FreeBSD__
 	ip6_output(mh, &ip6_opts, NULL,
 		   ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL, NULL);
+#else
+	ip6_output(mh, &ip6_opts, NULL,
+		   ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL);
+#endif
 }
 
 static struct mld_hdr *
@@ -1093,8 +1100,13 @@ mld_sendbuf(mh, ifp)
 
 	/* XXX: ToDo: create MLDv2 statistics field */
 	icmp6_ifstat_inc(ifp, ifs6_out_mldreport);
+#ifdef __FreeBSD__
 	ip6_output(mh, &ip6_opts, NULL,
 		   ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL, NULL);
+#else
+	ip6_output(mh, &ip6_opts, NULL,
+		   ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL);
+#endif
 }
 
 
@@ -2481,6 +2493,7 @@ in6_delmulti2(in6m, errorp, numsrc, src, mode, final)
 		bzero(&ifr.ifr_addr, sizeof(struct sockaddr_in6));
 		ifr.ifr_addr.sin6_family = AF_INET6;
 		ifr.ifr_addr.sin6_len = sizeof(struct sockaddr_in6);
+		ifr.ifr_addr.sin6_addr = in6m->in6m_addr;
 		(*in6m->in6m_ifp->if_ioctl)(in6m->in6m_ifp,
 		    SIOCDELMULTI, (caddr_t)&ifr);
 		free(in6m, M_IPMADDR);
@@ -2540,7 +2553,7 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 	/*
 	 * See if address already in list.
 	 */
-	IN6_LOOKUP_MULTI(ap, ifp, in6m);
+	IN6_LOOKUP_MULTI(*ap, ifp, in6m);
 
 	if (in6m != NULL) {
 		/*
@@ -2695,7 +2708,10 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 		 * Ask the network driver to update its multicast reception
 		 * filter appropriately for the new address.
 		 */
-		bcopy(ap, &ifr.ifr_addr, ap->sin6_len);
+		bzero(&ifr.ifr_addr, sizeof(struct sockaddr_in6));
+		ifr.ifr_addr.sin6_family = AF_INET6;
+		ifr.ifr_addr.sin6_len = sizeof(struct sockaddr_in6);
+		ifr.ifr_addr.sin6_addr = *ap;
 		if ((ifp->if_ioctl == NULL) ||
 		    (*ifp->if_ioctl)(ifp, SIOCADDMULTI, (caddr_t)&ifr) != 0) {
 			LIST_REMOVE(in6m, in6m_entry);
@@ -2764,7 +2780,7 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 				LIST_INSERT_HEAD(&ia->ia6_multiaddrs, in6m,
 				    in6m_entry);
 			} else {
-				nd6log((LOG_WARNING,
+				mldlog((LOG_WARNING,
 				    "in6_modmulti: addmulti failed for "
 				    "%s on %s (errno=%d)\n",
 				    ip6_sprintf(&in6m->in6m_addr),
@@ -3634,7 +3650,7 @@ in6_purgemkludge(ifp)
 		while ((in6m = LIST_FIRST(&mk->mk_head)) != NULL) {
 			int error;
 			/* ToDo: should remove all multicast entries */
-			in6_delmulti(in6m, &error, 0, NULL, MCAST_EXCLUDE, 1);
+			in6_delmulti2(in6m, &error, 0, NULL, MCAST_EXCLUDE, 1);
 		}
 		LIST_REMOVE(mk, mk_entry);
 		free(mk, M_IPMADDR);
