@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.145 2005/03/19 13:10:20 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.146 2005/03/20 06:37:19 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1379,7 +1379,6 @@ react_request(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	/*
 	 * See if we have to make a binding of some configuration information
 	 * for the client.
-	 * (Note that our implementation does not assign addresses (nor will)).
 	 */
 	
 	/*
@@ -1388,7 +1387,7 @@ react_request(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	 * router is authorized to delegate prefix(es) to the requesting
 	 * router, the delegating router selects the prefix(es) to be delegated
 	 * to the requesting router.
-	 * [dhcpv6-opt-prefix-delegation-01 Section 11.2]
+	 * [RFC3633 Section 12.2]
 	 */
 	if (!TAILQ_EMPTY(&optinfo->iapd_list)) {
 		struct dhcp6_list conflist;
