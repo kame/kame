@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.1 2001/06/16 09:21:17 itojun Exp $
+$KAME: FAQ,v 1.2 2001/06/16 09:40:00 jinmei Exp $
 
 
 GENERAL
@@ -166,6 +166,7 @@ Q: When I invoke ifconfig or netstat, garbled output is generated.
 	IPv6-enabled tools, you must invoke /usr/local/v6/sbin/ifconfig
 	or such.  You can of course add /usr/local/v6/bin into your
 	command search path.  Consult manpage for your shell.
+
 Q: How can I restrict RIPng route announcement for some of the interfaces?
 	First of all, you should choose appropriate routing daemon.
 
