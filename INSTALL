@@ -1,6 +1,6 @@
 	Installation procedure - preparation of the tree
 	KAME project
-	$KAME: INSTALL,v 1.27 2001/07/11 00:53:25 itojun Exp $
+	$KAME: INSTALL,v 1.28 2001/07/23 15:07:47 itojun Exp $
 
 Let's call the entire file-tree under this directory "the KAME tree".
 
@@ -63,7 +63,7 @@ perform "make obj" unless you are ready to tackle those troubles.
    otherwise the include files and source code become out-of-sync.
 
 1. See the "VERSION" file and identify a symbol name for your target
-   operating system. For the rest of this document, we assume "netbsd"
+   operating system.  For the rest of this document, we assume "netbsd"
    for explanation.
   
 2. Be sure to have the complete KAME tree.  For certain platforms

@@ -1,6 +1,6 @@
 	README of KAME kit
 	KAME Project
-	$KAME: README,v 1.57 2001/07/10 09:49:18 itojun Exp $
+	$KAME: README,v 1.58 2001/07/23 15:04:33 itojun Exp $
 
 <<<Project Overview>>>
 
@@ -115,16 +115,16 @@ When you report bugs, please be sure to include the following information:
 - (if necessary) IPv6/v4 connectivity status in your network
 
 Don't try to *describe* your settings, just paste command output itself
-onto the report instead. A bad example is "I assigned a global address on
-my ethernet interface, but ping6 didn't work. Why?" No one will be
-able to answer this kind of question. Instead, you should type as follows:
+onto the report instead.  A bad example is "I assigned a global address on
+my ethernet interface, but ping6 didn't work.  Why?" No one will be
+able to answer this kind of question.  Instead, you should type as follows:
 # /usr/local/v6/sbin/ifconfig -a
-(paste the output. Again, the exact output is best. Do not try to
+(paste the output.  Again, the exact output is best.  Do not try to
  describe the output by your own word)
 # /usr/local/v6/sbin/ifconfig ne0 inet6 2001:200::1234 prefixlen 64 alias
 (paste the output)
 # /usr/local/v6/sbin/ifconfig -a
-(paste the output. The difference between the two "ifconfig -a" might
+(paste the output.  The difference between the two "ifconfig -a" might
  be important.)
 # /usr/local/v6/sbin/ping6 -n 2001:300::1
 (paste the output, including errors and warnings)
