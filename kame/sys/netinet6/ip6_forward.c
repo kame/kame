@@ -27,6 +27,10 @@
  * SUCH DAMAGE.
  */
 
+#ifdef __FreeBSD__
+#include "opt_ip6fw.h"
+#endif
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>

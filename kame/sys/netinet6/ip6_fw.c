@@ -12,16 +12,18 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
- *	$Id: ip6_fw.c,v 1.4 1999/08/06 17:11:46 itojun Exp $
+ *	$Id: ip6_fw.c,v 1.5 1999/08/12 09:34:14 itojun Exp $
  */
 
 /*
  * Implement IPv6 packet firewall
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_ip6fw.h"
+#if __FreeBSD__ >= 3
 #include "opt_inet.h"
+#endif
 #endif
 
 #ifdef IP6DIVERT
