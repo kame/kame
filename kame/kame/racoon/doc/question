@@ -1,39 +1,42 @@
-$Id: question,v 1.4 2000/01/10 21:07:40 sakane Exp $
+$Id: question,v 1.5 2000/01/10 21:16:49 sakane Exp $
 
 HOW DO I DO ?
-o ID payload handling in phase 2 besides IPSECDOI_ID_IP*.
-  e.g. IPSECDOI_ID_DER_ASN1_DN.  Well, are these used in phase 2 ?
-o What should I do when HARD expiration has come ?
-o When node has multi address, I check only destination address on phase 2.
+Q. ID payload handling in phase 2 besides IPSECDOI_ID_IP*.
+   e.g. IPSECDOI_ID_DER_ASN1_DN.  Well, are these used in phase 2 ?
+Q. What should I do when HARD expiration has come ?
+Q. When node has multi address, I check only destination address on phase 2.
 	Must be check both with src and dst ?
-o replay prevention
+Q. replay prevention
 	limited number of session
 	limited session per peer
 	number of proposal
 	....
-o how to support multi interfaces ?
+Q. how to support multi interfaces ?
 	connect to dummy, like ping6.
 	bind multi address, like named.
-  now is former.
-o The padding for data attribute.
-o vendorid's hash algorithm
+   now is former.
+Q. The padding for data attribute.
+Q. vendorid's hash algorithm
 	For aggressive mode ?.
 	In mail mode, should I use negotiated algorithm ?
-o encryption during aggressive mode.
+Q. encryption during aggressive mode.
 	when receive encrypted packet of 1st exchange from responder,
 	it can be decoded.  When we are responder, should we send encrypted ?
-o packet padding ? in particular, variable attribute.
-o What is the perpose of exchange of DH attribute on quick mode ?
-o Should I do acceptable check of phase 2 pfs group ?.
-  If initiator requests PFS, should we accept without acceptable check.
-o base mode
+Q. packet padding ? in particular, variable attribute.
+Q. What is the perpose of exchange of DH attribute on quick mode ?
+Q. Should I do acceptable check of phase 2 pfs group ?.
+   If initiator requests PFS, should we accept without acceptable check.
+Q. base mode
    3.1. Base Mode Authenticated with Signatures
    HDR, SA, Idii, Ni_b     =>
                   Ni ???
                            <= HDR, SA, Idir, Nr_b
                                              Nr ?
-o What's proto_id in notify message of responder 2nd message with commit bit
+Q. What's proto_id in notify message of responder 2nd message with commit bit
   processing when multiple different SA applyed ?
-o Is it forbidden to clear commit bit during phase2 negotiation ?
-o how many time is the notify message sent ?
+Q. Is it forbidden to clear commit bit during phase2 negotiation ?
+
+Q. how many time is the notify message sent ?
+A. don't resend notify message because peer can use Acknowledged
+   Informational if peer requires the reply of the notify message.
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.11 2000/01/10 21:08:08 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.12 2000/01/10 21:16:46 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -651,11 +651,10 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	YIPSDEBUG(DEBUG_STAMP,
 		plog(logp, LOCATION, NULL, "sendto Information (%d).\n", np));
 
-	/* add to the schedule to resend, and seve back pointer. */
-	/* XXX Should we send three packet per a time, alternately re-send ? */
-	iph2->retry_counter = iph2->ph1->rmconf->retry_counter;
-	iph2->scr = sched_new(iph2->ph1->rmconf->retry_interval,
-				isakmp_ph2resend, iph2);
+	/*
+	 * don't resend notify message because peer can use Acknowledged
+	 * Informational if peer requires the reply of the notify message.
+	 */
 
 	error = 0;
 
