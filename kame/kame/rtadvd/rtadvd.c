@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.26 2000/05/23 11:31:26 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.27 2000/05/26 14:41:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -403,7 +403,7 @@ rtmsg_input()
 
 		switch(type) {
 		 case RTM_ADD:
-			 /* init iffalgs because it may have changed */
+			 /* init ifflags because it may have changed */
 			 iflist[ifindex]->ifm_flags =
 			 	if_getflags(ifindex,
 					    iflist[ifindex]->ifm_flags);
