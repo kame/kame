@@ -241,6 +241,8 @@ const struct cmd {
 	{ "-anycast",	-IN6_IFF_ANYCAST,	0,	setia6flags },
 	{ "tentative",	IN6_IFF_TENTATIVE,	0,	setia6flags },
 	{ "-tentative",	-IN6_IFF_TENTATIVE,	0,	setia6flags },
+	{ "deprecated",	IN6_IFF_DEPRECATED,	0,	setia6flags },
+	{ "-deprecated", -IN6_IFF_DEPRECATED,	0,	setia6flags },
 	{ "autoconf",	IN6_IFF_AUTOCONF,	0,	setia6flags },
 	{ "-autoconf",	-IN6_IFF_AUTOCONF,	0,	setia6flags },
 	{ "pltime",	NEXTARG,	0,		setia6pltime },
