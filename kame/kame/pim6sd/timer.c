@@ -1,4 +1,4 @@
-/*	$KAME: timer.c,v 1.15 2001/07/11 09:13:26 suz Exp $	*/
+/*	$KAME: timer.c,v 1.16 2001/07/21 08:01:58 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -248,7 +248,6 @@ age_vifs()
 		v->uv_querier->al_addr = v->uv_linklocal->pa_addr;
 		v->uv_querier->al_timer = MLD6_OTHER_QUERIER_PRESENT_INTERVAL;
 		time(&v->uv_querier->al_ctime); /* reset timestamp */
-		query_groups(v);
 	    }
 	} else {
 		/* We are in Querier state */
@@ -295,10 +294,6 @@ age_vifs()
 	/* PIM_HELLO periodic */
 	IF_TIMEOUT(v->uv_pim_hello_timer)
 	    send_pim6_hello(v, pim_hello_holdtime);
-
-	/* MLD6 query periodic */
-	IF_TIMEOUT(v->uv_gq_timer)
-	    query_groups(v);
     }
 
     IF_DEBUG(DEBUG_IF) {
