@@ -1,4 +1,4 @@
-/*	$KAME: gaistatd.c,v 1.6 2001/07/20 17:58:06 jinmei Exp $	*/
+/*	$KAME: gaistatd.c,v 1.7 2001/07/22 03:22:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -150,11 +150,11 @@ static void
 timeval_sub(a, b, result)
 	struct timeval *a, *b, *result;
 {
-	if (a->tv_usec > b->tv_usec) {
-		result->tv_usec = a->tv_usec - b->tv_usec;
-		result->tv_sec = a->tv_sec - b->tv_sec;
-	} else {
-		result->tv_usec = 1000000 + b->tv_usec - a->tv_usec;
-		result->tv_sec = a->tv_sec - b->tv_sec - 1;
+
+	result->tv_usec = a->tv_usec - b->tv_usec;
+	result->tv_sec = a->tv_sec - b->tv_sec;
+	while (result->tv_usec < 0) {
+		result->tv_usec += 1000000;
+		result->tv_sec--;
 	}
 }
