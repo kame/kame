@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.30 2001/01/02 12:10:56 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.31 2001/01/17 04:12:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -36,8 +36,14 @@
  * OS dependencies:
  *
  * - struct rt_addrinfo
- *   all *BSDs except bsdi4 only have two members; rti_addrs and rti_info[].
- *   bsdi4 has additional members; rti_flags, rti_ifa, rti_ifp, and rti_rtm.
+ *   bsdi4, netbsd 1.5R and beyond: rti_addrs, rti_info[], rti_flags, rti_ifa,
+ *	rti_ifp, and rti_rtm.
+ *   others: rti_addrs and rti_info[] only.
+ *
+ * - ifa->ifa_rtrequest
+ *   bsdi4, netbsd 1.5R and beyond: rt_addrinfo *
+ *   others: sockaddr * (note that sys/net/route.c:rtrequest() has an unsafe
+ *	typecast code, from 4.3BSD-reno)
  *
  * - side effects of rtrequest[1](RTM_DELETE)
  *	BSDI[34]: delete all cloned routes underneath the route.
