@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.6 2000/12/04 06:33:10 itojun Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.7 2001/04/17 17:53:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -186,6 +186,12 @@ accept_listener_query(src, dst, group, tmo)
 	}
     
 	/*
+	 * Ignore the query if we're (still) the querier.
+	 */
+	if ((v->uv_flags & VIFF_QUERIER) != 0)
+		return;
+
+	/*
 	 * Reset the timer since we've received a query.
 	 */
 	if (v->uv_querier && inet6_equal(src, &v->uv_querier->al_addr))
@@ -196,8 +202,7 @@ accept_listener_query(src, dst, group, tmo)
 	 * we must set our membership timer to [Last Member Query Count] *
 	 * the [Max Response Time] in the packet.
 	 */
-	if (!IN6_IS_ADDR_UNSPECIFIED(group) &&
-	    inet6_equal(src, &v->uv_linklocal->pa_addr)) {
+	if (!IN6_IS_ADDR_UNSPECIFIED(group)) {
 		register struct listaddr *g;
 
 		IF_DEBUG(DEBUG_MLD)
