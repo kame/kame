@@ -600,7 +600,7 @@ ifioctl(so, cmd, data, p)
 		break;
 
 	case SIOCSIFMTU:
-	{
+	    {
 		u_long oldmtu = ifp->if_mtu;
 
 		error = suser(p->p_ucred, &p->p_acflag);
@@ -619,7 +619,7 @@ ifioctl(so, cmd, data, p)
 #endif 
 		}
 		break;
-	}
+	    }
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
 	case SIOCSIFMEDIA:
