@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: strnames.h,v 1.1 2000/01/09 01:31:34 itojun Exp $ */
+/* YIPS @(#)$Id: strnames.h,v 1.2 2000/01/11 16:31:02 sakane Exp $ */
 
 extern char *s_ipsecdoi_proto __P((int proto));
 extern char *s_ipsecdoi_trns __P((int proto, int trns));
@@ -44,3 +44,4 @@ extern char *s_ipsecdoi_ident __P((int type));
 extern char *s_isakmp_etype __P((u_int8_t etype));
 extern char *s_pfkey_type __P((u_int8_t type));
 extern char *s_pfkey_satype __P((u_int8_t type));
+extern char *s_isakmp_notify_msg __P((u_int8_t type));

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.17 2000/01/11 15:56:04 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.18 2000/01/11 16:31:01 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -78,6 +78,7 @@
 #include "pfkey.h"
 #include "policy.h"
 #include "admin.h"
+#include "strnames.h"
 
 /* information exchange */
 static int isakmp_info_recv_n __P((struct ph1handle *, vchar_t *, struct sockaddr *));
@@ -647,7 +648,9 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	}
 
 	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL, "sendto Information (%d).\n", np));
+		plog(logp, LOCATION, NULL,
+			"sendto Information %d:%s.\n",
+			np, s_isakmp_notify_msg(np)));
 
 	/*
 	 * don't resend notify message because peer can use Acknowledged
@@ -660,41 +663,6 @@ end:
 
 	return(error);
 }
-
-static char *isakmp_notify_msg[] = {
-0,
-"INVALID-PAYLOAD-TYPE",
-"DOI-NOT-SUPPORTED",
-"SITUATION-NOT-SUPPORTED",
-"INVALID-COOKIE",
-"INVALID-MAJOR-VERSION",
-"INVALID-MINOR-VERSION",
-"INVALID-EXCHANGE-TYPE",
-"INVALID-FLAGS",
-"INVALID-MESSAGE-ID",
-"INVALID-PROTOCOL-ID",
-"INVALID-SPI",
-"INVALID-TRANSFORM-ID",
-"ATTRIBUTES-NOT-SUPPORTED",
-"NO-PROPOSAL-CHOSEN",
-"BAD-PROPOSAL-SYNTAX",
-"PAYLOAD-MALFORMED",
-"INVALID-KEY-INFORMATION",
-"INVALID-ID-INFORMATION",
-"INVALID-CERT-ENCODING",
-"INVALID-CERTIFICATE",
-"CERT-TYPE-UNSUPPORTED",
-"INVALID-CERT-AUTHORITY",
-"INVALID-HASH-INFORMATION",
-"AUTHENTICATION-FAILED",
-"INVALID-SIGNATURE",
-"ADDRESS-NOTIFICATION",
-"NOTIFY-SA-LIFETIME",
-"CERTIFICATE-UNAVAILABLE",
-"UNSUPPORTED-EXCHANGE-TYPE",
-"UNEQUAL-PAYLOAD-LENGTHS",
-0
-};
 
 /*
  * handling to receive Notification payload
@@ -737,13 +705,6 @@ isakmp_info_recv_n(iph1, msg, remote)
 		return -1;
 
 	type = ntohs(n->type);
-
-	/* sanity check */
-	if (type > sizeof(isakmp_notify_msg)/sizeof(isakmp_notify_msg[0])) {
-		plog(logp, LOCATION, remote,
-			"received unsupported message type %d.\n", type);
-		return -1;
-	}
 
 	switch (type) {
 	case ISAKMP_NTYPE_CONNECTED:
@@ -790,7 +751,7 @@ isakmp_info_recv_n(iph1, msg, remote)
 	plog(logp, LOCATION, remote,
 		"notification message %d:%s, "
 		"doi=%d proto_id=%d spi=%s(size=%d).\n",
-		type, isakmp_notify_msg[type],
+		type, s_isakmp_notify_msg(type),
 		ntohl(n->doi), n->proto_id, spi, n->spi_size);
 
 	free(spi);

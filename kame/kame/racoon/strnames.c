@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: strnames.c,v 1.1 2000/01/09 01:31:34 itojun Exp $ */
+/* YIPS @(#)$Id: strnames.c,v 1.2 2000/01/11 16:31:02 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -36,6 +36,19 @@
 #include "var.h"
 #include "strnames.h"
 #include "algorithm.h"
+
+static char *num2str __P((int n));
+
+static char *
+num2str(n)
+	int n;
+{
+	static char buf[20];
+
+	snprintf(buf, sizeof(buf), "%d", n);
+
+	return buf;
+}
 
 static char *name_ipsecdoi_proto[] = {
 	"",
@@ -468,3 +481,49 @@ s_pfkey_satype(type)
 
 	return NULL;
 }
+
+static char *name_isakmp_notify_msg[] = {
+	NULL,
+	"INVALID-PAYLOAD-TYPE",
+	"DOI-NOT-SUPPORTED",
+	"SITUATION-NOT-SUPPORTED",
+	"INVALID-COOKIE",
+	"INVALID-MAJOR-VERSION",
+	"INVALID-MINOR-VERSION",
+	"INVALID-EXCHANGE-TYPE",
+	"INVALID-FLAGS",
+	"INVALID-MESSAGE-ID",
+	"INVALID-PROTOCOL-ID",
+	"INVALID-SPI",
+	"INVALID-TRANSFORM-ID",
+	"ATTRIBUTES-NOT-SUPPORTED",
+	"NO-PROPOSAL-CHOSEN",
+	"BAD-PROPOSAL-SYNTAX",
+	"PAYLOAD-MALFORMED",
+	"INVALID-KEY-INFORMATION",
+	"INVALID-ID-INFORMATION",
+	"INVALID-CERT-ENCODING",
+	"INVALID-CERTIFICATE",
+	"CERT-TYPE-UNSUPPORTED",
+	"INVALID-CERT-AUTHORITY",
+	"INVALID-HASH-INFORMATION",
+	"AUTHENTICATION-FAILED",
+	"INVALID-SIGNATURE",
+	"ADDRESS-NOTIFICATION",
+	"NOTIFY-SA-LIFETIME",
+	"CERTIFICATE-UNAVAILABLE",
+	"UNSUPPORTED-EXCHANGE-TYPE",
+	"UNEQUAL-PAYLOAD-LENGTHS",
+	NULL
+};
+
+char *
+s_isakmp_notify_msg(type)
+	u_int8_t type;
+{
+	if (ARRAYLEN(name_isakmp_notify_msg) > type)
+		return name_isakmp_notify_msg[type];
+
+	return num2str(type);
+}
+
