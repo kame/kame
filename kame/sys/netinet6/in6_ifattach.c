@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.71 2000/12/01 16:09:49 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.72 2001/01/02 08:28:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -391,8 +391,10 @@ in6_ifattach_addaddr(ifp, ia)
 #else
 	TAILQ_INSERT_TAIL(&ifp->if_addrlist, (struct ifaddr *)ia, ifa_list);
 #endif
+#ifdef __NetBSD__
 	/* gain a refcnt for the link from if_addrlist */
 	IFAREF(&ia->ia_ifa);
+#endif
 
 	/*
 	 * Also link into the IPv6 address chain beginning with in6_ifaddr.
@@ -404,8 +406,10 @@ in6_ifattach_addaddr(ifp, ia)
 		oia->ia_next = ia;
 	} else
 		in6_ifaddr = ia;
+#ifdef __NetBSD__
 	/* gain another refcnt for the link from in6_ifaddr */
 	IFAREF(&ia->ia_ifa);
+#endif
 
 	/*
 	 * give the interface a chance to initialize, in case this
@@ -435,7 +439,9 @@ in6_ifattach_addaddr(ifp, ia)
 #else
 		TAILQ_REMOVE(&ifp->if_addrlist, (struct ifaddr *)ia, ifa_list);
 #endif
+#ifdef __NetBSD__
 		IFAFREE(&ia->ia_ifa);
+#endif
 		if (oia)
 			oia->ia_next = ia->ia_next;
 		else
