@@ -1,5 +1,5 @@
 /*	$OpenBSD: getaddrinfo.c,v 1.23 2000/05/15 10:49:55 itojun Exp $	*/
-/*	$KAME: getaddrinfo.c,v 1.37 2001/01/05 16:38:20 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.38 2001/01/05 16:43:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -311,7 +311,6 @@ getaddrinfo(hostname, servname, hints, res)
 	int error = 0;
 	struct addrinfo ai, ai0, *afai;
 	struct addrinfo *pai;
-	const struct afd *afd;
 	const struct explore *ex;
 
 	memset(&sentinel, 0, sizeof(sentinel));
