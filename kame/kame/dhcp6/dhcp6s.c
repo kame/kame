@@ -685,16 +685,10 @@ server6_react_request(buf, siz, rcvpi)
 	struct tm *tm;
 	struct dhcp6e extbuf;
 	int agent;
-#if 0 /*def USE_DHCP6EXT_NULTERM - author confirmed, no zero termination */
-#define PADLEN0(x)	((x) + 1)
-#else
+/* 15/12 draft was unclear - author confirmed, no zero termination */
 #define PADLEN0(x)	((x))
-#endif
-#if 0 /*def USE_DHCP6EXT_PAD4 - author confirmed, no padding */
-#define PADLEN(x)	((PADLEN0((x)) + 3) & ~3)
-#else
+/* 15/12 draft was unclear - author confirmed, no padding */
 #define PADLEN(x)	(PADLEN0((x)))
-#endif
 
 	dprintf(LOG_DEBUG, "react_request");
 
