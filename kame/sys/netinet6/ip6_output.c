@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.267 2001/12/25 01:22:38 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.268 2001/12/25 01:39:36 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1879,16 +1879,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 #ifdef HAVE_NRL_INPCB
 	struct inpcb *inp = sotoinpcb(so);
 #define in6p inp
-#define in6p_socket inp_socket
-#define in6p_inputopts inp_inputopts6
-#define in6p_outputopts inp_outputopts6
-#define in6p_hops inp_hops
-#define in6p_lport inp_lport
-#define in6p_laddr inp_laddr6
-#define in6p_faddr inp_faddr6
-#define in6p_moptions inp_moptions6
-#define in6p_flags inp_flags
-#define in6p_route inp_route
 #else  /* !NRL */
 	struct in6pcb *in6p = sotoin6pcb(so);
 #endif /* HAVE_NRL_INPCB */
@@ -3106,16 +3096,6 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 
 #ifdef HAVE_NRL_INPCB
 #undef in6p
-#undef in6p_socket
-#undef in6p_inputopts
-#undef in6p_outputopts
-#undef in6p_hops
-#undef in6p_lport
-#undef in6p_laddr
-#undef in6p_faddr
-#undef in6p_moptions
-#undef in6p_flags
-#undef in6p_route
 #endif
 
 /*
