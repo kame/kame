@@ -30,7 +30,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     From: @(#)gethostbyname.3	8.4 (Berkeley) 5/25/95
-.\"     $Id: getipnodebyname.3,v 1.2 1999/09/13 16:04:51 itojun Exp $
+.\"     $Id: getipnodebyname.3,v 1.3 1999/12/10 01:44:27 itojun Exp $
 .\"
 .Dd May 25, 1995
 .Dt GETIPNODEBYNAME 3
@@ -442,4 +442,16 @@ are documented in ``Basic Socket Interface Extensions for IPv6''
 .Pq RFC2553 .
 .\"
 .Sh BUGS
+.Nm getipnodebyname
+and
+.Nm getipnodebyaddr
+do not handle scoped IPv6 address properly.
+If you use these functions,
+your program will not be able to handle scoped IPv6 addresses.
+For IPv6 address manipulation,
+.Fn getaddrinfo 3
+and
+.Fn getnameinfo 3
+are recommended.
+.Pp
 The text was shamelessly copied from RFC2553.
