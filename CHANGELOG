@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.775 2000/04/14 15:44:37 jinmei Exp $
+$Id: CHANGELOG,v 1.776 2000/04/17 03:03:26 itojun Exp $
 
 <200003>
+Mon Apr 17 11:37:44 JST 2000  itojun@iijlab.net
+	* sys/netinet/in_gif.c: reject packets with IPv4 broadcast address
+	  on outer IPv4 source.  this is suggested in ngtrans-mech-05.
+
 2000-04-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/dhcp6[cs].c: tiny clarifications;
 	- shutdown(0) for write only sockets
