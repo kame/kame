@@ -36,9 +36,9 @@ grammar.c: grammar.y
 	mv y.tab.h tokdefs.h
 
 grammar.o: grammar.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -Dyylval=pcap_lval -c $>
+	$(CC) $(CFLAGS) $(CPPFLAGS) -Dyylval=pcap_lval -c grammar.c
 grammar.po: grammar.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -Dyylval=pcap_lval -c -pg -o $@ $>
+	$(CC) $(CFLAGS) $(CPPFLAGS) -Dyylval=pcap_lval -c -pg -o $@ grammar.c
 
 version.c: VERSION
 	@rm -f $@
