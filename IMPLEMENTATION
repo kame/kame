@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.328 2003/03/08 07:56:34 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.329 2003/03/10 12:51:19 t-momose Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -218,7 +218,7 @@ draft-ietf-ipngwg-rfc2292bis-09.txt:
 	Advanced Sockets API for IPv6 (revised)
     * Some of the updates in the draft are not implemented yet.  See
       TODO.2292bis for more details.
-draft-ietf-mobileip-ipv6-19.txt: Mobility Support in IPv6
+draft-ietf-mobileip-ipv6-20.txt: Mobility Support in IPv6
     * See section 6.
 draft-ietf-ipngwg-router-selection-01.txt:
 	Default Router Preferences and More-Specific Routes
