@@ -52,10 +52,10 @@ case ${osname} in
 		altqchr=96
 		;;
 	NetBSD*i386)
-		altqchr=65
+		altqchr=75
 		;;
 	NetBSD*alpha)
-		altqchr=56
+		altqchr=62
 		;;
 	OpenBSD*i386)
 		altqchr=67

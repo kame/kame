@@ -1,4 +1,4 @@
-/*	$KAME: altq_conf.c,v 1.8 2000/12/01 12:48:44 kjc Exp $	*/
+/*	$KAME: altq_conf.c,v 1.9 2000/12/02 04:51:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_conf.c,v 1.8 2000/12/01 12:48:44 kjc Exp $
+ * $Id: altq_conf.c,v 1.9 2000/12/02 04:51:36 itojun Exp $
  */
 
 #ifdef ALTQ
@@ -172,9 +172,9 @@ void	altqattach __P((int));
 #define	CDEV_MAJOR 96		/* FreeBSD official number */
 #elif defined(__NetBSD__)
 #if defined(__i386__)
-#define	CDEV_MAJOR 65		/* NetBSD i386 (not official) */
+#define	CDEV_MAJOR 75		/* NetBSD i386 (not official) */
 #elif defined(__alpha__)
-#define	CDEV_MAJOR 56		/* NetBSD alpha (not official) */
+#define	CDEV_MAJOR 62		/* NetBSD alpha (not official) */
 #else
 #error arch not supported
 #endif
