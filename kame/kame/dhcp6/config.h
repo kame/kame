@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.1 2002/04/30 14:49:08 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.2 2002/05/01 06:12:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -43,7 +43,7 @@ struct dhcp_if {
 	long max_retrans_cnt;
 	long max_retrans_time;
 	long max_retrans_dur;
-	int timo;		/* number of timeouts */
+	int timeouts;		/* number of timeouts */
 
 	/* static parameters of the interface */
 	char *ifname;

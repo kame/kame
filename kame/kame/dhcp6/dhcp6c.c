@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.65 2002/05/01 06:00:00 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.66 2002/05/01 06:12:09 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -333,16 +333,16 @@ client6_mainloop()
 				dprintf(LOG_ERR, "select");
 				exit(1); /* XXX: signal case? */
 			case 0:	/* timeout */
-				ifp->timo++;
+				ifp->timeouts++;
 				if (ifp->max_retrans_cnt &&
-				    ifp->timo > ifp->max_retrans_cnt) {
+				    ifp->timeouts > ifp->max_retrans_cnt) {
 					dprintf(LOG_NOTICE, "client6_mainloop:"
 						" no responses were received.");
 					exit(0); /* XXX */
 				}
 				switch(ifp->state) {
 				case DHCP6S_INIT:
-					ifp->timo = 0;
+					ifp->timeouts = 0;
 					if ((ifp->flags & DHCIFF_INFO_ONLY))
 						ifp->state = DHCP6S_INFOREQ;
 					else
@@ -601,7 +601,13 @@ client6_send(ifp, s)
 		dh6->dh6_msgtype = DH6_INFORM_REQ;
 		break;
 	}
-	ifp->xid = random() & DH6_XIDMASK;
+	if (ifp->timeouts <= 1) {
+		/*
+		 * A client MUST leave the transaction-ID unchanged in
+		 * retransmissions of a message. [dhcpv6-24 15.1]
+		 */
+		ifp->xid = random() & DH6_XIDMASK;
+	}
 	dh6->dh6_xid &= ~ntohl(DH6_XIDMASK);
 	dh6->dh6_xid |= htonl(ifp->xid);
 	len = sizeof(*dh6);
@@ -834,7 +840,7 @@ reset_timer(ifp)
 			MIN_SOL_DELAY;
 		break;
 	default:
-		if (ifp->timo == 0)
+		if (ifp->timeouts == 0)
 			n = 2 * ifp->init_retrans + r * ifp->init_retrans;
 		else {
 			n = 2 * ifp->retrans + r * ifp->retrans;
