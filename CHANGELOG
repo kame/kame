@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1577 2001/03/01 11:10:16 suz Exp $
+$KAME: CHANGELOG,v 1.1578 2001/03/01 16:49:18 itojun Exp $
 
 <200103>
+Fri Mar  2 01:48:24 JST 2001  itojun@iijlab.net
+	* sys/netinet/ip_input.c (all *bsd): drop packets from outside
+	  if these contain 127/8 in ip_src or ip_dst.
+
 Thu Mar  1 20:01:14 JST 2001	suz@sdl.hitachi.co.jp
 	* bsdi3/sys/netinet/raw_ip.c
 	fixed a bug that bsdi3 KAME with IPsec crashes when it receives 	
