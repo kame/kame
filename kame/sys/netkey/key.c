@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.176 2000/12/05 18:01:29 jinmei Exp $	*/
+/*	$KAME: key.c,v 1.177 2000/12/21 01:40:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3936,7 +3936,9 @@ key_cmpspidx_withmask(spidx0, spidx1)
 		 * scope_id check. if sin6_scope_id is 0, we regard it
 		 * as a wildcard scope, which matches any scope zone ID. 
 		 */
-		if (satosin6(&spidx0->dst)->sin6_scope_id !=
+		if (satosin6(&spidx0->src)->sin6_scope_id &&
+		    satosin6(&spidx1->src)->sin6_scope_id &&
+		    satosin6(&spidx0->dst)->sin6_scope_id !=
 		    satosin6(&spidx1->dst)->sin6_scope_id)
 			return 0;
 		if (!key_bbcmp((caddr_t)&satosin6(&spidx0->dst)->sin6_addr,
