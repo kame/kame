@@ -27,7 +27,10 @@ BINMODE=4555
 CFLAGS+=-Wall
 .endif
 .if (${OPSYS} != "NetBSD")
-CFLAGS+=-DINET6 -DIPSEC
+CFLAGS+=-DINET6 -DUSE_RFC2292BIS
+.if (${OPSYS} != "OpenBSD")
+CFLAGS+=-DIPSEC
+.endif
 .else
 CPPFLAGS+=-DINET6 -DIPSEC
 .endif
@@ -39,8 +42,10 @@ DPADD+=	${.OBJDIR}/../libinet6/libipsec.a \
 	${.OBJDIR}/../libinet6/obj/libipsec.a \
 	/usr/local/v6/lib/libipsec.a
 .else
+.if (${OPSYS} != "OpenBSD")
 LDADD+=	-lipsec
 DPADD+=	${LIBIPSEC}
+.endif
 .endif
 .if exists(/usr/local/v6/lib/libinet6.a)
 LDADD+=	-L${.OBJDIR}/../libipsec -L${.OBJDIR}/../libipsec/obj \

@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.48 2002/05/26 01:05:14 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.49 2002/05/26 01:06:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1080,8 +1080,7 @@ packet_ok(mhdr, cc, seq)
 	if (cc < hlen + sizeof(struct icmp6_hdr)) {
 		if (verbose) {
 			if (getnameinfo((struct sockaddr *)from, from->sin6_len,
-			    hbuf, sizeof(hbuf), NULL, 0,
-			    NI_NUMERICHOST) != 0)
+			    hbuf, sizeof(hbuf), NULL, 0, NI_NUMERICHOST) != 0)
 				strlcpy(hbuf, "invalid", sizeof(hbuf));
 			printf("packet too short (%d bytes) from %s\n", cc,
 			    hbuf);
@@ -1094,8 +1093,7 @@ packet_ok(mhdr, cc, seq)
 	if (cc < sizeof(struct icmp6_hdr)) {
 		if (verbose) {
 			if (getnameinfo((struct sockaddr *)from, from->sin6_len,
-			    hbuf, sizeof(hbuf), NULL, 0,
-			    NI_NUMERICHOST) != 0)
+			    hbuf, sizeof(hbuf), NULL, 0, NI_NUMERICHOST) != 0)
 				strlcpy(hbuf, "invalid", sizeof(hbuf));
 			printf("data too short (%d bytes) from %s\n", cc, hbuf);
 		}
