@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.101 2001/04/04 05:17:30 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.102 2001/04/14 16:38:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2096,6 +2096,7 @@ ipsec4_encapsulate(m, sav)
 		&ip->ip_src, sizeof(ip->ip_src));
 	bcopy(&((struct sockaddr_in *)&sav->sah->saidx.dst)->sin_addr,
 		&ip->ip_dst, sizeof(ip->ip_dst));
+	ip->ip_ttl = IPDEFTTL;
 
 	/* XXX Should ip_src be updated later ? */
 
@@ -2175,6 +2176,7 @@ ipsec6_encapsulate(m, sav)
 		&ip6->ip6_src, sizeof(ip6->ip6_src));
 	bcopy(&((struct sockaddr_in6 *)&sav->sah->saidx.dst)->sin6_addr,
 		&ip6->ip6_dst, sizeof(ip6->ip6_dst));
+	ip6->ip6_hlim = IPV6_DEFHLIM;
 
 	/* XXX Should ip6_src be updated later ? */
 
