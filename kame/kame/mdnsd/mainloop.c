@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.80 2001/08/22 03:05:30 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.81 2001/09/03 09:52:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -39,7 +39,6 @@
  * - negative cache on NXRRSET reply on query timeout
  * - attach additional section on reply
  * - random delay before reply
- * - don't just relay EDNS0, decide EDNS0 independently from the querier
  * - as querier, retry without EDNS0 on FormError
  * - as querier, retry by TCP on truncated response (EDNS0??)
  * - multiple replies
