@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.121 2003/07/21 21:13:18 millert Exp $
+#	$OpenBSD: Makefile,v 1.125 2004/03/08 23:31:51 drahn Exp $
 #	$NetBSD: Makefile,v 1.59 1996/05/15 21:36:43 jtc Exp $
 
 #	@(#)Makefile	5.45.1.1 (Berkeley) 5/6/91
@@ -6,8 +6,11 @@
 # The ``rm -rf''s used below are safe because rm doesn't follow symbolic
 # links.
 
-# Missing: mp.h
 
+.include <bsd.own.mk>
+USE_GCC3?=No
+
+# Missing: mp.h
 FILES=	a.out.h ar.h assert.h bitstring.h blf.h bm.h bsd_auth.h cast.h \
 	cpio.h ctype.h curses.h db.h dbm.h des.h dirent.h disktab.h \
 	dlfcn.h elf_abi.h err.h fnmatch.h fstab.h fts.h ftw.h getopt.h \
@@ -26,8 +29,8 @@ FILES+=	link.h link_aout.h link_elf.h
 FILES+= ieeefp.h
 .endif
 
-MFILES=	float.h frame.h stdarg.h varargs.h
-LFILES=	errno.h fcntl.h syslog.h termios.h
+MFILES=	float.h frame.h 
+LFILES=	errno.h fcntl.h syslog.h termios.h stdarg.h varargs.h
 
 DIRS=	arpa protocols rpc rpcsvc
 LDIRS=	crypto ddb dev isofs miscfs net netatalk netccitt netinet altq \
@@ -49,19 +52,32 @@ PRDIRS=
 
 # Directories with an includes target that use Makefile.bsd-wrapper
 WDIRS=
-#WDIRS=	../usr.sbin/httpd ../gnu/egcs/libio ../gnu/egcs/libstdc++ \
-#	../gnu/egcs/libf2c ../gnu/egcs/libobjc ../gnu/egcs/gcc \
-#	../gnu/usr.bin/binutils
+#WDIRS=	../usr.sbin/httpd
+#.if ${MACHINE_ARCH} != "arm"
+#WDIRS+=	../gnu/usr.bin/binutils
+#.endif
 
 # Places using Makefile.bsd-wrapper that needs a prerequisite target met
 # before includes
 PWDIRS=
-#PWDIRS=	../usr.sbin/httpd ../gnu/egcs/libf2c ../gnu/usr.bin/binutils
+#PWDIRS=	../usr.sbin/httpd
+#.if ${MACHINE_ARCH} != "arm"
+#PWDIRS+=	../gnu/usr.bin/binutils
+#.endif
+
+#.if ${USE_GCC3:L} == "yes"
+#WDIRS+= ../gnu/lib/libstdc++ ../gnu/usr.bin/gcc ../gnu/lib/libobjc \
+#	../gnu/lib/libf2c
+#PWDIRS+= ../gnu/lib/libstdc++ ../gnu/lib/libf2c
+#.else
+#WDIRS+= ../gnu/egcs/libio ../gnu/egcs/libstdc++ \
+#	../gnu/egcs/libf2c ../gnu/egcs/libobjc ../gnu/egcs/gcc
+#PWDIRS+= ../gnu/egcs/libf2c
+#.endif
 
 NOOBJ=	noobj
 
 # Change SYS_INCLUDE in bsd.own.mk to "symlinks" if you don't want copies
-.include <bsd.own.mk>
 SYS_INCLUDE?=	copies
 #.if ${KERBEROS5:L} == "yes"
 #RDIRS+= ../lib/libkrb5 ../lib/libgssapi ../lib/libkadm5srv
