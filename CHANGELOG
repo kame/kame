@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2554 2004/03/10 09:34:13 jinmei Exp $
+$KAME: CHANGELOG,v 1.2555 2004/03/10 10:26:58 jinmei Exp $
 
 <200403>
+2004-03-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_reflect): made sure to provide
+	a valid sockaddr_in6 structure with regards to scope zone.  With
+	the previous the code a forwarding node could not return an ICMPv6
+	error if the source of the erroneous packet was link-local.
+
 2004-03-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_forward.c (ip6_forward): recovered scope
 	zone boundary check for the destination address.
