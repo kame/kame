@@ -701,8 +701,13 @@ icmp6_input(mp, offp, proto)
 			goto badcode;
 		if (icmp6len < sizeof(struct nd_router_solicit))
 			goto badlen;
-		IP6_EXTHDR_CHECK(m, off, icmp6len, IPPROTO_DONE);
-		nd6_rs_input(m, off, icmp6len);
+		if ((n = m_copym(m, 0, M_COPYALL, M_DONTWAIT)) == NULL) {
+			/* give up local */
+			nd6_rs_input(m, off, icmp6len);
+			m = NULL;
+			goto freeit;
+		}
+		nd6_rs_input(n, off, icmp6len);
 		/* m stays. */
 		break;
 
@@ -712,8 +717,13 @@ icmp6_input(mp, offp, proto)
 			goto badcode;
 		if (icmp6len < sizeof(struct nd_router_advert))
 			goto badlen;
-		IP6_EXTHDR_CHECK(m, off, icmp6len, IPPROTO_DONE);
-		nd6_ra_input(m, off, icmp6len);
+		if ((n = m_copym(m, 0, M_COPYALL, M_DONTWAIT)) == NULL) {
+			/* give up local */
+			nd6_ra_input(m, off, icmp6len);
+			m = NULL;
+			goto freeit;
+		}
+		nd6_ra_input(n, off, icmp6len);
 		/* m stays. */
 		break;
 
@@ -723,8 +733,13 @@ icmp6_input(mp, offp, proto)
 			goto badcode;
 		if (icmp6len < sizeof(struct nd_neighbor_solicit))
 			goto badlen;
-		IP6_EXTHDR_CHECK(m, off, icmp6len, IPPROTO_DONE);
-		nd6_ns_input(m, off, icmp6len);
+		if ((n = m_copym(m, 0, M_COPYALL, M_DONTWAIT)) == NULL) {
+			/* give up local */
+			nd6_ns_input(m, off, icmp6len);
+			m = NULL;
+			goto freeit;
+		}
+		nd6_ns_input(n, off, icmp6len);
 		/* m stays. */
 		break;
 
@@ -734,8 +749,13 @@ icmp6_input(mp, offp, proto)
 			goto badcode;
 		if (icmp6len < sizeof(struct nd_neighbor_advert))
 			goto badlen;
-		IP6_EXTHDR_CHECK(m, off, icmp6len, IPPROTO_DONE);
-		nd6_na_input(m, off, icmp6len);
+		if ((n = m_copym(m, 0, M_COPYALL, M_DONTWAIT)) == NULL) {
+			/* give up local */
+			nd6_na_input(m, off, icmp6len);
+			m = NULL;
+			goto freeit;
+		}
+		nd6_na_input(n, off, icmp6len);
 		/* m stays. */
 		break;
 

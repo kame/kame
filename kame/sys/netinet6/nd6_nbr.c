@@ -98,11 +98,10 @@ nd6_ns_input(m, off, icmp6len)
 {
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
-	struct nd_neighbor_solicit *nd_ns
-		= (struct nd_neighbor_solicit *)((caddr_t)ip6 + off);
+	struct nd_neighbor_solicit *nd_ns;
 	struct in6_addr saddr6 = ip6->ip6_src;
 	struct in6_addr daddr6 = ip6->ip6_dst;
-	struct in6_addr taddr6 = nd_ns->nd_ns_target;
+	struct in6_addr taddr6;
 	struct in6_addr myaddr6;
 	char *lladdr = NULL;
 	struct ifaddr *ifa;
@@ -114,7 +113,7 @@ nd6_ns_input(m, off, icmp6len)
 	if (ip6->ip6_hlim != 255) {
 		log(LOG_ERR,
 		    "nd6_ns_input: invalid hlim %d\n", ip6->ip6_hlim);
-		return;
+		goto freeit;
 	}
 
 	if (IN6_IS_ADDR_UNSPECIFIED(&saddr6)) {
@@ -131,6 +130,19 @@ nd6_ns_input(m, off, icmp6len)
 			goto bad;
 		}
 	}
+
+	/* XXX too strong requirement */
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, icmp6len,);
+	nd_ns = (struct nd_neighbor_solicit *)((caddr_t)ip6 + off);
+#else
+	IP6_EXTHDR_GET(nd_ns, struct nd_neighbor_solicit *, m, off, icmp6len);
+	if (nd_ns == NULL) {
+		icmp6stat.icp6s_tooshort++;
+		return;
+	}
+#endif
+	taddr6 = nd_ns->nd_ns_target;
 
 	if (IN6_IS_ADDR_MULTICAST(&taddr6)) {
 		log(LOG_INFO, "nd6_ns_input: bad NS target (multicast)\n");
@@ -220,13 +232,13 @@ nd6_ns_input(m, off, icmp6len)
 		 * assigned for us.  We MUST silently ignore it.
 		 * See RFC2461 7.2.3.
 		 */
-		return;
+		goto freeit;
 	}
 	myaddr6 = *IFA_IN6(ifa);
 	anycast = ((struct in6_ifaddr *)ifa)->ia6_flags & IN6_IFF_ANYCAST;
 	tentative = ((struct in6_ifaddr *)ifa)->ia6_flags & IN6_IFF_TENTATIVE;
 	if (((struct in6_ifaddr *)ifa)->ia6_flags & IN6_IFF_DUPLICATED)
-		return;
+		goto freeit;
 
 	if (lladdr && ((ifp->if_addrlen + 2 + 7) & ~7) != lladdrlen) {
 		log(LOG_INFO,
@@ -239,7 +251,7 @@ nd6_ns_input(m, off, icmp6len)
 		log(LOG_INFO,
 		    "nd6_ns_input: duplicate IP6 address %s\n",
 		    ip6_sprintf(&saddr6));
-		return;
+		goto freeit;
 	}
 
 	/*
@@ -265,7 +277,7 @@ nd6_ns_input(m, off, icmp6len)
 		if (IN6_IS_ADDR_UNSPECIFIED(&saddr6))
 			nd6_dad_ns_input(ifa);
 
-		return;
+		goto freeit;
 	}
 
 	/*
@@ -284,7 +296,7 @@ nd6_ns_input(m, off, icmp6len)
 				      ? 0 : ND_NA_FLAG_OVERRIDE)
 			      	| (ip6_forwarding ? ND_NA_FLAG_ROUTER : 0),
 			      tlladdr);
-		return;
+		goto freeit;
 	}
 
 	nd6_cache_lladdr(ifp, &saddr6, lladdr, lladdrlen, ND_NEIGHBOR_SOLICIT, 0);
@@ -294,13 +306,15 @@ nd6_ns_input(m, off, icmp6len)
 			| (ip6_forwarding ? ND_NA_FLAG_ROUTER : 0)
 			| ND_NA_FLAG_SOLICITED,
 		      tlladdr);
+ freeit:
+	m_freem(m);
 	return;
 
  bad:
 	log(LOG_ERR, "nd6_ns_input: src=%s\n", ip6_sprintf(&saddr6));
 	log(LOG_ERR, "nd6_ns_input: dst=%s\n", ip6_sprintf(&daddr6));
 	log(LOG_ERR, "nd6_ns_input: tgt=%s\n", ip6_sprintf(&taddr6));
-	return;
+	m_freem(m);
 }
 
 /*
@@ -505,17 +519,16 @@ nd6_na_input(m, off, icmp6len)
 {
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
-	struct nd_neighbor_advert *nd_na
-		= (struct nd_neighbor_advert *)((caddr_t)ip6 + off);
+	struct nd_neighbor_advert *nd_na;
 #if 0
 	struct in6_addr saddr6 = ip6->ip6_src;
 #endif
 	struct in6_addr daddr6 = ip6->ip6_dst;
-	struct in6_addr taddr6 = nd_na->nd_na_target;
-	int flags = nd_na->nd_na_flags_reserved;
-	int is_router = ((flags & ND_NA_FLAG_ROUTER) != 0);
-	int is_solicited = ((flags & ND_NA_FLAG_SOLICITED) != 0);
-	int is_override = ((flags & ND_NA_FLAG_OVERRIDE) != 0);
+	struct in6_addr taddr6;
+	int flags;
+	int is_router;
+	int is_solicited;
+	int is_override;
 	char *lladdr = NULL;
 	int lladdrlen = 0;
 	struct ifaddr *ifa;
@@ -527,8 +540,25 @@ nd6_na_input(m, off, icmp6len)
 	if (ip6->ip6_hlim != 255) {
 		log(LOG_ERR,
 		    "nd6_na_input: invalid hlim %d\n", ip6->ip6_hlim);
+		goto freeit;
+	}
+
+	/* XXX too strong requirement */
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, icmp6len,);
+	nd_na = (struct nd_neighbor_advert *)((caddr_t)ip6 + off);
+#else
+	IP6_EXTHDR_GET(nd_na, struct nd_neighbor_advert *, m, off, icmp6len);
+	if (nd_na == NULL) {
+		icmp6stat.icp6s_tooshort++;
 		return;
 	}
+#endif
+	taddr6 = nd_na->nd_na_target;
+	flags = nd_na->nd_na_flags_reserved;
+	is_router = ((flags & ND_NA_FLAG_ROUTER) != 0);
+	is_solicited = ((flags & ND_NA_FLAG_SOLICITED) != 0);
+	is_override = ((flags & ND_NA_FLAG_OVERRIDE) != 0);
 
 	if (IN6_IS_SCOPE_LINKLOCAL(&taddr6))
 		taddr6.s6_addr16[1] = htons(ifp->if_index);
@@ -537,20 +567,20 @@ nd6_na_input(m, off, icmp6len)
 		log(LOG_ERR,
 		    "nd6_na_input: invalid target address %s\n",
 		    ip6_sprintf(&taddr6));
-		return;
+		goto freeit;
 	}
 	if (IN6_IS_ADDR_MULTICAST(&daddr6))
 		if (is_solicited) {
 			log(LOG_ERR,
 			    "nd6_na_input: a solicited adv is multicasted\n");
-			return;
+			goto freeit;
 		}
 
 	icmp6len -= sizeof(*nd_na);
 	nd6_option_init(nd_na + 1, icmp6len, &ndopts);
 	if (nd6_options(&ndopts) < 0) {
 		log(LOG_INFO, "nd6_na_input: invalid ND option, ignored\n");
-		return;
+		goto freeit;
 	}
 
 	if (ndopts.nd_opts_tgt_lladdr) {
@@ -572,7 +602,7 @@ nd6_na_input(m, off, icmp6len)
 	if (ifa
 	 && (((struct in6_ifaddr *)ifa)->ia6_flags & IN6_IFF_TENTATIVE)) {
 		nd6_dad_na_input(ifa);
-		return;
+		goto freeit;
 	}
 
 	/* Just for safety, maybe unnecessery. */
@@ -580,7 +610,7 @@ nd6_na_input(m, off, icmp6len)
 		log(LOG_ERR,
 		    "nd6_na_input: duplicate IP6 address %s\n",
 		    ip6_sprintf(&taddr6));
-		return;
+		goto freeit;
 	}
 
 	if (lladdr && ((ifp->if_addrlen + 2 + 7) & ~7) != lladdrlen) {
@@ -597,7 +627,7 @@ nd6_na_input(m, off, icmp6len)
 	if ((rt == NULL) ||
 	   ((ln = (struct llinfo_nd6 *)rt->rt_llinfo) == NULL) ||
 	   ((sdl = SDL(rt->rt_gateway)) == NULL))
-		return;
+		goto freeit;
 
 	if (ln->ln_state == ND6_LLINFO_INCOMPLETE) {
 		/*
@@ -605,7 +635,7 @@ nd6_na_input(m, off, icmp6len)
 		 * discard the packet.
 		 */
 		if (ifp->if_addrlen && !lladdr)
-			return;
+			goto freeit;
 
 		/*
 		 * Record link-layer address, and update the state.
@@ -668,7 +698,7 @@ nd6_na_input(m, off, icmp6len)
 			 */
 			if (ln->ln_state == ND6_LLINFO_REACHABLE)
 				ln->ln_state = ND6_LLINFO_STALE;
-			return;
+			goto freeit;
 		} else if (is_override				   /* (2a) */
 			|| (!is_override && (lladdr && !llchange)) /* (2b) */
 			|| !lladdr) {				   /* (2c) */
@@ -745,6 +775,9 @@ nd6_na_input(m, off, icmp6len)
 #endif 
 		ln->ln_hold = 0;
 	}
+
+ freeit:
+	m_freem(m);
 }
 
 /*

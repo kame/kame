@@ -100,8 +100,7 @@ nd6_rs_input(m, off, icmp6len)
 {
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
-	struct nd_router_solicit *nd_rs
-		= (struct nd_router_solicit *)((caddr_t)ip6 + off);
+	struct nd_router_solicit *nd_rs;
 	struct in6_addr saddr6 = ip6->ip6_src;
 #if 0
 	struct in6_addr daddr6 = ip6->ip6_dst;
@@ -118,13 +117,13 @@ nd6_rs_input(m, off, icmp6len)
 
 	/* If I'm not a router, ignore it. */
 	if (ip6_accept_rtadv != 0 || ip6_forwarding != 1)
-		return;
+		goto freeit;
 
 	/* Sanity checks */
 	if (ip6->ip6_hlim != 255) {
 		log(LOG_ERR,
 		    "nd6_rs_input: invalid hlim %d\n", ip6->ip6_hlim);
-		return;
+		goto freeit;
 	}
 
 	/*
@@ -132,13 +131,25 @@ nd6_rs_input(m, off, icmp6len)
 	 * This indicates that the src has no IP address assigned yet.
 	 */
 	if (IN6_IS_ADDR_UNSPECIFIED(&saddr6))
+		goto freeit;
+
+	/* XXX too strong requirement */
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, icmp6len,);
+	nd_rs = (struct nd_router_solicit *)((caddr_t)ip6 + off);
+#else
+	IP6_EXTHDR_GET(nd_rs, struct nd_router_solicit *, m, off, icmp6len);
+	if (nd_rs == NULL) {
+		icmp6stat.icp6s_tooshort++;
 		return;
+	}
+#endif
 
 	icmp6len -= sizeof(*nd_rs);
 	nd6_option_init(nd_rs + 1, icmp6len, &ndopts);
 	if (nd6_options(&ndopts) < 0) {
 		log(LOG_INFO, "nd6_rs_input: invalid ND option, ignored\n");
-		return;
+		goto freeit;
 	}
 
 	if (ndopts.nd_opts_src_lladdr) {
@@ -154,6 +165,9 @@ nd6_rs_input(m, off, icmp6len)
 	}
 
 	nd6_cache_lladdr(ifp, &saddr6, lladdr, lladdrlen, ND_ROUTER_SOLICIT, 0);
+
+ freeit:
+	m_freem(m);
 }
 
 /*
@@ -171,12 +185,11 @@ nd6_ra_input(m, off, icmp6len)
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct nd_ifinfo *ndi = &nd_ifinfo[ifp->if_index];
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
-	struct nd_router_advert *nd_ra =
-		(struct nd_router_advert *)((caddr_t)ip6 + off);
+	struct nd_router_advert *nd_ra;
 	struct in6_addr saddr6 = ip6->ip6_src;
 #if 0
 	struct in6_addr daddr6 = ip6->ip6_dst;
-	int flags = nd_ra->nd_ra_flags_reserved;
+	int flags; /* = nd_ra->nd_ra_flags_reserved; */
 	int is_managed = ((flags & ND_RA_FLAG_MANAGED) != 0);
 	int is_other = ((flags & ND_RA_FLAG_OTHER) != 0);
 #endif
@@ -184,26 +197,38 @@ nd6_ra_input(m, off, icmp6len)
 	struct nd_defrouter *dr;
 
 	if (ip6_accept_rtadv == 0)
-		return;
+		goto freeit;
 
 	if (ip6->ip6_hlim != 255) {
 		log(LOG_ERR,
 		    "nd6_ra_input: invalid hlim %d\n", ip6->ip6_hlim);
-		return;
+		goto freeit;
 	}
 
 	if (!IN6_IS_ADDR_LINKLOCAL(&saddr6)) {
 		log(LOG_ERR,
 		    "nd6_ra_input: src %s is not link-local\n",
 		    ip6_sprintf(&saddr6));
+		goto freeit;
+	}
+
+	/* XXX too strong requirement */
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, icmp6len,);
+	nd_ra = (struct nd_router_advert *)((caddr_t)ip6 + off);
+#else
+	IP6_EXTHDR_GET(nd_ra, struct nd_router_advert *, m, off, icmp6len);
+	if (nd_ra == NULL) {
+		icmp6stat.icp6s_tooshort++;
 		return;
 	}
+#endif
 
 	icmp6len -= sizeof(*nd_ra);
 	nd6_option_init(nd_ra + 1, icmp6len, &ndopts);
 	if (nd6_options(&ndopts) < 0) {
 		log(LOG_INFO, "nd6_ra_input: invalid ND option, ignored\n");
-		return;
+		goto freeit;
 	}
 
     {
@@ -372,6 +397,9 @@ nd6_ra_input(m, off, icmp6len)
 	 */
 	pfxlist_onlink_check();
     }
+
+freeit:
+	m_freem(m);
 }
 
 /*
