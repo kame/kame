@@ -1,9 +1,17 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.103 1999/09/08 12:46:36 sakane Exp $
+$Id: CHANGELOG,v 1.104 1999/09/08 17:12:30 itojun Exp $
 
 
 <199909>
+Thu Sep  9 02:10:21 JST 1999  itojun@iijlab.net
+	* netbsd/sys/net/if_ethersubr.c: grab IEEE802 MAC address as
+	  seed of IPv6 interface index, on ether_ifattach().
+	  this is for pcmcia ethernet cards inserted after bootstrap time.
+	  (commits for other operating systems should follow)
+
+	  From: sakane@kame.net
+
 Wed Sep  8 19:34:57 JST 1999  itojun@iijlab.net
 	* netbsd/sys/dev/ic/sm91cxx.c: avoid duplicated multicast packet
 	  reception on promiscuous mode.  this fixes DAD failure during
@@ -14,7 +22,7 @@ Wed Sep  8 19:34:57 JST 1999  itojun@iijlab.net
 	  on active data connection.
 	  
 	  v6 ftp client  --control---> ftp translator ----> v4 ftp server
-		       <---data----*
+			 <---data----*
 	  
 	  "*" needs to be fake IPv4 address generated from translation pool
 	  prefix and the address for v4 ftp server.
