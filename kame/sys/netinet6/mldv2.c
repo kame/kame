@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.25 2004/07/05 03:10:14 jinmei Exp $	*/
+/*	$KAME: mldv2.c,v 1.26 2004/07/09 14:13:59 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -192,7 +192,14 @@ struct multi6_kludge {
 
 int mldmaxsrcfilter = IP_MAX_SOURCE_FILTER;
 int mldsomaxsrc = SO_MAX_SOURCE_FILTER;
-int mldalways_v2 = 0;
+
+/*
+ * mld_version:
+ * 	0: mldv2 with compat mode
+ * 	1: mldv1-only,
+ * 	2: mldv2 without compat-mode
+ */
+int mld_version = 0;
 
 #ifdef MLDV2_DEBUG
 int mld_debug = 1;
@@ -225,8 +232,8 @@ SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_MLD_MAXSRCFILTER, mld_maxsrcfilter, CTLFL
 	&mldmaxsrcfilter, IP_MAX_SOURCE_FILTER, "");
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_MLD_SOMAXSRC, mld_somaxsrc, CTLFLAG_RW,
 	&mldsomaxsrc, SO_MAX_SOURCE_FILTER, "");
-SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_MLD_ALWAYSV2, mld_alwaysv2, CTLFLAG_RW,
-	&mldalways_v2, 0, "");
+SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_MLD_VERSION, mld_version, CTLFLAG_RW,
+	&mld_version, 0, "");
 #endif
 
 #define	SOURCE_RECORD_LEN(numsrc)	(numsrc * addrlen)
@@ -331,7 +338,10 @@ rt6i_init(ifp)
 	rti->rt6i_qrv = MLD_DEF_RV;
 	rti->rt6i_qqi = MLD_DEF_QI;
 	rti->rt6i_qri = MLD_DEF_QRI / MLD_TIMER_SCALE;
-	rti->rt6i_type = MLD_V2_ROUTER;
+	if (mld_version == 1)
+		rti->rt6i_type = MLD_V1_ROUTER;
+	else
+		rti->rt6i_type = MLD_V2_ROUTER;
 	rti->rt6i_next = Head6;
 	Head6 = rti;
 	return (rti);
@@ -591,13 +601,16 @@ mld_input(m, off)
 	 * MLDv2 Query: length >= 28 octets AND Max-Resp-Code != 0
 	 * (MLDv1 implementation must accept only the first 24
 	 * octets of the query message)
+	 *
+	 * If sysctl variable "mld_version" is specified to 1,
+	 * query-type will be MLDv1 regardless of the packet size.
 	 */
 	mldlen = m->m_pkthdr.len - off;
 	if (mldlen > MLD_MINLEN && mldlen < MLD_V2_QUERY_MINLEN) {
 		mldlog((LOG_DEBUG, "invalid MLD packet(len=%d)\n", mldlen));
 		goto end;
 	}
-	if (mldlen == MLD_MINLEN) {
+	if (mldlen == MLD_MINLEN || mld_version == 1) {
 		rt6i->rt6i_type = query_ver = MLD_V1_ROUTER;
 		mldlog((LOG_DEBUG, "regard it as MLDv1 Query from %s for %s\n",
 		       ip6_sprintf(&ip6->ip6_src),
@@ -699,8 +712,13 @@ mldv1_query:
 	 * MLDv1 Querier Present is set to Older Version Querier Present 
 	 * Timeout seconds whenever an MLDv1 General Query is received.
 	 */
-	if (mldalways_v2 == 0 &&
-	    IN6_ARE_ADDR_EQUAL(&mc_sa.sin6_addr, &in6addr_any)) {
+	if (IN6_ARE_ADDR_EQUAL(&mc_sa.sin6_addr, &in6addr_any)) {
+		if (mld_version == 2) {
+			mldlog((LOG_DEBUG,
+				"not shift to MLDv1-compat mode "
+				"due to the kernel configuration\n"));
+			goto end;
+		}
 		mldlog((LOG_DEBUG, "shift to MLDv1-compat mode\n"));
 		mld_set_hostcompat(ifp, rt6i, query_ver);
 	}
@@ -868,8 +886,13 @@ mld_slowtimeo()
 
 	for (rt6i = Head6; rt6i != 0; rt6i = rt6i->rt6i_next) {
 		if (rt6i->rt6i_timer1 == 0) {
-			if (rt6i->rt6i_type != MLD_V2_ROUTER)
-				rt6i->rt6i_type = MLD_V2_ROUTER;
+			if (mld_version == 1) {
+				if (rt6i->rt6i_type != MLD_V1_ROUTER)
+					rt6i->rt6i_type = MLD_V1_ROUTER;
+			} else {
+				if (rt6i->rt6i_type != MLD_V2_ROUTER)
+					rt6i->rt6i_type = MLD_V2_ROUTER;
+			}
 		} else if (rt6i->rt6i_timer1 > 0) {
 			--rt6i->rt6i_timer1;
 			if (rt6i->rt6i_timer2 > 0)
@@ -2056,9 +2079,9 @@ mld_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		error = sysctl_int(oldp, oldlenp, newp, newlen,
 				   &mldsomaxsrc);
 		break;
-	case ICMPV6CTL_MLD_ALWAYSV2:
+	case ICMPV6CTL_MLD_VERSION:
 		error = sysctl_int(oldp, oldlenp, newp, newlen,
-				   &mldalways_v2);
+				   &mld_version);
 		break;
 	default:
 		error = EOPNOTSUPP;

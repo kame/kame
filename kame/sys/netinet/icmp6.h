@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.93 2004/05/21 08:35:48 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.94 2004/07/09 14:13:59 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -832,7 +832,7 @@ struct icmp6stat {
 #define ICMPV6CTL_ND6_PRLIST	20
 #define ICMPV6CTL_MLD_MAXSRCFILTER	21
 #define ICMPV6CTL_MLD_SOMAXSRC	22
-#define ICMPV6CTL_MLD_ALWAYSV2	23
+#define ICMPV6CTL_MLD_VERSION	23
 #define ICMPV6CTL_MAXID		24
 
 #define ICMPV6CTL_NAMES { \

@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.106 2004/07/05 07:27:29 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.107 2004/07/09 14:13:59 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -159,7 +159,7 @@ struct multi6_kludge {
 
 int mldmaxsrcfilter = IP_MAX_SOURCE_FILTER;
 int mldsomaxsrc = SO_MAX_SOURCE_FILTER;
-int mldalways_v2 = 0;
+int mld_verion = 1;
 
 struct router6_info *Head6;
 

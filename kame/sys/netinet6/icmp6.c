@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.387 2004/07/05 04:43:27 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.388 2004/07/09 14:13:59 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3687,7 +3687,7 @@ icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 #ifdef MLDV2
 	case ICMPV6CTL_MLD_MAXSRCFILTER:
 	case ICMPV6CTL_MLD_SOMAXSRC:
-	case ICMPV6CTL_MLD_ALWAYSV2:
+	case ICMPV6CTL_MLD_VERSION:
 		return mld_sysctl(&name[0], namelen, oldp, oldlenp, newp, newlen);
 #endif
 
