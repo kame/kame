@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1070 2000/06/28 06:00:38 sakane Exp $
+$Id: CHANGELOG,v 1.1071 2000/06/28 08:31:32 suz Exp $
 
 <200006>
+2000-06-28  SUZUKI Shinsuke  <suz@kame.net>
+	* kame/sys/netinet6/ip6_fw.c
+	ip6fw works on FreeBSD-4.0 + KAME, too.
+
 Wed Jun 28 15:01:09 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	improved sending a notify message including delete payload.

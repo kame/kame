@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.13 2000/05/05 11:01:00 sumikawa Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.14 2000/06/28 08:31:32 suz Exp $	*/
 
 /*
  * Copyright (c) 1993 Daniel Boulet
@@ -14,7 +14,7 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
- *	$Id: ip6_fw.c,v 1.13 2000/05/05 11:01:00 sumikawa Exp $
+ *	$Id: ip6_fw.c,v 1.14 2000/06/28 08:31:32 suz Exp $
  */
 
 /*
@@ -105,6 +105,9 @@ static int fw6_verbose_limit = 0;
 LIST_HEAD (ip6_fw_head, ip6_fw_chain) ip6_fw_chain;
 
 #ifdef SYSCTL_NODE
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+SYSCTL_DECL(_net_inet6_ip6);
+#endif
 SYSCTL_NODE(_net_inet6_ip6, OID_AUTO, fw, CTLFLAG_RW, 0, "Firewall");
 SYSCTL_INT(_net_inet6_ip6_fw, OID_AUTO, debug, CTLFLAG_RW, &fw6_debug, 0, "");
 SYSCTL_INT(_net_inet6_ip6_fw, OID_AUTO, verbose, CTLFLAG_RW, &fw6_verbose, 0, "");
@@ -803,6 +806,9 @@ got_match:
 #elif defined(__NetBSD__)
 			tcp_respond(NULL, NULL, *m, (struct tcphdr *)(ip6 + 1),
 				ack, seq, flags);
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+			tcp_respond(NULL, ip6, (struct tcphdr *)(ip6 + 1),
+				*m, ack, seq, flags);
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 3
 			tcp_respond(NULL, ip6, (struct tcphdr *)(ip6 + 1),
 				*m, ack, seq, flags, 1);
