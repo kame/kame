@@ -1,2 +1,3 @@
+exclude crypto
 exclude netpm
 exclude netkey
