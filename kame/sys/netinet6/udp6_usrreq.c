@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.108 2002/09/25 11:41:24 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.109 2002/10/24 09:18:03 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -410,7 +410,7 @@ udp6_input(mp, offp, proto)
 
 			strcpy(buf, ip6_sprintf(&ip6->ip6_dst));
 			log(LOG_INFO,
-			    "Connection attempt to UDP %s:%d from %s:%d\n",
+			    "Connection attempt to UDP [%s]:%d from [%s]:%d\n",
 			    buf, ntohs(uh->uh_dport),
 			    ip6_sprintf(&ip6->ip6_src), ntohs(uh->uh_sport));
 		}
