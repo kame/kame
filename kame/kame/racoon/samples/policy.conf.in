@@ -1,4 +1,4 @@
-# YIPS @(#)$Id: policy.conf.in,v 1.4 2000/02/16 04:02:57 sakane Exp $
+# YIPS @(#)$Id: policy.conf.in,v 1.5 2000/03/26 10:51:13 itojun Exp $
 
 # IPsec SA configuration
 
@@ -46,9 +46,8 @@ policy 10.1.1.0/24 10.2.2.0/24 any inout ipsec
 			# specified carefully.
 			mode tunnel 172.168.2.2;
 
-			# "strength" defines a strength of algorithm in use.
-			# This is either "extra_high", "high" or "normal".
-			strength high ;
+			# algorithm for ESP encryption
+			encryption_algorithm 3des;
 		}
 	}
 
@@ -63,14 +62,17 @@ policy 10.1.1.0/24 10.2.2.0/24 any inout ipsec
 		protocol esp {
 			level require ;
 			mode tunnel 172.168.2.2;
-			strength high ;
+
+			# algorithm for ESP encryption
+			encryption_algorithm 3des;
 		}
 
 		# "ah" means AH.
 		protocol ah {
 			level require ;
 			mode transport ;	# NOTE: not tunnel.
-			strength high ;
+			# algorithm for AH
+			authentication_algorithm hmac_md5;
 		}
 	}
 }
@@ -87,7 +89,10 @@ policy 172.165.1.1[25] 0.0.0.0/0[25] tcp out ipsec
 		protocol esp {
 			level use ;
 			mode transport ;
-			strength normal ;
+			# algorithm for ESP encryption
+			encryption_algorithm 3des;
+			# algorithm for ESP authentication
+			authentication_algorithm hmac_md5;
 		}
 	}
 }

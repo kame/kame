@@ -1,4 +1,4 @@
-# $Id: basic.conf.in,v 1.10 2000/03/13 10:28:34 sakane Exp $
+# $Id: basic.conf.in,v 1.11 2000/03/26 10:51:13 itojun Exp $
 
 # search this file for pre_shared_key with various ID key.
 path pre_shared_key "@sysconfdir_x@/racoon/psk.txt" ;
@@ -44,56 +44,4 @@ timer {
 	# timer for waiting to complete each phase.
 	phase1 30 sec;
 	phase2 15 sec;
-}
-
-# Specification of algorithm level.  These are extracted into attribute of
-# proposal to negotiate SA.  There are seven type of class;
-#	"ISAKMP authentication method"
-#	"ISAKMP encryption algorithm"
-#	"ISAKMP hash algorithm",
-#	"ISAKMP DH group",
-#	"IPsec encryption algorithm",
-#	"IPsec authentication algorithm",
-#	"IPsec compression algorithm",
-# Each class can be defined three level; "normal", "high" and "extra_high".
-# Each level can be omitted.  If so, it is interpreted that there is no
-# algorithm appropriately for use in its level.
-# NOTE: due to a bug, we can't declare multiple algorithm
-# items into single level.
-algorithm_strength {
-	isakmp_auth_method {
-		extra_high nothing ;	# to clarify.
-		high  dsssig ;
-		normal pre_shared_key ;
-	}
-	isakmp_encryption {
-		extra_high nothing ;
-		high rc5 ;
-		normal cast128 ;
-	}
-	isakmp_hash {
-		extra_high nothing ;
-		high sha1 ;
-		normal md5 ;
-	}
-	isakmp_dh_group {
-		extra_high modp1536 ;
-		high modp1024 ;
-		normal modp768 ;
-	}
-	ipsec_encryption {
-		extra_high nothing ;
-		high rc5 ;
-		normal cast128 ;
-	}
-	ipsec_authentication {
-		extra_high nothing ;
-		high hmac_sha1 ;
-		normal hmac_md5 ;
-	}
-	ipsec_ipcomp {
-		extra_high nothing ;
-		high deflate ;
-		normal deflate ;
-	}
 }

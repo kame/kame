@@ -6,7 +6,7 @@ $hostname =~ s/\n$//;
 $userfqdn = `whoami`;
 $userfqdn =~ s/\n$//;
 $userfqdn .= '@' . $hostname;
-$rcsid = '$Id: sandiego.pl,v 1.9 2000/03/02 03:27:58 itojun Exp $';
+$rcsid = '$Id: sandiego.pl,v 1.10 2000/03/26 10:51:14 itojun Exp $';
 
 print <<EOF;
 # automatically generated from $rcsid
@@ -58,58 +58,6 @@ timer {
 	# timer for waiting to complete each phase.
 	phase1 20 sec;
 	phase2 15 sec;
-}
-
-# Specification of algorithm level.  These are extracted into attribute of
-# proposal to negotiate SA.  There are seven type of class;
-#	"ISAKMP authentication method"
-#	"ISAKMP encryption algorithm"
-#	"ISAKMP hash algorithm",
-#	"ISAKMP DH group",
-#	"IPsec encryption algorithm",
-#	"IPsec authentication algorithm",
-#	"IPsec compression algorithm",
-# Each class can be defined three level; "normal", "high" and "extra_high".
-# Each level can be omited.  If so, it is interpreted that there is no
-# algorithm appropreately for use in its level.
-# NOTE: due to a bug, we can't declare multiple algorithm
-# items into single level.
-algorithm_strength {
-	isakmp_auth_method {
-		extra_high nothing ;	# to clarify.
-		high  dsssig ;
-		normal pre_shared_key ;
-	}
-	isakmp_encryption {
-		extra_high nothing ;
-		high rc5 ;
-		normal cast128 ;
-	}
-	isakmp_hash {
-		extra_high nothing ;
-		high sha1 ;
-		normal md5 ;
-	}
-	isakmp_dh_group {
-		extra_high modp1536 ;
-		high modp1024 ;
-		normal modp768 ;
-	}
-	ipsec_encryption {
-		extra_high nothing ;
-		high rc5 ;
-		normal cast128 ;
-	}
-	ipsec_authentication {
-		extra_high nothing ;
-		high hmac_sha1 ;
-		normal hmac_md5 ;
-	}
-	ipsec_ipcomp {
-		extra_high nothing ;
-		high deflate ;
-		normal deflate ;
-	}
 }
 
 # main mode example, with "anonymous" (any peer) configuration
