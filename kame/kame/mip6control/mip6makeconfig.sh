@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $Id: mip6makeconfig.sh,v 1.3 2003/01/31 10:19:46 keiichi Exp $
+# $Id: mip6makeconfig.sh,v 1.4 2003/09/30 12:37:16 keiichi Exp $
 
 cat=/bin/cat
 basename=/usr/bin/basename
@@ -45,11 +45,17 @@ node_dir=${ipv6_mobile_config_dir}/${1}
 #
 # set other auto configurable parameters
 #
-if [ "X${transport_protocol}" = "Xah" ]; then
-	transport_algoarg='-A'
+if [ "X${transport_protocol}" = 'Xah' ]; then
+	transport_esparg=''
+	transport_esp_algorithm=''
+	transport_esp_secret=''
 else
-	transport_algoarg='-E'
+	transport_esparg='-E'
+	transport_esp_secret=\"${transport_esp_secret}\"
 fi
+transport_auth_secret=\"${transport_auth_secret}\"
+tunnel_auth_secret=\"${tunnel_auth_secret}\"
+tunnel_esp_secret=\"${tunnel_esp_secret}\"
 
 #
 # write security association configuration files
@@ -62,21 +68,25 @@ ${cat} << EOF > ${node_dir}/add
 add ${mobile_node} ${home_agent}
 	${transport_protocol} ${transport_spi_mn_to_ha}
 	-m transport
-	${transport_algoarg} ${transport_algorithm} "${transport_secret}";
+	${transport_esparg} ${transport_esp_algorithm} ${transport_esp_secret}
+	-A ${transport_auth_algorithm} ${transport_auth_secret};
 add ${home_agent} ${mobile_node}
 	${transport_protocol} ${transport_spi_ha_to_mn}
 	-m transport
-	${transport_algoarg} ${transport_algorithm} "${transport_secret}";
+	${transport_esparg} ${transport_esp_algorithm} ${transport_esp_secret}
+	-A ${transport_auth_algorithm} ${transport_auth_secret};
 add ${mobile_node} ${home_agent}
 	esp ${tunnel_spi_mn_to_ha}
 	-m tunnel
 	-u  ${tunnel_uid_mn_to_ha}
-	-E ${tunnel_algorithm} "${tunnel_secret}";
+	-E ${tunnel_esp_algorithm} ${tunnel_esp_secret}
+	-A ${tunnel_auth_algorithm} ${tunnel_auth_secret};
 add ${home_agent} ${mobile_node}
 	esp ${tunnel_spi_ha_to_mn}
 	-m tunnel
 	-u ${tunnel_uid_ha_to_mn}
-	-E ${tunnel_algorithm} "${tunnel_secret}";
+	-E ${tunnel_esp_algorithm} ${tunnel_esp_secret}
+	-A ${tunnel_auth_algorithm} ${tunnel_auth_secret};
 EOF
 
 #
