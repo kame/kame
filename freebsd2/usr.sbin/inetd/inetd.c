@@ -156,6 +156,7 @@ static const char rcsid[] =
 #ifndef IPSEC_POLICY_IPSEC	/* no ipsec support on old ipsec */
 #undef IPSEC
 #endif
+#include "ipsec.h"
 #endif
 
 #ifndef	MAXCHILD
@@ -262,9 +263,6 @@ void		disable __P((struct servtab *));
 void		retry __P((int));
 int		setconfig __P((void));
 void		setup __P((struct servtab *));
-#ifdef IPSEC
-void		ipsecsetup __P((struct servtab *));
-#endif
 char	       *sskip __P((char **));
 char	       *skip __P((char **));
 struct servtab *tcpmux __P((int));
@@ -821,7 +819,17 @@ config(signo)
 				SWAP(sep->se_argv[i], new->se_argv[i]);
 #ifdef IPSEC
 			SWAP(sep->se_policy, new->se_policy);
-			ipsecsetup(sep);
+			if (sep->se_fd >= 0) {
+				if (ipsecsetup(sep->se_family, sep->se_fd,
+				    sep->se_policy) && sep->se_policy) {
+					syslog(LOG_ERR, "%s/%s: "
+					    "ipsec initialization failed",
+					    sep->se_service, sep->se_proto);
+					sep->se_checked = 0;
+					sigsetmask(omask);
+					continue;
+				}
+			}
 #endif
 			sigsetmask(omask);
 			freeconfig(new);
@@ -992,7 +1000,14 @@ setsockopt(fd, SOL_SOCKET, opt, (char *)&on, sizeof (on))
 		    (char *)&on, sizeof (on)) < 0)
 			syslog(LOG_ERR, "setsockopt (TCP_NOPUSH): %m");
 #ifdef IPSEC
-	ipsecsetup(sep);
+	if (ipsecsetup(sep->se_family, sep->se_fd, sep->se_policy) < 0
+	 && sep->se_policy) {
+		syslog(LOG_ERR, "%s/%s: ipsec setup failed",
+		    sep->se_service, sep->se_proto);
+		(void)close(sep->se_fd);
+		sep->se_fd = -1;
+		return;
+	}
 #endif
 	if (bind(sep->se_fd, (struct sockaddr *)&sep->se_ctrladdr,
 	    sep->se_ctrladdr.ss_len) < 0) {
@@ -1052,84 +1067,6 @@ setsockopt(fd, SOL_SOCKET, opt, (char *)&on, sizeof (on))
 			sep->se_server, sep->se_fd);
 	}
 }
-
-#ifdef IPSEC
-void
-ipsecsetup(sep)
-	struct servtab *sep;
-{
-	char *buf;
-	char *policy_in = NULL;
-	char *policy_out = NULL;
-	int level;
-	int opt;
-
-	switch (sep->se_family) {
-	case AF_INET:
-		level = IPPROTO_IP;
-		break;
-#ifdef INET6
-	case AF_INET6:
-		level = IPPROTO_IPV6;
-		break;
-#endif
-	default:
-		return;
-	}
-
-	if (!sep->se_policy || sep->se_policy[0] == '\0') {
-		policy_in = "in entrust";
-		policy_out = "out entrust";
-	} else {
-		if (!strncmp("in", sep->se_policy, 2))
-			policy_in = sep->se_policy;
-		else if (!strncmp("out", sep->se_policy, 3))
-			policy_out = sep->se_policy;
-		else {
-			syslog(LOG_ERR, "invalid security policy \"%s\"",
-				sep->se_policy);
-			return;
-		}
-	}
-
-	if (policy_in != NULL) {
-		opt = (level == IPPROTO_IP) ? IP_IPSEC_POLICY
-					    : IPV6_IPSEC_POLICY;
-		buf = ipsec_set_policy(policy_in, strlen(policy_in));
-		if (buf != NULL) {
-			if (setsockopt(sep->se_fd, level, opt,
-					buf, ipsec_get_policylen(buf)) < 0
-			 && sep->se_policy) {
-				syslog(LOG_ERR,
-					"%s/%s: ipsec initialization failed; %s",
-					sep->se_service, sep->se_proto,
-					policy_in);
-			}
-			free(buf);
-		} else
-			syslog(LOG_ERR, "invalid security policy \"%s\"",
-				policy_in);
-	}
-	if (policy_out != NULL) {
-		opt = (level == IPPROTO_IP) ? IP_IPSEC_POLICY
-					    : IPV6_IPSEC_POLICY;
-		buf = ipsec_set_policy(policy_out, strlen(policy_out));
-		if (buf != NULL) {
-			if (setsockopt(sep->se_fd, level, opt,
-					buf, ipsec_get_policylen(buf)) < 0
-			 && sep->se_policy) {
-				syslog(LOG_ERR,
-					"%s/%s: ipsec initialization failed; %s",
-					sep->se_service, sep->se_proto,
-					policy_out);
-			}
-			free(buf);
-		} else
-			syslog(LOG_ERR, "invalid security policy \"%s\"",
-				policy_out);
-	}
-}
-#endif
 
 /*
  * Finish with a service and its socket.
@@ -1266,7 +1203,7 @@ getconfigent()
 	static char TCPMUX_TOKEN[] = "tcpmux/";
 #define MUX_LEN		(sizeof(TCPMUX_TOKEN)-1)
 #ifdef IPSEC
-	char *policy = NULL, *dummy;
+	char *policy = NULL;
 #endif
 	struct sockaddr_storage baddr;
 	struct addrinfo hints, *res;
@@ -1285,17 +1222,15 @@ more:
 					free(policy);
 				policy = NULL;
 			} else {
-				dummy = ipsec_set_policy(p, strlen(p));
-				if (dummy != NULL) {
-					free(dummy);
-					if (policy)
-						free(policy);
-					policy = newstr(p);
-				} else {
+				if (ipsecsetup_test(p) < 0) {
 					syslog(LOG_ERR,
 						"%s: invalid ipsec policy \"%s\"",
 						CONFIG, p);
 					exit(EX_CONFIG);
+				} else {
+					if (policy)
+						free(policy);
+					policy = newstr(p);
 				}
 			}
 		}
