@@ -127,7 +127,7 @@ int	tcbhashsize = TCBHASHSIZE;
 extern int ip6_defhlim;
 #endif /* INET6 */
 
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 void	tcp_mtudisc_callback __P((struct in6_addr *));
 void	tcp_mtudisc __P((struct inpcb *, int));
 #endif

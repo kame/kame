@@ -327,7 +327,7 @@ done:
 	splx(s);
 }
 
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 int
 tcp6_input(mp, offp, proto)
 	struct mbuf **mp;

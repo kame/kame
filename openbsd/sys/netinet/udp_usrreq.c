@@ -127,7 +127,7 @@ udp_init()
 	in_pcbinit(&udbtable, udbhashsize);
 }
 
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 int
 udp6_input(mp, offp, proto)
 	struct mbuf **mp;
@@ -682,7 +682,7 @@ udp_notify(inp, errno)
 	sowwakeup(inp->inp_socket);
 }
 
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 void
 udp6_ctlinput(cmd, sa, d)
 	int cmd;
@@ -1170,7 +1170,7 @@ u_int	udp_sendspace = 9216;		/* really max datagram size */
 u_int	udp_recvspace = 40 * (1024 + sizeof(struct sockaddr_in));
 					/* 40 1K datagrams */
 
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 /*ARGSUSED*/
 int
 udp6_usrreq(so, req, m, addr, control, p)
