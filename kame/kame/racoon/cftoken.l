@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.45 2000/12/17 21:50:10 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.46 2000/12/17 21:55:07 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -134,12 +134,12 @@ octetstring	{octet}({dot}{octet})+
 
 	/* logging */
 <S_INI>log		{ BEGIN S_LOG; YYDB; return(LOGGING); }
-<S_LOG>info		{ YYD; yylval.num = 0; return(LOGLEV); }
+<S_LOG>info		{ YYD; yywarn("use notify, it will be obsoleted in the future."); yylval.num = 0; return(LOGLEV); }
 <S_LOG>notify		{ YYD; yylval.num = 0; return(LOGLEV); }
 <S_LOG>debug		{ YYD; yylval.num = 1; return(LOGLEV); }
 <S_LOG>debug2		{ YYD; yylval.num = 2; return(LOGLEV); }
-<S_LOG>debug3		{ YYD; yylval.num = 2; return(LOGLEV); }
-<S_LOG>debug4		{ YYD; yylval.num = 2; return(LOGLEV); }
+<S_LOG>debug3		{ YYD; yywarn("use debug2, it will be obsoleted in the future."); yylval.num = 2; return(LOGLEV); }
+<S_LOG>debug4		{ YYD; yywarn("use debug2, it will be obsoleted in the future."); yylval.num = 2; return(LOGLEV); }
 <S_LOG>{semi}		{ BEGIN S_INI; return(EOS); }
 
 	/* padding */
