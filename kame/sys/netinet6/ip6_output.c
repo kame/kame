@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.247 2001/12/18 02:23:44 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.248 2001/12/18 02:29:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1391,18 +1391,18 @@ skip_ipsec2:;
 		ip6 = mtod(m, struct ip6_hdr *);
 		ia6 = in6_ifawithifp(ifp, &ip6->ip6_src);
 		if (ia6) {
- 			/* Record statistics for this interface address. */
+			/* Record statistics for this interface address. */
 #if defined(__NetBSD__) && defined(IFA_STATS)
 			ia6->ia_ifa.ifa_data.ifad_outbytes +=
 				m->m_pkthdr.len;
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 4
- 			ia6->ia_ifa.if_opackets++;
- 			ia6->ia_ifa.if_obytes += m->m_pkthdr.len;
+			ia6->ia_ifa.if_opackets++;
+			ia6->ia_ifa.if_obytes += m->m_pkthdr.len;
 #elif defined(__bsdi__) && _BSDI_VERSION >= 199802
- 			ia6->ia_ifa.ifa_opackets++;
- 			ia6->ia_ifa.ifa_obytes += m->m_pkthdr.len;
+			ia6->ia_ifa.ifa_opackets++;
+			ia6->ia_ifa.ifa_obytes += m->m_pkthdr.len;
 #endif
- 		}
+		}
 #if defined(IPSEC) && !defined(__OpenBSD__)
 		/* clean ipsec history once it goes out of the node */
 		ipsec_delaux(m);
@@ -1502,8 +1502,8 @@ skip_ipsec2:;
 			mhip6 = mtod(m, struct ip6_hdr *);
 			*mhip6 = *ip6;
 			m->m_len = sizeof(*mhip6);
- 			error = ip6_insertfraghdr(m0, m, hlen, &ip6f);
- 			if (error) {
+			error = ip6_insertfraghdr(m0, m, hlen, &ip6f);
+			if (error) {
 				ip6stat.ip6s_odropped++;
 				goto sendorfree;
 			}
@@ -1556,11 +1556,11 @@ sendorfree:
 				ia6->ia_ifa.ifa_data.ifad_outbytes +=
 					m->m_pkthdr.len;
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 4
- 				ia6->ia_ifa.if_opackets++;
- 				ia6->ia_ifa.if_obytes += m->m_pkthdr.len;
+				ia6->ia_ifa.if_opackets++;
+				ia6->ia_ifa.if_obytes += m->m_pkthdr.len;
 #elif defined(__bsdi__) && _BSDI_VERSION >= 199802
- 				ia6->ia_ifa.ifa_opackets++;
- 				ia6->ia_ifa.ifa_obytes += m->m_pkthdr.len;
+				ia6->ia_ifa.ifa_opackets++;
+				ia6->ia_ifa.ifa_obytes += m->m_pkthdr.len;
 #endif
 			}
 #if defined(IPSEC) && !defined(__OpenBSD__)
