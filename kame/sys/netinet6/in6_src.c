@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.62 2001/08/28 08:53:46 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.63 2001/08/28 13:04:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -369,6 +369,21 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 		if (!(ia_best->ia_ifp->if_flags & IFF_UP) &&
 		    (ia->ia_ifp->if_flags & IFF_UP))
 			REPLACE(8);
+
+		/*
+		 * Rule 9: prefer addresses on "preferred" interfaces.
+		 * This is a KAME specific rule.
+		 */
+#define NDI_BEST (nd_ifinfo[ia_best->ia_ifp->if_index])
+#define NDI_NEW  (nd_ifinfo[ia->ia_ifp->if_index])
+		if ((NDI_BEST.flags & ND6_IFF_PREFER_SOURCE) &&
+		    !(NDI_NEW.flags & ND6_IFF_PREFER_SOURCE))
+			NEXT(9);
+		if (!(NDI_BEST.flags & ND6_IFF_PREFER_SOURCE) &&
+		    (NDI_NEW.flags & ND6_IFF_PREFER_SOURCE))
+			REPLACE(9);
+#undef NDI_BEST
+#undef NDI_NEW
 
 		/*
 		 * Rule 14: Use longest matching prefix.
