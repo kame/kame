@@ -30,7 +30,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#if 0
 #include <net/if.h>
+#endif
 
 #include <netinet/in.h>
 
