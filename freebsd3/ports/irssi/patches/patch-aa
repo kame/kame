@@ -1,0 +1,12 @@
+--- configure~	Mon Jan 24 11:45:15 2000
++++ configure	Mon Jan 24 12:20:51 2000
+@@ -5133,6 +5133,9 @@
+ #define HAVE_IPV6 1
+ EOF
+ 
++irssi_LDFLAGS="$irssi_LDFLAGS -L/usr/local/v6/lib"
++LDFLAGS="$LDFLAGS -L/usr/local/v6/lib"
++LIBS="$LIBS -linet6"
+ fi
+ 
+ 

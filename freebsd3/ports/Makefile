@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.16 2000/01/21 17:00:06 sumikawa Exp $
+# $Id: Makefile,v 1.17 2000/01/24 03:39:29 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -15,6 +15,7 @@ SUBDIR+=	heimdal
 SUBDIR+=	icecast
 SUBDIR+=	ipv6socket_scrub
 SUBDIR+=	irc
+SUBDIR+=	irssi
 SUBDIR+=	inn
 SUBDIR+=	ja-mnews
 SUBDIR+=	ja-w3m
