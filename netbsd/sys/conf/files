@@ -1,4 +1,4 @@
-#	$NetBSD: files,v 1.530 2002/05/21 03:05:00 augustss Exp $
+#	$NetBSD: files,v 1.530.2.1 2002/12/12 23:48:37 he Exp $
 
 #	@(#)files.newconf	7.5 (Berkeley) 5/10/93
 
@@ -286,7 +286,7 @@ file	dev/ic/aic77xx.c		ahc_aic77xx
 # DPT EATA SCSI controllers
 #
 device	dpt: scsi
-file	dev/ic/dpt.c			dpt
+file	dev/ic/dpt.c			dpt			needs-flag
 
 # Compaq Smart ARRAY controllers
 #
@@ -904,7 +904,7 @@ defpseudo faith:	ifnet
 defpseudo stf:		ifnet
 defpseudo irframetty:	irframedrv, irdasir
 defpseudo hif:		ifnet
-defpseudo vrrp:         ifnet, ether
+defpseudo vrrp:		ifnet, ether
 
 defpseudo sequencer
 defpseudo clockctl
@@ -1115,7 +1115,7 @@ file	net/if_ieee80211subr.c		wlan
 file	net/if_loop.c			loop			needs-count
 file	net/if_media.c
 file	net/if_ppp.c			ppp			needs-count
-file	net/if_stf.c			stf 			needs-count
+file	net/if_stf.c			stf & inet & inet6	needs-count
 file	net/if_sl.c			sl			needs-count
 file	net/if_spppsubr.c		sppp
 file	net/if_strip.c			strip			needs-count
@@ -1123,7 +1123,7 @@ file	net/if_tokensubr.c		token			needs-flag
 file	net/if_tun.c			tun			needs-flag
 file	net/if_vlan.c			vlan			needs-flag
 file	net/if_pppoe.c			pppoe			needs-flag
-file    net/if_vrrp.c                   vrrp                    needs-flag
+file	net/if_vrrp.c			vrrp			needs-flag
 #file net/net_osdep.c
 file	net/pfil.c			pfil_hooks | ipfilter
 file	net/ppp-deflate.c		ppp & ppp_deflate

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_sip.c,v 1.52.4.1 2002/05/28 23:00:39 tv Exp $	*/
+/*	$NetBSD: if_sip.c,v 1.52.4.7 2002/11/21 18:28:15 he Exp $	*/
 
 /*-
  * Copyright (c) 2001, 2002 The NetBSD Foundation, Inc.
@@ -78,11 +78,11 @@
  *
  *	- Support the 10-bit interface on the DP83820 (for fiber).
  *
- *	- Reduce the interrupt load.
+ *	- Reduce the Rx interrupt load.
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_sip.c,v 1.52.4.1 2002/05/28 23:00:39 tv Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_sip.c,v 1.52.4.7 2002/11/21 18:28:15 he Exp $");
 
 #include "bpfilter.h"
 
@@ -254,8 +254,11 @@ struct sip_softc {
 	 */
 	struct evcnt sc_ev_txsstall;	/* Tx stalled due to no txs */
 	struct evcnt sc_ev_txdstall;	/* Tx stalled due to no txd */
-	struct evcnt sc_ev_txintr;	/* Tx interrupts */
+	struct evcnt sc_ev_txforceintr;	/* Tx interrupts forced */
+	struct evcnt sc_ev_txdintr;	/* Tx descriptor interrupts */
+	struct evcnt sc_ev_txiintr;	/* Tx idle interrupts */
 	struct evcnt sc_ev_rxintr;	/* Rx interrupts */
+	struct evcnt sc_ev_hiberr;	/* HIBERR interrupts */
 #ifdef DP83820
 	struct evcnt sc_ev_rxipsum;	/* IP checksums checked in-bound */
 	struct evcnt sc_ev_rxtcpsum;	/* TCP checksums checked in-bound */
@@ -286,6 +289,7 @@ struct sip_softc {
 
 	int	sc_txfree;		/* number of free Tx descriptors */
 	int	sc_txnext;		/* next ready Tx descriptor */
+	int	sc_txwin;		/* Tx descriptors since last intr */
 
 	struct sip_txsq sc_txfreeq;	/* free Tx descsofts */
 	struct sip_txsq sc_txdirtyq;	/* dirty Tx descsofts */
@@ -548,6 +552,49 @@ SIP_DECL(lookup)(const struct pci_attach_args *pa)
 	return (NULL);
 }
 
+#ifdef DP83820
+/*
+ * I really hate stupid hardware vendors.  There's a bit in the EEPROM
+ * which indicates if the card can do 64-bit data transfers.  Unfortunately,
+ * several vendors of 32-bit cards fail to clear this bit in the EEPROM,
+ * which means we try to use 64-bit data transfers on those cards if we
+ * happen to be plugged into a 32-bit slot.
+ *
+ * What we do is use this table of cards known to be 64-bit cards.  If
+ * you have a 64-bit card who's subsystem ID is not listed in this table,
+ * send the output of "pcictl dump ..." of the device to me so that your
+ * card will use the 64-bit data path when plugged into a 64-bit slot.
+ *
+ *	-- Jason R. Thorpe <thorpej@netbsd.org>
+ *	   June 30, 2002
+ */
+static int
+SIP_DECL(check_64bit)(const struct pci_attach_args *pa)
+{
+	static const struct {
+		pci_vendor_id_t c64_vendor;
+		pci_product_id_t c64_product;
+	} card64[] = {
+		/* Asante GigaNIX */
+		{ 0x128a,	0x0002 },
+
+		{ 0, 0}
+	};
+	pcireg_t subsys;
+	int i;
+
+	subsys = pci_conf_read(pa->pa_pc, pa->pa_tag, PCI_SUBSYS_ID_REG);
+
+	for (i = 0; card64[i].c64_vendor != 0; i++) {
+		if (PCI_VENDOR(subsys) == card64[i].c64_vendor &&
+		    PCI_PRODUCT(subsys) == card64[i].c64_product)
+			return (1);
+	}
+
+	return (0);
+}
+#endif /* DP83820 */
+
 int
 SIP_DECL(match)(struct device *parent, struct cfdata *cf, void *aux)
 {
@@ -787,31 +834,73 @@ SIP_DECL(attach)(struct device *parent, struct device *self, void *aux)
 	 * friends -- it affects packet data, not descriptors.
 	 */
 #ifdef DP83820
+	/*
+	 * Cause the chip to load configuration data from the EEPROM.
+	 */
+	bus_space_write_4(sc->sc_st, sc->sc_sh, SIP_PTSCR, PTSCR_EELOAD_EN);
+	for (i = 0; i < 10000; i++) {
+		delay(10);
+		if ((bus_space_read_4(sc->sc_st, sc->sc_sh, SIP_PTSCR) &
+		    PTSCR_EELOAD_EN) == 0)
+			break;
+	}
+	if (bus_space_read_4(sc->sc_st, sc->sc_sh, SIP_PTSCR) &
+	    PTSCR_EELOAD_EN) {
+		printf("%s: timeout loading configuration from EEPROM\n",
+		    sc->sc_dev.dv_xname);
+		return;
+	}
+
 	reg = bus_space_read_4(sc->sc_st, sc->sc_sh, SIP_CFG);
 	if (reg & CFG_PCI64_DET) {
-		printf("%s: 64-bit PCI slot detected\n", sc->sc_dev.dv_xname);
+		printf("%s: 64-bit PCI slot detected", sc->sc_dev.dv_xname);
 		/*
-		 * XXX Need some PCI flags indicating support for
-		 * XXX 64-bit addressing (SAC or DAC) and 64-bit
-		 * XXX data path.
+		 * Check to see if this card is 64-bit.  If so, enable 64-bit
+		 * data transfers.
+		 *
+		 * We can't use the DATA64_EN bit in the EEPROM, because
+		 * vendors of 32-bit cards fail to clear that bit in many
+		 * cases (yet the card still detects that it's in a 64-bit
+		 * slot; go figure).
 		 */
+		if (SIP_DECL(check_64bit)(pa)) {
+			sc->sc_cfg |= CFG_DATA64_EN;
+			printf(", using 64-bit data transfers");
+		}
+		printf("\n");
 	}
-	if (sc->sc_cfg & (CFG_TBI_EN|CFG_EXT_125)) {
+
+	/*
+	 * XXX Need some PCI flags indicating support for
+	 * XXX 64-bit addressing.
+	 */
+#if 0
+	if (reg & CFG_M64ADDR)
+		sc->sc_cfg |= CFG_M64ADDR;
+	if (reg & CFG_T64ADDR)
+		sc->sc_cfg |= CFG_T64ADDR;
+#endif
+
+	if (reg & (CFG_TBI_EN|CFG_EXT_125)) {
 		const char *sep = "";
 		printf("%s: using ", sc->sc_dev.dv_xname);
-		if (sc->sc_cfg & CFG_EXT_125) {
+		if (reg & CFG_EXT_125) {
+			sc->sc_cfg |= CFG_EXT_125;
 			printf("%s125MHz clock", sep);
 			sep = ", ";
 		}
-		if (sc->sc_cfg & CFG_TBI_EN) {
+		if (reg & CFG_TBI_EN) {
+			sc->sc_cfg |= CFG_TBI_EN;
 			printf("%sten-bit interface", sep);
 			sep = ", ";
 		}
 		printf("\n");
 	}
-	if ((pa->pa_flags & PCI_FLAGS_MRM_OKAY) == 0)
+	if ((pa->pa_flags & PCI_FLAGS_MRM_OKAY) == 0 ||
+	    (reg & CFG_MRM_DIS) != 0)
 		sc->sc_cfg |= CFG_MRM_DIS;
-	if ((pa->pa_flags & PCI_FLAGS_MWI_OKAY) == 0)
+	if ((pa->pa_flags & PCI_FLAGS_MWI_OKAY) == 0 ||
+	    (reg & CFG_MWI_DIS) != 0)
 		sc->sc_cfg |= CFG_MWI_DIS;
 
 	/*
@@ -930,10 +1019,16 @@ SIP_DECL(attach)(struct device *parent, struct device *self, void *aux)
 	    NULL, sc->sc_dev.dv_xname, "txsstall");
 	evcnt_attach_dynamic(&sc->sc_ev_txdstall, EVCNT_TYPE_MISC,
 	    NULL, sc->sc_dev.dv_xname, "txdstall");
-	evcnt_attach_dynamic(&sc->sc_ev_txintr, EVCNT_TYPE_INTR,
-	    NULL, sc->sc_dev.dv_xname, "txintr");
+	evcnt_attach_dynamic(&sc->sc_ev_txforceintr, EVCNT_TYPE_INTR,
+	    NULL, sc->sc_dev.dv_xname, "txforceintr");
+	evcnt_attach_dynamic(&sc->sc_ev_txdintr, EVCNT_TYPE_INTR,
+	    NULL, sc->sc_dev.dv_xname, "txdintr");
+	evcnt_attach_dynamic(&sc->sc_ev_txiintr, EVCNT_TYPE_INTR,
+	    NULL, sc->sc_dev.dv_xname, "txiintr");
 	evcnt_attach_dynamic(&sc->sc_ev_rxintr, EVCNT_TYPE_INTR,
 	    NULL, sc->sc_dev.dv_xname, "rxintr");
+	evcnt_attach_dynamic(&sc->sc_ev_hiberr, EVCNT_TYPE_INTR,
+	    NULL, sc->sc_dev.dv_xname, "hiberr");
 #ifdef DP83820
 	evcnt_attach_dynamic(&sc->sc_ev_rxipsum, EVCNT_TYPE_MISC,
 	    NULL, sc->sc_dev.dv_xname, "rxipsum");
@@ -1188,6 +1283,17 @@ SIP_DECL(start)(struct ifnet *ifp)
 		/* Clear the MORE bit on the last segment. */
 		sc->sc_txdescs[lasttx].sipd_cmdsts &= htole32(~CMDSTS_MORE);
 
+		/*
+		 * If we're in the interrupt delay window, delay the
+		 * interrupt.
+		 */
+		if (++sc->sc_txwin >= (SIP_TXQUEUELEN * 2 / 3)) {
+			SIP_EVCNT_INCR(&sc->sc_ev_txforceintr);
+			sc->sc_txdescs[lasttx].sipd_cmdsts |=
+			    htole32(CMDSTS_INTR);
+			sc->sc_txwin = 0;
+		}
+
 #ifdef DP83820
 		/*
 		 * If VLANs are enabled and the packet has a VLAN tag, set
@@ -1266,14 +1372,6 @@ SIP_DECL(start)(struct ifnet *ifp)
 	}
 
 	if (sc->sc_txfree != ofree) {
-		/*
-		 * Cause a descriptor interrupt to happen on the
-		 * last packet we enqueued.
-		 */
-		sc->sc_txdescs[lasttx].sipd_cmdsts |= htole32(CMDSTS_INTR);
-		SIP_CDTXSYNC(sc, lasttx, 1,
-		    BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
-
 		/*
 		 * The entire packet chain is set up.  Give the
 		 * first descrptor to the chip now.
@@ -1431,8 +1529,13 @@ SIP_DECL(intr)(void *arg)
 			}
 		}
 
-		if (isr & (ISR_TXURN|ISR_TXDESC)) {
-			SIP_EVCNT_INCR(&sc->sc_ev_txintr);
+		if (isr & (ISR_TXURN|ISR_TXDESC|ISR_TXIDLE)) {
+#ifdef SIP_EVENT_COUNTERS
+			if (isr & ISR_TXDESC)
+				SIP_EVCNT_INCR(&sc->sc_ev_txdintr);
+			else if (isr & ISR_TXIDLE)
+				SIP_EVCNT_INCR(&sc->sc_ev_txiintr);
+#endif
 
 			/* Sweep up transmit descriptors. */
 			SIP_DECL(txintr)(sc);
@@ -1473,15 +1576,31 @@ SIP_DECL(intr)(void *arg)
 #endif /* ! DP83820 */
 
 		if (isr & ISR_HIBERR) {
+			int want_init = 0;
+
+			SIP_EVCNT_INCR(&sc->sc_ev_hiberr);
+
 #define	PRINTERR(bit, str)						\
-			if (isr & (bit))				\
-				printf("%s: %s\n", sc->sc_dev.dv_xname, str)
+			do {						\
+				if (isr & (bit)) {			\
+					printf("%s: %s\n",		\
+					    sc->sc_dev.dv_xname, str);	\
+					want_init = 1;			\
+				}					\
+			} while (/*CONSTCOND*/0)
+
 			PRINTERR(ISR_DPERR, "parity error");
 			PRINTERR(ISR_SSERR, "system error");
 			PRINTERR(ISR_RMABT, "master abort");
 			PRINTERR(ISR_RTABT, "target abort");
 			PRINTERR(ISR_RXSOVR, "receive status FIFO overrun");
-			(void) SIP_DECL(init)(ifp);
+			/*
+			 * Ignore:
+			 *	Tx reset complete
+			 *	Rx reset complete
+			 */
+			if (want_init)
+				(void) SIP_DECL(init)(ifp);
 #undef PRINTERR
 		}
 	}
@@ -1558,8 +1677,10 @@ SIP_DECL(txintr)(struct sip_softc *sc)
 	 * If there are no more pending transmissions, cancel the watchdog
 	 * timer.
 	 */
-	if (txs == NULL)
+	if (txs == NULL) {
 		ifp->if_timer = 0;
+		sc->sc_txwin = 0;
+	}
 }
 
 #if defined(DP83820)
@@ -2084,6 +2205,7 @@ SIP_DECL(init)(struct ifnet *ifp)
 	    BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
 	sc->sc_txfree = SIP_NTXDESC;
 	sc->sc_txnext = 0;
+	sc->sc_txwin = 0;
 
 	/*
 	 * Initialize the transmit job descriptors.
@@ -2219,7 +2341,7 @@ SIP_DECL(init)(struct ifnet *ifp)
 	 * Initialize the interrupt mask.
 	 */
 	sc->sc_imr = ISR_DPERR|ISR_SSERR|ISR_RMABT|ISR_RTABT|ISR_RXSOVR|
-	    ISR_TXURN|ISR_TXDESC|ISR_RXORN|ISR_RXIDLE|ISR_RXDESC;
+	    ISR_TXURN|ISR_TXDESC|ISR_TXIDLE|ISR_RXORN|ISR_RXIDLE|ISR_RXDESC;
 	bus_space_write_4(st, sh, SIP_IMR, sc->sc_imr);
 
 	/* Set up the receive filter. */
@@ -3057,12 +3179,6 @@ SIP_DECL(dp83820_read_macaddr)(struct sip_softc *sc,
 
 	/* Get the GPIOR bits. */
 	sc->sc_gpior = eeprom_data[0x04];
-
-	/* Get various CFG related bits. */
-	if ((eeprom_data[0x05] >> 0) & 1)
-		sc->sc_cfg |= CFG_EXT_125; 
-	if ((eeprom_data[0x05] >> 9) & 1)
-		sc->sc_cfg |= CFG_TBI_EN;
 }
 #else /* ! DP83820 */
 void

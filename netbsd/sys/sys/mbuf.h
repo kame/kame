@@ -216,10 +216,8 @@ struct mbuf {
 #define M_LOOP		0x0040	/* for Mbuf statistics */
 #define M_AUTHIPDGM	0x0080	/* data origin authentication */
 
-#define M_AUX		0x8000	/* mbufs pointed to by m->m_pkthdr.aux */
-
 /* flags copied when copying m_pkthdr */
-#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_BCAST|M_MCAST|M_CANFASTFWD|M_LINK0|M_LINK1|M_LINK2|M_AUTHIPHDR|M_DECRYPTED|M_LOOP|M_AUTHIPDGM|M_AUX|M_NOTIFICATION)
+#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_BCAST|M_MCAST|M_CANFASTFWD|M_LINK0|M_LINK1|M_LINK2|M_AUTHIPHDR|M_DECRYPTED|M_LOOP|M_AUTHIPDGM|M_NOTIFICATION)
 
 /* mbuf types */
 #define	MT_FREE		0	/* should be on free list */

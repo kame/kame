@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ethersubr.c,v 1.95 2002/05/18 22:52:44 itojun Exp $	*/
+/*	$NetBSD: if_ethersubr.c,v 1.95.2.2 2003/01/26 10:32:57 jmc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -65,7 +65,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ethersubr.c,v 1.95 2002/05/18 22:52:44 itojun Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ethersubr.c,v 1.95.2.2 2003/01/26 10:32:57 jmc Exp $");
 
 #include "opt_inet.h"
 #include "opt_atalk.h"
@@ -105,9 +105,9 @@ __KERNEL_RCSID(0, "$NetBSD: if_ethersubr.c,v 1.95 2002/05/18 22:52:44 itojun Exp
 
 #if NARP == 0
 /*
- * XXX there should realy be a way to issue this warning from within config(8)
+ * XXX there should really be a way to issue this warning from within config(8)
  */
-#error You have included a pseudo-device in your configuration that depends on the presence of ethernet interfaces, but have no such interfaces configured. Check if you realy need pseudo-device bridge, ppppoe or vlan.
+#error You have included a pseudo-device in your configuration that depends on the presence of ethernet interfaces, but have no such interfaces configured. Check if you really need pseudo-device bridge, ppppoe or vlan.
 #endif
 
 #if NBPFILTER > 0 
@@ -484,8 +484,21 @@ ether_output(struct ifnet *ifp, struct mbuf *m0, struct sockaddr *dst,
 	if (m == 0)
 		senderr(ENOBUFS);
 	eh = mtod(m, struct ether_header *);
-	bcopy((caddr_t)&etype,(caddr_t)&eh->ether_type,
-		sizeof(eh->ether_type));
+	/* Note: etype is already in network byte order. */
+#ifdef __NO_STRICT_ALIGNMENT
+	eh->ether_type = etype;
+#else
+	{
+		uint8_t *dstp = (uint8_t *) &eh->ether_type;
+#if BYTE_ORDER == BIG_ENDIAN
+		dstp[0] = etype >> 8;
+		dstp[1] = etype; 
+#else
+		dstp[0] = etype;
+		dstp[1] = etype >> 8;
+#endif /* BYTE_ORDER == BIG_ENDIAN */
+	}
+#endif /* __NO_STRICT_ALIGNMENT */
  	bcopy((caddr_t)edst, (caddr_t)eh->ether_dhost, sizeof (edst));
 	if (hdrcmplt)
 		bcopy((caddr_t)esrc, (caddr_t)eh->ether_shost,

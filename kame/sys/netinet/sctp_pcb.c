@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.19 2003/04/21 06:26:10 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.20 2003/04/22 07:24:05 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.c,v 1.207 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -3790,43 +3790,45 @@ sctp_set_primary_addr(struct sctp_tcb *stcb, struct sockaddr *sa)
 int
 sctp_is_vtag_good(struct sctp_inpcb *m, u_int32_t tag, struct timeval *now)
 {
-    /*
-     * This function serves two purposes. It will see if a TAG can be
-     * re-used and return 1 for yes it is ok and 0 for don't use that
-     * tag.
-     * A secondary function it will do is purge out old tags that can
-     * be removed.
-     */
-    struct sctpvtaghead *chain;
-    struct sctp_tagblock *twait_block;
+	/*
+	 * This function serves two purposes. It will see if a TAG can be
+	 * re-used and return 1 for yes it is ok and 0 for don't use that
+	 * tag.
+	 * A secondary function it will do is purge out old tags that can
+	 * be removed.
+	 */
+	struct sctpvtaghead *chain;
+	struct sctp_tagblock *twait_block;
 
-    int i;
+	int i;
 #ifdef SCTP_VTAG_TIMEWAIT_PER_STACK
-    chain = &sctppcbinfo.vtag_timewait[(tag % SCTP_STACK_VTAG_HASH_SIZE)];
+	chain = &sctppcbinfo.vtag_timewait[(tag % SCTP_STACK_VTAG_HASH_SIZE)];
 #else
-    chain = &m->vtag_timewait[(tag % SCTP_STACK_VTAG_HASH_SIZE)];
+	chain = &m->vtag_timewait[(tag % SCTP_STACK_VTAG_HASH_SIZE)];
 #endif
-    if (!LIST_EMPTY(chain)) {
-	/* Block(s) are present, lets see if we have this tag in the list */
-	LIST_FOREACH(twait_block, chain, sctp_nxt_tagblock) {
-	    for (i = 0; i < SCTP_NUMBER_IN_VTAG_BLOCK; i++) {
-		if (twait_block->vtag_block[i].v_tag == 0) {
-		    /* not used */
-		    continue;
-		} else if (twait_block->vtag_block[i].tv_sec_at_expire >
-			   now->tv_sec) {
-		    /* Audit expires this guy */
-		    twait_block->vtag_block[i].tv_sec_at_expire = 0;
-		    twait_block->vtag_block[i].v_tag = 0;
-		} else if (twait_block->vtag_block[i].v_tag == tag) {
-		    /* Bad tag, sorry :< */
-			return (0);
+	if (!LIST_EMPTY(chain)) {
+		/*
+		 * Block(s) are present, lets see if we have this tag in
+		 * the list
+		 */
+		LIST_FOREACH(twait_block, chain, sctp_nxt_tagblock) {
+			for (i = 0; i < SCTP_NUMBER_IN_VTAG_BLOCK; i++) {
+				if (twait_block->vtag_block[i].v_tag == 0) {
+					/* not used */
+					continue;
+				} else if (twait_block->vtag_block[i].tv_sec_at_expire > now->tv_sec) {
+					/* Audit expires this guy */
+					twait_block->vtag_block[i].tv_sec_at_expire = 0;
+					twait_block->vtag_block[i].v_tag = 0;
+				} else if (twait_block->vtag_block[i].v_tag == tag) {
+					/* Bad tag, sorry :< */
+					return (0);
+				}
+			}
 		}
-	    }
 	}
-    }
-    /* Not found, ok to use the tag */
-    return (1);
+	/* Not found, ok to use the tag */
+	return (1);
 }
 
 

@@ -200,10 +200,10 @@ atm_output(ifp, m0, dst, rt0)
 		default:
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 			printf("%s: can't handle af%d\n", ifp->if_xname, 
-			       dst->sa_family);
+			    dst->sa_family);
 #elif defined(__FreeBSD__) || defined(__bsdi__)
 			printf("%s%d: can't handle af%d\n", ifp->if_name, 
-			       ifp->if_unit, dst->sa_family);
+			    ifp->if_unit, dst->sa_family);
 #endif
 			senderr(EAFNOSUPPORT);
 		}

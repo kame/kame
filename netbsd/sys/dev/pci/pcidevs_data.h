@@ -1,10 +1,10 @@
-/*	$NetBSD: pcidevs_data.h,v 1.431.2.9 2002/08/02 05:42:12 lukem Exp $	*/
+/*	$NetBSD: pcidevs_data.h,v 1.431.2.18 2003/01/28 06:24:48 jmc Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: pcidevs,v 1.428.2.10 2002/08/02 05:40:32 lukem Exp 
+ *	NetBSD: pcidevs,v 1.428.2.19 2003/01/27 06:21:36 jmc Exp 
  */
 
 /*
@@ -866,6 +866,24 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "Alteon",
 	    "ACEnic BCM5701 10/100/1000 Ethernet",
+	},
+	{
+	    PCI_VENDOR_ALTIMA, PCI_PRODUCT_ALTIMA_AC1000,
+	    0,
+	    "Altima",
+	    "AC1000 Gigabit Ethernet",
+	},
+	{
+	    PCI_VENDOR_ALTIMA, PCI_PRODUCT_ALTIMA_AC1001,
+	    0,
+	    "Altima",
+	    "AC1001 Gigabit Ethernet",
+	},
+	{
+	    PCI_VENDOR_ALTIMA, PCI_PRODUCT_ALTIMA_AC9100,
+	    0,
+	    "Altima",
+	    "AC9100 Gigabit Ethernet",
 	},
 	{
 	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_PCNET_PCI,
@@ -1774,6 +1792,60 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    "BCM5701 10/100/1000 Ethernet",
 	},
 	{
+	    PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_BCM5702,
+	    0,
+	    "Broadcom Corporation",
+	    "BCM5702 10/100/1000 Ethernet",
+	},
+	{
+	    PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_BCM5702X,
+	    0,
+	    "Broadcom Corporation",
+	    "BCM5702X 10/100/1000 Ethernet",
+	},
+	{
+	    PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_BCM5702FE,
+	    0,
+	    "Broadcom Corporation",
+	    "BCM5702FE 10/100 Ethernet",
+	},
+	{
+	    PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_BCM5703,
+	    0,
+	    "Broadcom Corporation",
+	    "BCM5703 10/100/1000 Ethernet",
+	},
+	{
+	    PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_BCM5703X,
+	    0,
+	    "Broadcom Corporation",
+	    "BCM5703X 10/100/1000 Ethernet",
+	},
+	{
+	    PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_BCM5704C,
+	    0,
+	    "Broadcom Corporation",
+	    "BCM5704C Gigabit Ethernet (1000BASE-T)",
+	},
+	{
+	    PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_BCM5704S,
+	    0,
+	    "Broadcom Corporation",
+	    "BCM5704S Gigabit Ethernet (1000BASE-X)",
+	},
+	{
+	    PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_BCM5705,
+	    0,
+	    "Broadcom Corporation",
+	    "BCM5705 10/100/1000 Ethernet",
+	},
+	{
+	    PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_BCM4401,
+	    0,
+	    "Broadcom Corporation",
+	    "BCM4401 10/100 Ethernet",
+	},
+	{
 	    PCI_VENDOR_BROOKTREE, PCI_PRODUCT_BROOKTREE_BT848,
 	    0,
 	    "Brooktree",
@@ -2536,6 +2608,12 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    "PERC 3/Di",
 	},
 	{
+	    PCI_VENDOR_DELL, PCI_PRODUCT_DELL_PERC_3DI_3,
+	    0,
+	    "Dell Computer",
+	    "PERC 3/Di",
+	},
+	{
 	    PCI_VENDOR_DELL, PCI_PRODUCT_DELL_PERC_3SI,
 	    0,
 	    "Dell Computer",
@@ -2561,6 +2639,24 @@ const struct pci_knowndev pci_knowndevs[] = {
 	},
 	{
 	    PCI_VENDOR_DELL, PCI_PRODUCT_DELL_PERC_3DI_SUB3,
+	    0,
+	    "Dell Computer",
+	    "PERC 3/Di",
+	},
+	{
+	    PCI_VENDOR_DELL, PCI_PRODUCT_DELL_PERC_3DI_3_SUB,
+	    0,
+	    "Dell Computer",
+	    "PERC 3/Di",
+	},
+	{
+	    PCI_VENDOR_DELL, PCI_PRODUCT_DELL_PERC_3DI_3_SUB2,
+	    0,
+	    "Dell Computer",
+	    "PERC 3/Di",
+	},
+	{
+	    PCI_VENDOR_DELL, PCI_PRODUCT_DELL_PERC_3DI_3_SUB3,
 	    0,
 	    "Dell Computer",
 	    "PERC 3/Di",
@@ -2612,6 +2708,12 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "Distributed Processing Technology",
 	    "SmartRAID (I2O)",
+	},
+	{
+	    PCI_VENDOR_DPT, PCI_PRODUCT_DPT_RAID_2005S,
+	    0,
+	    "Distributed Processing Technology",
+	    "Zero Channel SmartRAID (I2O)",
 	},
 	{
 	    PCI_VENDOR_DPT, PCI_PRODUCT_DPT_MEMCTLR,
@@ -3070,6 +3172,12 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    "PPC 405GP PCI Bridge",
 	},
 	{
+	    PCI_VENDOR_IBM, PCI_PRODUCT_IBM_133PCIX,
+	    0,
+	    "IBM",
+	    "133 PCI-X Bridge",
+	},
+	{
 	    PCI_VENDOR_IBM, PCI_PRODUCT_IBM_MPIC2,
 	    0,
 	    "IBM",
@@ -3166,6 +3274,12 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    "80312 I/O Companion Chip",
 	},
 	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_80321,
+	    0,
+	    "Intel",
+	    "80321 I/O Processor",
+	},
+	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_PCEB,
 	    0,
 	    "Intel",
@@ -3223,49 +3337,79 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82542,
 	    0,
 	    "Intel",
-	    "i82452 Gigabit Ethernet",
+	    "i82542 Gigabit Ethernet",
 	},
 	{
-	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82543_FIBER,
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82543GC_FIBER,
 	    0,
 	    "Intel",
-	    "i82453 Gigabit Ethernet (1000BASE-X)",
+	    "i82453GC Gigabit Ethernet (1000BASE-X)",
 	},
 	{
-	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82543_SC,
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82543GC_COPPER,
 	    0,
 	    "Intel",
-	    "i82453-SC Gigabit Ethernet",
+	    "i82543GC Gigabit Ethernet (1000BASE-T)",
 	},
 	{
-	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82543_COPPER,
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544EI_COPPER,
 	    0,
 	    "Intel",
-	    "i82543 Gigabit Ethernet (1000BASE-T)",
+	    "i82544EI Gigabit Ethernet (1000BASE-T)",
 	},
 	{
-	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544_XT,
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544EI_FIBER,
 	    0,
 	    "Intel",
-	    "i82544 Gigabit Ethernet (1000BASE-T)",
+	    "i82544EI Gigabit Ethernet (1000BASE-X)",
 	},
 	{
-	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544_XF,
-	    0,
-	    "Intel",
-	    "i82544 Gigabit Ethernet (1000BASE-X)",
-	},
-	{
-	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544GC,
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544GC_COPPER,
 	    0,
 	    "Intel",
 	    "i82544GC Gigabit Ethernet (1000BASE-T)",
 	},
 	{
-	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544GC_64,
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544GC_LOM,
 	    0,
 	    "Intel",
-	    "i82544GC (64-bit) Gigabit Ethernet (1000BASE-T)",
+	    "i82544GC (LOM) Gigabit Ethernet",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82540EM,
+	    0,
+	    "Intel",
+	    "i82540EM Gigabit Ethernet (1000BASE-T)",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82545EM_COPPER,
+	    0,
+	    "Intel",
+	    "i82545EM Gigabit Ethernet (1000BASE-T)",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82546EB_COPPER,
+	    0,
+	    "Intel",
+	    "i82546EB Gigabit Ethernet (1000BASE-T)",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82545EM_FIBER,
+	    0,
+	    "Intel",
+	    "i82545EM Gigabit Ethernet (1000BASE-X)",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82546EB_FIBER,
+	    0,
+	    "Intel",
+	    "i82546EB Gigabit Ethernet (1000BASE-X)",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82540EM_LOM,
+	    0,
+	    "Intel",
+	    "i82540EM (LOM) Gigabit Ethernet",
 	},
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_IN_BUSINESS,
@@ -3740,6 +3884,24 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "Intel",
 	    "82801BA Hub-to-PCI Bridge",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801E_SMB,
+	    0,
+	    "Intel",
+	    "82801E SMBus Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801E_LAN_1,
+	    0,
+	    "Intel",
+	    "82801E LAN Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801E_LAN_2,
+	    0,
+	    "Intel",
+	    "82801E LAN Controller",
 	},
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801CA_LPC,
@@ -5326,6 +5488,18 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    "Ultra133/ATA Bus Master IDE Accelerator",
 	},
 	{
+	    PCI_VENDOR_PROMISE, PCI_PRODUCT_PROMISE_ULTRA133TX2,
+	    0,
+	    "Promise Technology",
+	    "Ultra133TX2/ATA Bus Master IDE Accelerator",
+	},
+	{
+	    PCI_VENDOR_PROMISE, PCI_PRODUCT_PROMISE_ULTRA133TX2v2,
+	    0,
+	    "Promise Technology",
+	    "Ultra133TX2v2/ATA Bus Master IDE Accelerator",
+	},
+	{
 	    PCI_VENDOR_QLOGIC, PCI_PRODUCT_QLOGIC_ISP1020,
 	    0,
 	    "Q Logic",
@@ -5740,6 +5914,18 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    "CMIC_HE Host",
 	},
 	{
+	    PCI_VENDOR_SERVERWORKS, PCI_PRODUCT_SERVERWORKS_CMIC_LE,
+	    0,
+	    "ServerWorks",
+	    "CMIC_LE Host",
+	},
+	{
+	    PCI_VENDOR_SERVERWORKS, PCI_PRODUCT_SERVERWORKS_CMIC_SL,
+	    0,
+	    "ServerWorks",
+	    "CMIC_SL Host",
+	},
+	{
 	    PCI_VENDOR_SERVERWORKS, PCI_PRODUCT_SERVERWORKS_OSB4_IDE,
 	    0,
 	    "ServerWorks",
@@ -6148,10 +6334,10 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    "SK-NET GE",
 	},
 	{
-	    PCI_VENDOR_SCHNEIDERKOCH, PCI_PRODUCT_SCHNEIDERKOCH_ALTIMA,
+	    PCI_VENDOR_SCHNEIDERKOCH, PCI_PRODUCT_SCHNEIDERKOCH_SK_9DX1,
 	    0,
 	    "Schneider & Koch",
-	    "SK-NET Altima Gigabit Ethernet",
+	    "SK-NET SK-9DX1 Gigabit Ethernet",
 	},
 	{
 	    PCI_VENDOR_SCHNEIDERKOCH, PCI_PRODUCT_SCHNEIDERKOCH_SK_9D21,
@@ -6937,7 +7123,7 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    PCI_VENDOR_VIATECH, PCI_PRODUCT_VIATECH_VT8233_AC97,
 	    0,
 	    "VIA Technologies",
-	    "VT8233 AC-97 Audio Controller",
+	    "VT8233/VT8235 AC-97 Audio Controller",
 	},
 	{
 	    PCI_VENDOR_VIATECH, PCI_PRODUCT_VIATECH_VT6102,
@@ -6968,6 +7154,12 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "VIA Technologies",
 	    "VT8233A PCI-ISA Bridge",
+	},
+	{
+	    PCI_VENDOR_VIATECH, PCI_PRODUCT_VIATECH_VT8235,
+	    0,
+	    "VIA Technologies",
+	    "VT8235 (Apollo KT400) PCI-ISA Bridge",
 	},
 	{
 	    PCI_VENDOR_VIATECH, PCI_PRODUCT_VIATECH_VT86C100A,
@@ -10711,6 +10903,12 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    PCI_VENDOR_GLOBALSUN, 0,
 	    PCI_KNOWNDEV_NOPROD,
 	    "Global Sun Tech",
+	    NULL,
+	},
+	{
+	    PCI_VENDOR_ALTIMA, 0,
+	    PCI_KNOWNDEV_NOPROD,
+	    "Altima",
 	    NULL,
 	},
 	{
