@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.40 2004/12/27 05:41:16 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.41 2005/01/18 10:51:07 suz Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -1049,7 +1049,12 @@ dccp_input(struct mbuf *m, ...)
 	}
 
 	if (dh->dh_type == DCCP_TYPE_DATA || dh->dh_type == DCCP_TYPE_DATAACK) {
-		if (so->so_state & SS_CANTRCVMORE) {
+#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+		if (so->so_rcv.sb_state & SBS_CANTRCVMORE) 
+#else
+		if (so->so_state & SS_CANTRCVMORE) 
+#endif
+		{
 			DCCP_DEBUG((LOG_INFO, "state & SS_CANTRCVMORE...!\n"));
 			m_freem(m);
 			if (opts)

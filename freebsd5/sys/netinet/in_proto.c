@@ -74,6 +74,7 @@
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 #ifdef DCCP
+#include <netinet/in_pcb.h>
 #include <netinet/dccp.h>
 #include <netinet/dccp_var.h>
 #endif /* DCCP */
