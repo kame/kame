@@ -121,7 +121,7 @@ main(argc, argv)
 			break;
 		default:
 			usage();
-			/*NOTREACHED*/
+			exit(0);
 		}
 	}
 	argc -= optind;
@@ -129,7 +129,7 @@ main(argc, argv)
 
 	if (argc != 1) {
 		usage();
-		/*NOTREACHED*/
+		exit(0);
 	}
 	device = argv[0];
 
@@ -141,7 +141,6 @@ static void
 usage()
 {
 	fprintf(stderr, "usage: dhcpc [-d] intface\n");
-	exit(0);
 }
 
 static void
