@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.93 2000/04/04 11:20:45 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.94 2000/04/04 14:45:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -844,8 +844,12 @@ skip_ipsec2:;
 	/*
 	 * advanced API (IPV6_USE_MIN_MTU) overrides mtu setting
 	 */
-	if ((flags & IPV6_MINMTU) != 0 && mtu > IPV6_MMTU)
-		mtu = IPV6_MMTU;
+	if (mtu > IPV6_MMTU) {
+		if ((opt && (opt->ip6po_flags & IP6PO_MINMTU)) ||
+		    (flags & IPV6_MINMTU)) {
+			mtu = IPV6_MMTU;
+		}
+	}
 
 	/*
 	 * Fake link-local scope-class addresses
@@ -3141,6 +3145,12 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 			if (cm->cmsg_len != CMSG_LEN(0))
 				return(EINVAL);
 			opt->ip6po_flags |= IP6PO_REACHCONF;
+			break;
+
+		case IPV6_USE_MIN_MTU:
+			if (cm->cmsg_len != CMSG_LEN(0))
+				return(EINVAL);
+			opt->ip6po_flags |= IP6PO_MINMTU;
 			break;
 
 		default:

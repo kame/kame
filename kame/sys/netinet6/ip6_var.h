@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.31 2000/04/04 08:48:26 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.32 2000/04/04 14:45:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -147,6 +147,7 @@ struct	ip6_pktopts {
 
 	int ip6po_flags;
 #define IP6PO_REACHCONF	0x01	/* upper-layer reachability confirmation */
+#define IP6PO_MINMTU	0x02	/* use minimum MTU (IPV6_USE_MIN_MTU) */
 };
 
 /*
