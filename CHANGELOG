@@ -1,7 +1,43 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2000 2001/12/04 11:59:51 keiichi Exp $
+$KAME: CHANGELOG,v 1.2001 2001/12/11 11:38:08 fujisawa Exp $
 
 <200112>
+2001-12-11 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_{defs,dispatch,trans,tslot,var}.[ch]:
+	- Support fragmented IPv4 packet translation.  
+	  Fragmented IPv4 packet is translated into fragmented one or
+	  two IPv6 packet.  IPv4 packet larger than 1280 bytes
+	  (monolithic or fragmented) is translated into fragmented
+	  two IPv6 pakcets.  Sorry, DF flag is not cared yet.
+
+	  Restrictions:
+	    - Reassembly is not supported.
+	      The following limitation occurs from this restriction.
+	      o Fragmented ICMPv4 packet is not translated into ICMPv6
+		packet.  Because length of ICMPv6 packet is necessary
+		when translator calculates ICMPv6 checksum, but the
+		length is not provided without reassembly.
+	      o IPv4 packet which is fragmented and needs conversion
+		of payload is not translated into IPv6 packet.
+		i.e. ftp command.
+
+	      I think there is hardly a case that FTP command or ICMP
+	      packet is fragmented except ICMP ECHO/ECHOREPLY message.
+	      Therefor, I think this restriction is not so serious.
+
+	  Todo: 
+	    - Mind DF flag.
+	    - Send back ICMP "packet too big" message to sender when
+	      DF flag is set and IPv4 packet size is larger than 1280
+	      bytes.
+
+	      There is a host that sends a IPv4 packet which DF bit is
+	      set but does not listen an ICMP message.  Or an ICMP
+	      "packet too big" message may be dropped at a firewall
+	      prior to this host.
+
+	      This problem is still under consideration now.
+
 Tue Dec  4 20:58:54 JST 2001 keiichi@iij.ad.jp
 	* kame/sys/net/if_hif.[hc]
 	* kame/sys/netinet6/{mip6.[hc],mip6_binding.c}
