@@ -43,50 +43,54 @@
 #define MLD6V2_H
 /* 
  * Multicast Listener Discovery v.2
- * XXX: this portion will be merged into system include file
  */
+#ifndef MLD_QRV	 /* XXX: only for non-SSM platform compilation */
 struct mldv2_hdr {	/* MLDv2 Header */
     struct icmp6_hdr mld_icmp6_hdr;	/* Standard ICMP header */
     struct in6_addr mld_addr;	/* Multicast Address */
-    u_int8          mld_misc;	/* Resv+S+QRV */
+    u_int8          mld_rtval;	/* Resv+S+QRV */
     u_int8          mld_qqi;	/* QQIC */
     u_int16         mld_numsrc;	/* Number of Sources */
-    struct in6_addr mld_sources[1];	/* Sources Addresses List */
+    struct in6_addr mld_src[1];	/* Sources Addresses List */
 };
 
-#define MLD6_QRV(x) ((x)->mld_misc & (0x07))
+#define MLD_QRV(x) ((x)->mld_misc & (0x07))
 
-struct mld_maddr_rec {		/* Multicast Address Record  */
-    u_int8          mmr_type;	/* Multicast Address Record Type */
-    u_int8          mmr_datalen;/* Aux Data Length */
-    u_int16         mmr_numsrc;	/* Number of Sources */
-    struct in6_addr mmr_maddr;	/* Multicast Address */
-    struct in6_addr mmr_sources[1];	/* Sources Addresses List */
+struct mld_group_record_hdr {	/* Multicast Address Record  */
+    u_int8          record_type;/* Multicast Address Record Type */
+    u_int8          auxlen;	/* Aux Data Length */
+    u_int16         numsrc;	/* Number of Sources */
+    struct in6_addr group;	/* Multicast Address */
+    struct in6_addr src[1];	/* Sources Addresses List */
 };
 
 #define nmcastrcd mldv2_hdr.icmp6_data16[1]
 
-struct mld_report {	/* Multicast Report */
-    u_int8_t  mr_type;	/* Multicast Report Type */
-    u_int8_t  mr_rsv1;	/* Reserved */
-    u_int16_t mr_cksum;	/* Checksum */
-    u_int16_t mr_rsv2;	/* Reserved */
-    u_int16_t mr_numgrps;	/* Number of Multicast Address Records */
-    struct mld_maddr_rec mr_maddr[1];	/* Multicast Records */
+struct mld_report_hdr {	/* Multicast Report */
+    u_int8_t  mld_type;	/* Multicast Report Type */
+    u_int8_t  mld_reserved1;	/* Reserved */
+    u_int16_t mld_cksum;	/* Checksum */
+    u_int16_t mld_reserved2;	/* Reserved */
+    u_int16_t mld_grpnum;	/* Number of Multicast Address Records */
 };
+#endif
 
-#define MLD6_MINLEN 8		/* Minimal Message Length */
-#define MLD6_HDRLEN 8		/* Minimal Header Length */
-#define MLD6_MADDR_REC_HDRLEN 20	/* Minimal Multicast Addresses Length */
-#define MLD6_PREPEND 0		/* Allocation for low level use  */
+#ifndef MLD_MINLEN
+#define MLD_MINLEN 8		/* Minimal Message Length */
+#endif
+#define MLD_HDRLEN 8		/* Minimal Header Length */
+#define MLD_MADDR_REC_HDRLEN 20	/* Minimal Multicast Addresses Length */
+#define MLD_PREPEND 0		/* Allocation for low level use  */
 
-#define MLD6_MAXSOURCES(len)  (((len)-28)>>2)
+#define MLD_MAXSOURCES(len)  (((len)-28)>>2)
 
 /*************** MYDEV ***********************/
 
 #define SFLAGYES		0x08
 #define SFLAGNO			0x0
-#define MLD6_SFLAG(x) ((x)->mld_misc &(0x08))
+#ifndef MLD_SFLAG
+#define MLD_SFLAG(x) ((x)->mld_rtval &(0x08))
+#endif
 
 /*
  * Multicast Address Record Types 

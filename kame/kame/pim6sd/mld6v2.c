@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2.c,v 1.11 2002/06/26 10:24:48 jinmei Exp $
+ * $KAME: mld6v2.c,v 1.12 2002/09/05 08:12:23 suz Exp $
  */
 
 /*
@@ -159,7 +159,7 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
                 IF_DEBUG(DEBUG_MLD)
                     log(LOG_DEBUG, 0, "%s", sa6_fmt(&lstsrc->al_addr));
 
-                mhp->mld_sources[nbsrc] = lstsrc->al_addr.sin6_addr;
+                mhp->mld_src[nbsrc] = lstsrc->al_addr.sin6_addr;
                 nbsrc++;
                 lstsrc->al_rob--;
                 if (timer_leftTimer(lstsrc->al_timerid) >
@@ -188,7 +188,7 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
 
                 IF_DEBUG(DEBUG_MLD)
                     log(LOG_DEBUG, 0, "%s", sa6_fmt(&lstsrc->al_addr));
-                mhp->mld_sources[nbsrc] = lstsrc->al_addr.sin6_addr;
+                mhp->mld_src[nbsrc] = lstsrc->al_addr.sin6_addr;
                 nbsrc++;
                 lstsrc->al_rob--;
 	    nextsrc2:
@@ -229,7 +229,7 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
 	mhp->mld_addr = group->sin6_addr;
     else
 	mhp->mld_addr = in6addr_any;
-    mhp->mld_misc = misc;
+    mhp->mld_rtval = misc;
     mhp->mld_qqi = codafloat(qqic, &realnbr, 3, 4);
     mhp->mld_numsrc = htons(nbsrc);
 

@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.11 2002/06/26 10:24:48 jinmei Exp $
+ * $KAME: mld6v2_proto.c,v 1.12 2002/09/05 08:12:23 suz Exp $
  */
 
 /*
@@ -235,8 +235,8 @@ accept_listenerV2_query(src, dst, query_message, datalen)
     if ((qqi = mldh->mld_qqi) >= 128)
 	qqi = decodeafloat(mldh->mld_qqi, 3, 4);
 
-    qrv = MLD6_QRV(mldh);
-    sflag = MLD6_SFLAG(mldh);
+    qrv = MLD_QRV(mldh->mld_rtval);
+    sflag = MLD_SFLAG(mldh->mld_rtval);
 
     IF_DEBUG(DEBUG_MLD)
 	log(LOG_DEBUG, 0,
@@ -326,7 +326,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
 		log(LOG_DEBUG,0,"List of sources :");
 	    for (i = 0; i < numsrc; i++)
 	    {
-		source_sa.sin6_addr = mldh->mld_sources[i];
+		source_sa.sin6_addr = mldh->mld_src[i];
 		source_sa.sin6_scope_id = inet6_uvif2scopeid(&source_sa, v);
 
 	        log(LOG_DEBUG, 0, "%s", sa6_fmt(&source_sa));
@@ -391,8 +391,8 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 
     register mifi_t vifi;
     register struct uvif *v;
-    struct mld_report *report;
-    struct mld_maddr_rec *mard;
+    struct mld_report_hdr *report;
+    struct mld_group_record_hdr *mard;
     int             i, j, nummard, numsrc, totsrc;
     struct listaddr *g = NULL;
     struct listaddr *s = NULL;
@@ -423,8 +423,8 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 	    "accepting multicast listener V2 report: "
 	    "src %s,dst %s", sa6_fmt(src), inet6_fmt(dst));
 
-    report = (struct mld_report *) report_message;
-    nummard = ntohs(report->mr_numgrps);
+    report = (struct mld_report_hdr *) report_message;
+    nummard = ntohs(report->mld_grpnum);
 
     v->uv_in_mld_report++;
 
@@ -435,13 +435,14 @@ accept_listenerV2_report(src, dst, report_message, datalen)
     totsrc = 0;
     for (i = 0; i < nummard; i++)
     {
- 	p = (char *)&report->mr_maddr[i] - sizeof(struct in6_addr) * i
+	struct mld_group_record_hdr *mard0 = (struct mld_group_record_hdr *)(report + 1);
+ 	p = (char *)(mard0 + i) - sizeof(struct in6_addr) * i
 		+ totsrc * sizeof(struct in6_addr);
-        mard= (struct mld_maddr_rec *) p;
-	numsrc = ntohs(mard->mmr_numsrc);
+        mard= (struct mld_group_record_hdr *) p;
+	numsrc = ntohs(mard->numsrc);
 	totsrc += numsrc;
 
-	group_sa.sin6_addr = mard->mmr_maddr;
+	group_sa.sin6_addr = mard->group;
 	group_sa.sin6_scope_id = inet6_uvif2scopeid(&group_sa, v);
 
 	if (IN6_IS_ADDR_MC_LINKLOCAL(&group_sa.sin6_addr))
@@ -458,7 +459,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 	    continue;
 	}
 
-	switch (mard->mmr_type)
+	switch (mard->record_type)
 	{
 	case MODE_IS_INCLUDE:
 	case ALLOW_NEW_SOURCES:
@@ -470,7 +471,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
                  * (B)=MALI implementation
 		 */
 
-		source_sa.sin6_addr = mard->mmr_sources[j];
+		source_sa.sin6_addr = mard->src[j];
 		source_sa.sin6_scope_id = inet6_uvif2scopeid(&source_sa, v);
 
 		IF_DEBUG(DEBUG_MLD)
@@ -591,7 +592,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 		 * in our src/group list; in order to set up a short-timeout group/source specific query.
 		 */
 
-		source_sa.sin6_addr = mard->mmr_sources[j];
+		source_sa.sin6_addr = mard->src[j];
 		source_sa.sin6_scope_id = inet6_uvif2scopeid(&source_sa, v);
 
 		if ((s =
@@ -640,7 +641,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 	default:
 	    log(LOG_NOTICE, 0,
 		"Received a multicast report not supported : %d",
-		mard->mmr_type);
+		mard->record_type);
 	}
 
     }
