@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.970 2000/06/04 17:22:15 jinmei Exp $
+$Id: CHANGELOG,v 1.971 2000/06/04 17:23:21 jinmei Exp $
 
 <200006>
 2000-06-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -13,6 +13,7 @@ $Id: CHANGELOG,v 1.970 2000/06/04 17:22:15 jinmei Exp $
 	3 and later.
 	* freebsd[34]/sys/netinet6/udp6_usrreq.c: removed original
 	udp6_output().
+	* freebsd[34]/sys/conf/files: added netinet6/udp6_output.c
 
 2000-06-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd[34]/sys/netinet6/udp6_usrreq.c (udp6_send): added some
