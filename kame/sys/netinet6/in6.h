@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.61 2000/10/30 14:41:06 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.62 2000/10/30 14:42:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -457,6 +457,8 @@ struct route_in6 {
 #define IPV6_ESP_NETWORK_LEVEL	55   /* int; full-packet encryption */
 #define IPSEC6_OUTSA		56   /* set the outbound SA for a socket */
 #endif
+
+#define IPV6_V6ONLY		57 /* bool; suppress IPv4 mapped (2553bis) */
 /* to define items, should talk with KAME guys first, for *BSD compatibility */
 
 #define IPV6_RTHDR_LOOSE     0 /* this hop need not be a neighbor. XXX old spec */
