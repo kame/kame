@@ -1,6 +1,6 @@
 racoon FAQ
 KAME team
-$KAME: FAQ,v 1.2 2000/09/13 05:50:45 itojun Exp $
+$KAME: FAQ,v 1.3 2000/09/13 05:53:31 itojun Exp $
 
 
 Q: With what other IKE/IPsec implementation racoon is known to be interoperable?
@@ -25,10 +25,10 @@ A: (NetBSD 1.5/current, FreeBSD 4.1/current)
 	To build racoon on these platforms, there are couple of ways:
 	- on NetBSD/FreeBSD integrated platforms, use pkgsrc/ports.
 	  It is the easiest and recommended way.
-	- If you need to use configure.in and Makefile.in under
-	  kame/kame/racoon, use the following operation:
-		% (cd ../../../bsdi4/lib; make)
-		% env LIBS=-L../../../bsdi4/lib/libpfkey CFLAGS=-I../../sys \
+	- If you need to use configure.in and Makefile.in distributed with
+	  KAME kit, kame/kame/racoon, use the following operation:
+		% (cd ../../../netbsd/lib; make)
+		% env LIBS=-L../../../netbsd/lib/libpfkey CFLAGS=-I../../sys \
 		    ./configure --with-libpfkey
 		% make
 	  If you do not do the above, you may see missing symbols with pfkey_xx
