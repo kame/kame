@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1999 2001/12/04 09:09:43 jinmei Exp $
+$KAME: CHANGELOG,v 1.2000 2001/12/04 11:59:51 keiichi Exp $
 
 <200112>
+Tue Dec  4 20:58:54 JST 2001 keiichi@iij.ad.jp
+	* kame/sys/net/if_hif.[hc]
+	* kame/sys/netinet6/{mip6.[hc],mip6_binding.c}
+	* kame/sys/netinet6/nd6_rtr.c
+	- do movement detection in pfxlist_onlink_check() instead of
+	  nd6_ra_input().  this change makes it possible to utilize
+	  the change of the status of (detached) prefixes to detect
+	  movement.
+
 2001-12-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/contrib/bind/src/lib/irs/dns_ho.c (ho_byaddr):
 	* bsdi4/contrib/bind/src/lib/resolv/res_init.c (res_setoptions):
