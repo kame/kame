@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1110 2000/07/08 01:59:38 itojun Exp $
+$Id: CHANGELOG,v 1.1111 2000/07/08 03:13:30 itojun Exp $
 
 <200006>
+Sat Jul  8 12:11:34 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/bind9: use bind 9.0.0b5
+	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 7/3 snapshot.
+
 Sat Jul  8 10:57:36 JST 2000  itojun@iijlab.net
 	* {netbsd,openbsd}/usr.sbin/inetd: allow square-bracket for the first
 	  element on inetd.conf, to disambiguate IPv6 address and colon
