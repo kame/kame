@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.44 2000/11/30 12:30:34 jinmei Exp $	*/
+/*	$KAME: esp_input.c,v 1.45 2000/11/30 17:31:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -986,6 +986,24 @@ esp6_ctlinput(cmd, sa, d)
 
 	if (ip6) {
 		/*
+		 * Notify the error to all possible sockets via pfctlinput2.
+		 * Since the upper layer information (such as protocol type,
+		 * source and destination ports) is embedded in the encrypted
+		 * data and might have been cut, we can't directly call
+		 * an upper layer ctlinput function. However, the pcbnotify
+		 * function will consider source and destination addresses
+		 * as well as the flow info value, and may be able to find
+		 * some PCB that should be notified.
+		 * Although pfctlinput2 will call esp6_ctlinput(), there is
+		 * no possibility of an infinite loop of function calls,
+		 * because we don't pass the inner IPv6 header.
+		 */
+		bzero(&ip6cp1, sizeof(ip6cp1));
+		ip6cp1.ip6c_src = ip6cp->ip6c_src;
+		pfctlinput2(cmd, sa, (void *)&ip6cp1);
+
+		/*
+		 * Then go to special cases that need ESP header information.
 		 * XXX: We assume that when ip6 is non NULL,
 		 * M and OFF are valid.
 		 */
@@ -1033,23 +1051,6 @@ esp6_ctlinput(cmd, sa, d)
 			 */
 			icmp6_mtudisc_update((struct ip6ctlparam *)d);
 		}
-
-		/*
-		 * Notify the error to all possible sockets via pfctlinput2.
-		 * Since the upper layer information (such as protocol type,
-		 * source and destination ports) is embedded in the encrypted
-		 * data and might have been cut, we can't directly call
-		 * an upper layer ctlinput function. However, the pcbnotify
-		 * function will consider source and destination addresses
-		 * as well as the flow info value, and may be able to find
-		 * some PCB that should be notified.
-		 * Although pfctlinput2 will call esp6_ctlinput(), there is
-		 * no possibility of an infinite loop of function calls,
-		 * because we don't pass the inner IPv6 header.
-		 */
-		bzero(&ip6cp1, sizeof(ip6cp1));
-		ip6cp1.ip6c_src = ip6cp->ip6c_src;
-		pfctlinput2(cmd, sa, (void *)&ip6cp1);
 	} else {
 		/* we normally notify any pcb here */
 	}
