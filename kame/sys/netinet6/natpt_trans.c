@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.52 2001/10/17 05:47:48 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.53 2001/10/17 07:02:49 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -245,7 +245,7 @@ natpt_translateIPv6To4(struct pcv *cv6, struct pAddr *pad)
 		break;
 	}
 
-	if (m4)	{
+	if (m4) {
 		int		 mlen;
 		struct mbuf	*mm;
 		struct ip	*ip4;
@@ -620,13 +620,13 @@ natpt_translateTCPUDPv6To4(struct pcv *cv6, struct pAddr *pad, struct pcv *cv4)
 	ulc.ulc_len = htonl(cv6->plen);
 	ulc.ulc_pr  = cv6->ip_p;
 	if (cv6->ip_p == IPPROTO_TCP) {
-	    ulc.ulc_tu.th.th_sport = cv6->pyld.tcp6->th_sport;
-	    ulc.ulc_tu.th.th_dport = cv6->pyld.tcp6->th_dport;
-	    aux.cksum6 = ntohs(cv6->pyld.tcp6->th_sum);
+		ulc.ulc_tu.th.th_sport = cv6->pyld.tcp6->th_sport;
+		ulc.ulc_tu.th.th_dport = cv6->pyld.tcp6->th_dport;
+		aux.cksum6 = ntohs(cv6->pyld.tcp6->th_sum);
 	} else {
-	    ulc.ulc_tu.uh.uh_sport = cv6->pyld.udp->uh_sport;
-	    ulc.ulc_tu.uh.uh_dport = cv6->pyld.udp->uh_dport;
-	    aux.cksum6 = ntohs(cv6->pyld.udp->uh_sum);
+		ulc.ulc_tu.uh.uh_sport = cv6->pyld.udp->uh_sport;
+		ulc.ulc_tu.uh.uh_dport = cv6->pyld.udp->uh_dport;
+		aux.cksum6 = ntohs(cv6->pyld.udp->uh_sum);
 	}
 
 	aux.ulc6 = &ulc;
@@ -1130,7 +1130,7 @@ natpt_translateTCPUDPv4To6(struct pcv *cv4, struct pAddr *pad, struct pcv *cv6)
 
 	if ((m6 = natpt_mgethdr(sizeof(struct ip6_hdr), cv4->plen)) == NULL)
 		return (NULL);
-	
+
 	{
 		caddr_t	tcp4;
 		caddr_t	tcp6;
@@ -1359,10 +1359,10 @@ natpt_icmp4TimeExceed(struct pcv *cv4from, struct mbuf *m4)
 				       (u_char *)&Dee, sizeof(Dee));
 		icmp4to->icmp_cksum = htons(cksum);
 	}
-    
+
 	{
 		int	hlen = ip4to->ip_hl << 2;
-	
+
 		m4->m_data += hlen;
 		m4->m_len  -= hlen;
 		icmp4to->icmp_cksum = 0;
@@ -1519,7 +1519,7 @@ natpt_translatePYLD4To4(struct pcv *cv4to)
 			else if (cv4to->fromto == NATPT_TO)
 				natpt_incrementSeq(th4, ts->delta[1]);
 		}
-	
+
 		if ((delta != 0)
 		    && ((th_seq != ts->seq[0])
 			|| (th_ack != ts->ack[0]))) {
@@ -1732,7 +1732,7 @@ natpt_translateFTP4ReplyTo6(struct pcv *cv6)
 		delta = natpt_rewriteMbuf(cv6->m, kb, (kk-kb), Wow, strlen(Wow));
 		ts->rewrite[cv6->fromto] = 1;
 		break;
-	    
+
 	case FTPS_EPSV:
 		if (ftp4.cmd != 227)
 			return (0);
@@ -1891,7 +1891,7 @@ natpt_parseEPRT(caddr_t kb, caddr_t kk, struct sockaddr_in6 *sin6)
 		kb++;
 	}
 	if (*kb != '|')			return (NULL);
-    
+
 	sin6->sin6_port = htons(port);
 	sin6->sin6_len = sizeof(struct sockaddr_in6);
 	return ((struct sockaddr *)sin6);
@@ -1910,7 +1910,7 @@ natpt_parsePORT(caddr_t kb, caddr_t kk, struct sockaddr_in *sin)
 
 	d = (u_char *)&sin->sin_addr;
 	for (bite = 0, cnt = 4; (kb < kk) && (isdigit(*kb) || (*kb == ',')); kb++) {
-		if (*kb == ',')	{
+		if (*kb == ',') {
 			*d++ = (bite & 0xff);
 			bite = 0;
 			if (--cnt <= 0)
@@ -1925,7 +1925,7 @@ natpt_parsePORT(caddr_t kb, caddr_t kk, struct sockaddr_in *sin)
 	kb++;
 	d = (u_char *)&sin->sin_port;
 	for (bite = 0, cnt = 2; (kb < kk) && (isdigit(*kb) || (*kb == ',')); kb++) {
-		if (*kb == ',')	{
+		if (*kb == ',') {
 			*d++ = (bite & 0xff);
 			bite = 0;
 			if (--cnt <= 0)
@@ -2148,7 +2148,7 @@ natpt_updateTcpStatus(struct pcv *cv)
 int
 natpt_tcpfsm(short state, int inout, u_char flags)
 {
-	int	    rv = state;
+	int	rv = state;
 
 	if (flags & TH_RST)
 		return (TCPS_CLOSED);
@@ -2225,7 +2225,7 @@ natpt_mgethdr(int hlen, int len)
 			m = NULL;
 		}
 	}
-	if (m == NULL)	{
+	if (m == NULL) {
 		return (NULL);
 	}
 	m->m_pkthdr.rcvif = NULL;

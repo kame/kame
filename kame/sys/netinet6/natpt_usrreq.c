@@ -1,4 +1,4 @@
-/*	$KAME: natpt_usrreq.c,v 1.16 2001/09/02 19:06:26 fujisawa Exp $	*/
+/*	$KAME: natpt_usrreq.c,v 1.17 2001/10/17 07:02:49 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -153,7 +153,7 @@ natpt_input(struct mbuf *m0, struct sockproto *proto,
 		if (last) {
 			struct mbuf *n;
 
-			if ((n = m_copy(m, 0, (int)M_COPYALL)) != NULL)	{
+			if ((n = m_copy(m, 0, (int)M_COPYALL)) != NULL) {
 				if (sbappendaddr(&last->so_rcv, src, n,
 						 (struct mbuf *)NULL) == 0)
 					/* should notify about lost packet */
@@ -249,7 +249,7 @@ natpt_attach(struct socket *so, int proto)
 	struct rawcb	*rp;
 	int		 error;
 
-	if (so->so_pcb == NULL)	{
+	if (so->so_pcb == NULL) {
 		MALLOC(rp, struct rawcb *, sizeof(*rp), M_PCB, M_WAITOK);
 		if (rp == NULL)
 			return (ENOBUFS);

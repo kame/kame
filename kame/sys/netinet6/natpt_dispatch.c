@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.28 2001/09/19 10:08:33 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.29 2001/10/17 07:02:48 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -107,7 +107,7 @@ natpt_in6(struct mbuf *m6, struct mbuf **m4)
 	match.s6_addr32[2] &= in6mask96.s6_addr32[2];
 	match.s6_addr32[3] &= in6mask96.s6_addr32[3];
 
-	if (!IN6_ARE_ADDR_EQUAL(&natpt_prefix, &match))	{
+	if (!IN6_ARE_ADDR_EQUAL(&natpt_prefix, &match)) {
 		if (isDump(D_IN6REJECT))
 			natpt_logMBuf(LOG_DEBUG, m6,
 				      "%s(): v6 translation rejected.", fn);
@@ -136,7 +136,7 @@ natpt_in6(struct mbuf *m6, struct mbuf **m4)
 			return (IPPROTO_IP);
 	}
 
-	if (cv6.fromto == NATPT_FROM){
+	if (cv6.fromto == NATPT_FROM) {
 		pad = &cv6.ats->remote;
 		cv6.ats->fromto++;
 	} else {
@@ -184,7 +184,7 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 		cv4.ats = ats;
 	}
 
-	if (cv4.ats == NULL ){
+	if (cv4.ats == NULL ) {
 		struct cSlot	*csl;
 
 		if ((csl = natpt_lookForRule4(&cv4)) == NULL)
@@ -193,7 +193,7 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 			return (IPPROTO_IP);
 	}
 
-	if (cv4.fromto == NATPT_FROM){
+	if (cv4.fromto == NATPT_FROM) {
 		pad = &cv4.ats->remote;
 		cv4.ats->fromto++;
 	} else {
@@ -209,7 +209,7 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 	} else
 #endif
 	if ((*m6 = natpt_translateIPv4To6(&cv4, pad)) == NULL)
-	    return (IPPROTO_MAX);
+		return (IPPROTO_MAX);
 
 	return (IPPROTO_IPV6);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.25 2001/09/11 07:57:31 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.26 2001/10/17 07:02:49 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -95,15 +95,15 @@ natpt_lookForRule6(struct pcv *cv6)
 			continue;
 
 		if (acs->proto != 0) {
-		    if ((cv6->ip_p == IPPROTO_ICMPV6)
-			&& ((acs->proto & NATPT_ICMP) == 0))
-			    continue;
-		    if ((cv6->ip_p == IPPROTO_TCP)
-			&& ((acs->proto & NATPT_TCP) == 0))
-			    continue;
-		    if ((cv6->ip_p == IPPROTO_UDP)
-			&& ((acs->proto & NATPT_UDP) == 0))
-			    continue;
+			if ((cv6->ip_p == IPPROTO_ICMPV6)
+			    && ((acs->proto & NATPT_ICMP) == 0))
+				continue;
+			if ((cv6->ip_p == IPPROTO_TCP)
+			    && ((acs->proto & NATPT_TCP) == 0))
+				continue;
+			if ((cv6->ip_p == IPPROTO_UDP)
+			    && ((acs->proto & NATPT_UDP) == 0))
+				continue;
 		}
 
 		if (natpt_matchIn6addr(cv6, &acs->local) != 0) {
@@ -114,7 +114,7 @@ natpt_lookForRule6(struct pcv *cv6)
 		}
 	}
 	splx(s);
-	
+
 	return (NULL);
 }
 
@@ -135,15 +135,15 @@ natpt_lookForRule4(struct pcv *cv4)
 			continue;
 
 		if (csl->proto != 0) {
-		    if ((cv4->ip_p == IPPROTO_ICMP)
-			&& ((csl->proto & NATPT_ICMP) == 0))
-			    continue;
-		    if ((cv4->ip_p == IPPROTO_TCP)
-			&& ((csl->proto & NATPT_TCP) == 0))
-			    continue;
-		    if ((cv4->ip_p == IPPROTO_UDP)
-			&& ((csl->proto & NATPT_UDP) == 0))
-			    continue;
+			if ((cv4->ip_p == IPPROTO_ICMP)
+			    && ((csl->proto & NATPT_ICMP) == 0))
+				continue;
+			if ((cv4->ip_p == IPPROTO_TCP)
+			    && ((csl->proto & NATPT_TCP) == 0))
+				continue;
+			if ((cv4->ip_p == IPPROTO_UDP)
+			    && ((csl->proto & NATPT_UDP) == 0))
+				continue;
 		}
 
 		if (natpt_matchIn4addr(cv4, &csl->local) != 0) {
@@ -154,7 +154,7 @@ natpt_lookForRule4(struct pcv *cv4)
 		}
 	}
 	splx(s);
-	
+
 	return (NULL);
 }
 
@@ -180,11 +180,11 @@ natpt_matchIn6addr(struct pcv *cv6, struct pAddr *from)
 		match.s6_addr32[1] &= from->in6Mask.s6_addr32[1];
 		match.s6_addr32[2] &= from->in6Mask.s6_addr32[2];
 		match.s6_addr32[3] &= from->in6Mask.s6_addr32[3];
-	
+
 		if (IN6_ARE_ADDR_EQUAL(&match, &from->in6Addr))
 			goto proto;
 		return (0);
-	
+
 	default:
 		return (0);
 	}
@@ -333,7 +333,7 @@ natpt_setRules(caddr_t addr)
 int
 natpt_prependRule(struct cSlot *cst)
 {
-	int	 	 s;
+	int		 s;
 	struct timeval	 atv;
 
 	microtime(&atv);
@@ -422,7 +422,7 @@ natpt_setOnOff(int cmd)
 		ip6_protocol_tr = FALSE;
 		break;
 	}
-	
+
 	return (0);
 }
 

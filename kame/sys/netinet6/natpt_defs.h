@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.23 2001/10/14 17:20:04 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.24 2001/10/17 07:02:48 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -115,8 +115,8 @@ struct pcvaux
 
 union inaddr					/* sizeof():  16[byte]	*/
 {
-    struct in_addr	in4;
-    struct in6_addr	in6;
+	struct in_addr	in4;
+	struct in6_addr	in6;
 };
 
 

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.25 2001/09/19 10:08:33 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.26 2001/10/17 07:02:49 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -186,7 +186,7 @@ natpt_internHash6(struct cSlot *acs, struct pcv *cv6)
 	thl = &tslhashl[hvl];
 	ats->hvr = hvr = natpt_hashPad4(remote);
 	thr = &tslhashr[hvr];
-	
+
 	s = splnet();
 	thl->curlen++;
 	thl->maxlen = max(thl->maxlen, thl->curlen);
@@ -273,7 +273,7 @@ natpt_internHash4(struct cSlot *acs, struct pcv *cv4)
 		hvr = natpt_hashPad6(remote);
 	ats->hvr = hvr;
 	thr = &tslhashr[hvr];
-	
+
 	s = splnet();
 	thl->curlen++;
 	thl->maxlen = max(thl->maxlen, thl->curlen);
@@ -479,7 +479,7 @@ natpt_lookForHash(struct pcv *cv, struct tslhash *th, int side)
 				goto next;
 			pad = &ats->remote;
 		}
-		
+
 		if (cv->sa_family == AF_INET6) {
 			ip6 = cv->ip.ip6;
 			if (!IN6_ARE_ADDR_EQUAL(&ip6->ip6_src, &pad->in6src)
@@ -571,34 +571,34 @@ natpt_hash4(struct pcv *cv)
 static int
 natpt_hashPad6(struct pAddr *pad6)
 {
-    struct sockaddr_in6	src, dst;
+	struct sockaddr_in6	src, dst;
 
-    bzero(&src, sizeof(struct sockaddr_in6));
-    bzero(&dst, sizeof(struct sockaddr_in6));
+	bzero(&src, sizeof(struct sockaddr_in6));
+	bzero(&dst, sizeof(struct sockaddr_in6));
 
-    src.sin6_port = pad6->port[0];
-    src.sin6_addr = pad6->in6src;
-    dst.sin6_port = pad6->port[1];
-    dst.sin6_addr = pad6->in6dst;
+	src.sin6_port = pad6->port[0];
+	src.sin6_addr = pad6->in6src;
+	dst.sin6_port = pad6->port[1];
+	dst.sin6_addr = pad6->in6dst;
 
-    return ((natpt_hashSin6(&src) + natpt_hashSin6(&dst)) % NATPTHASHSZ);
+	return ((natpt_hashSin6(&src) + natpt_hashSin6(&dst)) % NATPTHASHSZ);
 }
 
 
 static int
 natpt_hashPad4(struct pAddr *pad4)
 {
-    struct sockaddr_in	src, dst;
+	struct sockaddr_in	src, dst;
 
-    bzero(&src, sizeof(struct sockaddr_in));
-    bzero(&dst, sizeof(struct sockaddr_in));
+	bzero(&src, sizeof(struct sockaddr_in));
+	bzero(&dst, sizeof(struct sockaddr_in));
 
-    src.sin_port = pad4->port[0];
-    src.sin_addr = pad4->in4src;
-    dst.sin_port = pad4->port[1];
-    dst.sin_addr = pad4->in4dst;
+	src.sin_port = pad4->port[0];
+	src.sin_addr = pad4->in4src;
+	dst.sin_port = pad4->port[1];
+	dst.sin_addr = pad4->in4dst;
 
-    return ((natpt_hashSin4(&src) + natpt_hashSin4(&dst)) % NATPTHASHSZ);
+	return ((natpt_hashSin4(&src) + natpt_hashSin4(&dst)) % NATPTHASHSZ);
 }
 
 
@@ -697,7 +697,7 @@ natpt_expireTSlot(void *ignored_arg)
 				if ((atv.tv_sec - tsl->tstamp) >= natpt_tcp_maxidle)
 					natpt_removeTSlotEntry(tsl);
 				break;
-		
+
 			case TCPS_TIME_WAIT:
 				if ((atv.tv_sec - tsl->tstamp) >= natpt_TCPT_2MSL)
 					natpt_removeTSlotEntry(tsl);
