@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.153 2000/10/18 19:24:24 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.154 2000/10/18 20:01:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1088,9 +1088,7 @@ icmp6_mtudisc_update(ip6cp)
 {
 	struct in6_addr *dst = ip6cp->ip6c_finaldst;
 	struct icmp6_hdr *icmp6 = ip6cp->ip6c_icmp6;
-#if 0
 	struct mbuf *m = ip6cp->ip6c_m;	/* will be necessary for scope issue */
-#endif
 	u_int mtu = ntohl(icmp6->icmp6_mtu);
 	struct rtentry *rt = NULL;
 	struct sockaddr_in6 sin6;
@@ -1106,6 +1104,11 @@ icmp6_mtudisc_update(ip6cp)
 	sin6.sin6_family = PF_INET6;
 	sin6.sin6_len = sizeof(struct sockaddr_in6);
 	sin6.sin6_addr = *dst;
+	/* XXX normally, this won't happen */
+	if (IN6_IS_ADDR_LINKLOCAL(dst)) {
+		sin6.sin6_addr.s6_addr16[1] =
+		    htons(m->m_pkthdr.rcvif->if_index);
+	}
 	/* sin6.sin6_scope_id = XXX: should be set if DST is a scoped addr */
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	rt = rtalloc1((struct sockaddr *)&sin6, 1);	/*clone*/
