@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.73 2000/09/18 04:58:31 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.74 2000/09/18 15:43:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1023,14 +1023,14 @@ ipsec4_setspidx_ipaddr(m, spidx)
 	}
 
 	sin = (struct sockaddr_in *)&spidx->src;
-	memset(sin, 0, sizeof(*sin));
+	bzero(sin, sizeof(*sin));
 	sin->sin_family = AF_INET;
 	sin->sin_len = sizeof(struct sockaddr_in);
 	bcopy(&ip->ip_src, &sin->sin_addr, sizeof(ip->ip_src));
 	spidx->prefs = sizeof(struct in_addr) << 3;
 
 	sin = (struct sockaddr_in *)&spidx->dst;
-	memset(sin, 0, sizeof(*sin));
+	bzero(sin, sizeof(*sin));
 	sin->sin_family = AF_INET;
 	sin->sin_len = sizeof(struct sockaddr_in);
 	bcopy(&ip->ip_dst, &sin->sin_addr, sizeof(ip->ip_dst));
@@ -1102,7 +1102,7 @@ ipsec6_setspidx_ipaddr(m, spidx)
 	}
 
 	sin6 = (struct sockaddr_in6 *)&spidx->src;
-	memset(sin6, 0, sizeof(*sin6));
+	bzero(sin6, sizeof(*sin6));
 	sin6->sin6_family = AF_INET6;
 	sin6->sin6_len = sizeof(struct sockaddr_in6);
 	bcopy(&ip6->ip6_src, &sin6->sin6_addr, sizeof(ip6->ip6_src));
@@ -1113,7 +1113,7 @@ ipsec6_setspidx_ipaddr(m, spidx)
 	spidx->prefs = sizeof(struct in6_addr) << 3;
 
 	sin6 = (struct sockaddr_in6 *)&spidx->dst;
-	memset(sin6, 0, sizeof(*sin6));
+	bzero(sin6, sizeof(*sin6));
 	sin6->sin6_family = AF_INET6;
 	sin6->sin6_len = sizeof(struct sockaddr_in6);
 	bcopy(&ip6->ip6_dst, &sin6->sin6_addr, sizeof(ip6->ip6_dst));
