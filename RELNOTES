@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/06/27 15:56:36 $
+		     $Date: 2000/06/29 08:31:55 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -57,7 +57,7 @@ Many of old ones have been solved.
   be warned.  Workaround: perform "ifconfig down", then "ifconfig up"
   after resume.
 
-- FreeBSD/Openbsd/BSDI Intel EtherExpress Pro driver has some problem with
+- FreeBSD/OpenBSD/BSDI Intel EtherExpress Pro driver has some problem with
   the initialization sequence KAME is using.  This is because these
   drivers use interrupts for multicast filter setup, and KAME code calls
   multicast initialization code in splimp() or splnet(). 
