@@ -916,11 +916,14 @@ bgp_send_update(bnp, rte, headrte)
   /**********                          **********/ 
 
   /* unrecognized but transitive path attributes */
-  for(optatr = rte->rt_aspath->asp_optatr; optatr; optatr = optatr->next) {
-    memcpy(&outpkt[i], optatr->data, optatr->len); /* XXX: boundary check */
-    /* set partial bit since we don't recognize the attribute */
-    outpkt[i] |= PA_FLAG_PARTIAL;
-    i += optatr->len;
+  if (rtp->rtp_type == RTPROTO_BGP &&
+      rte->rt_aspath) {		/* XXX: paranoid? */
+    for (optatr = rte->rt_aspath->asp_optatr; optatr; optatr = optatr->next) {
+      memcpy(&outpkt[i], optatr->data, optatr->len); /* XXX: boundary check */
+      /* set partial bit since we don't recognize the attribute */
+      outpkt[i] |= PA_FLAG_PARTIAL;
+      i += optatr->len;
+    }
   }
 
   /*** Total Path Attribute Length (2 octets) ***/
