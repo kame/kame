@@ -160,6 +160,7 @@ mroute6pr(mfcaddr, mifaddr)
 			       routename6(&mfc.mf6c_origin));
 			printf(" %-*.*s", WID_GRP, WID_GRP,
 			       routename6(&mfc.mf6c_mcastgrp));
+			printf(" %9qu", mfc.mf6c_pkt_cnt);
 
 			for (waitings = 0, rtep = mfc.mf6c_stall; rtep; ) {
 				waitings++;
@@ -171,8 +172,7 @@ mroute6pr(mfcaddr, mifaddr)
 			if (mfc.mf6c_parent == MF6C_INCOMPLETE_PARENT)
 				printf(" ---   ");
 			else
-				printf(" %9qu", mfc.mf6c_pkt_cnt);
-			printf("  %3d   ", mfc.mf6c_parent);
+				printf("  %3d   ", mfc.mf6c_parent);
 			for (mifi = 0; mifi <= maxmif; mifi++) {
 				if (IF_ISSET(mifi, &mfc.mf6c_ifset))
 					printf(" %u", mifi); 
