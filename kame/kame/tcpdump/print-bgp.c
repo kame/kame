@@ -70,6 +70,12 @@ struct bgp_open {
 	/* options should follow */
 };
 
+struct bgp_opt {
+	u_int8_t bgpopt_type;
+	u_int8_t bgpopt_len;
+	/* variable length */
+};
+
 struct bgp_notification {
 	u_int8_t bgpn_marker[16];
 	u_int16_t bgpn_len;
@@ -114,6 +120,12 @@ static const char *bgptype[] = {
 	NULL, "OPEN", "UPDATE", "NOTIFICATION", "KEEPALIVE",
 };
 #define bgp_type(x) num_or_str(bgptype, sizeof(bgptype)/sizeof(bgptype[0]), (x))
+
+static const char *bgpopt_type[] = {
+	NULL, "Authentication Information",
+};
+#define bgp_opttype(x) \
+	num_or_str(bgpopt_type, sizeof(bgpopt_type)/sizeof(bgpopt_type[0]), (x))
 
 static const char *bgpnotify_major[] = {
 	NULL, "Message Header Error",
@@ -450,7 +462,10 @@ static void
 bgp_open_print(const u_char *dat, int length)
 {
 	struct bgp_open bgpo;
+	struct bgp_opt bgpopt;
 	int hlen;
+	const u_char *opt;
+	int i;
 
 	memcpy(&bgpo, dat, sizeof(bgpo));
 	hlen = ntohs(bgpo.bgpo_len);
@@ -460,6 +475,22 @@ bgp_open_print(const u_char *dat, int length)
 	printf(" Holdtime %u,", ntohs(bgpo.bgpo_holdtime));
 	printf(" ID %s,", getname((char *)&bgpo.bgpo_id));
 	printf(" Option length %u", bgpo.bgpo_optlen);
+
+	/* ugly! */
+	opt = &((struct bgp_open *)dat)->bgpo_optlen;
+	opt++;
+
+	for (i = 0; i < bgpo.bgpo_optlen; i++) {
+		memcpy(&bgpopt, &opt[i], sizeof(bgpopt));
+		if (i + 2 + bgpopt.bgpopt_len > bgpo.bgpo_optlen) {
+			printf(" [|opt %d %d]", bgpopt.bgpopt_len, bgpopt.bgpopt_type);
+			break;
+		}
+
+		printf(" (option %s, len=%d)", bgp_opttype(bgpopt.bgpopt_type),
+			bgpopt.bgpopt_len);
+		i += sizeof(bgpopt) + bgpopt.bgpopt_len;
+	}
 }
 
 static void
