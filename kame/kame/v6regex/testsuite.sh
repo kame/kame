@@ -31,11 +31,11 @@ echo '==> invalid IPv6 address'
 ./v6regex gggg:gggg:gggg:gggg:gggg:gggg:gggg:gggg
 
 echo '==> with KAME scoped'
+./v6regex fe80::1@10
 ./v6regex fe80::1@$interface
 
 echo '==> with KAME scoped, should be considered invalid.'
 # site-local is a bit controversial but the code does not support it yet.
-./v6regex fe80::1@10000
 ./v6regex fe80::1@mumbojumbo
 ./v6regex fec0::1@$interface
 ./v6regex 3ffe::1@$interface
@@ -46,7 +46,6 @@ echo '==> with new scoped proposal'
 
 echo '==> with new scoped proposal, should be considered invalid'
 # again, site-local is a bit controversial.
-./v6regex 10000%fe80::1
 ./v6regex mumbojumbo%fe80::1
 ./v6regex $interface%fec0::1
 ./v6regex $interface%3ffe::1

@@ -28,23 +28,34 @@
  * SUCH DAMAGE.
  */
 /*
- * KAME $Id: scanner.l,v 1.4 2000/02/04 04:54:04 itojun Exp $
+ * KAME $Id: scanner.l,v 1.5 2000/02/04 05:52:49 itojun Exp $
  */
 
 /*
  * The following regular expression tries to identify IPv6 address (possibly
  * with scope identifier extension) as correct as possible.
  *
- * There are possible loose ends, though.  This is inherently difficult
+ * There are possible loose ends, though.  (1) is inherently difficult
  * for a parser to tackle.
- * While we can exactly identify IPv4 address with regular expression,
- * it is impossible to identify IPv6 address with scope identifiers.
- * This is because:
- * - interface identifier portion is determined by kernel configuration.
- *   If you say fe80::1@1000 and you only have 10 interfaces, it is invalid.
+ * (1) Regex and getaddrinfo can disagree about what is valid or not, for
+ *     IPv6 address with non-numeric scope identifier extension.
+ *
+ * If you can shorten regular expression for IPv6 numeric address, please let
+ * me know.  Obvious one is to use {m,n} (repeat m to n times), but I fear
+ * that it is not supported in certain platform so I tried to avoid it.
+ *
+ * itojun, KAME project
+ *
+ *
+ * Detail for (1):
+ *
+ * While we are able to write down regex for IPv4/v6 numeric address,
+ * it is impossible for us to write a regular expression for non-numeric
+ * scope identifier.
+ * - Interface identifier portion is determined by kernel configuration.
  *   If you say fe80::1@ether0 and your kernel has no "ether0" interface, it is
  *   invalid.
- * - interface identifier portion is context-dependent to IPv6 numeric address
+ * - Interface identifier portion is context-dependent to IPv6 numeric address
  *   portion.  For example, the regular expression cannot reject "3ffe::1@10"
  *   (scope id after global address).
  * If we would like to identify such situations, we would add a rule like 
@@ -52,12 +63,17 @@
  *	.*	{ if (getaddrinfo success) return T_IPv6; else return T_STR; }
  * however, this leaves too high possibility for conflicts, like mistakingly
  * identify "10%fe80::1" as numeric "10", token "%" and then IPv6 address.
- * 
- * If you can shorten regular expression for IPv6 numeric address, please let
- * me know.  Obvious one is to use {m,n} (repeat m to n times), but I fear
- * that it is not supported in certain platform so I tried to avoid it.
  *
- * itojun, KAME project
+ * If we are given numeric scope identifier, regex and getaddrinfo agree with
+ * each other.
+ * However, the kernel will bark about the address.  This is different story
+ * from the above, IMHO.  This is like giving unreachable address to the
+ * kernel (like non-existing 10.1.1.1).
+ * - Imagine you say fe80::1@1000 and you only have 10 interfaces.
+ *   The string will be accepted by regex and getaddrinfo.  getaddrinfo will
+ *   fill in sin6_scope_id portion.
+ *   The resulting sockaddr will be rejected by the kernel, since it contains
+ *   invalid sin6_scope_id value (to the kernel).
  */ 
 
 #include <sys/types.h>
