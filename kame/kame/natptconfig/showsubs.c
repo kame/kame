@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.5 2001/09/05 04:15:34 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.6 2001/09/11 06:43:08 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -106,6 +106,37 @@ makeCSlotLine(char *wow, int size, struct cSlot *csl)
 	appendPAddr(&lmsg, &csl->local);
 	concat(&lmsg, " to");
 	appendPAddr(&lmsg, &csl->remote);
+
+	if (csl->proto) {
+		int	found = 0;
+
+		concat(&lmsg, " proto ");
+		if (csl->proto & NATPT_ICMP) {
+			concat(&lmsg, "icmp");
+			found++;
+		}
+		if (csl->proto & NATPT_TCP) {
+			if (found > 0)
+				concat(&lmsg, "/");
+			concat(&lmsg, "tcp");
+			found++;
+		}
+		if (csl->proto & NATPT_UDP) {
+			if (found > 0)
+				concat(&lmsg, "/");
+			concat(&lmsg, "udp");
+		}
+	}
+
+	if (csl->lifetime != CSLOT_INFINITE_LIFETIME) {
+		int		 remain;
+		struct timeval	 atv;
+
+
+		gettimeofday(&atv, NULL);
+		remain = csl->lifetime - (atv.tv_sec - csl->tstamp);
+		concat(&lmsg, " lifetime %d", (remain >= 0) ? remain : 0);
+	}
 
 	*lmsg.lmsg_last =  '\0';
 }
