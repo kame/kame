@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.1 2004/12/09 02:18:41 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.2 2004/12/16 11:58:50 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -537,7 +537,7 @@ mh_input(src, dst, hoa, rtaddr, mh, mhlen)
 	case IP6_MH_TYPE_BERROR:
 		break;
 	default:
-		send_be(src, dst, NULL, IP6_MH_BES_UNKNOWN_MH);
+		send_be(src, dst, hoa, IP6_MH_BES_UNKNOWN_MH);
 		break;
 	}
 

@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.1 2004/12/09 02:18:34 t-momose Exp $	*/
+/*	$KAME: fsm.c,v 1.2 2004/12/16 11:58:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -240,14 +240,25 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 	case IP6_MH_TYPE_BERROR:
 		ip6mhbe = (struct ip6_mh_binding_error *)mh;
 
+		if (IN6_IS_ADDR_UNSPECIFIED(&ip6mhbe->ip6mhbe_homeaddr))
+			hinfo = hoainfo_find_withhoa(dst);
+		else {
+			hinfo = hoainfo_find_withhoa(&ip6mhbe->ip6mhbe_homeaddr);
+		}
+		if (hinfo == NULL) {
+			syslog(LOG_NOTICE,
+			    "no related HoA found with this BE.\n");
+			return (-1);
+		}
+
 #ifndef MIP_MCOA 
-		bul = bul_get(dst, src);
+		bul = bul_get(&hinfo->hinfo_hoa, src);
 #else
 		bid = get_bid_option(mh, sizeof(struct ip6_mh_binding_error), 
 				     fsmmsg.fsmm_datalen);
 
 		/* bid must be stored in BRR request. retrieve that... XXX */ 
-		bul = bul_mcoa_get(dst, src, bid); /* XXX */
+		bul = bul_mcoa_get(&hinfo->hinfo_hoa, src, bid); /* XXX */
 #endif /* MIP_MCOA */
 		if (bul == NULL) {
 			syslog(LOG_NOTICE,
