@@ -1,0 +1,128 @@
+#! /bin/sh
+
+ip6router=NO
+ip6mrouter=NO
+
+#----------
+# manual configurations - in case ip6router=YES
+#route6dflags=
+#
+## list of interfaces, and prefix for interfaces
+## NOTE: no trailing double colon necessary here!
+#iface="ed0 ep0"
+#prefix_ed0="fec0:0000:0000:0001"
+#prefix_ep0="fec0:0000:0000:0002"
+
+#----------
+# manual configurations - in case ip6router=NO
+iface="ed0"
+
+#----------
+
+# inet6d configuration
+# inet46d:
+#	KAME/FreeBSD3.2: AF_INET{,6} dual stack support with wildcard
+#		bind on AF_INET6 socket. Also with IPsec support
+# inet6d: AF_INET6 only.  Also with IPsec support
+
+if [ -x /usr/local/v6/sbin/inet46d ]; then
+	inet6d=/usr/local/v6/sbin/inet46d
+else
+	inet6d=/usr/local/v6/sbin/inet6d #use only AF_INET6 sockets
+fi
+
+# tool locations
+ifconfig=/usr/local/v6/sbin/ifconfig
+prefixconfig=/usr/local/v6/sbin/prefix
+route6d=/usr/local/v6/sbin/route6d
+mroute6d=/usr/local/v6/sbin/pim6dd
+rtsol=/usr/local/v6/sbin/rtsol
+rtadvd=/usr/local/v6/sbin/rtadvd
+if [ -x /usr/local/v6/sbin/sysctl ]; then
+	sysctl=/usr/local/v6/sbin/sysctl
+else
+	sysctl=sysctl
+fi
+
+if [ X"${ip6router}" = X"YES" ]; then
+	# act as a router
+	$sysctl -w net.inet6.ip6.forwarding=1
+	$sysctl -w net.inet6.ip6.accept_rtadv=0
+
+	# wait for DAD
+	for i in $iface; do
+		ifconfig $i up
+	done
+	sleep `$sysctl net.inet6.ip6.dad_count | awk '{print $NF}'`
+	sleep 1
+
+	# setting up interfaces
+	for i in $iface; do
+		eval prefix=\$prefix_$i
+		if [ X"$prefix" = X"" ]; then
+			continue
+		fi
+		for j in $prefix; do
+			if [ -x $prefixconfig ]; then
+				$prefixconfig $i $j::
+			else
+				# NetBSD *requires* inet6
+				laddr=`$ifconfig $i inet6 | grep 'inet6 fe80:' | head -1 | \
+					awk '{print $2}'`
+				hostid=`echo $laddr | sed -e 's/fe80:[0-9a-fA-F]*:://'`
+				address=$j\:$hostid
+
+				eval hostid_$i=$hostid
+				eval address_$i=$address
+
+				$ifconfig $i inet6 $address prefixlen 64 alias
+			fi
+
+			# subnet-router anycast address (rfc2373)
+			$ifconfig $i inet6 $j:: prefixlen 64 alias anycast
+		done
+
+		$ifconfig $i inet6
+	done
+
+	# again, wait for DAD's completion (for global addrs)
+	sleep `$sysctl net.inet6.ip6.dad_count | awk '{print $NF}'`
+	sleep 1
+
+	# route6d
+	[ -x $route6d ] && $route6d $route6dflags
+
+	# rtadvd
+	# This should enabled with a great care.
+	# You may want to fine-tune /usr/local/v6/etc/rtadvd.conf.
+#	[ -x $rtadvd ] && $rtadvd $iface
+
+	# mroute6d
+	if [ X"${ip6mrouter}" = X"YES" -a -x $mroute6d ]; then
+	    $mroute6d $mroute6dflags
+	fi
+else
+	# act as endhost - automatically configured
+	$sysctl -w net.inet6.ip6.forwarding=0
+	$sysctl -w net.inet6.ip6.accept_rtadv=1
+	for i in $iface; do
+		$rtsol $i
+	done
+
+	# wait for DAD's completion (for global addrs)
+	sleep `$sysctl net.inet6.ip6.dad_count | awk '{print $NF}'`
+	sleep 1
+fi
+
+echo -n "Starting standard IPv6 daemons:"
+
+if [ "X${inet6d_enable}" != X"NO" ]; then
+        echo -n ' inet6d';       $inet6d $inet6d_flags
+fi
+
+# for each valid dir in $local_startup, search for init scripts matching *.sh
+[ -d /usr/local/v6/etc/rc.d ] && for script in /usr/local/v6/etc/rc.d/*.sh; do
+	[ -x ${script} ] && ${script} start
+done
+
+echo '.'
