@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1890 2001/09/24 16:09:48 jinmei Exp $
+$KAME: CHANGELOG,v 1.1891 2001/09/24 16:11:43 jinmei Exp $
 
 <200109>
+2001-09-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/addrselect/: a tool to configure the policy table (see
+	below).  This program is also an experimental stuff.
+
 2001-09-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_src.c: implemented the policy table for
 	source address selection, according to
