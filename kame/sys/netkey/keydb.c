@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.43 2000/01/13 16:16:45 itojun Exp $ */
+/* KAME $Id: keydb.c,v 1.44 2000/01/14 03:42:04 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -288,8 +288,13 @@ static struct sadb_msg *key_spdadd __P((caddr_t *mhp));
 static struct sadb_msg *key_spddelete __P((caddr_t *mhp));
 static struct sadb_msg *key_spdflush __P((caddr_t *mhp));
 static int key_spddump __P((caddr_t *mhp, struct socket *so, int target));
+#if 0
 static u_int key_setdumpsp __P((struct sadb_msg *newmsg, struct secpolicy *sp,
 				u_int8_t type, u_int32_t seq, u_int32_t pid));
+#else
+static struct mbuf *key_setdumpsp __P((struct secpolicy *sp,
+				u_int8_t type, u_int32_t seq, u_int32_t pid));
+#endif
 static u_int key_getspmsglen __P((struct secpolicy *sp));
 static u_int key_getspreqmsglen __P((struct secpolicy *sp));
 static struct secashead *key_newsah __P((struct secasindex *saidx));
@@ -307,11 +312,21 @@ static int key_mature __P((struct secasvar *sav));
 static u_int key_setdumpsa __P((struct sadb_msg *newmsg, struct secasvar *sav,
 				u_int8_t type, u_int8_t satype,
 				u_int32_t seq, u_int32_t pid));
+#if 1
+static int key_setsadbmsg_m __P((struct mbuf *, u_int8_t type, int tlen,
+				u_int8_t satype, u_int32_t seq, pid_t pid,
+				u_int8_t mode, u_int32_t reqid,
+				u_int8_t reserved1, u_int32_t reserved2));
+#endif
 static caddr_t key_setsadbmsg __P((caddr_t buf, u_int8_t type, int tlen,
 				u_int8_t satype, u_int32_t seq, pid_t pid,
 				u_int8_t mode, u_int32_t reqid,
 				u_int8_t reserved1, u_int32_t reserved2));
 static caddr_t key_setsadbsa __P((caddr_t buf, struct secasvar *sav));
+#if 1
+static int key_setsadbaddr_m __P((struct mbuf *m, u_int16_t exttype,
+	struct sockaddr *saddr, u_int8_t prefixlen, u_int16_t ul_proto));
+#endif
 static caddr_t key_setsadbaddr __P((caddr_t buf, u_int16_t exttype,
 	struct sockaddr *saddr, u_int8_t prefixlen, u_int16_t ul_proto));
 static caddr_t key_setsadbident
@@ -368,6 +383,8 @@ static const char *key_getfqdn __P((void));
 static const char *key_getuserfqdn __P((void));
 #endif
 static void key_sa_chgstate __P((struct secasvar *sav, u_int8_t state));
+static caddr_t key_appendmbuf __P((struct mbuf *, int));
+
 /* %%% IPsec policy management */
 /*
  * allocating a SP for OUTBOUND or INBOUND packet.
@@ -1516,9 +1533,15 @@ key_spddump(mhp, so, target)
 {
 	struct sadb_msg *msg0;
 	struct secpolicy *sp;
-	int len, cnt;
+	int cnt;
+#if 0
+	int len;
 	struct sadb_msg *newmsg;
+#endif
 	u_int dir;
+#if 1
+	struct mbuf *m;
+#endif
 
 	/* sanity check */
 	if (mhp == NULL || mhp[0] == NULL)
@@ -1537,9 +1560,13 @@ key_spddump(mhp, so, target)
 	if (cnt == 0)
 		return ENOENT;
 
+#if 0
 	newmsg = NULL;
+#endif
 	for (dir = 0; dir < IPSEC_DIR_MAX; dir++) {
 		__LIST_FOREACH(sp, &sptree[dir], chain) {
+			--cnt;
+#if 0
 			len = key_getspmsglen(sp);
 
 			/* making buffer */
@@ -1550,19 +1577,114 @@ key_spddump(mhp, so, target)
 			}
 			bzero((caddr_t)newmsg, len);
 
-			--cnt;
 			(void)key_setdumpsp(newmsg, sp, SADB_X_SPDDUMP,
 			                    cnt, msg0->sadb_msg_pid);
 
 			key_sendup(so, newmsg, len, target);
+
 			KFREE(newmsg);
 			newmsg = NULL;
+#else
+			m = key_setdumpsp(sp, SADB_X_SPDDUMP,
+			                    cnt, msg0->sadb_msg_pid);
+
+			if (m)
+				key_sendup_mbuf(so, m, target);
+#endif
 		}
 	}
 
 	return 0;
 }
 
+#if 1
+static struct mbuf *
+key_setdumpsp(sp, type, seq, pid)
+	struct secpolicy *sp;
+	u_int8_t type;
+	u_int32_t seq, pid;
+{
+	struct mbuf *m;
+	u_int tlen;
+	caddr_t p;
+
+	/* XXX it would be better to avoid pre-computing length */
+	tlen = key_getspmsglen(sp);
+
+	/* XXX maybe it's a wrong idea to insist on cluster? */
+	MGETHDR(m, M_DONTWAIT, MT_DATA);
+	if (m != NULL) {
+		MCLGET(m, M_DONTWAIT);
+		if ((m->m_flags & M_EXT) == 0) {
+			m_freem(m);
+			m = NULL;
+		}
+	}
+	if (m == NULL)
+		return NULL;	/*ENOBUFS*/
+
+	m->m_pkthdr.len = m->m_len = 0;
+	m->m_next = NULL;
+
+	/* sadb_msg->sadb_msg_len must be filled afterwards */
+	if (key_setsadbmsg_m(m, type, 0, SADB_SATYPE_UNSPEC, seq, pid,
+		    IPSEC_MODE_ANY, 0, 0, sp->refcnt) != 0) {
+		m_freem(m);
+		return NULL;
+	}
+
+	if (key_setsadbaddr_m(m, SADB_EXT_ADDRESS_SRC,
+		    (struct sockaddr *)&sp->spidx.src, sp->spidx.prefs,
+		    sp->spidx.ul_proto) != 0) {
+		m_freem(m);
+		return NULL;
+	}
+
+	if (key_setsadbaddr_m(m, SADB_EXT_ADDRESS_DST,
+		    (struct sockaddr *)&sp->spidx.dst, sp->spidx.prefd,
+		    sp->spidx.ul_proto) != 0) {
+		m_freem(m);
+		return NULL;
+	}
+
+    {
+	struct sadb_x_policy *tmp;
+
+	if ((tmp = key_sp2msg(sp)) == NULL) {
+#ifdef IPSEC_DEBUG
+		printf("key_setdumpsp: No more memory.\n");
+#endif
+		m_freem(m);
+		return NULL;
+	}
+
+	/* validity check */
+	if (key_getspreqmsglen(sp) != PFKEY_UNUNIT64(tmp->sadb_x_policy_len))
+		panic("key_setdumpsp: length mismatch."
+		      "sp:%d msg:%d\n",
+			key_getspreqmsglen(sp),
+			PFKEY_UNUNIT64(tmp->sadb_x_policy_len));
+	
+	p = key_appendmbuf(m, PFKEY_UNUNIT64(tmp->sadb_x_policy_len));
+	if (p == NULL) {
+		m_freem(m);
+		return NULL;
+	}
+	bcopy(tmp, p, PFKEY_UNUNIT64(tmp->sadb_x_policy_len));
+	KFREE(tmp);
+    }
+
+	if (m->m_len < sizeof(struct sadb_msg)) {
+		m = m_pullup(m, sizeof(struct sadb_msg));
+		if (m == NULL)
+			return NULL;
+	}
+	mtod(m, struct sadb_msg *)->sadb_msg_len =
+	    PFKEY_UNIT64(m->m_pkthdr.len);
+
+	return m;
+}
+#else
 static u_int
 key_setdumpsp(newmsg, sp, type, seq, pid)
 	struct sadb_msg *newmsg;
@@ -1614,6 +1736,7 @@ key_setdumpsp(newmsg, sp, type, seq, pid)
 
 	return tlen;
 }
+#endif
 
 /* get sadb message length for a SP. */
 static u_int
@@ -2673,6 +2796,35 @@ key_setdumpsa(newmsg, sav, type, satype, seq, pid)
 	return tlen;
 }
 
+#if 1
+static int
+key_setsadbmsg_m(m, type, tlen, satype, seq, pid, mode, reqid,
+		reserved1, reserved2)
+	struct mbuf *m;
+	u_int8_t type, satype;
+	u_int16_t tlen;
+	u_int32_t seq;
+	pid_t pid;
+	u_int8_t mode;
+	u_int32_t reqid;
+	u_int8_t reserved1;
+	u_int32_t reserved2;
+{
+	caddr_t p;
+	const size_t len = sizeof(struct sadb_msg);
+
+	p = key_appendmbuf(m, len);
+	if (p == NULL)
+		return ENOBUFS;
+
+	if (key_setsadbmsg(p, type, tlen, satype, seq, pid, mode, reqid,
+			reserved1, reserved2))
+		return 0;
+	else
+		return EINVAL;
+}
+#endif
+
 /*
  * set data into sadb_msg.
  * `buf' must has been allocated sufficiently.
@@ -2740,6 +2892,30 @@ key_setsadbsa(buf, sav)
 	return(buf + len);
 }
 
+#if 1
+static int
+key_setsadbaddr_m(m, exttype, saddr, prefixlen, ul_proto)
+	struct mbuf *m;
+	u_int16_t exttype;
+	struct sockaddr *saddr;
+	u_int8_t prefixlen;
+	u_int16_t ul_proto;
+{
+	caddr_t p;
+	const size_t len =
+	    sizeof(struct sadb_address) + PFKEY_ALIGN8(saddr->sa_len);
+
+	p = key_appendmbuf(m, len);
+	if (p == NULL)
+		return ENOBUFS;
+
+	if (key_setsadbaddr(p, exttype, saddr, prefixlen, ul_proto))
+		return 0;
+	else
+		return EINVAL;
+}
+#endif
+
 /*
  * set data into sadb_address.
  * `buf' must has been allocated sufficiently.
@@ -2753,7 +2929,7 @@ key_setsadbaddr(buf, exttype, saddr, prefixlen, ul_proto)
 	u_int16_t ul_proto;
 {
 	struct sadb_address *p;
-	u_int len;
+	size_t len;
 
 	p = (struct sadb_address *)buf;
 	len = sizeof(struct sadb_address) + PFKEY_ALIGN8(saddr->sa_len);
@@ -5981,6 +6157,48 @@ key_sa_chgstate(sav, state)
 
 	sav->state = state;
 	LIST_INSERT_HEAD(&sav->sah->savtree[state], sav, chain);
+}
+
+/* returns NULL on error, m0 will be left unchanged */
+static caddr_t
+key_appendmbuf(m0, len)
+	struct mbuf *m0;
+	int len;
+{
+	caddr_t p;
+	struct mbuf *m;
+	struct mbuf *n;
+
+	if (!m0 || (m0->m_flags & M_PKTHDR) == 0)
+		return NULL;	/*EINVAL*/
+	if (len > MCLBYTES)
+		return NULL;	/*EINVAL*/
+
+	for (m = m0; m && m->m_next; m = m->m_next)
+		;
+	if (len <= M_TRAILINGSPACE(m)) {
+		p = mtod(m, caddr_t) + m->m_len;
+		m->m_len += len;
+		m0->m_pkthdr.len += len;
+
+		return p;
+	}
+	MGET(n, M_DONTWAIT, m->m_type);
+	if (n != NULL) {
+		MCLGET(n, M_DONTWAIT);
+		if ((n->m_flags & M_EXT) == 0) {
+			m_freem(n);
+			n = NULL;
+		}
+	}
+	if (n == NULL)
+		return NULL;	/*ENOBUFS*/
+	n->m_next = NULL;
+	m->m_next = n;
+	n->m_len = len;
+	m0->m_pkthdr.len += len;
+
+	return mtod(n, caddr_t);
 }
 
 #ifdef __bsdi__

@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: keysock.c,v 1.3 2000/01/10 01:32:06 itojun Exp $ */
+/* KAME @(#)$Id: keysock.c,v 1.4 2000/01/14 03:42:05 itojun Exp $ */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
@@ -155,7 +155,10 @@ key_usrreq(so, req, m, nam, control, p)
 	if (req == PRU_ATTACH && kp) {
 		int af = kp->kp_raw.rcb_proto.sp_protocol;
 		if (error) {
+#ifdef IPSEC_DEBUG
 			printf("key_usrreq: key_usrreq results %d\n", error);
+#endif
+			pfkeystat.sockerr++;
 			free((caddr_t)kp, M_PCB);
 			so->so_pcb = (caddr_t) 0;
 			splx(s);
@@ -180,7 +183,7 @@ key_usrreq(so, req, m, nam, control, p)
 		MGET(m, M_WAITOK, MT_DATA);
 		if (!m) {
 			error = ENOBUFS;
-			printf("key_usrreq: key_usrreq results %d\n", error);
+			pfkeystat.in_nomem++;
 			free((caddr_t)kp, M_PCB);
 			so->so_pcb = (caddr_t) 0;
 			splx(s);
@@ -190,7 +193,7 @@ key_usrreq(so, req, m, nam, control, p)
 		if (!n) {
 			error = ENOBUFS;
 			m_freem(m);
-			printf("key_usrreq: key_usrreq results %d\n", error);
+			pfkeystat.in_nomem++;
 			free((caddr_t)kp, M_PCB);
 			so->so_pcb = (caddr_t) 0;
 			splx(s);

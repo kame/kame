@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: keysock.h,v 1.2 2000/01/10 01:32:06 itojun Exp $ */
+/* $Id: keysock.h,v 1.3 2000/01/14 03:42:05 itojun Exp $ */
 
 #ifndef _NETKEY_KEYSOCK_H_
 #define _NETKEY_KEYSOCK_H_
@@ -53,6 +53,8 @@ struct pfkeystat {
 	u_quad_t in_msgtype[256];	/* message type histogram */
 	u_quad_t in_msgtarget[3];	/* one/all/registered */
 	u_quad_t in_nomem;		/* memory allocation failure */
+	/* others */
+	u_quad_t sockerr;		/* # of socket related errors */
 };
 
 #define KEY_SENDUP_ONE		0
