@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.63 2001/08/17 06:28:49 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.64 2001/09/10 23:10:49 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1019,7 +1019,7 @@ setkeymsg_add(type, satype, srcs, dsts)
 			    sizeof(m_addr), (caddr_t)sa, salen);
 
 			/* set dst */
-			sa = s->ai_addr;
+			sa = d->ai_addr;
 			salen = d->ai_addr->sa_len;
 			m_addr.sadb_address_len = PFKEY_UNIT64(sizeof(m_addr) +
 			    PFKEY_ALIGN8(salen));
