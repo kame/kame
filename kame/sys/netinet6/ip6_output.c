@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.222 2001/09/19 10:05:43 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.223 2001/09/20 06:18:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -669,7 +669,7 @@ skip_ipsec2:;
 	 * and the address currently stored in the Home Address option
 	 * field must be exchanged
 	 */
-	if (error = mip6_addr_exchange(m, exthdrs.ip6e_haddr)) {
+	if ((error = mip6_addr_exchange(m, exthdrs.ip6e_haddr)) != 0) {
 		mip6log((LOG_ERR,
 			 "%s: addr exchange between haddr and coa failed.\n",
 			 __FUNCTION__));
