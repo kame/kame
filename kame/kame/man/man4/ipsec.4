@@ -1,4 +1,4 @@
-.\"	$KAME: ipsec.4,v 1.17 2001/06/27 15:25:10 itojun Exp $
+.\"	$KAME: ipsec.4,v 1.18 2001/10/23 09:19:24 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -176,19 +176,27 @@ means
 The following variables are accessible via
 .Xr sysctl 8 ,
 for tweaking kernel IPsec behavior:
-.Bl -column net.inet6.ipsec6.inbonud_call_ike integerxxx
+.Bl -column net.inet.ipsec.ah_offsetmask12345 integerxxx
 .It Sy Name	Type	Changeable
 .It net.inet.ipsec.ah_cleartos	integer	yes
 .It net.inet.ipsec.ah_offsetmask	integer	yes
 .It net.inet.ipsec.dfbit	integer	yes
 .It net.inet.ipsec.ecn	integer	yes
 .It net.inet.ipsec.debug	integer	yes
+.It net.inet.ipsec.esp_randpad	integer yes
 .It net.inet6.ipsec6.ecn	integer	yes
 .It net.inet6.ipsec6.debug	integer	yes
+.It net.inet6.ipsec6.esp_randpad	integer yes
 .El
 .Pp
 The variables are interpreted as follows:
 .Bl -tag -width "123456"
+.It Li ipsec.esp_randpad
+support random padding for ESP, to circumvent traffic analysis.
+This value will tell the kernel the maximum length to be padded.
+If set to 128, packets < 128 will be padded up to 128 randomly,
+to avoid traffic analysis.
+If set to -1, this function does not take place.
 .It Li ipsec.ah_cleartos
 If set to non-zero, the kernel clears type-of-service field in the IPv4 header
 during AH authentication data computation.
