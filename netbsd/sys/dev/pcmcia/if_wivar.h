@@ -79,4 +79,8 @@ struct wi_softc	{
 	int                     wi_tx_key;
 	struct wi_ltv_keys      wi_keys;
 	struct wi_counters	wi_stats;
+
+	int			wi_resource; /* Resources alloc'ed on attach */
+#define WI_RES_IO	1
+#define WI_RES_NET	2
 };
