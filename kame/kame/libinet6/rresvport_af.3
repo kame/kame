@@ -30,7 +30,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     From: @(#)rcmd.3	8.1 (Berkeley) 6/4/93
-.\"	$Id: rresvport_af.3,v 1.4 2000/01/05 06:36:01 itojun Exp $
+.\"	$Id: rresvport_af.3,v 1.5 2000/01/25 08:19:59 itojun Exp $
 .\"
 .Dd February 15, 1996
 .Dt RCMD 3
@@ -40,6 +40,7 @@
 .Nm rresvport ,
 .Nm iruserok ,
 .Nm ruserok ,
+.Nm rcmd_af ,
 .Nm rresvport_af ,
 .Nm iruserok_af ,
 .Nm iruserok_sa
@@ -54,6 +55,8 @@
 .Fn iruserok "u_long raddr" "int superuser" "const char *ruser" "const char *luser"
 .Ft int
 .Fn ruserok "const char *rhost" "int superuser" "const char *ruser" "const char *luser"
+.Ft int
+.Fn rcmd_af "char **ahost" "int inport" "const char *locuser" "const char *remuser" "const char *cmd" "int *fd2p" "int af"
 .Ft int
 .Fn rresvport_af "int *port" "int family"
 .Ft int
@@ -186,18 +189,26 @@ function requires trusting the entire DNS, which can be spoofed.
 Functions with
 .Dq Li _af
 suffix, i.e.
+.Fn rcmd_af ,
 .Fn rresvport_af ,
 and
 .Fn iruserok_af
 work just as same as functions without
 .Dq Li _af ,
 and is capable of handling both IPv6 port and IPv4 port.
+Functions without
+.Dq Li _af
+works for IPv4 only.
 To switch address family,
 .Fa af
 argument must be filled with
-.Dv AF_INET
+.Dv AF_INET ,
 or
 .Dv AF_INET6 .
+For
+.Fn rcmd_af ,
+.Dv PF_UNSPEC
+is also allowed.
 .Pp
 .Fn iruserok_sa
 is similar to
@@ -258,6 +269,9 @@ functions appeared in
 .Fn rresvport_af
 appeared in RFC2292, and implemented by WIDE project
 for Hydrangea IPv6 protocol stack kit.
+.Fn rcmd_af
+appeared in draft-ietf-ipngwg-rfc2292bis-01.txt,
+and implemented by WIDE/KAME IPv6 protocol stack kit.
 .Fn iruserok_af
 and
 .Fn iruserok_sa
