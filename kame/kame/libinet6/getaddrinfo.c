@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.74 2000/07/09 04:19:21 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.75 2000/07/09 04:22:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1104,8 +1104,8 @@ addrconfig(pai)
 	if (s < 0) {
 		if (errno != EMFILE)
 			return 0;
-	}
-	close(s);
+	} else
+		close(s);
 	return 1;
 #endif
 }
