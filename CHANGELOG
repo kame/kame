@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.49 1999/08/23 17:15:42 itojun Exp $
+$Id: CHANGELOG,v 1.50 1999/08/24 07:46:16 itojun Exp $
 
 <199908>
+Tue Aug 24 16:42:54 JST 1999  itojun@iijlab.net
+	* usr.sbin/rtsold, sbin/rtsol: Integrate rtsold and rtsol source code.
+	  Behavior is switched by argv[0].  sbin/rtsol needs to be statically
+	  linked for most of the platforms, so they are compiled separately.
+	  This change will improve IPv6 spec conformance of rtsol(8).
+
 Tue Aug 24 02:11:54 JST 1999  itojun@iijlab.net
 	* etc/rc.net6: disallow multiple interfaces from being autoconfigured
 	  on host case, added some comment on it.
