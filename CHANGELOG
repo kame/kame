@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1988 2001/11/26 16:56:35 sakane Exp $
+$KAME: CHANGELOG,v 1.1989 2001/11/27 07:30:14 suz Exp $
 
 <200111>
+Tue Nov 27 16:03:20 JST 2001 suz@sdl.hitachi.co.jp
+	* kame/kame/pim6sd/:
+	- SSM prefix definition is now based on draft-ietf-ipngwg-uni-
+	  based-mcast-03.txt
+	- joins all MLDv2 routers group on all interfaces listening to MLDv2
+	- updated MLDv2-related code (from Mickael Hoerdt)
+
 Tue Nov 27 01:35:26 JST 2001 sakane@kame.net
 	* kame/kame/racoon:
 	- when racoon receives a IKE packet, it checks the value of the
