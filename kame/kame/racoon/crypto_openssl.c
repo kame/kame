@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.64 2001/08/16 13:21:10 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.65 2001/08/16 21:44:22 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1367,7 +1367,7 @@ eay_aes_encrypt(data, key, iv)
 
 	/* encryption data */
 	memset(&c, 0, sizeof(c));
-	if (rijndael_cipherInit(&c, MODE_ECB, iv->v) < 0)
+	if (rijndael_cipherInit(&c, MODE_CBC, iv->v) < 0)
 		return NULL;
 	if (rijndael_blockEncrypt(&c, &k, data->v, data->l << 3, res->v) < 0)
 		return NULL;
@@ -1393,7 +1393,7 @@ eay_aes_decrypt(data, key, iv)
 
 	/* decryption data */
 	memset(&c, 0, sizeof(c));
-	if (rijndael_cipherInit(&c, MODE_ECB, iv->v) < 0)
+	if (rijndael_cipherInit(&c, MODE_CBC, iv->v) < 0)
 		return NULL;
 	if (rijndael_blockDecrypt(&c, &k, data->v, data->l << 3, res->v) < 0)
 		return NULL;
