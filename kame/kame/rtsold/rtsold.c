@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.61 2003/04/11 10:14:56 jinmei Exp $	*/
+/*	$KAME: rtsold.c,v 1.62 2003/04/11 13:40:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -302,14 +302,6 @@ main(argc, argv)
 
 	/* dump the current pid */
 	if (!once) {
-#if 0
-#if (defined(__NetBSD__) && __NetBSD_Version__ >= 106010000) || defined(__OpenBSD__)
-		if (pidfile(NULL) < 0) {
-			warnmsg(LOG_ERR, __func__,
-			    "failed to open a pid log file: %s",
-			    strerror(errno));
-		}
-#else
 		pid_t pid = getpid();
 		FILE *fp;
 
@@ -321,8 +313,6 @@ main(argc, argv)
 			fprintf(fp, "%d\n", pid);
 			fclose(fp);
 		}
-#endif
-#endif
 	}
 
 #ifndef HAVE_POLL_H
