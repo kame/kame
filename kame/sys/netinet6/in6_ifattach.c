@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.60 2000/06/13 02:38:10 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.61 2000/06/13 08:15:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -676,7 +676,8 @@ nigroup(ifp, name, namelen, in6)
 	bzero(&ctxt, sizeof(ctxt));
 	MD5Init(&ctxt);
 	MD5Update(&ctxt, &l, sizeof(l));
-	MD5Update(&ctxt, name, p - name);
+	/* LINTED const cast */
+	MD5Update(&ctxt, (void *)name, p - name);
 	MD5Final(digest, &ctxt);
 
 	bzero(in6, sizeof(*in6));
