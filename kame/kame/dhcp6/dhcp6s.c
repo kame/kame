@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.153 2005/03/27 03:50:09 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.154 2005/03/27 06:09:45 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1141,7 +1141,7 @@ react_solicit(ifp, dh6, len, optinfo, from, fromlen, relayinfohead)
 		goto fail;
 	}
 
-	/* server information option */
+	/* server identifier option */
 	if (duidcpy(&roptinfo.serverID, &server_duid)) {
 		dprintf(LOG_ERR, FNAME, "failed to copy server ID");
 		goto fail;
@@ -1323,7 +1323,7 @@ react_request(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	 */
 	dhcp6_init_options(&roptinfo);
 
-	/* server information option */
+	/* server identifier option */
 	if (duidcpy(&roptinfo.serverID, &server_duid)) {
 		dprintf(LOG_ERR, FNAME, "failed to copy server ID");
 		goto fail;
@@ -1550,7 +1550,7 @@ react_renew(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	 */
 	dhcp6_init_options(&roptinfo);
 
-	/* server information option */
+	/* server identifier option */
 	if (duidcpy(&roptinfo.serverID, &server_duid)) {
 		dprintf(LOG_ERR, FNAME, "failed to copy server ID");
 		goto fail;
@@ -1673,7 +1673,7 @@ react_rebind(ifp, dh6, len, optinfo, from, fromlen, relayinfohead)
 	 */
 	dhcp6_init_options(&roptinfo);
 
-	/* server information option */
+	/* server identifier option */
 	if (duidcpy(&roptinfo.serverID, &server_duid)) {
 		dprintf(LOG_ERR, FNAME, "failed to copy server ID");
 		goto fail;
@@ -1788,7 +1788,7 @@ react_release(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	 */
 	dhcp6_init_options(&roptinfo);
 
-	/* server information option */
+	/* server identifier option */
 	if (duidcpy(&roptinfo.serverID, &server_duid)) {
 		dprintf(LOG_ERR, FNAME, "failed to copy server ID");
 		goto fail;
@@ -1907,7 +1907,7 @@ react_informreq(ifp, dh6, len, optinfo, from, fromlen, relayinfohead)
 		return (-1);
 	}
 
-	/* if a server information is included, it must match ours. */
+	/* if a server identifier is included, it must match ours. */
 	if (optinfo->serverID.duid_len &&
 	    duidcmp(&optinfo->serverID, &server_duid)) {
 		dprintf(LOG_INFO, FNAME, "server DUID mismatch");
@@ -1919,7 +1919,7 @@ react_informreq(ifp, dh6, len, optinfo, from, fromlen, relayinfohead)
 	 */
 	dhcp6_init_options(&roptinfo);
 
-	/* server information option */
+	/* server identifier option */
 	if (duidcpy(&roptinfo.serverID, &server_duid)) {
 		dprintf(LOG_ERR, FNAME, "failed to copy server ID");
 		goto fail;
