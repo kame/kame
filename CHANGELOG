@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.654 2000/03/06 02:20:35 itojun Exp $
+$Id: CHANGELOG,v 1.655 2000/03/06 04:40:29 itojun Exp $
 
 <200003>
+Mon Mar  6 13:38:59 JST 2000  itojun@iijlab.net
+	* sys/netinet/ip_encap.c: add new api, encap_attach_func(), which
+	  allows you to attach decapsulator with packet matcher function.
+	* sys/net/if_stf.c: 6to4 tunnel support. (compiles on netbsd only at
+	  this moment)
+
 Mon Mar  6 11:19:24 JST 2000  itojun@iijlab.net
 	* netbsd/libexec/{rlogind,rshd}/{rlogind,rshd}.c:
 	  reject connection from IPv4 mapped address (IPv4 connection via
