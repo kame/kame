@@ -595,6 +595,7 @@ resin(s, event, arg)
 			}
 
 			ap = (u_int8_t *)&sin6.sin6_addr;
+			pp = (u_int8_t *)&port;
 
 			relay->ser.len = snprintf(relay->ser.buf,
 			    sizeof(relay->ser.buf),
