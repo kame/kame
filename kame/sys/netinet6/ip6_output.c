@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.163 2001/02/10 04:44:25 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.164 2001/02/10 05:05:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1263,13 +1263,11 @@ skip_ipsec2:;
 		 * can always occur when an application tries to send a larger
 		 * packet than the link MTU even with specifing path MTU.
 		 * Or should we always notify all applications?
-		 *
-		 * XXX what if mtu >= 2^32?
 		 */
-		if ((opt == NULL || opt->ip6po_mtu == -1) &&
-		    mtu <= 0xffffffffLU) {
+		if ((opt == NULL || opt->ip6po_mtu == -1)) {
 			u_int32_t mtu32;
-			mtu32 = mtu;
+		 	/* mtu > IPV6_MAXPACKET case is already covered */
+			mtu32 = (u_int32_t)mtu;
 			bzero(&ip6cp, sizeof(ip6cp));
 			ip6cp.ip6c_cmdarg = (void *)&mtu32;
 			pfctlinput2(PRC_MSGSIZE, &ro_pmtu->ro_dst,
