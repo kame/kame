@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.358 2004/05/21 07:07:31 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.359 2004/05/26 09:41:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -115,7 +115,7 @@
 #include <machine/limits.h>
 #endif
 
-#if !defined(__OpenBSD__)
+#ifndef __OpenBSD__
 #include "loop.h"
 #endif
 #if defined(__NetBSD__)

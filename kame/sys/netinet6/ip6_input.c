@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.343 2004/05/21 09:42:29 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.344 2004/05/26 09:41:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -150,11 +150,14 @@
 #include <netinet6/ip6protosw.h>
 
 /* we need it for NLOOP. */
-#if defined(__NetBSD__) || defined(__FreeBSD__)
+#ifndef __OpenBSD__
 #include "loop.h"
 #endif
 #include "faith.h"
 #include "gif.h"
+#ifndef __FreeBSD__
+#include "bpfilter.h"
+#endif
 #include "pf.h"
 
 #if NGIF > 0

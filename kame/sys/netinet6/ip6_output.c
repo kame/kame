@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.449 2004/05/21 07:07:31 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.450 2004/05/26 09:41:05 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -186,7 +186,7 @@ extern int ipsec_ipcomp_default_level;
 #include "loop.h"
 #endif
 
-#if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if defined(IPV6FIREWALL) || defined(__FreeBSD__)
 #include <netinet6/ip6_fw.h>
 #endif
 

@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.144 2004/05/26 07:41:31 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.145 2004/05/26 09:41:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -125,7 +125,9 @@
 
 #include <net/net_osdep.h>
 
+#ifndef __OpenBSD__
 #include "loop.h"
+#endif
 #ifdef __NetBSD__
 extern struct ifnet loif[NLOOP];
 #endif
