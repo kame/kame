@@ -1474,12 +1474,7 @@ bridge_rtlookup(sc, ea)
 {
 	struct bridge_rtnode *p;
 	u_int32_t h;
-	int s, dir;
-
-	/*
-	 * Lock out everything else
-	 */
-	s = splhigh();
+	int dir;
 
 	if (sc->sc_rts == NULL)
 		goto fail;
