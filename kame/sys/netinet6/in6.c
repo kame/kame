@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.229 2001/08/31 05:13:39 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.230 2001/09/12 16:52:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -963,7 +963,7 @@ in6_update_ifa(ifp, ifra, ia)
 	dst6 = ifra->ifra_dstaddr;
 	if ((ifp->if_flags & (IFF_POINTOPOINT|IFF_LOOPBACK)) &&
 	    (dst6.sin6_family == AF_INET6)) {
-		int scopeid;
+		int64_t zoneid;
 
 #ifndef SCOPEDROUTING
 		if ((error = in6_recoverscope(&dst6,
@@ -971,10 +971,11 @@ in6_update_ifa(ifp, ifra, ia)
 					      ifp)) != 0)
 			return(error);
 #endif
-		scopeid = in6_addr2zoneid(ifp, &dst6.sin6_addr);
+		if ((zoneid = in6_addr2zoneid(ifp, &dst6.sin6_addr)) < 0)
+			return(EINVAL);
 		if (dst6.sin6_scope_id == 0) /* user omit to specify the ID. */
-			dst6.sin6_scope_id = scopeid;
-		else if (dst6.sin6_scope_id != scopeid)
+			dst6.sin6_scope_id = zoneid;
+		else if (dst6.sin6_scope_id != zoneid)
 			return(EINVAL); /* scope ID mismatch. */
 #ifndef SCOPEDROUTING
 		if ((error = in6_embedscope(&dst6.sin6_addr, &dst6, NULL, NULL))
@@ -1629,6 +1630,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 	struct if_laddrreq *iflr = (struct if_laddrreq *)data;
 	struct ifaddr *ifa;
 	struct sockaddr *sa;
+	int64_t zoneid;
 
 	/* sanity checks */
 	if (!data || !ifp) {
@@ -1824,8 +1826,10 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 			s6 = (struct sockaddr_in6 *)&iflr->addr;
 			if (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr)) {
 				s6->sin6_addr.s6_addr16[1] = 0;
-				s6->sin6_scope_id =
-					in6_addr2zoneid(ifp, &s6->sin6_addr);
+				zoneid = in6_addr2zoneid(ifp, &s6->sin6_addr);
+				if (zoneid < 0) /* XXX: should not happen */
+					return(EINVAL);
+				s6->sin6_scope_id = zoneid;
 			}
 #endif
 			if ((ifp->if_flags & IFF_POINTOPOINT) != 0) {
@@ -1835,9 +1839,11 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 				s6 = (struct sockaddr_in6 *)&iflr->dstaddr;
 				if (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr)) {
 					s6->sin6_addr.s6_addr16[1] = 0;
-					s6->sin6_scope_id =
-						in6_addr2zoneid(ifp,
-								&s6->sin6_addr);
+					zoneid = in6_addr2zoneid(ifp,
+								 &s6->sin6_addr);
+					if (zoneid < 0) /* XXX */
+						return(EINVAL);
+					s6->sin6_scope_id = zoneid;
 				}
 #endif
 			} else

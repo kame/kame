@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.218 2001/09/07 08:26:36 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.219 2001/09/12 16:52:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -888,7 +888,8 @@ skip_ipsec2:;
 		struct ifnet *ifp0 = NULL;
 		struct sockaddr_in6 src;
 		struct sockaddr_in6 dst0 = *dst;
-		int zone, clone = 0;
+		int clone = 0;
+		int64_t zone;
 
 #if defined(__bsdi__) || defined(__FreeBSD__)
 		if (ro != &ip6route && !IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
@@ -3633,12 +3634,15 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 			sin6.sin6_len = sizeof(sin6);
 			sin6.sin6_family = AF_INET6;
 			if (ifp) {
-				sin6.sin6_scope_id = in6_addr2zoneid(ifp,
-								     &pktinfo->ipi6_addr);
-				if (sin6.sin6_scope_id == -1) {
+				int64_t zone;
+
+				zone = in6_addr2zoneid(ifp,
+						       &pktinfo->ipi6_addr);
+				if (zone < 0) {
 					/* XXX: this should not happen */
 					return(EINVAL);
 				}
+				sin6.sin6_scope_id = zone;
 			}
 			sin6.sin6_addr = pktinfo->ipi6_addr;
 #ifndef SCOPEDROUTING

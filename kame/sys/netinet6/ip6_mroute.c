@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.50 2001/07/29 09:23:05 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.51 2001/09/12 16:52:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1575,6 +1575,8 @@ ip6_mdq(m, ifp, rt)
 	 */
 	for (mifp = mif6table, mifi = 0; mifi < nummifs; mifp++, mifi++)
 		if (IF_ISSET(mifi, &rt->mf6c_ifset)) {
+			int64_t dscopein, sscopein, dscopeout, sscopeout;
+
 			/*
 			 * check if the outgoing packet is going to break
 			 * a scope boundary.
@@ -1583,15 +1585,16 @@ ip6_mdq(m, ifp, rt)
 			 */
 			if ((mif6table[rt->mf6c_parent].m6_flags &
 			     MIFF_REGISTER) == 0 &&
-			    (mif6table[mifi].m6_flags & MIFF_REGISTER) == 0 &&
-			    (in6_addr2zoneid(ifp, &ip6->ip6_dst) !=
-			     in6_addr2zoneid(mif6table[mifi].m6_ifp,
-					     &ip6->ip6_dst) ||
-			     in6_addr2zoneid(ifp, &ip6->ip6_src) !=
-			     in6_addr2zoneid(mif6table[mifi].m6_ifp,
-					     &ip6->ip6_src))) {
-				ip6stat.ip6s_badscope++;
-				continue;
+			    (mif6table[mifi].m6_flags & MIFF_REGISTER) == 0) {
+				if ((dscopein = in6_addr2zoneid(ifp, &ip6->ip6_dst)) < 0 ||
+				    (dscopeout = in6_addr2zoneid(mif6table[mifi].m6_ifp, &ip6->ip6_dst)) < 0 ||
+				    (sscopein = in6_addr2zoneid(ifp, &ip6->ip6_src)) < 0 ||
+				    (sscopeout = in6_addr2zoneid(mif6table[mifi].m6_ifp, &ip6->ip6_src)) < 0 ||
+				    dscopein != dscopeout ||
+				    sscopein != sscopeout) {
+					ip6stat.ip6s_badscope++;
+					continue;
+				}
 			}
 
 			mifp->m6_pkt_out++;

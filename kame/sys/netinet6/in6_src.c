@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.67 2001/09/05 12:42:37 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.68 2001/09/12 16:52:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -267,7 +267,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 #endif
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
 		int new_scope = -1, new_matchlen = -1;
-		int srczone, dstzone;
+		int64_t srczone, dstzone;
 		struct ifnet *ifp1 = ia->ia_ifp;
 
 		/*

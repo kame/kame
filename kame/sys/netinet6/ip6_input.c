@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.217 2001/09/05 03:22:24 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.218 2001/09/12 16:52:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -839,6 +839,9 @@ ip6_input(m)
 		ip6stat.ip6s_forward_cachehit++;
 	else {
 		struct sockaddr_in6 *dst6;
+#ifdef SCOPEDROUTING
+		int64_t dstzone;
+#endif
 
 		if (ip6_forward_rt.ro_rt) {
 			/* route is down or destination is different */
@@ -853,8 +856,13 @@ ip6_input(m)
 		dst6->sin6_family = AF_INET6;
 		dst6->sin6_addr = ip6->ip6_dst;
 #ifdef SCOPEDROUTING
-		ip6_forward_rt.ro_dst.sin6_scope_id =
-			in6_addr2zoneid(m->m_pkthdr.rcvif, &ip6->ip6_dst);
+		if ((dstzone = in6_addr2zoneid(m->m_pkthdr.rcvif,
+					       &ip6->ip6_dst)) < 0) {
+			ip6stat.ip6s_badscope++;
+			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_addrerr);
+			goto bad;
+		}
+		ip6_forward_rt.ro_dst.sin6_scope_id = dstzone;
 #endif
 
 #ifdef __FreeBSD__

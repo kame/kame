@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.18 2001/09/05 12:50:02 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.19 2001/09/12 16:52:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -246,7 +246,12 @@ in6_addrscope(addr)
 	return IPV6_ADDR_SCOPE_GLOBAL;
 }
 
-int
+/*
+ * When we introduce the "4+28" split semantics in sin6_scope_id,
+ * a 32bit integer is not enough to tell a large ID from an error (-1).
+ * So, we intentionally use a large type as the return value.
+ */
+int64_t
 in6_addr2zoneid(ifp, addr)
 	struct ifnet *ifp;	/* must not be NULL */
 	struct in6_addr *addr;	/* must not be NULL */

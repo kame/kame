@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.143 2001/08/31 05:13:40 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.144 2001/09/12 16:52:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -594,6 +594,9 @@ in6_ifattach_linklocal(ifp, altifp)
 	struct in6_aliasreq ifra;
 	struct nd_prefix pr0;
 	int i, error;
+#ifdef SCOPEDROUTING
+	int64_t zoneid;
+#endif
 
 	/*
 	 * configure link-local address.
@@ -622,12 +625,13 @@ in6_ifattach_linklocal(ifp, altifp)
 		if (get_ifid(ifp, altifp, &ifra.ifra_addr.sin6_addr) != 0) {
 			nd6log((LOG_ERR,
 			    "%s: no ifid available\n", if_name(ifp)));
-			return -1;
+			return(-1);
 		}
 	}
 #ifdef SCOPEDROUTING
-	ifra.ifra_addr.sin6_scope_id =
-		in6_addr2zoneid(ifp,  &ifra.ifra_addr.sin6_addr);
+	if ((zoneid = in6_addr2zoneid(ifp, &ifra.ifra_addr.sin6_addr)) < 0)
+		return(-1);
+	ifra.ifra_addr.sin6_scope_id = zoneid;
 #endif
 
 	ifra.ifra_prefixmask.sin6_len = sizeof(struct sockaddr_in6);
