@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.248 2001/12/18 02:29:44 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.249 2001/12/20 13:59:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1371,7 +1371,31 @@ skip_ipsec2:;
 	 * If necessary, do IPv6 fragmentation before sending.
 	 */
 	tlen = m->m_pkthdr.len;
-	if (tlen <= mtu
+	/*
+	 * Even if the DONTFRAG option is specified, we cannot send the packet
+	 * when the data length is larger than the MTU of the outgoing
+	 * interface.
+	 * Notify the error by sending IPV6_PATHMTU ancillary data as well
+	 * as returning an error code (the latter is not described in the API
+	 * spec.)
+	 */
+	if (opt && (opt->ip6po_flags & IP6PO_DONTFRAG) && tlen > ifp->if_mtu
+#ifdef notyet
+	    && !(ifp->if_flags & IFF_FRAGMENTABLE)
+#endif
+		) {
+		u_int32_t mtu32;
+		struct ip6ctlparam ip6cp;
+
+		mtu32 = (u_int32_t)mtu;
+		bzero(&ip6cp, sizeof(ip6cp));
+		ip6cp.ip6c_cmdarg = (void *)&mtu32;
+		pfctlinput2(PRC_MSGSIZE, &ro_pmtu->ro_dst, (void *)&ip6cp);
+
+		error = EMSGSIZE;
+		goto bad;
+	}
+	if (tlen <= mtu || (opt && (opt->ip6po_flags & IP6PO_DONTFRAG))
 #ifdef notyet
 	    /*
 	     * On any link that cannot convey a 1280-octet packet in one piece,
@@ -1383,11 +1407,12 @@ skip_ipsec2:;
 	     * XXX: IFF_FRAGMENTABLE (or such) flag has not been defined yet...
 	     */
 	
-	    || ifp->if_flags & IFF_FRAGMENTABLE
+	    || (ifp->if_flags & IFF_FRAGMENTABLE)
 #endif
 	    )
 	{
 		struct in6_ifaddr *ia6;
+
 		ip6 = mtod(m, struct ip6_hdr *);
 		ia6 = in6_ifawithifp(ifp, &ip6->ip6_src);
 		if (ia6) {
@@ -1427,6 +1452,7 @@ skip_ipsec2:;
 		u_int32_t id = htonl(ip6_id++);
 		u_char nextproto;
 		struct ip6ctlparam ip6cp;
+		u_int32_t mtu32;
 
 		/*
 		 * Too large for the destination or interface;
@@ -1438,15 +1464,11 @@ skip_ipsec2:;
 			mtu = IPV6_MAXPACKET;
 
 		/* Notify a proper path MTU to applications. */
-		if (opt == NULL) {
-			u_int32_t mtu32;
-		 	/* mtu > IPV6_MAXPACKET case is already covered */
-			mtu32 = (u_int32_t)mtu;
-			bzero(&ip6cp, sizeof(ip6cp));
-			ip6cp.ip6c_cmdarg = (void *)&mtu32;
-			pfctlinput2(PRC_MSGSIZE, &ro_pmtu->ro_dst,
-				    (void *)&ip6cp);
-		}
+		/* mtu > IPV6_MAXPACKET case is already covered */
+		mtu32 = (u_int32_t)mtu;
+		bzero(&ip6cp, sizeof(ip6cp));
+		ip6cp.ip6c_cmdarg = (void *)&mtu32;
+		pfctlinput2(PRC_MSGSIZE, &ro_pmtu->ro_dst, (void *)&ip6cp);
 
 		len = (mtu - hlen - sizeof(struct ip6_frag)) & ~7;
 		if (len < 8) {
@@ -1931,8 +1953,8 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_RECVRTHDR:
 			case IPV6_USE_MIN_MTU:
 			case IPV6_RECVPATHMTU:
-			case IPV6_V6ONLY:
 			case IPV6_RECVTCLASS:
+			case IPV6_V6ONLY:
 			case IPV6_AUTOFLOWLABEL:
 				if (optlen != sizeof(int)) {
 					error = EINVAL;
@@ -2196,6 +2218,7 @@ do { \
 			}
 
 			case IPV6_TCLASS:
+			case IPV6_DONTFRAG:
 				if (optlen != sizeof(optval)) {
 					error = EINVAL;
 					break;
@@ -2626,6 +2649,7 @@ do { \
 			case IPV6_RECVRTHDR:
 			case IPV6_USE_MIN_MTU:
 			case IPV6_RECVPATHMTU:
+			case IPV6_DONTFRAG:
 
 			case IPV6_FAITH:
 			case IPV6_V6ONLY:
@@ -2724,6 +2748,7 @@ do { \
 #define in6p_outputopts inp_outputopts6
 #endif
 				case IPV6_TCLASS:
+				case IPV6_DONTFRAG:
 					error = ip6_getpcbopt(in6p->in6p_outputopts,
 							      optname, &optdata,
 							      &optdatalen);
@@ -3788,6 +3813,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		case IPV6_RTHDR:
 		case IPV6_REACHCONF:
 		case IPV6_USE_MIN_MTU:
+		case IPV6_DONTFRAG:
 			return(ENOPROTOOPT);
 		}
 	}
@@ -4158,14 +4184,32 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		break;
 
 	case IPV6_USE_MIN_MTU:
-		if (cmsg) {
-			if (len != CMSG_LEN(0))
-				return(EINVAL);
-		} else if (len != 0)
-			return(EINVAL);
+	case IPV6_DONTFRAG:
+	{
+		int on, flag = 0;
 
-		opt->ip6po_flags |= IP6PO_MINMTU;
+		if (cmsg) {
+			if (len != CMSG_LEN(sizeof(int)))
+				return(EINVAL);
+		}  else if (len != sizeof(int))
+			return(EINVAL);
+		on = *(int *)buf;
+
+		switch (optname) {
+		case IPV6_USE_MIN_MTU:
+			flag = IP6PO_MINMTU;
+			break;
+		case IPV6_DONTFRAG:
+			flag = IP6PO_DONTFRAG;
+			break;
+		}
+
+		if (on)
+			opt->ip6po_flags |= flag;
+		else
+			opt->ip6po_flags &= ~flag;
 		break;
+	}
 
 	default:
 		return(ENOPROTOOPT);	
