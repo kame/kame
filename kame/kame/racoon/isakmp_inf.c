@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.36 2000/07/06 09:21:26 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.37 2000/07/06 11:19:21 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -750,14 +750,12 @@ purge_spi(proto, spi, n)
 	u_int32_t *spi;	/*network byteorder*/
 	size_t n;
 {
-	vchar_t *buf;
+	vchar_t *buf = NULL;
 	struct sadb_msg *msg, *next, *end;
 	struct sadb_sa *sa;
 	struct sadb_address *src, *dst;
 	size_t i;
 	caddr_t mhp[SADB_EXT_MAX + 1];
-
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
 	buf = pfkey_dump_sadb(proto);
 	if (buf == NULL) {
@@ -820,7 +818,8 @@ purge_spi(proto, spi, n)
 		msg = next;
 	}
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "end.\n"));
+	if (buf)
+		vfree(buf);
 }
 
 /*
@@ -830,13 +829,11 @@ static void
 info_recv_initialcontact(remote)
 	struct sockaddr *remote;
 {
-	vchar_t *buf;
+	vchar_t *buf = NULL;
 	struct sadb_msg *msg, *next, *end;
 	struct sadb_sa *sa;
 	struct sockaddr *src, *dst;
 	caddr_t mhp[SADB_EXT_MAX + 1];
-
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
 	/* XXX to be purge IKE-SA(s) */
 
@@ -894,7 +891,8 @@ info_recv_initialcontact(remote)
 		msg = next;
 	}
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "end.\n"));
+	if (buf)
+		vfree(buf);
 }
 
 /*
