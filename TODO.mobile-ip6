@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.31 2002/12/12 10:23:37 keiichi Exp $
+$KAME: TODO.mobile-ip6,v 1.32 2003/01/14 06:10:15 keiichi Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -11,6 +11,8 @@ KAME project
 	- Processing a binding update with S=0 doesn't work as
 	  described in the spec.
 	- Simultaniously use with the privacy extention doesn't work.
+	- Accept HoT/CoT messages with HAO.
+	- Incorrect DHAAD reply message format.
 
 - Missing features
 	- The mobile prefix sol/adv.
