@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.57 2000/04/29 04:46:40 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.58 2000/04/29 04:51:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1887,7 +1887,7 @@ nd6_output(ifp, m0, dst, rt0)
 	 * XXX: we currently do not make neighbor cache on any interface
 	 * other than ARCnet, Ethernet, FDDI and GIF.
 	 *
-	 * draft-ietf-ngtrans-mech-04.txt says:
+	 * draft-ietf-ngtrans-mech-06.txt says:
 	 * - unidirectional tunnels needs no ND
 	 */
 	switch (ifp->if_type) {
