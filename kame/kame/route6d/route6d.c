@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.45 2001/01/22 09:30:44 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.46 2001/01/22 10:11:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.45 2001/01/22 09:30:44 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.46 2001/01/22 10:11:15 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -798,25 +798,15 @@ ripsend(ifcp, sin, flag)
 			continue;
 
 		/*
-		 * -U: do not advertise if prefix equals the configured prefix.
+		 * if it is an aggregated route and the interface is not
+		 * listed on -A, we don't advertise it.
 		 */
-		ok = 1;
-		for (iffp = ifcp->ifc_filter; iffp; iffp = iffp->iff_next) {
-			if (iffp->iff_type != 'U')
-				continue;
-			if (rrt->rrt_info.rip6_plen == iffp->iff_plen &&
-			    IN6_ARE_ADDR_EQUAL(&rrt->rrt_info.rip6_dest,
-			    &iffp->iff_addr)) {
-				ok = 0;
-				break;
-			}
-		}
-		if (!ok)
+		if ((rrt->rrt_rflags & RRTF_AGGREGATE) && !iff_find(ifcp, 'A'))
 			continue;
+
 		/*
 		 * -O: advertise only if prefix matches the configured prefix.
 		 */
-		ok = 1;
 		for (iffp = ifcp->ifc_filter; iffp; iffp = iffp->iff_next) {
 			if (iffp->iff_type != 'O')
 				continue;
@@ -2880,8 +2870,6 @@ ifdump0(dump, ifcp)
 			switch (iffp->iff_type) {
 			case 'A':
 				ft = "Aggregate"; addr++; break;
-			case 'U':
-				ft = "Suppress"; addr++; break;
 			case 'N':
 				ft = "No-advertise"; break;
 			case 'O':
@@ -2964,7 +2952,6 @@ filterconfig()
 	struct iff ftmp, *iff_obj;
 	struct ifc *ifcp;
 	struct riprt *rrt;
-	struct iff *iffp;
 #if 0
 	struct in6_addr gw;
 #endif
@@ -3071,28 +3058,6 @@ ifonly:
 		if (nflag) 	/* do not modify kernel routing table */
 			continue;
 		addroute(rrt, &in6addr_loopback, loopifcp);
-		/* suppress advertisement for other interfaces */
-		for (ifcp = ifc; ifcp; ifcp = ifcp->ifc_next) {
-			for (iffp = ifcp->ifc_filter;
-			     iffp; iffp = iffp->iff_next) {
-				if (iffp->iff_type == 'A')
-					break;
-			}
-			if (iffp)
-				continue;
-
-			iff_obj = (struct iff *)malloc(sizeof(struct iff));
-			if (iff_obj == NULL) {
-				fatal("malloc of iff_obj");
-				/*NOTREACHED*/
-			}
-			memcpy((void *)iff_obj, (void *)&ftmp,
-			    sizeof(struct iff));
-			iff_obj->iff_type = 'U';
-			/* link it to the interface filter */
-			iff_obj->iff_next = ifcp->ifc_filter;
-			ifcp->ifc_filter = iff_obj;
-		}
 	}
 }
 
