@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.63 2000/09/22 06:51:32 itojun Exp $	*/
+/*	$KAME: oakley.c,v 1.64 2000/09/22 07:00:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.63 2000/09/22 06:51:32 itojun Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.64 2000/09/22 07:00:07 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1301,7 +1301,7 @@ get_cert_fromlocal(iph1, my)
 		YIPSDEBUG(DEBUG_CERT,
 			if (cert) {
 				char *p = NULL;
-				eay_get_x509text(cert);
+				p = eay_get_x509text(cert);
 				plog(logp, LOCATION, NULL, "%s", p ? p : "\n");
 				free(p);
 			});
