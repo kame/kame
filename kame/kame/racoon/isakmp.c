@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.164 2001/11/26 16:34:46 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.165 2001/12/06 07:16:30 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -497,16 +497,19 @@ isakmp_main(msg, remote, local)
 			isakmp_info_send_nx(isakmp, remote, local,
 				ISAKMP_NTYPE_INVALID_COOKIE, NULL);
 			plog(LLV_ERROR, LOCATION, remote,
-				"Unknown quick mode exchange, "
-				"there is no ISAKMP-SA.\n");
+				"can't start the quick mode, "
+				"there is no ISAKMP-SA, %s\n",
+				isakmp_pindex((isakmp_index *)&isakmp->i_ck,
+					isakmp->msgid));
 			return -1;
 		}
 
 		/* check status of phase 1 whether negotiated or not. */
 		if (iph1->status != PHASE1ST_ESTABLISHED) {
 			plog(LLV_ERROR, LOCATION, remote,
-				"Unknown quick mode exchange, "
-				"there is no valid ISAKMP-SA.\n");
+				"can't start the quick mode, "
+				"there is no valid ISAKMP-SA, %s\n",
+				isakmp_pindex(&iph1->index, iph1->msgid));
 			return -1;
 		}
 
