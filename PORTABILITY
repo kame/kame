@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.27 2000/01/06 14:48:08 itojun Exp $
+	$Id: PORTABILITY,v 1.28 2000/02/18 16:58:17 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -85,6 +85,12 @@ across those possibilities.
   When doing printf(), cast size_t to u_long and print it as %lu.
 	size_t siz;
 	printf("%lu", (u_long)siz);
+  Use of "%p" is more appropriate here.
+
+- If you would like to use printf() against variable typed u_quad_t,
+  cast them to unsigned long long and use %llu.  %qu does not work on alpha.
+	u_quad_t x;
+	printf("%llu", (unsigned long long)x);
 
 - tv.tv_sec is not typed as time_t.
   If you want time_t, explicitly copy the value.
@@ -109,6 +115,8 @@ across those possibilities.
   For NetBSD and OpenBSD, CFLAGS and CPPFLAGS are defined separately:
 	CPPFLAGS+=-I/usr/local/include
 	CFLAGS+=-g
+  CPPFLAGS contains -I and -D only (those who needs to be passed to cpp).
+  CFLAGS can contain other flags.
   For FreeBSD and BSDI, there's no distinction.
 	CFLAGS+=-I/usr/local/include
 	CFLAGS+=-g
