@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.25 2002/04/03 02:17:32 suz Exp $	*/
+/*	$KAME: main.c,v 1.26 2002/04/03 04:12:55 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -84,7 +84,7 @@
 #include "timer.h"
 #include "rp.h"
 #include "kern.h"
-#include "cfparse.h"
+#include "cfparse-defs.h"
 #include "pim6_proto.h"
 
 char            	configfilename[256] = _PATH_PIM6D_CONF;

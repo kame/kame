@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.9 2001/07/11 09:13:27 suz Exp $	*/
+/*	$KAME: cftoken.l,v 1.10 2002/04/03 04:12:55 suz Exp $	*/
 
 %{
 /*
@@ -43,7 +43,7 @@
 #include "var.h"
 #include "vmbuf.h"
 #include "debug.h"
-#include "cfparse.h"
+#include "cfparse-defs.h"
 #include "y.tab.h"
 
 static int yyerrorcount = 0;

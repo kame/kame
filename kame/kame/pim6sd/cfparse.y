@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.19 2002/04/03 02:47:04 itojun Exp $	*/
+/*	$KAME: cfparse.y,v 1.20 2002/04/03 04:12:55 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -48,7 +48,7 @@
 
 #include "var.h"
 #include "vmbuf.h"
-#include "cfparse.h"
+#include "cfparse-defs.h"
 #include "debug.h"
 #include "pimd.h"
 #include "timer.h"
