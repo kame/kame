@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.43 2002/06/28 14:11:55 keiichi Exp $	*/
+/*	$KAME: dest6.c,v 1.44 2002/08/02 08:15:34 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -90,14 +90,16 @@ dest6_input(mp, offp, proto)
 	struct mbuf *m = *mp;
 	int off = *offp, dstoptlen, optlen;
 	struct ip6_dest *dstopts;
+	u_int8_t *opt;
+#ifdef MIP6
 	struct mbuf *n;
 	struct ip6_opt_home_address *haopt = NULL;
 	struct sockaddr_in6 *src_sa, *dst_sa, home_sa;
 	struct ip6aux *ip6a = NULL;
-	u_int8_t *opt;
 	struct ip6_hdr *ip6;
 
 	ip6 = mtod(m, struct ip6_hdr *);
+#endif
 
 	/* validation of the length of the header */
 #ifndef PULLDOWN_TEST
@@ -137,6 +139,7 @@ dest6_input(mp, offp, proto)
 		case IP6OPT_PADN:
 			optlen = *(opt + 1) + 2;
 			break;
+#ifdef MIP6
 		case IP6OPT_HOME_ADDRESS:
 			/* HAO must appear only once */
 			n = ip6_addaux(m);
@@ -173,7 +176,6 @@ dest6_input(mp, offp, proto)
 			    != 0)
 				goto bad;
 
-#ifdef MIP6
 			/* check whether this HAO is 'verified'. */
 			if (mip6_bc_list_find_withphaddr(
 				&mip6_bc_list, &home_sa) != NULL) {
@@ -205,7 +207,6 @@ dest6_input(mp, offp, proto)
 			(void)dest6_send_be(dst_sa, src_sa, &home_sa);
 			goto bad;
 		verified:
-#endif /* MIP6 */
 
 			/* store the CoA in a aux. */
 			bcopy(&ip6a->ip6a_src.sin6_addr, &ip6a->ip6a_coa,
@@ -231,7 +232,7 @@ dest6_input(mp, offp, proto)
 			 */
 
 			break;
-
+#endif /* MIP6 */
 		default:		/* unknown option */
 			optlen = ip6_unknown_opt(opt, m,
 			    opt - mtod(m, u_int8_t *));
@@ -242,6 +243,7 @@ dest6_input(mp, offp, proto)
 		}
 	}
 
+#ifdef MIP6
 	/* if haopt is non-NULL, we are sure we have seen fresh HA option */
 	if (haopt && ip6a &&
 	    (ip6a->ip6a_flags & (IP6A_HASEEN | IP6A_SWAP)) == IP6A_HASEEN) {
@@ -263,6 +265,7 @@ dest6_input(mp, offp, proto)
 #endif
 		ip6a->ip6a_flags |= IP6A_SWAP;
 	}
+#endif /* MIP6 */
 
 	*offp = off;
 	return (dstopts->ip6d_nxt);
