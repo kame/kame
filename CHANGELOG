@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1506 2001/01/24 00:33:35 itojun Exp $
+$KAME: CHANGELOG,v 1.1507 2001/01/24 01:33:21 itojun Exp $
 
 <200101>
+Wed Jan 24 10:31:29 JST 2001  itojun@iijlab.net
+	* sys/netinet6/ip6_fw.[ch]: pull security patch (fixes "established"
+	  tcp filter) from FreeBSD-SA-01:08.ipfw.
+	  NOTE: IPv4 ip_fw.[ch] on freebsd[234] are NOT patched (yet).
+
 Wed Jan 24 09:32:16 JST 2001  itojun@iijlab.net
 	* sys/net/radix_art.[ch]: ART routing table lookup algorithm.
 	  (memory eater, but should be faster).  currently netbsd/openbsd only.
