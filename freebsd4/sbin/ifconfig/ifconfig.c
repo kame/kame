@@ -199,6 +199,8 @@ struct	cmd {
 	{ "anycast",	IN6_IFF_ANYCAST, setip6flags },
 	{ "tentative",	IN6_IFF_TENTATIVE, setip6flags },
 	{ "-tentative",	-IN6_IFF_TENTATIVE, setip6flags },
+	{ "deprecated",	IN6_IFF_DEPRECATED, setip6flags },
+	{ "-deprecated", -IN6_IFF_DEPRECATED, setip6flags },
 	{ "autoconf",	IN6_IFF_AUTOCONF, setip6flags },
 	{ "-autoconf",	-IN6_IFF_AUTOCONF, setip6flags },
 	{ "vltime",     NEXTARG,        setip6vltime },
