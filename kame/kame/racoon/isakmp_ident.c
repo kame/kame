@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.54 2001/03/27 02:39:57 thorpej Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.55 2001/03/27 02:46:05 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1435,6 +1435,10 @@ end:
 		vfree(buf);
 		buf = NULL;
 	}
+#ifdef HAVE_GSSAPI
+	if (gsstoken)
+		vfree(gsstoken);
+#endif
 	if (vid)
 		vfree(vid);
 

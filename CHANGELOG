@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1624 2001/03/27 02:39:56 thorpej Exp $
+$KAME: CHANGELOG,v 1.1625 2001/03/27 02:46:05 thorpej Exp $
 
 <200103>
+2001-03-26  Jason R. Thorpe  <thorpej@zembu.com>
+
+	* racoon/isakmp_ident.c: ident_ir2sendmx(): plug memory
+	  leak -- gsstoken wasn't being freed at function exit.
+
 2001-03-26  Jason R. Thorpe  <thorpej@zembu.com>
 
 	* racoon: Changes to Vendor ID payload handling.  Determine
