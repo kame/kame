@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.137 2000/08/30 06:36:59 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.138 2000/08/30 06:45:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1777,7 +1777,7 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 			 */
 			if ((ifa6->ia6_flags & IN6_IFF_ANYCAST) != 0 &&
 			    (niflags & NI_NODEADDR_FLAG_ANYCAST) == 0)
-					continue;
+				continue;
 
 			/* now we can copy the address */
 			if (resid < sizeof(struct in6_addr)) {
