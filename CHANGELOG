@@ -1,12 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.299 1999/11/26 11:23:26 itojun Exp $
+$Id: CHANGELOG,v 1.300 1999/11/26 11:35:24 itojun Exp $
 
 <199911>
 Fri Nov 26 19:50:19 JST 1999  itojun@iijlab.net
 	* KAME repository experienced a disk crash last night.  It was
 	  recovered by now.
-	* {netbsd,bsdi4}/sys/netinet/tcp_input.c:
+	* {netbsd,bsdi4,openbsd}/sys/netinet/tcp_input.c:
 	  implement upper-layer reachability confirmation hint to NDP.
 
 Thu Nov 25 19:57:44 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
