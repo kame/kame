@@ -363,6 +363,7 @@ tcp_input(m, va_alist)
 	register int tiflags;
 	struct socket *so = NULL;
 	int todrop, acked, ourfinisacked, needoutput = 0;
+	int hdroptlen = 0;
 	short ostate = 0;
 	struct in_addr laddr;
 	int dropsocket = 0;
@@ -859,8 +860,7 @@ findpcb:
 			 * Drop TCP, IP headers and TCP options then add data
 			 * to socket buffer.
 			 */
-			m->m_data += iphlen + off;
-			m->m_len -= iphlen + off;
+			m_adj(m, iphlen + off);
 			sbappend(&so->so_rcv, m);
 			sorwakeup(so);
 			if (th->th_flags & TH_PUSH)
@@ -872,10 +872,9 @@ findpcb:
 	}
 
 	/*
-	 * Drop TCP, IP headers and TCP options.
+	 * Compute mbuf offset to TCP data segment.
 	 */
-	m->m_data += iphlen + off;
-	m->m_len  -= iphlen + off;
+	hdroptlen = iphlen + off;
 
 	/*
 	 * Calculate amount of space in receive window,
@@ -1268,7 +1267,7 @@ trimthenstep6:
 			tcpstat.tcps_rcvpartduppack++;
 			tcpstat.tcps_rcvpartdupbyte += todrop;
 		}
-		m_adj(m, todrop);
+		hdroptlen += todrop;	/* drop from head afterwards */
 		th->th_seq += todrop;
 		tlen -= todrop;
 		if (th->th_urp > todrop)
@@ -1876,7 +1875,7 @@ step6:
 		     && (so->so_options & SO_OOBINLINE) == 0
 #endif
 		     )
-		        tcp_pulloutofband(so, th->th_urp, m); /* XXX? */
+		        tcp_pulloutofband(so, th->th_urp, m, hdroptlen);
 	} else
 		/*
 		 * If no out of band data is expected,
@@ -1907,9 +1906,11 @@ dodata:							/* XXX */
 			tiflags = th->th_flags & TH_FIN;
 			tcpstat.tcps_rcvpack++;
 			tcpstat.tcps_rcvbyte += tlen;
+			m_adj(m, hdroptlen);
 			sbappend(&so->so_rcv, m);
 			sorwakeup(so);
 		} else {
+			m_adj(m, hdroptlen);
 			tiflags = tcp_reass(tp, th, m, &tlen);
 			tp->t_flags |= TF_ACKNOW;
 		}
@@ -2577,12 +2578,13 @@ tcp_sack_partialack(tp, th)
  * sequencing purposes.
  */
 void
-tcp_pulloutofband(so, urgent, m)
+tcp_pulloutofband(so, urgent, m, off)
 	struct socket *so;
 	u_int urgent;
 	register struct mbuf *m;
+	int off;
 {
-        int cnt = urgent - 1;
+        int cnt = off + urgent - 1;
 	
 	while (cnt >= 0) {
 		if (m->m_len > cnt) {

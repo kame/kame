@@ -347,7 +347,7 @@ struct tcpcb *
 	 tcp_newtcpcb __P((struct inpcb *));
 void	 tcp_notify __P((struct inpcb *, int));
 int	 tcp_output __P((struct tcpcb *));
-void	 tcp_pulloutofband __P((struct socket *, u_int, struct mbuf *));
+void	 tcp_pulloutofband __P((struct socket *, u_int, struct mbuf *, int));
 void	 tcp_quench __P((struct inpcb *, int));
 int	 tcp_reass __P((struct tcpcb *, struct tcphdr *, struct mbuf *, int *));
 void	 tcp_respond __P((struct tcpcb *, caddr_t, struct mbuf *, tcp_seq,
