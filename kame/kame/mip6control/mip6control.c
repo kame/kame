@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.7 2001/12/04 11:43:05 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.8 2001/12/13 09:24:34 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,10 +57,7 @@
 #define IOC_ENTRY_COUNT 100 /* XXX */
 
 static int getaddress(char *, struct in6_addr *);
-#if 0
-static char *ip6addr_print(struct in6_addr *in6, int plen, char *);
-#endif
-static char *ip6_sprintf(const struct in6_addr *);
+static const char *ip6_sprintf(const struct in6_addr *);
 
 static const char *pfx_desc[] = {
 	"prefix\t\tplen\tvltime\tvlrem\tpltime\tplrem\thaddr\n",
@@ -90,6 +87,8 @@ static const char *ipaddr_fmt[] = {
 	"%-31s "
 };
 
+int numerichost = 0;
+
 int
 main(argc, argv)
      int argc;
@@ -109,10 +108,13 @@ main(argc, argv)
 	int gbu = 0;
 	int gbc = 0;
 
-	while ((ch = getopt(argc, argv, "mgli:H:hP:A:L:abc")) != -1) {
+	while ((ch = getopt(argc, argv, "mngli:H:hP:A:L:abc")) != -1) {
 		switch(ch) {
 		case 'm':
 			enablemn = 1;
+			break;
+		case 'n':
+			numerichost = 1;
 			break;
 		case 'g':
 			enableha = 1;
@@ -410,118 +412,41 @@ main(argc, argv)
 static int
 getaddress(char *address, struct in6_addr *in6addr)
 {
-        if (inet_pton(AF_INET6, address, in6addr) == NULL) {
-                struct hostent *hp;
-                if ((hp = gethostbyname2(address, AF_INET6)) == NULL)
-                        return -1;
-                else
-                        memcpy(in6addr, hp->h_addr_list[0], 
-                               sizeof(struct in6_addr));
-        }
+	struct addrinfo hints, *res;
+	int ai_errno;
+
+	bzero(&hints, sizeof(struct addrinfo));
+	hints.ai_family = AF_INET6;
+
+	ai_errno = getaddrinfo(address, NULL, &hints, &res);
+	if (ai_errno)
+		errx(1, "%s: %s", address, gai_strerror(ai_errno));
+	memcpy(in6addr, &((struct sockaddr_in6 *)res->ai_addr)->sin6_addr,
+	       sizeof(struct in6_addr));
+	freeaddrinfo(res);
+
         return 0;
 }
 
-#if 0
-static char *
-ip6addr_print(struct in6_addr *in6, int plen, char *ifname)
-{
-	static char line[NI_MAXHOST + 5];
-	struct sockaddr_in6 sa6;
-	int niflags = 0;
-
-	memset(&sa6, 0, sizeof(sa6));
-	sa6.sin6_family = AF_INET6;
-	sa6.sin6_len = sizeof(sa6);
-	sa6.sin6_addr = *in6;
-	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr) && ifname != NULL) {
-		/*
-		 * Deal with KAME's embedded link ID.
-		 * XXX: this function should take sockaddr_in6 with
-		 * an appropriate sin6_scope_id value.
-		 * XXX: this part assumes one-to-one mapping between
-		 * links and interfaces, but it is not always true.
-		 */
-		sa6.sin6_addr.s6_addr[2] = 0;
-		sa6.sin6_addr.s6_addr[3] = 0;
-		sa6.sin6_scope_id = if_nametoindex(ifname);
-	}
-
-	/*
-	if (!nflag)
-		niflags |= NI_NUMERICHOST;
-	*/
-	if (getnameinfo((struct sockaddr *)&sa6, sizeof(sa6), line, NI_MAXHOST,
-			NULL, 0, niflags) != 0)
-		strcpy(line, "???"); /* XXX */
-
-	if(plen >= 0) {
-		char plen_str[5];
-
-		sprintf(plen_str, "/%d", plen);
-		strcat(line, plen_str);
-	}
-    
-	return line;
-}
-#endif
-
-static char digits[] = "0123456789abcdef";
 static int ip6round = 0;
-char *
+const char *
 ip6_sprintf(addr)
 	const struct in6_addr *addr;
 {
-	static char ip6buf[8][48];
-	int i;
-	char *cp;
-	u_short *a = (u_short *)addr;
-	u_char *d;
-	int dcolon = 0;
-	u_char leadingzero = 0x0;
+	static char ip6buf[8][NI_MAXHOST];
+	static struct sockaddr_in6 sin6 = { sizeof(struct sockaddr_in6),
+					    AF_INET6 };
+	int flags = 0;
+
+	if (numerichost)
+		flags |= NI_NUMERICHOST;
+	sin6.sin6_addr = *addr;
 
 	ip6round = (ip6round + 1) & 7;
-	cp = ip6buf[ip6round];
 
-	for (i = 0; i < 8; i++) {
-		if (dcolon == 1) {
-			if (*a == 0) {
-				if (i == 7)
-					*cp++ = ':';
-				a++;
-				continue;
-			} else
-				dcolon = 2;
-		}
-		if (*a == 0) {
-			if (dcolon == 0 && *(a + 1) == 0) {
-				if (i == 0)
-					*cp++ = ':';
-				*cp++ = ':';
-				dcolon = 1;
-			} else {
-				*cp++ = '0';
-				*cp++ = ':';
-			}
-			a++;
-			continue;
-		}
-		d = (u_char *)a;
-		leadingzero = 0;
-		if ((*d >> 4) == 0)
-			leadingzero = 1;
-		else
-			*cp++ = digits[*d >> 4];
-		if ((*d & 0xf) == 0 && (leadingzero == 1))
-			leadingzero = 2;
-		else
-			*cp++ = digits[*d & 0xf];
-		d++;
-		if ((*d >> 4) != 0 || (leadingzero != 2))
-			*cp++ = digits[*d >> 4];
-		*cp++ = digits[*d & 0xf];
-		*cp++ = ':';
-		a++;
-	}
-	*--cp = 0;
-	return(ip6buf[ip6round]);
+	if (getnameinfo((struct sockaddr *)&sin6, sizeof(sin6),
+			ip6buf[ip6round], NI_MAXHOST, NULL, 0, flags) != 0)
+		return "?";
+
+	return ip6buf[ip6round];
 }
