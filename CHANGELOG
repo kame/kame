@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1950 2001/10/25 13:09:15 jinmei Exp $
+$KAME: CHANGELOG,v 1.1951 2001/10/26 09:29:48 keiichi Exp $
 
 <200110>
+Fri Oct 26 18:27:29 JST 2001 keiichi@iij.ad.jp
+	* mip6
+  	- changed the mip6 ioctl request structure. (this REQUIRES UPDATING
+  	  the mip6control command you are using.)
+  	- protected the mip6 ioctl path by splnet() during retreiving
+  	  binding cache entries.
+
 2001-10-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ndp/ndp.c (dump): skipped non-host routes when
 	printing neighbor cache entries, since they were just confusing.
