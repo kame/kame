@@ -1,5 +1,5 @@
 /*	$OpenBSD: getaddrinfo.c,v 1.23 2000/05/15 10:49:55 itojun Exp $	*/
-/*	$KAME: getaddrinfo.c,v 1.24 2000/07/05 02:31:37 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.25 2000/07/05 02:59:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -193,7 +193,7 @@ typedef union {
 struct res_target {
 	struct res_target *next;
 	const char *name;	/* domain name */
-	int class, type;	/* class and type of query */
+	int qclass, qtype;	/* class and type of query */
 	u_char *answer;		/* buffer to put answer */
 	int anslen;		/* size of answer buffer */
 	int n;			/* result length */
