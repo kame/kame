@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.81 2000/08/30 05:23:38 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.82 2000/08/31 07:18:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1407,6 +1407,8 @@ pr_pack(buf, cc, mhdr)
 
 				if ((end - (u_char *)ni) < ICMP6_NIRLEN) {
 					/* case of refusion, unkown */
+					/*(*/
+					putchar(')');
 					goto fqdnend;
 				}
 				ttl = (int32_t)ntohl(*(u_long *)&buf[off+ICMP6ECHOLEN+8]);
