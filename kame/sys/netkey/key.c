@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.135 2000/06/22 09:11:10 sakane Exp $	*/
+/*	$KAME: key.c,v 1.136 2000/06/24 00:31:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4965,7 +4965,7 @@ key_add(so, m, mhp)
 #endif
 		return key_senderror(so, m, EINVAL);
 	}
-	if (mhp->extlen[SADB_EXT_SA] == NULL < sizeof(struct sadb_sa) ||
+	if (mhp->extlen[SADB_EXT_SA] < sizeof(struct sadb_sa) ||
 	    mhp->extlen[SADB_EXT_ADDRESS_SRC] < sizeof(struct sadb_address) ||
 	    mhp->extlen[SADB_EXT_ADDRESS_DST] < sizeof(struct sadb_address)) {
 		/* XXX need more */
