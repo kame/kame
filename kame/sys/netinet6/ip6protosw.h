@@ -94,7 +94,7 @@ struct ip6ctlparam {
 };
 
 struct ip6protosw {
-#if defined(__FreeBSD__) && __FreeBSD__ < 3
+#if (defined(__FreeBSD__) && __FreeBSD__ < 3) || defined(__OpenBSD__)
 	short 	pr_type;		/* socket type used for */
 #else
 	int 	pr_type;		/* socket type used for */
