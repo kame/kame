@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.307 2002/06/07 14:14:42 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.308 2002/06/07 14:28:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -187,28 +187,28 @@ static int ip6_pcbopt __P((int, u_char *, int, struct ip6_pktopts **,
 			   int, int));
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 static int ip6_pcbopts __P((struct ip6_pktopts **, struct mbuf *,
-			    struct socket *, struct sockopt *));
+	struct socket *, struct sockopt *));
 static int ip6_getpcbopt __P((struct ip6_pktopts *, int, struct sockopt *));
 #else
 static int ip6_pcbopts __P((struct ip6_pktopts **, struct mbuf *,
-			    struct socket *));
+	struct socket *));
 static int ip6_getpcbopt __P((struct ip6_pktopts *, int, struct mbuf **));
 #endif
 static int ip6_setpktoption __P((int, u_char *, int, struct ip6_pktopts *, int,
-				 int, int, int));
+	int, int, int));
 static int ip6_setmoptions __P((int, struct ip6_moptions **, struct mbuf *));
 static int ip6_getmoptions __P((int, struct ip6_moptions *, struct mbuf **));
 static int ip6_copyexthdr __P((struct mbuf **, caddr_t, int));
 static int ip6_insertfraghdr __P((struct mbuf *, struct mbuf *, int,
-				  struct ip6_frag **));
+	struct ip6_frag **));
 static int ip6_insert_jumboopt __P((struct ip6_exthdrs *, u_int32_t));
 static int ip6_splithdr __P((struct mbuf *, struct ip6_exthdrs *));
 #ifdef NEW_STRUCT_ROUTE
 static int ip6_getpmtu __P((struct route *, struct route *, struct ifnet *,
-			    struct sockaddr_in6 *, u_long *, int *));
+	struct sockaddr_in6 *, u_long *, int *));
 #else
 static int ip6_getpmtu __P((struct route *, struct route *, struct ifnet *,
-			    struct sockaddr_in6 *, u_long *, int *));
+	struct sockaddr_in6 *, u_long *, int *));
 #endif
 
 #ifdef __bsdi__
@@ -325,8 +325,8 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
     do {								\
 	if (hp) {							\
 		struct ip6_ext *eh = (struct ip6_ext *)(hp);		\
-		error = ip6_copyexthdr((mp), (caddr_t)(hp), 		\
-				       ((eh)->ip6e_len + 1) << 3);	\
+		error = ip6_copyexthdr((mp), (caddr_t)(hp),		\
+		    ((eh)->ip6e_len + 1) << 3);				\
 		if (error)						\
 			goto freehdrs;					\
 	}								\
