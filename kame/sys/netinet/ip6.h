@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.38 2002/11/05 03:48:31 itojun Exp $	*/
+/*	$KAME: ip6.h,v 1.39 2002/11/11 10:20:32 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -294,9 +294,10 @@ struct ip6_mobility {
 struct ip6m_binding_request {
 	u_int8_t ip6mr_pproto;
 	u_int8_t ip6mr_len;
-	u_int16_t ip6mr_type;
+	u_int8_t ip6mr_type;
+	u_int8_t ip6mr_reserved0;
 	u_int16_t ip6mr_cksum;
-	u_int16_t ip6mr_reserved;
+	u_int16_t ip6mr_reserved1;
 	/* followed by mobility options */
 } __attribute__((__packed__));
 
@@ -304,9 +305,10 @@ struct ip6m_binding_request {
 struct ip6m_home_test_init {
 	u_int8_t ip6mhi_pproto;
 	u_int8_t ip6mhi_len;
-	u_int16_t ip6mhi_type;
+	u_int8_t ip6mhi_type;
+	u_int8_t ip6mhi_reserved0;
 	u_int16_t ip6mhi_cksum;
-	u_int16_t ip6mhi_reserved;
+	u_int16_t ip6mhi_reserved1;
 	u_int8_t ip6mhi_hot_cookie[8];
 	/* followed by mobility options */
 } __attribute__((__packed__));
@@ -315,9 +317,10 @@ struct ip6m_home_test_init {
 struct ip6m_careof_test_init {
 	u_int8_t ip6mci_pproto;
 	u_int8_t ip6mci_len;
-	u_int16_t ip6mci_type;
+	u_int8_t ip6mci_type;
+	u_int8_t ip6mci_reserved0;
 	u_int16_t ip6mci_cksum;
-	u_int16_t ip6mci_reserved;
+	u_int16_t ip6mci_reserved1;
 	u_int8_t ip6mci_cot_cookie[8];
 	/* followed by mobility options */
 } __attribute__((__packed__));
@@ -326,7 +329,8 @@ struct ip6m_careof_test_init {
 struct ip6m_home_test {
 	u_int8_t ip6mh_pproto;
 	u_int8_t ip6mh_len;
-	u_int16_t ip6mh_type;
+	u_int8_t ip6mh_type;
+	u_int8_t ip6mh_reserved;
 	u_int16_t ip6mh_cksum;
 	u_int16_t ip6mh_nonce_index;	/* idx of the CN nonce list array */
 	u_int8_t ip6mh_hot_cookie[8];
@@ -338,7 +342,8 @@ struct ip6m_home_test {
 struct ip6m_careof_test {
 	u_int8_t ip6mc_pproto;
 	u_int8_t ip6mc_len;
-	u_int16_t ip6mc_type;
+	u_int8_t ip6mc_type;
+	u_int8_t ip6mc_reserved;
 	u_int16_t ip6mc_cksum;
 	u_int16_t ip6mc_nonce_index;	/* idx of the CN nonce list array */
 	u_int8_t ip6mc_cot_cookie[8];
@@ -350,11 +355,12 @@ struct ip6m_careof_test {
 struct ip6m_binding_update {
 	u_int8_t ip6mu_pproto;
 	u_int8_t ip6mu_len;
-	u_int16_t ip6mu_type;
+	u_int8_t ip6mu_type;
+	u_int8_t ip6mu_reserved0;
 	u_int16_t ip6mu_cksum;
 	u_int16_t ip6mu_seqno;
 	u_int8_t ip6mu_flags;
-	u_int8_t ip6mu_reserved;
+	u_int8_t ip6mu_reserved1;
 	u_int16_t ip6mu_lifetime;	/* a unit of 4 seconds */
 	/* followed by mobility options */
 } __attribute__((__packed__));
@@ -371,10 +377,11 @@ struct ip6m_binding_update {
 struct ip6m_binding_ack {
 	u_int8_t ip6ma_pproto;
 	u_int8_t ip6ma_len;
-	u_int16_t ip6ma_type;
+	u_int8_t ip6ma_type;
+	u_int8_t ip6ma_reserved0;
 	u_int16_t ip6ma_cksum;
 	u_int8_t ip6ma_status;
-	u_int8_t ip6ma_reserved;
+	u_int8_t ip6ma_reserved1;
 	u_int16_t ip6ma_seqno;
 	u_int16_t ip6ma_lifetime;	/* a unit of 4 seconds */
 	/* followed by mobility options */
@@ -384,10 +391,11 @@ struct ip6m_binding_ack {
 struct ip6m_binding_error {
 	u_int8_t ip6me_pproto;
 	u_int8_t ip6me_len;
-	u_int16_t ip6me_type;
+	u_int8_t ip6me_type;
+	u_int8_t ip6me_reserved0;
 	u_int16_t ip6me_cksum;
 	u_int8_t ip6me_status;
-	u_int8_t ip6me_reserved;
+	u_int8_t ip6me_reserved1;
 	struct in6_addr ip6me_addr;
 	/* followed by mobility options */
 } __attribute__((__packed__));
@@ -406,13 +414,11 @@ struct ip6m_opt {
 /* Mobility option type */
 #define IP6MOPT_PAD1		0	/* Pad1 */
 #define IP6MOPT_PADN		1	/* PadN */
-#define IP6MOPT_UID		2	/* Unique Identifier */
+			/*	2	   (reserved) */
 #define IP6MOPT_ALTCOA		3	/* Alternate Care-of Address */
 #define IP6MOPT_NONCE		4	/* Nonce Indices */
 #define IP6MOPT_AUTHDATA	5	/* Binding Authorization Data */
-/* XXX MIPv6 Issue 97 */
-/* #define IP6MOPT_REFRESH	6 */
-#define IP6MOPT_REFRESH		7	/* Binding Refresh Advice */
+#define IP6MOPT_REFRESH		6	/* Binding Refresh Advice */
 
 /* Unique Identifier */
 struct ip6m_opt_uid {

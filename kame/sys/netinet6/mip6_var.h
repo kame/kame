@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.70 2002/11/05 03:48:33 itojun Exp $	*/
+/*	$KAME: mip6_var.h,v 1.71 2002/11/11 10:20:32 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -305,7 +305,7 @@ struct mip6_mobility_options {
 	u_int16_t	mopt_refresh;		/*  Refresh Interval */
 };
 
-#define MOPT_UID	0x0001
+#define MOPT_UID	0x0001	/* unused */
 #define MOPT_ALTCOA	0x0002
 #define MOPT_NONCE_IDX	0x0004
 #define MOPT_AUTHDATA	0x0008

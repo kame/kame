@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.179 2002/11/05 03:48:33 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.180 2002/11/11 10:20:32 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2759,11 +2759,6 @@ mip6_get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
 				mh++;
 				continue;
 			case IP6MOPT_PADN:
-				break;
-			case IP6MOPT_UID:
-				check_mopt_len(2);
-				valid_option = MOPT_UID;
-				GET_NETVAL_S(mh + 2, mopt->mopt_uid);
 				break;
 			case IP6MOPT_ALTCOA:
 				check_mopt_len(16);
