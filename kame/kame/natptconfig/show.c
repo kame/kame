@@ -26,8 +26,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: show.c,v 1.10 2000/04/19 08:09:01 fujisawa Exp $
+ *	$Id: show.c,v 1.11 2000/05/05 16:49:00 itojun Exp $
  */
+
+#include <sys/types.h>
+#include <sys/fcntl.h>
+#include <sys/ioctl.h>
+#include <sys/param.h>
+#include <sys/socket.h>
+#include <sys/sysctl.h>
+#include <sys/syslog.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,13 +45,6 @@
 #include <errno.h>
 #include <netdb.h>
 #include <paths.h>
-
-#include <sys/fcntl.h>
-#include <sys/ioctl.h>
-#include <sys/param.h>
-#include <sys/socket.h>
-#include <sys/sysctl.h>
-#include <sys/syslog.h>
 
 #include <net/if.h>
 #include <netinet/in.h>

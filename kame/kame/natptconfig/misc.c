@@ -26,8 +26,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: misc.c,v 1.8 2000/04/19 08:09:01 fujisawa Exp $
+ *	$Id: misc.c,v 1.9 2000/05/05 16:48:59 itojun Exp $
  */
+
+#include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/syslog.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,10 +42,6 @@
 #include <err.h>
 #include <errno.h>
 #include <netdb.h>
-
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <sys/syslog.h>
 
 #include <net/if.h>
 #include <netinet/in.h>
