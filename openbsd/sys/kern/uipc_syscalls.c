@@ -218,7 +218,7 @@ sys_accept(p, v, retval)
 	}
 	/* if an error occured, free the file descriptor */
 	if (error) {
-		fdremove(fdp, fd);
+		fdremove(p->p_fd, tmpfd);
 		ffree(fp);
 	}
 	m_freem(nam);
