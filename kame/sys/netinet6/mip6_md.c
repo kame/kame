@@ -1,4 +1,4 @@
-/*	$KAME: mip6_md.c,v 1.17 2000/05/05 13:27:15 sumikawa Exp $	*/
+/*	$KAME: mip6_md.c,v 1.18 2000/05/05 14:45:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -44,6 +44,7 @@
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
+#include "opt_ipsec.h"
 #endif
 
 /*
