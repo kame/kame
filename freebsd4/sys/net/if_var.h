@@ -503,7 +503,6 @@ extern int if_indexlim;
 extern struct	ifnet	**ifindex2ifnet;
 extern	int ifqmaxlen;
 extern	struct ifnet loif[];
-extern	int if_index;
 extern	struct ifaddr **ifnet_addrs;
 
 void	ether_ifattach(struct ifnet *, int);
