@@ -1,4 +1,5 @@
 SUBDIR+=netstat
-SUBDIR+=altqstat mcastsend mcastread mchat v6test
+SUBDIR+=mcastsend mcastread mchat v6test
+#SUBDIR+=altqstat
 
 .include <bsd.subdir.mk>

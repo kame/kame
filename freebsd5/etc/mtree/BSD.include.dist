@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.include.dist,v 1.77 2003/11/29 18:22:01 ru Exp $
+# $FreeBSD: src/etc/mtree/BSD.include.dist,v 1.88.2.2 2004/09/30 23:36:07 dougb Exp $
 #
 # Please see the file src/etc/mtree/README before making changes to this file.
 #
@@ -12,10 +12,12 @@
     bsnmp
     ..
     c++
-        3.3
+        3.4
             backward
             ..
             bits
+            ..
+            debug
             ..
             ext
             ..
@@ -29,6 +31,8 @@
     ..
     dev
         an
+        ..
+        bktr
         ..
         firewire
         ..
@@ -78,8 +82,24 @@
         ..
     ..
     geom
+        concat
+        ..
+        gate
+        ..
+        label
+        ..
+        mirror
+        ..
+        nop
+        ..
+        raid3
+        ..
+        stripe
+        ..
     ..
-    isc
+    gnu
+        posix
+        ..
     ..
     isofs
         cd9660
@@ -88,6 +108,8 @@
     kadm5
     ..
     libmilter
+    ..
+    lwres
     ..
     machine
         pc
@@ -128,6 +150,8 @@
     netkey
     ..
     netnatm
+        api
+        ..
         msg
         ..
         saal

@@ -31,13 +31,14 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
 #if 0
+#ifndef lint
 static char sccsid[] = "From: @(#)route.c	8.6 (Berkeley) 4/28/95";
-#endif
-static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/route.c,v 1.72 2003/11/28 17:34:23 bms Exp $";
 #endif /* not lint */
+#endif
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/usr.bin/netstat/route.c,v 1.75 2004/07/28 18:18:47 glebius Exp $");
 
 #include <sys/param.h>
 #include <sys/protosw.h>
@@ -71,12 +72,6 @@ static const char rcsid[] =
 #include "netstat.h"
 
 #define kget(p, d) (kread((u_long)(p), (char *)&(d), sizeof (d)))
-
-
-/* alignment constraint for routing socket */
-#define ROUNDUP(a) \
-       ((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
-#define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
 
 /*
  * Definitions for showing gateway flags.
@@ -492,7 +487,7 @@ ntreestuff(void)
 	}
 
 	if ((buf = malloc(needed)) == 0) {
-		err(2, "malloc(%lu)", (unsigned long)needed);
+		errx(2, "malloc(%lu)", (unsigned long)needed);
 	}
 	if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0) {
 		err(1, "sysctl: net.route.0.0.dump");
@@ -536,7 +531,7 @@ np_rtentry(struct rt_msghdr *rtm)
 		p_sockaddr(sa, NULL, 0, 36);
 	else {
 		p_sockaddr(sa, NULL, rtm->rtm_flags, 16);
-		sa = (struct sockaddr *)(ROUNDUP(sa->sa_len) + (char *)sa);
+		sa = (struct sockaddr *)(SA_SIZE(sa) + (char *)sa);
 		p_sockaddr(sa, NULL, 0, 18);
 	}
 	p_flags(rtm->rtm_flags & interesting, "%-6.6s ");
@@ -569,21 +564,21 @@ fmt_sockaddr(struct sockaddr *sa, struct sockaddr *mask, int flags)
 	switch(sa->sa_family) {
 	case AF_INET:
 	    {
-		struct sockaddr_in *sin = (struct sockaddr_in *)sa;
+		struct sockaddr_in *sockin = (struct sockaddr_in *)sa;
 
-		if ((sin->sin_addr.s_addr == INADDR_ANY) &&
+		if ((sockin->sin_addr.s_addr == INADDR_ANY) &&
 			mask &&
 			ntohl(((struct sockaddr_in *)mask)->sin_addr.s_addr)
 				==0L)
 				cp = "default" ;
 		else if (flags & RTF_HOST)
-			cp = routename(sin->sin_addr.s_addr);
+			cp = routename(sockin->sin_addr.s_addr);
 		else if (mask)
-			cp = netname(sin->sin_addr.s_addr,
+			cp = netname(sockin->sin_addr.s_addr,
 				     ntohl(((struct sockaddr_in *)mask)
 					   ->sin_addr.s_addr));
 		else
-			cp = netname(sin->sin_addr.s_addr, 0L);
+			cp = netname(sockin->sin_addr.s_addr, 0L);
 		break;
 	    }
 
@@ -652,6 +647,7 @@ fmt_sockaddr(struct sockaddr *sa, struct sockaddr *mask, int flags)
 			switch (sdl->sdl_type) {
 
 			case IFT_ETHER:
+			case IFT_L2VLAN:
 				if (sdl->sdl_alen == ETHER_ADDR_LEN) {
 					cp = ether_ntoa((struct ether_addr *)
 					    (sdl->sdl_data + sdl->sdl_nlen));

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -42,7 +38,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.92 2003/10/26 04:36:47 peter Exp $";
+  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.106.2.1 2004/09/07 23:21:10 brooks Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -98,6 +94,11 @@ static const char rcsid[] =
 #define	NI_WITHSCOPEID	0
 #endif
 
+/*
+ * Since "struct ifreq" is composed of various union members, callers
+ * should pay special attention to interprete the value.
+ * (.e.g. little/big endian difference in the structure.)
+ */
 struct	ifreq		ifr, ridreq;
 struct	ifaliasreq	addreq;
 #ifdef INET6
@@ -113,7 +114,7 @@ struct	in6_aliasreq	in6_addreq =
 struct	sockaddr_in	netmask;
 struct	netrange	at_nr;		/* AppleTalk net range */
 
-char	name[32];
+char	name[IFNAMSIZ];
 int	flags;
 int	setaddr;
 int	setipdst;
@@ -129,6 +130,7 @@ struct	afswtch;
 
 int supmedia = 0;
 int listcloners = 0;
+int printname = 0;		/* Print the name of the created interface. */
 
 #ifdef INET6
 char	addr_buf[MAXHOSTNAMELEN *2 + 1];	/*for getnameinfo()*/
@@ -173,6 +175,7 @@ c_func	setip6eui64;
 c_func	setifipdst;
 c_func	setifflags, setifmetric, setifmtu, setifcap;
 c_func	clone_destroy;
+c_func	setifname;
 
 
 void clone_create(void);
@@ -273,6 +276,9 @@ struct	cmd {
 	{ "wepkey",	NEXTARG,	set80211wepkey },
 	{ "nwkey",	NEXTARG,	set80211nwkey },	/* NetBSD */
 	{ "-nwkey",	0,		set80211wep },		/* NetBSD */
+	{ "rtsthreshold",NEXTARG,	set80211rtsthreshold },
+	{ "protmode",	NEXTARG,	set80211protmode },
+	{ "txpower",	NEXTARG,	set80211txpower },
 #endif
 #ifdef USE_MAC
 	{ "maclabel",	NEXTARG,	setifmaclabel },
@@ -283,10 +289,17 @@ struct	cmd {
 	{ "-txcsum",	-IFCAP_TXCSUM,	setifcap },
 	{ "netcons",	IFCAP_NETCONS,	setifcap },
 	{ "-netcons",	-IFCAP_NETCONS,	setifcap },
+	{ "polling",	IFCAP_POLLING,	setifcap },
+	{ "-polling",	-IFCAP_POLLING,	setifcap },
+	{ "vlanmtu",	IFCAP_VLAN_MTU,		setifcap },
+	{ "-vlanmtu",	-IFCAP_VLAN_MTU,	setifcap },
+	{ "vlanhwtag",	IFCAP_VLAN_HWTAGGING,	setifcap },
+	{ "-vlanhwtag",	-IFCAP_VLAN_HWTAGGING,	setifcap },
 	{ "normal",	-IFF_LINK0,	setifflags },
 	{ "compress",	IFF_LINK0,	setifflags },
 	{ "noicmp",	IFF_LINK1,	setifflags },
 	{ "mtu",	NEXTARG,	setifmtu },
+	{ "name",	NEXTARG,	setifname },
 	{ 0,		0,		setifaddr },
 	{ 0,		0,		setifdstaddr },
 };
@@ -368,10 +381,6 @@ struct	afswtch {
  * configuration read via sysctl().
  */
 
-#define ROUNDUP(a) \
-	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
-#define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
-
 void
 rt_xaddrs(caddr_t cp, caddr_t cplim, struct rt_addrinfo *rtinfo)
 {
@@ -383,7 +392,7 @@ rt_xaddrs(caddr_t cp, caddr_t cplim, struct rt_addrinfo *rtinfo)
 		if ((rtinfo->rti_addrs & (1 << i)) == 0)
 			continue;
 		rtinfo->rti_info[i] = sa = (struct sockaddr *)cp;
-		ADVANCE(cp, sa);
+		cp += SA_SIZE(sa);
 	}
 }
 
@@ -418,7 +427,7 @@ main(int argc, char *argv[])
 {
 	int c;
 	int all, namesonly, downonly, uponly;
-	int need_nl = 0;
+	int need_nl = 0, count = 0;
 	const struct afswtch *afp = 0;
 	int addrcount, ifindex;
 	struct	if_msghdr *ifm, *nextifm;
@@ -526,7 +535,7 @@ main(int argc, char *argv[])
 			clone_create();
 			argc--, argv++;
 			if (argc == 0)
-				exit(0);
+				goto end;
 		}
 		ifindex = if_nametoindex(name);
 		if (ifindex == 0)
@@ -544,6 +553,7 @@ main(int argc, char *argv[])
 			afp = NULL;	/* not a family, NULL */
 	}
 
+retry:
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
 	mib[2] = 0;
@@ -559,8 +569,15 @@ main(int argc, char *argv[])
 		errx(1, "iflist-sysctl-estimate");
 	if ((buf = malloc(needed)) == NULL)
 		errx(1, "malloc");
-	if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0)
+	if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0) {
+		if (errno == ENOMEM && count++ < 10) {
+			warnx("Routing table grew, retrying");
+			free(buf);
+			sleep(1);
+			goto retry;
+		}
 		errx(1, "actual retrieval of interface table");
+	}
 	lim = buf + needed;
 
 	next = buf;
@@ -569,7 +586,10 @@ main(int argc, char *argv[])
 		ifm = (struct if_msghdr *)next;
 		
 		if (ifm->ifm_type == RTM_IFINFO) {
-			sdl = (struct sockaddr_dl *)(ifm + 1);
+			if (ifm->ifm_data.ifi_datalen == 0)
+				ifm->ifm_data.ifi_datalen = sizeof(struct if_data);
+			sdl = (struct sockaddr_dl *)((char *)ifm + sizeof(struct if_msghdr) -
+			     sizeof(struct if_data) + ifm->ifm_data.ifi_datalen);
 			flags = ifm->ifm_flags;
 		} else {
 			fprintf(stderr, "out of sync parsing NET_RT_IFLIST\n");
@@ -597,8 +617,11 @@ main(int argc, char *argv[])
 			addrcount++;
 			next += nextifm->ifm_msglen;
 		}
-		strncpy(name, sdl->sdl_data, sdl->sdl_nlen);
-		name[sdl->sdl_nlen] = '\0';
+		memcpy(name, sdl->sdl_data,
+		    sizeof(name) < sdl->sdl_nlen ?
+		    sizeof(name)-1 : sdl->sdl_nlen);
+		name[sizeof(name) < sdl->sdl_nlen ?
+		    sizeof(name)-1 : sdl->sdl_nlen] = '\0';
 
 		if (all || namesonly) {
 			if (uponly)
@@ -629,6 +652,9 @@ main(int argc, char *argv[])
 
 	if (namesonly && need_nl > 0)
 		putchar('\n');
+end:
+	if (printname)
+		printf("%s\n", name);
 
 	exit (0);
 }
@@ -636,14 +662,15 @@ main(int argc, char *argv[])
 int
 ifconfig(int argc, char *const *argv, const struct afswtch *afp)
 {
-	int s;
+	int af, s;
 
 	if (afp == NULL)
 		afp = &afs[0];
-	ifr.ifr_addr.sa_family = afp->af_af == AF_LINK ? AF_INET : afp->af_af;
+	af = afp->af_af == AF_LINK ? AF_INET : afp->af_af;
+	ifr.ifr_addr.sa_family = af;
 	strncpy(ifr.ifr_name, name, sizeof ifr.ifr_name);
 
-	if ((s = socket(ifr.ifr_addr.sa_family, SOCK_DGRAM, 0)) < 0)
+	if ((s = socket(af, SOCK_DGRAM, 0)) < 0)
 		err(1, "socket");
 
 	while (argc > 0) {
@@ -673,7 +700,7 @@ ifconfig(int argc, char *const *argv, const struct afswtch *afp)
 		argc--, argv++;
 	}
 #ifdef INET6
-	if (ifr.ifr_addr.sa_family == AF_INET6 && explicit_prefix == 0) {
+	if (af == AF_INET6 && explicit_prefix == 0) {
 		/* Aggregatable address architecture defines all prefixes
 		   are 64. So, it is convenient to set prefixlen to 64 if
 		   it is not specified. */
@@ -682,7 +709,7 @@ ifconfig(int argc, char *const *argv, const struct afswtch *afp)
 	}
 #endif
 #ifndef NO_IPX
-	if (setipdst && ifr.ifr_addr.sa_family == AF_IPX) {
+	if (setipdst && af == AF_IPX) {
 		struct ipxip_req rq;
 		int size = sizeof(rq);
 
@@ -693,13 +720,13 @@ ifconfig(int argc, char *const *argv, const struct afswtch *afp)
 			Perror("Encapsulation Routing");
 	}
 #endif
-	if (ifr.ifr_addr.sa_family == AF_APPLETALK)
+	if (af == AF_APPLETALK)
 		checkatrange((struct sockaddr_at *) &addreq.ifra_addr);
 	if (clearaddr) {
 		if (afp->af_ridreq == NULL || afp->af_difaddr == 0) {
 			warnx("interface %s cannot change %s addresses!",
 			      name, afp->af_name);
-			clearaddr = NULL;
+			clearaddr = 0;
 		}
 	}
 	if (clearaddr) {
@@ -1048,13 +1075,37 @@ setifmtu(const char *val, int dummy __unused, int s,
 		warn("ioctl (set mtu)");
 }
 
+void
+setifname(const char *val, int dummy __unused, int s, 
+    const struct afswtch *afp)
+{
+	char	*newname;
+
+	newname = strdup(val);
+
+	ifr.ifr_data = newname;
+	if (ioctl(s, SIOCSIFNAME, (caddr_t)&ifr) < 0) {
+		warn("ioctl (set name)");
+		free(newname);
+		return;
+	}
+	strlcpy(name, newname, sizeof(name));
+	free(newname);
+
+	/*
+	 * Even if we just created the interface, we don't need to print
+	 * its name because we just nailed it down separately.
+	 */
+	printname = 0;
+}
+
 #define	IFFBITS \
 "\020\1UP\2BROADCAST\3DEBUG\4LOOPBACK\5POINTOPOINT\6SMART\7RUNNING" \
 "\10NOARP\11PROMISC\12ALLMULTI\13OACTIVE\14SIMPLEX\15LINK0\16LINK1\17LINK2" \
-"\20MULTICAST\023MONITOR\024STATICARP"
+"\20MULTICAST\21POLLING\23MONITOR\24STATICARP"
 
 #define	IFCAPBITS \
-"\003\1RXCSUM\2TXCSUM\3NETCONS\4VLAN_MTU\5VLAN_HWTAGGING\6JUMBO_MTU"
+"\020\1RXCSUM\2TXCSUM\3NETCONS\4VLAN_MTU\5VLAN_HWTAGGING\6JUMBO_MTU\7POLLING"
 
 /*
  * Print the status of the interface.  If an address family was
@@ -1905,8 +1956,13 @@ clone_create(void)
 	if (ioctl(s, SIOCIFCREATE, &ifr) < 0)
 		err(1, "SIOCIFCREATE");
 
+	/*
+	 * If we get a different name back then we put in, we probably
+	 * want to print it out, but we might change our mind later so
+	 * we just signal our intrest and leave the printout for later.
+	 */
 	if (strcmp(name, ifr.ifr_name) != 0) {
-		printf("%s\n", ifr.ifr_name);
+		printname = 1;
 		strlcpy(name, ifr.ifr_name, sizeof(name));
 	}
 
@@ -1920,4 +1976,9 @@ clone_destroy(const char *val, int d, int s, const struct afswtch *rafp)
 	(void) strncpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
 	if (ioctl(s, SIOCIFDESTROY, &ifr) < 0)
 		err(1, "SIOCIFDESTROY");
+	/*
+	 * If we create and destroy an interface in the same command,
+	 * there isn't any reason to print it's name.
+	 */
+	printname = 0;
 }

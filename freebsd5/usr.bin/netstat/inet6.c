@@ -30,15 +30,16 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/usr.bin/netstat/inet6.c,v 1.21 2003/01/14 16:02:56 mtm Exp $
  */
 
+#if 0
 #ifndef lint
-/*
 static char sccsid[] = "@(#)inet6.c	8.4 (Berkeley) 4/20/94";
-*/
 #endif /* not lint */
+#endif
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/usr.bin/netstat/inet6.c,v 1.25 2004/07/28 16:03:12 stefanf Exp $");
 
 #ifdef INET6
 #include <sys/param.h>
@@ -72,7 +73,8 @@ static char sccsid[] = "@(#)inet6.c	8.4 (Berkeley) 4/20/94";
 
 struct	socket sockb;
 
-char	*inet6name (struct in6_addr *);
+char	*inet6name(struct in6_addr *);
+const char *pluralies(int);
 
 static char ntop_buf[INET6_ADDRSTRLEN];
 
@@ -139,7 +141,7 @@ static	const char *ip6nh[] = {
 	"no next header",	
 	"destination option",
 	"#61",
-	"#62",
+	"mobility",
 	"#63",
 	"#64",
 	"#65",
@@ -907,12 +909,12 @@ icmp6_stats(u_long off __unused, const char *name, int af1 __unused)
 
 	p(icp6s_reflect, "\t%llu message response%s generated\n");
 	p(icp6s_nd_toomanyopt, "\t%llu message%s with too many ND options\n");
-	p(icp6s_nd_badopt, "\t%qu message%s with bad ND options\n");
-	p(icp6s_badns, "\t%qu bad neighbor solicitation message%s\n");
-	p(icp6s_badna, "\t%qu bad neighbor advertisement message%s\n");
-	p(icp6s_badrs, "\t%qu bad router solicitation message%s\n");
-	p(icp6s_badra, "\t%qu bad router advertisement message%s\n");
-	p(icp6s_badredirect, "\t%qu bad redirect message%s\n");
+	p(icp6s_nd_badopt, "\t%llu message%s with bad ND options\n");
+	p(icp6s_badns, "\t%llu bad neighbor solicitation message%s\n");
+	p(icp6s_badna, "\t%llu bad neighbor advertisement message%s\n");
+	p(icp6s_badrs, "\t%llu bad router solicitation message%s\n");
+	p(icp6s_badra, "\t%llu bad router advertisement message%s\n");
+	p(icp6s_badredirect, "\t%llu bad redirect message%s\n");
 	p(icp6s_pmtuchg, "\t%llu path MTU change%s\n");
 #undef p
 #undef p_5
