@@ -1,0 +1,11 @@
+--- Makefile-	Tue Feb 26 15:23:15 2002
++++ Makefile	Tue Feb 26 15:23:40 2002
+@@ -2,7 +2,7 @@
+ SUBDIR += libhack
+ .endif
+ SUBDIR+=ppp pppctl
+-PPP_EXAMPLES?=/usr/share/examples/ppp
++PPP_EXAMPLES?=/usr/local/share/examples/ppp
+ 
+ .include <bsd.subdir.mk>
+ 
