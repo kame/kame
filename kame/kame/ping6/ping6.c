@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.109 2000/12/27 11:32:37 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.110 2001/01/05 01:23:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1932,7 +1932,7 @@ get_pathmtu(mhdr)
 			 * If the notified destination is different from
 			 * the one we are pinging, just ignore the info.
 			 * We check the scope ID only when both notified value
-			 * and our own value has non-0 value, because we may
+			 * and our own value have non-0 values, because we may
 			 * have used the default scope zone ID for sending,
 			 * in which case the scope ID value is 0.
 			 */
