@@ -1,4 +1,4 @@
-/*	$KAME: ip6_id.c,v 1.14 2003/11/25 18:37:16 itojun Exp $	*/
+/*	$KAME: ip6_id.c,v 1.15 2003/12/10 05:25:18 itojun Exp $	*/
 /*	$OpenBSD: ip_id.c,v 1.6 2002/03/15 18:19:52 millert Exp $	*/
 
 /*
@@ -123,7 +123,7 @@ struct randomtab {
 	u_int32_t ru_msb;
 
 	u_int32_t ru_x;
-	u_int32_t ru_seed;
+	u_int32_t ru_seed, ru_seed2;
 	u_int32_t ru_a, ru_b;
 	u_int32_t ru_g;
 	long ru_reseed;
@@ -196,6 +196,7 @@ initid(struct randomtab *p)
 
 	/* (bits - 1) bits of random seed */
 	p->ru_seed = arc4random() & (~0U >> (32 - p->ru_bits + 1));
+	p->ru_seed2 = arc4random() & (~0U >> (32 - p->ru_bits + 1));
 
 	/* Determine the LCG we use */
 	p->ru_b = (arc4random() & (~0U >> (32 - p->ru_bits))) | 1;
@@ -237,7 +238,6 @@ static u_int32_t
 randomid(struct randomtab *p)
 {
 	int i, n;
-	u_int32_t tmp;
 
 #ifdef __FreeBSD__
 	if (p->ru_counter >= p->ru_max || time_second > p->ru_reseed)
@@ -246,21 +246,19 @@ randomid(struct randomtab *p)
 #endif
 		initid(p);
 
-	tmp = arc4random();
-
 	/* Skip a random number of ids */
-	n = tmp & 0x3; tmp = tmp >> 2;
+	n = arc4random() & 0x3;
 	if (p->ru_counter + n >= p->ru_max)
 		initid(p);
 
 	for (i = 0; i <= n; i++) {
 		/* Linear Congruential Generator */
-		p->ru_x = (u_int32_t)((u_int64_t)p->ru_a * p->ru_x + p->ru_b) % p->ru_m;
+		p->ru_x = ((u_int64_t)p->ru_a * p->ru_x + p->ru_b) % p->ru_m;
 	}
 
 	p->ru_counter += i;
 
-	return (p->ru_seed ^ pmod(p->ru_g, p->ru_x, p->ru_n)) |
+	return (p->ru_seed ^ pmod(p->ru_g, p->ru_seed2 + p->ru_x, p->ru_n)) |
 	    p->ru_msb;
 }
 
