@@ -1,15 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.402 2000/01/04 17:56:27 itojun Exp $
+$Id: CHANGELOG,v 1.403 2000/01/04 23:53:38 itojun Exp $
 
 <200001>
 Wed Jan  5 02:49:05 JST 2000  itojun@iijlab.net
 	* netbsd: add net.inet6.ip6.bindv6only sysctl.  this is a replacement
 	  of net.inet6.ip6.mapped_addr, which was bitwise opposite to
-	  IPV6_BINDV6ONLY.  by setting net.inet6.ip6.bindv6only to 1, AF_INET6
-	  socket will grab IPv6 traffic only.  by setting it to 0, AF_INET6
-	  socket will grab IPv4 traffic as well (as described in rfc1933).
-	  default value is 1 (i.e. AF_INET6 grabs IPv6 traffic only).
+	  IPV6_BINDV6ONLY.
+	  if set to 1: AF_INET6 listening socket will grab IPv6 traffic only.
+	  if set to 0: AF_INET6 listening socket will grab IPv4 traffic as well,
+		  as if it was from v4 mapped address (described in rfc1933).
+	  default value is 1 (i.e. AF_INET6 socket grabs IPv6 traffic only).
+	  the variable controls inbound direction only; you can always use
+	  v4 mapped address for outgoing connections.
 
 	  "options INET6_BINDV6ONLY" will remove the code completely and
 	  hardcodes behavior to net.inet6.ip6.bindv6only=1 case.
