@@ -764,7 +764,6 @@
 #define	USB_PRODUCT_HP_5400C	0x1105		/* Scanjet 5400C */
 #define	USB_PRODUCT_HP_4400C	0x0705		/* Scanjet 4400C */
 #define	USB_PRODUCT_HP_970CSE	0x1004		/* Deskjet 970Cse */
-#define	USB_PRODUCT_HP_5400C	0x1005		/* Scanjet 5400C */
 #define	USB_PRODUCT_HP_930C	0x1204		/* DeskJet 930c */
 #define	USB_PRODUCT_HP_P2000U	0x1801		/* Inkjet P-2000U */
 #define	USB_PRODUCT_HP_640C	0x2004		/* DeskJet 640c */
