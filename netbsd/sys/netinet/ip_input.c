@@ -481,8 +481,21 @@ ip_input(struct mbuf *m)
 	 * Note that filters must _never_ set this flag, as another filter
 	 * in the list may have previously cleared it.
 	 */
-	m0 = m;
-	pfh = pfil_hook_get(PFIL_IN, &inetsw[ip_protox[IPPROTO_IP]].pr_pfh);
+#ifdef IPSEC
+	/*
+	 * let ipfilter look at packet on the wire,
+	 * not the decapsulated packet.
+	 */
+	if (!ipsec_gethist(m, NULL))
+#else
+	if (1 /*CONSTCOND*/)
+#endif
+	{
+		m0 = m;
+		pfh = pfil_hook_get(PFIL_IN,
+		    &inetsw[ip_protox[IPPROTO_IP]].pr_pfh);
+	} else
+		pfh = NULL;
 	for (; pfh; pfh = pfh->pfil_link.tqe_next)
 		if (pfh->pfil_func) {
 			rv = pfh->pfil_func(ip, hlen,

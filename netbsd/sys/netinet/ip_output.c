@@ -418,26 +418,6 @@ ip_output(m0, va_alist)
 		m->m_flags &= ~M_BCAST;
 
 sendit:
-#ifdef PFIL_HOOKS
-	/*
-	 * Run through list of hooks for output packets.
-	 */
-	m1 = m;
-	pfh = pfil_hook_get(PFIL_OUT, &inetsw[ip_protox[IPPROTO_IP]].pr_pfh);
-	for (; pfh; pfh = pfh->pfil_link.tqe_next)
-		if (pfh->pfil_func) {
-		    	rv = pfh->pfil_func(ip, hlen, ifp, 1, &m1);
-			if (rv) {
-				error = EHOSTUNREACH;
-				goto done;
-			}
-			m = m1;
-			if (m == NULL)
-				goto done;
-			ip = mtod(m, struct ip *);
-		}
-#endif /* PFIL_HOOKS */
-
 #ifdef IPSEC
 	/* get SP for this packet */
 	if (so == NULL)
@@ -555,6 +535,26 @@ sendit:
 	ip->ip_off = ntohs((u_short)ip->ip_off);
 skip_ipsec:
 #endif /*IPSEC*/
+
+#ifdef PFIL_HOOKS
+	/*
+	 * Run through list of hooks for output packets.
+	 */
+	m1 = m;
+	pfh = pfil_hook_get(PFIL_OUT, &inetsw[ip_protox[IPPROTO_IP]].pr_pfh);
+	for (; pfh; pfh = pfh->pfil_link.tqe_next)
+		if (pfh->pfil_func) {
+		    	rv = pfh->pfil_func(ip, hlen, ifp, 1, &m1);
+			if (rv) {
+				error = EHOSTUNREACH;
+				goto done;
+			}
+			m = m1;
+			if (m == NULL)
+				goto done;
+			ip = mtod(m, struct ip *);
+		}
+#endif /* PFIL_HOOKS */
 
 	/*
 	 * If small enough for mtu of path, can just send directly.
