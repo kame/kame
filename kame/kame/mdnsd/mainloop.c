@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.47 2001/04/25 12:47:50 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.48 2001/05/02 10:44:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -777,11 +777,11 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs, scoped, loopback)
 				close(s);
 				continue;
 			}
-			if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_NOTREADY) != 0) {
-				close(s);
-				continue;
-			}
 			close(s);
+			if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_ANYCAST) != 0)
+				continue;
+			if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_NOTREADY) != 0)
+				continue;
 #endif
 
 			ntype = T_AAAA;
