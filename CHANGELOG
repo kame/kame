@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2326 2003/01/31 12:32:35 keiichi Exp $
+$KAME: CHANGELOG,v 1.2327 2003/02/03 09:58:07 keiichi Exp $
 
 <200301>
+Mon Feb  3 18:53:50 JST 2003	keiichi@iij.ad.jp
+	* kame/sys/netinet6/{mip6_binding.c|ipsec.c}
+	* kame/sys/netkey/key.[hc]
+	- added partial support for the mip6-ha-ipsec draft.
+	  define MIP6_HAIPSEC macro in your kernel config file to
+	  enable optimized tunneling format.
+
 Fri Jan 31 21:28:08 JST 2003	keiichi@iij.ad.jp
 	* kame/kame/mip6control:
 	- the file format for mip6makeconfig.sh has been changed.
