@@ -1,0 +1,49 @@
+.Dd June 25, 1999
+.Dt PVCBRIDGE 8
+.Os BSD
+.Sh NAME
+.Nm pvcbridge
+.Nd display or control ATM PVC bridging between two PVC sub interfaces
+.Sh SYNOPSIS
+.Nm pvcbridge
+.Op add|delete
+.Ar interface1
+.Ar interface2
+.Nm pvcbridge
+.Op get
+.Ar interface
+.Sh DESCRIPTION
+.Nm 
+displays or controls bridging between two PVC sub interfaces.
+ATM bridging allows to forward ATM frames at the driver level, 
+neither IP address nor IP routing is rquired for the PVC sub
+interfaces.
+An ATM VC should be assgined to each PVC sub interface by 
+.Xr pvctxctl 8 .
+.Pp
+With the first form,
+.Nm
+sets or deletes bridging between the given two ATM PVC sub interfaces.
+With the second form, 
+.Nm 
+displays the current bridge setting of the given PVC sub interface.
+The
+.Ar inerface
+parameter must be an ATM PVC sub interface created by
+.Xr pvcsif 8 .
+
+.Sh EXAMPLE
+For example, to set up bridging between VC:201 on en0 and VC:202 on en1:
+.Pp
+.Dl # pvcsif en0      			# creates pvc0
+.Dl # ifconfig pvc0 up			# up pvc0
+.Dl # pvctxctl pvc0 201 -b 45M		# assign vc
+.Dl # pvcsif en1      			# creates pvc1
+.Dl # ifconfig pvc1 up			# up pvc1
+.Dl # pvctxctl pvc1 202 -b 45M		# assign vc
+.Dl # pvcbridge pvc0 pvc1		# set bridging
+
+.Sh SEE ALSO
+.Xr ifconfig 8 , 
+.Xr pvcsif 8 ,
+.Xr pvctxctl 8

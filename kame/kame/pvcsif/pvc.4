@@ -1,0 +1,32 @@
+.Dd December 29, 1997
+.Dt PVC 4
+.Os BSD
+.Sh NAME
+.Nm pvc
+.Nd
+ATM PVC sub interface driver
+.Sh SYNOPSIS
+.Cd "device en0"
+.Cd "pseudo-device atm"
+.Sh DESCRIPTION
+A PVC sub interface is dynamically created by 
+.Xr pvcsif 8
+command.
+A sub interface is intended to use an ATM PVC as an alternative
+serial connection, and to be allocated per PVC basis.
+A sub interface looks as a point-to-point interface
+and is multicast capable, as opposed to the NBMA 
+(NonBroadcast Multiple Access) model that requires a MARS server.
+A point-to-point interface is useful to run MBone or protocols
+requiring multicast, such as RSVP and IPv6, over a PVC WAN
+connection.
+
+.Sh BUGS
+.Nm
+device should be defined as another pseudo device 
+.Dq pvc .
+.Sh SEE ALSO
+.Xr pvcsif 8 , 
+.Xr pvctxctl 8 , 
+.Xr pvcbridge 8 , 
+.Xr en 4
