@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.194 2001/02/08 15:19:12 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.195 2001/02/08 15:35:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2385,7 +2385,7 @@ icmp6_redirect_diag(src6, dst6, tgt6)
 	struct in6_addr *tgt6;
 {
 	static char buf[1024];
-#if !defined(__OpenBSD__) && !defined(__bsdi__)
+#ifndef __bsdi__
 	snprintf(buf, sizeof(buf), "(src=%s dst=%s tgt=%s)",
 		ip6_sprintf(src6), ip6_sprintf(dst6), ip6_sprintf(tgt6));
 #else
