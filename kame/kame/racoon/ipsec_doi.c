@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.158 2002/09/27 05:55:52 itojun Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.159 2003/05/23 06:18:18 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2640,6 +2640,22 @@ setph2proposal0(iph2, pp, pr)
 
 	for (tr = pr->head; tr; tr = tr->next) {
 	
+		switch (pr->proto_id) {
+		case IPSECDOI_PROTO_IPSEC_ESP:
+			/*
+			 * don't build a null encryption
+			 * with no authentication transform.
+			 */
+			if (tr->trns_id == IPSECDOI_ESP_NULL &&
+			    tr->authtype == IPSECDOI_ATTR_AUTH_NONE)
+				plog(LLV_ERROR, LOCATION, NULL,
+				    "attr AUTH must be present "
+				    "for ESP NULL encryption.\n");
+				vfree(p);
+				return NULL;
+			break;
+		}
+
 		if (np_t) {
 			*np_t = ISAKMP_NPTYPE_T;
 			prop->num_t++;
