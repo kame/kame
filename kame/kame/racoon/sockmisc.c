@@ -1,4 +1,4 @@
-/*	$KAME: sockmisc.c,v 1.17 2000/09/13 04:50:29 itojun Exp $	*/
+/*	$KAME: sockmisc.c,v 1.18 2000/09/19 00:04:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sockmisc.c,v 1.17 2000/09/13 04:50:29 itojun Exp $ */
+/* YIPS @(#)$Id: sockmisc.c,v 1.18 2000/09/19 00:04:00 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -634,7 +634,7 @@ saddrwop2str(saddr)
 void
 mask_sockaddr(a, b, l)
 	struct sockaddr *a;
-	struct sockaddr *b;
+	const struct sockaddr *b;
 	size_t l;
 {
 	size_t i;

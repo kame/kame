@@ -1,4 +1,4 @@
-/*	$KAME: sockmisc.h,v 1.5 2000/09/13 04:50:29 itojun Exp $	*/
+/*	$KAME: sockmisc.h,v 1.6 2000/09/19 00:04:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sockmisc.h,v 1.5 2000/09/13 04:50:29 itojun Exp $ */
+/* YIPS @(#)$Id: sockmisc.h,v 1.6 2000/09/19 00:04:00 itojun Exp $ */
 
 extern const int niflags;
 
@@ -48,4 +48,5 @@ extern struct sockaddr *newsaddr __P((int));
 extern struct sockaddr *dupsaddr __P((struct sockaddr *));
 extern char *saddr2str __P((struct sockaddr *));
 extern char *saddrwop2str __P((struct sockaddr *));
-extern void mask_sockaddr __P((struct sockaddr *, struct sockaddr *, size_t));
+extern void mask_sockaddr __P((struct sockaddr *, const struct sockaddr *,
+	size_t));
