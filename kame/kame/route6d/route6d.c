@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.75 2001/10/26 05:47:22 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.76 2001/11/08 09:55:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.75 2001/10/26 05:47:22 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.76 2001/11/08 09:55:47 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -1457,7 +1457,7 @@ ifconfig1(name, sa, ifcp, s)
 	if (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr) && !lflag)
 		return;
 	ifr.ifr_addr = *sin6;
-	strcpy(ifr.ifr_name, name);
+	strncpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
 	if (ioctl(s, SIOCGIFNETMASK_IN6, (char *)&ifr) < 0) {
 		fatal("ioctl: SIOCGIFNETMASK_IN6");
 		/*NOTREACHED*/
@@ -3265,6 +3265,11 @@ allocopy(p)
 	char *p;
 {
 	char *q = (char *)malloc(strlen(p) + 1);
+
+	if (!q) {
+		fatal("malloc");
+		/*NOTREACHED*/
+	}
 
 	strcpy(q, p);
 	return q;
