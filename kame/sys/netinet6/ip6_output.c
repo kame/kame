@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.434 2004/03/09 07:34:40 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.435 2004/03/12 08:38:09 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -866,6 +866,7 @@ skip_ipsec2:;
 		struct ip6_rthdr *rh;
 		struct ip6_rthdr0 *rh0;
 		struct in6_addr *addr;
+		struct sockaddr_in6 sa;
 
 		if (exthdrs.ip6e_rthdr)
 			rh = (struct ip6_rthdr *)(mtod(exthdrs.ip6e_rthdr,
@@ -887,7 +888,22 @@ skip_ipsec2:;
 		case IPV6_RTHDR_TYPE_0:
 			 rh0 = (struct ip6_rthdr0 *)rh;
 			 addr = (struct in6_addr *)(rh0 + 1);
-			 ip6->ip6_dst = addr[0];
+
+			/*
+			 * construct a sockaddr_in6 form of the first hop.
+			 * XXX: we may not have enough information about
+			 * its scope zone; there is no standard API to pass
+			 * the information from the application.
+			 */
+			 bzero(&sa, sizeof(sa));
+			 sa.sin6_family = AF_INET6;
+			 sa.sin6_len = sizeof(sa);
+			 sa.sin6_addr = addr[0];
+			 if ((error = scope6_check_id(&sa, ip6_use_defzone))
+			     != 0) {
+				 goto bad;
+			 }
+			 ip6->ip6_dst = sa.sin6_addr;
 			 bcopy(&addr[1], &addr[0], sizeof(struct in6_addr) *
 			     (rh0->ip6r0_segleft - 1));
 			 addr[rh0->ip6r0_segleft - 1] = finaldst;
