@@ -1,7 +1,23 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1850 2001/08/28 10:07:19 jinmei Exp $
+$KAME: CHANGELOG,v 1.1851 2001/08/28 11:53:43 jinmei Exp $
 
 <200108>
+2001-08-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ndp/ndp.c (ifinfo):
+	- printed the value of ND6_IFF_ACCEPT_RTADV by 'ndp -i IF'
+	- allowed a user to specify the flag bit by
+	  'ndp -i IF [-]accept_rtadv'
+
+2001-08-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.[ch]:
+	* kame/sys/netinet6/nd6_rtr.c (nd6_ra_input):
+	introduced a new flag bit "ND6_IFF_ACCEPT_RTADV" in the nd_ifinfo
+	structure, in order to control whether to accept RAs per-interface
+	basis.  The kernel now accepts RAs only when
+	net.inet6.ip6.accept_rtadv is 1 and the flag is on the receiving
+	interface.  The new stuff does not change the old default
+	behavior.
+
 2001-08-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_src.c (in6_selectsrc): corrected a
 	condition on temporary addresses.
