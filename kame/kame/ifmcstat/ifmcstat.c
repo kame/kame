@@ -149,7 +149,6 @@ int main(argc, argv)
 	struct sockaddr_dl sdl;
 #endif
 	const char *kernel = NULL;
-	int c;
 
 	switch (argc) {
 	case 1:
