@@ -686,6 +686,7 @@ void	 syn_cache_reset __P((struct sockaddr *, struct sockaddr *,
 		struct tcphdr *));
 int	 syn_cache_respond __P((struct syn_cache *, struct mbuf *));
 void	 syn_cache_timer __P((void));
+void	 syn_cache_cleanup __P((struct socket *));
 
 int	tcp_newreno __P((struct tcpcb *, struct tcphdr *));
 #endif

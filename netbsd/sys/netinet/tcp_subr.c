@@ -905,12 +905,14 @@ tcp_close(tp)
 	pool_put(&tcpcb_pool, tp);
 	if (inp) {
 		inp->inp_ppcb = 0;
+		syn_cache_cleanup(so);
 		soisdisconnected(so);
 		in_pcbdetach(inp);
 	}
 #ifdef INET6
 	else if (in6p) {
 		in6p->in6p_ppcb = 0;
+		syn_cache_cleanup(so);
 		soisdisconnected(so);
 		in6_pcbdetach(in6p);
 	}

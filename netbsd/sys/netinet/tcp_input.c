@@ -2545,6 +2545,30 @@ syn_cache_timer()
 }
 
 /*
+ * Remove reference from syn cache to socket structure,
+ * before socket strucuture goes away.
+ */
+void
+syn_cache_cleanup(so)
+	struct socket *so;
+{
+	struct syn_cache *sc;
+	int i, s;
+
+	s = splsoftnet();
+
+	for (i = 0; i < TCP_MAXRXTSHIFT; i++) {
+		for (sc = TAILQ_FIRST(&tcp_syn_cache_timeq[i]);
+		     sc != NULL;
+		     sc = TAILQ_NEXT(sc, sc_timeq)) {
+			if (sc->sc_so == so)
+				sc->sc_so = NULL;
+		}
+	}
+	splx(s);
+}
+
+/*
  * Find an entry in the syn cache.
  */
 struct syn_cache *
