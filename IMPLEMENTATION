@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.281 2001/11/13 10:42:42 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.282 2001/11/16 06:11:03 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -643,7 +643,10 @@ Currently
 	v6 in v4
 	v4 in v6
 	v4 in v4
-are available.  Use "gifconfig" to assign physical (outer) source
+are available.  On NetBSD,
+	netiso in v4 (EON encapsulation)
+	netiso in v6 (EON encapsulation)
+are also available.  Use "gifconfig" to assign physical (outer) source
 and destination address to gif interfaces.
 Configuration that uses same address family for inner and outer IP
 header (v4 in v4, or v6 in v6) is dangerous.  It is very easy to
