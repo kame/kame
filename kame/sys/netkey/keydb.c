@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.9 1999/09/01 16:43:00 itojun Exp $ */
+/* KAME $Id: keydb.c,v 1.10 1999/09/06 13:09:52 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -1100,8 +1100,8 @@ key_spdadd(mhp)
 
 	/* Is there SP in SPD ? */
 	newsp = key_getsp(&spidx);
-	key_freesp(newsp);
 	if (newsp != NULL) {
+		key_freesp(newsp);
 		printf("key_spdadd: a SP entry exists already.\n");
 		msg0->sadb_msg_errno = EEXIST;
 		return NULL;
