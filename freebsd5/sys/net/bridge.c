@@ -392,9 +392,9 @@ reconfigure_bridge(void)
 {
     bridge_off();
     if (do_bridge) {
-	if (if_index >= BDG_MAX_PORTS) {
+	if (if_indexlim >= BDG_MAX_PORTS) {
 	    printf("-- sorry too many interfaces (%d, max is %d),"
-		" disabling bridging\n", if_index, BDG_MAX_PORTS);
+		" disabling bridging\n", if_indexlim, BDG_MAX_PORTS);
 	    do_bridge=0;
 	    return;
 	}

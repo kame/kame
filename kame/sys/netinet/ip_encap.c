@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.89 2003/12/22 02:43:41 suz Exp $	*/
+/*	$KAME: ip_encap.c,v 1.90 2004/01/06 08:04:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -189,7 +189,7 @@ extern int max_keylen;	/* radix.c */
 struct radix_node_head *encap_head[2];	/* 0 for AF_INET, 1 for AF_INET6 */
 #endif
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ < 5
 void	(*ipip_input)(struct mbuf *, int); /* hook for mrouting */
 #endif
 
