@@ -34,7 +34,7 @@
  * Author:  Hesham Soliman <Hesham.Soliman@ericsson.com.au>
  *          Magnus Braathen <Magnus.Braathen@era.ericsson.se>
  *
- * $Id: mip6config.c,v 1.6 2000/03/18 03:05:45 itojun Exp $
+ * $Id: mip6config.c,v 1.7 2000/04/02 15:24:30 itojun Exp $
  *
  */
 
@@ -462,7 +462,7 @@ main(int argc, char *argv[])
     if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
         err(1, "socket");
 
-    while ((ch = getopt(argc, argv, "F:H:E:f:b:w:y:l:hgxu:m:p:r:t:q:d:a:e:")) != -1)
+    while ((ch = getopt(argc, argv, "F:H:E:f:b:w:y:l:hgxu:m:p:r:t:q:d:ae:")) != -1)
 	switch(ch) {
 	case 'F':
 	    coaddr = optarg;
