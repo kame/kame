@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.390 2004/07/16 07:40:39 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.391 2004/10/26 06:29:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2840,7 +2840,11 @@ icmp6_redirect_input(m, off)
 			    "with inet6 gateway found for redirect dst: %s\n",
 			    icmp6_redirect_diag(&src6, &reddst6.sin6_addr,
 			    &redtgt6.sin6_addr)));
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+			RTFREE_LOCKED(rt);
+#else
 			RTFREE(rt);
+#endif
 			goto bad;
 		}
 
@@ -2853,7 +2857,11 @@ icmp6_redirect_input(m, off)
 			    ip6_sprintf(gw6),
 			    icmp6_redirect_diag(&src6, &reddst6.sin6_addr,
 			    &redtgt6.sin6_addr)));
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+			RTFREE_LOCKED(rt);
+#else
 			RTFREE(rt);
+#endif
 			goto bad;
 		}
 	} else {
@@ -2864,7 +2872,11 @@ icmp6_redirect_input(m, off)
 		    &redtgt6.sin6_addr)));
 		goto bad;
 	}
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+	RTFREE_LOCKED(rt);
+#else
 	RTFREE(rt);
+#endif
 	rt = NULL;
 
 	is_router = is_onlink = 0;
