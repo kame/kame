@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.356 2003/10/15 01:50:31 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.357 2003/10/17 04:07:16 suz Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -213,6 +213,7 @@ RFC3542: Advanced Sockets API for IPv6 (revised)
     * For supported library functions/kernel APIs, see sys/netinet6/ADVAPI.
     * Some of the updates in the draft are not implemented yet.  See
       TODO.2292bis for more details.
+RFC3590: Source Address Selection for the Multicast Listener Discovery (MLD) Protocol
 draft-ietf-ipngwg-icmp-name-lookups-09: IPv6 Name Lookups Through ICMP
 draft-ietf-mobileip-ipv6-21.txt: Mobility Support in IPv6
     * See section 6.
