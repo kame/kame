@@ -32,7 +32,7 @@ RPCFILES=	auth.h auth_unix.h clnt.h pmap_clnt.h pmap_prot.h pmap_rmt.h \
 MFILES=	float.h floatingpoint.h stdarg.h varargs.h
 LFILES=	errno.h fcntl.h syslog.h termios.h
 
-LDIRS=	net netns netatalk netinet netipx netkey nfs pccard sys vm \
+LDIRS=	net netns netatalk netinet netinet6 netipx netkey nfs pccard sys vm \
 		# netccitt netiso
 
 LUDIR=	ufs
