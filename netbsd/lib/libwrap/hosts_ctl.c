@@ -1,4 +1,4 @@
-/*	$NetBSD: hosts_ctl.c,v 1.2 1997/10/09 21:20:32 christos Exp $	*/
+/*	$NetBSD: hosts_ctl.c,v 1.4 1999/07/03 12:30:41 simonb Exp $	*/
 
  /*
   * hosts_ctl() combines common applications of the host access control
@@ -18,7 +18,7 @@
 #if 0
 static char sccsid[] = "@(#) hosts_ctl.c 1.4 94/12/28 17:42:27";
 #else
-__RCSID("$NetBSD: hosts_ctl.c,v 1.2 1997/10/09 21:20:32 christos Exp $");
+__RCSID("$NetBSD: hosts_ctl.c,v 1.4 1999/07/03 12:30:41 simonb Exp $");
 #endif
 #endif
 

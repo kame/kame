@@ -1,4 +1,4 @@
-/*	$NetBSD: percent_x.c,v 1.2 1997/10/09 21:20:41 christos Exp $	*/
+/*	$NetBSD: percent_x.c,v 1.4 1999/07/03 12:30:41 simonb Exp $	*/
 
  /*
   * percent_x() takes a string and performs %<char> expansions. It aborts the
@@ -17,7 +17,7 @@
 #if 0
 static char sccsid[] = "@(#) percent_x.c 1.4 94/12/28 17:42:37";
 #else
-__RCSID("$NetBSD: percent_x.c,v 1.2 1997/10/09 21:20:41 christos Exp $");
+__RCSID("$NetBSD: percent_x.c,v 1.4 1999/07/03 12:30:41 simonb Exp $");
 #endif
 #endif
 

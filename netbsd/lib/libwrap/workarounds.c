@@ -1,4 +1,4 @@
-/*	$NetBSD: workarounds.c,v 1.2 1997/10/09 21:20:58 christos Exp $	*/
+/*	$NetBSD: workarounds.c,v 1.6 2000/01/21 17:08:34 mycroft Exp $	*/
 
  /*
   * Workarounds for known system software bugs. This module provides wrappers
@@ -14,7 +14,7 @@
 #if 0
 char    sccsid[] = "@(#) workarounds.c 1.6 96/03/19 16:22:25";
 #else
-__RCSID("$NetBSD: workarounds.c,v 1.2 1997/10/09 21:20:58 christos Exp $");
+__RCSID("$NetBSD: workarounds.c,v 1.6 2000/01/21 17:08:34 mycroft Exp $");
 #endif
 #endif
 
@@ -28,8 +28,6 @@ __RCSID("$NetBSD: workarounds.c,v 1.2 1997/10/09 21:20:58 christos Exp $");
 #include <stdio.h>
 #include <syslog.h>
 #include <string.h>
-
-extern int errno;
 
 #include "tcpd.h"
 
@@ -141,10 +139,10 @@ int    *fromlen;
 
     if ((ret = recvfrom(sock, buf, buflen, flags, from, fromlen)) >= 0) {
 	if (from->sa_family == 0) {
-	    struct sockaddr my_addr;
+	    struct sockaddr_storage my_addr;
 	    int     my_addr_len = sizeof(my_addr);
 
-	    if (getsockname(0, &my_addr, &my_addr_len)) {
+	    if (getsockname(0, (struct sockaddr *)&my_addr, &my_addr_len)) {
 		tcpd_warn("getsockname: %m");
 	    } else {
 		from->sa_family = my_addr.sa_family;

@@ -1,4 +1,4 @@
-/*	$NetBSD: eval.c,v 1.3 1997/10/09 21:20:24 christos Exp $	*/
+/*	$NetBSD: eval.c,v 1.5 1999/07/03 12:30:41 simonb Exp $	*/
 
  /*
   * Routines for controlled evaluation of host names, user names, and so on.
@@ -25,7 +25,7 @@
 #if 0
 static char sccsid[] = "@(#) eval.c 1.3 95/01/30 19:51:45";
 #else
-__RCSID("$NetBSD: eval.c,v 1.3 1997/10/09 21:20:24 christos Exp $");
+__RCSID("$NetBSD: eval.c,v 1.5 1999/07/03 12:30:41 simonb Exp $");
 #endif
 #endif
 

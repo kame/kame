@@ -1,4 +1,4 @@
-/*	$NetBSD: diag.c,v 1.3 1997/10/09 21:20:21 christos Exp $	*/
+/*	$NetBSD: diag.c,v 1.5 1999/07/03 12:30:40 simonb Exp $	*/
 
  /*
   * Routines to report various classes of problems. Each report is decorated
@@ -16,7 +16,7 @@
 #if 0
 static char sccsid[] = "@(#) diag.c 1.1 94/12/28 17:42:20";
 #else
-__RCSID("$NetBSD: diag.c,v 1.3 1997/10/09 21:20:21 christos Exp $");
+__RCSID("$NetBSD: diag.c,v 1.5 1999/07/03 12:30:40 simonb Exp $");
 #endif
 #endif
 

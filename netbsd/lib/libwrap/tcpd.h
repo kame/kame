@@ -1,9 +1,12 @@
-/*	$NetBSD: tcpd.h,v 1.4 1999/01/18 19:54:20 christos Exp $	*/
+/*	$NetBSD: tcpd.h,v 1.9.4.1 2001/03/30 22:40:56 he Exp $	*/
  /*
   * @(#) tcpd.h 1.5 96/03/19 16:22:24
   * 
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
+
+#include <sys/cdefs.h>
+#include <stdio.h>
 
 /* Structure to describe one communications endpoint. */
 
@@ -12,7 +15,7 @@
 struct host_info {
     char    name[STRING_LENGTH];	/* access via eval_hostname(host) */
     char    addr[STRING_LENGTH];	/* access via eval_hostaddr(host) */
-    struct sockaddr_in *sin;		/* socket address or 0 */
+    struct sockaddr *sin;		/* socket address or 0 */
     struct t_unitdata *unit;		/* TLI transport address or 0 */
     struct request_info *request;	/* for shared information */
 };
@@ -56,8 +59,10 @@ struct request_info {
 #define STRING_UNKNOWN	"unknown"	/* lookup failed */
 #define STRING_PARANOID	"paranoid"	/* hostname conflict */
 
+__BEGIN_DECLS
 extern char unknown[];
 extern char paranoid[];
+__END_DECLS
 
 #define HOSTNAME_KNOWN(s) (STR_NE((s),unknown) && STR_NE((s),paranoid))
 
@@ -65,6 +70,7 @@ extern char paranoid[];
 
 /* Global functions. */
 
+__BEGIN_DECLS
 #if defined(TLI) || defined(PTX) || defined(TLI_SEQUENT)
 extern void fromhost			/* get/validate client host info */
 		__P((struct request_info *));
@@ -81,7 +87,7 @@ extern void shell_cmd			/* execute shell command */
 extern char *percent_x			/* do %<char> expansion */
 		__P((char *, int, char *, struct request_info *));
 extern void rfc931			/* client name from RFC 931 daemon */
-		__P((struct sockaddr_in *, struct sockaddr_in *, char *));
+		__P((struct sockaddr *, struct sockaddr *, char *));
 extern void clean_exit			/* clean up and exit */
 		__P((struct request_info *));
 extern void refuse			/* clean up and exit */
@@ -90,8 +96,8 @@ extern char *xgets			/* fgets() on steroids */
 		__P((char *, int, FILE *));
 extern char *split_at			/* strchr() and split */
 		__P((char *, int));
-extern unsigned long dot_quad_addr	/* restricted inet_addr() */
-		__P((char *));
+extern int dot_quad_addr	/* restricted inet_aton() */
+		__P((char *, unsigned long *));
 
 /* Global variables. */
 
@@ -174,12 +180,15 @@ extern void tcpd_warn			/* report problem and proceed */
 		__P((char *, ...));
 extern void tcpd_jump			/* report problem and jump */
 		__P((char *, ...));
+__END_DECLS
 
 struct tcpd_context {
     char   *file;			/* current file */
     int     line;			/* current line */
 };
+__BEGIN_DECLS
 extern struct tcpd_context tcpd_context;
+__END_DECLS
 
  /*
   * While processing access control rules, error conditions are handled by
@@ -199,6 +208,7 @@ extern struct tcpd_context tcpd_context;
   * behavior.
   */
 
+__BEGIN_DECLS
 extern void process_options		/* execute options */
 		__P((char *, struct request_info *));
 extern int dry_run;			/* verification flag */
@@ -241,3 +251,4 @@ extern char *fix_strtok __P((char *, char *));
 #define strtok	my_strtok
 extern char *my_strtok __P((char *, char *));
 #endif
+__END_DECLS
