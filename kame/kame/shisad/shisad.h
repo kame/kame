@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.1 2004/12/09 02:18:48 t-momose Exp $	*/
+/*	$KAME: shisad.h,v 1.2 2004/12/21 02:21:16 keiichi Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.
  * All rights reserved.
@@ -85,6 +85,7 @@ typedef u_int8_t mip6_authenticator_t[MIP6_AUTHENTICATOR_SIZE];
 #define NEMO_PTFILE 	"/etc/prefix_table.conf"
 #endif /* MIP_NEMO */
 
+#define _PATH_SHISADCONF	"/usr/local/v6/etc/shisad.conf"
 
 /*
  * homeprefix_info -> homeprefix_info -> ...

@@ -1,4 +1,4 @@
-/*      $KAME: mdd_probe.c,v 1.1 2004/12/09 02:18:40 t-momose Exp $  */
+/*      $KAME: mdd_probe.c,v 1.2 2004/12/21 02:21:16 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -69,7 +69,9 @@ extern int mipsock_deregforeign(struct sockaddr_in6 *, struct sockaddr_in6 *,
 
 
 int
-probe_ifstatus(int s) {
+probe_ifstatus(s)
+	int s;
+{
 	struct ifmediareq ifmr;
         struct cif *cifp;
 
@@ -118,12 +120,14 @@ probe_ifstatus(int s) {
 		cifp->cif_linkstatus = ifmr.ifm_status;
 	}
 	
-	return 0;
+	return (0);
 };
 
 
 static int
-send_rs(struct cif  *cifp) {
+send_rs(cifp)
+	struct cif *cifp;
+{
         struct msghdr msg;
         struct iovec iov;
         struct cmsghdr  *cmsgptr = NULL;
@@ -141,19 +145,19 @@ send_rs(struct cif  *cifp) {
 	icmpsock = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
 	if (icmpsock < 0) {
 		perror("socket for ICMPv6");
-		return 0;
+		return (0);
 	}
 	if (setsockopt(icmpsock, IPPROTO_IPV6, 
 		       IPV6_RECVPKTINFO, &on, sizeof(on)) < 0) {
 		perror("setsockopt IPV6_RECVPKTINFO for ICMPv6");
-		return 0;
+		return (0);
 	}
 
 
         memset(&to, 0, sizeof(to));
         if (inet_pton(AF_INET6, "ff02::1",&to.sin6_addr) != 1) {
 		close (icmpsock);
-                return -1;
+                return (-1);
 	}
 	to.sin6_family = AF_INET6;
 	to.sin6_port = 0;
@@ -208,7 +212,7 @@ send_rs(struct cif  *cifp) {
 		rslen += ROUNDUP8(ETHER_ADDR_LEN + 2);
 		break;
 	default:
-		return -1;
+		return (-1);
 	}
 #endif
 
@@ -221,11 +225,13 @@ send_rs(struct cif  *cifp) {
 	printf("sending -- RS\n");
 
 	close (icmpsock);
-	return errno;
+	return (errno);
 }
 
 static void
-defrtrlists_flush(int s) {
+defrtrlists_flush(s)
+	int s;
+{
 	char dummyif[IFNAMSIZ+8];
 
 	strncpy(dummyif, "lo0", sizeof(dummyif));
@@ -238,7 +244,7 @@ defrtrlists_flush(int s) {
 #ifdef MIP_MCOA
 static void
 send_dereg_link(cifp)
-        struct cif  *cifp;
+        struct cif *cifp;
 {
         int detachindex;
         struct in6_ifreq ifr6;

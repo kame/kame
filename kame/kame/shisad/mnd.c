@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.1 2004/12/09 02:18:45 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.2 2004/12/21 02:21:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -74,6 +74,7 @@
 /* Global Variables */
 int mipsock, icmp6sock, mhsock, csock;
 int debug = 0, numerichost = 0;
+u_char *conffile = NULL;
 struct mip6_mipif_list mipifhead;
 struct mip6_hinfo_list hoa_head;
 struct no_ro_head noro_head;
@@ -135,7 +136,9 @@ mn_usage()
 }
 
 int
-main(int argc, char **argv)
+main(argc, argv)
+	int argc;
+	char **argv;
 {
 	int pfds, ch = 0;
 	char *arg_ifname = NULL;
@@ -152,12 +155,15 @@ main(int argc, char **argv)
 	}
 
 #ifdef MIP_NEMO
-        while ((ch = getopt(argc, argv, "dna:if:")) != -1)
+        while ((ch = getopt(argc, argv, "c:dna:if:")) != -1)
 #else
-        while ((ch = getopt(argc, argv, "dna:il:")) != -1) 
+        while ((ch = getopt(argc, argv, "c:dna:il:")) != -1) 
 #endif
 	{
                 switch (ch) {
+		case 'c':
+			conffile = optarg;
+			break;
                 case 'd':
                         debug = 1;
                         break;
@@ -1055,7 +1061,7 @@ add_hal_by_commanline_xxx(homeagent)
 		syslog(LOG_ERR,
 		    "the specified home agent addrss (%s) is invalid.\n",
 		    homeagent);
-		return(-1);
+		return (-1);
 	}
 
 	LIST_FOREACH(mif, &mipifhead, mipif_entry) {
@@ -1149,7 +1155,8 @@ mnd_add_mipif(ifname)
 }
 
 void
-mnd_delete_mipif(u_int16_t ifindex)
+mnd_delete_mipif(ifindex)
+	u_int16_t ifindex;
 {
 	/* never delete mipif */
 	return; 

@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.1 2004/12/09 02:18:45 t-momose Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.2 2004/12/21 02:21:16 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -214,11 +214,13 @@ main (argc, argv)
 
 	mainloop();
 
-	return 0;
+	return (0);
 };
 
 static int
-ha_parse_ptconf(char *filename) {
+ha_parse_ptconf(filename)
+	char *filename;
+{
         FILE *file;
         int i=0;
         char buf[256], *spacer, *head;
@@ -233,11 +235,11 @@ ha_parse_ptconf(char *filename) {
          */
 
 	if (filename == NULL)
-		return EINVAL;
+		return (EINVAL);
 	file = fopen(filename, "r");
         if(file == NULL) {
 		syslog(LOG_ERR, "opening %s is failed %s\n", filename, strerror(errno));
-                return errno;
+                return (errno);
         }
 
         memset(buf, 0, sizeof(buf));
@@ -275,7 +277,7 @@ ha_parse_ptconf(char *filename) {
 
 		pt = malloc(sizeof(*pt));
 		if (pt == NULL)
-			return ENOMEM;
+			return (ENOMEM);
 		memset(pt, 0, sizeof(pt));
                 if (inet_pton(AF_INET6, option[0], &pt->hoa) < 0) {
                         fprintf(stderr, "%s is not correct address\n", option[0]);
@@ -301,12 +303,14 @@ ha_parse_ptconf(char *filename) {
                 memset(buf, 0, sizeof(buf));
         } 
 	fclose(file);
-	return 0;
+	return (0);
 
 };
 
 static int
-mr_parse_ptconf(char *filename) {
+mr_parse_ptconf(filename)
+	char *filename;
+{
         FILE *file;
         int i=0;
         char buf[256], *spacer, *head;
@@ -322,12 +326,12 @@ mr_parse_ptconf(char *filename) {
          */
 
 	if (filename == NULL)
-		return EINVAL;
+		return (EINVAL);
 
         file = fopen(filename, "r");
         if(file == NULL) {
 		syslog(LOG_ERR, "opening %s is failed %s\n", filename, strerror(errno));
-                return errno;
+                return (errno);
         }
 
         memset(buf, 0, sizeof(buf));
@@ -365,7 +369,7 @@ mr_parse_ptconf(char *filename) {
 
 		pt = malloc(sizeof(*pt));
 		if (pt == NULL)
-			return ENOMEM;
+			return (ENOMEM);
 		memset(pt, 0, sizeof(*pt));
 
 		if (inet_pton(AF_INET6, option[0], &pt->hoa) < 0) {
@@ -393,7 +397,7 @@ mr_parse_ptconf(char *filename) {
 	} 
 	
 	fclose(file);
-	return 0;
+	return (0);
 };
 
 
@@ -415,15 +419,15 @@ set_nemo_ifinfo() {
 	
 	if (sysctl(mib, 6, NULL, &needed, NULL, 0) < 0) {
 		syslog(LOG_ERR, "sysctl: %s\n", strerror(errno));
-		return errno;
+		return (errno);
 	}
 	if ((buf = malloc(needed)) == NULL) {
 		syslog(LOG_ERR, "malloc: %s\n", strerror(errno));
-		return errno;
+		return (errno);
 	}
 	if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0) {
 		syslog(LOG_ERR, "sysctl: %s\n", strerror(errno));
-		return errno;
+		return (errno);
 	}
 
         for (next = buf; next < buf + needed ; next += ifm->ifm_msglen) {
@@ -439,7 +443,7 @@ set_nemo_ifinfo() {
 
 				nif = malloc(sizeof(struct nemo_if));
 				if (nif == NULL)
-					return ENOMEM;
+					return (ENOMEM);
 
 				memset(nif, 0, sizeof(*nif));
 				strncpy(nif->ifname, name, strlen(name));
@@ -463,12 +467,14 @@ set_nemo_ifinfo() {
 		syslog(LOG_INFO, "\n");
 	}
 
-	return 0;
+	return (0);
 };
 
 
 static void
-set_static_tun(char *filename) {
+set_static_tun(filename)
+	char *filename;
+{
 	struct nemo_if *nif;
 	FILE *file;
 	int i=0;
@@ -874,7 +880,7 @@ nemo_setup_forwarding (src, dst, hoa, bid)
 	if (nif == NULL) {
 		syslog(LOG_ERR, 
 		       "No more available nemo interfaces\n");
-		return NULL;
+		return (NULL);
 	}
 	
 	nif->hoa = *hoa;
@@ -891,7 +897,7 @@ nemo_setup_forwarding (src, dst, hoa, bid)
 			&((struct sockaddr_in6 *)src)->sin6_addr)) { 
 		/*nemo_gif_ar_set(nif->ifname, &((struct sockaddr_in6 *)src)->sin6_addr);*/ 
 		
-		return nif;
+		return (nif);
 	}
 #endif
 
@@ -921,7 +927,7 @@ nemo_setup_forwarding (src, dst, hoa, bid)
 			ip6_sprintf(&((struct sockaddr_in6 *)dst)->sin6_addr));
 	}
 
-	return nif;
+	return (nif);
 }
 
 static struct nemo_if *
@@ -946,7 +952,7 @@ nemo_destroy_forwarding (hoa, bid)
 	if (nif == NULL) {
 		syslog(LOG_ERR, 
 		       "No associated nemo interfaces for %s\n", ip6_sprintf(hoa));
-		return NULL;
+		return (NULL);
 	}
 
 	nemo_tun_del(nif->ifname);
@@ -965,7 +971,7 @@ nemo_destroy_forwarding (hoa, bid)
 	}
         memset(&nif->coa, 0, sizeof(nif->coa));
 
-	return nif;
+	return (nif);
 }
 
 

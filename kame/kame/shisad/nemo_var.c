@@ -1,4 +1,4 @@
-/*      $KAME: nemo_var.c,v 1.1 2004/12/09 02:18:46 t-momose Exp $  */
+/*      $KAME: nemo_var.c,v 1.2 2004/12/21 02:21:16 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -82,10 +82,10 @@ nemo_mpt_get(hoainfo, nemoprefix, prefixlen)
 
 		if (mip6_are_prefix_equal(nemoprefix, 
 					  &mpt->mpt_prefix, mpt->mpt_prefixlen)) 
-			return mpt;
+			return (mpt);
 	}
 
-	return NULL;
+	return (NULL);
 }
 
 struct nemo_mptable *
@@ -100,7 +100,7 @@ nemo_mpt_add(hoainfo, nemoprefix, prefixlen, mode)
 	newmpt = (struct nemo_mptable *)malloc(sizeof(struct nemo_mptable)); 
 	if (newmpt == NULL) {
 		perror("malloc");
-		return NULL;
+		return (NULL);
 	}
 
 	memset(newmpt, 0, sizeof(struct nemo_mptable));
@@ -122,11 +122,13 @@ nemo_mpt_add(hoainfo, nemoprefix, prefixlen, mode)
 		syslog(LOG_INFO, "add mobile network prefix %s into hoainfo\n", 
 		       ip6_sprintf(&newmpt->mpt_prefix));
 
-	return newmpt;
+	return (newmpt);
 }
 
 void
-command_show_pt(int s) {
+command_show_pt(s)
+	int s;
+{
 	char buff[2048];
 	struct nemo_mptable *mpt, *mptn;
         struct mip6_hoainfo *hoainfo = NULL;
@@ -164,10 +166,10 @@ nemo_hpt_get(prefix, prefixlen)
 		if (prefixlen != hpt->hpt_prefixlen)
 			continue;
 		if (mip6_are_prefix_equal(&hpt->hpt_prefix, prefix, prefixlen))
-			return hpt;
+			return (hpt);
 	}
 
-	return NULL;
+	return (NULL);
 }
 
 struct nemo_hptable *
@@ -182,7 +184,7 @@ nemo_hpt_add(hoa, nemoprefix, prefixlen, mode)
 	newpt = (struct nemo_hptable *)malloc(sizeof(struct nemo_hptable)); 
 	if (newpt == NULL) {
 		perror("malloc");
-		return NULL;
+		return (NULL);
 	}
 
 	memset(newpt, 0, sizeof(struct nemo_hptable));
@@ -198,7 +200,7 @@ nemo_hpt_add(hoa, nemoprefix, prefixlen, mode)
 	else {
 		syslog(LOG_ERR, "Routing Update is not supported\n");
 		free(newpt);
-		return NULL;
+		return (NULL);
 	}
 
 	LIST_INSERT_HEAD(&hpt_head, newpt, hpt_entry);
@@ -207,7 +209,7 @@ nemo_hpt_add(hoa, nemoprefix, prefixlen, mode)
 		syslog(LOG_INFO, "add mobile network prefix %s into PrefixTable\n", 
 		       ip6_sprintf(&newpt->hpt_prefix));
 
-	return newpt;
+	return (newpt);
 }
 
 

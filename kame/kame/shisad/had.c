@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.1 2004/12/09 02:18:36 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.2 2004/12/21 02:21:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -121,11 +121,12 @@ ha_usage(path)
 #else
 	fprintf(stderr, "%s [-dn] -i ifname -p preference\n", cmd);
 #endif
-	exit(0);
 } 
 
 int
-main(int argc, char **argv)
+main(argc, argv)
+	int argc;
+	char **argv;
 {
 	int pfds;
 	int pid;
@@ -143,7 +144,7 @@ main(int argc, char **argv)
 
         if (argc < 2) {
 		ha_usage(argv[0]);
-		return EINVAL;
+		exit (0);
 	}
 
 	/* get options */
@@ -257,7 +258,8 @@ ha_lists_init()
 }
 
 int
-mipsock_input(struct mip_msghdr *miphdr)
+mipsock_input(miphdr)
+	struct mip_msghdr *miphdr;
 {
 	int err = 0;
 
@@ -269,34 +271,38 @@ mipsock_input(struct mip_msghdr *miphdr)
 		break;
 	}
 
-	return err;
+	return (err);
 }
 
 int
-had_is_ha_if(u_int16_t ifindex)
+had_is_ha_if(ifindex)
+	u_int16_t ifindex;
 {
 	if (ifindex == ha_ifindex)
-		return 1;
+		return (1);
 	
-	return 0;
+	return (0);
 };
 
 struct mip6_hpfxl *
-had_is_myhomenet(struct in6_addr *hoa)
+had_is_myhomenet(hoa)
+	struct in6_addr *hoa;
 {
 	struct mip6_hpfxl *hpfx = NULL;
 
 	LIST_FOREACH(hpfx, &hpfx_head, hpfx_entry) {
 		if (mip6_are_prefix_equal(&hpfx->hpfx_prefix, hoa,  hpfx->hpfx_prefixlen))
-			return hpfx;
+			return (hpfx);
 	}
 
-	return NULL;
+	return (NULL);
 }
 
 
 static void
-had_init_homeprefix (char *ifname, int preference)
+had_init_homeprefix (ifname, preference)
+	char *ifname;
+	int preference;
 {
         size_t needed;
         char *buf, *next, name[32];
@@ -456,7 +462,7 @@ had_add_hal(hpfx_entry, gladdr, lladdr, lifetime, preference, flag)
 
 			if (hal->hal_flag != MIP6_HAL_OWN)
 				hal_set_expire_timer(hal, hal->hal_lifetime);
-			return hal;
+			return (hal);
 		}
 	} 
 
@@ -568,7 +574,7 @@ send_haadrep(dst, anycastaddr, dhreq, ifindex)
 	if (ifindex)
 		pi->ipi6_ifindex = ifindex;
 	else
-		return -1;
+		return (-1);
 	cmsgptr->cmsg_level = IPPROTO_IPV6;
 	cmsgptr->cmsg_type = IPV6_PKTINFO;
 	cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
@@ -590,7 +596,7 @@ send_haadrep(dst, anycastaddr, dhreq, ifindex)
 		if (debug)
 			syslog(LOG_INFO, 
 			       "no matched home prefix list is found, drop dhaad request\n");
-		return 0;
+		return (0);
 	}
 
 	reqlen = sizeof(struct mip6_dhaad_rep);
@@ -624,7 +630,7 @@ send_haadrep(dst, anycastaddr, dhreq, ifindex)
 	if (sendmsg(icmp6sock, &msg, 0) < 0)
 			perror ("sendmsg icmp6 @haadreply");
 
-	return errno;
+	return (errno);
 }
 
 static void
@@ -689,7 +695,6 @@ command_flush(s, arg)
 		write(s, msg, strlen(msg));
 
 	}
-
 }
 
 
@@ -742,7 +747,7 @@ send_mpa(dst, mps_id, ifindex)
 	if (ifindex)
 		pi->ipi6_ifindex = ifindex;
 	else
-		return -1;
+		return (-1);
 	cmsgptr->cmsg_level = IPPROTO_IPV6;
 	cmsgptr->cmsg_type = IPV6_PKTINFO;
 	cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));

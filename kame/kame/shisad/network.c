@@ -1,4 +1,4 @@
-/*      $KAME: network.c,v 1.1 2004/12/09 02:18:47 t-momose Exp $  */
+/*      $KAME: network.c,v 1.2 2004/12/21 02:21:16 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -263,7 +263,7 @@ nemo_tun_set(src, dst, gifindex, nxthop_enable)
 	
 	close(ioctls);
 
-	return(0);
+	return (0);
 }
 
 
@@ -296,7 +296,7 @@ nemo_tun_del(gifname)
 
 
 	close(ioctls);
-	return(errno);
+	return (errno);
 }
 
 
@@ -489,7 +489,9 @@ route_add(dest, gate, mask, pfxlen, gifindex)
 
 /* when gifindex is zero, it indicates default route flush */
 int
-route_del(u_int16_t gifindex){
+route_del(gifindex)
+	u_int16_t gifindex;
+{
 	size_t needed;
 	int s, mib[6], rlen, seqno;
 	struct rt_msghdr *rtm;
@@ -507,16 +509,16 @@ route_del(u_int16_t gifindex){
 	
 	if(sysctl(mib, 6, NULL, &needed, NULL, 0) < 0){
 		perror("sysctl");
-		return(-1);
+		return (-1);
 	}
 	if ((buf = malloc(needed)) == NULL){
 		perror("malloc");
-		return(-1);
+		return (-1);
 	}
 	if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0){
 		perror("sysctl");
 		free(buf);
-		return(-1);
+		return (-1);
 	}
 	lim = buf + needed;
 	seqno = 0;
@@ -588,7 +590,7 @@ prefixlen(pfxlen_tmp, sin6_tmp)
         if( maxlen == len )
                 return (-1);
         else
-                return(len);
+                return (len);
 }
 
 
@@ -867,11 +869,11 @@ getnbrinfo(addr, ifindex, warning)
 		if (warning)
 			perror("ioctl(SIOCGNBRINFO_IN6)");
 		close(s);
-		return(NULL);
+		return (NULL);
 	}
 
 	close(s);
-	return(&nbi);
+	return (&nbi);
 }
 
 
