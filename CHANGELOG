@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1398 2000/11/24 08:30:18 itojun Exp $
+$KAME: CHANGELOG,v 1.1399 2000/11/24 17:44:04 kawa Exp $
 
 <200011>
+2000-11-25  Koji Kawano <K.Kawano@rdmg.mgcs.mei.co.jp>
+	* kame/freebsdX/net/if_loop.c: fix memory leak
+	when icmp reply with loop back interface:
+	ex: ping6 -w -I lo0 ::1
+
 Fri Nov 24 17:29:30 JST 2000  itojun@iijlab.net
 	* libinet6/if_nametoindex.c: conform to RFC2553 (ENXIO if the interface
 	  is not found).
