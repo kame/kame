@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.27 2001/08/05 08:33:25 itojun Exp $	*/
+/*	$KAME: key_debug.c,v 1.28 2001/08/12 11:50:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,7 +77,7 @@ static void kdebug_secreplay __P((struct secreplay *));
 #endif
 
 #ifndef _KERNEL
-#define panic(param)	{ printf(param); exit(-1); }
+#define panic(param)	{ printf(param); exit(1); }
 #endif
 
 /* NOTE: host byte order */
