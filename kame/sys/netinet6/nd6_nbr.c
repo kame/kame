@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.56 2001/02/07 08:09:47 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.57 2001/02/07 08:18:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1147,6 +1147,9 @@ nd6_dad_start(ifa, tick)
 		return;
 	}
 	bzero(dp, sizeof(*dp));
+#ifdef __NetBSD__
+	callout_init(&dp->dad_timer_ch);
+#endif
 	TAILQ_INSERT_TAIL(&dadq, (struct dadq *)dp, dad_list);
 
 	nd6log((LOG_DEBUG, "%s: starting DAD for %s\n", if_name(ifa->ifa_ifp),
