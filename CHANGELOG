@@ -1,6 +1,10 @@
-$KAME: CHANGELOG,v 1.2457 2003/08/15 06:06:57 suz Exp $
+$KAME: CHANGELOG,v 1.2458 2003/08/18 05:39:09 itojun Exp $
 
 <200308>
+Sun Aug 17 JST 2003  itojun@iijlab.net
+	* sys/netinet{,6}/in{,6}_proto.c: enforce inbound IPsec policy on
+	  protocols that falls into raw socket as a wildcard case.
+
 2003-08-15  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/kame/pim6sd/{cfparse.y, mrt.[ch], pim6_proto.c, rp.c}
 	Now static-RP configuration can work together with bootstrap-
