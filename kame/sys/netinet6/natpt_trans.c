@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.63 2001/12/03 12:59:30 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.64 2001/12/04 06:28:45 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -206,8 +206,8 @@ void		 natpt_decrementAck		__P((struct tcphdr *, int));
 int		 natpt_updateTcpStatus		__P((struct pcv *));
 int		 natpt_tcpfsm			__P((short state, int, u_char flags));
 struct mbuf	*natpt_mgethdr			__P((int, int));
-void		 natpt_composeIPv6Hdr		__P((struct ip *, struct pAddr *,
-						     struct ip6_hdr *));
+void		 natpt_composeIPv6Hdr		__P((struct pcv *, struct pAddr *,
+						     struct pcv *));
 void		 natpt_composeIPv4Hdr		__P((struct pcv *, struct pAddr *,
 						     struct pcv *));
 void		 natpt_adjustMBuf		__P((struct mbuf *, struct mbuf *));
@@ -828,7 +828,7 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 	cv6.flags  = cv4->flags;
 
 	ip6->ip6_nxt  = IPPROTO_ICMPV6;
-	natpt_composeIPv6Hdr(ip4, pad, ip6);
+	natpt_composeIPv6Hdr(cv4, pad, &cv6);
 	ip6->ip6_src.s6_addr32[0] = natpt_prefix.s6_addr32[0];
 	ip6->ip6_src.s6_addr32[1] = natpt_prefix.s6_addr32[1];
 	ip6->ip6_src.s6_addr32[2] = natpt_prefix.s6_addr32[2];
@@ -1178,7 +1178,7 @@ natpt_translateTCPUDPv4To6(struct pcv *cv4, struct pAddr *pad, struct pcv *cv6)
 	cv6->fromto = cv4->fromto;
 
 	ip4 = mtod(cv4->m, struct ip *);
-	natpt_composeIPv6Hdr(ip4, pad, ip6);
+	natpt_composeIPv6Hdr(cv4, pad, cv6);
 
 	tcp6 = cv6->pyld.tcp6;
 	tcp6->th_sport = pad->port[1];
@@ -2243,8 +2243,11 @@ natpt_mgethdr(int hlen, int len)
 
 
 void
-natpt_composeIPv6Hdr(struct ip *ip4, struct pAddr *pad, struct ip6_hdr *ip6)
+natpt_composeIPv6Hdr(struct pcv *cv4, struct pAddr *pad, struct pcv *cv6)
 {
+	struct ip	*ip4 = cv4->ip.ip4;
+	struct ip6_hdr	*ip6 = cv6->ip.ip6;
+
 	ip6->ip6_flow = 0;
 	ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
 	ip6->ip6_vfc |=	 IPV6_VERSION;
