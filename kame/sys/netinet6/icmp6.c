@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.385 2004/05/24 11:29:08 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.386 2004/05/24 11:31:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2161,11 +2161,7 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 	struct ifnet *ifp0;
 	int resid;
 {
-#ifdef __FreeBSD__
-	struct ifnet *ifp = ifp0 ? ifp0 : ifnet;
-#else
 	struct ifnet *ifp = ifp0 ? ifp0 : TAILQ_FIRST(&ifnet);
-#endif
 	struct in6_ifaddr *ifa6;
 	struct ifaddr *ifa;
 	struct ifnet *ifp_dep = NULL;
