@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.104 2000/05/11 17:14:03 itojun Exp $	*/
+/*	$KAME: key.c,v 1.105 2000/05/12 14:02:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -444,9 +444,11 @@ static int key_delete __P((struct socket *, struct mbuf *,
 static int key_get __P((struct socket *, struct mbuf *,
 	const struct sadb_msghdr *));
 static int key_acquire __P((struct secasindex *, struct secpolicy *));
+#ifndef IPSEC_NONBLOCK_ACQUIRE
 static struct secacq *key_newacq __P((struct secasindex *));
 static struct secacq *key_getacq __P((struct secasindex *));
 static struct secacq *key_getacqbyseq __P((u_int32_t));
+#endif
 static struct secspacq *key_newspacq __P((struct secpolicyindex *));
 static struct secspacq *key_getspacq __P((struct secpolicyindex *));
 static int key_acquire2 __P((struct socket *, struct mbuf *,
