@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.23 2003/08/14 11:18:17 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.24 2003/08/14 15:29:37 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -3522,7 +3522,6 @@ mip6_ip6mci_create(pktopt_mobility, mbu)
 	return (0);
 }
 
-#define AUTH_SIZE	(sizeof(struct ip6m_opt_authdata) + MIP6_AUTHENTICATOR_LEN)
 int
 mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	struct ip6_mobility **pktopt_mobility;
@@ -3602,10 +3601,10 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 		   since this option must be the last mobility option,
 		   an implicit alignment requirement is 8n + 2. 
 		*/
-		auth_size = AUTH_SIZE;
+		auth_size = IP6MOPT_AUTHDATA_SIZE;
 		auth_size += MIP6_PADLEN(bu_size + nonce_size + auth_size, 8, 0);
 #ifdef RR_DBG
-printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_size, nonce_size, auth_size, AUTH_SIZE);
+printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_size, nonce_size, auth_size, IP6MOPT_AUTHDATA_SIZE);
 #endif
 		altcoa_size = 0;
 	} else {
@@ -3688,9 +3687,9 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 			}
 		}
 		if (auth_size) {
-			if ((pad = auth_size - AUTH_SIZE) >= 2) {
+			if ((pad = auth_size - IP6MOPT_AUTHDATA_SIZE) >= 2) {
 				u_char *p = (u_int8_t *)ip6mu
-				    + bu_size + nonce_size + AUTH_SIZE;
+				    + bu_size + nonce_size + IP6MOPT_AUTHDATA_SIZE;
 				*p = IP6MOPT_PADN;
 				*(p + 1) = pad - 2;
 			}
@@ -3708,13 +3707,13 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 
 		/* Auth. data */
 		mopt_auth->ip6moau_type = IP6MOPT_AUTHDATA;
-		mopt_auth->ip6moau_len = AUTH_SIZE - 2;
+		mopt_auth->ip6moau_len = IP6MOPT_AUTHDATA_SIZE - 2;
 
-		if (auth_size > AUTH_SIZE) {
-			*((u_int8_t *)ip6mu + bu_size + nonce_size + AUTH_SIZE)
+		if (auth_size > IP6MOPT_AUTHDATA_SIZE) {
+			*((u_int8_t *)ip6mu + bu_size + nonce_size + IP6MOPT_AUTHDATA_SIZE)
 			    = IP6MOPT_PADN;
-			*((u_int8_t *)ip6mu + bu_size + nonce_size + AUTH_SIZE + 1)
-			    = auth_size - AUTH_SIZE - 2;
+			*((u_int8_t *)ip6mu + bu_size + nonce_size + IP6MOPT_AUTHDATA_SIZE + 1)
+			    = auth_size - IP6MOPT_AUTHDATA_SIZE - 2;
 		}
 
 #ifdef RR_DBG
@@ -3730,7 +3729,7 @@ mip6_hexdump("MN: Kbm: ", sizeof(key_bm), key_bm);
 #endif
 
 		/* Calculate authenticator (5.2.6) */
-		/* HMAC_SHA1(Kbm, (coa, | cn | BU)) */
+		/* First(96, HMAC_SHA1(Kbm, (coa, | cn | BU))) */
 		mip6_calculate_authenticator(key_bm, (u_int8_t *)(mopt_auth + 1), 
 			&mbu->mbu_coa.sin6_addr, &dst->sin6_addr, 
 			(caddr_t)ip6mu, bu_size + nonce_size + auth_size, 

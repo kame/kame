@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.48 2003/07/24 07:11:17 keiichi Exp $	*/
+/*	$KAME: ip6.h,v 1.49 2003/08/14 15:29:36 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -402,6 +402,7 @@ struct ip6m_binding_ack {
 #define IP6MA_STATUS_HOME_NONCE_EXPIRED    136	/* Expired Home Nonce Index */
 #define IP6MA_STATUS_CAREOF_NONCE_EXPIRED  137	/* Expired Care-of Nonce Index */
 #define IP6MA_STATUS_NONCE_EXPIRED         138	/* Expired Nonces */
+#define IP6MA_STATUS_REG_NOT_ALLOWED       139	/* Registration type change disallowed */
 
 /* Binding Error (BE) message */
 struct ip6m_binding_error {
@@ -456,6 +457,7 @@ struct ip6m_opt_authdata {
 	u_int8_t ip6moau_len;
 	/* followed by authenticator data */
 } __attribute__((__packed__));
+#define IP6MOPT_AUTHDATA_SIZE (sizeof(struct ip6m_opt_authdata) + MIP6_AUTHENTICATOR_LEN)
 
 /* Binding Refresh Advice */
 struct ip6m_opt_refresh {

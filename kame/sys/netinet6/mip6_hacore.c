@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.12 2003/08/08 11:59:11 t-momose Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.13 2003/08/14 15:29:37 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -100,6 +100,8 @@ mip6_process_hrbu(bi)
 	long time_second = time.tv_sec;
 #endif
 
+	bi->mbc_status = IP6MA_STATUS_ACCEPTED;
+
 	/* find the home ifp of this homeaddress. */
 	for (pr = nd_prefix.lh_first;
 	    pr;
@@ -162,8 +164,10 @@ mip6_process_hrbu(bi)
 	}
 
 	/* adjust lifetime */
-	if (bi->mbc_lifetime > prlifetime)
+	if (bi->mbc_lifetime > prlifetime) {
 		bi->mbc_lifetime = prlifetime;
+		bi->mbc_status = IP6MA_STATUS_PREFIX_DISC;
+	}
 
 	/*
 	 * - L=0: defend the given address.
@@ -288,6 +292,7 @@ mip6_process_hrbu(bi)
 		 * proccesing.
 		 */
 		mip6_dad_start(prim_mbc);
+		bi->mbc_send_ba = 0;
 	} else {
 		/*
 		 * a binding cache entry is updated.  return a binding
@@ -297,7 +302,6 @@ mip6_process_hrbu(bi)
 		if (bi->mbc_refresh < MIP6_REFRESH_MINLIFETIME)
 			bi->mbc_refresh = bi->mbc_lifetime < MIP6_REFRESH_MINLIFETIME ?
 				  bi->mbc_lifetime : MIP6_REFRESH_MINLIFETIME;
-		bi->mbc_status = IP6MA_STATUS_ACCEPTED;
 		bi->mbc_send_ba = 1;
 	}
 
@@ -732,11 +736,11 @@ mip6_dad_success(ifa)
 
 	/* return a binding ack. */
 	if (mip6_bc_send_ba(&mbc->mbc_addr, &mbc->mbc_phaddr, &mbc->mbc_pcoa,
-	    IP6MA_STATUS_ACCEPTED, mbc->mbc_seqno, mbc->mbc_lifetime,
+	    mbc->mbc_status, mbc->mbc_seqno, mbc->mbc_lifetime,
 	    mbc->mbc_lifetime / 2 /* XXX */, NULL)) {
 		mip6log((LOG_ERR,
-		    "%s:%d: sending BA to %s(%s) failed. send it later.\n",
-		    __FILE__, __LINE__,
+		    "%s:%d: sending BA(%d) to %s(%s) failed. send it later.\n",
+		    __FILE__, __LINE__, mbc->mbc_status,
 		    ip6_sprintf(&mbc->mbc_phaddr.sin6_addr),
 		    ip6_sprintf(&mbc->mbc_pcoa.sin6_addr)));
 	}

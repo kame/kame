@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.28 2003/08/08 11:59:11 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.29 2003/08/14 15:29:37 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1662,6 +1662,7 @@ mip6_calculate_authenticator(key_bm, result, addr1, addr2, data, datalen,
 #endif
 	}
 	hmac_result(&hmac_ctx, sha1_result, sizeof(sha1_result));
+	/* First(96, sha1_result) */
 	bcopy(sha1_result, result, MIP6_AUTHENTICATOR_LEN);
 #ifdef RR_DBG
 	mip6_hexdump("MN: Authdata: ", MIP6_AUTHENTICATOR_LEN, result);
@@ -1989,6 +1990,16 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	}
 
 	if ((mopt.valid_options & MOPT_AUTHDATA) &&
+	    ((mopt.mopt_auth + IP6MOPT_AUTHDATA_SIZE) - (caddr_t)ip6mu < ip6mulen)) {
+		/* Auth. data options is not the last option */
+		/* discard. */
+		m_freem(m);
+		/* XXX Statistics */
+		return (EINVAL);
+	}
+
+
+	if ((mopt.valid_options & (MOPT_AUTHDATA | MOPT_NONCE_IDX)) &&
 	    (ip6mu->ip6mu_flags & IP6MU_HOME)) {
 		/* discard. */
 		m_freem(m);
@@ -2050,6 +2061,16 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 			/* discard. */
 			m_freem(m);
 			mip6stat.mip6s_seqno++;
+			goto send_ba;
+		}
+		if ((bi.mbc_flags & IP6MU_HOME) ^ (mbc->mbc_flags & IP6MU_HOME)) {
+			/* 9.5.1 */
+			bi.mbc_status = IP6MA_STATUS_REG_NOT_ALLOWED;
+			bi.mbc_send_ba = 1;
+			error = EINVAL;
+
+			/* discard. */
+			m_freem(m);
 			goto send_ba;
 		}
 	}
@@ -2230,7 +2251,6 @@ mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 	return (0);
 }
 
-#define AUTH_SIZE	(sizeof(struct ip6m_opt_authdata) + MIP6_AUTHENTICATOR_LEN)
 int
 mip6_ip6ma_create(pktopt_mobility, src, dst, dstcoa, status, seqno, lifetime,
     refresh, mopt)
@@ -2277,7 +2297,7 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, dstcoa, status, seqno, lifetime,
 			refresh_size += MIP6_PADLEN(ba_size + refresh_size, 8, 2);
 		else
 			ba_size += MIP6_PADLEN(ba_size, 8, 2);
-		auth_size = AUTH_SIZE;
+		auth_size = IP6MOPT_AUTHDATA_SIZE;
 	}
 	ip6ma_size = ba_size + refresh_size + auth_size;
 	ip6ma_size += MIP6_PADLEN(ip6ma_size, 8, 0);
@@ -2315,8 +2335,8 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, dstcoa, status, seqno, lifetime,
 		*(p + 1) = pad - 2;
 	}
 	if (auth_size && 
-	    ((p = (u_int8_t *)ip6ma + ba_size + refresh_size + AUTH_SIZE),
-	     (pad = auth_size - AUTH_SIZE) >= 2)) {
+	    ((p = (u_int8_t *)ip6ma + ba_size + refresh_size +IP6MOPT_AUTHDATA_SIZE),
+	     (pad = auth_size - IP6MOPT_AUTHDATA_SIZE) >= 2)) {
 		*p = IP6MOPT_PADN;
 		*(p + 1) = pad - 2;
 	}
@@ -2335,12 +2355,12 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, dstcoa, status, seqno, lifetime,
 	if (need_auth) {
 		/* authorization data processing. */
 		mopt_auth->ip6moau_type = IP6MOPT_AUTHDATA;
-		mopt_auth->ip6moau_len = AUTH_SIZE - 2;
+		mopt_auth->ip6moau_len = IP6MOPT_AUTHDATA_SIZE - 2;
 		mip6_calculate_authenticator(key_bm, (caddr_t)(mopt_auth + 1),
 			&dstcoa->sin6_addr, &src->sin6_addr,
 			(caddr_t)ip6ma, ip6ma_size,
 			ba_size + refresh_size + sizeof(struct ip6m_opt_authdata),
-			AUTH_SIZE - 2);
+			IP6MOPT_AUTHDATA_SIZE - 2);
 	}
 
 #if 0
