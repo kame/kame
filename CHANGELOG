@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.337 1999/12/13 11:13:11 jinmei Exp $
+$Id: CHANGELOG,v 1.338 1999/12/14 06:44:05 jinmei Exp $
 
 <199912>
+1999-12-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/{in6_pcb.c, ip6_output.c, tcp6_input.c,
+	tcp_subr.c}: rtcalloc was reverted for bsdi where it was necessary
+	to make a cloned route for path MTU discovery.
+
 1999-12-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ndp/ndp.c (getdefif): was added to allow the -I option
 	not to take an argument, which now means to show the current
