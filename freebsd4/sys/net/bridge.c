@@ -125,10 +125,6 @@ static void bdgtakeifaces(void);
 static void flush_table(void);
 static void bdg_promisc_on(void);
 static void parse_bdg_cfg(void);
-#ifdef ALTQ
-static int do_classify __P((struct ifaltq *, struct mbuf *,
-			    struct altq_pktattr *));
-#endif
 
 static int bdg_ipfw = 0 ;
 int do_bridge = 0;
@@ -804,6 +800,7 @@ forward:
 	    int len;
 #ifdef ALTQ
 	    struct altq_pktattr pktattr;
+	    int af;
 #endif
 
 	    if (canfree && once ) { /* no need to copy */
@@ -815,21 +812,37 @@ forward:
 		printf("bdg_forward: sorry, m_copy failed!\n");
 		return ENOBUFS ; /* the original is still there... */
 	    }
+
+#ifdef ALTQ
+	    if (ALTQ_IS_ENABLED(&last->if_snd)) {
+		    u_short	ether_type;
+
+		    /*
+		     * if the queueing discipline needs packet classification,
+		     * do it before prepending link headers.
+		     */
+		    ether_type = ntohs(eh->ether_type);
+		    if (ether_type == ETHERTYPE_IP)
+			    af = AF_INET;
+#ifdef INET6
+		    else if (ether_type == ETHERTYPE_IPV6)
+			    af = AF_INET6;
+#endif
+		    else
+			    af = AF_UNSPEC;
+		    IFQ_CLASSIFY(&last->if_snd, m, af, &pktattr);
+	    }
+#endif /* ALTQ */
 	    /*
 	     * Last part of ether_output: add header, queue pkt and start
 	     * output if interface not yet active.
 	     */
-#ifdef ALTQ
-	    if (ALTQ_IS_ENABLED(&last->if_snd) &&
-		ALTQ_NEEDS_CLASSIFY(&last->if_snd))
-		do_classify(&last->if_snd, m, &pktattr);
-#endif
-	    mflags = m->m_flags;
-	    len = m->m_pkthdr.len;
 	    M_PREPEND(m, ETHER_HDR_LEN, M_DONTWAIT);
 	    if (m == NULL)
 		    return ENOBUFS;
 	    bcopy(eh, mtod(m, struct ether_header *), ETHER_HDR_LEN);
+	    mflags = m->m_flags;
+	    len = m->m_pkthdr.len;
 	    s = splimp();
 #ifdef ALTQ
 	    IFQ_ENQUEUE(&last->if_snd, m, &pktattr, error);
@@ -868,68 +881,3 @@ forward:
 
     return error ;
 }
-
-#ifdef ALTQ
-/*
- * find the size of ethernet header, and call classifier
- */
-static int
-do_classify(ifq, m, pktattr)
-	struct ifaltq *ifq;
-	struct mbuf *m;
-	struct altq_pktattr *pktattr;
-{
-	struct ether_header *eh;
-	u_short	ether_type;
-	int	hsize, af;
-	caddr_t hdr;
-
-	hsize = sizeof(struct ether_header);
-	eh = mtod(m, struct ether_header *);
-
-	ether_type = ntohs(eh->ether_type);
-	if (ether_type < ETHERMTU) {
-		/* ick! LLC/SNAP */
-		struct llc *llc = (struct llc *)(eh + 1);
-		hsize += 8;
-
-		if (m->m_len < hsize ||
-		    llc->llc_dsap != LLC_SNAP_LSAP ||
-		    llc->llc_ssap != LLC_SNAP_LSAP ||
-		    llc->llc_control != LLC_UI) {
-			/* not snap! */
-			pktattr->pattr_class = NULL;
-			pktattr->pattr_hdr = NULL;
-			pktattr->pattr_af = AF_UNSPEC;
-			return (0);
-		}
-
-		ether_type = ntohs(llc->llc_un.type_snap.ether_type);
-	}
-
-	if (ether_type == ETHERTYPE_IP)
-		af = AF_INET;
-#ifdef INET6
-	else if (ether_type == ETHERTYPE_IPV6)
-		af = AF_INET6;
-#endif
-	else
-		af = AF_UNSPEC;
-
-	while (m->m_len <= hsize) {
-		hsize -= m->m_len;
-		m = m->m_next;
-	}
-	hdr = m->m_data + hsize;
-
-	m->m_data += hsize;
-	m->m_len -= hsize;
-	pktattr->pattr_class = (*ifq->altq_classify)(ifq->altq_clfier, m, af);
-	m->m_data -= hsize;
-	m->m_len += hsize;
-
-	pktattr->pattr_af = af;
-	pktattr->pattr_hdr = hdr;
-	return (1);
-}
-#endif /* ALTQ */

@@ -143,9 +143,6 @@ ether_output(ifp, m, dst, rt0)
 	int off, loop_copy = 0;
 	int hlen;	/* link layer header lenght */
 	struct arpcom *ac = IFP2AC(ifp);
-#ifdef ALTQ
-	struct altq_pktattr pktattr;
-#endif
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
@@ -174,14 +171,6 @@ ether_output(ifp, m, dst, rt0)
 			    time_second < rt->rt_rmx.rmx_expire)
 				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
 	}
-
-#ifdef ALTQ
-	/*
-	 * if the queueing discipline needs packet classification,
-	 * do it before prepending link headers.
-	 */
-	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
-#endif
 
 	hlen = ETHER_HDR_LEN;
 	switch (dst->sa_family) {
@@ -369,11 +358,7 @@ bad:			if (m != NULL)
 	}
 
 	/* Continue with link-layer output */
-#ifdef ALTQ
-	return ether_output_frame(ifp, m, &pktattr);
-#else
 	return ether_output_frame(ifp, m);
-#endif
 }
 
 /*
@@ -383,19 +368,15 @@ bad:			if (m != NULL)
  * in the first mbuf (if BRIDGE'ing).
  */
 int
-ether_output_frame(ifp, m
-#ifdef ALTQ
-		   , pktattr
-#endif
-	)
+ether_output_frame(ifp, m)
 	struct ifnet *ifp;
 	struct mbuf *m;
-#ifdef ALTQ
-	struct altq_pktattr *pktattr;
-#endif
 {
-	int s, error = 0;
+	int s, len, error = 0;
 	short mflags;
+#ifdef ALTQ
+	struct altq_pktattr pktattr;
+#endif
 
 #ifdef BRIDGE
 	if (do_bridge) {
@@ -411,15 +392,20 @@ ether_output_frame(ifp, m
 		return (0);
 	}
 #endif
+#ifdef ALTQ
+	if (ALTQ_IS_ENABLED(&ifp->if_snd) &&
+	    ALTQ_NEEDS_CLASSIFY(&ifp->if_snd))
+		altq_etherclassify(&ifp->if_snd, m, &pktattr);
+#endif
 	mflags = m->m_flags;
-
+	len = m->m_pkthdr.len;
 	s = splimp();
 	/*
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
 #ifdef ALTQ
-	IFQ_ENQUEUE(&ifp->if_snd, m, pktattr, error);
+	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
 #else
 	IFQ_ENQUEUE(&ifp->if_snd, m, error);
 #endif
@@ -428,8 +414,8 @@ ether_output_frame(ifp, m
 		splx(s);
 		return (error);
 	}
-	ifp->if_obytes += m->m_pkthdr.len;
-	if (m->m_flags & M_MCAST)
+	ifp->if_obytes += len;
+	if (mflags & M_MCAST)
 		ifp->if_omcasts++;
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
@@ -910,3 +896,77 @@ ether_resolvemulti(ifp, llsa, sa)
 	}
 }
 
+#ifdef ALTQ
+/*
+ * find the size of ethernet header, and call classifier
+ */
+int
+altq_etherclassify(ifq, m, pktattr)
+	struct ifaltq *ifq;
+	struct mbuf *m;
+	struct altq_pktattr *pktattr;
+{
+	struct ether_header *eh;
+	u_short	ether_type;
+	int	hlen, af, hdrsize;
+	caddr_t hdr;
+
+	hlen = sizeof(struct ether_header);
+	eh = mtod(m, struct ether_header *);
+
+	ether_type = ntohs(eh->ether_type);
+	if (ether_type < ETHERMTU) {
+		/* ick! LLC/SNAP */
+		struct llc *llc = (struct llc *)(eh + 1);
+		hlen += 8;
+
+		if (m->m_len < hlen ||
+		    llc->llc_dsap != LLC_SNAP_LSAP ||
+		    llc->llc_ssap != LLC_SNAP_LSAP ||
+		    llc->llc_control != LLC_UI)
+			goto bad;  /* not snap! */
+
+		ether_type = ntohs(llc->llc_un.type_snap.ether_type);
+	}
+
+	if (ether_type == ETHERTYPE_IP) {
+		af = AF_INET;
+		hdrsize = 20;  /* sizeof(struct ip) */
+#ifdef INET6
+	} else if (ether_type == ETHERTYPE_IPV6) {
+		af = AF_INET6;
+		hdrsize = 40;  /* sizeof(struct ip6_hdr) */
+#endif
+	} else
+		goto bad;
+
+	while (m->m_len <= hlen) {
+		hlen -= m->m_len;
+		m = m->m_next;
+	}
+	hdr = m->m_data + hlen;
+	if (m->m_len < hlen + hdrsize) {
+		/*
+		 * ip header is not in a single mbuf.  this should not
+		 * happen in the current code.
+		 * (todo: use m_pulldown in the future)
+		 */
+		goto bad;
+	}
+	m->m_data += hlen;
+	m->m_len -= hlen;
+	pktattr->pattr_class = (*ifq->altq_classify)(ifq->altq_clfier, m, af);
+	m->m_data -= hlen;
+	m->m_len += hlen;
+
+	pktattr->pattr_af = af;
+	pktattr->pattr_hdr = hdr;
+	return (1);
+
+bad:
+	pktattr->pattr_class = NULL;
+	pktattr->pattr_hdr = NULL;
+	pktattr->pattr_af = AF_UNSPEC;
+	return (0);
+}
+#endif /* ALTQ */
