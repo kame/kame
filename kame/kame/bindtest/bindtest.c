@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.23 2001/05/08 02:31:17 jinmei Exp $	*/
+/*	$KAME: bindtest.c,v 1.24 2001/05/08 03:32:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -73,6 +73,11 @@
 #include <fcntl.h>
 
 #include <netinet/in.h>
+
+/* portability */
+#if defined(__bsdi__) && _BSDI_VERSION < 199802
+#define socklen_t	int
+#endif
 
 static struct testitem{
 	const char *name;
