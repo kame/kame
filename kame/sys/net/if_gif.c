@@ -99,6 +99,19 @@ void gifattach __P((int));
 int ngif = NGIF;		/* number of interfaces */
 struct gif_softc *gif = 0;
 
+#ifndef MAX_GIF_NEST
+/*
+ * This macro controls the upper limitation on nesting of gif tunnels.
+ * Since, setting a large value to this macro with a careless configuration
+ * may introduce system crash, we don't allow any nestings by default.
+ * If you need to configure nested gif tunnels, you can define this macro
+ * in your kernel configuration file. However, if you do so, please be
+ * careful to configure the tunnels so that it won't make a loop.
+ */
+#define MAX_GIF_NEST 1
+#endif 
+static int max_gif_nesting = MAX_GIF_NEST;
+
 void
 gifattach(dummy)
 #ifdef __FreeBSD__
@@ -149,7 +162,6 @@ gif_output(ifp, m, dst, rt)
 	register struct gif_softc *sc = (struct gif_softc*)ifp;
 	int error = 0;
 	static int called = 0;	/* XXX: MUTEX */
-	int calllimit = 10;	/* XXX: adhoc */
 
 	/*
 	 * gif may cause infinite recursion calls when misconfigured.
@@ -158,7 +170,7 @@ gif_output(ifp, m, dst, rt)
 	 *      mutual exclusion of the variable CALLED, especially if we
 	 *      use kernel thread.
 	 */
-	if (++called >= calllimit) {
+	if (++called > max_gif_nesting) {
 		log(LOG_NOTICE,
 		    "gif_output: recursively called too many times(%d)\n",
 		    called);
