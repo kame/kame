@@ -1,4 +1,4 @@
-/*	$KAME: sctp_constants.h,v 1.4 2002/09/18 01:00:25 itojun Exp $	*/
+/*	$KAME: sctp_constants.h,v 1.5 2002/10/09 18:01:20 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_constants.h,v 1.61 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef __sctp_constants_h__
@@ -136,6 +136,7 @@
 #define SCTP_ECN_ECHO		0x0c
 #define SCTP_ECN_CWR		0x0d
 #define SCTP_SHUTDOWN_COMPLETE	0x0e
+
 /* draft-ietf-tsvwg-addip-sctp */
 #define SCTP_ASCONF		0xc1
 #define	SCTP_ASCONF_ACK		0x80
@@ -182,32 +183,37 @@
 #define SCTP_ULP_ADAPTION	0xc006
 
 /* Notification error codes */
-#define SCTP_FAILED_THRESHOLD		1
-#define SCTP_HEARTBEAT_SUCCESS		2
-#define SCTP_NOTIFY_DATAGRAM_UNSENT	3
-#define SCTP_NOTIFY_DATAGRAM_SENT	4
-#define SCTP_RESPONSE_TO_USER_REQ	5
-#define SCTP_INTERNAL_ERROR		6
-#define SCTP_SHUTDOWN_GUARD_EXPIRES	7
-#define SCTP_RECEIVED_SACK		8
-#define SCTP_PEER_FAULTY		9
+#define SCTP_NOTIFY_DATAGRAM_UNSENT	0x0001
+#define SCTP_NOTIFY_DATAGRAM_SENT	0x0002
+#define SCTP_FAILED_THRESHOLD		0x0004
+#define SCTP_HEARTBEAT_SUCCESS		0x0008
+#define SCTP_RESPONSE_TO_USER_REQ	0x000f
+#define SCTP_INTERNAL_ERROR		0x0010
+#define SCTP_SHUTDOWN_GUARD_EXPIRES	0x0020
+#define SCTP_RECEIVED_SACK		0x0040
+#define SCTP_PEER_FAULTY		0x0080
 
 /* Error causes used in SCTP op-err's and aborts */
-#define SCTP_CAUSE_INV_STRM		1
-#define SCTP_CAUSE_MISS_PARAM		2
-#define SCTP_CAUSE_STALE_COOKIE		3
-#define SCTP_CAUSE_OUT_OF_RESC		4
-#define SCTP_CAUSE_UNRESOLV_ADDR	5
-#define SCTP_CAUSE_UNRECOG_CHUNK	6
-#define SCTP_CAUSE_INVALID_PARAM	7
+#define SCTP_CAUSE_INV_STRM		0x001
+#define SCTP_CAUSE_MISS_PARAM		0x002
+#define SCTP_CAUSE_STALE_COOKIE		0x003
+#define SCTP_CAUSE_OUT_OF_RESC		0x004
+#define SCTP_CAUSE_UNRESOLV_ADDR	0x005
+#define SCTP_CAUSE_UNRECOG_CHUNK	0x006
+#define SCTP_CAUSE_INVALID_PARAM	0x007
 /* This one is also the same as SCTP_UNRECOG_PARAM above */
-#define SCTP_CAUSE_UNRECOG_PARAM	8
-#define SCTP_CAUSE_NOUSER_DATA		9
-#define SCTP_CAUSE_COOKIE_IN_SHUTDOWN	10
+#define SCTP_CAUSE_UNRECOG_PARAM	0x008
+#define SCTP_CAUSE_NOUSER_DATA		0x009
+#define SCTP_CAUSE_COOKIE_IN_SHUTDOWN	0x00a
+#define SCTP_CAUSE_RESTART_W_NEWADDR	0x00b
+#define SCTP_CAUSE_USER_INITIATED_ABT	0x00c
+#define SCTP_CAUSE_PROTOCOL_VIOLATION	0x00d
+
 /* Error's from add ip */
-#define SCTP_CAUSE_DELETEING_LAST_ADDR	12
-#define SCTP_CAUSE_OPERATION_REFUSED	13
-#define SCTP_CAUSE_DELETING_SRC_ADDR	14
+#define SCTP_CAUSE_DELETEING_LAST_ADDR	0x100
+#define SCTP_CAUSE_OPERATION_REFUSED	0x101
+#define SCTP_CAUSE_DELETING_SRC_ADDR	0x102
+#define SCTP_CAUSE_ILLEGAL_ASCONF	0x103
 
 /* bits for TOS field */
 #define SCTP_ECT0_BIT		0x02
@@ -377,6 +383,8 @@
 
 #define SCTP_MAX_OUTSTANDING_DG	10000
 
+/* How many streams I request initally by default */
+#define SCTP_OSTREAM_INITIAL 10
 
 /* This constant (SCTP_MAX_READBUFFER) define
  * how big the read/write buffer is

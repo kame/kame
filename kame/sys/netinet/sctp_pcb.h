@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.h,v 1.6 2002/09/18 01:00:26 itojun Exp $	*/
+/*	$KAME: sctp_pcb.h,v 1.7 2002/10/09 18:01:21 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.h,v 1.92 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef __sctp_pcb_h__
@@ -304,6 +304,8 @@ struct sctp_inpcb {
 	struct sctpsocketq sctp_queue_list;
 	void *sctp_tcb_at_block;
 	int  error_on_block;
+	int32_t sctp_frag_point;
+	u_int32_t sctp_vtag_last;
 
 #ifndef SCTP_VTAG_TIMEWAIT_PER_STACK
 	struct sctpvtaghead vtag_timewait[SCTP_NUMBER_IN_VTAG_BLOCK];
@@ -340,32 +342,25 @@ struct sctp_tcb {
 
 extern int sctp_auto_asconf;
 
-void sctp_fill_pcbinfo(struct sctp_pcbinfo *spcb);
+int SCTP6_ARE_ADDR_EQUAL(struct in6_addr *a, struct in6_addr *b);
 
-struct sctp_nets *
-sctp_findnet(struct sctp_tcb *tcb,struct sockaddr *addr);
+void sctp_fill_pcbinfo(struct sctp_pcbinfo *);
 
-struct sctp_inpcb *
-sctp_pcb_findep(struct sockaddr *nam);
+struct sctp_nets *sctp_findnet(struct sctp_tcb *, struct sockaddr *);
 
-int sctp_inpcb_bind(struct socket *so, struct sockaddr *nam, struct proc *p);
+struct sctp_inpcb *sctp_pcb_findep(struct sockaddr *);
 
-struct sctp_tcb *
-sctp_findassociation_addr(struct mbuf *pkt,int iphlen,
-			  struct sctp_inpcb **inp,
-			  struct sctp_nets **netp);
+int sctp_inpcb_bind(struct socket *, struct sockaddr *, struct proc *);
 
-struct sctp_tcb *
-sctp_findassociation_addr_sa(struct sockaddr *to,
-			     struct sockaddr *from,
-			     struct sctp_inpcb **inp,
-			     struct sctp_nets **netp);
+struct sctp_tcb *sctp_findassociation_addr(struct mbuf *, int,
+	struct sctp_inpcb **, struct sctp_nets **);
+
+struct sctp_tcb *sctp_findassociation_addr_sa(struct sockaddr *,
+	struct sockaddr *, struct sctp_inpcb **, struct sctp_nets **);
 
 #ifdef SCTP_TCP_MODEL_SUPPORT
-void
-sctp_move_pcb_and_assoc(struct sctp_inpcb *old_inp,
-			struct sctp_inpcb *new_inp,
-			struct sctp_tcb  *tcb_tomove);
+void sctp_move_pcb_and_assoc(struct sctp_inpcb *, struct sctp_inpcb *,
+	struct sctp_tcb  *);
 #endif
 
 /*
@@ -375,84 +370,56 @@ sctp_move_pcb_and_assoc(struct sctp_inpcb *old_inp,
  * bound (non-boundall). The TCP model MAY change the actual ep field,
  * this is why it is passed.
  */
-struct sctp_tcb *
-sctp_findassociation_ep_addr(struct sctp_inpcb **ep,
-			     struct sockaddr *to,
-			     struct sctp_nets **netp,
-			     struct sockaddr *from);
+struct sctp_tcb *sctp_findassociation_ep_addr(struct sctp_inpcb **,
+	struct sockaddr *, struct sctp_nets **, struct sockaddr *);
 
-struct sctp_tcb *
-sctp_findassociation_ep_asocid(struct sctp_inpcb *ep, caddr_t asoc_id);
+struct sctp_tcb *sctp_findassociation_ep_asocid(struct sctp_inpcb *, caddr_t);
 
-int
-sctp_inpcb_alloc(struct socket *sp);
+int sctp_inpcb_alloc(struct socket *);
 
-void
-sctp_inpcb_free(struct sctp_inpcb *ep,int immediate);
+void sctp_inpcb_free(struct sctp_inpcb *, int);
 
-struct sctp_tcb *
-sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
-		int for_a_init, int *error);
+struct sctp_tcb *sctp_aloc_assoc(struct sctp_inpcb *, struct sockaddr *,
+	int, int *);
 
-void
-sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *asoc);
+void sctp_free_assoc(struct sctp_inpcb *, struct sctp_tcb *);
 
-int
-sctp_add_local_addr_ep(struct sctp_inpcb *ep, struct ifaddr *laddr);
+int sctp_add_local_addr_ep(struct sctp_inpcb *, struct ifaddr *);
 
-int
-sctp_insert_laddr(struct sctpladdr *list, struct ifaddr *ifa);
+int sctp_insert_laddr(struct sctpladdr *, struct ifaddr *);
 
-void
-sctp_remove_laddr(struct sctp_laddr *laddr);
+void sctp_remove_laddr(struct sctp_laddr *);
 
-int
-sctp_del_local_addr_ep(struct sctp_inpcb *ep,struct ifaddr *laddr);
+int sctp_del_local_addr_ep(struct sctp_inpcb *, struct ifaddr *);
 
+int sctp_del_local_addr_ep_sa(struct sctp_inpcb *, struct sockaddr *);
 
-int
-sctp_del_local_addr_ep_sa(struct sctp_inpcb *ep, struct sockaddr *sa);
+int sctp_add_remote_addr(struct sctp_tcb *, struct sockaddr *, int);
 
-int
-sctp_add_remote_addr(struct sctp_tcb *asoc, struct sockaddr *, int scope_set);
-
-int
-sctp_del_remote_addr(struct sctp_tcb *asoc, struct sockaddr *);
+int sctp_del_remote_addr(struct sctp_tcb *, struct sockaddr *);
 
 void sctp_pcb_init(void);
 
-void
-sctp_free_remote_addr(struct sctp_nets *net);
+void sctp_free_remote_addr(struct sctp_nets *);
 
-struct sctp_tcb *
-sctp_findassociation_associd(caddr_t asoc_id);
+struct sctp_tcb *sctp_findassociation_associd(caddr_t);
 
-int
-sctp_add_local_addr_assoc(struct sctp_tcb *stcb, struct ifaddr *ifa);
+int sctp_add_local_addr_assoc(struct sctp_tcb *, struct ifaddr *);
 
-int
-sctp_del_local_addr_assoc(struct sctp_tcb *stcb, struct ifaddr *ifa);
+int sctp_del_local_addr_assoc(struct sctp_tcb *, struct ifaddr *);
 
-int
-sctp_del_local_addr_assoc_sa(struct sctp_tcb *stcb, struct sockaddr *sa);
+int sctp_del_local_addr_assoc_sa(struct sctp_tcb *, struct sockaddr *);
 
-int
-sctp_load_addresses_from_init(struct sctp_tcb *stcb,
-			      struct mbuf *m,
-			      int iphlen,
-			      int param_offset,
-			      struct sockaddr *altsa,
-			      int limit);
+int sctp_load_addresses_from_init(struct sctp_tcb *, struct mbuf *, int, int,
+	struct sockaddr *, int);
 
-int
-sctp_set_primary_addr(struct sctp_tcb *stcb, struct sockaddr *sa);
+int sctp_set_primary_addr(struct sctp_tcb *, struct sockaddr *);
 
-int
-sctp_is_vtag_good(struct sctp_inpcb *m, u_int32_t x, struct timeval *now);
+int sctp_is_vtag_good(struct sctp_inpcb *, u_int32_t, struct timeval *);
 
 void sctp_drain(void);
 
-int sctp_destination_is_reachable(struct sctp_tcb *tcb, struct sockaddr *dest);
+int sctp_destination_is_reachable(struct sctp_tcb *, struct sockaddr *);
 
 #endif /* _KERNEL */
 #endif /* !__sctp_pcb_h__ */

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_crc32.h,v 1.2 2002/05/20 05:50:02 itojun Exp $	*/
+/*	$KAME: sctp_crc32.h,v 1.3 2002/10/09 18:01:21 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_crc32.h,v 1.9 2002/04/02 15:34:44 lei Exp	*/
 
 #ifndef __crc32c_h__
@@ -40,11 +40,9 @@
 
 #ifndef SCTP_USE_ADLER32
 #ifdef _KERNEL
-u_int32_t update_crc32(u_int32_t crc,
-		       unsigned char *buffer,
-		       unsigned int length);
+u_int32_t update_crc32(u_int32_t, unsigned char *, unsigned int);
 
-u_int32_t sctp_csum_finalize(u_int32_t crc32);
+u_int32_t sctp_csum_finalize(u_int32_t);
 
 #endif /* _KERNEL */
 #endif /* !SCTP_USE_ADLER32 */

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_asconf.c,v 1.8 2002/09/18 01:00:25 itojun Exp $	*/
+/*	$KAME: sctp_asconf.c,v 1.9 2002/10/09 18:01:20 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_asconf.c,v 1.72 2002/04/04 15:40:35 randall Exp	*/
 
 /*
@@ -936,7 +936,7 @@ sctp_asconf_addr_mgmt_ack(struct sctp_tcb *stcb, struct ifaddr *addr,
 
 /*
  * add an asconf add/delete IP address parameter to the queue
- * type = SCTP_ADD_IP_ADDRESS or SCTP_DEL_IP_ADDRESS
+ * type = SCTP_ADD_IP_ADDRESS, SCTP_DEL_IP_ADDRESS, SCTP_SET_PRIM_ADDR
  * returns 0 if completed, non-zero if not completed
  * NOTE: if adding, but delete already scheduled (and not yet
  * 	sent out), simply remove from queue.  Same for deleting
@@ -1060,11 +1060,15 @@ sctp_asconf_queue_add(struct sctp_tcb *tcb, struct ifaddr *ifa,
 		}
 #endif /* SCTP_DEBUG */
 	} else {
-		/* delete goes to the back of the queue */
+		/* delete and set primary goes to the back of the queue */
 		TAILQ_INSERT_TAIL(&tcb->asoc.asconf_queue, aa, next);
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_ASCONF1) {
-			printf("asconf_queue_add: inserted asconf DEL_IP_ADDRESS: %s\n", buf);
+			if (type == SCTP_DEL_IP_ADDRESS) {
+				printf("asconf_queue_add: inserted asconf DEL_IP_ADDRESS: %s\n", buf);
+			} else {
+				printf("asconf_queue_add: inserted asconf SET_PRIM_ADDR: %s\n", buf);
+			}
 		}
 #endif /* SCTP_DEBUG */
 	}
@@ -1074,7 +1078,7 @@ sctp_asconf_queue_add(struct sctp_tcb *tcb, struct ifaddr *ifa,
 
 /*
  * add an asconf add/delete IP address parameter to the queue by addr
- * type = SCTP_ADD_IP_ADDRESS or SCTP_DEL_IP_ADDRESS
+ * type = SCTP_ADD_IP_ADDRESS, SCTP_DEL_IP_ADDRESS, SCTP_SET_PRIM_ADDR
  * returns 0 if completed, non-zero if not completed
  * NOTE: if adding, but delete already scheduled (and not yet
  * 	sent out), simply remove from queue.  Same for deleting
@@ -1201,11 +1205,15 @@ sctp_asconf_queue_add_sa(struct sctp_tcb *tcb, struct sockaddr *sa,
 		}
 #endif /* SCTP_DEBUG */
 	} else {
-		/* delete goes to the back of the queue */
+		/* delete and set primary goes to the back of the queue */
 		TAILQ_INSERT_TAIL(&tcb->asoc.asconf_queue, aa, next);
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_ASCONF1) {
-			printf("asconf_queue_add_sa: inserted asconf DEL_IP_ADDRESS\n");
+			if (type == SCTP_DEL_IP_ADDRESS) {
+				printf("asconf_queue_add_sa: inserted asconf DEL_IP_ADDRESS\n");
+			} else {
+				printf("asconf_queue_add_sa: inserted asconf SET_PRIM_ADDR\n");
+			}
 		}
 #endif /* SCTP_DEBUG */
 	}
@@ -2031,6 +2039,43 @@ sctp_delete_ip_address(struct ifaddr *ifa) {
 	} /* for each ep */
 }
 
+/*
+ * sa is the sockaddr to ask the peer to set primary to
+ * returns: 0 = completed, -1 = error
+ */
+int32_t
+sctp_set_primary_ip_address_sa(struct sctp_tcb *stcb, struct sockaddr *sa) {
+	/* NOTE: we currently don't check the validity of the address! */
+
+	/* queue an ASCONF:SET_PRIM_ADDR to be sent */
+	if (!sctp_asconf_queue_add_sa(stcb, sa, SCTP_SET_PRIM_ADDR)) {
+		/* set primary queuing succeeded */
+		if ((stcb->asoc.state & SCTP_STATE_MASK) == SCTP_STATE_OPEN) {
+			sctp_timer_start(SCTP_TIMER_TYPE_ASCONF,
+					 stcb->sctp_ep, stcb,
+					 stcb->asoc.primary_destination);
+		}
+#ifdef SCTP_DEBUG
+		if (sctp_debug_on & SCTP_DEBUG_ASCONF1) {
+			printf("set_primary_ip_address_sa: queued on tcb=%xh, ",
+			       (uint32_t)stcb);
+			sctp_print_address(sa);
+		}
+#endif /* SCTP_DEBUG */
+	} else {
+#ifdef SCTP_DEBUG
+		if (sctp_debug_on & SCTP_DEBUG_ASCONF1) {
+			printf("set_primary_ip_address_sa: failed to add to queue on tcb=%xh, ",
+			       (uint32_t)stcb);
+			sctp_print_address(sa);
+		}
+#endif /* SCTP_DEBUG */
+		return (-1);
+	}
+	return (0);
+}
+
+
 void
 sctp_set_primary_ip_address(struct ifaddr *ifa) {
 	struct sctp_inpcb *ep;
@@ -2050,12 +2095,27 @@ sctp_set_primary_ip_address(struct ifaddr *ifa) {
 		struct sctp_tcb *tcb;
 		/* process for all associations for this endpoint */
 		LIST_FOREACH(tcb, &ep->sctp_asoc_list, sctp_tcblist) {
-			if (!sctp_set_primary_addr(tcb, ifa->ifa_addr)) {
-				/* set primary succeded */
+			/* queue an ASCONF:SET_PRIM_ADDR to be sent */
+			if (!sctp_asconf_queue_add(tcb, ifa,
+						   SCTP_SET_PRIM_ADDR)) {
+				/* set primary queuing succeeded */
+				if ((tcb->asoc.state & SCTP_STATE_MASK) ==
+				    SCTP_STATE_OPEN) {
+					sctp_timer_start(SCTP_TIMER_TYPE_ASCONF,
+							 tcb->sctp_ep, tcb,
+							 tcb->asoc.primary_destination);
+				}
 #ifdef SCTP_DEBUG
 				if (sctp_debug_on & SCTP_DEBUG_ASCONF1) {
-					printf("set_primary_ip_address: tcb=%xh, ",
+					printf("set_primary_ip_address: queued on tcb=%xh, ",
 					       (uint32_t)tcb);
+					sctp_print_address(ifa->ifa_addr);
+				}
+#endif /* SCTP_DEBUG */
+			} else {
+#ifdef SCTP_DEBUG
+				if (sctp_debug_on & SCTP_DEBUG_ASCONF1) {
+					printf("set_primary_ip_address: failed to add to queue, ");
 					sctp_print_address(ifa->ifa_addr);
 				}
 #endif /* SCTP_DEBUG */

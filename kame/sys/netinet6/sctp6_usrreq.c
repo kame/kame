@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.11 2002/10/02 11:15:11 k-sugyou Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.12 2002/10/09 18:01:23 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_usrreq.c,v 1.81 2002/04/04 21:53:15 randall Exp	*/
 
 /*
@@ -248,7 +248,7 @@ sctp6_input(mp, offp, proto)
 	stcb = sctp_findassociation_addr(m, iphlen, &in6p, &netp);
 	if (in6p == NULL) {
 		sctp_pegs[SCTP_NOPORTS]++;
-		sctp6_send_abort(m,ip6,sh,off,0,NULL);
+		sctp6_send_abort(m, ip6, sh, off, 0, NULL);
 		m_freem(m);
 		return IPPROTO_DONE;
 	}
@@ -263,7 +263,7 @@ sctp6_input(mp, offp, proto)
     struct m_tag *mtag;
     struct tdb_ident *tdbi;
     struct tdb *tdb;
-    int error,s;
+    int error, s;
 
     i_inp = in6p_ip;
     mtag = m_tag_find(m, PACKET_TAG_IPSEC_IN_DONE, NULL);
@@ -351,7 +351,7 @@ sctp6_input(mp, offp, proto)
 		s = splnet();
 #endif
 		(void)sctp_common_input_processing(in6p, stcb, netp, sh,
-						   ch, m, iphlen, offset,
+						   ch, &m, iphlen, offset,
 						   length, ecn_bits);
 		splx(s);
 	}
@@ -504,7 +504,7 @@ sctp6_ctlinput(cmd, pktdst, d)
 #endif
 		stcb = sctp_findassociation_addr_sa((struct sockaddr *)ip6cp->ip6c_src,
 						    (struct sockaddr *)&final,
-						    &inp,&netp);
+						    &inp, &netp);
 		if (stcb != NULL && inp && (inp->sctp_socket != NULL)) {
 			if (cmd == PRC_MSGSIZE) {
 				sctp6_notify_mbuf(inp,
@@ -886,6 +886,7 @@ sctp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 {
 	struct sctp_inpcb *inp;
 	struct inpcb *in_inp;
+
 	/* No SPL needed since sctp_output does this */
 #ifdef INET
 	struct sockaddr_in6 *sin6;
@@ -942,7 +943,7 @@ sctp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	}
 
 	if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-		if (ip6_v6only) {
+		if (!ip6_v6only) {
 			struct sockaddr_in sin;
 			/* convert v4-mapped into v4 addr and send */
 			in6_sin6_2_sin(&sin, sin6);
@@ -1019,13 +1020,14 @@ sctp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 			splx(s);
 			return EINVAL;
 		}
-		if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr))
+		if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
 			splx(s);
-		return EINVAL;
+			return EINVAL;
+		}
 	}
 
 	if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-		if (ip6_v6only) {
+		if (!ip6_v6only) {
 			/* convert v4-mapped into v4 addr */
 			in6_sin6_2_sin((struct sockaddr_in *)&ss, sin6);
 			addr = (struct sockaddr *)&ss;
@@ -1058,6 +1060,13 @@ sctp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		splx(s);
 		return (error);
 	}
+#ifdef SCTP_TCP_MODEL_SUPPORT
+	if (tcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) {
+		tcb->sctp_ep->sctp_flags |= SCTP_PCB_FLAGS_CONNECTED;
+		/* Set the connected flag so we can queue data */
+		soisconnecting(so);
+	}
+#endif
 	tcb->asoc.state = SCTP_STATE_COOKIE_WAIT;
 	SCTP_GETTIME_TIMEVAL(&tcb->asoc.time_entered);
 	sctp_send_initiate(inp, tcb);
@@ -1086,7 +1095,7 @@ sctp6_getaddr(struct socket *so,
 #else
 	sin6 = (struct sockaddr_in6 *)nam;
 #endif
-	bzero(sin6,sizeof(*sin6));
+	bzero(sin6, sizeof(*sin6));
 	sin6->sin6_family = AF_INET6;
 	sin6->sin6_len = sizeof(*sin6);
 
@@ -1101,42 +1110,38 @@ sctp6_getaddr(struct socket *so,
 	sin6->sin6_port = inp->sctp_lport;
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_BOUNDALL) {
 		/* For the bound all case you get back 0 */
-	    if (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) {
-		struct sctp_tcb *tcb;
-		struct sockaddr_in6 *sin_a6;
-		struct sctp_nets *net;
-		struct route *rtp;
-		int fnd;
+		if (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) {
+			struct sctp_tcb *tcb;
+			struct sockaddr_in6 *sin_a6;
+			struct sctp_nets *net;
+			struct route *rtp;
+			int fnd;
 
-		tcb = LIST_FIRST(&inp->sctp_asoc_list);
-		if (tcb == NULL) {
-		    goto notConn6;
+			tcb = LIST_FIRST(&inp->sctp_asoc_list);
+			if (tcb == NULL) {
+				goto notConn6;
+			}
+			fnd = 0;
+			sin_a6 = NULL;
+			TAILQ_FOREACH(net, &tcb->asoc.nets, sctp_next) {
+				sin_a6 = (struct sockaddr_in6 *)&net->ra._l_addr;
+				if (sin_a6->sin6_family == AF_INET6) {
+					fnd = 1;
+					break;
+				}
+			}
+			if ((!fnd) || (sin_a6 == NULL)) {
+				/* punt */
+				goto notConn6;
+			}
+			rtp = (struct route *)&net->ra;
+			sin6->sin6_addr = sctp_ipv6_source_address_selection(inp,
+			    tcb, sin_a6, rtp, net, 0);
+		} else {
+			/* For the bound all case you get back 0 */
+		notConn6:
+			memset(&sin6->sin6_addr, 0, sizeof(sin6->sin6_addr));
 		}
-		fnd = 0;
-		sin_a6 = NULL;
-		TAILQ_FOREACH(net, &tcb->asoc.nets, sctp_next) {
-		    sin_a6 = (struct sockaddr_in6 *)&net->ra._l_addr;
-		    if (sin_a6->sin6_family == AF_INET6) {
-			fnd = 1;
-			break;
-		    }
-		}
-		if ((!fnd) || (sin_a6 == NULL)) {
-		    /* punt */
-		    goto notConn6;
-		}
-		rtp = (struct route *)&net->ra;
-		sin6->sin6_addr = sctp_ipv6_source_address_selection(inp,
-								     tcb,
-								     sin_a6,
-								     rtp,
-								     net,
-								     0);
-	    }else{
-		/* For the bound all case you get back 0 */
-	    notConn6:
-		memset(&sin6->sin6_addr, 0, sizeof(sin6->sin6_addr));
-	    }
 	} else {
 		/* Take the first IPv6 address in the list */
 		struct sctp_laddr *laddr;
@@ -1179,7 +1184,7 @@ sctp6_peeraddr(struct socket *so,
 	       )
 {
 	int fnd;
-	register struct sockaddr_in6 *sin6,*sin_a;
+	register struct sockaddr_in6 *sin6, *sin_a;
 	struct sctp_inpcb *inp;
 	struct sctp_tcb *tcb;
 	struct sctp_nets *net;
@@ -1255,7 +1260,7 @@ sctp6_in6getaddr(struct socket *so,
 		 )
 {
 	struct inpcb *inp = sotoinpcb(so);
-	int	error,s;
+	int	error, s;
 
 	if (inp == NULL)
 		return EINVAL;
@@ -1307,7 +1312,7 @@ sctp6_getpeeraddr(struct socket *so,
 		  )
 {
 	struct inpcb *inp = sotoinpcb(so);
-	int	error,s;
+	int	error, s;
 
 	if (inp == NULL)
 		return EINVAL;
@@ -1507,7 +1512,7 @@ sctp6_usrreq(so, req, m, nam, control)
 		{
 			struct sockaddr *name;
 			if (nam)
-				name = mtod(nam,struct sockaddr *);
+				name = mtod(nam, struct sockaddr *);
 			else
 				name = (struct sockaddr *)NULL;
 			/* Flags are ignored */

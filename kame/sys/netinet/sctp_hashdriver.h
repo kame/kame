@@ -1,4 +1,4 @@
-/*	$KAME: sctp_hashdriver.h,v 1.2 2002/05/20 05:50:02 itojun Exp $	*/
+/*	$KAME: sctp_hashdriver.h,v 1.3 2002/10/09 18:01:21 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_hashdriver.h,v 1.5 2002/04/02 15:34:44 lei Exp	*/
 
 #ifndef __sctp_hashdriver_h__
@@ -36,12 +36,8 @@
  * SUCH DAMAGE.
  */
 
-void sctp_hash_digest(char *key, int key_len,
-		      char *table_entry, int table_len,
-		      unsigned char *digest);
+void sctp_hash_digest(char *, int, char *, int, unsigned char *);
 
-void sctp_hash_digest_m(char *key, int key_len,
-			struct mbuf *m, int offset,
-			unsigned char *digest);
+void sctp_hash_digest_m(char *, int, struct mbuf *, int, unsigned char *);
 
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.h,v 1.4 2002/09/18 01:00:25 itojun Exp $	*/
+/*	$KAME: sctp_output.h,v 1.5 2002/10/09 18:01:21 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.h,v 1.33 2002/04/01 21:59:20 randall Exp	*/
 
 #ifndef __sctp_output_h__
@@ -37,141 +37,76 @@
 
 #include <netinet/sctp_header.h>
 #ifdef _KERNEL
-void
-sctp_send_initiate(struct sctp_inpcb *inp,
-		   struct sctp_tcb *tcb);
+void sctp_send_initiate(struct sctp_inpcb *, struct sctp_tcb *);
 
-void
-sctp_send_initiate_ack(struct sctp_inpcb *inp,
-		       struct sctp_association *asoc,
-		       struct mbuf *input_mbufs,
-		       int iphlen);
+void sctp_send_initiate_ack(struct sctp_inpcb *, struct sctp_association *,
+	struct mbuf *, int);
 
-struct mbuf *
-sctp_arethere_unrecognized_parameters(struct mbuf *in_initpkt,
-				      int param_offset,
-				      int *abort_processing);
-void
-sctp_queue_op_err(struct sctp_tcb *stcb,struct mbuf *op_err);
+struct mbuf *sctp_arethere_unrecognized_parameters(struct mbuf *, int, int *);
+void sctp_queue_op_err(struct sctp_tcb *, struct mbuf *);
 
-int
-sctp_send_cookie_echo(struct mbuf *m,
-		      int offset,
-		      struct sctp_tcb *stcb,
-		      struct sctp_nets *netp);
-int
-sctp_send_cookie_ack(struct sctp_tcb *stcb);
+int sctp_send_cookie_echo(struct mbuf *, int, struct sctp_tcb *,
+	struct sctp_nets *);
+int sctp_send_cookie_ack(struct sctp_tcb *);
 
-void
-sctp_send_heartbeat_ack(struct sctp_tcb *stcb,
-			struct mbuf *m,
-			int offset,
-			int chk_length,
-			struct sctp_nets *netp);
+void sctp_send_heartbeat_ack(struct sctp_tcb *, struct mbuf *, int, int,
+	struct sctp_nets *);
 
-int
-sctp_is_addr_restricted(register struct sctp_tcb *tcb,
-			struct sockaddr *addr);
+int sctp_is_addr_restricted(register struct sctp_tcb *, struct sockaddr *);
 
-struct in_addr
-sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
-				   register struct sctp_tcb *tcb,
-				   struct sockaddr_in *to,
-				   struct route *rtp,
-				   struct sctp_nets *net,
-				   int non_asoc_addr_ok);
+struct in_addr sctp_ipv4_source_address_selection(register struct sctp_inpcb *,
+	register struct sctp_tcb *, struct sockaddr_in *, struct route *,
+	struct sctp_nets *, int);
 
-struct in6_addr
-sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
-				   register struct sctp_tcb *tcb,
-				   struct sockaddr_in6 *to,
-				   struct route *rtp,
-				   struct sctp_nets *net,
-				   int non_asoc_addr_ok);
+struct in6_addr sctp_ipv6_source_address_selection(register struct sctp_inpcb *,
+	register struct sctp_tcb *, struct sockaddr_in6 *, struct route *,
+	struct sctp_nets *, int);
 
 
-int
-sctp_send_shutdown_complete(struct sctp_tcb *stcb,struct sctp_nets *net);
+int sctp_send_shutdown_complete(struct sctp_tcb *, struct sctp_nets *);
 
-int
-sctp_send_shutdown_complete2(struct sctp_inpcb *ep,
-			     struct sockaddr *to,
-			     u_int32_t vtag);
+int sctp_send_shutdown_complete2(struct sctp_inpcb *, struct sockaddr *,
+	u_int32_t);
 
-int
-sctp_send_shutdown_ack(struct sctp_tcb *stcb,struct sctp_nets *net);
+int sctp_send_shutdown_ack(struct sctp_tcb *, struct sctp_nets *);
 
-int
-sctp_send_shutdown(struct sctp_tcb *stcb,struct sctp_nets *net);
+int sctp_send_shutdown(struct sctp_tcb *, struct sctp_nets *);
 
-int
-sctp_send_asconf(struct sctp_tcb *stcb, struct sctp_nets *netp);
+int sctp_send_asconf(struct sctp_tcb *, struct sctp_nets *);
 
-int
-sctp_send_asconf_ack(struct sctp_tcb *stcb, uint32_t retrans);
+int sctp_send_asconf_ack(struct sctp_tcb *, uint32_t);
 
-void
-sctp_toss_old_cookies(struct sctp_association *asoc);
+void sctp_toss_old_cookies(struct sctp_association *);
 
-void
-sctp_toss_old_asconf(struct sctp_tcb *stcb);
+void sctp_toss_old_asconf(struct sctp_tcb *);
 
-void
-sctp_fix_ecn_echo(struct sctp_association *asoc);
+void sctp_fix_ecn_echo(struct sctp_association *);
 
-int
-sctp_output(struct sctp_inpcb *inp,
-	    struct mbuf *m,
-	    struct sockaddr *addr,
-	    struct mbuf *control,
-	    struct proc *p);
+int sctp_output(struct sctp_inpcb *, struct mbuf *, struct sockaddr *,
+	struct mbuf *, struct proc *);
 
-int
-sctp_chunk_output(struct sctp_inpcb *inp,
-		  struct sctp_tcb *tcb,
-		  int from_time_out);
-void
-sctp_send_abort_tcb(struct sctp_tcb *stcb,struct mbuf *operr);
+int sctp_chunk_output(struct sctp_inpcb *, struct sctp_tcb *, int);
+void sctp_send_abort_tcb(struct sctp_tcb *, struct mbuf *);
 
-void
-send_forward_tsn(struct sctp_tcb *stcb,
-		 struct sctp_association *asoc);
+void send_forward_tsn(struct sctp_tcb *, struct sctp_association *);
 
-void
-sctp_send_sack(struct sctp_tcb *stcb);
+void sctp_send_sack(struct sctp_tcb *);
 
-void
-sctp_send_hb(struct sctp_tcb *tcb,int user_req,struct sctp_nets *u_net);
+void sctp_send_hb(struct sctp_tcb *, int, struct sctp_nets *);
 
-void
-sctp_send_ecn_echo(struct sctp_tcb *tcb,struct sctp_nets *net,u_int32_t high_tsn);
+void sctp_send_ecn_echo(struct sctp_tcb *, struct sctp_nets *, u_int32_t);
 
-void
-sctp_send_cwr(struct sctp_tcb *tcb,struct sctp_nets *net,u_int32_t high_tsn);
+void sctp_send_cwr(struct sctp_tcb *, struct sctp_nets *, u_int32_t);
 
-void
-sctp_handle_ecn_cwr(struct sctp_cwr_chunk *cwr,
-		    struct sctp_tcb *tcb);
+void sctp_handle_ecn_cwr(struct sctp_cwr_chunk *, struct sctp_tcb *);
 
-void
-sctp_send_abort(struct mbuf *m,
-		struct ip *oip,
-		struct sctphdr *osh,
-		int off,
-		u_int32_t vtag,
-		struct mbuf *operr);
-void
-sctp6_send_abort(struct mbuf *m,
-		 struct ip6_hdr *oip,
-		 struct sctphdr *osh,
-		 int off,
-		 u_int32_t vtag,
-		 struct mbuf *operr);
-void
-sctp_send_operr_to(struct mbuf *m,int iphlen,
-		   struct mbuf *scm,
-		   struct sctphdr *ohdr,
-		   u_int32_t vtag);
+void sctp_send_abort(struct mbuf *, struct ip *, struct sctphdr *, int,
+	u_int32_t, struct mbuf *);
+
+void sctp6_send_abort(struct mbuf *, struct ip6_hdr *, struct sctphdr *, int,
+	u_int32_t, struct mbuf *);
+void sctp_send_operr_to(struct mbuf *, int, struct mbuf *, struct sctphdr *,
+	u_int32_t);
 
 #endif
 #endif

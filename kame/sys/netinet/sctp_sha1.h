@@ -1,4 +1,4 @@
-/*	$KAME: sctp_sha1.h,v 1.3 2002/06/09 16:29:55 itojun Exp $	*/
+/*	$KAME: sctp_sha1.h,v 1.4 2002/10/09 18:01:22 itojun Exp $	*/
 
 #ifndef __SCTP_SLA1_h__
 #define __SCTP_SLA1_h__
@@ -77,9 +77,9 @@ struct sha1_context {
 
 #ifdef _KERNEL
 
-void SHA1_Init(struct sha1_context *ctx);
-void SHA1_Process(struct sha1_context *ctx, unsigned char *ptr, int siz);
-void SHA1_Final(struct sha1_context *ctx, unsigned char *digest);
+void SHA1_Init(struct sha1_context *);
+void SHA1_Process(struct sha1_context *, unsigned char *, int);
+void SHA1_Final(struct sha1_context *, unsigned char *);
 
 #endif /* _KERNEL */
 #endif

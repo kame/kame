@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.h,v 1.6 2002/09/18 01:00:26 itojun Exp $	*/
+/*	$KAME: sctputil.h,v 1.7 2002/10/09 18:01:22 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.h,v 1.36 2002/04/01 21:59:20 randall Exp	*/
 
 #ifndef __sctputil_h__
@@ -34,114 +34,88 @@
  */
 
 #ifdef _KERNEL
-u_int32_t sctp_select_initial_TSN(struct sctp_pcb *m);
+u_int32_t sctp_select_initial_TSN(struct sctp_pcb *);
 
-u_int32_t sctp_select_a_tag(struct sctp_inpcb *m);
+u_int32_t sctp_select_a_tag(struct sctp_inpcb *);
 
-void
-sctp_init_asoc(struct sctp_inpcb *m,struct sctp_association *asoc,int for_a_init);
+void sctp_init_asoc(struct sctp_inpcb *, struct sctp_association *, int);
 
-void
-sctp_fill_random_store(struct sctp_pcb *m);
+void sctp_fill_random_store(struct sctp_pcb *);
 
+int sctp_timer_start(int, struct sctp_inpcb *, struct sctp_tcb *,
+	struct sctp_nets *);
 
-int
-sctp_timer_start(int t_type,
-		 struct sctp_inpcb *ep,
-		 struct sctp_tcb *tcb,
-		 struct sctp_nets *net);
+int sctp_timer_stop(int, struct sctp_inpcb *, struct sctp_tcb *,
+	struct sctp_nets *);
 
-int
-sctp_timer_stop(int t_type,
-		struct sctp_inpcb *ep,
-		struct sctp_tcb *tcb,
-		struct sctp_nets *net);
+u_int32_t sctp_calculate_sum(struct mbuf *, int32_t *, u_int32_t);
 
-u_int32_t
-sctp_calculate_sum(struct mbuf *m,
-		   int32_t *pktlen,
-		   u_int32_t offset);
+void sctp_mtu_size_reset(struct sctp_inpcb *, struct sctp_association *,
+	u_long);
 
-void
-sctp_mtu_size_reset(struct sctp_association *asoc,
-		    u_long mtu);
+int find_next_best_mtu(int);
 
-int
-find_next_best_mtu(int cursiz);
+u_int32_t sctp_calculate_rto(struct sctp_tcb *, struct sctp_association *,
+	struct sctp_nets *, struct timeval *);
 
-u_int32_t
-sctp_calculate_rto(struct sctp_tcb *tcb,
-		   struct sctp_association *assoc,
-		   struct sctp_nets *net,
-		   struct timeval *old);
+caddr_t sctp_m_getptr(struct mbuf *, int, int, u_int8_t *);
 
-caddr_t
-sctp_m_getptr(struct mbuf *m, int off, int len, u_int8_t *ptr);
+struct sctp_paramhdr *sctp_get_next_param(struct mbuf *, int,
+	struct sctp_paramhdr *, int);
 
-struct sctp_paramhdr *
-sctp_get_next_param(struct mbuf *m,
-		    int offset,
-		    struct sctp_paramhdr *pull,
-		    int pull_limit);
+int sctp_add_pad_tombuf(struct mbuf *, int);
 
-int
-sctp_add_pad_tombuf(struct mbuf *m, int padlen);
+int sctp_pad_lastmbuf(struct mbuf *, int);
 
-int
-sctp_pad_lastmbuf(struct mbuf *m,int padval);
+void sctp_ulp_notify(u_int32_t, struct sctp_tcb *, u_int32_t, void *);
 
-void
-sctp_ulp_notify(u_int32_t notification, struct sctp_tcb *stcb,
-		u_int32_t error, void *data);
+void sctp_report_all_outbound(struct sctp_tcb *);
 
-void
-sctp_report_all_outbound(struct sctp_tcb *stcb);
-
-void
-sctp_abort_notification(struct sctp_tcb *stcb,int error);
+void sctp_abort_notification(struct sctp_tcb *, int);
 
 /* We abort responding to an IP packet for some reason */
-void
-sctp_abort_association(struct sctp_inpcb *inp,
-		       struct sctp_tcb *stcb,
-		       struct mbuf *m,
-		       int iphlen,
-		       struct mbuf *operr);
+void sctp_abort_association(struct sctp_inpcb *, struct sctp_tcb *,
+	struct mbuf *, int, struct mbuf *);
 
 /* We choose to abort via user input */
-void
-sctp_abort_an_association(struct sctp_inpcb *inp,
-			  struct sctp_tcb *stcb,
-			  int error,
-			  struct mbuf *operr);
+void sctp_abort_an_association(struct sctp_inpcb *, struct sctp_tcb *, int,
+	struct mbuf *);
 
-void
-sctp_handle_ootb(struct sctp_inpcb *ep,
-		 struct mbuf *,int iphlen,
-		 int offset, int length,
-		 struct mbuf *operr);
+void sctp_handle_ootb(struct sctp_inpcb *, struct mbuf *, int, int, int,
+	struct mbuf *);
 
-int sctp_is_there_an_abort_here(struct mbuf *m,int off);
-uint32_t sctp_is_same_scope(struct sockaddr_in6 *addr1,
-			    struct sockaddr_in6 *addr2);
-struct sockaddr_in6 *
-sctp_recover_scope(struct sockaddr_in6 *addr, struct sockaddr_in6 *lsa6);
+int sctp_is_there_an_abort_here(struct mbuf *, int);
+uint32_t sctp_is_same_scope(struct sockaddr_in6 *, struct sockaddr_in6 *);
+struct sockaddr_in6 *sctp_recover_scope(struct sockaddr_in6 *,
+	struct sockaddr_in6 *);
 
-int sctp_cmpaddr(struct sockaddr *a, struct sockaddr *b);
+int sctp_cmpaddr(struct sockaddr *, struct sockaddr *);
 
-const char * sctp_ntop4(const u_char *src, char *dst, size_t size);
-const char * sctp_ntop6(const u_char *src, char *dst, size_t size);
-void sctp_print_address(struct sockaddr *sa);
+const char *sctp_ntop4(const u_char *, char *, size_t);
+const char *sctp_ntop6(const u_char *, char *, size_t);
+void sctp_print_address(struct sockaddr *);
 
-int sbappendaddr_nocheck __P((struct sockbuf *sb, struct sockaddr *asa,
-	struct mbuf *m0, struct mbuf *control));
+int sbappendaddr_nocheck __P((struct sockbuf *, struct sockaddr *,
+	struct mbuf *, struct mbuf *, u_int32_t));
 
-struct rtentry *rtalloc_alternate __P((struct sockaddr *,struct rtentry *,
+struct rtentry *rtalloc_alternate __P((struct sockaddr *, struct rtentry *,
 	int));
 
 
-struct mbuf *
-sctp_generate_invmanparam(int err);
+struct mbuf *sctp_generate_invmanparam(int);
+
+/* this is an evil layer violation that I think
+ * is a hack.. but I stand alone on the tsvwg
+ * in this thought... everyone else considers
+ * it part of the sockets layer (along with
+ * all of the peeloff code :<
+ */
+void sctp_grub_through_socket_buffer(struct sctp_inpcb *,
+	struct socket *, struct socket *, struct sctp_tcb *);
+
+
+void sctp_free_bufspace(struct sctp_tcb *, struct sctp_association *,
+	struct sctp_tmit_chunk *);
 
 #endif /* KERNEL */
 #endif

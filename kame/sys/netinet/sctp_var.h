@@ -1,4 +1,4 @@
-/*	$KAME: sctp_var.h,v 1.7 2002/09/18 01:00:26 itojun Exp $	*/
+/*	$KAME: sctp_var.h,v 1.8 2002/10/09 18:01:22 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_var.h,v 1.46 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef _NETINET_SCTP_VAR_H_
@@ -143,48 +143,47 @@ void	sctp_input __P((struct mbuf *, ... ));
 #endif /* __FreeBSD__ */
 
 void	sctp_init __P((void));
-int	sctp_shutdown __P((struct socket *so));
+int	sctp_shutdown __P((struct socket *));
 
 void	sctp_notify __P((struct sctp_inpcb *, int, struct sctphdr *,
 			 struct sockaddr *, struct sctp_tcb *,
 			 struct sctp_nets *));
 
-int sctp_usr_recvd __P((struct socket *so, int flags));
+int sctp_usr_recvd __P((struct socket *, int));
 
 
 #ifdef INET6
-void ip_2_ip6_hdr __P((struct ip6_hdr *ip6, struct ip *ip));
+void ip_2_ip6_hdr __P((struct ip6_hdr *, struct ip *));
 #endif /* INET6 */
 
-int sctp_bindx(struct socket *so, int sd, struct sockaddr_storage *addrs,
-	       int addrcnt, int flags, struct proc *p);
+int sctp_bindx(struct socket *, int, struct sockaddr_storage *,
+	int, int, struct proc *);
 
-int sctp_peeloff(struct socket *so, struct socket *nso, int sd,
-		 sctp_assoc_t assoc_id, int *addrlen);
+int sctp_peeloff(struct socket *, struct socket *, int, sctp_assoc_t, int *);
 
-int sctp_ingetaddr(struct socket *so,
+int sctp_ingetaddr(struct socket *,
 #if defined(__FreeBSD__)
-		   struct sockaddr **nam
+		   struct sockaddr **
 #else
-		   struct sockaddr *nam
+		   struct sockaddr *
 #endif
 );
 
-int sctp_peeraddr(struct socket *so,
+int sctp_peeraddr(struct socket *,
 #if defined(__FreeBSD__)
-		  struct sockaddr **nam
+		  struct sockaddr **
 #else
-		  struct sockaddr *nam
+		  struct sockaddr *
 #endif
 );
 
-int sctp_listen(struct socket *so, struct proc *p);
+int sctp_listen(struct socket *, struct proc *);
 
-int sctp_accept(struct socket *so,
+int sctp_accept(struct socket *,
 #if defined(__FreeBSD__)
-		struct sockaddr **nam
+		struct sockaddr **
 #else
-		struct sockaddr *nam
+		struct sockaddr *
 #endif
 );
 

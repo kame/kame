@@ -1,4 +1,4 @@
-/*	$KAME: sctp_peeloff.h,v 1.2 2002/05/20 05:50:03 itojun Exp $	*/
+/*	$KAME: sctp_peeloff.h,v 1.3 2002/10/09 18:01:22 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_peeloff.h,v 1.5 2002/04/03 21:10:19 lei Exp	*/
 
 #ifndef __sctp_peeloff_h__
@@ -41,11 +41,9 @@
 
 #ifdef _KERNEL
 
-int
-sctp_can_peel_off(struct socket *head, caddr_t assoc_id);
+int sctp_can_peel_off(struct socket *, caddr_t);
 
-struct socket *
-sctp_get_peeloff(struct socket *head, caddr_t assoc_id, int *error);
+struct socket *sctp_get_peeloff(struct socket *, caddr_t, int *);
 
 
 #endif /* _KERNEL */

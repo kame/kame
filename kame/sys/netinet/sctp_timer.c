@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.10 2002/09/18 01:00:26 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.11 2002/10/09 18:01:22 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_timer.c,v 1.60 2002/04/04 17:47:19 randall Exp	*/
 
 /*
@@ -217,12 +217,12 @@ sctp_threshold_management(struct sctp_inpcb *ep,
 		/* Abort notification sends a ULP notify */
 		sctp_abort_an_association(ep, tcb, SCTP_FAILED_THRESHOLD,
 					  NULL);
-		if (ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE){
-		    /* Yes, so can we purge ourself now */
-		    if (LIST_FIRST(&ep->sctp_asoc_list) == NULL) {
-			/* finish the job now */
-			sctp_inpcb_free(ep,1);
-		    }
+		if (ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE) {
+			/* Yes, so can we purge ourself now */
+			if (LIST_FIRST(&ep->sctp_asoc_list) == NULL) {
+				/* finish the job now */
+				sctp_inpcb_free(ep,1);
+			}
 		}
 		return (1);
 	}
@@ -474,7 +474,7 @@ sctp_move_all_chunks_to_alt(struct sctp_tcb *tcb,
 	 */
 	TAILQ_FOREACH(outs, &asoc->out_wheel, next_spoke) {
 		/* now clean up any chunks here */
-		TAILQ_FOREACH(chk,&outs->outqueue,sctp_next) {
+		TAILQ_FOREACH(chk, &outs->outqueue, sctp_next) {
 			if (chk->whoTo == net) {
 				sctp_free_remote_addr(chk->whoTo);
 				chk->whoTo = alt;
@@ -483,7 +483,7 @@ sctp_move_all_chunks_to_alt(struct sctp_tcb *tcb,
 		}
 	}
 	/* Now check the pending queue */
-	TAILQ_FOREACH(chk,&asoc->send_queue,sctp_next) {
+	TAILQ_FOREACH(chk, &asoc->send_queue, sctp_next) {
 		if (chk->whoTo == net) {
 			sctp_free_remote_addr(chk->whoTo);
 			chk->whoTo = alt;
@@ -594,7 +594,7 @@ sctp_t1init_timer(struct sctp_inpcb *ep,
 		/* Association was destroyed */
 		return;
 	}
-	sctp_backoff_on_timeout(ep,tcb->asoc.primary_destination, 0);
+	sctp_backoff_on_timeout(ep, tcb->asoc.primary_destination, 0);
 	/* Send out a new init */
 	sctp_send_initiate(ep, tcb);
 }
@@ -759,9 +759,9 @@ sctp_shutdown_timer(struct sctp_inpcb *ep,
 
 	/* third generate a shutdown into the queue for out net */
 	if (alt) {
-	  sctp_send_shutdown(tcb,alt);
+		sctp_send_shutdown(tcb, alt);
 	} else {
-	  return;
+		return;
 	}
 	/* fourth restart timer */
 	sctp_timer_start(SCTP_TIMER_TYPE_SHUTDOWN, ep, tcb, alt);
@@ -831,7 +831,7 @@ static int mtu_sizes[]={
 
 
 static u_int32_t
-sctp_getnext_mtu(struct sctp_inpcb *ep,u_int32_t cur_mtu)
+sctp_getnext_mtu(struct sctp_inpcb *ep, u_int32_t cur_mtu)
 {
 	/* select another MTU that is just bigger than this one */
 	int i;
@@ -869,6 +869,7 @@ void sctp_pathmtu_timer(struct sctp_inpcb *ep,
 	if (asoc->smallest_mtu >= SCTP_DEFAULT_MAXSEGMENT)
 		/* nothing to do */
 		return;
+
 	next_mtu = sctp_getnext_mtu(ep, asoc->smallest_mtu);
 	/* fix the smallest one up */
 	if (next_mtu <= asoc->smallest_mtu) {

@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_var.h,v 1.4 2002/06/09 14:44:03 itojun Exp $	*/
+/*	$KAME: sctp6_var.h,v 1.5 2002/10/09 18:01:23 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_var.h,v 1.13 2002/04/04 19:23:44 randall Exp	*/
 
 /*
@@ -54,11 +54,8 @@ int	sctp6_usrreq __P((struct socket *, int, struct mbuf *, struct mbuf *,
 
 int	sctp6_input __P((struct mbuf **, int *, int));
 
-int	sctp6_output __P((struct sctp_inpcb *inp,
-			  struct mbuf *m,
-			  struct sockaddr *addr,
-			  struct mbuf *control,
-			  struct proc *p));
+int	sctp6_output __P((struct sctp_inpcb *, struct mbuf *, struct sockaddr *,
+	struct mbuf *, struct proc *));
 void	sctp6_ctlinput __P((int, struct sockaddr *, void *));
 
 #endif /* _KERNEL */

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_crc32.c,v 1.5 2002/09/11 02:34:15 itojun Exp $	*/
+/*	$KAME: sctp_crc32.c,v 1.6 2002/10/09 18:01:21 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_crc32.c,v 1.12 2002/04/02 15:34:44 lei Exp	*/
 
 /*
@@ -40,7 +40,7 @@
 #ifndef SCTP_USE_ADLER32
 
 #define SCTP_CRC32C_POLY 0x1EDC6F41
-#define SCTP_CRC32C(c,d) (c=(c>>8)^sctp_crc_c[(c^(d))&0xFF])
+#define SCTP_CRC32C(c, d) (c=(c>>8)^sctp_crc_c[(c^(d))&0xFF])
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 /* Copyright 2001, D. Otis.  Use this program, code or tables    */
 /* extracted from it, as desired without restriction.            */

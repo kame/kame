@@ -1,4 +1,4 @@
-/*	$KAME: sctp_peeloff.c,v 1.7 2002/09/11 02:34:16 itojun Exp $	*/
+/*	$KAME: sctp_peeloff.c,v 1.8 2002/10/09 18:01:21 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_peeloff.c,v 1.16 2002/04/04 19:12:45 randall Exp	*/
 
 /*
@@ -77,6 +77,7 @@
 #include <netinet/sctp_uio.h>
 #include <netinet/sctp_var.h>
 #include <netinet/sctp_peeloff.h>
+#include <netinet/sctputil.h>
 
 #ifdef IPSEC
 #ifndef __OpenBSD__
@@ -137,6 +138,11 @@ sctp_get_peeloff(struct socket *head, caddr_t assoc_id, int *error)
 	}
 	newso = sonewconn(head, SS_ISCONNECTED);
 	if (newso == NULL) {
+#ifdef SCTP_DEBUG
+		if (sctp_debug_on & SCTP_DEBUG_PEEL1) {
+			printf("sctp_peeloff:sonewconn failed err\n");
+		}
+#endif /* SCTP_DEBUG */
 		*error = ENOMEM;
 		return (newso);
 	}
@@ -153,6 +159,7 @@ sctp_get_peeloff(struct socket *head, caddr_t assoc_id, int *error)
 	/* We remove it right away */
 #ifdef __FreeBSD__
 	TAILQ_REMOVE(&head->so_comp, newso, so_list);
+	head->so_qlen--;
 #else
 
 #if defined( __NetBSD__) || defined(__OpenBSD__)
@@ -168,6 +175,12 @@ sctp_get_peeloff(struct socket *head, caddr_t assoc_id, int *error)
 	 * the tcb in the right place.
 	 */
 	sctp_move_pcb_and_assoc(inp, n_inp, tcb);
+	/* 
+	 * And now the final hack. We move data in the 
+	 * pending side i.e. head to the new socket
+	 * buffer. Let the GRUBBING begin :-0
+	 */
+	sctp_grub_through_socket_buffer(inp,head,newso,tcb);
 	return (newso);
 #else
 	/* We don't support this without the TCP model */

@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.127 2002/09/18 01:02:38 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.128 2002/10/09 18:01:23 itojun Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -305,7 +305,7 @@ struct ip6protosw inet6sw[] = {
 #endif /* TCP6 */
 
 #ifdef SCTP
-{ SOCK_DGRAM,	&inet6domain,	IPPROTO_SCTP,	PR_ATOMIC|PR_ADDR_OPT|PR_WANTRCVD,
+{ SOCK_DGRAM,	&inet6domain,	IPPROTO_SCTP,	PR_ADDR_OPT|PR_WANTRCVD,
   sctp6_input,	0,		sctp6_ctlinput,	sctp_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
@@ -321,7 +321,7 @@ struct ip6protosw inet6sw[] = {
 # endif
 #endif
 },
-{ SOCK_SEQPACKET,	&inet6domain,	IPPROTO_SCTP,	PR_ATOMIC|PR_ADDR_OPT|PR_WANTRCVD,
+{ SOCK_SEQPACKET,	&inet6domain,	IPPROTO_SCTP,	PR_ADDR_OPT|PR_WANTRCVD,
   sctp6_input,	0,		sctp6_ctlinput,	sctp_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,

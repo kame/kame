@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.h,v 1.2 2002/05/20 05:50:03 itojun Exp $	*/
+/*	$KAME: sctp_timer.h,v 1.3 2002/10/09 18:01:22 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_timer.h,v 1.7 2002/04/01 21:59:20 randall Exp	*/
 
 #ifndef __sctp_timer_h__
@@ -34,55 +34,37 @@
  */
 
 #ifdef _KERNEL
-struct sctp_nets *
-sctp_find_alternate_net(struct sctp_tcb *tcb,
-			struct sctp_nets *net);
+struct sctp_nets *sctp_find_alternate_net(struct sctp_tcb *,
+	struct sctp_nets *);
 
-int
-sctp_threshold_management(struct sctp_inpcb *ep,
-			  struct sctp_tcb *tcb,
-			  struct sctp_nets *net,
-			  u_short threshold);
+int sctp_threshold_management(struct sctp_inpcb *, struct sctp_tcb *,
+	struct sctp_nets *, u_short);
 
-void
-sctp_t3rxt_timer(struct sctp_inpcb *ep,
-		 struct sctp_tcb *tcb,
-		 struct sctp_nets *net);
-void
-sctp_t1init_timer(struct sctp_inpcb *ep,
-		  struct sctp_tcb *tcb,
-		  struct sctp_nets *net);
-void
-sctp_shutdown_timer(struct sctp_inpcb *ep,
-		    struct sctp_tcb *tcb,
-		    struct sctp_nets *net);
-void
-sctp_heartbeat_timer(struct sctp_inpcb *ep,
-		     struct sctp_tcb *tcb,
-		     struct sctp_nets *net);
+void sctp_t3rxt_timer(struct sctp_inpcb *, struct sctp_tcb *,
+	struct sctp_nets *);
+void sctp_t1init_timer(struct sctp_inpcb *, struct sctp_tcb *,
+	struct sctp_nets *);
+void sctp_shutdown_timer(struct sctp_inpcb *, struct sctp_tcb *,
+	struct sctp_nets *);
+void sctp_heartbeat_timer(struct sctp_inpcb *, struct sctp_tcb *,
+	struct sctp_nets *);
 
-void sctp_cookie_timer(struct sctp_inpcb *ep,
-		       struct sctp_tcb *tcb,
-		       struct sctp_nets *net);
+void sctp_cookie_timer(struct sctp_inpcb *, struct sctp_tcb *,
+	struct sctp_nets *);
 
-void sctp_pathmtu_timer(struct sctp_inpcb *ep,
-			struct sctp_tcb *tcb,
-			struct sctp_nets *net);
+void sctp_pathmtu_timer(struct sctp_inpcb *, struct sctp_tcb *,
+	struct sctp_nets *);
 
-void sctp_shutdownack_timer(struct sctp_inpcb *ep,
-			 struct sctp_tcb *tcb,
-			 struct sctp_nets *net);
+void sctp_shutdownack_timer(struct sctp_inpcb *, struct sctp_tcb *,
+	struct sctp_nets *);
 
-void sctp_asconf_timer(struct sctp_inpcb *ep,
-		       struct sctp_tcb *tcb,
-		       struct sctp_nets *net);
+void sctp_asconf_timer(struct sctp_inpcb *, struct sctp_tcb *,
+	struct sctp_nets *);
 
-void sctp_autoclose_timer(struct sctp_inpcb *ep,
-			  struct sctp_tcb *tcb,
-			  struct sctp_nets *net);
+void sctp_autoclose_timer(struct sctp_inpcb *, struct sctp_tcb *,
+	struct sctp_nets *net);
 
-void
-sctp_audit_retranmission_queue(struct sctp_association *asoc);
+void sctp_audit_retranmission_queue(struct sctp_association *);
 
 #endif
 #endif

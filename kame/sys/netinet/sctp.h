@@ -1,4 +1,4 @@
-/*    $KAME: sctp.h,v 1.7 2002/07/30 04:12:33 itojun Exp $    */
+/*    $KAME: sctp.h,v 1.8 2002/10/09 18:01:20 itojun Exp $    */
 /*	Header: /home/sctpBsd/netinet/sctp.h,v 1.43 2002/04/02 15:34:44 lei Exp	*/
 
 
@@ -127,10 +127,10 @@ struct sctp_paramhdr {
 #define SCTP_GET_PEGS			 0x00800000
 #define SCTP_DEFAULT_SEND_PARAM		 0x01000000
 #define SCTP_SET_DEBUG_LEVEL		 0x02000000
+#define SCTP_MAXSEG			 0x08000000
 
 /* Debug things that need to be purged */
 #define SCTP_SET_INITIAL_DBG_SEQ	 0x04000000
-#define SCTP_LIST_IN_STREAMS		 0x08000000
 #define SCTP_PRINT_A_STREAM              0x10000000
 #define SCTP_LIST_DELIVERY_Q		 0x20000000
 #define SCTP_DUMP_SEND_T_Q		 0x40000000

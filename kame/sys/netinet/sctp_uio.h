@@ -1,4 +1,4 @@
-/*	$KAME: sctp_uio.h,v 1.2 2002/05/20 05:50:03 itojun Exp $	*/
+/*	$KAME: sctp_uio.h,v 1.3 2002/10/09 18:01:22 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_uio.h,v 1.40 2002/04/04 16:34:41 lei Exp	*/
 
 #ifndef __sctp_uio_h__
@@ -73,6 +73,7 @@ struct sctp_sndrcvinfo {
 	u_int32_t sinfo_context;
 	u_int32_t sinfo_timetolive;
 	u_int32_t sinfo_tsn;
+	u_int32_t sinfo_cumtsn;
 	sctp_assoc_t sinfo_assoc_id;
 };
 
@@ -305,15 +306,12 @@ struct sctp_status {
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
-int	sctp_peeloff	__P((int fd, sctp_assoc_t *id));
-int	sctp_bindx	__P((int fd, struct sockaddr_storage *addrs,
-			     int addrcnt, int flags));
-int	sctp_getpaddrs	__P((int fd, sctp_assoc_t id,
-			     struct sockaddr_storage **addrs));
-void	sctp_freepaddrs	__P((struct sockaddr_storage *addrs));
-int	sctp_getladdrs	__P((int fd, sctp_assoc_t id,
-			     struct sockaddr_storage **addrs));
-void	sctp_freeladdrs	__P((struct sockaddr_storage *addrs));
+int	sctp_peeloff	__P((int, sctp_assoc_t *));
+int	sctp_bindx	__P((int, struct sockaddr_storage *, int, int));
+int	sctp_getpaddrs	__P((int, sctp_assoc_t, struct sockaddr_storage **));
+void	sctp_freepaddrs	__P((struct sockaddr_storage *));
+int	sctp_getladdrs	__P((int, sctp_assoc_t, struct sockaddr_storage **));
+void	sctp_freeladdrs	__P((struct sockaddr_storage *));
 __END_DECLS
 
 #define sctp_opt_info(fd, asoc, opt, arg, sz) \

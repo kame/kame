@@ -1,4 +1,4 @@
-/*	$KAME: sctp_asconf.h,v 1.4 2002/07/30 04:12:34 itojun Exp $	*/
+/*	$KAME: sctp_asconf.h,v 1.5 2002/10/09 18:01:20 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_asconf.h,v 1.15 2002/04/02 15:34:44 lei Exp	*/
 
 #ifndef _NETINET_SCTP_ASCONF_H_
@@ -36,40 +36,30 @@
 
 #ifdef _KERNEL
 
-extern void
-sctp_asconf_cleanup(struct sctp_tcb *tcb, struct sctp_nets *netp);
+extern void sctp_asconf_cleanup(struct sctp_tcb *, struct sctp_nets *);
 
-extern struct mbuf *
-sctp_compose_asconf(struct sctp_tcb *stcb);
+extern struct mbuf *sctp_compose_asconf(struct sctp_tcb *);
 
-extern void
-sctp_handle_asconf(struct mbuf *m, int offset, struct sctp_asconf_chunk *cp,
-		   struct sctp_tcb *stcb, struct sctp_nets *netp);
+extern void sctp_handle_asconf(struct mbuf *, int, struct sctp_asconf_chunk *,
+	struct sctp_tcb *, struct sctp_nets *);
 
-extern void
-sctp_handle_asconf_ack(struct mbuf *m, int offset,
-		       struct sctp_asconf_ack_chunk *cp,
-		       struct sctp_tcb *stcb, struct sctp_nets *netp);
+extern void sctp_handle_asconf_ack(struct mbuf *, int,
+	struct sctp_asconf_ack_chunk *, struct sctp_tcb *, struct sctp_nets *);
 
-extern uint32_t
-sctp_addr_mgmt_ep_sa(struct sctp_inpcb *ep, struct sockaddr *sa,
-		     uint16_t type);
+extern uint32_t sctp_addr_mgmt_ep_sa(struct sctp_inpcb *, struct sockaddr *,
+	uint16_t);
 
-extern void
-sctp_add_ip_address(struct ifaddr *ifa);
+extern void sctp_add_ip_address(struct ifaddr *);
 
-extern void
-sctp_delete_ip_address(struct ifaddr *ifa);
+extern void sctp_delete_ip_address(struct ifaddr *);
 
-extern void
-sctp_set_primary_ip_address(struct ifaddr *ifa);
+extern int32_t sctp_set_primary_ip_address_sa(struct sctp_tcb *,
+	struct sockaddr *);
 
-extern void
-sctp_check_address_list(struct sctp_tcb *stcb,
-			struct mbuf *m, int offset, int length,
-			struct sockaddr *init_addr,
-			uint16_t local_scope, uint16_t site_scope,
-			uint16_t ipv4_scope, uint16_t loopback_scope);
+extern void sctp_set_primary_ip_address(struct ifaddr *);
+
+extern void sctp_check_address_list(struct sctp_tcb *, struct mbuf *, int, int,
+	struct sockaddr *, uint16_t, uint16_t, uint16_t, uint16_t);
 
 #endif /* _KERNEL */
 

@@ -2163,7 +2163,7 @@ ip_setmopt_srcfilter(sop, imsfp)
 		ifp = ro.ro_rt->rt_ifp;
 		rtfree(ro.ro_rt);
 	} else {
-		ifp = ip_multicast_if(&imsf->imsf_interface, NULL);
+		ifp = ip_multicast_if (&imsf->imsf_interface, NULL);
 	}
 	/*
 	 * See if we found an interface, and confirm that it supports multicast.
