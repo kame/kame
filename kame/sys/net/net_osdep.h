@@ -74,7 +74,7 @@
  *	NetBSD, OpenBSD, BSDI [34], FreeBSD 2
  *		timeout() is a void function
  *	FreeBSD 3
- *		timeout() is non-void, must keep returned value for untimeuot()
+ *		timeout() is non-void, must keep returned value for untimeout()
  * - sysctl
  *	NetBSD, OpenBSD
  *		foo_sysctl()
