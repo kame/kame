@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.62 2001/07/29 04:27:25 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.63 2001/07/29 04:53:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -537,7 +537,7 @@ in6_gif_attach(sc)
 	    (struct sockaddr *)&mask6, sc->gif_pdst, (struct sockaddr *)&mask6,
 	    (struct protosw *)&in6_gif_protosw, sc);
 #else
-	sc->encap_cookie6 = encap_attach(AF_INET6, -1, gif_encapcheck,
+	sc->encap_cookie6 = encap_attach_func(AF_INET6, -1, gif_encapcheck,
 	    (struct protosw *)&in6_gif_protosw, sc);
 #endif
 	if (sc->encap_cookie6 == NULL)
