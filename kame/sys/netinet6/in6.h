@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.131 2002/09/05 08:09:36 suz Exp $	*/
+/*	$KAME: in6.h,v 1.132 2002/09/12 08:31:25 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -225,7 +225,7 @@ extern const struct in6_addr in6mask128;
 /* XXX temp. we wait IANA's decision */
 #define IN6ADDR_LINKLOCAL_ALLV2ROUTERS_INIT \
 	{{{ 0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
-	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0f }}}
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16 }}}
 #endif
 
 extern const struct in6_addr in6addr_any;
