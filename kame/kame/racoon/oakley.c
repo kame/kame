@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.80 2001/04/06 01:49:36 thorpej Exp $	*/
+/*	$KAME: oakley.c,v 1.81 2001/04/10 23:43:40 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1161,10 +1161,15 @@ oakley_validate_auth(iph1)
 	    {
 		int error = 0;
 
-		/* validate SIG & CERT */
-		if (iph1->id_p == NULL || iph1->sig_p == NULL) {
+		/* validation */
+		if (iph1->id_p == NULL) {
 			plog(LLV_ERROR, LOCATION, iph1->remote,
-				"few isakmp message received.\n");
+				"no ID payload was passed.\n");
+			return ISAKMP_NTYPE_PAYLOAD_MALFORMED;
+		}
+		if (iph1->sig_p == NULL) {
+			plog(LLV_ERROR, LOCATION, iph1->remote,
+				"no SIG payload was passed.\n");
 			return ISAKMP_NTYPE_PAYLOAD_MALFORMED;
 		}
 		if (iph1->cert_p == NULL && iph1->rmconf->peerscertfile == NULL) {
