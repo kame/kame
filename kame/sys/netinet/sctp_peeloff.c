@@ -1,4 +1,4 @@
-/*	$KAME: sctp_peeloff.c,v 1.2 2002/05/01 06:31:11 itojun Exp $	*/
+/*	$KAME: sctp_peeloff.c,v 1.3 2002/05/20 05:50:03 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_peeloff.c,v 1.16 2002/04/04 19:12:45 randall Exp	*/
 
 /*
@@ -149,6 +149,7 @@ sctp_get_peeloff(struct socket *head, caddr_t assoc_id, int *error)
 	n_inp->sctp_socket = newso;
 	/* Turn off any non-blocking symantic. */
 	newso->so_state &= ~SS_NBIO;
+	newso->so_state |= SS_ISCONNECTED;
 	/* We remove it right away */
 #ifdef __FreeBSD__
 	TAILQ_REMOVE(&head->so_comp, newso, so_list);

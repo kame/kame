@@ -1,4 +1,4 @@
-/*	$KAME: sctp_header.h,v 1.1 2002/04/15 08:34:06 itojun Exp $	*/
+/*	$KAME: sctp_header.h,v 1.2 2002/05/20 05:50:02 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_header.h,v 1.34 2002/04/03 21:10:19 lei Exp	*/
 
 #ifndef __sctp_header_h__
@@ -96,8 +96,8 @@ struct sctp_unrel_streams_param {
 
 /* draft-ietf-tsvwg-addip-sctp */
 struct sctp_asconf_paramhdr {		/* an ASCONF "parameter" */
-	u_int32_t correlation_id;	/* correlation id for this param */
 	struct sctp_paramhdr ph;	/* a SCTP parameter header */
+	u_int32_t correlation_id;	/* correlation id for this param */
 };
 
 struct sctp_asconf_addr_param {		/* an ASCONF address parameter */
@@ -324,17 +324,15 @@ struct sctp_shutdown_complete_msg {
 struct sctp_asconf_chunk {
 	struct sctp_chunkhdr ch;
 	u_int32_t serial_number;
-	u_int8_t reserved[3];
-	u_int8_t address_type;		/* ASCONF address type */
-	u_int8_t address[16];
-	/* asconf correlation/parameters follow */
+	/* lookup address parameter (mandatory) */
+	/* asconf parameters follow */
 };
 
 /* Address/Stream Configuration Acknowledge (ASCONF ACK) */
 struct sctp_asconf_ack_chunk {
 	struct sctp_chunkhdr ch;
 	u_int32_t serial_number;
-	/* asconf correlation/parameters follow */
+	/* asconf parameters follow */
 };
 
 /* draft-ietf-tsvwg-usctp */

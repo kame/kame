@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.2 2002/05/01 06:31:11 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.3 2002/05/20 05:50:03 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.c,v 1.153 2002/04/04 16:59:01 randall Exp	*/
 
 /*
@@ -287,11 +287,11 @@ sctp_init_asoc(struct sctp_inpcb *m, struct sctp_association *asoc,
 		/* Now look at the binding flag to see if V4 will be legal */
 		if (
 #ifndef __OpenBSD__
-		    (in_inp->inp_flags & IN6P_IPV6_V6ONLY) 
+			(in_inp->inp_flags & IN6P_IPV6_V6ONLY) 
 #else
-		    (0)
+			(0)
 #endif
-		    == 0) {
+			== 0) {
 
 			asoc->ipv4_addr_legal = 1;
 		} else {
@@ -363,7 +363,7 @@ sctp_timeout_handler(void *t)
 	struct sctp_tcb *tcb;
 	struct sctp_nets *net;
 	struct sctp_timer *tmr;
-	int s, did_output;
+	int s, did_output, typ;
 
 	tmr = (struct sctp_timer *)t;
 	ep = (struct sctp_inpcb *)tmr->ep;
@@ -402,6 +402,7 @@ sctp_timeout_handler(void *t)
 		splx(s);
 		return;
 	}
+	typ = tmr->type;
 	switch(tmr->type) {
 		/* call the handler for the appropriate timer type */
 	case SCTP_TIMER_TYPE_SEND:
@@ -417,48 +418,48 @@ sctp_timeout_handler(void *t)
 	case SCTP_TIMER_TYPE_RECV:
 		sctp_pegs[SCTP_RECV_TIMER]++;
 		sctp_send_sack(tcb);
-		sctp_chunk_output(ep, tcb, 0);
+		sctp_chunk_output(ep, tcb, 4);
 		break;
 	case SCTP_TIMER_TYPE_SHUTDOWN:
 		sctp_shutdown_timer(ep,tcb,net);
-		sctp_chunk_output(ep, tcb, 0);
+		sctp_chunk_output(ep, tcb, 5);
 		break;
 	case SCTP_TIMER_TYPE_HEARTBEAT:
 		sctp_heartbeat_timer(ep,tcb,net);
-		sctp_chunk_output(ep, tcb, 0);
+		sctp_chunk_output(ep, tcb, 6);
 		break;
 	case SCTP_TIMER_TYPE_COOKIE:
 		sctp_cookie_timer(ep,tcb,net);
 		sctp_chunk_output(ep, tcb, 1);
 		break;
 	case SCTP_TIMER_TYPE_NEWCOOKIE:
-		{
-			struct timeval time;
-			int i, secret;
-			SCTP_GETTIME_TIMEVAL(&time);
-			ep->sctp_ep.time_of_secret_change = time.tv_sec;
-			ep->sctp_ep.last_secret_number = ep->sctp_ep.current_secret_number;
-			ep->sctp_ep.current_secret_number++;
-			if (ep->sctp_ep.current_secret_number >=
-			    SCTP_HOW_MANY_SECRETS) {
-				ep->sctp_ep.current_secret_number = 0;
-			}
-			secret = (int)ep->sctp_ep.current_secret_number;
-			for(i=0; i<SCTP_NUMBER_OF_SECRETS; i++) {
-				ep->sctp_ep.secret_key[secret][i] = sctp_select_initial_TSN(&ep->sctp_ep);
-			}
-			sctp_timer_start(SCTP_TIMER_TYPE_NEWCOOKIE, ep,
-					 tcb, net);
+	{
+		struct timeval time;
+		int i, secret;
+		SCTP_GETTIME_TIMEVAL(&time);
+		ep->sctp_ep.time_of_secret_change = time.tv_sec;
+		ep->sctp_ep.last_secret_number = ep->sctp_ep.current_secret_number;
+		ep->sctp_ep.current_secret_number++;
+		if (ep->sctp_ep.current_secret_number >=
+		    SCTP_HOW_MANY_SECRETS) {
+			ep->sctp_ep.current_secret_number = 0;
 		}
-		did_output = 0;
-		break;
+		secret = (int)ep->sctp_ep.current_secret_number;
+		for(i=0; i<SCTP_NUMBER_OF_SECRETS; i++) {
+			ep->sctp_ep.secret_key[secret][i] = sctp_select_initial_TSN(&ep->sctp_ep);
+		}
+		sctp_timer_start(SCTP_TIMER_TYPE_NEWCOOKIE, ep,
+				 tcb, net);
+	}
+	did_output = 0;
+	break;
 	case SCTP_TIMER_TYPE_PATHMTURAISE:
 		sctp_pathmtu_timer(ep, tcb, net);
 		did_output = 0;
 		break;
 	case SCTP_TIMER_TYPE_SHUTDOWNACK:
 		sctp_shutdownack_timer(ep, tcb, net);
-		sctp_chunk_output(ep, tcb, 0);
+		sctp_chunk_output(ep, tcb, 7);
 		break;
 	case SCTP_TIMER_TYPE_SHUTDOWNGUARD:
 		sctp_abort_an_association(ep, tcb,
@@ -467,7 +468,7 @@ sctp_timeout_handler(void *t)
 		break;
 	case SCTP_TIMER_TYPE_ASCONF:
 		sctp_asconf_timer(ep, tcb, net);
-		sctp_chunk_output(ep, tcb, 0);
+		sctp_chunk_output(ep, tcb, 8);
 		break;
 	case SCTP_TIMER_TYPE_AUTOCLOSE:
 		sctp_autoclose_timer(ep, tcb, net);
@@ -495,7 +496,7 @@ sctp_timeout_handler(void *t)
 	}
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_TIMER1) {
-		printf("Timer now complete\n");
+		printf("Timer now complete (type %d)\n",typ);
 	}
 #endif /* SCTP_DEBUG */
 }
@@ -828,6 +829,15 @@ sctp_timer_stop(int t_type,
 #endif /* SCTP_DEBUG */
 		break;
 	};
+	if(tmr->type != t_type){
+		/* Ok we have a timer that is under
+		 * joint use. Cookie timer per chance with
+		 * the SEND timer. We therefore are NOT
+		 * running the timer that the caller wants
+		 * stopped. so just return.
+		 */
+		return(0);
+	}
 	if (tmr == NULL)
 		return(EFAULT);
 
@@ -978,7 +988,8 @@ u_int32_t
 sctp_calculate_rto(struct sctp_tcb *stcb,
 		   struct sctp_association *assoc,
 		   struct sctp_nets *net,
-		   struct timeval *old) {
+		   struct timeval *old) 
+{
 	/* 
 	 * given an association and the starting time of the current RTT 
 	 * period (in value1/value2) return RTO in number of usecs.
@@ -1030,11 +1041,11 @@ sctp_calculate_rto(struct sctp_tcb *stcb,
 	/* per Section 5.3.1 C3 in SCTP */
 	/*		net->lastsv = (int) 	*//* RTTVAR */
 	/*			(((double)(1.0 - 0.25) * (double)net->lastsv) +
-			(double)(0.25 * (double)abs(net->lastsa - calc_time)));
-			net->lastsa = (int) */	/* SRTT */
+				(double)(0.25 * (double)abs(net->lastsa - calc_time)));
+				net->lastsa = (int) */	/* SRTT */
 	/*(((double)(1.0 - 0.125) * (double)net->lastsa) +
-	   (double)(0.125 * (double)calc_time));
-	   } else {
+	  (double)(0.125 * (double)calc_time));
+	  } else {
 	*//* the first RTT calculation, per C2 Section 5.3.1 */
 	/*		net->lastsa = calc_time;	*//* SRTT */
 	/*		net->lastsv = calc_time / 2;	*//* RTTVAR */
@@ -1200,13 +1211,27 @@ extern void in6_sin_2_v4mapsin6 (struct sockaddr_in *sin,
 				 struct sockaddr_in6 *sin6);
 #endif
 
+extern int sctp_deliver_data(struct sctp_tcb *stcb,
+			     struct sctp_association *asoc,
+			     struct sctp_tmit_chunk *chk);
+
 static void
 sctp_notify_assoc_change(u_int32_t event, struct sctp_tcb *stcb,
-			 u_int32_t error) {
+			 u_int32_t error) 
+{
 	struct mbuf *m_notify;
 	struct sctp_assoc_change *sac;
 	struct sockaddr *to;
 	struct sockaddr_in6 sin6, lsa6;
+
+         /* First if we are are going down dump everything we
+	  * can to the socket rcv queue.
+	  */
+	if((event == SCTP_SHUTDOWN_COMP) ||
+	   (event == SCTP_COMM_LOST)){
+		sctp_deliver_data(stcb,&stcb->asoc,NULL);
+	}
+
 #ifdef SCTP_TCP_MODEL_SUPPORT
 	/*
 	 * For TCP model AND UDP connected sockets we will send
@@ -1214,10 +1239,10 @@ sctp_notify_assoc_change(u_int32_t event, struct sctp_tcb *stcb,
 	if (((stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) ||
 	     (stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_IN_TCPPOOL))
 	    && (event == SCTP_COMM_LOST)) {
-	  stcb->sctp_socket->so_error = ECONNRESET;
-	  /* Wake ANY sleepers */
-	  sowwakeup(stcb->sctp_socket);
-	  sorwakeup(stcb->sctp_socket);
+		stcb->sctp_socket->so_error = ECONNRESET;
+		/* Wake ANY sleepers */
+		sowwakeup(stcb->sctp_socket);
+		sorwakeup(stcb->sctp_socket);
 	}
 #endif /* SCTP_TCP_MODEL_SUPPORT */
 	if (!(stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_RECVASSOCEVNT)) {
@@ -1257,10 +1282,10 @@ sctp_notify_assoc_change(u_int32_t event, struct sctp_tcb *stcb,
 						   &lsa6);
 	/*
 	  We need to always notify comm changes.
- 	if (sctp_sbspace(&stcb->sctp_socket->so_rcv) < m_notify->m_len) {
-	 	m_freem(m_notify);
- 		return;
-	}
+	  if (sctp_sbspace(&stcb->sctp_socket->so_rcv) < m_notify->m_len) {
+	  m_freem(m_notify);
+	  return;
+	  }
 	*/
 	if (sbappendaddr_nocheck(&stcb->sctp_socket->so_rcv, 
 				 to, m_notify, NULL) == 0)
@@ -1273,7 +1298,8 @@ sctp_notify_assoc_change(u_int32_t event, struct sctp_tcb *stcb,
 
 static void
 sctp_notify_peer_addr_change(struct sctp_tcb *stcb, uint32_t state,
-			     struct sockaddr *sa, uint32_t error) {
+			     struct sockaddr *sa, uint32_t error) 
+{
 	struct mbuf *m_notify;
 	struct sctp_paddr_change *spc;
 	struct sockaddr *to;
@@ -1331,7 +1357,8 @@ sctp_notify_peer_addr_change(struct sctp_tcb *stcb, uint32_t state,
 
 static void
 sctp_notify_send_failed(struct sctp_tcb *stcb, u_int32_t error,
-			struct sctp_tmit_chunk *chk) {
+			struct sctp_tmit_chunk *chk) 
+{
 	struct mbuf *m_notify;
 	struct sctp_send_failed *ssf;
 	struct sockaddr_in6 sin6, lsa6;
@@ -1499,7 +1526,8 @@ sctp_notify_partial_delivery_indication(struct sctp_tcb *stcb,
 }
 
 static void
-sctp_notify_shutdown_event(struct sctp_tcb *stcb) {
+sctp_notify_shutdown_event(struct sctp_tcb *stcb) 
+{
 	struct mbuf *m_notify;
 	struct sctp_shutdown_event *sse;
 	struct sockaddr_in6 sin6, lsa6;
@@ -1548,7 +1576,12 @@ sctp_notify_shutdown_event(struct sctp_tcb *stcb) {
 
 void
 sctp_ulp_notify(u_int32_t notification, struct sctp_tcb *stcb,
-		u_int32_t error, void *data) {
+		u_int32_t error, void *data) 
+{
+	if(stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE){
+		/* No notifications up when we are in a no socket state */
+		return;
+	}
 	switch (notification) {
 	case SCTP_NOTIFY_ASSOC_UP:
 		sctp_notify_assoc_change(SCTP_COMM_UP, stcb, error);
@@ -1557,24 +1590,24 @@ sctp_ulp_notify(u_int32_t notification, struct sctp_tcb *stcb,
 		sctp_notify_assoc_change(SCTP_SHUTDOWN_COMP, stcb, error);
 		break;
 	case SCTP_NOTIFY_INTERFACE_DOWN:
-		{
-			struct sctp_nets *net;
-			net = (struct sctp_nets *)data;
-			sctp_notify_peer_addr_change(stcb, SCTP_ADDR_UNREACHABL,
-						     (struct sockaddr *)&net->ra._l_addr,
-						     error);
+	{
+		struct sctp_nets *net;
+		net = (struct sctp_nets *)data;
+		sctp_notify_peer_addr_change(stcb, SCTP_ADDR_UNREACHABL,
+					     (struct sockaddr *)&net->ra._l_addr,
+					     error);
 
-		}
-		break;
+	}
+	break;
 	case SCTP_NOTIFY_INTERFACE_UP:
-		{
-			struct sctp_nets *net;
-			net = (struct sctp_nets *)data;
-			sctp_notify_peer_addr_change(stcb, SCTP_ADDR_AVAILABLE,
-						     (struct sockaddr *)&net->ra._l_addr,
-						     error);
-		}
-		break;
+	{
+		struct sctp_nets *net;
+		net = (struct sctp_nets *)data;
+		sctp_notify_peer_addr_change(stcb, SCTP_ADDR_AVAILABLE,
+					     (struct sockaddr *)&net->ra._l_addr,
+					     error);
+	}
+	break;
 	case SCTP_NOTIFY_DG_FAIL:
 		sctp_notify_send_failed(stcb, error,
 					(struct sctp_tmit_chunk *)data);
@@ -1917,7 +1950,8 @@ sctp_is_there_an_abort_here(struct mbuf *m, int off)
  * so, create this function to compare link local scopes
  */
 uint32_t
-sctp_is_same_scope(struct sockaddr_in6 *addr1, struct sockaddr_in6 *addr2) {
+sctp_is_same_scope(struct sockaddr_in6 *addr1, struct sockaddr_in6 *addr2) 
+{
 	struct sockaddr_in6 a, b;
 	/* save copies */
 	a = *addr1;
@@ -1943,7 +1977,8 @@ sctp_is_same_scope(struct sockaddr_in6 *addr1, struct sockaddr_in6 *addr2) {
  * returns a sockaddr_in6 with embedded scope recovered and removed
  */
 struct sockaddr_in6 *
-sctp_recover_scope(struct sockaddr_in6 *addr, struct sockaddr_in6 *store) {
+sctp_recover_scope(struct sockaddr_in6 *addr, struct sockaddr_in6 *store) 
+{
 	/* check and strip embedded scope junk */
 	if (addr->sin6_family == AF_INET6) {
 		if (IN6_IS_SCOPE_LINKLOCAL(&addr->sin6_addr)) {
@@ -2098,8 +2133,8 @@ sbappendaddr_nocheck(sb, asa, m0, control)
 	struct mbuf *m, *n;
 	int space = asa->sa_len;
 
-if (m0 && (m0->m_flags & M_PKTHDR) == 0)
-panic("sbappendaddr");
+	if (m0 && (m0->m_flags & M_PKTHDR) == 0)
+		panic("sbappendaddr");
 	if (m0)
 		space += m0->m_pkthdr.len;
 	for (n = control; n; n = n->m_next) {
@@ -2138,8 +2173,8 @@ panic("sbappendaddr");
 	register struct mbuf *m, *n;
 	int space = asa->sa_len;
 
-if (m0 && (m0->m_flags & M_PKTHDR) == 0)
-panic("sbappendaddr");
+	if (m0 && (m0->m_flags & M_PKTHDR) == 0)
+		panic("sbappendaddr");
 	if (m0)
 		space += m0->m_pkthdr.len;
 	for (n = control; n; n = n->m_next) {

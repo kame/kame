@@ -1,4 +1,4 @@
-/*	$KAME: sctp_sha1.c,v 1.1 2002/04/15 08:34:07 itojun Exp $	*/
+/*	$KAME: sctp_sha1.c,v 1.2 2002/05/20 05:50:03 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_sha1.c,v 1.6 2002/04/04 17:43:19 randall Exp	*/
 
 /*

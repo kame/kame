@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.3 2002/05/01 06:31:12 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.4 2002/05/20 05:50:04 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_usrreq.c,v 1.81 2002/04/04 21:53:15 randall Exp	*/
 
 /*
@@ -346,9 +346,9 @@ sctp6_input(mp, offp, proto)
 	{
 		int s;
 		s = splnet();
-		(void)sctp_common_input_processing(&in6p, stcb, netp, sh,
-						   ch, &m, iphlen, &offset,
-						   &length, ecn_bits);
+		(void)sctp_common_input_processing(in6p, stcb, netp, sh,
+						   ch, m, iphlen, offset,
+						   length, ecn_bits);
 		splx(s);
 	}
 	/* XXX this stuff below gets moved to appropriate parts later... */
@@ -585,7 +585,7 @@ sctp6_abort(struct socket *so)
 		return EINVAL;	/* ??? possible? panic instead? */
 	soisdisconnected(so);
  	s = splnet();
-	sctp_inpcb_free(inp);
+	sctp_inpcb_free(inp,1);
 	splx(s);
 	return 0;
 }
@@ -760,7 +760,7 @@ sctp6_detach(struct socket *so)
 	if (inp == 0)
 		return EINVAL;
 	s = splnet();
-	sctp_inpcb_free(inp);
+	sctp_inpcb_free(inp,0);
 	splx(s);
 	return 0;
 }

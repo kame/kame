@@ -1,4 +1,4 @@
-/*	$KAME: sctp_uio.h,v 1.1 2002/04/15 08:34:07 itojun Exp $	*/
+/*	$KAME: sctp_uio.h,v 1.2 2002/05/20 05:50:03 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_uio.h,v 1.40 2002/04/04 16:34:41 lei Exp	*/
 
 #ifndef __sctp_uio_h__
@@ -111,6 +111,12 @@ struct sctp_assoc_change {
 	u_int16_t sac_outbound_streams;
 	u_int16_t sac_inbound_streams;
 	sctp_assoc_t sac_assoc_id;
+};
+struct sctp_sockstat {
+	sctp_assoc_t ss_assoc_id;
+	u_int32_t ss_total_sndbuf;
+	u_int32_t ss_total_mbuf_sndbuf;
+	u_int32_t ss_total_recv_buf;
 };
 /* sac_state values */
 #define SCTP_COMM_UP		0x0001

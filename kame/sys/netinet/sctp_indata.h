@@ -1,4 +1,4 @@
-/*	$KAME: sctp_indata.h,v 1.1 2002/04/15 08:34:07 itojun Exp $	*/
+/*	$KAME: sctp_indata.h,v 1.2 2002/05/20 05:50:02 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_indata.h,v 1.12 2002/04/01 21:59:20 randall Exp	*/
 
 #ifndef __sctp_indata_h__

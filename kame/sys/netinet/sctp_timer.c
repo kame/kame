@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.3 2002/05/01 06:31:11 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.4 2002/05/20 05:50:03 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_timer.c,v 1.60 2002/04/04 17:47:19 randall Exp	*/
 
 /*
@@ -513,8 +513,10 @@ sctp_t3rxt_timer(struct sctp_inpcb *ep,
 	alt = sctp_find_alternate_net(tcb, net);
 	win_probe = sctp_mark_all_for_resend(tcb, net, alt);
 
-	/* Backoff the timer and cwnd */
+	/* Loss recovery just ended. */
+	tcb->asoc.fast_retran_loss_recovery = 0;
 
+	/* Backoff the timer and cwnd */
 	sctp_backoff_on_timeout(ep, net, win_probe);
 	if (win_probe == 0) {
 		/* We don't do normal threshold management on window probes */
@@ -919,7 +921,7 @@ void sctp_autoclose_timer(struct sctp_inpcb *ep,
 			 * have hanging data. We can then safely check the
 			 * queues and know that we are clear to send shutdown
 			 */
-			sctp_chunk_output(ep, tcb, 0);
+			sctp_chunk_output(ep, tcb, 9);
 			/* Are we clean? */
 			if (TAILQ_EMPTY(&asoc->send_queue) &&
 			    TAILQ_EMPTY(&asoc->sent_queue)) {

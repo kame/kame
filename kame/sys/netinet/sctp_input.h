@@ -1,4 +1,4 @@
-/*	$KAME: sctp_input.h,v 1.1 2002/04/15 08:34:07 itojun Exp $	*/
+/*	$KAME: sctp_input.h,v 1.2 2002/05/20 05:50:03 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_input.h,v 1.8 2002/04/01 21:59:20 randall Exp	*/
 
 #ifndef __sctp_input_h__
@@ -35,15 +35,15 @@
 
 #ifdef _KERNEL
 int
-sctp_common_input_processing(struct sctp_inpcb **inp,
+sctp_common_input_processing(struct sctp_inpcb *inp,
 			     struct sctp_tcb *stcb,
 			     struct sctp_nets *netp,
 			     struct sctphdr *sh,
 			     struct sctp_chunkhdr *ch,
-			     struct mbuf **m,
+			     struct mbuf *m,
 			     int iphlen,
-			     int *offset,
-			     int *length,
+			     int offset,
+			     int length,
 			     u_int8_t ecn_bits);
 void
 sctp_process_unrecog_param(struct sctp_tcb *tcb,

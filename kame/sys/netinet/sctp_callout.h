@@ -1,4 +1,4 @@
-/*	$KAME: sctp_callout.h,v 1.1 2002/04/15 08:34:06 itojun Exp $	*/
+/*	$KAME: sctp_callout.h,v 1.2 2002/05/20 05:50:02 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_callout.h,v 1.3 2002/04/04 16:35:21 randall Exp	*/
 
 #ifndef __SCTP_CALLOUT__

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.h,v 1.2 2002/05/01 06:31:11 itojun Exp $	*/
+/*	$KAME: sctp_pcb.h,v 1.3 2002/05/20 05:50:03 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.h,v 1.92 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef __sctp_pcb_h__
@@ -104,6 +104,7 @@ LIST_HEAD(sctpvtaghead, sctp_tagblock);
 #define SCTP_PCB_FLAGS_BOUND_V6		0x01000000
 #define SCTP_PCB_FLAGS_NEEDS_MAPPED_V4	0x02000000
 #define SCTP_PCB_FLAGS_BLOCKING_IO      0x04000000
+#define SCTP_PCB_FLAGS_SOCKET_GONE	0x08000000
 
 /* flags to copy to new PCB */
 #define SCTP_PCB_COPY_FLAGS             0x0707ff64
@@ -385,7 +386,7 @@ int
 sctp_inpcb_alloc(struct socket *sp);
 
 void
-sctp_inpcb_free(struct sctp_inpcb *ep);
+sctp_inpcb_free(struct sctp_inpcb *ep,int immediate);
 
 struct sctp_tcb *
 sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
@@ -418,6 +419,8 @@ void sctp_pcb_init(void);
 void
 sctp_free_remote_addr(struct sctp_nets *net);
 
+struct sctp_tcb *
+sctp_findassociation_associd(caddr_t asoc_id);
 
 int
 sctp_add_local_addr_assoc(struct sctp_tcb *stcb, struct ifaddr *ifa);

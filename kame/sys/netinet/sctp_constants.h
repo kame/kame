@@ -1,4 +1,4 @@
-/*	$KAME: sctp_constants.h,v 1.1 2002/04/15 08:34:06 itojun Exp $	*/
+/*	$KAME: sctp_constants.h,v 1.2 2002/05/20 05:50:02 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_constants.h,v 1.61 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef __sctp_constants_h__
@@ -73,6 +73,7 @@
 #define SCTP_ADLER32_BASE 65521
 #endif
 
+#define SCTP_CWND_POSTS_LIST 256
 /* 
  * the SCTP protocol signature 
  * this includes the version number encoded in the last 4 bits
@@ -240,6 +241,7 @@
 #define SCTP_STATE_SHUTDOWN_RECEIVED	0x0020
 #define SCTP_STATE_SHUTDOWN_ACK_SENT	0x0040
 #define SCTP_STATE_SHUTDOWN_PENDING	0x0080
+#define SCTP_STATE_CLOSED_SOCKET	0x0100
 #define SCTP_STATE_MASK			0x007f
 
 
@@ -428,8 +430,8 @@
  * SWS is scaled to the sb_hiwat of the socket.
  * A value of 2 is hiwat/4, 1 would be hiwat/2 etc.
  */
-/* What receiver needs to see in sockbuf or we tell peer its 0 */
-#define SCTP_SWS_RECEIVER_DEF	2
+/* What receiver needs to see in sockbuf or we tell peer its 1 */
+#define SCTP_SWS_RECEIVER_DEF	3000
 
 
 /* amount peer is obligated to have in rwnd or I will abort */
@@ -526,7 +528,7 @@
 #define SCTP_UNSET_TSN_PRESENT(arry, gap) (arry[(gap>>3)] &= ((~(0x01 << ((gap&0x07)))) & 0xff))
 
 /* pegs */
-#define SCTP_NUMBER_OF_PEGS 32
+#define SCTP_NUMBER_OF_PEGS 36
 /* peg index's */
 #define SCTP_PEG_SACKS_SEEN 0 /* XX */
 #define SCTP_PEG_SACKS_SENT 1 /* XX */
@@ -546,7 +548,7 @@
 #define SCTP_HB_TIMER      15 /* XX */
 #define SCTP_FAST_RETRAN   16 /* XX */
 #define SCTP_TIMERS_EXP    17 /* XX */
-#define SCTP_NONE_LFT_TO   18
+#define SCTP_FR_INAWINDOW  18 /* XX */
 #define SCTP_RWND_BLOCKED  19 /* XX */
 #define SCTP_CWND_BLOCKED  20 /* XX */
 #define SCTP_RWND_DROPS    21 /* XX */
@@ -560,6 +562,10 @@
 #define SCTP_IN_MCAST      29 /* XX */
 #define SCTP_HDR_DROPS     30 /* XX */
 #define SCTP_NOPORTS	   31 /* XX */
+#define SCTP_CWND_NOFILL   32 /* XX */
+#define SCTP_CALLS_TO_CO   33 /* XX */
+#define SCTP_CO_NODATASNT  34 /* XX */
+#define SCTP_CWND_INCRS    35 /* XX */
 
 
 /* 

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_structs.h,v 1.2 2002/05/01 06:31:11 itojun Exp $	*/
+/*	$KAME: sctp_structs.h,v 1.3 2002/05/20 05:50:03 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_structs.h,v 1.67 2002/04/03 21:10:19 lei Exp	*/
 
 #ifndef __sctp_structs_h__
@@ -343,6 +343,7 @@ struct sctp_association {
 	 */
 	struct sctpchunk_listhead sent_queue;
 	int sent_queue_cnt;
+	int sent_queue_cnt_removeable;
 	/* 
 	 * Number on sent queue that are marked for retran until this
 	 * value is 0 we only send one packet of retran'ed data.
@@ -427,6 +428,7 @@ struct sctp_association {
 	int stale_cookie_count;
 	u_int32_t last_echo_tsn;
 	u_int32_t last_cwr_tsn;
+	u_int32_t fast_recovery_tsn;
 
 	int numduptsns;
 	int dup_tsns[SCTP_MAX_DUP_TSNS];
@@ -485,6 +487,7 @@ struct sctp_association {
 	/* flags to handle send alternate net tracking */
 	u_int8_t used_alt_onsack;
 	u_int8_t used_alt_asconfack;
+	u_int8_t fast_retran_loss_recovery;
 	/*
 	 * The mapping array is used to track out of order sequences
 	 * above last_acked_seq. 0 indicates packet missing 1 indicates

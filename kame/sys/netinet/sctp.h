@@ -1,4 +1,4 @@
-/*	$KAME: sctp.h,v 1.3 2002/05/01 06:31:11 itojun Exp $	*/
+/*	$KAME: sctp.h,v 1.4 2002/05/20 05:50:02 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp.h,v 1.43 2002/04/02 15:34:44 lei Exp	*/
 
 #ifndef _NETINET_SCTP_H_
@@ -110,7 +110,7 @@ struct sctp_paramhdr {
 /* Blocking I/O is controled by the SS_NBIO flag on the
  * socket state so_state field. 
  */
-
+#define SCTP_GET_SNDBUF_USE		 0x00008000
 /* latter added read/write */
 #define SCTP_SET_ADAPTION_LAYER_BITS	 0x00010000
 #define SCTP_DISABLE_FRAGMENTS           0x00020000
@@ -133,6 +133,7 @@ struct sctp_paramhdr {
 #define SCTP_PRINT_A_STREAM              0x10000000
 #define SCTP_LIST_DELIVERY_Q		 0x20000000
 #define SCTP_DUMP_SEND_T_Q		 0x40000000
+#define SCTP_PRINT_CWND_UPDATES		 0x80000000
 
 /*
  * user state values

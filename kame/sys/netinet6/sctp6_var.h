@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_var.h,v 1.2 2002/04/15 10:24:54 itojun Exp $	*/
+/*	$KAME: sctp6_var.h,v 1.3 2002/05/20 05:50:04 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_var.h,v 1.13 2002/04/04 19:23:44 randall Exp	*/
 
 /*
