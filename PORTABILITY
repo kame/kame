@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.42 2000/05/13 22:30:30 itojun Exp $
+	$Id: PORTABILITY,v 1.43 2000/05/25 02:06:22 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -296,3 +296,7 @@ across those possibilities.
 - (Not really a portability issue)  Fixes/improvements to libpcap and tcpdump
   should be sent to itojun, or patches@tcpdump.org.  We no longer maintain
   libpcap/tcpdump under "kame" directory.  http://www.tcpdump.org/
+
+- freebsd and bsdi3 do not have satosin() in sys/netinet/in.h.  not sure
+  where is the origin for this macro.  do not use it, or define it locally
+  in C source if you don't have one (#ifndef - #define).
