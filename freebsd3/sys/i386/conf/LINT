@@ -2057,21 +2057,25 @@ options		SPX_HACK
 options		VFS_BIO_DEBUG
 
 # ALTQ options
-options		ALTQ			#alternate queueing
-options		CBQ			#class based queueing
-options		WFQ			#weighted fair queueing
-options		AFMAP			#atm flow mapping
-options		FIFOQ			#fifo queueing
-options		RED			#random early detection
-options		FLOWVALVE		#flowvalve for RED (needs RED)
-options		CBQ_RED			#red for cbq (needs (CBQ and RED)
-options		RIO			#twin red for diffserv (needs RED)
-options		CBQ_RIO			#rio for cbq (needs CBQ, RIO, CBQ_RED)
-options		LOCALQ			#local use
-options		ALTQ_ACCOUNT		#altq accounting
-options		ALTQ_ECN		#ecn extention to tcp (needs RED)
-options		ALTQ_IPSEC		#check ipsec in IPv4
-options		ALTQ_PPP		#sio modification for userland ppp
+options 	ALTQ		#alternate queueing
+options 	CBQ		#class based queueing
+options 	WFQ		#weighted fair queueing
+options 	AFMAP		#atm flow mapping
+options 	FIFOQ		#fifo queueing
+options 	RED		#random early detection
+options 	FLOWVALVE	#flowvalve for RED (needs RED)
+options 	CBQ_RED		#red for cbq (needs CBQ and RED)
+options 	RIO		#twin red for diffserv (needs RED)
+options 	CBQ_RIO		#rio for cbq (needs CBQ, RIO, RED, CBQ_RED)
+options 	LOCALQ		#local use
+options 	HFSC		#hierarchical fair service curve
+options 	HFSC_RED	#red for hfsc (needs HFSC and RED)
+options 	HFSC_RIO	#rio for hfsc (needs HFSC, RIO, RED, HFSC_RED)
+options 	ALTQ_ACCOUNT	#altq accounting
+options 	ALTQ_ECN	#ecn extention to tcp (needs RED)
+options 	ALTQ_IPSEC	#check ipsec in IPv4
+options 	CDNR		#diffserv traffic conditioner
+options 	BLUE		#blue by wu-chang feng
 
 # The 'dpt' driver provides support for DPT controllers (http://www.dpt.com/).
 # These have hardware RAID-{0,1,5} support, and do multi-initiator I/O.

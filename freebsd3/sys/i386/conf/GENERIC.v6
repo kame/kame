@@ -16,7 +16,7 @@
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
 # $FreeBSD: src/sys/i386/conf/GENERIC,v 1.143.2.22 1999/09/14 22:53:30 jkh Exp $
-# $Id: GENERIC.v6,v 1.5 1999/09/22 03:54:57 sumikawa Exp $
+# $Id: GENERIC.v6,v 1.6 1999/10/02 06:54:59 itojun Exp $
 
 machine		"i386"
 cpu		"I386_CPU"
@@ -56,19 +56,26 @@ options	MAPPED_ADDR_ENABLED	#enable IPv4, on IPv6 socket
 #options 	"IPV6FIREWALL_DEFAULT_TO_ACCEPT"
 
 # ALTQ
-options		ALTQ			#alternate queueing
-options		CBQ			#class based queueing
-options		WFQ			#weighted fair queueing
-#options	FIFOQ			#fifo queueing
-options		RED			#random early detection
-options		CBQ_RED			#red for cbq
-#options	RIO			#twin red for diffserv (needs RED)
-#options	CBQ_RIO			#rio for cbq (needs CBQ, RIO, CBQ_RED)
-#options	LOCALQ			#local use
-options		ALTQ_ACCOUNT		#altq accounting
-#options	ALTQ_ECN		#ecn extention to tcp
-# you might want to set kernel timer to 1kHz if you use CBQ with 100baseT
-#options	HZ=1000
+options 	ALTQ		#alternate queueing
+#options 	CBQ		#class based queueing
+#options 	WFQ		#weighted fair queueing
+#options 	FIFOQ		#fifo queueing
+#options 	RED		#random early detection
+#options 	FLOWVALVE	#flowvalve for RED (needs RED)
+#options 	RIO		#twin red for diffserv (needs RED)
+#options 	CBQ_RED		#red for cbq (needs CBQ and RED)
+#options 	CBQ_RIO		#rio for cbq (needs CBQ, RIO, RED, CBQ_RED)
+#options 	LOCALQ		#local use
+#options 	HFSC		#hierarchical fair service curve
+#options 	HFSC_RED	#red for hfsc (needs HFSC and RED)
+#options 	HFSC_RIO	#rio for hfsc (needs HFSC, RIO, RED, HFSC_RED)
+#options 	ALTQ_ACCOUNT	#altq accounting
+#options 	ALTQ_ECN	#ecn extention to tcp
+#options 	CDNR		#diffserv traffic conditioner
+#options 	BLUE		#blue by wu-chang feng
+# you might want to set kernel timer to 1kHz if you use CBQ,
+# especially with 100baseT
+#options 	HZ=1000
 
 # Packet Management by SuMiRe
 #options 	PM			# SuMiRe (NAT).

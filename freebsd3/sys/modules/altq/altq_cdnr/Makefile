@@ -1,7 +1,7 @@
 
 .PATH:	${.CURDIR}/../../../netinet
-KMOD=	altq_rio
-SRCS=	altq_rio.c opt_altq.h opt_inet.h
+KMOD=	altq_cdnr
+SRCS=	altq_cdnr.c opt_altq.h opt_inet.h
 
 CFLAGS+= -DALTQ
 CLEANFILES+= opt_altq.h opt_inet.h
@@ -10,7 +10,7 @@ ALTQMOD_INET?=	1
 ALTQMOD_INET6?=	0
 
 opt_altq.h:
-	echo "#define RIO 1" > opt_altq.h
+	echo "#define CDNR 1" > opt_altq.h
 
 opt_inet.h:
 	touch opt_inet.h

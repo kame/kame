@@ -509,8 +509,11 @@ netatm/uni/unisig_subr.c	optional atm_uni atm_core
 netatm/uni/unisig_util.c	optional atm_uni atm_core
 netatm/uni/unisig_vc_state.c	optional atm_uni atm_core
 netinet/altq_afmap.c	optional altq
+netinet/altq_blue.c	optional altq
 netinet/altq_cbq.c	optional altq
+netinet/altq_cdnr.c	optional altq
 netinet/altq_fifoq.c	optional altq
+netinet/altq_hfsc.c	optional altq
 netinet/altq_localq.c	optional altq
 netinet/altq_red.c	optional altq
 netinet/altq_rio.c	optional altq

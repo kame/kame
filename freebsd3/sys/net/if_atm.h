@@ -107,7 +107,17 @@ struct pvctxreq {
     int pvc_pcr;			/* peak cell rate (shaper value) */
 };
 
+/* structure to control PVC bridging */
+struct pvcfwdreq {
+    /* first entry must be compatible with struct ifreq */
+    char pvc_ifname[IFNAMSIZ];		/* if name, e.g. "en0" */
+    char pvc_ifname2[IFNAMSIZ];		/* if name to be bridged to/from */
+    int	 pvc_op;			/* 1:add 0:delete */
+};
+
 /* use ifioctl for now */
+#define SIOCSPVCFWD	_IOW('i', 93, struct pvcfwdreq)
+#define SIOCGPVCFWD	_IOWR('i', 94, struct pvcfwdreq)
 #define SIOCSPVCTX	_IOWR('i', 95, struct pvctxreq)
 #define SIOCGPVCTX	_IOWR('i', 96, struct pvctxreq)
 #define SIOCSPVCSIF	_IOWR('i', 97, struct ifreq)
@@ -158,8 +168,10 @@ struct pvcsif {
 	struct ifnet sif_if;		/* ifnet structure per pvc */
 	struct atm_pseudohdr sif_aph;	/* flags + vpi:vci */
 	int	sif_vci;		/* vci no */
+	struct ifnet *sif_fwdifp;	/* bridging ifp */
 	SLIST_ENTRY(pvcsif) sif_links;
 };
 struct ifnet *pvcsif_alloc __P((void));
+int pvc_set_fwd __P((char *, char *, int));
 #endif
 #endif /* ATM_PVCEXT */
