@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.58 2001/12/20 02:09:36 k-sugyou Exp $	*/
+/*	$KAME: config.c,v 1.59 2002/04/28 10:36:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -291,7 +291,7 @@ getconfig(intface)
 	MAYHAVE(val, "clockskew", 0);
 	tmp->clockskew = val;
 
-	if ((pfxs = agetnum("addrs")) < 0) {
+	if ((pfxs = agetnum("addrs")) <= 0) {
 		/* auto configure prefix information */
 		if (agetstr("addr", &bp) || agetstr("addr1", &bp)) {
 			syslog(LOG_ERR,
@@ -301,8 +301,7 @@ getconfig(intface)
 			exit(1);
 		}
 		get_prefix(tmp);
-	}
-	else {
+	} else {
 		tmp->pfxs = pfxs;
 		for (i = 0; i < pfxs; i++) {
 			struct prefix *pfx;
