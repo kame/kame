@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_input.c,v 1.33 1999/03/27 21:04:20 provos Exp $	*/
+/*	$OpenBSD: tcp_input.c,v 1.49 1999/09/01 21:38:21 provos Exp $	*/
 /*	$NetBSD: tcp_input.c,v 1.23 1996/02/13 23:43:44 christos Exp $	*/
 
 /*
@@ -118,121 +118,6 @@ extern u_long sb_max;
 /* for modulo comparisons of timestamps */
 #define TSTMP_LT(a,b)	((int)((a)-(b)) < 0)
 #define TSTMP_GEQ(a,b)	((int)((a)-(b)) >= 0)
-
-#ifdef TCPCOOKIE
-/*
- * Code originally by Matt Blaze and John Ioannidis. This code implements
- * a cookie-like extension for TCP. Adapted to OpenBSD by Angelos D.
- * Keromytis.
- */
-
-#ifndef TCK_NFRIENDS
-#define TCK_NFRIENDS 16
-#endif /* TCK_NFRIENDS */
-
-static struct in_addr tck_friends[TCK_NFRIENDS];
-static int tck_nfriends = 0;
-static int tck_initialized = 0;
-
-#define TCK_PORT  333			/* Unused port! */
-
-static int
-tck_isafriend(struct in_addr f)
-{
-	register int i;
-	
-	for (i = tck_nfriends - 1; i >= 0; i--)
-	  if (tck_friends[i].s_addr == f.s_addr)
-	    return 1;
-
-	return 0;
-}
-
-static void
-tck_delat(int n)
-{
-	int i;
-	
-	if ((n >= tck_nfriends) || (tck_nfriends == 0))
-	  return;
-
-	for (i = n + 1; i < tck_nfriends ; i++)
-	  tck_friends[i - 1] = tck_friends[i];
-
-	tck_nfriends--;
-}
-
-static void
-tck_addfriend(struct in_addr f)
-{
-#ifdef DEBUG_TCPCOOKIE
-	printf("tck_addfriend: 0x%08x\n", ntohl(f.s_addr));
-#endif /* DEBUG_TCPCOOKIE */
-
-	if (tck_isafriend(f))
-	  return;
-
-	if (tck_nfriends == TCK_NFRIENDS)
-	  tck_delat(0);
-
-	tck_friends[tck_nfriends++] = f;
-}
-
-/*
- * static void
- * tck_delfriend(struct in_addr f)
- * {
- *	int i;
- *
- *      for (i = tck_nfriends - 1; i >= 0; i--)
- *        if (tck_friends[i].s_addr == f.s_addr)
- *	    goto found1;
- *	
- *	return;
- *
- * found1:
- *	tck_delat(i);
- * }
-*/
-
-static u_int32_t
-tck_makecookie(f)
-	struct in_addr f;
-{
-	static MD5_CTX ctx;
-	u_int8_t buf[16];
-	MD5_CTX ctx2;
-
-	if (tck_initialized == 0) {	/* This only happens once per reboot */
-		tck_initialized = 1;
-
-		get_random_bytes((void *) buf, 16);
-		MD5Init(&ctx);
-		MD5Update(&ctx, buf, 16);
-	}
-	ctx2 = ctx;
-	MD5Update(&ctx2, (void *) &f, sizeof(f));
-	MD5Final(buf, &ctx2);		/* This may not be necessary */
-	return ((buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3]);
-}	
-
-static int
-tck_chkcookie(ti)
-	struct tcpiphdr *ti;
-{
-#ifdef DEBUG_TCPCOOKIE
-	printf("tck_chkcookie: src = 0x%08x, cookie = 0x%08x, seq = 0x%08x, ack = 0x%08x\n", ntohl(ti->ti_src.s_addr), tck_makecookie(ti->ti_src), ti->ti_seq, ti->ti_ack);
-#endif /* DEBUG_TCPCOOKIE */
-
-	if (tck_makecookie(ti->ti_src) == ti->ti_seq) {
-		/* seq in host order */
-		tck_addfriend(ti->ti_src);
-		return 1;
-	}
-	return 0;
-}
-
-#endif /* TCPCOOKIE */
 
 /*
  * Insert segment ti into reassembly queue of tcp with
@@ -662,22 +547,6 @@ tcp_input(m, va_alist)
 	NTOHS(th->th_win);
 	NTOHS(th->th_urp);
 
-#ifdef TCPCOOKIE
-	/* 
-	 * If this looks like a cookie response, check it.
-	 * If it is, the check routine also adds the source
-	 * of the packet to the friends list.
-	 */
-
-#ifdef INET6
-	if (!is_ipv6 && (tiflags & TH_RST) && (ntohs(th->th_dport) == TCK_PORT))
-#else /* INET6 */
-	if ((tiflags & TH_RST) && (ntohs(ti->ti_dport) == TCK_PORT))
-#endif /* INET6 */
-	  if (tck_chkcookie(ti))
-	    goto drop;			/* RST is no longer needed */
-#endif /* TCPCOOKIE */
-
 	/*
 	 * Locate pcb for segment.
 	 */
@@ -822,7 +691,7 @@ findpcb:
 			    inp->inp_options = ip_srcroute();
 #if INET6
 			  }
-			};
+			}
 #endif /* INET6 */
 			in_pcbrehash(inp);
 			tp = intotcpcb(inp);
@@ -935,6 +804,14 @@ findpcb:
 				tcpstat.tcps_rcvackbyte += acked;
 				sbdrop(&so->so_snd, acked);
 				tp->snd_una = th->th_ack;
+#if defined(TCP_SACK) || defined(TCP_NEWRENO)
+				/* 
+				 * We want snd_last to track snd_una so
+				 * as to avoid sequence wraparound problems
+				 * for very large transfers.
+				 */
+				tp->snd_last = tp->snd_una;
+#endif /* TCP_SACK or TCP_NEWRENO */
 #if defined(TCP_SACK) && defined(TCP_FACK)
 				tp->snd_fack = tp->snd_una;
 				tp->retran_data = 0;
@@ -1056,25 +933,6 @@ findpcb:
 		  }
 #endif /* INET6 */
 		}
-
-#ifdef TCPCOOKIE
-		/*
-		 * If source address is on friends list, proceed, otherwise
-		 * try to obtain a cookie and drop the frame.
-		 */
-		
-		if (!tck_isafriend(ti->ti_src)) {
-			u_int32_t acookie;
-
-			acookie = tck_makecookie(ti->ti_src);
-			ti->ti_dport = htons(TCK_PORT);
-			tcp_respond(tp, ti, m, acookie, acookie, TH_ACK);
-			/* destroy temporarily created socket */
-			if (dropsocket)
-				(void) soabort(so);
-			return;
-		}
-#endif /* TCPCOOKIE */
 
 		/*
 		 * RFC1122 4.2.3.10, p. 104: discard bcast/mcast SYN
@@ -1213,7 +1071,7 @@ findpcb:
 #ifdef TCP_COMPAT_42
 		tcp_iss += TCP_ISSINCR/2;
 #else /* TCP_COMPAT_42 */
-		tcp_iss += arc4random() % (TCP_ISSINCR / 2) + 1;
+		tcp_iss += arc4random() % TCP_ISSINCR + 1;
 #endif /* !TCP_COMPAT_42 */
 		tp->irs = th->th_seq;
 		tcp_sendseqinit(tp);
@@ -1537,8 +1395,12 @@ trimthenstep6:
 	/*
 	 * If the ACK bit is off we drop the segment and return.
 	 */
-	if ((tiflags & TH_ACK) == 0)
-		goto drop;
+	if ((tiflags & TH_ACK) == 0) {
+		if (tp->t_flags & TF_ACKNOW)
+			goto dropafterack;
+		else
+			goto drop;
+	}
 	
 	/*
 	 * Ack processing.
@@ -1949,9 +1811,9 @@ step6:
 	 * Update window information.
 	 * Don't look at window if no ACK: TAC's send garbage on first SYN.
 	 */
-	if (((tiflags & TH_ACK) && SEQ_LT(tp->snd_wl1, th->th_seq)) ||
+	if ((tiflags & TH_ACK) && (SEQ_LT(tp->snd_wl1, th->th_seq) ||
 	    (tp->snd_wl1 == th->th_seq && SEQ_LT(tp->snd_wl2, th->th_ack)) ||
-	    (tp->snd_wl2 == th->th_ack && tiwin > tp->snd_wnd)) {
+	    (tp->snd_wl2 == th->th_ack && tiwin > tp->snd_wnd))) {
 		/* keep track of pure window updates */
 		if (tlen == 0 &&
 		    tp->snd_wl2 == th->th_ack && tiwin > tp->snd_wnd)
@@ -2124,10 +1986,10 @@ dodata:							/* XXX */
 	if (so->so_options & SO_DEBUG) {
 #ifdef INET6
 		if (tp->pf == PF_INET6)
-			tcp_trace(TA_INPUT, ostate, tp, (struct tcpiphdr *) &tcp_saveti6, 0, tlen);
+			tcp_trace(TA_INPUT, ostate, tp, (caddr_t) &tcp_saveti6, 0, tlen);
 		else
 #endif /* INET6 */
-			tcp_trace(TA_INPUT, ostate, tp, &tcp_saveti, 0, tlen);
+			tcp_trace(TA_INPUT, ostate, tp, (caddr_t) &tcp_saveti, 0, tlen);
 	}
 
 	/*
@@ -2183,11 +2045,11 @@ dropwithreset:
 	}
 #endif /* INET6 */
 	if (tiflags & TH_ACK)
-		tcp_respond(tp, ti, m, (tcp_seq)0, th->th_ack, TH_RST);
+		tcp_respond(tp, (caddr_t) ti, m, (tcp_seq)0, th->th_ack, TH_RST);
 	else {
 		if (tiflags & TH_SYN)
 			tlen++;
-		tcp_respond(tp, ti, m, th->th_seq+tlen, (tcp_seq)0,
+		tcp_respond(tp, (caddr_t) ti, m, th->th_seq+tlen, (tcp_seq)0,
 		    TH_RST|TH_ACK);
 	}
 	/* destroy temporarily created socket */
@@ -2202,10 +2064,10 @@ drop:
 	if (tp && (tp->t_inpcb->inp_socket->so_options & SO_DEBUG)) {
 #ifdef INET6
 	  if (tp->pf == PF_INET6)
-	    tcp_trace(TA_DROP, ostate, tp, (struct tcpiphdr *)&tcp_saveti6, 0, tlen);
+	    tcp_trace(TA_DROP, ostate, tp, (caddr_t) &tcp_saveti6, 0, tlen);
 	  else
 #endif /* INET6 */
-	    tcp_trace(TA_DROP, ostate, tp, &tcp_saveti, 0, tlen);
+	    tcp_trace(TA_DROP, ostate, tp, (caddr_t) &tcp_saveti, 0, tlen);
 	}
 
 	m_freem(m);
@@ -2455,6 +2317,15 @@ tcp_sack_option(tp, th, cp, optlen)
 		if (SEQ_GEQ(sack.end, tp->snd_fack))
 			tp->snd_fack = sack.end;
 #endif /* TCP_FACK */
+		if (SEQ_GT(th->th_ack, tp->snd_una)) {
+			if (SEQ_LT(sack.start, th->th_ack))
+				continue;
+		} else {
+			if (SEQ_LT(sack.start, tp->snd_una))
+				continue;
+		}
+		if (SEQ_GEQ(sack.end, tp->snd_max))
+			continue;
 		if (tp->snd_holes == 0) { /* first hole */
 			tp->snd_holes = (struct sackhole *)
 			    malloc(sizeof(struct sackhole), M_PCB, M_NOWAIT);
@@ -2637,7 +2508,8 @@ tcp_del_sackholes(tp, th)
 {
 	if (!tp->sack_disable && tp->t_state != TCPS_LISTEN) {
 		/* max because this could be an older ack just arrived */
-		tcp_seq lastack = max(th->th_ack, tp->snd_una);
+		tcp_seq lastack = SEQ_GT(th->th_ack, tp->snd_una) ?
+			th->th_ack : tp->snd_una;
 		struct sackhole *cur = tp->snd_holes;
 		struct sackhole *prev = cur;
 		while (cur)
@@ -3042,7 +2914,11 @@ tcp_newreno(tp, th)
 		tp->t_timer[TCPT_REXMT] = 0;
 		tp->t_rtt = 0;
 		tp->snd_nxt = th->th_ack;
-		tp->snd_cwnd = tp->t_maxseg;
+		/* 
+		 * Set snd_cwnd to one segment beyond acknowledged offset
+		 * (tp->snd_una not yet updated when this function is called)
+		 */ 
+		tp->snd_cwnd = tp->t_maxseg + (th->th_ack - tp->snd_una);
 		(void) tcp_output(tp);
 		tp->snd_cwnd = ocwnd;
 		if (SEQ_GT(onxt, tp->snd_nxt))

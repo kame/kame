@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_output.c,v 1.16 1999/01/11 02:01:36 deraadt Exp $	*/
+/*	$OpenBSD: tcp_output.c,v 1.21 1999/07/06 20:17:53 cmetz Exp $	*/
 /*	$NetBSD: tcp_output.c,v 1.16 1997/06/03 16:17:09 kml Exp $	*/
 
 /*
@@ -83,18 +83,16 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet6/tcpipv6.h>
 #endif /* INET6 */
 
+#ifdef TCP_SIGNATURE
+#include <sys/md5k.h>
+#endif /* TCP_SIGNATURE */
+
 #ifdef notyet
 extern struct mbuf *m_copypack();
 #endif
 
 #ifdef TCP_SACK
 extern int tcprexmtthresh;
-#endif
-
-#ifdef TCP_SACK
-#define MAX_TCPOPTLEN	40	/* need 40 at least for 3 SACKs + TIMESTAMP */
-#else
-#define MAX_TCPOPTLEN	32	/* max # bytes that go in options */
 #endif
 
 #ifdef TCP_SACK
@@ -181,11 +179,7 @@ tcp_output(tp)
 	register long len, win;
 	int off, flags, error;
 	register struct mbuf *m;
-	register struct tcpiphdr *ti;
 	register struct tcphdr *th;
-#ifdef INET6
-	register struct tcpipv6hdr *ti6 = NULL;
-#endif /* INET6 */
 	u_char opt[MAX_TCPOPTLEN];
 	unsigned int optlen, hdrlen;
 	int idle, sendalot;
@@ -196,6 +190,14 @@ tcp_output(tp)
 #if defined(TCP_SACK) || defined(TCP_NEWRENO)
 	int maxburst = TCP_MAXBURST;
 #endif
+#ifdef TCP_SIGNATURE
+	unsigned int sigoff;
+#endif /* TCP_SIGNATURE */
+
+#if defined(TCP_SACK) && defined(TCP_SIGNATURE) && defined(DIAGNOSTIC)
+	if (!tp->sack_disable && (tp->t_flags & TF_SIGNATURE))
+		return (EINVAL);
+#endif /* defined(TCP_SACK) && defined(TCP_SIGNATURE) && defined(DIAGNOSTIC) */
 
 	/*
 	 * Determine length of data that should be transmitted,
@@ -438,23 +440,26 @@ send:
 	 * NOTE: we assume that the IP/TCP header plus TCP options
 	 * always fit in a single mbuf, leaving room for a maximum
 	 * link header, i.e.
-	 *	max_linkhdr + sizeof (struct tcpiphdr) + optlen <= MHLEN
+	 *	max_linkhdr + sizeof(network header) + sizeof(struct tcphdr +
+	 * 		optlen <= MHLEN
 	 */
-#ifdef INET6
-        /*
-	 * For IPv6, this has changed to be:
-	 *      max_linkhdr + sizeof(struct tcphdr) + optlen + 
-	 *           sizeof(struct ip6_hdr)  <= MHLEN
-	 * This MIGHT be harder...
-	 */
-#endif /* INET6 */
 	optlen = 0;
+
+	switch (tp->pf) {
+#ifdef INET
+	case PF_INET:
+		hdrlen = sizeof(struct ip) + sizeof(struct tcphdr);
+		break;
+#endif /* INET */
 #ifdef INET6
-	if (tp->pf == PF_INET6)  /* if tp->pf is 0, then assume IPv4. */
-	  hdrlen = sizeof(struct tcphdr) + sizeof(struct ip6_hdr);
-	else
+	case PF_INET6:
+		hdrlen = sizeof(struct ip6_hdr) + sizeof(struct tcphdr);
+		break;
 #endif /* INET6 */
-	hdrlen = sizeof (struct tcpiphdr);
+	default:
+		return (EPFNOSUPPORT);
+	}
+
 	if (flags & TH_SYN) {
 		tp->snd_nxt = tp->iss;
 		if ((tp->t_flags & TF_NOOPT) == 0) {
@@ -511,6 +516,33 @@ send:
 		optlen += TCPOLEN_TSTAMP_APPA;
 	}
 
+#ifdef TCP_SIGNATURE
+	if (tp->t_flags & TF_SIGNATURE) {
+		u_int8_t *bp = (u_int8_t *)(opt + optlen);
+
+		/* Send signature option */
+		*(bp++) = TCPOPT_SIGNATURE;
+		*(bp++) = TCPOLEN_SIGNATURE;
+		sigoff = optlen + 2;
+
+		{
+			unsigned int i;
+
+			for (i = 0; i < 16; i++)
+				*(bp++) = 0;
+		}
+
+		optlen += TCPOLEN_SIGNATURE;
+
+		/* Pad options list to the next 32 bit boundary and 
+		 * terminate it.
+		 */
+		*bp++ = TCPOPT_NOP;
+		*bp++ = TCPOPT_EOL;
+		optlen += 2;
+	}
+#endif /* TCP_SIGNATURE */
+
 #ifdef TCP_SACK
 	/*
 	 * Send SACKs if necessary.  This should be the last option processed.
@@ -538,6 +570,11 @@ send:
 		optlen += TCPOLEN_SACK*count + 4; /* including leading NOPs */
 	}
 #endif /* TCP_SACK */
+
+#ifdef DIAGNOSTIC
+	if (optlen > MAX_TCPOPTLEN)
+		panic("tcp_output: options too long");
+#endif /* DIAGNOSTIC */
 
 	hdrlen += optlen;
  
@@ -644,31 +681,17 @@ send:
 		m->m_len = hdrlen;
 	}
 	m->m_pkthdr.rcvif = (struct ifnet *)0;
-#ifdef INET6
-	if (tp->pf == PF_INET6) {
-		ti6 = mtod(m, struct tcpipv6hdr *);
-		ti = NULL;
 
-		if (!tp->t_template)
-			panic("tcp_output");
-
-		bcopy((caddr_t)tp->t_template, (caddr_t)ti6,
-			sizeof (struct tcpipv6hdr));
-
-		th = &ti6->ti6_t;
-	} else
-#endif /* INET6 */
-	{
-		ti = mtod(m, struct tcpiphdr *);
-
-		if (tp->t_template == 0)
-			panic("tcp_output");
-
-		bcopy((caddr_t)tp->t_template, (caddr_t)ti,
-		      sizeof (struct tcpiphdr));
-
-		th = &ti->ti_t;
-	};
+	if (!tp->t_template)
+		panic("tcp_output");
+#ifdef DIAGNOSTIC
+	if (tp->t_template->m_len != hdrlen - optlen)
+		panic("tcp_output: template len != hdrlen - optlen");
+#endif /* DIAGNOSTIC */
+	bcopy(mtod(tp->t_template, caddr_t), mtod(m, caddr_t),
+		tp->t_template->m_len);
+	th = (struct tcphdr *)(mtod(m, caddr_t) + tp->t_template->m_len -
+		sizeof(struct tcphdr));
 
 	/*
 	 * Fill in fields, remembering maximum advertised
@@ -748,24 +771,129 @@ send:
 		 */
 		tp->snd_up = tp->snd_una;		/* drag it along */
 
+	/* Put TCP length in pseudo-header */
+#if defined(INET) && defined(INET6)
+	switch (tp->pf) {
+#else /* defined(INET) && defined(INET6) */
+	switch (0) {
+#endif /* defined(INET) && defined(INET6) */
+	case 0:
+#ifdef INET
+	case AF_INET:
+		if (len + optlen)
+			mtod(m, struct ipovly *)->ih_len = htons((u_int16_t)(
+				sizeof (struct tcphdr) + optlen + len));
+		break;
+#endif /* INET */
+#ifdef INET6
+	case AF_INET6:
+		break;
+#endif /* INET6 */
+	}
+
+#ifdef TCP_SIGNATURE
+	if (tp->t_flags & TF_SIGNATURE) {
+		MD5_CTX ctx;
+		union sockaddr_union sa;
+		struct tdb *tdb;
+
+		memset(&sa, 0, sizeof(union sockaddr_union));
+
+#if defined(INET) && defined(INET6)
+		switch(tp->pf) {
+#else /* defined(INET) && defined(INET6) */
+		switch (0) {
+#endif /* defined(INET) && defined(INET6) */
+		case 0:
+#ifdef INET
+		case AF_INET:
+			sa.sa.sa_len = sizeof(struct sockaddr_in);
+			sa.sa.sa_family = AF_INET;
+			sa.sin.sin_addr = mtod(m, struct ip *)->ip_dst;
+			break;
+#endif /* INET */
+#ifdef INET6
+		case AF_INET6:
+			sa.sa.sa_len = sizeof(struct sockaddr_in6);
+			sa.sa.sa_family = AF_INET6;
+			sa.sin6.sin6_addr = mtod(m, struct ip6_hdr *)->ip6_dst;
+			break;
+#endif /* INET6 */
+		}
+
+		tdb = gettdb(0, &sa, IPPROTO_TCP);
+		if (tdb == NULL)
+			return (EPERM);
+
+		MD5Init(&ctx);
+
+#if defined(INET) && defined(INET6)
+		switch(tp->pf) {
+#else /* defined(INET) && defined(INET6) */
+		switch (0) {
+#endif /* defined(INET) && defined(INET6) */
+		case 0:
+#ifdef INET
+		case AF_INET:
+			{
+				struct ippseudo ippseudo;
+				struct ipovly *ipovly;
+
+				ipovly = mtod(m, struct ipovly *);
+
+				ippseudo.ippseudo_src = ipovly->ih_src;
+				ippseudo.ippseudo_dst = ipovly->ih_dst;
+				ippseudo.ippseudo_pad = 0;
+				ippseudo.ippseudo_p   = IPPROTO_TCP;
+				ippseudo.ippseudo_len = ipovly->ih_len;
+				MD5Update(&ctx, (char *)&ippseudo,
+					sizeof(struct ippseudo));
+				MD5Update(&ctx, mtod(m, caddr_t) +
+					sizeof(struct ip),
+					sizeof(struct tcphdr));
+			}
+			break;
+#endif /* INET */
+#ifdef INET6
+		case AF_INET6:
+			{
+				static int printed = 0;
+
+				if (!printed) {
+					printf("error: TCP MD5 support for "
+						"IPv6 not yet implemented.\n");
+					printed = 1;
+				}
+			}
+			break;
+#endif /* INET6 */
+		}
+
+		if (len && m_apply(m, hdrlen, len, tcp_signature_apply,
+				(caddr_t)&ctx))
+			return (EINVAL);
+
+		MD5Update(&ctx, tdb->tdb_amxkey, tdb->tdb_amxkeylen);
+		MD5Final(mtod(m, caddr_t) + hdrlen - optlen + sigoff, &ctx);
+	}
+#endif /* TCP_SIGNATURE */
+
 	/*
 	 * Put TCP length in extended header, and then
 	 * checksum extended header and data.
 	 */
+	switch (tp->pf) {
+#ifdef INET
+	case AF_INET:
+		th->th_sum = in_cksum(m, (int)(hdrlen + len));
+		break;
+#endif /* INET */
 #ifdef INET6
-	if (tp->pf == PF_INET6) {
-	  m->m_pkthdr.len = sizeof(struct ip6_hdr) + sizeof(struct tcphdr)
-		  + optlen + len;
-	  th->th_sum = in6_cksum(m, IPPROTO_TCP,
-				 sizeof(struct ip6_hdr),
-				 sizeof(struct tcphdr) + optlen + len);
-	} else
+	case AF_INET6:
+  		th->th_sum = in6_cksum(m, IPPROTO_TCP, sizeof(struct ip6_hdr),
+			hdrlen + len);
+		break;
 #endif /* INET6 */
-	{
-		if (len + optlen)
-			ti->ti_len = htons((u_int16_t)(sizeof (struct tcphdr) +
-				optlen + len));
-		ti->ti_sum = in_cksum(m, (int)(hdrlen + len));
 	}
 
 	/*
@@ -844,12 +972,8 @@ send:
 	 * Trace.
 	 */
 	if (so->so_options & SO_DEBUG)
-#if INET6
-		tcp_trace(TA_OUTPUT, tp->t_state, tp,
-		    (tp->pf == AF_INET6) ? (struct tcpiphdr *)ti6 : ti, 0, len);
-#else
-	tcp_trace(TA_OUTPUT, tp->t_state, tp, ti, 0, len);
-#endif
+		tcp_trace(TA_OUTPUT, tp->t_state, tp, mtod(m, caddr_t), 0,
+			len);
 
 	/*
 	 * Fill in IP length and desired time to live and
@@ -858,38 +982,52 @@ send:
 	 * the template, but need a way to checksum without them.
 	 */
 	m->m_pkthdr.len = hdrlen + len;
-#ifdef TUBA
-	if (tp->t_tuba_pcb)
-		error = tuba_output(m, tp);
-	else
-#endif
+
+	switch (tp->pf) {
+#ifdef INET
+	case AF_INET:
+		{
+			struct ip *ip;
+
+			ip = mtod(m, struct ip *);
+			ip->ip_len = m->m_pkthdr.len;
+			ip->ip_ttl = tp->t_inpcb->inp_ip.ip_ttl;
+			ip->ip_tos = tp->t_inpcb->inp_ip.ip_tos;
+		}
+		error = ip_output(m, tp->t_inpcb->inp_options,
+			&tp->t_inpcb->inp_route, so->so_options & SO_DONTROUTE,
+			0, tp->t_inpcb);
+		break;
+#endif /* INET */
 #ifdef INET6
-	if (tp->pf == PF_INET6) {
-	  ((struct ip6_hdr *)ti6)->ip6_plen = m->m_pkthdr.len - sizeof(struct ip6_hdr);
-
-#if 0
-	  /* Following fields are already grabbed from the tcp_template. */
-	  ((struct ip6_hdr *)ti6)->ip6_flow   = ntohl(0x60000000);
-	  ((struct ip6_hdr *)ti6)->ipv6_nexthdr  = IPPROTO_TCP;
-#endif
-	  ((struct ip6_hdr *)ti6)->ip6_hlim = in6_selecthlim(tp->t_inpcb, NULL);
-	  /*XXX*/
-
-	  error = ip6_output(m, tp->t_inpcb->inp_outputopts6, &tp->t_inpcb->inp_route6, (so->so_options & SO_DONTROUTE), NULL, NULL);
-	} else
+	case AF_INET6:
+		{
+			struct ip6_hdr *ipv6;
+			
+			ipv6->ip6_plen = m->m_pkthdr.len -
+				sizeof(struct ip6_hdr);
+			ipv6->ip6_nxt = IPPROTO_TCP;
+			ipv6->ip6_hlim = in6_selecthlim(tp->t_inpcb, NULL);
+		}
+		error = ip6_output(m, tp->t_inpcb->inp_outputopts6,
+			  &tp->t_inpcb->inp_route6,
+			  (so->so_options & SO_DONTROUTE), NULL, NULL);
+		break;
 #endif /* INET6 */
-    {
-	((struct ip *)ti)->ip_len = m->m_pkthdr.len;
-	((struct ip *)ti)->ip_ttl = tp->t_inpcb->inp_ip.ip_ttl;	/* XXX */
-	((struct ip *)ti)->ip_tos = tp->t_inpcb->inp_ip.ip_tos;	/* XXX */
-	error = ip_output(m, tp->t_inpcb->inp_options, &tp->t_inpcb->inp_route,
-	    so->so_options & SO_DONTROUTE, 0, tp->t_inpcb);
+#ifdef TUBA
+	case AF_ISO:
+		if (tp->t_tuba_pcb)
+			error = tuba_output(m, tp);
+		break;
+#endif /* TUBA */
+	}
+
 #if defined(TCP_SACK) && defined(TCP_FACK)
 	/* Update snd_awnd to reflect the new data that was sent.  */
-        tp->snd_awnd = tcp_seq_subtract(tp->snd_max, tp->snd_fack) +
-            tp->retran_data;                
-#endif
-    }
+	tp->snd_awnd = tcp_seq_subtract(tp->snd_max, tp->snd_fack) +
+		tp->retran_data;                
+#endif /* defined(TCP_SACK) && defined(TCP_FACK) */
+
 	if (error) {
 out:
 		if (error == ENOBUFS) {

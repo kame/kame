@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.h,v 1.11 1999/03/13 19:06:16 deraadt Exp $	*/
+/*	$OpenBSD: if.h,v 1.13 1999/08/08 00:43:00 niklas Exp $	*/
 /*	$NetBSD: if.h,v 1.23 1996/05/07 02:40:27 thorpej Exp $	*/
 
 /*
@@ -359,6 +359,18 @@ struct if_laddrreq {
 	struct sockaddr_storage dstaddr; /* out */
 };
 
+struct if_nameindex {
+	unsigned int	if_index;
+	char 		*if_name;
+};
+
+__BEGIN_DECLS
+unsigned int if_nametoindex __P((const char *));
+char 	*if_indextoname __P((unsigned int, char *));
+struct	if_nameindex *if_nameindex __P((void));
+void	if_freenameindex __P((struct if_nameindex *));
+__END_DECLS
+
 #include <net/if_arp.h>
 
 #ifdef _KERNEL
@@ -377,6 +389,7 @@ struct ifnet loif[];
 int if_index;
 
 void	ether_ifattach __P((struct ifnet *));
+void	ether_ifdetach __P((struct ifnet *));
 int	ether_ioctl __P((struct ifnet *, struct arpcom *, u_long, caddr_t));
 void	ether_input __P((struct ifnet *, struct ether_header *, struct mbuf *));
 int	ether_output __P((struct ifnet *,
@@ -386,6 +399,7 @@ char	*ether_sprintf __P((u_char *));
 void	if_attach __P((struct ifnet *));
 void	if_attachtail __P((struct ifnet *));
 void	if_attachhead __P((struct ifnet *));
+void	if_detach __P((struct ifnet *));
 void	if_down __P((struct ifnet *));
 void	if_qflush __P((struct ifqueue *));
 void	if_slowtimo __P((void *));
@@ -412,16 +426,4 @@ void	loopattach __P((int));
 int	looutput __P((struct ifnet *,
 	   struct mbuf *, struct sockaddr *, struct rtentry *));
 void	lortrequest __P((int, struct rtentry *, struct sockaddr *));
-#else
-struct if_nameindex {
-	unsigned int	if_index;	/* 1, 2, ... */
-	char		*if_name;	/* null terminated name: "le0", ... */
-};
-
-__BEGIN_DECLS
-unsigned int if_nametoindex __P((const char *));
-char *if_indextoname __P((unsigned int, char *));
-struct if_nameindex *if_nameindex __P((void));
-void if_freenameindex __P((struct if_nameindex *));
-__END_DECLS
 #endif /* _KERNEL */

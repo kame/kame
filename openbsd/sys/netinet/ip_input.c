@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_input.c,v 1.39 1999/04/12 03:17:09 deraadt Exp $	*/
+/*	$OpenBSD: ip_input.c,v 1.42 1999/09/25 06:35:48 deraadt Exp $	*/
 /*	$NetBSD: ip_input.c,v 1.30 1996/03/16 23:53:58 christos Exp $	*/
 
 /*
@@ -259,6 +259,7 @@ ipv4_input(struct mbuf *m, ...)
 {
 	register struct ip *ip;
 	register struct ipq *fp;
+	struct in_ifaddr *ia;
 	struct ipqent *ipqe;
 	int hlen, mff;
 	va_list ap;
@@ -371,7 +372,8 @@ ipv4_input(struct mbuf *m, ...)
 	/*
 	 * Check our list of addresses, to see if the packet is for us.
 	 */
-	if (in_iawithaddr(ip->ip_dst, m))
+	if ((ia = in_iawithaddr(ip->ip_dst, m)) != NULL &&
+	    (ia->ia_ifp->if_flags & IFF_UP))
 		goto ours;
 
 	if (IN_MULTICAST(ip->ip_dst.s_addr)) {
@@ -1268,8 +1270,6 @@ ip_forward(m, srcrt)
 	}
 	HTONS(ip->ip_id);
 	if (ip->ip_ttl <= IPTTLDEC) {
-		HTONS(ip->ip_off);
-		HTONS(ip->ip_len);
 		icmp_error(m, ICMP_TIMXCEED, ICMP_TIMXCEED_INTRANS, dest, 0);
 		return;
 	}
@@ -1288,8 +1288,6 @@ ip_forward(m, srcrt)
 
 		rtalloc(&ipforward_rt);
 		if (ipforward_rt.ro_rt == 0) {
-			HTONS(ip->ip_off);
-			HTONS(ip->ip_len);
 			icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_HOST, dest, 0);
 			return;
 		}
@@ -1434,9 +1432,6 @@ ip_forward(m, srcrt)
 		break;
 	}
 
-	ip = mtod(mcopy, struct ip *);
-	HTONS(ip->ip_off);
-	HTONS(ip->ip_len);
 	icmp_error(mcopy, type, code, dest, destifp);
 }
 

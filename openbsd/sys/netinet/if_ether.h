@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ether.h,v 1.6 1999/01/07 09:11:52 deraadt Exp $	*/
+/*	$OpenBSD: if_ether.h,v 1.9 1999/08/08 00:43:00 niklas Exp $	*/
 /*	$NetBSD: if_ether.h,v 1.22 1996/05/11 13:00:00 mycroft Exp $	*/
 
 /*
@@ -45,7 +45,7 @@ struct ether_addr {
 };
 
 /*
- * Structure of a 10Mb/s Ethernet header.
+ * Structure of a Ethernet header.
  */
 #define	ETHER_ADDR_LEN	6
 
@@ -165,8 +165,9 @@ struct sockaddr_inarp {
 /*
  * IP and ethernet specific routing flags
  */
-#define	RTF_USETRAILERS	RTF_PROTO1	/* use trailers */
-#define	RTF_ANNOUNCE	RTF_PROTO2	/* announce new arp entry */
+#define	RTF_USETRAILERS	  RTF_PROTO1	/* use trailers */
+#define	RTF_ANNOUNCE	  RTF_PROTO2	/* announce new arp entry */
+#define	RTF_PERMANENT_ARP RTF_PROTO3    /* only manual overwrite of entry */
 
 #ifdef	_KERNEL
 u_int8_t etherbroadcastaddr[ETHER_ADDR_LEN];
@@ -252,6 +253,8 @@ struct ether_multistep {
 }
 
 #ifdef _KERNEL
+
+extern struct ifnet *myip_ifp;
 
 void arp_rtrequest __P((int, struct rtentry *, struct sockaddr *));
 int arpresolve __P((struct arpcom *, struct rtentry *, struct mbuf *,

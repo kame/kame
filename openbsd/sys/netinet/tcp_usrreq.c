@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_usrreq.c,v 1.33 1999/03/24 02:28:21 cmetz Exp $	*/
+/*	$OpenBSD: tcp_usrreq.c,v 1.36 1999/09/01 21:38:21 provos Exp $	*/
 /*	$NetBSD: tcp_usrreq.c,v 1.20 1996/02/13 23:44:16 christos Exp $	*/
 
 /*
@@ -349,7 +349,7 @@ tcp_usrreq(so, req, m, nam, control)
 #ifdef TCP_COMPAT_42
 		tcp_iss += TCP_ISSINCR/2;
 #else /* TCP_COMPAT_42 */
-		tcp_iss += arc4random() % (TCP_ISSINCR / 2) + 1;
+		tcp_iss += arc4random() % TCP_ISSINCR + 1;
 #endif /* !TCP_COMPAT_42 */
 		tcp_sendseqinit(tp);
 #if defined(TCP_SACK) || defined(TCP_NEWRENO)
@@ -514,7 +514,7 @@ tcp_usrreq(so, req, m, nam, control)
 		panic("tcp_usrreq");
 	}
 	if (tp && (so->so_options & SO_DEBUG))
-		tcp_trace(TA_USER, ostate, tp, (struct tcpiphdr *)0, req, 0);
+		tcp_trace(TA_USER, ostate, tp, (caddr_t)0, req, 0);
 	splx(s);
 	return (error);
 }
@@ -579,7 +579,13 @@ tcp_ctloutput(op, so, level, optname, mp)
 			break;
 
 		case TCP_MAXSEG:
-			if (m && (i = *mtod(m, int *)) > 0 && i <= tp->t_maxseg)
+			if (m == NULL || m->m_len < sizeof (int)) {
+				error = EINVAL;
+				break;
+			}
+
+			i = *mtod(m, int *);
+			if (i > 0 && i <= tp->t_maxseg)
 				tp->t_maxseg = i;
 			else
 				error = EINVAL;
@@ -587,11 +593,49 @@ tcp_ctloutput(op, so, level, optname, mp)
 
 #ifdef TCP_SACK
 		case TCP_SACK_DISABLE:
-			i = *mtod(m, int *);
-			tp->sack_disable = i;
+			if (m == NULL || m->m_len < sizeof (int)) {
+				error = EINVAL;
+				break;
+			}
+
+			if (TCPS_HAVEESTABLISHED(tp->t_state)) {
+				error = EPERM;
+				break;
+			}
+
+			if (tp->t_flags & TF_SIGNATURE) {
+				error = EPERM;
+				break;
+			}
+
+			if (*mtod(m, int *))
+				tp->sack_disable = 1;
+			else
+				tp->sack_disable = 0;
 			break;
 #endif
-		default:
+#ifdef TCP_SIGNATURE
+		case TCP_SIGNATURE_ENABLE:
+			if (m == NULL || m->m_len < sizeof (int)) {
+				error = EINVAL;
+				break;
+			}
+
+			if (TCPS_HAVEESTABLISHED(tp->t_state)) {
+				error = EPERM;
+				break;
+			}
+
+			if (*mtod(m, int *)) {
+				tp->t_flags |= TF_SIGNATURE;
+#ifdef TCP_SACK
+				tp->sack_disable = 1;
+#endif /* TCP_SACK */
+			} else
+				tp->t_flags &= ~TF_SIGNATURE;
+			break;
+#endif /* TCP_SIGNATURE */
+ 		default:
 			error = ENOPROTOOPT;
 			break;
 		}

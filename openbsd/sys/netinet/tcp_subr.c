@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_subr.c,v 1.14 1999/02/17 00:14:26 deraadt Exp $	*/
+/*	$OpenBSD: tcp_subr.c,v 1.19 1999/08/27 08:15:50 millert Exp $	*/
 /*	$NetBSD: tcp_subr.c,v 1.22 1996/02/13 23:44:00 christos Exp $	*/
 
 /*
@@ -81,6 +81,10 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <sys/domain.h>
 #endif /* INET6 */
 
+#ifdef TCP_SIGNATURE
+#include <sys/md5k.h>
+#endif /* TCP_SIGNATURE */
+
 /* patchable/settable parameters for tcp */
 int	tcp_mssdflt = TCP_MSS;
 int	tcp_rttdflt = TCPTV_SRTTDFLT / PR_SLOWHZ;
@@ -101,7 +105,7 @@ int    tcp_do_rfc1323 = TCP_DO_RFC1323;
 
 #ifndef TCP_DO_SACK
 #ifdef TCP_SACK
-#define TCP_DO_SACK	1
+#define TCP_DO_SACK	0	/* XXX - make this 1 when SACK is fixed */
 #else
 #define TCP_DO_SACK	0
 #endif
@@ -154,55 +158,89 @@ tcp_init()
  * for the TCP header.  Also, we made the former tcpiphdr header pointer 
  * into just an IP overlay pointer, with casting as appropriate for v6. rja
  */
-struct tcpiphdr *
+struct mbuf *
 tcp_template(tp)
 	struct tcpcb *tp;
 {
 	register struct inpcb *inp = tp->t_inpcb;
 	register struct mbuf *m;
-	register struct tcpiphdr *n;
 	register struct tcphdr *th;
-#ifdef INET6
-	register struct tcpipv6hdr *ti6;
-	register struct ip6_hdr *ipv6;
-#endif /* INET6 */
 
-	if ((n = tp->t_template) == 0) {
+	if ((m = tp->t_template) == 0) {
 		m = m_get(M_DONTWAIT, MT_HEADER);
 		if (m == NULL)
 			return (0);
+
+		switch (tp->pf) {
+#ifdef INET
+		case AF_INET:
+			m->m_len = sizeof(struct ip);
+			break;
+#endif /* INET */
 #ifdef INET6
-		if (tp->pf == PF_INET6) 
-			m->m_len = sizeof (struct tcphdr) + sizeof(struct ip6_hdr);
-		else 
+		case AF_INET6:
+			m->m_len = sizeof(struct ip6_hdr);
+			break;
 #endif /* INET6 */
-			m->m_len = sizeof (struct tcpiphdr);
-		n = mtod(m, struct tcpiphdr *);
+		}
+		m->m_len += sizeof (struct tcphdr);
+
+		/*
+		 * The link header, network header, TCP header, and TCP options
+		 * all must fit in this mbuf. For now, assume the worst case of
+		 * TCP options size. Eventually, compute this from tp flags.
+		 */ 
+		if (m->m_len + MAX_TCPOPTLEN + max_linkhdr >= MHLEN) {
+			MCLGET(m, M_DONTWAIT);
+			if ((m->m_flags & M_EXT) == 0) {
+				m_free(m);
+				return (0);
+			}
+		}
 	}
+
+	switch(tp->pf) {
+#ifdef INET
+	case AF_INET:
+		{
+			struct ipovly *ipovly;
+
+			ipovly = mtod(m, struct ipovly *);
+
+			bzero(ipovly->ih_x1, sizeof ipovly->ih_x1);
+			ipovly->ih_pr = IPPROTO_TCP;
+			ipovly->ih_len = htons(sizeof (struct tcpiphdr) -
+				sizeof (struct ip));
+			ipovly->ih_src = inp->inp_laddr;
+			ipovly->ih_dst = inp->inp_faddr;
+
+			th = (struct tcphdr *)(mtod(m, caddr_t) +
+				sizeof(struct ip));
+		}
+		break;
+#endif /* INET */
 #ifdef INET6
-	if (tp->pf == PF_INET6) {
+	case AF_INET6:
+		{
+			struct ip6_hdr *ipv6;
 
-		ti6 = (struct tcpipv6hdr *)n;
-		ipv6 = (struct ip6_hdr *)n;
-		th = &ti6->ti6_t;
+			ipv6 = mtod(m, struct ip6_hdr *);
 
-		ipv6->ip6_src = inp->inp_laddr6;
-		ipv6->ip6_dst = inp->inp_faddr6;
-		ipv6->ip6_flow = htonl(0x60000000) |
-		    (inp->inp_ipv6.ip6_flow & htonl(0x0fffffff));  
+			ipv6->ip6_src = inp->inp_laddr6;
+			ipv6->ip6_dst = inp->inp_faddr6;
+			ipv6->ip6_flow = htonl(0x60000000) |
+			    (inp->inp_ipv6.ip6_flow & htonl(0x0fffffff));  
 						  
-		ipv6->ip6_nxt = IPPROTO_TCP;
-		ipv6->ip6_plen = htons(sizeof(struct tcphdr)); /*XXX*/
-		ipv6->ip6_hlim = in6_selecthlim(inp, NULL);	/*XXX*/
-	} else
+
+			ipv6->ip6_nxt = IPPROTO_TCP;
+			ipv6->ip6_plen = htons(sizeof(struct tcphdr)); /*XXX*/
+			ipv6->ip6_hlim = in6_selecthlim(inp, NULL);	/*XXX*/
+
+			th = (struct tcphdr *)(mtod(m, caddr_t) +
+				sizeof(struct ip6_hdr));
+		}
+		break;
 #endif /* INET6 */
-	{
-		th = &n->ti_t;
-		bzero(n->ti_x1, sizeof n->ti_x1);
-		n->ti_pr = IPPROTO_TCP;
-		n->ti_len = htons(sizeof (struct tcpiphdr) - sizeof (struct ip));
-		n->ti_src = inp->inp_laddr;
-		n->ti_dst = inp->inp_faddr;
 	}
 
 	th->th_sport = inp->inp_lport;
@@ -215,7 +253,7 @@ tcp_template(tp)
 	th->th_win = 0;
 	th->th_sum = 0;
 	th->th_urp = 0;
-	return (n);
+	return (m);
 }
 
 /*
@@ -235,9 +273,9 @@ tcp_template(tp)
 /* This function looks hairy, because it was so IPv4-dependent. */
 #endif /* INET6 */
 void
-tcp_respond(tp, ti, m, ack, seq, flags)
+tcp_respond(tp, template, m, ack, seq, flags)
 	struct tcpcb *tp;
-	register struct tcpiphdr *ti;
+	caddr_t template;
 	register struct mbuf *m;
 	tcp_seq ack, seq;
 	int flags;
@@ -246,6 +284,7 @@ tcp_respond(tp, ti, m, ack, seq, flags)
 	int win = 0;
 	struct route *ro = 0;
 	register struct tcphdr *th;
+	register struct tcpiphdr *ti = (struct tcpiphdr *)template;
 #ifdef INET6
 	int is_ipv6 = 0;   /* true iff IPv6 */
 #endif /* INET6 */
@@ -602,7 +641,7 @@ tcp_close(tp)
 	}
 #endif
 	if (tp->t_template)
-		(void) m_free(dtom(tp->t_template));
+		(void) m_free(tp->t_template);
 	free(tp, M_PCB);
 	inp->inp_ppcb = 0;
 	soisdisconnected(so);
@@ -729,3 +768,92 @@ tcp_quench(inp, errno)
 	if (tp)
 		tp->snd_cwnd = tp->t_maxseg;
 }
+
+#ifdef TCP_SIGNATURE
+int
+tcp_signature_tdb_attach()
+{
+	return (0);
+}
+
+int
+tcp_signature_tdb_init(tdbp, xsp, ii)
+	struct tdb *tdbp;
+	struct xformsw *xsp;
+	struct ipsecinit *ii;
+{
+	char *c;
+#define isdigit(c)	  (((c) >= '0') && ((c) <= '9'))
+#define isalpha(c)	( (((c) >= 'A') && ((c) <= 'Z')) || \
+			  (((c) >= 'a') && ((c) <= 'z')) )
+
+	if ((ii->ii_authkeylen < 1) || (ii->ii_authkeylen > 80))
+		return (EINVAL);
+
+	c = (char *)ii->ii_authkey;
+
+	while (c < (char *)ii->ii_authkey + ii->ii_authkeylen - 1) {
+		if (isdigit(*c)) {
+			if (*(c + 1) == ' ')
+				return (EINVAL);
+		} else {
+			if (!isalpha(*c))
+				return (EINVAL);
+		}
+
+		c++;
+	}
+
+	if (!isdigit(*c) && !isalpha(*c))
+		return (EINVAL);
+
+	tdbp->tdb_amxkey = malloc(ii->ii_authkeylen, M_XDATA, M_DONTWAIT);
+	if (tdbp->tdb_amxkey == NULL)
+		return (ENOMEM);
+	bcopy(ii->ii_authkey, tdbp->tdb_amxkey, ii->ii_authkeylen);
+	tdbp->tdb_amxkeylen = ii->ii_authkeylen;
+
+	return (0);
+}
+
+int
+tcp_signature_tdb_zeroize(tdbp)
+	struct tdb *tdbp;
+{
+	if (tdbp->tdb_amxkey) {
+		bzero(tdbp->tdb_amxkey, tdbp->tdb_amxkeylen);
+		free(tdbp->tdb_amxkey, M_XDATA);
+		tdbp->tdb_amxkey = NULL;
+	}
+
+	return (0);
+}
+
+struct mbuf *
+tcp_signature_tdb_input(m, tdbp)
+	struct mbuf *m;
+	struct tdb *tdbp;
+{
+	return (0);
+}
+
+int
+tcp_signature_tdb_output(m, gw, tdbp, mp)
+	struct mbuf *m;
+	struct sockaddr_encap *gw;
+	struct tdb *tdbp;
+	struct mbuf **mp;
+{
+	return (EINVAL);
+}
+
+int
+tcp_signature_apply(fstate, data, len)
+	caddr_t fstate;
+	caddr_t data;
+	unsigned int len;
+{
+	MD5Update((MD5_CTX *)fstate, (char *)data, len);
+	return 0;
+}
+#endif /* TCP_SIGNATURE */

@@ -1,4 +1,4 @@
-/*    $OpenBSD: ip_fil.c,v 1.21 1999/04/16 13:44:25 deraadt Exp $    */
+/*    $OpenBSD: ip_fil.c,v 1.24 1999/06/07 22:00:32 deraadt Exp $    */
 /*
  * Copyright (C) 1993-1998 by Darren Reed.
  *
@@ -8,7 +8,7 @@
  */
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_fil.c	2.41 6/5/96 (C) 1993-1995 Darren Reed";
-static const char rcsid[] = "@(#)$Id: ip_fil.c,v 1.21 1999/04/16 13:44:25 deraadt Exp $";
+static const char rcsid[] = "@(#)$Id: ip_fil.c,v 1.24 1999/06/07 22:00:32 deraadt Exp $";
 #endif
 
 #ifndef	SOLARIS
@@ -1033,11 +1033,9 @@ frdest_t *fdp;
 	 * If small enough for interface, can just send directly.
 	 */
 	if (ip->ip_len <= ifp->if_mtu) {
-# ifndef sparc
 		ip->ip_id = htons(ip->ip_id);
 		ip->ip_len = htons(ip->ip_len);
 		ip->ip_off = htons(ip->ip_off);
-# endif
 		if (!ip->ip_sum)
 			ip->ip_sum = in_cksum(m, hlen);
 # if	BSD >= 199306
@@ -1103,9 +1101,7 @@ frdest_t *fdp;
 			error = ENOBUFS;	/* ??? */
 			goto sendorfree;
 		}
-# ifndef sparc
 		mhip->ip_off = htons((u_short)mhip->ip_off);
-# endif
 		mhip->ip_sum = 0;
 		mhip->ip_sum = in_cksum(m, mhlen);
 		*mnext = m;
@@ -1187,18 +1183,24 @@ ip_t *ip;
 	char fname[32];
 
 # if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
-	(defined(OpenBSD) && (OpenBSD >= 199603))
+    (defined(OpenBSD) && (OpenBSD >= 199603))
+#    if defined __OpenBSD__
+	sprintf(fname, "/var/run/%s", ifp->if_xname);
+#    else
 	sprintf(fname, "/tmp/%s", ifp->if_xname);
-	if ((fp = fopen(fname, "a"))) {
-		fclose(fp);
-	}
+#    endif
 # else
 	sprintf(fname, "/tmp/%s%d", ifp->if_name, ifp->if_unit);
+# endif
+	/*
+	 * XXX
+	 * This is still raceable, if the attacker gains the ability to
+	 * erase the existing file in /tmp
+	 */
 	if ((fp = fopen(fname, "a"))) {
 		fwrite((char *)ip, ntohs(ip->ip_len), 1, fp);
 		fclose(fp);
 	}
-# endif
 	return 0;
 }
 
@@ -1261,24 +1263,30 @@ char *name;
 
 void init_ifp()
 {
-	FILE *fp;
+
 	struct ifnet *ifp, **ifa;
 	char fname[32];
+	int fd;
+
 # if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
 	(defined(OpenBSD) && (OpenBSD >= 199603))
 	for (ifa = ifneta; ifa && (ifp = *ifa); ifa++) {
 		ifp->if_output = write_output;
+#    if defined(__OpenBSD__)
+		sprintf(fname, "/var/run/%s", ifp->if_xname);
+#    else
 		sprintf(fname, "/tmp/%s", ifp->if_xname);
-		if ((fp = fopen(fname, "w")))
-			fclose(fp);
+#endif
+		if ((fd = open(fname, O_WRONLY|O_CREAT|O_EXCL, 0600)) != -1)
+			close(fd);
 	}
 # else
 
 	for (ifa = ifneta; ifa && (ifp = *ifa); ifa++) {
 		ifp->if_output = write_output;
 		sprintf(fname, "/tmp/%s%d", ifp->if_name, ifp->if_unit);
-		if ((fp = fopen(fname, "w")))
-			fclose(fp);
+		if ((fd = open(fname, O_WRONLY|O_CREAT|O_EXCL, 0600)) != -1)
+			close(fd);
 	}
 # endif
 }
