@@ -1,8 +1,21 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1256 2000/09/06 07:33:42 sakane Exp $
+$KAME: CHANGELOG,v 1.1257 2000/09/06 15:32:51 jinmei Exp $
 
 <200009>
+2000-09-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ping6/ping6.c (pr_nodeaddr): printed address lifetime
+	according to the latest specification.
+	This change was based on a patch from Hideaki YOSHIFUJI
+	<yoshfuji@v6.linux.or.jp>.
+
+2000-09-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (ni6_store_addrs): conformed to the
+	latest (05 or later) specification:
+	- put TTL (valid lifetime) of each address before the address
+	  itself.
+	- put preferred addresses before deprecated ones.
+
 Wed Sep  6 16:20:45 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/mail/fetchmail: update to 5.5.1
 
