@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.257 2001/11/06 13:09:07 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.258 2001/11/09 04:41:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -533,6 +533,8 @@ icmp6_input(mp, offp, proto)
 	int icmp6len = m->m_pkthdr.len - *offp;
 	int code, sum, noff;
 
+	icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_msg);
+
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, sizeof(struct icmp6_hdr), IPPROTO_DONE);
 	/* m might change if M_LOOP.  So, call mtod after this */
@@ -546,6 +548,7 @@ icmp6_input(mp, offp, proto)
 	ip6 = mtod(m, struct ip6_hdr *);
 	if (icmp6len < sizeof(struct icmp6_hdr)) {
 		icmp6stat.icp6s_tooshort++;
+		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_error);
 		goto freeit;
 	}
 
@@ -558,6 +561,7 @@ icmp6_input(mp, offp, proto)
 	IP6_EXTHDR_GET(icmp6, struct icmp6_hdr *, m, off, sizeof(*icmp6));
 	if (icmp6 == NULL) {
 		icmp6stat.icp6s_tooshort++;
+		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_error);
 		return IPPROTO_DONE;
 	}
 #endif
@@ -568,6 +572,7 @@ icmp6_input(mp, offp, proto)
 		    "ICMP6 checksum error(%d|%x) %s\n",
 		    icmp6->icmp6_type, sum, ip6_sprintf(&ip6->ip6_src)));
 		icmp6stat.icp6s_checksum++;
+		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_error);
 		goto freeit;
 	}
 
@@ -590,9 +595,6 @@ icmp6_input(mp, offp, proto)
 #endif
 
 	icmp6stat.icp6s_inhist[icmp6->icmp6_type]++;
-	icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_msg);
-	if (icmp6->icmp6_type < ICMP6_INFOMSG_MASK)
-		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_error);
 
 #ifdef MIP6
 	if (mip6_icmp6_tunnel_input(m, off, icmp6len)) {
