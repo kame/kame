@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.255 2002/08/20 06:10:02 sakane Exp $	*/
+/*	$KAME: key.c,v 1.256 2002/08/20 06:12:18 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -5621,7 +5621,7 @@ key_getcomb_setlifetime(comb)
 	comb->sadb_comb_soft_bytes = 0;
 	comb->sadb_comb_hard_bytes = 0;
 	comb->sadb_comb_hard_addtime = 86400;	/* 1 day */
-	comb->sadb_comb_soft_addtime = comb->sadb_comb_soft_addtime * 80 / 100;
+	comb->sadb_comb_soft_addtime = comb->sadb_comb_hard_addtime * 80 / 100;
 	comb->sadb_comb_hard_usetime = 28800;	/* 8 hours */
 	comb->sadb_comb_soft_usetime = comb->sadb_comb_hard_usetime * 80 / 100;
 }
