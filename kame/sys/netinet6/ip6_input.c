@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.253 2002/01/17 14:30:10 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.254 2002/01/17 14:36:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1023,7 +1023,7 @@ ip6_input(m)
 #endif
 
 	/*
-	 * FAITH(Firewall Aided Internet Translator)
+	 * FAITH (Firewall Aided Internet Translator)
 	 */
 #if defined(NFAITH) && 0 < NFAITH
 	if (ip6_keepfaith) {
