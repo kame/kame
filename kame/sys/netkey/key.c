@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.113 2000/05/23 13:19:21 itojun Exp $	*/
+/*	$KAME: key.c,v 1.114 2000/05/24 16:22:38 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -305,6 +305,8 @@ do { \
 		free((caddr_t)(p), M_SECA);                                  \
 	} while (0)
 #endif
+
+#define KSIN6(a) (&((struct sockaddr_in6 *)(a))->sin6_addr)
 
 /*
  * set parameters into secpolicyindex buffer.
@@ -772,15 +774,86 @@ key_allocsa(family, src, dst, proto, spi)
 					continue;
 
 #if 0	/* don't check src */
-				if (!key_bbcmp(src,
-				     _INADDRBYSA(&sav->sah->saidx.src),
-				     _INALENBYAF(sav->sah->saidx.src.ss_family) << 3))
+				/* check src address */
+				switch (family) {
+				case AF_INET:
+					if (!key_bbcmp(src,
+					     (caddr_t)&((struct sockaddr_in *)&sav->sah->saidx.src)->sin_addr,
+					     sizeof(struct in_addr) << 3))
+						continue;
+					break;
+				case AF_INET6:
+				{
+					struct in6_addr *in6, fake;
+					struct sockaddr_in6 *s;
+
+					in6 = (struct in6_addr *)src;
+					s = (struct sockaddr_in6 *)&sav->sah->saidx.src;
+
+					if (IN6_IS_SCOPE_LINKLOCAL((struct in6_addr *)src)
+					 && IN6_IS_SCOPE_LINKLOCAL(&s->sin6_addr)) {
+						if (s->sin6_scope_id != ntohs(in6->s6_addr16[1]))
+							continue;
+
+						/* fake scope id */
+						bcopy(src, &fake, sizeof(fake));
+
+						fake.s6_addr16[1] = 0;
+						in6 = &fake;
+					}
+
+					if (!key_bbcmp((caddr_t)in6,
+						(caddr_t)&s->sin6_addr,
+						sizeof(struct in6_addr) << 3))
+						continue;
+					break;
+				}
+				default:
+					printf("key_allocsa: unknown address family=%d.\n",
+						family);
 					continue;
+				}
+
 #endif
-				if (!key_bbcmp(dst,
-				     _INADDRBYSA(&sav->sah->saidx.dst),
-				     _INALENBYAF(sav->sah->saidx.dst.ss_family) << 3))
+				/* check dst address */
+				switch (family) {
+				case AF_INET:
+					if (!key_bbcmp(dst,
+					     (caddr_t)&((struct sockaddr_in *)&sav->sah->saidx.src)->sin_addr,
+					     sizeof(struct in_addr) << 3))
+						continue;
+					break;
+				case AF_INET6:
+				{
+					struct in6_addr *in6, fake;
+					struct sockaddr_in6 *s;
+
+					in6 = (struct in6_addr *)dst;
+					s = (struct sockaddr_in6 *)&sav->sah->saidx.dst;
+
+					if (IN6_IS_SCOPE_LINKLOCAL((struct in6_addr *)dst)
+					 && IN6_IS_SCOPE_LINKLOCAL(&s->sin6_addr)) {
+						if (s->sin6_scope_id != ntohs(in6->s6_addr16[1]))
+							continue;
+
+						/* fake scope id */
+						bcopy(dst, &fake, sizeof(fake));
+
+						fake.s6_addr16[1] = 0;
+						in6 = &fake;
+					}
+
+					if (!key_bbcmp((caddr_t)in6,
+						(caddr_t)&s->sin6_addr,
+						sizeof(struct in6_addr) << 3))
+						continue;
+					break;
+				}
+				default:
+					printf("key_allocsa: unknown address family=%d.\n",
+						family);
 					continue;
+				}
 
 				goto found;
 			}
@@ -3685,6 +3758,19 @@ key_cmpsaidx_withmode(saidx0, saidx1)
     {
 	int sa_len = _INALENBYAF(saidx0->src.ss_family);
 
+	if (IN6_IS_SCOPE_LINKLOCAL(KSIN6(&saidx0->src))
+	 && IN6_IS_SCOPE_LINKLOCAL(KSIN6(&saidx1->src))) {
+		if (((struct sockaddr_in6 *)&saidx0->src)->sin6_scope_id !=
+			((struct sockaddr_in6 *)&saidx1->src)->sin6_scope_id)
+			return 0;
+	}
+	if (IN6_IS_SCOPE_LINKLOCAL(KSIN6(&saidx0->dst))
+	 && IN6_IS_SCOPE_LINKLOCAL(KSIN6(&saidx1->dst))) {
+		if (((struct sockaddr_in6 *)&saidx0->dst)->sin6_scope_id !=
+			((struct sockaddr_in6 *)&saidx1->dst)->sin6_scope_id)
+			return 0;
+	}
+
 	if (bcmp(_INADDRBYSA(&saidx0->src), _INADDRBYSA(&saidx1->src), sa_len)
 	 || bcmp(_INADDRBYSA(&saidx0->dst), _INADDRBYSA(&saidx1->dst), sa_len))
 		return 0;
@@ -3761,6 +3847,20 @@ key_cmpspidx_withmask(spidx0, spidx1)
 	if (_INPORTBYSA(&spidx0->dst) != IPSEC_PORT_ANY
 	 && _INPORTBYSA(&spidx0->dst) != _INPORTBYSA(&spidx1->dst))
 		return 0;
+
+	if (IN6_IS_SCOPE_LINKLOCAL(KSIN6(&spidx0->src))
+	 && IN6_IS_SCOPE_LINKLOCAL(KSIN6(&spidx1->src))) {
+		if (((struct sockaddr_in6 *)&spidx0->src)->sin6_scope_id !=
+			((struct sockaddr_in6 *)&spidx1->src)->sin6_scope_id)
+			return 0;
+	}
+
+	if (IN6_IS_SCOPE_LINKLOCAL(KSIN6(&spidx0->dst))
+	 && IN6_IS_SCOPE_LINKLOCAL(KSIN6(&spidx1->dst))) {
+		if (((struct sockaddr_in6 *)&spidx0->dst)->sin6_scope_id !=
+			((struct sockaddr_in6 *)&spidx1->dst)->sin6_scope_id)
+			return 0;
+	}
 
 	if (!key_bbcmp(_INADDRBYSA(&spidx0->src),
 	               _INADDRBYSA(&spidx1->src),

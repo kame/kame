@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.63 2000/05/12 18:05:08 sakane Exp $	*/
+/*	$KAME: ipsec.c,v 1.64 2000/05/24 16:22:38 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -792,12 +792,22 @@ ipsec_setspidx_mbuf(spidx, dir, family, m)
 		sin6->sin6_len = sizeof(*sin6);
 		bcopy(&ip6->ip6_src, &sin6->sin6_addr, sizeof(sin6->sin6_addr));
 		sin6->sin6_port = IPSEC_PORT_ANY;
+		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src)) {
+			/* fix scope id for comparing SPD */
+			sin6->sin6_addr.s6_addr16[1] = 0;
+			sin6->sin6_scope_id = ntohs(ip6->ip6_src.s6_addr16[1]);
+		}
 
 		sin6 = (struct sockaddr_in6 *)&spidx->dst;
 		sin6->sin6_family = AF_INET6;
 		sin6->sin6_len = sizeof(*sin6);
 		bcopy(&ip6->ip6_dst, &sin6->sin6_addr, sizeof(sin6->sin6_addr));
 		sin6->sin6_port = IPSEC_PORT_ANY;
+		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst)) {
+			/* fix scope id for comparing SPD */
+			sin6->sin6_addr.s6_addr16[1] = 0;
+			sin6->sin6_scope_id = ntohs(ip6->ip6_dst.s6_addr16[1]);
+		}
 
 		spidx->prefs = spidx->prefd = sizeof(struct in6_addr) << 3;
 
@@ -1024,6 +1034,7 @@ ipsec6_setspidx_ipaddr(m, spidx)
 {
 	struct ip6_hdr *ip6 = NULL;
 	struct ip6_hdr ip6buf;
+	struct sockaddr_in6 *sin6;
 
 	/* sanity check 1 for minimum ip header length */
 	if (m == NULL)
@@ -1053,10 +1064,19 @@ ipsec6_setspidx_ipaddr(m, spidx)
 		return;
 	}
 
-	bcopy(&ip6->ip6_src, &((struct sockaddr_in6 *)&spidx->src)->sin6_addr,
-	    sizeof(ip6->ip6_src));
-	bcopy(&ip6->ip6_dst, &((struct sockaddr_in6 *)&spidx->dst)->sin6_addr,
-	    sizeof(ip6->ip6_dst));
+	sin6 = (struct sockaddr_in6 *)&spidx->src;
+	bcopy(&ip6->ip6_src, &sin6->sin6_addr, sizeof(ip6->ip6_src));
+	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src)) {
+		sin6->sin6_addr.s6_addr16[1] = 0;
+		sin6->sin6_scope_id = ntohs(ip6->ip6_src.s6_addr16[1]);
+	}
+
+	sin6 = (struct sockaddr_in6 *)&spidx->dst;
+	bcopy(&ip6->ip6_dst, &sin6->sin6_addr, sizeof(ip6->ip6_dst));
+	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst)) {
+		sin6->sin6_addr.s6_addr16[1] = 0;
+		sin6->sin6_scope_id = ntohs(ip6->ip6_dst.s6_addr16[1]);
+	}
 
 	return;
 }
@@ -2745,7 +2765,11 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 			sin6->sin6_port = IPSEC_PORT_ANY;
 			bcopy(&ip6->ip6_src, &sin6->sin6_addr,
 			    sizeof(ip6->ip6_src));
-			/* XXX scope */
+			if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src)) {
+				/* fix scope id for comparing SPD */
+				sin6->sin6_addr.s6_addr16[1] = 0;
+				sin6->sin6_scope_id = ntohs(ip6->ip6_src.s6_addr16[1]);
+			}
 		}
 		sin6 = (struct sockaddr_in6 *)&saidx.dst;
 		if (sin6->sin6_len == 0) {
@@ -2754,7 +2778,11 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 			sin6->sin6_port = IPSEC_PORT_ANY;
 			bcopy(&ip6->ip6_dst, &sin6->sin6_addr,
 			    sizeof(ip6->ip6_dst));
-			/* XXX scope */
+			if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst)) {
+				/* fix scope id for comparing SPD */
+				sin6->sin6_addr.s6_addr16[1] = 0;
+				sin6->sin6_scope_id = ntohs(ip6->ip6_dst.s6_addr16[1]);
+			}
 		}
 
 		if (key_checkrequest(isr, &saidx) == ENOENT) {
