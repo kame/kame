@@ -1,0 +1,10 @@
+# default policy table based on draft-ietf-ipngwg-default-addr-select-05
+# usage: addrselect -c addrselect.conf.sample
+#
+#Format:
+#Prefix       Precedence Label
+::1/128               50     0 
+::/0                  40     1 
+2002::/16             30     2 
+::/96                 20     3 
+::ffff:0:0/96         10     4 
