@@ -28,6 +28,7 @@ CFLAGS+=-Wall
 .if (${OPSYS} != "NetBSD")
 CFLAGS+=-DINET6
 .else
+WARNS?=2
 CPPFLAGS+=-DINET6
 .endif
 .if (${OPSYS} == "NetBSD") || (${OPSYS} == "OpenBSD")

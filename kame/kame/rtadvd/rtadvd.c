@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.71 2002/06/10 19:59:47 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.72 2002/06/29 13:02:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -76,7 +76,7 @@ volatile sig_atomic_t do_die;
 struct msghdr sndmhdr;
 struct iovec rcviov[2];
 struct iovec sndiov[2];
-struct sockaddr_in6 from;
+struct sockaddr_in6 rcvfrom;
 struct sockaddr_in6 sin6_allnodes = {sizeof(sin6_allnodes), AF_INET6};
 struct in6_addr in6a_site_allrouters;
 static char *dumpfilename = "/var/run/rtadvd.dump"; /* XXX: should be configurable */
@@ -711,7 +711,7 @@ rtadvd_input()
 			    "<%s> RS with invalid hop limit(%d) "
 			    "received from %s on %s",
 			    __func__, *hlimp,
-			    inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
+			    inet_ntop(AF_INET6, &rcvfrom.sin6_addr, ntopbuf,
 			    INET6_ADDRSTRLEN),
 			    if_indextoname(pi->ipi6_ifindex, ifnamebuf));
 			return;
@@ -721,7 +721,7 @@ rtadvd_input()
 			    "<%s> RS with invalid ICMP6 code(%d) "
 			    "received from %s on %s",
 			    __func__, icp->icmp6_code,
-			    inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
+			    inet_ntop(AF_INET6, &rcvfrom.sin6_addr, ntopbuf,
 			    INET6_ADDRSTRLEN),
 			    if_indextoname(pi->ipi6_ifindex, ifnamebuf));
 			return;
@@ -731,12 +731,12 @@ rtadvd_input()
 			    "<%s> RS from %s on %s does not have enough "
 			    "length (len = %d)",
 			    __func__,
-			    inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
+			    inet_ntop(AF_INET6, &rcvfrom.sin6_addr, ntopbuf,
 			    INET6_ADDRSTRLEN),
 			    if_indextoname(pi->ipi6_ifindex, ifnamebuf), i);
 			return;
 		}
-		rs_input(i, (struct nd_router_solicit *)icp, pi, &from);
+		rs_input(i, (struct nd_router_solicit *)icp, pi, &rcvfrom);
 		break;
 	case ND_ROUTER_ADVERT:
 		/*
@@ -748,7 +748,7 @@ rtadvd_input()
 			    "<%s> RA with invalid hop limit(%d) "
 			    "received from %s on %s",
 			    __func__, *hlimp,
-			    inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
+			    inet_ntop(AF_INET6, &rcvfrom.sin6_addr, ntopbuf,
 			    INET6_ADDRSTRLEN),
 			    if_indextoname(pi->ipi6_ifindex, ifnamebuf));
 			return;
@@ -758,7 +758,7 @@ rtadvd_input()
 			    "<%s> RA with invalid ICMP6 code(%d) "
 			    "received from %s on %s",
 			    __func__, icp->icmp6_code,
-			    inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
+			    inet_ntop(AF_INET6, &rcvfrom.sin6_addr, ntopbuf,
 			    INET6_ADDRSTRLEN),
 			    if_indextoname(pi->ipi6_ifindex, ifnamebuf));
 			return;
@@ -768,12 +768,12 @@ rtadvd_input()
 			    "<%s> RA from %s on %s does not have enough "
 			    "length (len = %d)",
 			    __func__,
-			    inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
+			    inet_ntop(AF_INET6, &rcvfrom.sin6_addr, ntopbuf,
 			    INET6_ADDRSTRLEN),
 			    if_indextoname(pi->ipi6_ifindex, ifnamebuf), i);
 			return;
 		}
-		ra_input(i, (struct nd_router_advert *)icp, pi, &from);
+		ra_input(i, (struct nd_router_advert *)icp, pi, &rcvfrom);
 		break;
 	case ICMP6_ROUTER_RENUMBERING:
 		if (accept_rr == 0) {
@@ -782,7 +782,7 @@ rtadvd_input()
 			    __func__);
 			break;
 		}
-		rr_input(i, (struct icmp6_router_renum *)icp, pi, &from,
+		rr_input(i, (struct icmp6_router_renum *)icp, pi, &rcvfrom,
 			 &dst);
 		break;
 	default:
@@ -1504,8 +1504,8 @@ sock_open()
 	/* initialize msghdr for receiving packets */
 	rcviov[0].iov_base = (caddr_t)answer;
 	rcviov[0].iov_len = sizeof(answer);
-	rcvmhdr.msg_name = (caddr_t)&from;
-	rcvmhdr.msg_namelen = sizeof(from);
+	rcvmhdr.msg_name = (caddr_t)&rcvfrom;
+	rcvmhdr.msg_namelen = sizeof(rcvfrom);
 	rcvmhdr.msg_iov = rcviov;
 	rcvmhdr.msg_iovlen = 1;
 	rcvmhdr.msg_control = (caddr_t) rcvcmsgbuf;
@@ -1533,12 +1533,12 @@ rtsock_open()
 }
 
 struct rainfo *
-if_indextorainfo(int index)
+if_indextorainfo(int idx)
 {
 	struct rainfo *rai = ralist;
 
 	for (rai = ralist; rai; rai = rai->next) {
-		if (rai->ifindex == index)
+		if (rai->ifindex == idx)
 			return(rai);
 	}
 

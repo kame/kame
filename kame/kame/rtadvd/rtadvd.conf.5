@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.41 2002/05/29 14:34:35 itojun Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.42 2002/06/29 13:02:55 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -154,6 +154,11 @@ These items can be omitted, then
 .Nm rtadvd
 will automatically get appropriate prefixes from the kernel's routing table,
 and advertise the prefixes with the default parameters.
+Keywords other than
+.Cm clockskew
+can be augmented with number, like
+.Dq Li prefix2 ,
+to specify multiple prefixes.
 .Bl -tag -width indent
 .It Cm \&clockskew
 (num) Time skew to adjust link propagation delays and clock skews
@@ -166,22 +171,6 @@ real time.
 If the value is 0, it means the consistency check will be skipped
 for such prefixes.
 The default value is 0.
-.It Cm \&addrs
-(num) Number of prefixes.
-Its default is 0, so it must explicitly be set to positve values
-if you want to specify any prefix information option.
-If its value is 0,
-.Xr rtadvd 8
-looks up the system routing table and
-advertise the prefixes corresponding to interface routes
-on the interface.
-If its value is more than 1, you must specify the index of the prefix
-for each item below.
-Indices vary from 0 to N-1, where N is the
-value of
-.Cm addrs .
-Each index shall follow the name of each item, e.g.,
-.Dq prefixlen2 .
 .It Cm \&prefixlen
 (num) Prefix length field.
 The default value is 64.
