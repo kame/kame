@@ -44,7 +44,23 @@ static const char rcsid[] =
 
 #include <stdio.h>
 
-#include <netinet6/ah.h>
+/* there's no standard definition so we are on our own */
+struct ah {
+	u_int8_t	ah_nxt;		/* Next Header */
+	u_int8_t	ah_len;		/* Length of data, in 32bit */
+	u_int16_t	ah_reserve;	/* Reserved for future use */
+	u_int32_t	ah_spi;		/* Security parameter index */
+	/* variable size, 32bit bound*/	/* Authentication data */
+};
+
+struct newah {
+	u_int8_t	ah_nxt;		/* Next Header */
+	u_int8_t	ah_len;		/* Length of data + 1, in 32bit */
+	u_int16_t	ah_reserve;	/* Reserved for future use */
+	u_int32_t	ah_spi;		/* Security parameter index */
+	u_int32_t	ah_seq;		/* Sequence number field */
+	/* variable size, 32bit bound*/	/* Authentication data */
+};
 
 #include "interface.h"
 #include "addrtoname.h"
