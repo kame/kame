@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.21 2004/05/23 15:35:59 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.22 2004/05/23 15:37:03 suz Exp $
  */
 
 /*
@@ -929,7 +929,11 @@ mld_shift_to_v1mode(mifi, src, grp)
 	}
 	g->sources = NULL;
 	g->comp_mode = MLDv1;
-	query_groups(v);
+	/* 
+	 * MLDv2 router send a MLD query in MLDv2 regardless of compat-mode.
+	 * draft-vida-mld-v2-08.txt (sec 8.3.2 p.47)
+	 */
+	query_groupsV2(v);
 
 	/* set timer to disable v1-compat-mode later */
 update_timer:
