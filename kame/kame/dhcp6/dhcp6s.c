@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.73 2002/05/09 11:48:54 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.74 2002/05/09 12:38:11 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -477,7 +477,8 @@ server6_react_solicit(ifp, buf, siz, optinfo, from, fromlen)
 	/* get per-host configuration for the client, if any. */
 	if ((client_conf = find_hostconf(&optinfo->clientID))) {
 		dprintf(LOG_DEBUG, "server6_react_solicit: "
-			"found a host configuration for the client");
+			"found a host configuration for %s",
+			client_conf->name);
 	}
 
 	/*
