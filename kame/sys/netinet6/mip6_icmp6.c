@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.6 2001/08/09 07:55:21 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.7 2001/08/09 14:30:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -206,11 +206,105 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
      int off;
      int icmp6len;
 {
+	struct mbuf *n;
+	struct ip6_hdr *ip6, otip6, oip6, *nip6;
+	struct icmp6_hdr *icmp6, *nicmp6;
+	int plen, nplen;
+	struct mip6_bc *mbc;
+
+	if (!MIP6_IS_HA) {
+		/*
+		 * this check is needed only for a node that is acting
+		 * a home agent.
+		 */
+		return (0);
+	}
+	
 	/*
-	 * XXX to be filled.  check if this icmp is returned while
-	 * encapsulating from ha to mn.  if so, relay this icmp to the
+	 * check if this icmp is generated on the way to sending from
+	 * ha to mn by encapsulating.  if so, relay this icmp to the
 	 * sender of an original packet.
+	 *
+	 * the icmp packet against the tunneled packet looks like as
+	 * follows.
+	 *   ip(src=??,dst=ha)
+	 *     |icmp|ip(src=ha,dst=mnhoa)|ip(src=cn,dst=mnhoa)|payload
 	 */
+	ip6 = mtod(m, struct ip6_hdr *);
+	plen = ip6->ip6_plen;
+	icmp6 = (struct icmp6_hdr *)((caddr_t)ip6 + off);
+	/* original tunneled ip6 hdr is not guaranteed to be continuous. */
+	m_copydata(m, off + sizeof(*icmp6), sizeof(otip6), (caddr_t)&otip6);
+
+	/*
+	 * XXX
+	 * must check extension headers...
+	 */
+	if (otip6.ip6_nxt != IPPROTO_IPV6) {
+		/* this packet is not tunneled. */
+		/* XXX we must chase extension haeders... */
+		return (0);
+	}
+
+	m_copydata(m, off + sizeof(*icmp6) + sizeof(otip6),
+		   sizeof(oip6), (caddr_t)&oip6);
+	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &oip6.ip6_dst);
+	if (mbc == NULL) {
+		/* we are not a homeagent of this mn?? */
+		return (0);
+	}
+
+	n = m_dup(m, M_DONTWAIT);
+	if (n == NULL) {
+		mip6log((LOG_ERR,
+			 "%s: mbuf allocation failed.\n",
+			 __FUNCTION__));
+		/* continue, anyway */
+		return (0);
+	}
+	m_adj(n, off + sizeof(*icmp6) + sizeof(otip6));
+	M_PREPEND(n, sizeof(struct icmp6_hdr), M_DONTWAIT);
+	if (n == NULL) {
+		mip6log((LOG_ERR,
+			 "%s: mbuf prepend for icmp6 failed.\n",
+			 __FUNCTION__));
+		/* continue */
+		return (0);
+	}
+	nicmp6 = mtod(n, struct icmp6_hdr *);
+	/* fill the icmp6 hdr */
+	nicmp6->icmp6_type = icmp6->icmp6_type;
+	nicmp6->icmp6_code = icmp6->icmp6_code;
+	nicmp6->icmp6_data32[0] = icmp6->icmp6_data32[0];
+
+	M_PREPEND(n, sizeof(struct ip6_hdr), M_DONTWAIT);
+	if (n == NULL) {
+		mip6log((LOG_ERR,
+			 "%s: mbuf prepend for ip6 failed.\n",
+			 __FUNCTION__));
+		/* continue */
+		return (0);
+	}
+	nip6 = mtod(n, struct ip6_hdr *);
+	/* fill the ip6 hdr */
+	nip6->ip6_flow = 0;
+	nip6->ip6_vfc &= ~IPV6_VERSION_MASK;
+	nip6->ip6_vfc |= IPV6_VERSION;
+	nip6->ip6_plen = htons(n->m_pkthdr.len - sizeof(struct ip6_hdr));
+	nip6->ip6_nxt = IPPROTO_ICMPV6;
+	nip6->ip6_hlim = 255;
+	nip6->ip6_src = ip6->ip6_dst;
+	nip6->ip6_dst = oip6.ip6_src;
+
+	/* calculate checksum */
+	nicmp6->icmp6_cksum = 0;
+	nicmp6->icmp6_cksum = in6_cksum(n, IPPROTO_ICMPV6, 
+					sizeof(*nip6), ntohs(nip6->ip6_plen));
+
+	/* XXX IPSEC? */
+
+	ip6_output(n, NULL, NULL, 0, NULL, NULL);
+	/* XXX stat? */
 
 	return (0);
 }
