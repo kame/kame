@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.372 2004/08/11 10:49:37 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.373 2004/08/11 10:56:26 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -680,16 +680,21 @@ See 1.2 in the document for relationship between DAD and autoconfiguration.
 
 1.4.3 DHCPv6
 
-We supply a tiny DHCPv6 server/client in kame/dhcp6.  However, the
-implementation is premature (for example, this does NOT implement
-address lease/release), and it is not in default compilation tree on
-some platforms.  If you want to do some experiment, compile it on your
-own.
+We supply an "incomplete" implementation of DHCPv6 server, client, and
+relay agent in kame/dhcp6.  While the implementation supports many
+features of the DHCPv6 standard, it is still called "incomplete"
+because it does NOT implement address lease/release.
 
-DHCPv6 and autoconfiguration also needs more work.  "Managed" and "Other"
-bits in RA have no special effect to stateful autoconfiguration procedure
-in DHCPv6 client program ("Managed" bit actually prevents stateless
-autoconfiguration, but no special action will be taken for DHCPv6 client).
+DHCPv6 and autoconfiguration also needs more work.  The "Managed" bit
+in RA has no special effect to the stateful autoconfiguration
+procedure in the DHCPv6 client program.  It is possible to invoke
+DHCPv6 for "other" information configuration when receiving an RA with
+the "Otherconfig" flag being set through a knob for router
+solicitation daemon.  Nevertheless, this is also consider
+experimental, and the IETF is now working on clarifying this part of
+the specification.  The implementation behavior may also change in the
+future accordingly.
+
 
 1.5 Generic tunnel interface
 
