@@ -360,6 +360,15 @@ cleanup_parse_url:
 		strncpy(*host, thost + 1, len);
 		(*host)[len] = '\0';
 		cp++;
+		if (!*cp)
+			cp = NULL;
+		else if (*cp == ':')
+			;
+		else {
+			warnx("Invalid port separator `%c' in %s `%s'", *cp,
+			    desc, url);
+			goto cleanup_parse_url;
+		}
 	} else if ((cp = strrchr(thost, ':')) != NULL) {
 		size_t len = cp - thost;
 		*host = (char *)xmalloc(len + 1);
@@ -374,8 +383,8 @@ cleanup_parse_url:
 	if (cp != NULL) {
 		long nport;
 
-		*cp = '\0';
-		nport = strtol(cp + 1, &ep, 10);
+		*cp++ = '\0';
+		nport = strtol(cp, &ep, 10);
 		if (nport < 1 || nport > MAX_IN_PORT_T || *ep != '\0') {
 			warnx("Invalid port `%s' in %s `%s'", cp, desc, url);
 			goto cleanup_parse_url;
