@@ -1,0 +1,400 @@
+.\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+.\" All rights reserved.
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.Dd Aug 13, 1999
+.Dt RACOON.CONF 5
+.Os KAME
+.\"
+.Sh NAME
+.Nm racoon.conf
+.Nd configuration file for racoon
+.\"
+.\" .Sh SYNOPSIS
+.\"
+.Sh DESCRIPTION
+.Nm
+is the configuration file for the ISAKMP daemon named racoon,
+negotiating security association for myself and IPsec.
+This is consists of a sequence of directives and statements like C code.
+Each directives are composed by a tag and a enclosed by '{' and '}'
+in which some statements are composed of tokens separated by white space,
+which can be any combination of blanks, tabs.
+Lines beginning with
+.Ql #
+are comments.
+.\"
+.Ss Meta Syntax
+Keywords and special characters that the parser expects exactly are
+displayed using the
+.Ic bold
+font.
+Parameters are specifying with
+.Ar underline .
+Parameters shown in
+square brackets (`[' and `]') are used to show optional
+keywords and parameters.
+The vertical bar (`|') is used to indicate
+between a choice of optional parameters.
+Parentheses (`(' and
+`)') are used to group keywords and parameters when necessary.
+Major parameters are listed below.
+.Pp
+.Bl -tag -width addressx -compact
+.It Ar number
+means hexa-decimal or decimal number.  The former is expressed with '0x'.
+.It Ar string
+means any string enclosed `"' (double quotation).
+.It Ar address
+means IPv6 and IPv4 address.
+.It Ar port
+means TCP/UDP port number.
+.El
+.\"
+.Ss Listening Port Specification
+.Pp
+.Bl -tag -width Ds -compact
+.It Ic listen { Ar statements Ic }
+If no
+.Ar listen
+directive is specified, racoon will listen to all available interface addresses.
+The followings are the list of statements.
+.Pp
+.Bl -tag -width Ds -compact
+.It Ic isakmp Ar address Ic port Ar port ;
+If this(these) is specifyed, racoon will only listen to its address.
+.It Ic admin Ic port Ar port ;
+specify the port for connecting to
+.Xr kmpstat 8 .
+.El
+.El
+.\"
+.Ss Remote Nodes Specifications 
+.Pp
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic remote ( Ar address \*(Ba Ic anonymous )
+.Ic { Ar statements Ic }
+.Xc
+definie the parameters of IKE phase 1, phase 2 and others.
+The followings are the list of statements.
+.Pp
+.Bl -tag -width Ds -compact
+.It Ic try_to_send Ar number ;
+the count of sending packet for retransmission.
+.It Ic send_timer Ar number ;
+the number of interval to re-send packet.
+.It Ic vendor_id Ar string ;
+define the vendor identifier.
+.\"
+.It Xo
+.Ic phase Ar number
+.Ic { Ar substatements Ic }
+.Xc
+.Ar number
+is 1 or 2 that mean IKE phase.
+The followings are the list of statements.
+.Pp
+.Bl -tag -width Ds -compact
+.It Ic exchange_mode ( main \*(Ba aggressive ) ;
+defined mode of phase 1.
+.Ic main
+and
+.Ic aggressive
+mean main mode and aggressive respectively.
+.It Ic doi Ar ipsec_doi ;
+means to use IPSEC-DOI specifyed RFC 2407.
+It must be stated.
+.It Ic situation Ic identity_only ;
+It must be stated.
+.It Ic pfs_group Ar group ;
+define the group of Diffie-Hellman exponentiations for PFS.
+It's only use in phase 2.
+.Ar group
+are one of the followings:
+.Ic modp768 , modp1024 , modp1536 .
+.It Ic id_type Ar type Ar string ;
+It's not used.
+.\"
+.It Xo
+.Ic proposal Ar number Ar protocol
+.Ic { Ar sub-substatements Ic }
+.Xc
+.Ar number
+must be increasing.
+.Ar protocol
+is one of followins:
+.Ic isakmp , esp , ah
+or
+.Ic ipcomp .
+.Pp
+.Ic isakmp
+means
+.Do
+Internet Security Association and Key Management Protocol
+.Dc ,
+RFC 2408.
+.Ic esp
+means
+.Do
+IP Encapsulating Security Payload
+.Dc ,
+RFC 2406.
+.Ic ah
+means
+.Do
+IP Authentication Header
+.Dc ,
+RFC 2402.
+.Ic ipcomp
+means
+.Do
+IP Payload Compression Protocol
+.Dc ,
+RFC 2393.
+.Pp
+.Bl -tag -width Ds -compact
+.\"
+.It Xo
+.Ic transform Ar number Ar transform
+.Ic { sub-sub-substatements }
+.Xc
+.Ar transform
+is one of following:
+.Ic oakley
+for isakmp.
+.Ic des , 3des , des_iv64 , null , rc5 , cast128 , blowfish
+for esp.
+.Ic sha1 , md5
+for ah.
+.Ic oui , deflate , lzs
+for ipcomp.
+.Ar number
+must be increasing.
+.Pp
+.Bl -tag -width Ds -compact
+.\"
+.It Ic encryption_algorithm Ar algorithm ;
+define encryption algorithm for phase 1 negotiation.
+.Ar algorithm
+is one of following:
+.Ic des , 3des , idea , blowfish , rc5 , cast
+for oakley.
+In the case of other transform, must not use this statement.
+.\"
+.It Ic hash_algorithm Ar algorithm;
+define hash algorithm for phase 1 negotiation.
+.Ar algorithm
+is one of following:
+.Ic md5, sha1
+for oakley.
+.\"
+.It Ic authentication_method Ar type ;
+define the authentication method for phase 1 negotiation.
+.Ar type
+is only one:
+.Ic pre_shared_key Ar string ;
+.\"
+.It Ic dh_group Ar group ;
+define the group of Diffie-Hellman exponentiations.
+.Ar group
+is one of following:
+.Ic modp768 , modp1024 , modp1536 .
+.\"
+.It Ic authentication_algorithm Ar algorithm ;
+.Ic hmac_md5, hmac_sha1, none
+for esp and ah.
+.\"
+.It Ic nonce_size Ar number ;
+define the byte size of random value.
+.\"
+.It Ic lifetime Ar number Ar type ;
+Ar type is one of followings: second or KB.
+But in the case of oakley, KB is not supported now.
+.El
+.El
+.El
+.El
+.It Xo
+.Ic post-command
+.Ic { Ar substatements Ic }
+.Xc
+.Bl -tag -width Ds -compact
+.It Ic path Ar path ;
+specify PATH to execute command.
+.It Ic exec Ar command ;
+define the command to execute after to negotiate phase 1.
+.It Ic success Ar command ;
+define the command to execute if success of execution the defined by
+.Ic exec .
+.It Ic failure Ar command ;
+define the command to execute if failure of execution the defined by
+.Ic exec .
+.El
+.El
+.\"
+.Ss Filtering rules
+.Bl -tag -width Ds -compact
+.It Ic filter { statements }
+It'll be supported in the future.
+.El
+.\"
+.Ss Specifying log file
+.Bl -tag -width Ds -compact
+.It Ic log ( Ar number \*(Ba Ar level ) ;
+define dump level.  It is debugging use.
+.Ar is one of following:
+.Ic info , notify , sched , sched2 , cipher , sa , net , misc , all .
+.El
+.\"
+.Ss Specifying the way to pad
+.Bl -tag -width Ds -compact
+.It Ic padding { Ar statements Ic }
+specifyed padding format.
+The followings are the list of statements.
+.Bl -tag -width Ds -compact
+.It Ic max_length Ar number ;
+.It Ic random_length (on \(ba off) ;
+.It Ic check_length (on \(ba off) ;
+.It Ic excl_lastone (on \(ba off) ;
+.El
+.El
+.\"
+.Sh EXAMPLE
+.Bd -literal -offset
+# main mode example, with "anonymous" (any peer) configuration
+remote anonymous {
+	try_to_send 3;   # count
+	send_timer 20;   # (s)
+	vendor_id "KAME/racoon";
+
+	phase 1 {
+		exchange_mode main;
+		doi ipsec_doi;
+		situation identity_only;
+
+		proposal 1 isakmp {
+			transform 1 oakley {
+				encryption_algorithm des;
+				hash_algorithm md5;
+				authentication_method pre_shared_key "mekmitasdigoat";
+				dh_group modp768;
+				nonce_size 16;
+				lifetime 7200 second;
+			}
+			transform 2 oakley {
+				encryption_algorithm des;
+				hash_algorithm md5;
+				authentication_method pre_shared_key "mekmitasdigoat";
+				dh_group modp1024;
+				nonce_size 16;
+				lifetime 7200 second;
+			}
+		}
+	}
+
+	phase 2 {
+		doi ipsec_doi;
+		situation identity_only;
+
+		pfs_group modp1024;
+
+		proposal 1 ah {
+			transform 1 sha1 {
+				authentication_algorithm hmac_sha1;
+				lifetime 3600 second;
+				lifetime 10000 KB;
+			}
+		}
+		proposal 7 esp {
+			transform 1 des {
+				authentication_algorithm hmac_sha1;
+				lifetime 3600 second;
+				lifetime 10000 KB;
+			}
+		}
+	}
+}
+
+# aggressive mode example
+remote 10.0.0.1 {
+	try_to_send 10;   # count
+	send_timer 30;   # (s)
+	vendor_id "KAME/racoon";
+
+	phase 1 {
+		exchange_mode aggressive;
+		doi ipsec_doi;
+		situation identity_only;
+		pfs_group modp1024;
+
+		proposal 1 isakmp {
+			transform 3 oakley {
+				encryption_algorithm 3des;
+				hash_algorithm md5;
+				authentication_method pre_shared_key "mekmitasdigoat";
+				nonce_size 16;
+				lifetime 900 second;
+			}
+			transform 7 oakley {
+				encryption_algorithm 3des;
+				hash_algorithm sha1;
+				authentication_method pre_shared_key "mekmitasdigoat";
+				nonce_size 16;
+				lifetime 300 second;
+			}
+		}
+	}
+
+	phase 2 {
+		doi ipsec_doi;
+		situation identity_only;
+		pfs_group modp1024;
+
+		proposal 16 esp {
+			transform 1 3des {
+				authentication_algorithm hmac_md5;
+				lifetime 300 second;
+				lifetime 10000 KB;
+			}
+		}
+	}
+}
+
+.Ed
+.\"
+.Sh SEE ALSO
+.Xr racoon 8
+.\"
+.Sh HISTORY
+The
+.Nm
+configuration file first appeared in
+.Dq YIPS
+Yokogawa IPsec implementation.
+.\"
+.Sh BUGS
+Some statements may be obsoleted, but must be ramained.
+These will be deleted in the future.
