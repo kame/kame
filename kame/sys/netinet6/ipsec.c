@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.205 2003/09/22 04:50:52 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.206 2004/01/13 03:26:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1401,8 +1401,11 @@ ipsec_deepcopy_policy(src)
 	struct ipsecrequest *r;
 	struct secpolicy *dst;
 
+	if (src == NULL)
+		return NULL;
+
 	dst = key_newsp(0);
-	if (src == NULL || dst == NULL)
+	if (dst == NULL)
 		return NULL;
 
 	/*
