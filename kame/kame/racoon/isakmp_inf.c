@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.44 2000/07/18 14:44:33 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.45 2000/07/19 08:58:08 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -940,6 +940,9 @@ info_recv_initialcontact(iph1)
 	int proto_id;
 	struct ph2handle *iph2;
 
+	if (f_local)
+		goto step_ph1;
+
 	/* purge IPsec-SA(s) */
 	buf = pfkey_dump_sadb(SADB_SATYPE_UNSPEC);
 	if (buf == NULL) {
@@ -1018,6 +1021,7 @@ info_recv_initialcontact(iph1)
 	if (buf)
 		vfree(buf);
 
+    step_ph1:
 	purgeph1(iph1);
 }
 

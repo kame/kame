@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.30 2000/07/18 14:44:33 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.31 2000/07/19 08:58:08 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -73,6 +73,8 @@ getph1byindex(index)
 	struct ph1handle *p;
 
 	LIST_FOREACH(p, &ph1tree, chain) {
+		if (p->status == PHASE1ST_EXPIRED)
+			continue;
 		if (memcmp(&p->index, index, sizeof(*index)) == 0)
 			return p;
 	}
@@ -90,6 +92,8 @@ getph1byindex0(index)
 	struct ph1handle *p;
 
 	LIST_FOREACH(p, &ph1tree, chain) {
+		if (p->status == PHASE1ST_EXPIRED)
+			continue;
 		if (memcmp(&p->index, index, sizeof(cookie_t)) == 0)
 			return p;
 	}
@@ -109,6 +113,8 @@ getph1byaddr(remote)
 	struct ph1handle *p;
 
 	LIST_FOREACH(p, &ph1tree, chain) {
+		if (p->status == PHASE1ST_EXPIRED)
+			continue;
 		if (cmpsaddrwop(remote, p->remote) == 0)
 			return p;
 	}
@@ -126,18 +132,18 @@ purgeph1(iph1)
 		if (cmpsaddrwop(iph1->remote, p->remote))
 			continue;
 		/* don't delete current phase 1 SA */
-		if (memcmp(&p->index, &iph1->index, sizeof(isakmp_index)) == 0)
+		if (memcmp(&iph1->index, &p->index, sizeof(isakmp_index)) == 0)
 			continue;	/* don't delete current phase 1 SA */
 
 		YIPSDEBUG(DEBUG_SA,
 			plog(logp, LOCATION, NULL,
 				"proto_id ISAKMP purging spi:%s.\n",
-				isakmp_pindex(&iph1->index, 0)));
+				isakmp_pindex(&p->index, 0)));
 
-		if (iph1->sce)
-			SCHED_KILL(iph1->sce);
-		iph1->status = PHASE1ST_EXPIRED;
-		iph1->sce = sched_new(1, isakmp_ph1delete, iph1);
+		if (p->sce)
+			SCHED_KILL(p->sce);
+		p->status = PHASE1ST_EXPIRED;
+		p->sce = sched_new(1, isakmp_ph1delete, p);
 	}
 }
 
