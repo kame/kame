@@ -169,6 +169,8 @@ static struct nlist nl[] = {
 	{ "_mf6ctable" },
 #define N_MIF6TABLE	50
 	{ "_mif6table" },
+#define N_PFKEYSTAT	51
+	{ "_pfkeystat" },
 	{ "" },
 };
 
@@ -222,6 +224,15 @@ struct protox ip6protox[] = {
 };
 #endif /*INET6*/
 
+#ifdef IPSEC
+struct protox pfkeyprotox[] = {
+	{ N_PFKEYSTAT,	N_PFKEYSTAT,	1,	0,
+	  pfkey_stats,	NULL,		"pfkey" },
+	{ -1,		-1,		0,	0,
+	  0,		NULL,		0 }
+};
+#endif
+
 struct protox atalkprotox[] = {
 	{ N_DDPCB,	N_DDPSTAT,	1,	atalkprotopr,
 	  ddp_stats,	NULL,		"ddp" },
@@ -270,6 +281,9 @@ struct protox *protoprotox[] = {
 	protox,
 #ifdef INET6
 	ip6protox,
+#endif
+#ifdef IPSEC
+	pfkeyprotox,
 #endif
 	ipxprotox, atalkprotox,
 #ifdef NS
@@ -328,6 +342,10 @@ main(argc, argv)
 			else if (strcmp(optarg, "inet6") == 0)
 				af = AF_INET6;
 #endif /*INET6*/
+#ifdef IPSEC
+			else if (strcmp(optarg, "pfkey") == 0)
+				af = PF_KEY;
+#endif /*IPSEC*/
 			else if (strcmp(optarg, "unix") == 0)
 				af = AF_UNIX;
 			else if (strcmp(optarg, "atalk") == 0)
@@ -532,6 +550,11 @@ main(argc, argv)
 		for (tp = ip6protox; tp->pr_name; tp++)
 			printproto(tp, tp->pr_name);
 #endif /*INET6*/
+#ifdef IPSEC
+	if (af == PF_KEY || af == AF_UNSPEC)
+		for (tp = pfkeyprotox; tp->pr_name; tp++)
+			printproto(tp, tp->pr_name);
+#endif /*IPSEC*/
 	if (af == AF_IPX || af == AF_UNSPEC)
 		for (tp = ipxprotox; tp->pr_name; tp++)
 			printproto(tp, tp->pr_name);
