@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.45 2001/03/12 11:35:02 itojun Exp $
+.\"	$KAME: setkey.8,v 1.46 2001/05/18 04:59:48 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -384,6 +384,9 @@ They must be in numeric form.
 .It Ar upperspec
 Upper-layer protocol to be used.
 Currently
+.Li icmp ,
+.Li icmp6 ,
+.Li ip4 ,
 .Li tcp ,
 .Li udp
 and
@@ -392,6 +395,7 @@ can be specified.
 .Li any
 stands for
 .Dq any protocol .
+Also you can use the protocol number.
 .Pp
 NOTE:
 .Ar upperspec

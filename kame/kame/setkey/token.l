@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.19 2001/03/12 09:02:55 itojun Exp $	*/
+/*	$KAME: token.l,v 1.20 2001/05/18 04:59:48 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -208,6 +208,7 @@ nocyclic-seq	{ PREPROC; return(NOCYCLICSEQ); }
 	/* upper layer protocols */
 icmp		{ PREPROC; yylval.num = IPPROTO_ICMP; return(UP_PROTO); }
 icmp6		{ PREPROC; yylval.num = IPPROTO_ICMPV6; return(UP_PROTO); }
+ip4		{ PREPROC; yylval.num = IPPROTO_IPV4; return(UP_PROTO); }
 tcp		{ PREPROC; yylval.num = IPPROTO_TCP; return(UP_PROTO); }
 udp		{ PREPROC; yylval.num = IPPROTO_UDP; return(UP_PROTO); }
 
