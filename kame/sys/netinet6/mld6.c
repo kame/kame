@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.67 2002/11/04 04:25:19 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.68 2002/11/04 04:26:06 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -471,7 +471,7 @@ mld6_input(m, off)
 	int timer = 0;		/* timer value in the MLD query header */
 #ifdef MLDV2
 	struct mldv2_hdr *mldv2h;
-	int query_type = 0;
+	int query_ver = 0;
 	u_int16_t mldlen;
 	struct router6_info *rt6i;
 #endif
@@ -569,49 +569,27 @@ mld6_input(m, off)
 		 * octets of the query message)
 		 */
 		mldlen = m->m_pkthdr.len - off;
-		if (mldlen == MLD_MINLEN) {
-			query_type = MLD_V1_QUERY;
+		if (mldlen > MLD_MINLEN && mldlen < MLD_V2_QUERY_MINLEN) {
 #ifdef MLDV2_DEBUG
-			printf("mld_input(): regard it as MLDv1 Query from %s for %s\n",
-			       ip6_sprintf(&ip6->ip6_src),
-			       ip6_sprintf(&mldh->mld_addr));
-#endif
-		} else if (mldlen > MLD_MINLEN && mldlen < MLD_V2_QUERY_MINLEN) {
-#ifdef MLDV2_DEBUG
-			printf("mld_input: ignores MLD packet with improper length (%d)\n", mldlen);
+			printf("ignores MLD packet with improper length (%d)\n", mldlen);
 #endif
 			m_freem(m);
 			return;
+		}
+		if (mldlen == MLD_MINLEN) {
+			rt6i->rt6i_type = query_ver = MLD_V1_ROUTER;
+#ifdef MLDV2_DEBUG
+			printf("regard it as MLDv1 Query from %s for %s\n",
+			       ip6_sprintf(&ip6->ip6_src),
+			       ip6_sprintf(&mldh->mld_addr));
+#endif
 		} else {
-			/* mldlen >= MLD_V2_QUERY_MINLEN */
-			if (IN6_IS_ADDR_UNSPECIFIED(&mldh->mld_addr) &&
-			    mldv2h->mld_numsrc == 0) {
-				query_type = MLD_V2_GENERAL_QUERY;
-#ifdef MLDV2_DEBUG
-				printf("mld_input(): regard it as MLDv2 general Query\n");
-#endif
-			} else if (IN6_IS_ADDR_MULTICAST(&mldh->mld_addr) &&
-				 mldv2h->mld_numsrc == 0) {
-				query_type = MLD_V2_GROUP_QUERY;
-#ifdef MLDV2_DEBUG
-				printf("mld_input(): regard it as MLDv2 group Query\n");
-#endif
-			} else if (IN6_IS_ADDR_MULTICAST(&mldh->mld_addr) &&
-				 ntohs(mldv2h->mld_numsrc) > 0) {
-				query_type = MLD_V2_GROUP_SOURCE_QUERY;
-#ifdef MLDV2_DEBUG
-				printf("mld_input(): regard it as MLDv2 source-group Query\n");
-#endif
-			} else {
-#ifdef MLDV2_DEBUG
-				printf("mld_input: ignores MLD packet with invalid format(%d)\n", mldlen);
-#endif
-				m_freem(m);
-				return;
-			}
+			query_ver = MLD_V2_ROUTER;
+			goto mldv2_query;
 		}
 #endif
 
+mldv1_query:
 		/*
 		 * - Start the timers in all of our membership records
 		 *   that the query applies to for the interface on
@@ -633,19 +611,6 @@ mld6_input(m, off)
 		if (timer == 0 && mldh->mld_maxdelay)
 			timer = 1;
 
-#ifdef MLDV2
-		if (query_type != MLD_V1_QUERY) {
-			if (mld_set_timer(ifp, rt6i, mldh, mldlen, query_type)
-			    != 0) {
-#ifdef MLDV2_DEBUG
-				printf("mld_input: receive bad query\n");
-#endif
-				m_freem(m);
-				return;
-			}
-			break;
-		}
-#endif
 
 #ifdef __FreeBSD__
 		for (ifma = LIST_FIRST(&ifp->if_multiaddrs);
@@ -678,7 +643,7 @@ mld6_input(m, off)
 
 			if (timer == 0) {
 #ifdef MLDV2_DEBUG
-				printf("mld_input: send a report immediately\n");
+				printf("send a MLDv1 report immediately\n");
 #endif
 				/* send a report immediately */
 				mld6_sendpkt(in6m, MLD_LISTENER_REPORT, NULL);
@@ -687,7 +652,7 @@ mld6_input(m, off)
 			} else if (in6m->in6m_timer == 0 || /*idle state*/
 				   in6m->in6m_timer > timer) {
 #ifdef MLDV2_DEBUG
-				printf("mld_input: invoke a timer\n");
+				printf("invoke a MLDv1 timer\n");
 #endif
 				in6m->in6m_timer = MLD_RANDOM_DELAY(timer);
 				mld_group_timers_are_running = 1;
@@ -703,12 +668,58 @@ mld6_input(m, off)
 		if (mldalways_v2 == 0 &&
 		    IN6_ARE_ADDR_EQUAL(&mldh->mld_addr, &in6addr_any)) {
 #ifdef MLDV2_DEBUG
-			printf("mld_input: shift to v1-compat mode\n");
+			printf("shift to MLDv1-compat mode\n");
 #endif
-			mld_set_hostcompat(ifp, rt6i, query_type);
+			mld_set_hostcompat(ifp, rt6i, query_ver);
 		}
 #endif
 		break;
+
+
+#ifdef MLDV2
+mldv2_query:
+		if (query_ver == MLD_V2_ROUTER) {
+			int query_type;
+
+			/* mldlen >= MLD_V2_QUERY_MINLEN */
+			if (IN6_IS_ADDR_UNSPECIFIED(&mldh->mld_addr) &&
+			    mldv2h->mld_numsrc == 0) {
+				query_type = MLD_V2_GENERAL_QUERY;
+#ifdef MLDV2_DEBUG
+				printf("regard it as MLDv2 general Query\n");
+#endif
+			} else if (IN6_IS_ADDR_MULTICAST(&mldh->mld_addr) &&
+				 mldv2h->mld_numsrc == 0) {
+				query_type = MLD_V2_GROUP_QUERY;
+#ifdef MLDV2_DEBUG
+				printf("regard it as MLDv2 group Query\n");
+#endif
+			} else if (IN6_IS_ADDR_MULTICAST(&mldh->mld_addr) &&
+				 ntohs(mldv2h->mld_numsrc) > 0) {
+				query_type = MLD_V2_GROUP_SOURCE_QUERY;
+#ifdef MLDV2_DEBUG
+				printf("regard it as MLDv2 source-group Query\n");
+#endif
+			} else {
+#ifdef MLDV2_DEBUG
+				printf("ignores MLD packet with invalid format(%d)\n", mldlen);
+#endif
+				m_freem(m);
+				return;
+			}
+			if (rt6i->rt6i_type == MLD_V1_ROUTER)
+				goto mldv1_query;
+			if (mld_set_timer(ifp, rt6i, mldh, mldlen, query_type)
+			    != 0) {
+#ifdef MLDV2_DEBUG
+				printf("mld_input: receive bad query\n");
+#endif
+				m_freem(m);
+				return;
+			}
+		}
+		break;
+#endif
 
 	case MLD_LISTENER_REPORT:
 		/*
