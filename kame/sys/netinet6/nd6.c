@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.68 2000/07/02 14:48:02 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.69 2000/07/10 11:38:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -877,7 +877,9 @@ nd6_free(rt)
 	 * Clear all destination cache entries for the neighbor.
 	 * XXX: is it better to restrict this to hosts?
 	 */
+#if 0				/* experimentaly disable */
 	pfctlinput(PRC_HOSTDEAD, rt_key(rt));
+#endif
 
 	if (!ip6_forwarding && ip6_accept_rtadv) { /* XXX: too restrictive? */
 		int s;
@@ -888,6 +890,7 @@ nd6_free(rt)
 #endif
 		dr = defrouter_lookup(&((struct sockaddr_in6 *)rt_key(rt))->sin6_addr,
 				      rt->rt_ifp);
+
 		if (ln->ln_router || dr) {
 			/*
 			 * rt6_flush must be called whether or not the neighbor
@@ -931,15 +934,11 @@ nd6_free(rt)
 		splx(s);
 	}
 
-	if (rt->rt_refcnt > 0 && (sdl = SDL(rt->rt_gateway)) &&
-	    sdl->sdl_family == AF_LINK) {
-		sdl->sdl_alen = 0;
-		ln->ln_state = ND6_LLINFO_WAITDELETE;
-		ln->ln_asked = 0;
-		rt->rt_flags &= ~RTF_REJECT;
-		return;
-	}
-
+	/*
+	 * Detach the route from the routing tree and the list of neighbor
+	 * caches, and disabled the route entry not to be used in already
+	 * cached routes.
+	 */
 	rtrequest(RTM_DELETE, rt_key(rt), (struct sockaddr *)0,
 		  rt_mask(rt), 0, (struct rtentry **)0);
 }
@@ -1083,7 +1082,6 @@ nd6_resolve(ifp, rt, m, dst, desten)
 		m_freem(ln->ln_hold);
 	ln->ln_hold = m;
 	if (ln->ln_expire) {
-		rt->rt_flags &= ~RTF_REJECT;
 		if (ln->ln_asked < nd6_mmaxtries &&
 		    ln->ln_expire < time_second) {
 			ln->ln_asked++;
@@ -1772,7 +1770,6 @@ fail:
 		ln->ln_state = newstate;
 
 		if (ln->ln_state == ND6_LLINFO_STALE) {
-			rt->rt_flags &= ~RTF_REJECT;
 			if (ln->ln_hold) {
 #ifdef OLDIP6OUTPUT
 				(*ifp->if_output)(ifp, ln->ln_hold,
@@ -1969,9 +1966,6 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 			 */
 			if (!nd6_is_addr_neighbor(gw6, ifp) ||
 			    in6ifa_ifpwithaddr(ifp, &gw6->sin6_addr)) {
-				if (rt->rt_flags & RTF_REJECT)
-					senderr(EHOSTDOWN);
-
 				/*
 				 * We allow this kind of tricky route only
 				 * when the outgoing interface is p2p.
@@ -2005,8 +1999,6 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 #endif
 			}
 		}
-		if (rt->rt_flags & RTF_REJECT)
-			senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
 	}
 
 	/*
@@ -2083,7 +2075,6 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		m_freem(ln->ln_hold);
 	ln->ln_hold = m;
 	if (ln->ln_expire) {
-		rt->rt_flags &= ~RTF_REJECT;
 		if (ln->ln_asked < nd6_mmaxtries &&
 		    ln->ln_expire < time_second) {
 			ln->ln_asked++;
