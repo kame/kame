@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.22 2001/01/18 05:40:04 jinmei Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.23 2001/01/18 05:42:19 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -150,8 +150,10 @@ betwen routers on the link
 This value is used in consistency check for locally-configured and
 advertised prefix lifetimes, and has its meaning when the local router
 configures a prefix on the link with a lifetime that decrements in
-real time. If the value is 0, it means the consistency check will be skipped
-for such prefixes. The default value is 0.
+real time.
+If the value is 0, it means the consistency check will be skipped
+for such prefixes.
+The default value is 0.
 .It Cm \&addrs
 (num) Number of prefixes.
 Its default is 0, so it must explicitly be set to positve values
@@ -285,13 +287,13 @@ for details on the capability.
 #       in specifications, and hence you usually do not have to set them
 #       by hand unless you need special non-default values.
 #
-#       You even do not need to create the configuration file. rtadvd
+#       You even do not need to create the configuration file.  rtadvd
 #       would usually work well without a configuration file.
 #       See also: rtadvd(8)
 
 #       We explicitly write the default values down below, just as
-#       references. Please do not forget there is no need to uncomment
-#       the followings in your configuration file (even if any). rtadvd
+#       references.  Please do not forget there is no need to uncomment
+#       the followings in your configuration file (even if any).  rtadvd
 #       will automatically use the default values without any explicit
 #       configuration.
 
@@ -301,18 +303,18 @@ for details on the capability.
 #ether:\\
 #	:mtu#1500:tc=default:
 
-#      You may sometimes want to change the default values. For example,
+#      You may sometimes want to change the default values.  For example,
 #      if you only want to advertise network parameters, and do not
 #      want to let your box forward packets, you can manually set zero
 #      to the router lifetime (rltime) like:
 #ne0:rltime#0:
-#      where ne0 is the advertising interface of your box. Again,
-#      PLEASE DO NOT FORGET THAT THIS IS NOT A TYPICAL EXAMPLE. Do not
+#      where ne0 is the advertising interface of your box.  Again,
+#      PLEASE DO NOT FORGET THAT THIS IS NOT A TYPICAL EXAMPLE.  Do not
 #      just cut and (edit and) paste the above example into your
 #      configuration unless you understand its meaning.
 
 # per-interface definitions.
-#   Mainly IPv6 prefixes are configured in this part. However, rtadvd
+#   Mainly IPv6 prefixes are configured in this part.  However, rtadvd
 #   automatically learns appropriate prefixes from the kernel's routing
 #   table, and advertises the prefixes, so you don't have to configure
 #   this part, either.
