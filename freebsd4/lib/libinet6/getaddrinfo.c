@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.4 2000/05/01 02:29:29 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.5 2000/05/05 07:36:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -265,7 +265,9 @@ static char *ai_errlist[] = {
 	"System error returned in errno", 		/* EAI_SYSTEM     */
 	"Invalid value for hints",			/* EAI_BADHINTS	  */
 	"Resolved protocol is unknown",			/* EAI_PROTOCOL   */
+#ifdef EAI_RESNULL
 	"Argument res is NULL",				/* EAI_RESNULL	  */
+#endif
 	"Unknown error", 				/* EAI_MAX        */
 };
 
@@ -402,8 +404,10 @@ getaddrinfo(hostname, servname, hints, res)
 
 	if (hostname == NULL && servname == NULL)
 		return EAI_NONAME;
+#ifdef EAI_RESNULL
 	if (res == NULL)
 		return EAI_RESNULL; /* xxx */
+#endif
 	if (hints) {
 		/* error check for hints */
 		if (hints->ai_addrlen || hints->ai_canonname ||
@@ -711,12 +715,9 @@ explore_fqdn(pai, hostname, servname, res)
 			GET_PORT(cur, servname);
 			/* canonname should be filled already */
 		}
-		break;
+		*res = result;
+		return 0;
 	}
-
-	*res = result;
-
-	return 0;
 
 free:
 	if (result)
@@ -1501,7 +1502,7 @@ _gethtent(hostf, name, pai)
 	const struct addrinfo *pai;
 {
 	char *p;
-	char *cp, *tname;
+	char *cp, *tname, *cname;
 	struct addrinfo hints, *res0, *res;
 	int error;
 	const char *addr;
@@ -1519,6 +1520,7 @@ _gethtent(hostf, name, pai)
 		goto again;
 	*cp++ = '\0';
 	addr = p;
+	cname = NULL;
 	/* if this is not something we're looking for, skip it. */
 	while (cp && *cp) {
 		if (*cp == ' ' || *cp == '\t') {
@@ -1526,6 +1528,8 @@ _gethtent(hostf, name, pai)
 			continue;
 		}
 		tname = cp;
+		if (cname == NULL)
+			cname = cp;
 		if ((cp = strpbrk(cp, " \t")) != NULL)
 			*cp++ = '\0';
 		if (strcasecmp(name, tname) == 0)
@@ -1552,7 +1556,7 @@ found:
 		res->ai_flags = pai->ai_flags;
 
 		if (pai->ai_flags & AI_CANONNAME) {
-			if (get_canonname(pai, res, name) != 0) {
+			if (get_canonname(pai, res, cname) != 0) {
 				freeaddrinfo(res0);
 				goto again;
 			}
