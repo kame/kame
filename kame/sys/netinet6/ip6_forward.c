@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.109 2002/09/11 08:10:17 sakane Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.110 2002/09/19 04:46:22 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -409,6 +409,18 @@ ip6_forward(m, srcrt)
 				m_freem(m);
 				return;
 			}
+
+			if (m->m_pkthdr.len > IPV6_MMTU) {
+				u_long mtu = IPV6_MMTU;
+				/* XXX in6_ifstat_inc(rt->rt_ifp, ifs6_in_toobig); */
+				if (mcopy) {
+					icmp6_error(mcopy, ICMP6_PACKET_TOO_BIG,
+						    0, mtu);
+				}
+				m_freem(m);
+				return;
+			}
+
 			/*
 			 * if we have a binding cache entry for the
 			 * ip6_dst, we are acting as a home agent for
