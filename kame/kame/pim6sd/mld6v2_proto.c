@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.22 2004/05/23 15:37:03 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.23 2004/05/23 15:37:59 suz Exp $
  */
 
 /*
@@ -110,20 +110,21 @@ static void strip_source_in_multicast_record(mifi_t,
 
 void
 query_groupsV2(v)
-    register struct uvif *v;
+    struct uvif *v;
 {
 
-    if ((v->uv_flags & VIFF_NOLISTENER) == 0)
-    {
+    v->uv_gq_timer = v->uv_mld_query_interval;
+    if ((v->uv_flags & VIFF_QUERIER) &&
+    	(v->uv_flags & VIFF_NOLISTENER) == 0) {
+	if (v->uv_stquery_cnt)
+		v->uv_stquery_cnt--;
+	if (v->uv_stquery_cnt)
+		v->uv_gq_timer /= 4;	/* Startup Query Interval */
+
 	IF_DEBUG(DEBUG_MLD)
 	    log_msg(LOG_DEBUG, 0,
 		"sending multicast listener general query V2 on : %s ",
 		v->uv_name);
-
-	/*
-	 * send gen. q. v2 
-	 * S Flag not set.
-	 */
 
 	send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
 		    NULL, (struct sockaddr_in6 *) NULL, v->uv_ifindex,
@@ -131,12 +132,6 @@ query_groupsV2(v)
 		    v->uv_mld_robustness, v->uv_mld_query_interval);
 	v->uv_out_mld_query++;
     }
-    /*
-     * (re)start initial gen. q. timer 
-     */
-
-    SET_TIMER(v->uv_gq_timer, v->uv_mld_query_interval);
-
 }
 
 /*
