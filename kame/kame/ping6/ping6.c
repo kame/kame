@@ -800,10 +800,11 @@ pinger()
 	icp = (struct icmp6_hdr *)outpack;
 	icp->icmp6_code = 0;
 	icp->icmp6_cksum = 0;
-	icp->icmp6_seq = ntransmitted++;
-	icp->icmp6_id = ident;			/* ID */
+	icp->icmp6_seq = ntransmitted++;		/* htons later */
+	icp->icmp6_id = htons(ident);			/* ID */
 
 	CLR(icp->icmp6_seq % mx_dup_ck);
+	icp->icmp6_seq = htons(icp->icmp6_seq);
 
 	if (options & F_FQDN) {
 		icp->icmp6_type = ICMP6_NI_QUERY;
@@ -951,7 +952,9 @@ pr_pack(buf, cc, mhdr)
 	}
 
 	if (icp->icmp6_type == ICMP6_ECHO_REPLY) {
-		if (icp->icmp6_id != ident)
+		/* XXX the following line overwrites the original packet */
+		icp->icmp6_seq = ntohs(icp->icmp6_seq);
+		if (ntohs(icp->icmp6_id) != ident)
 			return;			/* It was not our ECHO */
 		++nreceived;
 		if (timing) {
