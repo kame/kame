@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.245 1999/11/03 15:30:50 sakane Exp $
+$Id: CHANGELOG,v 1.246 1999/11/03 20:53:16 itojun Exp $
 
 <199911>
+Thu Nov  4 05:52:12 JST 1999  itojun@iijlab.net
+	* netbsd/pkgsrc/net/ucd-snmp, freebsd[23]/ucd-snmp:
+	  use latest IPv6 patch.
+
 Wed Nov  3 22:11:16 JST 1999 sakane@ydc.co.jp
 	* kame/sys/netkey/key.c:
 	key_msg2sp() returns suitable error code.
