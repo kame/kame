@@ -146,11 +146,7 @@ hippi_output(ifp, m0, dst, rt0)
 	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
 
 	switch (dst->sa_family) {
-
 #ifdef INET
-#ifdef INET6
-	case AF_INET6:
-#endif
 	case AF_INET:
 		if (rt) {
 			struct sockaddr_dl *sdl = 
@@ -161,6 +157,20 @@ hippi_output(ifp, m0, dst, rt0)
 		if (!ifield)  /* XXX:  bogus check, but helps us get going */
 			senderr(EHOSTUNREACH);
 		htype = htons(ETHERTYPE_IP);
+		break;
+#endif
+
+#ifdef INET6
+	case AF_INET6:
+		if (rt) {
+			struct sockaddr_dl *sdl = 
+				(struct sockaddr_dl *) SDL(rt->rt_gateway);
+			if (sdl->sdl_family == AF_LINK && sdl->sdl_alen != 0)
+				bcopy(LLADDR(sdl), &ifield, sizeof(ifield));
+		}
+		if (!ifield)  /* XXX:  bogus check, but helps us get going */
+			senderr(EHOSTUNREACH);
+		htype = htons(ETHERTYPE_IPV6);
 		break;
 #endif
 
