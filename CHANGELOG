@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2164 2002/05/26 22:23:48 itojun Exp $
+$KAME: CHANGELOG,v 1.2165 2002/05/27 15:09:15 itojun Exp $
 
 <200205>
+Tue May 28 00:08:08 JST 2002  itojun@iijlab.net
+	* sys/netinet6/in6_ifattach.c: attach per-interface data structure
+	  to if_afdata[AF_INET6] member via dom_ifattach framework.
+
 Mon May 27 07:22:51 JST 2002  itojun@iijlab.net
 	* sys/sys/if.h: add framework to have per-domain/af data onto
 	  struct ifnet.  as discussed on bsd-api-discuss.
