@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.50 2001/02/04 06:15:15 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.51 2001/08/07 08:49:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -825,7 +825,7 @@ rs_input(int len, struct nd_router_solicit *rs,
 			/*XXX RFC2553 need clarification on flowinfo */
 			sol->addr.sin6_flowinfo = 0;	
 			sol->next = ra->soliciter;
-			ra->soliciter = sol->next;
+			ra->soliciter = sol;
 		}
 
 		/*
