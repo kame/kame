@@ -180,9 +180,9 @@ struct protox ip6protox[] = {
 	{ -1,		-1,		1,	protopr,
 	  udp_stats,	NULL,		"udp",	IPPROTO_UDP },
 	{ -1,		N_IP6STAT,	1,	0,
-	  ip6_stats,	ip6_ifstat,	"ip6",	0 },
+	  ip6_stats,	ip6_ifstats,	"ip6",	0 },
 	{ -1,		N_ICMP6STAT,	1,	0,
-	  icmp6_stats,	NULL,		"icmp6",0 },
+	  icmp6_stats,	icmp6_ifstats,	"icmp6",0 },
 #ifdef IPSEC
 	{ -1,		N_IPSEC6STAT,	1,	0,
 	  ipsec_stats,	NULL,		"ipsec6",0 },

@@ -204,9 +204,9 @@ struct protox {
 #ifdef INET6
 struct protox ip6protox[] = {
 	{ -1,		N_IP6STAT,	1,	0,
-	  ip6_stats,	ip6_ifstat,	"ip6" },
+	  ip6_stats,	ip6_ifstats,	"ip6" },
 	{ -1,		N_ICMP6STAT,	1,	0,
-	  icmp6_stats,	NULL,		"icmp6" },
+	  icmp6_stats,	icmp6_ifstats,	"icmp6" },
 	{ N_TCB6,	N_TCP6STAT,	1,	ip6protopr,
 	  tcp6_stats,	NULL,		"tcp6" },
 	{ N_UDB6,	N_UDP6STAT,	1,	ip6protopr,

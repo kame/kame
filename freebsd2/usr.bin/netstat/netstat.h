@@ -77,7 +77,7 @@ void	ip6protopr __P((u_long, char *));
 void	tcp6_stats __P((u_long, char *));
 void	udp6_stats __P((u_long, char *));
 void	ip6_stats __P((u_long, char *));
-void	ip6_ifstat __P((char *));
+void	ip6_ifstats __P((char *));
 void	icmp6_stats __P((u_long, char *));
 void	pim6_stats __P((u_long, char *));
 void	mroute6pr __P((u_long, u_long, u_long));
