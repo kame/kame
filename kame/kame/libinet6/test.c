@@ -10,11 +10,56 @@ struct addrinfo ai;
 
 char host[NI_MAXHOST];
 char serv[NI_MAXSERV];
+int vflag = 0;
 
 static void
 usage()
 {
-	fprintf(stderr, "usage: test [-DpS46] host serv\n");
+	fprintf(stderr, "usage: test [-DpSv46] host serv\n");
+}
+
+static void
+print1(title, res, h, s)
+	const char *title;
+	const struct addrinfo *res;
+	char *h;
+	char *s;
+{
+	char *start, *end;
+	int error;
+
+	if (res->ai_addr) {
+		error = getnameinfo(res->ai_addr, res->ai_addr->sa_len,
+				    host, sizeof(host), serv, sizeof(serv),
+				    NI_NUMERICHOST | NI_WITHSCOPEID);
+		h = host;
+		s = serv;
+	} else
+		error = 0;
+
+	if (vflag) {
+		start = "\t";
+		end = "\n";
+	} else {
+		start = " ";
+		end = "";
+	}
+	printf("%s%s", title, end);
+	printf("%sfamily %d%s", start, res->ai_family, end);
+	printf("%ssocktype %d%s", start, res->ai_socktype, end);
+	printf("%sprotocol %d%s", start, res->ai_protocol, end);
+	printf("%saddrlen %d%s", start, res->ai_addrlen, end);
+	if (res->ai_canonname)
+		printf("%s%s%s", start, res->ai_canonname, end);
+	if (error)
+		printf("%serror %d%s", start, error, end);
+	else {
+		printf("%shost %s%s", start, h, end);
+		printf("%sserv %s%s", start, s, end);
+	}
+	if (!vflag)
+		printf("\n");
+
 }
 
 int
@@ -27,11 +72,12 @@ main(argc, argv)
 	char *p, *q;
 	extern int optind;
 	int c;
+	char nbuf[10];
 
 	memset(&ai, 0, sizeof(ai));
 	ai.ai_family = PF_UNSPEC;
 	ai.ai_flags |= AI_CANONNAME;
-	while ((c = getopt(argc, argv, "DpS46")) != EOF) {
+	while ((c = getopt(argc, argv, "DpSv46")) != EOF) {
 		switch (c) {
 		case 'D':
 			ai.ai_socktype = SOCK_DGRAM;
@@ -41,6 +87,9 @@ main(argc, argv)
 			break;
 		case 'S':
 			ai.ai_socktype = SOCK_STREAM;
+			break;
+		case 'v':
+			vflag++;
 			break;
 		case '4':
 			ai.ai_family = PF_INET;
@@ -69,23 +118,13 @@ main(argc, argv)
 		exit(1);
 	}
 
+	print1("arg:", &ai, argv[0], argv[1]);
+
 	i = 1;
 	do {
-		printf("ai%d:\n", i);
-		printf("\tfamily %d\n", res->ai_family);
-		printf("\tsocktype %d\n", res->ai_socktype);
-		printf("\tprotocol %d\n", res->ai_protocol);
-		printf("\taddrlen %d\n", res->ai_addrlen);
-		if (res->ai_canonname) printf("\t%s\n", res->ai_canonname);
-		error = getnameinfo(res->ai_addr, res->ai_addr->sa_len,
-				    host, sizeof(host), serv, sizeof(serv),
-				    NI_NUMERICHOST | NI_WITHSCOPEID);
-		if (error) {
-			printf("error %d\n", error);
-			exit(1);
-		}
-		printf("\thost %s\n", host);
-		printf("\tserv %s\n", serv);
+		snprintf(nbuf, sizeof(nbuf), "ai%d:", i);
+		print1(nbuf, res, NULL, NULL);
+
 		i++;
 	} while ((res = res->ai_next) != NULL);
 

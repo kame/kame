@@ -57,6 +57,9 @@ install:
 		fi; \
 	done
 
+test: test.o libinet6.a
+	$(CC) $(LDFLAGS) -o test test.o -L${.CURDIR} -linet6
+
 clean:
 	/bin/rm -f libinet6.a *.o
 
