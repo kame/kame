@@ -1,4 +1,4 @@
-.\"	$KAME: natpt.conf.5,v 1.12 2001/11/16 08:11:47 fujisawa Exp $
+.\"	$KAME: natpt.conf.5,v 1.13 2002/01/18 07:02:42 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -254,11 +254,21 @@ Enable or disable translation.  Initial status is disabled.
 .Xc
 Set the value to the variable.  Allowed variable is as follows.
 .Bl -tag -width XXX
-.It Sy natpt_debug
+.It Sy translation
+The flag which does Protocol translation.  If this value is not zero,
+protocol translation is done.  Otherwise, protocol translation is not
+done.  This value is also set by
+.Sy map
+subcommand.
+.It Sy debug
 This is for debug.
-.It Sy natpt_dump
+.It Sy dump
 When set, dump mbuf or ip packet.  You must run natptlog command to
 show its dump.
+.It Sy prefix
+NAT-PT prefix. This value is set by
+.Sy prefix
+subcommand.
 .El
 .Pp
 You can examine these variables and it's value with invoking following
@@ -266,7 +276,8 @@ command.
 .Dl # natptconfig show variables
 .Pp
 However, you cannot set all of the variables which can appear with
-show subcommand.
+.Sy show
+subcommand.
 .El
 .\"
 .Sh EXAMPLES
