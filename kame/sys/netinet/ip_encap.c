@@ -77,6 +77,9 @@
 #ifdef MROUTING
 #include <netinet/ip_mroute.h>
 #endif /* MROUTING */
+#ifdef __OpenBSD__
+#include <netinet/ip_ipsp.h>
+#endif
 
 #ifdef INET6
 #include <netinet/ip6.h>
