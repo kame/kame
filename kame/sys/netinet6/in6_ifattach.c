@@ -82,8 +82,8 @@ ieee802_to_eui64(dst, src)
 	dst[5] = src[3];
 	dst[6] = src[4];
 	dst[7] = src[5];
-	/* set global bit */
-	dst[0] |= 0x02;
+	/* invert u bit */
+	dst[0] ^= 0x02;
 }
 
 /*
