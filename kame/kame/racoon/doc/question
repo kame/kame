@@ -1,63 +1,61 @@
-$Id: question,v 1.17 2000/09/20 20:29:47 itojun Exp $
+$Id: question,v 1.18 2000/09/20 22:41:42 sakane Exp $
 
-HOW DO I DO ?
+Q: how may policy matters are.  can we interoperate ?
 
-Q. If there is the phase 1 spi size excepting 16 and 0.
+Q. If there is the phase 1 spi size excepting 16 and 0 in SA payload.
 	warn it.  and reject or accept ?
 
 Q. ID payload handling in phase 2 besides IPSECDOI_ID_IP*.
    e.g. IPSECDOI_ID_DER_ASN1_DN.  Well, are these used in phase 2 ?
-Q. What should I do when HARD expiration has come ?
-Q. When a node has multi address, I check only destination address on phase 2.
-	Should we check both src and dst?
-Q. replay prevention
-	limited number of session
-	limited session per peer
-	number of proposal
-	....
-Q. how to support multi interfaces ?
-	perform a dummy connect(2), like ping6.
-	bind multi address, like named.
-   now racoon uses the former way.
+
 Q. The padding for data attribute.
 	in particular, variable-length attribute like ID-userfqdn.
+
 Q. vendorid's hash algorithm
 	For aggressive mode ?.
-	In mail mode, should I use negotiated algorithm ?
+	In main mode, should I use negotiated algorithm ?
+A. it's not needed any negotiation.
 
-	-> it's not negotiated
+Q. If we use different hash algorith to compute the value of the vendor id,
+   is it possible to be same result of the hash value ?
+
 Q. encryption during aggressive mode.
-	when receive encrypted packet of 1st exchange from responder,
-	it can be decoded.  When we are responder, should we send encrypted ?
-Q. What is the perpose of exchange of DH attribute on quick mode ?
-	-> pfs
-Q. Should I do acceptable check of phase 2 pfs group ?.
-   If initiator requests PFS, should we accept without acceptable check.
-	-> well-known issue
+	when i receive encrypted packet of 2nd message from responder,
+	it can be decoded.  When i am responder, should i send encrypted one ?
 
-Q. RESPONDER-LIFETIME is only one payload in a IKE message even in the case
-   of SA bundle case is ?
-A. At the moment, racoon sends this notify payload(s) against each protocol.
+Q: phase2 PFS and KE payload
+	when the responder was not required PFS, if the initiator send KE ?
+	if the responder's pfs group is not match to the initiator's one ?
+	If initiator requests PFS, should we accept without acceptable check ?
+		reject the proposal and quit the phase 2.
+		accept it.
+	it's policy issue.
+
+Q. Is there only one payload of RESPONDER-LIFETIME in a IKE message
+   even if SA bundle is required ?
+   At the moment, racoon sends this notify payload(s) against each protocol.
 
 Q. Which is SPI to be used initiator's or responder's when sending
    RESPONDER-LIFETIME ?
 A. At the moment, racoon sends responder's one.
 
-Q. Is it typo that a body of nonce payload during base mode exchange.
+Q. Is it typo in the base mode draft ?
             HDR, SA, Idii, Ni_b     =>
                            Ni ???
                                     <= HDR, SA, Idir, Nr_b
                                                       Nr ???
-A. Yes, typo. (by network associates.)
+A. Yes, typo. (network associates said.)
 
-Q. What's proto_id in notify message of responder 2nd message with commit bit
-  processing when multiple different SA applyed ?
+Q. What's proto_id in notify message of the responder 2nd message with commit
+   bit processing when multiple different SA applyed ?
+
 Q. Is it forbidden to clear commit bit during phase2 negotiation ?
-	-> not forbidden,
+A. not forbidden,
 
-Q. how many time is the notify message sent ?
+Q. how many time is the notify message sent in phase 2 ?
 A. don't resend notify message because peer can use Acknowledged
    Informational if peer requires the reply of the notify message.
+Q. phase 1 is ?
 
 Q. What kind of policy configuration is desired?
    policy.conf makes sense in certain situations only, such as:
@@ -99,8 +97,9 @@ Q. What kind of policy configuration is desired?
 Q. What's msgid of informational exchange for error notify message during
    phase2 ?  Is it same as msgid of phase2 negotiation caused error ?
    Or new msgid created ?  If later case, spi must be conveyed.
-	-> new msgid should be used
-	-> then, how can we deduce phase 2 from the notification?
+A. new msgid should be used
+Q. how can we deduce phase 2 from the notification?
+A. see draft-ietf-ipsec-notifymsg-*.txt
 
 Q. I don't know the situation to initiate acknowledged informational.
 
@@ -388,13 +387,6 @@ Q: Nonce size
 	a size of value MUST be 4 - 252 (RFC2409)
 	reject if the value is out-of-range
 
-Q: phase2 KE payload
-	when the responder was not required PFS, if the initiator send KE ?
-	if the responder's pfs group is not match to the initiator's one ?
-		reject.
-		accept.
-	it's policy issue.
-
 Q: x.509 certificate and ID payload
 	if there is the certificate and the type of ID payload is
 		not DN, then compare with the subjectAltName in certificate.
@@ -423,8 +415,6 @@ Q: phase 1 ID payload
 	RSA signature and pre-shared key
 	same ID value.
 	must include the ID into subject alt name.
-
-Q: how may policy issue are.  can we interoperate ?
 
 Q: rekey.
 	- common: IPsec layer always use oldest SA.  optionally, send a delete
