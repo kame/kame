@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_query.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_query.c,v 1.6 2000/04/26 05:58:46 itojun Exp $";
+static char rcsid[] = "$Id: res_query.c,v 1.7 2000/04/26 06:50:00 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -388,9 +388,9 @@ hostalias(name)
 	if (file == NULL || (fp = fopen(file, "r")) == NULL)
 		return (NULL);
 	/*
-	 * if a setuid binary dumps core in weak privilege, malicious user
-	 * may try to use $HOSTALIASES to peep content of protected files.
-	 * be cautious.
+	 * if a setuid binary dumps core into a weak-privileged file, malicious
+	 * user may try to use $HOSTALIASES to peep content of protected files
+	 * kept in *fp.
 	 */
 	if (getuid() != geteuid() || getgid() != getegid())
 		setbuf(fp, NULL);
