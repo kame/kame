@@ -1150,7 +1150,7 @@ rip6_stats(off, name)
 #define	p(f, m) if (rip6stat.f || sflag <= 1) \
     printf(m, (unsigned long long)rip6stat.f, plural(rip6stat.f))
 	p(rip6s_ipackets, "\t%llu message%s received\n");
-	p(rip6s_isum, "\t%llu checksum calcuration%s on inbound\n");
+	p(rip6s_isum, "\t%llu checksum calculation%s on inbound\n");
 	p(rip6s_badsum, "\t%llu message%s with bad checksum\n");
 	p(rip6s_nosock, "\t%llu message%s dropped due to no socket\n");
 	p(rip6s_nosockmcast,

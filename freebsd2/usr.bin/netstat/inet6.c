@@ -1214,7 +1214,7 @@ rip6_stats(off, name)
 #define	p(f, m) if (rip6stat.f || sflag <= 1) \
     printf(m, (u_quad_t)rip6stat.f, plural(rip6stat.f))
 	p(rip6s_ipackets, "\t%qu message%s received\n");
-	p(rip6s_isum, "\t%qu checksum calcuration%s on inbound\n");
+	p(rip6s_isum, "\t%qu checksum calculation%s on inbound\n");
 	p(rip6s_badsum, "\t%qu message%s with bad checksum\n");
 	p(rip6s_nosock, "\t%qu message%s dropped due to no socket\n");
 	p(rip6s_nosockmcast,
