@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.20 1999/10/28 11:54:32 sakane Exp $ */
+/* KAME $Id: keydb.c,v 1.21 1999/10/28 12:22:39 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -433,6 +433,14 @@ key_checkrequest(isr)
 	 * SADB_SASTATE_MATURE, and if this is newer one.
 	 */
 	if (isr->sav != NULL) {
+		/*
+		 * XXX While SA is hanging on policy request(isr), its refcnt
+		 * can not be zero.  So isr->sav->sah is valid pointer if
+		 * isr->sav != NULL.  But that may not be true in fact.
+		 * There may be missunderstanding by myself.  Anyway I set
+		 * zero to isr->sav->sah when isr->sav is flushed.
+		 * I must check to have conviction this issue.
+		 */
 		if (isr->sav->sah != NULL
 		 && isr->sav != (struct secasvar *)LIST_FIRST(
 			    &isr->sav->sah->savtree[SADB_SASTATE_MATURE])) {
@@ -1769,6 +1777,8 @@ key_delsav(sav)
 #endif
 
 	sav->sah = NULL;
+		/* XXX for making sure.  See key_checkrequest(),
+		 * Refcnt may be suspicious. */
 
 	KFREE(sav);
 
