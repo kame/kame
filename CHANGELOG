@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1482 2001/01/17 17:02:11 itojun Exp $
+$KAME: CHANGELOG,v 1.1483 2001/01/18 12:58:13 jinmei Exp $
 
 <200101>
+2001-01-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/contrib/bind/src/lib/irs/{lcl,nis}_ho.c: set ho_addrinfo
+	function(s) properly. Without this fix, getaddrinfo() could cause
+	SEGV when "local" or "nis" is specified to look hosts up. Be sure
+	to update.
+
 Thu Jan 18 02:00:32 JST 2001  itojun@iijlab.net
 	* netbsd, openbsd, bsdi4: fix unsafe typecast in rtrequest1().
 	  clarify 3rd arg handling in eonrtrequest().
