@@ -433,7 +433,6 @@ tcp_input(m, off0)
 			tcpstat.tcps_rcvbadsum++;
 			goto drop;
 		}
-		th = (struct tcphdr *)((caddr_t)ip6 + off0);
 
 		/*
 		 * Be proactive about unspecified IPv6 address in source.
@@ -452,6 +451,7 @@ tcp_input(m, off0)
 		 * Get IP and TCP header together in first mbuf.
 		 * Note: IP leaves IP header in first mbuf.
 		 */
+#ifndef PULLDOWN_TEST
 		if (off0 > sizeof(struct ip)) {
 			ip_stripoptions(m, (struct mbuf *)0);
 			off0 = sizeof(struct ip);
@@ -462,39 +462,19 @@ tcp_input(m, off0)
 				return;
 			}
 		}
+#endif
 		ip = mtod(m, struct ip *);
 		ipov = (struct ipovly *)ip;
-		th = (struct tcphdr *)((caddr_t)ip + off0);
 		tlen = ip->ip_len;
 #ifdef TCP_ECN
 		/* save ip_tos before clearing it for checksum */
 		iptos = ip->ip_tos;
 #endif
-
-		if (m->m_pkthdr.csum_flags & CSUM_DATA_VALID) {
-			if (m->m_pkthdr.csum_flags & CSUM_PSEUDO_HDR)
-				th->th_sum = m->m_pkthdr.csum_data;
-			else
-				th->th_sum = in_pseudo(ip->ip_src.s_addr,
-						ip->ip_dst.s_addr,
-						htonl(m->m_pkthdr.csum_data +
-							ip->ip_len +
-							IPPROTO_TCP));
-			th->th_sum ^= 0xffff;
-		} else {
-			/*
-			 * Checksum extended TCP header and data.
-			 */
-			len = sizeof(struct ip) + tlen;
-			bzero(ipov->ih_x1, sizeof(ipov->ih_x1));
-			ipov->ih_len = (u_short)tlen;
-			ipov->ih_len = htons(ipov->ih_len);
-			th->th_sum = in_cksum(m, len);
-		}
-		if (th->th_sum) {
+		if (in4_cksum(m, IPPROTO_TCP, off0, tlen)) {
 			tcpstat.tcps_rcvbadsum++;
 			goto drop;
 		}
+
 #ifdef INET6
 		/* Re-initialization for later version check */
 		ip->ip_v = IPVERSION;
@@ -505,6 +485,31 @@ tcp_input(m, off0)
 	 * Check that TCP offset makes sense,
 	 * pull out TCP options and adjust length.		XXX
 	 */
+#ifndef PULLDOWN_TEST
+	if (isipv6) {
+		IP6_EXTHDR_CHECK(m, off0, off, );
+		ip6 = mtod(m, struct ip6_hdr *);
+		th = (struct tcphdr *)((caddr_t)ip6 + off0);
+	} else {
+		if (m->m_len < sizeof(struct ip) + off) {
+			if ((m = m_pullup(m, sizeof(struct ip) + off))
+					== 0) {
+				tcpstat.tcps_rcvshort++;
+				return;
+			}
+			ip = mtod(m, struct ip *);
+			ipov = (struct ipovly *)ip;
+			th = (struct tcphdr *)((caddr_t)ip + off0);
+		}
+	}
+#else
+	IP6_EXTHDR_GET(th, struct tcphdr *, m, off0, off);
+	if (!th) {
+		tcpstat.tcps_rcvshort++;
+		return;
+	}
+#endif
+
 	off = th->th_off << 2;
 	if (off < sizeof(struct tcphdr) || off > tlen) {
 		tcpstat.tcps_rcvbadoff++;
@@ -512,22 +517,6 @@ tcp_input(m, off0)
 	}
 	tlen -= off;	/* tlen is used instead of ti->ti_len */
 	if (off > sizeof(struct tcphdr)) {
-		if (isipv6) {
-			IP6_EXTHDR_CHECK(m, off0, off, );
-			ip6 = mtod(m, struct ip6_hdr *);
-			th = (struct tcphdr *)((caddr_t)ip6 + off0);
-		} else {
-			if (m->m_len < sizeof(struct ip) + off) {
-				if ((m = m_pullup(m, sizeof(struct ip) + off))
-						== 0) {
-					tcpstat.tcps_rcvshort++;
-					return;
-				}
-				ip = mtod(m, struct ip *);
-				ipov = (struct ipovly *)ip;
-				th = (struct tcphdr *)((caddr_t)ip + off0);
-			}
-		}
 		optlen = off - sizeof(struct tcphdr);
 		optp = (u_char *)(th + 1);
 	}

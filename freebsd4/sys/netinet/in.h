@@ -599,6 +599,7 @@ struct ifnet; struct mbuf;	/* forward declarations for Standard C */
 int	 in_broadcast __P((struct in_addr, struct ifnet *));
 int	 in_canforward __P((struct in_addr));
 int	 in_cksum __P((struct mbuf *, int));
+int	 in4_cksum __P((struct mbuf *, u_int8_t, int, int));
 int	 in_localaddr __P((struct in_addr));
 char 	*inet_ntoa __P((struct in_addr)); /* in libkern */
 

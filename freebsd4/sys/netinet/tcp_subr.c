@@ -469,23 +469,22 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 		ip6->ip6_flow = 0;
 		ip6->ip6_vfc = IPV6_VERSION;
 		ip6->ip6_nxt = IPPROTO_TCP;
-		ip6->ip6_plen = htons((u_short)(sizeof (struct tcphdr) +
-						tlen));
-		tlen += sizeof (struct ip6_hdr) + sizeof (struct tcphdr);
+		ip6->ip6_plen = htons((u_short)(sizeof(struct tcphdr) + tlen));
+		tlen += sizeof(struct ip6_hdr) + sizeof(struct tcphdr);
 	} else
 #endif
-      {
-	tlen += sizeof (struct tcpiphdr);
-	ip->ip_len = tlen;
-	ip->ip_ttl = ip_defttl;
-      }
+	{
+		tlen += sizeof(struct tcpiphdr);
+		ip->ip_len = tlen;
+		ip->ip_ttl = ip_defttl;
+	}
 	m->m_len = tlen;
 	m->m_pkthdr.len = tlen;
 	m->m_pkthdr.rcvif = (struct ifnet *) 0;
 	nth->th_seq = htonl(seq);
 	nth->th_ack = htonl(ack);
 	nth->th_x2 = 0;
-	nth->th_off = sizeof (struct tcphdr) >> 2;
+	nth->th_off = sizeof(struct tcphdr) >> 2;
 	nth->th_flags = flags;
 	if (tp)
 		nth->th_win = htons((u_short) (win >> tp->rcv_scale));
@@ -740,10 +739,10 @@ tcp_close(tp)
 				i = 2;
 			i *= (u_long)(tp->t_maxseg +
 #ifdef INET6
-				      (isipv6 ? sizeof (struct ip6_hdr) +
-					       sizeof (struct tcphdr) :
+				      (isipv6 ? sizeof(struct ip6_hdr) +
+					       sizeof(struct tcphdr) :
 #endif
-				       sizeof (struct tcpiphdr)
+				       sizeof(struct tcpiphdr)
 #ifdef INET6
 				       )
 #endif
@@ -1455,13 +1454,13 @@ ipsec_hdrsiz_tcp(tp)
 		hdrsiz = ipsec6_hdrsiz(m, IPSEC_DIR_OUTBOUND, inp);
 	} else
 #endif /* INET6 */
-      {
-	ip = mtod(m, struct ip *);
-	th = (struct tcphdr *)(ip + 1);
-	m->m_pkthdr.len = m->m_len = sizeof(struct tcpiphdr);
-	tcp_fillheaders(tp, ip, th);
-	hdrsiz = ipsec4_hdrsiz(m, IPSEC_DIR_OUTBOUND, inp);
-      }
+	{
+		ip = mtod(m, struct ip *);
+		th = (struct tcphdr *)(ip + 1);
+		m->m_pkthdr.len = m->m_len = sizeof(struct tcpiphdr);
+		tcp_fillheaders(tp, ip, th);
+		hdrsiz = ipsec4_hdrsiz(m, IPSEC_DIR_OUTBOUND, inp);
+	}
 
 	m_free(m);
 	return hdrsiz;
