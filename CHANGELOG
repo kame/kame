@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2053 2002/01/21 02:44:31 suz Exp $
+$KAME: CHANGELOG,v 1.2054 2002/01/21 05:02:24 jinmei Exp $
 
 <200201>
+2002-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/route6.c (ip6_rthdr0): made the source routing
+	code more scope-aware:
+	- it now considers all type of scopes (i.e. not only link-local
+	  addresses).
+        - it conforms to the forwarding rule described in the scoping arch
+	  draft.
+
 2002-01-21 SUZUKI, Shinsuke <suz@sdl.hitachi.co.jp>
 	* kame/kame/pim6sd/mldv2_proto.c:
 	- fixed a bug that MLDv2 Report crashes pim6sd.
