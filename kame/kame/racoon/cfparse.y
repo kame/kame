@@ -836,12 +836,15 @@ isakmpproposal_spec
 
 	/* static sa */
 staticsa_statement
-	:	STATICSA STATICSA_STATEMENT EOS
+	:	STATICSA STATICSA_STATEMENT
 		{
 			/* execute static sa */
-			/* system("setkey $2.v"); */
+			yywarn("staticsa directive don't work yet.");
+
+			/* like system("setkey $2.v"); */
 			free($2.v);
 		}
+		EOS
 	;
 
 %%
