@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.253 2001/10/22 08:18:37 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.254 2001/10/31 03:16:44 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3202,11 +3202,11 @@ ppsratecheck(lasttime, curpps, maxpps)
 	timersub(&tv, lasttime, &delta);
 
 	/*
-	 * check for 0,0 is so that the message will be seen at least once.
-	 * if more than one second have passed since the last update of
+	 * Check for 0,0 so that the message will be seen at least once.
+	 * If more than one second have passed since the last update of
 	 * lasttime, reset the counter.
 	 *
-	 * we do increment *curpps even in *curpps < maxpps case, as some may
+	 * We do increment *curpps even in *curpps < maxpps case, as some may
 	 * try to use *curpps for stat purposes as well.
 	 */
 	if ((lasttime->tv_sec == 0 && lasttime->tv_usec == 0) ||
