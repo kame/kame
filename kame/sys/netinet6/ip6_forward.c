@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.40 2000/07/12 12:58:03 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.41 2000/07/12 14:11:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -310,7 +310,7 @@ ip6_forward(m, srcrt)
 	}
 #endif
 
-	dst = &ip6_forward_rt.ro_dst;
+	dst = (struct sockaddr_in6 *)&ip6_forward_rt.ro_dst;
 	if (!srcrt) {
 		/*
 		 * ip6_forward_rt.ro_dst.sin6_addr is equal to ip6->ip6_dst
