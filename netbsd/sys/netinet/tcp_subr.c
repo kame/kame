@@ -439,10 +439,12 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 			th = (struct tcphdr *)(ip6 + 1);
 			break;
 #endif
+#if 0
 		default:
 			/* noone will visit here */
 			m_freem(m);
 			return EAFNOSUPPORT;
+#endif
 		}
 		flags = TH_ACK;
 	} else {
@@ -490,10 +492,12 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 			ip6->ip6_nxt = IPPROTO_TCP;
 			break;
 #endif
+#if 0
 		default:
 			/* noone will visit here */
 			m_freem(m);
 			return EAFNOSUPPORT;
+#endif
 		}
 		*th = *th0;
 		xchg(th->th_dport, th->th_sport, u_int16_t);
