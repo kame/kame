@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.63 2001/07/26 02:09:21 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.64 2001/07/27 09:21:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -119,13 +119,8 @@ static int gif_eon_decap(struct ifnet *, struct mbuf **);
 /*
  * gif global variable definitions
  */
-#ifdef __OpenBSD__
 int ngif;			/* number of interfaces */
-struct gif_softc *gif = 0;
-#else
-static int ngif;		/* number of interfaces */
-static struct gif_softc *gif = 0;
-#endif
+struct gif_softc *gif_softc = NULL;
 
 #ifndef MAX_GIF_NEST
 /*
@@ -156,7 +151,8 @@ gifattach(dummy)
 #else
 	ngif = NGIF;
 #endif
-	gif = sc = malloc(ngif * sizeof(struct gif_softc), M_DEVBUF, M_WAIT);
+	gif_softc = sc = malloc(ngif * sizeof(struct gif_softc),
+	    M_DEVBUF, M_WAIT);
 	bzero(sc, ngif * sizeof(struct gif_softc));
 	for (i = 0; i < ngif; sc++, i++) {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -784,7 +780,7 @@ gif_set_tunnel(ifp, src, dst)
 #endif
 
 	for (i = 0; i < ngif; i++) {
-		sc2 = gif + i;
+		sc2 = gif_softc + i;
 		if (sc2 == sc)
 			continue;
 		if (!sc2->gif_pdst || !sc2->gif_psrc)
@@ -803,25 +799,7 @@ gif_set_tunnel(ifp, src, dst)
 		}
 #endif
 
-		/* can't configure multiple multi-dest interfaces */
-#define multidest(x) \
-(((struct sockaddr_in *)(x))->sin_addr.s_addr == INADDR_ANY)
-#ifdef INET6
-#define multidest6(x) \
-(IN6_IS_ADDR_UNSPECIFIED(&((struct sockaddr_in6 *)(x))->sin6_addr))
-#endif
-		if (dst->sa_family == AF_INET &&
-		    multidest(dst) && multidest(sc2->gif_pdst)) {
-			error = EADDRNOTAVAIL;
-			goto bad;
-		}
-#ifdef INET6
-		if (dst->sa_family == AF_INET6 &&
-		    multidest6(dst) && multidest6(sc2->gif_pdst)) {
-			error = EADDRNOTAVAIL;
-			goto bad;
-		}
-#endif
+		/* XXX both end must be valid? (I mean, not 0.0.0.0) */
 	}
 
 	/* XXX we can detach from both, but be polite just in case */
