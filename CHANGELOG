@@ -1,7 +1,18 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2005 2001/12/13 05:39:59 fujisawa Exp $
+$KAME: CHANGELOG,v 1.2006 2001/12/13 05:52:53 fujisawa Exp $
 
 <200112>
+2001-12-13 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/natpt_{defs,dispatch}.[ch]:
+	- Add a code to send ICMP "packet too big" message to IPv4
+	  host when IPv4 packet is too big (at most 1232 octets,
+	  excluding the IPv4 header) to translate into IPv6.  1232
+	  comes from 1280 (IPv6 minimum MTU) minus 40 for the IPv6
+	  header and 8 for the Fragment header.
+
+	  A problem of the host who does not listen to ICMP is still
+	  unsolved.
+
 Thu Dec 13 00:31:47 JST 2001 sakane@kame.net
 	* kame/racoon:
 	the retransmission logic has been improved.  racoon stores the packet
