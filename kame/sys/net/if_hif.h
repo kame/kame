@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.22 2003/08/26 04:42:27 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.23 2003/08/26 11:01:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -146,8 +146,7 @@ int hif_output(struct ifnet *, struct mbuf *, struct sockaddr *,
     struct rtentry *);
 void hif_save_location(struct hif_softc *);
 void hif_restore_location(struct hif_softc *);
-struct mip6_ha *hif_find_preferable_ha(struct hif_softc *,
-    struct mip6_prefix *);
+struct mip6_ha *hif_find_preferable_ha(struct hif_softc *);
 
 struct hif_prefix *hif_prefix_list_insert_withmpfx(struct hif_prefix_list *,
     struct mip6_prefix *);

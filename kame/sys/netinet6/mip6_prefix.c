@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.27 2003/08/26 04:42:27 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.28 2003/08/26 11:01:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -382,31 +382,6 @@ mip6_prefix_list_remove(mpfx_list, mpfx)
 	FREE(mpfx, M_TEMP);
 
 	return (0);
-}
-
-struct mip6_prefix *
-mip6_prefix_list_find(tmpmpfx)
-	struct mip6_prefix *tmpmpfx;
-{
-	struct mip6_prefix *mpfx;
-
-	if (tmpmpfx == NULL) {
-		return (NULL);
-	}
-
-	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
-	     mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
-		if (in6_are_prefix_equal(&tmpmpfx->mpfx_prefix.sin6_addr,
-					 &mpfx->mpfx_prefix.sin6_addr,
-					 tmpmpfx->mpfx_prefixlen)
-		    && (tmpmpfx->mpfx_prefixlen == mpfx->mpfx_prefixlen)) {
-			/* found. */
-			return (mpfx);
-		}
-	}
-
-	/* not found. */
-	return (NULL);
 }
 
 struct mip6_prefix *

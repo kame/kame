@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.77 2003/08/26 04:42:27 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.78 2003/08/26 11:01:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -581,6 +581,10 @@ mip6_icmp6_dhaad_req_output(sc)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
+
+	mip6log((LOG_INFO,
+	    "mip6_icmp6_dhaad_req_output: "
+	    "sending a DHAAD request message.\n"));
 
 	/* rate limitation. */
 	if (sc->hif_dhaad_count != 0) {

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.h,v 1.12 2003/08/26 04:27:49 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.h,v 1.13 2003/08/26 11:01:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -106,7 +106,6 @@ struct mip6_prefix *mip6_prefix_create(struct sockaddr_in6 *, u_int8_t,
 int mip6_prefix_list_insert(struct mip6_prefix_list *, struct mip6_prefix *);
 int mip6_prefix_list_remove(struct mip6_prefix_list *,
     struct mip6_prefix *mpfx);
-struct mip6_prefix *mip6_prefix_list_find(struct mip6_prefix *);
 struct mip6_prefix *mip6_prefix_list_find_withprefix(struct sockaddr_in6 *,
     int);
 struct mip6_prefix *mip6_prefix_list_find_withhaddr(struct mip6_prefix_list *,

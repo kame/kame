@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.30 2003/08/26 04:42:27 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.31 2003/08/26 11:01:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -222,9 +222,8 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 	struct nd_opt_prefix_info *ndopt_pi;
 	struct sockaddr_in6 prefix_sa;
 	int is_home;
-	int mha_is_new, mpfx_is_new;
 	struct mip6_ha *mha;
-	struct mip6_prefix tmpmpfx, *mpfx;
+	struct mip6_prefix *mpfx;
 	struct mip6_prefix *prefix_list[IPV6_MINMTU/sizeof(struct nd_opt_prefix_info)];
 	int nprefix = 0;
 	struct hif_prefix *hpfx;
@@ -302,7 +301,11 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 		prefix_sa.sin6_family = AF_INET6;
 		prefix_sa.sin6_len = sizeof(prefix_sa);
 		prefix_sa.sin6_addr = ndopt_pi->nd_opt_pi_prefix;
-		/* XXX scope? */
+		if (in6_addr2zoneid(m->m_pkthdr.rcvif, &prefix_sa.sin6_addr,
+		    &prefix_sa.sin6_scope_id))
+			continue;
+		if (in6_embedscope(&prefix_sa.sin6_addr, &prefix_sa))
+			continue;
 		hpfx = hif_prefix_list_find_withprefix(
 		    &sc->hif_prefix_list_home, &prefix_sa,
 		    ndopt_pi->nd_opt_pi_prefix_len);
@@ -382,23 +385,23 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 		prefix_sa.sin6_family = AF_INET6;
 		prefix_sa.sin6_len = sizeof(prefix_sa);
 		prefix_sa.sin6_addr = ndopt_pi->nd_opt_pi_prefix;
+		if (in6_addr2zoneid(m->m_pkthdr.rcvif, &prefix_sa.sin6_addr,
+		    &prefix_sa.sin6_scope_id))
+			continue;
+		if (in6_embedscope(&prefix_sa.sin6_addr, &prefix_sa))
+			continue;
 
 		/* update mip6_prefix_list. */
-		bzero(&tmpmpfx, sizeof(tmpmpfx));
-		tmpmpfx.mpfx_prefix.sin6_family = AF_INET6;
-		tmpmpfx.mpfx_prefix.sin6_len = sizeof(tmpmpfx.mpfx_prefix);
-		tmpmpfx.mpfx_prefix.sin6_addr = ndopt_pi->nd_opt_pi_prefix;
-		tmpmpfx.mpfx_prefixlen = ndopt_pi->nd_opt_pi_prefix_len;
-		tmpmpfx.mpfx_vltime = ntohl(ndopt_pi->nd_opt_pi_valid_time);
-		tmpmpfx.mpfx_pltime = ntohl(ndopt_pi->nd_opt_pi_preferred_time);
-		mpfx_is_new = 0;
-		mpfx = mip6_prefix_list_find(&tmpmpfx);
+		mpfx = mip6_prefix_list_find_withprefix(&prefix_sa,
+		    ndopt_pi->nd_opt_pi_prefix_len);
 		if (mpfx) {
 			/* found an existing entry.  just update it. */
-			mpfx->mpfx_vltime = tmpmpfx.mpfx_vltime;
+			mpfx->mpfx_vltime
+			    = ntohl(ndopt_pi->nd_opt_pi_valid_time);
 			mpfx->mpfx_vlexpire = mono_time.tv_sec
 			    + mpfx->mpfx_vltime;
-			mpfx->mpfx_pltime = tmpmpfx.mpfx_pltime;
+			mpfx->mpfx_pltime
+			    = ntohl(ndopt_pi->nd_opt_pi_preferred_time);
 			mpfx->mpfx_plexpire = mono_time.tv_sec
 			    + mpfx->mpfx_pltime;
 			/* XXX mpfx->mpfx_haddr; */
@@ -407,10 +410,10 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 			mpfx->mpfx_state = MIP6_PREFIX_STATE_PREFERRED;
 		} else {
 			/* this is a new prefix. */
-			mpfx = mip6_prefix_create(&tmpmpfx.mpfx_prefix,
-			    tmpmpfx.mpfx_prefixlen,
-			    tmpmpfx.mpfx_vltime,
-			    tmpmpfx.mpfx_pltime);
+			mpfx = mip6_prefix_create(&prefix_sa,
+			    ndopt_pi->nd_opt_pi_prefix_len,
+			    ntohl(ndopt_pi->nd_opt_pi_valid_time),
+			    ntohl(ndopt_pi->nd_opt_pi_preferred_time));
 			if (mpfx == NULL) {
 				mip6log((LOG_ERR,
 				    "%s:%d: "
@@ -428,7 +431,6 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 				goto skip_prefix_update;
 			}
 
-			mpfx_is_new = 1;
 			mip6log((LOG_INFO,
 			    "%s:%d: receive a new prefix %s\n",
 			    __FILE__, __LINE__,
@@ -526,12 +528,11 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 			}
 			mip6_ha_list_insert(&mip6_ha_list, mha);
 
-			mha_is_new = 1;
 			mip6log((LOG_INFO,
 			    "%s:%d: found a new router %s(%s)\n",
 			    __FILE__, __LINE__,
 			    ip6_sprintf(&rtaddr->sin6_addr),
-			    ip6_sprintf(&tmpmpfx.mpfx_prefix.sin6_addr)));
+			    ip6_sprintf(&haaddr.sin6_addr)));
 		}
 		for (i = 0; i < nprefix; i++) {
 			mip6_prefix_ha_list_insert(
@@ -1697,16 +1698,13 @@ mip6_home_registration(sc)
 			 */
 
 			/* pick the preferable HA from the list. */
-			mha = hif_find_preferable_ha(sc, mpfx);
+			mha = hif_find_preferable_ha(sc);
 				    
 			if (mha == NULL) {
 				/*
 				 * if no HA is found, try to find a HA
 				 * using Dynamic Home Agent Discovery.
 				 */
-				mip6log((LOG_INFO,
-				    "%s:%d: no home agent.  start ha discovery.\n",
-				    __FILE__, __LINE__));
 				mip6_icmp6_dhaad_req_output(sc);
 				haaddr = &sin6_any;
 			} else {
@@ -2141,47 +2139,51 @@ int
 mip6_bu_send_bu(mbu)
 	struct mip6_bu *mbu;
 {
+	struct mip6_ha *mha;
 	struct mbuf *m;
 	struct ip6_pktopts opt;
-	int error;
+	int error = 0;
 
 	/* sanity check. */
 	if (mbu == NULL)
 		return (EINVAL);
 
-	/* init local variables. */
-	error = 0;
-
 	if (IN6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr.sin6_addr)) {
 		/* we do not know where to send a binding update. */
 		if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
-			mip6log((LOG_INFO,
-			    "%s:%d: "
-			    "no home agent.  start DHAAD.\n",
-			    __FILE__, __LINE__));
-			error = mip6_icmp6_dhaad_req_output(mbu->mbu_hif);
-			if (error) {
-				mip6log((LOG_ERR,
-				    "%s:%d: failed to send DHAAD request.\n",
-				    __FILE__, __LINE__));
-				/* continue, anyway. */
+			mha = hif_find_preferable_ha(mbu->mbu_hif);
+			if (mha == NULL) {
+				error = mip6_icmp6_dhaad_req_output(
+				    mbu->mbu_hif);
+				if (error) {
+					mip6log((LOG_ERR,
+					    "mip6_bu_send_bu: "
+					    "failed to send a DHAAD request.\n",
+					    __FILE__, __LINE__));
+					/* continue, anyway. */
+				}
+				/*
+				 * a binding update will be sent
+				 * immediately after receiving DHAAD
+				 * reply.
+				 */
+				goto bu_send_bu_end;
+			} else {
+				/* try another home agent. */
+				mbu->mbu_paddr = mha->mha_addr;
+				goto bu_send_bu_continue;
 			}
-			/*
-			 * a binding update will be sent immediately
-			 * after receiving DHAAD reply.
-			 */
-			goto bu_send_bu_end;
 		}
 		panic("a peer address must be known when sending a binding update.");
 	}
 
+ bu_send_bu_continue:
 	/* create an ipv6 header to send a binding update. */
 	m = mip6_create_ip6hdr(&mbu->mbu_haddr, &mbu->mbu_paddr,
 	    IPPROTO_NONE, 0);
 	if (m == NULL) {
 		mip6log((LOG_ERR,
-		    "%s:%d: memory allocation failed.\n",
-		    __FILE__, __LINE__));
+		    "mip6_bu_send_bu: failed to create ip6hdr.\n"));
 		error = ENOBUFS;
 		goto bu_send_bu_end;
 	}
@@ -2194,9 +2196,8 @@ mip6_bu_send_bu(mbu)
 	    &mbu->mbu_paddr, mbu->mbu_hif);
 	if (error) {
 		mip6log((LOG_ERR,
-		    "%s:%d: a binding update mobility header "
-		    "creation failed (%d).\n",
-		    __FILE__, __LINE__, error));
+		    "mip6_bu_send_bu: failed to create a binding update "
+		    "mobility header.\n"));
 		m_freem(m);
 		goto free_ip6pktopts;
 	}
@@ -2211,15 +2212,13 @@ mip6_bu_send_bu(mbu)
 	}
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL
 #if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-			   , NULL
+	    , NULL
 #endif
 			  );
 	if (error) {
 		mip6log((LOG_ERR,
-			 "%s:%d: ip6_output returns error (%d) "
-			 "when sending NULL packet to send BU.\n",
-			 __FILE__, __LINE__,
-			 error));
+		    "mip6_bu_send_bu: ip6_output returns error (%d).\n",
+		    error));
 		goto free_ip6pktopts;
 	}
 

@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.59 2003/08/26 04:42:27 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.60 2003/08/26 11:01:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -429,9 +429,8 @@ hif_restore_location(sc)
  * home agent of this hif interface.
  */
 struct mip6_ha *
-hif_find_preferable_ha(hif, mpfx)
+hif_find_preferable_ha(hif)
 	struct hif_softc *hif;
-	struct mip6_prefix *mpfx;
 {
 	struct mip6_ha *mha;
 
@@ -499,7 +498,8 @@ hif_prefix_list_update_withprefix(sc, data)
 		return (EINVAL);
 	}
 
-	mpfx = mip6_prefix_list_find(nmpfx);
+	mpfx = mip6_prefix_list_find_withprefix(&nmpfx->mpfx_prefix,
+	    nmpfx->mpfx_prefixlen);
 	if (mpfx == NULL) {
 		mpfx = mip6_prefix_create(&nmpfx->mpfx_prefix,
 		    nmpfx->mpfx_prefixlen, nmpfx->mpfx_vltime,
