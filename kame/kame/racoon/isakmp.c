@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.16 2000/01/09 23:11:06 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.17 2000/01/10 00:39:36 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -112,9 +112,9 @@ static int (*ph2exchange[][2][PHASE2ST_MAX])
 	__P((struct ph2handle *, vchar_t *)) = {
  { /* Quick mode for IKE*/
   { NULL, NULL, quick_i1prep, NULL, quick_i1send,
-    quick_i2recv, quick_i2send, NULL, NULL, NULL, },
+    quick_i2recv, quick_i2send, quick_i3recv, NULL, NULL, },
   { NULL, quick_r1recv, quick_r1prep, NULL, quick_r2send,
-    quick_r3recv, quick_r3prep, NULL, NULL, NULL, }
+    quick_r3recv, quick_r3send, quick_r3prep, NULL, NULL, }
  },
 };
 
@@ -447,6 +447,16 @@ isakmp_main(msg, remote, local)
 			return 0;
 			/*NOTREACHED*/
 		}
+
+		/* commit bit. */
+		/* XXX
+		 * we keep to set commit bit during negotiation.
+		 * When SA is configured, bit will be reset.
+		 * XXX
+		 * don't initiate commit bit.  should be fixed in the future.
+		 */
+		if (ISSET(isakmp->flags, ISAKMP_FLAG_C))
+			iph2->ph1->flags |= ISAKMP_FLAG_C;
 
 		/* receive */
 		YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));

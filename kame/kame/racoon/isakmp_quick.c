@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.2 2000/01/09 22:59:37 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.3 2000/01/10 00:39:36 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -601,6 +601,13 @@ quick_i2send(iph2, msg0)
 		goto end;
 	}
 
+	/* if there is commit bit don't set up SA now. */
+	if (ISSET(iph2->ph1->flags, ISAKMP_FLAG_C)) {
+		iph2->status = PHASE2ST_COMMIT;
+		error = 0;
+		goto end;
+	}
+
 	/* Do UPDATE for initiator */
 	if (pk_sendupdate(iph2) < 0) {
 		plog(logp, LOCATION, NULL, "pfkey update failed.\n");
@@ -626,6 +633,152 @@ quick_i2send(iph2, msg0)
 end:
 	if (buf != NULL)
 		vfree(buf);
+	if (msg != NULL)
+		vfree(msg);
+
+	return error;
+}
+
+/*
+ * receive from responder
+ * 	HDR#*, HASH(4), notify
+ */
+int
+quick_i3recv(iph2, msg0)
+	struct ph2handle *iph2;
+	vchar_t *msg0;
+{
+	vchar_t *msg = NULL;
+	vchar_t *pbuf = NULL;	/* for payload parsing */
+	struct isakmp_parse_t *pa;
+	struct isakmp_pl_hash *hash = NULL;
+	vchar_t *notify = NULL;
+	int error = -1;
+
+	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
+
+	/* validity check */
+	if (iph2->status != PHASE2ST_COMMIT) {
+		plog(logp, LOCATION, NULL,
+			"status mismatched %d.\n", iph2->status);
+		goto end;
+	}
+
+	/* decrypt packet */
+	if (!ISSET(((struct isakmp *)msg0->v)->flags, ISAKMP_FLAG_E)) {
+		plog(logp, LOCATION, iph2->ph1->remote,
+			"Packet wasn't encrypted.\n");
+		goto end;
+	}
+	msg = oakley_do_decrypt(iph2->ph1, msg0, iph2->ivm->iv, iph2->ivm->ive);
+	if (msg == NULL)
+		goto end;
+
+	/* validate the type of next payload */
+	/*
+	 * ISAKMP_ETYPE_QUICK, RESPONDER, PHASE2ST_COMMIT
+	 * ISAKMP_NPTYPE_HASH, (ISAKMP_NPTYPE_N), ISAKMP_NPTYPE_NONE
+	 */
+	pbuf = isakmp_parse(msg);
+	if (pbuf == NULL)
+		goto end;
+
+	for (pa = (struct isakmp_parse_t *)pbuf->v;
+	     pa->type != ISAKMP_NPTYPE_NONE;
+	     pa++) {
+
+		switch (pa->type) {
+		case ISAKMP_NPTYPE_HASH:
+			hash = (struct isakmp_pl_hash *)pa->ptr;
+			break;
+		case ISAKMP_NPTYPE_N:
+			isakmp_check_notify(pa->ptr, iph2->ph1);
+			notify = vmalloc(pa->len);
+			if (notify == NULL) {
+				plog(logp, LOCATION, NULL,
+					"vmalloc (%s)\n", strerror(errno));
+				goto end;
+			}
+			memcpy(notify->v, pa->ptr, notify->l);
+			break;
+		default:
+			/* don't send information, see ident_r1recv() */
+			error = 0;
+			plog(logp, LOCATION, iph2->ph1->remote,
+				"ignore the packet, "
+				"received unexpecting payload type %d.\n",
+				pa->type);
+			goto end;
+		}
+	}
+
+	/* payload existency check */
+	if (hash == NULL) {
+		plog(logp, LOCATION, iph2->ph1->remote,
+			"few isakmp message received.\n");
+		goto end;
+	}
+
+	/* validate HASH(4) */
+    {
+	char *r_hash;
+	vchar_t *my_hash = NULL;
+	vchar_t *tmp = NULL;
+	int result;
+
+	r_hash = (char *)hash + sizeof(*hash);
+
+	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "HASH(4) validate:"));
+	YIPSDEBUG(DEBUG_DKEY,
+		hexdump(r_hash, ntohs(hash->h.len) - sizeof(*hash)));
+
+	my_hash = oakley_compute_hash1(iph2->ph1, iph2->msgid, notify);
+	vfree(tmp);
+	if (my_hash == NULL)
+		goto end;
+
+	result = memcmp(my_hash->v, r_hash, my_hash->l);
+	vfree(my_hash);
+
+	if (result) {
+		plog(logp, LOCATION, iph2->ph1->remote, "HASH(4) mismatch.\n");
+		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL, iph2->ph1->flags);
+		goto end;
+	}
+    }
+
+	iph2->status = PHASE2ST_ADDSA;
+	iph2->ph1->flags ^= ISAKMP_FLAG_C;	/* reset bit */
+
+	/* don't anything if local test mode. */
+	if (f_local) {
+		error = 0;
+		goto end;
+	}
+
+	/* Do UPDATE for initiator */
+	if (pk_sendupdate(iph2) < 0) {
+		plog(logp, LOCATION, NULL, "pfkey update failed.\n");
+		goto end;
+	}
+	YIPSDEBUG(DEBUG_STAMP,
+		plog(logp, LOCATION, NULL, "pfkey update sent.\n"));
+
+	/* Do ADD for responder */
+	if (pk_sendadd(iph2) < 0) {
+		plog(logp, LOCATION, NULL, "pfkey add failed.\n");
+		goto end;
+	}
+	YIPSDEBUG(DEBUG_STAMP,
+		plog(logp, LOCATION, NULL, "pfkey add sent.\n"));
+
+	plog(logp, LOCATION, iph2->ph1->remote,
+		"get SA values for IPsec, %s.\n",
+	        isakmp_pindex(&iph2->ph1->index, iph2->msgid));
+
+	error = 0;
+
+end:
 	if (msg != NULL)
 		vfree(msg);
 
@@ -1271,6 +1424,13 @@ quick_r3recv(iph2, msg0)
 	}
     }
 
+	/* if there is commit bit don't set up SA now. */
+	if (ISSET(iph2->ph1->flags, ISAKMP_FLAG_C)) {
+		iph2->status = PHASE2ST_COMMIT;
+		error = 0;
+		goto end;
+	}
+
 	iph2->status = PHASE2ST_STATUS6;
 
 	error = 0;
@@ -1280,6 +1440,108 @@ end:
 		vfree(pbuf);
 	if (msg != NULL)
 		vfree(msg);
+
+	return error;
+}
+
+/*
+ * send to initiator
+ * 	HDR#*, HASH(4), notify
+ */
+int
+quick_r3send(iph2, msg0)
+	struct ph2handle *iph2;
+	vchar_t *msg0;
+{
+	vchar_t *buf = NULL;
+	vchar_t *myhash = NULL;
+	struct isakmp_pl_n *n;
+	vchar_t *notify = NULL;
+	char *p;
+	int tlen;
+	int error = -1;
+
+	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
+
+	/* validity check */
+	if (iph2->status != PHASE2ST_COMMIT) {
+		plog(logp, LOCATION, NULL,
+			"status mismatched %d.\n", iph2->status);
+		goto end;
+	}
+
+	/* generate HASH(4) */
+	/* XXX What can I do in the case of multiple different SA */
+	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "HASH(4) generate\n"));
+
+	tlen = sizeof(struct isakmp_pl_n) + sizeof(iph2->keys->spi);
+	notify = vmalloc(tlen);
+	if (notify == NULL) { 
+		plog(logp, LOCATION, NULL,
+			"vmalloc (%s)\n", strerror(errno));
+		goto end;
+	}
+	n = (struct isakmp_pl_n *)notify->v;
+	n->h.np = ISAKMP_NPTYPE_NONE;
+	n->h.len = htons(tlen);
+	n->doi = IPSEC_DOI;
+	n->proto_id = iph2->keys->proto_id;
+	n->spi_size = sizeof(iph2->keys->spi);
+	n->type = htons(ISAKMP_NTYPE_CONNECTED);
+	memcpy(n + 1, &iph2->keys->spi, sizeof(iph2->keys->spi));
+
+	myhash = oakley_compute_hash1(iph2->ph1, iph2->msgid, notify);
+	if (myhash == NULL)
+		goto end;
+
+	/* create buffer for isakmp payload */
+	tlen = sizeof(struct isakmp)
+		+ sizeof(struct isakmp_gen) + myhash->l
+		+ notify->l;
+	buf = vmalloc(tlen);
+	if (buf == NULL) { 
+		plog(logp, LOCATION, NULL,
+			"vmalloc (%s)\n", strerror(errno));
+		goto end;
+	}
+
+	/* create isakmp header */
+	p = set_isakmp_header2(buf, iph2, ISAKMP_NPTYPE_HASH);
+	if (p == NULL)
+		goto end;
+
+	/* add HASH(4) payload */
+	p = set_isakmp_payload(p, myhash, ISAKMP_NPTYPE_N);
+
+	/* add notify payload */
+	memcpy(p, notify->v, notify->l);
+
+#ifdef HAVE_PRINT_ISAKMP_C
+	isakmp_printpacket(buf, iph2->ph1->local, iph2->ph1->remote, 1);
+#endif
+
+	/* encoding */
+	iph2->sendbuf = oakley_do_encrypt(iph2->ph1, buf, iph2->ivm->ive, iph2->ivm->iv);
+	if (iph2->sendbuf == NULL)
+		goto end;
+
+	/* send HDR*;HASH(3) */
+	if (isakmp_send(iph2->ph1, iph2->sendbuf) < 0)
+		goto end;
+
+	/* XXX: How resend ? */
+
+	iph2->status = PHASE2ST_COMMIT;
+
+	error = 0;
+
+end:
+	if (buf != NULL)
+		vfree(buf);
+	if (myhash != NULL)
+		vfree(myhash);
+	if (notify != NULL)
+		vfree(notify);
 
 	return error;
 }
@@ -1309,6 +1571,7 @@ quick_r3prep(iph2, msg0)
 		goto end;
 
 	iph2->status = PHASE2ST_ADDSA;
+	iph2->ph1->flags ^= ISAKMP_FLAG_C;	/* reset bit */
 
 	/* don't anything if local test mode. */
 	if (f_local) {

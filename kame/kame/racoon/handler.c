@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.8 2000/01/09 01:31:23 itojun Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.9 2000/01/10 00:39:35 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -379,7 +379,6 @@ void
 initph2(iph2)
 	struct ph2handle *iph2;
 {
-	/* iph2->inuse = 0; don't init ! */
 	if (iph2->ivm)
 		oakley_delivm(iph2->ivm);
 	if (iph2->sce)

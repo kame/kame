@@ -26,15 +26,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.h,v 1.1 2000/01/09 01:31:27 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.h,v 1.2 2000/01/10 00:39:37 sakane Exp $ */
 
 extern int quick_i1prep __P((struct ph2handle *, vchar_t *msg));
 extern int quick_i1send __P((struct ph2handle *, vchar_t *msg));
 extern int quick_i2recv __P((struct ph2handle *, vchar_t *msg));
 extern int quick_i2send __P((struct ph2handle *, vchar_t *msg));
+extern int quick_i3recv __P((struct ph2handle *, vchar_t *msg));
 
 extern int quick_r1recv __P((struct ph2handle *, vchar_t *msg));
 extern int quick_r1prep __P((struct ph2handle *, vchar_t *msg));
 extern int quick_r2send __P((struct ph2handle *, vchar_t *msg));
 extern int quick_r3recv __P((struct ph2handle *, vchar_t *msg));
+extern int quick_r3send __P((struct ph2handle *, vchar_t *msg));
 extern int quick_r3prep __P((struct ph2handle *, vchar_t *msg));

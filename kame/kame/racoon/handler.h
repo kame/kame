@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.4 2000/01/09 23:11:04 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.5 2000/01/10 00:39:35 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -173,9 +173,10 @@ struct ph1handle {
  *  4   getspi done             getspi done
  *  5   1st msg sent            1st msg sent
  *  6   1st valid msg received  2nd valid msg received
- *  7   SAs added               SAs added
- *  8   SAs established         SAs established
- *  9   SAs expired             SAs expired
+ *  7   (commit bit)            (commit bit)
+ *  8   SAs added               SAs added
+ *  9   SAs established         SAs established
+ * 10   SAs expired             SAs expired
  */
 #define PHASE2ST_SPAWN		0
 #define PHASE2ST_START		1
@@ -184,10 +185,11 @@ struct ph1handle {
 #define PHASE2ST_GETSPIDONE	4
 #define PHASE2ST_MSG1SENT	5
 #define PHASE2ST_STATUS6	6
-#define PHASE2ST_ADDSA		7
-#define PHASE2ST_ESTABLISHED	8
-#define PHASE2ST_EXPIRED	9
-#define PHASE2ST_MAX		10
+#define PHASE2ST_COMMIT		7
+#define PHASE2ST_ADDSA		8
+#define PHASE2ST_ESTABLISHED	9
+#define PHASE2ST_EXPIRED	10
+#define PHASE2ST_MAX		11
 
 struct ph2handle {
 	struct policyindex *spidx;	/* pointer to policy */
