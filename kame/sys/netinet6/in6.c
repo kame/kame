@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.75 2000/04/12 03:51:29 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.76 2000/04/18 08:18:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,6 +108,7 @@
 #include <netinet6/mld6_var.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet6/in6_ifattach.h>
+#include <netinet6/scope6_var.h>
 
 #include <net/net_osdep.h>
 
@@ -493,6 +494,17 @@ in6_control(so, cmd, data, ifp)
 		if (ip6_forwarding == 0)
 			return(EPERM);
 		return(in6_prefix_ioctl(so, cmd, data, ifp));
+	}
+
+	switch(cmd) {
+	case SIOCSSCOPE6:
+		if (!privileged)
+			return(EPERM);
+		return(scope6_set(ifp, ifr->ifr_ifru.ifru_scope_id));
+		break;
+	case SIOCGSCOPE6:
+		return(scope6_get(ifp, ifr->ifr_ifru.ifru_scope_id));
+		break;
 	}
 
 	switch (cmd) {
