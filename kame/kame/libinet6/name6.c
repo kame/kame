@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.40 2003/03/28 11:25:41 jinmei Exp $	*/
+/*	$KAME: name6.c,v 1.41 2003/03/28 15:16:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1664,12 +1664,6 @@ _icmp_nodeinfo_query(const struct in6_addr *addr, int ifindex)
 	static char dnsname[MAXDNAME + 1]; /* XXX: thread unsafe */
 	u_int32_t r1, r2;
 
-	for (hc = hc_head; hc; hc = hc->hc_next) {
-		if (hc->hc_ifindex == ifindex &&
-		    IN6_ARE_ADDR_EQUAL(&hc->hc_addr, addr))
-			return hc->hc_name;
-	}
-
 	if (pid == 0)
 		pid = getpid();
 
@@ -1773,6 +1767,7 @@ _icmp_nodeinfo_query(const struct in6_addr *addr, int ifindex)
 	}
 	close(s);
 
+	memset(dnsname, 0, sizeof(dnsname));
 	cp = (char *)(nir + 1);
 	end = ((char *)nir) + cc;
 	if (end - cp < sizeof(int32_t))	/* for TTL.  we don't use it. */
