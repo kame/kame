@@ -63,6 +63,8 @@ ipsecsetup(af, fd, policy)
 		p0 = p = strdup("in entrust; out entrust");
 	else
 		p0 = p = strdup(policy);
+	if (!p)
+		return -1;
 
 	error = 0;
 	while (1) {
@@ -96,6 +98,8 @@ ipsecsetup_test(policy)
 	if (!policy)
 		return -1;
 	p0 = p = strdup((char *)policy);
+	if (!p)
+		return -1;
 
 	error = 0;
 	while (1) {
