@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.70 2000/07/10 23:21:12 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.71 2000/07/11 02:31:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -935,7 +935,7 @@ nd6_free(rt)
 
 	/*
 	 * Detach the route from the routing tree and the list of neighbor
-	 * caches, and disabled the route entry not to be used in already
+	 * caches, and disable the route entry not to be used in already
 	 * cached routes.
 	 */
 	rtrequest(RTM_DELETE, rt_key(rt), (struct sockaddr *)0,
