@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.158 1999/10/05 15:58:43 jinmei Exp $
+$Id: CHANGELOG,v 1.159 1999/10/06 04:25:31 jinmei Exp $
 
 <199910>
+1999-10-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd/pim6sd.conf.5: was added for configuration
+	guide.
+
 1999-10-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/v6test/v6test.c (bpf_open): use pcap_lookupdev (if
 	possible) to choose the outgoing interface when the user does not
