@@ -421,14 +421,15 @@ flush:
 		/* There is another listener, so construct message */
 		rp = sotorawcb(so);
 	}
-	/* XXX is it okay if we omit responses when we are unable to reply? */
-	if (rtm->rtm_msglen > MCLBYTES) {
-		Free(rtm);
-		rtm = NULL;
-	}
+	/*
+	 * copy rtm into m.
+	 * XXX is it okay if we omit responses when we are unable to reply?
+	 */
 	if (rtm) {
-		/* copy rtm into m */
-		if (m->m_pkthdr.len > rtm->rtm_msglen) {
+		if (rtm->rtm_msglen > MCLBYTES) {
+			m_freem(m);
+			m = NULL;
+		} else if (m->m_pkthdr.len > rtm->rtm_msglen) {
 			m_copyback(m, 0, rtm->rtm_msglen, (caddr_t)rtm);
 			m_adj(m, rtm->rtm_msglen - m->m_pkthdr.len);
 		} else {
