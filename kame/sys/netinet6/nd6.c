@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.183 2001/08/01 16:48:31 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.184 2001/08/01 22:10:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -992,7 +992,6 @@ nd6_is_addr_neighbor(addr, ifp)
 	struct sockaddr_in6 *addr;
 	struct ifnet *ifp;
 {
-	struct ifaddr *ifa;
 	struct nd_prefix *pr;
 	int i;
 
