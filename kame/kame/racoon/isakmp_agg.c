@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_agg.c,v 1.57 2004/03/03 05:39:59 sakane Exp $	*/
+/*	$KAME: isakmp_agg.c,v 1.58 2004/03/17 14:39:18 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -544,8 +544,6 @@ agg_i2send(iph1, msg)
 		}
 		/* set isakmp header */
 		p = set_isakmp_header(iph1->sendbuf, iph1);
-		if (p == NULL)
-			goto end;
 		p = set_isakmp_payload_c(p, gsshash, ISAKMP_NPTYPE_HASH);
 		break;
 #endif
