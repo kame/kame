@@ -1,4 +1,4 @@
-/*	$KAME: backupsa.c,v 1.3 2001/01/31 05:54:49 sakane Exp $	*/
+/*	$KAME: backupsa.c,v 1.4 2001/01/31 08:46:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -145,10 +145,12 @@ backupsa_to_file(satype, mode, src, dst, spi, reqid, wsize,
 	l = snprintf(p, len,
 		" %u %lu %u %u %u "
 		"%u %u %u %u %u "
-		"%u %qu %qu %qu %u",
-		satype, ntohl(spi), mode, reqid, wsize,
+		"%u %llu %llu %llu %u",
+		satype, (unsigned long)ntohl(spi), mode, reqid, wsize,
 		e_type, e_keylen, a_type, a_keylen, flags,
-		l_alloc, l_bytes, l_addtime, l_usetime, seq);
+		l_alloc, (unsigned long long)l_bytes,
+		(unsigned long long)l_addtime, (unsigned long long)l_usetime,
+		seq);
 	p += l;
 	len -= l;
 	if (len < 0)
