@@ -345,14 +345,14 @@ ip6_forward(m, srcrt)
 		in6_ifstat_inc(rt->rt_ifp, ifs6_in_toobig);
 		if (mcopy) {
 			u_long mtu;
-#ifdef IPSEC
+#ifdef IPSEC_IPV6FWD
 			struct secpolicy *sp;
 			int ipsecerror;
 			size_t ipsechdrsiz;
 #endif
 
 			mtu = rt->rt_ifp->if_mtu;
-#ifdef IPSEC
+#ifdef IPSEC_IPV6FWD
 			/*
 			 * When we do IPsec tunnel ingress, we need to play
 			 * with if_mtu value (decrement IPsec header size
