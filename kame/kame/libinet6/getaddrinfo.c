@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.99 2001/01/26 01:31:59 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.100 2001/01/26 07:37:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -246,13 +246,13 @@ static int explore_fqdn __P((const struct addrinfo *, const char *,
 #ifndef __OpenBSD__
 static const char *ai_errlist[] = {
 	"Success",
-	"Address family for hostname not supported",	/* EAI_ADDRFAMILY */
+	"EAI_ADDRFAMILY (obsoleted)",			/* EAI_ADDRFAMILY */
 	"Temporary failure in name resolution",		/* EAI_AGAIN      */
 	"Invalid value for ai_flags",		       	/* EAI_BADFLAGS   */
 	"Non-recoverable failure in name resolution", 	/* EAI_FAIL       */
 	"ai_family not supported",			/* EAI_FAMILY     */
 	"Memory allocation failure", 			/* EAI_MEMORY     */
-	"No address associated with hostname", 		/* EAI_NODATA     */
+	"EAI_NODATA (obsoleted)", 			/* EAI_NODATA     */
 	"hostname nor servname provided, or not known",	/* EAI_NONAME     */
 	"servname not supported for ai_socktype",	/* EAI_SERVICE    */
 	"ai_socktype not supported", 			/* EAI_SOCKTYPE   */
@@ -510,9 +510,9 @@ getaddrinfo(hostname, servname, hints, res)
 		goto globcopy;
 
 	if (pai->ai_flags & AI_NUMERICHOST)
-		ERR(EAI_NODATA);
+		ERR(EAI_NONAME);
 	if (hostname == NULL)
-		ERR(EAI_NODATA);
+		ERR(EAI_NONAME);
 
 	/*
 	 * hostname as alphabetical name.
@@ -857,7 +857,7 @@ explore_numeric_scope(pai, hostname, servname, res)
 				free(hostname2);
 				freeaddrinfo(*res);
 				*res = NULL;
-				return(EAI_NODATA); /* XXX: is return OK? */
+				return(EAI_NONAME); /* XXX: is return OK? */
 			}
 			sin6->sin6_scope_id = scopeid;
 		}
@@ -1192,7 +1192,7 @@ explore_fqdn(pai, hostname, servname, res)
 		switch (h_error) {
 		case HOST_NOT_FOUND:
 		case NO_DATA:
-			error = EAI_NODATA;
+			error = EAI_NONAME;
 			break;
 		case TRY_AGAIN:
 			error = EAI_AGAIN;
@@ -1369,7 +1369,7 @@ explore_fqdn(pai, hostname, servname, res)
 		error = EAI_FAIL;
 		goto free;
 	case NS_NOTFOUND:
-		error = EAI_NODATA;
+		error = EAI_NONAME;
 		goto free;
 	case NS_SUCCESS:
 		error = 0;
@@ -2477,7 +2477,7 @@ explore_fqdn(pai, hostname, servname, res)
 			error = EAI_FAIL;	/*XXX strange */
 			break;
 		case HOST_NOT_FOUND:
-			error = EAI_NODATA;
+			error = EAI_NONAME;
 			break;
 		case TRY_AGAIN:
 			error = EAI_AGAIN;
@@ -2489,7 +2489,7 @@ explore_fqdn(pai, hostname, servname, res)
 #if NO_ADDRESS != NO_DATA
 		case NO_ADDRESS:
 #endif
-			error = EAI_NODATA;
+			error = EAI_NONAME;
 			break;
 		default:			/* unknown ones */
 			error = EAI_FAIL;
@@ -3421,11 +3421,11 @@ explore_fqdn(pai, hostname, servname, res)
 			break;
 		case HOST_NOT_FOUND:
 		case NO_DATA:
-			error = EAI_NODATA;
+			error = EAI_NONAME;
 			break;
 		default:
 		case NETDB_SUCCESS: /* should be impossible... */
-			error = EAI_NODATA;
+			error = EAI_NONAME;
 			break;
 		}
 		goto free;
@@ -3972,7 +3972,7 @@ _dns_getaddrinfo(pai, hostname, res)
 		return EAI_FAIL;
 	}
 	if (res_searchN(hostname, &q) < 0)
-		return EAI_NODATA;
+		return EAI_NONAME;
 	ai = getanswer(&buf, q.n, q.name, q.qtype, pai);
 	if (ai) {
 		cur->ai_next = ai;
@@ -3987,7 +3987,7 @@ _dns_getaddrinfo(pai, hostname, res)
 	if (sentinel.ai_next == NULL)
 		switch (h_errno) {
 		case HOST_NOT_FOUND:
-			return EAI_NODATA;
+			return EAI_NONAME;
 		case TRY_AGAIN:
 			return EAI_AGAIN;
 		default:
@@ -4097,7 +4097,7 @@ _files_getaddrinfo(pai, hostname, res)
 	fclose(hostf);
 
 	if (!sentinel.ai_next)
-		return EAI_NODATA;
+		return EAI_NONAME;
 
 	*res = sentinel.ai_next;
 	return 0;
@@ -4124,7 +4124,7 @@ _nis_getaddrinfo(pai, hostname, res)
 
 	af = (pai->ai_family == AF_UNSPEC) ? AF_INET : pai->ai_family;
 	if (af != AF_INET)
-		return (EAI_ADDRFAMILY);
+		return (EAI_FAMILY);
 
 	if ((hp = _gethostbynisname(hostname, af)) == NULL) {
 		switch (errno) {
