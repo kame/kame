@@ -35,6 +35,8 @@
 #include <sys/kernel.h>
 #ifdef __bsdi__
 #include <crypto/md5.h>
+#elif defined(__OpenBSD__)
+#include <sys/md5k.h>
 #else
 #include <sys/md5.h>
 #endif
