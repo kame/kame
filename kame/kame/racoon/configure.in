@@ -181,6 +181,10 @@ if test "$ipv6" = "yes"; then
 yes
 #endif],
 				[ipv6type=$i;
+				ipv6lib=inet6;
+				ipseclib=ipsec;
+				ipv6libdir=/usr/lib;
+				ipv6trylibc=yes
 				CPPFLAGS="-DINET6 $CPPFLAGS"])
 			;;
 		kame)

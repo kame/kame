@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: session.c,v 1.2 1999/10/20 15:06:09 sakane Exp $ */
+/* YIPS @(#)$Id: session.c,v 1.3 1999/10/21 06:12:05 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -72,7 +72,7 @@ static int sigreq = 0;
 int session(void)
 {
 	static fd_set mask0;
-	int nfds;
+	int nfds = 0;
 	fd_set rfds;
 	struct timeval timeout, *tm;
 	int num = 0;	/* number of entry in schedule */

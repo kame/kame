@@ -7,7 +7,9 @@
 #include <net/route.h>
 
 #include <netinet/in.h>
+#ifndef IPV6_INRIA_VERSION
 #include <netinet6/in6.h>
+#endif
 
 #include <netkey/keydb.h>
 #include <netkey/key_var.h>

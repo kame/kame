@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: misc.c,v 1.7 1999/10/20 11:50:22 sakane Exp $ */
+/* YIPS @(#)$Id: misc.c,v 1.8 1999/10/21 06:12:05 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -35,8 +35,17 @@
 #include <sys/uio.h>
 
 #include <netinet/in.h>
+#ifdef IPV6_INRIA_VERSION
+#include <sys/mbuf.h>
+#include <sys/queue.h>
+#include <net/radix.h>
+#include <net/route.h>
+#include <netinet/ipsec.h>
+#define IPV6_RECVDSTADDR IP_RECVDSTADDR
+#else
 #include <netinet6/in6.h>
 #include <netinet6/ipsec.h>
+#endif
 
 #include <netkey/keydb.h>
 #include <netkey/key_var.h>
@@ -540,7 +549,7 @@ sendfromto(s, buf, buflen, src, dst)
 	}
 
 	switch (src->sa_family) {
-#if defined(INET6) && defined(ADVAPI)
+#if defined(INET6) && defined(ADVAPI) && !defined(IPV6_INRIA_VERSION)
 	case AF_INET6:
 	    {
 		struct msghdr m;
@@ -566,6 +575,7 @@ sendfromto(s, buf, buflen, src, dst)
 		/* flowinfo for IKE?  mmm, maybe useful but for now make it 0 */
 		src6.sin6_flowinfo = dst6.sin6_flowinfo = 0;
 
+		memset(&m, 0, sizeof(m));
 		m.msg_name = (caddr_t)&dst6;
 		m.msg_namelen = sizeof(dst6);
 		iov[0].iov_base = (char *)buf;

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.4 1999/09/06 18:10:29 itojun Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.5 1999/10/21 06:12:04 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -41,7 +41,12 @@
 #include <netkey/key_var.h>
 
 #include <netinet/in.h>
+#ifdef IPV6_INRIA_VERSION
+#include <sys/queue.h>
+#include <netinet/ipsec.h>
+#else
 #include <netinet6/ipsec.h>
+#endif
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -333,8 +338,13 @@ isakmp_open()
 #ifdef INET6
 		case AF_INET6:
 #ifdef ADVAPI
+#ifdef IPV6_INRIA_VERSION
+			if (setsockopt(p->sock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
+					(void *)&tmp, sizeof(tmp)) < 0)
+#else
 			if (setsockopt(p->sock, IPPROTO_IPV6, IPV6_PKTINFO,
 					(void *)&tmp, sizeof(tmp)) < 0)
+#endif
 #else
 			if (setsockopt(p->sock, IPPROTO_IPV6, IPV6_RECVDSTADDR,
 					(void *)&tmp, sizeof(tmp)) < 0)
@@ -1490,7 +1500,9 @@ grab_myaddrs()
 	struct ifreq *ifr, *ifr_end;
 	struct myaddrs *p;
 #ifdef INET6
+#ifdef __KAME__
 	struct sockaddr_in6 *sin6;
+#endif
 #endif
 
 	maxif = if_maxindex() + 1;

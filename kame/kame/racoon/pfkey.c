@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.4 1999/09/01 05:39:40 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.5 1999/10/21 06:12:05 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -40,7 +40,11 @@
 #include <netkey/key_debug.h>
 
 #include <netinet/in.h>
+#ifdef IPV6_INRIA_VERSION
+#include <netinet/ipsec.h>
+#else
 #include <netinet6/ipsec.h>
+#endif
 
 #include <stdlib.h>
 #include <string.h>
@@ -598,6 +602,7 @@ struct pfkey_st *pfkey_new_pst(
 	pst->ul_proto = ul_proto;
 	pst->spi = 0;
 	pst->spi_p = 0;
+	pst->mode = IPSECDOI_ATTR_ENC_MODE_DEFAULT;
 
 	/* get src address */
 	GET_NEWBUF(pst->src, struct sockaddr *, src, src->sa_len);

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.4 1999/09/01 05:39:38 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.5 1999/10/21 06:12:05 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -36,9 +36,13 @@
 #include <net/pfkeyv2.h>
 #include <netkey/keydb.h>
 #include <netkey/key_var.h>
-#include <netinet6/ipsec.h>
-
 #include <netinet/in.h>
+#ifdef IPV6_INRIA_VERSION
+#include <sys/queue.h>
+#include <netinet/ipsec.h>
+#else
+#include <netinet6/ipsec.h>
+#endif
 
 #include <stdlib.h>
 #include <stdio.h>

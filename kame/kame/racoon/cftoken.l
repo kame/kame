@@ -3,7 +3,9 @@
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#ifndef IPV6_INRIA_VERSION
 #include <netinet6/in6.h>
+#endif
 
 #include <stdlib.h>
 #include <limits.h>

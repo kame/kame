@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.2 1999/09/01 05:39:36 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.3 1999/10/21 06:12:04 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -36,7 +36,7 @@
 #include <netkey/key_var.h>
 
 #include <netinet/in.h>
-#if INET6
+#if INET6 && !defined(IPV6_INRIA_VERSION)
 #include <netinet6/in6.h>
 #endif
 
