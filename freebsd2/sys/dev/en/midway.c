@@ -1322,9 +1322,6 @@ caddr_t data;
 			error = EAFNOSUPPORT;
 			break;
 		}
-#else
-		error = EINVAL;
-#endif
 		break;
 
 	case SIOCGPVCSIF:
