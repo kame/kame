@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.13 2000/06/22 20:58:26 itojun Exp $	*/
+/*	$KAME: route6.c,v 1.14 2000/06/23 07:04:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -84,7 +84,14 @@ route6_input(mp, offp, proto)
 
 	switch(rh->ip6r_type) {
 	 case IPV6_RTHDR_TYPE_0:
-		 /* XXX the code chokes with ip6r_segleft > 127 */
+		/*
+		 * note about option length:
+		 * maximum rhlen: 2048
+		 * max mbuf m_pulldown can handle: MCLBYTES = usually 2048 
+		 * so, here we are assuming that m_pulldown can handle
+		 * rhlen = 2048 case.  this may not be a good thing to
+		 * assume - we may want to avoid pulling it up altogether.
+		 */
 		 rhlen = (rh->ip6r_len + 1) << 3;
 #ifndef PULLDOWN_TEST
 		 IP6_EXTHDR_CHECK(m, off, rhlen, IPPROTO_DONE);
