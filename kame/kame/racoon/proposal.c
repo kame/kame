@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.28 2001/02/22 00:59:03 sakane Exp $	*/
+/*	$KAME: proposal.c,v 1.29 2001/03/23 01:14:52 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -998,7 +998,7 @@ set_proposal_from_policy(iph2, sp_in, sp_out)
 		if (pr || req) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				"There is a difference "
-				"between the in/out bound policies.\n");
+				"between the in/out bound policies in SPD.\n");
 			goto err;
 		}
 	}
