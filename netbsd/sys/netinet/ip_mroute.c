@@ -1785,7 +1785,7 @@ tbf_send_packet(vifp, m)
 		(void)ipsec_setsocket(m, NULL);
 #endif
 		ip_output(m, (struct mbuf *)0, &vifp->v_route,
-			  IP_FORWARDING, (struct ip_moptions *)0);
+		    IP_FORWARDING, (struct ip_moptions *)0);
 	} else {
 		/* if physical interface option, extract the options and then send */
 		struct ip_moptions imo;
@@ -1802,7 +1802,7 @@ tbf_send_packet(vifp, m)
 		(void)ipsec_setsocket(m, NULL);
 #endif
 		error = ip_output(m, (struct mbuf *)0, (struct route *)0,
-				  IP_FORWARDING|IP_MULTICASTOPTS, &imo);
+		    IP_FORWARDING|IP_MULTICASTOPTS, &imo);
 
 		if (mrtdebug & DEBUG_XMIT)
 			log(LOG_DEBUG, "phyint_send on vif %ld err %d\n",
