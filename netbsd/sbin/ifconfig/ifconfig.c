@@ -1810,7 +1810,9 @@ in6_getaddr(s, which)
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET6;
 	hints.ai_socktype = SOCK_DGRAM;
+#if 0
 	hints.ai_flags = AI_NUMERICHOST;
+#endif
 	error = getaddrinfo(s, "0", &hints, &res);
 	if (error)
 		errx(1, "%s: %s", s, gai_strerror(error));
