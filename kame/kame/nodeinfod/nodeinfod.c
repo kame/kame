@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.17 2001/10/24 04:40:19 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.18 2001/10/24 06:54:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -924,11 +924,13 @@ ni6_addrs(ni6, p, buf, buflen, sa, salen, subj, af)
 				}
 			}
 			break;
+		case ICMP6_NI_SUBJ_FQDN:
+			/* there's no concept of "interface" in hostname */
+			ifname = NULL;
+			break;
+		case ICMP6_NI_SUBJ_IPV4:
+			goto fail; /* not yet */
 		default:
-			/*
-			 * XXX: we only support IPv6 subject address for
-			 * this Qtype.
-			 */
 			goto fail;
 		}
 	} else
