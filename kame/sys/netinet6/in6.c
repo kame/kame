@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.239 2001/09/26 12:05:30 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.240 2001/10/11 08:17:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -514,13 +514,10 @@ in6_control(so, cmd, data, ifp)
 		if (!privileged)
 			return(EPERM);
 		return(scope6_set(ifp, ifr->ifr_ifru.ifru_scope_id));
-		break;
 	case SIOCGSCOPE6:
 		return(scope6_get(ifp, ifr->ifr_ifru.ifru_scope_id));
-		break;
 	case SIOCGSCOPE6DEF:
 		return(scope6_get_default(ifr->ifr_ifru.ifru_scope_id));
-		break;
 	}
 
 	switch (cmd) {
