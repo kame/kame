@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.351 2003/08/06 23:37:28 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.352 2003/08/06 23:40:33 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1231,7 +1231,9 @@ mapped address or not.  This adds many twists:
 - By enabling kernel support for IPv4 mapped address (outgoing direction),
   servers on the kernel can be hosed by IPv6 native packet that has IPv4
   mapped address in IPv6 header source, and can generate unwanted IPv4 packets.
-  draft-itojun-ipv6-transition-abuse-01.txt talks more about this scenario.
+  draft-itojun-ipv6-transition-abuse-01.txt, draft-cmetz-v6ops-v4mapped-api-
+  harmful-00.txt, and draft-itojun-v6ops-v4mapped-harmful-01.txt
+  has more on this scenario.
 
 Due to the above twists, some of KAME userland programs has restrictions on
 the use of IPv4 mapped addresses:
@@ -1363,7 +1365,9 @@ KAME kernel will reject packets with certain source/dstination address in IPv6
 base header, or IPv6 routing header.  Also, KAME default configuration file
 is written carefully, to avoid those attacks.
 
-draft-itojun-ipv6-transition-abuse-01.txt talks about more about this.
+draft-itojun-ipv6-transition-abuse-01.txt, draft-cmetz-v6ops-v4mapped-api-
+harmful-00.txt and draft-itojun-v6ops-v4mapped-harmful-01.txt has more on
+this issue.
 
 1.15 Node's required addresses
 
