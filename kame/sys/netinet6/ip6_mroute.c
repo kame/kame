@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.106 2003/10/31 08:45:32 ono Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.107 2003/11/05 17:43:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1239,7 +1239,7 @@ ip6_mforward(ip6, ifp, m)
 	 * source. It was discussed in July 2000, on ipngwg mailing list.
 	 * This is rather more serious than unicast cases, because some
 	 * MLD packets can be sent with the unspecified source address
-	 * (although such packets must normally set 1 to the hop limit field).
+	 * (although such packets must normally set the hop limit field to 1).
 	 */
 	if (IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src)) {
 		ip6stat.ip6s_cantforward++;
