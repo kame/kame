@@ -58,7 +58,7 @@
 # Questions concerning this software should be directed to 
 # Kurt Windisch (kurtw@antc.uoregon.edu)
 #
-# $Id: Makefile,v 1.1 2000/04/21 09:55:50 itojun Exp $
+# $Id: Makefile,v 1.2 2003/09/23 11:12:41 itojun Exp $
 #
 #
 #Part of this program has been derived from PIM sparse-mode pimd.
@@ -82,7 +82,6 @@ SRCS=	mld6.c mld6_proto.c\
 	route.c vif.c timer.c mrt.c pim6.c pim6_proto.c trace.c
 
 CFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -DUSE_RFC2292BIS -I${SRCDIR}
-CFLAGS+=-DHAVE_GETIFADDRS
 LDADD+=	-L${.OBJDIR}/../../lib/libinet6 \
 	-L/usr/local/v6/lib -linet6
 DPADD+= ${.OBJDIR}/../../lib/libinet6/libinet6.a \
