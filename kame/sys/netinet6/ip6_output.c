@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.380 2003/06/30 05:39:29 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.381 2003/07/01 02:54:28 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1993,7 +1993,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 {
 	int privileged, optdatalen, uproto;
 	void *optdata;
-	struct ip6_recvpktopts *rcvopts;
 #if defined(IPSEC) && defined(__OpenBSD__)
 	struct proc *p = curproc; /* XXX */
 	struct tdb *tdb;
@@ -2050,7 +2049,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 	privileged = (in6p->in6p_socket->so_state & SS_PRIV);
 #endif
 	uproto = (int)so->so_proto->pr_protocol;
-	rcvopts = in6p->in6p_inputopts;
 
 	if (level == IPPROTO_IPV6) {
 		switch (op) {
