@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.40 2004/04/18 15:03:13 suz Exp $	*/
+/*	$KAME: vif.c,v 1.41 2004/06/09 16:24:13 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -382,35 +382,33 @@ void start_vif (mifi_t vifi)
  */ 
 
 
-void stop_vif( mifi_t vifi )
+void
+stop_vif(mifi_t vifi)
 {
 	struct uvif *v;
 	struct listaddr *a;
 	register pim_nbr_entry_t *n;
-	register pim_nbr_entry_t *next;
+	register pim_nbr_entry_t *next
 	struct vif_acl *acl;
-
  
 	/*
 	 * TODO: make sure that the kernel viftable is
 	 * consistent with the daemon table
 	 */
+	v = &uvifs[vifi];
+	if (!(v->uv_flags & MIFF_REGISTER)) {
+		k_leave(mld6_socket, &allpim6routers_group.sin6_addr,
+			v->uv_ifindex);
+		k_leave(mld6_socket, &allrouters_group.sin6_addr,
+			v->uv_ifindex);
 
-	v=&uvifs[vifi];
-	if( !( v->uv_flags&MIFF_REGISTER ) )
-	{
-		k_leave( mld6_socket , &allpim6routers_group.sin6_addr , v->uv_ifindex );
-		k_leave( mld6_socket , &allrouters_group.sin6_addr , v->uv_ifindex );
-
-    /*
-     * Discard all group addresses.  (No need to tell kernel;
-     * the k_del_vif() call will clean up kernel state.)
-     */
-
-		while( v->uv_groups!=NULL )
-		{
-			a=v->uv_groups;
-			v->uv_groups=a->al_next;
+		/*
+		 * Discard all group addresses.  (No need to tell kernel;
+		 * the k_del_vif() call will clean up kernel state.)
+		 */
+		while (v->uv_groups != NULL) {
+			a = v->uv_groups;
+			v->uv_groups = a->al_next;
 
 			/* reset all the timers */
 			if (a->al_query) {
@@ -444,22 +442,19 @@ void stop_vif( mifi_t vifi )
 	/*
 	 * Delete the interface from the kernel's vif structure.
 	 */
-
-	k_del_vif( mld6_socket , vifi );
-	v->uv_flags=(v->uv_flags & ~VIFF_DR & ~VIFF_QUERIER & ~VIFF_NONBRS) | VIFF_DOWN;
-	if( !(v->uv_flags & MIFF_REGISTER ))
-	{
+	k_del_vif(mld6_socket, vifi);
+	v->uv_flags = (v->uv_flags & ~VIFF_DR & ~VIFF_QUERIER & ~VIFF_NONBRS) | VIFF_DOWN;
+	if (!(v->uv_flags & MIFF_REGISTER)) {
 		RESET_TIMER(v->uv_pim_hello_timer);
 		RESET_TIMER(v->uv_jp_timer);
 		RESET_TIMER(v->uv_gq_timer);
 
-		for( n=v->uv_pim_neighbors ; n!=NULL ; n = next )
-		{
+		for (n = v->uv_pim_neighbors; n != NULL; n = next) {
 			/* Free the space for each neighbour */
-			next=n->next;
+			next = n->next;
 			delete_pim6_nbr(n);
 		}
-		v->uv_pim_neighbors=NULL;
+		v->uv_pim_neighbors = NULL;
 	}
 	if (v->uv_querier != NULL) {
 	    free(v->uv_querier);
@@ -477,22 +472,19 @@ void stop_vif( mifi_t vifi )
 	v->uv_addrs = NULL;
 	v->uv_linklocal = NULL; /* uv_linklocal must be in uv_addrs */
 
-
-	
 	/* TODO: currently not used */
 	/* The Access Control List (list with the scoped addresses) */
-
-	while( v->uv_acl!=NULL )
-	{
-		acl=v->uv_acl;
-		v->uv_acl=acl->acl_next;
+	while (v->uv_acl != NULL) {
+		acl = v->uv_acl;
+		v->uv_acl = acl->acl_next;
 		free((char *)acl);
 	}
 
-	vifs_down=TRUE;
+	vifs_down = TRUE;
 
 	IF_DEBUG(DEBUG_IF)
-		log_msg( LOG_DEBUG ,0,"%s goes down , vif #%u out of service" , v->uv_name , vifi);
+		log_msg(LOG_DEBUG, 0, "%s goes down, vif #%u out of service",
+			v->uv_name, vifi);
 }
 
 /*
