@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.h,v 1.33 2000/07/24 00:21:40 itojun Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.34 2000/08/15 07:42:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -91,7 +91,7 @@ struct	in6pcb {
 	u_int32_t in6p_flowinfo;	/* priority and flowlabel */
 	struct	socket *in6p_socket;	/* back pointer to socket */
 	caddr_t	in6p_ppcb;		/* pointer to per-protocol pcb */
-#if defined(NEW_STRUCT_ROUTE) || defined(__NetBSD__)
+#if defined(NEW_STRUCT_ROUTE) || defined(__NetBSD__) || defined(__FreeBSD__)
 	struct	route in6p_route;	/* placeholder for routing entry */
 #else
 	struct	route_in6 in6p_route;	/* placeholder for routing entry */
@@ -175,7 +175,7 @@ void	in6_setpeeraddr __P((struct in6pcb *, struct mbuf *));
 void	in6_setsockaddr __P((struct in6pcb *, struct mbuf *));
 
 /* in in6_src.c */
-#if defined(NEW_STRUCT_ROUTE) || defined(__NetBSD__)
+#if defined(NEW_STRUCT_ROUTE) || defined(__NetBSD__) || defined(__FreeBSD__)
 struct 	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
 				     struct ip6_pktopts *,
 				     struct ip6_moptions *,
