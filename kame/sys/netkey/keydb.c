@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.27 1999/11/17 14:10:25 sakane Exp $ */
+/* KAME $Id: keydb.c,v 1.28 1999/11/29 18:05:55 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -122,7 +122,11 @@ struct key_cb key_cb;
 
 /* search order for SAs */
 static u_int saorder_state_valid[] = {
-	SADB_SASTATE_MATURE, SADB_SASTATE_DYING
+	SADB_SASTATE_DYING, SADB_SASTATE_MATURE,
+	/*
+	 * This order is important because we must select a oldest SA
+	 * for outbound processing.  For inbound, This is not important.
+	 */
 };
 static u_int saorder_state_alive[] = {
 	/* except DEAD */
@@ -177,6 +181,16 @@ typedef void (timeout_t)(void *);
 	for (elm = LIST_FIRST(head); elm; elm = LIST_NEXT(elm, field))
 #define __LIST_CHAINED(elm) \
 	(!((elm)->chain.le_next == NULL && (elm)->chain.le_prev == NULL))
+#define LIST_INSERT_TAIL(head, elm, type, field) do {\
+	struct type *curelm = LIST_FIRST(head); \
+	if (curelm == NULL) {\
+		LIST_INSERT_HEAD(head, elm, field); \
+	} else { \
+		while (LIST_NEXT(curelm, field)) \
+			curelm = LIST_NEXT(curelm, field);\
+		LIST_INSERT_AFTER(curelm, elm, field);\
+	}\
+} while (0)
 
 #define KEY_CHKSASTATE(head, sav, name) {                                    \
 	if ((head) != (sav)) {                                               \
@@ -404,6 +418,7 @@ found:
 }
 
 /*
+ * allocating a SA entry for a *OUTBOUND* packet.
  * checking each request entries in SP, and acquire SA if need.
  * OUT:	0: there are valid requests.
  *	ENOENT: policy may be valid, but SA with REQUIRE is on acquiring.
@@ -434,21 +449,14 @@ key_checkrequest(isr, saidx)
 	level = ipsec_get_reqlevel(isr);
 
 	/*
-	 * We don't allocate new SA if the state of SA in the holder is
-	 * SADB_SASTATE_MATURE, and if this is newer one.
+	 * We do allocate new SA only if the state of SA in the holder is
+	 * SADB_SASTATE_DEAD.  The SA for outbound must be the oldest.
 	 */
 	if (isr->sav != NULL) {
-		/*
-		 * XXX While SA is hanging on policy request(isr), its refcnt
-		 * can not be zero.  So isr->sav->sah is valid pointer if
-		 * isr->sav != NULL.  But that may not be true in fact.
-		 * There may be missunderstanding by myself.  Anyway I set
-		 * zero to isr->sav->sah when isr->sav is flushed.
-		 * I must check to have conviction this issue.
-		 */
-		if (isr->sav->sah != NULL
-		 && isr->sav != (struct secasvar *)LIST_FIRST(
-			    &isr->sav->sah->savtree[SADB_SASTATE_MATURE])) {
+		if (isr->sav->sah == NULL)
+			panic("key_checkrequest: sah is null.\n");
+		if (isr->sav == (struct secasvar *)LIST_FIRST(
+			    &isr->sav->sah->savtree[SADB_SASTATE_DEAD])) {
 			KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 				printf("DP checkrequest calls free SA:%p\n",
 					isr->sav));
@@ -547,15 +555,12 @@ key_do_allocsa_policy(sah, state)
 		/* Which SA is the better ? */
 
 		/* sanity check 2 */
-		if (candidate->lft_c == NULL || sav->lft_c == NULL) {
-			/*XXX do panic ? */
-			printf("key_do_allocsa_policy: "
+		if (candidate->lft_c == NULL || sav->lft_c == NULL)
+			panic("key_do_allocsa_policy: "
 				"lifetime_current is NULL.\n");
-			continue;
-		}
 
 		/* XXX What the best method is to compare ? */
-		if (candidate->lft_c->sadb_lifetime_addtime <
+		if (candidate->lft_c->sadb_lifetime_addtime >
 				sav->lft_c->sadb_lifetime_addtime) {
 			candidate = sav;
 			continue;
@@ -1669,6 +1674,7 @@ key_delsah(sah)
 	struct secasvar *sav, *nextsav;
 	u_int stateidx, state;
 	int s;
+	int zonbie = 0;
 
 	/* sanity check */
 	if (sah == NULL)
@@ -1679,10 +1685,6 @@ key_delsah(sah)
 #else
 	s = splnet();	/*called from softclock()*/
 #endif
-
-	/* remove from tree of SA index */
-	if (__LIST_CHAINED(sah))
-		LIST_REMOVE(sah, chain);
 
 	/* searching all SA registerd in the secindex. */
 	for (stateidx = 0;
@@ -1696,26 +1698,37 @@ key_delsah(sah)
 
 			nextsav = LIST_NEXT(sav, chain);
 
+			if (sav->refcnt > 1) {
+				/* give up to delete this sa */
+				zonbie++;
+				continue;
+			}
+
 			/* sanity check */
 			KEY_CHKSASTATE(state, sav->state, "key_delsah");
 
+			key_freesav(sav);
+
 			/* remove back pointer */
 			sav->sah = NULL;
-
-			if (sav->refcnt < 0) {
-				printf("key_delsah: why refcnt < 0 ?, "
-					"sav->refcnt=%d\n",
-					sav->refcnt);
-			}
-			key_freesav(sav);
 			sav = NULL;
 		}
+	}
+
+	/* don't delete sah only if there are savs. */
+	if (zonbie) {
+		splx(s);
+		return;
 	}
 
 	if (sah->sa_route.ro_rt) {
 		RTFREE(sah->sa_route.ro_rt);
 		sah->sa_route.ro_rt = (struct rtentry *)NULL;
 	}
+
+	/* remove from tree of SA index */
+	if (__LIST_CHAINED(sah))
+		LIST_REMOVE(sah, chain);
 
 	KFREE(sah);
 
@@ -1800,7 +1813,8 @@ key_newsav(mhp, sah)
 	newsav->sah = sah;
 	newsav->refcnt = 1;
 	newsav->state = SADB_SASTATE_LARVAL;
-	LIST_INSERT_HEAD(&sah->savtree[SADB_SASTATE_LARVAL], newsav, chain);
+	LIST_INSERT_TAIL(&sah->savtree[SADB_SASTATE_LARVAL], newsav,
+			secasvar, chain);
 
 	return newsav;
 }
@@ -1816,7 +1830,8 @@ key_delsav(sav)
 	if (sav == NULL)
 		panic("key_delsav: NULL pointer is passed.\n");
 
-	if (sav->refcnt > 0) return; /* can't free */
+	if (sav->refcnt > 0)
+		return;		/* can't free */
 
 	/* remove from SA header */
 	if (__LIST_CHAINED(sav))
@@ -1846,12 +1861,6 @@ key_delsav(sav)
 		KFREE(sav->misc2);
 	if (sav->misc3 != NULL)
 		KFREE(sav->misc3);
-#endif
-
-#if 0
-	sav->sah = NULL;
-		/* XXX for making sure.  See key_checkrequest(),
-		 * Refcnt may be suspicious. */
 #endif
 
 	KFREE(sav);
@@ -4601,7 +4610,6 @@ key_acquire2(mhp)
 
 	msg0->sadb_msg_errno = key_acquire(&saidx, NULL);
 	if (msg0->sadb_msg_errno != 0) {
-		/* XXX What I do ? */
 		printf("key_acquire2: error %d returned "
 			"from key_acquire.\n", msg0->sadb_msg_errno);
 		return NULL;

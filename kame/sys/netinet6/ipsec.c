@@ -2454,9 +2454,15 @@ ipsec4_output(state, sp, flags)
 			}
 		}
 
+		/*
+		 * If there is no valid SA, we give up to process any
+		 * more.  In such a case, the SA's status is changed
+		 * from DYING to DEAD after allocating.  If a packet
+		 * send to the receiver by dead SA, the receiver can
+		 * not decode a packet because SA has been dead.
+		 */
 		if (isr->sav->state != SADB_SASTATE_MATURE
 		 && isr->sav->state != SADB_SASTATE_DYING) {
-			/* If there is no valid SA, we give up to process. */
 			ipsecstat.out_nosa++;
 			error = EINVAL;
 			goto bad;
@@ -2679,9 +2685,12 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 			}
 		}
 
+		/*
+		 * If there is no valid SA, we give up to process.
+		 * see same place at ipsec4_output().
+		 */
 		if (isr->sav->state != SADB_SASTATE_MATURE
 		 && isr->sav->state != SADB_SASTATE_DYING) {
-			/* If there is no valid SA, we give up to process. */
 			ipsec6stat.out_nosa++;
 			error = EINVAL;
 			goto bad;
@@ -2802,9 +2811,12 @@ ipsec6_output_tunnel(state, sp, flags)
 			}
 		}
 
+		/*
+		 * If there is no valid SA, we give up to process.
+		 * see same place at ipsec4_output().
+		 */
 		if (isr->sav->state != SADB_SASTATE_MATURE
 		 && isr->sav->state != SADB_SASTATE_DYING) {
-			/* If there is no valid SA, we give up to process. */
 			ipsec6stat.out_nosa++;
 			error = EINVAL;
 			goto bad;
