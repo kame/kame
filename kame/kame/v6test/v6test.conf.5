@@ -1,0 +1,523 @@
+.\"	$KAME: v6test.conf.5,v 1.1 2001/04/04 05:11:55 suz Exp $
+.\"
+.\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd Mar 27, 2001
+.Dt V6TEST.CONF 5
+.Os KAME
+.Sh NAME
+.Nm v6test.conf
+.Nd config file for v6test
+.Sh DESCRIPTION
+This file describes the configuration file format for 
+.Xr v6test 1 ,
+an IPv6 testing tool to generate artibitrary IPv6 packets.
+It declares test entries to be specified in the argument of
+.Xr v6test.
+.Pp
+It obeys the famous
+.Xr termcap 5
+file format.
+Each line in the file describes a test entry.
+Fields are separated by a colon
+.Pq Sq \&: ,
+and each field corresponds to an test block to construct the entry.
+Lines may be concatenated by the
+.Sq \e
+character.
+The comment marker is the
+.Sq \&#
+character.
+.Pp
+.Sh ENTRIES
+Entries describe the elements of packets to be sent and control
+.Xr v6test 1
+behavior.
+The name of entries should begin with either of the following keywords,
+except for the entries to be specified in the arguments of
+.Xr v6test 1 .
+Their name determines their properties to be specified.
+
+\fBinterval ether ip6 hbh icmp6echorpl icmp6echo icmp6err rtsol rtadvd nsol nadv redirect frghdr dstopt tcp udp\fR
+
+.Pp
+Every description begins with phrases regarding its argument. Its meanings are
+listed below.
+.Bl -tag -width addressx -compact
+.It Ar num
+number.
+.It Ar text
+string quoted by \&"
+.Pq double quote .
+.It Ar entry
+other entries.
+.It Ar auto
+you can special keyword
+.Ic auto
+(not quote it by \&") to use the correct value judging from the context.
+.It Ar optional
+not necessary.
+.It Ar hex
+a sequence of hexadecimal values (XX, where X=0-9, A-F), to declare octet sequence.
+.El
+
+.Pp
+.Bl -tag -width indent
+.It \&other than the following keywords
+Specifies a packet concaticating each of them in the specified order.
+
+.Pp
+.It Cm \&interval \fI(num)\fR
+Just waits for the specified time (unit: millisecond).
+
+.Pp
+.It Cm \&ether \fI(entry)\fR
+Ethernet header. Packet type is always 0x8600 (IPv6). Following entries should be specified.
+.Bl -tag -width indent -compact
+.It Cm \&edst \fI(text, optional)\fR
+Ethernet destination address
+.It Cm \&esrc \fI(text, optional)\fR
+Ethernet source address
+.El
+
+.Pp
+.It Cm \&ip \fI(entry)\fR
+Specify IPv6 basic header. The following entries should be specified.
+.Bl -tag -width indent -compact
+.It Cm \&ip6_ver \fI(num, optional)\fR
+IPv6 version field. If not specified, 6 is assumed.
+.It Cm \&ip6_tc \fI(num, optional)\fR
+IPv6 traffic class field. If not specified, 0 is assumed.
+.It Cm \&ip6_flow \fI(num)\fR
+IPv6 Flow ID field.
+.It Cm \&ip6_plen \fI(num, auto)\fR
+IPv6 Payload length field.
+.It Cm \&ip6_nxt \fI(num, auto)\fR
+IPv6 Next Header field. 
+.It Cm \&ip6_hlim \fI(num, optinal)\fR
+IPv6 HopLimit field. If not specified, 64 is assumed.
+.It Cm \&ip6_src \fI(text)\fR
+IPv6 source address. You can override it by \fB-s\fR option of
+.Xr v6test 1
+.It Cm \&ip6_dst \fI(text)\fR
+IPv6 destination address. You can override it by \fB-d\fR
+option of
+.Xr v6test 1
+.El
+
+.Pp
+.It Cm \&hbh \fI(entry)\fR
+IPv6 hop-by-hop option header.  The following entries should be specified.
+.Bl -tag -width indent -compact
+.It Cm \&hbh_nxt \fI(num, auto)\fR
+Next Header field.
+.It Cm \&hbh_len \fI(num)\fR
+option length field
+.It Cm \&hbh_opts \fI(entry)\fR
+option data. Following entry can be specified.
+.Bl -tag -width indent -compact
+.It Cm \&pad1 \fI(no arg)\fR
+length-1 padding.
+.It Cm \&padn \fI(entry)\fR
+length-n padding. Its length is specified in the following entries.
+.Bl -tag -width indent -compact
+.It Cm \&padoptlen \fI(num)\fR
+padding length
+.It Cm \&padoptreallen \fI(num, optional)\fR
+Specifies padding length. if not specified, values in
+.Cm \&padoptlen
+is used.
+.El
+.El
+.It Cm \&jumbo \fI(entry)\fR
+jumbo-packet hop-by-hop option.  Following entry should be specified.
+.Bl -tag -width indent -compact
+.It Cm \&jumbo_len \fI(num)\fR
+jumbo-payload length field
+.El
+.It Cm \&unknownopt \fI(text)\fR
+unknown option. Following entries should be specified.
+.Bl -tag -width indent -compact
+.It Cm \&opttype \fI(num)\fR
+option type
+.It Cm \&optlen \fI(num)\fR
+option length
+.El
+.El
+
+.Pp
+.It Cm \&icmp6echo, icmp6echorpl \fI(entry)\fR
+ICMPv6 ECHO and ECHO-REPLY data.  The following entries should be specified.
+.Bl -tag -width indent -compact
+.It Cm \&icmp6_code \fI(num)\fR
+ICMPv6 code
+.It Cm \&icmp6_id \fI(num)\fR
+ICMPv6 identifier
+.It Cm \&icmp6_seq \fI(num)\fR
+ICMPv6 sequence number
+.It Cm \&icmp6_len \fI(num, optional)\fR
+ICMPv6 length field. If not specified, 8 (=sizeof(icmp6 header)) is assumed
+.El
+
+.Pp
+.It Cm \&icmp6err \fI(entry)\fR
+ICMPv6 Error data. The following entries should be specified.
+.Bl -tag -width indent -compact
+.It Cm \&icmp6_type \fI(num)\fR
+ICMPv6 Type field.
+.It Cm \&icmp6_code \fI(num)\fR
+ICMPv6 Code field.
+.It Cm \&icmp6_mtu \fI(num)\fR
+path MTU for ICMPv6 Packet-Too-Big message. Can be specified only when 
+.Ic icmp6_type
+is 
+2 (=ICMP6_PACKET_TOO_BIG).
+.It Cm \&icmp6_param \fI(num)\fR
+pointer for ICMPv6 Parameter Problem message. Can be specified only when 
+.Ic icmp6_type
+is 4 (=ICMP6_PARAM_PROB).
+.El
+
+.Pp
+.It Cm \&rtsol \fI(entry)\fR
+Router-Solicitation message. The following entries should be specified.
+.Bl -tag -width indent -compact
+.It Cm \&rs_code \fI(num, optional)\fR
+RS code field (=ICMPv6 code field). If not specified, 0 is assumed.
+.It Cm \&rs_rsv \fI(num, optional)\fR
+RS Reserved field (=ICMPv6 Data field). If not specified, 0 is assumed.
+.It Cm \&rs_opts \fI(entry)\fR
+ND options. The following entries can be specified.
+.Bl -tag -width indent -compact
+.It Cm \&srclladdr, tgtlladdr \fI(entry, optional)\fR
+Source/Target link-layer address ND option. If not specified, then just omitted.
+.Bl -tag -width indent -compact
+.It Cm \&len \fI(num, optional)\fR
+ND option Length. If omitted, 1 is assumed.
+.It Cm \&lladdr \fI(text)\fR
+Link-layer address.  If not specified, then just omitted.
+.El
+.It Cm \&prefix \fI(entry, optional)\fR
+Prefix option.  If not specified, then just omitted.
+.Bl -tag -width indent -compact
+.It Cm \&len \fI(num, optional)\fR
+ND option Length. If omitted, 4 is assumed.
+.It Cm \&pfxlen \fI(num)\fR
+Prefix length field.
+.It Cm \&lflg \fI(num, optional)\fR
+Onlink flag. If omitted, 0 (off) is assumed.
+.It Cm \&aflg \fI(num, optional)\fR
+Autonomous flag. If omitted, 0 (off) is assumed.
+.It Cm \&vltime \fI(num)\fR
+Valid Lifetime.
+.It Cm \&pltime \fI(num)\fR
+Preferred Lifetime.
+.It Cm \&rsv \fI(num, optional)\fR
+Reserved field in prefix ND option. If omitted, all 0 is assumed.
+.It Cm \&prefix \fI(text)\fR
+Prefix field.
+.El
+.It Cm \&mtu \fI(entry, optional)\fR
+MTU ND option. If not specified, then just omitted.
+.Bl -tag -width indent -compact
+.It Cm \&len \fI(num, optional)\fR
+ND option Length. If omitted, 1 is assumed.
+.It Cm \&rsv \fI(num, optional)\fR
+Reserved field in MTU ND option. If omitted, all 0 is assumed.
+.It Cm \&mtu \fI(num)\fR
+MTU field in MTU ND option.
+.El
+.It Cm \&ndopt \fI(entry, optional)\fR
+Used to configure unknown ND option. 
+.Bl -tag -width indent -compact
+.It Cm \&opttype \fI(num)\fR
+ND option type.
+.It Cm \&optlen \fI(num)\fR
+ND option length.
+.El
+.El
+.El
+
+.Pp
+.It Cm \&rtadvd \fI(entry)\fR
+Router-Advertisement message. The following entries should be speicified.
+.Bl -tag -width indent -compact
+.It Cm \&ra_code \fI(num, optional)\fR
+RA code (=ICMPv6 code). if not specified, 0 is assumed.
+.It Cm \&ra_cksum \fI(num, optional)\fR
+RA checksum(=ICMPv6 checksum). if not specified, 0 is assumed.
+.It Cm \&ra_curhop \fI(num)\fR
+RA curhoplimit
+.It Cm \&ra_flag \fI(num, optional)\fR
+RA flag. If not specified, 0 is assumed.
+.It Cm \&ra_rltime \fI(num)\fR
+RA router-lifetime
+.It Cm \&ra_rtime \fI(num)\fR
+RA router-reachable-time
+.It Cm \&ra_retrans \fI(num)\fR
+RA router-retrans-timer
+.It Cm \&ra_opts \fI(entry)\fR
+ND options.  See 
+.Ic rs_opts
+for detail.
+.El
+
+.Pp
+.It Cm \&nsol \fI(entry)\fR
+Neighbor Solicitation message. The following entries can be spcified.
+.Bl -tag -width indent -compact
+.It Cm \&ns_code \fI(num, optional)\fR
+NS code (=ICMPv6 code). if not specified, 0 is assumed.
+.It Cm \&ns_cksum \fI(num, optional)\fR
+NS checksum (=ICMPv6 checksum). if not specified, 0 is assumed.
+.It Cm \&ns_rsv \fI(num, optional)\fR
+NS reserved field (=ICMPv6 Data field). if not specified, all-0 is assumed.
+.It Cm \&ns_tgt \fI(text, auto)\fR
+NS target field. If "
+.Ic auto
+" is specified, then the destination address is used.
+.It Cm \&ns_opts \fI(entry)\fR
+ND options.  See 
+.Ic rs_opts
+for detail.
+.El
+
+.Pp
+.It Cm \&nadv \fI(entry)\fR
+Neighbor-Advertisement message. The following entries should be specified.
+.Bl -tag -width indent -compact
+.It Cm \&na_code \fI(num, optional)\fR
+NA code (=ICMPv6 code). if not specified, 0 is assumed.
+.It Cm \&na_cksum \fI(num, optional)\fR
+NA checksum (=ICMPv6 checksum). if not specified, 0 is assumed.
+.It Cm \&na_rflg \fI(num, optional)\fR
+NA router-flag. if not specified, 0 (=off) is assumed.
+.It Cm \&na_sflg \fI(num, optional)\fR
+NA solicitated-flag. if not specified, 0 (=off) is assumed.
+.It Cm \&na_oflg \fI(num, optional)\fR
+NS override-flag. if not specified, 0 (=off) is assumed.
+.It Cm \&na_tgt \fI(text)
+NA target field.
+.It Cm \&na_opts \fI(entry)\fR
+ND options.  See 
+.Ic rs_opts
+for detail.
+.El
+
+.Pp
+.It Cm \&redirect \fI(entry)\fR
+Redirect message. The following entries should be specified.
+.Bl -tag -width indent -compact
+.It Cm \&rd_code \fI(num, optional)\fR
+redirect code (=ICMPv6 code). if not specified, 0 is assumed.
+.It Cm \&rd_cksum \fI(num, optional)\fR
+redirect checksum (=ICMPv6 checksum). if not specified, 0 is assumed.
+.It Cm \&rd_rsv \fI(num, optional)\fR
+redirect reserved field (=ICMPv6 Data field). if not specified, all-0 is assumed.
+.It Cm \&rd_tgt \fI(text)\fR
+redirect target address.
+.It Cm \&rd_dst \fI(text)\fR
+redirect destination address.
+.It Cm \&rd_opts \fI(entry)\fR
+See 
+.Ic rs_opts
+for detail.
+.El
+
+.Pp
+.It Cm \&rthdr \fI(entry)\fR
+Routing Header. The following entries should be specified.
+.Bl -tag -width indent -compact
+.It Cm \&rthdr_nxt \fI(num, auto)\fR
+Next Header field.
+.It Cm \&rthdr_len \fI(num, optional)\fR
+Routing Header length. If not specified, it is automatically calculated from the remaining part of this header.
+.It Cm \&rthdr_type \fI(num)\fR
+Routing Header Type field.
+.It Cm \&rthdr_segleft \fI(num)\fR
+Routing Header Left Segment field.
+.It Cm \&rthdr0_hops \fI(num, optional)\fR
+Routing Header Hops field.  Valid only if
+.Ic rthdr_type
+is 0. If not specified, (len - 8)/sizeof(struct ip6_hdr) is assumed.  (where len is the valud in
+.Ic rthdr_len
+, and sizeof(struct ip6_hdr) is 40).
+.El
+
+.Pp
+.It Cm \&frghdr \fI(entry)\fR
+IPv6 fragment header options. The following entries should be specified.
+.Bl -tag -width indent -compact -compact
+.It Cm \&frghdr_next \fI(num, auto)\fR
+Next Header field.
+.It Cm \&frghdr_rsv \fI(num, auto)\fR
+Reserved field. If not specified, 0 will be fulfilled.
+.It Cm \&frghdr_off \fI(num)\fR
+Fragment Offset
+.It Cm \&frghdr_more\fI(num, optional)\fR
+Fragment more flag. If not specified, ON(=1) is assumed.
+.It Cm \&frghdr_id\fI(num, optional)\fR
+Fragment ID. If not specified, 0 is assumed.
+.El
+
+.Pp
+.It Cm \&authhdr \fI(entry)\fR
+Authentication header. The following entries should be specified.
+.Bl -tag -width indent -compact
+.It Cm \&ah_next \fI(num, auto)\fR
+Next Header field.
+.It Cm \&ah_len \fI(num, optional)\fR
+length field. If not specified, 4 is assumned
+.It Cm \&ah_rsv \fI(num, optional)\fR
+reserved field. If not specified, 0 is assumned
+.It Cm \&ah_spi \fI(num)\fR
+SPI field.
+.It Cm \&ah_seq \fI(num)\fR
+sequence field
+.El
+
+.Pp
+.It Cm \&dstopt \fI(entry)\fR
+IPv6 destination option header. The following entries should be specified.
+.Bl -tag -width indent -compact
+.It Cm \&dst_nxt \fI(num, auto)\fR
+Next Header field. 
+.It Cm \&dst_len \fI(num)\fR
+length field
+.It Cm \&dst_opts \fI(entry)\fR
+Specifies entries. Same entries as
+.Ic hbh_opts
+can be specified.
+.El
+
+.Pp
+.It Cm \&tcp \fI(entry)\fR
+TCP message. The following entries should be specified.
+.Bl -tag -width indent -compact
+.It Cm \&tcp_sport \fI(num)\fR
+TCP source port
+.It Cm \&tcp_dport \fI(num)\fR
+TCP destination port
+.It Cm \&tcp_seq \fI(num, optional)\fR
+TCP sequence field. If not specified, 0 is assumed.
+.It Cm \&tcp_ack \fI(num)\fR
+TCP acknowledgement field. If not specified, 0 is assumed.
+.It Cm \&tcp_off \fI(num)\fR
+TCP offset field. If not specified, sizeof(struct tcphdr)/4 is assumed.
+.It Cm \&tcp_flags \fI(num, optional)\fR
+TCP flag. If not specified, 0 is assumed.
+.It Cm \&tcp_win \fI(num, optional)\fR
+TCP window-size field. If not specified, 8192 is specified.
+.It Cm \&tcp_sum \fI(num, optional)\fR
+TCP checksum field. If not specified, 0 is specified.
+.It Cm \&tcp_urp \fI(num, optional)\fR
+TCP urgent flag. If not specified, 0 (=off) is specified.
+.It Cm \&tcp_data \fI(hex)\fR
+TCP data.
+.El
+.Pp
+.It Cm \&udp \fI(entry)\fR
+UDP message. The following entries should be specified.
+.Bl -tag -width indent -compact
+.It Cm \&udp_sport \fI(num)\fR
+UDP source port
+.It Cm \&udp_dport \fI(num)\fR
+UDP destination port
+.It Cm \&udp_len \fI(num, optional)\fR
+UDP length field. If not specified, 8 is assumed.
+.It Cm \&udp_data \fI(hex)\fR
+UDP data.
+.El
+.El
+
+
+.Sh EXAMPLES
+Here's an example to send looped SYN packet. You can generate this packet by
+.Bd -literal
+	v6test -f \fI(config.file)\fR synloop
+.Ed
+command.
+
+.Bd -literal -offset
+############################################
+synloop:\\
+	:ip6:tcp1:
+############################################
+ip6:\\
+        :ip6_flow#0:ip6_plen=auto:ip6_nxt=auto:ip6_hlim#255:\\
+        :ip6_src="fe80::260:97ff:fe47:9ba1":\\
+	:ip6_dst="fe80::260:97ff:fe47:9ba1":
+############################################
+tcp1:\\
+	:tcp_sport#23:tcp_dport#23:tcp_seq#0:tcp_ack#0:tcp_flags#2:
+############################################
+.Ed
+
+Here's another example to send multiple ping packets by
+.Bd -literal
+	 v6test -f \fI(configfile)\fR ping wait500ms ping
+.Ed
+command.
+
+.Bd -literal -offset
+############################################
+# just ping
+ping:\\
+	:ip6:icmp6echo:
+############################################
+# interval timer (msec)
+wait500msec:\\
+	:interval 500:
+############################################
+ip6:\\
+        :ip6_flow#0:ip6_plen=auto:ip6_nxt=auto:ip6_hlim#255:\\
+        :ip6_src="fe80::2a0:24ff:fea8:6cf1":\\
+	:ip6_dst="fe80::260:97ff:fe47:9ba1":
+############################################
+#echo request packet
+icmp6echo:\\
+        :icmp6_type=echo:icmp6_code#0:icmp6_cksum=auto:icmp6_id#0:\\
+	:icmp6_seq#0:
+############################################
+.Ed
+
+.Sh FILES
+.Bl -tag -width Pa -compact
+.It Pa ./v6test.conf
+The default configuration file
+.El
+
+.Sh SEE ALSO
+.Xr termcap 5 ,
+.Xr v6test 1 ,
+.Sh HISTORY
+The
+.Xr v6test
+command first appeared in WIDE Hydrangea IPv6 protocol stack kit.
+.\" .Sh BUGS
+.\" (to be written)
