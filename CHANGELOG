@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.429 2000/01/11 20:14:08 sumikawa Exp $
+$Id: CHANGELOG,v 1.430 2000/01/11 20:31:32 itojun Exp $
 
 <200001>
 Wed Jan 12 05:13:33 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
-	* freebsd3/ports/mrt: Upgrade to 2.1.2a.
+	* freebsd3/ports/mrt, netbsd/pkgsrc/net/mrt: Upgrade to 2.1.2a.
 
 2000-01-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_pcbopt): made the
