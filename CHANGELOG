@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1263 2000/09/10 18:25:09 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1264 2000/09/11 05:54:41 itojun Exp $
 
 <200009>
+Mon Sep 11 14:54:04 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/bind9: use bind 9.0.0rc5.
+
 2000-09-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6sd/pim6_proto.c (receive_pim6_join_prune):
 	improved the algorithm of random delay calculation; the result of
