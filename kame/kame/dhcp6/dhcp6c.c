@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.152 2005/01/30 02:44:05 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.153 2005/02/14 20:35:33 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1564,40 +1564,36 @@ client6_recvadvert(ifp, dh6, len, optinfo)
 	 * The requesting router MUST ignore any Advertise message that
 	 * includes a Status Code option containing the value NoPrefixAvail
 	 * [RFC3633 Section 11.1].
-	 * We only apply this when we are requiring prefixes to be delegated.
+	 * Likewise, the client MUST ignore any Advertise message that includes
+	 * a Status Code option containing the value NoAddrsAvail. 
+	 * [RFC3315 Section 17.1.3].
+	 * We only apply this when we are going to request an address or
+	 * a prefix.
 	 */
 	for (evd = TAILQ_FIRST(&ev->data_list); evd;
 	    evd = TAILQ_NEXT(evd, link)) {
-		if (evd->type == DHCP6_EVDATA_IAPD)
-			break;
-		if (evd->type == DHCP6_EVDATA_IANA)
-			break;
-	}
-	if (evd) {
 		u_int16_t stcode;
-		
-		if (evd->type == DHCP6_EVDATA_IAPD) {
+		char *stcodestr;
+
+		switch (evd->type) {
+		case DHCP6_EVDATA_IAPD:
 			stcode = DH6OPT_STCODE_NOPREFIXAVAIL;
-		} else {
+			stcodestr = "NoPrefixAvail";
+			break;
+		case DHCP6_EVDATA_IANA:
 			stcode = DH6OPT_STCODE_NOADDRAVAIL;
+			stcodestr = "NoAddrAvail";
+			break;
+		default:
+			continue;
 		}
 		if (dhcp6_find_listval(&optinfo->stcode_list,
 		    DHCP6_LISTVAL_STCODE, &stcode, 0)) {
 			dprintf(LOG_INFO, FNAME,
-			    "advertise contains %s status",
-			    evd->type == DHCP6_EVDATA_IAPD ?
-			        "NoPrefixAvail" : "NoAddrAvail");
+			    "advertise contains %s status", stcodestr);
 			return (-1);
 		}
 	}
-
-	/*
-	 * The client MUST ignore any Advertise message that includes a Status
-	 * Code option containing the value NoAddrsAvail.
-	 * [RFC3315 Section 17.1.3].
-	 * XXX: we should not follow this when we do not need addresses!!
-	 */
-	;
 
 	if (ev->state != DHCP6S_SOLICIT ||
 	    (ifp->send_flags & DHCIFF_RAPID_COMMIT)) {
@@ -1606,7 +1602,7 @@ client6_recvadvert(ifp, dh6, len, optinfo)
 		 * Advertise message.  The server should be configured not to
 		 * allow the Rapid Commit option.
 		 * We process the message as if we expected the Advertise.
-		 * [RFC3315 Section 17.1.3]
+		 * [RFC3315 Section 17.1.4]
 		 */
 		dprintf(LOG_INFO, FNAME, "unexpected advertise");
 		/* proceed anyway */
