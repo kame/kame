@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.99 2001/02/06 03:45:16 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.100 2001/02/07 08:25:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -436,7 +436,7 @@ get_ifid(ifp0, altifp, in6)
 		goto success;
 	}
 
-	/* try secondary EUI64 source. this basiocally is for ATM PVC */
+	/* try secondary EUI64 source. this basically is for ATM PVC */
 	if (altifp && get_hw_ifid(altifp, in6) == 0) {
 		nd6log((LOG_DEBUG, "%s: got interface identifier from %s\n",
 		    if_name(ifp0), if_name(altifp)));
