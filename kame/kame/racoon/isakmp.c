@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.11 2000/01/02 12:54:00 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.12 2000/01/05 19:17:28 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -635,6 +635,11 @@ isakmp_parse0(np0, gen, len)
 
 		p->type = np;
 		p->len = ntohs(gen->len);
+		if (gen->len == 0) {
+			plog(LOCATION, "invalid length of payload\n");
+			vfree(result);
+			return NULL;
+		}
 		p->ptr = gen;
 		p++;
 		if (ep <= p) {
