@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.52 2000/08/15 04:46:28 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.53 2000/09/12 08:26:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -525,8 +525,28 @@ ip6_forward(m, srcrt)
 	 * modified by a redirect.
 	 */
 	if (rt->rt_ifp == m->m_pkthdr.rcvif && !srcrt &&
-	    (rt->rt_flags & (RTF_DYNAMIC|RTF_MODIFIED)) == 0)
-		type = ND_REDIRECT;
+	    (rt->rt_flags & (RTF_DYNAMIC|RTF_MODIFIED)) == 0) {
+#ifdef PROHIBIT_P2PREDIRECT
+		if ((rt->rt_ifp->if_flags & IFF_POINTOPOINT) != 0) {
+			/*
+			 * If the incoming interface equals to the outgoing
+			 * one, and the link attached to the interface is
+			 * point-to-point, then it will be highly probable
+			 * that a routing loop occurs. Thus, we immediately
+			 * drop the packet and send an ICMPv6 error message.
+			 * XXX: are the type and code appropriate? For
+			 * example, is a time exceeded error, which will
+			 * be sent upon a routing loop, suitable in this case?
+			 */
+			icmp6_error(mcopy, ICMP6_DST_UNREACH,
+				    ICMP6_DST_UNREACH_NOROUTE, 0);
+			m_freem(m);
+			return;
+		}
+		else
+#endif
+			type = ND_REDIRECT;
+	}
 
 #ifdef IPV6FIREWALL
 	/*
