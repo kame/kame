@@ -1,4 +1,4 @@
-/*	$KAME: defs.h,v 1.12 2003/02/12 04:28:12 suz Exp $	*/
+/*	$KAME: defs.h,v 1.13 2003/09/02 10:12:24 suz Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Oregon.
@@ -322,7 +322,7 @@ extern void config_vifs_from_file   __P((void));
 /* debug.c */
 extern char     *packet_kind __P((u_int proto, u_int type, u_int code));
 extern int      debug_kind   __P((u_int proto, u_int type, u_int code));
-extern void     log          __P((int, int, char *, ...))
+extern void     log_msg      __P((int, int, char *, ...))
 	__attribute__((__format__(__printf__, 3, 4)));
 extern void	dump_mldqueriers __P((FILE *));
 extern int      log_level    __P((u_int proto, u_int type, u_int code));
