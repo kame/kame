@@ -445,7 +445,7 @@ add_rp_grp_entry(used_cand_rp_list, used_grp_mask_list,
 
     if (!IN6_IS_ADDR_MULTICAST(&group_addr->sin6_addr))
     {
-		return (rp_grp_entry_t *) NULL;
+	return (rp_grp_entry_t *) NULL;
     }
     grp_mask_ptr = add_grp_mask(used_grp_mask_list, group_addr, group_mask,
 				bsr_hash_mask);
