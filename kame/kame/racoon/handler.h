@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.27 2000/07/21 15:51:19 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.28 2000/08/02 20:33:54 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -118,6 +118,7 @@ struct ph1handle {
 	struct sched *scr;		/* schedule for resend */
 	int retry_counter;		/* for resend. */
 	vchar_t *sendbuf;		/* buffer for re-sending */
+	struct recvedpkt *rlist;	/* list of all packets received. */
 	time_t time_sent;		/* timestamp to sent packet */
 
 	vchar_t *dhpriv;		/* DH; private value */
@@ -212,6 +213,7 @@ struct ph2handle {
 	struct sched *sce;		/* schedule for expire */
 	struct sched *scr;		/* schedule for resend */
 	vchar_t *sendbuf;		/* buffer for re-sending */
+	struct recvedpkt *rlist;	/* list of all packets received. */
 	int retry_counter;
 	time_t sent;			/* timestamp to sent packet */
 
@@ -265,6 +267,14 @@ struct ph2handle {
 struct contacted {
 	struct sockaddr *remote;	/* remote address to negosiate ph1 */
 	LIST_ENTRY(contacted) chain;
+};
+
+/*
+ * for checking a packet retransmited.
+ */
+struct recvedpkt {
+	struct recvedpkt *next;
+	vchar_t *hash;
 };
 
 /* for parsing ISAKMP header. */
@@ -331,3 +341,7 @@ extern void unbindph12 __P((struct ph2handle *));
 extern struct contacted *getcontacted __P((struct sockaddr *));
 extern int inscontacted __P((struct sockaddr *));
 extern void initctdtree __P((void));
+
+extern int check_recvedpkt __P((vchar_t *, struct recvedpkt *));
+extern int add_recvedpkt __P((vchar_t *, struct recvedpkt **));
+extern void flush_recvedpkt __P((struct recvedpkt *));

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.32 2000/07/21 15:51:19 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.33 2000/08/02 20:33:54 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -46,6 +46,7 @@
 
 #include "schedule.h"
 #include "algorithm.h"
+#include "crypto_openssl.h"
 #include "policy.h"
 #include "proposal.h"
 #include "isakmp_var.h"
@@ -227,6 +228,9 @@ delph1(iph1)
 	if (iph1->scr)
 		SCHED_KILL(iph1->scr);
 	VPTRINIT(iph1->sendbuf);
+
+	flush_recvedpkt(iph1->rlist);
+	iph1->rlist = NULL;
 
 	VPTRINIT(iph1->dhpriv);
 	VPTRINIT(iph1->dhpub);
@@ -462,6 +466,9 @@ initph2(iph2)
 
 	VPTRINIT(iph2->sendbuf);
 
+	flush_recvedpkt(iph2->rlist);
+	iph2->rlist = NULL;
+
 	/* clear spi, keep variables in the proposal */
 	if (iph2->proposal) {
 		struct saproto *pr;
@@ -638,4 +645,81 @@ void
 initctdtree()
 {
 	LIST_INIT(&ctdtree);
+}
+
+/*
+ * checking a packet whether is received or not.
+ * OUT:
+ *	 0:	the packet is first received.
+ *	 1:	the packet was reveiced before, or error happened.
+ */
+int
+check_recvedpkt(msg, list)
+	vchar_t *msg;
+	struct recvedpkt *list;
+{
+	vchar_t *buf;
+	struct recvedpkt *n;
+
+	buf = eay_md5_one(msg);
+	if (!buf) {
+		plog(logp, LOCATION, NULL,
+			"FATAL: failed to allocate buffer.\n");
+		return 1;
+	}
+
+	for (n = list; n; n = n->next) {
+		if (memcmp(buf->v, n->hash->v, n->hash->l) == 0)
+			break;
+	}
+
+	vfree(buf);
+
+	if (n)
+		return 1;
+
+	return 0;
+}
+
+/*
+ * adding a hash of received packet into the received list.
+ */
+int
+add_recvedpkt(msg, list)
+	vchar_t *msg;
+	struct recvedpkt **list;
+{
+	struct recvedpkt *new;
+
+	new = CALLOC(sizeof(*new), struct recvedpkt *);
+	if (!new) {
+		plog(logp, LOCATION, NULL,
+			"FATAL: failed to allocate buffer.\n");
+		return -1;
+	}
+	new->hash = eay_md5_one(msg);
+	if (!new->hash) {
+		plog(logp, LOCATION, NULL,
+			"FATAL: failed to allocate buffer.\n");
+		free(new);
+		return -1;
+	}
+
+	new->next = *list;
+	*list = new;
+
+	return 0;
+}
+
+void
+flush_recvedpkt(list)
+	struct recvedpkt *list;
+{
+	struct recvedpkt *n, *next;
+
+	for (n = list; n; n = next) {
+		next = n->next;
+		vfree(n->hash);
+		free(n);
+	}
 }

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.88 2000/07/26 03:50:34 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.89 2000/08/02 20:33:54 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -381,8 +381,8 @@ isakmp_main(msg, remote, local)
 		}
 
 		/*
-		 * Don't delete phase 1 handler when the handler's exchange
-		 * type is not equual to packet's one because of no
+		 * Don't delete phase 1 handler when the exchange type
+		 * in handler is not equual to packet's one because of no
 		 * authencication completed.
 		 */
 		if (iph1->etype != isakmp->etype) {
@@ -392,6 +392,14 @@ isakmp_main(msg, remote, local)
 				s_isakmp_etype(iph1->etype),
 				s_isakmp_etype(isakmp->etype));
 			/* ignore it */
+			return -1;
+		}
+
+		/* check a packet retransmited. */
+		if (check_recvedpkt(msg, iph1->rlist)) {
+			YIPSDEBUG(DEBUG_NET,
+				plog(logp, LOCATION, iph1->remote,
+					"retransmited.\n"));
 			return -1;
 		}
 
@@ -473,6 +481,14 @@ isakmp_main(msg, remote, local)
 				return -1;
 			return 0;
 			/*NOTREACHED*/
+		}
+
+		/* check a packet retransmited. */
+		if (check_recvedpkt(msg, iph2->rlist)) {
+			YIPSDEBUG(DEBUG_NET,
+				plog(logp, LOCATION, remote,
+					"retransmited.\n"));
+			return -1;
 		}
 
 		/* commit bit. */
@@ -588,6 +604,12 @@ ph1_main(iph1, msg)
 		return -1;
 	}
 
+	if (add_recvedpkt(msg, &iph1->rlist)) {
+		plog(logp, LOCATION, iph1->remote,
+			"ERROR: failed to manage a received packet.\n");
+		return -1;
+	}
+
 	if (iph1->status == PHASE1ST_ESTABLISHED) {
 
 		/* save created date. */
@@ -682,6 +704,12 @@ quick_main(iph2, msg)
 			[iph2->status])(iph2, msg) != 0) {
 		plog(logp, LOCATION, iph2->ph1->remote,
 			"ERROR: failed to process packet.\n");
+		return -1;
+	}
+
+	if (add_recvedpkt(msg, &iph2->rlist)) {
+		plog(logp, LOCATION, iph2->ph1->remote,
+			"ERROR: failed to manage a received packet.\n");
 		return -1;
 	}
 
@@ -853,6 +881,13 @@ isakmp_ph1begin_r(msg, remote, local, etype)
 		return -1;
 	}
 
+
+	if (add_recvedpkt(msg, &iph1->rlist)) {
+		plog(logp, LOCATION, remote,
+			"ERROR: failed to manage a received packet.\n");
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -975,6 +1010,12 @@ isakmp_ph2begin_r(iph1, msg)
 			plog(logp, LOCATION, iph2->ph1->remote,
 				"failed to process packet.\n"));
 		/* don't release handler */
+		return -1;
+	}
+
+	if (add_recvedpkt(msg, &iph2->rlist)) {
+		plog(logp, LOCATION, iph2->ph1->remote,
+			"ERROR: failed to manage a received packet.\n");
 		return -1;
 	}
 
