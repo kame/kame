@@ -3,7 +3,7 @@ SRCDIR=	${.CURDIR}/../../kame/rtadvd
 PROG=	rtadvd
 SRCS=	rtadvd.c rrenum.c advcap.c if.c config.c timer.c dump.c
 
-CFLAGS+=-DINET6 -DMIP6
+CFLAGS+=-DINET6
 LDADD+=	-lcompat
 DPADD+=	${LIBCOMPAT}
 LDADD+=	-L${.OBJDIR}/../../lib/libinet6 \
