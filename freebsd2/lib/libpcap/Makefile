@@ -5,7 +5,7 @@ SRCS=	pcap-bpf.c pcap.c inet.c gencode.c optimize.c nametoaddr.c \
 	etherent.c savefile.c bpf_filter.c bpf_image.c \
 	scanner.c grammar.c version.c
 
-MAN=	pcap.3
+MAN3=	pcap.3
 
 CFLAGS+=	-O2
 DEFS =  -DHAVE_SYS_IOCCOM_H=1 -DHAVE_SYS_SOCKIO_H=1 -DHAVE_ETHER_HOSTTON=1 -DHAVE_STRERROR=1 -DINET6=1 -DHAVE_SOCKADDR_SA_LEN=1 
