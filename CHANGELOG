@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.859 2000/05/08 14:09:40 itojun Exp $
+$Id: CHANGELOG,v 1.860 2000/05/08 14:25:27 itojun Exp $
 
 <200005>
+Mon May  8 23:24:34 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use tcpdump.org 2000/5/8
+	  weekly snap.
+
 Mon May  8 23:08:24 JST 2000  itojun@iijlab.net
 	* libinet6/name6.c: correct resolver error code handling (h_errno,
 	  like last arg for getipnodebyname).
@@ -14,7 +18,7 @@ Mon May  8 17:20:17 JST 2000  itojun@iijlab.net
 Sat May  6 01:48:14 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd[23]/ports/{libpcap, tcpdump}: upgrade to 2000/05/01.
 	* freebsd[23]/ports/tcp_wrapper: upgrade to latest IPv6 patch.
-	* {freebsd[23]/ports,netbsd/pkgsrc}/mtr: upgrade to 0.42.
+	* {freebsd[23]/ports,netbsd/pkgsrc/net}/mtr: upgrade to 0.42.
 	* freebsd3/ports/vat6: upgrade to latest IPv6 patch.
 
 Sat May  6 00:30:39 JST 2000  itojun@iijlab.net
