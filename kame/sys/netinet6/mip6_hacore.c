@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.22 2003/12/17 01:32:04 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.23 2004/01/19 04:45:59 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1155,8 +1155,13 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 
 	/* fill the icmp6_hdr. */
 	nicmp6 = (struct icmp6_hdr *)(nip6 + 1);
-	nicmp6->icmp6_type = icmp6->icmp6_type;
-	nicmp6->icmp6_code = icmp6->icmp6_code;
+	if (icmp6->icmp6_type == ICMP6_TIME_EXCEEDED) {
+		nicmp6->icmp6_type = ICMP6_DST_UNREACH;
+		nicmp6->icmp6_code = ICMP6_DST_UNREACH_ADDR;
+	} else {
+		nicmp6->icmp6_type = icmp6->icmp6_type;
+		nicmp6->icmp6_code = icmp6->icmp6_code;
+	}
 	nicmp6->icmp6_data32[0] = icmp6->icmp6_data32[0];
 
 	/* XXX modify icmp data in some case.  (ex. TOOBIG) */
