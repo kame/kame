@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1866 2001/09/06 09:35:29 jinmei Exp $
+$KAME: CHANGELOG,v 1.1867 2001/09/07 08:30:18 jinmei Exp $
 
 <200109>
+2001-09-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_setpktoptions): checked if
+	each cmsghdr pointer had enough size to store the structure.
+	This could be a security fix, but I think the current code is
+	practically safe enough.  That is, we do not have to be in a harry
+	to merge this fix to *BSDs.
+
 2001-09-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* *bsd/sys/sys/socket.h (CMSG_FIRSTHDR): checked msg_controllen
 	in CMSG_FIRSTHDR as described in RFC2292, particularly in case
