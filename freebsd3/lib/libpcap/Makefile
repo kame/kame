@@ -14,6 +14,14 @@ CFLAGS+=	${DEFS} -I${SRCDIR} -I${.CURDIR}
 CFLAGS+=	-I${SRCDIR}/lbl -I${SRCDIR}/bpf
 YFLAGS+=	-d
 
+#
+# Flex and bison allow you to specify the prefixes of the global symbols
+# used by the generated parser.  This allows programs to use lex/yacc
+# and link against libpcap.  If you don't have flex or bison, get them.
+#
+LEX = flex -Ppcap_
+YACC = bison -y -p pcap_
+
 MKPIC=	no
 # do not overwrite OS-suppplied lint database
 NOLINT=	yes
