@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1419 2000/12/02 17:50:32 itojun Exp $
+$KAME: CHANGELOG,v 1.1420 2000/12/02 21:00:31 kawa Exp $
 
 <200012>
+2000-12-03  Koji Kawano <K.Kawano@rdmg.mgcs.mei.co.jp>
+	* sys/netinet6/in6_prefix.c: missing copy vltime & pltime to
+	  ifra(interface)
+	  This effects that, if you use prefix command, you can't
+	  add address to the interface or vltime = 0 even added.
+
 Sun Dec  3 02:48:51 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_mroute.h: to provide better binary compatibility
 	  with *BSD-integrated tree, change operation #.  you'll need to
