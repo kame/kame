@@ -25,7 +25,7 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile.in,v 1.38 2004/09/03 10:52:35 jinmei Exp $
+# $Id: Makefile.in,v 1.39 2004/09/07 04:51:30 jinmei Exp $
 #
 
 prefix=	@prefix@
@@ -41,7 +41,7 @@ LIBS=	@LIBS@ -ly -ll
 CC=	@CC@
 #we are not sure if dhcp6lc really makes sense
 #TARGET=	dhcp6c dhcp6s dhcp6relay dhcp6lc dhcp6sctl
-TARGET=	dhcp6c dhcp6s dhcp6relay dhcp6sctl
+TARGET=	dhcp6c dhcp6s dhcp6relay dhcp6ctl
 
 INSTALL=@INSTALL@
 INSTALL_PROGRAM=@INSTALL_PROGRAM@
@@ -62,25 +62,25 @@ CFLAGS+= @DHCPOPT_DNS@ @DH6OPT_DNSNAME@ \
 
 GENSRCS=cfparse.c cftoken.c
 CLIENTOBJS=	dhcp6c.o common.o config.o prefixconf.o dhcp6c_ia.o timer.o \
-	dhcp6c_script.o if.o base64.o auth.o $(GENSRCS:%.c=%.o)
+	dhcp6c_script.o if.o base64.o auth.o dhcp6_ctl.o $(GENSRCS:%.c=%.o)
 SERVOBJS=	dhcp6s.o common.o if.o config.o timer.o \
 	base64.o auth.o dhcp6_ctl.o $(GENSRCS:%.c=%.o)
 RELAYOBJS =	dhcp6relay.o common.o timer.o
 LITECLIENTOBJS=	dhcp6lc.o common.o if.o timer.o dhcp6c_script.o
-SERVERCTLOBJS= dhcp6sctl.o base64.o auth.o
+CTLOBJS= dhcp6_ctlclient.o base64.o auth.o
 CLEANFILES+=	y.tab.h
 
 all:	$(TARGET)
 dhcp6c:	$(CLIENTOBJS) $(LIBOBJS)
-	$(CC) $(LDFLAGS) -o dhcp6c $(CLIENTOBJS) $(LIBOBJS) $(LIBS) 
+	$(CC) $(LDFLAGS) -o dhcp6c $(CLIENTOBJS) $(LIBOBJS) $(LIBS)
 dhcp6s:	$(SERVOBJS) $(LIBOBJS)
-	$(CC) $(LDFLAGS) -o dhcp6s $(SERVOBJS) $(LIBOBJS) $(LIBS) 
+	$(CC) $(LDFLAGS) -o dhcp6s $(SERVOBJS) $(LIBOBJS) $(LIBS)
 dhcp6relay: $(RELAYOBJS) $(LIBOBJS)
-	$(CC) $(LDFLAGS) -o $@ $(RELAYOBJS) $(LIBOBJS) $(LIBS) 
+	$(CC) $(LDFLAGS) -o $@ $(RELAYOBJS) $(LIBOBJS) $(LIBS)
 dhcp6lc:$(LITECLIENTOBJS) $(LIBOBJS)
 	$(CC) $(LDFLAGS) -o $@ $(LITECLIENTOBJS) $(LIBOBJS) $(LIBS)
-dhcp6sctl: $(SERVERCTLOBJS)
-	$(CC) $(LDFLAGS) -o $@ $(SERVERCTLOBJS) $(LIBOBJS) $(LIBS)
+dhcp6ctl: $(CTLOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(CTLOBJS) $(LIBOBJS) $(LIBS)
 
 cfparse.c y.tab.h: cfparse.y
 	yacc -d cfparse.y
