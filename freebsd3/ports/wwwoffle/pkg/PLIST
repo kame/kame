@@ -1,0 +1,30 @@
+bin/wwwoffle
+bin/wwwoffle-ls
+bin/wwwoffle-mv
+bin/wwwoffle-read
+bin/wwwoffle-rm
+bin/wwwoffle-tools
+bin/wwwoffle-write
+etc/rc.d/wwwoffle.sh
+etc/wwwoffle/wwwoffle.conf.default
+@exec if [ ! -f %D/etc/wwwoffle/wwwoffle.conf ]; then cp -p %D/etc/wwwoffle/wwwoffle.conf.default %D/etc/wwwoffle/wwwoffle.conf; fi
+man/man1/wwwoffle.1
+man/man5/wwwoffle.conf.5
+man/man8/wwwoffled.8
+sbin/wwwoffled
+share/doc/wwwoffle/CHANGES.CONF
+share/doc/wwwoffle/CONVERT
+share/doc/wwwoffle/COPYING
+share/doc/wwwoffle/FAQ
+share/doc/wwwoffle/INSTALL
+share/doc/wwwoffle/NEWS
+share/doc/wwwoffle/README
+share/doc/wwwoffle/README.1st
+share/doc/wwwoffle/README.CONF
+share/doc/wwwoffle/README.PWD
+share/doc/wwwoffle/README.htdig
+share/doc/wwwoffle/README.lang
+share/doc/wwwoffle/README.win32
+share/doc/wwwoffle/UPGRADE
+@dirrm share/doc/wwwoffle
+@unexec rm -rf /var/wwwoffle
