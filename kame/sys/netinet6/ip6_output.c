@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.287 2002/02/19 14:30:07 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.288 2002/02/26 03:31:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3524,7 +3524,7 @@ ip6_setmoptions(optname, im6op, m)
 		/* Fill in the scope zone ID */
 		if (in6_addr2zoneid(ifp, &sa6_mc.sin6_addr,
 				    &sa6_mc.sin6_scope_id)) {
-			error = ENXIO; /* XXX: should not happen */
+			error = EADDRNOTAVAIL; /* XXX: should not happen */
 			break;
 		}
 		in6_embedscope(&sa6_mc.sin6_addr, &sa6_mc); /* XXX */
@@ -3601,7 +3601,8 @@ ip6_setmoptions(optname, im6op, m)
 		if (ifp) {
 			if (in6_addr2zoneid(ifp, &sa6_mc.sin6_addr,
 					    &sa6_mc.sin6_scope_id)) {
-				error = ENXIO; /* XXX: should not happen */
+				/* XXX: should not happen */
+				error = EADDRNOTAVAIL;
 				break;
 			}
 			in6_embedscope(&sa6_mc.sin6_addr, &sa6_mc); /* XXX */

@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.28 2002/01/31 14:14:54 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.29 2002/02/26 03:31:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -396,7 +396,7 @@ scope6_setzoneid(ifp, sin6)
 	int error;
 
 	if (in6_addr2zoneid(ifp, &sin6->sin6_addr, &zoneid))
-		return(ENXIO);
+		return(EADDRNOTAVAIL);
 
 	if (zoneid) {
 		sin6->sin6_scope_id = zoneid;
