@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.53 2004/07/05 03:10:14 jinmei Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.54 2004/08/04 18:32:29 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1801,7 +1801,7 @@ mip6_home_registration2(mbu)
 	if (mbu == NULL)
 		return (EINVAL);
 
-#ifndef __FreeBSD__
+#ifdef __FreeBSD__
 	mono_time.tv_sec = time_second;
 #endif
 
