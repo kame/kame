@@ -524,22 +524,31 @@ local_iface(char *ifname)
 	register struct uvif *v;
 	vifi_t vifi;
 	struct phaddr *p;
-	struct phaddr *pmax;
+	struct phaddr *pmax = NULL;
 
 	for(vifi=0,v=uvifs;vifi<numvifs;++vifi,++v)
 	{
 		if (v->uv_flags & (VIFF_DISABLED | VIFF_DOWN | MIFF_REGISTER))
 			continue;
-		if(EQUAL(v->uv_name,ifname))
+		if(EQUAL(v->uv_name, ifname))
 		{
-			for(p=v->uv_addrs,pmax=v->uv_addrs;p!=NULL;p=p->pa_next)
+			for(p=v->uv_addrs; p!=NULL; p=p->pa_next)
 			{
-				if(inet6_lessthan(&pmax->pa_addr, &p->pa_addr) &&
-				   !IN6_IS_ADDR_LINKLOCAL(&p->pa_addr.sin6_addr)&&
-				   !IN6_IS_ADDR_SITELOCAL(&p->pa_addr.sin6_addr))
-					pmax=p;	
+				if (!IN6_IS_ADDR_LINKLOCAL(&p->pa_addr.sin6_addr)&&
+				    !IN6_IS_ADDR_SITELOCAL(&p->pa_addr.sin6_addr)) {
+					/*
+					 * If this is the first global address
+					 * or larger than the current MAX global
+					 * address, remember it.
+					 */
+					if (pmax == NULL ||
+					    inet6_lessthan(&pmax->pa_addr,
+							   &p->pa_addr))
+						pmax = p;
+				}
 			}
-			return &pmax->pa_addr;
+			if (pmax)
+				return(&pmax->pa_addr);
 		}
 	}
 

@@ -673,16 +673,15 @@ int parse_phyint(char *s)
  *  The general form is:
  *      'cand_rp <ifname> [priority <number>] [time <number>]'.
  */
-
-
-int parse_candidateRP(char *s)
+int
+parse_candidateRP(char *s)
 {
-    char *w;
-	struct sockaddr_in6 *ifname;
+	char *w;
+	struct sockaddr_in6 *sa6_rp;
 	u_int time = PIM_DEFAULT_CAND_RP_ADV_PERIOD;
 	u_int priority = PIM_DEFAULT_CAND_RP_PRIORITY;
 
-	ifname=NULL;
+	sa6_rp = NULL;
 	cand_rp_flag = FALSE;	
 
 	my_cand_rp_adv_period = PIM_DEFAULT_CAND_RP_ADV_PERIOD;
@@ -691,16 +690,16 @@ int parse_candidateRP(char *s)
 	{ 
 		if((!EQUAL(w,"priority")) && (!EQUAL(w,"time")))
 		{
-
-			/* if the interface is specified and is valid
-			   we take the max global add. of the interface (aliasing)
-			   else look a the end of the function.
-			*/
-			ifname = local_iface(w);
-			if(!ifname)	
+			/*
+			 * if the interface is specified and is valid
+			 * we take the max global address of the interface
+			 * (aliasing) else look at the end of the function.
+			 */
+			sa6_rp = local_iface(w);
+			if(!sa6_rp)	
 				log(LOG_WARNING, 0,
 				    "cand_rp '%s' in  %s is not configured."
-				    "take the max local add. the router..",
+				    "take the max local address the router..",
 				    w, configfilename);
 		}
 		else
@@ -762,10 +761,10 @@ int parse_candidateRP(char *s)
 		}
 	}
 
-	if(!ifname)
-		ifname= max_global_address();
+	if(!sa6_rp)
+		sa6_rp= max_global_address();
 
-	my_cand_rp_address=*ifname;
+	my_cand_rp_address=*sa6_rp;
 	my_cand_rp_priority = priority;
 	my_cand_rp_adv_period = time;
 	cand_rp_flag = TRUE;	
@@ -780,9 +779,8 @@ int parse_candidateRP(char *s)
  * operation: parse group_prefix configured information.
  *  General form: 'group_prefix <group-addr>/<prefix_len>'.
  */ 
-
-
-int parse_group_prefix(char *s)
+int
+parse_group_prefix(char *s)
 {
 	char *w;
 	struct in6_addr group_addr;
@@ -856,15 +854,16 @@ int parse_group_prefix(char *s)
  *  this function is similar to parse_candrp 
  */ 
 
-int parseBSR(char *s)
+int
+parseBSR(char *s)
 {
 	char *w;
-	struct sockaddr_in6 *ifname;
+	struct sockaddr_in6 *sa6_bsr;
 	u_int32 priority = PIM_DEFAULT_BSR_PRIORITY;
 	u_int time = PIM_DEFAULT_BOOTSTRAP_PERIOD;
 	my_bsr_period = PIM_DEFAULT_BOOTSTRAP_PERIOD;
 
-	ifname=NULL;
+	sa6_bsr = NULL;
 	cand_bsr_flag = FALSE; 
 
 	while(!EQUAL((w = next_word(&s)),""))
@@ -872,8 +871,8 @@ int parseBSR(char *s)
 		if((!EQUAL(w,"priority")) && (!EQUAL(w,"time")))
 		{
 
-			ifname = local_iface(w);
-			if(!ifname)
+			sa6_bsr = local_iface(w);
+			if(!sa6_bsr)
 			{	
 				log(LOG_WARNING,0,
 				    "cand_bootstrap_router '%s' in %s is not "
@@ -896,7 +895,10 @@ int parseBSR(char *s)
 					if (sscanf(w,"%u",&priority)!= 1 )
 					{
 						priority = PIM_DEFAULT_BSR_PRIORITY;
-						log(LOG_WARNING,0,"Invalid priority '%s'for the bsr;set to default : %d",w,priority);
+						log(LOG_WARNING, 0,
+						    "Invalid priority '%s'for "
+						    "the bsr;set to default : %d",
+						    w, priority);
 					}
 					else
 					{
@@ -931,13 +933,13 @@ int parseBSR(char *s)
 		}
 	}
 
-        if(!ifname)
-                ifname= max_global_address();
+        if(!sa6_bsr)
+                sa6_bsr = max_global_address();
 
-		my_bsr_address=*ifname;
+	my_bsr_address=*sa6_bsr;
         my_bsr_priority = priority;
        	MASKLEN_TO_MASK6(RP_DEFAULT_IPV6_HASHMASKLEN,my_bsr_hash_mask); 
-		cand_bsr_flag = TRUE;
+	cand_bsr_flag = TRUE;
 
       	return TRUE;
 }

@@ -3378,8 +3378,8 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 				prefix_h2,
 				group_,
 				rpp_;
-	int i;
-	struct uvif 		*v;
+    int i;
+    struct uvif 		*v;
 
 
     if ((mifi=find_vif_direct(src)) == NO_VIF)
@@ -3403,6 +3403,19 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
     GET_BYTE(new_bsr_hash_masklen, data_ptr);
     GET_BYTE(new_bsr_priority, data_ptr);
     GET_EUADDR6(&new_bsr_uni_addr, data_ptr);
+
+    /* 
+     * BSR address must be a global unicast address.
+     * [draft-ietf-pim-ipv6-01.txt sec 4.5]
+     */
+    if (IN6_IS_ADDR_MULTICAST(&new_bsr_uni_addr.unicast_addr) ||
+	IN6_IS_ADDR_LINKLOCAL(&new_bsr_uni_addr.unicast_addr) ||
+	IN6_IS_ADDR_SITELOCAL(&new_bsr_uni_addr.unicast_addr)) {
+	    log(LOG_WARNING, 0,
+		"receive_pim6_bootstrap: invalid BSR address: %s",
+		inet6_fmt(&new_bsr_uni_addr.unicast_addr));
+	    return(FALSE);
+    }
 
     new_bsr_address.sin6_addr = new_bsr_uni_addr.unicast_addr;
     new_bsr_address.sin6_len = sizeof(new_bsr_address);
