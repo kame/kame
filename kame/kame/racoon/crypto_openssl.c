@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.27 2000/03/07 09:39:38 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.28 2000/08/10 12:25:33 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -55,6 +55,7 @@
 #endif
 #ifdef HAVE_OPENSSL_X509_H
 #include <openssl/x509.h>
+#include <openssl/x509_vfy.h>
 #endif
 #include <openssl/bn.h>
 #include <openssl/dh.h>
@@ -73,7 +74,9 @@
 #include <openssl/err.h>
 
 #include "var.h"
+#include "misc.h"
 #include "vmbuf.h"
+#include "plog.h"
 #include "oakley.h"
 #include "crypto_openssl.h"
 #include "debug.h"
@@ -84,7 +87,150 @@
  */
 
 #ifdef HAVE_SIGNING_C
+static int cb_check_cert __P((int, X509_STORE_CTX *));
+
 /* X509 Certificate */
+/*
+ * this functions is derived from apps/verify.c in OpenSSL0.9.5
+ */
+int
+eay_check_x509cert(cert, CApath)
+	vchar_t *cert;
+	vchar_t *CApath;
+{
+	X509_STORE *cert_ctx = NULL;
+	X509_LOOKUP *lookup = NULL;
+	X509 *x509 = NULL;
+	X509_STORE_CTX *csc;
+	int error = -1;
+
+	/* XXX define only functions required. */
+	OpenSSL_add_all_algorithms();
+
+	cert_ctx = X509_STORE_new();
+	if (cert_ctx == NULL)
+		goto end;
+	X509_STORE_set_verify_cb_func(cert_ctx, cb_check_cert);
+
+	lookup = X509_STORE_add_lookup(cert_ctx, X509_LOOKUP_file());
+	if (lookup == NULL)
+		goto end;
+	X509_LOOKUP_load_file(lookup, NULL, X509_FILETYPE_DEFAULT); /* XXX */
+
+	lookup = X509_STORE_add_lookup(cert_ctx, X509_LOOKUP_hash_dir());
+	if (lookup == NULL)
+		goto end;
+	error = X509_LOOKUP_add_dir(lookup, CApath->v, X509_FILETYPE_PEM);
+	if(!error) {
+		error = -1;
+		goto end;
+	}
+	error = -1;	/* initialized */
+
+	/* read the certificate to be verified */
+#ifndef EAYDEBUG
+    {
+	u_char *bp;
+
+	bp = cert->v;
+
+	x509 = d2i_X509(NULL, &bp, cert->l);
+    }
+#else
+    {
+	BIO *bio;
+
+	printf("%s\n", cert->v);
+	bio = BIO_new(BIO_s_mem());
+	if (bio == NULL)
+		goto end;
+	error = BIO_write(bio, cert->v, cert->l);
+	x509 = PEM_read_bio_X509(bio, NULL, NULL, NULL);
+	BIO_free(bio);
+    }
+#endif
+	if (x509 == NULL)
+		goto end;
+
+	csc = X509_STORE_CTX_new();
+	if (csc == NULL)
+		goto end;
+	X509_STORE_CTX_init(csc, cert_ctx, x509, NULL);
+	error = X509_verify_cert(csc);
+	X509_STORE_CTX_cleanup(csc);
+
+	/*
+	 * if x509_verify_cert() is successful then the value of error is
+	 * set non-zero.
+	 */
+	error = error ? 0 : -1;
+
+end:
+	if (error)
+		eay_strerror();
+	if (cert_ctx != NULL)
+		X509_STORE_free(cert_ctx);
+	if (x509 != NULL)
+		X509_free(x509);
+
+	return(error);
+}
+
+/*
+ * callback function for verifing certificate.
+ * this function is derived from cb() in openssl/apps/s_server.c
+ */
+static int
+cb_check_cert(ok, ctx)
+	int ok;
+	X509_STORE_CTX *ctx;
+{
+	char buf[256], *alarm;
+
+	if (!ok) {
+		X509_NAME_oneline(
+				X509_get_subject_name(ctx->current_cert),
+				buf,
+				256);
+		/*
+		 * since we are just checking the certificates, it is
+		 * ok if they are self signed. But we should still warn
+		 * the user.
+ 		 */
+		switch (ctx->error) {
+		case X509_V_ERR_CERT_HAS_EXPIRED:
+		case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
+		case X509_V_ERR_INVALID_CA:
+		case X509_V_ERR_PATH_LENGTH_EXCEEDED:
+		case X509_V_ERR_INVALID_PURPOSE:
+			ok = 1;
+			alarm = "WARNING";
+			break;
+		default:
+			alarm = "ERROR";
+		}
+#ifndef EAYDEBUG
+		plog(logp, LOCATION, NULL,
+			"%s: %s(%d) at depth:%d SubjectName:%s\n",
+			alarm,
+			X509_verify_cert_error_string(ctx->error),
+			ctx->error,
+			ctx->error_depth,
+			buf);
+#else
+		printf("%s: %s(%d) at depth:%d SubjectName:%s\n",
+			alarm,
+			X509_verify_cert_error_string(ctx->error),
+			ctx->error,
+			ctx->error_depth,
+			buf);
+#endif
+	}
+	ERR_clear_error();
+
+	return ok;
+}
+
 /*
  * get a X509 certificate from local file.
  * a certificate must be PEM format.
