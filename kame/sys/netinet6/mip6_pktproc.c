@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.72 2002/10/25 05:11:05 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.73 2002/10/28 13:33:29 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1514,7 +1514,8 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 		mip6_icmp6_ha_discov_req_output(sc);
 		return (0);
 	}
-	if ((mbu->mbu_state & MIP6_BU_STATE_WAITSENT) == 0) {
+	if ((mbu->mbu_flags & IP6MU_HOME) /* XXX */
+	    && (mbu->mbu_state & MIP6_BU_STATE_WAITSENT) == 0) {
 		/* no need to send. */
 		return (0);
 	}
