@@ -1251,7 +1251,7 @@ epget(sc, totlen)
 	m->m_pkthdr.len = totlen;
 	pad = ALIGN(sizeof(struct ether_header)) - sizeof(struct ether_header);
 	len = MHLEN;
-	if (totlen >= MINCLSIZE) {
+	if (totlen + pad >= MINCLSIZE) {
 		MCLGET(m, M_DONTWAIT);
 		if (m->m_flags & M_EXT)
 			len = MCLBYTES;

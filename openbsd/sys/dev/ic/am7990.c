@@ -406,8 +406,7 @@ am7990_get(sc, boff, totlen)
 	m->m_pkthdr.rcvif = ifp;
 	m->m_pkthdr.len = totlen;
 	pad = ALIGN(sizeof(struct ether_header)) - sizeof(struct ether_header);
-	m->m_data += pad;
-	len = MHLEN - pad;
+	len = MHLEN;
 	top = 0;
 	mp = &top;
 
@@ -420,15 +419,14 @@ am7990_get(sc, boff, totlen)
 			}
 			len = MLEN;
 		}
-		if (totlen >= MINCLSIZE) {
+		if (totlen + ((!top) ? pad : 0) >= MINCLSIZE) {
 			MCLGET(m, M_DONTWAIT);
-			if (m->m_flags & M_EXT) {
+			if (m->m_flags & M_EXT)
 				len = MCLBYTES;
-				if (!top) {
-					m->m_data += pad;
-					len -= pad;
-				}
-			}
+		}
+		if (!top) {
+			m->m_data += pad;
+			len = MHLEN - pad;
 		}
 		m->m_len = len = min(totlen, len);
 		(*sc->sc_copyfrombuf)(sc, mtod(m, caddr_t), boff, len);

@@ -751,15 +751,10 @@ rlnget(sc, hdr, totlen)
 		goto drop;
 	m->m_pkthdr.rcvif = ifp;
 	m->m_pkthdr.len = totlen;
-	/*
-	 * Insert some leading padding in the mbuf, so that payload data is
-	 * aligned.
-	 */
-	pad = ALIGN(sizeof(struct ether_header)) - sizeof(struct ether_header);
-	m->m_data += pad;
-	len = MHLEN - pad;
+	len = MHLEN;
 	top = 0;
 	mp = &top;
+	pad = ALIGN(sizeof(struct ether_header)) - sizeof(struct ether_header);
 
 	while (totlen > 0) {
 		if (top) {
@@ -770,15 +765,18 @@ rlnget(sc, hdr, totlen)
 			}
 			len = MLEN;
 		}
-		if (totlen >= MINCLSIZE) {
+		if (totlen + ((!top) ? pad : 0) >= MINCLSIZE) {
 			MCLGET(m, M_DONTWAIT);
-			if (m->m_flags & M_EXT) {
+			if (m->m_flags & M_EXT)
 				len = MCLBYTES;
-				if (!top) {
-					m->m_data += pad;
-					len -= pad;
-				}
-			}
+		}
+		if (!top) {
+			/*
+			 * Insert some leading padding in the mbuf, so that
+			 * payload data is aligned.
+			 */
+			m->m_data += pad;
+			len -= pad;
 		}
 		len = min(totlen, len);
 		rln_rx_pdata(sc, mtod(m, u_int8_t *), len, &pd);
