@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.262 2004/08/17 10:18:58 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.263 2004/10/21 01:52:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2154,6 +2154,18 @@ in6_ifadd(pr, mcast)
 	/* XXX: scope zone ID? */
 
 	ifra.ifra_flags |= IN6_IFF_AUTOCONF; /* obey autoconf */
+
+	/*
+	 * Make sure that we do not have this address already.  This should
+	 * usually not happen, but we can still see this case, e.g., if we
+	 * have manually configured the exact address to be configured.
+	 */
+	if (in6ifa_ifpwithaddr(ifp, &ifra.ifra_addr.sin6_addr) != NULL) {
+		/* this should be rare enough to make an explicit log */
+		log(LOG_INFO, "in6_ifadd: %s is already configured\n",
+		    ip6_sprintf(&ifra.ifra_addr.sin6_addr));
+		return (NULL);
+	}
 
 	/*
 	 * Allocate ifaddr structure, link into chain, etc.
