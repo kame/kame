@@ -72,6 +72,9 @@ void	ip6protopr(u_long, char *);
 #endif
 void	tcp_stats(u_long, char *);
 void	udp_stats(u_long, char *);
+#ifdef DCCP
+void	dccp_stats(u_long, char *);
+#endif
 void	ip_stats(u_long, char *);
 void	icmp_stats(u_long, char *);
 void	igmp_stats(u_long, char *);

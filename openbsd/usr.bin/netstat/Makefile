@@ -15,6 +15,7 @@ CPPFLAGS+=	-DINET6
 .endif
 
 CPPFLAGS+=	-DKAME_SCOPEID
+CPPFLAGS+=	-DDCCP -g
 
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 \
 	-L${.CURDIR}/../../lib/libinet6/obj \
