@@ -2,6 +2,10 @@
 #define USERS_PATH	"/root/PKI/USERS/"
 #define CA_PATH		"/root/PKI/CA/"
 
+#define PRIVKEYFILE	"secret.pem"
+#define CERTFILE	"cert.pem"
+#define CERTREQFILE	"cr.pem"
+
 
 /*
  *	sign is a signature function

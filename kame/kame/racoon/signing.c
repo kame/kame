@@ -32,7 +32,7 @@
  * Sun Jan  9 06:23:42 JST 2000
  *    Merged into new racoon with trivial modification.
  */
-/* $Id: signing.c,v 1.2 2000/01/18 22:03:48 sakane Exp $ */
+/* $Id: signing.c,v 1.3 2000/01/18 23:31:12 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -58,7 +58,15 @@ int apps_startup() { return 0;}
 #include <err.h>
 #include <pem.h>
 #include <ssl.h>
+
+#include "var.h"
+#include "misc.h"
+#include "vmbuf.h"
+#include "plog.h"
+#include "debug.h"
+#include "localconf.h"
 #include "signing.h"
+
 /* Buffer used:	3072 bytes for data to be signed
  *		1024 bytes for signature buffer
  */
@@ -93,10 +101,8 @@ sign(donnees_source, taille_donnees_source, user, signature, taille_signature)
 	char **signature;
 	int *taille_signature;
 {
-
-
-/* Declaration */
-	static char	keyfile[]  		= "/root/PKI/USERS/";
+	/* Declaration */
+	static char	keyfile[]		= USERS_PATH;
 	char		buf[BUFFER_SIZE],
 			*sig_buf,
 			*data,
@@ -108,7 +114,7 @@ sign(donnees_source, taille_donnees_source, user, signature, taille_signature)
 	FILE		*fp;
 
 
-/* Initialization */
+	/* Initialization */
 	ERR_load_crypto_strings();
 	data	=	&(buf[0]);
 	*data	=	'\0';
@@ -118,7 +124,7 @@ sign(donnees_source, taille_donnees_source, user, signature, taille_signature)
 /* Read private key (what if it is password-ciphered?)*/
 	strcat(data, keyfile);
 	strcat(data, user);
-	strcat(data, "/private_key.pem");
+	strcat(data, PRIVKEYFILE);
 	fp = fopen (data, "r");
 	if (fp == NULL) return (-1);
 #if (defined(SSLVER) && SSLVER >= 94)
@@ -181,9 +187,8 @@ check_signature(donnees_source, taille_donnees_source, user, signature, taille_s
 	char *signature;
 	int taille_signature;
 {
-
 	/* Declaration */
-	static const char	certfile[]		= "/root/PKI/USERS/";
+	static const char	certfile[]		= USERS_PATH;
 	char			buf[BUFFER_SIZE],
 				*data,
 				*sig_buf;
@@ -203,7 +208,7 @@ check_signature(donnees_source, taille_donnees_source, user, signature, taille_s
 /* Read the public key certificate and get the public key from the user directory*/
 	strcat(data,certfile);
 	strcat(data,user);
-	strcat(data,"/user_certificate.pem");
+	strcat(data, CERTFILE);
 	fp 	= fopen (data, "r");   if (fp == NULL) {printf("Bad user. Stop.\n");return (-1);}
 
 #if (defined(SSLVER) && SSLVER >= 94)
@@ -243,6 +248,86 @@ check_signature(donnees_source, taille_donnees_source, user, signature, taille_s
 	return(0);
 }
 
+#if 0
+static EVP_PKEY *
+getsecretkey(certtype, idtype, subject)
+	int certtype;
+	int idtype;
+	char *subject;
+{
+	char path[MAXPATHLEN];
+	FILE *fp;
+	EVP_PKEY *pkey = NULL;
+
+	switch (certtype) {
+	case ISAKMP_CERT_PKCS7:
+	case ISAKMP_CERT_X509SIGN:
+		/* make secret file name */
+		snprintf(path, sizeof(path), "%s/%s/%s/%s",
+			lcconf->pathinfo[LC_PATHTYPE_CERT],
+			s_ipsecdoi_ident(idtype),
+			subject, PRIVKEYFILE);
+
+		/* Read private key */
+		fp = fopen (path, "r");
+		if (fp == NULL)
+			return NULL
+		pkey = PEM_read_PrivateKey(fp, NULL, NULL);
+		fclose (fp);
+		break;
+	default:
+		return NULL;
+	}
+
+	if (pkey == NULL)
+		return NULL;
+
+	return pkey;
+}
+
+static EVP_PKEY *
+getpubkey(certtype, idtype, subject)
+	int certtype;
+	int idtype;
+	char *subject;
+{
+	char path[MAXPATHLEN];
+	FILE *fp;
+	EVP_PKEY *pkey = NULL;
+	X509 *x509 = NULL;
+
+	switch (certtype) {
+	case ISAKMP_CERT_PKCS7:
+	case ISAKMP_CERT_X509SIGN:
+		/* make secret file name */
+		snprintf(path, sizeof(path), "%s/%s/%s/%s",
+			lcconf->pathinfo[LC_PATHTYPE_CERT],
+			s_ipsecdoi_ident(idtype),
+			subject, CERTFILE);
+
+		/* Read private key */
+		fp = fopen (path, "r");
+		if (fp == NULL)
+			return NULL
+		x509 = PEM_read_X509(fp, NULL, NULL);
+		fclose (fp);
+		break;
+	default:
+		return NULL;
+	}
+
+	if (x509 == NULL)
+		return NULL;
+  
+	/* Get public key - eay */
+	pkey = X509_get_pubkey(x509);
+	if (pkey == NULL)
+		return NULL;
+
+	return pkey;
+}
+#endif
+  
 //////////////////////////////////////////////////////////////////////////////////////////
 // 					TO GET A CERTIFICATE
 // Input:
@@ -260,7 +345,7 @@ get_certificate(user, certificate_size, certificate)
 {
 
 /* Declaration */
-	static const char	certfile[]		= "/root/PKI/USERS/";
+	static const char	certfile[]		= USERS_PATH;
 	struct stat 		*statistics;
 	char			buf[BUFFER_SIZE_PATH],
 				*data;
@@ -281,7 +366,7 @@ get_certificate(user, certificate_size, certificate)
  */
  	strcat(data,certfile);
 	strcat(data,user);
-	strcat(data,"/user_certificate.pem");
+	strcat(data, CERTFILE);
 
 	fp 	= fopen (data, "r");   if (fp == NULL) return (-1);
 	statistics = (struct stat*) malloc(sizeof(stat));
@@ -485,12 +570,12 @@ check_certificate(user, cryptCert, certificate_size)
 	int certificate_size;
 {
 
-	static  char	certfile[]		= "/root/PKI/USERS/";
+	static  char	certfile[]		= USERS_PATH;
 	char	buf[BUFFER_SIZE],
 		buf_string[BUFFER_SIZE],
 		*file_name,
 		*file_name_temp,
-		*CA_FILE			= "/root/PKI/CA/cacert.pem";
+		*CA_FILE			= CA_PATH "cacert.pem";
 	int	ret = -1;
 	FILE	*fp;
 
@@ -508,7 +593,7 @@ check_certificate(user, cryptCert, certificate_size)
 	// Verify that the directory exists: if so, nothing is damaged.
 	// Notice that in case of failure, this directory is not destroyed.
 	mkdir(file_name, 493);
-	strcat(file_name,"/user_certificate.pem");
+	strcat(file_name, CERTFILE);
 	strcat(file_name_temp, file_name);
 	strcat(file_name_temp, ".temp");
 	
