@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.565 2000/02/16 15:27:50 sumikawa Exp $
+$Id: CHANGELOG,v 1.566 2000/02/16 15:41:39 itojun Exp $
 
 <200002>
+Thu Feb 17 00:40:39 JST 2000  itojun@iijlab.net
+	* sys/net/if_gif.c: fix IFF_LINK0 (multi destination mode), which
+	  was broken during ip_encap.c migration.
+
 Wed Feb 16 23:57:53 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd[23]/lib/libftpio: add '229 Entering Extended Passive
 	  Mode' from RFC2426
