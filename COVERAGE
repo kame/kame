@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.81 2000/11/11 03:44:08 itojun Exp $
+$KAME: COVERAGE,v 1.82 2000/11/15 16:16:24 itojun Exp $
 
 
 x: supported/integrated
@@ -14,9 +14,8 @@ TCP/UDP		see IMPLEMENTATION for details
 
 ALTQ		x	x	x	x	x	-	-
 
-IPsec		x	(*1)	x	x	(*2)	x	x
+IPsec		x	(*1)	x	x	x	x	x
     (*1) OpenBSD IPsec is available for IPv4 IPsec.  no IPv6 IPsec.
-    (*2) kernel compiles, panics frequently
 
 NAT/PT		(*1)	(*1)	x	(*1)	?	(*1)	(*1)
     (*1) compilable but not tested
@@ -75,6 +74,10 @@ IPsec ESP, blowfish/des on LP64
 		x	x	(*1)	-	x	(*1)	-
     (*1) not based on kame
 
+IPsec ESP, des on big endian
+		x	x	(*1)	-	x	(*1)	-
+    (*1) not based on kame
+
 IPsec ESP, crypto backend uses block cipher (esp_cbc_encrypt)
 		x	x	(*1)	-	x	(*1)	-
     (*1) not based on kame
@@ -85,7 +88,7 @@ RFC2367 conformance: sadb_msg
 
 RFC2367 conformance: SADB_[EAC]ALG
 		x	x	(*2)	(*1)	x	(*2)	(*1)
-    (*1) old KAME declaration, violates RFC2367 namespace
+    (*1) old KAME declaration, violates RFC2367 namespace and numbers
     (*2) not based on kame
 
 TCP/UDP		see IMPLEMENTATION for details
@@ -198,7 +201,11 @@ ipsec esp, encryption logic
 ipsec esp, blowfish-cbc codebase (before/after aug28, 2000)
 		new	new	-	old	old	-	old
 
-ipsec esp, rijndael/twofish support
+ipsec esp, rijndael support
+		(*1)	x	-	-	x	-	-
+    (*1) experimental, based on draft-ietf-ipsec-ciph-aes-cbc-00.txt
+
+ipsec esp, twofish support
 		(*1)	-	-	-	-	-	-
     (*1) experimental, based on draft-ietf-ipsec-ciph-aes-cbc-00.txt
 
@@ -241,4 +248,4 @@ default sendmail.cf is IPv6 ready
 		?	x	x	-	x	x	-
 
 racoon		latest	pkgsrc	-	ports
-			000730a		000718a
+			001111a		000718a
