@@ -1,0 +1,233 @@
+.\"	$KAME: natpt.conf.5,v 1.1 2001/09/30 21:13:14 fujisawa Exp $
+.\"
+.\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\" Note: The date here should be updated whenever a non-trivial
+.\" change is made to the manual page.
+.Dd December 25, 1999
+.Dt NATPT.CONF 5
+.\" Note: Only specify the operating system when the command
+.\" is FreeBSD specific, otherwise use the .Os macro with no
+.\" arguments.
+.Os KAME
+.\"
+.Sh NAME
+.Nm natpt.conf
+.Nd configuration file for KAME NAT-PT
+.\"
+.Sh DESCRIPTION
+.Nm
+describes the configuration file format for
+.Xr natptconfig 8 .
+However
+.Xr natptconfig 8
+does not have default configuration file, this filename
+.Pq Nm
+is as an example.
+.Pp
+This file consists of a sequence of statements.  Each statement is
+beginning with directive.  Lines beginning with
+.Ql #
+are comments.  Blank line is ignored.
+.Pp
+Each rule processed by this translater is added in the kernel internal
+list if there is no parsing problems.  When more than one rule is
+described, rule that has an error is not added, but the rule that has
+no error is added to this list.  Rules are added to the end of the
+internal lists using
+.Qq map
+directive, matching the
+order in which they appear when given in natptconfig.
+.\"
+.Sh DIRECTIVES
+Keywords and special characters that the parser expects exactly are
+displayed using
+.Sy this
+font.  Parameters are specified with
+.Em this
+font.  Square brackets
+.Pq So \&[ Sc and So \&] Sc
+are used to show optional keywords and parameters.  Parentheses
+.Pq So \&( Sc and So \&) Sc
+are used to group keywords and parameters when necessary.  The
+vertical bar
+.Pq Ql \&|
+is used to indicate a choice between optional
+parameters.
+.Pp
+The following directives are available in the configuration file.
+.Bl -tag -width Ds -offset indent
+.\"
+.It Xo Sy prefix
+.Xc
+Set NAT-PT prefix.  Packet addressed to this prefix will subject to
+translate.  Prefix length is always assumed as 96 bit.
+.\"
+.It Xo Sy map from ...
+.Xc
+Add translation rule into the kernel internal list.  The rules for
+returning packet is not appear in this map list.  The following
+formats are available.
+.Bl -tag -width XXX
+.\"	map from any6 to 202.249.11.250 port 28672 - 32767
+.It Xo Sy map from any6 to
+.Ar v4addr
+.Op Sy port Ar num Sy - Ar mum
+.Xc
+Translate the packet which come from arbitrary IPv6 address into
+specified IPv4 address.  If
+.Sy port
+directive is specified, convert source port number into in appointed
+range.  If not, source port number is not converted.
+.\"	map from 3ffe:501:4819::/48 to 202.249.11.250 port 28672 - 32767
+.It Xo Sy map from
+.Ar v6addr Op Sy \&/ Ar num
+.Sy to
+.Ar v4addr
+.Op Sy port Ar num Sy - Ar mum
+.Xc
+Translate the packet which come from specified IPv6 address or address
+range into specified IPv4 address.  The number after
+.Sy \&/
+specifies address mask, and when address mask is not specified, it is
+same as
+.Ar v6addr
+.Sy \&/ 128 .
+.\"	map from 202.249.11.251 dport 65305 to 3ffe:0501:041c::1 dport 23
+.It Xo Sy map from
+.Ar v4addr Op Sy dport Ar num
+.Sy to
+.Ar v6addr
+.Op Sy dport Ar num
+.Xc
+Translate IPv4 packet coming from specified IPv4 address into
+specified IPv6 address.  If both
+.Sy dport
+directive is specified, convert destination port number also.  Address
+and both port number must appoint it exactly.
+.\"	map from 10.0.0.3/8 to 202.249.11.252 port 28672 - 32767
+.It Xo Sy map from
+.Ar v4addr Op Sy \&/ Ar num
+.Sy to
+.Ar v4addr
+.Op Sy port Ar num Sy - Ar mum
+.Xc
+Translate IPv4 packet coming from specified IPv4 address or address
+range into specified IPv4 address. If
+.Sy port
+directive is specified, convert source port number into in appointed
+range.  If not, source port number is not converted.
+The number after
+.Sy \&/
+specifies address mask, and when address mask is not specified, it is
+same as
+.Ar v4addr
+.Sy \&/ 32 .
+This facility is same as usual V4 NAT.
+.El
+.Pp
+All the rules mentioned above
+.Pq Sy map from ...
+can have
+.Op  Sy proto Ar proto
+options.  This option specifies the protocol, specify
+.Sy icmp tcp udp
+separated by 
+.Ql Sy \&/ .
+There is no meaning in order of protocol to specify.
+.\"
+.It Xo Sy map flush
+.Xc
+Remove all translation rules from the kernel.  There is no way to
+remove only one rule.
+.\"
+.It Xo Sy map
+.Pq Sy enable|disable
+.Xc
+Enable or disable translation.  Initial status is disabled.
+.\"
+.It Xo Sy set Ar var Ar = Ar value
+.Xc
+Set the value to the variable.  Allowed variable is as follows.
+.Bl -tag -width XXX
+.It Sy natpt_debug
+This is for debug.
+.It Sy natpt_dump
+When set, dump mbuf or ip packet.  You must run natptlog command to
+show its dump.
+.El
+.Pp
+You can examine these variables and it's value with invoking following
+command.
+.Dl # natptconfig show variables
+.Pp
+However, you cannot set all of the variables which can appear with
+show subcommand.
+.El
+.\"
+.Sh EXAMPLES
+.Pq to be written
+.\"
+.Sh COMPATIBILITY
+Caution is needed because some syntax was changed.  The following is
+changed point of syntax.
+.Bl -bullet -offset indent
+.It
+.Ql interface
+directive was removed.
+.It
+about
+.Ql prefix
+directive, word
+.Ql natpt
+became needless.
+.It
+about
+.Ql map
+directive, word
+.Ql inbound
+and
+.Ql outbound
+became needless.  Use
+.Ql dport
+when you want to change destination port number.
+.Pp
+i.e.
+.Pp
+map from 202.249.11.251 dport 65305 to 3ffe:0501:041c::1 dport 23
+.El
+.\"
+.Sh SEE ALSO
+.Xr natptconfig 8
+.\"
+.Sh HISTORY
+The
+.Xr natptconfig
+command first appeared in WIDE/KAME IPv6 protocol stack kit.
+.\"
+.Sh BUGS
