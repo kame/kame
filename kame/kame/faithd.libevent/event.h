@@ -45,6 +45,7 @@ extern "C" {
 #define EV_TIMEOUT	0x01
 #define EV_READ		0x02
 #define EV_WRITE	0x04
+#define EV_EXCEPT	0x08
 
 /* Fix so that ppl dont have to run with <sys/queue.h> */
 #ifndef TAILQ_ENTRY

@@ -27,7 +27,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "config.h"
 
 #include <sys/types.h>
 #include <sys/tree.h>
@@ -238,13 +237,13 @@ event_pending(struct event *ev, short event, struct timeval *tv)
 	int flags = 0;
 
 	if (ev->ev_flags & EVLIST_INSERTED)
-		flags |= (ev->ev_events & (EV_READ|EV_WRITE));
+		flags |= (ev->ev_events & (EV_READ|EV_WRITE|EV_EXCEPT));
 	if (ev->ev_flags & EVLIST_ACTIVE)
 		flags |= ev->ev_res;
 	if (ev->ev_flags & EVLIST_TIMEOUT)
 		flags |= EV_TIMEOUT;
 
-	event &= (EV_TIMEOUT|EV_READ|EV_WRITE);
+	event &= (EV_TIMEOUT|EV_READ|EV_WRITE|EV_EXCEPT);
 
 	/* See if there is a timeout that we should report */
 	if (tv != NULL && (flags & event & EV_TIMEOUT))
@@ -257,10 +256,11 @@ int
 event_add(struct event *ev, struct timeval *tv)
 {
 	LOG_DBG((LOG_MISC, 55,
-		 "event_add: event: %p, %s%s%scall %p",
+		 "event_add: event: %p, %s%s%s%scall %p",
 		 ev,
 		 ev->ev_events & EV_READ ? "EV_READ " : " ",
 		 ev->ev_events & EV_WRITE ? "EV_WRITE " : " ",
+		 ev->ev_events & EV_EXCEPT ? "EV_EXCEPT " : " ",
 		 tv ? "EV_TIMEOUT " : " ",
 		 ev->ev_callback));
 
@@ -281,7 +281,7 @@ event_add(struct event *ev, struct timeval *tv)
 		event_queue_insert(ev, EVLIST_TIMEOUT);
 	}
 
-	if ((ev->ev_events & (EV_READ|EV_WRITE)) &&
+	if ((ev->ev_events & (EV_READ|EV_WRITE|EV_EXCEPT)) &&
 	    !(ev->ev_flags & EVLIST_INSERTED)) {
 		event_queue_insert(ev, EVLIST_INSERTED);
 

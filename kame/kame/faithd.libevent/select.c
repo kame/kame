@@ -27,7 +27,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "config.h"
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -60,6 +59,7 @@ struct selectop {
 	int event_fdsz;
 	fd_set *event_readset;
 	fd_set *event_writeset;
+	fd_set *event_exceptset;
 } sop;
 
 void *select_init	(void);
@@ -94,7 +94,7 @@ int
 select_recalc(void *arg, int max)
 {
 	struct selectop *sop = arg;
-	fd_set *readset, *writeset;
+	fd_set *readset, *writeset, *exceptset;
 	struct event *ev;
 	int fdsz;
 
@@ -120,13 +120,23 @@ select_recalc(void *arg, int max)
 			return (-1);
 		}
 
+		if ((exceptset = realloc(sop->event_exceptset, fdsz)) == NULL) {
+			log_error("malloc");
+			free(readset);
+			free(writeset);
+			return (-1);
+		}
+
 		memset((char *)readset + sop->event_fdsz, 0,
 		    fdsz - sop->event_fdsz);
 		memset((char *)writeset + sop->event_fdsz, 0,
 		    fdsz - sop->event_fdsz);
+		memset((char *)exceptset + sop->event_fdsz, 0,
+		    fdsz - sop->event_fdsz);
 
 		sop->event_readset = readset;
 		sop->event_writeset = writeset;
+		sop->event_exceptset = exceptset;
 		sop->event_fdsz = fdsz;
 	}
 
@@ -142,8 +152,11 @@ select_dispatch(void *arg, struct timeval *tv)
 
 	memset(sop->event_readset, 0, sop->event_fdsz);
 	memset(sop->event_writeset, 0, sop->event_fdsz);
+	memset(sop->event_exceptset, 0, sop->event_fdsz);
 
 	TAILQ_FOREACH(ev, &eventqueue, ev_next) {
+		if (ev->ev_events & EV_EXCEPT)
+			FD_SET(ev->ev_fd, sop->event_exceptset);
 		if (ev->ev_events & EV_WRITE)
 			FD_SET(ev->ev_fd, sop->event_writeset);
 		if (ev->ev_events & EV_READ)
@@ -152,7 +165,7 @@ select_dispatch(void *arg, struct timeval *tv)
 
 
 	if ((res = select(sop->event_fds + 1, sop->event_readset, 
-		 sop->event_writeset, NULL, tv)) == -1) {
+		 sop->event_writeset, sop->event_exceptset, tv)) == -1) {
 		if (errno != EINTR) {
 			log_error("select");
 			return (-1);
@@ -173,6 +186,8 @@ select_dispatch(void *arg, struct timeval *tv)
 			res |= EV_READ;
 		if (FD_ISSET(ev->ev_fd, sop->event_writeset))
 			res |= EV_WRITE;
+		if (FD_ISSET(ev->ev_fd, sop->event_exceptset))
+			res |= EV_EXCEPT;
 		res &= ev->ev_events;
 
 		if (res) {
