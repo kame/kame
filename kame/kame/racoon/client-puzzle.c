@@ -44,8 +44,12 @@ main(ac, av)
 		n = atoi(*(av + 2));
 	case 2:
 		k = atoi(*(av + 1));
-	case 1:
 		break;
+	case 1:
+		printf("Usage: client-puzzle (size) (times)\n");
+		printf("\tsize : the length of MSB to be zero.\n");
+		printf("\ttimes: the number of times of testing.\n");
+		exit(0);
 	}
 
 	data = vmalloc(16);	/*XXX*/
@@ -148,8 +152,8 @@ mdx(data, k)
 			printf("%02x", (u_char)(res->v[i] & 0xff));
 		printf("\n");
 #endif
-		printf("n=%ld\ttotal=%9.6f(s)\tavg=%9.6f(s)\n",
-			n, stats, stats/(n + 1));
+		printf("k=%d\tn=%ld\ttotal=%9.6f(s)\tavg=%9.6f(s)\n",
+			k, n + 1, stats, stats/(n + 1));
 	}
 #endif
 	vfree(sub);
