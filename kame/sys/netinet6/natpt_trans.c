@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.50 2001/10/14 17:20:05 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.51 2001/10/17 04:19:34 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -2321,7 +2321,7 @@ natpt_fixTCPUDP64cksum(int header, int proto, struct pcv *cv6, struct pcv *cv4)
 				natpt_log(LOG_DUMP, LOG_DEBUG, &ulc4, sizeof(ulc4));
 			}
 
-			cksum = natpt_fixCksum(ntohs(cv6->pyld.tcp6->th_sum),
+			cksum = natpt_fixCksum(cksum6,
 					       (u_char *)&ulc6, sizeof(struct ulc6),
 					       (u_char *)&ulc4, sizeof(struct ulc4));
 			cv4->pyld.tcp4->th_sum = htons(cksum);
@@ -2346,7 +2346,7 @@ natpt_fixTCPUDP64cksum(int header, int proto, struct pcv *cv6, struct pcv *cv4)
 		ulc4.ulc_tu.uh.uh_dport = cv4->pyld.udp->uh_dport;
 
 		if (header == AF_INET6) {
-			cksum = natpt_fixCksum(ntohs(cv6->pyld.udp->uh_sum),
+			cksum = natpt_fixCksum(cksum6,
 					       (u_char *)&ulc6, sizeof(struct ulc6),
 					       (u_char *)&ulc4, sizeof(struct ulc4));
 			cv4->pyld.udp->uh_sum = htons(cksum);
