@@ -15,4 +15,7 @@ NOMAN=	yes
 
 .PATH:	${SRCDIR}
 
+LDADD+=	-lutil
+DPADD+=	${LIBUTIL}
+
 .include <bsd.prog.mk>

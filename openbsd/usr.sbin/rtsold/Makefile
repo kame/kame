@@ -15,4 +15,7 @@ MLINKS=	rtsold.8 rtsol.8
 
 .PATH:	${SRCDIR}
 
+LDADD+=	-lutil
+DPADD+=	${LIBUTIL}
+
 .include <bsd.prog.mk>
