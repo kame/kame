@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.21 2001/12/07 03:32:39 keiichi Exp $
+$KAME: TODO.mobile-ip6,v 1.22 2001/12/20 02:29:45 k-sugyou Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -70,6 +70,9 @@ HA side
 	CFLAGS+=-DMIP6
 - build mip6control in kame/kame/mip6control.
 - to become a HA.
+	ifconfig de0 inet6 home_agent_address
+	ifconfig de0 inet6 home_prefix:fdff:ffff:ffff:fffe anycast
+	sysctl -w net.inet6.ip6.forwarding=1
 	invoke rtadvd with -m option
 	mip6control -g
 - to become a MN.
@@ -94,6 +97,6 @@ ftp://ftp.kame.net/pub/kame/contrib/mip6/ericsson.
 
 Also, NEC provides mobile ipv6 (based on draft 13) patch freely
 available for the KAME stack.  You can get it from
-www.6bone.nec.co.jp.
+http://www.6bone.nec.co.jp/mipv6/.
 
 [EOF]
