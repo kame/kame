@@ -30,7 +30,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     @(#)lpd.8	8.3 (Berkeley) 4/19/94
-.\" $FreeBSD: src/usr.sbin/lpr/lpd/lpd.8,v 1.14.2.1 2000/07/03 06:25:02 ps Exp $
+.\" $FreeBSD: src/usr.sbin/lpr/lpd/lpd.8,v 1.14.2.4 2001/02/18 16:15:44 ume Exp $
 .\"
 .Dd April 19, 1994
 .Dt LPD 8
@@ -105,7 +105,7 @@ or
 Second, if the
 .Li rs
 capability is specified in the
-.Xr printcap
+.Xr printcap 5
 entry for the printer being accessed,
 .Em lpr
 requests will only be honored for those users with accounts on the

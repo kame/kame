@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)syslogd.c	8.3 (Berkeley) 4/4/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.sbin/syslogd/syslogd.c,v 1.59.2.3 2000/10/30 11:42:27 dwmalone Exp $";
+  "$FreeBSD: src/usr.sbin/syslogd/syslogd.c,v 1.59.2.6 2001/02/18 16:22:59 ume Exp $";
 #endif /* not lint */
 
 /*
@@ -710,6 +710,8 @@ printsys(p)
 			pri = 10 * pri + (*p - '0');
 		if (*p == '>')
 			++p;
+		if ((pri & LOG_FACMASK) == LOG_CONSOLE)
+			flags |= IGN_CONS;
 	} else {
 		/* kernel printf's come out on console */
 		flags |= IGN_CONS;
