@@ -281,7 +281,7 @@ udp_input(m, off, proto)
 					 * and m_copy() will copy M_PKTHDR
 					 * only if offset is 0.
 					 */
-					m_adj(m, sizeof(struct udpiphdr));
+					m_adj(n, sizeof(struct udpiphdr));
 					if (last->inp_flags & INP_CONTROLOPTS
 					    || last->inp_socket->so_options & SO_TIMESTAMP)
 						ip_savecontrol(last, &opts, ip, n);
