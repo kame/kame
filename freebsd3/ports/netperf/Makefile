@@ -2,7 +2,7 @@
 # Date created:		19 July 1996
 # Whom:			koshy
 #
-# $Id: Makefile,v 1.4 2000/06/25 10:58:40 sumikawa Exp $
+# $Id: Makefile,v 1.5 2000/07/22 12:34:58 sumikawa Exp $
 #
 
 PORTNAME=	netperf
@@ -11,7 +11,7 @@ CATEGORIES=	benchmarks
 MASTER_SITES=	ftp://ftp.cup.hp.com/dist/networking/benchmarks/netperf/
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	netperf-21pl3-20000121a.diff.gz
+PATCHFILES=	netperf-21pl3-20000721.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	sumikawa@kame.net
