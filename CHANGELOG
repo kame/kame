@@ -1,9 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.116 1999/09/15 09:41:52 jinmei Exp $
+$Id: CHANGELOG,v 1.117 1999/09/16 00:45:00 itojun Exp $
 
 
 <199909>
+Thu Sep 16 09:44:03 JST 1999  itojun@iijlab.net
+	* netbsd/pkgsrc/net/tcptrace, freebsd[23]/pkgsrc/net/tcptrace:
+	  upgrade to 5.2.1.
+
 1999-09-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_control): removed a redundant
 	sanity check for ifp in the SIOCGIFSTAT_IN6 case. The check was
