@@ -1,4 +1,4 @@
-/*	$KAME: remoteconf.c,v 1.21 2001/03/23 01:19:08 sakane Exp $	*/
+/*	$KAME: remoteconf.c,v 1.22 2001/03/27 02:39:57 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -63,6 +63,7 @@
 #include "localconf.h"
 #include "grabmyaddr.h"
 #include "proposal.h"
+#include "vendorid.h"
 
 static LIST_HEAD(_rmtree, remoteconf) rmtree;
 
@@ -263,6 +264,12 @@ newisakmpsa()
 	new = CALLOC(sizeof(*new), struct isakmpsa *);
 	if (new == NULL)
 		return NULL;
+
+	/*
+	 * Just for sanity, make sure this is initialized.  This is
+	 * filled in for real when the ISAKMP proposal is configured.
+	 */
+	new->vendorid = VENDORID_UNKNOWN;
 
 	new->next = NULL;
 	new->rmconf = NULL;

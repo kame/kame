@@ -1,4 +1,4 @@
-/*	$KAME: localconf.c,v 1.29 2001/02/21 05:19:11 sakane Exp $	*/
+/*	$KAME: localconf.c,v 1.30 2001/03/27 02:39:57 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,13 +80,6 @@ initlcconf()
 	setdefault();
 
 	lcconf->racoon_conf = LC_DEFAULT_CF;
-
-	/* set hashed vendor id */
-	lcconf->vendorid = set_vendorid();
-	if (lcconf->vendorid == NULL) {
-		fprintf(stderr, "failed to set vendorid.\n");
-		exit(1);
-	}
 }
 
 void

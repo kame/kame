@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.94 2001/03/21 22:38:29 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.95 2001/03/27 02:39:57 thorpej Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -48,6 +48,7 @@
 #ifdef HAVE_GSSAPI
 #include "gssapi.h"
 #endif
+#include "vendorid.h"
 
 struct proposalspec {
 	time_t lifetime;		/* for isakmp/ipsec */
@@ -67,6 +68,7 @@ struct secprotospec {
 	int proto_id;		/* for ipsec (isakmp?) */
 	int ipsec_level;	/* for ipsec */
 	int encmode;		/* for ipsec */
+	int vendorid;		/* for isakmp */
 	char *gssid;
 	struct sockaddr *remote;
 	int algclass[MAXALGCLASS];
@@ -103,7 +105,7 @@ static int set_isakmp_proposal
 	__P((struct remoteconf *, struct proposalspec *));
 static void clean_tmpalgtype __P((void));
 static int expand_isakmpspec __P((int, int, int *,
-	int, int, time_t, int, int, char *, struct remoteconf *));
+	int, int, time_t, int, int, int, char *, struct remoteconf *));
 
 static int fix_lifebyte __P((u_long));
 %}
@@ -1157,6 +1159,10 @@ isakmpproposal_spec
 		EOS
 	|	GSSAPI_ID QUOTEDSTRING
 		{
+			if (prhead->spspec->vendorid != VENDORID_GSSAPI) {
+				yyerror("wrong Vendor ID for gssapi_id");
+				return -1;
+			}
 			prhead->spspec->gssid = strdup($2->v);
 		}
 		EOS
@@ -1212,6 +1218,28 @@ isakmpproposal_spec
 				break;
 			case algclass_isakmp_ameth:
 				prhead->spspec->algclass[algclass_isakmp_ameth] = doi;
+				/*
+				 * We may have to set the Vendor ID for the
+				 * authentication method we're using.
+				 */
+				switch ($2) {
+				case algtype_gssapikrb:
+					if (prhead->spspec->vendorid !=
+					    VENDORID_UNKNOWN) {
+						yyerror("Vendor ID mismatch "
+						    "for auth method");
+						return -1;
+					}
+					/*
+					 * For interoperability with Win2k,
+					 * we set the Vendor ID to "GSSAPI".
+					 */
+					prhead->spspec->vendorid =
+					    VENDORID_GSSAPI;
+					break;
+				default:
+					break;
+				}
 				break;
 			default:
 				yyerror("algorithm mismatched 2");
@@ -1288,6 +1316,13 @@ newspspec()
 	}
 
 	new->encklen = 0;	/*XXX*/
+
+	/*
+	 * Default to "uknown" vendor -- we will override this
+	 * as necessary.  When we send a Vendor ID payload, an
+	 * "unknown" will be translated to a KAME/racoon ID.
+	 */
+	new->vendorid = VENDORID_UNKNOWN;
 
 	return new;
 }
@@ -1382,7 +1417,7 @@ set_isakmp_proposal(rmconf, prspec)
 				algclass_isakmp_enc, algclass_isakmp_ameth + 1,
 				s->lifetime ? s->lifetime : p->lifetime,
 				s->lifebyte ? s->lifebyte : p->lifebyte,
-				s->encklen, s->gssid,
+				s->encklen, s->vendorid, s->gssid,
 				rmconf);
 		if (trns_no == -1) {
 			plog(LLV_ERROR, LOCATION, NULL,
@@ -1412,12 +1447,14 @@ clean_tmpalgtype()
 
 static int
 expand_isakmpspec(prop_no, trns_no, types,
-		class, last, lifetime, lifebyte, encklen, gssid, rmconf)
+		class, last, lifetime, lifebyte, encklen, vendorid, gssid,
+		rmconf)
 	int prop_no, trns_no;
 	int *types, class, last;
 	time_t lifetime;
 	int lifebyte;
 	int encklen;
+	int vendorid;
 	char *gssid;
 	struct remoteconf *rmconf;
 {
@@ -1473,6 +1510,7 @@ expand_isakmpspec(prop_no, trns_no, types,
 	new->authmethod = types[algclass_isakmp_ameth];
 	new->hashtype = types[algclass_isakmp_hash];
 	new->dh_group = types[algclass_isakmp_dh];
+	new->vendorid = vendorid;
 #ifdef HAVE_GSSAPI
 	if (gssid != NULL) {
 		new->gssid = vmalloc(strlen(gssid) + 1);

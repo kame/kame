@@ -1,8 +1,31 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1623 2001/03/25 09:59:18 itojun Exp $
+$KAME: CHANGELOG,v 1.1624 2001/03/27 02:39:56 thorpej Exp $
 
 <200103>
+2001-03-26  Jason R. Thorpe  <thorpej@zembu.com>
+
+	* racoon: Changes to Vendor ID payload handling.  Determine
+	  which VID we will send on a per-proposal basis; we may need
+	  to send a different one for each proposal depending on the
+	  proposal contents (e.g. GSSAPI auth method).  We no longer
+	  set the Vendor ID in the localconf.
+
+	  When matching the Vendor ID in check_vendorid(), use a table
+	  of known Vendor IDs, and return the index, and maintain a list
+	  of extensions that vendors implement (e.g. GSSAPI auth method).
+	  XXX We have a slight hack to recognize the Windows 2000 Vendor
+	  ID.  Need to clarify with the Microsoft IPsec guys.
+
+	  In Aggressive Mode, as responder, when sending first
+	  response, make sure to include a Vendor ID payload.
+
+	  In Main Mode, as responder, when sending first response,
+	  make sure to include a Vendor ID payload.
+
+	  XXX Still more Vendor ID processing fixes to go.  And
+	  GSSAPI auth doesn't interoperate with Windows 2000 yet.
+
 Sun Mar 25 18:11:24 JST 2001  itojun@iijlab.net
 	* sys/netinet6/{ip6_mroute,in6_prefix}.c: add missing splx.
 	  From: csapuntz@play-doh.stanford.edu (Constantine Sapuntzakis)
