@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.76 2000/03/30 14:19:03 sumikawa Exp $	*/
+/*	$KAME: ip6_input.c,v 1.77 2000/04/11 05:58:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -267,13 +267,9 @@ static void
 ip6_init2(dummy)
 	void *dummy;
 {
-	int ret;
 #if defined(__bsdi__) && _BSDI_VERSION < 199802
 	struct ifnet *loifp = &loif;
 #endif
-
-	/* get EUI64 from somewhere */
-	ret = in6_ifattach_getifid(NULL);
 
 	/*
 	 * to route local address of p2p link to loopback,
