@@ -1,4 +1,4 @@
-/*	$KAME: esp_rijndael.c,v 1.10 2003/07/15 15:25:18 itojun Exp $	*/
+/*	$KAME: esp_rijndael.c,v 1.11 2003/07/15 15:26:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -44,6 +44,7 @@
 
 #include <net/if.h>
 #include <net/route.h>
+
 #include <netinet/in.h>
 
 #include <netinet6/ipsec.h>
