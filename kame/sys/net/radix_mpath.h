@@ -1,4 +1,4 @@
-/*	$KAME: radix_mpath.h,v 1.8 2002/07/04 01:57:02 itojun Exp $	*/
+/*	$KAME: radix_mpath.h,v 1.9 2004/03/30 11:21:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -58,6 +58,13 @@ int	rn6_mpath_inithead __P((void **, int));
 #else
 int	rn_mpath_inithead __P((void **, int));
 #endif
+
+#ifdef __FreeBSD__
+/* for compatibility with NetBSD */
+#define rn_p rn_parent
+#define rn_b rn_bit
+#endif
+
 #endif
 
 #endif /* _NET_RADIX_MPATH_H_ */
