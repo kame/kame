@@ -1,4 +1,4 @@
-.\"	$OpenBSD: ifconfig.8,v 1.67 2003/07/10 19:56:49 avsm Exp $
+.\"	$OpenBSD: ifconfig.8,v 1.79 2004/03/18 20:52:13 mcbride Exp $
 .\"	$NetBSD: ifconfig.8,v 1.11 1996/01/04 21:27:29 pk Exp $
 .\"     $FreeBSD: ifconfig.8,v 1.16 1998/02/01 07:03:29 steve Exp $
 .\"
@@ -59,12 +59,28 @@
 .Cm vlandev
 .Ar parent-interface
 .Nm ifconfig
+.Ar carp-interface
+.Cm vhid
+.Ar host-id
+.Nm ifconfig
+.Ar pfsync-interface
+.Cm syncif
+.Ar iface
+.Nm ifconfig
 .Ar interface
 .Op Ar address_family
 .Nm ifconfig
 .Fl m
 .Ar interface
 .Op Ar address_family
+.Nm ifconfig
+.Ar interface
+.Cm create
+.Nm ifconfig
+.Ar interface
+.Cm destroy
+.Nm ifconfig
+.Fl C
 .Nm ifconfig
 .Op Fl a | am
 .Op Ar address_family
@@ -122,8 +138,8 @@ byte, and the dots are optional, if the user wishes to (carefully)
 count out long strings of digits in network byte order.
 .Tn AppleTalk
 (LLAP) addresses are specified as nn.na (Network Number.Node Address).
-Node addresses are divided into 2 classes: User Node IDs and Server
-Node IDs. 1-127($01-$7F) are for User Node IDs while 128-254($80-$FE)
+Node addresses are divided into 2 classes: User Node IDs and Server Node IDs.
+1-127($01-$7F) are for User Node IDs while 128-254($80-$FE)
 are used for Server Node IDs.
 Node 0($00) is not allowed (unknown)
 while Node 255($FF) is reserved for the AppleTalk broadcast Hardware
@@ -150,6 +166,14 @@ parameter is a string of the form
 .Dq name unit ,
 for example,
 .Dq en0 .
+If no optional parameters are supplied, this string may also be of the form
+.Dq name .
+In this case, all interfaces of that type will be displayed.
+For example,
+.Dq carp
+will display the current configuration of all
+.Xr carp 4
+interfaces.
 .El
 .Pp
 The following parameters may be set with
@@ -215,6 +239,21 @@ Both addresses must be of the same family.
 .It Cm deletetunnel
 Removes the source and destination tunnel addresses,
 configured onto a tunnel interface.
+.It Cm create
+Create the specified network pseudo-device.
+At least the following devices can be created on demand:
+.Pp
+.Xr bridge 4 ,
+.Xr carp 4 ,
+.Xr gif 4 ,
+.Xr gre 4 ,
+.Xr lo 4 ,
+.Xr ppp 4 ,
+.Xr sl 4 ,
+.Xr tun 4 ,
+.Xr vlan 4
+.It Cm destroy
+Destroy the specified network pseudo-device.
 .It Cm ipdst
 This is used to specify an Internet host who is willing to receive
 ip packets encapsulating NS packets bound for a remote network.
@@ -292,9 +331,10 @@ and
 .Cm vlandev
 must both be set at the same time.
 .It Cm vlandev Ar iface
-If the interface is a vlan pseudo device, associate physical interface
+If the interface is a vlan pseudo-device, associate physical interface
 .Ar iface
-with it. Packets transmitted through the vlan interface will be
+with it.
+Packets transmitted through the vlan interface will be
 diverted to the specified physical interface
 .Ar iface
 with 802.1Q vlan encapsulation.
@@ -323,10 +363,58 @@ parent interface supports insertion and extraction of vlan tags on its
 own (usually in firmware) and that it should pass packets to and from
 the parent unaltered.
 .It Fl vlandev
-If the driver is a vlan pseudo device, disassociate the physical interface
+If the driver is a vlan pseudo-device, disassociate the physical interface
 from it.
 This breaks the link between the vlan interface and its parent,
 clears its vlan tag, flags and its link address and shuts the interface down.
+.It Cm vhid Ar n
+If the driver is a carp pseudo-device, set the virtual host ID to
+.Ar n .
+Acceptable values are 1 to 255.
+.It Cm advbase Ar n
+If the driver is a carp pseudo-device, set the base advertisement interval to
+.Ar n
+seconds.
+This is an 8-bit number; the default value is 1 second.
+.It Cm advskew Ar n
+If the driver is a carp pseudo-device, skew the advertisement interval by
+.Ar n .
+This is an 8-bit number; the default value is 0.
+.Pp
+Taken together the
+.Cm advbase
+and
+.Cm advskew
+indicate how frequently, in seconds, the host will advertise the fact that it
+considers itself master of the virtual host.
+The formula is
+.Cm advbase
++
+.Cm ( advskew
+/ 255 ).
+If the master does not advertise within three times this interval, this host
+will begin advertising as master.
+.It Cm pass Ar passphrase
+If the driver is a carp pseudo-device, set the authentication key to
+.Ar passphrase .
+There is no passphrase by default.
+.It Cm state Ar state
+Explicitly force the carp pseudo-device to enter this state.
+Valid states are
+.Ar init ,
+.Ar backup ,
+and
+.Ar master .
+.It Cm syncif Ar iface
+If the driver is a pfsync pseudo-device, use the specified interface
+to send and receive pfsync state synchronisation messages.
+.It Fl syncif
+If the driver is a pfsync pseudo-device, stop sending pfsync state
+synchronisation messages over the network.
+.It Cm maxupd Ar n
+If the driver is a pfsync pseudo-device, indicate the maximum number
+of updates for a single state which can be collapsed into one.
+This is an 8-bit number; the default value is 128.
 .It Cm metric Ar n
 Set the routing metric of the interface to
 .Ar n ,
@@ -541,6 +629,14 @@ If
 followed by an interface name is specified, then the media information
 for that interface will be printed.
 .Pp
+The
+.Fl C
+option causes
+.Nm
+to print the names of all network pseudo-devices that
+can be created dynamically at runtime using
+.Cm ifconfig create .
+.Pp
 Only the superuser may modify the configuration of a network interface.
 .Sh EXAMPLES
 .Bl -tag -width ifconfig
@@ -551,7 +647,7 @@ Assign the inet(4) address of 192.168.1.10 with a network mask of
 .It Cm # ifconfig fxp0 ipx 12625920
 Assign the ipx(3) address of 12625920 specified in decimal to interface fxp0.
 .Pp
-.It Cm # ifconfig fxp0 atalk 39108.128 range 39107-39109 phase 2
+.It Cm "# ifconfig fxp0 atalk 39108.128 range 39107-39109 phase 2"
 Assign the AppleTalk network 39108 and server node 128 with a network
 range of 39107-39109 to interface fxp0 on a phase 2 AppleTalk network.
 .Pp
@@ -564,6 +660,15 @@ Configure the xl0 interface to use 100baseTX, full duplex.
 .It Cm # ifconfig vlan0 192.168.254.1 vlan 4 vlandev fxp0
 Configure the vlan0 interface for IP address 192.168.254.1, vlan tag 4,
 and vlan parent device fxp0.
+.Pp
+.It Cm # ifconfig carp0 vhid 1 192.168.10.1
+Configure the carp0 interface for IP address 192.168.10.1, virtual host ID 1.
+.Pp
+.It Cm # ifconfig gif1 create
+Create the gif1 network interface.
+.Pp
+.It Cm # ifconfig gif1 destroy
+Destroy the gif1 network interface.
 .El
 .Sh DIAGNOSTICS
 Messages indicating the specified interface does not exist, the
@@ -571,8 +676,18 @@ requested address is unknown, or the user is not privileged and
 tried to alter an interface's configuration.
 .Sh SEE ALSO
 .Xr netstat 1 ,
+.Xr bridge 4 ,
+.Xr carp 4 ,
+.Xr gif 4 ,
+.Xr gre 4 ,
 .Xr ifmedia 4 ,
+.Xr lo 4 ,
 .Xr netintro 4 ,
+.Xr pfsync 4 ,
+.Xr ppp 4 ,
+.Xr sl 4 ,
+.Xr tun 4 ,
+.Xr vlan 4 ,
 .Xr hostname.if 5 ,
 .Xr brconfig 8 ,
 .Xr rc 8 ,
