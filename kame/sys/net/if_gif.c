@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.33 2000/10/07 03:56:49 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.34 2000/10/07 03:58:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -650,7 +650,6 @@ gif_ioctl(ifp, cmd, data)
 		case SIOCGIFPSRCADDR:
 			dst = &ifr->ifr_addr;
 			size = sizeof(ifr->ifr_addr);
-			i = AF_INET;
 			break;
 #endif /* INET */
 #ifdef INET6
@@ -658,15 +657,12 @@ gif_ioctl(ifp, cmd, data)
 			dst = (struct sockaddr *)
 				&(((struct in6_ifreq *)data)->ifr_addr);
 			size = sizeof(((struct in6_ifreq *)data)->ifr_addr);
-			i = AF_INET6;
 			break;
 #endif /* INET6 */
 		default:
 			error = EADDRNOTAVAIL;
 			goto bad;
 		}
-		if (src->sa_family != i)
-			return EADDRNOTAVAIL;
 		if (src->sa_len > size)
 			return EINVAL;
 		bcopy((caddr_t)src, (caddr_t)dst, src->sa_len);
