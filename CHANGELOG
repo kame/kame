@@ -1,7 +1,21 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1958 2001/10/31 08:10:41 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1959 2001/10/31 11:30:35 jinmei Exp $
 
 <200110>
+2001-10-31  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (defrtrlist_update): corrected the
+	default router selection algorithm so that round-robin will surely
+	be performed when there's no reachable router.
+
+	Also, do not try to install more than one default router,
+	regardless of the availability of the multipath routing.  This is
+	because I'm not sure about the benefits for stub hosts comparing
+	to the risk of making the code complicated and the possibility of
+	introducing bugs.  (the previous code was actually buggy.)
+
+	The bug was found by recent TAHI tests, and was reported by Yukiyo
+	Akisada <yukiyo_akisada@yokogawa.co.jp>
+
 2001-10-31 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_{rule,tslot}.c:
 	  kame/kame/natptconfig/{cfparse,defs,misc,showsubs,yylex}.[chy]:
