@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.63 2002/10/02 11:16:00 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.64 2002/10/03 09:28:17 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1715,7 +1715,7 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 	int need_refresh = 0;
 	int need_auth = 0;
 	int ip6ma_size, pad;
-	int ba_size = 0, refresh_size = 0, auth_size = 0;
+	int ba_size = 0, refresh_size = 0;
 	u_int8_t key_bu[MIP6_KBU_LEN]; /* Stated as 'Kbu' in the spec */
 
 	*pktopt_mobility = NULL;
