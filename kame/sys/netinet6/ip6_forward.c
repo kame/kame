@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.47 2000/08/14 15:06:09 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.48 2000/08/14 17:31:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -93,10 +93,13 @@ struct	route_in6 ip6_forward_rt;
 #endif
 
 #ifdef MEASURE_PERFORMANCE
+#define OURS_CHECK_ALG_RTABLE 0	/* XXX: duplicated def. */
+
 extern int ip6_logentry;
 extern int ip6_logsize;
 extern unsigned long long ip6_performance_log[];
 extern unsigned long long ctr_beg, ctr_end;
+extern int ip6_ours_check_algorithm;
 
 static __inline unsigned long long read_tsc __P((void));
 static __inline void add_performance_log __P((unsigned long long)); 
@@ -357,7 +360,12 @@ ip6_forward(m, srcrt)
 		 * ip6_forward_rt.ro_dst.sin6_addr is equal to ip6->ip6_dst
 		 */
 		if (ip6_forward_rt.ro_rt == 0 ||
-		    (ip6_forward_rt.ro_rt->rt_flags & RTF_UP) == 0) {
+		    (ip6_forward_rt.ro_rt->rt_flags & RTF_UP) == 0
+#ifdef MEASURE_PERFORMANCE
+		    || (ip6_ours_check_algorithm != OURS_CHECK_ALG_RTABLE &&
+			!IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &dst->sin6_addr))
+#endif
+			) {
 			if (ip6_forward_rt.ro_rt) {
 				RTFREE(ip6_forward_rt.ro_rt);
 				ip6_forward_rt.ro_rt = 0;
@@ -370,6 +378,14 @@ ip6_forward(m, srcrt)
 			rtalloc((struct route *)&ip6_forward_rt);
 #endif
 		}
+
+#ifdef MEASURE_PERFORMANCE
+		ctr_end = read_tsc();
+#ifdef MEASURE_PERFORMANCE_UDPONLY
+		if (ip6->ip6_nxt == IPPROTO_UDP)
+#endif
+			add_performance_log(ctr_end - ctr_beg);
+#endif
 
 		if (ip6_forward_rt.ro_rt == 0) {
 			ip6stat.ip6s_noroute++;
@@ -409,14 +425,6 @@ ip6_forward(m, srcrt)
 		}
 	}
 	rt = ip6_forward_rt.ro_rt;
-
-#ifdef MEASURE_PERFORMANCE
-	ctr_end = read_tsc();
-#ifdef MEASURE_PERFORMANCE_UDPONLY
-	if (ip6->ip6_nxt == IPPROTO_UDP)
-#endif
-		add_performance_log(ctr_end - ctr_beg);
-#endif
 
 	/*
 	 * Scope check: if a packet can't be delivered to its destination
