@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.22 2003/07/31 02:48:53 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.23 2003/07/31 09:56:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -76,6 +76,7 @@
 #include <net/net_osdep.h>
 
 #include <netinet/in.h>
+#include <netinet/in_pcb.h>
 #include <netinet/ip_encap.h>
 #include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
@@ -191,6 +192,8 @@ static int mip6_bc_register(struct sockaddr_in6 *, struct sockaddr_in6 *,
     struct sockaddr_in6 *, u_int16_t, u_int16_t, u_int32_t);
 static int mip6_bc_update(struct mip6_bc *, struct sockaddr_in6 *,
     struct sockaddr_in6 *, u_int16_t, u_int16_t, u_int32_t);
+static int mip6_bc_send_brr(struct mip6_bc *);
+static int mip6_bc_need_brr(struct mip6_bc *);
 static void mip6_bc_starttimer(void);
 static void mip6_bc_stoptimer(void);
 static void mip6_bc_timeout(void *);
@@ -205,6 +208,8 @@ static int mip6_ip6mh_create(struct ip6_mobility **, struct sockaddr_in6 *,
     struct sockaddr_in6 *, u_int8_t *);
 static int mip6_ip6mc_create(struct ip6_mobility **, struct sockaddr_in6 *,
     struct sockaddr_in6 *, u_int8_t *);
+static int mip6_ip6mr_create(struct ip6_mobility **, struct sockaddr_in6 *,
+    struct sockaddr_in6 *);
 
 /* core functions for mobile node and home agent. */
 #if !defined(MIP6_NOHAIPSEC)
@@ -721,7 +726,7 @@ mip6_rthdr_create_withdst(pktopt_rthdr, dst, opt)
 
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, dst);
 	if (mbc == NULL) {
-		/* no BC entry found. */
+		/* no binding cache entry for this dst is found. */
 		return (0);
 	}
 
@@ -823,6 +828,7 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
 	/* sanity check for overflow */
 	if (mbc->mbc_expire < time_second)
 		mbc->mbc_expire = 0x7fffffff;
+	mbc->mbc_state = MIP6_BC_FSM_STATE_BOUND;
 	mbc->mbc_mpa_exp = time_second;	/* set to current time to send mpa as soon as created it */
 #ifdef MIP6_CALLOUTTEST
 	/* It isn't necessary to create timeout entry here because it will be done when inserting mbc to the list */
@@ -1035,6 +1041,7 @@ mip6_bc_update(mbc, coa_sa, dst_sa, flags, seqno, lifetime)
 	/* sanity check for overflow */
 	if (mbc->mbc_expire < time_second)
 		mbc->mbc_expire = 0x7fffffff;
+	mbc->mbc_state = MIP6_BC_FSM_STATE_BOUND;
 #ifdef MIP6_CALLOUTTEST
 	mip6_timeoutentry_update(mbc->mbc_timeout, mbc->mbc_expire);
 	mip6_timeoutentry_update(mbc->mbc_brr_timeout, mbc->mbc_expire - mbc->mbc_lifetime / 4);
@@ -1139,6 +1146,99 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh, mopt)
 	return (error);
 }
 
+static int
+mip6_bc_send_brr(mbc)
+	struct mip6_bc *mbc;
+{
+	struct mbuf *m;
+	struct ip6_pktopts opt;
+	int error;
+
+	init_ip6pktopts(&opt);
+
+	m = mip6_create_ip6hdr(&mbc->mbc_addr, &mbc->mbc_phaddr, IPPROTO_NONE,
+	    0);
+	if (m == NULL) {
+		mip6log((LOG_ERR,
+		    "%s:%d: creating ip6hdr failed.\n",
+		    __FILE__, __LINE__));
+		return (ENOMEM);
+	}
+
+	error = mip6_ip6mr_create(&opt.ip6po_mobility, &mbc->mbc_addr,
+	    &mbc->mbc_phaddr);
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: a binding refresh reqeust message creation error "
+		    "(%d)\n",
+		    __FILE__, __LINE__, error));
+		m_freem(m);
+		goto free_ip6pktopts;
+	}
+
+	error = ip6_output(m, &opt, NULL, 0, NULL, NULL
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
+			   , NULL
+#endif
+			  );
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: sending ip packet error. (%d)\n",
+		    __FILE__, __LINE__, error));
+		goto free_ip6pktopts;
+	}
+
+ free_ip6pktopts:
+	if (opt.ip6po_mobility)
+		FREE(opt.ip6po_mobility, M_IP6OPT);
+
+	return (error);
+}
+
+#ifdef __FreeBSD__
+extern struct inpcbhead tcb;
+#endif
+static int
+mip6_bc_need_brr(mbc)
+	struct mip6_bc *mbc;
+{
+	int found;
+	struct sockaddr_in6 *src, *dst;
+#ifdef __FreeBSD__
+	struct inpcb *inp;
+#endif
+#ifdef __NetBSD__
+	struct in6pcb *inp;
+#endif
+
+	found = 0;
+	src = &mbc->mbc_addr;
+	dst = &mbc->mbc_phaddr;
+
+#ifdef __FreeBSD__
+	for (inp = LIST_FIRST(&tcb); inp; inp = LIST_NEXT(inp, inp_list)) {
+		if ((inp->inp_vflag & INP_IPV6) == 0)
+			continue;
+		if (SA6_ARE_ADDR_EQUAL(src, &inp->in6p_lsa)
+		    && SA6_ARE_ADDR_EQUAL(dst, &inp->in6p_fsa)) {
+			found++;
+			break;
+		}
+	}
+#endif
+#ifdef __NetBSD__
+	for (inp = &tbc6; inp != &tcb6; inp = inp->inp_next) {
+		if (SA6_ARE_ADDR_EQUAL(src, &inp->in6p_lsa)
+		    && SA6_ARE_ADDR_EQUAL(dst, &inp->in6p_fsa)) {
+			found++;
+			break;
+		}
+	}
+#endif
+
+	return (found);
+}
+
 static void
 mip6_bc_starttimer(void)
 {
@@ -1215,36 +1315,57 @@ mip6_bc_timeout(dummy)
 #else
 	for (mbc = LIST_FIRST(&mip6_bc_list); mbc; mbc = mbc_next) {
 		mbc_next = LIST_NEXT(mbc, mbc_entry);
-		/* expiration check. */
-		if (mbc->mbc_expire < time_second) {
+		switch (mbc->mbc_state) {
+		case MIP6_BC_FSM_STATE_BOUND:
+			if (mbc->mbc_expire - (mbc->mbc_lifetime / 2)
+			    < time_second) {
+				if (mip6_bc_need_brr(mbc))
+					mip6_bc_send_brr(mbc);
+				mbc->mbc_state = MIP6_BC_FSM_STATE_WAITB;
+			}
+			break;
+		case MIP6_BC_FSM_STATE_WAITB:
+			if (mbc->mbc_expire - (mbc->mbc_lifetime / 4)
+			    < time_second) {
+				if (mip6_bc_need_brr(mbc))
+					mip6_bc_send_brr(mbc);
+				mbc->mbc_state = MIP6_BC_FSM_STATE_WAITB2;
+			}
+			break;
+		case MIP6_BC_FSM_STATE_WAITB2:
+			/* expiration check. */
+			if (mbc->mbc_expire < time_second) {
 #ifdef MIP6_HOME_AGENT
-			if (mbc->mbc_flags & IP6MU_CLONED) {
+				if (mbc->mbc_flags & IP6MU_CLONED) {
+					/*
+					 * cloned entry is removed
+					 * when the last referring mbc
+					 * is removed.
+					 */
+					continue;
+				}
+				if (mbc->mbc_llmbc != NULL) {
+					/* remove a cloned entry. */
+					error = mip6_bc_list_remove(
+					    &mip6_bc_list, mbc->mbc_llmbc);
+				}
+				if (error) {
+					mip6log((LOG_ERR,
+					    "%s:%d: failed to remove "
+					    "a cloned binding cache entry.\n",
+					    __FILE__, __LINE__));
+				}
 				/*
-				 * cloned entry is removed when the
-				 * last referring mbc is removed.
+				 * we must reset mbc_next.  since a
+				 * removal of a mbc may cause another
+				 * removal of a related cloned mbc,
+				 * mbc_next may have a bogus pointer.
 				 */
-				continue;
-			}
-			if (mbc->mbc_llmbc != NULL) {
-				/* remove a cloned entry. */
-				error = mip6_bc_list_remove(&mip6_bc_list,
-				    mbc->mbc_llmbc);
-			}
-			if (error) {
-				mip6log((LOG_ERR,
-				    "%s:%d: failed to remove "
-				    "a cloned binding cache entry.\n",
-				    __FILE__, __LINE__));
-			}
-			/*
-			 * we must reset mbc_next.  since a removal of
-			 * a mbc may cause another removal of a
-			 * related cloned mbc, mbc_next may have a
-			 * bogus pointer.
-			 */
-			mbc_next = LIST_NEXT(mbc, mbc_entry);
+				mbc_next = LIST_NEXT(mbc, mbc_entry);
 #endif /* MIP6_HOME_AGENT */
-			mip6_bc_list_remove(&mip6_bc_list, mbc);
+				mip6_bc_list_remove(&mip6_bc_list, mbc);
+			}
+			break;
 		}
 	}
 #endif
@@ -2266,6 +2387,38 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, dstcoa, status, seqno, lifetime, re
 	return (0);
 }
 
+static int
+mip6_ip6mr_create(pktopt_mobility, src, dst)
+	struct ip6_mobility **pktopt_mobility;
+	struct sockaddr_in6 *src;
+	struct sockaddr_in6 *dst;
+{
+	struct ip6m_binding_request *ip6mr;
+	int ip6mr_size;
+
+	*pktopt_mobility = NULL;
+
+	ip6mr_size = sizeof(struct ip6m_binding_request);
+
+	MALLOC(ip6mr, struct ip6m_binding_request *,
+	       ip6mr_size, M_IP6OPT, M_NOWAIT);
+	if (ip6mr == NULL)
+		return (ENOMEM);
+
+	bzero(ip6mr, ip6mr_size);
+	ip6mr->ip6mr_pproto = IPPROTO_NONE;
+	ip6mr->ip6mr_len = (ip6mr_size >> 3) - 1;
+	ip6mr->ip6mr_type = IP6M_BINDING_REQUEST;
+
+	/* calculate checksum. */
+	ip6mr->ip6mr_cksum = mip6_cksum(src, dst, ip6mr_size, IPPROTO_MOBILITY,
+	    (char *)ip6mr);
+
+	*pktopt_mobility = (struct ip6_mobility *)ip6mr;
+
+	return (0);
+}
+
 int
 mip6_ip6me_create(pktopt_mobility, src, dst, status, addr)
 	struct ip6_mobility **pktopt_mobility;
@@ -2299,6 +2452,7 @@ mip6_ip6me_create(pktopt_mobility, src, dst, status, addr)
 					IPPROTO_MOBILITY, (char *)ip6me);
 
 	*pktopt_mobility = (struct ip6_mobility *)ip6me;
+
 	return (0);
 }
 

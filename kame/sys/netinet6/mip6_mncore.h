@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.h,v 1.7 2003/07/29 08:10:16 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.h,v 1.8 2003/07/31 09:56:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -133,6 +133,7 @@ int mip6_addr_exchange(struct mbuf *, struct mbuf *);
 int mip6_ip6mh_input(struct mbuf *, struct ip6m_home_test *, int);
 int mip6_ip6mc_input(struct mbuf *, struct ip6m_careof_test *, int);
 int mip6_ip6ma_input(struct mbuf *, struct ip6m_binding_ack *, int);
+int mip6_ip6mr_input(struct mbuf *, struct ip6m_binding_request *, int);
 int mip6_ip6me_input(struct mbuf *, struct ip6m_binding_error *, int);
 int mip6_ip6mhi_create(struct ip6_mobility **, struct mip6_bu *);
 int mip6_ip6mci_create(struct ip6_mobility **, struct mip6_bu *);

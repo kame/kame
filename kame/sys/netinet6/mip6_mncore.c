@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.18 2003/07/29 08:10:16 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.19 2003/07/31 09:56:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -3208,6 +3208,68 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	}
 
 	return (0);
+}
+
+int
+mip6_ip6mr_input(m, ip6mr, ip6mrlen)
+	struct mbuf *m;
+	struct ip6m_binding_request *ip6mr;
+	int ip6mrlen;
+{
+	struct sockaddr_in6 src_sa, dst_sa;
+	struct hif_softc *sc;
+	struct mip6_bu *mbu;
+	int error;
+
+	mip6stat.mip6s_br++;
+
+	/* get packet source and destination addresses. */
+	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
+		/* must not happen. */
+		goto bad;
+	}
+
+	/* packet length check. */
+	if (ip6mrlen < sizeof (struct ip6m_binding_request)) {
+		mip6log((LOG_NOTICE,
+		    "%s:%d: too short binding request (len = %d) "
+		    "from host %s.\n",
+		    __FILE__, __LINE__,
+		    ip6mrlen, ip6_sprintf(&src_sa.sin6_addr)));
+		ip6stat.ip6s_toosmall++;
+		/* send ICMP parameter problem. */
+		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
+		    (caddr_t)&ip6mr->ip6mr_len - (caddr_t)mtod(m, struct ip6_hdr *));
+		return(EINVAL);
+	}
+
+	/* find hif corresponding to the home address. */
+	sc = hif_list_find_withhaddr(&dst_sa);
+	if (sc == NULL) {
+		/* we have no such home address. */
+		mip6stat.mip6s_nohif++;
+		goto bad;
+	}
+
+	/* find a corresponding binding update entry. */
+	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &src_sa, &dst_sa);
+	if (mbu == NULL) {
+		/* we have no binding update entry for dst_sa. */
+		return (0);
+	}
+
+	error = mip6_bu_fsm(mbu, MIP6_BU_PRI_FSM_EVENT_BRR, ip6mr);
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: state transition failed. (%d)\n",
+		    __FILE__, __LINE__, error));
+		goto bad;
+	}
+
+	return (0);
+ bad:
+	m_freem(m);
+	return (EINVAL);
 }
 
 int

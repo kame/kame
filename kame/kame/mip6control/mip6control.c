@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.47 2003/07/31 01:35:33 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.48 2003/07/31 09:56:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -72,7 +72,7 @@ static const char *buflg_sprintf(u_int8_t);
 static const char *bufpsmstate_sprintf(u_int8_t);
 static const char *bufssmstate_sprintf(u_int8_t);
 static const char *bustate_sprintf(u_int8_t);
-static const char *bcflg_sprintf(u_int8_t);
+static const char *bcstate_sprintf(u_int8_t);
 static struct hif_softc *get_hif_softc(char *);
 static void kread(u_long, void *, int);
 static int parse_address_port(char *, struct in6_addr *, uint16_t *);
@@ -566,7 +566,7 @@ main(argc, argv)
 			       mbc->mbc_seqno,
 			       mbc->mbc_lifetime,
 			       mbc->mbc_expire - time.tv_sec,
-			       bcflg_sprintf(mbc->mbc_state),
+			       bcstate_sprintf(mbc->mbc_state),
 			       mbc->mbc_refcnt);
 		}
 	}
@@ -871,12 +871,16 @@ bustate_sprintf(flags)
 }
 
 static const char *
-bcflg_sprintf(flags)
-	u_int8_t flags;
+bcstate_sprintf(state)
+	u_int8_t state;
 {
-	static char buf[] = "---";
+	static char *buf[] = {
+		"BOUND",
+		"WAITB",
+		"WAITB2"
+	};
 
-	return buf;
+	return buf[state];
 }
 
 static struct hif_softc *

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.21 2003/04/23 09:15:51 keiichi Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.22 2003/07/31 09:56:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1211,7 +1211,45 @@ mip6_bu_pri_fsm(mbu, event, data)
 	case MIP6_BU_PRI_FSM_STATE_BOUND:
 		switch (event) {
 		case MIP6_BU_PRI_FSM_EVENT_BRR:
-			/* XXX */
+			if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
+				/*
+				 * Send BU,
+				 * Start retransmission timer.
+				 */
+				error = mip6_bu_pri_fsm_home_registration(mbu);
+				if (error) {
+					mip6log((LOG_ERR,
+					    "%s:%d: "
+					    "sending a home registration "
+					    "failed. (%d)\n",
+					    __FILE__, __LINE__, error));
+					/* continue and try again. */
+				}
+
+				*mbu_pri_fsm_state
+				    = MIP6_BU_PRI_FSM_STATE_WAITAR;
+			} else {
+				/*
+				 * Stop timers,
+				 * Start RR.
+				 */
+				mip6_bu_stop_timers(mbu);
+
+				error = mip6_bu_sec_fsm(mbu,
+				    MIP6_BU_SEC_FSM_EVENT_START_RR,
+				    data);
+				if (error) {
+					mip6log((LOG_ERR,
+					    "%s:%d: "
+					    "second fsm state transition "
+					    "failed.\n",
+					    __FILE__, __LINE__));
+					return (error);
+				}
+
+				*mbu_pri_fsm_state
+				    = MIP6_BU_PRI_FSM_STATE_RRREDO;
+			}
 			break;
 
 		case MIP6_BU_PRI_FSM_EVENT_MOVEMENT:

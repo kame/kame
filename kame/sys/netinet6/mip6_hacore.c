@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.10 2003/07/30 12:45:11 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.11 2003/07/31 09:56:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -212,6 +212,7 @@ mip6_process_hrbu(bi)
 			/* sanity check for overflow. */
 			if (llmbc->mbc_expire < time_second)
 				llmbc->mbc_expire = 0x7fffffff;
+			llmbc->mbc_state = MIP6_BC_FSM_STATE_BOUND;
 #ifdef MIP6_CALLOUTTEST
 			mip6_timeoutentry_update(llmbc->mbc_timeout, llmbc->mbc_expire);
 			mip6_timeoutentry_update(llmbc->mbc_brr_timeout, llmbc->mbc_expire - mbc->mbc_lifetime / 4);
@@ -269,6 +270,7 @@ mip6_process_hrbu(bi)
 		/* sanity check for overflow. */
 		if (mbc->mbc_expire < time_second)
 			mbc->mbc_expire = 0x7fffffff;
+		mbc->mbc_state = MIP6_BC_FSM_STATE_BOUND;
 #ifdef MIP6_CALLOUTTEST
 		mip6_timeoutentry_update(mbc->mbc_timeout, mbc->mbc_expire);
 		/* mip6_timeoutentry_update(mbc->mbc_brr_timeout, mbc->mbc_expire - mbc->mbc_lifetime / 4); */
