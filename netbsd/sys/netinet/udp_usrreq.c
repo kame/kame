@@ -564,7 +564,7 @@ udp4_realinput(src, dst, m, off)
 
 		/*
 		 * KAME note: usually we drop udpiphdr from mbuf here.
-		 * we need udpiphdr for iPsec processing so we do that later.
+		 * we need udpiphdr for IPsec processing so we do that later.
 		 */
 		/*
 		 * Locate pcb(s) for datagram.
@@ -730,7 +730,7 @@ udp6_realinput(af, src, dst, m, off)
 
 		/*
 		 * KAME note: usually we drop udpiphdr from mbuf here.
-		 * we need udpiphdr for iPsec processing so we do that later.
+		 * we need udpiphdr for IPsec processing so we do that later.
 		 */
 		/*
 		 * Locate pcb(s) for datagram.
@@ -970,7 +970,7 @@ udp_input(m, va_alist)
 		iphlen += sizeof(struct udphdr);
 		/*
 		 * KAME note: usually we drop udpiphdr from mbuf here.
-		 * we need udpiphdr for iPsec processing so we do that later.
+		 * we need udpiphdr for IPsec processing so we do that later.
 		 */
 		/*
 		 * Locate pcb(s) for datagram.
