@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.72 2000/09/29 18:45:09 itojun Exp $	*/
+/*	$KAME: cfparse.y,v 1.73 2000/10/04 03:26:09 itojun Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -1009,8 +1009,13 @@ remote_spec
 	|	CERTIFICATE_TYPE cert_spec
 	|	PEERS_CERTFILE QUOTEDSTRING
 		{
+#ifdef HAVE_SIGNING_C
 			cur_rmconf->peerscertfile = strdup($2->v);
 			vfree($2);
+#else
+			yyerror("directive not supported");
+			return -1;
+#endif
 		}
 		EOS
 	|	VERIFY_CERT SWITCH EOS { cur_rmconf->verify_cert = $2; }
@@ -1086,11 +1091,16 @@ exchange_types
 cert_spec
 	:	CERT_X509 QUOTEDSTRING QUOTEDSTRING
 		{
+#ifdef HAVE_SIGNING_C
 			cur_rmconf->certtype = $1;
 			cur_rmconf->mycertfile = strdup($2->v);
 			vfree($2);
 			cur_rmconf->myprivfile = strdup($3->v);
 			vfree($3);
+#else
+			yyerror("directive not supported");
+			return -1;
+#endif
 		}
 		EOS
 dh_group_num
