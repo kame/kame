@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.691 2000/03/14 01:05:49 itojun Exp $
+$Id: CHANGELOG,v 1.692 2000/03/15 00:40:33 itojun Exp $
 
 <200003>
 Tue Mar 14 10:04:42 JST 2000  itojun@iijlab.net
@@ -11,10 +11,11 @@ Tue Mar 14 10:04:42 JST 2000  itojun@iijlab.net
 Mon Mar 13 21:29:32 JST 2000  itojun@iijlab.net
 	* {netbsd,openbsd}/lib/libinet6/getaddrinfo.c: fix error handling in
 	  YP name lookup.
-	* netbsd/lib/libinet6/getaddrinfo.c, kame/libinet6/name6.c: filter out
-	  IPv4 mapped address in DNS/YP/hosts database, as they are not
-	  supposed to appear on those places.  There are real-world example
-	  with incorrect use exist.
+	* {netbsd,openbsd}/lib/libinet6/getaddrinfo.c, kame/libinet6/name6.c:
+	  filter out IPv4 mapped address in DNS/YP/hosts database, as they
+	  are not supposed to appear on those places.  There are real-world
+	  example with incorrect use exist, and it makes trouble with
+	  IPv6-only node.
 
 Mon Mar 13 19:36:55 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
