@@ -1,4 +1,4 @@
-/*	$KAME: keydb.c,v 1.80 2003/09/06 20:58:44 itojun Exp $	*/
+/*	$KAME: keydb.c,v 1.81 2003/09/07 05:25:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -54,6 +54,7 @@
 
 #include <net/pfkeyv2.h>
 #include <netkey/keydb.h>
+#include <netkey/key.h>
 #include <netinet6/ipsec.h>
 
 #include <net/net_osdep.h>
@@ -70,11 +71,6 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 MALLOC_DEFINE(M_SECA, "key mgmt", "security associations, key management");
 #endif
-
-extern TAILQ_HEAD(_satailq, secasvar) satailq;
-extern TAILQ_HEAD(_sptailq, secpolicy) sptailq;
-
-static void keydb_delsecasvar __P((struct secasvar *));
 
 /*
  * secpolicy management
@@ -197,11 +193,14 @@ again:
 			goto again;
 		if (q->id < said && said < TAILQ_NEXT(q, tailq)->id)
 			break;
+		if (q->id + 1 < TAILQ_NEXT(q, tailq)->id) {
+			said = q->id + 1;
+			break;
+		}
 	}
 
 	bzero(p, sizeof(*p));
 	p->id = said;
-	p->refcnt = 1;
 	if (q)
 		TAILQ_INSERT_AFTER(&satailq, q, p, tailq);
 	else
@@ -210,47 +209,12 @@ again:
 }
 
 void
-keydb_refsecasvar(p)
-	struct secasvar *p;
-{
-	int s;
-
-#ifdef __NetBSD__
-	s = splsoftnet();
-#else
-	s = splnet();
-#endif
-	p->refcnt++;
-	splx(s);
-}
-
-void
-keydb_freesecasvar(p)
-	struct secasvar *p;
-{
-	int s;
-
-#ifdef __NetBSD__
-	s = splsoftnet();
-#else
-	s = splnet();
-#endif
-	p->refcnt--;
-	/* negative refcnt will cause panic intentionally */
-	if (p->refcnt <= 0)
-		keydb_delsecasvar(p);
-	splx(s);
-}
-
-static void
 keydb_delsecasvar(p)
 	struct secasvar *p;
 {
 
-	if (p->refcnt)
-		panic("keydb_delsecasvar called with refcnt != 0");
-
 	TAILQ_REMOVE(&satailq, p, tailq);
+
 	free(p, M_SECA);
 }
 

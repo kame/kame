@@ -1,4 +1,4 @@
-/*	$KAME: keydb.h,v 1.22 2003/09/06 20:58:45 itojun Exp $	*/
+/*	$KAME: keydb.h,v 1.23 2003/09/07 05:25:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -161,8 +161,7 @@ extern struct secashead *keydb_newsecashead __P((void));
 extern void keydb_delsecashead __P((struct secashead *));
 /* secasvar */
 extern struct secasvar *keydb_newsecasvar __P((void));
-extern void keydb_refsecasvar __P((struct secasvar *));
-extern void keydb_freesecasvar __P((struct secasvar *));
+extern void keydb_delsecasvar __P((struct secasvar *));
 /* secreplay */
 extern struct secreplay *keydb_newsecreplay __P((size_t));
 extern void keydb_delsecreplay __P((struct secreplay *));

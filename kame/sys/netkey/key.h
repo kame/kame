@@ -1,4 +1,4 @@
-/*	$KAME: key.h,v 1.31 2003/07/07 11:23:44 keiichi Exp $	*/
+/*	$KAME: key.h,v 1.32 2003/09/07 05:25:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -34,7 +34,12 @@
 
 #ifdef _KERNEL
 
+#include <sys/queue.h>
+
 extern struct key_cb key_cb;
+
+extern TAILQ_HEAD(_satailq, secasvar) satailq;
+extern TAILQ_HEAD(_sptailq, secpolicy) sptailq;
 
 struct secpolicy;
 struct secpolicyindex;

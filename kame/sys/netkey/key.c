@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.301 2003/09/06 20:58:44 itojun Exp $	*/
+/*	$KAME: key.c,v 1.302 2003/09/07 05:25:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -143,7 +143,7 @@
  *   referenced from SA header.
  * - SAs that are in DEAD state will have (total external reference)
  *   in reference count field.  they are ready to be freed.  reference from
- *   SA header will be removed in key_delsav(), when the reference count
+ *   SA header will be removed in keydb_delsecasvar(), when the reference count
  *   field hits 0 (= no external reference other than from SA header.
  */
 
@@ -160,8 +160,8 @@ static int key_preferred_oldsa = 1;	/*preferred old sa rather than new sa.*/
 static u_int32_t acq_seq = 0;
 static int key_tick_init_random = 0;
 
-TAILQ_HEAD(_satailq, secasvar) satailq;		/* list of all SAD entry */
-TAILQ_HEAD(_sptailq, secpolicy) sptailq;	/* SPD table + pcb */
+struct _satailq satailq;		/* list of all SAD entry */
+struct _sptailq sptailq;		/* SPD table + pcb */
 static LIST_HEAD(_sptree, secpolicy) sptree[IPSEC_DIR_MAX];	/* SPD table */
 static LIST_HEAD(_sahtree, secashead) sahtree;			/* SAD */
 static LIST_HEAD(_regtree, secreg) regtree[SADB_SATYPE_MAX + 1];
@@ -389,6 +389,7 @@ struct sadb_msghdr {
 
 static struct secasvar *key_allocsa_policy __P((struct secasindex *));
 static struct secasvar *key_do_allocsa_policy __P((struct secashead *, u_int));
+static void key_delsav __P((struct secasvar *));
 static void key_delsp __P((struct secpolicy *));
 static struct secpolicy *key_getsp __P((struct secpolicyindex *, int));
 #if NPF > 0
@@ -418,7 +419,6 @@ static struct secashead *key_newsah __P((struct secasindex *));
 static void key_delsah __P((struct secashead *));
 static struct secasvar *key_newsav __P((struct mbuf *,
 	const struct sadb_msghdr *, struct secashead *, int *));
-static void key_delsav __P((struct secasvar *));
 static struct secashead *key_getsah __P((struct secasindex *));
 static struct secasvar *key_checkspidup __P((struct secasindex *, u_int32_t));
 static struct secasvar *key_getsavbyspi __P((struct secashead *, u_int32_t));
@@ -1161,10 +1161,64 @@ key_freesav(sav)
 		printf("DP freesav cause refcnt--:%d SA:%p SPI %u\n",
 			sav->refcnt, sav, (u_int32_t)ntohl(sav->spi)));
 
-	if (sav->refcnt == 0)
-		key_delsav(sav);
+	if (sav->refcnt > 0)
+		return;
 
-	return;
+	key_delsav(sav);
+}
+
+static void
+key_delsav(sav)
+	struct secasvar *sav;
+{
+
+	/* sanity check */
+	if (sav == NULL)
+		panic("key_delsav: NULL pointer is passed.");
+
+	if (sav->refcnt > 0)
+		panic("key_delsav: called with positive refcnt");
+
+	if (__LIST_CHAINED(sav))
+		LIST_REMOVE(sav, chain);
+
+	if (sav->key_auth != NULL) {
+		bzero(_KEYBUF(sav->key_auth), _KEYLEN(sav->key_auth));
+		KFREE(sav->key_auth);
+		sav->key_auth = NULL;
+	}
+	if (sav->key_enc != NULL) {
+		bzero(_KEYBUF(sav->key_enc), _KEYLEN(sav->key_enc));
+		KFREE(sav->key_enc);
+		sav->key_enc = NULL;
+	}
+	if (sav->sched) {
+		bzero(sav->sched, sav->schedlen);
+		KFREE(sav->sched);
+		sav->sched = NULL;
+	}
+	if (sav->replay != NULL) {
+		keydb_delsecreplay(sav->replay);
+		sav->replay = NULL;
+	}
+	if (sav->lft_c != NULL) {
+		KFREE(sav->lft_c);
+		sav->lft_c = NULL;
+	}
+	if (sav->lft_h != NULL) {
+		KFREE(sav->lft_h);
+		sav->lft_h = NULL;
+	}
+	if (sav->lft_s != NULL) {
+		KFREE(sav->lft_s);
+		sav->lft_s = NULL;
+	}
+	if (sav->iv != NULL) {
+		KFREE(sav->iv);
+		sav->iv = NULL;
+	}
+
+	keydb_delsecasvar(sav);
 }
 
 /* %%% SPD management */
@@ -2871,13 +2925,12 @@ key_newsav(m, mhp, sah, errp)
 	if (m == NULL || mhp == NULL || mhp->msg == NULL || sah == NULL)
 		panic("key_newsa: NULL pointer is passed.");
 
-	KMALLOC(newsav, struct secasvar *, sizeof(struct secasvar));
+	newsav = keydb_newsecasvar();
 	if (newsav == NULL) {
 		ipseclog((LOG_DEBUG, "key_newsa: No more memory.\n"));
 		*errp = ENOBUFS;
 		return NULL;
 	}
-	bzero((caddr_t)newsav, sizeof(struct secasvar));
 
 	switch (mhp->msg->sadb_msg_type) {
 	case SADB_GETSPI:
@@ -2937,65 +2990,6 @@ key_newsav(m, mhp, sah, errp)
 			secasvar, chain);
 
 	return newsav;
-}
-
-/*
- * free() SA variable entry.
- */
-static void
-key_delsav(sav)
-	struct secasvar *sav;
-{
-	/* sanity check */
-	if (sav == NULL)
-		panic("key_delsav: NULL pointer is passed.");
-
-	if (sav->refcnt > 0)
-		panic("key_delsav: called with positive refcnt");
-
-	/* remove from SA header */
-	if (__LIST_CHAINED(sav))
-		LIST_REMOVE(sav, chain);
-
-	if (sav->key_auth != NULL) {
-		bzero(_KEYBUF(sav->key_auth), _KEYLEN(sav->key_auth));
-		KFREE(sav->key_auth);
-		sav->key_auth = NULL;
-	}
-	if (sav->key_enc != NULL) {
-		bzero(_KEYBUF(sav->key_enc), _KEYLEN(sav->key_enc));
-		KFREE(sav->key_enc);
-		sav->key_enc = NULL;
-	}
-	if (sav->sched) {
-		bzero(sav->sched, sav->schedlen);
-		KFREE(sav->sched);
-		sav->sched = NULL;
-	}
-	if (sav->replay != NULL) {
-		keydb_delsecreplay(sav->replay);
-		sav->replay = NULL;
-	}
-	if (sav->lft_c != NULL) {
-		KFREE(sav->lft_c);
-		sav->lft_c = NULL;
-	}
-	if (sav->lft_h != NULL) {
-		KFREE(sav->lft_h);
-		sav->lft_h = NULL;
-	}
-	if (sav->lft_s != NULL) {
-		KFREE(sav->lft_s);
-		sav->lft_s = NULL;
-	}
-	if (sav->iv != NULL) {
-		KFREE(sav->iv);
-		sav->iv = NULL;
-	}
-
-	KFREE(sav);
-
-	return;
 }
 
 /*
