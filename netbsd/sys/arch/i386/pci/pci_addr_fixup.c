@@ -297,7 +297,7 @@ pciaddr_do_resource_allocate(pc, tag, mapreg, ex, type, addr, size)
 		PCIBIOS_PRINTV(("No available resources. fixup failed\n"));
 		return (1);
 	}
-	error = extent_alloc_subregion(ex, start, start + size - 1, size,
+	error = extent_alloc_subregion(ex, start, ex->ex_end, size,
 				       size, 0,
 				       EX_FAST|EX_NOWAIT|EX_MALLOCOK, addr);
 	if (error) {
