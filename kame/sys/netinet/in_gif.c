@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.64 2001/07/25 02:55:58 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.65 2001/07/29 04:27:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -41,6 +41,9 @@
 #include "opt_inet.h"
 #include "opt_iso.h"
 #endif
+
+/* define it if you want to use encap_attach_func (it helps *BSD merge) */
+/*#define USE_ENCAPCHECK*/
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -366,12 +369,18 @@ in_gif_input(m, va_alist)
 
 	gifp = (struct ifnet *)encap_getarg(m);
 
-	if (gifp == NULL || (gifp->if_flags & IFF_UP) == 0 ||
-	    !gif_validate4(ip, (struct gif_softc *)gifp, m->m_pkthdr.rcvif)) {
+	if (gifp == NULL || (gifp->if_flags & IFF_UP) == 0) {
 		m_freem(m);
 		ipstat.ips_nogif++;
 		return;
 	}
+#ifndef USE_ENCAPCHECK
+	if (!gif_validate4(ip, (struct gif_softc *)gifp, m->m_pkthdr.rcvif)) {
+		m_freem(m);
+		ipstat.ips_nogif++;
+		return;
+	}
+#endif
 
 #ifdef __OpenBSD__
 	m->m_pkthdr.rcvif = gifp;
@@ -545,6 +554,7 @@ int
 in_gif_attach(sc)
 	struct gif_softc *sc;
 {
+#ifndef USE_ENCAPCHECK
 	struct sockaddr_in mask4;
 
 	bzero(&mask4, sizeof(mask4));
@@ -556,6 +566,10 @@ in_gif_attach(sc)
 	sc->encap_cookie4 = encap_attach(AF_INET, -1, sc->gif_psrc,
 	    (struct sockaddr *)&mask4, sc->gif_pdst, (struct sockaddr *)&mask4,
 	    (struct protosw *)&in_gif_protosw, sc);
+#else
+	sc->encap_cookie4 = encap_attach_func(AF_INET, -1, gif_encapcheck,
+	    &in_gif_protosw, sc);
+#endif
 	if (sc->encap_cookie4 == NULL)
 		return EEXIST;
 	return 0;
