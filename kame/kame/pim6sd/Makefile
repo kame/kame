@@ -58,7 +58,7 @@
 # Questions concerning this software should be directed to 
 # Kurt Windisch (kurtw@antc.uoregon.edu)
 #
-# $Id: Makefile,v 1.2 1999/09/02 12:53:03 jinmei Exp $
+# $Id: Makefile,v 1.3 1999/10/06 04:26:53 jinmei Exp $
 #
 #
 #Part of this program has been derived from PIM sparse-mode pimd.
@@ -80,9 +80,12 @@
 
 BINDIR=	$(PREFIX)/sbin
 PROG=	pim6sd
+CFLAGS+=-DHAVE_STDARG_H -DYIPS_DEBUG
+LDADD+=-ly -ll
 SRCS=	mld6.c mld6_proto.c\
 	inet6.c kern.c main.c config.c debug.c routesock.c vers.c callout.c\
-	route.c vif.c timer.c mrt.c pim6.c pim6_proto.c rp.c crc.c trace.c
+	route.c vif.c timer.c mrt.c pim6.c pim6_proto.c rp.c crc.c trace.c\
+	vmbuf.c cfparse.y cftoken.l
 
 .if (${OPSYS} == "BSD/OS")
 CC=	gcc
@@ -103,11 +106,10 @@ DPADD+=	${.OBJDIR}/../libinet6/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
 .if (${OPSYS} != "NetBSD")
-#MAN5=	pim6sd.conf.5: notyet
+MAN5=	pim6sd.conf.5
 MAN8=	pim6sd.8
 .else
-#MAN=	pim6sd.conf.5: notyet
-MAN=	pim6sd.8
+MAN=	pim6sd.8 pim6sd.conf.5
 .endif
 
 realinstall:
