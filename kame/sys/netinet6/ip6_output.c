@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.257 2001/12/21 08:00:41 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.258 2001/12/21 08:34:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2283,6 +2283,7 @@ do { \
 			case IPV6_RTHDR:
 			case IPV6_DSTOPTS:
 			case IPV6_RTHDRDSTOPTS:
+			case IPV6_NEXTHOP:
 			{
 				/* new advanced API (2292bis) */
 				u_char *optbuf;
@@ -2806,6 +2807,7 @@ do { \
 			case IPV6_RTHDR:
 			case IPV6_DSTOPTS:
 			case IPV6_RTHDRDSTOPTS:
+			case IPV6_NEXTHOP:
 				error = ip6_getpcbopt(in6p->in6p_outputopts,
 						      optname, &optdata,
 						      &optdatalen);
