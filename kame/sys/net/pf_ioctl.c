@@ -105,20 +105,22 @@ PSEUDO_SET(pfattach, pf);
 
 #define CDEV_MAJOR 200
 static struct cdevsw pf_cdevsw = {
-	/* open */	pfopen,
-	/* close */	pfclose,
-	/* read */	noread,
-	/* write */	nowrite,
-	/* ioctl */	pfioctl,
-	/* poll */	nopoll,
-	/* mmap */	nommap,
-	/* strategy */	nostrategy,
-	/* name */	"pf",
-	/* maj */	CDEV_MAJOR,
-	/* dump */	nodump,
-	/* psize */	nopsize,
-	/* flags */	0,
-	/* bmaj */	-1
+	.d_open =	pfopen,
+	.d_close =	pfclose,
+	.d_read =	noread,
+	.d_write =	nowrite,
+	.d_ioctl =	pfioctl,
+	.d_poll  =	nopoll,
+	.d_mmap =	nommap,
+	.d_strategy =	nostrategy,
+	.d_name =	"pf",
+	.d_maj =	CDEV_MAJOR,
+	.d_dump =	nodump,
+#if (__FreeBSD_version < 501000)
+	.d_psize =	nopsize,
+#endif
+	.d_flags =	0,
+	.d_kqfilter =	nokqfilter
 };
 #endif
 
