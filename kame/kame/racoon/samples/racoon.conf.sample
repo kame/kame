@@ -1,4 +1,4 @@
-# $KAME: racoon.conf.sample,v 1.14 2000/09/21 03:02:31 itojun Exp $
+# $KAME: racoon.conf.sample,v 1.15 2000/09/22 16:16:44 itojun Exp $
 
 # "path" affects "include" directive.  "path" must be specified before any
 # "include" directive with relative file path.
@@ -57,4 +57,9 @@ sainfo anonymous
 	encryption_algorithm 3des, cast128, blowfish, des, twofish, rijndael ;
 	authentication_algorithm hmac_sha1, hmac_md5 ;
 	compression_algorithm deflate ;
+
+	# the configuration makes racoon (as a responder) to obey the
+	# initiator's lifetime and PFS group proposal.
+	# this makes testing so much easier.
+	#proposal_check obey;
 }
