@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.9 2000/11/21 09:33:16 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.10 2000/11/27 14:19:13 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -69,18 +69,19 @@ main(argc, argv)
     char *argv[];
 {
 	int i, s;
-	int rthlen = 0, ip6optlen = 0, hops = 0, error;
+	int rthlen = 0, ip6optlen = 0, hops = 0, mtu, error;
 	char *portstr = DEFAULTPORT;
 	char *finaldst;
 	struct iovec msgiov;
 	char *e, *databuf;
 	int datalen = 1, ch;
+	char *mtup = NULL;
 	struct addrinfo hints, *res;
 	extern int optind;
 	extern void *malloc();
 	extern char *optarg;
 
-	while ((ch = getopt(argc, argv, "d:D:h:l:mp:s:")) != EOF)
+	while ((ch = getopt(argc, argv, "d:D:h:l:M:mp:s:")) != EOF)
 		switch(ch) {
 		case 'D':
 			dsthdr1len = atoi(optarg);
@@ -96,6 +97,13 @@ main(argc, argv)
 			break;
 		case 'm':
 			mflag++;
+			break;
+		case 'M':
+#ifdef IPV6_USE_MTU
+			mtup = optarg;
+#else
+			errx(1, "IPV6_USE_MTU is not supported");
+#endif
 			break;
 		case 'p':
 			portstr = optarg;
@@ -128,6 +136,15 @@ main(argc, argv)
 #endif
 		ip6optlen += CMSG_SPACE(sizeof(int));
 	}
+	if (mtup != NULL) {
+		mtu = atoi(mtup);
+#if 0
+		/* intentionally omit the check to see the kernel behavior. */
+		if (mtu < IPV6_MINMTU)
+			errx(1, "invalid MTU: %s", mtup);
+#endif
+		ip6optlen += CMSG_SPACE(sizeof(int));
+	}
 	if (argc > 1) {		/* intermediate node(s) exist(s) */
 		hops = argc - 1;
 		rthlen = inet6_rth_space(IPV6_RTHDR_TYPE_0, hops);
@@ -155,6 +172,16 @@ main(argc, argv)
 		*(int *)CMSG_DATA(cmsgp) = hlim;
 		cmsgp = CMSG_NXTHDR(&msg, cmsgp);
 	}
+#ifdef IPV6_USE_MTU
+	if (mtup != NULL) {
+		cmsgp->cmsg_len = CMSG_LEN(sizeof(int));
+		cmsgp->cmsg_level = IPPROTO_IPV6;
+		cmsgp->cmsg_type = IPV6_USE_MTU;
+
+		*(int *)CMSG_DATA(cmsgp) = mtu;
+		cmsgp = CMSG_NXTHDR(&msg, cmsgp);
+	}
+#endif
 	if (hbhlen > 0) setopthdr(hbhlen, IPV6_HOPOPTS);
 	if (dsthdr1len > 0) setopthdr(dsthdr1len, IPV6_RTHDRDSTOPTS);
 	if (dsthdr2len > 0) setopthdr(dsthdr2len, IPV6_DSTOPTS);
@@ -308,6 +335,7 @@ static void
 usage()
 {
 	fprintf(stderr, "usage: sender [-d optlen] [-D optlen] [-h optlen] "
-		"[-l hoplimit] [-m] [-p port] [-s packetsize] IPv6addrs...\n");
+		"[-l hoplimit] [-M mtu] [-m] [-p port] [-s packetsize] "
+		"IPv6addrs...\n");
 	exit(1);
 }
