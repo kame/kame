@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 /*
- * $Id: libtest.c,v 1.2 1999/10/26 05:57:45 itojun Exp $
+ * $Id: libtest.c,v 1.3 1999/10/26 11:31:09 itojun Exp $
  */
 
 #include <sys/types.h>
@@ -88,9 +88,9 @@ usage()
 static int
 test_pton()
 {
+#define FUNCNAME	"test_pton"
 	struct in6_addr a;
 	int success = 0;
-#define FUNCNAME	"test_pton"
 
 	/* test for broken inet_pton() (pre BIND82) */
 	if (inet_pton(AF_INET6, "0:1:2:3:4:5:6:7:", &a) == 0)
