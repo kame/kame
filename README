@@ -1,6 +1,6 @@
 	README of KAME kit
 	KAME Project
-	$KAME: README,v 1.41 2000/09/06 00:44:42 itojun Exp $
+	$KAME: README,v 1.42 2000/09/10 10:17:10 jinmei Exp $
 
 <<<Project Overview>>>
 
@@ -92,12 +92,12 @@ When you report bugs, please be sure to include the following information:
 - the version of KAME you are using ("SNAP dated Jan 1 2000", or
   "grabbed via anonymous CVS around Jan 1 2000")
 - information necessary to repeat the problem
-  this includes, but not limited to, 
-	(1) kernel compilation options, 
-	(2) exact command line that raises the issue, 
-	(3) routing table setup taken by "netstat -rn", 
+  this includes, but not limited to,
+	(1) kernel compilation options,
+	(2) exact command line that raises the issue,
+	(3) routing table setup taken by "netstat -rn",
 	(4) interface configuration via "ifconfig -a",
-	(5) sysctl setting taken by "sysctl -a", 
+	(5) sysctl setting taken by "sysctl -a"
 - (if necessary) hardware configuration, like "ethernet card is NE2000"
 - (if necessary) screen trace on the trouble, taken by "script" command.
 - (if necessary) packet trace taken by "tcpdump" command.
