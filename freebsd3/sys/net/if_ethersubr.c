@@ -921,7 +921,7 @@ ether_resolvemulti(ifp, llsa, sa)
 #ifdef INET6
 	case AF_INET6:
 		sin6 = (struct sockaddr_in6 *)sa;
-		if (IN6_IS_ADDR_ANY(&sin6->sin6_addr)) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
 			/*
 			 * An IP6 address of 0 means listen to all
 			 * of the Ethernet multicast address used for IP6.

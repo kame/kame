@@ -284,10 +284,12 @@ tunifioctl(ifp, cmd, data)
 	switch(cmd) {
 	case SIOCSIFADDR:
 	case SIOCSIFDSTADDR:
+#if 0
 #if defined(INET6) && defined(__FreeBSD__) && __FreeBSD__ >= 3
 		if (found_first_ifid == 0)
 			in6_ifattach_noifid(ifp);
 #endif /* defined(INET6) && defined(__FreeBSD__) && __FreeBSD__ >= 3 */
+#endif
 		tuninit(ifp->if_unit, cmd, ifr->ifr_addr.sa_family);
 		break;
 	case SIOCSIFMTU:
