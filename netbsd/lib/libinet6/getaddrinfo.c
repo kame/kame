@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.37 2001/01/05 12:27:13 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.38 2001/01/05 14:53:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -598,7 +598,8 @@ getaddrinfo(hostname, servname, hints, res)
 		}
 	}
 
-	freeaddrinfo(afai[0]);
+	if (afai[0])
+		freeaddrinfo(afai[0]);
 
 	/* XXX */
 	if (sentinel.ai_next)
