@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.150 2005/02/04 08:32:44 keiichi Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.151 2005/02/21 09:54:43 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -395,8 +395,9 @@ ip6_forward(m, srcrt)
 	 */
 
 	/* XXX need some policy to determine bid for MCOA*/
-	bce = mip6_bce_get(&ip6->ip6_dst, NULL, NULL, 0); 
-	if (bce &&
+	if ((in6_recoverscope(&sin6, &ip6->ip6_dst, m->m_pkthdr.rcvif) == 0) &&
+	    (bce = mip6_bce_get(&sin6.sin6_addr, NULL, NULL, 0)) &&
+	    bce &&
 	     (bce->mbc_flags & IP6_MH_BU_HOME) &&
 	     (bce->mbc_encap != NULL)) {
 		if (IN6_IS_ADDR_LINKLOCAL(&bce->mbc_hoa)
