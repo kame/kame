@@ -1,4 +1,10 @@
 TARGET?=	bogus
+ARCH?=		i386
+.if ${TARGET} == "freebsd4" || ${TARGET} == "openbsd"
+KERNCONF?=	GENERIC.KAME
+.else
+KERNCONF?=	GENERIC.v6
+.endif
 
 DEVELOPER=	NO
 .if ${DEVELOPER} == "YES"
@@ -59,5 +65,30 @@ tree:
 		cvs update -d -P $(TARGET); \
 	fi; \
 	cvs update -d -P kame)
+
+# use it with caution - must be root for "make includes"
+autobuild:
+	(cd ${.CURDIR}; ${MAKE} clean update prepare)
+	(cd ${.CURDIR}/${TARGET}; ${MAKE} clean)
+	case ${TARGET} in \
+	bsdi*|freebsd*) \
+		(cd ${.CURDIR}/${TARGET}; ${MAKE} includes); \
+		(cd ${.CURDIR}/${TARGET}; ${MAKE} install-includes); \
+		;; \
+	netbsd*|openbsd*) \
+		(cd ${.CURDIR}/${TARGET}; ${MAKE} includes); \
+		;; \
+	esac
+	(cd ${.CURDIR}/${TARGET}; ${MAKE})
+	case ${TARGET} in \
+	bsdi*|freebsd*) \
+		(cd ${.CURDIR}/${TARGET}/sys/${ARCH}/conf; config ${KERNCONF}); \
+		(cd ${.CURDIR}/${TARGET}/sys/compile/${KERNCONF}; ${MAKE} clean depend; ${MAKE}); \
+		;; \
+	netbsd*|openbsd*) \
+		(cd ${.CURDIR}/${TARGET}/sys/arch/${ARCH}/conf; config ${KERNCONF}); \
+		(cd ${.CURDIR}/${TARGET}/sys/arch/${ARCH}/compile/${KERNCONF}; ${MAKE} clean depend; ${MAKE}); \
+		;; \
+	esac
 
 .include "Makefile.inc"
