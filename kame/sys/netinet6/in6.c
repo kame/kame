@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.137 2001/01/22 12:03:00 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.138 2001/01/22 12:05:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1661,7 +1661,7 @@ in6_ifinit(ifp, ia, sin6, newhost, newprefix)
 		ia->ia_ifa.ifa_rtrequest = nd6_rtrequest;
 		ia->ia_ifa.ifa_flags |= RTF_CLONING;
 	}
-#else  /* this case should be removed in a short peroid */
+#else  /* this case should be removed in a short period */
 	switch (ifp->if_type) {
 	case IFT_ARCNET:
 	case IFT_ETHER:
