@@ -266,15 +266,23 @@ octetstring	{octet}({dot}{octet})+
 <S_RMTP>dh_group	{ YYD; return(DH_GROUP); }
 
 	/* static sa */
-<S_INI>static_sa	{ BEGIN S_SA; YYDB; return(STATICSA); }
+<S_INI>static_sa	{
+				BEGIN S_SA; YYDB;
+				yywarn("staticsa directive don't work yet.");
+				return(STATICSA);
+			}
 <S_SA>{semi}		{ YYD; BEGIN S_INI; return(EOS); }
 <S_SA>[a-zA-Z0-9:\.\-_/ \n\t\"][a-zA-Z0-9:\.\-_/ \n\t\"]* {
 		yymore();
 
 		incstack[incstackp].lineno += yycf_count_nl(yytext);
 
-		yylval.val.l = strlen(yytext);
-		yylval.val.v = strdup(yytext);
+		yylval.val = vmalloc(yyleng);
+		if (yylval.val == NULL) {
+			yyerror("vmalloc failed: %s\n");
+			return -1;
+		}
+		memcpy(yylval.val->v, yytext, yylval.val->l);
 
 		return(STATICSA_STATEMENT);
 }
@@ -369,35 +377,55 @@ hour|hours		{ YYD; yylval.num = CF_UNITTYPE_H; return(UNITTYPE); }
 		}
 
 {hexstring}	{
-			YYD; 
+			char *p;
 
-			yylval.val.l = yyleng + (yyleng & 1);
+			YYD; 
+			yylval.val = vmalloc(yyleng + (yyleng & 1));
+			if (yylval.val == NULL) {
+				yyerror("vmalloc failed: %s\n");
+				return -1;
+			}
+
+			p = yylval.val->v;
+			*p++ = '0';
+			*p++ = 'x';
 
 			/* fixed string if length is odd. */
-			if (yyleng & 1) {
-				yytext[1] = '0';
-				yylval.val.v = strdup(yytext + 1);
-			} else
-				yylval.val.v = strdup(yytext + 2);
+			if (yyleng & 1)
+				*p++ = '0';
+			memcpy(p, &yytext[2], yyleng - 2);
 
 			return(HEXSTRING);
 		}
 
 {quotedstring}	{
 			u_char *p = yytext;
+
 			YYD;
 			while (*++p != '"') ;
 			*p = NULL;
 			yytext++;
-			yylval.val.l = yyleng-2;
-			yylval.val.v = strdup(yytext);
+
+			yylval.val = vmalloc(yyleng-2);
+			if (yylval.val == NULL) {
+				yyerror("vmalloc failed: %s\n");
+				return -1;
+			}
+			memcpy(yylval.val->v, yytext, yylval.val->l);
+
 			return(QUOTEDSTRING);
 		}
 
 {addrstring}	{
 			YYD;
-			yylval.val.l = strlen(yytext);
-			yylval.val.v = strdup(yytext);
+
+			yylval.val = vmalloc(yyleng);
+			if (yylval.val == NULL) {
+				yyerror("vmalloc failed: %s\n");
+				return -1;
+			}
+			memcpy(yylval.val->v, yytext, yylval.val->l);
+
 			return(ADDRSTRING);
 		}
 

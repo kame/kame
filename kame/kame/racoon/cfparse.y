@@ -107,7 +107,7 @@ static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
 
 %union {
 	unsigned long num;
-	vchar_t val;
+	vchar_t *val;
 	struct addrinfo *res;
 	struct policyindex *spidx;
 	struct remoteconf *rmconf;
@@ -201,7 +201,8 @@ path_statement
 				free(lcconf->pathinfo[$2]);
 
 			/* set new pathinfo */
-			lcconf->pathinfo[$2] = $3.v;
+			lcconf->pathinfo[$2] = strdup($3->v);
+			vfree($3);
 		}
 	;
 
@@ -212,8 +213,8 @@ include_statement
 			char path[MAXPATHLEN];
 
 			snprintf(path, sizeof(path), "%s/%s", 
-				lcconf->pathinfo[LC_PATHTYPE_INCLUDE], $2.v);
-			free($2.v);
+				lcconf->pathinfo[LC_PATHTYPE_INCLUDE], $2->v);
+			vfree($2);
 			if (yycf_switch_buffer(path) != 0)
 				return -1;
 		}
@@ -226,8 +227,7 @@ identifier_statement
 identifier_stmt
 	:	VENDORID QUOTEDSTRING EOS
 		{
-			lcconf->vendorid = vdup(&$2);
-			free($2.v);
+			lcconf->vendorid = $2;
 			if (lcconf->vendorid == NULL) {
 				yyerror("failed to set vendorid: %s",
 					strerror(errno));
@@ -236,8 +236,7 @@ identifier_stmt
 		}
 	|	IDENTIFIERTYPE QUOTEDSTRING EOS
 		{
-			lcconf->ident[$1] = vdup(&$2);
-			free($2.v);
+			lcconf->ident[$1] = $2;
 			if (lcconf->ident[$1] == NULL) {
 				yyerror("failed to set my ident: %s",
 					strerror(errno));
@@ -253,13 +252,20 @@ logging_statement
 log_level
 	:	HEXSTRING
 		{
+			if (($1->l - 2) / 2 > sizeof(u_int32_t)) {
+				yyerror("invalid debugging level: %s",
+					$1->v);
+				return -1;
+			}
+
 			/* command line option has a priority than it. */
 			if (!f_debugcmd) {
-				u_long v;
-				v = strtoul($1.v, NULL, 16);
+				u_int32_t v;
+
+				v = strtoul($1->v, NULL, 16);
 				debug |= v;
 			}
-			free($1.v);
+			vfree($1);
 		}
 	|	LOGLEV
 		{
@@ -326,8 +332,8 @@ ike_addrinfo_port
 			char portbuf[10];
 
 			snprintf(portbuf, sizeof(portbuf), "%ld", $2);
-			$$ = parse_addr($1.v, portbuf, AI_NUMERICHOST);
-			free($1.v);
+			$$ = parse_addr($1->v, portbuf, AI_NUMERICHOST);
+			vfree($1);
 			if (!$$)
 				return -1;
 		}
@@ -437,10 +443,10 @@ policy_index
 	:	ADDRSTRING prefix port
 		ADDRSTRING prefix port ul_proto DIRTYPE ACTION
 		{
-			$$ = parse_spidx($1.v, $2, $3, $4.v, $5, $6, $7, $8);
+			$$ = parse_spidx($1->v, $2, $3, $4->v, $5, $6, $7, $8);
 			$$->action = $9;
-			free($1.v);
-			free($4.v);
+			vfree($1);
+			vfree($4);
 		}
 	;
 prefix
@@ -614,10 +620,10 @@ secmode
 			}
 			prhead->spspec->encmode = $1;
 
-			res = parse_addr($2.v, NULL, AI_NUMERICHOST);
+			res = parse_addr($2->v, NULL, AI_NUMERICHOST);
+			vfree($2);
 			if (res == NULL)
 				return -1;
-			free($2.v);
 			prhead->spspec->remote = dupsaddr(res->ai_addr);
 			if (prhead->spspec->remote == NULL) {
 				yyerror("failed to copy sockaddr ");
@@ -839,10 +845,8 @@ staticsa_statement
 	:	STATICSA STATICSA_STATEMENT
 		{
 			/* execute static sa */
-			yywarn("staticsa directive don't work yet.");
-
-			/* like system("setkey $2.v"); */
-			free($2.v);
+			/* like system("setkey $2->v"); */
+			vfree($2);
 		}
 		EOS
 	;
