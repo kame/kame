@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.81 2003/06/04 06:54:41 keiichi Exp $	*/
+/*	$KAME: config.c,v 1.82 2003/06/10 00:27:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -188,7 +188,7 @@ getconfig(intface)
 	if (val < MIN_MAXINTERVAL || val > MAX_MAXINTERVAL) {
 		syslog(LOG_ERR,
 		       "<%s> maxinterval (%ld) on %s is invalid "
-		       "(must be between %e and %u)", __func__, val,
+		       "(must be between %u and %u)", __func__, val,
 		       intface, MIN_MAXINTERVAL, MAX_MAXINTERVAL);
 		exit(1);
 	}
@@ -219,7 +219,7 @@ getconfig(intface)
 	if (val < MIN_MININTERVAL || val > (tmp->maxinterval * 3) / 4) {
 		syslog(LOG_ERR,
 		       "<%s> mininterval (%ld) on %s is invalid "
-		       "(must be between %e and %d)",
+		       "(must be between %d and %d)",
 		       __func__, val, intface, MIN_MININTERVAL,
 		       (tmp->maxinterval * 3) / 4);
 		exit(1);
