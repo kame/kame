@@ -1,6 +1,6 @@
 Installation procedure - NetBSD
 KAME project
-$Id: INSTALL,v 1.1 1999/08/07 02:30:15 itojun Exp $
+$Id: INSTALL,v 1.2 1999/08/14 14:39:01 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -16,6 +16,7 @@ The following procedure replaces, or overwrites, the following
 files/directories:
 	/netbsd
 	/usr/include
+	some of boot-loader related files, such as those in /usr/mdec
 so you may want to back them up before going through the steps.
 
 A-1. Backup your kernel file, if you need to.
