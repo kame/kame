@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.163 2002/07/09 04:50:04 k-sugyou Exp $	*/
+/*	$KAME: ipsec.c,v 1.164 2002/07/09 08:17:01 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3759,7 +3759,7 @@ ipsec6_tunnel_validate(m, off, nxt0, sav)
 	sin6 = (struct sockaddr_in6 *)&sav->sah->saidx.dst;
 	if (sin6->sin6_family != AF_INET6)
 		return 0;
-	if (!SA6_ARE_ADDR_EQUAL(osrc, sin6))
+	if (!SA6_ARE_ADDR_EQUAL(odst, sin6))
 		return 0;
 
 	/* XXX slow */
