@@ -1153,6 +1153,11 @@ client6_recvreply(s, serv)
 			 * XXX SPEC ISSUE: padding requirement for extension
 			 * XXX SPEC ISSUE: string termination requirement for
 			 *	extension
+			 * XXX the following code assumes that elen == real
+			 *	option len.  if we are supposed to set elen
+			 *	to the real meat in the extension, and
+			 *	we should pad according to some rule
+			 *	(like pad to 4), we are hosed.
 			 */
 			if (sizeof(buf) >= elen + 1) {
 				/*
@@ -1179,6 +1184,11 @@ client6_recvreply(s, serv)
 		default:
 			/*
 			 * XXX SPEC ISSUE: padding requirement for extension
+			 * XXX the following code assumes that elen == real
+			 *	option len.  if we are supposed to set elen
+			 *	to the real meat in the extension, and
+			 *	we should pad according to some rule
+			 *	(like pad to 4), we are hosed.
 			 */
 			for (i = 0; i < elen; i++)
 				dprintf(LOG_DEBUG, "  %02x", cp[4 + i] & 0xff);
