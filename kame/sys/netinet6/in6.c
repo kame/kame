@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.202 2001/07/23 18:26:33 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.203 2001/07/24 07:13:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -515,8 +515,17 @@ in6_control(so, cmd, data, ifp)
 
 	/*
 	 * Find address for this interface, if it exists.
+	 *
+	 * In netinet code, we have checked ifra_addr in SIOCSIF*ADDR operation
+	 * only, and used the first interface address as the target of the
+	 * operation.  This was because netinet code/API assumed at most 1
+	 * interface address per interface.
+	 * Since IPv6 allows a node to assign multiple addresses
+	 * on a single interface, we almost always look and check the
+	 * presense of ifra_addr, and reject invalid ones here.
+	 * It also decreases duplicated code among SIOC*_IN6 operations.
 	 */
-	if (ifra->ifra_addr.sin6_family == AF_INET6) { /* XXX */
+	if (ifra->ifra_addr.sin6_family == AF_INET6) {
 		struct sockaddr_in6 *sa6 =
 			(struct sockaddr_in6 *)&ifra->ifra_addr;
 
@@ -545,10 +554,8 @@ in6_control(so, cmd, data, ifp)
 	case SIOCSIFNETMASK_IN6:
 		/*
 		 * Since IPv6 allows a node to assign multiple addresses
-		 * on a single interface, SIOCSIFxxx ioctls are not suitable
-		 * and should be unused.
+		 * on a single interface, SIOCSIFxxx ioctls are deprecated.
 		 */
-		/* we decided to obsolete this command (20000704) */
 		return(EINVAL);
 
 	case SIOCDIFADDR_IN6:
