@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_output.c,v 1.17 2000/09/21 19:01:58 itojun Exp $	*/
+/*	$KAME: ipcomp_output.c,v 1.18 2000/09/21 19:34:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -166,8 +166,10 @@ ipcomp_output(m, nexthdrp, md, isr, af)
 	/*
 	 * retain the original packet for two purposes:
 	 * (1) we need to backout our changes when compression is not necessary.
-	 * (2) byte lifetime computation.
-	 * normally we do not make deep copy of them.
+	 * (2) byte lifetime computation should use the original packet.
+	 *     see RFC2401 page 23.
+	 * compromise two m_copym().  we will be going through every byte of
+	 * the payload during compression process anyways.
 	 */
 	mcopy = m_copym(m, 0, M_COPYALL, M_NOWAIT);
 	if (mcopy == NULL) {
