@@ -45,9 +45,8 @@ static struct dhcp6_opt dh6opttab[] = {
 	{ OC6_DNS, OL6_16N,	"Domain Name Server",		OT6_V6, },
 	{ OC6_DOMAIN, OL6_N,	"Domain Name",			OT6_STR, },
 
-	/* Application and Service Parameters */
-	{ OC6_DIRAGENT, OL6_N,	"Directory Agent",		OT6_NONE, },
-	{ OC6_SVCSCOPE, OL6_N,	"Service Scope"	,		OT6_NONE, },
+	{ OC6_SLPAGENT, OL6_N,	"Directory Agent",		OT6_NONE, },
+	{ OC6_SLPSCOPE, OL6_N,	"Service Scope"	,		OT6_NONE, },
 	{ OC6_NTPSERVER, OL6_16N,	"Network Time Protocol Servers",
 	  							OT6_V6, },
 	{ OC6_NISDOMAIN, OL6_N,	"NIS Domain",			OT6_STR, },

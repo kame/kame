@@ -54,9 +54,6 @@
 #define OC6_DOMAIN 8195
 #define OC6_SLPAGENT 8196
 #define OC6_SLPSCOPE 8197
-/* Application and Service Parameters */
-#define OC6_DIRAGENT 8196
-#define OC6_SVCSCOPE 8197
 #define OC6_NTPSERVER 8198
 #define OC6_NISDOMAIN 8199
 #define OC6_NISSERVER 8200
