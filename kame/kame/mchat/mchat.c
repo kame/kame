@@ -290,7 +290,7 @@ main(argc, argv)
 		}
 		break;
 	case AF_INET:
-		if (!IN_MULTICAST(&((struct sockaddr_in *)res->ai_addr)->sin_addr.s_addr))
+		if (!IN_MULTICAST(((struct sockaddr_in *)res->ai_addr)->sin_addr.s_addr))
 			break;
 		memset(&mreq4, 0, sizeof(mreq4));
 		memcpy(&mreq4.imr_multiaddr,
