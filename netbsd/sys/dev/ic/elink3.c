@@ -1576,6 +1576,7 @@ epget(sc, totlen)
 	}
 	m->m_pkthdr.rcvif = ifp;
 	m->m_pkthdr.len = totlen;
+	m->m_pkthdr.aux = NULL;
 	len = MHLEN;
 	top = 0;
 	mp = &top;
