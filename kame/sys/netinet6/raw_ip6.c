@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.103 2001/11/13 07:28:14 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.104 2001/11/13 07:31:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -519,9 +519,7 @@ rip6_output(m, va_alist)
 	M_PREPEND(m, sizeof(*ip6), M_WAIT);
 	ip6 = mtod(m, struct ip6_hdr *);
 
-	/*
-	 * Source address selection.
-	 */
+	/* Source address selection. */
 	if ((in6a = in6_selectsrc(dstsock, in6p->in6p_outputopts,
 				  in6p->in6p_moptions,
 				  &in6p->in6p_route,
@@ -537,7 +535,6 @@ rip6_output(m, va_alist)
 		goto bad;
 	}
 	if (oifp == NULL && in6p->in6p_route.ro_rt) {
-		/* what if oifp contradicts ? */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
 		oifp = ifnet_byindex(in6p->in6p_route.ro_rt->rt_ifp->if_index);
 #else
@@ -545,7 +542,7 @@ rip6_output(m, va_alist)
 #endif
 	}
 
-	/* fill in the rest of the IPv6 fields */
+	/* fill in the rest of the IPv6 header fields */
 	ip6->ip6_dst = *dst;
 	ip6->ip6_flow = in6p->in6p_flowinfo & IPV6_FLOWINFO_MASK;
 	ip6->ip6_vfc  &= ~IPV6_VERSION_MASK;
