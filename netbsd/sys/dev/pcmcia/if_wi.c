@@ -1,4 +1,4 @@
-/*	$NetBSD: if_wi.c,v 1.3 1999/09/10 00:30:59 itojun Exp $	*/
+/*	$NetBSD: if_wi.c,v 1.6 2000/02/12 23:35:28 enami Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -31,7 +31,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: if_wi.c,v 1.3 1999/09/10 00:30:59 itojun Exp $
+ *	$Id: if_wi.c,v 1.6 2000/02/12 23:35:28 enami Exp $
  */
 
 /*
@@ -84,6 +84,7 @@
 #include <sys/mbuf.h>
 #include <sys/ioctl.h>
 #include <sys/kernel.h>		/* for hz */
+#include <sys/proc.h>
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -109,13 +110,12 @@
 #include <dev/pcmcia/pcmciavar.h>
 #include <dev/pcmcia/pcmciadevs.h>
 
-#include <dev/pcmcia/if_wivar.h>
-
 #include <dev/pcmcia/if_wi_ieee.h>
+#include <dev/pcmcia/if_wivar.h>
 
 #if !defined(lint)
 static const char rcsid[] =
-	"$Id: if_wi.c,v 1.3 1999/09/10 00:30:59 itojun Exp $";
+	"$Id: if_wi.c,v 1.6 2000/02/12 23:35:28 enami Exp $";
 #endif
 
 #ifdef foo
@@ -124,7 +124,10 @@ static u_int8_t	wi_mcast_addr[6] = { 0x01, 0x60, 0x1D, 0x00, 0x01, 0x00 };
 
 static int wi_match		__P((struct device *, struct cfdata *, void *));
 static void wi_attach		__P((struct device *, struct device *, void *));
-
+#if __NetBSD_Version__ > 104010000
+static int wi_detach		__P((struct device *, int));
+static int wi_activate		__P((struct device *, enum devact));
+#endif
 
 static int wi_intr __P((void *arg));
 
@@ -160,6 +163,9 @@ static int wi_disable __P((struct wi_softc *));
 struct cfattach wi_ca =
 {
 	sizeof(struct wi_softc), wi_match, wi_attach
+#if __NetBSD_Version__ > 104010000
+		, wi_detach, wi_activate
+#endif
 };
 
 static int
@@ -244,11 +250,14 @@ wi_attach(parent, self, aux)
 	if (pcmcia_io_alloc(sc->sc_pf, 0, WI_IOSIZ, WI_IOSIZ,
 	    &sc->sc_pcioh) != 0) {
 		printf(": can't allocate i/o space\n");
+		pcmcia_function_disable(sc->sc_pf);
 		return;
 	}
 	if (pcmcia_io_map(sc->sc_pf, PCMCIA_WIDTH_IO16, 0,
 	    WI_IOSIZ, &sc->sc_pcioh, &sc->sc_iowin) != 0) {
 		printf(": can't map i/o space\n");
+		pcmcia_io_free(sc->sc_pf, &sc->sc_pcioh);
+		pcmcia_function_disable(sc->sc_pf);
 		return;
 	}
 	sc->wi_btag = sc->sc_pcioh.iot;
@@ -314,6 +323,14 @@ wi_attach(parent, self, aux)
 
 	bzero((char *)&sc->wi_stats, sizeof(sc->wi_stats));
 
+	/*
+	 * Find out if we support WEP on this card.
+	 */
+	gen.wi_type = WI_RID_WEP_AVAIL;
+	gen.wi_len = 2;
+	wi_read_record(sc, &gen);
+	sc->wi_has_wep = gen.wi_val;
+
 	wi_init(sc);
 	wi_stop(sc);
 
@@ -329,6 +346,9 @@ wi_attach(parent, self, aux)
 #endif
 
 	sc->sc_sdhook = shutdownhook_establish(wi_shutdown, sc);
+
+	/* Disable the card now, and turn it on when the interface goes up */
+	pcmcia_function_disable(sc->sc_pf);
 }
 
 static void wi_rxeof(sc)
@@ -479,6 +499,9 @@ void wi_inquire(xsc)
 	sc = xsc;
 	ifp = &sc->sc_ethercom.ec_if;
 
+	if ((sc->sc_dev.dv_flags & DVF_ACTIVE) == 0)
+		return;
+
 	timeout(wi_inquire, sc, hz * 60);
 
 	/* Don't do this while we're transmitting */
@@ -535,6 +558,8 @@ int wi_intr(arg)
 	struct ifnet		*ifp;
 	u_int16_t		status;
 
+	if ((sc->sc_dev.dv_flags & DVF_ACTIVE) == 0)
+		return (0);
 
 	ifp = &sc->sc_ethercom.ec_if;
 
@@ -888,6 +913,12 @@ static void wi_setmulti(sc)
 			bzero((char *)&mcast, sizeof(mcast));
 			break;
 		}
+#if 0
+		/* Punt on ranges. */
+		if (bcmp(enm->enm_addrlo, enm->enm_addrhi,
+			 sizeof(enm->enm_addrlo)) != 0)
+			break;
+#endif
 		bcopy(enm->enm_addrlo,
 		    (char *)&mcast.wi_mcast[i], ETHER_ADDR_LEN);
 		i++;
@@ -955,6 +986,16 @@ static void wi_setdef(sc, wreq)
 	case WI_RID_MAX_SLEEP:
 		sc->wi_max_sleep = wreq->wi_val[0];
 		break;
+	case WI_RID_ENCRYPTION:
+		sc->wi_use_wep = wreq->wi_val[0];
+		break;
+	case WI_RID_TX_CRYPT_KEY:
+		sc->wi_tx_key = wreq->wi_val[0];
+		break;
+	case WI_RID_DEFLT_CRYPT_KEYS:
+		bcopy((char *)wreq, (char *)&sc->wi_keys,
+		      sizeof(struct wi_ltv_keys));
+		break;
 	default:
 		break;
 	}
@@ -974,6 +1015,7 @@ static int wi_ioctl(ifp, command, data)
 	struct wi_softc		*sc;
 	struct wi_req		wreq;
 	struct ifreq		*ifr;
+	struct proc *p = curproc;
 	struct ifaddr *ifa = (struct ifaddr *)data;
 
 	s = splimp();
@@ -1051,6 +1093,14 @@ static int wi_ioctl(ifp, command, data)
 			bcopy((char *)&sc->wi_stats, (char *)&wreq.wi_val,
 			    sizeof(sc->wi_stats));
 			wreq.wi_len = (sizeof(sc->wi_stats) / 2) + 1;
+		} else if (wreq.wi_type == WI_RID_DEFLT_CRYPT_KEYS) {
+			/* For non-root user, return all-zeroes keys */
+			if (suser(p->p_ucred, &p->p_acflag))
+				bzero((char *)&wreq,
+				      sizeof(struct wi_ltv_keys));
+			else
+				bcopy((char *)&sc->wi_keys, (char *)&wreq,
+				      sizeof(struct wi_ltv_keys));
 		} else {
 			if (wi_read_record(sc, (struct wi_ltv_gen *)&wreq)) {
 				error = EINVAL;
@@ -1060,6 +1110,9 @@ static int wi_ioctl(ifp, command, data)
 		error = copyout(&wreq, ifr->ifr_data, sizeof(wreq));
 		break;
 	case SIOCSWAVELAN:
+		error = suser(p->p_ucred, &p->p_acflag);
+		if (error)
+			break;
 		error = copyin(ifr->ifr_data, &wreq, sizeof(wreq));
 		if (error)
 			break;
@@ -1147,6 +1200,15 @@ static void wi_init(xsc)
 	mac.wi_type = WI_RID_MAC_NODE;
 	memcpy(&mac.wi_mac_addr, sc->sc_macaddr, ETHER_ADDR_LEN);
 	wi_write_record(sc, (struct wi_ltv_gen *)&mac);
+
+	/* Configure WEP. */
+	if (sc->wi_has_wep) {
+		WI_SETVAL(WI_RID_ENCRYPTION, sc->wi_use_wep);
+		WI_SETVAL(WI_RID_TX_CRYPT_KEY, sc->wi_tx_key);
+		sc->wi_keys.wi_len = (sizeof(struct wi_ltv_keys) / 2) + 1;
+		sc->wi_keys.wi_type = WI_RID_DEFLT_CRYPT_KEYS;
+		wi_write_record(sc, (struct wi_ltv_gen *)&sc->wi_keys);
+	}
 
 	/* Initialize promisc mode. */
 	if (ifp->if_flags & IFF_PROMISC) {
@@ -1359,3 +1421,52 @@ static void wi_shutdown(arg)
 	wi_disable(sc);
 	return;
 }
+
+#if __NetBSD_Version__ > 104010000
+static int
+wi_activate(self, act)
+	struct device *self;
+	enum devact act;
+{
+	struct wi_softc *sc = (struct wi_softc *)self;
+	int rv = 0, s;
+
+	s = splnet();
+	switch (act) {
+	case DVACT_ACTIVATE:
+		rv = EOPNOTSUPP;
+		break;
+
+	case DVACT_DEACTIVATE:
+		if_deactivate(&sc->sc_ethercom.ec_if);
+		break;
+	}
+	splx(s);
+	return (rv);
+}
+
+static int
+wi_detach(self, flags)
+	struct device *self;
+	int flags;
+{
+	struct wi_softc *sc = (struct wi_softc *)self;
+	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
+
+	if (ifp->if_flags & IFF_RUNNING)
+		untimeout(wi_inquire, sc);
+	wi_disable(sc);
+
+#if NBPFILTER > 0
+	bpfdetach(ifp);
+#endif
+	ether_ifdetach(ifp);
+	if_detach(ifp);
+
+	/* unmap and free our i/o windows */
+	pcmcia_io_unmap(sc->sc_pf, sc->sc_iowin);
+	pcmcia_io_free(sc->sc_pf, &sc->sc_pcioh);
+
+	return (0);
+}
+#endif
