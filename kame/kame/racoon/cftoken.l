@@ -388,6 +388,8 @@ user_fqdn	{ YYD; yylval.num = LC_IDENTTYPE_USERFQDN; return(IDENTIFIERTYPE); }
 fqdn		{ YYD; yylval.num = LC_IDENTTYPE_FQDN; return(IDENTIFIERTYPE); }
 keyid		{ YYD; yylval.num = LC_IDENTTYPE_KEYID; return(IDENTIFIERTYPE); }
 address		{ YYD; yylval.num = LC_IDENTTYPE_ADDRESS; return(IDENTIFIERTYPE); }
+asn1dn		{ YYD; yylval.num = LC_IDENTTYPE_ASN1DN; return(IDENTIFIERTYPE); }
+
 	/* units */
 B|byte|bytes		{ YYD; yylval.num = CF_UNITTYPE_B; return(UNITTYPE); }
 KB			{ YYD; yylval.num = CF_UNITTYPE_KB; return(UNITTYPE); }
