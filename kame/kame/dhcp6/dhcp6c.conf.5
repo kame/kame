@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.conf.5,v 1.7 2003/01/23 03:26:47 jinmei Exp $
+.\"	$KAME: dhcp6c.conf.5,v 1.8 2003/04/11 07:13:22 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -140,6 +140,14 @@ to only exchange informational configuration parameters with servers.
 A list of DNS server addresses is an example of such parameters.
 This statement is useful when the client does not need stateful
 configuration parameters such as IPv6 addresses or prefixes.
+.It script Ar \(dqscript-name\(dq ;
+This statement specifies a path to script invoked by
+.Nm dhcp6c
+on a certain condition including when the daemon receives a reply
+message.
+.Ar script-name
+must be the absolute path from root to the script file, be a regular
+file, and be created by the same owner who runs the daemon.
 .El
 .El
 .\"

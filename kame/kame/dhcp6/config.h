@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.24 2003/02/07 12:22:03 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.25 2003/04/11 07:13:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -57,6 +57,8 @@ struct dhcp6_if {
 #define DHCIFF_RAPID_COMMIT 0x2
 
 	int server_pref;	/* server preference (server only) */
+
+	char *scriptpath;	/* path to config script (client only) */
 
 	struct dhcp6_list reqopt_list;
 	struct ia_conflist iaconf_list;
@@ -189,7 +191,7 @@ struct cf_list {
 };
 
 enum {DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY, DECL_REQUEST, DECL_DUID,
-      DECL_PREFIX, DECL_PREFERENCE,
+      DECL_PREFIX, DECL_PREFERENCE, DECL_SCRIPT,
       IFPARAM_SLA_ID, IFPARAM_SLA_LEN,
       DHCPOPT_RAPID_COMMIT, DHCPOPT_DNS, DHCPOPT_IA_PD,
       ADDRESS_LIST_ENT,

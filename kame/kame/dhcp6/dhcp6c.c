@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.114 2003/04/08 11:47:27 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.115 2003/04/11 07:13:21 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -120,6 +120,9 @@ static int sa2plen __P((struct sockaddr_in6 *));
 
 struct dhcp6_timer *client6_timo __P((void *));
 int client6_ifinit __P((struct dhcp6_if *));
+
+extern void client6_script __P((struct dhcp6_if *, int,
+    struct dhcp6_optinfo *));
 
 #define DHCP6C_CONF "/usr/local/v6/etc/dhcp6c.conf"
 #define DHCP6C_PIDFILE "/var/run/dhcp6c.pid"
@@ -1428,6 +1431,12 @@ client6_recvreply(ifp, dh6, len, optinfo)
 			    i, in6addr2str(&d->val_addr6, 0));
 		}
 	}
+
+	/*
+	 * Call the configuration script, if specified, to handle various
+	 * configuration parameters.
+	 */
+	client6_script(ifp, state, optinfo);
 
 	/* update stateful configuration information */
 	if (state != DHCP6S_RELEASE) {

@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.28 2003/03/14 11:06:27 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.29 2003/04/11 07:13:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -71,6 +71,8 @@ struct dhcp6_ifconf {
 	u_long allow_flags;
 
 	int server_pref;	/* server preference (server only) */
+
+	char *scriptpath;	/* path to config script (client only) */
 
 	struct dhcp6_list reqopt_list;
 	struct ia_conflist iaconf_list;
@@ -146,6 +148,7 @@ configure_interface(iflist)
 {
 	struct cf_namelist *ifp;
 	struct dhcp6_ifconf *ifc;
+	char *cp;
 
 	for (ifp = iflist; ifp; ifp = ifp->next) {
 		struct cf_list *cfl;
@@ -220,6 +223,35 @@ configure_interface(iflist)
 						ifc->server_pref);
 					goto bad;
 				}
+				break;
+			case DECL_SCRIPT:
+				if (dhcp6_mode != DHCP6_MODE_CLIENT) {
+					dprintf(LOG_INFO, FNAME, "%s:%d "
+						"client-only configuration",
+						configfilename, cfl->line);
+					goto bad;
+				}
+				if (ifc->scriptpath) {
+					dprintf(LOG_INFO, FNAME,
+					    "%s:%d duplicated configuration",
+					    configfilename, cfl->line);
+					goto bad;
+				}
+				cp = cfl->ptr;
+				ifc->scriptpath = strdup(cp + 1);
+				if (ifc->scriptpath == NULL) {
+					dprintf(LOG_NOTICE, FNAME,
+					    "failed to copy script path");
+					goto bad;
+				}
+				cp = ifc->scriptpath;
+				if (*cp != '/') {
+					dprintf(LOG_INFO, FNAME,
+					    "script must be an absolute path");
+					goto bad;
+				}
+				cp += strlen(ifc->scriptpath) - 1;
+				*cp = '\0'; /* clear the terminating quote */
 				break;
 			default:
 				dprintf(LOG_ERR, FNAME, "%s:%d "
@@ -671,6 +703,9 @@ configure_commit()
 			}
 
 			ifp->server_pref = ifc->server_pref;
+
+			ifp->scriptpath = ifc->scriptpath;
+			ifc->scriptpath = NULL;
 		}
 	}
 	clear_ifconf(dhcp6_ifconflist);
@@ -706,6 +741,9 @@ clear_ifconf(iflist)
 		dhcp6_clear_list(&ifc->reqopt_list);
 
 		clear_iaconf(&ifc->iaconf_list);
+
+		if (ifc->scriptpath)
+			free(ifc->scriptpath);
 
 		free(ifc);
 	}

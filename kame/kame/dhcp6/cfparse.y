@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.21 2003/03/14 11:06:26 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.22 2003/04/11 07:13:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -96,7 +96,9 @@ static void cleanup_cflist __P((struct cf_list *));
 %token HOST HOSTNAME DUID
 %token OPTION RAPID_COMMIT IA_PD DNS_SERVERS
 %token INFO_ONLY
-%token NUMBER SLASH EOS BCL ECL STRING PREFIX INFINITY
+%token SCRIPT
+
+%token NUMBER SLASH EOS BCL ECL STRING QSTRING PREFIX INFINITY
 %token COMMA
 
 %union {
@@ -106,7 +108,7 @@ static void cleanup_cflist __P((struct cf_list *));
 	struct dhcp6_prefix *prefix;
 }
 
-%type <str> IFNAME HOSTNAME DUID_ID STRING IAID
+%type <str> IFNAME HOSTNAME DUID_ID STRING QSTRING IAID
 %type <num> NUMBER duration
 %type <list> declaration declarations dhcpoption ifparam ifparams
 %type <list> address_list address_list_ent
@@ -303,6 +305,14 @@ declaration:
 
 			MAKE_CFLIST(l, DECL_PREFERENCE, NULL, NULL);
 			l->num = $2;
+
+			$$ = l;
+		}
+	|	SCRIPT QSTRING EOS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, DECL_SCRIPT, $2, NULL);
 
 			$$ = l;
 		}

@@ -1,5 +1,5 @@
 #
-# $Id: Makefile.in,v 1.19 2003/01/22 01:30:36 jinmei Exp $
+# $Id: Makefile.in,v 1.20 2003/04/11 07:13:21 jinmei Exp $
 #
 
 srcdir=	@srcdir@
@@ -29,7 +29,7 @@ CFLAGS+= -DCONF_DH6OPT_DNS=@dhcpopt_dns@ \
 
 GENSRCS=cfparse.c cftoken.c
 CLIENTOBJS=	dhcp6c.o common.o config.o prefixconf.o dhcp6c_ia.o timer.o \
-	$(GENSRCS:%.c=%.o)
+	dhcp6c_script.o $(GENSRCS:%.c=%.o)
 SERVOBJS=	dhcp6s.o common.o config.o timer.o $(GENSRCS:%.c=%.o)
 RELAYOBJS =	dhcp6relay.o common.o
 

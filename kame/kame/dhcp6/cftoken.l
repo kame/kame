@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.19 2003/03/14 11:06:26 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.20 2003/04/11 07:13:21 jinmei Exp $	*/
 
 %{
 /*
@@ -76,6 +76,7 @@ ws		[ \t]+
 comma		,
 comment		\#.*
 semi		\;
+quotedstring	\".*\"
 string		[a-zA-Z0-9:\._][a-zA-Z0-9:\._]*
 digit		[0-9]
 integer 	{digit}+
@@ -133,6 +134,8 @@ ecl		\}
 
 <S_CNF>preference { DECHO; return (PREFERENCE); }
 
+<S_CNF>script { DECHO; return (SCRIPT); }
+
 	/* request */
 <S_CNF>request { DECHO; return (REQUEST); }
 
@@ -185,6 +188,12 @@ ecl		\}
 {ecl} { DP("end of closure"); return (ECL); }
 
 	/* generic string */
+{quotedstring} {
+		DECHO;
+		yylval.str = strdup(yytext);
+		return (QSTRING);
+	}
+
 {string} {
 		DECHO;
 		yylval.str = strdup(yytext);
