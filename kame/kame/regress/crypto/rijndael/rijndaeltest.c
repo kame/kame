@@ -1,4 +1,4 @@
-/*	$KAME: rijndaeltest.c,v 1.4 2000/11/01 14:38:24 itojun Exp $	*/
+/*	$KAME: rijndaeltest.c,v 1.5 2000/11/08 05:07:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -177,7 +177,7 @@ next1:;
 				printf("blockEncrypt failed for %s %d/%d\n",
 				    test, i, j);
 				error++;
-				goto next1;
+				goto next2;
 			}
 
 			memcpy(input, output, sizeof(input));

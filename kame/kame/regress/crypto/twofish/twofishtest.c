@@ -1,4 +1,4 @@
-/*	$KAME: twofishtest.c,v 1.1 2000/11/01 14:55:39 itojun Exp $	*/
+/*	$KAME: twofishtest.c,v 1.2 2000/11/08 05:07:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -87,7 +87,7 @@ main(argc, argv)
 	int argc;
 	char **argv;
 {
-	int i, j;
+	int i;
 	keyInstance k;
 	cipherInstance c;
 	int error;
