@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.37 2001/06/25 05:54:07 itojun Exp $	*/
+/*	$KAME: bindtest.c,v 1.38 2001/06/25 05:55:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -95,6 +95,10 @@ static struct testitem{
 	{ NULL,		0,		NULL,			NULL }
 };
 
+#ifndef __P
+#define __P(x)	x
+#endif
+
 int main __P((int, char **));
 static void usage __P((void));
 static void printversion __P((void));
@@ -105,7 +109,7 @@ static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct addrinfo *));
 static void conntest __P((int, int, struct addrinfo *));
 
-static char *versionstr = "$KAME: bindtest.c,v 1.37 2001/06/25 05:54:07 itojun Exp $"; 
+static char *versionstr = "$KAME: bindtest.c,v 1.38 2001/06/25 05:55:44 itojun Exp $"; 
 static char *port = NULL;
 static char *otheraddr = NULL;
 static struct addrinfo *oai;
