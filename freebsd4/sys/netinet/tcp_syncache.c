@@ -1224,7 +1224,7 @@ no_options:
 		th->th_sum = 0;
 		th->th_sum = in6_cksum(m, IPPROTO_TCP, hlen, tlen - hlen);
 		ip6->ip6_hlim = in6_selecthlim(NULL,
-		    ro6->ro_rt ?  ro6->ro_rt->rt_ifp : NULL);
+		    ro6->ro_rt ? ro6->ro_rt->rt_ifp : NULL);
 		if (!ip6_setpktaddrs(m, &sc->sc_inc.inc6_lsa,
 				     &sc->sc_inc.inc6_fsa)) {
 			m_freem(m);
