@@ -326,10 +326,12 @@ connect_process(struct rpcb *bnp)
 
 #ifdef ADVANCEDAPI
     {
+      int off;
+#ifndef IPV6_PKTOPTIONS		/* XXX almost unnecessary */
       struct cmsghdr     *cmsgp;   /* Adv. API */
       struct in6_pktinfo *pktinfo; /* Adv. API */
       struct ifinfo      *ife;     /* ours     */ 
-      int                 off, optlen;
+      int                 optlen;
       if ((cmsgp =
 	   (struct cmsghdr *)malloc(CMSG_SPACE(sizeof(struct in6_pktinfo))))
 	  == 0)
@@ -357,6 +359,7 @@ connect_process(struct rpcb *bnp)
       } else {
 	bnp->rp_ife = ife; /* overwrite */
       }
+#endif
 
       off = 0;
 #ifdef IPV6_RECVPKTINFO
@@ -514,9 +517,16 @@ bgp_process_open(struct rpcb *bnp)
 
   if (rcvas == my_as_number) { /* IGP */
     if (bnp->rp_mode & BGPO_PASSIVE) {
+      struct in6_addr     llhackaddr;
+
+      if (!IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_laddr) && bnp->rp_ife) {
+	llhackaddr = bnp->rp_laddr;
+	SET_IN6_LINKLOCAL_IFINDEX(&llhackaddr, bnp->rp_ife->ifi_ifn->if_index);
+      }
+
       if ((ip = rpcblookup(bgb, rcvid)) ||              /* iw97         */
 	  (ip = find_apeer_by_addr(&bnp->rp_gaddr)) ||   /* (1998/05/25) */
-	  (ip = find_apeer_by_addr(&bnp->rp_laddr)))  {  /* (1998/05/25) */
+	  (ip = find_apeer_by_addr(&llhackaddr)))  {  /* (1998/05/25) */
 	bnp->rp_as    = rcvas;
 	bnp->rp_id    = rcvid;
 	bnp->rp_mode |= BGPO_IGP;
@@ -2017,7 +2027,8 @@ bgp_process_notification (struct rpcb *bnp) {
  *       process received KEEPALIVE msg.
  */
 void
-bgp_process_keepalive (struct rpcb *bnp) {
+bgp_process_keepalive (struct rpcb *bnp)
+{
   int                    i;               /*  tracer       */
   struct bgphdr          *bh;
   struct rt_entry        *rtehead, *rte;  /*  advertising  */
@@ -2054,7 +2065,7 @@ bgp_process_keepalive (struct rpcb *bnp) {
       } else {
 	dperror("<bgp_process_keepalive>: getsockopt: IPV6_PKTOPTIONS");
 	if ((bnp->rp_ife = find_if_by_addr(&bnp->rp_myaddr.sin6_addr)) == NULL)
-	  fatalx("<bgp_process_open>: find_if_by_addr");
+	  fatalx("<bgp_process_keepalive>: find_if_by_addr");
       }
 
       off = 0;

@@ -243,6 +243,7 @@ main_listen_accept()
 
   while (1) {                                            /* outer */
     sigset_t set, oset;
+    struct ifinfo *ife_dummy = NULL; /* XXX */
 
     while (1) {
       FD_COPY(&fdmask, &currentmask);
@@ -313,31 +314,74 @@ main_listen_accept()
       else
 	bnp->rp_gaddr = fromaddr.sin6_addr; /* ummh */
 
-      {
-	    struct ifinfo *ife_dummy = NULL; /* XXX */
-	    if (in6_is_addr_onlink(&fromaddr.sin6_addr, &ife_dummy))
-		    bnp->rp_mode |= BGPO_ONLINK;
-      }
-
-      insque(bnp, bgb);
-
       /*  my address  (insufficient information) */
       myaddrlen = sizeof(bnp->rp_myaddr);
       if (getsockname(bnp->rp_socket,
-		      (struct sockaddr *)&bnp->rp_myaddr, &myaddrlen) != 0) {
+		      (struct sockaddr *)&bnp->rp_myaddr, &myaddrlen) != 0)
 	fatal("<main_listen_accept>: getsockname");
-      }
+
+      if (in6_is_addr_onlink(&fromaddr.sin6_addr, &ife_dummy)) {
 #ifdef ADVANCEDAPI
-      on = 1;
-#ifdef IPV6_RECVPKTINFO
-      if (setsockopt(bnp->rp_socket, IPPROTO_IPV6, IPV6_RECVPKTINFO,
-		     &on, sizeof(on)) < 0)
-	fatal("<main_listen_accept>: setsockopt(IPV6_RECVPKTINFO)");
-#endif /* old adv. API */
-      if (setsockopt(bnp->rp_socket, IPPROTO_IPV6, IPV6_PKTINFO,
-		     &on, sizeof(on)) < 0)
-	fatal("<main_listen_accept>: setsockopt(IPV6_PKTINFO)");
+	struct msghdr rcvmh;
+	struct cmsghdr     *cmsgp, *cm;
+	struct in6_pktinfo *pktinfo = NULL;
 #endif
+
+	bnp->rp_mode |= BGPO_ONLINK;
+
+	/* set receive interface if the connection is on-link */
+#ifdef ADVANCEDAPI
+	/*
+	 * XXX: we can't use a static buffer, since CMSG_SPACE might be a
+	 * function.
+	 */
+	if ((cmsgp =
+	     (struct cmsghdr *)malloc(CMSG_SPACE(sizeof(struct in6_pktinfo))))
+	    == 0)
+	  fatalx("<main_listen_accept>: malloc");
+
+	memset(&rcvmh, 0, sizeof(rcvmh));
+	memset(cmsgp, 0, CMSG_SPACE(sizeof(struct in6_pktinfo)));
+	rcvmh.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
+	rcvmh.msg_control = (caddr_t)cmsgp;
+
+#ifdef IPV6_RECVPKTINFO		/* new advanced API */
+	/* just receive ancillary data */
+	if (recvmsg(bnp->rp_socket, &rcvmh, 0) < 0)
+	  fatal("<main_listen_accept>: recvmsg");
+#else  /* old advanced API */
+	optlen  = CMSG_SPACE(sizeof(struct in6_pktinfo));
+	if (getsockopt(bnp->rp_socket, IPPROTO_IPV6, IPV6_PKTOPTIONS,
+		       (void *)cmsgp, &optlen))
+	  fatal("<main_listen_accept>: getsockopt(IPV6_PKTOPTIONS)");
+#endif
+
+	for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(&rcvmh);
+	     cm;
+	     cm = (struct cmsghdr *)CMSG_NXTHDR(&rcvmh, cm)) {
+	  if (cm->cmsg_level != IPPROTO_IPV6 ||
+	      (cm->cmsg_type != IPV6_PKTINFO) ||
+	      cm->cmsg_len != CMSG_LEN(sizeof(struct in6_pktinfo)))
+	    continue;
+
+	  pktinfo = (struct in6_pktinfo *)CMSG_DATA(cm);
+	  break;
+	}
+
+	if (pktinfo == NULL)
+	  fatalx("<main_listen_accept>: can't get accepted interface");
+
+	if ((bnp->rp_ife = find_if_by_index(pktinfo->ipi6_ifindex)) == NULL)
+	  fatalx("<main_listen_accept>: find_if_by_index: Unknown I/F");
+
+      free(cmsgp);		/* XXX: ugly, but important */
+#else  /* !ADVANCEDAPI */
+      if ((bnp->rp_ife = find_if_by_addr(&bnp->rp_myaddr.sin6_addr)) == NULL)
+	fatalx("<main_listen_accept>: find_if_by_addr Unknown I/F");
+#endif /* ADVANCEDAPI */
+      }
+
+      insque(bnp, bgb);
 
       bgp_send_open(bnp);
     }   /* End of "bgpsock" */
