@@ -248,6 +248,23 @@ static int res_querydomainN __P((const char *, const char *,
 static struct addrinfo *_dns_getaddrinfo __P((const char *,
 	const struct addrinfo *));
 
+static char *ai_errlist[] = {
+	"Success",
+	"Address family for hostname not supported",	/* EAI_ADDRFAMILY */
+	"Temporary failure in name resolution",		/* EAI_AGAIN      */
+	"Invalid value for ai_flags",		       	/* EAI_BADFLAGS   */
+	"Non-recoverable failure in name resolution", 	/* EAI_FAIL       */
+	"ai_family not supported",			/* EAI_FAMILY     */
+	"Memory allocation failure", 			/* EAI_MEMORY     */
+	"No address associated with hostname", 		/* EAI_NODATA     */
+	"hostname nor servname provided, or not known",	/* EAI_NONAME     */
+	"servname not supported for ai_socktype",	/* EAI_SERVICE    */
+	"ai_socktype not supported", 			/* EAI_SOCKTYPE   */
+	"System error returned in errno", 		/* EAI_SYSTEM     */
+	"Invalid value for hints",			/* EAI_BADHINTS	  */
+	"Resolved protocol is unknown",			/* EAI_PROTOCOL   */
+	"Unknown error", 				/* EAI_MAX        */
+};
 
 /* XXX macros that make external reference is BAD. */
 
@@ -288,6 +305,31 @@ do { \
 	((x) == (y) || (/*CONSTCOND*/(w) && ((x) == PF_UNSPEC || (y) == PF_UNSPEC)))
 #define MATCH(x, y, w) \
 	((x) == (y) || (/*CONSTCOND*/(w) && ((x) == ANY || (y) == ANY)))
+
+char *
+gai_strerror(ecode)
+	int ecode;
+{
+	if (ecode < 0 || ecode > EAI_MAX)
+		ecode = EAI_MAX;
+	return ai_errlist[ecode];
+}
+
+void
+freeaddrinfo(ai)
+	struct addrinfo *ai;
+{
+	struct addrinfo *next;
+
+	do {
+		next = ai->ai_next;
+		if (ai->ai_canonname)
+			free(ai->ai_canonname);
+		/* no need to free(ai->ai_addr) */
+		free(ai);
+		ai = next;
+	} while (ai);
+}
 
 static int
 str_isnumber(p)
