@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.124 2001/01/18 04:34:05 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.125 2001/01/18 05:57:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1006,7 +1006,7 @@ in6_update_ifa(ifp, ifra, ia)
 	/*
 	 * make sure to initialize ND6 information.  this is to workaround
 	 * issues with interfaces with IPv6 addresses, which have never brought
-	 # up.  we are assuming that it is safe to nd6_ifattach multiple times.
+	 * up.  we are assuming that it is safe to nd6_ifattach multiple times.
 	 */
 	nd6_ifattach(ifp);
 
