@@ -1,8 +1,11 @@
 #! /bin/sh
 #
 # build script for KAME buildlab.  may not be useful for normal usage.
-# $KAME: build.sh,v 1.4 2001/01/22 12:42:33 itojun Exp $
+# $KAME: build.sh,v 1.5 2001/02/05 00:58:21 itojun Exp $
 #
+
+echo the script is only for KAME buildlab, it is not useful in general
+exit 1
 
 PATH=/usr/pkg/bin:/usr/local/bin:/usr/X11R6/bin:/usr/bin:/bin:/usr/sbin:/sbin
 export PATH
