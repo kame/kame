@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.30 2000/01/11 02:17:18 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.31 2000/01/11 02:23:32 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -145,7 +145,8 @@ isakmp_handler(so_isakmp)
 	while ((len = recvfromto(so_isakmp, (char *)&isakmp, sizeof(isakmp),
 		    MSG_PEEK, (struct sockaddr *)&remote, &remote_len,
 		    (struct sockaddr *)&local, &local_len)) < 0) {
-		if (errno == EINTR) continue;
+		if (errno == EINTR)
+			continue;
 		plog(logp, LOCATION, NULL,
 			"failed to receive isakmp packet\n");
 		goto end;
@@ -174,7 +175,8 @@ isakmp_handler(so_isakmp)
 	while ((len = recvfromto(so_isakmp, buf->v, buf->l,
 	                    0, (struct sockaddr *)&remote, &remote_len,
 	                    (struct sockaddr *)&local, &local_len)) < 0) {
-		if (errno == EINTR) continue;
+		if (errno == EINTR)
+			continue;
 		plog(logp, LOCATION, NULL,
 			"failed to receive isakmp packet\n");
 		goto end;
@@ -191,6 +193,21 @@ isakmp_handler(so_isakmp)
 			"%d bytes message received from %s\n",
 			len, saddr2str((struct sockaddr *)&remote)));
 	YIPSDEBUG(DEBUG_DNET, PVDUMP(buf));
+
+	/* avoid packets with malicious port/address */
+	if (_INPORTBYSA((struct sockaddr *)&remote) = 0) {
+		plog(logp, LOCATION, (struct sockaddr *)&remote,
+			"possible attack: src port == 0 "
+			"(valid as UDP but not with IKE)\n");
+		goto end;
+	}
+	if (cmpsaddr((struct sockaddr *)&local,
+			(struct sockaddr *)&remote) == 0) {
+		plog(logp, LOCATION, (struct sockaddr *)&remote,
+			"possible attack: "
+			"local addr/port == remote addr/port\n");
+		goto end;
+	}
 
 	/* XXX: check sender whether to be allowed or not to accept */
 
