@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.230 2001/10/17 08:24:23 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.231 2001/10/18 04:23:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -324,42 +324,51 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		MAKE_EXTHDR(opt->ip6po_dest2, &exthdrs.ip6e_dest2);
 	}
 #ifdef MIP6
-	/*
-	 * MIP6 extention headers handling.
-	 * insert HA, BU, BA, BR options if necessary.
-	 */
-	/* XXX TODO */
 	bzero((caddr_t)&mip6opt, sizeof(mip6opt));
-	if (mip6_exthdr_create(m, opt, &mip6opt))
-		goto freehdrs;
-	/*
-	 * mip6_exthdr_create() won't fill mip6po_rthdr if opt->ip6po_rthdr
-	 * is already filled.  therefore, we won't insert dest1 twice.
-	 * yuck...
-	 */
-	if (mip6opt.mip6po_rthdr) {
+	if ((flags & IPV6_FORWARDING) == 0) {
 		/*
-		 * mip6po_rthdr will be only allocated when we
-		 * have no rthdr passed by the pktopt from the upper
-		 * layer. so, we don't care about the duplicate
-		 * allocation of ip6e_rthdr.
+		 * XXX: reconsider the following routine.
 		 */
 		/*
-		 * XXX: see the comments of
-		 * mip6.c:mip6_exthdr_create().
+		 * MIP6 extention headers handling.
+		 * insert HA, BU, BA, BR options if necessary.
 		 */
-		MAKE_EXTHDR(mip6opt.mip6po_rthdr, &exthdrs.ip6e_rthdr);
-
+		if (mip6_exthdr_create(m, opt, &mip6opt))
+			goto freehdrs;
 		/*
-		 * if a routing header exists dest1 must be inserted
-		 * if it exists.
+		 * mip6_exthdr_create() won't fill mip6po_rthdr if
+		 * opt->ip6po_rthdr is already filled.  therefore, we
+		 * won't insert dest1 twice.  yuck...
 		 */
-		MAKE_EXTHDR(opt->ip6po_dest1, &exthdrs.ip6e_dest1);
-	}
-	MAKE_EXTHDR(mip6opt.mip6po_haddr, &exthdrs.ip6e_haddr);
-	if (mip6opt.mip6po_dest2) {
-		m_freem(exthdrs.ip6e_dest2);
-		MAKE_EXTHDR(mip6opt.mip6po_dest2, &exthdrs.ip6e_dest2);
+		if (mip6opt.mip6po_rthdr) {
+			/*
+			 * mip6po_rthdr will be only allocated when we
+			 * have no rthdr passed by the pktopt from the
+			 * upper layer. so, we don't care about the
+			 * duplicate allocation of ip6e_rthdr.
+			 */
+			/*
+			 * XXX: see the comments of
+			 * mip6.c:mip6_exthdr_create().
+			 */
+			MAKE_EXTHDR(mip6opt.mip6po_rthdr, &exthdrs.ip6e_rthdr);
+			
+			/*
+			 * if a routing header exists dest1 must be
+			 * inserted if it exists.
+			 */
+			MAKE_EXTHDR(opt->ip6po_dest1, &exthdrs.ip6e_dest1);
+		}
+		MAKE_EXTHDR(mip6opt.mip6po_haddr, &exthdrs.ip6e_haddr);
+		if (mip6opt.mip6po_dest2) {
+			m_freem(exthdrs.ip6e_dest2);
+			MAKE_EXTHDR(mip6opt.mip6po_dest2, &exthdrs.ip6e_dest2);
+		}
+	} else {
+		/*
+		 * this is the forwarding packet.  do not modify any
+		 * extension headers.
+		 */
 	}
 #endif /* MIP6 */
 
@@ -678,17 +687,30 @@ skip_ipsec2:;
 	}
 
 #ifdef MIP6
-	/*
-	 * After the IPsec processing the IPv6 header source address
-	 * and the address currently stored in the Home Address option
-	 * field must be exchanged
-	 */
-	if ((error = mip6_addr_exchange(m, exthdrs.ip6e_haddr)) != 0) {
-		mip6log((LOG_ERR,
-			 "%s:%d: "
-			 "addr exchange between haddr and coa failed.\n",
-			 __FILE__, __LINE__));
-		goto bad;
+	if ((flags & IPV6_FORWARDING) == 0) {
+		/*
+		 * After the IPsec processing the IPv6 header source
+		 * address (this is the homeaddress of this node) and
+		 * the address currently stored in the Home Address
+		 * destination option (this is the coa of this node)
+		 * must be swapped.
+		 */
+		if ((error = mip6_addr_exchange(m, exthdrs.ip6e_haddr)) != 0) {
+			mip6log((LOG_ERR,
+				 "%s:%d: "
+				 "addr exchange between haddr and "
+				 "coa failed.\n",
+				 __FILE__, __LINE__));
+			goto bad;
+		}
+	} else {
+		/*
+		 * this is the forwarding packet.  The typical (and
+		 * only ?) case is multicast packet forwarding.  The
+		 * swapping has been already done before (if
+		 * necessary).  we must not touch any extension
+		 * headers at all.
+		 */
 	}
 #endif /* MIP6 */
 
