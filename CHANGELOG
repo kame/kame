@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2519 2003/12/16 12:41:01 t-momose Exp $
+$KAME: CHANGELOG,v 1.2520 2003/12/17 02:20:47 itojun Exp $
 
 <200312>
+Wed Dec 17 12:33:24 JST 2003  itojun@iijlab.net
+	* sys/netinet*: new SCTP patch from randall.  see commit message for
+	  changes.
+
 2003-12-16  MOMOSE Tsuyoshi  <t-momose@netlab.nec.co.jp>
 	* kame/sys/netinet/icmp6.h: Some of ICMPv6 parameters related
 	mip6(DHAAD/MPS/MPA) were changed as assigned IANA.
