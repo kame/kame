@@ -1,4 +1,4 @@
-.\"	$KAME: faithd.8,v 1.9 2000/05/31 03:06:07 itojun Exp $
+.\"	$KAME: faithd.8,v 1.10 2000/07/01 11:46:48 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -185,6 +185,27 @@ Inactive sessions will be disconnected in 30 minutes,
 to avoid stale sessions from chewing up resources.
 This may be inappropriate for some of the services
 .Pq should this be configurable? .
+.Pp
+.Nm
+can be used with
+.Xr inetd 8 ,
+if
+.Xr inetd 8
+includes speical support for
+.Nm Ns .
+.Xr inetd.conf 5
+must include entries like below:
+.Bd -literal -offset
+telnet stream tcp6/faith nowait root /usr/local/v6/libexec/faithd telnetd
+ftp    stream tcp6/faith nowait root /usr/local/v6/libexec/faithd ftpd -l
+.Ed
+.Pp
+When the destination address belongs to reserved IPv6 prefix,
+.Nm
+will relay the connection towarrd IPv4 destination.
+Otherwise, normal service daemons like
+.Xr telnetd 8
+will be invoked.
 .Sh EXAMPLES
 Before invoking
 .Nm Ns ,
