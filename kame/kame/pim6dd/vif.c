@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.9 2003/09/02 09:57:05 itojun Exp $	*/
+/*	$KAME: vif.c,v 1.10 2004/07/06 10:22:33 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -234,7 +234,7 @@ start_vif(vifi)
     /*
      * Join the PIM multicast group on the interface.
      */
-    k_join(mld6_socket, &allpim6routers_group.sin6_addr, v->uv_ifindex);
+    k_join(pim6_socket, &allpim6routers_group.sin6_addr, v->uv_ifindex);
 	
     /*
      * Join the ALL-ROUTERS multicast group on the interface.
@@ -285,7 +285,7 @@ stop_vif(vifi)
      * consistent with the daemon table
      */	
     v = &uvifs[vifi];
-    k_leave(mld6_socket, &allpim6routers_group.sin6_addr, v->uv_ifindex);
+    k_leave(pim6_socket, &allpim6routers_group.sin6_addr, v->uv_ifindex);
     k_leave(mld6_socket, &allrouters_group.sin6_addr, v->uv_ifindex);
     /*
      * Discard all group addresses.  (No need to tell kernel;
