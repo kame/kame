@@ -107,3 +107,4 @@
 #define IFT_PVC		0xf2
 #define IFT_FAITH	0xf3
 #define IFT_STF		0xf4
+#define IFT_HIF		0xf5
