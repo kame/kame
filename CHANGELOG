@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.984 2000/06/06 13:17:27 itojun Exp $
+$Id: CHANGELOG,v 1.985 2000/06/06 13:43:14 itojun Exp $
 
 <200006>
+Tue Jun  6 22:41:24 JST 2000  itojun@iijlab.net
+	* bsdi4/sys/netinet/tcp_input.c: fix INP_IPV6_MAPPED configuration
+	  onto inpcb.  the mistake caused ND to behave badly (ND tries to
+	  update reachability info for IPv4 mapped address - one more reason
+	  to hate IPv4 mapped address).
+	  From: dab@bsdi.com
+
 Tue Jun  6 22:16:18 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/www/wwwoffle: upgrade to 2.5e.
 
