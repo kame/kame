@@ -59,6 +59,12 @@
 #include <netinet/in_var.h>
 #include <netinet/ip_var.h>
 
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#include <netkey/key.h>
+#include <netkey/key_debug.h>
+#endif /* IPSEC */
+
 struct	in_addr zeroin_addr;
 
 static void	 in_pcbinshash __P((struct inpcb *));
@@ -320,6 +326,8 @@ in_pcbladdr(inp, nam, plocal_sin)
 		    sin->sin_addr = satosin(&in_ifaddr->ia_broadaddr)->sin_addr;
 	}
 	if (inp->inp_laddr.s_addr == INADDR_ANY) {
+		struct sockaddr_in *ifaddr;
+#if 0
 		register struct route *ro;
 
 		ia = (struct in_ifaddr *)0;
@@ -386,12 +394,22 @@ in_pcbladdr(inp, nam, plocal_sin)
 					return (EADDRNOTAVAIL);
 			}
 		}
-	/*
-	 * Don't do pcblookup call here; return interface in plocal_sin
-	 * and exit to caller, that will do the lookup.
-	 */
-		*plocal_sin = &ia->ia_addr;
-
+		ifaddr = satosin(&ia->ia_addr);
+#else
+		int error;
+		ifaddr = in_selectsrc(sin, &inp->inp_route,
+			inp->inp_socket->so_options, inp->inp_moptions, &error);
+		if (ifaddr == NULL) {
+			if (error == 0)
+				error = EADDRNOTAVAIL;
+			return error;
+		}
+#endif
+		/*
+		 * Don't do pcblookup call here; return interface in plocal_sin
+		 * and exit to caller, that will do the lookup.
+		 */
+		*plocal_sin = ifaddr;
 	}
 	return(0);
 }
@@ -452,6 +470,14 @@ in_pcbdetach(inp)
 	struct socket *so = inp->inp_socket;
 	int s;
 
+#ifdef IPSEC
+	if (so->so_pcb) {
+		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
+			printf("DP in_pcbdetach calls free SO:%lx\n", so));
+		key_freeso(so);
+	}
+	ipsec4_delete_pcbpolicy(inp);
+#endif /*IPSEC*/
 	so->so_pcb = 0;
 	sofree(so);
 	if (inp->inp_options)
@@ -759,4 +785,83 @@ in_pcbrehash(inp)
 
 	LIST_INSERT_HEAD(head, inp, inp_hash);
 	splx(s);
+}
+
+struct sockaddr_in *
+in_selectsrc(sin, ro, soopts, mopts, errorp)
+	struct sockaddr_in *sin;
+	struct route *ro;
+	int soopts;
+	struct ip_moptions *mopts;
+	int *errorp;
+{
+	struct in_ifaddr *ia;
+
+	ia = (struct in_ifaddr *)0;
+	/*
+	 * If route is known or can be allocated now,
+	 * our src addr is taken from the i/f, else punt.
+	 */
+	if (ro->ro_rt &&
+	    (satosin(&ro->ro_dst)->sin_addr.s_addr != sin->sin_addr.s_addr ||
+	     soopts & SO_DONTROUTE)) {
+		RTFREE(ro->ro_rt);
+		ro->ro_rt = (struct rtentry *)0;
+	}
+	if ((soopts & SO_DONTROUTE) == 0 && /*XXX*/
+	    (ro->ro_rt == (struct rtentry *)0 ||
+	    ro->ro_rt->rt_ifp == (struct ifnet *)0)) {
+		/* No route yet, so try to acquire one */
+		ro->ro_dst.sa_family = AF_INET;
+		ro->ro_dst.sa_len = sizeof(struct sockaddr_in);
+		((struct sockaddr_in *) &ro->ro_dst)->sin_addr =
+			sin->sin_addr;
+		rtalloc(ro);
+	}
+	/*
+	 * If we found a route, use the address
+	 * corresponding to the outgoing interface
+	 * unless it is the loopback (in case a route
+	 * to our address on another net goes to loopback).
+	 */
+	if (ro->ro_rt && !(ro->ro_rt->rt_ifp->if_flags & IFF_LOOPBACK))
+		ia = ifatoia(ro->ro_rt->rt_ifa);
+	if (ia == 0) {
+		u_short fport = sin->sin_port;
+
+		sin->sin_port = 0;
+		ia = ifatoia(ifa_ifwithdstaddr(sintosa(sin)));
+		if (ia == 0)
+			ia = ifatoia(ifa_ifwithnet(sintosa(sin)));
+		sin->sin_port = fport;
+		if (ia == 0)
+			ia = in_ifaddr;
+		if (ia == 0) {
+			*errorp = EADDRNOTAVAIL;
+			return NULL;
+		}
+	}
+	/*
+	 * If the destination address is multicast and an outgoing
+	 * interface has been set as a multicast option, use the
+	 * address of that interface as our source address.
+	 */
+	if (IN_MULTICAST(ntohl(sin->sin_addr.s_addr)) &&
+	    mopts != NULL) {
+		struct ip_moptions *imo;
+		struct ifnet *ifp;
+
+		imo = mopts;
+		if (imo->imo_multicast_ifp != NULL) {
+			ifp = imo->imo_multicast_ifp;
+			for (ia = in_ifaddr; ia; ia = ia->ia_next)
+				if (ia->ia_ifp == ifp)
+					break;
+			if (ia == 0)
+				*errorp = EADDRNOTAVAIL;
+				return NULL;
+		}
+	}
+
+	return satosin(&ia->ia_addr);
 }

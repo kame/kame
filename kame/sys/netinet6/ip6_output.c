@@ -1645,7 +1645,7 @@ ip6_setmoptions(optname, im6op, m)
 			break;
 		}
 		mreq = mtod(m, struct ipv6_mreq *);
-		if (IN6_IS_ADDR_ANY(&mreq->ipv6mr_multiaddr)) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&mreq->ipv6mr_multiaddr)) {
 			/*
 			 * We use the unspecified address to specify to accept
 			 * all multicast addresses. Only super user is allowed
@@ -1761,7 +1761,7 @@ ip6_setmoptions(optname, im6op, m)
 			break;
 		}
 		mreq = mtod(m, struct ipv6_mreq *);
-		if (IN6_IS_ADDR_ANY(&mreq->ipv6mr_multiaddr)) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&mreq->ipv6mr_multiaddr)) {
 			if (suser(p->p_ucred, &p->p_acflag)) {
 				error = EACCES;
 				break;
@@ -1953,7 +1953,7 @@ ip6_setpktoptions(control, opt, priv)
 				return(ENXIO);
 			}
 
-			if (!IN6_IS_ADDR_ANY(&opt->ip6po_pktinfo->ipi6_addr)) {
+			if (!IN6_IS_ADDR_UNSPECIFIED(&opt->ip6po_pktinfo->ipi6_addr)) {
 				struct ifaddr *ia;
 				struct sockaddr_in6 sin6;
 
@@ -2077,7 +2077,7 @@ ip6_mloopback(ifp, m, dst)
 
 	copym = m_copy(m, 0, M_COPYALL);
 	if (copym != NULL) {
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 		(void)if_simloop(ifp, copym, (struct sockaddr *)dst, NULL);
 #else
 		(void)looutput(ifp, copym, (struct sockaddr *)dst, NULL);

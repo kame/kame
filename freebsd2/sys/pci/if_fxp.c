@@ -564,6 +564,9 @@ fxp_attach(config_id, unit)
 	ifp->if_ioctl = fxp_ioctl;
 	ifp->if_start = fxp_start;
 	ifp->if_watchdog = fxp_watchdog;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 	/*
 	 * Attach the interface.
@@ -800,6 +803,12 @@ txloop:
 	/*
 	 * Grab a packet to transmit.
 	 */
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+		mb_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+	}
+	else
+#endif
 	IF_DEQUEUE(&ifp->if_snd, mb_head);
 	if (mb_head == NULL) {
 		/*
@@ -1055,6 +1064,11 @@ getit:
 			/*
 			 * Try to start more packets transmitting.
 			 */
+#ifdef ALTQ
+			if (ALTQ_IS_ON(ifp))
+			        fxp_start(ifp);
+			else
+#endif
 			if (ifp->if_snd.ifq_head != NULL)
 				fxp_start(ifp);
 		}

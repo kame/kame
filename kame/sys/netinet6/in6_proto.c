@@ -175,22 +175,43 @@ struct ip6protosw inet6sw[] = {
 { SOCK_DGRAM,	&inet6domain,	IPPROTO_UDP,	PR_ATOMIC | PR_ADDR,
   udp6_input,	0,		udp6_ctlinput,	ip6_ctloutput,
   udp6_usrreq,
-  udp6_init,	0,		0,		0,		udp6_sysctl,
+  udp6_init,	0,		0,		0,
+#ifndef __FreeBSD__
+  udp6_sysctl,
+#else
+# if __FreeBSD__ >= 3
+  &nousrreqs,
+# endif
+#endif
 },
 #ifdef TCP6
 { SOCK_STREAM,	&inet6domain,	IPPROTO_TCP,	PR_CONNREQUIRED | PR_WANTRCVD,
   tcp6_input,	0,		tcp6_ctlinput,	tcp6_ctloutput,
   tcp6_usrreq,
-  tcp6_init,	tcp6_fasttimo,	tcp6_slowtimo,	tcp6_drain,	tcp6_sysctl
+  tcp6_init,	tcp6_fasttimo,	tcp6_slowtimo,	tcp6_drain,
+#ifndef __FreeBSD__
+  tcp6_sysctl,
+#else
+# if __FreeBSD__ >= 3
+  &nousrreqs,
+# endif
+#endif
 },
 #else
 { SOCK_STREAM,	&inet6domain,	IPPROTO_TCP,	PR_CONNREQUIRED | PR_WANTRCVD,
   tcp6_input,	0,		tcp6_ctlinput,	tcp_ctloutput,
   tcp_usrreq,
 #ifdef INET	/* don't call timeout routines twice */
-  tcp_init,	0,		0,		tcp_drain,	tcp_sysctl
+  tcp_init,	0,		0,		tcp_drain,
 #else
-  tcp_init,	tcp_fasttimo,	tcp_slowtimo,	tcp_drain,	tcp_sysctl
+  tcp_init,	tcp_fasttimo,	tcp_slowtimo,	tcp_drain,
+#endif
+#ifndef __FreeBSD__
+  tcp_sysctl,
+#else
+# if __FreeBSD__ >= 3
+  &nousrreqs,
+# endif
 #endif
 },
 #endif
@@ -202,7 +223,14 @@ struct ip6protosw inet6sw[] = {
 { SOCK_RAW,	&inet6domain,	IPPROTO_ICMPV6,	PR_ATOMIC | PR_ADDR,
   icmp6_input,	rip6_output,	0,		rip6_ctloutput,
   rip6_usrreq,
-  icmp6_init,	icmp6_fasttimo,	0,		0,		icmp6_sysctl
+  icmp6_init,	icmp6_fasttimo,	0,		0,
+#ifndef __FreeBSD__
+  icmp6_sysctl,
+#else
+# if __FreeBSD__ >= 3
+  &nousrreqs,
+# endif
+#endif
 },
 { SOCK_RAW,	&inet6domain,	IPPROTO_DSTOPTS,PR_ATOMIC|PR_ADDR,
   dest6_input,	0,	 	0,		0,
@@ -223,19 +251,40 @@ struct ip6protosw inet6sw[] = {
 { SOCK_RAW,	&inet6domain,	IPPROTO_AH,	PR_ATOMIC|PR_ADDR,
   ah6_input,	0,	 	0,		0,
   0,	  
-  0,		0,		0,		0,		ipsec6_sysctl
+  0,		0,		0,		0,
+#ifndef __FreeBSD__
+  ipsec6_sysctl,
+#else
+# if __FreeBSD__ >= 3
+  &nousrreqs,
+# endif
+#endif
 },
 #ifdef IPSEC_ESP
 { SOCK_RAW,	&inet6domain,	IPPROTO_ESP,	PR_ATOMIC|PR_ADDR,
   esp6_input,	0,	 	0,		0,
   0,	  
-  0,		0,		0,		0,		ipsec6_sysctl
+  0,		0,		0,		0,
+#ifndef __FreeBSD__
+  ipsec6_sysctl,
+#else
+# if __FreeBSD__ >= 3
+  &nousrreqs,
+# endif
+#endif
 },
 #endif
 { SOCK_RAW,	&inet6domain,	IPPROTO_IPCOMP,	PR_ATOMIC|PR_ADDR,
   ipcomp6_input, 0,	 	0,		0,
   0,	  
-  0,		0,		0,		0,		ipsec6_sysctl
+  0,		0,		0,		0,
+#ifndef __FreeBSD__
+  ipsec6_sysctl,
+#else
+# if __FreeBSD__ >= 3
+  &nousrreqs,
+# endif
+#endif
 },
 #endif /* IPSEC */
 #if NGIF > 0

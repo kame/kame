@@ -58,6 +58,10 @@
 
 #include <netinet/ip_fw.h>
 
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#endif /*IPSEC*/
+
 #if !defined(COMPAT_IPFW) || COMPAT_IPFW == 1
 #undef COMPAT_IPFW
 #define COMPAT_IPFW 1
@@ -101,38 +105,41 @@ static struct	sockaddr_in ripsrc = { sizeof(ripsrc), AF_INET };
  * mbuf chain.
  */
 void
-rip_input(m, iphlen)
+rip_input(m, off, proto)
 	struct mbuf *m;
-	int iphlen;
+	int off, proto;
 {
 	register struct ip *ip = mtod(m, struct ip *);
 	register struct inpcb *inp;
 	struct inpcb *last = 0;
 	struct mbuf *opts = 0;
 
+	/*
+	 * xxx must check proto!
+	 */
 	ripsrc.sin_addr = ip->ip_src;
 	for (inp = ripcb.lh_first; inp != NULL; inp = inp->inp_list.le_next) {
-		if (inp->inp_ip_p && inp->inp_ip_p != ip->ip_p)
+		if (inp->inp_ip_p && inp->inp_ip_p != proto)
 			continue;
 		if (inp->inp_laddr.s_addr &&
-                  inp->inp_laddr.s_addr != ip->ip_dst.s_addr)
+		    inp->inp_laddr.s_addr != ip->ip_dst.s_addr)
 			continue;
 		if (inp->inp_faddr.s_addr &&
-                  inp->inp_faddr.s_addr != ip->ip_src.s_addr)
+		    inp->inp_faddr.s_addr != ip->ip_src.s_addr)
 			continue;
 		if (last) {
 			struct mbuf *n = m_copy(m, 0, (int)M_COPYALL);
 			if (n) {
 				if (last->inp_flags & INP_CONTROLOPTS ||
 				    last->inp_socket->so_options & SO_TIMESTAMP)
-				    ip_savecontrol(last, &opts, ip, n);
+					ip_savecontrol(last, &opts, ip, n);
 				if (sbappendaddr(&last->inp_socket->so_rcv,
-				    (struct sockaddr *)&ripsrc, n,
-				    opts) == 0) {
+						 (struct sockaddr *)&ripsrc, n,
+						 opts) == 0) {
 					/* should notify about lost packet */
 					m_freem(n);
 					if (opts)
-					    m_freem(opts);
+						m_freem(opts);
 				} else
 					sorwakeup(last->inp_socket);
 				opts = 0;
@@ -145,17 +152,18 @@ rip_input(m, iphlen)
 		    last->inp_socket->so_options & SO_TIMESTAMP)
 			ip_savecontrol(last, &opts, ip, m);
 		if (sbappendaddr(&last->inp_socket->so_rcv,
-		    (struct sockaddr *)&ripsrc, m, opts) == 0) {
+				 (struct sockaddr *)&ripsrc, m, opts) == 0) {
 			m_freem(m);
 			if (opts)
-			    m_freem(opts);
+				m_freem(opts);
 		} else
 			sorwakeup(last->inp_socket);
 	} else {
 		m_freem(m);
-              ipstat.ips_noproto++;
-              ipstat.ips_delivered--;
-      }
+		ipstat.ips_noproto++;
+		ipstat.ips_delivered--;
+	}
+	return;
 }
 
 /*
@@ -198,7 +206,7 @@ rip_output(m, so, dst)
 		ip = mtod(m, struct ip *);
 		/* don't allow both user specified and setsockopt options,
 		   and don't allow packet length sizes that will crash */
-		if (((IP_VHL_HL(ip->ip_vhl) != (sizeof (*ip) >> 2)) 
+		if (((IP_VHL_HL(ip->ip_vhl) != (sizeof (*ip) >> 2))
 		     && inp->inp_options)
 		    || (ip->ip_len > m->m_pkthdr.len)
 		    || (ip->ip_len < (IP_VHL_HL(ip->ip_vhl) << 2))) {
@@ -211,6 +219,11 @@ rip_output(m, so, dst)
 		flags |= IP_RAWOUTPUT;
 		ipstat.ips_rawout++;
 	}
+
+#ifdef IPSEC
+	m->m_pkthdr.rcvif = (struct ifnet *)so;	/*XXX*/
+#endif /*IPSEC*/
+
 	return (ip_output(m, inp->inp_options, &inp->inp_route, flags,
 			  inp->inp_moptions));
 }
@@ -260,7 +273,7 @@ rip_ctloutput(op, so, level, optname, m)
 			if (*m) (void)m_free(*m);
 			return(EINVAL);
 		}
-		return (*ip_fw_ctl_ptr)(optname, m); 
+		return (*ip_fw_ctl_ptr)(optname, m);
 
 	case IP_FW_ADD:
 	case IP_FW_DEL:
@@ -270,14 +283,14 @@ rip_ctloutput(op, so, level, optname, m)
 			if (*m) (void)m_free(*m);
 			return(EINVAL);
 		}
-		return (*ip_fw_ctl_ptr)(optname, m); 
+		return (*ip_fw_ctl_ptr)(optname, m);
 
 	case IP_NAT:
 		if (ip_nat_ctl_ptr == NULL) {
 			if (*m) (void)m_free(*m);
 			return(EINVAL);
 		}
-		return (*ip_nat_ctl_ptr)(op, m); 
+		return (*ip_nat_ctl_ptr)(op, m);
 
 #endif
 #ifdef DUMMYNET
@@ -369,6 +382,9 @@ rip_usrreq(so, req, m, nam, control)
 			break;
 		inp = (struct inpcb *)so->so_pcb;
 		inp->inp_ip_p = (int)nam;
+#ifdef IPSEC
+		error = ipsec_init_policy(&inp->inp_sp);
+#endif /*IPSEC*/
 		break;
 
 	case PRU_DISCONNECT:

@@ -1,4 +1,33 @@
 /*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+/*
  * Copyright (c) 1982, 1986, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -46,10 +75,12 @@
  * Protocols (RFC 1700)
  */
 #define	IPPROTO_IP		0		/* dummy for IP */
+#define IPPROTO_HOPOPTS		0		/* IP6 hop-by-hop options */
 #define	IPPROTO_ICMP		1		/* control message protocol */
 #define	IPPROTO_IGMP		2		/* group mgmt protocol */
 #define	IPPROTO_GGP		3		/* gateway^2 (deprecated) */
 #define IPPROTO_IPIP		4 		/* IP encapsulation in IP */
+#define IPPROTO_IPV4		4 		/* IP header */
 #define	IPPROTO_TCP		6		/* tcp */
 #define	IPPROTO_ST		7		/* Stream protocol II */
 #define	IPPROTO_EGP		8		/* exterior gateway protocol */
@@ -85,10 +116,10 @@
 #define	IPPROTO_CMTP		38		/* Control Message Transport */
 #define	IPPROTO_TPXX		39		/* TP++ Transport */
 #define	IPPROTO_IL		40		/* IL transport protocol */
-#define	IPPROTO_SIP		41		/* Simple Internet Protocol */
+#define IPPROTO_IPV6		41		/* IP6 header */
 #define	IPPROTO_SDRP		42		/* Source Demand Routing */
-#define	IPPROTO_SIPSR		43		/* SIP Source Route */
-#define	IPPROTO_SIPFRAG		44		/* SIP Fragment */
+#define IPPROTO_ROUTING		43		/* IP6 routing header */
+#define IPPROTO_FRAGMENT	44		/* IP6 fragmentation header */
 #define	IPPROTO_IDRP		45		/* InterDomain Routing*/
 #define IPPROTO_RSVP		46 		/* resource reservation */
 #define	IPPROTO_GRE		47		/* General Routing Encap. */
@@ -99,7 +130,10 @@
 #define	IPPROTO_INLSP		52		/* Integ. Net Layer Security */
 #define	IPPROTO_SWIPE		53		/* IP with encryption */
 #define	IPPROTO_NHRP		54		/* Next Hop Resolution */
-/* 55-60: Unassigned */
+/* 55-57: Unassigned */
+#define IPPROTO_ICMPV6		58		/* ICMP6 */
+#define IPPROTO_NONE		59		/* IP6 no next header */
+#define IPPROTO_DSTOPTS		60		/* IP6 destination option */
 #define	IPPROTO_AHIP		61		/* any host internal protocol */
 #define	IPPROTO_CFTP		62		/* CFTP */
 #define	IPPROTO_HELLO		63		/* "hello" routing protocol */
@@ -140,13 +174,23 @@
 #define	IPPROTO_ENCAP		98		/* encapsulation header */
 #define	IPPROTO_APES		99		/* any private encr. scheme */
 #define	IPPROTO_GMTP		100		/* GMTP*/
+#define	IPPROTO_IPCOMP		108		/* payload compression (IPComp) */
 /* 101-254: Unassigned */
+#if defined(PM)
+#define	IPPROTO_PM		101		/* PM - Packet Management by SuMiRe */
+#endif
+#define IPPROTO_PIM		103		/* Protocol Independent Mcast */
+#if defined(PTR)
+#define	IPPROTO_PTR		104		/* Protocol Translator */
+#endif
 /* 255: Reserved */
 /* BSD Private, local use, namespace incursion */
 #define	IPPROTO_DIVERT		254		/* divert pseudo-protocol */
 #define	IPPROTO_RAW		255		/* raw IP packet */
 #define	IPPROTO_MAX		256
 
+/* last return value of *_input(), meaning "all job for this pkt is done".  */
+#define	IPPROTO_DONE		257
 
 /*
  * Local port number conventions:
@@ -267,6 +311,8 @@ struct sockaddr_in {
 	char	sin_zero[8];
 };
 
+#define INET_ADDRSTRLEN                 16
+
 /*
  * Structure used to describe IP options.
  * Used to store options internally, to pass them to a process,
@@ -303,6 +349,10 @@ struct ip_opts {
 #define IP_RSVP_VIF_OFF		18   /* unset RSVP per-vif socket */
 #define IP_PORTRANGE		19   /* int; range to choose for unspec port */
 #define	IP_RECVIF		20   /* bool; receive reception if w/dgram */
+#if 1	/*IPSEC*/
+#define IP_IPSEC_POLICY		21   /* int; set/get security policy */
+#endif
+#define IP_FAITH		22   /* bool; accept FAITH'ed connections */
 
 #define IP_FW_ADD     		50   /* add a firewall rule to chain */
 #define IP_FW_DEL    		51   /* delete a firewall rule from chain */
@@ -345,7 +395,7 @@ struct ip_mreq {
  * Third level is protocol number.
  * Fourth level is desired variable within that protocol.
  */
-#define	IPPROTO_MAXID	(IPPROTO_IDP + 1)	/* don't list to IPPROTO_MAX */
+#define	IPPROTO_MAXID	(IPPROTO_AH + 1)	/* don't list to IPPROTO_MAX */
 
 #define	CTL_IPPROTO_NAMES { \
 	{ "ip", CTLTYPE_NODE }, \
@@ -371,6 +421,35 @@ struct ip_mreq {
 	{ 0, 0 }, \
 	{ 0, 0 }, \
 	{ "idp", CTLTYPE_NODE }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ "ipsec", CTLTYPE_NODE }, \
 }
 
 /*
@@ -391,7 +470,9 @@ struct ip_mreq {
 #define IPCTL_INTRQDROPS	11	/* number of netisr q drops */
 #define	IPCTL_STATS		12	/* ipstat structure */
 #define	IPCTL_ACCEPTSOURCEROUTE	13	/* may accept source routed packets */
-#define	IPCTL_MAXID		13
+#define IPCTL_KEEPFAITH		14
+#define IPCTL_GIF_TTL		15	/* default TTL for gif encap packet */
+#define	IPCTL_MAXID		15
 
 #define	IPCTL_NAMES { \
 	{ 0, 0 }, \
@@ -408,8 +489,12 @@ struct ip_mreq {
 	{ "intr-queue-drops", CTLTYPE_INT }, \
 	{ "stats", CTLTYPE_STRUCT }, \
 	{ "accept_sourceroute", CTLTYPE_INT }, \
+	{ "keepfaith", CTLTYPE_INT }, \
+	{ "gifttl", CTLTYPE_INT }, \
 }
 
+/* INET6 stuff */
+#include <netinet6/in6.h>
 
 #ifdef KERNEL
 struct ifnet; struct mbuf;	/* forward declarations for Standard C */
@@ -419,6 +504,7 @@ int	 in_canforward __P((struct in_addr));
 int	 in_cksum __P((struct mbuf *, int));
 int	 in_localaddr __P((struct in_addr));
 char 	*inet_ntoa __P((struct in_addr)); /* in libkern */
+u_long	in_netof __P((struct in_addr));
 
 /* Firewall hooks */
 struct ip;

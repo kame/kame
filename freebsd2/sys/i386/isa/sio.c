@@ -271,8 +271,14 @@ struct com_s {
 	 * Data area for output buffers.  Someday we should build the output
 	 * buffer queue without copying data.
 	 */
+#ifdef ALTQ_PPP
+	/* kludge: reduce the output buffers for userland ppp */
+	u_char	obuf1[64];
+	u_char	obuf2[64];
+#else
 	u_char	obuf1[256];
 	u_char	obuf2[256];
+#endif
 #ifdef DEVFS
 	void	*devfs_token_ttyd;
 	void	*devfs_token_ttyl;
@@ -2374,6 +2380,13 @@ disc_optim(tp, t, com)
 		com->hotchar = 0x7e;
 	else
 		com->hotchar = 0;
+#ifdef ALTQ_PPP
+	if (tp->t_line == TTYDISC) {
+		/* kludge: reduce the watermarks for userland ppp */
+		tp->t_lowat = TTMINLOWAT;
+		tp->t_hiwat = roundup(50, CBSIZE);  /* from slip code */
+	}
+#endif /* ALTQ_PPP */
 }
 
 /*

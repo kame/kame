@@ -18,6 +18,10 @@
  */
 #undef DEBUG
 
+#ifdef ALTQ
+#include "opt_altq.h"
+#endif
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -29,14 +33,22 @@
 #include <net/netisr.h>
 #include <net/if_types.h>
 
-#ifdef INET
+#if defined(INET) || defined(INET6)
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
+#endif /* INET || INET6 */
+
+#ifdef INET
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
-#include <netinet/if_ether.h>
 #endif
+
+#ifdef INET6
+#include <netinet/ip6.h>
+#endif /*INET6*/
+
+#include <netinet/if_ether.h>
 
 #ifdef IPX
 #include <netipx/ipx.h>
@@ -73,6 +85,8 @@
 #define PPP_IPX         0x002b          /* Novell IPX Protocol */
 #define PPP_LCP         0xc021          /* Link Control Protocol */
 #define PPP_IPCP        0x8021          /* Internet Protocol Control Protocol */
+#define PPP_IPV6	0x0057		/* Internet Protocol version 6 */
+#define PPP_IPV6CP	0x8057		/* IPv6 Control Protocol */
 
 #define LCP_CONF_REQ    1               /* PPP LCP configure request */
 #define LCP_CONF_ACK    2               /* PPP LCP configure acknowledge */
@@ -102,6 +116,14 @@
 #define IPCP_TERM_REQ   LCP_TERM_REQ    /* PPP IPCP terminate request */
 #define IPCP_TERM_ACK   LCP_TERM_ACK    /* PPP IPCP terminate acknowledge */
 #define IPCP_CODE_REJ   LCP_CODE_REJ    /* PPP IPCP code reject */
+
+#define IPV6CP_CONF_REQ   LCP_CONF_REQ    /* PPP IPV6CP configure request */
+#define IPV6CP_CONF_ACK   LCP_CONF_ACK    /* PPP IPV6CP configure acknowledge */
+#define IPV6CP_CONF_NAK   LCP_CONF_NAK    /* PPP IPV6CP configure negative ack */
+#define IPV6CP_CONF_REJ   LCP_CONF_REJ    /* PPP IPV6CP configure reject */
+#define IPV6CP_TERM_REQ   LCP_TERM_REQ    /* PPP IPV6CP terminate request */
+#define IPV6CP_TERM_ACK   LCP_TERM_ACK    /* PPP IPV6CP terminate acknowledge */
+#define IPV6CP_CODE_REJ   LCP_CODE_REJ    /* PPP IPV6CP code reject */
 
 #define CISCO_MULTICAST         0x8f    /* Cisco multicast address */
 #define CISCO_UNICAST           0x0f    /* Cisco unicast address */
@@ -164,14 +186,29 @@ static void sppp_cp_send (struct sppp *sp, u_short proto, u_char type,
 static void sppp_cisco_send (struct sppp *sp, int type, long par1, long par2);
 static void sppp_lcp_input (struct sppp *sp, struct mbuf *m);
 static void sppp_cisco_input (struct sppp *sp, struct mbuf *m);
+#ifdef INET
 static void sppp_ipcp_input (struct sppp *sp, struct mbuf *m);
+#endif /* INET */
+#ifdef INET6
+static void sppp_ipv6cp_input (struct sppp *sp, struct mbuf *m);
+#endif /* INET6 */
 static void sppp_lcp_open (struct sppp *sp);
+#ifdef INET
 static void sppp_ipcp_open (struct sppp *sp);
+#endif /* INET */
+#ifdef INET6
+static void sppp_ipv6cp_open (struct sppp *sp);
+#endif /* INET6 */
 static int sppp_lcp_conf_parse_options (struct sppp *sp, struct lcp_header *h,
 	int len, u_long *magic);
 static void sppp_cp_timeout (void *arg);
 static char *sppp_lcp_type_name (u_char type);
+#ifdef INET
 static char *sppp_ipcp_type_name (u_char type);
+#endif /* INET */
+#ifdef INET6
+static char *sppp_ipv6cp_type_name (u_char type);
+#endif /* INET6 */
 static void sppp_print_bytes (u_char *p, u_short len);
 static int sppp_output (struct ifnet *ifp, struct mbuf *m, 
 	struct sockaddr *dst, struct rtentry *rt);
@@ -267,6 +304,19 @@ invalid:        if (ifp->if_flags & IFF_DEBUG)
 			}
 			break;
 #endif
+#ifdef INET6
+		case PPP_IPV6CP:
+			if (sp->lcp.state == LCP_STATE_OPENED)
+				sppp_ipv6cp_input ((struct sppp*) ifp, m);
+			m_freem (m);
+			return;
+		case PPP_IPV6:
+			if (sp->ipv6cp.state == IPV6CP_STATE_OPENED) {
+				schednetisr (NETISR_IPV6);
+				inq = &ip6intrq;
+			}
+			break;
+#endif /*INET6*/
 #ifdef IPX
 		case PPP_IPX:
 			/* IPX IPXCP not implemented yet */
@@ -320,6 +370,12 @@ invalid:        if (ifp->if_flags & IFF_DEBUG)
 			inq = &ipintrq;
 			break;
 #endif
+#ifdef INET6
+		case ETHERTYPE_IPV6:
+			schednetisr (NETISR_IPV6);
+			inq = &ip6intrq;
+			break;
+#endif /*INET6*/
 #ifdef IPX
 		case ETHERTYPE_IPX:
 			schednetisr (NETISR_IPX);
@@ -363,6 +419,9 @@ sppp_output (struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst, struct rte
 	struct sppp *sp = (struct sppp*) ifp;
 	struct ppp_header *h;
 	struct ifqueue *ifq;
+#ifdef ALTQ
+	struct pr_hdr pr_hdr;
+#endif
 	int s = splimp ();
 
 	if (! (ifp->if_flags & IFF_UP) || ! (ifp->if_flags & IFF_RUNNING)) {
@@ -371,6 +430,18 @@ sppp_output (struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst, struct rte
 		return (ENETDOWN);
 	}
 
+#ifdef ALTQ
+	/*
+	 * save a pointer to the protocol level header before adding
+	 * link headers.
+	 */
+	pr_hdr.ph_family = dst->sa_family;
+	pr_hdr.ph_hdr = mtod(m, caddr_t);
+#endif /* ALTQ */
+
+#ifdef ALTQ
+	if (!ALTQ_IS_ON(ifp)) {
+#endif
 	ifq = &ifp->if_snd;
 #ifdef INET
 	/*
@@ -389,6 +460,25 @@ sppp_output (struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst, struct rte
 	    	    INTERACTIVE (ntohs (tcp->th_dport)))))
 			ifq = &sp->pp_fastq;
 	}
+#endif
+#ifdef INET6
+	/*
+	 * Put interactive packets in front of the queue.
+	 */
+#if 0
+	if (dst->sa_family == AF_INET6) {
+		struct ip6_hdr *ip6 = mtod (m, struct ip6_hdr *);
+
+		if (! IF_QFULL(&sp->pp_fastq)
+		 && (ip6->ip6_head & IPV6_FLOWINFO_PRIORITY)
+				== IPV6_PRIORITY_INTERACTIVE) {
+			ifq = &sp->pp_fastq;
+		}
+	}
+#endif /* 0 */
+#endif /*INET6*/
+#ifdef ALTQ
+        }
 #endif
 
 	/*
@@ -425,6 +515,19 @@ sppp_output (struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst, struct rte
 		}
 		break;
 #endif
+#ifdef INET6
+	case AF_INET6:   /* Internet Protocol version 6 */
+		if (sp->pp_flags & PP_CISCO)
+			h->protocol = htons (ETHERTYPE_IPV6);
+		else if (sp->ipv6cp.state == IPV6CP_STATE_OPENED)
+			h->protocol = htons (PPP_IPV6);
+		else {
+			m_freem (m);
+			splx (s);
+			return (ENETDOWN);
+		}
+		break;
+#endif /*INET6*/
 #ifdef NS
 	case AF_NS:     /* Xerox NS Protocol */
 		h->protocol = htons ((sp->pp_flags & PP_CISCO) ?
@@ -451,17 +554,38 @@ nosupport:
 		return (EAFNOSUPPORT);
 	}
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+	        int error, len;
+	        len = m->m_pkthdr.len;
+	        error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr, ALTEQ_NORMAL);
+	        if (error) {
+			IF_DROP (&ifp->if_snd);
+		}
+		else
+		        ifp->if_obytes += len + 3;
+	        splx(s);
+	        return (error);
+	}
+#endif /* ALTQ */
+
 	/*
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
 	if (IF_QFULL (ifq)) {
 		IF_DROP (&ifp->if_snd);
+#ifdef ALTQ_ACCOUNT
+		ALTQ_ACCOUNTING(ifp, m, &pr_hdr, ALTEQ_ACCDROP);
+#endif
 		m_freem (m);
 		splx (s);
 		return (ENOBUFS);
 	}
 	IF_ENQUEUE (ifq, m);
+#ifdef ALTQ_ACCOUNT
+	ALTQ_ACCOUNTING(ifp, m, &pr_hdr, ALTEQ_ACCOK);
+#endif
 	if (! (ifp->if_flags & IFF_OACTIVE))
 		(*ifp->if_start) (ifp);
 
@@ -496,7 +620,12 @@ void sppp_attach (struct ifnet *ifp)
 	sp->pp_rseq = 0;
 	sp->lcp.magic = 0;
 	sp->lcp.state = LCP_STATE_CLOSED;
+#ifdef INET
 	sp->ipcp.state = IPCP_STATE_CLOSED;
+#endif /* INET */
+#ifdef INET6
+	sp->ipv6cp.state = IPV6CP_STATE_CLOSED;
+#endif /* INET6 */
 }
 
 void 
@@ -524,6 +653,12 @@ void sppp_flush (struct ifnet *ifp)
 {
 	struct sppp *sp = (struct sppp*) ifp;
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+	        (void)(*ifp->if_altqdequeue)(ifp, ALTDQ_FLUSH);
+	        return;
+	}
+#endif
 	qflush (&sp->pp_if.if_snd);
 	qflush (&sp->pp_fastq);
 }
@@ -537,6 +672,11 @@ sppp_isempty (struct ifnet *ifp)
 	struct sppp *sp = (struct sppp*) ifp;
 	int empty, s = splimp ();
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp))
+	        empty = ((*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK) == NULL);
+	else
+#endif
 	empty = !sp->pp_fastq.ifq_head && !sp->pp_if.if_snd.ifq_head;
 	splx (s);
 	return (empty);
@@ -551,6 +691,13 @@ struct mbuf *sppp_dequeue (struct ifnet *ifp)
 	struct mbuf *m;
 	int s = splimp ();
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+	        m = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+	        splx(s);
+	        return (m);
+	}
+#endif /* ALTQ */
 	IF_DEQUEUE (&sp->pp_fastq, m);
 	if (! m)
 		IF_DEQUEUE (&sp->pp_if.if_snd, m);
@@ -584,10 +731,20 @@ void sppp_keepalive (void *dummy)
 			printf ("%s%d: down\n", ifp->if_name, ifp->if_unit);
 			if_down (ifp);
 			qflush (&sp->pp_fastq);
+#ifdef ALTQ
+			if (ALTQ_IS_ON(ifp))
+			        (void)(*ifp->if_altqdequeue)(ifp, ALTDQ_FLUSH);
+#endif
 			if (! (sp->pp_flags & PP_CISCO)) {
 				/* Shut down the PPP link. */
 				sp->lcp.state = LCP_STATE_CLOSED;
+#ifdef INET
 				sp->ipcp.state = IPCP_STATE_CLOSED;
+#endif /* INET */
+#ifdef INET6
+				sp->ipv6cp.state = IPV6CP_STATE_CLOSED;
+#endif /* INET6 */
+
 				UNTIMO (sp);
 				/* Initiate negotiation. */
 				sppp_lcp_open (sp);
@@ -668,6 +825,11 @@ void sppp_lcp_input (struct sppp *sp, struct mbuf *m)
 				if (ifp->if_flags & IFF_UP) {
 					if_down (ifp);
 					qflush (&sp->pp_fastq);
+#ifdef ALTQ
+					if (ALTQ_IS_ON(ifp))
+					        (void)(*ifp->if_altqdequeue)
+						        (ifp, ALTDQ_FLUSH);
+#endif
 				}
 			} else if (ifp->if_flags & IFF_DEBUG)
 				printf ("%s%d: conf req: magic glitch\n",
@@ -693,7 +855,12 @@ badreq:
 			case LCP_STATE_ACK_SENT:
 				/* Go to closed state. */
 				sp->lcp.state = LCP_STATE_CLOSED;
+#ifdef INET
 				sp->ipcp.state = IPCP_STATE_CLOSED;
+#endif /* INET */
+#ifdef INET6
+				sp->ipv6cp.state = IPV6CP_STATE_CLOSED;
+#endif /* INET6 */
 			}
 			break;
 		}
@@ -708,12 +875,23 @@ badreq:
 			break;
 		case LCP_STATE_ACK_RCVD:
 			sp->lcp.state = LCP_STATE_OPENED;
+#ifdef INET
 			sppp_ipcp_open (sp);
+#endif /* INET */
+#ifdef INET6
+			sppp_ipv6cp_open (sp);
+#endif /* INET6 */
 			break;
 		case LCP_STATE_OPENED:
 			/* Remote magic changed -- close session. */
+
 			sp->lcp.state = LCP_STATE_CLOSED;
+#ifdef INET
 			sp->ipcp.state = IPCP_STATE_CLOSED;
+#endif /* INET */
+#ifdef INET6
+			sp->ipv6cp.state = IPV6CP_STATE_CLOSED;
+#endif /* INET6 */
 			/* Initiate renegotiation. */
 			sppp_lcp_open (sp);
 			/* An ACK has already been sent. */
@@ -738,7 +916,12 @@ badreq:
 			break;
 		case LCP_STATE_ACK_SENT:
 			sp->lcp.state = LCP_STATE_OPENED;
+#ifdef INET
 			sppp_ipcp_open (sp);
+#endif /* INET */
+#ifdef INET6
+			sppp_ipv6cp_open (sp);
+#endif /* INET6 */
 			break;
 		}
 		break;
@@ -760,7 +943,12 @@ badreq:
 		if (sp->lcp.state != LCP_STATE_ACK_SENT) {
 			/* Go to closed state. */
 			sp->lcp.state = LCP_STATE_CLOSED;
+#ifdef INET
 			sp->ipcp.state = IPCP_STATE_CLOSED;
+#endif /* INET */
+#ifdef INET6
+			sp->ipv6cp.state = IPV6CP_STATE_CLOSED;
+#endif /* INET6 */
 		}
 		/* The link will be renegotiated after timeout,
 		 * to avoid endless req-nack loop. */
@@ -776,7 +964,12 @@ badreq:
 		if (sp->lcp.state != LCP_STATE_ACK_SENT) {
 			/* Go to closed state. */
 			sp->lcp.state = LCP_STATE_CLOSED;
+#ifdef INET
 			sp->ipcp.state = IPCP_STATE_CLOSED;
+#endif /* INET */
+#ifdef INET6
+			sp->ipv6cp.state = IPV6CP_STATE_CLOSED;
+#endif /* INET6 */
 		}
 		break;
 	case LCP_TERM_REQ:
@@ -785,7 +978,12 @@ badreq:
 		sppp_cp_send (sp, PPP_LCP, LCP_TERM_ACK, h->ident, 0, 0);
 		/* Go to closed state. */
 		sp->lcp.state = LCP_STATE_CLOSED;
+#ifdef INET
 		sp->ipcp.state = IPCP_STATE_CLOSED;
+#endif /* INET */
+#ifdef INET6
+		sp->ipv6cp.state = IPV6CP_STATE_CLOSED;
+#endif /* INET6 */
 		/* Initiate renegotiation. */
 		sppp_lcp_open (sp);
 		break;
@@ -811,10 +1009,19 @@ badreq:
 			printf ("%s%d: loopback\n", ifp->if_name, ifp->if_unit);
 			if_down (ifp);
 			qflush (&sp->pp_fastq);
+#ifdef ALTQ
+			if (ALTQ_IS_ON(ifp))
+			        (void)(*ifp->if_altqdequeue)(ifp, ALTDQ_FLUSH);
+#endif
 
 			/* Shut down the PPP link. */
 			sp->lcp.state = LCP_STATE_CLOSED;
+#ifdef INET
 			sp->ipcp.state = IPCP_STATE_CLOSED;
+#endif /* INET */
+#ifdef INET6
+			sp->ipv6cp.state = IPV6CP_STATE_CLOSED;
+#endif /* INET6 */
 			UNTIMO (sp);
 			/* Initiate negotiation. */
 			sppp_lcp_open (sp);
@@ -882,6 +1089,11 @@ sppp_cisco_input (struct sppp *sp, struct mbuf *m)
 				if (ifp->if_flags & IFF_UP) {
 					if_down (ifp);
 					qflush (&sp->pp_fastq);
+#ifdef ALTQ
+					if (ALTQ_IS_ON(ifp))
+					        (void)(*ifp->if_altqdequeue)
+						    (ifp, ALTDQ_FLUSH);
+#endif
 				}
 			}
 			++sp->pp_loopcnt;
@@ -947,16 +1159,53 @@ sppp_cp_send (struct sppp *sp, u_short proto, u_char type,
 		bcopy (data, lh+1, len);
 
 	if (ifp->if_flags & IFF_DEBUG) {
+		char *proto_name, *type_name;
+		switch (proto) {
+		case PPP_LCP:
+			proto_name = "lcp";
+			type_name = sppp_lcp_type_name(lh->type);
+			break;
+#ifdef INET
+		case PPP_IPCP:
+			proto_name = "ipcp";
+			type_name = sppp_ipcp_type_name(lh->type);
+			break;
+#endif /* INET */
+#ifdef INET6
+		case PPP_IPV6CP:
+			proto_name = "ipv6cp";
+			type_name = sppp_ipv6cp_type_name(lh->type);
+			break;
+#endif /* INET6 */
+		default:
+			proto_name = "unknown";
+			type_name = sppp_lcp_type_name(lh->type); /* XXX */
+		}
 		printf ("%s%d: %s output <%s id=%xh len=%xh",
 			ifp->if_name, ifp->if_unit,
-			proto==PPP_LCP ? "lcp" : "ipcp",
-			proto==PPP_LCP ? sppp_lcp_type_name (lh->type) :
-			sppp_ipcp_type_name (lh->type), lh->ident,
+			proto_name,
+			type_name, lh->ident,
 			ntohs (lh->len));
 		if (len)
 			sppp_print_bytes ((u_char*) (lh+1), len);
 		printf (">\n");
 	}
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+		struct pr_hdr pr_hdr;
+	        int error, len;
+
+	        len = m->m_pkthdr.len;
+		altq_mkctlhdr(&pr_hdr);  /* fake a control type header */
+	        error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr, ALTEQ_NORMAL);
+	        if (error) {
+			IF_DROP (&ifp->if_snd);
+		}
+		else
+		        ifp->if_obytes += len + 3;
+	        return;
+	}
+#endif /* ALTQ */
 	if (IF_QFULL (&sp->pp_fastq)) {
 		IF_DROP (&ifp->if_snd);
 		m_freem (m);
@@ -1003,6 +1252,19 @@ sppp_cisco_send (struct sppp *sp, int type, long par1, long par2)
 			ifp->if_name, ifp->if_unit, ntohl (ch->type), ch->par1,
 			ch->par2, ch->rel, ch->time0, ch->time1);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+		struct pr_hdr pr_hdr;
+	        int error, len;
+
+	        len = m->m_pkthdr.len;
+		altq_mkctlhdr(&pr_hdr);  /* fake a control type header */
+	        error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr, ALTEQ_NORMAL);
+	        if (error == 0)
+		        ifp->if_obytes += len + 3;
+	        return;
+	}
+#endif /* ALTQ */
 	if (IF_QFULL (&sp->pp_fastq)) {
 		IF_DROP (&ifp->if_snd);
 		m_freem (m);
@@ -1045,7 +1307,12 @@ sppp_ioctl (struct ifnet *ifp, int cmd, void *data)
 			/* Shut down the PPP link. */
 			ifp->if_flags &= ~IFF_RUNNING;
 			sp->lcp.state = LCP_STATE_CLOSED;
+#ifdef INET
 			sp->ipcp.state = IPCP_STATE_CLOSED;
+#endif /* INET */
+#ifdef INET6
+			sp->ipv6cp.state = IPV6CP_STATE_CLOSED;
+#endif /* INET6 */
 			UNTIMO (sp);
 		}
 		if (going_up) {
@@ -1144,6 +1411,7 @@ sppp_lcp_conf_parse_options (struct sppp *sp, struct lcp_header *h,
 	return (rlen == 0);
 }
 
+#ifdef INET
 static void
 sppp_ipcp_input (struct sppp *sp, struct mbuf *m)
 {
@@ -1244,6 +1512,110 @@ sppp_ipcp_input (struct sppp *sp, struct mbuf *m)
 		break;
 	}
 }
+#endif /* INET */
+
+#ifdef INET6
+static void
+sppp_ipv6cp_input (struct sppp *sp, struct mbuf *m)
+{
+	struct lcp_header *h;
+	struct ifnet *ifp = &sp->pp_if;
+	int len = m->m_pkthdr.len;
+
+	if (len < 4) {
+		/* if (ifp->if_flags & IFF_DEBUG) */
+			printf ("%s%d: invalid ipv6cp packet length: %d bytes\n",
+				ifp->if_name, ifp->if_unit, len);
+		return;
+	}
+	h = mtod (m, struct lcp_header*);
+	if (ifp->if_flags & IFF_DEBUG) {
+		printf ("%s%d: ipv6cp input: %d bytes <%s id=%xh len=%xh",
+			ifp->if_name, ifp->if_unit, len,
+			sppp_ipv6cp_type_name (h->type), h->ident, ntohs (h->len));
+		if (len > 4)
+			sppp_print_bytes ((u_char*) (h+1), len-4);
+		printf (">\n");
+	}
+	if (len > ntohs (h->len))
+		len = ntohs (h->len);
+	switch (h->type) {
+	default:
+		/* Unknown packet type -- send Code-Reject packet. */
+		sppp_cp_send (sp, PPP_IPV6CP, IPV6CP_CODE_REJ, ++sp->pp_seq, len, h);
+		break;
+	case IPV6CP_CONF_REQ:
+		if (len < 4) {
+			if (ifp->if_flags & IFF_DEBUG)
+				printf ("%s%d: invalid ipv6cp configure request packet length: %d bytes\n",
+					ifp->if_name, ifp->if_unit, len);
+			return;
+		}
+		if (len > 4) {
+			sppp_cp_send (sp, PPP_IPV6CP, LCP_CONF_REJ, h->ident,
+				len-4, h+1);
+
+			switch (sp->ipcp.state) {
+			case IPCP_STATE_OPENED:
+				/* Initiate renegotiation. */
+				sppp_ipv6cp_open (sp);
+				/* fall through... */
+			case IPCP_STATE_ACK_SENT:
+				/* Go to closed state. */
+				sp->ipv6cp.state = IPV6CP_STATE_CLOSED;
+			}
+		} else {
+			/* Send Configure-Ack packet. */
+			sppp_cp_send (sp, PPP_IPV6CP, IPV6CP_CONF_ACK, h->ident,
+				0, 0);
+			/* Change the state. */
+			if (sp->ipv6cp.state == IPV6CP_STATE_ACK_RCVD)
+				sp->ipv6cp.state = IPV6CP_STATE_OPENED;
+			else
+				sp->ipv6cp.state = IPV6CP_STATE_ACK_SENT;
+		}
+		break;
+	case IPV6CP_CONF_ACK:
+		if (h->ident != sp->ipv6cp.confid)
+			break;
+		UNTIMO (sp);
+		switch (sp->ipv6cp.state) {
+		case IPV6CP_STATE_CLOSED:
+			sp->ipv6cp.state = IPV6CP_STATE_ACK_RCVD;
+			TIMO (sp, 5);
+			break;
+		case IPV6CP_STATE_ACK_SENT:
+			sp->ipv6cp.state = IPV6CP_STATE_OPENED;
+			break;
+		}
+		break;
+	case IPV6CP_CONF_NAK:
+	case IPV6CP_CONF_REJ:
+		if (h->ident != sp->ipv6cp.confid)
+			break;
+		UNTIMO (sp);
+			/* Initiate renegotiation. */
+			sppp_ipv6cp_open (sp);
+		if (sp->ipv6cp.state != IPV6CP_STATE_ACK_SENT)
+			/* Go to closed state. */
+			sp->ipv6cp.state = IPV6CP_STATE_CLOSED;
+		break;
+	case IPV6CP_TERM_REQ:
+		/* Send Terminate-Ack packet. */
+		sppp_cp_send (sp, PPP_IPV6CP, IPV6CP_TERM_ACK, h->ident, 0, 0);
+		/* Go to closed state. */
+		sp->ipv6cp.state = IPV6CP_STATE_CLOSED;
+			/* Initiate renegotiation. */
+			sppp_ipv6cp_open (sp);
+		break;
+	case IPV6CP_TERM_ACK:
+		/* Ignore for now. */
+	case IPV6CP_CODE_REJ:
+		/* Ignore for now. */
+		break;
+	}
+}
+#endif /* INET6 */
 
 static void
 sppp_lcp_open (struct sppp *sp)
@@ -1264,6 +1636,7 @@ sppp_lcp_open (struct sppp *sp)
 	TIMO (sp, 2);
 }
 
+#ifdef INET
 static void
 sppp_ipcp_open (struct sppp *sp)
 {
@@ -1271,6 +1644,17 @@ sppp_ipcp_open (struct sppp *sp)
 	sppp_cp_send (sp, PPP_IPCP, IPCP_CONF_REQ, sp->ipcp.confid, 0, 0);
 	TIMO (sp, 2);
 }
+#endif /* INET */
+
+#ifdef INET6
+static void
+sppp_ipv6cp_open (struct sppp *sp)
+{
+	sp->ipv6cp.confid = ++sp->pp_seq;
+	sppp_cp_send (sp, PPP_IPV6CP, IPV6CP_CONF_REQ, sp->ipv6cp.confid, 0, 0);
+	TIMO (sp, 2);
+}
+#endif /* INET6 */
 
 /*
  * Process PPP control protocol timeouts.
@@ -1301,7 +1685,8 @@ sppp_cp_timeout (void *arg)
 		sppp_lcp_open (sp);
 		break;
 	case LCP_STATE_OPENED:
-		/* LCP is already OK, try IPCP. */
+		/* LCP is already OK, try IPCP and IPV6CP. */
+#ifdef INET
 		switch (sp->ipcp.state) {
 		case IPCP_STATE_CLOSED:
 			/* No ACK for Configure-Request, retry. */
@@ -1320,6 +1705,27 @@ sppp_cp_timeout (void *arg)
 			/* IPCP is OK. */
 			break;
 		}
+#endif /* INET */
+#ifdef INET6
+		switch (sp->ipv6cp.state) {
+		case IPV6CP_STATE_CLOSED:
+			/* No ACK for Configure-Request, retry. */
+			sppp_ipv6cp_open (sp);
+			break;
+		case IPV6CP_STATE_ACK_RCVD:
+			/* ACK got, but no Configure-Request for peer, retry. */
+			sppp_ipv6cp_open (sp);
+			sp->ipv6cp.state = IPV6CP_STATE_CLOSED;
+			break;
+		case IPV6CP_STATE_ACK_SENT:
+			/* ACK sent but no ACK for Configure-Request, retry. */
+			sppp_ipv6cp_open (sp);
+			break;
+		case IPV6CP_STATE_OPENED:
+			/* IPV6CP is OK. */
+			break;
+		}
+#endif /* INET6 */
 		break;
 	}
 	splx (s);
@@ -1346,6 +1752,7 @@ static char
 	return (buf);
 }
 
+#ifdef INET
 static char
 *sppp_ipcp_type_name (u_char type)
 {
@@ -1362,6 +1769,15 @@ static char
 	sprintf (buf, "%xh", type);
 	return (buf);
 }
+#endif /* INET */
+
+#ifdef INET6
+static char
+*sppp_ipv6cp_type_name (u_char type)
+{
+	return(sppp_lcp_type_name(type)); /* XXX */
+}
+#endif /* INET6 */
 
 static void
 sppp_print_bytes (u_char *p, u_short len)

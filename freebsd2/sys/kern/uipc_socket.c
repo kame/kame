@@ -140,7 +140,17 @@ sofree(so)
 {
 	struct socket *head = so->so_head;
 
-	if (so->so_pcb || (so->so_state & SS_NOFDREF) == 0)
+	if (so->so_pcb
+#ifdef MAPPED_ADDR_ENABLED
+	    /*
+	     * MAPPED_ADDR implementation spec:
+	     *  Check so_pcb2 despite the ip6_mapped_addr value. 
+	     *  Because the sysctl value may be changed to 0
+	     *  after connection establishment.
+	     */
+	    || so->so_pcb2
+#endif /* MAPPED_ADDR_ENABLED */
+	    || (so->so_state & SS_NOFDREF) == 0)
 		return;
 	if (head != NULL) {
 		if (so->so_state & SS_INCOMP) {
@@ -184,7 +194,11 @@ soclose(so)
 			(void) soabort(sp);
 		}
 	}
-	if (so->so_pcb == 0)
+	if (so->so_pcb == 0
+#ifdef MAPPED_ADDR_ENABLED
+	    && so->so_pcb2 == 0
+#endif /* MAPPED_ADDR_ENABLED */
+	    )
 		goto discard;
 	if (so->so_state & SS_ISCONNECTED) {
 		if ((so->so_state & SS_ISDISCONNECTING) == 0) {
@@ -205,7 +219,11 @@ soclose(so)
 		}
 	}
 drop:
-	if (so->so_pcb) {
+	if (so->so_pcb
+#ifdef MAPPED_ADDR_ENABLED
+	    || so->so_pcb2
+#endif /* MAPPED_ADDR_ENABLED */
+	    ) {
 		int error2 = (*so->so_proto->pr_usrreqs->pru_detach)(so);
 		if (error == 0)
 			error = error2;
@@ -801,7 +819,13 @@ dontblock:
 	if ((flags & MSG_PEEK) == 0) {
 		if (m == 0)
 			so->so_rcv.sb_mb = nextrecord;
-		if (pr->pr_flags & PR_WANTRCVD && so->so_pcb)
+		if (pr->pr_flags & PR_WANTRCVD &&
+		    (so->so_pcb
+#ifdef MAPPED_ADDR_ENABLED
+		     || so->so_pcb2
+#endif /* MAPPED_ADDR_ENABLED */
+		     )
+		    )
 			(*pr->pr_usrreqs->pru_rcvd)(so, flags);
 	}
 	if (orig_resid == uio->uio_resid && orig_resid &&

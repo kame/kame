@@ -1283,6 +1283,9 @@ lnc_attach_sc(struct lnc_softc *sc, int unit)
 	sc->arpcom.ac_if.if_type = IFT_ETHER;
 	sc->arpcom.ac_if.if_addrlen = ETHER_ADDR_LEN;
 	sc->arpcom.ac_if.if_hdrlen = ETHER_HDR_LEN;
+#ifdef ALTQ
+	sc->arpcom.ac_if.if_altqflags |= ALTQF_READY;
+#endif
 
 	/*
 	 * XXX -- should check return status of if_attach
@@ -1695,6 +1698,11 @@ lnc_start(struct ifnet *ifp)
 
 	do {
 
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp))
+			head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		else
+#endif
 		IF_DEQUEUE(&sc->arpcom.ac_if.if_snd, head);
 		if (!head)
 			return;

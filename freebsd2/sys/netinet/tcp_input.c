@@ -1,4 +1,33 @@
 /*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+/*
  * Copyright (c) 1982, 1986, 1988, 1990, 1993, 1994, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -71,6 +100,16 @@
 static struct	tcpiphdr tcp_saveti;
 #endif
 
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#include <netkey/key.h>
+#endif /*IPSEC*/
+
+#include "faith.h"
+#if defined(NFAITH) && NFAITH > 0
+#include <net/if_types.h>
+#endif
+
 static int	tcprexmtthresh = 3;
 tcp_seq	tcp_iss;
 tcp_cc	tcp_ccgen;
@@ -79,9 +118,9 @@ struct	tcpstat tcpstat;
 SYSCTL_STRUCT(_net_inet_tcp, TCPCTL_STATS, stats,
 	CTLFLAG_RD, &tcpstat , tcpstat, "");
 
-static int log_in_vain = 0;
+int tcp_log_in_vain = 0;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, log_in_vain, CTLFLAG_RW, 
-	&log_in_vain, 0, "");
+	&tcp_log_in_vain, 0, "");
 
 static int no_local_slowstart = 0;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, no_local_slowstart, CTLFLAG_RW, 
@@ -263,9 +302,9 @@ present:
  * protocol specification dated September, 1981 very closely.
  */
 void
-tcp_input(m, iphlen)
-	register struct mbuf *m;
-	int iphlen;
+tcp_input(m, iphlen, proto)
+	struct mbuf *m;
+	int iphlen, proto;
 {
 	register struct tcpiphdr *ti;
 	register struct inpcb *inp;
@@ -354,17 +393,32 @@ tcp_input(m, iphlen)
 	NTOHS(ti->ti_urp);
 
 	/*
-	 * Drop TCP, IP headers and TCP options.
-	 */
-	m->m_data += sizeof(struct tcpiphdr)+off-sizeof(struct tcphdr);
-	m->m_len  -= sizeof(struct tcpiphdr)+off-sizeof(struct tcphdr);
-
-	/*
 	 * Locate pcb for segment.
 	 */
 findpcb:
 	inp = in_pcblookuphash(&tcbinfo, ti->ti_src, ti->ti_sport,
 	    ti->ti_dst, ti->ti_dport, 1);
+#if defined(NFAITH) && NFAITH > 0
+	if (m->m_pkthdr.rcvif && m->m_pkthdr.rcvif->if_type == IFT_FAITH) {
+		if ((tiflags & (TH_SYN|TH_ACK)) == TH_SYN && inp &&
+		    inp->inp_laddr.s_addr == INADDR_ANY &&
+		    !(inp->inp_flags & INP_FAITH))
+			goto drop;
+	}
+#endif
+
+#ifdef IPSEC
+	if (inp != NULL && ipsec4_in_reject(m, inp)) {
+		ipsecstat.in_polvio++;
+		goto drop;
+	}
+#endif /*IPSEC*/
+
+	/*
+	 * Drop TCP, IP headers and TCP options.
+	 */
+	m->m_data += sizeof(struct tcpiphdr)+off-sizeof(struct tcphdr);
+	m->m_len  -= sizeof(struct tcpiphdr)+off-sizeof(struct tcphdr);
 
 	/*
 	 * If the state is CLOSED (i.e., TCB does not exist) then
@@ -373,7 +427,7 @@ findpcb:
 	 * but should either do a listen or a connect soon.
 	 */
 	if (inp == NULL) {
-		if (log_in_vain && tiflags & TH_SYN) {
+		if (tcp_log_in_vain && tiflags & TH_SYN) {
 			char buf[4*sizeof "123"];
 
 			strcpy(buf, inet_ntoa(ti->ti_dst));
@@ -407,6 +461,11 @@ findpcb:
 		if (so->so_options & SO_ACCEPTCONN) {
 			register struct tcpcb *tp0 = tp;
 			struct socket *so2;
+#ifdef IPSEC
+			struct socket *oso;
+#endif
+
+#ifndef IPSEC
 			if ((tiflags & (TH_RST|TH_ACK|TH_SYN)) != TH_SYN) {
 				/*
 				 * Note: dropwithreset makes sure we don't
@@ -418,6 +477,7 @@ findpcb:
 				}
 				goto drop;
 			}
+#endif
 			so2 = sonewconn(so, 0);
 			if (so2 == 0) {
 				tcpstat.tcps_listendrop++;
@@ -429,6 +489,9 @@ findpcb:
 				if (!so2)
 					goto drop;
 			}
+#ifdef IPSEC
+			oso = so;
+#endif
 			so = so2;
 			/*
 			 * This is ugly, but ....
@@ -446,8 +509,35 @@ findpcb:
 			inp->inp_laddr = ti->ti_dst;
 			inp->inp_lport = ti->ti_dport;
 			in_pcbrehash(inp);
+#ifdef IPSEC
+			/*
+			 * from IPsec perspective, it is important to do it
+			 * after making actual listening socket.
+			 * otherwise, cached security association will bark.
+			 *
+			 * Subject: (KAME-snap 748)
+			 * From: Wayne Knowles <w.knowles@niwa.cri.nz>
+			 */
+			if ((tiflags & (TH_RST|TH_ACK|TH_SYN)) != TH_SYN) {
+				/*
+				 * Note: dropwithreset makes sure we don't
+				 * send a RST in response to a RST.
+				 */
+				if (tiflags & TH_ACK) {
+					tcpstat.tcps_badsyn++;
+					goto dropwithreset;
+				}
+				goto drop;
+			}
+#endif
 #if BSD>=43
 			inp->inp_options = ip_srcroute();
+#endif
+#ifdef IPSEC
+			key_freesp(inp->inp_sp);
+			inp->inp_sp = sotoinpcb(oso)->inp_sp;
+			if (inp->inp_sp)
+				inp->inp_sp->refcnt++;
 #endif
 			tp = intotcpcb(inp);
 			tp->t_state = TCPS_LISTEN;
@@ -2120,11 +2210,60 @@ tcp_mss(tp, offer)
 	/*
 	 * if there's an mtu associated with the route, use it
 	 */
-	if (rt->rt_rmx.rmx_mtu)
+	if (rt->rt_rmx.rmx_mtu) {
 		mss = rt->rt_rmx.rmx_mtu - sizeof(struct tcpiphdr);
+#ifdef IPSEC
+	    {
+		int tmp;
+		struct ipoption *p;
+
+		/* why we don't have this here?  could anyone comment? */
+		if (inp->inp_options) {
+			tmp = inp->inp_options->m_len - sizeof(p->ipopt_dst);
+			if (mss > tmp)
+				mss -= tmp;
+			else {
+				printf("tcp_mss(1): "
+					"invalid mss(IP4 option)\n");
+			}
+		}
+
+		/* plug for AH/ESP. */
+		tmp = ipsec4_hdrsiz_tcp(tp);
+		if (mss > tmp)
+			mss -= tmp;
+		else
+			printf("tcp_mss(1): invalid mss(IPsec)\n");
+	    }
+#endif /*IPSEC*/
+	}
 	else
 	{
 		mss = ifp->if_mtu - sizeof(struct tcpiphdr);
+#ifdef IPSEC
+	    {
+		int tmp;
+		struct ipoption *p;
+
+		/* why we don't have this here?  could anyone comment? */
+		if (inp->inp_options) {
+			tmp = inp->inp_options->m_len - sizeof(p->ipopt_dst);
+			if (mss > tmp)
+				mss -= tmp;
+			else {
+				printf("tcp_mss(2): "
+					"invalid mss(IP4 option)\n");
+			}
+		}
+
+		/* plug for AH/ESP. */
+		tmp = ipsec4_hdrsiz_tcp(tp);
+		if (mss > tmp)
+			mss -= tmp;
+		else
+			printf("tcp_mss(2): invalid mss(IPsec)\n");
+	    }
+#endif /*IPSEC*/
 		if (!in_localaddr(inp->inp_faddr))
 			mss = min(mss, tcp_mssdflt);
 	}
@@ -2216,11 +2355,40 @@ tcp_mssopt(tp)
 	struct tcpcb *tp;
 {
 	struct rtentry *rt;
+	int mss;
 
 	rt = tcp_rtlookup(tp->t_inpcb);
 	if (rt == NULL)
 		return tcp_mssdflt;
 
-	return rt->rt_ifp->if_mtu - sizeof(struct tcpiphdr);
+	mss = rt->rt_ifp->if_mtu - sizeof(struct tcpiphdr);
+#ifdef IPSEC
+    {
+	struct inpcb *inp;
+	int tmp;
+	struct ipoption *p;
+
+	inp = tp->t_inpcb;
+
+	/* why we don't have this here?  could anyone comment? */
+	if (inp->inp_options) {
+		tmp = inp->inp_options->m_len - sizeof(p->ipopt_dst);
+		if (mss > tmp)
+			mss -= tmp;
+		else {
+			printf("tcp_mssopt: "
+				"invalid mss(IP4 option)\n");
+		}
+	}
+
+	/* plug for AH/ESP. */
+	tmp = ipsec4_hdrsiz_tcp(tp);
+	if (mss > tmp)
+		mss -= tmp;
+	else
+		printf("tcp_mssopt: invalid mss(IPsec)\n");
+    }
+#endif /*IPSEC*/
+	return mss;
 }
 #endif /* TUBA_INCLUDE */

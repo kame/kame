@@ -61,6 +61,13 @@
 #include <netinet/ip.h>
 #endif
 
+#ifdef INET6
+#ifndef INET
+#include <netinet/in.h>
+#endif
+#include <netinet6/in6_ifattach.h>
+#endif
+
 #ifdef NS
 #include <netns/ns.h>
 #include <netns/ns_if.h>
@@ -189,6 +196,11 @@ dsioctl(ifp, cmd, data)
 		/*
 		 * Everything else is done at a higher level.
 		 */
+#ifdef INET6
+		/* fall through... */
+	case SIOCSIFFLAGS:
+		in6_ifattach(ifp, IN6_IFT_P2P, NULL, 1);
+#endif /* INET6 */
 		break;
 
 	case SIOCADDMULTI:
@@ -201,6 +213,11 @@ dsioctl(ifp, cmd, data)
 
 #ifdef INET
 		case AF_INET:
+			break;
+#endif
+
+#ifdef INET6
+		case AF_INET6:
 			break;
 #endif
 

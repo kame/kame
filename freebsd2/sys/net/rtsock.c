@@ -1,4 +1,33 @@
 /*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+/*
  * Copyright (c) 1988, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -73,6 +102,8 @@ static int	 route_output __P((struct mbuf *, struct socket *));
 static int	 route_usrreq __P((struct socket *,
 	    int, struct mbuf *, struct mbuf *, struct mbuf *));
 static void	 rt_setmetrics __P((u_long, struct rt_metrics *, struct rt_metrics *));
+static void	rt_setif __P((struct rtentry *, struct sockaddr *, struct sockaddr *,
+			      struct sockaddr *));
 
 /* Sleazy use of local variables throughout file, warning!!!! */
 #define dst	info.rti_info[RTAX_DST]
@@ -94,6 +125,7 @@ route_usrreq(so, req, m, nam, control)
 	register struct rawcb *rp = sotorawcb(so);
 	int s;
 
+	s = splnet();
 	if (req == PRU_ATTACH) {
 		MALLOC(rp, struct rawcb *, sizeof(*rp), M_PCB, M_WAITOK);
 		if (rp)
@@ -106,6 +138,8 @@ route_usrreq(so, req, m, nam, control)
 		int af = rp->rcb_proto.sp_protocol;
 		if (af == AF_INET)
 			route_cb.ip_count--;
+		else if (af == AF_INET6)
+			route_cb.ip6_count--;
 		else if (af == AF_IPX)
 			route_cb.ipx_count--;
 		else if (af == AF_NS)
@@ -125,6 +159,8 @@ route_usrreq(so, req, m, nam, control)
 		}
 		if (af == AF_INET)
 			route_cb.ip_count++;
+		else if (af == AF_INET6)
+			route_cb.ip6_count++;
 		else if (af == AF_IPX)
 			route_cb.ipx_count++;
 		else if (af == AF_NS)
@@ -153,7 +189,6 @@ route_output(m, so)
 	struct rt_addrinfo info;
 	int len, error = 0;
 	struct ifnet *ifp = 0;
-	struct ifaddr *ifa = 0;
 
 #define senderr(e) { error = e; goto flush;}
 	if (m == 0 || ((m->m_len < sizeof(long)) &&
@@ -194,6 +229,7 @@ route_output(m, so)
 		else
 			senderr(ENOBUFS);
 	}
+
 	switch (rtm->rtm_type) {
 
 	case RTM_ADD:
@@ -202,6 +238,35 @@ route_output(m, so)
 		error = rtrequest(RTM_ADD, dst, gate, netmask,
 					rtm->rtm_flags, &saved_nrt);
 		if (error == 0 && saved_nrt) {
+		    /* 
+		     * If the route request specified an interface with
+		     * IFA and/or IFP, we set the requested interface on
+		     * the route with rt_setif.  It would be much better
+		     * to do this inside rtrequest, but that would
+		     * require passing the desired interface, in some
+		     * form, to rtrequest.  Since rtrequest is called in
+		     * so many places (roughly 40 in our source), adding
+		     * a parameter is to much for us to swallow; this is
+		     * something for the FreeBSD developers to tackle.
+		     * Instead, we let rtrequest compute whatever
+		     * interface it wants, then come in behind it and
+		     * stick in the interface that we really want.  This
+		     * works reasonably well except when rtrequest can't
+		     * figure out what interface to use (with
+		     * ifa_withroute) and returns ENETUNREACH.  Ideally
+		     * it shouldn't matter if rtrequest can't figure out
+		     * the interface if we're going to explicitly set it
+		     * ourselves anyway.  But practically we can't
+		     * recover here because rtrequest will not do any of
+		     * the work necessary to add the route if it can't
+		     * find an interface.  As long as there is a default
+		     * route that leads to some interface, rtrequest will
+		     * find an interface, so this problem should be
+		     * rarely encountered.
+		     * dwiggins@bbn.com
+		     */
+
+			rt_setif(saved_nrt, ifpaddr, ifaaddr, gate);
 			rt_setmetrics(rtm->rtm_inits,
 				&rtm->rtm_rmx, &saved_nrt->rt_rmx);
 			saved_nrt->rt_rmx.rmx_locks &= ~(rtm->rtm_inits);
@@ -282,33 +347,10 @@ route_output(m, so)
 			if ((rt->rt_flags & RTF_GATEWAY) && !gate)
 				gate = rt->rt_gateway;
 
-			/* new gateway could require new ifaddr, ifp;
-			   flags may also be different; ifp may be specified
-			   by ll sockaddr when protocol address is ambiguous */
-			if (ifpaddr && (ifa = ifa_ifwithnet(ifpaddr)) &&
-			    (ifp = ifa->ifa_ifp) && (ifaaddr || gate))
-				ifa = ifaof_ifpforaddr(ifaaddr ? ifaaddr : gate,
-							ifp);
-			else if ((ifaaddr && (ifa = ifa_ifwithaddr(ifaaddr))) ||
-				 (gate && (ifa = ifa_ifwithroute(rt->rt_flags,
-							rt_key(rt), gate))))
-				ifp = ifa->ifa_ifp;
-			if (ifa) {
-				register struct ifaddr *oifa = rt->rt_ifa;
-				if (oifa != ifa) {
-				    if (oifa && oifa->ifa_rtrequest)
-					oifa->ifa_rtrequest(RTM_DELETE,
-								rt, gate);
-				    IFAFREE(rt->rt_ifa);
-				    rt->rt_ifa = ifa;
-				    ifa->ifa_refcnt++;
-				    rt->rt_ifp = ifp;
-				}
-			}
+			rt_setif(rt, ifpaddr, ifaaddr, gate);
+
 			rt_setmetrics(rtm->rtm_inits, &rtm->rtm_rmx,
 					&rt->rt_rmx);
-			if (rt->rt_ifa && rt->rt_ifa->ifa_rtrequest)
-			       rt->rt_ifa->ifa_rtrequest(RTM_ADD, rt, gate);
 			if (genmask)
 				rt->rt_genmask = genmask;
 			/*
@@ -381,6 +423,56 @@ rt_setmetrics(which, in, out)
 	metric(RTV_EXPIRE, rmx_expire);
 #undef metric
 }
+
+/*
+ * Set route's interface given ifpaddr, ifaaddr, and gateway.
+ */
+static void
+rt_setif(rt, Ifpaddr, Ifaaddr, Gate)
+	struct rtentry *rt;
+	struct sockaddr *Ifpaddr, *Ifaaddr, *Gate;
+{
+	struct ifaddr *ifa = 0;
+	struct ifnet  *ifp = 0;
+
+	/* new gateway could require new ifaddr, ifp;
+	   flags may also be different; ifp may be specified
+	   by ll sockaddr when protocol address is ambiguous */
+	if (Ifpaddr && (ifa = ifa_ifwithnet(Ifpaddr)) &&
+	    (ifp = ifa->ifa_ifp) && (Ifaaddr || Gate))
+		ifa = ifaof_ifpforaddr(Ifaaddr ? Ifaaddr : Gate,
+					ifp);
+	else if (Ifpaddr && (ifp = if_withname(Ifpaddr)) ) {
+		ifa = Gate ? ifaof_ifpforaddr(Gate, ifp) :
+				ifp->if_addrlist;
+	}
+	else if ((Ifaaddr && (ifa = ifa_ifwithaddr(Ifaaddr))) ||
+		 (Gate && (ifa = ifa_ifwithroute(rt->rt_flags,
+					rt_key(rt), Gate))))
+		ifp = ifa->ifa_ifp;
+	if (ifa) {
+		register struct ifaddr *oifa = rt->rt_ifa;
+		if (oifa != ifa) {
+		    if (oifa && oifa->ifa_rtrequest)
+			oifa->ifa_rtrequest(RTM_DELETE,
+						rt, Gate);
+		    IFAFREE(rt->rt_ifa);
+		    rt->rt_ifa = ifa;
+		    ifa->ifa_refcnt++;
+		    rt->rt_ifp = ifp;
+		    rt->rt_rmx.rmx_mtu = ifp->if_mtu;
+		    if (rt->rt_ifa && rt->rt_ifa->ifa_rtrequest)
+			rt->rt_ifa->ifa_rtrequest(RTM_ADD, rt, Gate);
+		} else
+			goto call_ifareq;
+		return;
+	}
+      call_ifareq:
+	/* XXX: to reset gateway to correct value, at RTM_CHANGE */
+	if (rt->rt_ifa && rt->rt_ifa->ifa_rtrequest)
+		rt->rt_ifa->ifa_rtrequest(RTM_ADD, rt, Gate);
+}
+
 
 #define ROUNDUP(a) \
 	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))

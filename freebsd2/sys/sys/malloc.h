@@ -130,7 +130,12 @@
 #define	M_KTRACE	83	/* KTRACE */
 #define	M_SELECT	84	/* select() buffer */
 #define M_CFS		85	/* Coda */
-#define	M_LAST		86	/* Must be last type + 1 */
+#define M_IP6OPT	86	/* IPv6 options */
+#define	M_IP6NDP	87	/* IPv6 Neighbour Discovery */
+#define	M_PM		88	/* Packet Management by SuMiRe */
+#define M_IP6RR		89	/* IPv6 Router Renumbering Prefix */
+#define M_RR_ADDR	90	/* IPv6 Router Renumbering Ifid */
+#define	M_LAST		91	/* Must be last type + 1 */
 
 #define INITKMEMNAMES { \
 	"free",		/* 0 M_FREE */ \
@@ -216,6 +221,11 @@
 	"KTRACE",	/* 83 M_KTRACE */ \
 	"select",	/* 84 M_SELECT */ \
 	"Coda",		/* 85 M_CFS */ \
+	"ip6_options",	/* 86 M_IP6OPT */ \
+	"NDP",		/* 87 M_IP6NDP */ \
+	"PM",		/* 88 M_PM */ \
+	"ip6rr",	/* 89 M_IP6RR */ \
+	"rp_addr",	/* 90 M_RR_ADDR */ \
 }
 
 struct kmemstats {

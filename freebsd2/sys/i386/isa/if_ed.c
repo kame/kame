@@ -63,6 +63,13 @@
 #include <netinet/if_ether.h>
 #endif
 
+#ifdef INET6
+#ifndef INET
+#include <netinet/in.h>
+#endif
+#include <netinet6/in6_ifattach.h>
+#endif
+
 #ifdef IPX
 #include <netipx/ipx.h>
 #include <netipx/ipx_if.h>
@@ -232,6 +239,7 @@ edinit(struct pccard_devinfo *devi)
 	/* validate unit number. */
 	if (devi->isahd.id_unit >= NED)
 		return(ENODEV);
+
 	/*
 	 * Probe the device. If a value is returned, the
 	 * device was found at the location.
@@ -241,6 +249,10 @@ edinit(struct pccard_devinfo *devi)
 		return(ENXIO);
 	if (ed_attach_isa(&devi->isahd) == 0)
 		return(ENXIO);
+#ifdef INET6
+	in6_ifattach(&sc->arpcom.ac_if, IN6_IFT_802,
+		     (caddr_t)sc->arpcom.ac_enaddr, 0);
+#endif /* INET6 */
 
 	return(0);
 }
@@ -1690,6 +1702,9 @@ ed_attach(sc, unit, flags)
 			ifp->if_flags = (IFF_BROADCAST | IFF_SIMPLEX |
 			    IFF_MULTICAST);
 
+#ifdef ALTQ
+		ifp->if_altqflags |= ALTQF_READY;
+#endif
 		/*
 		 * Attach the interface
 		 */
@@ -2076,6 +2091,12 @@ outloop:
 		ifp->if_flags |= IFF_OACTIVE;
 		return;
 	}
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+	    m = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+	}
+	else
+#endif
 	IF_DEQUEUE(&ifp->if_snd, m);
 	if (m == 0) {
 

@@ -145,7 +145,7 @@ in6_pcbbind(in6p, nam)
 	int wild = 0, reuseport = (so->so_options & SO_REUSEPORT);
 	int error;
 
-	if (in6p->in6p_lport || !IN6_IS_ADDR_ANY(&in6p->in6p_laddr))
+	if (in6p->in6p_lport || !IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
 		return(EINVAL);
 	if ((so->so_options & (SO_REUSEADDR|SO_REUSEPORT)) == 0 &&
 	   ((so->so_proto->pr_flags & PR_CONNREQUIRED) == 0 ||
@@ -214,7 +214,7 @@ in6_pcbbind(in6p, nam)
 				sizeof(sin.sin_addr));
 			if (ifa_ifwithaddr((struct sockaddr *)&sin) == 0)
 				return EADDRNOTAVAIL;
-		} else if (!IN6_IS_ADDR_ANY(&sin6->sin6_addr)) {
+		} else if (!IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
 			struct ifaddr *ia = NULL;
 
 			sin6->sin6_port = 0;		/* yech... */
@@ -393,7 +393,7 @@ in6_pcbconnect(in6p, nam)
 		mapped.s6_addr16[5] = htons(0xffff);
 		bcopy(&sinp->sin_addr, &mapped.s6_addr32[3], sizeof(sinp->sin_addr));
 		in6a = &mapped;
-	} else if (IN6_IS_ADDR_ANY(&in6p->in6p_laddr)) {
+	} else if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
 		in6a = in6_selectsrc(sin6, in6p->in6p_outputopts,
 				  in6p->in6p_moptions, &in6p->in6p_route,
 				  &error);
@@ -423,12 +423,12 @@ in6_pcbconnect(in6p, nam)
 	if (in6_pcblookup(in6p->in6p_head,
 			 &sin6->sin6_addr,
 			 sin6->sin6_port,
-			 IN6_IS_ADDR_ANY(&in6p->in6p_laddr) ?
+			 IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr) ?
 			  in6a : &in6p->in6p_laddr,
 			 in6p->in6p_lport,
 			 0))
 		return(EADDRINUSE);
-	if (IN6_IS_ADDR_ANY(&in6p->in6p_laddr)
+	if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)
 	 || (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr)
 	  && in6p->in6p_laddr.s6_addr32[3] == 0)) {
 		if (in6p->in6p_lport == 0)
@@ -474,7 +474,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, errorp)
 	 * the interface.
 	 */
 	if (opts && (pi = opts->ip6po_pktinfo)) {
-		if (!IN6_IS_ADDR_ANY(&pi->ipi6_addr))
+		if (!IN6_IS_ADDR_UNSPECIFIED(&pi->ipi6_addr))
 			return(&pi->ipi6_addr);
 		else if (pi->ipi6_ifindex) {
 			/* XXX boundary check is assumed to be already done. */
@@ -746,7 +746,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 	if ((unsigned)cmd > PRC_NCMDS || dst->sa_family != AF_INET6)
 		return 0;
 	faddr6 = ((struct sockaddr_in6 *)dst)->sin6_addr;
-	if (IN6_IS_ADDR_ANY(&faddr6))
+	if (IN6_IS_ADDR_UNSPECIFIED(&faddr6))
 		return 0;
 
 	/*
@@ -770,7 +770,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 		if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr,&faddr6) ||
 		   in6p->in6p_socket == 0 ||
 		   (lport && in6p->in6p_lport != lport) ||
-		   (!IN6_IS_ADDR_ANY(laddr6) &&
+		   (!IN6_IS_ADDR_UNSPECIFIED(laddr6) &&
 		    !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, laddr6)) ||
 		   (fport && in6p->in6p_fport != fport)) {
 			in6p = in6p->in6p_next;
@@ -852,23 +852,23 @@ in6_pcblookup(head, faddr6, fport_arg, laddr6, lport_arg, flags)
 		if (in6p->in6p_lport != lport)
 			continue;
 		wildcard = 0;
-		if (!IN6_IS_ADDR_ANY(&in6p->in6p_laddr)) {
-			if (IN6_IS_ADDR_ANY(laddr6))
+		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
+			if (IN6_IS_ADDR_UNSPECIFIED(laddr6))
 				wildcard++;
 			else if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, laddr6))
 				continue;
 		} else {
-			if (!IN6_IS_ADDR_ANY(laddr6))
+			if (!IN6_IS_ADDR_UNSPECIFIED(laddr6))
 				wildcard++;
 		}
-		if (!IN6_IS_ADDR_ANY(&in6p->in6p_faddr)) {
-			if (IN6_IS_ADDR_ANY(faddr6))
+		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
+			if (IN6_IS_ADDR_UNSPECIFIED(faddr6))
 				wildcard++;
 			else if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, faddr6)
 			      || in6p->in6p_fport != fport)
 				continue;
 		} else {
-			if (!IN6_IS_ADDR_ANY(faddr6))
+			if (!IN6_IS_ADDR_UNSPECIFIED(faddr6))
 				wildcard++;
 		}
 		if (wildcard && (flags & IN6PLOOKUP_WILDCARD) == 0)

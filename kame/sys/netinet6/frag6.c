@@ -64,8 +64,8 @@ u_int frag6_nfragpackets;
 struct	ip6q ip6q;	/* ip6 reassemble queue */
 
 /* FreeBSD tweak */
-#ifndef M_FTABLE
-#define M_FTABLE	M_TEMP
+#if !defined(M_FTABLE) && (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+MALLOC_DEFINE(M_FTABLE, "fragment", "fragment reassembly header");
 #endif
 
 /*

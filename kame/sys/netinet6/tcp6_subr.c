@@ -390,7 +390,7 @@ tcp6_close(t6p)
 	 */
 	if (SEQ_LT(t6p->iss + so->so_snd.sb_hiwat * 16, t6p->snd_max) &&
 	    (rt = in6p->in6p_route.ro_rt) &&
-	    (IN6_IS_ADDR_ANY(&((struct sockaddr_in6 *)rt_key(rt))->sin6_addr))){
+	    (IN6_IS_ADDR_UNSPECIFIED(&((struct sockaddr_in6 *)rt_key(rt))->sin6_addr))){
 		register u_long i = 0;
 
 		if ((rt->rt_rmx.rmx_locks & RTV_RTT) == 0) {

@@ -758,6 +758,16 @@ ip6_savecontrol(in6p, mp, ip6, m)
 #ifdef __bsdi__
 # define sbcreatecontrol	so_cmsg
 #endif
+	int privileged;
+
+	privileged = 0;
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	if (p && !suser(p->p_ucred, &p->p_acflag))
+		privileged++;
+#else
+	if ((in6p->in6p_socket->so_state & SS_PRIV) != 0)
+		privileged++;
+#endif
 
 	if (in6p->in6p_socket->so_options & SO_TIMESTAMP) {
 		struct timeval tv;
@@ -815,8 +825,7 @@ ip6_savecontrol(in6p, mp, ip6, m)
 	 * be some hop-by-hop options which can be returned to normal user.
 	 * See RFC 2292 section 6.
 	 */
-	if ((in6p->in6p_flags & IN6P_HOPOPTS) &&
-	    p && !suser(p->p_ucred, &p->p_acflag)) {
+	if ((in6p->in6p_flags & IN6P_HOPOPTS) && privileged) {
 		/*
 		 * Check if a hop-by-hop options header is contatined in the
 		 * received packet, and if so, store the options as ancillary
@@ -868,7 +877,7 @@ ip6_savecontrol(in6p, mp, ip6, m)
 				  * the option.
 				  * See the comments on IN6_HOPOPTS.
 				  */
-				 if (!p || !suser(p->p_ucred, &p->p_acflag))
+				 if (!privileged)
 					 break;
 
 				 *mp = sbcreatecontrol((caddr_t)ip6e,
@@ -915,12 +924,10 @@ ip6_savecontrol(in6p, mp, ip6, m)
 		}
 	  loopend:
 	}
-	if ((in6p->in6p_flags & IN6P_HOPOPTS)
-	 && p && !suser(p->p_ucred, &p->p_acflag)) {
+	if ((in6p->in6p_flags & IN6P_HOPOPTS) && privileged) {
 		/* to be done */
 	}
-	if ((in6p->in6p_flags & IN6P_DSTOPTS)
-	 && p && !suser(p->p_ucred, &p->p_acflag)) {
+	if ((in6p->in6p_flags & IN6P_DSTOPTS) && privileged) {
 		/* to be done */
 	}
 	/* IN6P_RTHDR - to be done */

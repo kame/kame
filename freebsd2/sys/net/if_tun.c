@@ -38,6 +38,7 @@
 #include <sys/conf.h>
 
 #include <net/if.h>
+#include <net/if_types.h>
 #include <net/netisr.h>
 #include <net/route.h>
 
@@ -48,6 +49,13 @@
 #include <netinet/ip.h>
 #include <netinet/if_ether.h>
 #endif
+
+#include <netinet/in_var.h>
+#ifdef INET6
+#include <netinet/ip6.h>
+#include <netinet6/ip6_var.h>
+#include <netinet6/in6_ifattach.h>
+#endif /* INET6 */
 
 #ifdef NS
 #include <netns/ns.h>
@@ -75,7 +83,7 @@ static struct tun_softc tunctl[NTUN];
 static int tunoutput __P((struct ifnet *, struct mbuf *, struct sockaddr *,
 	    struct rtentry *rt));
 static int tunifioctl __P((struct ifnet *, int, caddr_t));
-static int tuninit __P((int));
+static int tuninit __P((int, int, u_char));
 
 static	d_open_t	tunopen;
 static	d_close_t	tunclose;
@@ -125,6 +133,7 @@ tunattach(dummy)
 		ifp->if_ioctl = tunifioctl;
 		ifp->if_output = tunoutput;
 		ifp->if_flags = IFF_POINTOPOINT | IFF_MULTICAST;
+		ifp->if_type = IFT_PPP; /* necessary init value for IPv6 lladdr auto conf */
 		ifp->if_snd.ifq_maxlen = ifqmaxlen;
 		ifp->if_collisions = 0;
 		ifp->if_ierrors = 0;
@@ -199,7 +208,17 @@ tunclose(dev_t dev, int foo, int bar, struct proc *p)
 		    /* find internet addresses and delete routes */
 		    register struct ifaddr *ifa;
 		    for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next) {
-			if (ifa->ifa_addr->sa_family == AF_INET) {
+			if (
+#ifdef INET
+			    ifa->ifa_addr->sa_family == AF_INET
+#endif /* INET */
+#if defined(INET) && defined(INET6)
+			    ||
+#endif /* INET && INET6 */
+#ifdef INET6
+			    ifa->ifa_addr->sa_family == AF_INET6
+#endif /* INET6 */
+			    ) {
 			    rtinit(ifa, (int)RTM_DELETE,
 				   tp->tun_flags & TUN_DSTADDR ? RTF_HOST : 0);
 			}
@@ -207,6 +226,7 @@ tunclose(dev_t dev, int foo, int bar, struct proc *p)
 		}
 		splx(s);
 	}
+	ifp->if_flags &= ~IFF_RUNNING;
 	tp->tun_pgrp = 0;
 	selwakeup(&tp->tun_rsel);
 
@@ -214,9 +234,33 @@ tunclose(dev_t dev, int foo, int bar, struct proc *p)
 	return (0);
 }
 
+/* There should be some other general function */
 static int
-tuninit(unit)
+tun_is_addr_unspecified(struct sockaddr *sa)
+{
+	switch(sa->sa_family) {
+#ifdef INET
+	case AF_INET:
+		return (((struct sockaddr_in *)sa)->sin_addr.s_addr ? 0 : 1);
+		/* NOTREACHED */
+		break;
+#endif /* INET */
+#ifdef INET6
+	case AF_INET6:
+		return (IN6_IS_ADDR_UNSPECIFIED(&((struct sockaddr_in6 *)sa)->sin6_addr)
+			? 1 : 0);
+		/* NOTREACHED */
+		break;
+#endif /* INET6 */
+	}
+	return 0;
+}
+
+static int
+tuninit(unit, cmd, af)
 	int	unit;
+	int	cmd;
+	u_char	af;
 {
 	struct tun_softc *tp = &tunctl[unit];
 	struct ifnet	*ifp = &tp->tun_if;
@@ -224,20 +268,32 @@ tuninit(unit)
 
 	TUNDEBUG("%s%d: tuninit\n", ifp->if_name, ifp->if_unit);
 
-	ifp->if_flags |= IFF_UP | IFF_RUNNING;
+	if ((tp->tun_flags & TUN_READY) == TUN_READY) {
+		ifp->if_flags |= IFF_UP | IFF_RUNNING;
+	}
 	microtime(&ifp->if_lastchange);
 
 	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-		if (ifa->ifa_addr->sa_family == AF_INET) {
-		    struct sockaddr_in *si;
+		if (ifa->ifa_addr->sa_family == af) {
 
-		    si = (struct sockaddr_in *)ifa->ifa_addr;
-		    if (si && si->sin_addr.s_addr)
+		    switch(cmd) {
+		    case SIOCSIFADDR:
+		    	if (!tun_is_addr_unspecified(ifa->ifa_addr)) {
 			    tp->tun_flags |= TUN_IASET;
-
-		    si = (struct sockaddr_in *)ifa->ifa_dstaddr;
-		    if (si && si->sin_addr.s_addr)
+			    TUNDEBUG("%s%d: af %3d address set\n",
+				     ifp->if_name, ifp->if_unit, af);
+			}
+			break;
+		    case SIOCSIFDSTADDR:
+		    	if (ifa->ifa_dstaddr &&
+			    ifa->ifa_dstaddr->sa_family == af &&
+			    !tun_is_addr_unspecified(ifa->ifa_dstaddr)) {
 			    tp->tun_flags |= TUN_DSTADDR;
+			    TUNDEBUG("%s%d: af %3d destination address set\n",
+				     ifp->if_name, ifp->if_unit, af);
+			}
+			break;
+		    }
 		}
 
 	return 0;
@@ -258,14 +314,8 @@ tunifioctl(ifp, cmd, data)
 	s = splimp();
 	switch(cmd) {
 	case SIOCSIFADDR:
-		tuninit(ifp->if_unit);
-		TUNDEBUG("%s%d: address set\n",
-			 ifp->if_name, ifp->if_unit);
-		break;
 	case SIOCSIFDSTADDR:
-		tuninit(ifp->if_unit);
-		TUNDEBUG("%s%d: destination address set\n",
-			 ifp->if_name, ifp->if_unit);
+		tuninit(ifp->if_unit, cmd, ifr->ifr_addr.sa_family);
 		break;
 	case SIOCSIFMTU:
 		ifp->if_mtu = ifr->ifr_mtu;
@@ -280,17 +330,27 @@ tunifioctl(ifp, cmd, data)
 		}
 		switch (ifr->ifr_addr.sa_family) {
 
+#if defined(INET) || defined(INET6)
 #ifdef INET
 		case AF_INET:
+#endif /* INET */
+#ifdef INET6
+		case AF_INET6:
+#endif /* INET6 */
 			break;
-#endif
-
+#endif /* INET || INET6 */
 		default:
 			error = EAFNOSUPPORT;
 			break;
 		}
 		break;
 
+	case SIOCSIFFLAGS:
+		if ((ifp->if_flags & IFF_UP) != 0)
+			ifp->if_flags |= IFF_RUNNING;
+		else if ((ifp->if_flags & IFF_UP) == 0)
+			ifp->if_flags &= ~IFF_RUNNING;
+		break;
 
 	default:
 		error = EINVAL;
@@ -301,6 +361,26 @@ tunifioctl(ifp, cmd, data)
 
 /*
  * tunoutput - queue packets from higher level ready to put out.
+ */
+/* Packet data format between tun and ppp is changed to enable checking of
+ * Address Family of sending packet. When INET6 is defined, 4byte AF field
+ * is appended to packet data as following.
+ *
+ *        0  1  2  3  4  5  6  7  8 .....
+ *       ------------------------------
+ *       |    af     |  packet data .....
+ *       ------------------------------
+ *       ^^^^^^^^^^^^^
+ *       Newly added part. The size is sizeof(u_long).
+ *
+ * However, this is not adopted for tun -> ppp AF_INET packet for 
+ * backword compatibility, because the ppp process may be an existing
+ * ip only supporting one.  
+ * Also in ppp->tun case, when af value is unknown, (af > 255) is checked and
+ * if it is true, AF_INET is assumed. (the 4byte may be the head of
+ * AF_INET packet. Despite the byte order, the value must always be
+ * greater than 255, because of ip_len field or (ip_v and ip_hl)
+ * field. (Idea from Mr. Noritoshi Demize)
  */
 int
 tunoutput(ifp, m0, dst, rt)
@@ -351,8 +431,20 @@ tunoutput(ifp, m0, dst, rt)
 #endif
 
 	switch(dst->sa_family) {
+#if defined(INET) || defined(INET6)
+#ifdef INET6
+	case AF_INET6:
+		M_PREPEND(m0, sizeof(u_long) /* af field passed to upper */,
+			  M_DONTWAIT);
+		if (m0 == 0)
+			return (ENOBUFS);
+		*mtod(m0, u_long *) = (u_long)dst->sa_family;
+		/* FALLTHROUGH */
+#endif /* INET6 */
 #ifdef INET
 	case AF_INET:
+#endif /* INET */
+#endif /* INET || INET6 */
 		s = splimp();
 		if (IF_QFULL(&ifp->if_snd)) {
 			IF_DROP(&ifp->if_snd);
@@ -366,7 +458,6 @@ tunoutput(ifp, m0, dst, rt)
 		splx(s);
 		ifp->if_opackets++;
 		break;
-#endif
 	default:
 		m_freem(m0);
 		return EAFNOSUPPORT;
@@ -513,6 +604,8 @@ tunread(dev_t dev, struct uio *uio, int flag)
 /*
  * the cdevsw write interface - an atomic write is a packet - or else!
  */
+/* See top of tunoutput() about interface change between ppp process and 
+ * tun. */
 static	int
 tunwrite(dev_t dev, struct uio *uio, int flag)
 {
@@ -520,6 +613,9 @@ tunwrite(dev_t dev, struct uio *uio, int flag)
 	struct ifnet	*ifp = &tunctl[unit].tun_if;
 	struct mbuf	*top, **mp, *m;
 	int		error=0, s, tlen, mlen;
+	u_long af;
+	u_int netisr_af;
+	struct ifqueue *afintrq;
 
 	TUNDEBUG("%s%d: tunwrite\n", ifp->if_name, ifp->if_unit);
 
@@ -534,7 +630,15 @@ tunwrite(dev_t dev, struct uio *uio, int flag)
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
 	if (m == NULL)
 		return ENOBUFS;
-	mlen = MHLEN;
+	if (tlen > MHLEN) {
+	  MCLGET(m, M_DONTWAIT);
+	  if ((m->m_flags & M_EXT) == 0) {
+	    m_free(m);
+	    return ENOBUFS;
+	  }
+	  mlen = m->m_ext.ext_size;
+	} else
+	  mlen = MHLEN;
 
 	top = 0;
 	mp = &top;
@@ -552,12 +656,39 @@ tunwrite(dev_t dev, struct uio *uio, int flag)
 			mlen = MLEN;
 		}
 	}
+	/* Change for checking Address Family of sending packet. */
+	af = *mtod(top, u_long *);
+	switch (af) {
+#ifdef INET
+	case AF_INET:
+		netisr_af = NETISR_IP;
+		afintrq = &ipintrq;
+		break;
+#endif /* INET */
+#ifdef INET6
+	case AF_INET6:
+		netisr_af = NETISR_IPV6;
+		afintrq = &ip6intrq;
+		break;
+#endif /* INET6 */
+	default:
+		if (af > 255) { /* see description at the top of tunoutput */
+			af = AF_INET;
+			netisr_af = NETISR_IP;
+			afintrq = &ipintrq;
+			goto af_decided;
+		}
+		error = EAFNOSUPPORT;
+		break;
+	}
+	m_adj(top, sizeof(u_long)); /* remove af field passed from upper */
+	tlen -= sizeof(u_long);
+      af_decided:
 	if (error) {
 		if (top)
 			m_freem (top);
 		return error;
 	}
-
 	top->m_pkthdr.len = tlen;
 	top->m_pkthdr.rcvif = ifp;
 
@@ -571,7 +702,6 @@ tunwrite(dev_t dev, struct uio *uio, int flag)
 		 * try to free it or keep a pointer to it).
 		 */
 		struct mbuf m;
-		u_int af = AF_INET;
 
 		m.m_next = top;
 		m.m_len = 4;
@@ -582,18 +712,18 @@ tunwrite(dev_t dev, struct uio *uio, int flag)
 #endif
 
 	s = splimp();
-	if (IF_QFULL (&ipintrq)) {
-		IF_DROP(&ipintrq);
+	if (IF_QFULL (afintrq)) {
+		IF_DROP(afintrq);
 		splx(s);
 		ifp->if_collisions++;
 		m_freem(top);
 		return ENOBUFS;
 	}
-	IF_ENQUEUE(&ipintrq, top);
+	IF_ENQUEUE(afintrq, top);
 	splx(s);
 	ifp->if_ibytes += tlen;
 	ifp->if_ipackets++;
-	schednetisr(NETISR_IP);
+	schednetisr(netisr_af);
 	return error;
 }
 

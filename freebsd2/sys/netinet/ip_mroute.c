@@ -126,14 +126,18 @@ _mrt_ioctl(int req, caddr_t data, struct proc *p)
 int (*mrt_ioctl)(int, caddr_t, struct proc *) = _mrt_ioctl;
 
 void
-rsvp_input(m, iphlen)		/* XXX must fixup manually */
-	struct mbuf *m;
-	int iphlen;
+rsvp_input(m, off, proto)		/* XXX must fixup manually */
+    struct mbuf *m;
+    int off;
+    int proto;
 {
-    /* Can still get packets with rsvp_on = 0 if there is a local member
+    int iphlen = off;
+    /*
+     * Can still get packets with rsvp_on = 0 if there is a local member
      * of the group to which the RSVP packet is addressed.  But in this
      * case we want to throw the packet away.
      */
+    
     if (!rsvp_on) {
 	m_freem(m);
 	return;
@@ -142,15 +146,21 @@ rsvp_input(m, iphlen)		/* XXX must fixup manually */
     if (ip_rsvpd != NULL) {
 	if (rsvpdebug)
 	    printf("rsvp_input: Sending packet up old-style socket\n");
-	rip_input(m, iphlen);
+	rip_input(m, off, proto);
 	return;
     }
     /* Drop the packet */
     m_freem(m);
+    return;
 }
 
-void ipip_input(struct mbuf *m, int iphlen) { /* XXX must fixup manually */
-	rip_input(m, iphlen);
+void
+ipip_input(m, off, proto)
+    struct mbuf *m;
+    int off;
+    int proto;
+{
+    rip_input(m, off, proto);
 }
 
 int (*legal_vif_num)(int) = 0;
@@ -1628,13 +1638,15 @@ encap_send(ip, vifp, m)
  */
 void
 #ifdef MROUTE_LKM
-X_ipip_input(m, iphlen)
+X_ipip_input(m, off, proto)
 #else
-ipip_input(m, iphlen)
+ipip_input(m, off, proto)
 #endif
-	register struct mbuf *m;
-	int iphlen;
+    struct mbuf *m;
+    int off;
+    int proto;
 {
+    int iphlen = off;
     struct ifnet *ifp = m->m_pkthdr.rcvif;
     register struct ip *ip = mtod(m, struct ip *);
     register int hlen = ip->ip_hl << 2;
@@ -1643,7 +1655,7 @@ ipip_input(m, iphlen)
     register struct vif *vifp;
 
     if (!have_encap_tunnel) {
-	    rip_input(m, iphlen);
+	    rip_input(m, off, proto);
 	    return;
     }
     /*
@@ -1707,6 +1719,7 @@ ipip_input(m, iphlen)
 	 */
     }
     splx(s);
+    return;
 }
 
 /*
@@ -1907,6 +1920,9 @@ tbf_send_packet(vifp, m)
 
     if (vifp->v_flags & VIFF_TUNNEL) {
 	/* If tunnel options */
+#ifdef IPSEC
+	m->m_pkthdr.rcvif = NULL;
+#endif /*IPSEC*/
 	ip_output(m, (struct mbuf *)0, &vifp->v_route,
 		  IP_FORWARDING, (struct ip_moptions *)0);
     } else {
@@ -1921,6 +1937,9 @@ tbf_send_packet(vifp, m)
 	 * should get rejected because they appear to come from
 	 * the loopback interface, thus preventing looping.
 	 */
+#ifdef IPSEC
+	m->m_pkthdr.rcvif = NULL;
+#endif /*IPSEC*/
 	error = ip_output(m, (struct mbuf *)0, &ro,
 			  IP_FORWARDING, &imo);
 
@@ -2141,15 +2160,23 @@ ip_rsvp_force_done(so)
 }
 
 void
-rsvp_input(m, iphlen)
-	struct mbuf *m;
-	int iphlen;
+rsvp_input(m, off, proto)
+    struct mbuf *m;
+    int off;
+    int proto;
 {
+    int iphlen = off;
     int vifi;
     register struct ip *ip = mtod(m, struct ip *);
     static struct sockaddr_in rsvp_src = { sizeof rsvp_src, AF_INET };
     register int s;
     struct ifnet *ifp;
+#ifdef ALTQ
+    /* support IP_RECVIF used by rsvpd rel4.2a1 */
+    struct inpcb *inp;
+    struct socket *so;
+    struct mbuf *opts;
+#endif
 
     if (rsvpdebug)
 	printf("rsvp_input: rsvp_on %d\n",rsvp_on);
@@ -2169,7 +2196,7 @@ rsvp_input(m, iphlen)
     if (ip_rsvpd != NULL) {
 	if (rsvpdebug)
 	    printf("rsvp_input: Sending packet up old-style socket\n");
-	rip_input(m, iphlen);
+	rip_input(m, off, proto);  /* xxx */
 	return;
     }
 
@@ -2202,7 +2229,11 @@ rsvp_input(m, iphlen)
     if (rsvpdebug)
 	printf("rsvp_input: check socket\n");
 
+#ifdef ALTQ
+    if ((so = viftable[vifi].v_rsvpd) == NULL) {
+#else
     if (viftable[vifi].v_rsvpd == NULL) {
+#endif
 	/* drop packet, since there is no specific socket for this
 	 * interface */
 	    if (rsvpdebug)
@@ -2217,14 +2248,36 @@ rsvp_input(m, iphlen)
 	printf("rsvp_input: m->m_len = %d, sbspace() = %ld\n",
 	       m->m_len,sbspace(&(viftable[vifi].v_rsvpd->so_rcv)));
 
+#ifdef ALTQ
+    opts = NULL;
+    inp = (struct inpcb *)so->so_pcb;
+    if (inp->inp_flags & INP_CONTROLOPTS ||
+	inp->inp_socket->so_options & SO_TIMESTAMP)
+	ip_savecontrol(inp, &opts, ip, m);
+    if (sbappendaddr(&so->so_rcv,
+		     (struct sockaddr *)&rsvp_src,m, opts) == 0) {
+	m_freem(m);
+	if (opts)
+	    m_freem(opts);
+	if (rsvpdebug)
+	    printf("rsvp_input: Failed to append to socket\n");
+    }
+    else {
+	sorwakeup(so);
+	if (rsvpdebug)
+	    printf("rsvp_input: send packet up\n");
+    }
+#else /* !ALTQ */
     if (socket_send(viftable[vifi].v_rsvpd, m, &rsvp_src) < 0)
 	if (rsvpdebug)
 	    printf("rsvp_input: Failed to append to socket\n");
     else
 	if (rsvpdebug)
 	    printf("rsvp_input: send packet up\n");
+#endif /* !ALTQ */
     
     splx(s);
+    return;
 }
 
 #ifdef MROUTE_LKM

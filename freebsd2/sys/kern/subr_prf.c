@@ -317,6 +317,20 @@ sprintf(char *buf, const char *cfmt, ...)
 	return retval;
 }
 
+/* XXX dummy */
+int
+snprintf(char *buf, size_t len, const char *cfmt, ...)
+{
+	int retval;
+	va_list ap;
+
+	va_start(ap, cfmt);
+	retval = kvprintf(cfmt, NULL, (void *)buf, 10, ap);
+	buf[retval] = '\0';
+	va_end(ap);
+	return retval;
+}
+
 /*
  * Put a number (base <= 16) in a buffer in reverse order; return an
  * optional length and a pointer to the NULL terminated (preceded?)

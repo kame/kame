@@ -24,10 +24,19 @@ struct slcp {
 	u_char  confid;         /* id of last configuration request */
 };
 
+#ifdef INET
 struct sipcp {
 	u_short state;          /* state machine */
 	u_char  confid;         /* id of last configuration request */
 };
+#endif /* INET */
+
+#ifdef INET6
+struct sipv6cp {
+	u_short state;          /* state machine */
+	u_char  confid;         /* id of last configuration request */
+};
+#endif /* INET6 */
 
 struct sppp {
 	struct  ifnet pp_if;    /* network interface data */
@@ -39,7 +48,12 @@ struct sppp {
 	u_long  pp_seq;         /* local sequence number */
 	u_long  pp_rseq;        /* remote sequence number */
 	struct slcp lcp;        /* LCP params */
+#ifdef INET
 	struct sipcp ipcp;      /* IPCP params */
+#endif /* INET */
+#ifdef INET6
+	struct sipv6cp ipv6cp;      /* IPV6CP params */
+#endif /* INET6 */
 };
 
 #define PP_KEEPALIVE    0x01    /* use keepalive protocol */
@@ -53,10 +67,19 @@ struct sppp {
 #define LCP_STATE_ACK_SENT      2       /* LCP state: conf-ack sent */
 #define LCP_STATE_OPENED        3       /* LCP state: opened */
 
+#ifdef INET
 #define IPCP_STATE_CLOSED       0       /* IPCP state: closed (conf-req sent) */
 #define IPCP_STATE_ACK_RCVD     1       /* IPCP state: conf-ack received */
 #define IPCP_STATE_ACK_SENT     2       /* IPCP state: conf-ack sent */
 #define IPCP_STATE_OPENED       3       /* IPCP state: opened */
+#endif /* INET */
+
+#ifdef INET6
+#define IPV6CP_STATE_CLOSED       0       /* IPV6CP state: closed (conf-req sent) */
+#define IPV6CP_STATE_ACK_RCVD     1       /* IPV6CP state: conf-ack received */
+#define IPV6CP_STATE_ACK_SENT     2       /* IPV6CP state: conf-ack sent */
+#define IPV6CP_STATE_OPENED       3       /* IPV6CP state: opened */
+#endif /* INET6 */
 
 #ifdef KERNEL
 void sppp_attach (struct ifnet *ifp);

@@ -68,7 +68,7 @@
 #endif /* INET6 */
 #endif
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if !(defined(__NetBSD__) || defined(__OpenBSD__))
 const char *
 if_name(ifp)
 	struct ifnet *ifp;

@@ -63,6 +63,12 @@
 #endif
 #include <machine/in_cksum.h>
 
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#include <netkey/key.h>
+#include <netkey/key_debug.h>
+#endif /*IPSEC*/
+
 #if !defined(COMPAT_IPFW) || COMPAT_IPFW == 1
 #undef COMPAT_IPFW
 #define COMPAT_IPFW 1
@@ -92,6 +98,11 @@ static int	ip_setmoptions
 
 extern	struct protosw inetsw[];
 
+#if defined(PM)
+extern	int	doNatFil;
+extern	int	pm_out	__P((struct ifnet *, struct ip *, struct mbuf *));
+#endif
+
 /*
  * IP output.  The packet in mbuf chain m contains a skeletal IP
  * header (with len, off, ttl, proto, tos, src, dst).
@@ -114,6 +125,11 @@ ip_output(m0, opt, ro, flags, imo)
 	struct sockaddr_in *dst;
 	struct in_ifaddr *ia;
 	int isbroadcast;
+#ifdef IPSEC
+	struct route iproute;
+	struct socket *so = (struct socket *)m->m_pkthdr.rcvif;
+	struct secpolicy *sp = NULL;
+#endif /*IPSEC*/
 
 #ifndef IPDIVERT /* dummy variable for the firewall code to play with */
 	u_short ip_divert_cookie = 0 ;
@@ -121,6 +137,17 @@ ip_output(m0, opt, ro, flags, imo)
 #ifdef COMPAT_IPFW
 	struct ip_fw_chain *rule = NULL;
 #endif
+
+#ifdef IPSEC
+	/*
+	 * NOTE: This code is just to prevent ipfw code from SEGV.
+	 * ipfw code uses rcvif to determine incoming interface, and
+	 * KAME uses rcvif for ipsec processing.
+	 * ipfw may not be working right with KAME at this moment.
+	 * We need more tests.
+	 */
+	m->m_pkthdr.rcvif = NULL;
+#endif /*IPSEC*/
 
 #if defined(IPFIREWALL) && defined (DUMMYNET)
 	/*
@@ -178,11 +205,22 @@ ip_output(m0, opt, ro, flags, imo)
 	 * check that it is to the same destination
 	 * and is still up.  If not, free it and try again.
 	 */
+#if defined(PM)
+	if (ro->ro_rt
+	    && !(flags & IP_PROTOCOLROUTE)
+	    && ((ro->ro_rt->rt_flags & RTF_UP) == 0
+		|| dst->sin_addr.s_addr != ip->ip_dst.s_addr))
+	{
+		RTFREE(ro->ro_rt);
+		ro->ro_rt = (struct rtentry *)0;
+	}
+#else
 	if (ro->ro_rt && ((ro->ro_rt->rt_flags & RTF_UP) == 0 ||
 	   dst->sin_addr.s_addr != ip->ip_dst.s_addr)) {
 		RTFREE(ro->ro_rt);
 		ro->ro_rt = (struct rtentry *)0;
 	}
+#endif
 	if (ro->ro_rt == 0) {
 		dst->sin_family = AF_INET;
 		dst->sin_len = sizeof(*dst);
@@ -339,6 +377,12 @@ ip_output(m0, opt, ro, flags, imo)
 	if (ip->ip_src.s_addr == INADDR_ANY)
 		ip->ip_src = IA_SIN(ia)->sin_addr;
 #endif
+#ifdef ALTQ
+	/*
+	 * disable packet drop hack.
+	 * packetdrop should be done by queueing.
+	 */
+#else /* !ALTQ */
 	/*
 	 * Verify that we have any chance at all of being able to queue
 	 *      the packet or packet fragments
@@ -348,6 +392,7 @@ ip_output(m0, opt, ro, flags, imo)
 			error = ENOBUFS;
 			goto bad;
 	}
+#endif /* !ALTQ */
 
 	/*
 	 * Look for broadcast address and
@@ -416,7 +461,7 @@ sendit:
 #ifdef IPDIVERT
 		ip_divert_port = off & 0xffff ;
 		if (ip_divert_port) {		/* Divert packet */
-		    (*inetsw[ip_protox[IPPROTO_DIVERT]].pr_input)(m, 0);
+		    (*inetsw[ip_protox[IPPROTO_DIVERT]].pr_input)(m, 0, 0);
 		    goto done;
 		}
 #endif
@@ -427,6 +472,136 @@ sendit:
 	    }
 	}
 #endif /* COMPAT_IPFW */
+
+#if defined(PM)
+	/*
+	 * Processing IP filter/NAT.
+	 * Return TRUE  iff this packet is discarded.
+	 * Return FALSE iff this packet is accepted.
+	 */
+
+	if (doNatFil && pm_out(ro->ro_rt->rt_ifp, ip, m))
+	    goto done;
+#endif
+
+#ifdef IPSEC
+	/* get SP for this packet */
+	if (so == NULL)
+		sp = ipsec4_getpolicybyaddr(m, flags, &error);
+	else
+		sp = ipsec4_getpolicybysock(m, so, &error);
+
+	if (sp == NULL) {
+		ipsecstat.out_inval++;
+		goto bad;
+	}
+
+	error = 0;
+
+	/* check policy */
+	switch (sp->policy) {
+	case IPSEC_POLICY_DISCARD:
+		/*
+		 * This packet is just discarded.
+		 */
+		ipsecstat.out_polvio++;
+		goto bad;
+
+	case IPSEC_POLICY_BYPASS:
+	case IPSEC_POLICY_NONE:
+		/* no need to do IPsec. */
+		goto skip_ipsec;
+	
+	case IPSEC_POLICY_IPSEC:
+		if (sp->req == NULL) {
+			/* XXX should be panic ? */
+			printf("ip_output: No IPsec request specified.\n");
+			error = EINVAL;
+			goto bad;
+		}
+		break;
+
+	case IPSEC_POLICY_ENTRUST:
+	default:
+		printf("ip_output: Invalid policy found. %d\n", sp->policy);
+	}
+
+	ip->ip_len = htons((u_short)ip->ip_len);
+	ip->ip_off = htons((u_short)ip->ip_off);
+	ip->ip_sum = 0;
+
+    {
+	struct ipsec_output_state state;
+	bzero(&state, sizeof(state));
+	state.m = m;
+	if (flags & IP_ROUTETOIF) {
+		state.ro = &iproute;
+		bzero(&iproute, sizeof(iproute));
+	} else
+		state.ro = ro;
+	state.dst = (struct sockaddr *)dst;
+
+	error = ipsec4_output(&state, sp, flags);
+
+	m = state.m;
+	if (flags & IP_ROUTETOIF) {
+		/*
+		 * if we have tunnel mode SA, we may need to ignore
+		 * IP_ROUTETOIF.
+		 */
+		if (state.ro != &iproute || state.ro->ro_rt != NULL) {
+			flags &= ~IP_ROUTETOIF;
+			ro = state.ro;
+		}
+	} else
+		ro = state.ro;
+	dst = (struct sockaddr_in *)state.dst;
+	if (error) {
+		/* mbuf is already reclaimed in ipsec4_output. */
+		m0 = NULL;
+		switch (error) {
+		case EHOSTUNREACH:
+		case ENETUNREACH:
+		case EMSGSIZE:
+		case ENOBUFS:
+		case ENOMEM:
+			break;
+		default:
+			printf("ip4_output (ipsec): error code %d\n", error);
+			/*fall through*/
+		case ENOENT:
+			/* don't show these error codes to the user */
+			error = 0;
+			break;
+		}
+		goto bad;
+	}
+    }
+
+	/* be sure to update variables that are affected by ipsec4_output() */
+	ip = mtod(m, struct ip *);
+#ifdef _IP_VHL
+	hlen = IP_VHL_HL(ip->ip_vhl) << 2;
+#else
+	hlen = ip->ip_hl << 2;
+#endif
+	if (ro->ro_rt == NULL) {
+		if ((flags & IP_ROUTETOIF) == 0) {
+			printf("ip_output: "
+				"can't update route after IPsec processing\n");
+			error = EHOSTUNREACH;	/*XXX*/
+			goto bad;
+		}
+	} else {
+		/* nobody uses ia beyond here */
+		ifp = ro->ro_rt->rt_ifp;
+	}
+
+	/* make it flipped, again. */
+	ip->ip_len = ntohs((u_short)ip->ip_len);
+	ip->ip_off = ntohs((u_short)ip->ip_off);
+skip_ipsec:
+#endif /*IPSEC*/
 
 	/*
 	 * If small enough for interface, can just send directly.
@@ -440,10 +615,12 @@ sendit:
 		} else {
 			ip->ip_sum = in_cksum(m, hlen);
 		}
+
 		error = (*ifp->if_output)(ifp, m,
 				(struct sockaddr *)dst, ro->ro_rt);
 		goto done;
 	}
+
 	/*
 	 * Too large for interface; fragment if possible.
 	 * Must be able to put at least 8 bytes per fragment.
@@ -555,6 +732,18 @@ sendorfree:
 		ipstat.ips_fragmented++;
     }
 done:
+#ifdef IPSEC
+	if (ro == &iproute && ro->ro_rt) {
+		RTFREE(ro->ro_rt);
+		ro->ro_rt = NULL;
+	}
+	if (sp != NULL) {
+		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
+			printf("DP ip_output call free SP:%p\n", sp));
+		key_freesp(sp);
+	}
+#endif /* IPSEC */
+
 	return (error);
 bad:
 	m_freem(m0);
@@ -685,6 +874,7 @@ ip_ctloutput(op, so, level, optname, mp)
 		case IP_RECVRETOPTS:
 		case IP_RECVDSTADDR:
 		case IP_RECVIF:
+		case IP_FAITH:
 			if (m == 0 || m->m_len != sizeof(int))
 				error = EINVAL;
 			else {
@@ -718,6 +908,10 @@ ip_ctloutput(op, so, level, optname, mp)
 
 				case IP_RECVIF:
 					OPTSET(INP_RECVIF);
+					break;
+
+				case IP_FAITH:
+					OPTSET(INP_FAITH);
 					break;
 				}
 			}
@@ -763,6 +957,24 @@ ip_ctloutput(op, so, level, optname, mp)
 			}
 			break;
 
+#ifdef IPSEC
+		case IP_IPSEC_POLICY:
+		    {
+			caddr_t req = NULL;
+			int len = 0;
+			int priv;
+
+			priv = inp->inp_socket->so_state & SS_PRIV ? 1 : 0;
+			if (m != 0) {
+				req = mtod(m, caddr_t);
+				len = m->m_len;
+			}
+			error = ipsec_set_policy(&inp->inp_sp,
+			                         optname, req, len, priv);
+			break;
+		    }
+#endif /*IPSEC*/
+
 		default:
 			error = ENOPROTOOPT;
 			break;
@@ -790,6 +1002,7 @@ ip_ctloutput(op, so, level, optname, mp)
 		case IP_RECVRETOPTS:
 		case IP_RECVDSTADDR:
 		case IP_RECVIF:
+		case IP_FAITH:
 			*mp = m = m_get(M_WAIT, MT_SOOPTS);
 			m->m_len = sizeof(int);
 			switch (optname) {
@@ -819,6 +1032,10 @@ ip_ctloutput(op, so, level, optname, mp)
 			case IP_RECVIF:
 				optval = OPTBIT(INP_RECVIF);
 				break;
+
+			case IP_FAITH:
+				optval = OPTBIT(INP_FAITH);
+				break;
 			}
 			*mtod(m, int *) = optval;
 			break;
@@ -845,6 +1062,12 @@ ip_ctloutput(op, so, level, optname, mp)
 
 			*mtod(m, int *) = optval;
 			break;
+
+#ifdef IPSEC
+		case IP_IPSEC_POLICY:
+			error = ipsec_get_policy(inp->inp_sp, mp);
+			break;
+#endif /*IPSEC*/
 
 		default:
 			error = ENOPROTOOPT;

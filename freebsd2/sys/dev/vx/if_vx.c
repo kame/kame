@@ -220,6 +220,9 @@ vxattach(sc)
     ifp->if_init = vxinit;
     ifp->if_watchdog = vxwatchdog;
     ifp->if_softc = sc;
+#ifdef ALTQ
+    ifp->if_altqflags |= ALTQF_READY;
+#endif
 
     if_attach(ifp);
     ether_ifattach(ifp);
@@ -461,6 +464,11 @@ vxstart(ifp)
 
 startagain:
     /* Sneak a peek at the next packet */
+#ifdef ALTQ
+    if (ALTQ_IS_ON(ifp))
+	m0 = (*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK);
+    else
+#endif
     m0 = ifp->if_snd.ifq_head;
     if (m0 == 0) {
 	return;
@@ -480,6 +488,14 @@ startagain:
     if (len + pad > ETHER_MAX_LEN) {
 	/* packet is obviously too large: toss it */
 	++ifp->if_oerrors;
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+	    struct mbuf *tmp = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+	    if (tmp != m0)
+		panic("vxstart: different mbuf dequeued!");
+	}
+	else
+#endif
 	IF_DEQUEUE(&ifp->if_snd, m0);
 	m_freem(m0);
 	goto readcheck;
@@ -495,6 +511,14 @@ startagain:
 	}
     }
     outw(BASE + VX_COMMAND, SET_TX_AVAIL_THRESH | (8188 >> 2));
+#ifdef ALTQ
+    if (ALTQ_IS_ON(ifp)) {
+	struct mbuf *tmp = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+	if (tmp != m0)
+	    panic("vxstart: different mbuf dequeued!");
+    }
+    else
+#endif
     IF_DEQUEUE(&ifp->if_snd, m0);
     if (m0 == 0) {		/* not really needed */
 	return;
@@ -872,7 +896,7 @@ vxget(sc, totlen)
             }
             len = MLEN;
         }
-        if (totlen >= MINCLSIZE) {
+        if (totlen >= MHLEN) {
 	    MCLGET(m, M_DONTWAIT);
 	    if (m->m_flags & M_EXT)
 		len = MCLBYTES;
@@ -991,7 +1015,7 @@ vxwatchdog(ifp)
     struct ifnet *ifp;
 {
     struct vx_softc *sc = vx_softc[ifp->if_unit];
-
+    
     if (ifp->if_flags & IFF_DEBUG)
 	printf("vx%d: device timeout\n", ifp->if_unit);
     ifp->if_flags &= ~IFF_OACTIVE;

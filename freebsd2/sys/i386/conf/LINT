@@ -1311,3 +1311,34 @@ options		SHMMNI=33
 options		SHMSEG=9
 options		SI_DEBUG
 options		SPX_HACK
+
+# ALTQ options
+options		ALTQ		#alternate queueing
+options		CBQ		#class based queueing
+options		WFQ		#weighted fair queueing
+options		AFMAP		#atm flow mapping
+options		FIFOQ		#fifo queueing
+options		RED		#random early detection
+options		FLOWVALVE	#flowvalve for RED (needs RED)
+options		CBQ_RED		#red for cbq (needs CBQ and RED)
+options		RIO		#twin red for diffserv (needs RED)
+options		CBQ_RIO		#rio for cbq (needs CBQ, RIO, RED, CBQ_RED)
+options		LOCALQ		#local use
+options		ALTQ_ACCOUNT	#altq accounting
+options		ALTQ_ECN	#ecn extention to tcp (needs RED)
+options		ALTQ_IPSEC	#check ipsec in IPv4
+options		ALTQ_PPP	#sio modification for userland ppp
+
+# ATM related options
+#
+# The `en' device provides support for Efficient Networks (ENI)
+# ENI-155 PCI midway cards, and the Adaptec 155Mbps PCI ATM cards (ANA-59x0).
+#
+# atm pseudo-device provides generic atm functions and is required for
+# atm devices.
+# NATM enables the netnatm protocol family that can be used to
+# bypass TCP/IP.
+pseudo-device	atm
+device en0
+device en1
+options		NATM			#native ATM

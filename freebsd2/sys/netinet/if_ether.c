@@ -287,6 +287,9 @@ arprequest(ac, sip, tip, enaddr)
 	eh = (struct ether_header *)sa.sa_data;
 	bzero((caddr_t)ea, sizeof (*ea));
 	(void)memcpy(eh->ether_dhost, etherbroadcastaddr, sizeof(eh->ether_dhost));
+#ifdef TAHI
+	bzero(eh->ether_shost,sizeof(eh->ether_shost));
+#endif
 	eh->ether_type = htons(ETHERTYPE_ARP);	/* if_output will not swap */
 	ea->arp_hrd = htons(ARPHRD_ETHER);
 	ea->arp_pro = htons(ETHERTYPE_IP);

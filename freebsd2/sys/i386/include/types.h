@@ -65,6 +65,15 @@ typedef	unsigned int		u_int32_t;
 typedef	long long		  int64_t;
 typedef	unsigned long long	u_int64_t;
 
+typedef	__signed char		   int8m_t;
+typedef	unsigned char		 u_int8m_t;
+typedef	short			  int16m_t;
+typedef	unsigned short		u_int16m_t;
+typedef	int			  int32m_t;
+typedef	unsigned int		u_int32m_t;
+typedef	long long		  int64m_t;
+typedef	unsigned long long	u_int64m_t;
+
 typedef	int32_t			register_t;
 
 #endif /* !_MACHINE_TYPES_H_ */

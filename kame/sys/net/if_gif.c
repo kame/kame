@@ -157,8 +157,8 @@ gif_output(ifp, m, dst, rt)
 		goto end;
 	}
 
-#if defined(__FreeBSD__) || __FreeBSD__ >= 3
-	getmicrotime(&ifp->if_lastchange);	
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	getmicrotime(&ifp->if_lastchange);
 #else
 	ifp->if_lastchange = time;	
 #endif

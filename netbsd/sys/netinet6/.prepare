@@ -1,3 +1,4 @@
+exclude in6_rmx.c
 exclude tcp6.h
 exclude tcp6_debug.c
 exclude tcp6_debug.h

@@ -1,4 +1,33 @@
 /*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+/*
  * Copyright (c) 1982, 1986, 1988, 1990, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -69,6 +98,10 @@
 #ifdef TCPDEBUG
 #include <netinet/tcp_debug.h>
 #endif
+
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#endif /*IPSEC*/
 
 int 	tcp_mssdflt = TCP_MSS;
 SYSCTL_INT(_net_inet_tcp, TCPCTL_MSSDFLT, mssdflt,
@@ -240,6 +273,9 @@ tcp_respond(tp, ti, m, ack, seq, flags)
 	if (tp == NULL || (tp->t_inpcb->inp_socket->so_options & SO_DEBUG))
 		tcp_trace(TA_OUTPUT, 0, tp, ti, 0);
 #endif
+#ifdef IPSEC
+	m->m_pkthdr.rcvif = tp ? (struct ifnet *)tp->t_inpcb->inp_socket : NULL;
+#endif /*IPSEC*/
 	(void) ip_output(m, NULL, ro, 0, NULL);
 	if (ro == &sro && ro->ro_rt) {
 		RTFREE(ro->ro_rt);
@@ -522,6 +558,30 @@ tcp_mtudisc(inp, errno)
 		taop = rmx_taop(rt->rt_rmx);
 		offered = taop->tao_mssopt;
 		mss = rt->rt_rmx.rmx_mtu - sizeof(struct tcpiphdr);
+#ifdef IPSEC
+	    {
+		int tmp;
+		struct ipoption *p;
+
+		/* why we don't have this here?  could anyone comment? */
+		if (inp->inp_options) {
+			tmp = inp->inp_options->m_len - sizeof(p->ipopt_dst);
+			if (mss > tmp)
+				mss -= tmp;
+			else {
+				printf("tcp_mtudisc: "
+					"invalid mss(IP4 option)\n");
+			}
+		}
+
+		/* plug for AH/ESP. */
+		tmp = ipsec4_hdrsiz_tcp(tp);
+		if (mss > tmp)
+			mss -= tmp;
+		else
+			printf("tcp_mtudisc: invalid mss(IPsec)\n");
+	    }
+#endif /*IPSEC*/
 		if (offered)
 			mss = min(mss, offered);
 		/*
@@ -630,3 +690,28 @@ tcp_gettaocache(inp)
 static void
 tcp_cleartaocache(void)
 { }
+
+#ifdef IPSEC
+/* compute ESP/AH header size for TCP, including outer IP header. */
+size_t
+ipsec4_hdrsiz_tcp(tp)
+	struct tcpcb *tp;
+{
+	struct inpcb *inp;
+	struct mbuf *m;
+	size_t hdrsiz;
+
+	if (!tp || !tp->t_template || !(inp = tp->t_inpcb))
+		return 0;
+	MGETHDR(m, M_DONTWAIT, MT_DATA);
+	if (!m)
+		return 0;
+	m->m_pkthdr.len = m->m_len = sizeof(struct tcpiphdr);
+	bcopy(tp->t_template, mtod(m, u_char *), sizeof(struct tcpiphdr));
+
+	hdrsiz = ipsec4_hdrsiz(m, inp);
+
+	m_free(m);
+	return hdrsiz;
+}
+#endif /*IPSEC*/

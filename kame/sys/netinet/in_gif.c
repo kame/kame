@@ -233,9 +233,7 @@ in_gif_input(m, va_alist)
 	struct ifnet *gifp = NULL;
 	struct ip *ip;
 	int i, af;
-#ifdef __NetBSD__
 	va_list ap;
-#endif /* __NetBSD__ */
 	u_int8_t otos;
 
 	va_start(ap, m);

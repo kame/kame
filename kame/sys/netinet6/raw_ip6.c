@@ -160,10 +160,10 @@ rip6_input(mp, offp, proto)
 		if (in6p->in6p_ip6.ip6_nxt &&
 		    in6p->in6p_ip6.ip6_nxt != proto)
 			continue;
-		if (!IN6_IS_ADDR_ANY(&in6p->in6p_laddr) &&
+		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr) &&
 		   !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &ip6->ip6_dst))
 			continue;
-		if (!IN6_IS_ADDR_ANY(&in6p->in6p_faddr) &&
+		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr) &&
 		   !IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, &ip6->ip6_src))
 			continue;
 		if (in6p->in6p_cksum != -1
@@ -253,12 +253,18 @@ rip6_output(m, va_alist)
 
 	in6p = sotoin6pcb(so);
 
-	{
-		struct proc *p = curproc;	/* XXX */
+	priv = 0;
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+    {
+	struct proc *p = curproc;	/* XXX */
 
-		if (p && !suser(p->p_ucred, &p->p_acflag))
-			priv = 1;
-	}
+	if (p && !suser(p->p_ucred, &p->p_acflag))
+		priv = 1;
+    }
+#else
+	if ((so->so_state & SS_PRIV) != 0)
+		priv = 1;
+#endif
 	dst = &dstsock->sin6_addr;
 	if (control) {
 		if ((error = ip6_setpktoptions(control, &opt, priv)) != 0)
@@ -310,7 +316,7 @@ rip6_output(m, va_alist)
 		}
 	}
 
-	if (IN6_IS_ADDR_ANY(&in6p->in6p_laddr)) {
+	if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
 		struct in6_addr *in6a;
 
 		if ((in6a = in6_selectsrc(dstsock, optp,
@@ -451,16 +457,30 @@ rip6_usrreq(so, req, m, nam, control, p)
 	int s;
 	int error = 0;
 /*	extern	struct socket *ip6_mrouter; */ /* xxx */
+	int priv;
+
+	priv = 0;
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	if (p && !suser(p->p_ucred, &p->p_acflag))
+		priv++;
+#else
+	if ((so->so_state & SS_PRIV) != 0)
+		priv++;
+#endif
 
 	if (req == PRU_CONTROL)
 		return (in6_control(so, (u_long)m, (caddr_t)nam,
-				    (struct ifnet *)control, p));
+				    (struct ifnet *)control
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+				    , p
+#endif
+				    ));
 
 	switch (req) {
 	case PRU_ATTACH:
 		if (in6p)
 			panic("rip6_attach");
-		if (p == 0 || suser(p->p_ucred, &p->p_acflag)) {
+		if (!priv) {
 			error = EACCES;
 			break;
 		}
@@ -522,9 +542,14 @@ rip6_usrreq(so, req, m, nam, control, p)
 			error = EINVAL;
 			break;
 		}
-		if ((ifnet.tqh_first == 0) ||
+		if (
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+		   (ifnet == 0) ||
+#else
+		   (ifnet.tqh_first == 0) ||
+#endif
 		   (addr->sin6_family != AF_INET6) ||
-		   (!IN6_IS_ADDR_ANY(&addr->sin6_addr) &&
+		   (!IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr) &&
 		    (ia = ifa_ifwithaddr((struct sockaddr *)addr)) == 0)) {
 			error = EADDRNOTAVAIL;
 			break;
@@ -549,7 +574,12 @@ rip6_usrreq(so, req, m, nam, control, p)
 			error = EINVAL;
 			break;
 		}
-		if (ifnet.tqh_first == 0) {
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+		if (ifnet == 0)
+#else
+		if (ifnet.tqh_first == 0)
+#endif
+		{
 			error = EADDRNOTAVAIL;
 			break;
 		}
@@ -560,7 +590,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 
 		/* Source address selection. XXX: need pcblookup? */
 		in6a = &in6p->in6p_laddr;
-		if (IN6_IS_ADDR_ANY(in6a) &&
+		if (IN6_IS_ADDR_UNSPECIFIED(in6a) &&
 		    (in6a = in6_selectsrc(addr, in6p->in6p_outputopts,
 					  in6p->in6p_moptions, &in6p->in6p_route,
 					  &error)) == NULL) {

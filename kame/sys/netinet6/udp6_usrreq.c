@@ -78,6 +78,9 @@
 #ifdef __NetBSD__
 #include <sys/proc.h>
 #endif
+#ifdef __FreeBSD__
+#include <sys/syslog.h>
+#endif
 
 #include <net/if.h>
 #include <net/route.h>
@@ -108,6 +111,10 @@ struct	in6pcb *udp6_last_in6pcb = &udb6;
 static	int in6_mcmatch __P((struct in6pcb *, struct in6_addr *, struct ifnet *));
 static	void udp6_detach __P((struct in6pcb *));
 static	void udp6_notify __P((struct in6pcb *, int));
+
+#ifdef __FreeBSD__
+extern int udp_log_in_vain;
+#endif
 
 void
 udp6_init()
@@ -247,14 +254,14 @@ udp6_input(mp, offp, proto)
 		     in6p = in6p->in6p_next) {
 			if (in6p->in6p_lport != uh->uh_dport)
 				continue;
-			if (!IN6_IS_ADDR_ANY(&in6p->in6p_laddr)) {
+			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
 				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr,
 							&ip6->ip6_dst) &&
 				    !in6_mcmatch(in6p, &ip6->ip6_dst,
 						 m->m_pkthdr.rcvif))
 					continue;
 			}
-			if (!IN6_IS_ADDR_ANY(&in6p->in6p_faddr)) {
+			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
 				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr,
 							&ip6->ip6_src) ||
 				   in6p->in6p_fport != uh->uh_sport)
@@ -281,7 +288,8 @@ udp6_input(mp, offp, proto)
 					 * and m_copy() will copy M_PKTHDR
 					 * only if offset is 0.
 					 */
-					if (last->in6p_flags & IN6P_CONTROLOPTS) {
+					if (last->in6p_flags & IN6P_CONTROLOPTS
+					 || last->in6p_socket->so_options & SO_TIMESTAMP) {
 						ip6_savecontrol(last, &opts,
 								ip6, n);
 					}
@@ -332,8 +340,10 @@ udp6_input(mp, offp, proto)
 			goto bad;
 		}
 #endif /*IPSEC*/
-		if (last->in6p_flags & IN6P_CONTROLOPTS)
+		if (last->in6p_flags & IN6P_CONTROLOPTS
+		 || last->in6p_socket->so_options & SO_TIMESTAMP) {
 			ip6_savecontrol(last, &opts, ip6, m);
+		}
 
 		m_adj(m, off + sizeof(struct udphdr));
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
@@ -362,6 +372,17 @@ udp6_input(mp, offp, proto)
 		udp6stat.udp6ps_pcbcachemiss++;
 	}
 	if (in6p == 0) {
+#ifdef __FreeBSD__
+		if (udp_log_in_vain) {
+			char buf[INET6_ADDRSTRLEN];
+
+			strcpy(buf, ip6_sprintf(&ip6->ip6_dst));
+			log(LOG_INFO,
+			    "Connection attempt to UDP %s:%d from %s:%d\n",
+			    buf, ntohs(uh->uh_dport),
+			    ip6_sprintf(&ip6->ip6_src), ntohs(uh->uh_sport));
+		}
+#endif
 		udp6stat.udp6s_noport++;
 		if (m->m_flags & M_MCAST) {
 			printf("UDP6: M_MCAST is set in a unicast packet.\n");
@@ -399,8 +420,10 @@ udp6_input(mp, offp, proto)
 			udp_in6.sin6_scope_id = 0;
 	} else
 		udp_in6.sin6_scope_id = 0;
-	if (in6p->in6p_flags & IN6P_CONTROLOPTS)
+	if (in6p->in6p_flags & IN6P_CONTROLOPTS
+	 || in6p->in6p_socket->so_options & SO_TIMESTAMP) {
 		ip6_savecontrol(in6p, &opts, ip6, m);
+	}
 
 	m_adj(m, off + sizeof(struct udphdr));
 	if (sbappendaddr(&in6p->in6p_socket->so_rcv,
@@ -502,11 +525,19 @@ udp6_output(in6p, m, addr6, control)
 	struct	in6_addr laddr6;
 	int s = 0, error = 0;
 	struct ip6_pktopts opt, *stickyopt = in6p->in6p_outputopts;
-	int priv = 0;
+	int priv;
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct proc *p = curproc;	/* XXX */
+#endif
 
+	priv = 0;
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	if (p && !suser(p->p_ucred, &p->p_acflag))
 		priv = 1;
+#else
+	if ((in6p->in6p_socket->so_state & SS_PRIV) != 0)
+		priv = 1;
+#endif
 	if (control) {
 		if ((error = ip6_setpktoptions(control, &opt, priv)) != 0)
 			goto release;
@@ -515,7 +546,7 @@ udp6_output(in6p, m, addr6, control)
 
 	if (addr6) {
 		laddr6 = in6p->in6p_laddr;
-		if (!IN6_IS_ADDR_ANY(&in6p->in6p_faddr)) {
+		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
 			error = EISCONN;
 			goto release;
 		}
@@ -533,7 +564,7 @@ udp6_output(in6p, m, addr6, control)
 			goto release;
 		}
 	} else {
-		if (IN6_IS_ADDR_ANY(&in6p->in6p_faddr)) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
 			error = ENOTCONN;
 			goto release;
 		}
@@ -545,6 +576,8 @@ udp6_output(in6p, m, addr6, control)
 	M_PREPEND(m, sizeof(struct ip6_hdr) + sizeof(struct udphdr), M_DONTWAIT);
 	if (m == 0) {
 		error = ENOBUFS;
+		if (addr6)
+			splx(s);
 		goto release;
 	}
 
@@ -603,11 +636,18 @@ extern	int udp6_sendspace;
 extern	int udp6_recvspace;
 
 int
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 udp6_usrreq(so, req, m, addr6, control, p)
 	struct socket *so;
 	int req;
 	struct mbuf *m, *addr6, *control;
 	struct proc *p;
+#else
+udp6_usrreq(so, req, m, addr6, control)
+	struct socket *so;
+	int req;
+	struct mbuf *m, *addr6, *control;
+#endif
 {
 	struct	in6pcb *in6p = sotoin6pcb(so);
 	int	error = 0;
@@ -625,7 +665,11 @@ udp6_usrreq(so, req, m, addr6, control, p)
 	 */
 	if (req == PRU_CONTROL)
 		return(in6_control(so, (u_long)m, (caddr_t)addr6,
-				   (struct ifnet *)control, p));
+				   (struct ifnet *)control
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+				   , p
+#endif
+				   ));
 
 	if (in6p == NULL && req != PRU_ATTACH) {
 		error = EINVAL;
@@ -682,7 +726,7 @@ udp6_usrreq(so, req, m, addr6, control, p)
 		break;
 
 	case PRU_CONNECT:
-		if (!IN6_IS_ADDR_ANY(&in6p->in6p_faddr)) {
+		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
 			error = EISCONN;
 			break;
 		}

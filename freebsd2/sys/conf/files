@@ -24,6 +24,7 @@ ddb/db_variables.c	optional ddb
 ddb/db_watch.c		optional ddb
 ddb/db_write_cmd.c	optional ddb
 dev/ccd/ccd.c		optional ccd device-driver
+dev/en/midway.c		optional en device-driver
 dev/pdq/pdq.c		optional fea device-driver
 dev/pdq/pdq_ifsubr.c	optional fea device-driver
 dev/pdq/pdq.c		optional fpa device-driver
@@ -81,6 +82,7 @@ kern/kern_sysctl.c	standard
 kern/kern_time.c	standard
 kern/kern_xxx.c		standard
 kern/md5c.c		optional md5
+kern/md5c.c		optional ipsec
 kern/subr_autoconf.c	standard
 kern/subr_diskslice.c	standard
 kern/subr_dkbad.c	standard
@@ -159,11 +161,13 @@ msdosfs/msdosfs_fat.c		optional msdosfs
 msdosfs/msdosfs_lookup.c	optional msdosfs
 msdosfs/msdosfs_vfsops.c	optional msdosfs
 msdosfs/msdosfs_vnops.c		optional msdosfs
+net/altq_conf.c		optional altq
 net/bpf.c		optional bpfilter
 net/bpf_filter.c	optional bpfilter
 net/bridge.c		optional bridge
 net/bsd_comp.c		optional ppp_bsdcomp
 net/if.c		standard
+net/if_atmsubr.c	optional atm
 net/if_disc.c		optional disc
 net/if_ethersubr.c	optional ether
 net/if_fddisubr.c	optional fddi
@@ -184,6 +188,7 @@ net/rtsock.c		standard
 net/slcompress.c	optional ppp
 net/slcompress.c	optional sl
 net/zlib.c		optional ppp_deflate
+net/zlib.c		optional ipsec
 netatalk/aarp.c		optional netatalk
 netatalk/at_control.c	optional netatalk
 netatalk/at_proto.c	optional netatalk
@@ -214,6 +219,16 @@ netatalk/ddp_usrreq.c	optional netatalk
 #netimp/if_imp.c		optional imp
 #netimp/if_imphost.c	optional imp
 #netimp/raw_imp.c	optional imp
+netinet/altq_afmap.c	optional altq
+netinet/altq_cbq.c	optional altq
+netinet/altq_fifoq.c	optional altq
+netinet/altq_localq.c	optional altq
+netinet/altq_red.c	optional altq
+netinet/altq_rio.c	optional altq
+netinet/altq_rmclass.c	optional altq
+netinet/altq_subr.c	optional altq
+netinet/altq_wfq.c	optional altq
+netinet/if_atm.c	optional atm
 netinet/if_ether.c	optional ether
 netinet/igmp.c		optional inet
 netinet/in.c		optional inet
@@ -295,7 +310,12 @@ netipx/spx_usrreq.c	optional ipx
 #netiso/tuba_subr.c	optional iso tuba
 #netiso/tuba_table.c	optional iso tuba
 #netiso/tuba_usrreq.c	optional iso tuba
-netkey/key.c		optional key
+netkey/key.c		optional ipsec
+netkey/key_debug.c	optional ipsec
+netkey/keysock.c	optional ipsec
+netnatm/natm_pcb.c	optional natm
+netnatm/natm_proto.c	optional natm
+netnatm/natm.c		optional natm
 #netns/idp_usrreq.c	optional ns
 #netns/ns.c		optional ns
 #netns/ns_error.c	optional ns
@@ -306,6 +326,16 @@ netkey/key.c		optional key
 #netns/ns_proto.c	optional ns
 #netns/spp_debug.c	optional ns
 #netns/spp_usrreq.c	optional ns
+netpm/pm_aTT.c		optional pm
+netpm/pm_ams.c		optional pm
+netpm/pm_dispatch.c	optional pm
+netpm/pm_filter.c	optional pm
+netpm/pm_list.c		optional pm
+netpm/pm_log.c		optional pm
+netpm/pm_nat.c		optional pm
+netpm/pm_pmd.c		optional pm
+netpm/pm_route.c	optional pm
+netpm/pm_usrreq.c	optional pm
 nfs/nfs_bio.c		optional nfs
 nfs/nfs_node.c		optional nfs
 nfs/nfs_nqlease.c	optional nfs
@@ -329,6 +359,7 @@ pci/bt9xx.c		optional bt device-driver
 pci/cy_pci.c		optional cy device-driver
 pci/if_de.c		optional de device-driver
 pci/if_ed_p.c		optional ed device-driver
+pci/if_en_pci.c		optional en device-driver
 pci/if_fxp.c		optional fxp device-driver
 pci/if_lnc_p.c		optional lnc device-driver
 pci/if_fpa.c		optional fpa device-driver
@@ -337,6 +368,7 @@ pci/if_tl.c		optional tl device-driver
 pci/if_tx.c		optional tx device-driver
 pci/if_vx_pci.c		optional vx device-driver
 pci/if_xl.c		optional xl device-driver
+pci/if_ti.c		optional ti device-driver
 pci/meteor.c		optional meteor device-driver
 pci/ncr.c		optional ncr device-driver
 pci/pci.c		optional pci device-driver
@@ -416,3 +448,72 @@ dev/dpt/dpt_control.c	optional  dpt     device-driver
 dev/dpt/dpt_scsi.c	optional  dpt     device-driver
 pci/dpt_pci.c		optional  dpt     device-driver
 
+net/if_dummy.c		optional dummy
+net/if_faith.c		optional faith
+net/if_gif.c		optional gif
+net/if_vlan.c		optional vlan
+netinet/ip_ecn.c	optional inet
+netinet/ip_ecn.c	optional inet6
+netinet/in_gif.c	optional gif inet
+netinet6/in6_gif.c	optional gif inet6
+net/net_osdep.c		standard
+netinet6/in6.c		optional inet6
+netinet6/in6_ifattach.c	optional inet6
+netinet6/in6_cksum.c	optional inet6
+netinet6/in6_pcb.c	optional inet6
+netinet6/in6_proto.c	optional inet6
+netinet6/in6_rmx.c	optional inet6
+netinet6/in6_prefix.c	optional inet6
+netinet6/dest6.c	optional inet6
+netinet6/frag6.c	optional inet6
+netinet6/icmp6.c	optional inet6
+netinet6/ip6_input.c	optional inet6
+netinet6/ip6_forward.c	optional inet6
+netinet6/ip6_mroute.c	optional inet6
+netinet6/ip6_output.c	optional inet6
+netinet6/route6.c	optional inet6
+netinet6/mld6.c		optional inet6
+netinet6/nd6.c		optional inet6
+netinet6/nd6_nbr.c	optional inet6
+netinet6/nd6_rtr.c	optional inet6
+netinet6/ptr_dispatch.c	optional inet6 ptr
+netinet6/ptr_list.c	optional inet6 ptr
+netinet6/ptr_log.c	optional inet6 ptr
+netinet6/ptr_rule.c	optional inet6 ptr
+netinet6/ptr_trans.c	optional inet6 ptr
+netinet6/ptr_tslot.c	optional inet6 ptr
+netinet6/ptr_usrreq.c	optional inet6 ptr
+netinet6/raw_ip6.c	optional inet6
+netinet6/tcp6_debug.c	optional inet6
+netinet6/tcp6_input.c	optional inet6
+netinet6/tcp6_output.c	optional inet6
+netinet6/tcp6_subr.c	optional inet6
+netinet6/tcp6_timer.c	optional inet6
+netinet6/tcp6_usrreq.c	optional inet6
+netinet6/udp6_usrreq.c	optional inet6
+#crypto/md5.c		optional ipsec 
+netinet6/ah_core.c	optional ipsec
+netinet6/esp_core.c	optional ipsec_esp
+netinet6/ipsec.c	optional ipsec
+netinet6/ah_output.c	optional ipsec
+netinet6/ah_input.c	optional ipsec
+netinet6/esp_output.c	optional ipsec_esp
+netinet6/esp_input.c	optional ipsec_esp
+netinet6/ipcomp_core.c	optional ipsec
+netinet6/ipcomp_input.c	optional ipsec
+netinet6/ipcomp_output.c	optional ipsec
+netinet6/ip6_fw.c	optional ipv6firewall
+#crypto/hmac_md5.c	optional ipsec
+crypto/sha1.c		optional ipsec
+crypto/des/des_cbc.c	optional ipsec_esp
+crypto/des/des_ecb.c	optional ipsec_esp
+crypto/des/des_setkey.c	optional ipsec_esp
+crypto/des/des_3cbc.c	optional ipsec_esp
+crypto/blowfish/bf_cbc.c	optional ipsec_esp
+crypto/blowfish/bf_cbc_m.c	optional ipsec_esp
+crypto/blowfish/bf_enc.c	optional ipsec_esp
+crypto/blowfish/bf_skey.c	optional ipsec_esp
+crypto/cast128/cast128.c	optional ipsec_esp
+crypto/cast128/cast128_cbc.c	optional ipsec_esp
+crypto/rc5/rc5.c		optional ipsec_esp
+crypto/rc5/rc5_cbc.c		optional ipsec_esp

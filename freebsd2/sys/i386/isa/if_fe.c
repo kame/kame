@@ -98,6 +98,13 @@
 #include <netinet/if_ether.h>
 #endif
 
+#ifdef INET6
+#ifndef INET
+#include <netinet/in.h>
+#endif
+#include <netinet6/in6_ifattach.h>
+#endif
+
 /* IPX code is not tested.  FIXME.  */
 #ifdef IPX
 #include <netipx/ipx.h>
@@ -105,9 +112,11 @@
 #endif
 
 /* To be used with IPv6 package of INRIA.  */
+#if 0	/*INRIA*/
 #ifdef INET6
 /* IPv6 added by shin 96.2.6 */
 #include <netinet/if_ether6.h>
+#endif
 #endif
 
 /* XNS code is not tested.  FIXME.  */
@@ -374,6 +383,11 @@ feinit(struct pccard_devinfo *devi)
 #endif
 	if (fe_attach(&devi->isahd) == 0)
 		return (ENXIO);
+
+#ifdef INET6
+	in6_ifattach(&sc->arpcom.ac_if, IN6_IFT_802,
+		     (caddr_t)sc->arpcom.ac_enaddr, 0);
+#endif /* INET6 */
 
 	return (0);
 }
@@ -2467,12 +2481,14 @@ fe_ioctl ( struct ifnet * ifp, int command, caddr_t data )
 				break;
 			}
 #endif
+#if 0	/*INRIA*/
 #ifdef INET6
 		  case AF_INET6:
 			/* IPV6 added by shin 96.2.6 */
 			fe_init(sc->sc_unit);
 			ndp6_ifinit(&sc->arpcom, ifa);
 			break;
+#endif
 #endif
 #ifdef NS
 

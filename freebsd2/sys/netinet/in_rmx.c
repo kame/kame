@@ -130,11 +130,13 @@ in_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 	 * as it sees fit.  This will hopefully allow TCP more
 	 * opportunities to save its ssthresh value.
 	 */
+#if !defined(ALTQ)  /* commented out for the tcp window problem  --kjc */
 	if (!rt->rt_rmx.rmx_sendpipe && !(rt->rt_rmx.rmx_locks & RTV_SPIPE))
 		rt->rt_rmx.rmx_sendpipe = tcp_sendspace;
 
 	if (!rt->rt_rmx.rmx_recvpipe && !(rt->rt_rmx.rmx_locks & RTV_RPIPE))
 		rt->rt_rmx.rmx_recvpipe = tcp_recvspace;
+#endif
 
 	if (!rt->rt_rmx.rmx_mtu && !(rt->rt_rmx.rmx_locks & RTV_MTU) 
 	    && rt->rt_ifp)

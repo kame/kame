@@ -1,4 +1,33 @@
 /*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+/*
  * Copyright (c) 1980, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -53,6 +82,11 @@
 #include <net/if_types.h>
 #include <net/radix.h>
 
+#ifdef INET6
+/*XXX*/
+#include <netinet/in.h>
+#endif
+
 /*
  * System initialization
  */
@@ -65,9 +99,16 @@ static void link_rtrequest __P((int, struct rtentry *, struct sockaddr *));
 
 SYSINIT(interfaces, SI_SUB_PROTO_IF, SI_ORDER_FIRST, ifinit, NULL)
 
+int ifqmaxlen = IFQ_MAXLEN;
+struct ifnet *ifnet;
 
-int	ifqmaxlen = IFQ_MAXLEN;
-struct	ifnet *ifnet;
+#ifdef INET6
+/*
+ * XXX: declare here to avoid to include many inet6 related files..
+ * should be more generalized?
+ */
+extern void nd6_setmtu __P((struct ifnet *));
+#endif 
 
 /*
  * Network interface utility routines.
@@ -84,15 +125,16 @@ ifinit(dummy)
 {
 	register struct ifnet *ifp;
 
-	for (ifp = ifnet; ifp; ifp = ifp->if_next)
+	for (ifp = ifnet; ifp; ifp = ifp->if_next) {
 		if (ifp->if_snd.ifq_maxlen == 0)
 			ifp->if_snd.ifq_maxlen = ifqmaxlen;
+	}
 	if_slowtimo(0);
 }
 
 int if_index = 0;
-struct ifaddr **ifnet_addrs;
-
+struct ifaddr **ifnet_addrs = NULL;
+struct ifnet **ifindex2ifnet = NULL;
 
 /*
  * Attach an interface to the
@@ -108,25 +150,50 @@ if_attach(ifp)
 	register struct ifnet **p = &ifnet;
 	register struct sockaddr_dl *sdl;
 	register struct ifaddr *ifa;
-	static int if_indexlim = 8;
-
+	static size_t if_indexlim = 8;
 
 	while (*p)
 		p = &((*p)->if_next);
 	*p = ifp;
 	ifp->if_index = ++if_index;
 	microtime(&ifp->if_lastchange);
-	if (ifnet_addrs == 0 || if_index >= if_indexlim) {
-		unsigned n = (if_indexlim <<= 1) * sizeof(ifa);
-		struct ifaddr **q = (struct ifaddr **)
-					malloc(n, M_IFADDR, M_WAITOK);
-		bzero((caddr_t)q, n);
+
+	/*
+	 * We have some arrays that should be indexed by if_index.
+	 * since if_index will grow dynamically, they should grow too.
+	 *	struct ifadd **ifnet_addrs
+	 *	struct ifnet **ifindex2ifnet
+	 */
+	if (ifnet_addrs == 0 || ifindex2ifnet == 0 || if_index >= if_indexlim) {
+		size_t n;
+		caddr_t q;
+		
+		while(if_index >= if_indexlim)
+			if_indexlim <<= 1;
+
+		/* grow ifnet_addrs */
+		n = if_indexlim * sizeof(ifa);
+		q = (caddr_t)malloc(n, M_IFADDR, M_WAITOK);
+		bzero(q, n);
 		if (ifnet_addrs) {
-			bcopy((caddr_t)ifnet_addrs, (caddr_t)q, n/2);
+			bcopy((caddr_t)ifnet_addrs, q, n/2);
 			free((caddr_t)ifnet_addrs, M_IFADDR);
 		}
-		ifnet_addrs = q;
+		ifnet_addrs = (struct ifaddr **)q;
+
+		/* grow ifindex2ifnet */
+		n = if_indexlim * sizeof(struct ifnet *);
+		q = (caddr_t)malloc(n, M_IFADDR, M_WAITOK);
+		bzero(q, n);
+		if (ifindex2ifnet) {
+			bcopy((caddr_t)ifindex2ifnet, q, n/2);
+			free((caddr_t)ifindex2ifnet, M_IFADDR);
+		}
+		ifindex2ifnet = (struct ifnet **)q;
 	}
+
+	ifindex2ifnet[if_index] = ifp;
+
 	/*
 	 * create a Link Level name for this device
 	 */
@@ -149,7 +216,7 @@ if_attach(ifp)
 		sdl->sdl_nlen = namelen;
 		sdl->sdl_index = ifp->if_index;
 		sdl->sdl_type = ifp->if_type;
-		ifnet_addrs[if_index - 1] = ifa;
+		ifnet_addrs[if_index] = ifa;
 		ifa->ifa_ifp = ifp;
 		ifa->ifa_next = ifp->if_addrlist;
 		ifa->ifa_rtrequest = link_rtrequest;
@@ -163,6 +230,7 @@ if_attach(ifp)
 			sdl->sdl_data[--namelen] = 0xff;
 	}
 }
+
 /*
  * Locate an interface based on a complete address.
  */
@@ -183,6 +251,8 @@ ifa_ifwithaddr(addr)
 		if (equal(addr, ifa->ifa_addr))
 			return (ifa);
 		if ((ifp->if_flags & IFF_BROADCAST) && ifa->ifa_broadaddr &&
+		    /* IP6 doesn't have broadcast */
+		    ifa->ifa_broadaddr->sa_len != 0 &&
 		    equal(ifa->ifa_broadaddr, addr))
 			return (ifa);
 	}
@@ -227,7 +297,7 @@ ifa_ifwithnet(addr)
 	if (af == AF_LINK) {
 	    register struct sockaddr_dl *sdl = (struct sockaddr_dl *)addr;
 	    if (sdl->sdl_index && sdl->sdl_index <= if_index)
-		return (ifnet_addrs[sdl->sdl_index - 1]);
+		return (ifnet_addrs[sdl->sdl_index]);
 	}
 	for (ifp = ifnet; ifp; ifp = ifp->if_next) {
 		for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next) {
@@ -235,11 +305,14 @@ ifa_ifwithnet(addr)
 
 			if (ifa->ifa_addr->sa_family != af)
 				next: continue;
+#if 0	/* 97/10/3: for route6d */
 			if (ifp->if_flags & IFF_POINTOPOINT) {
 				if (ifa->ifa_dstaddr != 0
 				    && equal(addr, ifa->ifa_dstaddr))
  					return (ifa);
-			} else {
+			} else
+#endif
+			{
 				/*
 				 * if we have a special address handler,
 				 * then use it instead of the generic one.
@@ -392,6 +465,9 @@ if_up(ifp)
 		pfctlinput(PRC_IFUP, ifa->ifa_addr);
 #endif
 	rt_ifmsg(ifp);
+#ifdef INET6
+	in6_if_up(ifp);
+#endif
 }
 
 /*
@@ -487,6 +563,35 @@ ifunit(name)
 	return (ifp);
 }
 
+
+/*
+ * Map interface name in a sockaddr_dl to
+ * interface structure pointer.
+ */
+struct ifnet *
+if_withname(sa)
+	struct sockaddr *sa;
+{
+	char ifname[IFNAMSIZ+1];
+	struct sockaddr_dl *sdl = (struct sockaddr_dl *)sa;
+
+	if ( (sa->sa_family != AF_LINK) || (sdl->sdl_nlen == 0) ||
+	     (sdl->sdl_nlen > IFNAMSIZ) )
+		return NULL;
+
+	/*
+	 * ifunit wants a null-terminated name.  It may not be null-terminated
+	 * in the sockaddr.  We don't want to change the caller's sockaddr,
+	 * and there might not be room to put the trailing null anyway, so we
+	 * make a local copy that we know we can null terminate safely.
+	 */
+
+	bcopy(sdl->sdl_data, ifname, sdl->sdl_nlen);
+	ifname[sdl->sdl_nlen] = '\0';
+	return ifunit(ifname);
+}
+
+
 /*
  * Interface ioctls.
  */
@@ -500,6 +605,7 @@ ifioctl(so, cmd, data, p)
 	register struct ifnet *ifp;
 	register struct ifreq *ifr;
 	int error;
+	short oif_flags;
 
 	switch (cmd) {
 
@@ -570,6 +676,9 @@ ifioctl(so, cmd, data, p)
 		return(error);
 
 	case SIOCSIFMTU:
+	{
+		u_long oldmtu = ifp->if_mtu;
+
 		error = suser(p->p_ucred, &p->p_acflag);
 		if (error)
 			return (error);
@@ -584,7 +693,16 @@ ifioctl(so, cmd, data, p)
 		error = (*ifp->if_ioctl)(ifp, cmd, data);
 		if (error == 0)
 			microtime(&ifp->if_lastchange);
-		return(error);
+		/*
+		 * If the link MTU changed, do network layer specific procedure.
+		 */
+		if (ifp->if_mtu != oldmtu) {
+#ifdef INET6
+			nd6_setmtu(ifp);
+#endif 
+		}
+		return (error);
+	}
 
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
@@ -615,10 +733,11 @@ ifioctl(so, cmd, data, p)
 		return ((*ifp->if_ioctl)(ifp, cmd, data));
 
 	default:
+		oif_flags = ifp->if_flags;
 		if (so->so_proto == 0)
 			return (EOPNOTSUPP);
 #ifndef COMPAT_43
-		return ((*so->so_proto->pr_usrreqs->pru_control)(so, cmd,
+		error = ((*so->so_proto->pr_usrreqs->pru_control)(so, cmd,
 								 data,
 								 ifp));
 #else
@@ -670,10 +789,18 @@ ifioctl(so, cmd, data, p)
 		case OSIOCGIFNETMASK:
 			*(u_short *)&ifr->ifr_addr = ifr->ifr_addr.sa_family;
 		}
-		return (error);
-
 	    }
+#endif /* COMPAT_43 */
+		if ((oif_flags ^ ifp->if_flags) & IFF_UP) {
+#ifdef INET6
+			if (ifp->if_flags & IFF_UP) {
+				int s = splimp();
+				in6_if_up(ifp);
+				splx(s);
+			}
 #endif
+		}
+		return error;
 	}
 	return (0);
 }

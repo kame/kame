@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.h	8.1 (Berkeley) 6/10/93
- * $Id: if.h,v 1.36.2.4 1998/07/07 05:24:08 gibbs Exp $
+ * $Id: if.h,v 1.36.2.3 1997/10/05 21:41:05 julian Exp $
  */
 
 #ifndef _NET_IF_H_
@@ -64,6 +64,9 @@
 
 #ifndef _TIME_ /*  XXX fast fix for SNMP, going away soon */
 #include <sys/time.h>
+#endif
+#if 1 /* ALTQ */
+#include <net/if_altq.h>
 #endif
 
 #ifdef __STDC__
@@ -164,6 +167,17 @@ struct ifnet {
 		__P((void *));
 	struct	ifqueue if_snd;		/* output queue */
 	struct	ifqueue *if_poll_slowq;	/* input queue for slow devices */
+#if 1 /* ALTQ */
+	/* alternate queueing related stuff */
+	int	if_altqtype;		/* queueing scheme id */
+	int	if_altqflags;		/* altq flags (e.g. ready, in-use) */
+	void	*if_altqp;		/* queue state */
+	int	(*if_altqenqueue)
+		__P((struct ifnet *, struct mbuf *, struct pr_hdr *, int));
+	struct mbuf *(*if_altqdequeue)
+		__P((struct ifnet *, int));
+#endif /* ALTQ */
+	struct	ifprefix *if_prefixlist; /* linked list of prefixes per if */
 };
 typedef void if_init_f_t __P((void *));       
 
@@ -212,7 +226,6 @@ typedef void if_init_f_t __P((void *));
 #define	IFF_CANTCHANGE \
 	(IFF_BROADCAST|IFF_POINTOPOINT|IFF_RUNNING|IFF_OACTIVE|\
 	    IFF_SIMPLEX|IFF_MULTICAST|IFF_ALLMULTI)
-
 
 /*
  * These really don't belong here, but there's no other obviously appropriate
@@ -323,6 +336,20 @@ struct ifaddr {
 #define	IFA_ROUTE	RTF_UP		/* route installed */
 
 /*
+ * The prefix structure contains information about one prefix
+ * of an interface.  They are maintained by the different address families,
+ * are allocated and attached when an prefix or an address is set, 
+ * and are linked together so all prfefixes for an interface can be located.
+ */
+struct ifprefix {
+	struct	sockaddr *ifpr_prefix;	/* prefix of interface */
+	struct	ifnet *ifpr_ifp;	/* back-pointer to interface */
+	struct ifprefix *ifpr_next;
+	u_char	ifpr_plen;		/* prefix length in bits */
+	u_char	ifpr_type;		/* protocol dependent prefix type */
+};
+
+/*
  * Message format for use in obtaining information about interfaces
  * from getkerninfo and the routing socket
  */
@@ -358,6 +385,7 @@ struct ifa_msghdr {
  */
 struct	ifreq {
 #define	IFNAMSIZ	16
+#define	IF_NAMESIZE	IFNAMSIZ
 	char	ifr_name[IFNAMSIZ];		/* if name, e.g. "en0" */
 	union {
 		struct	sockaddr ifru_addr;
@@ -413,6 +441,18 @@ struct	ifconf {
 #define	ifc_req	ifc_ifcu.ifcu_req	/* array of structures returned */
 };
 
+/*
+ * Structure for SIOC[AGD]LIFADDR
+ */
+struct if_laddrreq {
+	char iflr_name[IFNAMSIZ];
+	unsigned int flags;
+#define IFLR_PREFIX	0x8000	/* in: prefix given  out: kernel fills id */
+	unsigned int prefixlen;		/* in/out */
+	struct sockaddr_storage addr;	/* in/out */
+	struct sockaddr_storage dstaddr; /* out */
+};
+
 #include <net/if_arp.h>
 
 #ifdef KERNEL
@@ -423,6 +463,7 @@ struct	ifconf {
 		(ifa)->ifa_refcnt--;
 
 extern struct	ifnet	*ifnet;
+extern struct	ifnet	**ifindex2ifnet;
 extern int	ifqmaxlen;
 extern struct	ifnet	loif[];
 extern int	if_index;
@@ -444,6 +485,7 @@ void	ifubareset __P((int));
 int	ifioctl __P((struct socket *, int, caddr_t, struct proc *));
 int	ifpromisc __P((struct ifnet *, int));
 struct	ifnet *ifunit __P((char *));
+struct  ifnet *if_withname __P((struct sockaddr *));
 
 int	if_poll_recv_slow __P((struct ifnet *ifp, int *quotap));
 void	if_poll_xmit_slow __P((struct ifnet *ifp, int *quotap));
@@ -462,6 +504,18 @@ void	ifafree __P((struct ifaddr *));
 
 int	looutput __P((struct ifnet *,
 	   struct mbuf *, struct sockaddr *, struct rtentry *));
+#else
+struct if_nameindex {
+	unsigned int	if_index;	/* 1, 2, ... */
+	char		*if_name;	/* null terminated name: "le0", ... */
+};
+
+__BEGIN_DECLS
+unsigned int if_nametoindex __P((const char *));
+char *if_indextoname __P((unsigned int, char *));
+struct if_nameindex *if_nameindex __P((void));
+void if_freenameindex __P((struct if_nameindex *));
+__END_DECLS
 #endif /* KERNEL */
 
 #endif /* !_NET_IF_H_ */

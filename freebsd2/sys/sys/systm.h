@@ -99,6 +99,7 @@ int	kvprintf __P((char const *, void (*)(int, void*), void *, int,
 void	log __P((int, const char *, ...));
 int	printf __P((const char *, ...));
 int	sprintf __P((char *buf, const char *, ...));
+int	snprintf __P((char *buf, size_t, const char *, ...));
 void	uprintf __P((const char *, ...));
 void	vprintf __P((const char *, _BSD_VA_LIST_));
 void	ttyprintf __P((struct tty *, const char *, ...));

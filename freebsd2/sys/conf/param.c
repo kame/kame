@@ -81,7 +81,11 @@
 #endif
 int	hz = HZ;
 int	tick = 1000000 / HZ;
+#ifdef ALTQ  /* fix for HZ > 500 */
+int	tickadj = howmany(30000, 60 * HZ);	/* can adjust 30ms in 60s */
+#else
 int	tickadj = 30000 / (60 * HZ);		/* can adjust 30ms in 60s */
+#endif
 #define	NPROC (20 + 16 * MAXUSERS)
 #define MAXFILES (NPROC*2)
 int	maxproc = NPROC;			/* maximum # of processes */

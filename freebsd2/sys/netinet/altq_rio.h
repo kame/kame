@@ -1,0 +1,189 @@
+/*
+ * Copyright (C) 1998-1999
+ *	Sony Computer Science Laboratories Inc.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY SONY CSL AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL SONY CSL OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * $Id: altq_rio.h,v 1.1 1999/08/05 14:33:08 itojun Exp $
+ */
+
+#ifndef _NETINET_ALTQ_RIO_H_
+#define _NETINET_ALTQ_RIO_H_
+
+/*
+ * RIO: RED with IN/OUT bit
+ */
+
+struct rio_interface {
+	char	rio_ifname[IFNAMSIZ];
+};
+
+struct redstat {
+	u_int		xmit_packets;
+	u_int		drop_packets;
+	u_int		drop_forced;
+	u_int		drop_unforced;
+	u_int		marked_packets;
+	u_quad_t	xmit_bytes;
+	u_quad_t	drop_bytes;
+};
+
+struct tbmstat {
+	u_int		packets;
+	u_quad_t	bytes;
+	u_int		in_packets;
+	u_quad_t	in_bytes;
+};
+
+struct redparams {
+	int th_min;		/* red min threshold */
+	int th_max;		/* red max threshold */
+	int inv_pmax;		/* inverse of max drop probability */
+};
+
+struct rio_stats {
+	struct rio_interface iface;
+	int q_len;
+	int q_avg;
+	int in_len;
+	int in_avg;
+	struct redstat q_stat, in_stat;
+
+	struct tbmstat tb_stat;
+
+	/* static red parameters */
+	int q_limit;
+	int weight;
+	int flags;
+	struct redparams q_params, in_params;
+};
+
+struct rio_conf {
+	struct rio_interface iface;
+	struct redparams q_params, in_params;
+	int rio_weight;		/* weight for EWMA */
+	int rio_limit;		/* max queue length */
+	int rio_pkttime;	/* average packet time in usec */
+	int rio_flags;		/* see below */
+};
+
+struct rio_meter {
+	struct rio_interface iface;
+	int rate;		/* service rate in bits-per-second */
+	int depth;		/* token-bucket depth in bytes */
+	int codepoint;		/* codepoint to write into ds-field */
+};
+
+/* rio flags */
+#define RIOF_ECN4	0x01	/* use packet marking for IPv4 packets */
+#define RIOF_ECN6	0x02	/* use packet marking for IPv6 packets */
+#define RIOF_ECN	(RIOF_ECN4 | RIOF_ECN6)
+#define RIOF_METERONLY		0x100	/* meter only, skip rio dropper */
+#define RIOF_CLEARCODEPOINT	0x200	/* clear codepoint */
+
+/* 
+ * IOCTLs for RIO
+ */
+#define RIO_ENABLE		_IOW('Q', 1, struct rio_interface)
+#define RIO_DISABLE		_IOW('Q', 2, struct rio_interface)
+#define	RIO_IF_ATTACH		_IOW('Q', 3, struct rio_interface)
+#define	RIO_IF_DETACH		_IOW('Q', 4, struct rio_interface)
+#define	RIO_ACC_ENABLE		_IOW('Q', 5, struct rio_interface)
+#define	RIO_ACC_DISABLE		_IOW('Q', 6, struct rio_interface)
+#define	RIO_GETSTATS		_IOWR('Q', 7, struct rio_stats)
+#define	RIO_CONFIG		_IOWR('Q', 8, struct rio_conf)
+#define	RIO_ADD_METER		_IOWR('Q', 9, struct rio_meter)
+
+#if defined(KERNEL) || defined(_KERNEL)
+
+typedef struct rio {
+	struct {
+		/* red parameters */
+		int inv_pmax;	/* inverse of max drop probability */
+		int th_min;		/* red min threshold */
+		int th_max;		/* red max threshold */
+
+		/* variables for internal use */
+		int th_min_s;	/* th_min scaled by avgshift */
+		int th_max_s;	/* th_max scaled by avgshift */
+		int probd;		/* drop probability denominator */
+
+		int avg;		/* (scaled) queue length average */
+		int count; 	  	/* packet count since the last dropped/marked
+				   packet */
+		int idle;		/* queue was empty */
+		int old;		/* avg is above th_min */
+		struct timeval last;  /* timestamp when the queue becomes idle */
+		
+	} q, in;  /* for total-queue and in-queue */
+
+	int in_qlen;		/* queue length for in-packets */
+		
+	int rio_wshift;		/* log(red_weight) */
+	int rio_weight;		/* weight for EWMA */
+	struct wtab *rio_wtab;	/* weight table */
+
+	int rio_pkttime; 	/* average packet time in micro sec
+				   used for idle calibration */
+	int rio_flags;		/* rio flags */
+
+	u_int8_t rio_codepoint;		/* codepoint value to tag packets */
+	u_int8_t rio_codepointmask;	/* codepoint mask bits */
+	struct rio_tbm *rio_meter;	/* traffic meter/tagger */
+	
+	struct redstat q_stat, in_stat;		/* statistics */
+} rio_t;
+
+
+/*
+ * rio traffic meter/tagger using a token bucket algorithm.
+ */
+struct rio_tbm {
+	int	tb_kbps;	/* rate (r parameter) in kilo-bits-per-sec */
+	int	tb_max;		/* bucket size (d parameter) in bytes */
+	int	tb_token;	/* current token in bytes */
+	int	tb_filluptime;	/* time in usec to fill up the token bucket */
+	struct timeval tb_last; /* timestamp of the last packet sent */
+
+	struct tbmstat tb_stat;	/* statistics */
+};
+
+typedef struct rio_queue {
+	struct rio_queue *rq_next;	/* next red_state in the list */
+	struct ifnet *rq_ifp;		/* backpointer to ifnet */
+
+	class_queue_t *rq_q;
+
+	rio_t *rq_rio;
+} rio_queue_t;
+
+extern rio_t *rio_alloc __P((int, int, int, int, int, int, int, int, int));
+extern void rio_destroy __P((rio_t *));
+extern int rio_addq __P((rio_t *, class_queue_t *, struct mbuf *,
+			 struct pr_hdr *));
+extern struct mbuf *rio_getq __P((rio_t *, class_queue_t *));
+extern int rio_set_meter __P((rio_t *, int, int, int));
+
+#endif /* KERNEL */
+
+#endif _NETINET_ALTQ_RIO_H_
+

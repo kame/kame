@@ -384,7 +384,7 @@ in6_ifindex2scopeid(idx)
 		return -1;
 	ifp = ifindex2ifnet[idx];
 
-#ifdef __bsdi__
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
 #else
 	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next)
@@ -456,6 +456,9 @@ in6_control(so, cmd, data, ifp)
 #endif
 {
 	struct	in6_ifreq *ifr = (struct in6_ifreq *)data;
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	struct  ifaddr *ifa;
+#endif
 	struct	in6_ifaddr *ia, *oia;
 	struct	in6_aliasreq *ifra = (struct in6_aliasreq *)data;
 	struct	sockaddr_in6 oldaddr, net;
@@ -964,13 +967,19 @@ in6_control(so, cmd, data, ifp)
  * address encoding scheme. (see figure on page 8)
  */
 static int
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 in6_lifaddr_ioctl(so, cmd, data, ifp, p)
 	struct socket *so;
 	u_long cmd;
 	caddr_t	data;
 	struct ifnet *ifp;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct proc *p;
+#else
+in6_lifaddr_ioctl(so, cmd, data, ifp)
+	struct socket *so;
+	u_long cmd;
+	caddr_t	data;
+	struct ifnet *ifp;
 #endif
 {
 	struct if_laddrreq *iflr = (struct if_laddrreq *)data;
@@ -1996,7 +2005,12 @@ in6_if_up(ifp)
 
 dad:
 	dad_delay = 0;
-	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next) {
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
+#else
+	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next)
+#endif
+	{
 		if (ifa->ifa_addr->sa_family != AF_INET6)
 			continue;
 		ia = (struct in6_ifaddr *)ifa;

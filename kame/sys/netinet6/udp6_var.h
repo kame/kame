@@ -158,8 +158,14 @@ int	udp6_input __P((struct mbuf **, int *, int));
 int	udp6_output __P((struct in6pcb *,
 			 struct mbuf *, struct mbuf *, struct mbuf *));
 int	udp6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 int	udp6_usrreq __P((struct socket *,
-			 int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *));
+			 int, struct mbuf *, struct mbuf *, struct mbuf *,
+			 struct proc *));
+#else
+int	udp6_usrreq __P((struct socket *,
+			 int, struct mbuf *, struct mbuf *, struct mbuf *));
+#endif
 #endif /* _KERNEL */
 
 #endif /*_NETINET6_UDP6_VAR_H_*/

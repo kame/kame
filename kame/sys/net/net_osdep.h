@@ -94,6 +94,9 @@
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 #define if_name(ifp)	((ifp)->if_xname)
+#else
+struct ifnet;
+extern char *if_name __P((struct ifnet *));
 #endif
 
 #ifdef __FreeBSD__

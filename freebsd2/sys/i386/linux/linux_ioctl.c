@@ -604,7 +604,7 @@ linux_ioctl(struct proc *p, struct linux_ioctl_args *args, int *retval)
 	 * Linux interface names are all different
 	 */
 
-	for (ifn = 0; ifn < if_index; ifn++) {
+	for (ifn = 1; ifn <= if_index; ifn++) {
 
 	    ifp = ifnet_addrs[ifn]->ifa_ifp;	/* pointer to interface */
 	    if (ifp->if_type == IFT_ETHER) {	/* looks good */

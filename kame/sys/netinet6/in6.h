@@ -293,7 +293,9 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
 /*
  * Wildcard Socket
  */
+#if 0	/*pre-RFC2553*/
 #define IN6_IS_ADDR_ANY(a)	IN6_IS_ADDR_UNSPECIFIED(a)
+#endif
 
 /*
  * KAME Scope

@@ -551,7 +551,7 @@ zpattach(isa_dev)
 
 	ifp->if_softc = sc;
 	ifp->if_mtu = ETHERMTU;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_unit = isa_dev->id_unit;
 	ifp->if_name = "zp";
 	ifp->if_output = ether_output;
@@ -628,11 +628,6 @@ zpinit(unit)
 	    S_TX_COMPLETE | S_TX_AVAIL);
 	outw(BASE + EP_COMMAND, SET_INTR_MASK | S_CARD_FAILURE | S_RX_COMPLETE |
 	    S_TX_COMPLETE | S_TX_AVAIL);
-
-#ifndef IFF_MULTICAST
-#define	IFF_MULTICAST	0x10000
-#endif
-
 	outw(BASE + EP_COMMAND, SET_RX_FILTER | FIL_INDIVIDUAL |
 	    ((sc->arpcom.ac_if.if_flags & IFF_MULTICAST) ? FIL_GROUP : 0) |
 	    FIL_BRDCST |
@@ -880,6 +875,8 @@ zpread(sc)
 		m->m_data = m->m_pktdat;
 		m->m_flags = M_PKTHDR;
 	}
+	if (totlen >= MHLEN)
+		MCLGET(m, M_DONTWAIT);
 
 	top = m0 = m;		/* We assign top so we can "goto out" */
 #define EROUND  ((sizeof(struct ether_header) + 3) & ~3)
@@ -912,7 +909,7 @@ zpread(sc)
 				timeout(zpmbuffill, sc, 0);
 				sc->next_mb = (sc->next_mb + 1) % MAX_MBS;
 			}
-			if (totlen >= MINCLSIZE)
+			if (totlen >= MHLEN)
 				MCLGET(m, M_DONTWAIT);
 			m->m_len = 0;
 			mcur->m_next = m;
@@ -1005,7 +1002,8 @@ zpioctl(ifp, cmd, data)
 	int     cmd;
 	caddr_t data;
 {
-	register struct ifaddr *ifa = (struct ifaddr *) data;
+	struct ifaddr *ifa = (struct ifaddr *) data;
+	struct ifreq *ifr = (struct ifreq *) data;
 	struct zp_softc *sc = ifp->if_softc;
 	int     error = 0;
 
@@ -1069,6 +1067,23 @@ zpioctl(ifp, cmd, data)
 			break;
 		}
 		zpinit(ifp->if_unit);
+		break;
+	case SIOCSIFMTU:
+		/*
+		 * Set the interface MTU.
+		 */
+		if (ifr->ifr_mtu > ETHERMTU)
+			error = EINVAL;
+		else
+			ifp->if_mtu = ifr->ifr_mtu;
+		break; 
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
+		/* Now this driver has no support for programmable
+		 * multicast filters. If some day it will gain this
+		 * support this part of code must be extended.
+		 */
+		error = 0;
 		break;
 	default:
 		error = EINVAL;

@@ -124,11 +124,18 @@ extern	char *tcp6states[];
  */
 /*ARGSUSED*/
 int
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 tcp6_usrreq(so, req, m, nam, control, p)
 	struct socket *so;
 	int req;
 	struct mbuf *m, *nam, *control;
 	struct proc *p;
+#else
+tcp6_usrreq(so, req, m, nam, control)
+	struct socket *so;
+	int req;
+	struct mbuf *m, *nam, *control;
+#endif
 {
 	register struct in6pcb *in6p;
 	register struct tcp6cb *t6p = (struct tcp6cb *)NULL;
@@ -142,7 +149,11 @@ tcp6_usrreq(so, req, m, nam, control, p)
 	 */
 	if (req == PRU_CONTROL)
 		return (in6_control(so, (u_long)m, (caddr_t)nam,
-			(struct ifnet *)control, p));
+			(struct ifnet *)control
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+			, p
+#endif
+			));
 	if (control && control->m_len) {
 		m_freem(control);
 		if (m && req != PRU_SENSE && req != PRU_RCVOOB)

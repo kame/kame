@@ -179,7 +179,11 @@ tcp6_slowtimo()
 			if (t6p->t_timer[i] && --t6p->t_timer[i] == 0) {
 				(void) tcp6_usrreq(ip6->in6p_socket,
 				    PRU_SLOWTIMO, (struct mbuf *)0,
-				    (struct mbuf *)i, (struct mbuf *)0, 0);
+				    (struct mbuf *)i, (struct mbuf *)0
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+				    , 0
+#endif
+				    );
 				if (ip6nxt->in6p_prev != ip6)
 					goto t6pgone;
 			}
@@ -206,7 +210,11 @@ t6pgone:
 			ip6nxt = ip6->in6p_next;
 			(void) tcp6_usrreq(ip6->in6p_socket,
 			    PRU_SLOWTIMO, (struct mbuf *)0,
-			    (struct mbuf *)TCP6T_2MSL, (struct mbuf *)0, 0);
+			    (struct mbuf *)TCP6T_2MSL, (struct mbuf *)0
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+			    , 0
+#endif
+			    );
 			if ((ip6 = ip6nxt) == &tcb6)
 				break;
 			t6p = intotcp6cb(ip6);

@@ -88,6 +88,13 @@
 #include <netinet/if_ether.h>
 #endif
 
+#ifdef INET6
+#ifndef INET
+#include <netinet/in.h>
+#endif
+#include <netinet6/in6_ifattach.h>
+#endif /*INET6*/
+
 #ifdef IPX
 #include <netipx/ipx.h>
 #include <netipx/ipx_if.h>
@@ -635,6 +642,9 @@ ep_attach(sc)
     ifp->if_start = epstart;
     ifp->if_ioctl = epioctl;
     ifp->if_watchdog = epwatchdog;
+#ifdef ALTQ
+    ifp->if_altqflags |= ALTQF_READY;
+#endif
 
     if (!attached) {
 	if_attach(ifp);
@@ -823,6 +833,11 @@ epinit(sc)
     GO_WINDOW(1);
     epstart(ifp);
 
+#ifdef INET6
+    in6_ifattach(&sc->arpcom.ac_if, IN6_IFT_802,
+		 (caddr_t)sc->arpcom.ac_enaddr, 0);
+#endif /* INET6 */
+
     splx(s);
 }
 
@@ -850,6 +865,11 @@ epstart(ifp)
     }
 startagain:
     /* Sneak a peek at the next packet */
+#ifdef ALTQ
+    if (ALTQ_IS_ON(ifp))
+	m = (*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK);
+    else
+#endif
     m = ifp->if_snd.ifq_head;
     if (m == 0) {
 	splx(s);
@@ -868,6 +888,14 @@ startagain:
     if (len + pad > ETHER_MAX_LEN) {
 	/* packet is obviously too large: toss it */
 	++ifp->if_oerrors;
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+	    m = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+	    if (m != top)
+		panic("epstart: different mbuf dequeued!");
+	}
+	else
+#endif
 	IF_DEQUEUE(&ifp->if_snd, m);
 	m_freem(m);
 	goto readcheck;
@@ -882,6 +910,14 @@ startagain:
 	    return;
 	}
     }
+#ifdef ALTQ
+    if (ALTQ_IS_ON(ifp)) {
+	m = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+	if (m != top)
+	    panic("epstart: different mbuf dequeued!");
+    }
+    else
+#endif
     IF_DEQUEUE(&ifp->if_snd, m);
 
     outw(BASE + EP_W1_TX_PIO_WR_1, len); 
@@ -1099,7 +1135,7 @@ read_again:
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
 	if (!m)
 	    goto out;
-	if (rx_fifo >= MINCLSIZE)
+	if (rx_fifo >= MHLEN)
 	    MCLGET(m, M_DONTWAIT);
 	sc->top = sc->mcur = top = m;
 #define EROUND  ((sizeof(struct ether_header) + 3) & ~3)
@@ -1127,7 +1163,7 @@ read_again:
 	    MGET(m, M_DONTWAIT, MT_DATA);
 	    if (!m)
 		goto out;
-	    if (rx_fifo >= MINCLSIZE)
+	    if (rx_fifo >= MHLEN)
 		MCLGET(m, M_DONTWAIT);
 	    m->m_len = 0;
 	    mcur->m_next = m;

@@ -68,6 +68,10 @@
 #include <netinet/tcp_debug.h>
 #endif
 
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#endif /*IPSEC*/
+
 /*
  * TCP protocol interface to socket abstraction.
  */
@@ -75,7 +79,10 @@ extern	char *tcpstates[];
 
 static int	tcp_attach __P((struct socket *));
 static int	tcp_connect __P((struct tcpcb *, struct mbuf *));
-static struct tcpcb *
+#ifndef MAPPED_ADDR_ENABLED
+static
+#endif /* MAPPED_ADDR_ENABLED */
+struct tcpcb *
 		tcp_disconnect __P((struct tcpcb *));
 static struct tcpcb *
 		tcp_usrclosed __P((struct tcpcb *));
@@ -95,7 +102,10 @@ static struct tcpcb *
  * TCP attaches to socket via pru_attach(), reserving space,
  * and an internet control block.
  */
-static int
+#ifndef MAPPED_ADDR_ENABLED
+static
+#endif /* MAPPED_ADDR_ENABLED */
+int
 tcp_usr_attach(struct socket *so, int proto)
 {
 	int s = splnet();
@@ -130,7 +140,10 @@ out:
  * which may finish later; embryonic TCB's can just
  * be discarded here.
  */
-static int
+#ifndef MAPPED_ADDR_ENABLED
+static
+#endif /* MAPPED_ADDR_ENABLED */
+int
 tcp_usr_detach(struct socket *so)
 {
 	int s = splnet();
@@ -171,7 +184,10 @@ tcp_usr_detach(struct socket *so)
 /*
  * Give the socket an address.
  */
-static int
+#ifndef MAPPED_ADDR_ENABLED
+static
+#endif /* MAPPED_ADDR_ENABLED */
+int
 tcp_usr_bind(struct socket *so, struct mbuf *nam)
 {
 	int s = splnet();
@@ -202,7 +218,10 @@ tcp_usr_bind(struct socket *so, struct mbuf *nam)
 /*
  * Prepare to accept connections.
  */
-static int
+#ifndef MAPPED_ADDR_ENABLED
+static
+#endif /* MAPPED_ADDR_ENABLED */
+int
 tcp_usr_listen(struct socket *so)
 {
 	int s = splnet();
@@ -225,7 +244,11 @@ tcp_usr_listen(struct socket *so)
  * Start keep-alive timer, and seed output sequence space.
  * Send initial segment on connection.
  */
-static int
+
+#ifndef MAPPED_ADDR_ENABLED
+static
+#endif /* MAPPED_ADDR_ENABLED */
+int
 tcp_usr_connect(struct socket *so, struct mbuf *nam)
 {
 	int s = splnet();
@@ -263,7 +286,10 @@ tcp_usr_connect(struct socket *so, struct mbuf *nam)
  *
  * SHOULD IMPLEMENT LATER PRU_CONNECT VIA REALLOC TCPCB.
  */
-static int
+#ifndef MAPPED_ADDR_ENABLED
+static
+#endif /* MAPPED_ADDR_ENABLED */
+int
 tcp_usr_disconnect(struct socket *so)
 {
 	int s = splnet();
@@ -297,7 +323,10 @@ tcp_usr_accept(struct socket *so, struct mbuf *nam)
 /*
  * Mark the connection as being incapable of further output.
  */
-static int
+#ifndef MAPPED_ADDR_ENABLED
+static
+#endif /* MAPPED_ADDR_ENABLED */
+int
 tcp_usr_shutdown(struct socket *so)
 {
 	int s = splnet();
@@ -316,7 +345,10 @@ tcp_usr_shutdown(struct socket *so)
 /*
  * After a receive, possibly send window update to peer.
  */
-static int
+#ifndef MAPPED_ADDR_ENABLED
+static
+#endif /* MAPPED_ADDR_ENABLED */
+int
 tcp_usr_rcvd(struct socket *so, int flags)
 {
 	int s = splnet();
@@ -333,7 +365,10 @@ tcp_usr_rcvd(struct socket *so, int flags)
  * Do a send by putting data in output queue and updating urgent
  * marker if URG set.  Possibly send more data.
  */
-static int
+#ifndef MAPPED_ADDR_ENABLED
+static
+#endif /* MAPPED_ADDR_ENABLED */
+int
 tcp_usr_send(struct socket *so, int flags, struct mbuf *m, struct mbuf *nam,
 	     struct mbuf *control)
 {
@@ -417,7 +452,10 @@ tcp_usr_send(struct socket *so, int flags, struct mbuf *m, struct mbuf *nam,
 /*
  * Abort the TCP.
  */
-static int
+#ifndef MAPPED_ADDR_ENABLED
+static
+#endif /* MAPPED_ADDR_ENABLED */
+int
 tcp_usr_abort(struct socket *so)
 {
 	int s = splnet();
@@ -446,7 +484,10 @@ tcp_usr_sense(struct socket *so, struct stat *sb)
 /*
  * Receive out-of-band data.
  */
-static int
+#ifndef MAPPED_ADDR_ENABLED
+static
+#endif /* MAPPED_ADDR_ENABLED */
+int
 tcp_usr_rcvoob(struct socket *so, struct mbuf *m, int flags)
 {
 	int s = splnet();
@@ -752,6 +793,12 @@ tcp_attach(so)
 	if (error)
 		return (error);
 	inp = sotoinpcb(so);
+#ifdef IPSEC
+	if ((error = ipsec_init_policy(&inp->inp_sp)) != 0) {
+		in_pcbdetach(inp);
+		return (error);
+	}
+#endif /*IPSEC*/
 	tp = tcp_newtcpcb(inp);
 	if (tp == 0) {
 		int nofd = so->so_state & SS_NOFDREF;	/* XXX */
@@ -773,7 +820,10 @@ tcp_attach(so)
  * current input data; switch states based on user close, and
  * send segment to peer (with FIN).
  */
-static struct tcpcb *
+#ifndef MAPPED_ADDR_ENABLED
+static
+#endif /* MAPPED_ADDR_ENABLED */
+struct tcpcb *
 tcp_disconnect(tp)
 	register struct tcpcb *tp;
 {

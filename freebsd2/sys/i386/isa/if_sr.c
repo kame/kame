@@ -65,6 +65,15 @@
 
 #include <net/if.h>
 #include <net/if_sppp.h>
+#ifdef INET6
+# include <net/if_types.h>
+# if NFR > 0
+#  error "frame relay not supported"
+# else
+#  include <netinet/in.h>
+#  include <netinet6/in6_ifattach.h>
+# endif
+#endif
 
 #if NBPFILTER > 0
 #include <net/bpf.h>
@@ -818,6 +827,16 @@ srattach(struct sr_hardc *hc)
 		ifp->if_ioctl = srioctl;
 		ifp->if_start = srstart;
 		ifp->if_watchdog = srwatchdog;
+#ifdef INET6
+#if NFR > 0
+		ifp->if_type = 0;	/*none of IFTs*/
+#else
+		ifp->if_type = IFT_PPP;	/*ppp only*/
+#endif
+#endif
+#ifdef ALTQ
+		ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 		printf("sr%d: Adapter %d, port %d.\n",
 		       sc->unit, hc->cunit, sc->subunit);
@@ -1164,7 +1183,13 @@ top_srstart:
 		 * hardcoded.  A packet can't be larger than 3 buffers (3 x
 		 * 512).
 		 */
+#if 0 /* defined(ALTQ) */
+		/* XXX use 6KB buffer instead of 16KB to reduce latency */
+		/* quick dirty hack, but very effective! */
+		if ((i + 3) >= (blkp->txmax * 6 / 16)) {  /* enough remains? */
+#else
 		if ((i + 3) >= blkp->txmax) {	/* enough remains? */
+#endif
 #if BUGGY > 9
 			printf("sr%d.srstart: i=%d (%d pkts); card full.\n",
 			       sc->unit, i, pkts);
@@ -1368,7 +1393,11 @@ srioctl(struct ifnet *ifp, int cmd, caddr_t data)
 		 * XXX Clear the IFF_UP flag so that the link will only go
 		 * up after sppp lcp and ipcp negotiation.
 		 */
+#if defined(INET6) && NFR > 0
+		in6_ifattach(ifp, IN6_IFT_P2P, 0, 1);
+#else
 		ifp->if_flags &= ~IFF_UP;
+#endif
 	} else if (was_up && !should_be_up) {
 		/*
 		 * Interface should be down -- stop it.
@@ -1384,6 +1413,11 @@ srioctl(struct ifnet *ifp, int cmd, caddr_t data)
 		default:
 			sppp_flush(ifp);
 		}
+#ifdef INET6
+#if NFR > 0
+		in6_ifdetach(ifp);
+#endif
+#endif
 	}
 	splx(s);
 

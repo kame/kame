@@ -1,4 +1,33 @@
 /*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+/*
  * Copyright (c) 1982, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,6 +62,9 @@
  *	@(#)if_ethersubr.c	8.1 (Berkeley) 6/10/93
  * $Id: if_ethersubr.c,v 1.26.2.5 1998/09/17 18:02:20 luigi Exp $
  */
+#ifdef ALTQ
+#include "opt_altq.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -63,6 +95,14 @@
 #ifdef IPX
 #include <netipx/ipx.h>
 #include <netipx/ipx_if.h>
+#endif
+
+#ifdef INET6
+#ifndef INET
+#include <netinet/in.h>
+#endif
+#include <netinet6/in6_var.h>
+#include <netinet6/nd6.h>
 #endif
 
 #ifdef NS
@@ -125,6 +165,9 @@ ether_output(ifp, m0, dst, rt0)
 	short type;
 	int s, error = 0;
  	u_char *cp, edst[6];
+#ifdef TAHI
+	u_char esrc[6];
+#endif
 	register struct mbuf *m2, *m = m0;
 	register struct rtentry *rt;
 	struct mbuf *mcopy = (struct mbuf *)0;
@@ -135,6 +178,13 @@ ether_output(ifp, m0, dst, rt0)
 #ifdef NETATALK
 	struct at_ifaddr *aa;
 #endif NETATALK
+#ifdef ALTQ
+	struct pr_hdr pr_hdr;
+#endif
+
+#ifdef TAHI
+	bzero(esrc, sizeof(esrc));
+#endif
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
@@ -163,6 +213,15 @@ ether_output(ifp, m0, dst, rt0)
 			    time.tv_sec < rt->rt_rmx.rmx_expire)
 				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
 	}
+#ifdef ALTQ
+	/*
+	 * save a pointer to the protocol level header before adding
+	 * link headers.
+	 */
+	pr_hdr.ph_family = dst->sa_family;
+	pr_hdr.ph_hdr = mtod(m, caddr_t);
+#endif /* ALTQ */
+
 	switch (dst->sa_family) {
 
 #ifdef INET
@@ -176,6 +235,19 @@ ether_output(ifp, m0, dst, rt0)
 		type = htons(ETHERTYPE_IP);
 		break;
 #endif
+#ifdef INET6
+	case AF_INET6:
+#ifdef NEWIP6OUTPUT
+		if (!nd6_storelladdr(&ac->ac_if, rt, m, dst, (u_char *)edst))
+			return(0); /* it must be impossible, but... */
+#else
+		if (!nd6_resolve(&ac->ac_if, rt, m, dst, (u_char *)edst))
+			return(0);	/* if not yet resolves */
+#endif /* NEWIP6OUTPUT */
+		off = m->m_pkthdr.len - m->m_len;
+		type = htons(ETHERTYPE_IPV6);
+		break;
+#endif
 #ifdef IPX
 	case AF_IPX:
 		{
@@ -185,8 +257,8 @@ ether_output(ifp, m0, dst, rt0)
  		bcopy((caddr_t)&(((struct sockaddr_ipx *)dst)->sipx_addr.x_host),
 		    (caddr_t)edst, sizeof (edst));
 		for (ia = ifp->if_addrlist; ia != NULL; ia = ia->ifa_next)
-			if(ia->ifa_addr->sa_family == AF_IPX &&
-			   !bcmp((caddr_t)edst,
+			if (ia->ifa_addr->sa_family == AF_IPX &&
+			    !bcmp((caddr_t)edst,
 				 (caddr_t)&((struct ipx_ifaddr *)ia)->ia_addr.sipx_addr.x_host,
 				 sizeof(edst)))
 				return (looutput(ifp, m, dst, rt));
@@ -212,7 +284,7 @@ ether_output(ifp, m0, dst, rt0)
 		if (aa == NULL) {
 			goto bad;
 		}
-		if( aa->aa_ifa.ifa_ifp != ifp ) {
+		if (aa->aa_ifa.ifa_ifp != ifp) {
 			(*aa->aa_ifa.ifa_ifp->if_output)(aa->aa_ifa.ifa_ifp,
 							m,dst,rt);
 		}
@@ -399,6 +471,9 @@ ether_output(ifp, m0, dst, rt0)
 	case AF_UNSPEC:
 		eh = (struct ether_header *)dst->sa_data;
  		(void)memcpy(edst, eh->ether_dhost, sizeof (edst));
+#ifdef TAHI
+		(void)memcpy(esrc, eh->ether_shost, sizeof (esrc));
+#endif
 		type = eh->ether_type;
 		break;
 
@@ -422,8 +497,19 @@ ether_output(ifp, m0, dst, rt0)
 	(void)memcpy(&eh->ether_type, &type,
 		sizeof(eh->ether_type));
  	(void)memcpy(eh->ether_dhost, edst, sizeof (edst));
- 	(void)memcpy(eh->ether_shost, ac->ac_enaddr,
-	    sizeof(eh->ether_shost));
+
+#ifndef TAHI
+ 	(void)memcpy(eh->ether_shost, ac->ac_enaddr, sizeof(eh->ether_shost));
+#else
+ 	if (dst->sa_family == AF_UNSPEC &&
+ 	   !(esrc[0] == 0 && esrc[1] == 0 && esrc[2] == 0 &&
+ 	     esrc[3] == 0 && esrc[4] == 0 && esrc[5] == 0)) {
+		(void)memcpy(eh->ether_shost, esrc, sizeof (esrc));
+        } else {
+		(void)memcpy(eh->ether_shost, ac->ac_enaddr,
+			sizeof(eh->ether_shost));
+	}
+#endif
 #ifdef BRIDGE
 	if (do_bridge) {
 	    struct ifnet *old_ifp = ifp ;
@@ -437,6 +523,22 @@ ether_output(ifp, m0, dst, rt0)
             return 0 ;
 	}
 #endif
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+	        s = splimp();
+		error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr, ALTEQ_NORMAL);
+		splx(s);
+		if (error) {
+			IF_DROP(&ifp->if_snd);
+		}
+		else {
+			ifp->if_obytes += len + sizeof (struct ether_header);
+			if (m->m_flags & M_MCAST)
+				ifp->if_omcasts++;
+		}
+		return (error);
+	}
+#endif /* ALTQ */
 	s = splimp();
 	/*
 	 * Queue message on interface, and start output if interface
@@ -444,10 +546,16 @@ ether_output(ifp, m0, dst, rt0)
 	 */
 	if (IF_QFULL(&ifp->if_snd)) {
 		IF_DROP(&ifp->if_snd);
+#ifdef ALTQ_ACCOUNT
+		ALTQ_ACCOUNTING(ifp, m, &pr_hdr, ALTEQ_ACCDROP);
+#endif
 		splx(s);
 		senderr(ENOBUFS);
 	}
 	IF_ENQUEUE(&ifp->if_snd, m);
+#ifdef ALTQ_ACCOUNT
+	ALTQ_ACCOUNTING(ifp, m, &pr_hdr, ALTEQ_ACCOK);
+#endif
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);
@@ -513,6 +621,12 @@ ether_input(ifp, eh, m)
 		inq = &ipxintrq;
 		break;
 #endif
+#ifdef INET6
+	case ETHERTYPE_IPV6:
+		schednetisr(NETISR_IPV6);
+		inq = &ip6intrq;
+		break;
+#endif
 #ifdef NS
 	case 0x8137: /* Novell Ethernet_II Ethernet TYPE II */
 		schednetisr(NETISR_NS);
@@ -536,7 +650,7 @@ ether_input(ifp, eh, m)
 		/* Novell 802.3 */
 		if ((ether_type <= ETHERMTU) &&
 			((*checksum == 0xffff) || (*checksum == 0xE0E0))){
-			if(*checksum == 0xE0E0) {
+			if (*checksum == 0xE0E0) {
 				m->m_pkthdr.len -= 3;
 				m->m_len -= 3;
 				m->m_data += 3;
@@ -608,7 +722,7 @@ ether_input(ifp, eh, m)
 
 			case LLC_XID:
 			case LLC_XID_P:
-				if(m->m_len < 6)
+				if (m->m_len < 6)
 					goto dropanyway;
 				l->llc_window = 0;
 				l->llc_fid = 9;
@@ -654,7 +768,7 @@ ether_input(ifp, eh, m)
 			M_PREPEND(m, sizeof(struct sdl_hdr) , M_DONTWAIT);
 			if (m == 0)
 				return;
-			if ( !sdl_sethdrif(ifp, eh->ether_shost, LLC_X25_LSAP,
+			if (!sdl_sethdrif(ifp, eh->ether_shost, LLC_X25_LSAP,
 					    eh->ether_dhost, LLC_X25_LSAP, 6,
 					    mtod(m, struct sdl_hdr *)))
 				panic("ETHER cons addr failure");
@@ -718,6 +832,12 @@ static u_char ether_ipmulticast_min[6] =
 	{ 0x01, 0x00, 0x5e, 0x00, 0x00, 0x00 };
 static u_char ether_ipmulticast_max[6] =
 	{ 0x01, 0x00, 0x5e, 0x7f, 0xff, 0xff };
+#ifdef INET6
+static u_char	ether_ip6multicast_min[ETHER_ADDR_LEN] =
+	{ 0x33, 0x33, 0x00, 0x00, 0x00, 0x00 };
+static u_char	ether_ip6multicast_max[ETHER_ADDR_LEN] =
+	{ 0x33, 0x33, 0xff, 0xff, 0xff, 0xff };
+#endif
 /*
  * Add an Ethernet multicast address or range of addresses to the list for a
  * given interface.
@@ -729,6 +849,7 @@ ether_addmulti(ifr, ac)
 {
 	register struct ether_multi *enm;
 	struct sockaddr_in *sin;
+	struct sockaddr_in6 *sin6;
 	u_char addrlo[6];
 	u_char addrhi[6];
         int set_allmulti = 0;
@@ -757,6 +878,25 @@ ether_addmulti(ifr, ac)
 		else {
 			ETHER_MAP_IP_MULTICAST(&sin->sin_addr, addrlo);
 			bcopy(addrlo, addrhi, 6);
+		}
+		break;
+#endif
+#ifdef INET6
+	case AF_INET6:
+		sin6 = (struct sockaddr_in6 *)
+			&(((struct in6_ifreq *)ifr)->ifr_addr);
+		if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
+			/*
+			 * An IP6 address of 0 means listen to all
+			 * of the Ethernet multicast address used for IP6.
+			 * (This is used for multicast routers.)
+			 */
+			bcopy(ether_ip6multicast_min, addrlo, ETHER_ADDR_LEN);
+			bcopy(ether_ip6multicast_max, addrhi, ETHER_ADDR_LEN);
+			set_allmulti = 1;
+		} else {
+			ETHER_MAP_IPV6_MULTICAST(&sin6->sin6_addr, addrlo);
+			bcopy(addrlo, addrhi, ETHER_ADDR_LEN);
 		}
 		break;
 #endif
@@ -823,6 +963,7 @@ ether_delmulti(ifr, ac)
 	register struct ether_multi *enm;
 	register struct ether_multi **p;
 	struct sockaddr_in *sin;
+	struct sockaddr_in6 *sin6;
 	u_char addrlo[6];
 	u_char addrhi[6];
       int unset_allmulti = 0;
@@ -851,6 +992,23 @@ ether_delmulti(ifr, ac)
 		else {
 			ETHER_MAP_IP_MULTICAST(&sin->sin_addr, addrlo);
 			bcopy(addrlo, addrhi, 6);
+		}
+		break;
+#endif
+#ifdef INET6
+	case AF_INET6:
+		sin6 = (struct sockaddr_in6 *)&(ifr->ifr_addr);
+		if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
+			/*
+			 * An IP6 address of all 0 means stop listening
+			 * to the range of Ethernet multicast addresses used
+			 * for IP6
+			 */
+			bcopy(ether_ip6multicast_min, addrlo, ETHER_ADDR_LEN);
+			bcopy(ether_ip6multicast_max, addrhi, ETHER_ADDR_LEN);
+		} else {
+			ETHER_MAP_IPV6_MULTICAST(&sin6->sin6_addr, addrlo);
+			bcopy(addrlo, addrhi, ETHER_ADDR_LEN);
 		}
 		break;
 #endif

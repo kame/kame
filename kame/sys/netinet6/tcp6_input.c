@@ -151,10 +151,11 @@ static int  tcp6_mss_round __P((int));
  * Neighbor Discovery, Neighbor Unreachability Detection
  * Upper layer hint.
  */
-#define ND6_HINT(t6p) { \
+#define ND6_HINT(t6p) \
+do { \
 	if (t6p && t6p->t_in6pcb && t6p->t_in6pcb->in6p_route.ro_rt) \
 		nd6_nud_hint(t6p->t_in6pcb->in6p_route.ro_rt, NULL); \
-}
+} while (0)
 
 /*
  * TCP6 SYN caching information
@@ -170,7 +171,8 @@ u_long	syn_hash61, syn_hash62;
 
 #define	eptosp(ep, e, s)	((struct s *)((char *)(ep) - \
 			    ((char *)(&((struct s *)0)->e) - (char *)0)))
-#define	SYN_CACHE_RM6(sc, p, scp) {					\
+#define	SYN_CACHE_RM6(sc, p, scp) \
+do {									\
 	*(p) = (sc)->sc_next;						\
 	if ((sc)->sc_next)						\
 		(sc)->sc_next->sc_timer += (sc)->sc_timer;		\
@@ -184,8 +186,11 @@ u_long	syn_hash61, syn_hash62;
 	}								\
 	(scp)->sch_length--;						\
 	syn_cache_count6--;						\
-}
+} while (0)
 
+#ifdef __FreeBSD__
+#define sb_notify(x)	((x)->sb_flags & SB_NOTIFY)
+#endif
 
 /*
  * Look for in6pcb for listening TCP6 socket
@@ -210,7 +215,7 @@ tcp6_listen_lookup(dst, dport, ifp)
 #endif
 		if (in6p->in6p_lport != dport)
 			continue;
-		if (IN6_IS_ADDR_ANY(&in6p->in6p_laddr)) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
 			if (maybe == NULL)
 				maybe = in6p;
 		} else if (IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &dst))
@@ -858,7 +863,7 @@ after_listen:
 		 * that the association is unique, and the
 		 * local address is always set here.
 		 */
-		if (IN6_IS_ADDR_ANY(&in6p->in6p_laddr))
+		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
 			in6p->in6p_laddr = ip6->ip6_dst;
 		in6p->in6p_faddr = ip6->ip6_src;
 		in6p->in6p_fport = th->th_sport;
@@ -872,7 +877,7 @@ after_listen:
 		sin6.sin6_addr = ip6->ip6_src;
 		sin6.sin6_port = th->th_sport;
 		laddr = in6p->in6p_laddr;
-		if (IN6_IS_ADDR_ANY(&in6p->in6p_laddr))
+		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
 			in6p->in6p_laddr = ip6->ip6_dst;
 		if (in6_pcbconnectok(in6p, &sin6)) {
 			in6p->in6p_laddr = laddr;
@@ -2008,7 +2013,7 @@ tcp6_rtlookup(in6p)
 	}
 
 	/* No route yet, so try to acquire one */
-	if (!IN6_IS_ADDR_ANY(&in6p->in6p_faddr)) {
+	if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
 		bzero(&ro->ro_dst, sizeof(struct sockaddr_in6));
 		ro->ro_dst.sin6_family = AF_INET6;
 		ro->ro_dst.sin6_len = sizeof(struct sockaddr_in6);

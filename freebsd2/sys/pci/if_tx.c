@@ -432,6 +432,9 @@ epic_freebsd_attach(
 	ifp->if_init = (if_init_f_t*)epic_init;
 	ifp->if_timer = 0;
 	ifp->if_output = ether_output;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 	/* Get iobase or membase */
 #if defined(EPIC_USEIOSPACE)
@@ -771,6 +774,11 @@ epic_ifstart(struct ifnet * const ifp){
 		flist = sc->tx_flist + sc->cur_tx;
 
 		/* Get next packet to send */
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp))
+			m = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		else
+#endif
 		IF_DEQUEUE( &ifp->if_snd, m0 );
 
 		/* If nothing to send, return */

@@ -1,4 +1,33 @@
 /*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+/*
  * Copyright (c) 1982, 1986, 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -57,6 +86,16 @@
 #include <netinet/ip_var.h>
 #include <netinet/icmp_var.h>
 
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#include <netkey/key.h>
+#endif
+
+#include "faith.h"
+#if defined(NFAITH) && NFAITH > 0
+#include <net/if_types.h>
+#endif
+
 /*
  * ICMP routines: error generation, receive packet processing, and
  * routines to turnaround packets back to the originator, and
@@ -81,7 +120,11 @@ int	icmpprintfs = 0;
 
 static void	icmp_reflect __P((struct mbuf *));
 static void	icmp_send __P((struct mbuf *, struct mbuf *));
+#if 0
 static int	ip_next_mtu __P((int, int));
+#else
+/*static*/ int	ip_next_mtu __P((int, int));
+#endif
 
 extern	struct protosw inetsw[];
 
@@ -190,10 +233,11 @@ static struct sockaddr_in icmpgw = { sizeof (struct sockaddr_in), AF_INET };
  * Process a received ICMP message.
  */
 void
-icmp_input(m, hlen)
-	register struct mbuf *m;
-	int hlen;
+icmp_input(m, off, proto)
+	struct mbuf *m;
+	int off, proto;
 {
+	int hlen = off;
 	register struct icmp *icp;
 	register struct ip *ip = mtod(m, struct ip *);
 	int icmplen = ip->ip_len;
@@ -234,10 +278,34 @@ icmp_input(m, hlen)
 	m->m_len += hlen;
 	m->m_data -= hlen;
 
+#if defined(NFAITH) && 0 < NFAITH
+	if (m->m_pkthdr.rcvif && m->m_pkthdr.rcvif->if_type == IFT_FAITH) {
+		/*
+		 * Deliver very specific ICMP type only.
+		 */
+		switch (icp->icmp_type) {
+		case ICMP_UNREACH:
+		case ICMP_TIMXCEED:
+			break;
+		default:
+			goto freeit;
+		}
+	}
+#endif
+
 #ifdef ICMPPRINTFS
 	if (icmpprintfs)
 		printf("icmp_input, type %d code %d\n", icp->icmp_type,
 		    icp->icmp_code);
+#endif
+
+#ifdef IPSEC
+	/* drop it if it does not match the policy */
+	/* XXX Is there meaning of check in here ? */
+	if (ipsec4_in_reject(m, NULL)) {
+		ipsecstat.in_polvio++;
+		goto freeit;
+	}
 #endif
 
 	/*
@@ -365,6 +433,10 @@ icmp_input(m, hlen)
 		}
 
 #endif
+		/*
+		 * XXX if the packet contains [IPv4 AH TCP], we can't make a
+		 * notification to TCP layer.
+		 */
 		ctlfunc = inetsw[ip_protox[icp->icmp_ip.ip_p]].pr_ctlinput;
 		if (ctlfunc)
 			(*ctlfunc)(code, (struct sockaddr *)&icmpsrc,
@@ -472,6 +544,9 @@ reflect:
 		  (struct sockaddr *)0, RTF_GATEWAY | RTF_HOST,
 		  (struct sockaddr *)&icmpgw, (struct rtentry **)0);
 		pfctlinput(PRC_REDIRECT_HOST, (struct sockaddr *)&icmpsrc);
+#ifdef IPSEC
+		key_sa_routechange((struct sockaddr *)&icmpsrc);
+#endif
 		break;
 
 	/*
@@ -489,11 +564,12 @@ reflect:
 	}
 
 raw:
-	rip_input(m, hlen);
+	rip_input(m, off, proto);
 	return;
 
 freeit:
 	m_freem(m);
+	return;
 }
 
 /*
@@ -651,6 +727,10 @@ icmp_send(m, opts)
 	}
 #endif
 	bzero(&ro, sizeof ro);
+
+#ifdef IPSEC
+	m->m_pkthdr.rcvif = NULL;
+#endif /*IPSEC*/
 	(void) ip_output(m, opts, &ro, 0, NULL);
 	if (ro.ro_rt)
 		RTFREE(ro.ro_rt);
@@ -673,7 +753,7 @@ iptime()
  * given current value MTU.  If DIR is less than zero, a larger plateau
  * is returned; otherwise, a smaller value is returned.
  */
-static int
+/* static */ int
 ip_next_mtu(mtu, dir)
 	int mtu;
 	int dir;

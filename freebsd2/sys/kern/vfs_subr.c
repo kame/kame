@@ -1481,8 +1481,17 @@ vfs_hang_addrlist(struct mount *mp, struct netexport *nep,
 		 */
 		for (dom = domains; dom; dom = dom->dom_next)
 			if (dom->dom_family == i && dom->dom_rtattach) {
+#ifdef RADISH
+				dom->dom_rtattach((void **)&nep->ne_rtable[i],
+						  dom->dom_family,
+						  dom->dom_maxrtkey,
+						  dom->dom_rtoffset,
+						  dom->dom_addrlen,
+						  dom->dom_match);
+#else /* RADISH */
 				dom->dom_rtattach((void **) &nep->ne_rtable[i],
 				    dom->dom_rtoffset);
+#endif /* RADISH */
 				break;
 			}
 		if ((rnh = nep->ne_rtable[i]) == 0) {

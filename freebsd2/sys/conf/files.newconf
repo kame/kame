@@ -8,6 +8,8 @@ define	tty
 
 # net device attributes - we have generic code for ether.
 # we should have imp but right now it is a pseudo-device.
+define	altq
+define	atm
 define	ether
 # define	imp
 pseudo-device imp
@@ -118,9 +120,11 @@ file	miscfs/umapfs/umap_vnops.c	umapfs
 file	miscfs/union/union_subr.c	union
 file	miscfs/union/union_vfsops.c	union
 file	miscfs/union/union_vnops.c	union
+file	net/altq_conf.c		altq
 file	net/bpf.c		bpfilter needs-count
 file	net/bpf_filter.c	bpfilter needs-count
 file	net/if.c
+file	net/if_atmsubr.c	atm needs-flag
 file	net/if_ethersubr.c	ether needs-flag
 file	net/if_loop.c		loop needs-count
 file	net/if_sl.c		sl needs-count
@@ -152,6 +156,15 @@ file	netccitt/pk_usrreq.c	ccitt
 file	netimp/if_imp.c		imp needs-count
 file	netimp/if_imphost.c	imp needs-count
 file	netimp/raw_imp.c	imp
+file	netinet/altq_afmap.c	altq
+file	netinet/altq_cbq.c	altq
+file	netinet/altq_fifoq.c	altq
+file	netinet/altq_red.c	altq
+file	netinet/altq_rmclass.c	altq
+file	netinet/altq_subr.c	altq
+file	netinet/altq_wfq.c	altq
+file	netinet/if_atm.c	atm
+file	netinet/if_atm.c	atm
 file	netinet/if_ether.c	ether
 file	netinet/igmp.c		inet
 file	netinet/in.c		inet
@@ -205,6 +218,12 @@ file	netiso/tp_usrreq.c	iso tpip
 file	netiso/tuba_subr.c	iso tuba
 file	netiso/tuba_table.c	iso tuba
 file	netiso/tuba_usrreq.c	iso tuba
+file	netkey/key.c		ipsec
+file	netkey/key_debug.c	ipsec
+file	netkey/keysock.c	ipsec
+file	netnatm/natm_pcb.c	natm
+file	netnatm/natm_proto.c	natm
+file	netnatm/natm.c		natm
 file	netns/idp_usrreq.c	ns
 file	netns/ns.c		ns
 file	netns/ns_error.c	ns
@@ -272,3 +291,57 @@ file	vm/vm_swap.c
 file	vm/vm_unix.c
 file	vm/vm_user.c
 file	vm/vnode_pager.c	vnodepager
+
+# inet6 stuff
+file	net/if_dummy.c		dummy needs-count
+file	net/if_gif.c		gif
+file	netinet/in_gif.c	gif inet
+file	netinet6/in6_gif.c	gif inet6
+file	net/radish.c
+file	netinet6/in6.c		inet6
+file	netinet6/in6_ifattach.c	inet6
+file	netinet6/in6_cksum.c	inet6
+file	netinet6/in6_pcb.c	inet6
+file	netinet6/in6_proto.c	inet6
+file	netinet6/in6_rmx.c	inet6
+file	netinet6/dest6.c	inet6
+file	netinet6/frag6.c	inet6
+file	netinet6/icmp6.c	inet6
+file	netinet6/ip6_input.c	inet6
+file	netinet6/ip6_forward.c	inet6
+file	netinet6/ip6_output.c	inet6
+file	netinet6/route6.c	inet6
+file	netinet6/nd6.c		inet6
+file	netinet6/nd6_nbr.c	inet6
+file	netinet6/nd6_rtr.c	inet6
+file	netinet6/raw_ip6.c	inet6
+file	netinet6/tcp6_debug.c	inet6
+file	netinet6/tcp6_input.c	inet6
+file	netinet6/tcp6_output.c	inet6
+file	netinet6/tcp6_subr.c	inet6
+file	netinet6/tcp6_timer.c	inet6
+file	netinet6/tcp6_usrreq.c	inet6
+file	netinet6/udp6_usrreq.c	inet6
+file	crypto/md5.c		inet
+file	crypto/md5.c		inet6
+file	netinet6/ah.c		ipsec
+file	netinet6/esp.c		ipsec
+file	netinet6/ipsec.c	ipsec
+file	netinet6/ah_output.c	ipsec
+file	netinet6/ah_input.c	ipsec
+file	netinet6/esp_output.c	ipsec
+file	netinet6/esp_input.c	ipsec
+file	crypto/hmac_md5.c	ipsec
+file	crypto/sha1.c		ipsec
+file	crypto/des/des_cbc.c	ipsec
+file	crypto/des/des_ecb.c	ipsec
+file	crypto/des/des_setkey.c	ipsec
+file	crypto/des/des_3cbc.c	ipsec
+file	crypto/blowfish/bf_cbc.c	ipsec
+file	crypto/blowfish/bf_enc.c	ipsec
+file	crypto/blowfish/bf_skey.c	ipsec
+file	crypto/cast128/cast128.c	ipsec
+file	crypto/cast128/cast128_cbc.c	ipsec
+file	crypto/rc5/rc5.c		ipsec
+file	crypto/rc5/rc5_cbc.c		ipsec
+file	net/if_eif.c		eif ipsec
