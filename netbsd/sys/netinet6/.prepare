@@ -11,11 +11,3 @@ exclude tcp6_timer.c
 exclude tcp6_timer.h
 exclude tcp6_usrreq.c
 exclude tcp6_var.h
-exclude mip6.c
-exclude mip6.h
-exclude mip6_common.h
-exclude mip6_ha.c
-exclude mip6_hooks.c
-exclude mip6_io.c
-exclude mip6_md.c
-exclude mip6_mn.c
