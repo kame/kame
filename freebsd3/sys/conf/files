@@ -723,6 +723,7 @@ netinet6/natpt_tslot.c	optional inet6 natpt
 netinet6/natpt_usrreq.c	optional inet6 natpt
 netinet6/raw_ip6.c	optional inet6
 netinet6/udp6_usrreq.c	optional inet6
+netinet6/udp6_output.c	optional inet6
 #crypto/md5.c		optional ipsec
 netinet6/ah_core.c	optional ipsec
 netinet6/esp_core.c	optional ipsec
