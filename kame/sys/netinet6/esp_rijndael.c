@@ -1,4 +1,4 @@
-/*	$KAME: esp_rijndael.c,v 1.2 2000/10/02 14:20:29 itojun Exp $	*/
+/*	$KAME: esp_rijndael.c,v 1.3 2000/11/08 04:54:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,7 +108,7 @@ esp_rijndael_blockdecrypt(algo, sav, s, d)
 
 	/* does not take advantage of CBC mode support */
 	bzero(&c, sizeof(c));
-	if (rijndael_cipherInit(&c, MODE_CBC, NULL) < 0)
+	if (rijndael_cipherInit(&c, MODE_ECB, NULL) < 0)
 		return -1;
 	p = (keyInstance *)sav->sched;
 	if (rijndael_blockDecrypt(&c, &p[0], s, algo->padbound * 8, d) < 0)
@@ -128,7 +128,7 @@ esp_rijndael_blockencrypt(algo, sav, s, d)
 
 	/* does not take advantage of CBC mode support */
 	bzero(&c, sizeof(c));
-	if (rijndael_cipherInit(&c, MODE_CBC, NULL) < 0)
+	if (rijndael_cipherInit(&c, MODE_ECB, NULL) < 0)
 		return -1;
 	p = (keyInstance *)sav->sched;
 	if (rijndael_blockEncrypt(&c, &p[1], s, algo->padbound * 8, d) < 0)
