@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.76 2001/12/16 19:38:47 sumikawa Exp $
+$KAME: FAQ,v 1.77 2001/12/20 09:48:39 jinmei Exp $
 
 
 GENERAL
@@ -530,8 +530,26 @@ Q: How can I configure NAT-PT?
 Q: When I configure an IPv6 address by ifconfig(8) on a node doing
 stateless autoconfiguration, the interface route corresponding to the
 configured with ifconfig(8) immediately disappears.
-	This is the intentional behavior.
-	XXX: need more description.
+	This is probably because the prefix corresponding to the
+	address is regarded as "detached".  Check the output of
+	ndp(8).  The entry for the prefix should have a "D" flag like
+	this:
+
+	3ffe:501:ffff::/64 if=exp0
+	flags=LD vltime=infinity, pltime=infinity, expire=Never, ref=0
+	  No advertising router
+
+	The KAME kernel basically does not assume a mixture of
+	stateless autoconfiguration and manual configuration of
+	addresses, and, in such a case, prefers the autoconfigured
+	prefix by marking the manual prefix as "detached."  Even with
+	this situation, however, reachability to neighbors covered by
+	the prefix should be ensured via a default router that
+	advertises an "attached" prefix.
+
+	For the notion of "detached", see Section 3.4 of the following
+	paper:
+	http://www.isoc.org/inet99/4s/4s_2.htm
 
 OS SPECIFIC
 ===========
