@@ -181,7 +181,7 @@ transmit(s, addr, port, hlim, buf, len)
 	error = transmit_sa(s, res->ai_addr, hlim, buf, len);
 
 	freeaddrinfo(res);
-	return (error != len) ? -1 : 0;
+	return error;
 }
 
 long
