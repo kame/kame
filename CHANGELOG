@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1464 2001/01/05 04:24:49 itojun Exp $
+$KAME: CHANGELOG,v 1.1465 2001/01/05 13:51:50 itojun Exp $
 
 <200101>
+Fri Jan  5 22:51:16 JST 2001  itojun@iijlab.net
+	* libinet6/name6.c: nuke getnodeby{name,addr}, which was mentioned
+	  only in draft-ietf-ipngwg-bsd-api-new-01.txt.
+
 Fri Jan  5 13:24:21 JST 2001  itojun@iijlab.net
 	* getaddrinfo.c (shared/netbsd/openbsd/freebsd4)
 	  query DNS only once per an AF.
