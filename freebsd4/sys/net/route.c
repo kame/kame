@@ -750,8 +750,16 @@ rtrequest1(req, info, ret_nrt)
 #ifdef RADIX_MPATH
 		/* do not permit exactly the same dst/mask/gw pair */
 		if (rn_mpath_capable(rnh) &&
-		    rt_mpath_conflict(rnh, rt, netmask))
+		    rt_mpath_conflict(rnh, rt, netmask)) {
+			if (rt->rt_gwroute)
+				rtfree(rt->rt_gwroute);
+			if (rt->rt_ifa) {
+				IFAFREE(rt->rt_ifa);
+			}
+			Free(rt_key(rt));
+			Free(rt);
 			senderr(EEXIST);
+		}
 #endif
 		/* XXX mtu manipulation will be done in rnh_addaddr -- itojun */
 
