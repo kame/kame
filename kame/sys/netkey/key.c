@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.292 2003/07/01 06:55:28 itojun Exp $	*/
+/*	$KAME: key.c,v 1.293 2003/07/02 00:10:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -623,7 +623,7 @@ key_gettunnel(osrc, odst, isrc, idst)
 	struct secpolicyindex spidx;
 
 	if (isrc->sa_family != idst->sa_family) {
-		ipseclog((LOG_ERR, "protocol family mismatched %u != %u\n.",
+		ipseclog((LOG_ERR, "protocol family mismatched %u != %u\n",
 			isrc->sa_family, idst->sa_family));
 		return NULL;
 	}
