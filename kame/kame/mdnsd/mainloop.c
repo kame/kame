@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.33 2000/05/31 17:27:11 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.34 2000/05/31 17:35:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -75,7 +75,7 @@ static char *decode_name __P((const char **, int));
 static int dnsdump __P((const char *, const char *, int,
 	const struct sockaddr *));
 static int encode_myaddrs __P((const char *, u_int16_t, u_int16_t, char *,
-	int, int, int *));
+	int, int, int *, int));
 #if 0
 static const struct sockaddr *getsa __P((const char *, const char *, int));
 #endif
@@ -433,7 +433,7 @@ dnsdump(title, buf, len, from)
 }
 
 static int
-encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs)
+encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs, scoped)
 	const char *n;
 	u_int16_t type;
 	u_int16_t class;
@@ -441,6 +441,7 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs)
 	int off;
 	int buflen;
 	int *naddrs;
+	int scoped;
 {
 	struct ifaddrs *ifap = NULL, *ifa;
 	char *p;
@@ -499,13 +500,13 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs)
 
 			/* XXX be careful about scope issue! */
 			if (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr)) {
-				if (!lflag)
+				if (!scoped)
 					continue;
 				if (strcmp(ifa->ifa_name, intface) != 0)
 					continue;
 			}
 			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
-				if (!lflag)
+				if (!scoped)
 					continue;
 				if (strcmp(ifa->ifa_name, intface) != 0)
 					continue;
@@ -537,7 +538,7 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs)
 		p += sizeof(u_int16_t);
 		*(u_int16_t *)p = htons(nclass);
 		p += sizeof(u_int16_t);
-		*(int32_t *)p = htonl(30);	/*TTL*/
+		*(int32_t *)p = htonl(scoped ? 0 : 30);	/*TTL*/
 		p += sizeof(int32_t);
 		*(u_int16_t *)p = htons(alen);
 		p += sizeof(u_int16_t);
@@ -753,9 +754,17 @@ serve(sd, buf, len, from)
 	char replybuf[8 * 1024];
 	int l;
 	int count;
+	int scoped;
 
 	if (dflag)
 		dnsdump("serve I", buf, len, from);
+
+	if (from->sa_family == AF_INET6 &&
+	    (IN6_IS_ADDR_LINKLOCAL(&((struct sockaddr_in6 *)from)->sin6_addr) ||
+	     IN6_IS_ADDR_LOOPBACK(&((struct sockaddr_in6 *)from)->sin6_addr))) {
+		scoped = lflag;
+	} else
+		scoped = 0;
 
 	/* we handle queries only */
 	if (sizeof(*hp) > len)
@@ -790,7 +799,7 @@ serve(sd, buf, len, from)
 
 		count = 0;
 		l = encode_myaddrs(n, type, class, replybuf, d - buf,
-		    sizeof(replybuf), &count);
+		    sizeof(replybuf), &count, scoped);
 		if (l <= 0)
 			goto fail;
 		p += l;

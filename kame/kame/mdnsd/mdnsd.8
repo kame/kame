@@ -1,4 +1,4 @@
-.\"     $KAME: mdnsd.8,v 1.18 2000/05/31 17:27:11 itojun Exp $
+.\"     $KAME: mdnsd.8,v 1.19 2000/05/31 17:35:15 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -119,7 +119,8 @@ will be used.
 specifies outgoing interface for multicast queries.
 The flag is mandatory.
 .It Fl l
-Advertise scoped addresses on replies.
+Advertise scoped addresses agianst queries from IPv6 link-local address,
+or loopback address.
 Care must be taken if you enable it,
 scoped address and DNS are not really friendly.
 .It Fl m
