@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.140 2002/08/05 05:26:06 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.141 2002/08/08 08:49:03 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -346,7 +346,8 @@ natpt_translateICMPv6To4(struct pcv *cv6, struct pAddr *pad)
 				: (icmp6->icmp6_pptr == 7) ? 8	/* ttl */
 				: (icmp6->icmp6_pptr == 8) ? 12	/* source address */
 				: (icmp6->icmp6_pptr == 24) ? 16 /* destination address */
-				: 0xff; /* XXX */
+				:  icmp6->icmp6_pptr -
+					(sizeof(struct ip6_hdr) - sizeof(struct ip));
 		}
 		
 		natpt_icmp6MimicPayload(cv6, &cv4, pad);
@@ -1210,7 +1211,8 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 			: (icmp4->icmp_pptr == 9) ? 6	/* next header */
 			: (icmp4->icmp_pptr == 12) ? 8	/* source address */
 			: (icmp4->icmp_pptr == 16) ? 24 /* destination address */
-			: 0xffffffff; /* XXX */
+			:  icmp4->icmp_pptr +
+				(sizeof(struct ip6_hdr) - sizeof(struct ip));
 
 		HTONL(icmp6->icmp6_pptr);
 		break;
