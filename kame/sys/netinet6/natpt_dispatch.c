@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.21 2001/06/07 13:22:03 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.22 2001/06/21 07:47:34 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -651,8 +651,8 @@ foundFinalPayload(struct mbuf *m, int *proto, int *offset)
 #endif
 	  case IPPROTO_DSTOPTS:
 	    nxt = ip6ext->ip6e_nxt;
-	    off += ip6ext->ip6e_len;
-	    ip6ext = (struct ip6_ext *)(((caddr_t)ip6ext) + ip6ext->ip6e_len);
+	    off += (ip6ext->ip6e_len + 1) << 3;
+	    ip6ext = (struct ip6_ext *)(((caddr_t)ip6ext) + ((ip6ext->ip6e_len + 1) << 3));
 	    break;
 
 	  case IPPROTO_ICMPV6:
