@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.214 2001/08/16 12:13:36 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.215 2001/08/29 03:31:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2378,6 +2378,9 @@ ip6_nexthdr(m, off, proto, nxtp)
 
 	switch (proto) {
 	case IPPROTO_IPV6:
+		/* do not chase beyond intermediate IPv6 headers */
+		if (off != 0)
+			return -1;
 		if (m->m_pkthdr.len < off + sizeof(ip6))
 			return -1;
 		m_copydata(m, off, sizeof(ip6), (caddr_t)&ip6);
