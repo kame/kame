@@ -316,6 +316,22 @@ SEND-PR: manual if you are not sure how to fill out a problem report.
 SEND-PR: Note that the Synopsis field is mandatory.  The Subject (for
 SEND-PR: the mail) will be made the same as Synopsis unless explicitly
 SEND-PR: changed.
+SEND-PR: 
+SEND-PR: Please be sure to EXPLICITLY STATE the following items: 
+SEND-PR:
+SEND-PR: - The operating system you are using (for example, NetBSD)
+SEND-PR: - The version of operating system you are using (1.4 for example)
+SEND-PR: - CPU architecture you are using (sparc for example)
+SEND-PR: - The KAME kit releasing tree (SNAP, STABLE or RELEASE)
+SEND-PR: - KAME kit release date (19991231)
+SEND-PR: - If you are reporting for userland application on non-KAME IPv6
+SEND-PR:   stack, the detailed version/platform/whatever info about the stack.
+SEND-PR: - Complete information to reproduce the problem. For example, exact
+SEND-PR:   command line, generated results (captured by script(1)), routing
+SEND-PR:   setups (netstat -rn), whatever necessary.
+SEND-PR:
+SEND-PR: NO JAPANESE TEXT IN BUG REPORT PLEASE! The text will be get archived,
+SEND-PR: and will be sent to English-only Mailing list.
 SEND-PR:
 SEND-PR: Choose from the following categories:
 SEND-PR:
