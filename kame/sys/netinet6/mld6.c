@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.16 2000/02/22 14:04:27 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.17 2000/03/01 12:37:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -70,9 +70,6 @@
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 #include "opt_inet.h"
-#ifdef __NetBSD__	/*XXX*/
-#include "opt_ipsec.h"
-#endif
 #endif
 
 #include <sys/param.h>

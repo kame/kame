@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.25 2000/02/26 18:08:37 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.26 2000/03/01 12:41:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -35,9 +35,6 @@
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 #include "opt_inet.h"
-#ifdef __NetBSD__	/*XXX*/
-#include "opt_ipsec.h"
-#endif
 #endif
 
 #include <sys/param.h>
