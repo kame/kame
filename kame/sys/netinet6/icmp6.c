@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.281 2002/02/04 06:20:30 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.282 2002/02/04 06:28:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2192,9 +2192,7 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 			/* copy the address itself */
 			bcopy(&ifa6->ia_addr.sin6_addr, cp,
 			      sizeof(struct in6_addr));
-			/* XXX: KAME link-local hack; remove ifindex */
-			if (IN6_IS_ADDR_LINKLOCAL(&ifa6->ia_addr.sin6_addr))
-				((struct in6_addr *)cp)->s6_addr16[1] = 0;
+			in6_clearscope((struct in6_addr *)cp); /* XXX */
 			cp += sizeof(struct in6_addr);
 			
 			resid -= (sizeof(struct in6_addr) + sizeof(u_int32_t));
