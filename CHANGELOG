@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1178 2000/08/06 03:34:53 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1179 2000/08/07 13:52:55 jinmei Exp $
 
 <200007>
+2000-08-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/netiso: if NEW_STRUCT_ROUTE is defined, just use
+	`struct route' instead of struct route_iso.
+	(compilable, but not tested)
+
 Sun Aug  6 05:41:47 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/freebsd4: we now start to support 4.1-RELEASE.
 
