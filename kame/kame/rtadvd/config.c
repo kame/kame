@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.43 2001/06/02 18:00:24 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.44 2001/06/02 18:34:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -474,17 +474,11 @@ getconfig(intface)
 		}
 
 		makeentry(entbuf, i, "rtltime", added);
-		/*
-		 * XXX: since default value of route lifetime is not defined in
-		 * draft-ietf-ipngwg-router-selection-00.txt.
-		 * I took the default value of valid lifetime of prefix as its
-		 * default.  It need be much considered.
-		 */
-		MAYHAVE(val64, entbuf, DEF_ADVVALIDLIFETIME);
-		if (val64 < 0 || val64 > 0xffffffff) {
+		MUSTHAVE(val64, entbuf);
+		if (val64 > 0xffffffff) {
 			syslog(LOG_ERR,
-			       "<%s> rtltime out of range",
-			       __FUNCTION__);
+			       "<%s> route lifetime (%ld) out of range",
+			        __FUNCTION__, (long)val64);
 			exit(1);
 		}
 		rti->ltime = (u_int32_t)val64;
@@ -493,8 +487,7 @@ getconfig(intface)
 		addr = (char *)agetstr(entbuf, &bp);
 		if (addr == NULL) {
 			syslog(LOG_ERR,
-			       "<%s> need %s as a route for "
-			       "interface %s",
+			       "<%s> need %s as a route for interface %s", 
 			       __FUNCTION__, entbuf, intface);
 			exit(1);
 		}
