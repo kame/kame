@@ -182,10 +182,10 @@ ip_randomid(void)
 	if (ru_counter >= RU_MAX || time.tv_sec > ru_reseed)
 		ip_initid();
 
+#if 0
 	if (!tmp)
 		tmp = arc4random();
 
-#if 0
 	/* Skip a random number of ids */
 	n = tmp & 0x3; tmp = tmp >> 2;
 	if (ru_counter + n >= RU_MAX)
