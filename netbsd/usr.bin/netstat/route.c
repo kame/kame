@@ -889,12 +889,14 @@ routename6(sa6)
 #else
 	int flag = 0;
 #endif
+	/* use local variable for safety */
+	struct sockaddr_in6 sa6_local = {AF_INET6, sizeof(sa6_local),};
 
 	if (nflag)
 		flag |= NI_NUMERICHOST;
 
-	getnameinfo((struct sockaddr *)sa6, sa6->sin6_len, line, sizeof(line),
-		    NULL, 0, flag);
+	getnameinfo((struct sockaddr *)&sa6_local, sa6_local.sin6_len,
+		    line, sizeof(line), NULL, 0, flag);
 
 	return line;
 }

@@ -803,12 +803,16 @@ routename6(sa6)
 {
 	static char line[MAXHOSTNAMELEN + 1];
 	int flag = NI_WITHSCOPEID;
+	/* use local variable for safety */
+	struct sockaddr_in6 sa6_local = {AF_INET6, sizeof(sa6_local),};
+
+	sa6_local.sin6_addr = sa6->sin6_addr;
 
 	if (nflag)
 		flag |= NI_NUMERICHOST;
 
-	getnameinfo((struct sockaddr *)sa6, sa6->sin6_len, line, sizeof(line),
-		    NULL, 0, flag);
+	getnameinfo((struct sockaddr *)&sa6_local, sa6_local.sin6_len,
+		    line, sizeof(line), NULL, 0, flag);
 
 	return line;
 }
