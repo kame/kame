@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2570 2004/03/18 05:21:18 suz Exp $
+$KAME: CHANGELOG,v 1.2571 2004/03/19 10:25:15 suz Exp $
 
 <200403>
+2004-03-19  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/kame/mld6query: to receive an MLD report for any group, 
+	it behaves like an IPv6 multicast daemon, instead of joining to ::.
+	If cannot, just transmits MLDv1 Queries.
+
 2004-03-17  MOMOSE Tsuyoshi  <momose@az.jp.nec.com>
 	* dest6.c: A Binding Error against a packet including an invalid 
 	home address is sent only when the packet is not Binding Update.
