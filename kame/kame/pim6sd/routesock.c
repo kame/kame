@@ -1,4 +1,4 @@
-/*	$KAME: routesock.c,v 1.17 2002/06/26 10:24:48 jinmei Exp $	*/
+/*	$KAME: routesock.c,v 1.18 2002/06/28 08:48:52 jinmei Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -80,6 +80,7 @@
 #include "debug.h"
 #include "routesock.h"
 #include "mrt.h"
+#include "inet6.h"
 
 #ifdef HAVE_ROUTING_SOCKETS
 union sockunion
