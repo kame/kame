@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.29 2003/02/10 06:15:41 suz Exp $	*/
+/*	$KAME: main.c,v 1.30 2003/02/12 04:32:23 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -780,6 +780,8 @@ restart(i)
 
     init_pim6_mrt();
     init_vifs();
+    init_rp6();	/* Must be after init_vifs() */
+    init_bsr6();	/* Must be after init_vifs() */
 
     /* schedule timer interrupts */
     timer_setTimer(timer_interval, timer, NULL);
