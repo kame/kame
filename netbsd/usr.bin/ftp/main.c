@@ -106,9 +106,7 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
-	struct servent *sp;
 	int ch, top, rval;
-	long port;
 	struct passwd *pw = NULL;
 	char *cp, *ep, homedir[MAXPATHLEN];
 	int dumbterm;

@@ -288,7 +288,6 @@ parse_url(url, desc, type, user, pass, host, port, path)
 	char		**path;
 {
 	char *cp, *ep, *thost;
-	char *tport;
 	size_t len;
 
 	if (url == NULL || desc == NULL || type == NULL || user == NULL
@@ -1139,7 +1138,6 @@ fetch_ftp(url)
 	const char *url;
 {
 	char		*cp, *xargv[5], rempath[MAXPATHLEN];
-	char		portnum[6];		/* large enough for "65535\0" */
 	char		*host, *path, *dir, *file, *user, *pass;
 	char		*port;
 	int		dirhasglob, filehasglob, oautologin, rval, type, xargc;
