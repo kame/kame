@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2226 2002/09/08 16:29:43 fujisawa Exp $
+$KAME: CHANGELOG,v 1.2227 2002/09/09 07:58:05 itojun Exp $
 
 <200209>
+Mon Sep  9 16:56:45 JST 2002  itojun@iijlab.net
+	* */sys/netinet*/tcp*input.c: always respect shutdown(s, SHUT_RD).
+	  previous (4.4BSD) code did not check it in certain cases, resulting
+	  in unexpected kernel memory waste.
+
 2002-09-09  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_*.c:
 	- Does not process a IPv4 multicast packet.
