@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.16 2000/09/19 02:08:09 itojun Exp $	*/
+/*	$KAME: proposal.c,v 1.17 2000/09/19 02:46:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.c,v 1.16 2000/09/19 02:08:09 itojun Exp $ */
+/* YIPS @(#)$Id: proposal.c,v 1.17 2000/09/19 02:46:23 itojun Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -158,12 +158,14 @@ inssatrns(pr, new)
 }
 
 /*
- * take a single match between saprop.  and new proposal allocated.
+ * take a single match between saprop.  allocate a new proposal and return it
+ * for future use (like picking single proposal from a bundle).
  *	pp1: peer's proposal.
  *	pp2: my proposal.
  * NOTE: In the case of initiator, must be ensured that there is no
  * modification of the proposal by calling cmp_aproppair_i() before
  * this function.
+ * XXX cannot understand the comment!
  */
 struct saprop *
 cmpsaprop_alloc(ph1, pp1, pp2)
@@ -370,7 +372,7 @@ err:
 	return NULL;
 }
 
-/* take a single match between saprop.  0 if equal. */
+/* take a single match between saprop.  returns 0 if pp1 equals to pp2. */
 int
 cmpsaprop(pp1, pp2)
 	const struct saprop *pp1, *pp2;
@@ -399,9 +401,9 @@ cmpsaprop(pp1, pp2)
 }
 
 /*
- * take a single match between satrns.  0 if equal.
- * tr1: peer's
- * tr2: my.
+ * take a single match between satrns.  returns 0 if tr1 equals to tr2.
+ * tr1: peer's satrns
+ * tr2: my satrns
  */
 int
 cmpsatrns(tr1, tr2)
