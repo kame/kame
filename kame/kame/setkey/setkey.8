@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.82 2003/07/01 04:03:19 itojun Exp $
+.\"	$KAME: setkey.8,v 1.83 2003/07/19 10:44:08 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -433,7 +433,7 @@ as it requires extra reassembly at forwarding node
 .Pq not implemented at this moment .
 We have many protocols in
 .Pa /etc/protocols ,
-but protocols except of TCP, UDP and ICMP may not be suitable to use with IPSec.
+but protocols except of TCP, UDP and ICMP may not be suitable to use with IPsec.
 You have to consider and be careful to use them.
 .\"
 .Pp
@@ -525,7 +525,7 @@ If you configure the SA by manual keying for that policy,
 you can put the decimal number as the policy identifier after
 .Li unique
 separated by colon
-.Sq \:
+.Sq \&:
 like the following;
 .Li unique:number .
 in order to bind this policy to the SA.
@@ -586,6 +586,8 @@ hmac-sha2-384	384		ah: 96bit ICV (no document)
 		384		ah-old: 128bit ICV (no document)
 hmac-sha2-512	512		ah: 96bit ICV (no document)
 		512		ah-old: 128bit ICV (no document)
+aes-xcbc-mac	128		ah: 96bit ICV (draft-ietf-ipsec-ciph-aes-xcbc-mac-03)
+		128		ah-old: 128bit ICV (no document)
 .Ed
 .Pp
 Followings are the list of encryption algorithms that can be used as
@@ -603,11 +605,16 @@ des-cbc		64		esp-old: rfc1829, esp: rfc2405
 null		0 to 2048	rfc2410
 blowfish-cbc	40 to 448	rfc2451
 cast128-cbc	40 to 128	rfc2451
-des-deriv	64		ipsec-ciph-des-derived-01 (expired)
+des-deriv	64		ipsec-ciph-des-derived-01
 3des-deriv	192		no document
 rijndael-cbc	128/192/256	draft-ietf-ipsec-ciph-aes-cbc-01
 twofish-cbc	0 to 256	draft-ietf-ipsec-ciph-aes-cbc-01
+aes-ctr		160/224/288	draft-ietf-ipsec-ciph-aes-ctr-03
 .Ed
+.Pp
+Note that the first 128 bits of a key for
+.Li aes-ctr
+will be used as AES key, and remaining 32 bits will be used as nonce.
 .Pp
 Followings are the list of compression algorithms that can be used as
 .Ar calgo

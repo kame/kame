@@ -1,5 +1,5 @@
 /*	$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $	*/
-/*	$KAME: ipsec.c,v 1.31 2003/04/15 07:38:42 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.32 2003/07/19 10:44:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -122,6 +122,9 @@ static struct val2str ipsec_ahnames[] = {
 #ifdef SADB_X_AALG_SHA2_512
 	{ SADB_X_AALG_SHA2_512, "hmac-sha2-512", },
 #endif
+#ifdef SADB_X_AALG_AES_XCBC_MAC
+	{ SADB_X_AALG_AES_XCBC_MAC, "aes-xcbc-mac", },
+#endif
 	{ -1, NULL },
 };
 
@@ -137,6 +140,9 @@ static struct val2str ipsec_espnames[] = {
 #endif
 #ifdef SADB_X_EALG_TWOFISHCBC
 	{ SADB_X_EALG_TWOFISHCBC, "twofish-cbc", },
+#endif
+#ifdef SADB_X_EALG_AESCTR
+	{ SADB_X_EALG_AESCTR, "aes-ctr", },
 #endif
 	{ -1, NULL },
 };

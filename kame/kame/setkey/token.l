@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.41 2003/06/27 06:02:07 itojun Exp $	*/
+/*	$KAME: token.l,v 1.42 2003/07/19 10:44:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -77,8 +77,14 @@ int yyparse __P((void));
 #ifndef SADB_X_AALG_SHA2_512
 #define SADB_X_AALG_SHA2_512	(-1)
 #endif
+#ifndef SADB_X_AALG_AES_XCBC_MAC
+#define SADB_X_AALG_AES_XCBC_MAC	(-1)
+#endif
 #ifndef SADB_X_EALG_TWOFISHCBC
 #define SADB_X_EALG_TWOFISHCBC	(-1)
+#endif
+#ifndef SADB_X_EALG_AESCTR
+#define SADB_X_EALG_AESCTR	(-1)
 #endif
 %}
 
@@ -166,6 +172,7 @@ ipcomp		{ yylval.num = 0; return(PR_IPCOMP); }
 <S_AUTHALG>hmac-sha2-256 { yylval.num = SADB_X_AALG_SHA2_256; BEGIN INITIAL; return(ALG_AUTH); }
 <S_AUTHALG>hmac-sha2-384 { yylval.num = SADB_X_AALG_SHA2_384; BEGIN INITIAL; return(ALG_AUTH); }
 <S_AUTHALG>hmac-sha2-512 { yylval.num = SADB_X_AALG_SHA2_512; BEGIN INITIAL; return(ALG_AUTH); }
+<S_AUTHALG>aes-xcbc-mac { yylval.num = SADB_X_AALG_AES_XCBC_MAC; BEGIN INITIAL; return(ALG_AUTH); }
 <S_AUTHALG>null { yylval.num = SADB_X_AALG_NULL; BEGIN INITIAL; return(ALG_AUTH_NOKEY); }
 
 	/* encryption alogorithm */
@@ -180,6 +187,7 @@ ipcomp		{ yylval.num = 0; return(PR_IPCOMP); }
 <S_ENCALG>des-32iv	{ yylval.num = SADB_EALG_DESCBC; BEGIN INITIAL; return(ALG_ENC_DES32IV); }
 <S_ENCALG>twofish-cbc	{ yylval.num = SADB_X_EALG_TWOFISHCBC; BEGIN INITIAL; return(ALG_ENC); }
 <S_ENCALG>rijndael-cbc	{ yylval.num = SADB_X_EALG_RIJNDAELCBC; BEGIN INITIAL; return(ALG_ENC); }
+<S_ENCALG>aes-ctr	{ yylval.num = SADB_X_EALG_AESCTR; BEGIN INITIAL; return(ALG_ENC); }
 
 	/* compression algorithms */
 {hyphen}C	{ return(F_COMP); }
