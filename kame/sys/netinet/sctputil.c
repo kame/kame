@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.34 2005/01/25 08:20:06 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.35 2005/01/26 19:40:16 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -63,6 +63,12 @@
 #include <sys/proc.h>
 #include <sys/kernel.h>
 #include <sys/sysctl.h>
+
+#ifdef __FreeBSD__
+#include <sys/callout.h>
+#else
+#include <netinet/sctp_callout.h>	/* for callout_active() */
+#endif
 
 #include <net/radix.h>
 #include <net/route.h>
@@ -129,7 +135,6 @@
 #include <netinet/sctp_indata.h>	/* for sctp_deliver_data() */
 #define NUMBER_OF_MTU_SIZES 18
 
-#include <netinet/sctp_callout.h>	/* for callout_active() */
 #ifdef SCTP_DEBUG
 extern u_int32_t sctp_debug_on;
 #endif
