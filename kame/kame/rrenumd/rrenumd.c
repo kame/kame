@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +13,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -215,7 +215,7 @@ config(FILE **fpp)
 		 * so segment number is not supported.
 		 */
 		/* TODO: rr flags config in parser */
-		irr->rr_specsite = 1;
+		irr->rr_flags |= ICMP6_RR_FLAGS_SPECSITE;
 		/* TODO: max delay config in parser */
 
 		/*
@@ -244,8 +244,8 @@ sock6_open(struct flags *flags
 #ifdef IPSEC
 #ifndef IPSEC_POLICY_IPSEC
 	int optval;
-#endif 
-#endif 
+#endif
+#endif
 
 	if (with_v6dest == 0)
 		return;
@@ -331,8 +331,8 @@ sock4_open(struct flags *flags
 #ifdef IPSEC
 #ifndef IPSEC_POLICY_IPSEC
 	int optval;
-#endif 
-#endif 
+#endif
+#endif
 
 	if (with_v4dest == 0)
 		return;
@@ -357,7 +357,7 @@ sock4_open(struct flags *flags
 		if (buf == NULL)
 			errx(1, ipsec_strerror());
 		/* XXX should handle in/out bound policy. */
-		if (setsockopt(s4, IPPROTO_IP, IP_IPSEC_POLICY, 
+		if (setsockopt(s4, IPPROTO_IP, IP_IPSEC_POLICY,
 				buf, ipsec_get_policylen(buf)) < 0)
 			err(1, NULL);
 		free(buf);

@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +13,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -101,10 +101,10 @@ static void pllist_enqueue __P((struct payload_list *pl_entry));
 %type <num> retrynum seqnum rrenum_cmd
 %type <num> prefixlen maxlen minlen keeplen vltime pltime
 %type <num> lifetime days hours minutes seconds
-%type <num> decstring 
+%type <num> decstring
 %type <num> raf_onlink raf_auto raf_decrvalid raf_decrprefd flag
 %type <dl> dest_addrs dest_addr sin sin6
-%type <pl> rrenum_statement 
+%type <pl> rrenum_statement
 %type <cs> ifname
 %type <prefix> prefixval
 
@@ -157,7 +157,7 @@ dest_addrs:
 		}
 	;
 
-dest_addr : 
+dest_addr :
 		sin
 		{
 			with_v4dest = 1;
@@ -433,11 +433,8 @@ use_prefix_values:
 
 			rpu->rpu_vltime = DEF_VLTIME;
 			rpu->rpu_pltime = DEF_PLTIME;
-			rpu->rpu_mask_onlink = 0;
-			rpu->rpu_mask_autonomous = 0;
-			rpu->rpu_decr_vltime = 0;
-			rpu->rpu_decr_pltime = 0;
-			rpu->rpu_flags_reserved = 0;
+			rpu->rpu_ramask = 0;
+			rpu->rpu_flags = 0;
 		}
 	|	BCL vltime pltime raf_onlink raf_auto raf_decrvalid raf_decrprefd ECL
 		{
@@ -452,21 +449,43 @@ use_prefix_values:
 
 			rpu->rpu_vltime = $2;
 			rpu->rpu_pltime = $3;
-			if ($4 == NOSPEC)
-				rpu->rpu_mask_onlink = 0;
-			else {
-				rpu->rpu_mask_onlink = 1;
-				rpu->rpu_onlink = $4;
+			if ($4 == NOSPEC) {
+				rpu->rpu_ramask &=
+				    ~ICMP6_RR_PCOUSE_RAFLAGS_ONLINK;
+			} else {
+				rpu->rpu_ramask |=
+				    ICMP6_RR_PCOUSE_RAFLAGS_ONLINK;
+				if ($4 == ON) {
+					rpu->rpu_raflags |=
+					    ICMP6_RR_PCOUSE_RAFLAGS_ONLINK;
+				} else {
+					rpu->rpu_raflags &=
+					    ~ICMP6_RR_PCOUSE_RAFLAGS_ONLINK;
+				}
 			}
-			if ($5 == NOSPEC)
-				rpu->rpu_mask_autonomous = 0;
-			else {
-				rpu->rpu_mask_autonomous = 1;
-				rpu->rpu_autonomous = $5;
+			if ($5 == NOSPEC) {
+				rpu->rpu_ramask &=
+				    ICMP6_RR_PCOUSE_RAFLAGS_AUTO;
+			} else {
+				rpu->rpu_ramask |=
+				    ICMP6_RR_PCOUSE_RAFLAGS_AUTO;
+				if ($5 == ON) {
+					rpu->rpu_raflags |=
+					    ICMP6_RR_PCOUSE_RAFLAGS_AUTO;
+				} else {
+					rpu->rpu_raflags &=
+					    ~ICMP6_RR_PCOUSE_RAFLAGS_AUTO;
+				}
 			}
-			rpu->rpu_decr_vltime = ($6 == NOSPEC) ? 0 : $6;
-			rpu->rpu_decr_pltime = ($7 == NOSPEC) ? 0 : $7;
-			rpu->rpu_flags_reserved = 0;
+			rpu->rpu_flags = 0;
+			if ($6 == ON) {
+				rpu->rpu_flags |=
+				    ICMP6_RR_PCOUSE_FLAGS_DECRVLTIME;
+			}
+			if ($7 == ON) {
+				rpu->rpu_flags |=
+				    ICMP6_RR_PCOUSE_FLAGS_DECRPLTIME;
+			}
 		}
 	;
 
@@ -581,7 +600,7 @@ days:
 	;
 
 hours:
-		/* empty */		
+		/* empty */
 		{
 			$$ = 0;
 		}
