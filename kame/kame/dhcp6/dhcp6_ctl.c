@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6_ctl.c,v 1.2 2004/06/12 10:56:20 jinmei Exp $	*/
+/*	$KAME: dhcp6_ctl.c,v 1.3 2004/06/12 12:40:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -189,6 +189,11 @@ dhcp6_ctl_readcommand(read_fds)
 			if (cc < 0) {
 				dprintf(LOG_WARNING, FNAME, "read failed: %s",
 				    strerror(errno));
+				goto closecommand;
+			}
+			if (cc == 0) {
+				dprintf(LOG_INFO, FNAME,
+				    "control channel was reset by peer");
 				goto closecommand;
 			}
 
