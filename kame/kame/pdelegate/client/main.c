@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.9 2001/09/07 07:54:04 itojun Exp $	*/
+/*	$KAME: main.c,v 1.10 2001/09/07 08:37:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -397,6 +397,13 @@ receive_initreq(s, from, fromlenp, ecode)
 	char buf[4096];
 	ssize_t l;
 	struct icmp6_prefix_delegation *p;
+	char hbuf[NI_MAXHOST];
+#ifdef NI_WITHSCOPEID
+	const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+	const int niflags = NI_NUMERICHOST;
+#endif
+	struct sockaddr_in6 sin6;
 
 	*ecode = 0;
 
@@ -418,6 +425,22 @@ receive_initreq(s, from, fromlenp, ecode)
 		*ecode = p->icmp6_pd_hdr.icmp6_code;
 		return -1;
 	case ICMP6_PD_PREFIX_DELEGATED:
+		/* we assume prefixlen to match up */
+		if ((p->icmp6_pd_hdr.icmp6_pd_flaglen & ICMP6_PD_LEN_MASK) != 
+		    prefixlen) {
+			warnx("bogus prefixlen %u != requested %d",
+			    p->icmp6_pd_hdr.icmp6_pd_flaglen & ICMP6_PD_LEN_MASK,
+			    prefixlen);
+			return -1;
+		}
+		memset(&sin6, 0, sizeof(sin6));
+		sin6.sin6_family = AF_INET6;
+		sin6.sin6_len = sizeof(sin6);
+		sin6.sin6_addr = p->icmp6_pd_prefix;
+		if (getnameinfo((struct sockaddr *)&sin6, sizeof(sin6),
+		    hbuf, sizeof(hbuf), NULL, 0, niflags) != 0)
+			return -1;
+		printf("%s", hbuf);
 		return 0;
 	default:
 		*ecode = p->icmp6_pd_hdr.icmp6_code;
@@ -448,12 +471,9 @@ receive(s, buf, blen, from, fromlenp)
 		warnx("address scope is not global");
 		return -1;
 	}
-	/* we assume prefixlen to match up */
-	if ((p->icmp6_pd_hdr.icmp6_pd_flaglen & ICMP6_PD_LEN_MASK) != 
-	    prefixlen) {
-		warnx("bogus prefixlen %u != requested %d",
-		    p->icmp6_pd_hdr.icmp6_pd_flaglen & ICMP6_PD_LEN_MASK,
-		    prefixlen);
+	/* routing protocol field is yet to be standardized */
+	if (p->icmp6_pd_hdr.icmp6_pd_rtproto) {
+		warnx("bogus routing protocol field");
 		return -1;
 	}
 	/* routing information field is yet to be standardized */
@@ -461,7 +481,6 @@ receive(s, buf, blen, from, fromlenp)
 		warnx("bogus routing information field");
 		return -1;
 	}
-
 
 	/* XXX more validation */
 

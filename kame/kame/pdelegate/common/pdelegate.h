@@ -1,4 +1,4 @@
-/*	$KAME: pdelegate.h,v 1.6 2001/09/06 05:34:38 itojun Exp $	*/
+/*	$KAME: pdelegate.h,v 1.7 2001/09/07 08:37:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -79,4 +79,4 @@ struct icmp6_prefix_delegation {
 #define ICMP6_PD_FLAGS_SCOPE	0x80
 #define ICMP6_PD_LEN_MASK	0x7f
 #define icmp6_pd_lifetime	icmp6_data16[1]
-#define icmp6_pd_rtproto	icmp6_data3[1]
+#define icmp6_pd_rtproto	icmp6_data8[1]
