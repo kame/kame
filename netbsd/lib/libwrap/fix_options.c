@@ -45,7 +45,7 @@ struct request_info *request;
 
     /* check if this is AF_INET socket */
     sslen = sizeof(ss);
-    if (getsockname(fd, (struct sockaddr *)&ss, &sslen < 0)) {
+    if (getsockname(fd, (struct sockaddr *)&ss, &sslen) < 0) {
 	syslog(LOG_ERR, "getpeername: %m");
 	clean_exit(request);
     }
