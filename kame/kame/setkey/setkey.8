@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: setkey.8,v 1.4 1999/09/08 11:25:43 itojun Exp $
+.\"     $Id: setkey.8,v 1.5 1999/09/10 02:18:09 itojun Exp $
 .\"
 .Dd May 17, 1998
 .Dt SETKEY 8
@@ -119,7 +119,7 @@ Description of meta-arguments follows.
 .Li add
 .Ar src Ar dst Ar protocol Ar spi
 .Op Ar extensions
-.Ar argorithm
+.Ar algorithm...
 .Li ;
 .Xc
 Add a SAD entry.
@@ -253,25 +253,16 @@ Specify hard/soft lifetime.
 .\"
 .Pp
 .It Ar algorithm
-.Fl E
-specifies encryption algorithm, and
-.Fl A
-specifies authentication algorithm.
+.Bl -tag -width Fl -compact 
+.It Fl E Ar ealgo Ar key
+Specify encryption algorithm.
+.It Fl A Ar ealgo Ar key
+Specify authentication algorithm.
 If
 .Fl A
-is used for esp or esp-old,
-it will be treated as ESP payload authentication algorithm.
-Possible values for
-.Ar ealgo ,
-.Ar aalgo
-and
-.Ar calgo
-are specified in separete section.
-.Ar key
-must be double-quoted character string or a series of hexadecimal digits.
-.Fl R
-is used only with
-.Li ipcomp .
+is used for esp, it will be treated as ESP payload authentication algorithm.
+.It Fl C Ar calgo Op Fl R
+Specify compression algorithm.
 If
 .Fl R
 is specified with
@@ -294,6 +285,37 @@ field will appear on IPComp CPI field on outgoing packets.
 field needs to be smaller than
 .Li 0x10000
 in this case.
+.El
+.Pp
+.Li esp
+SAs accept
+.Fl E
+and
+.Fl A .
+.Li esp-old
+SAs accept
+.Fl E
+only.
+.Li ah
+and
+.Li ah-old
+SAs accept
+.Fl A
+only.
+.Li impcomp
+SAs accept
+.Fl C
+only.
+.Pp
+.Ar key
+must be double-quoted character string or a series of hexadecimal digits.
+.Pp
+Possible values for
+.Ar ealgo ,
+.Ar aalgo
+and
+.Ar calgo
+are specified in separate section.
 .\"
 .It Ar src_range
 .It Ar dst_range
@@ -315,8 +337,7 @@ must be decimal number.
 The square bracket around
 .Ar port
 is really necessary.
-They are not manpage metacharacters
-.Li :-)
+They are not manpage metacharacters.
 .Pp
 .Nm
 does not consult hostname-to-address for arguments
@@ -334,12 +355,14 @@ and
 .Li any
 can be specified.
 .Li any
-is as the wildcard.
+stands for
+.Dq any protocol .
+.Pp
 NOTE:
 .Ar upperspec
-of forwarding packet has no effect at this moment, since kernel code fragment to handle
-.Ar upperspec
-is disabled.
+does not work against forwarding case at this moment,
+as it requires extra reassembly at forwarding node
+.Pq not implemented as this moment .
 .\"
 .It Ar policy
 .Ar policy
@@ -364,7 +387,7 @@ is the one of following:
 .Ed
 .Pp
 You must specify the direction of its policy as
-.Li direction .
+.Ar direction .
 Either
 .Li out
 or
@@ -388,15 +411,12 @@ is either
 .Li transport
 or
 .Li tunnel .
-Must not use
-.Li any .
 You must specify the end-points addresses of the SA as
 .Ar src
 and
 .Ar dst
 with
-.So -
-.Sc
+.Sq -
 between these addresses which is used to specify the SA to use.
 .Ar level
 is to be one of the following:
