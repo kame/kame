@@ -1,7 +1,7 @@
 # $OpenBSD$
 # KAME Id: Makefile,v 1.5 1999/09/13 16:27:41 itojun Exp
 
-DISTNAME=	zebra-0.83
+DISTNAME=	zebra-0.84a
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.zebra.org/pub/zebra/
 # you might need debugging, it's a developer release !
@@ -9,8 +9,6 @@ MASTER_SITES=	ftp://ftp.zebra.org/pub/zebra/
 
 MAINTAINER=	itojun@itojun.org
 HOMEPAGE=	http://www.zebra.org/
-
-BROKEN=		"cannot recognize libinet6.a"
 
 GNU_CONFIGURE=	yes
 #CONFIGURE_ARGS+=--sysconfdir=${PREFIX}/etc/zebra
