@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_send.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_send.c,v 1.6 2000/04/26 10:20:31 itojun Exp $";
+static char rcsid[] = "$Id: res_send.c,v 1.7 2000/04/26 10:38:54 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 	/* change this to "0"
@@ -611,6 +611,14 @@ read_len:
 					goto next_ns;
 #endif
 				}
+#ifdef IPV6_MINMTU
+				if (af == AF_INET6) {
+					const int yes = 1;
+					(void)setsockopt(s, IPPROTO_IPV6,
+					    IPV6_USE_MIN_MTU, &yes,
+					    sizeof(yes));
+				}
+#endif
 				connected = 0;
 			}
 			/*
@@ -678,6 +686,14 @@ read_len:
 					(void) close(s1);
 					Dprint(_res.options & RES_DEBUG,
 					       (stdout, ";; new DG socket\n"))
+#endif
+#ifdef IPV6_MINMTU
+					if (af == AF_INET6) {
+						const int yes = 1;
+						(void)setsockopt(s, IPPROTO_IPV6,
+						    IPV6_USE_MIN_MTU, &yes,
+						    sizeof(yes));
+					}
 #endif
 					connected = 0;
 					errno = 0;
