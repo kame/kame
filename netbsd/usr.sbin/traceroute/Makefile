@@ -4,8 +4,10 @@ PROG=	traceroute
 SRCS=	traceroute.c ifaddrlist.c savestr.c version.c
 
 DEFS =  -DHAVE_MALLOC_H=1 -DHAVE_SYS_SELECT_H=1 -DHAVE_SYS_SOCKIO_H=1 -DHAVE_STRERROR=1 -DHAVE_SETLINEBUF=1 -DHAVE_SOCKADDR_SA_LEN=1  -DIPSEC
-CFLAGS=	-I${SRCDIR} -O2
-CPPFLAGS=${DEFS}
+CFLAGS+=-I${SRCDIR} -O2
+CPPFLAGS+=${DEFS}
+# workaround for gnuc.h - should be revisited
+CPPFLAGS+=-I${SRCDIR}/lbl
 
 LDADD+= -L${.CURDIR}/../../lib/libipsec -L${.CURDIR}/../../lib/libipsec/obj \
 	-L/usr/local/v6/lib -lipsec
