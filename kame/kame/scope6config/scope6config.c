@@ -32,6 +32,9 @@
 #include <sys/ioctl.h>
 
 #include <net/if.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include <net/if_var.h>
+#endif
 
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
