@@ -13,7 +13,6 @@ DPADD+=	${.OBJDIR}/../../lib/libinet6/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
 MAN8=	vrrp6d.8
-MLINKS=	vrrp6d.8
 
 .PATH:	${SRCDIR}
 
