@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.31 2004/02/05 12:38:11 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.32 2004/02/13 02:52:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -72,6 +72,7 @@
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
 #include <netinet6/nd6.h>
+#include <netinet/ip6mh.h>
 
 #include <net/if_hif.h>
 

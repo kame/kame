@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.140 2004/02/12 15:38:30 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.141 2004/02/13 02:52:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -114,6 +114,7 @@
 #include <netinet6/scope6_var.h>
 
 #ifdef MIP6
+#include <netinet/ip6mh.h>
 #include <net/if_hif.h>
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>

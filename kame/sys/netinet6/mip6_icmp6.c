@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.88 2004/02/05 12:38:11 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.89 2004/02/13 02:52:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -93,8 +93,8 @@
 #endif
 #endif /* IPSEC */
 
+#include <netinet/ip6mh.h>
 #include <net/if_hif.h>
-
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6_cncore.h>

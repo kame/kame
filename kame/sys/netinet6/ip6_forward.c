@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.134 2004/02/05 12:38:10 keiichi Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.135 2004/02/13 02:52:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -102,6 +102,7 @@
 #endif
 
 #ifdef MIP6
+#include <netinet/ip6mh.h>
 #include <net/if_hif.h>
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>

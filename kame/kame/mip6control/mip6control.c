@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.60 2004/02/05 12:38:09 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.61 2004/02/13 02:52:08 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -50,6 +50,7 @@
 #include <arpa/inet.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
+#include <netinet/ip6mh.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
 

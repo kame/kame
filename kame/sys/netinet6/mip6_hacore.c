@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.26 2004/02/10 12:18:02 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.27 2004/02/13 02:52:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -74,8 +74,8 @@
 
 #include <netinet/ip_encap.h>
 
+#include <netinet/ip6mh.h>
 #include <net/if_hif.h>
-
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6_cncore.h>

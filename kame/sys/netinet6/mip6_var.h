@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.115 2004/02/05 12:38:11 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.116 2004/02/13 02:52:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -309,7 +309,6 @@ struct mip6_pktopts {
 
 struct mip6_mobility_options {
 	u_int16_t valid_options;	/* shows valid options in this structure */
-	u_int16_t	mopt_uid;		/* Unique ID */
 	struct in6_addr mopt_altcoa;		/* Alternate CoA */
 	u_int16_t	mopt_ho_nonce_idx;	/* Home Nonce Index */
 	u_int16_t	mopt_co_nonce_idx;	/* Care-of Nonce Index */
@@ -317,11 +316,10 @@ struct mip6_mobility_options {
 	u_int16_t	mopt_refresh;		/*  Refresh Interval */
 };
 
-#define MOPT_UID	0x0001	/* unused */
-#define MOPT_ALTCOA	0x0002
-#define MOPT_NONCE_IDX	0x0004
-#define MOPT_AUTHDATA	0x0008
-#define MOPT_REFRESH	0x0010
+#define MOPT_ALTCOA	0x0001
+#define MOPT_NONCE_IDX	0x0002
+#define MOPT_AUTHDATA	0x0004
+#define MOPT_REFRESH	0x0008
 
 #define MOPT_AUTH_LEN(mopts)	(int)(*((mopts)->mopt_auth + 1))
 

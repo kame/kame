@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.26 2004/02/05 12:38:10 keiichi Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.27 2004/02/13 02:52:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -59,8 +59,8 @@
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/scope6_var.h>
 
+#include <netinet/ip6mh.h>
 #include <net/if_hif.h>
-
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6_cncore.h>
@@ -1584,8 +1584,8 @@ mip6_bu_sec_fsm(mbu, event, data)
 			/* XXX */
 			mbu->mbu_home_nonce_index
 			    = htons(ip6mh->ip6mhht_nonce_index);
-			bcopy(ip6mh->ip6mhht_token8, mbu->mbu_home_token,
-			    sizeof(ip6mh->ip6mhht_token8));
+			bcopy(ip6mh->ip6mhht_keygen8, mbu->mbu_home_token,
+			    sizeof(ip6mh->ip6mhht_keygen8));
 
 			*mbu_sec_fsm_state = MIP6_BU_SEC_FSM_STATE_WAITC;
 
@@ -1598,8 +1598,8 @@ mip6_bu_sec_fsm(mbu, event, data)
 			/* XXX */
 			mbu->mbu_careof_nonce_index
 			    = htons(ip6mc->ip6mhct_nonce_index);
-			bcopy(ip6mc->ip6mhct_token8, mbu->mbu_careof_token,
-			    sizeof(ip6mc->ip6mhct_token8));
+			bcopy(ip6mc->ip6mhct_keygen8, mbu->mbu_careof_token,
+			    sizeof(ip6mc->ip6mhct_keygen8));
 
 			*mbu_sec_fsm_state = MIP6_BU_SEC_FSM_STATE_WAITH;
 			break;
@@ -1643,8 +1643,8 @@ mip6_bu_sec_fsm(mbu, event, data)
 			 */
 			mbu->mbu_home_nonce_index
 			    = htons(ip6mh->ip6mhht_nonce_index);
-			bcopy(ip6mh->ip6mhht_token8, mbu->mbu_home_token,
-			    sizeof(ip6mh->ip6mhht_token8));
+			bcopy(ip6mh->ip6mhht_keygen8, mbu->mbu_home_token,
+			    sizeof(ip6mh->ip6mhht_keygen8));
 
 			mip6_bu_stop_timers(mbu);
 
@@ -1699,8 +1699,8 @@ mip6_bu_sec_fsm(mbu, event, data)
 			 */
 			mbu->mbu_careof_nonce_index
 			    = htons(ip6mc->ip6mhct_nonce_index);
-			bcopy(ip6mc->ip6mhct_token8, mbu->mbu_careof_token,
-			    sizeof(ip6mc->ip6mhct_token8));
+			bcopy(ip6mc->ip6mhct_keygen8, mbu->mbu_careof_token,
+			    sizeof(ip6mc->ip6mhct_keygen8));
 
 			mip6_bu_stop_timers(mbu);
 

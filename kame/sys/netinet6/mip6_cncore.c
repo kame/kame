@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.62 2004/02/06 08:32:40 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.63 2004/02/13 02:52:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -123,8 +123,8 @@
 #include <crypto/hmac.h>
 #endif
 
+#include <netinet/ip6mh.h>
 #include <net/if_hif.h>
-
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6_cncore.h>
@@ -2342,7 +2342,7 @@ mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
 	ip6mh->ip6mhht_nonce_index = htons(nonce_index);
 	bcopy(cookie, ip6mh->ip6mhht_cookie8, sizeof(ip6mh->ip6mhht_cookie8));
 	if (mip6_create_keygen_token(dst, &home_nodekey,
-	    &home_nonce, 0, ip6mh->ip6mhht_token8)) {
+	    &home_nonce, 0, ip6mh->ip6mhht_keygen8)) {
 		mip6log((LOG_ERR,
 		 	"%s:%d: Failed of creation of home keygen token\n",
 		 	__FILE__, __LINE__));
@@ -2389,7 +2389,7 @@ mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 	ip6mc->ip6mhct_nonce_index = htons(nonce_index);
 	bcopy(cookie, ip6mc->ip6mhct_cookie8, sizeof(ip6mc->ip6mhct_cookie8));
 	if (mip6_create_keygen_token(dst, &careof_nodekey, &careof_nonce, 1,
-		ip6mc->ip6mhct_token8)) {
+		ip6mc->ip6mhct_keygen8)) {
 		mip6log((LOG_ERR,
 		    "mip6_ip6mc_create:%d: "
 		    "Failed of creation of home keygen token\n",

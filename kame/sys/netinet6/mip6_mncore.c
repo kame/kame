@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.47 2004/02/06 06:48:52 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.48 2004/02/13 02:52:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -82,8 +82,8 @@
 #include <netinet6/ah.h>
 #endif /* IPSEC && !__OpenBSD__ */
 
+#include <netinet/ip6mh.h>
 #include <net/if_hif.h>
-
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6_cncore.h>
@@ -3776,10 +3776,10 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 		/* Nonce Indicies */
 		mopt_nonce->ip6moni_type = IP6_MHOPT_NONCEID;
 		mopt_nonce->ip6moni_len = sizeof(struct ip6_mh_opt_nonce_index) - 2;
-		SET_NETVAL_S(&mopt_nonce->ip6moni_home_nonce,
+		SET_NETVAL_S(&mopt_nonce->ip6moni_home_nonce8,
 		    mbu->mbu_home_nonce_index);
 		if (!ignore_co_nonce) {
-			SET_NETVAL_S(&mopt_nonce->ip6moni_coa_nonce,
+			SET_NETVAL_S(&mopt_nonce->ip6moni_coa_nonce8,
 			    mbu->mbu_careof_nonce_index);
 		}
 

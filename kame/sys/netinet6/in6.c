@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.363 2004/02/12 15:38:30 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.364 2004/02/13 02:52:09 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -155,6 +155,7 @@
 #endif
 
 #ifdef MIP6
+#include <netinet/ip6mh.h>
 #include <net/if_hif.h>
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>

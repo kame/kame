@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.369 2004/02/09 18:55:32 t-momose Exp $	*/
+/*	$KAME: icmp6.c,v 1.370 2004/02/13 02:52:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -130,6 +130,7 @@
 #endif
 
 #ifdef MIP6
+#include <netinet/ip6mh.h>
 #include <net/if_hif.h>
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>

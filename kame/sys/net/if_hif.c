@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.67 2004/02/05 12:38:10 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.68 2004/02/13 02:52:08 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -125,6 +125,7 @@ t.
 #include <netinet6/ip6_var.h>
 #include <netinet6/ip6protosw.h>
 #include <netinet/icmp6.h>
+#include <netinet/ip6mh.h>
 #endif /* INET6 */
 
 #if defined(__NetBSD__) && defined(ISO)

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.213 2004/02/12 15:38:30 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.214 2004/02/13 02:52:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,6 +101,7 @@
 #include <netkey/key_debug.h>
 
 #ifdef MIP6
+#include <netinet/ip6mh.h>
 #include <net/if_hif.h>
 #include <netinet6/scope6_var.h>
 #include <netinet6/nd6.h>

@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.31 2004/02/05 12:38:11 keiichi Exp $	*/
+/*	$KAME: mobility6.c,v 1.32 2004/02/13 02:52:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -73,6 +73,7 @@
 #endif
 
 #ifdef MIP6
+#include <netinet/ip6mh.h>
 #include <net/if_hif.h>
 #include <netinet6/nd6.h>
 #include <netinet6/mip6.h>

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.142 2004/02/12 08:31:29 keiichi Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.143 2004/02/13 02:52:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -85,6 +85,7 @@
 #endif
 
 #ifdef MIP6
+#include <netinet/ip6mh.h>
 #include <net/if_hif.h>
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>
