@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.686 2000/03/12 07:02:01 itojun Exp $
+$Id: CHANGELOG,v 1.687 2000/03/13 05:10:41 itojun Exp $
 
 <200003>
+Mon Mar 13 14:09:54 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/{tcpdump,libpcap}: upgrade to 20000228.
+
 Sun Mar 12 13:58:34 JST 2000  itojun@iijlab.net
 	* {openbsd,netbsd}/sys/netinet/in.c: undo interface address addition
 	  attempt, when in_ifinit() fails.
@@ -49,9 +52,6 @@ Thu Mar  9 22:08:17 JST 2000 sakane@ydc.co.jp
 		pfkey_send_spdupdate() replace a policy entry.
 		pfkey_send_spdsetidx() set a policy index.
 		pfkey_send_spdget() gets a policy entry.
-
-Thu Mar  9 18:13:23 JST 2000  itojun@iijlab.net
-	* netbsd/pkgsrc/net/zebra: upgrade to 0.85.
 
 Thu Mar  9 18:06:30 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ah_output.c: avoid mbuf memory leak, or unauthenticated
