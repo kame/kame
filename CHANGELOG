@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1667 2001/05/08 02:38:50 jinmei Exp $
+$KAME: CHANGELOG,v 1.1668 2001/05/09 11:27:24 itojun Exp $
 
 <200105>
+Wed May  9 20:15:22 JST 2001  itojun@iijlab.net
+	* ping6/ping6.c: correct signal handling with
+	  "ping6 -f <nonexisting peer>".  from hash@iij.ad.jp.
+
 2001-05-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/bindtest: added supplement tests to see which sockets
 	receive which packets.
