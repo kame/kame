@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.107 2001/12/07 07:07:10 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.108 2001/12/07 07:12:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -615,7 +615,7 @@ rip6_output(m, va_alist)
 	return(error);
 }
 
-/* 
+/*
  * Raw IPv6 socket option processing.
  */
 int
