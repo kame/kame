@@ -828,16 +828,20 @@ rip_process_response(ripif, nn)
     }
 
     if (!IN6_IS_ADDR_ROUTABLE(&np->rip6_dest)) {
-      syslog(LOG_ERR, 
-	     "<rip_process_response>: non-routable address");
-      continue;  /* ignore */
+	    syslog(LOG_NOTICE,
+		   "<%s>: non-routable address(%s/%d) on %s",
+		   __FUNCTION__, ip6str(&np->rip6_dest, 0), np->rip6_plen,
+		   ripif->rip_ife->ifi_ifn->if_name);
+	    continue;  /* ignore */
     }
 
     if (np->rip6_metric == 0 ||
 	np->rip6_metric > RIPNG_METRIC_UNREACHABLE) { 
-      syslog(LOG_ERR,
-	     "<rip_process_response>: invaid metric(%d)", np->rip6_metric);
-      continue;  /* ignore */
+	    syslog(LOG_NOTICE,
+		   "<%s>: invaid metric(%d) for %s/%d on %s", __FUNCTION__,
+		   np->rip6_metric, ip6str(&np->rip6_dest, 0), np->rip6_plen,
+		   ripif->rip_ife->ifi_ifn->if_name);
+	    continue;  /* ignore */
     }
     else {
 	    /* incoming metric addition(if specified) */
