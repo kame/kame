@@ -1,4 +1,4 @@
-/*	$KAME: ip6opt.c,v 1.12 2002/10/17 14:13:48 jinmei Exp $	*/
+/*	$KAME: ip6opt.c,v 1.13 2003/06/06 10:08:20 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -70,7 +70,7 @@ inet6_option_init(bp, cmsgp, type)
 	struct cmsghdr **cmsgp;
 	int type;
 {
-	register struct cmsghdr *ch = (struct cmsghdr *)bp;
+	struct cmsghdr *ch = (struct cmsghdr *)bp;
 
 	/* argument validation */
 	if (type != IPV6_HOPOPTS && type != IPV6_DSTOPTS)
@@ -102,7 +102,7 @@ inet6_option_append(cmsg, typep, multx, plusy)
 	int plusy;
 {
 	int padlen, optlen, off;
-	register u_char *bp = (u_char *)cmsg + cmsg->cmsg_len;
+	u_char *bp = (u_char *)cmsg + cmsg->cmsg_len;
 	struct ip6_ext *eh = (struct ip6_ext *)CMSG_DATA(cmsg);
 
 	/* argument validation */
@@ -177,7 +177,7 @@ inet6_option_alloc(cmsg, datalen, multx, plusy)
 	int plusy;
 {
 	int padlen, off;
-	register u_int8_t *bp = (u_char *)cmsg + cmsg->cmsg_len;
+	u_int8_t *bp = (u_char *)cmsg + cmsg->cmsg_len;
 	u_int8_t *retval;
 	struct ip6_ext *eh = (struct ip6_ext *)CMSG_DATA(cmsg);
 
