@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.25 2000/01/12 17:23:07 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.26 2000/01/12 17:50:34 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2952,13 +2952,14 @@ ipsecdoi_setid1(iph1)
 	int lctype;
 	vchar_t *ident = NULL, idtmp;
 
+	lctype = doi2idtype(iph1->rmconf->identtype);
+
 	/* init */
 	id_b.type = iph1->rmconf->identtype;
 	id_b.proto_id = 0;
 	id_b.port = 0;
 
-	lctype = doi2idtype(iph1->rmconf->identtype);
-	switch (lctype) {
+	switch (iph1->rmconf->identtype) {
 	case IPSECDOI_ID_FQDN:
 		ident = lcconf->ident[lctype];
 		break;
