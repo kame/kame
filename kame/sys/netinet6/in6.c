@@ -162,14 +162,6 @@ struct multi6_kludge {
 };
 #endif
 
-int
-in6_are_addr_samescope(src, dst, srcifp, dstifp)
-	struct in6_addr *src, *dst;
-	struct ifnet *srcifp, *dstifp;
-{
-	
-}
-
 /*
  * Check if the loopback entry will be automatically generated.
  *   if 0 returned, will not be automatically generated.
