@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.10 2000/06/13 05:17:14 itojun Exp $	*/
+/*	$KAME: if.c,v 1.11 2000/07/06 08:20:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -204,6 +204,7 @@ if_getflags(int ifindex, int oifflags)
 		close(s);
 		return (oifflags & ~IFF_UP);
 	}
+	close(s);
 	return (ifr.ifr_flags);
 }
 
