@@ -43,6 +43,40 @@
 #define OT6_STR		2
 #define OT6_NUM		3
 
+/*
+ * DHCPv6 extension code values:
+ */
+/* IP Address Extension */
+#define OC6_IPADDR 1
+/* General Extension */
+#define OC6_TIMEOFFSET 2
+#define OC6_TIMEZONE 3
+#define OC6_DNS 6
+#define OC6_DOMAIN 10
+/* Application and Service Parameters */
+#define OC6_DIRAGENT 16
+#define OC6_SVCSCOPE 17
+#define OC6_NTPSERVER 18
+#define OC6_NISDOMAIN 19
+#define OC6_NISSERVER 20
+#define OC6_NISPLUSDOMAIN 21
+#define OC6_NISPLUSSERVER 22
+/* TCP Parameters */
+#define OC6_TCPKEEPALIVEINT 32
+/* DHCPv6 Extensions */
+#define OC6_MAXSIZE 40
+#define OC6_CONFPARAM 41
+#define OC6_PLATSPECIFIC 48
+#define OC6_PLATCLASSID 49
+#define OC6_CLASSID 64
+#define OC6_RECONFMADDR 66
+#define OC6_RENUMSERVERADDR 67
+#define OC6_DHCPICMPERR 68
+#define OC6_CLISVRAUTH 84
+#define OC6_CLIKEYSELECT 85
+/* End Extension */
+#define OC6_END 65536
+
 struct dhcp6_opt {
 	u_int code;
 	int len;
