@@ -90,7 +90,7 @@ static const char rcsid[] =
 char	*inetname (struct in_addr *);
 void	inetprint (struct in_addr *, int, char *, int);
 #ifdef INET6
-extern void	sa_print (struct sockaddr *, char *, int);
+extern void	inet6print (struct in6_addr *, int, char *, int);
 static int udp_done, tcp_done;
 #ifdef DCCP
 static int dccp_done;
@@ -301,11 +301,11 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 			}
 #ifdef INET6
 			else if (inp->inp_vflag & INP_IPV6) {
-				sa_print((struct sockaddr *)&inp->in6p_lsa,
-				    name, 1);
+				inet6print(&inp->in6p_laddr,
+				    (int)inp->inp_lport, name, 1);
 				if (!Lflag)
-					sa_print((struct sockaddr *)&inp->in6p_fsa,
-					    name, 1);
+					inet6print(&inp->in6p_faddr,
+					    (int)inp->inp_fport, name, 1);
 			} /* else nothing printed now */
 #endif /* INET6 */
 		} else if (inp->inp_flags & INP_ANONPORT) {
@@ -318,11 +318,11 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 			}
 #ifdef INET6
 			else if (inp->inp_vflag & INP_IPV6) {
-				sa_print((struct sockaddr *)&inp->in6p_lsa,
-				    name, 1);
+				inet6print(&inp->in6p_laddr,
+				    (int)inp->inp_lport, name, 1);
 				if (!Lflag)
-					sa_print((struct sockaddr *)&inp->in6p_fsa,
-					    name, 0);
+					inet6print(&inp->in6p_faddr,
+					    (int)inp->inp_fport, name, 0);
 			} /* else nothing printed now */
 #endif /* INET6 */
 		} else {
@@ -337,11 +337,11 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 			}
 #ifdef INET6
 			else if (inp->inp_vflag & INP_IPV6) {
-				sa_print((struct sockaddr *)&inp->in6p_lsa,
-				    name, 0);
+				inet6print(&inp->in6p_laddr,
+				    (int)inp->inp_lport, name, 0);
 				if (!Lflag)
-					sa_print((struct sockaddr *)&inp->in6p_fsa,
-					    name,
+					inet6print(&inp->in6p_faddr,
+					    (int)inp->inp_fport, name,
 					    inp->inp_lport != inp->inp_fport);
 			} /* else nothing printed now */
 #endif /* INET6 */
