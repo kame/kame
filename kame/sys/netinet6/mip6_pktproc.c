@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.95 2003/01/17 11:44:11 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.96 2003/01/17 12:00:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -267,7 +267,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 		ip6a = mtod(n, struct ip6aux *);
 		if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {
 			mip6log((LOG_NOTICE,
-			    "%s:%d: recieved a home test init with "
+			    "%s:%d: recieved a care-of test init with "
 			    " a home address destination option.\n",
 			    __FILE__, __LINE__));
 			m_freem(m0);
