@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.147 2000/08/21 05:40:52 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.148 2000/08/21 05:45:08 jinmei Exp $
 
 1. IPv6
 
@@ -641,7 +641,7 @@ this, KAME sys/netinet6 code defines its own protocol switch
 structure, as "struct ip6protosw" (see netinet6/ip6protosw.h).
 
 In addition to this, we restrict the number of extension headers (including
-the IPv6 header) in a single packet, in order to prevent a DoS attack
+the IPv6 header) in each incoming packet, in order to prevent a DoS attack
 that tries to send packets with a massive number of extension headers.
 The upper limit can be configurable the sysctl value
 net.inet6.ip6.hdrnestlimit. As of writing this document, the default value
