@@ -279,8 +279,8 @@ client6_init()
 		err(1, "setsockopt(outbound, IPV6_MULTICAST_IF)");
 		/*NOTREACHED*/
 	}
+	/* make the socket write-only */
 	if (shutdown(outsock, 0)) {
-		/* make the socket write-only */
 		err(1, "shutdown(outbound, 0)");
 		/* NOTREACHED */
 	}
