@@ -1,4 +1,4 @@
-/*	$KAME: defs.h,v 1.11 2001/02/21 03:49:56 itojun Exp $	*/
+/*	$KAME: defs.h,v 1.12 2003/02/12 04:28:12 suz Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Oregon.
@@ -566,6 +566,7 @@ extern void   trigger_prune_alert    __P((mrtentry_t *mrtentry_ptr));
 extern int    k_req_incoming         __P((struct sockaddr_in6 *source,
 					  struct rpfctl *rpfp));
 #ifdef HAVE_ROUTING_SOCKETS
+extern int    routing_socket;
 extern int    init_routesock         __P((void));
 #endif /* HAVE_ROUTING_SOCKETS */
 

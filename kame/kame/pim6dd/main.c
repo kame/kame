@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.8 2001/11/08 09:47:05 itojun Exp $	*/
+/*	$KAME: main.c,v 1.9 2003/02/12 04:28:12 suz Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Oregon.
@@ -675,6 +675,9 @@ restart(i)
     close(mld6_socket);
     close(pim6_socket);
     close(udp_socket);
+#ifdef HAVE_ROUTING_SOCKETS
+    close(routing_socket);
+#endif
     
     /*
      * start processing again
