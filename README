@@ -2,7 +2,7 @@
 
 			KAME Project
 
-			$Date: 2000/04/20 01:58:18 $
+			$Date: 2000/04/21 04:37:49 $
 
 <<<Project Overview>>>
 
@@ -12,15 +12,15 @@ Limited, Hitachi, Ltd., IIJ Research Laboratory, NEC Corporation,
 Toshiba Corporation, Yokogawa Digital Computer Corporation, Yokogawa
 Electric Corporation joined the project.  This joint effort will avoid
 unnecessary duplicated development in the same area, and effectively
-provides high quality and advanced featured package.
+provides high quality and advanced featured packages.
 
 KAME is originally called "Hydrangea" which was developed by v6
-working group, WIDE Project.  We are merging codes, which each company
+working group, WIDE Project.  We have merged codes, which each company
 in Japan has developed, into "Hydrangea".  To identify the joint
-effort, we changed the name from "Hydrangea" to "KAME". 
+effort, we changed the name from "Hydrangea" to "KAME".
 
-KAME software has been merged into NetBSD-current.  It will also be
-merged into BSD/OS, FreeBSD, and OpenBSD(IPv6 stuff only).
+KAME software has been merged into {FreeBSD,NetBSD,OpenBSD}-current.
+It will also be merged into BSD/OS.
 
 "KAME" officially indicates a short word of <Ka>rigo<me> where our office
 locates.  But it, in fact, stands for turtle in Japanese.
@@ -54,8 +54,9 @@ with the kit.
 To know the difference from the previous stable release, please refer
 to CHANGELOG and RELNOTES.
 
-To install this kit, please read INSTALL at top directory, and
-INSTALL under operating system directory (for example, netbsd/INSTALL).
+To install this kit, please read INSTALL at the top directory, and
+INSTALL under operating system directory (for example,
+netbsd/INSTALL).
 
 If you want to know what features are provided, please refer to
 IMPLEMENTATION. 
@@ -93,10 +94,12 @@ When you report bugs, please be sure to include the following information:
 - the version of KAME you are using ("SNAP dated Jan 1 2000", or
   "grabbed via anonymous CVS around Jan 1 2000")
 - information necessary to repeat the problem
-  this includes, not limited to (1) kernel compilation options, (2) exact
-  command line that raises the issue, (3) routing table setup taken by
-  "netstat -rn", (4) interface configuration via "ifconfig -a",
-  (5) sysctl setting taken by "sysctl -a", 
+  this includes, but not limited to, 
+	(1) kernel compilation options, 
+	(2) exact command line that raises the issue, 
+	(3) routing table setup taken by "netstat -rn", 
+	(4) interface configuration via "ifconfig -a",
+	(5) sysctl setting taken by "sysctl -a", 
 - (if necessary) hardware configuration, like "ethernet card is NE2000"
 - (if necessary) screen trace on the trouble, taken by "script" command.
 - (if necessary) packet trace taken by "tcpdump" command.
@@ -107,14 +110,15 @@ onto the report instead.
 
 If you track the bugs, please notice the following items:
 - be sure to use "ping6 -n", not "ping6", when you probe reachability.
-- read IMPLEMENTATION chapter 1.3 if you try link-local addresses on your tests.
+- read IMPLEMENTATION chapter 1.3 if you try link-local addresses on
+  your tests.
 
-Submit your bug report by using bug database, or you may want to submit
-it to snap-users mailing list.
+Submit your bug report by using bug database, or you may want to
+submit it to snap-users mailing list.
 	bug database: http://www.kame.net/, or /usr/local/v6/bin/kame-send-pr
 	snap-users mailing list: http://www.kame.net/snap-users/
 
-Thanks for your feedbacks!
+Thanks for your feedback!
 
 
 <<<Contact Points>>
@@ -126,14 +130,14 @@ send bug reports on this web page.
 
 We maintain users mailing list, called "snap-users".
 	http://www.kame.net/snap-users/
-has archive of postings, how to subscribe, and some other information.
+has archives of postings, how to subscribe, and some other information.
 Share your tips, experiences, comments with other users.
 
 If you have private comments to our developers, please drop a line to:
 	core@kame.net
 
-If you have questions about commercial usage or other administrative/political
-issues, please send the questions to:
+If you have questions about commercial usage or other
+administrative/political issues, please send the questions to:
 	kame-secretary@kame.net
 
 
@@ -179,5 +183,8 @@ and Akira Kato (in no particular order).
 
 We would also like to thank BSDI (http://www.bsdi.com/) for donating
 BSD/OS licenses for development.
+
+We apologize for any omissions from this list, which are certainly
+unintentional.
 
 							<end of README>
