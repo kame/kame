@@ -355,10 +355,10 @@ timer_stmt
 
 	/* algorithm */
 algorithm_statement
-	:	ALGORITHM_LEVEL BOC algorithm_stmts EOC
+	:	ALGORITHM_LEVEL
 		{
 			yywarn("algorithm directive are obsoleted.");
-		}
+		} BOC algorithm_stmts EOC
 	;
 algorithm_stmts
 	:	/* nothing */
@@ -538,10 +538,10 @@ secproto_specs
 secproto_spec
 	:	SECLEVEL SECLEVELTYPE EOS { prhead->spspec->ipsec_level = $2; }
 	|	SECMODE secmode EOS
-	|	STRENGTH STRENGTHTYPE EOS
+	|	STRENGTH
 		{
 			yyerror("strength directive are obsoleted.");
-		}
+		} STRENGTHTYPE EOS
 	|	ALGORITHM_CLASS ALGORITHMTYPE keylength EOS
 		{
 			int doi;
@@ -783,10 +783,10 @@ isakmpproposal_specs
 	|	isakmpproposal_specs isakmpproposal_spec
 	;
 isakmpproposal_spec
-	:	STRENGTH STRENGTHTYPE EOS
+	:	STRENGTH
 		{
 			yyerror("strength directive are obsoleted.");
-		}
+		} STRENGTHTYPE EOS
 	|	LIFETIME LIFETYPE NUMBER UNITTYPE EOS
 		{
 			if ($2 == CF_LIFETYPE_TIME)
