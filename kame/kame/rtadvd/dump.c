@@ -129,6 +129,14 @@ if_dump()
 				inet_ntop(AF_INET6, &pfx->prefix,
 					  prefixbuf, sizeof(prefixbuf)),
 				pfx->prefixlen);
+			switch(pfx->origin) {
+			case PREFIX_FROM_KERNEL:
+				fprintf(fp, "KERNEL, ");
+				break;
+			case PREFIX_FROM_CONFIG:
+				fprintf(fp, "CONFIG, ");
+				break;
+			}
 			if (pfx->validlifetime == ND6_INFINITE_LIFETIME)
 				fprintf(fp, "vltime: infinity, ");
 			else
@@ -139,13 +147,14 @@ if_dump()
 			else
 				fprintf(fp, "pltime: %ld, ",
 					(long)pfx->preflifetime);
-			fprintf(fp, "flags: %s%s%s)\n",
+			fprintf(fp, "flags: %s%s%s",
 				pfx->onlinkflg ? "L" : "",
 				pfx->autoconfflg ? "A" : "",
 #ifdef MIP6
 				pfx->routeraddr ? "R" :
 #endif
 				"");
+			fprintf(fp, ")\n");
 		}
 	}
 }

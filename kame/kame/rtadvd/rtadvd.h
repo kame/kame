@@ -62,6 +62,9 @@
 #define MIN_DELAY_BETWEEN_RAS             3
 #define MAX_RA_DELAY_TIME                 500000 /* usec */
 
+#define PREFIX_FROM_KERNEL 1
+#define PREFIX_FROM_CONFIG 2
+
 struct prefix {
 	struct prefix *next;	/* forward link */
 	struct prefix *prev;	/* previous link */
@@ -73,7 +76,8 @@ struct prefix {
 #ifdef MIP6
 	u_int routeraddr;	/* bool: RouterAddress */
 #endif
-	int	prefixlen;
+	int prefixlen;
+	int origin;		/* from kernel or cofig */
 	struct in6_addr prefix;
 };
 

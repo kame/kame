@@ -258,6 +258,8 @@ getconfig(intface)
 			/* link into chain */
 			insque(pfx, &tmp->prefix);
 
+			pfx->origin = PREFIX_FROM_CONFIG;
+
 			makeentry(entbuf, i, "prefixlen", added);
 			MAYHAVE(val, entbuf, 64);
 			if (val < 0 || val > 128) {
@@ -491,6 +493,7 @@ add_prefix(struct rainfo *rai, struct in6_prefixreq *ipr)
 	prefix->preflifetime = ipr->ipr_pltime;
 	prefix->onlinkflg = ipr->ipr_raf_onlink;
 	prefix->autoconfflg = ipr->ipr_raf_auto;
+	prefix->origin = PREFIX_FROM_KERNEL;
 
 	insque(prefix, &rai->prefix);
 
