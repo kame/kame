@@ -1,3 +1,5 @@
+/*	$KAME: var.h,v 1.3 2000/07/24 01:00:29 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: var.h,v 1.2 2000/07/14 08:48:01 itojun Exp $ */
 
 #if !defined(_VAR_H_)
 #define _VAR_H_

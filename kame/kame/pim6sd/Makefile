@@ -1,3 +1,5 @@
+#	$KAME: Makefile,v 1.9 2000/07/24 01:00:28 itojun Exp $
+#
 # Copyright (c) 1999 WIDE Project. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -57,8 +59,6 @@
 #
 # Questions concerning this software should be directed to 
 # Kurt Windisch (kurtw@antc.uoregon.edu)
-#
-# $Id: Makefile,v 1.8 2000/02/25 06:32:22 itojun Exp $
 #
 #
 #Part of this program has been derived from PIM sparse-mode pimd.

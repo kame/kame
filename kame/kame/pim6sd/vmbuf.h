@@ -1,3 +1,5 @@
+/*	$KAME: vmbuf.h,v 1.2 2000/07/24 01:00:29 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: vmbuf.h,v 1.1 1999/10/29 09:04:55 jinmei Exp $ */
 
 typedef struct _vchar_ {
 	u_int32_t t;	/* type of the value */
