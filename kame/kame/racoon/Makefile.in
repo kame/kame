@@ -1,4 +1,4 @@
-# YIPS $Id: Makefile.in,v 1.17 2000/01/31 13:39:12 itojun Exp $
+# YIPS $Id: Makefile.in,v 1.18 2000/02/01 09:51:26 itojun Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -7,7 +7,7 @@ CC=	@CC@
 LDFLAGS=@LDFLAGS@
 CPPFLAGS=	@CPPFLAGS@
 OPTFLAG=@OPTFLAG@
-CFLAGS=	@CFLAGS@ @CPPFLAGS@ @DEFS@ $(CPPFLAGS) $(OPTFLAG) -DIPSEC -I. -I$(srcdir) -Dss_family=__ss_family -Dss_len=__ss_len -DSYSCONFDIR=\"${sysconfdir}\"
+CFLAGS=	@CFLAGS@ $(CPPFLAGS) @DEFS@ $(CPPFLAGS) $(OPTFLAG) -DIPSEC -I. -I$(srcdir) -Dss_family=__ss_family -Dss_len=__ss_len -DSYSCONFDIR=\"${sysconfdir}\"
 CFLAGS+=-DYY_NO_UNPUT
 LIBS=	@LIBS@
 YFLAGS+=-d
