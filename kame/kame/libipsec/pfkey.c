@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.45 2003/08/26 03:24:20 itojun Exp $	*/
+/*	$KAME: pfkey.c,v 1.46 2003/08/26 03:37:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -41,7 +41,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <stdio.h>
 
 #include "ipsec_strerror.h"
 #include "libpfkey.h"
