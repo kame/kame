@@ -91,7 +91,11 @@ extern int innetgr __P(( const char *, const char *, const char *, const char * 
 
 #define max(a, b)	((a > b) ? a : b)
 
-int __ivaliduser_sa __P((FILE *, const struct sockaddr *, int, const char *, const char *));
+int __ivaliduser __P((FILE *, u_long, const char *, const char *));
+int __ivaliduser_af __P((FILE *,const void *, const char *, const char *,
+	int, int));
+int __ivaliduser_sa __P((FILE *, const struct sockaddr *, int, const char *,
+	const char *));
 #if 0
 static int __icheckhost __P((const void *, const char *, int, int));
 #endif
