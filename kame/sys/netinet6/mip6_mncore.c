@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.5 2003/06/11 11:32:28 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.6 2003/06/12 11:11:04 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -3567,7 +3567,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 		 */
 		bu_size += MIP6_PADLEN(bu_size, 2, 0);
 		nonce_size = sizeof(struct ip6m_opt_nonce);
-		nonce_size += MIP6_PADLEN(nonce_size, 8, 2);
+		nonce_size += MIP6_PADLEN(bu_size + nonce_size, 8, 2);
 		/* (6.2.7)
 		   The Binding Authorization Data option does not
 		   have alignment requirements as such.  However,
