@@ -20,7 +20,7 @@
  */
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/pcap-bpf.c,v 1.1 1999/08/08 23:30:15 itojun Exp $ (LBL)";
+    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/pcap-bpf.c,v 1.2 1999/09/27 13:23:42 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>			/* optionally get BSD define */
@@ -204,6 +204,13 @@ pcap_open_live(char *device, int snaplen, int promisc, int to_ms, char *ebuf)
 		sprintf(ebuf, "BIOCGDLT: %s", pcap_strerror(errno));
 		goto bad;
 	}
+#ifdef __OpenBSD__
+	switch (v) {
+	case DLT_LOOP:
+		v = DLT_NULL;
+		break;
+	}
+#endif
 #if _BSDI_VERSION - 0 >= 199510
 	/* The SLIP and PPP link layer header changed in BSD/OS 2.1 */
 	switch (v) {

@@ -37,7 +37,7 @@
  *
  *      @(#)bpf.h       7.1 (Berkeley) 5/7/91
  *
- * @(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/bpf/net/bpf.h,v 1.1 1999/08/08 23:30:28 itojun Exp $ (LBL)
+ * @(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/bpf/net/bpf.h,v 1.2 1999/09/27 13:23:43 itojun Exp $ (LBL)
  */
 
 #ifndef BPF_MAJOR_VERSION
@@ -174,6 +174,10 @@ struct bpf_hdr {
 #define DLT_FDDI	10	/* FDDI */
 #ifdef __FreeBSD__
 #define DLT_ATM_RFC1483	11	/* LLC/SNAP encapsulated atm */
+#endif
+#ifdef __OpenBSD__
+#define DLT_ATM_RFC1483	11	/* LLC/SNAP encapsulated atm */
+#define DLT_LOOP	12	/* loopback */
 #endif
 /* offset to avoid collision with BSD/OS values */
 #ifndef DLT_ATM_RFC1483
