@@ -91,6 +91,8 @@ defflag	opt_ppp.h		PPP_DEFLATE PPP_BSDCOMP PPP_FILTER
 defflag	opt_sctp.h      	SCTP SCTP_TCP_MODEL_SUPPORT
 defflag	opt_sctp.h      	SCTP_DEBUG SCTP_USE_ADLER32
 
+defflag opt_dccp.h		DCCP DCCP_TFRC
+
 # networking options
 #
 defflag				GATEWAY
@@ -1215,6 +1217,10 @@ file	netinet/sctp_sha1.c		sctp & inet & inet6
 file	netinet/sctp_timer.c		sctp & inet & inet6
 file	netinet/sctp_usrreq.c		sctp & inet & inet6
 file	netinet/sctputil.c		sctp & inet & inet6
+file	netinet/dccp_usrreq.c		dccp & inet
+file	netinet/dccp_cc_sw.c		dccp & inet
+file	netinet/dccp_tcplike.c		dccp & inet
+file	netinet/dccp_tfrc.c		dccp & dccp_tfrc & inet
 file	netinet/tcp_debug.c		inet | inet6
 file	netinet/tcp_input.c		inet | inet6
 file	netinet/tcp_output.c		inet | inet6
