@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.26 2002/09/17 09:57:19 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.27 2002/10/11 14:26:29 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -143,6 +143,12 @@ query_groups(v)
 	v->uv_gq_timer = MLD6_QUERY_INTERVAL;
 	if (v->uv_flags & VIFF_QUERIER &&
 	    (v->uv_flags & VIFF_NOLISTENER) == 0) {
+		if (v->uv_stquery_cnt)
+			v->uv_stquery_cnt--;
+		if (v->uv_stquery_cnt)
+			v->uv_gq_timer = MLD6_STARTUP_QUERY_INTERVAL;
+		else
+			v->uv_gq_timer = MLD6_QUERY_INTERVAL;
 		send_mld6(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
 			  NULL, (struct in6_addr *)&in6addr_any, v->uv_ifindex,
 			  MLD6_QUERY_RESPONSE_INTERVAL, 0, 1);

@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.28 2002/10/02 06:27:24 suz Exp $	*/
+/*	$KAME: vif.c,v 1.29 2002/10/11 14:26:29 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -360,6 +360,8 @@ void start_vif (mifi_t vifi)
 	    v->uv_querier->al_addr = v->uv_linklocal->pa_addr;
 	    v->uv_querier->al_timer = MLD6_OTHER_QUERIER_PRESENT_INTERVAL;
 	    time(&v->uv_querier->al_ctime); /* reset timestamp */
+	    v->uv_stquery_cnt = MLD6_STARTUP_QUERY_COUNT;
+
 #ifdef MLD6V2_LISTENER_REPORT
 	    if (v->uv_mld_version & MLDv2)
 		query_groupsV2(v);

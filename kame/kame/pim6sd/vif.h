@@ -1,4 +1,4 @@
-/*	$KAME: vif.h,v 1.20 2002/06/28 09:03:13 jinmei Exp $	*/
+/*	$KAME: vif.h,v 1.21 2002/10/11 14:26:29 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -192,6 +192,7 @@ struct uvif {
 	u_int16 uv_pim_hello_timer; /* timer for sending PIM hello msgs  */
 	u_int16	uv_gq_timer;	/* Group Query timer                    */
 	u_int16	uv_jp_timer;	/* Join/Prune timer 			*/	
+	u_int16 uv_stquery_cnt;	/* Startup Query Count */
 	u_int16 uv_mld_version;	/* mld version of this mif */
 	u_int16 uv_mld_robustness; /* robustness variable of this vif (mld6 protocol) */
 	u_int32 uv_mld_query_interval; /* query interval of this vif (mld6 protocol) */
