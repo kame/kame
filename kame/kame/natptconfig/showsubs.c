@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.15 2002/03/25 07:38:23 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.16 2002/05/15 12:40:51 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -170,7 +170,10 @@ makeCUI64Line(struct logmsg *lmsg, struct cSlot *csl)
 		appendProto(lmsg, csl);
 	} else {
 		/* in case One-on-one translation */
-		concat(lmsg, "static");
+		if (((struct mAddr *)&csl->local)->saddr.aType != ADDR_SINGLE)
+			concat(lmsg, "masquerade");
+		else
+			concat(lmsg, "static");
 		appendPAddr6(lmsg, csl, (struct mAddr *)&csl->local);
 		appendPAddr4(lmsg, csl, (struct mAddr *)&csl->remote);
 		appendProto(lmsg, csl);
