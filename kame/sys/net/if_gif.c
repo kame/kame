@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.55 2001/07/24 13:54:09 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.56 2001/07/24 13:56:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -476,9 +476,8 @@ gif_input(m, af, gifp)
 	 * prevent too many recursive calls of such input functions, which
 	 * might cause kernel panic.  But the change may introduce another
 	 * problem; if the input queue is full, packets are discarded.
-	 * We believed it rarely occurs and changed the policy.  If we find
-	 * it occurs more times than we thought, we may change the policy
-	 * again.
+	 * The kernel stack overflow really happened, and we believed
+	 * queue-full rarely occurs, so we changed the policy.
 	 */
 	switch (af) {
 #ifdef INET
