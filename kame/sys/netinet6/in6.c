@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.307 2002/09/20 21:57:55 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.308 2002/09/21 06:53:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1064,13 +1064,13 @@ in6_update_ifa(ifp, ifra, ia)
 
 		if ((ifp->if_flags & (IFF_POINTOPOINT|IFF_LOOPBACK)) == 0) {
 			/* XXX: noisy message */
-			nd6log((LOG_INFO, "in6_update_ifa: a destination can be "
-			    "specified for a p2p or a loopback IF only\n"));
+			nd6log((LOG_INFO, "in6_update_ifa: a destination can "
+			    "be specified for a p2p or a loopback IF only\n"));
 			return (EINVAL);
 		}
 		if (plen != 128) {
-			nd6log((LOG_INFO, "in6_update_ifa: prefixlen should be "
-			    "128 when dstaddr is specified\n"));
+			nd6log((LOG_INFO, "in6_update_ifa: prefixlen should "
+			    "be 128 when dstaddr is specified\n"));
 #ifdef FORCE_P2PPLEN
 			/*
 			 * To be compatible with old configurations,
