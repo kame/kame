@@ -1,4 +1,4 @@
-/* $Id: mipsock.h,v 1.3 2005/02/28 19:08:06 keiichi Exp $ */
+/* $Id: mipsock.h,v 1.4 2005/03/10 23:30:36 t-momose Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -50,7 +50,6 @@ struct mipm_bc_info {
 	int mipc_seqno;
 	int mipc_lifetime;
 	u_int16_t mipc_flags;
-	u_int16_t mipc_bid;      /* Binding Unique Identifier */
 	struct sockaddr mipc_addr[0];
 #define MIPC_HOA(mipc)	(&(mipc)->mipc_addr[0])
 #define MIPC_COA(mipc)	((struct sockaddr *)((caddr_t)(MIPC_HOA(mipc)) \
@@ -68,7 +67,6 @@ struct mipm_bul_info {
 	u_int16_t	mipu_flags;
 	u_short		mipu_hoa_ifindex;
 	char	mipu_coa_ifname[IFNAMSIZ];
-	u_int16_t mipu_bid;     /* Binding Unique Identifier */
 	u_int8_t        mipu_state;
 	struct sockaddr mipu_addr[0];
 #define MIPU_HOA(mipu)	(&(mipu)->mipu_addr[0])
@@ -140,7 +138,6 @@ struct mipm_md_info {
 #define MIPM_MD_ADDR 		0x02
 #define MIPM_MD_HOME 		0x03
 	u_int16_t mipm_md_ifindex;        
-	u_int16_t mipm_md_bid;      /* Binding Unique Identifier */
 
 	struct sockaddr mipm_md_addr[0];
 #define MIPD_HOA(mipd)	(&(mipd)->mipm_md_addr[0])
