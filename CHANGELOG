@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1435 2000/12/11 19:13:41 itojun Exp $
+$KAME: CHANGELOG,v 1.1436 2000/12/12 05:19:51 jinmei Exp $
 
 <200012>
+2000-12-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/raw_ip6.c: used by bsdi4 for better code
+	sharing. Basically, no new feature change was introduced by this
+	change.
+
 Snu Dec 11 JST 2000  itojun@iijlab.net
 	* freebsd4/sys/i386/isa/if_lnc.c: cope with VMware ethernet chip
 	  emulation, which loops back multicast packet to itself
