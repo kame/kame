@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1883 2001/09/20 09:40:03 jinmei Exp $
+$KAME: CHANGELOG,v 1.1884 2001/09/21 05:24:56 sakane Exp $
 
 <200109>
+Fri Sep 21 14:19:02 JST 2001 sakane@kame.net
+	* kame/sys/netinet6/ipsec.c:
+	When the value of the upper layer of the security policy index (spidx)
+	structure is ICMPv6, the port field in "src" of the spidx means ICMPv6
+	type, and the port field in "dst" of the spidx specifies ICMPv6 code.
+	For example, the following means the policy doesn't require IPsec for
+	an inbound Neighbor Solicitation.
+		spdadd ::/0[135] ::/0 icmp6 -P in none;
+
 2001-09-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_rtr.c (prelist_update): corrected the
 	definition of "storedlifetime" (used in the two-hour rule) for an
