@@ -1,4 +1,4 @@
-/*	$KAME: mip6stat.c,v 1.19 2003/02/24 02:57:58 k-sugyou Exp $	*/
+/*	$KAME: mip6stat.c,v 1.20 2003/04/24 06:28:25 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -43,6 +43,8 @@
 #include <sys/queue.h>
 
 #include <net/route.h>
+
+#include <net/if.h>
 
 #include <netinet/in.h>
 #include <netinet6/ip6_var.h>
