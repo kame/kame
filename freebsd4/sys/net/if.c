@@ -918,6 +918,7 @@ ifioctl(so, cmd, data, p)
 #ifdef INET6
 	case SIOCSIFPHYADDR_IN6:
 #endif
+	case SIOCSLIFPHYADDR:
         case SIOCSIFMEDIA:
 	case SIOCSIFGENERIC:
 		error = suser(p);
@@ -934,6 +935,9 @@ ifioctl(so, cmd, data, p)
 		ifs = (struct ifstat *)data;
 		ifs->ascii[0] = '\0';
 		
+	case SIOCGIFPSRCADDR:
+	case SIOCGIFPDSTADDR:
+	case SIOCGLIFPHYADDR:
 	case SIOCGIFMEDIA:
 	case SIOCGIFGENERIC:
 		if (ifp->if_ioctl == 0)

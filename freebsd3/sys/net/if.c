@@ -814,6 +814,7 @@ ifioctl(so, cmd, data, p)
 #ifdef INET6
 	case SIOCSIFPHYADDR_IN6:
 #endif
+	case SIOCSLIFPHYADDR:
         case SIOCSIFMEDIA:
 	case SIOCSIFGENERIC:
 		error = suser(p->p_ucred, &p->p_acflag);
@@ -826,6 +827,9 @@ ifioctl(so, cmd, data, p)
 			getmicrotime(&ifp->if_lastchange);
 		return error;
 
+	case SIOCGIFPSRCADDR:
+	case SIOCGIFPDSTADDR:
+	case SIOCGLIFPHYADDR:
 	case SIOCGIFMEDIA:
 	case SIOCGIFGENERIC:
 		if (ifp->if_ioctl == 0)
