@@ -67,21 +67,33 @@ int found_first_ifid = 0;
 #define IFID_LEN 8
 static char first_ifid[IFID_LEN];
 
-static void ieee802_to_eui64 __P((u_int8_t *, u_int8_t *));
+static int laddr_to_eui64 __P((u_int8_t *, u_int8_t *, size_t));
 
-static void
-ieee802_to_eui64(dst, src)
+static int
+laddr_to_eui64(dst, src, len)
 	u_int8_t *dst;
 	u_int8_t *src;
+	size_t len;
 {
-	dst[0] = src[0];
-	dst[1] = src[1];
-	dst[2] = src[2];
-	dst[3] = 0xff;
-	dst[4] = 0xfe;
-	dst[5] = src[3];
-	dst[6] = src[4];
-	dst[7] = src[5];
+	switch (len) {
+	case 6:
+		dst[0] = src[0];
+		dst[1] = src[1];
+		dst[2] = src[2];
+		dst[3] = 0xff;
+		dst[4] = 0xfe;
+		dst[5] = src[3];
+		dst[6] = src[4];
+		dst[7] = src[5];
+		break;
+	case 8:
+		bcopy(src, dst, len);
+		break;
+	default:
+		return EINVAL;
+	}
+
+	return 0;
 }
 
 /*
@@ -144,18 +156,8 @@ in6_ifattach_getifid(ifp0)
 	return EADDRNOTAVAIL;
 
 found:
-	switch (addrlen) {
-	case 6:
-		ieee802_to_eui64(first_ifid, addr);
+	if (laddr_to_eui64(first_ifid, addr, addrlen) == 0)
 		found_first_ifid = 1;
-		break;
-	case 8:
-		bcopy(addr, first_ifid, 8);
-		found_first_ifid = 1;
-		break;
-	default:
-		break;
-	}
 
 	if (found_first_ifid) {
 		printf("%s: supplying EUI64: "
@@ -225,8 +227,8 @@ in6_ifattach(ifp, type, laddr, noloop)
 	struct ifnet *ifp;
 	u_int type;
 	caddr_t laddr;
+	/* size_t laddrlen; */
 	int noloop;
-	/* xxx sizeof(laddr) */
 {
 	static size_t if_indexlim = 8;
 	struct sockaddr_in6 mltaddr;
@@ -386,7 +388,13 @@ in6_ifattach(ifp, type, laddr, noloop)
 	case IN6_IFT_P2P802:
 		if (laddr == NULL)
 			break;
-		ieee802_to_eui64(&ia->ia_addr.sin6_addr.s6_addr8[8], laddr);
+		/* XXX use laddrlen */
+		if (laddr_to_eui64(&ia->ia_addr.sin6_addr.s6_addr8[8],
+				laddr, 6) != 0) {
+			break;
+		}
+		/* invert u bit to convert EUI64 to RFC2373 interface ID. */
+		ia->ia_addr.sin6_addr.s6_addr8[8] ^= 0x02;
 		if (found_first_ifid == 0) {
 			if (in6_ifattach_getifid(ifp) == 0)
 				in6_ifattach_p2p();
