@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.74 1999/08/26 13:35:59 itojun Exp $
+$Id: CHANGELOG,v 1.75 1999/08/27 03:26:29 itojun Exp $
 
 <199908>
+Fri Aug 27 12:23:19 JST 1999  itojun@iijlab.net
+	* netbsd/sys/netinet/tcp_subr.c: fix IPsec header size consideration
+	  during TCP mss computation.  you will see no fragmentation on
+	  IPsec'ed TCP packets.
+
 Thu Aug 26 22:36:07 JST 1999  itojun@iijlab.net
 	* kame/tcpdump/print-ip.c: fix length printer for IPv4 first framgnet.
 	  variable was broken during onion peeling and garbled value was
