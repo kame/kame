@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1220 2000/08/21 10:16:59 sakane Exp $
+$KAME: CHANGELOG,v 1.1221 2000/08/21 17:48:05 sumikawa Exp $
 
 <200008>
+Mon Aug 21 13:33:12 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* kame/freebsd4/ports/{ct, v6eval}: TAHI test tools
+
 Mon Aug 21 19:17:17 JST 2000 sakane@ydc.co.jp
 	* freebsd3/ports/apache13: apache 1.3.12 + latest IPv6 patch
 
