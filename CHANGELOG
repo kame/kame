@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.693 2000/03/15 13:52:02 jinmei Exp $
+$Id: CHANGELOG,v 1.694 2000/03/16 08:03:24 jinmei Exp $
 
 <200003>
+2000-03-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ndp/ndp.c: added additional arguments for the -i
+	option to set some ND-related parameters per i/f basis.
+	Note: you should update kernel and include files before
+	recompiling ndp.
+
+2000-03-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c: performed NUD on p2p links. A new
+	member of nd_ifinio{} and a new ioctl (SIOCSIFINFO_FLAGS) were
+	added to turn on/off the feature.
+
 2000-03-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ping6/ping6.c: added a new option 'H', which specifies
 	to try reverse-lookup of IPv6 addresses. ping6 now does not try
