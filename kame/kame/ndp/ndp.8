@@ -1,4 +1,4 @@
-.\"	$KAME: ndp.8,v 1.28 2002/07/17 08:46:33 itojun Exp $
+.\"	$KAME: ndp.8,v 1.29 2004/06/08 04:43:57 suz Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -212,13 +212,13 @@ Show default router list.
 .It Fl R
 Flush all the entries in the default router list.
 .It Fl s
-Register a NDP entry for a node.
+Register an NDP entry for a node.
 The entry will be permanent unless the word
 .Li temp
 is given in the command.
 If the word
 .Li proxy
-is given, this system will act as an proxy NDP server,
+is given, this system will act as a proxy NDP server,
 responding to requests for
 .Ar hostname
 even though the host address is not its own.
