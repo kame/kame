@@ -2432,7 +2432,7 @@ tn(argc, argv)
     retry = 0;
     for (res = res0; res; res = res->ai_next) {
 	if (1 /* retry */) {
-	    char hbuf[MAXHOSTNAMELEN];
+	    char hbuf[NI_MAXHOST];
 
 	    getnameinfo(res->ai_addr, res->ai_addrlen, hbuf, sizeof(hbuf),
 		NULL, 0, NI_NUMERICHOST);
@@ -2495,7 +2495,7 @@ tn(argc, argv)
 	}
 
 	if (connect(net, res->ai_addr, res->ai_addrlen) < 0) {
-	    char hbuf[MAXHOSTNAMELEN];
+	    char hbuf[NI_MAXHOST];
 
 	    getnameinfo(res->ai_addr, res->ai_addrlen, hbuf, sizeof(hbuf),
 		NULL, 0, NI_NUMERICHOST);
