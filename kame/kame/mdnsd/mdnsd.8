@@ -1,4 +1,4 @@
-.\"	$KAME: mdnsd.8,v 1.44 2001/07/31 04:36:09 itojun Exp $
+.\"	$KAME: mdnsd.8,v 1.45 2001/07/31 04:39:16 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -52,7 +52,7 @@
 .Fl i Ar intface
 .Ek
 .Bk -words
-.Op Ar userv...
+.Op Ar server...
 .Ek
 .\"
 .Sh DESCRIPTION
@@ -160,7 +160,7 @@ is for debugging purposes only
 .Po
 for running two daemons on a single node
 .Pc .
-.It Ar userv
+.It Ar server
 Specify unicast DNS servers we may want to try sending queries.
 Users can list multiple DNS servers.
 .El
@@ -272,7 +272,7 @@ we use linklocal all-node multicast address at this moment.
 .Nm
 is too aggressive when sending queries.
 For example, if you specify unicast DNS servers by
-.Ar userv
+.Ar server
 argument,
 .Nm
 will transmit DNS queries every time a client asks
