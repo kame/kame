@@ -738,7 +738,6 @@ nd6_free(rt)
 			rt6_flush(&in6, rt->rt_ifp);
 		}
 
-		/* this is safe when dr is NULL */
 		if (dr) {
 			/*
 			 * Unreachablity of a router might affect the default
