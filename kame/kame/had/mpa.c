@@ -1,4 +1,4 @@
-/*	$KAME: mpa.c,v 1.10 2004/02/05 12:38:09 keiichi Exp $	*/
+/*	$KAME: mpa.c,v 1.11 2004/02/09 02:24:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: mpa.c,v 1.10 2004/02/05 12:38:09 keiichi Exp $
+ * $Id: mpa.c,v 1.11 2004/02/09 02:24:23 keiichi Exp $
  */
 
 #include <sys/param.h>
@@ -156,8 +156,8 @@ err:
  * Send Mobile Prefix Advertisement message
  */
 void
-mpi_advert_output(dst, src, haif, id)
-    struct sockaddr_in6 *dst;	/* home addr of destination MN */
+mpi_advert_output(dst_sa, src, haif, id)
+    struct sockaddr_in6 *dst_sa;	/* home addr of destination MN */
     struct in6_addr *src;
     struct hagent_ifinfo *haif;
     u_int16_t id;
@@ -197,8 +197,8 @@ mpi_advert_output(dst, src, haif, id)
 
     map->mip6_pa_cksum = 0;
     map->mip6_pa_id = id;
-    sndmhdr.msg_name = (caddr_t)dst;
-    sndmhdr.msg_namelen = dst->sin6_len;
+    sndmhdr.msg_name = (caddr_t)dst_sa;
+    sndmhdr.msg_namelen = dst_sa->sin6_len;
     sndmhdr.msg_iov[0].iov_base = (caddr_t)buf;
     sndmhdr.msg_iov[0].iov_len = len;
 
@@ -458,6 +458,7 @@ examine_mpaexp_bc()
     struct hagent_gaddr *galp;
     struct mip6_bc *mbc, mip6_bc;
     struct mip6_bc_list mip6_bc_list;
+    struct sockaddr_in6 phaddr_sa;
     
     if (get_bc_list(&mip6_bc_list))
 	return;
@@ -493,7 +494,17 @@ examine_mpaexp_bc()
 	    return;
 
 	/* Sending MPA */
-        mpi_advert_output(&mip6_bc.mbc_phaddr, hagent_addr, haif, 0);
+	bzero(&phaddr_sa, sizeof(phaddr_sa));
+	phaddr_sa.sin6_len = sizeof(phaddr_sa);
+	phaddr_sa.sin6_family = AF_INET6;
+	phaddr_sa.sin6_addr = mip6_bc.mbc_phaddr;
+#ifdef __KAME__
+	if (IN6_IS_ADDR_LINKLOCAL(&phaddr_sa.sin6_addr)) {
+	    phaddr_sa.sin6_scope_id = ntohs(*(u_int16_t *)&phaddr_sa.sin6_addr.s6_addr[2]);
+	    *(u_int16_t *)&phaddr_sa.sin6_addr.s6_addr[2] = 0;
+	}
+#endif
+        mpi_advert_output(&phaddr_sa, hagent_addr, haif, 0);
 
 	/* Update mpa expiration time */
 	/* XXX ; These constants should be customized  */
