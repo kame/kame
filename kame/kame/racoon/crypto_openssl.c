@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.28 2000/08/10 12:25:33 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.29 2000/08/22 11:34:47 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -105,7 +105,11 @@ eay_check_x509cert(cert, CApath)
 	int error = -1;
 
 	/* XXX define only functions required. */
+#if OPENSSL_VERSION_NUMBER >= 0x00905100L
 	OpenSSL_add_all_algorithms();
+#else
+	SSLeay_add_all_algorithms();
+#endif
 
 	cert_ctx = X509_STORE_new();
 	if (cert_ctx == NULL)
