@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.112 2004/08/11 02:36:51 suz Exp $	*/
+/*	$KAME: common.c,v 1.113 2004/08/19 12:35:45 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1873,7 +1873,7 @@ sprint_auth(optinfo)
 	opth.dh6opt_type = htons((t)); \
 	opth.dh6opt_len = htons((l)); \
 	memcpy((p), &opth, sizeof(opth)); \
-	if ((l)) \
+	if ((l) && (v)) \
 		memcpy((p) + 1, (v), (l)); \
 	(p) = (struct dhcp6opt *)((char *)((p) + 1) + (l)); \
  	(len) += sizeof(struct dhcp6opt) + (l); \
