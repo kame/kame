@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: var.h,v 1.3 2000/01/10 22:38:40 itojun Exp $ */
+/* YIPS @(#)$Id: var.h,v 1.4 2000/01/10 23:28:35 itojun Exp $ */
 
 #if !defined(_VAR_H_)
 #define _VAR_H_
@@ -59,9 +59,6 @@
 #define CALLOC(size, cast) (cast)calloc(1, (size))
 
 #include <sys/socket.h>
-#define BUFADDRSIZE 128		/* buffer size of string of address */
-#define INET_NTOP(addr, buf) \
-	inet_ntop(((struct sockaddr *)(addr))->sa_family, _INADDRBYSA(addr), buf, sizeof(buf))
 
 /*
  * XXX use of GETNAMEINFO(x, y, NULL) is not politically correct,
