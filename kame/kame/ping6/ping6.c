@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.75 2000/08/14 08:03:58 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.76 2000/08/14 08:22:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1683,7 +1683,7 @@ pr_suptypes(ni, nilen)
 				return;
 			cp += sizeof(cbit);
 			clen = ntohs(cbit.words) * sizeof(v);
-			if (cur + clen * 8 + ntohs(cbit.skip) * 32 > MAXQTYPES)
+			if (cur + clen * 8 + (u_long)ntohs(cbit.skip) * 32 > MAXQTYPES)
 				return;
 		}
 
