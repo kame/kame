@@ -67,7 +67,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.25 2000/02/26 09:38:54 itojun Exp $");
+__RCSID("$Id: inet6.c,v 1.26 2000/02/26 09:41:49 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -334,7 +334,8 @@ udp6_stats(off, name)
 	p1(udp6s_badsum, "\t%llu with bad checksum\n");
 	p1(udp6s_nosum, "\t%llu with no checksum\n");
 	p1(udp6s_noport, "\t%llu dropped due to no socket\n");
-	p(udp6s_noportmcast, "\t%llu multicast datagram%s dropped due to no socket\n");
+	p(udp6s_noportmcast,
+		"\t%llu multicast datagram%s dropped due to no socket\n");
 	p1(udp6s_fullsock, "\t%llu dropped due to full socket buffers\n");
 	delivered = udp6stat.udp6s_ipackets -
 		    udp6stat.udp6s_hdrops -
@@ -637,7 +638,8 @@ ip6_stats(off, name)
 	p1(ip6s_badoptions, "\t%llu with bad options\n");
 	p1(ip6s_badvers, "\t%llu with incorrect version number\n");
 	p(ip6s_fragments, "\t%llu fragment%s received\n");
-	p(ip6s_fragdropped, "\t%llu fragment%s dropped (dup or out of space)\n");
+	p(ip6s_fragdropped,
+	    "\t%llu fragment%s dropped (dup or out of space)\n");
 	p(ip6s_fragtimeout, "\t%llu fragment%s dropped after timeout\n");
 	p(ip6s_fragoverflow, "\t%llu fragment%s that exceeded limit\n");
 	p(ip6s_reassembled, "\t%llu packet%s reassembled ok\n");
@@ -647,7 +649,8 @@ ip6_stats(off, name)
 	p(ip6s_redirectsent, "\t%llu redirect%s sent\n");
 	p(ip6s_localout, "\t%llu packet%s sent from this host\n");
 	p(ip6s_rawout, "\t%llu packet%s sent with fabricated ip header\n");
-	p(ip6s_odropped, "\t%llu output packet%s dropped due to no bufs, etc.\n");
+	p(ip6s_odropped,
+	    "\t%llu output packet%s dropped due to no bufs, etc.\n");
 	p(ip6s_noroute, "\t%llu output packet%s discarded due to no route\n");
 	p(ip6s_fragmented, "\t%llu output datagram%s fragmented\n");
 	p(ip6s_ofragments, "\t%llu fragment%s created\n");
@@ -681,9 +684,11 @@ ip6_stats(off, name)
 	    (unsigned long long)ip6stat.ip6s_mext1);
 	printf("\t\t%llu two or more ext mbuf\n",
 	    (unsigned long long)ip6stat.ip6s_mext2m);	
-	p(ip6s_exthdrtoolong, "\t%llu packet%s whose headers are not continuous\n");
+	p(ip6s_exthdrtoolong,
+	    "\t%llu packet%s whose headers are not continuous\n");
 	p(ip6s_nogif, "\t%llu tunneling packet%s that can't find gif\n");
-	p(ip6s_toomanyhdr, "\t%llu packet%s discarded due to too many headers\n");
+	p(ip6s_toomanyhdr,
+	    "\t%llu packet%s discarded due to too many headers\n");
 
 	if (ip6stat.ip6s_exthdrget || ip6stat.ip6s_exthdrget0) {
 		p(ip6s_exthdrget, "\t%llu use%s of IP6_EXTHDR_GET\n");
