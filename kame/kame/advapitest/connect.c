@@ -1,4 +1,4 @@
-/*	$KAME: connect.c,v 1.13 2002/03/02 09:52:56 jinmei Exp $ */
+/*	$KAME: connect.c,v 1.14 2003/06/12 09:58:48 suz Exp $ */
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -57,7 +57,7 @@ main(argc, argv)
 	struct addrinfo hints, *res;
 	struct sockaddr_in6 dst;
 	char readbuf[1024], *port = DEFAULTPORT;
-	char **gate, *src;
+	char **gate, *src = NULL;
 	struct ip6_rthdr *rthdr;
 
 	if ((gate = malloc((sizeof(char *)) * argc)) == NULL)
