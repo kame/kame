@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.86 2001/05/24 23:24:03 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.87 2001/05/25 01:08:00 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -672,7 +672,7 @@ struct ip6_mtuinfo {
 #define __IPV6CTL_NAMES_RTMAXCACHE	"maxcache"
 #define __IPV6CTL_TYPE_RTMAXCACHE	CTLTYPE_INT
 #define __IPV6CTL_VARS_RTMAXCACHE	0	/*&rtq_toomany*/
-#elsRTe
+#else
 #define __IPV6CTL_NAMES_RTMAXCACHE	0
 #define __IPV6CTL_TYPE_RTMAXCACHE	0
 #define __IPV6CTL_VARS_RTMAXCACHE	0
