@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1635 2001/04/04 04:21:19 suz Exp $
+$KAME: CHANGELOG,v 1.1636 2001/04/04 10:50:17 itojun Exp $
 
 <200104>
+Wed Apr  4 19:49:39 JST 2001  itojun@iijlab.net
+	* sys/netinet6/icmp6.c: make sure we do not pass mbuf with 
+	  bogus m->m_pkthdr.rcvif, to icmp6_reflect(), on icmp6 error
+	  generation.
+
 Wed Apr  4 13:17:00 JST 2001	suz@sdl.hitachi.co.jp
 	* kame/v6test/getconfig.c
 	fixed a bug that you cannot specify an optional value if its 
