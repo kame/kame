@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1693 2001/05/27 16:22:13 itojun Exp $
+$KAME: CHANGELOG,v 1.1694 2001/05/28 16:13:40 fujisawa Exp $
 
 <200105>
+2001-05-29  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_{defs.h,trans.c,tslot.c,var.h}
+	- convert FTP EPRT command to PORT.
+	  Now, you can connect IPv6 host to IPv4 ftp server when passive
+	  mode is off.
+	  Todo: LPSV/LPRT
+
 Mon May 28 00:24:45 JST 2001  itojun@iijlab.net
 	* sys/netinet6/raw_ip6.c: declare struct rip6stat.  gather statistics
 	  on SOCK_RAW sockets (except for icmp6 sockets) for debugging aid.
