@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.392 2003/08/09 17:06:40 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.393 2003/08/26 19:46:12 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3122,7 +3122,7 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 		p = sopt->sopt_p;
 #endif
 	} else {
-		panic("ip6_ctloutput: arg soopt is NULL");
+		panic("ip6_raw_ctloutput: arg soopt is NULL");
 	}
 #else
 	optlen = m ? m->m_len : 0;
