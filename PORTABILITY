@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.40 2000/04/14 09:52:09 itojun Exp $
+	$Id: PORTABILITY,v 1.41 2000/04/17 08:10:52 jinmei Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -272,19 +272,18 @@ across those possibilities.
   argument except on FreeBSD. Also, the original FreeBSD's extension
   has several bugs (although those bugs are fixed in the route command
   in the KAME kit). If you regard portability and stability, it would
-  be better to use an IPv6 link-local address on the interface as
-  gateway.
+  be better to use a mixture of the "change" operation and the -ifp
+  modifier of the route command.
 
   For example,
   # route add -inet6 default -interface gif0 (on FreeBSD)
   is equivalent to
-  # route add -inet6 default `ifconfig gif0 | grep fe80 | awk '{print $2}'`
-  If you care about cases that gif0 has more than one link-local address,
-  you might have to type
-  # route add -inet6 default `ifconfig gif0 | grep fe80 | head -1 | awk '{print $2}'`
-  Note that this kind of approach assumes that gif0 has at least one
-  IPv6 link-local address. If you are not sure about this, you might
-  want to execute
+  # route add -inet6 default ::1
+  # route change -inet6 default ::1 -ifp gif0
+
+  Note that the kernel code to perform the change operation assumes
+  that gif0 has at least one IPv6 address. If you are not sure about
+  this, you might want to execute
   # ifconfig gif0 up
   before executing the route command.
 
