@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1066 2000/06/27 05:05:00 sumikawa Exp $
+$Id: CHANGELOG,v 1.1067 2000/06/27 14:50:30 suz Exp $
 
 <200006>
+Tue Jun 27 23:12:54 JST 2000	SUZUKI Shinsuke <suz@sdl.hitachi.co.jp>
+	* bsdi3/sbin/ifconfig/ifconfig.c: fixed error trap when given name 
+	corresponds to multiple v6 addresses.
+
 Tue Jun 27 14:01:39 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/emacs: upgrade to 20.7
 
