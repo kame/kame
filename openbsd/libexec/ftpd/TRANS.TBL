@@ -1,0 +1,11 @@
+D CVS                               	CVS
+F EXTERN.H                          	extern.h
+F FTPCMD.Y                          	ftpcmd.y
+F FTPD.8                            	ftpd.8
+F FTPD.C                            	ftpd.c
+F LOGUTMP.C                         	logutmp.c
+F LOGWTMP.C                         	logwtmp.c
+F MAKEFILE                          	Makefile
+L OBJ                               	obj	/usr/obj/libexec/ftpd
+F PATHNAME.H                        	pathnames.h
+F POPEN.C                           	popen.c

@@ -1,0 +1,18 @@
+F CMDS.C                            	cmds.c
+F CMDTAB.C                          	cmdtab.c
+F COMPLETE.C                        	complete.c
+D CVS                               	CVS
+F DOMACRO.C                         	domacro.c
+F EXTERN.H                          	extern.h
+F FETCH.C                           	fetch.c
+F FTP.1                             	ftp.1
+F FTP.C                             	ftp.c
+F FTP_VAR.H                         	ftp_var.h
+F MAIN.C                            	main.c
+F MAKEFILE                          	Makefile
+L OBJ                               	obj	/usr/obj/usr.bin/ftp
+F PATHNAME.H                        	pathnames.h
+F RUSERPAS.C                        	ruserpass.c
+F STRINGLI.C                        	stringlist.c
+F STRINGLI.H                        	stringlist.h
+F UTIL.C                            	util.c
