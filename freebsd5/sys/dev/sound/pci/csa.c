@@ -43,12 +43,12 @@
 #include <dev/sound/pci/csareg.h>
 #include <dev/sound/pci/csavar.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <gnu/dev/sound/pci/csaimg.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/csa.c,v 1.24 2002/07/24 21:27:22 ambrisko Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/csa.c,v 1.27 2003/09/02 17:30:37 jhb Exp $");
 
 /* This is the pci device id. */
 #define CS4610_PCI_ID 0x60011013
@@ -258,11 +258,11 @@ csa_attach(device_t dev)
 	scp->card = csa_findsubcard(dev);
 	scp->binfo.card = scp->card;
 	printf("csa: card is %s\n", scp->card->name);
-	resp->io_rid = PCIR_MAPS;
+	resp->io_rid = PCIR_BAR(0);
 	resp->io = bus_alloc_resource(dev, SYS_RES_MEMORY, &resp->io_rid, 0, ~0, 1, RF_ACTIVE);
 	if (resp->io == NULL)
 		return (ENXIO);
-	resp->mem_rid = PCIR_MAPS + 4;
+	resp->mem_rid = PCIR_BAR(1);
 	resp->mem = bus_alloc_resource(dev, SYS_RES_MEMORY, &resp->mem_rid, 0, ~0, 1, RF_ACTIVE);
 	if (resp->mem == NULL)
 		goto err_io;
@@ -363,9 +363,14 @@ csa_detach(device_t dev)
 static int
 csa_resume(device_t dev)
 {
+#if 0
+	/*
+	 * XXX: this cannot possibly work
+	 * needs to be properly implemented
+	 */
 	csa_detach(dev);
 	csa_attach(dev);
-
+#endif
 	return 0;
 }
 
@@ -387,10 +392,10 @@ csa_alloc_resource(device_t bus, device_t child, int type, int *rid,
 		break;
 	case SYS_RES_MEMORY:
 		switch (*rid) {
-		case PCIR_MAPS:
+		case PCIR_BAR(0):
 			res = resp->io;
 			break;
-		case PCIR_MAPS + 4:
+		case PCIR_BAR(1):
 			res = resp->mem;
 			break;
 		default:

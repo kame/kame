@@ -27,8 +27,6 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/pci/meteor.c,v 1.61 2003/03/25 00:07:05 jake Exp $
  */
 
 /*		Change History:
@@ -145,6 +143,9 @@
 			future version of this driver.
 */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/meteor.c,v 1.66 2003/08/26 16:57:24 nectar Exp $");
+
 #ifdef COMPILING_LINT
 #warning "The meteor driver is broken and is not compiled with LINT"
 #else
@@ -170,8 +171,8 @@
 #include <vm/pmap.h>
 #include <vm/vm_extern.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 #include <machine/ioctl_meteor.h>
 #include <pci/meteor_reg.h>
 
@@ -639,9 +640,9 @@ meteor_intr(void *arg)
 		 * If the user requested to be notified via signal,
 		 * let them know the field is complete.
 		 */
-		if(mtr->proc && (mtr->signal & METEOR_SIG_MODE_MASK)) {
+		if(mtr->proc != NULL) {
 			PROC_LOCK(mtr->proc);
-			psignal(mtr->proc, mtr->signal&(~METEOR_SIG_MODE_MASK));
+			psignal(mtr->proc, mtr->signal);
 			PROC_UNLOCK(mtr->proc);
 		}
 	}
@@ -656,9 +657,9 @@ meteor_intr(void *arg)
 		 * If the user requested to be notified via signal,
 		 * let them know the field is complete.
 		 */
-		if(mtr->proc && (mtr->signal & METEOR_SIG_MODE_MASK)) {
+		if(mtr->proc != NULL) {
 			PROC_LOCK(mtr->proc);
-			psignal(mtr->proc, mtr->signal&(~METEOR_SIG_MODE_MASK));
+			psignal(mtr->proc, mtr->signal);
 			PROC_UNLOCK(mtr->proc);
 		}
 	}
@@ -692,9 +693,9 @@ meteor_intr(void *arg)
 		 * If the user requested to be notified via signal,
 		 * let them know the frame is complete.
 		 */
-		if(mtr->proc && !(mtr->signal & METEOR_SIG_MODE_MASK)) {
+		if(mtr->proc != NULL) {
 			PROC_LOCK(mtr->proc);
-			psignal(mtr->proc, mtr->signal&(~METEOR_SIG_MODE_MASK));
+			psignal(mtr->proc, mtr->signal);
 			PROC_UNLOCK(mtr->proc);
 		}
 		/*
@@ -1333,6 +1334,7 @@ meteor_ioctl(dev_t dev, u_long cmd, caddr_t arg, int flag, struct thread *td)
 {
 	int	error;  
 	int	unit;   
+	int	sig;
 	unsigned int	temp;
 	meteor_reg_t *mtr;
 	struct meteor_counts *cnt;
@@ -1391,12 +1393,12 @@ meteor_ioctl(dev_t dev, u_long cmd, caddr_t arg, int flag, struct thread *td)
 		*(u_short *)arg = mtr->fps;
 		break;
 	case METEORSSIGNAL:
-		mtr->signal = *(int *) arg;
-		if (mtr->signal) {
-		  mtr->proc = td->td_proc;
-		} else {
-		  mtr->proc = (struct proc *)0;
-		}
+		sig = *(int *)arg;
+		/* Applications use 0 to reset signal delivery. */
+		if (sig < 0 || sig > _SIG_MAXSIG)
+			return (EINVAL);
+		mtr->signal = sig;
+		mtr->proc = sig ? td->td_proc : NULL;
 		break;
 	case METEORGSIGNAL:
 		*(int *)arg = mtr->signal;

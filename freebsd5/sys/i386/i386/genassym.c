@@ -34,9 +34,12 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)genassym.c	5.11 (Berkeley) 5/10/91
- * $FreeBSD: src/sys/i386/i386/genassym.c,v 1.140 2003/04/17 22:17:28 jhb Exp $
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/i386/genassym.c,v 1.146 2003/11/12 18:14:34 jhb Exp $");
+
+#include "opt_apic.h"
 #include "opt_compat.h"
 #include "opt_kstack_pages.h"
 
@@ -68,8 +71,8 @@
 #include <nfs/rpcv2.h>
 #include <nfsclient/nfs.h>
 #include <nfsclient/nfsdiskless.h>
-#ifdef SMP
-#include <machine/apic.h>
+#ifdef DEV_APIC
+#include <machine/apicreg.h>
 #endif
 #include <machine/cpu.h>
 #include <machine/sigframe.h>
@@ -85,9 +88,6 @@ ASSYM(P_UAREA, offsetof(struct proc, p_uarea));
 ASSYM(TD_FLAGS, offsetof(struct thread, td_flags));
 ASSYM(TD_PCB, offsetof(struct thread, td_pcb));
 ASSYM(TD_PROC, offsetof(struct thread, td_proc));
-ASSYM(TD_INTR_NESTING_LEVEL, offsetof(struct thread, td_intr_nesting_level));
-ASSYM(TD_CRITNEST, offsetof(struct thread, td_critnest));
-ASSYM(TD_SWITCHIN, offsetof(struct thread, td_switchin));
 ASSYM(TD_MD, offsetof(struct thread, td_md));
 
 ASSYM(P_MD, offsetof(struct proc, p_md));
@@ -109,13 +109,16 @@ ASSYM(NPDEPTD, NPDEPTD);
 ASSYM(NPGPTD, NPGPTD);
 ASSYM(PDESIZE, sizeof(pd_entry_t));
 ASSYM(PTESIZE, sizeof(pt_entry_t));
+ASSYM(PDESHIFT, PDESHIFT);
 ASSYM(PTESHIFT, PTESHIFT);
 ASSYM(PAGE_SHIFT, PAGE_SHIFT);
 ASSYM(PAGE_MASK, PAGE_MASK);
 ASSYM(PDRSHIFT, PDRSHIFT);
+ASSYM(PDRMASK, PDRMASK);
 ASSYM(USRSTACK, USRSTACK);
 ASSYM(VM_MAXUSER_ADDRESS, VM_MAXUSER_ADDRESS);
 ASSYM(KERNBASE, KERNBASE);
+ASSYM(KERNLOAD, KERNLOAD);
 ASSYM(MCLBYTES, MCLBYTES);
 ASSYM(PCB_CR3, offsetof(struct pcb, pcb_cr3));
 ASSYM(PCB_EDI, offsetof(struct pcb, pcb_edi));
@@ -142,6 +145,7 @@ ASSYM(PCB_FLAGS, offsetof(struct pcb, pcb_flags));
 ASSYM(PCB_SAVEFPU, offsetof(struct pcb, pcb_save));
 ASSYM(PCB_SAVEFPU_SIZE, sizeof(union savefpu));
 ASSYM(PCB_ONFAULT, offsetof(struct pcb, pcb_onfault));
+ASSYM(PCB_SWITCHOUT, offsetof(struct pcb, pcb_switchout));
 
 ASSYM(PCB_SIZE, sizeof(struct pcb));
 ASSYM(PCB_VM86CALL, PCB_VM86CALL);
@@ -173,6 +177,7 @@ ASSYM(UC_GS, offsetof(ucontext_t, uc_mcontext.mc_gs));
 ASSYM(ENOENT, ENOENT);
 ASSYM(EFAULT, EFAULT);
 ASSYM(ENAMETOOLONG, ENAMETOOLONG);
+ASSYM(MAXCOMLEN, MAXCOMLEN);
 ASSYM(MAXPATHLEN, MAXPATHLEN);
 ASSYM(BOOTINFO_SIZE, sizeof(struct bootinfo));
 ASSYM(BI_VERSION, offsetof(struct bootinfo, bi_version));
@@ -187,10 +192,6 @@ ASSYM(BI_KERNEND, offsetof(struct bootinfo, bi_kernend));
 ASSYM(PC_SIZEOF, sizeof(struct pcpu));
 ASSYM(PC_PRVSPACE, offsetof(struct pcpu, pc_prvspace));
 ASSYM(PC_CURTHREAD, offsetof(struct pcpu, pc_curthread));
-ASSYM(PC_INT_PENDING, offsetof(struct pcpu, pc_int_pending));
-ASSYM(PC_IPENDING, offsetof(struct pcpu, pc_ipending));
-ASSYM(PC_FPENDING, offsetof(struct pcpu, pc_fpending));
-ASSYM(PC_SPENDING, offsetof(struct pcpu, pc_spending));
 ASSYM(PC_FPCURTHREAD, offsetof(struct pcpu, pc_fpcurthread));
 ASSYM(PC_IDLETHREAD, offsetof(struct pcpu, pc_idlethread));
 ASSYM(PC_CURPCB, offsetof(struct pcpu, pc_curpcb));
@@ -199,14 +200,16 @@ ASSYM(PC_COMMON_TSSD, offsetof(struct pcpu, pc_common_tssd));
 ASSYM(PC_TSS_GDT, offsetof(struct pcpu, pc_tss_gdt));
 ASSYM(PC_CURRENTLDT, offsetof(struct pcpu, pc_currentldt));
 ASSYM(PC_CPUID, offsetof(struct pcpu, pc_cpuid));
+ASSYM(PC_CURPMAP, offsetof(struct pcpu, pc_curpmap));
 
-#ifdef SMP
+#ifdef DEV_APIC
 ASSYM(LA_VER, offsetof(struct LAPIC, version));
 ASSYM(LA_TPR, offsetof(struct LAPIC, tpr));
 ASSYM(LA_EOI, offsetof(struct LAPIC, eoi));
 ASSYM(LA_SVR, offsetof(struct LAPIC, svr));
 ASSYM(LA_ICR_LO, offsetof(struct LAPIC, icr_lo));
 ASSYM(LA_ICR_HI, offsetof(struct LAPIC, icr_hi));
+ASSYM(LA_ISR, offsetof(struct LAPIC, isr0));
 #endif
 
 ASSYM(KCSEL, GSEL(GCODE_SEL, SEL_KPL));

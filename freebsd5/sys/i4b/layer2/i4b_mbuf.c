@@ -26,12 +26,12 @@
  *
  *	i4b - mbuf handling support routines
  *	------------------------------------
- *
- * $FreeBSD: src/sys/i4b/layer2/i4b_mbuf.c,v 1.15 2003/02/19 05:47:24 imp Exp $
- *
  *      last edit-date: [Sat Mar  9 17:51:22 2002]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer2/i4b_mbuf.c,v 1.16 2003/06/10 23:55:01 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -24,9 +24,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/subr_devstat.c,v 1.44 2003/04/17 15:06:28 harti Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/subr_devstat.c,v 1.47 2003/09/27 12:01:00 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -44,7 +45,7 @@
 #include <machine/atomic.h>
 
 static int devstat_num_devs;
-static long devstat_generation;
+static long devstat_generation = 1;
 static int devstat_version = DEVSTAT_VERSION;
 static int devstat_current_devnumber;
 static struct mtx devstat_mutex;
@@ -363,9 +364,6 @@ sysctl_devstat(SYSCTL_HANDLER_ARGS)
 
 	mtx_assert(&devstat_mutex, MA_NOTOWNED);
 
-	if (devstat_num_devs == 0)
-		return(EINVAL);
-
 	/*
 	 * XXX devstat_generation should really be "volatile" but that
 	 * XXX freaks out the sysctl macro below.  The places where we
@@ -377,6 +375,9 @@ sysctl_devstat(SYSCTL_HANDLER_ARGS)
 	mygen = devstat_generation;
 
 	error = SYSCTL_OUT(req, &mygen, sizeof(mygen));
+
+	if (devstat_num_devs == 0)
+		return(0);
 
 	if (error != 0)
 		return (error);
@@ -436,8 +437,6 @@ SYSCTL_INT(_kern_devstat, OID_AUTO, version, CTLFLAG_RD,
 static d_mmap_t devstat_mmap;
 
 static struct cdevsw devstat_cdevsw = {
-	.d_open =	nullopen,
-	.d_close =	nullclose,
 	.d_mmap =	devstat_mmap,
 	.d_name =	"devstat",
 };

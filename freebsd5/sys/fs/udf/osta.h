@@ -1,7 +1,7 @@
 /*
  * Prototypes for the OSTA functions
  *
- * $FreeBSD: src/sys/fs/udf/osta.h,v 1.1 2002/04/14 16:52:14 scottl Exp $
+ * $FreeBSD: src/sys/fs/udf/osta.h,v 1.2 2003/11/05 06:55:23 scottl Exp $
  */
 
 #ifndef UNIX
@@ -21,6 +21,7 @@ typedef unsigned short unicode_t;
 typedef unsigned char byte;
 
 int udf_UncompressUnicode(int, byte *, unicode_t *);
+int udf_UncompressUnicodeByte(int, byte *, byte *);
 int udf_CompressUnicode(int, int, unicode_t *, byte *);
 unsigned short udf_cksum(unsigned char *, int);
 unsigned short udf_unicode_cksum(unsigned short *, int);

@@ -34,8 +34,10 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)isa.c	7.2 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/isa/isa_dma.c,v 1.13 2003/03/25 00:07:03 jake Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/isa/isa_dma.c,v 1.14 2003/06/02 16:32:54 obrien Exp $");
 
 /*
  * code to manage AT bus

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)dirent.h	8.2 (Berkeley) 7/28/94
- * $FreeBSD: src/include/dirent.h,v 1.13 2002/09/10 18:12:16 mike Exp $
+ * $FreeBSD: src/include/dirent.h,v 1.13.6.1 2003/12/18 00:59:50 peter Exp $
  */
 
 #ifndef _DIRENT_H_
@@ -53,6 +53,8 @@
 #endif
 
 #if __BSD_VISIBLE
+
+#include <sys/_null.h>
 
 /* definitions for library routines operating on directories. */
 #define	DIRBLKSIZ	1024
@@ -80,10 +82,6 @@ typedef struct _dirdesc {
 #define DTF_NODUP	0x0002	/* don't return duplicate names */
 #define DTF_REWIND	0x0004	/* rewind after reading union stack */
 #define __DTF_READALL	0x0008	/* everything has been read */
-
-#ifndef NULL
-#define	NULL	0
-#endif
 
 #else /* !__BSD_VISIBLE */
 

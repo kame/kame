@@ -26,11 +26,11 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_btsocket_hci_raw.h,v 1.3 2003/03/25 23:53:32 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/include/ng_btsocket_hci_raw.h,v 1.2 2003/05/10 21:44:40 julian Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/include/ng_btsocket_hci_raw.h,v 1.3 2003/11/14 03:45:29 emax Exp $
  */
 
 #ifndef _NETGRAPH_BTSOCKET_HCI_RAW_H_
-#define _NETGRAPH_BTSOCKET_HCI_RAW_H_ 1
+#define _NETGRAPH_BTSOCKET_HCI_RAW_H_
 
 #define NG_BTSOCKET_HCI_RAW_SENDSPACE	(4 * 1024)
 #define NG_BTSOCKET_HCI_RAW_RECVSPACE	(4 * 1024)

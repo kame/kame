@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)union_vfsops.c	8.20 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/fs/unionfs/union_vfsops.c,v 1.61 2003/03/11 22:15:09 kan Exp $
+ * $FreeBSD: src/sys/fs/unionfs/union_vfsops.c,v 1.64 2003/11/01 15:04:50 kan Exp $
  */
 
 /*
@@ -57,14 +57,11 @@
 
 static MALLOC_DEFINE(M_UNIONFSMNT, "UNION mount", "UNION mount structure");
 
-extern int	union_init(struct vfsconf *);
-static int	union_mount(struct mount *mp, struct nameidata *ndp,
-				  struct thread *td);
-static int	union_root(struct mount *mp, struct vnode **vpp);
-static int	union_statfs(struct mount *mp, struct statfs *sbp,
-				  struct thread *td);
-static int	union_unmount(struct mount *mp, int mntflags,
-				   struct thread *td);
+extern vfs_init_t       union_init;
+static vfs_root_t       union_root;
+static vfs_nmount_t	union_mount;
+static vfs_statfs_t	union_statfs;
+static vfs_unmount_t    union_unmount;
 
 /*
  * Mount union filesystem.
@@ -350,15 +347,10 @@ union_unmount(mp, mntflags, td)
 	 * in the filesystem.
 	 */
 	for (freeing = 0; (error = vflush(mp, 0, flags)) != 0;) {
-		struct vnode *vp;
 		int n;
 
 		/* count #vnodes held on mount list */
-		mtx_lock(&mntvnode_mtx);
-		n = 0;
-		TAILQ_FOREACH(vp, &mp->mnt_nvnodelist, v_nmntvnodes)
-			n++;
-		mtx_unlock(&mntvnode_mtx);
+		n = mp->mnt_nvnodelistsize;
 
 		/* if this is unchanged then stop */
 		if (n == freeing)
@@ -496,21 +488,11 @@ union_statfs(mp, sbp, td)
 }
 
 static struct vfsops union_vfsops = {
-	NULL,
-	vfs_stdstart,	/* underlying start already done */
-	union_unmount,
-	union_root,
-	vfs_stdquotactl,
-	union_statfs,
-	vfs_stdnosync,    /* XXX assumes no cached data on union level */
-	vfs_stdvget,
-	vfs_stdfhtovp,
-	vfs_stdcheckexp,
-	vfs_stdvptofh,
-	union_init,
-	vfs_stduninit,
-	vfs_stdextattrctl,
-	union_mount,
+	.vfs_init = 		union_init,
+	.vfs_nmount =		union_mount,
+	.vfs_root =		union_root,
+	.vfs_statfs =		union_statfs,
+	.vfs_unmount =		union_unmount,
 };
 
 VFS_SET(union_vfsops, unionfs, VFCF_LOOPBACK);

@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/sscop_timer.c,v 1.9 2002/03/20 08:00:53 alfred Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ---------------------
  *
  * SSCOP - Timer processing
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/sscop_timer.c,v 1.10 2003/06/11 07:22:30 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -57,11 +55,6 @@
 #include <netatm/uni/sscop.h>
 #include <netatm/uni/sscop_misc.h>
 #include <netatm/uni/sscop_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/sscop_timer.c,v 1.9 2002/03/20 08:00:53 alfred Exp $");
-#endif
-
 
 /*
  * Local functions

@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netipsec/key.h,v 1.1 2002/10/16 02:10:07 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/key.h,v 1.2 2003/09/01 05:35:55 sam Exp $	*/
 /*	$KAME: key.h,v 1.21 2001/07/27 03:51:30 itojun Exp $	*/
 
 /*
@@ -100,7 +100,14 @@ extern void key_sa_routechange __P((struct sockaddr *));
 extern void key_sa_stir_iv __P((struct secasvar *));
 
 #ifdef MALLOC_DECLARE
-MALLOC_DECLARE(M_SECA);
+MALLOC_DECLARE(M_IPSEC_SA);
+MALLOC_DECLARE(M_IPSEC_SAH);
+MALLOC_DECLARE(M_IPSEC_SP);
+MALLOC_DECLARE(M_IPSEC_SR);
+MALLOC_DECLARE(M_IPSEC_MISC);
+MALLOC_DECLARE(M_IPSEC_SAQ);
+MALLOC_DECLARE(M_IPSEC_SAR);
+MALLOC_DECLARE(M_IPSEC_INPCB);
 #endif /* MALLOC_DECLARE */
 
 #endif /* defined(_KERNEL) */

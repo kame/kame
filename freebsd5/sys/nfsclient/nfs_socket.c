@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_socket.c,v 1.98 2003/05/13 20:36:01 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_socket.c,v 1.101 2003/11/14 20:54:08 alfred Exp $");
 
 /*
  * Socket operations for use by nfs
@@ -65,6 +65,8 @@ __FBSDID("$FreeBSD: src/sys/nfsclient/nfs_socket.c,v 1.98 2003/05/13 20:36:01 jh
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
+#include <rpc/rpcclnt.h>
+
 #include <nfs/rpcv2.h>
 #include <nfs/nfsproto.h>
 #include <nfsclient/nfs.h>
@@ -72,6 +74,8 @@ __FBSDID("$FreeBSD: src/sys/nfsclient/nfs_socket.c,v 1.98 2003/05/13 20:36:01 jh
 #include <nfsclient/nfsm_subs.h>
 #include <nfsclient/nfsmount.h>
 #include <nfsclient/nfsnode.h>
+
+#include <nfs4client/nfs4.h>
 
 #define	TRUE	1
 #define	FALSE	0
@@ -160,6 +164,8 @@ nfs_connect(struct nfsmount *nmp, struct nfsreq *rep)
 	int pktscale;
 	struct sockaddr *saddr;
 	struct thread *td = &thread0; /* only used for socreate and sobind */
+
+	GIANT_REQUIRED;		/* XXX until socket locking done */
 
 	nmp->nm_so = NULL;
 	saddr = nmp->nm_nam;
@@ -288,6 +294,7 @@ nfs_connect(struct nfsmount *nmp, struct nfsreq *rep)
 			int val;
 
 			bzero(&sopt, sizeof sopt);
+			sopt.sopt_dir = SOPT_SET;
 			sopt.sopt_level = SOL_SOCKET;
 			sopt.sopt_name = SO_KEEPALIVE;
 			sopt.sopt_val = &val;
@@ -300,6 +307,7 @@ nfs_connect(struct nfsmount *nmp, struct nfsreq *rep)
 			int val;
 
 			bzero(&sopt, sizeof sopt);
+			sopt.sopt_dir = SOPT_SET;
 			sopt.sopt_level = IPPROTO_TCP;
 			sopt.sopt_name = TCP_NODELAY;
 			sopt.sopt_val = &val;
@@ -375,6 +383,8 @@ nfs_disconnect(struct nfsmount *nmp)
 {
 	struct socket *so;
 
+	GIANT_REQUIRED;		/* XXX until socket locking done */
+
 	if (nmp->nm_so) {
 		so = nmp->nm_so;
 		nmp->nm_so = NULL;
@@ -408,6 +418,8 @@ nfs_send(struct socket *so, struct sockaddr *nam, struct mbuf *top,
 {
 	struct sockaddr *sendnam;
 	int error, soflags, flags;
+
+	GIANT_REQUIRED;		/* XXX until socket locking done */
 
 	KASSERT(rep, ("nfs_send: called with rep == NULL"));
 
@@ -481,6 +493,8 @@ nfs_receive(struct nfsreq *rep, struct sockaddr **aname, struct mbuf **mp)
 	struct sockaddr **getnam;
 	int error, sotype, rcvflg;
 	struct thread *td = curthread;	/* XXX */
+
+	GIANT_REQUIRED;		/* XXX until socket locking done */
 
 	/*
 	 * Set up arguments for soreceive()
@@ -864,6 +878,8 @@ nfs_request(struct vnode *vp, struct mbuf *mrest, int procnum,
 		return (ESTALE);
 	}
 	nmp = VFSTONFS(vp->v_mount);
+	if ((nmp->nm_flag & NFSMNT_NFSV4) != 0)
+		return nfs4_request(vp, mrest, procnum, td, cred, mrp, mdp, dposp);
 	MALLOC(rep, struct nfsreq *, sizeof(struct nfsreq), M_NFSREQ, M_WAITOK);
 	rep->r_nmp = nmp;
 	rep->r_vp = vp;
@@ -1225,6 +1241,8 @@ nfs_sigintr(struct nfsmount *nmp, struct nfsreq *rep, struct thread *td)
 	struct proc *p;
 	sigset_t tmpset;
 
+	if ((nmp->nm_flag & NFSMNT_NFSV4) != 0)
+		return nfs4_sigintr(nmp, rep, td);
 	if (rep && (rep->r_flags & R_SOFTTERM))
 		return (EINTR);
 	/* Terminate all requests while attempting a forced unmount. */

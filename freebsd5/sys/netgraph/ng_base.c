@@ -36,7 +36,7 @@
  * Authors: Julian Elischer <julian@freebsd.org>
  *          Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.69 2003/04/29 13:36:04 kan Exp $
+ * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.72 2003/11/08 22:28:39 sam Exp $
  * $Whistle: ng_base.c,v 1.39 1999/01/28 23:54:53 julian Exp $
  */
 
@@ -69,6 +69,9 @@ MODULE_VERSION(netgraph, NG_ABI_VERSION);
 /* List of all active nodes */
 static LIST_HEAD(, ng_node) ng_nodelist;
 static struct mtx	ng_nodelist_mtx;
+
+/* Mutex that protects the free queue item list */
+static struct mtx	ngq_mtx;
 
 #ifdef	NETGRAPH_DEBUG
 
@@ -176,9 +179,6 @@ static struct mtx	ng_idhash_mtx;
 		}							\
 	} while (0)
 
-/* Mutex that protects the free queue item list */
-static volatile item_p		ngqfree;	/* free ones */
-static struct mtx	ngq_mtx;
 
 /* Internal functions */
 static int	ng_add_hook(node_p node, const char *name, hook_p * hookp);
@@ -2984,9 +2984,10 @@ ngb_mod_event(module_t mod, int event, void *data)
 		mtx_init(&ng_typelist_mtx, "netgraph types mutex", NULL, 0);
 		mtx_init(&ng_nodelist_mtx, "netgraph nodelist mutex", NULL, 0);
 		mtx_init(&ng_idhash_mtx, "netgraph idhash mutex", NULL, 0);
-		mtx_init(&ngq_mtx, "netgraph netisr mutex", NULL, 0);
+		mtx_init(&ngq_mtx, "netgraph free item list mutex", NULL, 0);
 		s = splimp();
-		netisr_register(NETISR_NETGRAPH, (netisr_t *)ngintr, NULL);
+		/* XXX could use NETISR_MPSAFE but need to verify code */
+		netisr_register(NETISR_NETGRAPH, (netisr_t *)ngintr, NULL, 0);
 		splx(s);
 		break;
 	case MOD_UNLOAD:
@@ -3021,15 +3022,17 @@ static int			maxalloc = 128;	/* limit the damage of a leak */
 static int			ngqfreemax = 64;/* cache at most this many */
 
 TUNABLE_INT("net.graph.maxalloc", &maxalloc);
-SYSCTL_INT(_net_graph, OID_AUTO, maxalloc, CTLFLAG_RD, &maxalloc,
+SYSCTL_INT(_net_graph, OID_AUTO, maxalloc, CTLFLAG_RDTUN, &maxalloc,
     0, "Maximum number of queue items to allocate");
 
 TUNABLE_INT("net.graph.ngqfreemax", &ngqfreemax);
-SYSCTL_INT(_net_graph, OID_AUTO, ngqfreemax, CTLFLAG_RD, &ngqfreemax,
+SYSCTL_INT(_net_graph, OID_AUTO, ngqfreemax, CTLFLAG_RDTUN, &ngqfreemax,
     0, "Maximum number of free queue items to cache");
 
 static const int		ngqfreelow = 4; /* try malloc if free < this */
 static volatile int		ngqfreesize;	/* number of cached entries */
+static volatile item_p		ngqfree;	/* free ones */
+
 #ifdef	NETGRAPH_DEBUG
 static TAILQ_HEAD(, ng_item) ng_itemlist = TAILQ_HEAD_INITIALIZER(ng_itemlist);
 #endif
@@ -3038,8 +3041,7 @@ static TAILQ_HEAD(, ng_item) ng_itemlist = TAILQ_HEAD_INITIALIZER(ng_itemlist);
  * This is usually called when a packet first enters netgraph.
  * By definition, this is usually from an interrupt, or from a user.
  * Users are not so important, but try be quick for the times that it's
- * an interrupt. Use atomic operations to cope with collisions
- * with interrupts and other processors. Assumes MALLOC is SMP safe.
+ * an interrupt.
  * XXX If reserve is low, we should try to get 2 from malloc as this
  * would indicate it often fails.
  */
@@ -3052,60 +3054,38 @@ ng_getqblk(void)
 	 * Try get a cached queue block, or else allocate a new one
 	 * If we are less than our reserve, try malloc. If malloc
 	 * fails, then that's what the reserve is for...
-	 * Don't completely trust ngqfreesize, as it is subject
-	 * to races.. (it'll eventually catch up but may be out by one or two
-	 * for brief moments(under SMP or interrupts).
-	 * ngqfree is the final arbiter. We have our little reserve
+	 * We have our little reserve
 	 * because we use M_NOWAIT for malloc. This just helps us
 	 * avoid dropping packets while not increasing the time
 	 * we take to service the interrupt (on average) (I hope).
 	 */
-	for (;;) {
-		if ((ngqfreesize < ngqfreelow) || (ngqfree == NULL)) {
-			if (allocated < maxalloc) {  /* don't leak forever */
-				MALLOC(item, item_p ,
-				    sizeof(*item), M_NETGRAPH_ITEM,
-				    (M_NOWAIT | M_ZERO));
-				if (item) {
-#ifdef	NETGRAPH_DEBUG
-					TAILQ_INSERT_TAIL(&ng_itemlist,
-								item, all);
-#endif	/* NETGRAPH_DEBUG */
-					atomic_add_int(&allocated, 1);
-					break;
-				}
-			}
-		}
+	mtx_lock(&ngq_mtx);
 
-		/*
-		 * We didn't or couldn't malloc.
-		 * try get one from our cache.
-		 * item must be NULL to get here.
-		 */
-		if ((item = ngqfree) != NULL) {
-			/*
-			 * Atomically try grab the first item
-			 * and put it's successor in its place.
-			 * If we fail, just try again.. someone else
-			 * beat us to this one or freed one.
-			 * Don't worry about races with ngqfreesize.
-			 * Close enough is good enough..
-			 */
-			if (atomic_cmpset_ptr(&ngqfree, item, item->el_next)) {
-				atomic_subtract_int(&ngqfreesize, 1);
-				item->el_flags &= ~NGQF_FREE;
-				break;
+	if ((ngqfreesize < ngqfreelow) || (ngqfree == NULL)) {
+		if (allocated < maxalloc) {  /* don't leak forever */
+			MALLOC(item, item_p ,
+			    sizeof(*item), M_NETGRAPH_ITEM,
+			    (M_NOWAIT | M_ZERO));
+			if (item) {
+#ifdef	NETGRAPH_DEBUG
+				TAILQ_INSERT_TAIL(&ng_itemlist, item, all);
+#endif	/* NETGRAPH_DEBUG */
+				allocated++;
 			}
-			/* 
-			 * something got there before we did.. try again
-			 * (go around the loop again)
-			 */
-			item = NULL;
-		} else {
-			/* We really ran out */
-			break;
 		}
 	}
+
+	/*
+	 * We didn't or couldn't malloc.
+	 * try get one from our cache.
+	 */
+	if (item == NULL && (item = ngqfree) != NULL) {
+		ngqfree = item->el_next;
+		ngqfreesize--;
+		item->el_flags &= ~NGQF_FREE;
+	}
+
+	mtx_unlock(&ngq_mtx);
 	return (item);
 }
 
@@ -3149,26 +3129,19 @@ ng_free_item(item_p item)
 	_NGI_CLR_HOOK(item);
 	item->el_flags |= NGQF_FREE;
 
-	/*
-	 * We have freed any resources held by the item.
-	 * now we can free the item itself.
-	 */
-	if (ngqfreesize < ngqfreemax) { /* don't worry about races */
-		for (;;) {
-			item->el_next = ngqfree;
-			if (atomic_cmpset_ptr(&ngqfree, item->el_next, item)) {
-				break;
-			}
-		}
-		atomic_add_int(&ngqfreesize, 1);
+	mtx_lock(&ngq_mtx);
+	if (ngqfreesize < ngqfreemax) {
+		ngqfreesize++;
+		item->el_next = ngqfree;
+		ngqfree = item;
 	} else {
-		/* This is the only place that should use this Macro */
 #ifdef	NETGRAPH_DEBUG
 		TAILQ_REMOVE(&ng_itemlist, item, all);
 #endif	/* NETGRAPH_DEBUG */
 		NG_FREE_ITEM_REAL(item);
-		atomic_subtract_int(&allocated, 1);
+		allocated--;
 	}
+	mtx_unlock(&ngq_mtx);
 }
 
 #ifdef	NETGRAPH_DEBUG

@@ -46,9 +46,10 @@
  * What documentation exists is thanks to Andrew Tridge, and his page at
  * http://samba.org/picturebook/ Special thanks also to Ian Dowse, who
  * also provided sample code upon which this driver was based.
- *
- * $FreeBSD: src/sys/i386/isa/spic.c,v 1.7 2003/03/03 12:15:49 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/isa/spic.c,v 1.10 2003/11/09 09:17:23 tanimura Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -96,7 +97,7 @@ static struct cdevsw spic_cdevsw = {
 #define SCBUFLEN 128
 
 struct spic_softc {
-	u_short sc_port_addr;
+	u_int sc_port_addr;
 	u_char sc_intr;
 	struct resource *sc_port_res,*sc_intr_res;
 	int	sc_port_rid,sc_intr_rid;
@@ -432,7 +433,7 @@ spictimeout(void *arg)
 			sc->sc_sleeping = 0;
 			wakeup( sc);
 		}
-		selwakeup(&sc->sc_rsel);
+		selwakeuppri(&sc->sc_rsel, PZERO);
 	}
 	spic_call2(sc, 0x81, 0xff); /* Clear event */
 

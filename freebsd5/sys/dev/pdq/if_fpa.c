@@ -21,9 +21,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pdq/if_fpa.c,v 1.19 2003/04/16 03:16:55 mdodd Exp $
  *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/pdq/if_fpa.c,v 1.21 2003/10/31 18:32:03 brooks Exp $");
 
 /*
  * DEC PDQ FDDI Controller; code for BSD derived operating systems
@@ -147,11 +149,10 @@ pdq_pci_attach(device_t dev)
 	goto bad;
     }
 
-    ifp->if_name = "fpa";
-    ifp->if_unit = device_get_unit(dev);
+    if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 
     sc->sc_pdq = pdq_initialize(sc->mem_bst, sc->mem_bsh,
-				ifp->if_name, ifp->if_unit,
+				ifp->if_xname, -1,
 				(void *)sc, PDQ_DEFPA);
     if (sc->sc_pdq == NULL) {
 	device_printf(dev, "Initialization failed.\n");

@@ -32,12 +32,12 @@
  *
  *	i4b_itjc_pci.c: NetJet-S hardware driver
  *	----------------------------------------
- *
- * $FreeBSD: src/sys/i4b/layer1/itjc/i4b_itjc_pci.c,v 1.7 2003/05/30 20:40:33 hmp Exp $
- *
  *      last edit-date: [Thu Jan 11 11:29:38 2001]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/itjc/i4b_itjc_pci.c,v 1.12 2003/09/02 17:30:40 jhb Exp $");
 
 #include "opt_i4b.h"
 
@@ -53,8 +53,8 @@
 #include <sys/bus.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <sys/socket.h>
 #include <net/if.h>
@@ -1523,9 +1523,9 @@ itjc_attach(device_t dev)
 	bzero(sc, sizeof(struct l1_softc));
 
 	/* Probably not really required. */
-	if (unit > ITJC_MAXUNIT)
+	if (unit >= ITJC_MAXUNIT)
 	{
-		printf("itjc%d: Error, unit > ITJC_MAXUNIT!\n", unit);
+		printf("itjc%d: Error, unit >= ITJC_MAXUNIT!\n", unit);
 		splx(s);
 		return ENXIO;
 	}
@@ -1538,7 +1538,7 @@ itjc_attach(device_t dev)
 
 	itjc_scp[unit] = sc;
 
-	sc->sc_resources.io_rid[0] = PCIR_MAPS+0;
+	sc->sc_resources.io_rid[0] = PCIR_BAR(0);
 	sc->sc_resources.io_base[0] = bus_alloc_resource(dev, SYS_RES_IOPORT,
 		&sc->sc_resources.io_rid[0], 0, ~0, 1, RF_ACTIVE);
 
@@ -1608,6 +1608,7 @@ itjc_attach(device_t dev)
 		1,					/* nsegments*/
 		ITJC_DMA_POOL_BYTES,			/* maxsegsz*/
 		BUS_DMA_ALLOCNOW | BUS_DMA_COHERENT,	/* flags*/
+		NULL, NULL,				/* lockfuunc, lockarg */
 		&ctx->tag);
 
 	if (error)
@@ -1762,7 +1763,7 @@ itjc_attach(device_t dev)
 		/* FALL TRHU */
 
 	case 1:
-		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_MAPS+0,
+		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_BAR(0),
 			sc->sc_resources.io_base[0]);
 		/* FALL TRHU */
 

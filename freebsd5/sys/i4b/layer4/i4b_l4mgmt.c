@@ -26,12 +26,12 @@
  *
  *	i4b_l4mgmt.c - layer 4 calldescriptor management utilites
  *	-----------------------------------------------------------
- *
- * $FreeBSD: src/sys/i4b/layer4/i4b_l4mgmt.c,v 1.15 2003/01/01 18:48:54 schweikh Exp $
- *
  *      last edit-date: [Sun Aug 11 12:42:01 2002]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer4/i4b_l4mgmt.c,v 1.16 2003/06/11 00:01:05 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

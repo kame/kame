@@ -1,6 +1,4 @@
 /*	$NetBSD: natm.c,v 1.5 1996/11/09 03:26:26 chuck Exp $	*/
-/* $FreeBSD: src/sys/netnatm/natm.c,v 1.23 2003/04/08 14:25:46 des Exp $ */
-
 /*
  *
  * Copyright (c) 1996 Charles D. Cranor and Washington University.
@@ -37,6 +35,9 @@
  * natm.c: native mode ATM access (both aal0 and aal5).
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netnatm/natm.c,v 1.31 2003/11/18 00:39:05 rwatson Exp $");
+
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/kernel.h>
@@ -50,6 +51,7 @@
 #include <sys/sockio.h>
 #include <sys/sx.h>
 #include <sys/systm.h>
+#include <sys/sysctl.h>
 
 #include <net/if.h>
 #include <net/if_atm.h>
@@ -78,10 +80,10 @@ static int natm_usr_connect(struct socket *, struct sockaddr *, d_thread_t *);
 static int natm_usr_disconnect(struct socket *);
 static int natm_usr_shutdown(struct socket *);
 static int natm_usr_send(struct socket *, int, struct mbuf *,
-			      struct sockaddr *, struct mbuf *, d_thread_t *);
+    struct sockaddr *, struct mbuf *, d_thread_t *);
 static int natm_usr_peeraddr(struct socket *, struct sockaddr **);
 static int natm_usr_control(struct socket *, u_long, caddr_t,
-				 struct ifnet *, d_thread_t *);
+    struct ifnet *, d_thread_t *);
 static int natm_usr_abort(struct socket *);
 static int natm_usr_bind(struct socket *, struct sockaddr *, d_thread_t *);
 static int natm_usr_sockaddr(struct socket *, struct sockaddr **);
@@ -93,7 +95,7 @@ natm_usr_attach(struct socket *so, int proto, d_thread_t *p)
     int error = 0;
     int s = SPLSOFTNET();
 
-    npcb = (struct natmpcb *) so->so_pcb;
+    npcb = (struct natmpcb *)so->so_pcb;
 
     if (npcb) {
 	error = EISCONN;
@@ -123,7 +125,7 @@ natm_usr_detach(struct socket *so)
     int error = 0;
     int s = SPLSOFTNET();
 
-    npcb = (struct natmpcb *) so->so_pcb;
+    npcb = (struct natmpcb *)so->so_pcb;
     if (npcb == NULL) {
 	error = EINVAL;
 	goto out;
@@ -145,13 +147,13 @@ natm_usr_connect(struct socket *so, struct sockaddr *nam, d_thread_t *p)
 {
     struct natmpcb *npcb;
     struct sockaddr_natm *snatm;
-    struct atm_pseudoioctl api;
+    struct atmio_openvcc op;
     struct ifnet *ifp;
     int error = 0;
     int s2, s = SPLSOFTNET();
     int proto = so->so_proto->pr_protocol;
 
-    npcb = (struct natmpcb *) so->so_pcb;
+    npcb = (struct natmpcb *)so->so_pcb;
     if (npcb == NULL) {
 	error = EINVAL;
 	goto out;
@@ -160,7 +162,6 @@ natm_usr_connect(struct socket *so, struct sockaddr *nam, d_thread_t *p)
     /*
      * validate nam and npcb
      */
-
     snatm = (struct sockaddr_natm *)nam;
     if (snatm->snatm_len != sizeof(*snatm) ||
 	(npcb->npcb_flags & NPCB_FREE) == 0) {
@@ -172,13 +173,12 @@ natm_usr_connect(struct socket *so, struct sockaddr *nam, d_thread_t *p)
 	goto out;
     }
 
-    snatm->snatm_if[IFNAMSIZ-1] = '\0';  /* XXX ensure null termination
-					    since ifunit() uses strcmp */
+    snatm->snatm_if[IFNAMSIZ - 1] = '\0';	/* XXX ensure null termination
+						   since ifunit() uses strcmp */
 
     /*
      * convert interface string to ifp, validate.
      */
-
     ifp = ifunit(snatm->snatm_if);
     if (ifp == NULL || (ifp->if_flags & IFF_RUNNING) == 0) {
 	error = ENXIO;
@@ -192,23 +192,26 @@ natm_usr_connect(struct socket *so, struct sockaddr *nam, d_thread_t *p)
     /*
      * register us with the NATM PCB layer
      */
-
     if (npcb_add(npcb, ifp, snatm->snatm_vci, snatm->snatm_vpi) != npcb) {
         error = EADDRINUSE;
         goto out;
     }
 
     /*
-     * enable rx
+     * open the channel
      */
+    bzero(&op, sizeof(op));
+    op.rxhand = npcb;
+    op.param.flags = ATMIO_FLAG_PVC;
+    op.param.vpi = npcb->npcb_vpi;
+    op.param.vci = npcb->npcb_vci;
+    op.param.rmtu = op.param.tmtu = ifp->if_mtu;
+    op.param.aal = (proto == PROTO_NATMAAL5) ? ATMIO_AAL_5 : ATMIO_AAL_0;
+    op.param.traffic = ATMIO_TRAFFIC_UBR;
 
-    ATM_PH_FLAGS(&api.aph) = (proto == PROTO_NATMAAL5) ? ATM_PH_AAL5 : 0;
-    ATM_PH_VPI(&api.aph) = npcb->npcb_vpi;
-    ATM_PH_SETVCI(&api.aph, npcb->npcb_vci);
-    api.rxhand = npcb;
     s2 = splimp();
     if (ifp->if_ioctl == NULL || 
-	ifp->if_ioctl(ifp, SIOCATMENA, (caddr_t) &api) != 0) {
+	ifp->if_ioctl(ifp, SIOCATMOPENVCC, (caddr_t)&op) != 0) {
 	splx(s2);
 	npcb_free(npcb, NPCB_REMOVE);
         error = EIO;
@@ -227,12 +230,12 @@ static int
 natm_usr_disconnect(struct socket *so)
 {
     struct natmpcb *npcb;
-    struct atm_pseudoioctl api;
+    struct atmio_closevcc cl;
     struct ifnet *ifp;
     int error = 0;
     int s2, s = SPLSOFTNET();
 
-    npcb = (struct natmpcb *) so->so_pcb;
+    npcb = (struct natmpcb *)so->so_pcb;
     if (npcb == NULL) {
 	error = EINVAL;
 	goto out;
@@ -248,14 +251,11 @@ natm_usr_disconnect(struct socket *so)
     /*
      * disable rx
      */
-
-    ATM_PH_FLAGS(&api.aph) = ATM_PH_AAL5;
-    ATM_PH_VPI(&api.aph) = npcb->npcb_vpi;
-    ATM_PH_SETVCI(&api.aph, npcb->npcb_vci);
-    api.rxhand = npcb;
+    cl.vpi = npcb->npcb_vpi;
+    cl.vci = npcb->npcb_vci;
     s2 = splimp();
     if (ifp->if_ioctl != NULL)
-	ifp->if_ioctl(ifp, SIOCATMDIS, (caddr_t) &api);
+	ifp->if_ioctl(ifp, SIOCATMCLOSEVCC, (caddr_t)&cl);
     splx(s2);
 
     npcb_free(npcb, NPCB_REMOVE);
@@ -270,12 +270,12 @@ static int
 natm_usr_shutdown(struct socket *so)
 {
     socantsendmore(so);
-    return 0;
+    return (0);
 }
 
 static int
 natm_usr_send(struct socket *so, int flags, struct mbuf *m, 
-	      struct sockaddr *nam, struct mbuf *control, d_thread_t *p)
+    struct sockaddr *nam, struct mbuf *control, d_thread_t *p)
 {
     struct natmpcb *npcb;
     struct atm_pseudohdr *aph;
@@ -283,7 +283,7 @@ natm_usr_send(struct socket *so, int flags, struct mbuf *m,
     int s = SPLSOFTNET();
     int proto = so->so_proto->pr_protocol;
 
-    npcb = (struct natmpcb *) so->so_pcb;
+    npcb = (struct natmpcb *)so->so_pcb;
     if (npcb == NULL) {
 	error = EINVAL;
 	goto out;
@@ -299,7 +299,6 @@ natm_usr_send(struct socket *so, int flags, struct mbuf *m,
     /*
      * send the data.   we must put an atm_pseudohdr on first
      */
-
     M_PREPEND(m, sizeof(*aph), M_TRYWAIT);
     if (m == NULL) {
         error = ENOBUFS;
@@ -325,7 +324,7 @@ natm_usr_peeraddr(struct socket *so, struct sockaddr **nam)
     int error = 0;
     int s = SPLSOFTNET();
 
-    npcb = (struct natmpcb *) so->so_pcb;
+    npcb = (struct natmpcb *)so->so_pcb;
     if (npcb == NULL) {
 	error = EINVAL;
 	goto out;
@@ -335,8 +334,8 @@ natm_usr_peeraddr(struct socket *so, struct sockaddr **nam)
     bzero(snatm, sizeof(*snatm));
     snatm->snatm_len = sizeof(*snatm);
     snatm->snatm_family = AF_NATM;
-    snprintf(snatm->snatm_if, sizeof(snatm->snatm_if),
-	"%s%d", npcb->npcb_ifp->if_name, npcb->npcb_ifp->if_unit);
+    strlcpy(snatm->snatm_if, npcb->npcb_ifp->if_xname,
+        sizeof(snatm->snatm_if));
     snatm->snatm_vci = npcb->npcb_vci;
     snatm->snatm_vpi = npcb->npcb_vpi;
     *nam = dup_sockaddr((struct sockaddr *)snatm, 0);
@@ -348,41 +347,24 @@ natm_usr_peeraddr(struct socket *so, struct sockaddr **nam)
 
 static int
 natm_usr_control(struct socket *so, u_long cmd, caddr_t arg,
-		 struct ifnet *ifp, d_thread_t *p)
+    struct ifnet *ifp, d_thread_t *p)
 {
     struct natmpcb *npcb;
-    struct atm_rawioctl ario;
     int error = 0;
     int s = SPLSOFTNET();
 
-    npcb = (struct natmpcb *) so->so_pcb;
+    npcb = (struct natmpcb *)so->so_pcb;
     if (npcb == NULL) {
 	error = EINVAL;
 	goto out;
     }
 
-    /*
-     * raw atm ioctl.   comes in as a SIOCRAWATM.   we convert it to
-     * SIOCXRAWATM and pass it to the driver.
-     */
-    if (cmd == SIOCRAWATM) {
-        if (npcb->npcb_ifp == NULL) {
-	    error = ENOTCONN;
-	    goto out;
-        }
-        ario.npcb = npcb;
-        ario.rawvalue = *((int *)arg);
-        error = npcb->npcb_ifp->if_ioctl(npcb->npcb_ifp, 
-					 SIOCXRAWATM, (caddr_t) &ario);
-	if (!error) {
-	    if (ario.rawvalue) 
-		npcb->npcb_flags |= NPCB_RAW;
-	    else
-		npcb->npcb_flags &= ~(NPCB_RAW);
-	}
-    }
-    else
+    splx(s);
+    if (ifp == NULL || ifp->if_ioctl == NULL) {
 	error = EOPNOTSUPP;
+	goto out;
+    }
+    return ((*ifp->if_ioctl)(ifp, cmd, arg));
 
  out:
     splx(s);
@@ -392,19 +374,19 @@ natm_usr_control(struct socket *so, u_long cmd, caddr_t arg,
 static int
 natm_usr_abort(struct socket *so)
 {
-    return natm_usr_shutdown(so);
+    return (natm_usr_shutdown(so));
 }
 
 static int
 natm_usr_bind(struct socket *so, struct sockaddr *nam, d_thread_t *p)
 {
-    return EOPNOTSUPP;
+    return (EOPNOTSUPP);
 }
 
 static int
 natm_usr_sockaddr(struct socket *so, struct sockaddr **nam)
 {
-    return EOPNOTSUPP;
+    return (EOPNOTSUPP);
 }
 
 /* xxx - should be const */
@@ -414,7 +396,7 @@ struct pr_usrreqs natm_usrreqs = {
 	natm_usr_detach, natm_usr_disconnect, pru_listen_notsupp,
 	natm_usr_peeraddr, pru_rcvd_notsupp, pru_rcvoob_notsupp,
 	natm_usr_send, pru_sense_null, natm_usr_shutdown,
-	natm_usr_sockaddr, sosend, soreceive, sopoll
+	natm_usr_sockaddr, sosend, soreceive, sopoll, pru_sosetlabel_null
 };
 
 #else  /* !FREEBSD_USRREQS */
@@ -696,100 +678,80 @@ done:
  * pointer.    we can get the interface pointer from the so's PCB if
  * we really need it.
  */
-
 void
 natmintr(struct mbuf *m)
 {
-  int s;
-  struct socket *so;
-  struct natmpcb *npcb;
+	int s;
+	struct socket *so;
+	struct natmpcb *npcb;
+
+	GIANT_REQUIRED;
 
 #ifdef DIAGNOSTIC
-  M_ASSERTPKTHDR(m);
+	M_ASSERTPKTHDR(m);
 #endif
 
-  npcb = (struct natmpcb *) m->m_pkthdr.rcvif; /* XXX: overloaded */
-  so = npcb->npcb_socket;
+	npcb = (struct natmpcb *)m->m_pkthdr.rcvif;	/* XXX: overloaded */
+	so = npcb->npcb_socket;
 
-  s = splimp();			/* could have atm devs @ different levels */
-  npcb->npcb_inq--;
-  splx(s);
+	s = splimp();		/* could have atm devs @ different levels */
+	npcb->npcb_inq--;
+	splx(s);
 
-  if (npcb->npcb_flags & NPCB_DRAIN) {
-    m_freem(m);
-    if (npcb->npcb_inq == 0)
-      FREE(npcb, M_PCB);			/* done! */
-    return;
-  }
+	if (npcb->npcb_flags & NPCB_DRAIN) {
+		m_freem(m);
+		if (npcb->npcb_inq == 0)
+			FREE(npcb, M_PCB);			/* done! */
+		return;
+	}
 
-  if (npcb->npcb_flags & NPCB_FREE) {
-    m_freem(m);					/* drop */
-    return;
-  }
+	if (npcb->npcb_flags & NPCB_FREE) {
+		m_freem(m);					/* drop */
+		return;
+	}
 
 #ifdef NEED_TO_RESTORE_IFP
-  m->m_pkthdr.rcvif = npcb->npcb_ifp;
+	m->m_pkthdr.rcvif = npcb->npcb_ifp;
 #else
 #ifdef DIAGNOSTIC
-m->m_pkthdr.rcvif = NULL;	/* null it out to be safe */
+	m->m_pkthdr.rcvif = NULL;	/* null it out to be safe */
 #endif
 #endif
 
-  if (sbspace(&so->so_rcv) > m->m_pkthdr.len ||
-     ((npcb->npcb_flags & NPCB_RAW) != 0 && so->so_rcv.sb_cc < NPCB_RAWCC) ) {
+	if (sbspace(&so->so_rcv) > m->m_pkthdr.len) {
 #ifdef NATM_STAT
-    natm_sookcnt++;
-    natm_sookbytes += m->m_pkthdr.len;
+		natm_sookcnt++;
+		natm_sookbytes += m->m_pkthdr.len;
 #endif
-    sbappendrecord(&so->so_rcv, m);
-    sorwakeup(so);
-  } else {
+		sbappendrecord(&so->so_rcv, m);
+		sorwakeup(so);
+	} else {
 #ifdef NATM_STAT
-    natm_sodropcnt++;
-    natm_sodropbytes += m->m_pkthdr.len;
+		natm_sodropcnt++;
+		natm_sodropbytes += m->m_pkthdr.len;
 #endif
-    m_freem(m);
-  }
+		m_freem(m);
+	}
 }
 
 /* 
  * natm0_sysctl: not used, but here in case we want to add something
  * later...
  */
-
-int natm0_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
-
-int *name;
-u_int namelen;
-void *oldp;
-size_t *oldlenp;
-void *newp;
-size_t newlen;
-
+int
+natm0_sysctl(SYSCTL_HANDLER_ARGS)
 {
-  /* All sysctl names at this level are terminal. */
-  if (namelen != 1)
-    return (ENOTDIR);
-  return (ENOPROTOOPT);
+	/* All sysctl names at this level are terminal. */
+	return (ENOENT);
 }
 
 /* 
  * natm5_sysctl: not used, but here in case we want to add something
  * later...
  */
-
-int natm5_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
-
-int *name;
-u_int namelen;
-void *oldp;
-size_t *oldlenp;
-void *newp;
-size_t newlen;
-
+int
+natm5_sysctl(SYSCTL_HANDLER_ARGS)
 {
-  /* All sysctl names at this level are terminal. */
-  if (namelen != 1)
-    return (ENOTDIR);
-  return (ENOPROTOOPT);
+	/* All sysctl names at this level are terminal. */
+	return (ENOENT);
 }

@@ -60,14 +60,15 @@
  *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
- *
- * $FreeBSD: src/sys/vm/vm_pager.c,v 1.86 2003/05/06 02:45:28 alc Exp $
  */
 
 /*
  *	Paging space routine stubs.  Emulates a matchmaker-like interface
  *	for builtin pagers.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/vm/vm_pager.c,v 1.92 2003/10/20 05:16:27 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -86,12 +87,6 @@
 #include <vm/vm_extern.h>
 
 MALLOC_DEFINE(M_VMPGDATA, "VM pgdata", "XXX: VM pager private data");
-
-extern struct pagerops defaultpagerops;
-extern struct pagerops swappagerops;
-extern struct pagerops vnodepagerops;
-extern struct pagerops devicepagerops;
-extern struct pagerops physpagerops;
 
 int cluster_pbuf_freecnt = -1;	/* unlimited to begin with */
 
@@ -159,13 +154,11 @@ dead_pager_dealloc(object)
 }
 
 static struct pagerops deadpagerops = {
-	NULL,
-	dead_pager_alloc,
-	dead_pager_dealloc,
-	dead_pager_getpages,
-	dead_pager_putpages,
-	dead_pager_haspage,
-	NULL
+	.pgo_alloc = 	dead_pager_alloc,
+	.pgo_dealloc =	dead_pager_dealloc,
+	.pgo_getpages =	dead_pager_getpages,
+	.pgo_putpages =	dead_pager_putpages,
+	.pgo_haspage =	dead_pager_haspage,
 };
 
 struct pagerops *pagertab[] = {
@@ -231,7 +224,7 @@ vm_pager_bufferinit()
 
 	cluster_pbuf_freecnt = nswbuf / 2;
 
-	swapbkva = kmem_alloc_pageable(pager_map, nswbuf * MAXPHYS);
+	swapbkva = kmem_alloc_nofault(pager_map, nswbuf * MAXPHYS);
 	if (!swapbkva)
 		panic("Not enough pager_map VM space for physical buffers");
 }
@@ -269,29 +262,9 @@ vm_pager_deallocate(object)
 }
 
 /*
- *      vm_pager_strategy:
- *
- *      called with no specific spl
- *      Execute strategy routine directly to pager.
- */
-void
-vm_pager_strategy(vm_object_t object, struct bio *bp)
-{
-	if (pagertab[object->type]->pgo_strategy) {
-		(*pagertab[object->type]->pgo_strategy)(object, bp);
-	} else {
-		bp->bio_flags |= BIO_ERROR;
-		bp->bio_error = ENXIO;
-		biodone(bp);
-	}
-}
-
-/*
  * vm_pager_get_pages() - inline, see vm/vm_pager.h
  * vm_pager_put_pages() - inline, see vm/vm_pager.h
  * vm_pager_has_page() - inline, see vm/vm_pager.h
- * vm_pager_page_inserted() - inline, see vm/vm_pager.h
- * vm_pager_page_removed() - inline, see vm/vm_pager.h
  */
 
 vm_offset_t
@@ -340,8 +313,9 @@ initpbuf(struct buf *bp)
 	bp->b_rcred = NOCRED;
 	bp->b_wcred = NOCRED;
 	bp->b_qindex = 0;	/* On no queue (QUEUE_NONE) */
-	bp->b_data = (caddr_t) (MAXPHYS * (bp - swbuf)) + swapbkva;
-	bp->b_kvabase = bp->b_data;
+	bp->b_saveaddr = (caddr_t) (MAXPHYS * (bp - swbuf)) + swapbkva;
+	bp->b_data = bp->b_saveaddr;
+	bp->b_kvabase = bp->b_saveaddr;
 	bp->b_kvasize = MAXPHYS;
 	bp->b_xflags = 0;
 	bp->b_flags = 0;

@@ -31,8 +31,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_time.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/kern_time.c,v 1.102 2003/05/13 19:21:46 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_time.c,v 1.105 2003/10/26 02:19:00 alfred Exp $");
 
 #include "opt_mac.h"
 
@@ -531,6 +533,8 @@ realitexpire(void *arg)
 	psignal(p, SIGALRM);
 	if (!timevalisset(&p->p_realtimer.it_interval)) {
 		timevalclear(&p->p_realtimer.it_value);
+		if (p->p_flag & P_WEXIT)
+			wakeup(&p->p_itcallout);
 		PROC_UNLOCK(p);
 		return;
 	}
@@ -617,7 +621,7 @@ expire:
  * Caveat emptor.
  */
 void
-timevaladd(struct timeval *t1, struct timeval *t2)
+timevaladd(struct timeval *t1, const struct timeval *t2)
 {
 
 	t1->tv_sec += t2->tv_sec;
@@ -626,7 +630,7 @@ timevaladd(struct timeval *t1, struct timeval *t2)
 }
 
 void
-timevalsub(struct timeval *t1, struct timeval *t2)
+timevalsub(struct timeval *t1, const struct timeval *t2)
 {
 
 	t1->tv_sec -= t2->tv_sec;

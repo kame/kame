@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_partition/mac_partition.c,v 1.6 2003/03/27 19:26:39 rwatson Exp $
+ * $FreeBSD: src/sys/security/mac_partition/mac_partition.c,v 1.9 2003/12/06 21:48:02 rwatson Exp $
  */
 
 /*
@@ -46,6 +46,7 @@
 #include <sys/mac.h>
 #include <sys/mount.h>
 #include <sys/proc.h>
+#include <sys/sbuf.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
 #include <sys/sysent.h>
@@ -100,17 +101,27 @@ mac_partition_destroy_label(struct label *label)
 	SLOT(label) = 0;
 }
 
+static void
+mac_partition_copy_label(struct label *src, struct label *dest)
+{
+
+	SLOT(dest) = SLOT(src);
+}
+
 static int
 mac_partition_externalize_label(struct label *label, char *element_name,
-    char *element_data, size_t size, size_t *len, int *claimed)
+    struct sbuf *sb, int *claimed)
 {
 
 	if (strcmp(MAC_PARTITION_LABEL_NAME, element_name) != 0)
 		return (0);
 
 	(*claimed)++;
-	*len = snprintf(element_data, size, "%ld", SLOT(label));
-	return (0);
+
+	if (sbuf_printf(sb, "%ld", SLOT(label)) == -1)
+		return (EINVAL);
+	else
+		return (0);
 }
 
 static int
@@ -127,24 +138,17 @@ mac_partition_internalize_label(struct label *label, char *element_name,
 }
 
 static void
-mac_partition_create_cred(struct ucred *cred_parent, struct ucred *cred_child)
-{
-
-	SLOT(&cred_child->cr_label) = SLOT(&cred_parent->cr_label);
-}
-
-static void
 mac_partition_create_proc0(struct ucred *cred)
 {
 
-	SLOT(&cred->cr_label) = 0;
+	SLOT(cred->cr_label) = 0;
 }
 
 static void
 mac_partition_create_proc1(struct ucred *cred)
 {
 
-	SLOT(&cred->cr_label) = 0;
+	SLOT(cred->cr_label) = 0;
 }
 
 static void
@@ -152,7 +156,7 @@ mac_partition_relabel_cred(struct ucred *cred, struct label *newlabel)
 {
 
 	if (SLOT(newlabel) != 0)
-		SLOT(&cred->cr_label) = SLOT(newlabel);
+		SLOT(cred->cr_label) = SLOT(newlabel);
 }
 
 static int
@@ -197,7 +201,7 @@ mac_partition_check_cred_visible(struct ucred *u1, struct ucred *u2)
 {
 	int error;
 
-	error = label_on_label(&u1->cr_label, &u2->cr_label);
+	error = label_on_label(u1->cr_label, u2->cr_label);
 
 	return (error == 0 ? 0 : ESRCH);
 }
@@ -207,7 +211,7 @@ mac_partition_check_proc_debug(struct ucred *cred, struct proc *proc)
 {
 	int error;
 
-	error = label_on_label(&cred->cr_label, &proc->p_ucred->cr_label);
+	error = label_on_label(cred->cr_label, proc->p_ucred->cr_label);
 
 	return (error ? ESRCH : 0);
 }
@@ -217,7 +221,7 @@ mac_partition_check_proc_sched(struct ucred *cred, struct proc *proc)
 {
 	int error;
 
-	error = label_on_label(&cred->cr_label, &proc->p_ucred->cr_label);
+	error = label_on_label(cred->cr_label, proc->p_ucred->cr_label);
 
 	return (error ? ESRCH : 0);
 }
@@ -228,7 +232,7 @@ mac_partition_check_proc_signal(struct ucred *cred, struct proc *proc,
 {
 	int error;
 
-	error = label_on_label(&cred->cr_label, &proc->p_ucred->cr_label);
+	error = label_on_label(cred->cr_label, proc->p_ucred->cr_label);
 
 	return (error ? ESRCH : 0);
 }
@@ -239,7 +243,7 @@ mac_partition_check_socket_visible(struct ucred *cred, struct socket *socket,
 {
 	int error;
 
-	error = label_on_label(&cred->cr_label, socketlabel);
+	error = label_on_label(cred->cr_label, socketlabel);
 
 	return (error ? ENOENT : 0);
 }
@@ -267,9 +271,9 @@ static struct mac_policy_ops mac_partition_ops =
 	.mpo_init = mac_partition_init,
 	.mpo_init_cred_label = mac_partition_init_label,
 	.mpo_destroy_cred_label = mac_partition_destroy_label,
+	.mpo_copy_cred_label = mac_partition_copy_label,
 	.mpo_externalize_cred_label = mac_partition_externalize_label,
 	.mpo_internalize_cred_label = mac_partition_internalize_label,
-	.mpo_create_cred = mac_partition_create_cred,
 	.mpo_create_proc0 = mac_partition_create_proc0,
 	.mpo_create_proc1 = mac_partition_create_proc1,
 	.mpo_relabel_cred = mac_partition_relabel_cred,

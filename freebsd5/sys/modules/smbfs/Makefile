@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/smbfs/Makefile,v 1.5 2002/03/18 13:06:57 mux Exp $
+# $FreeBSD: src/sys/modules/smbfs/Makefile,v 1.6 2003/11/19 05:08:26 imp Exp $
 
 .PATH:	${.CURDIR}/../../crypto/des \
 	${.CURDIR}/../../crypto/des/arch/${MACHINE_ARCH} \
@@ -11,7 +11,7 @@ KMOD=	smbfs
 
 SRCS=	vnode_if.h \
 	opt_inet.h opt_ipx.h \
-	opt_netsmb.h opt_smbfs.h opt_vmpage.h \
+	opt_netsmb.h opt_vmpage.h \
 	iconv_converter_if.h \
 	md4c.c \
 	smb_conn.c smb_dev.c smb_trantcp.c smb_smb.c smb_subr.c smb_rq.c \

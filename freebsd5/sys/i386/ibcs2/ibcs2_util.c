@@ -27,8 +27,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *	from: svr4_util.c,v 1.5 1995/01/22 23:44:50 christos Exp
- * $FreeBSD: src/sys/i386/ibcs2/ibcs2_util.c,v 1.15 2003/02/19 05:47:22 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_util.c,v 1.17 2003/10/12 04:25:26 tjr Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -160,8 +162,10 @@ ibcs2_emul_find(td, sgp, prefix, path, pbuf, cflag)
 		*pbuf = buf;
 	else {
 		sz = &ptr[len] - buf;
-		*pbuf = stackgap_alloc(sgp, sz + 1);
-		error = copyout(buf, *pbuf, sz);
+		if ((*pbuf = stackgap_alloc(sgp, sz + 1)) != NULL)
+			error = copyout(buf, *pbuf, sz);
+		else
+			error = ENAMETOOLONG;
 		free(buf, M_TEMP);
 	}
 

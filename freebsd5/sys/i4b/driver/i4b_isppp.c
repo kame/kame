@@ -34,11 +34,12 @@
  *	the "cx" driver for Cronyx's HDLC-in-hardware device).  This driver
  *	is only the glue between sppp and i4b.
  *
- * $FreeBSD: src/sys/i4b/driver/i4b_isppp.c,v 1.23 2003/02/06 14:52:47 gj Exp $
- *
  *	last edit-date: [Sat Mar  9 14:09:27 2002]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_isppp.c,v 1.25 2003/10/31 18:32:07 brooks Exp $");
 
 #include "i4bisppp.h"
 
@@ -67,9 +68,9 @@
 #include <i4b/layer4/i4b_l4.h>
 
 #define ISPPP_FMT	"isp%d: "
-#define	ISPPP_ARG(sc)	((sc)->sc_if.if_unit)
+#define	ISPPP_ARG(sc)	((sc)->sc_if.if_dunit)
 #define	PDEVSTATIC	static
-#define IFP2UNIT(ifp)	(ifp)->if_unit
+#define IFP2UNIT(ifp)	(ifp)->if_dunit
 		
 #  define CALLOUT_INIT(chan)		callout_handle_init(chan)
 #  define TIMEOUT(fun, arg, chan, tick)	chan = timeout(fun, arg, tick)
@@ -169,8 +170,7 @@ i4bispppattach(void *dummy)
 		i4bisppp_init_linktab(i);
 		
 		sc->sc_if.if_softc = sc;
-		sc->sc_if.if_name = "isp";
-		sc->sc_if.if_unit = i;
+		if_initname(&sc->sc_if, "isp", i);
 		sc->sc_if.if_mtu = PP_MTU;
 		sc->sc_if.if_flags = IFF_SIMPLEX | IFF_POINTOPOINT;
 		sc->sc_if.if_type = IFT_ISDNBASIC;

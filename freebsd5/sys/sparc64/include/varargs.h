@@ -46,8 +46,11 @@
  * SUCH DAMAGE.
  *
  *	@(#)varargs.h	8.3 (Berkeley) 3/22/94
- * $FreeBSD: src/sys/sparc64/include/varargs.h,v 1.5 2002/10/06 22:02:06 mike Exp $
+ * $FreeBSD: src/sys/sparc64/include/varargs.h,v 1.6 2003/09/01 03:01:45 kan Exp $
  */
+
+#ifndef _MACHINE_VARARGS_H_
+#define	_MACHINE_VARARGS_H_
 
 #if defined(__GNUC__) && (__GNUC__ == 2 && __GNUC_MINOR__ > 95 || __GNUC__ >= 3)
 
@@ -67,9 +70,6 @@ typedef int __builtin_va_alist_t __attribute__((__mode__(__word__)));
 #define	va_end(ap)		__builtin_va_end(ap)
 
 #else	/* ! __GNUC__ post GCC 2.95 */
-
-#ifndef _MACHINE_VARARGS_H_
-#define	_MACHINE_VARARGS_H_
 
 #include <machine/stdarg.h>
 

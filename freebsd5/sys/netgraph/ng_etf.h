@@ -28,11 +28,11 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_etf.h,v 1.2 2002/05/31 23:48:02 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_etf.h,v 1.3 2003/11/11 12:30:37 ru Exp $
  */
 
-#ifndef _NETGRAPH_ETHERTYPE_FILTER_H_
-#define _NETGRAPH_ETHERTYPE_FILTER_H_
+#ifndef _NETGRAPH_NG_ETF_H_
+#define _NETGRAPH_NG_ETF_H_
 
 /* Node type name. This should be unique among all netgraph node types */
 #define NG_ETF_NODE_TYPE	"etf"
@@ -85,4 +85,4 @@ struct ng_etffilter {
 	  { NULL }						\
 }
 
-#endif /* _NETGRAPH_ETHERTYPE_FILTER_H_ */
+#endif /* _NETGRAPH_NG_ETF_H_ */

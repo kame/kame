@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_h4_var.h,v 1.1 2002/11/24 19:46:55 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/drivers/h4/ng_h4_var.h,v 1.2 2003/05/10 21:44:39 julian Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/drivers/h4/ng_h4_var.h,v 1.3 2003/11/14 03:45:29 emax Exp $
  * 
  * Based on:
  * ---------
@@ -36,7 +36,7 @@
  */
 
 #ifndef _NETGRAPH_H4_VAR_H_
-#define _NETGRAPH_H4_VAR_H_ 1
+#define _NETGRAPH_H4_VAR_H_
 
 /*
  * Malloc declaration

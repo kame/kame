@@ -27,7 +27,6 @@
  *
  *	from BSDI $Id: mutex_witness.c,v 1.1.2.20 2000/04/27 03:10:27 cp Exp $
  *	and BSDI $Id: synch_machdep.c,v 2.3.2.39 2000/04/27 03:10:25 cp Exp $
- * $FreeBSD: src/sys/kern/subr_witness.c,v 1.153 2003/05/31 06:42:37 peter Exp $
  */
 
 /*
@@ -82,11 +81,11 @@
  * will not result in a lock order reversal.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/subr_witness.c,v 1.165 2003/11/20 15:35:48 markm Exp $");
+
 #include "opt_ddb.h"
 #include "opt_witness.h"
-#ifdef __i386__
-#include "opt_swtch.h"
-#endif
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -239,7 +238,7 @@ int	witness_skipspin = 1;
 int	witness_skipspin = 0;
 #endif
 TUNABLE_INT("debug.witness_skipspin", &witness_skipspin);
-SYSCTL_INT(_debug, OID_AUTO, witness_skipspin, CTLFLAG_RD, &witness_skipspin, 0,
+SYSCTL_INT(_debug, OID_AUTO, witness_skipspin, CTLFLAG_RDTUN, &witness_skipspin, 0,
     "");
 
 static struct mtx w_mtx;
@@ -273,9 +272,6 @@ static struct witness_order_list_entry order_lists[] = {
 	 */
 #ifdef SMP
 	{ "ap boot", &lock_class_mtx_spin },
-#ifdef __i386__
-	{ "com", &lock_class_mtx_spin },
-#endif
 #endif
 	{ "sio", &lock_class_mtx_spin },
 #ifdef __i386__
@@ -285,9 +281,15 @@ static struct witness_order_list_entry order_lists[] = {
 	{ "zstty", &lock_class_mtx_spin },
 	{ "ng_node", &lock_class_mtx_spin },
 	{ "ng_worklist", &lock_class_mtx_spin },
+	{ "taskqueue_fast", &lock_class_mtx_spin },
+	{ "intr table", &lock_class_mtx_spin },
 	{ "ithread table lock", &lock_class_mtx_spin },
 	{ "sched lock", &lock_class_mtx_spin },
+	{ "turnstile chain", &lock_class_mtx_spin },
+	{ "td_contested", &lock_class_mtx_spin },
 	{ "callout", &lock_class_mtx_spin },
+	{ "entropy harvest", &lock_class_mtx_spin },
+	{ "entropy harvest buffers", &lock_class_mtx_spin },
 	/*
 	 * leaf locks
 	 */
@@ -296,10 +298,8 @@ static struct witness_order_list_entry order_lists[] = {
 	{ "icu", &lock_class_mtx_spin },
 #ifdef SMP
 	{ "smp rendezvous", &lock_class_mtx_spin },
-#if defined(__i386__) && defined(APIC_IO)
+#if defined(__i386__) || defined(__amd64__)
 	{ "tlb", &lock_class_mtx_spin },
-#endif
-#if defined(__i386__) && defined(LAZY_SWITCH)
 	{ "lazypmap", &lock_class_mtx_spin },
 #endif
 #ifdef __sparc64__
@@ -343,9 +343,7 @@ static struct mtx all_mtx = {
 	  LO_INITIALIZED,		/* mtx_object.lo_flags */
 	  { NULL, NULL },		/* mtx_object.lo_list */
 	  NULL },			/* mtx_object.lo_witness */
-	MTX_UNOWNED, 0,			/* mtx_lock, mtx_recurse */
-	TAILQ_HEAD_INITIALIZER(all_mtx.mtx_blocked),
-	{ NULL, NULL }			/* mtx_contested */
+	MTX_UNOWNED, 0			/* mtx_lock, mtx_recurse */
 };
 
 /*
@@ -1052,7 +1050,7 @@ witness_warn(int flags, struct lock_object *lock, const char *fmt, ...)
 				printf(" with the following");
 				if (flags & WARN_SLEEPOK)
 					printf(" non-sleepable");
-				printf("locks held:\n");
+				printf(" locks held:\n");
 			}
 			n++;
 			witness_list_lock(lock1);
@@ -1069,7 +1067,7 @@ witness_warn(int flags, struct lock_object *lock, const char *fmt, ...)
 			printf(" with the following");
 			if (flags & WARN_SLEEPOK)
 				printf(" non-sleepable");
-			printf("locks held:\n");
+			printf(" locks held:\n");
 		}
 		n += witness_list_locks(PCPU_PTR(spinlocks));
 	}
@@ -1594,6 +1592,27 @@ witness_list_locks(struct lock_list_entry **lock_list)
 	return (nheld);
 }
 
+/*
+ * This is a bit risky at best.  We call this function when we have timed
+ * out acquiring a spin lock, and we assume that the other CPU is stuck
+ * with this lock held.  So, we go groveling around in the other CPU's
+ * per-cpu data to try to find the lock instance for this spin lock to
+ * see when it was last acquired.
+ */
+void
+witness_display_spinlock(struct lock_object *lock, struct thread *owner)
+{
+	struct lock_instance *instance;
+	struct pcpu *pc;
+
+	if (owner->td_critnest == 0 || owner->td_oncpu == NOCPU)
+		return;
+	pc = pcpu_find(owner->td_oncpu);
+	instance = find_instance(pc->pc_spinlocks, lock);
+	if (instance != NULL)
+		witness_list_lock(instance);
+}
+
 void
 witness_save(struct lock_object *lock, const char **filep, int *linep)
 {
@@ -1649,7 +1668,6 @@ witness_assert(struct lock_object *lock, int flags, const char *file, int line)
 	else {
 		panic("Lock (%s) %s is not sleep or spin!",
 		    lock->lo_class->lc_name, lock->lo_name);
-		return;
 	}
 	file = fixup_filename(file);
 	switch (flags) {

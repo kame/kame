@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/udf/udf_vnops.c,v 1.27 2003/05/04 07:39:11 scottl Exp $
+ * $FreeBSD: src/sys/fs/udf/udf_vnops.c,v 1.32 2003/11/05 06:56:08 scottl Exp $
  */
 
 /* udf_vnops.c */
@@ -37,6 +37,7 @@
 #include <sys/stat.h>
 #include <sys/bio.h>
 #include <sys/buf.h>
+#include <sys/iconv.h>
 #include <sys/mount.h>
 #include <sys/vnode.h>
 #include <sys/dirent.h>
@@ -48,6 +49,9 @@
 #include <fs/udf/ecma167-udf.h>
 #include <fs/udf/osta.h>
 #include <fs/udf/udf.h>
+#include <fs/udf/udf_mount.h>
+
+extern struct iconv_functions *udf_iconv;
 
 static int udf_access(struct vop_access_args *);
 static int udf_getattr(struct vop_getattr_args *);
@@ -446,41 +450,65 @@ udf_dumpblock(void *data, int len)
 /*
  * Call the OSTA routines to translate the name from a CS0 dstring to a
  * 16-bit Unicode String.  Hooks need to be placed in here to translate from
- * Unicode to the encoding that the kernel/user expects.  For now, compact
- * the encoding to 8 bits if possible.  Return the length of the translated
- * string.
- * XXX This horribly pessimizes the 8bit case
+ * Unicode to the encoding that the kernel/user expects.  Return the length
+ * of the translated string.
  */
 static int
-udf_transname(char *cs0string, char *destname, int len)
+udf_transname(char *cs0string, char *destname, int len, struct udf_mnt *udfmp)
 {
 	unicode_t *transname;
-	int i, unilen = 0;
+	char *unibuf, *unip;
+	int i, unilen = 0, destlen;
+	size_t destleft = MAXNAMLEN;
 
-	/* allocate a buffer big enough to hold an 8->16 bit expansion */
-	transname = uma_zalloc(udf_zone_trans, M_WAITOK);
-
-	if ((unilen = udf_UncompressUnicode(len, cs0string, transname)) == -1) {
-		printf("udf: Unicode translation failed\n");
-		uma_zfree(udf_zone_trans, transname);
-		return 0;
-	}
-
-	/* At this point, the name is in 16-bit Unicode.  Compact it down
-	 * to 8-bit
-	 */
-	for (i = 0; i < unilen ; i++) {
-		if (transname[i] & 0xff00) {
-			destname[i] = '.';	/* Fudge the 16bit chars */
-		} else {
-			destname[i] = transname[i] & 0xff;
+	/* Convert 16-bit Unicode to destname */
+	if (udfmp->im_flags & UDFMNT_KICONV && udf_iconv) {
+		/* allocate a buffer big enough to hold an 8->16 bit expansion */
+		unibuf = uma_zalloc(udf_zone_trans, M_WAITOK);
+		unip = unibuf;
+		if ((unilen = udf_UncompressUnicodeByte(len, cs0string, unibuf)) == -1) {
+			printf("udf: Unicode translation failed\n");
+			uma_zfree(udf_zone_trans, unibuf);
+			return 0;
 		}
+
+		while (unilen > 0 && destleft > 0) {
+			udf_iconv->conv(udfmp->im_d2l, (const char **)&unibuf,
+				(size_t *)&unilen, (char **)&destname, &destleft);
+			/* Unconverted character found */
+			if (unilen > 0 && destleft > 0) {
+				*destname++ = '?';
+				destleft--;
+				unibuf += 2;
+				unilen -= 2;
+			}
+		}
+		uma_zfree(udf_zone_trans, unip);
+		*destname = '\0';
+		destlen = MAXNAMLEN - (int)destleft;
+	} else {
+		/* allocate a buffer big enough to hold an 8->16 bit expansion */
+		transname = uma_zalloc(udf_zone_trans, M_WAITOK);
+
+		if ((unilen = udf_UncompressUnicode(len, cs0string, transname)) == -1) {
+			printf("udf: Unicode translation failed\n");
+			uma_zfree(udf_zone_trans, transname);
+			return 0;
+		}
+
+		for (i = 0; i < unilen ; i++) {
+			if (transname[i] & 0xff00) {
+				destname[i] = '.';	/* Fudge the 16bit chars */
+			} else {
+				destname[i] = transname[i] & 0xff;
+			}
+		}
+		uma_zfree(udf_zone_trans, transname);
+		destname[unilen] = 0;
+		destlen = unilen;
 	}
 
-	destname[unilen] = 0;
-	uma_zfree(udf_zone_trans, transname);
-
-	return unilen;
+	return (destlen);
 }
 
 /*
@@ -489,7 +517,7 @@ udf_transname(char *cs0string, char *destname, int len)
  * here also.
  */
 static int
-udf_cmpname(char *cs0string, char *cmpname, int cs0len, int cmplen)
+udf_cmpname(char *cs0string, char *cmpname, int cs0len, int cmplen, struct udf_mnt *udfmp)
 {
 	char *transname;
 	int error = 0;
@@ -497,7 +525,7 @@ udf_cmpname(char *cs0string, char *cmpname, int cs0len, int cmplen)
 	/* This is overkill, but not worth creating a new zone */
 	transname = uma_zalloc(udf_zone_trans, M_WAITOK);
 
-	cs0len = udf_transname(cs0string, transname, cs0len);
+	cs0len = udf_transname(cs0string, transname, cs0len, udfmp);
 
 	/* Easy check.  If they aren't the same length, they aren't equal */
 	if ((cs0len == 0) || (cs0len != cmplen))
@@ -686,6 +714,7 @@ udf_readdir(struct vop_readdir_args *a)
 	struct uio *uio;
 	struct dirent dir;
 	struct udf_node *node;
+	struct udf_mnt *udfmp;
 	struct fileid_desc *fid;
 	struct udf_uiodir uiodir;
 	struct udf_dirstream *ds;
@@ -696,6 +725,7 @@ udf_readdir(struct vop_readdir_args *a)
 	vp = a->a_vp;
 	uio = a->a_uio;
 	node = VTON(vp);
+	udfmp = node->udfmp;
 	uiodir.eofflag = 1;
 
 	if (a->a_ncookies != NULL) {
@@ -762,7 +792,7 @@ udf_readdir(struct vop_readdir_args *a)
 			error = udf_uiodir(&uiodir, dir.d_reclen, uio, 2);
 		} else {
 			dir.d_namlen = udf_transname(&fid->data[fid->l_iu],
-			    &dir.d_name[0], fid->l_fi);
+			    &dir.d_name[0], fid->l_fi, udfmp);
 			dir.d_fileno = udf_getid(&fid->icb);
 			dir.d_type = (fid->file_char & UDF_FILE_CHAR_DIR) ?
 			    DT_DIR : DT_UNKNOWN;
@@ -819,6 +849,8 @@ udf_strategy(struct vop_strategy_args *a)
 	vp = bp->b_vp;
 	node = VTON(vp);
 
+	KASSERT(a->a_vp == a->a_bp->b_vp, ("%s(%p != %p)",
+	    __func__, a->a_vp, a->a_bp->b_vp));
 	/* cd9660 has this test reversed, but it seems more logical this way */
 	if (bp->b_blkno != bp->b_lblkno) {
 		/*
@@ -837,6 +869,7 @@ udf_strategy(struct vop_strategy_args *a)
 	}
 	vp = node->i_devvp;
 	bp->b_dev = vp->v_rdev;
+	bp->b_iooffset = dbtob(bp->b_blkno);
 	VOP_SPECSTRATEGY(vp, bp);
 	return (0);
 }
@@ -943,7 +976,7 @@ lookloop:
 			}
 		} else {
 			if (!(udf_cmpname(&fid->data[fid->l_iu],
-			    nameptr, fid->l_fi, namelen))) {
+			    nameptr, fid->l_fi, namelen, udfmp))) {
 				id = udf_getid(&fid->icb);
 				break;
 			}
@@ -1016,7 +1049,6 @@ udf_reclaim(struct vop_reclaim_args *a)
 	vp = a->a_vp;
 	unode = VTON(vp);
 
-	cache_purge(vp);
 	if (unode != NULL) {
 		udf_hashrem(unode);
 		if (unode->i_devvp) {

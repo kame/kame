@@ -25,14 +25,15 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/subr_smp.c,v 1.174 2003/04/10 17:35:44 julian Exp $
  */
 
 /*
  * This module holds the global variables and machine independent functions
  * used for the kernel SMP support.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/subr_smp.c,v 1.180 2003/12/03 14:55:31 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -47,10 +48,13 @@
 
 #include <machine/smp.h>
 
+#ifdef SMP
 volatile u_int stopped_cpus;
 volatile u_int started_cpus;
 
 void (*cpustop_restartfunc)(void);
+#endif
+
 int mp_ncpus;
 
 volatile int smp_started;
@@ -60,24 +64,30 @@ u_int mp_maxid;
 SYSCTL_NODE(_kern, OID_AUTO, smp, CTLFLAG_RD, NULL, "Kernel SMP");
 
 int smp_active = 0;	/* are the APs allowed to run? */
-SYSCTL_INT(_kern_smp, OID_AUTO, active, CTLFLAG_RW, &smp_active, 0, "");
+SYSCTL_INT(_kern_smp, OID_AUTO, active, CTLFLAG_RW, &smp_active, 0,
+    "Number of Auxillary Processors (APs) that were successfully started");
 
 int smp_disabled = 0;	/* has smp been disabled? */
-SYSCTL_INT(_kern_smp, OID_AUTO, disabled, CTLFLAG_RD, &smp_disabled, 0, "");
+SYSCTL_INT(_kern_smp, OID_AUTO, disabled, CTLFLAG_RDTUN, &smp_disabled, 0,
+    "SMP has been disabled from the loader");
 TUNABLE_INT("kern.smp.disabled", &smp_disabled);
 
 int smp_cpus = 1;	/* how many cpu's running */
-SYSCTL_INT(_kern_smp, OID_AUTO, cpus, CTLFLAG_RD, &smp_cpus, 0, "");
+SYSCTL_INT(_kern_smp, OID_AUTO, cpus, CTLFLAG_RD, &smp_cpus, 0,
+    "Number of CPUs online");
 
+#ifdef SMP
 /* Enable forwarding of a signal to a process running on a different CPU */
 static int forward_signal_enabled = 1;
 SYSCTL_INT(_kern_smp, OID_AUTO, forward_signal_enabled, CTLFLAG_RW,
-	   &forward_signal_enabled, 0, "");
+	   &forward_signal_enabled, 0,
+	   "Forwarding of a signal to a process on a different CPU");
 
 /* Enable forwarding of roundrobin to all other cpus */
 static int forward_roundrobin_enabled = 1;
 SYSCTL_INT(_kern_smp, OID_AUTO, forward_roundrobin_enabled, CTLFLAG_RW,
-	   &forward_roundrobin_enabled, 0, "");
+	   &forward_roundrobin_enabled, 0,
+	   "Forwarding of roundrobin to all other CPUs");
 
 /* Variables needed for SMP rendezvous. */
 static void (*smp_rv_setup_func)(void *arg);
@@ -86,17 +96,16 @@ static void (*smp_rv_teardown_func)(void *arg);
 static void *smp_rv_func_arg;
 static volatile int smp_rv_waiters[2];
 static struct mtx smp_rv_mtx;
-static int mp_probe_status;
 
 /*
- * Initialize MI SMP variables.
+ * Let the MD SMP code initialize mp_maxid very early if it can.
  */
 static void
-mp_probe(void *dummy)
+mp_setmaxid(void *dummy)
 {
-	mp_probe_status = cpu_mp_probe();
+	cpu_mp_setmaxid();
 }
-SYSINIT(cpu_mp_probe, SI_SUB_TUNABLES, SI_ORDER_FIRST, mp_probe, NULL)
+SYSINIT(cpu_mp_setmaxid, SI_SUB_TUNABLES, SI_ORDER_FIRST, mp_setmaxid, NULL)
 
 /*
  * Call the MD SMP initialization code.
@@ -106,8 +115,11 @@ mp_start(void *dummy)
 {
 
 	/* Probe for MP hardware. */
-	if (mp_probe_status == 0 || smp_disabled != 0)
+	if (smp_disabled != 0 || cpu_mp_probe() == 0) {
+		mp_ncpus = 1;
+		all_cpus = PCPU_GET(cpumask);
 		return;
+	}
 
 	mtx_init(&smp_rv_mtx, "smp rendezvous", NULL, MTX_SPIN);
 	cpu_mp_start();
@@ -323,3 +335,35 @@ smp_rendezvous(void (* setup_func)(void *),
 	/* release lock */
 	mtx_unlock_spin(&smp_rv_mtx);
 }
+#else /* !SMP */
+
+/*
+ * Provide dummy SMP support for UP kernels.  Modules that need to use SMP
+ * APIs will still work using this dummy support.
+ */
+static void
+mp_setvariables_for_up(void *dummy)
+{
+	mp_ncpus = 1;
+	mp_maxid = PCPU_GET(cpuid);
+	all_cpus = PCPU_GET(cpumask);
+	KASSERT(PCPU_GET(cpuid) == 0, ("UP must have a CPU ID of zero"));
+}
+SYSINIT(cpu_mp_setvariables, SI_SUB_TUNABLES, SI_ORDER_FIRST,
+    mp_setvariables_for_up, NULL)
+
+void
+smp_rendezvous(void (* setup_func)(void *), 
+	       void (* action_func)(void *),
+	       void (* teardown_func)(void *),
+	       void *arg)
+{
+
+	if (setup_func != NULL)
+		setup_func(arg);
+	if (action_func != NULL)
+		action_func(arg);
+	if (teardown_func != NULL)
+		teardown_func(arg);
+}
+#endif /* SMP */

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ufs/ufs/acl.h,v 1.4 2002/03/19 22:40:48 alfred Exp $
+ * $FreeBSD: src/sys/ufs/ufs/acl.h,v 1.5 2003/08/04 03:29:13 rwatson Exp $
  */
 /*
  * Developed by the TrustedBSD Project.
@@ -38,8 +38,7 @@
 #ifdef _KERNEL
 
 void	ufs_sync_acl_from_inode(struct inode *ip, struct acl *acl);
-void	ufs_sync_inode_from_acl(struct acl *acl, struct inode *ip,
-	    mode_t preserve_mask);
+void	ufs_sync_inode_from_acl(struct acl *acl, struct inode *ip);
 
 int	ufs_getacl(struct vop_getacl_args *);
 int	ufs_setacl(struct vop_setacl_args *);

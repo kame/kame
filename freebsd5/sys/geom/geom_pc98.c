@@ -28,9 +28,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/geom/geom_pc98.c,v 1.39 2003/05/02 06:34:51 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/geom/geom_pc98.c,v 1.43 2003/09/01 20:45:32 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/endian.h>
@@ -133,39 +134,34 @@ g_pc98_modify(struct g_geom *gp, struct g_pc98_softc *ms, u_char *sec)
 	return (0);
 }
 
-static void
-g_pc98_ioctl(void *arg, int flag)
+static int
+g_pc98_ioctl(struct g_provider *pp, u_long cmd, void *data, struct thread *td)
 {
-	struct bio *bp;
 	struct g_geom *gp;
-	struct g_slicer *gsp;
 	struct g_pc98_softc *ms;
-	struct g_ioctl *gio;
+	struct g_slicer *gsp;
 	struct g_consumer *cp;
-	u_char *sec;
 	int error;
 
-	bp = arg;
-	if (flag == EV_CANCEL) {
-		g_io_deliver(bp, ENXIO);
-		return;
-	}
-	gp = bp->bio_to->geom;
+	gp = pp->geom;
 	gsp = gp->softc;
 	ms = gsp->softc;
-	gio = (struct g_ioctl *)bp->bio_data;
 
-	/* The disklabel to set is the ioctl argument. */
-	sec = gio->data;
-
-	error = g_pc98_modify(gp, ms, sec);
-	if (error) {
-		g_io_deliver(bp, error);
-		return;
+	switch(cmd) {
+	case DIOCSPC98: {
+		DROP_GIANT();
+		g_topology_lock();
+		/* Validate and modify our slicer instance to match. */
+		error = g_pc98_modify(gp, ms, data);
+		cp = LIST_FIRST(&gp->consumer);
+		error = g_write_data(cp, 0, data, 8192);
+		g_topology_unlock();
+		PICKUP_GIANT();
+		return(error);
 	}
-	cp = LIST_FIRST(&gp->consumer);
-	error = g_write_data(cp, 0, sec, 8192);
-	g_io_deliver(bp, error);
+	default:
+		return (ENOIOCTL);
+	}
 }
 
 static int
@@ -175,8 +171,7 @@ g_pc98_start(struct bio *bp)
 	struct g_geom *gp;
 	struct g_pc98_softc *mp;
 	struct g_slicer *gsp;
-	struct g_ioctl *gio;
-	int idx, error;
+	int idx;
 
 	pp = bp->bio_to;
 	idx = pp->index;
@@ -189,33 +184,6 @@ g_pc98_start(struct bio *bp)
 		if (g_handleattr_off_t(bp, "PC98::offset",
 				       gsp->slices[idx].offset))
 			return (1);
-	}
-
-	/* We only handle ioctl(2) requests of the right format. */
-	if (strcmp(bp->bio_attribute, "GEOM::ioctl"))
-		return (0);
-	else if (bp->bio_length != sizeof(*gio))
-		return (0);
-	/* Get hold of the ioctl parameters. */
-	gio = (struct g_ioctl *)bp->bio_data;
-
-	switch (gio->cmd) {
-	case DIOCSPC98:
-		/*
-		 * These we cannot do without the topology lock and some
-		 * some I/O requests.  Ask the event-handler to schedule
-		 * us in a less restricted environment.
-		 */
-		error = g_post_event(g_pc98_ioctl, bp, M_NOWAIT, gp, NULL);
-		if (error)
-			g_io_deliver(bp, error);
-		/*
-		 * We must return non-zero to indicate that we will deal
-		 * with this bio, even though we have not done so yet.
-		 */
-		return (1);
-	default:
-		return (0);
 	}
 
 	return (0);
@@ -258,7 +226,6 @@ g_pc98_taste(struct g_class *mp, struct g_provider *pp, int flags)
 	struct g_consumer *cp;
 	int error;
 	struct g_pc98_softc *ms;
-	struct g_slicer *gsp;
 	u_int fwsectors, fwheads, sectorsize;
 	u_char *buf;
 
@@ -270,9 +237,9 @@ g_pc98_taste(struct g_class *mp, struct g_provider *pp, int flags)
 	gp = g_slice_new(mp, NDOSPART, pp, &cp, &ms, sizeof *ms, g_pc98_start);
 	if (gp == NULL)
 		return (NULL);
-	gsp = gp->softc;
 	g_topology_unlock();
 	gp->dumpconf = g_pc98_dumpconf;
+	gp->ioctl = g_pc98_ioctl;
 	do {
 		if (gp->rank != 2 && flags == G_TF_NORMAL)
 			break;
@@ -317,7 +284,6 @@ g_pc98_taste(struct g_class *mp, struct g_provider *pp, int flags)
 static struct g_class g_pc98_class = {
 	.name = PC98_CLASS_NAME,
 	.taste = g_pc98_taste,
-	G_CLASS_INITIALIZER
 };
 
 DECLARE_GEOM_CLASS(g_pc98_class, g_pc98);

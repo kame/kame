@@ -35,7 +35,7 @@
  *
  *	from: @(#)isa.c	7.2 (Berkeley) 5/13/91
  *	from: isa_dma.c,v 1.3 1999/05/09 23:56:00 peter Exp $
- * $FreeBSD: src/sys/ia64/isa/isa_dma.c,v 1.4 2002/04/29 07:43:15 peter Exp $
+ * $FreeBSD: src/sys/ia64/isa/isa_dma.c,v 1.5 2003/07/01 15:52:05 scottl Exp $
  */
 
 /*
@@ -51,6 +51,8 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 #include <sys/bus.h>
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -129,6 +131,8 @@ isa_dmainit(chan, bouncebufsize)
 			       /*maxsize*/bouncebufsize,
 			       /*nsegments*/1, /*maxsegz*/0x3ffff,
 			       /*flags*/BUS_DMA_ISA,
+			       /*lockfunc*/busdma_lock_mutex,
+			       /*lockarg*/&Giant,
 			       &dma_tag[chan]) != 0) {
 		panic("isa_dmainit: unable to create dma tag\n");
 	}

@@ -21,12 +21,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/ufs/ufs/ufs_dirhash.c,v 1.16 2003/02/19 05:47:46 imp Exp $
  */
+
 /*
  * This implements a hash-based lookup scheme for UFS directories.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_dirhash.c,v 1.17 2003/06/11 06:34:30 obrien Exp $");
 
 #include "opt_ufs.h"
 

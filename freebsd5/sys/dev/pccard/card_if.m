@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/dev/pccard/card_if.m,v 1.21 2002/11/02 23:00:28 imp Exp $
+# $FreeBSD: src/sys/dev/pccard/card_if.m,v 1.23 2003/10/07 03:33:53 imp Exp $
 #
 
 #include <sys/bus.h>
@@ -90,14 +90,6 @@ METHOD int attach_card {
 #
 METHOD int detach_card {
 	device_t  dev;
-}
-
-#
-# Returns the type of card this is.  Maybe we don't need this.
-#
-METHOD int get_type {
-	device_t  dev;
-	int	  *type;
 }
 
 #
@@ -200,52 +192,3 @@ METHOD struct pccard_product * do_product_lookup {
 METHOD int compat_match {
 	device_t dev;
 }
-
-#
-# Method for devices to ask its CIS-enabled parent bus for CIS info.
-# Device driver requests all tuples if type 'id', the routine places
-# 'nret' number of tuples in 'buff'.  Returns 0 if all tuples processed,
-# or an error code if processing was aborted.
-# Users of this method will be responsible for freeing the memory allocated
-# by calling the cis_free method.
-#
-
-HEADER {
-	struct cis_tupleinfo {
-		u_int8_t id;
-		int len;
-		char *data;
-	};
-};
-
-CODE  {
-	static int
-	null_cis_read(device_t dev, device_t child, u_int8_t id,
-	    struct cis_tupleinfo **buff, int *nret)
-	{
-		*nret = 0;
-		*buff = NULL;
-		return ENXIO;
-	}
-
-	static void
-	null_cis_free(device_t dev, struct cis_tupleinfo *buff, int *nret)
-	{
-		return;
-	}
-};
-
-METHOD int cis_read {
-	device_t dev;
-	device_t child;
-	u_int8_t id;
-	struct	 cis_tupleinfo **buff;
-	int	 *nret;
-} DEFAULT null_cis_read;
-
-METHOD int cis_free {
-	device_t dev;
-	struct	 cis_tupleinfo *buff;
-	int	 nret;
-} DEFAULT null_cis_free;
-

@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 1999, 2000, 2001, 2002 Robert N. M. Watson
- * Copyright (c) 2001, 2002 Networks Associates Technology, Inc.
+ * Copyright (c) 2001, 2002, 2003 Networks Associates Technology, Inc.
  * All rights reserved.
  *
  * This software was developed by Robert Watson for the TrustedBSD Project.
@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_bsdextended/mac_bsdextended.c,v 1.14 2003/03/27 19:26:38 rwatson Exp $
+ * $FreeBSD: src/sys/security/mac_bsdextended/mac_bsdextended.c,v 1.16 2003/08/21 14:34:54 rwatson Exp $
  */
 /*
  * Developed by the TrustedBSD Project.
@@ -412,9 +412,25 @@ mac_bsdextended_check_vnode_deleteacl(struct ucred *cred, struct vnode *vp,
 		return (0);
 
 	error = VOP_GETATTR(vp, &vap, cred, curthread);
-	if (error) 
+	if (error)
 		return (error);
 	return (mac_bsdextended_check(cred, vap.va_uid, vap.va_gid, VADMIN));
+}
+
+static int
+mac_bsdextended_check_vnode_deleteextattr(struct ucred *cred, struct vnode *vp,
+    struct label *label, int attrnamespace, const char *name)
+{
+	struct vattr vap;
+	int error;
+
+	if (!mac_bsdextended_enabled)
+		return (0);
+
+	error = VOP_GETATTR(vp, &vap, cred, curthread);
+	if (error)
+		return (error);
+	return (mac_bsdextended_check(cred, vap.va_uid, vap.va_gid, VWRITE));
 }
 
 static int
@@ -495,15 +511,31 @@ mac_bsdextended_check_vnode_link(struct ucred *cred, struct vnode *dvp,
 }
 
 static int
+mac_bsdextended_check_vnode_listextattr(struct ucred *cred, struct vnode *vp,
+    struct label *label, int attrnamespace)
+{
+	struct vattr vap;
+	int error;
+
+	if (!mac_bsdextended_enabled)
+		return (0);
+
+	error = VOP_GETATTR(vp, &vap, cred, curthread);
+	if (error)
+		return (error);
+	return (mac_bsdextended_check(cred, vap.va_uid, vap.va_gid, VREAD));
+}
+
+static int
 mac_bsdextended_check_vnode_lookup(struct ucred *cred, struct vnode *dvp,
     struct label *dlabel, struct componentname *cnp)
 {
 	struct vattr vap;
 	int error;
-  
+
 	if (!mac_bsdextended_enabled)
 		return (0);
-  
+
 	error = VOP_GETATTR(dvp, &vap, cred, curthread);
 	if (error)
 		return (error);
@@ -752,10 +784,12 @@ static struct mac_policy_ops mac_bsdextended_ops =
 	.mpo_check_vnode_create = mac_bsdextended_check_create_vnode,
 	.mpo_check_vnode_delete = mac_bsdextended_check_vnode_delete,
 	.mpo_check_vnode_deleteacl = mac_bsdextended_check_vnode_deleteacl,
+	.mpo_check_vnode_deleteextattr = mac_bsdextended_check_vnode_deleteextattr,
 	.mpo_check_vnode_exec = mac_bsdextended_check_vnode_exec,
 	.mpo_check_vnode_getacl = mac_bsdextended_check_vnode_getacl,
 	.mpo_check_vnode_getextattr = mac_bsdextended_check_vnode_getextattr,
 	.mpo_check_vnode_link = mac_bsdextended_check_vnode_link,
+	.mpo_check_vnode_listextattr = mac_bsdextended_check_vnode_listextattr,
 	.mpo_check_vnode_lookup = mac_bsdextended_check_vnode_lookup,
 	.mpo_check_vnode_open = mac_bsdextended_check_vnode_open,
 	.mpo_check_vnode_readdir = mac_bsdextended_check_vnode_readdir,

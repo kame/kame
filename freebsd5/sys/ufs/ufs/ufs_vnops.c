@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_vnops.c	8.27 (Berkeley) 5/27/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_vnops.c,v 1.225 2003/03/03 19:15:40 njl Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_vnops.c,v 1.234 2003/10/18 14:10:27 phk Exp $");
 
 #include "opt_mac.h"
 #include "opt_quota.h"
@@ -337,7 +339,6 @@ ufs_access(ap)
 	int error;
 #ifdef UFS_ACL
 	struct acl *acl;
-	size_t len;
 #endif
 
 	/*
@@ -369,7 +370,6 @@ ufs_access(ap)
 #ifdef UFS_ACL
 	if ((vp->v_mount->mnt_flag & MNT_ACLS) != 0) {
 		MALLOC(acl, struct acl *, sizeof(*acl), M_ACL, M_WAITOK);
-		len = sizeof(*acl);
 		error = VOP_GETACL(vp, ACL_TYPE_ACCESS, acl, ap->a_cred,
 		    ap->a_td);
 		switch (error) {
@@ -645,13 +645,17 @@ ufs_chmod(vp, mode, cred, td)
 	/*
 	 * Privileged processes may set the sticky bit on non-directories,
 	 * as well as set the setgid bit on a file with a group that the
-	 * process is not a member of.
+	 * process is not a member of.  Both of these are allowed in
+	 * jail(8).
 	 */
-	if (suser_cred(cred, PRISON_ROOT)) {
-		if (vp->v_type != VDIR && (mode & S_ISTXT))
+	if (vp->v_type != VDIR && (mode & S_ISTXT)) {
+		if (suser_cred(cred, PRISON_ROOT))
 			return (EFTYPE);
-		if (!groupmember(ip->i_gid, cred) && (mode & ISGID))
-			return (EPERM);
+	}
+	if (!groupmember(ip->i_gid, cred) && (mode & ISGID)) {
+		error = suser_cred(cred, PRISON_ROOT);
+		if (error)
+			return (error);
 	}
 	ip->i_mode &= ~ALLPERMS;
 	ip->i_mode |= (mode & ALLPERMS);
@@ -1454,16 +1458,11 @@ ufs_mkdir(ap)
 		case 0:
 			/*
 			 * Retrieved a default ACL, so merge mode and ACL if
-			 * necessary.
+			 * necessary.  If the ACL is empty, fall through to
+			 * the "not defined or available" case.
 			 */
 			if (acl->acl_cnt != 0) {
-				/*
-				 * Two possible ways for default ACL to not
-				 * be present.  First, the EA can be
-				 * undefined, or second, the default ACL can
-				 * be blank.  If it's blank, fall through to
-				 * the it's not defined case.
-				 */
+				dmode = acl_posix1e_newfilemode(dmode, acl);
 				ip->i_mode = dmode;
 				DIP(ip, i_mode) = dmode;
 				*dacl = *acl;
@@ -1949,6 +1948,8 @@ ufs_strategy(ap)
 	ufs2_daddr_t blkno;
 	int error;
 
+	KASSERT(ap->a_vp == ap->a_bp->b_vp, ("%s(%p != %p)",
+	    __func__, ap->a_vp, ap->a_bp->b_vp));
 	ip = VTOI(vp);
 	if (bp->b_blkno == bp->b_lblkno) {
 		error = ufs_bmaparray(vp, bp->b_lblkno, &blkno, bp, NULL, NULL);
@@ -1968,6 +1969,7 @@ ufs_strategy(ap)
 	}
 	vp = ip->i_devvp;
 	bp->b_dev = vp->v_rdev;
+	bp->b_iooffset = dbtob(bp->b_blkno);
 	VOP_SPECSTRATEGY(vp, bp);
 	return (0);
 }
@@ -2091,7 +2093,7 @@ ufsfifo_read(ap)
 	ip = VTOI(ap->a_vp);
 	if ((ap->a_vp->v_mount->mnt_flag & MNT_NOATIME) == 0 && ip != NULL &&
 	    (uio->uio_resid != resid || (error == 0 && resid != 0)))
-		VTOI(ap->a_vp)->i_flag |= IN_ACCESS;
+		ip->i_flag |= IN_ACCESS;
 	return (error);
 }
 
@@ -2116,7 +2118,7 @@ ufsfifo_write(ap)
 	error = VOCALL(fifo_vnodeop_p, VOFFSET(vop_write), ap);
 	ip = VTOI(ap->a_vp);
 	if (ip != NULL && (uio->uio_resid != resid || (error == 0 && resid != 0)))
-		VTOI(ap->a_vp)->i_flag |= IN_CHANGE | IN_UPDATE;
+		ip->i_flag |= IN_CHANGE | IN_UPDATE;
 	return (error);
 }
 
@@ -2443,6 +2445,7 @@ ufs_makeinode(mode, dvp, vpp, cnp)
 				 * be blank.  If it's blank, fall through to
 				 * the it's not defined case.
 				 */
+				mode = acl_posix1e_newfilemode(mode, acl);
 				ip->i_mode = mode;
 				DIP(ip, i_mode) = mode;
 				ufs_sync_acl_from_inode(ip, acl);
@@ -2701,6 +2704,7 @@ static struct vnodeopv_entry_desc ufs_vnodeop_entries[] = {
 	{ &vop_whiteout_desc,		(vop_t *) ufs_whiteout },
 #ifdef UFS_EXTATTR
 	{ &vop_getextattr_desc,		(vop_t *) ufs_getextattr },
+	{ &vop_deleteextattr_desc,		(vop_t *) ufs_deleteextattr },
 	{ &vop_setextattr_desc,		(vop_t *) ufs_setextattr },
 #endif
 #ifdef UFS_ACL
@@ -2731,6 +2735,7 @@ static struct vnodeopv_entry_desc ufs_specop_entries[] = {
 	{ &vop_write_desc,		(vop_t *) ufsspec_write },
 #ifdef UFS_EXTATTR
 	{ &vop_getextattr_desc,		(vop_t *) ufs_getextattr },
+	{ &vop_deleteextattr_desc,		(vop_t *) ufs_deleteextattr },
 	{ &vop_setextattr_desc,		(vop_t *) ufs_setextattr },
 #endif
 #ifdef UFS_ACL
@@ -2762,6 +2767,7 @@ static struct vnodeopv_entry_desc ufs_fifoop_entries[] = {
 	{ &vop_write_desc,		(vop_t *) ufsfifo_write },
 #ifdef UFS_EXTATTR
 	{ &vop_getextattr_desc,		(vop_t *) ufs_getextattr },
+	{ &vop_deleteextattr_desc,		(vop_t *) ufs_deleteextattr },
 	{ &vop_setextattr_desc,		(vop_t *) ufs_setextattr },
 #endif
 #ifdef UFS_ACL

@@ -28,10 +28,13 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- * $FreeBSD: src/sys/netncp/ncp_conn.c,v 1.23 2003/03/20 21:17:39 jhb Exp $
  *
  * Connection tables
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netncp/ncp_conn.c,v 1.24 2003/06/11 05:30:35 obrien Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>

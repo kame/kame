@@ -56,7 +56,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/powerpc/powerpc/clock.c,v 1.15 2003/04/03 21:36:33 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/powerpc/powerpc/clock.c,v 1.16 2003/09/26 09:02:24 grehan Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -306,7 +306,7 @@ decr_get_timecount(struct timecounter *tc)
  * Wait for about n microseconds (at least!).
  */
 void
-delay(int n)
+DELAY(int n)
 {
 	u_quad_t	tb, ttb;
 	

@@ -26,8 +26,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/vx/if_vx_eisa.c,v 1.16 2002/03/20 02:07:47 alfred Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/vx/if_vx_eisa.c,v 1.20 2003/10/31 18:32:06 brooks Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -46,6 +48,7 @@
 #include <dev/eisa/eisaconf.h>
 
 #include <dev/vx/if_vxreg.h>
+#include <dev/vx/if_vxvar.h>
 
 #define EISA_DEVICE_ID_3COM_3C592	0x506d5920
 #define EISA_DEVICE_ID_3COM_3C597_TX	0x506d5970
@@ -66,16 +69,12 @@ vx_match(eisa_id_t type)
     switch (type) {
       case EISA_DEVICE_ID_3COM_3C592:
 	return "3Com 3C592 Network Adapter";
-	break;
       case EISA_DEVICE_ID_3COM_3C597_TX:
 	return "3Com 3C597-TX Network Adapter";
-	break;
       case EISA_DEVICE_ID_3COM_3C597_T4:
 	return "3Com 3C597-T4 Network Adapter";
-	break;
       case EISA_DEVICE_ID_3COM_3C597_MII:
 	return "3Com 3C597-MII Network Adapter";
-	break;
       default:
 	break;
     }
@@ -141,8 +140,8 @@ vx_eisa_attach(device_t dev)
     sc = device_get_softc(dev);
 
     sc->vx_res = io;
-    sc->vx_bhandle = rman_get_bushandle(io);
-    sc->vx_btag = rman_get_bustag(io);
+    sc->bst = rman_get_bustag(io);
+    sc->bsh = rman_get_bushandle(io);
 
     rid = 0;
     irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
@@ -156,7 +155,7 @@ vx_eisa_attach(device_t dev)
 
     /* Now the registers are availible through the lower ioport */
 
-    vxattach(sc);
+    vxattach(dev);
 
     if (bus_setup_intr(dev, irq, INTR_TYPE_NET, vxintr, sc, &ih)) {
 	goto bad;

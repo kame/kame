@@ -1,5 +1,5 @@
 /*	$NetBSD: pcmciavar.h,v 1.12 2000/02/08 12:51:31 enami Exp $	*/
-/* $FreeBSD: src/sys/dev/pccard/pccardvar.h,v 1.41 2003/04/23 23:32:53 imp Exp $ */
+/* $FreeBSD: src/sys/dev/pccard/pccardvar.h,v 1.46 2003/11/02 20:18:19 imp Exp $ */
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -60,7 +60,6 @@ struct pccard_mem_handle {
 	bus_addr_t      addr;		/* resulting address in bus space */
 	bus_size_t      size;		/* size of mem space */
 	bus_size_t      realsize;	/* how much we really allocated */
-	long		offset;		/* mapped Offset on card */
 	bus_addr_t	cardaddr;	/* Absolute address on card */
 	int		kind;
 };
@@ -148,8 +147,8 @@ struct pccard_function {
 #define	pf_ccr_realsize	pf_pcmh.realsize
 	uint32_t	pf_ccr_offset;	/* Offset from ccr_base of CIS */
 	int		pf_ccr_window;
-	long		pf_mfc_iobase;	/* Right type? */
-	long		pf_mfc_iomax;
+	bus_addr_t	pf_mfc_iobase;
+	bus_addr_t	pf_mfc_iomax;
 	int		pf_flags;
 	driver_intr_t	*intr_handler;
 	void		*intr_handler_arg;
@@ -185,9 +184,6 @@ struct pccard_card {
 	STAILQ_HEAD(, pccard_function) pf_head;
 };
 
-#define	PCCARD_MEM_ATTR		1
-#define	PCCARD_MEM_COMMON	2
-
 #define	PCCARD_WIDTH_AUTO	0
 #define	PCCARD_WIDTH_IO8	1
 #define	PCCARD_WIDTH_IO16	2
@@ -206,9 +202,6 @@ struct pccard_softc {
 	struct pccard_card card;
 	int		sc_enabled_count;	/* num functions enabled */
 };
-
-void
-pccardbus_if_setup(struct pccard_softc*);
 
 struct pccard_cis_quirk {
 	int32_t manufacturer;
@@ -290,7 +283,8 @@ int	pccard_scan_cis(device_t,
 #define	PCCARD_SPACE_MEMORY	1
 #define	PCCARD_SPACE_IO		2
 
-#define	pccard_mfc(sc)	(STAILQ_FIRST(&(sc)->card.pf_head) &&		\
+#define	pccard_mfc(sc)							\
+		(STAILQ_FIRST(&(sc)->card.pf_head) &&			\
 		 STAILQ_NEXT(STAILQ_FIRST(&(sc)->card.pf_head),pf_list))
 
 #define	pccard_io_alloc(pf, start, size, align, pciop)			\
@@ -355,10 +349,10 @@ PCCARD_ACCESSOR(product,	PRODUCT,		uint32_t)
 PCCARD_ACCESSOR(prodext,	PRODEXT,		uint16_t)
 PCCARD_ACCESSOR(function_number,FUNCTION_NUMBER,	uint32_t)
 PCCARD_ACCESSOR(function,	FUNCTION,		uint32_t)
-PCCARD_ACCESSOR(vendor_str,	VENDOR_STR,		char *)
-PCCARD_ACCESSOR(product_str,	PRODUCT_STR,		char *)
-PCCARD_ACCESSOR(cis3_str,	CIS3_STR,		char *)
-PCCARD_ACCESSOR(cis4_str,	CIS4_STR,		char *)
+PCCARD_ACCESSOR(vendor_str,	VENDOR_STR,		const char *)
+PCCARD_ACCESSOR(product_str,	PRODUCT_STR,		const char *)
+PCCARD_ACCESSOR(cis3_str,	CIS3_STR,		const char *)
+PCCARD_ACCESSOR(cis4_str,	CIS4_STR,		const char *)
 
 /* shared memory flags */
 enum {
@@ -379,10 +373,8 @@ enum {
 #define PCMCIA_CARD2_D(v1, p1, p2, f) \
 		{ PCMCIA_STR_ ## p2, PCMCIA_VENDOR_ ## v1, PCCARD_P(v1, p1), \
 		  f, PCMCIA_CIS_ ## p2}
-#if 1
 #define PCMCIA_CARD(v, p, f) { NULL, PCMCIA_VENDOR_ ## v, \
 		PCCARD_P(v, p), f, PCCARD_C(v, p) }
 #define PCMCIA_CARD2(v1, p1, p2, f) \
 		{ NULL, PCMCIA_VENDOR_ ## v1, PCCARD_P(v1, p1), \
 		  f, PCMCIA_CIS_ ## p2}
-#endif

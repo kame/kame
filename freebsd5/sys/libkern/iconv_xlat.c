@@ -28,9 +28,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/libkern/iconv_xlat.c,v 1.3 2003/02/19 05:47:28 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/libkern/iconv_xlat.c,v 1.5 2003/09/26 20:26:24 fjoe Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -44,7 +46,7 @@
  */
 
 #ifdef MODULE_DEPEND
-MODULE_DEPEND(iconv_xlat, libiconv, 1, 1, 1);
+MODULE_DEPEND(iconv_xlat, libiconv, 2, 2, 2);
 #endif
 
 /*
@@ -82,7 +84,8 @@ iconv_xlat_close(void *data)
 
 static int
 iconv_xlat_conv(void *d2p, const char **inbuf,
-	size_t *inbytesleft, char **outbuf, size_t *outbytesleft)
+	size_t *inbytesleft, char **outbuf, size_t *outbytesleft,
+	int convchar, int casetype)
 {
 	struct iconv_xlat *dp = (struct iconv_xlat*)d2p;
 	const char *src;
@@ -91,14 +94,19 @@ iconv_xlat_conv(void *d2p, const char **inbuf,
 
 	if (inbuf == NULL || *inbuf == NULL || outbuf == NULL || *outbuf == NULL)
 		return 0;
-	r = n = min(*inbytesleft, *outbytesleft);
+	if (casetype != 0)
+		return -1;
+	if (convchar == 1)
+		r = n = 1;
+	else
+		r = n = min(*inbytesleft, *outbytesleft);
 	src = *inbuf;
 	dst = *outbuf;
 	while(r--)
 		*dst++ = dp->d_table[(u_char)*src++];
 	*inbuf += n;
 	*outbuf += n;
-	*inbytesleft += n;
+	*inbytesleft -= n;
 	*outbytesleft -= n;
 	return 0;
 }

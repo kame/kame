@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_mls/mac_mls.c,v 1.47.2.2 2003/06/02 18:59:29 rwatson Exp $
+ * $FreeBSD: src/sys/security/mac_mls/mac_mls.c,v 1.59 2003/12/06 21:48:02 rwatson Exp $
  */
 
 /*
@@ -69,8 +69,10 @@
 #include <net/if_var.h>
 
 #include <netinet/in.h>
+#include <netinet/in_pcb.h>
 #include <netinet/ip_var.h>
 
+#include <vm/uma.h>
 #include <vm/vm.h>
 
 #include <sys/mac_policy.h>
@@ -112,7 +114,7 @@ SYSCTL_INT(_security_mac_mls, OID_AUTO, max_compartments, CTLFLAG_RD,
 static int	mac_mls_slot;
 #define	SLOT(l)	((struct mac_mls *)LABEL_TO_SLOT((l), mac_mls_slot).l_ptr)
 
-MALLOC_DEFINE(M_MACMLS, "mls label", "MAC/MLS labels");
+static uma_zone_t	zone_mls;
 
 static __inline int
 mls_bit_set_empty(u_char *set) {
@@ -127,11 +129,8 @@ mls_bit_set_empty(u_char *set) {
 static struct mac_mls *
 mls_alloc(int flag)
 {
-	struct mac_mls *mac_mls;
 
-	mac_mls = malloc(sizeof(struct mac_mls), M_MACMLS, M_ZERO | flag);
-
-	return (mac_mls);
+	return (uma_zalloc(zone_mls, flag | M_ZERO));
 }
 
 static void
@@ -139,7 +138,7 @@ mls_free(struct mac_mls *mac_mls)
 {
 
 	if (mac_mls != NULL)
-		free(mac_mls, M_MACMLS);
+		uma_zfree(zone_mls, mac_mls);
 	else
 		atomic_add_int(&destroyed_not_inited, 1);
 }
@@ -286,11 +285,12 @@ mac_mls_contains_equal(struct mac_mls *mac_mls)
 }
 
 static int
-mac_mls_subject_equal_ok(struct mac_mls *mac_mls)
+mac_mls_subject_privileged(struct mac_mls *mac_mls)
 {
 
-	KASSERT((mac_mls->mm_flags & MAC_MLS_FLAGS_BOTH) == MAC_MLS_FLAGS_BOTH,
-	    ("mac_mls_subject_equal_ok: subject doesn't have both labels"));
+	KASSERT((mac_mls->mm_flags & MAC_MLS_FLAGS_BOTH) ==
+	    MAC_MLS_FLAGS_BOTH,
+	    ("mac_mls_subject_privileged: subject doesn't have both labels"));
 
 	/* If the single is EQUAL, it's ok. */
 	if (mac_mls->mm_single.mme_type == MAC_MLS_TYPE_EQUAL)
@@ -453,15 +453,11 @@ mac_mls_copy(struct mac_mls *source, struct mac_mls *dest)
  * Policy module operations.
  */
 static void
-mac_mls_destroy(struct mac_policy_conf *conf)
-{
-
-}
-
-static void
 mac_mls_init(struct mac_policy_conf *conf)
 {
 
+	zone_mls = uma_zcreate("mac_mls", sizeof(struct mac_mls), NULL,
+	    NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
 }
 
 /*
@@ -541,57 +537,49 @@ mac_mls_element_to_string(struct sbuf *sb, struct mac_mls_element *element)
 }
 
 /*
- * mac_mls_to_string() converts an MLS label to a string, placing the
- * results in the passed string buffer.  It returns 0 on success,
- * or EINVAL if there isn't room in the buffer.  The size of the
- * string appended, leaving out the nul termination, is returned to
- * the caller via *caller_len.  Eventually, we should expose the
- * sbuf to the caller rather than using C strings at this layer.
+ * mac_mls_to_string() converts an MLS label to a string, and places
+ * the results in the passed sbuf.  It returns 0 on success, or EINVAL
+ * if there isn't room in the sbuf.  Note: the sbuf will be modified
+ * even in a failure case, so the caller may need to revert the sbuf
+ * by restoring the offset if that's undesired.
  */
 static int
-mac_mls_to_string(char *string, size_t size, size_t *caller_len,
-    struct mac_mls *mac_mls)
+mac_mls_to_string(struct sbuf *sb, struct mac_mls *mac_mls)
 {
-	struct sbuf sb;
-
-	sbuf_new(&sb, string, size, SBUF_FIXEDLEN);
 
 	if (mac_mls->mm_flags & MAC_MLS_FLAG_SINGLE) {
-		if (mac_mls_element_to_string(&sb, &mac_mls->mm_single)
+		if (mac_mls_element_to_string(sb, &mac_mls->mm_single)
 		    == -1)
 			return (EINVAL);
 	}
 
 	if (mac_mls->mm_flags & MAC_MLS_FLAG_RANGE) {
-		if (sbuf_putc(&sb, '(') == -1)
+		if (sbuf_putc(sb, '(') == -1)
 			return (EINVAL);
 
-		if (mac_mls_element_to_string(&sb, &mac_mls->mm_rangelow)
+		if (mac_mls_element_to_string(sb, &mac_mls->mm_rangelow)
 		    == -1)
 			return (EINVAL);
 
-		if (sbuf_putc(&sb, '-') == -1)
+		if (sbuf_putc(sb, '-') == -1)
 			return (EINVAL);
 
-		if (mac_mls_element_to_string(&sb, &mac_mls->mm_rangehigh)
+		if (mac_mls_element_to_string(sb, &mac_mls->mm_rangehigh)
 		    == -1)
 			return (EINVAL);
 
-		if (sbuf_putc(&sb, ')') == -1)
+		if (sbuf_putc(sb, ')') == -1)
 			return (EINVAL);
 	}
 
-	sbuf_finish(&sb);
-	*caller_len = strlen(string);
 	return (0);
 }
 
 static int
 mac_mls_externalize_label(struct label *label, char *element_name,
-    char *element_data, size_t size, size_t *len, int *claimed)
+    struct sbuf *sb, int *claimed)
 {
 	struct mac_mls *mac_mls;
-	int error;
 
 	if (strcmp(MAC_MLS_LABEL_NAME, element_name) != 0)
 		return (0);
@@ -600,11 +588,7 @@ mac_mls_externalize_label(struct label *label, char *element_name,
 
 	mac_mls = SLOT(label);
 
-	error = mac_mls_to_string(element_data, size, len, mac_mls);
-	if (error)
-		return (error);
-
-	return (0);
+	return (mac_mls_to_string(sb, mac_mls));
 }
 
 static int
@@ -796,7 +780,7 @@ mac_mls_create_devfs_symlink(struct ucred *cred, struct mount *mp,
 {
 	struct mac_mls *source, *dest;
 
-	source = SLOT(&cred->cr_label);
+	source = SLOT(cred->cr_label);
 	dest = SLOT(delabel);
 
 	mac_mls_copy_single(source, dest);
@@ -808,7 +792,7 @@ mac_mls_create_mount(struct ucred *cred, struct mount *mp,
 {
 	struct mac_mls *source, *dest;
 
-	source = SLOT(&cred->cr_label);
+	source = SLOT(cred->cr_label);
 	dest = SLOT(mntlabel);
 	mac_mls_copy_single(source, dest);
 	dest = SLOT(fslabel);
@@ -930,7 +914,7 @@ mac_mls_create_vnode_extattr(struct ucred *cred, struct mount *mp,
 	buflen = sizeof(temp);
 	bzero(&temp, buflen);
 
-	source = SLOT(&cred->cr_label);
+	source = SLOT(cred->cr_label);
 	dest = SLOT(vlabel);
 	mac_mls_copy_single(source, &temp);
 
@@ -967,6 +951,18 @@ mac_mls_setlabel_vnode_extattr(struct ucred *cred, struct vnode *vp,
  * Labeling event operations: IPC object.
  */
 static void
+mac_mls_create_inpcb_from_socket(struct socket *so, struct label *solabel,
+    struct inpcb *inp, struct label *inplabel)
+{
+	struct mac_mls *source, *dest;
+
+	source = SLOT(solabel);
+	dest = SLOT(inplabel);
+
+	mac_mls_copy_single(source, dest);
+}
+
+static void
 mac_mls_create_mbuf_from_socket(struct socket *so, struct label *socketlabel,
     struct mbuf *m, struct label *mbuflabel)
 {
@@ -984,7 +980,7 @@ mac_mls_create_socket(struct ucred *cred, struct socket *socket,
 {
 	struct mac_mls *source, *dest;
 
-	source = SLOT(&cred->cr_label);
+	source = SLOT(cred->cr_label);
 	dest = SLOT(socketlabel);
 
 	mac_mls_copy_single(source, dest);
@@ -996,7 +992,7 @@ mac_mls_create_pipe(struct ucred *cred, struct pipe *pipe,
 {
 	struct mac_mls *source, *dest;
 
-	source = SLOT(&cred->cr_label);
+	source = SLOT(cred->cr_label);
 	dest = SLOT(pipelabel);
 
 	mac_mls_copy_single(source, dest);
@@ -1073,7 +1069,7 @@ mac_mls_create_bpfdesc(struct ucred *cred, struct bpf_d *bpf_d,
 {
 	struct mac_mls *source, *dest;
 
-	source = SLOT(&cred->cr_label);
+	source = SLOT(cred->cr_label);
 	dest = SLOT(bpflabel);
 
 	mac_mls_copy_single(source, dest);
@@ -1246,27 +1242,27 @@ mac_mls_update_ipq(struct mbuf *fragment, struct label *fragmentlabel,
 	/* NOOP: we only accept matching labels, so no need to update */
 }
 
-/*
- * Labeling event operations: processes.
- */
 static void
-mac_mls_create_cred(struct ucred *cred_parent, struct ucred *cred_child)
+mac_mls_inpcb_sosetlabel(struct socket *so, struct label *solabel,
+    struct inpcb *inp, struct label *inplabel)
 {
 	struct mac_mls *source, *dest;
 
-	source = SLOT(&cred_parent->cr_label);
-	dest = SLOT(&cred_child->cr_label);
+	source = SLOT(solabel);
+	dest = SLOT(inplabel);
 
-	mac_mls_copy_single(source, dest);
-	mac_mls_copy_range(source, dest);
+	mac_mls_copy(source, dest);
 }
 
+/*
+ * Labeling event operations: processes.
+ */
 static void
 mac_mls_create_proc0(struct ucred *cred)
 {
 	struct mac_mls *dest;
 
-	dest = SLOT(&cred->cr_label);
+	dest = SLOT(cred->cr_label);
 
 	mac_mls_set_single(dest, MAC_MLS_TYPE_EQUAL, 0, NULL);
 	mac_mls_set_range(dest, MAC_MLS_TYPE_LOW, 0, NULL, MAC_MLS_TYPE_HIGH,
@@ -1278,7 +1274,7 @@ mac_mls_create_proc1(struct ucred *cred)
 {
 	struct mac_mls *dest;
 
-	dest = SLOT(&cred->cr_label);
+	dest = SLOT(cred->cr_label);
 
 	mac_mls_set_single(dest, MAC_MLS_TYPE_LOW, 0, NULL);
 	mac_mls_set_range(dest, MAC_MLS_TYPE_LOW, 0, NULL, MAC_MLS_TYPE_HIGH,
@@ -1291,7 +1287,7 @@ mac_mls_relabel_cred(struct ucred *cred, struct label *newlabel)
 	struct mac_mls *source, *dest;
 
 	source = SLOT(newlabel);
-	dest = SLOT(&cred->cr_label);
+	dest = SLOT(cred->cr_label);
 
 	mac_mls_copy(source, dest);
 }
@@ -1322,7 +1318,7 @@ mac_mls_check_cred_relabel(struct ucred *cred, struct label *newlabel)
 	struct mac_mls *subj, *new;
 	int error;
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	new = SLOT(newlabel);
 
 	/*
@@ -1369,7 +1365,7 @@ mac_mls_check_cred_relabel(struct ucred *cred, struct label *newlabel)
 		 * their label.
 		 */
 		if (mac_mls_contains_equal(new)) {
-			error = mac_mls_subject_equal_ok(subj);
+			error = mac_mls_subject_privileged(subj);
 			if (error)
 				return (error);
 		}
@@ -1386,8 +1382,8 @@ mac_mls_check_cred_visible(struct ucred *u1, struct ucred *u2)
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&u1->cr_label);
-	obj = SLOT(&u2->cr_label);
+	subj = SLOT(u1->cr_label);
+	obj = SLOT(u2->cr_label);
 
 	/* XXX: range */
 	if (!mac_mls_dominate_single(subj, obj))
@@ -1403,7 +1399,7 @@ mac_mls_check_ifnet_relabel(struct ucred *cred, struct ifnet *ifnet,
 	struct mac_mls *subj, *new;
 	int error;
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	new = SLOT(newlabel);
 
 	/*
@@ -1415,23 +1411,9 @@ mac_mls_check_ifnet_relabel(struct ucred *cred, struct ifnet *ifnet,
 		return (error);
 
 	/*
-	 * If the MLS label is to be changed, authorize as appropriate.
+	 * Relabeling network interfaces requires MLS privilege.
 	 */
-	if (new->mm_flags & MAC_MLS_FLAGS_BOTH) {
-		/*
-		 * Rely on traditional superuser status for the MLS
-		 * interface relabel requirements.  XXX: This will go
-		 * away.
-		 */
-		error = suser_cred(cred, 0);
-		if (error)
-			return (EPERM);
-
-		/*
-		 * XXXMAC: Additional consistency tests regarding the single
-		 * and the range of the new label might be performed here.
-		 */
-	}
+	error = mac_mls_subject_privileged(subj);
 
 	return (0);
 }
@@ -1452,6 +1434,21 @@ mac_mls_check_ifnet_transmit(struct ifnet *ifnet, struct label *ifnetlabel,
 }
 
 static int
+mac_mls_check_inpcb_deliver(struct inpcb *inp, struct label *inplabel,
+    struct mbuf *m, struct label *mlabel)
+{
+	struct mac_mls *p, *i;
+
+	if (!mac_mls_enabled)
+		return (0);
+
+	p = SLOT(mlabel);
+	i = SLOT(inplabel);
+
+	return (mac_mls_equal_single(p, i) ? 0 : EACCES);
+}
+
+static int
 mac_mls_check_mount_stat(struct ucred *cred, struct mount *mp,
     struct label *mntlabel)
 {
@@ -1460,7 +1457,7 @@ mac_mls_check_mount_stat(struct ucred *cred, struct mount *mp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(mntlabel);
 
 	if (!mac_mls_dominate_single(subj, obj))
@@ -1491,7 +1488,7 @@ mac_mls_check_pipe_poll(struct ucred *cred, struct pipe *pipe,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT((pipelabel));
 
 	if (!mac_mls_dominate_single(subj, obj))
@@ -1509,7 +1506,7 @@ mac_mls_check_pipe_read(struct ucred *cred, struct pipe *pipe,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT((pipelabel));
 
 	if (!mac_mls_dominate_single(subj, obj))
@@ -1526,7 +1523,7 @@ mac_mls_check_pipe_relabel(struct ucred *cred, struct pipe *pipe,
 	int error;
 
 	new = SLOT(newlabel);
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(pipelabel);
 
 	/*
@@ -1560,7 +1557,7 @@ mac_mls_check_pipe_relabel(struct ucred *cred, struct pipe *pipe,
 		 * subject must have appropriate privilege.
 		 */
 		if (mac_mls_contains_equal(new)) {
-			error = mac_mls_subject_equal_ok(subj);
+			error = mac_mls_subject_privileged(subj);
 			if (error)
 				return (error);
 		}
@@ -1578,7 +1575,7 @@ mac_mls_check_pipe_stat(struct ucred *cred, struct pipe *pipe,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT((pipelabel));
 
 	if (!mac_mls_dominate_single(subj, obj))
@@ -1596,7 +1593,7 @@ mac_mls_check_pipe_write(struct ucred *cred, struct pipe *pipe,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT((pipelabel));
 
 	if (!mac_mls_dominate_single(obj, subj))
@@ -1613,8 +1610,8 @@ mac_mls_check_proc_debug(struct ucred *cred, struct proc *proc)
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
-	obj = SLOT(&proc->p_ucred->cr_label);
+	subj = SLOT(cred->cr_label);
+	obj = SLOT(proc->p_ucred->cr_label);
 
 	/* XXX: range checks */
 	if (!mac_mls_dominate_single(subj, obj))
@@ -1633,8 +1630,8 @@ mac_mls_check_proc_sched(struct ucred *cred, struct proc *proc)
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
-	obj = SLOT(&proc->p_ucred->cr_label);
+	subj = SLOT(cred->cr_label);
+	obj = SLOT(proc->p_ucred->cr_label);
 
 	/* XXX: range checks */
 	if (!mac_mls_dominate_single(subj, obj))
@@ -1653,8 +1650,8 @@ mac_mls_check_proc_signal(struct ucred *cred, struct proc *proc, int signum)
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
-	obj = SLOT(&proc->p_ucred->cr_label);
+	subj = SLOT(cred->cr_label);
+	obj = SLOT(proc->p_ucred->cr_label);
 
 	/* XXX: range checks */
 	if (!mac_mls_dominate_single(subj, obj))
@@ -1688,7 +1685,7 @@ mac_mls_check_socket_relabel(struct ucred *cred, struct socket *socket,
 	int error;
 
 	new = SLOT(newlabel);
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(socketlabel);
 
 	/*
@@ -1722,7 +1719,7 @@ mac_mls_check_socket_relabel(struct ucred *cred, struct socket *socket,
 		 * the subject must have appropriate privilege.
 		 */
 		if (mac_mls_contains_equal(new)) {
-			error = mac_mls_subject_equal_ok(subj);
+			error = mac_mls_subject_privileged(subj);
 			if (error)
 				return (error);
 		}
@@ -1740,7 +1737,7 @@ mac_mls_check_socket_visible(struct ucred *cred, struct socket *socket,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(socketlabel);
 
 	if (!mac_mls_dominate_single(subj, obj))
@@ -1758,7 +1755,7 @@ mac_mls_check_system_swapon(struct ucred *cred, struct vnode *vp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(label);
 
 	if (!mac_mls_dominate_single(obj, subj) ||
@@ -1777,7 +1774,7 @@ mac_mls_check_vnode_chdir(struct ucred *cred, struct vnode *dvp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(dlabel);
 
 	if (!mac_mls_dominate_single(subj, obj))
@@ -1795,7 +1792,7 @@ mac_mls_check_vnode_chroot(struct ucred *cred, struct vnode *dvp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(dlabel);
 
 	if (!mac_mls_dominate_single(subj, obj))
@@ -1813,7 +1810,7 @@ mac_mls_check_vnode_create(struct ucred *cred, struct vnode *dvp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(dlabel);
 
 	if (!mac_mls_dominate_single(obj, subj))
@@ -1832,7 +1829,7 @@ mac_mls_check_vnode_delete(struct ucred *cred, struct vnode *dvp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(dlabel);
 
 	if (!mac_mls_dominate_single(obj, subj))
@@ -1855,7 +1852,25 @@ mac_mls_check_vnode_deleteacl(struct ucred *cred, struct vnode *vp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
+	obj = SLOT(label);
+
+	if (!mac_mls_dominate_single(obj, subj))
+		return (EACCES);
+
+	return (0);
+}
+
+static int
+mac_mls_check_vnode_deleteextattr(struct ucred *cred, struct vnode *vp,
+    struct label *label, int attrnamespace, const char *name)
+{
+	struct mac_mls *subj, *obj;
+
+	if (!mac_mls_enabled)
+		return (0);
+
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(label);
 
 	if (!mac_mls_dominate_single(obj, subj))
@@ -1887,7 +1902,7 @@ mac_mls_check_vnode_exec(struct ucred *cred, struct vnode *vp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(label);
 
 	if (!mac_mls_dominate_single(subj, obj))
@@ -1905,7 +1920,7 @@ mac_mls_check_vnode_getacl(struct ucred *cred, struct vnode *vp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(label);
 
 	if (!mac_mls_dominate_single(subj, obj))
@@ -1923,7 +1938,7 @@ mac_mls_check_vnode_getextattr(struct ucred *cred, struct vnode *vp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(label);
 
 	if (!mac_mls_dominate_single(subj, obj))
@@ -1942,7 +1957,7 @@ mac_mls_check_vnode_link(struct ucred *cred, struct vnode *dvp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(dlabel);
 
 	if (!mac_mls_dominate_single(obj, subj))
@@ -1950,6 +1965,25 @@ mac_mls_check_vnode_link(struct ucred *cred, struct vnode *dvp,
 
 	obj = SLOT(dlabel);
 	if (!mac_mls_dominate_single(obj, subj))
+		return (EACCES);
+
+	return (0);
+}
+
+static int
+mac_mls_check_vnode_listextattr(struct ucred *cred, struct vnode *vp,
+    struct label *label, int attrnamespace)
+{
+
+	struct mac_mls *subj, *obj;
+
+	if (!mac_mls_enabled)
+		return (0);
+
+	subj = SLOT(cred->cr_label);
+	obj = SLOT(label);
+
+	if (!mac_mls_dominate_single(subj, obj))
 		return (EACCES);
 
 	return (0);
@@ -1964,7 +1998,7 @@ mac_mls_check_vnode_lookup(struct ucred *cred, struct vnode *dvp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(dlabel);
 
 	if (!mac_mls_dominate_single(subj, obj))
@@ -1986,7 +2020,7 @@ mac_mls_check_vnode_mmap(struct ucred *cred, struct vnode *vp,
 	if (!mac_mls_enabled || !revocation_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(label);
 
 	if (prot & (VM_PROT_READ | VM_PROT_EXECUTE)) {
@@ -2010,7 +2044,7 @@ mac_mls_check_vnode_open(struct ucred *cred, struct vnode *vp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(vnodelabel);
 
 	/* XXX privilege override for admin? */
@@ -2035,7 +2069,7 @@ mac_mls_check_vnode_poll(struct ucred *active_cred, struct ucred *file_cred,
 	if (!mac_mls_enabled || !revocation_enabled)
 		return (0);
 
-	subj = SLOT(&active_cred->cr_label);
+	subj = SLOT(active_cred->cr_label);
 	obj = SLOT(label);
 
 	if (!mac_mls_dominate_single(subj, obj))
@@ -2053,7 +2087,7 @@ mac_mls_check_vnode_read(struct ucred *active_cred, struct ucred *file_cred,
 	if (!mac_mls_enabled || !revocation_enabled)
 		return (0);
 
-	subj = SLOT(&active_cred->cr_label);
+	subj = SLOT(active_cred->cr_label);
 	obj = SLOT(label);
 
 	if (!mac_mls_dominate_single(subj, obj))
@@ -2071,7 +2105,7 @@ mac_mls_check_vnode_readdir(struct ucred *cred, struct vnode *dvp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(dlabel);
 
 	if (!mac_mls_dominate_single(subj, obj))
@@ -2089,7 +2123,7 @@ mac_mls_check_vnode_readlink(struct ucred *cred, struct vnode *vp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(vnodelabel);
 
 	if (!mac_mls_dominate_single(subj, obj))
@@ -2107,7 +2141,7 @@ mac_mls_check_vnode_relabel(struct ucred *cred, struct vnode *vp,
 
 	old = SLOT(vnodelabel);
 	new = SLOT(newlabel);
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 
 	/*
 	 * If there is an MLS label update for the vnode, it must be a
@@ -2140,7 +2174,7 @@ mac_mls_check_vnode_relabel(struct ucred *cred, struct vnode *vp,
 		 * the subject must have appropriate privilege.
 		 */
 		if (mac_mls_contains_equal(new)) {
-			error = mac_mls_subject_equal_ok(subj);
+			error = mac_mls_subject_privileged(subj);
 			if (error)
 				return (error);
 		}
@@ -2160,7 +2194,7 @@ mac_mls_check_vnode_rename_from(struct ucred *cred, struct vnode *dvp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(dlabel);
 
 	if (!mac_mls_dominate_single(obj, subj))
@@ -2184,7 +2218,7 @@ mac_mls_check_vnode_rename_to(struct ucred *cred, struct vnode *dvp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(dlabel);
 
 	if (!mac_mls_dominate_single(obj, subj))
@@ -2209,7 +2243,7 @@ mac_mls_check_vnode_revoke(struct ucred *cred, struct vnode *vp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(label);
 
 	if (!mac_mls_dominate_single(obj, subj))
@@ -2227,7 +2261,7 @@ mac_mls_check_vnode_setacl(struct ucred *cred, struct vnode *vp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(label);
 
 	if (!mac_mls_dominate_single(obj, subj))
@@ -2246,7 +2280,7 @@ mac_mls_check_vnode_setextattr(struct ucred *cred, struct vnode *vp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(vnodelabel);
 
 	if (!mac_mls_dominate_single(obj, subj))
@@ -2266,7 +2300,7 @@ mac_mls_check_vnode_setflags(struct ucred *cred, struct vnode *vp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(vnodelabel);
 
 	if (!mac_mls_dominate_single(obj, subj))
@@ -2284,7 +2318,7 @@ mac_mls_check_vnode_setmode(struct ucred *cred, struct vnode *vp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(vnodelabel);
 
 	if (!mac_mls_dominate_single(obj, subj))
@@ -2302,7 +2336,7 @@ mac_mls_check_vnode_setowner(struct ucred *cred, struct vnode *vp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(vnodelabel);
 
 	if (!mac_mls_dominate_single(obj, subj))
@@ -2320,7 +2354,7 @@ mac_mls_check_vnode_setutimes(struct ucred *cred, struct vnode *vp,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&cred->cr_label);
+	subj = SLOT(cred->cr_label);
 	obj = SLOT(vnodelabel);
 
 	if (!mac_mls_dominate_single(obj, subj))
@@ -2338,7 +2372,7 @@ mac_mls_check_vnode_stat(struct ucred *active_cred, struct ucred *file_cred,
 	if (!mac_mls_enabled)
 		return (0);
 
-	subj = SLOT(&active_cred->cr_label);
+	subj = SLOT(active_cred->cr_label);
 	obj = SLOT(vnodelabel);
 
 	if (!mac_mls_dominate_single(subj, obj))
@@ -2356,7 +2390,7 @@ mac_mls_check_vnode_write(struct ucred *active_cred, struct ucred *file_cred,
 	if (!mac_mls_enabled || !revocation_enabled)
 		return (0);
 
-	subj = SLOT(&active_cred->cr_label);
+	subj = SLOT(active_cred->cr_label);
 	obj = SLOT(label);
 
 	if (!mac_mls_dominate_single(obj, subj))
@@ -2367,12 +2401,12 @@ mac_mls_check_vnode_write(struct ucred *active_cred, struct ucred *file_cred,
 
 static struct mac_policy_ops mac_mls_ops =
 {
-	.mpo_destroy = mac_mls_destroy,
 	.mpo_init = mac_mls_init,
 	.mpo_init_bpfdesc_label = mac_mls_init_label,
 	.mpo_init_cred_label = mac_mls_init_label,
 	.mpo_init_devfsdirent_label = mac_mls_init_label,
 	.mpo_init_ifnet_label = mac_mls_init_label,
+	.mpo_init_inpcb_label = mac_mls_init_label_waitcheck,
 	.mpo_init_ipq_label = mac_mls_init_label_waitcheck,
 	.mpo_init_mbuf_label = mac_mls_init_label_waitcheck,
 	.mpo_init_mount_label = mac_mls_init_label,
@@ -2385,6 +2419,7 @@ static struct mac_policy_ops mac_mls_ops =
 	.mpo_destroy_cred_label = mac_mls_destroy_label,
 	.mpo_destroy_devfsdirent_label = mac_mls_destroy_label,
 	.mpo_destroy_ifnet_label = mac_mls_destroy_label,
+	.mpo_destroy_inpcb_label = mac_mls_destroy_label,
 	.mpo_destroy_ipq_label = mac_mls_destroy_label,
 	.mpo_destroy_mbuf_label = mac_mls_destroy_label,
 	.mpo_destroy_mount_label = mac_mls_destroy_label,
@@ -2393,8 +2428,10 @@ static struct mac_policy_ops mac_mls_ops =
 	.mpo_destroy_socket_label = mac_mls_destroy_label,
 	.mpo_destroy_socket_peer_label = mac_mls_destroy_label,
 	.mpo_destroy_vnode_label = mac_mls_destroy_label,
+	.mpo_copy_cred_label = mac_mls_copy_label,
 	.mpo_copy_mbuf_label = mac_mls_copy_label,
 	.mpo_copy_pipe_label = mac_mls_copy_label,
+	.mpo_copy_socket_label = mac_mls_copy_label,
 	.mpo_copy_vnode_label = mac_mls_copy_label,
 	.mpo_externalize_cred_label = mac_mls_externalize_label,
 	.mpo_externalize_ifnet_label = mac_mls_externalize_label,
@@ -2431,6 +2468,7 @@ static struct mac_policy_ops mac_mls_ops =
 	.mpo_create_datagram_from_ipq = mac_mls_create_datagram_from_ipq,
 	.mpo_create_fragment = mac_mls_create_fragment,
 	.mpo_create_ifnet = mac_mls_create_ifnet,
+	.mpo_create_inpcb_from_socket = mac_mls_create_inpcb_from_socket,
 	.mpo_create_ipq = mac_mls_create_ipq,
 	.mpo_create_mbuf_from_mbuf = mac_mls_create_mbuf_from_mbuf,
 	.mpo_create_mbuf_linklayer = mac_mls_create_mbuf_linklayer,
@@ -2441,7 +2479,7 @@ static struct mac_policy_ops mac_mls_ops =
 	.mpo_fragment_match = mac_mls_fragment_match,
 	.mpo_relabel_ifnet = mac_mls_relabel_ifnet,
 	.mpo_update_ipq = mac_mls_update_ipq,
-	.mpo_create_cred = mac_mls_create_cred,
+	.mpo_inpcb_sosetlabel = mac_mls_inpcb_sosetlabel,
 	.mpo_create_proc0 = mac_mls_create_proc0,
 	.mpo_create_proc1 = mac_mls_create_proc1,
 	.mpo_relabel_cred = mac_mls_relabel_cred,
@@ -2450,6 +2488,7 @@ static struct mac_policy_ops mac_mls_ops =
 	.mpo_check_cred_visible = mac_mls_check_cred_visible,
 	.mpo_check_ifnet_relabel = mac_mls_check_ifnet_relabel,
 	.mpo_check_ifnet_transmit = mac_mls_check_ifnet_transmit,
+	.mpo_check_inpcb_deliver = mac_mls_check_inpcb_deliver,
 	.mpo_check_mount_stat = mac_mls_check_mount_stat,
 	.mpo_check_pipe_ioctl = mac_mls_check_pipe_ioctl,
 	.mpo_check_pipe_poll = mac_mls_check_pipe_poll,
@@ -2470,10 +2509,12 @@ static struct mac_policy_ops mac_mls_ops =
 	.mpo_check_vnode_create = mac_mls_check_vnode_create,
 	.mpo_check_vnode_delete = mac_mls_check_vnode_delete,
 	.mpo_check_vnode_deleteacl = mac_mls_check_vnode_deleteacl,
+	.mpo_check_vnode_deleteextattr = mac_mls_check_vnode_deleteextattr,
 	.mpo_check_vnode_exec = mac_mls_check_vnode_exec,
 	.mpo_check_vnode_getacl = mac_mls_check_vnode_getacl,
 	.mpo_check_vnode_getextattr = mac_mls_check_vnode_getextattr,
 	.mpo_check_vnode_link = mac_mls_check_vnode_link,
+	.mpo_check_vnode_listextattr = mac_mls_check_vnode_listextattr,
 	.mpo_check_vnode_lookup = mac_mls_check_vnode_lookup,
 	.mpo_check_vnode_mmap = mac_mls_check_vnode_mmap,
 	.mpo_check_vnode_mprotect = mac_mls_check_vnode_mmap,

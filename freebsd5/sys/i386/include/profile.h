@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)profile.h	8.1 (Berkeley) 6/11/93
- * $FreeBSD: src/sys/i386/include/profile.h,v 1.30 2002/09/25 13:46:23 markm Exp $
+ * $FreeBSD: src/sys/i386/include/profile.h,v 1.31 2003/06/02 00:29:35 obrien Exp $
  */
 
 #ifndef _MACHINE_PROFILE_H_
@@ -94,14 +94,14 @@ mcount()								\
 	 *								\
 	 * selfpc = pc pushed by call to mcount				\
 	 */								\
-	asm("movl 4(%%ebp),%0" : "=r" (selfpc));			\
+	__asm("movl 4(%%ebp),%0" : "=r" (selfpc));			\
 	/*								\
 	 * frompc = pc pushed by call to mcount's caller.		\
 	 * The caller's stack frame has already been built, so %ebp is	\
 	 * the caller's frame pointer.  The caller's raddr is in the	\
 	 * caller's frame following the caller's caller's frame pointer.\
 	 */								\
-	asm("movl (%%ebp),%0" : "=r" (frompc));				\
+	__asm("movl (%%ebp),%0" : "=r" (frompc));				\
 	frompc = ((uintfptr_t *)frompc)[1];				\
 	_mcount(frompc, selfpc);					\
 }

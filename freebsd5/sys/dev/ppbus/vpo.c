@@ -23,8 +23,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ppbus/vpo.c,v 1.28 2003/05/01 19:46:21 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ppbus/vpo.c,v 1.29 2003/08/24 17:54:16 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

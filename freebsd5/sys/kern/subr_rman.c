@@ -25,8 +25,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/subr_rman.c,v 1.29 2003/02/12 07:00:59 imp Exp $
  */
 
 /*
@@ -56,6 +54,9 @@
  * is to say, sharing of overlapping-but-not-identical regions is not
  * permitted.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/subr_rman.c,v 1.31 2003/06/11 00:56:57 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -475,9 +476,7 @@ rman_await_resource(struct resource *r, int pri, int timo)
 static int
 int_rman_deactivate_resource(struct resource *r)
 {
-	struct	rman *rm;
 
-	rm = r->r_rm;
 	r->r_flags &= ~RF_ACTIVE;
 	if (r->r_flags & RF_WANTED) {
 		r->r_flags &= ~RF_WANTED;

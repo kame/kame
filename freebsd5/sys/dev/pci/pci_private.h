@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pci/pci_private.h,v 1.8 2003/04/16 03:15:08 mdodd Exp $
+ * $FreeBSD: src/sys/dev/pci/pci_private.h,v 1.11 2003/09/17 08:32:44 iwasaki Exp $
  *
  */
 
@@ -50,10 +50,10 @@ int		pci_write_ivar(device_t dev, device_t child, int which,
 int		pci_set_powerstate_method(device_t dev, device_t child,
 		    int state);
 int		pci_get_powerstate_method(device_t dev, device_t child);
-u_int32_t	pci_read_config_method(device_t dev, device_t child, 
+uint32_t	pci_read_config_method(device_t dev, device_t child, 
 		    int reg, int width);
 void		pci_write_config_method(device_t dev, device_t child, 
-		    int reg, u_int32_t val, int width);
+		    int reg, uint32_t val, int width);
 int		pci_enable_busmaster_method(device_t dev, device_t child);
 int		pci_disable_busmaster_method(device_t dev, device_t child);
 int		pci_enable_io_method(device_t dev, device_t child, int space);
@@ -72,4 +72,6 @@ int		pci_child_location_str_method(device_t cbdev, device_t child,
 		    char *buf, size_t buflen);
 int		pci_child_pnpinfo_str_method(device_t cbdev, device_t child,
 		    char *buf, size_t buflen);
+int		pci_assign_interrupt_method(device_t dev, device_t child);
+int		pci_resume(device_t dev);
 #endif /* _PCI_PRIVATE_H_ */

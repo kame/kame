@@ -22,9 +22,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/syscons/scterm-dumb.c,v 1.3 2000/04/29 15:35:19 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/syscons/scterm-dumb.c,v 1.5 2003/08/24 18:17:24 obrien Exp $");
 
 #include "opt_syscons.h"
 
@@ -32,7 +33,11 @@
 #include <sys/systm.h>
 #include <sys/consio.h>
 
+#ifdef __sparc64__
+#include <machine/sc_machdep.h>
+#else
 #include <machine/pc/display.h>
+#endif
 
 #include <dev/syscons/syscons.h>
 #include <dev/syscons/sctermvar.h>

@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)fs.h	8.7 (Berkeley) 4/19/94
- * $FreeBSD: src/sys/gnu/ext2fs/fs.h,v 1.13 2003/03/13 07:07:16 jeff Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/fs.h,v 1.15 2003/08/28 00:56:39 jeff Exp $
  */
 
 /*
@@ -153,25 +153,19 @@ extern u_char *fragtbl[];
 #define  unlock_super(devvp) 	VOP_UNLOCK(devvp, 0, curthread)
 
 /*
- * To lock a buffer, set the B_LOCKED flag and then brelse() it. To unlock,
- * reset the B_LOCKED flag and brelse() the buffer back on the LRU list
+ * Historically, ext2fs kept it's metadata buffers on the LOCKED queue.  Now,
+ * we simply change the lock owner to kern so that it may be released from
+ * another context.  Later, we release the buffer, and conditionally write it
+ * when we're done.
  */
-#define LCK_BUF(bp) { \
-	int s; \
-	s = splbio(); \
-	(bp)->b_flags |= B_LOCKED; \
-	splx(s); \
-	brelse(bp); \
-}
+#define LCK_BUF(bp)	BUF_KERNPROC(bp);
 
 #define ULCK_BUF(bp) { \
 	long flags; \
 	int s; \
 	s = splbio(); \
-	BUF_LOCK(bp, LK_EXCLUSIVE, NULL); \
 	flags = (bp)->b_flags; \
-	(bp)->b_flags &= ~(B_DIRTY | B_LOCKED); \
-	bremfree(bp); \
+	(bp)->b_flags &= ~(B_DIRTY); \
 	splx(s); \
 	if (flags & B_DIRTY) \
 		bwrite(bp); \

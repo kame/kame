@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/sscop_pdu.c,v 1.10 2002/11/08 18:27:30 jhb Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ---------------------
  *
  * SSCOP - PDU subroutines
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/sscop_pdu.c,v 1.13 2003/07/24 09:14:50 harti Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -58,10 +56,6 @@
 #include <netatm/uni/sscop_misc.h>
 #include <netatm/uni/sscop_pdu.h>
 #include <netatm/uni/sscop_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/sscop_pdu.c,v 1.10 2002/11/08 18:27:30 jhb Exp $");
-#endif
 
 /*
  * Local functions
@@ -1238,10 +1232,7 @@ sscop_send_ud(sop, m)
  *
  */
 void
-sscop_pdu_print(sop, m, msg)
-	struct sscop	*sop;
-	KBuffer		*m;
-	char		*msg;
+sscop_pdu_print(const struct sscop *sop, const KBuffer *m, const char *msg)
 {
 	char		buf[128];
 	struct vccb	*vcp;
@@ -1251,4 +1242,3 @@ sscop_pdu_print(sop, m, msg)
 	    "sscop %s: vcc=(%d,%d)\n", msg, vcp->vc_vpi, vcp->vc_vci);
 	atm_pdu_print(m, buf);
 }
-

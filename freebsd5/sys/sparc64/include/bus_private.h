@@ -25,13 +25,21 @@
  *
  *	from: FreeBSD: src/sys/i386/i386/busdma_machdep.c,v 1.25 2002/01/05
  *
- * $FreeBSD: src/sys/sparc64/include/bus_private.h,v 1.4 2003/01/21 18:22:26 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/include/bus_private.h,v 1.6 2003/07/10 23:27:35 tmm Exp $
  */
 
 #ifndef	_MACHINE_BUS_PRIVATE_H_
 #define	_MACHINE_BUS_PRIVATE_H_
 
 #include <sys/queue.h>
+
+/*
+ * Helpers
+ */
+int sparc64_bus_mem_map(bus_space_tag_t, bus_space_handle_t, bus_size_t,
+    int, vm_offset_t, void **);
+int sparc64_bus_mem_unmap(void *, bus_size_t);
+bus_space_handle_t sparc64_fake_bustag(int, bus_addr_t, struct bus_space_tag *);
 
 /*
  * This is more or less arbitrary, except for the stack space consumed by
@@ -46,17 +54,37 @@ struct bus_dmamap_res {
 	SLIST_ENTRY(bus_dmamap_res)	dr_link;
 };
 
+/*
+ * Callers of the bus_dma interfaces must always protect their tags and maps
+ * appropriately against concurrent access. However, when a map is on a LRU
+ * queue, there is a second access path to it; for this case, the locking rules
+ * are given in the parenthesized comments below:
+ *	q - locked by the mutex protecting the queue.
+ *	p - private to the owner of the map, no access through the queue.
+ *	* - comment refers to pointer target.
+ * Only the owner of the map is allowed to insert the map into a queue. Removal
+ * and repositioning (i.e. temporal removal and reinsertion) is allowed to all
+ * if the queue lock is held.
+ */
 struct bus_dmamap {
-	TAILQ_ENTRY(bus_dmamap)	dm_maplruq;
-	SLIST_HEAD(, bus_dmamap_res)	dm_reslist;
-	int			dm_onq;
-	int			dm_loaded;
+	TAILQ_ENTRY(bus_dmamap)	dm_maplruq;		/* (q) */
+	SLIST_HEAD(, bus_dmamap_res)	dm_reslist;	/* (q, *q) */
+	int			dm_onq;			/* (q) */
+	int			dm_flags;		/* (p) */
 };
 
-static __inline void
-sparc64_dmamap_init(struct bus_dmamap *m)
-{
-	SLIST_INIT(&m->dm_reslist);
-}
+/* Flag values. */
+#define	DMF_LOADED	1	/* Map is loaded */
+#define	DMF_COHERENT	2	/* Coherent mapping requested */
+
+int sparc64_dma_alloc_map(bus_dma_tag_t dmat, bus_dmamap_t *mapp);
+void sparc64_dma_free_map(bus_dma_tag_t dmat, bus_dmamap_t map);
+
+/*
+ * XXX: This is a kluge. It would be better to handle dma tags in a hierarchical
+ * way, and have a BUS_GET_DMA_TAG(); however, since this is not currently the
+ * case, save a root tag in the relevant bus attach function and use that.
+ */
+extern bus_dma_tag_t sparc64_root_dma_tag;
 
 #endif /* !_MACHINE_BUS_PRIVATE_H_ */

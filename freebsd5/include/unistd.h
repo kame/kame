@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)unistd.h	8.12 (Berkeley) 4/27/95
- * $FreeBSD: src/include/unistd.h,v 1.66 2002/12/29 01:07:55 mike Exp $
+ * $FreeBSD: src/include/unistd.h,v 1.69.2.1 2003/12/18 00:59:50 peter Exp $
  */
 
 #ifndef _UNISTD_H_
@@ -40,6 +40,7 @@
 #include <sys/cdefs.h>
 #include <sys/types.h>			/* XXX adds too much pollution. */
 #include <sys/unistd.h>
+#include <sys/_null.h>
 #include <sys/_types.h>
 
 #ifndef _GID_T_DECLARED
@@ -80,10 +81,6 @@ typedef	__useconds_t	useconds_t;
 #define	 STDIN_FILENO	0	/* standard input file descriptor */
 #define	STDOUT_FILENO	1	/* standard output file descriptor */
 #define	STDERR_FILENO	2	/* standard error file descriptor */
-
-#ifndef NULL
-#define	NULL		0	/* null pointer constant */
-#endif
 
 #if __XSI_VISIBLE || __POSIX_VISIBLE >= 200112
 #define	F_ULOCK		0	/* unlock locked section */
@@ -404,7 +401,7 @@ int	 fchown(int, uid_t, gid_t);
 int	 readlink(const char *, char *, int);
 #endif
 #if __POSIX_VISIBLE >= 200112
-int	 gethostname(char *, int /* socklen_t */);
+int	 gethostname(char *, size_t);
 int	 setegid(gid_t);
 int	 seteuid(uid_t);
 #endif
@@ -470,6 +467,7 @@ int	 des_cipher(const char *, char *, long, int);
 int	 des_setkey(const char *key);
 void	 endusershell(void);
 int	 exect(const char *, char * const *, char * const *);
+int	 execvP(const char *, const char *, char * const *);
 char	*fflagstostr(u_long);
 int	 getdomainname(char *, int);
 int	 getgrouplist(const char *, gid_t, gid_t *, int *);

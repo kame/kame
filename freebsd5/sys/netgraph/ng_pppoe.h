@@ -36,12 +36,12 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_pppoe.h,v 1.16 2002/09/23 18:54:32 alfred Exp $
+ * $FreeBSD: src/sys/netgraph/ng_pppoe.h,v 1.17 2003/11/11 12:30:37 ru Exp $
  * $Whistle: ng_pppoe.h,v 1.7 1999/10/16 10:16:43 julian Exp $
  */
 
-#ifndef _NETGRAPH_PPPOE_H_
-#define _NETGRAPH_PPPOE_H_
+#ifndef _NETGRAPH_NG_PPPOE_H_
+#define _NETGRAPH_NG_PPPOE_H_
 
 /********************************************************************
  * Netgraph hook constants etc.
@@ -248,5 +248,5 @@ struct datatag {
 #define TAGS_HUNIQ 3
 /* for PADT */
 
-#endif /* _NETGRAPH_PPPOE_H_ */
+#endif /* _NETGRAPH_NG_PPPOE_H_ */
 

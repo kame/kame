@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)device_pager.c	8.1 (Berkeley) 6/11/93
- * $FreeBSD: src/sys/vm/device_pager.c,v 1.63 2003/03/25 00:07:05 jake Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/vm/device_pager.c,v 1.69 2003/10/05 22:23:44 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -78,13 +80,12 @@ static vm_page_t dev_pager_getfake(vm_paddr_t);
 static void dev_pager_putfake(vm_page_t);
 
 struct pagerops devicepagerops = {
-	dev_pager_init,
-	dev_pager_alloc,
-	dev_pager_dealloc,
-	dev_pager_getpages,
-	dev_pager_putpages,
-	dev_pager_haspage,
-	NULL
+	.pgo_init =	dev_pager_init,
+	.pgo_alloc =	dev_pager_alloc,
+	.pgo_dealloc =	dev_pager_dealloc,
+	.pgo_getpages =	dev_pager_getpages,
+	.pgo_putpages =	dev_pager_putpages,
+	.pgo_haspage =	dev_pager_haspage,
 };
 
 static void
@@ -94,7 +95,8 @@ dev_pager_init()
 	sx_init(&dev_pager_sx, "dev_pager create");
 	mtx_init(&dev_pager_mtx, "dev_pager list", NULL, MTX_DEF);
 	fakepg_zone = uma_zcreate("DP fakepg", sizeof(struct vm_page),
-	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE); 
+	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR,
+	    UMA_ZONE_NOFREE|UMA_ZONE_VM); 
 }
 
 /*
@@ -210,9 +212,10 @@ dev_pager_getpages(object, m, count, reqpage)
 	d_mmap_t *mapfunc;
 	int prot;
 
-	mtx_assert(&Giant, MA_OWNED);
+	VM_OBJECT_LOCK_ASSERT(object, MA_OWNED);
 	dev = object->handle;
 	offset = m[reqpage]->pindex;
+	VM_OBJECT_UNLOCK(object);
 	prot = PROT_READ;	/* XXX should pass in? */
 	mapfunc = devsw(dev)->d_mmap;
 
@@ -226,12 +229,14 @@ dev_pager_getpages(object, m, count, reqpage)
 	 * free up the all of the original pages.
 	 */
 	page = dev_pager_getfake(paddr);
+	VM_OBJECT_LOCK(object);
 	TAILQ_INSERT_TAIL(&object->un_pager.devp.devp_pglist, page, pageq);
 	vm_page_lock_queues();
 	for (i = 0; i < count; i++)
 		vm_page_free(m[i]);
 	vm_page_unlock_queues();
 	vm_page_insert(page, object, offset);
+	m[reqpage] = page;
 
 	return (VM_PAGER_OK);
 }

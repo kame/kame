@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: FreeBSD: src/sys/i386/include/db_machdep.h,v 1.16 1999/10/04
- * $FreeBSD: src/sys/sparc64/include/db_machdep.h,v 1.6 2001/11/18 03:41:11 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/db_machdep.h,v 1.7 2003/06/07 18:24:37 jake Exp $
  */
 
 #ifndef	_MACHINE_DB_MACHDEP_H_
@@ -44,7 +44,7 @@ extern db_regs_t ddb_regs;
 
 #define	PC_REGS(regs)	((db_addr_t)(regs)->tf_tpc)
 
-#define	BKPT_INST	(0)
+#define	BKPT_INST	(0x91d03001)
 #define	BKPT_SIZE	(4)
 #define	BKPT_SET(inst)	(BKPT_INST)
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)if.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_var.h,v 1.58 2003/01/01 18:48:54 schweikh Exp $
+ * $FreeBSD: src/sys/net/if_var.h,v 1.62 2003/11/12 03:14:29 rwatson Exp $
  */
 
 #ifndef	_NET_IF_VAR_H_
@@ -74,7 +74,6 @@ struct	socket;
 struct	ether_header;
 #endif
 
-#include <sys/_label.h>		/* struct label */
 #include <sys/queue.h>		/* get TAILQ macros */
 
 #ifdef _KERNEL
@@ -83,6 +82,8 @@ struct	ether_header;
 #include <sys/lock.h>		/* XXX */
 #include <sys/mutex.h>		/* XXX */
 #include <sys/event.h>		/* XXX */
+
+#define	IF_DUNIT_NONE	-1
 
 TAILQ_HEAD(ifnethead, ifnet);	/* we use TAILQs so that the order of */
 TAILQ_HEAD(ifaddrhead, ifaddr);	/* instantiation is preserved in the list */
@@ -128,14 +129,15 @@ struct	ifqueue {
  */
 struct ifnet {
 	void	*if_softc;		/* pointer to driver state */
-	char	*if_name;		/* name, e.g. ``en'' or ``lo'' */
 	TAILQ_ENTRY(ifnet) if_link; 	/* all struct ifnets are chained */
+	char	if_xname[IFNAMSIZ];	/* external name (name + unit) */
+	const char *if_dname;		/* driver name */
+	int	if_dunit;		/* unit or IF_DUNIT_NONE */
 	struct	ifaddrhead if_addrhead;	/* linked list of addresses per if */
 	struct	klist if_klist;		/* events attached to this if */
 	int	if_pcount;		/* number of promiscuous listeners */
 	struct	bpf_if *if_bpf;		/* packet filter structure */
 	u_short	if_index;		/* numeric abbreviation for this if  */
-	short	if_unit;		/* sub-unit for lower level driver */
 	short	if_timer;		/* time 'til if_watchdog called */
 	u_short	if_nvlans;		/* number of active vlans */
 	int	if_flags;		/* up/down, broadcast, etc. */
@@ -177,7 +179,11 @@ struct ifnet {
 	struct	ifqueue *if_poll_slowq;	/* input queue for slow devices */
 	struct	ifprefixhead if_prefixhead; /* list of prefixes per if */
 	u_int8_t *if_broadcastaddr;	/* linklevel broadcast bytestring */
-	struct	label if_label;		/* interface MAC label */
+	struct	label *if_label;	/* interface MAC label */
+
+	void	*if_afdata[AF_MAX];
+	int	if_afdata_initialized;
+	struct	mtx if_afdata_mtx;
 };
 
 typedef void if_init_f_t(void *);
@@ -287,6 +293,13 @@ typedef void if_init_f_t(void *);
 } while (0)
 
 #ifdef _KERNEL
+#define	IF_AFDATA_LOCK_INIT(ifp)	\
+    mtx_init(&(ifp)->if_afdata_mtx, "if_afdata", NULL, MTX_DEF)
+#define	IF_AFDATA_LOCK(ifp)	mtx_lock(&(ifp)->if_afdata_mtx)
+#define	IF_AFDATA_TRYLOCK(ifp)	mtx_trylock(&(ifp)->if_afdata_mtx)
+#define	IF_AFDATA_UNLOCK(ifp)	mtx_unlock(&(ifp)->if_afdata_mtx)
+#define	IF_AFDATA_DESTROY(ifp)	mtx_destroy(&(ifp)->if_afdata_mtx)
+
 #define	IF_HANDOFF(ifq, m, ifp)			if_handoff(ifq, m, ifp, 0)
 #define	IF_HANDOFF_ADJ(ifq, m, ifp, adj)	if_handoff(ifq, m, ifp, adj)
 
@@ -440,6 +453,7 @@ void	if_attach(struct ifnet *);
 int	if_delmulti(struct ifnet *, struct sockaddr *);
 void	if_detach(struct ifnet *);
 void	if_down(struct ifnet *);
+void	if_initname(struct ifnet *, const char *, int);
 int	if_printf(struct ifnet *, const char *, ...) __printflike(2, 3);
 void	if_route(struct ifnet *, int flag, int fam);
 int	if_setlladdr(struct ifnet *, const u_char *, int);

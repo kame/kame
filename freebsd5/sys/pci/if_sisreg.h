@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sisreg.h,v 1.21 2003/01/29 21:56:10 mux Exp $
+ * $FreeBSD: src/sys/pci/if_sisreg.h,v 1.25.2.1 2003/12/30 10:47:22 phk Exp $
  */
 
 /*
@@ -74,8 +74,10 @@
 #define SIS_TIMEUNIT		0xA4
 #define SIS_GPIO		0xB8
 
-/* NS DP83815 registers */
+/* NS DP83815/6 registers */
+#define NS_IHR			0x1C
 #define NS_CLKRUN		0x3C
+#define NS_SRR			0x58
 #define NS_BMCR			0x80
 #define NS_BMSR			0x84
 #define NS_PHYIDR1		0x88
@@ -96,6 +98,11 @@
 #define NS_CLKRUN_PMESTS	0x00008000
 #define NS_CLKRUN_PMEENB	0x00000100
 #define NS_CLNRUN_CLKRUN_ENB	0x00000001
+
+/* NS silicon revisions */
+#define NS_SRR_15C		0x302
+#define NS_SRR_15D		0x403
+#define NS_SRR_16A		0x505
 
 #define SIS_CSR_TX_ENABLE	0x00000001
 #define SIS_CSR_TX_DISABLE	0x00000002
@@ -442,6 +449,7 @@ struct sis_mii_frame {
 #define SIS_TYPE_900	1
 #define SIS_TYPE_7016	2
 #define SIS_TYPE_83815	3
+#define SIS_TYPE_83816	4
 
 struct sis_softc {
 	struct arpcom		arpcom;		/* interface info */
@@ -450,24 +458,29 @@ struct sis_softc {
 	struct resource		*sis_res;
 	struct resource		*sis_irq;
 	void			*sis_intrhand;
+	device_t		sis_self;
 	device_t		sis_miibus;
 	u_int8_t		sis_unit;
 	u_int8_t		sis_type;
 	u_int8_t		sis_rev;
 	u_int8_t		sis_link;
+	u_int			sis_srr;
 	struct sis_list_data	sis_ldata;
 	bus_dma_tag_t		sis_parent_tag;
 	bus_dma_tag_t		sis_tag;
 	struct sis_ring_data	sis_cdata;
-	struct callout_handle	sis_stat_ch;
+	struct callout		sis_stat_ch;
+	int			sis_stopped;
 #ifdef DEVICE_POLLING
 	int			rxcycles;
 #endif
+	int			in_tick;
 	struct mtx		sis_mtx;
 };
 
 #define	SIS_LOCK(_sc)		mtx_lock(&(_sc)->sis_mtx)
 #define	SIS_UNLOCK(_sc)		mtx_unlock(&(_sc)->sis_mtx)
+#define	SIS_LOCK_ASSERT(_sc)	mtx_assert(&(_sc)->sis_mtx, MA_OWNED)
 
 /*
  * register space access macros

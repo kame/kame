@@ -24,9 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/ibcs2/ibcs2_stat.c,v 1.21 2003/01/13 00:28:58 dillon Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_stat.c,v 1.24 2003/08/10 23:26:16 nectar Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -82,6 +83,10 @@ cvt_statfs(sp, buf, len)
 {
 	struct ibcs2_statfs ssfs;
 
+	if (len < 0)
+		return (EINVAL);
+	else if (len > sizeof(ssfs))
+		len = sizeof(ssfs);
 	bzero(&ssfs, sizeof ssfs);
 	ssfs.f_fstyp = 0;
 	ssfs.f_bsize = sp->f_bsize;
@@ -132,7 +137,7 @@ ibcs2_fstatfs(td, uap)
 
 	if ((error = getvnode(td->td_proc->p_fd, uap->fd, &fp)) != 0)
 		return (error);
-	mp = ((struct vnode *)fp->f_data)->v_mount;
+	mp = fp->f_vnode->v_mount;
 	sp = &mp->mnt_stat;
 	error = VFS_STATFS(mp, sp, td);
 	fdrop(fp, td);

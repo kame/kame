@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_bridge.c,v 1.19 2003/05/15 18:51:28 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_bridge.c,v 1.20 2003/10/31 18:32:11 brooks Exp $
  */
 
 /*
@@ -600,8 +600,7 @@ ng_bridge_rcvdata(hook_p hook, item_p item)
 
 					if (ifp != NULL)
 						snprintf(suffix, sizeof(suffix),
-						    " (%s%d)", ifp->if_name,
-						    ifp->if_unit);
+						    " (%s)", ifp->if_xname);
 					else
 						*suffix = '\0';
 					log(LOG_WARNING, "ng_bridge: %s:"

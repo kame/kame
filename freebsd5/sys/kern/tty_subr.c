@@ -23,13 +23,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/tty_subr.c,v 1.38 2003/02/19 05:47:26 imp Exp $
  */
 
 /*
  * clist support routines
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/tty_subr.c,v 1.41 2003/07/22 10:36:36 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

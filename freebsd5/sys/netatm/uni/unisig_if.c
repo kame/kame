@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_if.c,v 1.13 2002/06/13 14:32:51 arr Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ----------------------------------------
  *
  * System interface module
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/unisig_if.c,v 1.16 2003/07/29 13:32:10 harti Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -69,11 +67,6 @@
 #include <netatm/uni/unisig_msg.h>
 
 #include <vm/uma.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/unisig_if.c,v 1.13 2002/06/13 14:32:51 arr Exp $");
-#endif
-
 
 /*
  * Global variables
@@ -176,10 +169,6 @@ unisig_start()
 	if (unisig_ie_zone == NULL)
 		panic("unisig_start: uma_zcreate failed to create ie zone");
 	
-	uma_zone_set_max(unisig_vc_zone, 50);
-	uma_zone_set_max(unisig_msg_zone, 50);
-	uma_zone_set_max(unisig_ie_zone, 50);
-
 	/*
 	 * Register ourselves with system
 	 */
@@ -833,7 +822,8 @@ unisig_ioctl(code, data, arg1)
 	struct atm_pif		*pip;
 	Atm_connection		*cop;
 	u_int			vpi, vci;
-	int			err = 0, buf_len, i;
+	int			err = 0, i;
+	size_t buf_len;
 	caddr_t			buf_addr;
 
 	ATM_DEBUG1("unisig_ioctl: code=%d\n", code);

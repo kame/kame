@@ -50,8 +50,10 @@
  * SUCH DAMAGE.
  *
  *	from:	@(#)fd.c	7.4 (Berkeley) 5/25/91
- * $FreeBSD: src/sys/isa/fd.c,v 1.249 2003/04/01 15:06:25 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/isa/fd.c,v 1.262 2003/10/23 05:52:52 peter Exp $");
 
 #include "opt_fdc.h"
 #include "card.h"
@@ -314,9 +316,11 @@ struct fd_data {
 	struct	callout_handle toffhandle;
 	struct	callout_handle tohandle;
 	struct	devstat *device_stats;
-	eventhandler_tag clonetag;
 	dev_t	masterdev;
+#ifdef GONE_IN_5
+	eventhandler_tag clonetag;
 	dev_t	clonedevs[NUMDENS - 1];
+#endif
 	device_t dev;
 	fdu_t	fdu;
 };
@@ -384,7 +388,9 @@ static int fdc_detach(device_t dev);
 static void fdc_add_child(device_t, const char *, int);
 static int fdc_attach(device_t);
 static int fdc_print_child(device_t, device_t);
+#ifdef GONE_IN_5
 static void fd_clone (void *, char *, int, dev_t *);
+#endif
 static int fd_probe(device_t);
 static int fd_attach(device_t);
 static int fd_detach(device_t);
@@ -398,10 +404,10 @@ static void fdc_reset(fdc_p);
 static int fd_in(struct fdc_data *, int *);
 static int out_fdc(struct fdc_data *, int);
 /*
- * The open function is named Fdopen() to avoid confusion with fdopen()
+ * The open function is named fdopen() to avoid confusion with fdopen()
  * in fd(4).  The difference is now only meaningful for debuggers.
  */
-static	d_open_t	Fdopen;
+static	d_open_t	fdopen;
 static	d_close_t	fdclose;
 static	d_strategy_t	fdstrategy;
 static void fdstart(struct fdc_data *);
@@ -477,7 +483,7 @@ fdin_rd(fdc_p fdc)
 
 #define CDEV_MAJOR 9
 static struct cdevsw fd_cdevsw = {
-	.d_open =	Fdopen,
+	.d_open =	fdopen,
 	.d_close =	fdclose,
 	.d_read =	physread,
 	.d_write =	physwrite,
@@ -971,7 +977,7 @@ fdc_detach(device_t dev)
 static void
 fdc_add_child(device_t dev, const char *name, int unit)
 {
-	int	disabled, flags;
+	int	flags;
 	struct fdc_ivars *ivar;
 	device_t child;
 
@@ -988,8 +994,7 @@ fdc_add_child(device_t dev, const char *name, int unit)
 	device_set_ivars(child, ivar);
 	if (resource_int_value(name, unit, "flags", &flags) == 0)
 		 device_set_flags(child, flags);
-	if (resource_int_value(name, unit, "disabled", &disabled) == 0
-	    && disabled != 0)
+	if (resource_disabled(name, unit))
 		device_disable(child);
 }
 
@@ -1116,6 +1121,7 @@ DRIVER_MODULE(fdc, pccard, fdc_pccard_driver, fdc_devclass, 0, 0);
 
 #endif /* NCARD > 0 */
 
+#ifdef GONE_IN_5
 /*
  * Create a clone device upon request by devfs.
  */
@@ -1165,10 +1171,12 @@ fd_clone(void *arg, char *name, int namelen, dev_t *dev)
 						UID_ROOT, GID_OPERATOR, 0640,
 						name);
 				fd->clonedevs[i] = *dev;
+				fd->clonedevs[i]->si_drv1 = fd;
 				return;
 			}
 	}
 }
+#endif
 
 /*
  * Configuration/initialization, per drive.
@@ -1202,7 +1210,7 @@ fd_probe(device_t dev)
  * fail the probe).  However, for whatever reason, testing for _MACHINE_ARCH
  * == i386 breaks the test on FreeBSD/Alpha.
  */
-#ifdef __i386__
+#if defined(__i386__) || defined(__amd64__)
 	if (fd->type == FDT_NONE && (fd->fdu == 0 || fd->fdu == 1)) {
 		/* Look up what the BIOS thinks we have. */
 		if (fd->fdu == 0) {
@@ -1222,7 +1230,7 @@ fd_probe(device_t dev)
 		if (fd->type == FDT_288M_1)
 			fd->type = FDT_288M;
 	}
-#endif /* __i386__ */
+#endif /* __i386__ || __amd64__ */
 	/* is there a unit? */
 	if (fd->type == FDT_NONE)
 		return (ENXIO);
@@ -1322,14 +1330,21 @@ static int
 fd_attach(device_t dev)
 {
 	struct	fd_data *fd;
-	int i;
 
 	fd = device_get_softc(dev);
+#ifdef GONE_IN_5
 	fd->clonetag = EVENTHANDLER_REGISTER(dev_clone, fd_clone, fd, 1000);
+#endif
 	fd->masterdev = make_dev(&fd_cdevsw, fd->fdu << 6,
 				 UID_ROOT, GID_OPERATOR, 0640, "fd%d", fd->fdu);
+	fd->masterdev->si_drv1 = fd;
+#ifdef GONE_IN_5
+	{
+	int i;
 	for (i = 0; i < NUMDENS - 1; i++)
 		fd->clonedevs[i] = NODEV;
+	}
+#endif
 	fd->device_stats = devstat_new_entry(device_get_name(dev), 
 			  device_get_unit(dev), 0, DEVSTAT_NO_ORDERED_TAGS,
 			  DEVSTAT_TYPE_FLOPPY | DEVSTAT_TYPE_IF_OTHER,
@@ -1341,16 +1356,20 @@ static int
 fd_detach(device_t dev)
 {
 	struct	fd_data *fd;
-	int i;
 
 	fd = device_get_softc(dev);
 	untimeout(fd_turnoff, fd, fd->toffhandle);
 	devstat_remove_entry(fd->device_stats);
 	destroy_dev(fd->masterdev);
+#ifdef GONE_IN_5
+	{
+	int i;
 	for (i = 0; i < NUMDENS - 1; i++)
 		if (fd->clonedevs[i] != NODEV)
 			destroy_dev(fd->clonedevs[i]);
 	EVENTHANDLER_DEREGISTER(dev_clone, fd->clonetag);
+	}
+#endif
 
 	return (0);
 }
@@ -1543,15 +1562,15 @@ out_fdc(struct fdc_data *fdc, int x)
  * auxiliary functions).
  */
 static int
-Fdopen(dev_t dev, int flags, int mode, struct thread *td)
+fdopen(dev_t dev, int flags, int mode, struct thread *td)
 {
- 	fdu_t fdu = FDUNIT(minor(dev));
 	int type = FDTYPE(minor(dev));
 	fd_p	fd;
 	fdc_p	fdc;
  	int rv, unitattn, dflags;
 
-	if ((fd = devclass_get_softc(fd_devclass, fdu)) == 0)
+	fd = dev->si_drv1;
+	if (fd == NULL)
 		return (ENXIO);
 	fdc = fd->fdc;
 	if ((fdc == NULL) || (fd->type == FDT_NONE))
@@ -1586,6 +1605,11 @@ Fdopen(dev_t dev, int flags, int mode, struct thread *td)
 			 *
 			 * If UA has been forced, proceed.
 			 *
+			 * If the drive has no changeline support,
+			 * or if the drive parameters have been lost
+			 * due to previous non-blocking access,
+			 * assume a forced UA condition.
+			 *
 			 * If motor is off, turn it on for a moment
 			 * and select our drive, in order to read the
 			 * UA hardware signal.
@@ -1601,7 +1625,8 @@ Fdopen(dev_t dev, int flags, int mode, struct thread *td)
 			 */
 			unitattn = 0;
 			if ((dflags & FD_NO_CHLINE) != 0 ||
-			    (fd->flags & FD_UA) != 0) {
+			    (fd->flags & FD_UA) != 0 ||
+			    fd->ft == 0) {
 				unitattn = 1;
 				fd->flags &= ~FD_UA;
 			} else if (fdc->fdout & (FDO_MOEN0 | FDO_MOEN1 |
@@ -1641,10 +1666,9 @@ Fdopen(dev_t dev, int flags, int mode, struct thread *td)
 static int
 fdclose(dev_t dev, int flags, int mode, struct thread *td)
 {
- 	fdu_t fdu = FDUNIT(minor(dev));
 	struct fd_data *fd;
 
-	fd = devclass_get_softc(fd_devclass, fdu);
+	fd = dev->si_drv1;
 	fd->flags &= ~(FD_OPEN | FD_NONBLOCK);
 	fd->options &= ~(FDOPT_NORETRY | FDOPT_NOERRLOG | FDOPT_NOERROR);
 
@@ -1662,13 +1686,17 @@ fdstrategy(struct bio *bp)
 	size_t	fdblk;
 
  	fdu = FDUNIT(minor(bp->bio_dev));
-	fd = devclass_get_softc(fd_devclass, fdu);
-	if (fd == 0)
+	fd = bp->bio_dev->si_drv1;
+	if (fd == NULL)
 		panic("fdstrategy: buf for nonexistent device (%#lx, %#lx)",
 		      (u_long)major(bp->bio_dev), (u_long)minor(bp->bio_dev));
 	fdc = fd->fdc;
+	bp->bio_resid = bp->bio_bcount;
 	if (fd->type == FDT_NONE || fd->ft == 0) {
-		bp->bio_error = ENXIO;
+		if (fd->type != FDT_NONE && (fd->flags & FD_NONBLOCK))
+			bp->bio_error = EAGAIN;
+		else
+			bp->bio_error = ENXIO;
 		bp->bio_flags |= BIO_ERROR;
 		goto bad;
 	}
@@ -1679,10 +1707,10 @@ fdstrategy(struct bio *bp)
 			bp->bio_flags |= BIO_ERROR;
 			goto bad;
 		}
-		if (bp->bio_blkno < 0) {
+		if (bp->bio_offset < 0) {
 			printf(
-		"fd%d: fdstrat: bad request blkno = %lu, bcount = %ld\n",
-			       fdu, (u_long)bp->bio_blkno, bp->bio_bcount);
+		"fd%d: fdstrat: bad request offset = %ju, bcount = %ld\n",
+			       fdu, (intmax_t)bp->bio_offset, bp->bio_bcount);
 			bp->bio_error = EINVAL;
 			bp->bio_flags |= BIO_ERROR;
 			goto bad;
@@ -1697,22 +1725,16 @@ fdstrategy(struct bio *bp)
 	/*
 	 * Set up block calculations.
 	 */
-	if (bp->bio_blkno > 20000000) {
-		/*
-		 * Reject unreasonably high block number, prevent the
-		 * multiplication below from overflowing.
-		 */
+	if (bp->bio_offset >= ((off_t)128 << fd->ft->secsize) * fd->ft->size) {
 		bp->bio_error = EINVAL;
 		bp->bio_flags |= BIO_ERROR;
 		goto bad;
 	}
-	blknum = bp->bio_blkno * DEV_BSIZE / fdblk;
+	blknum = bp->bio_offset / fdblk;
  	nblocks = fd->ft->size;
 	if (blknum + bp->bio_bcount / fdblk > nblocks) {
 		if (blknum >= nblocks) {
-			if (bp->bio_cmd == BIO_READ)
-				bp->bio_resid = bp->bio_bcount;
-			else {
+			if (bp->bio_cmd != BIO_READ) {
 				bp->bio_error = ENOSPC;
 				bp->bio_flags |= BIO_ERROR;
 			}
@@ -1858,7 +1880,7 @@ fdautoselect(dev_t dev)
 	int i, n, oopts, rv;
 
  	fdu = FDUNIT(minor(dev));
-	fd = devclass_get_softc(fd_devclass, fdu);
+	fd = dev->si_drv1;
 
 	switch (fd->type) {
 	default:
@@ -1985,7 +2007,7 @@ fdstate(fdc_p fdc)
  		return (0);
 	}
 	fdu = FDUNIT(minor(bp->bio_dev));
-	fd = devclass_get_softc(fd_devclass, fdu);
+	fd = bp->bio_dev->si_drv1;
 	fdblk = 128 << fd->ft->secsize;
 	if (fdc->fd && (fd != fdc->fd))
 		device_printf(fd->dev, "confused fd pointers\n");
@@ -2488,7 +2510,7 @@ retrier(struct fdc_data *fdc)
 
 	/* XXX shouldn't this be cached somewhere?  */
 	fdu = FDUNIT(minor(bp->bio_dev));
-	fd = devclass_get_softc(fd_devclass, fdu);
+	fd = bp->bio_dev->si_drv1;
 	if (fd->options & FDOPT_NORETRY)
 		goto fail;
 
@@ -2559,7 +2581,7 @@ fdmisccmd(dev_t dev, u_int cmd, void *data)
 	int error;
 
  	fdu = FDUNIT(minor(dev));
-	fd = devclass_get_softc(fd_devclass, fdu);
+	fd = dev->si_drv1;
 	fdblk = 128 << fd->ft->secsize;
 	finfo = (struct fd_formb *)data;
 	idfield = (struct fdc_readid *)data;
@@ -2567,23 +2589,21 @@ fdmisccmd(dev_t dev, u_int cmd, void *data)
 	bp = malloc(sizeof(struct bio), M_TEMP, M_WAITOK | M_ZERO);
 
 	/*
-	 * Set up a bio request for fdstrategy().  bio_blkno is faked
+	 * Set up a bio request for fdstrategy().  bio_offset is faked
 	 * so that fdstrategy() will seek to the the requested
 	 * cylinder, and use the desired head.
 	 */
 	bp->bio_cmd = cmd;
 	if (cmd == FDBIO_FORMAT) {
-		bp->bio_blkno =
+		bp->bio_offset =
 		    (finfo->cyl * (fd->ft->sectrac * fd->ft->heads) +
-		     finfo->head * fd->ft->sectrac) *
-		    fdblk / DEV_BSIZE;
+		     finfo->head * fd->ft->sectrac) * fdblk;
 		bp->bio_bcount = sizeof(struct fd_idfield_data) *
 		    finfo->fd_formb_nsecs;
 	} else if (cmd == FDBIO_RDSECTID) {
-		bp->bio_blkno =
+		bp->bio_offset =
 		    (idfield->cyl * (fd->ft->sectrac * fd->ft->heads) +
-		     idfield->head * fd->ft->sectrac) *
-		    fdblk / DEV_BSIZE;
+		     idfield->head * fd->ft->sectrac) * fdblk;
 		bp->bio_bcount = sizeof(struct fdc_readid);
 	} else
 		panic("wrong cmd in fdmisccmd()");
@@ -2607,12 +2627,11 @@ fdioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
  	fd_p fd;
 	struct fdc_status *fsp;
 	struct fdc_readid *rid;
-	size_t fdblk;
 	int error, type;
 
  	fdu = FDUNIT(minor(dev));
 	type = FDTYPE(minor(dev));
- 	fd = devclass_get_softc(fd_devclass, fdu);
+ 	fd = dev->si_drv1;
 
 	/*
 	 * First, handle everything that could be done with
@@ -2621,10 +2640,14 @@ fdioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
 	switch (cmd) {
 
 	case DIOCGMEDIASIZE:
+		if (fd->ft == 0)
+			return ((fd->flags & FD_NONBLOCK) ? EAGAIN : ENXIO);
 		*(off_t *)addr = (128 << (fd->ft->secsize)) * fd->ft->size;
 		return (0);
 
 	case DIOCGSECTORSIZE:
+		if (fd->ft == 0)
+			return ((fd->flags & FD_NONBLOCK) ? EAGAIN : ENXIO);
 		*(u_int *)addr = 128 << (fd->ft->secsize);
 		return (0);
 
@@ -2722,7 +2745,6 @@ fdioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
 		return (EAGAIN);
 	if (fd->ft == 0)
 		return (ENXIO);
-	fdblk = 128 << fd->ft->secsize;
 	error = 0;
 
 	switch (cmd) {

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/bde/g_bde_crypt.c,v 1.15 2003/05/02 19:08:57 phk Exp $
+ * $FreeBSD: src/sys/geom/bde/g_bde_crypt.c,v 1.18 2003/09/08 18:35:26 phk Exp $
  *
  * This source file contains the functions responsible for the crypto, keying
  * and mapping operations on the I/O requests.
@@ -159,7 +159,7 @@ g_bde_crypt_read(struct g_bde_work *wp)
 	}
 	bzero(skey, sizeof skey);
 	bzero(&ci, sizeof ci);
-	bzero(&ki, sizeof ci);
+	bzero(&ki, sizeof ki);
 }
 
 /*
@@ -197,7 +197,7 @@ g_bde_crypt_write(struct g_bde_work *wp)
 		bcopy(s, d, sc->sectorsize);
 		}
 #else
-		arc4rand(&skey, sizeof skey, 0);
+		arc4rand(skey, sizeof skey, 0);
 		AES_makekey(&ki, DIR_ENCRYPT, G_BDE_SKEYBITS, skey);
 		AES_encrypt(&ci, &ki, s, d, sc->sectorsize);
 #endif
@@ -209,7 +209,7 @@ g_bde_crypt_write(struct g_bde_work *wp)
 	}
 	bzero(skey, sizeof skey);
 	bzero(&ci, sizeof ci);
-	bzero(&ki, sizeof ci);
+	bzero(&ki, sizeof ki);
 }
 
 /*
@@ -243,7 +243,7 @@ g_bde_crypt_delete(struct g_bde_work *wp)
 	 */
 	for (o = 0; o < wp->length; o += sc->sectorsize) {
 		arc4rand(d, sc->sectorsize, 0);
-		arc4rand(&skey, sizeof skey, 0);
+		arc4rand(skey, sizeof skey, 0);
 		AES_makekey(&ki, DIR_ENCRYPT, G_BDE_SKEYBITS, skey);
 		AES_encrypt(&ci, &ki, d, d, sc->sectorsize);
 		d += sc->sectorsize;

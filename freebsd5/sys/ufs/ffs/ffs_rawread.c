@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/ufs/ffs/ffs_rawread.c,v 1.6 2003/05/18 22:02:51 alc Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_rawread.c,v 1.12 2003/11/15 09:28:09 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -41,8 +42,11 @@
 #include <sys/ttycom.h>
 #include <sys/bio.h>
 #include <sys/buf.h>
+#include <ufs/ufs/extattr.h>
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
+#include <ufs/ufs/ufsmount.h>
+#include <ufs/ufs/ufs_extern.h>
 #include <ufs/ffs/fs.h>
 
 #include <vm/vm.h>
@@ -189,10 +193,15 @@ ffs_rawread_readahead(struct vnode *vp,
 	int bsize;
 	struct vnode *dp;
 	int bforwards;
+	struct inode *ip;
+	ufs2_daddr_t blkno;
 	
 	GIANT_REQUIRED;
 	bsize = vp->v_mount->mnt_stat.f_iosize;
 	
+	ip = VTOI(vp);
+	dp = ip->i_devvp;
+
 	iolen = ((vm_offset_t) udata) & PAGE_MASK;
 	bp->b_bcount = len;
 	if (bp->b_bcount + iolen > bp->b_kvasize) {
@@ -200,26 +209,23 @@ ffs_rawread_readahead(struct vnode *vp,
 		if (iolen != 0)
 			bp->b_bcount -= PAGE_SIZE;
 	}
-	bp->b_flags = B_PHYS;
+	bp->b_flags = 0;	/* XXX necessary ? */
 	bp->b_iocmd = BIO_READ;
 	bp->b_iodone = ffs_rawreadwakeup;
 	bp->b_data = udata;
 	bp->b_saveaddr = sa;
-	bp->b_offset = offset;
-	blockno = bp->b_offset / bsize;
-	blockoff = (bp->b_offset % bsize) / DEV_BSIZE;
+	blockno = offset / bsize;
+	blockoff = (offset % bsize) / DEV_BSIZE;
 	if ((daddr_t) blockno != blockno) {
 		return EINVAL; /* blockno overflow */
 	}
 	
 	bp->b_lblkno = bp->b_blkno = blockno;
 	
-	error = VOP_BMAP(vp, bp->b_lblkno, &dp, &bp->b_blkno, &bforwards,
-			 NULL);
-	if (error != 0) {
+	error = ufs_bmaparray(vp, bp->b_lblkno, &blkno, NULL, &bforwards, NULL);
+	if (error != 0)
 		return error;
-	}
-	if (bp->b_blkno == -1) {
+	if (blkno == -1) {
 
 		/* Fill holes with NULs to preserve semantics */
 		
@@ -240,11 +246,12 @@ ffs_rawread_readahead(struct vnode *vp,
 		bp->b_flags |= B_DONE;
 		return 0;
 	}
+	bp->b_blkno = blkno + blockoff;
+	bp->b_offset = bp->b_iooffset = (blkno + blockoff) * DEV_BSIZE;
 	
 	if (bp->b_bcount + blockoff * DEV_BSIZE > bsize * (1 + bforwards))
 		bp->b_bcount = bsize * (1 + bforwards) - blockoff * DEV_BSIZE;
 	bp->b_bufsize = bp->b_bcount;
-	bp->b_blkno += blockoff;
 	bp->b_dev = dp->v_rdev;
 	
 	if (vmapbuf(bp) < 0)

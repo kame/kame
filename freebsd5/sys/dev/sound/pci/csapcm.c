@@ -35,10 +35,10 @@
 #include <dev/sound/pci/csareg.h>
 #include <dev/sound/pci/csavar.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/csapcm.c,v 1.24 2003/02/20 17:31:11 cognet Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/csapcm.c,v 1.27 2003/09/02 17:30:37 jhb Exp $");
 
 /* Buffer size on dma transfer. Fixed for CS416x. */
 #define CS461x_BUFFSIZE   (4 * 1024)
@@ -679,7 +679,8 @@ csa_allocres(struct csa_info *csa, device_t dev)
 			       /*highaddr*/BUS_SPACE_MAXADDR,
 			       /*filter*/NULL, /*filterarg*/NULL,
 			       /*maxsize*/CS461x_BUFFSIZE, /*nsegments*/1, /*maxsegz*/0x3ffff,
-			       /*flags*/0, &csa->parent_dmat) != 0)
+			       /*flags*/0, /*lockfunc*/busdma_lock_mutex,
+			       /*lockarg*/&Giant, &csa->parent_dmat) != 0)
 		return (1);
 
 	return (0);
@@ -761,8 +762,8 @@ pcmcsa_attach(device_t dev)
 
 	/* Allocate the resources. */
 	resp = &csa->res;
-	resp->io_rid = PCIR_MAPS;
-	resp->mem_rid = PCIR_MAPS + 4;
+	resp->io_rid = PCIR_BAR(0);
+	resp->mem_rid = PCIR_BAR(1);
 	resp->irq_rid = 0;
 	if (csa_allocres(csa, dev)) {
 		csa_releaseres(csa, dev);

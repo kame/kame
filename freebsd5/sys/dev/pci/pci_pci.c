@@ -26,9 +26,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/dev/pci/pci_pci.c,v 1.24 2003/05/22 17:45:26 ticso Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/pci/pci_pci.c,v 1.28 2003/10/21 18:28:34 silby Exp $");
 
 /*
  * PCI:PCI bridge support.
@@ -44,9 +45,9 @@
 
 #include <machine/resource.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
-#include <pci/pcib_private.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcib_private.h>
 
 #include "pcib_if.h"
 
@@ -97,7 +98,7 @@ static int pci_allow_unsupported_io_range = 0;
 TUNABLE_INT("hw.pci.allow_unsupported_io_range",
 	(int *)&pci_allow_unsupported_io_range);
 SYSCTL_DECL(_hw_pci);
-SYSCTL_INT(_hw_pci, OID_AUTO, allow_unsupported_io_range, CTLFLAG_RD,
+SYSCTL_INT(_hw_pci, OID_AUTO, allow_unsupported_io_range, CTLFLAG_RDTUN,
 	&pci_allow_unsupported_io_range, 0,
 	"Allows the PCI Bridge to pass through an unsupported memory range "
 	"assigned by the BIOS.");
@@ -120,7 +121,7 @@ void
 pcib_attach_common(device_t dev)
 {
     struct pcib_softc	*sc;
-    u_int8_t		iolow;
+    uint8_t		iolow;
 
     sc = device_get_softc(dev);
     sc->dev = dev;
@@ -174,7 +175,7 @@ pcib_attach_common(device_t dev)
     switch (pci_get_devid(dev)) {
 	case 0x12258086:		/* Intel 82454KX/GX (Orion) */
 	{
-	    u_int8_t	supbus;
+	    uint8_t	supbus;
 
 	    supbus = pci_read_config(dev, 0x41, 1);
 	    if (supbus != 0xff) {
@@ -462,14 +463,14 @@ pcib_maxslots(device_t dev)
 /*
  * Since we are a child of a PCI bus, its parent must support the pcib interface.
  */
-u_int32_t
+uint32_t
 pcib_read_config(device_t dev, int b, int s, int f, int reg, int width)
 {
     return(PCIB_READ_CONFIG(device_get_parent(device_get_parent(dev)), b, s, f, reg, width));
 }
 
 void
-pcib_write_config(device_t dev, int b, int s, int f, int reg, u_int32_t val, int width)
+pcib_write_config(device_t dev, int b, int s, int f, int reg, uint32_t val, int width)
 {
     PCIB_WRITE_CONFIG(device_get_parent(device_get_parent(dev)), b, s, f, reg, val, width);
 }
@@ -516,9 +517,9 @@ pcib_route_interrupt(device_t pcib, device_t dev, int pin)
  */
 int
 host_pcib_get_busno(pci_read_config_fn read_config, int bus, int slot, int func,
-    u_int8_t *busnum)
+    uint8_t *busnum)
 {
-	u_int32_t id;
+	uint32_t id;
 
 	id = read_config(bus, slot, func, PCIR_DEVVENDOR, 4);
 	if (id == 0xffffffff)

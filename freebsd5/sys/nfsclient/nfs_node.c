@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_node.c,v 1.61 2003/02/19 05:47:38 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_node.c,v 1.65 2003/11/14 20:54:08 alfred Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -52,6 +52,8 @@ __FBSDID("$FreeBSD: src/sys/nfsclient/nfs_node.c,v 1.61 2003/02/19 05:47:38 imp 
 #include <sys/vnode.h>
 
 #include <vm/uma.h>
+
+#include <rpc/rpcclnt.h>
 
 #include <nfs/rpcv2.h>
 #include <nfs/nfsproto.h>
@@ -182,7 +184,7 @@ nfs_nget(struct mount *mntp, nfsfh_t *fhp, int fhsize, struct nfsnode **npp)
 
 	/*
 	 * Calculate nfs mount point and figure out whether the rslock should
-	 * be interruptable or not.
+	 * be interruptible or not.
 	 */
 	nmp = VFSTONFS(mntp);
 	if (nmp->nm_flag & NFSMNT_INT)
@@ -226,7 +228,10 @@ loop:
 	 */
 	np = uma_zalloc(nfsnode_zone, M_WAITOK);
 
-	error = getnewvnode("nfs", mntp, nfsv2_vnodeop_p, &nvp);
+	if (nmp->nm_flag & NFSMNT_NFSV4)
+		error = getnewvnode("nfs4", mntp, nfs4_vnodeop_p, &nvp);
+	else
+		error = getnewvnode("nfs", mntp, nfs_vnodeop_p, &nvp);
 	if (error) {
 		if (nfs_node_hash_lock < 0)
 			wakeup(&nfs_node_hash_lock);
@@ -291,25 +296,11 @@ nfs_inactive(struct vop_inactive_args *ap)
 	} else
 		sp = NULL;
 	if (sp) {
-		/*
-		 * We need a reference to keep the vnode from being
-		 * recycled by getnewvnode while we do the I/O
-		 * associated with discarding the buffers unless we
-		 * are being forcibly unmounted in which case we already
-		 * have our own reference.
-		 */
-		if (vrefcnt(ap->a_vp) > 0)
-			(void) nfs_vinvalbuf(ap->a_vp, 0, sp->s_cred, td, 1);
-		else if (vget(ap->a_vp, 0, td))
-			panic("nfs_inactive: lost vnode");
-		else {
-			(void) nfs_vinvalbuf(ap->a_vp, 0, sp->s_cred, td, 1);
-			vrele(ap->a_vp);
-		}
+		(void)nfs_vinvalbuf(ap->a_vp, 0, sp->s_cred, td, 1);
 		/*
 		 * Remove the silly file that was rename'd earlier
 		 */
-		nfs_removeit(sp);
+		(sp->s_removeit)(sp);
 		crfree(sp->s_cred);
 		vrele(sp->s_dvp);
 		FREE((caddr_t)sp, M_NFSREQ);
@@ -353,8 +344,6 @@ nfs_reclaim(struct vop_reclaim_args *ap)
 	}
 
 	lockdestroy(&np->n_rslock);
-
-	cache_purge(vp);
 	uma_zfree(nfsnode_zone, vp->v_data);
 	vp->v_data = NULL;
 	return (0);

@@ -38,12 +38,14 @@
  * from: Utah $Hdr: vm_unix.c 1.1 89/11/07$
  *
  *	@(#)vm_unix.c	8.1 (Berkeley) 6/11/93
- * $FreeBSD: src/sys/vm/vm_unix.c,v 1.41 2002/09/21 22:07:17 jake Exp $
  */
 
 /*
  * Traditional sbrk/grow interface to VM
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/vm/vm_unix.c,v 1.43 2003/08/11 07:14:08 bms Exp $");
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -77,7 +79,9 @@ obreak(td, uap)
 	vm_offset_t new, old, base;
 	int rv;
 	int error = 0;
+	boolean_t do_map_wirefuture;
 
+	do_map_wirefuture = FALSE;
 	new = round_page((vm_offset_t)uap->nsize);
 	vm_map_lock(&vm->vm_map);
 
@@ -119,6 +123,20 @@ obreak(td, uap)
 			goto done;
 		}
 		vm->vm_dsize += btoc(new - old);
+		/*
+		 * Handle the MAP_WIREFUTURE case for legacy applications,
+		 * by marking the newly mapped range of pages as wired.
+		 * We are not required to perform a corresponding
+		 * vm_map_unwire() before vm_map_delete() below, as
+		 * it will forcibly unwire the pages in the range.
+		 *
+		 * XXX If the pages cannot be wired, no error is returned.
+		 */
+		if ((vm->vm_map.flags & MAP_WIREFUTURE) == MAP_WIREFUTURE) {
+			if (bootverbose)
+				printf("obreak: MAP_WIREFUTURE set\n");
+			do_map_wirefuture = TRUE;
+		}
 	} else if (new < old) {
 		rv = vm_map_delete(&vm->vm_map, new, old);
 		if (rv != KERN_SUCCESS) {
@@ -129,6 +147,11 @@ obreak(td, uap)
 	}
 done:
 	vm_map_unlock(&vm->vm_map);
+
+	if (do_map_wirefuture)
+		(void) vm_map_wire(&vm->vm_map, old, new,
+		    VM_MAP_WIRE_USER|VM_MAP_WIRE_NOHOLES);
+
 	return (error);
 }
 

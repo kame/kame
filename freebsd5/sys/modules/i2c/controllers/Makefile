@@ -1,5 +1,9 @@
-# $FreeBSD: src/sys/modules/i2c/controllers/Makefile,v 1.1 2002/03/23 15:48:38 nsouch Exp $
+# $FreeBSD: src/sys/modules/i2c/controllers/Makefile,v 1.3 2003/06/15 04:24:28 nyan Exp $
 
-SUBDIR = alpm intpm viapm lpbb pcf
+.if ${MACHINE} == "pc98"
+SUBDIR = lpbb
+.else
+SUBDIR = alpm amdpm intpm viapm lpbb pcf
+.endif
 
 .include <bsd.subdir.mk>

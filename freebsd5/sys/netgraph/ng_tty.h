@@ -36,12 +36,12 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_tty.h,v 1.2 2000/10/24 17:32:45 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_tty.h,v 1.3 2003/11/11 12:30:37 ru Exp $
  * $Whistle: ng_tty.h,v 1.7 1999/01/20 00:22:15 archie Exp $
  */
 
-#ifndef _NETGRAPH_TTY_H_
-#define _NETGRAPH_TTY_H_
+#ifndef _NETGRAPH_NG_TTY_H_
+#define _NETGRAPH_NG_TTY_H_
 
 /* Node type name and magic cookie */
 #define NG_TTY_NODE_TYPE	"tty"
@@ -59,4 +59,4 @@ enum {
 	NGM_TTY_SET_HOTCHAR,
 };
 
-#endif /* _NETGRAPH_TTY_H_ */
+#endif /* _NETGRAPH_NG_TTY_H_ */

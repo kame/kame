@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2000 Doug Rabson
+ * Copyright (c) 2000,2003 Doug Rabson
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/sys/kobj.h,v 1.7 2002/06/10 22:40:26 kbyanc Exp $
+ *	$FreeBSD: src/sys/sys/kobj.h,v 1.9 2003/10/16 09:16:28 dfr Exp $
  */
 
 #ifndef _SYS_KOBJ_H_
@@ -55,6 +55,7 @@ struct kobj_method {
 	const char	*name;		/* class name */		\
 	kobj_method_t	*methods;	/* method table */		\
 	size_t		size;		/* object size */		\
+	kobj_class_t	*baseclasses;	/* base classes */		\
 	u_int		refs;		/* reference count */		\
 	kobj_ops_t	ops		/* compiled method table */
 
@@ -79,13 +80,13 @@ struct kobj {
 #define KOBJ_CACHE_SIZE	256
 
 struct kobj_ops {
-	kobj_method_t	cache[KOBJ_CACHE_SIZE];
+	kobj_method_t	*cache[KOBJ_CACHE_SIZE];
 	kobj_class_t	cls;
 };
 
 struct kobjop_desc {
-	unsigned int	id;	/* unique ID */
-	kobjop_t	deflt;	/* default implementation */
+	unsigned int	id;		/* unique ID */
+	kobj_method_t	*deflt;		/* default implementation */
 };
 
 /*
@@ -93,11 +94,77 @@ struct kobjop_desc {
  */
 #define KOBJMETHOD(NAME, FUNC) { &NAME##_desc, (kobjop_t) FUNC }
 
-#define DEFINE_CLASS(name, methods, size)	\
-						\
-struct kobj_class name ## _class = {		\
-	#name, methods, size			\
+/*
+ * Declare a class (which should be defined in another file.
+ */
+#define DECLARE_CLASS(name) extern struct kobj_class name
+
+/*
+ * Define a class with no base classes (api backward-compatible. with
+ * FreeBSD-5.1 and earlier).
+ */
+#define DEFINE_CLASS(name, methods, size)     		\
+DEFINE_CLASS_0(name, name ## _class, methods, size)
+
+/*
+ * Define a class with no base classes. Use like this:
+ *
+ * DEFINE_CLASS_0(foo, foo_class, foo_methods, sizeof(foo_softc));
+ */
+#define DEFINE_CLASS_0(name, classvar, methods, size)	\
+							\
+struct kobj_class classvar = {				\
+	#name, methods, size, 0				\
 }
+
+/*
+ * Define a class inheriting a single base class. Use like this:
+ *
+ * DEFINE_CLASS1(foo, foo_class, foo_methods, sizeof(foo_softc),
+ *			  bar);
+ */
+#define DEFINE_CLASS_1(name, classvar, methods, size,	\
+		       base1)				\
+							\
+static kobj_class_t name ## _baseclasses[] =		\
+	{ &base1, 0 };					\
+struct kobj_class classvar = {				\
+	#name, methods, size, name ## _baseclasses	\
+}
+
+/*
+ * Define a class inheriting two base classes. Use like this:
+ *
+ * DEFINE_CLASS2(foo, foo_class, foo_methods, sizeof(foo_softc),
+ *			  bar, baz);
+ */
+#define DEFINE_CLASS_2(name, methods, size,		\
+	               base1, base2)			\
+							\
+static kobj_class_t name ## _baseclasses[] =		\
+	{ &base1,					\
+	  &base2, 0 };					\
+struct kobj_class name ## _class = {			\
+	#name, methods, size, name ## _baseclasses	\
+}
+
+/*
+ * Define a class inheriting three base classes. Use like this:
+ *
+ * DEFINE_CLASS3(foo, foo_class, foo_methods, sizeof(foo_softc),
+ *			  bar, baz, foobar);
+ */
+#define DEFINE_CLASS_3(name, methods, size,		\
+		       base1, base2, base3)		\
+							\
+static kobj_class_t name ## _baseclasses[] =		\
+	{ &base1,					\
+	  &base2,					\
+	  &base3, 0 };					\
+struct kobj_class name ## _class = {			\
+	#name, methods, size, name ## _baseclasses	\
+}
+
 
 /*
  * Compile the method table in a class.
@@ -138,32 +205,45 @@ void		kobj_delete(kobj_t obj, struct malloc_type *mtype);
 #ifdef KOBJ_STATS
 extern u_int kobj_lookup_hits;
 extern u_int kobj_lookup_misses;
-#define KOBJOPHIT	do { kobj_lookup_hits++; } while (0)
-#define KOBJOPMISS	do { kobj_lookup_misses++; } while (0)
-#else
-#define KOBJOPHIT	do { } while (0)
-#define KOBJOPMISS	do { } while (0)
 #endif
 
 /*
  * Lookup the method in the cache and if it isn't there look it up the
  * slow way.
  */
-#define KOBJOPLOOKUP(OPS,OP) do {					\
-	kobjop_desc_t _desc = &OP##_##desc;				\
-	kobj_method_t *_ce =						\
-	    &OPS->cache[_desc->id & (KOBJ_CACHE_SIZE-1)];		\
-	if (_ce->desc != _desc) {					\
-		KOBJOPMISS;						\
-		kobj_lookup_method(OPS->cls->methods, _ce, _desc);	\
-	} else {							\
-		KOBJOPHIT;						\
-	}								\
-	_m = _ce->func;							\
+#ifdef KOBJ_STATS
+#define KOBJOPLOOKUP(OPS,OP) do {				\
+	kobjop_desc_t _desc = &OP##_##desc;			\
+	kobj_method_t **_cep =					\
+	    &OPS->cache[_desc->id & (KOBJ_CACHE_SIZE-1)];	\
+	kobj_method_t *_ce = *_cep;				\
+	kobj_lookup_hits++; /* assume hit */			\
+	if (_ce->desc != _desc)					\
+		_ce = kobj_lookup_method(OPS->cls,		\
+					 _cep, _desc);		\
+	_m = _ce->func;						\
 } while(0)
+#else
+#define KOBJOPLOOKUP(OPS,OP) do {				\
+	kobjop_desc_t _desc = &OP##_##desc;			\
+	kobj_method_t **_cep =					\
+	    &OPS->cache[_desc->id & (KOBJ_CACHE_SIZE-1)];	\
+	kobj_method_t *_ce = *_cep;				\
+	if (_ce->desc != _desc)					\
+		_ce = kobj_lookup_method(OPS->cls,		\
+					 _cep, _desc);		\
+	_m = _ce->func;						\
+} while(0)
+#endif
 
-void kobj_lookup_method(kobj_method_t *methods,
-			kobj_method_t *ce,
-			kobjop_desc_t desc);
+kobj_method_t* kobj_lookup_method(kobj_class_t cls,
+				  kobj_method_t **cep,
+				  kobjop_desc_t desc);
+
+
+/*
+ * Default method implementation. Returns ENXIO.
+ */
+int kobj_error_method(void);
 
 #endif /* !_SYS_KOBJ_H_ */

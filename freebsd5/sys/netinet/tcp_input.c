@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_input.c	8.12 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.205 2003/05/07 05:26:27 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.217.2.1 2004/01/09 12:32:36 andre Exp $
  */
 
 #include "opt_ipfw.h"		/* for ipfw_fwd		*/
@@ -154,9 +154,8 @@ static int	 tcp_timewait(struct tcptw *, struct tcpopt *,
 #define ND6_HINT(tp) \
 do { \
 	if ((tp) && (tp)->t_inpcb && \
-	    ((tp)->t_inpcb->inp_vflag & INP_IPV6) != 0 && \
-	    (tp)->t_inpcb->in6p_route.ro_rt) \
-		nd6_nud_hint((tp)->t_inpcb->in6p_route.ro_rt, NULL, 0); \
+	    ((tp)->t_inpcb->inp_vflag & INP_IPV6) != 0) \
+		nd6_nud_hint(NULL, NULL, 0); \
 } while (0)
 #else
 #define ND6_HINT(tp)
@@ -296,7 +295,7 @@ present:
 		if (so->so_state & SS_CANTRCVMORE)
 			m_freem(q->tqe_m);
 		else
-			sbappend(&so->so_rcv, q->tqe_m);
+			sbappendstream(&so->so_rcv, q->tqe_m);
 		FREE(q, M_TSEGQ);
 		q = nq;
 	} while (q && q->tqe_th->th_seq == tp->rcv_nxt);
@@ -358,8 +357,7 @@ tcp_input(m, off0)
 	int todrop, acked, ourfinisacked, needoutput = 0;
 	u_long tiwin;
 	struct tcpopt to;		/* options in this segment */
-	struct rmxp_tao *taop;		/* pointer to our TAO cache entry */
-	struct rmxp_tao	tao_noncached;	/* in case there's no cached entry */
+	struct rmxp_tao tao;		/* our TAO cache entry */
 	int headlocked = 0;
 	struct sockaddr_in *next_hop = NULL;
 	int rstreason; /* For badport_bandlim accounting purposes */
@@ -389,6 +387,7 @@ tcp_input(m, off0)
 #ifdef INET6
 	isipv6 = (mtod(m, struct ip *)->ip_v == 6) ? 1 : 0;
 #endif
+	bzero(&tao, sizeof(tao));
 	bzero((char *)&to, sizeof(to));
 
 	tcpstat.tcps_rcvtotal++;
@@ -445,6 +444,10 @@ tcp_input(m, off0)
 							ip->ip_len +
 							IPPROTO_TCP));
 			th->th_sum ^= 0xffff;
+#ifdef TCPDEBUG
+			ipov->ih_len = (u_short)tlen;
+			ipov->ih_len = htons(ipov->ih_len);
+#endif
 		} else {
 			/*
 			 * Checksum extended TCP header and data.
@@ -620,6 +623,7 @@ findpcb:
 			case 1:
 				if ((thflags & TH_SYN) == 0)
 					break;
+				/* FALLTHROUGH */
 			case 2:
 				log(LOG_INFO,
 				    "Connection attempt to TCP %s:%d "
@@ -678,11 +682,11 @@ findpcb:
 	else
 		tiwin = th->th_win;
 
-	so = inp->inp_socket;
 #ifdef MAC
-	if (mac_check_socket_deliver(so, m))
+	if (mac_check_inpcb_deliver(inp, m))
 		goto drop;
 #endif
+	so = inp->inp_socket;
 #ifdef TCPDEBUG
 	if (so->so_options & SO_DEBUG) {
 		ostate = tp->t_state;
@@ -702,11 +706,9 @@ findpcb:
 		if (isipv6) {
 			inc.inc6_faddr = ip6->ip6_src;
 			inc.inc6_laddr = ip6->ip6_dst;
-			inc.inc6_route.ro_rt = NULL;		/* XXX */
 		} else {
 			inc.inc_faddr = ip->ip_src;
 			inc.inc_laddr = ip->ip_dst;
-			inc.inc_route.ro_rt = NULL;		/* XXX */
 		}
 		inc.inc_fport = th->th_sport;
 		inc.inc_lport = th->th_dport;
@@ -863,6 +865,11 @@ findpcb:
 		 * for syncache, or perform t/tcp connection.
 		 */
 		if (so->so_qlen <= so->so_qlimit) {
+#ifdef TCPDEBUG
+			if (so->so_options & SO_DEBUG)
+				tcp_trace(TA_INPUT, ostate, tp,
+				    (void *)tcp_saveipgen, &tcp_savetcp, 0);
+#endif
 			tcp_dooptions(&to, optp, optlen, 1);
 			if (!syncache_add(&inc, &to, th, &so, m))
 				goto drop;
@@ -906,10 +913,65 @@ findpcb:
 	}
 after_listen:
 
-/* XXX temp debugging */
+	/* XXX temp debugging */
 	/* should not happen - syncache should pick up these connections */
 	if (tp->t_state == TCPS_LISTEN)
 		panic("tcp_input: TCPS_LISTEN");
+
+	/*
+	 * This is the second part of the MSS DoS prevention code (after
+	 * minmss on the sending side) and it deals with too many too small
+	 * tcp packets in a too short timeframe (1 second).
+	 *
+	 * For every full second we count the number of received packets
+	 * and bytes. If we get a lot of packets per second for this connection
+	 * (tcp_minmssoverload) we take a closer look at it and compute the
+	 * average packet size for the past second. If that is less than
+	 * tcp_minmss we get too many packets with very small payload which
+	 * is not good and burdens our system (and every packet generates
+	 * a wakeup to the process connected to our socket). We can reasonable
+	 * expect this to be small packet DoS attack to exhaust our CPU
+	 * cycles.
+	 *
+	 * Care has to be taken for the minimum packet overload value. This
+	 * value defines the minimum number of packets per second before we
+	 * start to worry. This must not be too low to avoid killing for
+	 * example interactive connections with many small packets like
+	 * telnet or SSH.
+	 *
+	 * Setting either tcp_minmssoverload or tcp_minmss to "0" disables
+	 * this check.
+	 *
+	 * Account for packet if payload packet, skip over ACK, etc.
+	 */
+	if (tcp_minmss && tcp_minmssoverload &&
+	    tp->t_state == TCPS_ESTABLISHED && tlen > 0) {
+		if (tp->rcv_second > ticks) {
+			tp->rcv_pps++;
+			tp->rcv_byps += tlen + off;
+			if (tp->rcv_pps > tcp_minmssoverload) {
+				if ((tp->rcv_byps / tp->rcv_pps) < tcp_minmss) {
+					printf("too many small tcp packets from "
+					       "%s:%u, av. %lubyte/packet, "
+					       "dropping connection\n",
+#ifdef INET6
+						isipv6 ?
+						ip6_sprintf(&inp->inp_inc.inc6_faddr) :
+#endif
+						inet_ntoa(inp->inp_inc.inc_faddr),
+						inp->inp_inc.inc_fport,
+						tp->rcv_byps / tp->rcv_pps);
+					tp = tcp_drop(tp, ECONNRESET);
+					tcpstat.tcps_minmssdrops++;
+					goto drop;
+				}
+			}
+		} else {
+			tp->rcv_second = ticks + hz;
+			tp->rcv_pps = 1;
+			tp->rcv_byps = tlen + off;
+		}
+	}
 
 	/*
 	 * Segment received on connection.
@@ -920,8 +982,9 @@ after_listen:
 		callout_reset(tp->tt_keep, tcp_keepidle, tcp_timer_keep, tp);
 
 	/*
-	 * Process options.
-	 * XXX this is tradtitional behavior, may need to be cleaned up.
+	 * Process options only when we get SYN/ACK back. The SYN case
+	 * for incoming connections is handled in tcp_syncache.
+	 * XXX this is traditional behavior, may need to be cleaned up.
 	 */
 	tcp_dooptions(&to, optp, optlen, thflags & TH_SYN);
 	if (thflags & TH_SYN) {
@@ -991,8 +1054,7 @@ after_listen:
 			    tp->snd_cwnd >= tp->snd_wnd &&
 			    ((!tcp_do_newreno &&
 			      tp->t_dupacks < tcprexmtthresh) ||
-			     (tcp_do_newreno &&
-			      !SEQ_LT(tp->snd_una, tp->snd_recover)))) {
+			     (tcp_do_newreno && !IN_FASTRECOVERY(tp)))) {
 				KASSERT(headlocked, ("headlocked"));
 				INP_INFO_WUNLOCK(&tcbinfo);
 				/*
@@ -1008,7 +1070,9 @@ after_listen:
 					tp->snd_cwnd = tp->snd_cwnd_prev;
 					tp->snd_ssthresh =
 					    tp->snd_ssthresh_prev;
-					tp->snd_high = tp->snd_high_prev;
+					tp->snd_recover = tp->snd_recover_prev;
+					if (tp->t_flags & TF_WASFRECOVERY)
+					    ENTER_FASTRECOVERY(tp);
 					tp->snd_nxt = tp->snd_max;
 					tp->t_badrxtwin = 0;
 				}
@@ -1035,10 +1099,10 @@ after_listen:
 				tcpstat.tcps_rcvackpack++;
 				tcpstat.tcps_rcvackbyte += acked;
 				sbdrop(&so->so_snd, acked);
-				if (SEQ_GT(tp->snd_una, tp->snd_high) &&
-				    SEQ_LEQ(th->th_ack, tp->snd_high))
-					tp->snd_high = th->th_ack - 1;
-				tp->snd_una = tp->snd_recover = th->th_ack;
+				if (SEQ_GT(tp->snd_una, tp->snd_recover) &&
+				    SEQ_LEQ(th->th_ack, tp->snd_recover))
+					tp->snd_recover = th->th_ack - 1;
+				tp->snd_una = th->th_ack;
 				/*
 				 * pull snd_wl2 up to prevent seq wrap relative
 				 * to th_ack.
@@ -1056,6 +1120,13 @@ after_listen:
 				 * wakeup/selwakeup/signal.  If data
 				 * are ready to send, let tcp_output
 				 * decide between more output or persist.
+
+#ifdef TCPDEBUG
+				if (so->so_options & SO_DEBUG)
+					tcp_trace(TA_INPUT, ostate, tp,
+					    (void *)tcp_saveipgen,
+					    &tcp_savetcp, 0);
+#endif
 				 */
 				if (tp->snd_una == tp->snd_max)
 					callout_stop(tp->tt_rexmt);
@@ -1095,13 +1166,18 @@ after_listen:
 			tcpstat.tcps_rcvbyte += tlen;
 			ND6_HINT(tp);	/* some progress has been done */
 			/*
+#ifdef TCPDEBUG
+			if (so->so_options & SO_DEBUG)
+				tcp_trace(TA_INPUT, ostate, tp,
+				    (void *)tcp_saveipgen, &tcp_savetcp, 0);
+#endif
 			 * Add data to socket buffer.
 			 */
 			if (so->so_state & SS_CANTRCVMORE) {
 				m_freem(m);
 			} else {
 				m_adj(m, drop_hdrlen);	/* delayed header drop */
-				sbappend(&so->so_rcv, m);
+				sbappendstream(&so->so_rcv, m);
 			}
 			sorwakeup(so);
 			if (DELAY_ACK(tp)) {
@@ -1156,10 +1232,8 @@ after_listen:
 	 *	continue processing rest of data/controls, beginning with URG
 	 */
 	case TCPS_SYN_SENT:
-		if ((taop = tcp_gettaocache(&inp->inp_inc)) == NULL) {
-			taop = &tao_noncached;
-			bzero(taop, sizeof(*taop));
-		}
+		if (tcp_do_rfc1644)
+			tcp_hc_gettao(&inp->inp_inc, &tao);
 
 		if ((thflags & TH_ACK) &&
 		    (SEQ_LEQ(th->th_ack, tp->iss) ||
@@ -1172,7 +1246,7 @@ after_listen:
 			 * Our new SYN, when it arrives, will serve as the
 			 * needed ACK.
 			 */
-			if (taop->tao_ccsent != 0)
+			if (tao.tao_ccsent != 0)
 				goto drop;
 			else {
 				rstreason = BANDLIM_UNLIMITED;
@@ -1202,7 +1276,7 @@ after_listen:
 			 */
 			if (to.to_flags & TOF_CCECHO) {
 				if (tp->cc_send != to.to_ccecho) {
-					if (taop->tao_ccsent != 0)
+					if (tao.tao_ccsent != 0)
 						goto drop;
 					else {
 						rstreason = BANDLIM_UNLIMITED;
@@ -1223,8 +1297,8 @@ after_listen:
 				tp->rcv_scale = tp->request_r_scale;
 			}
 			/* Segment is acceptable, update cache if undefined. */
-			if (taop->tao_ccsent == 0)
-				taop->tao_ccsent = to.to_ccecho;
+			if (tao.tao_ccsent == 0 && tcp_do_rfc1644)
+				tcp_hc_updatetao(&inp->inp_inc, TCP_HC_TAO_CCSENT, to.to_ccecho, 0);
 
 			tp->rcv_adv += tp->rcv_wnd;
 			tp->snd_una++;		/* SYN is acked */
@@ -1267,14 +1341,16 @@ after_listen:
 			tp->t_flags |= TF_ACKNOW;
 			callout_stop(tp->tt_rexmt);
 			if (to.to_flags & TOF_CC) {
-				if (taop->tao_cc != 0 &&
-				    CC_GT(to.to_cc, taop->tao_cc)) {
+				if (tao.tao_cc != 0 &&
+				    CC_GT(to.to_cc, tao.tao_cc)) {
 					/*
 					 * update cache and make transition:
 					 *        SYN-SENT -> ESTABLISHED*
 					 *        SYN-SENT* -> FIN-WAIT-1*
 					 */
-					taop->tao_cc = to.to_cc;
+					tao.tao_cc = to.to_cc;
+					tcp_hc_updatetao(&inp->inp_inc,
+						TCP_HC_TAO_CC, to.to_cc, 0);
 					tp->t_starttime = ticks;
 					if (tp->t_flags & TF_NEEDFIN) {
 						tp->t_state = TCPS_FIN_WAIT_1;
@@ -1290,8 +1366,12 @@ after_listen:
 				} else
 					tp->t_state = TCPS_SYN_RECEIVED;
 			} else {
-				/* CC.NEW or no option => invalidate cache */
-				taop->tao_cc = 0;
+				if (tcp_do_rfc1644) {
+					/* CC.NEW or no option => invalidate cache */
+					tao.tao_cc = 0;
+					tcp_hc_updatetao(&inp->inp_inc,
+						TCP_HC_TAO_CC, to.to_cc, 0);
+				}
 				tp->t_state = TCPS_SYN_RECEIVED;
 			}
 		}
@@ -1621,7 +1701,7 @@ trimthenstep6:
 	if (thflags & TH_SYN) {
 		tp = tcp_drop(tp, ECONNRESET);
 		rstreason = BANDLIM_UNLIMITED;
-		goto dropwithreset;
+		goto drop;
 	}
 
 	/*
@@ -1659,13 +1739,14 @@ trimthenstep6:
 		}
 		/*
 		 * Upon successful completion of 3-way handshake,
-		 * update cache.CC if it was undefined, pass any queued
-		 * data to the user, and advance state appropriately.
+		 * update cache.CC, pass any queued data to the user,
+		 * and advance state appropriately.
 		 */
-		if ((taop = tcp_gettaocache(&inp->inp_inc)) != NULL &&
-		    taop->tao_cc == 0)
-			taop->tao_cc = tp->cc_recv;
-
+		if (tcp_do_rfc1644) {
+			tao.tao_cc = tp->cc_recv;
+			tcp_hc_updatetao(&inp->inp_inc, TCP_HC_TAO_CC,
+					 tp->cc_recv, 0);
+		}
 		/*
 		 * Make transitions:
 		 *      SYN-RECEIVED  -> ESTABLISHED
@@ -1738,8 +1819,7 @@ trimthenstep6:
 					tp->t_dupacks = 0;
 				else if (++tp->t_dupacks > tcprexmtthresh ||
 					 (tcp_do_newreno &&
-					  SEQ_LT(tp->snd_una,
-					  	 tp->snd_recover))) {
+					  IN_FASTRECOVERY(tp))) {
 					tp->snd_cwnd += tp->t_maxseg;
 					(void) tcp_output(tp);
 					goto drop;
@@ -1747,7 +1827,8 @@ trimthenstep6:
 					tcp_seq onxt = tp->snd_nxt;
 					u_int win;
 					if (tcp_do_newreno &&
-					    SEQ_LEQ(th->th_ack, tp->snd_high)) {
+					    SEQ_LEQ(th->th_ack,
+					            tp->snd_recover)) {
 						tp->t_dupacks = 0;
 						break;
 					}
@@ -1756,6 +1837,7 @@ trimthenstep6:
 					if (win < 2)
 						win = 2;
 					tp->snd_ssthresh = win * tp->t_maxseg;
+					ENTER_FASTRECOVERY(tp);
 					tp->snd_recover = tp->snd_max;
 					callout_stop(tp->tt_rexmt);
 					tp->t_rtttime = 0;
@@ -1808,7 +1890,7 @@ trimthenstep6:
 		 * for the other side's cached packets, retract it.
 		 */
 		if (tcp_do_newreno) {
-			if (SEQ_LT(tp->snd_una, tp->snd_recover)) {
+			if (IN_FASTRECOVERY(tp)) {
 				if (SEQ_LT(th->th_ack, tp->snd_recover)) {
 					tcp_newreno_partial_ack(tp, th);
 				} else {
@@ -1878,7 +1960,9 @@ process_ACK:
 			++tcpstat.tcps_sndrexmitbad;
 			tp->snd_cwnd = tp->snd_cwnd_prev;
 			tp->snd_ssthresh = tp->snd_ssthresh_prev;
-			tp->snd_high = tp->snd_high_prev;
+			tp->snd_recover = tp->snd_recover_prev;
+			if (tp->t_flags & TF_WASFRECOVERY)
+				ENTER_FASTRECOVERY(tp);
 			tp->snd_nxt = tp->snd_max;
 			tp->t_badrxtwin = 0;	/* XXX probably not required */ 
 		}
@@ -1932,7 +2016,7 @@ process_ACK:
 		 * Otherwise open linearly: maxseg per window
 		 * (maxseg^2 / cwnd per packet).
 		 */
-		if (!tcp_do_newreno || SEQ_GEQ(tp->snd_una, tp->snd_recover)) {
+		if (!tcp_do_newreno || !IN_FASTRECOVERY(tp)) {
 			register u_int cw = tp->snd_cwnd;
 			register u_int incr = tp->t_maxseg;
 			if (cw > tp->snd_ssthresh)
@@ -1950,12 +2034,13 @@ process_ACK:
 		}
 		sowwakeup(so);
 		/* detect una wraparound */
-		if (SEQ_GEQ(tp->snd_una, tp->snd_recover) &&
-		    SEQ_LT(th->th_ack, tp->snd_recover))
-			tp->snd_recover = th->th_ack;
-		if (SEQ_GT(tp->snd_una, tp->snd_high) &&
-		    SEQ_LEQ(th->th_ack, tp->snd_high))
-			tp->snd_high = th->th_ack - 1;
+		if (tcp_do_newreno && !IN_FASTRECOVERY(tp) &&
+		    SEQ_GT(tp->snd_una, tp->snd_recover) &&
+		    SEQ_LEQ(th->th_ack, tp->snd_recover))
+			tp->snd_recover = th->th_ack - 1;
+		if (tcp_do_newreno && IN_FASTRECOVERY(tp) &&
+		    SEQ_GEQ(th->th_ack, tp->snd_recover))
+			EXIT_FASTRECOVERY(tp);
 		tp->snd_una = th->th_ack;
 		if (SEQ_LT(tp->snd_nxt, tp->snd_una))
 			tp->snd_nxt = tp->snd_una;
@@ -2151,7 +2236,7 @@ dodata:							/* XXX */
 			if (so->so_state & SS_CANTRCVMORE)
 				m_freem(m);
 			else
-				sbappend(&so->so_rcv, m);
+				sbappendstream(&so->so_rcv, m);
 			sorwakeup(so);
 		} else {
 			thflags = tcp_reass(tp, th, &tlen, m);
@@ -2321,9 +2406,6 @@ dropwithreset:
 			  &tcp_savetcp, 0);
 #endif
 
-	if (tp)
-		INP_UNLOCK(inp);
-
 	if (thflags & TH_ACK)
 		/* mtod() below is safe as long as hdr dropping is delayed */
 		tcp_respond(tp, mtod(m, void *), th, m, (tcp_seq)0, th->th_ack,
@@ -2335,6 +2417,9 @@ dropwithreset:
 		tcp_respond(tp, mtod(m, void *), th, m, th->th_seq+tlen,
 			    (tcp_seq)0, TH_RST|TH_ACK);
 	}
+
+	if (tp)
+		INP_UNLOCK(inp);
 	if (headlocked)
 		INP_INFO_WUNLOCK(&tcbinfo);
 	return;
@@ -2584,25 +2669,26 @@ tcp_xmit_timer(tp, rtt)
  * are present.  Store the upper limit of the length of options plus
  * data in maxopd.
  *
- * NOTE that this routine is only called when we process an incoming
- * segment, for outgoing segments only tcp_mssopt is called.
  *
  * In case of T/TCP, we call this routine during implicit connection
  * setup as well (offer = -1), to initialize maxseg from the cached
  * MSS of our peer.
+ *
+ * NOTE that this routine is only called when we process an incoming
+ * segment. Outgoing SYN/ACK MSS settings are handled in tcp_mssopt().
  */
 void
 tcp_mss(tp, offer)
 	struct tcpcb *tp;
 	int offer;
 {
-	register struct rtentry *rt;
-	struct ifnet *ifp;
-	register int rtt, mss;
+	int rtt, mss;
 	u_long bufsize;
+	u_long maxmtu;
 	struct inpcb *inp = tp->t_inpcb;
 	struct socket *so;
-	struct rmxp_tao *taop;
+	struct hc_metrics_lite metrics;
+	struct rmxp_tao tao;
 	int origoffer = offer;
 #ifdef INET6
 	int isipv6 = ((inp->inp_vflag & INP_IPV6) != 0) ? 1 : 0;
@@ -2610,92 +2696,101 @@ tcp_mss(tp, offer)
 			    sizeof (struct ip6_hdr) + sizeof (struct tcphdr) :
 			    sizeof (struct tcpiphdr);
 #else
-	const int isipv6 = 0;
-	const size_t min_protoh = sizeof (struct tcpiphdr);
+	const size_t min_protoh = sizeof(struct tcpiphdr);
 #endif
+	bzero(&tao, sizeof(tao));
 
-	if (isipv6)
-		rt = tcp_rtlookup6(&inp->inp_inc);
-	else
-		rt = tcp_rtlookup(&inp->inp_inc);
-	if (rt == NULL) {
-		tp->t_maxopd = tp->t_maxseg =
-				isipv6 ? tcp_v6mssdflt : tcp_mssdflt;
-		return;
+	/* initialize */
+#ifdef INET6
+	if (isipv6) {
+		maxmtu = tcp_maxmtu6(&inp->inp_inc);
+		tp->t_maxopd = tp->t_maxseg = tcp_v6mssdflt;
+	} else
+#endif
+	{
+		maxmtu = tcp_maxmtu(&inp->inp_inc);
+		tp->t_maxopd = tp->t_maxseg = tcp_mssdflt;
 	}
-	ifp = rt->rt_ifp;
 	so = inp->inp_socket;
 
-	taop = rmx_taop(rt->rt_rmx);
 	/*
-	 * Offer == -1 means that we didn't receive SYN yet,
-	 * use cached value in that case;
+	 * no route to sender, take default mss and return
 	 */
-	if (offer == -1)
-		offer = taop->tao_mssopt;
-	/*
-	 * Offer == 0 means that there was no MSS on the SYN segment,
-	 * in this case we use tcp_mssdflt.
-	 */
-	if (offer == 0)
-		offer = isipv6 ? tcp_v6mssdflt : tcp_mssdflt;
-	else
-		/*
-		 * Sanity check: make sure that maxopd will be large
-		 * enough to allow some data on segments even is the
-		 * all the option space is used (40bytes).  Otherwise
-		 * funny things may happen in tcp_output.
-		 */
-		offer = max(offer, 64);
-	taop->tao_mssopt = offer;
+	if (maxmtu == 0)
+		return;
+
+	/* what have we got? */
+	switch (offer) {
+		case 0:
+			/*
+			 * Offer == 0 means that there was no MSS on the SYN
+			 * segment, in this case we use tcp_mssdflt.
+			 */
+			offer =
+#ifdef INET6
+				isipv6 ? tcp_v6mssdflt :
+#endif
+				tcp_mssdflt;
+			break;
+
+		case -1:
+			/*
+			 * Offer == -1 means that we didn't receive SYN yet,
+			 * use cached value in that case;
+			 */
+			if (tcp_do_rfc1644)
+				tcp_hc_gettao(&inp->inp_inc, &tao);
+			if (tao.tao_mssopt != 0)
+				offer = tao.tao_mssopt;
+			/* FALLTHROUGH */
+
+		default:
+			/*
+			 * Prevent DoS attack with too small MSS. Round up
+			 * to at least minmss.
+			 */
+			offer = max(offer, tcp_minmss);
+			/*
+			 * Sanity check: make sure that maxopd will be large
+			 * enough to allow some data on segments even if the
+			 * all the option space is used (40bytes).  Otherwise
+			 * funny things may happen in tcp_output.
+			 */
+			offer = max(offer, 64);
+			if (tcp_do_rfc1644)
+				tcp_hc_updatetao(&inp->inp_inc,
+						 TCP_HC_TAO_MSSOPT, 0, offer);
+	}
 
 	/*
-	 * While we're here, check if there's an initial rtt
-	 * or rttvar.  Convert from the route-table units
-	 * to scaled multiples of the slow timeout timer.
+	 * rmx information is now retrieved from tcp_hostcache
 	 */
-	if (tp->t_srtt == 0 && (rtt = rt->rt_rmx.rmx_rtt)) {
-		/*
-		 * XXX the lock bit for RTT indicates that the value
-		 * is also a minimum value; this is subject to time.
-		 */
-		if (rt->rt_rmx.rmx_locks & RTV_RTT)
-			tp->t_rttmin = rtt / (RTM_RTTUNIT / hz);
-		tp->t_srtt = rtt / (RTM_RTTUNIT / (hz * TCP_RTT_SCALE));
-		tp->t_rttbest = tp->t_srtt + TCP_RTT_SCALE;
-		tcpstat.tcps_usedrtt++;
-		if (rt->rt_rmx.rmx_rttvar) {
-			tp->t_rttvar = rt->rt_rmx.rmx_rttvar /
-			    (RTM_RTTUNIT / (hz * TCP_RTTVAR_SCALE));
-			tcpstat.tcps_usedrttvar++;
-		} else {
-			/* default variation is +- 1 rtt */
-			tp->t_rttvar =
-			    tp->t_srtt * TCP_RTTVAR_SCALE / TCP_RTT_SCALE;
-		}
-		TCPT_RANGESET(tp->t_rxtcur,
-			      ((tp->t_srtt >> 2) + tp->t_rttvar) >> 1,
-			      tp->t_rttmin, TCPTV_REXMTMAX);
-	}
+	tcp_hc_get(&inp->inp_inc, &metrics);
+
 	/*
-	 * if there's an mtu associated with the route, use it
+	 * if there's a discovered mtu int tcp hostcache, use it
 	 * else, use the link mtu.
 	 */
-	if (rt->rt_rmx.rmx_mtu)
-		mss = rt->rt_rmx.rmx_mtu - min_protoh;
+	if (metrics.rmx_mtu)
+		mss = metrics.rmx_mtu - min_protoh;
 	else {
+#ifdef INET6
 		if (isipv6) {
-			mss = nd_ifinfo[rt->rt_ifp->if_index].linkmtu -
-				min_protoh;
-			if (!in6_localaddr(&inp->in6p_faddr))
+			mss = maxmtu - min_protoh;
+			if (!path_mtu_discovery &&
+			    !in6_localaddr(&inp->in6p_faddr))
 				mss = min(mss, tcp_v6mssdflt);
-		} else {
-			mss = ifp->if_mtu - min_protoh;
-			if (!in_localaddr(inp->inp_faddr))
+		} else
+#endif
+		{
+			mss = maxmtu - min_protoh;
+			if (!path_mtu_discovery &&
+			    !in_localaddr(inp->inp_faddr))
 				mss = min(mss, tcp_mssdflt);
 		}
 	}
 	mss = min(mss, offer);
+
 	/*
 	 * maxopd stores the maximum length of data AND options
 	 * in a segment; maxseg is the amount of data in a normal
@@ -2718,6 +2813,7 @@ tcp_mss(tp, offer)
 	    (origoffer == -1 ||
 	     (tp->t_flags & TF_RCVD_CC) == TF_RCVD_CC))
 		mss -= TCPOLEN_CC_APPA;
+	tp->t_maxseg = mss;
 
 #if	(MCLBYTES & (MCLBYTES - 1)) == 0
 		if (mss > MCLBYTES)
@@ -2726,15 +2822,18 @@ tcp_mss(tp, offer)
 		if (mss > MCLBYTES)
 			mss = mss / MCLBYTES * MCLBYTES;
 #endif
+	tp->t_maxseg = mss;
+
 	/*
-	 * If there's a pipesize, change the socket buffer
-	 * to that size.  Make the socket buffers an integral
-	 * number of mss units; if the mss is larger than
-	 * the socket buffer, decrease the mss.
+	 * If there's a pipesize, change the socket buffer to that size,
+	 * don't change if sb_hiwat is different than default (then it
+	 * has been changed on purpose with setsockopt).
+	 * Make the socket buffers an integral number of mss units;
+	 * if the mss is larger than the socket buffer, decrease the mss.
 	 */
-#ifdef RTV_SPIPE
-	if ((bufsize = rt->rt_rmx.rmx_sendpipe) == 0)
-#endif
+	if ((so->so_snd.sb_hiwat == tcp_sendspace) && metrics.rmx_sendpipe)
+		bufsize = metrics.rmx_sendpipe;
+	else
 		bufsize = so->so_snd.sb_hiwat;
 	if (bufsize < mss)
 		mss = bufsize;
@@ -2747,9 +2846,9 @@ tcp_mss(tp, offer)
 	}
 	tp->t_maxseg = mss;
 
-#ifdef RTV_RPIPE
-	if ((bufsize = rt->rt_rmx.rmx_recvpipe) == 0)
-#endif
+	if ((so->so_rcv.sb_hiwat == tcp_recvspace) && metrics.rmx_recvpipe)
+		bufsize = metrics.rmx_recvpipe;
+	else
 		bufsize = so->so_rcv.sb_hiwat;
 	if (bufsize > mss) {
 		bufsize = roundup(bufsize, mss);
@@ -2758,57 +2857,112 @@ tcp_mss(tp, offer)
 		if (bufsize > so->so_rcv.sb_hiwat)
 			(void)sbreserve(&so->so_rcv, bufsize, so, NULL);
 	}
-
 	/*
-	 * Set the slow-start flight size depending on whether this
-	 * is a local network or not.
+	 * While we're here, check the others too
 	 */
-	if (tcp_do_rfc3390)
-		tp->snd_cwnd = min(4 * mss, max(2 * mss, 4380));
-	else if ((isipv6 && in6_localaddr(&inp->in6p_faddr)) ||
-	    (!isipv6 && in_localaddr(inp->inp_faddr)))
-		tp->snd_cwnd = mss * ss_fltsz_local;
-	else
-		tp->snd_cwnd = mss * ss_fltsz;
-
-	if (rt->rt_rmx.rmx_ssthresh) {
+	if (tp->t_srtt == 0 && (rtt = metrics.rmx_rtt)) {
+		tp->t_srtt = rtt;
+		tp->t_rttbest = tp->t_srtt + TCP_RTT_SCALE;
+		tcpstat.tcps_usedrtt++;
+		if (metrics.rmx_rttvar) {
+			tp->t_rttvar = metrics.rmx_rttvar;
+			tcpstat.tcps_usedrttvar++;
+		} else {
+			/* default variation is +- 1 rtt */
+			tp->t_rttvar =
+			    tp->t_srtt * TCP_RTTVAR_SCALE / TCP_RTT_SCALE;
+		}
+		TCPT_RANGESET(tp->t_rxtcur,
+			      ((tp->t_srtt >> 2) + tp->t_rttvar) >> 1,
+			      tp->t_rttmin, TCPTV_REXMTMAX);
+	}
+	if (metrics.rmx_ssthresh) {
 		/*
 		 * There's some sort of gateway or interface
 		 * buffer limit on the path.  Use this to set
 		 * the slow start threshhold, but set the
 		 * threshold to no less than 2*mss.
 		 */
-		tp->snd_ssthresh = max(2 * mss, rt->rt_rmx.rmx_ssthresh);
+		tp->snd_ssthresh = max(2 * mss, metrics.rmx_ssthresh);
 		tcpstat.tcps_usedssthresh++;
 	}
+	if (metrics.rmx_bandwidth)
+		tp->snd_bandwidth = metrics.rmx_bandwidth;
+
+	/*
+	 * Set the slow-start flight size depending on whether this
+	 * is a local network or not.
+	 *
+	 * Extend this so we cache the cwnd too and retrieve it here.
+	 * Make cwnd even bigger than RFC3390 suggests but only if we
+	 * have previous experience with the remote host. Be careful
+	 * not make cwnd bigger than remote receive window or our own
+	 * send socket buffer. Maybe put some additional upper bound
+	 * on the retrieved cwnd. Should do incremental updates to
+	 * hostcache when cwnd collapses so next connection doesn't
+	 * overloads the path again.
+	 *
+	 * RFC3390 says only do this if SYN or SYN/ACK didn't got lost.
+	 * We currently check only in syncache_socket for that.
+	 */
+#define TCP_METRICS_CWND
+#ifdef TCP_METRICS_CWND
+	if (metrics.rmx_cwnd)
+		tp->snd_cwnd = max(mss,
+				min(metrics.rmx_cwnd / 2,
+				 min(tp->snd_wnd, so->so_snd.sb_hiwat)));
+	else
+#endif
+	if (tcp_do_rfc3390)
+		tp->snd_cwnd = min(4 * mss, max(2 * mss, 4380));
+#ifdef INET6
+	else if ((isipv6 && in6_localaddr(&inp->in6p_faddr)) ||
+		 (!isipv6 && in_localaddr(inp->inp_faddr)))
+#else
+	else if (in_localaddr(inp->inp_faddr))
+#endif
+		tp->snd_cwnd = mss * ss_fltsz_local;
+	else
+		tp->snd_cwnd = mss * ss_fltsz;
 }
 
 /*
  * Determine the MSS option to send on an outgoing SYN.
  */
 int
-tcp_mssopt(tp)
-	struct tcpcb *tp;
+tcp_mssopt(inc)
+	struct in_conninfo *inc;
 {
-	struct rtentry *rt;
+	int mss = 0;
+	u_long maxmtu = 0;
+	u_long thcmtu = 0;
+	size_t min_protoh;
 #ifdef INET6
-	int isipv6 = ((tp->t_inpcb->inp_vflag & INP_IPV6) != 0) ? 1 : 0;
-	size_t min_protoh = isipv6 ?
-			    sizeof (struct ip6_hdr) + sizeof (struct tcphdr) :
-			    sizeof (struct tcpiphdr);
-#else
-	const int isipv6 = 0;
-	const size_t min_protoh = sizeof (struct tcpiphdr);
+	int isipv6 = inc->inc_isipv6 ? 1 : 0;
 #endif
 
-	if (isipv6)
-		rt = tcp_rtlookup6(&tp->t_inpcb->inp_inc);
-	else
-		rt = tcp_rtlookup(&tp->t_inpcb->inp_inc);
-	if (rt == NULL)
-		return (isipv6 ? tcp_v6mssdflt : tcp_mssdflt);
+	KASSERT(inc != NULL, ("tcp_mssopt with NULL in_conninfo pointer"));
 
-	return (rt->rt_ifp->if_mtu - min_protoh);
+#ifdef INET6
+	if (isipv6) {
+		mss = tcp_v6mssdflt;
+		maxmtu = tcp_maxmtu6(inc);
+		thcmtu = tcp_hc_getmtu(inc); /* IPv4 and IPv6 */
+		min_protoh = sizeof(struct ip6_hdr) + sizeof(struct tcphdr);
+	} else
+#endif
+	{
+		mss = tcp_mssdflt;
+		maxmtu = tcp_maxmtu(inc);
+		thcmtu = tcp_hc_getmtu(inc); /* IPv4 and IPv6 */
+		min_protoh = sizeof(struct tcpiphdr);
+	}
+	if (maxmtu && thcmtu)
+		mss = min(maxmtu, thcmtu) - min_protoh;
+	else if (maxmtu || thcmtu)
+		mss = max(maxmtu, thcmtu) - min_protoh;
+
+	return (mss);
 }
 
 

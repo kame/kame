@@ -1,6 +1,6 @@
-/*
- * Copyright (c) 2000
- *	John Baldwin <jhb@FreeBSD.org>.  All rights reserved.
+/*-
+ * Copyright (c) 2000 John Baldwin <jhb@FreeBSD.org>
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,29 +10,30 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the author nor the names of any co-contributors
+ * 3. Neither the name of the author nor the names of any co-contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY JOHN BALDWIN AND CONTRIBUTORS ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL JOHN BALDWIN OR THE VOICES IN HIS HEAD
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
- * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/kern_ktr.c,v 1.36 2003/05/02 00:33:11 julian Exp $
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
 
 /*
  * This module holds the global variables used by KTR and the ktr_tracepoint()
  * function that does the actual tracing.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_ktr.c,v 1.43 2003/09/10 01:09:32 jhb Exp $");
 
 #include "opt_ddb.h"
 #include "opt_ktr.h"
@@ -140,8 +141,9 @@ sysctl_debug_ktr_alq_enable(SYSCTL_HANDLER_ARGS)
 		error = suser(curthread);
 		if (error)
 			return (error);
-		error = alq_open(&ktr_alq, (const char *)ktr_alq_file, 
-		    sizeof(struct ktr_entry), ktr_alq_depth);
+		error = alq_open(&ktr_alq, (const char *)ktr_alq_file,
+		    req->td->td_ucred, sizeof(struct ktr_entry),
+		    ktr_alq_depth);
 		if (error == 0) {
 			ktr_mask &= ~KTR_ALQ_MASK;
 			ktr_alq_cnt = 0;
@@ -188,9 +190,9 @@ ktr_tracepoint(u_int mask, const char *file, int line, const char *format,
 		return;
 #if defined(KTR_VERBOSE) || defined(KTR_ALQ)
 	td = curthread;
-	if (td->td_inktr)
+	if (td->td_pflags & TDP_INKTR)
 		return;
-	td->td_inktr++;
+	td->td_pflags |= TDP_INKTR;
 #endif
 #ifdef KTR_ALQ
 	if (ktr_alq_enabled &&
@@ -247,7 +249,7 @@ ktr_tracepoint(u_int mask, const char *file, int line, const char *format,
 done:
 #endif
 #if defined(KTR_VERBOSE) || defined(KTR_ALQ)
-	td->td_inktr--;
+	td->td_pflags &= ~TDP_INKTR;
 #endif
 }
 
@@ -265,38 +267,25 @@ static	int db_mach_vtrace(void);
 
 DB_SHOW_COMMAND(ktr, db_ktr_all)
 {
-	int	c, lines;
-	int	all = 0;
-
-	lines = NUM_LINES_PER_PAGE;
+	int quit;
+	
+	quit = 0;
 	tstate.cur = (ktr_idx - 1) & (KTR_ENTRIES - 1);
 	tstate.first = -1;
 	if (strcmp(modif, "v") == 0)
 		db_ktr_verbose = 1;
 	else
 		db_ktr_verbose = 0;
-	if (strcmp(modif, "a") == 0)
-		all = 1;
-	while (db_mach_vtrace())
-		if (all) {
-			if (cncheckc() != -1)
-				return;
-		} else if (--lines == 0) {
-			db_printf("--More--");
-			c = cngetc();
-			db_printf("\r");
-			switch (c) {
-			case '\n':	/* one more line */
-				lines = 1;
+	if (strcmp(modif, "a") == 0) {
+		while (cncheckc() != -1)
+			if (db_mach_vtrace() == 0)
 				break;
-			case ' ':	/* one more page */
-				lines = NUM_LINES_PER_PAGE;
+	} else {
+		db_setup_paging(db_simple_pager, &quit, DB_LINES_PER_PAGE);
+		while (!quit)
+			if (db_mach_vtrace() == 0)
 				break;
-			default:
-				db_printf("\n");
-				return;
-			}
-		}
+	}
 }
 
 static int

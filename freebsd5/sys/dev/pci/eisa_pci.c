@@ -26,9 +26,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/dev/pci/eisa_pci.c,v 1.3 2000/12/13 01:25:10 msmith Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/pci/eisa_pci.c,v 1.5 2003/08/24 17:54:15 obrien Exp $");
 
 /*
  * PCI:EISA bridge support
@@ -38,8 +39,8 @@
 #include <sys/kernel.h>
 #include <sys/bus.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 
 static int	eisab_probe(device_t dev);
 static int	eisab_attach(device_t dev);
@@ -124,4 +125,3 @@ eisab_attach(device_t dev)
 
     return(0);
 }
-

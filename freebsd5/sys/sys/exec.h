@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)exec.h	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/exec.h,v 1.28 2003/01/04 08:17:27 jake Exp $
+ * $FreeBSD: src/sys/sys/exec.h,v 1.29 2003/11/07 21:25:54 peter Exp $
  */
 
 #ifndef _SYS_EXEC_H_
@@ -61,7 +61,7 @@ struct ps_strings {
  * Address of ps_strings structure (in user space).
  */
 #define	PS_STRINGS	(USRSTACK - sizeof(struct ps_strings))
-#define SPARE_USRSPACE	256
+#define SPARE_USRSPACE	4096
 
 struct image_params;
 

@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/atm_var.h,v 1.20 2003/03/04 23:19:52 jlemon Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/atm_var.h,v 1.24 2003/10/31 18:32:10 brooks Exp $
  *
  */
 
@@ -109,10 +109,11 @@ void *		atm_dev_alloc(u_int, u_int, u_int);
 void		atm_dev_free(volatile void *);
 KBuffer *	atm_dev_compress(KBuffer *);
 Cmn_vcc *	atm_dev_vcc_find(Cmn_unit *, u_int, u_int, u_int);
-void		atm_dev_pdu_print(Cmn_unit *, Cmn_vcc *, KBuffer *, char *);
+void		atm_dev_pdu_print(const Cmn_unit *, const Cmn_vcc *,
+		    const KBuffer *, const char *);
 
 	/* atm_if.c */
-int		atm_physif_register(Cmn_unit *, char *,
+int		atm_physif_register(Cmn_unit *, const char *,
 			struct stack_defn *);
 int		atm_physif_deregister(Cmn_unit *);
 void		atm_physif_freenifs(struct atm_pif *, uma_zone_t);
@@ -172,6 +173,12 @@ int		atm_untimeout(struct atm_time *);
 int		atm_stack_enq(int, void (*)(int, void *, intptr_t, intptr_t), 
 			void *, Atm_connvc *, intptr_t, intptr_t);
 void		atm_stack_drain(void);
-void		atm_pdu_print(KBuffer *, char *);
+void		atm_pdu_print(const KBuffer *, const char *);
+
+#ifdef SYSCTL_DECL
+SYSCTL_DECL(_net_harp);
+SYSCTL_DECL(_net_harp_atm);
+#endif
+
 #endif	/* _KERNEL */
 #endif	/* _NETATM_ATM_VAR_H */

@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_vnops.c	8.2 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/vfs_vnops.c,v 1.184 2003/04/29 13:36:03 kan Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/vfs_vnops.c,v 1.195 2003/10/04 14:35:22 jeff Exp $");
 
 #include "opt_mac.h"
 
@@ -71,18 +73,24 @@ static fo_stat_t	vn_statfile;
 static fo_close_t	vn_closefile;
 
 struct 	fileops vnops = {
-	vn_read, vn_write, vn_ioctl, vn_poll, vn_kqfilter,
-	vn_statfile, vn_closefile, DFLAG_PASSABLE
+	.fo_read = vn_read,
+	.fo_write = vn_write,
+	.fo_ioctl = vn_ioctl,
+	.fo_poll = vn_poll,
+	.fo_kqfilter = vn_kqfilter,
+	.fo_stat = vn_statfile,
+	.fo_close = vn_closefile,
+	.fo_flags = DFLAG_PASSABLE | DFLAG_SEEKABLE
 };
 
 int
-vn_open(ndp, flagp, cmode)
-	register struct nameidata *ndp;
-	int *flagp, cmode;
+vn_open(ndp, flagp, cmode, fdidx)
+	struct nameidata *ndp;
+	int *flagp, cmode, fdidx;
 {
 	struct thread *td = ndp->ni_cnd.cn_thread;
 
-	return (vn_open_cred(ndp, flagp, cmode, td->td_ucred));
+	return (vn_open_cred(ndp, flagp, cmode, td->td_ucred, fdidx));
 }
 
 /*
@@ -93,10 +101,11 @@ vn_open(ndp, flagp, cmode)
  * due to the NDINIT being done elsewhere.
  */
 int
-vn_open_cred(ndp, flagp, cmode, cred)
-	register struct nameidata *ndp;
+vn_open_cred(ndp, flagp, cmode, cred, fdidx)
+	struct nameidata *ndp;
 	int *flagp, cmode;
 	struct ucred *cred;
+	int fdidx;
 {
 	struct vnode *vp;
 	struct mount *mp;
@@ -226,7 +235,7 @@ restart:
 		vp->v_cachedfs = vap->va_fsid;
 		vp->v_cachedid = vap->va_fileid;
 	}
-	if ((error = VOP_OPEN(vp, fmode, cred, td)) != 0)
+	if ((error = VOP_OPEN(vp, fmode, cred, td, fdidx)) != 0)
 		goto bad;
 	/*
 	 * Make sure that a VM object is created for VMIO support.
@@ -265,6 +274,7 @@ restart:
 	if (fmode & FWRITE)
 		vp->v_writecount++;
 	*flagp = fmode;
+	ASSERT_VOP_LOCKED(vp, "vn_open_cred");
 	return (0);
 bad:
 	NDFREE(ndp, NDF_ONLY_PNBUF);
@@ -501,7 +511,7 @@ vn_read(fp, uio, active_cred, flags, td)
 	mtx_lock(&Giant);
 	KASSERT(uio->uio_td == td, ("uio_td %p is not td %p",
 	    uio->uio_td, td));
-	vp = fp->f_data;
+	vp = fp->f_vnode;
 	ioflag = 0;
 	if (fp->f_flag & FNONBLOCK)
 		ioflag |= IO_NDELAY;
@@ -551,7 +561,7 @@ vn_write(fp, uio, active_cred, flags, td)
 	mtx_lock(&Giant);
 	KASSERT(uio->uio_td == td, ("uio_td %p is not td %p",
 	    uio->uio_td, td));
-	vp = fp->f_data;
+	vp = fp->f_vnode;
 	if (vp->v_type == VREG)
 		bwillwrite();
 	ioflag = IO_UNIT;
@@ -599,7 +609,7 @@ vn_statfile(fp, sb, active_cred, td)
 	struct ucred *active_cred;
 	struct thread *td;
 {
-	struct vnode *vp = fp->f_data;
+	struct vnode *vp = fp->f_vnode;
 	int error;
 
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
@@ -742,7 +752,7 @@ vn_ioctl(fp, com, data, active_cred, td)
 	struct ucred *active_cred;
 	struct thread *td;
 {
-	struct vnode *vp = fp->f_data;
+	struct vnode *vp = fp->f_vnode;
 	struct vnode *vpold;
 	struct vattr vattr;
 	int error;
@@ -824,7 +834,7 @@ vn_poll(fp, events, active_cred, td)
 	int error;
 #endif
 
-	vp = fp->f_data;
+	vp = fp->f_vnode;
 #ifdef MAC
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 	error = mac_check_vnode_poll(active_cred, fp->f_cred, vp);
@@ -860,12 +870,15 @@ debug_vn_lock(vp, flags, td, filename, line)
 		if ((flags & LK_INTERLOCK) == 0)
 			VI_LOCK(vp);
 		if ((vp->v_iflag & VI_XLOCK) && vp->v_vxproc != curthread) {
+			if ((flags & LK_NOWAIT) != 0) {
+				VI_UNLOCK(vp);
+				return (ENOENT);
+			}
 			vp->v_iflag |= VI_XWANT;
 			msleep(vp, VI_MTX(vp), PINOD, "vn_lock", 0);
-			error = ENOENT;
 			if ((flags & LK_RETRY) == 0) {
 				VI_UNLOCK(vp);
-				return (error);
+				return (ENOENT);
 			}
 		} 
 #ifdef	DEBUG_LOCKS
@@ -892,7 +905,7 @@ vn_closefile(fp, td)
 {
 
 	fp->f_ops = &badfileops;
-	return (vn_close(fp->f_data, fp->f_flag, fp->f_cred, td));
+	return (vn_close(fp->f_vnode, fp->f_flag, fp->f_cred, td));
 }
 
 /*
@@ -1043,7 +1056,7 @@ static int
 vn_kqfilter(struct file *fp, struct knote *kn)
 {
 
-	return (VOP_KQFILTER(fp->f_data, kn));
+	return (VOP_KQFILTER(fp->f_vnode, kn));
 }
 
 /*
@@ -1141,7 +1154,10 @@ vn_extattr_rm(struct vnode *vp, int ioflg, int attrnamespace,
 	}
 
 	/* authorize attribute removal as kernel */
-	error = VOP_SETEXTATTR(vp, attrnamespace, attrname, NULL, NULL, td);
+	error = VOP_DELETEEXTATTR(vp, attrnamespace, attrname, NULL, td);
+	if (error == EOPNOTSUPP)
+		error = VOP_SETEXTATTR(vp, attrnamespace, attrname, NULL,
+		    NULL, td);
 
 	if ((ioflg & IO_NODELOCKED) == 0) {
 		vn_finished_write(mp);

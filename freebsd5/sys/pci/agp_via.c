@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/pci/agp_via.c,v 1.7 2003/04/15 06:37:29 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/agp_via.c,v 1.11 2003/08/22 07:13:20 imp Exp $");
 
 #include "opt_bus.h"
 
@@ -38,8 +39,8 @@
 #include <sys/mutex.h>
 #include <sys/proc.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 #include <pci/agppriv.h>
 #include <pci/agpreg.h>
 
@@ -64,16 +65,18 @@ agp_via_match(device_t dev)
 		return NULL;
 
 	switch (pci_get_devid(dev)) {
+	case 0x03051106:
+		return ("VIA 82C8363 (Apollo KT133A) host to PCI bridge");
 	case 0x05011106:
 		return ("VIA 8501 (Apollo MVP4) host to PCI bridge");
 	case 0x05971106:
 		return ("VIA 82C597 (Apollo VP3) host to PCI bridge");
 	case 0x05981106:
 		return ("VIA 82C598 (Apollo MVP3) host to PCI bridge");
+	case 0x06051106:
+		return ("VIA 82C694X (Apollo Pro 133A) host to PCI bridge");
 	case 0x06911106:
 		return ("VIA 82C691 (Apollo Pro) host to PCI bridge");
-	case 0x03051106:
-	    return ("VIA 82C8363 (Apollo KT133A) host to PCI bridge");
 	};
 
 	if (pci_get_vendor(dev) == 0x1106)

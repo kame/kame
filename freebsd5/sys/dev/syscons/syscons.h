@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/syscons.h,v 1.75 2002/07/10 03:29:38 dd Exp $
+ * $FreeBSD: src/sys/dev/syscons/syscons.h,v 1.77 2003/08/24 04:04:44 jake Exp $
  */
 
 #ifndef _DEV_SYSCONS_SYSCONS_H_
@@ -256,7 +256,9 @@ typedef struct scr_stat {
 	int		index;			/* index of this vty */
 	struct sc_softc *sc;			/* pointer to softc */
 	struct sc_rndr_sw *rndr;		/* renderer */
+#ifndef __sparc64__
 	sc_vtb_t	scr;
+#endif
 	sc_vtb_t	vtb;
 
 	int 		xpos;			/* current X position */
@@ -270,6 +272,7 @@ typedef struct scr_stat {
 
 	u_char		*font;			/* current font */
 	int		font_size;		/* fontsize in Y direction */
+	int		font_width;		/* fontsize in X direction */
 
 	int		start;			/* modified area start */
 	int		end;			/* modified area end */

@@ -27,9 +27,10 @@
  * Only minor changes done to interface with the timecounters over in
  * sys/kern/kern_clock.c.   Some of the comments below may be (even more)
  * confusing and/or plain wrong in that context.
- *
- * $FreeBSD: src/sys/kern/kern_ntptime.c,v 1.50 2003/01/06 01:01:08 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_ntptime.c,v 1.52 2003/06/25 20:56:40 imp Exp $");
 
 #include "opt_ntp.h"
 
@@ -479,6 +480,7 @@ ntp_update_second(int64_t *adjustment, time_t *newsec)
 		else if ((*newsec) % 86400 == 0) {
 			(*newsec)--;
 			time_state = TIME_OOP;
+			time_tai++;
 		}
 		break;
 
@@ -499,7 +501,6 @@ ntp_update_second(int64_t *adjustment, time_t *newsec)
 		 * Insert second in progress.
 		 */
 		case TIME_OOP:
-			time_tai++;
 			time_state = TIME_WAIT;
 		break;
 

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/sched.h,v 1.4 2003/04/11 03:39:06 jeff Exp $
+ * $FreeBSD: src/sys/sys/sched.h,v 1.9 2003/11/15 23:54:49 jeff Exp $
  */
 
 #ifndef _SYS_SCHED_H_
@@ -51,32 +51,40 @@ void	sched_fork_ksegrp(struct ksegrp *kg, struct ksegrp *child);
 void	sched_nice(struct ksegrp *kg, int nice);
 
 /*
- * Threads are switched in and out, block on resources, and have temporary
- * priorities inherited from their ksegs.
+ * Threads are switched in and out, block on resources, have temporary
+ * priorities inherited from their ksegs, and use up cpu time.
  */
 void	sched_exit_thread(struct thread *td, struct thread *child);
 void	sched_fork_thread(struct thread *td, struct thread *child);
+fixpt_t	sched_pctcpu(struct thread *td);
 void	sched_prio(struct thread *td, u_char prio);
 void	sched_sleep(struct thread *td, u_char prio);
-void	sched_switchin(struct thread *td);
-void	sched_switchout(struct thread *td);
+void	sched_switch(struct thread *td);
 void	sched_userret(struct thread *td);
 void	sched_wakeup(struct thread *td);
 
 /*
- * KSEs are moved on and off of run queues.
+ * Threads are moved on and off of run queues
  */
-void	sched_add(struct kse *ke);
-struct kse *sched_choose(void);
-void	sched_clock(struct kse *ke);
-void	sched_exit_kse(struct kse *ke, struct kse *child);
-void	sched_fork_kse(struct kse *ke, struct kse *child);
-void	sched_rem(struct kse *ke);
+void	sched_add(struct thread *td);
+struct kse *sched_choose(void);		/* XXX Should be thread * */
+void	sched_clock(struct thread *td);
+void	sched_rem(struct thread *td);
 
 /*
- * and they use up cpu time.
+ * Binding makes cpu affinity permanent while pinning is used to temporarily
+ * hold a thread on a particular CPU.
  */
-fixpt_t	sched_pctcpu(struct kse *ke);
+void	sched_bind(struct thread *td, int cpu);
+static __inline void sched_pin(void);
+void	sched_unbind(struct thread *td);
+static __inline void sched_unpin(void);
+
+/*
+ * These interfaces will eventually be removed.
+ */
+void	sched_exit_kse(struct kse *ke, struct kse *child);
+void	sched_fork_kse(struct kse *ke, struct kse *child);
 
 /*
  * These procedures tell the process data structure allocation code how
@@ -91,5 +99,17 @@ extern struct ke_sched *kse0_sched;
 extern struct kg_sched *ksegrp0_sched;
 extern struct p_sched *proc0_sched;
 extern struct td_sched *thread0_sched;
+
+static __inline void
+sched_pin(void)
+{
+	curthread->td_pinned++;
+}
+
+static __inline void
+sched_unpin(void)
+{
+	curthread->td_pinned--;
+}
 
 #endif /* !_SYS_SCHED_H_ */

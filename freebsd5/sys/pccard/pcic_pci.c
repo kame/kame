@@ -26,8 +26,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pcic_pci.c,v 1.124 2003/02/26 05:45:48 imp Exp $
+ * $FreeBSD: src/sys/pccard/pcic_pci.c,v 1.127 2003/10/21 18:28:36 silby Exp $
  */
+
+#define OBSOLETE_IN_6
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -63,7 +65,7 @@ SYSCTL_DECL(_hw_pcic);
 
 static int pcic_ignore_function_1 = 0;
 TUNABLE_INT("hw.pcic.ignore_function_1", &pcic_ignore_function_1);
-SYSCTL_INT(_hw_pcic, OID_AUTO, ignore_function_1, CTLFLAG_RD,
+SYSCTL_INT(_hw_pcic, OID_AUTO, ignore_function_1, CTLFLAG_RDTUN,
     &pcic_ignore_function_1, 0,
     "When set, driver ignores pci function 1 of the bridge.  This option\n\
 is obsolete and will be deleted before FreeBSD 4.8.");
@@ -76,7 +78,7 @@ is obsolete and will be deleted before FreeBSD 4.8.");
  */
 static int pcic_intr_path = (int)pcic_iw_pci;
 TUNABLE_INT("hw.pcic.intr_path", &pcic_intr_path);
-SYSCTL_INT(_hw_pcic, OID_AUTO, intr_path, CTLFLAG_RD, &pcic_intr_path, 0,
+SYSCTL_INT(_hw_pcic, OID_AUTO, intr_path, CTLFLAG_RDTUN, &pcic_intr_path, 0,
     "Which path to send the interrupts over.  Normally interrupts for\n\
 cardbus bridges are routed over the PCI bus (2).  However, some laptops\n\
 will hang when using PCI interrupts due to bugs in this code.  Those\n\
@@ -84,7 +86,7 @@ bugs can be worked around by forcings ISA interrupts (1).");
 
 static int pcic_init_routing = 0;
 TUNABLE_INT("hw.pcic.init_routing", &pcic_init_routing);
-SYSCTL_INT(_hw_pcic, OID_AUTO, init_routing, CTLFLAG_RD,
+SYSCTL_INT(_hw_pcic, OID_AUTO, init_routing, CTLFLAG_RDTUN,
     &pcic_init_routing, 0,
     "Force the interrupt routing to be initialized on those bridges where\n\
 doing so will cause probelms.  This is very rare and generally is not\n\
@@ -95,7 +97,7 @@ and will be deleted before FreeBSD 4.8.");
 
 static int pcic_ignore_pci = 0;
 TUNABLE_INT("hw.pcic.ignore_pci", &pcic_ignore_pci);
-SYSCTL_INT(_hw_pcic, OID_AUTO, ignore_pci, CTLFLAG_RD,
+SYSCTL_INT(_hw_pcic, OID_AUTO, ignore_pci, CTLFLAG_RDTUN,
     &pcic_ignore_pci, 0,
     "When set, driver ignores pci cardbus bridges it would otherwise claim.\n\
 Generally speaking, this option is not needed for anything other than as an\n\
@@ -103,7 +105,7 @@ aid in debugging.");
 
 static int pcic_pd6729_intr_path = (int)pcic_iw_isa;
 TUNABLE_INT("hw.pcic.pd6729_intr_path", &pcic_pd6729_intr_path);
-SYSCTL_INT(_hw_pcic, OID_AUTO, pd6729_intr_path, CTLFLAG_RD,
+SYSCTL_INT(_hw_pcic, OID_AUTO, pd6729_intr_path, CTLFLAG_RDTUN,
     &pcic_pd6729_intr_path, 0,
   "Determine the interrupt path or method for Cirrus Logic PD6729 and\n\
 similar I/O space based pcmcia bridge.  Chips on a PCI expansion card need\n\
@@ -113,7 +115,7 @@ that it can default to ISA when intr_path defaults to PCI.");
 
 static int pcic_ti12xx_enable_pci_clock = 0;
 TUNABLE_INT("hw.pcic.ti12xx_enable_pci_clock", &pcic_ti12xx_enable_pci_clock);
-SYSCTL_INT(_hw_pcic, OID_AUTO, ti12xx_enable_pci_clock, CTLFLAG_RD,
+SYSCTL_INT(_hw_pcic, OID_AUTO, ti12xx_enable_pci_clock, CTLFLAG_RDTUN,
     &pcic_ti12xx_enable_pci_clock, 0,
   "Some TI-12xx parts need to have the PCI clock enabled.  These designs do\n\
 not provide a clock themselves.  Most of the reference boards have the\n\
@@ -436,6 +438,8 @@ pcic_pci_oz68xx_csc(struct pcic_slot *sp, enum pcic_intr_way way)
 	 * The 68xx datasheets make it hard to know what the right thing
 	 * to do here is.  We do what we know, which is nothing, and
 	 * hope for the best.
+	 *
+	 * XXX NEWCARD may have some useful code here.
 	 */
 	/* XXX */
 	return (0);

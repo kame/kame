@@ -40,8 +40,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_alloc.c	8.18 (Berkeley) 5/26/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_alloc.c,v 1.113 2003/03/20 21:15:54 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_alloc.c,v 1.116 2003/10/31 07:25:06 truckman Exp $");
 
 #include "opt_quota.h"
 
@@ -952,18 +954,18 @@ ffs_dirpref(pip)
 	 * optimal allocation of a directory inode.
 	 */
 	maxndir = min(avgndir + fs->fs_ipg / 16, fs->fs_ipg);
-	minifree = avgifree - fs->fs_ipg / 4;
-	if (minifree < 0)
-		minifree = 0;
-	minbfree = avgbfree - fs->fs_fpg / fs->fs_frag / 4;
-	if (minbfree < 0)
-		minbfree = 0;
+	minifree = avgifree - avgifree / 4;
+	if (minifree < 1)
+		minifree = 1;
+	minbfree = avgbfree - avgbfree / 4;
+	if (minbfree < 1)
+		minbfree = 1;
 	cgsize = fs->fs_fsize * fs->fs_fpg;
 	dirsize = fs->fs_avgfilesize * fs->fs_avgfpdir;
 	curdirsize = avgndir ? (cgsize - avgbfree * fs->fs_bsize) / avgndir : 0;
 	if (dirsize < curdirsize)
 		dirsize = curdirsize;
-	maxcontigdirs = min(cgsize / dirsize, 255);
+	maxcontigdirs = min((avgbfree * fs->fs_bsize) / dirsize, 255);
 	if (fs->fs_avgfpdir > 0)
 		maxcontigdirs = min(maxcontigdirs,
 				    fs->fs_ipg / fs->fs_avgfpdir);
@@ -1682,7 +1684,7 @@ ffs_blkfree(fs, devvp, bno, size, inum)
 	struct buf *bp;
 	ufs1_daddr_t fragno, cgbno;
 	ufs2_daddr_t cgblkno;
-	int i, error, cg, blk, frags, bbase;
+	int i, cg, blk, frags, bbase;
 	u_int8_t *blksfree;
 	dev_t dev;
 
@@ -1719,7 +1721,7 @@ ffs_blkfree(fs, devvp, bno, size, inum)
 		ffs_fserr(fs, inum, "bad block");
 		return;
 	}
-	if ((error = bread(devvp, cgblkno, (int)fs->fs_cgsize, NOCRED, &bp))) {
+	if (bread(devvp, cgblkno, (int)fs->fs_cgsize, NOCRED, &bp)) {
 		brelse(bp);
 		return;
 	}
@@ -1944,7 +1946,7 @@ ffs_checkfreefile(fs, devvp, ino)
 	struct cg *cgp;
 	struct buf *bp;
 	ufs2_daddr_t cgbno;
-	int error, ret, cg;
+	int ret, cg;
 	u_int8_t *inosused;
 
 	cg = ino_to_cg(fs, ino);
@@ -1957,7 +1959,7 @@ ffs_checkfreefile(fs, devvp, ino)
 	}
 	if ((u_int)ino >= fs->fs_ipg * fs->fs_ncg)
 		return (1);
-	if ((error = bread(devvp, cgbno, (int)fs->fs_cgsize, NOCRED, &bp))) {
+	if (bread(devvp, cgbno, (int)fs->fs_cgsize, NOCRED, &bp)) {
 		brelse(bp);
 		return (1);
 	}

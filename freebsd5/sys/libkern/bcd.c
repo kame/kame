@@ -1,8 +1,10 @@
-/* $FreeBSD: src/sys/libkern/bcd.c,v 1.5 2000/05/01 20:06:35 peter Exp $ */
 /*
  * Some data-tables that are often used.
  * Cannot be copyrighted.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/libkern/bcd.c,v 1.6 2003/06/11 05:23:04 obrien Exp $");
 
 #include <sys/libkern.h>
 

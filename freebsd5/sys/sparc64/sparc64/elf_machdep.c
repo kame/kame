@@ -36,7 +36,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  *	from: NetBSD: mdreloc.c,v 1.5 2001/04/25 12:24:51 kleink Exp
- * $FreeBSD: src/sys/sparc64/sparc64/elf_machdep.c,v 1.13 2003/01/21 02:42:43 jake Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/elf_machdep.c,v 1.15 2003/09/25 01:10:26 peter Exp $
  */
 
 #include <sys/param.h>
@@ -83,7 +83,8 @@ struct sysentvec elf64_freebsd_sysvec = {
 	PS_STRINGS,
 	VM_PROT_READ | VM_PROT_WRITE,
 	exec_copyout_strings,
-	exec_setregs
+	exec_setregs,
+	NULL
 };
 
 static Elf64_Brandinfo freebsd_brand_info = {
@@ -91,7 +92,7 @@ static Elf64_Brandinfo freebsd_brand_info = {
 						EM_SPARCV9,
 						"FreeBSD",
 						"",
-						"/usr/libexec/ld-elf.so.1",
+						"/libexec/ld-elf.so.1",
 						&elf64_freebsd_sysvec
 					  };
 

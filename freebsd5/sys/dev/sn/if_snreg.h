@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *   $FreeBSD: src/sys/dev/sn/if_snreg.h,v 1.3 2001/01/15 12:01:14 toshi Exp $
+ *   $FreeBSD: src/sys/dev/sn/if_snreg.h,v 1.4 2003/10/25 19:56:19 imp Exp $
  */
 
 /*
@@ -394,19 +394,15 @@
  * or slightly complicated, repeated tasks.
  */
 
-/* The base I/O address.
- */
-#define BASE    (sc->sn_io_addr)
-
 /* Select a register bank, 0 to 3
  */
-#define SMC_SELECT_BANK(x)  { outw( BASE + BANK_SELECT_REG_W, (x) ); }
+#define SMC_SELECT_BANK(sc, x)  { CSR_WRITE_2(sc, BANK_SELECT_REG_W, (x)); }
 
 /* Define a small delay for the reset
  */
-#define SMC_DELAY() { inw( BASE + RECV_CONTROL_REG_W );\
-                      inw( BASE + RECV_CONTROL_REG_W );\
-                      inw( BASE + RECV_CONTROL_REG_W );  }
+#define SMC_DELAY(sc) { CSR_READ_2(sc, RECV_CONTROL_REG_W); \
+                        CSR_READ_2(sc, RECV_CONTROL_REG_W); \
+                        CSR_READ_2(sc, RECV_CONTROL_REG_W); }
 
 /* Define flags
  */

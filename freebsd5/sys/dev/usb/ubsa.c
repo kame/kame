@@ -23,6 +23,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/ubsa.c,v 1.11 2003/11/16 12:13:39 akiyama Exp $");
 /*
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -59,9 +62,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/ubsa.c,v 1.6 2003/02/19 05:47:15 imp Exp $");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -69,6 +69,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/ubsa.c,v 1.6 2003/02/19 05:47:15 imp Exp $")
 #include <sys/bus.h>
 #include <sys/ioccom.h>
 #include <sys/fcntl.h>
+#include <sys/interrupt.h>
 #include <sys/conf.h>
 #include <sys/tty.h>
 #include <sys/file.h>
@@ -177,9 +178,13 @@ struct	ubsa_softc {
 
 	u_char			sc_lsr;		/* Local status register */
 	u_char			sc_msr;		/* ubsa status register */
+#if __FreeBSD_version >= 500000
+	void			*sc_swicookie;
+#endif
 };
 
 Static	void ubsa_intr(usbd_xfer_handle, usbd_private_handle, usbd_status);
+Static	void ubsa_notify(void *);
 
 Static	void ubsa_get_status(void *, int, u_char *, u_char *);
 Static	void ubsa_set(void *, int, int, int);
@@ -237,7 +242,7 @@ Static device_method_t ubsa_methods[] = {
 };
 
 Static driver_t ubsa_driver = {
-	"ubsa",
+	"ucom",
 	ubsa_methods,
 	sizeof (struct ubsa_softc)
 };
@@ -246,6 +251,10 @@ DRIVER_MODULE(ubsa, uhub, ubsa_driver, ucom_devclass, usbd_driver_load, 0);
 MODULE_DEPEND(ubsa, usb, 1, 1, 1);
 MODULE_DEPEND(ubsa, ucom, UCOM_MINVER, UCOM_PREFVER, UCOM_MAXVER);
 MODULE_VERSION(ubsa, UBSA_MODVER);
+
+#if __FreeBSD_version >= 500000
+static struct ithd *ucom_ithd;
+#endif
 
 USB_MATCH(ubsa)
 {
@@ -401,6 +410,11 @@ USB_ATTACH(ubsa)
 	DPRINTF(("ubsa: in = 0x%x, out = 0x%x, intr = 0x%x\n",
 	    ucom->sc_bulkin_no, ucom->sc_bulkout_no, sc->sc_intr_number));
 
+#if __FreeBSD_version >= 500000
+	swi_add(&ucom_ithd, "ucom", ubsa_notify, sc, SWI_TTY, 0,
+	    &sc->sc_swicookie);
+#endif
+ 
 	ucom_attach(ucom);
 
 	free(devinfo, M_USBDEV);
@@ -429,6 +443,10 @@ USB_DETACH(ubsa)
 	sc->sc_ucom.sc_dying = 1;
 
 	rv = ucom_detach(&sc->sc_ucom);
+
+#if __FreeBSD_version >= 500000
+	ithread_remove_handler(sc->sc_swicookie);
+#endif
 
 	return (rv);
 }
@@ -721,6 +739,20 @@ ubsa_intr(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	DPRINTF(("%s: ubsa lsr = 0x%02x, msr = 0x%02x\n",
 	    USBDEVNAME(sc->sc_ucom.sc_dev), sc->sc_lsr, sc->sc_msr));
 
+#if __FreeBSD_version >= 500000
+	swi_sched(sc->sc_swicookie, 0);
+#else
+	ubsa_notify(sc);
+#endif
+}
+
+/* Handle delayed events. */
+Static void
+ubsa_notify(void *arg)
+{
+	struct ubsa_softc *sc;
+
+	sc = arg;
 	ucom_status_change(&sc->sc_ucom);
 }
 

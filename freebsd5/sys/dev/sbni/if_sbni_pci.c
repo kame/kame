@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997-2001 Granch, Ltd. All rights reserved.
  * Author: Denis I.Timofeev <timofeev@granch.ru>
  *
@@ -23,11 +23,11 @@
  * LIABILITY, OR TORT (INCLUDING NEIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/sbni/if_sbni_pci.c,v 1.7 2003/04/15 06:37:26 mdodd Exp $
  */
 
- 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/sbni/if_sbni_pci.c,v 1.10 2003/09/02 17:30:37 jhb Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/socket.h>
@@ -43,8 +43,8 @@
 #include <net/ethernet.h>
 #include <net/if_arp.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 
 #include <dev/sbni/if_sbnireg.h>
 #include <dev/sbni/if_sbnivar.h>
@@ -93,7 +93,7 @@ sbni_pci_probe(device_t dev)
 	} else
 		device_set_desc(dev, "Granch SBNI12/PCI adapter");
 
-	sc->io_rid = PCIR_MAPS;
+	sc->io_rid = PCIR_BAR(0);
  	sc->io_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &sc->io_rid,
 					0ul, ~0ul, ports, RF_ACTIVE);
 	if (!sc->io_res) {

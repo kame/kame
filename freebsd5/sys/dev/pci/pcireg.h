@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pci/pcireg.h,v 1.32 2003/04/23 15:51:36 des Exp $
+ * $FreeBSD: src/sys/dev/pci/pcireg.h,v 1.39 2003/09/14 19:30:00 scottl Exp $
  *
  */
 
@@ -35,6 +35,7 @@
  * PCIP_xxx: device programming interface
  * PCIV_xxx: PCI vendor ID (only required to fixup ancient devices)
  * PCID_xxx: device ID
+ * PCIY_xxx: capability identification number
  */
 
 /* some PCI bus constants */
@@ -43,6 +44,7 @@
 #define PCI_SLOTMAX	31
 #define PCI_FUNCMAX	7
 #define PCI_REGMAX	255
+#define PCI_MAXHDRTYPE	2
 
 /* PCI config header registers for all devices */
 
@@ -78,13 +80,43 @@
 #define PCIR_CLASS	0x0b
 #define PCIR_CACHELNSZ	0x0c
 #define PCIR_LATTIMER	0x0d
-#define PCIR_HEADERTYPE	0x0e
+#define PCIR_HDRTYPE	0x0e
+#ifndef BURN_BRIDGES
+#define	PCIR_HEADERTYPE	PCIR_HDRTYPE
+#endif
+#define PCIM_HDRTYPE		0x7f
+#define PCIM_HDRTYPE_NORMAL	0x00
+#define PCIM_HDRTYPE_BRIDGE	0x01
+#define PCIM_HDRTYPE_CARDBUS	0x02
 #define PCIM_MFDEV		0x80
 #define PCIR_BIST	0x0f
 
+/* Capability Identification Numbers */
+
+#define PCIY_PMG	0x01	/* PCI Power Management */
+#define PCIY_AGP	0x02	/* AGP */
+#define PCIY_VPD	0x03	/* Vital Product Data */
+#define PCIY_SLOTID	0x04	/* Slot Identification */
+#define PCIY_MSI	0x05	/* Message Signaled Interrupts */
+#define PCIY_CHSWP	0x06	/* CompactPCI Hot Swap */
+#define PCIY_PCIX	0x07	/* PCI-X */
+#define PCIY_HT		0x08	/* HyperTransport */
+#define PCIY_VENDOR	0x09	/* Vendor Unique */
+#define PCIY_DEBUG	0x0a	/* Debug port */
+#define PCIY_CRES	0x0b	/* CompactPCI central resource control */
+#define PCIY_HOTPLUG	0x0c	/* PCI Hot-Plug */
+#define PCIY_AGP8X	0x0e	/* AGP 8x */
+#define PCIY_SECDEV	0x0f	/* Secure Device */
+#define PCIY_EXPRESS	0x10	/* PCI Express */
+#define PCIY_MSIX	0x11	/* MSI-X */
+
 /* config registers for header type 0 devices */
 
-#define PCIR_MAPS	0x10
+#define PCIR_BARS	0x10
+#define	PCIR_BAR(x)	(PCIR_BARS + (x) * 4)
+#ifndef BURN_BRIDGES
+#define	PCIR_MAPS	PCIR_BARS
+#endif
 #define PCIR_CARDBUSCIS	0x28
 #define PCIR_SUBVEND_0	0x2c
 #define PCIR_SUBDEV_0	0x2e
@@ -295,6 +327,32 @@
 
 #define PCIR_POWER_DATA		0x7
 
+/* PCI Message Signalled Interrupts (MSI) */
+#define PCIR_MSI_CTRL		0x2
+#define PCIM_MSICTRL_VECTOR		0x0100
+#define PCIM_MSICTRL_64BIT		0x0080
+#define PCIM_MSICTRL_MME_MASK		0x0070
+#define PCIM_MSICTRL_MME_1		0x0000
+#define PCIM_MSICTRL_MME_2		0x0010
+#define PCIM_MSICTRL_MME_4		0x0020
+#define PCIM_MSICTRL_MME_8		0x0030
+#define PCIM_MSICTRL_MME_16		0x0040
+#define PCIM_MSICTRL_MME_32		0x0050
+#define PCIM_MSICTRL_MMC_MASK		0x000E
+#define PCIM_MSICTRL_MMC_1		0x0000
+#define PCIM_MSICTRL_MMC_2		0x0002
+#define PCIM_MSICTRL_MMC_4		0x0004
+#define PCIM_MSICTRL_MMC_8		0x0006
+#define PCIM_MSICTRL_MMC_16		0x0008
+#define PCIM_MSICTRL_MMC_32		0x000A
+#define PCIM_MSICTRL_MSI_ENABLE		0x0001
+#define PCIR_MSI_ADDR		0x4
+#define PCIR_MSI_ADDR_HIGH	0x8
+#define PCIR_MSI_DATA		0x8
+#define PCIR_MSI_DATA_64BIT	0xc
+#define PCIR_MSI_MASK		0x10
+#define PCIR_MSI_PENDING	0x14
+
 /* PCI-X definitions */
 #define PCIXR_COMMAND	0x96
 #define PCIXR_DEVADDR	0x98
@@ -311,12 +369,3 @@
 #define PCIXM_STATUS_MAXSPLITS	0x0380	/* Maximum Split Transactions */
 #define PCIXM_STATUS_MAXCRDS	0x1C00	/* Maximum Cumulative Read Size */
 #define PCIXM_STATUS_RCVDSCEM	0x2000	/* Received a Split Comp w/Error msg */
-
-#if 0
-/* some PCI vendor definitions (only used to identify ancient devices !!! */
-
-#define PCIV_INTEL	0x8086
-
-#define PCID_INTEL_SATURN	0x0483
-#define PCID_INTEL_ORION	0x84c4
-#endif

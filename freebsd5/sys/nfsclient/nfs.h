@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs.h	8.4 (Berkeley) 5/1/95
- * $FreeBSD: src/sys/nfsclient/nfs.h,v 1.73 2002/10/20 21:40:55 phk Exp $
+ * $FreeBSD: src/sys/nfsclient/nfs.h,v 1.76 2003/11/22 02:21:48 alfred Exp $
  */
 
 #ifndef _NFSCLIENT_NFS_H_
@@ -112,6 +112,20 @@
  * vfs.nfs sysctl(3) identifiers
  */
 #define NFS_NFSSTATS	1		/* struct: struct nfsstats */
+
+/*
+ * File context information for nfsv4.	Currently, there is only one
+ * lockowner for the whole machine "0."
+ */
+struct nfs4_fctx {
+	TAILQ_ENTRY(nfs4_fstate) next;
+
+	pid_t		pid;
+	uint32_t	refcnt;
+	struct nfs4_lowner *lop;
+	struct nfsnode *np;
+	char		stateid[NFSX_V4STATEID];
+};
 
 #ifdef _KERNEL
 
@@ -201,6 +215,20 @@ extern TAILQ_HEAD(nfs_reqq, nfsreq) nfs_reqq;
 #define	R_GETONEREP	0x80		/* Probe for one reply only */
 
 /*
+ * Pointers to ops that differ from v3 to v4
+ */
+struct nfs_rpcops {
+	int	(*nr_readrpc)(struct vnode *vp, struct uio *uiop, struct ucred *cred);
+	int	(*nr_writerpc)(struct vnode *vp, struct uio *uiop, struct ucred *cred,
+			       int *iomode, int *must_commit);
+	int	(*nr_writebp)(struct buf *bp, int force, struct thread *td);
+	int	(*nr_readlinkrpc)(struct vnode *vp, struct uio *uiop, struct ucred *cred);
+	void	(*nr_invaldir)(struct vnode *vp);
+	int	(*nr_commit)(struct vnode *vp, u_quad_t offset, int cnt,
+			     struct ucred *cred, struct thread *td);
+};
+
+/*
  * Defines for WebNFS
  */
 
@@ -245,10 +273,14 @@ extern int nfs_debug;
 vfs_init_t nfs_init;
 vfs_uninit_t nfs_uninit;
 int	nfs_mountroot(struct mount *mp, struct thread *td);
+
+#ifndef NFS4_USE_RPCCLNT
 int	nfs_send(struct socket *, struct sockaddr *, struct mbuf *,
 	    struct nfsreq *);
 int	nfs_sndlock(struct nfsreq *);
 void	nfs_sndunlock(struct nfsreq *);
+#endif /* ! NFS4_USE_RPCCLNT */
+
 int	nfs_vinvalbuf(struct vnode *, int, struct ucred *, struct thread *,
 	    int);
 int	nfs_readrpc(struct vnode *, struct uio *, struct ucred *);
@@ -271,6 +303,7 @@ int	nfsm_mbuftouio(struct mbuf **, struct uio *, int, caddr_t *);
 void	nfs_nhinit(void);
 int	nfs_nmcancelreqs(struct nfsmount *);
 void	nfs_timer(void*);
+
 int	nfs_connect(struct nfsmount *, struct nfsreq *);
 void	nfs_disconnect(struct nfsmount *);
 void	nfs_safedisconnect(struct nfsmount *);

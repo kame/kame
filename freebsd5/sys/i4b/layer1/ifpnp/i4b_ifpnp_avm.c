@@ -32,12 +32,12 @@
  *
  *	i4b_ifpnp_avm.c: AVM Fritz!Card PnP hardware driver
  *	---------------------------------------------------
- *
- * $FreeBSD: src/sys/i4b/layer1/ifpnp/i4b_ifpnp_avm.c,v 1.8 2002/09/02 00:52:08 brooks Exp $
- *
  *      last edit-date: [Fri Jan 12 17:05:28 2001]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/ifpnp/i4b_ifpnp_avm.c,v 1.10 2003/06/10 23:37:09 obrien Exp $");
 
 #include "opt_i4b.h"
 
@@ -470,8 +470,8 @@ avm_pnp_attach(device_t dev)
 	bzero(sc, sizeof(struct l1_softc));
 
 	/* probably not really required */
-	if(unit > IFPNP_MAXUNIT) {
-		printf("avm_pnp%d: Error, unit > IFPNP_MAXUNIT!\n", unit);
+	if(unit >= IFPNP_MAXUNIT) {
+		printf("avm_pnp%d: Error, unit >= IFPNP_MAXUNIT!\n", unit);
 		splx(s);
 		return(ENXIO);
 	}

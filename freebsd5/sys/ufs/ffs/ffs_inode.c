@@ -31,8 +31,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_inode.c	8.13 (Berkeley) 4/21/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_inode.c,v 1.87 2003/03/04 00:04:43 jeff Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_inode.c,v 1.91 2003/10/18 14:10:27 phk Exp $");
 
 #include "opt_quota.h"
 
@@ -82,6 +84,10 @@ ffs_update(vp, waitfor)
 	struct inode *ip;
 	int error;
 
+#ifdef DEBUG_VFS_LOCKS
+	if ((vp->v_iflag & VI_XLOCK) == 0)
+		ASSERT_VOP_LOCKED(vp, "ffs_update");
+#endif
 	ufs_itimes(vp);
 	ip = VTOI(vp);
 	if ((ip->i_flag & IN_MODIFIED) == 0 && waitfor == 0)
@@ -559,6 +565,7 @@ ffs_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
 			panic("ffs_indirtrunc: bad buffer size");
 		bp->b_blkno = dbn;
 		vfs_busy_pages(bp, 0);
+		bp->b_iooffset = dbtob(bp->b_blkno);
 		VOP_STRATEGY(bp->b_vp, bp);
 		error = bufwait(bp);
 	}

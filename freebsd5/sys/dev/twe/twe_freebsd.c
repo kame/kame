@@ -1,5 +1,7 @@
 /*-
  * Copyright (c) 2000 Michael Smith
+ * Copyright (c) 2003 Paul Saab
+ * Copyright (c) 2003 Vinod Kashyap
  * Copyright (c) 2000 BSDi
  * All rights reserved.
  *
@@ -24,26 +26,20 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/twe/twe_freebsd.c,v 1.26 2003/04/01 15:06:25 phk Exp $
+ * $FreeBSD: src/sys/dev/twe/twe_freebsd.c,v 1.31 2003/12/02 07:57:20 ps Exp $
  */
 
 /*
  * FreeBSD-specific code.
  */
 
-#include <sys/param.h>
-#include <sys/cons.h>
-#include <machine/bus.h>
-#include <machine/clock.h>
-#include <machine/md_var.h>
-#include <vm/vm.h>
-#include <vm/pmap.h>
 #include <dev/twe/twe_compat.h>
-#include <geom/geom_disk.h>
 #include <dev/twe/twereg.h>
 #include <dev/twe/tweio.h>
 #include <dev/twe/twevar.h>
 #include <dev/twe/twe_tables.h>
+
+#include <vm/vm.h>
 
 static devclass_t	twe_devclass;
 
@@ -57,6 +53,9 @@ static u_int32_t	twed_bio_out;
 #define TWED_BIO_OUT
 #endif
 
+static void	twe_setup_data_dmamap(void *arg, bus_dma_segment_t *segs, int nsegments, int error);
+static void	twe_setup_request_dmamap(void *arg, bus_dma_segment_t *segs, int nsegments, int error);
+
 /********************************************************************************
  ********************************************************************************
                                                          Control device interface
@@ -66,8 +65,6 @@ static u_int32_t	twed_bio_out;
 static	d_open_t		twe_open;
 static	d_close_t		twe_close;
 static	d_ioctl_t		twe_ioctl_wrapper;
-
-#define TWE_CDEV_MAJOR  146
 
 static struct cdevsw twe_cdevsw = {
 	.d_open =	twe_open,
@@ -150,11 +147,7 @@ static driver_t twe_pci_driver = {
 	sizeof(struct twe_softc)
 };
 
-#ifdef TWE_OVERRIDE
-DRIVER_MODULE(Xtwe, pci, twe_pci_driver, twe_devclass, 0, 0);
-#else
 DRIVER_MODULE(twe, pci, twe_pci_driver, twe_devclass, 0, 0);
-#endif
 
 /********************************************************************************
  * Match a 3ware Escalade ATA RAID controller.
@@ -168,12 +161,8 @@ twe_probe(device_t dev)
     if ((pci_get_vendor(dev) == TWE_VENDOR_ID) &&
 	((pci_get_device(dev) == TWE_DEVICE_ID) || 
 	 (pci_get_device(dev) == TWE_DEVICE_ID_ASIC))) {
-	device_set_desc(dev, TWE_DEVICE_NAME);
-#ifdef TWE_OVERRIDE
+	device_set_desc_copy(dev, TWE_DEVICE_NAME ". Driver version " TWE_DRIVER_VERSION_STRING);
 	return(0);
-#else
-	return(-10);
-#endif
     }
     return(ENXIO);
 }
@@ -195,6 +184,18 @@ twe_attach(device_t dev)
      */
     sc = device_get_softc(dev);
     sc->twe_dev = dev;
+
+    sysctl_ctx_init(&sc->sysctl_ctx);
+    sc->sysctl_tree = SYSCTL_ADD_NODE(&sc->sysctl_ctx,
+	SYSCTL_STATIC_CHILDREN(_hw), OID_AUTO,
+	device_get_nameunit(dev), CTLFLAG_RD, 0, "");
+    if (sc->sysctl_tree == NULL) {
+	twe_printf(sc, "cannot add sysctl tree node\n");
+	return (ENXIO);
+    }
+    SYSCTL_ADD_STRING(&sc->sysctl_ctx, SYSCTL_CHILDREN(sc->sysctl_tree),
+	OID_AUTO, "driver_version", CTLFLAG_RD, TWE_DRIVER_VERSION_STRING, 0,
+	"TWE driver version");
 
     /*
      * Make sure we are going to be able to talk to this board.
@@ -233,6 +234,8 @@ twe_attach(device_t dev)
 			   MAXBSIZE, TWE_MAX_SGL_LENGTH,	/* maxsize, nsegments */
 			   BUS_SPACE_MAXSIZE_32BIT,		/* maxsegsize */
 			   BUS_DMA_ALLOCNOW,			/* flags */
+			   NULL,				/* lockfunc */
+			   NULL,				/* lockarg */
 			   &sc->twe_parent_dmat)) {
 	twe_printf(sc, "can't allocate parent DMA tag\n");
 	twe_free(sc);
@@ -255,16 +258,50 @@ twe_attach(device_t dev)
     }
 
     /*
+     * Create DMA tag for mapping command's into controller-addressable space.
+     */
+    if (bus_dma_tag_create(sc->twe_parent_dmat, 	/* parent */
+			   1, 0, 			/* alignment, boundary */
+			   BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
+			   BUS_SPACE_MAXADDR, 		/* highaddr */
+			   NULL, NULL, 			/* filter, filterarg */
+			   sizeof(TWE_Command) *
+			   TWE_Q_LENGTH, 1,		/* maxsize, nsegments */
+			   BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
+			   BUS_DMA_ALLOCNOW,		/* flags */
+			   NULL,			/* lockfunc */
+			   NULL,			/* lockarg */
+			   &sc->twe_cmd_dmat)) {
+	twe_printf(sc, "can't allocate data buffer DMA tag\n");
+	twe_free(sc);
+	return(ENOMEM);
+    }
+    /*
+     * Allocate memory and make it available for DMA.
+     */
+    if (bus_dmamem_alloc(sc->twe_cmd_dmat, (void **)&sc->twe_cmd,
+			 BUS_DMA_NOWAIT, &sc->twe_cmdmap)) {
+	twe_printf(sc, "can't allocate command memory\n");
+	return(ENOMEM);
+    }
+    bus_dmamap_load(sc->twe_cmd_dmat, sc->twe_cmdmap, sc->twe_cmd,
+		    sizeof(TWE_Command) * TWE_Q_LENGTH,
+		    twe_setup_request_dmamap, sc, 0);
+    bzero(sc->twe_cmd, sizeof(TWE_Command) * TWE_Q_LENGTH);
+
+    /*
      * Create DMA tag for mapping objects into controller-addressable space.
      */
     if (bus_dma_tag_create(sc->twe_parent_dmat, 	/* parent */
 			   1, 0, 			/* alignment, boundary */
-			   BUS_SPACE_MAXADDR,		/* lowaddr */
+			   BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
 			   BUS_SPACE_MAXADDR, 		/* highaddr */
 			   NULL, NULL, 			/* filter, filterarg */
 			   MAXBSIZE, TWE_MAX_SGL_LENGTH,/* maxsize, nsegments */
 			   BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
 			   0,				/* flags */
+			   busdma_lock_mutex,		/* lockfunc */
+			   &Giant,			/* lockarg */
 			   &sc->twe_buffer_dmat)) {
 	twe_printf(sc, "can't allocate data buffer DMA tag\n");
 	twe_free(sc);
@@ -272,10 +309,39 @@ twe_attach(device_t dev)
     }
 
     /*
+     * Create DMA tag for mapping objects into controller-addressable space.
+     */
+    if (bus_dma_tag_create(sc->twe_parent_dmat, 	/* parent */
+			   1, 0, 			/* alignment, boundary */
+			   BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
+			   BUS_SPACE_MAXADDR, 		/* highaddr */
+			   NULL, NULL, 			/* filter, filterarg */
+			   MAXBSIZE, 1,			/* maxsize, nsegments */
+			   BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
+			   BUS_DMA_ALLOCNOW,		/* flags */
+			   NULL,			/* lockfunc */
+			   NULL,			/* lockarg */
+			   &sc->twe_immediate_dmat)) {
+	twe_printf(sc, "can't allocate data buffer DMA tag\n");
+	twe_free(sc);
+	return(ENOMEM);
+    }
+    /*
+     * Allocate memory for requests which cannot sleep or support continuation.
+     */
+     if (bus_dmamem_alloc(sc->twe_immediate_dmat, (void **)&sc->twe_immediate,
+			  BUS_DMA_NOWAIT, &sc->twe_immediate_map)) {
+	twe_printf(sc, "can't allocate memory for immediate requests\n");
+	return(ENOMEM);
+     }
+
+    /*
      * Initialise the controller and driver core.
      */
-    if ((error = twe_setup(sc)))
+    if ((error = twe_setup(sc))) {
+	twe_free(sc);
 	return(error);
+    }
 
     /*
      * Print some information about the controller and configuration.
@@ -321,6 +387,20 @@ twe_free(struct twe_softc *sc)
     while ((tr = twe_dequeue_free(sc)) != NULL)
 	twe_free_request(tr);
 
+    if (sc->twe_cmd != NULL) {
+	bus_dmamap_unload(sc->twe_cmd_dmat, sc->twe_cmdmap);
+	bus_dmamem_free(sc->twe_cmd_dmat, sc->twe_cmd, sc->twe_cmdmap);
+    }
+
+    if (sc->twe_immediate != NULL) {
+	bus_dmamap_unload(sc->twe_immediate_dmat, sc->twe_immediate_map);
+	bus_dmamem_free(sc->twe_immediate_dmat, sc->twe_immediate,
+			sc->twe_immediate_map);
+    }
+
+    if (sc->twe_immediate_dmat)
+	bus_dma_tag_destroy(sc->twe_immediate_dmat);
+
     /* destroy the data-transfer DMA tag */
     if (sc->twe_buffer_dmat)
 	bus_dma_tag_destroy(sc->twe_buffer_dmat);
@@ -342,6 +422,8 @@ twe_free(struct twe_softc *sc)
     /* destroy control device */
     if (sc->twe_dev_t != (dev_t)NULL)
 	destroy_dev(sc->twe_dev_t);
+
+    sysctl_ctx_free(&sc->sysctl_ctx);
 }
 
 /********************************************************************************
@@ -363,7 +445,7 @@ twe_detach(device_t dev)
     /*	
      * Shut the controller down.
      */
-    if ((error = twe_shutdown(dev)))
+    if (twe_shutdown(dev))
 	goto out;
 
     twe_free(sc);
@@ -384,21 +466,19 @@ static int
 twe_shutdown(device_t dev)
 {
     struct twe_softc	*sc = device_get_softc(dev);
-    int			i, s, error;
+    int			i, s, error = 0;
 
     debug_called(4);
 
     s = splbio();
-    error = 0;
 
     /* 
      * Delete all our child devices.
      */
     for (i = 0; i < TWE_MAX_UNITS; i++) {
 	if (sc->twe_drive[i].td_disk != 0) {
-	    if ((error = device_delete_child(sc->twe_dev, sc->twe_drive[i].td_disk)) != 0)
+	    if ((error = twe_detach_drive(sc, i)) != 0)
 		goto out;
-	    sc->twe_drive[i].td_disk = 0;
 	}
     }
 
@@ -407,7 +487,7 @@ twe_shutdown(device_t dev)
      */
     twe_deinit(sc);
 
- out:
+out:
     splx(s);
     return(error);
 }
@@ -476,9 +556,9 @@ twe_intrhook(void *arg)
 /********************************************************************************
  * Given a detected drive, attach it to the bio interface.
  *
- * This is called from twe_init.
+ * This is called from twe_add_unit.
  */
-void
+int
 twe_attach_drive(struct twe_softc *sc, struct twe_drive *dr)
 {
     char	buf[80];
@@ -486,8 +566,8 @@ twe_attach_drive(struct twe_softc *sc, struct twe_drive *dr)
 
     dr->td_disk =  device_add_child(sc->twe_dev, NULL, -1);
     if (dr->td_disk == NULL) {
-	twe_printf(sc, "device_add_child failed\n");
-	return;
+	twe_printf(sc, "Cannot add unit\n");
+	return (EIO);
     }
     device_set_ivars(dr->td_disk, dr);
 
@@ -495,12 +575,35 @@ twe_attach_drive(struct twe_softc *sc, struct twe_drive *dr)
      * XXX It would make sense to test the online/initialising bits, but they seem to be
      * always set...
      */
-    sprintf(buf, "%s, %s", twe_describe_code(twe_table_unittype, dr->td_type),
+    sprintf(buf, "Unit %d, %s, %s",
+	    dr->td_twe_unit,
+	    twe_describe_code(twe_table_unittype, dr->td_type),
 	    twe_describe_code(twe_table_unitstate, dr->td_state & TWE_PARAM_UNITSTATUS_MASK));
     device_set_desc_copy(dr->td_disk, buf);
 
-    if ((error = bus_generic_attach(sc->twe_dev)) != 0)
-	twe_printf(sc, "bus_generic_attach returned %d\n", error);
+    if ((error = bus_generic_attach(sc->twe_dev)) != 0) {
+	twe_printf(sc, "Cannot attach unit to controller. error = %d\n", error);
+	return (EIO);
+    }
+    return (0);
+}
+
+/********************************************************************************
+ * Detach the specified unit if it exsists
+ *
+ * This is called from twe_del_unit.
+ */
+int
+twe_detach_drive(struct twe_softc *sc, int unit)
+{
+    int error = 0;
+
+    if ((error = device_delete_child(sc->twe_dev, sc->twe_drive[unit].td_disk)) != 0) {
+	twe_printf(sc, "failed to delete unit %d\n", unit);
+	return(error);
+    }
+    bzero(&sc->twe_drive[unit], sizeof(sc->twe_drive[unit]));
+    return(error);
 }
 
 /********************************************************************************
@@ -532,7 +635,7 @@ twe_clear_pci_abort(struct twe_softc *sc)
 /*
  * Disk device softc
  */
-struct twed_softc 
+struct twed_softc
 {
     device_t		twed_dev;
     struct twe_softc	*twed_controller;	/* parent device softc */
@@ -561,11 +664,7 @@ static driver_t twed_driver = {
 };
 
 static devclass_t	twed_devclass;
-#ifdef TWE_OVERRIDE
-DRIVER_MODULE(Xtwed, Xtwe, twed_driver, twed_devclass, 0, 0);
-#else
 DRIVER_MODULE(twed, twe, twed_driver, twed_devclass, 0, 0);
-#endif
 
 /*
  * Disk device control interface.
@@ -608,11 +707,11 @@ twed_strategy(twe_bio *bp)
 
     debug_called(4);
 
-    bp->bio_driver1 = &sc->twed_drive->td_unit;
+    bp->bio_driver1 = &sc->twed_drive->td_twe_unit;
     TWED_BIO_IN;
 
     /* bogus disk? */
-    if (sc == NULL) {
+    if (sc == NULL || sc->twed_drive->td_disk == NULL) {
 	TWE_BIO_SET_ERROR(bp, EINVAL);
 	printf("twe: bio for invalid disk!\n");
 	TWE_BIO_DONE(bp);
@@ -649,7 +748,7 @@ twed_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t l
 	return(ENXIO);
 
     if (length > 0) {
-	if ((error = twe_dump_blocks(twe_sc, twed_sc->twed_drive->td_unit, offset / TWE_BLOCK_SIZE, virtual, length / TWE_BLOCK_SIZE)) != 0)
+	if ((error = twe_dump_blocks(twe_sc, twed_sc->twed_drive->td_twe_unit, offset / TWE_BLOCK_SIZE, virtual, length / TWE_BLOCK_SIZE)) != 0)
 	    return(error);
     }
     return(0);
@@ -716,8 +815,9 @@ twed_attach(device_t dev)
     sc->twed_disk.d_mediasize = TWE_BLOCK_SIZE * (off_t)sc->twed_drive->td_size;
     sc->twed_disk.d_fwsectors = sc->twed_drive->td_sectors;
     sc->twed_disk.d_fwheads = sc->twed_drive->td_heads;
+    sc->twed_drive->td_sys_unit = device_get_unit(dev);
 
-    disk_create(device_get_unit(dev), &sc->twed_disk, 0, NULL, NULL);
+    disk_create(sc->twed_drive->td_sys_unit, &sc->twed_disk, 0, NULL, NULL);
 #ifdef FREEBSD_4
     disks_registered++;
 #endif
@@ -740,13 +840,12 @@ twed_detach(device_t dev)
     if (sc->twed_disk.d_flags & DISKFLAG_OPEN)
 	return(EBUSY);
 
+    disk_destroy(&sc->twed_disk);
+
 #ifdef FREEBSD_4
     if (--disks_registered == 0)
 	cdevsw_remove(&tweddisk_cdevsw);
-#else
-    disk_destroy(&sc->twed_disk);
 #endif
-
     return(0);
 }
 
@@ -756,30 +855,26 @@ twed_detach(device_t dev)
  ********************************************************************************
  ********************************************************************************/
 
-static void	twe_setup_data_dmamap(void *arg, bus_dma_segment_t *segs, int nsegments, int error);
-static void	twe_setup_request_dmamap(void *arg, bus_dma_segment_t *segs, int nsegments, int error);
-
 /********************************************************************************
  * Allocate a command buffer
  */
 MALLOC_DEFINE(TWE_MALLOC_CLASS, "twe commands", "twe commands");
 
 struct twe_request *
-twe_allocate_request(struct twe_softc *sc)
+twe_allocate_request(struct twe_softc *sc, int tag)
 {
     struct twe_request	*tr;
 
-    if ((tr = malloc(sizeof(struct twe_request), TWE_MALLOC_CLASS, M_NOWAIT)) == NULL)
-	return(NULL);
-    bzero(tr, sizeof(*tr));
-    tr->tr_sc = sc;
-    if (bus_dmamap_create(sc->twe_buffer_dmat, 0, &tr->tr_cmdmap)) {
-	twe_free_request(tr);
+    if ((tr = malloc(sizeof(struct twe_request), TWE_MALLOC_CLASS, M_WAITOK)) == NULL) {
+	twe_printf(sc, "unable to allocate memory for tag %d\n", tag);
 	return(NULL);
     }
+    bzero(tr, sizeof(*tr));
+    tr->tr_sc = sc;
+    tr->tr_tag = tag;
     if (bus_dmamap_create(sc->twe_buffer_dmat, 0, &tr->tr_dmamap)) {
-	bus_dmamap_destroy(sc->twe_buffer_dmat, tr->tr_cmdmap);
 	twe_free_request(tr);
+	twe_printf(sc, "unable to allocate dmamap for tag %d\n", tag);
 	return(NULL);
     }    
     return(tr);
@@ -795,7 +890,6 @@ twe_free_request(struct twe_request *tr)
     
     debug_called(4);
 
-    bus_dmamap_destroy(sc->twe_buffer_dmat, tr->tr_cmdmap);
     bus_dmamap_destroy(sc->twe_buffer_dmat, tr->tr_dmamap);
     free(tr, TWE_MALLOC_CLASS);
 }
@@ -809,19 +903,39 @@ twe_free_request(struct twe_request *tr)
  * and we take care of that here as well.
  */
 static void
+twe_fillin_sgl(TWE_SG_Entry *sgl, bus_dma_segment_t *segs, int nsegments, int max_sgl)
+{
+    int i;
+
+    for (i = 0; i < nsegments; i++) {
+	sgl[i].address = segs[i].ds_addr;
+	sgl[i].length = segs[i].ds_len;
+    }
+    for (; i < max_sgl; i++) {				/* XXX necessary? */
+	sgl[i].address = 0;
+	sgl[i].length = 0;
+    }
+}
+		
+static void
 twe_setup_data_dmamap(void *arg, bus_dma_segment_t *segs, int nsegments, int error)
 {
     struct twe_request	*tr = (struct twe_request *)arg;
-    TWE_Command		*cmd = &tr->tr_command;
-    int			i;
+    struct twe_softc	*sc = tr->tr_sc;
+    TWE_Command		*cmd = TWE_FIND_COMMAND(tr);
 
     debug_called(4);
+
+    if (tr->tr_flags & TWE_CMD_MAPPED)
+	panic("already mapped command");
+
+    tr->tr_flags |= TWE_CMD_MAPPED;
 
     /* save base of first segment in command (applicable if there only one segment) */
     tr->tr_dataphys = segs[0].ds_addr;
 
     /* correct command size for s/g list size */
-    tr->tr_command.generic.size += 2 * nsegments;
+    cmd->generic.size += 2 * nsegments;
 
     /*
      * Due to the fact that parameter and I/O commands have the scatter/gather list in
@@ -832,63 +946,96 @@ twe_setup_data_dmamap(void *arg, bus_dma_segment_t *segs, int nsegments, int err
     case TWE_OP_GET_PARAM:
     case TWE_OP_SET_PARAM:
 	cmd->generic.sgl_offset = 2;
-	for (i = 0; i < nsegments; i++) {
-	    cmd->param.sgl[i].address = segs[i].ds_addr;
-	    cmd->param.sgl[i].length = segs[i].ds_len;
-	}
-	for (; i < TWE_MAX_SGL_LENGTH; i++) {		/* XXX necessary? */
-	    cmd->param.sgl[i].address = 0;
-	    cmd->param.sgl[i].length = 0;
-	}
+	twe_fillin_sgl(&cmd->param.sgl[0], segs, nsegments, TWE_MAX_SGL_LENGTH);
 	break;
     case TWE_OP_READ:
     case TWE_OP_WRITE:
 	cmd->generic.sgl_offset = 3;
-	for (i = 0; i < nsegments; i++) {
-	    cmd->io.sgl[i].address = segs[i].ds_addr;
-	    cmd->io.sgl[i].length = segs[i].ds_len;
-	}
-	for (; i < TWE_MAX_SGL_LENGTH; i++) {		/* XXX necessary? */
-	    cmd->io.sgl[i].address = 0;
-	    cmd->io.sgl[i].length = 0;
-	}
+	twe_fillin_sgl(&cmd->io.sgl[0], segs, nsegments, TWE_MAX_SGL_LENGTH);
+	break;
+    case TWE_OP_ATA_PASSTHROUGH:
+	cmd->generic.sgl_offset = 5;
+	twe_fillin_sgl(&cmd->ata.sgl[0], segs, nsegments, TWE_MAX_ATA_SGL_LENGTH);
 	break;
     default:
-	/* no s/g list, nothing to do */
-	break;
+	/*
+	 * Fall back to what the linux driver does.
+	 * Do this because the API may send an opcode
+	 * the driver knows nothing about and this will
+	 * at least stop PCIABRT's from hosing us.
+	 */
+	switch (cmd->generic.sgl_offset) {
+	case 2:
+	    twe_fillin_sgl(&cmd->param.sgl[0], segs, nsegments, TWE_MAX_SGL_LENGTH);
+	    break;
+	case 3:
+	    twe_fillin_sgl(&cmd->io.sgl[0], segs, nsegments, TWE_MAX_SGL_LENGTH);
+	    break;
+	case 5:
+	    twe_fillin_sgl(&cmd->ata.sgl[0], segs, nsegments, TWE_MAX_ATA_SGL_LENGTH);
+	    break;
+	}
     }
+
+    if (tr->tr_flags & TWE_CMD_DATAIN) {
+	if (tr->tr_flags & TWE_CMD_IMMEDIATE) {
+	    bus_dmamap_sync(sc->twe_immediate_dmat, sc->twe_immediate_map,
+			    BUS_DMASYNC_PREREAD);
+	} else {
+	    bus_dmamap_sync(sc->twe_buffer_dmat, tr->tr_dmamap,
+			    BUS_DMASYNC_PREREAD);
+	}
+    }
+
+    if (tr->tr_flags & TWE_CMD_DATAOUT) {
+	/*
+	 * if we're using an alignment buffer, and we're writing data
+	 * copy the real data out
+	 */
+	if (tr->tr_flags & TWE_CMD_ALIGNBUF)
+	    bcopy(tr->tr_realdata, tr->tr_data, tr->tr_length);
+
+	if (tr->tr_flags & TWE_CMD_IMMEDIATE) {
+	    bus_dmamap_sync(sc->twe_immediate_dmat, sc->twe_immediate_map,
+			    BUS_DMASYNC_PREWRITE);
+	} else {
+	    bus_dmamap_sync(sc->twe_buffer_dmat, tr->tr_dmamap,
+			    BUS_DMASYNC_PREWRITE);
+	}
+    }
+
+    if (twe_start(tr) == EBUSY)
+	twe_requeue_ready(tr);
 }
 
 static void
 twe_setup_request_dmamap(void *arg, bus_dma_segment_t *segs, int nsegments, int error)
 {
-    struct twe_request	*tr = (struct twe_request *)arg;
+    struct twe_softc	*sc = (struct twe_softc *)arg;
 
     debug_called(4);
 
     /* command can't cross a page boundary */
-    tr->tr_cmdphys = segs[0].ds_addr;
+    sc->twe_cmdphys = segs[0].ds_addr;
 }
 
-void
+int
 twe_map_request(struct twe_request *tr)
 {
     struct twe_softc	*sc = tr->tr_sc;
+    int			error = 0;
 
     debug_called(4);
 
+    if (sc->twe_state & TWE_STATE_FRZN)
+	return (EBUSY);
 
-    /*
-     * Map the command into bus space.
-     */
-    bus_dmamap_load(sc->twe_buffer_dmat, tr->tr_cmdmap, &tr->tr_command, sizeof(tr->tr_command), 
-		    twe_setup_request_dmamap, tr, 0);
-    bus_dmamap_sync(sc->twe_buffer_dmat, tr->tr_cmdmap, BUS_DMASYNC_PREWRITE);
+    bus_dmamap_sync(sc->twe_cmd_dmat, sc->twe_cmdmap, BUS_DMASYNC_PREWRITE);
 
     /*
      * If the command involves data, map that too.
      */
-    if (tr->tr_data != NULL) {
+    if (tr->tr_data != NULL && ((tr->tr_flags & TWE_CMD_MAPPED) == 0)) {
 
 	/* 
 	 * Data must be 64-byte aligned; allocate a fixup buffer if it's not.
@@ -901,18 +1048,23 @@ twe_map_request(struct twe_request *tr)
 	
 	/*
 	 * Map the data buffer into bus space and build the s/g list.
-	 */
-	bus_dmamap_load(sc->twe_buffer_dmat, tr->tr_dmamap, tr->tr_data, tr->tr_length, 
-			twe_setup_data_dmamap, tr, 0);
-	if (tr->tr_flags & TWE_CMD_DATAIN)
-	    bus_dmamap_sync(sc->twe_buffer_dmat, tr->tr_dmamap, BUS_DMASYNC_PREREAD);
-	if (tr->tr_flags & TWE_CMD_DATAOUT) {
-	    /* if we're using an alignment buffer, and we're writing data, copy the real data out */
-	    if (tr->tr_flags & TWE_CMD_ALIGNBUF)
-		bcopy(tr->tr_realdata, tr->tr_data, tr->tr_length);
-	    bus_dmamap_sync(sc->twe_buffer_dmat, tr->tr_dmamap, BUS_DMASYNC_PREWRITE);
+	*/
+	if (tr->tr_flags & TWE_CMD_IMMEDIATE) {
+	    bcopy(tr->tr_data, sc->twe_immediate, tr->tr_length);
+	    bus_dmamap_load(sc->twe_immediate_dmat, sc->twe_immediate_map, sc->twe_immediate,
+			    tr->tr_length, twe_setup_data_dmamap, tr, 0);
+	} else {
+	    error = bus_dmamap_load(sc->twe_buffer_dmat, tr->tr_dmamap, tr->tr_data, tr->tr_length, 
+				    twe_setup_data_dmamap, tr, 0);
 	}
-    }
+	if (error == EINPROGRESS) {
+	    sc->twe_state |= TWE_STATE_FRZN;
+	    error = 0;
+	}
+    } else
+	error = twe_start(tr);
+
+    return(error);
 }
 
 void
@@ -922,27 +1074,41 @@ twe_unmap_request(struct twe_request *tr)
 
     debug_called(4);
 
-    /*
-     * Unmap the command from bus space.
-     */
-    bus_dmamap_sync(sc->twe_buffer_dmat, tr->tr_cmdmap, BUS_DMASYNC_POSTWRITE);
-    bus_dmamap_unload(sc->twe_buffer_dmat, tr->tr_cmdmap); 
+    bus_dmamap_sync(sc->twe_cmd_dmat, sc->twe_cmdmap, BUS_DMASYNC_POSTWRITE);
 
     /*
      * If the command involved data, unmap that too.
      */
     if (tr->tr_data != NULL) {
-	
 	if (tr->tr_flags & TWE_CMD_DATAIN) {
-	    bus_dmamap_sync(sc->twe_buffer_dmat, tr->tr_dmamap, BUS_DMASYNC_POSTREAD);
+	    if (tr->tr_flags & TWE_CMD_IMMEDIATE) {
+		bus_dmamap_sync(sc->twe_immediate_dmat, sc->twe_immediate_map,
+				BUS_DMASYNC_POSTREAD);
+	    } else {
+		bus_dmamap_sync(sc->twe_buffer_dmat, tr->tr_dmamap,
+				BUS_DMASYNC_POSTREAD);
+	    }
+
 	    /* if we're using an alignment buffer, and we're reading data, copy the real data in */
 	    if (tr->tr_flags & TWE_CMD_ALIGNBUF)
 		bcopy(tr->tr_data, tr->tr_realdata, tr->tr_length);
 	}
-	if (tr->tr_flags & TWE_CMD_DATAOUT)
-	    bus_dmamap_sync(sc->twe_buffer_dmat, tr->tr_dmamap, BUS_DMASYNC_POSTWRITE);
+	if (tr->tr_flags & TWE_CMD_DATAOUT) {
+	    if (tr->tr_flags & TWE_CMD_IMMEDIATE) {
+		bus_dmamap_sync(sc->twe_immediate_dmat, sc->twe_immediate_map,
+				BUS_DMASYNC_POSTWRITE);
+	    } else {
+		bus_dmamap_sync(sc->twe_buffer_dmat, tr->tr_dmamap,
+				BUS_DMASYNC_POSTWRITE);
+	    }
+	}
 
-	bus_dmamap_unload(sc->twe_buffer_dmat, tr->tr_dmamap); 
+	if (tr->tr_flags & TWE_CMD_IMMEDIATE) {
+	    bcopy(sc->twe_immediate, tr->tr_data, tr->tr_length);
+	    bus_dmamap_unload(sc->twe_immediate_dmat, sc->twe_immediate_map);
+	} else {
+	    bus_dmamap_unload(sc->twe_buffer_dmat, tr->tr_dmamap); 
+	}
     }
 
     /* free alignment buffer if it was used */

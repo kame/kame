@@ -24,7 +24,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * Id: pdqvar.h,v 1.21 1997/03/21 21:16:04 thomas Exp
- * $FreeBSD: src/sys/dev/pdq/pdqvar.h,v 1.9 2003/02/19 05:47:09 imp Exp $
+ * $FreeBSD: src/sys/dev/pdq/pdqvar.h,v 1.10 2003/10/31 18:32:03 brooks Exp $
  *
  */
 
@@ -73,7 +73,7 @@ enum _pdq_type_t {
 #include <vm/vm_kern.h>
 
 #define	PDQ_USE_MBUFS
-#if defined(__NetBSD__)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 #define	PDQ_OS_PREFIX			"%s: "
 #define	PDQ_OS_PREFIX_ARGS		pdq->pdq_os_name
 #else

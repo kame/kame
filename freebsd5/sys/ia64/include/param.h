@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/ia64/include/param.h,v 1.14 2003/04/30 23:16:33 marcel Exp $ */
+/* $FreeBSD: src/sys/ia64/include/param.h,v 1.17 2003/08/23 03:39:55 marcel Exp $ */
 /* From: NetBSD: param.h,v 1.20 1997/09/19 13:52:53 leo Exp */
 
 /*
@@ -107,23 +107,11 @@
 #define	ALIGN(p)		_ALIGN(p)
 #define ALIGNED_POINTER(p,t)	_ALIGNED_POINTER(p,t)
 
-#if !defined(PAGE_SIZE_4K) && !defined(PAGE_SIZE_8K) && !defined(PAGE_SIZE_16K)
-#define PAGE_SIZE_8K
+#ifndef LOG2_PAGE_SIZE
+#define	LOG2_PAGE_SIZE		13		/* 8K pages by default. */
 #endif
-
-#ifdef PAGE_SIZE_4K
-#define	PAGE_SIZE	4096			/* bytes/page */
-#define PAGE_SHIFT	12
-#endif
-#ifdef PAGE_SIZE_8K
-#define	PAGE_SIZE	8192			/* bytes/page */
-#define PAGE_SHIFT	13
-#endif
-#ifdef PAGE_SIZE_16K
-#define	PAGE_SIZE	16384			/* bytes/page */
-#define PAGE_SHIFT	14
-#endif
-
+#define	PAGE_SHIFT	(LOG2_PAGE_SIZE)
+#define	PAGE_SIZE	(1<<(LOG2_PAGE_SIZE))
 #define PAGE_MASK	(PAGE_SIZE-1)
 #define NPTEPG		(PAGE_SIZE/(sizeof (pt_entry_t)))
 
@@ -134,7 +122,10 @@
 #define	SSIZE		1		/* initial stack size/NBPG */
 #define	SINCR		1		/* increment of stack/NBPG */
 
+#ifndef	KSTACK_PAGES
 #define	KSTACK_PAGES	4		/* pages of kernel stack */
+#endif
+#define	KSTACK_GUARD_PAGES 0		/* pages of kstack guard; 0 disables */
 #define	UAREA_PAGES	1		/* pages of u-area */
 
 /*

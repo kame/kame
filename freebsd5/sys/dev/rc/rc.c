@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/rc/rc.c,v 1.80 2003/03/05 08:16:28 das Exp $
+ * $FreeBSD: src/sys/dev/rc/rc.c,v 1.81 2003/08/07 15:04:25 jhb Exp $
  */
 
 /*
@@ -1012,7 +1012,7 @@ rc_hardclose(struct rc_chans *rc)
 
 /* Reset the bastard */
 static void
-rc_hwreset(struct rc_softc *sc, uint chipid)
+rc_hwreset(struct rc_softc *sc, u_int chipid)
 {
 	CCRCMD(sc, -1, CCR_HWRESET);            /* Hardware reset */
 	DELAY(20000);

@@ -1,5 +1,13 @@
-/*	$NetBSD: usb.c,v 1.67 2002/02/11 15:11:49 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb.c,v 1.87 2003/04/14 14:04:07 ticso Exp $	*/
+/*	$NetBSD: usb.c,v 1.68 2002/02/20 20:30:12 christos Exp $	*/
+
+/* Also already merged from NetBSD:
+ *	$NetBSD: usb.c,v 1.70 2002/05/09 21:54:32 augustss Exp $
+ *	$NetBSD: usb.c,v 1.71 2002/06/01 23:51:04 lukem Exp $
+ *	$NetBSD: usb.c,v 1.73 2002/09/23 05:51:19 simonb Exp $
+ */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/usb.c,v 1.95 2003/11/09 23:54:21 joe Exp $");
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -49,7 +57,9 @@
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#if __FreeBSD_version >= 500000
 #include <sys/mutex.h>
+#endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <sys/device.h>
 #elif defined(__FreeBSD__)
@@ -144,7 +154,7 @@ struct cdevsw usb_cdevsw = {
 	.d_name =	"usb",
 	.d_maj =	USB_CDEV_MAJOR,
 #if __FreeBSD_version < 500014
-	/* bmaj */      -1
+	.d_bmaj =	-1
 #endif
 };
 #endif
@@ -371,7 +381,7 @@ usb_event_thread(void *arg)
 {
 	struct usb_softc *sc = arg;
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_lock(&Giant);
 #endif
 
@@ -421,7 +431,7 @@ usb_task_thread(void *arg)
 	struct usb_task *task;
 	int s;
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_lock(&Giant);
 #endif
 
@@ -540,7 +550,11 @@ usbioctl(dev_t devt, u_long cmd, caddr_t data, int flag, usb_proc_ptr p)
 
 		case FIOASYNC:
 			if (*(int *)data)
+#if __FreeBSD_version >= 500000
 				usb_async_proc = p->td_proc;
+#else
+				usb_async_proc = p;
+#endif
 			else
 				usb_async_proc = 0;
 			return (0);
@@ -797,7 +811,7 @@ usb_add_event(int type, struct usb_event *uep)
 	TAILQ_INSERT_TAIL(&usb_events, ueq, next);
 	usb_nevents++;
 	wakeup(&usb_events);
-	selwakeup(&usb_selevent);
+	selwakeuppri(&usb_selevent, PZERO);
 	if (usb_async_proc != NULL) {
 		PROC_LOCK(usb_async_proc);
 		psignal(usb_async_proc, SIGIO);
@@ -838,7 +852,6 @@ usb_activate(device_ptr_t self, enum devact act)
 	switch (act) {
 	case DVACT_ACTIVATE:
 		return (EOPNOTSUPP);
-		break;
 
 	case DVACT_DEACTIVATE:
 		sc->sc_dying = 1;

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/cpufunc.h,v 1.16 2003/04/06 17:05:26 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/cpufunc.h,v 1.17 2003/06/22 01:26:07 jmg Exp $
  */
 
 #ifndef	_MACHINE_CPUFUNC_H_
@@ -135,6 +135,15 @@ STNC_GEN(u_long, stxa);
 #define	stha(va, asi, val)	ST_GENERIC(va, asi, val, stha)
 #define	stwa(va, asi, val)	ST_GENERIC(va, asi, val, stwa)
 #define	stxa(va, asi, val)	ST_GENERIC(va, asi, val, stxa)
+
+/*
+ * Attempt to read from addr, val.  If a Data Access Error trap happens,
+ * they return -1 and the contents of val is undefined.  A return of 0
+ * means no trap happened, and the contents of val is valid.
+ */
+int fasword8(u_long asi, void *addr, uint8_t *val);
+int fasword16(u_long asi, void *addr, uint16_t *val);
+int fasword32(u_long asi, void *addr, uint32_t *val);
 
 #define	membar(mask) do {						\
 	__asm __volatile("membar %0" : : "n" (mask) : "memory");	\

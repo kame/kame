@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)fifo_vnops.c	8.10 (Berkeley) 5/27/95
- * $FreeBSD: src/sys/fs/fifofs/fifo_vnops.c,v 1.85 2003/03/24 11:03:42 bde Exp $
+ * $FreeBSD: src/sys/fs/fifofs/fifo_vnops.c,v 1.91 2003/11/16 01:11:11 truckman Exp $
  */
 
 #include <sys/param.h>
@@ -154,6 +154,23 @@ fifo_lookup(ap)
 }
 
 /*
+ * Dispose of fifo resources.
+ */
+static void
+fifo_cleanup(struct vnode *vp)
+{
+	struct fifoinfo *fip = vp->v_fifoinfo;
+
+	ASSERT_VOP_LOCKED(vp, "fifo_cleanup");
+	if (fip->fi_readers == 0 && fip->fi_writers == 0) {
+		vp->v_fifoinfo = NULL;
+		(void)soclose(fip->fi_readsock);
+		(void)soclose(fip->fi_writesock);
+		FREE(fip, M_VNODE);
+	}
+}
+
+/*
  * Open called to set up a new instance of a fifo or
  * to find an active instance of a fifo.
  */
@@ -170,102 +187,118 @@ fifo_open(ap)
 	struct vnode *vp = ap->a_vp;
 	struct fifoinfo *fip;
 	struct thread *td = ap->a_td;
+	struct ucred *cred = ap->a_cred;
 	struct socket *rso, *wso;
 	int error;
 
 	if ((fip = vp->v_fifoinfo) == NULL) {
 		MALLOC(fip, struct fifoinfo *, sizeof(*fip), M_VNODE, M_WAITOK);
-		vp->v_fifoinfo = fip;
-		error = socreate(AF_LOCAL, &rso, SOCK_STREAM, 0,
-		    ap->a_td->td_ucred, ap->a_td);
-		if (error) {
-			free(fip, M_VNODE);
-			vp->v_fifoinfo = NULL;
-			return (error);
-		}
+		error = socreate(AF_LOCAL, &rso, SOCK_STREAM, 0, cred, td);
+		if (error)
+			goto fail1;
 		fip->fi_readsock = rso;
-		error = socreate(AF_LOCAL, &wso, SOCK_STREAM, 0,
-		    ap->a_td->td_ucred, ap->a_td);
-		if (error) {
-			(void)soclose(rso);
-			free(fip, M_VNODE);
-			vp->v_fifoinfo = NULL;
-			return (error);
-		}
+		error = socreate(AF_LOCAL, &wso, SOCK_STREAM, 0, cred, td);
+		if (error)
+			goto fail2;
 		fip->fi_writesock = wso;
 		error = unp_connect2(wso, rso);
 		if (error) {
 			(void)soclose(wso);
+fail2:
 			(void)soclose(rso);
+fail1:
 			free(fip, M_VNODE);
-			vp->v_fifoinfo = NULL;
 			return (error);
 		}
 		fip->fi_readers = fip->fi_writers = 0;
 		wso->so_snd.sb_lowat = PIPE_BUF;
 		rso->so_state |= SS_CANTRCVMORE;
+		vp->v_fifoinfo = fip;
 	}
+
+	/*
+	 * General access to fi_readers and fi_writers is protected using
+	 * the vnode lock.
+	 *
+	 * Protect the increment of fi_readers and fi_writers and the
+	 * associated calls to wakeup() with the vnode interlock in
+	 * addition to the vnode lock.  This allows the vnode lock to
+	 * be dropped for the msleep() calls below, and using the vnode
+	 * interlock as the msleep() mutex prevents the wakeup from
+	 * being missed.
+	 */
+	VI_LOCK(vp);
 	if (ap->a_mode & FREAD) {
 		fip->fi_readers++;
 		if (fip->fi_readers == 1) {
 			fip->fi_writesock->so_state &= ~SS_CANTSENDMORE;
 			if (fip->fi_writers > 0) {
 				wakeup(&fip->fi_writers);
+				VI_UNLOCK(vp);
 				sowwakeup(fip->fi_writesock);
+				VI_LOCK(vp);
 			}
 		}
 	}
 	if (ap->a_mode & FWRITE) {
+		if ((ap->a_mode & O_NONBLOCK) && fip->fi_readers == 0) {
+			VI_UNLOCK(vp);
+			return (ENXIO);
+		}
 		fip->fi_writers++;
 		if (fip->fi_writers == 1) {
 			fip->fi_readsock->so_state &= ~SS_CANTRCVMORE;
 			if (fip->fi_readers > 0) {
 				wakeup(&fip->fi_readers);
+				VI_UNLOCK(vp);
 				sorwakeup(fip->fi_writesock);
+				VI_LOCK(vp);
 			}
 		}
 	}
-	if ((ap->a_mode & FREAD) && (ap->a_mode & O_NONBLOCK) == 0) {
-		if (fip->fi_writers == 0) {
+	if ((ap->a_mode & O_NONBLOCK) == 0) {
+		if ((ap->a_mode & FREAD) && fip->fi_writers == 0) {
 			VOP_UNLOCK(vp, 0, td);
-			error = tsleep(&fip->fi_readers,
+			error = msleep(&fip->fi_readers, VI_MTX(vp),
 			    PCATCH | PSOCK, "fifoor", 0);
-			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
-			if (error)
-				goto bad;
+			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY | LK_INTERLOCK, td);
+			if (error) {
+				fip->fi_readers--;
+				if (fip->fi_readers == 0)
+					socantsendmore(fip->fi_writesock);
+				fifo_cleanup(vp);
+				return (error);
+			}
+			VI_LOCK(vp);
 			/*
 			 * We must have got woken up because we had a writer.
 			 * That (and not still having one) is the condition
 			 * that we must wait for.
 			 */
 		}
-	}
-	if (ap->a_mode & FWRITE) {
-		if (ap->a_mode & O_NONBLOCK) {
-			if (fip->fi_readers == 0) {
-				error = ENXIO;
-				goto bad;
+		if ((ap->a_mode & FWRITE) && fip->fi_readers == 0) {
+			VOP_UNLOCK(vp, 0, td);
+			error = msleep(&fip->fi_writers, VI_MTX(vp),
+			    PCATCH | PSOCK, "fifoow", 0);
+			vn_lock(vp,
+			    LK_EXCLUSIVE | LK_RETRY | LK_INTERLOCK, td);
+			if (error) {
+				fip->fi_writers--;
+				if (fip->fi_writers == 0)
+					socantrcvmore(fip->fi_readsock);
+				fifo_cleanup(vp);
+				return (error);
 			}
-		} else {
-			if (fip->fi_readers == 0) {
-				VOP_UNLOCK(vp, 0, td);
-				error = tsleep(&fip->fi_writers,
-				    PCATCH | PSOCK, "fifoow", 0);
-				vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
-				if (error)
-					goto bad;
-				/*
-				 * We must have got woken up because we had
-				 * a reader.  That (and not still having one)
-				 * is the condition that we must wait for.
-				 */
-			}
+			/*
+			 * We must have got woken up because we had
+			 * a reader.  That (and not still having one)
+			 * is the condition that we must wait for.
+			 */
+			return (0);
 		}
 	}
+	VI_UNLOCK(vp);
 	return (0);
-bad:
-	VOP_CLOSE(vp, ap->a_mode, ap->a_cred, td);
-	return (error);
 }
 
 /*
@@ -284,7 +317,7 @@ fifo_read(ap)
 	struct uio *uio = ap->a_uio;
 	struct socket *rso = ap->a_vp->v_fifoinfo->fi_readsock;
 	struct thread *td = uio->uio_td;
-	int error, startresid;
+	int error;
 
 #ifdef DIAGNOSTIC
 	if (uio->uio_rw != UIO_READ)
@@ -294,7 +327,6 @@ fifo_read(ap)
 		return (0);
 	if (ap->a_ioflag & IO_NDELAY)
 		rso->so_state |= SS_NBIO;
-	startresid = uio->uio_resid;
 	VOP_UNLOCK(ap->a_vp, 0, td);
 	error = soreceive(rso, (struct sockaddr **)0, uio, (struct mbuf **)0,
 	    (struct mbuf **)0, (int *)0);
@@ -525,9 +557,11 @@ fifo_close(ap)
 		struct thread *a_td;
 	} */ *ap;
 {
-	register struct vnode *vp = ap->a_vp;
-	register struct fifoinfo *fip = vp->v_fifoinfo;
-	int error1, error2;
+	struct vnode *vp = ap->a_vp;
+	struct thread *td = ap->a_td;
+	struct fifoinfo *fip = vp->v_fifoinfo;
+
+	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 
 	if (ap->a_fflag & FREAD) {
 		fip->fi_readers--;
@@ -539,17 +573,10 @@ fifo_close(ap)
 		if (fip->fi_writers == 0)
 			socantrcvmore(fip->fi_readsock);
 	}
-	if (vrefcnt(vp) > 1)
-		return (0);
-	error1 = soclose(fip->fi_readsock);
-	error2 = soclose(fip->fi_writesock);
-	FREE(fip, M_VNODE);
-	vp->v_fifoinfo = NULL;
-	if (error1)
-		return (error1);
-	return (error2);
+	fifo_cleanup(vp);
+	VOP_UNLOCK(vp, 0, td);
+	return (0);
 }
-
 
 /*
  * Print out internal contents of a fifo vnode.

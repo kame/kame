@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/t4dwave.h,v 1.5 2001/08/26 19:15:28 greid Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/t4dwave.h,v 1.6 2003/09/07 16:28:03 cg Exp $
  */
 
 #ifndef _T4DWAVE_REG_H

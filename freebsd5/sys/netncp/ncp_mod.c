@@ -29,9 +29,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/netncp/ncp_mod.c,v 1.9 2003/03/09 11:03:45 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netncp/ncp_mod.c,v 1.11 2003/09/27 12:01:00 phk Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -64,8 +66,6 @@ static dev_t		ncp_dev;
 static d_ioctl_t	ncp_ioctl;
 
 static struct cdevsw ncp_cdevsw = {
-	.d_open =	nullopen,
-	.d_close =	nullclose,
 	.d_ioctl =	ncp_ioctl,
 	.d_name =	"ncp",
 };

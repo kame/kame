@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/atm_cm.c,v 1.25 2003/02/19 05:47:30 imp Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * -----------------
  *
  * ATM Connection Manager
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/atm_cm.c,v 1.31 2003/07/26 14:20:37 harti Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -43,6 +41,7 @@
 #include <sys/socketvar.h>
 #include <sys/syslog.h>
 #include <net/if.h>
+#include <net/bpf.h>
 #include <netatm/port.h>
 #include <netatm/queue.h>
 #include <netatm/atm.h>
@@ -55,11 +54,6 @@
 #include <netatm/atm_stack.h>
 #include <netatm/atm_pcb.h>
 #include <netatm/atm_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_cm.c,v 1.25 2003/02/19 05:47:30 imp Exp $");
-#endif
-
 
 /*
  * Global variables
@@ -112,11 +106,13 @@ atm_cm_init(void)
 
 	atm_connection_zone = uma_zcreate("atm connection",
 	    sizeof(Atm_connection), NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
-	uma_zone_set_max(atm_connection_zone, 100);
+	if (atm_connection_zone == NULL)
+		panic("atm_connection_zone");
 
 	atm_connvc_zone = uma_zcreate("atm connvc", sizeof(Atm_connvc), NULL,
 	    NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
-	uma_zone_set_max(atm_connvc_zone, 100);
+	if (atm_connvc_zone == NULL)
+		panic("atm_connvc_zone");
 }
 
 /*
@@ -173,8 +169,9 @@ atm_cm_connect(epp, token, ap, copp)
 
 	/*
 	 * Get a connection block
+	 * May be called from timeout - don't wait.
 	 */
-	cop = uma_zalloc(atm_connection_zone, M_WAITOK);
+	cop = uma_zalloc(atm_connection_zone, M_NOWAIT);
 	if (cop == NULL)
 		return (ENOMEM);
 
@@ -404,8 +401,9 @@ atm_cm_connect(epp, token, ap, copp)
 
 	/*
 	 * Get a connection VCC block
+	 * May be called from timeouts - don't wait.
 	 */
-	cvp = uma_zalloc(atm_connvc_zone, M_WAITOK);
+	cvp = uma_zalloc(atm_connvc_zone, M_NOWAIT);
 	if (cvp == NULL) {
 		err = ENOMEM;
 		goto donex;
@@ -814,8 +812,9 @@ atm_cm_addllc(epp, token, llc, ecop, copp)
 
 	/*
 	 * Get a connection block
+	 * May be called from netisr - don't wait.
 	 */
-	cop = uma_zalloc(atm_connection_zone, M_WAITOK);
+	cop = uma_zalloc(atm_connection_zone, M_NOWAIT);
 	if (cop == NULL)
 		return (ENOMEM);
 
@@ -1265,8 +1264,9 @@ atm_cm_incoming(vcp, ap)
 
 	/*
 	 * Get a connection VCC block
+	 * May be called from netisr - don't wait.
 	 */
-	cvp = uma_zalloc(atm_connvc_zone, M_WAITOK);
+	cvp = uma_zalloc(atm_connvc_zone, M_NOWAIT);
 	if (cvp == NULL) {
 		err = ENOMEM;
 		goto fail;
@@ -1583,8 +1583,9 @@ atm_cm_incall(cvp)
 		if (cop == NULL) {
 			/*
 			 * Need a new connection block
+			 * May be called from timeout - dont wait.
 			 */
-			cop = uma_zalloc(atm_connection_zone, M_WAITOK);
+			cop = uma_zalloc(atm_connection_zone, M_NOWAIT);
 			if (cop == NULL) {
 				cvp->cvc_attr.cause = atm_cause_tmpl;
 				cvp->cvc_attr.cause.v.cause_value =
@@ -2778,8 +2779,7 @@ atm_cm_cpcs_data(cop, m)
 			 * We have to allocate another buffer and tack it
 			 * onto the front of the packet
 			 */
-			KB_ALLOCPKT(n, llcp->v.llc_len, KB_F_NOWAIT,
-					KB_T_HEADER);
+			MGETHDR(n, KB_F_NOWAIT, KB_T_HEADER);
 			if (n == 0) {
 				err = ENOMEM;
 				goto done;
@@ -2884,6 +2884,18 @@ atm_cm_cpcs_upper(cmd, tok, arg1, arg2)
 				atm_cm_stat.cms_rcvconnvc++;
 				return;
 			}
+		}
+
+		/*
+		 * Send the packet to the interface's bpf if this
+		 * vc has one.
+		 */
+		if (cvp->cvc_vcc != NULL &&
+		    cvp->cvc_vcc->vc_nif != NULL) {
+			struct ifnet *ifp =
+			    (struct ifnet *)cvp->cvc_vcc->vc_nif;
+
+			BPF_MTAP(ifp, m);
 		}
 
 		/*

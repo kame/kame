@@ -28,9 +28,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/posix4/posix4_mib.c,v 1.7 2002/11/17 04:15:34 alfred Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/posix4/posix4_mib.c,v 1.8 2003/06/11 06:28:14 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

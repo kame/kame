@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)domain.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/domain.h,v 1.17 2002/03/19 20:18:36 alfred Exp $
+ * $FreeBSD: src/sys/sys/domain.h,v 1.18 2003/10/17 15:46:31 ume Exp $
  */
 
 #ifndef _SYS_DOMAIN_H_
@@ -45,6 +45,7 @@
  * Forward structure declarations for function prototypes [sic].
  */
 struct	mbuf;
+struct	ifnet;
 
 struct domain {
 	int	dom_family;		/* AF_xxx */
@@ -61,6 +62,9 @@ struct domain {
 		(void **, int);
 	int	dom_rtoffset;		/* an arg to rtattach, in bits */
 	int	dom_maxrtkey;		/* for routing layer */
+	void	*(*dom_ifattach)(struct ifnet *);
+	void	(*dom_ifdetach)(struct ifnet *, void *);
+					/* af-dependent data on ifnet */
 };
 
 #ifdef _KERNEL

@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_event.c,v 1.8 2000/12/07 22:19:04 phk Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * -------------------
  *
  * IP VCC event handler
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/ipatm/ipatm_event.c,v 1.9 2003/06/11 07:00:30 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -58,11 +56,6 @@
 #include <netatm/ipatm/ipatm.h>
 #include <netatm/ipatm/ipatm_var.h>
 #include <netatm/ipatm/ipatm_serv.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_event.c,v 1.8 2000/12/07 22:19:04 phk Exp $");
-#endif
-
 
 /*
  * Process an IP VCC timeout

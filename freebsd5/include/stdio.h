@@ -34,13 +34,14 @@
  * SUCH DAMAGE.
  *
  *	@(#)stdio.h	8.5 (Berkeley) 4/29/95
- * $FreeBSD: src/include/stdio.h,v 1.51 2003/01/13 08:41:47 tjr Exp $
+ * $FreeBSD: src/include/stdio.h,v 1.51.4.1 2003/12/18 00:59:50 peter Exp $
  */
 
 #ifndef	_STDIO_H_
 #define	_STDIO_H_
 
 #include <sys/cdefs.h>
+#include <sys/_null.h>
 #include <sys/_types.h>
 
 typedef	__off_t		fpos_t;
@@ -55,10 +56,6 @@ typedef	__size_t	size_t;
 typedef	__va_list	va_list;
 #define	_VA_LIST_DECLARED
 #endif
-#endif
-
-#ifndef NULL
-#define	NULL	0
 #endif
 
 #define	_FSTDIO			/* Define for new stdio with functions. */

@@ -26,21 +26,19 @@
  *
  *	i4b_ifpnp_l1.c - AVM Fritz PnP layer 1 handler
  *	----------------------------------------------
- *
  *	$Id: i4b_ifpnp_l1.c,v 1.4 2000/06/02 16:14:36 hm Exp $ 
  *	$Ust: src/i4b/layer1-nb/ifpnp/i4b_ifpnp_l1.c,v 1.4 2000/04/18 08:03:05 ust Exp $ 
- *
- * $FreeBSD: src/sys/i4b/layer1/ifpnp/i4b_ifpnp_l1.c,v 1.5 2002/09/02 00:52:08 brooks Exp $
- *
  *      last edit-date: [Fri Jun  2 14:55:49 2000]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/ifpnp/i4b_ifpnp_l1.c,v 1.6 2003/06/10 23:37:09 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
-
 
 #include <net/if.h>
 

@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_subs.c,v 1.117 2003/02/19 05:47:38 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_subs.c,v 1.122 2003/11/22 02:21:49 alfred Exp $");
 
 /*
  * These functions support the macros and help fiddle mbuf chains for
@@ -66,6 +66,8 @@ __FBSDID("$FreeBSD: src/sys/nfsclient/nfs_subs.c,v 1.117 2003/02/19 05:47:38 imp
 #include <vm/vm_object.h>
 #include <vm/vm_extern.h>
 #include <vm/uma.h>
+
+#include <rpc/rpcclnt.h>
 
 #include <nfs/rpcv2.h>
 #include <nfs/nfsproto.h>
@@ -527,10 +529,10 @@ nfs_loadattrcache(struct vnode **vpp, struct mbuf **mdp, caddr_t *dposp,
 	if (vp->v_type != vtyp) {
 		vp->v_type = vtyp;
 		if (vp->v_type == VFIFO) {
-			vp->v_op = fifo_nfsv2nodeop_p;
+			vp->v_op = fifo_nfsnodeop_p;
 		}
 		if (vp->v_type == VCHR || vp->v_type == VBLK) {
-			vp->v_op = spec_nfsv2nodeop_p;
+			vp->v_op = spec_nfsnodeop_p;
 			vp = addaliasu(vp, rdev);
 			np->n_vnode = vp;
 		}
@@ -788,14 +790,18 @@ nfs_clearcommit(struct mount *mp)
 	GIANT_REQUIRED;
 
 	s = splbio();
-	mtx_lock(&mntvnode_mtx);
+	MNT_ILOCK(mp);
 loop:
 	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp; vp = nvp) {
 		if (vp->v_mount != mp)	/* Paranoia */
 			goto loop;
 		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
 		VI_LOCK(vp);
-		mtx_unlock(&mntvnode_mtx);
+		if (vp->v_iflag & VI_XLOCK) {
+			VI_UNLOCK(vp);
+			continue;
+		}
+		MNT_IUNLOCK(mp);
 		for (bp = TAILQ_FIRST(&vp->v_dirtyblkhd); bp; bp = nbp) {
 			nbp = TAILQ_NEXT(bp, b_vnbufs);
 			if (BUF_REFCNT(bp) == 0 &&
@@ -804,9 +810,9 @@ loop:
 				bp->b_flags &= ~(B_NEEDCOMMIT | B_CLUSTEROK);
 		}
 		VI_UNLOCK(vp);
-		mtx_lock(&mntvnode_mtx);
+		MNT_ILOCK(mp);
 	}
-	mtx_unlock(&mntvnode_mtx);
+	MNT_IUNLOCK(mp);
 	splx(s);
 }
 

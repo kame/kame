@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/sound/usb/uaudio_pcm.c,v 1.2 2002/11/25 17:03:39 cg Exp $ */
+/* $FreeBSD: src/sys/dev/sound/usb/uaudio_pcm.c,v 1.3 2003/07/01 15:52:02 scottl Exp $ */
 
 /*
  * Copyright (c) 2000-2002 Hiroyuki Aizu <aizu@navi.org>
@@ -307,6 +307,8 @@ ua_attach(device_t dev)
 				/*filter*/NULL, /*filterarg*/NULL,
 				/*maxsize*/bufsz, /*nsegments*/1,
 				/*maxsegz*/0x3fff, /*flags*/0,
+				/*lockfunc*/busdma_lock_mutex,
+				/*lockarg*/&Giant,
 				&ua->parent_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		goto bad;

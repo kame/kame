@@ -31,8 +31,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_domain.c	8.2 (Berkeley) 10/18/93
- * $FreeBSD: src/sys/kern/uipc_domain.c,v 1.31 2003/03/07 22:47:32 bbraun Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/uipc_domain.c,v 1.34 2003/09/02 20:59:23 sam Exp $");
 
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -40,6 +42,8 @@
 #include <sys/domain.h>
 #include <sys/mbuf.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 #include <sys/socketvar.h>
 #include <sys/systm.h>
 #include <vm/uma.h>
@@ -65,7 +69,9 @@ static struct callout pfslow_callout;
 static void	pffasttimo(void *);
 static void	pfslowtimo(void *);
 
-struct domain *domains;
+struct domain *domains;		/* registered protocol domains */
+struct mtx dom_mtx;		/* domain list lock */
+MTX_SYSINIT(domain, &dom_mtx, "domain list", MTX_DEF);
 
 /*
  * Add a new protocol domain to the list of supported domains
@@ -75,10 +81,8 @@ struct domain *domains;
 static void
 net_init_domain(struct domain *dp)
 {
-	register struct protosw *pr;
-	int	s;
+	struct protosw *pr;
 
-	s = splnet();
 	if (dp->dom_init)
 		(*dp->dom_init)();
 	for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++){
@@ -94,7 +98,6 @@ net_init_domain(struct domain *dp)
 	 */
 	max_hdr = max_linkhdr + max_protohdr;
 	max_datalen = MHLEN - max_hdr;
-	splx(s);
 }
 
 /*
@@ -105,14 +108,13 @@ net_init_domain(struct domain *dp)
 void
 net_add_domain(void *data)
 {
-	int	s;
 	struct domain *dp;
 
 	dp = (struct domain *)data;
-	s = splnet();
+	mtx_lock(&dom_mtx);
 	dp->dom_next = domains;
 	domains = dp;
-	splx(s);
+	mtx_unlock(&dom_mtx);
 	net_init_domain(dp);
 }
 

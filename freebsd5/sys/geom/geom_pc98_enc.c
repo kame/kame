@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/geom/geom_pc98_enc.c,v 1.1 2003/05/01 13:44:24 nyan Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/geom/geom_pc98_enc.c,v 1.2 2003/06/11 06:49:15 obrien Exp $");
 
 #include <sys/types.h>
 #include <sys/diskpc98.h>

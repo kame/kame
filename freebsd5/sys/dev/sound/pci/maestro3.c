@@ -55,13 +55,13 @@
 #include <dev/sound/pcm/sound.h>
 #include <dev/sound/pcm/ac97.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <gnu/dev/sound/pci/maestro3_reg.h>
 #include <gnu/dev/sound/pci/maestro3_dsp.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/maestro3.c,v 1.19 2003/02/20 17:31:11 cognet Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/maestro3.c,v 1.22 2003/09/02 17:30:37 jhb Exp $");
 
 /* -------------------------------------------------------------------- */
 
@@ -1109,7 +1109,7 @@ m3_pci_attach(device_t dev)
 	data |= (PCIM_CMD_PORTEN | PCIM_CMD_MEMEN | PCIM_CMD_BUSMASTEREN);
 	pci_write_config(dev, PCIR_COMMAND, data, 2);
 
-	sc->regid = PCIR_MAPS;
+	sc->regid = PCIR_BAR(0);
 	sc->regtype = SYS_RES_MEMORY;
 	sc->reg = bus_alloc_resource(dev, sc->regtype, &sc->regid,
 				     0, ~0, 1, RF_ACTIVE);
@@ -1146,7 +1146,8 @@ m3_pci_attach(device_t dev)
 			       /*filter*/NULL, /*filterarg*/NULL,
 			       /*maxsize*/sc->bufsz, /*nsegments*/1,
 			       /*maxsegz*/0x3ffff,
-			       /*flags*/0, &sc->parent_dmat) != 0) {
+			       /*flags*/0, /*lockfunc*/busdma_lock_mutex,
+			       /*lockarg*/&Giant, &sc->parent_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		goto bad;
 	}

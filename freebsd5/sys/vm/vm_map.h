@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_map.h,v 1.97 2003/03/12 23:13:16 das Exp $
+ * $FreeBSD: src/sys/vm/vm_map.h,v 1.106 2003/11/09 05:25:35 alc Exp $
  */
 
 /*
@@ -81,6 +81,7 @@
  *	vm_map_entry_t		an entry in an address map.
  */
 
+typedef u_char vm_flags_t;
 typedef u_int vm_eflags_t;
 
 /*
@@ -136,10 +137,13 @@ struct vm_map_entry {
 #define MAP_ENTRY_NEEDS_WAKEUP		0x0200	/* waiters in transition */
 #define MAP_ENTRY_NOCOREDUMP		0x0400	/* don't include in a core */
 
+#define	MAP_ENTRY_GROWS_DOWN		0x1000	/* Top-down stacks */
+#define	MAP_ENTRY_GROWS_UP		0x2000	/* Bottom-up stacks */
+
 #ifdef	_KERNEL
-static __inline u_char   
+static __inline u_char
 vm_map_entry_behavior(vm_map_entry_t entry)
-{                  
+{
 	return (entry->eflags & MAP_ENTRY_BEHAV_MASK);
 }
 #endif	/* _KERNEL */
@@ -150,7 +154,7 @@ vm_map_entry_behavior(vm_map_entry_t entry)
  *	list.  Both structures are ordered based upon the start and
  *	end addresses contained within each map entry.  Sleator and
  *	Tarjan's top-down splay algorithm is employed to control
- *	height imbalance in the binary search tree.  
+ *	height imbalance in the binary search tree.
  *
  *	Note: the lock structure cannot be the first element of vm_map
  *	because this can result in a running lockup between two or more
@@ -168,16 +172,22 @@ struct vm_map {
 	struct mtx system_mtx;
 	int nentries;			/* Number of entries */
 	vm_size_t size;			/* virtual size */
+	u_int timestamp;		/* Version number */
 	u_char needs_wakeup;
 	u_char system_map;		/* Am I a system map? */
 	u_char infork;			/* Am I in fork processing? */
+	vm_flags_t flags;		/* flags for this vm_map */
 	vm_map_entry_t root;		/* Root of a binary search tree */
-	unsigned int timestamp;		/* Version number */
 	vm_map_entry_t first_free;	/* First free space hint */
 	pmap_t pmap;			/* (c) Physical map */
 #define	min_offset	header.start	/* (c) */
 #define	max_offset	header.end	/* (c) */
 };
+
+/*
+ * vm_flags_t values
+ */
+#define MAP_WIREFUTURE		0x01	/* wire all future pages */
 
 #ifdef	_KERNEL
 static __inline vm_offset_t
@@ -197,9 +207,15 @@ vm_map_pmap(vm_map_t map)
 {
 	return (map->pmap);
 }
+
+static __inline void
+vm_map_modflags(vm_map_t map, vm_flags_t set, vm_flags_t clear)
+{
+	map->flags = (map->flags | set) & ~clear;
+}
 #endif	/* _KERNEL */
 
-/* 
+/*
  * Shareable process virtual address space.
  *
  * List of locks
@@ -267,6 +283,7 @@ void vm_map_wakeup(vm_map_t map);
 			_vm_map_lock_downgrade(map, LOCK_FILE, LOCK_LINE)
 
 long vmspace_resident_count(struct vmspace *vmspace);
+long vmspace_wired_count(struct vmspace *vmspace);
 #endif	/* _KERNEL */
 
 
@@ -286,6 +303,8 @@ long vmspace_resident_count(struct vmspace *vmspace);
 #define MAP_DISABLE_SYNCER	0x0020
 #define MAP_DISABLE_COREDUMP	0x0100
 #define MAP_PREFAULT_MADVISE	0x0200	/* from (user) madvise request */
+#define	MAP_STACK_GROWS_DOWN	0x1000
+#define	MAP_STACK_GROWS_UP	0x2000
 
 /*
  * vm_fault option flags
@@ -296,10 +315,18 @@ long vmspace_resident_count(struct vmspace *vmspace);
 #define VM_FAULT_WIRE_MASK (VM_FAULT_CHANGE_WIRING|VM_FAULT_USER_WIRE)
 #define VM_FAULT_DIRTY 8		/* Dirty the page */
 
+/*
+ * vm_map_wire and vm_map_unwire option flags
+ */
+#define VM_MAP_WIRE_SYSTEM	0	/* wiring in a kernel map */
+#define VM_MAP_WIRE_USER	1	/* wiring in a user map */
+
+#define VM_MAP_WIRE_NOHOLES	0	/* region must not have holes */
+#define VM_MAP_WIRE_HOLESOK	2	/* region may have holes */
+
 #ifdef _KERNEL
 boolean_t vm_map_check_protection (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t);
-struct pmap;
-vm_map_t vm_map_create (struct pmap *, vm_offset_t, vm_offset_t);
+vm_map_t vm_map_create(pmap_t, vm_offset_t, vm_offset_t);
 int vm_map_delete (vm_map_t, vm_offset_t, vm_offset_t);
 int vm_map_find (vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t *, vm_size_t, boolean_t, vm_prot_t, vm_prot_t, int);
 int vm_map_findspace (vm_map_t, vm_offset_t, vm_size_t, vm_offset_t *);
@@ -310,20 +337,22 @@ int vm_map_lookup (vm_map_t *, vm_offset_t, vm_prot_t, vm_map_entry_t *, vm_obje
     vm_pindex_t *, vm_prot_t *, boolean_t *);
 void vm_map_lookup_done (vm_map_t, vm_map_entry_t);
 boolean_t vm_map_lookup_entry (vm_map_t, vm_offset_t, vm_map_entry_t *);
-int vm_map_clean (vm_map_t, vm_offset_t, vm_offset_t, boolean_t, boolean_t);
+void vm_map_pmap_enter(vm_map_t map, vm_offset_t addr,
+    vm_object_t object, vm_pindex_t pindex, vm_size_t size, int flags);
 int vm_map_protect (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t, boolean_t);
 int vm_map_remove (vm_map_t, vm_offset_t, vm_offset_t);
 void vm_map_startup (void);
 int vm_map_submap (vm_map_t, vm_offset_t, vm_offset_t, vm_map_t);
+int vm_map_sync(vm_map_t, vm_offset_t, vm_offset_t, boolean_t, boolean_t);
 int vm_map_madvise (vm_map_t, vm_offset_t, vm_offset_t, int);
 void vm_map_simplify_entry (vm_map_t, vm_map_entry_t);
 void vm_init2 (void);
 int vm_map_stack (vm_map_t, vm_offset_t, vm_size_t, vm_prot_t, vm_prot_t, int);
 int vm_map_growstack (struct proc *p, vm_offset_t addr);
 int vm_map_unwire(vm_map_t map, vm_offset_t start, vm_offset_t end,
-    boolean_t user_unwire);
+    int flags);
 int vm_map_wire(vm_map_t map, vm_offset_t start, vm_offset_t end,
-    boolean_t user_wire);
+    int flags);
 int vmspace_swap_count (struct vmspace *vmspace);
 #endif				/* _KERNEL */
 #endif				/* _VM_MAP_ */

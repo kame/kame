@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_vrreg.h,v 1.17 2003/02/01 01:27:05 silby Exp $
+ * $FreeBSD: src/sys/pci/if_vrreg.h,v 1.18 2003/11/14 19:00:32 sam Exp $
  */
 
 /*
@@ -475,6 +475,7 @@ struct vr_softc {
 
 #define	VR_LOCK(_sc)		mtx_lock(&(_sc)->vr_mtx)
 #define	VR_UNLOCK(_sc)		mtx_unlock(&(_sc)->vr_mtx)
+#define	VR_LOCK_ASSERT(_sc)	mtx_assert(&(_sc)->vr_mtx, MA_OWNED)
 
 /*
  * register space access macros

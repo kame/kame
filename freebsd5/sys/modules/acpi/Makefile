@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/acpi/Makefile,v 1.27 2003/04/29 18:50:34 njl Exp $
+# $FreeBSD: src/sys/modules/acpi/Makefile,v 1.35 2003/12/05 15:49:01 jhb Exp $
 
 .PATH: ${.CURDIR}/../../contrib/dev/acpica \
        ${.CURDIR}/../../pci \
@@ -35,20 +35,20 @@ SRCS+=	utxface.c
 
 # OSD layer
 SRCS+=	acpi.c acpi_acad.c acpi_battery.c acpi_button.c acpi_cmbat.c acpi_cpu.c
-SRCS+=	acpi_ec.c acpi_lid.c acpi_pci.c acpi_pcib.c acpi_pcib_acpi.c
+SRCS+=	acpi_ec.c acpi_isab.c acpi_lid.c
+SRCS+=	acpi_package.c acpi_pci.c acpi_pcib.c acpi_pcib_acpi.c
 SRCS+=	acpi_pcib_pci.c acpi_powerres.c acpi_resource.c acpi_thermal.c
-SRCS+=	acpi_timer.c acpica_support.c
-SRCS+=	acpi_pci_link.c 
-SRCS+=  OsdDebug.c 
+SRCS+=	acpi_timer.c acpi_pci_link.c 
+SRCS+=	OsdDebug.c 
 SRCS+=	OsdHardware.c OsdInterrupt.c OsdMemory.c OsdSchedule.c
 SRCS+=	OsdStream.c OsdSynch.c OsdTable.c OsdEnvironment.c 
 SRCS+=	opt_acpi.h opt_bus.h opt_ddb.h
 SRCS+=	device_if.h bus_if.h pci_if.h pcib_if.h isa_if.h
-.if ACPI_NO_SEMAPHORES
-CFLAGS+=-DACPI_NO_SEMAPHORES
-.endif
 .if ACPI_MAX_THREADS
 CFLAGS+=-DACPI_MAX_THREADS=${ACPI_MAX_THREADS}
+.endif
+.if ACPI_NO_SEMAPHORES
+CFLAGS+=-DACPI_NO_SEMAPHORES
 .endif
 
 # Debugging support
@@ -56,7 +56,7 @@ CFLAGS+=-DACPI_MAX_THREADS=${ACPI_MAX_THREADS}
 CFLAGS+=-DACPI_DEBUG
 SRCS+=	dbcmds.c dbdisply.c dbexec.c dbfileio.c dbhistry.c
 SRCS+=	dbinput.c dbstats.c dbutils.c dbxface.c
-SRCS+=	dmbuffer.c dmnames.c dmopcode.c dmresrc.c dmresrcl.c
+SRCS+=	dmbuffer.c dmnames.c dmopcode.c dmobject.c dmresrc.c dmresrcl.c
 SRCS+=	dmresrcs.c dmutils.c dmwalk.c
 opt_ddb.h: Makefile
 	echo '#define DDB 1' > ${.TARGET}
@@ -67,6 +67,9 @@ opt_ddb.h: Makefile
 
 # Machine-specific code such as sleep/wakeup
 SRCS+=	acpi_machdep.c acpi_wakecode.h acpi_wakeup.c
+.if ${MACHINE} == "i386"
+SRCS+=	madt.c
+.endif
 CLEANFILES+=	acpi_wakecode.h acpi_wakecode.o acpi_wakecode.bin
 
 acpi_wakecode.h: acpi_wakecode.S

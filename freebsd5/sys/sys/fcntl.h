@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)fcntl.h	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/fcntl.h,v 1.14 2002/09/17 22:22:50 mike Exp $
+ * $FreeBSD: src/sys/sys/fcntl.h,v 1.15 2003/06/20 07:59:59 phk Exp $
  */
 
 #ifndef _SYS_FCNTL_H_
@@ -107,9 +107,6 @@ typedef	__pid_t		pid_t;
 #define	O_TRUNC		0x0400		/* truncate to zero length */
 #define	O_EXCL		0x0800		/* error if already exists */
 #ifdef _KERNEL
-/* FMARK/FDEFER kept in f_gcflags */
-#define	FMARK		0x1		/* mark during gc() */
-#define	FDEFER		0x2		/* defer for next gc pass */
 #define	FHASLOCK	0x4000		/* descriptor holds advisory lock */
 #endif
 

@@ -30,7 +30,7 @@
  * from: svr4_util.h,v 1.5 1994/11/18 02:54:31 christos Exp
  * from: linux_util.h,v 1.2 1995/03/05 23:23:50 fvdl Exp
  *
- * $FreeBSD: src/sys/i386/ibcs2/ibcs2_util.h,v 1.16 2002/12/14 01:56:24 alfred Exp $
+ * $FreeBSD: src/sys/i386/ibcs2/ibcs2_util.h,v 1.17 2003/10/12 04:25:26 tjr Exp $
  */
 
 /*
@@ -68,7 +68,10 @@ stackgap_alloc(sgp, sz)
 	size_t   sz;
 {
 	void	*p = (void *) *sgp;
-	*sgp += ALIGN(sz);
+	sz = ALIGN(sz);
+	if (*sgp + sz > (caddr_t)(PS_STRINGS - szsigcode))
+		return NULL;
+	*sgp += sz;
 	return p;
 }
 

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)iso.h	8.6 (Berkeley) 5/10/95
- * $FreeBSD: src/sys/isofs/cd9660/iso.h,v 1.24 2002/03/24 04:35:23 bde Exp $
+ * $FreeBSD: src/sys/isofs/cd9660/iso.h,v 1.25 2003/09/26 20:26:24 fjoe Exp $
  */
 
 #define ISODCL(from, to) (to - from + 1)
@@ -245,6 +245,9 @@ struct iso_mnt {
 	int rr_skip0;
 
 	int joliet_level;
+
+	void *im_d2l;
+	void *im_l2d;
 };
 
 #define VFSTOISOFS(mp)	((struct iso_mnt *)((mp)->mnt_data))
@@ -265,10 +268,11 @@ extern vop_t **cd9660_vnodeop_p;
 extern vop_t **cd9660_specop_p;
 extern vop_t **cd9660_fifoop_p;
 
-int isochar(u_char *, u_char *, int, u_char *);
-int isofncmp(u_char *, int, u_char *, int, int);
-void isofntrans(u_char *, int, u_char *, u_short *, int, int, int);
+int isochar(u_char *, u_char *, int, u_short *, int *, int, void *);
+int isofncmp(u_char *, int, u_char *, int, int, int, void *, void *);
+void isofntrans(u_char *, int, u_char *, u_short *, int, int, int, int, void *);
 ino_t isodirino(struct iso_directory_record *, struct iso_mnt *);
+u_short sgetrune(const char *, size_t, char const **, int, void *);
 
 #endif /* _KERNEL */
 

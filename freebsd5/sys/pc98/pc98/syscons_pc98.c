@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/syscons_pc98.c,v 1.18 2003/01/15 13:12:12 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/syscons_pc98.c,v 1.20 2003/10/31 13:48:24 nyan Exp $
  */
 
 #include "opt_syscons.h"
@@ -94,6 +94,10 @@ scsuspend(device_t dev)
 	sc_softc_t	*sc;
 
 	sc = &main_softc;
+
+	if (sc->cur_scp == NULL)
+		return (0);
+
 	sc_cur_scr = sc->cur_scp->index;
 
 	if (sc_no_suspend_vtswitch)
@@ -180,14 +184,12 @@ sc_softc_t
 int
 sc_get_cons_priority(int *unit, int *flags)
 {
-	int disabled;
 	const char *at;
 	int u, f;
 
 	*unit = -1;
 	for (u = 0; u < 16; u++) {
-		if ((resource_int_value(SC_DRIVER_NAME, u, "disabled",
-					&disabled) == 0) && disabled)
+		if (resource_disabled(SC_DRIVER_NAME, u))
 			continue;
 		if (resource_string_value(SC_DRIVER_NAME, u, "at", &at) != 0)
 			continue;

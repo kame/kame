@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $Id: if_mn.c,v 1.1 1999/02/01 13:06:40 phk Exp $
+ * $Id: if_mn.c,v 1.38 2003/06/11 06:24:36 obrien Exp $
  *
  * Driver for Siemens reference design card "Easy321-R1".
  *
@@ -20,9 +20,10 @@
  * comfort, so I have not bothered typing it all into a "fooreg.h" file,
  * you will (badly!) need the documentation anyway if you want to mess with
  * this gadget.
- *
- * $FreeBSD: src/sys/pci/if_mn.c,v 1.37 2003/02/19 05:47:41 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/if_mn.c,v 1.40 2003/09/02 17:30:40 jhb Exp $");
 
 /*
  * Stuff to describe the MUNIC32X and FALC54 chips.
@@ -41,8 +42,8 @@
 #include <sys/systm.h>
 #include <sys/malloc.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 #include "pci_if.h"
 
 #include <machine/bus.h>
@@ -1348,7 +1349,7 @@ mn_attach (device_t self)
 	sc->framing = E1;
 	sprintf(sc->name, "mn%d", sc->unit);
 
-        rid = PCIR_MAPS;
+        rid = PCIR_BAR(0);
         res = bus_alloc_resource(self, SYS_RES_MEMORY, &rid,
             0, ~0, 1, RF_ACTIVE);
         if (res == NULL) {
@@ -1359,7 +1360,7 @@ mn_attach (device_t self)
         sc->m0v = rman_get_virtual(res);
         sc->m0p = rman_get_start(res);
 
-        rid = PCIR_MAPS + 4;
+        rid = PCIR_BAR(1);
         res = bus_alloc_resource(self, SYS_RES_MEMORY, &rid,
             0, ~0, 1, RF_ACTIVE);
         if (res == NULL) {

@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  *	from BSDI: pmap.c,v 1.28.2.15 2000/04/27 03:10:31 cp Exp
- * $FreeBSD: src/sys/sparc64/sparc64/tsb.c,v 1.33 2003/04/08 06:35:09 jake Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/tsb.c,v 1.35 2003/08/22 07:38:08 imp Exp $
  */
 
 #include "opt_ddb.h"
@@ -175,9 +175,11 @@ enter:
 			pm->pm_stats.resident_count++;
 			data |= TD_PV;
 		}
+		vm_page_lock_queues();
 		if (pmap_cache_enter(m, va) != 0)
 			data |= TD_CV;
 		TAILQ_INSERT_TAIL(&m->md.tte_list, tp, tte_link);
+		vm_page_unlock_queues();
 	} else
 		data |= TD_FAKE | TD_E;
 

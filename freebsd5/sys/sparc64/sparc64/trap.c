@@ -37,7 +37,7 @@
  *
  *      from: @(#)trap.c        7.4 (Berkeley) 5/13/91
  * 	from: FreeBSD: src/sys/i386/i386/trap.c,v 1.197 2001/07/19
- * $FreeBSD: src/sys/sparc64/sparc64/trap.c,v 1.62 2003/05/04 07:21:04 jake Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/trap.c,v 1.69 2003/11/11 06:41:54 jake Exp $
  */
 
 #include "opt_ddb.h"
@@ -53,8 +53,10 @@
 #include <sys/mutex.h>
 #include <sys/systm.h>
 #include <sys/pioctl.h>
+#include <sys/ptrace.h>
 #include <sys/proc.h>
 #include <sys/smp.h>
+#include <sys/signalvar.h>
 #include <sys/syscall.h>
 #include <sys/sysctl.h>
 #include <sys/sysent.h>
@@ -100,6 +102,10 @@ extern char fs_nofault_begin[];
 extern char fs_nofault_end[];
 extern char fs_nofault_intr_begin[];
 extern char fs_nofault_intr_end[];
+
+extern char fas_fault[];
+extern char fas_nofault_begin[];
+extern char fas_nofault_end[];
 
 extern char *syscallnames[];
 
@@ -329,6 +335,26 @@ trap(struct trapframe *tf)
 			}
 			error = 1;	
 			break;
+		case T_DATA_ERROR:
+			/*
+			 * handle PCI poke/peek as per UltraSPARC IIi
+			 * User's Manual 16.2.1.
+			 */
+#define MEMBARSYNC_INST	((u_int32_t)0x8143e040)
+			if (tf->tf_tpc > (u_long)fas_nofault_begin &&
+			    tf->tf_tpc < (u_long)fas_nofault_end &&
+			    *(u_int32_t *)tf->tf_tpc == MEMBARSYNC_INST &&
+			    ((u_int32_t *)tf->tf_tpc)[-2] == MEMBARSYNC_INST) {
+				cache_flush();
+				cache_enable();
+				tf->tf_tpc = (u_long)fas_fault;
+				tf->tf_tnpc = tf->tf_tpc + 4;
+				error = 0;
+				break;
+			}
+#undef MEMBARSYNC_INST
+			error = 1;
+			break;
 		default:
 			error = 1;
 			break;
@@ -490,7 +516,7 @@ syscall(struct trapframe *tf)
 	td->td_frame = tf;
 	if (td->td_ucred != p->p_ucred)
 		cred_update_thread(td);
-	if (p->p_flag & P_THREADED)
+	if (p->p_flag & P_SA)
 		thread_user_enter(p, td);
 	code = tf->tf_global[1];
 
@@ -556,6 +582,8 @@ syscall(struct trapframe *tf)
 
 		STOPEVENT(p, S_SCE, narg);	/* MP aware */
 
+		PTRACESTOP_SC(p, td, S_PT_SCE);
+
 		error = (*callp->sy_call)(td, argp);
 
 		CTR5(KTR_SYSC, "syscall: p=%p error=%d %s return %#lx %#lx ", p,
@@ -619,6 +647,8 @@ syscall(struct trapframe *tf)
 	 * is not the case, this code will need to be revisited.
 	 */
 	STOPEVENT(p, S_SCX, code);
+
+	PTRACESTOP_SC(p, td, S_PT_SCX);
 
 #ifdef DIAGNOSTIC
 	cred_free_thread(td);

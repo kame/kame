@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2000 Mark R V Murray
+ * Copyright (c) 2000, 2001, 2002, 2003 Mark R V Murray
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,8 +23,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/random/hash.c,v 1.9 2002/09/21 21:40:02 markm Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/random/hash.c,v 1.11 2003/11/17 23:02:21 markm Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

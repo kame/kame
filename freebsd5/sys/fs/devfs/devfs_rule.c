@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/devfs/devfs_rule.c,v 1.8 2003/02/19 05:47:17 imp Exp $
+ * $FreeBSD: src/sys/fs/devfs/devfs_rule.c,v 1.8.4.1 2004/01/29 19:32:43 cperciva Exp $
  */
 
 /*
@@ -633,7 +633,8 @@ devfs_rule_matchpath(struct devfs_krule *dk, struct devfs_dirent *de)
 	dev = devfs_rule_getdev(de);
 	if (dev != NULL)
 		pname = dev->si_name;
-	else if (de->de_dirent->d_type == DT_LNK)
+	else if (de->de_dirent->d_type == DT_LNK ||
+	    de->de_dirent->d_type == DT_DIR)
 		pname = de->de_dirent->d_name;
 	else
 		return (0);

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/sparc64/tlb.c,v 1.7 2003/04/13 21:54:58 jake Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/tlb.c,v 1.8 2003/08/22 07:38:08 imp Exp $
  */
 
 #include "opt_pmap.h"

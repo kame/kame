@@ -40,9 +40,10 @@
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
  * 	from: FreeBSD: src/sys/i386/i386/vm_machdep.c,v 1.167 2001/07/12
- * $FreeBSD: src/sys/sparc64/sparc64/vm_machdep.c,v 1.44 2003/04/08 06:35:09 jake Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/vm_machdep.c,v 1.55 2003/11/16 23:40:06 alc Exp $
  */
 
+#include "opt_kstack_pages.h"
 #include "opt_pmap.h"
 
 #include <sys/param.h>
@@ -51,7 +52,11 @@
 #include <sys/proc.h>
 #include <sys/bio.h>
 #include <sys/buf.h>
+#include <sys/kernel.h>
 #include <sys/linker_set.h>
+#include <sys/mbuf.h>
+#include <sys/mutex.h>
+#include <sys/sf_buf.h>
 #include <sys/sysctl.h>
 #include <sys/unistd.h>
 #include <sys/user.h>
@@ -62,6 +67,7 @@
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
 #include <vm/pmap.h>
+#include <vm/vm_kern.h>
 #include <vm/vm_map.h>
 #include <vm/vm_page.h>
 #include <vm/vm_pageout.h>
@@ -70,6 +76,7 @@
 #include <vm/uma_int.h>
 
 #include <machine/cache.h>
+#include <machine/bus.h>
 #include <machine/cpu.h>
 #include <machine/fp.h>
 #include <machine/fsr.h>
@@ -80,8 +87,19 @@
 #include <machine/tlb.h>
 #include <machine/tstate.h>
 
-extern struct ofw_mem_region sparc64_memreg[];
-extern int sparc64_nmemreg;
+static void	sf_buf_init(void *arg);
+SYSINIT(sock_sf, SI_SUB_MBUF, SI_ORDER_ANY, sf_buf_init, NULL)
+
+/*
+ * Expanded sf_freelist head. Really an SLIST_HEAD() in disguise, with the
+ * sf_freelist head with the sf_lock mutex.
+ */
+static struct {
+	SLIST_HEAD(, sf_buf) sf_head;
+	struct mtx sf_lock;
+} sf_freelist;
+
+static u_int	sf_buf_alloc_want;
 
 PMAP_STATS_VAR(uma_nsmall_alloc);
 PMAP_STATS_VAR(uma_nsmall_alloc_oc);
@@ -147,11 +165,23 @@ cpu_thread_setup(struct thread *td)
 }
 
 void
-cpu_set_upcall(struct thread *td, void *v)
+cpu_thread_swapin(struct thread *td)
+{
+}
+
+void
+cpu_thread_swapout(struct thread *td)
+{
+}
+
+void
+cpu_set_upcall(struct thread *td, struct thread *td0)
 {
 	struct trapframe *tf;
 	struct frame *fr;
 	struct pcb *pcb;
+
+	bcopy(td0->td_frame, td->td_frame, sizeof(struct trapframe));
 
 	pcb = td->td_pcb;
 	tf = td->td_frame;
@@ -166,6 +196,18 @@ cpu_set_upcall(struct thread *td, void *v)
 void
 cpu_set_upcall_kse(struct thread *td, struct kse_upcall *ku)
 {
+	struct trapframe *tf;
+	uint64_t sp;
+
+	tf = td->td_frame;
+	sp = (uint64_t)ku->ku_stack.ss_sp + ku->ku_stack.ss_size;
+	tf->tf_out[0] = (uint64_t)ku->ku_mailbox;
+	tf->tf_out[6] = sp - SPOFF - sizeof(struct frame);
+	tf->tf_tpc = (uint64_t)ku->ku_func;
+	tf->tf_tnpc = tf->tf_tpc + 4;
+
+	td->td_retval[0] = tf->tf_out[0];
+	td->td_retval[1] = tf->tf_out[1];
 }
 
 /*
@@ -309,11 +351,6 @@ cpu_set_fork_handler(struct thread *td, void (*func)(void *), void *arg)
 	fp->fr_local[1] = (u_long)arg;
 }
 
-void
-cpu_wait(struct proc *p)
-{
-}
-
 int
 is_physical_memory(vm_paddr_t addr)
 {
@@ -323,6 +360,89 @@ is_physical_memory(vm_paddr_t addr)
 		if (addr >= mr->mr_start && addr < mr->mr_start + mr->mr_size)
 			return (1);
 	return (0);
+}
+
+/*
+ * Allocate a pool of sf_bufs (sendfile(2) or "super-fast" if you prefer. :-))
+ */
+static void
+sf_buf_init(void *arg)
+{
+	struct sf_buf *sf_bufs;
+	vm_offset_t sf_base;
+	int i;
+
+	mtx_init(&sf_freelist.sf_lock, "sf_bufs list lock", NULL, MTX_DEF);
+	SLIST_INIT(&sf_freelist.sf_head);
+	sf_base = kmem_alloc_nofault(kernel_map, nsfbufs * PAGE_SIZE);
+	sf_bufs = malloc(nsfbufs * sizeof(struct sf_buf), M_TEMP,
+	    M_NOWAIT | M_ZERO);
+	for (i = 0; i < nsfbufs; i++) {
+		sf_bufs[i].kva = sf_base + i * PAGE_SIZE;
+		SLIST_INSERT_HEAD(&sf_freelist.sf_head, &sf_bufs[i], free_list);
+	}
+	sf_buf_alloc_want = 0;
+}
+
+/*
+ * Get an sf_buf from the freelist. Will block if none are available.
+ */
+struct sf_buf *
+sf_buf_alloc(struct vm_page *m)
+{
+	struct sf_buf *sf;
+	int error;
+
+	mtx_lock(&sf_freelist.sf_lock);
+	while ((sf = SLIST_FIRST(&sf_freelist.sf_head)) == NULL) {
+		sf_buf_alloc_want++;
+		error = msleep(&sf_freelist, &sf_freelist.sf_lock, PVM|PCATCH,
+		    "sfbufa", 0);
+		sf_buf_alloc_want--;
+
+		/*
+		 * If we got a signal, don't risk going back to sleep. 
+		 */
+		if (error)
+			break;
+	}
+	if (sf != NULL) {
+		SLIST_REMOVE_HEAD(&sf_freelist.sf_head, free_list);
+		sf->m = m;
+		pmap_qenter(sf->kva, &sf->m, 1);
+	}
+	mtx_unlock(&sf_freelist.sf_lock);
+	return (sf);
+}
+
+/*
+ * Detatch mapped page and release resources back to the system.
+ */
+void
+sf_buf_free(void *addr, void *args)
+{
+	struct sf_buf *sf;
+	struct vm_page *m;
+
+	sf = args;
+	pmap_qremove((vm_offset_t)addr, 1);
+	m = sf->m;
+	vm_page_lock_queues();
+	vm_page_unwire(m, 0);
+	/*
+	 * Check for the object going away on us. This can
+	 * happen since we don't hold a reference to it.
+	 * If so, we're responsible for freeing the page.
+	 */
+	if (m->wire_count == 0 && m->object == NULL)
+		vm_page_free(m);
+	vm_page_unlock_queues();
+	sf->m = NULL;
+	mtx_lock(&sf_freelist.sf_lock);
+	SLIST_INSERT_HEAD(&sf_freelist.sf_head, sf, free_list);
+	if (sf_buf_alloc_want > 0)
+		wakeup_one(&sf_freelist);
+	mtx_unlock(&sf_freelist.sf_lock);
 }
 
 void
@@ -376,7 +496,7 @@ uma_small_alloc(uma_zone_t zone, int bytes, u_int8_t *flags, int wait)
 		dcache_page_inval(pa);
 	}
 	va = (void *)TLB_PHYS_TO_DIRECT(pa);
-	if ((m->flags & PG_ZERO) == 0)
+	if ((wait & M_ZERO) && (m->flags & PG_ZERO) == 0)
 		bzero(va, PAGE_SIZE);
 	return (va);
 }

@@ -1,5 +1,4 @@
 /*	$NetBSD: ulpt.c,v 1.55 2002/10/23 09:14:01 jdolecek Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ulpt.c,v 1.55 2003/03/03 12:15:47 phk Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -38,6 +37,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/ulpt.c,v 1.59 2003/09/28 20:48:13 phk Exp $");
+
 /*
  * Printer Class spec: http://www.usb.org/developers/data/devclass/usbprint109.PDF
  */
@@ -56,7 +58,6 @@
 #endif
 #include <sys/uio.h>
 #include <sys/conf.h>
-#include <sys/vnode.h>
 #include <sys/syslog.h>
 #include <sys/sysctl.h>
 
@@ -154,7 +155,7 @@ Static struct cdevsw ulpt_cdevsw = {
 	.d_name =	"ulpt",
 	.d_maj =	ULPT_CDEV_MAJOR,
 #if __FreeBSD_version < 500014
-	/* bmaj */	-1
+	.d_bmaj		-1
 #endif
 };
 #endif
@@ -374,8 +375,6 @@ USB_DETACH(ulpt)
 	int s;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	int maj, mn;
-#elif defined(__FreeBSD__)
-	struct vnode *vp;
 #endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -412,13 +411,6 @@ USB_DETACH(ulpt)
 	mn = self->dv_unit;
 	vdevgone(maj, mn, mn, VCHR);
 #elif defined(__FreeBSD__)
-	vp = SLIST_FIRST(&sc->dev->si_hlist);
-	if (vp)
-		VOP_REVOKE(vp, REVOKEALL);
-	vp = SLIST_FIRST(&sc->dev_noprime->si_hlist);
-	if (vp)
-		VOP_REVOKE(vp, REVOKEALL);
-
 	destroy_dev(sc->dev);
 	destroy_dev(sc->dev_noprime);
 #endif
@@ -528,8 +520,14 @@ ulptopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 	error = 0;
 	sc->sc_refcnt++;
 
-	if ((flags & ULPT_NOPRIME) == 0)
+	if ((flags & ULPT_NOPRIME) == 0) {
 		ulpt_reset(sc);
+		if (sc->sc_dying) {
+			error = ENXIO;
+			sc->sc_state = 0;
+			goto done;
+		}
+	}
 
 	for (spin = 0; (ulpt_status(sc) & LPS_SELECT) == 0; spin += STEP) {
 		DPRINTF(("ulpt_open: waiting a while\n"));

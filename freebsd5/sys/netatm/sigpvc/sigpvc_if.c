@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/sigpvc/sigpvc_if.c,v 1.14 2002/05/24 00:38:25 arr Exp $
- *
  */
 
 /*
@@ -33,8 +29,10 @@
  *
  * External interfaces to SigPVC manager.  Includes support for 
  * running as a loadable kernel module.
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/sigpvc/sigpvc_if.c,v 1.17 2003/07/29 13:32:10 harti Exp $");
 
 #ifndef ATM_SIGPVC_MODULE
 #include "opt_atm.h"
@@ -68,11 +66,6 @@
 #include <netatm/sigpvc/sigpvc_var.h>
 
 #include <vm/uma.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/sigpvc/sigpvc_if.c,v 1.14 2002/05/24 00:38:25 arr Exp $");
-#endif
-
 
 /*
  * Global variables
@@ -152,7 +145,8 @@ sigpvc_start()
 
 	sigpvc_vc_zone = uma_zcreate("sigpvc vc", sizeof(struct sigpvc_vccb),
 	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
-	uma_zone_set_max(sigpvc_vc_zone, 50);		
+	if (sigpvc_vc_zone == NULL)
+		return (ENOMEM);
  
 	/*
 	 * Register ourselves with system
@@ -561,9 +555,11 @@ sigpvc_ioctl(code, data, arg1)
 	Atm_connection	*cop;
 	caddr_t		cp;
 	u_int	vpi, vci;
-	int	i, space, err = 0;
+	int err;
+	size_t space;
+	size_t tlen;
 
-
+	err = 0;
 	switch (code) {
 
 	case AIOCS_DEL_PVC:
@@ -639,10 +635,10 @@ sigpvc_ioctl(code, data, arg1)
 			else
 				avr.avp_encaps = 0;
 			bzero(avr.avp_owners, sizeof(avr.avp_owners));
-			for (i = 0; cop && i < sizeof(avr.avp_owners);
+			for (tlen = 0; cop && tlen < sizeof(avr.avp_owners);
 					cop = cop->co_next,
-					i += T_ATM_APP_NAME_LEN+1) {
-				strncpy(&avr.avp_owners[i],
+					tlen += T_ATM_APP_NAME_LEN + 1) {
+				strncpy(&avr.avp_owners[tlen],
 					cop->co_endpt->ep_getname(cop->co_toku),
 					T_ATM_APP_NAME_LEN);
 			}

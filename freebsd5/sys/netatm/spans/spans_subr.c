@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/spans/spans_subr.c,v 1.11 2003/02/19 05:47:31 imp Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ---------------------------
  *
  * SPANS-related subroutines.
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/spans/spans_subr.c,v 1.12 2003/06/11 07:11:35 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -60,11 +58,6 @@
 
 #include "spans_xdr.h"
 #include <netatm/spans/spans_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/spans/spans_subr.c,v 1.11 2003/02/19 05:47:31 imp Exp $");
-#endif
-
 
 /*
  * Open a SPANS VCC

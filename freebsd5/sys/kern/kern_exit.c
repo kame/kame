@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_exit.c	8.7 (Berkeley) 2/12/94
- * $FreeBSD: src/sys/kern/kern_exit.c,v 1.214 2003/05/13 20:35:59 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_exit.c,v 1.218 2003/11/14 18:49:01 cognet Exp $");
 
 #include "opt_compat.h"
 #include "opt_ktrace.h"
@@ -132,7 +134,7 @@ exit1(struct thread *td, int rv)
 	 * MUST abort all other threads before proceeding past here.
 	 */
 	PROC_LOCK(p);
-	if (p->p_flag & P_THREADED || p->p_numthreads > 1) {
+	if (p->p_flag & P_SA || p->p_numthreads > 1) {
 		/*
 		 * First check if some other thread got here before us..
 		 * if so, act apropriatly, (exit or suspend);
@@ -162,7 +164,7 @@ exit1(struct thread *td, int rv)
 		 * ...
 		 * Turn off threading support.
 		 */
-		p->p_flag &= ~P_THREADED;
+		p->p_flag &= ~P_SA;
 		thread_single_end();	/* Don't need this any more. */
 	}
 	/*
@@ -218,8 +220,18 @@ exit1(struct thread *td, int rv)
 	p->p_flag &= ~(P_TRACED | P_PPWAIT);
 	SIGEMPTYSET(p->p_siglist);
 	SIGEMPTYSET(td->td_siglist);
-	if (timevalisset(&p->p_realtimer.it_value))
-		callout_stop(&p->p_itcallout);
+
+	/*
+	 * Stop the real interval timer.  If the handler is currently
+	 * executing, prevent it from rearming itself and let it finish.
+	 */
+	if (timevalisset(&p->p_realtimer.it_value) &&
+	    callout_stop(&p->p_itcallout) == 0) {
+		timevalclear(&p->p_realtimer.it_interval);
+		msleep(&p->p_itcallout, &p->p_mtx, PWAIT, "ritwait", 0);
+		KASSERT(!timevalisset(&p->p_realtimer.it_value),
+		    ("realtime timer is still armed"));
+	}
 	PROC_UNLOCK(p);
 
 	/*
@@ -424,6 +436,13 @@ exit1(struct thread *td, int rv)
 	 * Notify interested parties of our demise.
 	 */
 	KNOTE(&p->p_klist, NOTE_EXIT);
+	/*
+	 * Just delete all entries in the p_klist. At this point we won't
+	 * report any more events, and there are nasty race conditions that
+	 * can beat us if we don't.
+	 */
+	while (SLIST_FIRST(&p->p_klist))
+		SLIST_REMOVE_HEAD(&p->p_klist, kn_selnext);
 
 	/*
 	 * Notify parent that we're gone.  If parent has the PS_NOCLDWAIT

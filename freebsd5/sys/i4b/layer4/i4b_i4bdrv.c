@@ -26,12 +26,12 @@
  *
  *	i4b_i4bdrv.c - i4b userland interface driver
  *	--------------------------------------------
- *
- * $FreeBSD: src/sys/i4b/layer4/i4b_i4bdrv.c,v 1.34 2003/03/03 12:15:50 phk Exp $
- *
  *      last edit-date: [Sun Aug 11 12:42:46 2002]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer4/i4b_i4bdrv.c,v 1.38 2003/11/10 14:20:34 gj Exp $");
 
 #include "i4bipr.h"
 #include "i4btel.h"
@@ -820,7 +820,7 @@ i4bputqueue(struct mbuf *m)
 	if(selflag)
 	{
 		selflag = 0;
-		selwakeup(&select_rd_info);
+		selwakeuppri(&select_rd_info, I4BPRI);
 	}
 }
 
@@ -863,6 +863,6 @@ i4bputqueue_hipri(struct mbuf *m)
 	if(selflag)
 	{
 		selflag = 0;
-		selwakeup(&select_rd_info);
+		selwakeuppri(&select_rd_info, I4BPRI);
 	}
 }

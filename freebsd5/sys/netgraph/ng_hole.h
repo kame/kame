@@ -36,15 +36,15 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_hole.h,v 1.2 2000/10/24 17:32:45 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_hole.h,v 1.3 2003/11/11 12:30:37 ru Exp $
  * $Whistle: ng_hole.h,v 1.3 1999/01/20 00:22:13 archie Exp $
  */
 
-#ifndef _NETGRAPH_HOLE_H_
-#define _NETGRAPH_HOLE_H_
+#ifndef _NETGRAPH_NG_HOLE_H_
+#define _NETGRAPH_NG_HOLE_H_
 
 /* Node type name and magic cookie */
 #define NG_HOLE_NODE_TYPE	"hole"
 #define NGM_HOLE_COOKIE		915433206
 
-#endif /* _NETGRAPH_HOLE_H_ */
+#endif /* _NETGRAPH_NG_HOLE_H_ */

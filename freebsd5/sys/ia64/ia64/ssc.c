@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/ia64/ia64/ssc.c,v 1.15 2003/03/03 12:15:50 phk Exp $
+ *	$FreeBSD: src/sys/ia64/ia64/ssc.c,v 1.16 2003/09/26 10:37:16 phk Exp $
  */
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -94,7 +94,7 @@ ssc(u_int64_t in0, u_int64_t in1, u_int64_t in2, u_int64_t in3, int which)
 static void
 ssccnprobe(struct consdev *cp)
 {
-	cp->cn_dev = makedev(CDEV_MAJOR, 0);
+	sprintf(cp->cn_name, "ssccons");
 	cp->cn_pri = CN_INTERNAL;
 }
 

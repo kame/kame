@@ -26,6 +26,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/puc/puc_pci.c,v 1.9 2003/11/28 05:28:28 imp Exp $");
+
 /*
  * Copyright (c) 1996, 1998, 1999
  *	Christopher G. Demetriou.  All rights reserved.
@@ -58,7 +61,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/puc/puc_pci.c,v 1.4 2002/09/01 01:59:38 jmallett Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/puc/puc_pci.c,v 1.9 2003/11/28 05:28:28 imp Exp $");
 
 #include "opt_puc.h"
 
@@ -79,13 +82,39 @@ __FBSDID("$FreeBSD: src/sys/dev/puc/puc_pci.c,v 1.4 2002/09/01 01:59:38 jmallett
 #define PUC_ENTRAILS	1
 #include <dev/puc/pucvar.h>
 
+extern const struct puc_device_description puc_devices[];
+
+int puc_config_win877(struct puc_softc *);
+
+static const struct puc_device_description *
+puc_find_description(uint32_t vend, uint32_t prod, uint32_t svend, 
+    uint32_t sprod)
+{
+	int i;
+
+#define checkreg(val, index) \
+    (((val) & puc_devices[i].rmask[(index)]) == puc_devices[i].rval[(index)])
+
+	for (i = 0; puc_devices[i].name != NULL; i++) {
+		if (checkreg(vend, PUC_REG_VEND) &&
+		    checkreg(prod, PUC_REG_PROD) &&
+		    checkreg(svend, PUC_REG_SVEND) &&
+		    checkreg(sprod, PUC_REG_SPROD))
+			return (&puc_devices[i]);
+	}
+
+#undef checkreg
+
+	return (NULL);
+}
+
 static int
 puc_pci_probe(device_t dev)
 {
 	uint32_t v1, v2, d1, d2;
 	const struct puc_device_description *desc;
 
-	if ((pci_read_config(dev, PCIR_HEADERTYPE, 1) & 0x7f) != 0)
+	if ((pci_read_config(dev, PCIR_HDRTYPE, 1) & PCIM_HDRTYPE) != 0)
 		return (ENXIO);
 
 	v1 = pci_read_config(dev, PCIR_VENDOR, 2);

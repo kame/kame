@@ -1,4 +1,4 @@
-/* 
+/*-
  * Copyright (c) Comtrol Corporation <support@comtrol.com>
  * All rights reserved.
  *
@@ -31,9 +31,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/rp/rp_pci.c,v 1.4 2002/10/16 08:48:37 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/rp/rp_pci.c,v 1.6 2003/08/24 17:54:22 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,8 +52,8 @@
 #include <dev/rp/rpreg.h>
 #include <dev/rp/rpvar.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 /* PCI IDs  */
 #define RP_VENDOR_ID		0x11FE

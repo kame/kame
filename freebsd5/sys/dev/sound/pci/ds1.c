@@ -27,13 +27,13 @@
 #include <dev/sound/pcm/sound.h>
 #include <dev/sound/pcm/ac97.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/sound/pci/ds1.h>
 #include <dev/sound/pci/ds1-fw.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/ds1.c,v 1.32 2003/04/16 05:03:35 simokawa Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/ds1.c,v 1.36 2003/09/02 17:30:37 jhb Exp $");
 
 /* -------------------------------------------------------------------- */
 
@@ -526,12 +526,13 @@ static int
 ds1pchan_setblocksize(kobj_t obj, void *data, u_int32_t blocksize)
 {
 	struct sc_pchinfo *ch = data;
+	struct sc_info *sc = ch->parent;
 	int drate;
 
 	/* irq rate is fixed at 187.5hz */
 	drate = ch->spd * sndbuf_getbps(ch->buffer);
-	blocksize = (drate << 8) / DS1_IRQHZ;
-	sndbuf_resize(ch->buffer, DS1_BUFFSIZE / blocksize, blocksize);
+	blocksize = roundup2((drate << 8) / DS1_IRQHZ, 4);
+	sndbuf_resize(ch->buffer, sc->bufsz / blocksize, blocksize);
 
 	return blocksize;
 }
@@ -653,12 +654,13 @@ static int
 ds1rchan_setblocksize(kobj_t obj, void *data, u_int32_t blocksize)
 {
 	struct sc_rchinfo *ch = data;
+	struct sc_info *sc = ch->parent;
 	int drate;
 
 	/* irq rate is fixed at 187.5hz */
 	drate = ch->spd * sndbuf_getbps(ch->buffer);
-	blocksize = (drate << 8) / DS1_IRQHZ;
-	sndbuf_resize(ch->buffer, DS1_BUFFSIZE / blocksize, blocksize);
+	blocksize = roundup2((drate << 8) / DS1_IRQHZ, 4);
+	sndbuf_resize(ch->buffer, sc->bufsz / blocksize, blocksize);
 
 	return blocksize;
 }
@@ -828,7 +830,8 @@ ds_init(struct sc_info *sc)
 
 	if (sc->regbase == NULL) {
 		if (bus_dma_tag_create(NULL, 2, 0, BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR,
-				       NULL, NULL, memsz, 1, memsz, 0, &sc->control_dmat))
+				       NULL, NULL, memsz, 1, memsz, 0, busdma_lock_mutex,
+				       &Giant, &sc->control_dmat))
 			return -1;
 		if (bus_dmamem_alloc(sc->control_dmat, &buf, BUS_DMA_NOWAIT, &sc->map))
 			return -1;
@@ -950,7 +953,7 @@ ds_pci_attach(device_t dev)
 	pci_write_config(dev, PCIR_COMMAND, data, 2);
 	data = pci_read_config(dev, PCIR_COMMAND, 2);
 
-	sc->regid = PCIR_MAPS;
+	sc->regid = PCIR_BAR(0);
 	sc->reg = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->regid,
 					     0, ~0, 1, RF_ACTIVE);
 	if (!sc->reg) {
@@ -968,7 +971,8 @@ ds_pci_attach(device_t dev)
 		/*highaddr*/BUS_SPACE_MAXADDR,
 		/*filter*/NULL, /*filterarg*/NULL,
 		/*maxsize*/sc->bufsz, /*nsegments*/1, /*maxsegz*/0x3ffff,
-		/*flags*/0, &sc->buffer_dmat) != 0) {
+		/*flags*/0, /*lockfunc*/busdma_lock_mutex,
+		/*lockarg*/&Giant, &sc->buffer_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		goto bad;
 	}

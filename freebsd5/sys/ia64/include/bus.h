@@ -67,7 +67,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* $FreeBSD: src/sys/ia64/include/bus.h,v 1.12 2003/05/30 20:40:33 hmp Exp $ */
+/* $FreeBSD: src/sys/ia64/include/bus.h,v 1.16 2003/11/07 23:29:42 scottl Exp $ */
 
 #ifndef _MACHINE_BUS_H_
 #define _MACHINE_BUS_H_
@@ -119,13 +119,20 @@ typedef	u_long bus_space_handle_t;
 /*
  * Map a region of device bus space into CPU virtual address space.
  */
-#define	BUS_SPACE_MAP_CACHEABLE		0x01
-#define	BUS_SPACE_MAP_LINEAR		0x02
 
-int
-bus_space_map(bus_space_tag_t bst, bus_addr_t addr, bus_size_t size, int flags,
-    bus_space_handle_t *bshp);
+static __inline int bus_space_map(bus_space_tag_t t, bus_addr_t addr,
+				  bus_size_t size, int flags,
+				  bus_space_handle_t *bshp);
 
+static __inline int
+bus_space_map(bus_space_tag_t t __unused, bus_addr_t addr,
+	      bus_size_t size __unused, int flags __unused,
+	      bus_space_handle_t *bshp)
+{
+
+	*bshp = addr;
+	return (0);
+}
 
 /*
  * Unmap a region of device bus space.
@@ -852,6 +859,7 @@ bus_space_copy_region_8(bus_space_tag_t bst, bus_space_handle_t bsh1,
 #define	BUS_DMA_NOWAIT		0x01	/* not safe to sleep */
 #define	BUS_DMA_ALLOCNOW	0x02	/* perform resource allocation now */
 #define	BUS_DMA_COHERENT	0x04	/* hint: map memory in a coherent way */
+#define	BUS_DMA_ZERO		0x08	/* allocate zero'ed memory */
 #define	BUS_DMA_ISA		0x10	/* map memory for ISA dma */
 #define	BUS_DMA_BUS2		0x20	/* placeholders for bus functions... */
 #define	BUS_DMA_BUS3		0x40
@@ -905,6 +913,17 @@ typedef struct bus_dma_segment {
 typedef int bus_dma_filter_t(void *, bus_addr_t);
 
 /*
+ * A function that performs driver-specific syncronization on behalf of
+ * busdma.
+ */
+typedef enum {
+	BUS_DMA_LOCK	= 0x01,
+	BUS_DMA_UNLOCK	= 0x02,
+} bus_dma_lock_op_t;
+
+typedef void bus_dma_lock_t(void *, bus_dma_lock_op_t);
+   
+/*
  * Allocate a device specific dma_tag encapsulating the constraints of
  * the parent tag in addition to other restrictions specified:
  *
@@ -921,6 +940,10 @@ typedef int bus_dma_filter_t(void *, bus_addr_t);
  *	nsegments:	Number of discontinuities allowed in maps.
  *	maxsegsz:	Maximum size of a segment in the map.
  *	flags:		Bus DMA flags.
+ *	lockfunc:	An optional function to handle driver-defined lock
+ *			operations.
+ *	lockfuncarg:	An argument that will be passed to lockfunc in addition
+ *			to the lock operation.
  *	dmat:		A pointer to set to a valid dma tag should the return
  *			value of this function indicate success.
  */
@@ -928,7 +951,8 @@ typedef int bus_dma_filter_t(void *, bus_addr_t);
 int bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignemnt,
     bus_size_t boundary, bus_addr_t lowaddr, bus_addr_t highaddr,
     bus_dma_filter_t *filtfunc, void *filtfuncarg, bus_size_t maxsize,
-    int nsegments, bus_size_t maxsegsz, int flags, bus_dma_tag_t *dmat);
+    int nsegments, bus_size_t maxsegsz, int flags, bus_dma_lock_t *lockfunc,
+    void *lockfuncarg, bus_dma_tag_t *dmat);
 
 int bus_dma_tag_destroy(bus_dma_tag_t dmat);
 
@@ -1016,4 +1040,8 @@ bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t dmamap)
 		_bus_dmamap_unload(dmat, dmamap);
 }
 
+/*
+ * Generic helper function for manipulating mutexes.
+ */
+void busdma_lock_mutex(void *arg, bus_dma_lock_op_t op);
 #endif /* _MACHINE_BUS_H_ */

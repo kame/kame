@@ -6,7 +6,6 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/kern/imgact_gzip.c,v 1.49 2003/01/01 18:48:54 schweikh Exp $
  *
  * This module handles execution of a.out files which have been run through
  * "gzip".  This saves diskspace, but wastes cpu-cycles and VM.
@@ -20,6 +19,9 @@
  *	so is the rest...
  *	tidy up unnecesary includes
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/imgact_gzip.c,v 1.50 2003/06/11 00:56:54 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/exec.h>

@@ -33,9 +33,11 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinumparser.c,v 1.24 2003/04/28 02:54:43 grog Exp $
- * $FreeBSD: src/sys/dev/vinum/vinumparser.c,v 1.30 2003/05/05 05:35:01 grog Exp $
+ * $Id: vinumparser.c,v 1.25 2003/05/07 03:33:28 grog Exp grog $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/vinum/vinumparser.c,v 1.33 2003/08/24 17:55:56 obrien Exp $");
 
 /*
  * This file contains the parser for the configuration routines.  It's used
@@ -76,6 +78,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <string.h>
 #define iswhite isspace					    /* use the ctype macro */
 #endif
 
@@ -100,7 +103,6 @@ struct _keywords keywords[] =
     keypair(name),
     keypair(writethrough),
     keypair(writeback),
-    keypair(raw),
     keypair(device),
     keypair(concat),
     keypair(raid4),
@@ -142,7 +144,6 @@ struct _keywords keywords[] =
     keypair(mv),
     keypair(move),
     keypair(init),
-    keypair(label),
     keypair(resetconfig),
     keypair(start),
     keypair(stop),

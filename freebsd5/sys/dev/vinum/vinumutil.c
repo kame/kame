@@ -36,8 +36,10 @@
  * advised of the possibility of such damage.
  *
  * $Id: vinumutil.c,v 1.17 2003/04/28 02:54:43 grog Exp $
- * $FreeBSD: src/sys/dev/vinum/vinumutil.c,v 1.16 2003/05/01 01:34:38 grog Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/vinum/vinumutil.c,v 1.18 2003/08/24 17:55:57 obrien Exp $");
 
 /* This file contains utility routines used both in kernel and user context */
 
@@ -45,6 +47,7 @@
 #include <dev/vinum/statetexts.h>
 #ifndef _KERNEL
 #include <stdio.h>
+#include <string.h>
 extern jmp_buf command_fail;				    /* return on a failed command */
 #endif
 

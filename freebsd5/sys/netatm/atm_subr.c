@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/atm_subr.c,v 1.34 2003/03/04 23:19:52 jlemon Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * -----------------
  *
  * Miscellaneous ATM subroutines
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/atm_subr.c,v 1.41 2003/11/08 22:28:39 sam Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -43,6 +41,7 @@
 #include <sys/kernel.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <sys/sysctl.h>
 #include <net/if.h>
 #include <net/netisr.h>
 #include <netatm/port.h>
@@ -57,11 +56,6 @@
 #include <netatm/atm_var.h>
 #include <vm/uma.h>
 
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_subr.c,v 1.34 2003/03/04 23:19:52 jlemon Exp $");
-#endif
-
-
 /*
  * Global variables
  */
@@ -71,14 +65,32 @@ Atm_endpoint		*atm_endpoints[ENDPT_MAX+1] = {NULL};
 struct stackq_entry	*atm_stackq_head = NULL, *atm_stackq_tail;
 struct atm_sock_stat	atm_sock_stat = { { 0 } };
 int			atm_init = 0;
-int			atm_debug = 0;
-int			atm_dev_print = 0;
-int			atm_print_data = 0;
 int			atm_version = ATM_VERSION;
 struct timeval		atm_debugtime = {0, 0};
 struct ifqueue		atm_intrq;
 
 uma_zone_t atm_attributes_zone;
+
+/*
+ * net.harp.atm.atm_debug
+ */
+int atm_debug;
+SYSCTL_INT(_net_harp_atm, OID_AUTO, atm_debug, CTLFLAG_RW,
+    &atm_debug, 0, "HARP ATM layer debugging flag");
+
+/*
+ * net.harp.atm.atm_dev_print
+ */
+int atm_dev_print;
+SYSCTL_INT(_net_harp_atm, OID_AUTO, atm_dev_print, CTLFLAG_RW,
+    &atm_dev_print, 0, "display ATM CPCS headers");
+
+/*
+ * net.harp.atm.atm_print_data
+ */
+int atm_print_data;
+SYSCTL_INT(_net_harp_atm, OID_AUTO, atm_print_data, CTLFLAG_RW,
+    &atm_print_data, 0, "display ATM CPCS payloads");
 
 /*
  * Local functions
@@ -121,17 +133,15 @@ atm_initialize()
 	    UMA_ALIGN_PTR, 0);
 	if (atm_attributes_zone == NULL)
 		panic("atm_initialize: unable to create attributes zone");
-	uma_zone_set_max(atm_attributes_zone, 100);
 
 	atm_stackq_zone = uma_zcreate("atm stackq", sizeof(struct stackq_entry),
 	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
 	if (atm_stackq_zone == NULL)
 		panic("atm_initialize: unable to create stackq zone");
-	uma_zone_set_max(atm_stackq_zone, 10);
 
 	atm_intrq.ifq_maxlen = ATM_INTRQ_MAX;
 	mtx_init(&atm_intrq.ifq_mtx, "atm_inq", NULL, MTX_DEF);
-	netisr_register(NETISR_ATM, atm_intr, &atm_intrq);
+	netisr_register(NETISR_ATM, atm_intr, &atm_intrq, 0);
 
 	/*
 	 * Initialize subsystems
@@ -391,7 +401,7 @@ atm_stack_enq(cmd, func, token, cvp, arg1, arg2)
 	/*
 	 * Get a new queue entry for this call
 	 */
-	sqp = uma_zalloc(atm_stackq_zone, M_ZERO);
+	sqp = uma_zalloc(atm_stackq_zone, M_NOWAIT | M_ZERO);
 	if (sqp == NULL) {
 		(void) splx(s);
 		return (ENOMEM);
@@ -547,6 +557,8 @@ atm_intr(struct mbuf *m)
 	atm_intr_func_t	func;
 	void		*token;
 
+	GIANT_REQUIRED;
+
 	/*
 	 * Get function to call and token value
 	 */
@@ -584,23 +596,21 @@ atm_intr(struct mbuf *m)
  *
  */
 void
-atm_pdu_print(m, msg)
-	KBuffer		*m;
-	char		*msg;
+atm_pdu_print(const KBuffer *m, const char *msg)
 {
-	caddr_t		cp;
+	const u_char	*cp;
 	int		i;
 	char		c = ' ';
 
 	printf("%s:", msg);
 	while (m) { 
-		KB_DATASTART(m, cp, caddr_t);
+		KB_DATASTART(m, cp, const u_char *);
 		printf("%cbfr=%p data=%p len=%d: ",
 			c, m, cp, KB_LEN(m));
 		c = '\t';
 		if (atm_print_data) {
 			for (i = 0; i < KB_LEN(m); i++) {
-				printf("%2x ", (u_char)*cp++);
+				printf("%2x ", *cp++);
 			}
 			printf("<end_bfr>\n");
 		} else {
@@ -609,4 +619,3 @@ atm_pdu_print(m, msg)
 		m = KB_NEXT(m);
 	}
 }
-

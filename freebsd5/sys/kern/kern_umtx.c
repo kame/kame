@@ -22,10 +22,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/kern_umtx.c,v 1.3.2.1 2003/06/03 20:43:18 jeff Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_umtx.c,v 1.13 2003/09/07 11:14:52 tjr Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -180,7 +180,7 @@ _umtx_lock(struct thread *td, struct _umtx_lock_args *uap)
 			if (owner == -1)
 				return (EFAULT);
 
-			if (owner == MTX_CONTESTED);
+			if (owner == UMTX_CONTESTED)
 				return (0);
 
 			/* If this failed the lock has changed, restart. */
@@ -211,14 +211,20 @@ _umtx_lock(struct thread *td, struct _umtx_lock_args *uap)
 
 		/*
 		 * We set the contested bit, sleep. Otherwise the lock changed
-		 * and we need to retry.
+		 * and we need to retry or we lost a race to the thread
+		 * unlocking the umtx.
 		 */
 		UMTX_LOCK();
-		if (old == owner)
+		mtx_lock_spin(&sched_lock);
+		if (old == owner && (td->td_flags & TDF_UMTXWAKEUP) == 0) {
+			mtx_unlock_spin(&sched_lock);
 			error = msleep(td, &umtx_lock,
 			    td->td_priority | PCATCH, "umtx", 0);
-		else
+			mtx_lock_spin(&sched_lock);
+		} else
 			error = 0;
+		td->td_flags &= ~TDF_UMTXWAKEUP;
+		mtx_unlock_spin(&sched_lock);
 
 		umtx_remove(uq, td);
 		UMTX_UNLOCK();
@@ -257,49 +263,65 @@ _umtx_unlock(struct thread *td, struct _umtx_unlock_args *uap)
 
 	if ((struct thread *)(owner & ~UMTX_CONTESTED) != td)
 		return (EPERM);
-	/*
-	 * If we own it but it isn't contested then we can just release and
-	 * return.
-	 */
-	if ((owner & UMTX_CONTESTED) == 0) {
-		owner = casuptr((intptr_t *)&umtx->u_owner,
-		    (intptr_t)td, UMTX_UNOWNED);
 
-		if (owner == -1)
+	/* We should only ever be in here for contested locks */
+	if ((owner & UMTX_CONTESTED) == 0)
+		return (EINVAL);
+	blocked = NULL;
+
+	/*
+	 * When unlocking the umtx, it must be marked as unowned if
+	 * there is zero or one thread only waiting for it.
+	 * Otherwise, it must be marked as contested.
+	 */
+	UMTX_LOCK();
+	uq = umtx_lookup(td, umtx);
+	if (uq == NULL ||
+	    (uq != NULL && (blocked = TAILQ_FIRST(&uq->uq_tdq)) != NULL &&
+	    TAILQ_NEXT(blocked, td_umtx) == NULL)) {
+		UMTX_UNLOCK();
+		old = casuptr((intptr_t *)&umtx->u_owner, owner,
+		    UMTX_UNOWNED);
+		if (old == -1)
 			return (EFAULT);
-		/*
-		 * If this failed someone modified the memory without going
-		 * through this api.
-		 */
-		if (owner != (intptr_t)td)
+		if (old != owner)
 			return (EINVAL);
 
-		return (0);
+		/*
+		 * Recheck the umtx queue to make sure another thread
+		 * didn't put itself on it after it was unlocked.
+		 */
+		UMTX_LOCK();
+		uq = umtx_lookup(td, umtx);
+		if (uq != NULL &&
+		    ((blocked = TAILQ_FIRST(&uq->uq_tdq)) != NULL &&
+		    TAILQ_NEXT(blocked, td_umtx) != NULL)) {
+			UMTX_UNLOCK();
+			old = casuptr((intptr_t *)&umtx->u_owner,
+			    UMTX_UNOWNED, UMTX_CONTESTED);
+		} else {
+			UMTX_UNLOCK();
+		}
+	} else {
+		UMTX_UNLOCK();
+		old = casuptr((intptr_t *)&umtx->u_owner,
+		    owner, UMTX_CONTESTED);
+		if (old != -1 && old != owner)
+			return (EINVAL);
 	}
-
-	old = casuptr((intptr_t *)&umtx->u_owner, owner, UMTX_CONTESTED);
 
 	if (old == -1)
 		return (EFAULT);
 
 	/*
-	 * This will only happen if someone modifies the lock without going
-	 * through this api.
+	 * If there is a thread waiting on the umtx, wake it up.
 	 */
-	if (old != owner)
-		return (EINVAL);
-
-	/*
-	 * We have to wake up one of the blocked threads.
-	 */
-	UMTX_LOCK();
-	uq = umtx_lookup(td, umtx);
-	if (uq != NULL) {
-		blocked = TAILQ_FIRST(&uq->uq_tdq);
+	if (blocked != NULL) {
+		mtx_lock_spin(&sched_lock);
+		blocked->td_flags |= TDF_UMTXWAKEUP;
+		mtx_unlock_spin(&sched_lock);
 		wakeup(blocked);
 	}
-
-	UMTX_UNLOCK();
 
 	return (0);
 }

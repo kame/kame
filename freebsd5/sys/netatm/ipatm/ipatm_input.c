@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_input.c,v 1.11 2003/03/04 23:19:52 jlemon Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * -------------------
  *
  * Process stack and data input
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/ipatm/ipatm_input.c,v 1.13 2003/07/24 15:25:17 harti Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -56,11 +54,6 @@
 
 #include <netatm/ipatm/ipatm_var.h>
 
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_input.c,v 1.11 2003/03/04 23:19:52 jlemon Exp $");
-#endif
-
-
 /*
  * Process VCC Input Data
  * 
@@ -79,11 +72,9 @@ ipatm_cpcs_data(tok, m)
 {
 	struct ipvcc	*ivp = tok;
 
-#ifdef DIAGNOSTIC
 	if (ipatm_print) {
 		atm_pdu_print(m, "ipatm_input");
 	}
-#endif
 
 	/*
 	 * Handle input packet
@@ -127,11 +118,9 @@ ipatm_ipinput(inp, m)
 	KBuffer		*m;
 {
 
-#ifdef DIAGNOSTIC
 	if (ipatm_print) {
 		atm_pdu_print(m, "ipatm_ipinput");
 	}
-#endif
 
 #ifdef DIAGNOSTIC
 	if (!KB_ISPKT(m)) {

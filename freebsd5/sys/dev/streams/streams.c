@@ -30,8 +30,10 @@
  * skeleton produced from /usr/share/examples/drivers/make_pseudo_driver.sh
  * in 3.0-980524-SNAP then hacked a bit (but probably not enough :-).
  *
- * $FreeBSD: src/sys/dev/streams/streams.c,v 1.39 2003/03/03 12:15:46 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/streams/streams.c,v 1.43 2003/10/19 20:41:06 dwmalone Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -65,16 +67,7 @@ static int svr4_soo_close(struct file *, struct thread *);
 static int svr4_ptm_alloc(struct thread *);
 static  d_open_t	streamsopen;
 
-struct svr4_sockcache_entry {
-	struct proc *p;		/* Process for the socket		*/
-	void *cookie;		/* Internal cookie used for matching	*/
-	struct sockaddr_un sock;/* Pathname for the socket		*/
-	dev_t dev;		/* Device where the socket lives on	*/
-	ino_t ino;		/* Inode where the socket lives on	*/
-	TAILQ_ENTRY(svr4_sockcache_entry) entries;
-};
-
-TAILQ_HEAD(svr4_sockcache_head, svr4_sockcache_entry) svr4_head;
+struct svr4_sockcache_head svr4_head;
 
 /* Initialization flag (set/queried by svr4_mod LKM) */
 int svr4_str_initialized = 0;
@@ -99,8 +92,13 @@ static dev_t dt_ptm, dt_arp, dt_icmp, dt_ip, dt_tcp, dt_udp, dt_rawip,
 	dt_unix_dgram, dt_unix_stream, dt_unix_ord_stream;
 
 static struct fileops svr4_netops = {
-	soo_read, soo_write, soo_ioctl, soo_poll, soo_kqfilter,
-	soo_stat, svr4_soo_close
+	.fo_read = soo_read,
+	.fo_write = soo_write,
+	.fo_ioctl = soo_ioctl,
+	.fo_poll = soo_poll,
+	.fo_kqfilter = soo_kqfilter,
+	.fo_stat = soo_stat,
+	.fo_close =  svr4_soo_close
 };
  
 #define CDEV_MAJOR 103
@@ -191,7 +189,7 @@ static  int
 streamsopen(dev_t dev, int oflags, int devtype, struct thread *td)
 {
 	int type, protocol;
-	int fd;
+	int fd, extraref;
 	struct file *fp;
 	struct socket *so;
 	int error;
@@ -253,13 +251,21 @@ streamsopen(dev_t dev, int oflags, int devtype, struct thread *td)
 
 	if ((error = falloc(td, &fp, &fd)) != 0)
 	  return error;
+	/* An extra reference on `fp' has been held for us by falloc(). */
 
 	if ((error = socreate(family, &so, type, protocol,
 	    td->td_ucred, td)) != 0) {
 	  FILEDESC_LOCK(p->p_fd);
-	  p->p_fd->fd_ofiles[fd] = 0;
+	  /* Check the fd table entry hasn't changed since we made it. */
+	  extraref = 0;
+	  if (p->p_fd->fd_ofiles[fd] == fp) {
+	    p->p_fd->fd_ofiles[fd] = NULL;
+	    extraref = 1;
+	  }
 	  FILEDESC_UNLOCK(p->p_fd);
-	  ffree(fp);
+	  if (extraref)
+	    fdrop(fp, td);
+	  fdrop(fp, td);
 	  return error;
 	}
 
@@ -271,6 +277,7 @@ streamsopen(dev_t dev, int oflags, int devtype, struct thread *td)
 	FILEDESC_UNLOCK(p->p_fd);
 
 	(void)svr4_stream_get(fp);
+	fdrop(fp, td);
 	PROC_LOCK(p);
 	td->td_dupfd = fd;
 	PROC_UNLOCK(p);

@@ -31,14 +31,15 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/geom/geom_event.c,v 1.39 2003/05/02 05:26:19 phk Exp $
  */
 
 /*
  * XXX: How do we in general know that objects referenced in events
  * have not been destroyed before we get around to handle the event ?
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/geom/geom_event.c,v 1.43.2.2 2004/01/26 05:18:35 scottl Exp $");
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -105,8 +106,12 @@ g_orphan_provider(struct g_provider *pp, int error)
 	KASSERT(error != 0,
 	    ("g_orphan_provider(%p(%s), 0) error must be non-zero\n",
 	     pp, pp->name));
+	
 	pp->error = error;
 	mtx_lock(&g_eventlock);
+	KASSERT(!(pp->flags & G_PF_ORPHAN),
+	    ("g_orphan_provider(%p(%s)), already an orphan", pp, pp->name));
+	pp->flags |= G_PF_ORPHAN;
 	TAILQ_INSERT_TAIL(&g_doorstep, pp, orphan);
 	mtx_unlock(&g_eventlock);
 	wakeup(&g_wait_event);
@@ -121,9 +126,13 @@ static void
 g_orphan_register(struct g_provider *pp)
 {
 	struct g_consumer *cp, *cp2;
+	int wf;
 
 	g_trace(G_T_TOPOLOGY, "g_orphan_register(%s)", pp->name);
 	g_topology_assert();
+
+	wf = pp->flags & G_PF_WITHER;
+	pp->flags &= ~G_PF_WITHER;
 
 	/*
 	 * Tell all consumers the bad news.
@@ -138,6 +147,10 @@ g_orphan_register(struct g_provider *pp)
 		cp->geom->orphan(cp);
 		cp = cp2;
 	}
+	if (LIST_EMPTY(&pp->consumers) && wf)
+		g_destroy_provider(pp);
+	else
+		pp->flags |= wf;
 #ifdef notyet
 	cp = LIST_FIRST(&pp->consumers);
 	if (cp != NULL)
@@ -229,6 +242,8 @@ g_cancel_event(void *ref)
 				} else {
 					g_free(ep);
 				}
+				if (--g_pending_events == 0)
+					wakeup(&g_pending_events);
 				break;
 			}
 		}
@@ -243,7 +258,7 @@ g_post_event_x(g_event_t *func, void *arg, int flag, struct g_event **epp, va_li
 	void *p;
 	u_int n;
 
-	g_trace(G_T_TOPOLOGY, "g_post_event_x(%p, %p, %d", func, arg, flag);
+	g_trace(G_T_TOPOLOGY, "g_post_event_x(%p, %p, %d)", func, arg, flag);
 	ep = g_malloc(sizeof *ep, flag | M_ZERO);
 	if (ep == NULL)
 		return (ENOMEM);
@@ -253,9 +268,8 @@ g_post_event_x(g_event_t *func, void *arg, int flag, struct g_event **epp, va_li
 		if (p == NULL)
 			break;
 		g_trace(G_T_TOPOLOGY, "  ref %p", p);
-		ep->ref[n++] = p;
+		ep->ref[n] = p;
 	}
-	va_end(ap);
 	KASSERT(p == NULL, ("Too many references to event"));
 	ep->func = func;
 	ep->arg = arg;
@@ -273,11 +287,14 @@ int
 g_post_event(g_event_t *func, void *arg, int flag, ...)
 {
 	va_list ap;
+	int i;
 
-	va_start(ap, flag);
 	KASSERT(flag == M_WAITOK || flag == M_NOWAIT,
 	    ("Wrong flag to g_post_event"));
-	return (g_post_event_x(func, arg, flag, NULL, ap));
+	va_start(ap, flag);
+	i = g_post_event_x(func, arg, flag, NULL, ap);
+	va_end(ap);
+	return (i);
 }
 
 
@@ -296,10 +313,11 @@ g_waitfor_event(g_event_t *func, void *arg, int flag, ...)
 	int error;
 
 	/* g_topology_assert_not(); */
-	va_start(ap, flag);
 	KASSERT(flag == M_WAITOK || flag == M_NOWAIT,
 	    ("Wrong flag to g_post_event"));
+	va_start(ap, flag);
 	error = g_post_event_x(func, arg, flag | EV_WAKEUP, &ep, ap);
+	va_end(ap);
 	if (error)
 		return (error);
 	do 

@@ -35,8 +35,10 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)trap.c	7.4 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/i386/trap.c,v 1.252 2003/05/20 20:50:33 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/i386/trap.c,v 1.260 2003/11/03 21:53:37 jhb Exp $");
 
 /*
  * 386 Trap and System call handling
@@ -55,6 +57,7 @@
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/pioctl.h>
+#include <sys/ptrace.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
@@ -79,28 +82,21 @@
 #include <vm/vm_extern.h>
 
 #include <machine/cpu.h>
+#include <machine/intr_machdep.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
 #ifdef SMP
 #include <machine/smp.h>
 #endif
 #include <machine/tss.h>
-
-#include <i386/isa/icu.h>
-#include <i386/isa/intr_machdep.h>
+#include <machine/vm86.h>
 
 #ifdef POWERFAIL_NMI
 #include <sys/syslog.h>
 #include <machine/clock.h>
 #endif
 
-#include <machine/vm86.h>
-
 #include <ddb/ddb.h>
-
-#include <sys/sysctl.h>
-
-int (*pmath_emulate)(struct trapframe *);
 
 extern void trap(struct trapframe frame);
 #ifdef I386_CPU
@@ -277,6 +273,7 @@ trap(frame)
 
 		case T_BPTFLT:		/* bpt instruction fault */
 		case T_TRCTRAP:		/* trace trap */
+			enable_intr();
 			frame.tf_eflags &= ~PSL_T;
 			i = SIGTRAP;
 			break;
@@ -316,6 +313,9 @@ trap(frame)
 			break;
 
 		case T_PAGEFLT:		/* page fault */
+			if (td->td_flags & TDF_SA)
+				thread_user_enter(p, td);
+
 			i = trap_pfault(&frame, TRUE, eva);
 #if defined(I586_CPU) && !defined(NO_F00F_HACK)
 			if (i == -2) {
@@ -396,21 +396,8 @@ trap(frame)
 			if (npxdna())
 				goto userout;
 #endif
-			if (!pmath_emulate) {
-				i = SIGFPE;
-				ucode = FPE_FPU_NP_TRAP;
-				break;
-			}
-			mtx_lock(&Giant);
-			i = (*pmath_emulate)(&frame);
-			mtx_unlock(&Giant);
-			if (i == 0) {
-				if (!(frame.tf_eflags & PSL_T))
-					goto userout;
-				frame.tf_eflags &= ~PSL_T;
-				i = SIGTRAP;
-			}
-			/* else ucode = emulator_only_knows() XXX */
+			i = SIGFPE;
+			ucode = FPE_FPU_NP_TRAP;
 			break;
 
 		case T_FPOPFLT:		/* FPU operand fetch fault */
@@ -775,7 +762,7 @@ trap_fatal(frame, eva)
 #ifdef SMP
 	/* two separate prints in case of a trap on an unmapped page */
 	printf("cpuid = %d; ", PCPU_GET(cpuid));
-	printf("lapic.id = %08x\n", lapic.id);
+	printf("apic id = %02x\n", PCPU_GET(apic_id));
 #endif
 	if (type == T_PAGEFLT) {
 		printf("fault virtual address	= 0x%x\n", eva);
@@ -858,7 +845,7 @@ dblfault_handler()
 #ifdef SMP
 	/* two separate prints in case of a trap on an unmapped page */
 	printf("cpuid = %d; ", PCPU_GET(cpuid));
-	printf("lapic.id = %08x\n", lapic.id);
+	printf("apic id = %02x\n", PCPU_GET(apic_id));
 #endif
 	panic("double fault");
 }
@@ -949,7 +936,7 @@ syscall(frame)
 	td->td_frame = &frame;
 	if (td->td_ucred != p->p_ucred) 
 		cred_update_thread(td);
-	if (p->p_flag & P_THREADED)
+	if (p->p_flag & P_SA)
 		thread_user_enter(p, td);
 	params = (caddr_t)frame.tf_esp + sizeof(int);
 	code = frame.tf_eax;
@@ -1018,6 +1005,8 @@ syscall(frame)
 
 		STOPEVENT(p, S_SCE, narg);
 
+		PTRACESTOP_SC(p, td, S_PT_SCE);
+
 		error = (*callp->sy_call)(td, args);
 	}
 
@@ -1081,6 +1070,8 @@ syscall(frame)
 	 * is not the case, this code will need to be revisited.
 	 */
 	STOPEVENT(p, S_SCX, code);
+
+	PTRACESTOP_SC(p, td, S_PT_SCX);
 
 #ifdef DIAGNOSTIC
 	cred_free_thread(td);

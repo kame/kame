@@ -28,9 +28,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/geom/geom_mbr.c,v 1.50 2003/05/02 08:13:03 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/geom/geom_mbr.c,v 1.55 2003/09/01 20:45:32 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -151,41 +152,35 @@ g_mbr_modify(struct g_geom *gp, struct g_mbr_softc *ms, u_char *sec0)
 	return (0);
 }
 
-static void
-g_mbr_ioctl(void *arg, int flag)
+static int
+g_mbr_ioctl(struct g_provider *pp, u_long cmd, void *data, struct thread *td)
 {
-	struct bio *bp;
 	struct g_geom *gp;
-	struct g_slicer *gsp;
 	struct g_mbr_softc *ms;
-	struct g_ioctl *gio;
+	struct g_slicer *gsp;
 	struct g_consumer *cp;
-	u_char *sec0;
 	int error;
 
-	bp = arg;
-	if (flag == EV_CANCEL) {
-		g_io_deliver(bp, ENXIO);
-		return;
-	}
-	gp = bp->bio_to->geom;
+	gp = pp->geom;
 	gsp = gp->softc;
 	ms = gsp->softc;
-	gio = (struct g_ioctl *)bp->bio_data;
 
-	/* The disklabel to set is the ioctl argument. */
-	sec0 = gio->data;
-
-	error = g_mbr_modify(gp, ms, sec0);
-	if (error) {
-		g_io_deliver(bp, error);
-		return;
+	switch(cmd) {
+	case DIOCSMBR: {
+		DROP_GIANT();
+		g_topology_lock();
+		/* Validate and modify our slicer instance to match. */
+		error = g_mbr_modify(gp, ms, data);
+		cp = LIST_FIRST(&gp->consumer);
+		error = g_write_data(cp, 0, data, 512);
+		g_topology_unlock();
+		PICKUP_GIANT();
+		return(error);
 	}
-	cp = LIST_FIRST(&gp->consumer);
-	error = g_write_data(cp, 0, sec0, 512);
-	g_io_deliver(bp, error);
+	default:
+		return (ENOIOCTL);
+	}
 }
-
 
 static int
 g_mbr_start(struct bio *bp)
@@ -194,8 +189,7 @@ g_mbr_start(struct bio *bp)
 	struct g_geom *gp;
 	struct g_mbr_softc *mp;
 	struct g_slicer *gsp;
-	struct g_ioctl *gio;
-	int idx, error;
+	int idx;
 
 	pp = bp->bio_to;
 	idx = pp->index;
@@ -208,34 +202,6 @@ g_mbr_start(struct bio *bp)
 		if (g_handleattr_off_t(bp, "MBR::offset",
 		    gsp->slices[idx].offset))
 			return (1);
-	}
-
-	/* We only handle ioctl(2) requests of the right format. */
-	if (strcmp(bp->bio_attribute, "GEOM::ioctl"))
-		return (0);
-	else if (bp->bio_length != sizeof(*gio))
-		return (0);
-
-	/* Get hold of the ioctl parameters. */
-	gio = (struct g_ioctl *)bp->bio_data;
-
-	switch (gio->cmd) {
-	case DIOCSMBR:
-		/*
-		 * These we cannot do without the topology lock and some
-		 * some I/O requests.  Ask the event-handler to schedule
-		 * us in a less restricted environment.
-		 */
-		error = g_post_event(g_mbr_ioctl, bp, M_NOWAIT, gp, NULL);
-		if (error)
-			g_io_deliver(bp, error);
-		/*
-		 * We must return non-zero to indicate that we will deal
-		 * with this bio, even though we have not done so yet.
-		 */
-		return (1);
-	default:
-		return (0);
 	}
 
 	return (0);
@@ -266,7 +232,6 @@ g_mbr_taste(struct g_class *mp, struct g_provider *pp, int insist)
 	struct g_consumer *cp;
 	int error;
 	struct g_mbr_softc *ms;
-	struct g_slicer *gsp;
 	u_int fwsectors, sectorsize;
 	u_char *buf;
 
@@ -275,9 +240,9 @@ g_mbr_taste(struct g_class *mp, struct g_provider *pp, int insist)
 	gp = g_slice_new(mp, NDOSPART, pp, &cp, &ms, sizeof *ms, g_mbr_start);
 	if (gp == NULL)
 		return (NULL);
-	gsp = gp->softc;
 	g_topology_unlock();
 	gp->dumpconf = g_mbr_dumpconf;
+	gp->ioctl = g_mbr_ioctl;
 	do {
 		if (gp->rank != 2 && insist == 0)
 			break;
@@ -309,7 +274,6 @@ g_mbr_taste(struct g_class *mp, struct g_provider *pp, int insist)
 static struct g_class g_mbr_class	= {
 	.name = MBR_CLASS_NAME,
 	.taste = g_mbr_taste,
-	G_CLASS_INITIALIZER
 };
 
 DECLARE_GEOM_CLASS(g_mbr_class, g_mbr);
@@ -369,7 +333,6 @@ g_mbrext_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 	u_char *buf;
 	struct dos_partition dp[4];
 	u_int fwsectors, sectorsize;
-	struct g_slicer *gsp;
 
 	g_trace(G_T_TOPOLOGY, "g_mbrext_taste(%s,%s)", mp->name, pp->name);
 	g_topology_assert();
@@ -379,7 +342,6 @@ g_mbrext_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 	    g_mbrext_start);
 	if (gp == NULL)
 		return (NULL);
-	gsp = gp->softc;
 	g_topology_unlock();
 	gp->dumpconf = g_mbrext_dumpconf;
 	off = 0;
@@ -431,7 +393,8 @@ g_mbrext_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 			}
 			if (dp[1].dp_flag != 0)
 				break;
-			if (dp[1].dp_typ != DOSPTYP_EXT)
+			if (dp[1].dp_typ != DOSPTYP_EXT &&
+			    dp[1].dp_typ != DOSPTYP_EXTLBA)
 				break;
 			if (dp[1].dp_size == 0)
 				break;
@@ -452,7 +415,6 @@ g_mbrext_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 static struct g_class g_mbrext_class	= {
 	.name = MBREXT_CLASS_NAME,
 	.taste = g_mbrext_taste,
-	G_CLASS_INITIALIZER
 };
 
 DECLARE_GEOM_CLASS(g_mbrext_class, g_mbrext);

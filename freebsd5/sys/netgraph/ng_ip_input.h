@@ -62,14 +62,14 @@
  * Author:		Brooks Davis <brooks@FreeBSD.org>
  * Derived from:	ng_hole.h
  *
- * $FreeBSD: src/sys/netgraph/ng_ip_input.h,v 1.1 2001/09/27 21:54:27 brooks Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ip_input.h,v 1.2 2003/11/11 12:30:37 ru Exp $
  */
 
-#ifndef _NETGRAPH_IP_INPUT_H_
-#define _NETGRAPH_IP_INPUT_H_
+#ifndef _NETGRAPH_NG_IP_INPUT_H_
+#define _NETGRAPH_NG_IP_INPUT_H_
 
 /* Node type name and magic cookie */
 #define NG_IP_INPUT_NODE_TYPE	"ip_input"
 #define NGM_IP_INPUT_COOKIE	994874907
 
-#endif /* _NETGRAPH_IP_INPUT_H_ */
+#endif /* _NETGRAPH_NG_IP_INPUT_H_ */

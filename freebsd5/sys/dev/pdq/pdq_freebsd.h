@@ -24,7 +24,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * Id: pdqvar.h,v 1.21 1997/03/21 21:16:04 thomas Exp
- * $FreeBSD: src/sys/dev/pdq/pdq_freebsd.h,v 1.6 2003/04/01 16:31:12 gallatin Exp $
+ * $FreeBSD: src/sys/dev/pdq/pdq_freebsd.h,v 1.7 2003/10/31 18:32:03 brooks Exp $
  *
  */
 
@@ -158,8 +158,8 @@ typedef struct _pdq_os_ctx_t {
 
 #if defined(PDQ_HWSUPPORT)
 
-#define	PDQ_OS_PREFIX			"%s%d: "
-#define	PDQ_OS_PREFIX_ARGS		pdq->pdq_os_name, pdq->pdq_unit
+#define	PDQ_OS_PREFIX			"%s: "
+#define	PDQ_OS_PREFIX_ARGS		pdq->pdq_os_name
 
 #define	PDQ_OS_PTR_FMT	"%p"
 #define	PDQ_OS_CSR_FMT	"0x%x"

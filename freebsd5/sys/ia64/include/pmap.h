@@ -43,7 +43,7 @@
  *	from: hp300: @(#)pmap.h	7.2 (Berkeley) 12/16/90
  *	from: @(#)pmap.h	7.4 (Berkeley) 5/12/91
  *	from: i386 pmap.h,v 1.54 1997/11/20 19:30:35 bde Exp
- * $FreeBSD: src/sys/ia64/include/pmap.h,v 1.14 2003/05/19 04:16:30 marcel Exp $
+ * $FreeBSD: src/sys/ia64/include/pmap.h,v 1.15 2003/10/06 01:47:11 bms Exp $
  */
 
 #ifndef _MACHINE_PMAP_H_
@@ -83,7 +83,6 @@ struct pmap {
 };
 
 #define	pmap_page_is_mapped(m)	(!TAILQ_EMPTY(&(m)->md.pv_list))
-#define pmap_resident_count(pmap) (pmap)->pm_stats.resident_count
 
 #define PM_FLAG_LOCKED	0x1
 #define PM_FLAG_WANTED	0x2

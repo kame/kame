@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/pci/intpm.c,v 1.28 2003/02/26 13:46:40 nyan Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/intpm.c,v 1.30 2003/08/22 07:13:22 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -45,8 +46,8 @@
 /*This should be removed if force_pci_map_int supported*/
 #include <sys/interrupt.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 #include <pci/intpmreg.h>
 
 #include "opt_intpm.h"

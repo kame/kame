@@ -1,7 +1,5 @@
-# $FreeBSD: src/sys/modules/netgraph/etf/Makefile,v 1.2 2002/01/11 15:48:52 ru Exp $
+# $FreeBSD: src/sys/modules/netgraph/etf/Makefile,v 1.3 2003/11/10 12:54:54 ru Exp $
 # Ethertype filter
-
-COPTS+=-g
 
 KMOD=	ng_etf
 SRCS= 	ng_etf.c

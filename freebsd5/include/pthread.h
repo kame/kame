@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF 
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/include/pthread.h,v 1.28 2003/04/20 01:53:12 jdp Exp $
+ * $FreeBSD: src/include/pthread.h,v 1.32 2003/11/04 20:10:15 deischen Exp $
  */
 #ifndef _PTHREAD_H_
 #define _PTHREAD_H_
@@ -52,6 +52,7 @@
 #define PTHREAD_KEYS_MAX			256
 #define PTHREAD_STACK_MIN			1024
 #define PTHREAD_THREADS_MAX			ULONG_MAX
+#define PTHREAD_BARRIER_SERIAL_THREAD		-1
 
 /*
  * Flags for threads and thread attributes.
@@ -95,6 +96,9 @@ struct pthread_mutex_attr;
 struct pthread_once;
 struct pthread_rwlock;
 struct pthread_rwlockattr;
+struct pthread_barrier;
+struct pthread_barrier_attr;
+struct pthread_spinlock;
 
 /*
  * Primitive system data type definitions required by P1003.1c.
@@ -113,6 +117,9 @@ typedef int     			pthread_key_t;
 typedef struct	pthread_once		pthread_once_t;
 typedef struct	pthread_rwlock		*pthread_rwlock_t;
 typedef struct	pthread_rwlockattr	*pthread_rwlockattr_t;
+typedef struct	pthread_barrier		*pthread_barrier_t;
+typedef struct	pthread_barrierattr	*pthread_barrierattr_t;
+typedef struct	pthread_spinlock	*pthread_spinlock_t;
 
 /*
  * Additional type definitions:
@@ -189,6 +196,8 @@ enum pthread_mutextype {
  * Thread function prototype definitions:
  */
 __BEGIN_DECLS
+int		pthread_atfork(void (*prepare)(void), void (*parent)(void),
+			void (*child)(void));
 int		pthread_attr_destroy(pthread_attr_t *);
 int		pthread_attr_getstack(const pthread_attr_t * __restrict, 
 			void ** __restrict stackaddr, 
@@ -203,6 +212,15 @@ int		pthread_attr_setguardsize(pthread_attr_t *, size_t);
 int		pthread_attr_setstack(pthread_attr_t *, void *, size_t);
 int		pthread_attr_setstackaddr(pthread_attr_t *, void *);
 int		pthread_attr_setdetachstate(pthread_attr_t *, int);
+int		pthread_barrier_destroy(pthread_barrier_t *);
+int		pthread_barrier_init(pthread_barrier_t *,
+			const pthread_barrierattr_t *, unsigned);
+int		pthread_barrier_wait(pthread_barrier_t *);
+int		pthread_barrierattr_destroy(pthread_barrierattr_t *);
+int		pthread_barrierattr_getpshared(const pthread_barrierattr_t *,
+			int *);
+int		pthread_barrierattr_init(pthread_barrierattr_t *);
+int		pthread_barrierattr_setpshared(pthread_barrierattr_t *, int);
 void		pthread_cleanup_pop(int);
 void		pthread_cleanup_push(void (*) (void *), void *routine_arg);
 int		pthread_condattr_destroy(pthread_condattr_t *);
@@ -236,12 +254,18 @@ int		pthread_mutex_init(pthread_mutex_t *,
 			const pthread_mutexattr_t *);
 int		pthread_mutex_lock(pthread_mutex_t *);
 int		pthread_mutex_trylock(pthread_mutex_t *);
+int		pthread_mutex_timedlock(pthread_mutex_t *,
+			const struct timespec *);
 int		pthread_mutex_unlock(pthread_mutex_t *);
 int		pthread_once(pthread_once_t *, void (*) (void));
 int		pthread_rwlock_destroy(pthread_rwlock_t *);
 int		pthread_rwlock_init(pthread_rwlock_t *,
 			const pthread_rwlockattr_t *);
 int		pthread_rwlock_rdlock(pthread_rwlock_t *);
+int		pthread_rwlock_timedrdlock(pthread_rwlock_t *,
+			const struct timespec *);
+int		pthread_rwlock_timedrwlock(pthread_rwlock_t *,
+			const struct timespec *);
 int		pthread_rwlock_tryrdlock(pthread_rwlock_t *);
 int		pthread_rwlock_trywrlock(pthread_rwlock_t *);
 int		pthread_rwlock_unlock(pthread_rwlock_t *);
@@ -255,6 +279,11 @@ pthread_t	pthread_self(void);
 int		pthread_setspecific(pthread_key_t, const void *);
 int		pthread_sigmask(int, const sigset_t *, sigset_t *);
 
+int		pthread_spin_init(pthread_spinlock_t *, int);
+int		pthread_spin_destroy(pthread_spinlock_t *);
+int		pthread_spin_lock(pthread_spinlock_t *);
+int		pthread_spin_trylock(pthread_spinlock_t *);
+int		pthread_spin_unlock(pthread_spinlock_t *);
 int		pthread_cancel(pthread_t);
 int		pthread_setcancelstate(int, int *);
 int		pthread_setcanceltype(int, int *);

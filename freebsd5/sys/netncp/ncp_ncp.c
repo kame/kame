@@ -29,10 +29,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netncp/ncp_ncp.c,v 1.16 2003/05/13 20:36:00 jhb Exp $
- *
  * Core of NCP protocol
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netncp/ncp_ncp.c,v 1.18 2003/07/24 01:59:17 peter Exp $");
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -205,7 +206,8 @@ int
 ncp_renegotiate_connparam(struct ncp_conn *conn, int buffsize, u_int8_t in_options)
 {
 	u_int8_t options;
-	int neg_buffsize, error, sl, ckslevel, ilen;
+	int neg_buffsize, error, sl, ckslevel;
+	size_t ilen;
 
 	sl = conn->li.sig_level;
 	if (sl >= 2)

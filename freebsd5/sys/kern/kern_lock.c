@@ -38,8 +38,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_lock.c	8.18 (Berkeley) 5/21/95
- * $FreeBSD: src/sys/kern/kern_lock.c,v 1.67 2003/03/11 20:00:37 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_lock.c,v 1.70 2003/07/16 01:00:38 truckman Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -72,7 +74,6 @@
  * share a fixed (at boot time) number of mutexes across all lockmgr locks in
  * order to keep sizeof(struct lock) down.
  */
-int lock_mtx_valid;
 static struct mtx lock_mtx;
 
 static int acquire(struct lock **lkpp, int extflags, int wanted);
@@ -82,18 +83,9 @@ static int acquiredrain(struct lock *lkp, int extflags) ;
 static void
 lockmgr_init(void *dummy __unused)
 {
-	/*
-	 * Initialize the lockmgr protection mutex if it hasn't already been
-	 * done.  Unless something changes about kernel startup order, VM
-	 * initialization will always cause this mutex to already be
-	 * initialized in a call to lockinit().
-	 */
-	if (lock_mtx_valid == 0) {
-		mtx_init(&lock_mtx, "lockmgr", NULL, MTX_DEF);
-		lock_mtx_valid = 1;
-	}
+	mtx_init(&lock_mtx, "lockmgr", NULL, MTX_DEF);
 }
-SYSINIT(lmgrinit, SI_SUB_LOCK, SI_ORDER_FIRST, lockmgr_init, NULL)
+SYSINIT(lmgrinit, SI_SUB_LOCKMGR, SI_ORDER_FIRST, lockmgr_init, NULL)
 
 static LOCK_INLINE void
 sharelock(struct lock *lkp, int incr) {
@@ -537,21 +529,7 @@ lockinit(lkp, prio, wmesg, timo, flags)
 	CTR5(KTR_LOCK, "lockinit(): lkp == %p, prio == %d, wmesg == \"%s\", "
 	    "timo == %d, flags = 0x%x\n", lkp, prio, wmesg, timo, flags);
 
-	if (lock_mtx_valid == 0) {
-		mtx_init(&lock_mtx, "lockmgr", NULL, MTX_DEF);
-		lock_mtx_valid = 1;
-	}
-	/*
-	 * XXX cleanup - make sure mtxpool is always initialized before
-	 * this is ever called.
-	 */
-	if (mtx_pool_valid) {
-		mtx_lock(&lock_mtx);
-		lkp->lk_interlock = mtx_pool_alloc();
-		mtx_unlock(&lock_mtx);
-	} else {
-		lkp->lk_interlock = &lock_mtx;
-	}
+	lkp->lk_interlock = mtx_pool_alloc(mtxpool_lockbuilder);
 	lkp->lk_flags = (flags & LK_EXTFLG_MASK);
 	lkp->lk_sharecount = 0;
 	lkp->lk_waitcount = 0;

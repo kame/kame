@@ -31,18 +31,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/exception.s,v 1.103 2003/02/17 09:55:08 julian Exp $
+ * $FreeBSD: src/sys/i386/i386/exception.s,v 1.106 2003/11/03 22:08:52 jhb Exp $
  */
 
 #include "opt_npx.h"
 
 #include <machine/asmacros.h>
-#include <sys/mutex.h>
 #include <machine/psl.h>
 #include <machine/trap.h>
-#ifdef SMP
-#include <machine/smptests.h>		/** various SMP options */
-#endif
 
 #include "assym.s"
 
@@ -77,9 +73,6 @@
  * %ss segment registers, but does not mess with %ds, %es, or %fs.  Thus we
  * must load them with appropriate values for supervisor mode operation.
  */
-#define	IDTVEC(name)	ALIGN_TEXT; .globl __CONCAT(X,name); \
-			.type __CONCAT(X,name),@function; __CONCAT(X,name):
-#define	TRAP(a)		pushl $(a) ; jmp alltraps
 
 MCOUNT_LABEL(user)
 MCOUNT_LABEL(btrap)
@@ -217,9 +210,6 @@ ENTRY(fork_trampoline)
 	pushl	%esp			/* trapframe pointer */
 	pushl	%ebx			/* arg1 */
 	pushl	%esi			/* function */
-	movl    PCPU(CURTHREAD),%ebx	/* setup critnest */
-	movl	$1,TD_CRITNEST(%ebx)
-	sti				/* enable interrupts */
 	call	fork_exit
 	addl	$12,%esp
 	/* cut from syscall */
@@ -236,13 +226,6 @@ ENTRY(fork_trampoline)
  */
 #include "i386/i386/vm86bios.s"
 
-/*
- * Include what was once config+isa-dependent code.
- * XXX it should be in a stand-alone file.  It's still icu-dependent and
- * belongs in i386/isa.
- */
-#include "i386/isa/vector.s"
-
 	.data
 	ALIGN_DATA
 
@@ -253,6 +236,7 @@ ENTRY(fork_trampoline)
  */
 	.text
 	SUPERALIGN_TEXT
+	.globl	doreti
 	.type	doreti,@function
 doreti:
 	FAKE_MCOUNT(bintr)		/* init "from" bintr -> doreti */
@@ -275,7 +259,7 @@ doreti_notvm86:
 doreti_ast:
 	/*
 	 * Check for ASTs atomically with returning.  Disabling CPU
-	 * interrupts provides sufficient locking evein the SMP case,
+	 * interrupts provides sufficient locking even in the SMP case,
 	 * since we will be informed of any new ASTs by an IPI.
 	 */
 	cli
@@ -337,9 +321,3 @@ doreti_popl_fs_fault:
 	movl	$0,TF_ERR(%esp)	/* XXX should be the error code */
 	movl	$T_PROTFLT,TF_TRAPNO(%esp)
 	jmp	alltraps_with_regs_pushed
-
-#ifdef APIC_IO
-#include "i386/isa/apic_ipl.s"
-#else
-#include "i386/isa/icu_ipl.s"
-#endif /* APIC_IO */

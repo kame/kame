@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/nwfs/nwfs_vnops.c,v 1.27 2003/03/03 19:15:38 njl Exp $
+ * $FreeBSD: src/sys/fs/nwfs/nwfs_vnops.c,v 1.30 2003/10/18 11:06:14 phk Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -796,9 +796,9 @@ static int nwfs_strategy (ap)
 	struct thread *td;
 	int error = 0;
 
+	KASSERT(ap->a_vp == ap->a_bp->b_vp, ("%s(%p != %p)",
+	    __func__, ap->a_vp, ap->a_bp->b_vp));
 	NCPVNDEBUG("\n");
-	if (bp->b_flags & B_PHYS)
-		panic("nwfs physio");
 	if (bp->b_flags & B_ASYNC)
 		td = (struct thread *)0;
 	else

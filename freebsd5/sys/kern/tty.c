@@ -44,7 +44,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)tty.c	8.8 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/tty.c,v 1.201 2003/05/14 00:03:55 ps Exp $
  */
 
 /*-
@@ -74,6 +73,9 @@
  *	o Restore TS_WOPEN since it is useful in pstat.  It must be cleared
  *	  only when _all_ openers leave open().
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/tty.c,v 1.205 2003/11/09 09:17:24 tanimura Exp $");
 
 #include "opt_compat.h"
 #include "opt_tty.h"
@@ -259,7 +261,7 @@ ttyclose(struct tty *tp)
 	funsetown(&tp->t_sigio);
 	s = spltty();
 	if (constty == tp)
-		constty = NULL;
+		constty_clear();
 
 	ttyflush(tp, FREAD | FWRITE);
 	clist_free_cblocks(&tp->t_canq);
@@ -869,9 +871,9 @@ ttioctl(struct tty *tp, u_long cmd, void *data, int flag)
 			if (error)
 				return (error);
 
-			constty = tp;
+			constty_set(tp);
 		} else if (tp == constty)
-			constty = NULL;
+			constty_clear();
 		break;
 	case TIOCDRAIN:			/* wait till output drained */
 		error = ttywait(tp);
@@ -2269,7 +2271,7 @@ ttwakeup(struct tty *tp)
 {
 
 	if (SEL_WAITING(&tp->t_rsel))
-		selwakeup(&tp->t_rsel);
+		selwakeuppri(&tp->t_rsel, TTIPRI);
 	if (ISSET(tp->t_state, TS_ASYNC) && tp->t_sigio != NULL)
 		pgsigio(&tp->t_sigio, SIGIO, (tp->t_session != NULL));
 	wakeup(TSA_HUP_OR_INPUT(tp));
@@ -2284,7 +2286,7 @@ ttwwakeup(struct tty *tp)
 {
 
 	if (SEL_WAITING(&tp->t_wsel) && tp->t_outq.c_cc <= tp->t_olowat)
-		selwakeup(&tp->t_wsel);
+		selwakeuppri(&tp->t_wsel, TTOPRI);
 	if (ISSET(tp->t_state, TS_ASYNC) && tp->t_sigio != NULL)
 		pgsigio(&tp->t_sigio, SIGIO, (tp->t_session != NULL));
 	if (ISSET(tp->t_state, TS_BUSY | TS_SO_OCOMPLETE) ==
@@ -2417,7 +2419,7 @@ ttyinfo(struct tty *tp)
 
 			td = FIRST_THREAD_IN_PROC(pick);
 			sprefix = "";
-			if (pick->p_flag & P_THREADED) {
+			if (pick->p_flag & P_SA) {
 				stmp = "KSE" ;  /* XXXKSE */
 			} else {
 				if (td) {

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)spec_vnops.c	8.14 (Berkeley) 5/21/95
- * $FreeBSD: src/sys/fs/specfs/spec_vnops.c,v 1.199 2003/03/13 07:31:45 jeff Exp $
+ * $FreeBSD: src/sys/fs/specfs/spec_vnops.c,v 1.214 2003/11/13 09:58:09 phk Exp $
  */
 
 #include <sys/param.h>
@@ -67,7 +67,6 @@ static int	spec_open(struct vop_open_args *);
 static int	spec_poll(struct vop_poll_args *);
 static int	spec_print(struct vop_print_args *);
 static int	spec_read(struct vop_read_args *);
-static int	spec_strategy(struct vop_strategy_args *);
 static int	spec_specstrategy(struct vop_specstrategy_args *);
 static int	spec_write(struct vop_write_args *);
 
@@ -103,7 +102,7 @@ static struct vnodeopv_entry_desc spec_vnodeop_entries[] = {
 	{ &vop_rmdir_desc,		(vop_t *) vop_panic },
 	{ &vop_setattr_desc,		(vop_t *) vop_ebadf },
 	{ &vop_specstrategy_desc,	(vop_t *) spec_specstrategy },
-	{ &vop_strategy_desc,		(vop_t *) spec_strategy },
+	{ &vop_strategy_desc,		(vop_t *) vop_panic },
 	{ &vop_symlink_desc,		(vop_t *) vop_panic },
 	{ &vop_write_desc,		(vop_t *) spec_write },
 	{ NULL, NULL }
@@ -197,9 +196,14 @@ spec_open(ap)
 	VOP_UNLOCK(vp, 0, td);
 	if(dsw->d_flags & D_NOGIANT) {
 		DROP_GIANT();
-		error = dsw->d_open(dev, ap->a_mode, S_IFCHR, td);
+		if (dsw->d_fdopen != NULL)
+			error = dsw->d_fdopen(dev, ap->a_mode, td, ap->a_fdidx);
+		else
+			error = dsw->d_open(dev, ap->a_mode, S_IFCHR, td);
 		PICKUP_GIANT();
-	} else
+	} else if (dsw->d_fdopen != NULL)
+		error = dsw->d_fdopen(dev, ap->a_mode, td, ap->a_fdidx);
+	else
 		error = dsw->d_open(dev, ap->a_mode, S_IFCHR, td);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 
@@ -506,37 +510,13 @@ spec_xstrategy(struct vnode *vp, struct buf *bp)
 	   devtoname(bp->b_dev), bp));
 	
 	if (dsw->d_flags & D_NOGIANT) {
-		DROP_GIANT();
+		/* XXX: notyet DROP_GIANT(); */
 		DEV_STRATEGY(bp);
-		PICKUP_GIANT();
+		/* XXX: notyet PICKUP_GIANT(); */
 	} else
 		DEV_STRATEGY(bp);
 		
 	return (0);
-}
-
-/*
- * Decoy strategy routine.  We should always come in via the specstrategy
- * method, but in case some code has botched it, we have a strategy as
- * well.  We will deal with the request anyway and first time around we
- * print some debugging useful information.
- */
-
-static int
-spec_strategy(ap)
-	struct vop_strategy_args /* {
-		struct vnode *a_vp;
-		struct buf *a_bp;
-	} */ *ap;
-{
-	static int once;
-
-	if (!once) {
-		vprint("VOP_STRATEGY on VCHR", ap->a_vp);
-		backtrace();
-		once++;
-	}
-	return spec_xstrategy(ap->a_vp, ap->a_bp);
 }
 
 static int
@@ -547,6 +527,10 @@ spec_specstrategy(ap)
 	} */ *ap;
 {
 
+	KASSERT(ap->a_vp->v_rdev == ap->a_bp->b_dev,
+	    ("%s, dev %s != %s", __func__,
+	    devtoname(ap->a_vp->v_rdev),
+	    devtoname(ap->a_bp->b_dev)));
 	return spec_xstrategy(ap->a_vp, ap->a_bp);
 }
 
@@ -571,6 +555,7 @@ spec_freeblks(ap)
 	bp->b_dev = ap->a_vp->v_rdev;
 	bp->b_blkno = ap->a_addr;
 	bp->b_offset = dbtob(ap->a_addr);
+	bp->b_iooffset = bp->b_offset;
 	bp->b_bcount = ap->a_length;
 	BUF_KERNPROC(bp);
 	DEV_STRATEGY(bp);
@@ -746,11 +731,11 @@ spec_getpages(ap)
 	bp->b_iocmd = BIO_READ;
 	bp->b_iodone = bdone;
 
-	/* B_PHYS is not set, but it is nice to fill this in. */
 	KASSERT(bp->b_rcred == NOCRED, ("leaking read ucred"));
 	KASSERT(bp->b_wcred == NOCRED, ("leaking write ucred"));
 	bp->b_rcred = crhold(curthread->td_ucred);
 	bp->b_wcred = crhold(curthread->td_ucred);
+	bp->b_iooffset = offset;
 	bp->b_blkno = blkno;
 	bp->b_lblkno = blkno;
 	pbgetvp(ap->a_vp, bp);
@@ -786,6 +771,10 @@ spec_getpages(ap)
 	pmap_qremove(kva, pcount);
 
 	gotreqpage = 0;
+	/*
+	 * While the page is busy, its object field is immutable.
+	 */
+	VM_OBJECT_LOCK(ap->a_m[ap->a_reqpage]->object);
 	vm_page_lock_queues();
 	for (i = 0, toff = 0; i < pcount; i++, toff = nextoff) {
 		nextoff = toff + PAGE_SIZE;
@@ -844,17 +833,19 @@ spec_getpages(ap)
 	    "spec_getpages:(%s) I/O read failure: (error=%d) bp %p vp %p\n",
 			devtoname(bp->b_dev), error, bp, bp->b_vp);
 		printf(
-	    "               size: %d, resid: %ld, a_count: %d, valid: 0x%x\n",
-		    size, bp->b_resid, ap->a_count, m->valid);
+	    "               size: %d, resid: %ld, a_count: %d, valid: 0x%lx\n",
+		    size, bp->b_resid, ap->a_count, (u_long)m->valid);
 		printf(
 	    "               nread: %d, reqpage: %d, pindex: %lu, pcount: %d\n",
 		    nread, ap->a_reqpage, (u_long)m->pindex, pcount);
+		VM_OBJECT_UNLOCK(m->object);
 		/*
 		 * Free the buffer header back to the swap buffer pool.
 		 */
 		relpbuf(bp, NULL);
 		return VM_PAGER_ERROR;
 	}
+	VM_OBJECT_UNLOCK(ap->a_m[ap->a_reqpage]->object);
 	/*
 	 * Free the buffer header back to the swap buffer pool.
 	 */

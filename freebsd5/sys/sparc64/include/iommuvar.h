@@ -27,7 +27,7 @@
  *
  *	from: NetBSD: iommuvar.h,v 1.9 2001/07/20 00:07:13 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/include/iommuvar.h,v 1.11 2003/05/26 04:00:52 scottl Exp $
+ * $FreeBSD: src/sys/sparc64/include/iommuvar.h,v 1.14 2003/07/10 23:27:35 tmm Exp $
  */
 
 #ifndef _MACHINE_IOMMUVAR_H_
@@ -40,64 +40,60 @@
 #define	trunc_io_page(x)	trunc_page(x)
 
 /*
- * per-IOMMU state
+ * Per-IOMMU state. The parenthesized comments indicate the locking strategy:
+ *	i - protected by iommu_mtx.
+ *	r - read-only after initialization.
+ *	* - comment refers to pointer target / target hardware registers
+ *	    (for bus_addr_t).
+ * iommu_map_lruq is also locked by iommu_mtx. Elements of iommu_tsb may only
+ * be accessed from functions operating on the map owning the corresponding
+ * resource, so the locking the user is required to do to protect the map is
+ * sufficient. As soon as the TSBs are divorced, these will be moved into struct
+ * iommu_state, and each state struct will get its own lock.
+ * iommu_dvma_rman needs to be moved there too, but has its own internal lock.
  */
 struct iommu_state {
-	int			is_tsbsize;	/* 0 = 8K, ... */
-	u_int64_t		is_dvmabase;
-	int64_t			is_cr;		/* IOMMU control register value */
+	int			is_tsbsize;	/* (r) 0 = 8K, ... */
+	u_int64_t		is_dvmabase;	/* (r) */
+	int64_t			is_cr;		/* (r) Control reg value */
 
-	vm_paddr_t		is_flushpa[2];
-	volatile int64_t	*is_flushva[2];
+	vm_paddr_t		is_flushpa[2];	/* (r) */
+	volatile int64_t	*is_flushva[2];	/* (r, *i) */
 	/*
+	 * (i)
 	 * When a flush is completed, 64 bytes will be stored at the given
 	 * location, the first double word being 1, to indicate completion.
 	 * The lower 6 address bits are ignored, so the addresses need to be
 	 * suitably aligned; over-allocate a large enough margin to be able
 	 * to adjust it.
 	 * Two such buffers are needed.
-	 * Needs to be volatile or egcs optimizes away loads.
 	 */
 	volatile char		is_flush[STRBUF_FLUSHSYNC_NBYTES * 3 - 1];
 
 	/* copies of our parents state, to allow us to be self contained */
-	bus_space_tag_t		is_bustag;	/* our bus tag */
-	bus_space_handle_t	is_bushandle;
-	bus_addr_t		is_iommu;	/* IOMMU registers */
-	bus_addr_t		is_sb[2];	/* streaming buffer */
-	bus_addr_t		is_dtag;	/* tag diagnostics access */
-	bus_addr_t		is_ddram;	/* data ram diag. access */
-	bus_addr_t		is_dqueue;	/* LRU queue diag. access */
-	bus_addr_t		is_dva;		/* VA diag. register */
-	bus_addr_t		is_dtcmp;	/* tag compare diag. access */
+	bus_space_tag_t		is_bustag;	/* (r) Our bus tag */
+	bus_space_handle_t	is_bushandle;	/* (r) */
+	bus_addr_t		is_iommu;	/* (r, *i) IOMMU registers */
+	bus_addr_t		is_sb[2];	/* (r, *i) Streaming buffer */
+	/* Tag diagnostics access */
+	bus_addr_t		is_dtag;	/* (r, *r) */
+	/* Data RAM diagnostic access */
+	bus_addr_t		is_ddram;	/* (r, *r) */
+	/* LRU queue diag. access */
+	bus_addr_t		is_dqueue;	/* (r, *r) */
+	/* Virtual address diagnostics register */
+	bus_addr_t		is_dva;		/* (r, *r) */
+	/* Tag compare diagnostics access */
+	bus_addr_t		is_dtcmp;	/* (r, *r) */
 
-	STAILQ_ENTRY(iommu_state)	is_link;
+	STAILQ_ENTRY(iommu_state)	is_link;	/* (r) */
 };
 
 /* interfaces for PCI/SBUS code */
 void iommu_init(char *, struct iommu_state *, int, u_int32_t, int);
 void iommu_reset(struct iommu_state *);
-void iommu_enter(struct iommu_state *, vm_offset_t, vm_paddr_t, int);
-void iommu_remove(struct iommu_state *, vm_offset_t, size_t);
 void iommu_decode_fault(struct iommu_state *, vm_offset_t);
 
-int iommu_dvmamap_create(bus_dma_tag_t, bus_dma_tag_t, struct iommu_state *,
-    int, bus_dmamap_t *);
-int iommu_dvmamap_destroy(bus_dma_tag_t, bus_dma_tag_t, struct iommu_state *,
-    bus_dmamap_t);
-int iommu_dvmamap_load(bus_dma_tag_t, bus_dma_tag_t, struct iommu_state *,
-    bus_dmamap_t, void *, bus_size_t, bus_dmamap_callback_t *, void *, int);
-int iommu_dvmamap_load_mbuf(bus_dma_tag_t, bus_dma_tag_t, struct iommu_state *,
-    bus_dmamap_t, struct mbuf *, bus_dmamap_callback2_t *, void *, int);
-int iommu_dvmamap_load_uio(bus_dma_tag_t, bus_dma_tag_t, struct iommu_state *,
-    bus_dmamap_t, struct uio *, bus_dmamap_callback2_t *, void *, int);
-void iommu_dvmamap_unload(bus_dma_tag_t, bus_dma_tag_t, struct iommu_state *,
-    bus_dmamap_t);
-void iommu_dvmamap_sync(bus_dma_tag_t, bus_dma_tag_t, struct iommu_state *,
-    bus_dmamap_t, int);
-int iommu_dvmamem_alloc(bus_dma_tag_t, bus_dma_tag_t, struct iommu_state *,
-    void **, int, bus_dmamap_t *);
-void iommu_dvmamem_free(bus_dma_tag_t, bus_dma_tag_t, struct iommu_state *,
-    void *, bus_dmamap_t);
+extern struct bus_dma_methods iommu_dma_methods;
 
 #endif /* !_MACHINE_IOMMUVAR_H_ */

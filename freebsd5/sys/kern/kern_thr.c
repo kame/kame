@@ -22,10 +22,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/kern_thr.c,v 1.8 2003/05/16 21:26:42 marcel Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_thr.c,v 1.14 2003/08/14 03:56:24 grehan Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -111,11 +111,7 @@ thr_exit1(void)
 	sched_exit_thread(TAILQ_NEXT(td, td_kglist), td);
 	thread_stash(td);
 
-#if !defined(__alpha__) && !defined(__powerpc__) 
 	cpu_throw(td, choosethread());
-#else
-	cpu_throw();
-#endif
 }
 
 #define	RANGEOF(type, start, end) (offsetof(type, end) - offsetof(type, start))
@@ -156,7 +152,6 @@ thr_create(struct thread *td, struct thr_create_args *uap)
 	PROC_LOCK(td->td_proc);
 	td0->td_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	bcopy(td->td_frame, td0->td_frame, sizeof(struct trapframe));
 	td0->td_ucred = crhold(td->td_ucred);
 
 	/* Initialize our kse structure. */
@@ -165,7 +160,7 @@ thr_create(struct thread *td, struct thr_create_args *uap)
 	    RANGEOF(struct kse, ke_startzero, ke_endzero));
 
 	/* Set up our machine context. */
-	cpu_set_upcall(td0, td->td_pcb);
+	cpu_set_upcall(td0, td);
 	error = set_mcontext(td0, &ctx.uc_mcontext);
 	if (error != 0) {
 		kse_free(ke0);
@@ -239,33 +234,23 @@ thr_kill(struct thread *td, struct thr_kill_args *uap)
 
 	p = td->td_proc;
 	error = 0;
-
 	PROC_LOCK(p);
-
-	FOREACH_THREAD_IN_PROC(p, ttd)
+	FOREACH_THREAD_IN_PROC(p, ttd) {
 		if (ttd == uap->id)
 			break;
-
+	}
 	if (ttd == NULL) {
 		error = ESRCH;
 		goto out;
 	}
-
 	if (uap->sig == 0)
 		goto out;
-
 	if (!_SIG_VALID(uap->sig)) {
 		error = EINVAL;
 		goto out;
 	}
-
-	/*
-	 * We need a way to force this to go into this thread's siglist.
-	 * Until then blocked signals will go to the proc.
-	 */
-	tdsignal(ttd, uap->sig);
+	tdsignal(ttd, uap->sig, SIGTARGET_TD);
 out:
 	PROC_UNLOCK(p);
-
 	return (error);
 }

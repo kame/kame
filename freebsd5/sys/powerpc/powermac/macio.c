@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/powerpc/powermac/macio.c,v 1.11 2003/04/18 02:42:27 grehan Exp $
+ * $FreeBSD: src/sys/powerpc/powermac/macio.c,v 1.12 2003/06/29 02:05:19 grehan Exp $
  */
 
 /*
@@ -137,7 +137,6 @@ struct macio_quirk_entry {
 };
 
 static struct macio_quirk_entry macio_quirks[] = {
-	{ "interrupt-controller",	MACIO_QUIRK_IGNORE },
 	{ "escc-legacy",		MACIO_QUIRK_IGNORE },
 	{ "timer",			MACIO_QUIRK_IGNORE },
 	{ "escc",			MACIO_QUIRK_CHILD_HAS_INTR },

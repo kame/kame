@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_syscalls.c	8.13 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.314 2003/04/29 13:36:03 kan Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.333 2003/11/12 08:01:39 mckusick Exp $");
 
 /* For 4.3 integer FS ID compatibility */
 #include "opt_compat.h"
@@ -87,6 +89,9 @@ static int setutimes(struct thread *td, struct vnode *,
     const struct timespec *, int, int);
 static int vn_access(struct vnode *vp, int user_flags, struct ucred *cred,
     struct thread *td);
+
+static int extattr_list_vp(struct vnode *vp, int attrnamespace, void *data,
+    size_t nbytes, struct thread *td);
 
 int (*union_dircheckp)(struct thread *td, struct vnode **, struct file *);
 int (*softdep_fsync_hook)(struct vnode *);
@@ -221,11 +226,10 @@ statfs(td, uap)
 		struct statfs *buf;
 	} */ *uap;
 {
-	register struct mount *mp;
-	register struct statfs *sp;
+	struct mount *mp;
+	struct statfs *sp, sb;
 	int error;
 	struct nameidata nd;
-	struct statfs sb;
 
 	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, uap->path, td);
 	if ((error = namei(&nd)) != 0)
@@ -239,10 +243,15 @@ statfs(td, uap)
 	if (error)
 		return (error);
 #endif
+	/*
+	 * Set these in case the underlying filesystem fails to do so.
+	 */
+	sp->f_version = STATFS_VERSION;
+	sp->f_namemax = NAME_MAX;
+	sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
 	error = VFS_STATFS(mp, sp, td);
 	if (error)
 		return (error);
-	sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
 	if (suser(td)) {
 		bcopy(sp, &sb, sizeof(sb));
 		sb.f_fsid.val[0] = sb.f_fsid.val[1] = 0;
@@ -271,13 +280,12 @@ fstatfs(td, uap)
 {
 	struct file *fp;
 	struct mount *mp;
-	register struct statfs *sp;
+	struct statfs *sp, sb;
 	int error;
-	struct statfs sb;
 
 	if ((error = getvnode(td->td_proc->p_fd, uap->fd, &fp)) != 0)
 		return (error);
-	mp = ((struct vnode *)fp->f_data)->v_mount;
+	mp = fp->f_vnode->v_mount;
 	fdrop(fp, td);
 	if (mp == NULL)
 		return (EBADF);
@@ -287,10 +295,15 @@ fstatfs(td, uap)
 		return (error);
 #endif
 	sp = &mp->mnt_stat;
+	/*
+	 * Set these in case the underlying filesystem fails to do so.
+	 */
+	sp->f_version = STATFS_VERSION;
+	sp->f_namemax = NAME_MAX;
+	sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
 	error = VFS_STATFS(mp, sp, td);
 	if (error)
 		return (error);
-	sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
 	if (suser(td)) {
 		bcopy(sp, &sb, sizeof(sb));
 		sb.f_fsid.val[0] = sb.f_fsid.val[1] = 0;
@@ -318,12 +331,190 @@ getfsstat(td, uap)
 		int flags;
 	} */ *uap;
 {
-	register struct mount *mp, *nmp;
-	register struct statfs *sp;
+	struct mount *mp, *nmp;
+	struct statfs *sp, sb;
 	caddr_t sfsp;
 	long count, maxcount, error;
 
 	maxcount = uap->bufsize / sizeof(struct statfs);
+	sfsp = (caddr_t)uap->buf;
+	count = 0;
+	mtx_lock(&mountlist_mtx);
+	for (mp = TAILQ_FIRST(&mountlist); mp != NULL; mp = nmp) {
+#ifdef MAC
+		if (mac_check_mount_stat(td->td_ucred, mp) != 0) {
+			nmp = TAILQ_NEXT(mp, mnt_list);
+			continue;
+		}
+#endif
+		if (vfs_busy(mp, LK_NOWAIT, &mountlist_mtx, td)) {
+			nmp = TAILQ_NEXT(mp, mnt_list);
+			continue;
+		}
+		if (sfsp && count < maxcount) {
+			sp = &mp->mnt_stat;
+			/*
+			 * Set these in case the underlying filesystem
+			 * fails to do so.
+			 */
+			sp->f_version = STATFS_VERSION;
+			sp->f_namemax = NAME_MAX;
+			sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
+			/*
+			 * If MNT_NOWAIT or MNT_LAZY is specified, do not
+			 * refresh the fsstat cache. MNT_NOWAIT or MNT_LAZY
+			 * overrides MNT_WAIT.
+			 */
+			if (((uap->flags & (MNT_LAZY|MNT_NOWAIT)) == 0 ||
+			    (uap->flags & MNT_WAIT)) &&
+			    (error = VFS_STATFS(mp, sp, td))) {
+				mtx_lock(&mountlist_mtx);
+				nmp = TAILQ_NEXT(mp, mnt_list);
+				vfs_unbusy(mp, td);
+				continue;
+			}
+			if (suser(td)) {
+				bcopy(sp, &sb, sizeof(sb));
+				sb.f_fsid.val[0] = sb.f_fsid.val[1] = 0;
+				sp = &sb;
+			}
+			error = copyout(sp, sfsp, sizeof(*sp));
+			if (error) {
+				vfs_unbusy(mp, td);
+				return (error);
+			}
+			sfsp += sizeof(*sp);
+		}
+		count++;
+		mtx_lock(&mountlist_mtx);
+		nmp = TAILQ_NEXT(mp, mnt_list);
+		vfs_unbusy(mp, td);
+	}
+	mtx_unlock(&mountlist_mtx);
+	if (sfsp && count > maxcount)
+		td->td_retval[0] = maxcount;
+	else
+		td->td_retval[0] = count;
+	return (0);
+}
+
+#ifdef COMPAT_FREEBSD4
+/*
+ * Get old format filesystem statistics.
+ */
+static void cvtstatfs(struct thread *, struct statfs *, struct ostatfs *);
+
+#ifndef _SYS_SYSPROTO_H_
+struct freebsd4_statfs_args {
+	char *path;
+	struct ostatfs *buf;
+};
+#endif
+/* ARGSUSED */
+int
+freebsd4_statfs(td, uap)
+	struct thread *td;
+	struct freebsd4_statfs_args /* {
+		char *path;
+		struct ostatfs *buf;
+	} */ *uap;
+{
+	struct mount *mp;
+	struct statfs *sp;
+	struct ostatfs osb;
+	int error;
+	struct nameidata nd;
+
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, uap->path, td);
+	if ((error = namei(&nd)) != 0)
+		return (error);
+	mp = nd.ni_vp->v_mount;
+	sp = &mp->mnt_stat;
+	NDFREE(&nd, NDF_ONLY_PNBUF);
+	vrele(nd.ni_vp);
+#ifdef MAC
+	error = mac_check_mount_stat(td->td_ucred, mp);
+	if (error)
+		return (error);
+#endif
+	error = VFS_STATFS(mp, sp, td);
+	if (error)
+		return (error);
+	sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
+	cvtstatfs(td, sp, &osb);
+	return (copyout(&osb, uap->buf, sizeof(osb)));
+}
+
+/*
+ * Get filesystem statistics.
+ */
+#ifndef _SYS_SYSPROTO_H_
+struct freebsd4_fstatfs_args {
+	int fd;
+	struct ostatfs *buf;
+};
+#endif
+/* ARGSUSED */
+int
+freebsd4_fstatfs(td, uap)
+	struct thread *td;
+	struct freebsd4_fstatfs_args /* {
+		int fd;
+		struct ostatfs *buf;
+	} */ *uap;
+{
+	struct file *fp;
+	struct mount *mp;
+	struct statfs *sp;
+	struct ostatfs osb;
+	int error;
+
+	if ((error = getvnode(td->td_proc->p_fd, uap->fd, &fp)) != 0)
+		return (error);
+	mp = fp->f_vnode->v_mount;
+	fdrop(fp, td);
+	if (mp == NULL)
+		return (EBADF);
+#ifdef MAC
+	error = mac_check_mount_stat(td->td_ucred, mp);
+	if (error)
+		return (error);
+#endif
+	sp = &mp->mnt_stat;
+	error = VFS_STATFS(mp, sp, td);
+	if (error)
+		return (error);
+	sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
+	cvtstatfs(td, sp, &osb);
+	return (copyout(&osb, uap->buf, sizeof(osb)));
+}
+
+/*
+ * Get statistics on all filesystems.
+ */
+#ifndef _SYS_SYSPROTO_H_
+struct freebsd4_getfsstat_args {
+	struct ostatfs *buf;
+	long bufsize;
+	int flags;
+};
+#endif
+int
+freebsd4_getfsstat(td, uap)
+	struct thread *td;
+	register struct freebsd4_getfsstat_args /* {
+		struct ostatfs *buf;
+		long bufsize;
+		int flags;
+	} */ *uap;
+{
+	struct mount *mp, *nmp;
+	struct statfs *sp;
+	struct ostatfs osb;
+	caddr_t sfsp;
+	long count, maxcount, error;
+
+	maxcount = uap->bufsize / sizeof(struct ostatfs);
 	sfsp = (caddr_t)uap->buf;
 	count = 0;
 	mtx_lock(&mountlist_mtx);
@@ -354,12 +545,13 @@ getfsstat(td, uap)
 				continue;
 			}
 			sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
-			error = copyout(sp, sfsp, sizeof(*sp));
+			cvtstatfs(td, sp, &osb);
+			error = copyout(&osb, sfsp, sizeof(osb));
 			if (error) {
 				vfs_unbusy(mp, td);
 				return (error);
 			}
-			sfsp += sizeof(*sp);
+			sfsp += sizeof(osb);
 		}
 		count++;
 		mtx_lock(&mountlist_mtx);
@@ -373,6 +565,98 @@ getfsstat(td, uap)
 		td->td_retval[0] = count;
 	return (0);
 }
+
+/*
+ * Implement fstatfs() for (NFS) file handles.
+ */
+#ifndef _SYS_SYSPROTO_H_
+struct freebsd4_fhstatfs_args {
+	struct fhandle *u_fhp;
+	struct ostatfs *buf;
+};
+#endif
+int
+freebsd4_fhstatfs(td, uap)
+	struct thread *td;
+	struct freebsd4_fhstatfs_args /* {
+		struct fhandle *u_fhp;
+		struct ostatfs *buf;
+	} */ *uap;
+{
+	struct statfs *sp;
+	struct mount *mp;
+	struct vnode *vp;
+	struct ostatfs osb;
+	fhandle_t fh;
+	int error;
+
+	/*
+	 * Must be super user
+	 */
+	error = suser(td);
+	if (error)
+		return (error);
+
+	if ((error = copyin(uap->u_fhp, &fh, sizeof(fhandle_t))) != 0)
+		return (error);
+
+	if ((mp = vfs_getvfs(&fh.fh_fsid)) == NULL)
+		return (ESTALE);
+	if ((error = VFS_FHTOVP(mp, &fh.fh_fid, &vp)))
+		return (error);
+	mp = vp->v_mount;
+	sp = &mp->mnt_stat;
+	vput(vp);
+#ifdef MAC
+	error = mac_check_mount_stat(td->td_ucred, mp);
+	if (error)
+		return (error);
+#endif
+	if ((error = VFS_STATFS(mp, sp, td)) != 0)
+		return (error);
+	sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
+	cvtstatfs(td, sp, &osb);
+	return (copyout(&osb, uap->buf, sizeof(osb)));
+}
+
+/*
+ * Convert a new format statfs structure to an old format statfs structure.
+ */
+static void
+cvtstatfs(td, nsp, osp)
+	struct thread *td;
+	struct statfs *nsp;
+	struct ostatfs *osp;
+{
+
+	bzero(osp, sizeof(*osp));
+	osp->f_bsize = MIN(nsp->f_bsize, LONG_MAX);
+	osp->f_iosize = MIN(nsp->f_iosize, LONG_MAX);
+	osp->f_blocks = MIN(nsp->f_blocks, LONG_MAX);
+	osp->f_bfree = MIN(nsp->f_bfree, LONG_MAX);
+	osp->f_bavail = MIN(nsp->f_bavail, LONG_MAX);
+	osp->f_files = MIN(nsp->f_files, LONG_MAX);
+	osp->f_ffree = MIN(nsp->f_ffree, LONG_MAX);
+	osp->f_owner = nsp->f_owner;
+	osp->f_type = nsp->f_type;
+	osp->f_flags = nsp->f_flags;
+	osp->f_syncwrites = MIN(nsp->f_syncwrites, LONG_MAX);
+	osp->f_asyncwrites = MIN(nsp->f_asyncwrites, LONG_MAX);
+	osp->f_syncreads = MIN(nsp->f_syncreads, LONG_MAX);
+	osp->f_asyncreads = MIN(nsp->f_asyncreads, LONG_MAX);
+	bcopy(nsp->f_fstypename, osp->f_fstypename,
+	    MIN(MFSNAMELEN, OMNAMELEN));
+	bcopy(nsp->f_mntonname, osp->f_mntonname,
+	    MIN(MFSNAMELEN, OMNAMELEN));
+	bcopy(nsp->f_mntfromname, osp->f_mntfromname,
+	    MIN(MFSNAMELEN, OMNAMELEN));
+	if (suser(td)) {
+		osp->f_fsid.val[0] = osp->f_fsid.val[1] = 0;
+	} else {
+		osp->f_fsid = nsp->f_fsid;
+	}
+}
+#endif /* COMPAT_FREEBSD4 */
 
 /*
  * Change current working directory to a given file descriptor.
@@ -398,7 +682,7 @@ fchdir(td, uap)
 
 	if ((error = getvnode(fdp, uap->fd, &fp)) != 0)
 		return (error);
-	vp = fp->f_data;
+	vp = fp->f_vnode;
 	VREF(vp);
 	fdrop(fp, td);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
@@ -497,7 +781,7 @@ chroot_refuse_vdir_fds(fdp)
 		if (fp == NULL)
 			continue;
 		if (fp->f_type == DTYPE_VNODE) {
-			vp = fp->f_data;
+			vp = fp->f_vnode;
 			if (vp->v_type == VDIR)
 				return (EPERM);
 		}
@@ -659,7 +943,7 @@ kern_open(struct thread *td, char *path, enum uio_seg pathseg, int flags,
 	struct vnode *vp;
 	struct vattr vat;
 	struct mount *mp;
-	int cmode, oflags;
+	int cmode;
 	struct file *nfp;
 	int type, indx, error;
 	struct flock lf;
@@ -667,22 +951,29 @@ kern_open(struct thread *td, char *path, enum uio_seg pathseg, int flags,
 
 	if ((flags & O_ACCMODE) == O_ACCMODE)
 		return (EINVAL);
-	oflags = flags;
 	flags = FFLAGS(flags);
 	error = falloc(td, &nfp, &indx);
 	if (error)
 		return (error);
+	/* An extra reference on `nfp' has been held for us by falloc(). */
 	fp = nfp;
 	cmode = ((mode &~ fdp->fd_cmask) & ALLPERMS) &~ S_ISTXT;
 	NDINIT(&nd, LOOKUP, FOLLOW, pathseg, path, td);
-	td->td_dupfd = -indx - 1;		/* XXX check for fdopen */
-	/*
-	 * Bump the ref count to prevent another process from closing
-	 * the descriptor while we are blocked in vn_open()
-	 */
-	fhold(fp);
-	error = vn_open(&nd, &flags, cmode);
+	td->td_dupfd = -1;		/* XXX check for fdopen */
+	error = vn_open(&nd, &flags, cmode, indx);
 	if (error) {
+
+		/*
+		 * If the vn_open replaced the method vector, something
+		 * wonderous happened deep below and we just pass it up
+		 * pretending we know what we do.
+		 */
+		if (error == ENXIO && fp->f_ops != &badfileops) {
+			fdrop(fp, td);
+			td->td_retval[0] = indx;
+			return (0);
+		}
+
 		/*
 		 * release our own reference
 		 */
@@ -741,17 +1032,19 @@ kern_open(struct thread *td, char *path, enum uio_seg pathseg, int flags,
 		td->td_retval[0] = indx;
 		return 0;
 	}
+	fp->f_vnode = vp;
+	fp->f_data = vp;
+	fp->f_flag = flags & FMASK;
+	fp->f_ops = &vnops;
+	fp->f_seqcount = 1;
+	fp->f_type = (vp->v_type == VFIFO ? DTYPE_FIFO : DTYPE_VNODE);
+	FILEDESC_UNLOCK(fdp);
+	FILE_UNLOCK(fp);
 
 	/* assert that vn_open created a backing object if one is needed */
 	KASSERT(!vn_canvmio(vp) || VOP_GETVOBJECT(vp, NULL) == 0,
 		("open: vmio vnode has no backing object after vn_open"));
 
-	fp->f_data = vp;
-	fp->f_flag = flags & FMASK;
-	fp->f_ops = &vnops;
-	fp->f_type = (vp->v_type == VFIFO ? DTYPE_FIFO : DTYPE_VNODE);
-	FILEDESC_UNLOCK(fdp);
-	FILE_UNLOCK(fp);
 	VOP_UNLOCK(vp, 0, td);
 	if (flags & (O_EXLOCK | O_SHLOCK)) {
 		lf.l_whence = SEEK_SET;
@@ -889,8 +1182,13 @@ restart:
 		return (error);
 	vp = nd.ni_vp;
 	if (vp != NULL) {
+		NDFREE(&nd, NDF_ONLY_PNBUF);
 		vrele(vp);
-		error = EEXIST;
+		if (vp == nd.ni_dvp)
+			vrele(nd.ni_dvp);
+		else
+			vput(nd.ni_dvp);
+		return (EEXIST);
 	} else {
 		VATTR_NULL(&vattr);
 		FILEDESC_LOCK(td->td_proc->p_fd);
@@ -987,7 +1285,10 @@ restart:
 	if (nd.ni_vp != NULL) {
 		NDFREE(&nd, NDF_ONLY_PNBUF);
 		vrele(nd.ni_vp);
-		vput(nd.ni_dvp);
+		if (nd.ni_vp == nd.ni_dvp)
+			vrele(nd.ni_dvp);
+		else
+			vput(nd.ni_dvp);
 		return (EEXIST);
 	}
 	if (vn_start_write(nd.ni_dvp, &mp, V_NOWAIT) != 0) {
@@ -1069,6 +1370,10 @@ kern_link(struct thread *td, char *path, char *link, enum uio_seg segflg)
 	if ((error = namei(&nd)) == 0) {
 		if (nd.ni_vp != NULL) {
 			vrele(nd.ni_vp);
+			if (nd.ni_dvp == nd.ni_vp)
+				vrele(nd.ni_dvp);
+			else
+				vput(nd.ni_dvp);
 			error = EEXIST;
 		} else if ((error = vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td))
 		    == 0) {
@@ -1081,9 +1386,9 @@ kern_link(struct thread *td, char *path, char *link, enum uio_seg segflg)
 #endif
 				error = VOP_LINK(nd.ni_dvp, vp, &nd.ni_cnd);
 			VOP_UNLOCK(vp, 0, td);
+			vput(nd.ni_dvp);
 		}
 		NDFREE(&nd, NDF_ONLY_PNBUF);
-		vput(nd.ni_dvp);
 	}
 	vrele(vp);
 	vn_finished_write(mp);
@@ -1138,7 +1443,10 @@ restart:
 	if (nd.ni_vp) {
 		NDFREE(&nd, NDF_ONLY_PNBUF);
 		vrele(nd.ni_vp);
-		vput(nd.ni_dvp);
+		if (nd.ni_vp == nd.ni_dvp)
+			vrele(nd.ni_dvp);
+		else
+			vput(nd.ni_dvp);
 		error = EEXIST;
 		goto out;
 	}
@@ -1205,7 +1513,10 @@ restart:
 		NDFREE(&nd, NDF_ONLY_PNBUF);
 		if (nd.ni_vp)
 			vrele(nd.ni_vp);
-		vput(nd.ni_dvp);
+		if (nd.ni_vp == nd.ni_dvp)
+			vrele(nd.ni_dvp);
+		else
+			vput(nd.ni_dvp);
 		return (EEXIST);
 	}
 	if (vn_start_write(nd.ni_dvp, &mp, V_NOWAIT) != 0) {
@@ -1337,11 +1648,11 @@ lseek(td, uap)
 
 	if ((error = fget(td, uap->fd, &fp)) != 0)
 		return (error);
-	if (fp->f_type != DTYPE_VNODE) {
+	if (!(fp->f_ops->fo_flags & DFLAG_SEEKABLE)) {
 		fdrop(fp, td);
 		return (ESPIPE);
 	}
-	vp = fp->f_data;
+	vp = fp->f_vnode;
 	noneg = (vp->v_type != VCHR);
 	offset = uap->offset;
 	switch (uap->whence) {
@@ -2051,7 +2362,7 @@ fchflags(td, uap)
 
 	if ((error = getvnode(td->td_proc->p_fd, uap->fd, &fp)) != 0)
 		return (error);
-	error = setfflags(td, fp->f_data, uap->flags);
+	error = setfflags(td, fp->f_vnode, uap->flags);
 	fdrop(fp, td);
 	return (error);
 }
@@ -2171,13 +2482,11 @@ fchmod(td, uap)
 	} */ *uap;
 {
 	struct file *fp;
-	struct vnode *vp;
 	int error;
 
 	if ((error = getvnode(td->td_proc->p_fd, uap->fd, &fp)) != 0)
 		return (error);
-	vp = fp->f_data;
-	error = setfmode(td, fp->f_data, uap->mode);
+	error = setfmode(td, fp->f_vnode, uap->mode);
 	fdrop(fp, td);
 	return (error);
 }
@@ -2315,13 +2624,11 @@ fchown(td, uap)
 	} */ *uap;
 {
 	struct file *fp;
-	struct vnode *vp;
 	int error;
 
 	if ((error = getvnode(td->td_proc->p_fd, uap->fd, &fp)) != 0)
 		return (error);
-	vp = fp->f_data;
-	error = setfown(td, fp->f_data, uap->uid, uap->gid);
+	error = setfown(td, fp->f_vnode, uap->uid, uap->gid);
 	fdrop(fp, td);
 	return (error);
 }
@@ -2519,7 +2826,7 @@ kern_futimes(struct thread *td, int fd, struct timeval *tptr,
 		return (error);
 	if ((error = getvnode(td->td_proc->p_fd, fd, &fp)) != 0)
 		return (error);
-	error = setutimes(td, fp->f_data, ts, 2, tptr == NULL);
+	error = setutimes(td, fp->f_vnode, ts, 2, tptr == NULL);
 	fdrop(fp, td);
 	return (error);
 }
@@ -2621,7 +2928,7 @@ ftruncate(td, uap)
 		fdrop(fp, td);
 		return (EINVAL);
 	}
-	vp = fp->f_data;
+	vp = fp->f_vnode;
 	if ((error = vn_start_write(vp, &mp, V_WAIT | PCATCH)) != 0) {
 		fdrop(fp, td);
 		return (error);
@@ -2732,7 +3039,7 @@ fsync(td, uap)
 
 	if ((error = getvnode(td->td_proc->p_fd, uap->fd, &fp)) != 0)
 		return (error);
-	vp = fp->f_data;
+	vp = fp->f_vnode;
 	if ((error = vn_start_write(vp, &mp, V_WAIT | PCATCH)) != 0) {
 		fdrop(fp, td);
 		return (error);
@@ -3095,7 +3402,7 @@ ogetdirentries(td, uap)
 		fdrop(fp, td);
 		return (EBADF);
 	}
-	vp = fp->f_data;
+	vp = fp->f_vnode;
 unionread:
 	if (vp->v_type != VDIR) {
 		fdrop(fp, td);
@@ -3195,6 +3502,7 @@ unionread:
 			struct vnode *tvp = vp;
 			vp = vp->v_mount->mnt_vnodecovered;
 			VREF(vp);
+			fp->f_vnode = vp;
 			fp->f_data = vp;
 			fp->f_offset = 0;
 			vput(tvp);
@@ -3243,7 +3551,7 @@ getdirentries(td, uap)
 		fdrop(fp, td);
 		return (EBADF);
 	}
-	vp = fp->f_data;
+	vp = fp->f_vnode;
 unionread:
 	if (vp->v_type != VDIR) {
 		fdrop(fp, td);
@@ -3292,6 +3600,7 @@ unionread:
 			struct vnode *tvp = vp;
 			vp = vp->v_mount->mnt_vnodecovered;
 			VREF(vp);
+			fp->f_vnode = vp;
 			fp->f_data = vp;
 			fp->f_offset = 0;
 			vput(tvp);
@@ -3438,7 +3747,7 @@ getvnode(fdp, fd, fpp)
 		if ((u_int)fd >= fdp->fd_nfiles ||
 		    (fp = fdp->fd_ofiles[fd]) == NULL)
 			error = EBADF;
-		else if (fp->f_type != DTYPE_VNODE && fp->f_type != DTYPE_FIFO) {
+		else if (fp->f_vnode == NULL) {
 			fp = NULL;
 			error = EINVAL;
 		} else {
@@ -3450,6 +3759,7 @@ getvnode(fdp, fd, fpp)
 	*fpp = fp;
 	return (error);
 }
+
 /*
  * Get (NFS) file handle
  */
@@ -3616,7 +3926,7 @@ fhopen(td, uap)
 		if (error)
 			goto bad;
 	}
-	error = VOP_OPEN(vp, fmode, td->td_ucred, td);
+	error = VOP_OPEN(vp, fmode, td->td_ucred, td, -1);
 	if (error)
 		goto bad;
 	/*
@@ -3638,13 +3948,10 @@ fhopen(td, uap)
 			vp->v_writecount--;
 		goto bad;
 	}
+	/* An extra reference on `nfp' has been held for us by falloc(). */
 	fp = nfp;	
 
-	/*
-	 * Hold an extra reference to avoid having fp ripped out 
-	 * from under us while we block in the lock op
-	 */
-	fhold(fp);
+	nfp->f_vnode = vp;
 	nfp->f_data = vp;
 	nfp->f_flag = fmode & FMASK;
 	nfp->f_ops = &vnops;
@@ -3760,10 +4067,9 @@ fhstatfs(td, uap)
 		struct statfs *buf;
 	} */ *uap;
 {
-	struct statfs *sp;
+	struct statfs *sp, sb;
 	struct mount *mp;
 	struct vnode *vp;
-	struct statfs sb;
 	fhandle_t fh;
 	int error;
 
@@ -3789,9 +4095,14 @@ fhstatfs(td, uap)
 	if (error)
 		return (error);
 #endif
+	/*
+	 * Set these in case the underlying filesystem fails to do so.
+	 */
+	sp->f_version = STATFS_VERSION;
+	sp->f_namemax = NAME_MAX;
+	sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
 	if ((error = VFS_STATFS(mp, sp, td)) != 0)
 		return (error);
-	sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
 	if (suser(td)) {
 		bcopy(sp, &sb, sizeof(sb));
 		sb.f_fsid.val[0] = sb.f_fsid.val[1] = 0;
@@ -3966,7 +4277,7 @@ extattr_set_fd(td, uap)
 	if (error)
 		return (error);
 
-	error = extattr_set_vp(fp->f_data, uap->attrnamespace,
+	error = extattr_set_vp(fp->f_vnode, uap->attrnamespace,
 	    attrname, uap->data, uap->nbytes, td);
 	fdrop(fp, td);
 
@@ -4057,6 +4368,15 @@ extattr_get_vp(struct vnode *vp, int attrnamespace, const char *attrname,
 	size_t size, *sizep;
 	int error;
 
+	/*
+	 * XXX: Temporary API compatibility for applications that know
+	 * about this hack ("" means list), but haven't been updated
+	 * for the extattr_list_*() system calls yet.  This will go
+	 * away for FreeBSD 5.3.
+	 */
+	if (strlen(attrname) == 0)
+		return (extattr_list_vp(vp, attrnamespace, data, nbytes, td));
+
 	VOP_LEASE(vp, td, td->td_ucred, LEASE_READ);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 
@@ -4130,7 +4450,7 @@ extattr_get_fd(td, uap)
 	if (error)
 		return (error);
 
-	error = extattr_get_vp(fp->f_data, uap->attrnamespace,
+	error = extattr_get_vp(fp->f_vnode, uap->attrnamespace,
 	    attrname, uap->data, uap->nbytes, td);
 
 	fdrop(fp, td);
@@ -4225,14 +4545,17 @@ extattr_delete_vp(struct vnode *vp, int attrnamespace, const char *attrname,
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 
 #ifdef MAC
-	error = mac_check_vnode_setextattr(td->td_ucred, vp, attrnamespace,
-	    attrname, NULL);
+	error = mac_check_vnode_deleteextattr(td->td_ucred, vp, attrnamespace,
+	    attrname);
 	if (error)
 		goto done;
 #endif
 
-	error = VOP_SETEXTATTR(vp, attrnamespace, attrname, NULL, td->td_ucred,
+	error = VOP_DELETEEXTATTR(vp, attrnamespace, attrname, td->td_ucred,
 	    td);
+	if (error == EOPNOTSUPP)
+		error = VOP_SETEXTATTR(vp, attrnamespace, attrname, NULL,
+		    td->td_ucred, td);
 #ifdef MAC
 done:
 #endif
@@ -4262,7 +4585,7 @@ extattr_delete_fd(td, uap)
 	error = getvnode(td->td_proc->p_fd, uap->fd, &fp);
 	if (error)
 		return (error);
-	vp = fp->f_data;
+	vp = fp->f_vnode;
 
 	error = extattr_delete_vp(vp, uap->attrnamespace, attrname, td);
 	fdrop(fp, td);
@@ -4324,3 +4647,145 @@ extattr_delete_link(td, uap)
 	vrele(nd.ni_vp);
 	return(error);
 }
+
+/*-
+ * Retrieve a list of extended attributes on a file or directory.
+ *
+ * Arguments: unlocked vnode "vp", attribute namespace 'attrnamespace",
+ *            userspace buffer pointer "data", buffer length "nbytes",
+ *            thread "td".
+ * Returns: 0 on success, an error number otherwise
+ * Locks: none
+ * References: vp must be a valid reference for the duration of the call
+ */
+static int
+extattr_list_vp(struct vnode *vp, int attrnamespace, void *data,
+    size_t nbytes, struct thread *td)
+{
+	struct uio auio, *auiop;
+	size_t size, *sizep;
+	struct iovec aiov;
+	ssize_t cnt;
+	int error;
+
+	VOP_LEASE(vp, td, td->td_ucred, LEASE_READ);
+	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
+
+	auiop = NULL;
+	sizep = NULL;
+	cnt = 0;
+	if (data != NULL) {
+		aiov.iov_base = data;
+		aiov.iov_len = nbytes;
+		auio.uio_iov = &aiov;
+		auio.uio_offset = 0;
+		if (nbytes > INT_MAX) {
+			error = EINVAL;
+			goto done;
+		}
+		auio.uio_resid = nbytes;
+		auio.uio_rw = UIO_READ;
+		auio.uio_segflg = UIO_USERSPACE;
+		auio.uio_td = td;
+		auiop = &auio;
+		cnt = nbytes;
+	} else
+		sizep = &size;
+
+#ifdef MAC
+	error = mac_check_vnode_listextattr(td->td_ucred, vp, attrnamespace);
+	if (error)
+		goto done;
+#endif
+
+	error = VOP_LISTEXTATTR(vp, attrnamespace, auiop, sizep,
+	    td->td_ucred, td);
+
+	if (auiop != NULL) {
+		cnt -= auio.uio_resid;
+		td->td_retval[0] = cnt;
+	} else
+		td->td_retval[0] = size;
+
+done:
+	VOP_UNLOCK(vp, 0, td);
+	return (error);
+}
+
+
+int
+extattr_list_fd(td, uap)
+	struct thread *td;
+	struct extattr_list_fd_args /* {
+		int fd;
+		int attrnamespace;
+		void *data;
+		size_t nbytes;
+	} */ *uap;
+{
+	struct file *fp;
+	int error;
+
+	error = getvnode(td->td_proc->p_fd, uap->fd, &fp);
+	if (error)
+		return (error);
+
+	error = extattr_list_vp(fp->f_vnode, uap->attrnamespace, uap->data,
+	    uap->nbytes, td);
+
+	fdrop(fp, td);
+	return (error);
+}
+
+int
+extattr_list_file(td, uap)
+	struct thread*td;
+	struct extattr_list_file_args /* {
+		const char *path;
+		int attrnamespace;
+		void *data;
+		size_t nbytes;
+	} */ *uap;
+{
+	struct nameidata nd;
+	int error;
+
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, uap->path, td);
+	error = namei(&nd);
+	if (error)
+		return (error);
+	NDFREE(&nd, NDF_ONLY_PNBUF);
+
+	error = extattr_list_vp(nd.ni_vp, uap->attrnamespace, uap->data,
+	    uap->nbytes, td);
+
+	vrele(nd.ni_vp);
+	return (error);
+}
+
+int
+extattr_list_link(td, uap)
+	struct thread*td;
+	struct extattr_list_link_args /* {
+		const char *path;
+		int attrnamespace;
+		void *data;
+		size_t nbytes;
+	} */ *uap;
+{
+	struct nameidata nd;
+	int error;
+
+	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_USERSPACE, uap->path, td);
+	error = namei(&nd);
+	if (error)
+		return (error);
+	NDFREE(&nd, NDF_ONLY_PNBUF);
+
+	error = extattr_list_vp(nd.ni_vp, uap->attrnamespace, uap->data,
+	    uap->nbytes, td);
+
+	vrele(nd.ni_vp);
+	return (error);
+}
+

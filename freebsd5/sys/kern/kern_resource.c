@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_resource.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_resource.c,v 1.125 2003/04/23 18:48:55 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_resource.c,v 1.128 2003/10/27 07:15:47 jeff Exp $");
 
 #include "opt_compat.h"
 
@@ -407,7 +409,7 @@ rtp_to_pri(struct rtprio *rtp, struct ksegrp *kg)
 	sched_class(kg, rtp->type);
 	if (curthread->td_ksegrp == kg) {
 		curthread->td_base_pri = kg->kg_user_pri;
-		curthread->td_priority = kg->kg_user_pri; /* XXX dubious */
+		sched_prio(curthread, kg->kg_user_pri); /* XXX dubious */
 	}
 	return (0);
 }
@@ -891,7 +893,7 @@ uifind(uid)
 			free(uip, M_UIDINFO);
 			uip = old_uip;
 		} else {
-			uip->ui_mtxp = mtx_pool_alloc();
+			uip->ui_mtxp = mtx_pool_alloc(mtxpool_sleep);
 			uip->ui_uid = uid;
 			LIST_INSERT_HEAD(UIHASH(uid), uip, ui_hash);
 		}

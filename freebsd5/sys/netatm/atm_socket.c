@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/atm_socket.c,v 1.15 2003/02/19 05:47:30 imp Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * -----------------
  *
  * ATM common socket protocol processing
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/atm_socket.c,v 1.19 2003/10/31 18:32:10 brooks Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -53,10 +51,6 @@
 #include <netatm/atm_stack.h>
 #include <netatm/atm_pcb.h>
 #include <netatm/atm_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_socket.c,v 1.15 2003/02/19 05:47:30 imp Exp $");
-#endif
 
 
 /*
@@ -84,7 +78,6 @@ atm_sock_init(void)
 	    NULL, NULL, UMA_ALIGN_PTR, 0);
 	if (atm_pcb_zone == NULL)
 		panic("atm_sock_init: unable to initialize atm_pcb_zone");
-	uma_zone_set_max(atm_pcb_zone, 100);
 }
 
 /*
@@ -826,7 +819,9 @@ atm_sock_setopt(so, sopt, atp)
 			return (EINVAL);
 		if ((p.brr.traffic_type != T_ATM_NULL) &&
 		    (p.brr.traffic_type != T_ATM_CBR) &&
-		    (p.brr.traffic_type != T_ATM_VBR))
+		    (p.brr.traffic_type != T_ATM_VBR) &&
+		    (p.brr.traffic_type != T_ATM_ABR) &&
+		    (p.brr.traffic_type != T_ATM_UBR))
 			return (EINVAL);
 		if ((p.brr.timing_requirements != T_ATM_NULL) &&
 		    (p.brr.timing_requirements != T_ATM_END_TO_END) &&
@@ -1223,7 +1218,7 @@ atm_sock_getopt(so, sopt, atp)
 
 			ifp = &ap->nif->nif_if;
 			(void) snprintf(netif.net_intf, sizeof(netif.net_intf),
-			    "%s%d", ifp->if_name, ifp->if_unit);
+			    "%s", ifp->if_xname);
 			return (sooptcopyout(sopt, &netif,
 					sizeof netif));
 		} else {

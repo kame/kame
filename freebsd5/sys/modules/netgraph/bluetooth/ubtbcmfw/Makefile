@@ -1,13 +1,10 @@
 # $Id: Makefile,v 1.1 2003/04/27 00:22:12 max Exp $
-# $FreeBSD: src/sys/modules/netgraph/bluetooth/ubtbcmfw/Makefile,v 1.1 2003/05/10 21:44:38 julian Exp $
+# $FreeBSD: src/sys/modules/netgraph/bluetooth/ubtbcmfw/Makefile,v 1.2 2003/10/12 22:04:20 emax Exp $
 
 .PATH: ${.CURDIR}/../../../../netgraph/bluetooth/drivers/ubtbcmfw
 
-CFLAGS+=	-g -I${.CURDIR}/../../../../netgraph/bluetooth/include \
+CFLAGS+=	-I${.CURDIR}/../../../../netgraph/bluetooth/include \
 		-I${.CURDIR}/../../../../netgraph/bluetooth/drivers/ubtbcmfw
-
-#CFLAGS+=	-DINVARIANTS=1 -DINVARIANT_SUPPORT=1
-#CFLAGS+=	-DWITNESS=1 -DWITNESS_SKIPSPIN=1
 
 KMOD=		ubtbcmfw
 SRCS=		ubtbcmfw.c bus_if.h device_if.h vnode_if.h opt_usb.h

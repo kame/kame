@@ -32,12 +32,12 @@
 #include <dev/sound/pcm/sound.h>
 #include <dev/sound/pcm/ac97.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/sound/pci/cs4281.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/cs4281.c,v 1.14 2003/02/20 17:31:11 cognet Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/cs4281.c,v 1.17 2003/09/02 17:30:37 jhb Exp $");
 
 #define CS4281_DEFAULT_BUFSZ 16384
 
@@ -785,7 +785,7 @@ cs4281_pci_attach(device_t dev)
     }
 #endif
 
-    sc->regid   = PCIR_MAPS;
+    sc->regid   = PCIR_BAR(0);
     sc->regtype = SYS_RES_MEMORY;
     sc->reg = bus_alloc_resource(dev, sc->regtype, &sc->regid,
 				 0, ~0, CS4281PCI_BA0_SIZE, RF_ACTIVE);
@@ -801,7 +801,7 @@ cs4281_pci_attach(device_t dev)
     sc->st = rman_get_bustag(sc->reg);
     sc->sh = rman_get_bushandle(sc->reg);
 
-    sc->memid = PCIR_MAPS + 4;
+    sc->memid = PCIR_BAR(1);
     sc->mem = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->memid, 0,
 				 ~0, CS4281PCI_BA1_SIZE, RF_ACTIVE);
     if (sc->mem == NULL) {
@@ -830,7 +830,8 @@ cs4281_pci_attach(device_t dev)
 			   /*filter*/NULL, /*filterarg*/NULL,
 			   /*maxsize*/sc->bufsz, /*nsegments*/1,
 			   /*maxsegz*/0x3ffff,
-			   /*flags*/0, &sc->parent_dmat) != 0) {
+			   /*flags*/0, /*lockfunc*/busdma_lock_mutex,
+			   /*lockarg*/&Giant, &sc->parent_dmat) != 0) {
 	device_printf(dev, "unable to create dma tag\n");
 	goto bad;
     }

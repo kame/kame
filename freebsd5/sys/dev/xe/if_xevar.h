@@ -24,7 +24,7 @@
  * SUCH DAMAGE.
  *
  *	$Id: if_xe.c,v 1.20 1999/06/13 19:17:40 scott Exp $
- * $FreeBSD: src/sys/dev/xe/if_xevar.h,v 1.3 2002/02/20 14:23:58 shiba Exp $
+ * $FreeBSD: src/sys/dev/xe/if_xevar.h,v 1.4 2003/10/14 22:51:35 rsm Exp $
  */
 #ifndef DEV_XE_IF_XEDEV_H
 #define DEV_XE_IF_XEDEV_H
@@ -49,11 +49,14 @@ struct xe_softc {
   int irq_rid;
   struct resource *port_res;
   int port_rid;
+  struct resource *ce2_port_res;
+  int ce2_port_rid;
   int srev;     	/* Silicon revision */
   int tx_queued;	/* Packets currently waiting to transmit */
   int tx_tpr;		/* Last value of TPR reg on card */
-  int tx_collisions;	/* Collisions since last successful send */
   int tx_timeouts;	/* Count of transmit timeouts */
+  u_int16_t tx_min;	/* Smallest packet we can send without padding */
+  u_int16_t tx_thres;	/* Threshold bytes for early transmit */
   int autoneg_status;	/* Autonegotiation progress state */
   int media;		/* Private media word */
   u_char version;	/* Bonding Version register from card */

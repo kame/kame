@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/isa/isahint.c,v 1.12 2001/06/12 09:40:01 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/isa/isahint.c,v 1.14 2003/07/02 16:09:01 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -78,7 +79,7 @@ isahint_add_device(device_t parent, const char *name, int unit)
 	if (resource_int_value(name, unit, "flags", &t) == 0)
 		device_set_flags(child, t);
 
-	if (resource_int_value(name, unit, "disabled", &t) == 0 && t != 0)
+	if (resource_disabled(name, unit))
 		device_disable(child);
 }
 

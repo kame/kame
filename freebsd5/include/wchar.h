@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/include/wchar.h,v 1.35 2003/04/28 22:40:05 kan Exp $
+ * $FreeBSD: src/include/wchar.h,v 1.35.4.1 2003/12/18 00:59:50 peter Exp $
  */
 
 /*-
@@ -68,12 +68,9 @@
 #define _WCHAR_H_
 
 #include <sys/cdefs.h>
+#include <sys/_null.h>
 #include <sys/_types.h>
 #include <machine/_limits.h>
-
-#ifndef NULL
-#define	NULL	0
-#endif
 
 #ifndef _MBSTATE_T_DECLARED
 typedef	__mbstate_t	mbstate_t;

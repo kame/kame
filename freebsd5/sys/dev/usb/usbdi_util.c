@@ -1,5 +1,4 @@
-/*	$NetBSD: usbdi_util.c,v 1.35 2001/10/26 17:58:21 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usbdi_util.c,v 1.28 2003/03/02 16:54:35 des Exp $	*/
+/*	$NetBSD: usbdi_util.c,v 1.36 2001/11/13 06:24:57 lukem Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -37,6 +36,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/usbdi_util.c,v 1.31 2003/08/24 17:55:55 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -87,7 +89,7 @@ usbd_get_config_desc(usbd_device_handle dev, int confidx,
 	usbd_status err;
 
 	DPRINTFN(3,("usbd_get_config_desc: confidx=%d\n", confidx));
-	err = usbd_get_desc(dev, UDESC_CONFIG, confidx, 
+	err = usbd_get_desc(dev, UDESC_CONFIG, confidx,
 			    USB_CONFIG_DESCRIPTOR_SIZE, d);
 	if (err)
 		return (err);
@@ -111,7 +113,7 @@ usbd_status
 usbd_get_device_desc(usbd_device_handle dev, usb_device_descriptor_t *d)
 {
 	DPRINTFN(3,("usbd_get_device_desc:\n"));
-	return (usbd_get_desc(dev, UDESC_DEVICE, 
+	return (usbd_get_desc(dev, UDESC_DEVICE,
 			     0, USB_DEVICE_DESCRIPTOR_SIZE, d));
 }
 
@@ -126,7 +128,7 @@ usbd_get_device_status(usbd_device_handle dev, usb_status_t *st)
 	USETW(req.wIndex, 0);
 	USETW(req.wLength, sizeof(usb_status_t));
 	return (usbd_do_request(dev, &req, st));
-}	
+}
 
 usbd_status
 usbd_get_hub_status(usbd_device_handle dev, usb_hub_status_t *st)
@@ -139,7 +141,7 @@ usbd_get_hub_status(usbd_device_handle dev, usb_hub_status_t *st)
 	USETW(req.wIndex, 0);
 	USETW(req.wLength, sizeof(usb_hub_status_t));
 	return (usbd_do_request(dev, &req, st));
-}	
+}
 
 usbd_status
 usbd_set_address(usbd_device_handle dev, int addr)
@@ -390,7 +392,7 @@ usbd_read_report_desc(usbd_interface_handle ifc, void **descp, int *sizep,
 	return (USBD_NORMAL_COMPLETION);
 }
 
-usbd_status 
+usbd_status
 usbd_get_config(usbd_device_handle dev, u_int8_t *conf)
 {
 	usb_device_request_t req;
@@ -403,7 +405,7 @@ usbd_get_config(usbd_device_handle dev, u_int8_t *conf)
 	return (usbd_do_request(dev, &req, conf));
 }
 
-Static void usbd_bulk_transfer_cb(usbd_xfer_handle xfer, 
+Static void usbd_bulk_transfer_cb(usbd_xfer_handle xfer,
 				  usbd_private_handle priv, usbd_status status);
 Static void
 usbd_bulk_transfer_cb(usbd_xfer_handle xfer, usbd_private_handle priv,
@@ -445,7 +447,7 @@ usbd_bulk_transfer(usbd_xfer_handle xfer, usbd_pipe_handle pipe,
 	return (err);
 }
 
-Static void usbd_intr_transfer_cb(usbd_xfer_handle xfer, 
+Static void usbd_intr_transfer_cb(usbd_xfer_handle xfer,
 				  usbd_private_handle priv, usbd_status status);
 Static void
 usbd_intr_transfer_cb(usbd_xfer_handle xfer, usbd_private_handle priv,
@@ -495,11 +497,11 @@ usb_detach_wait(device_ptr_t dv)
 		printf("usb_detach_wait: %s didn't detach\n",
 		        USBDEVPTRNAME(dv));
 	DPRINTF(("usb_detach_wait: %s done\n", USBDEVPTRNAME(dv)));
-}       
+}
 
 void
 usb_detach_wakeup(device_ptr_t dv)
 {
 	DPRINTF(("usb_detach_wakeup: for %s\n", USBDEVPTRNAME(dv)));
 	wakeup(dv);
-}       
+}

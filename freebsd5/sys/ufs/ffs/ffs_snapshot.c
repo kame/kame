@@ -31,8 +31,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_snapshot.c	8.11 (McKusick) 7/23/00
- * $FreeBSD: src/sys/ufs/ffs/ffs_snapshot.c,v 1.69 2003/04/30 12:57:40 markm Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_snapshot.c,v 1.76 2003/11/13 03:56:32 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -403,7 +405,7 @@ restart:
 	snaplistsize = fs->fs_ncg + howmany(fs->fs_cssize, fs->fs_bsize) +
 	    FSMAXSNAP + 1 /* superblock */ + 1 /* last block */ + 1 /* size */;
 	mp->mnt_kern_flag &= ~MNTK_SUSPENDED;
-	mtx_lock(&mntvnode_mtx);
+	MNT_ILOCK(mp);
 loop:
 	for (xvp = TAILQ_FIRST(&mp->mnt_nvnodelist); xvp; xvp = nvp) {
 		/*
@@ -413,22 +415,31 @@ loop:
 		if (xvp->v_mount != mp)
 			goto loop;
 		nvp = TAILQ_NEXT(xvp, v_nmntvnodes);
-		mtx_unlock(&mntvnode_mtx);
-		mp_fixme("Unlocked GETATTR.");
-		if (vrefcnt(xvp) == 0 || xvp->v_type == VNON ||
-		    (VTOI(xvp)->i_flags & SF_SNAPSHOT) ||
-		    (VOP_GETATTR(xvp, &vat, td->td_ucred, td) == 0 &&
-		    vat.va_nlink > 0)) {
-			mtx_lock(&mntvnode_mtx);
+		VI_LOCK(xvp);
+		MNT_IUNLOCK(mp);
+		if ((xvp->v_iflag & VI_XLOCK) ||
+		    xvp->v_usecount == 0 || xvp->v_type == VNON ||
+		    (VTOI(xvp)->i_flags & SF_SNAPSHOT)) {
+			VI_UNLOCK(xvp);
+			MNT_ILOCK(mp);
 			continue;
 		}
 		if (snapdebug)
 			vprint("ffs_snapshot: busy vnode", xvp);
-		if (vn_lock(xvp, LK_EXCLUSIVE, td) != 0)
+		if (vn_lock(xvp, LK_EXCLUSIVE | LK_INTERLOCK, td) != 0) {
+			MNT_ILOCK(mp);
 			goto loop;
+		}
+		if (VOP_GETATTR(xvp, &vat, td->td_ucred, td) == 0 &&
+		    vat.va_nlink > 0) {
+			VOP_UNLOCK(xvp, 0, td);
+			MNT_ILOCK(mp);
+			continue;
+		}
 		xp = VTOI(xvp);
 		if (ffs_checkfreefile(copy_fs, vp, xp->i_number)) {
 			VOP_UNLOCK(xvp, 0, td);
+			MNT_ILOCK(mp);
 			continue;
 		}
 		/*
@@ -464,9 +475,9 @@ loop:
 			sbp = NULL;
 			goto out1;
 		}
-		mtx_lock(&mntvnode_mtx);
+		MNT_ILOCK(mp);
 	}
-	mtx_unlock(&mntvnode_mtx);
+	MNT_IUNLOCK(mp);
 	/*
 	 * If there already exist snapshots on this filesystem, grab a
 	 * reference to their shared lock. If this is the first snapshot
@@ -641,9 +652,9 @@ out1:
 	space = devvp->v_rdev->si_snapblklist;
 	devvp->v_rdev->si_snapblklist = snapblklist;
 	devvp->v_rdev->si_snaplistsize = snaplistsize;
+	VI_UNLOCK(devvp);
 	if (space != NULL)
 		FREE(space, M_UFSMNT);
-	VI_UNLOCK(devvp);
 done:
 	free(copy_fs->fs_csp, M_UFSMNT);
 	bawrite(sbp);
@@ -811,10 +822,10 @@ expunge_ufs1(snapvp, cancelip, fs, acctfunc, expungetype)
 	if (lbn < NDADDR) {
 		blkno = VTOI(snapvp)->i_din1->di_db[lbn];
 	} else {
-		td->td_proc->p_flag |= P_COWINPROGRESS;
+		td->td_pflags |= TDP_COWINPROGRESS;
 		error = UFS_BALLOC(snapvp, lblktosize(fs, (off_t)lbn),
 		   fs->fs_bsize, KERNCRED, BA_METAONLY, &bp);
-		td->td_proc->p_flag &= ~P_COWINPROGRESS;
+		td->td_pflags &= ~TDP_COWINPROGRESS;
 		if (error)
 			return (error);
 		indiroff = (lbn - NDADDR) % NINDIR(fs);
@@ -900,10 +911,15 @@ indiracct_ufs1(snapvp, cancelvp, level, blkno, lbn, rlbn, remblks,
 	ufs1_daddr_t last, *bap;
 	struct buf *bp;
 
+	if (blkno == 0) {
+		if (expungetype == BLK_NOCOPY)
+			return (0);
+		panic("indiracct_ufs1: missing indir");
+	}
 	if ((error = ufs_getlbns(cancelvp, rlbn, indirs, &num)) != 0)
 		return (error);
-	if (lbn != indirs[num - 1 - level].in_lbn || blkno == 0 || num < 2)
-		panic("indiracct: botched params");
+	if (lbn != indirs[num - 1 - level].in_lbn || num < 2)
+		panic("indiracct_ufs1: botched params");
 	/*
 	 * We have to expand bread here since it will deadlock looking
 	 * up the block number for any blocks that are not in the cache.
@@ -1009,7 +1025,7 @@ snapacct_ufs1(vp, oldblkp, lastblkp, fs, lblkno, expungetype)
 				brelse(ibp);
 		} else {
 			if (*blkp != 0)
-				panic("snapacct: bad block");
+				panic("snapacct_ufs1: bad block");
 			*blkp = expungetype;
 			if (lbn >= NDADDR)
 				bdwrite(ibp);
@@ -1086,10 +1102,10 @@ expunge_ufs2(snapvp, cancelip, fs, acctfunc, expungetype)
 	if (lbn < NDADDR) {
 		blkno = VTOI(snapvp)->i_din2->di_db[lbn];
 	} else {
-		td->td_proc->p_flag |= P_COWINPROGRESS;
+		td->td_pflags |= TDP_COWINPROGRESS;
 		error = UFS_BALLOC(snapvp, lblktosize(fs, (off_t)lbn),
 		   fs->fs_bsize, KERNCRED, BA_METAONLY, &bp);
-		td->td_proc->p_flag &= ~P_COWINPROGRESS;
+		td->td_pflags &= ~TDP_COWINPROGRESS;
 		if (error)
 			return (error);
 		indiroff = (lbn - NDADDR) % NINDIR(fs);
@@ -1175,10 +1191,15 @@ indiracct_ufs2(snapvp, cancelvp, level, blkno, lbn, rlbn, remblks,
 	ufs2_daddr_t last, *bap;
 	struct buf *bp;
 
+	if (blkno == 0) {
+		if (expungetype == BLK_NOCOPY)
+			return (0);
+		panic("indiracct_ufs2: missing indir");
+	}
 	if ((error = ufs_getlbns(cancelvp, rlbn, indirs, &num)) != 0)
 		return (error);
-	if (lbn != indirs[num - 1 - level].in_lbn || blkno == 0 || num < 2)
-		panic("indiracct: botched params");
+	if (lbn != indirs[num - 1 - level].in_lbn || num < 2)
+		panic("indiracct_ufs2: botched params");
 	/*
 	 * We have to expand bread here since it will deadlock looking
 	 * up the block number for any blocks that are not in the cache.
@@ -1284,7 +1305,7 @@ snapacct_ufs2(vp, oldblkp, lastblkp, fs, lblkno, expungetype)
 				brelse(ibp);
 		} else {
 			if (*blkp != 0)
-				panic("snapacct: bad block");
+				panic("snapacct_ufs2: bad block");
 			*blkp = expungetype;
 			if (lbn >= NDADDR)
 				bdwrite(ibp);
@@ -1531,10 +1552,10 @@ retry:
 			      VI_MTX(devvp), td) != 0)
 				goto retry;
 			snapshot_locked = 1;
-			td->td_proc->p_flag |= P_COWINPROGRESS;
+			td->td_pflags |= TDP_COWINPROGRESS;
 			error = UFS_BALLOC(vp, lblktosize(fs, (off_t)lbn),
 			    fs->fs_bsize, KERNCRED, BA_METAONLY, &ibp);
-			td->td_proc->p_flag &= ~P_COWINPROGRESS;
+			td->td_pflags &= ~TDP_COWINPROGRESS;
 			if (error)
 				break;
 			indiroff = (lbn - NDADDR) % NINDIR(fs);
@@ -1638,10 +1659,10 @@ retry:
 		 * allocation will never require any additional allocations for
 		 * the snapshot inode.
 		 */
-		td->td_proc->p_flag |= P_COWINPROGRESS;
+		td->td_pflags |= TDP_COWINPROGRESS;
 		error = UFS_BALLOC(vp, lblktosize(fs, (off_t)lbn),
 		    fs->fs_bsize, KERNCRED, 0, &cbp);
-		td->td_proc->p_flag &= ~P_COWINPROGRESS;
+		td->td_pflags &= ~TDP_COWINPROGRESS;
 		if (error)
 			break;
 #ifdef DEBUG
@@ -1909,7 +1930,7 @@ ffs_copyonwrite(devvp, bp)
 	ufs2_daddr_t lbn, blkno, *snapblklist;
 	int lower, upper, mid, indiroff, snapshot_locked = 0, error = 0;
 
-	if (td->td_proc->p_flag & P_COWINPROGRESS)
+	if (td->td_pflags & TDP_COWINPROGRESS)
 		panic("ffs_copyonwrite: recursive call");
 	/*
 	 * First check to see if it is in the preallocated list.
@@ -1967,10 +1988,10 @@ retry:
 				goto retry;
 			}
 			snapshot_locked = 1;
-			td->td_proc->p_flag |= P_COWINPROGRESS;
+			td->td_pflags |= TDP_COWINPROGRESS;
 			error = UFS_BALLOC(vp, lblktosize(fs, (off_t)lbn),
 			   fs->fs_bsize, KERNCRED, BA_METAONLY, &ibp);
-			td->td_proc->p_flag &= ~P_COWINPROGRESS;
+			td->td_pflags &= ~TDP_COWINPROGRESS;
 			if (error)
 				break;
 			indiroff = (lbn - NDADDR) % NINDIR(fs);
@@ -2004,10 +2025,10 @@ retry:
 			goto retry;
 		}
 		snapshot_locked = 1;
-		td->td_proc->p_flag |= P_COWINPROGRESS;
+		td->td_pflags |= TDP_COWINPROGRESS;
 		error = UFS_BALLOC(vp, lblktosize(fs, (off_t)lbn),
 		    fs->fs_bsize, KERNCRED, 0, &cbp);
-		td->td_proc->p_flag &= ~P_COWINPROGRESS;
+		td->td_pflags &= ~TDP_COWINPROGRESS;
 		if (error)
 			break;
 #ifdef DEBUG

@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_lookup.c	8.15 (Berkeley) 6/16/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_lookup.c,v 1.67 2003/04/30 12:57:40 markm Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_lookup.c,v 1.68 2003/06/11 06:34:30 obrien Exp $");
 
 #include "opt_ffs_broken_fixme.h"
 #include "opt_ufs.h"

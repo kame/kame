@@ -1,4 +1,3 @@
-/*	$FreeBSD: src/sys/opencrypto/cryptosoft.c,v 1.2 2002/10/11 14:58:32 mike Exp $	*/
 /*	$OpenBSD: cryptosoft.c,v 1.35 2002/04/26 08:43:50 deraadt Exp $	*/
 
 /*
@@ -21,6 +20,9 @@
  * MERCHANTABILITY OF THIS SOFTWARE OR ITS FITNESS FOR ANY PARTICULAR
  * PURPOSE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/opencrypto/cryptosoft.c,v 1.4 2003/06/27 20:07:09 sam Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -811,7 +813,7 @@ swcr_freesession(void *arg, u_int64_t tid)
 	struct enc_xform *txf;
 	struct auth_hash *axf;
 	struct comp_algo *cxf;
-	u_int32_t sid = ((u_int32_t) tid) & 0xffffffff;
+	u_int32_t sid = CRYPTO_SESID2LID(tid);
 
 	if (sid > swcr_sesnum || swcr_sessions == NULL ||
 	    swcr_sessions[sid] == NULL)
@@ -997,7 +999,7 @@ done:
 static void
 swcr_init(void)
 {
-	swcr_id = crypto_get_driverid(CRYPTOCAP_F_SOFTWARE);
+	swcr_id = crypto_get_driverid(CRYPTOCAP_F_SOFTWARE | CRYPTOCAP_F_SYNC);
 	if (swcr_id < 0)
 		panic("Software crypto device cannot initialize!");
 	crypto_register(swcr_id, CRYPTO_DES_CBC,

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ppbus/ppbconf.h,v 1.18 2000/04/27 21:08:23 n_hibma Exp $
+ * $FreeBSD: src/sys/dev/ppbus/ppbconf.h,v 1.19 2003/08/07 15:04:25 jhb Exp $
  *
  */
 #ifndef __PPBCONF_H
@@ -187,10 +187,10 @@ struct ppb_device {
 
 	const char *name;		/* name of the device */
 
-	ushort mode;			/* current mode of the device */
-	ushort avm;			/* available IEEE1284 modes of 
+	u_short mode;			/* current mode of the device */
+	u_short avm;			/* available IEEE1284 modes of 
 					 * the device */
-	uint flags;			/* flags */
+	u_int flags;			/* flags */
 
 	struct ppb_context ctx;		/* context of the device */
 

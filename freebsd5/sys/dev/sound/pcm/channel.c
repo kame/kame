@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * Portions Copyright by Luigi Rizzo - 1997-99
  * All rights reserved.
  *
@@ -29,7 +29,7 @@
 
 #include "feeder_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/channel.c,v 1.88 2003/02/26 14:38:19 orion Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/channel.c,v 1.93 2003/12/05 02:08:13 matk Exp $");
 
 #define MIN_CHUNK_SIZE 		256	/* for uiomove etc. */
 #define	DMA_ALIGN_THRESHOLD	4
@@ -67,9 +67,12 @@ SYSCTL_INT(_hw_snd, OID_AUTO, report_soft_formats, CTLFLAG_RW,
 static int chn_buildfeeder(struct pcm_channel *c);
 
 static void
-chn_lockinit(struct pcm_channel *c)
+chn_lockinit(struct pcm_channel *c, int dir)
 {
-	c->lock = snd_mtxcreate(c->name, "pcm channel");
+	if (dir == PCMDIR_PLAY)
+		c->lock = snd_mtxcreate(c->name, "pcm play channel");
+	else
+		c->lock = snd_mtxcreate(c->name, "pcm record channel");
 }
 
 static void
@@ -116,7 +119,7 @@ chn_wakeup(struct pcm_channel *c)
 
 	CHN_LOCKASSERT(c);
 	if (SEL_WAITING(sndbuf_getsel(bs)) && chn_polltrigger(c))
-		selwakeup(sndbuf_getsel(bs));
+		selwakeuppri(sndbuf_getsel(bs), PRIBIO);
 	wakeup(bs);
 }
 
@@ -250,6 +253,8 @@ chn_write(struct pcm_channel *c, struct uio *buf)
 {
 	int ret, timeout, newsize, count, sz;
 	struct snd_dbuf *bs = c->bufsoft;
+	void *off;
+	int t, x,togo,p;
 
 	CHN_LOCKASSERT(c);
 	/*
@@ -291,7 +296,24 @@ chn_write(struct pcm_channel *c, struct uio *buf)
 			sz = MIN(sz, buf->uio_resid);
 			KASSERT(sz > 0, ("confusion in chn_write"));
 			/* printf("sz: %d\n", sz); */
-			ret = sndbuf_uiomove(bs, buf, sz);
+
+			/*
+			 * The following assumes that the free space in
+			 * the buffer can never be less around the
+			 * unlock-uiomove-lock sequence.
+			 */
+			togo = sz;
+			while (ret == 0 && togo> 0) {
+				p = sndbuf_getfreeptr(bs);
+				t = MIN(togo, sndbuf_getsize(bs) - p);
+				off = sndbuf_getbufofs(bs, p);
+				CHN_UNLOCK(c);
+				ret = uiomove(off, t, buf);
+				CHN_LOCK(c);
+				togo -= t;
+				x = sndbuf_acquire(bs, NULL, t);
+			}
+			ret = 0;
 			if (ret == 0 && !(c->flags & CHN_F_TRIGGERED))
 				chn_start(c, 0);
 		}
@@ -395,6 +417,8 @@ chn_read(struct pcm_channel *c, struct uio *buf)
 {
 	int		ret, timeout, sz, count;
 	struct snd_dbuf       *bs = c->bufsoft;
+	void *off;
+	int t, x,togo,p;
 
 	CHN_LOCKASSERT(c);
 	if (!(c->flags & CHN_F_TRIGGERED))
@@ -406,7 +430,23 @@ chn_read(struct pcm_channel *c, struct uio *buf)
 		sz = MIN(buf->uio_resid, sndbuf_getready(bs));
 
 		if (sz > 0) {
-			ret = sndbuf_uiomove(bs, buf, sz);
+			/*
+			 * The following assumes that the free space in
+			 * the buffer can never be less around the
+			 * unlock-uiomove-lock sequence.
+			 */
+			togo = sz;
+			while (ret == 0 && togo> 0) {
+				p = sndbuf_getreadyptr(bs);
+				t = MIN(togo, sndbuf_getsize(bs) - p);
+				off = sndbuf_getbufofs(bs, p);
+				CHN_UNLOCK(c);
+				ret = uiomove(off, t, buf);
+				CHN_LOCK(c);
+				togo -= t;
+				x = sndbuf_dispose(bs, NULL, t);
+			}
+			ret = 0;
 		} else {
 			if (c->flags & CHN_F_NBIO) {
 				ret = EWOULDBLOCK;
@@ -508,7 +548,19 @@ chn_sync(struct pcm_channel *c, int threshold)
     	struct snd_dbuf *bs = c->bufsoft;
 
 	CHN_LOCKASSERT(c);
-    	for (;;) {
+
+	/* if we haven't yet started and nothing is buffered, else start*/
+	if (!(c->flags & CHN_F_TRIGGERED)) {
+		if (sndbuf_getready(bs) > 0) {
+			ret = chn_start(c, 1);
+			if (ret)
+				return ret;
+		} else {
+			return 0;
+		}
+	}
+
+	for (;;) {
 		rdy = (c->direction == PCMDIR_PLAY)? sndbuf_getfree(bs) : sndbuf_getready(bs);
 		if (rdy <= threshold) {
 	    		ret = chn_sleep(c, "pcmsyn", 1);
@@ -572,10 +624,13 @@ chn_abort(struct pcm_channel *c)
 
 /*
  * this routine tries to flush the dma transfer. It is called
- * on a close. We immediately abort any read DMA
- * operation, and then wait for the play buffer to drain.
+ * on a close of a playback channel.
+ * first, if there is data in the buffer, but the dma has not yet
+ * begun, we need to start it.
+ * next, we wait for the play buffer to drain
+ * finally, we stop the dma.
  *
- * called from: dsp_close
+ * called from: dsp_close, not valid for record channels.
  */
 
 int
@@ -586,10 +641,19 @@ chn_flush(struct pcm_channel *c)
     	struct snd_dbuf *bs = c->bufsoft;
 
 	CHN_LOCKASSERT(c);
-	KASSERT(c->direction == PCMDIR_PLAY, ("chn_wrupdate on bad channel"));
-    	DEB(printf("chn_flush c->flags 0x%08x\n", c->flags));
-	if (!(c->flags & CHN_F_TRIGGERED))
-		return 0;
+	KASSERT(c->direction == PCMDIR_PLAY, ("chn_flush on bad channel"));
+    	DEB(printf("chn_flush: c->flags 0x%08x\n", c->flags));
+
+	/* if we haven't yet started and nothing is buffered, else start*/
+	if (!(c->flags & CHN_F_TRIGGERED)) {
+		if (sndbuf_getready(bs) > 0) {
+			ret = chn_start(c, 1);
+			if (ret)
+				return ret;
+		} else {
+			return 0;
+		}
+	}
 
 	c->flags |= CHN_F_CLOSING;
 	resid = sndbuf_getready(bs) + sndbuf_getready(b);
@@ -603,13 +667,16 @@ chn_flush(struct pcm_channel *c)
 			ret = 0;
 		if (ret == 0) {
 			resid = sndbuf_getready(bs) + sndbuf_getready(b);
-			if (resid >= resid_p)
+			if (resid == resid_p)
 				count--;
+			if (resid > resid_p)
+				DEB(printf("chn_flush: buffer length increasind %d -> %d\n", resid_p, resid));
 			resid_p = resid;
 		}
    	}
 	if (count == 0)
-		DEB(printf("chn_flush: timeout\n"));
+		DEB(printf("chn_flush: timeout, hw %d, sw %d\n",
+			sndbuf_getready(b), sndbuf_getready(bs)));
 
 	c->flags &= ~CHN_F_TRIGGERED;
 	/* kill the channel */
@@ -672,7 +739,7 @@ chn_init(struct pcm_channel *c, void *devinfo, int dir)
 	struct snd_dbuf *b, *bs;
 	int ret;
 
-	chn_lockinit(c);
+	chn_lockinit(c, dir);
 
 	b = NULL;
 	bs = NULL;
@@ -776,7 +843,7 @@ int
 chn_setvolume(struct pcm_channel *c, int left, int right)
 {
 	CHN_LOCKASSERT(c);
-	/* could add a feeder for volume changing if channel returns -1 */
+	/* should add a feeder for volume changing if channel returns -1 */
 	c->volume = (left << 8) | right;
 	return 0;
 }
@@ -1075,7 +1142,7 @@ chn_buildfeeder(struct pcm_channel *c)
 	}
 	flags = c->feederflags;
 
-	DEB(printf("not mapped, feederflags %x\n", flags));
+	DEB(printf("feederflags %x\n", flags));
 
 	for (type = FEEDER_RATE; type <= FEEDER_LAST; type++) {
 		if (flags & (1 << type)) {
@@ -1093,7 +1160,7 @@ chn_buildfeeder(struct pcm_channel *c)
 			}
 
 			if (c->feeder->desc->out != fc->desc->in) {
- 				DEB(printf("build fmtchain from %x to %x: ", c->feeder->desc->out, fc->desc->in));
+ 				DEB(printf("build fmtchain from 0x%x to 0x%x: ", c->feeder->desc->out, fc->desc->in));
 				tmp[0] = fc->desc->in;
 				tmp[1] = 0;
 				if (chn_fmtchain(c, tmp) == 0) {
@@ -1106,11 +1173,11 @@ chn_buildfeeder(struct pcm_channel *c)
 
 			err = chn_addfeeder(c, fc, fc->desc);
 			if (err) {
-				DEB(printf("can't add feeder %p, output %x, err %d\n", fc, fc->desc->out, err));
+				DEB(printf("can't add feeder %p, output 0x%x, err %d\n", fc, fc->desc->out, err));
 
 				return err;
 			}
-			DEB(printf("added feeder %p, output %x\n", fc, c->feeder->desc->out));
+			DEB(printf("added feeder %p, output 0x%x\n", fc, c->feeder->desc->out));
 		}
 	}
 
@@ -1126,7 +1193,7 @@ chn_buildfeeder(struct pcm_channel *c)
 			u_int32_t *x = chn_getcaps(c)->fmtlist;
 			printf("acceptable formats for %s:\n", c->name);
 			while (*x) {
-				printf("[%8x] ", *x);
+				printf("[0x%8x] ", *x);
 				x++;
 			}
 #endif

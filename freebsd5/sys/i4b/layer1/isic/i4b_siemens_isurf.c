@@ -29,18 +29,18 @@
  *   SUCH DAMAGE.
  *
  *---------------------------------------------------------------------------
-  *
+ *
  *	Siemens I-Surf 2.0 PnP specific routines for isic driver
  *	--------------------------------------------------------
- *
  *	Based on ELSA Quickstep 1000pro PCI driver (i4b_elsa_qs1p.c)
  *	In case of trouble please contact Udo Schweigert <ust@cert.siemens.de>
- 
- * $FreeBSD: src/sys/i4b/layer1/isic/i4b_siemens_isurf.c,v 1.6 2002/09/02 00:52:08 brooks Exp $
  *
  *      last edit-date: [Wed Jan 24 09:13:25 2001]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_siemens_isurf.c,v 1.7 2003/06/10 23:45:23 obrien Exp $");
 
 #include "opt_i4b.h"
 

@@ -32,9 +32,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)spx_debug.c
- *
- * $FreeBSD: src/sys/netipx/spx_debug.c,v 1.14 1999/08/28 00:49:43 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netipx/spx_debug.c,v 1.15 2003/06/11 05:25:14 obrien Exp $");
 
 #include "opt_inet.h"
 #include "opt_tcpdebug.h"

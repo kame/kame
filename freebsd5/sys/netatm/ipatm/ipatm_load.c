@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_load.c,v 1.15 2002/11/08 18:27:29 jhb Exp $
- *
  */
 
 /*
@@ -32,15 +28,16 @@
  * -------------------
  *
  * Support for running as a loadable kernel module
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/ipatm/ipatm_load.c,v 1.19 2003/07/24 15:25:17 harti Exp $");
 
 #ifndef ATM_IP_MODULE
 #include "opt_atm.h"
 #endif
 
 #include <sys/param.h>
-#include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
 #include <sys/time.h>
@@ -48,6 +45,8 @@
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/syslog.h>
+#include <sys/kernel.h>
+#include <sys/sysctl.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/in_var.h>
@@ -67,17 +66,11 @@
 
 #include <vm/uma.h>
 
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_load.c,v 1.15 2002/11/08 18:27:29 jhb Exp $");
-#endif
-
-
 /*
  * Global variables
  */
 int		ipatm_vccnt = 0;		
 int		ipatm_vcidle = IPATM_VCIDLE;		
-int		ipatm_print = 0;
 u_long		last_map_ipdst = 0;
 struct ipvcc*	last_map_ipvcc = NULL;
 
@@ -106,7 +99,19 @@ Atm_endpoint	ipatm_endpt = {
 };
 
 uma_zone_t	ipatm_vc_zone;
-uma_zone_t	ipatm_nif_zone;
+
+/*
+ * net.harp.ip
+ */
+SYSCTL_NODE(_net_harp, OID_AUTO, ip, CTLFLAG_RW, 0, "IPv4 over ATM");
+
+/*
+ * net.harp.ip.ipatm_print
+ */
+int		ipatm_print = 0;
+SYSCTL_INT(_net_harp_ip, OID_AUTO, ipatm_print, CTLFLAG_RW,
+    &ipatm_print, 0, "dump IPv4-over-ATM packets");
+
 
 /*
  * Local functions
@@ -409,14 +414,7 @@ ipatm_start()
 	    NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
 	if (ipatm_vc_zone == NULL)
 		panic("ipatm_start: unable to create ipatm_vc_zone");
-	uma_zone_set_max(ipatm_vc_zone, 100);
 		
-	ipatm_nif_zone = uma_zcreate("ipatm nif", sizeof(struct ip_nif), NULL,
-	    NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
-	if (ipatm_nif_zone == NULL)
-		panic("ipatm_start: unable to create ipatm_nif_zone");
-	uma_zone_set_max(ipatm_nif_zone, 52);
-
 	/*
 	 * Register ourselves as a network convergence module
 	 */
@@ -606,7 +604,6 @@ ipatm_stop()
 	 * Free up our storage pools
 	 */
 	uma_zdestroy(ipatm_vc_zone);
-	uma_zdestroy(ipatm_nif_zone);
 done:
 	(void) splx(s);
 	return (err);

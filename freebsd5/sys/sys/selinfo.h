@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)select.h	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/sys/selinfo.h,v 1.15 2002/03/19 20:18:41 alfred Exp $
+ * $FreeBSD: src/sys/sys/selinfo.h,v 1.16 2003/11/09 09:17:26 tanimura Exp $
  */
 
 #ifndef _SYS_SELINFO_H_
@@ -58,6 +58,7 @@ struct selinfo {
 void	clear_selinfo_list(struct thread *td);
 void	selrecord(struct thread *selector, struct selinfo *sip);
 void	selwakeup(struct selinfo *sip);
+void	selwakeuppri(struct selinfo *sip, int pri);
 #endif
 
 #endif /* !_SYS_SELINFO_H_ */

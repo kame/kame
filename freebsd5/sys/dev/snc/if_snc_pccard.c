@@ -24,8 +24,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/snc/if_snc_pccard.c,v 1.3 2003/04/15 06:37:26 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/snc/if_snc_pccard.c,v 1.4 2003/08/24 18:03:45 obrien Exp $");
 
 /*
  *	National Semiconductor  DP8393X SONIC Driver

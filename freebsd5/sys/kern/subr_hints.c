@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/subr_hints.c,v 1.7 2002/05/01 02:51:50 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/subr_hints.c,v 1.9 2003/07/02 16:01:38 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -363,4 +364,18 @@ resource_find_dev(int *anchor, const char *name, int *unit,
 	}
 	*anchor = newln;
 	return ret;
+}
+
+/*
+ * Check to see if a device is disabled via a disabled hint.
+ */
+int
+resource_disabled(const char *name, int unit)
+{
+	int error, value;
+
+	error = resource_int_value(name, unit, "disabled", &value);
+	if (error)
+	       return (0);
+	return (value);
 }

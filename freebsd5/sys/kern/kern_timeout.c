@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)kern_clock.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_timeout.c,v 1.75 2003/02/01 10:06:40 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_timeout.c,v 1.83 2003/11/15 18:33:54 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -45,7 +47,17 @@
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
+#include <sys/sysctl.h>
 
+static int avg_depth;
+SYSCTL_INT(_debug, OID_AUTO, to_avg_depth, CTLFLAG_RD, &avg_depth, 0,
+    "Average number of items examined per softclock call. Units = 1/1000");
+static int avg_gcalls;
+SYSCTL_INT(_debug, OID_AUTO, to_avg_gcalls, CTLFLAG_RD, &avg_gcalls, 0,
+    "Average number of Giant callouts made per softclock call. Units = 1/1000");
+static int avg_mpcalls;
+SYSCTL_INT(_debug, OID_AUTO, to_avg_mpcalls, CTLFLAG_RD, &avg_mpcalls, 0,
+    "Average number of MP callouts made per softclock call. Units = 1/1000");
 /*
  * TODO:
  *	allocate more timeout table slots when table overflows.
@@ -58,6 +70,9 @@ int callwheelsize, callwheelbits, callwheelmask;
 struct callout_tailq *callwheel;
 int softticks;			/* Like ticks, but for softclock(). */
 struct mtx callout_lock;
+#ifdef DIAGNOSTIC
+struct mtx dont_sleep_in_callout;
+#endif
 
 static struct callout *nextsoftcheck;	/* Next callout to be checked. */
 
@@ -108,6 +123,9 @@ kern_timeout_callwheel_init(void)
 		TAILQ_INIT(&callwheel[i]);
 	}
 	mtx_init(&callout_lock, "callout", NULL, MTX_SPIN | MTX_RECURSE);
+#ifdef DIAGNOSTIC
+	mtx_init(&dont_sleep_in_callout, "dont_sleep_in_callout", NULL, MTX_DEF);
+#endif
 }
 
 /*
@@ -133,16 +151,22 @@ softclock(void *dummy)
 	struct callout_tailq *bucket;
 	int curticks;
 	int steps;	/* #steps since we last allowed interrupts */
+	int depth;
+	int mpcalls;
+	int gcalls;
 #ifdef DIAGNOSTIC
 	struct bintime bt1, bt2;
 	struct timespec ts2;
-	static uint64_t maxdt = 18446744073709551LL;	/* 1 msec */
+	static uint64_t maxdt = 36893488147419102LL;	/* 2 msec */
 #endif
 
 #ifndef MAX_SOFTCLOCK_STEPS
 #define MAX_SOFTCLOCK_STEPS 100 /* Maximum allowed value of steps. */
 #endif /* MAX_SOFTCLOCK_STEPS */
 
+	mpcalls = 0;
+	gcalls = 0;
+	depth = 0;
 	steps = 0;
 	mtx_lock_spin(&callout_lock);
 	while (softticks != ticks) {
@@ -155,6 +179,7 @@ softclock(void *dummy)
 		bucket = &callwheel[curticks & callwheelmask];
 		c = TAILQ_FIRST(bucket);
 		while (c) {
+			depth++;
 			if (c->c_time != curticks) {
 				c = TAILQ_NEXT(c, c_links.tqe);
 				++steps;
@@ -187,22 +212,28 @@ softclock(void *dummy)
 					    (c->c_flags & ~CALLOUT_PENDING);
 				}
 				mtx_unlock_spin(&callout_lock);
-				if (!(c_flags & CALLOUT_MPSAFE))
+				if (!(c_flags & CALLOUT_MPSAFE)) {
 					mtx_lock(&Giant);
+					gcalls++;
+				} else {
+					mpcalls++;
+				}
 #ifdef DIAGNOSTIC
 				binuptime(&bt1);
+				mtx_lock(&dont_sleep_in_callout);
 #endif
 				c_func(c_arg);
 #ifdef DIAGNOSTIC
+				mtx_unlock(&dont_sleep_in_callout);
 				binuptime(&bt2);
 				bintime_sub(&bt2, &bt1);
 				if (bt2.frac > maxdt) {
 					maxdt = bt2.frac;
 					bintime2timespec(&bt2, &ts2);
 					printf(
-			"Expensive timeout(9) function: %p(%p) %d.%09ld s\n",
+			"Expensive timeout(9) function: %p(%p) %ld.%09ld s\n",
 					c_func, c_arg,
-					ts2.tv_sec, ts2.tv_nsec);
+					(long)ts2.tv_sec, ts2.tv_nsec);
 				}
 #endif
 				if (!(c_flags & CALLOUT_MPSAFE))
@@ -213,6 +244,9 @@ softclock(void *dummy)
 			}
 		}
 	}
+	avg_depth += (depth * 1000 - avg_depth) >> 8;
+	avg_mpcalls += (mpcalls * 1000 - avg_mpcalls) >> 8;
+	avg_gcalls += (gcalls * 1000 - avg_gcalls) >> 8;
 	nextsoftcheck = NULL;
 	mtx_unlock_spin(&callout_lock);
 }

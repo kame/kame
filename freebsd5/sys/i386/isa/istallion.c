@@ -32,9 +32,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/isa/istallion.c,v 1.51 2003/03/05 08:16:29 das Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/isa/istallion.c,v 1.53 2003/11/09 09:17:23 tanimura Exp $");
 
 /*****************************************************************************/
 
@@ -1708,7 +1709,7 @@ static void stli_start(struct tty *tp)
 			tp->t_state &= ~TS_ASLEEP;
 			wakeup(&tp->t_outq);
 		}
-		selwakeup(&tp->t_wsel);
+		selwakeuppri(&tp->t_wsel, TTOPRI);
 	}
 #endif
 

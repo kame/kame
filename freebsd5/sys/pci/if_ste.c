@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_ste.c,v 1.52 2003/04/21 18:34:04 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/if_ste.c,v 1.58 2003/11/14 19:00:32 sam Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -62,8 +62,8 @@ __FBSDID("$FreeBSD: src/sys/pci/if_ste.c,v 1.52 2003/04/21 18:34:04 imp Exp $");
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 /* "controller miibus0" required.  See GENERIC if you get errors here. */
 #include "miibus_if.h"
@@ -119,7 +119,7 @@ static void ste_miibus_statchg	(device_t);
 static int ste_eeprom_wait	(struct ste_softc *);
 static int ste_read_eeprom	(struct ste_softc *, caddr_t, int, int, int);
 static void ste_wait		(struct ste_softc *);
-static u_int8_t ste_calchash	(caddr_t);
+static u_int32_t ste_mchash	(caddr_t);
 static void ste_setmulti	(struct ste_softc *);
 static int ste_init_rx_list	(struct ste_softc *);
 static void ste_init_tx_list	(struct ste_softc *);
@@ -552,24 +552,22 @@ ste_read_eeprom(sc, dest, off, cnt, swap)
 	return(err ? 1 : 0);
 }
 
-static u_int8_t
-ste_calchash(addr)
-	caddr_t			addr;
+static u_int32_t
+ste_mchash(addr)
+	caddr_t		addr;
 {
 
-	u_int32_t		crc, carry;
-	int			i, j;
-	u_int8_t		c;
+	u_int32_t	crc, carry;
+	int		idx, bit;
+	u_int8_t	data;
 
 	/* Compute CRC for the address value. */
 	crc = 0xFFFFFFFF; /* initial value */
 
-	for (i = 0; i < 6; i++) {
-		c = *(addr + i);
-		for (j = 0; j < 8; j++) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (c & 0x01);
+	for (idx = 0; idx < 6; idx++) {
+		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
+			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
 			crc <<= 1;
-			c >>= 1;
 			if (carry)
 				crc = (crc ^ 0x04c11db6) | carry;
 		}
@@ -605,7 +603,7 @@ ste_setmulti(sc)
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = ste_calchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = ste_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
 		if (h < 32)
 			hashes[0] |= (1 << h);
 		else
@@ -695,6 +693,8 @@ ste_rxeof(sc)
 	int			total_len = 0, count=0;
 	u_int32_t		rxstat;
 
+	STE_LOCK_ASSERT(sc);
+
 	ifp = &sc->arpcom.ac_if;
 
 	while((rxstat = sc->ste_cdata.ste_rx_head->ste_ptr->ste_status)
@@ -752,7 +752,9 @@ ste_rxeof(sc)
 		m->m_pkthdr.len = m->m_len = total_len;
 
 		ifp->if_ipackets++;
+		STE_UNLOCK(sc);
 		(*ifp->if_input)(ifp, m);
+		STE_LOCK(sc);
 
 		cur_rx->ste_ptr->ste_status = 0;
 		count++;
@@ -929,7 +931,7 @@ ste_attach(dev)
 
 	mtx_init(&sc->ste_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-
+#ifndef BURN_BRIDGES
 	/*
 	 * Handle power management nonsense.
 	 */
@@ -952,7 +954,7 @@ ste_attach(dev)
 		pci_write_config(dev, STE_PCI_LOMEM, membase, 4);
 		pci_write_config(dev, STE_PCI_INTLINE, irq, 4);
 	}
-
+#endif
 	/*
 	 * Map control/status registers.
 	 */
@@ -1027,8 +1029,7 @@ ste_attach(dev)
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = unit;
-	ifp->if_name = "ste";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = ste_ioctl;
@@ -1226,12 +1227,10 @@ ste_init(xsc)
 	struct ste_softc	*sc;
 	int			i;
 	struct ifnet		*ifp;
-	struct mii_data		*mii;
 
 	sc = xsc;
 	STE_LOCK(sc);
 	ifp = &sc->arpcom.ac_if;
-	mii = device_get_softc(sc->ste_miibus);
 
 	ste_stop(sc);
 
@@ -1475,7 +1474,6 @@ ste_encap(sc, c, m_head)
 	struct ste_frag		*f = NULL;
 	struct mbuf		*m;
 	struct ste_desc		*d;
-	int			total_len = 0;
 
 	d = c->ste_ptr;
 	d->ste_ctl = 0;
@@ -1485,7 +1483,6 @@ encap_retry:
 		if (m->m_len != 0) {
 			if (frag == STE_MAXFRAGS)
 				break;
-			total_len += m->m_len;
 			f = &d->ste_frags[frag];
 			f->ste_addr = vtophys(mtod(m, vm_offset_t));
 			f->ste_len = m->m_len;

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if.h,v 1.81 2002/11/14 23:16:18 sam Exp $
+ * $FreeBSD: src/sys/net/if.h,v 1.83 2003/10/31 18:32:08 brooks Exp $
  */
 
 #ifndef _NET_IF_H_
@@ -62,7 +62,7 @@ struct ifnet;
 #define		IF_NAMESIZE	16
 #if __BSD_VISIBLE
 #define		IFNAMSIZ	IF_NAMESIZE
-#define		IF_MAXUNIT	0x7fff	/* ifp->if_unit is only 15 bits */
+#define		IF_MAXUNIT	0x7fff	/* historical value */
 #endif
 
 #ifdef _KERNEL
@@ -150,6 +150,7 @@ struct if_data {
 #define	IFF_POLLING	0x10000		/* Interface is in polling mode. */
 #define	IFF_PPROMISC	0x20000		/* user-requested promisc mode */
 #define	IFF_MONITOR	0x40000		/* user-requested monitor mode */
+#define	IFF_STATICARP	0x80000		/* static ARP */
 
 /* flags set internally only: */
 #define	IFF_CANTCHANGE \

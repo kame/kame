@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 2001 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,7 @@
 #include <dev/sound/pcm/vchan.h>
 #include "feeder_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/vchan.c,v 1.12 2003/02/19 05:47:12 imp Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/vchan.c,v 1.13.2.2 2004/02/15 00:16:53 truckman Exp $");
 
 struct vchinfo {
 	u_int32_t spd, fmt, blksz, bps, run;
@@ -77,7 +77,9 @@ feed_vchan_s16(struct pcm_feeder *f, struct pcm_channel *c, u_int8_t *b, u_int32
 	int16_t *tmp, *dst;
 	unsigned int cnt;
 
-	KASSERT(sndbuf_getsize(src) >= count, ("bad bufsize"));
+	if (sndbuf_getsize(src) < count)
+		panic("feed_vchan_s16(%s): tmp buffer size %d < count %d, flags = 0x%x",
+		    c->name, sndbuf_getsize(src), count, c->flags);
 	count &= ~1;
 	bzero(b, count);
 

@@ -26,14 +26,13 @@
  *
  *	i4b_hdlc.c - software-HDLC constant tables
  *	------------------------------------------
- *
  *	$Id: i4b_hdlc.h,v 1.5 2000/08/28 07:41:19 hm Exp $
- *
- * $FreeBSD: src/sys/i4b/layer1/i4b_hdlc.c,v 1.1 2002/09/11 12:44:58 phk Exp $
- *
  *	last edit-date: [Wed Jul 19 09:41:13 2000]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/i4b_hdlc.c,v 1.2 2003/06/10 23:18:32 obrien Exp $");
 
 #include <sys/types.h>
 

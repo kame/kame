@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)namei.h	8.5 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/namei.h,v 1.39 2003/01/13 08:49:36 phk Exp $
+ * $FreeBSD: src/sys/sys/namei.h,v 1.40 2003/08/07 15:04:27 jhb Exp $
  */
 
 #ifndef _SYS_NAMEI_H_
@@ -172,7 +172,7 @@ NDINIT(struct nameidata *ndp,
 #define NDF_NO_FREE_PNBUF	0x00000020
 #define NDF_ONLY_PNBUF		(~NDF_NO_FREE_PNBUF)
 
-void NDFREE(struct nameidata *, const uint);
+void NDFREE(struct nameidata *, const u_int);
 
 int	namei(struct nameidata *ndp);
 int	lookup(struct nameidata *ndp);

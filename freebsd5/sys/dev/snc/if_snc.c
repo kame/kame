@@ -24,8 +24,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/snc/if_snc.c,v 1.3 2000/10/31 08:22:26 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/snc/if_snc.c,v 1.5 2003/08/24 18:03:45 obrien Exp $");
 
 /*
  *	National Semiconductor  DP8393X SONIC Driver
@@ -46,11 +48,6 @@
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <net/if_media.h>
-
-#include "opt_bdg.h"
-#ifdef BRIDGE
-#include <net/bridge.h>
-#endif
 
 #include <dev/snc/dp83932reg.h>
 #include <dev/snc/dp83932var.h>

@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netinet6/in6_pcb.h,v 1.9 2002/08/21 11:57:12 truckman Exp $	*/
+/*	$FreeBSD: src/sys/netinet6/in6_pcb.h,v 1.10 2003/11/04 20:22:33 ume Exp $	*/
 /*	$KAME: in6_pcb.h,v 1.13 2001/02/06 09:16:53 itojun Exp $	*/
 
 /*
@@ -103,11 +103,6 @@ int	in6_setpeeraddr __P((struct socket *so, struct sockaddr **nam));
 int	in6_setsockaddr __P((struct socket *so, struct sockaddr **nam));
 int	in6_mapped_sockaddr __P((struct socket *so, struct sockaddr **nam));
 int	in6_mapped_peeraddr __P((struct socket *so, struct sockaddr **nam));
-struct	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
-				     struct ip6_pktopts *,
-				     struct ip6_moptions *,
-				     struct route_in6 *,
-				     struct in6_addr *, int *));
 int	in6_selecthlim __P((struct in6pcb *, struct ifnet *));
 int	in6_pcbsetport __P((struct in6_addr *, struct inpcb *, struct thread *));
 void	init_sin6 __P((struct sockaddr_in6 *sin6, struct mbuf *m));

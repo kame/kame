@@ -1,6 +1,4 @@
-/*	$FreeBSD: src/sys/dev/usb/ehci_pci.c,v 1.1 2003/04/14 14:04:07 ticso Exp $ */
-
-/*
+/*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -37,6 +35,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/ehci_pci.c,v 1.8 2003/11/28 05:28:29 imp Exp $");
+
 /*
  * USB Enhanced Host Controller Driver, a.k.a. USB 2.0 controller.
  *
@@ -44,14 +45,12 @@
  * http://developer.intel.com/technology/usb/download/ehci-r10.pdf
  * and the USB 2.0 spec at
  * http://www.usb.org/developers/docs/usb_20.zip
- *
  */
 
 /* The low level controller code for EHCI has been split into
  * PCI probes and EHCI specific code. This was done to facilitate the
  * sharing of code between *BSD's
  */
-
 
 #include "opt_bus.h"
 
@@ -61,12 +60,13 @@
 #include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/queue.h>
+#include <sys/lockmgr.h>
 #include <machine/bus.h>
 #include <sys/rman.h>
 #include <machine/resource.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
@@ -158,6 +158,8 @@ ehci_pci_attach(device_t self)
 		break;
 	}
 
+	pci_enable_busmaster(self);
+
 	rid = PCI_CBMEM;
 	sc->io_res = bus_alloc_resource(self, SYS_RES_MEMORY, &rid,
 	    0, ~0, 1, RF_ACTIVE);
@@ -248,7 +250,7 @@ ehci_pci_attach(device_t self)
 			bsc = device_get_softc(nbus[0]);
 			printf("ehci_pci_attach: companion %s\n",
 			USBDEVNAME(bsc->bdev));
-			sc->sc_comps[ncomp++] = bsc;  
+			sc->sc_comps[ncomp++] = bsc;
 			if (ncomp >= EHCI_COMPANION_MAX)
 				break;
 		}

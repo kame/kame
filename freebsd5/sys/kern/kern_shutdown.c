@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_shutdown.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.143 2003/04/17 22:29:23 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_shutdown.c,v 1.146 2003/08/16 16:57:57 marcel Exp $");
 
 #include "opt_ddb.h"
 #include "opt_ddb_trace.h"
@@ -67,8 +69,8 @@
 #include <sys/sysproto.h>
 #include <sys/vnode.h>
 
+#include <machine/cpu.h>
 #include <machine/pcb.h>
-#include <machine/md_var.h>
 #include <machine/smp.h>
 
 #include <sys/signalvar.h>
@@ -505,11 +507,16 @@ panic(const char *fmt, ...)
 	}
 
 	va_start(ap, fmt);
-	(void)vsnprintf(buf, sizeof(buf), fmt, ap);
-	if (panicstr == fmt)
+	if (newpanic) {
+		(void)vsnprintf(buf, sizeof(buf), fmt, ap);
 		panicstr = buf;
+		printf("panic: %s\n", buf);
+	} else {
+		printf("panic: ");
+		vprintf(fmt, ap);
+		printf("\n");
+	}
 	va_end(ap);
-	printf("panic: %s\n", buf);
 #ifdef SMP
 	/* two separate prints in case of an unmapped page and trap */
 	printf("cpuid = %d; ", PCPU_GET(cpuid));

@@ -1,6 +1,8 @@
 /*	$NetBSD: i82365.c,v 1.25 1999/10/15 06:07:27 haya Exp $	*/
-/* $FreeBSD: src/sys/dev/pcic/i82365.c,v 1.38 2003/03/02 16:54:34 des Exp $ */
 
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/pcic/i82365.c,v 1.39 2003/08/24 17:54:15 obrien Exp $");
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
  *

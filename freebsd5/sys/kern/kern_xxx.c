@@ -31,8 +31,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_xxx.c	8.2 (Berkeley) 11/14/93
- * $FreeBSD: src/sys/kern/kern_xxx.c,v 1.36 2002/06/29 02:00:01 alfred Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_xxx.c,v 1.39 2003/09/13 17:12:22 nectar Exp $");
 
 #include "opt_compat.h"
 
@@ -142,11 +144,12 @@ osethostid(td, uap)
 {
 	int error;
 
-	mtx_lock(&Giant);
 	if ((error = suser(td)))
-		hostid = uap->hostid;
+		return (error);
+	mtx_lock(&Giant);
+	hostid = uap->hostid;
 	mtx_unlock(&Giant);
-	return (error);
+	return (0);
 }
 
 /*
@@ -272,8 +275,8 @@ getdomainname(td, uap)
 
 	mtx_lock(&Giant);
 	domainnamelen = strlen(domainname) + 1;
-	if ((u_int)uap->len > domainnamelen + 1)
-		uap->len = domainnamelen + 1;
+	if ((u_int)uap->len > domainnamelen)
+		uap->len = domainnamelen;
 	error = copyout(domainname, uap->domainname, uap->len);
 	mtx_unlock(&Giant);
 	return (error);

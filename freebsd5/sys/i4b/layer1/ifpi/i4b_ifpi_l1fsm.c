@@ -26,20 +26,18 @@
  *
  *	i4b_ifpi_l1fsm.c - AVM Fritz PCI layer 1 I.430 state machine
  *	------------------------------------------------------------
- *
  *	$Id: i4b_ifpi_l1fsm.c,v 1.4 2000/05/29 15:41:41 hm Exp $ 
- *
- * $FreeBSD: src/sys/i4b/layer1/ifpi/i4b_ifpi_l1fsm.c,v 1.6 2002/09/02 00:52:07 brooks Exp $
- *
  *      last edit-date: [Mon May 29 15:23:15 2000]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/ifpi/i4b_ifpi_l1fsm.c,v 1.7 2003/06/10 23:21:00 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
 #include <sys/socket.h>
-
 
 #include <net/if.h>
 

@@ -31,10 +31,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/geom/geom_io.c,v 1.42 2003/05/07 05:37:31 phk Exp $
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/geom/geom_io.c,v 1.50.2.2 2004/02/11 08:31:23 scottl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,6 +51,7 @@
 
 static struct g_bioq g_bio_run_down;
 static struct g_bioq g_bio_run_up;
+static struct g_bioq g_bio_run_task;
 
 static u_int pace;
 static uma_zone_t	biozone;
@@ -151,6 +152,7 @@ g_io_init()
 
 	g_bioq_init(&g_bio_run_down);
 	g_bioq_init(&g_bio_run_up);
+	g_bioq_init(&g_bio_run_task);
 	biozone = uma_zcreate("g_bio", sizeof (struct bio),
 	    NULL, NULL,
 	    NULL, NULL,
@@ -209,13 +211,18 @@ g_io_check(struct bio *bp)
 	case BIO_READ:
 	case BIO_WRITE:
 	case BIO_DELETE:
+		/* Zero sectorsize is a probably lack of media */
+		if (pp->sectorsize == 0)
+			return (ENXIO);
 		/* Reject I/O not on sector boundary */
 		if (bp->bio_offset % pp->sectorsize)
 			return (EINVAL);
 		/* Reject I/O not integral sector long */
 		if (bp->bio_length % pp->sectorsize)
 			return (EINVAL);
-		/* Reject requests past the end of media. */
+		/* Reject requests before or past the end of media. */
+		if (bp->bio_offset < 0)
+			return (EIO);
 		if (bp->bio_offset > pp->mediasize)
 			return (EIO);
 		break;
@@ -230,10 +237,10 @@ g_io_request(struct bio *bp, struct g_consumer *cp)
 {
 	struct g_provider *pp;
 
-	pp = cp->provider;
 	KASSERT(cp != NULL, ("NULL cp in g_io_request"));
 	KASSERT(bp != NULL, ("NULL bp in g_io_request"));
 	KASSERT(bp->bio_data != NULL, ("NULL bp->data in g_io_request"));
+	pp = cp->provider;
 	KASSERT(pp != NULL, ("consumer not attached in g_io_request"));
 
 	bp->bio_from = cp;
@@ -261,12 +268,17 @@ g_io_deliver(struct bio *bp, int error)
 	struct g_consumer *cp;
 	struct g_provider *pp;
 
-	cp = bp->bio_from;
-	pp = bp->bio_to;
 	KASSERT(bp != NULL, ("NULL bp in g_io_deliver"));
+	pp = bp->bio_to;
+	KASSERT(pp != NULL, ("NULL bio_to in g_io_deliver"));
+	cp = bp->bio_from;
+	if (cp == NULL) {
+		bp->bio_error = error;
+		bp->bio_done(bp);
+		return;
+	}
 	KASSERT(cp != NULL, ("NULL bio_from in g_io_deliver"));
 	KASSERT(cp->geom != NULL, ("NULL bio_from->geom in g_io_deliver"));
-	KASSERT(pp != NULL, ("NULL bio_to in g_io_deliver"));
 
 	g_trace(G_T_BIO,
 "g_io_deliver(%p) from %p(%s) to %p(%s) cmd %d error %d off %jd len %jd",
@@ -303,14 +315,14 @@ g_io_schedule_down(struct thread *tp __unused)
 	struct mtx mymutex;
  
 	bzero(&mymutex, sizeof mymutex);
-	mtx_init(&mymutex, "g_xdown", MTX_DEF, 0);
+	mtx_init(&mymutex, "g_xdown", NULL, MTX_DEF);
 
 	for(;;) {
 		g_bioq_lock(&g_bio_run_down);
 		bp = g_bioq_first(&g_bio_run_down);
 		if (bp == NULL) {
 			msleep(&g_wait_down, &g_bio_run_down.bio_queue_lock,
-			    PRIBIO | PDROP, "g_down", hz/10);
+			    PRIBIO | PDROP, "-", hz/10);
 			continue;
 		}
 		g_bioq_unlock(&g_bio_run_down);
@@ -349,15 +361,40 @@ g_io_schedule_down(struct thread *tp __unused)
 }
 
 void
+bio_taskqueue(struct bio *bp, bio_task_t *func, void *arg)
+{
+	bp->bio_task = func;
+	bp->bio_task_arg = arg;
+	/*
+	 * The taskqueue is actually just a second queue off the "up"
+	 * queue, so we use the same lock.
+	 */
+	g_bioq_lock(&g_bio_run_up);
+	TAILQ_INSERT_TAIL(&g_bio_run_task.bio_queue, bp, bio_queue);
+	g_bio_run_task.bio_queue_length++;
+	wakeup(&g_wait_up);
+	g_bioq_unlock(&g_bio_run_up);
+}
+
+
+void
 g_io_schedule_up(struct thread *tp __unused)
 {
 	struct bio *bp;
 	struct mtx mymutex;
  
 	bzero(&mymutex, sizeof mymutex);
-	mtx_init(&mymutex, "g_xup", MTX_DEF, 0);
+	mtx_init(&mymutex, "g_xup", NULL, MTX_DEF);
 	for(;;) {
 		g_bioq_lock(&g_bio_run_up);
+		bp = g_bioq_first(&g_bio_run_task);
+		if (bp != NULL) {
+			g_bioq_unlock(&g_bio_run_up);
+			mtx_lock(&mymutex);
+			bp->bio_task(bp->bio_task_arg);
+			mtx_unlock(&mymutex);
+			continue;
+		}
 		bp = g_bioq_first(&g_bio_run_up);
 		if (bp != NULL) {
 			g_bioq_unlock(&g_bio_run_up);
@@ -367,7 +404,7 @@ g_io_schedule_up(struct thread *tp __unused)
 			continue;
 		}
 		msleep(&g_wait_up, &g_bio_run_up.bio_queue_lock,
-		    PRIBIO | PDROP, "g_up", hz/10);
+		    PRIBIO | PDROP, "-", hz/10);
 	}
 }
 
@@ -377,6 +414,9 @@ g_read_data(struct g_consumer *cp, off_t offset, off_t length, int *error)
 	struct bio *bp;
 	void *ptr;
 	int errorc;
+
+	KASSERT(length >= 512 && length <= DFLTPHYS,
+		("g_read_data(): invalid length %jd", (intmax_t)length));
 
 	bp = g_new_bio();
 	bp->bio_cmd = BIO_READ;
@@ -402,6 +442,9 @@ g_write_data(struct g_consumer *cp, off_t offset, void *ptr, off_t length)
 {
 	struct bio *bp;
 	int error;
+
+	KASSERT(length >= 512 && length <= DFLTPHYS,
+		("g_write_data(): invalid length %jd", (intmax_t)length));
 
 	bp = g_new_bio();
 	bp->bio_cmd = BIO_WRITE;

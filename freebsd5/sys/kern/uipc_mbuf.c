@@ -31,8 +31,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_mbuf.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/kern/uipc_mbuf.c,v 1.116 2003/04/15 02:14:43 silby Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/uipc_mbuf.c,v 1.120 2003/09/01 05:55:37 silby Exp $");
 
 #include "opt_mac.h"
 #include "opt_param.h"
@@ -53,11 +55,11 @@ int	max_linkhdr;
 int	max_protohdr;
 int	max_hdr;
 int	max_datalen;
+#ifdef MBUF_STRESS_TEST
 int	m_defragpackets;
 int	m_defragbytes;
 int	m_defraguseless;
 int	m_defragfailure;
-#ifdef MBUF_STRESS_TEST
 int	m_defragrandomfailures;
 #endif
 
@@ -72,6 +74,7 @@ SYSCTL_INT(_kern_ipc, KIPC_MAX_PROTOHDR, max_protohdr, CTLFLAG_RW,
 SYSCTL_INT(_kern_ipc, KIPC_MAX_HDR, max_hdr, CTLFLAG_RW, &max_hdr, 0, "");
 SYSCTL_INT(_kern_ipc, KIPC_MAX_DATALEN, max_datalen, CTLFLAG_RW,
 	   &max_datalen, 0, "");
+#ifdef MBUF_STRESS_TEST
 SYSCTL_INT(_kern_ipc, OID_AUTO, m_defragpackets, CTLFLAG_RD,
 	   &m_defragpackets, 0, "");
 SYSCTL_INT(_kern_ipc, OID_AUTO, m_defragbytes, CTLFLAG_RD,
@@ -80,7 +83,6 @@ SYSCTL_INT(_kern_ipc, OID_AUTO, m_defraguseless, CTLFLAG_RD,
 	   &m_defraguseless, 0, "");
 SYSCTL_INT(_kern_ipc, OID_AUTO, m_defragfailure, CTLFLAG_RD,
 	   &m_defragfailure, 0, "");
-#ifdef MBUF_STRESS_TEST
 SYSCTL_INT(_kern_ipc, OID_AUTO, m_defragrandomfailures, CTLFLAG_RW,
 	   &m_defragrandomfailures, 0, "");
 #endif
@@ -158,7 +160,10 @@ m_prepend(struct mbuf *m, int len, int how)
 {
 	struct mbuf *mn;
 
-	MGET(mn, how, m->m_type);
+	if (m->m_flags & M_PKTHDR)
+		MGETHDR(mn, how, m->m_type);
+	else
+		MGET(mn, how, m->m_type);
 	if (mn == NULL) {
 		m_freem(m);
 		return (NULL);
@@ -207,7 +212,10 @@ m_copym(struct mbuf *m, int off0, int len, int wait)
 			    ("m_copym, length > size of mbuf chain"));
 			break;
 		}
-		MGET(n, wait, m->m_type);
+		if (copyhdr)
+			MGETHDR(n, wait, m->m_type);
+		else
+			MGET(n, wait, m->m_type);
 		*np = n;
 		if (n == NULL)
 			goto nospace;
@@ -810,6 +818,8 @@ m_defrag(struct mbuf *m0, int how)
 	if (!(m0->m_flags & M_PKTHDR))
 		return (m0);
 
+	m_fixhdr(m0); /* Needed sanity check */
+
 #ifdef MBUF_STRESS_TEST
 	if (m_defragrandomfailures) {
 		int temp = arc4random() & 0xff;
@@ -852,18 +862,108 @@ m_defrag(struct mbuf *m0, int how)
 			m_cat(m_final, m_new);
 		m_new = NULL;
 	}
+#ifdef MBUF_STRESS_TEST
 	if (m0->m_next == NULL)
 		m_defraguseless++;
+#endif
 	m_freem(m0);
 	m0 = m_final;
+#ifdef MBUF_STRESS_TEST
 	m_defragpackets++;
 	m_defragbytes += m0->m_pkthdr.len;
+#endif
 	return (m0);
 nospace:
+#ifdef MBUF_STRESS_TEST
 	m_defragfailure++;
+#endif
 	if (m_new)
 		m_free(m_new);
 	if (m_final)
 		m_freem(m_final);
 	return (NULL);
 }
+
+#ifdef MBUF_STRESS_TEST
+
+/*
+ * Fragment an mbuf chain.  There's no reason you'd ever want to do
+ * this in normal usage, but it's great for stress testing various
+ * mbuf consumers.
+ *
+ * If fragmentation is not possible, the original chain will be
+ * returned.
+ *
+ * Possible length values:
+ * 0	 no fragmentation will occur
+ * > 0	each fragment will be of the specified length
+ * -1	each fragment will be the same random value in length
+ * -2	each fragment's length will be entirely random
+ * (Random values range from 1 to 256)
+ */
+struct mbuf *
+m_fragment(struct mbuf *m0, int how, int length)
+{
+	struct mbuf	*m_new = NULL, *m_final = NULL;
+	int		progress = 0;
+
+	if (!(m0->m_flags & M_PKTHDR))
+		return (m0);
+	
+	if ((length == 0) || (length < -2))
+		return (m0);
+
+	m_fixhdr(m0); /* Needed sanity check */
+
+	m_final = m_getcl(how, MT_DATA, M_PKTHDR);
+
+	if (m_final == NULL)
+		goto nospace;
+
+	if (m_dup_pkthdr(m_final, m0, how) == NULL)
+		goto nospace;
+
+	m_new = m_final;
+
+	if (length == -1)
+		length = 1 + (arc4random() & 255);
+
+	while (progress < m0->m_pkthdr.len) {
+		int fraglen;
+
+		if (length > 0)
+			fraglen = length;
+		else
+			fraglen = 1 + (arc4random() & 255);
+		if (fraglen > m0->m_pkthdr.len - progress)
+			fraglen = m0->m_pkthdr.len - progress;
+
+		if (fraglen > MCLBYTES)
+			fraglen = MCLBYTES;
+
+		if (m_new == NULL) {
+			m_new = m_getcl(how, MT_DATA, 0);
+			if (m_new == NULL)
+				goto nospace;
+		}
+
+		m_copydata(m0, progress, fraglen, mtod(m_new, caddr_t));
+		progress += fraglen;
+		m_new->m_len = fraglen;
+		if (m_new != m_final)
+			m_cat(m_final, m_new);
+		m_new = NULL;
+	}
+	m_freem(m0);
+	m0 = m_final;
+	return (m0);
+nospace:
+	if (m_new)
+		m_free(m_new);
+	if (m_final)
+		m_freem(m_final);
+	/* Return the original chain on failure */
+	return (m0);
+}
+
+#endif

@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/sigpvc/sigpvc_subr.c,v 1.12 2003/02/19 05:47:31 imp Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ---------------------------
  *
  * Subroutines
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/sigpvc/sigpvc_subr.c,v 1.13 2003/06/11 07:06:31 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,10 +49,6 @@
 #include <netatm/sigpvc/sigpvc_var.h>
 
 #include <vm/uma.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/sigpvc/sigpvc_subr.c,v 1.12 2003/02/19 05:47:31 imp Exp $");
-#endif
 
 extern uma_zone_t	sigpvc_vc_zone;
 

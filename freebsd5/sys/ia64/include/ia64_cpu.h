@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/ia64/include/ia64_cpu.h,v 1.17 2002/05/19 04:42:19 marcel Exp $
+ *	$FreeBSD: src/sys/ia64/include/ia64_cpu.h,v 1.19 2003/08/15 05:46:33 marcel Exp $
  */
 
 #ifndef _MACHINE_IA64_CPU_H_
@@ -284,7 +284,7 @@ ia64_get_##name(void)						\
 static __inline void						\
 ia64_set_##name(u_int64_t v)					\
 {								\
-	__asm __volatile("mov ar." #name "=%0" :: "r" (v));	\
+	__asm __volatile("mov ar." #name "=%0;;" :: "r" (v));	\
 }
 
 IA64_AR(k0)
@@ -340,7 +340,7 @@ ia64_get_##name(void)						\
 static __inline void						\
 ia64_set_##name(u_int64_t v)					\
 {								\
-	__asm __volatile("mov cr." #name "=%0" :: "r" (v));	\
+	__asm __volatile("mov cr." #name "=%0;;" :: "r" (v));	\
 }
 
 IA64_CR(dcr)
@@ -397,7 +397,19 @@ ia64_get_cpuid(int i)
 	return result;
 }
 
-#endif
+static __inline void
+ia64_disable_highfp(void)
+{
+	__asm __volatile("ssm psr.dfh;; srlz.d");
+}
+
+static __inline void
+ia64_enable_highfp(void)
+{
+	__asm __volatile("rsm psr.dfh;; srlz.d");
+}
+
+#endif /* !LOCORE */
 
 #endif /* _MACHINE_IA64_CPU_H_ */
 

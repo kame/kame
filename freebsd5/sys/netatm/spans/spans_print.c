@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/spans/spans_print.c,v 1.9 2002/03/20 08:00:51 alfred Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ---------------------------
  *
  * SPANS Print Routines.
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/spans/spans_print.c,v 1.10 2003/06/11 07:11:35 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -53,10 +51,6 @@
 
 #include "spans_xdr.h"
 #include <netatm/spans/spans_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/spans/spans_print.c,v 1.9 2002/03/20 08:00:51 alfred Exp $");
-#endif
 
 /*
  * If LONGPRINT is defined, every field of the SPANS message will be

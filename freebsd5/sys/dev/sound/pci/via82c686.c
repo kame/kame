@@ -27,13 +27,13 @@
 #include <dev/sound/pcm/sound.h>
 #include <dev/sound/pcm/ac97.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 #include <sys/sysctl.h>
 
 #include <dev/sound/pci/via82c686.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/via82c686.c,v 1.24 2003/03/28 16:33:15 orion Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/via82c686.c,v 1.27 2003/09/02 17:30:37 jhb Exp $");
 
 #define VIA_PCI_ID 0x30581106
 #define	NSEGS		4	/* Number of segments in SGD table */
@@ -506,7 +506,7 @@ via_attach(device_t dev)
 		DELAY(5000);
 	}
 
-	via->regid = PCIR_MAPS;
+	via->regid = PCIR_BAR(0);
 	via->reg = bus_alloc_resource(dev, SYS_RES_IOPORT, &via->regid, 0, ~0, 1, RF_ACTIVE);
 	if (!via->reg) {
 		device_printf(dev, "cannot allocate bus resource.");
@@ -544,7 +544,8 @@ via_attach(device_t dev)
 		/*highaddr*/BUS_SPACE_MAXADDR,
 		/*filter*/NULL, /*filterarg*/NULL,
 		/*maxsize*/via->bufsz, /*nsegments*/1, /*maxsegz*/0x3ffff,
-		/*flags*/0, &via->parent_dmat) != 0) {
+		/*flags*/0, /*lockfunc*/busdma_lock_mutex,
+		/*lockarg*/&Giant, &via->parent_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		goto bad;
 	}
@@ -560,7 +561,8 @@ via_attach(device_t dev)
 		/*filter*/NULL, /*filterarg*/NULL,
 		/*maxsize*/NSEGS * sizeof(struct via_dma_op),
 		/*nsegments*/1, /*maxsegz*/0x3ffff,
-		/*flags*/0, &via->sgd_dmat) != 0) {
+		/*flags*/0, /*lockfunc*/busdma_lock_mutex,
+		/*lockarg*/&Giant, &via->sgd_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		goto bad;
 	}

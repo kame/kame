@@ -12,13 +12,14 @@
  * DISCLAIMER:  This code isn't warranted to do anything useful.  Anything
  * bad that happens because of using this software isn't the responsibility
  * of the author.  This software is distributed AS-IS.
- *
- * $FreeBSD: src/sys/kern/vfs_aio.c,v 1.161 2003/04/29 13:36:03 kan Exp $
  */
 
 /*
  * This file contains support for the POSIX 1003.1B AIO/LIO facility.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/vfs_aio.c,v 1.168 2003/11/15 09:28:08 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -1058,7 +1059,7 @@ aio_qphysio(struct proc *p, struct aiocblist *aiocbe)
 	if (fp->f_type != DTYPE_VNODE) 
 		return (-1);
 
-	vp = fp->f_data;
+	vp = fp->f_vnode;
 
 	/*
 	 * If its not a disk, we don't want to return a positive error.
@@ -1096,16 +1097,16 @@ aio_qphysio(struct proc *p, struct aiocblist *aiocbe)
 	/*
 	 * Get a copy of the kva from the physical buffer.
 	 */
-	bp->b_caller1 = p;
 	bp->b_dev = vp->v_rdev;
 	error = 0;
 
 	bp->b_bcount = cb->aio_nbytes;
 	bp->b_bufsize = cb->aio_nbytes;
-	bp->b_flags = B_PHYS;
 	bp->b_iodone = aio_physwakeup;
 	bp->b_saveaddr = bp->b_data;
 	bp->b_data = (void *)(uintptr_t)cb->aio_buf;
+	bp->b_offset = cb->aio_offset;
+	bp->b_iooffset = cb->aio_offset;
 	bp->b_blkno = btodb(cb->aio_offset);
 	bp->b_iocmd = cb->aio_lio_opcode == LIO_WRITE ? BIO_WRITE : BIO_READ;
 
@@ -1119,7 +1120,7 @@ aio_qphysio(struct proc *p, struct aiocblist *aiocbe)
 
 	s = splbio();
 	aiocbe->bp = bp;
-	bp->b_spc = (void *)aiocbe;
+	bp->b_caller1 = (void *)aiocbe;
 	TAILQ_INSERT_TAIL(&aio_bufjobs, aiocbe, list);
 	TAILQ_INSERT_TAIL(&ki->kaio_bufqueue, aiocbe, plist);
 	aiocbe->jobstate = JOBST_JOBQBUF;
@@ -1328,8 +1329,9 @@ _aio_aqueue(struct thread *td, struct aiocb *job, struct aio_liojob *lj, int typ
 	}
 
 	fp = aiocbe->fd_file = fdp->fd_ofiles[fd];
-	if ((fp == NULL) || ((opcode == LIO_WRITE) && ((fp->f_flag & FWRITE) ==
-	    0))) {
+	if ((fp == NULL) ||
+	    ((opcode == LIO_WRITE) && ((fp->f_flag & FWRITE) == 0)) ||
+	    ((opcode == LIO_READ) && ((fp->f_flag & FREAD) == 0))) {
 		FILEDESC_UNLOCK(fdp);
 		uma_zfree(aiocb_zone, aiocbe);
 		if (type == 0)
@@ -1722,7 +1724,7 @@ aio_cancel(struct thread *td, struct aio_cancel_args *uap)
 		return (EBADF);
 
         if (fp->f_type == DTYPE_VNODE) {
-		vp = fp->f_data;
+		vp = fp->f_vnode;
 		
 		if (vn_isdisk(vp,&error)) {
 			td->td_retval[0] = AIO_NOTCANCELED;
@@ -2127,9 +2129,9 @@ aio_physwakeup(struct buf *bp)
 
 	wakeup(bp);
 
-	aiocbe = (struct aiocblist *)bp->b_spc;
+	aiocbe = (struct aiocblist *)bp->b_caller1;
 	if (aiocbe) {
-		p = bp->b_caller1;
+		p = aiocbe->userproc;
 
 		aiocbe->jobstate = JOBST_JOBBFINISHED;
 		aiocbe->uaiocb._aiocb_private.status -= bp->b_resid;

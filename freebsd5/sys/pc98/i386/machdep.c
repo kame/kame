@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
- * $FreeBSD: src/sys/pc98/i386/machdep.c,v 1.318 2003/05/14 20:21:42 jhb Exp $
+ * $FreeBSD: src/sys/pc98/i386/machdep.c,v 1.331 2003/11/15 12:37:15 nyan Exp $
  */
 
 #include "opt_atalk.h"
@@ -45,12 +45,11 @@
 #include "opt_inet.h"
 #include "opt_ipx.h"
 #include "opt_isa.h"
+#include "opt_kstack_pages.h"
 #include "opt_maxmem.h"
 #include "opt_msgbuf.h"
 #include "opt_npx.h"
 #include "opt_perfmon.h"
-#include "opt_swtch.h"
-#include "opt_kstack_pages.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -91,7 +90,10 @@
 #include <sys/exec.h>
 #include <sys/cons.h>
 
+#ifdef DDB
 #include <ddb/ddb.h>
+#include <ddb/db_sym.h>
+#endif
 
 #include <net/netisr.h>
 
@@ -101,6 +103,7 @@
 #include <machine/clock.h>
 #include <machine/specialreg.h>
 #include <machine/bootinfo.h>
+#include <machine/intr_machdep.h>
 #include <machine/md_var.h>
 #include <machine/pc/bios.h>
 #include <machine/pcb_ext.h>		/* pcb.h included via sys/user.h */
@@ -113,8 +116,10 @@
 #include <machine/smp.h>
 #endif
 
+#ifdef DEV_ISA
 #include <i386/isa/icu.h>
-#include <i386/isa/intr_machdep.h>
+#endif
+
 #ifdef PC98
 #include <pc98/pc98/pc98_machdep.h>
 #include <pc98/pc98/pc98.h>
@@ -159,44 +164,7 @@ int	need_post_dma_flush;	/* If 1, use invd after DMA transfer. */
 #endif
 
 int	_udatasel, _ucodesel;
-u_int	atdevbase;
-
-#if defined(SWTCH_OPTIM_STATS)
-int stupid_switch;
-SYSCTL_INT(_debug, OID_AUTO, stupid_switch,
-	CTLFLAG_RW, &stupid_switch, 0, "");
-int swtch_optim_stats;
-SYSCTL_INT(_debug, OID_AUTO, swtch_optim_stats,
-	CTLFLAG_RW, &swtch_optim_stats, 0, "");
-int tlb_flush_count;
-SYSCTL_INT(_debug, OID_AUTO, tlb_flush_count,
-	CTLFLAG_RW, &tlb_flush_count, 0, "");
-int lazy_flush_count;
-SYSCTL_INT(_debug, OID_AUTO, lazy_flush_count,
-	CTLFLAG_RW, &lazy_flush_count, 0, "");
-int lazy_flush_fixup;
-SYSCTL_INT(_debug, OID_AUTO, lazy_flush_fixup,
-	CTLFLAG_RW, &lazy_flush_fixup, 0, "");
-#ifdef SMP
-int lazy_flush_smpfixup;
-SYSCTL_INT(_debug, OID_AUTO, lazy_flush_smpfixup,
-	CTLFLAG_RW, &lazy_flush_smpfixup, 0, "");
-int lazy_flush_smpipi;
-SYSCTL_INT(_debug, OID_AUTO, lazy_flush_smpipi,
-	CTLFLAG_RW, &lazy_flush_smpipi, 0, "");
-int lazy_flush_smpbadcr3;
-SYSCTL_INT(_debug, OID_AUTO, lazy_flush_smpbadcr3,
-	CTLFLAG_RW, &lazy_flush_smpbadcr3, 0, "");
-int lazy_flush_smpmiss;
-SYSCTL_INT(_debug, OID_AUTO, lazy_flush_smpmiss,
-	CTLFLAG_RW, &lazy_flush_smpmiss, 0, "");
-#endif
-#endif
-#ifdef LAZY_SWITCH
-int lazy_flush_enable = 1;
-SYSCTL_INT(_debug, OID_AUTO, lazy_flush_enable,
-	CTLFLAG_RW, &lazy_flush_enable, 0, "");
-#endif
+u_int	atdevbase, basemem;
 
 #ifdef PC98
 static int	ispc98 = 1;
@@ -280,10 +248,7 @@ cpu_startup(dummy)
 	bufinit();
 	vm_pager_bufferinit();
 
-#ifndef SMP
-	/* For SMP, we delay the cpu_setregs() until after SMP startup. */
 	cpu_setregs();
-#endif
 }
 
 /*
@@ -687,6 +652,26 @@ sendsig(catcher, sig, mask, code)
 }
 
 /*
+ * Build siginfo_t for SA thread
+ */
+void
+cpu_thread_siginfo(int sig, u_long code, siginfo_t *si)
+{
+	struct proc *p;
+	struct thread *td;
+
+	td = curthread;
+	p = td->td_proc;
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+
+	bzero(si, sizeof(*si));
+	si->si_signo = sig;
+	si->si_code = code;
+	si->si_addr = (void *)td->td_frame->tf_err;
+	/* XXXKSE fill other fields */
+}
+
+/*
  * System call to cleanup state after a signal
  * has been taken.  Reset signal mask and
  * stack state from context left by sendsig (above).
@@ -1069,6 +1054,17 @@ static int	cpu_idle_hlt = 1;
 SYSCTL_INT(_machdep, OID_AUTO, cpu_idle_hlt, CTLFLAG_RW,
     &cpu_idle_hlt, 0, "Idle loop HLT enable");
 
+static void
+cpu_idle_default(void)
+{
+	/*
+	 * we must absolutely guarentee that hlt is the
+	 * absolute next instruction after sti or we
+	 * introduce a timing window.
+	 */
+	__asm __volatile("sti; hlt");
+}
+
 /*
  * Note that we have to be careful here to avoid a race between checking
  * sched_runnable() and actually halting.  If we don't do this, we may waste
@@ -1086,18 +1082,15 @@ cpu_idle(void)
 
 	if (cpu_idle_hlt) {
 		disable_intr();
-  		if (sched_runnable()) {
+  		if (sched_runnable())
 			enable_intr();
-		} else {
-			/*
-			 * we must absolutely guarentee that hlt is the
-			 * absolute next instruction after sti or we
-			 * introduce a timing window.
-			 */
-			__asm __volatile("sti; hlt");
-		}
+		else
+			(*cpu_idle_hook)();
 	}
 }
+
+/* Other subsystems (e.g., ACPI) can hook this later. */
+void (*cpu_idle_hook)(void) = cpu_idle_default;
 
 /*
  * Clear registers on exec
@@ -1253,10 +1246,7 @@ union descriptor gdt[NGDT * MAXCPU];	/* global descriptor table */
 static struct gate_descriptor idt0[NIDT];
 struct gate_descriptor *idt = &idt0[0];	/* interrupt descriptor table */
 union descriptor ldt[NLDT];		/* local descriptor table */
-#ifdef SMP
-/* table descriptors - used to load tables by microp */
-struct region_descriptor r_gdt, r_idt;
-#endif
+struct region_descriptor r_gdt, r_idt;	/* table descriptors */
 
 int private_tss;			/* flag indicating private tss */
 
@@ -1312,7 +1302,7 @@ struct soft_segment_descriptor gdt_segs[] = {
 /* GPROC0_SEL	4 Proc 0 Tss Descriptor */
 {
 	0x0,			/* segment base address */
-	sizeof(struct i386tss)-1,/* length - all address space */
+	sizeof(struct i386tss)-1,/* length  */
 	SDT_SYS386TSS,		/* segment type */
 	0,			/* segment descriptor priority level */
 	1,			/* segment descriptor present */
@@ -1498,6 +1488,31 @@ extern inthand_t
 	IDTVEC(page), IDTVEC(mchk), IDTVEC(rsvd), IDTVEC(fpu), IDTVEC(align),
 	IDTVEC(xmm), IDTVEC(lcall_syscall), IDTVEC(int0x80_syscall);
 
+#ifdef DDB
+/*
+ * Display the index and function name of any IDT entries that don't use
+ * the default 'rsvd' entry point.
+ */
+DB_SHOW_COMMAND(idt, db_show_idt)
+{
+	struct gate_descriptor *ip;
+	int idx, quit;
+	uintptr_t func;
+
+	ip = idt;
+	db_setup_paging(db_simple_pager, &quit, DB_LINES_PER_PAGE);
+	for (idx = 0, quit = 0; idx < NIDT; idx++) {
+		func = (ip->gd_hioffset << 16 | ip->gd_looffset);
+		if (func != (uintptr_t)&IDTVEC(rsvd)) {
+			db_printf("%3d\t", idx);
+			db_printsym(func, DB_STGY_PROC);
+			db_printf("\n");
+		}
+		ip++;
+	}
+}
+#endif
+
 void
 sdtossd(sd, ssd)
 	struct segment_descriptor *sd;
@@ -1532,13 +1547,13 @@ getmemsize(int first)
 {
 #ifdef PC98
 	int i, physmap_idx, pa_indx, pg_n;
-	u_int basemem, extmem, under16;
+	u_int extmem, under16;
 	vm_offset_t pa, physmap[PHYSMAP_SIZE];
 	pt_entry_t *pte;
 	char *cp;
 #else
 	int i, physmap_idx, pa_indx;
-	u_int basemem, extmem;
+	u_int extmem;
 	struct vm86frame vmf;
 	struct vm86context vmc;
 	vm_paddr_t pa, physmap[PHYSMAP_SIZE];
@@ -1788,10 +1803,7 @@ physmap_done:
 
 #ifdef SMP
 	/* make hole for AP bootstrap code */
-	physmap[1] = mp_bootaddress(physmap[1] / 1024);
-
-	/* look for the MP hardware - needed for apic addresses */
-	i386_mp_probe();
+	physmap[1] = mp_bootaddress(physmap[1]);
 #endif
 
 	/*
@@ -1880,7 +1892,7 @@ physmap_done:
 			/*
 			 * block out kernel memory as not available.
 			 */
-			if (pa >= 0x100000 && pa < first)
+			if (pa >= KERNLOAD && pa < first)
 				continue;
 	
 			page_bad = FALSE;
@@ -1992,10 +2004,6 @@ init386(first)
 {
 	struct gate_descriptor *gdp;
 	int gsel_tss, metadata_missing, off, x;
-#ifndef SMP
-	/* table descriptors - used to load tables by microp */
-	struct region_descriptor r_gdt, r_idt;
-#endif
 	struct pcpu *pc;
 
 	proc0.p_uarea = proc0uarea;
@@ -2075,7 +2083,7 @@ init386(first)
 	 *	     under witness.
 	 */
 	mutex_init();
-	mtx_init(&clock_lock, "clk", NULL, MTX_SPIN | MTX_RECURSE);
+	mtx_init(&clock_lock, "clk", NULL, MTX_SPIN);
 	mtx_init(&icu_lock, "icu", NULL, MTX_SPIN | MTX_NOWITNESS);
 
 	/* make ldt memory segments */
@@ -2096,46 +2104,44 @@ init386(first)
 	for (x = 0; x < NIDT; x++)
 		setidt(x, &IDTVEC(rsvd), SDT_SYS386TGT, SEL_KPL,
 		    GSEL(GCODE_SEL, SEL_KPL));
-	setidt(0, &IDTVEC(div),  SDT_SYS386TGT, SEL_KPL,
+	setidt(IDT_DE, &IDTVEC(div),  SDT_SYS386TGT, SEL_KPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
-	setidt(1, &IDTVEC(dbg),  SDT_SYS386IGT, SEL_KPL,
+	setidt(IDT_DB, &IDTVEC(dbg),  SDT_SYS386IGT, SEL_KPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
-	setidt(2, &IDTVEC(nmi),  SDT_SYS386TGT, SEL_KPL,
+	setidt(IDT_NMI, &IDTVEC(nmi),  SDT_SYS386TGT, SEL_KPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
- 	setidt(3, &IDTVEC(bpt),  SDT_SYS386IGT, SEL_UPL,
+ 	setidt(IDT_BP, &IDTVEC(bpt),  SDT_SYS386IGT, SEL_UPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
-	setidt(4, &IDTVEC(ofl),  SDT_SYS386TGT, SEL_UPL,
+	setidt(IDT_OF, &IDTVEC(ofl),  SDT_SYS386TGT, SEL_UPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
-	setidt(5, &IDTVEC(bnd),  SDT_SYS386TGT, SEL_KPL,
+	setidt(IDT_BR, &IDTVEC(bnd),  SDT_SYS386TGT, SEL_KPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
-	setidt(6, &IDTVEC(ill),  SDT_SYS386TGT, SEL_KPL,
+	setidt(IDT_UD, &IDTVEC(ill),  SDT_SYS386TGT, SEL_KPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
-	setidt(7, &IDTVEC(dna),  SDT_SYS386TGT, SEL_KPL
+	setidt(IDT_NM, &IDTVEC(dna),  SDT_SYS386TGT, SEL_KPL
 	    , GSEL(GCODE_SEL, SEL_KPL));
-	setidt(8, 0,  SDT_SYSTASKGT, SEL_KPL, GSEL(GPANIC_SEL, SEL_KPL));
-	setidt(9, &IDTVEC(fpusegm),  SDT_SYS386TGT, SEL_KPL,
+	setidt(IDT_DF, 0,  SDT_SYSTASKGT, SEL_KPL, GSEL(GPANIC_SEL, SEL_KPL));
+	setidt(IDT_FPUGP, &IDTVEC(fpusegm),  SDT_SYS386TGT, SEL_KPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
-	setidt(10, &IDTVEC(tss),  SDT_SYS386TGT, SEL_KPL,
+	setidt(IDT_TS, &IDTVEC(tss),  SDT_SYS386TGT, SEL_KPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
-	setidt(11, &IDTVEC(missing),  SDT_SYS386TGT, SEL_KPL,
+	setidt(IDT_NP, &IDTVEC(missing),  SDT_SYS386TGT, SEL_KPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
-	setidt(12, &IDTVEC(stk),  SDT_SYS386TGT, SEL_KPL,
+	setidt(IDT_SS, &IDTVEC(stk),  SDT_SYS386TGT, SEL_KPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
-	setidt(13, &IDTVEC(prot),  SDT_SYS386TGT, SEL_KPL,
+	setidt(IDT_GP, &IDTVEC(prot),  SDT_SYS386TGT, SEL_KPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
-	setidt(14, &IDTVEC(page),  SDT_SYS386IGT, SEL_KPL,
+	setidt(IDT_PF, &IDTVEC(page),  SDT_SYS386IGT, SEL_KPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
-	setidt(15, &IDTVEC(rsvd),  SDT_SYS386TGT, SEL_KPL,
+	setidt(IDT_MF, &IDTVEC(fpu),  SDT_SYS386TGT, SEL_KPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
-	setidt(16, &IDTVEC(fpu),  SDT_SYS386TGT, SEL_KPL,
+	setidt(IDT_AC, &IDTVEC(align), SDT_SYS386TGT, SEL_KPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
-	setidt(17, &IDTVEC(align), SDT_SYS386TGT, SEL_KPL,
+	setidt(IDT_MC, &IDTVEC(mchk),  SDT_SYS386TGT, SEL_KPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
-	setidt(18, &IDTVEC(mchk),  SDT_SYS386TGT, SEL_KPL,
+	setidt(IDT_XF, &IDTVEC(xmm), SDT_SYS386TGT, SEL_KPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
-	setidt(19, &IDTVEC(xmm), SDT_SYS386TGT, SEL_KPL,
-	    GSEL(GCODE_SEL, SEL_KPL));
- 	setidt(0x80, &IDTVEC(int0x80_syscall), SDT_SYS386TGT, SEL_UPL,
+ 	setidt(IDT_SYSCALL, &IDTVEC(int0x80_syscall), SDT_SYS386TGT, SEL_UPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
 
 	r_idt.rd_limit = sizeof(idt0) - 1;
@@ -2151,7 +2157,7 @@ init386(first)
 		printf("WARNING: loader(8) metadata is missing!\n");
 
 #ifdef DEV_ISA
-	isa_defaultirq();
+	atpic_startup();
 #endif
 
 #ifdef DDB
@@ -2161,9 +2167,9 @@ init386(first)
 #endif
 
 	finishidentcpu();	/* Final stage of CPU initialization */
-	setidt(6, &IDTVEC(ill),  SDT_SYS386TGT, SEL_KPL,
+	setidt(IDT_UD, &IDTVEC(ill),  SDT_SYS386TGT, SEL_KPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
-	setidt(13, &IDTVEC(prot),  SDT_SYS386TGT, SEL_KPL,
+	setidt(IDT_GP, &IDTVEC(prot),  SDT_SYS386TGT, SEL_KPL,
 	    GSEL(GCODE_SEL, SEL_KPL));
 	initializecpu();	/* Initialize CPU registers */
 
@@ -2235,18 +2241,17 @@ init386(first)
 void
 cpu_pcpu_init(struct pcpu *pcpu, int cpuid, size_t size)
 {
+
 }
 
 #if defined(I586_CPU) && !defined(NO_F00F_HACK)
 static void f00f_hack(void *unused);
-SYSINIT(f00f_hack, SI_SUB_INTRINSIC, SI_ORDER_FIRST, f00f_hack, NULL);
+SYSINIT(f00f_hack, SI_SUB_INTRINSIC, SI_ORDER_FIRST, f00f_hack, NULL)
 
 static void
-f00f_hack(void *unused) {
+f00f_hack(void *unused)
+{
 	struct gate_descriptor *new_idt;
-#ifndef SMP
-	struct region_descriptor r_idt;
-#endif
 	vm_offset_t tmp;
 
 	if (!has_f00f_bug)
@@ -2256,29 +2261,27 @@ f00f_hack(void *unused) {
 
 	printf("Intel Pentium detected, installing workaround for F00F bug\n");
 
-	r_idt.rd_limit = sizeof(idt0) - 1;
-
 	tmp = kmem_alloc(kernel_map, PAGE_SIZE * 2);
 	if (tmp == 0)
 		panic("kmem_alloc returned 0");
-	if (((unsigned int)tmp & (PAGE_SIZE-1)) != 0)
-		panic("kmem_alloc returned non-page-aligned memory");
-	/* Put the first seven entries in the lower page */
-	new_idt = (struct gate_descriptor*)(tmp + PAGE_SIZE - (7*8));
+
+	/* Put the problematic entry (#6) at the end of the lower page. */
+	new_idt = (struct gate_descriptor*)
+	    (tmp + PAGE_SIZE - 7 * sizeof(struct gate_descriptor));
 	bcopy(idt, new_idt, sizeof(idt0));
-	r_idt.rd_base = (int)new_idt;
+	r_idt.rd_base = (u_int)new_idt;
 	lidt(&r_idt);
 	idt = new_idt;
 	if (vm_map_protect(kernel_map, tmp, tmp + PAGE_SIZE,
 			   VM_PROT_READ, FALSE) != KERN_SUCCESS)
 		panic("vm_map_protect failed");
-	return;
 }
 #endif /* defined(I586_CPU) && !NO_F00F_HACK */
 
 int
-ptrace_set_pc(struct thread *td, unsigned long addr)
+ptrace_set_pc(struct thread *td, u_long addr)
 {
+
 	td->td_frame->tf_eip = addr;
 	return (0);
 }
@@ -2431,7 +2434,7 @@ set_fpregs(struct thread *td, struct fpreg *fpregs)
  * Get machine context.
  */
 int
-get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
+get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 {
 	struct trapframe *tp;
 
@@ -2449,7 +2452,7 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
 	mcp->mc_ebp = tp->tf_ebp;
 	mcp->mc_isp = tp->tf_isp;
 	mcp->mc_ebx = tp->tf_ebx;
-	if (clear_ret != 0) {
+	if (flags & GET_MC_CLEAR_RET) {
 		mcp->mc_eax = 0;
 		mcp->mc_edx = 0;
 	} else {
@@ -2793,7 +2796,6 @@ user_dbreg_trap(void)
          */
         return 0;
 }
-
 
 #ifndef DDB
 void

@@ -1,4 +1,3 @@
-/*	$FreeBSD: src/sys/opencrypto/crypto.c,v 1.9 2003/02/23 07:25:47 sam Exp $	*/
 /*	$OpenBSD: crypto.c,v 1.38 2002/06/11 11:14:29 beck Exp $	*/
 /*
  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
@@ -20,6 +19,10 @@
  * MERCHANTABILITY OF THIS SOFTWARE OR ITS FITNESS FOR ANY PARTICULAR
  * PURPOSE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/opencrypto/crypto.c,v 1.13 2003/06/30 05:09:32 sam Exp $");
+
 #define	CRYPTO_TIMING				/* enable timing support */
 
 #include <sys/param.h>
@@ -36,8 +39,6 @@
 #include <vm/uma.h>
 #include <opencrypto/cryptodev.h>
 #include <opencrypto/xform.h>			/* XXX for M_XDATA */
-
-#define	SESID2HID(sid)	(((sid) >> 32) & 0xffffffff)
 
 /*
  * Crypto drivers register themselves by allocating a slot in the
@@ -114,16 +115,16 @@ crypto_init(void)
 {
 	int error;
 
-	mtx_init(&crypto_drivers_mtx, "crypto driver table",
-		NULL, MTX_DEF|MTX_QUIET);
+	mtx_init(&crypto_drivers_mtx, "crypto", "crypto driver table",
+		MTX_DEF|MTX_QUIET);
 
 	TAILQ_INIT(&crp_q);
 	TAILQ_INIT(&crp_kq);
-	mtx_init(&crypto_q_mtx, "crypto op queues", NULL, MTX_DEF);
+	mtx_init(&crypto_q_mtx, "crypto", "crypto op queues", MTX_DEF);
 
 	TAILQ_INIT(&crp_ret_q);
 	TAILQ_INIT(&crp_ret_kq);
-	mtx_init(&crypto_ret_q_mtx, "crypto return queues", NULL, MTX_DEF);
+	mtx_init(&crypto_ret_q_mtx, "crypto", "crypto return queues", MTX_DEF);
 
 	cryptop_zone = uma_zcreate("cryptop", sizeof (struct cryptop),
 				    0, 0, 0, 0,
@@ -275,26 +276,25 @@ crypto_newsession(u_int64_t *sid, struct cryptoini *cri, int hard)
 	 */
 
 	for (hid = 0; hid < crypto_drivers_num; hid++) {
+		struct cryptocap *cap = &crypto_drivers[hid];
 		/*
 		 * If it's not initialized or has remaining sessions
 		 * referencing it, skip.
 		 */
-		if (crypto_drivers[hid].cc_newsession == NULL ||
-		    (crypto_drivers[hid].cc_flags & CRYPTOCAP_F_CLEANUP))
+		if (cap->cc_newsession == NULL ||
+		    (cap->cc_flags & CRYPTOCAP_F_CLEANUP))
 			continue;
 
 		/* Hardware required -- ignore software drivers. */
-		if (hard > 0 &&
-		    (crypto_drivers[hid].cc_flags & CRYPTOCAP_F_SOFTWARE))
+		if (hard > 0 && (cap->cc_flags & CRYPTOCAP_F_SOFTWARE))
 			continue;
 		/* Software required -- ignore hardware drivers. */
-		if (hard < 0 &&
-		    (crypto_drivers[hid].cc_flags & CRYPTOCAP_F_SOFTWARE) == 0)
+		if (hard < 0 && (cap->cc_flags & CRYPTOCAP_F_SOFTWARE) == 0)
 			continue;
 
 		/* See if all the algorithms are supported. */
 		for (cr = cri; cr; cr = cr->cri_next)
-			if (crypto_drivers[hid].cc_alg[cr->cri_alg] == 0)
+			if (cap->cc_alg[cr->cri_alg] == 0)
 				break;
 
 		if (cr == NULL) {
@@ -309,13 +309,14 @@ crypto_newsession(u_int64_t *sid, struct cryptoini *cri, int hard)
 
 			/* Call the driver initialization routine. */
 			lid = hid;		/* Pass the driver ID. */
-			err = crypto_drivers[hid].cc_newsession(
-					crypto_drivers[hid].cc_arg, &lid, cri);
+			err = (*cap->cc_newsession)(cap->cc_arg, &lid, cri);
 			if (err == 0) {
-				(*sid) = hid;
+				/* XXX assert (hid &~ 0xffffff) == 0 */
+				/* XXX assert (cap->cc_flags &~ 0xff) == 0 */
+				(*sid) = ((cap->cc_flags & 0xff) << 24) | hid;
 				(*sid) <<= 32;
 				(*sid) |= (lid & 0xffffffff);
-				crypto_drivers[hid].cc_sessions++;
+				cap->cc_sessions++;
 			}
 			break;
 		}
@@ -343,7 +344,7 @@ crypto_freesession(u_int64_t sid)
 	}
 
 	/* Determine two IDs. */
-	hid = SESID2HID(sid);
+	hid = CRYPTO_SESID2HID(sid);
 
 	if (hid >= crypto_drivers_num) {
 		err = ENOENT;
@@ -654,7 +655,7 @@ crypto_unblock(u_int32_t driverid, int what)
 int
 crypto_dispatch(struct cryptop *crp)
 {
-	u_int32_t hid = SESID2HID(crp->crp_sid);
+	u_int32_t hid = CRYPTO_SESID2HID(crp->crp_sid);
 	int result;
 
 	cryptostats.cs_ops++;
@@ -664,6 +665,7 @@ crypto_dispatch(struct cryptop *crp)
 		binuptime(&crp->crp_tstamp);
 #endif
 
+	CRYPTO_Q_LOCK();
 	if ((crp->crp_flags & CRYPTO_F_BATCH) == 0) {
 		struct cryptocap *cap;
 		/*
@@ -679,21 +681,22 @@ crypto_dispatch(struct cryptop *crp)
 				 * The driver ran out of resources, mark the
 				 * driver ``blocked'' for cryptop's and put
 				 * the request on the queue.
+				 *
+				 * XXX ops are placed at the tail so their
+				 * order is preserved but this can place them
+				 * behind batch'd ops.
 				 */
-				CRYPTO_Q_LOCK();
 				crypto_drivers[hid].cc_qblocked = 1;
-				TAILQ_INSERT_HEAD(&crp_q, crp, crp_next);
-				CRYPTO_Q_UNLOCK();
+				TAILQ_INSERT_TAIL(&crp_q, crp, crp_next);
 				cryptostats.cs_blocks++;
+				result = 0;
 			}
 		} else {
 			/*
 			 * The driver is blocked, just queue the op until
 			 * it unblocks and the kernel thread gets kicked.
 			 */
-			CRYPTO_Q_LOCK();
 			TAILQ_INSERT_TAIL(&crp_q, crp, crp_next);
-			CRYPTO_Q_UNLOCK();
 			result = 0;
 		}
 	} else {
@@ -704,14 +707,13 @@ crypto_dispatch(struct cryptop *crp)
 		 * when the operation is low priority and/or suitable
 		 * for batching.
 		 */
-		CRYPTO_Q_LOCK();
 		wasempty = TAILQ_EMPTY(&crp_q);
 		TAILQ_INSERT_TAIL(&crp_q, crp, crp_next);
 		if (wasempty)
 			wakeup_one(&crp_q);
-		CRYPTO_Q_UNLOCK();
 		result = 0;
 	}
+	CRYPTO_Q_UNLOCK();
 
 	return result;
 }
@@ -743,7 +745,7 @@ crypto_kdispatch(struct cryptkop *krp)
 			 * it at the end does not work.
 			 */
 			crypto_drivers[krp->krp_hid].cc_kqblocked = 1;
-			TAILQ_INSERT_HEAD(&crp_kq, krp, krp_next);
+			TAILQ_INSERT_TAIL(&crp_kq, krp, krp_next);
 			cryptostats.cs_kblocks++;
 		}
 	} else {
@@ -855,7 +857,7 @@ crypto_invoke(struct cryptop *crp, int hint)
 		return 0;
 	}
 
-	hid = SESID2HID(crp->crp_sid);
+	hid = CRYPTO_SESID2HID(crp->crp_sid);
 	if (hid < crypto_drivers_num) {
 		if (crypto_drivers[hid].cc_flags & CRYPTOCAP_F_CLEANUP)
 			crypto_freesession(crp->crp_sid);
@@ -939,13 +941,25 @@ crypto_getreq(int num)
 void
 crypto_done(struct cryptop *crp)
 {
+	KASSERT((crp->crp_flags & CRYPTO_F_DONE) == 0,
+		("crypto_done: op already done, flags 0x%x", crp->crp_flags));
+	crp->crp_flags |= CRYPTO_F_DONE;
 	if (crp->crp_etype != 0)
 		cryptostats.cs_errs++;
 #ifdef CRYPTO_TIMING
 	if (crypto_timing)
 		crypto_tstat(&cryptostats.cs_done, &crp->crp_tstamp);
 #endif
-	if (crp->crp_flags & CRYPTO_F_CBIMM) {
+	/*
+	 * CBIMM means unconditionally do the callback immediately;
+	 * CBIFSYNC means do the callback immediately only if the
+	 * operation was done synchronously.  Both are used to avoid
+	 * doing extraneous context switches; the latter is mostly
+	 * used with the software crypto driver.
+	 */
+	if ((crp->crp_flags & CRYPTO_F_CBIMM) ||
+	    ((crp->crp_flags & CRYPTO_F_CBIFSYNC) &&
+	     (CRYPTO_SESID2CAPS(crp->crp_sid) & CRYPTOCAP_F_SYNC))) {
 		/*
 		 * Do the callback directly.  This is ok when the
 		 * callback routine does very little (e.g. the
@@ -1066,7 +1080,7 @@ crypto_proc(void)
 		submit = NULL;
 		hint = 0;
 		TAILQ_FOREACH(crp, &crp_q, crp_next) {
-			u_int32_t hid = SESID2HID(crp->crp_sid);
+			u_int32_t hid = CRYPTO_SESID2HID(crp->crp_sid);
 			cap = crypto_checkdriver(hid);
 			if (cap == NULL || cap->cc_process == NULL) {
 				/* Op needs to be migrated, process it. */
@@ -1084,7 +1098,7 @@ crypto_proc(void)
 					 * better to just use a per-driver
 					 * queue instead.
 					 */
-					if (SESID2HID(submit->crp_sid) == hid)
+					if (CRYPTO_SESID2HID(submit->crp_sid) == hid)
 						hint = CRYPTO_HINT_MORE;
 					break;
 				} else {
@@ -1109,7 +1123,7 @@ crypto_proc(void)
 				 * it at the end does not work.
 				 */
 				/* XXX validate sid again? */
-				crypto_drivers[SESID2HID(submit->crp_sid)].cc_qblocked = 1;
+				crypto_drivers[CRYPTO_SESID2HID(submit->crp_sid)].cc_qblocked = 1;
 				TAILQ_INSERT_HEAD(&crp_q, submit, crp_next);
 				cryptostats.cs_blocks++;
 			}

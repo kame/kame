@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/uni/uniip_var.h,v 1.5 2002/06/13 14:32:51 arr Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/uniip_var.h,v 1.8 2003/07/29 13:46:43 harti Exp $
  *
  */
 
@@ -52,7 +52,7 @@ struct uniip {
 	u_char		uip_arpstate;	/* ARP interface state (see below) */
 	struct arpmap	uip_arpsvrmap;	/* ATMARP server map info */
 	struct ipvcc	*uip_arpsvrvcc;	/* ATMARP server's VCC */
-	int		uip_nprefix;	/* Count of IP prefixes (server only) */
+	u_int		uip_nprefix;	/* Count of IP prefixes (server only) */
 	struct uniarp_prf *uip_prefix;	/* Array of IP prefixes (server only) */
 	struct atm_time	uip_arptime;	/* ARP timer controls */
 };
@@ -281,7 +281,8 @@ int		uniarp_validate_ip(struct uniip *, struct in_addr *, u_int);
 
 	/* uniarp_input.c */
 void		uniarp_cpcs_data(void *, KBuffer *);
-void		uniarp_pdu_print(struct ipvcc *, KBuffer *, char *);
+void		uniarp_pdu_print(const struct ipvcc *,
+		    const KBuffer *, const char *);
 
 	/* uniarp_output.c */
 int		uniarp_arp_req(struct uniip *, struct in_addr *);

@@ -67,7 +67,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* $FreeBSD: src/sys/i386/include/bus_dma.h,v 1.21 2003/05/30 20:40:33 hmp Exp $ */
+/* $FreeBSD: src/sys/i386/include/bus_dma.h,v 1.25 2003/11/07 23:29:41 scottl Exp $ */
 
 #ifndef _I386_BUS_DMA_H_
 #define _I386_BUS_DMA_H_
@@ -79,6 +79,7 @@
 #define	BUS_DMA_NOWAIT		0x01	/* not safe to sleep */
 #define	BUS_DMA_ALLOCNOW	0x02	/* perform resource allocation now */
 #define	BUS_DMA_COHERENT	0x04	/* hint: map memory in a coherent way */
+#define	BUS_DMA_ZERO		0x08	/* allocate zero'ed memory */
 #define	BUS_DMA_BUS1		0x10	/* placeholders for bus functions... */
 #define	BUS_DMA_BUS2		0x20
 #define	BUS_DMA_BUS3		0x40
@@ -103,7 +104,7 @@ typedef int bus_dmasync_op_t;
  *	A machine-dependent opaque type describing the characteristics
  *	of how to perform DMA mappings.  This structure encapsultes
  *	information concerning address and alignment restrictions, number
- *	of S/G	segments, amount of data per S/G segment, etc.
+ *	of S/G segments, amount of data per S/G segment, etc.
  */
 typedef struct bus_dma_tag	*bus_dma_tag_t;
 
@@ -132,10 +133,21 @@ typedef struct bus_dma_segment {
 typedef int bus_dma_filter_t(void *, bus_addr_t);
 
 /*
+ * A function that performs driver-specific synchronization on behalf of
+ * busdma.
+ */
+typedef enum {
+	BUS_DMA_LOCK	= 0x01,
+	BUS_DMA_UNLOCK	= 0x02,
+} bus_dma_lock_op_t;
+
+typedef void bus_dma_lock_t(void *, bus_dma_lock_op_t);
+
+/*
  * Allocate a device specific dma_tag encapsulating the constraints of
  * the parent tag in addition to other restrictions specified:
  *
- *	alignment:	alignment for segments.
+ *	alignment:	Alignment for segments.
  *	boundary:	Boundary that segments cannot cross.
  *	lowaddr:	Low restricted address that cannot appear in a mapping.
  *	highaddr:	High restricted address that cannot appear in a mapping.
@@ -148,6 +160,10 @@ typedef int bus_dma_filter_t(void *, bus_addr_t);
  *	nsegments:	Number of discontinuities allowed in maps.
  *	maxsegsz:	Maximum size of a segment in the map.
  *	flags:		Bus DMA flags.
+ *	lockfunc:	An optional function to handle driver-defined lock
+ *			operations.
+ *	lockfuncarg:	An argument that will be passed to lockfunc in addition
+ *			to the lock operation.
  *	dmat:		A pointer to set to a valid dma tag should the return
  *			value of this function indicate success.
  */
@@ -156,7 +172,8 @@ int bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 		       bus_size_t boundary, bus_addr_t lowaddr,
 		       bus_addr_t highaddr, bus_dma_filter_t *filtfunc,
 		       void *filtfuncarg, bus_size_t maxsize, int nsegments,
-		       bus_size_t maxsegsz, int flags, bus_dma_tag_t *dmat);
+		       bus_size_t maxsegsz, int flags, bus_dma_lock_t *lockfunc,
+		       void *lockfuncarg, bus_dma_tag_t *dmat);
 
 int bus_dma_tag_destroy(bus_dma_tag_t dmat);
 
@@ -167,21 +184,21 @@ int bus_dma_tag_destroy(bus_dma_tag_t dmat);
 int bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp);
 
 /*
- * Destroy  a handle for mapping from kva/uva/physical
+ * Destroy a handle for mapping from kva/uva/physical
  * address space into bus device space.
  */
 int bus_dmamap_destroy(bus_dma_tag_t dmat, bus_dmamap_t map);
 
 /*
  * Allocate a piece of memory that can be efficiently mapped into
- * bus device space based on the constraints lited in the dma tag.
+ * bus device space based on the constraints listed in the dma tag.
  * A dmamap to for use with dmamap_load is also allocated.
  */
 int bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
 		     bus_dmamap_t *mapp);
 
 /*
- * Free a piece of memory and it's allociated dmamap, that was allocated
+ * Free a piece of memory and its allocated dmamap, that was allocated
  * via bus_dmamem_alloc.
  */
 void bus_dmamem_free(bus_dma_tag_t dmat, void *vaddr, bus_dmamap_t map);
@@ -201,7 +218,7 @@ int bus_dmamap_load(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 
 /*
  * Like bus_dmamap_callback but includes map size in bytes.  This is
- * defined as a separate interface to maintain compatiiblity for users
+ * defined as a separate interface to maintain compatibility for users
  * of bus_dmamap_callback_t--at some point these interfaces should be merged.
  */
 typedef void bus_dmamap_callback2_t(void *, bus_dma_segment_t *, int, bus_size_t, int);
@@ -223,7 +240,7 @@ int bus_dmamap_load_uio(bus_dma_tag_t dmat, bus_dmamap_t map,
 			int flags);
 
 /*
- * Perform a syncronization operation on the given map.
+ * Perform a synchronization operation on the given map.
  */
 void _bus_dmamap_sync(bus_dma_tag_t, bus_dmamap_t, bus_dmasync_op_t);
 #define bus_dmamap_sync(dmat, dmamap, op) 		\
@@ -238,4 +255,8 @@ void _bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map);
 	if ((dmamap) != NULL)				\
 		_bus_dmamap_unload(dmat, dmamap)
 
+/*
+ * Generic helper function for manipulating mutexes.
+ */
+void busdma_lock_mutex(void *arg, bus_dma_lock_op_t op);
 #endif /* _I386_BUS_DMA_H_ */

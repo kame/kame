@@ -31,13 +31,12 @@
  * SUCH DAMAGE.
  *
  *	@(#)socketvar.h	8.3 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/socketvar.h,v 1.103 2003/03/29 06:14:14 alc Exp $
+ * $FreeBSD: src/sys/sys/socketvar.h,v 1.108 2003/11/16 06:11:26 alc Exp $
  */
 
 #ifndef _SYS_SOCKETVAR_H_
 #define _SYS_SOCKETVAR_H_
 
-#include <sys/_label.h>			/* for struct label */
 #include <sys/queue.h>			/* for TAILQ macros */
 #include <sys/selinfo.h>		/* for struct selinfo */
 
@@ -100,7 +99,11 @@ struct socket {
  */
 	struct sockbuf {
 		struct	selinfo sb_sel;	/* process selecting read/write */
+#define	sb_startzero	sb_mb
 		struct	mbuf *sb_mb;	/* the mbuf chain */
+		struct	mbuf *sb_mbtail; /* the last mbuf in the chain */
+		struct	mbuf *sb_lastrecord;	/* first mbuf of last record in
+						 * socket buffer */
 		u_int	sb_cc;		/* actual chars in buffer */
 		u_int	sb_hiwat;	/* max actual char count */
 		u_int	sb_mbcnt;	/* chars of mbufs used */
@@ -124,8 +127,8 @@ struct socket {
 	void	(*so_upcall)(struct socket *, void *, int);
 	void	*so_upcallarg;
 	struct	ucred *so_cred;		/* user credentials */
-	struct	label so_label;		/* MAC label for socket */
-	struct	label so_peerlabel;	/* cached MAC label for socket peer */
+	struct	label *so_label;	/* MAC label for socket */
+	struct	label *so_peerlabel;	/* cached MAC label for socket peer */
 	/* NB: generation count must not be first; easiest to make it last. */
 	so_gen_t so_gencnt;		/* generation count */
 	void	*so_emuldata;		/* private data for emulators */
@@ -135,6 +138,13 @@ struct socket {
 		char	*so_accept_filter_str;	/* saved user args */
 	} *so_accf;
 };
+
+#define SB_EMPTY_FIXUP(sb) do {						\
+	if ((sb)->sb_mb == NULL) {					\
+		(sb)->sb_mbtail = NULL;					\
+		(sb)->sb_lastrecord = NULL;				\
+	}								\
+} while (/*CONSTCOND*/0)
 
 /*
  * Socket state bits.
@@ -312,12 +322,6 @@ struct sockopt {
 	struct	thread *sopt_td; /* calling thread or null if kernel */
 };
 
-struct sf_buf {
-	SLIST_ENTRY(sf_buf) free_list;	/* list of free buffer slots */
-	struct		vm_page *m;	/* currently mapped page */
-	vm_offset_t	kva;		/* va of mapping */
-};
-
 struct accept_filter {
 	char	accf_name[16];
 	void	(*accf_callback)
@@ -352,6 +356,7 @@ struct	sockaddr *dup_sockaddr(struct sockaddr *sa, int canwait);
 int	sockargs(struct mbuf **mp, caddr_t buf, int buflen, int type);
 int	getsockaddr(struct sockaddr **namp, caddr_t uaddr, size_t len);
 void	sbappend(struct sockbuf *sb, struct mbuf *m);
+void	sbappendstream(struct sockbuf *sb, struct mbuf *m);
 int	sbappendaddr(struct sockbuf *sb, struct sockaddr *asa,
 	    struct mbuf *m0, struct mbuf *control);
 int	sbappendcontrol(struct sockbuf *sb, struct mbuf *m0,
@@ -370,9 +375,6 @@ int	sbreserve(struct sockbuf *sb, u_long cc, struct socket *so,
 	    struct thread *td);
 void	sbtoxsockbuf(struct sockbuf *sb, struct xsockbuf *xsb);
 int	sbwait(struct sockbuf *sb);
-struct sf_buf *
-	sf_buf_alloc(struct vm_page *m);
-void	sf_buf_free(void *addr, void *args);
 int	sb_lock(struct sockbuf *sb);
 int	soabort(struct socket *so);
 int	soaccept(struct socket *so, struct sockaddr **nam);
@@ -400,7 +402,7 @@ int	solisten(struct socket *so, int backlog, struct thread *td);
 struct socket *
 	sonewconn(struct socket *head, int connstatus);
 int	sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen);
-int	sooptcopyout(struct sockopt *sopt, void *buf, size_t len);
+int	sooptcopyout(struct sockopt *sopt, const void *buf, size_t len);
 
 /* XXX; prepare mbuf for (__FreeBSD__ < 3) routines. */
 int	soopt_getm(struct sockopt *sopt, struct mbuf **mp);
@@ -420,6 +422,17 @@ int	sosetopt(struct socket *so, struct sockopt *sopt);
 int	soshutdown(struct socket *so, int how);
 void	sotoxsocket(struct socket *so, struct xsocket *xso);
 void	sowakeup(struct socket *so, struct sockbuf *sb);
+
+#ifdef SOCKBUF_DEBUG
+void	sblastrecordchk(struct sockbuf *, const char *, int);
+#define	SBLASTRECORDCHK(sb)	sblastrecordchk((sb), __FILE__, __LINE__)
+
+void	sblastmbufchk(struct sockbuf *, const char *, int);
+#define	SBLASTMBUFCHK(sb)	sblastmbufchk((sb), __FILE__, __LINE__)
+#else
+#define	SBLASTRECORDCHK(sb)      /* nothing */
+#define	SBLASTMBUFCHK(sb)        /* nothing */
+#endif /* SOCKBUF_DEBUG */
 
 /*
  * Accept filter functions (duh).

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfsm_subs.h	8.2 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/nfsclient/nfsm_subs.h,v 1.32 2001/12/18 01:22:06 iedowse Exp $
+ * $FreeBSD: src/sys/nfsclient/nfsm_subs.h,v 1.33 2003/11/14 20:54:09 alfred Exp $
  */
 
 #ifndef _NFSCLIENT_NFSM_SUBS_H_
@@ -139,6 +139,17 @@ do { \
 #define	nfsm_request(v, t, p, c) \
 do { \
 	error = nfs_request((v), mreq, (t), (p), (c), &mrep, &md, &dpos); \
+	if (error != 0) { \
+		if (error & NFSERR_RETERR) \
+			error &= ~NFSERR_RETERR; \
+		else \
+			goto nfsmout; \
+	} \
+} while (0)
+
+#define	nfsm_request_mnt(n, t, p, c) \
+do { \
+	error = nfs4_request_mnt((n), mreq, (t), (p), (c), &mrep, &md, &dpos); \
 	if (error != 0) { \
 		if (error & NFSERR_RETERR) \
 			error &= ~NFSERR_RETERR; \

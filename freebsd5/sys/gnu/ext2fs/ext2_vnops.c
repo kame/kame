@@ -43,7 +43,7 @@
  *
  *	@(#)ufs_vnops.c	8.7 (Berkeley) 2/3/94
  *	@(#)ufs_vnops.c 8.27 (Berkeley) 5/27/95
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_vnops.c,v 1.78 2003/03/03 19:15:39 njl Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_vnops.c,v 1.81 2003/10/18 14:10:25 phk Exp $
  */
 
 #include "opt_suiddir.h"
@@ -1461,6 +1461,8 @@ ext2_strategy(ap)
 	int32_t blkno;
 	int error;
 
+	KASSERT(ap->a_vp == ap->a_bp->b_vp, ("%s(%p != %p)",
+	    __func__, ap->a_vp, ap->a_bp->b_vp));
 	ip = VTOI(vp);
 	if (vp->v_type == VBLK || vp->v_type == VCHR)
 		panic("ext2_strategy: spec");
@@ -1482,6 +1484,7 @@ ext2_strategy(ap)
 	}
 	vp = ip->i_devvp;
 	bp->b_dev = vp->v_rdev;
+	bp->b_iooffset = dbtob(bp->b_blkno);
 	VOP_SPECSTRATEGY(vp, bp);
 	return (0);
 }

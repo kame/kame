@@ -32,7 +32,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom.h,v 1.64 2003/05/04 19:24:34 phk Exp $
+ * $FreeBSD: src/sys/geom/geom.h,v 1.74.2.1 2003/12/30 12:00:40 phk Exp $
  */
 
 #ifndef _GEOM_GEOM_H_
@@ -44,6 +44,7 @@
 #include <sys/queue.h>
 #include <sys/ioccom.h>
 #include <sys/sbuf.h>
+#include <sys/module.h>
 
 struct g_class;
 struct g_geom;
@@ -57,11 +58,14 @@ struct gctl_req;
 struct g_configargs;
 
 typedef int g_config_t (struct g_configargs *ca);
+typedef void g_ctl_req_t (struct gctl_req *, struct g_class *cp, char const *verb);
 typedef int g_ctl_create_geom_t (struct gctl_req *, struct g_class *cp, struct g_provider *pp);
 typedef int g_ctl_destroy_geom_t (struct gctl_req *, struct g_class *cp, struct g_geom *gp);
 typedef int g_ctl_config_geom_t (struct gctl_req *, struct g_geom *gp, const char *verb);
-typedef struct g_geom * g_taste_t (struct g_class *, struct g_provider *,
-    int flags);
+typedef void g_init_t (struct g_class *mp);
+typedef void g_fini_t (struct g_class *mp);
+typedef struct g_geom * g_taste_t (struct g_class *, struct g_provider *, int flags);
+typedef int g_ioctl_t(struct g_provider *pp, u_long cmd, void *data, struct thread *td);
 #define G_TF_NORMAL		0
 #define G_TF_INSIST		1
 #define G_TF_TRANSPARENT	2
@@ -85,28 +89,21 @@ struct g_class {
 	const char		*name;
 	g_taste_t		*taste;
 	g_config_t		*config;
-	g_ctl_create_geom_t	*create_geom;
+	g_ctl_req_t		*ctlreq;
+	g_init_t		*init;
+	g_fini_t		*fini;
 	g_ctl_destroy_geom_t	*destroy_geom;
-	g_ctl_config_geom_t	*config_geom;
 	/*
-	 * The remaning elements are private and classes should use
-	 * the G_CLASS_INITIALIZER macro to initialize them.
-         */
+	 * The remaining elements are private
+	 */
 	LIST_ENTRY(g_class)	class;
 	LIST_HEAD(,g_geom)	geom;
-	u_int			protect;
 };
-
-#define G_CLASS_INITIALIZER 	\
-	.class = { 0, 0 },	\
-	.geom = { 0 },		\
-	.protect = 0	
 
 /*
  * The g_geom is an instance of a g_class.
  */
 struct g_geom {
-	u_int			protect;
 	char			*name;
 	struct g_class		*class;
 	LIST_ENTRY(g_geom)	geom;
@@ -119,6 +116,7 @@ struct g_geom {
 	g_dumpconf_t		*dumpconf;
 	g_access_t		*access;
 	g_orphan_t		*orphan;
+	g_ioctl_t		*ioctl;
 	void			*softc;
 	unsigned		flags;
 #define	G_GEOM_WITHER		1
@@ -142,7 +140,6 @@ struct g_bioq {
  */
 
 struct g_consumer {
-	u_int			protect;
 	struct g_geom		*geom;
 	LIST_ENTRY(g_consumer)	consumer;
 	struct g_provider	*provider;
@@ -157,7 +154,6 @@ struct g_consumer {
  * A g_provider is a "logical disk".
  */
 struct g_provider {
-	u_int			protect;
 	char			*name;
 	LIST_ENTRY(g_provider)	provider;
 	struct g_geom		*geom;
@@ -174,10 +170,13 @@ struct g_provider {
 	u_int			nstart, nend;
 	u_int			flags;
 #define G_PF_CANDELETE		0x1
+#define G_PF_WITHER		0x2
+#define G_PF_ORPHAN		0x4
 };
 
 /* geom_dev.c */
-int g_dev_print(void);
+void g_dev_print(void);
+struct g_provider *g_dev_getprovider(dev_t dev);
 
 /* geom_dump.c */
 void g_hexdump(void *ptr, int length);
@@ -199,13 +198,13 @@ void g_waitidle(void);
 /* geom_subr.c */
 int g_access_abs(struct g_consumer *cp, int nread, int nwrite, int nexcl);
 int g_access_rel(struct g_consumer *cp, int nread, int nwrite, int nexcl);
-void g_add_class(struct g_class *mp);
 int g_attach(struct g_consumer *cp, struct g_provider *pp);
 void g_destroy_consumer(struct g_consumer *cp);
 void g_destroy_geom(struct g_geom *pp);
 void g_destroy_provider(struct g_provider *pp);
 void g_detach(struct g_consumer *cp);
 void g_error_provider(struct g_provider *pp, int error);
+struct g_provider *g_provider_by_name(char const *arg);
 int g_getattr__(const char *attr, struct g_consumer *cp, void *var, int len);
 #define g_getattr(a, c, v) g_getattr__((a), (c), (v), sizeof *(v))
 int g_handleattr(struct bio *bp, const char *attribute, void *val, int len);
@@ -214,12 +213,14 @@ int g_handleattr_off_t(struct bio *bp, const char *attribute, off_t val);
 struct g_consumer * g_new_consumer(struct g_geom *gp);
 struct g_geom * g_new_geomf(struct g_class *mp, const char *fmt, ...);
 struct g_provider * g_new_providerf(struct g_geom *gp, const char *fmt, ...);
-void g_sanity(void *ptr);
+void g_sanity(void const *ptr);
 void g_spoil(struct g_provider *pp, struct g_consumer *cp);
 int g_std_access(struct g_provider *pp, int dr, int dw, int de);
 void g_std_done(struct bio *bp);
 void g_std_spoiled(struct g_consumer *cp);
 void g_wither_geom(struct g_geom *gp, int error);
+
+int g_modevent(module_t, int, void *);
 
 /* geom_io.c */
 struct bio * g_clone_bio(struct bio *);
@@ -232,20 +233,6 @@ void * g_read_data(struct g_consumer *cp, off_t offset, off_t length, int *error
 int g_write_data(struct g_consumer *cp, off_t offset, void *ptr, off_t length);
 
 /* geom_kern.c / geom_kernsim.c */
-
-#ifndef _SYS_CONF_H_
-typedef int d_ioctl_t(dev_t dev, u_long cmd, caddr_t data,
-		      int fflag, struct thread *td);
-#endif
-
-struct g_ioctl {
-	u_long		cmd;
-	void		*data;
-	int		fflag;
-	struct thread	*td;
-	d_ioctl_t	*func;
-	void		*dev;
-};
 
 #ifdef _KERNEL
 
@@ -295,25 +282,22 @@ extern struct sx topology_lock;
 		sx_assert(&topology_lock, SX_XLOCKED);		\
 	} while (0)
 
-#define DECLARE_GEOM_CLASS_INIT(class, name, init) 	\
-	SYSINIT(name, SI_SUB_DRIVERS, SI_ORDER_FIRST, init, NULL);
-
-#define DECLARE_GEOM_CLASS(class, name) 	\
-	static void				\
-	name##init(void)			\
-	{					\
-		mtx_unlock(&Giant);		\
-		g_add_class(&class);		\
-		mtx_lock(&Giant);		\
-	}					\
-	DECLARE_GEOM_CLASS_INIT(class, name, name##init);
+#define DECLARE_GEOM_CLASS(class, name) 			\
+	static moduledata_t name##_mod = {			\
+		#name, g_modevent, &class			\
+	};							\
+	DECLARE_MODULE(name, name##_mod, SI_SUB_DRIVERS, SI_ORDER_FIRST);
 
 #endif /* _KERNEL */
 
 /* geom_ctl.c */
-int gctl_set_param(struct gctl_req *req, const char *param, void *ptr, int len);
+void gctl_set_param(struct gctl_req *req, const char *param, void const *ptr, int len);
 void *gctl_get_param(struct gctl_req *req, const char *param, int *len);
+char const *gctl_get_asciiparam(struct gctl_req *req, const char *param);
 void *gctl_get_paraml(struct gctl_req *req, const char *param, int len);
 int gctl_error(struct gctl_req *req, const char *fmt, ...);
+struct g_class *gctl_get_class(struct gctl_req *req, char const *arg);
+struct g_geom *gctl_get_geom(struct gctl_req *req, struct g_class *mpr, char const *arg);
+struct g_provider *gctl_get_provider(struct gctl_req *req, char const *arg);
 
 #endif /* _GEOM_GEOM_H_ */

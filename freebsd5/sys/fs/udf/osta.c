@@ -3,7 +3,7 @@
  * each code segment.  Slight whitespace modifications have been made for
  * formatting purposes.  Typos/bugs have been fixed.
  *
- * $FreeBSD: src/sys/fs/udf/osta.c,v 1.2 2002/08/23 14:10:55 scottl Exp $
+ * $FreeBSD: src/sys/fs/udf/osta.c,v 1.3 2003/11/05 06:55:23 scottl Exp $
  */
 
 #include <fs/udf/osta.h>
@@ -67,6 +67,51 @@ udf_UncompressUnicode(
 				    UDFCompressed[byteIndex++];
 			}
 			unicodeIndex++;
+		}
+		returnValue = unicodeIndex;
+	}
+	return(returnValue);
+}
+
+/*
+ * Almost same as udf_UncompressUnicode(). The difference is that
+ * it keeps byte order of unicode string.
+ */
+int
+udf_UncompressUnicodeByte(
+	int numberOfBytes,	/* (Input) number of bytes read from media. */
+	byte *UDFCompressed,	/* (Input) bytes read from media. */
+	byte *unicode)		/* (Output) uncompressed unicode characters. */
+{
+	unsigned int compID;
+	int returnValue, unicodeIndex, byteIndex;
+
+	/* Use UDFCompressed to store current byte being read. */
+	compID = UDFCompressed[0];
+
+	/* First check for valid compID. */
+	if (compID != 8 && compID != 16) {
+		returnValue = -1;
+	} else {
+		unicodeIndex = 0;
+		byteIndex = 1;
+
+		/* Loop through all the bytes. */
+		while (byteIndex < numberOfBytes) {
+			if (compID == 16) {
+				/* Move the first byte to the high bits of the
+				 * unicode char.
+				 */
+				unicode[unicodeIndex++] =
+				    UDFCompressed[byteIndex++];
+			} else {
+				unicode[unicodeIndex++] = 0;
+			}
+			if (byteIndex < numberOfBytes) {
+				/*Then the next byte to the low bits. */
+				unicode[unicodeIndex++] =
+				    UDFCompressed[byteIndex++];
+			}
 		}
 		returnValue = unicodeIndex;
 	}

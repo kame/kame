@@ -42,7 +42,7 @@
  *
  *	from: hp300: @(#)pmap.h	7.2 (Berkeley) 12/16/90
  *	from: @(#)pmap.h	7.4 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/i386/include/pmap.h,v 1.99 2003/04/28 20:35:36 jake Exp $
+ * $FreeBSD: src/sys/i386/include/pmap.h,v 1.103 2003/11/08 03:01:26 alc Exp $
  */
 
 #ifndef _MACHINE_PMAP_H_
@@ -281,7 +281,6 @@ struct md_page {
 
 struct pmap {
 	pd_entry_t		*pm_pdir;	/* KVA of page directory */
-	vm_object_t		pm_pteobj;	/* Container for pte's */
 	TAILQ_HEAD(,pv_entry)	pm_pvlist;	/* list of mappings in pmap */
 	u_int			pm_active;	/* active on cpus */
 	struct pmap_statistics	pm_stats;	/* pmap statistics */
@@ -293,7 +292,6 @@ struct pmap {
 };
 
 #define	pmap_page_is_mapped(m)	(!TAILQ_EMPTY(&(m)->md.pv_list))
-#define pmap_resident_count(pmap) (pmap)->pm_stats.resident_count
 
 typedef struct pmap	*pmap_t;
 
@@ -331,6 +329,8 @@ extern vm_paddr_t avail_start;
 extern vm_offset_t clean_eva;
 extern vm_offset_t clean_sva;
 extern vm_paddr_t phys_avail[];
+extern int pseflag;
+extern int pgeflag;
 extern char *ptvmmap;		/* poor name! */
 extern vm_offset_t virtual_avail;
 extern vm_offset_t virtual_end;
@@ -340,8 +340,8 @@ void	pmap_kenter(vm_offset_t va, vm_paddr_t pa);
 void	pmap_kremove(vm_offset_t);
 void	*pmap_mapdev(vm_paddr_t, vm_size_t);
 void	pmap_unmapdev(vm_offset_t, vm_size_t);
-pt_entry_t *pmap_pte_quick(pmap_t, vm_offset_t) __pure2;
-void	pmap_set_opt(void);
+pt_entry_t *pmap_pte(pmap_t, vm_offset_t) __pure2;
+void	pmap_set_pg(void);
 void	pmap_invalidate_page(pmap_t, vm_offset_t);
 void	pmap_invalidate_range(pmap_t, vm_offset_t, vm_offset_t);
 void	pmap_invalidate_all(pmap_t);

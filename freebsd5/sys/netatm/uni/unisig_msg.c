@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_msg.c,v 1.13 2003/01/21 08:56:01 alfred Exp $
- *
  */
 
 /*
@@ -32,16 +28,19 @@
  * ----------------------------------------
  *
  * Message handling module
- *
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/unisig_msg.c,v 1.16 2003/07/25 06:39:46 harti Exp $");
+
 #include <sys/param.h>
-#include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <sys/kernel.h>
+#include <sys/sysctl.h>
 #include <net/if.h>
 #include <netatm/port.h>
 #include <netatm/queue.h>
@@ -63,11 +62,6 @@
 
 #include <vm/uma.h>
 
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/unisig_msg.c,v 1.13 2003/01/21 08:56:01 alfred Exp $");
-#endif
-
-
 /*
  * Local functions
  */
@@ -76,12 +70,15 @@ static void	unisig_rcv_setup(struct unisig *, struct unisig_msg *);
 
 
 /*
- * Local variables
+ * net.harp.uni.unisig_print_msg
+ *
+ * 0 - disable
+ * 1 - dump UNI message
+ * 2 - dump UNI message + print decoded form
  */
-#ifdef DIAGNOSTIC
 static int	unisig_print_msg = 0;
-#endif
-
+SYSCTL_INT(_net_harp_uni, OID_AUTO, unisig_print_msg, CTLFLAG_RW,
+    &unisig_print_msg, 0, "dump UNI messages");
 
 /*
  * Set a Cause IE based on information in an ATM attribute block
@@ -211,13 +208,11 @@ unisig_send_msg(usp, msg)
 	if (usp->us_state != UNISIG_ACTIVE)
 		return(ENETDOWN);
 
-#ifdef DIAGNOSTIC
 	/*
 	 * Print the message we're sending.
 	 */
 	if (unisig_print_msg)
 		usp_print_msg(msg, UNISIG_MSG_OUT);
-#endif
 
 	/*
 	 * Convert message to network order
@@ -235,13 +230,11 @@ unisig_send_msg(usp, msg)
 		return(EIO);
 	}
 
-#ifdef DIAGNOSTIC
 	/*
 	 * Print the converted message
 	 */
 	if (unisig_print_msg > 1)
 		unisig_print_mbuf(usf.usf_m_base);
-#endif
 
 	/*
 	 * Send the message
@@ -294,7 +287,7 @@ unisig_send_setup(usp, uvp)
 	/*
 	 * Get memory for a SETUP message
 	 */
-	setup = uma_zalloc(unisig_msg_zone, M_ZERO);
+	setup = uma_zalloc(unisig_msg_zone, M_ZERO | M_NOWAIT);
 	if (setup == NULL) {
 		err = ENOMEM;
 		goto done;
@@ -320,7 +313,7 @@ unisig_send_setup(usp, uvp)
 	 * specify one in the attribute block
 	 */
 	if (ap->calling.tag != T_ATM_PRESENT) {
-		setup->msg_ie_cgad = uma_zalloc(unisig_ie_zone, 0);
+		setup->msg_ie_cgad = uma_zalloc(unisig_ie_zone, M_NOWAIT);
 		if (setup->msg_ie_cgad == NULL) {
 			err = ENOMEM;
 			goto done;
@@ -379,11 +372,11 @@ unisig_send_release(usp, uvp, msg, cause)
 	/*
 	 * Get memory for a RELEASE message
 	 */
-	rls_msg = uma_zalloc(unisig_msg_zone, M_ZERO);
+	rls_msg = uma_zalloc(unisig_msg_zone, M_ZERO | M_NOWAIT);
 	if (rls_msg == NULL) {
 		return(ENOMEM);
 	}
-	cause_ie = uma_zalloc(unisig_ie_zone, M_ZERO);
+	cause_ie = uma_zalloc(unisig_ie_zone, M_ZERO | M_NOWAIT);
 	if (cause_ie == NULL) {
 		uma_zfree(unisig_msg_zone, rls_msg);
 		return(ENOMEM);
@@ -455,11 +448,11 @@ unisig_send_release_complete(usp, uvp, msg, cause)
 	/*
 	 * Get memory for a RELEASE COMPLETE message
 	 */
-	rls_cmp = uma_zalloc(unisig_msg_zone, M_ZERO);
+	rls_cmp = uma_zalloc(unisig_msg_zone, M_ZERO | M_NOWAIT);
 	if (rls_cmp == NULL) {
 		return(ENOMEM);
 	}
-	cause_ie = uma_zalloc(unisig_ie_zone, M_ZERO);
+	cause_ie = uma_zalloc(unisig_ie_zone, M_ZERO | M_NOWAIT);
 	if (cause_ie == NULL) {
 		uma_zfree(unisig_msg_zone, rls_cmp);
 		return(ENOMEM);
@@ -534,16 +527,16 @@ unisig_send_status(usp, uvp, msg, cause)
 	/*
 	 * Get memory for a STATUS message
 	 */
-	stat_msg = uma_zalloc(unisig_msg_zone, M_ZERO);
+	stat_msg = uma_zalloc(unisig_msg_zone, M_ZERO | M_NOWAIT);
 	if (stat_msg == NULL) {
 		return(ENOMEM);
 	}
-	cause_ie = uma_zalloc(unisig_ie_zone, M_ZERO);
+	cause_ie = uma_zalloc(unisig_ie_zone, M_ZERO | M_NOWAIT);
 	if (cause_ie == NULL) {
 		uma_zfree(unisig_msg_zone, stat_msg);
 		return(ENOMEM);
 	}
-	clst_ie = uma_zalloc(unisig_ie_zone, M_ZERO);
+	clst_ie = uma_zalloc(unisig_ie_zone, M_ZERO | M_NOWAIT);
 	if (clst_ie == NULL) {
 		uma_zfree(unisig_msg_zone, stat_msg);
 		uma_zfree(unisig_ie_zone, cause_ie);
@@ -679,7 +672,7 @@ unisig_rcv_restart(usp, msg)
 	/*
 	 * Get memory for a RESTART ACKNOWLEDGE message
 	 */
-	rsta_msg = uma_zalloc(unisig_msg_zone, 0);
+	rsta_msg = uma_zalloc(unisig_msg_zone, M_NOWAIT);
 	if (rsta_msg == NULL) {
 		return;
 	}
@@ -772,7 +765,7 @@ unisig_rcv_setup(usp, msg)
 	/*
 	 * Get a new VCCB for the connection
 	 */
-	uvp = uma_zalloc(unisig_vc_zone, M_ZERO);
+	uvp = uma_zalloc(unisig_vc_zone, M_ZERO | M_NOWAIT);
 	if (uvp == NULL) {
 		return;
 	}
@@ -842,7 +835,7 @@ unisig_rcv_msg(usp, m)
 	/*
 	 * Get storage for the message
 	 */
-	msg = uma_zalloc(unisig_msg_zone, M_ZERO);
+	msg = uma_zalloc(unisig_msg_zone, M_ZERO | M_NOWAIT);
 	if (msg == NULL) {
 		err = ENOMEM;
 		goto done;
@@ -867,13 +860,11 @@ unisig_rcv_msg(usp, m)
 		goto done;
 	}
 
-#ifdef DIAGNOSTIC
 	/*
 	 * Debug--print some information about the message
 	 */
 	if (unisig_print_msg)
 		usp_print_msg(msg, UNISIG_MSG_IN);
-#endif
 
 	/*
 	 * Get the call reference value

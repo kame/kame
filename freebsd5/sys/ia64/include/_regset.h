@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/include/_regset.h,v 1.1 2003/05/15 08:36:03 marcel Exp $
+ * $FreeBSD: src/sys/ia64/include/_regset.h,v 1.4 2003/07/25 08:02:24 marcel Exp $
  */
 
 #ifndef _MACHINE_REGSET_H_
@@ -43,9 +43,10 @@
  */
 
 /* A single FP register. */
-struct _ia64_fpreg {
+union _ia64_fpreg {
 	unsigned char	fpr_bits[16];
-} __aligned(16);
+	long double	fpr_flt;
+};
 
 /*
  * Special registers.
@@ -74,8 +75,102 @@ struct _special {
 };
 
 struct _high_fp {
-	struct _ia64_fpreg	fr[96];		/* High FP register set. */
-/* Can't be bothered to name them seperately. They are fr32-fr127. */
+	union _ia64_fpreg	fr32;
+	union _ia64_fpreg	fr33;
+	union _ia64_fpreg	fr34;
+	union _ia64_fpreg	fr35;
+	union _ia64_fpreg	fr36;
+	union _ia64_fpreg	fr37;
+	union _ia64_fpreg	fr38;
+	union _ia64_fpreg	fr39;
+	union _ia64_fpreg	fr40;
+	union _ia64_fpreg	fr41;
+	union _ia64_fpreg	fr42;
+	union _ia64_fpreg	fr43;
+	union _ia64_fpreg	fr44;
+	union _ia64_fpreg	fr45;
+	union _ia64_fpreg	fr46;
+	union _ia64_fpreg	fr47;
+	union _ia64_fpreg	fr48;
+	union _ia64_fpreg	fr49;
+	union _ia64_fpreg	fr50;
+	union _ia64_fpreg	fr51;
+	union _ia64_fpreg	fr52;
+	union _ia64_fpreg	fr53;
+	union _ia64_fpreg	fr54;
+	union _ia64_fpreg	fr55;
+	union _ia64_fpreg	fr56;
+	union _ia64_fpreg	fr57;
+	union _ia64_fpreg	fr58;
+	union _ia64_fpreg	fr59;
+	union _ia64_fpreg	fr60;
+	union _ia64_fpreg	fr61;
+	union _ia64_fpreg	fr62;
+	union _ia64_fpreg	fr63;
+	union _ia64_fpreg	fr64;
+	union _ia64_fpreg	fr65;
+	union _ia64_fpreg	fr66;
+	union _ia64_fpreg	fr67;
+	union _ia64_fpreg	fr68;
+	union _ia64_fpreg	fr69;
+	union _ia64_fpreg	fr70;
+	union _ia64_fpreg	fr71;
+	union _ia64_fpreg	fr72;
+	union _ia64_fpreg	fr73;
+	union _ia64_fpreg	fr74;
+	union _ia64_fpreg	fr75;
+	union _ia64_fpreg	fr76;
+	union _ia64_fpreg	fr77;
+	union _ia64_fpreg	fr78;
+	union _ia64_fpreg	fr79;
+	union _ia64_fpreg	fr80;
+	union _ia64_fpreg	fr81;
+	union _ia64_fpreg	fr82;
+	union _ia64_fpreg	fr83;
+	union _ia64_fpreg	fr84;
+	union _ia64_fpreg	fr85;
+	union _ia64_fpreg	fr86;
+	union _ia64_fpreg	fr87;
+	union _ia64_fpreg	fr88;
+	union _ia64_fpreg	fr89;
+	union _ia64_fpreg	fr90;
+	union _ia64_fpreg	fr91;
+	union _ia64_fpreg	fr92;
+	union _ia64_fpreg	fr93;
+	union _ia64_fpreg	fr94;
+	union _ia64_fpreg	fr95;
+	union _ia64_fpreg	fr96;
+	union _ia64_fpreg	fr97;
+	union _ia64_fpreg	fr98;
+	union _ia64_fpreg	fr99;
+	union _ia64_fpreg	fr100;
+	union _ia64_fpreg	fr101;
+	union _ia64_fpreg	fr102;
+	union _ia64_fpreg	fr103;
+	union _ia64_fpreg	fr104;
+	union _ia64_fpreg	fr105;
+	union _ia64_fpreg	fr106;
+	union _ia64_fpreg	fr107;
+	union _ia64_fpreg	fr108;
+	union _ia64_fpreg	fr109;
+	union _ia64_fpreg	fr110;
+	union _ia64_fpreg	fr111;
+	union _ia64_fpreg	fr112;
+	union _ia64_fpreg	fr113;
+	union _ia64_fpreg	fr114;
+	union _ia64_fpreg	fr115;
+	union _ia64_fpreg	fr116;
+	union _ia64_fpreg	fr117;
+	union _ia64_fpreg	fr118;
+	union _ia64_fpreg	fr119;
+	union _ia64_fpreg	fr120;
+	union _ia64_fpreg	fr121;
+	union _ia64_fpreg	fr122;
+	union _ia64_fpreg	fr123;
+	union _ia64_fpreg	fr124;
+	union _ia64_fpreg	fr125;
+	union _ia64_fpreg	fr126;
+	union _ia64_fpreg	fr127;
 };
 
 /*
@@ -97,26 +192,26 @@ struct _callee_saved {
 };
 
 struct _callee_saved_fp {
-	struct _ia64_fpreg	fr2;
-	struct _ia64_fpreg	fr3;
-	struct _ia64_fpreg	fr4;
-	struct _ia64_fpreg	fr5;
-	struct _ia64_fpreg	fr16;
-	struct _ia64_fpreg	fr17;
-	struct _ia64_fpreg	fr18;
-	struct _ia64_fpreg	fr19;
-	struct _ia64_fpreg	fr20;
-	struct _ia64_fpreg	fr21;
-	struct _ia64_fpreg	fr22;
-	struct _ia64_fpreg	fr23;
-	struct _ia64_fpreg	fr24;
-	struct _ia64_fpreg	fr25;
-	struct _ia64_fpreg	fr26;
-	struct _ia64_fpreg	fr27;
-	struct _ia64_fpreg	fr28;
-	struct _ia64_fpreg	fr29;
-	struct _ia64_fpreg	fr30;
-	struct _ia64_fpreg	fr31;
+	union _ia64_fpreg	fr2;
+	union _ia64_fpreg	fr3;
+	union _ia64_fpreg	fr4;
+	union _ia64_fpreg	fr5;
+	union _ia64_fpreg	fr16;
+	union _ia64_fpreg	fr17;
+	union _ia64_fpreg	fr18;
+	union _ia64_fpreg	fr19;
+	union _ia64_fpreg	fr20;
+	union _ia64_fpreg	fr21;
+	union _ia64_fpreg	fr22;
+	union _ia64_fpreg	fr23;
+	union _ia64_fpreg	fr24;
+	union _ia64_fpreg	fr25;
+	union _ia64_fpreg	fr26;
+	union _ia64_fpreg	fr27;
+	union _ia64_fpreg	fr28;
+	union _ia64_fpreg	fr29;
+	union _ia64_fpreg	fr30;
+	union _ia64_fpreg	fr31;
 };
 
 /*
@@ -156,22 +251,22 @@ struct _caller_saved {
 };
 
 struct _caller_saved_fp {
-	struct _ia64_fpreg	fr6;
-	struct _ia64_fpreg	fr7;
-	struct _ia64_fpreg	fr8;
-	struct _ia64_fpreg	fr9;
-	struct _ia64_fpreg	fr10;
-	struct _ia64_fpreg	fr11;
-	struct _ia64_fpreg	fr12;
-	struct _ia64_fpreg	fr13;
-	struct _ia64_fpreg	fr14;
-	struct _ia64_fpreg	fr15;
+	union _ia64_fpreg	fr6;
+	union _ia64_fpreg	fr7;
+	union _ia64_fpreg	fr8;
+	union _ia64_fpreg	fr9;
+	union _ia64_fpreg	fr10;
+	union _ia64_fpreg	fr11;
+	union _ia64_fpreg	fr12;
+	union _ia64_fpreg	fr13;
+	union _ia64_fpreg	fr14;
+	union _ia64_fpreg	fr15;
 };
 
 #ifdef _KERNEL
-void	restore_callee_saved(struct _callee_saved *);
-void	restore_callee_saved_fp(struct _callee_saved_fp *);
-void	restore_high_fp(struct _high_fp *);
+void	restore_callee_saved(const struct _callee_saved *);
+void	restore_callee_saved_fp(const struct _callee_saved_fp *);
+void	restore_high_fp(const struct _high_fp *);
 void	save_callee_saved(struct _callee_saved *);
 void	save_callee_saved_fp(struct _callee_saved_fp *);
 void	save_high_fp(struct _high_fp *);

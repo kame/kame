@@ -32,7 +32,7 @@
  *
  *	@(#)endian.h	8.1 (Berkeley) 6/10/93
  *	$NetBSD: endian.h,v 1.7 1999/08/21 05:53:51 simonb Exp $
- * $FreeBSD: src/sys/powerpc/include/endian.h,v 1.11 2002/09/23 04:32:17 mike Exp $
+ * $FreeBSD: src/sys/powerpc/include/endian.h,v 1.12 2003/08/03 07:53:50 obrien Exp $
  */
 
 #ifndef _MACHINE_ENDIAN_H_
@@ -51,6 +51,7 @@
  * Definitions for byte order, according to byte significance from low
  * address to high.
  */
+#undef  _BIG_ENDIAN		/* GCC annoyingly defines this for PowerPC */
 #define	_LITTLE_ENDIAN	1234	/* LSB first: i386, vax */
 #define	_BIG_ENDIAN	4321	/* MSB first: 68000, ibm, net */
 #define	_PDP_ENDIAN	3412	/* LSB first in word, MSW first in long */

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/include/md_var.h,v 1.11 2003/02/01 22:50:09 marcel Exp $
+ * $FreeBSD: src/sys/ia64/include/md_var.h,v 1.15 2003/11/12 03:24:34 marcel Exp $
  */
 
 #ifndef _MACHINE_MD_VAR_H_
@@ -39,8 +39,9 @@ extern	int	szsigcode;
 extern	long	Maxmem;
 
 struct fpreg;
-struct thread;
 struct reg;
+struct thread;
+struct trapframe;
 
 struct ia64_fdesc {
 	u_int64_t	func;
@@ -51,11 +52,23 @@ struct ia64_fdesc {
 #define FDESC_GP(fn)    (((struct ia64_fdesc *) fn)->gp)
 
 void	busdma_swi(void);
-void	cpu_halt(void);
-void	cpu_reset(void);
-int	is_physical_memory(vm_offset_t addr);
+int	copyout_regstack(struct thread *, uint64_t *, uint64_t *);
+void	cpu_mp_add(u_int, u_int, u_int);
+int	do_ast(struct trapframe *);
+int	ia64_count_cpus(void);
+int	ia64_highfp_drop(struct thread *);
+int	ia64_highfp_save(struct thread *);
+void	ia64_init(void);
+void	ia64_probe_sapics(void);
+int	interrupt(uint64_t, struct trapframe *);
+void	map_gateway_page(void);
+void	map_pal_code(void);
+void	map_port_space(void);
 void	os_boot_rendez(void);
 void	os_mca(void);
-void	swi_vm(void *);
+void	spillfd(void *src, void *dst);
+int	syscall(struct trapframe *);
+void	trap(int, struct trapframe *);
+int	unaligned_fixup(struct trapframe *, struct thread *);
 
 #endif /* !_MACHINE_MD_VAR_H_ */

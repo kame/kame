@@ -28,8 +28,10 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/if_xl.c,v 1.162 2003/11/28 05:28:29 imp Exp $");
 
 /*
  * 3Com 3c90x Etherlink XL PCI NIC driver
@@ -72,7 +74,6 @@
  * Electrical Engineering Department
  * Columbia University, New York City
  */
-
 /*
  * The 3c90x series chips use a bus-master DMA interface for transfering
  * packets to and from the controller chip. Some of the "vortex" cards
@@ -100,9 +101,6 @@
  * PCI-based NICs.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_xl.c,v 1.143 2003/04/21 18:34:04 imp Exp $");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -129,14 +127,14 @@ __FBSDID("$FreeBSD: src/sys/pci/if_xl.c,v 1.143 2003/04/21 18:34:04 imp Exp $");
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 MODULE_DEPEND(xl, pci, 1, 1, 1);
 MODULE_DEPEND(xl, ether, 1, 1, 1);
 MODULE_DEPEND(xl, miibus, 1, 1, 1);
 
-/* "controller miibus0" required.  See GENERIC if you get errors here. */
+/* "device miibus" required.  See GENERIC if you get errors here. */
 #include "miibus_if.h"
 
 #include <pci/if_xlreg.h>
@@ -240,7 +238,7 @@ static int xl_mii_writereg	(struct xl_softc *, struct xl_mii_frame *);
 
 static void xl_setcfg		(struct xl_softc *);
 static void xl_setmode		(struct xl_softc *, int);
-static u_int8_t xl_calchash	(caddr_t);
+static u_int32_t xl_mchash	(caddr_t);
 static void xl_setmulti		(struct xl_softc *);
 static void xl_setmulti_hash	(struct xl_softc *);
 static void xl_reset		(struct xl_softc *);
@@ -414,7 +412,9 @@ xl_mii_sync(sc)
 	for (i = 0; i < 32; i++) {
 		MII_SET(XL_MII_CLK);
 		MII_SET(XL_MII_DATA);
+		MII_SET(XL_MII_DATA);
 		MII_CLR(XL_MII_CLK);
+		MII_SET(XL_MII_DATA);
 		MII_SET(XL_MII_DATA);
 	}
 
@@ -810,22 +810,21 @@ xl_read_eeprom(sc, dest, off, cnt, swap)
  * 256 bit hash table. This means we have to use all 8 bits regardless.
  * On older cards, the upper 2 bits will be ignored. Grrrr....
  */
-static u_int8_t xl_calchash(addr)
-	caddr_t			addr;
+static u_int32_t
+xl_mchash(addr)
+	caddr_t		addr;
 {
-	u_int32_t		crc, carry;
-	int			i, j;
-	u_int8_t		c;
+	u_int32_t	crc, carry;
+	int		idx, bit;
+	u_int8_t	data;
 
 	/* Compute CRC for the address value. */
 	crc = 0xFFFFFFFF; /* initial value */
 
-	for (i = 0; i < 6; i++) {
-		c = *(addr + i);
-		for (j = 0; j < 8; j++) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (c & 0x01);
+	for (idx = 0; idx < 6; idx++) {
+		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
+			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
 			crc <<= 1;
-			c >>= 1;
 			if (carry)
 				crc = (crc ^ 0x04c11db6) | carry;
 		}
@@ -906,7 +905,7 @@ xl_setmulti_hash(sc)
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = xl_calchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = xl_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
 		CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_RX_SET_HASH|XL_HASH_SET|h);
 		mcnt++;
 	}
@@ -1079,6 +1078,16 @@ xl_reset(sc)
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_RESET | 
 		    ((sc->xl_flags & XL_FLAG_WEIRDRESET) ?
 		     XL_RESETOPT_DISADVFD:0));
+
+	/*
+	 * If we're using memory mapped register mode, pause briefly
+	 * after issuing the reset command before trying to access any
+	 * other registers. With my 3c575C cardbus card, failing to do
+	 * this results in the system locking up while trying to poll
+	 * the command busy bit in the status register.
+	 */
+	if (sc->xl_flags & XL_FLAG_USE_MMIO)
+		DELAY(100000);
 
 	for (i = 0; i < XL_TIMEOUT; i++) {
 		DELAY(10);
@@ -1302,6 +1311,7 @@ xl_attach(dev)
 	struct ifnet		*ifp;
 	int			media = IFM_ETHER|IFM_100_TX|IFM_FDX;
 	int			unit, error = 0, rid, res;
+	uint16_t		did;
 
 	sc = device_get_softc(dev);
 	unit = device_get_unit(dev);
@@ -1310,42 +1320,55 @@ xl_attach(dev)
 	    MTX_DEF | MTX_RECURSE);
 	ifmedia_init(&sc->ifmedia, 0, xl_ifmedia_upd, xl_ifmedia_sts);
 
+	did = pci_get_device(dev);
+
 	sc->xl_flags = 0;
-	if (pci_get_device(dev) == TC_DEVICEID_HURRICANE_555)
+	if (did == TC_DEVICEID_HURRICANE_555)
 		sc->xl_flags |= XL_FLAG_EEPROM_OFFSET_30 | XL_FLAG_PHYOK;
-	if (pci_get_device(dev) == TC_DEVICEID_HURRICANE_556 ||
-	    pci_get_device(dev) == TC_DEVICEID_HURRICANE_556B)
+	if (did == TC_DEVICEID_HURRICANE_556 ||
+	    did == TC_DEVICEID_HURRICANE_556B)
 		sc->xl_flags |= XL_FLAG_FUNCREG | XL_FLAG_PHYOK |
 		    XL_FLAG_EEPROM_OFFSET_30 | XL_FLAG_WEIRDRESET |
 		    XL_FLAG_INVERT_LED_PWR | XL_FLAG_INVERT_MII_PWR;
-	if (pci_get_device(dev) == TC_DEVICEID_HURRICANE_555 ||
-	    pci_get_device(dev) == TC_DEVICEID_HURRICANE_556)
+	if (did == TC_DEVICEID_HURRICANE_555 ||
+	    did == TC_DEVICEID_HURRICANE_556)
 		sc->xl_flags |= XL_FLAG_8BITROM;
-	if (pci_get_device(dev) == TC_DEVICEID_HURRICANE_556B)
+	if (did == TC_DEVICEID_HURRICANE_556B)
 		sc->xl_flags |= XL_FLAG_NO_XCVR_PWR;
 
-	if (pci_get_device(dev) == TC_DEVICEID_HURRICANE_575A ||
-	    pci_get_device(dev) == TC_DEVICEID_HURRICANE_575B ||
-	    pci_get_device(dev) == TC_DEVICEID_HURRICANE_575C ||
-	    pci_get_device(dev) == TC_DEVICEID_HURRICANE_656B ||
-	    pci_get_device(dev) == TC_DEVICEID_TORNADO_656C)
+	if (did == TC_DEVICEID_HURRICANE_575A ||
+	    did == TC_DEVICEID_HURRICANE_575B ||
+	    did == TC_DEVICEID_HURRICANE_575C ||
+	    did == TC_DEVICEID_HURRICANE_656B ||
+	    did == TC_DEVICEID_TORNADO_656C)
 		sc->xl_flags |= XL_FLAG_FUNCREG | XL_FLAG_PHYOK |
 		    XL_FLAG_EEPROM_OFFSET_30 | XL_FLAG_8BITROM;
-	if (pci_get_device(dev) == TC_DEVICEID_HURRICANE_656)
+	if (did == TC_DEVICEID_HURRICANE_656)
 		sc->xl_flags |= XL_FLAG_FUNCREG | XL_FLAG_PHYOK;
-	if (pci_get_device(dev) == TC_DEVICEID_HURRICANE_575B)
+	if (did == TC_DEVICEID_HURRICANE_575B)
 		sc->xl_flags |= XL_FLAG_INVERT_LED_PWR;
-	if (pci_get_device(dev) == TC_DEVICEID_HURRICANE_575C)
+	if (did == TC_DEVICEID_HURRICANE_575C)
 		sc->xl_flags |= XL_FLAG_INVERT_MII_PWR;
-	if (pci_get_device(dev) == TC_DEVICEID_TORNADO_656C)
+	if (did == TC_DEVICEID_TORNADO_656C)
 		sc->xl_flags |= XL_FLAG_INVERT_MII_PWR;
-	if (pci_get_device(dev) == TC_DEVICEID_HURRICANE_656 ||
-	    pci_get_device(dev) == TC_DEVICEID_HURRICANE_656B)
+	if (did == TC_DEVICEID_HURRICANE_656 ||
+	    did == TC_DEVICEID_HURRICANE_656B)
 		sc->xl_flags |= XL_FLAG_INVERT_MII_PWR |
 		    XL_FLAG_INVERT_LED_PWR;
-	if (pci_get_device(dev) == TC_DEVICEID_TORNADO_10_100BT_920B)
+	if (did == TC_DEVICEID_TORNADO_10_100BT_920B)
 		sc->xl_flags |= XL_FLAG_PHYOK;
 
+	switch (did) {
+	case TC_DEVICEID_HURRICANE_575A:
+	case TC_DEVICEID_HURRICANE_575B:
+	case TC_DEVICEID_HURRICANE_575C:
+		sc->xl_flags |= XL_FLAG_NO_MMIO;
+		break;
+	default:
+		break;
+	}
+
+#ifndef BURN_BRIDGES
 	/*
 	 * If this is a 3c905B, we have to check one extra thing.
 	 * The 905B supports power management and may be placed in
@@ -1384,17 +1407,20 @@ xl_attach(dev)
 		pci_write_config(dev, XL_PCI_LOMEM, membase, 4);
 		pci_write_config(dev, XL_PCI_INTLINE, irq, 4);
 	}
+#endif
 
 	/*
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
 
-	rid = XL_PCI_LOMEM;
-	res = SYS_RES_MEMORY;
+	if ((sc->xl_flags & XL_FLAG_NO_MMIO) == 0) {
+		rid = XL_PCI_LOMEM;
+		res = SYS_RES_MEMORY;
 
-	sc->xl_res = bus_alloc_resource(dev, res, &rid,
-	    0, ~0, 1, RF_ACTIVE);
+		sc->xl_res = bus_alloc_resource(dev, res, &rid,
+		    0, ~0, 1, RF_ACTIVE);
+	}
 
 	if (sc->xl_res != NULL) {
 		sc->xl_flags |= XL_FLAG_USE_MMIO;
@@ -1472,14 +1498,15 @@ xl_attach(dev)
 	 */
 	error = bus_dma_tag_create(NULL, 8, 0,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
-	    XL_RX_LIST_SZ, 1, XL_RX_LIST_SZ, 0, &sc->xl_ldata.xl_rx_tag);
+	    XL_RX_LIST_SZ, 1, XL_RX_LIST_SZ, 0, NULL, NULL,
+	    &sc->xl_ldata.xl_rx_tag);
 	if (error) {
 		printf("xl%d: failed to allocate rx dma tag\n", unit);
 		goto fail;
 	}
 
 	error = bus_dmamem_alloc(sc->xl_ldata.xl_rx_tag,
-	    (void **)&sc->xl_ldata.xl_rx_list, BUS_DMA_NOWAIT,
+	    (void **)&sc->xl_ldata.xl_rx_list, BUS_DMA_NOWAIT | BUS_DMA_ZERO,
 	    &sc->xl_ldata.xl_rx_dmamap);
 	if (error) {
 		printf("xl%d: no memory for rx list buffers!\n", unit);
@@ -1491,7 +1518,7 @@ xl_attach(dev)
 	error = bus_dmamap_load(sc->xl_ldata.xl_rx_tag,
 	    sc->xl_ldata.xl_rx_dmamap, sc->xl_ldata.xl_rx_list,
 	    XL_RX_LIST_SZ, xl_dma_map_addr,
-	    &sc->xl_ldata.xl_rx_dmaaddr, 0);
+	    &sc->xl_ldata.xl_rx_dmaaddr, BUS_DMA_NOWAIT);
 	if (error) {
 		printf("xl%d: cannot get dma address of the rx ring!\n", unit);
 		bus_dmamem_free(sc->xl_ldata.xl_rx_tag, sc->xl_ldata.xl_rx_list,
@@ -1503,14 +1530,15 @@ xl_attach(dev)
 
 	error = bus_dma_tag_create(NULL, 8, 0,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
-	    XL_TX_LIST_SZ, 1, XL_TX_LIST_SZ, 0, &sc->xl_ldata.xl_tx_tag);
+	    XL_TX_LIST_SZ, 1, XL_TX_LIST_SZ, 0, NULL, NULL,
+	    &sc->xl_ldata.xl_tx_tag);
 	if (error) {
 		printf("xl%d: failed to allocate tx dma tag\n", unit);
 		goto fail;
 	}
 
 	error = bus_dmamem_alloc(sc->xl_ldata.xl_tx_tag,
-	    (void **)&sc->xl_ldata.xl_tx_list, BUS_DMA_NOWAIT,
+	    (void **)&sc->xl_ldata.xl_tx_list, BUS_DMA_NOWAIT | BUS_DMA_ZERO,
 	    &sc->xl_ldata.xl_tx_dmamap);
 	if (error) {
 		printf("xl%d: no memory for list buffers!\n", unit);
@@ -1522,7 +1550,7 @@ xl_attach(dev)
 	error = bus_dmamap_load(sc->xl_ldata.xl_tx_tag,
 	    sc->xl_ldata.xl_tx_dmamap, sc->xl_ldata.xl_tx_list,
 	    XL_TX_LIST_SZ, xl_dma_map_addr,
-	    &sc->xl_ldata.xl_tx_dmaaddr, 0);
+	    &sc->xl_ldata.xl_tx_dmaaddr, BUS_DMA_NOWAIT);
 	if (error) {
 		printf("xl%d: cannot get dma address of the tx ring!\n", unit);
 		bus_dmamem_free(sc->xl_ldata.xl_tx_tag, sc->xl_ldata.xl_tx_list,
@@ -1537,14 +1565,12 @@ xl_attach(dev)
 	 */
 	error = bus_dma_tag_create(NULL, 1, 0,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
-	    MCLBYTES * XL_MAXFRAGS, XL_MAXFRAGS, MCLBYTES, 0, &sc->xl_mtag);
+	    MCLBYTES * XL_MAXFRAGS, XL_MAXFRAGS, MCLBYTES, 0, NULL,
+	    NULL, &sc->xl_mtag);
 	if (error) {
 		printf("xl%d: failed to allocate mbuf dma tag\n", unit);
 		goto fail;
 	}
-
-	bzero(sc->xl_ldata.xl_tx_list, XL_TX_LIST_SZ);
-	bzero(sc->xl_ldata.xl_rx_list, XL_RX_LIST_SZ);
 
 	/* We need a spare DMA map for the RX ring. */
 	error = bus_dmamap_create(sc->xl_mtag, 0, &sc->xl_tmpmap);
@@ -1555,25 +1581,31 @@ xl_attach(dev)
 	 * Figure out the card type. 3c905B adapters have the
 	 * 'supportsNoTxLength' bit set in the capabilities
 	 * word in the EEPROM.
+	 * Note: my 3c575C cardbus card lies. It returns a value
+	 * of 0x1578 for its capabilities word, which is somewhat
+ 	 * nonsensical. Another way to distinguish a 3c90x chip
+	 * from a 3c90xB/C chip is to check for the 'supportsLargePackets'
+	 * bit. This will only be set for 3c90x boomerage chips.
 	 */
 	xl_read_eeprom(sc, (caddr_t)&sc->xl_caps, XL_EE_CAPS, 1, 0);
-	if (sc->xl_caps & XL_CAPS_NO_TXLENGTH)
+	if (sc->xl_caps & XL_CAPS_NO_TXLENGTH ||
+	    !(sc->xl_caps & XL_CAPS_LARGE_PKTS))
 		sc->xl_type = XL_TYPE_905B;
 	else
 		sc->xl_type = XL_TYPE_90X;
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = unit;
-	ifp->if_name = "xl";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = xl_ioctl;
 	ifp->if_output = ether_output;
+	ifp->if_capabilities = IFCAP_VLAN_MTU;
 	if (sc->xl_type == XL_TYPE_905B) {
 		ifp->if_start = xl_start_90xB;
 		ifp->if_hwassist = XL905B_CSUM_FEATURES;
-		ifp->if_capabilities = IFCAP_HWCSUM;
+		ifp->if_capabilities |= IFCAP_HWCSUM;
 	} else
 		ifp->if_start = xl_start;
 	ifp->if_watchdog = xl_watchdog;
@@ -1959,7 +1991,7 @@ xl_newbuf(sc, c)
 	m_adj(m_new, ETHER_ALIGN);
 
 	error = bus_dmamap_load_mbuf(sc->xl_mtag, sc->xl_tmpmap, m_new,
-	    xl_dma_map_rxbuf, &baddr, 0);
+	    xl_dma_map_rxbuf, &baddr, BUS_DMA_NOWAIT);
 	if (error) {
 		m_freem(m_new);
 		printf("xl%d: can't map mbuf (error %d)\n", sc->xl_unit, error);
@@ -2015,6 +2047,8 @@ xl_rxeof(sc)
 	int			total_len = 0;
 	u_int32_t		rxstat;
 
+	XL_LOCK_ASSERT(sc);
+
 	ifp = &sc->arpcom.ac_if;
 
 again:
@@ -2024,6 +2058,16 @@ again:
 	while((rxstat = le32toh(sc->xl_cdata.xl_rx_head->xl_ptr->xl_status))) {
 		cur_rx = sc->xl_cdata.xl_rx_head;
 		sc->xl_cdata.xl_rx_head = cur_rx->xl_next;
+		total_len = rxstat & XL_RXSTAT_LENMASK;
+
+		/*
+		 * Since we have told the chip to allow large frames,
+		 * we need to trap giant frame errors in software. We allow
+		 * a little more than the normal frame size to account for
+		 * frames with VLAN tags.
+		 */
+		if (total_len > XL_MAX_FRAMELEN)
+			rxstat |= (XL_RXSTAT_UP_ERROR|XL_RXSTAT_OVERSIZE);
 
 		/*
 		 * If an error occurs, update stats, clear the
@@ -2040,7 +2084,7 @@ again:
 		}
 
 		/*
-		 * If there error bit was not set, the upload complete
+		 * If the error bit was not set, the upload complete
 		 * bit should be set which means we have a valid packet.
 		 * If not, something truly strange has happened.
 		 */
@@ -2058,8 +2102,6 @@ again:
 		bus_dmamap_sync(sc->xl_mtag, cur_rx->xl_map,
 		    BUS_DMASYNC_POSTREAD);
 		m = cur_rx->xl_mbuf;
-		total_len = le32toh(cur_rx->xl_ptr->xl_status) &
-		    XL_RXSTAT_LENMASK;
 
 		/*
 		 * Try to conjure up a new mbuf cluster. If that
@@ -2082,7 +2124,7 @@ again:
 		m->m_pkthdr.rcvif = ifp;
 		m->m_pkthdr.len = m->m_len = total_len;
 
-		if (sc->xl_type == XL_TYPE_905B) {
+		if (ifp->if_capenable & IFCAP_RXCSUM) {
 			/* Do IP checksum checking. */
 			if (rxstat & XL_RXSTAT_IPCKOK)
 				m->m_pkthdr.csum_flags |= CSUM_IP_CHECKED;
@@ -2098,7 +2140,9 @@ again:
 			}
 		}
 
+		XL_UNLOCK(sc);
 		(*ifp->if_input)(ifp, m);
+		XL_LOCK(sc);
 	}
 
 	/*
@@ -2420,6 +2464,9 @@ xl_encap(sc, c, m_head)
 {
 	int			error;
 	u_int32_t		status;
+	struct ifnet		*ifp;
+
+	ifp = &sc->arpcom.ac_if;
 
 	/*
  	 * Start packing the mbufs in this chain into
@@ -2427,7 +2474,7 @@ xl_encap(sc, c, m_head)
  	 * of fragments or hit the end of the mbuf chain.
 	 */
 	error = bus_dmamap_load_mbuf(sc->xl_mtag, c->xl_map, m_head,
-	    xl_dma_map_txbuf, c->xl_ptr, 0);
+	    xl_dma_map_txbuf, c->xl_ptr, BUS_DMA_NOWAIT);
 
 	if (error && error != EFBIG) {
 		m_freem(m_head);
@@ -2455,7 +2502,7 @@ xl_encap(sc, c, m_head)
 		}
 
 		error = bus_dmamap_load_mbuf(sc->xl_mtag, c->xl_map,
-			m_head, xl_dma_map_txbuf, c->xl_ptr, 0);
+			m_head, xl_dma_map_txbuf, c->xl_ptr, BUS_DMA_NOWAIT);
 		if (error) {
 			m_freem(m_head);
 			printf("xl%d: can't map mbuf (error %d)\n",
@@ -2882,9 +2929,22 @@ xl_init(xsc)
 	else
 		CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_COAX_STOP);
 
-	/* increase packet size to allow reception of 802.1q or ISL packets */
+	/*
+	 * increase packet size to allow reception of 802.1q or ISL packets.
+	 * For the 3c90x chip, set the 'allow large packets' bit in the MAC
+	 * control register. For 3c90xB/C chips, use the RX packet size
+	 * register.
+	 */
+	
 	if (sc->xl_type == XL_TYPE_905B) 
 		CSR_WRITE_2(sc, XL_W3_MAXPKTSIZE, XL_PACKET_SIZE);
+	else {
+		u_int8_t macctl;
+		macctl = CSR_READ_1(sc, XL_W3_MAC_CTRL);
+		macctl |= XL_MACCTRL_ALLOW_LARGE_PACK;
+		CSR_WRITE_1(sc, XL_W3_MAC_CTRL, macctl);
+	}
+
 	/* Clear out the stats counters. */
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_STATS_DISABLE);
 	sc->xl_stats_no_timeout = 1;
@@ -2980,17 +3040,25 @@ xl_ifmedia_sts(ifp, ifmr)
 {
 	struct xl_softc		*sc;
 	u_int32_t		icfg;
+	u_int16_t		status = 0;
 	struct mii_data		*mii = NULL;
 
 	sc = ifp->if_softc;
 	if (sc->xl_miibus != NULL)
 		mii = device_get_softc(sc->xl_miibus);
 
+	XL_SEL_WIN(4);
+	status = CSR_READ_2(sc, XL_W4_MEDIA_STATUS);
+
 	XL_SEL_WIN(3);
 	icfg = CSR_READ_4(sc, XL_W3_INTERNAL_CFG) & XL_ICFG_CONNECTOR_MASK;
 	icfg >>= XL_ICFG_CONNECTOR_BITS;
 
 	ifmr->ifm_active = IFM_ETHER;
+	ifmr->ifm_status = IFM_AVALID;
+
+	if ((status & XL_MEDIASTAT_CARRIER) == 0)
+		ifmr->ifm_status |= IFM_ACTIVE;
 
 	switch(icfg) {
 	case XL_XCVR_10BT:
@@ -3098,6 +3166,13 @@ xl_ioctl(ifp, command, data)
 		else
 			error = ifmedia_ioctl(ifp, ifr,
 			    &mii->mii_media, command);
+		break;
+        case SIOCSIFCAP:
+		ifp->if_capenable = ifr->ifr_reqcap;
+		if (ifp->if_capenable & IFCAP_TXCSUM)
+			ifp->if_hwassist = XL905B_CSUM_FEATURES;
+		else
+			ifp->if_hwassist = 0;
 		break;
 	default:
 		error = ether_ioctl(ifp, command, data);

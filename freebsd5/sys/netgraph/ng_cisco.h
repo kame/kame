@@ -36,12 +36,12 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_cisco.h,v 1.6 2002/05/31 23:48:02 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_cisco.h,v 1.7 2003/11/11 12:30:37 ru Exp $
  * $Whistle: ng_cisco.h,v 1.6 1999/01/25 01:21:48 archie Exp $
  */
 
-#ifndef _NETGRAPH_CISCO_H_
-#define _NETGRAPH_CISCO_H_
+#ifndef _NETGRAPH_NG_CISCO_H_
+#define _NETGRAPH_NG_CISCO_H_
 
 /* Node type name and magic cookie */
 #define NG_CISCO_NODE_TYPE		"cisco"
@@ -86,5 +86,5 @@ struct ng_cisco_stats {
 	  { NULL }						\
 }
 
-#endif /* _NETGRAPH_CISCO_H_ */
+#endif /* _NETGRAPH_NG_CISCO_H_ */
 

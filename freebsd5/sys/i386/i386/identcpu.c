@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992 Terrence R. Lambert.
  * Copyright (c) 1982, 1987, 1990 The Regents of the University of California.
  * Copyright (c) 1997 KATO Takenori.
@@ -38,8 +38,10 @@
  * SUCH DAMAGE.
  *
  *	from: Id: machdep.c,v 1.193 1996/06/18 01:22:04 bde Exp
- * $FreeBSD: src/sys/i386/i386/identcpu.c,v 1.122 2003/04/30 12:23:58 markm Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/i386/identcpu.c,v 1.132 2003/11/03 22:38:00 jhb Exp $");
 
 #include "opt_cpu.h"
 
@@ -53,12 +55,10 @@
 #include <machine/asmacros.h>
 #include <machine/clock.h>
 #include <machine/cputypes.h>
+#include <machine/intr_machdep.h>
+#include <machine/md_var.h>
 #include <machine/segments.h>
 #include <machine/specialreg.h>
-#include <machine/md_var.h>
-
-#include <i386/isa/icu.h>
-#include <i386/isa/intr_machdep.h>
 
 #define	IDENTBLUE_CYRIX486	0
 #define	IDENTBLUE_IBMCPU	1
@@ -159,7 +159,8 @@ printcpuinfo(void)
 	    (strcmp(cpu_vendor, "GenuineIntel") == 0 ||
 	    strcmp(cpu_vendor, "AuthenticAMD") == 0 ||
 	    strcmp(cpu_vendor, "GenuineTMx86") == 0 ||
-	    strcmp(cpu_vendor, "TransmetaCPU") == 0)) {
+	    strcmp(cpu_vendor, "TransmetaCPU") == 0 ||
+	    strcmp(cpu_vendor, "Geode by NSC") == 0)) {
 		do_cpuid(0x80000000, regs);
 		if (regs[0] >= 0x80000000) {
 			cpu_exthigh = regs[0];
@@ -497,6 +498,7 @@ printcpuinfo(void)
 				switch (cyrix_did & 0x0f) {
 				case 0x0d:
 					strcat(cpu_model, "Overdrive CPU");
+					break;
 				case 0x0e:
 					strcpy(cpu_model, "Texas Instruments 486SXL");
 					break;
@@ -532,14 +534,36 @@ printcpuinfo(void)
 		case 0x580:
 			strcpy(cpu_model, "IDT WinChip 2");
 			break;
+		case 0x660:
+			strcpy(cpu_model, "VIA C3 Samuel");
+			break;
 		case 0x670:
-			strcpy(cpu_model, "VIA C3 Samuel 2");
+			if (cpu_id & 0x8)
+				strcpy(cpu_model, "VIA C3 Ezra");
+			else
+				strcpy(cpu_model, "VIA C3 Samuel 2");
+			break;
+		case 0x680:
+			strcpy(cpu_model, "VIA C3 Ezra-T");
+			break;
+		case 0x690:
+			strcpy(cpu_model, "VIA C3 Nehemiah");
 			break;
 		default:
 			strcpy(cpu_model, "VIA/IDT Unknown");
 		}
 	} else if (strcmp(cpu_vendor, "IBM") == 0) {
 		strcpy(cpu_model, "Blue Lightning CPU");
+	} else if (strcmp(cpu_vendor, "Geode by NSC") == 0) {
+		switch (cpu_id & 0xfff) {
+		case 0x540:
+			strcpy(cpu_model, "Geode SC1100");
+			tsc_is_broken = 1;
+			break;
+		default:
+			strcpy(cpu_model, "Geode/NSC unknown");
+			break;
+		}
 	}
 
 	/*
@@ -751,15 +775,15 @@ static	volatile u_int trap_by_rdmsr;
 inthand_t	bluetrap6;
 #ifdef __GNUC__
 __asm
-("									\
-	.text;								\
-	.p2align 2,0x90;						\
-	.type	" __XSTRING(CNAME(bluetrap6)) ",@function;		\
-" __XSTRING(CNAME(bluetrap6)) ":					\
-	ss;								\
-	movl	$0xa8c1d," __XSTRING(CNAME(trap_by_rdmsr)) ";		\
-	addl	$2, (%esp);	/* rdmsr is a 2-byte instruction */	\
-	iret								\
+("									\n\
+	.text								\n\
+	.p2align 2,0x90							\n\
+	.type	" __XSTRING(CNAME(bluetrap6)) ",@function		\n\
+" __XSTRING(CNAME(bluetrap6)) ":					\n\
+	ss								\n\
+	movl	$0xa8c1d," __XSTRING(CNAME(trap_by_rdmsr)) "		\n\
+	addl	$2, (%esp)	/* rdmsr is a 2-byte instruction */	\n\
+	iret								\n\
 ");
 #endif
 
@@ -770,16 +794,16 @@ __asm
 inthand_t	bluetrap13;
 #ifdef __GNUC__
 __asm
-("									\
-	.text;								\
-	.p2align 2,0x90;						\
-	.type " __XSTRING(CNAME(bluetrap13)) ",@function;		\
-" __XSTRING(CNAME(bluetrap13)) ":					\
-	ss;								\
-	movl	$0xa89c4," __XSTRING(CNAME(trap_by_rdmsr)) ";		\
-	popl	%eax;		/* discard errorcode. */		\
-	addl	$2, (%esp);	/* rdmsr is a 2-bytes instruction. */	\
-	iret;								\
+("									\n\
+	.text								\n\
+	.p2align 2,0x90							\n\
+	.type	" __XSTRING(CNAME(bluetrap13)) ",@function		\n\
+" __XSTRING(CNAME(bluetrap13)) ":					\n\
+	ss								\n\
+	movl	$0xa89c4," __XSTRING(CNAME(trap_by_rdmsr)) "		\n\
+	popl	%eax		/* discard error code */		\n\
+	addl	$2, (%esp)	/* rdmsr is a 2-byte instruction */	\n\
+	iret								\n\
 ");
 #endif
 
@@ -803,14 +827,16 @@ identblue(void)
 	 * will be trapped by bluetrap6() on Cyrix 486-class CPU.  The
 	 * bluetrap6() set the magic number to trap_by_rdmsr.
 	 */
-	setidt(6, bluetrap6, SDT_SYS386TGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
+	setidt(IDT_UD, bluetrap6, SDT_SYS386TGT, SEL_KPL,
+	    GSEL(GCODE_SEL, SEL_KPL));
 
 	/*
 	 * Certain BIOS disables cpuid instruction of Cyrix 6x86MX CPU.
 	 * In this case, rdmsr generates general protection fault, and
 	 * exception will be trapped by bluetrap13().
 	 */
-	setidt(13, bluetrap13, SDT_SYS386TGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
+	setidt(IDT_GP, bluetrap13, SDT_SYS386TGT, SEL_KPL,
+	    GSEL(GCODE_SEL, SEL_KPL));
 
 	rdmsr(0x1002);		/* Cyrix CPU generates fault. */
 
@@ -1068,7 +1094,7 @@ print_AMD_features(void)
 		"\022PGE36"	/* 36 bit address space support */
 		"\023RSVD"	/* Reserved, unknown */
 		"\024MP"	/* Multiprocessor Capable */
-		"\025<b20>"
+		"\025NX"	/* Has EFER.NXE, NX (no execute pte bit) */
 		"\026<b21>"
 		"\027AMIE"	/* AMD MMX Instruction Extensions */
 		"\030MMX"
@@ -1077,9 +1103,9 @@ print_AMD_features(void)
 		"\033<b26>"
 		"\034<b27>"
 		"\035<b28>"
-		"\036<b29>"
+		"\036LM"	/* Long mode */
 		"\037DSP"	/* AMD 3DNow! Instruction Extensions */
-		"\0403DNow!"
+		"\0403DNow!"	/* AMD 3DNow! Instructions */
 		);
 }
 #endif

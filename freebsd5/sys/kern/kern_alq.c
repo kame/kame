@@ -22,16 +22,19 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/kern_alq.c,v 1.6 2003/05/25 08:48:42 jeff Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_alq.c,v 1.10 2003/10/25 16:10:41 rwatson Exp $");
+
+#include "opt_mac.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/kthread.h>
 #include <sys/lock.h>
+#include <sys/mac.h>
 #include <sys/mutex.h>
 #include <sys/namei.h>
 #include <sys/proc.h>
@@ -291,8 +294,13 @@ alq_doio(struct alq *alq)
 	vn_start_write(vp, &mp, V_WAIT);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 	VOP_LEASE(vp, td, alq->aq_cred, LEASE_WRITE);
-	/* XXX error ignored */
-	VOP_WRITE(vp, &auio, IO_UNIT | IO_APPEND, alq->aq_cred);	
+	/*
+	 * XXX: VOP_WRITE error checks are ignored.
+	 */
+#ifdef MAC
+	if (mac_check_vnode_write(alq->aq_cred, NOCRED, vp) == 0)
+#endif
+		VOP_WRITE(vp, &auio, IO_UNIT | IO_APPEND, alq->aq_cred);
 	VOP_UNLOCK(vp, 0, td);
 	vn_finished_write(mp);
 
@@ -326,7 +334,8 @@ SYSINIT(ald, SI_SUB_LOCK, SI_ORDER_ANY, ald_startup, NULL)
  * Create the queue data structure, allocate the buffer, and open the file.
  */
 int
-alq_open(struct alq **alqp, const char *file, int size, int count)
+alq_open(struct alq **alqp, const char *file, struct ucred *cred, int size,
+    int count)
 {
 	struct thread *td;
 	struct nameidata nd;
@@ -344,7 +353,7 @@ alq_open(struct alq **alqp, const char *file, int size, int count)
 	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, file, td);
 	flags = FWRITE | O_NOFOLLOW | O_CREAT;
 
-	error = vn_open(&nd, &flags, 0);
+	error = vn_open_cred(&nd, &flags, 0, cred, -1);
 	if (error)
 		return (error);
 	
@@ -356,7 +365,7 @@ alq_open(struct alq **alqp, const char *file, int size, int count)
 	alq->aq_entbuf = malloc(count * size, M_ALD, M_WAITOK|M_ZERO);
 	alq->aq_first = malloc(sizeof(*ale) * count, M_ALD, M_WAITOK|M_ZERO);
 	alq->aq_vp = nd.ni_vp;
-	alq->aq_cred = crhold(td->td_ucred);
+	alq->aq_cred = crhold(cred);
 	alq->aq_entmax = count;
 	alq->aq_entlen = size;
 	alq->aq_entfree = alq->aq_first;

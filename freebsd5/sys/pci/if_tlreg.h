@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_tlreg.h,v 1.18 2002/10/21 02:54:50 brooks Exp $
+ * $FreeBSD: src/sys/pci/if_tlreg.h,v 1.19 2003/11/14 19:00:32 sam Exp $
  */
 
 
@@ -130,6 +130,7 @@ struct tl_softc {
 
 #define	TL_LOCK(_sc)		mtx_lock(&(_sc)->tl_mtx)
 #define	TL_UNLOCK(_sc)		mtx_unlock(&(_sc)->tl_mtx)
+#define	TL_LOCK_ASSERT(_sc)	mtx_assert(&(_sc)->tl_mtx, MA_OWNED)
 
 /*
  * Transmit interrupt threshold.

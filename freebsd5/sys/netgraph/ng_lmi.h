@@ -36,12 +36,12 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_lmi.h,v 1.2 2000/10/24 17:32:45 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_lmi.h,v 1.3 2003/11/11 12:30:37 ru Exp $
  * $Whistle: ng_lmi.h,v 1.9 1999/01/20 00:22:13 archie Exp $
  */
 
-#ifndef _NETGRAPH_LMI_H_
-#define _NETGRAPH_LMI_H_
+#ifndef _NETGRAPH_NG_LMI_H_
+#define _NETGRAPH_NG_LMI_H_
 
 /* Node type name and magic cookie */
 #define NG_LMI_NODE_TYPE		"lmi"
@@ -77,4 +77,4 @@ struct nglmistat {
 #define NG_LMI_SEQ_PER_FULL		5	/* keepalives per full status */
 #define NG_LMI_LMI_PRIORITY		64	/* priority for LMI data */
 
-#endif /* _NETGRAPH_LMI_H_ */
+#endif /* _NETGRAPH_NG_LMI_H_ */

@@ -6,7 +6,6 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/dev/ppbus/pps.c,v 1.37 2003/03/03 12:15:44 phk Exp $
  *
  * This driver implements a draft-mogul-pps-api-02.txt PPS source.
  *
@@ -14,6 +13,9 @@
  * The echo output pin is pin#14
  *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ppbus/pps.c,v 1.38 2003/08/24 17:54:16 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/kern/bus_if.m,v 1.25 2003/03/25 04:32:52 mdodd Exp $
+# $FreeBSD: src/sys/kern/bus_if.m,v 1.26 2003/09/10 21:37:10 marcel Exp $
 #
 
 #include <sys/bus.h>
@@ -280,3 +280,14 @@ METHOD int child_location_str {
 	char		*_buf;
 	size_t		_buflen;
 };
+
+#
+# Allow (bus) drivers to specify the trigger mode and polarity of the
+# specified interrupt.
+#
+METHOD int config_intr {
+	device_t	_dev;
+	int		_irq;
+	enum intr_trigger _trig;
+	enum intr_polarity _pol;
+} DEFAULT bus_generic_config_intr;

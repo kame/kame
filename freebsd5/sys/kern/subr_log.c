@@ -31,12 +31,14 @@
  * SUCH DAMAGE.
  *
  *	@(#)subr_log.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/subr_log.c,v 1.55 2003/03/03 12:15:51 phk Exp $
  */
 
 /*
  * Error log buffer for kernel printf's.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/subr_log.c,v 1.59 2003/11/09 09:17:24 tanimura Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -99,6 +101,10 @@ logopen(dev_t dev, int flags, int mode, struct thread *td)
 	log_open = 1;
 	callout_init(&logsoftc.sc_callout, 0);
 	fsetown(td->td_proc->p_pid, &logsoftc.sc_sigio);	/* signal process only */
+	if (log_wakeups_per_second < 1) {
+		printf("syslog wakeup is less than one.  Adjusting to 1.\n");
+		log_wakeups_per_second = 1;
+	}
 	callout_reset(&logsoftc.sc_callout, hz / log_wakeups_per_second,
 	    logtimeout, NULL);
 	return (0);
@@ -120,11 +126,12 @@ logclose(dev_t dev, int flag, int mode, struct thread *td)
 static	int
 logread(dev_t dev, struct uio *uio, int flag)
 {
+	char buf[128];
 	struct msgbuf *mbp = msgbufp;
 	int error = 0, l, s;
 
 	s = splhigh();
-	while (mbp->msg_bufr == mbp->msg_bufx) {
+	while (msgbuf_getcount(mbp) == 0) {
 		if (flag & IO_NDELAY) {
 			splx(s);
 			return (EWOULDBLOCK);
@@ -139,19 +146,13 @@ logread(dev_t dev, struct uio *uio, int flag)
 	logsoftc.sc_state &= ~LOG_RDWAIT;
 
 	while (uio->uio_resid > 0) {
-		l = mbp->msg_bufx - mbp->msg_bufr;
-		if (l < 0)
-			l = mbp->msg_size - mbp->msg_bufr;
-		l = imin(l, uio->uio_resid);
+		l = imin(sizeof(buf), uio->uio_resid);
+		l = msgbuf_getbytes(mbp, buf, l);
 		if (l == 0)
 			break;
-		error = uiomove((char *)msgbufp->msg_ptr + mbp->msg_bufr,
-		    l, uio);
+		error = uiomove(buf, l, uio);
 		if (error)
 			break;
-		mbp->msg_bufr += l;
-		if (mbp->msg_bufr >= mbp->msg_size)
-			mbp->msg_bufr = 0;
 	}
 	return (error);
 }
@@ -166,7 +167,7 @@ logpoll(dev_t dev, int events, struct thread *td)
 	s = splhigh();
 
 	if (events & (POLLIN | POLLRDNORM)) {
-		if (msgbufp->msg_bufr != msgbufp->msg_bufx)
+		if (msgbuf_getcount(msgbufp) > 0)
 			revents |= events & (POLLIN | POLLRDNORM);
 		else
 			selrecord(td, &logsoftc.sc_selp);
@@ -181,13 +182,17 @@ logtimeout(void *arg)
 
 	if (!log_open)
 		return;
+	if (log_wakeups_per_second < 1) {
+		printf("syslog wakeup is less than one.  Adjusting to 1.\n");
+		log_wakeups_per_second = 1;
+	}
 	if (msgbuftrigger == 0) {
 		callout_reset(&logsoftc.sc_callout,
 		    hz / log_wakeups_per_second, logtimeout, NULL);
 		return;
 	}
 	msgbuftrigger = 0;
-	selwakeup(&logsoftc.sc_selp);
+	selwakeuppri(&logsoftc.sc_selp, LOG_RDPRI);
 	if ((logsoftc.sc_state & LOG_ASYNC) && logsoftc.sc_sigio != NULL)
 		pgsigio(&logsoftc.sc_sigio, SIGIO, 0);
 	if (logsoftc.sc_state & LOG_RDWAIT) {
@@ -202,18 +207,12 @@ logtimeout(void *arg)
 static	int
 logioctl(dev_t dev, u_long com, caddr_t data, int flag, struct thread *td)
 {
-	int l, s;
 
 	switch (com) {
 
 	/* return number of characters immediately available */
 	case FIONREAD:
-		s = splhigh();
-		l = msgbufp->msg_bufx - msgbufp->msg_bufr;
-		splx(s);
-		if (l < 0)
-			l += msgbufp->msg_size;
-		*(int *)data = l;
+		*(int *)data = msgbuf_getcount(msgbufp);
 		break;
 
 	case FIONBIO:

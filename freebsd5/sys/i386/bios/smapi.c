@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/bios/smapi.c,v 1.5 2003/03/24 19:54:14 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/bios/smapi.c,v 1.8 2003/09/27 12:00:59 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -66,17 +67,14 @@ struct smapi_softc {
 	struct smapi_bios_header *header;
 };
 
-u_long smapi32_offset;
-u_short smapi32_segment;
-#define	SMAPI32_SEGMENT	0x18
+extern u_long smapi32_offset;
+extern u_short smapi32_segment;
 
 devclass_t smapi_devclass;
 
 static d_ioctl_t smapi_ioctl;
 
 static struct cdevsw smapi_cdevsw = {
-	.d_open =	nullopen,
-	.d_close =	nullclose,
 	.d_ioctl =	smapi_ioctl,
 	.d_name =	"smapi",
 	.d_maj =	MAJOR_AUTO,
@@ -122,14 +120,8 @@ smapi_ioctl (dev, cmd, data, fflag, td)
 		error = 0;
 		break;
 	case SMAPIOCGFUNCTION:
-#if 1
-		smapi32_segment = SMAPI32_SEGMENT;
 		smapi32_offset = sc->smapi32_entry;
-		error = smapi32(
-#else
-		error = smapi32_new(sc->smapi32_entry, SMAPI32_SEGMENT,
-#endif
-				(struct smapi_bios_parameter *)data,
+		error = smapi32((struct smapi_bios_parameter *)data,
 				(struct smapi_bios_parameter *)data);
 		break;
 	default:

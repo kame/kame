@@ -24,9 +24,10 @@
  *
  * capi/iavc/iavc_card.c
  *		The AVM ISDN controllers' card specific support routines.
- *
- * $FreeBSD: src/sys/i4b/capi/iavc/iavc_card.c,v 1.3 2002/09/02 00:52:06 brooks Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/capi/iavc/iavc_card.c,v 1.4 2003/06/10 23:10:44 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

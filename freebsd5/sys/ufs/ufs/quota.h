@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)quota.h	8.3 (Berkeley) 8/19/94
- * $FreeBSD: src/sys/ufs/ufs/quota.h,v 1.24 2003/02/24 08:49:59 das Exp $
+ * $FreeBSD: src/sys/ufs/ufs/quota.h,v 1.25 2003/06/15 06:36:19 rwatson Exp $
  */
 
 #ifndef _UFS_UFS_QUOTA_H_
@@ -183,12 +183,12 @@ void	dqinit(void);
 void	dqrele(struct vnode *, struct dquot *);
 void	dquninit(void);
 int	getinoquota(struct inode *);
-int	getquota(struct mount *, u_long, int, caddr_t);
+int	getquota(struct thread *, struct mount *, u_long, int, caddr_t);
 int	qsync(struct mount *mp);
 int	quotaoff(struct thread *td, struct mount *, int);
 int	quotaon(struct thread *td, struct mount *, int, caddr_t);
-int	setquota(struct mount *, u_long, int, caddr_t);
-int	setuse(struct mount *, u_long, int, caddr_t);
+int	setquota(struct thread *, struct mount *, u_long, int, caddr_t);
+int	setuse(struct thread *, struct mount *, u_long, int, caddr_t);
 vfs_quotactl_t ufs_quotactl;
 
 #else /* !_KERNEL */

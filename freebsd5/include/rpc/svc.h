@@ -30,7 +30,7 @@
  *
  *	from: @(#)svc.h 1.35 88/12/17 SMI
  *	from: @(#)svc.h      1.27    94/04/25 SMI
- * $FreeBSD: src/include/rpc/svc.h,v 1.23 2003/01/16 07:13:51 mbr Exp $
+ * $FreeBSD: src/include/rpc/svc.h,v 1.24 2003/06/15 10:32:01 mbr Exp $
  */
 
 /*
@@ -142,11 +142,6 @@ struct svc_req {
  *  Approved way of getting address of caller
  */
 #define svc_getrpccaller(x) (&(x)->xp_rtaddr)
-
-/*
- * FreeBSD-only definition to get the creds of the caller (AF_LOCAL).
- */
-#define __svc_getcallercreds(x) ((struct cmsgcred *)(x)->xp_p2)
 
 /*
  * Operations defined on an SVCXPRT handle

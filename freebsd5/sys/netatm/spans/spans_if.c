@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/spans/spans_if.c,v 1.12 2002/05/24 00:39:58 arr Exp $
- *
  */
 
 /*
@@ -33,8 +29,10 @@
  *
  * External interfaces to SPANS manager.  Includes support for
  * running as a loadable kernel module.
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/spans/spans_if.c,v 1.15 2003/07/29 13:32:10 harti Exp $");
 
 #ifndef ATM_SPANS_MODULE
 #include "opt_atm.h"
@@ -68,10 +66,6 @@
 
 #include "spans_xdr.h"
 #include <netatm/spans/spans_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/spans/spans_if.c,v 1.12 2002/05/24 00:39:58 arr Exp $");
-#endif
 
 /*
  * Global variables
@@ -132,11 +126,13 @@ spans_start()
 
 	spans_vc_zone = uma_zcreate("spans vc", sizeof(struct spans_vccb),
 	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
-	uma_zone_set_max(spans_vc_zone, 50);
+	if (spans_vc_zone == NULL)
+		panic("spans_vc_zone");
 
 	spans_msg_zone = uma_zcreate("spans msg", sizeof(spans_msg), NULL,
 	    NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
-	uma_zone_set_max(spans_msg_zone, 50);
+	if (spans_msg_zone == NULL)
+		panic("spans_msg_zone");
 
 	/*
 	 * Allocate protocol definition structure
@@ -910,7 +906,8 @@ spans_ioctl(code, data, arg1)
 	struct spans_vccb	*svp;
 	struct air_vcc_rsp	rsp;
 	Atm_connection		*cop;
-	int			buf_len, err = 0, i, vpi, vci;
+	int			err = 0, i, vpi, vci;
+	size_t buf_len;
 	caddr_t			buf_addr;
 
 

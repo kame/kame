@@ -50,7 +50,7 @@
  *
  *	Last Edit-Date: [Sat Jul 15 15:06:06 2000]
  *
- * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_drv.c,v 1.77 2003/03/25 00:07:03 jake Exp $
+ * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_drv.c,v 1.80 2003/09/26 08:51:54 phk Exp $
  *
  *---------------------------------------------------------------------------*/
 
@@ -640,10 +640,9 @@ static void
 pcvt_cn_probe(struct consdev *cp)
 {
 	int unit = 0;
-	int i;
 
-	/* See if this driver is disabled in probe hint. */ 
-	if (resource_int_value("vt", unit, "disabled", &i) == 0 && i)
+	/* See if this driver is disabled in probe hint. */
+	if (resource_disabled("vt", unit))
 	{
 		cp->cn_pri = CN_DEAD;
 		return;
@@ -659,7 +658,7 @@ pcvt_cn_probe(struct consdev *cp)
 
 	/* initialize required fields */
 
-	cp->cn_dev = makedev(CDEV_MAJOR, 0);
+	sprintf(cp->cn_name, "ttyv%r", 0);
 	cp->cn_pri = CN_INTERNAL;
 	cp->cn_tp = &pcvt_tty[0];
 }

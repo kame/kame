@@ -24,9 +24,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ppbus/immio.c,v 1.16 2001/06/23 06:51:51 nsouch Exp $
  *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ppbus/immio.c,v 1.17 2003/08/24 17:54:16 obrien Exp $");
 
 /*
  * Iomega ZIP+ Matchmaker Parallel Port Interface driver

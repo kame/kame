@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/ia64/ia64/interrupt.c,v 1.37 2003/05/16 21:26:40 marcel Exp $ */
+/* $FreeBSD: src/sys/ia64/ia64/interrupt.c,v 1.43 2003/11/17 06:10:14 peter Exp $ */
 /* $NetBSD: interrupt.c,v 1.23 1998/02/24 07:38:01 thorpej Exp $ */
 
 /*
@@ -52,10 +52,11 @@
 
 #include <machine/clock.h>
 #include <machine/cpu.h>
-#include <machine/reg.h>
 #include <machine/frame.h>
 #include <machine/intr.h>
+#include <machine/md_var.h>
 #include <machine/pcb.h>
+#include <machine/reg.h>
 #include <machine/sapicvar.h>
 #include <machine/smp.h>
 
@@ -85,21 +86,51 @@ dummy_perf(unsigned long vector, struct trapframe *framep)
 void (*perf_irq)(unsigned long, struct trapframe *) = dummy_perf;
 
 static unsigned int ints[MAXCPU];
+SYSCTL_OPAQUE(_debug, OID_AUTO, ints, CTLFLAG_RW, &ints, sizeof(ints), "IU",
+    "");
+
 static unsigned int clks[MAXCPU];
+#ifdef SMP
+SYSCTL_OPAQUE(_debug, OID_AUTO, clks, CTLFLAG_RW, &clks, sizeof(clks), "IU",
+    "");
+#else
+SYSCTL_INT(_debug, OID_AUTO, clks, CTLFLAG_RW, clks, 0, "");
+#endif
+
+#ifdef SMP
 static unsigned int asts[MAXCPU];
+SYSCTL_OPAQUE(_debug, OID_AUTO, asts, CTLFLAG_RW, &asts, sizeof(asts), "IU",
+    "");
+
 static unsigned int rdvs[MAXCPU];
-SYSCTL_OPAQUE(_debug, OID_AUTO, ints, CTLFLAG_RW, &ints, sizeof(ints), "IU","");
-SYSCTL_OPAQUE(_debug, OID_AUTO, clks, CTLFLAG_RW, &clks, sizeof(clks), "IU","");
-SYSCTL_OPAQUE(_debug, OID_AUTO, asts, CTLFLAG_RW, &asts, sizeof(asts), "IU","");
-SYSCTL_OPAQUE(_debug, OID_AUTO, rdvs, CTLFLAG_RW, &rdvs, sizeof(rdvs), "IU","");
+SYSCTL_OPAQUE(_debug, OID_AUTO, rdvs, CTLFLAG_RW, &rdvs, sizeof(rdvs), "IU",
+    "");
+#endif
 
-static u_int schedclk2;
+static int adjust_edges = 0;
+SYSCTL_INT(_debug, OID_AUTO, clock_adjust_edges, CTLFLAG_RW,
+    &adjust_edges, 0, "Number of times ITC got more than 12.5% behind");
 
-void
+static int adjust_excess = 0;
+SYSCTL_INT(_debug, OID_AUTO, clock_adjust_excess, CTLFLAG_RW,
+    &adjust_excess, 0, "Total number of ignored ITC interrupts");
+
+static int adjust_lost = 0;
+SYSCTL_INT(_debug, OID_AUTO, clock_adjust_lost, CTLFLAG_RW,
+    &adjust_lost, 0, "Total number of lost ITC interrupts");
+
+static int adjust_ticks = 0;
+SYSCTL_INT(_debug, OID_AUTO, clock_adjust_ticks, CTLFLAG_RW,
+    &adjust_ticks, 0, "Total number of ITC interrupts with adjustment");
+
+int
 interrupt(u_int64_t vector, struct trapframe *framep)
 {
 	struct thread *td;
 	volatile struct ia64_interrupt_block *ib = IA64_INTERRUPT_BLOCK;
+	uint64_t adj, clk, itc;
+	int64_t delta;
+	int count;
 
 	td = curthread;
 	atomic_add_int(&td->td_intr_nesting_level, 1);
@@ -115,46 +146,66 @@ interrupt(u_int64_t vector, struct trapframe *framep)
 
 	if (vector == CLOCK_VECTOR) {/* clock interrupt */
 		/* CTR0(KTR_INTR, "clock interrupt"); */
-			
+
 		cnt.v_intr++;
 #ifdef EVCNT_COUNTERS
 		clock_intr_evcnt.ev_count++;
 #else
 		intrcnt[INTRCNT_CLOCK]++;
 #endif
-		critical_enter();
-		/* Rearm so we get the next clock interrupt */
-		ia64_set_itm(ia64_get_itc() + itm_reload);
-#ifdef SMP
 		clks[PCPU_GET(cpuid)]++;
-		/* Only the BSP runs the real clock */
-		if (PCPU_GET(cpuid) == 0) {
-#endif
-			hardclock((struct clockframe *)framep);
-			/* divide hz (1024) by 8 to get stathz (128) */
-			if ((++schedclk2 & 0x7) == 0) {
-				if (profprocs != 0)
-					profclock((struct clockframe *)framep);
-				statclock((struct clockframe *)framep);
-			}
-#ifdef SMP
-		} else {
-			hardclock_process((struct clockframe *)framep);
-			if ((schedclk2 & 0x7) == 0) {
-				if (profprocs != 0)
-					profclock((struct clockframe *)framep);
-				statclock((struct clockframe *)framep);
-			}
+
+		critical_enter();
+
+		adj = PCPU_GET(clockadj);
+		itc = ia64_get_itc();
+		ia64_set_itm(itc + ia64_clock_reload - adj);
+		clk = PCPU_GET(clock);
+		delta = itc - clk;
+		count = 0;
+		while (delta >= ia64_clock_reload) {
+			/* Only the BSP runs the real clock */
+			if (PCPU_GET(cpuid) == 0)
+				hardclock((struct clockframe *)framep);
+			else
+				hardclock_process((struct clockframe *)framep);
+			if (profprocs != 0)
+				profclock((struct clockframe *)framep);
+			statclock((struct clockframe *)framep);
+			delta -= ia64_clock_reload;
+			clk += ia64_clock_reload;
+			if (adj != 0)
+				adjust_ticks++;
+			count++;
 		}
-#endif
+		if (count > 0) {
+			adjust_lost += count - 1;
+			if (delta > (ia64_clock_reload >> 3)) {
+				if (adj == 0)
+					adjust_edges++;
+				adj = ia64_clock_reload >> 4;
+			} else if (delta < (ia64_clock_reload >> 3))
+				adj = 0;
+		} else {
+			adj = 0;
+			adjust_excess++;
+		}
+		PCPU_SET(clock, clk);
+		PCPU_SET(clockadj, adj);
+
 		critical_exit();
+
 #ifdef SMP
 	} else if (vector == ipi_vector[IPI_AST]) {
 		asts[PCPU_GET(cpuid)]++;
 		CTR1(KTR_SMP, "IPI_AST, cpuid=%d", PCPU_GET(cpuid));
 	} else if (vector == ipi_vector[IPI_HIGH_FP]) {
-		if (PCPU_GET(fpcurthread) != NULL)
-			ia64_highfp_save(PCPU_GET(fpcurthread));
+		struct thread *thr = PCPU_GET(fpcurthread);
+		if (thr != NULL) {
+			save_high_fp(&thr->td_pcb->pcb_high_fp);
+			thr->td_pcb->pcb_fpcpu = NULL;
+			PCPU_SET(fpcurthread, NULL);
+		}
 	} else if (vector == ipi_vector[IPI_RENDEZVOUS]) {
 		rdvs[PCPU_GET(cpuid)]++;
 		CTR1(KTR_SMP, "IPI_RENDEZVOUS, cpuid=%d", PCPU_GET(cpuid));
@@ -184,23 +235,7 @@ interrupt(u_int64_t vector, struct trapframe *framep)
 	}
 
 	atomic_subtract_int(&td->td_intr_nesting_level, 1);
-}
-
-int
-badaddr(addr, size)
-	void *addr;
-	size_t size;
-{
-	return(badaddr_read(addr, size, NULL));
-}
-
-int
-badaddr_read(addr, size, rptr)
-	void *addr;
-	size_t size;
-	void *rptr;
-{
-	return (1);		/* XXX implement */
+	return (TRAPF_USERMODE(framep));
 }
 
 /*
@@ -228,23 +263,7 @@ ithds_init(void *dummy)
 SYSINIT(ithds_init, SI_SUB_INTR, SI_ORDER_SECOND, ithds_init, NULL);
 
 static void
-ia64_enable(int vector)
-{
-	int irq, i;
-
-	irq = vector - IA64_HARDWARE_IRQ_BASE;
-	for (i = 0; i < ia64_sapic_count; i++) {
-		struct sapic *sa = ia64_sapics[i];
-		if (irq < sa->sa_base || irq > sa->sa_limit)
-			continue;
-		sapic_enable(sa, irq - sa->sa_base, vector,
-		    (irq < 16) ? SAPIC_TRIGGER_EDGE : SAPIC_TRIGGER_LEVEL,
-		    (irq < 16) ? SAPIC_POLARITY_HIGH : SAPIC_POLARITY_LOW);
-	}
-}
-
-static void
-ia64_send_eoi(int vector)
+ia64_send_eoi(uintptr_t vector)
 {
 	int irq, i;
 
@@ -310,8 +329,7 @@ ia64_setup_intr(const char *name, int irq, driver_intr_t handler, void *arg,
 	if (errcode)
 		return errcode;
 
-	ia64_enable(vector);
-	return 0;
+	return (sapic_enable(irq, vector));
 }
 
 int

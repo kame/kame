@@ -20,9 +20,10 @@
  * the original CMU copyright notice.
  *
  * Version 1.3, Thu Nov 11 12:09:13 MSK 1993
- * $FreeBSD: src/sys/i386/isa/wt.c,v 1.72 2003/03/03 12:15:49 phk Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/isa/wt.c,v 1.75 2003/08/05 20:11:50 bde Exp $");
 
 /*
  * Code for MTERASE added by John Lind (john@starfire.mn.org) 95/09/02.
@@ -156,7 +157,7 @@ typedef struct {
 
 	wtstatus_t error;               /* status of controller */
 
-	unsigned short DATAPORT, CMDPORT, STATPORT, CTLPORT, SDMAPORT, RDMAPORT;
+	unsigned DATAPORT, CMDPORT, STATPORT, CTLPORT, SDMAPORT, RDMAPORT;
 	unsigned char BUSY, NOEXCEP, RESETMASK, RESETVAL;
 	unsigned char ONLINE, RESET, REQUEST, IEN;
 } wtinfo_t;
@@ -249,6 +250,7 @@ static int
 wtattach (struct isa_device *id)
 {
 	wtinfo_t *t = wttab + id->id_unit;
+	dev_t dev;
 
 	id->id_ointr = wtintr;
 	if (t->type == ARCHIVE) {
@@ -260,7 +262,9 @@ wtattach (struct isa_device *id)
 	t->dens = -1;                           /* unknown density */
 	isa_dmainit(t->chan, 1024);
 
-	make_dev(&wt_cdevsw, id->id_unit, 0, 0, 0600, "rwt%d", id->id_unit);
+	dev = make_dev(&wt_cdevsw, id->id_unit,
+	    UID_ROOT, GID_WHEEL, 0600, "rwt%d", id->id_unit);
+	dev->si_drv1 = t;
 	return (1);
 }
 
@@ -279,10 +283,15 @@ static int
 wtopen (dev_t dev, int flag, int fmt, struct thread *td)
 {
 	int u = minor (dev) & WT_UNIT;
-	wtinfo_t *t = wttab + u;
+	wtinfo_t *t;
 	int error;
 
-	if (u >= NWT || t->type == UNKNOWN)
+	if (u >= NWT)
+		return (ENXIO);
+
+	t = dev->si_drv1;
+
+	if (t->type == UNKNOWN)
 		return (ENXIO);
 
 	/* Check that device is not in use */
@@ -361,7 +370,9 @@ static int
 wtclose (dev_t dev, int flags, int fmt, struct thread *td)
 {
 	int u = minor (dev) & WT_UNIT;
-	wtinfo_t *t = wttab + u;
+	wtinfo_t *t;
+
+	t = dev->si_drv1;
 
 	if (u >= NWT || t->type == UNKNOWN)
 		return (ENXIO);
@@ -410,9 +421,10 @@ static int
 wtioctl (dev_t dev, u_long cmd, caddr_t arg, int flags, struct thread *td)
 {
 	int u = minor (dev) & WT_UNIT;
-	wtinfo_t *t = wttab + u;
+	wtinfo_t *t;
 	int error, count, op;
 
+	t = dev->si_drv1;
 	if (u >= NWT || t->type == UNKNOWN)
 		return (ENXIO);
 
@@ -508,9 +520,10 @@ static void
 wtstrategy (struct bio *bp)
 {
 	int u = minor (bp->bio_dev) & WT_UNIT;
-	wtinfo_t *t = wttab + u;
+	wtinfo_t *t;
 	int s;
 
+	t = bp->bio_dev->si_drv1;
 	bp->bio_resid = bp->bio_bcount;
 	if (u >= NWT || t->type == UNKNOWN) {
 		bp->bio_error = ENXIO;

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_tireg.h,v 1.26 2002/11/09 12:55:07 alfred Exp $
+ * $FreeBSD: src/sys/pci/if_tireg.h,v 1.27 2003/11/14 19:00:32 sam Exp $
  */
 
 /*
@@ -1030,6 +1030,7 @@ struct ti_softc {
 
 #define	TI_LOCK(_sc)		mtx_lock(&(_sc)->ti_mtx)
 #define	TI_UNLOCK(_sc)		mtx_unlock(&(_sc)->ti_mtx)
+#define	TI_LOCK_ASSERT(_sc)	mtx_assert(&(_sc)->ti_mtx, MA_OWNED)
 
 /*
  * Microchip Technology 24Cxx EEPROM control bytes

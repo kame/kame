@@ -24,11 +24,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_dummynet.c,v 1.63.2.1 2003/06/04 02:19:36 ticso Exp $
+ * $FreeBSD: src/sys/netinet/ip_dummynet.c,v 1.75 2003/12/06 09:01:25 emax Exp $
  */
 
-#define DEB(x)
-#define DDB(x)	x
+#define	DUMMYNET_DEBUG
 
 /*
  * This module implements IP dummynet, a bandwidth limiter/delay emulator
@@ -40,10 +39,7 @@
  *  + scheduler and dummynet functions;
  *  + configuration and initialization.
  *
- * NOTA BENE: critical sections are protected by splimp()/splx()
- *    pairs. One would think that splnet() is enough as for most of
- *    the netinet code, but it is not so because when used with
- *    bridging, dummynet is invoked at splimp().
+ * NOTA BENE: critical sections are protected by the "dummynet lock".
  *
  * Most important Changes:
  *
@@ -123,7 +119,7 @@ static void ready_event(struct dn_flow_queue *q);
 static struct dn_pipe *all_pipes = NULL ;	/* list of all pipes */
 static struct dn_flow_set *all_flow_sets = NULL ;/* list of all flow_sets */
 
-static struct callout_handle dn_timeout;
+static struct callout dn_timeout;
 
 #ifdef SYSCTL_NODE
 SYSCTL_NODE(_net_inet_ip, OID_AUTO, dummynet,
@@ -153,10 +149,34 @@ SYSCTL_INT(_net_inet_ip_dummynet, OID_AUTO, red_max_pkt_size,
 	CTLFLAG_RD, &red_max_pkt_size, 0, "RED Max packet size");
 #endif
 
+#ifdef DUMMYNET_DEBUG
+int	dummynet_debug = 0;
+#ifdef SYSCTL_NODE
+SYSCTL_INT(_net_inet_ip_dummynet, OID_AUTO, debug, CTLFLAG_RW, &dummynet_debug,
+	    0, "control debugging printfs");
+#endif
+#define	DPRINTF(X)	if (dummynet_debug) printf X
+#else
+#define	DPRINTF(X)
+#endif
+
+static struct mtx dummynet_mtx;
+/*
+ * NB: Recursion is needed to deal with re-entry via ICMP.  That is,
+ *     a packet may be dispatched via ip_input from dummynet_io and
+ *     re-enter through ip_output.  Yech.
+ */
+#define	DUMMYNET_LOCK_INIT() \
+	mtx_init(&dummynet_mtx, "dummynet", NULL, MTX_DEF | MTX_RECURSE)
+#define	DUMMYNET_LOCK_DESTROY()	mtx_destroy(&dummynet_mtx)
+#define	DUMMYNET_LOCK()		mtx_lock(&dummynet_mtx)
+#define	DUMMYNET_UNLOCK()	mtx_unlock(&dummynet_mtx)
+#define	DUMMYNET_LOCK_ASSERT()	mtx_assert(&dummynet_mtx, MA_OWNED)
+
 static int config_pipe(struct dn_pipe *p);
 static int ip_dn_ctl(struct sockopt *sopt);
 
-static void rt_unref(struct rtentry *);
+static void rt_unref(struct rtentry *, const char *);
 static void dummynet(void *);
 static void dummynet_flush(void);
 void dummynet_drain(void);
@@ -166,14 +186,16 @@ static void dn_rule_delete(void *);
 int if_tx_rdy(struct ifnet *ifp);
 
 static void
-rt_unref(struct rtentry *rt)
+rt_unref(struct rtentry *rt, const char *where)
 {
     if (rt == NULL)
 	return ;
-    if (rt->rt_refcnt <= 0)
-	printf("dummynet: warning, refcnt now %ld, decreasing\n",
-	    rt->rt_refcnt);
-    RTFREE(rt);
+    RT_LOCK(rt);
+    if (rt->rt_refcnt <= 0) {
+	printf("dummynet: warning, refcnt now %ld, decreasing (%s)\n",
+	    rt->rt_refcnt, where);
+    }
+    RTFREE_LOCKED(rt);
 }
 
 /*
@@ -201,14 +223,14 @@ heap_init(struct dn_heap *h, int new_size)
     struct dn_heap_entry *p;
 
     if (h->size >= new_size ) {
-	printf("dummynet: heap_init, Bogus call, have %d want %d\n",
+	printf("dummynet: %s, Bogus call, have %d want %d\n", __func__,
 		h->size, new_size);
 	return 0 ;
     }
     new_size = (new_size + HEAP_INCREMENT ) & ~HEAP_INCREMENT ;
     p = malloc(new_size * sizeof(*p), M_DUMMYNET, M_NOWAIT);
     if (p == NULL) {
-	printf("dummynet: heap_init, resize %d failed\n", new_size );
+	printf("dummynet: %s, resize %d failed\n", __func__, new_size );
 	return 1 ; /* error */
     }
     if (h->size > 0) {
@@ -405,6 +427,8 @@ transmit_event(struct dn_pipe *pipe)
 {
     struct dn_pkt *pkt ;
 
+    DUMMYNET_LOCK_ASSERT();
+
     while ( (pkt = pipe->head) && DN_KEY_LEQ(pkt->output_time, curr_time) ) {
 	/*
 	 * first unlink, then call procedures, since ip_input() can invoke
@@ -412,6 +436,8 @@ transmit_event(struct dn_pipe *pipe)
 	 */
 	pipe->head = DN_NEXT(pkt) ;
 
+	/* XXX: drop the lock for now to avoid LOR's */
+	DUMMYNET_UNLOCK();
 	/*
 	 * The actual mbuf is preceded by a struct dn_pkt, resembling an mbuf
 	 * (NOT A REAL one, just a small block of malloc'ed memory) with
@@ -424,7 +450,7 @@ transmit_event(struct dn_pipe *pipe)
 	switch (pkt->dn_dir) {
 	case DN_TO_IP_OUT:
 	    (void)ip_output((struct mbuf *)pkt, NULL, NULL, 0, NULL, NULL);
-	    rt_unref (pkt->ro.ro_rt) ;
+	    rt_unref (pkt->ro.ro_rt, __func__) ;
 	    break ;
 
 	case DN_TO_IP_IN :
@@ -434,6 +460,7 @@ transmit_event(struct dn_pipe *pipe)
 	case DN_TO_BDG_FWD :
 	    if (!BDG_LOADED) {
 		/* somebody unloaded the bridge module. Drop pkt */
+		/* XXX rate limit */
 		printf("dummynet: dropping bridged packet trapped in pipe\n");
 		m_freem(pkt->dn_m);
 		break;
@@ -454,9 +481,6 @@ transmit_event(struct dn_pipe *pipe)
 		 * it has not consumed it.
 		 */
 		if (pkt->dn_dir == DN_TO_BDG_FWD) {
-		    /*
-		     * same as ether_input, make eh be a pointer into the mbuf
-		     */
 		    m = bdg_forward_ptr(m, pkt->ifp);
 		    if (m)
 			m_freem(m);
@@ -474,6 +498,7 @@ transmit_event(struct dn_pipe *pipe)
 	    break ;
 	}
 	free(pkt, M_DUMMYNET);
+	DUMMYNET_LOCK();
     }
     /* if there are leftover packets, put into the heap for next event */
     if ( (pkt = pipe->head) )
@@ -527,6 +552,8 @@ ready_event(struct dn_flow_queue *q)
     struct dn_pkt *pkt;
     struct dn_pipe *p = q->fs->pipe ;
     int p_was_empty ;
+
+    DUMMYNET_LOCK_ASSERT();
 
     if (p == NULL) {
 	printf("dummynet: ready_event- pipe is gone\n");
@@ -592,14 +619,16 @@ ready_event_wfq(struct dn_pipe *p)
     struct dn_heap *sch = &(p->scheduler_heap);
     struct dn_heap *neh = &(p->not_eligible_heap) ;
 
+    DUMMYNET_LOCK_ASSERT();
+
     if (p->if_name[0] == 0) /* tx clock is simulated */
 	p->numbytes += ( curr_time - p->sched_time ) * p->bandwidth;
     else { /* tx clock is for real, the ifq must be empty or this is a NOP */
 	if (p->ifp && p->ifp->if_snd.ifq_head != NULL)
 	    return ;
 	else {
-	    DEB(printf("dummynet: pipe %d ready from %s --\n",
-		p->pipe_nr, p->if_name);)
+	    DPRINTF(("dummynet: pipe %d ready from %s --\n",
+		p->pipe_nr, p->if_name));
 	}
     }
 
@@ -708,7 +737,6 @@ dummynet(void * __unused unused)
 {
     void *p ; /* generic parameter to handler */
     struct dn_heap *h ;
-    int s ;
     struct dn_heap *heaps[3];
     int i;
     struct dn_pipe *pe ;
@@ -716,14 +744,15 @@ dummynet(void * __unused unused)
     heaps[0] = &ready_heap ;		/* fixed-rate queues */
     heaps[1] = &wfq_ready_heap ;	/* wfq queues */
     heaps[2] = &extract_heap ;		/* delay line */
-    s = splimp(); /* see note on top, splnet() is not enough */
+
+    DUMMYNET_LOCK();
     curr_time++ ;
     for (i=0; i < 3 ; i++) {
 	h = heaps[i];
 	while (h->elements > 0 && DN_KEY_LEQ(h->p[0].key, curr_time) ) {
-	    DDB(if (h->p[0].key > curr_time)
+	    if (h->p[0].key > curr_time)
 		printf("dummynet: warning, heap %d is %d ticks late\n",
-		    i, (int)(curr_time - h->p[0].key));)
+		    i, (int)(curr_time - h->p[0].key));
 	    p = h->p[0].object ; /* store a copy before heap_extract */
 	    heap_extract(h, NULL); /* need to extract before processing */
 	    if (i == 0)
@@ -749,8 +778,9 @@ dummynet(void * __unused unused)
 	    q->S = q->F + 1 ; /* mark timestamp as invalid */
 	    pe->sum -= q->fs->weight ;
 	}
-    splx(s);
-    dn_timeout = timeout(dummynet, NULL, 1);
+    DUMMYNET_UNLOCK();
+
+    callout_reset(&dn_timeout, 1, dummynet, NULL);
 }
 
 /*
@@ -761,25 +791,27 @@ if_tx_rdy(struct ifnet *ifp)
 {
     struct dn_pipe *p;
 
+    DUMMYNET_LOCK();
     for (p = all_pipes; p ; p = p->next )
 	if (p->ifp == ifp)
 	    break ;
     if (p == NULL) {
-	char buf[32];
-	sprintf(buf, "%s%d",ifp->if_name, ifp->if_unit);
 	for (p = all_pipes; p ; p = p->next )
-	    if (!strcmp(p->if_name, buf) ) {
+	    if (!strcmp(p->if_name, ifp->if_xname) ) {
 		p->ifp = ifp ;
-		DEB(printf("dummynet: ++ tx rdy from %s (now found)\n", buf);)
+		DPRINTF(("dummynet: ++ tx rdy from %s (now found)\n",
+			ifp->if_xname));
 		break ;
 	    }
     }
     if (p != NULL) {
-	DEB(printf("dummynet: ++ tx rdy from %s%d - qlen %d\n", ifp->if_name,
-		ifp->if_unit, ifp->if_snd.ifq_len);)
+	DPRINTF(("dummynet: ++ tx rdy from %s - qlen %d\n", ifp->if_xname,
+		ifp->if_snd.ifq_len));
 	p->numbytes = 0 ; /* mark ready for I/O */
 	ready_event_wfq(p);
     }
+    DUMMYNET_UNLOCK();
+
     return 0;
 }
 
@@ -880,11 +912,11 @@ find_queue(struct dn_flow_set *fs, struct ipfw_flow_id *id)
 	for (prev=NULL, q = fs->rq[i] ; q ; ) {
 	    search_steps++;
 	    if (id->dst_ip == q->id.dst_ip &&
-		id->src_ip == q->id.src_ip &&
-		id->dst_port == q->id.dst_port &&
-		id->src_port == q->id.src_port &&
-		id->proto == q->id.proto &&
-		id->flags == q->id.flags)
+		    id->src_ip == q->id.src_ip &&
+		    id->dst_port == q->id.dst_port &&
+		    id->src_port == q->id.src_port &&
+		    id->proto == q->id.proto &&
+		    id->flags == q->id.flags)
 		break ; /* found */
 	    else if (pipe_expire && q->head == NULL && q->S == q->F+1 ) {
 		/* entry is idle and not in any heap, expire it */
@@ -940,7 +972,7 @@ red_drops(struct dn_flow_set *fs, struct dn_flow_queue *q, int len)
     /* queue in bytes or packets ? */
     u_int q_size = (fs->flags_fs & DN_QSIZE_IS_BYTES) ? q->len_bytes : q->len;
 
-    DEB(printf("\ndymmynet: %d q: %2u ", (int) curr_time, q_size);)
+    DPRINTF(("\ndummynet: %d q: %2u ", (int) curr_time, q_size));
 
     /* average queue size estimation */
     if (q_size != 0) {
@@ -966,7 +998,7 @@ red_drops(struct dn_flow_set *fs, struct dn_flow_queue *q, int len)
 		    SCALE_MUL(q->avg, fs->w_q_lookup[t]) : 0;
 	}
     }
-    DEB(printf("dummynet: avg: %u ", SCALE_VAL(q->avg));)
+    DPRINTF(("dummynet: avg: %u ", SCALE_VAL(q->avg)));
 
     /* should i drop ? */
 
@@ -985,7 +1017,7 @@ red_drops(struct dn_flow_set *fs, struct dn_flow_queue *q, int len)
 	    p_b = SCALE_MUL((int64_t) fs->c_3, (int64_t) q->avg) - fs->c_4;
 	} else {
 	    q->count = -1;
-	    DEB(printf("dummynet: - drop"););
+	    DPRINTF(("dummynet: - drop"));
 	    return 1 ;
 	}
     } else if (q->avg > fs->min_th) {
@@ -1007,7 +1039,7 @@ red_drops(struct dn_flow_set *fs, struct dn_flow_queue *q, int len)
 	 */
 	if (SCALE_MUL(p_b, SCALE((int64_t) q->count)) > q->random) {
 	    q->count = 0;
-	    DEB(printf("dummynet: - red drop");)
+	    DPRINTF(("dummynet: - red drop"));
 	    /* after a drop we calculate a new random value */
 	    q->random = random() & 0xffff;
 	    return 1;    /* drop */
@@ -1089,7 +1121,6 @@ dummynet_io(struct mbuf *m, int pipe_nr, int dir, struct ip_fw_args *fwa)
     struct dn_pipe *pipe ;
     u_int64_t len = m->m_pkthdr.len ;
     struct dn_flow_queue *q = NULL ;
-    int s = splimp();
     int is_pipe;
 #if IPFW2
     ipfw_insn *cmd = fwa->rule->cmd + fwa->rule->act_ofs;
@@ -1103,6 +1134,7 @@ dummynet_io(struct mbuf *m, int pipe_nr, int dir, struct ip_fw_args *fwa)
 
     pipe_nr &= 0xffff ;
 
+    DUMMYNET_LOCK();
     /*
      * This is a dummynet rule, so we expect an O_PIPE or O_QUEUE rule.
      */
@@ -1163,11 +1195,13 @@ dummynet_io(struct mbuf *m, int pipe_nr, int dir, struct ip_fw_args *fwa)
 	 * a pointer into *ro so it needs to be updated.
 	 */
 	pkt->ro = *(fwa->ro);
-	if (fwa->ro->ro_rt)
-	    fwa->ro->ro_rt->rt_refcnt++ ;
+	if (pkt->ro.ro_rt) {
+	    RT_LOCK(pkt->ro.ro_rt);
+	    RT_ADDREF(pkt->ro.ro_rt) ;
+	    RT_UNLOCK(pkt->ro.ro_rt);
+	}
 	if (fwa->dst == (struct sockaddr_in *)&fwa->ro->ro_dst) /* dst points into ro */
 	    fwa->dst = (struct sockaddr_in *)&(pkt->ro.ro_dst) ;
-
 	pkt->dn_dst = fwa->dst;
 	pkt->flags = fwa->flags;
     }
@@ -1243,21 +1277,21 @@ dummynet_io(struct mbuf *m, int pipe_nr, int dir, struct ip_fw_args *fwa)
 	    if (pipe->numbytes >= 0) { /* pipe is idle */
 		if (pipe->scheduler_heap.elements != 1)
 		    printf("dummynet: OUCH! pipe should have been idle!\n");
-		DEB(printf("dummynet: waking up pipe %d at %d\n",
-			pipe->pipe_nr, (int)(q->F >> MY_M)); )
+		DPRINTF(("dummynet: waking up pipe %d at %d\n",
+			pipe->pipe_nr, (int)(q->F >> MY_M)));
 		pipe->sched_time = curr_time ;
 		ready_event_wfq(pipe);
 	    }
 	}
     }
 done:
-    splx(s);
+    DUMMYNET_UNLOCK();
     return 0;
 
 dropit:
-    splx(s);
     if (q)
 	q->drops++ ;
+    DUMMYNET_UNLOCK();
     m_freem(m);
     return ( (fs && (fs->flags_fs & DN_NOERROR)) ? 0 : ENOBUFS);
 }
@@ -1268,7 +1302,7 @@ dropit:
  */
 #define DN_FREE_PKT(pkt)	{		\
 	struct dn_pkt *n = pkt ;		\
-	rt_unref ( n->ro.ro_rt ) ;		\
+	rt_unref ( n->ro.ro_rt, __func__ ) ;	\
 	m_freem(n->dn_m);			\
 	pkt = DN_NEXT(n) ;			\
 	free(n, M_DUMMYNET) ;	}
@@ -1285,6 +1319,8 @@ purge_flow_set(struct dn_flow_set *fs, int all)
     struct dn_pkt *pkt ;
     struct dn_flow_queue *q, *qn ;
     int i ;
+
+    DUMMYNET_LOCK_ASSERT();
 
     for (i = 0 ; i <= fs->rq_size ; i++ ) {
 	for (q = fs->rq[i] ; q ; q = qn ) {
@@ -1337,10 +1373,8 @@ dummynet_flush()
 {
     struct dn_pipe *curr_p, *p ;
     struct dn_flow_set *fs, *curr_fs;
-    int s ;
 
-    s = splimp() ;
-
+    DUMMYNET_LOCK();
     /* remove all references to pipes ...*/
     flush_pipe_ptrs(NULL);
     /* prevent future matches... */
@@ -1352,7 +1386,7 @@ dummynet_flush()
     heap_free(&ready_heap);
     heap_free(&wfq_ready_heap);
     heap_free(&extract_heap);
-    splx(s) ;
+
     /*
      * Now purge all queued pkts and delete all pipes
      */
@@ -1368,6 +1402,7 @@ dummynet_flush()
 	p = p->next ;
 	free(curr_p, M_DUMMYNET);
     }
+    DUMMYNET_UNLOCK();
 }
 
 
@@ -1396,6 +1431,7 @@ dn_rule_delete(void *r)
     struct dn_pkt *pkt ;
     struct dn_flow_set *fs ;
 
+    DUMMYNET_LOCK();
     /*
      * If the rule references a queue (dn_flow_set), then scan
      * the flow set, otherwise scan pipes. Should do either, but doing
@@ -1410,6 +1446,7 @@ dn_rule_delete(void *r)
 	    if (pkt->rule == r)
 		pkt->rule = ip_fw_default_rule ;
     }
+    DUMMYNET_UNLOCK();
 }
 
 /*
@@ -1519,7 +1556,7 @@ set_fs_parms(struct dn_flow_set *x, struct dn_flow_set *src)
 static int
 config_pipe(struct dn_pipe *p)
 {
-    int i, s;
+    int i, r;
     struct dn_flow_set *pfs = &(p->fs);
     struct dn_flow_queue *q;
 
@@ -1537,6 +1574,8 @@ config_pipe(struct dn_pipe *p)
 	return EINVAL ;
     if (p->pipe_nr != 0) { /* this is a pipe */
 	struct dn_pipe *x, *a, *b;
+
+	DUMMYNET_LOCK();
 	/* locate pipe */
 	for (a = NULL , b = all_pipes ; b && b->pipe_nr < p->pipe_nr ;
 		 a = b , b = b->next) ;
@@ -1555,15 +1594,12 @@ config_pipe(struct dn_pipe *p)
 	    x->idle_heap.offset=OFFSET_OF(struct dn_flow_queue, heap_pos);
 	} else {
 	    x = b;
-	    s = splimp();
 	    /* Flush accumulated credit for all queues */
 	    for (i = 0; i <= x->fs.rq_size; i++)
 		for (q = x->fs.rq[i]; q; q = q->next)
 		    q->numbytes = 0;
-	    splx(s);
 	}
 
-	s = splimp();
 	x->bandwidth = p->bandwidth ;
 	x->numbytes = 0; /* just in case... */
 	bcopy(p->if_name, x->if_name, sizeof(p->if_name) );
@@ -1573,10 +1609,11 @@ config_pipe(struct dn_pipe *p)
 
 
 	if ( x->fs.rq == NULL ) { /* a new pipe */
-	    s = alloc_hash(&(x->fs), pfs) ;
-	    if (s) {
+	    r = alloc_hash(&(x->fs), pfs) ;
+	    if (r) {
+		DUMMYNET_UNLOCK();
 		free(x, M_DUMMYNET);
-		return s ;
+		return r ;
 	    }
 	    x->next = b ;
 	    if (a == NULL)
@@ -1584,10 +1621,11 @@ config_pipe(struct dn_pipe *p)
 	    else
 		a->next = x ;
 	}
-	splx(s);
+	DUMMYNET_UNLOCK();
     } else { /* config queue */
 	struct dn_flow_set *x, *a, *b ;
 
+	DUMMYNET_LOCK();
 	/* locate flow_set */
 	for (a=NULL, b=all_flow_sets ; b && b->fs_nr < pfs->fs_nr ;
 		 a = b , b = b->next) ;
@@ -1597,6 +1635,7 @@ config_pipe(struct dn_pipe *p)
 		return EINVAL ;
 	    x = malloc(sizeof(struct dn_flow_set), M_DUMMYNET, M_NOWAIT|M_ZERO);
 	    if (x == NULL) {
+		DUMMYNET_UNLOCK();
 		printf("dummynet: no memory for new flow_set\n");
 		return ENOSPC;
 	    }
@@ -1613,14 +1652,14 @@ config_pipe(struct dn_pipe *p)
 		return EINVAL ;
 	    x = b;
 	}
-	s = splimp();
 	set_fs_parms(x, pfs);
 
 	if ( x->rq == NULL ) { /* a new flow_set */
-	    s = alloc_hash(x, pfs) ;
-	    if (s) {
+	    r = alloc_hash(x, pfs) ;
+	    if (r) {
+		DUMMYNET_UNLOCK();
 		free(x, M_DUMMYNET);
-		return s ;
+		return r ;
 	    }
 	    x->next = b;
 	    if (a == NULL)
@@ -1628,7 +1667,7 @@ config_pipe(struct dn_pipe *p)
 	    else
 		a->next = x;
 	}
-	splx(s);
+	DUMMYNET_UNLOCK();
     }
     return 0 ;
 }
@@ -1681,6 +1720,8 @@ dummynet_drain()
     struct dn_pipe *p;
     struct dn_pkt *pkt;
 
+    DUMMYNET_LOCK_ASSERT();
+
     heap_free(&ready_heap);
     heap_free(&wfq_ready_heap);
     heap_free(&extract_heap);
@@ -1702,8 +1743,6 @@ dummynet_drain()
 static int
 delete_pipe(struct dn_pipe *p)
 {
-    int s ;
-
     if (p->pipe_nr == 0 && p->fs.fs_nr == 0)
 	return EINVAL ;
     if (p->pipe_nr != 0 && p->fs.fs_nr != 0)
@@ -1712,13 +1751,14 @@ delete_pipe(struct dn_pipe *p)
 	struct dn_pipe *a, *b;
 	struct dn_flow_set *fs;
 
+	DUMMYNET_LOCK();
 	/* locate pipe */
 	for (a = NULL , b = all_pipes ; b && b->pipe_nr < p->pipe_nr ;
 		 a = b , b = b->next) ;
-	if (b == NULL || (b->pipe_nr != p->pipe_nr) )
+	if (b == NULL || (b->pipe_nr != p->pipe_nr) ) {
+	    DUMMYNET_UNLOCK();
 	    return EINVAL ; /* not found */
-
-	s = splimp() ;
+	}
 
 	/* unlink from list of pipes */
 	if (a == NULL)
@@ -1741,18 +1781,21 @@ delete_pipe(struct dn_pipe *p)
 	/* remove reference to here from extract_heap and wfq_ready_heap */
 	pipe_remove_from_heap(&extract_heap, b);
 	pipe_remove_from_heap(&wfq_ready_heap, b);
-	splx(s);
+	DUMMYNET_UNLOCK();
+
 	free(b, M_DUMMYNET);
     } else { /* this is a WF2Q queue (dn_flow_set) */
 	struct dn_flow_set *a, *b;
 
+	DUMMYNET_LOCK();
 	/* locate set */
 	for (a = NULL, b = all_flow_sets ; b && b->fs_nr < p->fs.fs_nr ;
 		 a = b , b = b->next) ;
-	if (b == NULL || (b->fs_nr != p->fs.fs_nr) )
+	if (b == NULL || (b->fs_nr != p->fs.fs_nr) ) {
+	    DUMMYNET_UNLOCK();
 	    return EINVAL ; /* not found */
+	}
 
-	s = splimp() ;
 	if (a == NULL)
 	    all_flow_sets = b->next ;
 	else
@@ -1770,7 +1813,7 @@ delete_pipe(struct dn_pipe *p)
 #endif
 	}
 	purge_flow_set(b, 1);
-	splx(s);
+	DUMMYNET_UNLOCK();
     }
     return 0 ;
 }
@@ -1783,6 +1826,8 @@ dn_copy_set(struct dn_flow_set *set, char *bp)
 {
     int i, copied = 0 ;
     struct dn_flow_queue *q, *qp = (struct dn_flow_queue *)bp;
+
+    DUMMYNET_LOCK_ASSERT();
 
     for (i = 0 ; i <= set->rq_size ; i++)
 	for (q = set->rq[i] ; q ; q = q->next, qp++ ) {
@@ -1812,9 +1857,10 @@ dummynet_get(struct sockopt *sopt)
     size_t size ;
     struct dn_flow_set *set ;
     struct dn_pipe *p ;
-    int s, error=0 ;
+    int error=0 ;
 
-    s = splimp();
+    /* XXX lock held too long */
+    DUMMYNET_LOCK();
     /*
      * compute size of data structures: list of pipes and flow_sets.
      */
@@ -1826,7 +1872,7 @@ dummynet_get(struct sockopt *sopt)
 	    set->rq_elements * sizeof(struct dn_flow_queue);
     buf = malloc(size, M_TEMP, M_NOWAIT);
     if (buf == 0) {
-	splx(s);
+	DUMMYNET_UNLOCK();
 	return ENOBUFS ;
     }
     for (p = all_pipes, bp = buf ; p ; p = p->next ) {
@@ -1865,7 +1911,8 @@ dummynet_get(struct sockopt *sopt)
 	bp += sizeof( *set ) ;
 	bp = dn_copy_set( set, bp );
     }
-    splx(s);
+    DUMMYNET_UNLOCK();
+
     error = sooptcopyout(sopt, buf, size);
     free(buf, M_TEMP);
     return error ;
@@ -1928,7 +1975,11 @@ ip_dn_ctl(struct sockopt *sopt)
 static void
 ip_dn_init(void)
 {
-    printf("DUMMYNET initialized (011031)\n");
+    if (bootverbose)
+	    printf("DUMMYNET initialized (011031)\n");
+
+    DUMMYNET_LOCK_INIT();
+
     all_pipes = NULL ;
     all_flow_sets = NULL ;
     ready_heap.size = ready_heap.elements = 0 ;
@@ -1939,27 +1990,40 @@ ip_dn_init(void)
 
     extract_heap.size = extract_heap.elements = 0 ;
     extract_heap.offset = 0 ;
+
     ip_dn_ctl_ptr = ip_dn_ctl;
     ip_dn_io_ptr = dummynet_io;
     ip_dn_ruledel_ptr = dn_rule_delete;
-    bzero(&dn_timeout, sizeof(struct callout_handle));
-    dn_timeout = timeout(dummynet, NULL, 1);
+
+    callout_init(&dn_timeout, debug_mpsafenet ? CALLOUT_MPSAFE : 0);
+    callout_reset(&dn_timeout, 1, dummynet, NULL);
 }
+
+#ifdef KLD_MODULE
+static void
+ip_dn_destroy(void)
+{
+    ip_dn_ctl_ptr = NULL;
+    ip_dn_io_ptr = NULL;
+    ip_dn_ruledel_ptr = NULL;
+
+    callout_stop(&dn_timeout);
+    dummynet_flush();
+
+    DUMMYNET_LOCK_DESTROY();
+}
+#endif /* KLD_MODULE */
 
 static int
 dummynet_modevent(module_t mod, int type, void *data)
 {
-	int s;
 	switch (type) {
 	case MOD_LOAD:
-		s = splimp();
 		if (DUMMYNET_LOADED) {
-		    splx(s);
 		    printf("DUMMYNET already loaded\n");
 		    return EEXIST ;
 		}
 		ip_dn_init();
-		splx(s);
 		break;
 
 	case MOD_UNLOAD:
@@ -1967,13 +2031,7 @@ dummynet_modevent(module_t mod, int type, void *data)
 		printf("dummynet statically compiled, cannot unload\n");
 		return EINVAL ;
 #else
-		s = splimp();
-		untimeout(dummynet, NULL, dn_timeout);
-		dummynet_flush();
-		ip_dn_ctl_ptr = NULL;
-		ip_dn_io_ptr = NULL;
-		ip_dn_ruledel_ptr = NULL;
-		splx(s);
+		ip_dn_destroy();
 #endif
 		break ;
 	default:

@@ -27,7 +27,7 @@
 #include <dev/sound/pcm/ac97.h>
 #include <dev/sound/pcm/ac97_patch.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/ac97_patch.c,v 1.1 2003/01/25 16:54:05 orion Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/ac97_patch.c,v 1.2 2003/08/21 15:44:55 orion Exp $");
 
 void ad1886_patch(struct ac97_info* codec)
 {
@@ -40,3 +40,9 @@ void ad1886_patch(struct ac97_info* codec)
 	 */
 	ac97_wrcd(codec, AC97_AD_JACK_SPDIF, 0x0010);
 }
+
+void ad198x_patch(struct ac97_info* codec)
+{
+	ac97_wrcd(codec, 0x76, ac97_rdcd(codec, 0x76) | 0x0420);
+}
+

@@ -26,14 +26,14 @@
  *
  *	isic - I4B Siemens ISDN Chipset Driver for ELSA MicroLink ISDN/PCI
  *	==================================================================
- *
- * $FreeBSD: src/sys/i4b/layer1/isic/i4b_elsa_qs1p.c,v 1.8 2002/09/02 00:52:08 brooks Exp $
- *
  *      last edit-date: [Wed Jan 24 09:09:28 2001]
  *
  *	Note: ELSA Quickstep 1000pro PCI = ELSA MicroLink ISDN/PCI
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_elsa_qs1p.c,v 1.11 2003/09/02 17:30:39 jhb Exp $");
 
 #include "opt_i4b.h"
 
@@ -50,20 +50,20 @@
 #include <sys/bus.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <machine/i4b_ioctl.h>
 
 #include <i4b/layer1/isic/i4b_isic.h>
 #include <i4b/layer1/isic/i4b_ipac.h>
 
-#define MEM0_MAPOFF	0
-#define PORT0_MAPOFF	4
-#define PORT1_MAPOFF	12
+#define MEM0_BAR	0
+#define PORT0_BAR	1
+#define PORT1_BAR	3
 
-#define ELSA_PORT0_MAPOFF	(PCIR_MAPS+PORT0_MAPOFF)
-#define ELSA_PORT1_MAPOFF	(PCIR_MAPS+PORT1_MAPOFF)
+#define ELSA_PORT0_MAPOFF	PCIR_BAR(PORT0_BAR)
+#define ELSA_PORT1_MAPOFF	PCIR_BAR(PORT1_BAR)
 
 #define PCI_QS1000_DID	0x1000
 #define PCI_QS1000_VID	0x1048

@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/q2110_subr.c,v 1.7 2000/10/30 07:42:05 phk Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ---------------------
  *
  * ITU-T Q.2110 - Subroutines
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/q2110_subr.c,v 1.8 2003/06/11 07:22:30 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -49,11 +47,6 @@
 #include <netatm/uni/sscop.h>
 #include <netatm/uni/sscop_misc.h>
 #include <netatm/uni/sscop_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/q2110_subr.c,v 1.7 2000/10/30 07:42:05 phk Exp $");
-#endif
-
 
 /*
  * Conditionally Clear Transmission Queues

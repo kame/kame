@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/linux/Makefile,v 1.61 2003/02/03 17:43:20 ume Exp $
+# $FreeBSD: src/sys/modules/linux/Makefile,v 1.62 2003/11/19 05:08:26 imp Exp $
 
 MAINTAINER=	emulation@FreeBSD.org
 
@@ -8,7 +8,7 @@ KMOD=	linux
 SRCS=	linux_dummy.c linux_file.c linux_getcwd.c linux_ioctl.c linux_ipc.c \
 	linux_machdep.c linux_mib.c linux_misc.c linux_signal.c linux_socket.c \
 	linux_stats.c linux_sysctl.c linux_sysent.c linux_sysvec.c \
-	linux_util.c opt_compat.h opt_inet6.h opt_linux.h opt_mac.h \
+	linux_util.c opt_compat.h opt_inet6.h opt_mac.h \
 	opt_vmpage.h vnode_if.h
 OBJS=	linux_locore.o
 

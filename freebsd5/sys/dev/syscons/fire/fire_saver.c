@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/fire/fire_saver.c,v 1.9 2002/03/23 12:36:18 amorita Exp $
+ * $FreeBSD: src/sys/dev/syscons/fire/fire_saver.c,v 1.10 2003/07/21 13:04:54 nyan Exp $
  */
 
 /*
@@ -105,7 +105,7 @@ fire_update(video_adapter_t *adp)
 static int
 fire_saver(video_adapter_t *adp, int blank)
 {
-	int i, pl;
+	int pl;
 
 	if (blank) {
 		/* switch to graphics mode */
@@ -118,10 +118,7 @@ fire_saver(video_adapter_t *adp, int blank)
 			banksize = adp->va_window_size;
 			bpsl = adp->va_line_width;
 			splx(pl);
-			for (i = 0; i < bpsl * scrh; i += banksize) {
-				set_origin(adp, i);
-				bzero(vid, banksize);
-			}
+			(*vidsw[adp->va_index]->clear)(adp);
 		}
 		fire_update(adp);
 	} else {

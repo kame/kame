@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)union.h	8.9 (Berkeley) 12/10/94
- * $FreeBSD: src/sys/fs/unionfs/union.h,v 1.26 2002/10/14 03:20:34 mckusick Exp $
+ * $FreeBSD: src/sys/fs/unionfs/union.h,v 1.27 2003/06/14 23:27:29 das Exp $
  */
 
 #define UNMNT_ABOVE	0x0001		/* Target appears above mount point */
@@ -108,7 +108,8 @@ extern int union_allocvp(struct vnode **, struct mount *,
 				struct componentname *, struct vnode *,
 				struct vnode *, int);
 extern int union_freevp(struct vnode *);
-extern struct vnode *union_dircache(struct vnode *, struct thread *);
+extern struct vnode *union_dircache_get(struct vnode *, struct thread *);
+extern void union_dircache_free(struct union_node *);
 extern int union_copyup(struct union_node *, int, struct ucred *,
 				struct thread *);
 extern int union_dowhiteout(struct union_node *, struct ucred *,

@@ -27,9 +27,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/geom/geom_gpt.c,v 1.22 2003/05/02 08:33:26 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/geom/geom_gpt.c,v 1.26 2003/06/11 06:49:15 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -111,11 +112,10 @@ g_gpt_taste(struct g_class *mp, struct g_provider *pp, int insist)
 	struct g_consumer *cp;
 	struct g_geom *gp;
 	struct g_gpt_softc *gs;
-	struct g_slicer *gsp;
 	u_char *buf, *mbr;
 	struct gpt_ent *ent;
 	struct gpt_hdr *hdr;
-	u_int i, npart, secsz, tblsz;
+	u_int i, secsz, tblsz;
 	int error, ps;
 
 	g_trace(G_T_TOPOLOGY, "g_gpt_taste(%s,%s)", mp->name, pp->name);
@@ -131,13 +131,11 @@ g_gpt_taste(struct g_class *mp, struct g_provider *pp, int insist)
 	if (gp == NULL)
 		return (NULL);
 
-	gsp = gp->softc;
 	g_topology_unlock();
 	gp->dumpconf = g_gpt_dumpconf;
 
 	do {
 
-		npart = 0;
 		mbr = NULL;
 
 		if (gp->rank != 2 && insist == 0)
@@ -183,17 +181,19 @@ g_gpt_taste(struct g_class *mp, struct g_provider *pp, int insist)
 		for (i = 0; i < hdr->hdr_entries; i++) {
 			struct uuid unused = GPT_ENT_TYPE_UNUSED;
 			struct uuid freebsd = GPT_ENT_TYPE_FREEBSD;
+			struct uuid tmp;
 			if (i >= GPT_MAX_SLICES)
 				break;
 			ent = (void*)(buf + i * hdr->hdr_entsz);
-			if (!memcmp(&ent->ent_type, &unused, sizeof(unused)))
+			le_uuid_dec(&ent->ent_type, &tmp);
+			if (!memcmp(&tmp, &unused, sizeof(unused)))
 				continue;
 			/* XXX: This memory leaks */
 			gs->part[i] = g_malloc(hdr->hdr_entsz, M_WAITOK);
 			if (gs->part[i] == NULL)
 				break;
 			bcopy(ent, gs->part[i], hdr->hdr_entsz);
-			ps = (!memcmp(&ent->ent_type, &freebsd, sizeof(freebsd)))
+			ps = (!memcmp(&tmp, &freebsd, sizeof(freebsd)))
 			    ? 's' : 'p';
 			g_topology_lock();
 			(void)g_slice_config(gp, i, G_SLICE_CONFIG_SET,
@@ -202,12 +202,10 @@ g_gpt_taste(struct g_class *mp, struct g_provider *pp, int insist)
 			    secsz,
 			    "%s%c%d", gp->name, ps, i + 1);
 			g_topology_unlock();
-			npart++;
 		}
 		g_free(buf);
 
 	} while (0);
-
 
 	if (mbr != NULL)
 		g_free(mbr);
@@ -224,7 +222,6 @@ g_gpt_taste(struct g_class *mp, struct g_provider *pp, int insist)
 static struct g_class g_gpt_class = {
 	.name = "GPT",
 	.taste = g_gpt_taste,
-	G_CLASS_INITIALIZER
 };
 
 DECLARE_GEOM_CLASS(g_gpt_class, g_gpt);

@@ -1,5 +1,5 @@
 /*	$NetBSD: ohcireg.h,v 1.17 2000/04/01 09:27:35 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ohcireg.h,v 1.18 2002/04/01 13:21:43 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ohcireg.h,v 1.20 2003/07/15 23:12:54 jmg Exp $	*/
 
 
 /*
@@ -187,9 +187,11 @@ typedef struct {
 #define OHCI_TD_GET_DI(x)	(((x) >> 21) & 7)	/* Delay Interrupt */
 #define OHCI_TD_SET_DI(x)	((x) << 21)
 #define  OHCI_TD_NOINTR		0x00e00000
+#define  OHCI_TD_INTR_MASK	0x00e00000
 #define OHCI_TD_TOGGLE_CARRY	0x00000000
 #define OHCI_TD_TOGGLE_0	0x02000000
 #define OHCI_TD_TOGGLE_1	0x03000000
+#define OHCI_TD_TOGGLE_MASK	0x03000000
 #define OHCI_TD_GET_EC(x)	(((x) >> 26) & 3)	/* Error Count */
 #define OHCI_TD_GET_CC(x)	((x) >> 28)		/* Condition Code */
 #define  OHCI_TD_NOCC		0xf0000000
@@ -224,7 +226,7 @@ typedef struct {
 } ohci_itd_t;
 /* #define OHCI_ITD_SIZE 32 */
 #define OHCI_ITD_ALIGN 32
-	
+
 
 #define OHCI_CC_NO_ERROR		0
 #define OHCI_CC_CRC			1

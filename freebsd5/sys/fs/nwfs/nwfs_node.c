@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/nwfs/nwfs_node.c,v 1.29 2003/02/19 05:47:18 imp Exp $
+ * $FreeBSD: src/sys/fs/nwfs/nwfs_node.c,v 1.30 2003/10/05 02:43:30 jeff Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -268,7 +268,6 @@ nwfs_reclaim(ap)
 	lockmgr(&nwhashlock, LK_EXCLUSIVE, NULL, td);
 	LIST_REMOVE(np, n_hash);
 	lockmgr(&nwhashlock, LK_RELEASE, NULL, td);
-	cache_purge(vp);
 	if (nmp->n_root == np) {
 		nmp->n_root = NULL;
 	}

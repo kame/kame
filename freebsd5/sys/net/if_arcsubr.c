@@ -1,5 +1,5 @@
 /*	$NetBSD: if_arcsubr.c,v 1.36 2001/06/14 05:44:23 itojun Exp $	*/
-/*	$FreeBSD: src/sys/net/if_arcsubr.c,v 1.13 2003/03/04 23:19:51 jlemon Exp $ */
+/*	$FreeBSD: src/sys/net/if_arcsubr.c,v 1.15 2003/11/14 21:02:22 andre Exp $ */
 
 /*
  * Copyright (c) 1994, 1995 Ignatios Souvatzis
@@ -474,8 +474,8 @@ outofseq:
 	if (m)
 		m_freem(m);
 
-	log(LOG_INFO,"%s%d: got out of seq. packet: %s\n",
-	    ifp->if_name, ifp->if_unit, s);
+	log(LOG_INFO,"%s: got out of seq. packet: %s\n",
+	    ifp->if_xname, s);
 
 	return NULL;
 }
@@ -543,14 +543,14 @@ arc_input(ifp, m)
 #ifdef INET
 	case ARCTYPE_IP:
 		m_adj(m, ARC_HDRNEWLEN);
-		if (ipflow_fastforward(m))
+		if (ip_fastforward(m))
 			return;
 		isr = NETISR_IP;
 		break;
 
 	case ARCTYPE_IP_OLD:
 		m_adj(m, ARC_HDRLEN);
-		if (ipflow_fastforward(m))
+		if (ip_fastforward(m))
 			return;
 		isr = NETISR_IP;
 		break;
@@ -648,8 +648,8 @@ arc_ifattach(ifp, lla)
 	ac->ac_seqid = (time_second) & 0xFFFF; /* try to make seqid unique */
 	if (lla == 0) {
 		/* XXX this message isn't entirely clear, to me -- cgd */
-		log(LOG_ERR,"%s%d: link address 0 reserved for broadcasts.  Please change it and ifconfig %s%d down up\n",
-		   ifp->if_name, ifp->if_unit, ifp->if_name, ifp->if_unit);
+		log(LOG_ERR,"%s: link address 0 reserved for broadcasts.  Please change it and ifconfig %s down up\n",
+		   ifp->if_xname, ifp->if_xname);
 	}
 	arc_storelladdr(ifp, lla);
 

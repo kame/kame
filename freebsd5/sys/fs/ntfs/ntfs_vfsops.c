@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/ntfs/ntfs_vfsops.c,v 1.53 2003/03/11 22:15:08 kan Exp $
+ * $FreeBSD: src/sys/fs/ntfs/ntfs_vfsops.c,v 1.57 2003/09/26 20:26:23 fjoe Exp $
  */
 
 
@@ -64,18 +64,18 @@ MALLOC_DEFINE(M_NTFSDIR,"NTFS dir",  "NTFS dir buffer");
 
 struct sockaddr;
 
-static int	ntfs_root(struct mount *, struct vnode **);
-static int	ntfs_statfs(struct mount *, struct statfs *, struct thread *);
-static int	ntfs_unmount(struct mount *, int, struct thread *);
-static int	ntfs_vget(struct mount *mp, ino_t ino, int lkflags,
-			       struct vnode **vpp);
 static int	ntfs_mountfs(register struct vnode *, struct mount *, 
 				  struct ntfs_args *, struct thread *);
-static int	ntfs_vptofh(struct vnode *, struct fid *);
-static int	ntfs_fhtovp(struct mount *, struct fid *, struct vnode **);
-static int	ntfs_mount(struct mount *, char *, caddr_t,
-				struct nameidata *, struct thread *);
-static int	ntfs_init(struct vfsconf *);
+
+static vfs_init_t       ntfs_init;
+static vfs_uninit_t     ntfs_uninit;
+static vfs_vget_t       ntfs_vget;
+static vfs_fhtovp_t     ntfs_fhtovp;
+static vfs_mount_t      ntfs_mount;
+static vfs_root_t       ntfs_root;
+static vfs_statfs_t     ntfs_statfs;
+static vfs_unmount_t    ntfs_unmount;
+static vfs_vptofh_t     ntfs_vptofh;
 
 static int
 ntfs_init (
@@ -299,7 +299,7 @@ ntfs_mountfs(devvp, mp, argsp, td)
 
 	ronly = (mp->mnt_flag & MNT_RDONLY) != 0;
 	vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY, td);
-	error = VOP_OPEN(devvp, ronly ? FREAD : FREAD|FWRITE, FSCRED, td);
+	error = VOP_OPEN(devvp, ronly ? FREAD : FREAD|FWRITE, FSCRED, td, -1);
 	VOP_UNLOCK(devvp, 0, td);
 	if (error)
 		return (error);
@@ -311,6 +311,14 @@ ntfs_mountfs(devvp, mp, argsp, td)
 		goto out;
 	ntmp = malloc( sizeof *ntmp, M_NTFSMNT, M_WAITOK | M_ZERO);
 	bcopy( bp->b_data, &ntmp->ntm_bootfile, sizeof(struct bootfile) );
+	/*
+	 * We must not cache the boot block if its size is not exactly
+	 * one cluster in order to avoid confusing the buffer cache when
+	 * the boot file is read later by ntfs_readntvattr_plain(), which
+	 * reads a cluster at a time.
+	 */
+	if (ntfs_cntob(1) != BBSIZE)
+		bp->b_flags |= B_NOCACHE;
 	brelse( bp );
 	bp = NULL;
 
@@ -342,14 +350,14 @@ ntfs_mountfs(devvp, mp, argsp, td)
 	ntmp->ntm_flag = argsp->flag;
 
 	/* Copy in the 8-bit to Unicode conversion table */
-	if (argsp->flag & NTFSMNT_U2WTABLE) {
-		ntfs_82u_init(ntmp, argsp->u2w);
-	} else {
-		ntfs_82u_init(ntmp, NULL);
-	}
-
 	/* Initialize Unicode to 8-bit table from 8toU table */
-	ntfs_u28_init(ntmp, ntmp->ntm_82u);
+	if (argsp->flag & NTFS_MFLAG_KICONV) {
+		ntfs_82u_init(ntmp, argsp->cs_local, argsp->cs_ntfs);
+		ntfs_u28_init(ntmp, NULL, argsp->cs_local, argsp->cs_ntfs);
+	} else {
+		ntfs_82u_init(ntmp, NULL, NULL);
+		ntfs_u28_init(ntmp, ntmp->ntm_82u, NULL, NULL);
+	}
 
 	mp->mnt_data = (qaddr_t)ntmp;
 
@@ -775,19 +783,15 @@ ntfs_vget(
 }
 
 static struct vfsops ntfs_vfsops = {
-	ntfs_mount,
-	vfs_stdstart,
-	ntfs_unmount,
-	ntfs_root,
-	vfs_stdquotactl,
-	ntfs_statfs,
-	vfs_stdnosync,
-	ntfs_vget,
-	ntfs_fhtovp,
-	vfs_stdcheckexp,
-	ntfs_vptofh,
-	ntfs_init,
-	ntfs_uninit,
-	vfs_stdextattrctl,
+	.vfs_fhtovp =	ntfs_fhtovp,
+	.vfs_init =	ntfs_init,
+	.vfs_mount =	ntfs_mount,
+	.vfs_root =	ntfs_root,
+	.vfs_statfs =	ntfs_statfs,
+	.vfs_uninit =	ntfs_uninit,
+	.vfs_unmount =	ntfs_unmount,
+	.vfs_vget =	ntfs_vget,
+	.vfs_vptofh =	ntfs_vptofh,
 };
 VFS_SET(ntfs_vfsops, ntfs, 0);
+MODULE_VERSION(ntfs, 1);

@@ -26,12 +26,12 @@
  *
  *      i4b_l2.c - ISDN layer 2 (Q.921)
  *	-------------------------------
- *
- * $FreeBSD: src/sys/i4b/layer2/i4b_l2.c,v 1.18 2002/10/15 20:32:45 phk Exp $
- *
  *      last edit-date: [Sat Mar  9 16:11:14 2002]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer2/i4b_l2.c,v 1.19 2003/06/10 23:55:01 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -35,7 +35,7 @@
  *
  *	@(#)fdesc_vnops.c	8.9 (Berkeley) 1/21/94
  *
- * $FreeBSD: src/sys/fs/fdescfs/fdesc_vnops.c,v 1.88 2003/03/03 19:15:37 njl Exp $
+ * $FreeBSD: src/sys/fs/fdescfs/fdesc_vnops.c,v 1.92 2003/11/19 04:14:42 kan Exp $
  */
 
 /*
@@ -78,7 +78,6 @@ static int	fdesc_lookup(struct vop_lookup_args *ap);
 static int	fdesc_open(struct vop_open_args *ap);
 static int	fdesc_readdir(struct vop_readdir_args *ap);
 static int	fdesc_reclaim(struct vop_reclaim_args *ap);
-static int	fdesc_poll(struct vop_poll_args *ap);
 static int	fdesc_setattr(struct vop_setattr_args *ap);
 
 /*
@@ -395,13 +394,13 @@ fdesc_setattr(ap)
 		}
 		return (error);
 	}
-	vp = fp->f_data;
-	if ((error = vn_start_write(vp, &mp, V_WAIT | PCATCH)) != 0) {
-		fdrop(fp, ap->a_td);
-		return (error);
+	vp = fp->f_vnode;
+	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, ap->a_td);
+	if ((error = vn_start_write(vp, &mp, V_WAIT | PCATCH)) == 0) {
+		error = VOP_SETATTR(vp, ap->a_vap, ap->a_cred, ap->a_td);
+		vn_finished_write(mp);
 	}
-	error = VOP_SETATTR(vp, ap->a_vap, ap->a_cred, ap->a_td);
-	vn_finished_write(mp);
+	VOP_UNLOCK(vp, 0, ap->a_td);
 	fdrop(fp, ap->a_td);
 	return (error);
 }
@@ -491,18 +490,6 @@ done:
 }
 
 static int
-fdesc_poll(ap)
-	struct vop_poll_args /* {
-		struct vnode *a_vp;
-		int  a_events;
-		struct ucred *a_cred;
-		struct thread *a_td;
-	} */ *ap;
-{
-	return seltrue(0, ap->a_events, ap->a_td);
-}
-
-static int
 fdesc_inactive(ap)
 	struct vop_inactive_args /* {
 		struct vnode *a_vp;
@@ -544,7 +531,6 @@ static struct vnodeopv_entry_desc fdesc_vnodeop_entries[] = {
 	{ &vop_lookup_desc,		(vop_t *) fdesc_lookup },
 	{ &vop_open_desc,		(vop_t *) fdesc_open },
 	{ &vop_pathconf_desc,		(vop_t *) vop_stdpathconf },
-	{ &vop_poll_desc,		(vop_t *) fdesc_poll },
 	{ &vop_readdir_desc,		(vop_t *) fdesc_readdir },
 	{ &vop_reclaim_desc,		(vop_t *) fdesc_reclaim },
 	{ &vop_setattr_desc,		(vop_t *) fdesc_setattr },

@@ -34,7 +34,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_id.c,v 1.2 2002/03/19 21:25:46 alfred Exp $
+ * $FreeBSD: src/sys/netinet/ip_id.c,v 1.3 2003/11/07 23:31:29 sam Exp $
  */
 
 /* 
@@ -186,6 +186,7 @@ ip_randomid(void)
 	int i, n;
 	struct timeval time;
 
+	/* XXX not reentrant */
 	getmicrotime(&time);
 	if (ru_counter >= RU_MAX || time.tv_sec > ru_reseed)
 		ip_initid();

@@ -21,8 +21,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pcic_isa.c,v 1.24 2003/01/01 18:48:58 schweikh Exp $
+ * $FreeBSD: src/sys/pccard/pcic_isa.c,v 1.25 2003/06/12 04:46:43 imp Exp $
  */
+
+#define OBSOLETE_IN_6
 
 #include <sys/param.h>
 #include <sys/bus.h>

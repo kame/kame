@@ -26,9 +26,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/dev/pci/fixup_pci.c,v 1.3 2001/06/03 09:45:40 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/pci/fixup_pci.c,v 1.5 2003/08/24 17:54:15 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -36,8 +37,8 @@
 #include <sys/kernel.h>
 #include <sys/bus.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 
 /*
  * Chipset fixups.

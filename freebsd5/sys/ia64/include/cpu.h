@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/ia64/include/cpu.h,v 1.32 2003/05/29 06:30:36 marcel Exp $ */
+/* $FreeBSD: src/sys/ia64/include/cpu.h,v 1.40 2003/09/19 07:48:22 marcel Exp $ */
 /* From: NetBSD: cpu.h,v 1.18 1997/09/23 23:17:49 mjacob Exp */
 
 /*
@@ -56,31 +56,25 @@ struct clockframe {
 	struct trapframe cf_tf;
 };
 #define	CLKF_PC(cf)		((cf)->cf_tf.tf_special.iip)
-#define	CLKF_USERMODE(cf)	((CLKF_PC(cf) >> 61) < 5)
+#define	CLKF_CPL(cf)		((cf)->cf_tf.tf_special.psr & IA64_PSR_CPL)
+#define	CLKF_USERMODE(cf)	(CLKF_CPL(cf) != IA64_PSR_CPL_KERN)
 
-/* Used by signaling code. */
-#define	cpu_getstack(td)	((td)->td_frame->tf_special.sp)
-
-/* XXX */
 #define	TRAPF_PC(tf)		((tf)->tf_special.iip)
-#define	TRAPF_USERMODE(tf)	((TRAPF_PC(tf) >> 61) < 5)
+#define	TRAPF_CPL(tf)		((tf)->tf_special.psr & IA64_PSR_CPL)
+#define	TRAPF_USERMODE(tf)	(TRAPF_CPL(tf) != IA64_PSR_CPL_KERN)
 
 /*
  * CTL_MACHDEP definitions.
  */
 #define	CPU_CONSDEV		1	/* dev_t: console terminal device */
-#define	CPU_ROOT_DEVICE		2	/* string: root device name */
-#define	CPU_BOOTED_KERNEL	3	/* string: booted kernel name */
-#define	CPU_ADJKERNTZ		4	/* int:	timezone offset	(seconds) */
-#define	CPU_DISRTCSET		5	/* int: disable resettodr() call */
-#define	CPU_WALLCLOCK		6	/* int:	indicates wall CMOS clock */
-#define	CPU_MAXID		7	/* valid machdep IDs */
+#define	CPU_ADJKERNTZ		2	/* int:	timezone offset	(seconds) */
+#define	CPU_DISRTCSET		3	/* int: disable resettodr() call */
+#define	CPU_WALLCLOCK		4	/* int:	indicates wall CMOS clock */
+#define	CPU_MAXID		5	/* valid machdep IDs */
 
 #define	CTL_MACHDEP_NAMES { \
 	{ 0, 0 }, \
 	{ "console_device", CTLTYPE_STRUCT }, \
-	{ "root_device", CTLTYPE_STRING }, \
-	{ "booted_kernel", CTLTYPE_STRING }, \
 	{ "adjkerntz", CTLTYPE_INT }, \
 	{ "disable_rtc_set", CTLTYPE_INT }, \
 	{ "wall_cmos_clock", CTLTYPE_INT }, \
@@ -88,55 +82,19 @@ struct clockframe {
 
 #ifdef _KERNEL
 
-struct pcb;
-struct thread;
-struct reg;
-struct rpb;
-struct trapframe;
-
-extern struct rpb *hwrpb;
-extern volatile int mc_expected, mc_received;
-
-int	badaddr(void *, size_t);
-int	badaddr_read(void *, size_t, void *);
-u_int64_t console_restart(u_int64_t, u_int64_t, u_int64_t);
-int	do_ast(struct trapframe *);
-void	dumpconf(void);
-void	frametoreg(struct trapframe *, struct reg *);
-long	fswintrberr(void);				/* MAGIC */
-int	ia64_highfp_drop(struct thread *);
-int	ia64_highfp_load(struct thread *);
-int	ia64_highfp_save(struct thread *);
-void	ia64_init(void);
-int	ia64_pa_access(u_long);
-void	init_prom_interface(struct rpb*);
-void	interrupt(u_int64_t, struct trapframe *);
-void	machine_check(unsigned long, struct trapframe *, unsigned long,
-    unsigned long);
-u_int64_t hwrpb_checksum(void);
-void	hwrpb_restart_setup(void);
-void	regdump(struct trapframe *);
-void	regtoframe(struct reg *, struct trapframe *);
-void	set_iointr(void (*)(void *, unsigned long));
-void	fork_trampoline(void);				/* MAGIC */
-int	syscall(struct trapframe *);
-void	trap(int vector, struct trapframe *framep);
-void	ia64_probe_sapics(void);
-int	ia64_count_cpus(void);
-void	map_gateway_page(void);
-void	map_pal_code(void);
-void	map_port_space(void);
-void	cpu_mp_add(uint, uint, uint);
-
 /*
  * Return contents of in-cpu fast counter as a sort of "bogo-time"
  * for non-critical timing.
  */
-static __inline u_int64_t
-get_cyclecount(void)
-{
-	return (ia64_get_itc());
-}
+#define	get_cyclecount		ia64_get_itc
+
+/* Used by signaling code. */
+#define	cpu_getstack(td)	((td)->td_frame->tf_special.sp)
+
+void	cpu_halt(void);
+void	cpu_reset(void);
+void	fork_trampoline(void);				/* MAGIC */
+void	swi_vm(void *);
 
 #endif /* _KERNEL */
 

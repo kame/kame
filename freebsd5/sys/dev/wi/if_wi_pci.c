@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/wi/if_wi_pci.c,v 1.14 2003/04/15 06:37:28 mdodd Exp $
+ * $FreeBSD: src/sys/dev/wi/if_wi_pci.c,v 1.21 2003/09/05 22:29:30 sam Exp $
  */
 
 /*
@@ -52,19 +52,21 @@
 #include <machine/clock.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <net/ethernet.h>
 #include <net/if_media.h>
 #include <net/if_types.h>
-#include <net/if_ieee80211.h>
+
+#include <net80211/ieee80211_var.h>
+#include <net80211/ieee80211_radiotap.h>
 
 #include <dev/wi/if_wavelan_ieee.h>
-#include <dev/wi/if_wivar.h>
 #include <dev/wi/if_wireg.h>
+#include <dev/wi/if_wivar.h>
 
 static int wi_pci_probe(device_t);
 static int wi_pci_attach(device_t);
@@ -97,6 +99,7 @@ static struct {
 	/* Sorted by description */
 	{0x10b7, 0x7770, WI_BUS_PCI_PLX, "3Com Airconnect"},
 	{0x16ab, 0x1101, WI_BUS_PCI_PLX, "GLPRISM2 WaveLAN"},
+	{0x1260, 0x3872, WI_BUS_PCI_NATIVE, "Intersil Prism3"},
 	{0x1260, 0x3873, WI_BUS_PCI_NATIVE, "Intersil Prism2.5"},
 	{0x16ab, 0x1102, WI_BUS_PCI_PLX, "Linksys WDT11"},
 	{0x1385, 0x4100, WI_BUS_PCI_PLX, "Netgear MA301"},
@@ -104,6 +107,7 @@ static struct {
 	{0x111a, 0x1023, WI_BUS_PCI_PLX, "Siemens SpeedStream"},
 	{0x10b5, 0x9050, WI_BUS_PCI_PLX, "SMC 2602W"},
 	{0x16ec, 0x3685, WI_BUS_PCI_PLX, "US Robotics 2415"},
+	{0x4033, 0x7001, WI_BUS_PCI_PLX, "Addtron AWA-100 PCI"},
 	{0, 0, 0, NULL}
 };
 
@@ -235,9 +239,8 @@ wi_pci_attach(device_t dev)
 
 	error = wi_attach(dev);
 	if (error != 0)
-		return (error);
-
-	return (0);
+		wi_free(dev);
+	return (error);
 }
 
 static int
@@ -264,9 +267,10 @@ wi_pci_resume(device_t dev)
 	if (sc->wi_bus_type != WI_BUS_PCI_NATIVE)
 		return (0);
 
-	ifp->if_init(ifp->if_softc);
 	if (ifp->if_flags & IFF_UP) {
-		ifp->if_start(ifp);
+		ifp->if_init(ifp->if_softc);
+		if (ifp->if_flags & IFF_RUNNING)
+			ifp->if_start(ifp);
 	}
 
 	return (0);

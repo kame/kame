@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/dragon/dragon_saver.c,v 1.1 2002/03/23 12:36:17 amorita Exp $
+ * $FreeBSD: src/sys/dev/syscons/dragon/dragon_saver.c,v 1.2 2003/07/21 13:04:54 nyan Exp $
  */
 
 #include	<sys/param.h>
@@ -122,24 +122,6 @@ gdraw(int dx, int dy, int val)
 }
 
 static void
-gcls(void)
-{
-#ifdef PC98
-	outb(0x7c, 0x80);	/* GRCG on & TDW mode */
-	outb(0x7e, 0);			/* tile B */
-	outb(0x7e, 0);			/* tile R */
-	outb(0x7e, 0);			/* tile G */
-	outb(0x7e, 0);			/* tile I */
-
-	fillw(0, vid, 0x8000);
-
-	outb(0x7c, 0);	/* GRCG off */
-#else
-	bzero(vid, SCRW*SCRH);
-#endif
-}
-
-static void
 dragon_update(video_adapter_t *adp)
 {
 	static int	i, p, q;
@@ -153,7 +135,7 @@ dragon_update(video_adapter_t *adp)
 	int	tmp;
 
 	if (curve > CURVE) {
-		gcls();
+		(*vidsw[adp->va_index]->clear)(adp);
 
 		/* set palette of each curves */
 		for (tmp = 0; tmp < 3*CURVE; ++tmp) {

@@ -34,8 +34,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_quota.c	8.5 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_quota.c,v 1.63 2003/03/02 16:54:40 des Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_quota.c,v 1.70 2003/11/05 04:30:08 kan Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -48,6 +50,7 @@
 #include <sys/namei.h>
 #include <sys/proc.h>
 #include <sys/socket.h>
+#include <sys/sysctl.h>
 #include <sys/vnode.h>
 
 #include <ufs/ufs/extattr.h>
@@ -55,6 +58,13 @@
 #include <ufs/ufs/inode.h>
 #include <ufs/ufs/ufsmount.h>
 #include <ufs/ufs/ufs_extern.h>
+
+SYSCTL_DECL(_security_bsd);
+
+static int unprivileged_get_quota = 0;
+SYSCTL_INT(_security_bsd, OID_AUTO, unprivileged_get_quota, CTLFLAG_RW,
+    &unprivileged_get_quota, 0,
+    "Unprivileged processes may retrieve quotas for other uids and gids");
 
 static MALLOC_DEFINE(M_DQUOT, "UFS quota", "UFS quota entries");
 
@@ -402,10 +412,14 @@ quotaon(td, mp, type, fname)
 	int error, flags;
 	struct nameidata nd;
 
+	error = suser_cred(td->td_ucred, PRISON_ROOT);
+	if (error)
+		return (error);
+
 	vpp = &ump->um_quotas[type];
 	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, fname, td);
 	flags = FREAD | FWRITE;
-	error = vn_open(&nd, &flags, 0);
+	error = vn_open(&nd, &flags, 0, -1);
 	if (error)
 		return (error);
 	NDFREE(&nd, NDF_ONLY_PNBUF);
@@ -441,32 +455,34 @@ quotaon(td, mp, type, fname)
 	 * adding references to quota file being opened.
 	 * NB: only need to add dquot's for inodes being modified.
 	 */
-	mtx_lock(&mntvnode_mtx);
+	MNT_ILOCK(mp);
 again:
 	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nextvp) {
 		if (vp->v_mount != mp)
 			goto again;
 		nextvp = TAILQ_NEXT(vp, v_nmntvnodes);
-		
-		mtx_unlock(&mntvnode_mtx);
-		if (vget(vp, LK_EXCLUSIVE, td)) {
-			mtx_lock(&mntvnode_mtx);
+		VI_LOCK(vp);
+		MNT_IUNLOCK(mp);
+		if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK, td)) {
+			MNT_ILOCK(mp);
 			goto again;
 		}
 		if (vp->v_type == VNON || vp->v_writecount == 0) {
-			vput(vp);
-			mtx_lock(&mntvnode_mtx);
+			VOP_UNLOCK(vp, 0, td);
+			vrele(vp);
+			MNT_ILOCK(mp);
 			continue;
 		}
 		error = getinoquota(VTOI(vp));
-		vput(vp);
-		mtx_lock(&mntvnode_mtx);
+		VOP_UNLOCK(vp, 0, td);
+		vrele(vp);
+		MNT_ILOCK(mp);
 		if (error)
 			break;
 		if (TAILQ_NEXT(vp, v_nmntvnodes) != nextvp)
 			goto again;
 	}
-	mtx_unlock(&mntvnode_mtx);
+	MNT_IUNLOCK(mp);
 	ump->um_qflags[type] &= ~QTF_OPENING;
 	if (error)
 		quotaoff(td, mp, type);
@@ -489,6 +505,10 @@ quotaoff(td, mp, type)
 	struct inode *ip;
 	int error;
 
+	error = suser_cred(td->td_ucred, PRISON_ROOT);
+	if (error)
+		return (error);
+
 	if ((qvp = ump->um_quotas[type]) == NULLVP)
 		return (0);
 	ump->um_qflags[type] |= QTF_CLOSING;
@@ -496,34 +516,35 @@ quotaoff(td, mp, type)
 	 * Search vnodes associated with this mount point,
 	 * deleting any references to quota file being closed.
 	 */
-	mtx_lock(&mntvnode_mtx);
+	MNT_ILOCK(mp);
 again:
 	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nextvp) {
 		if (vp->v_mount != mp)
 			goto again;
 		nextvp = TAILQ_NEXT(vp, v_nmntvnodes);
 
-		mtx_unlock(&mntvnode_mtx);
-		mtx_lock(&vp->v_interlock);
+		VI_LOCK(vp);
+		MNT_IUNLOCK(mp);
 		if (vp->v_type == VNON) {
-			mtx_unlock(&vp->v_interlock);
-			mtx_lock(&mntvnode_mtx);
+			VI_UNLOCK(vp);
+			MNT_ILOCK(mp);
 			continue;
 		}
 		if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK, td)) {
-			mtx_lock(&mntvnode_mtx);
+			MNT_ILOCK(mp);
 			goto again;
 		}
 		ip = VTOI(vp);
 		dq = ip->i_dquot[type];
 		ip->i_dquot[type] = NODQUOT;
 		dqrele(vp, dq);
-		vput(vp);
-		mtx_lock(&mntvnode_mtx);
+		VOP_UNLOCK(vp, 0, td);
+		vrele(vp);
+		MNT_ILOCK(mp);
 		if (TAILQ_NEXT(vp, v_nmntvnodes) != nextvp)
 			goto again;
 	}
-	mtx_unlock(&mntvnode_mtx);
+	MNT_IUNLOCK(mp);
 	dqflush(qvp);
 	ASSERT_VOP_LOCKED(qvp, "quotaoff");
 	qvp->v_vflag &= ~VV_SYSTEM;
@@ -544,7 +565,8 @@ again:
  * Q_GETQUOTA - return current values in a dqblk structure.
  */
 int
-getquota(mp, id, type, addr)
+getquota(td, mp, id, type, addr)
+	struct thread *td;
 	struct mount *mp;
 	u_long id;
 	int type;
@@ -552,6 +574,27 @@ getquota(mp, id, type, addr)
 {
 	struct dquot *dq;
 	int error;
+
+	switch (type) {
+	case USRQUOTA:
+		if ((td->td_ucred->cr_uid != id) && !unprivileged_get_quota) {
+			error = suser_cred(td->td_ucred, PRISON_ROOT);
+			if (error)
+				return (error);
+		}
+		break;  
+
+	case GRPQUOTA:
+		if (!groupmember(id, td->td_ucred) && !unprivileged_get_quota) {
+			error = suser_cred(td->td_ucred, PRISON_ROOT);
+			if (error)
+				return (error);
+		}
+		break;
+
+	default:
+		return (EINVAL);
+	}
 
 	error = dqget(NULLVP, id, VFSTOUFS(mp), type, &dq);
 	if (error)
@@ -565,7 +608,8 @@ getquota(mp, id, type, addr)
  * Q_SETQUOTA - assign an entire dqblk structure.
  */
 int
-setquota(mp, id, type, addr)
+setquota(td, mp, id, type, addr)
+	struct thread *td;
 	struct mount *mp;
 	u_long id;
 	int type;
@@ -576,6 +620,10 @@ setquota(mp, id, type, addr)
 	struct ufsmount *ump = VFSTOUFS(mp);
 	struct dqblk newlim;
 	int error;
+
+	error = suser_cred(td->td_ucred, PRISON_ROOT);
+	if (error)
+		return (error);
 
 	error = copyin(addr, (caddr_t)&newlim, sizeof (struct dqblk));
 	if (error)
@@ -626,7 +674,8 @@ setquota(mp, id, type, addr)
  * Q_SETUSE - set current inode and block usage.
  */
 int
-setuse(mp, id, type, addr)
+setuse(td, mp, id, type, addr)
+	struct thread *td;
 	struct mount *mp;
 	u_long id;
 	int type;
@@ -637,6 +686,10 @@ setuse(mp, id, type, addr)
 	struct dquot *ndq;
 	struct dqblk usage;
 	int error;
+
+	error = suser_cred(td->td_ucred, PRISON_ROOT);
+	if (error)
+		return (error);
 
 	error = copyin(addr, (caddr_t)&usage, sizeof (struct dqblk));
 	if (error)
@@ -696,22 +749,22 @@ qsync(mp)
 	 * Search vnodes associated with this mount point,
 	 * synchronizing any modified dquot structures.
 	 */
-	mtx_lock(&mntvnode_mtx);
+	MNT_ILOCK(mp);
 again:
 	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nextvp) {
 		if (vp->v_mount != mp)
 			goto again;
 		nextvp = TAILQ_NEXT(vp, v_nmntvnodes);
-		mtx_unlock(&mntvnode_mtx);
-		mtx_lock(&vp->v_interlock);
+		VI_LOCK(vp);
+		MNT_IUNLOCK(mp);
 		if (vp->v_type == VNON) {
-			mtx_unlock(&vp->v_interlock);
-			mtx_lock(&mntvnode_mtx);
+			VI_UNLOCK(vp);
+			MNT_ILOCK(mp);
 			continue;
 		}
 		error = vget(vp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK, td);
 		if (error) {
-			mtx_lock(&mntvnode_mtx);
+			MNT_ILOCK(mp);
 			if (error == ENOENT)
 				goto again;
 			continue;
@@ -722,11 +775,11 @@ again:
 				dqsync(vp, dq);
 		}
 		vput(vp);
-		mtx_lock(&mntvnode_mtx);
+		MNT_ILOCK(mp);
 		if (TAILQ_NEXT(vp, v_nmntvnodes) != nextvp)
 			goto again;
 	}
-	mtx_unlock(&mntvnode_mtx);
+	MNT_IUNLOCK(mp);
 	return (0);
 }
 

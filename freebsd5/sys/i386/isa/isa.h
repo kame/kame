@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)isa.h	5.7 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/isa/isa.h,v 1.23 1999/08/28 00:44:54 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/isa.h,v 1.24 2003/09/05 14:54:26 peter Exp $
  */
 
 #ifdef PC98
@@ -186,15 +186,5 @@
 #define	RAM_END		0x1000000	/* End of RAM Memory */
 #define	RAM_SIZE	(RAM_END - RAM_BEGIN)
 #endif /* !RAM_BEGIN */
-
-/*
- * Oddball Physical Memory Addresses
- */
-#ifndef	COMPAQ_RAMRELOC
-#define	COMPAQ_RAMRELOC	0x80C00000	/* Compaq RAM relocation/diag */
-#define	COMPAQ_RAMSETUP	0x80C00002	/* Compaq RAM setup */
-#define	WEITEK_FPU	0xC0000000	/* WTL 2167 */
-#define	CYRIX_EMC	0xC0000000	/* Cyrix EMC */
-#endif /* !COMPAQ_RAMRELOC */
 
 #endif /* !_I386_ISA_ISA_H_ */

@@ -24,9 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/syscons/syscons.c,v 1.402 2003/05/09 18:24:40 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/syscons/syscons.c,v 1.409 2003/10/29 20:48:13 njl Exp $");
 
 #include "opt_syscons.h"
 #include "opt_splash.h"
@@ -53,7 +54,11 @@
 #include <sys/power.h>
 
 #include <machine/clock.h>
+#ifdef __sparc64__
+#include <machine/sc_machdep.h>
+#else
 #include <machine/pc/display.h>
+#endif
 #ifdef __i386__
 #include <machine/psl.h>
 #include <machine/apm_bios.h>
@@ -145,7 +150,7 @@ static kbd_callback_func_t sckbdevent;
 static int scparam(struct tty *tp, struct termios *t);
 static void scstart(struct tty *tp);
 static void scinit(int unit, int flags);
-#if __i386__ || __ia64__ || __amd64__
+#if __i386__ || __ia64__ || __amd64__ || __sparc64__
 static void scterm(int unit, int flags);
 #endif
 static void scshutdown(void *arg, int howto);
@@ -452,7 +457,9 @@ scopen(dev_t dev, int flag, int mode, struct thread *td)
     sc_softc_t *sc;
     struct tty *tp;
     scr_stat *scp;
+#ifndef __sparc64__
     keyarg_t key;
+#endif
     int error;
 
     DPRINTF(5, ("scopen: dev:%d,%d, unit:%d, vty:%d\n",
@@ -471,11 +478,13 @@ scopen(dev_t dev, int flag, int mode, struct thread *td)
 	ttychars(tp);
         /* Use the current setting of the <-- key as default VERASE. */  
         /* If the Delete key is preferable, an stty is necessary     */
+#ifndef __sparc64__
 	if (sc->kbd != NULL) {
 	    key.keynum = KEYCODE_BS;
 	    kbd_ioctl(sc->kbd, GIO_KEYMAPENT, (caddr_t)&key);
             tp->t_cc[VERASE] = key.key.map[0];
 	}
+#endif
 	tp->t_iflag = TTYDEF_IFLAG;
 	tp->t_oflag = TTYDEF_OFLAG;
 	tp->t_cflag = TTYDEF_CFLAG;
@@ -530,7 +539,9 @@ scclose(dev_t dev, int flag, int mode, struct thread *td)
 	}
 	else {
 	    sc_vtb_destroy(&scp->vtb);
+#ifndef __sparc64__
 	    sc_vtb_destroy(&scp->scr);
+#endif
 	    sc_free_history_buffer(scp, scp->ysize);
 	    SC_STAT(dev) = NULL;
 	    free(scp, M_DEVBUF);
@@ -961,7 +972,7 @@ scioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 	    return EPERM;
 	}
 	error = EINVAL;
-	switch(*(int *)data) {
+	switch(*(intptr_t *)data) {
 	case VT_FALSE:  	/* user refuses to release screen, abort */
 	    if ((error = finish_vt_rel(scp, FALSE, &s)) == 0)
 		DPRINTF(5, ("sc%d: VT_FALSE\n", sc->unit));
@@ -991,14 +1002,14 @@ scioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 	return EINVAL;
 
     case VT_ACTIVATE:   	/* switch to screen *data */
-	i = (*(int *)data == 0) ? scp->index : (*(int *)data - 1);
+	i = (*(intptr_t *)data == 0) ? scp->index : (*(intptr_t *)data - 1);
 	s = spltty();
 	sc_clean_up(sc->cur_scp);
 	splx(s);
 	return sc_switch_scr(sc, i);
 
     case VT_WAITACTIVE: 	/* wait for switch to occur */
-	i = (*(int *)data == 0) ? scp->index : (*(int *)data - 1);
+	i = (*(intptr_t *)data == 0) ? scp->index : (*(intptr_t *)data - 1);
 	if ((i < sc->first_vty) || (i >= sc->first_vty + sc->vtys))
 	    return EINVAL;
 	s = spltty();
@@ -1319,6 +1330,12 @@ scioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 
 #endif /* SC_NO_FONT_LOADING */
 
+#ifdef PC98
+    case ADJUST_CLOCK:	/* /dev/rtc for 98note resume */
+	inittodr(0);
+	return 0;
+#endif
+
     default:
 	break;
     }
@@ -1361,7 +1378,7 @@ scstart(struct tty *tp)
 static void
 sccnprobe(struct consdev *cp)
 {
-#if __i386__ || __ia64__ || __amd64__
+#if __i386__ || __ia64__ || __amd64__ || __sparc64__
     int unit;
     int flags;
 
@@ -1378,8 +1395,8 @@ sccnprobe(struct consdev *cp)
 	return;
 
     /* initialize required fields */
-    cp->cn_dev = makedev(CDEV_MAJOR, SC_CONSOLECTL);
-#endif /* __i386__ || __ia64__ || __amd64__ */
+    sprintf(cp->cn_name, "consolectl");
+#endif /* __i386__ || __ia64__ || __amd64__ || __sparc64__ */
 
 #if __alpha__
     /*
@@ -1394,7 +1411,7 @@ sccnprobe(struct consdev *cp)
 static void
 sccninit(struct consdev *cp)
 {
-#if __i386__ || __ia64__ || __amd64__
+#if __i386__ || __ia64__ || __amd64__ || __sparc64__
     int unit;
     int flags;
 
@@ -1402,7 +1419,7 @@ sccninit(struct consdev *cp)
     scinit(unit, flags | SC_KERNEL_CONSOLE);
     sc_console_unit = unit;
     sc_console = SC_STAT(sc_get_softc(unit, SC_KERNEL_CONSOLE)->dev[0]);
-#endif /* __i386__ || __ia64__ || __amd64__ */
+#endif /* __i386__ || __ia64__ || __amd64__ || __sparc64__ */
 
 #if __alpha__
     /* SHOULDN'T REACH HERE */
@@ -1417,7 +1434,7 @@ sccnterm(struct consdev *cp)
     if (sc_console_unit < 0)
 	return;			/* shouldn't happen */
 
-#if __i386__ || __ia64__ || __amd64__
+#if __i386__ || __ia64__ || __amd64__ || __sparc64__
 #if 0 /* XXX */
     sc_clear_screen(sc_console);
     sccnupdate(sc_console);
@@ -1425,7 +1442,7 @@ sccnterm(struct consdev *cp)
     scterm(sc_console_unit, SC_KERNEL_CONSOLE);
     sc_console_unit = -1;
     sc_console = NULL;
-#endif /* __i386__ || __ia64__ || __amd64__ */
+#endif /* __i386__ || __ia64__ || __amd64__ || __sparc64__ */
 
 #if __alpha__
     /* do nothing XXX */
@@ -1458,7 +1475,7 @@ sccnattach(void)
     scinit(unit, flags | SC_KERNEL_CONSOLE);
     sc_console_unit = unit;
     sc_console = SC_STAT(sc_get_softc(unit, SC_KERNEL_CONSOLE)->dev[0]);
-    consdev.cn_dev = makedev(CDEV_MAJOR, 0);
+    sprintf(consdev.cn_name, "ttyv%r", 0);
     cnadd(&consdev);
 }
 
@@ -1657,7 +1674,9 @@ sccnupdate(scr_stat *scp)
 static void
 scrn_timer(void *arg)
 {
+#ifndef PC98
     static int kbd_interval = 0;
+#endif
     struct timeval tv;
     sc_softc_t *sc;
     scr_stat *scp;
@@ -1680,6 +1699,7 @@ scrn_timer(void *arg)
     }
     s = spltty();
 
+#ifndef PC98
     if ((sc->kbd == NULL) && (sc->config & SC_AUTODETECT_KBD)) {
 	/* try to allocate a keyboard automatically */
 	if (++kbd_interval >= 25) {
@@ -1695,6 +1715,7 @@ scrn_timer(void *arg)
 	    kbd_interval = 0;
 	}
     }
+#endif /* PC98 */
 
     /* find the vty to update */
     scp = sc->cur_scp;
@@ -2126,6 +2147,9 @@ sc_switch_scr(sc_softc_t *sc, u_int next_scr)
 
     DPRINTF(5, ("sc0: sc_switch_scr() %d ", next_scr + 1));
 
+    if (sc->cur_scp == NULL)
+	return (0);
+
     /* prevent switch if previously requested */
     if (sc->flags & SC_SCRN_VTYLOCK) {
 	    sc_bell(sc->cur_scp, sc->cur_scp->bell_pitch,
@@ -2444,11 +2468,17 @@ exchange_scr(sc_softc_t *sc)
 
     /* set up the video for the new screen */
     scp = sc->cur_scp = sc->new_scp;
+#ifdef PC98
+    if (sc->old_scp->mode != scp->mode || ISUNKNOWNSC(sc->old_scp) || ISUNKNOWNSC(sc->new_scp))
+#else
     if (sc->old_scp->mode != scp->mode || ISUNKNOWNSC(sc->old_scp))
+#endif
 	set_mode(scp);
+#ifndef __sparc64__
     else
 	sc_vtb_init(&scp->scr, VTB_FRAMEBUFFER, scp->xsize, scp->ysize,
 		    (void *)sc->adp->va_window, FALSE);
+#endif
     scp->status |= MOUSE_HIDDEN;
     sc_move_cursor(scp, scp->xpos, scp->ypos);
     if (!ISGRAPHSC(scp))
@@ -2614,7 +2644,11 @@ scinit(int unit, int flags)
     static scr_stat main_console;
     static dev_t main_devs[MAXCONS];
     static struct tty main_tty;
+#ifdef PC98
+    static u_short sc_buffer[ROW*COL*2];/* XXX */
+#else
     static u_short sc_buffer[ROW*COL];	/* XXX */
+#endif
 #ifndef SC_NO_FONT_LOADING
     static u_char font_8[256*8];
     static u_char font_14[256*14];
@@ -2715,11 +2749,13 @@ scinit(int unit, int flags)
 	SC_STAT(sc->dev[0]) = scp;
 	sc->cur_scp = scp;
 
+#ifndef __sparc64__
 	/* copy screen to temporary buffer */
 	sc_vtb_init(&scp->scr, VTB_FRAMEBUFFER, scp->xsize, scp->ysize,
 		    (void *)scp->sc->adp->va_window, FALSE);
 	if (ISTEXTSC(scp))
 	    sc_vtb_copy(&scp->scr, 0, &scp->vtb, 0, scp->xsize*scp->ysize);
+#endif
 
 	/* move cursors to the initial positions */
 	if (col >= scp->xsize)
@@ -2802,11 +2838,14 @@ scinit(int unit, int flags)
     /* initialize mapscrn arrays to a one to one map */
     for (i = 0; i < sizeof(sc->scr_map); i++)
 	sc->scr_map[i] = sc->scr_rmap[i] = i;
+#ifdef PC98
+    sc->scr_map[0x5c] = (u_char)0xfc;	/* for backslash */
+#endif
 
     sc->flags |= SC_INIT_DONE;
 }
 
-#if __i386__ || __ia64__ || __amd64__
+#if __i386__ || __ia64__ || __amd64__ || __sparc64__
 static void
 scterm(int unit, int flags)
 {
@@ -2862,7 +2901,7 @@ scterm(int unit, int flags)
     sc->keyboard = -1;
     sc->adapter = -1;
 }
-#endif /* __i386__ || __ia64__ || __amd64__ */
+#endif /* __i386__ || __ia64__ || __amd64__ || __sparc64__ */
 
 static void
 scshutdown(void *arg, int howto)
@@ -2975,22 +3014,21 @@ init_scp(sc_softc_t *sc, int vty, scr_stat *scp)
 	scp->ysize = info.vi_height;
 	scp->xpixel = scp->xsize*info.vi_cwidth;
 	scp->ypixel = scp->ysize*info.vi_cheight;
+	scp->font_size = info.vi_cheight;
+	scp->font_width = info.vi_cwidth;
 	if (info.vi_cheight < 14) {
-	    scp->font_size = 8;
 #ifndef SC_NO_FONT_LOADING
 	    scp->font = sc->font_8;
 #else
 	    scp->font = NULL;
 #endif
 	} else if (info.vi_cheight >= 16) {
-	    scp->font_size = 16;
 #ifndef SC_NO_FONT_LOADING
 	    scp->font = sc->font_16;
 #else
 	    scp->font = NULL;
 #endif
 	} else {
-	    scp->font_size = 14;
 #ifndef SC_NO_FONT_LOADING
 	    scp->font = sc->font_14;
 #else
@@ -2999,7 +3037,9 @@ init_scp(sc_softc_t *sc, int vty, scr_stat *scp)
 	}
     }
     sc_vtb_init(&scp->vtb, VTB_MEMORY, 0, 0, NULL, FALSE);
+#ifndef __sparc64__
     sc_vtb_init(&scp->scr, VTB_FRAMEBUFFER, 0, 0, NULL, FALSE);
+#endif
     scp->xoff = scp->yoff = 0;
     scp->xpos = scp->ypos = 0;
     scp->start = scp->xsize * scp->ysize - 1;
@@ -3441,8 +3481,10 @@ set_mode(scr_stat *scp)
 
     /* setup video hardware for the given mode */
     (*vidsw[scp->sc->adapter]->set_mode)(scp->sc->adp, scp->mode);
+#ifndef __sparc64__
     sc_vtb_init(&scp->scr, VTB_FRAMEBUFFER, scp->xsize, scp->ysize,
 		(void *)scp->sc->adp->va_window, FALSE);
+#endif
 
 #ifndef SC_NO_FONT_LOADING
     /* load appropriate font */

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/smb_conn.h,v 1.8 2002/09/16 10:50:38 bp Exp $
+ * $FreeBSD: src/sys/netsmb/smb_conn.h,v 1.9 2003/07/27 11:36:00 tjr Exp $
  */
 
 /*
@@ -146,7 +146,7 @@ struct smb_vc_info {
 	int		flags;
 	enum smbiod_state iodstate;
 	struct smb_sopt	sopt;
-	char		srvname[SMB_MAXSRVNAMELEN];
+	char		srvname[SMB_MAXSRVNAMELEN + 1];
 	char		vcname[128];
 };
 

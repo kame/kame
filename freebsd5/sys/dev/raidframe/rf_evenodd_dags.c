@@ -1,5 +1,7 @@
-/*	$FreeBSD: src/sys/dev/raidframe/rf_evenodd_dags.c,v 1.1 2002/10/20 08:17:36 scottl Exp $ */
 /*	$NetBSD: rf_evenodd_dags.c,v 1.2 1999/02/05 00:06:11 oster Exp $	*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/raidframe/rf_evenodd_dags.c,v 1.2 2003/08/24 17:54:18 obrien Exp $");
 /*
  * rf_evenodd_dags.c
  */

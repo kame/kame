@@ -33,8 +33,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_cluster.c	8.7 (Berkeley) 2/13/94
- * $FreeBSD: src/sys/kern/vfs_cluster.c,v 1.138 2003/05/28 13:22:10 iedowse Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/vfs_cluster.c,v 1.148 2003/11/12 08:01:39 mckusick Exp $");
 
 #include "opt_debug_cluster.h"
 
@@ -237,6 +239,7 @@ cluster_read(vp, filesize, lblkno, size, cred, totread, seqcount, bpp)
 		bp->b_ioflags &= ~BIO_ERROR;
 		if ((bp->b_flags & B_ASYNC) || bp->b_iodone != NULL)
 			BUF_KERNPROC(bp);
+		bp->b_iooffset = dbtob(bp->b_blkno);
 		error = VOP_STRATEGY(vp, bp);
 		curproc->p_stats->p_ru.ru_inblock++;
 		if (error)
@@ -291,6 +294,7 @@ cluster_read(vp, filesize, lblkno, size, cred, totread, seqcount, bpp)
 		rbp->b_ioflags &= ~BIO_ERROR;
 		if ((rbp->b_flags & B_ASYNC) || rbp->b_iodone != NULL)
 			BUF_KERNPROC(rbp);
+		rbp->b_iooffset = dbtob(rbp->b_blkno);
 		(void) VOP_STRATEGY(vp, rbp);
 		curproc->p_stats->p_ru.ru_inblock++;
 	}
@@ -323,8 +327,8 @@ cluster_rbuild(vp, filesize, lbn, blkno, size, run, fbp)
 	GIANT_REQUIRED;
 
 	KASSERT(size == vp->v_mount->mnt_stat.f_iosize,
-	    ("cluster_rbuild: size %ld != filesize %ld\n",
-	    size, vp->v_mount->mnt_stat.f_iosize));
+	    ("cluster_rbuild: size %ld != filesize %jd\n",
+	    size, (intmax_t)vp->v_mount->mnt_stat.f_iosize));
 
 	/*
 	 * avoid a division
@@ -397,21 +401,29 @@ cluster_rbuild(vp, filesize, lbn, blkno, size, run, fbp)
 			 * VMIO backed.  The clustering code can only deal
 			 * with VMIO-backed buffers.
 			 */
-			if ((tbp->b_flags & (B_CACHE|B_LOCKED)) ||
-				(tbp->b_flags & B_VMIO) == 0) {
+			VI_LOCK(bp->b_vp);
+			if ((tbp->b_vflags & BV_BKGRDINPROG) ||
+			    (tbp->b_flags & B_CACHE) ||
+			    (tbp->b_flags & B_VMIO) == 0) {
+				VI_UNLOCK(bp->b_vp);
 				bqrelse(tbp);
 				break;
 			}
+			VI_UNLOCK(bp->b_vp);
 
 			/*
 			 * The buffer must be completely invalid in order to
 			 * take part in the cluster.  If it is partially valid
 			 * then we stop.
 			 */
+			VM_OBJECT_LOCK(tbp->b_object);
 			for (j = 0;j < tbp->b_npages; j++) {
+				VM_OBJECT_LOCK_ASSERT(tbp->b_pages[j]->object,
+				    MA_OWNED);
 				if (tbp->b_pages[j]->valid)
 					break;
 			}
+			VM_OBJECT_UNLOCK(tbp->b_object);
 			if (j != tbp->b_npages) {
 				bqrelse(tbp);
 				break;
@@ -446,8 +458,7 @@ cluster_rbuild(vp, filesize, lbn, blkno, size, run, fbp)
 		BUF_KERNPROC(tbp);
 		TAILQ_INSERT_TAIL(&bp->b_cluster.cluster_head,
 			tbp, b_cluster.cluster_entry);
-		if (tbp->b_object != NULL)
-			VM_OBJECT_LOCK(tbp->b_object);
+		VM_OBJECT_LOCK(tbp->b_object);
 		vm_page_lock_queues();
 		for (j = 0; j < tbp->b_npages; j += 1) {
 			vm_page_t m;
@@ -463,8 +474,7 @@ cluster_rbuild(vp, filesize, lbn, blkno, size, run, fbp)
 				tbp->b_pages[j] = bogus_page;
 		}
 		vm_page_unlock_queues();
-		if (tbp->b_object != NULL)
-			VM_OBJECT_UNLOCK(tbp->b_object);
+		VM_OBJECT_UNLOCK(tbp->b_object);
 		/*
 		 * XXX shouldn't this be += size for both, like in
 		 * cluster_wbuild()?
@@ -485,12 +495,15 @@ cluster_rbuild(vp, filesize, lbn, blkno, size, run, fbp)
 	 * Fully valid pages in the cluster are already good and do not need
 	 * to be re-read from disk.  Replace the page with bogus_page
 	 */
+	VM_OBJECT_LOCK(bp->b_object);
 	for (j = 0; j < bp->b_npages; j++) {
+		VM_OBJECT_LOCK_ASSERT(bp->b_pages[j]->object, MA_OWNED);
 		if ((bp->b_pages[j]->valid & VM_PAGE_BITS_ALL) ==
 		    VM_PAGE_BITS_ALL) {
 			bp->b_pages[j] = bogus_page;
 		}
 	}
+	VM_OBJECT_UNLOCK(bp->b_object);
 	if (bp->b_bufsize > bp->b_kvasize)
 		panic("cluster_rbuild: b_bufsize(%ld) > b_kvasize(%d)\n",
 		    bp->b_bufsize, bp->b_kvasize);
@@ -766,7 +779,8 @@ cluster_wbuild(vp, size, start_lbn, len)
 		 * partake in the clustered write.
 		 */
 		VI_LOCK(vp);
-		if ((tbp = gbincore(vp, start_lbn)) == NULL) {
+		if ((tbp = gbincore(vp, start_lbn)) == NULL ||
+		    (tbp->b_vflags & BV_BKGRDINPROG)) {
 			VI_UNLOCK(vp);
 			++start_lbn;
 			--len;
@@ -780,8 +794,7 @@ cluster_wbuild(vp, size, start_lbn, len)
 			splx(s);
 			continue;
 		}
-		if ((tbp->b_flags & (B_LOCKED | B_INVAL | B_DELWRI)) !=
-		    B_DELWRI) {
+		if ((tbp->b_flags & (B_INVAL | B_DELWRI)) != B_DELWRI) {
 			BUF_UNLOCK(tbp);
 			++start_lbn;
 			--len;
@@ -839,7 +852,7 @@ cluster_wbuild(vp, size, start_lbn, len)
 		bp->b_data = (char *)((vm_offset_t)bp->b_data |
 		    ((vm_offset_t)tbp->b_data & PAGE_MASK));
 		bp->b_flags |= B_CLUSTER |
-				(tbp->b_flags & (B_VMIO | B_NEEDCOMMIT | B_NOWDRAIN));
+				(tbp->b_flags & (B_VMIO | B_NEEDCOMMIT));
 		bp->b_iodone = cluster_callback;
 		pbgetvp(vp, bp);
 		/*
@@ -855,7 +868,8 @@ cluster_wbuild(vp, size, start_lbn, len)
 				 * can't need to be written.
 				 */
 				VI_LOCK(vp);
-				if ((tbp = gbincore(vp, start_lbn)) == NULL) {
+				if ((tbp = gbincore(vp, start_lbn)) == NULL ||
+				    (tbp->b_vflags & BV_BKGRDINPROG)) {
 					VI_UNLOCK(vp);
 					splx(s);
 					break;
@@ -879,7 +893,6 @@ cluster_wbuild(vp, size, start_lbn, len)
 				    B_INVAL | B_DELWRI | B_NEEDCOMMIT))
 				    != (B_DELWRI | B_CLUSTEROK |
 				    (bp->b_flags & (B_VMIO | B_NEEDCOMMIT))) ||
-				    (tbp->b_flags & B_LOCKED) ||
 				    tbp->b_wcred != bp->b_wcred) {
 					BUF_UNLOCK(tbp);
 					splx(s);

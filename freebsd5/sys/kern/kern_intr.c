@@ -22,11 +22,12 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/kern_intr.c,v 1.95 2003/05/02 00:33:11 julian Exp $
- *
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_intr.c,v 1.103 2003/11/20 15:35:48 markm Exp $");
+
+#include "opt_ddb.h"
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -50,10 +51,14 @@
 #include <machine/cpu.h>
 #include <machine/md_var.h>
 #include <machine/stdarg.h>
+#ifdef DDB
+#include <ddb/ddb.h>
+#include <ddb/db_sym.h>
+#endif
 
 struct	int_entropy {
 	struct	proc *proc;
-	int	vector;
+	uintptr_t vector;
 };
 
 void	*vm_ih;
@@ -164,8 +169,8 @@ ithread_update(struct ithd *ithd)
 }
 
 int
-ithread_create(struct ithd **ithread, int vector, int flags,
-    void (*disable)(int), void (*enable)(int), const char *fmt, ...)
+ithread_create(struct ithd **ithread, uintptr_t vector, int flags,
+    void (*disable)(uintptr_t), void (*enable)(uintptr_t), const char *fmt, ...)
 {
 	struct ithd *ithd;
 	struct thread *td;
@@ -215,12 +220,10 @@ ithread_destroy(struct ithd *ithread)
 {
 
 	struct thread *td;
-	struct proc *p;
 	if (ithread == NULL)
 		return (EINVAL);
 
 	td = ithread->it_td;
-	p = td->td_proc;
 	mtx_lock(&ithread->it_lock);
 	if (!TAILQ_EMPTY(&ithread->it_handlers)) {
 		mtx_unlock(&ithread->it_lock);
@@ -247,8 +250,6 @@ ithread_add_handler(struct ithd* ithread, const char *name,
 
 	if (ithread == NULL || name == NULL || handler == NULL)
 		return (EINVAL);
-	if ((flags & INTR_FAST) !=0)
-		flags |= INTR_EXCL;
 
 	ih = malloc(sizeof(struct intrhand), M_ITHREAD, M_WAITOK | M_ZERO);
 	ih->ih_handler = handler;
@@ -257,7 +258,7 @@ ithread_add_handler(struct ithd* ithread, const char *name,
 	ih->ih_ithread = ithread;
 	ih->ih_pri = pri;
 	if (flags & INTR_FAST)
-		ih->ih_flags = IH_FAST | IH_EXCLUSIVE;
+		ih->ih_flags = IH_FAST;
 	else if (flags & INTR_EXCL)
 		ih->ih_flags = IH_EXCLUSIVE;
 	if (flags & INTR_MPSAFE)
@@ -266,11 +267,17 @@ ithread_add_handler(struct ithd* ithread, const char *name,
 		ih->ih_flags |= IH_ENTROPY;
 
 	mtx_lock(&ithread->it_lock);
-	if ((flags & INTR_EXCL) !=0 && !TAILQ_EMPTY(&ithread->it_handlers))
+	if ((flags & INTR_EXCL) != 0 && !TAILQ_EMPTY(&ithread->it_handlers))
 		goto fail;
-	if (!TAILQ_EMPTY(&ithread->it_handlers) &&
-	    (TAILQ_FIRST(&ithread->it_handlers)->ih_flags & IH_EXCLUSIVE) != 0)
-		goto fail;
+	if (!TAILQ_EMPTY(&ithread->it_handlers)) {
+		temp_ih = TAILQ_FIRST(&ithread->it_handlers);
+		if (temp_ih->ih_flags & IH_EXCLUSIVE)
+			goto fail;
+		if ((ih->ih_flags & IH_FAST) && !(temp_ih->ih_flags & IH_FAST))
+			goto fail;
+		if (!(ih->ih_flags & IH_FAST) && (temp_ih->ih_flags & IH_FAST))
+			goto fail;
+	}
 
 	TAILQ_FOREACH(temp_ih, &ithread->it_handlers, ih_next)
 	    if (temp_ih->ih_pri > ih->ih_pri)
@@ -564,6 +571,143 @@ restart:
 	}
 }
 
+#ifdef DDB
+/*
+ * Dump details about an interrupt handler
+ */
+static void
+db_dump_intrhand(struct intrhand *ih)
+{
+	int comma;
+
+	db_printf("\t%-10s ", ih->ih_name);
+	switch (ih->ih_pri) {
+	case PI_REALTIME:
+		db_printf("CLK ");
+		break;
+	case PI_AV:
+		db_printf("AV  ");
+		break;
+	case PI_TTYHIGH:
+	case PI_TTYLOW:
+		db_printf("TTY ");
+		break;
+	case PI_TAPE:
+		db_printf("TAPE");
+		break;
+	case PI_NET:
+		db_printf("NET ");
+		break;
+	case PI_DISK:
+	case PI_DISKLOW:
+		db_printf("DISK");
+		break;
+	case PI_DULL:
+		db_printf("DULL");
+		break;
+	default:
+		if (ih->ih_pri >= PI_SOFT)
+			db_printf("SWI ");
+		else
+			db_printf("%4u", ih->ih_pri);
+		break;
+	}
+	db_printf(" ");
+	db_printsym((uintptr_t)ih->ih_handler, DB_STGY_PROC);
+	db_printf("(%p)", ih->ih_argument);
+	if (ih->ih_need ||
+	    (ih->ih_flags & (IH_FAST | IH_EXCLUSIVE | IH_ENTROPY | IH_DEAD |
+	    IH_MPSAFE)) != 0) {
+		db_printf(" {");
+		comma = 0;
+		if (ih->ih_flags & IH_FAST) {
+			db_printf("FAST");
+			comma = 1;
+		}
+		if (ih->ih_flags & IH_EXCLUSIVE) {
+			if (comma)
+				db_printf(", ");
+			db_printf("EXCL");
+			comma = 1;
+		}
+		if (ih->ih_flags & IH_ENTROPY) {
+			if (comma)
+				db_printf(", ");
+			db_printf("ENTROPY");
+			comma = 1;
+		}
+		if (ih->ih_flags & IH_DEAD) {
+			if (comma)
+				db_printf(", ");
+			db_printf("DEAD");
+			comma = 1;
+		}
+		if (ih->ih_flags & IH_MPSAFE) {
+			if (comma)
+				db_printf(", ");
+			db_printf("MPSAFE");
+			comma = 1;
+		}
+		if (ih->ih_need) {
+			if (comma)
+				db_printf(", ");
+			db_printf("NEED");
+		}
+		db_printf("}");
+	}
+	db_printf("\n");
+}
+
+/*
+ * Dump details about an ithread
+ */
+void
+db_dump_ithread(struct ithd *ithd, int handlers)
+{
+	struct proc *p;
+	struct intrhand *ih;
+	int comma;
+
+	if (ithd->it_td != NULL) {
+		p = ithd->it_td->td_proc;
+		db_printf("%s (pid %d)", p->p_comm, p->p_pid);
+	} else
+		db_printf("%s: (no thread)", ithd->it_name);
+	if ((ithd->it_flags & (IT_SOFT | IT_ENTROPY | IT_DEAD)) != 0 ||
+	    ithd->it_need) {
+		db_printf(" {");
+		comma = 0;
+		if (ithd->it_flags & IT_SOFT) {
+			db_printf("SOFT");
+			comma = 1;
+		}
+		if (ithd->it_flags & IT_ENTROPY) {
+			if (comma)
+				db_printf(", ");
+			db_printf("ENTROPY");
+			comma = 1;
+		}
+		if (ithd->it_flags & IT_DEAD) {
+			if (comma)
+				db_printf(", ");
+			db_printf("DEAD");
+			comma = 1;
+		}
+		if (ithd->it_need) {
+			if (comma)
+				db_printf(", ");
+			db_printf("NEED");
+		}
+		db_printf("}");
+	}
+	db_printf("\n");
+
+	if (handlers)
+		TAILQ_FOREACH(ih, &ithd->it_handlers, ih_next)
+		    db_dump_intrhand(ih);
+}
+#endif /* DDB */
+
 /*
  * Start standard software interrupt threads
  */
@@ -574,7 +718,7 @@ start_softintr(void *dummy)
 
 	if (swi_add(&clk_ithd, "clock", softclock, NULL, SWI_CLOCK,
 		INTR_MPSAFE, &softclock_ih) ||
-	    swi_add(NULL, "vm", swi_vm, NULL, SWI_VM, 0, &vm_ih))
+	    swi_add(NULL, "vm", swi_vm, NULL, SWI_VM, INTR_MPSAFE, &vm_ih))
 		panic("died while creating standard software ithreads");
 
 	p = clk_ithd->it_td->td_proc;
@@ -612,3 +756,25 @@ sysctl_intrcnt(SYSCTL_HANDLER_ARGS)
 
 SYSCTL_PROC(_hw, OID_AUTO, intrcnt, CTLTYPE_OPAQUE | CTLFLAG_RD,
     NULL, 0, sysctl_intrcnt, "", "Interrupt Counts");
+
+#ifdef DDB
+/*
+ * DDB command to dump the interrupt statistics.
+ */
+DB_SHOW_COMMAND(intrcnt, db_show_intrcnt)
+{
+	u_long *i;
+	char *cp;
+	int quit;
+
+	cp = intrnames;
+	db_setup_paging(db_simple_pager, &quit, DB_LINES_PER_PAGE);
+	for (i = intrcnt, quit = 0; i != eintrcnt && !quit; i++) {
+		if (*cp == '\0')
+			break;
+		if (*i != 0)
+			db_printf("%s\t%lu\n", cp, *i);
+		cp += strlen(cp) + 1;
+	}
+}
+#endif

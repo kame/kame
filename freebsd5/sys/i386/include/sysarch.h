@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/sysarch.h,v 1.17 2002/09/28 20:42:04 peter Exp $
+ * $FreeBSD: src/sys/i386/include/sysarch.h,v 1.18 2003/08/04 19:11:56 julian Exp $
  */
 
 /*
@@ -41,6 +41,7 @@
 
 #define I386_GET_LDT	0
 #define I386_SET_LDT	1
+#define	LDT_AUTO_ALLOC	0xffffffff
 				/* I386_IOPL */
 #define I386_GET_IOPERM	3
 #define I386_SET_IOPERM	4

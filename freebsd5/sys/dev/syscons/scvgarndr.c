@@ -23,8 +23,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/scvgarndr.c,v 1.13 2002/03/06 08:55:34 ru Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/syscons/scvgarndr.c,v 1.14 2003/08/24 18:17:24 obrien Exp $");
 
 #include "opt_syscons.h"
 #include "opt_vga.h"

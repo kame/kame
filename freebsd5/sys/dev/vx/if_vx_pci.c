@@ -25,9 +25,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/vx/if_vx_pci.c,v 1.23 2003/04/15 06:37:28 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/vx/if_vx_pci.c,v 1.28 2003/10/31 18:32:06 brooks Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -43,10 +44,11 @@
 #include <sys/bus.h>
 #include <sys/rman.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 
 #include <dev/vx/if_vxreg.h>
+#include <dev/vx/if_vxvar.h>
 
 static void vx_pci_shutdown(device_t);
 static int vx_pci_probe(device_t);
@@ -128,15 +130,15 @@ vx_pci_attach(
 
     sc = device_get_softc(dev);
 
-    rid = PCIR_MAPS;
+    rid = PCIR_BAR(0);
     sc->vx_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
 	0, ~0, 1, RF_ACTIVE);
 
     if (sc->vx_res == NULL)
 	goto bad;
 
-    sc->vx_btag = rman_get_bustag(sc->vx_res);
-    sc->vx_bhandle = rman_get_bushandle(sc->vx_res);
+    sc->bst = rman_get_bustag(sc->vx_res);
+    sc->bsh = rman_get_bushandle(sc->vx_res);
 
     rid = 0;
     sc->vx_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
@@ -149,7 +151,7 @@ vx_pci_attach(
 	vxintr, sc, &sc->vx_intrhand))
 	goto bad;
 
-    if (vxattach(sc) == 0) {
+    if (vxattach(dev) == 0) {
 	goto bad;
     }
 
@@ -159,7 +161,7 @@ vx_pci_attach(
 	if (vxbusyeeprom(sc))
 	    goto bad;
 	CSR_WRITE_2(sc, VX_W0_EEPROM_COMMAND,
-	    EEPROM_CMD_RD | EEPROM_SOFT_INFO_2);
+	    EEPROM_CMD_RD | EEPROM_SOFTINFO2);
 	if (vxbusyeeprom(sc))
 	    goto bad;
 	if (!(CSR_READ_2(sc, VX_W0_EEPROM_DATA) & NO_RX_OVN_ANOMALY)) {

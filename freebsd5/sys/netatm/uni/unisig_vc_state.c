@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_vc_state.c,v 1.14 2003/02/19 05:47:31 imp Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ----------------------------------------
  *
  * VC state machine
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/unisig_vc_state.c,v 1.16 2003/07/23 14:28:57 harti Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -59,11 +57,6 @@
 
 #include <netatm/uni/unisig_var.h>
 #include <netatm/uni/unisig_msg.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/unisig_vc_state.c,v 1.14 2003/02/19 05:47:31 imp Exp $");
-#endif
-
 
 /*
  * Local functions
@@ -666,9 +659,10 @@ unisig_vc_act06(usp, uvp, msg)
 	} else {
 		/*
 		 * No--VCI must have been specified earlier
+		 * May be called from netisr - don't wait.
 		 */
 		if (!uvp->uv_vci) {
-			iep = uma_zalloc(unisig_ie_zone, M_WAITOK);
+			iep = uma_zalloc(unisig_ie_zone, M_NOWAIT);
 			if (iep == NULL)
 				return(ENOMEM);
 			iep->ie_ident = UNI_IE_CNID;
@@ -741,8 +735,9 @@ unisig_vc_act06(usp, uvp, msg)
 
 	/*
 	 * Get memory for a CONNECT ACK message
+	 * May be called from netisr.
 	 */
-	cack_msg = uma_zalloc(unisig_msg_zone, M_WAITOK);
+	cack_msg = uma_zalloc(unisig_msg_zone, M_NOWAIT);
 	if (cack_msg == NULL)
 		return(ENOMEM);
 
@@ -1058,7 +1053,8 @@ unisig_vc_act09(usp, uvp, msg)
 	int			rc;
 	struct unisig_msg	*conn_msg;
 
-	conn_msg = uma_zalloc(unisig_msg_zone, M_WAITOK);
+	/* may be called from timeout - don't wait */
+	conn_msg = uma_zalloc(unisig_msg_zone, M_NOWAIT);
 	if (conn_msg == NULL)
 		return(ENOMEM);
 
@@ -1610,8 +1606,9 @@ unisig_vc_act20(usp, uvp, msg)
 
 	/*
 	 * Get memory for a STATUS ENQUIRY message
+	 * May be called from netisr - don't wait.
 	 */
-	stat_msg = uma_zalloc(unisig_msg_zone, M_WAITOK);
+	stat_msg = uma_zalloc(unisig_msg_zone, M_NOWAIT);
 	if (stat_msg == NULL)
 		return(ENOMEM);
 

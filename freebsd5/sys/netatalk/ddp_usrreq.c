@@ -2,7 +2,7 @@
  * Copyright (c) 1990,1994 Regents of The University of Michigan.
  * All Rights Reserved.  See COPYRIGHT.
  *
- * $FreeBSD: src/sys/netatalk/ddp_usrreq.c,v 1.30 2003/03/04 23:19:51 jlemon Exp $
+ * $FreeBSD: src/sys/netatalk/ddp_usrreq.c,v 1.33 2003/11/18 00:39:03 rwatson Exp $
  */
 
 #include <sys/param.h>
@@ -459,7 +459,7 @@ at_pcbdetach( struct socket *so, struct ddpcb *ddp)
     }
 
     if ( ddp->ddp_route.ro_rt ) {
-	rtfree( ddp->ddp_route.ro_rt );
+	RTFREE( ddp->ddp_route.ro_rt );
     }
 
     if ( ddp->ddp_prev ) {
@@ -553,9 +553,9 @@ ddp_init(void)
 	mtx_init(&atintrq1.ifq_mtx, "at1_inq", NULL, MTX_DEF);
 	mtx_init(&atintrq2.ifq_mtx, "at2_inq", NULL, MTX_DEF);
 	mtx_init(&aarpintrq.ifq_mtx, "aarp_inq", NULL, MTX_DEF);
-	netisr_register(NETISR_ATALK1, at1intr, &atintrq1);
-	netisr_register(NETISR_ATALK2, at2intr, &atintrq2);
-	netisr_register(NETISR_AARP, aarpintr, &aarpintrq);
+	netisr_register(NETISR_ATALK1, at1intr, &atintrq1, 0);
+	netisr_register(NETISR_ATALK2, at2intr, &atintrq2, 0);
+	netisr_register(NETISR_AARP, aarpintr, &aarpintrq, 0);
 }
 
 #if 0
@@ -590,5 +590,6 @@ struct pr_usrreqs ddp_usrreqs = {
 	at_setsockaddr,
 	sosend,
 	soreceive,
-	sopoll
+	sopoll,
+	pru_sosetlabel_null
 };

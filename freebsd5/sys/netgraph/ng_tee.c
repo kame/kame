@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_tee.c,v 1.23 2003/02/19 05:47:32 imp Exp $
+ * $FreeBSD: src/sys/netgraph/ng_tee.c,v 1.25 2003/07/03 22:09:47 julian Exp $
  * $Whistle: ng_tee.c,v 1.18 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -46,7 +46,7 @@
  * entering from the right is passed to the left and duplicated on
  * right2left, and data entering from the left is passed to the right
  * and duplicated on left2right. Data entering from left2right is
- * sent to right, and data from right2left to left.
+ * sent to left, and data from right2left to right.
  */
 
 #include <sys/param.h>
@@ -357,7 +357,7 @@ ngt_rcvdata(hook_p hook, item_p item)
 		NG_FWD_ITEM_HOOK(error, item, dest->hook);
 	else
 		NG_FREE_ITEM(item);
-	return (0);
+	return (error);
 }
 
 /*

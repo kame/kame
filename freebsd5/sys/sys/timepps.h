@@ -6,10 +6,10 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/sys/timepps.h,v 1.17 2002/04/30 19:46:20 phk Exp $
+ * $FreeBSD: src/sys/sys/timepps.h,v 1.18 2003/11/23 18:52:23 phk Exp $
  *
- * The is a FreeBSD protype version of the "draft-mogul-pps-api-05.txt" 
- * specification for Pulse Per Second timing interfaces.  
+ * The is a FreeBSD version of the RFC 2783 API for Pulse Per Second 
+ * timing interfaces.  
  */
 
 #ifndef _SYS_TIMEPPS_H_

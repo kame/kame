@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)filedesc.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/filedesc.h,v 1.50 2003/02/15 05:52:56 alfred Exp $
+ * $FreeBSD: src/sys/sys/filedesc.h,v 1.52 2003/11/11 22:07:29 jhb Exp $
  */
 
 #ifndef _SYS_FILEDESC_H_
@@ -75,6 +75,8 @@ struct filedesc {
 	u_long	fd_knhashmask;		/* size of knhash */
 	struct	klist *fd_knhash;	/* hash table for attached knotes */
 	struct mtx	fd_mtx;		/* mtx to protect the members of struct filedesc */
+	int	fd_holdleaderscount;	/* block fdfree() for shared close() */
+	int	fd_holdleaderswakeup;	/* fdfree() needs wakeup */
 };
 
 /*
@@ -89,6 +91,27 @@ struct filedesc0 {
 	 */
 	struct	file *fd_dfiles[NDFILE];
 	char	fd_dfileflags[NDFILE];
+};
+
+
+
+/*
+ * Structure to keep track of (process leader, struct fildedesc) tuples.
+ * Each process has a pointer to such a structure when detailed tracking
+ * is needed. e.g. when rfork(RFPROC | RFMEM) causes a file descriptor
+ * table to be shared by processes having different "p_leader" pointers
+ * and thus distinct POSIX style locks.
+ *
+ * fdl_refcount and fdl_holdcount are protected by struct filedesc mtx.
+ */
+struct filedesc_to_leader {
+	int		fdl_refcount;	/* references from struct proc */
+	int		fdl_holdcount;	/* temporary hold during closef */
+	int		fdl_wakeup;	/* fdfree() waits on closef() */
+	struct proc	*fdl_leader;	/* owner of POSIX locks */
+	/* Circular list */
+	struct filedesc_to_leader *fdl_prev;
+	struct filedesc_to_leader *fdl_next;
 };
 
 /*
@@ -114,6 +137,8 @@ struct filedesc0 {
 #define	FILEDESC_LOCKED(fd)	mtx_owned(&(fd)->fd_mtx)
 #define	FILEDESC_LOCK_ASSERT(fd, type)	mtx_assert(&(fd)->fd_mtx, (type))
 
+struct thread;
+
 int	closef(struct file *fp, struct thread *p);
 int	dupfdopen(struct thread *td, struct filedesc *fdp, int indx, int dfd,
 	    int mode, int error);
@@ -130,6 +155,12 @@ void	ffree(struct file *fp);
 static __inline struct file *	fget_locked(struct filedesc *fdp, int fd);
 int	getvnode(struct filedesc *fdp, int fd, struct file **fpp);
 void	setugidsafety(struct thread *td);
+
+struct filedesc_to_leader *
+filedesc_to_leader_alloc(struct filedesc_to_leader *old,
+			 struct filedesc *fdp,
+			 struct proc *leader);
+
 
 static __inline struct file *
 fget_locked(struct filedesc *fdp, int fd)

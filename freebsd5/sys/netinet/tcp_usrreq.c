@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)tcp_usrreq.c	8.2 (Berkeley) 1/3/94
- * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.86 2003/03/08 22:07:52 jlemon Exp $
+ * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.90.2.1 2004/01/09 12:32:36 andre Exp $
  */
 
 #include "opt_ipsec.h"
@@ -685,7 +685,7 @@ tcp_usr_send(struct socket *so, int flags, struct mbuf *m,
 		m_freem(control);	/* empty control, just free it */
 	}
 	if (!(flags & PRUS_OOB)) {
-		sbappend(&so->so_snd, m);
+		sbappendstream(&so->so_snd, m);
 		if (nam && tp->t_state < TCPS_SYN_SENT) {
 			/*
 			 * Do implied connect if not yet connected,
@@ -734,7 +734,7 @@ tcp_usr_send(struct socket *so, int flags, struct mbuf *m,
 		 * of data past the urgent section.
 		 * Otherwise, snd_up should be one lower.
 		 */
-		sbappend(&so->so_snd, m);
+		sbappendstream(&so->so_snd, m);
 		if (nam && tp->t_state < TCPS_SYN_SENT) {
 			/*
 			 * Do implied connect if not yet connected,
@@ -816,7 +816,7 @@ struct pr_usrreqs tcp_usrreqs = {
 	tcp_usr_connect, pru_connect2_notsupp, in_control, tcp_usr_detach,
 	tcp_usr_disconnect, tcp_usr_listen, tcp_peeraddr, tcp_usr_rcvd,
 	tcp_usr_rcvoob, tcp_usr_send, pru_sense_null, tcp_usr_shutdown,
-	tcp_sockaddr, sosend, soreceive, sopoll
+	tcp_sockaddr, sosend, soreceive, sopoll, in_pcbsosetlabel
 };
 
 #ifdef INET6
@@ -825,7 +825,7 @@ struct pr_usrreqs tcp6_usrreqs = {
 	tcp6_usr_connect, pru_connect2_notsupp, in6_control, tcp_usr_detach,
 	tcp_usr_disconnect, tcp6_usr_listen, in6_mapped_peeraddr, tcp_usr_rcvd,
 	tcp_usr_rcvoob, tcp_usr_send, pru_sense_null, tcp_usr_shutdown,
-	in6_mapped_sockaddr, sosend, soreceive, sopoll
+	in6_mapped_sockaddr, sosend, soreceive, sopoll, in_pcbsosetlabel
 };
 #endif /* INET6 */
 
@@ -848,11 +848,12 @@ tcp_connect(tp, nam, td)
 	struct inpcb *inp = tp->t_inpcb, *oinp;
 	struct socket *so = inp->inp_socket;
 	struct tcptw *otw;
-	struct rmxp_tao *taop;
-	struct rmxp_tao tao_noncached;
+	struct rmxp_tao tao;
 	struct in_addr laddr;
 	u_short lport;
 	int error;
+
+	bzero(&tao, sizeof(tao));
 
 	if (inp->inp_lport == 0) {
 		error = in_pcbbind(inp, (struct sockaddr *)0, td);
@@ -902,19 +903,21 @@ tcp_connect(tp, nam, td)
 	 * Generate a CC value for this connection and
 	 * check whether CC or CCnew should be used.
 	 */
-	if ((taop = tcp_gettaocache(&tp->t_inpcb->inp_inc)) == NULL) {
-		taop = &tao_noncached;
-		bzero(taop, sizeof(*taop));
-	}
+	if (tcp_do_rfc1644)
+		tcp_hc_gettao(&inp->inp_inc, &tao);
 
 	tp->cc_send = CC_INC(tcp_ccgen);
-	if (taop->tao_ccsent != 0 &&
-	    CC_GEQ(tp->cc_send, taop->tao_ccsent)) {
-		taop->tao_ccsent = tp->cc_send;
+	if (tao.tao_ccsent != 0 &&
+	    CC_GEQ(tp->cc_send, tao.tao_ccsent)) {
+		tao.tao_ccsent = tp->cc_send;
 	} else {
-		taop->tao_ccsent = 0;
+		tao.tao_ccsent = 0;
 		tp->t_flags |= TF_SENDCCNEW;
 	}
+
+	if (tcp_do_rfc1644)
+		tcp_hc_updatetao(&inp->inp_inc, TCP_HC_TAO_CCSENT,
+				 tao.tao_ccsent, 0);
 
 	return 0;
 }
@@ -931,9 +934,10 @@ tcp6_connect(tp, nam, td)
 	struct tcptw *otw;
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)nam;
 	struct in6_addr *addr6;
-	struct rmxp_tao *taop;
-	struct rmxp_tao tao_noncached;
+	struct rmxp_tao tao;
 	int error;
+
+	bzero(&tao, sizeof(tao));
 
 	if (inp->inp_lport == 0) {
 		error = in6_pcbbind(inp, (struct sockaddr *)0, td);
@@ -991,19 +995,20 @@ tcp6_connect(tp, nam, td)
 	 * Generate a CC value for this connection and
 	 * check whether CC or CCnew should be used.
 	 */
-	if ((taop = tcp_gettaocache(&tp->t_inpcb->inp_inc)) == NULL) {
-		taop = &tao_noncached;
-		bzero(taop, sizeof(*taop));
-	}
+	if (tcp_do_rfc1644)
+		tcp_hc_gettao(&inp->inp_inc, &tao);
 
 	tp->cc_send = CC_INC(tcp_ccgen);
-	if (taop->tao_ccsent != 0 &&
-	    CC_GEQ(tp->cc_send, taop->tao_ccsent)) {
-		taop->tao_ccsent = tp->cc_send;
+	if (tao.tao_ccsent != 0 &&
+	    CC_GEQ(tp->cc_send, tao.tao_ccsent)) {
+		tao.tao_ccsent = tp->cc_send;
 	} else {
-		taop->tao_ccsent = 0;
+		tao.tao_ccsent = 0;
 		tp->t_flags |= TF_SENDCCNEW;
 	}
+	if (tcp_do_rfc1644)
+		tcp_hc_updatetao(&inp->inp_inc, TCP_HC_TAO_CCSENT,
+				 tao.tao_ccsent, 0);
 
 	return 0;
 }
@@ -1097,7 +1102,8 @@ tcp_ctloutput(so, sopt)
 			if (error)
 				break;
 
-			if (optval > 0 && optval <= tp->t_maxseg)
+			if (optval > 0 && optval <= tp->t_maxseg &&
+			    optval + 40 >= tcp_minmss)
 				tp->t_maxseg = optval;
 			else
 				error = EINVAL;
@@ -1170,7 +1176,7 @@ tcp_attach(so, td)
 		if (error)
 			return (error);
 	}
-	error = in_pcballoc(so, &tcbinfo, td);
+	error = in_pcballoc(so, &tcbinfo, td, "tcpinp");
 	if (error)
 		return (error);
 	inp = sotoinpcb(so);

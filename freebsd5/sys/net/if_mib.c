@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_mib.c,v 1.12 2001/10/17 04:12:28 fenner Exp $
+ * $FreeBSD: src/sys/net/if_mib.c,v 1.13 2003/10/31 18:32:08 brooks Exp $
  */
 
 #include <sys/param.h>
@@ -71,10 +71,9 @@ static int
 sysctl_ifdata(SYSCTL_HANDLER_ARGS) /* XXX bad syntax! */
 {
 	int *name = (int *)arg1;
-	int error, ifnlen;
+	int error;
 	u_int namelen = arg2;
 	struct ifnet *ifp;
-	char workbuf[64];
 	struct ifmibdata ifmd;
 
 	if (namelen != 2)
@@ -91,13 +90,7 @@ sysctl_ifdata(SYSCTL_HANDLER_ARGS) /* XXX bad syntax! */
 		return ENOENT;
 
 	case IFDATA_GENERAL:
-		ifnlen = snprintf(workbuf, sizeof(workbuf),
-		    "%s%d", ifp->if_name, ifp->if_unit);
-		if(ifnlen + 1 > sizeof ifmd.ifmd_name) {
-			return ENAMETOOLONG;
-		} else {
-			strcpy(ifmd.ifmd_name, workbuf);
-		}
+		strlcpy(ifmd.ifmd_name, ifp->if_xname, sizeof(ifmd.ifmd_name));
 
 #define COPY(fld) ifmd.ifmd_##fld = ifp->if_##fld
 		COPY(pcount);

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/if_axereg.h,v 1.1 2003/04/20 19:05:33 wpaul Exp $
+ * $FreeBSD: src/sys/dev/usb/if_axereg.h,v 1.2 2003/06/15 21:45:43 wpaul Exp $
  */
 
 /*
@@ -105,6 +105,7 @@
 #define AXE_CTL_WRITE		0x02
 
 #define AXE_CONFIG_NO		1
+#define AXE_IFACE_IDX		0
 
 /*
  * The interrupt endpoint is currently unused

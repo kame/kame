@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/uniarp_output.c,v 1.8 2002/04/19 17:45:21 arr Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ---------------------
  *
  * UNI ATMARP support (RFC1577) - Output packet processing
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/uniarp_output.c,v 1.9 2003/06/11 07:22:30 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -60,11 +58,6 @@
 #include <netatm/ipatm/ipatm_var.h>
 #include <netatm/ipatm/ipatm_serv.h>
 #include <netatm/uni/uniip_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/uniarp_output.c,v 1.8 2002/04/19 17:45:21 arr Exp $");
-#endif
-
 
 /*
  * Issue an ATMARP Request PDU

@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_sigmgr_state.c,v 1.12 2002/04/19 17:45:21 arr Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ----------------------------------------
  *
  * Signalling manager finite state machine
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/unisig_sigmgr_state.c,v 1.13 2003/06/11 07:22:30 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -60,11 +58,6 @@
 #include <netatm/uni/uni.h>
 #include <netatm/uni/unisig.h>
 #include <netatm/uni/unisig_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/unisig_sigmgr_state.c,v 1.12 2002/04/19 17:45:21 arr Exp $");
-#endif
-
 
 /*
  * Local functions

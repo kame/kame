@@ -31,10 +31,16 @@
  * SUCH DAMAGE.
  *
  *	@(#)ptrace.h	8.1 (Berkeley) 6/11/93
- * $FreeBSD: src/sys/ia64/include/ptrace.h,v 1.3 2002/03/16 00:25:50 des Exp $
+ * $FreeBSD: src/sys/ia64/include/ptrace.h,v 1.4 2003/08/15 05:40:59 marcel Exp $
  */
 
 #ifndef _MACHINE_PTRACE_H_
-#define _MACHINE_PTRACE_H_
+#define	_MACHINE_PTRACE_H_
 
-#endif
+#define	__HAVE_PTRACE_MACHDEP
+
+/* Fetch/store dirty registers on the kernel stack. */
+#define	PT_GETKSTACK	(PT_FIRSTMACH + 0)
+#define	PT_SETKSTACK	(PT_FIRSTMACH + 1)
+
+#endif /* _MACHINE_PTRACE_H_ */

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/extattr.h,v 1.11 2002/10/09 21:48:57 rwatson Exp $
+ * $FreeBSD: src/sys/sys/extattr.h,v 1.12 2003/06/04 04:04:24 rwatson Exp $
  */
 /*
  * Developed by the TrustedBSD Project.
@@ -68,6 +68,12 @@ ssize_t	extattr_get_file(const char *_path, int _attrnamespace,
 	    const char *_attrname, void *_data, size_t _nbytes);
 ssize_t	extattr_get_link(const char *_path, int _attrnamespace,
 	    const char *_attrname, void *_data, size_t _nbytes);
+ssize_t	extattr_list_fd(int _fd, int _attrnamespace, void *_data,
+	    size_t _nbytes);
+ssize_t	extattr_list_file(const char *_path, int _attrnamespace, void *_data,
+	    size_t _nbytes);
+ssize_t	extattr_list_link(const char *_path, int _attrnamespace, void *_data,
+	    size_t _nbytes);
 int	extattr_set_fd(int _fd, int _attrnamespace, const char *_attrname,
 	    const void *_data, size_t _nbytes);
 int	extattr_set_file(const char *_path, int _attrnamespace,

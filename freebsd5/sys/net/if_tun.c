@@ -13,7 +13,7 @@
  * UCL. This driver is based much more on read/write/poll mode of
  * operation though.
  *
- * $FreeBSD: src/sys/net/if_tun.c,v 1.125 2003/03/08 17:32:21 jlemon Exp $
+ * $FreeBSD: src/sys/net/if_tun.c,v 1.130 2003/11/09 09:17:25 tanimura Exp $
  */
 
 #include "opt_atalk.h"
@@ -56,9 +56,8 @@
 #include <net/if_tunvar.h>
 #include <net/if_tun.h>
 
-#define TUNDEBUG	if (tundebug) printf
+#define TUNDEBUG	if (tundebug) if_printf
 #define	TUNNAME		"tun"
-#define	TUN_MAXUNIT	0x7fff	/* ifp->if_unit is only 15 bits */
 
 static MALLOC_DEFINE(M_TUN, TUNNAME, "Tunnel Interface");
 static int tundebug = 0;
@@ -106,7 +105,7 @@ tunclone(void *arg, char *name, int namelen, dev_t *dev)
 		return;
 
 	if (strcmp(name, TUNNAME) == 0) {
-		r = rman_reserve_resource(&tununits, 0, TUN_MAXUNIT, 1,
+		r = rman_reserve_resource(&tununits, 0, IF_MAXUNIT, 1,
 		    RF_ALLOCATED | RF_ACTIVE, NULL);
 		u = rman_get_start(r);
 		err = rman_release_resource(r);
@@ -153,7 +152,7 @@ tunmodevent(module_t mod, int type, void *data)
 			EVENTHANDLER_DEREGISTER(dev_clone, tag);
 			return (err);
 		}
-		err = rman_manage_region(&tununits, 0, TUN_MAXUNIT);
+		err = rman_manage_region(&tununits, 0, IF_MAXUNIT);
 		if (err != 0) {
 			printf("%s: tununits: rman_manage_region: Failed %d\n",
 			    TUNNAME, err);
@@ -171,10 +170,10 @@ tunmodevent(module_t mod, int type, void *data)
 		while (tunhead != NULL) {
 			KASSERT((tunhead->tun_flags & TUN_OPEN) == 0,
 			    ("tununits is out of sync - unit %d",
-			    tunhead->tun_if.if_unit));
+			    tunhead->tun_if.if_dunit));
 			tp = tunhead;
 			dev = makedev(tun_cdevsw.d_maj,
-			    unit2minor(tp->tun_if.if_unit));
+			    unit2minor(tp->tun_if.if_dunit));
 			KASSERT(dev->si_drv1 == tp, ("Bad makedev result"));
 			tunhead = tp->next;
 			bpfdetach(&tp->tun_if);
@@ -214,7 +213,7 @@ tunstart(struct ifnet *ifp)
 	}
 	if (tp->tun_flags & TUN_ASYNC && tp->tun_sigio)
 		pgsigio(&tp->tun_sigio, SIGIO, 0);
-	selwakeup(&tp->tun_rsel);
+	selwakeuppri(&tp->tun_rsel, PZERO + 1);
 }
 
 static void
@@ -233,8 +232,7 @@ tuncreate(dev_t dev)
 	tunhead = sc;
 
 	ifp = &sc->tun_if;
-	ifp->if_unit = dev2unit(dev);
-	ifp->if_name = TUNNAME;
+	if_initname(ifp, TUNNAME, dev2unit(dev));
 	ifp->if_mtu = TUNMTU;
 	ifp->if_ioctl = tunifioctl;
 	ifp->if_output = tunoutput;
@@ -257,7 +255,7 @@ tunopen(dev_t dev, int flag, int mode, struct thread *td)
 	int unit;
 
 	unit = dev2unit(dev);
-	if (unit > TUN_MAXUNIT)
+	if (unit > IF_MAXUNIT)
 		return (ENXIO);
 
 	r = rman_reserve_resource(&tununits, unit, unit, 1,
@@ -273,11 +271,11 @@ tunopen(dev_t dev, int flag, int mode, struct thread *td)
 		tp = dev->si_drv1;
 	}
 	KASSERT(!(tp->tun_flags & TUN_OPEN), ("Resource & flags out-of-sync"));
-	tp->r_unit = r;
+	tp->tun_unit = r;
 	tp->tun_pid = td->td_proc->p_pid;
 	ifp = &tp->tun_if;
 	tp->tun_flags |= TUN_OPEN;
-	TUNDEBUG("%s%d: open\n", ifp->if_name, ifp->if_unit);
+	TUNDEBUG(ifp, "open\n");
 
 	return (0);
 }
@@ -297,7 +295,7 @@ tunclose(dev_t dev, int foo, int bar, struct thread *td)
 	tp = dev->si_drv1;
 	ifp = &tp->tun_if;
 
-	KASSERT(tp->r_unit, ("Unit %d not marked open", ifp->if_unit));
+	KASSERT(tp->tun_unit, ("Unit %d not marked open", tp->tun_if.if_dunit));
 	tp->tun_flags &= ~TUN_OPEN;
 	tp->tun_pid = 0;
 
@@ -326,11 +324,11 @@ tunclose(dev_t dev, int foo, int bar, struct thread *td)
 	}
 
 	funsetown(&tp->tun_sigio);
-	selwakeup(&tp->tun_rsel);
+	selwakeuppri(&tp->tun_rsel, PZERO + 1);
 
-	TUNDEBUG ("%s%d: closed\n", ifp->if_name, ifp->if_unit);
-	err = rman_release_resource(tp->r_unit);
-	KASSERT(err == 0, ("Unit %d failed to release", ifp->if_unit));
+	TUNDEBUG (ifp, "closed\n");
+	err = rman_release_resource(tp->tun_unit);
+	KASSERT(err == 0, ("Unit %d failed to release", tp->tun_if.if_dunit));
 
 	return (0);
 }
@@ -342,7 +340,7 @@ tuninit(struct ifnet *ifp)
 	struct ifaddr *ifa;
 	int error = 0;
 
-	TUNDEBUG("%s%d: tuninit\n", ifp->if_name, ifp->if_unit);
+	TUNDEBUG(ifp, "tuninit\n");
 
 	ifp->if_flags |= IFF_UP | IFF_RUNNING;
 	getmicrotime(&ifp->if_lastchange);
@@ -392,17 +390,15 @@ tunifioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case SIOCSIFADDR:
 		error = tuninit(ifp);
-		TUNDEBUG("%s%d: address set, error=%d\n",
-			 ifp->if_name, ifp->if_unit, error);
+		TUNDEBUG(ifp, "address set, error=%d\n", error);
 		break;
 	case SIOCSIFDSTADDR:
 		error = tuninit(ifp);
-		TUNDEBUG("%s%d: destination address set, error=%d\n",
-			 ifp->if_name, ifp->if_unit, error);
+		TUNDEBUG(ifp, "destination address set, error=%d\n", error);
 		break;
 	case SIOCSIFMTU:
 		ifp->if_mtu = ifr->ifr_mtu;
-		TUNDEBUG("%s%d: mtu set\n", ifp->if_name, ifp->if_unit);
+		TUNDEBUG(ifp, "mtu set\n");
 		break;
 	case SIOCSIFFLAGS:
 	case SIOCADDMULTI:
@@ -430,7 +426,7 @@ tunoutput(
 	int error;
 #endif
 
-	TUNDEBUG ("%s%d: tunoutput\n", ifp->if_name, ifp->if_unit);
+	TUNDEBUG (ifp, "tunoutput\n");
 
 #ifdef MAC
 	error = mac_check_ifnet_transmit(ifp, m0);
@@ -441,8 +437,7 @@ tunoutput(
 #endif
 
 	if ((tp->tun_flags & TUN_READY) != TUN_READY) {
-		TUNDEBUG ("%s%d: not ready 0%o\n", ifp->if_name,
-			  ifp->if_unit, tp->tun_flags);
+		TUNDEBUG (ifp, "not ready 0%o\n", tp->tun_flags);
 		m_freem (m0);
 		return (EHOSTDOWN);
 	}
@@ -645,10 +640,9 @@ tunread(dev_t dev, struct uio *uio, int flag)
 	struct mbuf	*m;
 	int		error=0, len, s;
 
-	TUNDEBUG ("%s%d: read\n", ifp->if_name, ifp->if_unit);
+	TUNDEBUG (ifp, "read\n");
 	if ((tp->tun_flags & TUN_READY) != TUN_READY) {
-		TUNDEBUG ("%s%d: not ready 0%o\n", ifp->if_name,
-			  ifp->if_unit, tp->tun_flags);
+		TUNDEBUG (ifp, "not ready 0%o\n", tp->tun_flags);
 		return (EHOSTDOWN);
 	}
 
@@ -680,7 +674,7 @@ tunread(dev_t dev, struct uio *uio, int flag)
 	}
 
 	if (m) {
-		TUNDEBUG("%s%d: Dropping mbuf\n", ifp->if_name, ifp->if_unit);
+		TUNDEBUG(ifp, "Dropping mbuf\n");
 		m_freem(m);
 	}
 	return (error);
@@ -699,7 +693,7 @@ tunwrite(dev_t dev, struct uio *uio, int flag)
 	uint32_t	family;
 	int 		isr;
 
-	TUNDEBUG("%s%d: tunwrite\n", ifp->if_name, ifp->if_unit);
+	TUNDEBUG(ifp, "tunwrite\n");
 
 	if ((ifp->if_flags & IFF_UP) != IFF_UP)
 		/* ignore silently */
@@ -709,8 +703,7 @@ tunwrite(dev_t dev, struct uio *uio, int flag)
 		return (0);
 
 	if (uio->uio_resid < 0 || uio->uio_resid > TUNMRU) {
-		TUNDEBUG("%s%d: len=%d!\n", ifp->if_name, ifp->if_unit,
-		    uio->uio_resid);
+		TUNDEBUG(ifp, "len=%d!\n", uio->uio_resid);
 		return (EIO);
 	}
 	tlen = uio->uio_resid;
@@ -840,16 +833,14 @@ tunpoll(dev_t dev, int events, struct thread *td)
 	int		revents = 0;
 
 	s = splimp();
-	TUNDEBUG("%s%d: tunpoll\n", ifp->if_name, ifp->if_unit);
+	TUNDEBUG(ifp, "tunpoll\n");
 
 	if (events & (POLLIN | POLLRDNORM)) {
 		if (ifp->if_snd.ifq_len > 0) {
-			TUNDEBUG("%s%d: tunpoll q=%d\n", ifp->if_name,
-			    ifp->if_unit, ifp->if_snd.ifq_len);
+			TUNDEBUG(ifp, "tunpoll q=%d\n", ifp->if_snd.ifq_len);
 			revents |= events & (POLLIN | POLLRDNORM);
 		} else {
-			TUNDEBUG("%s%d: tunpoll waiting\n", ifp->if_name,
-			    ifp->if_unit);
+			TUNDEBUG(ifp, "tunpoll waiting\n");
 			selrecord(td, &tp->tun_rsel);
 		}
 	}

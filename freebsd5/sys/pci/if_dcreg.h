@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_dcreg.h,v 1.32 2003/05/12 19:50:20 mbr Exp $
+ * $FreeBSD: src/sys/pci/if_dcreg.h,v 1.40.2.1 2004/01/09 21:13:56 truckman Exp $
  */
 
 /*
@@ -464,7 +464,19 @@ struct dc_desc {
 #define DC_MIN_FRAMELEN		60
 #define DC_RXLEN		1536
 
-#define DC_INC(x, y)	(x) = (x + 1) % y
+#define DC_INC(x, y)		(x) = (x + 1) % y
+
+/* Macros to easily get the DMA address of a descriptor. */
+#define DC_RXDESC(sc, i)	(sc->dc_laddr +				\
+    (uintptr_t)(sc->dc_ldata->dc_rx_list + i) - (uintptr_t)sc->dc_ldata)
+#define DC_TXDESC(sc, i)	(sc->dc_laddr +				\
+    (uintptr_t)(sc->dc_ldata->dc_tx_list + i) - (uintptr_t)sc->dc_ldata)
+
+#if BYTE_ORDER == BIG_ENDIAN
+#define DC_SP_MAC(x)		((x) << 16)
+#else
+#define DC_SP_MAC(x)		(x)
+#endif
 
 struct dc_list_data {
 	struct dc_desc		dc_rx_list[DC_RX_LIST_CNT];
@@ -474,11 +486,18 @@ struct dc_list_data {
 struct dc_chain_data {
 	struct mbuf		*dc_rx_chain[DC_RX_LIST_CNT];
 	struct mbuf		*dc_tx_chain[DC_TX_LIST_CNT];
-	u_int32_t		dc_sbuf[DC_SFRAME_LEN/sizeof(u_int32_t)];
+	struct mbuf		*dc_tx_mapping;
+	bus_dmamap_t		dc_rx_map[DC_RX_LIST_CNT];
+	bus_dmamap_t		dc_tx_map[DC_TX_LIST_CNT];
+	u_int32_t		*dc_sbuf;
 	u_int8_t		dc_pad[DC_MIN_FRAMELEN];
+	int			dc_tx_err;
+	int			dc_tx_first;
 	int			dc_tx_prod;
 	int			dc_tx_cons;
 	int			dc_tx_cnt;
+	int			dc_rx_err;
+	int			dc_rx_cur;
 	int			dc_rx_prod;
 };
 
@@ -700,6 +719,14 @@ struct dc_softc {
 	struct arpcom		arpcom;		/* interface info */
 	bus_space_handle_t	dc_bhandle;	/* bus space handle */
 	bus_space_tag_t		dc_btag;	/* bus space tag */
+	bus_dma_tag_t		dc_ltag;	/* tag for descriptor ring */
+	bus_dmamap_t		dc_lmap;	/* map for descriptor ring */
+	u_int32_t		dc_laddr;	/* DMA address of dc_ldata */
+	bus_dma_tag_t		dc_mtag;	/* tag for mbufs */
+	bus_dmamap_t		dc_sparemap;
+	bus_dma_tag_t		dc_stag;	/* tag for the setup frame */
+	bus_dmamap_t		dc_smap;	/* map for the setup frame */
+	u_int32_t		dc_saddr;	/* DMA address of setup frame */
 	void			*dc_intrhand;
 	struct resource		*dc_irq;
 	struct resource		*dc_res;
@@ -730,7 +757,6 @@ struct dc_softc {
 	int			rxcycles;	/* ... when polling */
 #endif
 	int			suspended;	/* 0 = normal  1 = suspended */
-
 	u_int32_t		saved_maps[5];	/* pci data */
 	u_int32_t		saved_biosaddr;
 	u_int8_t		saved_intline;
@@ -741,6 +767,7 @@ struct dc_softc {
 
 #define	DC_LOCK(_sc)		mtx_lock(&(_sc)->dc_mtx)
 #define	DC_UNLOCK(_sc)		mtx_unlock(&(_sc)->dc_mtx)
+#define	DC_LOCK_ASSERT(_sc)	mtx_assert(&(_sc)->dc_mtx, MA_OWNED)
 
 #define DC_TX_POLL		0x00000001
 #define DC_TX_COALESCE		0x00000002
@@ -866,6 +893,9 @@ struct dc_softc {
  */
 #define DC_DEVICEID_AL981	0x0981
 #define DC_DEVICEID_AN985	0x0985
+#define DC_DEVICEID_FA511	0x1985
+#define DC_DEVICEID_ADM9511	0x9511
+#define DC_DEVICEID_ADM9513	0x9513
 
 /*
  * 3COM PCI vendor ID
@@ -924,6 +954,7 @@ struct dc_softc {
  * Abocom device IDs.
  */
 #define DC_DEVICEID_FE2500	0xAB02
+#define DC_DEVICEID_FE2500MX	0xab08
 
 /*
  * Conexant vendor ID.
@@ -956,6 +987,20 @@ struct dc_softc {
  * card.  Use that for now, and upgrade later.
  */
 #define DC_DEVICEID_HAWKING_PN672TX 0xab08
+
+/*
+ * Microsoft device ID.
+ */
+#define DC_VENDORID_MICROSOFT		0x1414
+
+/*
+ * Supported Microsoft PCI and cardbus NICs. These are really
+ * ADMtek parts in disguise.
+ */
+
+#define DC_DEVICEID_MSMN120	0x0001
+#define DC_DEVICEID_MSMN130	0x0002
+#define DC_DEVICEID_MSMN130_FAKE	0xFFF2
 
 /*
  * PCI low memory base and low I/O base register, and
@@ -1129,9 +1174,17 @@ struct dc_eblock_hdr {
 struct dc_eblock_sia {
 	struct dc_eblock_hdr	dc_sia_hdr;
 	u_int8_t		dc_sia_code;
-	u_int8_t		dc_sia_mediaspec[6]; /* CSR13, CSR14, CSR15 */
-	u_int8_t		dc_sia_gpio_ctl[2];
-	u_int8_t		dc_sia_gpio_dat[2];
+	union {
+		struct dc_sia_ext { /* if (dc_sia_code & DC_SIA_CODE_EXT) */
+			u_int8_t dc_sia_mediaspec[6]; /* CSR13, CSR14, CSR15 */
+			u_int8_t dc_sia_gpio_ctl[2];
+			u_int8_t dc_sia_gpio_dat[2];
+		} dc_sia_ext;
+		struct dc_sia_noext { 
+			u_int8_t dc_sia_gpio_ctl[2];
+			u_int8_t dc_sia_gpio_dat[2];
+		} dc_sia_noext;
+	} dc_un;
 };
 
 #define DC_SIA_CODE_10BT	0x00
@@ -1176,8 +1229,3 @@ struct dc_eblock_reset {
 	u_int8_t		dc_reset_len;
 /*	u_int16_t		dc_reset_dat[n]; */
 };
-
-#ifdef __alpha__
-#undef vtophys
-#define vtophys(va)		alpha_XXX_dmamap((vm_offset_t)va)
-#endif

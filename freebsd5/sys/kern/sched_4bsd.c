@@ -34,9 +34,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/sched_4bsd.c,v 1.18 2003/04/30 12:57:39 markm Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/sched_4bsd.c,v 1.28 2003/11/09 13:45:54 bde Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -58,7 +59,11 @@
 #define	ESTCPULIM(e) \
     min((e), INVERSE_ESTCPU_WEIGHT * (NICE_WEIGHT * (PRIO_MAX - PRIO_MIN) - \
     RQ_PPQ) + INVERSE_ESTCPU_WEIGHT - 1)
+#ifdef SMP
+#define	INVERSE_ESTCPU_WEIGHT	(8 * smp_cpus)
+#else
 #define	INVERSE_ESTCPU_WEIGHT	8	/* 1 / (priorities per estcpu level). */
+#endif
 #define	NICE_WEIGHT		1	/* Priorities per nice level. */
 
 struct ke_sched {
@@ -149,20 +154,20 @@ roundrobin(void *arg)
 
 /*
  * Constants for digital decay and forget:
- *	90% of (p_estcpu) usage in 5 * loadav time
- *	95% of (p_pctcpu) usage in 60 seconds (load insensitive)
+ *	90% of (kg_estcpu) usage in 5 * loadav time
+ *	95% of (ke_pctcpu) usage in 60 seconds (load insensitive)
  *          Note that, as ps(1) mentions, this can let percentages
  *          total over 100% (I've seen 137.9% for 3 processes).
  *
- * Note that schedclock() updates p_estcpu and p_cpticks asynchronously.
+ * Note that schedclock() updates kg_estcpu and p_cpticks asynchronously.
  *
- * We wish to decay away 90% of p_estcpu in (5 * loadavg) seconds.
+ * We wish to decay away 90% of kg_estcpu in (5 * loadavg) seconds.
  * That is, the system wants to compute a value of decay such
  * that the following for loop:
  * 	for (i = 0; i < (5 * loadavg); i++)
- * 		p_estcpu *= decay;
+ * 		kg_estcpu *= decay;
  * will compute
- * 	p_estcpu *= 0.1;
+ * 	kg_estcpu *= 0.1;
  * for all values of loadavg:
  *
  * Mathematically this loop can be expressed by saying:
@@ -215,7 +220,7 @@ roundrobin(void *arg)
 #define	loadfactor(loadav)	(2 * (loadav))
 #define	decay_cpu(loadfac, cpu)	(((loadfac) * (cpu)) / ((loadfac) + FSCALE))
 
-/* decay 95% of `p_pctcpu' in 60 seconds; see CCPU_SHIFT before changing */
+/* decay 95% of `ke_pctcpu' in 60 seconds; see CCPU_SHIFT before changing */
 static fixpt_t	ccpu = 0.95122942450071400909 * FSCALE;	/* exp(-1/20) */
 SYSCTL_INT(_kern, OID_AUTO, ccpu, CTLFLAG_RD, &ccpu, 0, "");
 
@@ -246,22 +251,26 @@ schedcpu(void *arg)
 	struct proc *p;
 	struct kse *ke;
 	struct ksegrp *kg;
-	int realstathz;
-	int awake;
+	int awake, realstathz;
 
 	realstathz = stathz ? stathz : hz;
 	sx_slock(&allproc_lock);
 	FOREACH_PROC_IN_SYSTEM(p) {
+		/*
+		 * Prevent state changes and protect run queue.
+		 */
 		mtx_lock_spin(&sched_lock);
+		/*
+		 * Increment time in/out of memory.  We ignore overflow; with
+		 * 16-bit int's (remember them?) overflow takes 45 days.
+		 */
 		p->p_swtime++;
 		FOREACH_KSEGRP_IN_PROC(p, kg) { 
 			awake = 0;
 			FOREACH_KSE_IN_GROUP(kg, ke) {
 				/*
-				 * Increment time in/out of memory and sleep
-				 * time (if sleeping).  We ignore overflow;
-				 * with 16-bit int's (remember them?)
-				 * overflow takes 45 days.
+				 * Increment sleep time (if sleeping).  We
+				 * ignore overflow, as above.
 				 */
 				/*
 				 * The kse slptimes are not touched in wakeup
@@ -280,12 +289,11 @@ schedcpu(void *arg)
 				}
 
 				/*
-				 * pctcpu is only for ps?
-				 * Do it per kse.. and add them up at the end?
+				 * ke_pctcpu is only for ps and ttyinfo().
+				 * Do it per kse, and add them up at the end?
 				 * XXXKSE
 				 */
-				ke->ke_pctcpu
-				    = (ke->ke_pctcpu * ccpu) >>
+				ke->ke_pctcpu = (ke->ke_pctcpu * ccpu) >>
 				    FSHIFT;
 				/*
 				 * If the kse has been idle the entire second,
@@ -325,9 +333,8 @@ schedcpu(void *arg)
 					updatepri(kg);
 				}
 				kg->kg_slptime = 0;
-			} else {
+			} else
 				kg->kg_slptime++;
-			}
 			if (kg->kg_slptime > 1)
 				continue;
 			kg->kg_estcpu = decay_cpu(loadfac, kg->kg_estcpu);
@@ -346,20 +353,21 @@ schedcpu(void *arg)
 
 /*
  * Recalculate the priority of a process after it has slept for a while.
- * For all load averages >= 1 and max p_estcpu of 255, sleeping for at
- * least six times the loadfactor will decay p_estcpu to zero.
+ * For all load averages >= 1 and max kg_estcpu of 255, sleeping for at
+ * least six times the loadfactor will decay kg_estcpu to zero.
  */
 static void
 updatepri(struct ksegrp *kg)
 {
+	register fixpt_t loadfac;
 	register unsigned int newcpu;
-	register fixpt_t loadfac = loadfactor(averunnable.ldavg[0]);
 
-	newcpu = kg->kg_estcpu;
+	loadfac = loadfactor(averunnable.ldavg[0]);
 	if (kg->kg_slptime > 5 * loadfac)
 		kg->kg_estcpu = 0;
 	else {
-		kg->kg_slptime--;	/* the first time was done in schedcpu */
+		newcpu = kg->kg_estcpu;
+		kg->kg_slptime--;	/* was incremented in schedcpu() */
 		while (newcpu && --kg->kg_slptime)
 			newcpu = decay_cpu(loadfac, newcpu);
 		kg->kg_estcpu = newcpu;
@@ -394,11 +402,12 @@ resetpriority(struct ksegrp *kg)
 static void
 sched_setup(void *dummy)
 {
+
 	if (sched_quantum == 0)
 		sched_quantum = SCHED_QUANTUM;
 	hogticks = 2 * sched_quantum;
 
-	callout_init(&schedcpu_callout, 1);
+	callout_init(&schedcpu_callout, CALLOUT_MPSAFE);
 	callout_init(&roundrobin_callout, 0);
 
 	/* Kick off timeout driven events by calling first time. */
@@ -424,8 +433,8 @@ sched_rr_interval(void)
 /*
  * We adjust the priority of the current process.  The priority of
  * a process gets worse as it accumulates CPU time.  The cpu usage
- * estimator (p_estcpu) is increased here.  resetpriority() will
- * compute a different priority each time p_estcpu increases by
+ * estimator (kg_estcpu) is increased here.  resetpriority() will
+ * compute a different priority each time kg_estcpu increases by
  * INVERSE_ESTCPU_WEIGHT
  * (until MAXPRI is reached).  The cpu usage estimator ramps up
  * quite quickly when the process is running (linearly), and decays
@@ -436,14 +445,14 @@ sched_rr_interval(void)
  * run much recently, and to round-robin among other processes.
  */
 void
-sched_clock(struct kse *ke)
+sched_clock(struct thread *td)
 {
 	struct ksegrp *kg;
-	struct thread *td;
+	struct kse *ke;
 
 	mtx_assert(&sched_lock, MA_OWNED);
-	kg = ke->ke_ksegrp;
-	td = ke->ke_thread;
+	kg = td->td_ksegrp;
+	ke = td->td_kse;
 
 	ke->ke_sched->ske_cpticks++;
 	kg->kg_estcpu = ESTCPULIM(kg->kg_estcpu + 1);
@@ -453,6 +462,7 @@ sched_clock(struct kse *ke)
 			td->td_priority = kg->kg_user_pri;
 	}
 }
+
 /*
  * charge childs scheduling cpu usage to parent.
  *
@@ -558,16 +568,9 @@ sched_sleep(struct thread *td, u_char prio)
 }
 
 void
-sched_switchin(struct thread *td)
+sched_switch(struct thread *td)
 {
-
-	mtx_assert(&sched_lock, MA_OWNED);
-	td->td_oncpu = PCPU_GET(cpuid);
-}
-
-void
-sched_switchout(struct thread *td)
-{
+	struct thread *newtd;
 	struct kse *ke;
 	struct proc *p;
 
@@ -589,7 +592,7 @@ sched_switchout(struct thread *td)
 	if (TD_IS_RUNNING(td)) {
 		/* Put us back on the run queue (kse and all). */
 		setrunqueue(td);
-	} else if (p->p_flag & P_THREADED) {
+	} else if (p->p_flag & P_SA) {
 		/*
 		 * We will not be on the run queue. So we must be
 		 * sleeping or similar. As it's available,
@@ -597,6 +600,11 @@ sched_switchout(struct thread *td)
 		 */
 		kse_reassign(ke);
 	}
+	newtd = choosethread();
+	if (td != newtd)
+		cpu_switch(td, newtd);
+	sched_lock.mtx_lock = (uintptr_t)td;
+	td->td_oncpu = PCPU_GET(cpuid);
 }
 
 void
@@ -614,8 +622,11 @@ sched_wakeup(struct thread *td)
 }
 
 void
-sched_add(struct kse *ke)
+sched_add(struct thread *td)
 {
+	struct kse *ke;
+
+	ke = td->td_kse;
 	mtx_assert(&sched_lock, MA_OWNED);
 	KASSERT((ke->ke_thread != NULL), ("runq_add: No thread on KSE"));
 	KASSERT((ke->ke_thread->td_kse != NULL),
@@ -632,8 +643,11 @@ sched_add(struct kse *ke)
 }
 
 void
-sched_rem(struct kse *ke)
+sched_rem(struct thread *td)
 {
+	struct kse *ke;
+
+	ke = td->td_kse;
 	KASSERT(ke->ke_proc->p_sflag & PS_INMEM,
 	    ("runq_remove: process swapped out"));
 	KASSERT((ke->ke_state == KES_ONRUNQ), ("KSE not on run queue"));
@@ -708,7 +722,15 @@ sched_sizeof_thread(void)
 }
 
 fixpt_t
-sched_pctcpu(struct kse *ke)
+sched_pctcpu(struct thread *td)
 {
-	return (ke->ke_pctcpu);
+	struct kse *ke;
+
+	ke = td->td_kse;
+	if (ke == NULL)
+		ke = td->td_last_kse;
+	if (ke)
+		return (ke->ke_pctcpu);
+
+	return (0);
 }

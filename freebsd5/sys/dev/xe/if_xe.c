@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998, 1999 Scott Mitchell
+ * Copyright (c) 1998, 1999, 2003  Scott Mitchell
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,20 +22,7 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$Id: if_xe.c,v 1.20 1999/06/13 19:17:40 scott Exp $
- * $FreeBSD: src/sys/dev/xe/if_xe.c,v 1.36 2003/02/19 05:47:17 imp Exp $
  */
-
-/*
- * XXX TODO XXX
- *
- * I've pushed this fairly far, but there are some things that need to be
- * done here.  I'm documenting them here in case I get destracted. -- imp
- *
- * xe_cem56fix -- need to figure out how to map the extra stuff.
- */
-
 /*
  * Portions of this software were derived from Werner Koch's xirc2ps driver
  * for Linux under the terms of the following license (from v1.30 of the
@@ -69,6 +56,9 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/xe/if_xe.c,v 1.45 2003/11/13 20:55:52 obrien Exp $");
+
 /*		
  * FreeBSD device driver for Xircom CreditCard PCMCIA Ethernet adapters.  The
  * following cards are currently known to work with the driver:
@@ -97,14 +87,8 @@
  * the CEM56/REM56 support code; and the FreeBSD UK Users' Group for hosting
  * the web pages.
  *
- * Contact points:
- *
- * Driver web page: http://ukug.uk.freebsd.org/~scott/xe_drv/
- *
- * Mailing list: http://www.lovett.com/lists/freebsd-xircom/
- * or send "subscribe freebsd-xircom" to <majordomo@lovett.com>
- *
  * Author email: <scott@uk.freebsd.org>
+ * Driver web page: http://ukug.uk.freebsd.org/~scott/xe_drv/
  */
 
 
@@ -117,6 +101,7 @@
 #include <sys/sockio.h>
 #include <sys/systm.h>
 #include <sys/uio.h>
+#include <sys/sysctl.h>
 
 #include <sys/module.h>
 #include <sys/bus.h>
@@ -157,6 +142,10 @@ struct xe_mii_frame {
 #define XE_AUTONEG_100TX	3	/* Trying to force 100baseTX link */
 #define XE_AUTONEG_FAIL		4	/* Autonegotiation failed */
 
+/*
+ * Multicast hashing CRC constants
+ */
+#define XE_CRC_POLY  0x04c11db6
 
 /*
  * Prototypes start here
@@ -168,16 +157,14 @@ static void      xe_watchdog		(struct ifnet *ifp);
 static int       xe_media_change	(struct ifnet *ifp);
 static void      xe_media_status	(struct ifnet *ifp, struct ifmediareq *mrp);
 static timeout_t xe_setmedia;
-static void      xe_hard_reset		(struct xe_softc *scp);
-static void      xe_soft_reset		(struct xe_softc *scp);
+static void      xe_reset		(struct xe_softc *scp);
 static void      xe_stop		(struct xe_softc *scp);
 static void      xe_enable_intr		(struct xe_softc *scp);
 static void      xe_disable_intr	(struct xe_softc *scp);
-static void      xe_setmulti		(struct xe_softc *scp);
-static void      xe_setaddrs		(struct xe_softc *scp);
+static void      xe_set_multicast	(struct xe_softc *scp);
+static void      xe_set_addr		(struct xe_softc *scp, u_int8_t* addr, unsigned idx);
+static void      xe_mchash		(struct xe_softc *scp, caddr_t addr);
 static int       xe_pio_write_packet	(struct xe_softc *scp, struct mbuf *mbp);
-static u_int32_t xe_compute_crc		(u_int8_t *data, int len) __unused;
-static int       xe_compute_hashbit	(u_int32_t crc) __unused;
 
 /*
  * MII functions
@@ -191,19 +178,45 @@ static u_int16_t xe_phy_readreg		(struct xe_softc *scp, u_int16_t reg);
 static void      xe_phy_writereg	(struct xe_softc *scp, u_int16_t reg, u_int16_t data);
 
 /*
- * Debug functions -- uncomment for VERY verbose dignostic information.
- * Set to 1 for less verbose information
+ * Debugging functions
  */
-/* #define XE_DEBUG 2 */
-#ifdef XE_DEBUG
-#define XE_REG_DUMP(scp)		xe_reg_dump((scp))
-#define XE_MII_DUMP(scp)		xe_mii_dump((scp))
-static void      xe_reg_dump		(struct xe_softc *scp);
 static void      xe_mii_dump		(struct xe_softc *scp);
-#else
-#define XE_REG_DUMP(scp)
-#define XE_MII_DUMP(scp)
+#if 0
+static void      xe_reg_dump		(struct xe_softc *scp);
 #endif
+
+/*
+ * Debug logging levels - set with hw.xe.debug sysctl
+ * 0 = None
+ * 1 = More hardware details, probe/attach progress
+ * 2 = Most function calls, ioctls and media selection progress
+ * 3 = Everything - interrupts, packets in/out and multicast address setup
+ */
+#define XE_DEBUG
+#ifdef XE_DEBUG
+
+/* sysctl vars */
+SYSCTL_NODE(_hw, OID_AUTO, xe, CTLFLAG_RD, 0, "if_xe parameters");
+
+int xe_debug = 0;
+SYSCTL_INT(_hw_xe, OID_AUTO, debug, CTLFLAG_RW,
+		   &xe_debug, 0, "if_xe debug level");
+
+#define DEVPRINTF(level, arg) if (xe_debug >= (level)) device_printf arg
+#define DPRINTF(level, arg) if (xe_debug >= (level)) printf arg
+#define XE_MII_DUMP(scp) if (xe_debug >= 3) xe_mii_dump(scp)
+#if 0
+#define XE_REG_DUMP(scp) if (xe_debug >= 3) xe_reg_dump(scp)
+#endif
+#else
+#define DEVPRINTF(level, arg)
+#define DPRINTF(level, arg)
+#define XE_MII_DUMP(scp)
+#if 0
+#define XE_REG_DUMP(scp)
+#endif
+#endif
+
 
 /*
  * Attach a device.
@@ -213,79 +226,77 @@ xe_attach (device_t dev)
 {
   struct xe_softc *scp = device_get_softc(dev);
 
-#ifdef XE_DEBUG
-  device_printf(dev, "attach\n");
-#endif
+  DEVPRINTF(2, (dev, "attach\n"));
 
-  /* Fill in some private data */
+  /* Initialise stuff... */
+  scp->dev = dev;
   scp->ifp = &scp->arpcom.ac_if;
   scp->ifm = &scp->ifmedia;
-  scp->autoneg_status = 0;
+  scp->autoneg_status = XE_AUTONEG_NONE;
 
-  /* Hopefully safe to read this here */
-  XE_SELECT_PAGE(4);
-  scp->version = XE_INB(XE_BOV);
-
-  scp->dev = dev;
   /* Initialise the ifnet structure */
-  if (!scp->ifp->if_name) {
-    scp->ifp->if_softc = scp;
-    scp->ifp->if_name = "xe";
-    scp->ifp->if_unit = device_get_unit(dev);
-    scp->ifp->if_timer = 0;
-    scp->ifp->if_flags = (IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);
-    scp->ifp->if_linkmib = &scp->mibdata;
-    scp->ifp->if_linkmiblen = sizeof scp->mibdata;
-    scp->ifp->if_output = ether_output;
-    scp->ifp->if_start = xe_start;
-    scp->ifp->if_ioctl = xe_ioctl;
-    scp->ifp->if_watchdog = xe_watchdog;
-    scp->ifp->if_init = xe_init;
-    scp->ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
-  }
+  scp->ifp->if_softc = scp;
+  if_initname(scp->ifp, device_get_name(dev), device_get_unit(dev));
+  scp->ifp->if_timer = 0;
+  scp->ifp->if_flags = (IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);
+  scp->ifp->if_linkmib = &scp->mibdata;
+  scp->ifp->if_linkmiblen = sizeof scp->mibdata;
+  scp->ifp->if_output = ether_output;
+  scp->ifp->if_start = xe_start;
+  scp->ifp->if_ioctl = xe_ioctl;
+  scp->ifp->if_watchdog = xe_watchdog;
+  scp->ifp->if_init = xe_init;
+  scp->ifp->if_baudrate = 100000000;
+  scp->ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 
   /* Initialise the ifmedia structure */
   ifmedia_init(scp->ifm, 0, xe_media_change, xe_media_status);
   callout_handle_init(&scp->chand);
 
-  /*
-   * Fill in supported media types.  Some cards _do_ support full duplex
-   * operation, but this driver doesn't, yet.  Therefore we leave those modes
-   * out of the list.  We support some form of autoselection in all cases.
-   */
+  /* Add supported media types */
   if (scp->mohawk) {
     ifmedia_add(scp->ifm, IFM_ETHER|IFM_100_TX, 0, NULL);
-    ifmedia_add(scp->ifm, IFM_ETHER|IFM_10_T, 0, NULL);
+    ifmedia_add(scp->ifm, IFM_ETHER|IFM_10_T|IFM_FDX, 0, NULL);
+    ifmedia_add(scp->ifm, IFM_ETHER|IFM_10_T|IFM_HDX, 0, NULL);
   }
-  else {
-    ifmedia_add(scp->ifm, IFM_ETHER|IFM_10_T, 0, NULL);
+  ifmedia_add(scp->ifm, IFM_ETHER|IFM_10_T, 0, NULL);
+  if (scp->ce2)
     ifmedia_add(scp->ifm, IFM_ETHER|IFM_10_2, 0, NULL);
-  }
   ifmedia_add(scp->ifm, IFM_ETHER|IFM_AUTO, 0, NULL);
 
   /* Default is to autoselect best supported media type */
   ifmedia_set(scp->ifm, IFM_ETHER|IFM_AUTO);
 
+  /* Get the hardware into a known state */
+  xe_reset(scp);
+
+  /* Get hardware version numbers */
+  XE_SELECT_PAGE(4);
+  scp->version = XE_INB(XE_BOV);
+  if (scp->mohawk)
+    scp->srev = (XE_INB(XE_BOV) & 0x70) >> 4;
+  else
+    scp->srev = (XE_INB(XE_BOV) & 0x30) >> 4;
+
   /* Print some useful information */
-  device_printf(dev, "%s %s, bonding version %#x%s%s\n",
+  device_printf(dev, "%s %s, version 0x%02x/0x%02x%s%s\n",
 	 scp->vendor,
 	 scp->card_type,
 	 scp->version,
+	 scp->srev,
 	 scp->mohawk ? ", 100Mbps capable" : "",
 	 scp->modem ?  ", with modem"      : "");
   if (scp->mohawk) {
     XE_SELECT_PAGE(0x10);
-    device_printf(dev, "DingoID = %#x, RevisionID = %#x, VendorID = %#x\n",
+    DEVPRINTF(1, (dev, "DingoID=0x%04x, RevisionID=0x%04x, VendorID=0x%04x\n",
 	   XE_INW(XE_DINGOID),
 	   XE_INW(XE_RevID),
-	   XE_INW(XE_VendorID));
+	   XE_INW(XE_VendorID)));
   }
   if (scp->ce2) {
     XE_SELECT_PAGE(0x45);
-    device_printf(dev, "CE2 version = %#x\n", XE_INB(XE_REV));
+    DEVPRINTF(1, (dev, "CE2 version = 0x%#02x\n", XE_INB(XE_REV)));
   }
-
-  /* Print MAC address */
   device_printf(dev, "Ethernet address %6D\n", scp->arpcom.ac_enaddr, ":");
 
   /* Attach the interface */
@@ -297,105 +308,149 @@ xe_attach (device_t dev)
 
 
 /*
- * Initialize device.  Completes the reset procedure on the card and starts
- * output.  If there's an autonegotiation in progress we DON'T do anything;
- * the media selection code will call us again when it's done.
+ * Complete hardware intitialisation and enable output.  Exits without doing
+ * anything if there's no address assigned to the card, or if media selection
+ * is in progress (the latter implies we've already run this function).
  */
 static void
 xe_init(void *xscp) {
   struct xe_softc *scp = xscp;
+  unsigned i;
   int s;
 
-#ifdef XE_DEBUG
-  device_printf(scp->dev, "init\n");
-#endif
-
   if (TAILQ_EMPTY(&scp->ifp->if_addrhead)) return;
+
+  if (scp->autoneg_status != XE_AUTONEG_NONE) return;
+
+  DEVPRINTF(2, (scp->dev, "init\n"));
+
+  s = splimp();
 
   /* Reset transmitter flags */
   scp->tx_queued = 0;
   scp->tx_tpr = 0;
-  scp->tx_collisions = 0;
+  scp->tx_timeouts = 0;
+  scp->tx_thres = 64;
+  scp->tx_min = ETHER_MIN_LEN - ETHER_CRC_LEN;
   scp->ifp->if_timer = 0;
 
-  s = splimp();
+  /* Soft reset the card */
+  XE_SELECT_PAGE(0);
+  XE_OUTB(XE_CR, XE_CR_SOFT_RESET);
+  DELAY(40000);
+  XE_OUTB(XE_CR, 0);
+  DELAY(40000);
 
+  if (scp->mohawk) {
+    /*
+     * set GP1 and GP2 as outputs (bits 2 & 3)
+     * set GP1 low to power on the ML6692 (bit 0)
+     * set GP2 high to power on the 10Mhz chip (bit 1)
+     */
+    XE_SELECT_PAGE(4);
+    XE_OUTB(XE_GPR0, XE_GPR0_GP2_SELECT|XE_GPR0_GP1_SELECT|XE_GPR0_GP2_OUT);
+  }
+
+  /* Shut off interrupts */
+  xe_disable_intr(scp);
+
+  /* Wait for everything to wake up */
+  DELAY(500000);
+
+  /* Check for PHY */
+  if (scp->mohawk)
+    scp->phy_ok = xe_mii_init(scp);
+
+  /* Disable 'source insertion' (not sure what that means) */
   XE_SELECT_PAGE(0x42);
-  XE_OUTB(XE_SWC0, 0x20);	/* Disable source insertion (WTF is that?) */
+  XE_OUTB(XE_SWC0, XE_SWC0_NO_SRC_INSERT);
 
-  /*
-   * Set the 'local memory dividing line' -- splits the 32K card memory into
-   * 8K for transmit buffers and 24K for receive.  This is done automatically
-   * on newer revision cards.
-   */
+  /* Set 8K/24K Tx/Rx buffer split */
   if (scp->srev != 1) {
     XE_SELECT_PAGE(2);
     XE_OUTW(XE_RBS, 0x2000);
   }
 
-  /* Set up multicast addresses */
-  xe_setmulti(scp);
+  /* Enable early transmit mode on Mohawk/Dingo */
+  if (scp->mohawk) {
+    XE_SELECT_PAGE(0x03);
+    XE_OUTW(XE_TPT, scp->tx_thres);
+    XE_SELECT_PAGE(0x01);
+    XE_OUTB(XE_ECR, XE_INB(XE_ECR) | XE_ECR_EARLY_TX);
+  }
 
-  /* Fix the data offset register -- reset leaves it off-by-one */
+  /* Put MAC address in first 'individual address' register */
+  XE_SELECT_PAGE(0x50);
+  for (i = 0; i < 6; i++)
+    XE_OUTB(0x08 + i, scp->arpcom.ac_enaddr[scp->mohawk ? 5 - i : i]);
+
+  /* Set up multicast addresses */
+  xe_set_multicast(scp);
+
+  /* Fix the receive data offset -- reset can leave it off-by-one */
   XE_SELECT_PAGE(0);
   XE_OUTW(XE_DO, 0x2000);
 
-  /*
-   * Set MAC interrupt masks and clear status regs.  The bit names are direct
-   * from the Linux code; I have no idea what most of them do.
-   */
-  XE_SELECT_PAGE(0x40);		/* Bit 7..0 */
-  XE_OUTB(XE_RX0Msk, 0xff);	/* ROK, RAB, rsv, RO,  CRC, AE,  PTL, MP  */
-  XE_OUTB(XE_TX0Msk, 0xff);	/* TOK, TAB, SQE, LL,  TU,  JAB, EXC, CRS */
-  XE_OUTB(XE_TX0Msk+1, 0xb0);	/* rsv, rsv, PTD, EXT, rsv, rsv, rsv, rsv */
-  XE_OUTB(XE_RST0, 0x00);	/* ROK, RAB, REN, RO,  CRC, AE,  PTL, MP  */
-  XE_OUTB(XE_TXST0, 0x00);	/* TOK, TAB, SQE, LL,  TU,  JAB, EXC, CRS */
-  XE_OUTB(XE_TXST1, 0x00);	/* TEN, rsv, PTD, EXT, retry_counter:4    */
+  /* Set interrupt masks */
+  XE_SELECT_PAGE(1);
+  XE_OUTB(XE_IMR0, XE_IMR0_TX_PACKET | XE_IMR0_MAC_INTR | XE_IMR0_RX_PACKET);
 
-  /*
-   * Check for an in-progress autonegotiation.  If one is active, just set
-   * IFF_RUNNING and return.  The media selection code will call us again when 
-   * it's done.
-   */
-  if (scp->autoneg_status) {
-    scp->ifp->if_flags |= IFF_RUNNING;
-  }
-  else {
-    /* Enable receiver, put MAC online */
-    XE_SELECT_PAGE(0x40);
-    XE_OUTB(XE_CMD0, XE_CMD0_RX_ENABLE|XE_CMD0_ONLINE);
+  /* Set MAC interrupt masks */
+  XE_SELECT_PAGE(0x40);
+  XE_OUTB(XE_RX0Msk,
+	  ~(XE_RX0M_RX_OVERRUN | XE_RX0M_CRC_ERROR
+	    | XE_RX0M_ALIGN_ERROR | XE_RX0M_LONG_PACKET));
+  XE_OUTB(XE_TX0Msk,
+	  ~(XE_TX0M_SQE_FAIL | XE_TX0M_LATE_COLLISION | XE_TX0M_TX_UNDERRUN
+	    | XE_TX0M_16_COLLISIONS | XE_TX0M_NO_CARRIER));
 
-    /* Set up IMR, enable interrupts */
-    xe_enable_intr(scp);
+  /* Clear MAC status registers */
+  XE_SELECT_PAGE(0x40);
+  XE_OUTB(XE_RST0, 0x00);
+  XE_OUTB(XE_TXST0, 0x00);
 
-    /* Attempt to start output */
-    scp->ifp->if_flags |= IFF_RUNNING;
-    scp->ifp->if_flags &= ~IFF_OACTIVE;
-    xe_start(scp->ifp);
-  }
+  /* Enable receiver and put MAC online */
+  XE_SELECT_PAGE(0x40);
+  XE_OUTB(XE_CMD0, XE_CMD0_RX_ENABLE|XE_CMD0_ONLINE);
+
+  /* Set up IMR, enable interrupts */
+  xe_enable_intr(scp);
+
+  /* Start media selection */
+  xe_setmedia(scp);
+
+  /* Enable output */
+  scp->ifp->if_flags |= IFF_RUNNING;
+  scp->ifp->if_flags &= ~IFF_OACTIVE;
 
   (void)splx(s);
 }
 
 
 /*
- * Start output on interface.  We make two assumptions here:
- *  1) that the current priority is set to splimp _before_ this code
- *     is called *and* is returned to the appropriate priority after
- *     return
- *  2) that the IFF_OACTIVE flag is checked before this code is called
- *     (i.e. that the output part of the interface is idle)
+ * Start output on interface.  Should be called at splimp() priority.  Check
+ * that the output is idle (ie, IFF_OACTIVE is not set) before calling this
+ * function.  If media selection is in progress we set IFF_OACTIVE ourselves
+ * and return immediately.
  */
 static void
 xe_start(struct ifnet *ifp) {
   struct xe_softc *scp = ifp->if_softc;
   struct mbuf *mbp;
 
+  if (scp->autoneg_status != XE_AUTONEG_NONE) {
+    ifp->if_flags |= IFF_OACTIVE;
+    return;
+  }
+
+  DEVPRINTF(3, (scp->dev, "start\n"));
+
   /*
    * Loop while there are packets to be sent, and space to send them.
    */
   while (1) {
-    IF_DEQUEUE(&ifp->if_snd, mbp);	/* Suck a packet off the send queue */
+    /* Suck a packet off the send queue */
+    IF_DEQUEUE(&ifp->if_snd, mbp);
 
     if (mbp == NULL) {
       /*
@@ -410,7 +465,8 @@ xe_start(struct ifnet *ifp) {
     }
 
     if (xe_pio_write_packet(scp, mbp) != 0) {
-      IF_PREPEND(&ifp->if_snd, mbp);	/* Push the packet back onto the queue */
+      /* Push the packet back onto the queue */
+      IF_PREPEND(&ifp->if_snd, mbp);
       ifp->if_flags |= IFF_OACTIVE;
       return;
     }
@@ -418,7 +474,8 @@ xe_start(struct ifnet *ifp) {
     /* Tap off here if there is a bpf listener */
     BPF_MTAP(ifp, mbp);
 
-    ifp->if_timer = 5;			/* In case we don't hear from the card again */
+    /* In case we don't hear from the card again... */
+    ifp->if_timer = 5;
     scp->tx_queued++;
 
     m_freem(mbp);
@@ -441,15 +498,15 @@ xe_ioctl (register struct ifnet *ifp, u_long command, caddr_t data) {
 
   switch (command) {
 
-   case SIOCSIFFLAGS:
+  case SIOCSIFFLAGS:
+    DEVPRINTF(2, (scp->dev, "ioctl: SIOCSIFFLAGS: 0x%04x\n", ifp->if_flags));
     /*
      * If the interface is marked up and stopped, then start it.  If it is
      * marked down and running, then stop it.
      */
     if (ifp->if_flags & IFF_UP) {
       if (!(ifp->if_flags & IFF_RUNNING)) {
-	xe_hard_reset(scp);
-	xe_setmedia(scp);
+	xe_reset(scp);
 	xe_init(scp);
       }
     }
@@ -457,27 +514,30 @@ xe_ioctl (register struct ifnet *ifp, u_long command, caddr_t data) {
       if (ifp->if_flags & IFF_RUNNING)
 	xe_stop(scp);
     }
+    /* FALL THROUGH  (handle changes to PROMISC/ALLMULTI flags) */
 
-   case SIOCADDMULTI:
-   case SIOCDELMULTI:
+  case SIOCADDMULTI:
+  case SIOCDELMULTI:
+    DEVPRINTF(2, (scp->dev, "ioctl: SIOC{ADD,DEL}MULTI\n"));
     /*
-     * Multicast list has (maybe) changed; set the hardware filter
-     * accordingly.  This also serves to deal with promiscuous mode if we have 
-     * a BPF listener active.
+     * Multicast list has (maybe) changed; set the hardware filters
+     * accordingly.
      */
-    xe_setmulti(scp);
+    xe_set_multicast(scp);
     error = 0;
     break;
 
-   case SIOCSIFMEDIA:
-   case SIOCGIFMEDIA:
+  case SIOCSIFMEDIA:
+  case SIOCGIFMEDIA:
+    DEVPRINTF(3, (scp->dev, "ioctl: bounce to ifmedia_ioctl\n"));
     /*
      * Someone wants to get/set media options.
      */
     error = ifmedia_ioctl(ifp, (struct ifreq *)data, &scp->ifmedia, command);
     break;
 
-   default:
+  default:
+    DEVPRINTF(3, (scp->dev, "ioctl: bounce to ether_ioctl\n"));
     error = ether_ioctl(ifp, command, data);
   }
 
@@ -510,248 +570,261 @@ xe_intr(void *xscp)
 {
   struct xe_softc *scp = (struct xe_softc *) xscp;
   struct ifnet *ifp;
-  int result;
-  u_int16_t rx_bytes, rxs, txs;
-  u_int8_t psr, isr, esr, rsr;
+  u_int8_t psr, isr, esr, rsr, rst0, txst0, txst1, coll;
 
   ifp = &scp->arpcom.ac_if;
-  rx_bytes = 0;			/* Bytes received on this interrupt */
-  result = 0;			/* Set true if the interrupt is for us */
 
-  if (scp->mohawk) {
-    XE_OUTB(XE_CR, 0);		/* Disable interrupts */
-  }
+  /* Disable interrupts */
+  if (scp->mohawk)
+    XE_OUTB(XE_CR, 0);
 
-  psr = XE_INB(XE_PR);		/* Stash the current register page */
+  /* Cache current register page */
+  psr = XE_INB(XE_PR);
 
-  /*
-   * Read ISR to see what caused this interrupt.  Note that this clears the
-   * ISR on CE2 type cards.
-   */
-  if ((isr = XE_INB(XE_ISR)) && isr != 0xff) {
+  /* Read ISR to see what caused this interrupt */
+  while ((isr = XE_INB(XE_ISR)) != 0) {
 
-    result = 1;			/* This device did generate an int */
-    esr = XE_INB(XE_ESR);	/* Read the other status registers */
+    /* 0xff might mean the card is no longer around */
+    if (isr == 0xff) {
+      DEVPRINTF(3, (scp->dev, "intr: interrupt received for missing card?\n"));
+      break;
+    }
+
+    /* Read other status registers */
     XE_SELECT_PAGE(0x40);
-    rxs = XE_INB(XE_RST0);
-    XE_OUTB(XE_RST0, ~rxs & 0xff);
-    txs = XE_INB(XE_TXST0);
-    txs |= XE_INB(XE_TXST1) << 8;
+    rst0 = XE_INB(XE_RST0);
+    XE_OUTB(XE_RST0, 0);
+    txst0 = XE_INB(XE_TXST0);
+    txst1 = XE_INB(XE_TXST1);
+    coll = txst1 & XE_TXST1_RETRY_COUNT;
     XE_OUTB(XE_TXST0, 0);
     XE_OUTB(XE_TXST1, 0);
     XE_SELECT_PAGE(0);
 
-#if XE_DEBUG > 2
-    printf("xe%d: ISR=%#2.2x ESR=%#2.2x RST=%#2.2x TXST=%#4.4x\n", unit, isr, esr, rxs, txs);
-#endif
+    DEVPRINTF(3, (scp->dev, "intr: ISR=0x%02x, RST=0x%02x, TXT=0x%02x%02x, COLL=0x%01x\n", isr, rst0, txst1, txst0, coll));
 
-    /*
-     * Handle transmit interrupts
-     */
     if (isr & XE_ISR_TX_PACKET) {
-      u_int8_t new_tpr, sent;
-      
-      if ((new_tpr = XE_INB(XE_TPR)) < scp->tx_tpr)	/* Update packet count */
-	sent = (0xff - scp->tx_tpr) + new_tpr;		/* TPR rolled over */
-      else
-	sent = new_tpr - scp->tx_tpr;
+      u_int8_t tpr, sent;
 
-      if (sent > 0) {				/* Packets sent since last interrupt */
-	scp->tx_tpr = new_tpr;
+      /* Update packet count, accounting for rollover */
+      tpr = XE_INB(XE_TPR);
+      sent = -scp->tx_tpr + tpr;
+
+      /* Update statistics if we actually sent anything */
+      if (sent > 0) {
+	scp->tx_tpr = tpr;
 	scp->tx_queued -= sent;
 	ifp->if_opackets += sent;
-	ifp->if_collisions += scp->tx_collisions;
+	ifp->if_collisions += coll;
 
 	/*
-	 * Collision stats are a PITA.  If multiples frames have been sent, we 
-	 * distribute any outstanding collision count equally amongst them.
-	 * However, if we're missing interrupts we're quite likely to also
-	 * miss some collisions; thus the total count will be off anyway.
-	 * Likewise, if we miss a frame dropped due to excessive collisions
-	 * any outstanding collisions count will be held against the next
-	 * frame to be successfully sent.  Hopefully it averages out in the
-	 * end!
-	 * XXX - This will screw up if tx_collisions/sent > 14. FIX IT!
+	 * According to the Xircom manual, Dingo will sometimes manage to
+	 * transmit a packet with triggering an interrupt.  If this happens,
+	 * we have sent > 1 and the collision count only reflects collisions
+	 * on the last packet sent (the one that triggered the interrupt).
+	 * Collision stats might therefore be a bit low, but there doesn't
+	 * seem to be anything we can do about that.
 	 */
-	switch (scp->tx_collisions) {
-	 case 0:
+
+	switch (coll) {
+	case 0:
 	  break;
-	 case 1:
+	case 1:
 	  scp->mibdata.dot3StatsSingleCollisionFrames++;
 	  scp->mibdata.dot3StatsCollFrequencies[0]++;
 	  break;
-	 default:
-	  if (sent == 1) {
-	    scp->mibdata.dot3StatsMultipleCollisionFrames++;
-	    scp->mibdata.dot3StatsCollFrequencies[scp->tx_collisions-1]++;
-	  }
-	  else {		/* Distribute across multiple frames */
-	    scp->mibdata.dot3StatsMultipleCollisionFrames += sent;
-	    scp->mibdata.
-	      dot3StatsCollFrequencies[scp->tx_collisions/sent] += sent - scp->tx_collisions%sent;
-	    scp->mibdata.
-	      dot3StatsCollFrequencies[scp->tx_collisions/sent + 1] += scp->tx_collisions%sent;
-	  }
+	default:
+	  scp->mibdata.dot3StatsMultipleCollisionFrames++;
+	  scp->mibdata.dot3StatsCollFrequencies[coll-1]++;
 	}
-	scp->tx_collisions = 0;
       }
       ifp->if_timer = 0;
       ifp->if_flags &= ~IFF_OACTIVE;
     }
-    if (txs & 0x0002) {		/* Excessive collisions (packet dropped) */
-      ifp->if_collisions += 16;
-      ifp->if_oerrors++;
-      scp->tx_collisions = 0;
-      scp->mibdata.dot3StatsExcessiveCollisions++;
-      scp->mibdata.dot3StatsMultipleCollisionFrames++;
-      scp->mibdata.dot3StatsCollFrequencies[15]++;
-      XE_OUTB(XE_CR, XE_CR_RESTART_TX);
+
+    /* Handle most MAC interrupts */
+    if (isr & XE_ISR_MAC_INTR) {
+
+#if 0
+      /* Carrier sense lost -- only in 10Mbit HDX mode */
+      if (txst0 & XE_TXST0_NO_CARRIER || !(txst1 & XE_TXST1_LINK_STATUS)) {
+	/* XXX - Need to update media status here */
+	device_printf(scp->dev, "no carrier\n");
+	ifp->if_oerrors++;
+	scp->mibdata.dot3StatsCarrierSenseErrors++;
+      }
+#endif
+      /* Excessive collisions -- try sending again */
+      if (txst0 & XE_TXST0_16_COLLISIONS) {
+	ifp->if_collisions += 16;
+	ifp->if_oerrors++;
+	scp->mibdata.dot3StatsExcessiveCollisions++;
+	scp->mibdata.dot3StatsMultipleCollisionFrames++;
+	scp->mibdata.dot3StatsCollFrequencies[15]++;
+	XE_OUTB(XE_CR, XE_CR_RESTART_TX);
+      }
+      /* Transmit underrun -- increase early transmit threshold */
+      if (txst0 & XE_TXST0_TX_UNDERRUN && scp->mohawk) {
+	DEVPRINTF(1, (scp->dev, "transmit underrun"));
+	if (scp->tx_thres < ETHER_MAX_LEN) {
+	  if ((scp->tx_thres += 64) > ETHER_MAX_LEN)
+	    scp->tx_thres = ETHER_MAX_LEN;
+	  DPRINTF(1, (": increasing transmit threshold to %u", scp->tx_thres));
+	  XE_SELECT_PAGE(0x3);
+	  XE_OUTW(XE_TPT, scp->tx_thres);
+	  XE_SELECT_PAGE(0x0);
+	}
+	DPRINTF(1, ("\n"));
+	ifp->if_oerrors++;
+	scp->mibdata.dot3StatsInternalMacTransmitErrors++;
+      }
+      /* Late collision -- just complain about it */
+      if (txst0 & XE_TXST0_LATE_COLLISION) {
+	device_printf(scp->dev, "late collision\n");
+	ifp->if_oerrors++;
+	scp->mibdata.dot3StatsLateCollisions++;
+      }
+      /* SQE test failure -- just complain about it */
+      if (txst0 & XE_TXST0_SQE_FAIL) {
+	device_printf(scp->dev, "SQE test failure\n");
+	ifp->if_oerrors++;
+	scp->mibdata.dot3StatsSQETestErrors++;
+      }
+      /* Packet too long -- what happens to these */
+      if (rst0 & XE_RST0_LONG_PACKET) {
+	device_printf(scp->dev, "received giant packet\n");
+	ifp->if_ierrors++;
+	scp->mibdata.dot3StatsFrameTooLongs++;
+      }
+      /* CRC error -- packet dropped */
+      if (rst0 & XE_RST0_CRC_ERROR) {
+	device_printf(scp->dev, "CRC error\n");
+	ifp->if_ierrors++;
+	scp->mibdata.dot3StatsFCSErrors++;
+      }
     }
-    if (txs & 0x0040)		/* Transmit aborted -- probably collisions */
-      scp->tx_collisions++;
 
-
-    /*
-     * Handle receive interrupts 
-     */
+    /* Handle received packet(s) */
     while ((esr = XE_INB(XE_ESR)) & XE_ESR_FULL_PACKET_RX) {
+      rsr = XE_INB(XE_RSR);
 
-      if ((rsr = XE_INB(XE_RSR)) & XE_RSR_RX_OK) {
+    DEVPRINTF(3, (scp->dev, "intr: ESR=0x%02x, RSR=0x%02x\n", esr, rsr));
+
+      /* Make sure packet is a good one */
+      if (rsr & XE_RSR_RX_OK) {
 	struct ether_header *ehp;
 	struct mbuf *mbp;
 	u_int16_t len;
 
-	len = XE_INW(XE_RBC);
+	len = XE_INW(XE_RBC) - ETHER_CRC_LEN;
 
-	if (len == 0)
-	  continue;
+    DEVPRINTF(3, (scp->dev, "intr: receive length = %d\n", len));
 
-#if 0
-	/*
-	 * Limit the amount of time we spend in this loop, dropping packets if 
-	 * necessary.  The Linux code does this with considerably more
-	 * finesse, adjusting the threshold dynamically.
-	 */
-	if ((rx_bytes += len) > 22000) {
+	if (len == 0) {
 	  ifp->if_iqdrops++;
-	  scp->mibData.dot3StatsMissedFrames++;
-	  XE_OUTW(XE_DO, 0x8000);
 	  continue;
 	}
-#endif
 
-	if (len & 0x01)
-	  len++;
+	/*
+	 * Allocate mbuf to hold received packet.  If the mbuf header isn't
+	 * big enough, we attach an mbuf cluster to hold the packet.  Note the
+	 * +=2 to align the packet data on a 32-bit boundary, and the +3 to
+	 * allow for the possibility of reading one more byte than the actual
+	 * packet length (we always read 16-bit words).
+	 * XXX - Surely there's a better way to do this alignment?
+	 */
+	MGETHDR(mbp, M_DONTWAIT, MT_DATA);
+	if (mbp == NULL) {
+	  ifp->if_iqdrops++;
+	  continue;
+	}
 
-	MGETHDR(mbp, M_DONTWAIT, MT_DATA);	/* Allocate a header mbuf */
-	if (mbp != NULL) {
-	  mbp->m_pkthdr.rcvif = ifp;
-	  mbp->m_pkthdr.len = mbp->m_len = len;
-
-	  /*
-	   * If the mbuf header isn't big enough for the packet, attach an
-	   * mbuf cluster to hold it.  The +2 is to allow for the nasty little 
-	   * alignment hack below.
-	   */
-	  if (len + 2 > MHLEN) {
-	    MCLGET(mbp, M_DONTWAIT);
-	    if ((mbp->m_flags & M_EXT) == 0) {
-	      m_freem(mbp);
-	      mbp = NULL;
-	    }
+	if (len + 3 > MHLEN) {
+	  MCLGET(mbp, M_DONTWAIT);
+	  if ((mbp->m_flags & M_EXT) == 0) {
+	    m_freem(mbp);
+	    ifp->if_iqdrops++;
+	    continue;
 	  }
 	}
 
-	if (mbp != NULL) {
-	  /*
-	   * The Ethernet header is 14 bytes long; thus the actual packet data 
-	   * won't be 32-bit aligned when it's dumped into the mbuf.  We
-	   * offset everything by 2 bytes to fix this.  Apparently the
-	   * alignment is important for NFS, damn its eyes.
-	   */
-	  mbp->m_data += 2;
-	  ehp = mtod(mbp, struct ether_header *);
+	mbp->m_data += 2;
+	ehp = mtod(mbp, struct ether_header *);
 
-	  /*
-	   * Now get the packet, including the Ethernet header and trailer (?)
-	   * We use programmed I/O, because we don't know how to do shared
-	   * memory with these cards.  So yes, it's real slow, and heavy on
-	   * the interrupts (CPU on my P150 maxed out at ~950KBps incoming).
-	   */
-	  if (scp->srev == 0) {		/* Workaround a bug in old cards */
-	    u_short rhs;
+	/*
+	 * Now get the packet in PIO mode, including the Ethernet header but
+	 * omitting the trailing CRC.
+	 */
 
-	    XE_SELECT_PAGE(5);
-	    rhs = XE_INW(XE_RHSA);
-	    XE_SELECT_PAGE(0);
+	/*
+	 * Work around a bug in CE2 cards.  There seems to be a problem with
+	 * duplicated and extraneous bytes in the receive buffer, but without
+	 * any real documentation for the CE2 it's hard to tell for sure.
+	 * XXX - Needs testing on CE2 hardware
+	 */
+	if (scp->srev == 0) {
+	  u_short rhs;
 
-	    rhs += 3;			 /* Skip control info */
+	  XE_SELECT_PAGE(5);
+	  rhs = XE_INW(XE_RHSA);
+	  XE_SELECT_PAGE(0);
 
-	    if (rhs >= 0x8000)
-	      rhs = 0;
+	  rhs += 3;			 /* Skip control info */
 
-	    if (rhs + len > 0x8000) {
-	      int i;
+	  if (rhs >= 0x8000)
+	    rhs = 0;
 
-	      /*
-	       * XXX - This i-- seems very wrong, but it's what the Linux guys 
-	       * XXX - do.  Need someone with an old CE2 to test this for me.
-	       * XXX - 99/3/28: Changed the first i-- to an i++, maybe that'll
-	       * XXX - fix it?  It seems as though the previous version would
-	       * XXX - have caused an infinite loop (what, another one?).
-	       */
-	      for (i = 0; i < len; i++, rhs++) {
-		((char *)ehp)[i] = XE_INB(XE_EDP);
-		if (rhs == 0x8000) {
-		  rhs = 0;
-		  i--;
-		}
+	  if (rhs + len > 0x8000) {
+	    int i;
+
+	    for (i = 0; i < len; i++, rhs++) {
+	      ((char *)ehp)[i] = XE_INB(XE_EDP);
+	      if (rhs == 0x8000) {
+		rhs = 0;
+		i--;
 	      }
 	    }
-	    else
-	      bus_space_read_multi_2(scp->bst, scp->bsh, XE_EDP, 
-	       (u_int16_t *) ehp, len >> 1);
 	  }
 	  else
 	    bus_space_read_multi_2(scp->bst, scp->bsh, XE_EDP, 
-	     (u_int16_t *) ehp, len >> 1);
-
-	  /* Deliver packet to upper layers */
-	  if (mbp != NULL) {
-	    mbp->m_flags |= M_HASFCS;		/* FCS is included in our
-						 * packet */
-	    mbp->m_pkthdr.len = mbp->m_len = len;
-	    (*ifp->if_input)(ifp, mbp);		/* Send the packet on its way */
-	    ifp->if_ipackets++;			/* Success! */
-	  }
-	  XE_OUTW(XE_DO, 0x8000);		/* skip_rx_packet command */
+				   (u_int16_t *) ehp, (len + 1) >> 1);
 	}
+	else
+	  bus_space_read_multi_2(scp->bst, scp->bsh, XE_EDP, 
+				 (u_int16_t *) ehp, (len + 1) >> 1);
+
+	/* Deliver packet to upper layers */
+	mbp->m_pkthdr.rcvif = ifp;
+	mbp->m_pkthdr.len = mbp->m_len = len;
+	(*ifp->if_input)(ifp, mbp);
+	ifp->if_ipackets++;
       }
-      else if (rsr & XE_RSR_LONG_PACKET) {	/* Packet length >1518 bytes */
-	scp->mibdata.dot3StatsFrameTooLongs++;
-	ifp->if_ierrors++;
-      }
-      else if (rsr & XE_RSR_CRC_ERROR) {	/* Bad checksum on packet */
-	scp->mibdata.dot3StatsFCSErrors++;
-	ifp->if_ierrors++;
-      }
-      else if (rsr & XE_RSR_ALIGN_ERROR) {	/* Packet alignment error */
+
+      /* Packet alignment error -- drop packet */
+      else if (rsr & XE_RSR_ALIGN_ERROR) {
+	device_printf(scp->dev, "alignment error\n");
 	scp->mibdata.dot3StatsAlignmentErrors++;
 	ifp->if_ierrors++;
       }
+
+      /* Skip to next packet, if there is one */
+      XE_OUTW(XE_DO, 0x8000);
     }
-    if (rxs & 0x10) {				/* Receiver overrun */
-      scp->mibdata.dot3StatsInternalMacReceiveErrors++;
+
+    /* Clear receiver overruns now we have some free buffer space */
+    if (rst0 & XE_RST0_RX_OVERRUN) {
+      DEVPRINTF(1, (scp->dev, "receive overrun\n"));
       ifp->if_ierrors++;
+      scp->mibdata.dot3StatsInternalMacReceiveErrors++;
       XE_OUTB(XE_CR, XE_CR_CLEAR_OVERRUN);
     }
   }
 
-  XE_SELECT_PAGE(psr);				/* Restore saved page */
-  XE_OUTB(XE_CR, XE_CR_ENABLE_INTR);		/* Re-enable interrupts */
+  /* Restore saved page */
+  XE_SELECT_PAGE(psr);
 
-  /* Could force an int here, instead of dropping packets? */
-  /* XE_OUTB(XE_CR, XE_CR_ENABLE_INTR|XE_CE_FORCE_INTR); */
+  /* Re-enable interrupts */
+  XE_OUTB(XE_CR, XE_CR_ENABLE_INTR);
 
   return;
 }
@@ -767,12 +840,11 @@ static void
 xe_watchdog(struct ifnet *ifp) {
   struct xe_softc *scp = ifp->if_softc;
 
-  device_printf(scp->dev, "watchdog timeout; resetting card\n");
+  device_printf(scp->dev, "watchdog timeout: resetting card\n");
   scp->tx_timeouts++;
   ifp->if_oerrors += scp->tx_queued;
   xe_stop(scp);
-  xe_hard_reset(scp);
-  xe_setmedia(scp);
+  xe_reset(scp);
   xe_init(scp);
 }
 
@@ -784,9 +856,7 @@ static int
 xe_media_change(struct ifnet *ifp) {
   struct xe_softc *scp = ifp->if_softc;
 
-#ifdef XE_DEBUG
-  if_printf(ifp, "media_change\n");
-#endif
+  DEVPRINTF(2, (scp->dev, "media_change\n"));
 
   if (IFM_TYPE(scp->ifm->ifm_media) != IFM_ETHER)
     return(EINVAL);
@@ -809,11 +879,12 @@ xe_media_change(struct ifnet *ifp) {
  */
 static void
 xe_media_status(struct ifnet *ifp, struct ifmediareq *mrp) {
+  struct xe_softc *scp = ifp->if_softc;
 
-#ifdef XE_DEBUG
-  if_printf(ifp, "media_status\n");
-#endif
+  DEVPRINTF(3, (scp->dev, "media_status\n"));
 
+  /* XXX - This is clearly wrong.  Will fix once I have CE2 working */
+  mrp->ifm_status = IFM_AVALID | IFM_ACTIVE;
   mrp->ifm_active = ((struct xe_softc *)ifp->if_softc)->media;
 
   return;
@@ -827,9 +898,7 @@ static void xe_setmedia(void *xscp) {
   struct xe_softc *scp = xscp;
   u_int16_t bmcr, bmsr, anar, lpar;
 
-#ifdef XE_DEBUG
-  device_printf(scp->dev, "setmedia\n");
-#endif
+  DEVPRINTF(2, (scp->dev, "setmedia\n"));
 
   /* Cancel any pending timeout */
   untimeout(xe_setmedia, scp, scp->chand);
@@ -873,21 +942,19 @@ static void xe_setmedia(void *xscp) {
      */
     switch (scp->autoneg_status) {
 
-     case XE_AUTONEG_NONE:
-#if XE_DEBUG > 1
-      device_printf(scp->dev, "Waiting for idle transmitter\n");
-#endif
+    case XE_AUTONEG_NONE:
+      DEVPRINTF(2, (scp->dev, "Waiting for idle transmitter\n"));
       scp->arpcom.ac_if.if_flags |= IFF_OACTIVE;
       scp->autoneg_status = XE_AUTONEG_WAITING;
-      scp->chand = timeout(xe_setmedia, scp, hz * 2);
-      return;
+      /* FALL THROUGH */
 
-     case XE_AUTONEG_WAITING:
-      xe_soft_reset(scp);
+    case XE_AUTONEG_WAITING:
+      if (scp->tx_queued != 0) {
+	scp->chand = timeout(xe_setmedia, scp, hz/2);
+	return;
+      }
       if (scp->phy_ok) {
-#if XE_DEBUG > 1
-	device_printf(scp->dev, "Starting autonegotiation\n");
-#endif
+	DEVPRINTF(2, (scp->dev, "Starting autonegotiation\n"));
 	bmcr = xe_phy_readreg(scp, PHY_BMCR);
 	bmcr &= ~(PHY_BMCR_AUTONEGENBL);
 	xe_phy_writereg(scp, PHY_BMCR, bmcr);
@@ -898,7 +965,7 @@ static void xe_setmedia(void *xscp) {
 	bmcr |= PHY_BMCR_AUTONEGENBL|PHY_BMCR_AUTONEGRSTR;
 	xe_phy_writereg(scp, PHY_BMCR, bmcr);
 	scp->autoneg_status = XE_AUTONEG_STARTED;
-	scp->chand = timeout(xe_setmedia, scp, hz * 7/2);
+ 	scp->chand = timeout(xe_setmedia, scp, hz * 7/2);
 	return;
       }
       else {
@@ -910,9 +977,7 @@ static void xe_setmedia(void *xscp) {
       bmsr = xe_phy_readreg(scp, PHY_BMSR);
       lpar = xe_phy_readreg(scp, PHY_LPAR);
       if (bmsr & (PHY_BMSR_AUTONEGCOMP|PHY_BMSR_LINKSTAT)) {
-#if XE_DEBUG > 1
-	device_printf(scp->dev, "Autonegotiation complete!\n");
-#endif
+	DEVPRINTF(2, (scp->dev, "Autonegotiation complete!\n"));
 	/*
 	 * XXX - Shouldn't have to do this, but (on my hub at least) the
 	 * XXX - transmitter won't work after a successful autoneg.  So we see 
@@ -949,11 +1014,8 @@ static void xe_setmedia(void *xscp) {
 	}
       }
       else {
-#if XE_DEBUG > 1
-	device_printf(scp->dev, "Autonegotiation failed; trying 100baseTX\n");
-#endif
+	DEVPRINTF(2, (scp->dev, "Autonegotiation failed; trying 100baseTX\n"));
 	XE_MII_DUMP(scp);
-	xe_soft_reset(scp);
 	if (scp->phy_ok) {
 	  xe_phy_writereg(scp, PHY_BMCR, PHY_BMCR_SPEEDSEL);
 	  scp->autoneg_status = XE_AUTONEG_100TX;
@@ -970,9 +1032,7 @@ static void xe_setmedia(void *xscp) {
       (void)xe_phy_readreg(scp, PHY_BMSR);
       bmsr = xe_phy_readreg(scp, PHY_BMSR);
       if (bmsr & PHY_BMSR_LINKSTAT) {
-#if XE_DEBUG > 1
-	device_printf(scp->dev, "Got 100baseTX link!\n");
-#endif
+	DEVPRINTF(2, (scp->dev, "Got 100baseTX link!\n"));
 	XE_MII_DUMP(scp);
 	XE_SELECT_PAGE(2);
 	XE_OUTB(XE_MSR, XE_INB(XE_MSR) | 0x08);
@@ -980,9 +1040,7 @@ static void xe_setmedia(void *xscp) {
 	scp->autoneg_status = XE_AUTONEG_NONE;
       }
       else {
-#if XE_DEBUG > 1
-	device_printf(scp->dev, "Autonegotiation failed; disabling PHY\n");
-#endif
+	DEVPRINTF(2, (scp->dev, "Autonegotiation failed; disabling PHY\n"));
 	XE_MII_DUMP(scp);
 	xe_phy_writereg(scp, PHY_BMCR, 0x0000);
 	XE_SELECT_PAGE(2);
@@ -1000,9 +1058,7 @@ static void xe_setmedia(void *xscp) {
      * already by the big switch above.
      */
     if (scp->autoneg_status == XE_AUTONEG_FAIL) {
-#if XE_DEBUG > 1
-      device_printf(scp->dev, "Selecting 10baseX\n");
-#endif
+      DEVPRINTF(2, (scp->dev, "Selecting 10baseX\n"));
       if (scp->mohawk) {
 	XE_SELECT_PAGE(0x42);
 	XE_OUTB(XE_SWC1, 0x80);
@@ -1028,11 +1084,8 @@ static void xe_setmedia(void *xscp) {
      * no PHY, we fall back to 10baseT operation).
      */
    case IFM_100_TX:	/* Force 100baseTX */
-    xe_soft_reset(scp);
     if (scp->phy_ok) {
-#if XE_DEBUG > 1
-      device_printf(scp->dev, "Selecting 100baseTX\n");
-#endif
+      DEVPRINTF(2, (scp->dev, "Selecting 100baseTX\n"));
       XE_SELECT_PAGE(0x42);
       XE_OUTB(XE_SWC1, 0);
       xe_phy_writereg(scp, PHY_BMCR, PHY_BMCR_SPEEDSEL);
@@ -1044,10 +1097,7 @@ static void xe_setmedia(void *xscp) {
     /* FALLTHROUGH */
 
    case IFM_10_T:	/* Force 10baseT */
-    xe_soft_reset(scp);
-#if XE_DEBUG > 1
-    device_printf(scp->dev, "Selecting 10baseT\n");
-#endif
+    DEVPRINTF(2, (scp->dev, "Selecting 10baseT\n"));
     if (scp->phy_ok) {
       xe_phy_writereg(scp, PHY_BMCR, 0x0000);
       XE_SELECT_PAGE(2);
@@ -1059,10 +1109,7 @@ static void xe_setmedia(void *xscp) {
     break;
 
    case IFM_10_2:
-    xe_soft_reset(scp);
-#if XE_DEBUG > 1
-    device_printf(scp->dev, "Selecting 10base2\n");
-#endif
+    DEVPRINTF(2, (scp->dev, "Selecting 10base2\n"));
     XE_SELECT_PAGE(0x42);
     XE_OUTB(XE_SWC1, 0xc0);
     scp->media |= IFM_10_2;
@@ -1074,9 +1121,7 @@ static void xe_setmedia(void *xscp) {
    * Finally, the LEDs are set to match whatever media was chosen and the
    * transmitter is unblocked. 
    */
-#if XE_DEBUG > 1
-  device_printf(scp->dev, "Setting LEDs\n");
-#endif
+  DEVPRINTF(2, (scp->dev, "Setting LEDs\n"));
   XE_SELECT_PAGE(2);
   switch (IFM_SUBTYPE(scp->media)) {
    case IFM_100_TX:
@@ -1092,8 +1137,9 @@ static void xe_setmedia(void *xscp) {
   }
 
   /* Restart output? */
+  xe_enable_intr(scp);
   scp->ifp->if_flags &= ~IFF_OACTIVE;
-  xe_init(scp);
+  xe_start(scp->ifp);
 }
 
 
@@ -1101,98 +1147,25 @@ static void xe_setmedia(void *xscp) {
  * Hard reset (power cycle) the card.
  */
 static void
-xe_hard_reset(struct xe_softc *scp) {
+xe_reset(struct xe_softc *scp) {
   int s;
 
-#ifdef XE_DEBUG
-  device_printf(scp->dev, "hard_reset\n");
-#endif
+  DEVPRINTF(2, (scp->dev, "reset\n"));
 
   s = splimp();
 
-  /*
-   * Power cycle the card.
-   */
+  /* Power down */
   XE_SELECT_PAGE(4);
-  XE_OUTB(XE_GPR1, 0);		/* Power off */
+  XE_OUTB(XE_GPR1, 0);
   DELAY(40000);
 
+  /* Power up again */
   if (scp->mohawk)
-    XE_OUTB(XE_GPR1, 1);	/* And back on again */
+    XE_OUTB(XE_GPR1, XE_GPR1_POWER_DOWN);
   else
-    XE_OUTB(XE_GPR1, 5);	/* Also set AIC bit, whatever that is */
+    XE_OUTB(XE_GPR1, XE_GPR1_POWER_DOWN|XE_GPR1_AIC);
+
   DELAY(40000);
-  XE_SELECT_PAGE(0);
-
-  (void)splx(s);
-}
-
-
-/*
- * Soft reset the card.  Also makes sure that the ML6692 and 10Mbit controller 
- * are powered up, sets the silicon revision number in softc, disables
- * interrupts and checks for the prescence of a 100Mbit PHY.  This should
- * leave us in a position where we can access the PHY and do media
- * selection. The function imposes a 0.5s delay while the hardware powers up.
- */
-static void
-xe_soft_reset(struct xe_softc *scp) {
-  int s;
-
-#ifdef XE_DEBUG
-  device_printf(scp->dev, "soft_reset\n");
-#endif
-
-  s = splimp();
-
-  /*
-   * Reset the card, (again).
-   */
-  XE_SELECT_PAGE(0);
-  XE_OUTB(XE_CR, XE_CR_SOFT_RESET);
-  DELAY(40000);
-  XE_OUTB(XE_CR, 0);
-  DELAY(40000);
-
-  if (scp->mohawk) {
-    /*
-     * set GP1 and GP2 as outputs (bits 2 & 3)
-     * set GP1 low to power on the ML6692 (bit 0)
-     * set GP2 high to power on the 10Mhz chip (bit 1)
-     */
-    XE_SELECT_PAGE(4);
-    XE_OUTB(XE_GPR0, 0x0e);
-  }
-
-  /*
-   * Wait for everything to wake up.
-   */
-  DELAY(500000);
-
-  /*
-   * Get silicon revision number.
-   */
-  XE_SELECT_PAGE(4);
-  if (scp->mohawk)
-    scp->srev = (XE_INB(XE_BOV) & 0x70) >> 4;
-  else
-    scp->srev = (XE_INB(XE_BOV) & 0x30) >> 4;
-#ifdef XE_DEBUG
-  device_printf(scp->dev, "silicon revision = %d\n", scp->srev);
-#endif
-  
-  /*
-   * Shut off interrupts.
-   */
-  xe_disable_intr(scp);
-
-  /*
-   * Check for PHY.
-   */
-  if (scp->mohawk) {
-    scp->phy_ok = xe_mii_init(scp);
-  }
-
   XE_SELECT_PAGE(0);
 
   (void)splx(s);
@@ -1208,9 +1181,7 @@ static void
 xe_stop(struct xe_softc *scp) {
   int s;
 
-#ifdef XE_DEBUG
-  device_printf(scp->dev, "stop\n");
-#endif
+  DEVPRINTF(2, (scp->dev, "stop\n"));
 
   s = splimp();
 
@@ -1225,6 +1196,15 @@ xe_stop(struct xe_softc *scp) {
   XE_SELECT_PAGE(4);
   XE_OUTB(XE_GPR1, 0);
   XE_SELECT_PAGE(0);
+  if (scp->mohawk) {
+    /*
+     * set GP1 and GP2 as outputs (bits 2 & 3)
+     * set GP1 high to power on the ML6692 (bit 0)
+     * set GP2 low to power on the 10Mhz chip (bit 1)
+     */
+    XE_SELECT_PAGE(4);
+    XE_OUTB(XE_GPR0, XE_GPR0_GP2_SELECT|XE_GPR0_GP1_SELECT|XE_GPR0_GP1_OUT);
+  }
 
   /*
    * ~IFF_RUNNING == interface down.
@@ -1238,18 +1218,12 @@ xe_stop(struct xe_softc *scp) {
 
 
 /*
- * Enable Ethernet interrupts from the card.
+ * Enable interrupts from the card.
  */
 static void
 xe_enable_intr(struct xe_softc *scp) {
-#ifdef XE_DEBUG
-  device_printf(scp->dev, "enable_intr\n");
-#endif
 
-  XE_SELECT_PAGE(1);
-  XE_OUTB(XE_IMR0, 0xff);		/* Unmask everything */
-  XE_OUTB(XE_IMR1, 0x01);		/* Unmask TX underrun detection */
-  DELAY(1);
+  DEVPRINTF(2, (scp->dev, "enable_intr\n"));
 
   XE_SELECT_PAGE(0);
   XE_OUTB(XE_CR, XE_CR_ENABLE_INTR);	/* Enable interrupts */
@@ -1262,132 +1236,226 @@ xe_enable_intr(struct xe_softc *scp) {
 
 
 /*
- * Disable all Ethernet interrupts from the card.
+ * Disable interrupts from the card.
  */
 static void
 xe_disable_intr(struct xe_softc *scp) {
-#ifdef XE_DEBUG
-  device_printf(scp->dev, "disable_intr\n");
-#endif
+
+  DEVPRINTF(2, (scp->dev, "disable_intr\n"));
 
   XE_SELECT_PAGE(0);
   XE_OUTB(XE_CR, 0);			/* Disable interrupts */
-  if (scp->modem && !scp->dingo) {	/* More magic (does this work?) */
+  if (scp->modem && !scp->dingo) {	/* More magic */
     XE_OUTB(0x10, 0x10);		/* Mask the master int enable bit */
   }
-
-  XE_SELECT_PAGE(1);
-  XE_OUTB(XE_IMR0, 0);			/* Forbid all interrupts */
-  XE_OUTB(XE_IMR1, 0);
-  XE_SELECT_PAGE(0);
 }
 
 
 /*
- * Set up multicast filter and promiscuous mode
+ * Set up multicast filter and promiscuous modes.
  */
 static void
-xe_setmulti(struct xe_softc *scp) {
+xe_set_multicast(struct xe_softc *scp) {
   struct ifnet *ifp;
   struct ifmultiaddr *maddr;
-  int count;
+  unsigned count, i;
+
+  DEVPRINTF(2, (scp->dev, "set_multicast\n"));
 
   ifp = &scp->arpcom.ac_if;
-  maddr = TAILQ_FIRST(&ifp->if_multiaddrs);
+  XE_SELECT_PAGE(0x42);
 
-  /* Get length of multicast list */
-  for (count = 0; maddr != NULL; maddr = TAILQ_NEXT(maddr, ifma_link), count++);
+  /* Handle PROMISC flag */
+  if (ifp->if_flags & IFF_PROMISC) {
+    XE_OUTB(XE_SWC1, XE_INB(XE_SWC1) | XE_SWC1_PROMISCUOUS);
+    return;
+  }
+  else
+    XE_OUTB(XE_SWC1, XE_INB(XE_SWC1) & ~XE_SWC1_PROMISCUOUS);
 
-  if ((ifp->if_flags & IFF_PROMISC) || (ifp->if_flags & IFF_ALLMULTI) || (count > 9)) {
-    /*
-     * Go into promiscuous mode if either of the PROMISC or ALLMULTI flags are
-     * set, or if we have been asked to deal with more than 9 multicast
-     * addresses.  To do this: set MPE and PME in SWC1
-     */
-    XE_SELECT_PAGE(0x42);
-    XE_OUTB(XE_SWC1, 0x06);
+  /* Handle ALLMULTI flag */
+  if (ifp->if_flags & IFF_ALLMULTI) {
+    XE_OUTB(XE_SWC1, XE_INB(XE_SWC1) | XE_SWC1_ALLMULTI);
+    return;
   }
-  else if ((ifp->if_flags & IFF_MULTICAST) && (count > 0)) {
-    /*
-     * Program the filters for up to 9 addresses
-     */
-    XE_SELECT_PAGE(0x42);
-    XE_OUTB(XE_SWC1, 0x01);
-    XE_SELECT_PAGE(0x40);
-    XE_OUTB(XE_CMD0, XE_CMD0_OFFLINE);
-    /*xe_reg_dump(scp);*/
-    xe_setaddrs(scp);
-    /*xe_reg_dump(scp);*/
-    XE_SELECT_PAGE(0x40);
-    XE_OUTB(XE_CMD0, XE_CMD0_RX_ENABLE|XE_CMD0_ONLINE);
+  else
+    XE_OUTB(XE_SWC1, XE_INB(XE_SWC1) & ~XE_SWC1_ALLMULTI);
+
+  /* Iterate over multicast address list */
+  count = 0;
+#if __FreeBSD_version < 500000
+  LIST_FOREACH(maddr, &ifp->if_multiaddrs, ifma_link) {
+#else
+  TAILQ_FOREACH(maddr, &ifp->if_multiaddrs, ifma_link) {
+#endif
+    if (maddr->ifma_addr->sa_family != AF_LINK)
+      continue;
+
+    count++;
+
+    if (count < 10)
+      /* First 9 use Individual Addresses for exact matching */
+      xe_set_addr(scp, LLADDR((struct sockaddr_dl *)maddr->ifma_addr), count);
+    else
+      if (scp->mohawk)
+	/* Use hash filter on Mohawk and Dingo */
+	xe_mchash(scp, LLADDR((struct sockaddr_dl *)maddr->ifma_addr));
+      else
+	/* Nowhere else to put them on CE2 */
+	break;
   }
+
+  DEVPRINTF(2, (scp->dev, "set_multicast: count = %u\n", count));
+
+  /* Now do some cleanup and enable multicast handling as needed */
+  if (count == 0) {
+    /* Disable all multicast handling */
+    XE_SELECT_PAGE(0x42);
+    XE_OUTB(XE_SWC1, XE_INB(XE_SWC1) & ~(XE_SWC1_IA_ENABLE|XE_SWC1_ALLMULTI));
+    if (scp->mohawk) {
+      XE_SELECT_PAGE(0x02);
+      XE_OUTB(XE_MSR, XE_INB(XE_MSR) & ~XE_MSR_HASH_TABLE);
+    }
+  }
+  else if (count < 10) {
+    /* Full in any unused Individual Addresses with our MAC address */
+    for (i = count + 1; i < 10; i++)
+      xe_set_addr(scp, (u_int8_t *)(&scp->arpcom.ac_enaddr), i);
+    /* Enable Individual Address matching only */
+    XE_SELECT_PAGE(0x42);
+    XE_OUTB(XE_SWC1, (XE_INB(XE_SWC1) & ~XE_SWC1_ALLMULTI) | XE_SWC1_IA_ENABLE);
+    if (scp->mohawk) {
+      XE_SELECT_PAGE(0x02);
+      XE_OUTB(XE_MSR, XE_INB(XE_MSR) & ~XE_MSR_HASH_TABLE);
+    }
+  }    
   else {
-    /*
-     * No multicast operation (default)
-     */
-    XE_SELECT_PAGE(0x42);
-    XE_OUTB(XE_SWC1, 0);
+    if (scp->mohawk) {
+      /* Check whether hash table is full */
+      XE_SELECT_PAGE(0x58);
+      for (i = 0x08; i < 0x10; i++)
+	if (XE_INB(i) != 0xff)
+	  break;
+      if (i == 0x10) {
+	/* Hash table full - enable promiscuous multicast matching */
+	XE_SELECT_PAGE(0x42);
+	XE_OUTB(XE_SWC1, (XE_INB(XE_SWC1) & ~XE_SWC1_IA_ENABLE) | XE_SWC1_ALLMULTI);
+	XE_SELECT_PAGE(0x02);
+	XE_OUTB(XE_MSR, XE_INB(XE_MSR) & ~XE_MSR_HASH_TABLE);
+      }
+      else {
+	/* Enable hash table and Individual Address matching */
+	XE_SELECT_PAGE(0x42);
+	XE_OUTB(XE_SWC1, (XE_INB(XE_SWC1) & ~XE_SWC1_ALLMULTI) | XE_SWC1_IA_ENABLE);
+	XE_SELECT_PAGE(0x02);
+	XE_OUTB(XE_MSR, XE_INB(XE_MSR) | XE_MSR_HASH_TABLE);
+      }
+    }
+    else {
+      /* Enable promiscuous multicast matching */
+      XE_SELECT_PAGE(0x42);
+      XE_OUTB(XE_SWC1, (XE_INB(XE_SWC1) & ~XE_SWC1_IA_ENABLE) | XE_SWC1_ALLMULTI);
+    }
   }
+
   XE_SELECT_PAGE(0);
 }
 
 
 /*
- * Set up all on-chip addresses (for multicast).  AFAICS, there are 10
- * of these things; the first is our MAC address, the other 9 are mcast
- * addresses, padded with the MAC address if there aren't enough.
- * XXX - This doesn't work right, but I'm not sure why yet.  We seem to be
- * XXX - doing much the same as the Linux code, which is weird enough that
- * XXX - it's probably right (despite my earlier comments to the contrary).
+ * Copy the Ethernet multicast address in addr to the on-chip registers for
+ * Individual Address idx.  Assumes that addr is really a multicast address
+ * and that idx > 0 (slot 0 is always used for the card MAC address).
  */
 static void
-xe_setaddrs(struct xe_softc *scp) {
-  struct ifmultiaddr *maddr;
-  u_int8_t *addr;
-  u_int8_t page, slot, byte, i;
+xe_set_addr(struct xe_softc *scp, u_int8_t* addr, unsigned idx) {
+  u_int8_t page, reg;
+  unsigned i;
 
-  maddr = TAILQ_FIRST(&scp->arpcom.ac_if.if_multiaddrs);
+  /*
+   * Individual Addresses are stored in registers 8-F of pages 0x50-0x57.  IA1
+   * therefore starts at register 0xE on page 0x50.  The expressions below
+   * compute the starting page and register for any IA index > 0.
+   */
+  --idx;
+  page = 0x50 + idx%4 + idx/4*3;
+  reg = 0x0e - 2 * (idx%4);
 
-  XE_SELECT_PAGE(page = 0x50);
+  DEVPRINTF(3, (scp->dev, "set_addr: idx = %u, page = 0x%02x, reg = 0x%02x\n",
+		idx+1, page, reg));
 
-  for (slot = 0, byte = 8; slot < 10; slot++) {
-
-    if (slot == 0)
-      addr = (u_int8_t *)(&scp->arpcom.ac_enaddr);
+  /*
+   * Copy the IA bytes.  Note that the byte order is reversed for Mohawk and
+   * Dingo wrt. CE2 hardware.
+   */
+  XE_SELECT_PAGE(page);
+  for (i = 0; i < 6; i++) {
+    if (i > 0) {
+      DPRINTF(3, (":%02x", addr[i]));
+    }
     else {
-      while (maddr != NULL && maddr->ifma_addr->sa_family != AF_LINK)
-	maddr = TAILQ_NEXT(maddr, ifma_link);
-      if (maddr != NULL)
-	addr = LLADDR((struct sockaddr_dl *)maddr->ifma_addr);
-      else
-	addr = (u_int8_t *)(&scp->arpcom.ac_enaddr);
+      DEVPRINTF(3, (scp->dev, "set_addr: %02x", addr[0]));
     }
-
-    for (i = 0; i < 6; i++, byte++) {
-#if XE_DEBUG > 2
-      if (i)
-	printf(":%x", addr[i]);
-      else
-	device_printf(scp->dev, "individual addresses %d: %x", slot, addr[0]);
-#endif
-
-      if (byte > 15) {
-	page++;
-	byte = 8;
-	XE_SELECT_PAGE(page);
-      }
-
-      if (scp->mohawk)
-	XE_OUTB(byte, addr[5 - i]);
-      else
-	XE_OUTB(byte, addr[i]);
+    XE_OUTB(reg, addr[scp->mohawk ? 5 - i : i]);
+    if (++reg == 0x10) {
+      reg = 0x08;
+      XE_SELECT_PAGE(++page);
     }
-#if XE_DEBUG > 2
-    printf("\n");
-#endif
+  }
+  DPRINTF(3, ("\n"));
+}
+
+
+/*
+ * Set the appropriate bit in the multicast hash table for the supplied
+ * Ethernet multicast address addr.  Assumes that addr is really a multicast
+ * address.
+ */
+static void
+xe_mchash(struct xe_softc* scp, caddr_t addr) {
+  u_int32_t crc = 0xffffffff;
+  int idx, bit;
+  u_int8_t carry, byte, data, crc31, hash;
+
+  /* Compute CRC of the address -- standard Ethernet CRC function */
+  for (data = *addr++, idx = 0; idx < 6; idx++, data >>= 1) {
+    for (bit = 1; bit <= 8; bit++) {
+      if (crc & 0x80000000)
+	crc31 = 0x01;
+      else
+	crc31 = 0;
+      carry = crc31 ^ (data & 0x01);
+      crc <<= 1;
+      data >>= 1;
+	crc = (crc ^ XE_CRC_POLY) | (carry|0x1);
+    }
   }
 
-  XE_SELECT_PAGE(0);
+  DEVPRINTF(3, (scp->dev, "set_hash: CRC = 0x%08x\n", crc));
+
+  /*
+   * Convert a CRC into an index into the multicast hash table.  What we do is
+   * take the most-significant 6 bits of the CRC, reverse them, and use that as
+   * the bit number in the hash table.  Bits 5:3 of the result give the byte
+   * within the table (0-7); bits 2:0 give the bit number within that byte (also
+   * 0-7), ie. the number of shifts needed to get it into the lsb position.
+   */
+  for (idx = 0, hash = 0; idx < 6; idx++) {
+    hash >>= 1;
+    if (crc & 0x80000000) {
+      hash |= 0x20;
+    }
+    crc <<= 1;
+  }
+
+  /* Top 3 bits of hash give register - 8, bottom 3 give bit within register */
+  byte = hash >> 3 | 0x08;
+  carry = 0x01 << (hash & 0x07);
+
+  DEVPRINTF(3, (scp->dev, "set_hash: hash = 0x%02x, byte = 0x%02x, carry = 0x%02x\n", hash, byte, carry));
+
+  XE_SELECT_PAGE(0x58);
+  XE_OUTB(byte, XE_INB(byte) | carry);
 }
 
 
@@ -1396,28 +1464,32 @@ xe_setaddrs(struct xe_softc *scp) {
  */
 static int
 xe_pio_write_packet(struct xe_softc *scp, struct mbuf *mbp) {
-  struct mbuf *mbp2;
-  u_int16_t len, pad, free, ok;
+  unsigned len, pad;
+  unsigned char wantbyte;
   u_int8_t *data;
-  u_int8_t savebyte[2], wantbyte;
+  u_int8_t savebyte[2];
 
   /* Get total packet length */
-  for (len = 0, mbp2 = mbp; mbp2 != NULL; len += mbp2->m_len, mbp2 = mbp2->m_next);
+  if (mbp->m_flags & M_PKTHDR)
+    len = mbp->m_pkthdr.len;
+  else {
+    struct mbuf* mbp2 = mbp;
+    for (len = 0; mbp2 != NULL; len += mbp2->m_len, mbp2 = mbp2->m_next);
+  }
+
+  DEVPRINTF(3, (scp->dev, "pio_write_packet: len = %u\n", len));
 
   /* Packets < minimum length may need to be padded out */
   pad = 0;
-  if (len < ETHER_MIN_LEN - ETHER_CRC_LEN) {
-    pad = (ETHER_MIN_LEN - ETHER_CRC_LEN - len + 1) >> 1;
-    len = ETHER_MIN_LEN - ETHER_CRC_LEN;
+  if (len < scp->tx_min) {
+    pad = scp->tx_min - len;
+    len = scp->tx_min;
   }
 
   /* Check transmit buffer space */
   XE_SELECT_PAGE(0);
-  XE_OUTW(XE_TRS, len+2);
-  free = XE_INW(XE_TSO);
-  ok = free & 0x8000;
-  free &= 0x7fff;
-  if (free <= len + 2)
+  XE_OUTW(XE_TRS, len+2);	/* Only effective on rev. 1 CE2 cards */
+  if ((XE_INW(XE_TSO) & 0x7fff) <= len + 2)
     return 1;
 
   /* Send packet length to card */
@@ -1440,7 +1512,7 @@ xe_pio_write_packet(struct xe_softc *scp, struct mbuf *mbp) {
       }
       if (len > 1) {		/* Output contiguous words */
 	bus_space_write_multi_2(scp->bst, scp->bsh, XE_EDP, (u_int16_t *) data,
-	 len >> 1);
+				len >> 1);
 	data += len & ~1;
 	len &= 1;
       }
@@ -1451,76 +1523,32 @@ xe_pio_write_packet(struct xe_softc *scp, struct mbuf *mbp) {
     }
     mbp = mbp->m_next;
   }
-  if (wantbyte)			/* Last byte for odd-length packets */
-    XE_OUTW(XE_EDP, *(u_short *)savebyte);
 
   /*
-   * For CE3 cards, just tell 'em to send -- apparently the card will pad out
-   * short packets with random cruft.  Otherwise, write nonsense words to fill 
-   * out the packet.  I guess it is then sent automatically (?)
+   * Send last byte of odd-length packets
+   */
+  if (wantbyte)
+    XE_OUTB(XE_EDP, savebyte[0]);
+
+  /*
+   * Can just tell CE3 cards to send; short packets will be padded out with
+   * random cruft automatically.  For CE2, manually pad the packet with
+   * garbage; it will be sent when the required number or bytes have been
+   * delivered to the card.
    */
   if (scp->mohawk)
-    XE_OUTB(XE_CR, XE_CR_TX_PACKET|XE_CR_ENABLE_INTR);
-  else
+    XE_OUTB(XE_CR, XE_CR_TX_PACKET | XE_CR_RESTART_TX | XE_CR_ENABLE_INTR);
+  else if (pad > 0) {
+    if (pad & 0x01)
+      XE_OUTB(XE_EDP, 0xaa);
+    pad >>= 1;
     while (pad > 0) {
       XE_OUTW(XE_EDP, 0xdead);
       pad--;
     }
+  }
 
   return 0;
-}
-
-/*
- * Compute the 32-bit Ethernet CRC for the given buffer.
- */
-static u_int32_t
-xe_compute_crc(u_int8_t *data, int len) {
-  u_int32_t crc = 0xffffffff;
-  u_int32_t poly = 0x04c11db6;
-  u_int8_t current, crc31, bit;
-  int i, k;
-
-  for (i = 0; i < len; i++) {
-    current = data[i];
-    for (k = 1; k <= 8; k++) {
-      if (crc & 0x80000000) {
-	crc31 = 0x01;
-      }
-      else {
-	crc31 = 0;
-      }
-      bit = crc31 ^ (current & 0x01);
-      crc <<= 1;
-      current >>= 1;
-      if (bit) {
-	crc = (crc ^ poly)|1;
-      }
-    }
-  }
-  return crc;
-}
-
-
-/*
- * Convert a CRC into an index into the multicast hash table.  What we do is
- * take the most-significant 6 bits of the CRC, reverse them, and use that as
- * the bit number in the hash table.  Bits 5:3 of the result give the byte
- * within the table (0-7); bits 2:0 give the bit number within that byte (also 
- * 0-7), ie. the number of shifts needed to get it into the lsb position.
- */
-static int
-xe_compute_hashbit(u_int32_t crc) {
-  u_int8_t hashbit = 0;
-  int i;
-
-  for (i = 0; i < 6; i++) {
-    hashbit >>= 1;
-    if (crc & 0x80000000) {
-      hashbit &= 0x80;
-    }
-    crc <<= 1;
-  }
-  return (hashbit >> 2);
 }
 
 
@@ -1570,15 +1598,11 @@ xe_mii_init(struct xe_softc *scp) {
 
   status = xe_phy_readreg(scp, PHY_BMSR);
   if ((status & 0xff00) != 0x7800) {
-#if XE_DEBUG > 1
-    device_printf(scp->dev, "no PHY found, %0x\n", status);
-#endif
+    DEVPRINTF(2, (scp->dev, "no PHY found, %0x\n", status));
     return 0;
   }
   else {
-#if XE_DEBUG > 1
-    device_printf(scp->dev, "PHY OK!\n");
-#endif
+    DEVPRINTF(2, (scp->dev, "PHY OK!\n"));
 
     /* Reset the PHY */
     xe_phy_writereg(scp, PHY_BMCR, PHY_BMCR_RESET);
@@ -1790,7 +1814,6 @@ xe_phy_writereg(struct xe_softc *scp, u_int16_t reg, u_int16_t data) {
 }
 
 
-#ifdef XE_DEBUG
 /*
  * A bit of debugging code.
  */
@@ -1812,7 +1835,8 @@ xe_mii_dump(struct xe_softc *scp) {
   (void)splx(s);
 }
 
-static void
+#if 0
+void
 xe_reg_dump(struct xe_softc *scp) {
   int page, i, s;
 
@@ -1855,19 +1879,20 @@ int
 xe_activate(device_t dev)
 {
 	struct xe_softc *sc = device_get_softc(dev);
-	int start, err;
+	int start, err, i;
 
-	if (!sc->dingo) {
+	DEVPRINTF(2, (dev, "activate\n"));
+
+	if (!sc->modem) {
 		sc->port_rid = 0;	/* 0 is managed by pccard */
 		sc->port_res = bus_alloc_resource(dev, SYS_RES_IOPORT,
 		    &sc->port_rid, 0, ~0, 16, RF_ACTIVE);
-	} else {
+	}
+	else if (sc->dingo) {
 		/*
 		 * Find a 16 byte aligned ioport for the card.
 		 */
-#if XE_DEBUG > 0
-		device_printf(dev, "Finding an aligned port for RealPort\n");
-#endif /* XE_DEBUG */
+		DEVPRINTF(1, (dev, "Finding an aligned port for RealPort\n"));
 		sc->port_rid = 1;	/* 0 is managed by pccard */
 		start = 0x100;
 		do {
@@ -1882,16 +1907,53 @@ xe_activate(device_t dev)
 			    sc->port_res);
 			start = (rman_get_start(sc->port_res) + 15) & ~0xf;
 		} while (1);
-#if XE_DEBUG > 2
-		device_printf(dev, "port 0x%0lx, size 0x%0lx\n",
+		DEVPRINTF(1, (dev, "RealPort port 0x%0lx, size 0x%0lx\n",
 		    bus_get_resource_start(dev, SYS_RES_IOPORT, sc->port_rid),
-		    bus_get_resource_count(dev, SYS_RES_IOPORT, sc->port_rid));
-#endif /* XE_DEBUG */
+		    bus_get_resource_count(dev, SYS_RES_IOPORT, sc->port_rid)));
 	}
+	else if (sc->ce2) {
+	    /*
+	     * Find contiguous I/O port for the Ethernet function on CEM2 and
+	     * CEM3 cards.  We allocate window 0 wherever pccard has decided
+	     * it should be, then find an available window adjacent to it for
+	     * the second function.  Not sure that both windows are actually
+	     * needed.
+	     */
+	    DEVPRINTF(1, (dev, "Finding I/O port for CEM2/CEM3\n"));
+	    sc->ce2_port_rid = 0;	/* 0 is managed by pccard */
+	    sc->ce2_port_res = bus_alloc_resource(dev, SYS_RES_IOPORT,
+						  &sc->ce2_port_rid, 0, ~0,
+						  8, RF_ACTIVE);
+	    if (!sc->ce2_port_res) {
+		DEVPRINTF(1, (dev, "Cannot allocate I/O port for modem\n"));
+		return ENOMEM;
+	    }
+
+	    sc->port_rid = 1;
+	    start = bus_get_resource_start(dev, SYS_RES_IOPORT,
+					   sc->ce2_port_rid);
+	    for (i = 0; i < 2; i++) {
+		start += (i == 0 ? 8 : -24);
+		sc->port_res = bus_alloc_resource(dev, SYS_RES_IOPORT,
+						  &sc->port_rid, start,
+						  start + 18, 18, RF_ACTIVE);
+		if (sc->port_res == 0)
+		    continue;	/* Failed, try again if possible */
+		if (bus_get_resource_start(dev, SYS_RES_IOPORT,
+					   sc->port_rid) == start)
+		    break;	/* Success! */
+
+		bus_release_resource(dev, SYS_RES_IOPORT, sc->port_rid,
+				     sc->port_res);
+		sc->port_res = 0;
+	    }
+		DEVPRINTF(1, (dev, "CEM2/CEM3 port 0x%0lx, size 0x%0lx\n",
+		    bus_get_resource_start(dev, SYS_RES_IOPORT, sc->port_rid),
+		    bus_get_resource_count(dev, SYS_RES_IOPORT, sc->port_rid)));
+	}
+
 	if (!sc->port_res) {
-#if XE_DEBUG > 0
-		device_printf(dev, "Cannot allocate ioport\n");
-#endif		
+		DEVPRINTF(1, (dev, "Cannot allocate ioport\n"));
 		return ENOMEM;
 	}
 
@@ -1899,9 +1961,7 @@ xe_activate(device_t dev)
 	sc->irq_res = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irq_rid, 
 	    0, ~0, 1, RF_ACTIVE);
 	if (!sc->irq_res) {
-#if XE_DEBUG > 0
-		device_printf(dev, "Cannot allocate irq\n");
-#endif
+		DEVPRINTF(1, (dev, "Cannot allocate irq\n"));
 		xe_deactivate(dev);
 		return ENOMEM;
 	}
@@ -1921,6 +1981,9 @@ xe_deactivate(device_t dev)
 {
 	struct xe_softc *sc = device_get_softc(dev);
 	
+	DEVPRINTF(2, (dev, "deactivate\n"));
+	xe_disable_intr(sc);
+
 	if (sc->intrhand)
 		bus_teardown_intr(dev, sc->irq_res, sc->intrhand);
 	sc->intrhand = 0;
@@ -1928,6 +1991,10 @@ xe_deactivate(device_t dev)
 		bus_release_resource(dev, SYS_RES_IOPORT, sc->port_rid, 
 		    sc->port_res);
 	sc->port_res = 0;
+	if (sc->ce2_port_res)
+	    bus_release_resource(dev, SYS_RES_IOPORT, sc->ce2_port_rid,
+				 sc->ce2_port_res);
+	sc->ce2_port_res = 0;
 	if (sc->irq_res)
 		bus_release_resource(dev, SYS_RES_IRQ, sc->irq_rid, 
 		    sc->irq_res);

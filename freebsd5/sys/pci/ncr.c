@@ -1,6 +1,5 @@
 /**************************************************************************
 **
-** $FreeBSD: src/sys/pci/ncr.c,v 1.171 2003/04/15 06:37:30 mdodd Exp $
 **
 **  Device driver for the   NCR 53C8XX   PCI-SCSI-Controller Family.
 **
@@ -38,6 +37,10 @@
 **
 ***************************************************************************
 */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/ncr.c,v 1.178 2003/08/23 02:25:04 marcel Exp $");
+
 
 #define NCR_DATE "pl30 98/1/1"
 
@@ -188,8 +191,8 @@
 #include <vm/vm_extern.h>
 #endif
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 #include <pci/ncrreg.h>
 
 #include <cam/cam.h>
@@ -1302,12 +1305,6 @@ static	int	ncr_attach	(device_t dev);
 **
 **==========================================================
 */
-
-
-#if !defined(lint)
-static const char ident[] =
-	"\n$FreeBSD: src/sys/pci/ncr.c,v 1.171 2003/04/15 06:37:30 mdodd Exp $\n";
-#endif
 
 static const u_long	ncr_version = NCR_VERSION	* 11
 	+ (u_long) sizeof (struct ncb)	*  7
@@ -3883,7 +3880,7 @@ ncr_action (struct cam_sim *sim, union ccb *ccb)
 		int segments;
 		u_int8_t nego;
 		u_int8_t idmsg;
-		u_int8_t qidx;
+		int qidx;
 		
 		tp = &np->target[ccb->ccb_h.target_id];
 		csio = &ccb->csio;
@@ -4157,7 +4154,8 @@ ncr_action (struct cam_sim *sim, union ccb *ccb)
 		*/
 
 		qidx = np->squeueput + 1;
-		if (qidx >= MAX_START) qidx=0;
+		if (qidx >= MAX_START)
+			qidx = 0;
 		np->squeue [qidx	 ] = NCB_SCRIPT_PHYS (np, idle);
 		np->squeue [np->squeueput] = CCB_PHYS (cp, phys);
 		np->squeueput = qidx;
@@ -4337,30 +4335,11 @@ ncr_action (struct cam_sim *sim, union ccb *ccb)
 	}
 	case XPT_CALC_GEOMETRY:
 	{
-		struct	  ccb_calc_geometry *ccg;
-		u_int32_t size_mb;
-		u_int32_t secs_per_cylinder;
-		int	  extended;
-
 		/* XXX JGibbs - I'm sure the NCR uses a different strategy,
 		 *		but it should be able to deal with Adaptec
 		 *		geometry too.
 		 */
-		extended = 1;
-		ccg = &ccb->ccg;
-		size_mb = ccg->volume_size
-			/ ((1024L * 1024L) / ccg->block_size);
-		
-		if (size_mb > 1024 && extended) {
-			ccg->heads = 255;
-			ccg->secs_per_track = 63;
-		} else {
-			ccg->heads = 64;
-			ccg->secs_per_track = 32;
-		}
-		secs_per_cylinder = ccg->heads * ccg->secs_per_track;
-		ccg->cylinders = ccg->volume_size / secs_per_cylinder;
-		ccb->ccb_h.status = CAM_REQ_CMP;
+		cam_calc_geometry(&ccb->ccg, /*extended*/1);
 		xpt_done(ccb);
 		break;
 	}
@@ -4423,7 +4402,6 @@ ncr_complete (ncb_p np, nccb_p cp)
 {
 	union ccb *ccb;
 	tcb_p tp;
-	lcb_p lp;
 
 	/*
 	**	Sanity check
@@ -4455,7 +4433,6 @@ ncr_complete (ncb_p np, nccb_p cp)
 	ccb = cp->ccb;
 	cp->ccb = NULL;
 	tp = &np->target[ccb->ccb_h.target_id];
-	lp = tp->lp[ccb->ccb_h.target_lun];
 
 	/*
 	**	We do not queue more than 1 nccb per target 

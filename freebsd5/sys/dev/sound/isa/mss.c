@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2001 George Reid <greid@ukug.uk.freebsd.org>
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * Copyright Luigi Rizzo, 1997,1998
  * Copyright by Hannu Savolainen 1994, 1995
  * All rights reserved.
@@ -29,7 +29,7 @@
 
 #include <dev/sound/pcm/sound.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/mss.c,v 1.84 2003/02/07 14:05:33 nyan Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/mss.c,v 1.86 2003/09/07 16:28:02 cg Exp $");
 
 /* board-specific include files */
 #include <dev/sound/isa/mss.h>
@@ -1720,8 +1720,9 @@ mss_doattach(device_t dev, struct mss_info *mss)
 			/*highaddr*/BUS_SPACE_MAXADDR,
 			/*filter*/NULL, /*filterarg*/NULL,
 			/*maxsize*/mss->bufsize, /*nsegments*/1,
-			/*maxsegz*/0x3ffff,
-			/*flags*/0, &mss->parent_dmat) != 0) {
+			/*maxsegz*/0x3ffff, /*flags*/0,
+			/*lockfunc*/busdma_lock_mutex, /*lockarg*/&Giant,
+			&mss->parent_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		goto no;
     	}

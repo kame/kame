@@ -32,9 +32,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)spx_usrreq.h
- *
- * $FreeBSD: src/sys/netipx/spx_usrreq.c,v 1.37 2003/02/19 05:47:37 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netipx/spx_usrreq.c,v 1.40 2003/11/18 00:39:05 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -111,7 +112,7 @@ struct	pr_usrreqs spx_usrreqs = {
 	spx_connect, pru_connect2_notsupp, ipx_control, spx_detach,
 	spx_usr_disconnect, spx_listen, ipx_peeraddr, spx_rcvd,
 	spx_rcvoob, spx_send, pru_sense_null, spx_shutdown,
-	ipx_sockaddr, sosend, soreceive, sopoll
+	ipx_sockaddr, sosend, soreceive, sopoll, pru_sosetlabel_null
 };
 
 struct	pr_usrreqs spx_usrreq_sps = {
@@ -119,7 +120,7 @@ struct	pr_usrreqs spx_usrreq_sps = {
 	spx_connect, pru_connect2_notsupp, ipx_control, spx_detach,
 	spx_usr_disconnect, spx_listen, ipx_peeraddr, spx_rcvd,
 	spx_rcvoob, spx_send, pru_sense_null, spx_shutdown,
-	ipx_sockaddr, sosend, soreceive, sopoll
+	ipx_sockaddr, sosend, soreceive, sopoll, pru_sosetlabel_null
 };
 
 void
@@ -637,7 +638,7 @@ spx_ctlinput(cmd, arg_as_sa, dummy)
 	struct ipx_addr *na;
 	struct sockaddr_ipx *sipx;
 
-	if (cmd < 0 || cmd > PRC_NCMDS)
+	if (cmd < 0 || cmd >= PRC_NCMDS)
 		return;
 
 	switch (cmd) {

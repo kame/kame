@@ -24,9 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/linux/linux_sysvec.c,v 1.123 2003/05/13 20:35:58 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/linux/linux_sysvec.c,v 1.126 2003/09/25 01:10:24 peter Exp $");
 
 /* XXX we use functions that might not exist. */
 #include "opt_compat.h"
@@ -235,7 +236,7 @@ elf_linux_fixup(register_t **stack_base, struct image_params *imgp)
 	register_t *pos;
 
 	KASSERT(curthread->td_proc == imgp->proc &&
-	    (curthread->td_proc->p_flag & P_THREADED) == 0,
+	    (curthread->td_proc->p_flag & P_SA) == 0,
 	    ("unsafe elf_linux_fixup(), should be curproc"));
 	args = (Elf32_Auxargs *)imgp->auxargs;
 	pos = *stack_base + (imgp->argc + imgp->envc + 2);
@@ -859,7 +860,8 @@ struct sysentvec linux_sysvec = {
 	PS_STRINGS,
 	VM_PROT_ALL,
 	exec_copyout_strings,
-	exec_linux_setregs
+	exec_linux_setregs,
+	NULL
 };
 
 struct sysentvec elf_linux_sysvec = {
@@ -887,7 +889,8 @@ struct sysentvec elf_linux_sysvec = {
 	PS_STRINGS,
 	VM_PROT_ALL,
 	exec_copyout_strings,
-	exec_linux_setregs
+	exec_linux_setregs,
+	NULL
 };
 
 static Elf32_Brandinfo linux_brand = {

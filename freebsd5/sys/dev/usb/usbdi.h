@@ -1,5 +1,5 @@
-/*	$NetBSD: usbdi.h,v 1.60 2002/02/11 15:11:49 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usbdi.h,v 1.46 2002/05/06 18:23:36 joe Exp $	*/
+/*	$NetBSD: usbdi.h,v 1.62 2002/07/11 21:14:35 augustss Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usbdi.h,v 1.48 2003/07/14 20:31:03 joe Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -45,7 +45,7 @@ typedef struct usbd_pipe	*usbd_pipe_handle;
 typedef struct usbd_xfer	*usbd_xfer_handle;
 typedef void			*usbd_private_handle;
 
-typedef enum {		/* keep in sync with usbd_status_msgs */ 
+typedef enum {		/* keep in sync with usbd_status_msgs */
 	USBD_NORMAL_COMPLETION = 0, /* must be 0 */
 	USBD_IN_PROGRESS,	/* 1 */
 	/* errors */
@@ -138,7 +138,7 @@ usbd_status usbd_do_request(usbd_device_handle pipe, usb_device_request_t *req,
 usbd_status usbd_do_request_async(usbd_device_handle pipe,
 				  usb_device_request_t *req, void *data);
 usbd_status usbd_do_request_flags(usbd_device_handle pipe,
-				  usb_device_request_t *req, 
+				  usb_device_request_t *req,
 				  void *data, u_int16_t flags, int*, u_int32_t);
 usbd_status usbd_do_request_flags_pipe(
 	usbd_device_handle dev, usbd_pipe_handle pipe,
@@ -157,7 +157,7 @@ int usbd_get_interface_altindex(usbd_interface_handle iface);
 usb_interface_descriptor_t *usbd_find_idesc(usb_config_descriptor_t *cd,
 					    int iindex, int ano);
 usb_endpoint_descriptor_t *usbd_find_edesc(usb_config_descriptor_t *cd,
-					   int ifaceidx, int altidx, 
+					   int ifaceidx, int altidx,
 					   int endptidx);
 
 void usbd_dopoll(usbd_interface_handle);

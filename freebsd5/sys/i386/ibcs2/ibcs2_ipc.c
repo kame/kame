@@ -21,9 +21,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/ibcs2/ibcs2_ipc.c,v 1.20 2002/12/14 01:56:24 alfred Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_ipc.c,v 1.21 2003/06/02 06:48:51 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

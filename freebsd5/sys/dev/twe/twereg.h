@@ -1,5 +1,7 @@
 /*-
  * Copyright (c) 2000 Michael Smith
+ * Copyright (c) 2003 Paul Saab
+ * Copyright (c) 2003 Vinod Kashyap
  * Copyright (c) 2000 BSDi
  * All rights reserved.
  *
@@ -24,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $FreeBSD: src/sys/dev/twe/twereg.h,v 1.7 2002/09/23 18:54:30 alfred Exp $
+ *      $FreeBSD: src/sys/dev/twe/twereg.h,v 1.10 2003/12/02 07:57:20 ps Exp $
  */
 
 /* 
@@ -98,7 +100,7 @@
 
 /* PCI related defines */
 #define TWE_IO_CONFIG_REG		0x10
-#define TWE_DEVICE_NAME			"3ware Storage Controller"
+#define TWE_DEVICE_NAME			"3ware 7000 series Storage Controller"
 #define TWE_VENDOR_ID			0x13C1
 #define TWE_DEVICE_ID			0x1000
 #define TWE_DEVICE_ID_ASIC		0x1001
@@ -119,6 +121,7 @@
 #define TWE_OP_FLUSH			0x0e
 #define TWE_OP_ABORT			0x0f
 #define TWE_OP_CHECKSTATUS		0x10
+#define TWE_OP_ATA_PASSTHROUGH		0x11
 #define TWE_OP_GET_PARAM		0x12
 #define TWE_OP_SET_PARAM		0x13
 #define TWE_OP_CREATEUNIT		0x14
@@ -127,7 +130,6 @@
 #define TWE_OP_SECTOR_INFO		0x1a
 #define TWE_OP_AEN_LISTEN		0x1c
 #define TWE_OP_CMD_PACKET		0x1d
-#define TWE_OP_ATA_PASSTHROUGH		0x1e
 #define TWE_OP_CMD_WITH_DATA		0x1f
 
 /* command status values */
@@ -160,7 +162,7 @@ typedef struct
 {
     u_int32_t	address;
     u_int32_t	length;
-} TWE_SG_Entry __packed;
+} __packed TWE_SG_Entry;
 
 typedef struct {
     u_int8_t	opcode:5;		/* TWE_OP_INITCONNECTION */
@@ -173,7 +175,7 @@ typedef struct {
     u_int8_t	flags;
     u_int16_t	message_credits;
     u_int32_t	response_queue_pointer;
-} TWE_Command_INITCONNECTION __packed;
+} __packed TWE_Command_INITCONNECTION;
 
 typedef struct
 {
@@ -188,7 +190,7 @@ typedef struct
     u_int16_t	block_count;
     u_int32_t	lba;
     TWE_SG_Entry sgl[TWE_MAX_SGL_LENGTH];
-} TWE_Command_IO __packed;
+} __packed TWE_Command_IO;
 
 typedef struct
 {
@@ -205,7 +207,7 @@ typedef struct
 #define TWE_OP_HOTSWAP_ADD_CBOD		0x01	/* add CBOD to empty port */
 #define TWE_OP_HOTSWAP_ADD_SPARE	0x02	/* add spare to empty port */
     u_int8_t	aport;
-} TWE_Command_HOTSWAP __packed;
+} __packed TWE_Command_HOTSWAP;
 
 typedef struct
 {
@@ -223,7 +225,7 @@ typedef struct
     u_int8_t	feature_mode;
     u_int16_t	all_units;
     u_int16_t	persistence;
-} TWE_Command_SETATAFEATURE __packed;
+} __packed TWE_Command_SETATAFEATURE;
 
 typedef struct
 {
@@ -236,7 +238,7 @@ typedef struct
     u_int8_t	status;
     u_int8_t	flags;
     u_int16_t	target_status;		/* set low byte to target request's ID */
-} TWE_Command_CHECKSTATUS __packed;
+} __packed TWE_Command_CHECKSTATUS;
 
 typedef struct
 {
@@ -250,7 +252,7 @@ typedef struct
     u_int8_t	flags;
     u_int16_t	param_count;
     TWE_SG_Entry sgl[TWE_MAX_SGL_LENGTH];
-} TWE_Command_PARAM __packed;
+} __packed TWE_Command_PARAM;
 
 typedef struct
 {
@@ -269,7 +271,7 @@ typedef struct
 #define TWE_OP_REBUILDUNIT_STARTUNIT	5	/* rebuild src_unit (not supported) */
     u_int8_t	cs:1;				/* request state change on src_unit */
     u_int8_t	logical_subunit;		/* for RAID10 rebuild of logical subunit */
-} TWE_Command_REBUILDUNIT __packed;
+} __packed TWE_Command_REBUILDUNIT;
 
 typedef struct
 {
@@ -280,6 +282,7 @@ typedef struct
     u_int8_t	unit:4;
     u_int8_t	host_id:4;
     u_int8_t	status;
+    u_int8_t	flags;
     u_int16_t	param;
     u_int16_t	features;
     u_int16_t	sector_count;
@@ -289,7 +292,7 @@ typedef struct
     u_int8_t	drive_head;
     u_int8_t	command;
     TWE_SG_Entry sgl[TWE_MAX_ATA_SGL_LENGTH];
-} TWE_Command_ATA __packed;
+} __packed TWE_Command_ATA;
 
 typedef struct
 {
@@ -307,7 +310,7 @@ typedef struct
 #define TWE_FLAGS_FATAL		0x03
 #define TWE_FLAGS_PERCENTAGE	(1<<8)	/* bits 0-6 indicate completion percentage */
     u_int16_t	count;			/* block count, parameter count, message credits */
-} TWE_Command_Generic __packed;
+} __packed TWE_Command_Generic;
 
 /* command packet - must be TWE_ALIGNMENT aligned */
 typedef union
@@ -451,7 +454,7 @@ typedef struct
     u_int8_t		log_drv_num;	/* must be zero for configuration == 0x0f */
     u_int32_t		start_lba;
     u_int32_t		block_count;	/* actual drive size if configuration == 0x0f, otherwise less DCB size */
-} TWE_Unit_Descriptor __packed;
+} __packed TWE_Unit_Descriptor;
 
 typedef struct
 {
@@ -459,7 +462,7 @@ typedef struct
     u_int8_t		res1;
     u_int8_t		mirunit_status[4];	/* bitmap of functional subunits in each mirror */
     u_int8_t		res2[6];
-} TWE_Mirror_Descriptor __packed;
+} __packed TWE_Mirror_Descriptor;
 
 typedef struct
 {
@@ -480,7 +483,7 @@ typedef struct
     u_int32_t		start_lba;
     u_int32_t		block_count;	/* actual drive size if configuration == 0x0f, otherwise less DCB size */
     TWE_Unit_Descriptor	subunit[0];	/* subunit descriptors, in RAID10 mode is [mirunit][subunit] */
-} TWE_Array_Descriptor __packed;
+} __packed TWE_Array_Descriptor;
 
 typedef struct
 {
@@ -488,5 +491,5 @@ typedef struct
     u_int8_t	parameter_id;
     u_int8_t	parameter_size_bytes;
     u_int8_t	data[0];
-} TWE_Param __packed;
+} __packed TWE_Param;
 

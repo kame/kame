@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/isa/isa.c,v 1.142 2002/02/17 09:16:45 nyan Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/isa/isa.c,v 1.143 2003/06/02 16:32:54 obrien Exp $");
 
 /*
  * Modifications for Intel architecture by Garrett A. Wollman.

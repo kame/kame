@@ -1,4 +1,4 @@
-/*
+/*-
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
  * <phk@FreeBSD.org> wrote this file.  As long as you retain this notice you
@@ -6,7 +6,6 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/i386/i386/elan-mmcr.c,v 1.14 2003/03/25 00:07:02 jake Exp $
  *
  * The AMD Elan sc520 is a system-on-chip gadget which is used in embedded
  * kind of things, see www.soekris.com for instance, and it has a few quirks
@@ -18,14 +17,29 @@
  * So instead we recognize the on-chip host-PCI bridge and call back from
  * sys/i386/pci/pci_bus.c to here if we find it.
  *
- * #ifdef ELAN_PPS
- *   The Elan has three general purpose counters, which when used just right
- *   can hardware timestamp external events with approx 250 nanoseconds
- *   resolution _and_ precision.  Connect the signal to TMR1IN and PIO7.
- *   (You can use any PIO pin, look for PIO7 to change this).  Use the
- *   PPS-API on the /dev/elan-mmcr device.
- * #endif ELAN_PPS
+ * #ifdef CPU_ELAN_PPS
+ *   The Elan has three general purpose counters, and when two of these
+ *   are used just right they can hardware timestamp external events with
+ *   approx 125 nsec resolution and +/- 125 nsec precision.
+ *
+ *   Connect the signal to TMR1IN and a GPIO pin, and configure the GPIO pin
+ *   with a 'P' in sysctl machdep.elan_gpio_config.
+ *
+ *   The rising edge of the signal will start timer 1 counting up from
+ *   zero, and when the timecounter polls for PPS, both counter 1 & 2 is
+ *   read, as well as the GPIO bit.  If a rising edge has happened, the
+ *   contents of timer 1 which is how long time ago the edge happened,
+ *   is subtracted from timer 2 to give us a "true time stamp".
+ *
+ *   Echoing the PPS signal on any GPIO pin is supported (set it to 'e'
+ *   or 'E' (inverted) in the sysctl)  The echo signal should only be
+ *   used as a visual indication, not for calibration since it suffers
+ *   from 1/hz (or more) jitter which the timestamps are compensated for.
+ * #endif CPU_ELAN_PPS
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/i386/elan-mmcr.c,v 1.21 2003/11/27 20:27:29 phk Exp $");
 
 #include "opt_cpu.h"
 #include <sys/param.h>
@@ -33,6 +47,7 @@
 #include <sys/kernel.h>
 #include <sys/conf.h>
 #include <sys/sysctl.h>
+#include <sys/syslog.h>
 #include <sys/timetc.h>
 #include <sys/proc.h>
 #include <sys/uio.h>
@@ -43,46 +58,191 @@
 #include <sys/timepps.h>
 #include <sys/watchdog.h>
 
+#include <dev/led/led.h>
 #include <machine/md_var.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
 
+static char gpio_config[33];
+
 uint16_t *elan_mmcr;
 
-/* Relating to the /dev/soekris-errled */
-static struct mtx errled_mtx;
-static char *errled;
-static struct callout_handle errled_h = CALLOUT_HANDLE_INITIALIZER(&errled_h);
-static void timeout_errled(void *);
-
-#ifdef ELAN_PPS
-/* Relating to the PPS-api */
+#ifdef CPU_ELAN_PPS
 static struct pps_state elan_pps;
+u_int	pps_a, pps_d;
+u_int	echo_a, echo_d;
+#endif /* CPU_ELAN_PPS */
+u_int	led_cookie[32];
+dev_t	led_dev[32];
 
+static void
+gpio_led(void *cookie, int state)
+{
+	u_int u, v;
+
+	u = *(int *)cookie;
+	v = u & 0xffff;
+	u >>= 16;
+	if (!state)
+		v ^= 0xc;
+	elan_mmcr[v / 2] = u;
+}
+
+static int
+sysctl_machdep_elan_gpio_config(SYSCTL_HANDLER_ARGS)
+{
+	u_int u, v;
+	int i, np, ne;
+	int error;
+	char buf[32], tmp[10];
+
+	error = SYSCTL_OUT(req, gpio_config, 33);
+	if (error != 0 || req->newptr == NULL)
+		return (error);
+	if (req->newlen != 32)
+		return (EINVAL);
+	error = SYSCTL_IN(req, buf, 32);
+	if (error != 0)
+		return (error);
+	/* Disallow any disabled pins and count pps and echo */
+	np = ne = 0;
+	for (i = 0; i < 32; i++) {
+		if (gpio_config[i] == '-' && (buf[i] != '-' && buf[i] != '.'))
+			return (EPERM);
+		if (buf[i] == 'P') {
+			np++;
+			if (np > 1)
+				return (EINVAL);
+		}
+		if (buf[i] == 'e' || buf[i] == 'E') {
+			ne++;
+			if (ne > 1)
+				return (EINVAL);
+		}
+		if (buf[i] != 'L' && buf[i] != 'l'
+#ifdef CPU_ELAN_PPS
+		    && buf[i] != 'P' && buf[i] != 'E' && buf[i] != 'e'
+#endif /* CPU_ELAN_PPS */
+		    && buf[i] != '.' && buf[i] != '-')
+			return (EINVAL);
+	}
+#ifdef CPU_ELAN_PPS
+	if (np == 0)
+		pps_a = pps_d = 0;
+	if (ne == 0)
+		echo_a = echo_d = 0;
+#endif
+	for (i = 0; i < 32; i++) {
+		u = 1 << (i & 0xf);
+		if (i >= 16)
+			v = 2;
+		else
+			v = 0;
+		if (buf[i] != 'l' && buf[i] != 'L' && led_dev[i] != NULL) {
+			led_destroy(led_dev[i]);	
+			led_dev[i] = NULL;
+			elan_mmcr[(0xc2a + v) / 2] &= ~u;
+		}
+		switch (buf[i]) {
+#ifdef CPU_ELAN_PPS
+		case 'P':
+			pps_d = u;
+			pps_a = 0xc30 + v;
+			elan_mmcr[(0xc2a + v) / 2] &= ~u;
+			gpio_config[i] = buf[i];
+			break;
+		case 'e':
+		case 'E':
+			echo_d = u;
+			if (buf[i] == 'E')
+				echo_a = 0xc34 + v;
+			else
+				echo_a = 0xc38 + v;
+			elan_mmcr[(0xc2a + v) / 2] |= u;
+			gpio_config[i] = buf[i];
+			break;
+#endif /* CPU_ELAN_PPS */
+		case 'l':
+		case 'L':
+			if (buf[i] == 'L')
+				led_cookie[i] = (0xc34 + v) | (u << 16);
+			else
+				led_cookie[i] = (0xc38 + v) | (u << 16);
+			if (led_dev[i])
+				break;
+			sprintf(tmp, "gpio%d", i);
+			led_dev[i] =
+			    led_create(gpio_led, &led_cookie[i], tmp);
+			elan_mmcr[(0xc2a + v) / 2] |= u;
+			gpio_config[i] = buf[i];
+			break;
+		case '.':
+			gpio_config[i] = buf[i];
+			break;
+		case '-':
+		default:
+			break;
+		}
+	}
+	return (0);
+}
+
+SYSCTL_OID(_machdep, OID_AUTO, elan_gpio_config, CTLTYPE_STRING | CTLFLAG_RW,
+    NULL, 0, sysctl_machdep_elan_gpio_config, "A", "Elan CPU GPIO pin config");
+
+#ifdef CPU_ELAN_PPS
 static void
 elan_poll_pps(struct timecounter *tc)
 {
 	static int state;
 	int i;
+	u_int u;
 
-	/* XXX: This is PIO7, change to your preference */
-	i = elan_mmcr[0xc30 / 2] & 0x80;
-	if (i == state)
+	/*
+	 * Order is important here.  We need to check the state of the GPIO
+	 * pin first, in order to avoid reading timer 1 right before the
+	 * state change.  Technically pps_a may be zero in which case we
+	 * harmlessly read the REVID register and the contents of pps_d is
+	 * of no concern.
+	 */
+	i = elan_mmcr[pps_a / 2] & pps_d;
+
+	/*
+	 * Subtract timer1 from timer2 to compensate for time from the
+	 * edge until now.
+	 */
+	u = elan_mmcr[0xc84 / 2] - elan_mmcr[0xc7c / 2];
+
+	/* If state did not change or we don't have a GPIO pin, return */
+	if (i == state || pps_a == 0)
 		return;
+
 	state = i;
-	if (!state)
+
+	/* If the state is "low", flip the echo GPIO and return.  */
+	if (!i) {
+		if (echo_a)
+			elan_mmcr[(echo_a ^ 0xc) / 2] = echo_d;
 		return;
+	}
+
+	/* State is "high", record the pps data */
 	pps_capture(&elan_pps);
-	elan_pps.capcount =
-	    (elan_mmcr[0xc84 / 2] - elan_mmcr[0xc7c / 2]) & 0xffff;
+	elan_pps.capcount = u & 0xffff;
 	pps_event(&elan_pps, PPS_CAPTUREASSERT);
+
+	/* Twiddle echo bit */
+	if (echo_a)
+		elan_mmcr[echo_a / 2] = echo_d;
 }
-#endif /* ELAN_PPS */
+#endif /* CPU_ELAN_PPS */
 
 static unsigned
 elan_get_timecount(struct timecounter *tc)
 {
+
+	/* Read timer2, end of story */
 	return (elan_mmcr[0xc84 / 2]);
 }
 
@@ -90,16 +250,17 @@ elan_get_timecount(struct timecounter *tc)
  * The Elan CPU can be run from a number of clock frequencies, this
  * allows you to override the default 33.3 MHZ.
  */
-#ifndef ELAN_XTAL
-#define ELAN_XTAL 33333333
+#ifndef CPU_ELAN_XTAL
+#define CPU_ELAN_XTAL 33333333
 #endif
 
 static struct timecounter elan_timecounter = {
 	elan_get_timecount,
 	NULL,
 	0xffff,
-	ELAN_XTAL / 4,
-	"ELAN"
+	CPU_ELAN_XTAL / 4,
+	"ELAN",
+	1000
 };
 
 static int
@@ -118,197 +279,95 @@ sysctl_machdep_elan_freq(SYSCTL_HANDLER_ARGS)
 SYSCTL_PROC(_machdep, OID_AUTO, elan_freq, CTLTYPE_UINT | CTLFLAG_RW,
     0, sizeof (u_int), sysctl_machdep_elan_freq, "IU", "");
 
+/*
+ * Positively identifying the Elan can only be done through the PCI id of
+ * the host-bridge, this function is called from i386/pci/pci_bus.c.
+ */
 void
 init_AMD_Elan_sc520(void)
 {
 	u_int new;
 	int i;
 
-	if (bootverbose)
-		printf("Doing h0h0magic for AMD Elan sc520\n");
 	elan_mmcr = pmap_mapdev(0xfffef000, 0x1000);
 
 	/*-
 	 * The i8254 is driven with a nonstandard frequency which is
 	 * derived thusly:
 	 *   f = 32768 * 45 * 25 / 31 = 1189161.29...
-	 * We use the sysctl to get the timecounter etc into whack.
+	 * We use the sysctl to get the i8254 (timecounter etc) into whack.
 	 */
 	
 	new = 1189161;
 	i = kernel_sysctlbyname(&thread0, "machdep.i8254_freq", 
-	    NULL, 0, 
-	    &new, sizeof new, 
-	    NULL);
-	if (bootverbose)
+	    NULL, 0, &new, sizeof new, NULL);
+	if (bootverbose || 1)
 		printf("sysctl machdep.i8254_freq=%d returns %d\n", new, i);
 
 	/* Start GP timer #2 and use it as timecounter, hz permitting */
+	elan_mmcr[0xc8e / 2] = 0x0;
 	elan_mmcr[0xc82 / 2] = 0xc001;
 
-#ifdef ELAN_PPS
+#ifdef CPU_ELAN_PPS
 	/* Set up GP timer #1 as pps counter */
 	elan_mmcr[0xc24 / 2] &= ~0x10;
 	elan_mmcr[0xc7a / 2] = 0x8000 | 0x4000 | 0x10 | 0x1;
+	elan_mmcr[0xc7e / 2] = 0x0;
+	elan_mmcr[0xc80 / 2] = 0x0;
 	elan_pps.ppscap |= PPS_CAPTUREASSERT;
 	pps_init(&elan_pps);
 #endif
-
 	tc_init(&elan_timecounter);
 }
 
-
-/*
- * Device driver initialization stuff
- */
-
-static d_write_t elan_write;
 static d_ioctl_t elan_ioctl;
 static d_mmap_t elan_mmap;
 
-#define ELAN_MMCR	0
-#define ELAN_ERRLED	1
-
-#define CDEV_MAJOR 100			/* Share with xrpu */
 static struct cdevsw elan_cdevsw = {
-	.d_open =	nullopen,
-	.d_close =	nullclose,
-	.d_write =	elan_write,
 	.d_ioctl =	elan_ioctl,
 	.d_mmap =	elan_mmap,
 	.d_name =	"elan",
-	.d_maj =	CDEV_MAJOR,
 };
 
 static void
 elan_drvinit(void)
 {
 
+	/* If no elan found, just return */
 	if (elan_mmcr == NULL)
 		return;
-	printf("Elan-mmcr driver: MMCR at %p\n", elan_mmcr);
-	make_dev(&elan_cdevsw, ELAN_MMCR,
+
+	printf("Elan-mmcr driver: MMCR at %p.%s\n", 
+	    elan_mmcr,
+#ifdef CPU_ELAN_PPS
+	    " PPS support."
+#else
+	    ""
+#endif
+	    );
+
+	make_dev(&elan_cdevsw, 0,
 	    UID_ROOT, GID_WHEEL, 0600, "elan-mmcr");
-	make_dev(&elan_cdevsw, ELAN_ERRLED,
-	    UID_ROOT, GID_WHEEL, 0600, "soekris-errled");
-	mtx_init(&errled_mtx, "Elan-errled", MTX_DEF, 0);
-	return;
+
+#ifdef CPU_SOEKRIS
+	/* Create the error LED on GPIO9 */
+	led_cookie[9] = 0x02000c34;
+	led_dev[9] = led_create(gpio_led, &led_cookie[9], "error");
+	
+	/* Disable the unavailable GPIO pins */
+	strcpy(gpio_config, "-----....--..--------..---------");
+#else /* !CPU_SOEKRIS */
+	/* We don't know which pins are available so enable them all */
+	strcpy(gpio_config, "................................");
+#endif /* CPU_SOEKRIS */
 }
 
-SYSINIT(elan, SI_SUB_PSEUDO, SI_ORDER_MIDDLE+CDEV_MAJOR,elan_drvinit,NULL);
-
-#define LED_ON()	do {elan_mmcr[0xc34 / 2] = 0x200;} while(0)
-#define LED_OFF()	do {elan_mmcr[0xc38 / 2] = 0x200;} while(0)
-
-static void
-timeout_errled(void *p)
-{
-	static enum {NOTHING, FLASH, DIGIT} mode;
-	static int count, cnt2, state;
-
-	mtx_lock(&errled_mtx);
-	if (p != NULL) {
-		mode = NOTHING;
-		/* Our instructions changed */
-		if (*errled == '1') {			/* Turn LED on */
-			LED_ON();
-		} else if (*errled == '0') {		/* Turn LED off */
-			LED_OFF();
-		} else if (*errled == 'f') {		/* Flash */
-			mode = FLASH;
-			cnt2 = 10;
-			if (errled[1] >= '1' && errled[1] <= '9')		
-				cnt2 = errled[1] - '0';
-			cnt2 = hz / cnt2;
-			LED_ON();
-			errled_h = timeout(timeout_errled, NULL, cnt2);
-		} else if (*errled == 'd') {		/* Digit */
-			mode = DIGIT;
-			count = 0;
-			cnt2 = 0;
-			state = 0;
-			LED_OFF();
-			errled_h = timeout(timeout_errled, NULL, hz/10);
-		}
-	} else if (mode == FLASH) {
-		if (count) 
-			LED_ON();
-		else
-			LED_OFF();
-		count = !count;
-		errled_h = timeout(timeout_errled, NULL, cnt2);
-	} else if (mode == DIGIT) {
-		if (cnt2 > 0) {
-			if (state) {
-				LED_OFF();
-				state = 0;
-				cnt2--;
-			} else {
-				LED_ON();
-				state = 1;
-			}
-			errled_h = timeout(timeout_errled, NULL, hz/5);
-		} else {
-			do 
-				count++;
-			while (errled[count] != '\0' &&
-			    (errled[count] < '0' || errled[count] > '9'));
-			if (errled[count] == '\0') {
-				count = 0;
-				errled_h = timeout(timeout_errled, NULL, hz * 2);
-			} else {
-				cnt2 = errled[count] - '0';
-				state = 0;
-				errled_h = timeout(timeout_errled, NULL, hz);
-			}
-		}
-	}
-	mtx_unlock(&errled_mtx);
-	return;
-}
-
-/*
- * The write function is used for the error-LED.
- */
-
-static int
-elan_write(dev_t dev, struct uio *uio, int ioflag)
-{
-	int error;
-	char *s, *q;
-
-	if (minor(dev) != ELAN_ERRLED)
-		return (EOPNOTSUPP);
-
-	if (uio->uio_resid > 512)
-		return (EINVAL);
-	s = malloc(uio->uio_resid + 1, M_DEVBUF, M_WAITOK);
-	if (s == NULL)
-		return (ENOMEM);
-	untimeout(timeout_errled, NULL, errled_h);
-	s[uio->uio_resid] = '\0';
-	error = uiomove(s, uio->uio_resid, uio);
-	if (error) {
-		free(s, M_DEVBUF);
-		return (error);
-	}
-	mtx_lock(&errled_mtx);
-	q = errled;
-	errled = s;
-	mtx_unlock(&errled_mtx);
-	if (q != NULL)
-		free(q, M_DEVBUF);
-	timeout_errled(errled);
-
-	return(0);
-}
+SYSINIT(elan, SI_SUB_PSEUDO, SI_ORDER_MIDDLE, elan_drvinit, NULL);
 
 static int
 elan_mmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
 {
 
-	if (minor(dev) != ELAN_MMCR)
-		return (EOPNOTSUPP);
 	if (offset >= 0x1000) 
 		return (-1);
 	*paddr = 0xfffef000;
@@ -382,19 +441,22 @@ elan_ioctl(dev_t dev, u_long cmd, caddr_t arg, int flag, struct  thread *tdr)
 	int error;
 
 	error = ENOTTY;
-#ifdef ELAN_PPS
-	error = pps_ioctl(cmd, arg, &elan_pps);
+
+#ifdef CPU_ELAN_PPS
+	if (pps_a != 0)
+		error = pps_ioctl(cmd, arg, &elan_pps);
 	/*
 	 * We only want to incur the overhead of the PPS polling if we
 	 * are actually asked to timestamp.
 	 */
-	if (elan_pps.ppsparam.mode & PPS_CAPTUREASSERT)
+	if (elan_pps.ppsparam.mode & PPS_CAPTUREASSERT) {
 		elan_timecounter.tc_poll_pps = elan_poll_pps;
-	else
+	} else {
 		elan_timecounter.tc_poll_pps = NULL;
+	}
 	if (error != ENOTTY)
 		return (error);
-#endif /* ELAN_PPS */
+#endif
 
 	if (cmd == WDIOCPATPAT)
 		return elan_watchdog(*((u_int*)arg));

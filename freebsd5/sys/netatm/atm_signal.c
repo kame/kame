@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/atm_signal.c,v 1.11 2002/11/08 18:27:29 jhb Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * -----------------
  *
  * General ATM signalling management
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/atm_signal.c,v 1.12 2003/06/11 06:56:50 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,10 +49,6 @@
 #include <netatm/atm_stack.h>
 #include <netatm/atm_pcb.h>
 #include <netatm/atm_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_signal.c,v 1.11 2002/11/08 18:27:29 jhb Exp $");
-#endif
 
 
 /*

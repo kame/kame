@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/atomic.h,v 1.29 2002/10/14 19:33:12 pirzyk Exp $
+ * $FreeBSD: src/sys/i386/include/atomic.h,v 1.31 2003/11/17 02:55:25 bde Exp $
  */
 #ifndef _MACHINE_ATOMIC_H_
 #define _MACHINE_ATOMIC_H_
@@ -98,7 +98,8 @@ atomic_##NAME##_##TYPE(volatile u_##TYPE *p, u_##TYPE v)\
 	__asm __volatile(__XSTRING(MPLOCKED) OP		\
 			 : "+m" (*p)			\
 			 : CONS (V));			\
-}
+}							\
+struct __hack
 
 #else /* !__GNUC__ */
 
@@ -191,7 +192,8 @@ atomic_store_rel_##TYPE(volatile u_##TYPE *p, u_##TYPE v)\
 {							\
 	*p = v;						\
 	__asm __volatile("" : : : "memory");		\
-}
+}							\
+struct __hack
 
 #else /* !defined(I386_CPU) */
 
@@ -219,7 +221,8 @@ atomic_store_rel_##TYPE(volatile u_##TYPE *p, u_##TYPE v)\
 	: "+m" (*p),			/* 0 */		\
 	  "+r" (v)			/* 1 */		\
 	: : "memory");				 	\
-}
+}							\
+struct __hack
 
 #endif	/* defined(I386_CPU) */
 
@@ -368,7 +371,11 @@ atomic_cmpset_ptr(volatile void *dst, void *exp, void *src)
 static __inline void *
 atomic_load_acq_ptr(volatile void *p)
 {
-	return (void *)atomic_load_acq_int((volatile u_int *)p);
+	/*
+	 * The apparently-bogus cast to intptr_t in the following is to
+	 * avoid a warning from "gcc -Wbad-function-cast".
+	 */
+	return ((void *)(intptr_t)atomic_load_acq_int((volatile u_int *)p));
 }
 
 static __inline void

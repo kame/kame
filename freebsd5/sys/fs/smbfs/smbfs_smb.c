@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_smb.c,v 1.10 2003/02/19 05:47:19 imp Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_smb.c,v 1.11 2003/06/17 12:58:02 tjr Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -363,7 +363,8 @@ smb_smb_flush(struct smbnode *np, struct smb_cred *scred)
 	struct mbchain *mbp;
 	int error;
 
-	if (np->n_opencount <= 0 || !SMBTOV(np) || SMBTOV(np)->v_type != VREG)
+	if ((np->n_flag & NOPEN) != 0 || !SMBTOV(np) ||
+	    SMBTOV(np)->v_type != VREG)
 		return 0; /* not a regular open file */
 	error = smb_rq_init(rqp, SSTOCP(ssp), SMB_COM_FLUSH, scred);
 	if (error)

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_types.h	8.3 (Berkeley) 4/28/95
- * $FreeBSD: src/sys/net/if_types.h,v 1.13 2001/04/04 14:18:57 yar Exp $
+ * $FreeBSD: src/sys/net/if_types.h,v 1.14 2003/10/26 14:29:04 ume Exp $
  * $NetBSD: if_types.h,v 1.16 2000/04/19 06:30:53 itojun Exp $
  */
 
@@ -243,9 +243,10 @@
 #define	IFT_OPTICALCHANNEL	   0xc3 /* Optical Channel */
 #define	IFT_OPTICALTRANSPORT	   0xc4 /* Optical Transport */
 
+#define	IFT_STF			   0xd7	/* 6to4 interface */
+
 /* not based on IANA assignments */
 #define	IFT_GIF		0xf0
 #define	IFT_PVC		0xf1
 #define	IFT_FAITH	0xf2
-#define	IFT_STF		0xf3
 #endif /* !_NET_IF_TYPES_H_ */

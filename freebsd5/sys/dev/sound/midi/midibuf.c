@@ -25,7 +25,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/midi/midibuf.c,v 1.8 2003/02/19 05:47:11 imp Exp $
+ * $FreeBSD: src/sys/dev/sound/midi/midibuf.c,v 1.9 2003/11/09 09:17:22 tanimura Exp $
  *
  */
 
@@ -358,7 +358,7 @@ queuerawdata(midi_dbuf *dbuf, char *data, int len)
 	/* Wake up the processes sleeping on input data. */
 	cv_broadcast(&dbuf->cv_in);
 	if (SEL_WAITING(&dbuf->sel) && dbuf->rl >= dbuf->blocksize)
-		selwakeup(&dbuf->sel);
+		selwakeuppri(&dbuf->sel, PRIBIO);
 }
 
 static void
@@ -399,5 +399,5 @@ deleterawdata(midi_dbuf *dbuf, int len)
 	/* Wake up the processes sleeping on queueing. */
 	cv_broadcast(&dbuf->cv_out);
 	if (SEL_WAITING(&dbuf->sel) && dbuf->fl >= dbuf->blocksize)
-		selwakeup(&dbuf->sel);
+		selwakeuppri(&dbuf->sel, PRIBIO);
 }

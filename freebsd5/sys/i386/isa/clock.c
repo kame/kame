@@ -34,8 +34,10 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)clock.c	7.2 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/i386/isa/clock.c,v 1.198 2003/04/29 13:36:02 kan Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/isa/clock.c,v 1.207 2003/11/13 10:02:12 phk Exp $");
 
 /*
  * Routines to handle clock hardware.
@@ -69,14 +71,12 @@
 #include <machine/clock.h>
 #include <machine/cputypes.h>
 #include <machine/frame.h>
+#include <machine/intr_machdep.h>
 #include <machine/md_var.h>
 #include <machine/psl.h>
-#ifdef APIC_IO
-#include <machine/segments.h>
-#endif
-#if defined(SMP) || defined(APIC_IO)
+#if defined(SMP)
 #include <machine/smp.h>
-#endif /* SMP || APIC_IO */
+#endif
 #include <machine/specialreg.h>
 
 #include <i386/isa/icu.h>
@@ -87,29 +87,20 @@
 #endif
 #include <i386/isa/timerreg.h>
 
-#include <i386/isa/intr_machdep.h>
-
 #ifdef DEV_MCA
 #include <i386/bios/mca_machdep.h>
-#endif
-
-#ifdef APIC_IO
-#include <i386/isa/intr_machdep.h>
-/* The interrupt triggered by the 8254 (timer) chip */
-int apic_8254_intr;
-static u_long read_intr_count(int vec);
-static void setup_8254_mixed_mode(void);
 #endif
 
 /*
  * 32-bit time_t's can't reach leap years before 1904 or after 2036, so we
  * can use a simple formula for leap years.
  */
-#define	LEAPYEAR(y) ((u_int)(y) % 4 == 0)
+#define	LEAPYEAR(y) (((u_int)(y) % 4 == 0) ? 1 : 0)
 #define DAYSPERYEAR   (31+28+31+30+31+30+31+31+30+31+30+31)
 
 #define	TIMER_DIV(x) ((timer_freq + (x) / 2) / (x))
 
+#ifndef BURN_BRIDGES
 /*
  * Time in timer cycles that it takes for microtime() to disable interrupts
  * and latch the count.  microtime() currently uses "cli; outb ..." so it
@@ -125,6 +116,7 @@ static void setup_8254_mixed_mode(void);
  * before the next timer interrupt.
  */
 #define	TIMER0_MAX_FREQ		20000
+#endif
 
 int	adjkerntz;		/* local offset from GMT in seconds */
 int	clkintr_pending;
@@ -146,6 +138,8 @@ static	u_int	hardclock_max_count;
 static	u_int32_t i8254_lastcount;
 static	u_int32_t i8254_offset;
 static	int	i8254_ticked;
+static	struct intsrc *i8254_intsrc;
+#ifndef BURN_BRIDGES
 /*
  * XXX new_function and timer_func should not handle clockframes, but
  * timer_func currently needs to hold hardclock to handle the
@@ -154,9 +148,11 @@ static	int	i8254_ticked;
  */
 static	void	(*new_function)(struct clockframe *frame);
 static	u_int	new_rate;
+static	u_int	timer0_prescaler_count;
+static	u_char	timer0_state;
+#endif
 static	u_char	rtc_statusa = RTCSA_DIVIDER | RTCSA_NOPROF;
 static	u_char	rtc_statusb = RTCSB_24HR | RTCSB_PINTR;
-static	u_int	timer0_prescaler_count;
 
 /* Values for timerX_state: */
 #define	RELEASED	0
@@ -164,7 +160,6 @@ static	u_int	timer0_prescaler_count;
 #define	ACQUIRED	2
 #define	ACQUIRE_PENDING	3
 
-static	u_char	timer0_state;
 static	u_char	timer2_state;
 static	void	(*timer_func)(struct clockframe *frame) = hardclock;
 
@@ -176,11 +171,12 @@ static struct timecounter i8254_timecounter = {
 	0,			/* no poll_pps */
 	~0u,			/* counter_mask */
 	0,			/* frequency */
-	"i8254"			/* name */
+	"i8254",		/* name */
+	0			/* quality */
 };
 
 static void
-clkintr(struct clockframe frame)
+clkintr(struct clockframe *frame)
 {
 
 	if (timecounter->tc_get_timecount == i8254_get_timecount) {
@@ -194,11 +190,12 @@ clkintr(struct clockframe frame)
 		clkintr_pending = 0;
 		mtx_unlock_spin(&clock_lock);
 	}
-	timer_func(&frame);
+	timer_func(frame);
 #ifdef SMP
 	if (timer_func == hardclock)
 		forward_hardclock();
 #endif
+#ifndef BURN_BRIDGES
 	switch (timer0_state) {
 
 	case RELEASED:
@@ -208,7 +205,7 @@ clkintr(struct clockframe frame)
 		if ((timer0_prescaler_count += timer0_max_count)
 		    >= hardclock_max_count) {
 			timer0_prescaler_count -= hardclock_max_count;
-			hardclock(&frame);
+			hardclock(frame);
 #ifdef SMP
 			forward_hardclock();
 #endif
@@ -243,13 +240,14 @@ clkintr(struct clockframe frame)
 			timer0_prescaler_count = 0;
 			timer_func = hardclock;
 			timer0_state = RELEASED;
-			hardclock(&frame);
+			hardclock(frame);
 #ifdef SMP
 			forward_hardclock();
 #endif
 		}
 		break;
 	}
+#endif
 #ifdef DEV_MCA
 	/* Reset clock interrupt by asserting bit 7 of port 0x61 */
 	if (MCA_system)
@@ -257,6 +255,7 @@ clkintr(struct clockframe frame)
 #endif
 }
 
+#ifndef BURN_BRIDGES
 /*
  * The acquire and release functions must be called at ipl >= splclock().
  */
@@ -292,6 +291,7 @@ acquire_timer0(int rate, void (*function)(struct clockframe *frame))
 	old_rate = new_rate = rate;
 	return (0);
 }
+#endif
 
 int
 acquire_timer2(int mode)
@@ -313,6 +313,7 @@ acquire_timer2(int mode)
 	return (0);
 }
 
+#ifndef BURN_BRIDGES
 int
 release_timer0()
 {
@@ -332,6 +333,7 @@ release_timer0()
 	}
 	return (0);
 }
+#endif
 
 int
 release_timer2()
@@ -366,16 +368,16 @@ release_timer2()
  * in the statistics, but the stat clock will no longer stop.
  */
 static void
-rtcintr(struct clockframe frame)
+rtcintr(struct clockframe *frame)
 {
 	while (rtcin(RTC_INTR) & RTCIR_PERIOD) {
 		if (profprocs != 0) {
 			if (--pscnt == 0)
 				pscnt = psdiv;
-			profclock(&frame);
+			profclock(frame);
 		}
 		if (pscnt == psdiv)
-			statclock(&frame);
+			statclock(frame);
 #ifdef SMP
 		forward_statclock();
 #endif
@@ -449,8 +451,18 @@ DELAY(int n)
 	 * takes about 1.5 usec for each of the i/o's in getit().  The loop
 	 * takes about 6 usec on a 486/33 and 13 usec on a 386/20.  The
 	 * multiplications and divisions to scale the count take a while).
+	 *
+	 * However, if ddb is active then use a fake counter since reading
+	 * the i8254 counter involves acquiring a lock.  ddb must not go
+	 * locking for many reasons, but it calls here for at least atkbd
+	 * input.
 	 */
-	prev_tick = getit();
+#ifdef DDB
+	if (db_active)
+		prev_tick = 0;
+	else
+#endif
+		prev_tick = getit();
 	n -= 0;			/* XXX actually guess no initial overhead */
 	/*
 	 * Calculate (n * (timer_freq / 1e6)) without using floating point
@@ -477,7 +489,13 @@ DELAY(int n)
 			     / 1000000;
 
 	while (ticks_left > 0) {
-		tick = getit();
+#ifdef DDB
+		if (db_active) {
+			inb(0x84);
+			tick = prev_tick + 1;
+		} else
+#endif
+			tick = getit();
 #ifdef DELAYDEBUG
 		++getit_calls;
 #endif
@@ -902,11 +920,6 @@ void
 cpu_initclocks()
 {
 	int diag;
-#ifdef APIC_IO
-	int apic_8254_trial;
-	void *clkdesc;
-#endif /* APIC_IO */
-	register_t crit;
 
 	if (statclock_disable) {
 		/*
@@ -922,171 +935,29 @@ cpu_initclocks()
 		profhz = RTC_PROFRATE;
         }
 
-	/* Finish initializing 8253 timer 0. */
-#ifdef APIC_IO
-
-	apic_8254_intr = isa_apic_irq(0);
-	apic_8254_trial = 0;
-	if (apic_8254_intr >= 0 ) {
-		if (apic_int_type(0, 0) == 3)
-			apic_8254_trial = 1;
-	} else {
-		/* look for ExtInt on pin 0 */
-		if (apic_int_type(0, 0) == 3) {
-			apic_8254_intr = apic_irq(0, 0);
-			setup_8254_mixed_mode();
-		} else 
-			panic("APIC_IO: Cannot route 8254 interrupt to CPU");
-	}
-
-	inthand_add("clk", apic_8254_intr, (driver_intr_t *)clkintr, NULL,
-	    INTR_TYPE_CLK | INTR_FAST, &clkdesc);
-	crit = intr_disable();
-	mtx_lock_spin(&icu_lock);
-	INTREN(1 << apic_8254_intr);
-	mtx_unlock_spin(&icu_lock);
-	intr_restore(crit);
-
-#else /* APIC_IO */
-
-	/*
-	 * XXX Check the priority of this interrupt handler.  I
-	 * couldn't find anything suitable in the BSD/OS code (grog,
-	 * 19 July 2000).
-	 */
-	inthand_add("clk", 0, (driver_intr_t *)clkintr, NULL,
+	/* Finish initializing 8254 timer 0. */
+	intr_add_handler("clk", 0, (driver_intr_t *)clkintr, NULL,
 	    INTR_TYPE_CLK | INTR_FAST, NULL);
-	crit = intr_disable();
-	mtx_lock_spin(&icu_lock);
-	INTREN(IRQ0);
-	mtx_unlock_spin(&icu_lock);
-	intr_restore(crit);
-
-#endif /* APIC_IO */
 
 	/* Initialize RTC. */
 	writertc(RTC_STATUSA, rtc_statusa);
 	writertc(RTC_STATUSB, RTCSB_24HR);
 
 	/* Don't bother enabling the statistics clock. */
-	if (statclock_disable)
-		return;
-	diag = rtcin(RTC_DIAG);
-	if (diag != 0)
-		printf("RTC BIOS diagnostic error %b\n", diag, RTCDG_BITS);
+	if (!statclock_disable) {
+		diag = rtcin(RTC_DIAG);
+		if (diag != 0)
+			printf("RTC BIOS diagnostic error %b\n", diag, RTCDG_BITS);
 
-#ifdef APIC_IO
-	if (isa_apic_irq(8) != 8)
-		panic("APIC RTC != 8");
-#endif /* APIC_IO */
+		intr_add_handler("rtc", 8, (driver_intr_t *)rtcintr, NULL,
+		    INTR_TYPE_CLK | INTR_FAST, NULL);
+		i8254_intsrc = intr_lookup_source(8);
 
-	inthand_add("rtc", 8, (driver_intr_t *)rtcintr, NULL,
-	    INTR_TYPE_CLK | INTR_FAST, NULL);
-
-	crit = intr_disable();
-	mtx_lock_spin(&icu_lock);
-#ifdef APIC_IO
-	INTREN(APIC_IRQ8);
-#else
-	INTREN(IRQ8);
-#endif /* APIC_IO */
-	mtx_unlock_spin(&icu_lock);
-	intr_restore(crit);
-
-	writertc(RTC_STATUSB, rtc_statusb);
-
-#ifdef APIC_IO
-	if (apic_8254_trial) {
-
-		printf("APIC_IO: Testing 8254 interrupt delivery\n");
-		while (read_intr_count(8) < 6)
-			;	/* nothing */
-		if (read_intr_count(apic_8254_intr) < 3) {
-			/* 
-			 * The MP table is broken.
-			 * The 8254 was not connected to the specified pin
-			 * on the IO APIC.
-			 * Workaround: Limited variant of mixed mode.
-			 */
-
-			crit = intr_disable();
-			mtx_lock_spin(&icu_lock);
-			INTRDIS(1 << apic_8254_intr);
-			mtx_unlock_spin(&icu_lock);
-			intr_restore(crit);
-			inthand_remove(clkdesc);
-			printf("APIC_IO: Broken MP table detected: "
-			       "8254 is not connected to "
-			       "IOAPIC #%d intpin %d\n",
-			       int_to_apicintpin[apic_8254_intr].ioapic,
-			       int_to_apicintpin[apic_8254_intr].int_pin);
-			/* 
-			 * Revoke current ISA IRQ 0 assignment and 
-			 * configure a fallback interrupt routing from
-			 * the 8254 Timer via the 8259 PIC to the
-			 * an ExtInt interrupt line on IOAPIC #0 intpin 0.
-			 * We reuse the low level interrupt handler number.
-			 */
-			if (apic_irq(0, 0) < 0) {
-				revoke_apic_irq(apic_8254_intr);
-				assign_apic_irq(0, 0, apic_8254_intr);
-			}
-			apic_8254_intr = apic_irq(0, 0);
-			setup_8254_mixed_mode();
-			inthand_add("clk", apic_8254_intr,
-				    (driver_intr_t *)clkintr, NULL,
-				    INTR_TYPE_CLK | INTR_FAST, NULL);
-			crit = intr_disable();
-			mtx_lock_spin(&icu_lock);
-			INTREN(1 << apic_8254_intr);
-			mtx_unlock_spin(&icu_lock);
-			intr_restore(crit);
-		}
-		
+		writertc(RTC_STATUSB, rtc_statusb);
 	}
-	if (apic_int_type(0, 0) != 3 ||
-	    int_to_apicintpin[apic_8254_intr].ioapic != 0 ||
-	    int_to_apicintpin[apic_8254_intr].int_pin != 0)
-		printf("APIC_IO: routing 8254 via IOAPIC #%d intpin %d\n",
-		       int_to_apicintpin[apic_8254_intr].ioapic,
-		       int_to_apicintpin[apic_8254_intr].int_pin);
-	else
-		printf("APIC_IO: "
-		       "routing 8254 via 8259 and IOAPIC #0 intpin 0\n");
-#endif
-	
-}
 
-#ifdef APIC_IO
-static u_long
-read_intr_count(int vec)
-{
-	u_long *up;
-	up = intr_countp[vec];
-	if (up)
-		return *up;
-	return 0UL;
+	init_TSC_tc();
 }
-
-static void 
-setup_8254_mixed_mode()
-{
-	/*
-	 * Allow 8254 timer to INTerrupt 8259:
-	 *  re-initialize master 8259:
-	 *   reset; prog 4 bytes, single ICU, edge triggered
-	 */
-	outb(IO_ICU1, 0x13);
-	outb(IO_ICU1 + 1, NRSVIDT);	/* start vector (unused) */
-	outb(IO_ICU1 + 1, 0x00);	/* ignore slave */
-	outb(IO_ICU1 + 1, 0x03);	/* auto EOI, 8086 */
-	outb(IO_ICU1 + 1, 0xfe);	/* unmask INT0 */
-	
-	/* program IO APIC for type 3 INT on INT0 */
-	if (ext_int_setup(0, 0) < 0)
-		panic("8254 redirect via APIC pin0 impossible!");
-}
-#endif
 
 void
 cpu_startprofclock(void)
@@ -1119,8 +990,10 @@ sysctl_machdep_i8254_freq(SYSCTL_HANDLER_ARGS)
 	freq = timer_freq;
 	error = sysctl_handle_int(oidp, &freq, sizeof(freq), req);
 	if (error == 0 && req->newptr != NULL) {
+#ifndef BURN_BRIDGES
 		if (timer0_state != RELEASED)
 			return (EBUSY);	/* too much trouble to handle */
+#endif
 		set_timer_freq(freq, hz);
 		i8254_timecounter.tc_frequency = freq;
 	}
@@ -1149,14 +1022,8 @@ i8254_get_timecount(struct timecounter *tc)
 	if (count < i8254_lastcount ||
 	    (!i8254_ticked && (clkintr_pending ||
 	    ((count < 20 || (!(eflags & PSL_I) && count < timer0_max_count / 2u)) &&
-#ifdef APIC_IO
-#define	lapic_irr1	((volatile u_int *)&lapic)[0x210 / 4]	/* XXX XXX */
-	    /* XXX this assumes that apic_8254_intr is < 24. */
-	    (lapic_irr1 & (1 << apic_8254_intr))))
-#else
-	    (inb(IO_ICU1) & 1)))
-#endif
-	    )) {
+	    i8254_intsrc != NULL &&
+	    i8254_intsrc->is_pic->pic_source_pending(i8254_intsrc))))) {
 		i8254_ticked = 1;
 		i8254_offset += timer0_max_count;
 	}

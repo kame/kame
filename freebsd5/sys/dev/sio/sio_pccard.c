@@ -20,9 +20,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/sio/sio_pccard.c,v 1.8 2003/02/16 18:03:15 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/sio/sio_pccard.c,v 1.11 2003/10/07 04:26:14 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -39,9 +40,10 @@
 #include <machine/resource.h>
 #include <sys/timepps.h>
 
+#include <dev/pccard/pccard_cis.h>
+#include <dev/pccard/pccarddevs.h>
 #include <dev/pccard/pccardreg.h>
 #include <dev/pccard/pccardvar.h>
-#include <dev/pccard/pccarddevs.h>
 
 #include <dev/sio/siovar.h>
 

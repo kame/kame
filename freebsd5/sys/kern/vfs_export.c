@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_subr.c	8.31 (Berkeley) 5/26/95
- * $FreeBSD: src/sys/kern/vfs_export.c,v 1.322 2003/02/19 05:47:26 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/vfs_export.c,v 1.324 2003/07/26 07:23:24 scottl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -118,8 +120,10 @@ vfs_hang_addrlist(mp, nep, argp)
 		return (0);
 	}
 
+#if MSIZE <= 256
 	if (argp->ex_addrlen > MLEN)
 		return (EINVAL);
+#endif
 
 	i = sizeof(struct netcred) + argp->ex_addrlen + argp->ex_masklen;
 	np = (struct netcred *) malloc(i, M_NETADDR, M_WAITOK | M_ZERO);

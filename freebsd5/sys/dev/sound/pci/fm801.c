@@ -26,10 +26,10 @@
 
 #include <dev/sound/pcm/sound.h>
 #include <dev/sound/pcm/ac97.h>
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/fm801.c,v 1.17 2003/02/20 17:31:11 cognet Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/fm801.c,v 1.20 2003/09/02 17:30:37 jhb Exp $");
 
 #define PCI_VENDOR_FORTEMEDIA	0x1319
 #define PCI_DEVICE_FORTEMEDIA1	0x08011319
@@ -587,7 +587,7 @@ fm801_pci_attach(device_t dev)
 	data = pci_read_config(dev, PCIR_COMMAND, 2);
 
 	for (i = 0; (mapped == 0) && (i < PCI_MAXMAPS_0); i++) {
-		fm801->regid = PCIR_MAPS + i*4;
+		fm801->regid = PCIR_BAR(i);
 		fm801->regtype = SYS_RES_MEMORY;
 		fm801->reg = bus_alloc_resource(dev, fm801->regtype, &fm801->regid,
 						0, ~0, 1, RF_ACTIVE);
@@ -632,7 +632,8 @@ fm801_pci_attach(device_t dev)
 		/*highaddr*/BUS_SPACE_MAXADDR,
 		/*filter*/NULL, /*filterarg*/NULL,
 		/*maxsize*/fm801->bufsz, /*nsegments*/1, /*maxsegz*/0x3ffff,
-		/*flags*/0, &fm801->parent_dmat) != 0) {
+		/*flags*/0, /*lockfunc*/busdma_lock_mutex,
+		/*lockarg*/&Giant, &fm801->parent_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		goto oops;
 	}
@@ -711,7 +712,7 @@ fm801_pci_probe( device_t dev )
 		pci_write_config(dev, PCIR_COMMAND, data, 2);
 		data = pci_read_config(dev, PCIR_COMMAND, 2);
 
-		regid = PCIR_MAPS;
+		regid = PCIR_BAR(0);
 		regtype = SYS_RES_IOPORT;
 		reg = bus_alloc_resource(dev, regtype, &regid, 0, ~0, 1,
 		    RF_ACTIVE);
@@ -759,7 +760,7 @@ fm801_alloc_resource(device_t bus, device_t child, int type, int *rid,
 
 	fm801 = pcm_getdevinfo(bus);
 
-	if (type == SYS_RES_IOPORT && *rid == PCIR_MAPS)
+	if (type == SYS_RES_IOPORT && *rid == PCIR_BAR(0))
 		return (fm801->reg);
 
 	return (NULL);

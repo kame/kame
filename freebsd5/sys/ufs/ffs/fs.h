@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)fs.h	8.13 (Berkeley) 3/21/95
- * $FreeBSD: src/sys/ufs/ffs/fs.h,v 1.39 2003/02/22 00:19:26 mckusick Exp $
+ * $FreeBSD: src/sys/ufs/ffs/fs.h,v 1.40 2003/11/16 07:08:27 wes Exp $
  */
 
 #ifndef _UFS_FFS_FS_H_
@@ -361,6 +361,7 @@ CTASSERT(sizeof(struct fs) == 1376);
  */
 #define	FS_UFS1_MAGIC	0x011954	/* UFS1 fast filesystem magic number */
 #define	FS_UFS2_MAGIC	0x19540119	/* UFS2 fast filesystem magic number */
+#define	FS_BAD2_MAGIC	0x19960408	/* UFS2 incomplete newfs magic number */
 #define	FS_OKAY		0x7c269d38	/* superblock checksum */
 #define FS_42INODEFMT	-1		/* 4.2BSD inode format */
 #define FS_44INODEFMT	2		/* 4.4BSD inode format */

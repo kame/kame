@@ -36,12 +36,12 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_socket.h,v 1.4 2000/10/24 17:32:45 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_socket.h,v 1.5 2003/11/11 12:30:37 ru Exp $
  * $Whistle: ng_socket.h,v 1.5 1999/01/20 00:22:14 archie Exp $
  */
 
 #ifndef _NETGRAPH_NG_SOCKET_H_
-#define _NETGRAPH_NG_SOCKET_H_ 1
+#define _NETGRAPH_NG_SOCKET_H_
 
 /* Netgraph node type name and cookie */
 #define	NG_SOCKET_NODE_TYPE	"socket"

@@ -33,8 +33,8 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinumio.c,v 1.38 2003/05/07 03:29:30 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumio.c,v 1.87 2003/05/19 02:21:31 grog Exp $
+ * $Id: vinumio.c,v 1.39 2003/05/23 00:59:53 grog Exp grog $
+ * $FreeBSD: src/sys/dev/vinum/vinumio.c,v 1.95 2003/11/24 04:06:56 grog Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
@@ -65,8 +65,11 @@ open_drive(struct drive *drive, struct thread *td, int verbose)
 	drive->lasterror = ENOENT;
     else if ((dsw->d_flags & D_DISK) == 0)
 	drive->lasterror = ENOTBLK;
-    else
+    else {
+        DROP_GIANT();
 	drive->lasterror = (dsw->d_open) (drive->dev, FWRITE | FREAD, 0, NULL);
+        PICKUP_GIANT();
+    }
 
     if (drive->lasterror != 0) {			    /* failed */
 	drive->state = drive_down;			    /* just force it down */
@@ -139,6 +142,7 @@ init_drive(struct drive *drive, int verbose)
     if (drive->lasterror)
 	return drive->lasterror;
 
+    DROP_GIANT();
     drive->lasterror = (*devsw(drive->dev)->d_ioctl) (drive->dev,
 	DIOCGSECTORSIZE,
 	(caddr_t) & drive->sectorsize,
@@ -150,6 +154,7 @@ init_drive(struct drive *drive, int verbose)
 	    (caddr_t) & drive->mediasize,
 	    FREAD,
 	    curthread);
+    PICKUP_GIANT();
     if (drive->lasterror) {
 	if (verbose)
 	    log(LOG_ERR,
@@ -188,7 +193,9 @@ close_locked_drive(struct drive *drive)
      * the queues, which spec_close() will try to
      * do.  Get rid of them here first.
      */
+    DROP_GIANT();
     error = (*devsw(drive->dev)->d_close) (drive->dev, FWRITE | FREAD, 0, NULL);
+    PICKUP_GIANT();
     drive->flags &= ~VF_OPEN;				    /* no longer open */
     if (drive->lasterror == 0)
 	drive->lasterror = error;
@@ -248,6 +255,8 @@ driveio(struct drive *drive, char *buf, size_t length, off_t offset, int flag)
 	bp->b_iocmd = flag;
 	bp->b_dev = drive->dev;				    /* device */
 	bp->b_blkno = offset / drive->sectorsize;	    /* block number */
+	bp->b_offset = offset;
+	bp->b_iooffset = offset;
 	bp->b_saveaddr = bp->b_data;
 	bp->b_data = buf;
 	bp->b_bcount = len;
@@ -368,13 +377,12 @@ check_drive(char *devicename)
 		}
 	    }
 	}
-    } else {
-	if (drive->lasterror == 0)
-	    drive->lasterror = ENODEV;
+	return drive;
+    } else {						    /* not ours, */
 	close_drive(drive);
-	drive->state = drive_down;
+	free_drive(drive);				    /* get rid of it */
+	return NULL;
     }
-    return drive;
 }
 
 static char *
@@ -678,57 +686,8 @@ get_volume_label(char *name, int plexes, u_int64_t size, struct disklabel *lp)
     lp->d_checksum = dkcksum(lp);
 }
 
-/* Write a volume label.  This implements the VINUM_LABEL ioctl. */
-int
-write_volume_label(int volno)
-{
-    struct disklabel *lp;
-    struct buf *bp;
-    struct disklabel *dlp;
-    struct volume *vol;
-    int error;
-
-    lp = (struct disklabel *) Malloc((sizeof(struct disklabel) + (DEV_BSIZE - 1)) & (DEV_BSIZE - 1));
-    if (lp == 0)
-	return ENOMEM;
-
-    if ((unsigned) (volno) >= (unsigned) vinum_conf.volumes_allocated) /* invalid volume */
-	return ENOENT;
-
-    vol = &VOL[volno];					    /* volume in question */
-    if (vol->state <= volume_uninit)			    /* nothing there */
-	return ENXIO;
-    else if (vol->state < volume_up)			    /* not accessible */
-	return EIO;					    /* I/O error */
-
-    get_volume_label(vol->name, vol->plexes, vol->size, lp); /* get the label */
-
-    /*
-     * Now write to disk.  This code is derived from the
-     * system writedisklabel (), which does silly things
-     * like reading the label and refusing to write
-     * unless it's already there.
-     */
-    bp = geteblk((int) lp->d_secsize);			    /* get a buffer */
-    bp->b_dev = makedev(VINUM_CDEV_MAJOR, vol->volno);	    /* our own raw volume */
-    bp->b_blkno = LABELSECTOR * ((int) lp->d_secsize / DEV_BSIZE);
-    bp->b_bcount = lp->d_secsize;
-    bzero(bp->b_data, lp->d_secsize);
-    dlp = (struct disklabel *) bp->b_data;
-    *dlp = *lp;
-    bp->b_flags &= ~B_INVAL;
-    bp->b_iocmd = BIO_WRITE;
-    DEV_STRATEGY(bp);
-    error = bufwait(bp);
-    bp->b_flags |= B_INVAL | B_AGE;
-    bp->b_ioflags &= ~BIO_ERROR;
-
-    brelse(bp);
-    return error;
-}
-
 /*
- * Seach disks on system for vinum slices and add
+ * Search disks on system for vinum slices and add
  * them to the configuuration if they're not
  * there already.  devicename is a blank-separate
  * list of device names.  If not provided, use
@@ -760,6 +719,7 @@ vinum_scandisk(char *devicename)
     int malloced;
     int partnamelen;					    /* length of partition name */
     int drives;
+    int goodpart;					    /* good vinum drives on this disk */
 
     malloced = 0;					    /* devicename not malloced */
     if (devicename == NULL) {				    /* no devices specified, */
@@ -806,8 +766,9 @@ vinum_scandisk(char *devicename)
     /* Open all drives and find which was modified most recently */
     for (cp = devicename; *cp; cp = ep) {
 	char part;					    /* UNIX partition */
+#ifdef __i386__
 	int slice;
-	int founddrive;					    /* flag when we find a vinum drive */
+#endif
 
 	while (*cp == ' ')
 	    cp++;					    /* find start of name */
@@ -825,8 +786,9 @@ vinum_scandisk(char *devicename)
 	memcpy(np, cp, ep - cp);			    /* put in name */
 	np += ep - cp;					    /* and point past */
 
+	goodpart = 0;					    /* no partitions on this disk yet */
 	partnamelen = MAXPATHLEN + np - partname;	    /* remaining length in partition name */
-	founddrive = 0;					    /* no vinum drive found yet on this spindle */
+#ifdef __i386__
 	/* first try the partition table */
 	for (slice = 1; slice < 5; slice++)
 	    for (part = 'a'; part < 'i'; part++) {
@@ -837,24 +799,28 @@ vinum_scandisk(char *devicename)
 			slice,
 			part);
 		    drive = check_drive(partname);	    /* try to open it */
-		    if ((drive->lasterror != 0)		    /* didn't work, */
-		    ||(drive->state < drive_down))
-			free_drive(drive);		    /* get rid of it */
-		    else if (drive->flags & VF_CONFIGURED)  /* already read this config, */
-			log(LOG_WARNING,
-			    "vinum: already read config from %s\n", /* say so */
-			    drive->label.name);
-		    else {
-			if (gooddrives == drives)	    /* ran out of entries */
-			    EXPAND(drivelist, int, drives, drives); /* double the size */
-			drivelist[gooddrives] = drive->driveno;	/* keep the drive index */
-			drive->flags &= ~VF_NEWBORN;	    /* which is no longer newly born */
-			gooddrives++;
-			founddrive++;
+		    if (drive) {			    /* got something, */
+			if (drive->flags & VF_CONFIGURED)   /* already read this config, */
+			    log(LOG_WARNING,
+				"vinum: already read config from %s\n",	/* say so */
+				drive->label.name);
+			else {
+			    if (gooddrives == drives)	    /* ran out of entries */
+				EXPAND(drivelist, int, drives, drives);	/* double the size */
+			    drivelist[gooddrives] = drive->driveno; /* keep the drive index */
+			    drive->flags &= ~VF_NEWBORN;    /* which is no longer newly born */
+			    gooddrives++;
+			    goodpart++;
+			}
 		    }
 		}
 	    }
-	if (founddrive == 0) {				    /* didn't find anything, */
+#endif
+	/*
+	 * If the machine doesn't have a BIOS
+	 * partition table, try normal devices.
+	 */
+	if (goodpart == 0) {				    /* didn't find anything, */
 	    for (part = 'a'; part < 'i'; part++)	    /* try the compatibility partition */
 		if (part != 'c') {			    /* don't do the c partition */
 		    snprintf(np,
@@ -862,19 +828,19 @@ vinum_scandisk(char *devicename)
 			"%c",
 			part);
 		    drive = check_drive(partname);	    /* try to open it */
-		    if ((drive->lasterror != 0)		    /* didn't work, */
-		    ||(drive->state < drive_down))
-			free_drive(drive);		    /* get rid of it */
-		    else if (drive->flags & VF_CONFIGURED)  /* already read this config, */
-			log(LOG_WARNING,
-			    "vinum: already read config from %s\n", /* say so */
-			    drive->label.name);
-		    else {
-			if (gooddrives == drives)	    /* ran out of entries */
-			    EXPAND(drivelist, int, drives, drives); /* double the size */
-			drivelist[gooddrives] = drive->driveno;	/* keep the drive index */
-			drive->flags &= ~VF_NEWBORN;	    /* which is no longer newly born */
-			gooddrives++;
+		    if (drive) {			    /* got something, */
+			if (drive->flags & VF_CONFIGURED)   /* already read this config, */
+			    log(LOG_WARNING,
+				"vinum: already read config from %s\n",	/* say so */
+				drive->label.name);
+			else {
+			    if (gooddrives == drives)	    /* ran out of entries */
+				EXPAND(drivelist, int, drives, drives);	/* double the size */
+			    drivelist[gooddrives] = drive->driveno; /* keep the drive index */
+			    drive->flags &= ~VF_NEWBORN;    /* which is no longer newly born */
+			    gooddrives++;
+			    goodpart++;
+			}
 		    }
 		}
 	}

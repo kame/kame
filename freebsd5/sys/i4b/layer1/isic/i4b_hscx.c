@@ -26,12 +26,12 @@
  *
  *	i4b - Siemens HSCX chip (B-channel) handling
  *	--------------------------------------------
- *
- * $FreeBSD: src/sys/i4b/layer1/isic/i4b_hscx.c,v 1.9 2002/09/02 00:52:08 brooks Exp $
- *
  *      last edit-date: [Sat Mar  9 16:01:49 2002]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_hscx.c,v 1.10 2003/06/10 23:45:23 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

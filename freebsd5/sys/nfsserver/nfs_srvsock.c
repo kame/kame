@@ -34,11 +34,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_socket.c	8.5 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/nfsserver/nfs_srvsock.c,v 1.83 2003/03/02 16:54:39 des Exp $
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_srvsock.c,v 1.83 2003/03/02 16:54:39 des Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_srvsock.c,v 1.86 2003/11/17 00:56:53 rwatson Exp $");
 
 /*
  * Socket operations for use by nfs
@@ -359,7 +358,7 @@ nfs_getreq(struct nfsrv_descript *nd, struct nfsd *nfsd, int has_header)
 		 * and related calls.  Right now, this tramples on any
 		 * extensible data in the ucred, fails to initialize the
 		 * mutex, and worse.  This must be fixed before FreeBSD
-		 * 5.0-RELEASE.
+		 * 5.3-RELEASE.
 		 */
 		bzero((caddr_t)&nd->nd_cr, sizeof (struct ucred));
 		nd->nd_cr.cr_ref = 1;
@@ -426,6 +425,8 @@ nfsrv_rcv(struct socket *so, void *arg, int waitflag)
 		goto dorecs;
 	}
 #endif
+	GIANT_REQUIRED;		/* XXX until socket locking is done */
+
 	auio.uio_td = NULL;
 	if (so->so_type == SOCK_STREAM) {
 		/*
@@ -725,6 +726,8 @@ nfsrv_send(struct socket *so, struct sockaddr *nam, struct mbuf *top)
 {
 	struct sockaddr *sendnam;
 	int error, soflags, flags;
+
+	GIANT_REQUIRED;		/* XXX until socket locking is done */
 
 	soflags = so->so_proto->pr_flags;
 	if ((soflags & PR_CONNREQUIRED) || (so->so_state & SS_ISCONNECTED))

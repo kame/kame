@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/usb/Makefile,v 1.12 2003/04/14 14:04:08 ticso Exp $ 
+# $FreeBSD: src/sys/modules/usb/Makefile,v 1.13 2003/07/15 22:42:37 jmg Exp $ 
 
 MAINTAINER=	n_hibma@freebsd.org
 
@@ -13,7 +13,7 @@ SRCS=	bus_if.h device_if.h usb_if.h usb_if.c \
 	hid.c hid.h usbhid.h \
 	uhub.c \
 	usb.c usb.h \
-	usb_mem.h \
+	usb_mem.c usb_mem.h \
 	usb_port.h \
 	usb_quirks.c usb_quirks.h \
 	usb_subr.c \

@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)param.h	5.8 (Berkeley) 6/28/91
- * $FreeBSD: src/sys/powerpc/include/param.h,v 1.9 2002/10/05 02:56:49 jmallett Exp $
+ * $FreeBSD: src/sys/powerpc/include/param.h,v 1.12 2003/09/24 01:45:07 grehan Exp $
  */
 
 /*
@@ -57,10 +57,10 @@
 #endif
 
 #ifndef	_MACHINE
-#define	_MACHINE	"powerpc"
+#define	_MACHINE	powerpc
 #endif
 #ifndef _MACHINE_ARCH
-#define	_MACHINE_ARCH	"powerpc"
+#define	_MACHINE_ARCH	powerpc
 #endif
 
 #ifndef _NO_NAMESPACE_POLLUTION
@@ -97,10 +97,10 @@
 #define	KERNBASE	0x100000	/* start of kernel virtual */
 #define	BTOPKERNBASE	((u_long)KERNBASE >> PGSHIFT)
 
-#ifndef KSTACK_UPAGES
+#ifndef KSTACK_PAGES
 #define	KSTACK_PAGES		4		/* includes pcb */
-#define	KSTACK_GUARD_PAGES	1
 #endif
+#define	KSTACK_GUARD_PAGES	1	/* pages of kstack guard; 0 disables */
 #define	USPACE		(KSTACK_PAGES * PAGE_SIZE)	/* total size of pcb */
 #define	UAREA_PAGES	1		/* holds struct user WITHOUT PCB */
 

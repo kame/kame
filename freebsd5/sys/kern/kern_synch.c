@@ -36,14 +36,13 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_synch.c	8.9 (Berkeley) 5/19/95
- * $FreeBSD: src/sys/kern/kern_synch.c,v 1.223 2003/05/16 21:26:42 marcel Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_synch.c,v 1.237 2003/10/29 15:23:09 bde Exp $");
 
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
-#ifdef __i386__
-#include "opt_swtch.h"
-#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -70,9 +69,6 @@
 #endif
 
 #include <machine/cpu.h>
-#ifdef SWTCH_OPTIM_STATS
-#include <machine/md_var.h>
-#endif
 
 static void sched_setup(void *dummy);
 SYSINIT(sched_setup, SI_SUB_KICK_SCHEDULER, SI_ORDER_FIRST, sched_setup, NULL)
@@ -155,6 +151,7 @@ msleep(ident, mtx, priority, wmesg, timo)
 	if (KTRPOINT(td, KTR_CSW))
 		ktrcsw(1, 0);
 #endif
+	/* XXX: mtx == NULL ?? */
 	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, &mtx->mtx_object,
 	    "Sleeping on \"%s\"", wmesg);
 	KASSERT(timo != 0 || mtx_owned(&Giant) || mtx != NULL,
@@ -167,35 +164,38 @@ msleep(ident, mtx, priority, wmesg, timo)
 	 * the thread (recursion here might be bad).
 	 */
 	mtx_lock_spin(&sched_lock);
-	if (p->p_flag & P_THREADED || p->p_numthreads > 1) {
+	if (p->p_flag & P_SA || p->p_numthreads > 1) {
 		/*
 		 * Just don't bother if we are exiting
 		 * and not the exiting thread or thread was marked as
 		 * interrupted.
 		 */
-		if (catch &&
-		    (((p->p_flag & P_WEXIT) && (p->p_singlethread != td)) ||
-		     (td->td_flags & TDF_INTERRUPT))) {
-			td->td_flags &= ~TDF_INTERRUPT;
-			mtx_unlock_spin(&sched_lock);
-			return (EINTR);
+		if (catch) {
+			if ((p->p_flag & P_WEXIT) && p->p_singlethread != td) {
+				mtx_unlock_spin(&sched_lock);
+				return (EINTR);
+			}
+			if (td->td_flags & TDF_INTERRUPT) {
+				mtx_unlock_spin(&sched_lock);
+				return (td->td_intrval);
+			}
 		}
 	}
 	if (cold ) {
 		/*
-		 * During autoconfiguration, just give interrupts
-		 * a chance, then just return.
-		 * Don't run any other procs or panic below,
+		 * During autoconfiguration, just return;
+		 * don't run any other procs or panic below,
 		 * in case this is the idle process and already asleep.
+		 * XXX: this used to do "s = splhigh(); splx(safepri);
+		 * splx(s);" to give interrupts a chance, but there is
+		 * no way to give interrupts a chance now.
 		 */
 		if (mtx != NULL && priority & PDROP)
 			mtx_unlock(mtx);
 		mtx_unlock_spin(&sched_lock);
 		return (0);
 	}
-
 	DROP_GIANT();
-
 	if (mtx != NULL) {
 		mtx_assert(mtx, MA_OWNED | MA_NOTRECURSED);
 		WITNESS_SAVE(&mtx->mtx_object, mtx);
@@ -203,7 +203,6 @@ msleep(ident, mtx, priority, wmesg, timo)
 		if (priority & PDROP)
 			mtx = NULL;
 	}
-
 	KASSERT(p != NULL, ("msleep1"));
 	KASSERT(ident != NULL && TD_IS_RUNNING(td), ("msleep"));
 
@@ -285,14 +284,12 @@ msleep(ident, mtx, priority, wmesg, timo)
 	} 
 	if ((td->td_flags & TDF_INTERRUPT) && (priority & PCATCH) &&
 	    (rval == 0)) {
-		td->td_flags &= ~TDF_INTERRUPT;
-		rval = EINTR;
+		rval = td->td_intrval;
 	}
 	mtx_unlock_spin(&sched_lock);
-
 	if (rval == 0 && catch) {
 		PROC_LOCK(p);
-		/* XXX: shouldn't we always be calling cursig() */
+		/* XXX: shouldn't we always be calling cursig()? */
 		mtx_lock(&p->p_sigacts->ps_mtx);
 		if (sig != 0 || (sig = cursig(td))) {
 			if (SIGISMEMBER(p->p_sigacts->ps_sigintr, sig))
@@ -316,7 +313,7 @@ msleep(ident, mtx, priority, wmesg, timo)
 }
 
 /*
- * Implement timeout for msleep()
+ * Implement timeout for msleep().
  *
  * If process hasn't been awakened (wchan non-zero),
  * set timeout flag and undo the sleep.  If proc
@@ -327,8 +324,9 @@ static void
 endtsleep(arg)
 	void *arg;
 {
-	register struct thread *td = arg;
+	register struct thread *td;
 
+	td = (struct thread *)arg;
 	CTR3(KTR_PROC, "endtsleep: thread %p (pid %d, %s)",
 	    td, td->td_proc->p_pid, td->td_proc->p_comm);
 	mtx_lock_spin(&sched_lock);
@@ -342,9 +340,8 @@ endtsleep(arg)
 		TD_CLR_ON_SLEEPQ(td);
 		td->td_flags |= TDF_TIMEOUT;
 		td->td_wmesg = NULL;
-	} else {
+	} else
 		td->td_flags |= TDF_TIMOFAIL;
-	}
 	TD_CLR_SLEEPING(td);
 	setrunnable(td);
 	mtx_unlock_spin(&sched_lock);
@@ -430,9 +427,9 @@ void
 wakeup_one(ident)
 	register void *ident;
 {
+	register struct proc *p;
 	register struct slpquehead *qp;
 	register struct thread *td;
-	register struct proc *p;
 	struct thread *ntd;
 
 	mtx_lock_spin(&sched_lock);
@@ -460,11 +457,7 @@ mi_switch(void)
 {
 	struct bintime new_switchtime;
 	struct thread *td;
-#if !defined(__alpha__) && !defined(__powerpc__)
-	struct thread *newtd;
-#endif
 	struct proc *p;
-	u_int sched_nest;
 
 	mtx_assert(&sched_lock, MA_OWNED | MA_NOTRECURSED);
 	td = curthread;			/* XXX */
@@ -485,6 +478,8 @@ mi_switch(void)
 	bintime_add(&p->p_runtime, &new_switchtime);
 	bintime_sub(&p->p_runtime, PCPU_PTR(switchtime));
 
+	td->td_generation++;	/* bump preempt-detect counter */
+
 #ifdef DDB
 	/*
 	 * Don't perform context switches from the debugger.
@@ -492,7 +487,7 @@ mi_switch(void)
 	if (db_active) {
 		mtx_unlock_spin(&sched_lock);
 		db_print_backtrace();
-		db_error("Context switches not allowed in the debugger.");
+		db_error("Context switches not allowed in the debugger");
 	}
 #endif
 
@@ -511,46 +506,15 @@ mi_switch(void)
 	 */
 	cnt.v_swtch++;
 	PCPU_SET(switchtime, new_switchtime);
+	PCPU_SET(switchticks, ticks);
 	CTR3(KTR_PROC, "mi_switch: old thread %p (pid %d, %s)", td, p->p_pid,
 	    p->p_comm);
-	sched_nest = sched_lock.mtx_recurse;
-	if (td->td_proc->p_flag & P_THREADED)
+	if (td->td_proc->p_flag & P_SA)
 		thread_switchout(td);
-	sched_switchout(td);
+	sched_switch(td);
 
-#if !defined(__alpha__) && !defined(__powerpc__) 
-	newtd = choosethread();
-	if (td != newtd)
-		cpu_switch(td, newtd);	/* SHAZAM!! */
-#ifdef SWTCH_OPTIM_STATS
-	else
-		stupid_switch++;
-#endif
-#else
-	cpu_switch();		/* SHAZAM!!*/
-#endif
-
-	sched_lock.mtx_recurse = sched_nest;
-	sched_lock.mtx_lock = (uintptr_t)td;
-	sched_switchin(td);
-
-	/* 
-	 * Start setting up stats etc. for the incoming thread.
-	 * Similar code in fork_exit() is returned to by cpu_switch()
-	 * in the case of a new thread/process.
-	 */
 	CTR3(KTR_PROC, "mi_switch: new thread %p (pid %d, %s)", td, p->p_pid,
 	    p->p_comm);
-	if (PCPU_GET(switchtime.sec) == 0)
-		binuptime(PCPU_PTR(switchtime));
-	PCPU_SET(switchticks, ticks);
-
-	/*
-	 * Call the switchin function while still holding the scheduler lock
-	 * (used by the idlezero code and the general page-zeroing code)
-	 */
-	if (td->td_switchin)
-		td->td_switchin();
 
 	/* 
 	 * If the last thread was exiting, finish cleaning it up.
@@ -569,8 +533,9 @@ mi_switch(void)
 void
 setrunnable(struct thread *td)
 {
-	struct proc *p = td->td_proc;
+	struct proc *p;
 
+	p = td->td_proc;
 	mtx_assert(&sched_lock, MA_OWNED);
 	switch (p->p_state) {
 	case PRS_ZOMBIE:
@@ -589,6 +554,7 @@ setrunnable(struct thread *td)
 		 */
 		if (td->td_inhibitors != TDI_SWAPPED)
 			return;
+		/* XXX: intentional fall-through ? */
 	case TDS_CAN_RUN:
 		break;
 	default:
@@ -663,7 +629,7 @@ sched_setup(dummy)
 	void *dummy;
 {
 	callout_init(&loadav_callout, 0);
-	callout_init(&lbolt_callout, 1);
+	callout_init(&lbolt_callout, CALLOUT_MPSAFE);
 
 	/* Kick off timeout driven events by calling first time. */
 	loadav(NULL);
@@ -676,8 +642,9 @@ sched_setup(dummy)
 int
 yield(struct thread *td, struct yield_args *uap)
 {
-	struct ksegrp *kg = td->td_ksegrp;
+	struct ksegrp *kg;
 
+	kg = td->td_ksegrp;
 	mtx_assert(&Giant, MA_NOTOWNED);
 	mtx_lock_spin(&sched_lock);
 	kg->kg_proc->p_stats->p_ru.ru_nvcsw++;
@@ -685,7 +652,5 @@ yield(struct thread *td, struct yield_args *uap)
 	mi_switch();
 	mtx_unlock_spin(&sched_lock);
 	td->td_retval[0] = 0;
-
 	return (0);
 }
-

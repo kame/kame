@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/i386/isa/bs/bshw_dma.c,v 1.8 2002/03/20 07:39:49 alfred Exp $ */
+/* $FreeBSD: src/sys/i386/isa/bs/bshw_dma.c,v 1.9 2003/08/25 08:13:07 nyan Exp $ */
 /*	$NecBSD: bshw_dma.c,v 1.3 1997/07/26 06:03:16 honda Exp $	*/
 /*	$NetBSD$	*/
 /*
@@ -173,7 +173,7 @@ bs_dma_xfer_end(ti)
 /**********************************************
  * GENERIC DMA FUNCS
  **********************************************/
-static u_int8_t dmapageport[4] = { 0x27, 0x21, 0x23, 0x25 };
+static bus_addr_t dmapageport[4] = { 0x27, 0x21, 0x23, 0x25 };
 
 /* common dma settings */
 #undef	DMA1_SMSK

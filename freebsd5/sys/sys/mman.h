@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mman.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/mman.h,v 1.35 2003/03/31 21:09:56 wes Exp $
+ * $FreeBSD: src/sys/sys/mman.h,v 1.37 2003/08/11 07:14:07 bms Exp $
  */
 
 #ifndef _SYS_MMAN_H_
@@ -137,9 +137,16 @@
 #endif /* __BSD_VISIBLE */
 
 /*
- * XXX missing POSIX_MADV_* macros, POSIX_TYPED_MEM_* macros, and
+ * XXX missing POSIX_TYPED_MEM_* macros and
  * posix_typed_mem_info structure.
  */
+#if __POSIX_VISIBLE >= 200112
+#define	POSIX_MADV_NORMAL	MADV_NORMAL
+#define	POSIX_MADV_RANDOM	MADV_RANDOM
+#define	POSIX_MADV_SEQUENTIAL	MADV_SEQUENTIAL
+#define	POSIX_MADV_WILLNEED	MADV_WILLNEED
+#define	POSIX_MADV_DONTNEED	MADV_DONTNEED
+#endif
 
 #ifndef _MODE_T_DECLARED
 typedef	__mode_t	mode_t;
@@ -160,7 +167,7 @@ typedef	__size_t	size_t;
 
 __BEGIN_DECLS
 /*
- * XXX not yet implemented: mlockall(), munlockall(), posix_madvise(),
+ * XXX not yet implemented: mlockall(), munlockall(),
  * posix_mem_offset(), posix_typed_mem_get_info(), posix_typed_mem_open().
  */
 #if __BSD_VISIBLE
@@ -177,7 +184,12 @@ int	mprotect(const void *, size_t, int);
 int	msync(void *, size_t, int);
 int	munlock(const void *, size_t);
 int	munmap(void *, size_t);
+#if __POSIX_VISIBLE >= 200112
+int	posix_madvise(void *, size_t, int);
+#endif
 #if __POSIX_VISIBLE >= 199309
+int	mlockall(int);
+int	munlockall(void);
 int	shm_open(const char *, int, mode_t);
 int	shm_unlink(const char *);
 #endif

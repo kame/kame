@@ -31,8 +31,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)sys_socket.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/sys_socket.c,v 1.53 2003/02/20 03:26:11 cognet Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/sys_socket.c,v 1.55 2003/06/18 18:16:39 phk Exp $");
 
 #include "opt_mac.h"
 
@@ -55,8 +57,14 @@
 #include <net/route.h>
 
 struct	fileops socketops = {
-	soo_read, soo_write, soo_ioctl, soo_poll, soo_kqfilter,
-	soo_stat, soo_close, DFLAG_PASSABLE
+	.fo_read = soo_read,
+	.fo_write = soo_write,
+	.fo_ioctl = soo_ioctl,
+	.fo_poll = soo_poll,
+	.fo_kqfilter = soo_kqfilter,
+	.fo_stat = soo_stat,
+	.fo_close = soo_close,
+	.fo_flags = DFLAG_PASSABLE
 };
 
 /* ARGSUSED */

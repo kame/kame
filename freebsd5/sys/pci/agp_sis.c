@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/pci/agp_sis.c,v 1.7 2003/04/15 06:37:29 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/agp_sis.c,v 1.9 2003/08/22 07:13:20 imp Exp $");
 
 #include "opt_bus.h"
 
@@ -38,8 +39,8 @@
 #include <sys/mutex.h>
 #include <sys/proc.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 #include <pci/agppriv.h>
 #include <pci/agpreg.h>
 

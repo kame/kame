@@ -36,12 +36,12 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_iface.h,v 1.4 2003/03/05 19:24:22 peter Exp $
+ * $FreeBSD: src/sys/netgraph/ng_iface.h,v 1.5 2003/11/11 12:30:37 ru Exp $
  * $Whistle: ng_iface.h,v 1.5 1999/01/20 00:22:13 archie Exp $
  */
 
-#ifndef _NETGRAPH_IFACE_H_
-#define _NETGRAPH_IFACE_H_
+#ifndef _NETGRAPH_NG_IFACE_H_
+#define _NETGRAPH_NG_IFACE_H_
 
 /* Node type name and magic cookie */
 #define NG_IFACE_NODE_TYPE		"iface"
@@ -75,4 +75,4 @@ struct ng_iface_ifname {
 	char    ngif_name[NG_IFACE_IFACE_NAME_MAX + 1];
 };
 
-#endif /* _NETGRAPH_IFACE_H_ */
+#endif /* _NETGRAPH_NG_IFACE_H_ */

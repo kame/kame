@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: maestro.c,v 1.12 2000/09/06 03:32:34 taku Exp $
+ *	$Id: maestro.c,v 1.18 2003/07/01 15:52:01 scottl Exp $
  */
 
 /*
@@ -35,7 +35,7 @@
  * Zach Brown <zab@zabbo.net>.
  *
  * busdma()-ize and buffer size reduction were suggested by
- * Cameron Grant <gandalf@vilnya.demon.co.uk>.
+ * Cameron Grant <cg@freebsd.org>.
  * Also he showed me the way to use busdma() suite.
  *
  * Internal speaker problems on NEC VersaPro's and Dell Inspiron 7500
@@ -46,12 +46,12 @@
 
 #include <dev/sound/pcm/sound.h>
 #include <dev/sound/pcm/ac97.h>
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/sound/pci/maestro_reg.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/maestro.c,v 1.17 2002/11/26 18:16:26 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/maestro.c,v 1.21 2003/09/07 16:28:03 cg Exp $");
 
 #define inline __inline
 
@@ -950,7 +950,7 @@ agg_attach(device_t dev)
 	struct agg_info	*ess = NULL;
 	u_int32_t	data;
 	int	mapped = 0;
-	int	regid = PCIR_MAPS;
+	int	regid = PCIR_BAR(0);
 	struct resource	*reg = NULL;
 	struct ac97_info	*codec = NULL;
 	int	irqid = 0;
@@ -972,7 +972,8 @@ agg_attach(device_t dev)
 	    /*lowaddr*/MAESTRO_MAXADDR, /*highaddr*/BUS_SPACE_MAXADDR,
 	    /*filter*/NULL, /*filterarg*/NULL,
 	    /*maxsize*/ess->bufsz, /*nsegments*/1, /*maxsegz*/0x3ffff,
-	    /*flags*/0, &ess->parent_dmat) != 0) {
+	    /*flags*/0, /*lockfunc*/busdma_lock_mutex,
+	    /*lockarg*/&Giant, &ess->parent_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		goto bad;
 	}

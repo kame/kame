@@ -37,12 +37,14 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_prot.c	8.6 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_prot.c,v 1.169 2003/05/01 21:21:42 jhb Exp $
  */
 
 /*
  * System calls related to processes and protection
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_prot.c,v 1.179 2003/12/06 21:48:01 rwatson Exp $");
 
 #include "opt_compat.h"
 #include "opt_mac.h"
@@ -402,8 +404,6 @@ setpgid(struct thread *td, register struct setpgid_args *uap)
 	sx_xlock(&proctree_lock);
 	if (uap->pid != 0 && uap->pid != curp->p_pid) {
 		if ((targp = pfind(uap->pid)) == NULL) {
-			if (targp)
-				PROC_UNLOCK(targp);
 			error = ESRCH;
 			goto done;
 		}
@@ -436,22 +436,23 @@ setpgid(struct thread *td, register struct setpgid_args *uap)
 	}
 	if (uap->pgid == 0)
 		uap->pgid = targp->p_pid;
-	if (uap->pgid == targp->p_pid) {
-		if (targp->p_pgid == uap->pgid)
-			goto done;
-		error = enterpgrp(targp, uap->pgid, newpgrp, NULL);
-		if (error == 0)
-			newpgrp = NULL;
-	} else {
-		if ((pgrp = pgfind(uap->pgid)) == NULL ||
-		    pgrp->pg_session != curp->p_session) {
-			if (pgrp != NULL)
-				PGRP_UNLOCK(pgrp);
+	if ((pgrp = pgfind(uap->pgid)) == NULL) {
+		if (uap->pgid == targp->p_pid) {
+			error = enterpgrp(targp, uap->pgid, newpgrp,
+			    NULL);
+			if (error == 0)
+				newpgrp = NULL;
+		} else
 			error = EPERM;
-			goto done;
-		}
+	} else {
 		if (pgrp == targp->p_pgrp) {
 			PGRP_UNLOCK(pgrp);
+			goto done;
+		}
+		if (pgrp->pg_id != targp->p_pid &&
+		    pgrp->pg_session != curp->p_session) {
+			PGRP_UNLOCK(pgrp);
+			error = EPERM;
 			goto done;
 		}
 		PGRP_UNLOCK(pgrp);
@@ -1138,7 +1139,7 @@ struct issetugid_args {
 };
 #endif
 /*
- * NOT MPSAFE?
+ * MPSAFE
  */
 /* ARGSUSED */
 int
@@ -1172,18 +1173,14 @@ __setugid(struct thread *td, struct __setugid_args *uap)
 	p = td->td_proc;
 	switch (uap->flag) {
 	case 0:
-		mtx_lock(&Giant);
 		PROC_LOCK(p);
 		p->p_flag &= ~P_SUGID;
 		PROC_UNLOCK(p);
-		mtx_unlock(&Giant);
 		return (0);
 	case 1:
-		mtx_lock(&Giant);
 		PROC_LOCK(p);
 		p->p_flag |= P_SUGID;
 		PROC_UNLOCK(p);
-		mtx_unlock(&Giant);
 		return (0);
 	default:
 		return (EINVAL);
@@ -1326,6 +1323,46 @@ cr_seeotheruids(struct ucred *u1, struct ucred *u2)
 	return (0);
 }
 
+/*
+ * 'see_other_gids' determines whether or not visibility of processes
+ * and sockets with credentials holding different real gids is possible
+ * using a variety of system MIBs.
+ * XXX: data declarations should be together near the beginning of the file.
+ */
+static int	see_other_gids = 1;
+SYSCTL_INT(_security_bsd, OID_AUTO, see_other_gids, CTLFLAG_RW,
+    &see_other_gids, 0,
+    "Unprivileged processes may see subjects/objects with different real gid");
+
+/*
+ * Determine if u1 can "see" the subject specified by u2, according to the
+ * 'see_other_gids' policy.
+ * Returns: 0 for permitted, ESRCH otherwise
+ * Locks: none
+ * References: *u1 and *u2 must not change during the call
+ *             u1 may equal u2, in which case only one reference is required
+ */
+static int
+cr_seeothergids(struct ucred *u1, struct ucred *u2)
+{
+	int i, match;
+	
+	if (!see_other_gids) {
+		match = 0;
+		for (i = 0; i < u1->cr_ngroups; i++) {
+			if (groupmember(u1->cr_groups[i], u2))
+				match = 1;
+			if (match)
+				break;
+		}
+		if (!match) {
+			if (suser_cred(u1, PRISON_ROOT) != 0)
+				return (ESRCH);
+		}
+	}
+	return (0);
+}
+
 /*-
  * Determine if u1 "can see" the subject specified by u2.
  * Returns: 0 for permitted, an errno value otherwise
@@ -1345,6 +1382,8 @@ cr_cansee(struct ucred *u1, struct ucred *u2)
 		return (error);
 #endif
 	if ((error = cr_seeotheruids(u1, u2)))
+		return (error);
+	if ((error = cr_seeothergids(u1, u2)))
 		return (error);
 	return (0);
 }
@@ -1366,6 +1405,20 @@ p_cansee(struct thread *td, struct proc *p)
 	return (cr_cansee(td->td_ucred, p->p_ucred));
 }
 
+/*
+ * 'conservative_signals' prevents the delivery of a broad class of
+ * signals by unprivileged processes to processes that have changed their
+ * credentials since the last invocation of execve().  This can prevent
+ * the leakage of cached information or retained privileges as a result
+ * of a common class of signal-related vulnerabilities.  However, this
+ * may interfere with some applications that expect to be able to
+ * deliver these signals to peer processes after having given up
+ * privilege.
+ */
+static int	conservative_signals = 1;
+SYSCTL_INT(_security_bsd, OID_AUTO, conservative_signals, CTLFLAG_RW,
+    &conservative_signals, 0, "Unprivileged processes prevented from "
+    "sending certain signals to processes whose credentials have changed");
 /*-
  * Determine whether cred may deliver the specified signal to proc.
  * Returns: 0 for permitted, an errno value otherwise.
@@ -1389,8 +1442,9 @@ cr_cansignal(struct ucred *cred, struct proc *proc, int signum)
 	if ((error = mac_check_proc_signal(cred, proc, signum)))
 		return (error);
 #endif
-	error = cr_seeotheruids(cred, proc->p_ucred);
-	if (error)
+	if ((error = cr_seeotheruids(cred, proc->p_ucred)))
+		return (error);
+	if ((error = cr_seeothergids(cred, proc->p_ucred)))
 		return (error);
 
 	/*
@@ -1398,12 +1452,13 @@ cr_cansignal(struct ucred *cred, struct proc *proc, int signum)
 	 * bit on the target process.  If the bit is set, then additional
 	 * restrictions are placed on the set of available signals.
 	 */
-	if (proc->p_flag & P_SUGID) {
+	if (conservative_signals && (proc->p_flag & P_SUGID)) {
 		switch (signum) {
 		case 0:
 		case SIGKILL:
 		case SIGINT:
 		case SIGTERM:
+		case SIGALRM:
 		case SIGSTOP:
 		case SIGTTIN:
 		case SIGTTOU:
@@ -1496,6 +1551,8 @@ p_cansched(struct thread *td, struct proc *p)
 #endif
 	if ((error = cr_seeotheruids(td->td_ucred, p->p_ucred)))
 		return (error);
+	if ((error = cr_seeothergids(td->td_ucred, p->p_ucred)))
+		return (error);
 	if (td->td_ucred->cr_ruid == p->p_ucred->cr_ruid)
 		return (0);
 	if (td->td_ucred->cr_uid == p->p_ucred->cr_ruid)
@@ -1556,6 +1613,8 @@ p_candebug(struct thread *td, struct proc *p)
 		return (error);
 #endif
 	if ((error = cr_seeotheruids(td->td_ucred, p->p_ucred)))
+		return (error);
+	if ((error = cr_seeothergids(td->td_ucred, p->p_ucred)))
 		return (error);
 
 	/*
@@ -1636,12 +1695,15 @@ cr_canseesocket(struct ucred *cred, struct socket *so)
 #endif
 	if (cr_seeotheruids(cred, so->so_cred))
 		return (ENOENT);
+	if (cr_seeothergids(cred, so->so_cred))
+		return (ENOENT);
 
 	return (0);
 }
 
 /*
  * Allocate a zeroed cred structure.
+ * MPSAFE
  */
 struct ucred *
 crget(void)
@@ -1650,7 +1712,7 @@ crget(void)
 
 	MALLOC(cr, struct ucred *, sizeof(*cr), M_CRED, M_WAITOK | M_ZERO);
 	cr->cr_ref = 1;
-	cr->cr_mtxp = mtx_pool_find(cr);
+	cr->cr_mtxp = mtx_pool_find(mtxpool_sleep, cr);
 #ifdef MAC
 	mac_init_cred(cr);
 #endif
@@ -1659,6 +1721,7 @@ crget(void)
 
 /*
  * Claim another reference to a ucred structure.
+ * MPSAFE
  */
 struct ucred *
 crhold(struct ucred *cr)
@@ -1673,6 +1736,7 @@ crhold(struct ucred *cr)
 /*
  * Free a cred structure.
  * Throws away space when ref count gets to 0.
+ * MPSAFE
  */
 void
 crfree(struct ucred *cr)
@@ -1710,6 +1774,7 @@ crfree(struct ucred *cr)
 
 /*
  * Check to see if this ucred is shared.
+ * MPSAFE
  */
 int
 crshared(struct ucred *cr)
@@ -1724,6 +1789,7 @@ crshared(struct ucred *cr)
 
 /*
  * Copy a ucred's contents from a template.  Does not block.
+ * MPSAFE
  */
 void
 crcopy(struct ucred *dest, struct ucred *src)
@@ -1738,12 +1804,13 @@ crcopy(struct ucred *dest, struct ucred *src)
 	if (jailed(dest))
 		prison_hold(dest->cr_prison);
 #ifdef MAC
-	mac_create_cred(src, dest);
+	mac_copy_cred(src, dest);
 #endif
 }
 
 /*
  * Dup cred struct to a new held one.
+ * MPSAFE
  */
 struct ucred *
 crdup(struct ucred *cr)
@@ -1770,6 +1837,7 @@ cred_free_thread(struct thread *td)
 
 /*
  * Fill in a struct xucred based on a struct ucred.
+ * MPSAFE
  */
 void
 cru2x(struct ucred *cr, struct xucred *xcr)
@@ -1785,6 +1853,7 @@ cru2x(struct ucred *cr, struct xucred *xcr)
 /*
  * small routine to swap a thread's current ucred for the correct one
  * taken from the process.
+ * MPSAFE
  */
 void
 cred_update_thread(struct thread *td)

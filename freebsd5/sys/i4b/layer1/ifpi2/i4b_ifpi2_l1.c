@@ -27,19 +27,17 @@
  *
  *	i4b_ifpi2_l1.c - AVM Fritz PCI Version 2 layer 1 handler
  *	---------------------------------------------
- *
  *	$Id$ 
  *
- * $FreeBSD: src/sys/i4b/layer1/ifpi2/i4b_ifpi2_l1.c,v 1.4 2002/09/02 00:52:07 brooks Exp $
- *
- *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/ifpi2/i4b_ifpi2_l1.c,v 1.5 2003/06/10 23:23:33 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
-
 
 #include <net/if.h>
 

@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_usrreq.c,v 1.10 2003/01/28 12:10:11 phk Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * -------------------
  *
  * Process user requests
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/ipatm/ipatm_usrreq.c,v 1.14 2003/10/31 18:32:10 brooks Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -59,11 +57,6 @@
 
 #include <netatm/ipatm/ipatm_var.h>
 #include <netatm/ipatm/ipatm_serv.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_usrreq.c,v 1.10 2003/01/28 12:10:11 phk Exp $");
-#endif
-
 
 /*
  * Process IP PF_ATM ioctls
@@ -97,7 +90,9 @@ ipatm_ioctl(code, data, arg1)
 	struct ipatmpvc	pv;
 	caddr_t		cp;
 	struct in_addr	ip;
-	int		space, err = 0;
+	int err = 0;
+	size_t space;
+	struct t_atm_traffic *traf;
 
 
 	switch (code) {
@@ -165,11 +160,111 @@ ipatm_ioctl(code, data, arg1)
 		}
 
 		/*
+		 * Validate PVC traffic
+		 */
+#define MAXVAL(bits)	((1 << bits) - 1)
+#define MAXMASK(bits)	(~MAXVAL(bits))
+		traf = &aap->aar_pvc_traffic;
+		switch (aap->aar_pvc_traffic_type) {
+
+		  case T_ATM_CBR:
+		  case T_ATM_UBR:
+			/*
+			 * PCR is a value between 0 to the PIF's PCR
+			 */
+			if (traf->forward.PCR_high_priority == T_ATM_ABSENT ||
+			    (traf->forward.PCR_high_priority & MAXMASK(24))) {
+				err = EINVAL;
+				break;
+			}
+			if (traf->forward.PCR_all_traffic == T_ATM_ABSENT ||
+			    (traf->forward.PCR_all_traffic & MAXMASK(24))) {
+				err = EINVAL;
+				break;
+			}
+
+			if (traf->backward.PCR_high_priority == T_ATM_ABSENT ||
+			    (traf->backward.PCR_high_priority & MAXMASK(24))) {
+				err = EINVAL;
+				break;
+			}
+			if (traf->backward.PCR_all_traffic == T_ATM_ABSENT  ||
+			    (traf->backward.PCR_all_traffic & MAXMASK(24))) {
+				err = EINVAL;
+				break;
+			}
+			break;
+
+		  case T_ATM_VBR:
+			/*
+			 * PCR, SCR and MBS are required
+			 */
+			if (traf->forward.PCR_high_priority == T_ATM_ABSENT ||
+			    (traf->forward.PCR_high_priority & MAXMASK(24)) ||
+			    traf->forward.PCR_all_traffic == T_ATM_ABSENT ||
+			    (traf->forward.PCR_all_traffic & MAXMASK(24))) {
+				err = EINVAL;
+				break;
+			}
+			if (traf->forward.SCR_high_priority == T_ATM_ABSENT ||
+			    (traf->forward.SCR_high_priority & MAXMASK(24)) ||
+			    traf->forward.SCR_all_traffic == T_ATM_ABSENT ||
+			    (traf->forward.SCR_all_traffic & MAXMASK(24))) {
+				err = EINVAL;
+				break;
+			}
+			if (traf->forward.MBS_high_priority == T_ATM_ABSENT ||
+			    (traf->forward.MBS_high_priority & MAXMASK(24)) ||
+			    traf->forward.MBS_all_traffic == T_ATM_ABSENT ||
+			    (traf->forward.MBS_all_traffic & MAXMASK(24))) {
+				err = EINVAL;
+				break;
+			}
+
+			if (traf->backward.PCR_high_priority == T_ATM_ABSENT ||
+			    (traf->backward.PCR_high_priority & MAXMASK(24)) ||
+			    traf->backward.PCR_all_traffic == T_ATM_ABSENT ||
+			    (traf->backward.PCR_all_traffic & MAXMASK(24))) {
+				err = EINVAL;
+				break;
+			}
+			if (traf->backward.SCR_high_priority == T_ATM_ABSENT ||
+			    (traf->backward.SCR_high_priority & MAXMASK(24)) ||
+			    traf->backward.SCR_all_traffic == T_ATM_ABSENT ||
+			    (traf->backward.SCR_all_traffic & MAXMASK(24))) {
+				err = EINVAL;
+				break;
+			}
+			if (traf->backward.MBS_high_priority == T_ATM_ABSENT ||
+			    (traf->backward.MBS_high_priority & MAXMASK(24)) ||
+			    traf->backward.MBS_all_traffic == T_ATM_ABSENT ||
+			    (traf->backward.MBS_all_traffic & MAXMASK(24))) {
+				err = EINVAL;
+				break;
+			}
+			break;
+
+		  case T_ATM_NULL:
+			/*
+			 * No PVC traffic type
+			 */
+			break;
+
+		  default:
+			err = EINVAL;
+			break;
+		}
+		if (err != 0)
+			break;
+
+		/*
 		 * Build connection request
 		 */
 		pv.ipp_ipnif = inp;
 		pv.ipp_vpi = aap->aar_pvc_vpi;
 		pv.ipp_vci = aap->aar_pvc_vci;
+		pv.ipp_traffic_type = aap->aar_pvc_traffic_type;
+		pv.ipp_traffic = aap->aar_pvc_traffic;
 		pv.ipp_encaps = aap->aar_pvc_encaps;
 		pv.ipp_aal = aap->aar_pvc_aal;
 		if (aap->aar_pvc_flags & PVC_DYN) {
@@ -351,10 +446,9 @@ ipatm_ioctl(code, data, arg1)
 					AF_INET;
 				SATOSIN(&aivr.aip_dst_addr)->sin_addr.s_addr = 
 					ivp->iv_dst.s_addr;
-				(void) snprintf(aivr.aip_intf,
-				    sizeof(aivr.aip_intf), "%s%d",
-					inp->inf_nif->nif_if.if_name,
-					inp->inf_nif->nif_if.if_unit);
+				strlcpy(aivr.aip_intf,
+				    inp->inf_nif->nif_if.if_xname,
+				    sizeof(aivr.aip_intf));
 				if ((ivp->iv_conn) &&
 				    (ivp->iv_conn->co_connvc) &&
 				    (vcp = ivp->iv_conn->co_connvc->cvc_vcc)) {

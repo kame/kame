@@ -1,4 +1,3 @@
-/*	$FreeBSD: src/sys/dev/stg/tmc18c30_isa.c,v 1.9 2003/04/07 10:13:25 mdodd Exp $	*/
 /*	$NecBSD: tmc18c30_pisa.c,v 1.22 1998/11/26 01:59:21 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -38,6 +37,9 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/stg/tmc18c30_isa.c,v 1.10 2003/08/24 18:17:23 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

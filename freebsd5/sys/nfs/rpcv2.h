@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)rpcv2.h	8.2 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/nfs/rpcv2.h,v 1.11 2001/09/18 23:31:47 peter Exp $
+ * $FreeBSD: src/sys/nfs/rpcv2.h,v 1.12 2003/11/14 20:54:07 alfred Exp $
  */
 
 
@@ -53,6 +53,7 @@
 #define	RPCAUTH_NULL	0
 #define	RPCAUTH_UNIX	1
 #define	RPCAUTH_SHORT	2
+#define	RPCAUTH_KERB4	4
 #define	RPCAUTH_MAXSIZ	400
 #define	RPCVERF_MAXSIZ	12	/* For Kerb, can actually be 400 */
 #define	RPCAUTH_UNIXGIDS 16
@@ -63,19 +64,28 @@
 #define RPCAKN_FULLNAME	0
 #define RPCAKN_NICKNAME	1
 
-/* Rpc Constants */
+/* msg type */
 #define	RPC_CALL	0
 #define	RPC_REPLY	1
+
+/* reply status */
 #define	RPC_MSGACCEPTED	0
 #define	RPC_MSGDENIED	1
+
+/* accepted status */
+#define	RPC_SUCCESS	0
 #define	RPC_PROGUNAVAIL	1
 #define	RPC_PROGMISMATCH	2
 #define	RPC_PROCUNAVAIL	3
 #define	RPC_GARBAGE	4		/* I like this one */
+#define	RPC_SYSTEMERR	5
+
+/* rejected status */
 #define	RPC_MISMATCH	0
 #define	RPC_AUTHERR	1
 
 /* Authentication failures */
+#define	AUTH_OK		0
 #define	AUTH_BADCRED	1
 #define	AUTH_REJECTCRED	2
 #define	AUTH_BADVERF	3

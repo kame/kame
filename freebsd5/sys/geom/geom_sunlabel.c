@@ -31,10 +31,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/geom/geom_sunlabel.c,v 1.36 2003/05/02 12:57:40 phk Exp $
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/geom/geom_sunlabel.c,v 1.40 2003/06/11 06:49:15 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/endian.h>
@@ -147,7 +147,7 @@ g_sunlabel_dumpconf(struct sbuf *sb, const char *indent, struct g_geom *gp, stru
 	}
 }
 
-struct h0h0 {
+struct g_hh01 {
 	struct g_geom *gp;
 	struct g_sunlabel_softc *ms;
 	u_char *label;
@@ -157,7 +157,7 @@ struct h0h0 {
 static void
 g_sunlabel_callconfig(void *arg, int flag)
 {
-	struct h0h0 *hp;
+	struct g_hh01 *hp;
 
 	hp = arg;
 	hp->error = g_sunlabel_modify(hp->gp, hp->ms, hp->label);
@@ -169,22 +169,26 @@ g_sunlabel_callconfig(void *arg, int flag)
 /*
  * NB! curthread is user process which GCTL'ed.
  */
-static int
-g_sunlabel_config(struct gctl_req *req, struct g_geom *gp, const char *verb)
+static void
+g_sunlabel_config(struct gctl_req *req, struct g_class *mp, const char *verb)
 {
 	u_char *label;
 	int error, i;
-	struct h0h0 h0h0;
+	struct g_hh01 h0h0;
 	struct g_slicer *gsp;
+	struct g_geom *gp;
 	struct g_consumer *cp;
 
 	g_topology_assert();
+	gp = gctl_get_geom(req, mp, "geom");
+	if (gp == NULL)
+		return;
 	cp = LIST_FIRST(&gp->consumer);
 	gsp = gp->softc;
 	if (!strcmp(verb, "write label")) {
 		label = gctl_get_paraml(req, "label", SUN_SIZE);
 		if (label == NULL)
-			return (EINVAL);
+			return;
 		h0h0.gp = gp;
 		h0h0.ms = gsp->softc;
 		h0h0.label = label;
@@ -192,24 +196,20 @@ g_sunlabel_config(struct gctl_req *req, struct g_geom *gp, const char *verb)
 		/* XXX: Does this reference register with our selfdestruct code ? */
 		error = g_access_rel(cp, 1, 1, 1);
 		if (error) {
-			g_free(label);
-			return (error);
+			gctl_error(req, "could not access consumer");
+			return;
 		}
-		g_topology_unlock();
-		g_waitfor_event(g_sunlabel_callconfig, &h0h0, M_WAITOK, gp, NULL);
-		g_topology_lock();
-		error = h0h0.error;
+		g_sunlabel_callconfig(&h0h0, 0);
 		g_access_rel(cp, -1, -1, -1);
-		g_free(label);
 	} else if (!strcmp(verb, "write bootcode")) {
 		label = gctl_get_paraml(req, "bootcode", SUN_BOOTSIZE);
 		if (label == NULL)
-			return (EINVAL);
+			return;
 		/* XXX: Does this reference register with our selfdestruct code ? */
 		error = g_access_rel(cp, 1, 1, 1);
 		if (error) {
-			g_free(label);
-			return (error);
+			gctl_error(req, "could not access consumer");
+			return;
 		}
 		for (i = 0; i < SUN_NPART; i++) {
 			if (gsp->slices[i].length <= SUN_BOOTSIZE)
@@ -219,12 +219,9 @@ g_sunlabel_config(struct gctl_req *req, struct g_geom *gp, const char *verb)
 			    SUN_BOOTSIZE - SUN_SIZE);
 		}
 		g_access_rel(cp, -1, -1, -1);
-		g_free(label);
 	} else {
-		return (gctl_error(req, "Unknown verb parameter"));
+		gctl_error(req, "Unknown verb parameter");
 	}
-
-	return (error);
 }
 
 static struct g_geom *
@@ -232,10 +229,9 @@ g_sunlabel_taste(struct g_class *mp, struct g_provider *pp, int flags)
 {
 	struct g_geom *gp;
 	struct g_consumer *cp;
-	int error, npart;
+	int error;
 	u_char *buf;
 	struct g_sunlabel_softc *ms;
-	off_t mediasize;
 	struct g_slicer *gsp;
 
 	g_trace(G_T_TOPOLOGY, "g_sunlabel_taste(%s,%s)", mp->name, pp->name);
@@ -248,14 +244,12 @@ g_sunlabel_taste(struct g_class *mp, struct g_provider *pp, int flags)
 		return (NULL);
 	gsp = gp->softc;
 	gp->dumpconf = g_sunlabel_dumpconf;
-	npart = 0;
 	do {
 		if (gp->rank != 2 && flags == G_TF_NORMAL)
 			break;
 		ms->sectorsize = cp->provider->sectorsize;
 		if (ms->sectorsize < 512)
 			break;
-		mediasize = cp->provider->mediasize;
 		g_topology_unlock();
 		buf = g_read_data(cp, 0, ms->sectorsize, &error);
 		g_topology_lock();
@@ -281,8 +275,7 @@ g_sunlabel_taste(struct g_class *mp, struct g_provider *pp, int flags)
 static struct g_class g_sunlabel_class = {
 	.name = SUNLABEL_CLASS_NAME,
 	.taste = g_sunlabel_taste,
-	.config_geom = g_sunlabel_config,
-	G_CLASS_INITIALIZER
+	.ctlreq = g_sunlabel_config,
 };
 
 DECLARE_GEOM_CLASS(g_sunlabel_class, g_sunlabel);

@@ -36,10 +36,14 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_clock.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_clock.c,v 1.158 2003/04/29 13:36:02 kan Exp $
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_clock.c,v 1.163 2003/10/16 08:39:15 jeff Exp $");
+
 #include "opt_ntp.h"
+#include "opt_ddb.h"
+#include "opt_watchdog.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -69,6 +73,10 @@
 #include <sys/gmon.h>
 #endif
 
+#ifdef DDB
+#include <ddb/ddb.h>
+#endif
+
 #ifdef DEVICE_POLLING
 extern void hardclock_device_poll(void);
 #endif /* DEVICE_POLLING */
@@ -81,6 +89,22 @@ long cp_time[CPUSTATES];
 
 SYSCTL_OPAQUE(_kern, OID_AUTO, cp_time, CTLFLAG_RD, &cp_time, sizeof(cp_time),
     "LU", "CPU time statistics");
+
+#ifdef WATCHDOG
+static int sysctl_watchdog_reset(SYSCTL_HANDLER_ARGS);
+static void watchdog_fire(void);
+
+static int watchdog_enabled;
+static unsigned int watchdog_ticks;
+static int watchdog_timeout = 20;
+
+SYSCTL_NODE(_debug, OID_AUTO, watchdog, CTLFLAG_RW, 0, "System watchdog");
+SYSCTL_INT(_debug_watchdog, OID_AUTO, enabled, CTLFLAG_RW, &watchdog_enabled,
+	0, "Enable the watchdog");
+SYSCTL_INT(_debug_watchdog, OID_AUTO, timeout, CTLFLAG_RW, &watchdog_timeout,
+	0, "Timeout for watchdog checkins");
+
+#endif /* WATCHDOG */
 
 /*
  * Clock handling routines.
@@ -162,7 +186,7 @@ hardclock_process(frame)
 	 * Run current process's virtual and profile time, as needed.
 	 */
 	mtx_lock_spin_flags(&sched_lock, MTX_QUIET);
-	if (p->p_flag & P_THREADED) {
+	if (p->p_flag & P_SA) {
 		/* XXXKSE What to do? */
 	} else {
 		pstats = p->p_stats;
@@ -226,6 +250,12 @@ hardclock(frame)
 	 */
 	if (need_softclock)
 		swi_sched(softclock_ih, 0);
+
+#ifdef WATCHDOG
+	if (watchdog_enabled > 0 &&
+	    (int)(ticks - watchdog_ticks) >= (hz * watchdog_timeout))
+		watchdog_fire();
+#endif /* WATCHDOG */
 }
 
 /*
@@ -355,7 +385,6 @@ statclock(frame)
 	struct rusage *ru;
 	struct vmspace *vm;
 	struct thread *td;
-	struct kse *ke;
 	struct proc *p;
 	long rss;
 
@@ -363,15 +392,14 @@ statclock(frame)
 	p = td->td_proc;
 
 	mtx_lock_spin_flags(&sched_lock, MTX_QUIET);
-	ke = td->td_kse;
 	if (CLKF_USERMODE(frame)) {
 		/*
 		 * Charge the time as appropriate.
 		 */
-		if (p->p_flag & P_THREADED)
+		if (p->p_flag & P_SA)
 			thread_statclock(1);
 		p->p_uticks++;
-		if (ke->ke_ksegrp->kg_nice > NZERO)
+		if (td->td_ksegrp->kg_nice > NZERO)
 			cp_time[CP_NICE]++;
 		else
 			cp_time[CP_USER]++;
@@ -392,7 +420,7 @@ statclock(frame)
 			p->p_iticks++;
 			cp_time[CP_INTR]++;
 		} else {
-			if (p->p_flag & P_THREADED)
+			if (p->p_flag & P_SA)
 				thread_statclock(0);
 			td->td_sticks++;
 			p->p_sticks++;
@@ -403,7 +431,7 @@ statclock(frame)
 		}
 	}
 
-	sched_clock(ke);
+	sched_clock(td);
 
 	/* Update resource usage integrals and maximums. */
 	if ((pstats = p->p_stats) != NULL &&
@@ -479,3 +507,57 @@ sysctl_kern_clockrate(SYSCTL_HANDLER_ARGS)
 SYSCTL_PROC(_kern, KERN_CLOCKRATE, clockrate, CTLTYPE_STRUCT|CTLFLAG_RD,
 	0, 0, sysctl_kern_clockrate, "S,clockinfo",
 	"Rate and period of various kernel clocks");
+
+#ifdef WATCHDOG
+/*
+ * Reset the watchdog timer to ticks, thus preventing the watchdog
+ * from firing for another watchdog timeout period.
+ */
+static int
+sysctl_watchdog_reset(SYSCTL_HANDLER_ARGS)
+{
+	int ret;
+
+	ret = 0;
+	watchdog_ticks = ticks;
+	return sysctl_handle_int(oidp, &ret, 0, req);
+}
+
+SYSCTL_PROC(_debug_watchdog, OID_AUTO, reset, CTLFLAG_RW, 0, 0,
+    sysctl_watchdog_reset, "I", "Reset the watchdog");
+
+/*
+ * Handle a watchdog timeout by dumping interrupt information and
+ * then either dropping to DDB or panicing.
+ */
+static void
+watchdog_fire(void)
+{
+	int nintr;
+	u_int64_t inttotal;
+	u_long *curintr;
+	char *curname;
+
+	curintr = intrcnt;
+	curname = intrnames;
+	inttotal = 0;
+	nintr = eintrcnt - intrcnt;
+	
+	printf("interrupt                   total\n");
+	while (--nintr >= 0) {
+		if (*curintr)
+			printf("%-12s %20lu\n", curname, *curintr);
+		curname += strlen(curname) + 1;
+		inttotal += *curintr++;
+	}
+	printf("Total        %20ju\n", (uintmax_t)inttotal);
+
+#ifdef DDB
+	db_print_backtrace();
+	Debugger("watchdog timeout");
+#else /* !DDB */
+	panic("watchdog timeout");
+#endif /* DDB */
+}
+
+#endif /* WATCHDOG */

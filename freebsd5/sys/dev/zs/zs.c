@@ -42,6 +42,9 @@
  *
  *      @(#)zs.c        8.1 (Berkeley) 7/19/93
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/zs/zs.c,v 1.15 2003/11/09 09:17:23 tanimura Exp $");
 /*-
  * Copyright (c) 2003 Jake Burkholder.
  * All rights reserved.
@@ -67,7 +70,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/zs/zs.c,v 1.11 2003/03/09 11:03:44 phk Exp $
  */
 
 /*
@@ -598,7 +600,7 @@ zsttystart(struct tty *tp)
 			tp->t_state &= ~TS_SO_OLOWAT;
 			wakeup(TSA_OLOWAT(tp));
 		}
-		selwakeup(&tp->t_wsel);
+		selwakeuppri(&tp->t_wsel, TTOPRI);
 		if (tp->t_outq.c_cc == 0) {
 			if ((tp->t_state & (TS_BUSY | TS_SO_OCOMPLETE)) ==
 			    TS_SO_OCOMPLETE && tp->t_outq.c_cc == 0) {
@@ -867,7 +869,7 @@ zs_cnprobe(struct consdev *cn)
 		cn->cn_pri = CN_DEAD;
 	else {
 		cn->cn_pri = CN_REMOTE;
-		cn->cn_dev = sc->sc_si;
+		strcpy(cn->cn_name, devtoname(sc->sc_si));
 		cn->cn_tp = sc->sc_tty;
 	}
 }
@@ -943,7 +945,7 @@ zstty_cngetc(struct zstty_softc *sc)
 static int
 zstty_cncheckc(struct zstty_softc *sc)
 {
-	uint8_t c;
+	int c;
 
 	c = -1;
 	zstty_cnopen(sc);

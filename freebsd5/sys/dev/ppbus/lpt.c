@@ -48,8 +48,10 @@
  *	from: unknown origin, 386BSD 0.1
  *	From Id: lpt.c,v 1.55.2.1 1996/11/12 09:08:38 phk Exp
  *	From Id: nlpt.c,v 1.14 1999/02/08 13:55:43 des Exp
- * $FreeBSD: src/sys/dev/ppbus/lpt.c,v 1.28 2003/03/03 12:15:44 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ppbus/lpt.c,v 1.29 2003/08/24 17:54:16 obrien Exp $");
 
 /*
  * Device Driver for AT parallel printer port

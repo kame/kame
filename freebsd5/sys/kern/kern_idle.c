@@ -1,28 +1,21 @@
 /*-
  * Copyright (c) 2000, All rights reserved.  See /usr/src/COPYRIGHT
  *
- * $FreeBSD: src/sys/kern/kern_idle.c,v 1.31 2003/05/02 00:33:11 julian Exp $
  */
 
-#include "opt_ktrace.h"
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_idle.c,v 1.35 2003/10/19 02:43:57 peter Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/ktr.h>
 #include <sys/kthread.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
-#include <sys/pcpu.h>
 #include <sys/proc.h>
 #include <sys/resourcevar.h>
 #include <sys/sched.h>
-#include <sys/smp.h>
 #include <sys/unistd.h>
-#ifdef KTRACE
-#include <sys/uio.h>
-#include <sys/ktrace.h>
-#endif
 
 static void idle_setup(void *dummy);
 SYSINIT(idle_setup, SI_SUB_SCHED_IDLE, SI_ORDER_FIRST, idle_setup, NULL)
@@ -30,7 +23,7 @@ SYSINIT(idle_setup, SI_SUB_SCHED_IDLE, SI_ORDER_FIRST, idle_setup, NULL)
 static void idle_proc(void *dummy);
 
 /*
- * Setup per-cpu idle process contexts.  The AP's shouldn't be running or
+ * Set up per-cpu idle process contexts.  The AP's shouldn't be running or
  * accessing their idle processes at this point, so don't bother with
  * locking.
  */
@@ -76,48 +69,25 @@ idle_setup(void *dummy)
 }
 
 /*
- * idle process context
+ * The actual idle process.
  */
 static void
 idle_proc(void *dummy)
 {
-#ifdef DIAGNOSTIC
-	int count;
-#endif
-	struct thread *td;
 	struct proc *p;
+	struct thread *td;
 
 	td = curthread;
 	p = td->td_proc;
 	for (;;) {
 		mtx_assert(&Giant, MA_NOTOWNED);
 
-#ifdef DIAGNOSTIC
-		count = 0;
-
-		while (count >= 0 && sched_runnable() == 0) {
-#else
-		while (sched_runnable() == 0) {
-#endif
-		/*
-		 * This is a good place to put things to be done in
-		 * the background, including sanity checks.
-		 */
-
-#ifdef DIAGNOSTIC
-			if (count++ < 0)
-				CTR0(KTR_PROC, "idle_proc: timed out waiting"
-				    " for a process");
-#endif
-
-#ifdef __i386__
+		while (sched_runnable() == 0)
 			cpu_idle();
-#endif
-		}
 
 		mtx_lock_spin(&sched_lock);
-		p->p_stats->p_ru.ru_nvcsw++;
 		td->td_state = TDS_CAN_RUN;
+		p->p_stats->p_ru.ru_nvcsw++;
 		mi_switch();
 		mtx_unlock_spin(&sched_lock);
 	}

@@ -33,9 +33,10 @@
  * Effort sponsored in part by the Defense Advanced Research Projects
  * Agency (DARPA) and Air Force Research Laboratory, Air Force
  * Materiel Command, USAF, under agreement number F30602-01-2-0537.
- *
- * $FreeBSD: src/sys/dev/sab/sab.c,v 1.17 2003/03/31 18:21:52 jake Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/sab/sab.c,v 1.21 2003/11/09 09:17:22 tanimura Exp $");
 
 /*
  * SAB82532 Dual UART driver
@@ -63,7 +64,7 @@
 
 #include <ddb/ddb.h>
 
-#include <ofw/openfirm.h>
+#include <dev/ofw/openfirm.h>
 #include <sparc64/ebus/ebusvar.h>
 
 #include <dev/sab/sab82532reg.h>
@@ -798,7 +799,7 @@ sabttystart(struct tty *tp)
 			tp->t_state &= ~TS_SO_OLOWAT;
 			wakeup(TSA_OLOWAT(tp));
 		}
-		selwakeup(&tp->t_wsel);
+		selwakeuppri(&tp->t_wsel, TTOPRI);
 		if (tp->t_outq.c_cc == 0) {
 			if ((tp->t_state & (TS_BUSY | TS_SO_OCOMPLETE)) ==
 			    TS_SO_OCOMPLETE && tp->t_outq.c_cc == 0) {
@@ -1110,7 +1111,7 @@ sab_cnprobe(struct consdev *cn)
 		cn->cn_pri = CN_DEAD;
 	else {
 		cn->cn_pri = CN_REMOTE;
-		cn->cn_dev = sc->sc_si;
+		strcpy(cn->cn_name, devtoname(sc->sc_si));
 		cn->cn_tp = sc->sc_tty;
 	}
 }

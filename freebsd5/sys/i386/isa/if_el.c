@@ -5,9 +5,11 @@
  * portions thereof.
  *
  * Questions, comments, bug reports and fixes to kimmel@cs.umass.edu.
- *
- * $FreeBSD: src/sys/i386/isa/if_el.c,v 1.59 2003/02/19 05:47:22 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/isa/if_el.c,v 1.61 2003/10/31 18:32:07 brooks Exp $");
+
 /* Except of course for the portions of code lifted from other FreeBSD
  * drivers (mainly elread, elget and el_ioctl)
  */
@@ -262,8 +264,7 @@ el_attach(device_t dev)
 
 	/* Initialize ifnet structure */
 	ifp->if_softc = sc;
-	ifp->if_unit = device_get_unit(dev);;
-	ifp->if_name = "el";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_start = el_start;
 	ifp->if_ioctl = el_ioctl;
@@ -763,7 +764,7 @@ el_ioctl(ifp, command, data)
 static void
 el_watchdog(struct ifnet *ifp)
 {
-	log(LOG_ERR,"el%d: device timeout\n", ifp->if_unit);
+	log(LOG_ERR,"%s: device timeout\n", ifp->if_xname);
 	ifp->if_oerrors++;
 	el_reset(ifp->if_softc);
 }

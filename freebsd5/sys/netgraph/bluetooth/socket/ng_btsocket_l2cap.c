@@ -25,12 +25,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ng_btsocket_l2cap.c,v 1.14 2003/04/06 22:53:18 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/socket/ng_btsocket_l2cap.c,v 1.6 2003/05/10 21:44:41 julian Exp $
+ * $Id: ng_btsocket_l2cap.c,v 1.16 2003/09/14 23:29:06 max Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/socket/ng_btsocket_l2cap.c,v 1.8 2003/10/12 22:04:21 emax Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/bitstring.h>
 #include <sys/domain.h>
 #include <sys/endian.h>
 #include <sys/errno.h>
@@ -49,7 +50,6 @@
 #include <sys/taskqueue.h>
 #include <netgraph/ng_message.h>
 #include <netgraph/netgraph.h>
-#include <bitstring.h>
 #include "ng_bluetooth.h"
 #include "ng_hci.h"
 #include "ng_l2cap.h"
@@ -1411,7 +1411,7 @@ ng_btsocket_l2cap_data_input(struct mbuf *m, hook_p hook)
 		rt->src.b[2], rt->src.b[1], rt->src.b[0],
 		hdr->dcid, hdr->length);
 
-	if (NG_L2CAP_FIRST_CID <= hdr->dcid && hdr->dcid <= NG_L2CAP_LAST_CID) {
+	if (hdr->dcid >= NG_L2CAP_FIRST_CID) {
 
 		mtx_lock(&ng_btsocket_l2cap_sockets_mtx);
 

@@ -23,9 +23,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/kern_poll.c,v 1.11 2003/03/04 23:19:54 jlemon Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_poll.c,v 1.15 2003/11/08 22:28:39 sam Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -186,8 +187,8 @@ static void
 init_device_poll(void)
 {
 
-	netisr_register(NETISR_POLL, (netisr_t *)netisr_poll, NULL);
-	netisr_register(NETISR_POLLMORE, (netisr_t *)netisr_pollmore, NULL);
+	netisr_register(NETISR_POLL, (netisr_t *)netisr_poll, NULL, 0);
+	netisr_register(NETISR_POLLMORE, (netisr_t *)netisr_pollmore, NULL, 0);
 }
 SYSINIT(device_poll, SI_SUB_CLOCKS, SI_ORDER_MIDDLE, init_device_poll, NULL)
 

@@ -11,6 +11,9 @@
  *(C)Copyright 1995-2001 Tekram Technology Co.,Ltd.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/trm/trm.c,v 1.17 2003/09/02 17:30:39 jhb Exp $");
+
 /*
  *	HISTORY:					
  *						
@@ -62,7 +65,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/trm/trm.c,v 1.8 2003/05/27 04:59:58 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/trm/trm.c,v 1.17 2003/09/02 17:30:39 jhb Exp $");
 
 #include <sys/param.h>
 
@@ -79,8 +82,8 @@ __FBSDID("$FreeBSD: src/sys/dev/trm/trm.c,v 1.8 2003/05/27 04:59:58 scottl Exp $
 #include <vm/vm.h>
 #include <vm/pmap.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 #include <machine/resource.h>
 #include <machine/bus_pio.h>
 #include <machine/bus.h>
@@ -569,13 +572,14 @@ trm_action(struct cam_sim *psim, union ccb *pccb)
 			TRM_DPRINTF(
 			    "pACB->scan_devices[target_id][target_lun]= %d \n"
 			    ,pACB->scan_devices[target_id][target_lun]);
-			if((pccb->ccb_h.status & CAM_STATUS_MASK) !=CAM_REQ_INPROG) {
+			if ((pccb->ccb_h.status & CAM_STATUS_MASK) !=
+			    CAM_REQ_INPROG) {
 				xpt_done(pccb);
 				splx(actionflags);
 				return;
 			}
 			pDCB = &pACB->DCBarray[target_id][target_lun];
-			if(!(pDCB->DCBstatus & DS_IN_QUEUE)) {
+			if (!(pDCB->DCBstatus & DS_IN_QUEUE)) {
 				pACB->scan_devices[target_id][target_lun] = 1;
 				trm_initDCB(pACB, pDCB, pACB->AdapterUnit, 
 				    target_id, target_lun); 
@@ -600,8 +604,8 @@ trm_action(struct cam_sim *psim, union ccb *pccb)
 			 * move layer of CAM command block to layer of SCSI
 			 * Request Block for SCSI processor command doing
 			 */
-			if((pccb->ccb_h.flags & CAM_CDB_POINTER) != 0) {
-				if((pccb->ccb_h.flags & CAM_CDB_PHYS) == 0) {
+			if ((pccb->ccb_h.flags & CAM_CDB_POINTER) != 0) {
+				if ((pccb->ccb_h.flags & CAM_CDB_PHYS) == 0) {
 					bcopy(pcsio->cdb_io.cdb_ptr,pSRB->CmdBlock
 					    ,pcsio->cdb_len);
 				} else {
@@ -984,29 +988,10 @@ trm_action(struct cam_sim *psim, union ccb *pccb)
 		 * Calculate the geometry parameters for a device give
 		 * the sector size and volume size. 
    		 */
-		case XPT_CALC_GEOMETRY:	{
-			struct		ccb_calc_geometry *ccg;
-			u_int32_t	size_mb;
-			u_int32_t	secs_per_cylinder;
-			int		extended;
-
+		case XPT_CALC_GEOMETRY:
 			TRM_DPRINTF(" XPT_CALC_GEOMETRY \n");
-			ccg = &pccb->ccg;
-			size_mb = ccg->volume_size / 
-			    ((1024L * 1024L) / ccg->block_size);
-			extended =  1;		
-			if (size_mb > 1024 && extended) {
-				ccg->heads = 255;
-				ccg->secs_per_track = 63;
-			} else {
-				ccg->heads = 64;
-				ccg->secs_per_track = 32;
-			}
-			secs_per_cylinder = ccg->heads * ccg->secs_per_track;
-			ccg->cylinders = ccg->volume_size / secs_per_cylinder;
-			pccb->ccb_h.status = CAM_REQ_CMP;
+			cam_calc_geometry(&pccb->ccg, /*extended*/1);
 			xpt_done(pccb);
-					}
 			break;
 		case XPT_ENG_INQ:           
 			TRM_DPRINTF(" XPT_ENG_INQ \n");
@@ -2195,9 +2180,9 @@ mingx0:
 				/* Transfer period factor */
 				pDCB->SyncOffset = pSRB->MsgInBuf[4]; 
 				/* REQ/ACK offset */
-				if(pACB->AdaptType == 1) {
+				if (pACB->AdaptType == 1) {
 					for(bIndex = 0; bIndex < 7; bIndex++) {
-						if(pSRB->MsgInBuf[3] <=
+						if (pSRB->MsgInBuf[3] <=
 					   dc395u2x_clock_period[bIndex]) {
 				            pDCB->tinfo.goal.period =
 						dc395u2x_tinfo_period[bIndex];
@@ -2213,7 +2198,7 @@ mingx0:
 					}
 				} else {
 					for(bIndex = 0; bIndex < 7; bIndex++) {
-						if(pSRB->MsgInBuf[3] <=
+						if (pSRB->MsgInBuf[3] <=
 						 dc395x_clock_period[bIndex]) {
 						   pDCB->tinfo.goal.period =
 						dc395x_tinfo_period[bIndex];
@@ -2538,7 +2523,6 @@ trm_SRBdone(PACB pACB, PDCB pDCB, PSRB pSRB)
 		pSRB->pSRBSGL->address = pSRB->SgSenseTemp.address;
 		pSRB->pSRBSGL->length = pSRB->SgSenseTemp.length;
 		pcsio->scsi_status = SCSI_STATUS_CHECK_COND;
-		bzero(&pcsio->sense_data, pcsio->sense_len);
 		bcopy(trm_get_sense_buf(pACB, pSRB), &pcsio->sense_data,
 		    pcsio->sense_len);
 		pcsio->ccb_h.status = CAM_SCSI_STATUS_ERROR 
@@ -2973,7 +2957,7 @@ trm_initDCB(PACB pACB, PDCB pDCB, u_int16_t unit,u_int32_t i,u_int32_t j)
 	pDCB->SyncPeriod = 0;
 	pDCB->SyncOffset = 0;
 	PeriodIndex = pEEpromBuf->NvramTarget[target_id].NvmTarPeriod & 0x07;
-	if(pACB->AdaptType==1) {/* is U2? */
+	if (pACB->AdaptType==1) {/* is U2? */
 	    pDCB->MaxNegoPeriod=dc395u2x_clock_period[ PeriodIndex ];
 	    pDCB->tinfo.user.period=pDCB->MaxNegoPeriod;
 	    pDCB->tinfo.user.offset=(pDCB->SyncMode & SYNC_NEGO_ENABLE) ? 31 : 0;
@@ -3015,48 +2999,62 @@ trm_srbmapSG(void *arg, bus_dma_segment_t *segs, int nseg, int error)
 static int
 trm_initSRB(PACB pACB)
 {
-    u_int16_t    i;
-    PSRB    pSRB;
+    	u_int16_t    i;
+	PSRB    pSRB;
+	int error;
 
-    for(i = 0; i < TRM_MAX_SRB_CNT; i++) {
-	    pSRB = (PSRB)&pACB->pFreeSRB[i];
+	for (i = 0; i < TRM_MAX_SRB_CNT; i++) {
+	       	pSRB = (PSRB)&pACB->pFreeSRB[i];
 
-	    /* DMA tag for our S/G structures */
-	    if(bus_dma_tag_create(                    
-		/*parent_dmat*/pSRB->parent_dmat, 
-		/*alignment*/  1,
-		/*boundary*/   0,
-		/*lowaddr*/    BUS_SPACE_MAXADDR,
-		/*highaddr*/   BUS_SPACE_MAXADDR,
-		/*filter*/     NULL, 
-		/*filterarg*/  NULL,
-		/*maxsize*/    TRM_MAX_SG_LISTENTRY * sizeof(SGentry), 
-		/*nsegments*/  1,
-		/*maxsegsz*/   TRM_MAXTRANSFER_SIZE,
-		/*flags*/      0, 
-		/*dmat*/       &pSRB->sg_dmat) != 0) {
-		    return ENXIO;
+		/* DMA tag for our S/G structures */
+		if (bus_dma_tag_create(                    
+		    /*parent_dmat*/pSRB->parent_dmat, 
+		    /*alignment*/  1,
+		    /*boundary*/   0,
+		    /*lowaddr*/    BUS_SPACE_MAXADDR,
+		    /*highaddr*/   BUS_SPACE_MAXADDR,
+		    /*filter*/     NULL, 
+		    /*filterarg*/  NULL,
+		    /*maxsize*/    TRM_MAX_SG_LISTENTRY * sizeof(SGentry), 
+		    /*nsegments*/  1,
+		    /*maxsegsz*/   TRM_MAXTRANSFER_SIZE,
+		    /*flags*/      0, 
+		    /*lockfunc*/   busdma_lock_mutex,
+		    /*lockarg*/    &Giant,
+		    /*dmat*/       &pSRB->sg_dmat) != 0) {
+			return ENXIO;
 		}
-	    if(bus_dmamem_alloc(pSRB->sg_dmat, (void **)&pSRB->pSRBSGL,
-		BUS_DMA_NOWAIT, &pSRB->sg_dmamap) !=0 ) {
-		    return ENXIO;
+		if (bus_dmamem_alloc(pSRB->sg_dmat, (void **)&pSRB->pSRBSGL,
+		    BUS_DMA_NOWAIT, &pSRB->sg_dmamap) !=0 ) {
+			return ENXIO;
 		}
-	    bus_dmamap_load(pSRB->sg_dmat, pSRB->sg_dmamap, pSRB->pSRBSGL,
-		TRM_MAX_SG_LISTENTRY * sizeof(SGentry),
-		trm_srbmapSG, pSRB, /*flags*/0);
-    	if(i != TRM_MAX_SRB_CNT - 1) {
+		bus_dmamap_load(pSRB->sg_dmat, pSRB->sg_dmamap, pSRB->pSRBSGL,
+		    TRM_MAX_SG_LISTENTRY * sizeof(SGentry),
+		    trm_srbmapSG, pSRB, /*flags*/0);
+		if (i != TRM_MAX_SRB_CNT - 1) {
+			/*
+			 * link all SRB 
+			 */
+			pSRB->pNextSRB = &pACB->pFreeSRB[i+1];
+		} else {
+			/*
+			 * load NULL to NextSRB of the last SRB
+			 */
+			pSRB->pNextSRB = NULL;
+		}
+		pSRB->TagNumber = i;
+
 		/*
-	 	 ** link all SRB 
- 		 */
-     		pSRB->pNextSRB = &pACB->pFreeSRB[i+1];
-	} else {
-		/*
-		 ** load NULL to NextSRB of the last SRB
+		 * Create the dmamap.  This is no longer optional!
+		 *
+		 * XXX This is not freed on unload!  None of the other
+		 * allocations in this function are either!
 		 */
-    		pSRB->pNextSRB = NULL;
+		if ((error = bus_dmamap_create(pACB->buffer_dmat, 0,
+					       &pSRB->dmamap)) != 0)
+			return (error);
+
 	}
-	pSRB->TagNumber = i;
-    }
 	return (0);
 }
 
@@ -3397,7 +3395,7 @@ static PACB
 trm_init(u_int16_t unit, device_t dev)
 {
 	PACB		pACB;
-	int		rid = PCIR_MAPS, i = 0, j = 0;
+	int		rid = PCIR_BAR(0), i = 0, j = 0;
 	u_int16_t	adaptType = 0;
     
  	pACB = (PACB) device_get_softc(dev);
@@ -3405,7 +3403,6 @@ trm_init(u_int16_t unit, device_t dev)
 		printf("trm%d: cannot allocate ACB !\n", unit);
 		return (NULL);
 	}
-	bzero (pACB, sizeof (struct _ACB));
 	pACB->iores = bus_alloc_resource(dev, SYS_RES_IOPORT, 
 	    &rid, 0, ~0, 1, RF_ACTIVE);
     	if (pACB->iores == NULL) {
@@ -3426,21 +3423,24 @@ trm_init(u_int16_t unit, device_t dev)
 	pACB->dev = dev;
 	pACB->tag = rman_get_bustag(pACB->iores);
 	pACB->bsh = rman_get_bushandle(pACB->iores);
-	if (bus_dma_tag_create(/*parent_dmat*/ pACB->parent_dmat,
-	      /*alignment*/                      1,
-	      /*boundary*/                       0,
-	      /*lowaddr*/  BUS_SPACE_MAXADDR,
-	      /*highaddr*/       BUS_SPACE_MAXADDR,
-	      /*filter*/                      NULL, 
-	      /*filterarg*/                   NULL,
-	      /*maxsize*/                 MAXBSIZE,
-	      /*nsegments*/               TRM_NSEG,
-	      /*maxsegsz*/    TRM_MAXTRANSFER_SIZE,
-	      /*flags*/           BUS_DMA_ALLOCNOW,
-	      &pACB->buffer_dmat) != 0) 
+	if (bus_dma_tag_create(
+	/*parent_dmat*/	pACB->parent_dmat,
+	/*alignment*/	1,
+	/*boundary*/	0,
+	/*lowaddr*/	BUS_SPACE_MAXADDR,
+	/*highaddr*/	BUS_SPACE_MAXADDR,
+	/*filter*/	NULL, 
+	/*filterarg*/	NULL,
+	/*maxsize*/	MAXBSIZE,
+	/*nsegments*/	TRM_NSEG,
+	/*maxsegsz*/	TRM_MAXTRANSFER_SIZE,
+	/*flags*/	BUS_DMA_ALLOCNOW,
+	/*lockfunc*/	busdma_lock_mutex,
+	/*lockarg*/	&Giant,
+	/* dmat */	&pACB->buffer_dmat) != 0) 
 		goto bad;
 	/* DMA tag for our ccb structures */
-	if(bus_dma_tag_create(                                 
+	if (bus_dma_tag_create(                                 
 	/*parent_dmat*/pACB->parent_dmat, 
 	/*alignment*/  1, 
 	/*boundary*/   0,
@@ -3451,7 +3451,9 @@ trm_init(u_int16_t unit, device_t dev)
 	/*maxsize*/    TRM_MAX_SRB_CNT * sizeof(TRM_SRB),
 	/*nsegments*/  1,
 	/*maxsegsz*/   TRM_MAXTRANSFER_SIZE,
-	/*flags*/      0, 
+	/*flags*/      0,
+	/*lockfunc*/   busdma_lock_mutex,
+	/*lockarg*/    &Giant,
 	/*dmat*/       &pACB->srb_dmat) != 0) {
 		printf("trm_init %d: bus_dma_tag_create SRB failure\n", unit);
 		goto bad;
@@ -3473,7 +3475,8 @@ trm_init(u_int16_t unit, device_t dev)
 	    sizeof(struct scsi_sense_data) * TRM_MAX_SRB_CNT,
 	    /*nsegments*/1,
 	    /*maxsegsz*/TRM_MAXTRANSFER_SIZE,
-	    /*flags*/0, &pACB->sense_dmat) != 0) {
+	    /*flags*/0, /*lockfunc*/busdma_lock_mutex,
+	    /*lockarg*/&Giant, &pACB->sense_dmat) != 0) {
 	  if (bootverbose)
 	    device_printf(dev, "cannot create sense buffer dmat\n");
 	  goto bad;
@@ -3511,7 +3514,7 @@ trm_init(u_int16_t unit, device_t dev)
 	return (pACB);
 bad:
 	if (pACB->iores)
-		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_MAPS,
+		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_BAR(0),
 		    pACB->iores);
 	if (pACB->sense_dmamap) {
 		bus_dmamap_unload(pACB->sense_dmat, pACB->sense_dmamap);
@@ -3627,7 +3630,7 @@ trm_attach(device_t dev)
 	return (0);
 bad:
 	if (pACB->iores)
-		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_MAPS,
+		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_BAR(0),
 		    pACB->iores);
 	if (pACB->srb_dmamap) {
 		bus_dmamap_unload(pACB->srb_dmat, pACB->srb_dmamap);
@@ -3685,7 +3688,7 @@ trm_detach(device_t dev)
 {
 	PACB pACB = device_get_softc(dev);
 
-	bus_release_resource(dev, SYS_RES_IOPORT, PCIR_MAPS, pACB->iores);
+	bus_release_resource(dev, SYS_RES_IOPORT, PCIR_BAR(0), pACB->iores);
 	bus_dmamap_unload(pACB->srb_dmat, pACB->srb_dmamap);
 	bus_dmamem_free(pACB->srb_dmat, pACB->pFreeSRB,
 	    pACB->srb_dmamap);

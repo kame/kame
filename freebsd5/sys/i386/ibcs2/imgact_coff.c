@@ -25,9 +25,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/ibcs2/imgact_coff.c,v 1.58 2003/02/19 05:47:22 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/ibcs2/imgact_coff.c,v 1.62 2003/11/18 14:21:34 tjr Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -199,7 +200,7 @@ coff_load_file(struct thread *td, char *name)
   	if ((error = VOP_ACCESS(vp, VEXEC, td->td_ucred, td)) != 0)
     		goto fail;
 
-  	if ((error = VOP_OPEN(vp, FREAD, td->td_ucred, td)) != 0)
+  	if ((error = VOP_OPEN(vp, FREAD, td->td_ucred, td, -1)) != 0)
     		goto fail;
 
 	/*
@@ -401,7 +402,7 @@ exec_coff_imgact(imgp)
 
 				DPRINTF(("%s(%d):  shared library %s\n",
 					 __FILE__, __LINE__, libname));
-				strcpy(&libbuf[emul_path_len], libname);
+				strlcpy(&libbuf[emul_path_len], libname, MAXPATHLEN);
 /* XXXKSE only 1:1 in coff */  	error = coff_load_file(
 				    FIRST_THREAD_IN_PROC(imgp->proc), libbuf);
 		      		if (error)

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs.h	8.4 (Berkeley) 5/1/95
- * $FreeBSD: src/sys/nfsclient/nfsargs.h,v 1.64 2001/11/12 02:33:52 alfred Exp $
+ * $FreeBSD: src/sys/nfsclient/nfsargs.h,v 1.65 2003/11/14 20:54:09 alfred Exp $
  */
 
 #ifndef _NFSCLIENT_NFSARGS_H_
@@ -95,5 +95,7 @@ struct nfs_args {
 #define	NFSMNT_ACDIRMIN		0x00100000
 #define	NFSMNT_ACDIRMAX		0x00200000
 #define	NFSMNT_NOLOCKD		0x00400000 /* Locks are local */
+#define	NFSMNT_NFSV4		0x00800000 /* Use NFS Version 4 protocol */
+#define	NFSMNT_HASWRITEVERF	0x01000000 /* NFSv4 Write verifier */
 
 #endif

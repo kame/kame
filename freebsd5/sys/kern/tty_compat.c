@@ -31,8 +31,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)tty_compat.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/tty_compat.c,v 1.31 2002/03/24 05:09:11 bde Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/tty_compat.c,v 1.32 2003/06/11 00:56:58 obrien Exp $");
 
 #include "opt_compat.h"
 

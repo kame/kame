@@ -37,8 +37,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_sysctl.c	8.4 (Berkeley) 4/14/94
- * $FreeBSD: src/sys/kern/kern_sysctl.c,v 1.143 2003/05/29 21:19:18 mux Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_sysctl.c,v 1.148 2003/10/05 13:31:33 bms Exp $");
 
 #include "opt_compat.h"
 #include "opt_mac.h"
@@ -879,26 +881,29 @@ retry:
 int
 sysctl_handle_opaque(SYSCTL_HANDLER_ARGS)
 {
-	int error;
-	void *tmparg;
+	int error, tries;
+	u_int generation;
+	struct sysctl_req req2;
 
 	/*
-	 * Attempt to get a coherent snapshot, either by wiring the
-	 * user space buffer or copying to a temporary kernel buffer
-	 * depending on the size of the data.
+	 * Attempt to get a coherent snapshot, by using the thread
+	 * pre-emption counter updated from within mi_switch() to
+	 * determine if we were pre-empted during a bcopy() or
+	 * copyout(). Make 3 attempts at doing this before giving up.
+	 * If we encounter an error, stop immediately.
 	 */
-	if (arg2 > PAGE_SIZE) {
-		sysctl_wire_old_buffer(req, arg2);
-		error = SYSCTL_OUT(req, arg1, arg2);
-	} else {
-		tmparg = malloc(arg2, M_SYSCTLTMP, M_WAITOK);
-		bcopy(arg1, tmparg, arg2);
-		error = SYSCTL_OUT(req, tmparg, arg2);
-		free(tmparg, M_SYSCTLTMP);
-	}
-
-	if (error || !req->newptr)
+	tries = 0;
+	req2 = *req;
+retry:
+	generation = curthread->td_generation;
+	error = SYSCTL_OUT(req, arg1, arg2);
+	if (error)
 		return (error);
+	tries++;
+	if (generation != curthread->td_generation && tries < 3) {
+		*req = req2;
+		goto retry;
+	}
 
 	error = SYSCTL_IN(req, arg1, arg2);
 
@@ -968,13 +973,13 @@ kernel_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 
 	req.oldfunc = sysctl_old_kernel;
 	req.newfunc = sysctl_new_kernel;
-	req.lock = 1;
+	req.lock = REQ_LOCKED;
 
 	SYSCTL_LOCK();
 
 	error = sysctl_root(0, name, namelen, &req);
 
-	if (req.lock == 2)
+	if (req.lock == REQ_WIRED)
 		vsunlock(req.oldptr, req.oldlen);
 
 	SYSCTL_UNLOCK();
@@ -1022,7 +1027,7 @@ sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 	int error = 0;
 	size_t i = 0;
 
-	if (req->lock == 1 && req->oldptr)
+	if (req->lock == REQ_LOCKED && req->oldptr)
 		WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
 		    "sysctl_old_user()");
 	if (req->oldptr) {
@@ -1069,9 +1074,10 @@ sysctl_new_user(struct sysctl_req *req, void *p, size_t l)
 void
 sysctl_wire_old_buffer(struct sysctl_req *req, size_t len)
 {
-	if (req->lock == 1 && req->oldptr && req->oldfunc == sysctl_old_user) {
+	if (req->lock == REQ_LOCKED && req->oldptr &&
+	    req->oldfunc == sysctl_old_user) {
 		vslock(req->oldptr, req->oldlen);
-		req->lock = 2;
+		req->lock = REQ_WIRED;
 	}
 }
 
@@ -1088,7 +1094,7 @@ sysctl_find_oid(int *name, u_int namelen, struct sysctl_oid **noid,
 		if (oid->oid_number == name[indx]) {
 			indx++;
 			if (oid->oid_kind & CTLFLAG_NOLOCK)
-				req->lock = 0;
+				req->lock = REQ_UNLOCKED;
 			if ((oid->oid_kind & CTLTYPE) == CTLTYPE_NODE) {
 				if (oid->oid_handler != NULL ||
 				    indx == namelen) {
@@ -1262,7 +1268,7 @@ userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 
 	req.oldfunc = sysctl_old_user;
 	req.newfunc = sysctl_new_user;
-	req.lock = 1;
+	req.lock = REQ_LOCKED;
 
 	SYSCTL_LOCK();
 
@@ -1281,7 +1287,7 @@ userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 	} while (error == EAGAIN);
 
 	req = req2;
-	if (req.lock == 2)
+	if (req.lock == REQ_WIRED)
 		vsunlock(req.oldptr, req.oldlen);
 
 	SYSCTL_UNLOCK();

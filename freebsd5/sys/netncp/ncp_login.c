@@ -28,9 +28,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/netncp/ncp_login.c,v 1.4 2001/03/22 10:38:16 bp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netncp/ncp_login.c,v 1.5 2003/06/11 05:30:35 obrien Exp $");
+
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/malloc.h>
@@ -45,4 +47,3 @@
 #include <netncp/ncp_rq.h>
 #include <netncp/ncp_nls.h>
 #include <netncp/nwerror.h>
-

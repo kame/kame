@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)wd.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/pc98/pc98/wd.c,v 1.133 2003/04/16 20:55:02 phk Exp $
+ * $FreeBSD: src/sys/pc98/pc98/wd.c,v 1.135 2003/10/18 17:45:44 phk Exp $
  */
 
 /* TODO:
@@ -66,6 +66,7 @@
 #include <sys/conf.h>
 #include <sys/bus.h>
 #include <sys/disk.h>
+#include <geom/geom_disk.h>
 #include <sys/bio.h>
 #include <sys/malloc.h>
 #include <machine/bootinfo.h>
@@ -617,7 +618,7 @@ wdstrategy(struct bio *bp)
 	int	s;
 
 	du = bp->bio_disk->d_drv1;
-	if (du == NULL ||  bp->bio_blkno < 0 ||
+	if (du == NULL ||  bp->bio_pblkno < 0 ||
 	    bp->bio_bcount % DEV_BSIZE != 0) {
 
 		bp->bio_error = EINVAL;

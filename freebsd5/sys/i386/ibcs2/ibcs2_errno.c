@@ -29,6 +29,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_errno.c,v 1.5 2003/06/02 06:48:51 obrien Exp $");
+
 #include <sys/errno.h>
 #include <i386/ibcs2/ibcs2_errno.h>
 

@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/pci/agp_intel.c,v 1.15 2003/05/27 20:13:44 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/agp_intel.c,v 1.19 2003/09/17 02:58:17 anholt Exp $");
 
 #include "opt_bus.h"
 
@@ -38,8 +39,8 @@
 #include <sys/mutex.h>
 #include <sys/proc.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 #include <pci/agppriv.h>
 #include <pci/agpreg.h>
 
@@ -99,11 +100,17 @@ agp_intel_match(device_t dev)
 	case 0x25308086:
 		return ("Intel 82850 host to AGP bridge");
 
+	case 0x33408086:
+		return ("Intel 82855 host to AGP bridge");
+
 	case 0x25318086:
 		return ("Intel 82860 host to AGP bridge");
 
 	case 0x25708086:
 		return ("Intel 82865 host to AGP bridge");
+
+	case 0x25788086:
+		return ("Intel 82875P host to AGP bridge");
 	};
 
 	if (pci_get_vendor(dev) == 0x8086)
@@ -202,7 +209,9 @@ agp_intel_attach(device_t dev)
 		break;
 
 	case 0x1a308086: /* i845 */
+	case 0x33408086: /* i855 */
 	case 0x25708086: /* i865 */
+	case 0x25788086: /* i875P */
 		pci_write_config(dev, AGP_INTEL_I845_MCHCFG,
 				 (pci_read_config(dev, AGP_INTEL_I845_MCHCFG, 1)
 				  | (1 << 1)), 1);
@@ -223,8 +232,10 @@ agp_intel_attach(device_t dev)
 	case 0x25018086: /* i820 */
 	case 0x1a308086: /* i845 */
 	case 0x25308086: /* i850 */
+	case 0x33408086: /* i855 */
 	case 0x25318086: /* i860 */
 	case 0x25708086: /* i865 */
+	case 0x25788086: /* i875P */
 		pci_write_config(dev, AGP_INTEL_I8XX_ERRSTS, 0x00ff, 2);
 		break;
 
@@ -267,7 +278,9 @@ agp_intel_detach(device_t dev)
 				& ~(1 << 1)), 1);
 
 	case 0x1a308086: /* i845 */
+	case 0x33408086: /* i855 */
 	case 0x25708086: /* i865 */
+	case 0x25788086: /* i875P */
 		printf("%s: set MCHCFG to %x\n", __func__, (unsigned)
 				(pci_read_config(dev, AGP_INTEL_I845_MCHCFG, 1)
 				& ~(1 << 1)));
@@ -360,7 +373,7 @@ agp_intel_flush_tlb(device_t dev)
 	u_int32_t val;
 
 	val = pci_read_config(dev, AGP_INTEL_AGPCTRL, 4);
-	pci_write_config(dev, AGP_INTEL_AGPCTRL, val & ~(1 << 8), 4);
+	pci_write_config(dev, AGP_INTEL_AGPCTRL, val & ~(1 << 7), 4);
 	pci_write_config(dev, AGP_INTEL_AGPCTRL, val, 4);
 }
 

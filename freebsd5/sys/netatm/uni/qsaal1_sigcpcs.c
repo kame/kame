@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/qsaal1_sigcpcs.c,v 1.10 2003/02/23 22:26:39 obrien Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ---------------------
  *
  * ITU-T Q.SAAL1 - Process CPCS-signals (SSCOP PDUs)
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/qsaal1_sigcpcs.c,v 1.11 2003/06/11 07:22:30 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -56,11 +54,6 @@
 #include <netatm/uni/sscop_misc.h>
 #include <netatm/uni/sscop_pdu.h>
 #include <netatm/uni/sscop_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/qsaal1_sigcpcs.c,v 1.10 2003/02/23 22:26:39 obrien Exp $");
-#endif
-
 
 /*
  * Local functions

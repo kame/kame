@@ -61,7 +61,7 @@
  *	from: @(#)isa.c	7.2 (Berkeley) 5/13/91
  *	form: src/sys/i386/isa/intr_machdep.c,v 1.57 2001/07/20
  *
- * $FreeBSD: src/sys/powerpc/powerpc/intr_machdep.c,v 1.2 2003/02/01 07:20:36 benno Exp $
+ * $FreeBSD: src/sys/powerpc/powerpc/intr_machdep.c,v 1.3 2003/11/17 06:10:15 peter Exp $
  */
 
 #include <sys/param.h>
@@ -99,12 +99,12 @@ extern u_long	extint_call;
 static ih_func_t	intr_stray_handler;
 static ih_func_t	sched_ithd;
 
-static void		(*irq_enable)(int);
-static void		(*irq_disable)(int);
+static void		(*irq_enable)(uintptr_t);
+static void		(*irq_disable)(uintptr_t);
 
 void
-intr_init(void (*handler)(void), int nirq, void (*irq_e)(int),
-    void (*irq_d)(int))
+intr_init(void (*handler)(void), int nirq, void (*irq_e)(uintptr_t),
+    void (*irq_d)(uintptr_t))
 {
 	int		i;
 	u_int32_t	msr;

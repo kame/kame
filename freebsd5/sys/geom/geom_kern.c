@@ -31,9 +31,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/geom/geom_kern.c,v 1.31 2003/04/30 12:57:39 markm Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/geom/geom_kern.c,v 1.33 2003/06/18 10:33:09 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -131,7 +132,7 @@ g_event_procbody(void)
 	tp->td_base_pri = PRIBIO;
 	for(;;) {
 		g_run_events();
-		tsleep(&g_wait_event, PRIBIO, "g_events", hz/10);
+		tsleep(&g_wait_event, PRIBIO, "-", hz/10);
 	}
 }
 
@@ -151,6 +152,8 @@ geom_shutdown(void *foo __unused)
 void
 g_init(void)
 {
+
+	g_trace(G_T_TOPOLOGY, "g_ignition");
 	sx_init(&topology_lock, "GEOM topology");
 	g_io_init();
 	g_event_init();

@@ -22,9 +22,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/isa/vga_isa.c,v 1.24 2003/05/01 04:23:15 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/isa/vga_isa.c,v 1.27 2003/09/26 10:41:43 phk Exp $");
 
 #include "opt_vga.h"
 #include "opt_fb.h"
@@ -93,7 +94,6 @@ static int
 isavga_probe(device_t dev)
 {
 	video_adapter_t adp;
-	device_t bus;
 	int error;
 
 	/* No pnp support */
@@ -103,7 +103,6 @@ isavga_probe(device_t dev)
 	device_set_desc(dev, "Generic ISA VGA");
 	error = vga_probe_unit(device_get_unit(dev), &adp, device_get_flags(dev));
 	if (error == 0) {
-		bus = device_get_parent(dev);
 		bus_set_resource(dev, SYS_RES_IOPORT, 0,
 				 adp.va_io_base, adp.va_io_size);
 		bus_set_resource(dev, SYS_RES_MEMORY, 0,
@@ -122,8 +121,6 @@ static int
 isavga_attach(device_t dev)
 {
 	vga_softc_t *sc;
-	struct resource *port;
-	struct resource *mem;
 	int unit;
 	int rid;
 	int error;
@@ -132,10 +129,10 @@ isavga_attach(device_t dev)
 	sc = device_get_softc(dev);
 
 	rid = 0;
-	port = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
+	bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
 				  0, ~0, 0, RF_ACTIVE | RF_SHAREABLE);
 	rid = 0;
-	mem = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
+	bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
 				 0, ~0, 0, RF_ACTIVE | RF_SHAREABLE);
 
 	error = vga_attach_unit(unit, sc, device_get_flags(dev));
@@ -144,7 +141,7 @@ isavga_attach(device_t dev)
 
 #ifdef FB_INSTALL_CDEV
 	/* attach a virtual frame buffer device */
-	error = fb_attach(makedev(0, VGA_MKMINOR(unit)), sc->adp, &isavga_cdevsw);
+	error = fb_attach(VGA_MKMINOR(unit), sc->adp, &isavga_cdevsw);
 	if (error)
 		return error;
 #endif /* FB_INSTALL_CDEV */

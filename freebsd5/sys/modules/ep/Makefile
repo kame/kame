@@ -1,10 +1,9 @@
-# $FreeBSD: src/sys/modules/ep/Makefile,v 1.4 2002/11/06 13:46:58 nyan Exp $
+# $FreeBSD: src/sys/modules/ep/Makefile,v 1.5 2003/08/02 18:46:02 ru Exp $
 
 .PATH: ${.CURDIR}/../../dev/ep
-.PATH: ${.CURDIR}/../../i386/isa
 
 KMOD=	if_ep
-SRCS=	if_ep.c if_ep_pccard.c elink.c
+SRCS=	if_ep.c if_ep_pccard.c
 SRCS+=	if_ep_isa.c
 #SRCS+=	if_ep_eisa.c
 #SRCS+=	if_ep_mca.c

@@ -1,6 +1,8 @@
 /*
- * $FreeBSD: src/sys/dev/scd/scd_isa.c,v 1.2 2003/04/16 20:51:48 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/scd/scd_isa.c,v 1.3 2003/08/24 18:03:43 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -1,5 +1,3 @@
-/* $FreeBSD: src/sys/kern/sysv_msg.c,v 1.48 2003/02/19 05:47:25 imp Exp $ */
-
 /*
  * Implementation of SVID messages
  *
@@ -18,6 +16,9 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/sysv_msg.c,v 1.52 2003/11/07 04:47:14 rwatson Exp $");
 
 #include "opt_sysvipc.h"
 
@@ -284,7 +285,7 @@ msgsys(td, uap)
 	struct thread *td;
 	/* XXX actually varargs. */
 	struct msgsys_args /* {
-		u_int	which;
+		int	which;
 		int	a2;
 		int	a3;
 		int	a4;
@@ -296,7 +297,8 @@ msgsys(td, uap)
 
 	if (!jail_sysvipc_allowed && jailed(td->td_ucred))
 		return (ENOSYS);
-	if (uap->which >= sizeof(msgcalls)/sizeof(msgcalls[0]))
+	if (uap->which < 0 ||
+	    uap->which >= sizeof(msgcalls)/sizeof(msgcalls[0]))
 		return (EINVAL);
 	error = (*msgcalls[uap->which])(td, &uap->a2);
 	return (error);
@@ -502,7 +504,7 @@ msgget(td, uap)
 				error = EEXIST;
 				goto done2;
 			}
-			if ((error = ipcperm(td, &msqptr->msg_perm, msgflg & 0700 ))) {
+			if ((error = ipcperm(td, &msqptr->msg_perm, msgflg & 0700))) {
 				DPRINTF(("requester doesn't have 0%o access\n",
 				    msgflg & 0700));
 				goto done2;
@@ -1140,10 +1142,10 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 
 SYSCTL_DECL(_kern_ipc);
 SYSCTL_INT(_kern_ipc, OID_AUTO, msgmax, CTLFLAG_RD, &msginfo.msgmax, 0, "");
-SYSCTL_INT(_kern_ipc, OID_AUTO, msgmni, CTLFLAG_RD, &msginfo.msgmni, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, msgmni, CTLFLAG_RDTUN, &msginfo.msgmni, 0, "");
 SYSCTL_INT(_kern_ipc, OID_AUTO, msgmnb, CTLFLAG_RD, &msginfo.msgmnb, 0, "");
 SYSCTL_INT(_kern_ipc, OID_AUTO, msgtql, CTLFLAG_RD, &msginfo.msgtql, 0, "");
-SYSCTL_INT(_kern_ipc, OID_AUTO, msgssz, CTLFLAG_RD, &msginfo.msgssz, 0, "");
-SYSCTL_INT(_kern_ipc, OID_AUTO, msgseg, CTLFLAG_RD, &msginfo.msgseg, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, msgssz, CTLFLAG_RDTUN, &msginfo.msgssz, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, msgseg, CTLFLAG_RDTUN, &msginfo.msgseg, 0, "");
 SYSCTL_PROC(_kern_ipc, OID_AUTO, msqids, CTLFLAG_RD,
     NULL, 0, sysctl_msqids, "", "Message queue IDs");

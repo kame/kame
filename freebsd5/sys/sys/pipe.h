@@ -18,7 +18,7 @@
  * 5. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/sys/pipe.h,v 1.20 2002/08/14 01:04:43 rwatson Exp $
+ * $FreeBSD: src/sys/sys/pipe.h,v 1.25 2003/11/12 03:14:31 rwatson Exp $
  */
 
 #ifndef _SYS_PIPE_H_
@@ -28,7 +28,6 @@
 #include <sys/time.h>			/* for struct timespec */
 #include <sys/selinfo.h>		/* for struct selinfo */
 #include <vm/vm.h>			/* for vm_page_t */
-#include <sys/_label.h>			/* for struct label */
 #include <machine/param.h>		/* for PAGE_SIZE */
 #endif
 
@@ -43,6 +42,10 @@
 #define BIG_PIPE_SIZE	(64*1024)
 #endif
 
+#ifndef SMALL_PIPE_SIZE
+#define SMALL_PIPE_SIZE	PAGE_SIZE
+#endif
+
 /*
  * PIPE_MINDIRECT MUST be smaller than PIPE_SIZE and MUST be bigger
  * than PIPE_BUF.
@@ -52,6 +55,12 @@
 #endif
 
 #define PIPENPAGES	(BIG_PIPE_SIZE / PAGE_SIZE + 1)
+
+/*
+ * See sys_pipe.c for info on what these limits mean. 
+ */
+extern int	maxpipekva;
+extern int	maxpipekvawired;
 
 /*
  * Pipe buffer information.
@@ -64,7 +73,6 @@ struct pipebuf {
 	u_int	out;		/* out pointer */
 	u_int	size;		/* size of buffer */
 	caddr_t	buffer;		/* kva of buffer */
-	struct	vm_object *object;	/* VM object containing buffer */
 };
 
 /*

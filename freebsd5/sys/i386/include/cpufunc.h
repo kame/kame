@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/cpufunc.h,v 1.133 2003/04/20 02:59:13 obrien Exp $
+ * $FreeBSD: src/sys/i386/include/cpufunc.h,v 1.135 2003/08/06 18:21:27 bde Exp $
  */
 
 /*

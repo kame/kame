@@ -1,6 +1,6 @@
 /*	$NetBSD: if_devar.h,v 1.32 1999/04/01 14:55:25 tsubai Exp $	*/
 
-/* $FreeBSD: src/sys/pci/if_devar.h,v 1.26 2002/06/02 20:05:55 schweikh Exp $ */
+/* $FreeBSD: src/sys/pci/if_devar.h,v 1.29 2003/10/31 18:32:13 brooks Exp $ */
 
 /*-
  * Copyright (c) 1994-1997 Matt Thomas (matt@3am-software.com)
@@ -431,6 +431,7 @@ typedef struct {
  */
 struct _tulip_softc_t {
     struct ifmedia tulip_ifmedia;
+    int tulip_unit;
 #if defined(TULIP_BUS_DMA)
     bus_dma_tag_t tulip_dmatag;		/* bus DMA tag */
 #if !defined(TULIP_BUS_DMA_NOTX)
@@ -609,10 +610,10 @@ struct _tulip_softc_t {
      */
     u_int32_t tulip_setupbuf[192/sizeof(u_int32_t)];
     u_int32_t tulip_setupdata[192/sizeof(u_int32_t)];
-    char tulip_boardid[16];		/* buffer for board ID */
-    u_int8_t tulip_rombuf[128];
-    u_int8_t tulip_pci_busno;		/* needed for multiport boards */
-    u_int8_t tulip_pci_devno;		/* needed for multiport boards */
+    char tulip_boardid[24];	/* buffer for board ID */
+    u_int8_t tulip_rombuf[128]; /* must be aligned */
+    u_int8_t tulip_pci_busno;	/* needed for multiport boards */
+    u_int8_t tulip_pci_devno;	/* needed for multiport boards */
     u_int8_t tulip_connidx;
     tulip_srom_connection_t tulip_conntype;
     tulip_desc_t *tulip_rxdescs;
@@ -850,10 +851,7 @@ NETISR_SET(NETISR_DE, tulip_softintr);
 #ifndef	tulip_if
 #define	tulip_if	tulip_ac.ac_if
 #endif
-#ifndef tulip_unit
-#define	tulip_unit	tulip_if.if_unit
-#endif
-#define	tulip_name	tulip_if.if_name
+#define	tulip_xname	tulip_if.if_xname
 #ifndef tulip_enaddr
 #define	tulip_enaddr	tulip_ac.ac_enaddr
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
  * Derived from the public domain Linux driver
@@ -31,10 +31,10 @@
 #include <dev/sound/pci/neomagic.h>
 #include <dev/sound/pci/neomagic-coeff.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/neomagic.c,v 1.27 2002/03/04 00:36:04 orion Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/neomagic.c,v 1.30 2003/09/07 16:28:03 cg Exp $");
 
 /* -------------------------------------------------------------------- */
 
@@ -608,7 +608,7 @@ nm_pci_probe(device_t dev)
 					 PCIM_CMD_PORTEN | PCIM_CMD_MEMEN |
 					 PCIM_CMD_BUSMASTEREN, 2);
 
-			sc->regid = PCIR_MAPS + 4;
+			sc->regid = PCIR_BAR(1);
 			sc->reg = bus_alloc_resource(dev, SYS_RES_MEMORY,
 						     &sc->regid, 0, ~0, 1,
 						     RF_ACTIVE);
@@ -675,10 +675,10 @@ nm_pci_attach(device_t dev)
 	pci_write_config(dev, PCIR_COMMAND, data, 2);
 	data = pci_read_config(dev, PCIR_COMMAND, 2);
 
-	sc->bufid = PCIR_MAPS;
+	sc->bufid = PCIR_BAR(0);
 	sc->buf = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->bufid,
 				     0, ~0, 1, RF_ACTIVE);
-	sc->regid = PCIR_MAPS + 4;
+	sc->regid = PCIR_BAR(1);
 	sc->reg = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->regid,
 				     0, ~0, 1, RF_ACTIVE);
 

@@ -33,7 +33,7 @@
  *
  *	From: @(#)ansi.h	8.2 (Berkeley) 1/4/94
  *	From: @(#)types.h	8.3 (Berkeley) 1/5/94
- * $FreeBSD: src/sys/ia64/include/_types.h,v 1.6 2003/03/25 00:07:03 jake Exp $
+ * $FreeBSD: src/sys/ia64/include/_types.h,v 1.7 2003/11/03 05:04:09 marcel Exp $
  */
 
 #ifndef _MACHINE__TYPES_H_
@@ -100,10 +100,14 @@ typedef	__uint64_t	__vm_size_t;
 typedef __builtin_va_list	__va_list;	/* internally known to gcc */
 #if !defined(__GNUC_VA_LIST) && !defined(__NO_GNUC_VA_LIST)
 #define	__GNUC_VA_LIST
-typedef	__va_list	__gnuc_va_list;		/* compatibility w/GNU headers*/
+typedef	__va_list	__gnuc_va_list;		/* compat. with GNU headers */
 #endif
 #else
+#ifdef lint
+typedef char *			__va_list;	/* non-functional */
+#else
 #error Must add va_list support for this non-GCC compiler.   
+#endif /* lint */
 #endif /* __GNUC__ */
 
 #endif /* !_MACHINE__TYPES_H_ */

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ucred.h	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/ucred.h,v 1.46 2003/03/27 11:35:45 maxim Exp $
+ * $FreeBSD: src/sys/sys/ucred.h,v 1.48 2003/11/12 15:07:18 bde Exp $
  */
 
 #ifndef _SYS_UCRED_H_
@@ -44,8 +44,6 @@
  * Only the suser() or suser_cred() function should be used for this.
  */
 #if defined(_KERNEL) || defined(_WANT_UCRED)
-#include <sys/_label.h>
-
 struct ucred {
 	u_int	cr_ref;			/* reference count */
 #define	cr_startcopy cr_uid
@@ -60,7 +58,7 @@ struct ucred {
 	struct uidinfo	*cr_ruidinfo;	/* per ruid resource consumption */
 	struct prison	*cr_prison;	/* jail(2) */
 #define	cr_endcopy	cr_label
-	struct label	cr_label;	/* MAC label */
+	struct label	*cr_label;	/* MAC label */
 	struct mtx	*cr_mtxp;      	/* protect refcount */
 };
 #define	NOCRED	((struct ucred *)0)	/* no credential available */
@@ -85,9 +83,6 @@ struct xucred {
 #ifdef _KERNEL
 struct thread;
 
-#ifdef DIAGNOSTIC
-void	cred_free_thread(struct thread *td);
-#endif
 void	change_egid(struct ucred *newcred, gid_t egid);
 void	change_euid(struct ucred *newcred, struct uidinfo *euip);
 void	change_rgid(struct ucred *newcred, gid_t rgid);
@@ -96,6 +91,9 @@ void	change_svgid(struct ucred *newcred, gid_t svgid);
 void	change_svuid(struct ucred *newcred, uid_t svuid);
 void	crcopy(struct ucred *dest, struct ucred *src);
 struct ucred	*crdup(struct ucred *cr);
+#ifdef DIAGNOSTIC
+void	cred_free_thread(struct thread *td);
+#endif
 void	cred_update_thread(struct thread *td);
 void	crfree(struct ucred *cr);
 struct ucred	*crget(void);

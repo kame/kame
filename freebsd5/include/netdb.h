@@ -55,7 +55,7 @@
 /*
  *      @(#)netdb.h	8.1 (Berkeley) 6/2/93
  *      From: Id: netdb.h,v 8.9 1996/11/19 08:39:29 vixie Exp $
- * $FreeBSD: src/include/netdb.h,v 1.25 2002/08/21 16:19:55 mike Exp $
+ * $FreeBSD: src/include/netdb.h,v 1.30 2003/10/24 06:53:12 ume Exp $
  */
 
 #ifndef _NETDB_H_
@@ -149,14 +149,21 @@ struct addrinfo {
 /*
  * Error return codes from getaddrinfo()
  */
+#if 0
+/* obsoleted */
 #define	EAI_ADDRFAMILY	 1	/* address family for hostname not supported */
+#endif
 #define	EAI_AGAIN	 2	/* temporary failure in name resolution */
 #define	EAI_BADFLAGS	 3	/* invalid value for ai_flags */
 #define	EAI_FAIL	 4	/* non-recoverable failure in name resolution */
 #define	EAI_FAMILY	 5	/* ai_family not supported */
 #define	EAI_MEMORY	 6	/* memory allocation failure */
+#if 0
+/* obsoleted */
 #define	EAI_NODATA	 7	/* no address associated with hostname */
+#endif
 #define	EAI_NONAME	 8	/* hostname nor servname provided, or not known */
+#define	EAI_NODATA	EAI_NONAME	/* to be removed on 23 Apr 2004 */
 #define	EAI_SERVICE	 9	/* servname not supported for ai_socktype */
 #define	EAI_SOCKTYPE	10	/* ai_socktype not supported */
 #define	EAI_SYSTEM	11	/* system error returned in errno */
@@ -195,7 +202,9 @@ struct addrinfo {
 #define	NI_NAMEREQD	0x00000004
 #define	NI_NUMERICSERV	0x00000008
 #define	NI_DGRAM	0x00000010
+#if 1 /* obsolete */
 #define NI_WITHSCOPEID	0x00000020
+#endif
 
 /*
  * Scope delimit character

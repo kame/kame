@@ -31,8 +31,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_socket.c	8.3 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/uipc_socket.c,v 1.150 2003/04/29 13:36:03 kan Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/uipc_socket.c,v 1.159 2003/11/16 18:25:20 rwatson Exp $");
 
 #include "opt_inet.h"
 #include "opt_mac.h"
@@ -193,7 +195,7 @@ socreate(dom, aso, type, proto, cred, td)
 
 	if (prp->pr_type != type)
 		return (EPROTOTYPE);
-	so = soalloc(M_NOWAIT);
+	so = soalloc(1);
 	if (so == NULL)
 		return (ENOBUFS);
 
@@ -265,7 +267,8 @@ solisten(so, backlog, td)
 	int s, error;
 
 	s = splnet();
-	if (so->so_state & (SS_ISCONNECTED | SS_ISCONNECTING)) {
+	if (so->so_state & (SS_ISCONNECTED | SS_ISCONNECTING |
+			    SS_ISDISCONNECTING)) {
 		splx(s);
 		return (EINVAL);
 	}
@@ -885,6 +888,8 @@ restart:
 			error = EWOULDBLOCK;
 			goto release;
 		}
+		SBLASTRECORDCHK(&so->so_rcv);
+		SBLASTMBUFCHK(&so->so_rcv);
 		sbunlock(&so->so_rcv);
 		error = sbwait(&so->so_rcv);
 		splx(s);
@@ -895,6 +900,8 @@ restart:
 dontblock:
 	if (uio->uio_td)
 		uio->uio_td->td_proc->p_stats->p_ru.ru_msgrcv++;
+	SBLASTRECORDCHK(&so->so_rcv);
+	SBLASTMBUFCHK(&so->so_rcv);
 	nextrecord = m->m_nextpkt;
 	if (pr->pr_flags & PR_ADDR) {
 		KASSERT(m->m_type == MT_SONAME,
@@ -936,12 +943,32 @@ dontblock:
 		}
 	}
 	if (m) {
-		if ((flags & MSG_PEEK) == 0)
+		if ((flags & MSG_PEEK) == 0) {
 			m->m_nextpkt = nextrecord;
+			/*
+			 * If nextrecord == NULL (this is a single chain),
+			 * then sb_lastrecord may not be valid here if m
+			 * was changed earlier.
+			 */
+			if (nextrecord == NULL) {
+				KASSERT(so->so_rcv.sb_mb == m,
+					("receive tailq 1"));
+				so->so_rcv.sb_lastrecord = m;
+			}
+		}
 		type = m->m_type;
 		if (type == MT_OOBDATA)
 			flags |= MSG_OOB;
+	} else {
+		if ((flags & MSG_PEEK) == 0) {
+			KASSERT(so->so_rcv.sb_mb == m,("receive tailq 2"));
+			so->so_rcv.sb_mb = nextrecord;
+			SB_EMPTY_FIXUP(&so->so_rcv);
+		}
 	}
+	SBLASTRECORDCHK(&so->so_rcv);
+	SBLASTMBUFCHK(&so->so_rcv);
+
 	moff = 0;
 	offset = 0;
 	while (m && uio->uio_resid > 0 && error == 0) {
@@ -968,6 +995,8 @@ dontblock:
 		 * block interrupts again.
 		 */
 		if (mp == 0) {
+			SBLASTRECORDCHK(&so->so_rcv);
+			SBLASTMBUFCHK(&so->so_rcv);
 			splx(s);
 #ifdef ZERO_COPY_SOCKETS
 			if (so_zero_copy_receive) {
@@ -1015,8 +1044,16 @@ dontblock:
 					so->so_rcv.sb_mb = m_free(m);
 					m = so->so_rcv.sb_mb;
 				}
-				if (m)
+				if (m) {
 					m->m_nextpkt = nextrecord;
+					if (nextrecord == NULL)
+						so->so_rcv.sb_lastrecord = m;
+				} else {
+					so->so_rcv.sb_mb = nextrecord;
+					SB_EMPTY_FIXUP(&so->so_rcv);
+				}
+				SBLASTRECORDCHK(&so->so_rcv);
+				SBLASTMBUFCHK(&so->so_rcv);
 			}
 		} else {
 			if (flags & MSG_PEEK)
@@ -1061,6 +1098,8 @@ dontblock:
 			 */
 			if (pr->pr_flags & PR_WANTRCVD && so->so_pcb)
 				(*pr->pr_usrreqs->pru_rcvd)(so, flags);
+			SBLASTRECORDCHK(&so->so_rcv);
+			SBLASTMBUFCHK(&so->so_rcv);
 			error = sbwait(&so->so_rcv);
 			if (error) {
 				sbunlock(&so->so_rcv);
@@ -1079,8 +1118,21 @@ dontblock:
 			(void) sbdroprecord(&so->so_rcv);
 	}
 	if ((flags & MSG_PEEK) == 0) {
-		if (m == 0)
+		if (m == 0) {
+			/*
+			 * First part is an inline SB_EMPTY_FIXUP().  Second
+			 * part makes sure sb_lastrecord is up-to-date if
+			 * there is still data in the socket buffer.
+			 */
 			so->so_rcv.sb_mb = nextrecord;
+			if (so->so_rcv.sb_mb == NULL) {
+				so->so_rcv.sb_mbtail = NULL;
+				so->so_rcv.sb_lastrecord = NULL;
+			} else if (nextrecord->m_nextpkt == NULL)
+				so->so_rcv.sb_lastrecord = nextrecord;
+		}
+		SBLASTRECORDCHK(&so->so_rcv);
+		SBLASTMBUFCHK(&so->so_rcv);
 		if (pr->pr_flags & PR_WANTRCVD && so->so_pcb)
 			(*pr->pr_usrreqs->pru_rcvd)(so, flags);
 	}
@@ -1131,8 +1183,14 @@ sorflush(so)
 	socantrcvmore(so);
 	sbunlock(sb);
 	asb = *sb;
-	bzero(sb, sizeof (*sb));
+	/*
+	 * Invalidate/clear most of the sockbuf structure, but keep
+	 * its selinfo structure valid.
+	 */
+	bzero(&sb->sb_startzero,
+	    sizeof(*sb) - offsetof(struct sockbuf, sb_startzero));
 	splx(s);
+
 	if (pr->pr_flags & PR_RIGHTS && pr->pr_domain->dom_dispose)
 		(*pr->pr_domain->dom_dispose)(asb.sb_mb);
 	sbrelease(&asb, so);
@@ -1394,10 +1452,8 @@ sosetopt(so, sopt)
 			    sizeof extmac);
 			if (error)
 				goto bad;
-
-			error = mac_setsockopt_label_set(
-			    sopt->sopt_td->td_ucred, so, &extmac);
-
+			error = mac_setsockopt_label(sopt->sopt_td->td_ucred,
+			    so, &extmac);
 #else
 			error = EOPNOTSUPP;
 #endif
@@ -1417,10 +1473,7 @@ bad:
 
 /* Helper routine for getsockopt */
 int
-sooptcopyout(sopt, buf, len)
-	struct	sockopt *sopt;
-	void	*buf;
-	size_t	len;
+sooptcopyout(struct sockopt *sopt, const void *buf, size_t len)
 {
 	int	error;
 	size_t	valsize;
@@ -1544,8 +1597,12 @@ integer:
 			break;
 		case SO_LABEL:
 #ifdef MAC
-			error = mac_getsockopt_label_get(
-			    sopt->sopt_td->td_ucred, so, &extmac);
+			error = sooptcopyin(sopt, &extmac, sizeof(extmac),
+			    sizeof(extmac));
+			if (error)
+				return (error);
+			error = mac_getsockopt_label(sopt->sopt_td->td_ucred,
+			    so, &extmac);
 			if (error)
 				return (error);
 			error = sooptcopyout(sopt, &extmac, sizeof extmac);
@@ -1555,7 +1612,11 @@ integer:
 			break;
 		case SO_PEERLABEL:
 #ifdef MAC
-			error = mac_getsockopt_peerlabel_get(
+			error = sooptcopyin(sopt, &extmac, sizeof(extmac),
+			    sizeof(extmac));
+			if (error)
+				return (error);
+			error = mac_getsockopt_peerlabel(
 			    sopt->sopt_td->td_ucred, so, &extmac);
 			if (error)
 				return (error);
@@ -1689,7 +1750,7 @@ sohasoutofband(so)
 {
 	if (so->so_sigio != NULL)
 		pgsigio(&so->so_sigio, SIGURG, 0);
-	selwakeup(&so->so_rcv.sb_sel);
+	selwakeuppri(&so->so_rcv.sb_sel, PSOCK);
 }
 
 int

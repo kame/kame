@@ -22,9 +22,41 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/usb/if_rue.c,v 1.1 2003/05/03 10:16:56 akiyama Exp $
  */
+/*-
+ * Copyright (c) 1997, 1998, 1999, 2000
+ *	Bill Paul <wpaul@ee.columbia.edu>.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by Bill Paul.
+ * 4. Neither the name of the author nor the names of any co-contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY Bill Paul AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL Bill Paul OR THE VOICES IN HIS HEAD
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ * THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/if_rue.c,v 1.7 2003/11/13 20:55:51 obrien Exp $");
 
 /*
  * RealTek RTL8150 USB to fast ethernet controller driver.
@@ -50,6 +82,10 @@
 #include <net/bpf.h>
 
 #include <sys/bus.h>
+#include <machine/bus.h>
+#if __FreeBSD_version < 500000
+#include <machine/clock.h>
+#endif
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
@@ -67,7 +103,7 @@
 #include "miibus_if.h"
 
 #ifdef USB_DEBUG
-static int	ruedebug = 0;
+Static int	ruedebug = 0;
 SYSCTL_NODE(_hw_usb, OID_AUTO, rue, CTLFLAG_RW, 0, "USB rue");
 SYSCTL_INT(_hw_usb_rue, OID_AUTO, debug, CTLFLAG_RW,
 	   &ruedebug, 0, "rue debug level");
@@ -121,7 +157,7 @@ Static int rue_miibus_readreg(device_ptr_t, int, int);
 Static int rue_miibus_writereg(device_ptr_t, int, int, int);
 Static void rue_miibus_statchg(device_ptr_t);
 
-static u_int8_t rue_calchash(caddr_t);
+Static u_int32_t rue_mchash(caddr_t);
 Static void rue_setmulti(struct rue_softc *);
 Static void rue_reset(struct rue_softc *);
 
@@ -428,22 +464,20 @@ rue_miibus_statchg(device_ptr_t dev)
  * Calculate CRC of a multicast group address, return the upper 6 bits.
  */
 
-static u_int8_t
-rue_calchash(caddr_t addr)
+Static u_int32_t
+rue_mchash(caddr_t addr)
 {
 	u_int32_t	crc, carry;
-	int		i, j;
-	u_int8_t	c;
+	int		idx, bit;
+	u_int8_t	data;
 
 	/* Compute CRC for the address value. */
 	crc = 0xFFFFFFFF;	/* initial value */
 
-	for (i = 0; i < 6; i++) {
-		c = *(addr + i);
-		for (j = 0; j < 8; j++) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (c & 0x01);
+	for (idx = 0; idx < 6; idx++) {
+		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
+			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
 			crc <<= 1;
-			c >>= 1;
 			if (carry)
 				crc = (crc ^ 0x04c11db6) | carry;
 		}
@@ -485,10 +519,15 @@ rue_setmulti(struct rue_softc *sc)
 	rue_csr_write_4(sc, RUE_MAR4, 0);
 
 	/* now program new ones */
-	TAILQ_FOREACH (ifma, &ifp->if_multiaddrs, ifma_link) {
+#if __FreeBSD_version >= 500000
+	TAILQ_FOREACH (ifma, &ifp->if_multiaddrs, ifma_link)
+#else
+	LIST_FOREACH (ifma, &ifp->if_multiaddrs, ifma_link)
+#endif
+	{
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = rue_calchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = rue_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
 		if (h < 32)
 			hashes[0] |= (1 << h);
 		else
@@ -626,8 +665,10 @@ USB_ATTACH(rue)
 		}
 	}
 
+#if __FreeBSD_version >= 500000
 	mtx_init(&sc->rue_mtx, device_get_nameunit(self), MTX_NETWORK_LOCK,
 		 MTX_DEF | MTX_RECURSE);
+#endif
 	RUE_LOCK(sc);
 
 	/* Reset the adapter */
@@ -648,8 +689,7 @@ USB_ATTACH(rue)
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = sc->rue_unit;
-	ifp->if_name = "rue";
+	if_initname(ifp, "rue", sc->rue_unit);
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = rue_ioctl;
@@ -671,7 +711,11 @@ USB_ATTACH(rue)
 	rue_qdat.if_rxstart = rue_rxstart;
 
 	/* Call MI attach routine */
+#if __FreeBSD_version >= 500000
 	ether_ifattach(ifp, eaddr);
+#else
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
+#endif
 	callout_handle_init(&sc->rue_stat_ch);
 	usb_register_netisr();
 	sc->rue_dying = 0;
@@ -682,7 +726,9 @@ USB_ATTACH(rue)
 
     error1:
 	RUE_UNLOCK(sc);
+#if __FreeBSD_version >= 500000
 	mtx_destroy(&sc->rue_mtx);
+#endif
     error:
 	free(devinfo, M_USBDEV);
 	USB_ATTACH_ERROR_RETURN;
@@ -700,7 +746,11 @@ rue_detach(device_ptr_t dev)
 
 	sc->rue_dying = 1;
 	untimeout(rue_tick, sc, sc->rue_stat_ch);
+#if __FreeBSD_version >= 500000
 	ether_ifdetach(ifp);
+#else
+	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
+#endif
 
 	if (sc->rue_ep[RUE_ENDPT_TX] != NULL)
 		usbd_abort_pipe(sc->rue_ep[RUE_ENDPT_TX]);
@@ -712,7 +762,9 @@ rue_detach(device_ptr_t dev)
 #endif
 
 	RUE_UNLOCK(sc);
+#if __FreeBSD_version >= 500000
 	mtx_destroy(&sc->rue_mtx);
+#endif
 
 	return (0);
 }

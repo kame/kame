@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/atm_ioctl.h,v 1.5 2002/06/07 05:29:13 mdodd Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/atm_ioctl.h,v 1.7 2003/07/29 13:32:10 harti Exp $
  *
  */
 
@@ -73,7 +73,7 @@ struct atmsetreq {
 			Atm_addr	asru_arp_addr;	/* ARP srvr address */
 			Atm_addr	asru_arp_subaddr;/* ARP srvr subaddr */
 			caddr_t		asru_arp_pbuf;	/* Prefix buffer addr */
-			int		asru_arp_plen;	/* Prefix buffer len */
+			size_t		asru_arp_plen;	/* Prefix buffer len */
 		} asru_asrvr;
 		/* MAC address */
 		struct {
@@ -84,7 +84,7 @@ struct atmsetreq {
 		struct {
 			char	asru_nif_intf[IFNAMSIZ];/* Interface name */
 			char	asru_nif_pref[IFNAMSIZ];/* I/f prefix name */
-			int	asru_nif_cnt;		/* Number of i/fs */
+			u_int	asru_nif_cnt;		/* Number of i/fs */
 		} asru_nif;
 		/* NSAP prefix */
 		struct {
@@ -123,6 +123,8 @@ struct atmaddreq {
 			Aal_t	aaru_pvc_aal;		/* AAL */
 			Encaps_t aaru_pvc_encaps;	/* Encapsulation */
 			u_char	aaru_pvc_flags;		/* Flags (see below) */
+			uint8_t	aaru_pvc_traffic_type;	/* traffic type */
+			struct t_atm_traffic aaru_pvc_traffic; /* traffic parameters */
 		} aaru_add_pvc;
 
 		/* Add ARP table entry */
@@ -142,6 +144,8 @@ struct atmaddreq {
 #define	aar_pvc_aal	aar_u.aaru_add_pvc.aaru_pvc_aal
 #define	aar_pvc_encaps	aar_u.aaru_add_pvc.aaru_pvc_encaps
 #define	aar_pvc_flags	aar_u.aaru_add_pvc.aaru_pvc_flags
+#define	aar_pvc_traffic_type	aar_u.aaru_add_pvc.aaru_pvc_traffic_type
+#define	aar_pvc_traffic	aar_u.aaru_add_pvc.aaru_pvc_traffic
 #define	aar_arp_intf	aar_u.aaru_add_arp.aaru_arp_intf
 #define	aar_arp_dst	aar_u.aaru_add_arp.aaru_arp_dst
 #define	aar_arp_addr	aar_u.aaru_add_arp.aaru_arp_addr
@@ -194,7 +198,7 @@ struct atmdelreq {
 struct atminfreq {
 	int		air_opcode;		/* Sub-operation */
 	caddr_t		air_buf_addr;		/* Buffer for returned info */
-	int		air_buf_len;		/* Buffer length */
+	size_t		air_buf_len;		/* Buffer length */
 	union {
 		/* Vendor info */
 		char		airu_vinfo_intf[IFNAMSIZ];/* Interface name */
@@ -243,7 +247,7 @@ struct atminfreq {
  */
 struct air_vinfo_rsp {
 	char		avsp_intf[IFNAMSIZ];	/* Interface name */
-	int		avsp_len;		/* Length of returned
+	size_t		avsp_len;		/* Length of returned
 							Vendor Info block */
 						/* Vendor info ... */
 };
@@ -307,7 +311,7 @@ struct air_int_rsp {
 	u_char		anp_sig_proto;		/* Signalling protocol */
 	u_char		anp_sig_state;		/* Signalling protocol state */
 	char		anp_nif_pref[IFNAMSIZ]; /* Netif prefix */
-	int		anp_nif_cnt;		/* No. of netifs */
+	u_int		anp_nif_cnt;		/* No. of netifs */
 };
 
 /*
@@ -321,6 +325,8 @@ struct air_netif_rsp {
 
 /*
  * VCC information
+ * Todo: add avp_traffic_type and avp_traffic. Update unisig_if.c,
+ *	spans_if.c and sigpvc_if.c
  */
 #define	O_CNT		8
 struct air_vcc_rsp {
@@ -335,12 +341,12 @@ struct air_vcc_rsp {
 	char		avp_owners[(T_ATM_APP_NAME_LEN+1)*O_CNT];/* VCC users */
 	Atm_addr	avp_daddr;		/* Address of far end */
 	Atm_addr	avp_dsubaddr;		/* Subaddress of far end */
-	long		avp_ipdus;		/* PDUs received from VCC */
-	long		avp_opdus;		/* PDUs sent to VCC */
-	long		avp_ibytes;		/* Bytes received from VCC */
-	long		avp_obytes;		/* Bytes sent to VCC */
-	long		avp_ierrors;		/* Errors receiving from VCC */
-	long		avp_oerrors;		/* Errors sending to VCC */
+	u_long		avp_ipdus;		/* PDUs received from VCC */
+	u_long		avp_opdus;		/* PDUs sent to VCC */
+	u_long		avp_ibytes;		/* Bytes received from VCC */
+	u_long		avp_obytes;		/* Bytes sent to VCC */
+	u_long		avp_ierrors;		/* Errors receiving from VCC */
+	u_long		avp_oerrors;		/* Errors sending to VCC */
 	time_t		avp_tstamp;		/* State transition timestamp */
 };
 

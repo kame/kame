@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/powerpc/ofw/ofw_pcib_pci.c,v 1.1 2003/01/09 12:04:18 benno Exp $
+ * $FreeBSD: src/sys/powerpc/ofw/ofw_pcib_pci.c,v 1.2 2003/08/22 07:39:05 imp Exp $
  */
 
 #include <sys/param.h>
@@ -37,9 +37,9 @@
 
 #include <powerpc/ofw/ofw_pci.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
-#include <pci/pcib_private.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcib_private.h>
 
 #include "pcib_if.h"
 

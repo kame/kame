@@ -29,7 +29,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *	$NetBSD: cpu.h,v 1.11 2000/05/26 21:19:53 thorpej Exp $
- * $FreeBSD: src/sys/powerpc/include/cpu.h,v 1.13 2003/01/18 11:20:06 grehan Exp $
+ * $FreeBSD: src/sys/powerpc/include/cpu.h,v 1.16 2003/09/26 09:02:24 grehan Exp $
  */
 
 #ifndef _MACHINE_CPU_H_
@@ -49,10 +49,6 @@
 
 #define	cpu_swapout(p)
 #define	cpu_number()		0
-
-#define	DELAY(n)		delay(n)
-
-extern char bootpath[];
 
 #if defined(_KERNEL) || defined(_STANDALONE)
 #define	CACHELINESIZE	32
@@ -94,8 +90,13 @@ get_cyclecount(void)
 
 #define	cpu_getstack(td)	((td)->td_frame->fixreg[1])
 
-void	savectx(struct pcb *);
+void	cpu_halt(void);
+void	cpu_reset(void);
 void	fork_trampoline(void);
+void	swi_vm(void *);
+
+/* XXX the following should not be here. */
+void	savectx(struct pcb *);
 int	kcopy(const void *, void *, size_t);
 
 #endif	/* _MACHINE_CPU_H_ */

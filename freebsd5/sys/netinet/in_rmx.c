@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/in_rmx.c,v 1.44 2003/02/10 22:01:34 hsu Exp $
+ * $FreeBSD: src/sys/netinet/in_rmx.c,v 1.51 2003/11/20 20:07:37 andre Exp $
  */
 
 /*
@@ -49,6 +49,7 @@
 #include <sys/socket.h>
 #include <sys/mbuf.h>
 #include <sys/syslog.h>
+#include <sys/callout.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -72,15 +73,6 @@ in_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 	struct radix_node *ret;
 
 	/*
-	 * For IP, all unicast non-host routes are automatically cloning.
-	 */
-	if (IN_MULTICAST(ntohl(sin->sin_addr.s_addr)))
-		rt->rt_flags |= RTF_MULTICAST;
-
-	if (!(rt->rt_flags & (RTF_HOST | RTF_CLONING | RTF_MULTICAST)))
-		rt->rt_flags |= RTF_PRCLONING;
-
-	/*
 	 * A little bit of help for both IP output and input:
 	 *   For host routes, we make sure that RTF_BROADCAST
 	 *   is set for anything that looks like a broadcast address.
@@ -93,8 +85,7 @@ in_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 	 *
 	 * We also mark routes to multicast addresses as such, because
 	 * it's easy to do and might be useful (but this is much more
-	 * dubious since it's so easy to inspect the address).  (This
-	 * is done above.)
+	 * dubious since it's so easy to inspect the address).
 	 */
 	if (rt->rt_flags & RTF_HOST) {
 		if (in_broadcast(sin->sin_addr, rt->rt_ifp)) {
@@ -104,9 +95,10 @@ in_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 			rt->rt_flags |= RTF_LOCAL;
 		}
 	}
+	if (IN_MULTICAST(ntohl(sin->sin_addr.s_addr)))
+		rt->rt_flags |= RTF_MULTICAST;
 
-	if (!rt->rt_rmx.rmx_mtu && !(rt->rt_rmx.rmx_locks & RTV_MTU) &&
-	    rt->rt_ifp)
+	if (!rt->rt_rmx.rmx_mtu && rt->rt_ifp)
 		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu;
 
 	ret = rn_addroute(v_arg, n_arg, head, treenodes);
@@ -117,32 +109,19 @@ in_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 		 * Find out if it is because of an
 		 * ARP entry and delete it if so.
 		 */
-		rt2 = rtalloc1((struct sockaddr *)sin, 0,
-				RTF_CLONING | RTF_PRCLONING);
+		rt2 = rtalloc1((struct sockaddr *)sin, 0, RTF_CLONING);
 		if (rt2) {
 			if (rt2->rt_flags & RTF_LLINFO &&
 			    rt2->rt_flags & RTF_HOST &&
 			    rt2->rt_gateway &&
 			    rt2->rt_gateway->sa_family == AF_LINK) {
-				rtrequest(RTM_DELETE,
-					  (struct sockaddr *)rt_key(rt2),
-					  rt2->rt_gateway, rt_mask(rt2),
-					  rt2->rt_flags, 0);
+				rtexpunge(rt2);
+				RTFREE_LOCKED(rt2);
 				ret = rn_addroute(v_arg, n_arg, head,
 						  treenodes);
-			}
-			RTFREE(rt2);
+			} else
+				RTFREE_LOCKED(rt2);
 		}
-	}
-
-	/*
-	 * If the new route created successfully, and we are forwarding,
-	 * and there is a cached route, free it.  Otherwise, we may end
-	 * up using the wrong route.
-	 */
-	if (ret != NULL && ipforwarding && ipforward_rt.ro_rt) {
-		RTFREE(ipforward_rt.ro_rt);
-		ipforward_rt.ro_rt = 0;
 	}
 
 	return ret;
@@ -159,6 +138,7 @@ in_matroute(void *v_arg, struct radix_node_head *head)
 	struct radix_node *rn = rn_match(v_arg, head);
 	struct rtentry *rt = (struct rtentry *)rn;
 
+	/*XXX locking? */
 	if (rt && rt->rt_refcnt == 0) {		/* this is first reference */
 		if (rt->rt_flags & RTPRF_OURS) {
 			rt->rt_flags &= ~RTPRF_OURS;
@@ -190,6 +170,8 @@ in_clsroute(struct radix_node *rn, struct radix_node_head *head)
 {
 	struct rtentry *rt = (struct rtentry *)rn;
 
+	RT_LOCK_ASSERT(rt);
+
 	if (!(rt->rt_flags & RTF_UP))
 		return;			/* prophylactic measures */
 
@@ -207,10 +189,7 @@ in_clsroute(struct radix_node *rn, struct radix_node_head *head)
 		rt->rt_flags |= RTPRF_OURS;
 		rt->rt_rmx.rmx_expire = time_second + rtq_reallyold;
 	} else {
-		rtrequest(RTM_DELETE,
-			  (struct sockaddr *)rt_key(rt),
-			  rt->rt_gateway, rt_mask(rt),
-			  rt->rt_flags, 0);
+		rtexpunge(rt);
 	}
 }
 
@@ -268,6 +247,7 @@ in_rtqkill(struct radix_node *rn, void *rock)
 
 #define RTQ_TIMEOUT	60*10	/* run no less than once every ten minutes */
 static int rtq_timeout = RTQ_TIMEOUT;
+static struct callout rtq_timer;
 
 static void
 in_rtqtimo(void *rock)
@@ -276,17 +256,14 @@ in_rtqtimo(void *rock)
 	struct rtqk_arg arg;
 	struct timeval atv;
 	static time_t last_adjusted_timeout = 0;
-	int s;
 
 	arg.found = arg.killed = 0;
 	arg.rnh = rnh;
 	arg.nextstop = time_second + rtq_timeout;
 	arg.draining = arg.updating = 0;
-	s = splnet();
 	RADIX_NODE_HEAD_LOCK(rnh);
 	rnh->rnh_walktree(rnh, in_rtqkill, &arg);
 	RADIX_NODE_HEAD_UNLOCK(rnh);
-	splx(s);
 
 	/*
 	 * Attempt to be somewhat dynamic about this:
@@ -311,16 +288,14 @@ in_rtqtimo(void *rock)
 #endif
 		arg.found = arg.killed = 0;
 		arg.updating = 1;
-		s = splnet();
 		RADIX_NODE_HEAD_LOCK(rnh);
 		rnh->rnh_walktree(rnh, in_rtqkill, &arg);
 		RADIX_NODE_HEAD_UNLOCK(rnh);
-		splx(s);
 	}
 
 	atv.tv_usec = 0;
 	atv.tv_sec = arg.nextstop - time_second;
-	timeout(in_rtqtimo, rock, tvtohz(&atv));
+	callout_reset(&rtq_timer, tvtohz(&atv), in_rtqtimo, rock);
 }
 
 void
@@ -328,17 +303,15 @@ in_rtqdrain(void)
 {
 	struct radix_node_head *rnh = rt_tables[AF_INET];
 	struct rtqk_arg arg;
-	int s;
+
 	arg.found = arg.killed = 0;
 	arg.rnh = rnh;
 	arg.nextstop = 0;
 	arg.draining = 1;
 	arg.updating = 0;
-	s = splnet();
 	RADIX_NODE_HEAD_LOCK(rnh);
 	rnh->rnh_walktree(rnh, in_rtqkill, &arg);
 	RADIX_NODE_HEAD_UNLOCK(rnh);
-	splx(s);
 }
 
 /*
@@ -359,6 +332,7 @@ in_inithead(void **head, int off)
 	rnh->rnh_addaddr = in_addroute;
 	rnh->rnh_matchaddr = in_matroute;
 	rnh->rnh_close = in_clsroute;
+	callout_init(&rtq_timer, CALLOUT_MPSAFE);
 	in_rtqtimo(rnh);	/* kick off timeout first time */
 	return 1;
 }
@@ -383,8 +357,8 @@ in_ifadownkill(struct radix_node *rn, void *xap)
 {
 	struct in_ifadown_arg *ap = xap;
 	struct rtentry *rt = (struct rtentry *)rn;
-	int err;
 
+	RT_LOCK(rt);
 	if (rt->rt_ifa == ap->ifa &&
 	    (ap->del || !(rt->rt_flags & RTF_STATIC))) {
 		/*
@@ -395,13 +369,10 @@ in_ifadownkill(struct radix_node *rn, void *xap)
 		 * the routes that rtrequest() would have in any case,
 		 * so that behavior is not needed there.
 		 */
-		rt->rt_flags &= ~(RTF_CLONING | RTF_PRCLONING);
-		err = rtrequest(RTM_DELETE, (struct sockaddr *)rt_key(rt),
-				rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
-		if (err) {
-			log(LOG_WARNING, "in_ifadownkill: error %d\n", err);
-		}
+		rt->rt_flags &= ~RTF_CLONING;
+		rtexpunge(rt);
 	}
+	RT_UNLOCK(rt);
 	return 0;
 }
 
@@ -420,6 +391,6 @@ in_ifadown(struct ifaddr *ifa, int delete)
 	RADIX_NODE_HEAD_LOCK(rnh);
 	rnh->rnh_walktree(rnh, in_ifadownkill, &arg);
 	RADIX_NODE_HEAD_UNLOCK(rnh);
-	ifa->ifa_flags &= ~IFA_ROUTE;
+	ifa->ifa_flags &= ~IFA_ROUTE;		/* XXXlocking? */
 	return 0;
 }

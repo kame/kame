@@ -24,10 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/pci/pci_cfgreg.c,v 1.101 2003/02/18 03:36:48 peter Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/pci/pci_cfgreg.c,v 1.107 2003/11/03 21:53:38 jhb Exp $");
 
 #include <sys/param.h>		/* XXX trim includes */
 #include <sys/systm.h>
@@ -37,6 +37,7 @@
 #include <sys/malloc.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
+#include <sys/sysctl.h>
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <machine/md_var.h>
@@ -46,10 +47,6 @@
 #include <machine/pci_cfgreg.h>
 #include <machine/segments.h>
 #include <machine/pc/bios.h>
-
-#ifdef APIC_IO
-#include <machine/smp.h>
-#endif /* APIC_IO */
 
 #include "pcib_if.h"
 
@@ -77,6 +74,23 @@ static struct PIR_table *pci_route_table;
 static int pci_route_count;
 
 static struct mtx pcicfg_mtx;
+
+/* sysctl vars */
+SYSCTL_DECL(_hw_pci);
+
+#ifdef PC98
+#define PCI_IRQ_OVERRIDE_MASK 0x3e68
+#else
+#define PCI_IRQ_OVERRIDE_MASK 0xdef4
+#endif
+
+static uint32_t pci_irq_override_mask = PCI_IRQ_OVERRIDE_MASK;
+TUNABLE_INT("hw.pci.irq_override_mask", &pci_irq_override_mask);
+SYSCTL_INT(_hw_pci, OID_AUTO, irq_override_mask, CTLFLAG_RDTUN,
+    &pci_irq_override_mask, PCI_IRQ_OVERRIDE_MASK,
+    "Mask of allowed irqs to try to route when it has no good clue about\n"
+    "which irqs it should use.");
+
 
 /*
  * Some BIOS writers seem to want to ignore the spec and put
@@ -183,49 +197,7 @@ u_int32_t
 pci_cfgregread(int bus, int slot, int func, int reg, int bytes)
 {
 	uint32_t line;
-#ifdef APIC_IO
-	uint32_t pin;
 
-	/*
-	 * If we are using the APIC, the contents of the intline
-	 * register will probably be wrong (since they are set up for
-	 * use with the PIC.  Rather than rewrite these registers
-	 * (maybe that would be smarter) we trap attempts to read them
-	 * and translate to our private vector numbers.
-	 */
-	if ((reg == PCIR_INTLINE) && (bytes == 1)) {
-
-		pin = pcireg_cfgread(bus, slot, func, PCIR_INTPIN, 1);
-		line = pcireg_cfgread(bus, slot, func, PCIR_INTLINE, 1);
-
-		if (pin != 0) {
-			int airq;
-
-			airq = pci_apic_irq(bus, slot, pin);
-			if (airq >= 0) {
-				/* PCI specific entry found in MP table */
-				if (airq != line)
-					undirect_pci_irq(line);
-				return(airq);
-			} else {
-				/* 
-				 * PCI interrupts might be redirected
-				 * to the ISA bus according to some MP
-				 * tables. Use the same methods as
-				 * used by the ISA devices devices to
-				 * find the proper IOAPIC int pin.
-				 */
-				airq = isa_apic_irq(line);
-				if ((airq >= 0) && (airq != line)) {
-					/* XXX: undirect_pci_irq() ? */
-					undirect_isa_irq(line);
-					return(airq);
-				}
-			}
-		}
-		return(line);
-	}
-#else
 	/*
 	 * Some BIOS writers seem to want to ignore the spec and put
 	 * 0 in the intline rather than 255 to indicate none.  The rest of
@@ -233,10 +205,9 @@ pci_cfgregread(int bus, int slot, int func, int reg, int bytes)
 	 */
 	if (reg == PCIR_INTLINE && bytes == 1) {
 		line = pcireg_cfgread(bus, slot, func, PCIR_INTLINE, 1);
-		return pci_i386_map_intline(line);
+		return (pci_i386_map_intline(line));
 	}
-#endif /* APIC_IO */
-	return(pcireg_cfgread(bus, slot, func, reg, bytes));
+	return (pcireg_cfgread(bus, slot, func, reg, bytes));
 }
 
 /* 
@@ -427,7 +398,7 @@ pci_cfgintr_linked(struct PIR_entry *pe, int pin)
 			 * table entry 
 			 */
 			irq = pci_cfgintr_search(pe, oe->pe_bus, oe->pe_device,
-			    j, pin);
+			    j + 1, pin);
 			if (irq != PCI_INVALID_IRQ)
 				return(irq);
 		}
@@ -515,6 +486,8 @@ pci_cfgintr_virgin(struct PIR_entry *pe, int pin)
 	/* life is tough, so just pick an interrupt */
 	for (irq = 0; irq < 16; irq++) {
 		ibit = (1 << irq);
+		if ((ibit & pci_irq_override_mask) == 0)
+			continue;
 		if (pe->pe_intpin[pin - 1].irqs & ibit) {
 			PRVERB(("pci_cfgintr_virgin: using routable interrupt %d\n", irq));
 			return(irq);

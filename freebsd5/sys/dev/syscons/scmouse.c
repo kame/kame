@@ -22,9 +22,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/syscons/scmouse.c,v 1.33 2003/04/29 13:36:01 kan Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/syscons/scmouse.c,v 1.36 2003/08/24 18:17:23 obrien Exp $");
 
 #include "opt_syscons.h"
 
@@ -75,8 +76,10 @@ typedef struct old_mouse_info {
 #ifndef SC_NO_SYSMOUSE
 
 /* local variables */
+#ifndef SC_NO_CUTPASTE
 static int		cut_buffer_size;
 static u_char		*cut_buffer;
+#endif
 
 /* local functions */
 static void set_mouse_pos(scr_stat *scp);
@@ -127,7 +130,8 @@ sc_mouse_move(scr_stat *scp, int x, int y)
 	scp->mouse_pos = scp->mouse_oldpos = 0;
     else
 	scp->mouse_pos = scp->mouse_oldpos = 
-	    (y/scp->font_size - scp->yoff)*scp->xsize + x/8 - scp->xoff;
+	    (y/scp->font_size - scp->yoff)*scp->xsize + x/scp->font_width -
+	    scp->xoff;
     scp->status |= MOUSE_MOVED;
     splx(s);
 }
@@ -136,8 +140,8 @@ sc_mouse_move(scr_stat *scp, int x, int y)
 static void
 set_mouse_pos(scr_stat *scp)
 {
-    if (scp->mouse_xpos < scp->xoff*8)
-	scp->mouse_xpos = scp->xoff*8;
+    if (scp->mouse_xpos < scp->xoff*scp->font_width)
+	scp->mouse_xpos = scp->xoff*scp->font_width;
     if (scp->mouse_ypos < scp->yoff*scp->font_size)
 	scp->mouse_ypos = scp->yoff*scp->font_size;
     if (ISGRAPHSC(scp)) {
@@ -147,8 +151,8 @@ set_mouse_pos(scr_stat *scp)
 	    scp->mouse_ypos = scp->ypixel-1;
 	return;
     } else {
-	if (scp->mouse_xpos > (scp->xsize + scp->xoff)*8 - 1)
-	    scp->mouse_xpos = (scp->xsize + scp->xoff)*8 - 1;
+	if (scp->mouse_xpos > (scp->xsize + scp->xoff)*scp->font_width - 1)
+	    scp->mouse_xpos = (scp->xsize + scp->xoff)*scp->font_width - 1;
 	if (scp->mouse_ypos > (scp->ysize + scp->yoff)*scp->font_size - 1)
 	    scp->mouse_ypos = (scp->ysize + scp->yoff)*scp->font_size - 1;
     }
@@ -157,7 +161,7 @@ set_mouse_pos(scr_stat *scp)
 	scp->status |= MOUSE_MOVED;
     	scp->mouse_pos =
 	    (scp->mouse_ypos/scp->font_size - scp->yoff)*scp->xsize 
-		+ scp->mouse_xpos/8 - scp->xoff;
+		+ scp->mouse_xpos/scp->font_width - scp->xoff;
 #ifndef SC_NO_CUTPASTE
 	if ((scp->status & MOUSE_VISIBLE) && (scp->status & MOUSE_CUTTING))
 	    mouse_cut(scp);
@@ -193,7 +197,8 @@ sc_remove_mouse_image(scr_stat *scp)
 
     ++scp->sc->videoio_in_progress;
     (*scp->rndr->draw_mouse)(scp,
-			     (scp->mouse_oldpos%scp->xsize + scp->xoff)*8,
+			     (scp->mouse_oldpos%scp->xsize + scp->xoff)
+			         * scp->font_width,
 			     (scp->mouse_oldpos/scp->xsize + scp->yoff)
 				 * scp->font_size,
 			     FALSE);
@@ -770,10 +775,10 @@ sc_mouse_ioctl(struct tty *tp, u_long cmd, caddr_t data, int flag,
 		}
 	    }
 
+#ifndef SC_NO_CUTPASTE
 	    if (ISGRAPHSC(cur_scp) || (cut_buffer == NULL))
 		break;
 
-#ifndef SC_NO_CUTPASTE
 	    if ((mouse->operation == MOUSE_ACTION) && f) {
 		/* process button presses */
 		if (cur_scp->mouse_buttons & MOUSE_BUTTON1DOWN)
@@ -825,10 +830,10 @@ sc_mouse_ioctl(struct tty *tp, u_long cmd, caddr_t data, int flag,
 		}
 	    }
 
+#ifndef SC_NO_CUTPASTE
 	    if (ISGRAPHSC(cur_scp) || (cut_buffer == NULL))
 		break;
 
-#ifndef SC_NO_CUTPASTE
 	    switch (mouse->u.event.id) {
 	    case MOUSE_BUTTON1DOWN:
 	        switch (mouse->u.event.value % 4) {

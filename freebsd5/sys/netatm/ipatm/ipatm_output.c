@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_output.c,v 1.10 2002/04/21 01:41:04 arr Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * -------------------
  *
  * Output IP packets across an ATM VCC
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/ipatm/ipatm_output.c,v 1.12 2003/07/24 15:25:17 harti Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -58,11 +56,6 @@
 
 #include <netatm/ipatm/ipatm_var.h>
 #include <netatm/ipatm/ipatm_serv.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_output.c,v 1.10 2002/04/21 01:41:04 arr Exp $");
-#endif
-
 
 /*
  * Output an IP Packet
@@ -92,11 +85,9 @@ ipatm_ifoutput(ifp, m, dst)
 	struct ipvcc	*ivp;
 	int	err = 0;
 
-#ifdef DIAGNOSTIC
 	if (ipatm_print) {
 		atm_pdu_print(m, "ipatm_ifoutput");
 	}
-#endif
 
 	/*
 	 * See if we've already got an appropriate VCC
@@ -224,4 +215,3 @@ ipatm_ifoutput(ifp, m, dst)
 done:
 	return (err);
 }
-

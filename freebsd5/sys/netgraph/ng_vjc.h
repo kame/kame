@@ -36,12 +36,12 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_vjc.h,v 1.7 2002/05/31 23:48:03 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_vjc.h,v 1.8 2003/11/11 12:30:37 ru Exp $
  * $Whistle: ng_vjc.h,v 1.6 1999/01/25 02:40:22 archie Exp $
  */
 
-#ifndef _NETGRAPH_VJC_H_
-#define _NETGRAPH_VJC_H_
+#ifndef _NETGRAPH_NG_VJC_H_
+#define _NETGRAPH_NG_VJC_H_
 
  /* Node type name and magic cookie */
 #define NG_VJC_NODE_TYPE	"vjc"
@@ -83,4 +83,4 @@ enum {
 	NGM_VJC_RECV_ERROR,	/* Indicate loss of incoming frame */
 };
 
-#endif /* _NETGRAPH_VJC_H_ */
+#endif /* _NETGRAPH_NG_VJC_H_ */

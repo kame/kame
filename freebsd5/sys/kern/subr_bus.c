@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1997,1998 Doug Rabson
+ * Copyright (c) 1997,1998,2003 Doug Rabson
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/subr_bus.c,v 1.128 2003/04/30 12:57:39 markm Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/subr_bus.c,v 1.138 2003/11/05 23:42:50 sam Exp $");
 
 #include "opt_bus.h"
 
@@ -61,8 +62,8 @@ SYSCTL_NODE(_hw, OID_AUTO, bus, CTLFLAG_RW, NULL, NULL);
  */
 typedef struct driverlink *driverlink_t;
 struct driverlink {
-    driver_t	*driver;
-    TAILQ_ENTRY(driverlink) link;	/* list of drivers in devclass */
+	kobj_class_t	driver;
+	TAILQ_ENTRY(driverlink) link;	/* list of drivers in devclass */
 };
 
 /*
@@ -74,6 +75,7 @@ typedef TAILQ_HEAD(device_list, device) device_list_t;
 
 struct devclass {
 	TAILQ_ENTRY(devclass) link;
+	devclass_t	parent;		/* parent in devclass hierarchy */
 	driver_list_t	drivers;     /* bus devclasses store drivers for bus */
 	char		*name;
 	device_t	*devices;	/* array of devices indexed by unit */
@@ -131,6 +133,7 @@ struct device_op_desc {
 };
 
 static MALLOC_DEFINE(M_BUS, "bus", "Bus data structures");
+static MALLOC_DEFINE(M_BUS_SC, "bus-sc", "Bus data structures, softc");
 
 #ifdef BUS_DEBUG
 
@@ -366,6 +369,65 @@ devpoll(dev_t dev, int events, d_thread_t *td)
 }
 
 /*
+ * Generic interface to queue data to the devctl device.  It is
+ * assumed that data is properly formatted.  It is further assumed
+ * that data is allocated.
+ */
+void
+devctl_queue_data(char *data)
+{
+	struct dev_event_info *n1 = NULL;
+	struct proc *p;
+
+	n1 = malloc(sizeof(*n1), M_BUS, M_NOWAIT);
+	if (n1 == NULL)
+		return;
+	n1->dei_data = data;
+	mtx_lock(&devsoftc.mtx);
+	TAILQ_INSERT_TAIL(&devsoftc.devq, n1, dei_link);	
+	cv_broadcast(&devsoftc.cv);
+	mtx_unlock(&devsoftc.mtx);
+	selwakeup(&devsoftc.sel);
+	p = devsoftc.async_proc;
+	if (p != NULL) {
+		PROC_LOCK(p);
+		psignal(p, SIGIO);
+		PROC_UNLOCK(p);
+	}
+}
+
+/*
+ * Send a 'notification' to userland, using standard ways
+ */
+void
+devctl_notify(const char *system, const char *subsystem, const char *type,
+    const char *data)
+{
+	int len = 0;
+	char *msg;
+
+	if (system == NULL)
+		return;		/* BOGUS!  Must specify system. */
+	if (subsystem == NULL)
+		return;		/* BOGUS!  Must specify subsystem. */
+	if (type == NULL)
+		return;		/* BOGUS!  Must specify type. */
+	len += strlen(" system=") + strlen(system);
+	len += strlen(" subsystem=") + strlen(subsystem);
+	len += strlen(" type=") + strlen(type);
+	/* add in the data message plus newline. */
+	if (data != NULL)
+		len += strlen(data);
+	len += 3;	/* '!', '\n', and NUL */
+	msg = malloc(len, M_BUS, M_NOWAIT);
+	if (msg == NULL)
+		return;		/* Drop it on the floor */
+	snprintf(msg, len, "!system=%s subsystem=%s type=%s %s\n", system,
+	    subsystem, type, data);
+	devctl_queue_data(msg);
+}
+
+/*
  * Common routine that tries to make sending messages as easy as possible.
  * We allocate memory for the data, copy strings into that, but do not
  * free it unless there's an error.  The dequeue part of the driver should
@@ -376,17 +438,12 @@ devpoll(dev_t dev, int events, d_thread_t *td)
 static void
 devaddq(const char *type, const char *what, device_t dev)
 {
-	struct dev_event_info *n1 = NULL;
-	struct proc *p;
 	char *data = NULL;
 	char *loc;
 	const char *parstr;
 
 	if (devctl_disable)
 		return;
-	n1 = malloc(sizeof(*n1), M_BUS, M_NOWAIT);
-	if (n1 == NULL)
-		goto bad;
 	data = malloc(1024, M_BUS, M_NOWAIT);
 	if (data == NULL)
 		goto bad;
@@ -401,22 +458,10 @@ devaddq(const char *type, const char *what, device_t dev)
 		parstr = device_get_nameunit(device_get_parent(dev));
 	snprintf(data, 1024, "%s%s at %s on %s\n", type, what, loc, parstr);
 	free(loc, M_BUS);
-	n1->dei_data = data;
-	mtx_lock(&devsoftc.mtx);
-	TAILQ_INSERT_TAIL(&devsoftc.devq, n1, dei_link);	
-	cv_broadcast(&devsoftc.cv);
-	mtx_unlock(&devsoftc.mtx);
-	selwakeup(&devsoftc.sel);
-	p = devsoftc.async_proc;
-	if (p != NULL) {
-		PROC_LOCK(p);
-		psignal(p, SIGIO);
-		PROC_UNLOCK(p);
-	}
+	devctl_queue_data(data);
 	return;
-bad:;
+bad:
 	free(data, M_BUS);
-	free(n1, M_BUS);
 	return;
 }
 
@@ -507,7 +552,8 @@ DEFINE_CLASS(null, null_methods, 0);
 static devclass_list_t devclasses = TAILQ_HEAD_INITIALIZER(devclasses);
 
 static devclass_t
-devclass_find_internal(const char *classname, int create)
+devclass_find_internal(const char *classname, const char *parentname,
+		       int create)
 {
 	devclass_t dc;
 
@@ -517,21 +563,25 @@ devclass_find_internal(const char *classname, int create)
 
 	TAILQ_FOREACH(dc, &devclasses, link) {
 		if (!strcmp(dc->name, classname))
-			return (dc);
+			break;
 	}
 
-	PDEBUG(("%s not found%s", classname, (create? ", creating": "")));
-	if (create) {
+	if (create && !dc) {
+		PDEBUG(("creating %s", classname));
 		dc = malloc(sizeof(struct devclass) + strlen(classname) + 1,
 		    M_BUS, M_NOWAIT|M_ZERO);
 		if (!dc)
 			return (NULL);
+		dc->parent = NULL;
 		dc->name = (char*) (dc + 1);
 		strcpy(dc->name, classname);
 		TAILQ_INIT(&dc->drivers);
 		TAILQ_INSERT_TAIL(&devclasses, dc, link);
 
 		bus_data_generation_update();
+	}
+	if (parentname && dc && !dc->parent) {
+		dc->parent = devclass_find_internal(parentname, 0, FALSE);
 	}
 
 	return (dc);
@@ -540,13 +590,13 @@ devclass_find_internal(const char *classname, int create)
 devclass_t
 devclass_create(const char *classname)
 {
-	return (devclass_find_internal(classname, TRUE));
+	return (devclass_find_internal(classname, 0, TRUE));
 }
 
 devclass_t
 devclass_find(const char *classname)
 {
-	return (devclass_find_internal(classname, FALSE));
+	return (devclass_find_internal(classname, 0, FALSE));
 }
 
 int
@@ -572,7 +622,7 @@ devclass_add_driver(devclass_t dc, driver_t *driver)
 	/*
 	 * Make sure the devclass which the driver is implementing exists.
 	 */
-	devclass_find_internal(driver->name, TRUE);
+	devclass_find_internal(driver->name, 0, TRUE);
 
 	dl->driver = driver;
 	TAILQ_INSERT_TAIL(&dc->drivers, dl, link);
@@ -666,7 +716,7 @@ devclass_find_driver_internal(devclass_t dc, const char *classname)
 	return (NULL);
 }
 
-driver_t *
+kobj_class_t
 devclass_find_driver(devclass_t dc, const char *classname)
 {
 	driverlink_t dl;
@@ -747,6 +797,18 @@ devclass_find_free_unit(devclass_t dc, int unit)
 	while (unit < dc->maxunit && dc->devices[unit] != NULL)
 		unit++;
 	return (unit);
+}
+
+void
+devclass_set_parent(devclass_t dc, devclass_t pdc)
+{
+	dc->parent = pdc;
+}
+
+devclass_t
+devclass_get_parent(devclass_t dc)
+{
+	return (dc->parent);
 }
 
 static int
@@ -855,7 +917,7 @@ make_device(device_t parent, const char *name, int unit)
 	PDEBUG(("%s at %s as unit %d", name, DEVICENAME(parent), unit));
 
 	if (name) {
-		dc = devclass_find_internal(name, TRUE);
+		dc = devclass_find_internal(name, 0, TRUE);
 		if (!dc) {
 			printf("make_device: can't find device class %s\n",
 			    name);
@@ -1041,44 +1103,54 @@ device_probe_child(device_t dev, device_t child)
 	if (child->state == DS_ALIVE)
 		return (0);
 
-	for (dl = first_matching_driver(dc, child);
-	     dl;
-	     dl = next_matching_driver(dc, child, dl)) {
-		PDEBUG(("Trying %s", DRIVERNAME(dl->driver)));
-		device_set_driver(child, dl->driver);
-		if (!hasclass)
-			device_set_devclass(child, dl->driver->name);
-		result = DEVICE_PROBE(child);
-		if (!hasclass)
-			device_set_devclass(child, 0);
+	for (; dc; dc = dc->parent) {
+		for (dl = first_matching_driver(dc, child);
+		     dl;
+		     dl = next_matching_driver(dc, child, dl)) {
+			PDEBUG(("Trying %s", DRIVERNAME(dl->driver)));
+			device_set_driver(child, dl->driver);
+			if (!hasclass)
+				device_set_devclass(child, dl->driver->name);
+			result = DEVICE_PROBE(child);
+			if (!hasclass)
+				device_set_devclass(child, 0);
 
+			/*
+			 * If the driver returns SUCCESS, there can be
+			 * no higher match for this device.
+			 */
+			if (result == 0) {
+				best = dl;
+				pri = 0;
+				break;
+			}
+
+			/*
+			 * The driver returned an error so it
+			 * certainly doesn't match.
+			 */
+			if (result > 0) {
+				device_set_driver(child, 0);
+				continue;
+			}
+
+			/*
+			 * A priority lower than SUCCESS, remember the
+			 * best matching driver. Initialise the value
+			 * of pri for the first match.
+			 */
+			if (best == 0 || result > pri) {
+				best = dl;
+				pri = result;
+				continue;
+			}
+		}
 		/*
-		 * If the driver returns SUCCESS, there can be no higher match
-		 * for this device.
+		 * If we have an unambiguous match in this devclass,
+		 * don't look in the parent.
 		 */
-		if (result == 0) {
-			best = dl;
-			pri = 0;
+		if (best && pri == 0)
 			break;
-		}
-
-		/*
-		 * The driver returned an error so it certainly doesn't match.
-		 */
-		if (result > 0) {
-			device_set_driver(child, 0);
-			continue;
-		}
-
-		/*
-		 * A priority lower than SUCCESS, remember the best matching
-		 * driver. Initialise the value of pri for the first match.
-		 */
-		if (best == 0 || result > pri) {
-			best = dl;
-			pri = result;
-			continue;
-		}
 	}
 
 	/*
@@ -1256,7 +1328,7 @@ void
 device_set_softc(device_t dev, void *softc)
 {
 	if (dev->softc && !(dev->flags & DF_EXTERNALSOFTC))
-		free(dev->softc, M_BUS);
+		free(dev->softc, M_BUS_SC);
 	dev->softc = softc;
 	if (dev->softc)
 		dev->flags |= DF_EXTERNALSOFTC;
@@ -1375,7 +1447,7 @@ device_set_devclass(device_t dev, const char *classname)
 		return (EINVAL);
 	}
 
-	dc = devclass_find_internal(classname, TRUE);
+	dc = devclass_find_internal(classname, 0, TRUE);
 	if (!dc)
 		return (ENOMEM);
 
@@ -1395,7 +1467,7 @@ device_set_driver(device_t dev, driver_t *driver)
 		return (0);
 
 	if (dev->softc && !(dev->flags & DF_EXTERNALSOFTC)) {
-		free(dev->softc, M_BUS);
+		free(dev->softc, M_BUS_SC);
 		dev->softc = NULL;
 	}
 	kobj_delete((kobj_t) dev, 0);
@@ -1403,7 +1475,7 @@ device_set_driver(device_t dev, driver_t *driver)
 	if (driver) {
 		kobj_init((kobj_t) dev, (kobj_class_t) driver);
 		if (!(dev->flags & DF_EXTERNALSOFTC) && driver->size > 0) {
-			dev->softc = malloc(driver->size, M_BUS,
+			dev->softc = malloc(driver->size, M_BUS_SC,
 			    M_NOWAIT | M_ZERO);
 			if (!dev->softc) {
 				kobj_delete((kobj_t) dev, 0);
@@ -1797,7 +1869,7 @@ bus_generic_resume(device_t dev)
 }
 
 int
-bus_print_child_header (device_t dev, device_t child)
+bus_print_child_header(device_t dev, device_t child)
 {
 	int	retval = 0;
 
@@ -1811,7 +1883,7 @@ bus_print_child_header (device_t dev, device_t child)
 }
 
 int
-bus_print_child_footer (device_t dev, device_t child)
+bus_print_child_footer(device_t dev, device_t child)
 {
 	return (printf(" on %s\n", device_get_nameunit(dev)));
 }
@@ -1842,7 +1914,7 @@ bus_generic_write_ivar(device_t dev, device_t child, int index,
 }
 
 struct resource_list *
-bus_generic_get_resource_list (device_t dev, device_t child)
+bus_generic_get_resource_list(device_t dev, device_t child)
 {
 	return (NULL);
 }
@@ -1925,7 +1997,18 @@ bus_generic_deactivate_resource(device_t dev, device_t child, int type,
 }
 
 int
-bus_generic_rl_get_resource (device_t dev, device_t child, int type, int rid,
+bus_generic_config_intr(device_t dev, int irq, enum intr_trigger trig,
+    enum intr_polarity pol)
+{
+
+	/* Propagate up the bus hierarchy until someone handles it. */
+	if (dev->parent)
+		return (BUS_CONFIG_INTR(dev->parent, irq, trig, pol));
+	return (EINVAL);
+}
+
+int
+bus_generic_rl_get_resource(device_t dev, device_t child, int type, int rid,
     u_long *startp, u_long *countp)
 {
 	struct resource_list *		rl = NULL;
@@ -1948,7 +2031,7 @@ bus_generic_rl_get_resource (device_t dev, device_t child, int type, int rid,
 }
 
 int
-bus_generic_rl_set_resource (device_t dev, device_t child, int type, int rid,
+bus_generic_rl_set_resource(device_t dev, device_t child, int type, int rid,
     u_long start, u_long count)
 {
 	struct resource_list *		rl = NULL;
@@ -1963,7 +2046,7 @@ bus_generic_rl_set_resource (device_t dev, device_t child, int type, int rid,
 }
 
 void
-bus_generic_rl_delete_resource (device_t dev, device_t child, int type, int rid)
+bus_generic_rl_delete_resource(device_t dev, device_t child, int type, int rid)
 {
 	struct resource_list *		rl = NULL;
 
@@ -1977,7 +2060,7 @@ bus_generic_rl_delete_resource (device_t dev, device_t child, int type, int rid)
 }
 
 int
-bus_generic_rl_release_resource (device_t dev, device_t child, int type,
+bus_generic_rl_release_resource(device_t dev, device_t child, int type,
     int rid, struct resource *r)
 {
 	struct resource_list *		rl = NULL;
@@ -1990,7 +2073,7 @@ bus_generic_rl_release_resource (device_t dev, device_t child, int type,
 }
 
 struct resource *
-bus_generic_rl_alloc_resource (device_t dev, device_t child, int type,
+bus_generic_rl_alloc_resource(device_t dev, device_t child, int type,
     int *rid, u_long start, u_long end, u_long count, u_int flags)
 {
 	struct resource_list *		rl = NULL;
@@ -2054,10 +2137,23 @@ int
 bus_setup_intr(device_t dev, struct resource *r, int flags,
     driver_intr_t handler, void *arg, void **cookiep)
 {
-	if (dev->parent == 0)
-		return (EINVAL);
-	return (BUS_SETUP_INTR(dev->parent, dev, r, flags,
-	    handler, arg, cookiep));
+	int error;
+
+	if (dev->parent != 0) {
+		if ((flags &~ INTR_ENTROPY) == (INTR_TYPE_NET | INTR_MPSAFE) &&
+		    !debug_mpsafenet)
+			flags &= ~INTR_MPSAFE;
+		error = BUS_SETUP_INTR(dev->parent, dev, r, flags,
+		    handler, arg, cookiep);
+		if (error == 0) {
+			if (flags & INTR_MPSAFE)
+				device_printf(dev, "[MPSAFE]\n");
+			if (flags & INTR_FAST)
+				device_printf(dev, "[FAST]\n");
+		}
+	} else
+		error = EINVAL;
+	return (error);
 }
 
 int
@@ -2219,7 +2315,7 @@ root_bus_module_handler(module_t mod, int what, void* arg)
 		kobj_init((kobj_t) root_bus, (kobj_class_t) &root_driver);
 		root_bus->driver = &root_driver;
 		root_bus->state = DS_ATTACHED;
-		root_devclass = devclass_find_internal("root", FALSE);
+		root_devclass = devclass_find_internal("root", 0, FALSE);
 		devinit();
 		return (0);
 
@@ -2253,12 +2349,13 @@ root_bus_configure(void)
 int
 driver_module_handler(module_t mod, int what, void *arg)
 {
-	int error, i;
+	int error;
 	struct driver_module_data *dmd;
 	devclass_t bus_devclass;
+	kobj_class_t driver;
 
 	dmd = (struct driver_module_data *)arg;
-	bus_devclass = devclass_find_internal(dmd->dmd_busname, TRUE);
+	bus_devclass = devclass_find_internal(dmd->dmd_busname, 0, TRUE);
 	error = 0;
 
 	switch (what) {
@@ -2266,31 +2363,38 @@ driver_module_handler(module_t mod, int what, void *arg)
 		if (dmd->dmd_chainevh)
 			error = dmd->dmd_chainevh(mod,what,dmd->dmd_chainarg);
 
-		for (i = 0; !error && i < dmd->dmd_ndrivers; i++) {
-			PDEBUG(("Loading module: driver %s on bus %s",
-			    DRIVERNAME(dmd->dmd_drivers[i]), dmd->dmd_busname));
-			error = devclass_add_driver(bus_devclass,
-			    dmd->dmd_drivers[i]);
-		}
+		driver = dmd->dmd_driver;
+		PDEBUG(("Loading module: driver %s on bus %s",
+		    DRIVERNAME(driver), dmd->dmd_busname));
+		error = devclass_add_driver(bus_devclass, driver);
 		if (error)
 			break;
 
 		/*
-		 * The drivers loaded in this way are assumed to all
-		 * implement the same devclass.
+		 * If the driver has any base classes, make the
+		 * devclass inherit from the devclass of the driver's
+		 * first base class. This will allow the system to
+		 * search for drivers in both devclasses for children
+		 * of a device using this driver.
 		 */
-		*dmd->dmd_devclass =
-		    devclass_find_internal(dmd->dmd_drivers[0]->name, TRUE);
+		if (driver->baseclasses) {
+			const char *parentname;
+			parentname = driver->baseclasses[0]->name;
+			*dmd->dmd_devclass =
+				devclass_find_internal(driver->name,
+				    parentname, TRUE);
+		} else {
+			*dmd->dmd_devclass =
+				devclass_find_internal(driver->name, 0, TRUE);
+		}
 		break;
 
 	case MOD_UNLOAD:
-		for (i = 0; !error && i < dmd->dmd_ndrivers; i++) {
-			PDEBUG(("Unloading module: driver %s from bus %s",
-			    DRIVERNAME(dmd->dmd_drivers[i]),
-			    dmd->dmd_busname));
-			error = devclass_delete_driver(bus_devclass,
-			    dmd->dmd_drivers[i]);
-		}
+		PDEBUG(("Unloading module: driver %s from bus %s",
+		    DRIVERNAME(dmd->dmd_driver),
+		    dmd->dmd_busname));
+		error = devclass_delete_driver(bus_devclass,
+		    dmd->dmd_driver);
 
 		if (!error && dmd->dmd_chainevh)
 			error = dmd->dmd_chainevh(mod,what,dmd->dmd_chainarg);

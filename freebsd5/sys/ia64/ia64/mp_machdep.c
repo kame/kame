@@ -23,8 +23,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/ia64/ia64/mp_machdep.c,v 1.47 2003/05/16 21:26:40 marcel Exp $
+ *	$FreeBSD: src/sys/ia64/ia64/mp_machdep.c,v 1.52 2003/11/21 22:23:25 jhb Exp $
  */
+
+#include "opt_kstack_pages.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -45,15 +47,15 @@
 #include <vm/vm_kern.h>
 
 #include <machine/atomic.h>
-#include <machine/cpu.h>
+#include <machine/clock.h>
+#include <machine/fpu.h>
+#include <machine/mca.h>
+#include <machine/md_var.h>
 #include <machine/pal.h>
 #include <machine/pcb.h>
 #include <machine/pmap.h>
-#include <machine/clock.h>
-#include <machine/mca.h>
 #include <machine/sal.h>
 #include <machine/smp.h>
-#include <machine/fpu.h>
 #include <i386/include/specialreg.h>
 
 MALLOC_DECLARE(M_PMAP);
@@ -121,17 +123,19 @@ ia64_ap_startup(void)
 
 	mtx_lock_spin(&sched_lock);
 
-	/* kick off the clock on this AP */
-	ia64_set_itm(ia64_get_itc() + itm_reload);
-	ia64_set_itv(CLOCK_VECTOR);
 	ia64_set_tpr(0);
+
+	/* kick off the clock on this AP */
+	pcpu_initclock();
+
 	cpu_throw(NULL, choosethread());
 	/* NOTREACHED */
 }
 
-int
-cpu_mp_probe()
+void
+cpu_mp_setmaxid(void)
 {
+
 	/*
 	 * Count the number of processors in the system by walking the ACPI
 	 * tables. Note that we record the actual number of processors, even
@@ -144,6 +148,11 @@ cpu_mp_probe()
 	 * VM initialization.
 	 */
 	mp_maxid = min(mp_ncpus, MAXCPU) - 1;
+}
+
+int
+cpu_mp_probe(void)
+{
 
 	/*
 	 * If there's only 1 processor, or we don't have a wake-up vector,
@@ -156,7 +165,7 @@ cpu_mp_probe()
 }
 
 void
-cpu_mp_add(uint acpiid, uint apicid, uint apiceid)
+cpu_mp_add(u_int acpiid, u_int apicid, u_int apiceid)
 {
 	struct pcpu *pc;
 	u_int64_t lid;

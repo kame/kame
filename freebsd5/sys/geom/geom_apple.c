@@ -1,5 +1,4 @@
 /*-
- *
  * Copyright (c) 2002 Peter Grehan.
  * All rights reserved.
  *
@@ -23,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/geom/geom_apple.c,v 1.9 2003/05/02 06:36:14 phk Exp $
  */
 
 /*
@@ -32,6 +29,9 @@
  *  As described in 'Inside Macintosh Vol 3: About the SCSI Manager -
  *    The Structure of Block Devices"
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/geom/geom_apple.c,v 1.12 2003/06/11 06:49:15 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/endian.h>
@@ -92,13 +92,11 @@ g_apple_start(struct bio *bp)
 {
 	struct g_provider *pp;
 	struct g_geom *gp;
-	struct g_apm_softc *mp;
 	struct g_slicer *gsp;
 
 	pp = bp->bio_to;
 	gp = pp->geom;
 	gsp = gp->softc;
-	mp = gsp->softc;
 	if (bp->bio_cmd == BIO_GETATTR) {
 		if (g_handleattr_off_t(bp, "APM::offset",
 		    gsp->slices[pp->index].offset))
@@ -145,9 +143,8 @@ g_apple_taste(struct g_class *mp, struct g_provider *pp, int insist)
 {
 	struct g_geom *gp;
 	struct g_consumer *cp;
-	int error, i, npart;
+	int error, i;
 	struct g_apple_softc *ms;
-	struct g_slicer *gsp;
 	struct apm_partition *apm;
 	u_int sectorsize;
 	u_char *buf;
@@ -157,10 +154,8 @@ g_apple_taste(struct g_class *mp, struct g_provider *pp, int insist)
 	gp = g_slice_new(mp, NAPMPART, pp, &cp, &ms, sizeof *ms, g_apple_start);
 	if (gp == NULL)
 		return (NULL);
-	gsp = gp->softc;
 	g_topology_unlock();
 	gp->dumpconf = g_apple_dumpconf;
-	npart = 0;
 	do {
 		if (gp->rank != 2 && insist == 0)
 			break;
@@ -218,7 +213,6 @@ g_apple_taste(struct g_class *mp, struct g_provider *pp, int insist)
 			    &ms->apmpart[i]);
 		}
 
-		npart = 0;
 		for (i = 0; i < NAPMPART; i++) {
 			apm = &ms->apmpart[i];
 
@@ -237,7 +231,6 @@ g_apple_taste(struct g_class *mp, struct g_provider *pp, int insist)
 				    gp->name);
 				/* g_apple_print(i, dp + i); */
 			}
-			npart++;
 			g_topology_lock();
 			g_slice_config(gp, i, G_SLICE_CONFIG_SET,
 			    (off_t)apm->am_start << 9ULL,
@@ -262,7 +255,6 @@ g_apple_taste(struct g_class *mp, struct g_provider *pp, int insist)
 static struct g_class g_apple_class	= {
 	.name = APPLE_CLASS_NAME,
 	.taste = g_apple_taste,
-	G_CLASS_INITIALIZER
 };
 
 DECLARE_GEOM_CLASS(g_apple_class, g_apple);

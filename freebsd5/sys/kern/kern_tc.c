@@ -5,9 +5,10 @@
  * can do whatever you want with this stuff. If we meet some day, and you think
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
- *
- * $FreeBSD: src/sys/kern/kern_tc.c,v 1.148 2003/03/18 08:45:23 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_tc.c,v 1.158 2003/11/13 10:03:58 phk Exp $");
 
 #include "opt_ntp.h"
 
@@ -18,6 +19,14 @@
 #include <sys/timepps.h>
 #include <sys/timetc.h>
 #include <sys/timex.h>
+
+/*
+ * A large step happens on boot.  This constant detects such steps.
+ * It is relatively small so that ntp_update_second gets called enough
+ * in the typical 'missed a couple of seconds' case, but doesn't loop
+ * forever when the time step is large.
+ */
+#define LARGE_STEP	200
 
 /*
  * Implement a dummy timecounter which we can use until we get a real one
@@ -34,7 +43,7 @@ dummy_get_timecount(struct timecounter *tc)
 }
 
 static struct timecounter dummy_timecounter = {
-	dummy_get_timecount, 0, ~0u, 1000000, "dummy",
+	dummy_get_timecount, 0, ~0u, 1000000, "dummy", -1000000
 };
 
 struct timehands {
@@ -272,27 +281,44 @@ getmicrotime(struct timeval *tvp)
 }
 
 /*
- * Initialize a new timecounter.
- * We should really try to rank the timecounters and intelligently determine
- * if the new timecounter is better than the current one.  This is subject
- * to further study.  For now always use the new timecounter.
+ * Initialize a new timecounter and possibly use it.
  */
 void
 tc_init(struct timecounter *tc)
 {
-	unsigned u;
-
-	printf("Timecounter \"%s\"  frequency %ju Hz",
-	    tc->tc_name, (intmax_t)tc->tc_frequency);
+	u_int u;
 
 	u = tc->tc_frequency / tc->tc_counter_mask;
-	if (u > hz) {
-		printf(" -- Insufficient hz, needs at least %u\n", u);
-		return;
+	/* XXX: We need some margin here, 10% is a guess */
+	u *= 11;
+	u /= 10;
+	if (u > hz && tc->tc_quality >= 0) {
+		tc->tc_quality = -2000;
+		if (bootverbose) {
+			printf("Timecounter \"%s\" frequency %ju Hz",
+			    tc->tc_name, (uintmax_t)tc->tc_frequency);
+			printf(" -- Insufficient hz, needs at least %u\n", u);
+		}
+	} else if (tc->tc_quality >= 0 || bootverbose) {
+		printf("Timecounter \"%s\" frequency %ju Hz quality %d\n",
+		    tc->tc_name, (uintmax_t)tc->tc_frequency,
+		    tc->tc_quality);
 	}
+
 	tc->tc_next = timecounters;
 	timecounters = tc;
-	printf("\n");
+	/*
+	 * Never automatically use a timecounter with negative quality.
+	 * Even though we run on the dummy counter, switching here may be
+	 * worse since this timecounter may not be monotonous.
+	 */
+	if (tc->tc_quality < 0)
+		return;
+	if (tc->tc_quality < timecounter->tc_quality)
+		return;
+	if (tc->tc_quality == timecounter->tc_quality &&
+	    tc->tc_frequency < timecounter->tc_frequency)
+		return;
 	(void)tc->tc_get_timecount(tc);
 	(void)tc->tc_get_timecount(tc);
 	timecounter = tc;
@@ -307,8 +333,8 @@ tc_getfrequency(void)
 }
 
 /*
- * Step our concept of GMT.  This is done by modifying our estimate of
- * when we booted.  XXX: needs futher work.
+ * Step our concept of UTC.  This is done by modifying our estimate of
+ * when we booted.  XXX: needs further work.
  */
 void
 tc_setclock(struct timespec *ts)
@@ -343,6 +369,7 @@ tc_windup(void)
 	u_int64_t scale;
 	u_int delta, ncount, ogen;
 	int i;
+	time_t t;
 
 	/*
 	 * Make the next timehands a copy of the current one, but do not
@@ -381,12 +408,29 @@ tc_windup(void)
 		tho->th_counter->tc_poll_pps(tho->th_counter);
 
 	/*
-	 * Deal with NTP second processing.  The for loop normally only
-	 * iterates once, but in extreme situations it might keep NTP sane
-	 * if timeouts are not run for several seconds.
+	 * Deal with NTP second processing.  The for loop normally
+	 * iterates at most once, but in extreme situations it might
+	 * keep NTP sane if timeouts are not run for several seconds.
+	 * At boot, the time step can be large when the TOD hardware
+	 * has been read, so on really large steps, we call
+	 * ntp_update_second only twice.  We need to call it twice in
+	 * case we missed a leap second.
 	 */
-	for (i = th->th_offset.sec - tho->th_offset.sec; i > 0; i--)
-		ntp_update_second(&th->th_adjustment, &th->th_offset.sec);
+	bt = th->th_offset;
+	bintime_add(&bt, &boottimebin);
+	i = bt.sec - tho->th_microtime.tv_sec;
+	if (i > LARGE_STEP)
+		i = 2;
+	for (; i > 0; i--) {
+		t = bt.sec;
+		ntp_update_second(&th->th_adjustment, &bt.sec);
+		if (bt.sec != t)
+			boottimebin.sec += bt.sec - t;
+	}
+	/* Update the UTC timestamps used by the get*() functions. */
+	/* XXX shouldn't do this here.  Should force non-`get' versions. */
+	bintime2timeval(&bt, &th->th_microtime);
+	bintime2timespec(&bt, &th->th_nanotime);
 
 	/* Now is a good time to change timecounters. */
 	if (th->th_counter != timecounter) {
@@ -401,7 +445,7 @@ tc_windup(void)
 	 * processing provides us with.
 	 *
 	 * The th_adjustment is nanoseconds per second with 32 bit binary
-	 * fraction and want 64 bit binary fraction of second:
+	 * fraction and we want 64 bit binary fraction of second:
 	 *
 	 *	 x = a * 2^32 / 10^9 = a * 4.294967296
 	 *
@@ -421,12 +465,6 @@ tc_windup(void)
 	scale += (th->th_adjustment / 1024) * 2199;
 	scale /= th->th_counter->tc_frequency;
 	th->th_scale = scale * 2;
-
-	/* Update the GMT timestamps used for the get*() functions. */
-	bt = th->th_offset;
-	bintime_add(&bt, &boottimebin);
-	bintime2timeval(&bt, &th->th_microtime);
-	bintime2timespec(&bt, &th->th_nanotime);
 
 	/*
 	 * Now that the struct timehands is again consistent, set the new
@@ -473,6 +511,29 @@ sysctl_kern_timecounter_hardware(SYSCTL_HANDLER_ARGS)
 
 SYSCTL_PROC(_kern_timecounter, OID_AUTO, hardware, CTLTYPE_STRING | CTLFLAG_RW,
     0, 0, sysctl_kern_timecounter_hardware, "A", "");
+
+
+/* Report or change the active timecounter hardware. */
+static int
+sysctl_kern_timecounter_choice(SYSCTL_HANDLER_ARGS)
+{
+	char buf[32], *spc;
+	struct timecounter *tc;
+	int error;
+
+	spc = "";
+	error = 0;
+	for (tc = timecounters; error == 0 && tc != NULL; tc = tc->tc_next) {
+		sprintf(buf, "%s%s(%d)",
+		    spc, tc->tc_name, tc->tc_quality);
+		error = SYSCTL_OUT(req, buf, strlen(buf));
+		spc = " ";
+	}
+	return (error);
+}
+
+SYSCTL_PROC(_kern_timecounter, OID_AUTO, choice, CTLTYPE_STRING | CTLFLAG_RD,
+    0, 0, sysctl_kern_timecounter_choice, "A", "");
 
 /*
  * RFC 2783 PPS-API implementation.

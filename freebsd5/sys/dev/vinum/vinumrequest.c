@@ -37,9 +37,11 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinumrequest.c,v 1.35 2003/04/28 02:54:43 grog Exp $
- * $FreeBSD: src/sys/dev/vinum/vinumrequest.c,v 1.66 2003/05/05 16:56:44 obrien Exp $
+ * $Id: vinumrequest.c,v 1.69 2003/10/18 17:57:48 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/vinum/vinumrequest.c,v 1.71 2003/11/24 04:06:56 grog Exp $");
 
 #include <dev/vinum/vinumhdr.h>
 #include <dev/vinum/request.h>
@@ -340,7 +342,7 @@ launch_requests(struct request *rq, int reviveok)
 		rq->bp->b_iocmd == BIO_READ ? "Read" : "Write",
 		major(rq->bp->b_dev),
 		minor(rq->bp->b_dev),
-		(intmax_t)rq->bp->b_blkno,
+		(intmax_t) rq->bp->b_blkno,
 		rq->bp->b_bcount);
 #endif
 	return 0;					    /* and get out of here */
@@ -362,7 +364,7 @@ launch_requests(struct request *rq, int reviveok)
 	    rq->bp->b_iocmd == BIO_READ ? "Read" : "Write",
 	    major(rq->bp->b_dev),
 	    minor(rq->bp->b_dev),
-	    (intmax_t)rq->bp->b_blkno,
+	    (intmax_t) rq->bp->b_blkno,
 	    rq->bp->b_bcount);
     vinum_conf.lastrq = rq;
     vinum_conf.lastbuf = rq->bp;
@@ -437,7 +439,7 @@ launch_requests(struct request *rq, int reviveok)
 			minor(rqe->b.b_dev),
 			rqe->sdno,
 			(u_int) (rqe->b.b_blkno - SD[rqe->sdno].driveoffset),
-			(intmax_t)rqe->b.b_blkno,
+			(intmax_t) rqe->b.b_blkno,
 			rqe->b.b_bcount);
 		if (debug & DEBUG_LASTREQS) {
 		    microtime(&rqe->launchtime);	    /* time we launched this request */
@@ -445,6 +447,8 @@ launch_requests(struct request *rq, int reviveok)
 		}
 #endif
 		/* fire off the request */
+		rqe->b.b_offset = rqe->b.b_blkno << DEV_BSHIFT;
+		rqe->b.b_iooffset = rqe->b.b_offset;
 		DEV_STRATEGY(&rqe->b);
 	    }
 	}
@@ -640,12 +644,12 @@ bre(struct request *rq,
 			    plex->name,
 			    sd->name,
 			    (u_int) sd->sectors,
-			    (intmax_t)bp->b_blkno);
+			    (intmax_t) bp->b_blkno);
 			log(LOG_DEBUG,
 			    "vinum: stripebase %#jx, stripeoffset %#jx, blockoffset %#jx\n",
-			    (intmax_t)stripebase,
-			    (intmax_t)stripeoffset,
-			    (intmax_t)blockoffset);
+			    (intmax_t) stripebase,
+			    (intmax_t) stripeoffset,
+			    (intmax_t) blockoffset);
 		    }
 #endif
 		}
@@ -980,8 +984,8 @@ sdio(struct buf *bp)
 	    major(sbp->b.b_dev),
 	    minor(sbp->b.b_dev),
 	    sbp->sdno,
-	    (intmax_t)(sbp->b.b_blkno - SD[sbp->sdno].driveoffset),
-	    (intmax_t)sbp->b.b_blkno,
+	    (intmax_t) (sbp->b.b_blkno - SD[sbp->sdno].driveoffset),
+	    (intmax_t) sbp->b.b_blkno,
 	    sbp->b.b_bcount);
 #endif
     s = splbio();
@@ -989,6 +993,8 @@ sdio(struct buf *bp)
     if (debug & DEBUG_LASTREQS)
 	logrq(loginfo_sdiol, (union rqinfou) &sbp->b, &sbp->b);
 #endif
+    sbp->b.b_offset = sbp->b.b_blkno << DEV_BSHIFT;
+    sbp->b.b_iooffset = sbp->b.b_offset;
     DEV_STRATEGY(&sbp->b);
     splx(s);
 }
@@ -1015,18 +1021,19 @@ vinum_bounds_check(struct buf *bp, struct volume *vol)
     int maxsize = vol->size;				    /* size of the partition (sectors) */
     int size = (bp->b_bcount + DEV_BSIZE - 1) >> DEV_BSHIFT; /* size of this request (sectors) */
 
+#ifdef LABELSECTOR
     /* Would this transfer overwrite the disk label? */
     if (bp->b_blkno <= LABELSECTOR			    /* starts before or at the label */
 #if LABELSECTOR != 0
 	&& bp->b_blkno + size > LABELSECTOR		    /* and finishes after */
 #endif
-	&& (!(vol->flags & VF_RAW))			    /* and it's not raw */
-	&&(bp->b_iocmd == BIO_WRITE)			    /* and it's a write */
+	&& (bp->b_iocmd == BIO_WRITE)			    /* and it's a write */
 	&&(!vol->flags & (VF_WLABEL | VF_LABELLING))) {	    /* and we're not allowed to write the label */
 	bp->b_error = EROFS;				    /* read-only */
 	bp->b_io.bio_flags |= BIO_ERROR;
 	return -1;
     }
+#endif
     if (size == 0)					    /* no transfer specified, */
 	return 0;					    /* treat as EOF */
     /* beyond partition? */
@@ -1046,7 +1053,6 @@ vinum_bounds_check(struct buf *bp, struct volume *vol)
 	}
 	bp->b_bcount = size << DEV_BSHIFT;
     }
-    bp->b_pblkno = bp->b_blkno;
     return 1;
 }
 

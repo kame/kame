@@ -31,7 +31,7 @@
  *	@(#)kernfs_vnops.c	8.15 (Berkeley) 5/21/95
  * From: FreeBSD: src/sys/miscfs/kernfs/kernfs_vnops.c 1.43
  *
- * $FreeBSD: src/sys/fs/devfs/devfs_vnops.c,v 1.64 2003/03/03 19:15:37 njl Exp $
+ * $FreeBSD: src/sys/fs/devfs/devfs_vnops.c,v 1.67 2003/10/20 15:08:10 phk Exp $
  */
 
 /*
@@ -297,9 +297,10 @@ devfs_lookupx(ap)
 	struct vnode *dvp, **vpp;
 	struct thread *td;
 	struct devfs_dirent *de, *dd;
+	struct devfs_dirent **dde;
 	struct devfs_mount *dmp;
-	dev_t cdev, *cpdev;
-	int error, cloned, flags, nameiop;
+	dev_t cdev;
+	int error, flags, nameiop;
 	char specname[SPECNAMELEN + 1], *pname;
 
 	cnp = ap->a_cnp;
@@ -310,7 +311,6 @@ devfs_lookupx(ap)
 	flags = cnp->cn_flags;
 	nameiop = cnp->cn_nameiop;
 	dmp = VFSTODEVFS(dvp->v_mount);
-	cloned = 0;
 	dd = dvp->v_data;
 
 	*vpp = NULLVP;
@@ -383,14 +383,17 @@ devfs_lookupx(ap)
 		goto notfound;
 
 	devfs_populate(dmp);
-	dd = dvp->v_data;
 
-	TAILQ_FOREACH(de, &dd->de_dlist, de_list) {
-		cpdev = devfs_itod(de->de_inode);
-		if (cpdev != NULL && cdev == *cpdev)
-			goto found;
-		continue;
-	}
+	dde = devfs_itode(dmp, cdev->si_inode);
+
+	if (dde == NULL || *dde == NULL || *dde == DE_DELETED)
+		goto notfound;
+
+	if ((*dde)->de_flags & DE_WHITEOUT)
+		goto notfound;
+
+	de = *dde;
+	goto found;
 
 notfound:
 
@@ -466,7 +469,6 @@ struct vop_mknod_args {
 	struct thread *td;
 	struct devfs_dirent *dd, *de;
 	struct devfs_mount *dmp;
-	int cloned, flags, nameiop;
 	int error;
 
 	dvp = ap->a_dvp;
@@ -476,9 +478,6 @@ struct vop_mknod_args {
 	cnp = ap->a_cnp;
 	vpp = ap->a_vpp;
 	td = cnp->cn_thread;
-	flags = cnp->cn_flags;
-	nameiop = cnp->cn_nameiop;
-	cloned = 0;
 	dd = dvp->v_data;
 
 	error = ENOENT;

@@ -52,7 +52,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/sparc64/mp_machdep.c,v 1.21 2003/04/08 06:35:09 jake Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/mp_machdep.c,v 1.25 2003/12/03 14:57:25 jhb Exp $
  */
 
 #include "opt_ddb.h"
@@ -80,6 +80,7 @@
 
 #include <machine/asi.h>
 #include <machine/atomic.h>
+#include <machine/bus.h>
 #include <machine/md_var.h>
 #include <machine/metadata.h>
 #include <machine/ofw_machdep.h>
@@ -139,8 +140,8 @@ mp_tramp_alloc(void)
 /*
  * Probe for other cpus.
  */
-int
-cpu_mp_probe(void)
+void
+cpu_mp_setmaxid(void)
 {
 	phandle_t child;
 	phandle_t root;
@@ -158,8 +159,14 @@ cpu_mp_probe(void)
 		    strcmp(buf, "cpu") == 0)
 			cpus++;
 	}
-	mp_maxid = cpus;
-	return (cpus > 1);
+	mp_maxid = cpus - 1;
+}
+
+int
+cpu_mp_probe(void)
+{
+
+	return (mp_maxid > 0);
 }
 
 static void

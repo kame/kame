@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/uniip.c,v 1.13 2003/02/19 05:47:31 imp Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ---------------------
  *
  * UNI IP interface module
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/uniip.c,v 1.15 2003/07/22 12:46:30 harti Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -53,11 +51,6 @@
 #include <netatm/uni/uniip_var.h>
 
 #include <vm/uma.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/uniip.c,v 1.13 2003/02/19 05:47:31 imp Exp $");
-#endif
-
 
 /*
  * Local functions
@@ -112,7 +105,6 @@ uniip_start()
 	    NULL, NULL, UMA_ALIGN_PTR, 0);
 	if (uniip_zone == NULL)
 		panic("uniip_start: uma_zcreate");
-	uma_zone_set_max(uniip_zone, 100);
 
 	/*
 	 * Tell arp to initialize stuff

@@ -22,10 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/i386/k6_mem.c,v 1.9 2002/09/15 15:07:54 dwmalone Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/i386/k6_mem.c,v 1.11 2003/08/25 09:48:47 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

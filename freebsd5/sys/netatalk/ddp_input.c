@@ -2,7 +2,7 @@
  * Copyright (c) 1990,1994 Regents of The University of Michigan.
  * All Rights Reserved.  See COPYRIGHT.
  *
- * $FreeBSD: src/sys/netatalk/ddp_input.c,v 1.18 2003/03/04 23:19:51 jlemon Exp $
+ * $FreeBSD: src/sys/netatalk/ddp_input.c,v 1.19 2003/11/08 22:28:39 sam Exp $
  */
 
 #include "opt_mac.h"
@@ -39,6 +39,7 @@ static void     ddp_input(struct mbuf *, struct ifnet *, struct elaphdr *, int);
 void
 at2intr(struct mbuf *m)
 {
+	GIANT_REQUIRED;
 
 	/*
 	 * Phase 2 packet handling 
@@ -65,6 +66,8 @@ at1intr(struct mbuf *m)
 	 */
 	elhp = mtod(m, struct elaphdr *);
 	m_adj(m, SZ_ELAPHDR);
+
+	GIANT_REQUIRED;
 
 	if (elhp->el_type == ELAP_DDPEXTEND) {
 		ddp_input(m, m->m_pkthdr.rcvif, NULL, 1);

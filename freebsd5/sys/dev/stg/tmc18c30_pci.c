@@ -1,4 +1,4 @@
-/*
+/*-
  *	Copyright (c) 2003 Bob Bishop
  *      All rights reserved.
  * [Ported for FreeBSD]
@@ -35,9 +35,10 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/stg/tmc18c30_pci.c,v 1.1 2003/04/07 10:13:25 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/stg/tmc18c30_pci.c,v 1.4 2003/09/02 17:30:38 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -52,8 +53,8 @@
 #include <machine/resource.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <cam/scsi/scsi_low.h>
 #include <cam/scsi/scsi_low_pisa.h>
@@ -92,7 +93,7 @@ stg_pci_attach(device_t dev)
 	struct stg_softc	*sc = device_get_softc(dev);
 	int			error;
 
-	sc->port_rid = PCIR_MAPS;
+	sc->port_rid = PCIR_BAR(0);
 	sc->irq_rid = 0;
 	error = stg_alloc_resource(dev);
 	if (error) {

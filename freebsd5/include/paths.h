@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)paths.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/include/paths.h,v 1.19 2003/05/05 22:49:22 obrien Exp $
+ * $FreeBSD: src/include/paths.h,v 1.24 2003/06/29 18:35:36 gordon Exp $
  */
 
 #ifndef _PATHS_H_
@@ -44,6 +44,9 @@
 /* All standard utilities path. */
 #define	_PATH_STDPATH \
 	"/usr/bin:/bin:/usr/sbin:/sbin:"
+/* Locate system binaries */
+#define _PATH_SYSPATH	\
+	"/sbin:/usr/sbin"
 
 #define	_PATH_AUTHCONF	"/etc/auth.conf"
 #define	_PATH_BSHELL	"/bin/sh"
@@ -53,7 +56,6 @@
 #define	_PATH_CP	"/bin/cp"
 #define	_PATH_CSHELL	"/bin/csh"
 #define	_PATH_DEFTAPE	"/dev/sa0"
-#define	_PATH_DEVDB	"/var/run/dev.db"
 #define	_PATH_DEVNULL	"/dev/null"
 #define	_PATH_DEVZERO	"/dev/zero"
 #define	_PATH_DRUM	"/dev/drum"
@@ -63,10 +65,14 @@
 #define	_PATH_IFCONFIG	"/sbin/ifconfig"
 #define	_PATH_KMEM	"/dev/kmem"
 #define	_PATH_LIBMAP_CONF	"/etc/libmap.conf"
+#define	_PATH_LOCALE	"/usr/share/locale"
 #define	_PATH_LOGIN	"/usr/bin/login"
 #define	_PATH_MAILDIR	"/var/mail"
 #define	_PATH_MAN	"/usr/share/man"
+#define	_PATH_MDCONFIG	"/sbin/mdconfig"
 #define	_PATH_MEM	"/dev/mem"
+#define	_PATH_MOUNT	"/sbin/mount"
+#define	_PATH_NEWFS	"/sbin/newfs"
 #define	_PATH_NOLOGIN	"/var/run/nologin"
 #define	_PATH_RCP	"/bin/rcp"
 #define	_PATH_REBOOT	"/sbin/reboot"
@@ -93,5 +99,40 @@
 __BEGIN_DECLS
 const char *getbootfile(void);
 __END_DECLS
+
+#ifdef RESCUE
+#undef	_PATH_DEFPATH
+#define	_PATH_DEFPATH	"/rescue:/usr/bin:/bin"
+#undef	_PATH_STDPATH
+#define	_PATH_STDPATH	"/rescue:/usr/bin:/bin:/usr/sbin:/sbin"
+#undef	_PATH_SYSPATH
+#define	_PATH_SYSPATH	"/rescue:/sbin:/usr/sbin"
+#undef	_PATH_BSHELL
+#define	_PATH_BSHELL	"/rescue/sh"
+#undef	_PATH_CP
+#define	_PATH_CP	"/rescue/cp"
+#undef	_PATH_CSHELL
+#define	_PATH_CSHELL	"/rescue/csh"
+#undef	_PATH_HALT
+#define	_PATH_HALT	"/rescue/halt"
+#undef	_PATH_IFCONFIG
+#define	_PATH_IFCONFIG	"/rescue/ifconfig"
+#undef	_PATH_MDCONFIG
+#define	_PATH_MDCONFIG	"/rescue/mdconfig"
+#undef	_PATH_MOUNT
+#define	_PATH_MOUNT	"/rescue/mount"
+#undef	_PATH_NEWFS
+#define	_PATH_NEWFS	"/rescue/newfs"
+#undef	_PATH_RCP
+#define	_PATH_RCP	"/rescue/rcp"
+#undef	_PATH_REBOOT
+#define	_PATH_REBOOT	"/rescue/reboot"
+#undef	_PATH_RM
+#define	_PATH_RM	"/rescue/rm"
+#undef	_PATH_VI
+#define	_PATH_VI	"/rescue/vi"
+#undef	_PATH_WALL
+#define	_PATH_WALL	"/rescue/wall"
+#endif /* RESCUE */
 
 #endif /* !_PATHS_H_ */

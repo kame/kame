@@ -23,9 +23,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ppbus/ppb_1284.c,v 1.13 2001/12/10 08:09:42 obrien Exp $
  *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ppbus/ppb_1284.c,v 1.14 2003/08/24 17:54:16 obrien Exp $");
 
 /*
  * General purpose routines for the IEEE1284-1994 Standard

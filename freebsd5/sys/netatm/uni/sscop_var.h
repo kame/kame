@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/uni/sscop_var.h,v 1.6 2002/11/08 18:27:30 jhb Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/sscop_var.h,v 1.8 2003/07/24 09:14:50 harti Exp $
  *
  */
 
@@ -168,7 +168,8 @@ int		sscop_send_poll(struct sscop *);
 int		sscop_send_stat(struct sscop *, sscop_seq);
 int		sscop_send_ustat(struct sscop *, sscop_seq);
 int		sscop_send_ud(struct sscop *, KBuffer *);
-void		sscop_pdu_print(struct sscop *, KBuffer *, char *);
+void		sscop_pdu_print(const struct sscop *,
+		    const KBuffer *, const char *);
 
 	/* sscop_sigaa.c */
 void		sscop_estreq_idle(struct sscop *, intptr_t, intptr_t);

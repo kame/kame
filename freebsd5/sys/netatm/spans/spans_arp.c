@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/spans/spans_arp.c,v 1.15 2003/02/19 05:47:31 imp Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ---------------------------
  *
  * SPANS CLS - ARP support
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/spans/spans_arp.c,v 1.19 2003/10/31 18:32:10 brooks Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -68,11 +66,6 @@
 #include <netatm/spans/spans_cls.h>
 
 #include <vm/uma.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/spans/spans_arp.c,v 1.15 2003/02/19 05:47:31 imp Exp $");
-#endif
-
 
 /*
  * Global variables
@@ -372,7 +365,8 @@ spansarp_start()
 
 	spansarp_zone = uma_zcreate("spansarp", sizeof(struct spansarp),
 	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
-	uma_zone_set_max(spansarp_zone, 100);
+	if (spansarp_zone == NULL)
+		panic("spansarp_zone");
 }
 
 /*
@@ -933,7 +927,8 @@ spansarp_ioctl(code, data, arg1)
 	struct ipvcc		*ivp, *inext;
 	struct in_addr		ip;
 	u_long			dst;
-	int			err = 0, i, buf_len;
+	int			err = 0, i;
+	size_t buf_len;
 	caddr_t			buf_addr;
 
 
@@ -1122,11 +1117,9 @@ spansarp_ioctl(code, data, arg1)
 					AF_INET;
 				SATOSIN(&aar.aap_arp_addr)->sin_addr.s_addr =
 					sap->sa_dstip.s_addr;
-				(void) snprintf(aar.aap_intf,
-				    sizeof(aar.aap_intf), "%s%d",
-					clp->cls_ipnif->inf_nif->nif_if.if_name,
-					clp->cls_ipnif->inf_nif->nif_if.if_unit
-					);
+				strlcpy(aar.aap_intf,
+					clp->cls_ipnif->inf_nif->nif_if.if_xname,
+					sizeof(aar.aap_intf));
 				aar.aap_flags = sap->sa_flags;
 				aar.aap_origin = sap->sa_origin;
 				if (sap->sa_flags & SAF_VALID)

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)if_loop.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_disc.c,v 1.35 2003/04/08 14:25:45 des Exp $
+ * $FreeBSD: src/sys/net/if_disc.c,v 1.37 2003/10/31 18:32:08 brooks Exp $
  */
 
 /*
@@ -93,8 +93,7 @@ disc_clone_create(struct if_clone *ifc, int unit)
 	ifp = &sc->sc_if;
 
 	ifp->if_softc = sc;
-	ifp->if_name = DISCNAME;
-	ifp->if_unit = unit;
+	if_initname(ifp, ifc->ifc_name, unit);
 	ifp->if_mtu = DSMTU;
 	ifp->if_flags = IFF_LOOPBACK | IFF_MULTICAST;
 	ifp->if_ioctl = discioctl;
@@ -194,6 +193,8 @@ discoutput(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 static void
 discrtrequest(int cmd, struct rtentry *rt, struct rt_addrinfo *info)
 {
+	RT_LOCK_ASSERT(rt);
+
 	if (rt)
 		rt->rt_rmx.rmx_mtu = DSMTU;
 }

@@ -1,5 +1,5 @@
 /*	$NetBSD: uhcivar.h,v 1.33 2002/02/11 11:41:30 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uhcivar.h,v 1.34 2002/09/30 17:50:18 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uhcivar.h,v 1.36 2003/07/15 23:19:49 jmg Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -41,8 +41,8 @@
 /*
  * To avoid having 1024 TDs for each isochronous transfer we introduce
  * a virtual frame list.  Every UHCI_VFRAMELIST_COUNT entries in the real
- * frame list points to a non-active TD.  These, in turn, form the 
- * starts of the virtual frame list.  This also has the advantage that it 
+ * frame list points to a non-active TD.  These, in turn, form the
+ * starts of the virtual frame list.  This also has the advantage that it
  * simplifies linking in/out of TDs/QHs in the schedule.
  * Furthermore, initially each of the inactive TDs point to an inactive
  * QH that forms the start of the interrupt traffic for that slot.
@@ -97,14 +97,14 @@ struct uhci_soft_td {
 	uhci_soft_td_qh_t link; 	/* soft version of the td_link field */
 	uhci_physaddr_t physaddr;	/* TD's physical address. */
 };
-/* 
+/*
  * Make the size such that it is a multiple of UHCI_TD_ALIGN.  This way
  * we can pack a number of soft TD together and have the real TD well
  * aligned.
  * NOTE: Minimum size is 32 bytes.
  */
 #define UHCI_STD_SIZE ((sizeof (struct uhci_soft_td) + UHCI_TD_ALIGN - 1) / UHCI_TD_ALIGN * UHCI_TD_ALIGN)
-#define UHCI_STD_CHUNK 128 /*(PAGE_SIZE / UHCI_TD_SIZE)*/
+#define UHCI_STD_CHUNK (PAGE_SIZE / UHCI_STD_SIZE)
 
 /*
  * Extra information that we need for a QH.
@@ -118,7 +118,7 @@ struct uhci_soft_qh {
 };
 /* See comment about UHCI_STD_SIZE. */
 #define UHCI_SQH_SIZE ((sizeof (struct uhci_soft_qh) + UHCI_QH_ALIGN - 1) / UHCI_QH_ALIGN * UHCI_QH_ALIGN)
-#define UHCI_SQH_CHUNK 128 /*(PAGE_SIZE / UHCI_QH_SIZE)*/
+#define UHCI_SQH_CHUNK (PAGE_SIZE / UHCI_SQH_SIZE)
 
 /*
  * Information about an entry in the virtual frame list.

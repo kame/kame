@@ -30,6 +30,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/if_wb.c,v 1.66 2003/11/14 19:00:32 sam Exp $");
+
 /*
  * Winbond fast ethernet PCI NIC driver
  *
@@ -41,7 +44,6 @@
  * Electrical Engineering Department
  * Columbia University, New York City
  */
-
 /*
  * The Winbond W89C840F chip is a bus master; in some ways it resembles
  * a DEC 'tulip' chip, only not as complicated. Unfortunately, it has
@@ -81,9 +83,6 @@
  * three of my test boards seems fine.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_wb.c,v 1.60 2003/04/21 18:34:04 imp Exp $");
-
 #include "opt_bdg.h"
 
 #include <sys/param.h>
@@ -112,8 +111,8 @@ __FBSDID("$FreeBSD: src/sys/pci/if_wb.c,v 1.60 2003/04/21 18:34:04 imp Exp $");
 #include <sys/bus.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
@@ -175,7 +174,7 @@ static int wb_mii_readreg	(struct wb_softc *, struct wb_mii_frame *);
 static int wb_mii_writereg	(struct wb_softc *, struct wb_mii_frame *);
 
 static void wb_setcfg		(struct wb_softc *, u_int32_t);
-static u_int8_t wb_calchash	(caddr_t);
+static u_int32_t wb_mchash	(caddr_t);
 static void wb_setmulti		(struct wb_softc *);
 static void wb_reset		(struct wb_softc *);
 static void wb_fixmedia		(struct wb_softc *);
@@ -587,22 +586,21 @@ wb_miibus_statchg(dev)
 	return;
 }
 
-static u_int8_t wb_calchash(addr)
-	caddr_t			addr;
+static u_int32_t
+wb_mchash(addr)
+	caddr_t		addr;
 {
-	u_int32_t		crc, carry;
-	int			i, j;
-	u_int8_t		c;
+	u_int32_t	crc, carry;
+	int		idx, bit;
+	u_int8_t	data;
 
 	/* Compute CRC for the address value. */
 	crc = 0xFFFFFFFF; /* initial value */
 
-	for (i = 0; i < 6; i++) {
-		c = *(addr + i);
-		for (j = 0; j < 8; j++) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (c & 0x01);
+	for (idx = 0; idx < 6; idx++) {
+		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
+			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
 			crc <<= 1;
-			c >>= 1;
 			if (carry)
 				crc = (crc ^ 0x04c11db6) | carry;
 		}
@@ -652,7 +650,7 @@ wb_setmulti(sc)
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = wb_calchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = wb_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
 		if (h < 32)
 			hashes[0] |= (1 << h);
 		else
@@ -829,7 +827,7 @@ wb_attach(dev)
 
 	mtx_init(&sc->wb_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-
+#ifndef BURN_BRIDGES
 	/*
 	 * Handle power management nonsense.
 	 */
@@ -853,7 +851,7 @@ wb_attach(dev)
 		pci_write_config(dev, WB_PCI_LOMEM, membase, 4);
 		pci_write_config(dev, WB_PCI_INTLINE, irq, 4);
 	}
-
+#endif
 	/*
 	 * Map control/status registers.
 	 */
@@ -915,8 +913,7 @@ wb_attach(dev)
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = unit;
-	ifp->if_name = "wb";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = wb_ioctl;
@@ -1135,6 +1132,8 @@ wb_rxeof(sc)
 	int			total_len = 0;
 	u_int32_t		rxstat;
 
+	WB_LOCK_ASSERT(sc);
+
 	ifp = &sc->arpcom.ac_if;
 
 	while(!((rxstat = sc->wb_cdata.wb_rx_head->wb_ptr->wb_status) &
@@ -1189,7 +1188,9 @@ wb_rxeof(sc)
 		m = m0;
 
 		ifp->if_ipackets++;
+		WB_UNLOCK(sc);
 		(*ifp->if_input)(ifp, m);
+		WB_LOCK(sc);
 	}
 }
 

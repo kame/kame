@@ -36,12 +36,12 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ksocket.h,v 1.7 2002/05/31 23:48:02 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ksocket.h,v 1.8 2003/11/11 12:30:37 ru Exp $
  * $Whistle: ng_ksocket.h,v 1.1 1999/11/16 20:04:40 archie Exp $
  */
 
-#ifndef _NETGRAPH_KSOCKET_H_
-#define _NETGRAPH_KSOCKET_H_
+#ifndef _NETGRAPH_NG_KSOCKET_H_
+#define _NETGRAPH_NG_KSOCKET_H_
 
 #include <sys/socket.h>
 
@@ -97,4 +97,4 @@ enum {
 /* Meta information ID's */
 #define NG_KSOCKET_META_SOCKADDR	1	/* data is struct sockaddr */
 
-#endif /* _NETGRAPH_KSOCKET_H_ */
+#endif /* _NETGRAPH_NG_KSOCKET_H_ */

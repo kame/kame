@@ -32,14 +32,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_bsd_enc.c,v 1.4 2003/05/04 18:48:25 phk Exp $
- *
  * Functions to encode and decode struct disklabel and struct partition into
  * a bytestream of little endianess and correct packing.
  *
  * NB!  This file must be usable both in kernel and userland.
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/geom/geom_bsd_enc.c,v 1.5 2003/06/11 06:49:15 obrien Exp $");
 
 #include <sys/types.h>
 #include <sys/endian.h>

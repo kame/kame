@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,7 @@
 
 #include "feeder_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/buffer.c,v 1.19 2003/04/20 17:08:56 orion Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/buffer.c,v 1.21 2003/11/27 19:51:44 matk Exp $");
 
 struct snd_dbuf *
 sndbuf_create(device_t dev, char *drv, char *desc)
@@ -129,7 +129,7 @@ sndbuf_resize(struct snd_dbuf *b, unsigned int blkcnt, unsigned int blksz)
 	b->bufsize = blkcnt * blksz;
 
 	tmpbuf = malloc(b->bufsize, M_DEVBUF, M_NOWAIT);
-	if (tmpbuf == NULL) 
+	if (tmpbuf == NULL)
 		return ENOMEM;
 	free(b->tmpbuf, M_DEVBUF);
 	b->tmpbuf = tmpbuf;
@@ -495,33 +495,6 @@ sndbuf_dispose(struct snd_dbuf *b, u_int8_t *to, unsigned int count)
 		b->rp = (b->rp + count) % b->bufsize;
 	}
 	KASSERT((b->rl >= 0) && (b->rl <= b->bufsize), ("%s: b->rl invalid %d, count %d", __func__, b->rl, count));
-
-	return 0;
-}
-
-int
-sndbuf_uiomove(struct snd_dbuf *b, struct uio *uio, unsigned int count)
-{
-	int x, c, p, rd, err;
-
-	err = 0;
-	rd = (uio->uio_rw == UIO_READ)? 1 : 0;
-	if (count > uio->uio_resid)
-		return EINVAL;
-
-	if (count > (rd? sndbuf_getready(b) : sndbuf_getfree(b))) {
-		return EINVAL;
-	}
-
-	while (err == 0 && count > 0) {
-		p = rd? sndbuf_getreadyptr(b) : sndbuf_getfreeptr(b);
-		c = MIN(count, sndbuf_getsize(b) - p);
-		x = uio->uio_resid;
-		err = uiomove(sndbuf_getbufofs(b, p), c, uio);
-		x -= uio->uio_resid;
-		count -= x;
-		x = rd? sndbuf_dispose(b, NULL, x) : sndbuf_acquire(b, NULL, x);
-	}
 
 	return 0;
 }

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/if_auereg.h,v 1.16 2002/11/14 23:54:54 sam Exp $
+ * $FreeBSD: src/sys/dev/usb/if_auereg.h,v 1.17 2003/10/04 21:41:01 joe Exp $
  */
 
 /*
@@ -242,7 +242,9 @@ struct aue_softc {
 	int			aue_if_flags;
 	struct aue_cdata	aue_cdata;
 	struct callout_handle	aue_stat_ch;
+#if __FreeBSD_version >= 500000
 	struct mtx		aue_mtx;
+#endif
 	u_int16_t		aue_flags;
 	char			aue_dying;
 	struct timeval		aue_rx_notice;

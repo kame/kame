@@ -27,9 +27,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- *   $FreeBSD: src/sys/dev/sn/if_sn.c,v 1.25 2003/03/05 19:24:21 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/sn/if_sn.c,v 1.34 2003/11/14 17:16:57 obrien Exp $");
 
 /*
  * This is a driver for SMC's 9000 series of Ethernet adapters.
@@ -63,7 +64,6 @@
  *    o   "if_ep.c,v 1.19 1995/01/24 20:53:45 davidg Exp"
  *
  * Known Bugs:
- *    o   The hardware multicast filter isn't used yet.
  *    o   Setting of the hardware address isn't supported.
  *    o   Hardware padding isn't used.
  */
@@ -122,16 +122,18 @@ static int snioctl(struct ifnet * ifp, u_long, caddr_t);
 
 static void snresume(struct ifnet *);
 
-void sninit(void *);
-void snread(struct ifnet *);
-void snreset(struct sn_softc *);
-void snstart(struct ifnet *);
-void snstop(struct sn_softc *);
-void snwatchdog(struct ifnet *);
+static void sninit_locked(void *);
+static void snstart_locked(struct ifnet *);
+
+static void sninit(void *);
+static void snread(struct ifnet *);
+static void snstart(struct ifnet *);
+static void snstop(struct sn_softc *);
+static void snwatchdog(struct ifnet *);
 
 static void sn_setmcast(struct sn_softc *);
 static int sn_getmcf(struct arpcom *ac, u_char *mcf);
-static u_int smc_crc(u_char *);
+static uint32_t sn_mchash(const uint8_t *addr);
 
 /* I (GB) have been unlucky getting the hardware padding
  * to work properly.
@@ -154,57 +156,54 @@ int
 sn_attach(device_t dev)
 {
 	struct sn_softc *sc = device_get_softc(dev);
-	struct ifnet   *ifp = &sc->arpcom.ac_if;
-	u_short         i;
-	u_char         *p;
-	struct ifaddr  *ifa;
+	struct ifnet    *ifp = &sc->arpcom.ac_if;
+	uint16_t        i, w;
+	uint8_t         *p;
+	struct ifaddr   *ifa;
 	struct sockaddr_dl *sdl;
 	int             rev;
-	u_short         address;
+	uint16_t        address;
 	int		j;
-
-	sn_activate(dev);
-
-	snstop(sc);
+	int		err;
 
 	sc->dev = dev;
+	sn_activate(dev);
+	SN_LOCK_INIT(sc);
+	snstop(sc);
 	sc->pages_wanted = -1;
 
-	device_printf(dev, " ");
+	SMC_SELECT_BANK(sc, 3);
+	rev = (CSR_READ_2(sc, REVISION_REG_W) >> 4) & 0xf;
+	if (chip_ids[rev])
+		device_printf(dev, " %s ", chip_ids[rev]);
+	else
+		device_printf(dev, " unsupported chip");
 
-	SMC_SELECT_BANK(3);
-	rev = inw(BASE + REVISION_REG_W);
-	if (chip_ids[(rev >> 4) & 0xF])
-		printf("%s ", chip_ids[(rev >> 4) & 0xF]);
-
-	SMC_SELECT_BANK(1);
-	i = inw(BASE + CONFIG_REG_W);
+	SMC_SELECT_BANK(sc, 1);
+	i = CSR_READ_2(sc, CONFIG_REG_W);
 	printf(i & CR_AUI_SELECT ? "AUI" : "UTP");
 
 	if (sc->pccard_enaddr)
 		for (j = 0; j < 3; j++) {
-			u_short	w;
-
-			w = (u_short)sc->arpcom.ac_enaddr[j * 2] | 
-				(((u_short)sc->arpcom.ac_enaddr[j * 2 + 1]) << 8);
-			outw(BASE + IAR_ADDR0_REG_W + j * 2, w);
+			w = (uint16_t)sc->arpcom.ac_enaddr[j * 2] | 
+			    (((uint16_t)sc->arpcom.ac_enaddr[j * 2 + 1]) << 8);
+			CSR_WRITE_2(sc, IAR_ADDR0_REG_W + j * 2, w);
 		}
 
 	/*
 	 * Read the station address from the chip. The MAC address is bank 1,
 	 * regs 4 - 9
 	 */
-	SMC_SELECT_BANK(1);
-	p = (u_char *) & sc->arpcom.ac_enaddr;
+	SMC_SELECT_BANK(sc, 1);
+	p = (uint8_t *) &sc->arpcom.ac_enaddr;
 	for (i = 0; i < 6; i += 2) {
-		address = inw(BASE + IAR_ADDR0_REG_W + i);
+		address = CSR_READ_2(sc, IAR_ADDR0_REG_W + i);
 		p[i + 1] = address >> 8;
 		p[i] = address & 0xFF;
 	}
 	printf(" MAC address %6D\n", sc->arpcom.ac_enaddr, ":");
 	ifp->if_softc = sc;
-	ifp->if_unit = device_get_unit(dev);
-	ifp->if_name = "sn";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_output = ether_output;
@@ -235,6 +234,16 @@ sn_attach(device_t dev)
 		bcopy(sc->arpcom.ac_enaddr, LLADDR(sdl), ETHER_ADDR_LEN);
 	}
 
+	/*
+	 * Activate the interrupt so we can get card interrupts.  This
+	 * needs to be done last so that we don't have/hold the lock
+	 * during startup to avoid LORs in the network layer.
+	 */
+	if ((err = bus_setup_intr(dev, sc->irq_res,
+	    INTR_TYPE_NET | INTR_MPSAFE, sn_intr, sc, &sc->intrhand)) != 0) {
+		sn_detach(dev);
+		return err;
+	}
 	return 0;
 }
 
@@ -244,66 +253,76 @@ sn_detach(device_t dev)
 {
 	struct sn_softc *sc = device_get_softc(dev);
 
+	snstop(sc);
 	sc->arpcom.ac_if.if_flags &= ~IFF_RUNNING; 
 	ether_ifdetach(&sc->arpcom.ac_if);
 	sn_deactivate(dev);
+	SN_LOCK_DESTORY(sc);
 	return 0;
+}
+
+static void
+sninit(void *xsc)
+{
+	struct sn_softc *sc = xsc;
+	SN_LOCK(sc);
+	sninit_locked(sc);
+	SN_UNLOCK(sc);
 }
 
 /*
  * Reset and initialize the chip
  */
-void
-sninit(void *xsc)
+static void
+sninit_locked(void *xsc)
 {
-	register struct sn_softc *sc = xsc;
-	register struct ifnet *ifp = &sc->arpcom.ac_if;
-	int             s;
+	struct sn_softc *sc = xsc;
+	struct ifnet *ifp = &sc->arpcom.ac_if;
 	int             flags;
 	int             mask;
 
-	s = splimp();
+	SN_ASSERT_LOCKED(sc);
 
 	/*
 	 * This resets the registers mostly to defaults, but doesn't affect
 	 * EEPROM.  After the reset cycle, we pause briefly for the chip to
 	 * be happy.
 	 */
-	SMC_SELECT_BANK(0);
-	outw(BASE + RECV_CONTROL_REG_W, RCR_SOFTRESET);
-	SMC_DELAY();
-	outw(BASE + RECV_CONTROL_REG_W, 0x0000);
-	SMC_DELAY();
-	SMC_DELAY();
+	SMC_SELECT_BANK(sc, 0);
+	CSR_WRITE_2(sc, RECV_CONTROL_REG_W, RCR_SOFTRESET);
+	SMC_DELAY(sc);
+	CSR_WRITE_2(sc, RECV_CONTROL_REG_W, 0x0000);
+	SMC_DELAY(sc);
+	SMC_DELAY(sc);
 
-	outw(BASE + TXMIT_CONTROL_REG_W, 0x0000);
+	CSR_WRITE_2(sc, TXMIT_CONTROL_REG_W, 0x0000);
 
 	/*
 	 * Set the control register to automatically release succesfully
 	 * transmitted packets (making the best use out of our limited
 	 * memory) and to enable the EPH interrupt on certain TX errors.
 	 */
-	SMC_SELECT_BANK(1);
-	outw(BASE + CONTROL_REG_W, (CTR_AUTO_RELEASE | CTR_TE_ENABLE |
+	SMC_SELECT_BANK(sc, 1);
+	CSR_WRITE_2(sc, CONTROL_REG_W, (CTR_AUTO_RELEASE | CTR_TE_ENABLE |
 				    CTR_CR_ENABLE | CTR_LE_ENABLE));
 
 	/* Set squelch level to 240mV (default 480mV) */
-	flags = inw(BASE + CONFIG_REG_W);
+	flags = CSR_READ_2(sc, CONFIG_REG_W);
 	flags |= CR_SET_SQLCH;
-	outw(BASE + CONFIG_REG_W, flags);
+	CSR_WRITE_2(sc, CONFIG_REG_W, flags);
 
 	/*
 	 * Reset the MMU and wait for it to be un-busy.
 	 */
-	SMC_SELECT_BANK(2);
-	outw(BASE + MMU_CMD_REG_W, MMUCR_RESET);
-	while (inw(BASE + MMU_CMD_REG_W) & MMUCR_BUSY)	/* NOTHING */
+	SMC_SELECT_BANK(sc, 2);
+	CSR_WRITE_2(sc, MMU_CMD_REG_W, MMUCR_RESET);
+	while (CSR_READ_2(sc, MMU_CMD_REG_W) & MMUCR_BUSY)	/* NOTHING */
 		;
 
 	/*
 	 * Disable all interrupts
 	 */
-	outb(BASE + INTR_MASK_REG_B, 0x00);
+	CSR_WRITE_1(sc, INTR_MASK_REG_B, 0x00);
 
 	sn_setmcast(sc);
 
@@ -319,20 +338,20 @@ sninit(void *xsc)
 	flags |= TCR_PAD_ENABLE;
 #endif	/* SW_PAD */
 
-	outw(BASE + TXMIT_CONTROL_REG_W, flags);
+	CSR_WRITE_2(sc, TXMIT_CONTROL_REG_W, flags);
 
 
 	/*
 	 * Now, enable interrupts
 	 */
-	SMC_SELECT_BANK(2);
+	SMC_SELECT_BANK(sc, 2);
 
 	mask = IM_EPH_INT |
 		IM_RX_OVRN_INT |
 		IM_RCV_INT |
 		IM_TX_INT;
 
-	outb(BASE + INTR_MASK_REG_B, mask);
+	CSR_WRITE_1(sc, INTR_MASK_REG_B, mask);
 	sc->intr_mask = mask;
 	sc->pages_wanted = -1;
 
@@ -346,35 +365,39 @@ sninit(void *xsc)
 	/*
 	 * Attempt to push out any waiting packets.
 	 */
-	snstart(ifp);
+	snstart_locked(ifp);
+}
 
-	splx(s);
+static void
+snstart(struct ifnet *ifp)
+{
+	struct sn_softc *sc = ifp->if_softc;
+	SN_LOCK(sc);
+	snstart_locked(ifp);
+	SN_UNLOCK(sc);
 }
 
 
-void
-snstart(struct ifnet *ifp)
+static void
+snstart_locked(struct ifnet *ifp)
 {
-	register struct sn_softc *sc = ifp->if_softc;
-	register u_int  len;
-	register struct mbuf *m;
-	struct mbuf    *top;
-	int             s, pad;
+	struct sn_softc *sc = ifp->if_softc;
+	u_int		len;
+	struct mbuf	*m;
+	struct mbuf	*top;
+	int             pad;
 	int             mask;
-	u_short         length;
-	u_short         numPages;
-	u_char          packet_no;
+	uint16_t        length;
+	uint16_t        numPages;
+	uint8_t         packet_no;
 	int             time_out;
 	int		junk = 0;
 
-	s = splimp();
+	SN_ASSERT_LOCKED(sc);
 
-	if (sc->arpcom.ac_if.if_flags & IFF_OACTIVE) {
-		splx(s);
+	if (sc->arpcom.ac_if.if_flags & IFF_OACTIVE)
 		return;
-	}
 	if (sc->pages_wanted != -1) {
-		splx(s);
 		if_printf(ifp, "snstart() while memory allocation pending\n");
 		return;
 	}
@@ -384,10 +407,8 @@ startagain:
 	 * Sneak a peek at the next packet
 	 */
 	m = sc->arpcom.ac_if.if_snd.ifq_head;
-	if (m == 0) {
-		splx(s);
+	if (m == 0)
 		return;
-	}
 	/*
 	 * Compute the frame length and set pad to give an overall even
 	 * number of bytes.  Below we assume that the packet length is even.
@@ -432,8 +453,8 @@ startagain:
 	/*
 	 * Now, try to allocate the memory
 	 */
-	SMC_SELECT_BANK(2);
-	outw(BASE + MMU_CMD_REG_W, MMUCR_ALLOC | numPages);
+	SMC_SELECT_BANK(sc, 2);
+	CSR_WRITE_2(sc, MMU_CMD_REG_W, MMUCR_ALLOC | numPages);
 
 	/*
 	 * Wait a short amount of time to see if the allocation request
@@ -443,7 +464,7 @@ startagain:
 
 	time_out = MEMORY_WAIT_TIME;
 	do {
-		if (inb(BASE + INTR_STAT_REG_B) & IM_ALLOC_INT)
+		if (CSR_READ_1(sc, INTR_STAT_REG_B) & IM_ALLOC_INT)
 			break;
 	} while (--time_out);
 
@@ -457,21 +478,19 @@ startagain:
 		 * interface active since there is no point in attempting an
 		 * snstart() until after the memory is available.
 		 */
-		mask = inb(BASE + INTR_MASK_REG_B) | IM_ALLOC_INT;
-		outb(BASE + INTR_MASK_REG_B, mask);
+		mask = CSR_READ_1(sc, INTR_MASK_REG_B) | IM_ALLOC_INT;
+		CSR_WRITE_1(sc, INTR_MASK_REG_B, mask);
 		sc->intr_mask = mask;
 
 		sc->arpcom.ac_if.if_timer = 1;
 		sc->arpcom.ac_if.if_flags |= IFF_OACTIVE;
 		sc->pages_wanted = numPages;
-
-		splx(s);
 		return;
 	}
 	/*
 	 * The memory allocation completed.  Check the results.
 	 */
-	packet_no = inb(BASE + ALLOC_RESULT_REG_B);
+	packet_no = CSR_READ_1(sc, ALLOC_RESULT_REG_B);
 	if (packet_no & ARR_FAILED) {
 		if (junk++ > 10)
 			if_printf(ifp, "Memory allocation failed\n");
@@ -480,20 +499,20 @@ startagain:
 	/*
 	 * We have a packet number, so tell the card to use it.
 	 */
-	outb(BASE + PACKET_NUM_REG_B, packet_no);
+	CSR_WRITE_1(sc, PACKET_NUM_REG_B, packet_no);
 
 	/*
 	 * Point to the beginning of the packet
 	 */
-	outw(BASE + POINTER_REG_W, PTR_AUTOINC | 0x0000);
+	CSR_WRITE_2(sc, POINTER_REG_W, PTR_AUTOINC | 0x0000);
 
 	/*
 	 * Send the packet length (+6 for status, length and control byte)
 	 * and the status word (set to zeros)
 	 */
-	outw(BASE + DATA_REG_W, 0);
-	outb(BASE + DATA_REG_B, (length + 6) & 0xFF);
-	outb(BASE + DATA_REG_B, (length + 6) >> 8);
+	CSR_WRITE_2(sc, DATA_REG_W, 0);
+	CSR_WRITE_1(sc, DATA_REG_B, (length + 6) & 0xFF);
+	CSR_WRITE_1(sc, DATA_REG_B, (length + 6) >> 8);
 
 	/*
 	 * Get the packet from the kernel.  This will include the Ethernet
@@ -509,41 +528,43 @@ startagain:
 		/*
 		 * Push out words.
 		 */
-		outsw(BASE + DATA_REG_W, mtod(m, caddr_t), m->m_len / 2);
+		CSR_WRITE_MULTI_2(sc, DATA_REG_W, mtod(m, uint16_t *),
+		    m->m_len / 2);
 
 		/*
 		 * Push out remaining byte.
 		 */
 		if (m->m_len & 1)
-			outb(BASE + DATA_REG_B, *(mtod(m, caddr_t) + m->m_len - 1));
+			CSR_WRITE_1(sc, DATA_REG_B,
+			    *(mtod(m, caddr_t) + m->m_len - 1));
 	}
 
 	/*
 	 * Push out padding.
 	 */
 	while (pad > 1) {
-		outw(BASE + DATA_REG_W, 0);
+		CSR_WRITE_2(sc, DATA_REG_W, 0);
 		pad -= 2;
 	}
 	if (pad)
-		outb(BASE + DATA_REG_B, 0);
+		CSR_WRITE_1(sc, DATA_REG_B, 0);
 
 	/*
 	 * Push out control byte and unused packet byte The control byte is 0
 	 * meaning the packet is even lengthed and no special CRC handling is
 	 * desired.
 	 */
-	outw(BASE + DATA_REG_W, 0);
+	CSR_WRITE_2(sc, DATA_REG_W, 0);
 
 	/*
 	 * Enable the interrupts and let the chipset deal with it Also set a
 	 * watchdog in case we miss the interrupt.
 	 */
-	mask = inb(BASE + INTR_MASK_REG_B) | (IM_TX_INT | IM_TX_EMPTY_INT);
-	outb(BASE + INTR_MASK_REG_B, mask);
+	mask = CSR_READ_1(sc, INTR_MASK_REG_B) | (IM_TX_INT | IM_TX_EMPTY_INT);
+	CSR_WRITE_1(sc, INTR_MASK_REG_B, mask);
 	sc->intr_mask = mask;
 
-	outw(BASE + MMU_CMD_REG_W, MMUCR_ENQUEUE);
+	CSR_WRITE_2(sc, MMU_CMD_REG_W, MMUCR_ENQUEUE);
 
 	sc->arpcom.ac_if.if_flags |= IFF_OACTIVE;
 	sc->arpcom.ac_if.if_timer = 1;
@@ -561,10 +582,8 @@ readcheck:
 	 * RX FIFO.  If nothing has arrived then attempt to queue another
 	 * transmit packet.
 	 */
-	if (inw(BASE + FIFO_PORTS_REG_W) & FIFO_REMPTY)
+	if (CSR_READ_2(sc, FIFO_PORTS_REG_W) & FIFO_REMPTY)
 		goto startagain;
-
-	splx(s);
 	return;
 }
 
@@ -581,16 +600,16 @@ readcheck:
 static void
 snresume(struct ifnet *ifp)
 {
-	register struct sn_softc *sc = ifp->if_softc;
-	register u_int  len;
-	register struct mbuf *m;
+	struct sn_softc *sc = ifp->if_softc;
+	u_int		len;
+	struct mbuf	*m;
 	struct mbuf    *top;
 	int             pad;
 	int             mask;
-	u_short         length;
-	u_short         numPages;
-	u_short         pages_wanted;
-	u_char          packet_no;
+	uint16_t        length;
+	uint16_t        numPages;
+	uint16_t        pages_wanted;
+	uint8_t         packet_no;
 
 	if (sc->pages_wanted < 0)
 		return;
@@ -648,13 +667,13 @@ snresume(struct ifnet *ifp)
 	numPages = (length + 6) >> 8;
 
 
-	SMC_SELECT_BANK(2);
+	SMC_SELECT_BANK(sc, 2);
 
 	/*
 	 * The memory allocation completed.  Check the results. If it failed,
 	 * we simply set a watchdog timer and hope for the best.
 	 */
-	packet_no = inb(BASE + ALLOC_RESULT_REG_B);
+	packet_no = CSR_READ_1(sc, ALLOC_RESULT_REG_B);
 	if (packet_no & ARR_FAILED) {
 		if_printf(ifp, "Memory allocation failed.  Weird.\n");
 		sc->arpcom.ac_if.if_timer = 1;
@@ -663,7 +682,7 @@ snresume(struct ifnet *ifp)
 	/*
 	 * We have a packet number, so tell the card to use it.
 	 */
-	outb(BASE + PACKET_NUM_REG_B, packet_no);
+	CSR_WRITE_1(sc, PACKET_NUM_REG_B, packet_no);
 
 	/*
 	 * Now, numPages should match the pages_wanted recorded when the
@@ -675,24 +694,24 @@ snresume(struct ifnet *ifp)
 		 * If the allocation was the wrong size we simply release the
 		 * memory once it is granted. Wait for the MMU to be un-busy.
 		 */
-		while (inw(BASE + MMU_CMD_REG_W) & MMUCR_BUSY)	/* NOTHING */
+		while (CSR_READ_2(sc, MMU_CMD_REG_W) & MMUCR_BUSY)	/* NOTHING */
 			;
-		outw(BASE + MMU_CMD_REG_W, MMUCR_FREEPKT);
+		CSR_WRITE_2(sc, MMU_CMD_REG_W, MMUCR_FREEPKT);
 
 		return;
 	}
 	/*
 	 * Point to the beginning of the packet
 	 */
-	outw(BASE + POINTER_REG_W, PTR_AUTOINC | 0x0000);
+	CSR_WRITE_2(sc, POINTER_REG_W, PTR_AUTOINC | 0x0000);
 
 	/*
 	 * Send the packet length (+6 for status, length and control byte)
 	 * and the status word (set to zeros)
 	 */
-	outw(BASE + DATA_REG_W, 0);
-	outb(BASE + DATA_REG_B, (length + 6) & 0xFF);
-	outb(BASE + DATA_REG_B, (length + 6) >> 8);
+	CSR_WRITE_2(sc, DATA_REG_W, 0);
+	CSR_WRITE_1(sc, DATA_REG_B, (length + 6) & 0xFF);
+	CSR_WRITE_1(sc, DATA_REG_B, (length + 6) >> 8);
 
 	/*
 	 * Get the packet from the kernel.  This will include the Ethernet
@@ -708,40 +727,41 @@ snresume(struct ifnet *ifp)
 		/*
 		 * Push out words.
 		 */
-		outsw(BASE + DATA_REG_W, mtod(m, caddr_t), m->m_len / 2);
-
+		CSR_WRITE_MULTI_2(sc, DATA_REG_W, mtod(m, uint16_t *),
+		    m->m_len / 2);
 		/*
 		 * Push out remaining byte.
 		 */
 		if (m->m_len & 1)
-			outb(BASE + DATA_REG_B, *(mtod(m, caddr_t) + m->m_len - 1));
+			CSR_WRITE_1(sc, DATA_REG_B,
+			    *(mtod(m, caddr_t) + m->m_len - 1));
 	}
 
 	/*
 	 * Push out padding.
 	 */
 	while (pad > 1) {
-		outw(BASE + DATA_REG_W, 0);
+		CSR_WRITE_2(sc, DATA_REG_W, 0);
 		pad -= 2;
 	}
 	if (pad)
-		outb(BASE + DATA_REG_B, 0);
+		CSR_WRITE_1(sc, DATA_REG_B, 0);
 
 	/*
 	 * Push out control byte and unused packet byte The control byte is 0
 	 * meaning the packet is even lengthed and no special CRC handling is
 	 * desired.
 	 */
-	outw(BASE + DATA_REG_W, 0);
+	CSR_WRITE_2(sc, DATA_REG_W, 0);
 
 	/*
 	 * Enable the interrupts and let the chipset deal with it Also set a
 	 * watchdog in case we miss the interrupt.
 	 */
-	mask = inb(BASE + INTR_MASK_REG_B) | (IM_TX_INT | IM_TX_EMPTY_INT);
-	outb(BASE + INTR_MASK_REG_B, mask);
+	mask = CSR_READ_1(sc, INTR_MASK_REG_B) | (IM_TX_INT | IM_TX_EMPTY_INT);
+	CSR_WRITE_1(sc, INTR_MASK_REG_B, mask);
 	sc->intr_mask = mask;
-	outw(BASE + MMU_CMD_REG_W, MMUCR_ENQUEUE);
+	CSR_WRITE_2(sc, MMU_CMD_REG_W, MMUCR_ENQUEUE);
 
 	BPF_MTAP(ifp, top);
 
@@ -771,42 +791,38 @@ void
 sn_intr(void *arg)
 {
 	int             status, interrupts;
-	register struct sn_softc *sc = (struct sn_softc *) arg;
+	struct sn_softc *sc = (struct sn_softc *) arg;
 	struct ifnet   *ifp = &sc->arpcom.ac_if;
-	int             x;
 
 	/*
 	 * Chip state registers
 	 */
-	u_char          mask;
-	u_char          packet_no;
-	u_short         tx_status;
-	u_short         card_stats;
+	uint8_t          mask;
+	uint8_t         packet_no;
+	uint16_t        tx_status;
+	uint16_t        card_stats;
 
-	/*
-	 * if_ep.c did this, so I do too.  Yet if_ed.c doesn't. I wonder...
-	 */
-	x = splbio();
+	SN_LOCK(sc);
 
 	/*
 	 * Clear the watchdog.
 	 */
 	ifp->if_timer = 0;
 
-	SMC_SELECT_BANK(2);
+	SMC_SELECT_BANK(sc, 2);
 
 	/*
 	 * Obtain the current interrupt mask and clear the hardware mask
 	 * while servicing interrupts.
 	 */
-	mask = inb(BASE + INTR_MASK_REG_B);
-	outb(BASE + INTR_MASK_REG_B, 0x00);
+	mask = CSR_READ_1(sc, INTR_MASK_REG_B);
+	CSR_WRITE_1(sc, INTR_MASK_REG_B, 0x00);
 
 	/*
 	 * Get the set of interrupts which occurred and eliminate any which
 	 * are masked.
 	 */
-	interrupts = inb(BASE + INTR_STAT_REG_B);
+	interrupts = CSR_READ_1(sc, INTR_STAT_REG_B);
 	status = interrupts & mask;
 
 	/*
@@ -820,8 +836,8 @@ sn_intr(void *arg)
 		/*
 		 * Acknowlege Interrupt
 		 */
-		SMC_SELECT_BANK(2);
-		outb(BASE + INTR_ACK_REG_B, IM_RX_OVRN_INT);
+		SMC_SELECT_BANK(sc, 2);
+		CSR_WRITE_1(sc, INTR_ACK_REG_B, IM_RX_OVRN_INT);
 
 		++sc->arpcom.ac_if.if_ierrors;
 	}
@@ -831,8 +847,8 @@ sn_intr(void *arg)
 	if (status & IM_RCV_INT) {
 		int             packet_number;
 
-		SMC_SELECT_BANK(2);
-		packet_number = inw(BASE + FIFO_PORTS_REG_W);
+		SMC_SELECT_BANK(sc, 2);
+		packet_number = CSR_READ_2(sc, FIFO_PORTS_REG_W);
 
 		if (packet_number & FIFO_REMPTY) {
 			/*
@@ -862,28 +878,28 @@ sn_intr(void *arg)
 		/*
 		 * Acknowlege Interrupt
 		 */
-		SMC_SELECT_BANK(2);
-		outb(BASE + INTR_ACK_REG_B, IM_TX_INT);
+		SMC_SELECT_BANK(sc, 2);
+		CSR_WRITE_1(sc, INTR_ACK_REG_B, IM_TX_INT);
 
-		packet_no = inw(BASE + FIFO_PORTS_REG_W);
+		packet_no = CSR_READ_2(sc, FIFO_PORTS_REG_W);
 		packet_no &= FIFO_TX_MASK;
 
 		/*
 		 * select this as the packet to read from
 		 */
-		outb(BASE + PACKET_NUM_REG_B, packet_no);
+		CSR_WRITE_1(sc, PACKET_NUM_REG_B, packet_no);
 
 		/*
 		 * Position the pointer to the first word from this packet
 		 */
-		outw(BASE + POINTER_REG_W, PTR_AUTOINC | PTR_READ | 0x0000);
+		CSR_WRITE_2(sc, POINTER_REG_W, PTR_AUTOINC | PTR_READ | 0x0000);
 
 		/*
 		 * Fetch the TX status word.  The value found here will be a
 		 * copy of the EPH_STATUS_REG_W at the time the transmit
 		 * failed.
 		 */
-		tx_status = inw(BASE + DATA_REG_W);
+		tx_status = CSR_READ_2(sc, DATA_REG_W);
 
 		if (tx_status & EPHSR_TX_SUC) {
 			device_printf(sc->dev, 
@@ -899,27 +915,27 @@ sn_intr(void *arg)
 		 * Some of these errors will have disabled transmit.
 		 * Re-enable transmit now.
 		 */
-		SMC_SELECT_BANK(0);
+		SMC_SELECT_BANK(sc, 0);
 
 #ifdef SW_PAD
-		outw(BASE + TXMIT_CONTROL_REG_W, TCR_ENABLE);
+		CSR_WRITE_2(sc, TXMIT_CONTROL_REG_W, TCR_ENABLE);
 #else
-		outw(BASE + TXMIT_CONTROL_REG_W, TCR_ENABLE | TCR_PAD_ENABLE);
+		CSR_WRITE_2(sc, TXMIT_CONTROL_REG_W, TCR_ENABLE | TCR_PAD_ENABLE);
 #endif	/* SW_PAD */
 
 		/*
 		 * kill the failed packet. Wait for the MMU to be un-busy.
 		 */
-		SMC_SELECT_BANK(2);
-		while (inw(BASE + MMU_CMD_REG_W) & MMUCR_BUSY)	/* NOTHING */
+		SMC_SELECT_BANK(sc, 2);
+		while (CSR_READ_2(sc, MMU_CMD_REG_W) & MMUCR_BUSY)	/* NOTHING */
 			;
-		outw(BASE + MMU_CMD_REG_W, MMUCR_FREEPKT);
+		CSR_WRITE_2(sc, MMU_CMD_REG_W, MMUCR_FREEPKT);
 
 		/*
 		 * Attempt to queue more transmits.
 		 */
 		sc->arpcom.ac_if.if_flags &= ~IFF_OACTIVE;
-		snstart(&sc->arpcom.ac_if);
+		snstart_locked(&sc->arpcom.ac_if);
 	}
 	/*
 	 * Transmit underrun.  We use this opportunity to update transmit
@@ -930,16 +946,16 @@ sn_intr(void *arg)
 		/*
 		 * Acknowlege Interrupt
 		 */
-		SMC_SELECT_BANK(2);
-		outb(BASE + INTR_ACK_REG_B, IM_TX_EMPTY_INT);
+		SMC_SELECT_BANK(sc, 2);
+		CSR_WRITE_1(sc, INTR_ACK_REG_B, IM_TX_EMPTY_INT);
 
 		/*
 		 * Disable this interrupt.
 		 */
 		mask &= ~IM_TX_EMPTY_INT;
 
-		SMC_SELECT_BANK(0);
-		card_stats = inw(BASE + COUNTER_REG_W);
+		SMC_SELECT_BANK(sc, 0);
+		card_stats = CSR_READ_2(sc, COUNTER_REG_W);
 
 		/*
 		 * Single collisions
@@ -951,20 +967,20 @@ sn_intr(void *arg)
 		 */
 		sc->arpcom.ac_if.if_collisions += (card_stats & ECR_MCOLN_MASK) >> 4;
 
-		SMC_SELECT_BANK(2);
+		SMC_SELECT_BANK(sc, 2);
 
 		/*
 		 * Attempt to enqueue some more stuff.
 		 */
 		sc->arpcom.ac_if.if_flags &= ~IFF_OACTIVE;
-		snstart(&sc->arpcom.ac_if);
+		snstart_locked(&sc->arpcom.ac_if);
 	}
 	/*
 	 * Some other error.  Try to fix it by resetting the adapter.
 	 */
 	if (status & IM_EPH_INT) {
 		snstop(sc);
-		sninit(sc);
+		sninit_locked(sc);
 	}
 
 out:
@@ -972,7 +988,7 @@ out:
 	 * Handled all interrupt sources.
 	 */
 
-	SMC_SELECT_BANK(2);
+	SMC_SELECT_BANK(sc, 2);
 
 	/*
 	 * Reestablish interrupts from mask which have not been deselected
@@ -981,27 +997,26 @@ out:
 	 * updated by one or more of the interrupt handers and we must let
 	 * those new interrupts stay enabled here.
 	 */
-	mask |= inb(BASE + INTR_MASK_REG_B);
-	outb(BASE + INTR_MASK_REG_B, mask);
+	mask |= CSR_READ_1(sc, INTR_MASK_REG_B);
+	CSR_WRITE_1(sc, INTR_MASK_REG_B, mask);
 	sc->intr_mask = mask;
-
-	splx(x);
+	SN_UNLOCK(sc);
 }
 
-void
-snread(register struct ifnet *ifp)
+static void
+snread(struct ifnet *ifp)
 {
         struct sn_softc *sc = ifp->if_softc;
 	struct ether_header *eh;
 	struct mbuf    *m;
 	short           status;
 	int             packet_number;
-	u_short         packet_length;
-	u_char         *data;
+	uint16_t        packet_length;
+	uint8_t        *data;
 
-	SMC_SELECT_BANK(2);
+	SMC_SELECT_BANK(sc, 2);
 #if 0
-	packet_number = inw(BASE + FIFO_PORTS_REG_W);
+	packet_number = CSR_READ_2(sc, FIFO_PORTS_REG_W);
 
 	if (packet_number & FIFO_REMPTY) {
 
@@ -1018,13 +1033,13 @@ read_another:
 	 * Start reading from the start of the packet. Since PTR_RCV is set,
 	 * packet number is found in FIFO_PORTS_REG_W, FIFO_RX_MASK.
 	 */
-	outw(BASE + POINTER_REG_W, PTR_READ | PTR_RCV | PTR_AUTOINC | 0x0000);
+	CSR_WRITE_2(sc, POINTER_REG_W, PTR_READ | PTR_RCV | PTR_AUTOINC | 0x0000);
 
 	/*
 	 * First two words are status and packet_length
 	 */
-	status = inw(BASE + DATA_REG_W);
-	packet_length = inw(BASE + DATA_REG_W) & RLEN_MASK;
+	status = CSR_READ_2(sc, DATA_REG_W);
+	packet_length = CSR_READ_2(sc, DATA_REG_W) & RLEN_MASK;
 
 	/*
 	 * The packet length contains 3 extra words: status, length, and a
@@ -1078,12 +1093,11 @@ read_another:
 	/*
 	 * Get packet, including link layer address, from interface.
 	 */
-
-	data = (u_char *) eh;
-	insw(BASE + DATA_REG_W, data, packet_length >> 1);
+	data = (uint8_t *) eh;
+	CSR_READ_MULTI_2(sc, DATA_REG_W, (uint16_t *) data, packet_length >> 1);
 	if (packet_length & 1) {
 		data += packet_length & ~1;
-		*data = inb(BASE + DATA_REG_B);
+		*data = CSR_READ_1(sc, DATA_REG_B);
 	}
 	++sc->arpcom.ac_if.if_ipackets;
 
@@ -1092,7 +1106,16 @@ read_another:
 	 */
 	m->m_pkthdr.len = m->m_len = packet_length;
 
+	/*
+	 * Drop locks before calling if_input() since it may re-enter
+	 * snstart() in the netisr case.  This would result in a
+	 * lock reversal.  Better performance might be obtained by
+	 * chaining all packets received, dropping the lock, and then
+	 * calling if_input() on each one.
+	 */
+	SN_UNLOCK(sc);
 	(*ifp->if_input)(ifp, m);
+	SN_LOCK(sc);
 
 out:
 
@@ -1100,15 +1123,15 @@ out:
 	 * Error or good, tell the card to get rid of this packet Wait for
 	 * the MMU to be un-busy.
 	 */
-	SMC_SELECT_BANK(2);
-	while (inw(BASE + MMU_CMD_REG_W) & MMUCR_BUSY)	/* NOTHING */
+	SMC_SELECT_BANK(sc, 2);
+	while (CSR_READ_2(sc, MMU_CMD_REG_W) & MMUCR_BUSY)	/* NOTHING */
 		;
-	outw(BASE + MMU_CMD_REG_W, MMUCR_RELEASE);
+	CSR_WRITE_2(sc, MMU_CMD_REG_W, MMUCR_RELEASE);
 
 	/*
 	 * Check whether another packet is ready
 	 */
-	packet_number = inw(BASE + FIFO_PORTS_REG_W);
+	packet_number = CSR_READ_2(sc, FIFO_PORTS_REG_W);
 	if (packet_number & FIFO_REMPTY) {
 		return;
 	}
@@ -1122,24 +1145,22 @@ out:
  * changes.
  */
 static int
-snioctl(register struct ifnet *ifp, u_long cmd, caddr_t data)
+snioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	struct sn_softc *sc = ifp->if_softc;
-	int             s, error = 0;
-
-	s = splimp();
+	int             error = 0;
 
 	switch (cmd) {
 	case SIOCSIFFLAGS:
+		SN_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) == 0 && ifp->if_flags & IFF_RUNNING) {
 			ifp->if_flags &= ~IFF_RUNNING;
 			snstop(sc);
-			break;
 		} else {
 			/* reinitialize card on any parameter change */
-			sninit(sc);
-			break;
+			sninit_locked(sc);
 		}
+		SN_UNLOCK(sc);
 		break;
 
 #ifdef notdef
@@ -1150,45 +1171,31 @@ snioctl(register struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 
 	case SIOCADDMULTI:
-	    /* update multicast filter list. */
-	    sn_setmcast(sc);
-	    error = 0;
-	    break;
+		/* update multicast filter list. */
+		SN_LOCK(sc);
+		sn_setmcast(sc);
+		error = 0;
+		SN_UNLOCK(sc);
+		break;
 	case SIOCDELMULTI:
-	    /* update multicast filter list. */
-	    sn_setmcast(sc);
-	    error = 0;
-	    break;
+		/* update multicast filter list. */
+		SN_LOCK(sc);
+		sn_setmcast(sc);
+		error = 0;
+		SN_UNLOCK(sc);
+		break;
 	default:
 		error = EINVAL;
 		error = ether_ioctl(ifp, cmd, data);
 		break;
 	}
-
-	splx(s);
-
 	return (error);
 }
 
-void
-snreset(struct sn_softc *sc)
-{
-	int	s;
-	
-	s = splimp();
-	snstop(sc);
-	sninit(sc);
-
-	splx(s);
-}
-
-void
+static void
 snwatchdog(struct ifnet *ifp)
 {
-	int	s;
-	s = splimp();
 	sn_intr(ifp->if_softc);
-	splx(s);
 }
 
 
@@ -1196,7 +1203,7 @@ snwatchdog(struct ifnet *ifp)
  * 2. clear the enable receive flag
  * 3. clear the enable xmit flags
  */
-void
+static void
 snstop(struct sn_softc *sc)
 {
 	
@@ -1205,15 +1212,15 @@ snstop(struct sn_softc *sc)
 	/*
 	 * Clear interrupt mask; disable all interrupts.
 	 */
-	SMC_SELECT_BANK(2);
-	outb(BASE + INTR_MASK_REG_B, 0x00);
+	SMC_SELECT_BANK(sc, 2);
+	CSR_WRITE_1(sc, INTR_MASK_REG_B, 0x00);
 
 	/*
 	 * Disable transmitter and Receiver
 	 */
-	SMC_SELECT_BANK(0);
-	outw(BASE + RECV_CONTROL_REG_W, 0x0000);
-	outw(BASE + TXMIT_CONTROL_REG_W, 0x0000);
+	SMC_SELECT_BANK(sc, 0);
+	CSR_WRITE_2(sc, RECV_CONTROL_REG_W, 0x0000);
+	CSR_WRITE_2(sc, TXMIT_CONTROL_REG_W, 0x0000);
 
 	/*
 	 * Cancel watchdog.
@@ -1226,7 +1233,6 @@ int
 sn_activate(device_t dev)
 {
 	struct sn_softc *sc = device_get_softc(dev);
-	int err;
 
 	sc->port_rid = 0;
 	sc->port_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &sc->port_rid,
@@ -1246,13 +1252,8 @@ sn_activate(device_t dev)
 		sn_deactivate(dev);
 		return ENOMEM;
 	}
-	if ((err = bus_setup_intr(dev, sc->irq_res, INTR_TYPE_NET, sn_intr, sc,
-	    &sc->intrhand)) != 0) {
-		sn_deactivate(dev);
-		return err;
-	}
-	
-	sc->sn_io_addr = rman_get_start(sc->port_res);
+	sc->bst = rman_get_bustag(sc->port_res);
+	sc->bsh = rman_get_bushandle(sc->port_res);
 	return (0);
 }
 
@@ -1294,23 +1295,18 @@ int
 sn_probe(device_t dev, int pccard)
 {
 	struct sn_softc *sc = device_get_softc(dev);
-	u_int           bank;
-	u_short         revision_register;
-	u_short         base_address_register;
-	u_short		ioaddr;
+	uint16_t        bank;
+	uint16_t        revision_register;
+	uint16_t        base_address_register;
 	int		err;
 
 	if ((err = sn_activate(dev)) != 0)
 		return err;
 
-	ioaddr = sc->sn_io_addr;
-#ifdef SN_DEBUG
-	device_printf(dev, "ioaddr is 0x%x\n", ioaddr);
-#endif
 	/*
 	 * First, see if the high byte is 0x33
 	 */
-	bank = inw(ioaddr + BANK_SELECT_REG_W);
+	bank = CSR_READ_2(sc, BANK_SELECT_REG_W);
 	if ((bank & BSR_DETECT_MASK) != BSR_DETECT_VALUE) {
 #ifdef	SN_DEBUG
 		device_printf(dev, "test1 failed\n");
@@ -1322,8 +1318,8 @@ sn_probe(device_t dev, int pccard)
 	 * test this.  Go to bank 0, then test that the register still
 	 * reports the high byte is 0x33.
 	 */
-	outw(ioaddr + BANK_SELECT_REG_W, 0x0000);
-	bank = inw(ioaddr + BANK_SELECT_REG_W);
+	CSR_WRITE_2(sc, BANK_SELECT_REG_W, 0x0000);
+	bank = CSR_READ_2(sc, BANK_SELECT_REG_W);
 	if ((bank & BSR_DETECT_MASK) != BSR_DETECT_VALUE) {
 #ifdef	SN_DEBUG
 		device_printf(dev, "test2 failed\n");
@@ -1337,14 +1333,14 @@ sn_probe(device_t dev, int pccard)
 	 * BASE_ADDR_REG_W register, after some jiggery pokery, is expected
 	 * to match the I/O port address where the adapter is being probed.
 	 */
-	outw(ioaddr + BANK_SELECT_REG_W, 0x0001);
-	base_address_register = inw(ioaddr + BASE_ADDR_REG_W);
+	CSR_WRITE_2(sc, BANK_SELECT_REG_W, 0x0001);
+	base_address_register = (CSR_READ_2(sc, BASE_ADDR_REG_W) >> 3) & 0x3e0;
 
 	/*
 	 * This test is nonsence on PC-card architecture, so if 
 	 * pccard == 1, skip this test. (hosokawa)
 	 */
-	if (!pccard && (ioaddr != (base_address_register >> 3 & 0x3E0))) {
+	if (!pccard && rman_get_start(sc->port_res) != base_address_register) {
 
 		/*
 		 * Well, the base address register didn't match.  Must not
@@ -1352,8 +1348,8 @@ sn_probe(device_t dev, int pccard)
 		 */
 #ifdef	SN_DEBUG
 		device_printf(dev, "test3 failed ioaddr = 0x%x, "
-		    "base_address_register = 0x%x\n", ioaddr,
-		    base_address_register >> 3 & 0x3E0);
+		    "base_address_register = 0x%x\n",
+		    rman_get_start(sc->port_res), base_address_register);
 #endif
 		goto error;
 	}
@@ -1363,8 +1359,8 @@ sn_probe(device_t dev, int pccard)
 	 * These might need to be added to later, as future revisions could
 	 * be added.
 	 */
-	outw(ioaddr + BANK_SELECT_REG_W, 0x3);
-	revision_register = inw(ioaddr + REVISION_REG_W);
+	CSR_WRITE_2(sc, BANK_SELECT_REG_W, 0x3);
+	revision_register = CSR_READ_2(sc, REVISION_REG_W);
 	if (!chip_ids[(revision_register >> 4) & 0xF]) {
 
 		/*
@@ -1395,6 +1391,9 @@ sn_setmcast(struct sn_softc *sc)
 {
 	struct ifnet *ifp = (struct ifnet *)sc;
 	int flags;
+	uint8_t mcf[MCFSZ];
+
+	SN_ASSERT_LOCKED(sc);
 
 	/*
 	 * Set the receiver filter.  We want receive enabled and auto strip
@@ -1408,32 +1407,31 @@ sn_setmcast(struct sn_softc *sc)
 	} else if (ifp->if_flags & IFF_ALLMULTI) {
 		flags |= RCR_ALMUL;
 	} else {
-		u_char mcf[MCFSZ];
 		if (sn_getmcf(&sc->arpcom, mcf)) {
 			/* set filter */
-			SMC_SELECT_BANK(3);
-			outw(BASE + MULTICAST1_REG_W,
-			    ((u_short)mcf[1] << 8) |  mcf[0]);
-			outw(BASE + MULTICAST2_REG_W,
-			    ((u_short)mcf[3] << 8) |  mcf[2]);
-			outw(BASE + MULTICAST3_REG_W,
-			    ((u_short)mcf[5] << 8) |  mcf[4]);
-			outw(BASE + MULTICAST4_REG_W,
-			    ((u_short)mcf[7] << 8) |  mcf[6]);
+			SMC_SELECT_BANK(sc, 3);
+			CSR_WRITE_2(sc, MULTICAST1_REG_W,
+			    ((uint16_t)mcf[1] << 8) |  mcf[0]);
+			CSR_WRITE_2(sc, MULTICAST2_REG_W,
+			    ((uint16_t)mcf[3] << 8) |  mcf[2]);
+			CSR_WRITE_2(sc, MULTICAST3_REG_W,
+			    ((uint16_t)mcf[5] << 8) |  mcf[4]);
+			CSR_WRITE_2(sc, MULTICAST4_REG_W,
+			    ((uint16_t)mcf[7] << 8) |  mcf[6]);
 		} else {
 			flags |= RCR_ALMUL;
 		}
 	}
-	SMC_SELECT_BANK(0);
-	outw(BASE + RECV_CONTROL_REG_W, flags);
+	SMC_SELECT_BANK(sc, 0);
+	CSR_WRITE_2(sc, RECV_CONTROL_REG_W, flags);
 }
 
 static int
-sn_getmcf(struct arpcom *ac, u_char *mcf)
+sn_getmcf(struct arpcom *ac, uint8_t *mcf)
 {
 	int i;
-	register u_int index, index2;
-	register u_char *af = (u_char *) mcf;
+	uint32_t index, index2;
+	uint8_t *af = mcf;
 	struct ifmultiaddr *ifma;
 
 	bzero(mcf, MCFSZ);
@@ -1441,7 +1439,8 @@ sn_getmcf(struct arpcom *ac, u_char *mcf)
 	TAILQ_FOREACH(ifma, &ac->ac_if.if_multiaddrs, ifma_link) {
 	    if (ifma->ifma_addr->sa_family != AF_LINK)
 		return 0;
-	    index = smc_crc(LLADDR((struct sockaddr_dl *)ifma->ifma_addr)) & 0x3f;
+	    index = sn_mchash(
+		LLADDR((struct sockaddr_dl *)ifma->ifma_addr)) & 0x3f;
 	    index2 = 0;
 	    for (i = 0; i < 6; i++) {
 		index2 <<= 1;
@@ -1453,21 +1452,21 @@ sn_getmcf(struct arpcom *ac, u_char *mcf)
 	return 1;  /* use multicast filter */
 }
 
-static u_int
-smc_crc(u_char *s)
+static uint32_t
+sn_mchash(const uint8_t *addr)
 {
-	int perByte;
-	int perBit;
-	const u_int poly = 0xedb88320;
-	u_int v = 0xffffffff;
-	u_char c;
-  
-	for (perByte = 0; perByte < ETHER_ADDR_LEN; perByte++) {
-		c = s[perByte];
-		for (perBit = 0; perBit < 8; perBit++) {
-			v = (v >> 1)^(((v ^ c) & 0x01) ? poly : 0);
-			c >>= 1;
+	const uint32_t poly = 0xedb88320;
+	uint32_t crc;
+	int idx, bit;
+	uint8_t data;
+
+	/* Compute CRC for the address value. */
+	crc = 0xFFFFFFFF; /* initial value */
+
+	for (idx = 0; idx < ETHER_ADDR_LEN; idx++) {
+		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
+			crc = (crc >> 1)^(((crc ^ data) & 0x01) ? poly : 0);
 		}
 	}
-	return v;
+	return crc;
 }

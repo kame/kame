@@ -23,21 +23,18 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/stddef.h,v 1.1 2002/11/13 15:14:57 mux Exp $
+ * $FreeBSD: src/sys/sys/stddef.h,v 1.1.6.1 2003/12/18 00:59:51 peter Exp $
  */
 
 #ifndef _SYS_STDDEF_H_
 #define _SYS_STDDEF_H_
 
 #include <sys/cdefs.h>
+#include <sys/_null.h>
 #include <machine/_types.h>
 
 typedef	__ptrdiff_t	ptrdiff_t;
 
 #define	offsetof(type, field)	__offsetof(type, field)
-
-#ifndef NULL
-#define	NULL	0
-#endif
 
 #endif /* !_SYS_STDDEF_H_ */

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 M. Warner Losh <imp@village.org> 
  * All rights reserved.
  *
@@ -21,16 +21,16 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/sn/if_sn_pccard.c,v 1.17 2003/04/15 06:37:26 mdodd Exp $
  */
-
 /*
  * Modifications for Megahertz X-Jack Ethernet Card (XJ-10BT)
  * 
  * Copyright (c) 1996 by Tatsumi Hosokawa <hosokawa@jp.FreeBSD.org>
  *                       BSD-nomads, Tokyo, Japan.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/sn/if_sn_pccard.c,v 1.20 2003/10/25 19:56:19 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -54,7 +54,7 @@
 #include "card_if.h"
 
 static const struct pccard_product sn_pccard_products[] = {
-	PCMCIA_CARD(MEGAHERTZ2, XJACK, 0),
+	PCMCIA_CARD(DSPSI, XJACK, 0),
 	PCMCIA_CARD(NEWMEDIA, BASICS, 0),
 #if 0
 	PCMCIA_CARD(SMC, 8020BT, 0),
@@ -86,17 +86,59 @@ sn_pccard_probe(device_t dev)
 }
 
 static int
+sn_pccard_ascii_enaddr(const char *str, u_char *enet)
+{
+        uint8_t digit;
+	int i;
+                
+	memset(enet, 0, ETHER_ADDR_LEN);
+         
+	for (i = 0, digit = 0; i < (ETHER_ADDR_LEN * 2); i++) {
+		if (str[i] >= '0' && str[i] <= '9')
+			digit |= str[i] - '0';
+		else if (str[i] >= 'a' && str[i] <= 'f')
+			digit |= (str[i] - 'a') + 10;
+		else if (str[i] >= 'A' && str[i] <= 'F')
+			digit |= (str[i] - 'A') + 10;
+		else {
+			/* Bogus digit!! */
+			return (0);
+		}
+
+		/* Compensate for ordering of digits. */
+		if (i & 1) {
+			enet[i >> 1] = digit;
+			digit = 0;
+		} else
+			digit <<= 4;
+	}
+
+	return (1);
+}
+
+static int
 sn_pccard_attach(device_t dev)
 {
 	struct sn_softc *sc = device_get_softc(dev);
 	int i;
 	u_char sum;
 	u_char ether_addr[ETHER_ADDR_LEN];
+	const char *cisstr;
 
 	sc->pccard_enaddr = 0;
 	pccard_get_ether(dev, ether_addr);
 	for (i = 0, sum = 0; i < ETHER_ADDR_LEN; i++)
 		sum |= ether_addr[i];
+	if (sum == 0) {
+		pccard_get_cis3_str(dev, &cisstr);
+		if (strlen(cisstr) == ETHER_ADDR_LEN * 2)
+		    sum = sn_pccard_ascii_enaddr(cisstr, ether_addr);
+	}
+	if (sum == 0) {
+		pccard_get_cis4_str(dev, &cisstr);
+		if (strlen(cisstr) == ETHER_ADDR_LEN * 2)
+		    sum = sn_pccard_ascii_enaddr(cisstr, ether_addr);
+	}
 	if (sum) {
 		sc->pccard_enaddr = 1;
 		bcopy(ether_addr, sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);

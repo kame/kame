@@ -39,8 +39,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)init_main.c	8.9 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/init_main.c,v 1.231 2003/05/13 20:35:59 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/init_main.c,v 1.238 2003/10/02 03:57:59 rwatson Exp $");
 
 #include "opt_init_path.h"
 #include "opt_mac.h"
@@ -94,8 +96,6 @@ static struct filedesc0 filedesc0;
 static struct plimit limit0;
 struct	vmspace vmspace0;
 struct	proc *initproc;
-
-int cmask = CMASK;
 
 struct	vnode *rootvp;
 int	boothowto = 0;		/* initialized so that it can be patched */
@@ -282,6 +282,7 @@ struct sysentvec null_sysvec = {
 	PS_STRINGS,
 	VM_PROT_ALL,
 	NULL,
+	NULL,
 	NULL
 };
 
@@ -384,8 +385,8 @@ proc0_init(void *dummy __unused)
 
 	bcopy("swapper", p->p_comm, sizeof ("swapper"));
 
-	callout_init(&p->p_itcallout, 1);
-	callout_init(&td->td_slpcallout, 1);
+	callout_init(&p->p_itcallout, CALLOUT_MPSAFE);
+	callout_init(&td->td_slpcallout, CALLOUT_MPSAFE);
 
 	/* Create credentials. */
 	p->p_ucred = crget();
@@ -407,9 +408,10 @@ proc0_init(void *dummy __unused)
 	/* Create the file descriptor table. */
 	fdp = &filedesc0;
 	p->p_fd = &fdp->fd_fd;
+	p->p_fdtol = NULL;
 	mtx_init(&fdp->fd_fd.fd_mtx, FILEDESC_LOCK_DESC, NULL, MTX_DEF);
 	fdp->fd_fd.fd_refcnt = 1;
-	fdp->fd_fd.fd_cmask = cmask;
+	fdp->fd_fd.fd_cmask = CMASK;
 	fdp->fd_fd.fd_ofiles = fdp->fd_dfiles;
 	fdp->fd_fd.fd_ofileflags = fdp->fd_dfileflags;
 	fdp->fd_fd.fd_nfiles = NDFILE;

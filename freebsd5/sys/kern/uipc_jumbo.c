@@ -28,14 +28,16 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  
- *
- * $FreeBSD: src/sys/kern/uipc_jumbo.c,v 1.7 2003/04/19 19:13:25 alc Exp $
  */
+
 /*
  * This is a set of routines for allocating large-sized mbuf payload
  * areas, and is primarily intended for use in receive side mbuf
  * allocation.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/uipc_jumbo.c,v 1.9 2003/06/11 21:23:04 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -220,6 +222,7 @@ jumbo_pg_free(vm_offset_t addr)
 	paddr = pmap_kextract((vm_offset_t)addr);
 	pg = PHYS_TO_VM_PAGE(paddr);
 
+	VM_OBJECT_LOCK(jumbo_vm_object);
 	if (pg->object != jumbo_vm_object) {
 		jumbo_vmuiomove_pgs_freed++;
 /*		if(vm_page_lookup(jumbo_vm_object, atop(addr - jumbo_basekva)))
@@ -233,6 +236,7 @@ jumbo_pg_free(vm_offset_t addr)
 		vm_page_free(pg);
 		vm_page_unlock_queues();
 	}
+	VM_OBJECT_UNLOCK(jumbo_vm_object);
 
 	mtx_lock(&jumbo_mutex);
 

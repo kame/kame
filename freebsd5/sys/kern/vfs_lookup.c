@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_lookup.c	8.4 (Berkeley) 2/16/94
- * $FreeBSD: src/sys/kern/vfs_lookup.c,v 1.60 2003/02/19 05:47:26 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/vfs_lookup.c,v 1.61 2003/06/11 00:56:58 obrien Exp $");
 
 #include "opt_ktrace.h"
 #include "opt_mac.h"

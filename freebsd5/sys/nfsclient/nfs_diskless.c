@@ -34,8 +34,10 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)autoconf.c	7.1 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/nfsclient/nfs_diskless.c,v 1.2 2002/12/22 05:35:03 hsu Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_diskless.c,v 1.6 2003/11/14 20:54:08 alfred Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -50,6 +52,7 @@
 #include <net/if_var.h>
 #include <net/ethernet.h>
 #include <netinet/in.h>
+#include <rpc/rpcclnt.h>
 #include <nfs/rpcv2.h>
 #include <nfs/nfsproto.h>
 #include <nfsclient/nfs.h>
@@ -122,12 +125,10 @@ nfs_setup_diskless(void)
 	printf("nfs_diskless: no interface\n");
 	return;	/* no matching interface */
 match_done:
-	sprintf(nd->myif.ifra_name, "%s%d", ifp->if_name, ifp->if_unit);
+	strlcpy(nd->myif.ifra_name, ifp->if_xname, sizeof(nd->myif.ifra_name));
 	
 	/* set up gateway */
 	inaddr_to_sockaddr("boot.netif.gateway", &nd->mygateway);
-
-	/* XXX set up swap? */
 
 	/* set up root mount */
 	nd->root_args.rsize = 8192;		/* XXX tunable? */

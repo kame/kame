@@ -36,10 +36,12 @@
  *      using byte-swap instructions
  *      polynomial $edb88320
  *
- * $FreeBSD: src/sys/libkern/crc32.c,v 1.1 2002/05/29 21:58:12 phk Exp $
  *
  * CRC32 code derived from work by Gary S. Brown.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/libkern/crc32.c,v 1.2 2003/06/11 05:23:04 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

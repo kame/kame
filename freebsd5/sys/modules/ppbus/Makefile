@@ -1,10 +1,10 @@
 
-# $FreeBSD: src/sys/modules/ppbus/Makefile,v 1.3 2002/01/11 15:48:56 ru Exp $
+# $FreeBSD: src/sys/modules/ppbus/Makefile,v 1.5 2003/11/19 05:08:26 imp Exp $
 
 .PATH:	${.CURDIR}/../../dev/ppbus
 KMOD=	ppbus
-SRCS=	bus_if.h device_if.h ppbus_if.h \
-	opt_ppb_1284.h opt_ppbus.h \
+SRCS=	bus_if.h device_if.h ppbus_if.h ppbus_if.c \
+	opt_ppb_1284.h \
 	ppb_1284.c ppb_base.c ppb_msq.c ppbconf.c
 
 EXPORT_SYMS=	ppb_attach_device	\

@@ -60,13 +60,14 @@
  *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
- *
- * $FreeBSD: src/sys/vm/vm_kern.c,v 1.97 2003/04/15 01:16:05 alc Exp $
  */
 
 /*
  *	Kernel memory management.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/vm/vm_kern.c,v 1.108 2003/11/10 00:44:00 mini Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -88,7 +89,7 @@
 vm_map_t kernel_map=0;
 vm_map_t kmem_map=0;
 vm_map_t exec_map=0;
-vm_map_t clean_map=0;
+vm_map_t pipe_map;
 vm_map_t buffer_map=0;
 
 /*
@@ -118,7 +119,11 @@ kmem_alloc_pageable(map, size)
 /*
  *	kmem_alloc_nofault:
  *
- *	Same as kmem_alloc_pageable, except that it create a nofault entry.
+ *	Allocate a virtual address range with no underlying object and
+ *	no initial mapping to physical memory.  Any mapping from this
+ *	range to physical memory must be explicitly created prior to
+ *	its use, typically with pmap_qenter().  Any attempt to create
+ *	a mapping on demand through vm_fault() will result in a panic. 
  */
 vm_offset_t
 kmem_alloc_nofault(map, size)
@@ -151,8 +156,6 @@ kmem_alloc(map, size)
 	vm_offset_t offset;
 	vm_offset_t i;
 
-	GIANT_REQUIRED;
-
 	size = round_page(size);
 
 	/*
@@ -178,12 +181,12 @@ kmem_alloc(map, size)
 
 	/*
 	 * Guarantee that there are pages already in this object before
-	 * calling vm_map_pageable.  This is to prevent the following
+	 * calling vm_map_wire.  This is to prevent the following
 	 * scenario:
 	 *
 	 * 1) Threads have swapped out, so that there is a pager for the
 	 * kernel_object. 2) The kmsg zone is empty, and so we are
-	 * kmem_allocing a new page for it. 3) vm_map_pageable calls vm_fault;
+	 * kmem_allocing a new page for it. 3) vm_map_wire calls vm_fault;
 	 * there is no page, but there is a pager, so we call
 	 * pager_data_request.  But the kmsg zone is empty, so we must
 	 * kmem_alloc. 4) goto 1 5) Even if the kmsg zone is not empty: when
@@ -191,8 +194,9 @@ kmem_alloc(map, size)
 	 * non-zero data.  kmem_alloc is defined to return zero-filled memory.
 	 *
 	 * We're intentionally not activating the pages we allocate to prevent a
-	 * race with page-out.  vm_map_pageable will wire the pages.
+	 * race with page-out.  vm_map_wire will wire the pages.
 	 */
+	VM_OBJECT_LOCK(kernel_object);
 	for (i = 0; i < size; i += PAGE_SIZE) {
 		vm_page_t mem;
 
@@ -200,17 +204,19 @@ kmem_alloc(map, size)
 				VM_ALLOC_ZERO | VM_ALLOC_RETRY);
 		if ((mem->flags & PG_ZERO) == 0)
 			pmap_zero_page(mem);
-		vm_page_lock_queues();
 		mem->valid = VM_PAGE_BITS_ALL;
+		vm_page_lock_queues();
 		vm_page_flag_clear(mem, PG_ZERO);
 		vm_page_wakeup(mem);
 		vm_page_unlock_queues();
 	}
+	VM_OBJECT_UNLOCK(kernel_object);
 
 	/*
 	 * And finally, mark the data as non-pageable.
 	 */
-	(void) vm_map_wire(map, addr, addr + size, FALSE);
+	(void) vm_map_wire(map, addr, addr + size,
+	    VM_MAP_WIRE_SYSTEM|VM_MAP_WIRE_NOHOLES);
 
 	return (addr);
 }
@@ -311,9 +317,6 @@ kmem_malloc(map, size, flags)
 	vm_page_t m;
 	int pflags;
 
-	if ((flags & M_NOWAIT) == 0)
-		GIANT_REQUIRED;
-
 	size = round_page(size);
 	addr = vm_map_min(map);
 
@@ -403,9 +406,10 @@ retry:
 		}
 		if (flags & M_ZERO && (m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
+		m->valid = VM_PAGE_BITS_ALL;
 		vm_page_lock_queues();
 		vm_page_flag_clear(m, PG_ZERO);
-		m->valid = VM_PAGE_BITS_ALL;
+		vm_page_unmanage(m);
 		vm_page_unlock_queues();
 	}
 	VM_OBJECT_UNLOCK(kmem_object);

@@ -36,12 +36,12 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_pptpgre.h,v 1.6 2002/05/31 23:48:03 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_pptpgre.h,v 1.7 2003/11/11 12:30:37 ru Exp $
  * $Whistle: ng_pptpgre.h,v 1.3 1999/12/08 00:11:36 archie Exp $
  */
 
-#ifndef _NETGRAPH_PPTPGRE_H_
-#define _NETGRAPH_PPTPGRE_H_
+#ifndef _NETGRAPH_NG_PPTPGRE_H_
+#define _NETGRAPH_NG_PPTPGRE_H_
 
 /* Node type name and magic cookie */
 #define NG_PPTPGRE_NODE_TYPE	"pptpgre"
@@ -125,4 +125,4 @@ enum {
 	NGM_PPTPGRE_GETCLR_STATS,	/* returns & clears stats */
 };
 
-#endif /* _NETGRAPH_PPTPGRE_H_ */
+#endif /* _NETGRAPH_NG_PPTPGRE_H_ */

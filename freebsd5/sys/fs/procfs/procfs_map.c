@@ -36,15 +36,18 @@
  *
  *	@(#)procfs_status.c	8.3 (Berkeley) 2/17/94
  *
- * $FreeBSD: src/sys/fs/procfs/procfs_map.c,v 1.31 2001/12/04 01:33:12 des Exp $
+ * $FreeBSD: src/sys/fs/procfs/procfs_map.c,v 1.34 2003/10/19 14:33:00 mux Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/lock.h>
+#include <sys/filedesc.h>
+#include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/uio.h>
+#include <sys/vnode.h>
 
 #include <fs/pseudofs/pseudofs.h>
 #include <fs/procfs/procfs.h>
@@ -77,8 +80,15 @@ procfs_doprocmap(PFS_FILL_ARGS)
 	pmap_t pmap = vmspace_pmap(p->p_vmspace);
 	vm_map_entry_t entry;
 	char mebuffer[MEBUFFERSIZE];
+	char *fullpath, *freepath;
 
 	GIANT_REQUIRED;
+
+	PROC_LOCK(p);
+	error = p_candebug(td, p);
+	PROC_UNLOCK(p);
+	if (error)
+		return (error);
 
 	if (uio->uio_rw != UIO_READ)
 		return (EOPNOTSUPP);
@@ -118,6 +128,8 @@ procfs_doprocmap(PFS_FILL_ARGS)
 		for (lobj = tobj = obj; tobj; tobj = tobj->backing_object)
 			lobj = tobj;
 
+		freepath = NULL;
+		fullpath = "-";
 		if (lobj) {
 			switch(lobj->type) {
 			default:
@@ -126,6 +138,10 @@ procfs_doprocmap(PFS_FILL_ARGS)
 				break;
 			case OBJT_VNODE:
 				type = "vnode";
+				vn_fullpath(td,
+				    (struct vnode *)lobj->handle,
+				    &fullpath,
+				    &freepath);
 				break;
 			case OBJT_SWAP:
 				type = "swap";
@@ -150,7 +166,7 @@ procfs_doprocmap(PFS_FILL_ARGS)
 		 *  start, end, resident, private resident, cow, access, type.
 		 */
 		snprintf(mebuffer, sizeof mebuffer,
-		    "0x%lx 0x%lx %d %d %p %s%s%s %d %d 0x%x %s %s %s\n",
+		    "0x%lx 0x%lx %d %d %p %s%s%s %d %d 0x%x %s %s %s %s\n",
 			(u_long)entry->start, (u_long)entry->end,
 			resident, privateresident, obj,
 			(entry->protection & VM_PROT_READ)?"r":"-",
@@ -159,7 +175,10 @@ procfs_doprocmap(PFS_FILL_ARGS)
 			ref_count, shadow_count, flags,
 			(entry->eflags & MAP_ENTRY_COW)?"COW":"NCOW",
 			(entry->eflags & MAP_ENTRY_NEEDS_COPY)?"NC":"NNC",
-			type);
+			type, fullpath);
+
+		if (freepath != NULL)
+			free(freepath, M_TEMP);
 
 		len = strlen(mebuffer);
 		if (len > uio->uio_resid) {

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)signalvar.h	8.6 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/signalvar.h,v 1.62 2003/05/14 15:00:24 jhb Exp $
+ * $FreeBSD: src/sys/sys/signalvar.h,v 1.65 2003/11/10 03:11:08 davidxu Exp $
  */
 
 #ifndef _SYS_SIGNALVAR_H_
@@ -205,11 +205,17 @@ __sigseteq(sigset_t *set1, sigset_t *set2)
 
 #ifdef _KERNEL
 
+/*
+ * Specifies the target of a signal.
+ *	P - Doesn't matter which thread it gets delivered to.
+ *	TD - Must be delivered to a specific thread.
+ */
+typedef enum sigtarget_enum { SIGTARGET_P, SIGTARGET_TD } sigtarget_t;
+
 /* Return nonzero if process p has an unmasked pending signal. */
 #define	SIGPENDING(td)							\
 	(!SIGISEMPTY((td)->td_siglist) &&				\
-	    (!sigsetmasked(&(td)->td_siglist, &(td)->td_sigmask) ||	\
-	    (td)->td_proc->p_flag & P_TRACED))
+	    !sigsetmasked(&(td)->td_siglist, &(td)->td_sigmask))
 
 /*
  * Return the value of the pseudo-expression ((*set & ~*mask) != 0).  This
@@ -267,8 +273,9 @@ void	sigexit(struct thread *td, int signum) __dead2;
 int	sig_ffs(sigset_t *set);
 void	siginit(struct proc *p);
 void	signotify(struct thread *td);
-void	tdsignal(struct thread *td, int sig);
+void	tdsignal(struct thread *td, int sig, sigtarget_t target);
 void	trapsignal(struct thread *td, int sig, u_long code);
+void	ptracestop(struct thread *td, int sig);
 
 /*
  * Machine-dependent functions:

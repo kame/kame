@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/csamidi.c,v 1.11 2002/04/04 21:03:17 jhb Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/csamidi.c,v 1.13 2003/09/02 17:30:37 jhb Exp $
  */
 
 #include <dev/sound/midi/midi.h>
@@ -31,8 +31,8 @@
 #include <dev/sound/pci/csareg.h>
 #include <machine/cpufunc.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 static devclass_t midi_devclass;
 
@@ -165,8 +165,8 @@ csamidi_probe(device_t dev)
 
 	scp = device_get_softc(dev);
 	bzero(scp, sizeof(*scp));
-	scp->io_rid = PCIR_MAPS;
-	scp->mem_rid = PCIR_MAPS + 4;
+	scp->io_rid = PCIR_BAR(0);
+	scp->mem_rid = PCIR_BAR(1);
 	scp->irq_rid = 0;
 
 	device_set_desc(dev, s);

@@ -26,18 +26,18 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * 	$FreeBSD: src/sys/netgraph/ng_eiface.h,v 1.3 2002/05/31 23:48:02 archie Exp $
+ * 	$FreeBSD: src/sys/netgraph/ng_eiface.h,v 1.5 2003/11/11 16:12:05 ru Exp $
  */
 
-#ifndef _NETGRAPH_EIFACE_H_
-#define _NETGRAPH_EIFACE_H_
+#ifndef _NETGRAPH_NG_EIFACE_H_
+#define _NETGRAPH_NG_EIFACE_H_
 
 /* Node type name and magic cookie */
 #define NG_EIFACE_NODE_TYPE		"eiface"
 #define NGM_EIFACE_COOKIE		948105892
 
 /* Interface base name */
-#define NG_EIFACE_EIFACE_NAME		"nge"
+#define NG_EIFACE_EIFACE_NAME		"ngeth"
 #define NG_EIFACE_EIFACE_NAME_MAX	15
 
 /* My hook names */
@@ -79,4 +79,4 @@ struct ng_eiface_par {
     { NULL }							\
 }
 
-#endif /* _NETGRAPH_EIFACE_H_ */
+#endif /* _NETGRAPH_NG_EIFACE_H_ */

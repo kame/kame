@@ -23,9 +23,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/isa/if_rdp.c,v 1.19 2003/03/05 19:24:21 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/isa/if_rdp.c,v 1.25 2003/11/04 14:02:13 nyan Exp $");
 
 /*
  * Device driver for RealTek RTL 8002 (`REDP') based pocket-ethernet
@@ -85,12 +86,12 @@
 
 #include <net/bpf.h>
 
+#include <machine/frame.h>
 #include <machine/md_var.h>
 
 #include <i386/isa/isa_device.h>
 #include <i386/isa/icu.h>
 #include <i386/isa/if_rdpreg.h>
-#include <i386/isa/intr_machdep.h>
 
 #ifndef COMPAT_OLDISA
 #error "The rdp device requires the old isa compatibility shims"
@@ -120,7 +121,7 @@ struct rdp_softc {
 	/*
 	 * local stuff, somewhat sorted by memory alignment class
 	 */
-	u_short baseaddr;	/* IO port address */
+	u_int baseaddr;		/* IO port address */
 	u_short txsize;		/* tx size for next (buffered) packet,
 				 * there's only one additional packet
 				 * we can buffer, thus a single variable
@@ -590,25 +591,22 @@ rdp_attach(struct isa_device *isa_dev)
 	 */
 	rdp_stop(sc);
 
-	if (!ifp->if_name) {
-		/*
-		 * Initialize ifnet structure
-		 */
-		ifp->if_softc = sc;
-		ifp->if_unit = unit;
-		ifp->if_name = "rdp";
-		ifp->if_start = rdp_start;
-		ifp->if_ioctl = rdp_ioctl;
-		ifp->if_watchdog = rdp_watchdog;
-		ifp->if_init = rdp_init;
-		ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
-		ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX;
+	/*
+	 * Initialize ifnet structure
+	 */
+	ifp->if_softc = sc;
+	if_initname(ifp, "rdp", unit);
+	ifp->if_start = rdp_start;
+	ifp->if_ioctl = rdp_ioctl;
+	ifp->if_watchdog = rdp_watchdog;
+	ifp->if_init = rdp_init;
+	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX;
 
-		/*
-		 * Attach the interface
-		 */
-		ether_ifattach(ifp, sc->arpcom.ac_enaddr);
-	}
+	/*
+	 * Attach the interface
+	 */
+	ether_ifattach(ifp, sc->arpcom.ac_enaddr);
 
 	/*
 	 * Print additional info when attached
@@ -669,7 +667,7 @@ static void
 rdp_watchdog(struct ifnet *ifp)
 {
 
-	log(LOG_ERR, "rdp%d: device timeout\n", ifp->if_unit);
+	log(LOG_ERR, "%s: device timeout\n", ifp->if_xname);
 	ifp->if_oerrors++;
 
 	rdp_reset(ifp);

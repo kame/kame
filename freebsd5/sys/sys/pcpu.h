@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/pcpu.h,v 1.10 2002/12/10 02:33:45 julian Exp $
+ * $FreeBSD: src/sys/sys/pcpu.h,v 1.11 2003/11/20 22:50:26 peter Exp $
  */
 
 #ifndef _SYS_PCPU_H_
@@ -83,7 +83,9 @@ extern struct cpuhead cpuhead;
 #define	curkse		(curthread->td_kse)
 #define	curksegrp	(curthread->td_ksegrp)
 #define	curproc		(curthread->td_proc)
+#ifndef curthread
 #define	curthread	PCPU_GET(curthread)
+#endif
 
 /*
  * MI PCPU support functions

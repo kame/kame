@@ -26,9 +26,10 @@
  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/isa/cy.c,v 1.131 2003/03/03 16:24:45 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/isa/cy.c,v 1.137 2003/12/02 12:36:00 bde Exp $");
 
 #include "opt_compat.h"
 #include "cy.h"
@@ -90,27 +91,6 @@
 #error "The cy device requires the old isa compatibility shims"
 #endif
 
-#ifdef SMP
-
-#include <machine/smptests.h>                   /** xxx_LOCK */
-
-#ifdef USE_COMLOCK
-#define COM_LOCK()	mtx_lock_spin(&com_mtx)
-#define COM_UNLOCK()	mtx_unlock_spin(&com_mtx)
-#else
-#define COM_LOCK()
-#define COM_UNLOCK()
-#endif /* USE_COMLOCK */
-
-#else /* SMP */
-
-#define COM_LOCK()
-#define COM_UNLOCK()
-
-#endif /* SMP */
-
-extern struct mtx	com_mtx;
-
 /*
  * Dictionary so that I can name everything *sio* or *com* to compare with
  * sio.c.  There is also lots of ugly formatting and unnecessary ifdefs to
@@ -142,8 +122,7 @@ extern struct mtx	com_mtx;
 #define	siodriver	cydriver
 #define	siodtrwakeup	cydtrwakeup
 #define	sioinput	cyinput
-#define	siointr		cyintr
-#define	siointr1	cyintr1
+#define	siointr1	cyintr
 #define	sioioctl	cyioctl
 #define	sioopen		cyopen
 #define	siopoll		cypoll
@@ -152,8 +131,11 @@ extern struct mtx	com_mtx;
 #define	siosetwater	cysetwater
 #define	comstop		cystop
 #define	siowrite	cywrite
-#define	sio_ih		cy_ih
+#define	sio_fast_ih	cy_fast_ih
+#define	sio_inited	cy_inited
 #define	sio_irec	cy_irec
+#define	sio_lock	cy_lock
+#define	sio_slow_ih	cy_slow_ih
 #define	sio_timeout	cy_timeout
 #define	sio_timeout_handle cy_timeout_handle
 #define	sio_timeouts_until_log	cy_timeouts_until_log
@@ -229,6 +211,14 @@ static	char const * const	error_desc[] = {
 
 #define	CE_NTYPES			3
 #define	CE_RECORD(com, errnum)		(++(com)->delta_error_counts[errnum])
+
+#ifdef SMP
+#define	COM_LOCK()	mtx_lock_spin(&sio_lock)
+#define	COM_UNLOCK()	mtx_unlock_spin(&sio_lock)
+#else
+#define	COM_LOCK()
+#define	COM_UNLOCK()
+#endif
 
 /* types.  XXX - should be elsewhere */
 typedef u_char	bool_t;		/* boolean */
@@ -342,10 +332,11 @@ struct com_s {
 	u_char	obuf2[256];
 };
 
-/* PCI driver entry point. */
-int	cyattach_common(cy_addr cy_iobase, int cy_align);
-ointhand2_t	siointr;
+/* PCI driver entry points. */
+void	*cyattach_common(cy_addr cy_iobase, int cy_align);
+driver_intr_t	siointr1;
 
+static	ointhand2_t cyointr;
 static	int	cy_units(cy_addr cy_iobase, int cy_align);
 static	int	sioattach(struct isa_device *dev);
 static	void	cd1400_channel_cmd(struct com_s *com, int cmd);
@@ -356,9 +347,6 @@ static	void	cd_setreg(struct com_s *com, int reg, int val);
 static	timeout_t siodtrwakeup;
 static	void	comhardclose(struct com_s *com);
 static	void	sioinput(struct com_s *com);
-#if 0
-static	void	siointr1(struct com_s *com);
-#endif
 static	int	commctl(struct com_s *com, int bits, int how);
 static	int	comparam(struct tty *tp, struct termios *t);
 static	void	siopoll(void *arg);
@@ -377,6 +365,8 @@ void	cystatus(int unit);
 #endif
 
 static char driver_name[] = "cy";
+static struct	mtx sio_lock;
+static int	sio_inited;
 
 /* table and macro for fast conversion from a unit number to its com struct */
 static	struct com_s	*p_com_addr[NSIO];
@@ -412,7 +402,8 @@ static struct cdevsw sio_cdevsw = {
 static	int	comconsole = -1;
 static	speed_t	comdefaultrate = TTYDEF_SPEED;
 static	u_int	com_events;	/* input chars + weighted output completions */
-static	void	*sio_ih;
+static	void	*sio_fast_ih;
+static	void	*sio_slow_ih;
 static	int	sio_timeout;
 static	int	sio_timeouts_until_log;
 static	struct	callout_handle sio_timeout_handle
@@ -440,6 +431,12 @@ sioprobe(dev)
 	struct isa_device	*dev;
 {
 	cy_addr	iobase;
+
+	while (sio_inited != 2)
+		if (atomic_cmpset_int(&sio_inited, 0, 1)) {
+			mtx_init(&sio_lock, driver_name, NULL, MTX_SPIN);
+			atomic_store_rel_int(&sio_inited, 2);
+		}
 
 	iobase = (cy_addr)dev->id_maddr;
 
@@ -510,11 +507,13 @@ static int
 sioattach(isdp)
 	struct isa_device	*isdp;
 {
-	int	adapter;
+	int		adapter;
+	struct com_s	*com;
 
-	adapter = cyattach_common((cy_addr) isdp->id_maddr, 0);
-	if (adapter < 0)
+	com = cyattach_common((cy_addr) isdp->id_maddr, 0);
+	if (com == NULL)
 		return (0);
+	adapter = com->unit / CY_MAX_PORTS;
 
 	/*
 	 * XXX
@@ -525,12 +524,12 @@ sioattach(isdp)
 		printf("cy%d: attached as cy%d\n", isdp->id_unit, adapter);
 		isdp->id_unit = adapter;	/* XXX */
 	}
-	isdp->id_ointr = siointr;
-	/* isdp->id_ri_flags |= RI_FAST; XXX unimplemented - use newbus! */
+
+	isdp->id_ointr = cyointr;
 	return (1);
 }
 
-int
+void *
 cyattach_common(cy_iobase, cy_align)
 	cy_addr	cy_iobase;
 	int	cy_align;
@@ -548,11 +547,11 @@ cyattach_common(cy_iobase, cy_align)
 		printf(
 	"cy%d: can't attach adapter: insufficient cy devices configured\n",
 		       adapter);
-		return (-1);
+		return (NULL);
 	}
 	ncyu = cy_units(cy_iobase, cy_align);
 	if (ncyu == 0)
-		return (-1);
+		return (NULL);
 	cy_nr_cd1400s[adapter] = ncyu;
 	cy_total_devices++;
 
@@ -615,7 +614,7 @@ cyattach_common(cy_iobase, cy_align)
 	}
 	if (siosetwater(com, com->it_in.c_ispeed) != 0) {
 		free(com, M_DEVBUF);
-		return (0);
+		return (NULL);
 	}
 	termioschars(&com->it_in);
 	com->it_in.c_ispeed = com->it_in.c_ospeed = comdefaultrate;
@@ -625,9 +624,11 @@ cyattach_common(cy_iobase, cy_align)
 	com_addr(unit) = com;
 	splx(s);
 
-	if (sio_ih == NULL) {
+	if (sio_fast_ih == NULL) {
 		swi_add(&tty_ithd, "tty:cy", siopoll, NULL, SWI_TTY, 0,
-		    &sio_ih);
+			&sio_fast_ih);
+		swi_add(&clk_ithd, "tty:cy", siopoll, NULL, SWI_TTY, 0,
+			&sio_slow_ih);
 	}
 	minorbase = UNIT_TO_MINOR(unit);
 	make_dev(&sio_cdevsw, minorbase,
@@ -654,7 +655,7 @@ cyattach_common(cy_iobase, cy_align)
 	/* ensure an edge for the next interrupt */
 	cy_outb(cy_iobase, CY_CLEAR_INTR, cy_align, 0);
 
-	return (adapter);
+	return (com_addr(adapter * CY_MAX_PORTS));
 }
 
 static int
@@ -1109,22 +1110,32 @@ sioinput(com)
 #endif
 }
 
-void
-siointr(unit)
-	int	unit;
+static void
+cyointr(int unit)
 {
+	siointr1(com_addr(unit * CY_MAX_PORTS));
+}
+
+void
+siointr1(vcom)
+	void	*vcom;
+{
+	struct com_s	*basecom;
 	int	baseu;
 	int	cy_align;
 	cy_addr	cy_iobase;
 	int	cyu;
 	cy_addr	iobase;
 	u_char	status;
+	int	unit;
 
 	COM_LOCK();	/* XXX could this be placed down lower in the loop? */
 
-	baseu = unit * CY_MAX_PORTS;
-	cy_align = com_addr(baseu)->cy_align;
-	cy_iobase = com_addr(baseu)->cy_iobase;
+	basecom = (struct com_s *)vcom;
+	baseu = basecom->unit;
+	cy_align = basecom->cy_align;
+	cy_iobase = basecom->cy_iobase;
+	unit = baseu / CY_MAX_PORTS;
 
 	/* check each CD1400 in turn */
 	for (cyu = 0; cyu < cy_nr_cd1400s[unit]; ++cyu) {
@@ -1178,7 +1189,7 @@ siointr(unit)
 #ifndef SOFT_HOTCHAR
 			if (line_status & CD1400_RDSR_SPECIAL
 			    && com->hotchar != 0)
-				swi_sched(sio_ih, 0);
+				swi_sched(sio_fast_ih, 0);
 
 #endif
 #if 1 /* XXX "intelligent" PFO error handling would break O error handling */
@@ -1206,7 +1217,7 @@ siointr(unit)
 			++com->bytes_in;
 #ifdef SOFT_HOTCHAR
 			if (com->hotchar != 0 && recv_data == com->hotchar)
-				swi_sched(sio_ih, 0);
+				swi_sched(sio_fast_ih, 0);
 #endif
 			ioptr = com->iptr;
 			if (ioptr >= com->ibufend)
@@ -1256,7 +1267,8 @@ siointr(unit)
 						if (com->hotchar != 0
 						    && recv_data
 						       == com->hotchar)
-							swi_sched(sio_ih, 0);
+							swi_sched(sio_fast_ih,
+								  0);
 #endif
 						ioptr[0] = recv_data;
 						ioptr[com->ierroff] = 0;
@@ -1271,7 +1283,7 @@ siointr(unit)
 #ifdef SOFT_HOTCHAR
 					if (com->hotchar != 0
 					    && recv_data == com->hotchar)
-						swi_sched(sio_ih, 0);
+						swi_sched(sio_fast_ih, 0);
 #endif
 				} while (--count != 0);
 			} else {
@@ -1296,7 +1308,7 @@ siointr(unit)
 #ifdef SOFT_HOTCHAR
 					if (com->hotchar != 0
 					    && recv_data == com->hotchar)
-						swi_sched(sio_ih, 0);
+						swi_sched(sio_fast_ih, 0);
 #endif
 					ioptr[0] = recv_data;
 					ioptr[com->ierroff] = 0;
@@ -1361,7 +1373,7 @@ cont:
 			if (!(com->state & CS_CHECKMSR)) {
 				com_events += LOTS_OF_EVENTS;
 				com->state |= CS_CHECKMSR;
-				swi_sched(sio_ih, 0);
+				swi_sched(sio_fast_ih, 0);
 			}
 
 #ifdef SOFT_CTS_OFLOW
@@ -1492,7 +1504,7 @@ cont:
 					if (!(com->state & CS_ODONE)) {
 						com_events += LOTS_OF_EVENTS;
 						com->state |= CS_ODONE;
-						swi_sched(sio_ih, 0);
+						swi_sched(sio_fast_ih, 0);
 					}
 					break;
 				case ETC_BREAK_ENDED:
@@ -1506,7 +1518,7 @@ cont:
 				if (!(com->extra_state & CSE_ODONE)) {
 					com_events += LOTS_OF_EVENTS;
 					com->extra_state |= CSE_ODONE;
-					swi_sched(sio_ih, 0);
+					swi_sched(sio_fast_ih, 0);
 				}
 				cd_outb(iobase, CD1400_SRER, cy_align,
 					com->intr_enable
@@ -1564,7 +1576,7 @@ cont:
 					com->state |= CS_ODONE;
 
 					/* handle at high level ASAP */
-					swi_sched(sio_ih, 0);
+					swi_sched(sio_fast_ih, 0);
 				}
 			}
 		}
@@ -1584,18 +1596,10 @@ terminate_tx_service:
 	/* ensure an edge for the next interrupt */
 	cy_outb(cy_iobase, CY_CLEAR_INTR, cy_align, 0);
 
-	swi_sched(sio_ih, 0);
+	swi_sched(sio_slow_ih, SWI_DELAY);
 
 	COM_UNLOCK();
 }
-
-#if 0
-static void
-siointr1(com)
-	struct com_s	*com;
-{
-}
-#endif
 
 static int
 sioioctl(dev, cmd, data, flag, td)
@@ -1877,25 +1881,22 @@ comparam(tp, t)
 	int		s;
 	int		unit;
 
-	/* do historical conversions */
-	if (t->c_ispeed == 0)
-		t->c_ispeed = t->c_ospeed;
-
 	unit = DEV_TO_UNIT(tp->t_dev);
 	com = com_addr(unit);
 
 	/* check requested parameters */
 	cy_clock = CY_CLOCK(com->gfrcr_image);
 	idivisor = comspeed(t->c_ispeed, cy_clock, &iprescaler);
-	if (idivisor < 0)
+	if (idivisor <= 0)
 		return (EINVAL);
-	odivisor = comspeed(t->c_ospeed, cy_clock, &oprescaler);
-	if (odivisor < 0)
+	odivisor = comspeed(t->c_ospeed != 0 ? t->c_ospeed : tp->t_ospeed,
+			    cy_clock, &oprescaler);
+	if (odivisor <= 0)
 		return (EINVAL);
 
 	/* parameters are OK, convert them to the com struct and the device */
 	s = spltty();
-	if (odivisor == 0)
+	if (t->c_ospeed == 0)
 		(void)commctl(com, TIOCM_DTR, DMBIC);	/* hang up line */
 	else
 		(void)commctl(com, TIOCM_DTR, DMBIS);
@@ -1904,14 +1905,10 @@ comparam(tp, t)
 
 	/* XXX we don't actually change the speed atomically. */
 
-	if (idivisor != 0) {
-		cd_setreg(com, CD1400_RBPR, idivisor);
-		cd_setreg(com, CD1400_RCOR, iprescaler);
-	}
-	if (odivisor != 0) {
-		cd_setreg(com, CD1400_TBPR, odivisor);
-		cd_setreg(com, CD1400_TCOR, oprescaler);
-	}
+	cd_setreg(com, CD1400_RBPR, idivisor);
+	cd_setreg(com, CD1400_RCOR, iprescaler);
+	cd_setreg(com, CD1400_TBPR, odivisor);
+	cd_setreg(com, CD1400_TCOR, oprescaler);
 
 	/*
 	 * channel control
@@ -1989,18 +1986,14 @@ comparam(tp, t)
 	/*
 	 * Set receive time-out period, normally to max(one char time, 5 ms).
 	 */
-	if (t->c_ispeed == 0)
-		itimeout = cd_getreg(com, CD1400_RTPR);
-	else {
-		itimeout = (1000 * bits + t->c_ispeed - 1) / t->c_ispeed;
+	itimeout = (1000 * bits + t->c_ispeed - 1) / t->c_ispeed;
 #ifdef SOFT_HOTCHAR
 #define	MIN_RTP		1
 #else
 #define	MIN_RTP		5
 #endif
-		if (itimeout < MIN_RTP)
-			itimeout = MIN_RTP;
-	}
+	if (itimeout < MIN_RTP)
+		itimeout = MIN_RTP;
 	if (!(t->c_lflag & ICANON) && t->c_cc[VMIN] != 0 && t->c_cc[VTIME] != 0
 	    && t->c_cc[VTIME] * 10 > itimeout)
 		itimeout = t->c_cc[VTIME] * 10;
@@ -2851,6 +2844,9 @@ cd_getreg(com, reg)
 	int	cy_align;
 	register_t	eflags;
 	cy_addr	iobase;
+#ifdef SMP
+	int	need_unlock;
+#endif
 	int	val;
 
 	basecom = com_addr(com->unit & ~(CD1400_NO_OF_CHANNELS - 1));
@@ -2859,13 +2855,20 @@ cd_getreg(com, reg)
 	iobase = com->iobase;
 	eflags = read_eflags();
 	critical_enter();
-	if (eflags & PSL_I)
+#ifdef SMP
+	need_unlock = 0;
+	if (!mtx_owned(&sio_lock)) {
 		COM_LOCK();
+		need_unlock = 1;
+	}
+#endif
 	if (basecom->car != car)
 		cd_outb(iobase, CD1400_CAR, cy_align, basecom->car = car);
 	val = cd_inb(iobase, reg, cy_align);
-	if (eflags & PSL_I)
+#ifdef SMP
+	if (need_unlock)
 		COM_UNLOCK();
+#endif
 	critical_exit();
 	return (val);
 }
@@ -2881,6 +2884,9 @@ cd_setreg(com, reg, val)
 	int	cy_align;
 	register_t	eflags;
 	cy_addr	iobase;
+#ifdef SMP
+	int	need_unlock;
+#endif
 
 	basecom = com_addr(com->unit & ~(CD1400_NO_OF_CHANNELS - 1));
 	car = com->unit & CD1400_CAR_CHAN;
@@ -2888,13 +2894,20 @@ cd_setreg(com, reg, val)
 	iobase = com->iobase;
 	eflags = read_eflags();
 	critical_enter();
-	if (eflags & PSL_I)
+#ifdef SMP
+	need_unlock = 0;
+	if (!mtx_owned(&sio_lock)) {
 		COM_LOCK();
+		need_unlock = 1;
+	}
+#endif
 	if (basecom->car != car)
 		cd_outb(iobase, CD1400_CAR, cy_align, basecom->car = car);
 	cd_outb(iobase, reg, cy_align, val);
-	if (eflags & PSL_I)
+#ifdef SMP
+	if (need_unlock)
 		COM_UNLOCK();
+#endif
 	critical_exit();
 }
 

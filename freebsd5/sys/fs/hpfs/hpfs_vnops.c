@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/hpfs/hpfs_vnops.c,v 1.43 2003/03/04 00:04:42 jeff Exp $
+ * $FreeBSD: src/sys/fs/hpfs/hpfs_vnops.c,v 1.47 2003/10/18 14:10:24 phk Exp $
  */
 
 #include <sys/param.h>
@@ -604,7 +604,6 @@ hpfs_reclaim(ap)
 	hpfs_hphashrem(hp);
 
 	/* Purge old data structures associated with the inode. */
-	cache_purge(vp);
 	if (hp->h_devvp) {
 		vrele(hp->h_devvp);
 		hp->h_devvp = NULL;
@@ -651,6 +650,8 @@ hpfs_strategy(ap)
 	daddr_t blkno;
 	int error;
 
+	KASSERT(ap->a_vp == ap->a_bp->b_vp, ("%s(%p != %p)",
+	    __func__, ap->a_vp, ap->a_bp->b_vp));
 	dprintf(("hpfs_strategy(): \n"));
 
 	if (vp->v_type == VBLK || vp->v_type == VCHR)
@@ -673,6 +674,7 @@ hpfs_strategy(ap)
 		return (0);
 	}
 	bp->b_dev = hp->h_devvp->v_rdev;
+	bp->b_iooffset = dbtob(bp->b_blkno);
 	VOP_SPECSTRATEGY(hp->h_devvp, bp);
 	return (0);
 }

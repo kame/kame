@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_wbreg.h,v 1.9 2001/02/09 06:11:21 bmilekic Exp $
+ * $FreeBSD: src/sys/pci/if_wbreg.h,v 1.10 2003/11/14 19:00:32 sam Exp $
  */
 
 /*
@@ -383,6 +383,7 @@ struct wb_softc {
 
 #define	WB_LOCK(_sc)		mtx_lock(&(_sc)->wb_mtx)
 #define	WB_UNLOCK(_sc)		mtx_unlock(&(_sc)->wb_mtx)
+#define	WB_LOCK_ASSERT(_sc)	mtx_assert(&(_sc)->wb_mtx, MA_OWNED)
 
 /*
  * register space access macros

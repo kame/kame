@@ -38,7 +38,7 @@
  *
  *	from: Utah $Hdr: mem.c 1.13 89/10/08$
  *	from: @(#)mem.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/ia64/ia64/mem.c,v 1.13 2003/03/25 00:07:03 jake Exp $
+ * $FreeBSD: src/sys/ia64/ia64/mem.c,v 1.15 2003/07/25 05:37:13 marcel Exp $
  */
 
 /*
@@ -95,6 +95,12 @@ static struct cdevsw mem_cdevsw = {
 
 struct mem_range_softc mem_range_softc;
 
+static __inline int
+ia64_pa_access(vm_offset_t pa)
+{
+	return (VM_PROT_READ|VM_PROT_WRITE);
+}
+
 static int
 mmclose(dev_t dev, int flags, int fmt, struct thread *td)
 {
@@ -139,12 +145,11 @@ mmopen(dev_t dev, int flags, int fmt, struct thread *td)
 static int
 mmrw(dev_t dev, struct uio *uio, int flags)
 {
-	vm_offset_t o, v;
-	int c = 0;
 	struct iovec *iov;
-	int error = 0, rw;
-	vm_offset_t addr, eaddr;
+	vm_offset_t addr, eaddr, o, v;
+	int c, error, rw;
 
+	error = 0;
 	while (uio->uio_resid > 0 && !error) {
 		iov = uio->uio_iov;
 		if (iov->iov_len == 0) {
@@ -154,6 +159,7 @@ mmrw(dev_t dev, struct uio *uio, int flags)
 				panic("mmrw");
 			continue;
 		}
+
 		switch (minor(dev)) {
 
 /* minor device 0 is physical memory */
@@ -161,7 +167,8 @@ mmrw(dev_t dev, struct uio *uio, int flags)
 			v = uio->uio_offset;
 kmemphys:
 			/* Allow reads only in RAM. */
-			rw = (uio->uio_rw == UIO_READ) ? VM_PROT_READ : VM_PROT_WRITE;
+			rw = (uio->uio_rw == UIO_READ)
+			    ? VM_PROT_READ : VM_PROT_WRITE;
 			if ((ia64_pa_access(v) & rw) != rw) {
 				error = EFAULT;
 				c = 0;
@@ -170,8 +177,7 @@ kmemphys:
 
 			o = uio->uio_offset & PAGE_MASK;
 			c = min(uio->uio_resid, (int)(PAGE_SIZE - o));
-			error =
-			    uiomove((caddr_t)IA64_PHYS_TO_RR7(v), c, uio);
+			error = uiomove((caddr_t)IA64_PHYS_TO_RR7(v), c, uio);
 			continue;
 
 /* minor device 1 is kernel memory */
@@ -184,22 +190,26 @@ kmemphys:
 			}
 
 			c = min(iov->iov_len, MAXPHYS);
+
 			/*
-			 * Make sure that all of the pages are currently resident so
-			 * that we don't create any zero-fill pages.
+			 * Make sure that all of the pages are currently
+			 * resident so that we don't create any zero-fill
+			 * pages.
 			 */
 			addr = trunc_page(v);
 			eaddr = round_page(v + c);
-			for (; addr < eaddr; addr += PAGE_SIZE) 
-				if (pmap_extract(kernel_pmap, addr) == 0) {
-					return EFAULT;
-				}
-			if (!kernacc((caddr_t)v, c,
-			    uio->uio_rw == UIO_READ ? 
-			    VM_PROT_READ : VM_PROT_WRITE)) {
-				return (EFAULT);
+			for (; addr < eaddr; addr += PAGE_SIZE) {
+				if (pmap_extract(kernel_pmap, addr) == 0)
+					return (EFAULT);
 			}
+			if (!kernacc((caddr_t)v, c, (uio->uio_rw == UIO_READ)
+			    ? VM_PROT_READ : VM_PROT_WRITE))
+				return (EFAULT);
 			error = uiomove((caddr_t)v, c, uio);
+			continue;
+
+		default:
+			return (ENODEV);
 		}
 
 		if (error)

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/fs/msdosfs/msdosfs_vnops.c,v 1.136 2003/03/04 00:04:42 jeff Exp $ */
+/* $FreeBSD: src/sys/fs/msdosfs/msdosfs_vnops.c,v 1.143 2003/10/18 14:10:24 phk Exp $ */
 /*	$NetBSD: msdosfs_vnops.c,v 1.68 1998/02/10 14:10:04 mrg Exp $	*/
 
 /*-
@@ -71,9 +71,9 @@
 #include <machine/mutex.h>
 
 #include <fs/msdosfs/bpb.h>
+#include <fs/msdosfs/msdosfsmount.h>
 #include <fs/msdosfs/direntry.h>
 #include <fs/msdosfs/denode.h>
-#include <fs/msdosfs/msdosfsmount.h>
 #include <fs/msdosfs/fat.h>
 
 #define	DOS_FILESIZE_MAX	0xffffffff
@@ -243,7 +243,7 @@ msdosfs_access(ap)
 
 	file_mode = (S_IXUSR|S_IXGRP|S_IXOTH) | (S_IRUSR|S_IRGRP|S_IROTH) |
 	    ((dep->de_Attributes & ATTR_READONLY) ? 0 : (S_IWUSR|S_IWGRP|S_IWOTH));
-	file_mode &= pmp->pm_mask;
+	file_mode &= (vp->v_type == VDIR ? pmp->pm_dirmask : pmp->pm_mask);
 
 	/*
 	 * Disallow write attempts on read-only filesystems;
@@ -307,7 +307,8 @@ msdosfs_getattr(ap)
 		mode = S_IRWXU|S_IRWXG|S_IRWXO;
 	else
 		mode = S_IRUSR|S_IXUSR|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH;
-	vap->va_mode = mode & pmp->pm_mask;
+	vap->va_mode = mode & 
+		(ap->a_vp->v_type == VDIR ? pmp->pm_dirmask : pmp->pm_mask);
 	vap->va_uid = pmp->pm_uid;
 	vap->va_gid = pmp->pm_gid;
 	vap->va_nlink = 1;
@@ -923,17 +924,11 @@ msdosfs_rename(ap)
 	u_long cn;
 	daddr_t bn;
 	struct denode *fddep;	/* from file's parent directory	 */
-	struct denode *fdep;	/* from file or directory	 */
-	struct denode *tddep;	/* to file's parent directory	 */
-	struct denode *tdep;	/* to file or directory		 */
 	struct msdosfsmount *pmp;
 	struct direntry *dotdotp;
 	struct buf *bp;
 
 	fddep = VTODE(ap->a_fdvp);
-	fdep = VTODE(ap->a_fvp);
-	tddep = VTODE(ap->a_tdvp);
-	tdep = tvp ? VTODE(tvp) : NULL;
 	pmp = fddep->de_pmp;
 
 	pmp = VFSTOMSDOSFS(fdvp->v_mount);
@@ -1559,6 +1554,7 @@ msdosfs_readdir(ap)
 		}
 	}
 
+	mbnambuf_init();
 	off = offset;
 	while (uio->uio_resid > 0) {
 		lbn = de_cluster(pmp, offset - bias);
@@ -1577,6 +1573,10 @@ msdosfs_readdir(ap)
 			return (error);
 		}
 		n = min(n, blsize - bp->b_resid);
+		if (n == 0) {
+			brelse(bp);
+			return (EIO);
+		}
 
 		/*
 		 * Convert from dos directory entries to fs-independent
@@ -1601,6 +1601,7 @@ msdosfs_readdir(ap)
 			 */
 			if (dentp->deName[0] == SLOT_DELETED) {
 				chksum = -1;
+				mbnambuf_init();
 				continue;
 			}
 
@@ -1611,9 +1612,7 @@ msdosfs_readdir(ap)
 				if (pmp->pm_flags & MSDOSFSMNT_SHORTNAME)
 					continue;
 				chksum = win2unixfn((struct winentry *)dentp,
-					&dirbuf, chksum,
-					pmp->pm_flags & MSDOSFSMNT_U2WTABLE,
-					pmp->pm_u2w);
+					chksum, pmp);
 				continue;
 			}
 
@@ -1622,6 +1621,7 @@ msdosfs_readdir(ap)
 			 */
 			if (dentp->deAttributes & ATTR_VOLUME) {
 				chksum = -1;
+				mbnambuf_init();
 				continue;
 			}
 			/*
@@ -1649,18 +1649,16 @@ msdosfs_readdir(ap)
 				dirbuf.d_fileno = offset / sizeof(struct direntry);
 				dirbuf.d_type = DT_REG;
 			}
-			if (chksum != winChksum(dentp->deName))
+			if (chksum != winChksum(dentp->deName)) {
 				dirbuf.d_namlen = dos2unixfn(dentp->deName,
 				    (u_char *)dirbuf.d_name,
 				    dentp->deLowerCase |
 					((pmp->pm_flags & MSDOSFSMNT_SHORTNAME) ?
 					(LCASE_BASE | LCASE_EXT) : 0),
-				    pmp->pm_flags & MSDOSFSMNT_U2WTABLE,
-				    pmp->pm_d2u,
-				    pmp->pm_flags & MSDOSFSMNT_ULTABLE,
-				    pmp->pm_ul);
-			else
-				dirbuf.d_name[dirbuf.d_namlen] = 0;
+				    pmp);
+				mbnambuf_init();
+			} else
+				mbnambuf_flush(&dirbuf);
 			chksum = -1;
 			dirbuf.d_reclen = GENERIC_DIRSIZ(&dirbuf);
 			if (uio->uio_resid < dirbuf.d_reclen) {
@@ -1755,6 +1753,8 @@ msdosfs_strategy(ap)
 	int error = 0;
 	daddr_t blkno;
 
+	KASSERT(ap->a_vp == ap->a_bp->b_vp, ("%s(%p != %p)",
+	    __func__, ap->a_vp, ap->a_bp->b_vp));
 	if (bp->b_vp->v_type == VBLK || bp->b_vp->v_type == VCHR)
 		panic("msdosfs_strategy: spec");
 	/*
@@ -1785,6 +1785,7 @@ msdosfs_strategy(ap)
 	 */
 	vp = dep->de_devvp;
 	bp->b_dev = vp->v_rdev;
+	bp->b_iooffset = dbtob(bp->b_blkno);
 	VOP_SPECSTRATEGY(vp, bp);
 	return (0);
 }

@@ -27,7 +27,7 @@
  *	i4b_global.h - i4b global include file
  *	--------------------------------------
  *
- * $FreeBSD: src/sys/i4b/include/i4b_global.h,v 1.10 2002/03/17 09:33:14 hm Exp $
+ * $FreeBSD: src/sys/i4b/include/i4b_global.h,v 1.11 2003/11/10 14:20:34 gj Exp $
  *
  *	last edit-date: [Sun Mar 17 09:55:26 2002]
  *
@@ -93,6 +93,9 @@
 
 #define TIMER_IDLE	1		/* a timer is running	*/
 #define TIMER_ACTIVE	2		/* a timer is idle	*/
+
+/* priority */
+#define I4BPRI		(PSOCK + 1)
 
 /* i4b's spl */
 

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)param.h	5.8 (Berkeley) 6/28/91
- * $FreeBSD: src/sys/i386/include/param.h,v 1.68 2003/03/30 05:24:52 jake Exp $
+ * $FreeBSD: src/sys/i386/include/param.h,v 1.69 2003/06/14 23:23:53 alc Exp $
  */
 
 /*
@@ -106,9 +106,8 @@
 #ifndef KSTACK_PAGES
 #define KSTACK_PAGES 2		/* Includes pcb! */
 #endif
+#define KSTACK_GUARD_PAGES 1	/* pages of kstack guard; 0 disables */
 #define UAREA_PAGES 1		/* holds struct user WITHOUT PCB (see def.) */
-
-#define KSTACK_GUARD		/* compile in the kstack guard page */
 
 /*
  * Ceiling on amount of swblock kva space, can be changed via

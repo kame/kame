@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/random/randomdev.h,v 1.3 2002/03/03 19:44:22 markm Exp $
+ * $FreeBSD: src/sys/dev/random/randomdev.h,v 1.4 2003/11/17 23:02:21 markm Exp $
  */
 
 /* This header contains only those definitions that are global
@@ -46,14 +46,17 @@
 
 SYSCTL_DECL(_kern_random);
 
+MALLOC_DECLARE(M_ENTROPY);
+
 /* These are used to queue harvested packets of entropy. The entropy
  * buffer size is pretty arbitrary.
  */
 struct harvest {
-	u_int64_t somecounter;		/* fast counter for clock jitter */
+	uintmax_t somecounter;		/* fast counter for clock jitter */
 	u_char entropy[HARVESTSIZE];	/* the harvested entropy */
 	u_int size, bits, frac;		/* stats about the entropy */
 	enum esource source;		/* stats about the entropy */
+	STAILQ_ENTRY(harvest) next;	/* next item on the list */
 };
 
 void random_init(void);

@@ -1,4 +1,3 @@
-/*	$FreeBSD: src/sys/opencrypto/criov.c,v 1.1 2002/10/04 20:31:22 sam Exp $	*/
 /*      $OpenBSD: criov.c,v 1.9 2002/01/29 15:48:29 jason Exp $	*/
 
 /*
@@ -27,6 +26,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/opencrypto/criov.c,v 1.2 2003/06/11 05:57:50 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

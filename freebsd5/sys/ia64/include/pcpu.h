@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/include/pcpu.h,v 1.14 2001/12/30 09:39:41 marcel Exp $
+ * $FreeBSD: src/sys/ia64/include/pcpu.h,v 1.17 2003/11/17 03:40:41 bde Exp $
  */
 
 #ifndef	_MACHINE_PCPU_H_
@@ -35,8 +35,11 @@
 #define	PCPU_MD_FIELDS							\
 	struct pcb	*pc_pcb;		/* Used by IPI_STOP */	\
 	struct pmap	*pc_current_pmap;	/* active pmap */	\
-	u_int64_t	pc_lid;			/* local CPU ID */	\
-	u_int32_t	pc_awake:1;		/* CPU is awake? */
+	uint64_t	pc_lid;			/* local CPU ID */	\
+	uint32_t	pc_awake:1;		/* CPU is awake? */	\
+	uint64_t	pc_clock;		/* Clock counter. */	\
+	uint64_t	pc_clockadj;		/* Clock adjust. */	\
+	uint32_t	pc_acpi_id		/* ACPI CPU id. */
 
 struct pcpu;
 
@@ -45,6 +48,8 @@ register struct pcpu *pcpup __asm__("r13");
 #define	PCPU_GET(member)	(pcpup->pc_ ## member)
 #define	PCPU_PTR(member)	(&pcpup->pc_ ## member)
 #define	PCPU_SET(member,value)	(pcpup->pc_ ## member = (value))
+
+void pcpu_initclock(void);
 
 #endif	/* _KERNEL */
 

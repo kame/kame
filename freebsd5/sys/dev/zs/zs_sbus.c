@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/zs/zs_sbus.c,v 1.3 2003/02/19 08:29:17 jake Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/zs/zs_sbus.c,v 1.5 2003/08/24 17:55:58 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -36,7 +37,7 @@
 #include <machine/resource.h>
 #include <sys/rman.h>
 
-#include <ofw/openfirm.h>
+#include <dev/ofw/openfirm.h>
 
 #include <sparc64/fhc/fhcreg.h>
 #include <sparc64/fhc/fhcvar.h>

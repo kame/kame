@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vm_extern.h	8.2 (Berkeley) 1/12/94
- * $FreeBSD: src/sys/vm/vm_extern.h,v 1.61 2003/03/25 00:07:05 jake Exp $
+ * $FreeBSD: src/sys/vm/vm_extern.h,v 1.66 2003/10/05 12:41:08 bms Exp $
  */
 
 #ifndef _VM_EXTERN_H_
@@ -70,7 +70,6 @@ void kmem_init(vm_offset_t, vm_offset_t);
 vm_offset_t kmem_malloc(vm_map_t, vm_size_t, boolean_t);
 vm_map_t kmem_suballoc(vm_map_t, vm_offset_t *, vm_offset_t *, vm_size_t);
 void munmapfd(struct thread *, int);
-int swaponvp(struct thread *, struct vnode *, dev_t , u_long);
 void swapout_procs(int);
 int useracc(void *, int, int);
 int vm_fault(vm_map_t, vm_offset_t, vm_prot_t, int);
@@ -96,5 +95,11 @@ void vm_object_print(/* db_expr_t */ long, boolean_t, /* db_expr_t */ long,
 int vm_fault_quick(caddr_t v, int prot);
 void vm_proc_new(struct proc *p);
 void vm_proc_dispose(struct proc *p);
+void vm_thread_dispose(struct thread *td);
+void vm_thread_dispose_altkstack(struct thread *td);
+void vm_thread_new(struct thread *td, int pages);
+void vm_thread_new_altkstack(struct thread *td, int pages);
+void vm_thread_swapin(struct thread *td);
+void vm_thread_swapout(struct thread *td);
 #endif				/* _KERNEL */
 #endif				/* !_VM_EXTERN_H_ */

@@ -26,12 +26,12 @@
  *
  *	i4b_l2if.c - Layer 3 interface to Layer 2
  *	-------------------------------------------
- *
- * $FreeBSD: src/sys/i4b/layer3/i4b_l2if.c,v 1.14 2002/09/02 00:52:11 brooks Exp $
- *
  *      last edit-date: [Sun Aug 11 12:48:41 2002]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer3/i4b_l2if.c,v 1.15 2003/06/10 23:59:33 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -30,13 +30,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/support.s,v 1.96 2003/04/04 17:29:54 des Exp $
+ * $FreeBSD: src/sys/i386/i386/support.s,v 1.100 2003/11/03 21:28:54 jhb Exp $
  */
 
 #include "opt_npx.h"
 
 #include <machine/asmacros.h>
 #include <machine/cputypes.h>
+#include <machine/intr_machdep.h>
 #include <machine/pmap.h>
 #include <machine/specialreg.h>
 
@@ -62,6 +63,16 @@ kernel_fpu_lock:
 	.byte	0xfe
 	.space	3
 #endif
+	ALIGN_DATA
+	.globl	intrcnt, eintrcnt
+intrcnt:
+	.space	INTRCNT_COUNT * 4
+eintrcnt:
+
+	.globl	intrnames, eintrnames
+intrnames:
+	.space	INTRCNT_COUNT * (MAXCOMLEN + 1)
+eintrnames:
 
 	.text
 
@@ -349,6 +360,21 @@ intreg_i586_bzero:
 	popl	%edi
 	ret
 #endif /* I586_CPU && defined(DEV_NPX) */
+
+ENTRY(sse2_pagezero)
+	pushl	%ebx
+	movl	8(%esp),%ecx
+	movl	%ecx,%eax
+	addl	$4096,%eax
+	xor	%ebx,%ebx
+1:
+	movnti	%ebx,(%ecx)
+	addl	$4,%ecx
+	cmpl	%ecx,%eax
+	jne	1b
+	sfence
+	popl	%ebx
+	ret
 
 ENTRY(i686_pagezero)
 	pushl	%edi
@@ -1182,11 +1208,10 @@ ENTRY(casuptr)
 	cmpl	$VM_MAXUSER_ADDRESS-4,%edx	/* verify address is valid */
 	ja	fusufault
 
-#if defined(SMP)
-	lock cmpxchgl %ecx, (%edx)		/* Compare and set. */
-#else	/* !SMP */
-	cmpxchgl %ecx, (%edx)
-#endif	/* !SMP */
+#ifdef SMP
+	lock
+#endif
+	cmpxchgl %ecx, (%edx)			/* Compare and set. */
 
 	/*
 	 * The old value is in %eax.  If the store succeeded it will be the

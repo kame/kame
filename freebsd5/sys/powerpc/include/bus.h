@@ -66,7 +66,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *	$NetBSD: bus.h,v 1.9.4.1 2000/06/30 16:27:30 simonb Exp $
- * $FreeBSD: src/sys/powerpc/include/bus.h,v 1.10 2003/05/27 04:59:58 scottl Exp $
+ * $FreeBSD: src/sys/powerpc/include/bus.h,v 1.12 2003/07/27 13:52:10 mux Exp $
  */
 
 #ifndef	_MACPPC_BUS_H_
@@ -744,6 +744,7 @@ bus_space_set_region_stream_4(bus_space_tag_t tag, bus_space_handle_t bsh,
 #define	BUS_DMA_NOWAIT		0x01	/* not safe to sleep */
 #define	BUS_DMA_ALLOCNOW	0x02	/* perform resource allocation now */
 #define	BUS_DMA_COHERENT	0x04	/* hint: map memory DMA coherent */
+#define	BUS_DMA_ZERO		0x08	/* allocate zero'ed memory */
 #define	BUS_DMA_BUS1		0x10	/* placeholders for bus functions... */
 #define	BUS_DMA_BUS2		0x20
 #define	BUS_DMA_BUS3		0x40
@@ -797,6 +798,17 @@ typedef struct bus_dma_segment {
 typedef int bus_dma_filter_t(void *, bus_addr_t);
 
 /*
+ * A function that performs driver-specific syncronization on behalf of
+ * busdma.
+ */
+typedef enum {
+	BUS_DMA_LOCK    = 0x01,
+	BUS_DMA_UNLOCK  = 0x02,
+} bus_dma_lock_op_t;
+ 
+typedef void bus_dma_lock_t(void *, bus_dma_lock_op_t);
+   
+/*
  * Allocate a device specific dma_tag encapsulating the constraints of
  * the parent tag in addition to other restrictions specified:
  *
@@ -820,7 +832,8 @@ int bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 		       bus_size_t boundary, bus_addr_t lowaddr,
 		       bus_addr_t highaddr, bus_dma_filter_t *filtfunc,
 		       void *filtfuncarg, bus_size_t maxsize, int nsegments,
-		       bus_size_t maxsegsz, int flags, bus_dma_tag_t *dmat);
+		       bus_size_t maxsegsz, int flags, bus_dma_lock_t *lockfunc,
+		       void *lockfuncarg, bus_dma_tag_t *dmat);
 
 int bus_dma_tag_destroy(bus_dma_tag_t dmat);
 
@@ -896,4 +909,8 @@ void bus_dmamap_sync(bus_dma_tag_t, bus_dmamap_t, bus_dmasync_op_t);
  */
 void bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map);
 
+/*
+ * Generic helper function for manipulating mutexes.
+ */     
+void busdma_lock_mutex(void *arg, bus_dma_lock_op_t op);
 #endif /* _MACPPC_BUS_H_ */

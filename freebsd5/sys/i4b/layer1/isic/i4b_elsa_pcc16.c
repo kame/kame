@@ -26,12 +26,12 @@
  *
  *	isic - I4B driver for ELSA MicroLink ISDN/PCC-16 and ELSA PCFpro
  *	================================================================
- *
- * $FreeBSD: src/sys/i4b/layer1/isic/i4b_elsa_pcc16.c,v 1.7 2002/09/02 00:52:08 brooks Exp $
- *
  *      last edit-date: [Sun Oct 21 09:42:17 2001]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_elsa_pcc16.c,v 1.8 2003/06/10 23:45:23 obrien Exp $");
 
 #include "opt_i4b.h"
 

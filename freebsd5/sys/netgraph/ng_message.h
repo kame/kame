@@ -36,19 +36,29 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_message.h,v 1.17 2003/04/18 12:37:33 phk Exp $
+ * $FreeBSD: src/sys/netgraph/ng_message.h,v 1.21 2003/11/12 17:03:40 harti Exp $
  * $Whistle: ng_message.h,v 1.12 1999/01/25 01:17:44 archie Exp $
  */
 
 #ifndef _NETGRAPH_NG_MESSAGE_H_
-#define _NETGRAPH_NG_MESSAGE_H_ 1
+#define _NETGRAPH_NG_MESSAGE_H_
 
 /* ASCII string size limits */
-#define NG_TYPELEN	15	/* max type name len (16 with null) */
-#define NG_HOOKLEN	15	/* max hook name len (16 with null) */
-#define NG_NODELEN	15	/* max node name len (16 with null) */
-#define NG_PATHLEN	511	/* max path len     (512 with null) */
-#define NG_CMDSTRLEN	15	/* max command string (16 with null) */
+#define	NG_TYPESIZ	32	/* max type name len (including null) */
+#define	NG_HOOKSIZ	32	/* max hook name len (including null) */
+#define	NG_NODESIZ	32	/* max node name len (including null) */
+#define	NG_PATHSIZ	512	/* max path len (including null) */
+#define	NG_CMDSTRSIZ	32	/* max command string (including null) */
+
+#ifndef BURN_BRIDGES
+/* don't use these - they will go away */
+#define NG_TYPELEN	(NG_TYPESIZ - 1)
+#define NG_HOOKLEN	(NG_HOOKSIZ - 1)
+#define NG_NODELEN	(NG_NODESIZ - 1)
+#define NG_PATHLEN	(NG_PATHSIZ - 1)
+#define NG_CMDSTRLEN	(NG_CMDSTRSIZ - 1)
+#endif
+
 #define NG_TEXTRESPONSE 1024	/* allow this length for a text response */
 
 /* A netgraph message */
@@ -63,7 +73,7 @@ struct ng_mesg {
 		u_int32_t	cmd;			/* command identifier */
 		u_char		cmdstr[NG_CMDSTRLEN+1];	/* cmd string + \0 */
 	} header;
-	char	data[0];		/* placeholder for actual data */
+	char	data[];			/* placeholder for actual data */
 };
 
 /* this command is guaranteed to not alter data or'd into the command */
@@ -88,7 +98,7 @@ struct ng_mesg {
  * Interfaces within the kernel are defined by a different 
  * value (see NG_ABI_VERSION in netgraph.g)
  */
-#define NG_VERSION	5
+#define NG_VERSION	6
 
 /* Flags field flags */
 #define NGF_ORIG	0x00000000	/* the msg is the original request */
@@ -236,7 +246,7 @@ struct linkinfo {
 
 struct hooklist {
 	struct nodeinfo nodeinfo;		/* node information */
-	struct linkinfo link[0];		/* info about each hook */
+	struct linkinfo link[];			/* info about each hook */
 };
 
 /* Keep this in sync with the above structure definition */
@@ -249,7 +259,7 @@ struct hooklist {
 /* Structure used for NGM_LISTNAMES/NGM_LISTNODES */
 struct namelist {
 	u_int32_t	numnames;
-	struct nodeinfo	nodeinfo[0];
+	struct nodeinfo	nodeinfo[];
 };
 
 /* Keep this in sync with the above structure definition */
@@ -274,7 +284,7 @@ struct typeinfo {
 
 struct typelist {
 	u_int32_t	numtypes;
-	struct typeinfo	typeinfo[0];
+	struct typeinfo	typeinfo[];
 };
 
 /* Keep this in sync with the above structure definition */

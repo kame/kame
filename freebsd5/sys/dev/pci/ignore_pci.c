@@ -23,9 +23,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/dev/pci/ignore_pci.c,v 1.1 2000/12/08 22:10:52 msmith Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/pci/ignore_pci.c,v 1.3 2003/08/24 17:54:15 obrien Exp $");
 
 /*
  * 'Ignore' driver - eats devices that show up errnoeously on PCI
@@ -36,7 +37,7 @@
 #include <sys/kernel.h>
 #include <sys/bus.h>
 
-#include <pci/pcivar.h>
+#include <dev/pci/pcivar.h>
 
 static int	ignore_pci_probe(device_t dev);
 

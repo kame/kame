@@ -28,9 +28,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/netsmb/smb_dev.c,v 1.16 2003/03/06 10:38:18 tjr Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netsmb/smb_dev.c,v 1.19 2003/09/26 20:26:25 fjoe Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -68,7 +70,7 @@ static d_open_t	 nsmb_dev_open;
 static d_close_t nsmb_dev_close;
 static d_ioctl_t nsmb_dev_ioctl;
 
-MODULE_DEPEND(netsmb, libiconv, 1, 1, 1);
+MODULE_DEPEND(netsmb, libiconv, 1, 1, 2);
 MODULE_VERSION(netsmb, NSMB_VERSION);
 
 static int smb_version = NSMB_VERSION;
@@ -387,7 +389,7 @@ smb_dev2share(int fd, int mode, struct smb_cred *scred,
 	fp = nsmb_getfp(scred->scr_td->td_proc->p_fd, fd, FREAD | FWRITE);
 	if (fp == NULL)
 		return EBADF;
-	vp = fp->f_data;
+	vp = fp->f_vnode;
 	if (vp == NULL) {
 		fdrop(fp, curthread);
 		return EBADF;

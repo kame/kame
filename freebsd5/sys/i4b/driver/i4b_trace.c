@@ -26,14 +26,14 @@
  *
  *	i4btrc - device driver for trace data read device
  *	---------------------------------------------------
- *
  *	last edit-date: [Sun Mar 17 09:52:51 2002]
- *
- * $FreeBSD: src/sys/i4b/driver/i4b_trace.c,v 1.23 2003/03/03 12:15:50 phk Exp $
  *
  *	NOTE: the code assumes that SPLI4B >= splimp !
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_trace.c,v 1.27 2003/11/10 14:20:34 gj Exp $");
 
 #include "i4btrc.h"
 
@@ -156,7 +156,7 @@ get_trace_data_from_l1(i4b_trace_hdr_t *hdr, int len, char *buf)
 	
 	/* check valid unit no */
 	
-	if((unit = hdr->unit) > NI4BTRC)
+	if((unit = hdr->unit) >= NI4BTRC)
 	{
 		printf("i4b_trace: get_trace_data_from_l1 - unit > NI4BTRC!\n"); 
 		return(0);
@@ -316,7 +316,7 @@ i4btrcread(dev_t dev, struct uio * uio, int ioflag)
 		
 		if((error = msleep( &trace_queue[unit],
 					&trace_queue[unit].ifq_mtx,
-					TTIPRI | PCATCH,
+					I4BPRI | PCATCH,
 					"bitrc", 0 )) != 0)
 		{
 			device_state[unit] &= ~ST_WAITDATA;

@@ -60,13 +60,14 @@
  *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
- *
- * $FreeBSD: src/sys/vm/vm_init.c,v 1.35 2002/11/07 23:57:17 tmm Exp $
  */
 
 /*
  *	Initialize the Virtual Memory subsystem.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/vm/vm_init.c,v 1.39 2003/09/01 16:46:47 eivind Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -74,6 +75,8 @@
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
+#include <sys/selinfo.h>
+#include <sys/pipe.h>
 #include <sys/bio.h>
 #include <sys/buf.h>
 
@@ -131,6 +134,7 @@ vm_ksubmap_init(struct kva_md_info *kmi)
 	long physmem_est;
 	vm_offset_t minaddr;
 	vm_offset_t maxaddr;
+	vm_map_t clean_map;
 
 	/*
 	 * Allocate space for system data structures.
@@ -171,7 +175,7 @@ again:
 	 * End of first pass, size has been calculated so allocate memory
 	 */
 	if (firstaddr == 0) {
-		size = (vm_size_t)((char *)v - firstaddr);
+		size = (vm_size_t)v;
 		firstaddr = kmem_alloc(kernel_map, round_page(size));
 		if (firstaddr == 0)
 			panic("startup: no room for tables");
@@ -194,6 +198,7 @@ again:
 	pager_map->system_map = 1;
 	exec_map = kmem_suballoc(kernel_map, &minaddr, &maxaddr,
 				(16*(ARG_MAX+(PAGE_SIZE*3))));
+	pipe_map = kmem_suballoc(kernel_map, &minaddr, &maxaddr, maxpipekva);
 
 	/*
 	 * XXX: Mbuf system machine-specific initializations should

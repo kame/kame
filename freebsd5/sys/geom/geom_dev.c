@@ -31,9 +31,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/geom/geom_dev.c,v 1.58 2003/05/09 21:25:28 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/geom/geom_dev.c,v 1.70 2003/10/19 19:06:54 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -65,7 +66,7 @@ static struct cdevsw g_dev_cdevsw = {
 	.d_strategy =	g_dev_strategy,
 	.d_name =	"g_dev",
 	.d_maj =	GEOM_MAJOR,
-	.d_flags =	D_DISK | D_TRACKCLOSE,
+	.d_flags =	D_DISK | D_TRACKCLOSE | D_NOGIANT,
 };
 
 static g_taste_t g_dev_taste;
@@ -74,21 +75,19 @@ static g_orphan_t g_dev_orphan;
 static struct g_class g_dev_class	= {
 	.name = "DEV",
 	.taste = g_dev_taste,
-	G_CLASS_INITIALIZER
 };
 
-int
+void
 g_dev_print(void)
 {
 	struct g_geom *gp;
+	char const *p = "";
 
-	if (LIST_EMPTY(&g_dev_class.geom))
-		return (0);
-	printf("List of GEOM disk devices:\n  ");
-	LIST_FOREACH(gp, &g_dev_class.geom, geom)
-		printf(" %s", gp->name);
+	LIST_FOREACH(gp, &g_dev_class.geom, geom) {
+		printf("%s%s", p, gp->name);
+		p = " ";
+	}
 	printf("\n");
-	return (1);
 }
 
 /*
@@ -133,6 +132,20 @@ g_dev_register_cloner(void *foo __unused)
 }
 
 SYSINIT(geomdev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE,g_dev_register_cloner,NULL);
+
+struct g_provider *
+g_dev_getprovider(dev_t dev)
+{
+	struct g_consumer *cp;
+
+	if (dev == NULL)
+		return (NULL);
+	if (devsw(dev) != &g_dev_cdevsw)
+		return (NULL);
+	cp = dev->si_drv2;
+	return (cp->provider);
+}
+
 
 static struct g_geom *
 g_dev_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
@@ -196,14 +209,12 @@ g_dev_open(dev_t dev, int flags, int fmt, struct thread *td)
 #else
 	e = 0;
 #endif
-	DROP_GIANT();
 	g_topology_lock();
 	if (dev->si_devsw == NULL)
 		error = ENXIO;		/* We were orphaned */
 	else
 		error = g_access_rel(cp, r, w, e);
 	g_topology_unlock();
-	PICKUP_GIANT();
 	g_waitidle();
 	if (!error)
 		dev->si_bsize_phys = cp->provider->sectorsize;
@@ -230,7 +241,6 @@ g_dev_close(dev_t dev, int flags, int fmt, struct thread *td)
 #else
 	e = 0;
 #endif
-	DROP_GIANT();
 	g_topology_lock();
 	if (dev->si_devsw == NULL)
 		error = ENXIO;		/* We were orphaned */
@@ -251,7 +261,6 @@ g_dev_close(dev_t dev, int flags, int fmt, struct thread *td)
 		    "Completing close anyway, panic may happen later.");
 	}
 	g_topology_unlock();
-	PICKUP_GIANT();
 	g_waitidle();
 	return (error);
 }
@@ -265,26 +274,19 @@ g_dev_close(dev_t dev, int flags, int fmt, struct thread *td)
 static int
 g_dev_ioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct thread *td)
 {
-	struct g_geom *gp, *gp2;
+	struct g_geom *gp;
 	struct g_consumer *cp;
-	struct g_provider *pp2;
 	struct g_kerneldump kd;
 	int i, error;
 	u_int u;
-	struct g_ioctl *gio;
 
 	gp = dev->si_drv1;
 	cp = dev->si_drv2;
-	pp2 = cp->provider;
-	gp2 = pp2->geom;
-	gio = NULL;
 
 	error = 0;
 	KASSERT(cp->acr || cp->acw,
 	    ("Consumer with zero access count in g_dev_ioctl"));
-	DROP_GIANT();
 
-	gio = NULL;
 	i = IOCPARM_LEN(cmd);
 	switch (cmd) {
 	case DIOCGSECTORSIZE:
@@ -326,47 +328,14 @@ g_dev_ioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct thread *td)
 		break;
 
 	default:
-		gio = g_malloc(sizeof *gio, M_WAITOK | M_ZERO);
-		gio->cmd = cmd;
-		gio->data = data;
-		gio->fflag = fflag;
-		gio->td = td;
-		i = sizeof *gio;
-		/*
-		 * We always issue ioctls as getattr since the direction of data
-		 * movement in ioctl is no indication of the ioctl being a "set"
-		 * or "get" type ioctl or if such simplistic terms even apply
-		 */
-		error = g_io_getattr("GEOM::ioctl", cp, &i, gio);
-		break;
+		if (cp->provider->geom->ioctl != NULL) {
+			error = cp->provider->geom->ioctl(cp->provider, cmd, data, td);
+		} else {
+			error = ENOIOCTL;
+		}
 	}
 
-	PICKUP_GIANT();
-	if (error == EDIRIOCTL) {
-		KASSERT(gio != NULL, ("NULL gio but EDIRIOCTL"));
-		KASSERT(gio->func != NULL, ("NULL function but EDIRIOCTL"));
-		error = (gio->func)(gio->dev, cmd, data, fflag, td);
-	}
 	g_waitidle();
-	if (gio != NULL && (error == EOPNOTSUPP || error == ENOIOCTL)) {
-		if (g_debugflags & G_T_TOPOLOGY) {
-			i = IOCGROUP(cmd);
-			printf("IOCTL(0x%lx) \"%s\"", cmd, gp->name);
-			if (i > ' ' && i <= '~')
-				printf(" '%c'", (int)IOCGROUP(cmd));
-			else
-				printf(" 0x%lx", IOCGROUP(cmd));
-			printf("/%ld ", cmd & 0xff);
-			if (cmd & IOC_IN)
-				printf("I");
-			if (cmd & IOC_OUT)
-				printf("O");
-			printf("(%ld) = ENOIOCTL\n", IOCPARM_LEN(cmd));
-		}
-		error = ENOTTY;
-	}
-	if (gio != NULL)
-		g_free(gio);
 	return (error);
 }
 
@@ -387,15 +356,12 @@ g_dev_done(struct bio *bp2)
 	}
 	bp->bio_resid = bp->bio_bcount - bp2->bio_completed;
 	g_destroy_bio(bp2);
-	mtx_lock(&Giant);
 	biodone(bp);
-	mtx_unlock(&Giant);
 }
 
 static void
 g_dev_strategy(struct bio *bp)
 {
-	struct g_geom *gp;
 	struct g_consumer *cp;
 	struct bio *bp2;
 	dev_t dev;
@@ -405,17 +371,21 @@ g_dev_strategy(struct bio *bp)
 	        bp->bio_cmd == BIO_DELETE,
 		("Wrong bio_cmd bio=%p cmd=%d", bp, bp->bio_cmd));
 	dev = bp->bio_dev;
-	gp = dev->si_drv1;
 	cp = dev->si_drv2;
 	KASSERT(cp->acr || cp->acw,
 	    ("Consumer with zero access count in g_dev_strategy"));
 
-	bp2 = g_clone_bio(bp);
+	for (;;) {
+		/*
+		 * XXX: This is not an ideal solution, but I belive it to
+		 * XXX: deadlock safe, all things considered.
+		 */
+		bp2 = g_clone_bio(bp);
+		if (bp2 != NULL)
+			break;
+		tsleep(&bp, PRIBIO, "gdstrat", hz / 10);
+	}
 	KASSERT(bp2 != NULL, ("XXX: ENOMEM in a bad place"));
-	bp2->bio_offset = (off_t)bp->bio_blkno << DEV_BSHIFT;
-	KASSERT(bp2->bio_offset >= 0,
-	    ("Negative bio_offset (%jd) on bio %p",
-	    (intmax_t)bp2->bio_offset, bp));
 	bp2->bio_length = (off_t)bp->bio_bcount;
 	bp2->bio_done = g_dev_done;
 	g_trace(G_T_BIO,

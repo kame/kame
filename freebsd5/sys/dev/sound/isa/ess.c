@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * Copyright 1997,1998 Luigi Rizzo.
  *
  * Derived from files in the Voxware 3.5 distribution,
@@ -38,7 +38,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/ess.c,v 1.25 2003/02/07 14:05:33 nyan Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/ess.c,v 1.27 2003/09/07 16:28:02 cg Exp $");
 
 #define ESS_BUFFSIZE (4096)
 #define ABS(x) (((x) < 0)? -(x) : (x))
@@ -855,7 +855,8 @@ ess_attach(device_t dev)
 			/*filter*/NULL, /*filterarg*/NULL,
 			/*maxsize*/sc->bufsize, /*nsegments*/1,
 			/*maxsegz*/0x3ffff,
-			/*flags*/0, &sc->parent_dmat) != 0) {
+			/*flags*/0, /*lockfunc*/busdma_lock_mutex,
+			/*lockarg*/&Giant, &sc->parent_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		goto no;
     	}

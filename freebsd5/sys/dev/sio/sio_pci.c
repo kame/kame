@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2001 M. Warner Losh.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -20,9 +20,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/sio/sio_pci.c,v 1.11 2003/02/27 14:09:36 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/sio/sio_pci.c,v 1.15 2003/11/28 05:28:28 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -40,7 +41,7 @@
 
 #include <dev/sio/siovar.h>
 
-#include <pci/pcivar.h>
+#include <dev/pci/pcivar.h>
 
 static	int	sio_pci_attach(device_t dev);
 static	void	sio_pci_kludge_unit(device_t dev);

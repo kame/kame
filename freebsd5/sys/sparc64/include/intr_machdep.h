@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/intr_machdep.h,v 1.12 2002/09/28 03:06:34 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/intr_machdep.h,v 1.13 2003/07/16 00:08:43 jmg Exp $
  */
 
 #ifndef	_MACHINE_INTR_MACHDEP_H_
@@ -33,6 +33,7 @@
 
 #define	PIL_MAX		(1 << 4)
 #define	IV_MAX		(1 << 11)
+#define IV_NAMLEN	1024
 
 #define	IR_FREE		(PIL_MAX * 2)
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/include/elf.h,v 1.9 2002/07/20 02:56:10 peter Exp $
+ * $FreeBSD: src/sys/ia64/include/elf.h,v 1.11 2003/09/25 01:10:24 peter Exp $
  */
 
 #ifndef _MACHINE_ELF_H_
@@ -203,6 +203,23 @@ __ElfType(Auxinfo);
 #define	R_IA64_SUB		0x85	/* immediate64	A - S */
 #define	R_IA64_LTOFF22X		0x86	/* immediate22	special */
 #define	R_IA64_LDXMOV		0x87	/* immediate22	special */
+#define	R_IA64_TPREL14		0x91	/* imm14	@tprel(S + A) */
+#define	R_IA64_TPREL22		0x92	/* imm22	@tprel(S + A) */
+#define	R_IA64_TPREL64I		0x93	/* imm64	@tprel(S + A) */
+#define	R_IA64_TPREL64MSB	0x96	/* word64 MSB	@tprel(S + A) */
+#define	R_IA64_TPREL64LSB	0x97	/* word64 LSB	@tprel(S + A) */
+#define	R_IA64_LTOFF_TPREL22	0x9a	/* imm22	@ltoff(@tprel(S+A)) */
+#define	R_IA64_DTPMOD64MSB	0xa6	/* word64 MSB	@dtpmod(S + A) */
+#define	R_IA64_DTPMOD64LSB	0xa7	/* word64 LSB	@dtpmod(S + A) */
+#define	R_IA64_LTOFF_DTPMOD22	0xaa	/* imm22	@ltoff(@dtpmod(S+A)) */
+#define	R_IA64_DTPREL14		0xb1	/* imm14	@dtprel(S + A) */
+#define	R_IA64_DTPREL22		0xb2	/* imm22	@dtprel(S + A) */
+#define	R_IA64_DTPREL64I	0xb3	/* imm64	@dtprel(S + A) */
+#define	R_IA64_DTPREL32MSB	0xb4	/* word32 MSB	@dtprel(S + A) */
+#define	R_IA64_DTPREL32LSB	0xb5	/* word32 LSB	@dtprel(S + A) */
+#define	R_IA64_DTPREL64MSB	0xb6	/* word64 MSB	@dtprel(S + A) */
+#define	R_IA64_DTPREL64LSB	0xb7	/* word64 LSB	@dtprel(S + A) */
+#define	R_IA64_LTOFF_DTPREL22	0xba	/* imm22	@ltoff(@dtprel(S+A)) */
 
 /* Define "machine" characteristics */
 #if __ELF_WORD_SIZE == 32
@@ -218,16 +235,4 @@ __ElfType(Auxinfo);
 
 #define DT_IA64_PLT_RESERVE     0x70000000
 
-#ifdef _KERNEL
-
-/*
- * On the ia64 we load the dynamic linker where a userland call
- * to mmap(0, ...) would put it.  The rationale behind this
- * calculation is that it leaves room for the heap to grow to
- * its maximum allowed size.
- */
-#define	ELF_RTLD_ADDR(vmspace) \
-    (round_page((vm_offset_t)(vmspace)->vm_daddr + maxdsiz))
-
-#endif /* _KERNEL */
 #endif /* !_MACHINE_ELF_H_ */

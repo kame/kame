@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/fs/pseudofs/pseudofs_vnops.c,v 1.35 2003/03/02 22:23:45 des Exp $
+ *	$FreeBSD: src/sys/fs/pseudofs/pseudofs_vnops.c,v 1.42.2.1 2004/02/10 21:08:01 nectar Exp $
  */
 
 #include <sys/param.h>
@@ -34,6 +34,7 @@
 #include <sys/ctype.h>
 #include <sys/dirent.h>
 #include <sys/fcntl.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/mount.h>
 #include <sys/mutex.h>
@@ -163,6 +164,9 @@ pfs_getattr(struct vop_getattr_args *va)
 
 	PFS_TRACE((pn->pn_name));
 
+	if (!pfs_visible(curthread, pn, pvd->pvd_pid))
+		PFS_RETURN (ENOENT);
+
 	VATTR_NULL(vap);
 	vap->va_type = vn->v_type;
 	vap->va_fileid = pn->pn_fileno;
@@ -227,7 +231,7 @@ pfs_ioctl(struct vop_ioctl_args *va)
 		PFS_RETURN (ENOTTY);
 
 	/*
-	 * This is necessary because either process' privileges may
+	 * This is necessary because process' privileges may
 	 * have changed since the open() call.
 	 */
 	if (!pfs_visible(curthread, pn, pvd->pvd_pid))
@@ -262,6 +266,9 @@ pfs_getextattr(struct vop_getextattr_args *va)
 	int error;
 
 	PFS_TRACE((pd->pn_name));
+
+	if (!pfs_visible(curthread, pn, pvd->pvd_pid))
+		PFS_RETURN (ENOENT);
 
 	if (pn->pn_getextattr == NULL)
 		PFS_RETURN (EOPNOTSUPP);
@@ -411,7 +418,8 @@ pfs_lookup(struct vop_lookup_args *va)
 		vn_lock(vn, LK_EXCLUSIVE|LK_RETRY, cnp->cn_thread);
 		cnp->cn_flags &= ~PDIRUNLOCK;
 	}
-	if (!lockparent || !(cnp->cn_flags & ISLASTCN))
+	if (!((lockparent && (cnp->cn_flags & ISLASTCN)) ||
+	    (cnp->cn_flags & ISDOTDOT)))
 		VOP_UNLOCK(vn, 0, cnp->cn_thread);
 
 	/*
@@ -472,8 +480,8 @@ pfs_read(struct vop_read_args *va)
 	struct uio *uio = va->a_uio;
 	struct proc *proc = NULL;
 	struct sbuf *sb = NULL;
-	char *ps;
-	int error, xlen;
+	int error;
+	unsigned int buflen, offset, resid;
 
 	PFS_TRACE((pn->pn_name));
 
@@ -508,7 +516,21 @@ pfs_read(struct vop_read_args *va)
 		PFS_RETURN (error);
 	}
 
-	sb = sbuf_new(sb, NULL, uio->uio_offset + uio->uio_resid, 0);
+	/* Beaucoup sanity checks so we don't ask for bogus allocation. */
+	if (uio->uio_offset < 0 || uio->uio_resid < 0 ||
+	    (offset = uio->uio_offset) != uio->uio_offset ||
+	    (resid = uio->uio_resid) != uio->uio_resid ||
+	    (buflen = offset + resid) < offset || buflen > INT_MAX) {
+		if (proc != NULL)
+			PRELE(proc);
+		PFS_RETURN (EINVAL);
+	}
+	if (buflen > MAXPHYS) {
+		if (proc != NULL)
+			PRELE(proc);
+		PFS_RETURN (EIO);
+	}
+	sb = sbuf_new(sb, NULL, buflen, 0);
 	if (sb == NULL) {
 		if (proc != NULL)
 			PRELE(proc);
@@ -525,12 +547,8 @@ pfs_read(struct vop_read_args *va)
 		PFS_RETURN (error);
 	}
 
-	/* XXX we should possibly detect and handle overflows */
 	sbuf_finish(sb);
-	ps = sbuf_data(sb) + uio->uio_offset;
-	xlen = sbuf_len(sb) - uio->uio_offset;
-	xlen = imin(xlen, uio->uio_resid);
-	error = (xlen <= 0 ? 0 : uiomove(ps, xlen, uio));
+	error = uiomove_frombuf(sbuf_data(sb), sbuf_len(sb), uio);
 	sbuf_delete(sb);
 	PFS_RETURN (error);
 }
@@ -542,21 +560,24 @@ static int
 pfs_iterate(struct thread *td, pid_t pid, struct pfs_node *pd,
 	    struct pfs_node **pn, struct proc **p)
 {
-	if ((*pn) == NULL)
-		*pn = pd->pn_nodes;
-	else
+	sx_assert(&allproc_lock, SX_LOCKED);
  again:
-	if ((*pn)->pn_type != pfstype_procdir)
+	if (*pn == NULL) {
+		/* first node */
+		*pn = pd->pn_nodes;
+	} else if ((*pn)->pn_type != pfstype_procdir) {
+		/* next node */
 		*pn = (*pn)->pn_next;
-
-	while (*pn != NULL && (*pn)->pn_type == pfstype_procdir) {
+	}
+	if (*pn != NULL && (*pn)->pn_type == pfstype_procdir) {
+		/* next process */
 		if (*p == NULL)
 			*p = LIST_FIRST(&allproc);
 		else
 			*p = LIST_NEXT(*p, p_list);
-		if (*p != NULL)
-			break;
-		*pn = (*pn)->pn_next;
+		/* out of processes: next node */
+		if (*p == NULL)
+			*pn = (*pn)->pn_next;
 	}
 
 	if ((*pn) == NULL)
@@ -676,9 +697,9 @@ pfs_readlink(struct vop_readlink_args *va)
 	struct pfs_node *pn = pvd->pvd_pn;
 	struct uio *uio = va->a_uio;
 	struct proc *proc = NULL;
-	char buf[MAXPATHLEN], *ps;
+	char buf[MAXPATHLEN];
 	struct sbuf sb;
-	int error, xlen;
+	int error;
 
 	PFS_TRACE((pn->pn_name));
 
@@ -708,12 +729,8 @@ pfs_readlink(struct vop_readlink_args *va)
 		PFS_RETURN (error);
 	}
 
-	/* XXX we should detect and handle overflows */
 	sbuf_finish(&sb);
-	ps = sbuf_data(&sb) + uio->uio_offset;
-	xlen = sbuf_len(&sb) - uio->uio_offset;
-	xlen = imin(xlen, uio->uio_resid);
-	error = (xlen <= 0 ? 0 : uiomove(ps, xlen, uio));
+	error = uiomove_frombuf(sbuf_data(&sb), sbuf_len(&sb), uio);
 	sbuf_delete(&sb);
 	PFS_RETURN (error);
 }

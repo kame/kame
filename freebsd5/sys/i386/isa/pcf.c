@@ -22,10 +22,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/isa/pcf.c,v 1.19 2003/01/01 18:48:53 schweikh Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/isa/pcf.c,v 1.21 2003/06/20 07:22:54 jmg Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -138,6 +139,7 @@ pcf_probe(device_t pcfdev)
 {
 	struct pcf_softc *pcf = DEVTOSOFTC(pcfdev);
 	device_t parent = device_get_parent(pcfdev);
+	uintptr_t base;
 
 	device_set_desc(pcfdev, "PCF8584 I2C bus controller");
 
@@ -155,7 +157,8 @@ pcf_probe(device_t pcfdev)
 		device_printf(pcfdev, "cannot reserve I/O port range\n");
 		goto error;
 	}
-	BUS_READ_IVAR(parent, pcfdev, ISA_IVAR_PORT, &pcf->pcf_base);
+	BUS_READ_IVAR(parent, pcfdev, ISA_IVAR_PORT, &base);
+	pcf->pcf_base = base;
 
 	pcf->pcf_flags = device_get_flags(pcfdev);
 

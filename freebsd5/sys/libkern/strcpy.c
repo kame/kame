@@ -29,9 +29,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/libkern/strcpy.c,v 1.9 2003/02/10 00:36:27 hsu Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/libkern/strcpy.c,v 1.10 2003/06/11 05:23:04 obrien Exp $");
 
 #include <sys/libkern.h>
 

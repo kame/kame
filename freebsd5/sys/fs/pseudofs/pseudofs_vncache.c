@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *      $FreeBSD: src/sys/fs/pseudofs/pseudofs_vncache.c,v 1.23 2003/03/24 21:15:34 jhb Exp $
+ *      $FreeBSD: src/sys/fs/pseudofs/pseudofs_vncache.c,v 1.24 2003/10/05 02:43:30 jeff Exp $
  */
 
 #include <sys/param.h>
@@ -196,8 +196,6 @@ int
 pfs_vncache_free(struct vnode *vp)
 {
 	struct pfs_vdata *pvd;
-
-	cache_purge(vp);
 
 	mtx_lock(&pfs_vncache_mutex);
 	pvd = (struct pfs_vdata *)vp->v_data;

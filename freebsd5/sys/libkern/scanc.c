@@ -31,9 +31,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)scanc.c	8.1 (Berkeley) 6/10/93
- *
- * $FreeBSD: src/sys/libkern/scanc.c,v 1.8 1999/08/28 00:46:36 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/libkern/scanc.c,v 1.10 2003/07/25 15:54:23 bde Exp $");
 
 #include <sys/libkern.h>
 
@@ -48,12 +49,7 @@ scanc(size, cp, table, mask0)
 
 	mask = mask0;
 	for (end = &cp[size]; cp < end; ++cp) {
-		/*
-		 * gcc-2.6.3 generates poor (un)sign extension code on i386's.
-		 * The cast to volatile should have no effect, but in fact it
-		 * improves the code on i386's.
-		 */
-		if (table[*(volatile const u_char *)cp] & mask)
+		if (table[*cp] & mask)
 			break;
 	}
 	return (end - cp);

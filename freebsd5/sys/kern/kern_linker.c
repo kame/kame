@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/kern_linker.c,v 1.105 2003/03/03 22:53:35 ru Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_linker.c,v 1.108 2003/09/23 14:42:38 fjoe Exp $");
 
 #include "opt_ddb.h"
 #include "opt_mac.h"
@@ -1085,7 +1086,7 @@ modlist_lookup2(const char *name, struct mod_depend *verinfo)
 			return (mod);
 		if (ver >= verinfo->md_ver_minimum &&
 		    ver <= verinfo->md_ver_maximum &&
-		    ver > bestmod->version)
+		    (bestmod == NULL || ver > bestmod->version))
 			bestmod = mod;
 	}
 	return (bestmod);
@@ -1391,7 +1392,7 @@ linker_lookup_file(const char *path, int pathlen, const char *name,
 		 */
 		NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, result, td);
 		flags = FREAD;
-		error = vn_open(&nd, &flags, 0);
+		error = vn_open(&nd, &flags, 0, -1);
 		if (error == 0) {
 			NDFREE(&nd, NDF_ONLY_PNBUF);
 			type = nd.ni_vp->v_type;
@@ -1439,7 +1440,7 @@ linker_hints_lookup(const char *path, int pathlen, const char *modname,
 
 	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, pathbuf, td);
 	flags = FREAD;
-	error = vn_open(&nd, &flags, 0);
+	error = vn_open(&nd, &flags, 0, -1);
 	if (error)
 		goto bad;
 	NDFREE(&nd, NDF_ONLY_PNBUF);

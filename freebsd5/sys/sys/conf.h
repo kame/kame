@@ -38,7 +38,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)conf.h	8.5 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/conf.h,v 1.172 2003/03/25 00:07:05 jake Exp $
+ * $FreeBSD: src/sys/sys/conf.h,v 1.179 2003/10/18 09:03:15 phk Exp $
  */
 
 #ifndef _SYS_CONF_H_
@@ -145,6 +145,7 @@ struct knote;
 typedef struct thread d_thread_t;
 
 typedef int d_open_t(dev_t dev, int oflags, int devtype, struct thread *td);
+typedef int d_fdopen_t(dev_t dev, int oflags, struct thread *td, int fdidx);
 typedef int d_close_t(dev_t dev, int fflag, int devtype, struct thread *td);
 typedef void d_strategy_t(struct bio *bp);
 typedef int d_ioctl_t(dev_t dev, u_long cmd, caddr_t data,
@@ -174,23 +175,7 @@ typedef int dumper_t(
 	off_t offset,		/* Byte-offset to write at. */
 	size_t length);		/* Number of bytes to dump. */
 
-#define BIO_STRATEGY(bp)						\
-	do {								\
-	if ((!(bp)->bio_cmd) || ((bp)->bio_cmd & ((bp)->bio_cmd - 1)))	\
-		Debugger("bio_cmd botch");				\
-	(*devsw((bp)->bio_dev)->d_strategy)(bp);			\
-	} while (0)
-
-#define DEV_STRATEGY(bp)						\
-	do {								\
-	if ((bp)->b_flags & B_PHYS)					\
-		(bp)->b_io.bio_offset = (bp)->b_offset;			\
-	else								\
-		(bp)->b_io.bio_offset = dbtob((bp)->b_blkno);		\
-	(bp)->b_io.bio_done = bufdonebio;				\
-	(bp)->b_io.bio_caller2 = (bp);					\
-	BIO_STRATEGY(&(bp)->b_io);					\
-	} while (0)
+#define DEV_STRATEGY(bp) dev_strategy(bp)
 
 #endif /* _KERNEL */
 
@@ -223,6 +208,7 @@ struct cdevsw {
 	u_int		d_flags;
 	const char	*d_name;
 	d_open_t	*d_open;
+	d_fdopen_t	*d_fdopen;
 	d_close_t	*d_close;
 	d_read_t	*d_read;
 	d_write_t	*d_write;
@@ -258,29 +244,14 @@ void ldisc_deregister(int);
 #endif /* _KERNEL */
 
 #ifdef _KERNEL
-d_open_t	noopen;
-d_close_t	noclose;
-d_read_t	noread;
-d_write_t	nowrite;
-d_ioctl_t	noioctl;
-d_mmap_t	nommap;
-d_kqfilter_t	nokqfilter;
-#define	nostrategy	((d_strategy_t *)NULL)
-#define	nopoll	seltrue
-
-dumper_t	nodump;
 
 #define NUMCDEVSW 256
 
-#define	MAJOR_AUTO	0	/* XXX: Not GM */
-
 /*
- * nopsize is little used, so not worth having dummy functions for.
+ * XXX: do not use MAJOR_AUTO unless you have no choice.  In general drivers
+ * should just not initialize .d_maj and that will DTRT.
  */
-#define	nopsize	(NULL)
-
-d_open_t	nullopen;
-d_close_t	nullclose;
+#define	MAJOR_AUTO	0	/* XXX: Not GM */
 
 l_ioctl_t	l_nullioctl;
 l_read_t	l_noread;
@@ -305,11 +276,11 @@ DECLARE_MODULE(name, name##_mod, SI_SUB_DRIVERS, SI_ORDER_MIDDLE)
 
 int	count_dev(dev_t _dev);
 void	destroy_dev(dev_t _dev);
-void	revoke_and_destroy_dev(dev_t _dev);
 struct cdevsw *devsw(dev_t _dev);
 const char *devtoname(dev_t _dev);
 int	dev_named(dev_t _pdev, const char *_name);
 void	dev_depends(dev_t _pdev, dev_t _cdev);
+void	dev_strategy(struct buf *bp);
 void	freedev(dev_t _dev);
 dev_t	makebdev(int _maj, int _min);
 dev_t	make_dev(struct cdevsw *_devsw, int _minor, uid_t _uid, gid_t _gid,

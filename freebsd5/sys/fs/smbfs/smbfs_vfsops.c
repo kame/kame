@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_vfsops.c,v 1.18 2003/04/01 02:42:02 tjr Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_vfsops.c,v 1.22 2003/11/12 09:52:10 phk Exp $
  */
 #include "opt_netsmb.h"
 #ifndef NETSMB
@@ -76,39 +76,32 @@ SYSCTL_INT(_vfs_smbfs, OID_AUTO, debuglevel, CTLFLAG_RW, &smbfs_debuglevel, 0, "
 
 static MALLOC_DEFINE(M_SMBFSHASH, "SMBFS hash", "SMBFS hash table");
 
-
-static int smbfs_mount(struct mount *, char *, caddr_t,
-			struct nameidata *, struct thread *);
-static int smbfs_quotactl(struct mount *, int, uid_t, caddr_t, struct thread *);
-static int smbfs_root(struct mount *, struct vnode **);
-static int smbfs_start(struct mount *, int, struct thread *);
-static int smbfs_statfs(struct mount *, struct statfs *, struct thread *);
-static int smbfs_unmount(struct mount *, int, struct thread *);
-static int smbfs_init(struct vfsconf *vfsp);
-static int smbfs_uninit(struct vfsconf *vfsp);
+static vfs_init_t       smbfs_init;
+static vfs_uninit_t     smbfs_uninit;
+static vfs_mount_t      smbfs_mount;
+static vfs_start_t      smbfs_start;
+static vfs_root_t       smbfs_root;
+static vfs_quotactl_t   smbfs_quotactl;
+static vfs_statfs_t     smbfs_statfs;
+static vfs_unmount_t    smbfs_unmount;
 
 static struct vfsops smbfs_vfsops = {
-	smbfs_mount,
-	smbfs_start,
-	smbfs_unmount,
-	smbfs_root,
-	smbfs_quotactl,
-	smbfs_statfs,
-	vfs_stdsync,
-	vfs_stdvget,
-	vfs_stdfhtovp,		/* shouldn't happen */
-	vfs_stdcheckexp,
-	vfs_stdvptofh,		/* shouldn't happen */
-	smbfs_init,
-	smbfs_uninit,
-	vfs_stdextattrctl
+	.vfs_init =		smbfs_init,
+	.vfs_mount =		smbfs_mount,
+	.vfs_quotactl =		smbfs_quotactl,
+	.vfs_root =		smbfs_root,
+	.vfs_start =		smbfs_start,
+	.vfs_statfs =		smbfs_statfs,
+	.vfs_sync =		vfs_stdsync,
+	.vfs_uninit =		smbfs_uninit,
+	.vfs_unmount =		smbfs_unmount,
 };
 
 
 VFS_SET(smbfs_vfsops, smbfs, VFCF_NETWORK);
 
 MODULE_DEPEND(smbfs, netsmb, NSMB_VERSION, NSMB_VERSION, NSMB_VERSION);
-MODULE_DEPEND(smbfs, libiconv, 1, 1, 1);
+MODULE_DEPEND(smbfs, libiconv, 1, 1, 2);
 MODULE_DEPEND(smbfs, libmchain, 1, 1, 1);
 
 int smbfs_pbuf_freecnt = -1;	/* start out unlimited */
@@ -339,7 +332,8 @@ smbfs_init(struct vfsconf *vfsp)
 {
 #ifndef SMP
 	int name[2];
-	int olen, ncpu, plen, error;
+	int ncpu, error;
+	size_t olen, plen;
 
 	name[0] = CTL_HW;
 	name[1] = HW_NCPU;
@@ -381,7 +375,6 @@ smbfs_statfs(struct mount *mp, struct statfs *sbp, struct thread *td)
 		return EINVAL;
 	
 	sbp->f_iosize = SSTOVC(ssp)->vc_txmax;		/* optimal transfer block size */
-	sbp->f_spare2 = 0;			/* placeholder */
 	smb_makescred(&scred, td, td->td_ucred);
 
 	if (SMB_DIALECT(SSTOVC(ssp)) >= SMB_DIALECT_LANMAN2_0)

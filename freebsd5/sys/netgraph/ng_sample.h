@@ -36,12 +36,12 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_sample.h,v 1.5 2002/05/31 23:48:03 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_sample.h,v 1.6 2003/11/11 12:30:37 ru Exp $
  * $Whistle: ng_sample.h,v 1.3 1999/01/20 00:22:14 archie Exp $
  */
 
-#ifndef _NETGRAPH_SAMPLE_H_
-#define _NETGRAPH_SAMPLE_H_
+#ifndef _NETGRAPH_NG_SAMPLE_H_
+#define _NETGRAPH_NG_SAMPLE_H_
 
 /* Node type name. This should be unique among all netgraph node types */
 #define NG_XXX_NODE_TYPE	"sample"
@@ -85,4 +85,4 @@ struct ngxxxstat {
 	  { NULL }						\
 }
 
-#endif /* _NETGRAPH_SAMPLE_H_ */
+#endif /* _NETGRAPH_NG_SAMPLE_H_ */

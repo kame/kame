@@ -22,9 +22,10 @@
  *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
- *
- * $FreeBSD: src/sys/i386/i386/db_disasm.c,v 1.26 2002/03/23 14:27:06 bde Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/i386/db_disasm.c,v 1.28 2003/08/25 09:48:46 obrien Exp $");
 
 /*
  * Instruction disassembler.

@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_decode.c,v 1.14 2003/02/19 05:47:31 imp Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ----------------------------------------
  *
  * Message formatting module
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/unisig_decode.c,v 1.16 2003/07/23 14:28:57 harti Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -62,12 +60,8 @@
 #include <netatm/uni/unisig_mbuf.h>
 #include <netatm/uni/unisig_decode.h>
 
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/unisig_decode.c,v 1.14 2003/02/19 05:47:31 imp Exp $");
-#endif
-
 #define	ALLOC_IE(ie) do {						\
-	(ie) = uma_zalloc(unisig_ie_zone, M_WAITOK | M_ZERO);		\
+	(ie) = uma_zalloc(unisig_ie_zone, M_NOWAIT | M_ZERO);		\
 	if ((ie) == NULL)						\
 		return (ENOMEM);					\
 } while (0)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,10 +28,10 @@
 #include <dev/sound/pcm/ac97.h>
 #include <dev/sound/pci/aureal.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/aureal.c,v 1.22 2003/02/20 17:31:11 cognet Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/aureal.c,v 1.26 2003/09/07 16:28:02 cg Exp $");
 
 /* PCI IDs of supported chips */
 #define AU8820_PCI_ID 0x000112eb
@@ -582,7 +582,7 @@ au_pci_attach(device_t dev)
 			printf("at 0x%x...", config_id->map[i].base);
 		}
 #endif
-		regid[j] = PCIR_MAPS + i*4;
+		regid[j] = PCIR_BAR(i);
 		type[j] = SYS_RES_MEMORY;
 		reg[j] = bus_alloc_resource(dev, type[j], &regid[j],
 					    0, ~0, 1, RF_ACTIVE);
@@ -641,7 +641,8 @@ au_pci_attach(device_t dev)
 		/*highaddr*/BUS_SPACE_MAXADDR,
 		/*filter*/NULL, /*filterarg*/NULL,
 		/*maxsize*/AU_BUFFSIZE, /*nsegments*/1, /*maxsegz*/0x3ffff,
-		/*flags*/0, &au->parent_dmat) != 0) {
+		/*flags*/0, /*lockfunc*/busdma_lock_mutex,
+		/*lockarg*/&Giant, &au->parent_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		goto bad;
 	}

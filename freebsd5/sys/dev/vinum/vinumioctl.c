@@ -2,6 +2,9 @@
  * XXX replace all the checks on object validity with
  * calls to valid<object>
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/vinum/vinumioctl.c,v 1.49 2003/08/24 17:55:56 obrien Exp $");
 /*-
  * Copyright (c) 1997, 1998, 1999
  *	Nan Yang Computer Services Limited.  All rights reserved.
@@ -41,8 +44,7 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinumioctl.c,v 1.23 2003/05/23 01:02:22 grog Exp $
- * $FreeBSD: src/sys/dev/vinum/vinumioctl.c,v 1.47 2003/05/23 01:14:13 grog Exp $
+ * $Id: vinumioctl.c,v 1.23 2003/05/23 01:02:22 grog Exp grog $
  */
 
 #include <dev/vinum/vinumhdr.h>
@@ -358,11 +360,6 @@ vinum_super_ioctl(dev_t dev,
     case VINUM_RQINFO:
 	return vinum_rqinfo(data);
 #endif
-
-    case VINUM_LABEL:					    /* label a volume */
-	ioctl_reply->error = write_volume_label(*(int *) data);	/* index of the volume to label */
-	ioctl_reply->msg[0] = '\0';			    /* no message */
-	return 0;
 
     case VINUM_REMOVE:
 	remove((struct vinum_ioctl_msg *) data);	    /* remove an object */

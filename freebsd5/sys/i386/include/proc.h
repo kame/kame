@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)proc.h	7.1 (Berkeley) 5/15/91
- * $FreeBSD: src/sys/i386/include/proc.h,v 1.19 2002/10/25 20:06:16 jhb Exp $
+ * $FreeBSD: src/sys/i386/include/proc.h,v 1.20 2003/11/03 21:30:00 jhb Exp $
  */
 
 #ifndef _MACHINE_PROC_H_
@@ -51,9 +51,7 @@ struct proc_ldt {
  * Machine-dependent part of the proc structure for i386.
  */
 struct mdthread {
-#ifdef lint
-	int	dummy;
-#endif
+	register_t md_savecrit;
 };
 
 struct mdproc {

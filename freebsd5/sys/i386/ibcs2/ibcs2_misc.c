@@ -44,9 +44,10 @@
  * from: Header: sun_misc.c,v 1.16 93/04/07 02:46:27 torek Exp 
  *
  *	@(#)sun_misc.c	8.1 (Berkeley) 6/18/93
- *
- * $FreeBSD: src/sys/i386/ibcs2/ibcs2_misc.c,v 1.49 2003/02/19 05:47:22 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_misc.c,v 1.52 2003/10/12 04:25:25 tjr Exp $");
 
 /*
  * IBCS2 compatibility module.
@@ -169,12 +170,24 @@ ibcs2_wait(td, uap)
 		if(error)
 		  return error;
 
-		/* convert status/signal result */
-		if(WIFSTOPPED(status))
+		/*
+		 * Convert status/signal result. We must validate the
+		 * signal number stored in the exit status in case
+		 * the user changed it between wait4()'s copyout()
+		 * and our copyin().
+		 */
+		if (WIFSTOPPED(status)) {
+			if (WSTOPSIG(status) <= 0 ||
+			    WSTOPSIG(status) > IBCS2_SIGTBLSZ)
+				return (EINVAL);
 			status =
 			  IBCS2_STOPCODE(bsd_to_ibcs2_sig[_SIG_IDX(WSTOPSIG(status))]);
-		else if(WIFSIGNALED(status))
+		} else if (WIFSIGNALED(status)) {
+			if (WTERMSIG(status) <= 0 ||
+			    WTERMSIG(status) > IBCS2_SIGTBLSZ)
+				return (EINVAL);
 			status = bsd_to_ibcs2_sig[_SIG_IDX(WTERMSIG(status))];
+		}
 		/* else exit status -- identical */
 
 		/* record result/status */
@@ -323,7 +336,7 @@ ibcs2_getdents(td, uap)
 		fdrop(fp, td);
 		return (EBADF);
 	}
-	vp = fp->f_data;
+	vp = fp->f_vnode;
 	if (vp->v_type != VDIR) {	/* XXX  vnode readdir op should do this */
 		fdrop(fp, td);
 		return (EINVAL);
@@ -480,7 +493,7 @@ ibcs2_read(td, uap)
 		fdrop(fp, td);
 		return (EBADF);
 	}
-	vp = fp->f_data;
+	vp = fp->f_vnode;
 	if (vp->v_type != VDIR) {
 		fdrop(fp, td);
 		return read(td, (struct read_args *)uap);
@@ -646,6 +659,10 @@ ibcs2_getgroups(td, uap)
 	gid_t *gp;
 	caddr_t sg = stackgap_init();
 
+	if (uap->gidsetsize < 0)
+		return (EINVAL);
+	if (uap->gidsetsize > NGROUPS_MAX)
+		uap->gidsetsize = NGROUPS_MAX;
 	sa.gidsetsize = uap->gidsetsize;
 	if (uap->gidsetsize) {
 		sa.gidset = stackgap_alloc(&sg, NGROUPS_MAX *
@@ -678,6 +695,8 @@ ibcs2_setgroups(td, uap)
 	gid_t *gp;
 	caddr_t sg = stackgap_init();
 
+	if (uap->gidsetsize < 0 || uap->gidsetsize > NGROUPS_MAX)
+		return (EINVAL);
 	sa.gidsetsize = uap->gidsetsize;
 	sa.gidset = stackgap_alloc(&sg, sa.gidsetsize *
 					    sizeof(gid_t *));

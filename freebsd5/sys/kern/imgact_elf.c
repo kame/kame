@@ -26,9 +26,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/imgact_elf.c,v 1.138 2003/02/19 05:47:24 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/imgact_elf.c,v 1.141 2003/09/25 01:10:25 peter Exp $");
 
 #include <sys/param.h>
 #include <sys/exec.h>
@@ -274,7 +275,9 @@ __elfN(map_insert)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	vm_offset_t start, vm_offset_t end, vm_prot_t prot,
 	vm_prot_t max, int cow)
 {
-	int rv;
+	vm_offset_t data_buf, off;
+	vm_size_t sz;
+	int error, rv;
 
 	if (start != trunc_page(start)) {
 		rv = __elfN(map_partial)(map, object, offset, start,
@@ -293,10 +296,6 @@ __elfN(map_insert)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	}
 	if (end > start) {
 		if (offset & PAGE_MASK) {
-			vm_offset_t data_buf, off;
-			vm_size_t sz;
-			int error;
-
 			/*
 			 * The mapping is not page aligned. This means we have
 			 * to copy the data. Sigh.
@@ -305,6 +304,7 @@ __elfN(map_insert)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 			    FALSE, prot, max, 0);
 			if (rv)
 				return (rv);
+			data_buf = 0;
 			while (start < end) {
 				vm_object_reference(object);
 				rv = vm_map_find(exec_map,
@@ -806,7 +806,14 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	vmspace->vm_dsize = data_size >> PAGE_SHIFT;
 	vmspace->vm_daddr = (caddr_t)(uintptr_t)data_addr;
 
-	addr = ELF_RTLD_ADDR(vmspace);
+	/*
+	 * We load the dynamic linker where a userland call
+	 * to mmap(0, ...) would put it.  The rationale behind this
+	 * calculation is that it leaves room for the heap to grow to
+	 * its maximum allowed size.
+	 */
+	addr = round_page((vm_offset_t)imgp->proc->p_vmspace->vm_daddr +
+	    imgp->proc->p_rlimit[RLIMIT_DATA].rlim_max);
 
 	imgp->entry_addr = entry;
 

@@ -34,8 +34,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/wds/wd7000.c,v 1.6 2003/04/16 20:49:11 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/wds/wd7000.c,v 1.8 2003/08/24 17:55:57 obrien Exp $");
 
 /* All bugs are subject to removal without further notice */
 
@@ -553,6 +555,8 @@ wds_attach(device_t dev)
 				   /*maxsize*/ sizeof(* wp->dx),
 				   /*nsegments*/ 1,
 				   /*maxsegsz*/ sizeof(* wp->dx), /*flags*/ 0,
+				   /*lockfunc*/busdma_lock_mutex,
+				   /*lockarg*/&Giant,
 				   &wp->bustag);
 	if (error)
 		goto bad;

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/powerpc/psim/ata_iobus.c,v 1.4 2003/04/18 02:47:12 grehan Exp $
+ * $FreeBSD: src/sys/powerpc/psim/ata_iobus.c,v 1.5 2003/09/22 11:55:02 grehan Exp $
  */
 
 /*
@@ -37,6 +37,7 @@
 #include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/malloc.h>
+#include <sys/taskqueue.h>
 #include <machine/stdarg.h>
 #include <machine/resource.h>
 #include <machine/bus.h>

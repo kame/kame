@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_var.h,v 1.6 2002/11/08 18:27:29 jhb Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/ipatm/ipatm_var.h,v 1.8 2003/07/25 08:35:26 harti Exp $
  *
  */
 
@@ -136,6 +136,8 @@ struct ipatmpvc {
 	Aal_t		ipp_aal;	/* AAL type */
 	Encaps_t	ipp_encaps;	/* VCC encapsulation */
 	struct sockaddr_in ipp_dst;	/* Destination's IP address */
+	uint8_t		ipp_traffic_type;	/* CBR, UBR, ... */
+	struct t_atm_traffic ipp_traffic;	/* traffic parameters */
 };
 
 
@@ -201,13 +203,16 @@ extern u_long		last_map_ipdst;
 extern struct ipvcc	*last_map_ipvcc;
 extern struct ip_nif	*ipatm_nif_head;
 extern uma_zone_t	ipatm_vc_zone;
-extern uma_zone_t	ipatm_nif_zone;
 extern struct ipatm_stat	ipatm_stat;
 extern struct atm_time	ipatm_itimer;
 extern Atm_endpoint	ipatm_endpt;
 extern Atm_attributes	ipatm_aal5llc;
 extern Atm_attributes	ipatm_aal5null;
 extern Atm_attributes	ipatm_aal4null;
+
+#ifdef SYSCTL_DECL
+SYSCTL_DECL(_net_harp_ip);
+#endif
 
 #endif	/* _KERNEL */
 

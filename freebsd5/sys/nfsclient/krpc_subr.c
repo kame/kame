@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/krpc_subr.c,v 1.22 2003/02/19 05:47:38 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/krpc_subr.c,v 1.26 2003/11/15 00:26:42 alfred Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -56,6 +56,8 @@ __FBSDID("$FreeBSD: src/sys/nfsclient/krpc_subr.c,v 1.22 2003/02/19 05:47:38 imp
 
 #include <net/if.h>
 #include <netinet/in.h>
+
+#include <rpc/rpcclnt.h>
 
 #include <nfs/rpcv2.h>
 #include <nfsclient/krpc.h>
@@ -84,7 +86,7 @@ struct auth_unix {
 	int32_t   ua_gidlist;	/* null */
 };
 
-struct rpc_call {
+struct krpc_call {
 	u_int32_t	rp_xid;		/* request transaction id */
 	int32_t 	rp_direction;	/* call direction (0) */
 	u_int32_t	rp_rpcvers;	/* rpc version (2) */
@@ -96,7 +98,7 @@ struct rpc_call {
 	struct	auth_info rpc_verf;
 };
 
-struct rpc_reply {
+struct krpc_reply {
 	u_int32_t rp_xid;		/* request transaction id */
 	int32_t  rp_direction;		/* call direction (1) */
 	int32_t  rp_astatus;		/* accept status (0: accepted) */
@@ -192,8 +194,8 @@ krpc_call(struct sockaddr_in *sa, u_int prog, u_int vers, u_int func,
 	struct sockaddr_in *sin, ssin;
 	struct sockaddr *from;
 	struct mbuf *m, *nam, *mhead;
-	struct rpc_call *call;
-	struct rpc_reply *reply;
+	struct krpc_call *call;
+	struct krpc_reply *reply;
 	struct sockopt sopt;
 	struct timeval tv;
 	struct uio auio;
@@ -213,6 +215,8 @@ krpc_call(struct sockaddr_in *sa, u_int prog, u_int vers, u_int func,
 	nam = mhead = NULL;
 	from = NULL;
 
+	GIANT_REQUIRED;		/* XXX until socket locking done */
+
 	/*
 	 * Create socket and set its recieve timeout.
 	 */
@@ -222,6 +226,7 @@ krpc_call(struct sockaddr_in *sa, u_int prog, u_int vers, u_int func,
 	tv.tv_sec = 1;
 	tv.tv_usec = 0;
 	bzero(&sopt, sizeof sopt);
+	sopt.sopt_dir = SOPT_SET;
 	sopt.sopt_level = SOL_SOCKET;
 	sopt.sopt_name = SO_RCVTIMEO;
 	sopt.sopt_val = &tv;
@@ -273,7 +278,7 @@ krpc_call(struct sockaddr_in *sa, u_int prog, u_int vers, u_int func,
 	 */
 	mhead = m_gethdr(M_TRYWAIT, MT_DATA);
 	mhead->m_next = *data;
-	call = mtod(mhead, struct rpc_call *);
+	call = mtod(mhead, struct krpc_call *);
 	mhead->m_len = sizeof(*call);
 	bzero((caddr_t)call, sizeof(*call));
 	/* rpc_call part */
@@ -367,7 +372,7 @@ krpc_call(struct sockaddr_in *sa, u_int prog, u_int vers, u_int func,
 				continue;
 			if (m->m_len < MIN_REPLY_HDR)
 				continue;
-			reply = mtod(m, struct rpc_reply *);
+			reply = mtod(m, struct krpc_reply *);
 
 			/* Is it the right reply? */
 			if (reply->rp_direction != txdr_unsigned(RPC_REPLY))
@@ -416,7 +421,7 @@ krpc_call(struct sockaddr_in *sa, u_int prog, u_int vers, u_int func,
 			goto out;
 		}
 	}
-	reply = mtod(m, struct rpc_reply *);
+	reply = mtod(m, struct krpc_reply *);
 	if (reply->rp_auth.authtype != 0) {
 		len += fxdr_unsigned(u_int32_t, reply->rp_auth.authlen);
 		len = (len + 3) & ~3; /* XXX? */

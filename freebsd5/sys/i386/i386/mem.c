@@ -38,8 +38,10 @@
  *
  *	from: Utah $Hdr: mem.c 1.13 89/10/08$
  *	from: @(#)mem.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/i386/mem.c,v 1.106 2003/04/03 23:44:35 jake Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/i386/mem.c,v 1.107 2003/06/02 06:43:14 obrien Exp $");
 
 /*
  * Memory special file

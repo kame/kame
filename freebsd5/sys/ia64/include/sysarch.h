@@ -10,11 +10,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -30,14 +26,20 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/include/sysarch.h,v 1.1 2000/09/29 13:46:06 dfr Exp $
+ * $FreeBSD: src/sys/ia64/include/sysarch.h,v 1.3 2003/10/27 22:54:34 marcel Exp $
  */
 
-/*
- * Architecture specific syscalls (alpha)
- */
 #ifndef _MACHINE_SYSARCH_H_
-#define _MACHINE_SYSARCH_H_
+#define	_MACHINE_SYSARCH_H_
+
+#define	IA64_IORD	0
+#define	IA64_IOWR	1
+
+struct ia64_iodesc {
+	int port;
+	int width;
+	unsigned long val;
+};
 
 #ifndef _KERNEL
 #include <sys/cdefs.h>

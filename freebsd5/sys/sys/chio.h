@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/chio.h,v 1.15 1999/12/29 04:24:38 peter Exp $
+ * $FreeBSD: src/sys/sys/chio.h,v 1.16 2003/05/31 16:54:37 phk Exp $
  */
 
 #ifndef	_SYS_CHIO_H_
@@ -52,6 +52,7 @@
 #define CHET_ST		1	/* storage transport (slot) */
 #define CHET_IE		2	/* import/export (portal) */
 #define CHET_DT		3	/* data transfer (drive) */
+#define CHET_MAX	CHET_DT
 
 /*
  * Maximum length of a volume identification string

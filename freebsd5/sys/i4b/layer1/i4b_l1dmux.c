@@ -26,12 +26,12 @@
  *
  *	i4b_l1dmux.c - isdn4bsd layer 1 driver multiplexer
  *	--------------------------------------------------
- *
- * $FreeBSD: src/sys/i4b/layer1/i4b_l1dmux.c,v 1.6 2002/10/15 20:32:44 phk Exp $
- *
  *      last edit-date: [Wed Jan 10 16:43:24 2001]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/i4b_l1dmux.c,v 1.7 2003/06/10 23:18:32 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

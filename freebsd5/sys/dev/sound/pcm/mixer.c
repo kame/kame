@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/mixer.c,v 1.31 2003/03/03 12:15:46 phk Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/mixer.c,v 1.33 2003/11/11 05:38:28 scottl Exp $");
 
 MALLOC_DEFINE(M_MIXER, "mixer", "mixer");
 
@@ -319,7 +319,6 @@ mixer_hwvol_init(device_t dev)
 
 	pdev = mixer_get_devt(dev);
 	m = pdev->si_drv1;
-	snd_mtxlock(m->lock);
 
 	m->hwvol_mixer = SOUND_MIXER_VOLUME;
 	m->hwvol_step = 5;
@@ -330,7 +329,6 @@ mixer_hwvol_init(device_t dev)
             OID_AUTO, "hwvol_mixer", CTLTYPE_STRING | CTLFLAG_RW, m, 0,
 	    sysctl_hw_snd_hwvol_mixer, "A", "");
 #endif
-	snd_mtxunlock(m->lock);
 	return 0;
 }
 

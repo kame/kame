@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/interrupt.h,v 1.23 2003/02/26 03:15:42 scottl Exp $
+ * $FreeBSD: src/sys/sys/interrupt.h,v 1.26 2003/11/17 06:08:10 peter Exp $
  */
 
 #ifndef _SYS_INTERRUPT_H_
@@ -67,12 +67,12 @@ struct ithd {
 	LIST_ENTRY(ithd) it_list;	/* All interrupt threads. */
 	TAILQ_HEAD(, intrhand) it_handlers; /* Interrupt handlers. */
 	struct	ithd *it_interrupted;	/* Who we interrupted. */
-	void	(*it_disable)(int);	/* Enable interrupt source. */
-	void	(*it_enable)(int);	/* Disable interrupt source. */
+	void	(*it_disable)(uintptr_t); /* Enable interrupt source. */
+	void	(*it_enable)(uintptr_t); /* Disable interrupt source. */
 	void	*it_md;			/* Hook for MD interrupt code. */
 	int	it_flags;		/* Interrupt-specific flags. */
 	int	it_need;		/* Needs service. */
-	int	it_vector;
+	uintptr_t it_vector;
 	char	it_name[MAXCOMLEN + 1];
 };
 
@@ -94,9 +94,10 @@ struct ithd {
 #define	SWI_CAMNET	2
 #define	SWI_CAMBIO	3
 #define	SWI_VM		4
-#define	SWI_TQ_GIANT	5
-#define	SWI_TQ		6
-#define	SWI_CLOCK	7
+#define	SWI_TQ_FAST	5
+#define	SWI_TQ_GIANT	6
+#define	SWI_TQ		7
+#define	SWI_CLOCK	8
 
 extern struct	ithd *tty_ithd;
 extern struct	ithd *clk_ithd;
@@ -110,9 +111,12 @@ extern char 	eintrnames[];	/* end of intrnames[] */
 extern u_long 	intrcnt[];	/* counts for for each device and stray */
 extern char 	intrnames[];	/* string table containing device names */
 
-int	ithread_create(struct ithd **ithread, int vector, int flags,
-	    void (*disable)(int), void (*enable)(int), const char *fmt, ...)
-	    __printflike(6, 7);
+#ifdef DDB
+void	db_dump_ithread(struct ithd *ithd, int handlers);
+#endif
+int	ithread_create(struct ithd **ithread, uintptr_t vector, int flags,
+	    void (*disable)(uintptr_t), void (*enable)(uintptr_t),
+	    const char *fmt, ...) __printflike(6, 7);
 int	ithread_destroy(struct ithd *ithread);
 u_char	ithread_priority(enum intr_type flags);
 int	ithread_add_handler(struct ithd *ithread, const char *name,

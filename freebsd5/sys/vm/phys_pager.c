@@ -21,9 +21,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/vm/phys_pager.c,v 1.17 2002/12/27 06:09:56 alc Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/vm/phys_pager.c,v 1.19 2003/08/05 06:51:26 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -200,11 +201,10 @@ phys_pager_haspage(vm_object_t object, vm_pindex_t pindex, int *before,
 }
 
 struct pagerops physpagerops = {
-	phys_pager_init,
-	phys_pager_alloc,
-	phys_pager_dealloc,
-	phys_pager_getpages,
-	phys_pager_putpages,
-	phys_pager_haspage,
-	NULL
+	.pgo_init =	phys_pager_init,
+	.pgo_alloc =	phys_pager_alloc,
+	.pgo_dealloc = 	phys_pager_dealloc,
+	.pgo_getpages =	phys_pager_getpages,
+	.pgo_putpages =	phys_pager_putpages,
+	.pgo_haspage =	phys_pager_haspage,
 };

@@ -22,16 +22,16 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/ppbus/ppb_base.c,v 1.12 2000/10/15 14:18:25 phk Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ppbus/ppb_base.c,v 1.14 2003/08/24 17:54:16 obrien Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
 #include <sys/bus.h>
-
 
 #include <dev/ppbus/ppbconf.h>
   
@@ -39,6 +39,8 @@
 
 #include <dev/ppbus/ppbio.h>
   
+MODULE_VERSION(ppbus, 1);
+
 #define DEVTOSOFTC(dev) ((struct ppb_data *)device_get_softc(dev))
  
 /*

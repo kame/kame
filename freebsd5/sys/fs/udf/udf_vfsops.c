@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/udf/udf_vfsops.c,v 1.12 2003/05/04 07:41:07 scottl Exp $
+ * $FreeBSD: src/sys/fs/udf/udf_vfsops.c,v 1.16 2003/11/05 06:56:08 scottl Exp $
  */
 
 /* udf_vfsops.c */
@@ -79,6 +79,7 @@
 #include <sys/conf.h>
 #include <sys/dirent.h>
 #include <sys/fcntl.h>
+#include <sys/iconv.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/mount.h>
@@ -90,45 +91,45 @@
 #include <vm/uma.h>
 
 #include <fs/udf/ecma167-udf.h>
-#include <fs/udf/udf.h>
 #include <fs/udf/osta.h>
+#include <fs/udf/udf.h>
+#include <fs/udf/udf_mount.h>
 
 MALLOC_DEFINE(M_UDFMOUNT, "UDF mount", "UDF mount structure");
 MALLOC_DEFINE(M_UDFFENTRY, "UDF fentry", "UDF file entry structure");
+
+struct iconv_functions *udf_iconv = NULL;
 
 /* Zones */
 uma_zone_t udf_zone_trans = NULL;
 uma_zone_t udf_zone_node = NULL;
 uma_zone_t udf_zone_ds = NULL;
 
-static int udf_init(struct vfsconf *);
-static int udf_uninit(struct vfsconf *);
-static int udf_mount(struct mount *, struct nameidata *, struct thread *);
-static int udf_unmount(struct mount *, int, struct thread *);
-static int udf_root(struct mount *, struct vnode **);
-static int udf_statfs(struct mount *, struct statfs *, struct thread *);
-static int udf_fhtovp(struct mount *, struct fid *, struct vnode **);
-static int udf_vptofh(struct vnode *, struct fid *);
+static vfs_init_t      udf_init;
+static vfs_uninit_t    udf_uninit;
+static vfs_nmount_t    udf_mount;
+static vfs_root_t      udf_root;
+static vfs_statfs_t    udf_statfs;
+static vfs_unmount_t   udf_unmount;
+static vfs_fhtovp_t	udf_fhtovp;
+static vfs_vptofh_t	udf_vptofh;
+
 static int udf_find_partmaps(struct udf_mnt *, struct logvol_desc *);
 
 static struct vfsops udf_vfsops = {
-	NULL,
-	vfs_stdstart,
-	udf_unmount,
-	udf_root,
-	vfs_stdquotactl,
-	udf_statfs,
-	vfs_stdnosync,
-	udf_vget,
-	udf_fhtovp,
-	vfs_stdcheckexp,
-	udf_vptofh,
-	udf_init,
-	udf_uninit,
-	vfs_stdextattrctl,
-	udf_mount,
+	.vfs_fhtovp =		udf_fhtovp,
+	.vfs_init =		udf_init,
+	.vfs_nmount =		udf_mount,
+	.vfs_root =		udf_root,
+	.vfs_statfs =		udf_statfs,
+	.vfs_uninit =		udf_uninit,
+	.vfs_unmount =		udf_unmount,
+	.vfs_vget =		udf_vget,
+	.vfs_vptofh =		udf_vptofh,
 };
 VFS_SET(udf_vfsops, udf, VFCF_READONLY);
+
+MODULE_VERSION(udf, 1);
 
 static int udf_mountfs(struct vnode *, struct mount *, struct thread *);
 
@@ -188,9 +189,9 @@ udf_mount(struct mount *mp, struct nameidata *ndp, struct thread *td)
 	struct udf_mnt *imp = 0;
 	struct export_args *export;
 	struct vfsoptlist *opts;
-	char *fspec;
+	char *fspec, *cs_disk, *cs_local;
 	size_t size;
-	int error, len;
+	int error, len, *udf_flags;
 
 	opts = mp->mnt_optnew;
 
@@ -251,6 +252,28 @@ udf_mount(struct mount *mp, struct nameidata *ndp, struct thread *td)
 	}
 
 	imp = VFSTOUDFFS(mp);
+
+	udf_flags = NULL;
+	error = vfs_getopt(opts, "flags", (void **)&udf_flags, &len);
+	if (error || len != sizeof(int))
+		return (EINVAL);
+	imp->im_flags = *udf_flags;
+
+	if (imp->im_flags & UDFMNT_KICONV && udf_iconv) {
+		cs_disk = NULL;
+		error = vfs_getopt(opts, "cs_disk", (void **)&cs_disk, &len);
+		if (!error && cs_disk[len - 1] != '\0')
+			return (EINVAL);
+		cs_local = NULL;
+		error = vfs_getopt(opts, "cs_local", (void **)&cs_local, &len);
+		if (!error && cs_local[len - 1] != '\0')
+			return (EINVAL);
+		udf_iconv->open(cs_local, cs_disk, &imp->im_d2l);
+#if 0
+		udf_iconv->open(cs_disk, cs_local, &imp->im_l2d);
+#endif
+	}
+
 	copystr(fspec, mp->mnt_stat.f_mntfromname, MNAMELEN - 1, &size);
 	bzero(mp->mnt_stat.f_mntfromname + size, MNAMELEN - size);
 	udf_statfs(mp, &mp->mnt_stat, td);
@@ -310,7 +333,7 @@ udf_mountfs(struct vnode *devvp, struct mount *mp, struct thread *td) {
 		return (error);
 
 	vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY, td);
-	error = VOP_OPEN(devvp, FREAD, FSCRED, td);
+	error = VOP_OPEN(devvp, FREAD, FSCRED, td, -1);
 	VOP_UNLOCK(devvp, 0, td);
 	if (error)
 		return error;
@@ -331,6 +354,10 @@ udf_mountfs(struct vnode *devvp, struct mount *mp, struct thread *td) {
 	udfmp->im_mountp = mp;
 	udfmp->im_dev = devvp->v_rdev;
 	udfmp->im_devvp = devvp;
+	udfmp->im_d2l = NULL;
+#if 0
+	udfmp->im_l2d = NULL;
+#endif
 
 	bsize = 2048;	/* XXX Should probe the media for it's size */
 
@@ -475,6 +502,15 @@ udf_unmount(struct mount *mp, int mntflags, struct thread *td)
 
 	if ((error = vflush(mp, 0, flags)))
 		return (error);
+
+	if (udfmp->im_flags & UDFMNT_KICONV && udf_iconv) {
+		if (udfmp->im_d2l)
+			udf_iconv->close(udfmp->im_d2l);
+#if 0
+		if (udfmp->im_l2d)
+			udf_iconv->close(udfmp->im_l2d);
+#endif
+	}
 
 	udfmp->im_devvp->v_rdev->si_mountpoint = NULL;
 	error = VOP_CLOSE(udfmp->im_devvp, FREAD, NOCRED, td);
@@ -652,8 +688,8 @@ udf_vget(struct mount *mp, ino_t ino, int flags, struct vnode **vpp)
 }
 
 struct ifid {
-	ushort	ifid_len;
-	ushort	ifid_pad;
+	u_short	ifid_len;
+	u_short	ifid_pad;
 	int	ifid_ino;
 	long	ifid_start;
 };

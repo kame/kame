@@ -37,11 +37,11 @@
  * SUCH DAMAGE.
  *
  *	@(#)varargs.h	8.2 (Berkeley) 3/22/94
- * $FreeBSD: src/sys/i386/include/varargs.h,v 1.11 2002/10/06 22:02:06 mike Exp $
+ * $FreeBSD: src/sys/i386/include/varargs.h,v 1.12 2003/09/01 03:01:45 kan Exp $
  */
 
-#ifndef _VARARGS_H_
-#define	_VARARGS_H_
+#ifndef _MACHINE_VARARGS_H_
+#define	_MACHINE_VARARGS_H_
 
 #if defined(__GNUC__) && (__GNUC__ == 2 && __GNUC_MINOR__ > 95 || __GNUC__ >= 3)
 
@@ -86,4 +86,4 @@ typedef char *va_list;
 
 #endif /* __GNUC__ post GCC 2.95 */
 
-#endif /* !_VARARGS_H_ */
+#endif /* !_MACHINE_VARARGS_H_ */

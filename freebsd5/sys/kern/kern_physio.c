@@ -15,9 +15,10 @@
  *    John S. Dyson.
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
- *
- * $FreeBSD: src/sys/kern/kern_physio.c,v 1.58 2003/04/05 23:02:58 alc Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_physio.c,v 1.62 2003/11/15 09:28:08 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -40,6 +41,8 @@ physio(dev_t dev, struct uio *uio, int ioflag)
 	u_int iolen;
 	struct buf *bp;
 
+	/* We cannot trust the device driver to hold Giant for us */
+	mtx_lock(&Giant);
 	/* Keep the process UPAGES from being swapped. XXX: why ? */
 	PHOLD(curproc);
 
@@ -56,7 +59,7 @@ physio(dev_t dev, struct uio *uio, int ioflag)
 
 	for (i = 0; i < uio->uio_iovcnt; i++) {
 		while (uio->uio_iov[i].iov_len) {
-			bp->b_flags = B_PHYS;
+			bp->b_flags = 0;
 			if (uio->uio_rw == UIO_READ)
 				bp->b_iocmd = BIO_READ;
 			else 
@@ -66,6 +69,7 @@ physio(dev_t dev, struct uio *uio, int ioflag)
 			bp->b_data = uio->uio_iov[i].iov_base;
 			bp->b_bcount = uio->uio_iov[i].iov_len;
 			bp->b_offset = uio->uio_offset;
+			bp->b_iooffset = uio->uio_offset;
 			bp->b_saveaddr = sa;
 
 			/* Don't exceed drivers iosize limit */
@@ -121,5 +125,6 @@ physio(dev_t dev, struct uio *uio, int ioflag)
 doerror:
 	relpbuf(bp, NULL);
 	PRELE(curproc);
+	mtx_unlock(&Giant);
 	return (error);
 }

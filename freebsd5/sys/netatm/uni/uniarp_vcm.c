@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/uniarp_vcm.c,v 1.12 2003/02/19 05:47:31 imp Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ---------------------
  *
  * UNI ATMARP support (RFC1577) - Virtual Channel Management
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/uniarp_vcm.c,v 1.14 2003/07/23 14:28:57 harti Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -61,10 +59,6 @@
 #include <netatm/uni/uniip_var.h>
 
 #include <vm/uma.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/uniarp_vcm.c,v 1.12 2003/02/19 05:47:31 imp Exp $");
-#endif
 
 extern uma_zone_t	unisig_vc_zone;
 
@@ -278,8 +272,9 @@ uniarp_svcout(ivp, dst)
 
 	/*
 	 * We're a client with an open VCC to the server, get a new arp entry
+	 * May be called from timeout - don't wait.
 	 */
-	uap = uma_zalloc(uniarp_zone, M_WAITOK);
+	uap = uma_zalloc(uniarp_zone, M_NOWAIT);
 	if (uap == NULL) {
 		(void) splx(s);
 		return (MAP_FAILED);
@@ -439,8 +434,9 @@ uniarp_svcin(ivp, dst, dstsub)
 
 	/*
 	 * No info in the cache - get a new arp entry
+	 * May be called from timeout - don't wait.
 	 */
-	uap = uma_zalloc(uniarp_zone, M_WAITOK | M_ZERO);
+	uap = uma_zalloc(uniarp_zone, M_NOWAIT | M_ZERO);
 	if (uap == NULL) {
 		(void) splx(s);
 		return (MAP_FAILED);

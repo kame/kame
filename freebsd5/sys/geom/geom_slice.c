@@ -31,10 +31,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/geom/geom_slice.c,v 1.47 2003/05/02 06:29:33 phk Exp $
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/geom/geom_slice.c,v 1.50 2003/06/11 06:49:15 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -300,13 +300,12 @@ g_slice_config(struct g_geom *gp, u_int idx, int how, off_t offset, off_t length
 	struct g_slice *gsl;
 	va_list ap;
 	struct sbuf *sb;
-	int error, acc;
+	int acc;
 
 	g_trace(G_T_TOPOLOGY, "g_slice_config(%s, %d, %d)",
 	     gp->name, idx, how);
 	g_topology_assert();
 	gsp = gp->softc;
-	error = 0;
 	if (idx >= gsp->nslice)
 		return(EINVAL);
 	gsl = &gsp->slices[idx];
@@ -345,9 +344,10 @@ g_slice_config(struct g_geom *gp, u_int idx, int how, off_t offset, off_t length
 		pp->mediasize = gsl->length;
 		return (0);
 	}
-	va_start(ap, fmt);
 	sb = sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND);
+	va_start(ap, fmt);
 	sbuf_vprintf(sb, fmt, ap);
+	va_end(ap);
 	sbuf_finish(sb);
 	pp = g_new_providerf(gp, sbuf_data(sb));
 	pp2 = LIST_FIRST(&gp->consumer)->provider;
@@ -430,6 +430,14 @@ g_slice_spoiled(struct g_consumer *cp)
 	g_wither_geom(gp, ENXIO);
 }
 
+int
+g_slice_destroy_geom(struct gctl_req *req, struct g_class *mp, struct g_geom *gp)
+{
+
+	g_slice_spoiled(LIST_FIRST(&gp->consumer));
+	return (0);
+}
+
 struct g_geom *
 g_slice_new(struct g_class *mp, u_int slices, struct g_provider *pp, struct g_consumer **cpp, void *extrap, int extra, g_slice_start_t *start)
 {
@@ -450,6 +458,8 @@ g_slice_new(struct g_class *mp, u_int slices, struct g_provider *pp, struct g_co
 	gp->start = g_slice_start;
 	gp->spoiled = g_slice_spoiled;
 	gp->dumpconf = g_slice_dumpconf;
+	if (gp->class->destroy_geom == NULL)
+		gp->class->destroy_geom = g_slice_destroy_geom;
 	cp = g_new_consumer(gp);
 	error = g_attach(cp, pp);
 	if (error == 0)

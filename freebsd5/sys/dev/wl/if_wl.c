@@ -1,4 +1,3 @@
-/* $FreeBSD: src/sys/dev/wl/if_wl.c,v 1.53 2003/04/17 17:51:24 jhay Exp $ */
 /* 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -129,7 +128,6 @@
  *	All rights reserved.
  *
  */ 
-
 /*
   Copyright 1988, 1989 by Olivetti Advanced Technology Center, Inc.,
 Cupertino, California.
@@ -152,7 +150,6 @@ LOSS OF USE, DATA OR PROFITS, WHETHER IN ACTION OF CONTRACT,
 NEGLIGENCE, OR OTHER TORTIOUS ACTION, ARISING OUR OF OR IN CONNECTION
 WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
-
 /*
   Copyright 1988, 1989 by Intel Corporation, Santa Clara, California.
 
@@ -174,6 +171,10 @@ LOSS OF USE, DATA OR PROFITS, WHETHER IN ACTION OF CONTRACT,
 NEGLIGENCE, OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
 WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/wl/if_wl.c,v 1.57 2003/11/14 19:00:31 sam Exp $");
+
 
 /*
  * NOTE:
@@ -264,6 +265,7 @@ struct wl_softc{
 };
 
 #define WL_LOCK(_sc)	mtx_lock(&(_sc)->wl_mtx)
+#define WL_LOCK_ASSERT(_sc)	mtx_assert(&(_sc)->wl_mtx, MA_OWNED)
 #define WL_UNLOCK(_sc)	mtx_unlock(&(_sc)->wl_mtx)
 
 static int	wlprobe(device_t);
@@ -552,8 +554,7 @@ wlattach(device_t device)
 #if	MULTICAST
     ifp->if_flags |= IFF_MULTICAST;
 #endif	/* MULTICAST */
-    ifp->if_name = "wl";
-    ifp->if_unit = unit;
+    if_initname(ifp, device_get_name(device), device_get_unit(device));
     ifp->if_init = wlinit;
     ifp->if_output = ether_output;
     ifp->if_start = wlstart;
@@ -568,7 +569,7 @@ wlattach(device_t device)
     ether_ifattach(ifp, &sc->wl_addr[0]);
 
     bcopy(&sc->wl_addr[0], sc->wl_ac.ac_enaddr, WAVELAN_ADDR_SIZE);
-    printf("%s%d: address %6D, NWID 0x%02x%02x", ifp->if_name, ifp->if_unit,
+    printf("%s: address %6D, NWID 0x%02x%02x", ifp->if_xname,
            sc->wl_ac.ac_enaddr, ":", sc->nwid[0], sc->nwid[1]);
     if (sc->freq24) 
 	printf(", Freq %d MHz",sc->freq24); 		/* 2.4 Gz       */
@@ -964,7 +965,6 @@ wlbldcu(struct wl_softc *sc)
 static void
 wlstart(struct ifnet *ifp)
 {
-    int			unit = ifp->if_unit;
     struct mbuf		*m;
     struct wl_softc	*sc = ifp->if_softc;
     short		base = sc->base;
@@ -973,7 +973,7 @@ wlstart(struct ifnet *ifp)
     WL_LOCK(sc);
 #ifdef WLDEBUG
     if (sc->wl_if.if_flags & IFF_DEBUG)
-	printf("wl%d: entered wlstart()\n",unit);
+	printf("%s: entered wlstart()\n", ifp->if_xname);
 #endif
 
     outw(PIOR1(base), OFFSET_CU);
@@ -998,8 +998,8 @@ wlstart(struct ifnet *ifp)
 	     * became idle but WE have masked interrupts so ...
 	     */
 #ifdef WLDEBUG
-	    printf("wl%d: CU idle, scb %04x %04x cu %04x\n",
-		   unit, scb_status, scb_command, cu_status);
+	    printf("%s: CU idle, scb %04x %04x cu %04x\n",
+		   ifp->if_xname, scb_status, scb_command, cu_status);
 #endif 
 	    if (xmt_watch) printf("!!");
 	} else {
@@ -1009,10 +1009,10 @@ wlstart(struct ifnet *ifp)
     } else if ((scb_status & 0x0700) == SCB_CUS_ACTV ||
       (cu_status & AC_SW_B)){
 #ifdef WLDEBUG
-	printf("wl%d: CU unexpectedly busy; scb %04x cu %04x\n",
-	       unit, scb_status, cu_status);
+	printf("%s: CU unexpectedly busy; scb %04x cu %04x\n",
+	       ifp->if_xname, scb_status, cu_status);
 #endif
-	if (xmt_watch) printf("wl%d: busy?!",unit);
+	if (xmt_watch) printf("%s: busy?!",ifp->if_xname);
 	WL_UNLOCK(sc);
 	return;		/* hey, why are we busy? */
     }
@@ -1070,13 +1070,14 @@ wlread(struct wl_softc *sc, u_short fd_p)
     u_short		mlen, len;
     u_short		bytes_in_msg, bytes_in_mbuf, bytes;
 
+    WL_LOCK_ASSERT(sc);
 
 #ifdef WLDEBUG
     if (sc->wl_if.if_flags & IFF_DEBUG)
 	printf("wl%d: entered wlread()\n", sc->unit);
 #endif
     if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING)) {
-	printf("wl%d read(): board is not running.\n", sc->unit);
+	printf("%s read(): board is not running.\n", ifp->if_xname);
 	sc->hacr &= ~HACR_INTRON;
 	CMD(sc);		/* turn off interrupts */
     }
@@ -1213,7 +1214,9 @@ wlread(struct wl_softc *sc, u_short fd_p)
      * received packet is now in a chain of mbuf's.  next step is
      * to pass the packet upwards.
      */
+    WL_UNLOCK(sc);
     (*ifp->if_input)(ifp, m);
+    WL_LOCK(sc);
     return 1;
 }
 
@@ -1233,7 +1236,6 @@ static int
 wlioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
     struct ifreq	*ifr = (struct ifreq *)data;
-    int			unit = ifp->if_unit;
     struct wl_softc	*sc = ifp->if_softc;
     short		base = sc->base;
     short		mode = 0;
@@ -1249,7 +1251,7 @@ wlioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
     WL_LOCK(sc);
 #ifdef WLDEBUG
     if (sc->wl_if.if_flags & IFF_DEBUG)
-	printf("wl%d: entered wlioctl()\n",unit);
+	printf("%s: entered wlioctl()\n", ifp->if_xname);
 #endif
     opri = splimp();
     switch (cmd) {
@@ -1280,7 +1282,7 @@ wlioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	 * stop it.
 	 */
 	if ((ifp->if_flags & IFF_UP) == 0 && sc->flags & DSF_RUNNING) {
-	    printf("wl%d ioctl(): board is not running\n", unit);
+	    printf("%s ioctl(): board is not running\n", ifp->if_xname);
 	    sc->flags &= ~DSF_RUNNING;
 	    sc->hacr &= ~HACR_INTRON;
 	    CMD(sc);		  /* turn off interrupts */
@@ -1766,7 +1768,7 @@ static int xmt_debug = 0;
  *	locations on the WaveLAN board and starts the board off on
  *	the transmit.
  *
- * input	: board number of interest, and a pointer to the mbuf
+ * input	: pointers to board of interest's softc and the mbuf
  * output	: board memory and registers are set for xfer and attention
  *
  */
@@ -1787,7 +1789,7 @@ wlxmt(struct wl_softc *sc, struct mbuf *m)
 	
 #ifdef WLDEBUG
     if (sc->wl_if.if_flags & IFF_DEBUG)
-	printf("wl%d: entered wlxmt()\n", sc->unit);
+	printf("%s: entered wlxmt()\n", sc->wl_if.if_xname);
 #endif
 
     cb.ac_status = 0;
@@ -1897,7 +1899,7 @@ wlxmt(struct wl_softc *sc, struct mbuf *m)
 	    break;
 	}
 	if ((spin == 0) && xmt_watch) {		/* not waking up, and we care */
-		printf("wl%d: slow accepting xmit\n", sc->unit);
+		printf("%s: slow accepting xmit\n", sc->wl_if.if_xname);
 	}
     }
     outw(PIOP0(base), SCB_CU_STRT);		/* new command */

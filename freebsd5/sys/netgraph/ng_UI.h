@@ -36,12 +36,12 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_UI.h,v 1.3 2000/10/24 17:32:44 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_UI.h,v 1.4 2003/11/11 12:30:37 ru Exp $
  * $Whistle: ng_UI.h,v 1.6 1999/01/20 00:54:15 archie Exp $
  */
 
-#ifndef _NETGRAPH_UI_H_
-#define _NETGRAPH_UI_H_
+#ifndef _NETGRAPH_NG_UI_H_
+#define _NETGRAPH_NG_UI_H_
 
 /* Node type name and cookie */
 #define NG_UI_NODE_TYPE		"UI"
@@ -51,5 +51,5 @@
 #define NG_UI_HOOK_DOWNSTREAM	"downstream"
 #define NG_UI_HOOK_UPSTREAM	"upstream"
 
-#endif /* _NETGRAPH_UI_H_ */
+#endif /* _NETGRAPH_NG_UI_H_ */
 

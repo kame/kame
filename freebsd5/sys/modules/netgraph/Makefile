@@ -1,8 +1,9 @@
 # $Whistle: Makefile,v 1.5 1999/01/24 06:48:37 archie Exp $
-# $FreeBSD: src/sys/modules/netgraph/Makefile,v 1.28 2003/04/20 19:05:32 wpaul Exp $
+# $FreeBSD: src/sys/modules/netgraph/Makefile,v 1.29 2003/06/25 13:20:18 harti Exp $
 
 SUBDIR=	UI \
 	async \
+	atm \
 	bpf \
 	bridge \
 	cisco \

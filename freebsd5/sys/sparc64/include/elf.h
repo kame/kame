@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/elf.h,v 1.10 2003/01/05 03:48:55 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/elf.h,v 1.12 2003/09/25 01:10:26 peter Exp $
  */
 
 #ifndef	_MACHINE_ELF_H_
@@ -162,21 +162,13 @@ __ElfType(Auxinfo);
 #define	R_SPARC_UA16		55
 
 /* Define "machine" characteristics */
-#define	ELF_TARG_CLASS	ELFCLASS64
+#if __ELF_WORD_SIZE == 32
+#define ELF_TARG_CLASS  ELFCLASS32
+#else
+#define ELF_TARG_CLASS  ELFCLASS64
+#endif
 #define	ELF_TARG_DATA	ELFDATA2MSB
 #define	ELF_TARG_MACH	ELF_ARCH
 #define	ELF_TARG_VER	1
 
-#ifdef _KERNEL
-
-/*
- * On the Sparc64 we load the dynamic linker where a userland call
- * to mmap(0, ...) would put it.  The rationale behind this
- * calculation is that it leaves room for the heap to grow to
- * its maximum allowed size.
- */
-#define	ELF_RTLD_ADDR(vmspace) \
-    (round_page((vm_offset_t)(vmspace)->vm_daddr + maxdsiz))
-
-#endif /* _KERNEL */
 #endif /* !_MACHINE_ELF_H_ */

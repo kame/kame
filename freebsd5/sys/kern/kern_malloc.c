@@ -31,8 +31,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_malloc.c	8.3 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/kern/kern_malloc.c,v 1.124 2003/05/12 05:09:56 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_malloc.c,v 1.130 2003/09/19 04:39:08 jeff Exp $");
 
 #include "opt_vm.h"
 
@@ -93,7 +95,7 @@ static char *kmemlimit;
 #define KMEM_ZBASE	16
 #define KMEM_ZMASK	(KMEM_ZBASE - 1)
 
-#define KMEM_ZMAX	65536
+#define KMEM_ZMAX	PAGE_SIZE
 #define KMEM_ZSIZE	(KMEM_ZMAX >> KMEM_ZSHIFT)
 static u_int8_t kmemsize[KMEM_ZSIZE + 1];
 
@@ -112,10 +114,21 @@ struct {
 	{1024, "1024", NULL},
 	{2048, "2048", NULL},
 	{4096, "4096", NULL},
+#if PAGE_SIZE > 4096
 	{8192, "8192", NULL},
+#if PAGE_SIZE > 8192
 	{16384, "16384", NULL},
+#if PAGE_SIZE > 16384
 	{32768, "32768", NULL},
+#if PAGE_SIZE > 32768
 	{65536, "65536", NULL},
+#if PAGE_SIZE > 65536
+#error	"Unsupported PAGE_SIZE"
+#endif	/* 65536 */
+#endif	/* 32768 */
+#endif	/* 16384 */
+#endif	/* 8192 */
+#endif	/* 4096 */
 	{0, NULL},
 };
 
@@ -418,11 +431,11 @@ kmeminit(dummy)
 	 * so make sure that there is enough space.
 	 */
 	vm_kmem_size = VM_KMEM_SIZE;
-	mem_size = cnt.v_page_count * PAGE_SIZE;
+	mem_size = cnt.v_page_count;
 
 #if defined(VM_KMEM_SIZE_SCALE)
-	if ((mem_size / VM_KMEM_SIZE_SCALE) > vm_kmem_size)
-		vm_kmem_size = mem_size / VM_KMEM_SIZE_SCALE;
+	if ((mem_size / VM_KMEM_SIZE_SCALE) > (vm_kmem_size / PAGE_SIZE))
+		vm_kmem_size = (mem_size / VM_KMEM_SIZE_SCALE) * PAGE_SIZE;
 #endif
 
 #if defined(VM_KMEM_SIZE_MAX)
@@ -439,8 +452,13 @@ kmeminit(dummy)
 	 * to something sane. Be careful to not overflow the 32bit
 	 * ints while doing the check.
 	 */
-	if ((vm_kmem_size / 2) > (cnt.v_page_count * PAGE_SIZE))
+	if (((vm_kmem_size / 2) / PAGE_SIZE) > cnt.v_page_count)
 		vm_kmem_size = 2 * cnt.v_page_count * PAGE_SIZE;
+
+	/*
+	 * Tune settings based on the kernel map's size at this time.
+	 */
+	init_param3(vm_kmem_size / PAGE_SIZE);
 
 	/*
 	 * In mbuf_init(), we set up submaps for mbufs and clusters, in which

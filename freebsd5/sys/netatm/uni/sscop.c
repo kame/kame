@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/sscop.c,v 1.15 2003/02/19 05:47:31 imp Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ---------------------
  *
  * Service Specific Connection Oriented Protocol (SSCOP)
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/sscop.c,v 1.17 2003/07/22 12:46:30 harti Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -62,11 +60,6 @@
 #include <netatm/uni/sscop_var.h>
 
 #include <vm/uma.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/sscop.c,v 1.15 2003/02/19 05:47:31 imp Exp $");
-#endif
-
 
 /*
  * Global variables
@@ -159,7 +152,6 @@ sscop_start()
 	    NULL, NULL, UMA_ALIGN_PTR, 0);
 	if (sscop_zone == NULL)
 		panic("sscop_start: uma_zcreate");
-	uma_zone_set_max(sscop_zone, 100);
 
 	/*
 	 * Register stack service

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)cons.h	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/sys/cons.h,v 1.29 2003/02/20 20:54:45 phk Exp $
+ * $FreeBSD: src/sys/sys/cons.h,v 1.33 2003/10/18 02:13:39 rwatson Exp $
  */
 
 #ifndef _MACHINE_CONS_H_
@@ -67,16 +67,22 @@ struct consdev {
 	cn_dbctl_t	*cn_dbctl;
 				/* debugger control interface */
 	struct	tty *cn_tp;	/* tty structure for console device */
-	dev_t	cn_dev;		/* major/minor of device */
 	short	cn_pri;		/* pecking order; the higher the better */
 	void	*cn_arg;	/* drivers method argument */
+	int	cn_unit;	/* some drivers prefer this */
+	int	cn_flags;	/* capabilities of this console */
+	char	cn_name[SPECNAMELEN + 1];	/* console (device) name */
 };
 
 /* values for cn_pri - reflect our policy for console selection */
 #define	CN_DEAD		0	/* device doesn't exist */
-#define CN_NORMAL	1	/* device exists but is nothing special */
-#define CN_INTERNAL	2	/* "internal" bit-mapped display */
-#define CN_REMOTE	3	/* serial interface with remote bit set */
+#define CN_LOW		1	/* device is a last restort only */
+#define CN_NORMAL	2	/* device exists but is nothing special */
+#define CN_INTERNAL	3	/* "internal" bit-mapped display */
+#define CN_REMOTE	4	/* serial interface with remote bit set */
+
+/* Values for cn_flags. */
+#define	CN_FLAG_NODEBUG	0x00000001	/* Not supported with debugger. */
 
 #ifdef _KERNEL
 extern int cons_unavail;

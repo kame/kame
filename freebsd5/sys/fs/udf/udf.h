@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/udf/udf.h,v 1.5 2003/05/04 07:40:29 scottl Exp $
+ * $FreeBSD: src/sys/fs/udf/udf.h,v 1.6 2003/11/05 06:56:08 scottl Exp $
  */
 
 #define UDF_HASHTBLSIZE 100
@@ -58,6 +58,10 @@ struct udf_mnt {
 	int			p_sectors;
 	int			s_table_entries;
 	struct udf_sparing_table *s_table;
+	void			*im_d2l;	/* disk->local iconv handle */
+#if 0
+	void			*im_l2d;	/* local->disk iconv handle */
+#endif
 };
 
 struct udf_dirstream {

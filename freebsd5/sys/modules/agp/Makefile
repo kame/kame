@@ -1,11 +1,12 @@
-# $FreeBSD: src/sys/modules/agp/Makefile,v 1.9 2003/02/14 06:33:52 anholt Exp $
+# $FreeBSD: src/sys/modules/agp/Makefile,v 1.10 2003/08/23 18:00:31 mdodd Exp $
 
 .PATH: ${.CURDIR}/../../pci
 
 KMOD=	agp
 SRCS=	agp.c agp_if.c
 .if ${MACHINE_ARCH} == "i386"
-SRCS+=	agp_i810.c agp_intel.c agp_via.c agp_sis.c agp_ali.c agp_amd.c
+SRCS+=	agp_i810.c agp_intel.c agp_via.c agp_sis.c agp_ali.c agp_amd.c \
+	agp_nvidia.c
 .endif
 .if  ${MACHINE_ARCH} == "alpha"
 SRCS+=	agp_amd.c

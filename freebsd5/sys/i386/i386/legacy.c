@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 1998 Massachusetts Institute of Technology
  *
  * Permission to use, copy, modify, and distribute this software and
@@ -25,9 +25,10 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/i386/legacy.c,v 1.49 2002/09/30 18:47:11 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/i386/legacy.c,v 1.52 2003/08/25 09:48:47 obrien Exp $");
 
 /*
  * This code implements a system driver for legacy systems that do not
@@ -41,6 +42,11 @@
 #include <sys/malloc.h>
 #include <machine/bus.h>
 #include <sys/rman.h>
+
+#include "opt_mca.h"
+#ifdef DEV_MCA
+#include <i386/bios/mca_machdep.h>
+#endif
 
 #include <machine/legacyvar.h>
 #include <machine/resource.h>
@@ -157,12 +163,14 @@ legacy_attach(device_t dev)
 			panic("legacy_attach eisa");
 		device_probe_and_attach(child);
 	}
-	if (!devclass_get_device(devclass_find("mca"), 0)) {
+#ifdef DEV_MCA
+	if (MCA_system && !devclass_get_device(devclass_find("mca"), 0)) {
         	child = BUS_ADD_CHILD(dev, 0, "mca", 0);
         	if (child == 0)
                 	panic("legacy_probe mca");
 		device_probe_and_attach(child);
 	}
+#endif
 	if (!devclass_get_device(devclass_find("isa"), 0)) {
 		child = BUS_ADD_CHILD(dev, 0, "isa", 0);
 		if (child == NULL)

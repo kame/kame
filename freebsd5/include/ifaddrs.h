@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/include/ifaddrs.h,v 1.2 2002/03/23 17:24:53 imp Exp $	*/
+/*	$FreeBSD: src/include/ifaddrs.h,v 1.3 2003/11/14 18:53:22 bms Exp $	*/
 
 /*
  * Copyright (c) 1995, 1999
@@ -46,11 +46,20 @@ struct ifaddrs {
 #define	ifa_broadaddr	ifa_dstaddr	/* broadcast address interface */
 #endif
 
+struct ifmaddrs {
+	struct ifmaddrs	*ifma_next;
+	struct sockaddr	*ifma_name;
+	struct sockaddr	*ifma_addr;
+	struct sockaddr	*ifma_lladdr;
+};
+
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
 extern int getifaddrs(struct ifaddrs **);
 extern void freeifaddrs(struct ifaddrs *);
+extern int getifmaddrs(struct ifmaddrs **);
+extern void freeifmaddrs(struct ifmaddrs *);
 __END_DECLS
 
 #endif

@@ -4,7 +4,7 @@
  *  Aug 1995, Godmar Back (gback@cs.utah.edu)
  *  University of Utah, Department of Computer Science
  *
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_linux_ialloc.c,v 1.18 2002/05/16 19:07:59 iedowse Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_linux_ialloc.c,v 1.21 2003/10/29 07:35:53 marcel Exp $
  */
 /*
  *  linux/fs/ext2/ialloc.c
@@ -46,10 +46,8 @@
 
 #ifdef __i386__
 #include <gnu/ext2fs/i386-bitops.h>
-#elif  __alpha__
-#include <gnu/ext2fs/alpha-bitops.h>
 #else
-#error please provide bit operation functions
+#include <gnu/ext2fs/ext2_bitops.h>
 #endif
 
 /* this is supposed to mark a buffer dirty on ready for delayed writing

@@ -26,9 +26,6 @@
  *
  *	i4b_ipr.c - isdn4bsd IP over raw HDLC ISDN network driver
  *	---------------------------------------------------------
- *
- * $FreeBSD: src/sys/i4b/driver/i4b_ipr.c,v 1.23 2003/03/04 23:19:54 jlemon Exp $
- *
  *	last edit-date: [Sun Mar 17 09:32:58 2002]
  *
  *---------------------------------------------------------------------------*
@@ -55,6 +52,9 @@
  *	sc->sc_outb		# of outgoing bytes before compression
  *
  *---------------------------------------------------------------------------*/ 
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_ipr.c,v 1.26 2003/10/31 18:32:07 brooks Exp $");
 
 #include "i4bipr.h"
 
@@ -201,9 +201,10 @@ i4biprattach(void *dummy)
 
 		NDBGL4(L4_DIALST, "setting dial state to ST_IDLE");
 
+		sc->sc_if.if_softc = sc;
 		sc->sc_state = ST_IDLE;
-		sc->sc_if.if_name = "ipr";
-		sc->sc_if.if_unit = i;
+		if_initname(&sc->sc_if, "ipr", i);
+
 
 #ifdef	IPR_VJ
 		sc->sc_if.if_flags = IFF_POINTOPOINT | IFF_SIMPLEX | IPR_AUTOCOMP;
@@ -286,8 +287,8 @@ i4biproutput(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	
 	s = SPLI4B();
 
-	unit = ifp->if_unit;
-	sc = &ipr_softc[unit];
+	sc = ifp->if_softc;
+	unit = ifp->if_dunit;
 
 	/* check for IP */
 	
@@ -408,7 +409,7 @@ i4biproutput(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 static int
 i4biprioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
-	struct ipr_softc *sc = &ipr_softc[ifp->if_unit];
+	struct ipr_softc *sc = ifp->if_softc;
 	struct ifreq *ifr = (struct ifreq *)data;
 	struct ifaddr *ifa = (struct ifaddr *)data;
 	int s;
@@ -434,7 +435,8 @@ i4biprioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				if(sc->sc_if.if_flags & IFF_RUNNING)
 				{
 					/* disconnect ISDN line */
-					i4b_l4_drvrdisc(BDRV_IPR, ifp->if_unit);
+					i4b_l4_drvrdisc(BDRV_IPR,
+					    ifp->if_dunit);
 					sc->sc_if.if_flags &= ~IFF_RUNNING;
 				}
 
@@ -512,8 +514,8 @@ iprclearqueues(struct ipr_softc *sc)
 static void
 iprwatchdog(struct ifnet *ifp)
 {
-	int unit = ifp->if_unit;
-	struct ipr_softc *sc = &ipr_softc[unit];
+	int unit = ifp->if_dunit;
+	struct ipr_softc *sc = ifp->if_softc;
 	bchan_statistics_t bs;
 	
 	/* get # of bytes in and out from the HSCX driver */ 
@@ -559,7 +561,7 @@ i4bipr_connect_startio(struct ipr_softc *sc)
 	if(sc->sc_state == ST_CONNECTED_W)
 	{
 		sc->sc_state = ST_CONNECTED_A;
-		ipr_tx_queue_empty(sc->sc_if.if_unit);
+		ipr_tx_queue_empty(sc->sc_if.if_dunit);
 	}
 
 	splx(s);

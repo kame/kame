@@ -29,8 +29,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pccard.c,v 1.158 2003/04/23 23:39:21 imp Exp $
+ * $FreeBSD: src/sys/pccard/pccard.c,v 1.160 2003/11/09 09:17:25 tanimura Exp $
  */
+
+#define OBSOLETE_IN_6
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -160,7 +162,7 @@ disable_slot_to(struct slot *slt)
 	else
 		printf("pccard: card deactivated, slot %d\n", slt->slotnum);
 	pccard_remove_beep();
-	selwakeup(&slt->selp);
+	selwakeuppri(&slt->selp, PZERO);
 }
 
 /*

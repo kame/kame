@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_var.h,v 1.7 2002/11/08 18:27:30 jhb Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_var.h,v 1.8 2003/07/25 06:39:46 harti Exp $
  *
  */
 
@@ -320,5 +320,10 @@ int		unisig_vc_state(struct unisig *,
 extern uma_zone_t	unisig_vc_zone;
 extern uma_zone_t	unisig_msg_zone;
 extern uma_zone_t	unisig_ie_zone;
+
+#ifdef SYSCTL_DECL
+SYSCTL_DECL(_net_harp_uni);
+#endif
+
 #endif	/* _KERNEL */
 #endif	/* _UNISIG_VAR_H */

@@ -34,8 +34,10 @@
  * advised of the possibility of such damage.
  *
  * $Id: vinummemory.c,v 1.31 2003/05/23 01:08:36 grog Exp $
- * $FreeBSD: src/sys/dev/vinum/vinummemory.c,v 1.33 2003/05/23 01:15:01 grog Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/vinum/vinummemory.c,v 1.34 2003/08/24 17:55:56 obrien Exp $");
 
 #include <dev/vinum/vinumhdr.h>
 

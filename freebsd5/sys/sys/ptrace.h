@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ptrace.h	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/sys/ptrace.h,v 1.19 2002/03/16 02:40:01 des Exp $
+ * $FreeBSD: src/sys/sys/ptrace.h,v 1.21 2003/10/09 10:17:16 robert Exp $
  */
 
 #ifndef	_SYS_PTRACE_H_
@@ -51,6 +51,10 @@
 #define	PT_ATTACH	10	/* trace some running process */
 #define	PT_DETACH	11	/* stop tracing a process */
 #define PT_IO		12	/* do I/O to/from stopped process. */
+
+#define	PT_TO_SCE	20
+#define	PT_TO_SCX	21
+#define	PT_SYSCALL	22
 
 #define PT_GETREGS      33	/* get general-purpose registers */
 #define PT_SETREGS      34	/* set general-purpose registers */
@@ -78,8 +82,25 @@ struct ptrace_io_desc {
 #define PIOD_WRITE_I	4	/* Write to I space */
 
 #ifdef _KERNEL
+
+#define	PTRACESTOP_SC(p, td, flag)				\
+	if ((p)->p_flag & P_TRACED && (p)->p_stops & (flag)) {	\
+		PROC_LOCK(p);					\
+		ptracestop((td), SIGTRAP);			\
+	}
+/*
+ * The flags below are used for ptrace(2) tracing and have no relation
+ * to procfs.  They are stored in struct proc's p_stops member.
+ */
+#define	S_PT_SCE	0x000010000
+#define	S_PT_SCX	0x000020000
+
 int	ptrace_set_pc(struct thread *_td, unsigned long _addr);
 int	ptrace_single_step(struct thread *_td);
+
+#ifdef __HAVE_PTRACE_MACHDEP
+int	cpu_ptrace(struct thread *_td, int _req, void *_addr, int _data);
+#endif
 
 /*
  * These are prototypes for functions that implement some of the

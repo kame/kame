@@ -33,7 +33,7 @@
  * This handles io against /dev/midi, the midi {in, out}put event queues
  * and the event/message transmittion to/from an MPU401 interface.
  *
- * $FreeBSD: src/sys/dev/sound/isa/mpu.c,v 1.16 2002/04/04 21:03:16 jhb Exp $
+ * $FreeBSD: src/sys/dev/sound/isa/mpu.c,v 1.18 2003/10/29 21:54:37 deischen Exp $
  *
  */
 
@@ -42,7 +42,6 @@
 #include <machine/cpufunc.h>
 
 #include <isa/isavar.h>
-#include <dev/sio/sioreg.h>
 #include <dev/ic/ns16550.h>
 
 static devclass_t midi_devclass;
@@ -363,6 +362,7 @@ mpu_attach(device_t dev)
 	/* Allocate the resources, switch to uart mode. */
 	if (mpu_allocres(scp, dev) || mpu_uartmode(scp)) {
 		mpu_releaseres(scp, dev);
+		mtx_destroy(&scp->mtx);
 		return (ENXIO);
 	}
 
@@ -769,7 +769,6 @@ mpu_releaseres(sc_p scp, device_t dev)
 		bus_release_resource(dev, SYS_RES_IOPORT, scp->io_rid, scp->io);
 		scp->io = NULL;
 	}
-	mtx_destroy(&scp->mtx);
 }
 
 static device_method_t mpu_methods[] = {

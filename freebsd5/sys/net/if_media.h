@@ -1,5 +1,5 @@
 /*	$NetBSD: if_media.h,v 1.3 1997/03/26 01:19:27 thorpej Exp $	*/
-/* $FreeBSD: src/sys/net/if_media.h,v 1.20 2003/04/29 17:23:23 harti Exp $ */
+/* $FreeBSD: src/sys/net/if_media.h,v 1.23 2003/07/21 02:48:35 sam Exp $ */
 
 /*
  * Copyright (c) 1997
@@ -194,6 +194,7 @@ int	ifmedia_ioctl(struct ifnet *ifp, struct ifreq *ifr,
 #define	IFM_IEEE80211_IBSS	0x00000400	/* Operate in IBSS mode */
 #define	IFM_IEEE80211_IBSSMASTER 0x00000800	/* Operate as an IBSS master */
 #define	IFM_IEEE80211_TURBO	0x00001000	/* Operate in turbo mode */
+#define	IFM_IEEE80211_MONITOR	0x00002000	/* Operate in monitor mode */
 /* operating mode for multi-mode devices */
 #define	IFM_IEEE80211_11A	1	/* 5Ghz, OFDM mode */
 #define	IFM_IEEE80211_11B	2	/* Direct Sequence mode */
@@ -443,13 +444,20 @@ struct ifmedia_description {
 	{ IFM_IEEE80211_IBSS, "ibss" },					\
 	{ IFM_IEEE80211_IBSSMASTER, "ibss-master" },			\
 	{ IFM_IEEE80211_TURBO, "turbo" },				\
+	{ IFM_IEEE80211_MONITOR, "monitor" },				\
 	{ 0, NULL },							\
 }
 
 #define	IFM_SUBTYPE_IEEE80211_MODE_DESCRIPTIONS {			\
+	{ IFM_AUTO, "autoselect" },					\
 	{ IFM_IEEE80211_11A, "11a" },					\
 	{ IFM_IEEE80211_11B, "11b" },					\
 	{ IFM_IEEE80211_11G, "11g" },					\
+	{ 0, NULL },							\
+}
+
+#define	IFM_SUBTYPE_IEEE80211_MODE_ALIASES {				\
+	{ IFM_AUTO, "auto" },						\
 	{ 0, NULL },							\
 }
 
@@ -461,7 +469,7 @@ struct ifmedia_description {
 	{ IFM_ATM_MM_155,	"Multi-mode/155MBit" },			\
 	{ IFM_ATM_SM_155,	"Single-mode/155MBit" },		\
 	{ IFM_ATM_UTP_155,	"UTP/155MBit" },			\
-	{ IFM_ATM_MM_622,	"Mult-imode/622MBit" },			\
+	{ IFM_ATM_MM_622,	"Multi-mode/622MBit" },			\
 	{ IFM_ATM_SM_622,	"Single-mode/622MBit" },		\
 	{ 0, NULL },							\
 }

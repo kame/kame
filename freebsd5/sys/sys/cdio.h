@@ -1,7 +1,7 @@
 /*
  * 16 Feb 93	Julian Elischer	(julian@dialix.oz.au)
  *
- * $FreeBSD: src/sys/sys/cdio.h,v 1.24 2003/04/30 12:07:32 markm Exp $
+ * $FreeBSD: src/sys/sys/cdio.h,v 1.25 2003/10/20 09:29:40 sos Exp $
  */
 
 /*
@@ -273,14 +273,5 @@ struct ioc_capability {			/*<2>*/
 };					/*<2>*/
 
 #define	CDIOCCAPABILITY	_IOR('c',30,struct ioc_capability)	/*<2>*/
-
-struct ioc_read_audio {
-	u_char address_format;
-	union msf_lba address;
-	int nframes;
-	u_char* buffer;
-};
-
-#define CDIOCREADAUDIO _IOWR('c',31,struct ioc_read_audio)
 
 #endif /* !_SYS_CDIO_H_ */

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/nwfs/Makefile,v 1.11 2002/01/11 15:48:55 ru Exp $
+# $FreeBSD: src/sys/modules/nwfs/Makefile,v 1.12 2003/11/19 05:08:26 imp Exp $
 
 .PATH: ${.CURDIR}/../../fs/nwfs
 
@@ -6,7 +6,7 @@ KMOD=	nwfs
 
 SRCS=	vnode_if.h \
 	nwfs_node.c nwfs_ioctl.c nwfs_io.c nwfs_vfsops.c nwfs_vnops.c \
-	nwfs_subr.c opt_ncp.h opt_nwfs.h opt_vmpage.h
+	nwfs_subr.c opt_ncp.h opt_vmpage.h
 
 .if defined(VNPRINT)
 CFLAGS+= -DVNPRINT

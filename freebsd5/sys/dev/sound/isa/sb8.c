@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * Copyright 1997,1998 Luigi Rizzo.
  *
  * Derived from files in the Voxware 3.5 distribution,
@@ -38,7 +38,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sb8.c,v 1.71 2003/02/07 14:05:33 nyan Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sb8.c,v 1.73 2003/09/07 16:28:02 cg Exp $");
 
 #define SB_DEFAULT_BUFSZ	4096
 
@@ -723,8 +723,9 @@ sb_attach(device_t dev)
 			/*highaddr*/BUS_SPACE_MAXADDR,
 			/*filter*/NULL, /*filterarg*/NULL,
 			/*maxsize*/sb->bufsize, /*nsegments*/1,
-			/*maxsegz*/0x3ffff,
-			/*flags*/0, &sb->parent_dmat) != 0) {
+			/*maxsegz*/0x3ffff, /*flags*/0,
+			/*lockfunc*/busdma_lock_mutex, /*lockarg*/&Giant,
+			&sb->parent_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		goto no;
     	}

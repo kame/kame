@@ -25,9 +25,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/syscons/schistory.c,v 1.16 2003/02/19 05:47:12 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/syscons/schistory.c,v 1.18 2003/08/24 18:17:23 obrien Exp $");
 
 #include "opt_syscons.h"
 
@@ -41,7 +42,11 @@
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 
+#ifdef __sparc64__
+#include <machine/sc_machdep.h>
+#else
 #include <machine/pc/display.h>
+#endif
 
 #include <dev/syscons/syscons.h>
 

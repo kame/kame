@@ -37,11 +37,11 @@
  * Author: Archie Cobbs <archie@freebsd.org>
  *
  * $Whistle: ng_parse.h,v 1.2 1999/11/29 01:43:48 archie Exp $
- * $FreeBSD: src/sys/netgraph/ng_parse.h,v 1.7 2002/05/31 23:48:02 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_parse.h,v 1.8 2003/11/11 12:30:37 ru Exp $
  */
 
-#ifndef _NETGRAPH_PARSE_H_
-#define _NETGRAPH_PARSE_H_
+#ifndef _NETGRAPH_NG_PARSE_H_
+#define _NETGRAPH_NG_PARSE_H_
 
 /*
 
@@ -527,5 +527,5 @@ extern char	*ng_get_string_token(const char *s, int *startp,
  */
 extern char	*ng_encode_string(const char *s, int slen);
 
-#endif /* _NETGRAPH_PARSE_H_ */
+#endif /* _NETGRAPH_NG_PARSE_H_ */
 

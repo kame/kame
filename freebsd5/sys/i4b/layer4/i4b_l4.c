@@ -26,12 +26,12 @@
  *
  *	i4b_l4.c - kernel interface to userland
  *	-----------------------------------------
- *
- * $FreeBSD: src/sys/i4b/layer4/i4b_l4.c,v 1.16 2002/09/02 00:52:11 brooks Exp $
- *
  *      last edit-date: [Sun Aug 11 12:43:14 2002]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer4/i4b_l4.c,v 1.17 2003/06/11 00:01:05 obrien Exp $");
 
 #include "i4bipr.h"
 

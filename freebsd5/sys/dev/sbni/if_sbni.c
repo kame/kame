@@ -24,8 +24,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sbni/if_sbni.c,v 1.10 2003/02/19 05:47:10 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/sbni/if_sbni.c,v 1.14 2003/10/31 18:32:04 brooks Exp $");
 
 /*
  * Device driver for Granch SBNI12 leased line adapters
@@ -224,26 +226,23 @@ sbni_attach(struct sbni_softc *sc, int unit, struct sbni_flags flags)
 	set_initial_values(sc, flags);
 
 	callout_handle_init(&sc->wch);
-	if (!ifp->if_name) {
-		/* Initialize ifnet structure */
-		ifp->if_softc	= sc;
-		ifp->if_unit	= unit;
-		ifp->if_name	= "sbni";
-		ifp->if_init	= sbni_init;
-		ifp->if_start	= sbni_start;
-	        ifp->if_output	= ether_output;
-		ifp->if_ioctl	= sbni_ioctl;
-		ifp->if_watchdog	= sbni_watchdog;
-		ifp->if_snd.ifq_maxlen	= IFQ_MAXLEN;
+	/* Initialize ifnet structure */
+	ifp->if_softc	= sc;
+	if_initname(ifp, "sbni", unit);
+	ifp->if_init	= sbni_init;
+	ifp->if_start	= sbni_start;
+	ifp->if_output	= ether_output;
+	ifp->if_ioctl	= sbni_ioctl;
+	ifp->if_watchdog	= sbni_watchdog;
+	ifp->if_snd.ifq_maxlen	= IFQ_MAXLEN;
 
-		/* report real baud rate */
-		csr0 = sbni_inb(sc, CSR0);
-		ifp->if_baudrate =
-			(csr0 & 0x01 ? 500000 : 2000000) / (1 << flags.rate);
+	/* report real baud rate */
+	csr0 = sbni_inb(sc, CSR0);
+	ifp->if_baudrate =
+		(csr0 & 0x01 ? 500000 : 2000000) / (1 << flags.rate);
 
-	        ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
-		ether_ifattach(ifp, sc->arpcom.ac_enaddr);
-	}
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ether_ifattach(ifp, sc->arpcom.ac_enaddr);
 	/* device attach does transition from UNCONFIGURED to IDLE state */
 
 	if_printf(ifp, "speed %ld, address %6D, rxl ",
@@ -926,7 +925,7 @@ card_start(struct sbni_softc *sc)
 static void
 sbni_watchdog(struct ifnet *ifp)
 {
-	log(LOG_ERR, "sbni%d: device timeout\n", ifp->if_unit);
+	log(LOG_ERR, "%s: device timeout\n", ifp->if_xname);
 	ifp->if_oerrors++;
 }
 
@@ -1222,9 +1221,9 @@ calc_crc32(u_int32_t crc, caddr_t p, u_int len)
 		"xorb	2(%%esi), %%bl\n"
 		"xorl	(%%edi,%%ebx,4), %%eax\n"
 	"2:\n"
-		:
-		: "a" (_crc), "g" (p), "g" (len)
-		: "ax", "bx", "cx", "dx", "si", "di"
+		: "=a" (_crc)
+		: "g" (p), "g" (len)
+		: "bx", "cx", "dx", "si", "di"
 	);
 
 	return (_crc);

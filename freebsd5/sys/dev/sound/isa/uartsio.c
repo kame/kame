@@ -42,11 +42,10 @@
  * This handles io against /dev/midi, the midi {in, out}put event queues
  * and the event/message transmittion to/from a serial port interface.
  *
- * $FreeBSD: src/sys/dev/sound/isa/uartsio.c,v 1.13 2002/12/18 22:53:23 semenu Exp $
+ * $FreeBSD: src/sys/dev/sound/isa/uartsio.c,v 1.15 2003/09/17 01:09:10 bde Exp $
  *
  */
 
-#include <dev/sio/sioreg.h>
 #include <dev/ic/ns16550.h>
 #include <dev/sound/midi/midi.h>
 

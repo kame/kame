@@ -28,7 +28,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_etf.c,v 1.2 2002/05/31 23:48:02 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_etf.c,v 1.3 2003/11/17 19:13:44 ru Exp $
  */
 
 #include <sys/param.h>
@@ -322,7 +322,8 @@ ng_etf_rcvmsg(node_p node, item_p item, hook_p lasthook)
 				MALLOC(fil, struct filter *, sizeof(*fil),
 					M_NETGRAPH_ETF, M_NOWAIT | M_ZERO);
 				if (fil == NULL) {
-					return (ENOMEM);
+					error = ENOMEM;
+					break;
 				}
 
 				fil->match_hook = hook;
@@ -472,6 +473,7 @@ ng_etf_disconnect(hook_p hook)
 		LIST_FOREACH(fil, (etfp->hashtable + i), next) {
 			if (fil->match_hook == hook) {
 				LIST_REMOVE(fil, next);
+				FREE(fil, M_NETGRAPH_ETF);
 			}
 		}
 	}

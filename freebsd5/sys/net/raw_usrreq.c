@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)raw_usrreq.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/raw_usrreq.c,v 1.28 2002/12/28 02:29:19 kbyanc Exp $
+ * $FreeBSD: src/sys/net/raw_usrreq.c,v 1.30 2003/11/18 00:39:03 rwatson Exp $
  */
 
 #include <sys/param.h>
@@ -129,7 +129,7 @@ raw_ctlinput(cmd, arg, dummy)
 	void *dummy;
 {
 
-	if (cmd < 0 || cmd > PRC_NCMDS)
+	if (cmd < 0 || cmd >= PRC_NCMDS)
 		return;
 	/* INCOMPLETE */
 }
@@ -295,5 +295,5 @@ struct pr_usrreqs raw_usrreqs = {
 	pru_connect2_notsupp, pru_control_notsupp, raw_udetach, 
 	raw_udisconnect, pru_listen_notsupp, raw_upeeraddr, pru_rcvd_notsupp,
 	pru_rcvoob_notsupp, raw_usend, pru_sense_null, raw_ushutdown,
-	raw_usockaddr, sosend, soreceive, sopoll
+	raw_usockaddr, sosend, soreceive, sopoll, pru_sosetlabel_null
 };

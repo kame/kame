@@ -33,7 +33,7 @@
  *	@(#)kernfs.h	8.6 (Berkeley) 3/29/95
  * From: FreeBSD: src/sys/miscfs/kernfs/kernfs.h 1.14
  *
- * $FreeBSD: src/sys/fs/devfs/devfs.h,v 1.17 2002/12/09 03:44:27 rwatson Exp $
+ * $FreeBSD: src/sys/fs/devfs/devfs.h,v 1.18 2003/11/12 03:14:29 rwatson Exp $
  */
 
 #ifndef _FS_DEVFS_DEVFS_H_
@@ -159,7 +159,7 @@ struct devfs_dirent {
 	mode_t	de_mode;
 	uid_t	de_uid;
 	gid_t	de_gid;
-	struct label	de_label;
+	struct label	*de_label;
 	struct timespec de_atime;
 	struct timespec de_mtime;
 	struct timespec de_ctime;

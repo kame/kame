@@ -6,11 +6,10 @@
  * can do whatever you want with this stuff. If we meet some day, and you think
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
- *
- * $FreeBSD: src/sys/kern/inflate.c,v 1.18 2003/02/19 05:47:25 imp Exp $
- *
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/inflate.c,v 1.19 2003/06/11 00:56:54 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/inflate.h>

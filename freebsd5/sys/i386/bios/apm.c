@@ -14,9 +14,10 @@
  * use.
  *
  * Sep, 1994	Implemented on FreeBSD 1.1.5.1R (Toshiba AVS001WD)
- *
- * $FreeBSD: src/sys/i386/bios/apm.c,v 1.133 2003/03/25 05:19:18 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/bios/apm.c,v 1.137 2003/11/09 09:17:23 tanimura Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -37,6 +38,7 @@
 
 #include <machine/apm_bios.h>
 #include <machine/clock.h>
+#include <machine/endian.h>
 #include <machine/pc/bios.h>
 #include <machine/cpufunc.h>
 #include <machine/segments.h>
@@ -118,6 +120,7 @@ static struct cdevsw apm_cdevsw = {
 
 static int apm_suspend_delay = 1;
 static int apm_standby_delay = 1;
+static int apm_swab_batt_minutes = 0;
 static int apm_debug = 0;
 
 #define APM_DPRINT(args...) do	{					\
@@ -129,6 +132,10 @@ static int apm_debug = 0;
 SYSCTL_INT(_machdep, OID_AUTO, apm_suspend_delay, CTLFLAG_RW, &apm_suspend_delay, 1, "");
 SYSCTL_INT(_machdep, OID_AUTO, apm_standby_delay, CTLFLAG_RW, &apm_standby_delay, 1, "");
 SYSCTL_INT(_debug, OID_AUTO, apm_debug, CTLFLAG_RW, &apm_debug, 0, "");
+
+TUNABLE_INT("machdep.apm_swab_batt_minutes", &apm_swab_batt_minutes);
+SYSCTL_INT(_machdep, OID_AUTO, apm_swab_batt_minutes, CTLFLAG_RW,
+	   &apm_swab_batt_minutes, 0, "Byte swap battery time value.");
 
 #ifdef PC98
 static __inline void
@@ -628,6 +635,8 @@ apm_get_pwstatus(apm_pwstatus_t app)
 	app->ap_batt_flag = (sc->bios.r.ecx >> 8) & 0xff;
 	app->ap_batt_life = sc->bios.r.ecx & 0xff;
 	sc->bios.r.edx &= 0xffff;
+	if (apm_swab_batt_minutes)
+		sc->bios.r.edx = __bswap16(sc->bios.r.edx) | 0x8000;
 	if (sc->bios.r.edx == 0xffff)	/* Time is unknown */
 		app->ap_batt_time = -1;
 	else if (sc->bios.r.edx & 0x8000)	/* Time is in minutes */
@@ -837,6 +846,9 @@ apm_identify(driver_t *driver, device_t parent)
 		return;
 	}
 
+	if (resource_disabled("apm", 0))
+		return;
+
 	child = BUS_ADD_CHILD(parent, 0, "apm", 0);
 	if (child == NULL)
 		panic("apm_identify");
@@ -851,18 +863,12 @@ apm_probe(device_t dev)
 #define APM_KERNBASE	KERNBASE
 	struct vm86frame	vmf;
 	struct apm_softc	*sc = &apm_softc;
-	int			disabled, flags;
+	int			flags;
 #ifdef PC98
 	int			rid;
 #endif
 
 	device_set_desc(dev, "APM BIOS");
-
-	if (resource_int_value("apm", 0, "disabled", &disabled) != 0)
-		disabled = 0;
-	if (disabled)
-		return ENXIO;
-
 	if (device_get_unit(dev) > 0) {
 		printf("apm: Only one APM driver supported.\n");
 		return ENXIO;
@@ -993,7 +999,7 @@ apm_record_event(struct apm_softc *sc, u_int event_type)
 	sc->event_ptr %= APM_NEVENTS;
 	evp->type = event_type;
 	evp->index = ++apm_evindex;
-	selwakeup(&sc->sc_rsel);
+	selwakeuppri(&sc->sc_rsel, PZERO);
 	return (sc->sc_flags & SCFLAG_OCTL) ? 0 : 1; /* user may handle */
 }
 
@@ -1535,10 +1541,8 @@ out:
 static void
 apm_pm_register(void *arg)
 {
-	int	disabled = 0;
 
-	resource_int_value("apm", 0, "disabled", &disabled);
-	if (disabled == 0)
+	if (!resource_disabled("apm", 0))
 		power_pm_register(POWER_PM_TYPE_APM, apm_pm_func, NULL);
 }
 

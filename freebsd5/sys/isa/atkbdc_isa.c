@@ -22,9 +22,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/isa/atkbdc_isa.c,v 1.25 2003/04/30 12:57:39 markm Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/isa/atkbdc_isa.c,v 1.27 2003/07/02 16:09:01 jhb Exp $");
 
 #include "opt_kbd.h"
 
@@ -254,7 +255,7 @@ atkbdc_add_child(device_t bus, int order, char *name, int unit)
 
 	if (resource_int_value(name, unit, "flags", &t) == 0)
 		device_set_flags(child, t);
-	if (resource_int_value(name, unit, "disabled", &t) == 0 && t != 0)
+	if (resource_disabled(name, unit))
 		device_disable(child);
 
 	device_set_ivars(child, ivar);

@@ -41,7 +41,7 @@
  *	from: @(#)cache.h	8.1 (Berkeley) 6/11/93
  *	from: NetBSD: cache.h,v 1.3 2000/08/01 00:28:02 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/include/cache.h,v 1.8 2003/04/08 06:35:08 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/cache.h,v 1.10 2003/11/11 06:41:54 jake Exp $
  */
 
 #ifndef _MACHINE_CACHE_H_
@@ -95,19 +95,32 @@ struct cacheinfo {
 	u_int	ec_l2linesize;
 };
 
+#ifdef _KERNEL
+
+typedef void cache_enable_t(void);
+typedef void cache_flush_t(void);
 typedef void dcache_page_inval_t(vm_paddr_t pa);
 typedef void icache_page_inval_t(vm_paddr_t pa);
 
 void	cache_init(phandle_t node);
 
+cache_enable_t cheetah_cache_enable;
+cache_flush_t cheetah_cache_flush;
 dcache_page_inval_t cheetah_dcache_page_inval;
 icache_page_inval_t cheetah_icache_page_inval;
+
+cache_enable_t spitfire_cache_enable;
+cache_flush_t spitfire_cache_flush;
 dcache_page_inval_t spitfire_dcache_page_inval;
 icache_page_inval_t spitfire_icache_page_inval;
 
+extern cache_enable_t *cache_enable;
+extern cache_flush_t *cache_flush;
 extern dcache_page_inval_t *dcache_page_inval;
 extern icache_page_inval_t *icache_page_inval;
 
 extern struct cacheinfo cache;
+
+#endif
 
 #endif	/* !_MACHINE_CACHE_H_ */

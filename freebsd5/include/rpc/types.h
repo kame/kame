@@ -30,7 +30,7 @@
  *
  *	from: @(#)types.h 1.18 87/07/24 SMI
  *	from: @(#)types.h	2.3 88/08/15 4.0 RPCSRC
- * $FreeBSD: src/include/rpc/types.h,v 1.10 2001/03/19 12:49:47 alfred Exp $
+ * $FreeBSD: src/include/rpc/types.h,v 1.10.6.1 2003/12/18 00:59:50 peter Exp $
  */
 
 /*
@@ -40,6 +40,7 @@
 #define _RPC_TYPES_H
 
 #include <sys/types.h>
+#include <sys/_null.h>
 
 typedef int32_t bool_t;
 typedef int32_t enum_t;
@@ -58,9 +59,6 @@ typedef   int32_t rpc_inline_t;
 #endif
 #ifndef TRUE
 #	define TRUE	(1)
-#endif
-#ifndef NULL
-#	define NULL	0
 #endif
 
 #define mem_alloc(bsize)	calloc(1, bsize)

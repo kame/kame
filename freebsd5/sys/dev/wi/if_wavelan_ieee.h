@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/wi/if_wavelan_ieee.h,v 1.17 2003/01/15 20:11:31 sam Exp $
+ * $FreeBSD: src/sys/dev/wi/if_wavelan_ieee.h,v 1.18 2003/06/27 00:49:04 sam Exp $
  */
 
 #ifndef _IF_WAVELAN_IEEE_H
@@ -466,9 +466,9 @@ struct wi_rx_frame {
 	u_int8_t	wi_src_addr[6];
 	u_int16_t	wi_len;
 };
-#define WI_DATA_HDRLEN		WI_802_11_OFFSET
-#define WI_MGMT_HDRLEN		WI_802_11_OFFSET_RAW
-#define WI_CTL_HDRLEN		WI_802_11_OFFSET_RAW
+#define WI_DATA_HDRLEN		0x44
+#define WI_MGMT_HDRLEN		0x3C
+#define WI_CTL_HDRLEN		0x3C
 
 
 /*

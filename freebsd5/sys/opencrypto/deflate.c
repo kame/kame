@@ -1,4 +1,3 @@
-/*	$FreeBSD: src/sys/opencrypto/deflate.c,v 1.1 2002/10/04 20:31:22 sam Exp $	*/
 /* $OpenBSD: deflate.c,v 1.3 2001/08/20 02:45:22 hugh Exp $ */
 
 /*
@@ -32,6 +31,9 @@
  * This file contains a wrapper around the deflate algo compression
  * functions using the zlib library (see net/zlib.{c,h})
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/opencrypto/deflate.c,v 1.2 2003/06/11 05:57:50 obrien Exp $");
 
 #include <sys/types.h>
 #include <sys/malloc.h>

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_xlreg.h,v 1.45 2003/03/18 06:29:51 silby Exp $
+ * $FreeBSD: src/sys/pci/if_xlreg.h,v 1.48 2003/11/14 19:00:32 sam Exp $
  */
 
 #define XL_EE_READ	0x0080	/* read, 5 bit address */
@@ -82,7 +82,8 @@
 #define XL_CAPS_PWRMGMT		0x2000
 
 #define XL_PACKET_SIZE 1540
-	
+#define XL_MAX_FRAMELEN	(ETHER_MAX_LEN + ETHER_VLAN_ENCAP_LEN)
+
 /*
  * Register layouts.
  */
@@ -571,6 +572,7 @@ struct xl_mii_frame {
 #define XL_FLAG_INVERT_MII_PWR		0x0040
 #define XL_FLAG_NO_XCVR_PWR		0x0080
 #define XL_FLAG_USE_MMIO		0x0100
+#define	XL_FLAG_NO_MMIO			0x0200
 
 #define XL_NO_XCVR_PWR_MAGICBITS	0x0900
 
@@ -608,9 +610,11 @@ struct xl_softc {
 /* These are a bit premature.  The driver still tries to sleep with locks. */
 #define XL_LOCK(_sc)		mtx_lock(&(_sc)->xl_mtx)
 #define XL_UNLOCK(_sc)		mtx_unlock(&(_sc)->xl_mtx)
+#define XL_LOCK_ASSERT(_sc)	mtx_assert(&(_sc)->xl_mtx, MA_OWNED)
 #else
 #define XL_LOCK(x)		do { } while (0)
 #define XL_UNLOCK(x)		do { } while (0)
+#define XL_LOCK_ASSERT(x)	do { } while (0)
 #endif
 
 #define xl_rx_goodframes(x) \

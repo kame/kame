@@ -32,9 +32,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ipx_outputfl.c
- *
- * $FreeBSD: src/sys/netipx/ipx_outputfl.c,v 1.18 2003/02/19 05:47:36 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netipx/ipx_outputfl.c,v 1.19 2003/06/11 05:25:14 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

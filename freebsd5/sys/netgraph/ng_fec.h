@@ -32,7 +32,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netgraph/ng_fec.h,v 1.1 2002/10/29 19:12:43 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_fec.h,v 1.2 2003/11/11 12:30:37 ru Exp $
  */
 /*
  * Copyright (c) 1996-1999 Whistle Communications, Inc.
@@ -72,8 +72,8 @@
  * $Whistle: ng_fec.h,v 1.5 1999/01/20 00:22:13 archie Exp $
  */
 
-#ifndef _NETGRAPH_FEC_H_
-#define _NETGRAPH_FEC_H_
+#ifndef _NETGRAPH_NG_FEC_H_
+#define _NETGRAPH_NG_FEC_H_
 
 #define NETISR_FEC			26
 
@@ -108,4 +108,4 @@ struct ng_fec_ifname {
 	char    ngif_name[NG_FEC_FEC_NAME_MAX + 1];
 };
 
-#endif /* _NETGRAPH_FEC_H_ */
+#endif /* _NETGRAPH_NG_FEC_H_ */

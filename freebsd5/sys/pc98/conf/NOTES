@@ -4,7 +4,7 @@
 # This file contains machine dependent kernel configuration notes.  For
 # machine independent notes, look in /sys/conf/NOTES.
 #
-# $FreeBSD: src/sys/pc98/conf/NOTES,v 1.8 2003/05/15 02:10:30 jmallett Exp $
+# $FreeBSD: src/sys/pc98/conf/NOTES,v 1.18 2003/12/03 21:44:44 imp Exp $
 #
 
 #
@@ -23,30 +23,27 @@ profile         2
 #####################################################################
 # SMP OPTIONS:
 #
-# APIC_IO enables the use of the IO APIC for Symmetric I/O.
+# The apic device enables the use of the I/O APIC for interrupt delivery.
+# The apic device can be used in both UP and SMP kernels, but is required
+# for SMP kernels.  Thus, the apic device is not strictly an SMP option,
+# but it is a prerequisite for SMP.
 #
 # Notes:
 #
-#  An SMP kernel will ONLY run on an Intel MP spec. qualified motherboard.
+# Be sure to disable 'cpu I386_CPU' for SMP kernels.
 #
-#  Be sure to disable 'cpu I386_CPU' && 'cpu I486_CPU' for SMP kernels.
-#
-#  Check the 'Rogue SMP hardware' section to see if additional options
-#   are required by your hardware.
+# By default, mixed mode is used to route IRQ0 from the AT timer via
+# the 8259A master PIC through the ExtINT pin on the first I/O APIC.
+# This can be disabled via the NO_MIXED_MODE option.  In that case,
+# IRQ0 will be routed via an intpin on the first I/O APIC.  Not all
+# motherboards hook IRQ0 up to the first I/O APIC even though their
+# MP table or MADT may claim to do so.  That is why mixed mode is
+# enabled by default.
 #
 
 # Mandatory:
-options 	APIC_IO			# Symmetric (APIC) I/O
-
-#
-# Rogue SMP hardware:
-#
-
-# Bridged PCI cards:
-#
-# The MP tables of most of the current generation MP motherboards
-#  do NOT properly support bridged PCI cards.  To use one of these
-#  cards you should refer to ???
+device		apic			# I/O apic
+options 	NO_MIXED_MODE		# Disable use of mixed mode
 
 
 #####################################################################
@@ -65,9 +62,6 @@ cpu		I686_CPU		# aka Pentium Pro(tm)
 
 #
 # Options for CPU features.
-#
-# CPU_ATHLON_SSE_HACK tries to enable SSE instructions when the BIOS has
-# forgotten to enable them.
 #
 # CPU_BLUELIGHTNING_FPU_OP_CACHE enables FPU operand cache on IBM
 # BlueLightning CPU.  It works only with Cyrix FPU, and this option
@@ -157,7 +151,6 @@ cpu		I686_CPU		# aka Pentium Pro(tm)
 # NOTE 3: This option may cause failures for software that requires
 # locked cycles in order to operate correctly.
 #
-options 	CPU_ATHLON_SSE_HACK
 options 	CPU_BLUELIGHTNING_FPU_OP_CACHE
 options 	CPU_BLUELIGHTNING_3X
 options 	CPU_BTB_EN
@@ -179,16 +172,6 @@ options 	CYRIX_CACHE_WORKS
 options 	CYRIX_CACHE_REALLY_WORKS
 #options 	NO_F00F_HACK
 options 	CPU_DISABLE_CMPXCHG
-
-#
-# A math emulator is mandatory if you wish to run on hardware which
-# does not have a floating-point processor.  Pick either the original,
-# bogus (but freely-distributable) math emulator, or a much more
-# fully-featured but GPL-licensed emulator taken from Linux.
-#
-options 	MATH_EMULATE		#Support for x87 emulation
-# Don't enable both of these in a real config.
-options 	GPL_MATH_EMULATE	#Support for x87 emulation via
 
 # Debug options
 options 	NPX_DEBUG	# enable npx debugging (FPU/math emu)
@@ -373,9 +356,10 @@ options 	TDFX_LINUX		# Enable Linuxulator support
 
 # DRM options:
 # mgadrm:    AGP Matrox G200, G400, G450, G550
-# tdfxdrm:   3dfx Voodoo 3/4/5 and Banshee
 # r128drm:   ATI Rage 128
 # radeondrm: ATI Radeon up to 9000/9100
+# sisdrm:    SiS 300/305,540,630
+# tdfxdrm:   3dfx Voodoo 3/4/5 and Banshee
 # DRM_DEBUG: include debug printfs, very slow
 #
 # mga requires AGP in the kernel, and it is recommended
@@ -384,6 +368,7 @@ options 	TDFX_LINUX		# Enable Linuxulator support
 device		mgadrm
 device		"r128drm"
 device		radeondrm
+device		sisdrm
 device		tdfxdrm
 
 options 	DRM_DEBUG
@@ -402,7 +387,6 @@ hint.mse.0.irq="13"
 
 # ar:   Arnet SYNC/570i hdlc sync 2/4 port V.35/X.21 serial driver
 #       (requires sppp)
-# cx:   Cronyx/Sigma multiport sync/async (with Cisco or PPP framing)
 # ed:   Western Digital and SMC 80xx; Novell NE1000 and NE2000; 3Com 3C503
 #       HP PC Lan+, various PC Card devices (refer to etc/defauls/pccard.conf)
 #       (requires miibus)
@@ -429,11 +413,6 @@ hint.ar.0.at="isa"
 hint.ar.0.port="0x300"
 hint.ar.0.irq="10"
 hint.ar.0.maddr="0xd0000"
-device		cx	1
-hint.cx.0.at="isa"
-hint.cx.0.port="0x240"
-hint.cx.0.irq="15"
-hint.cx.0.drq="7"
 device		ed
 #options 	ED_NO_MIIBUS		# Disable ed miibus support
 hint.ed.0.at="isa"
@@ -487,15 +466,6 @@ hint.wl.0.port="0x300"
 options 	WLCACHE		# enables the signal-strength cache
 options 	WLDEBUG		# enables verbose debugging output
 
-#
-# Audio drivers: `pca'
-#
-# pca: PCM audio through your PC speaker
-
-device		pca
-hint.pca.0.at="isa"
-hint.pca.0.port="0x040"
-
 # 
 # SCSI host adapters:
 # 
@@ -512,6 +482,16 @@ device          stg
 hint.stg.0.at="isa"
 hint.stg.0.port="0x140"
 hint.stg.0.port="11"
+
+#
+# SafeNet crypto driver: can be moved to the MI NOTES as soon as
+# it's tested on a big-endian machine
+#
+device		safe		# SafeNet 1141
+options		SAFE_DEBUG	# enable debugging support: hw.safe.debug
+options		SAFE_RNDTEST	# enable rndtest support
+
+#####################################################################
 
 #
 # Miscellaneous hardware:
@@ -591,7 +571,7 @@ hint.wt.0.at="isa"
 hint.wt.0.port="0x300"
 hint.wt.0.irq="5"
 hint.wt.0.drq="1"
-device		ctx	1
+device		ctx
 hint.ctx.0.at="isa"
 hint.ctx.0.port="0x230"
 hint.ctx.0.maddr="0xd0000"
@@ -948,8 +928,13 @@ nodevice	atkbdc
 nodevice	atkbd
 nodevice	psm
 nodevice	vga
-nodevice	aha
 nodevice	bt
+nodevice	adw
+nodevice	aha
+nodevice	ahb
+nodevice	ahd
+nodevice	mpt
+nodevice	trm
 nodevice	wds
 nodevice	asr
 nodevice	dpt
@@ -960,9 +945,19 @@ nodevice	ida		# Compaq Smart RAID
 nodevice	mlx		# Mylex DAC960
 nodevice	amr		# AMI MegaRAID
 nodevice	twe		# 3ware ATA RAID
+nodevice	cm
+nodevice	cs
+nodevice	ex
+nodevice	fea
 nodevice	cbb
 nodevice	pccard
 nodevice	cardbus
+nodevice	intpm
+nodevice	alpm
+nodevice	ichsmb
+nodevice	viapm
+nodevice	amdpm
+nodevice	nfpm
 
 
 #####################################################################
@@ -975,10 +970,15 @@ nooption	VGA_ALT_SEQACCESS
 nooption	PSM_RESETAFTERSUSPEND
 nooption	PSM_HOOKRESUME
 nooption	ATKBD_DFLT_KEYMAP
-nooption	DPT_ALLOW_MEMIO
+nooption	AHD_DEBUG
+nooption	AHD_DEBUG_OPTS
+nooption	AHD_REG_PRETTY_PRINT
+nooption	ADW_ALLOW_MEMIO
 nooption	DPT_LOST_IRQ
 nooption	DPT_RESET_HBA
 nooption	DPT_TIMEOUT_FACTOR
+nooption	AAC_DEBUG
+nooption	ACPI_MAX_THREADS
 
 
 #####################################################################

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/fade/fade_saver.c,v 1.18 1999/08/28 00:47:47 peter Exp $
+ * $FreeBSD: src/sys/dev/syscons/fade/fade_saver.c,v 1.19 2003/05/31 20:29:34 phk Exp $
  */
 
 #include <sys/param.h>
@@ -40,7 +40,6 @@
 #include <dev/syscons/syscons.h>
 
 static u_char palette[256*3];
-static int blanked;
 
 static int
 fade_saver(video_adapter_t *adp, int blank)
@@ -50,7 +49,6 @@ fade_saver(video_adapter_t *adp, int blank)
 	int i;
 
 	if (blank) {
-		blanked = TRUE;
 		if (ISPALAVAIL(adp->va_flags)) {
 			if (count <= 0)
 				save_palette(adp, palette);
@@ -77,7 +75,6 @@ fade_saver(video_adapter_t *adp, int blank)
 	    		(*vidsw[adp->va_index]->blank_display)(adp,
 							       V_DISPLAY_ON);
 		}
-		blanked = FALSE;
 	}
 	return 0;
 }
@@ -88,7 +85,6 @@ fade_init(video_adapter_t *adp)
 	if (!ISPALAVAIL(adp->va_flags)
 	    && (*vidsw[adp->va_index]->blank_display)(adp, V_DISPLAY_ON) != 0)
 		return ENODEV;
-	blanked = FALSE;
 	return 0;
 }
 

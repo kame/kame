@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/tcp.h,v 1.18 2002/10/02 04:22:34 mike Exp $
+ * $FreeBSD: src/sys/netinet/tcp.h,v 1.18.6.2 2004/01/09 14:29:52 andre Exp $
  */
 
 #ifndef _NETINET_TCP_H_
@@ -105,11 +105,28 @@ struct tcphdr {
 
 /*
  * Default maximum segment size for TCP.
- * With an IP MSS of 576, this is 536,
+ * With an IP MTU of 576, this is 536,
  * but 512 is probably more convenient.
  * This should be defined as MIN(512, IP_MSS - sizeof (struct tcpiphdr)).
  */
 #define	TCP_MSS	512
+/*
+ * TCP_MINMSS is defined to be 216 which is fine for the smallest
+ * link MTU (256 bytes, AX.25 packet radio) in the Internet.
+ * However it is very unlikely to come across such low MTU interfaces
+ * these days (anno dato 2003).
+ * See tcp_subr.c tcp_minmss SYSCTL declaration for more comments.
+ * Setting this to "0" disables the minmss check.
+ */
+#define	TCP_MINMSS 216
+/*
+ * TCP_MINMSSOVERLOAD is defined to be 1000 which should cover any type
+ * of interactive TCP session.
+ * See tcp_subr.c tcp_minmssoverload SYSCTL declaration and tcp_input.c
+ * for more comments.
+ * Setting this to "0" disables the minmssoverload check.
+ */
+#define	TCP_MINMSSOVERLOAD 0
 
 /*
  * Default maximum segment size for TCP6.

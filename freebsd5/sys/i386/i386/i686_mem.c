@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/i386/i686_mem.c,v 1.19 2003/02/19 05:47:20 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/i386/i686_mem.c,v 1.23 2003/10/21 18:28:34 silby Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -63,7 +64,7 @@ static char *mem_owner_bios = "BIOS";
 
 static int			mtrrs_disabled;
 TUNABLE_INT("machdep.disable_mtrrs", &mtrrs_disabled);
-SYSCTL_INT(_machdep, OID_AUTO, disable_mtrrs, CTLFLAG_RD,
+SYSCTL_INT(_machdep, OID_AUTO, disable_mtrrs, CTLFLAG_RDTUN,
 	&mtrrs_disabled, 0, "Disable i686 MTRRs.");
 
 static void			i686_mrinit(struct mem_range_softc *sc);
@@ -616,5 +617,3 @@ i686_mem_drvinit(void *unused)
 }
 
 SYSINIT(i686memdev,SI_SUB_DRIVERS,SI_ORDER_FIRST,i686_mem_drvinit,NULL)
-
-	

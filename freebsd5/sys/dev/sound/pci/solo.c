@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,15 +25,15 @@
 
 #include <dev/sound/pcm/sound.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include  <dev/sound/isa/sb.h>
 #include  <dev/sound/chip.h>
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/solo.c,v 1.25 2003/02/20 17:31:11 cognet Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/solo.c,v 1.29 2003/09/07 16:28:03 cg Exp $");
 
 #define SOLO_DEFAULT_BUFSZ 16384
 #define ABS(x) (((x) < 0)? -(x) : (x))
@@ -812,27 +812,27 @@ ess_release_resources(struct ess_info *sc, device_t dev)
 		sc->irq = 0;
     	}
     	if (sc->io) {
-		bus_release_resource(dev, SYS_RES_IOPORT, 0 * 4 + PCIR_MAPS, sc->io);
+		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_BAR(0), sc->io);
 		sc->io = 0;
     	}
 
     	if (sc->sb) {
-		bus_release_resource(dev, SYS_RES_IOPORT, 1 * 4 + PCIR_MAPS, sc->sb);
+		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_BAR(1), sc->sb);
 		sc->sb = 0;
     	}
 
     	if (sc->vc) {
-		bus_release_resource(dev, SYS_RES_IOPORT, 2 * 4 + PCIR_MAPS, sc->vc);
+		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_BAR(2), sc->vc);
 		sc->vc = 0;
     	}
 
     	if (sc->mpu) {
-		bus_release_resource(dev, SYS_RES_IOPORT, 3 * 4 + PCIR_MAPS, sc->mpu);
+		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_BAR(3), sc->mpu);
 		sc->mpu = 0;
     	}
 
     	if (sc->gp) {
-		bus_release_resource(dev, SYS_RES_IOPORT, 4 * 4 + PCIR_MAPS, sc->gp);
+		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_BAR(4), sc->gp);
 		sc->gp = 0;
     	}
 
@@ -849,19 +849,19 @@ ess_alloc_resources(struct ess_info *sc, device_t dev)
 {
 	int rid;
 
-	rid = 0 * 4 + PCIR_MAPS;
+	rid = PCIR_BAR(0);
     	sc->io = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1, RF_ACTIVE);
 
-	rid = 1 * 4 + PCIR_MAPS;
+	rid = PCIR_BAR(1);
     	sc->sb = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1, RF_ACTIVE);
 
-	rid = 2 * 4 + PCIR_MAPS;
+	rid = PCIR_BAR(2);
     	sc->vc = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1, RF_ACTIVE);
 
-	rid = 3 * 4 + PCIR_MAPS;
+	rid = PCIR_BAR(3);
     	sc->mpu = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1, RF_ACTIVE);
 
-	rid = 4 * 4 + PCIR_MAPS;
+	rid = PCIR_BAR(4);
     	sc->gp = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1, RF_ACTIVE);
 
 	rid = 0;
@@ -991,7 +991,8 @@ ess_attach(device_t dev)
 			/*filter*/NULL, /*filterarg*/NULL,
 			/*maxsize*/sc->bufsz, /*nsegments*/1,
 			/*maxsegz*/0x3ffff,
-			/*flags*/0, &sc->parent_dmat) != 0) {
+			/*flags*/0, /*lockfunc*/busdma_lock_mutex,
+			/*lockarg*/&Giant, &sc->parent_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		goto no;
     	}

@@ -35,7 +35,7 @@
  *
  *	@(#)null.h	8.3 (Berkeley) 8/20/94
  *
- * $FreeBSD: src/sys/fs/nullfs/null.h,v 1.18 2002/06/13 21:49:09 semenu Exp $
+ * $FreeBSD: src/sys/fs/nullfs/null.h,v 1.19 2003/06/17 08:52:45 tjr Exp $
  */
 
 struct null_mount {
@@ -51,6 +51,8 @@ struct null_node {
 	LIST_ENTRY(null_node)	null_hash;	/* Hash list */
 	struct vnode	        *null_lowervp;	/* VREFed once */
 	struct vnode		*null_vnode;	/* Back pointer */
+	int			null_pending_locks;
+	int			null_drain_wakeup;
 };
 
 #define	MOUNTTONULLMOUNT(mp) ((struct null_mount *)((mp)->mnt_data))

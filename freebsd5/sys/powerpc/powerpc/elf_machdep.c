@@ -22,7 +22,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/powerpc/powerpc/elf_machdep.c,v 1.14 2003/01/21 02:42:43 jake Exp $
+ * $FreeBSD: src/sys/powerpc/powerpc/elf_machdep.c,v 1.16 2003/09/25 01:10:26 peter Exp $
  */
 
 #include <sys/param.h>
@@ -72,7 +72,8 @@ struct sysentvec elf32_freebsd_sysvec = {
 	PS_STRINGS,
 	VM_PROT_ALL,
 	exec_copyout_strings,
-	exec_setregs
+	exec_setregs,
+	NULL
 };
 
 static Elf32_Brandinfo freebsd_brand_info = {
@@ -80,7 +81,7 @@ static Elf32_Brandinfo freebsd_brand_info = {
 						EM_PPC,
 						"FreeBSD",
 						"",
-						"/usr/libexec/ld-elf.so.1",
+						"/libexec/ld-elf.so.1",
 						&elf32_freebsd_sysvec
 					  };
 

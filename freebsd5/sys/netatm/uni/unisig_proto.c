@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_proto.c,v 1.9 2000/12/07 22:19:06 phk Exp $
- *
  */
 
 /*
@@ -32,16 +28,19 @@
  * ----------------------------------------
  *
  * Protocol processing module.
- *
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/unisig_proto.c,v 1.11 2003/07/25 06:39:46 harti Exp $");
+
 #include <sys/param.h>
-#include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/syslog.h>
+#include <sys/kernel.h>
+#include <sys/sysctl.h>
 #include <net/if.h>
 #include <netatm/port.h>
 #include <netatm/queue.h>
@@ -58,10 +57,10 @@
 
 #include <netatm/uni/unisig_var.h>
 
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/unisig_proto.c,v 1.9 2000/12/07 22:19:06 phk Exp $");
-#endif
-
+/*
+ * net.harp.uni
+ */
+SYSCTL_NODE(_net_harp, OID_AUTO, uni, CTLFLAG_RW, 0, "UNI");
 
 /*
  * Process a UNISIG timeout

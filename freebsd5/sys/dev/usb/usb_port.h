@@ -1,7 +1,12 @@
 /*	$OpenBSD: usb_port.h,v 1.18 2000/09/06 22:42:10 rahnds Exp $ */
 /*	$NetBSD: usb_port.h,v 1.54 2002/03/28 21:49:19 ichiro Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb_port.h,v 1.58 2002/10/02 07:44:20 scottl Exp $       */
- 
+/*	$FreeBSD: src/sys/dev/usb/usb_port.h,v 1.65 2003/11/09 23:54:21 joe Exp $       */
+
+/* Also already merged from NetBSD:
+ *	$NetBSD: usb_port.h,v 1.57 2002/09/27 20:42:01 thorpej Exp $
+ *	$NetBSD: usb_port.h,v 1.58 2002/10/01 01:25:26 thorpej Exp $
+ */
+
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -42,7 +47,7 @@
 #ifndef _USB_PORT_H
 #define _USB_PORT_H
 
-/* 
+/*
  * Macro's to cope with the differences between operating systems.
  */
 
@@ -95,6 +100,7 @@ typedef int usb_malloc_type;
 
 #define logprintf printf
 
+#define	USB_DNAME(dname)	dname
 #define USB_DECLARE_DRIVER(dname)  \
 int __CONCAT(dname,_match)(struct device *, struct cfdata *, void *); \
 void __CONCAT(dname,_attach)(struct device *, struct device *, void *); \
@@ -103,13 +109,12 @@ int __CONCAT(dname,_activate)(struct device *, enum devact); \
 \
 extern struct cfdriver __CONCAT(dname,_cd); \
 \
-struct cfattach __CONCAT(dname,_ca) = { \
-	sizeof(struct __CONCAT(dname,_softc)), \
-	__CONCAT(dname,_match), \
-	__CONCAT(dname,_attach), \
-	__CONCAT(dname,_detach), \
-	__CONCAT(dname,_activate), \
-}
+CFATTACH_DECL(USB_DNAME(dname), \
+    sizeof(struct ___CONCAT(dname,_softc)), \
+    ___CONCAT(dname,_match), \
+    ___CONCAT(dname,_attach), \
+    ___CONCAT(dname,_detach), \
+    ___CONCAT(dname,_activate))
 
 #define USB_MATCH(dname) \
 int __CONCAT(dname,_match)(struct device *parent, struct cfdata *match, void *aux)
@@ -262,7 +267,7 @@ struct cfdriver __CONCAT(dname,_cd) = { \
 	NULL, #dname, DV_DULL \
 }; \
 \
-struct cfattach __CONCAT(dname,_ca) = { \
+const struct cfattach __CONCAT(dname,_ca) = { \
 	sizeof(struct __CONCAT(dname,_softc)), \
 	__CONCAT(dname,_match), \
 	__CONCAT(dname,_attach), \
@@ -355,15 +360,19 @@ MALLOC_DECLARE(M_USBHC);
 #define USBDEVUNIT(bdev) device_get_unit(bdev)
 #define USBGETSOFTC(bdev) (device_get_softc(bdev))
 
-#define DECLARE_USB_DMA_T typedef char * usb_dma_t
+#define DECLARE_USB_DMA_T \
+	struct usb_dma_block; \
+	typedef struct { \
+		struct usb_dma_block *block; \
+		u_int offs; \
+		u_int len; \
+	} usb_dma_t
 
+#if __FreeBSD_version >= 500000
 typedef struct thread *usb_proc_ptr;
 
 #define uio_procp uio_td
 
-/* XXX Change this when FreeBSD has memset */
-#define	memcpy(d, s, l)		bcopy((s),(d),(l))
-#define	memset(d, v, l)		bzero((d),(l))
 #define usb_kthread_create1(f, s, p, a0, a1) \
 		kthread_create((f), (s), (p), RFHIGHPID, 0, (a0), (a1))
 #define usb_kthread_create2(f, s, p, a0) \
@@ -377,6 +386,30 @@ typedef struct callout usb_callout_t;
 #define usb_callout_init(h)     callout_init(&(h), 0)
 #define usb_callout(h, t, f, d) callout_reset(&(h), (t), (f), (d))
 #define usb_uncallout(h, f, d)  callout_stop(&(h))
+#else
+typedef struct proc *usb_proc_ptr;
+
+#define	PROC_LOCK(p)
+#define	PROC_UNLOCK(p)
+
+#define usb_kthread_create1(f, s, p, a0, a1) \
+		kthread_create((f), (s), (p), (a0), (a1))
+#define usb_kthread_create2(f, s, p, a0) \
+		kthread_create((f), (s), (p), (a0))
+#define usb_kthread_create	kthread_create
+
+#define	config_pending_incr()
+#define	config_pending_decr()
+
+typedef struct callout usb_callout_t;
+#define usb_callout_init(h)     callout_init(&(h))
+#define usb_callout(h, t, f, d) callout_reset(&(h), (t), (f), (d))
+#define usb_uncallout(h, f, d)  callout_stop(&(h))
+
+#define	BUS_DMA_COHERENT	0
+#define	ETHER_ALIGN		2
+#define	BPF_MTAP(ifp, m)	if ((ifp)->if_bpf) bpf_mtap((ifp), (m));
+#endif
 
 #define clalloc(p, s, x) (clist_alloc_cblocks((p), (s), (s)), 0)
 #define clfree(p) clist_free_cblocks((p))
@@ -459,18 +492,14 @@ __CONCAT(dname,_detach)(device_t self)
 	(device_probe_and_attach((bdev)) == 0 ? (bdev) : 0)
 
 /* conversion from one type of queue to the other */
-/* XXX In FreeBSD SIMPLEQ_REMOVE_HEAD only removes the head element.
- */
-#define SIMPLEQ_REMOVE_HEAD(h, e, f)	do {				\
-		if ( (e) != SIMPLEQ_FIRST((h)) )			\
-			panic("Removing other than first element");	\
-		STAILQ_REMOVE_HEAD(h, f);				\
-} while (0)
+#define SIMPLEQ_REMOVE_HEAD	STAILQ_REMOVE_HEAD
 #define SIMPLEQ_INSERT_HEAD	STAILQ_INSERT_HEAD
 #define SIMPLEQ_INSERT_TAIL	STAILQ_INSERT_TAIL
 #define SIMPLEQ_NEXT		STAILQ_NEXT
 #define SIMPLEQ_FIRST		STAILQ_FIRST
 #define SIMPLEQ_HEAD		STAILQ_HEAD
+#define SIMPLEQ_EMPTY		STAILQ_EMPTY
+#define SIMPLEQ_FOREACH		STAILQ_FOREACH
 #define SIMPLEQ_INIT		STAILQ_INIT
 #define SIMPLEQ_HEAD_INITIALIZER	STAILQ_HEAD_INITIALIZER
 #define SIMPLEQ_ENTRY		STAILQ_ENTRY

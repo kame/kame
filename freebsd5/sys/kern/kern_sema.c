@@ -23,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
  * DAMAGE.
- *
- * $FreeBSD: src/sys/kern/kern_sema.c,v 1.3 2002/04/04 21:03:26 jhb Exp $
  */
 
 /*
@@ -34,6 +32,9 @@
  * "owners" (a misnomer in the context of semaphores), so should not be relied
  * upon in combination with semaphores.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_sema.c,v 1.4 2003/06/11 00:56:56 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

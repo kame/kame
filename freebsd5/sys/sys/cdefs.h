@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)cdefs.h	8.8 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/cdefs.h,v 1.69 2003/04/18 18:59:34 bde Exp $
+ * $FreeBSD: src/sys/sys/cdefs.h,v 1.79 2003/10/31 05:42:53 peter Exp $
  */
 
 #ifndef	_SYS_CDEFS_H_
@@ -46,6 +46,16 @@
 #else
 #define	__BEGIN_DECLS
 #define	__END_DECLS
+#endif
+
+/*
+ * Macro to test if we're using a specific version of gcc or later.
+ */
+#ifdef __GNUC__
+#define	__GNUC_PREREQ__(ma, mi)	\
+	(__GNUC__ > (ma) || __GNUC__ == (ma) && __GNUC_MINOR__ >= (mi))
+#else
+#define	__GNUC_PREREQ__(ma, mi)	0
 #endif
 
 /*
@@ -122,7 +132,7 @@
 #define	__aligned(x)
 #define	__section(x)
 #else
-#if __GNUC__ < 2 || __GNUC__ == 2 && __GNUC_MINOR__ < 5
+#if !__GNUC_PREREQ__(2, 5)
 #define	__dead2
 #define	__pure2
 #define	__unused
@@ -133,7 +143,7 @@
 #define	__unused
 /* XXX Find out what to do for __packed, __aligned and __section */
 #endif
-#if __GNUC__ == 2 && __GNUC_MINOR__ >= 7 || __GNUC__ == 3
+#if __GNUC_PREREQ__(2, 7)
 #define	__dead2		__attribute__((__noreturn__))
 #define	__pure2		__attribute__((__const__))
 #define	__unused	__attribute__((__unused__))
@@ -143,8 +153,20 @@
 #endif
 #endif
 
+#if __GNUC_PREREQ__(3, 1)
+#define	__always_inline	__attribute__((__always_inline__))
+#else
+#define	__always_inline
+#endif
+
+#if __GNUC_PREREQ__(3, 3)
+#define __nonnull(x)	__attribute__((__nonnull__(x)))
+#else
+#define __nonnull(x)
+#endif
+
 /* XXX: should use `#if __STDC_VERSION__ < 199901'. */
-#if !(__GNUC__ == 2 && __GNUC_MINOR__ >= 7 || __GNUC__ >= 3)
+#if !__GNUC_PREREQ__(2, 7)
 #define	__func__	NULL
 #endif
 
@@ -159,11 +181,47 @@
  * software that is unaware of C99 keywords.
  */
 #if !(__GNUC__ == 2 && __GNUC_MINOR__ == 95)
-#if __STDC_VERSION__ < 199901
+#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 199901
 #define	__restrict
 #else
 #define	__restrict	restrict
 #endif
+#endif
+
+/*
+ * GNU C version 2.96 adds explicit branch prediction so that
+ * the CPU back-end can hint the processor and also so that
+ * code blocks can be reordered such that the predicted path
+ * sees a more linear flow, thus improving cache behavior, etc.
+ *
+ * The following two macros provide us with a way to utilize this
+ * compiler feature.  Use __predict_true() if you expect the expression
+ * to evaluate to true, and __predict_false() if you expect the
+ * expression to evaluate to false.
+ *
+ * A few notes about usage:
+ *
+ *	* Generally, __predict_false() error condition checks (unless
+ *	  you have some _strong_ reason to do otherwise, in which case
+ *	  document it), and/or __predict_true() `no-error' condition
+ *	  checks, assuming you want to optimize for the no-error case.
+ *
+ *	* Other than that, if you don't know the likelihood of a test
+ *	  succeeding from empirical or other `hard' evidence, don't
+ *	  make predictions.
+ *
+ *	* These are meant to be used in places that are run `a lot'.
+ *	  It is wasteful to make predictions in code that is run
+ *	  seldomly (e.g. at subsystem initialization time) as the
+ *	  basic block reordering that this affects can often generate
+ *	  larger code.
+ */
+#if __GNUC_PREREQ__(2, 96)
+#define __predict_true(exp)     __builtin_expect((exp), 1)
+#define __predict_false(exp)    __builtin_expect((exp), 0)
+#else
+#define __predict_true(exp)     (exp)
+#define __predict_false(exp)    (exp)
 #endif
 
 /*
@@ -178,7 +236,7 @@
  * that are known to support the features properly (old versions of gcc-2
  * didn't permit keeping the keywords out of the application namespace).
  */
-#if __GNUC__ < 2 || __GNUC__ == 2 && __GNUC_MINOR__ < 7
+#if !__GNUC_PREREQ__(2, 7)
 #define	__printflike(fmtarg, firstvararg)
 #define	__scanflike(fmtarg, firstvararg)
 #else
@@ -222,8 +280,10 @@
 #define	__IDSTRING(name,string)	__asm__(".ident\t\"" string "\"")
 #else
 /*
- * This doesn't work in header files. But it may be better than nothing.
- * The alternative is: #define __IDSTRING(name,string)  [nothing]
+ * The following definition might not work well if used in header files,
+ * but it should be better than nothing.  If you want a "do nothing"
+ * version, then it should generate some harmless declaration, such as:
+ *    #define __IDSTRING(name,string)	struct __hack
  */
 #define	__IDSTRING(name,string)	static const char name[] __unused = string
 #endif
@@ -232,7 +292,7 @@
  * Embed the rcs id of a source file in the resulting library.  Note that in
  * more recent ELF binutils, we use .ident allowing the ID to be stripped.
  * Usage:
- *	__FBSDID("$FreeBSD: src/sys/sys/cdefs.h,v 1.69 2003/04/18 18:59:34 bde Exp $");
+ *	__FBSDID("$FreeBSD: src/sys/sys/cdefs.h,v 1.79 2003/10/31 05:42:53 peter Exp $");
  */
 #ifndef	__FBSDID
 #if !defined(lint) && !defined(STRIP_FBSDID)
@@ -246,7 +306,7 @@
 #ifndef	NO__RCSID
 #define	__RCSID(s)	__IDSTRING(__CONCAT(__rcsid_,__LINE__),s)
 #else
-#define	__RCSID(s)
+#define	__RCSID(s)	struct __hack
 #endif
 #endif
 
@@ -254,7 +314,7 @@
 #ifndef	NO__RCSID_SOURCE
 #define	__RCSID_SOURCE(s)	__IDSTRING(__CONCAT(__rcsid_source_,__LINE__),s)
 #else
-#define	__RCSID_SOURCE(s)
+#define	__RCSID_SOURCE(s)	struct __hack
 #endif
 #endif
 
@@ -262,7 +322,7 @@
 #ifndef	NO__SCCSID
 #define	__SCCSID(s)	__IDSTRING(__CONCAT(__sccsid_,__LINE__),s)
 #else
-#define	__SCCSID(s)
+#define	__SCCSID(s)	struct __hack
 #endif
 #endif
 
@@ -270,7 +330,7 @@
 #ifndef	NO__COPYRIGHT
 #define	__COPYRIGHT(s)	__IDSTRING(__CONCAT(__copyright_,__LINE__),s)
 #else
-#define	__COPYRIGHT(s)
+#define	__COPYRIGHT(s)	struct __hack
 #endif
 #endif
 
@@ -309,13 +369,13 @@
  */
 
 /* Deal with IEEE Std. 1003.1-1990, in which _POSIX_C_SOURCE == 1. */
-#if _POSIX_C_SOURCE == 1
+#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE == 1
 #undef _POSIX_C_SOURCE		/* Probably illegal, but beyond caring now. */
 #define	_POSIX_C_SOURCE		199009
 #endif
 
 /* Deal with IEEE Std. 1003.2-1992, in which _POSIX_C_SOURCE == 2. */
-#if _POSIX_C_SOURCE == 2
+#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE == 2
 #undef _POSIX_C_SOURCE
 #define	_POSIX_C_SOURCE		199209
 #endif

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/fs/msdosfs/denode.h,v 1.24 2002/11/09 12:55:05 alfred Exp $ */
+/* $FreeBSD: src/sys/fs/msdosfs/denode.h,v 1.25 2003/06/24 22:11:20 jmg Exp $ */
 /*	$NetBSD: denode.h,v 1.25 1997/11/17 15:36:28 ws Exp $	*/
 
 /*-
@@ -140,7 +140,7 @@ struct denode {
 	struct vnode *de_vnode;	/* addr of vnode we are part of */
 	struct vnode *de_devvp;	/* vnode of blk dev we live on */
 	u_long de_flag;		/* flag bits */
-	dev_t de_dev;		/* device where direntry lives */
+	struct cdev *de_dev;	/* device where direntry lives */
 	u_long de_dirclust;	/* cluster of the directory file containing this entry */
 	u_long de_diroffset;	/* offset of this entry in the directory cluster */
 	u_long de_fndoffset;	/* offset of found dir entry */

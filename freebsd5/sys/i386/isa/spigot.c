@@ -41,10 +41,10 @@
  *	ftp.cs.uwm.edu://pub/FreeBSD-UWM/spigot/spigot.tar.gz
  *
  * Version 1.7, December 1995.
- *
- * $FreeBSD: src/sys/i386/isa/spigot.c,v 1.58 2003/03/25 00:07:03 jake Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/isa/spigot.c,v 1.60 2003/08/10 23:04:55 nectar Exp $");
 
 #include	"spigot.h"
 
@@ -222,6 +222,8 @@ struct	spigot_info	*info;
 	if(!data) return(EINVAL);
 	switch(cmd){
 	case	SPIGOT_SETINT:
+		if (*(int *)data < 0 || *(int *)data > _SIG_MAXSIG)
+			return EINVAL;
 		ss->p = td->td_proc;
 		ss->signal_num = *((int *)data);
 		break;

@@ -58,11 +58,14 @@
  *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
- *
- * $FreeBSD: src/sys/vm/vm_glue.c,v 1.172 2003/05/13 20:36:02 jhb Exp $
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/vm/vm_glue.c,v 1.187 2003/11/10 01:37:40 alc Exp $");
+
 #include "opt_vm.h"
+#include "opt_kstack_pages.h"
+#include "opt_kstack_max_pages.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -141,7 +144,9 @@ kernacc(addr, len, rw)
 	prot = rw;
 	saddr = trunc_page((vm_offset_t)addr);
 	eaddr = round_page((vm_offset_t)addr + len);
+	vm_map_lock_read(kernel_map);
 	rv = vm_map_check_protection(kernel_map, saddr, eaddr, prot);
+	vm_map_unlock_read(kernel_map);
 	return (rv == TRUE);
 }
 
@@ -171,8 +176,10 @@ useracc(addr, len, rw)
 	    (vm_offset_t)addr + len < (vm_offset_t)addr) {
 		return (FALSE);
 	}
+	vm_map_lock_read(map);
 	rv = vm_map_check_protection(map, trunc_page((vm_offset_t)addr),
 	    round_page((vm_offset_t)addr + len), prot);
+	vm_map_unlock_read(map);
 	return (rv == TRUE);
 }
 
@@ -186,7 +193,8 @@ vslock(addr, len)
 {
 
 	vm_map_wire(&curproc->p_vmspace->vm_map, trunc_page((vm_offset_t)addr),
-	    round_page((vm_offset_t)addr + len), FALSE);
+	    round_page((vm_offset_t)addr + len),
+	    VM_MAP_WIRE_SYSTEM|VM_MAP_WIRE_NOHOLES);
 }
 
 /*
@@ -200,7 +208,8 @@ vsunlock(addr, len)
 
 	vm_map_unwire(&curproc->p_vmspace->vm_map,
 	    trunc_page((vm_offset_t)addr),
-	    round_page((vm_offset_t)addr + len), FALSE);
+	    round_page((vm_offset_t)addr + len),
+	    VM_MAP_WIRE_SYSTEM|VM_MAP_WIRE_NOHOLES);
 }
 
 /*
@@ -217,12 +226,6 @@ vm_proc_new(struct proc *p)
 	u_int i;
 
 	/*
-	 * Allocate object for the upage.
-	 */
-	upobj = vm_object_allocate(OBJT_DEFAULT, UAREA_PAGES);
-	p->p_upages_obj = upobj;
-
-	/*
 	 * Get a kernel virtual address for the U area for this process.
 	 */
 	up = kmem_alloc_nofault(kernel_map, UAREA_PAGES * PAGE_SIZE);
@@ -230,20 +233,23 @@ vm_proc_new(struct proc *p)
 		panic("vm_proc_new: upage allocation failed");
 	p->p_uarea = (struct user *)up;
 
+	/*
+	 * Allocate object and page(s) for the U area.
+	 */
+	upobj = vm_object_allocate(OBJT_DEFAULT, UAREA_PAGES);
+	p->p_upages_obj = upobj;
+	VM_OBJECT_LOCK(upobj);
 	for (i = 0; i < UAREA_PAGES; i++) {
-		/*
-		 * Get a uarea page.
-		 */
 		m = vm_page_grab(upobj, i,
 		    VM_ALLOC_NORMAL | VM_ALLOC_RETRY | VM_ALLOC_WIRED);
 		ma[i] = m;
 
 		vm_page_lock_queues();
 		vm_page_wakeup(m);
-		vm_page_flag_clear(m, PG_ZERO);
 		m->valid = VM_PAGE_BITS_ALL;
 		vm_page_unlock_queues();
 	}
+	VM_OBJECT_UNLOCK(upobj);
 
 	/*
 	 * Enter the pages into the kernel address space.
@@ -321,6 +327,7 @@ vm_proc_swapin(struct proc *p)
 	int i;
 
 	upobj = p->p_upages_obj;
+	VM_OBJECT_LOCK(upobj);
 	for (i = 0; i < UAREA_PAGES; i++) {
 		m = vm_page_grab(upobj, i, VM_ALLOC_NORMAL | VM_ALLOC_RETRY);
 		if (m->valid != VM_PAGE_BITS_ALL) {
@@ -330,7 +337,6 @@ vm_proc_swapin(struct proc *p)
 		}
 		ma[i] = m;
 	}
-	VM_OBJECT_LOCK(upobj);
 	if (upobj->resident_page_count != UAREA_PAGES)
 		panic("vm_proc_swapin: lost pages from upobj");
 	vm_page_lock_queues();
@@ -350,7 +356,7 @@ vm_proc_swapin(struct proc *p)
  * The pages in the UAREA are marked dirty and their swap metadata is freed.
  */
 void
-vm_proc_swapin_all(int devidx)
+vm_proc_swapin_all(struct swdevt *devidx)
 {
 	struct proc *p;
 	vm_object_t object;
@@ -385,6 +391,194 @@ retry:
 	sx_sunlock(&allproc_lock);
 }
 #endif
+
+#ifndef KSTACK_MAX_PAGES
+#define KSTACK_MAX_PAGES 32
+#endif
+
+/*
+ * Create the kernel stack (including pcb for i386) for a new thread.
+ * This routine directly affects the fork perf for a process and
+ * create performance for a thread.
+ */
+void
+vm_thread_new(struct thread *td, int pages)
+{
+	vm_object_t ksobj;
+	vm_offset_t ks;
+	vm_page_t m, ma[KSTACK_MAX_PAGES];
+	int i;
+
+	/* Bounds check */
+	if (pages <= 1)
+		pages = KSTACK_PAGES;
+	else if (pages > KSTACK_MAX_PAGES)
+		pages = KSTACK_MAX_PAGES;
+	/*
+	 * Allocate an object for the kstack.
+	 */
+	ksobj = vm_object_allocate(OBJT_DEFAULT, pages);
+	td->td_kstack_obj = ksobj;
+	/*
+	 * Get a kernel virtual address for this thread's kstack.
+	 */
+	ks = kmem_alloc_nofault(kernel_map,
+	   (pages + KSTACK_GUARD_PAGES) * PAGE_SIZE);
+	if (ks == 0)
+		panic("vm_thread_new: kstack allocation failed");
+	if (KSTACK_GUARD_PAGES != 0) {
+		pmap_qremove(ks, KSTACK_GUARD_PAGES);
+		ks += KSTACK_GUARD_PAGES * PAGE_SIZE;
+	}
+	td->td_kstack = ks;
+	/*
+	 * Knowing the number of pages allocated is useful when you
+	 * want to deallocate them.
+	 */
+	td->td_kstack_pages = pages;
+	/* 
+	 * For the length of the stack, link in a real page of ram for each
+	 * page of stack.
+	 */
+	VM_OBJECT_LOCK(ksobj);
+	for (i = 0; i < pages; i++) {
+		/*
+		 * Get a kernel stack page.
+		 */
+		m = vm_page_grab(ksobj, i,
+		    VM_ALLOC_NORMAL | VM_ALLOC_RETRY | VM_ALLOC_WIRED);
+		ma[i] = m;
+		vm_page_lock_queues();
+		vm_page_wakeup(m);
+		m->valid = VM_PAGE_BITS_ALL;
+		vm_page_unlock_queues();
+	}
+	VM_OBJECT_UNLOCK(ksobj);
+	pmap_qenter(ks, ma, pages);
+}
+
+/*
+ * Dispose of a thread's kernel stack.
+ */
+void
+vm_thread_dispose(struct thread *td)
+{
+	vm_object_t ksobj;
+	vm_offset_t ks;
+	vm_page_t m;
+	int i, pages;
+
+	pages = td->td_kstack_pages;
+	ksobj = td->td_kstack_obj;
+	ks = td->td_kstack;
+	pmap_qremove(ks, pages);
+	VM_OBJECT_LOCK(ksobj);
+	for (i = 0; i < pages; i++) {
+		m = vm_page_lookup(ksobj, i);
+		if (m == NULL)
+			panic("vm_thread_dispose: kstack already missing?");
+		vm_page_lock_queues();
+		vm_page_busy(m);
+		vm_page_unwire(m, 0);
+		vm_page_free(m);
+		vm_page_unlock_queues();
+	}
+	VM_OBJECT_UNLOCK(ksobj);
+	vm_object_deallocate(ksobj);
+	kmem_free(kernel_map, ks - (KSTACK_GUARD_PAGES * PAGE_SIZE),
+	    (pages + KSTACK_GUARD_PAGES) * PAGE_SIZE);
+}
+
+/*
+ * Allow a thread's kernel stack to be paged out.
+ */
+void
+vm_thread_swapout(struct thread *td)
+{
+	vm_object_t ksobj;
+	vm_page_t m;
+	int i, pages;
+
+	cpu_thread_swapout(td);
+	pages = td->td_kstack_pages;
+	ksobj = td->td_kstack_obj;
+	pmap_qremove(td->td_kstack, pages);
+	VM_OBJECT_LOCK(ksobj);
+	for (i = 0; i < pages; i++) {
+		m = vm_page_lookup(ksobj, i);
+		if (m == NULL)
+			panic("vm_thread_swapout: kstack already missing?");
+		vm_page_lock_queues();
+		vm_page_dirty(m);
+		vm_page_unwire(m, 0);
+		vm_page_unlock_queues();
+	}
+	VM_OBJECT_UNLOCK(ksobj);
+}
+
+/*
+ * Bring the kernel stack for a specified thread back in.
+ */
+void
+vm_thread_swapin(struct thread *td)
+{
+	vm_object_t ksobj;
+	vm_page_t m, ma[KSTACK_MAX_PAGES];
+	int i, pages, rv;
+
+	pages = td->td_kstack_pages;
+	ksobj = td->td_kstack_obj;
+	VM_OBJECT_LOCK(ksobj);
+	for (i = 0; i < pages; i++) {
+		m = vm_page_grab(ksobj, i, VM_ALLOC_NORMAL | VM_ALLOC_RETRY);
+		if (m->valid != VM_PAGE_BITS_ALL) {
+			rv = vm_pager_get_pages(ksobj, &m, 1, 0);
+			if (rv != VM_PAGER_OK)
+				panic("vm_thread_swapin: cannot get kstack for proc: %d", td->td_proc->p_pid);
+			m = vm_page_lookup(ksobj, i);
+			m->valid = VM_PAGE_BITS_ALL;
+		}
+		ma[i] = m;
+		vm_page_lock_queues();
+		vm_page_wire(m);
+		vm_page_wakeup(m);
+		vm_page_unlock_queues();
+	}
+	VM_OBJECT_UNLOCK(ksobj);
+	pmap_qenter(td->td_kstack, ma, pages);
+	cpu_thread_swapin(td);
+}
+
+/*
+ * Set up a variable-sized alternate kstack.
+ */
+void
+vm_thread_new_altkstack(struct thread *td, int pages)
+{
+
+	td->td_altkstack = td->td_kstack;
+	td->td_altkstack_obj = td->td_kstack_obj;
+	td->td_altkstack_pages = td->td_kstack_pages;
+
+	vm_thread_new(td, pages);
+}
+
+/*
+ * Restore the original kstack.
+ */
+void
+vm_thread_dispose_altkstack(struct thread *td)
+{
+
+	vm_thread_dispose(td);
+
+	td->td_kstack = td->td_altkstack;
+	td->td_kstack_obj = td->td_altkstack_obj;
+	td->td_kstack_pages = td->td_altkstack_pages;
+	td->td_altkstack = 0;
+	td->td_altkstack_obj = NULL;
+	td->td_altkstack_pages = 0;
+}
 
 /*
  * Implement fork's actions on an address space.
@@ -474,7 +668,6 @@ vm_waitproc(p)
 {
 
 	GIANT_REQUIRED;
-	cpu_wait(p);
 	vmspace_exitfree(p);		/* and clean-out the vmspace */
 }
 
@@ -541,7 +734,7 @@ faultin(p)
 
 		vm_proc_swapin(p);
 		FOREACH_THREAD_IN_PROC(p, td)
-			pmap_swapin_thread(td);
+			vm_thread_swapin(td);
 
 		PROC_LOCK(p);
 		mtx_lock_spin(&sched_lock);
@@ -696,14 +889,10 @@ int action;
 	struct proc *p;
 	struct thread *td;
 	struct ksegrp *kg;
-	struct proc *outp, *outp2;
-	int outpri, outpri2;
 	int didswap = 0;
 
 	GIANT_REQUIRED;
 
-	outp = outp2 = NULL;
-	outpri = outpri2 = INT_MIN;
 retry:
 	sx_slock(&allproc_lock);
 	FOREACH_PROC_IN_SYSTEM(p) {
@@ -900,7 +1089,7 @@ swapout(p)
 
 	vm_proc_swapout(p);
 	FOREACH_THREAD_IN_PROC(p, td)
-		pmap_swapout_thread(td);
+		vm_thread_swapout(td);
 
 	PROC_LOCK(p);
 	mtx_lock_spin(&sched_lock);

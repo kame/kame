@@ -34,11 +34,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_syscalls.c	8.5 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/nfsserver/nfs_syscalls.c,v 1.87 2003/03/02 16:54:39 des Exp $
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_syscalls.c,v 1.87 2003/03/02 16:54:39 des Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_syscalls.c,v 1.93 2003/11/07 22:57:09 sam Exp $");
 
 #include "opt_inet6.h"
 #include "opt_mac.h"
@@ -200,6 +199,8 @@ nfssvc_addsock(struct file *fp, struct sockaddr *mynam, struct thread *td)
 	struct socket *so;
 	int error, s;
 
+	GIANT_REQUIRED;		/* XXX until socket locking done */
+
 	so = fp->f_data;
 #if 0
 	tslp = NULL;
@@ -236,6 +237,7 @@ nfssvc_addsock(struct file *fp, struct sockaddr *mynam, struct thread *td)
 		int val;
 
 		bzero(&sopt, sizeof sopt);
+		sopt.sopt_dir = SOPT_SET;
 		sopt.sopt_level = SOL_SOCKET;
 		sopt.sopt_name = SO_KEEPALIVE;
 		sopt.sopt_val = &val;
@@ -248,6 +250,7 @@ nfssvc_addsock(struct file *fp, struct sockaddr *mynam, struct thread *td)
 		int val;
 
 		bzero(&sopt, sizeof sopt);
+		sopt.sopt_dir = SOPT_SET;
 		sopt.sopt_level = IPPROTO_TCP;
 		sopt.sopt_name = TCP_NODELAY;
 		sopt.sopt_val = &val;
@@ -268,7 +271,7 @@ nfssvc_addsock(struct file *fp, struct sockaddr *mynam, struct thread *td)
 
 	slp->ns_so = so;
 	slp->ns_nam = mynam;
-	fp->f_count++;
+	fhold(fp);
 	slp->ns_fp = fp;
 	s = splnet();
 	so->so_upcallarg = (caddr_t)slp;
@@ -317,7 +320,7 @@ nfssvc_nfsd(struct thread *td)
 				nfsd->nfsd_flag |= NFSD_WAITING;
 				nfsd_waiting++;
 				error = tsleep(nfsd, PSOCK | PCATCH,
-				    "nfsd", 0);
+				    "-", 0);
 				nfsd_waiting--;
 				if (error)
 					goto done;
@@ -457,6 +460,7 @@ nfssvc_nfsd(struct thread *td)
 			nfsrvstats.srvrpccnt[nd->nd_procnum]++;
 			nfsrv_updatecache(nd, TRUE, mreq);
 			nd->nd_mrep = NULL;
+			/* FALLTHROUGH */
 		    case RC_REPLY:
 			siz = m_length(mreq, NULL);
 			if (siz <= 0 || siz > NFS_MAXPACKET) {

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/powerpc/powerpc/mp_machdep.c,v 1.10 2003/02/16 14:11:53 phk Exp $
+ *	$FreeBSD: src/sys/powerpc/powerpc/mp_machdep.c,v 1.11 2003/11/21 22:23:26 jhb Exp $
  */
 
 #include <sys/param.h>
@@ -46,6 +46,11 @@
 #include <machine/clock.h>
 
 int			boot_cpu_id;
+
+void
+cpu_mp_setmaxid(void)
+{
+}
 
 int
 cpu_mp_probe(void)

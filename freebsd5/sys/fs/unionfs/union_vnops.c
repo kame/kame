@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)union_vnops.c	8.32 (Berkeley) 6/23/95
- * $FreeBSD: src/sys/fs/unionfs/union_vnops.c,v 1.97 2003/03/03 19:15:39 njl Exp $
+ * $FreeBSD: src/sys/fs/unionfs/union_vnops.c,v 1.103 2003/11/14 08:23:13 das Exp $
  */
 
 #include <sys/param.h>
@@ -583,36 +583,30 @@ out:
 		((*ap->a_vpp) ? vrefcnt(*ap->a_vpp) : -99),
 		lowervp, uppervp));
 
-	/*
-	 * dvp lock state, determine whether to relock dvp.  dvp is expected
-	 * to be locked on return if:
-	 *
-	 *	- there was an error (except not EJUSTRETURN), or
-	 *	- we hit the last component and lockparent is true
-	 *
-	 * dvp_is_locked is the current state of the dvp lock, not counting
-	 * the possibility that *ap->a_vpp == dvp (in which case it is locked
-	 * anyway).  Note that *ap->a_vpp == dvp only if no error occured.
-	 */
+	if (error == 0 || error == EJUSTRETURN) {
+		/*
+		 * dvp lock state, determine whether to relock dvp.
+		 * We are expected to unlock dvp unless:
+		 *
+		 *	- there was an error (other than EJUSTRETURN), or
+		 *	- we hit the last component and lockparent is true
+		 */
+		if (*ap->a_vpp != dvp) {
+			if (!lockparent || (cnp->cn_flags & ISLASTCN) == 0)
+				VOP_UNLOCK(dvp, 0, td);
+		}
 
-	if (*ap->a_vpp != dvp) {
-		if ((error == 0 || error == EJUSTRETURN) &&
-		    (!lockparent || (cnp->cn_flags & ISLASTCN) == 0)) {
-			VOP_UNLOCK(dvp, 0, td);
+		if (cnp->cn_namelen == 1 &&
+		    cnp->cn_nameptr[0] == '.' &&
+		    *ap->a_vpp != dvp) {
+#ifdef	DIAGNOSTIC
+			vprint("union_lookup: vp", *ap->a_vpp);
+			vprint("union_lookup: dvp", dvp);
+#endif
+			panic("union_lookup returning . (%p) != startdir (%p)",
+			    *ap->a_vpp, dvp);
 		}
 	}
-
-	/*
-	 * Diagnostics
-	 */
-
-#ifdef DIAGNOSTIC
-	if (cnp->cn_namelen == 1 &&
-	    cnp->cn_nameptr[0] == '.' &&
-	    *ap->a_vpp != dvp) {
-		panic("union_lookup returning . (%p) not same as startdir (%p)", ap->a_vpp, dvp);
-	}
-#endif
 
 	return (error);
 }
@@ -668,13 +662,25 @@ union_whiteout(ap)
 	struct union_node *un = VTOUNION(ap->a_dvp);
 	struct componentname *cnp = ap->a_cnp;
 	struct vnode *uppervp;
-	int error = EOPNOTSUPP;
+	int error;
 
-	if ((uppervp = union_lock_upper(un, cnp->cn_thread)) != NULLVP) {
-		error = VOP_WHITEOUT(un->un_uppervp, cnp, ap->a_flags);
-		union_unlock_upper(uppervp, cnp->cn_thread);
+	switch (ap->a_flags) {
+	case CREATE:
+	case DELETE:
+		uppervp = union_lock_upper(un, cnp->cn_thread);
+		if (uppervp != NULLVP) {
+			error = VOP_WHITEOUT(un->un_uppervp, cnp, ap->a_flags);
+			union_unlock_upper(uppervp, cnp->cn_thread);
+		} else
+			error = EOPNOTSUPP;
+		break;
+	case LOOKUP:
+		error = EOPNOTSUPP;
+		break;
+	default:
+		panic("union_whiteout: unknown op");
 	}
-	return(error);
+	return (error);
 }
 
 /*
@@ -764,7 +770,7 @@ union_open(ap)
 	 */
 
 	if (error == 0)
-		error = VOP_OPEN(tvp, mode, cred, td);
+		error = VOP_OPEN(tvp, mode, cred, td, -1);
 
 	/*
 	 * This is absolutely necessary or UFS will blow up.
@@ -1655,7 +1661,6 @@ union_inactive(ap)
 	struct vnode *vp = ap->a_vp;
 	struct thread *td = ap->a_td;
 	struct union_node *un = VTOUNION(vp);
-	struct vnode **vpp;
 
 	/*
 	 * Do nothing (and _don't_ bypass).
@@ -1665,12 +1670,8 @@ union_inactive(ap)
 	 *
 	 */
 
-	if (un->un_dircache != 0) {
-		for (vpp = un->un_dircache; *vpp != NULLVP; vpp++)
-			vrele(*vpp);
-		free (un->un_dircache, M_TEMP);
-		un->un_dircache = 0;
-	}
+	if (un->un_dircache != NULL)
+		union_dircache_free(un);
 
 #if 0
 	if ((un->un_flags & UN_ULOCK) && un->un_uppervp) {
@@ -1823,6 +1824,8 @@ union_strategy(ap)
 	struct buf *bp = ap->a_bp;
 	struct vnode *othervp = OTHERVP(bp->b_vp);
 
+	KASSERT(ap->a_vp == ap->a_bp->b_vp, ("%s(%p != %p)",
+	    __func__, ap->a_vp, ap->a_bp->b_vp));
 #ifdef DIAGNOSTIC
 	if (othervp == NULLVP)
 		panic("union_strategy: nil vp");

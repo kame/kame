@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_pptpgre.c,v 1.30 2003/04/04 12:12:34 des Exp $
+ * $FreeBSD: src/sys/netgraph/ng_pptpgre.c,v 1.31 2003/11/18 20:43:23 archie Exp $
  * $Whistle: ng_pptpgre.c,v 1.7 1999/12/08 00:10:06 archie Exp $
  */
 
@@ -119,7 +119,7 @@ typedef u_int64_t		pptptime_t;
 #define PPTP_XMIT_WIN		16			/* max xmit window */
 #define PPTP_MIN_RTT		(PPTP_TIME_SCALE / 10)	/* 100 milliseconds */
 #define PPTP_MIN_TIMEOUT	(PPTP_TIME_SCALE / 83)	/* 12 milliseconds */
-#define PPTP_MAX_TIMEOUT	(10 * PPTP_TIME_SCALE)	/* 10 seconds */
+#define PPTP_MAX_TIMEOUT	(1 * PPTP_TIME_SCALE)	/* 1 second */
 
 /* When we recieve a packet, we wait to see if there's an outgoing packet
    we can piggy-back the ACK off of. These parameters determine the mimimum

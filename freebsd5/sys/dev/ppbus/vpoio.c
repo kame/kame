@@ -24,9 +24,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ppbus/vpoio.c,v 1.17 2002/09/21 08:44:51 phk Exp $
  *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ppbus/vpoio.c,v 1.18 2003/08/24 17:54:16 obrien Exp $");
 
 #ifdef _KERNEL
 #include <sys/param.h>

@@ -31,10 +31,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/geom/geom_subr.c,v 1.52 2003/05/02 06:42:59 phk Exp $
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/geom/geom_subr.c,v 1.63 2003/11/18 18:17:39 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -55,58 +55,147 @@
 
 struct class_list_head g_classes = LIST_HEAD_INITIALIZER(g_classes);
 static struct g_tailq_head geoms = TAILQ_HEAD_INITIALIZER(geoms);
-static int g_nproviders;
 char *g_wait_event, *g_wait_up, *g_wait_down, *g_wait_sim;
 
-static int g_ignition;
+static int g_valid_obj(void const *ptr);
 
+struct g_hh00 {
+	struct g_class	*mp;
+	int		error;
+};
 
 /*
  * This event offers a new class a chance to taste all preexisting providers.
  */
 static void
-g_new_class_event(void *arg, int flag)
+g_load_class(void *arg, int flag)
 {
+	struct g_hh00 *hh;
 	struct g_class *mp2, *mp;
 	struct g_geom *gp;
 	struct g_provider *pp;
 
 	g_topology_assert();
-	if (flag == EV_CANCEL)
+	if (flag == EV_CANCEL)	/* XXX: can't happen ? */
 		return;
 	if (g_shutdown)
 		return;
-	mp2 = arg;
-	if (mp2->taste == NULL)
+
+	hh = arg;
+	mp = hh->mp;
+	g_free(hh);
+	g_trace(G_T_TOPOLOGY, "g_load_class(%s)", mp->name);
+	LIST_FOREACH(mp2, &g_classes, class) {
+		KASSERT(mp2 != mp,
+		    ("The GEOM class %s already loaded", mp2->name));
+		KASSERT(strcmp(mp2->name, mp->name) != 0,
+		    ("A GEOM class named %s is already loaded", mp2->name));
+	}
+
+	LIST_INIT(&mp->geom);
+	LIST_INSERT_HEAD(&g_classes, mp, class);
+	if (mp->init != NULL)
+		mp->init(mp);
+	if (mp->taste == NULL)
 		return;
-	LIST_FOREACH(mp, &g_classes, class) {
-		if (mp2 == mp)
+	LIST_FOREACH(mp2, &g_classes, class) {
+		if (mp == mp2)
 			continue;
-		LIST_FOREACH(gp, &mp->geom, geom) {
+		LIST_FOREACH(gp, &mp2->geom, geom) {
 			LIST_FOREACH(pp, &gp->provider, provider) {
-				mp2->taste(mp2, pp, 0);
+				mp->taste(mp, pp, 0);
 				g_topology_assert();
 			}
 		}
 	}
 }
 
-void
-g_add_class(struct g_class *mp)
+static void
+g_unload_class(void *arg, int flag)
 {
+	struct g_hh00 *hh;
+	struct g_class *mp;
+	struct g_geom *gp;
+	struct g_provider *pp;
+	struct g_consumer *cp;
+	int error;
+
+	g_topology_assert();
+	hh = arg;
+	mp = hh->mp;
+	g_trace(G_T_TOPOLOGY, "g_unload_class(%s)", mp->name);
+	if (mp->destroy_geom == NULL) {
+		hh->error = EOPNOTSUPP;
+		return;
+	}
+
+	/* We refuse to unload if anything is open */
+	LIST_FOREACH(gp, &mp->geom, geom) {
+		LIST_FOREACH(pp, &gp->provider, provider)
+			if (pp->acr || pp->acw || pp->ace) {
+				hh->error = EBUSY;
+				return;
+			}
+		LIST_FOREACH(cp, &gp->consumer, consumer)
+			if (cp->acr || cp->acw || cp->ace) {
+				hh->error = EBUSY;
+				return;
+			}
+	}
+
+	/* Bar new entries */
+	mp->taste = NULL;
+	mp->config = NULL;
+
+	error = 0;
+	LIST_FOREACH(gp, &mp->geom, geom) {
+		error = mp->destroy_geom(NULL, mp, gp);
+		if (error != 0)
+			break;
+	}
+	if (error == 0) {
+		if (mp->fini != NULL)
+			mp->fini(mp);
+		LIST_REMOVE(mp, class);
+	}
+	hh->error = error;
+	return;
+}
+
+int
+g_modevent(module_t mod, int type, void *data)
+{
+	struct g_hh00 *hh;
+	int error;
+	static int g_ignition;
 
 	if (!g_ignition) {
 		g_ignition++;
 		g_init();
 	}
-	mp->protect = 0x020016600;
-	g_topology_lock();
-	g_trace(G_T_TOPOLOGY, "g_add_class(%s)", mp->name);
-	LIST_INIT(&mp->geom);
-	LIST_INSERT_HEAD(&g_classes, mp, class);
-	if (g_nproviders > 0 && mp->taste != NULL)
-		g_post_event(g_new_class_event, mp, M_WAITOK, mp, NULL);
-	g_topology_unlock();
+	hh = g_malloc(sizeof *hh, M_WAITOK | M_ZERO);
+	hh->mp = data;
+	error = EOPNOTSUPP;
+	switch (type) {
+	case MOD_LOAD:
+		g_trace(G_T_TOPOLOGY, "g_modevent(%s, LOAD)", hh->mp->name);
+		g_post_event(g_load_class, hh, M_WAITOK, NULL);
+		error = 0;
+		break;
+	case MOD_UNLOAD:
+		g_trace(G_T_TOPOLOGY, "g_modevent(%s, UNLOAD)", hh->mp->name);
+		error = g_waitfor_event(g_unload_class, hh, M_WAITOK, NULL);
+		if (error == 0)
+			error = hh->error;
+		if (error == 0) {
+			g_waitidle();
+			KASSERT(LIST_EMPTY(&hh->mp->geom),
+			    ("Unloaded class (%s) still has geom", hh->mp->name));
+		}
+		g_free(hh);
+		break;
+	}
+	return (error);
 }
 
 struct g_geom *
@@ -117,12 +206,13 @@ g_new_geomf(struct g_class *mp, const char *fmt, ...)
 	struct sbuf *sb;
 
 	g_topology_assert();
-	va_start(ap, fmt);
+	KASSERT(g_valid_obj(mp), ("g_new_geom_f() on alien class %p", mp));
 	sb = sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND);
+	va_start(ap, fmt);
 	sbuf_vprintf(sb, fmt, ap);
+	va_end(ap);
 	sbuf_finish(sb);
 	gp = g_malloc(sizeof *gp, M_WAITOK | M_ZERO);
-	gp->protect = 0x020016601;
 	gp->name = g_malloc(sbuf_len(sb) + 1, M_WAITOK | M_ZERO);
 	gp->class = mp;
 	gp->rank = 1;
@@ -203,7 +293,6 @@ g_new_consumer(struct g_geom *gp)
 	    gp->name, gp->class->name));
 
 	cp = g_malloc(sizeof *cp, M_WAITOK | M_ZERO);
-	cp->protect = 0x020016602;
 	cp->geom = gp;
 	cp->stat = devstat_new_entry(cp, -1, 0, DEVSTAT_ALL_SUPPORTED,
 	    DEVSTAT_TYPE_DIRECT, DEVSTAT_PRIORITY_MAX);
@@ -256,6 +345,14 @@ g_new_provider_event(void *arg, int flag)
 			continue;
 		mp->taste(mp, pp, 0);
 		g_topology_assert();
+		/*
+		 * XXX: Bandaid for 5.2-RELEASE
+		 * XXX: DO NOT REPLICATE THIS CODE!
+		 */
+		if (!g_valid_obj(pp)) {
+			printf("g_provider %p disappeared while tasting\n", pp);
+			return;
+		}
 	}
 }
 
@@ -268,12 +365,12 @@ g_new_providerf(struct g_geom *gp, const char *fmt, ...)
 	va_list ap;
 
 	g_topology_assert();
-	va_start(ap, fmt);
 	sb = sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND);
+	va_start(ap, fmt);
 	sbuf_vprintf(sb, fmt, ap);
+	va_end(ap);
 	sbuf_finish(sb);
 	pp = g_malloc(sizeof *pp + sbuf_len(sb) + 1, M_WAITOK | M_ZERO);
-	pp->protect = 0x020016603;
 	pp->name = (char *)(pp + 1);
 	strcpy(pp->name, sbuf_data(sb));
 	sbuf_delete(sb);
@@ -283,7 +380,6 @@ g_new_providerf(struct g_geom *gp, const char *fmt, ...)
 	pp->stat = devstat_new_entry(pp, -1, 0, DEVSTAT_ALL_SUPPORTED,
 	    DEVSTAT_TYPE_DIRECT, DEVSTAT_PRIORITY_MAX);
 	LIST_INSERT_HEAD(&gp->provider, pp, provider);
-	g_nproviders++;
 	g_post_event(g_new_provider_event, pp, M_WAITOK, pp, NULL);
 	return (pp);
 }
@@ -295,6 +391,23 @@ g_error_provider(struct g_provider *pp, int error)
 	pp->error = error;
 }
 
+struct g_provider *
+g_provider_by_name(char const *arg)
+{
+	struct g_class *cp;
+	struct g_geom *gp;
+	struct g_provider *pp;
+
+	LIST_FOREACH(cp, &g_classes, class) {
+		LIST_FOREACH(gp, &cp->geom, geom) {
+			LIST_FOREACH(pp, &gp->provider, provider) {
+				if (!strcmp(arg, pp->name))
+					return (pp);
+			}
+		}
+	}
+	return (NULL);
+}
 
 void
 g_destroy_provider(struct g_provider *pp)
@@ -308,7 +421,6 @@ g_destroy_provider(struct g_provider *pp)
 	KASSERT (pp->acw == 0, ("g_destroy_provider with acw"));
 	KASSERT (pp->acw == 0, ("g_destroy_provider with ace"));
 	g_cancel_event(pp);
-	g_nproviders--;
 	LIST_REMOVE(pp, provider);
 	gp = pp->geom;
 	devstat_remove_entry(pp->stat);
@@ -422,6 +534,8 @@ g_detach(struct g_consumer *cp)
 	cp->provider = NULL;
 	if (pp->geom->flags & G_GEOM_WITHER)
 		g_wither_geom(pp->geom, 0);
+	else if (pp->flags & G_PF_WITHER)
+		g_destroy_provider(pp);
 	redo_rank(cp->geom);
 }
 
@@ -679,11 +793,41 @@ g_getattr__(const char *attr, struct g_consumer *cp, void *var, int len)
 }
 
 /*
+ * XXX: Bandaid for 5.2.
+ * XXX: DO NOT EVEN THINK ABOUT CALLING THIS FUNCTION!
+ */
+static int
+g_valid_obj(void const *ptr)
+{
+	struct g_class *mp;
+	struct g_geom *gp;
+	struct g_consumer *cp;
+	struct g_provider *pp;
+
+	g_topology_assert();
+	LIST_FOREACH(mp, &g_classes, class) {
+		if (ptr == mp)
+			return (1);
+		LIST_FOREACH(gp, &mp->geom, geom) {
+			if (ptr == gp)
+				return (1);
+			LIST_FOREACH(cp, &gp->consumer, consumer)
+				if (ptr == cp)
+					return (1);
+			LIST_FOREACH(pp, &gp->provider, provider)
+				if (ptr == pp)
+					return (1);
+		}
+	}
+	return(0);
+}
+
+/*
  * Check if the given pointer is a live object
  */
 
 void
-g_sanity(void *ptr)
+g_sanity(void const *ptr)
 {
 	struct g_class *mp;
 	struct g_geom *gp;
@@ -694,24 +838,14 @@ g_sanity(void *ptr)
 		return;
 	LIST_FOREACH(mp, &g_classes, class) {
 		KASSERT(mp != ptr, ("Ptr is live class"));
-		KASSERT(mp->protect == 0x20016600,
-		    ("corrupt class %p %x", mp, mp->protect));
 		LIST_FOREACH(gp, &mp->geom, geom) {
 			KASSERT(gp != ptr, ("Ptr is live geom"));
-			KASSERT(gp->protect == 0x20016601,
-			    ("corrupt geom, %p %x", gp, gp->protect));
 			KASSERT(gp->name != ptr, ("Ptr is live geom's name"));
 			LIST_FOREACH(cp, &gp->consumer, consumer) {
 				KASSERT(cp != ptr, ("Ptr is live consumer"));
-				KASSERT(cp->protect == 0x20016602,
-				    ("corrupt consumer %p %x",
-				    cp, cp->protect));
 			}
 			LIST_FOREACH(pp, &gp->provider, provider) {
 				KASSERT(pp != ptr, ("Ptr is live provider"));
-				KASSERT(pp->protect == 0x20016603,
-				    ("corrupt provider %p %x",
-				    pp, pp->protect));
 			}
 		}
 	}

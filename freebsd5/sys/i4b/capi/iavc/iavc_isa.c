@@ -21,9 +21,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i4b/capi/iavc/iavc_isa.c,v 1.6 2002/09/02 00:52:06 brooks Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/capi/iavc/iavc_isa.c,v 1.7 2003/06/10 23:10:44 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

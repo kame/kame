@@ -26,12 +26,12 @@
  *
  *	i4b_bchan.c - B channel handling L1 procedures
  *	----------------------------------------------
- *
- * $FreeBSD: src/sys/i4b/layer1/isic/i4b_bchan.c,v 1.11 2002/09/02 00:52:08 brooks Exp $
- *
  *      last edit-date: [Sat Mar  9 16:00:56 2002]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_bchan.c,v 1.12 2003/06/10 23:45:23 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

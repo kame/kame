@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_subr.c,v 1.3 2003/02/03 19:49:34 phk Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_subr.c,v 1.4 2003/06/14 15:24:54 tjr Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -270,6 +270,8 @@ smb_fphelp(struct mbchain *mbp, struct smb_vc *vcp, struct smbnode *np,
 			return ENAMETOOLONG;
 		}
 		*npp++ = np;
+		if ((np->n_flag & NREFPARENT) == 0)
+			break;
 		np = VTOSMB(np->n_parent);
 	}
 /*	if (i == 0)

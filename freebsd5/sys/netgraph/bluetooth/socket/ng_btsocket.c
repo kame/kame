@@ -25,12 +25,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ng_btsocket.c,v 1.3 2003/01/19 00:19:04 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/socket/ng_btsocket.c,v 1.2 2003/05/10 21:44:41 julian Exp $
+ * $Id: ng_btsocket.c,v 1.4 2003/09/14 23:29:06 max Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/socket/ng_btsocket.c,v 1.5 2003/11/18 00:39:04 rwatson Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/bitstring.h>
 #include <sys/errno.h>
 #include <sys/domain.h>
 #include <sys/kernel.h>
@@ -41,7 +42,6 @@
 #include <sys/socketvar.h>
 #include <sys/sysctl.h>
 #include <sys/taskqueue.h>
-#include <bitstring.h>
 #include <netgraph/ng_message.h>
 #include <netgraph/netgraph.h>
 #include "ng_bluetooth.h"
@@ -79,7 +79,8 @@ static struct pr_usrreqs	ng_btsocket_hci_raw_usrreqs = {
 	ng_btsocket_hci_raw_sockaddr,	/* sockaddr */
 	sosend,
 	soreceive,
-	sopoll
+	sopoll,
+	pru_sosetlabel_null
 };
 
 /*
@@ -106,7 +107,8 @@ static struct pr_usrreqs	ng_btsocket_l2cap_raw_usrreqs = {
 	ng_btsocket_l2cap_raw_sockaddr,	/* sockaddr */
 	sosend,
 	soreceive,
-	sopoll
+	sopoll,
+	pru_sosetlabel_null
 };
 
 /*
@@ -133,7 +135,8 @@ static struct pr_usrreqs	ng_btsocket_l2cap_usrreqs = {
 	ng_btsocket_l2cap_sockaddr,	/* sockaddr */
 	sosend,
 	soreceive,
-	sopoll
+	sopoll,
+	pru_sosetlabel_null
 };
 
 /*
@@ -160,7 +163,8 @@ static struct pr_usrreqs	ng_btsocket_rfcomm_usrreqs = {
 	ng_btsocket_rfcomm_sockaddr,	/* sockaddr */
 	sosend,
 	soreceive,
-	sopoll
+	sopoll,
+	pru_sosetlabel_null
 };
 
 /* 

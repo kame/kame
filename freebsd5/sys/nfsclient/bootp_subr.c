@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/bootp_subr.c,v 1.47 2003/02/19 05:47:38 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/bootp_subr.c,v 1.56 2003/11/14 20:54:08 alfred Exp $");
 
 #include "opt_bootp.h"
 
@@ -64,6 +64,8 @@ __FBSDID("$FreeBSD: src/sys/nfsclient/bootp_subr.c,v 1.47 2003/02/19 05:47:38 im
 #include <netinet/in.h>
 #include <net/if_types.h>
 #include <net/if_dl.h>
+
+#include <rpc/rpcclnt.h>
 
 #include <nfs/rpcv2.h>
 #include <nfs/nfsproto.h>
@@ -155,17 +157,14 @@ struct bootpc_globalcontext {
 	struct bootpc_ifcontext *lastinterface;
 	u_int32_t xid;
 	int gotrootpath;
-	int gotswappath;
 	int gotgw;
 	int ifnum;
 	int secs;
 	int starttime;
 	struct bootp_packet reply;
 	int replylen;
-	struct bootpc_ifcontext *setswapfs;
 	struct bootpc_ifcontext *setrootfs;
 	struct bootpc_ifcontext *sethostname;
-	char lookup_path[24];
 	struct bootpc_tagcontext tmptag;
 	struct bootpc_tagcontext tag;
 };
@@ -194,10 +193,7 @@ struct bootpc_globalcontext {
 #define OVERLOAD_SNAME    2
 
 /* Site specific tags: */
-#define TAG_SWAP	128
-#define TAG_SWAPSIZE	129
 #define TAG_ROOTOPTS	130
-#define TAG_SWAPOPTS	131
 #define TAG_COOKIE	134	/* ascii info for userland, via sysctl */
 
 #define TAG_DHCP_MSGTYPE 53
@@ -220,9 +216,6 @@ SYSCTL_STRING(_kern, OID_AUTO, bootp_cookie, CTLFLAG_RD,
 /* mountd RPC */
 static int	md_mount(struct sockaddr_in *mdsin, char *path, u_char *fhp,
 		    int *fhsizep, struct nfs_args *args, struct thread *td);
-static int	md_lookup_swap(struct sockaddr_in *mdsin, char *path,
-		    u_char *fhp, int *fhsizep, struct nfs_args *args,
-		    struct thread *td);
 static int	setfs(struct sockaddr_in *addr, char *path, char *p);
 static int	getdec(char **ptr);
 static char	*substr(char *a, char *b);
@@ -232,7 +225,7 @@ static int	xdr_int_decode(struct mbuf **ptr, int *iptr);
 static void	print_in_addr(struct in_addr addr);
 static void	print_sin_addr(struct sockaddr_in *addr);
 static void	clear_sinaddr(struct sockaddr_in *sin);
-static struct bootpc_ifcontext *allocifctx(struct bootpc_globalcontext *gctx);
+static void	allocifctx(struct bootpc_globalcontext *gctx);
 static void	bootpc_compose_query(struct bootpc_ifcontext *ifctx,
 		    struct bootpc_globalcontext *gctx, struct thread *td);
 static unsigned char *bootpc_tag(struct bootpc_tagcontext *tctx,
@@ -348,7 +341,7 @@ bootpboot_p_rtentry(struct rtentry *rt)
 	printf(" ");
 	printf("flags %x", (unsigned short) rt->rt_flags);
 	printf(" %d", (int) rt->rt_rmx.rmx_expire);
-	printf(" %s%d\n", rt->rt_ifp->if_name, rt->rt_ifp->if_unit);
+	printf(" %s\n", rt->rt_ifp->if_xname);
 }
 
 void
@@ -384,10 +377,8 @@ void
 bootpboot_p_if(struct ifnet *ifp, struct ifaddr *ifa)
 {
 
-	printf("%s%d flags %x, addr ",
-	       ifp->if_name,
-	       ifp->if_unit,
-	       ifp->if_flags);
+	printf("%s flags %x, addr ",
+	       ifp->if_xname, ifp->if_flags);
 	print_sin_addr((struct sockaddr_in *) ifa->ifa_addr);
 	printf(", broadcast ");
 	print_sin_addr((struct sockaddr_in *) ifa->ifa_dstaddr);
@@ -428,16 +419,15 @@ clear_sinaddr(struct sockaddr_in *sin)
 	sin->sin_port = 0;
 }
 
-static struct bootpc_ifcontext *
+static void
 allocifctx(struct bootpc_globalcontext *gctx)
 {
 	struct bootpc_ifcontext *ifctx;
 	ifctx = (struct bootpc_ifcontext *) malloc(sizeof(*ifctx),
-						   M_TEMP, M_WAITOK);
+						   M_TEMP, M_WAITOK | M_ZERO);
 	if (ifctx == NULL)
 		panic("Failed to allocate bootp interface context structure");
 
-	bzero(ifctx, sizeof(*ifctx));
 	ifctx->xid = gctx->xid;
 #ifdef BOOTP_NO_DHCP
 	ifctx->state = IF_BOOTP_UNRESOLVED;
@@ -445,7 +435,11 @@ allocifctx(struct bootpc_globalcontext *gctx)
 	ifctx->state = IF_DHCP_UNRESOLVED;
 #endif
 	gctx->xid += 0x100;
-	return ifctx;
+	if (gctx->interfaces != NULL)
+		gctx->lastinterface->next = ifctx;
+	else
+		gctx->interfaces = ifctx;
+	gctx->lastinterface = ifctx;
 }
 
 static __inline int
@@ -595,16 +589,19 @@ bootpc_call(struct bootpc_globalcontext *gctx, struct thread *td)
 	int retry;
 	const char *s;
 
+	GIANT_REQUIRED;		/* XXX until socket locking done */
+
 	/*
 	 * Create socket and set its recieve timeout.
 	 */
 	error = socreate(AF_INET, &so, SOCK_DGRAM, 0, td->td_ucred, td);
 	if (error != 0)
-		goto out;
+		goto out0;
 
 	tv.tv_sec = 1;
 	tv.tv_usec = 0;
 	bzero(&sopt, sizeof(sopt));
+	sopt.sopt_dir = SOPT_SET;
 	sopt.sopt_level = SOL_SOCKET;
 	sopt.sopt_name = SO_RCVTIMEO;
 	sopt.sopt_val = &tv;
@@ -969,6 +966,7 @@ bootpc_call(struct bootpc_globalcontext *gctx, struct thread *td)
 gotreply:
 out:
 	soclose(so);
+out0:
 	return error;
 }
 
@@ -982,6 +980,8 @@ bootpc_fakeup_interface(struct bootpc_ifcontext *ifctx,
 	struct socket *so;
 	struct ifaddr *ifa;
 	struct sockaddr_dl *sdl;
+
+	GIANT_REQUIRED;		/* XXX until socket locking done */
 
 	error = socreate(AF_INET, &ifctx->so, SOCK_DGRAM, 0, td->td_ucred, td);
 	if (error != 0)
@@ -1380,8 +1380,9 @@ bootpc_compose_query(struct bootpc_ifcontext *ifctx,
 		leasetime = htonl(300);
 		memcpy(vendp, &leasetime, 4);
 		vendp += 4;
+		break;
 	default:
-		;
+		break;
 	}
 	*vendp = TAG_END;
 
@@ -1444,9 +1445,6 @@ static unsigned char *
 bootpc_tag(struct bootpc_tagcontext *tctx,
     struct bootp_packet *bp, int len, int tag)
 {
-	unsigned char *j;
-	unsigned char *ej;
-
 	tctx->overload = 0;
 	tctx->badopt = 0;
 	tctx->badtag = 0;
@@ -1455,9 +1453,6 @@ bootpc_tag(struct bootpc_tagcontext *tctx,
 
 	if (bootpc_hascookie(bp) == 0)
 		return NULL;
-
-	j = &bp->vend[4];
-	ej = (unsigned char *) bp + len;
 
 	bootpc_tag_helper(tctx, &bp->vend[4],
 			  (unsigned char *) bp + len - &bp->vend[4], tag);
@@ -1496,9 +1491,6 @@ bootpc_decode_reply(struct nfsv3_diskless *nd, struct bootpc_ifcontext *ifctx,
 	ifctx->myaddr.sin_addr = ifctx->reply.yiaddr;
 
 	ip = ntohl(ifctx->myaddr.sin_addr.s_addr);
-	snprintf(gctx->lookup_path, sizeof(gctx->lookup_path),
-		 "swap.%d.%d.%d.%d",
-		 ip >> 24, (ip >> 16) & 255, (ip >> 8) & 255, ip & 255);
 
 	printf("%s at ", ifctx->ireq.ifr_name);
 	print_sin_addr(&ifctx->myaddr);
@@ -1577,45 +1569,6 @@ bootpc_decode_reply(struct nfsv3_diskless *nd, struct bootpc_ifcontext *ifctx,
 	}
 
 	p = bootpc_tag(&gctx->tag, &ifctx->reply, ifctx->replylen,
-		       TAG_SWAP);
-	if (p != NULL) {
-		if (gctx->setswapfs != NULL) {
-			printf("swapfs %s (ignored) ", p);
-		} else 	if (setfs(&nd->swap_saddr,
-				  nd->swap_hostnam, p)) {
-			gctx->gotswappath = 1;
-			gctx->setswapfs = ifctx;
-			printf("swapfs %s ", p);
-
-			p = bootpc_tag(&gctx->tag, &ifctx->reply,
-				       ifctx->replylen,
-				       TAG_SWAPOPTS);
-			if (p != NULL) {
-				/* swap mount options */
-				mountopts(&nd->swap_args, p);
-				printf("swapopts %s ", p);
-			}
-
-			p = bootpc_tag(&gctx->tag, &ifctx->reply,
-				       ifctx->replylen,
-				       TAG_SWAPSIZE);
-			if (p != NULL) {
-				int swaplen;
-				if (gctx->tag.taglen != 4)
-					panic("bootpc: "
-					      "Expected 4 bytes for swaplen, "
-					      "not %d bytes",
-					      gctx->tag.taglen);
-				bcopy(p, &swaplen, 4);
-				nd->swap_nblks = ntohl(swaplen);
-				printf("swapsize %d KB ",
-				       nd->swap_nblks);
-			}
-		} else
-			panic("Failed to set swapfs to %s", p);
-	}
-
-	p = bootpc_tag(&gctx->tag, &ifctx->reply, ifctx->replylen,
 		       TAG_HOSTNAME);
 	if (p != NULL) {
 		if (gctx->tag.taglen >= MAXHOSTNAMELEN)
@@ -1663,6 +1616,9 @@ bootpc_init(void)
 	struct bootpc_globalcontext *gctx; 	/* Global BOOTP context */
 	struct ifnet *ifp;
 	int error;
+#ifndef BOOTP_WIRED_TO
+	int ifcnt;
+#endif
 	struct nfsv3_diskless *nd;
 	struct thread *td;
 
@@ -1675,15 +1631,12 @@ bootpc_init(void)
 	if (nfs_diskless_valid != 0)
 		return;
 
-	gctx = malloc(sizeof(*gctx), M_TEMP, M_WAITOK);
+	gctx = malloc(sizeof(*gctx), M_TEMP, M_WAITOK | M_ZERO);
 	if (gctx == NULL)
 		panic("Failed to allocate bootp global context structure");
 
-	bzero(gctx, sizeof(*gctx));
 	gctx->xid = ~0xFFFF;
 	gctx->starttime = time_second;
-
-	ifctx = allocifctx(gctx);
 
 	/*
 	 * Find a network interface.
@@ -1691,14 +1644,35 @@ bootpc_init(void)
 #ifdef BOOTP_WIRED_TO
 	printf("bootpc_init: wired to interface '%s'\n",
 	       __XSTRING(BOOTP_WIRED_TO));
-#endif
-	bzero(&ifctx->ireq, sizeof(ifctx->ireq));
+	allocifctx(gctx);
+#else
+	/*
+	 * Preallocate interface context storage, if another interface
+	 * attaches and wins the race, it won't be eligible for bootp.
+	 */
 	IFNET_RLOCK();
-	for (ifp = TAILQ_FIRST(&ifnet);
+	for (ifp = TAILQ_FIRST(&ifnet), ifcnt = 0;
 	     ifp != NULL;
 	     ifp = TAILQ_NEXT(ifp, if_link)) {
-		snprintf(ifctx->ireq.ifr_name, sizeof(ifctx->ireq.ifr_name),
-			 "%s%d", ifp->if_name, ifp->if_unit);
+		if ((ifp->if_flags &
+		     (IFF_LOOPBACK | IFF_POINTOPOINT | IFF_BROADCAST)) !=
+		    IFF_BROADCAST)
+			continue;
+		ifcnt++;
+	}
+	IFNET_RUNLOCK();
+	if (ifcnt == 0)
+		panic("bootpc_init: no eligible interfaces");
+	for (; ifcnt > 0; ifcnt--)
+		allocifctx(gctx);
+#endif
+
+	IFNET_RLOCK();
+	for (ifp = TAILQ_FIRST(&ifnet), ifctx = gctx->interfaces;
+	     ifp != NULL && ifctx != NULL;
+	     ifp = TAILQ_NEXT(ifp, if_link)) {
+		strlcpy(ifctx->ireq.ifr_name, ifp->if_xname,
+		    sizeof(ifctx->ireq.ifr_name));
 #ifdef BOOTP_WIRED_TO
 		if (strcmp(ifctx->ireq.ifr_name,
 			   __XSTRING(BOOTP_WIRED_TO)) != 0)
@@ -1709,18 +1683,12 @@ bootpc_init(void)
 		    IFF_BROADCAST)
 			continue;
 #endif
-		if (gctx->interfaces != NULL)
-			gctx->lastinterface->next = ifctx;
-		else
-			gctx->interfaces = ifctx;
 		ifctx->ifp = ifp;
-		gctx->lastinterface = ifctx;
-		ifctx = allocifctx(gctx);
+		ifctx = ifctx->next;
 	}
 	IFNET_RUNLOCK();
-	free(ifctx, M_TEMP);
 
-	if (gctx->interfaces == NULL) {
+	if (gctx->interfaces == NULL || gctx->interfaces->ifp == NULL) {
 #ifdef BOOTP_WIRED_TO
 		panic("bootpc_init: Could not find interface specified "
 		      "by BOOTP_WIRED_TO: "
@@ -1730,17 +1698,12 @@ bootpc_init(void)
 #endif
 	}
 
-	gctx->gotrootpath = 0;
-	gctx->gotswappath = 0;
-	gctx->gotgw = 0;
-
 	for (ifctx = gctx->interfaces; ifctx != NULL; ifctx = ifctx->next)
 		bootpc_fakeup_interface(ifctx, gctx, td);
 
 	for (ifctx = gctx->interfaces; ifctx != NULL; ifctx = ifctx->next)
 		bootpc_compose_query(ifctx, gctx, td);
 
-	ifctx = gctx->interfaces;
 	error = bootpc_call(gctx, td);
 
 	if (error != 0) {
@@ -1753,14 +1716,10 @@ bootpc_init(void)
 
 	mountopts(&nd->root_args, NULL);
 
-	mountopts(&nd->swap_args, NULL);
-
 	for (ifctx = gctx->interfaces; ifctx != NULL; ifctx = ifctx->next)
 		if (bootpc_ifctx_isresolved(ifctx) != 0)
 			bootpc_decode_reply(nd, ifctx, gctx);
 
-	if (gctx->gotswappath == 0)
-		nd->swap_nblks = 0;
 #ifdef BOOTP_NFSROOT
 	if (gctx->gotrootpath == 0)
 		panic("bootpc: No root path offered");
@@ -1793,24 +1752,6 @@ bootpc_init(void)
 		if (error != 0)
 			panic("nfs_boot: mountd root, error=%d", error);
 
-		if (gctx->gotswappath != 0) {
-
-			error = md_mount(&nd->swap_saddr,
-					 nd->swap_hostnam,
-					 nd->swap_fh, &nd->swap_fhsize,
-					 &nd->swap_args, td);
-			if (error != 0)
-				panic("nfs_boot: mountd swap, error=%d",
-				      error);
-
-			error = md_lookup_swap(&nd->swap_saddr,
-					       gctx->lookup_path,
-					       nd->swap_fh, &nd->swap_fhsize,
-					       &nd->swap_args, td);
-			if (error != 0)
-				panic("nfs_boot: lookup swap, error=%d",
-				      error);
-		}
 		nfs_diskless_valid = 3;
 	}
 
@@ -1917,99 +1858,6 @@ md_mount(struct sockaddr_in *mdsin, char *path, u_char *fhp, int *fhsizep,
 			     (args->flags &
 			      NFSMNT_NFSV3) ? NFS_VER3 : NFS_VER2,
 			     &mdsin->sin_port, td);
-
-	goto out;
-
-bad:
-	error = EBADRPC;
-
-out:
-	m_freem(m);
-	return error;
-}
-
-static int
-md_lookup_swap(struct sockaddr_in *mdsin, char *path, u_char *fhp, int *fhsizep,
-    struct nfs_args *args, struct thread *td)
-{
-	struct mbuf *m;
-	int error;
-	int size = -1;
-	int attribs_present;
-	int status;
-	union {
-		u_int32_t v2[17];
-		u_int32_t v3[21];
-	} fattribs;
-
-	m = m_get(M_TRYWAIT, MT_DATA);
-	if (m == NULL)
-	  	return ENOBUFS;
-
-	if ((args->flags & NFSMNT_NFSV3) != 0) {
-		*mtod(m, u_int32_t *) = txdr_unsigned(*fhsizep);
-		bcopy(fhp, mtod(m, u_char *) + sizeof(u_int32_t), *fhsizep);
-		m->m_len = *fhsizep + sizeof(u_int32_t);
-	} else {
-		bcopy(fhp, mtod(m, u_char *), NFSX_V2FH);
-		m->m_len = NFSX_V2FH;
-	}
-
-	m->m_next = xdr_string_encode(path, strlen(path));
-	if (m->m_next == NULL) {
-		error = ENOBUFS;
-		goto out;
-	}
-
-	/* Do RPC to nfsd. */
-	if ((args->flags & NFSMNT_NFSV3) != 0)
-		error = krpc_call(mdsin, NFS_PROG, NFS_VER3,
-				  NFSPROC_LOOKUP, &m, NULL, td);
-	else
-		error = krpc_call(mdsin, NFS_PROG, NFS_VER2,
-				  NFSV2PROC_LOOKUP, &m, NULL, td);
-	if (error != 0)
-		return error;	/* message already freed */
-
-	if (xdr_int_decode(&m, &status) != 0)
-		goto bad;
-	if (status != 0) {
-		error = ENOENT;
-		goto out;
-	}
-
-	if ((args->flags & NFSMNT_NFSV3) != 0) {
-		if (xdr_int_decode(&m, fhsizep) != 0 ||
-		    *fhsizep > NFSX_V3FHMAX ||
-		    *fhsizep <= 0)
-			goto bad;
-	} else
-		*fhsizep = NFSX_V2FH;
-
-	if (xdr_opaque_decode(&m, fhp, *fhsizep) != 0)
-		goto bad;
-
-	if ((args->flags & NFSMNT_NFSV3) != 0) {
-		if (xdr_int_decode(&m, &attribs_present) != 0)
-			goto bad;
-		if (attribs_present != 0) {
-			if (xdr_opaque_decode(&m, (u_char *) &fattribs.v3,
-					      sizeof(u_int32_t) * 21) != 0)
-				goto bad;
-			size = fxdr_unsigned(u_int32_t, fattribs.v3[6]);
-		}
-	} else {
-		if (xdr_opaque_decode(&m,(u_char *) &fattribs.v2,
-				      sizeof(u_int32_t) * 17) != 0)
-			goto bad;
-		size = fxdr_unsigned(u_int32_t, fattribs.v2[5]);
-	}
-
-	if (nfsv3_diskless.swap_nblks == 0 && size != -1) {
-		nfsv3_diskless.swap_nblks = size / 1024;
-		printf("md_lookup_swap: Swap size is %d KB\n",
-		       nfsv3_diskless.swap_nblks);
-	}
 
 	goto out;
 

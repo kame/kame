@@ -21,9 +21,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/ibcs2/ibcs2_socksys.c,v 1.17 2002/04/01 21:30:42 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_socksys.c,v 1.19 2003/10/12 04:25:26 tjr Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -186,8 +187,10 @@ ibcs2_setipdomainname(td, uap)
 	if ( ptr != NULL ) {
 		ptr++;
 		*ptr = '\0';
-	} else
-		strcat(hname, ".");
+	} else {
+		if (strlcat(hname, ".", sizeof(hname)) >= sizeof(hname))
+			return (EINVAL);
+	}
 
 	/* Set ptr to the end of the string so we can append to it */
 	hlen = strlen(hname);
@@ -196,7 +199,7 @@ ibcs2_setipdomainname(td, uap)
                 return EINVAL;
 
 	/* Append the ipdomain to the end */
-	error = copyin((caddr_t)uap->ipdomainname, ptr, uap->len);
+	error = copyinstr((caddr_t)uap->ipdomainname, ptr, uap->len, NULL);
 	if (error)
 		return (error);
 

@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/syscallsubr.h,v 1.9 2003/05/05 20:33:38 dwmalone Exp $
+ * $FreeBSD: src/sys/sys/syscallsubr.h,v 1.10 2003/11/05 01:53:10 fjoe Exp $
  */
 
 #ifndef _SYS_SYSCALLSUBR_H_
@@ -75,9 +75,9 @@ int	kern_select(struct thread *td, int nd, fd_set *fd_in, fd_set *fd_ou,
 int	kern_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
 	    struct mbuf *control);
 int	kern_shmat(struct thread *td, int shmid, const void *shmaddr,
-	    int shmflg, int wantrem);
+	    int shmflg);
 int	kern_shmctl(struct thread *td, int shmid, int cmd, void *buf,
-	    size_t *bufsz, int wantrem);
+	    size_t *bufsz);
 int	kern_sigaction(struct thread *td, int sig, struct sigaction *act,
 	    struct sigaction *oact, int flags);
 int	kern_sigaltstack(struct thread *td, stack_t *ss, stack_t *oss);

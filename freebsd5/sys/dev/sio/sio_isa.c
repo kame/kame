@@ -20,9 +20,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/sio/sio_isa.c,v 1.11 2003/05/16 04:04:04 murray Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/sio/sio_isa.c,v 1.13 2003/08/25 09:48:48 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

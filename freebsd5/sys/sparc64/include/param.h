@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)param.h	5.8 (Berkeley) 6/28/91
- * $FreeBSD: src/sys/sparc64/include/param.h,v 1.15 2002/10/01 06:34:21 jake Exp $
+ * $FreeBSD: src/sys/sparc64/include/param.h,v 1.18 2003/10/03 19:49:08 alc Exp $
  */
 
 /*
@@ -79,19 +79,19 @@
 #define ALIGN(p)	_ALIGN(p)
 
 #define	PAGE_SHIFT_8K	13
-#define	PAGE_SIZE_8K	(1UL<<PAGE_SHIFT_8K)
+#define	PAGE_SIZE_8K	(1L<<PAGE_SHIFT_8K)
 #define	PAGE_MASK_8K	(PAGE_SIZE_8K-1)
 
 #define	PAGE_SHIFT_64K	16
-#define	PAGE_SIZE_64K	(1UL<<PAGE_SHIFT_64K)
+#define	PAGE_SIZE_64K	(1L<<PAGE_SHIFT_64K)
 #define	PAGE_MASK_64K	(PAGE_SIZE_64K-1)
 
 #define	PAGE_SHIFT_512K	19
-#define	PAGE_SIZE_512K	(1UL<<PAGE_SHIFT_512K)
+#define	PAGE_SIZE_512K	(1L<<PAGE_SHIFT_512K)
 #define	PAGE_MASK_512K	(PAGE_SIZE_512K-1)
 
 #define	PAGE_SHIFT_4M	22
-#define	PAGE_SIZE_4M	(1UL<<PAGE_SHIFT_4M)
+#define	PAGE_SIZE_4M	(1L<<PAGE_SHIFT_4M)
 #define	PAGE_MASK_4M	(PAGE_SIZE_4M-1)
 
 #define PAGE_SHIFT_MIN	PAGE_SHIFT_8K
@@ -104,12 +104,13 @@
 #define PAGE_SIZE_MAX	PAGE_SIZE_4M
 #define PAGE_MASK_MAX	PAGE_MASK_4M
 
+#ifndef KSTACK_PAGES
 #define KSTACK_PAGES		4	/* pages of kernel stack (with pcb) */
+#endif
+#define KSTACK_GUARD_PAGES	1	/* pages of kstack guard; 0 disables */
 #define UAREA_PAGES		1	/* pages of user area */
 #define PCPU_PAGES		1
 
-#define KSTACK_GUARD 		/* compile in kstack guard page */
-#define KSTACK_GUARD_PAGES	1
 
 /*
  * Mach derived conversion macros

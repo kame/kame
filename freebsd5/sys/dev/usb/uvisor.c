@@ -1,17 +1,18 @@
 /*	$NetBSD: uvisor.c,v 1.9 2001/01/23 14:04:14 augustss Exp $	*/
-/*      $FreeBSD: src/sys/dev/usb/uvisor.c,v 1.12 2003/04/06 17:34:50 scottl Exp $	*/
+/*      $FreeBSD: src/sys/dev/usb/uvisor.c,v 1.16 2003/11/08 11:23:07 joe Exp $	*/
 
-/* This version of uvisor is heavily based upon the version in NetBSD
- * but is missing the following patches:
- *
- * 1.10	needed?		connect a ucom to each of the uvisor ports
- * 1.11	needed		ucom has an "info" attach message - use it
- * 1.12 not needed	rcsids
- * 1.13 already merged	extra arg to usbd_do_request_flags
- * 1.14 already merged	sony and palm support
- * 1.15 already merged	sony clie
- * 1.16 already merged	trailing whites
+/* Also already merged from NetBSD:
+ *	$NetBSD: uvisor.c,v 1.12 2001/11/13 06:24:57 lukem Exp $
+ *	$NetBSD: uvisor.c,v 1.13 2002/02/11 15:11:49 augustss Exp $
+ *	$NetBSD: uvisor.c,v 1.14 2002/02/27 23:00:03 augustss Exp $
+ *	$NetBSD: uvisor.c,v 1.15 2002/06/16 15:01:31 augustss Exp $
+ *	$NetBSD: uvisor.c,v 1.16 2002/07/11 21:14:36 augustss Exp $
+ *	$NetBSD: uvisor.c,v 1.17 2002/08/13 11:38:15 augustss Exp $
+ *	$NetBSD: uvisor.c,v 1.18 2003/02/05 00:50:14 augustss Exp $
+ *	$NetBSD: uvisor.c,v 1.19 2003/02/07 18:12:37 augustss Exp $
+ *	$NetBSD: uvisor.c,v 1.20 2003/04/11 01:30:10 simonb Exp $
  */
+
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -143,7 +144,17 @@ struct uvisor_connection_info {
 #define UVISOR_GET_PALM_INFORMATION_LEN		0x14
 
 
-#define UVISORIBUFSIZE 1024
+/*
+ * Crank down UVISORBUFSIZE from 1024 to 64 to avoid a problem where
+ * the Palm device and the USB host controller deadlock. The USB host
+ * controller is expecting an early-end-of-transmission packet with 0
+ * data, and the Palm doesn't send one because it's already
+ * communicated the amount of data it's going to send in a header
+ * (which ucom/uvisor are oblivious to). This is the problem that has
+ * been known on the pilot-link lists as the "[Free]BSD USB problem",
+ * but not understood.
+ */
+#define UVISORIBUFSIZE 64
 #define UVISOROBUFSIZE 1024
 
 struct uvisor_softc {
@@ -196,13 +207,20 @@ struct uvisor_type {
 };
 static const struct uvisor_type uvisor_devs[] = {
 	{{ USB_VENDOR_HANDSPRING, USB_PRODUCT_HANDSPRING_VISOR }, 0 },
+	{{ USB_VENDOR_HANDSPRING, USB_PRODUCT_HANDSPRING_TREO }, PALM4 },
 	{{ USB_VENDOR_PALM, USB_PRODUCT_PALM_M500 }, PALM4 },
 	{{ USB_VENDOR_PALM, USB_PRODUCT_PALM_M505 }, PALM4 },
 	{{ USB_VENDOR_PALM, USB_PRODUCT_PALM_M515 }, PALM4 },
+	{{ USB_VENDOR_PALM, USB_PRODUCT_PALM_I705 }, PALM4 },
 	{{ USB_VENDOR_PALM, USB_PRODUCT_PALM_M125 }, PALM4 },
-	{{ USB_VENDOR_SONY, USB_PRODUCT_SONY_CLIE_40 }, PALM4 },
+	{{ USB_VENDOR_PALM, USB_PRODUCT_PALM_M130 }, PALM4 },
+	{{ USB_VENDOR_PALM, USB_PRODUCT_PALM_TUNGSTEN_Z }, PALM4 },
+	{{ USB_VENDOR_PALM, USB_PRODUCT_PALM_TUNGSTEN_T }, PALM4 },
+	{{ USB_VENDOR_PALM, USB_PRODUCT_PALM_ZIRE }, PALM4 },
+	{{ USB_VENDOR_SONY, USB_PRODUCT_SONY_CLIE_40 }, 0 },
 	{{ USB_VENDOR_SONY, USB_PRODUCT_SONY_CLIE_41 }, 0 },
-	{{ USB_VENDOR_SONY, USB_PRODUCT_SONY_CLIE_50 }, 0 },
+	{{ USB_VENDOR_SONY, USB_PRODUCT_SONY_CLIE_S360 }, PALM4 },
+	{{ USB_VENDOR_SONY, USB_PRODUCT_SONY_CLIE_NX60 }, PALM4 },
 /*	{{ USB_VENDOR_SONY, USB_PRODUCT_SONY_CLIE_25 }, PALM4 },*/
 };
 #define uvisor_lookup(v, p) ((const struct uvisor_type *)usb_lookup(uvisor_devs, v, p))
@@ -211,7 +229,7 @@ static const struct uvisor_type uvisor_devs[] = {
 USB_MATCH(uvisor)
 {
 	USB_MATCH_START(uvisor, uaa);
-	
+
 	if (uaa->iface != NULL)
 		return (UMATCH_NONE);
 
@@ -285,7 +303,7 @@ USB_ATTACH(uvisor)
 			       ": %s\n", devname, usbd_errstr(err));
 			goto bad;
 		}
-		
+
 		addr = ed->bEndpointAddress;
 		dir = UE_GET_DIR(ed->bEndpointAddress);
 		attr = ed->bmAttributes & UE_XFERTYPE;
@@ -308,7 +326,7 @@ USB_ATTACH(uvisor)
 		       USBDEVNAME(ucom->sc_dev));
 		goto bad;
 	}
-	
+
 	ucom->sc_parent = sc;
 	ucom->sc_portno = UCOM_UNK_PORTNO;
 	/* bulkin, bulkout set above */
@@ -423,7 +441,7 @@ uvisor_init(struct uvisor_softc *sc)
 				break;
 			default:
 				string = "unknown";
-				break;	
+				break;
 			}
 			printf("%s: port %d, is for %s\n",
 			    USBDEVNAME(sc->sc_ucom.sc_dev), coninfo.connections[i].port,

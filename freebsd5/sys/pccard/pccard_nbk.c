@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pccard_nbk.c,v 1.43 2003/04/23 23:39:21 imp Exp $
+ * $FreeBSD: src/sys/pccard/pccard_nbk.c,v 1.44 2003/06/12 04:46:42 imp Exp $
  */
 
 /*
@@ -47,6 +47,8 @@
  *
  * These compatibility nodes are called pccnbk.  PCCard New Bus Kludge.
  */
+
+#define OBSOLETE_IN_6
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -38,8 +38,10 @@
  *
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
- * $FreeBSD: src/sys/i386/i386/vm_machdep.c,v 1.207.2.1 2003/06/02 21:37:07 tegge Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/i386/vm_machdep.c,v 1.219 2003/11/17 18:22:24 alc Exp $");
 
 #include "opt_npx.h"
 #ifdef PC98
@@ -60,8 +62,10 @@
 #include <sys/vmmeter.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
+#include <sys/mbuf.h>
 #include <sys/mutex.h>
 #include <sys/smp.h>
+#include <sys/sf_buf.h>
 #include <sys/sysctl.h>
 #include <sys/unistd.h>
 
@@ -93,6 +97,27 @@ static void	cpu_reset_proxy(void);
 static u_int	cpu_reset_proxyid;
 static volatile u_int	cpu_reset_proxy_active;
 #endif
+static void	sf_buf_init(void *arg);
+SYSINIT(sock_sf, SI_SUB_MBUF, SI_ORDER_ANY, sf_buf_init, NULL)
+
+LIST_HEAD(sf_head, sf_buf);
+
+/*
+ * A hash table of active sendfile(2) buffers
+ */
+static struct sf_head *sf_buf_active;
+static u_long sf_buf_hashmask;
+
+#define	SF_BUF_HASH(m)	(((m) - vm_page_array) & sf_buf_hashmask)
+
+static struct sf_head sf_buf_freelist;
+static u_int	sf_buf_alloc_want;
+
+/*
+ * A lock used to synchronize access to the hash table and free list
+ */
+static struct mtx sf_buf_lock;
+
 extern int	_ucodesel, _udatasel;
 
 /*
@@ -246,6 +271,8 @@ void
 cpu_exit(struct thread *td)
 {
 	struct mdproc *mdp;
+	struct pcb *pcb = td->td_pcb; 
+
 
 	/* Reset pc->pcb_gs and %gs before possibly invalidating it. */
 	mdp = &td->td_proc->p_md;
@@ -254,7 +281,11 @@ cpu_exit(struct thread *td)
 		load_gs(_udatasel);
 		user_ldt_free(td);
 	}
-	reset_dbregs();
+	if (pcb->pcb_flags & PCB_DBREGS) {
+		/* disable all hardware breakpoints */
+		reset_dbregs();
+		pcb->pcb_flags &= ~PCB_DBREGS;
+	}
 }
 
 void
@@ -262,12 +293,11 @@ cpu_thread_exit(struct thread *td)
 {
 	struct pcb *pcb = td->td_pcb; 
 #ifdef DEV_NPX
-	npxexit(td);
+	if (td == PCPU_GET(fpcurthread))
+		npxdrop();
 #endif
         if (pcb->pcb_flags & PCB_DBREGS) {
-                /*
-                 * disable all hardware breakpoints
-                 */
+		/* disable all hardware breakpoints */
                 reset_dbregs();
                 pcb->pcb_flags &= ~PCB_DBREGS;
         }
@@ -295,6 +325,16 @@ cpu_thread_clean(struct thread *td)
 }
 
 void
+cpu_thread_swapin(struct thread *td)
+{
+}
+
+void
+cpu_thread_swapout(struct thread *td)
+{
+}
+
+void
 cpu_sched_exit(td)
 	register struct thread *td;
 {
@@ -318,7 +358,7 @@ cpu_thread_setup(struct thread *td)
  * such as those generated in thread_userret() itself.
  */
 void
-cpu_set_upcall(struct thread *td, void *pcb)
+cpu_set_upcall(struct thread *td, struct thread *td0)
 {
 	struct pcb *pcb2;
 
@@ -336,7 +376,8 @@ cpu_set_upcall(struct thread *td, void *pcb)
 	 * at this time (see the matching comment below for
 	 * more analysis) (need a good safe default).
 	 */
-	bcopy(pcb, pcb2, sizeof(*pcb2));
+	bcopy(td0->td_pcb, pcb2, sizeof(*pcb2));
+	pcb2->pcb_flags &= ~(PCB_NPXTRAP|PCB_NPXINITDONE);
 
 	/*
 	 * Create a new fresh stack for the new thread.
@@ -346,7 +387,7 @@ cpu_set_upcall(struct thread *td, void *pcb)
 	 * The contexts are filled in at the time we actually DO the
 	 * upcall as only then do we know which KSE we got.
 	 */
-	td->td_frame = (struct trapframe *)((caddr_t)pcb2 - 16) - 1;
+	bcopy(td0->td_frame, td->td_frame, sizeof(struct trapframe));
 
 	/*
 	 * Set registers for trampoline to user mode.  Leave space for the
@@ -409,12 +450,6 @@ cpu_set_upcall_kse(struct thread *td, struct kse_upcall *ku)
 	 */
 	suword((void *)(td->td_frame->tf_esp + sizeof(void *)),
 	    (int)ku->ku_mailbox);
-}
-
-void
-cpu_wait(p)
-	struct proc *p;
-{
 }
 
 /*
@@ -535,6 +570,104 @@ cpu_reset_real()
 	invltlb();
 	/* NOTREACHED */
 	while(1);
+}
+
+/*
+ * Allocate a pool of sf_bufs (sendfile(2) or "super-fast" if you prefer. :-))
+ */
+static void
+sf_buf_init(void *arg)
+{
+	struct sf_buf *sf_bufs;
+	vm_offset_t sf_base;
+	int i;
+
+	sf_buf_active = hashinit(nsfbufs, M_TEMP, &sf_buf_hashmask);
+	LIST_INIT(&sf_buf_freelist);
+	sf_base = kmem_alloc_nofault(kernel_map, nsfbufs * PAGE_SIZE);
+	sf_bufs = malloc(nsfbufs * sizeof(struct sf_buf), M_TEMP,
+	    M_NOWAIT | M_ZERO);
+	for (i = 0; i < nsfbufs; i++) {
+		sf_bufs[i].kva = sf_base + i * PAGE_SIZE;
+		LIST_INSERT_HEAD(&sf_buf_freelist, &sf_bufs[i], list_entry);
+	}
+	sf_buf_alloc_want = 0;
+	mtx_init(&sf_buf_lock, "sf_buf", NULL, MTX_DEF);
+}
+
+/*
+ * Get an sf_buf from the freelist. Will block if none are available.
+ */
+struct sf_buf *
+sf_buf_alloc(struct vm_page *m)
+{
+	struct sf_head *hash_list;
+	struct sf_buf *sf;
+	int error;
+
+	hash_list = &sf_buf_active[SF_BUF_HASH(m)];
+	mtx_lock(&sf_buf_lock);
+	LIST_FOREACH(sf, hash_list, list_entry) {
+		if (sf->m == m) {
+			sf->ref_count++;
+			goto done;
+		}
+	}
+	while ((sf = LIST_FIRST(&sf_buf_freelist)) == NULL) {
+		sf_buf_alloc_want++;
+		error = msleep(&sf_buf_freelist, &sf_buf_lock, PVM|PCATCH,
+		    "sfbufa", 0);
+		sf_buf_alloc_want--;
+
+		/*
+		 * If we got a signal, don't risk going back to sleep. 
+		 */
+		if (error)
+			goto done;
+	}
+	LIST_REMOVE(sf, list_entry);
+	LIST_INSERT_HEAD(hash_list, sf, list_entry);
+	sf->ref_count = 1;
+	sf->m = m;
+	pmap_qenter(sf->kva, &sf->m, 1);
+done:
+	mtx_unlock(&sf_buf_lock);
+	return (sf);
+}
+
+/*
+ * Detatch mapped page and release resources back to the system.
+ */
+void
+sf_buf_free(void *addr, void *args)
+{
+	struct sf_buf *sf;
+	struct vm_page *m;
+
+	sf = args;
+	mtx_lock(&sf_buf_lock);
+	m = sf->m;
+	sf->ref_count--;
+	if (sf->ref_count == 0) {
+		pmap_qremove((vm_offset_t)addr, 1);
+		sf->m = NULL;
+		LIST_REMOVE(sf, list_entry);
+		LIST_INSERT_HEAD(&sf_buf_freelist, sf, list_entry);
+		if (sf_buf_alloc_want > 0)
+			wakeup_one(&sf_buf_freelist);
+	}
+	mtx_unlock(&sf_buf_lock);
+
+	vm_page_lock_queues();
+	vm_page_unwire(m, 0);
+	/*
+	 * Check for the object going away on us. This can
+	 * happen since we don't hold a reference to it.
+	 * If so, we're responsible for freeing the page.
+	 */
+	if (m->wire_count == 0 && m->object == NULL)
+		vm_page_free(m);
+	vm_page_unlock_queues();
 }
 
 /*

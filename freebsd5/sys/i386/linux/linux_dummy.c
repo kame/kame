@@ -24,9 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/linux/linux_dummy.c,v 1.35 2002/10/11 11:43:09 sobomax Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/linux/linux_dummy.c,v 1.37 2003/11/16 15:07:10 sobomax Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -69,3 +70,25 @@ DUMMY(setfsgid);
 DUMMY(pivot_root);
 DUMMY(mincore);
 DUMMY(madvise);
+DUMMY(fadvise64);
+
+#define DUMMY_XATTR(s)						\
+int								\
+linux_ ## s ## xattr(						\
+    struct thread *td, struct linux_ ## s ## xattr_args *arg)	\
+{								\
+								\
+	return (ENOATTR);					\
+}
+DUMMY_XATTR(set);
+DUMMY_XATTR(lset);
+DUMMY_XATTR(fset);
+DUMMY_XATTR(get);
+DUMMY_XATTR(lget);
+DUMMY_XATTR(fget);
+DUMMY_XATTR(list);
+DUMMY_XATTR(llist);
+DUMMY_XATTR(flist);
+DUMMY_XATTR(remove);
+DUMMY_XATTR(lremove);
+DUMMY_XATTR(fremove);

@@ -26,12 +26,12 @@
  *
  *	i4b_lme.c - layer management entity
  *	-------------------------------------
- *
- * $FreeBSD: src/sys/i4b/layer2/i4b_lme.c,v 1.13 2002/09/02 00:52:10 brooks Exp $
- *
  *      last edit-date: [Sat Mar  9 17:49:42 2002]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer2/i4b_lme.c,v 1.14 2003/06/10 23:55:01 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,10 +23,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/ac97.h,v 1.13 2003/01/25 16:54:05 orion Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/ac97.h,v 1.15 2003/09/07 16:28:03 cg Exp $
  */
 
-#define AC97_MUTE	0x8000
+#define AC97_MUTE	0x8080
 
 #define AC97_REG_RESET	0x00
 #define		AC97_CAP_MICCHANNEL	(1 << 0)

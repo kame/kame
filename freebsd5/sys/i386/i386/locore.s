@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)locore.s	7.3 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/i386/locore.s,v 1.171 2003/04/03 23:44:34 jake Exp $
+ * $FreeBSD: src/sys/i386/i386/locore.s,v 1.181 2003/11/03 21:53:37 jhb Exp $
  *
  *		originally from: locore.s, by William F. Jolitz
  *
@@ -46,6 +46,7 @@
 #include "opt_bootp.h"
 #include "opt_compat.h"
 #include "opt_nfsroot.h"
+#include "opt_pmap.h"
 
 #include <sys/syscall.h>
 #include <sys/reboot.h>
@@ -81,16 +82,17 @@
  * This is "constructed" in locore.s on the BSP and in mp_machdep.c
  * for each AP.  DO NOT REORDER THESE WITHOUT UPDATING THE REST!
  */
-	.globl	SMP_prvspace, lapic
+	.globl	SMP_prvspace
 	.set	SMP_prvspace,(MPPTDI << PDRSHIFT)
-	.set	lapic,SMP_prvspace + (NPTEPG-1) * PAGE_SIZE
 #endif /* SMP */
 
 /*
- * Compiled KERNBASE location
+ * Compiled KERNBASE location and the kernel load address
  */
 	.globl	kernbase
 	.set	kernbase,KERNBASE
+	.globl	kernload
+	.set	kernload,KERNLOAD
 
 /*
  * Globals
@@ -98,9 +100,8 @@
 	.data
 	ALIGN_DATA			/* just to be sure */
 
-	.globl	HIDENAME(tmpstk)
 	.space	0x2000			/* space for tmpstk - temporary stack */
-HIDENAME(tmpstk):
+tmpstk:
 
 	.globl	bootinfo
 bootinfo:	.space	BOOTINFO_SIZE	/* bootinfo that we can handle */
@@ -236,6 +237,24 @@ NON_GPROF_ENTRY(btext)
 	mov	%ax, %fs
 	mov	%ax, %gs
 
+/*
+ * Clear the bss.  Not all boot programs do it, and it is our job anyway.
+ *
+ * XXX we don't check that there is memory for our bss and page tables
+ * before using it.
+ *
+ * Note: we must be careful to not overwrite an active gdt or idt.  They
+ * inactive from now until we switch to new ones, since we don't load any
+ * more segment registers or permit interrupts until after the switch.
+ */
+	movl	$R(end),%ecx
+	movl	$R(edata),%edi
+	subl	%edi,%ecx
+	xorl	%eax,%eax
+	cld
+	rep
+	stosb
+
 	call	recover_bootinfo
 
 /* Get onto a stack that we can trust. */
@@ -244,7 +263,7 @@ NON_GPROF_ENTRY(btext)
  * the old stack, but it need not be, since recover_bootinfo actually
  * returns via the old frame.
  */
-	movl	$R(HIDENAME(tmpstk)),%esp
+	movl	$R(tmpstk),%esp
 
 #ifdef PC98
 	/* pc98_machine_type & M_EPSON_PC98 */
@@ -274,31 +293,6 @@ NON_GPROF_ENTRY(btext)
 #endif
 
 	call	identify_cpu
-
-/* clear bss */
-/*
- * XXX this should be done a little earlier.
- *
- * XXX we don't check that there is memory for our bss and page tables
- * before using it.
- *
- * XXX the boot program somewhat bogusly clears the bss.  We still have
- * to do it in case we were unzipped by kzipboot.  Then the boot program
- * only clears kzipboot's bss.
- *
- * XXX the gdt and idt are still somewhere in the boot program.  We
- * depend on the convention that the boot program is below 1MB and we
- * are above 1MB to keep the gdt and idt away from the bss and page
- * tables.
- */
-	movl	$R(end),%ecx
-	movl	$R(edata),%edi
-	subl	%edi,%ecx
-	xorl	%eax,%eax
-	cld
-	rep
-	stosb
-
 	call	create_pagetables
 
 /*
@@ -739,9 +733,9 @@ over_symalloc:
 	je	no_kernend
 	movl	%edi,%esi
 no_kernend:
-	
-	addl	$PAGE_MASK,%esi
-	andl	$~PAGE_MASK,%esi
+
+	addl	$PDRMASK,%esi		/* Play conservative for now, and */
+	andl	$~PDRMASK,%esi		/*   ... wrap to next 4M. */
 	movl	%esi,R(KERNend)		/* save end of kernel */
 	movl	%esi,R(physfree)	/* next free page is at end of kernel */
 
@@ -791,16 +785,53 @@ no_kernend:
 	movl	%esi, R(SMPpt)		/* relocated to KVM space */
 #endif	/* SMP */
 
-/* Map read-only from zero to the end of the kernel text section */
+/* Map page zero read-write so bios32 calls can use it */
 	xorl	%eax, %eax
+	movl	$PG_RW,%edx
+	movl	$1,%ecx
+	fillkptphys(%edx)
+
+/* Map read-only from page 1 to the beginning of the kernel text section */
+	movl	$PAGE_SIZE, %eax
 	xorl	%edx,%edx
-	movl	$R(etext),%ecx
+	movl	$R(btext),%ecx
 	addl	$PAGE_MASK,%ecx
+	subl	%eax,%ecx
 	shrl	$PAGE_SHIFT,%ecx
 	fillkptphys(%edx)
 
-/* Map read-write, data, bss and symbols */
-	movl	$R(etext),%eax
+/*
+ * Enable PSE and PGE.
+ */
+#ifndef DISABLE_PSE
+	testl	$CPUID_PSE, R(cpu_feature)
+	jz	1f
+	movl	$PG_PS, R(pseflag)
+	movl	%cr4, %eax
+	orl	$CR4_PSE, %eax
+	movl	%eax, %cr4
+1:
+#endif
+#ifndef DISABLE_PG_G
+	testl	$CPUID_PGE, R(cpu_feature)
+	jz	2f
+	movl	$PG_G, R(pgeflag)
+	movl	%cr4, %eax
+	orl	$CR4_PGE, %eax
+	movl	%eax, %cr4
+2:
+#endif
+
+/*
+ * Write page tables for the kernel starting at btext and
+ * until the end.  Make sure to map read+write.  We do this even
+ * if we've enabled PSE above, we'll just switch the corresponding kernel
+ * PDEs before we turn on paging.
+ *
+ * XXX: We waste some pages here in the PSE case!  DON'T BLINDLY REMOVE
+ * THIS!  SMP needs the page table to be there to map the kernel P==V.
+ */
+	movl	$R(btext),%eax
 	addl	$PAGE_MASK, %eax
 	andl	$~PAGE_MASK, %eax
 	movl	$PG_RW,%edx
@@ -889,12 +920,33 @@ no_kernend:
 	movl	$NKPT, %ecx
 	fillkpt(R(IdlePTD), $PG_RW)
 
-/* install pde's for pt's */
+/*
+ * For the non-PSE case, install PDEs for PTs covering the kernel.
+ * For the PSE case, do the same, but clobber the ones corresponding
+ * to the kernel (from btext to KERNend) with 4M ('PS') PDEs immediately
+ * after.
+ */
 	movl	R(KPTphys), %eax
 	movl	$KPTDI, %ebx
 	movl	$NKPT, %ecx
 	fillkpt(R(IdlePTD), $PG_RW)
+	cmpl	$0,R(pseflag)
+	je	done_pde
 
+	movl	R(KERNend), %ecx
+	movl	$KERNLOAD, %eax
+	subl	%eax, %ecx
+	shrl	$PDRSHIFT, %ecx
+	movl	$(KPTDI+(KERNLOAD/(1 << PDRSHIFT))), %ebx
+	shll	$PDESHIFT, %ebx
+	addl	R(IdlePTD), %ebx
+	orl	$(PG_V|PG_RW|PG_PS), %eax
+1:	movl	%eax, (%ebx)
+	addl	$(1 << PDRSHIFT), %eax
+	addl	$PDESIZE, %ebx
+	loop	1b
+
+done_pde:
 /* install a pde recursively mapping page directory as a page table */
 	movl	R(IdlePTD), %eax
 	movl	$PTDPTDI, %ebx

@@ -35,9 +35,12 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)trap.c	7.4 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/kern/subr_trap.c,v 1.254 2003/05/13 20:35:59 jhb Exp $
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/subr_trap.c,v 1.261 2003/09/05 22:15:26 peter Exp $");
+
+#include "opt_ktrace.h"
 #include "opt_mac.h"
 #ifdef __i386__
 #include "opt_npx.h"
@@ -50,13 +53,17 @@
 #include <sys/mac.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
-#include <sys/kse.h>
 #include <sys/ktr.h>
 #include <sys/resourcevar.h>
 #include <sys/sched.h>
 #include <sys/signalvar.h>
 #include <sys/systm.h>
 #include <sys/vmmeter.h>
+#ifdef KTRACE
+#include <sys/uio.h>
+#include <sys/ktrace.h>
+#endif
+
 #include <machine/cpu.h>
 #include <machine/pcb.h>
 
@@ -107,7 +114,7 @@ userret(td, frame, oticks)
 	/*
 	 * Do special thread processing, e.g. upcall tweaking and such.
 	 */
-	if (p->p_flag & P_THREADED) {
+	if (p->p_flag & P_SA) {
 		thread_userret(td, frame);
 	}
 
@@ -174,7 +181,7 @@ ast(struct trapframe *framep)
 	p->p_sflag &= ~PS_MACPEND;
 #endif
 	td->td_flags &= ~(TDF_ASTPENDING | TDF_NEEDSIGCHK |
-	    TDF_NEEDRESCHED | TDF_OWEUPC);
+	    TDF_NEEDRESCHED | TDF_OWEUPC | TDF_INTERRUPT);
 	cnt.v_soft++;
 	prticks = 0;
 	if (flags & TDF_OWEUPC && p->p_flag & P_PROFIL) {
@@ -234,32 +241,27 @@ ast(struct trapframe *framep)
 		mac_thread_userret(td);
 #endif
 	if (flags & TDF_NEEDRESCHED) {
+#ifdef KTRACE
+		if (KTRPOINT(td, KTR_CSW))
+			ktrcsw(1, 1);
+#endif
 		mtx_lock_spin(&sched_lock);
 		sched_prio(td, kg->kg_user_pri);
 		p->p_stats->p_ru.ru_nivcsw++;
 		mi_switch();
 		mtx_unlock_spin(&sched_lock);
+#ifdef KTRACE
+		if (KTRPOINT(td, KTR_CSW))
+			ktrcsw(0, 1);
+#endif
 	}
 	if (flags & TDF_NEEDSIGCHK) {
-		int sigs;
-
-		sigs = 0;
 		PROC_LOCK(p);
 		mtx_lock(&p->p_sigacts->ps_mtx);
-		while ((sig = cursig(td)) != 0) {
+		while ((sig = cursig(td)) != 0)
 			postsig(sig);
-			sigs++;
-		}
 		mtx_unlock(&p->p_sigacts->ps_mtx);
 		PROC_UNLOCK(p);
-		if (p->p_flag & P_THREADED && sigs) {
-			struct kse_upcall *ku = td->td_upcall;
-			if ((void *)TRAPF_PC(framep) != ku->ku_func) {
-				mtx_lock_spin(&sched_lock);
-				ku->ku_flags |= KUF_DOUPCALL;
-				mtx_unlock_spin(&sched_lock);
-			}
-		}
 	}
 
 	userret(td, framep, sticks);

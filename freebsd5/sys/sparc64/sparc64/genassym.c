@@ -24,8 +24,10 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)genassym.c	5.11 (Berkeley) 5/10/91
- * $FreeBSD: src/sys/sparc64/sparc64/genassym.c,v 1.51 2003/04/29 00:37:41 jake Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/genassym.c,v 1.54 2003/08/24 06:23:36 jmg Exp $
  */
+
+#include "opt_kstack_pages.h"
 
 #include <sys/param.h>
 #include <sys/assym.h>
@@ -88,6 +90,8 @@ ASSYM(FPRS_DU, FPRS_DU);
 ASSYM(FPRS_FEF, FPRS_FEF);
 
 ASSYM(LSU_VW, LSU_VW);
+ASSYM(LSU_IC, LSU_IC);
+ASSYM(LSU_DC, LSU_DC);
 
 ASSYM(TAR_VPN_SHIFT, TAR_VPN_SHIFT);
 
@@ -218,6 +222,7 @@ ASSYM(IV_FUNC, offsetof(struct intr_vector, iv_func));
 ASSYM(IV_ARG, offsetof(struct intr_vector, iv_arg));
 ASSYM(IV_PRI, offsetof(struct intr_vector, iv_pri));
 
+ASSYM(IV_NAMLEN, IV_NAMLEN);
 ASSYM(IV_MAX, IV_MAX);
 
 ASSYM(TDF_ASTPENDING, TDF_ASTPENDING);

@@ -22,9 +22,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/vm/uma_dbg.c,v 1.10 2002/11/11 11:50:03 mjacob Exp $
- *
  */
 
 /*
@@ -32,6 +29,8 @@
  *
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/vm/uma_dbg.c,v 1.13 2003/09/27 21:33:13 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -67,8 +66,8 @@ trash_ctor(void *mem, int size, void *arg)
 
 	for (p = mem; cnt > 0; cnt--, p++)
 		if (*p != uma_junk)
-			panic("Memory modified after free %p(%d)\n",
-			    mem, size);
+			panic("Memory modified after free %p(%d) val=%x @ %p\n",
+			    mem, size, *p, p);
 }
 
 /*
@@ -133,8 +132,8 @@ mtrash_ctor(void *mem, int size, void *arg)
 
 	for (p = mem; cnt > 0; cnt--, p++)
 		if (*p != uma_junk) {
-			printf("Memory modified after free %p(%d)\n",
-			    mem, size);
+			printf("Memory modified after free %p(%d) val=%x @ %p\n",
+			    mem, size, *p, p);
 			panic("Most recently used by %s\n", (*ksp == NULL)?
 			    "none" : (*ksp)->ks_shortdesc);
 		}
@@ -196,9 +195,9 @@ uma_dbg_getslab(uma_zone_t zone, void *item)
 	u_int8_t *mem;
 
 	mem = (u_int8_t *)((unsigned long)item & (~UMA_SLAB_MASK));
-	if (zone->uz_flags & UMA_ZFLAG_MALLOC) {
+	if (zone->uz_flags & UMA_ZONE_MALLOC) {
 		slab = vtoslab((vm_offset_t)mem);
-	} else if (zone->uz_flags & UMA_ZFLAG_HASH) {
+	} else if (zone->uz_flags & UMA_ZONE_HASH) {
 		slab = hash_sfind(&zone->uz_hash, mem);
 	} else {
 		mem += zone->uz_pgoff;

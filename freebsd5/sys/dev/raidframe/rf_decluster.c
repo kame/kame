@@ -1,5 +1,7 @@
-/*	$FreeBSD: src/sys/dev/raidframe/rf_decluster.c,v 1.1 2002/10/20 08:17:36 scottl Exp $ */
 /*	$NetBSD: rf_decluster.c,v 1.6 2001/01/26 04:40:03 oster Exp $	*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/raidframe/rf_decluster.c,v 1.4 2003/09/29 14:23:59 scottl Exp $");
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -64,7 +66,7 @@
 extern int rf_copyback_in_progress;	/* debug only */
 
 /* found in rf_kintf.c */
-int     rf_GetSpareTableFromDaemon(RF_SparetWait_t * req);
+extern int     rf_GetSpareTableFromDaemon(RF_SparetWait_t * req);
 
 #if (RF_INCLUDE_PARITY_DECLUSTERING > 0) || (RF_INCLUDE_PARITY_DECLUSTERING_PQ > 0)
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/sparc64/cheetah.c,v 1.3 2003/04/13 21:54:58 jake Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/cheetah.c,v 1.5 2003/11/11 06:41:54 jake Exp $
  */
 
 #include "opt_pmap.h"
@@ -44,6 +44,22 @@
 #include <machine/cpufunc.h>
 #include <machine/smp.h>
 #include <machine/tlb.h>
+
+/*
+ * Enable level 1 caches.
+ */
+void
+cheetah_cache_enable(void)
+{
+}
+
+/*
+ * Flush all lines from the level 1 caches.
+ */
+void
+cheetah_cache_flush(void)
+{
+}
 
 /*
  * Flush a physical page from the data cache.

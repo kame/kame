@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/nwfs/nwfs_io.c,v 1.27 2003/03/02 16:54:36 des Exp $
+ * $FreeBSD: src/sys/fs/nwfs/nwfs_io.c,v 1.32 2003/10/04 23:37:38 alc Exp $
  *
  */
 #include <sys/param.h>
@@ -404,6 +404,7 @@ nwfs_getpages(ap)
 	struct ucred *cred;
 	struct nwmount *nmp;
 	struct nwnode *np;
+	vm_object_t object;
 	vm_page_t *pages;
 
 	vp = ap->a_vp;
@@ -414,7 +415,7 @@ nwfs_getpages(ap)
 	pages = ap->a_m;
 	count = ap->a_count;
 
-	if (vp->v_object == NULL) {
+	if ((object = vp->v_object) == NULL) {
 		printf("nwfs_getpages: called with non-merged cache vnode??\n");
 		return VM_PAGER_ERROR;
 	}
@@ -439,6 +440,7 @@ nwfs_getpages(ap)
 
 	relpbuf(bp, &nwfs_pbuf_freecnt);
 
+	VM_OBJECT_LOCK(object);
 	if (error && (uio.uio_resid == count)) {
 		printf("nwfs_getpages: error %d\n",error);
 		vm_page_lock_queues();
@@ -447,6 +449,7 @@ nwfs_getpages(ap)
 				vm_page_free(pages[i]);
 		}
 		vm_page_unlock_queues();
+		VM_OBJECT_UNLOCK(object);
 		return VM_PAGER_ERROR;
 	}
 
@@ -493,6 +496,7 @@ nwfs_getpages(ap)
 		}
 	}
 	vm_page_unlock_queues();
+	VM_OBJECT_UNLOCK(object);
 	return 0;
 #endif /* NWFS_RWCACHE */
 }
@@ -522,7 +526,7 @@ nwfs_putpages(ap)
 #ifndef NWFS_RWCACHE
 	td = curthread;			/* XXX */
 	cred = td->td_ucred;		/* XXX */
-	VOP_OPEN(vp, FWRITE, cred, td);
+	VOP_OPEN(vp, FWRITE, cred, td, -1);
 	error = vop_stdputpages(ap);
 	VOP_CLOSE(vp, FWRITE, cred, td);
 	return error;
@@ -539,7 +543,7 @@ nwfs_putpages(ap)
 
 	td = curthread;			/* XXX */
 	cred = td->td_ucred;		/* XXX */
-/*	VOP_OPEN(vp, FWRITE, cred, td);*/
+/*	VOP_OPEN(vp, FWRITE, cred, td, -1);*/
 	np = VTONW(vp);
 	nmp = VFSTONWFS(vp->v_mount);
 	pages = ap->a_m;
@@ -601,12 +605,8 @@ nwfs_vinvalbuf(vp, flags, cred, td, intrflg)
 /*	struct nwmount *nmp = VTONWFS(vp);*/
 	int error = 0, slpflag, slptimeo;
 
-	VI_LOCK(vp);
-	if (vp->v_iflag & VI_XLOCK) {
-		VI_UNLOCK(vp);
+	if (vp->v_iflag & VI_XLOCK)
 		return (0);
-	}
-	VI_UNLOCK(vp);
 
 	if (intrflg) {
 		slpflag = PCATCH;

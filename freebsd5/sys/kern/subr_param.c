@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)param.c	8.3 (Berkeley) 8/20/94
- * $FreeBSD: src/sys/kern/subr_param.c,v 1.55 2002/08/30 04:04:35 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/subr_param.c,v 1.60 2003/08/11 05:51:50 silby Exp $");
 
 #include "opt_param.h"
 #include "opt_maxusers.h"
@@ -75,6 +77,8 @@ int	nbuf;
 int	nswbuf;
 int	maxswzone;			/* max swmeta KVA storage */
 int	maxbcache;			/* max buffer cache KVA storage */
+int	maxpipekva;			/* Limit on pipe KVA */
+int	maxpipekvawired;		/* Limit on wired pipe KVA */
 u_quad_t	maxtsiz;			/* max text size */
 u_quad_t	dfldsiz;			/* initial data size limit */
 u_quad_t	maxdsiz;			/* max data size */
@@ -157,7 +161,7 @@ init_param2(long physpages)
 	TUNABLE_INT_FETCH("kern.maxfiles", &maxfiles);
 	maxprocperuid = (maxproc * 9) / 10;
 	maxfilesperproc = (maxfiles * 9) / 10;
-
+	
 	/*
 	 * Cannot be changed after boot.
 	 */
@@ -166,4 +170,27 @@ init_param2(long physpages)
 
 	ncallout = 16 + maxproc + maxfiles;
 	TUNABLE_INT_FETCH("kern.ncallout", &ncallout);
+}
+
+/*
+ * Boot time overrides that are scaled against the kernel map
+ */
+void
+init_param3(long kmempages)
+{
+	/*
+	 * Limit pageable pipe memory usage to 5% of the kernel map
+	 * (via pipe_map), and nonpageable pipe memory usage to 2.5%
+	 * of the same.  Ensure that all have reasonable floors.
+	 * (See sys_pipe.c for more info.)
+	 */
+	maxpipekva = (kmempages / 20) * PAGE_SIZE;
+	maxpipekvawired = (kmempages / 40) * PAGE_SIZE;
+
+	if (maxpipekva < 512 * 1024)
+		maxpipekva = 512 * 1024;
+	if (maxpipekvawired < 512 * 1024)
+		maxpipekvawired = 512 * 1024;
+
+	TUNABLE_INT_FETCH("kern.ipc.maxpipekva", &maxpipekva);
 }

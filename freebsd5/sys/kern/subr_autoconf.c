@@ -41,8 +41,10 @@
  *
  *	@(#)subr_autoconf.c	8.1 (Berkeley) 6/10/93
  *
- * $FreeBSD: src/sys/kern/subr_autoconf.c,v 1.17 2002/03/19 21:24:06 alfred Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/subr_autoconf.c,v 1.20 2003/07/22 10:36:36 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

@@ -32,8 +32,10 @@
  *
  *	from tahoe:	in_cksum.c	1.2	86/01/05
  *	from:		@(#)in_cksum.c	1.3 (Berkeley) 1/19/91
- * $FreeBSD: src/sys/i386/i386/in_cksum.c,v 1.24 2002/06/22 22:35:49 jdp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/i386/in_cksum.c,v 1.25 2003/06/02 06:43:14 obrien Exp $");
 
 /*
  * MPsafe: alfred

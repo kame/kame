@@ -1,11 +1,3 @@
-/* 
- * $FreeBSD: src/sys/netncp/ncp_crypt.c,v 1.4 2000/10/29 13:57:12 phk Exp $
- */
-#include <sys/param.h>
-#include <sys/systm.h>
-#include <netncp/ncp.h>
-#include <netncp/ncp_subr.h>
-
 /*
  *  Routines in this file based on work of Volker Lendecke
  */
@@ -24,7 +16,13 @@
    $*
    $********************************************************* */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netncp/ncp_crypt.c,v 1.5 2003/06/11 05:30:35 obrien Exp $");
 
+#include <sys/param.h>
+#include <sys/systm.h>
+#include <netncp/ncp.h>
+#include <netncp/ncp_subr.h>
 
 typedef unsigned char buf32[32];
 

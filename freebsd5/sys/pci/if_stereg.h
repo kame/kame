@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_stereg.h,v 1.11 2002/12/23 21:50:47 phk Exp $
+ * $FreeBSD: src/sys/pci/if_stereg.h,v 1.12 2003/11/14 19:00:32 sam Exp $
  */
 
 /*
@@ -530,6 +530,7 @@ struct ste_softc {
 
 #define	STE_LOCK(_sc)		mtx_lock(&(_sc)->ste_mtx)
 #define	STE_UNLOCK(_sc)		mtx_unlock(&(_sc)->ste_mtx)
+#define	STE_LOCK_ASSERT(_sc)	mtx_assert(&(_sc)->ste_mtx, MA_OWNED)
 
 struct ste_mii_frame {
 	u_int8_t		mii_stdelim;

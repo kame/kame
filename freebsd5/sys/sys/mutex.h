@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  *	from BSDI $Id: mutex.h,v 2.7.2.35 2000/04/27 03:10:26 cp Exp $
- * $FreeBSD: src/sys/sys/mutex.h,v 1.61 2003/05/18 03:46:30 scottl Exp $
+ * $FreeBSD: src/sys/sys/mutex.h,v 1.68 2003/11/05 23:42:50 sam Exp $
  */
 
 #ifndef _SYS_MUTEX_H_
@@ -236,12 +236,29 @@ void	_mtx_assert(struct mtx *m, int what, const char *file, int line);
 #define mtx_unlock(m)		mtx_unlock_flags((m), 0)
 #define mtx_unlock_spin(m)	mtx_unlock_spin_flags((m), 0)
 
-struct mtx *mtx_pool_find(void *ptr);
-struct mtx *mtx_pool_alloc(void);
-void mtx_pool_lock(void *ptr);
-void mtx_pool_unlock(void *ptr);
+struct mtx_pool;
 
-extern int mtx_pool_valid;
+struct mtx_pool *mtx_pool_create(const char *mtx_name, int pool_size, int opts);
+void mtx_pool_destroy(struct mtx_pool **poolp);
+struct mtx *mtx_pool_find(struct mtx_pool *pool, void *ptr);
+struct mtx *mtx_pool_alloc(struct mtx_pool *pool);
+#define mtx_pool_lock(pool, ptr)					\
+	mtx_lock(mtx_pool_find((pool), (ptr)))
+#define mtx_pool_lock_spin(pool, ptr)					\
+	mtx_lock_spin(mtx_pool_find((pool), (ptr)))
+#define mtx_pool_unlock(pool, ptr)					\
+	mtx_unlock(mtx_pool_find((pool), (ptr)))
+#define mtx_pool_unlock_spin(pool, ptr)					\
+	mtx_unlock_spin(mtx_pool_find((pool), (ptr)))
+
+/*
+ * mtxpool_lockbuilder is a pool of sleep locks that is not witness
+ * checked and should only be used for building higher level locks.
+ *
+ * mtxpool_sleep is a general purpose pool of sleep mutexes.
+ */
+extern struct mtx_pool *mtxpool_lockbuilder;
+extern struct mtx_pool *mtxpool_sleep;
 
 #ifndef LOCK_DEBUG
 #error LOCK_DEBUG not defined, include <sys/lock.h> before <sys/mutex.h>
@@ -321,6 +338,27 @@ do {									\
 	if (mtx_owned(&Giant))						\
 		WITNESS_RESTORE(&Giant.mtx_object, Giant)
 #endif
+
+/*
+ * Network MPSAFE temporary workarounds.  When debug_mpsafenet
+ * is 1 the network is assumed to operate without Giant on the
+ * input path and protocols that require Giant must collect it
+ * on entry.  When 0 Giant is grabbed in the network interface
+ * ISR's and in the netisr path and there is no need to grab
+ * the Giant lock.
+ *
+ * This mechanism is intended as temporary until everything of
+ * importance is properly locked.
+ */
+extern	int debug_mpsafenet;		/* defined in net/netisr.c */
+#define	NET_PICKUP_GIANT() do {						\
+	if (debug_mpsafenet)						\
+		mtx_lock(&Giant);					\
+} while (0)
+#define	NET_DROP_GIANT() do {						\
+	if (debug_mpsafenet)						\
+		mtx_unlock(&Giant);					\
+} while (0)
 
 #define	UGAR(rval) do {							\
 	int _val = (rval);						\

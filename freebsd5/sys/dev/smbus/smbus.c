@@ -23,9 +23,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/smbus/smbus.c,v 1.16 2002/09/21 21:43:39 nsouch Exp $
  *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/smbus/smbus.c,v 1.18 2003/09/06 13:58:06 dfr Exp $");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -114,5 +116,4 @@ DRIVER_MODULE(smbus, alpm, smbus_driver, smbus_devclass, 0, 0);
 DRIVER_MODULE(smbus, ichsmb, smbus_driver, smbus_devclass, 0, 0);
 DRIVER_MODULE(smbus, amdpm, smbus_driver, smbus_devclass, 0, 0);
 DRIVER_MODULE(smbus, viapropm, smbus_driver, smbus_devclass, 0, 0);
-DRIVER_MODULE(smbus, nfpm, smbus_driver, smbus_devclass, 0, 0);
 MODULE_VERSION(smbus, SMBUS_MODVER);

@@ -28,9 +28,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/netsmb/smb_subr.c,v 1.16 2003/05/13 20:36:01 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netsmb/smb_subr.c,v 1.17 2003/06/11 05:32:09 obrien Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/endian.h>

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)resource.h	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/resource.h,v 1.19 2003/02/16 13:30:29 phk Exp $
+ * $FreeBSD: src/sys/sys/resource.h,v 1.20 2003/11/02 03:50:16 jeff Exp $
  */
 
 #ifndef _SYS_RESOURCE_H_
@@ -42,9 +42,6 @@
  */
 #define	PRIO_MIN	-20
 #define	PRIO_MAX	20
-#ifdef _KERNEL
-#define	PRIO_TOTAL	(PRIO_MAX - PRIO_MIN)
-#endif /* _KERNEL */
 
 #define	PRIO_PROCESS	0
 #define	PRIO_PGRP	1

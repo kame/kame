@@ -1,6 +1,4 @@
-/* $FreeBSD: src/sys/kern/sysv_ipc.c,v 1.24 2003/01/13 23:04:31 dillon Exp $ */
 /*	$NetBSD: sysv_ipc.c,v 1.7 1994/06/29 06:33:11 cgd Exp $	*/
-
 /*
  * Copyright (c) 1994 Herb Peyerl <hpeyerl@novatel.ca>
  * All rights reserved.
@@ -30,6 +28,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/sysv_ipc.c,v 1.27 2003/06/11 00:56:57 obrien Exp $");
 
 #include "opt_sysvipc.h"
 
@@ -76,21 +77,41 @@ ipcperm(td, perm, mode)
 	int mode;
 {
 	struct ucred *cred = td->td_ucred;
+	int error;
 
-	/* Check for user match. */
 	if (cred->cr_uid != perm->cuid && cred->cr_uid != perm->uid) {
-		if (mode & IPC_M)
-			return (suser(td) == 0 ? 0 : EPERM);
-		/* Check for group match. */
+		/*
+		 * For a non-create/owner, we require privilege to
+		 * modify the object protections.  Note: some other
+		 * implementations permit IPC_M to be delegated to
+		 * unprivileged non-creator/owner uids/gids.
+		 */
+		if (mode & IPC_M) {
+			error = suser(td);
+			if (error)
+				return (error);
+		}
+		/*
+		 * Try to match against creator/owner group; if not, fall
+		 * back on other.
+		 */
 		mode >>= 3;
 		if (!groupmember(perm->gid, cred) &&
 		    !groupmember(perm->cgid, cred))
-			/* Check for `other' match. */
 			mode >>= 3;
+	} else {
+		/*
+		 * Always permit the creator/owner to update the object
+		 * protections regardless of whether the object mode
+		 * permits it.
+		 */
+		if (mode & IPC_M)
+			return (0);
 	}
 
-	if (mode & IPC_M)
-		return (0);
-	return ((mode & perm->mode) == mode ||
-	    suser(td) == 0 ? 0 : EACCES);
+	if ((mode & perm->mode) != mode) {
+		if (suser(td) != 0)
+			return (EACCES);
+	}
+	return (0);
 }

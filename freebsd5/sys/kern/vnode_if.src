@@ -31,7 +31,7 @@
 # SUCH DAMAGE.
 #
 #	@(#)vnode_if.src	8.12 (Berkeley) 5/14/95
-# $FreeBSD: src/sys/kern/vnode_if.src,v 1.60 2003/01/04 22:10:36 phk Exp $
+# $FreeBSD: src/sys/kern/vnode_if.src,v 1.66 2003/07/28 18:53:28 rwatson Exp $
 #
 
 #
@@ -52,6 +52,12 @@
 # -: not applicable.  vnode does not yet (or no longer) exists.
 # =: the same on input and output, may be either L or U.
 # X: locked if not nil.
+#
+# The paramater named "vpp" is assumed to be always used with double
+# indirection (**vpp) and that name is hard-codeed in vnode_if.awk !
+#
+# If other such parameters are introduced, they have to be added to
+# the AWK script at the head of the definition of "add_debug_code()".
 #
 
 #
@@ -129,6 +135,7 @@ vop_open {
 	IN int mode;
 	IN struct ucred *cred;
 	IN struct thread *td;
+	IN int fdidx;
 };
 
 #
@@ -545,10 +552,33 @@ vop_getextattr {
 };
 
 #
+#% listextattr	vp	L L L
+#
+vop_listextattr {
+	IN struct vnode *vp;
+	IN int attrnamespace;
+	INOUT struct uio *uio;
+	OUT size_t *size;
+	IN struct ucred *cred;
+	IN struct thread *td;
+};
+
+#
 #% openextattr	vp	L L L
 #
 vop_openextattr {
 	IN struct vnode *vp;
+	IN struct ucred *cred;
+	IN struct thread *td;
+};
+
+#
+#% deleteextattr	vp	L L L
+#
+vop_deleteextattr {
+	IN struct vnode *vp;
+	IN int attrnamespace;
+	IN const char *name;
 	IN struct ucred *cred;
 	IN struct thread *td;
 };

@@ -31,8 +31,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_tables.c	8.1 (Berkeley) 6/11/93
- * $FreeBSD: src/sys/ufs/ffs/ffs_tables.c,v 1.9 2002/06/21 06:18:03 mckusick Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_tables.c,v 1.10 2003/06/11 06:31:28 obrien Exp $");
 
 #include <sys/param.h>
 #include <ufs/ufs/dinode.h>

@@ -17,8 +17,10 @@
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
  * NO EVENT SHALL THE AUTHORS BE LIABLE.
  *
- * $FreeBSD: src/sys/dev/si/si_isa.c,v 1.3 2002/11/07 19:56:21 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/si/si_isa.c,v 1.4 2003/08/24 18:03:44 obrien Exp $");
 
 #include "opt_debug_si.h"
 

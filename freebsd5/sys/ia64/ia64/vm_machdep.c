@@ -38,7 +38,7 @@
  *
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
- * $FreeBSD: src/sys/ia64/ia64/vm_machdep.c,v 1.57 2003/05/16 21:26:41 marcel Exp $
+ * $FreeBSD: src/sys/ia64/ia64/vm_machdep.c,v 1.76 2003/11/16 23:40:06 alc Exp $
  */
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -67,6 +67,8 @@
  * rights to redistribute these changes.
  */
 
+#include "opt_kstack_pages.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -76,6 +78,8 @@
 #include <sys/vnode.h>
 #include <sys/vmmeter.h>
 #include <sys/kernel.h>
+#include <sys/mbuf.h>
+#include <sys/sf_buf.h>
 #include <sys/sysctl.h>
 #include <sys/unistd.h>
 
@@ -96,6 +100,20 @@
 
 #include <i386/include/psl.h>
 
+static void	sf_buf_init(void *arg);
+SYSINIT(sock_sf, SI_SUB_MBUF, SI_ORDER_ANY, sf_buf_init, NULL)
+
+/*
+ * Expanded sf_freelist head. Really an SLIST_HEAD() in disguise, with the
+ * sf_freelist head with the sf_lock mutex.
+ */
+static struct {
+	SLIST_HEAD(, sf_buf) sf_head;
+	struct mtx sf_lock;
+} sf_freelist;
+
+static u_int	sf_buf_alloc_want;
+
 void
 cpu_thread_exit(struct thread *td)
 {
@@ -109,16 +127,98 @@ cpu_thread_clean(struct thread *td)
 void
 cpu_thread_setup(struct thread *td)
 {
+	intptr_t sp;
+
+	sp = td->td_kstack + KSTACK_PAGES * PAGE_SIZE;
+	sp -= sizeof(struct pcb);
+	td->td_pcb = (struct pcb *)sp;
+	sp -= sizeof(struct trapframe);
+	td->td_frame = (struct trapframe *)sp;
+	td->td_frame->tf_length = sizeof(struct trapframe);
 }
 
 void
-cpu_set_upcall(struct thread *td, void *pcb)
+cpu_thread_swapin(struct thread *td)
 {
+}
+
+void
+cpu_thread_swapout(struct thread *td)
+{
+
+	ia64_highfp_save(td);
+}
+
+void
+cpu_set_upcall(struct thread *td, struct thread *td0)
+{
+	struct pcb *pcb;
+	struct trapframe *tf;
+
+	tf = td->td_frame;
+	KASSERT(tf != NULL, ("foo"));
+	bcopy(td0->td_frame, tf, sizeof(*tf));
+	tf->tf_length = sizeof(struct trapframe);
+	tf->tf_flags = FRAME_SYSCALL;
+	tf->tf_special.ndirty = 0;
+	tf->tf_special.bspstore &= ~0x1ffUL;
+	tf->tf_scratch.gr8 = 0;
+	tf->tf_scratch.gr9 = 1;
+	tf->tf_scratch.gr10 = 0;
+
+	pcb = td->td_pcb;
+	KASSERT(pcb != NULL, ("foo"));
+	bcopy(td0->td_pcb, pcb, sizeof(*pcb));
+	pcb->pcb_special.bspstore = td->td_kstack;
+	pcb->pcb_special.pfs = 0;
+	pcb->pcb_current_pmap = vmspace_pmap(td->td_proc->p_vmspace);
+	pcb->pcb_special.sp = (uintptr_t)tf - 16;
+	pcb->pcb_special.rp = FDESC_FUNC(fork_trampoline);
+	cpu_set_fork_handler(td, (void (*)(void*))fork_return, td);
 }
 
 void
 cpu_set_upcall_kse(struct thread *td, struct kse_upcall *ku)
 {
+	struct ia64_fdesc *fd;
+	struct trapframe *tf;
+	uint64_t ndirty, stack;
+
+	tf = td->td_frame;
+	ndirty = tf->tf_special.ndirty + (tf->tf_special.bspstore & 0x1ffUL);
+
+	KASSERT((ndirty & ~PAGE_MASK) == 0,
+	    ("Whoa there! We have more than 8KB of dirty registers!"));
+
+	fd = ku->ku_func;
+	stack = (uint64_t)ku->ku_stack.ss_sp;
+
+	bzero(&tf->tf_special, sizeof(tf->tf_special));
+	tf->tf_special.iip = fuword(&fd->func);
+	tf->tf_special.gp = fuword(&fd->gp);
+	tf->tf_special.sp = (stack + ku->ku_stack.ss_size - 16) & ~15;
+	tf->tf_special.rsc = 0xf;
+	tf->tf_special.fpsr = IA64_FPSR_DEFAULT;
+	tf->tf_special.psr = IA64_PSR_IC | IA64_PSR_I | IA64_PSR_IT |
+	    IA64_PSR_DT | IA64_PSR_RT | IA64_PSR_DFH | IA64_PSR_BN |
+	    IA64_PSR_CPL_USER;
+
+	if (tf->tf_flags & FRAME_SYSCALL) {
+		tf->tf_special.cfm = (3UL<<62) | (1UL<<7) | 1UL;
+		tf->tf_special.bspstore = stack + 8;
+		suword((caddr_t)stack, (uint64_t)ku->ku_mailbox);
+	} else {
+		tf->tf_special.cfm = (1UL<<63) | (1UL<<7) | 1UL;
+		tf->tf_special.bspstore = stack;
+		tf->tf_special.ndirty = 8;
+		stack = td->td_kstack + ndirty - 8;
+		if ((stack & 0x1ff) == 0x1f8) {
+			*(uint64_t*)stack = 0;
+			tf->tf_special.ndirty += 8;
+			stack -= 8;
+		}
+		*(uint64_t*)stack = (uint64_t)ku->ku_mailbox;
+	}
 }
 
 /*
@@ -131,6 +231,7 @@ cpu_fork(struct thread *td1, struct proc *p2 __unused, struct thread *td2,
     int flags)
 {
 	char *stackp;
+	uint64_t ndirty;
 
 	KASSERT(td1 == curthread || td1 == &thread0,
 	    ("cpu_fork: td1 not curthread and not thread0"));
@@ -166,9 +267,9 @@ cpu_fork(struct thread *td1, struct proc *p2 __unused, struct thread *td2,
 	td2->td_frame = (struct trapframe *)stackp;
 	bcopy(td1->td_frame, td2->td_frame, sizeof(struct trapframe));
 	td2->td_frame->tf_length = sizeof(struct trapframe);
-
-	bcopy((void*)td1->td_kstack, (void*)td2->td_kstack,
-	    td2->td_frame->tf_special.ndirty);
+	ndirty = td2->td_frame->tf_special.ndirty +
+	    (td2->td_frame->tf_special.bspstore & 0x1ffUL);
+	bcopy((void*)td1->td_kstack, (void*)td2->td_kstack, ndirty);
 
 	/* Set-up the return values as expected by the fork() libc stub. */
 	if (td2->td_frame->tf_special.psr & IA64_PSR_IS) {
@@ -180,8 +281,7 @@ cpu_fork(struct thread *td1, struct proc *p2 __unused, struct thread *td2,
 		td2->td_frame->tf_scratch.gr10 = 0;
 	}
 
-	td2->td_pcb->pcb_special.bspstore = td2->td_kstack +
-	    td2->td_frame->tf_special.ndirty;
+	td2->td_pcb->pcb_special.bspstore = td2->td_kstack + ndirty;
 	td2->td_pcb->pcb_special.pfs = 0;
 	td2->td_pcb->pcb_current_pmap = vmspace_pmap(td2->td_proc->p_vmspace);
 
@@ -209,7 +309,6 @@ cpu_set_fork_handler(td, func, arg)
 /*
  * cpu_exit is called as the last action during exit.
  * We drop the fp state (if we have it) and switch to a live one.
- * When the proc is reaped, cpu_wait() will gc the VM state.
  */
 void
 cpu_exit(struct thread *td)
@@ -225,20 +324,79 @@ cpu_sched_exit(td)
 {
 }
 
-void
-cpu_wait(p)
-	struct proc *p;
+/*
+ * Allocate a pool of sf_bufs (sendfile(2) or "super-fast" if you prefer. :-))
+ */
+static void
+sf_buf_init(void *arg)
 {
+	struct sf_buf *sf_bufs;
+	int i;
+
+	mtx_init(&sf_freelist.sf_lock, "sf_bufs list lock", NULL, MTX_DEF);
+	SLIST_INIT(&sf_freelist.sf_head);
+	sf_bufs = malloc(nsfbufs * sizeof(struct sf_buf), M_TEMP,
+	    M_NOWAIT | M_ZERO);
+	for (i = 0; i < nsfbufs; i++)
+		SLIST_INSERT_HEAD(&sf_freelist.sf_head, sf_bufs+i, free_list);
+	sf_buf_alloc_want = 0;
 }
 
 /*
- * Force reset the processor by invalidating the entire address space!
+ * Get an sf_buf from the freelist. Will block if none are available.
+ */
+struct sf_buf *
+sf_buf_alloc(struct vm_page *m)
+{
+	struct sf_buf *sf;
+	int error;
+
+	mtx_lock(&sf_freelist.sf_lock);
+	while ((sf = SLIST_FIRST(&sf_freelist.sf_head)) == NULL) {
+		sf_buf_alloc_want++;
+		error = msleep(&sf_freelist, &sf_freelist.sf_lock, PVM|PCATCH,
+		    "sfbufa", 0);
+		sf_buf_alloc_want--;
+
+		/* If we got a signal, don't risk going back to sleep. */
+		if (error)
+			break;
+	}
+	if (sf != NULL) {
+		SLIST_REMOVE_HEAD(&sf_freelist.sf_head, free_list);
+		sf->m = m;
+	}
+	mtx_unlock(&sf_freelist.sf_lock);
+	return (sf);
+}
+
+/*
+ * Detach mapped page and release resources back to the system.
  */
 void
-cpu_reset()
+sf_buf_free(void *addr, void *args)
 {
+	struct sf_buf *sf;
+	struct vm_page *m;
 
-	cpu_boot(0);
+	sf = args;
+	m = sf->m;
+	vm_page_lock_queues();
+	vm_page_unwire(m, 0);
+	/*
+	 * Check for the object going away on us. This can happen since we
+	 * don't hold a reference to it. If so, we're responsible for freeing
+	 * the page.
+	 */
+	if (m->wire_count == 0 && m->object == NULL)
+		vm_page_free(m);
+	vm_page_unlock_queues();
+	sf->m = NULL;
+	mtx_lock(&sf_freelist.sf_lock);
+	SLIST_INSERT_HEAD(&sf_freelist.sf_head, sf, free_list);
+	if (sf_buf_alloc_want > 0)
+		wakeup_one(&sf_freelist);
+	mtx_unlock(&sf_freelist.sf_lock);
 }
 
 /*
@@ -251,24 +409,4 @@ swi_vm(void *dummy)
 	if (busdma_swi_pending != 0)
 		busdma_swi();
 #endif
-}
-
-/*
- * Tell whether this address is in some physical memory region.
- * Currently used by the kernel coredump code in order to avoid
- * dumping the ``ISA memory hole'' which could cause indefinite hangs,
- * or other unpredictable behaviour.
- */
-
-
-int
-is_physical_memory(addr)
-	vm_offset_t addr;
-{
-	/*
-	 * stuff other tests for known memory-mapped devices (PCI?)
-	 * here
-	 */
-
-	return 1;
 }

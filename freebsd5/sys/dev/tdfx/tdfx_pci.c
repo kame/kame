@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000-2001 by Coleman Kane <cokane@FreeBSD.org>
  * All rights reserved.
  *
@@ -27,9 +27,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- *   $FreeBSD: src/sys/dev/tdfx/tdfx_pci.c,v 1.26 2003/03/25 00:07:01 jake Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/tdfx/tdfx_pci.c,v 1.30 2003/09/02 17:30:39 jhb Exp $");
 
 /* 3dfx driver for FreeBSD 4.x - Finished 11 May 2000, 12:25AM ET
  *
@@ -55,8 +56,8 @@
 #include <sys/systm.h>
 #include <sys/uio.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
@@ -157,7 +158,7 @@ tdfx_attach(device_t dev) {
 	u_long	val;
 	/* rid value tells bus_alloc_resource where to find the addresses of ports or
 	 * of memory ranges in the PCI config space*/
-	int rid = PCIR_MAPS;
+	int rid = PCIR_BAR(0);
 
 	/* Increment the card counter (for the ioctl code) */
 	tdfx_count++;
@@ -754,7 +755,7 @@ tdfx_do_query(u_int cmd, struct tdfx_pio_data *piod)
 			printf("Bad Sub-cmd: 0x%x\n", _IOC_NR(cmd));
 #endif
 			return -EINVAL;
-	};
+	}
 }
 
 static int
@@ -770,7 +771,7 @@ tdfx_do_pio(u_int cmd, struct tdfx_pio_data *piod)
 			break;
 		default:
 			return -EINVAL;
-	};
+	}
 }
 
 /* Calls to ioctl(2) eventually end up here. Unhandled ioctls return an ENXIO,

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)systm.h	8.7 (Berkeley) 3/29/95
- * $FreeBSD: src/sys/sys/systm.h,v 1.193 2003/04/04 17:29:55 des Exp $
+ * $FreeBSD: src/sys/sys/systm.h,v 1.199 2003/09/30 20:54:12 mux Exp $
  */
 
 #ifndef _SYS_SYSTM_H_
@@ -45,6 +45,7 @@
 #include <machine/atomic.h>
 #include <machine/cpufunc.h>
 #include <sys/callout.h>
+#include <sys/cdefs.h>
 #include <sys/queue.h>
 #include <sys/stdint.h>		/* for people using printf mainly */
 
@@ -77,7 +78,10 @@ extern int bootverbose;		/* nonzero to print verbose messages */
 extern int maxusers;		/* system tune hint */
 
 #ifdef	INVARIANTS		/* The option is always available */
-#define	KASSERT(exp,msg)	do { if (!(exp)) panic msg; } while (0)
+#define	KASSERT(exp,msg) do {						\
+	if (__predict_false(!(exp)))					\
+		panic msg;						\
+} while (0)
 #else
 #define	KASSERT(exp,msg)
 #endif
@@ -122,11 +126,10 @@ struct _jmp_buf;
 
 int	setjmp(struct _jmp_buf *);
 void	longjmp(struct _jmp_buf *, int) __dead2;
-void	Debugger(const char *msg);
+void	Debugger(const char *msg) __nonnull(1);
 int	dumpstatus(vm_offset_t addr, off_t count);
 int	nullop(void);
 int	eopnotsupp(void);
-int	seltrue(dev_t dev, int which, struct thread *td);
 int	ureadc(int, struct uio *);
 void	hashdestroy(void *, struct malloc_type *, u_long);
 void	*hashinit(int count, struct malloc_type *type, u_long *hashmask);
@@ -147,6 +150,7 @@ void	critical_enter(void);
 void	critical_exit(void);
 void	init_param1(void);
 void	init_param2(long physpages);
+void	init_param3(long kmempages);
 void	tablefull(const char *);
 int	kvprintf(char const *, void (*)(int, void*), void *, int,
 	    __va_list) __printflike(1, 0);
@@ -161,26 +165,26 @@ int	vsnprintf(char *, size_t, const char *, __va_list) __printflike(3, 0);
 int	vsnrprintf(char *, size_t, int, const char *, __va_list) __printflike(4, 0); 
 int	vsprintf(char *buf, const char *, __va_list) __printflike(2, 0);
 int	ttyprintf(struct tty *, const char *, ...) __printflike(2, 3);
-int	sscanf(const char *, char const *, ...);
-int	vsscanf(const char *, char const *, __va_list);
-long	strtol(const char *, char **, int);
-u_long	strtoul(const char *, char **, int);
-quad_t	strtoq(const char *, char **, int);
-u_quad_t strtouq(const char *, char **, int);
+int	sscanf(const char *, char const *, ...) __nonnull(1) __nonnull(2);
+int	vsscanf(const char *, char const *, __va_list) __nonnull(1) __nonnull(2);
+long	strtol(const char *, char **, int) __nonnull(1);
+u_long	strtoul(const char *, char **, int) __nonnull(1);
+quad_t	strtoq(const char *, char **, int) __nonnull(1);
+u_quad_t strtouq(const char *, char **, int) __nonnull(1);
 void	tprintf(struct proc *p, int pri, const char *, ...) __printflike(3, 4);
 
 #define ovbcopy(f, t, l) bcopy((f), (t), (l))
-void	bcopy(const void *from, void *to, size_t len);
-void	bzero(void *buf, size_t len);
+void	bcopy(const void *from, void *to, size_t len) __nonnull(1) __nonnull(2);
+void	bzero(void *buf, size_t len) __nonnull(1);
 
-void	*memcpy(void *to, const void *from, size_t len);
+void	*memcpy(void *to, const void *from, size_t len) __nonnull(1) __nonnull(2);
 
 int	copystr(const void *kfaddr, void *kdaddr, size_t len,
-	    size_t *lencopied);
+	    size_t *lencopied) __nonnull(1) __nonnull(2);
 int	copyinstr(const void *udaddr, void *kaddr, size_t len,
-	    size_t *lencopied);
-int	copyin(const void *udaddr, void *kaddr, size_t len);
-int	copyout(const void *kaddr, void *udaddr, size_t len);
+	    size_t *lencopied) __nonnull(1) __nonnull(2);
+int	copyin(const void *udaddr, void *kaddr, size_t len) __nonnull(1) __nonnull(2);
+int	copyout(const void *kaddr, void *udaddr, size_t len) __nonnull(1) __nonnull(2);
 
 int	fubyte(const void *base);
 long	fuword(const void *base);
@@ -298,8 +302,8 @@ int	msleep(void *chan, struct mtx *mtx, int pri, const char *wmesg,
 	    int timo);
 void	abortsleep(struct thread *td);
 #define	tsleep(chan, pri, wmesg, timo)	msleep(chan, NULL, pri, wmesg, timo)
-void	wakeup(void *chan);
-void	wakeup_one(void *chan);
+void	wakeup(void *chan) __nonnull(1);
+void	wakeup_one(void *chan) __nonnull(1);
 
 /*
  * Common `dev_t' stuff are declared here to avoid #include poisoning

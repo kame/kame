@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,11 +28,11 @@
 #include <dev/sound/pcm/ac97.h>
 #include <gnu/dev/sound/pci/emu10k1.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 #include <sys/queue.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/emu10k1.c,v 1.37 2003/04/20 09:07:14 obrien Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/emu10k1.c,v 1.41 2003/09/07 16:28:03 cg Exp $");
 
 /* -------------------------------------------------------------------- */
 
@@ -1478,7 +1478,7 @@ emu_pci_attach(device_t dev)
 	pci_write_config(dev, PCIR_COMMAND, data, 2);
 	data = pci_read_config(dev, PCIR_COMMAND, 2);
 
-	i = PCIR_MAPS;
+	i = PCIR_BAR(0);
 	sc->reg = bus_alloc_resource(dev, SYS_RES_IOPORT, &i, 0, ~0, 1, RF_ACTIVE);
 	if (sc->reg == NULL) {
 		device_printf(dev, "unable to map register space\n");
@@ -1494,7 +1494,8 @@ emu_pci_attach(device_t dev)
 		/*highaddr*/BUS_SPACE_MAXADDR,
 		/*filter*/NULL, /*filterarg*/NULL,
 		/*maxsize*/sc->bufsz, /*nsegments*/1, /*maxsegz*/0x3ffff,
-		/*flags*/0, &sc->parent_dmat) != 0) {
+		/*flags*/0, /*lockfunc*/busdma_lock_mutex,
+		/*lockarg*/&Giant, &sc->parent_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		goto bad;
 	}
@@ -1530,7 +1531,7 @@ emu_pci_attach(device_t dev)
 
 bad:
 	if (codec) ac97_destroy(codec);
-	if (sc->reg) bus_release_resource(dev, SYS_RES_IOPORT, PCIR_MAPS, sc->reg);
+	if (sc->reg) bus_release_resource(dev, SYS_RES_IOPORT, PCIR_BAR(0), sc->reg);
 	if (sc->ih) bus_teardown_intr(dev, sc->irq, sc->ih);
 	if (sc->irq) bus_release_resource(dev, SYS_RES_IRQ, 0, sc->irq);
 	if (sc->parent_dmat) bus_dma_tag_destroy(sc->parent_dmat);
@@ -1553,7 +1554,7 @@ emu_pci_detach(device_t dev)
 	/* shutdown chip */
 	emu_uninit(sc);
 
-	bus_release_resource(dev, SYS_RES_IOPORT, PCIR_MAPS, sc->reg);
+	bus_release_resource(dev, SYS_RES_IOPORT, PCIR_BAR(0), sc->reg);
 	bus_teardown_intr(dev, sc->irq, sc->ih);
 	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->irq);
 	bus_dma_tag_destroy(sc->parent_dmat);

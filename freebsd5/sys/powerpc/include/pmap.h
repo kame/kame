@@ -29,7 +29,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *	$NetBSD: pmap.h,v 1.17 2000/03/30 16:18:24 jdolecek Exp $
- * $FreeBSD: src/sys/powerpc/include/pmap.h,v 1.10 2003/03/16 04:16:03 jake Exp $
+ * $FreeBSD: src/sys/powerpc/include/pmap.h,v 1.11 2003/10/06 01:47:11 bms Exp $
  */
 
 #ifndef	_MACHINE_PMAP_H_
@@ -64,7 +64,6 @@ extern	struct pmap kernel_pmap_store;
 #define	kernel_pmap	(&kernel_pmap_store)
 
 #define	pmap_page_is_mapped(m)	(!LIST_EMPTY(&(m)->md.mdpg_pvoh))
-#define	pmap_resident_count(pm)	(pm->pm_stats.resident_count)
 
 #ifdef _KERNEL
 

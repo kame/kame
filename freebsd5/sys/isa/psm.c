@@ -19,10 +19,7 @@
  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/isa/psm.c,v 1.55 2003/04/30 12:57:39 markm Exp $
  */
-
 /*
  *  Ported to 386bsd Oct 17, 1992
  *  Sandi Donno, Computer Science, University of Cape Town, South Africa
@@ -60,6 +57,9 @@
  *    Improved sync check logic.
  *    Vendor specific support routines.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/isa/psm.c,v 1.62 2003/11/09 09:17:24 tanimura Exp $");
 
 #include "opt_psm.h"
 
@@ -896,12 +896,12 @@ psmidentify(driver_t *driver, device_t parent)
     bus_set_resource(psm, SYS_RES_IRQ, KBDC_RID_AUX, irq, 1);
 }
 
-#define endprobe(v)	{   if (bootverbose) 				\
+#define endprobe(v)	do {   if (bootverbose)				\
 				--verbose;   				\
                             kbdc_set_device_mask(sc->kbdc, mask);	\
 			    kbdc_lock(sc->kbdc, FALSE);			\
 			    return (v);	     				\
-			}
+			} while (0)
 
 static int
 psmprobe(device_t dev)
@@ -1040,6 +1040,10 @@ psmprobe(device_t dev)
 	/*
 	 * NOTE: some controllers appears to hang the `keyboard' when the aux
 	 * port doesn't exist and `PSMC_RESET_DEV' is issued.
+	 *
+	 * Attempt to reset the controller twice -- this helps
+	 * pierce through some KVM switches. The second reset
+	 * is non-fatal.
 	 */
 	if (!reset_aux_dev(sc->kbdc)) {
             recover_from_error(sc->kbdc);
@@ -1047,6 +1051,11 @@ psmprobe(device_t dev)
             if (verbose)
         	printf("psm%d: failed to reset the aux device.\n", unit);
             endprobe(ENXIO);
+	} else if (!reset_aux_dev(sc->kbdc)) {
+	    recover_from_error(sc->kbdc);
+	    if (verbose >= 2)
+        	printf("psm%d: failed to reset the aux device (2).\n",
+        	    unit);
 	}
     }
 
@@ -1499,7 +1508,7 @@ tame_mouse(struct psm_softc *sc, mousestatus_t *status, unsigned char *buf)
         buf[7] = (~status->button >> 3) & 0x7f;
 	return MOUSE_SYS_PACKETSIZE;
     }
-    return sc->inputbytes;;
+    return sc->inputbytes;
 }
 
 static int
@@ -2362,7 +2371,7 @@ psmintr(void *arg)
             sc->state &= ~PSM_ASLP;
             wakeup( sc);
     	}
-        selwakeup(&sc->rsel);
+        selwakeuppri(&sc->rsel, PZERO);
     }
 }
 
@@ -2761,11 +2770,18 @@ enable_4dplus(struct psm_softc *sc)
     */
 
     id = get_aux_id(kbdc);
-    if (id != PSM_4DPLUS_ID)
-	return FALSE;
+    switch (id) {
+    case PSM_4DPLUS_ID:
+	    sc->hw.buttons = 4;
+	    break;
+    case PSM_4DPLUS_RFSW35_ID:
+	    sc->hw.buttons = 3;
+	    break;
+    default:
+	    return FALSE;
+    }
 
     sc->hw.hwid = id;
-    sc->hw.buttons = 4;		/* XXX */
 
     return TRUE;
 }
@@ -2862,6 +2878,7 @@ static struct isa_pnp_id psmcpnp_ids[] = {
 	{ 0x030fd041, "PS/2 mouse port" },		/* PNP0F03 */
 	{ 0x130fd041, "PS/2 mouse port" },		/* PNP0F13 */
 	{ 0x1303d041, "PS/2 port" },			/* PNP0313, XXX */
+	{ 0x02002e4f, "Dell PS/2 mouse port" },		/* Lat. X200, Dell */
 	{ 0x80374d24, "IBM PS/2 mouse port" },		/* IBM3780, ThinkPad */
 	{ 0x81374d24, "IBM PS/2 mouse port" },		/* IBM3781, ThinkPad */
 	{ 0x0190d94d, "SONY VAIO PS/2 mouse port"},     /* SNY9001, Vaio */

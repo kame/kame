@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/bios/smbios.c,v 1.1 2003/03/24 19:32:57 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/bios/smbios.c,v 1.2 2003/06/02 06:02:49 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

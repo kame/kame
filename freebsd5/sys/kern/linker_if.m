@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/kern/linker_if.m,v 1.4 2001/10/30 15:21:45 green Exp $
+# $FreeBSD: src/sys/kern/linker_if.m,v 1.5 2003/09/20 17:39:32 dfr Exp $
 #
 
 #include <sys/linker.h>
@@ -102,6 +102,6 @@ STATICMETHOD int link_preload {
     const char*		filename;
     linker_file_t*	result;
 };
-STATICMETHOD int link_preload_finish {
+METHOD int link_preload_finish {
     linker_file_t	file;
 };

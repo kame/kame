@@ -35,9 +35,10 @@
  * vm_page->swapblk field.  The object is only converted when the page is 
  * physically freed after having been cleaned and even then vm_page->swapblk
  * is maintained whenever a resident page also has swap backing store.
- *
- * $FreeBSD: src/sys/vm/default_pager.c,v 1.31 2002/03/20 04:02:58 jeff Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/vm/default_pager.c,v 1.34 2003/08/06 12:05:48 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -63,13 +64,11 @@ static boolean_t default_pager_haspage(vm_object_t, vm_pindex_t, int *,
  * pagerops for OBJT_DEFAULT - "default pager".
  */
 struct pagerops defaultpagerops = {
-	NULL,
-	default_pager_alloc,
-	default_pager_dealloc,
-	default_pager_getpages,
-	default_pager_putpages,
-	default_pager_haspage,
-	NULL
+	.pgo_alloc =	default_pager_alloc,
+	.pgo_dealloc =	default_pager_dealloc,
+	.pgo_getpages =	default_pager_getpages,
+	.pgo_putpages =	default_pager_putpages,
+	.pgo_haspage =	default_pager_haspage,
 };
 
 /*
@@ -130,7 +129,7 @@ default_pager_putpages(object, m, c, sync, rtvals)
 	boolean_t sync;
 	int *rtvals;
 {
-	swap_pager_putpages(object, m, c, sync, rtvals);
+	swappagerops.pgo_putpages(object, m, c, sync, rtvals);
 }
 
 /*

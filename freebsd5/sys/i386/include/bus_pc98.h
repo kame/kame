@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/i386/include/bus_pc98.h,v 1.25 2003/02/26 02:16:06 mux Exp $ */
+/* $FreeBSD: src/sys/i386/include/bus_pc98.h,v 1.26 2003/09/23 08:22:33 nyan Exp $ */
 /*	$NecBSD: busio.h,v 3.25.4.2.2.1 2000/06/12 03:53:08 honda Exp $	*/
 /*	$NetBSD: bus.h,v 1.12 1997/10/01 08:25:15 fvdl Exp $	*/
 
@@ -168,6 +168,19 @@ int i386_bus_space_handle_alloc(bus_space_tag_t t, bus_addr_t bpa,
 				bus_size_t size, bus_space_handle_t *bshp);
 void i386_bus_space_handle_free(bus_space_tag_t t, bus_space_handle_t bsh,
 				size_t size);
+
+/*
+ *      int bus_space_map (bus_space_tag_t t, bus_addr_t addr,
+ *          bus_size_t size, int flag, bus_space_handle_t *bshp);
+ *
+ * Map a region of bus space.
+ */
+
+int i386_memio_map(bus_space_tag_t t, bus_addr_t addr, bus_size_t size,
+		   int flag, bus_space_handle_t *bshp);
+
+#define bus_space_map(t, a, s, f, hp)					\
+	i386_memio_map((t), (a), (s), (f), (hp))
 
 /*
  *      int bus_space_unmap (bus_space_tag_t t,

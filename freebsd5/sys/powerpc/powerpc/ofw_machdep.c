@@ -32,14 +32,13 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/powerpc/powerpc/ofw_machdep.c,v 1.7 2003/04/03 21:36:33 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/powerpc/powerpc/ofw_machdep.c,v 1.8 2003/06/01 09:25:17 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
 #include <sys/disk.h>
-#include <sys/disklabel.h>
 #include <sys/fcntl.h>
 #include <sys/malloc.h>
 #include <sys/stat.h>

@@ -32,9 +32,10 @@
  * SUCH DAMAGE.
  * 
  *	@(#)ipx_ip.c
- *
- * $FreeBSD: src/sys/netipx/ipx_ip.c,v 1.34 2003/03/04 23:19:53 jlemon Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netipx/ipx_ip.c,v 1.36 2003/10/31 18:32:12 brooks Exp $");
 
 /*
  * Software interface driver for encapsulating IPX in IP.
@@ -73,6 +74,7 @@
 #include <netipx/ipx_var.h>
 
 static struct	ifnet ipxipif;
+static int	ipxipif_units;
 
 /* list of all hosts and gateways or broadcast addrs */
 static struct	ifnet_en *ipxip_list;
@@ -93,7 +95,7 @@ ipxipattach()
 
 	if (ipxipif.if_mtu == 0) {
 		ifp = &ipxipif;
-		ifp->if_name = "ipxip";
+		if_initname(ifp, "ipxip", ipxipif_units);
 		ifp->if_mtu = LOMTU;
 		ifp->if_ioctl = ipxipioctl;
 		ifp->if_output = ipxipoutput;
@@ -108,13 +110,12 @@ ipxipattach()
 	ipxip_list = m;
 	ifp = &m->ifen_ifnet;
 
-	ifp->if_name = "ipxip";
+	if_initname(ifp, "ipxip", ipxipif_units++);
 	ifp->if_mtu = LOMTU;
 	ifp->if_ioctl = ipxipioctl;
 	ifp->if_output = ipxipoutput;
 	ifp->if_start = ipxipstart;
 	ifp->if_flags = IFF_POINTOPOINT;
-	ifp->if_unit = ipxipif.if_unit++;
 	if_attach(ifp);
 
 	return (m);
@@ -378,7 +379,7 @@ ipxip_route(so, sopt)
 	/*
 	 * now configure this as a point to point link
 	 */
-	ifr_ipxip.ifr_name[4] = '0' + ipxipif.if_unit - 1;
+	ifr_ipxip.ifr_name[4] = '0' + ipxipif_units - 1;
 	ifr_ipxip.ifr_dstaddr = *(struct sockaddr *)ipx_dst;
 	ipx_control(so, (int)SIOCSIFDSTADDR, (caddr_t)&ifr_ipxip,
 			(struct ifnet *)ifn, sopt->sopt_td);

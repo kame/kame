@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)vmparam.h	5.9 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/i386/include/vmparam.h,v 1.36 2003/05/01 00:10:38 peter Exp $
+ * $FreeBSD: src/sys/i386/include/vmparam.h,v 1.37 2003/10/01 23:46:08 peter Exp $
  */
 
 
@@ -82,6 +82,13 @@
  */
 #define	MAXSLP 		20
 
+
+/*
+ * Kernel physical load address.
+ */
+#ifndef KERNLOAD
+#define	KERNLOAD		(1 << PDRSHIFT)
+#endif
 
 /*
  * Virtual addresses of things.  Derived from the page directory and

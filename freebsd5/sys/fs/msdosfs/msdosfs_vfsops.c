@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/fs/msdosfs/msdosfs_vfsops.c,v 1.101 2003/04/24 18:19:19 jhb Exp $ */
+/* $FreeBSD: src/sys/fs/msdosfs/msdosfs_vfsops.c,v 1.111 2003/11/05 04:30:06 kan Exp $ */
 /*	$NetBSD: msdosfs_vfsops.c,v 1.51 1997/11/17 15:36:58 ws Exp $	*/
 
 /*-
@@ -61,13 +61,14 @@
 #include <sys/fcntl.h>
 #include <sys/malloc.h>
 #include <sys/stat.h> 				/* defines ALLPERMS */
+#include <sys/iconv.h>
 #include <sys/mutex.h>
 
 #include <fs/msdosfs/bpb.h>
 #include <fs/msdosfs/bootsect.h>
+#include <fs/msdosfs/msdosfsmount.h>
 #include <fs/msdosfs/direntry.h>
 #include <fs/msdosfs/denode.h>
-#include <fs/msdosfs/msdosfsmount.h>
 #include <fs/msdosfs/fat.h>
 
 #define MSDOSFS_DFLTBSIZE       4096
@@ -85,6 +86,8 @@
 
 MALLOC_DEFINE(M_MSDOSFSMNT, "MSDOSFS mount", "MSDOSFS mount structure");
 static MALLOC_DEFINE(M_MSDOSFSFAT, "MSDOSFS FAT", "MSDOSFS file allocation table");
+
+struct iconv_functions *msdosfs_iconv = NULL;
 
 static int	update_mp(struct mount *mp, struct msdosfs_args *argp);
 static int	mountmsdosfs(struct vnode *devvp, struct mount *mp,
@@ -108,15 +111,18 @@ update_mp(mp, argp)
 	pmp->pm_gid = argp->gid;
 	pmp->pm_uid = argp->uid;
 	pmp->pm_mask = argp->mask & ALLPERMS;
+	pmp->pm_dirmask = argp->dirmask & ALLPERMS;
 	pmp->pm_flags |= argp->flags & MSDOSFSMNT_MNTOPT;
-	if (pmp->pm_flags & MSDOSFSMNT_U2WTABLE) {
-		bcopy(argp->u2w, pmp->pm_u2w, sizeof(pmp->pm_u2w));
-		bcopy(argp->d2u, pmp->pm_d2u, sizeof(pmp->pm_d2u));
-		bcopy(argp->u2d, pmp->pm_u2d, sizeof(pmp->pm_u2d));
-	}
-	if (pmp->pm_flags & MSDOSFSMNT_ULTABLE) {
-		bcopy(argp->ul, pmp->pm_ul, sizeof(pmp->pm_ul));
-		bcopy(argp->lu, pmp->pm_lu, sizeof(pmp->pm_lu));
+	if (pmp->pm_flags & MSDOSFSMNT_KICONV && msdosfs_iconv) {
+		msdosfs_iconv->open(argp->cs_win, argp->cs_local , &pmp->pm_u2w);
+		msdosfs_iconv->open(argp->cs_local, argp->cs_win , &pmp->pm_w2u);
+		msdosfs_iconv->open(argp->cs_dos, argp->cs_local , &pmp->pm_u2d);
+		msdosfs_iconv->open(argp->cs_local, argp->cs_dos , &pmp->pm_d2u);
+	} else {
+		pmp->pm_w2u = NULL;
+		pmp->pm_u2w = NULL;
+		pmp->pm_d2u = NULL;
+		pmp->pm_u2d = NULL;
 	}
 
 	if (pmp->pm_flags & MSDOSFSMNT_NOWIN95)
@@ -318,7 +324,16 @@ mountmsdosfs(devvp, mp, td, argp)
 
 	ronly = (mp->mnt_flag & MNT_RDONLY) != 0;
 	vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY, td);
-	error = VOP_OPEN(devvp, ronly ? FREAD : FREAD|FWRITE, FSCRED, td);
+	/*
+	 * XXX Open the device with write access even if the filesystem
+	 * is read-only: someone may remount it read-write later, and
+	 * we don't VOP_OPEN the device again in that case.
+	 */
+#ifdef notyet
+	error = VOP_OPEN(devvp, ronly ? FREAD : FREAD|FWRITE, FSCRED, td, -1);
+#else
+	error = VOP_OPEN(devvp, FREAD|FWRITE, FSCRED, td, -1);
+#endif
 	VOP_UNLOCK(devvp, 0, td);
 	if (error)
 		return (error);
@@ -607,7 +622,12 @@ mountmsdosfs(devvp, mp, td, argp)
 error_exit:
 	if (bp)
 		brelse(bp);
+	/* XXX See comment at VOP_OPEN call */
+#ifdef notyet
 	(void) VOP_CLOSE(devvp, ronly ? FREAD : FREAD | FWRITE, NOCRED, td);
+#else
+	(void) VOP_CLOSE(devvp, FREAD | FWRITE, NOCRED, td);
+#endif
 	if (pmp) {
 		if (pmp->pm_inusemap)
 			free(pmp->pm_inusemap, M_MSDOSFSFAT);
@@ -636,6 +656,16 @@ msdosfs_unmount(mp, mntflags, td)
 	if (error)
 		return error;
 	pmp = VFSTOMSDOSFS(mp);
+	if (pmp->pm_flags & MSDOSFSMNT_KICONV && msdosfs_iconv) {
+		if (pmp->pm_w2u)
+			msdosfs_iconv->close(pmp->pm_w2u);
+		if (pmp->pm_u2w)
+			msdosfs_iconv->close(pmp->pm_u2w);
+		if (pmp->pm_d2u)
+			msdosfs_iconv->close(pmp->pm_d2u);
+		if (pmp->pm_u2d)
+			msdosfs_iconv->close(pmp->pm_u2d);
+	}
 	pmp->pm_devvp->v_rdev->si_mountpoint = NULL;
 #ifdef MSDOSFS_DEBUG
 	{
@@ -662,9 +692,14 @@ msdosfs_unmount(mp, mntflags, td)
 		VI_UNLOCK(vp);
 	}
 #endif
+	/* XXX See comment at VOP_OPEN call */
+#ifdef notyet
 	error = VOP_CLOSE(pmp->pm_devvp,
 		    (pmp->pm_flags&MSDOSFSMNT_RONLY) ? FREAD : FREAD | FWRITE,
 		    NOCRED, td);
+#else
+	error = VOP_CLOSE(pmp->pm_devvp, FREAD | FWRITE, NOCRED, td);
+#endif
 	vrele(pmp->pm_devvp);
 	free(pmp->pm_inusemap, M_MSDOSFSFAT);
 	free(pmp, M_MSDOSFSMNT);
@@ -743,7 +778,7 @@ msdosfs_sync(mp, waitfor, cred, td)
 	/*
 	 * Write back each (modified) denode.
 	 */
-	mtx_lock(&mntvnode_mtx);
+	MNT_ILOCK(mp);
 loop:
 	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nvp) {
 		/*
@@ -754,20 +789,24 @@ loop:
 			goto loop;
 		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
 
-		mtx_unlock(&mntvnode_mtx);
 		VI_LOCK(vp);
+		if (vp->v_iflag & VI_XLOCK) {
+			VI_UNLOCK(vp);
+			continue;
+		}
+		MNT_IUNLOCK(mp);
 		dep = VTODE(vp);
 		if (vp->v_type == VNON ||
 		    ((dep->de_flag &
 		    (DE_ACCESS | DE_CREATE | DE_UPDATE | DE_MODIFIED)) == 0 &&
 		    (TAILQ_EMPTY(&vp->v_dirtyblkhd) || waitfor == MNT_LAZY))) {
 			VI_UNLOCK(vp);
-			mtx_lock(&mntvnode_mtx);
+			MNT_ILOCK(mp);
 			continue;
 		}
 		error = vget(vp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK, td);
 		if (error) {
-			mtx_lock(&mntvnode_mtx);
+			MNT_ILOCK(mp);
 			if (error == ENOENT)
 				goto loop;
 			continue;
@@ -777,9 +816,9 @@ loop:
 			allerror = error;
 		VOP_UNLOCK(vp, 0, td);
 		vrele(vp);
-		mtx_lock(&mntvnode_mtx);
+		MNT_ILOCK(mp);
 	}
-	mtx_unlock(&mntvnode_mtx);
+	MNT_IUNLOCK(mp);
 
 	/*
 	 * Flush filesystem control info.
@@ -832,20 +871,16 @@ msdosfs_vptofh(vp, fhp)
 }
 
 static struct vfsops msdosfs_vfsops = {
-	msdosfs_mount,
-	vfs_stdstart,
-	msdosfs_unmount,
-	msdosfs_root,
-	vfs_stdquotactl,
-	msdosfs_statfs,
-	msdosfs_sync,
-	vfs_stdvget,
-	msdosfs_fhtovp,
-	vfs_stdcheckexp,
-	msdosfs_vptofh,
-	msdosfs_init,
-	msdosfs_uninit,
-	vfs_stdextattrctl,
+	.vfs_fhtovp =		msdosfs_fhtovp,
+	.vfs_init =		msdosfs_init,
+	.vfs_mount =		msdosfs_mount,
+	.vfs_root =		msdosfs_root,
+	.vfs_statfs =		msdosfs_statfs,
+	.vfs_sync =		msdosfs_sync,
+	.vfs_uninit =		msdosfs_uninit,
+	.vfs_unmount =		msdosfs_unmount,
+	.vfs_vptofh =		msdosfs_vptofh,
 };
 
 VFS_SET(msdosfs_vfsops, msdosfs, 0);
+MODULE_VERSION(msdosfs, 1);

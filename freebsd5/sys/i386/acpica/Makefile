@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/i386/acpica/Makefile,v 1.3 2002/05/01 21:54:07 peter Exp $
+# $FreeBSD: src/sys/i386/acpica/Makefile,v 1.5 2003/11/01 00:18:29 njl Exp $
 
 # Correct path for kernel builds
 # Don't rely on the kernel's .depend file
@@ -22,4 +22,3 @@ acpi_wakecode.h: acpi_wakecode.bin acpi_wakecode.o
 	sh ${MAKESRCPATH}/genwakecode.sh > acpi_wakecode.h
 
 .include <bsd.prog.mk>
-

@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)cd9660_vfsops.c	8.18 (Berkeley) 5/22/95
- * $FreeBSD: src/sys/isofs/cd9660/cd9660_vfsops.c,v 1.109 2003/03/11 22:15:09 kan Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/isofs/cd9660/cd9660_vfsops.c,v 1.114 2003/09/26 20:26:23 fjoe Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -54,6 +56,7 @@
 #include <sys/malloc.h>
 #include <sys/stat.h>
 #include <sys/syslog.h>
+#include <sys/iconv.h>
 
 
 #include <isofs/cd9660/iso.h>
@@ -64,6 +67,8 @@
 MALLOC_DEFINE(M_ISOFSMNT, "ISOFS mount", "ISOFS mount structure");
 MALLOC_DEFINE(M_ISOFSNODE, "ISOFS node", "ISOFS vnode private part");
 
+struct iconv_functions *cd9660_iconv = NULL;
+
 static vfs_mount_t	cd9660_mount;
 static vfs_unmount_t	cd9660_unmount;
 static vfs_root_t	cd9660_root;
@@ -73,20 +78,15 @@ static vfs_fhtovp_t	cd9660_fhtovp;
 static vfs_vptofh_t	cd9660_vptofh;
 
 static struct vfsops cd9660_vfsops = {
-	cd9660_mount,
-	vfs_stdstart,
-	cd9660_unmount,
-	cd9660_root,
-	vfs_stdquotactl,
-	cd9660_statfs,
-	vfs_stdnosync,
-	cd9660_vget,
-	cd9660_fhtovp,
-	vfs_stdcheckexp,
-	cd9660_vptofh,
-	cd9660_init,
-	cd9660_uninit,
-	vfs_stdextattrctl,
+	.vfs_fhtovp =		cd9660_fhtovp,
+	.vfs_init =		cd9660_init,
+	.vfs_mount =		cd9660_mount,
+	.vfs_root =		cd9660_root,
+	.vfs_statfs =		cd9660_statfs,
+	.vfs_uninit =		cd9660_uninit,
+	.vfs_unmount =		cd9660_unmount,
+	.vfs_vget =		cd9660_vget,
+	.vfs_vptofh =		cd9660_vptofh,
 };
 VFS_SET(cd9660_vfsops, cd9660, VFCF_READONLY);
 MODULE_VERSION(cd9660, 1);
@@ -157,7 +157,7 @@ iso_mountroot(mp, td)
 	args.flags = ISOFSMNT_ROOT;
 
 	vn_lock(rootvp, LK_EXCLUSIVE | LK_RETRY, td);
-	error = VOP_OPEN(rootvp, FREAD, FSCRED, td);
+	error = VOP_OPEN(rootvp, FREAD, FSCRED, td, -1);
 	VOP_UNLOCK(rootvp, 0, td);
 	if (error)
 		return error;
@@ -307,7 +307,7 @@ iso_mountfs(devvp, mp, td, argp)
 		return (error);
 
 	vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY, td);
-	error = VOP_OPEN(devvp, FREAD, FSCRED, td);
+	error = VOP_OPEN(devvp, FREAD, FSCRED, td, -1);
 	VOP_UNLOCK(devvp, 0, td);
 	if (error)
 		return error;
@@ -474,7 +474,16 @@ iso_mountfs(devvp, mp, td, argp)
 		bp = NULL;
 	}
 	isomp->im_flags = argp->flags & (ISOFSMNT_NORRIP | ISOFSMNT_GENS |
-					 ISOFSMNT_EXTATT | ISOFSMNT_NOJOLIET);
+					 ISOFSMNT_EXTATT | ISOFSMNT_NOJOLIET |
+					 ISOFSMNT_KICONV);
+
+	if (isomp->im_flags & ISOFSMNT_KICONV && cd9660_iconv) {
+		cd9660_iconv->open(argp->cs_local, argp->cs_disk, &isomp->im_d2l);
+		cd9660_iconv->open(argp->cs_disk, argp->cs_local, &isomp->im_l2d);
+	} else {
+		isomp->im_d2l = NULL;
+		isomp->im_l2d = NULL;
+	}
 
 	if (high_sierra) {
 		/* this effectively ignores all the mount flags */
@@ -554,6 +563,12 @@ cd9660_unmount(mp, mntflags, td)
 
 	isomp = VFSTOISOFS(mp);
 
+	if (isomp->im_flags & ISOFSMNT_KICONV && cd9660_iconv) {
+		if (isomp->im_d2l)
+			cd9660_iconv->close(isomp->im_d2l);
+		if (isomp->im_l2d)
+			cd9660_iconv->close(isomp->im_l2d);
+	}
 	isomp->im_devvp->v_rdev->si_mountpoint = NULL;
 	error = VOP_CLOSE(isomp->im_devvp, FREAD, NOCRED, td);
 	vrele(isomp->im_devvp);
@@ -623,8 +638,8 @@ cd9660_statfs(mp, sbp, td)
  */
 
 struct ifid {
-	ushort	ifid_len;
-	ushort	ifid_pad;
+	u_short	ifid_len;
+	u_short	ifid_pad;
 	int	ifid_ino;
 	long	ifid_start;
 };

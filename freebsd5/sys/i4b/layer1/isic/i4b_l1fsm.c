@@ -26,12 +26,12 @@
  *
  *	i4b_l1fsm.c - isdn4bsd layer 1 I.430 state machine
  *	--------------------------------------------------
- *
- * $FreeBSD: src/sys/i4b/layer1/isic/i4b_l1fsm.c,v 1.6 2002/09/02 00:52:08 brooks Exp $
- *
  *      last edit-date: [Wed Jan 24 09:12:18 2001]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/isic/i4b_l1fsm.c,v 1.7 2003/06/10 23:45:23 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

@@ -26,12 +26,12 @@
  *
  *	i4b_tel.c - device driver for ISDN telephony
  *	--------------------------------------------
- *
- * $FreeBSD: src/sys/i4b/driver/i4b_tel.c,v 1.27 2003/03/03 12:15:50 phk Exp $
- *
  *	last edit-date: [Tue Aug 27 13:54:08 2002]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/driver/i4b_tel.c,v 1.31 2003/11/10 14:20:34 gj Exp $");
 
 #include "i4btel.h"
 
@@ -60,7 +60,6 @@
 #include <i4b/layer4/i4b_l4.h>
 
 /* minor number: lower 6 bits = unit number */
-
 #define UNITBITS	6
 #define UNITMASK	0x3f
 #define	UNIT(n)		(minor(n) & UNITMASK)
@@ -250,7 +249,7 @@ i4btelclose(dev_t dev, int flag, int fmt, struct thread *td)
 			sc->devstate |= ST_WRWAITEMPTY;
 	
 			if((error = tsleep( &sc->isdn_linktab->tx_queue,
-					TTIPRI | PCATCH, "wtcl", 0)) != 0)
+					I4BPRI | PCATCH, "wtcl", 0)) != 0)
 			{
 				break;
 			}
@@ -347,7 +346,7 @@ i4btelioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 				while ((sc->devstate & ST_TONE) && 
 				    sc->tones.duration[sc->toneidx] != 0) {
 					if((error = tsleep( &sc->tones,
-					    TTIPRI | PCATCH, "rtone", 0 )) != 0) {
+					    I4BPRI | PCATCH, "rtone", 0 )) != 0) {
 					    	splx(s);
 						return(error);
 					}
@@ -420,7 +419,7 @@ i4btelread(dev_t dev, struct uio *uio, int ioflag)
 
 			if((error = msleep( &sc->isdn_linktab->rx_queue,
 					&sc->isdn_linktab->rx_queue->ifq_mtx,
-					TTIPRI | PCATCH,
+					I4BPRI | PCATCH,
 					"rtel", 0 )) != 0)
 			{
 				sc->devstate &= ~ST_RDWAITDATA;
@@ -486,7 +485,7 @@ i4btelread(dev_t dev, struct uio *uio, int ioflag)
 			NDBGL4(L4_TELDBG, "i4btel%d, wait for result!", unit);
 			
 			if((error = tsleep( &sc->result,
-						TTIPRI | PCATCH,
+						I4BPRI | PCATCH,
 						"rtel1", 0 )) != 0)
 			{
 				sc->devstate &= ~ST_RDWAITDATA;
@@ -556,7 +555,7 @@ i4btelwrite(dev_t dev, struct uio * uio, int ioflag)
 
 			if((error = msleep( &sc->isdn_linktab->tx_queue,
 					&sc->isdn_linktab->tx_queue->ifq_mtx,
-					TTIPRI | PCATCH, "wtel", 0)) != 0)
+					I4BPRI | PCATCH, "wtel", 0)) != 0)
 			{
 				sc->devstate &= ~ST_WRWAITEMPTY;
 				IF_UNLOCK(sc->isdn_linktab->tx_queue);
@@ -792,7 +791,7 @@ tel_connect(int unit, void *cdp)
 			sc->devstate &= ~ST_RDWAITDATA;
 			wakeup( &sc->result);
 		}
-		selwakeup(&sc->selp);
+		selwakeuppri(&sc->selp, I4BPRI);
 	}
 }
 
@@ -836,7 +835,7 @@ tel_disconnect(int unit, void *cdp)
 			sc->devstate &= ~ST_RDWAITDATA;
 			wakeup( &sc->result);
 		}
-		selwakeup(&sc->selp);
+		selwakeuppri(&sc->selp, I4BPRI);
 
 		if (sc->devstate & ST_TONE) {
 			sc->devstate &= ~ST_TONE;
@@ -865,7 +864,7 @@ tel_dialresponse(int unit, int status, cause_t cause)
 			sc->devstate &= ~ST_RDWAITDATA;
 			wakeup( &sc->result);
 		}
-		selwakeup(&sc->selp);
+		selwakeuppri(&sc->selp, I4BPRI);
 	}
 }
 	
@@ -892,7 +891,7 @@ tel_rx_data_rdy(int unit)
 		sc->devstate &= ~ST_RDWAITDATA;
 		wakeup( &sc->isdn_linktab->rx_queue);
 	}
-	selwakeup(&sc->selp);
+	selwakeuppri(&sc->selp, TTOPRI);
 }
 
 /*---------------------------------------------------------------------------*
@@ -913,7 +912,7 @@ tel_tx_queue_empty(int unit)
 	if(sc->devstate & ST_TONE) {
 		tel_tone(sc);
 	} else {
-		selwakeup(&sc->selp);
+		selwakeuppri(&sc->selp, I4BPRI);
 	}
 }
 

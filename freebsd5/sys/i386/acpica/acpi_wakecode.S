@@ -23,12 +23,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *      $FreeBSD: src/sys/i386/acpica/acpi_wakecode.S,v 1.1 2001/07/20 06:07:31 takawata Exp $
  */
+
+#include <machine/asm.h>
+__FBSDID("$FreeBSD: src/sys/i386/acpica/acpi_wakecode.S,v 1.8 2003/11/01 01:05:53 njl Exp $");
 
 #define LOCORE
 
+#include <machine/param.h>
 #include <machine/specialreg.h>
 
 	.align 4
@@ -37,11 +39,29 @@ wakeup_16:
 	nop
 	cli
 
-	/* Set up segment registers for real mode */
+	/*
+	 * Set up segment registers for real mode and a small stack for
+	 * any calls we make.
+	 */
+	movw	%cs,%ax
+	movw	%ax,%ds
+	movw	%ax,%ss
+	movw	$PAGE_SIZE,%sp
+
+	/* Re-initialize video BIOS if the reset_video tunable is set. */
+	cmp	$0,reset_video
+	je	wakeup_16_gdt
+	lcall	$0xc000,$3
+
+	/*
+	 * Set up segment registers for real mode again in case the
+	 * previous BIOS call clobbers them.
+	 */
 	movw	%cs,%ax
 	movw	%ax,%ds
 	movw	%ax,%ss
 
+wakeup_16_gdt:
 	/* Load GDT for real mode */
 	lgdt	physical_gdt
 
@@ -199,6 +219,7 @@ physical_esp:		.long 0
 previous_cr2:		.long 0
 previous_cr3:		.long 0
 previous_cr4:		.long 0
+reset_video:		.long 0
 
 /* transfer from real mode to protected mode */
 previous_cr0:		.long 0
@@ -215,4 +236,3 @@ previous_fs:		.word 0
 previous_gs:		.word 0
 previous_ss:		.word 0
 dummy:			.word 0
-

@@ -34,8 +34,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_cache.c	8.5 (Berkeley) 3/22/95
- * $FreeBSD: src/sys/kern/vfs_cache.c,v 1.82 2003/03/20 10:40:45 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/vfs_cache.c,v 1.86 2003/10/05 07:13:50 jeff Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -52,6 +54,8 @@
 #include <sys/proc.h>
 #include <sys/filedesc.h>
 #include <sys/fnv_hash.h>
+
+#include <vm/uma.h>
 
 /*
  * This structure describes the elements in the cache of recent
@@ -109,6 +113,34 @@ SYSCTL_ULONG(_debug, OID_AUTO, numcachepl, CTLFLAG_RD, &numcachepl, 0, "");
 #endif
 struct	nchstats nchstats;		/* cache effectiveness statistics */
 
+struct mtx cache_lock;
+MTX_SYSINIT(vfscache, &cache_lock, "Name Cache", MTX_DEF);
+
+#define	CACHE_LOCK()	mtx_lock(&cache_lock)
+#define	CACHE_UNLOCK()	mtx_unlock(&cache_lock)
+
+/*
+ * UMA zones for the VFS cache.
+ *
+ * The small cache is used for entries with short names, which are the
+ * most common.  The large cache is used for entries which are too big to
+ * fit in the small cache.
+ */
+static uma_zone_t cache_zone_small;
+static uma_zone_t cache_zone_large;
+
+#define	CACHE_PATH_CUTOFF	32
+#define	CACHE_ZONE_SMALL	(sizeof(struct namecache) + CACHE_PATH_CUTOFF)
+#define	CACHE_ZONE_LARGE	(sizeof(struct namecache) + NAME_MAX)
+
+#define cache_alloc(len)	uma_zalloc(((len) <= CACHE_PATH_CUTOFF) ? \
+	cache_zone_small : cache_zone_large, M_WAITOK)
+#define cache_free(ncp)		do { \
+	if (ncp != NULL) \
+		uma_zfree(((ncp)->nc_nlen <= CACHE_PATH_CUTOFF) ? \
+		    cache_zone_small : cache_zone_large, (ncp)); \
+} while (0)
+
 static int	doingcache = 1;		/* 1 => enable the cache */
 SYSCTL_INT(_debug, OID_AUTO, vfscache, CTLFLAG_RW, &doingcache, 0, "");
 
@@ -136,11 +168,11 @@ static u_long numnegzaps; STATNODE(CTLFLAG_RD, numnegzaps, &numnegzaps);
 static u_long numneghits; STATNODE(CTLFLAG_RD, numneghits, &numneghits);
 
 SYSCTL_OPAQUE(_vfs_cache, OID_AUTO, nchstats, CTLFLAG_RD, &nchstats,
-        sizeof(nchstats), "LU", "VFS cache effectiveness statistics");
+	sizeof(nchstats), "LU", "VFS cache effectiveness statistics");
 
 
 
-static void cache_zap(struct namecache *ncp);
+static void cache_zap(struct namecache *ncp, int locked);
 
 static MALLOC_DEFINE(M_VFSCACHE, "vfscache", "VFS name cache entries");
 
@@ -235,13 +267,19 @@ SYSCTL_PROC(_debug_hashstat, OID_AUTO, nchash, CTLTYPE_INT|CTLFLAG_RD,
  *   pointer to a vnode or if it is just a negative cache entry.
  */
 static void
-cache_zap(ncp)
+cache_zap(ncp, locked)
 	struct namecache *ncp;
+	int locked;
 {
+	struct vnode *vp;
+
+	vp = NULL;
+	if (!locked)
+		CACHE_LOCK();
 	LIST_REMOVE(ncp, nc_hash);
 	LIST_REMOVE(ncp, nc_src);
 	if (LIST_EMPTY(&ncp->nc_dvp->v_cache_src)) {
-		vdrop(ncp->nc_dvp);
+		vp = ncp->nc_dvp;
 		numcachehv--;
 	}
 	if (ncp->nc_vp) {
@@ -251,15 +289,20 @@ cache_zap(ncp)
 		numneg--;
 	}
 	numcache--;
-	free(ncp, M_VFSCACHE);
+	CACHE_UNLOCK();
+	cache_free(ncp);
+	if (vp)
+		vdrop(vp);
+	if (locked)
+		CACHE_LOCK();
 }
 
 /*
  * cache_leaf_test()
- * 
+ *
  *      Test whether this (directory) vnode's namei cache entry contains
  *      subdirectories or not.  Used to determine whether the directory is
- *      a leaf in the namei cache or not.  Note: the directory may still   
+ *      a leaf in the namei cache or not.  Note: the directory may still
  *      contain files in the namei cache.
  *
  *      Returns 0 if the directory is a leaf, -1 if it isn't.
@@ -268,15 +311,21 @@ int
 cache_leaf_test(struct vnode *vp)
 {
 	struct namecache *ncpc;
+	int leaf;
 
+	leaf = 0;
+	CACHE_LOCK();
 	for (ncpc = LIST_FIRST(&vp->v_cache_src);
 	     ncpc != NULL;
 	     ncpc = LIST_NEXT(ncpc, nc_src)
-	) {
-		if (ncpc->nc_vp != NULL && ncpc->nc_vp->v_type == VDIR)
-			return(-1);
+	 ) {
+		if (ncpc->nc_vp != NULL && ncpc->nc_vp->v_type == VDIR) {
+			leaf = -1;
+			break;
+		}
 	}
-	return(0);
+	CACHE_UNLOCK();
+	return (leaf);
 }
 
 /*
@@ -304,12 +353,14 @@ cache_lookup(dvp, vpp, cnp)
 		return (0);
 	}
 
+	CACHE_LOCK();
 	numcalls++;
 
 	if (cnp->cn_nameptr[0] == '.') {
 		if (cnp->cn_namelen == 1) {
 			*vpp = dvp;
 			dothits++;
+			CACHE_UNLOCK();
 			return (-1);
 		}
 		if (cnp->cn_namelen == 2 && cnp->cn_nameptr[1] == '.') {
@@ -317,9 +368,11 @@ cache_lookup(dvp, vpp, cnp)
 			if (dvp->v_dd->v_id != dvp->v_ddid ||
 			    (cnp->cn_flags & MAKEENTRY) == 0) {
 				dvp->v_ddid = 0;
+				CACHE_UNLOCK();
 				return (0);
 			}
 			*vpp = dvp->v_dd;
+			CACHE_UNLOCK();
 			return (-1);
 		}
 	}
@@ -341,6 +394,7 @@ cache_lookup(dvp, vpp, cnp)
 			nummiss++;
 		}
 		nchstats.ncs_miss++;
+		CACHE_UNLOCK();
 		return (0);
 	}
 
@@ -348,15 +402,17 @@ cache_lookup(dvp, vpp, cnp)
 	if ((cnp->cn_flags & MAKEENTRY) == 0) {
 		numposzaps++;
 		nchstats.ncs_badhits++;
-		cache_zap(ncp);
+		CACHE_UNLOCK();
+		cache_zap(ncp, 0);
 		return (0);
 	}
 
 	/* We found a "positive" match, return the vnode */
-        if (ncp->nc_vp) {
+	if (ncp->nc_vp) {
 		numposhits++;
 		nchstats.ncs_goodhits++;
 		*vpp = ncp->nc_vp;
+		CACHE_UNLOCK();
 		return (-1);
 	}
 
@@ -364,7 +420,8 @@ cache_lookup(dvp, vpp, cnp)
 	if (cnp->cn_nameiop == CREATE) {
 		numnegzaps++;
 		nchstats.ncs_badhits++;
-		cache_zap(ncp);
+		CACHE_UNLOCK();
+		cache_zap(ncp, 0);
 		return (0);
 	}
 
@@ -380,6 +437,7 @@ cache_lookup(dvp, vpp, cnp)
 	nchstats.ncs_neghits++;
 	if (ncp->nc_flag & NCF_WHITE)
 		cnp->cn_flags |= ISWHITEOUT;
+	CACHE_UNLOCK();
 	return (ENOENT);
 }
 
@@ -395,6 +453,8 @@ cache_enter(dvp, vp, cnp)
 	struct namecache *ncp;
 	struct nchashhead *ncpp;
 	u_int32_t hash;
+	int hold;
+	int zap;
 	int len;
 
 	if (!doingcache)
@@ -415,10 +475,11 @@ cache_enter(dvp, vp, cnp)
 			return;
 		}
 	}
-	 
-	ncp = (struct namecache *)
-		malloc(sizeof *ncp + cnp->cn_namelen, M_VFSCACHE, M_WAITOK);
-	bzero((char *)ncp, sizeof *ncp);
+
+	hold = 0;
+	zap = 0;
+	ncp = cache_alloc(cnp->cn_namelen);
+	CACHE_LOCK();
 	numcache++;
 	if (!vp) {
 		numneg++;
@@ -442,7 +503,7 @@ cache_enter(dvp, vp, cnp)
 	ncpp = NCHHASH(hash);
 	LIST_INSERT_HEAD(ncpp, ncp, nc_hash);
 	if (LIST_EMPTY(&dvp->v_cache_src)) {
-		vhold(dvp);
+		hold = 1;
 		numcachehv++;
 	}
 	LIST_INSERT_HEAD(&dvp->v_cache_src, ncp, nc_src);
@@ -458,8 +519,13 @@ cache_enter(dvp, vp, cnp)
 	}
 	if (numneg * ncnegfactor > numcache) {
 		ncp = TAILQ_FIRST(&ncneg);
-		cache_zap(ncp);
+		zap = 1;
 	}
+	CACHE_UNLOCK();
+	if (hold)
+		vhold(dvp);
+	if (zap)
+		cache_zap(ncp, 0);
 }
 
 /*
@@ -470,6 +536,12 @@ nchinit(void *dummy __unused)
 {
 
 	TAILQ_INIT(&ncneg);
+
+	cache_zone_small = uma_zcreate("S VFS Cache", CACHE_ZONE_SMALL, NULL,
+	    NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_ZINIT);
+	cache_zone_large = uma_zcreate("L VFS Cache", CACHE_ZONE_LARGE, NULL,
+	    NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_ZINIT);
+
 	nchashtbl = hashinit(desiredvnodes * 2, M_VFSCACHE, &nchash);
 }
 SYSINIT(vfs, SI_SUB_VFS, SI_ORDER_SECOND, nchinit, NULL)
@@ -491,16 +563,21 @@ SYSINIT(vfs, SI_SUB_VFS, SI_ORDER_SECOND, nchinit, NULL)
  * XXX: using the global v_id.
  */
 
+/*
+ * XXX This is sometimes called when a vnode may still be re-used, in which
+ * case v_dd may be invalid.  Need to look this up.
+ */
 void
 cache_purge(vp)
 	struct vnode *vp;
 {
 	static u_long nextid;
 
-	while (!LIST_EMPTY(&vp->v_cache_src)) 
-		cache_zap(LIST_FIRST(&vp->v_cache_src));
-	while (!TAILQ_EMPTY(&vp->v_cache_dst)) 
-		cache_zap(TAILQ_FIRST(&vp->v_cache_dst));
+	CACHE_LOCK();
+	while (!LIST_EMPTY(&vp->v_cache_src))
+		cache_zap(LIST_FIRST(&vp->v_cache_src), 1);
+	while (!TAILQ_EMPTY(&vp->v_cache_dst))
+		cache_zap(TAILQ_FIRST(&vp->v_cache_dst), 1);
 
 	do
 		nextid++;
@@ -508,6 +585,7 @@ cache_purge(vp)
 	vp->v_id = nextid;
 	vp->v_dd = vp;
 	vp->v_ddid = 0;
+	CACHE_UNLOCK();
 }
 
 /*
@@ -522,16 +600,25 @@ cache_purgevfs(mp)
 {
 	struct nchashhead *ncpp;
 	struct namecache *ncp, *nnp;
+	struct nchashhead mplist;
+
+	LIST_INIT(&mplist);
+	ncp = NULL;
 
 	/* Scan hash tables for applicable entries */
+	CACHE_LOCK();
 	for (ncpp = &nchashtbl[nchash]; ncpp >= nchashtbl; ncpp--) {
 		for (ncp = LIST_FIRST(ncpp); ncp != 0; ncp = nnp) {
 			nnp = LIST_NEXT(ncp, nc_hash);
 			if (ncp->nc_dvp->v_mount == mp) {
-				cache_zap(ncp);
+				LIST_REMOVE(ncp, nc_hash);
+				LIST_INSERT_HEAD(&mplist, ncp, nc_hash);
 			}
 		}
 	}
+	CACHE_UNLOCK();
+	while (!LIST_EMPTY(&mplist))
+		cache_zap(LIST_FIRST(&mplist), 0);
 }
 
 /*
@@ -562,7 +649,7 @@ vfs_cache_lookup(ap)
 	lockparent = flags & LOCKPARENT;
 
 	if (dvp->v_type != VDIR)
-                return (ENOTDIR);
+		return (ENOTDIR);
 
 	if ((flags & ISLASTCN) && (dvp->v_mount->mnt_flag & MNT_RDONLY) &&
 	    (cnp->cn_nameiop == DELETE || cnp->cn_nameiop == RENAME))
@@ -601,7 +688,7 @@ vfs_cache_lookup(ap)
 		return (error);
 	}
 #else
-	if (!error) 
+	if (!error)
 		return (VOP_CACHEDLOOKUP(dvp, vpp, cnp));
 #endif
 
@@ -743,7 +830,6 @@ kern___getcwd(struct thread *td, u_char *buf, enum uio_seg bufseg, u_int buflen)
 	fdp = td->td_proc->p_fd;
 	slash_prefixed = 0;
 	FILEDESC_LOCK(fdp);
-	mp_fixme("No vnode locking done!");
 	for (vp = fdp->fd_cdir; vp != fdp->fd_rdir && vp != rootvnode;) {
 		if (vp->v_vflag & VV_ROOT) {
 			if (vp->v_mount == NULL) {	/* forced unmount */
@@ -760,37 +846,43 @@ kern___getcwd(struct thread *td, u_char *buf, enum uio_seg bufseg, u_int buflen)
 			free(tmpbuf, M_TEMP);
 			return (ENOTDIR);
 		}
+		CACHE_LOCK();
 		ncp = TAILQ_FIRST(&vp->v_cache_dst);
 		if (!ncp) {
-			FILEDESC_UNLOCK(fdp);
 			numcwdfail2++;
+			CACHE_UNLOCK();
+			FILEDESC_UNLOCK(fdp);
 			free(tmpbuf, M_TEMP);
 			return (ENOENT);
 		}
 		if (ncp->nc_dvp != vp->v_dd) {
-			FILEDESC_UNLOCK(fdp);
 			numcwdfail3++;
+			CACHE_UNLOCK();
+			FILEDESC_UNLOCK(fdp);
 			free(tmpbuf, M_TEMP);
 			return (EBADF);
 		}
 		for (i = ncp->nc_nlen - 1; i >= 0; i--) {
 			if (bp == tmpbuf) {
-				FILEDESC_UNLOCK(fdp);
 				numcwdfail4++;
+				CACHE_UNLOCK();
+				FILEDESC_UNLOCK(fdp);
 				free(tmpbuf, M_TEMP);
 				return (ENOMEM);
 			}
 			*--bp = ncp->nc_name[i];
 		}
 		if (bp == tmpbuf) {
-			FILEDESC_UNLOCK(fdp);
 			numcwdfail4++;
+			CACHE_UNLOCK();
+			FILEDESC_UNLOCK(fdp);
 			free(tmpbuf, M_TEMP);
 			return (ENOMEM);
 		}
 		*--bp = '/';
 		slash_prefixed = 1;
 		vp = vp->v_dd;
+		CACHE_UNLOCK();
 	}
 	FILEDESC_UNLOCK(fdp);
 	if (!slash_prefixed) {
@@ -853,9 +945,9 @@ vn_fullpath(struct thread *td, struct vnode *vn, char **retbuf, char **freebuf)
 	*bp = '\0';
 	fdp = td->td_proc->p_fd;
 	slash_prefixed = 0;
+	ASSERT_VOP_LOCKED(vn, "vn_fullpath");
 	FILEDESC_LOCK(fdp);
 	for (vp = vn; vp != fdp->fd_rdir && vp != rootvnode;) {
-		ASSERT_VOP_LOCKED(vp, "vn_fullpath");
 		if (vp->v_vflag & VV_ROOT) {
 			if (vp->v_mount == NULL) {	/* forced unmount */
 				FILEDESC_UNLOCK(fdp);
@@ -867,46 +959,52 @@ vn_fullpath(struct thread *td, struct vnode *vn, char **retbuf, char **freebuf)
 		}
 		if (vp != vn && vp->v_dd->v_id != vp->v_ddid) {
 			FILEDESC_UNLOCK(fdp);
-			numfullpathfail1++;
 			free(buf, M_TEMP);
+			numfullpathfail1++;
 			return (ENOTDIR);
 		}
+		CACHE_LOCK();
 		ncp = TAILQ_FIRST(&vp->v_cache_dst);
 		if (!ncp) {
-			FILEDESC_UNLOCK(fdp);
 			numfullpathfail2++;
+			CACHE_UNLOCK();
+			FILEDESC_UNLOCK(fdp);
 			free(buf, M_TEMP);
 			return (ENOENT);
 		}
 		if (vp != vn && ncp->nc_dvp != vp->v_dd) {
-			FILEDESC_UNLOCK(fdp);
 			numfullpathfail3++;
+			CACHE_UNLOCK();
+			FILEDESC_UNLOCK(fdp);
 			free(buf, M_TEMP);
 			return (EBADF);
 		}
 		for (i = ncp->nc_nlen - 1; i >= 0; i--) {
 			if (bp == buf) {
-				FILEDESC_UNLOCK(fdp);
 				numfullpathfail4++;
+				CACHE_UNLOCK();
+				FILEDESC_UNLOCK(fdp);
 				free(buf, M_TEMP);
 				return (ENOMEM);
 			}
 			*--bp = ncp->nc_name[i];
 		}
 		if (bp == buf) {
-			FILEDESC_UNLOCK(fdp);
 			numfullpathfail4++;
+			CACHE_UNLOCK();
+			FILEDESC_UNLOCK(fdp);
 			free(buf, M_TEMP);
 			return (ENOMEM);
 		}
 		*--bp = '/';
 		slash_prefixed = 1;
 		vp = ncp->nc_dvp;
+		CACHE_UNLOCK();
 	}
 	if (!slash_prefixed) {
 		if (bp == buf) {
-			FILEDESC_UNLOCK(fdp);
 			numfullpathfail4++;
+			FILEDESC_UNLOCK(fdp);
 			free(buf, M_TEMP);
 			return (ENOMEM);
 		}
@@ -914,7 +1012,7 @@ vn_fullpath(struct thread *td, struct vnode *vn, char **retbuf, char **freebuf)
 	}
 	FILEDESC_UNLOCK(fdp);
 	numfullpathfound++;
-	*retbuf = bp; 
+	*retbuf = bp;
 	*freebuf = buf;
 	return (0);
 }

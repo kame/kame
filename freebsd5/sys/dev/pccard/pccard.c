@@ -1,5 +1,4 @@
 /*	$NetBSD: pcmcia.c,v 1.23 2000/07/28 19:17:02 drochner Exp $	*/
-/* $FreeBSD: src/sys/dev/pccard/pccard.c,v 1.79 2003/04/10 04:11:15 imp Exp $ */
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -29,6 +28,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/pccard/pccard.c,v 1.91 2003/11/04 06:30:59 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -84,7 +86,6 @@ static int	pccard_ccr_read(struct pccard_function *pf, int ccr);
 static void	pccard_ccr_write(struct pccard_function *pf, int ccr, int val);
 static int	pccard_attach_card(device_t dev);
 static int	pccard_detach_card(device_t dev);
-static int	pccard_card_gettype(device_t dev, int *type);
 static void	pccard_function_init(struct pccard_function *pf);
 static void	pccard_function_free(struct pccard_function *pf);
 static int	pccard_function_enable(struct pccard_function *pf);
@@ -150,7 +151,8 @@ pccard_ccr_write(struct pccard_function *pf, int ccr, int val)
 static int
 pccard_set_default_descr(device_t dev)
 {
-	char *vendorstr, *prodstr, *str;
+	const char *vendorstr, *prodstr;
+	char *str;
 
 	if (pccard_get_vendor_str(dev, &vendorstr))
 		return (0);
@@ -261,9 +263,10 @@ pccard_attach_card(device_t dev)
 		    pccard_set_default_descr(child) == 0 &&
 		    device_probe_and_attach(child) == 0) {
 			DEVPRINTF((sc->dev, "function %d CCR at %d "
-			    "offset %x: %x %x %x %x, %x %x %x %x, %x\n",
+			    "offset %x mask %x: "
+			    "%x %x %x %x, %x %x %x %x, %x\n",
 			    pf->number, pf->pf_ccr_window, pf->pf_ccr_offset,
-			    pccard_ccr_read(pf, 0x00),
+			    pf->ccr_mask, pccard_ccr_read(pf, 0x00),
 			pccard_ccr_read(pf, 0x02), pccard_ccr_read(pf, 0x04),
 			pccard_ccr_read(pf, 0x06), pccard_ccr_read(pf, 0x0A),
 			pccard_ccr_read(pf, 0x0C), pccard_ccr_read(pf, 0x0E),
@@ -282,14 +285,16 @@ pccard_detach_card(device_t dev)
 	struct pccard_softc *sc = PCCARD_SOFTC(dev);
 	struct pccard_function *pf;
 	struct pccard_config_entry *cfe;
+	int state;
 
 	/*
 	 * We are running on either the PCCARD socket's event thread
 	 * or in user context detaching a device by user request.
 	 */
 	STAILQ_FOREACH(pf, &sc->card.pf_head, pf_list) {
-		int state = device_get_state(pf->dev);
-
+		if (pf->dev == NULL)
+			continue;
+		state = device_get_state(pf->dev);
 		if (state == DS_ATTACHED || state == DS_BUSY)
 			device_detach(pf->dev);
 		if (pf->cfe != NULL)
@@ -321,8 +326,8 @@ pccard_do_product_lookup(device_t bus, device_t dev,
 	u_int32_t fcn;
 	u_int32_t vendor;
 	u_int32_t prod;
-	char *vendorstr;
-	char *prodstr;
+	const char *vendorstr;
+	const char *prodstr;
 
 #ifdef DIAGNOSTIC
 	if (sizeof *ent > ent_size)
@@ -373,27 +378,6 @@ pccard_do_product_lookup(device_t bus, device_t dev,
 			return (ent);
 	}
 	return (NULL);
-}
-
-static int
-pccard_card_gettype(device_t dev, int *type)
-{
-	struct pccard_softc *sc = PCCARD_SOFTC(dev);
-	struct pccard_function *pf;
-
-	/*
-	 * set the iftype to memory if this card has no functions (not yet
-	 * probed), or only one function, and that is not initialized yet or
-	 * that is memory.
-	 */
-	pf = STAILQ_FIRST(&sc->card.pf_head);
-	if (pf == NULL ||
-	    (STAILQ_NEXT(pf, pf_list) == NULL &&
-	    (pf->cfe == NULL || pf->cfe->iftype == PCCARD_IFTYPE_MEMORY)))
-		*type = PCCARD_IFTYPE_MEMORY;
-	else
-		*type = PCCARD_IFTYPE_IO;
-	return (0);
 }
 
 /*
@@ -545,6 +529,42 @@ pccard_function_free(struct pccard_function *pf)
 	resource_list_free(&devi->resources);
 }
 
+static void
+pccard_mfc_adjust_iobase(struct pccard_function *pf, bus_addr_t addr,
+    bus_addr_t offset, bus_size_t size)
+{
+	bus_size_t iosize, tmp;
+
+	if (addr != 0) {
+		if (pf->pf_mfc_iomax == 0) {
+			pf->pf_mfc_iobase = addr + offset;
+			pf->pf_mfc_iomax = pf->pf_mfc_iobase + size;
+		} else {
+			/* this makes the assumption that nothing overlaps */
+			if (pf->pf_mfc_iobase > addr + offset)
+				pf->pf_mfc_iobase = addr + offset;
+			if (pf->pf_mfc_iomax < addr + offset + size)
+				pf->pf_mfc_iomax = addr + offset + size;
+		}
+	}
+
+	tmp = pf->pf_mfc_iomax - pf->pf_mfc_iobase;
+	/* round up to nearest (2^n)-1 */
+	for (iosize = 1; iosize < tmp; iosize <<= 1)
+		;
+	iosize--;
+
+	DEVPRINTF((pf->dev, "MFC: I/O base %#jx IOSIZE %#jx\n",
+	    (uintmax_t)pf->pf_mfc_iobase, (uintmax_t)(iosize + 1)));
+	pccard_ccr_write(pf, PCCARD_CCR_IOBASE0,
+	    pf->pf_mfc_iobase & 0xff);
+	pccard_ccr_write(pf, PCCARD_CCR_IOBASE1,
+	    (pf->pf_mfc_iobase >> 8) & 0xff);
+	pccard_ccr_write(pf, PCCARD_CCR_IOBASE2, 0);
+	pccard_ccr_write(pf, PCCARD_CCR_IOBASE3, 0);
+	pccard_ccr_write(pf, PCCARD_CCR_IOSIZE, iosize);
+}
+
 /* Enable a PCCARD function */
 static int
 pccard_function_enable(struct pccard_function *pf)
@@ -632,24 +652,8 @@ pccard_function_enable(struct pccard_function *pf)
 
 	pccard_ccr_write(pf, PCCARD_CCR_SOCKETCOPY, 0);
 
-	if (pccard_mfc(pf->sc)) {
-		long tmp, iosize;
-
-		tmp = pf->pf_mfc_iomax - pf->pf_mfc_iobase;
-		/* round up to nearest (2^n)-1 */
-		for (iosize = 1; iosize < tmp; iosize <<= 1)
-			;
-		iosize--;
-
-		pccard_ccr_write(pf, PCCARD_CCR_IOBASE0,
-				 pf->pf_mfc_iobase & 0xff);
-		pccard_ccr_write(pf, PCCARD_CCR_IOBASE1,
-				 (pf->pf_mfc_iobase >> 8) & 0xff);
-		pccard_ccr_write(pf, PCCARD_CCR_IOBASE2, 0);
-		pccard_ccr_write(pf, PCCARD_CCR_IOBASE3, 0);
-
-		pccard_ccr_write(pf, PCCARD_CCR_IOSIZE, iosize);
-	}
+	if (pccard_mfc(pf->sc))
+		pccard_mfc_adjust_iobase(pf, 0, 0, 0);
 
 #ifdef PCCARDDEBUG
 	if (pccard_debug) {
@@ -757,7 +761,7 @@ pccard_compat_do_attach(device_t bus, device_t dev)
 	int err;
 
 	err = CARD_COMPAT_PROBE(dev);
-	if (err == 0)
+	if (err <= 0)
 		err = CARD_COMPAT_ATTACH(dev);
 	return (err);
 }
@@ -1069,8 +1073,10 @@ pccard_alloc_resource(device_t dev, device_t child, int type, int *rid,
 	struct pccard_ivar *dinfo;
 	struct resource_list_entry *rle = 0;
 	int passthrough = (device_get_parent(child) != dev);
+	int isdefault = (start == 0 && end == ~0UL && count == 1);
 	struct resource *r = NULL;
 
+	/* XXX I'm no longer sure this is right */
 	if (passthrough) {
 		return (BUS_ALLOC_RESOURCE(device_get_parent(dev), child,
 		    type, rid, start, end, count, flags));
@@ -1079,30 +1085,27 @@ pccard_alloc_resource(device_t dev, device_t child, int type, int *rid,
 	dinfo = device_get_ivars(child);
 	rle = resource_list_find(&dinfo->resources, type, *rid);
 
-	if (rle == NULL)
-		return (NULL);		/* no resource of that type/rid */
-
-	if (rle->res == NULL) {
-		switch(type) {
-		case SYS_RES_IOPORT:
-			r = bus_alloc_resource(dev, type, rid, start, end,
-			    count, rman_make_alignment_flags(count));
-			if (r == NULL)
-				goto bad;
-			resource_list_add(&dinfo->resources, type, *rid,
-			    rman_get_start(r), rman_get_end(r), count);
-			rle = resource_list_find(&dinfo->resources, type, *rid);
-			if (!rle)
-				goto bad;
-			rle->res = r;
-			break;
-		case SYS_RES_MEMORY:
-			break;
-		case SYS_RES_IRQ:
-			break;
-		}
-		return (rle->res);
+	if (rle == NULL && isdefault)
+		return (NULL);	/* no resource of that type/rid */
+	if (rle == NULL || rle->res == NULL) {
+		/* Do we want this device to own it? */
+		/* XXX I think so, but that might be lame XXX */
+		r = bus_alloc_resource(dev, type, rid, start, end,
+		  count, flags /* XXX aligment? */);
+		if (r == NULL)
+		    goto bad;
+		resource_list_add(&dinfo->resources, type, *rid,
+		  rman_get_start(r), rman_get_end(r), count);
+		rle = resource_list_find(&dinfo->resources, type, *rid);
+		if (!rle)
+		    goto bad;
+		rle->res = r;
 	}
+	/*
+	 * XXX the following looks wrong, in theory, but likely it is
+	 * XXX needed because of how the CIS code allocates resources
+	 * XXX for this device.
+	 */
 	if (rman_get_device(rle->res) != dev)
 		return (NULL);
 	bus_release_resource(dev, type, *rid, rle->res);
@@ -1202,6 +1205,10 @@ pccard_intr(void *arg)
 	 * the interrupt will pacify the card enough to keep an
 	 * interrupt storm from happening.  Of course this won't
 	 * help in the non-MFC case.
+	 *
+	 * This has no impact for MPSAFEness of the client drivers.
+	 * We register this with whatever flags the intr_handler
+	 * was registered with.  All these functions are MPSAFE.
 	 */
 	if (pccard_mfc(pf->sc)) {
 		reg = pccard_ccr_read(pf, PCCARD_CCR_STATUS);
@@ -1265,6 +1272,37 @@ pccard_teardown_intr(device_t dev, device_t child, struct resource *r,
 	return (ret);
 }
 
+static int
+pccard_activate_resource(device_t brdev, device_t child, int type, int rid,
+    struct resource *r)
+{
+	struct pccard_ivar *ivar = PCCARD_IVAR(child);
+	struct pccard_function *pf = ivar->fcn;
+
+	switch(type) {
+	case SYS_RES_IOPORT:
+		/*
+		 * We need to adjust IOBASE[01] and IOSIZE if we're an MFC
+		 * card.
+		 */
+		if (pccard_mfc(pf->sc))
+			pccard_mfc_adjust_iobase(pf, rman_get_start(r), 0,
+			    rman_get_size(r));
+		break;
+	default:
+		break;
+	}
+	return (bus_generic_activate_resource(brdev, child, type, rid, r));
+}
+
+static int
+pccard_deactivate_resource(device_t brdev, device_t child, int type,
+    int rid, struct resource *r)
+{
+	/* XXX undo pccard_activate_resource? XXX */
+	return (bus_generic_deactivate_resource(brdev, child, type, rid, r));
+}
+
 static device_method_t pccard_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		pccard_probe),
@@ -1280,8 +1318,8 @@ static device_method_t pccard_methods[] = {
 	DEVMETHOD(bus_child_detached,	pccard_child_detached),
 	DEVMETHOD(bus_alloc_resource,	pccard_alloc_resource),
 	DEVMETHOD(bus_release_resource,	pccard_release_resource),
-	DEVMETHOD(bus_activate_resource, bus_generic_activate_resource),
-	DEVMETHOD(bus_deactivate_resource, bus_generic_deactivate_resource),
+	DEVMETHOD(bus_activate_resource, pccard_activate_resource),
+	DEVMETHOD(bus_deactivate_resource, pccard_deactivate_resource),
 	DEVMETHOD(bus_setup_intr,	pccard_setup_intr),
 	DEVMETHOD(bus_teardown_intr,	pccard_teardown_intr),
 	DEVMETHOD(bus_set_resource,	pccard_set_resource),
@@ -1295,7 +1333,6 @@ static device_method_t pccard_methods[] = {
 	/* Card Interface */
 	DEVMETHOD(card_set_res_flags,	pccard_set_res_flags),
 	DEVMETHOD(card_set_memory_offset, pccard_set_memory_offset),
-	DEVMETHOD(card_get_type,	pccard_card_gettype),
 	DEVMETHOD(card_attach_card,	pccard_attach_card),
 	DEVMETHOD(card_detach_card,	pccard_detach_card),
 	DEVMETHOD(card_compat_do_probe, pccard_compat_do_probe),
@@ -1315,8 +1352,5 @@ devclass_t	pccard_devclass;
 
 /* Maybe we need to have a slot device? */
 DRIVER_MODULE(pccard, pcic, pccard_driver, pccard_devclass, 0, 0);
-DRIVER_MODULE(pccard, pc98pcic, pccard_driver, pccard_devclass, 0, 0);
 DRIVER_MODULE(pccard, cbb, pccard_driver, pccard_devclass, 0, 0);
-DRIVER_MODULE(pccard, tcic, pccard_driver, pccard_devclass, 0, 0);
 MODULE_VERSION(pccard, 1);
-/*MODULE_DEPEND(pccard, pcic, 1, 1, 1);*/

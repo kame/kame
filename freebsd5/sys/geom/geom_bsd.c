@@ -32,12 +32,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_bsd.c,v 1.60 2003/05/06 19:36:13 phk Exp $
- *
  * This is the method for dealing with BSD disklabels.  It has been
  * extensively (by my standards at least) commented, in the vain hope that
  * it will serve as the source in future copy&paste operations.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/geom/geom_bsd.c,v 1.66 2003/09/01 20:45:32 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/endian.h>
@@ -88,7 +89,7 @@ g_bsd_modify(struct g_geom *gp, u_char *label)
 	struct g_consumer *cp;
 	struct g_bsd_softc *ms;
 	u_int secsize, u;
-	off_t mediasize, rawoffset, o;
+	off_t rawoffset, o;
 	struct disklabel dl;
 	MD5_CTX md5sum;
 
@@ -104,20 +105,6 @@ g_bsd_modify(struct g_geom *gp, u_char *label)
 	/* Get dimensions of our device. */
 	cp = LIST_FIRST(&gp->consumer);
 	secsize = cp->provider->sectorsize;
-	mediasize = cp->provider->mediasize;
-
-#ifdef notyet
-	/*
-	 * Indications are that the d_secperunit is not correctly
-	 * initialized in many cases, and since we don't need it
-	 * for anything, we dont strictly need this test.
-	 * Preemptive action to avoid confusing people in disklabel(8)
-	 * may be in order.
-	 */
-	/* The label cannot claim a larger size than the media. */
-	if ((off_t)dl.d_secperunit * dl.d_secsize > mediasize)
-		return (EINVAL);
-#endif
 
 	/* ... or a smaller sector size. */
 	if (dl.d_secsize < secsize) {
@@ -280,104 +267,6 @@ g_bsd_writelabel(struct g_geom *gp, u_char *bootcode)
 	return(error);
 }
 
-
-/*
- * Implement certain ioctls to modify disklabels with.  This function
- * is called by the event handler thread with topology locked as result
- * of the g_post_event() in g_bsd_start().  It is not necessary to keep
- * topology locked all the time but make sure to return with topology
- * locked as well.
- */
-
-static void
-g_bsd_ioctl(void *arg, int flag)
-{
-	struct bio *bp;
-	struct g_geom *gp;
-	struct g_slicer *gsp;
-	struct g_bsd_softc *ms;
-	struct g_ioctl *gio;
-	u_char *label;
-	int error;
-
-	g_topology_assert();
-	bp = arg;
-	if (flag == EV_CANCEL) {
-		g_io_deliver(bp, ENXIO);
-		return;
-	}
-
-	gp = bp->bio_to->geom;
-	gsp = gp->softc;
-	ms = gsp->softc;
-	gio = (struct g_ioctl *)bp->bio_data;
-
-	label = g_malloc(LABELSIZE, M_WAITOK);
-
-	/* The disklabel to set is the ioctl argument. */
-	bsd_disklabel_le_enc(label, gio->data);
-
-	/* Validate and modify our slice instance to match. */
-	error = g_bsd_modify(gp, label);	/* Picks up topology lock on success. */
-	g_free(label);
-	if (error || gio->cmd == DIOCSDINFO) {
-		g_io_deliver(bp, error);
-		return;
-	}
-	
-	KASSERT(gio->cmd == DIOCWDINFO, ("Unknown ioctl in g_bsd_ioctl"));
-	g_io_deliver(bp, g_bsd_writelabel(gp, NULL));
-}
-
-/*
- * Rewrite the bootblock, which is BBSIZE bytes from the start of the disk.
- * We punch down the disklabel where we expect it to be before writing.
- */
-static int
-g_bsd_diocbsdbb(dev_t dev, u_long cmd __unused, caddr_t data, int fflag __unused, struct thread *td __unused)
-{
-	struct g_geom *gp;
-	struct g_slicer *gsp;
-	struct g_bsd_softc *ms;
-	struct g_consumer *cp;
-	u_char *buf;
-	void *p;
-	u_int secsize;
-	int error, i;
-	uint64_t sum;
-
-	/* Get hold of the interesting bits from the bio. */
-	gp = (void *)dev;
-	gsp = gp->softc;
-	ms = gsp->softc;
-
-	/* The disklabel to set is the ioctl argument. */
-	buf = g_malloc(BBSIZE, M_WAITOK);
-	p = *(void **)data;
-	error = copyin(p, buf, BBSIZE);
-	if (!error) {
-		DROP_GIANT();
-		g_topology_lock();
-		/* Validate and modify our slice instance to match. */
-		error = g_bsd_modify(gp, buf + ms->labeloffset);
-		if (!error) {
-			cp = LIST_FIRST(&gp->consumer);
-			secsize = cp->provider->sectorsize;
-			if (ms->labeloffset == ALPHA_LABEL_OFFSET) {
-				sum = 0;
-				for (i = 0; i < 63; i++)
-					sum += le64dec(buf + i * 8);
-				le64enc(buf + 504, sum);
-			}
-			error = g_write_data(cp, 0, buf, BBSIZE);
-		}
-		g_topology_unlock();
-		PICKUP_GIANT();
-	}
-	g_free(buf);
-	return (error);
-}
-
 /*
  * If the user tries to overwrite our disklabel through an open partition
  * or via a magicwrite config call, we end up here and try to prevent
@@ -425,6 +314,79 @@ g_bsd_hotwrite(void *arg, int flag)
  *    * Don't grab the topology lock.
  *    * Don't call biowait, g_getattr(), g_setattr() or g_read_data()
  */
+static int
+g_bsd_ioctl(struct g_provider *pp, u_long cmd, void * data, struct thread *td)
+{
+	struct g_geom *gp;
+	struct g_bsd_softc *ms;
+	struct g_slicer *gsp;
+	u_char *label;
+	int error;
+
+	gp = pp->geom;
+	gsp = gp->softc;
+	ms = gsp->softc;
+
+	switch(cmd) {
+	case DIOCGDINFO:
+		/* Return a copy of the disklabel to userland. */
+		bsd_disklabel_le_dec(ms->label, data, MAXPARTITIONS);
+		return(0);
+	case DIOCBSDBB: {
+		struct g_consumer *cp;
+		u_char *buf;
+		void *p;
+		int error, i;
+		uint64_t sum;
+
+		/* The disklabel to set is the ioctl argument. */
+		buf = g_malloc(BBSIZE, M_WAITOK);
+		p = *(void **)data;
+		error = copyin(p, buf, BBSIZE);
+		if (!error) {
+			/* XXX: Rude, but supposedly safe */
+			DROP_GIANT();
+			g_topology_lock();
+			/* Validate and modify our slice instance to match. */
+			error = g_bsd_modify(gp, buf + ms->labeloffset);
+			if (!error) {
+				cp = LIST_FIRST(&gp->consumer);
+				if (ms->labeloffset == ALPHA_LABEL_OFFSET) {
+					sum = 0;
+					for (i = 0; i < 63; i++)
+						sum += le64dec(buf + i * 8);
+					le64enc(buf + 504, sum);
+				}
+				error = g_write_data(cp, 0, buf, BBSIZE);
+			}
+			g_topology_unlock();
+			PICKUP_GIANT();
+		}
+		g_free(buf);
+		return (error);
+	}
+	case DIOCSDINFO:
+	case DIOCWDINFO: {
+		label = g_malloc(LABELSIZE, M_WAITOK);
+
+		/* The disklabel to set is the ioctl argument. */
+		bsd_disklabel_le_enc(label, data);
+
+		DROP_GIANT();
+		g_topology_lock();
+		/* Validate and modify our slice instance to match. */
+		error = g_bsd_modify(gp, label);
+		if (error == 0 && cmd == DIOCWDINFO)
+			error = g_bsd_writelabel(gp, NULL);
+		g_topology_unlock();
+		PICKUP_GIANT();
+		g_free(label);
+		return(error);
+	}
+	default:
+		return (ENOIOCTL);
+	}
+}
 
 static int
 g_bsd_start(struct bio *bp)
@@ -432,61 +394,16 @@ g_bsd_start(struct bio *bp)
 	struct g_geom *gp;
 	struct g_bsd_softc *ms;
 	struct g_slicer *gsp;
-	struct g_ioctl *gio;
-	int error;
 
 	gp = bp->bio_to->geom;
 	gsp = gp->softc;
 	ms = gsp->softc;
-	switch(bp->bio_cmd) {
-	case BIO_GETATTR:
+	if (bp->bio_cmd == BIO_GETATTR) {
 		if (g_handleattr(bp, "BSD::labelsum", ms->labelsum,
 		    sizeof(ms->labelsum)))
 			return (1);
-		break;
-	default:
-		KASSERT(0 == 1, ("Unknown bio_cmd in g_bsd_start (%d)",
-		    bp->bio_cmd));
 	}
-
-	/* We only handle ioctl(2) requests of the right format. */
-	if (strcmp(bp->bio_attribute, "GEOM::ioctl"))
-		return (0);
-	else if (bp->bio_length != sizeof(*gio))
-		return (0);
-
-	/* Get hold of the ioctl parameters. */
-	gio = (struct g_ioctl *)bp->bio_data;
-
-	switch (gio->cmd) {
-	case DIOCGDINFO:
-		/* Return a copy of the disklabel to userland. */
-		bsd_disklabel_le_dec(ms->label, gio->data, MAXPARTITIONS);
-		g_io_deliver(bp, 0);
-		return (1);
-	case DIOCBSDBB:
-		gio->func = g_bsd_diocbsdbb;
-		gio->dev = (void *)gp;
-		g_io_deliver(bp, EDIRIOCTL);
-		return (1);
-	case DIOCSDINFO:
-	case DIOCWDINFO:
-		/*
-		 * These we cannot do without the topology lock and some
-		 * some I/O requests.  Ask the event-handler to schedule
-		 * us in a less restricted environment.
-		 */
-		error = g_post_event(g_bsd_ioctl, bp, M_NOWAIT, gp, NULL);
-		if (error)
-			g_io_deliver(bp, error);
-		/*
-		 * We must return non-zero to indicate that we will deal
-		 * with this bio, even though we have not done so yet.
-		 */
-		return (1);
-	default:
-		return (0);
-	}
+	return (0);
 }
 
 /*
@@ -578,6 +495,7 @@ g_bsd_taste(struct g_class *mp, struct g_provider *pp, int flags)
 	 * routine which the "slice" code should call at the right time
 	 */
 	gp->dumpconf = g_bsd_dumpconf;
+	gp->ioctl = g_bsd_ioctl;
 
 	/* Get the geom_slicer softc from the geom. */
 	gsp = gp->softc;
@@ -640,7 +558,7 @@ g_bsd_taste(struct g_class *mp, struct g_provider *pp, int flags)
 		MD5Final(ms->labelsum, &md5sum);
 
 		error = g_getattr("BSD::labelsum", cp, &hash);
-		if (!error && !strncmp(ms->labelsum, hash, sizeof(hash)))
+		if (!error && !bcmp(ms->labelsum, hash, sizeof(hash)))
 			break;
 
 		/*
@@ -690,29 +608,32 @@ g_bsd_callconfig(void *arg, int flag)
 /*
  * NB! curthread is user process which GCTL'ed.
  */
-static int
-g_bsd_config(struct gctl_req *req, struct g_geom *gp, const char *verb)
+static void
+g_bsd_config(struct gctl_req *req, struct g_class *mp, char const *verb)
 {
 	u_char *label;
-	int error, i;
+	int error;
 	struct h0h0 h0h0;
+	struct g_geom *gp;
 	struct g_slicer *gsp;
 	struct g_consumer *cp;
 	struct g_bsd_softc *ms;
 
-	i = 0;
 	g_topology_assert();
+	gp = gctl_get_geom(req, mp, "geom");
+	if (gp == NULL)
+		return;
 	cp = LIST_FIRST(&gp->consumer);
 	gsp = gp->softc;
 	ms = gsp->softc;
 	if (!strcmp(verb, "read mbroffset")) {
-		error = gctl_set_param(req, "mbroffset",
+		gctl_set_param(req, "mbroffset",
 		    &ms->mbroffset, sizeof(ms->mbroffset));
-		return (error);
+		return;
 	} else if (!strcmp(verb, "write label")) {
 		label = gctl_get_paraml(req, "label", LABELSIZE);
 		if (label == NULL)
-			return (EINVAL);
+			return;
 		h0h0.gp = gp;
 		h0h0.ms = gsp->softc;
 		h0h0.label = label;
@@ -720,41 +641,36 @@ g_bsd_config(struct gctl_req *req, struct g_geom *gp, const char *verb)
 		/* XXX: Does this reference register with our selfdestruct code ? */
 		error = g_access_rel(cp, 1, 1, 1);
 		if (error) {
-			g_free(label);
-			return (error);
+			gctl_error(req, "could not access consumer");
+			return;
 		}
-		g_topology_unlock();
-		g_waitfor_event(g_bsd_callconfig, &h0h0, M_WAITOK, gp, NULL);
-		g_topology_lock();
+		g_bsd_callconfig(&h0h0, 0);
 		error = h0h0.error;
 		g_access_rel(cp, -1, -1, -1);
-		g_free(label);
 	} else if (!strcmp(verb, "write bootcode")) {
 		label = gctl_get_paraml(req, "bootcode", BBSIZE);
 		if (label == NULL)
-			return (EINVAL);
+			return;
 		/* XXX: Does this reference register with our selfdestruct code ? */
 		error = g_access_rel(cp, 1, 1, 1);
 		if (error) {
-			g_free(label);
-			return (error);
+			gctl_error(req, "could not access consumer");
+			return;
 		}
 		error = g_bsd_writelabel(gp, label);
 		g_access_rel(cp, -1, -1, -1);
-		g_free(label);
 	} else {
-		return (gctl_error(req, "Unknown verb parameter"));
+		gctl_error(req, "Unknown verb parameter");
 	}
 
-	return (error);
+	return;
 }
 
 /* Finally, register with GEOM infrastructure. */
 static struct g_class g_bsd_class = {
 	.name = BSD_CLASS_NAME,
 	.taste = g_bsd_taste,
-	.config_geom = g_bsd_config,
-	G_CLASS_INITIALIZER
+	.ctlreq = g_bsd_config,
 };
 
 DECLARE_GEOM_CLASS(g_bsd_class, g_bsd);

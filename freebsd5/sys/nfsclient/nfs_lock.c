@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_lock.c,v 1.36 2003/05/30 17:15:56 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_lock.c,v 1.39 2003/11/14 20:54:08 alfred Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -50,6 +50,8 @@ __FBSDID("$FreeBSD: src/sys/nfsclient/nfs_lock.c,v 1.36 2003/05/30 17:15:56 rwat
 #include <sys/vnode.h>
 
 #include <net/if.h>
+
+#include <rpc/rpcclnt.h>
 
 #include <nfs/rpcv2.h>
 #include <nfs/nfsproto.h>
@@ -144,7 +146,7 @@ nfs_dolock(struct vop_advlock_args *ap)
 	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, _PATH_LCKFIFO, td);
 
 	fmode = FFLAGS(O_WRONLY | O_NONBLOCK);
-	error = vn_open_cred(&nd, &fmode, 0, thread0.td_ucred);
+	error = vn_open_cred(&nd, &fmode, 0, thread0.td_ucred, -1);
 	switch (error) {
 	case ENOENT:
 	case ENXIO:
@@ -190,6 +192,14 @@ nfs_dolock(struct vop_advlock_args *ap)
 		 * then even a reasonably loaded system should take (at least
 		 * on a local network).  XXX Probably should use a back-off
 		 * scheme.
+		 *
+		 * XXX: No PCATCH here since we currently have no useful
+		 * way to signal to the userland rpc.lockd that the request
+		 * has been aborted.  Once the rpc.lockd implementation
+		 * can handle aborts, and we report them properly,
+		 * PCATCH can be put back.  In the mean time, if we did
+		 * permit aborting, the lock attempt would "get lost"
+		 * and the lock would get stuck in the locked state.
 		 */
 		error = tsleep(p->p_nlminfo, PUSER, "lockd", 20*hz);
 		if (error != 0) {

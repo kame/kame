@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/spans/spans_msg.c,v 1.14 2003/02/19 05:47:31 imp Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ---------------------------
  *
  * SPANS signalling message processing.
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/spans/spans_msg.c,v 1.15 2003/06/11 07:11:35 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -60,10 +58,6 @@
 
 #include "spans_xdr.h"
 #include <netatm/spans/spans_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/spans/spans_msg.c,v 1.14 2003/02/19 05:47:31 imp Exp $");
-#endif
 
 /*
  * External functions

@@ -32,14 +32,13 @@
  *
  *	i4b_ifpi_pci.c: AVM Fritz!Card PCI hardware driver
  *	--------------------------------------------------
- *
  *	$Id: i4b_ifpi_pci.c,v 1.4 2000/06/02 11:58:56 hm Exp $
- *
- * $FreeBSD: src/sys/i4b/layer1/ifpi/i4b_ifpi_pci.c,v 1.11 2002/09/02 00:52:07 brooks Exp $
- *
  *      last edit-date: [Fri Jan 12 17:01:26 2001]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/ifpi/i4b_ifpi_pci.c,v 1.15 2003/09/02 17:30:39 jhb Exp $");
 
 #include "opt_i4b.h"
 
@@ -52,8 +51,8 @@
 #include <sys/bus.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <sys/socket.h>
 #include <net/if.h>
@@ -76,8 +75,8 @@
 #define PCI_AVMA1_DID 0x0a00
 
 /* prototypes */
-static void avma1pp_disable(device_t);
 
+static void avma1pp_disable(device_t);
 static void avma1pp_intr(void *);
 static void hscx_write_reg(int, u_int, u_int, struct l1_softc *);
 static u_char hscx_read_reg(int, u_int, struct l1_softc *);
@@ -502,8 +501,8 @@ avma1pp_attach_avma1pp(device_t dev)
 	bzero(sc, sizeof(struct l1_softc));
 
 	/* probably not really required */
-	if(unit > IFPI_MAXUNIT) {
-		printf("avma1pp%d: Error, unit > IFPI_MAXUNIT!\n", unit);
+	if(unit >= IFPI_MAXUNIT) {
+		printf("avma1pp%d: Error, unit >= IFPI_MAXUNIT!\n", unit);
 		splx(s);
 		return(ENXIO);
 	}
@@ -515,7 +514,7 @@ avma1pp_attach_avma1pp(device_t dev)
 
 	ifpi_scp[unit] = sc;
 
-	sc->sc_resources.io_rid[0] = PCIR_MAPS+4;
+	sc->sc_resources.io_rid[0] = PCIR_BAR(1);
 	sc->sc_resources.io_base[0] = bus_alloc_resource(dev, SYS_RES_IOPORT,
 		&sc->sc_resources.io_rid[0],
 		0, ~0, 1, RF_ACTIVE);
@@ -535,7 +534,7 @@ avma1pp_attach_avma1pp(device_t dev)
 		&sc->sc_resources.irq_rid, 0, ~0, 1, RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->sc_resources.irq == NULL) {
-		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_MAPS+4, sc->sc_resources.io_base[0]);
+		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_BAR(1), sc->sc_resources.io_base[0]);
 		printf("avma1pp%d: couldn't map interrupt\n", unit);
 		error = ENXIO;
 		goto fail;
@@ -545,7 +544,7 @@ avma1pp_attach_avma1pp(device_t dev)
 
 	if (error) {
 		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->sc_resources.irq);
-		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_MAPS+4, sc->sc_resources.io_base[0]);
+		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_BAR(1), sc->sc_resources.io_base[0]);
 		printf("avma1pp%d: couldn't set up irq\n", unit);
 		goto fail;
 	}

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/ia64/include/pcb.h,v 1.12 2003/05/16 21:26:41 marcel Exp $
+ *	$FreeBSD: src/sys/ia64/include/pcb.h,v 1.13 2003/08/12 03:51:53 marcel Exp $
  */
 
 #ifndef _MACHINE_PCB_H_
@@ -45,7 +45,6 @@ struct pcb {
 	struct pmap 		*pcb_current_pmap;
 
 	uint64_t		pcb_onfault;	/* for copy faults */
-	uint64_t		pcb_accessaddr;	/* for [fs]uswintr */
 
 #if IA32
 	uint64_t		pcb_ia32_cflg;

@@ -36,7 +36,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/ia64/include/setjmp.h,v 1.10 2003/03/05 04:39:23 marcel Exp $
+ * $FreeBSD: src/sys/ia64/include/setjmp.h,v 1.12 2003/07/26 08:03:43 marcel Exp $
  */
 
 #ifndef _MACHINE_SETJMP_H_
@@ -88,14 +88,9 @@
 #define	J_B5		0x1d0
 #define	J_SIGMASK	0x1d8
 #define	J_SIGSET	0x1e0
-#define	J_GP		0x1f0
 #endif /* __BSD_VISIBLE */
 
-/*
- * We have 8 bytes left for future use, but it's a nice round,
- * but above all large number. Size is in bytes.
- */
-#define	_JMPBUFSZ	0x200
+#define	_JBLEN		0x20			/* Size in long doubles */
 
 /*
  * XXX this check is wrong, since LOCORE is in the application namespace and
@@ -114,15 +109,21 @@
  */
 #if __BSD_VISIBLE || __POSIX_VISIBLE || __XSI_VISIBLE
 struct _sigjmp_buf {
-	char	_Buffer[_JMPBUFSZ];
-} __aligned(16);
+	long double buf[_JBLEN];
+};
 typedef struct _sigjmp_buf sigjmp_buf[1];
 #endif
 
 struct _jmp_buf {
-	char	_Buffer[_JMPBUFSZ];
-} __aligned(16);
+	long double buf[_JBLEN];
+};
 typedef struct _jmp_buf	jmp_buf[1];
+
+#ifdef _KERNEL
+#ifdef CTASSERT
+CTASSERT(sizeof(struct _jmp_buf) == 512);
+#endif
+#endif
 
 #endif /* !LOCORE */
 

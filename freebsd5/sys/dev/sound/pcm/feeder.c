@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,7 @@
 
 #include "feeder_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/feeder.c,v 1.29 2003/03/05 14:48:28 orion Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/feeder.c,v 1.32 2003/09/07 16:28:03 cg Exp $");
 
 MALLOC_DEFINE(M_FEEDER, "feeder", "pcm feeder");
 
@@ -194,11 +194,13 @@ chn_addfeeder(struct pcm_channel *c, struct feeder_class *fc, struct pcm_feederd
 
 	nf->source = c->feeder;
 
+	/* XXX we should use the lowest common denominator for align */
 	if (nf->align > 0)
 		c->align += nf->align;
 	else if (nf->align < 0 && c->align < -nf->align)
 		c->align = -nf->align;
-
+	if (c->feeder != NULL)
+		c->feeder->parent = nf;
 	c->feeder = nf;
 
 	return 0;
@@ -372,6 +374,20 @@ chn_fmtchain(struct pcm_channel *c, u_int32_t *to)
 	return (c->direction == PCMDIR_REC)? best : c->feeder->desc->out;
 }
 
+void
+feeder_printchain(struct pcm_feeder *head)
+{
+	struct pcm_feeder *f;
+
+	printf("feeder chain (head @%p)\n", head);
+	f = head;
+	while (f != NULL) {
+		printf("%s/%d @ %p\n", f->class->name, f->desc->idx, f);
+		f = f->source;
+	}
+	printf("[end]\n\n");
+}
+
 /*****************************************************************************/
 
 static int
@@ -409,12 +425,12 @@ static kobj_method_t feeder_root_methods[] = {
 	{ 0, 0 }
 };
 static struct feeder_class feeder_root_class = {
-	name:		"feeder_root",
-	methods:	feeder_root_methods,
-	size:		sizeof(struct pcm_feeder),
-	align:		0,
-	desc:		NULL,
-	data:		NULL,
+	.name =		"feeder_root",
+	.methods =	feeder_root_methods,
+	.size =		sizeof(struct pcm_feeder),
+	.align =	0,
+	.desc =		NULL,
+	.data =		NULL,
 };
 SYSINIT(feeder_root, SI_SUB_DRIVERS, SI_ORDER_FIRST, feeder_register, &feeder_root_class);
 SYSUNINIT(feeder_root, SI_SUB_DRIVERS, SI_ORDER_FIRST, feeder_unregisterall, NULL);

@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/atm_device.c,v 1.19 2003/03/04 23:19:52 jlemon Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * -----------------
  *
  * ATM device support functions
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/atm_device.c,v 1.25 2003/07/25 06:43:41 harti Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -44,6 +42,7 @@
 #include <sys/socketvar.h>
 #include <sys/syslog.h>
 #include <net/if.h>
+#include <net/bpf.h>
 #include <netatm/port.h>
 #include <netatm/queue.h>
 #include <netatm/atm.h>
@@ -55,11 +54,6 @@
 #include <netatm/atm_stack.h>
 #include <netatm/atm_pcb.h>
 #include <netatm/atm_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_device.c,v 1.19 2003/03/04 23:19:52 jlemon Exp $");
-#endif
-
 
 /*
  * Private structures for managing allocated kernel memory resources
@@ -170,8 +164,9 @@ atm_dev_inst(ssp, cvcp)
 
 	/*
 	 * Allocate a VCC control block
+	 * This can happen from a callout so don't wait here.
 	 */
-	cvp = uma_zalloc(cup->cu_vcc_zone, M_WAITOK);
+	cvp = uma_zalloc(cup->cu_vcc_zone, M_NOWAIT);
 	if (cvp == NULL)
 		return (ENOMEM);
 	
@@ -374,6 +369,16 @@ atm_dev_lower(cmd, tok, arg1, arg2)
 				tok, state );
 			KB_FREEALL((KBuffer *)arg1);
 			break;
+		}
+
+		/*
+		 * Send the packet to the interface's bpf if this vc has one.
+		 */
+		if (cvcp->cvc_vcc != NULL && cvcp->cvc_vcc->vc_nif != NULL) {
+			struct ifnet *ifp =
+			    (struct ifnet *)cvcp->cvc_vcc->vc_nif;
+
+			BPF_MTAP(ifp, (KBuffer *)arg1);
 		}
 
 		/*
@@ -798,11 +803,8 @@ atm_unload()
  *
  */
 void
-atm_dev_pdu_print(cup, cvp, m, msg)
-	Cmn_unit	*cup;
-	Cmn_vcc		*cvp;
-	KBuffer		*m;
-	char		*msg;
+atm_dev_pdu_print(const Cmn_unit *cup, const Cmn_vcc *cvp,
+    const KBuffer *m, const char *msg)
 {
 	char		buf[128];
 
@@ -812,4 +814,3 @@ atm_dev_pdu_print(cup, cvp, m, msg)
 
 	atm_pdu_print(m, buf);
 }
-

@@ -25,13 +25,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netgraph/ng_split.h,v 1.2 2001/07/24 23:33:06 brooks Exp $
+ * $FreeBSD: src/sys/netgraph/ng_split.h,v 1.3 2003/11/11 12:30:37 ru Exp $
  *
  */
 
 
-#ifndef _NG_SPLIT_H
-#define _NG_SPLIT_H
+#ifndef _NETGRAPH_NG_SPLIT_H_
+#define _NETGRAPH_NG_SPLIT_H_
 
 /* Node type name and magic cookie */
 #define NG_SPLIT_NODE_TYPE	"split"
@@ -42,4 +42,4 @@
 #define NG_SPLIT_HOOK_OUT	"out"	/* Output to outhook (sending out) */
 #define NG_SPLIT_HOOK_IN	"in"	/* Input from inhook (recieving) */
 
-#endif /* _NG_SPLIT_H */
+#endif /* _NETGRAPH_NG_SPLIT_H_ */

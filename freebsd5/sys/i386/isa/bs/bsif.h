@@ -1,5 +1,5 @@
 /*	$NecBSD: bsif.h,v 1.5 1997/10/23 20:52:34 honda Exp $	*/
-/* $FreeBSD: src/sys/i386/isa/bs/bsif.h,v 1.22 2003/04/16 20:52:26 phk Exp $ */
+/* $FreeBSD: src/sys/i386/isa/bs/bsif.h,v 1.23 2003/11/03 22:37:28 jhb Exp $ */
 /*
  * Copyright (c) HONDA Naofumi, KATO Takenori, 1996.  All rights reserved.
  * 
@@ -124,7 +124,6 @@
 #include <pc98/pc98/pc98.h>
 #include <i386/isa/isa_device.h>
 #include <i386/isa/icu.h>
-#include <i386/isa/intr_machdep.h>
 #endif	/* __FreeBSD__ */
 
 /***************************************************

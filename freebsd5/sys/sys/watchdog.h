@@ -23,10 +23,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/watchdog.h,v 1.1 2003/02/27 21:07:36 phk Exp $
+ * $FreeBSD: src/sys/sys/watchdog.h,v 1.2 2003/06/25 08:30:45 phk Exp $
  */
 #ifndef _SYS_WATCHDOG_H
-#define	_SYS__WATCHDOG_H
+#define	_SYS_WATCHDOG_H
 
 #include <sys/ioccom.h>
 

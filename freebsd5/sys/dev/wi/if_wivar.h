@@ -31,7 +31,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/wi/if_wivar.h,v 1.17 2003/03/18 04:22:42 imp Exp $
+ * $FreeBSD: src/sys/dev/wi/if_wivar.h,v 1.20 2003/09/05 22:29:30 sam Exp $
  */
 
 #if 0
@@ -61,6 +61,8 @@
 
 struct wi_softc	{
 	struct ieee80211com	sc_ic;
+	int			(*sc_newstate)(struct ieee80211com *,
+					enum ieee80211_state, int);
 	device_t		sc_dev;
 #if __FreeBSD_version >= 500000
 	struct mtx		sc_mtx;
@@ -95,7 +97,6 @@ struct wi_softc	{
 	void *			wi_intrhand;
 	int			wi_io_addr;
 
-	struct ifmedia		sc_media;
 	struct bpf_if		*sc_drvbpf;
 	int			sc_flags;
 	int			sc_if_flags;
@@ -105,10 +106,12 @@ struct wi_softc	{
 	u_int16_t		sc_procframe;
 	u_int16_t		sc_portnum;
 
-	u_int16_t		sc_dbm_adjust;
+	/* RSSI interpretation */
+	u_int16_t		sc_min_rssi;	/* clamp sc_min_rssi < RSSI */
+	u_int16_t		sc_max_rssi;	/* clamp RSSI < sc_max_rssi */
+	u_int16_t		sc_dbm_offset;	/* dBm ~ RSSI - sc_dbm_offset */
+
 	u_int16_t		sc_max_datalen;
-	u_int16_t		sc_frag_thresh;
-	u_int16_t		sc_rts_thresh;
 	u_int16_t		sc_system_scale;
 	u_int16_t		sc_cnfauthmode;
 	u_int16_t		sc_roaming_mode;
@@ -159,8 +162,19 @@ struct wi_softc	{
 	int			sc_false_syns;
 
 	u_int16_t		sc_txbuf[IEEE80211_MAX_LEN/2];
+
+	union {
+		struct wi_tx_radiotap_header th;
+		u_int8_t	pad[64];
+	} u_tx_rt;
+	union {
+		struct wi_rx_radiotap_header th;
+		u_int8_t	pad[64];
+	} u_rx_rt;
 };
 #define	sc_if			sc_ic.ic_if
+#define	sc_tx_th		u_tx_rt.th
+#define	sc_rx_th		u_rx_rt.th
 
 /* maximum consecutive false change-of-BSSID indications */
 #define	WI_MAX_FALSE_SYNS		10	
@@ -184,6 +198,17 @@ struct wi_card_ident {
 	char		*card_name;
 	u_int8_t	firm_type;
 };
+
+#define	WI_PRISM_MIN_RSSI	0x1b
+#define	WI_PRISM_MAX_RSSI	0x9a
+#define	WI_PRISM_DBM_OFFSET	100 /* XXX */
+
+#define	WI_LUCENT_MIN_RSSI	47
+#define	WI_LUCENT_MAX_RSSI	138
+#define	WI_LUCENT_DBM_OFFSET	149
+
+#define	WI_RSSI_TO_DBM(sc, rssi) (MIN((sc)->sc_max_rssi, \
+    MAX((sc)->sc_min_rssi, (rssi))) - (sc)->sc_dbm_offset)
 
 #if __FreeBSD_version < 500000
 /*

@@ -23,9 +23,10 @@
  * SUCH DAMAGE.
  *
  * capi/capi_l4if.c	The CAPI i4b L4/device interface.
- *
- * $FreeBSD: src/sys/i4b/capi/capi_l4if.c,v 1.5 2002/09/02 00:52:05 brooks Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/capi/capi_l4if.c,v 1.6 2003/06/10 23:09:37 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

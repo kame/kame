@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/uniarp_cache.c,v 1.10 2003/02/19 05:47:31 imp Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ---------------------
  *
  * UNI ATMARP support (RFC1577) - ARP cache processing
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/uniarp_cache.c,v 1.13 2003/07/29 13:32:10 harti Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -63,11 +61,6 @@
 #include <netatm/ipatm/ipatm_serv.h>
 #include <netatm/uni/unisig_var.h>
 #include <netatm/uni/uniip_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/uniarp_cache.c,v 1.10 2003/02/19 05:47:31 imp Exp $");
-#endif
-
 
 /*
  * Add data to the arp table cache
@@ -124,9 +117,10 @@ uniarp_cache_svc(uip, ip, atm, atmsub, origin)
 
 	/*
 	 * If there aren't any entries yet, create one
+	 * May be called from netisr - don't wait.
 	 */
 	if ((ipuap == NULL) && (nouap == NULL)) {
-		ipuap = uma_zalloc(uniarp_zone, M_WAITOK);
+		ipuap = uma_zalloc(uniarp_zone, M_NOWAIT);
 		if (ipuap == NULL)
 			return (ENOMEM);
 		ipuap->ua_dstip.s_addr = ip->s_addr;
@@ -412,7 +406,7 @@ uniarp_validate_ip(uip, ip, origin)
 	u_int			origin;
 {
 	struct uniarp_prf	*upp;
-	int	i;
+	u_int i;
 
 
 	/*

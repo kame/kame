@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mbuf.h	8.5 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/mbuf.h,v 1.122 2003/05/09 02:15:52 silby Exp $
+ * $FreeBSD: src/sys/sys/mbuf.h,v 1.128 2003/11/24 03:57:03 sam Exp $
  */
 
 #ifndef _SYS_MBUF_H_
@@ -153,6 +153,7 @@ struct mbuf {
 #define	M_PROTO3	0x0040	/* protocol-specific */
 #define	M_PROTO4	0x0080	/* protocol-specific */
 #define	M_PROTO5	0x0100	/* protocol-specific */
+#define M_PROTO6	0x4000	/* protocol-specific (avoid M_BCAST conflict) */
 #define	M_FREELIST	0x8000	/* mbuf is on the free list */
 
 /*
@@ -178,8 +179,8 @@ struct mbuf {
  * Flags copied when copying m_pkthdr.
  */
 #define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_RDONLY|M_PROTO1|M_PROTO1|M_PROTO2|\
-			    M_PROTO3|M_PROTO4|M_PROTO5|M_BCAST|M_MCAST|\
-			    M_FRAG|M_FIRSTFRAG|M_LASTFRAG)
+			    M_PROTO3|M_PROTO4|M_PROTO5|M_PROTO6|\
+			    M_BCAST|M_MCAST|M_FRAG|M_FIRSTFRAG|M_LASTFRAG)
 
 /*
  * Flags indicating hw checksum support and sw checksum requirements.
@@ -270,7 +271,7 @@ struct mbstat {
  */
 #define	M_DONTWAIT	0x4		/* don't conflict with M_NOWAIT */
 #define	M_TRYWAIT	0x8		/* or M_WAITOK */
-#define	M_WAIT		M_TRYWAIT	/* XXX: Deprecated. */
+#define	M_WAIT		M_TRYWAIT	/* XXX: deprecated */
 #define	MBTOM(how)	((how) & M_TRYWAIT ? M_WAITOK : M_NOWAIT)
 
 #ifdef _KERNEL
@@ -298,7 +299,7 @@ struct mbstat {
  * mbuf, cluster, and external object allocation macros
  * (for compatibility purposes).
  */
-/* NB: M_COPY_PKTHDR is deprecated, use M_MOVE_PKTHDR or m_dup_pktdr */
+/* NB: M_COPY_PKTHDR is deprecated.  Use M_MOVE_PKTHDR or m_dup_pktdr. */
 #define	M_MOVE_PKTHDR(to, from)	m_move_pkthdr((to), (from))
 #define	m_getclr(how, type)	m_get_clrd((how), (type))
 #define	MGET(m, how, type)	((m) = m_get((how), (type)))
@@ -338,6 +339,13 @@ struct mbstat {
 #define M_ASSERTPKTHDR(m)				\
 	KASSERT(m != NULL && m->m_flags & M_PKTHDR,	\
 		("%s: no mbuf packet header!", __func__))
+
+/*
+ * Ensure that the supplied mbuf is a valid, non-free mbuf.
+ */
+#define M_ASSERTVALID(m)					\
+	KASSERT((((struct mbuf *)m)->m_flags & M_FREELIST) == 0,			\
+		("%s: attempted use of a free mbuf!", __func__))
 
 /*
  * Set the m_data pointer of a newly-allocated mbuf (m_get/MGET) to place
@@ -443,6 +451,7 @@ struct	mbuf	*m_devget(char *, int, int, struct ifnet *,
 struct	mbuf	*m_dup(struct mbuf *, int);
 int		 m_dup_pkthdr(struct mbuf *, struct mbuf *, int);
 u_int		 m_fixhdr(struct mbuf *);
+struct	mbuf	*m_fragment(struct mbuf *, int, int);
 struct	mbuf	*m_free(struct mbuf *);
 void		 m_freem(struct mbuf *);
 struct	mbuf	*m_get(int, short);
@@ -468,10 +477,10 @@ struct	mbuf	*m_split(struct mbuf *, int, int);
  * The cookie is a 32-bit unique unsigned value used to identify
  * a module or ABI.  By convention this value is chose as the
  * date+time that the module is created, expressed as the number of
- * seconds since the epoch (e.g. using date -u +'%s').  The type value
+ * seconds since the epoch (e.g., using date -u +'%s').  The type value
  * is an ABI/module-specific value that identifies a particular annotation
  * and is private to the module.  For compatibility with systems
- * like openbsd that define packet tags w/o an ABI/module cookie,
+ * like OpenBSD that define packet tags w/o an ABI/module cookie,
  * the value PACKET_ABI_COMPAT is used to implement m_tag_get and
  * m_tag_find compatibility shim functions and several tag types are
  * defined below.  Users that do not require compatibility should use
@@ -487,7 +496,7 @@ struct	mbuf	*m_split(struct mbuf *, int, int);
  *
  * if the alignment of struct m_tag is sufficient for referencing members
  * of struct foo.  Otherwise it is necessary to embed struct m_tag within
- * the private data structure to insure proper alignment; e.g.
+ * the private data structure to insure proper alignment; e.g.,
  *
  *	struct foo {
  *		struct m_tag	tag;
@@ -497,9 +506,24 @@ struct	mbuf	*m_split(struct mbuf *, int, int);
  *	struct m_tag *mtag = &p->tag;
  */
 
+/*
+ * Persistent tags stay with an mbuf until the mbuf is reclaimed.
+ * Otherwise tags are expected to ``vanish'' when they pass through
+ * a network interface.  For most interfaces this happens normally
+ * as the tags are reclaimed when the mbuf is free'd.  However in
+ * some special cases reclaiming must be done manually.  An example
+ * is packets that pass through the loopback interface.  Also, one
+ * must be careful to do this when ``turning around'' packets (e.g.,
+ * icmp_reflect).
+ *
+ * To mark a tag persistent bit-or this flag in when defining the
+ * tag id.  The tag will then be treated as described above.
+ */
+#define	MTAG_PERSISTENT				0x800
+
 #define	PACKET_TAG_NONE				0  /* Nadda */
 
-/* Packet tag for use with PACKET_ABI_COMPAT */
+/* Packet tag for use with PACKET_ABI_COMPAT. */
 #define	PACKET_TAG_IPSEC_IN_DONE		1  /* IPsec applied, in */
 #define	PACKET_TAG_IPSEC_OUT_DONE		2  /* IPsec applied, out */
 #define	PACKET_TAG_IPSEC_IN_CRYPTO_DONE		3  /* NIC IPsec crypto done */
@@ -529,14 +553,15 @@ struct	mbuf	*m_split(struct mbuf *, int, int);
  */
 #define	_m_tag_id	m_hdr.mh_flags
 
-/* Packet tags used in the FreeBSD network stack */
+/* Packet tags used in the FreeBSD network stack. */
 #define	PACKET_TAG_DUMMYNET			15 /* dummynet info */
 #define	PACKET_TAG_IPFW				16 /* ipfw classification */
 #define	PACKET_TAG_DIVERT			17 /* divert info */
 #define	PACKET_TAG_IPFORWARD			18 /* ipforward info */
-#define	PACKET_TAG_MACLABEL			19 /* MAC label */
+#define	PACKET_TAG_MACLABEL	(19 | MTAG_PERSISTENT) /* MAC label */
+#define	PACKET_TAG_IPFASTFWD_OURS		20 /* IP fastforward dropback */
 
-/* Packet tag routines */
+/* Packet tag routines. */
 struct	m_tag 	*m_tag_alloc(u_int32_t, int, int, int);
 void		 m_tag_free(struct m_tag *);
 void		 m_tag_prepend(struct mbuf *, struct m_tag *);
@@ -549,8 +574,9 @@ int		 m_tag_copy_chain(struct mbuf *, struct mbuf *, int);
 void		 m_tag_init(struct mbuf *);
 struct	m_tag	*m_tag_first(struct mbuf *);
 struct	m_tag	*m_tag_next(struct mbuf *, struct m_tag *);
+void		 m_tag_delete_nonpersistent(struct mbuf *);
 
-/* these are for openbsd compatibility */
+/* These are for OpenBSD compatibility. */
 #define	MTAG_ABI_COMPAT		0		/* compatibility ABI */
 
 static __inline struct m_tag *

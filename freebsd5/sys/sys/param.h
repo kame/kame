@@ -36,11 +36,13 @@
  * SUCH DAMAGE.
  *
  *	@(#)param.h	8.3 (Berkeley) 4/4/95
- * $FreeBSD: src/sys/sys/param.h,v 1.156.2.1 2003/06/04 05:55:09 scottl Exp $
+ * $FreeBSD: src/sys/sys/param.h,v 1.174.2.4 2004/02/23 05:34:20 scottl Exp $
  */
 
 #ifndef _SYS_PARAM_H_
 #define _SYS_PARAM_H_
+
+#include <sys/_null.h>
 
 #define	BSD	199506		/* System version (year & month). */
 #define BSD4_3	1
@@ -53,13 +55,11 @@
  * Currently this lives here:
  *
  *	doc/en_US.ISO8859-1/books/porters-handbook/book.sgml
+ *
+ * scheme is:  <major><two digit minor><0 if release branch, otherwise 1>xx
  */
 #undef __FreeBSD_version
-#define __FreeBSD_version 501000	/* Master, propagated to newvers */
-
-#ifndef NULL
-#define	NULL	0
-#endif
+#define __FreeBSD_version 502010	/* Master, propagated to newvers */
 
 #ifndef LOCORE
 #include <sys/types.h>
@@ -87,6 +87,10 @@
 
 /* More types and definitions used throughout the kernel. */
 #ifdef _KERNEL
+#if (defined(BURN_BRIDGES) || __FreeBSD_version >= 600000) \
+	&& defined(OBSOLETE_IN_6)
+#error "This file contains obsolete code to be removed in 6.0-current"
+#endif
 #include <sys/cdefs.h>
 #include <sys/errno.h>
 #include <sys/time.h>

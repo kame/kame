@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)buf.h	8.9 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/sys/buf.h,v 1.149 2003/03/13 07:31:45 jeff Exp $
+ * $FreeBSD: src/sys/sys/buf.h,v 1.162 2003/11/15 09:28:09 phk Exp $
  */
 
 #ifndef _SYS_BUF_H_
@@ -102,27 +102,22 @@ typedef unsigned char b_xflags_t;
  *		D - Protected by an dependency implementation specific lock
  */
 struct buf {
-	/* XXX: b_io must be the first element of struct buf for now /phk */
-	/* XXX: if you change this, fix BIOTOBUF macro below */
 	struct bio b_io;		/* "Builtin" I/O request. */
-#define	BIOTOBUF(biop)	((struct buf *)(biop))
 #define	b_bcount	b_io.bio_bcount
-#define	b_blkno		b_io.bio_blkno
 #define	b_caller1	b_io.bio_caller1
 #define	b_data		b_io.bio_data
 #define	b_dev		b_io.bio_dev
-#define	b_driver1	b_io.bio_driver1
-#define	b_driver2	b_io.bio_driver2
 #define	b_error		b_io.bio_error
 #define	b_iocmd		b_io.bio_cmd
 #define	b_ioflags	b_io.bio_flags
-#define	b_pblkno	b_io.bio_pblkno
+#define	b_iooffset	b_io.bio_offset
 #define	b_resid		b_io.bio_resid
 	struct buf_ops	*b_op;
 	unsigned		b_magic;
 #define B_MAGIC_BIO	0x10b10b10
 #define B_MAGIC_NFS	0x67238234
 	void	(*b_iodone)(struct buf *);
+	daddr_t b_blkno;		/* Underlying physical block number. */
 	off_t	b_offset;		/* Offset into file. */
 	TAILQ_ENTRY(buf) b_vnbufs;	/* (V) Buffer's associated vnode. */
 	struct buf	*b_left;	/* (V) splay tree link */
@@ -146,7 +141,6 @@ struct buf {
 	struct	ucred *b_wcred;		/* Write credentials reference. */
 	void	*b_saveaddr;		/* Original b_addr for physio. */
 	union	pager_info {
-		void	*pg_spc;
 		int	pg_reqpage;
 	} b_pager;
 	union	cluster_info {
@@ -157,8 +151,6 @@ struct buf {
 	int		b_npages;
 	struct	workhead b_dep;		/* (D) List of filesystem dependencies. */
 };
-
-#define b_spc	b_pager.pg_spc
 
 /*
  * These flags are kept in b_flags.
@@ -206,10 +198,6 @@ struct buf {
  *			sticky until the buffer is released and typically
  *			only has an effect when B_RELBUF is also set.
  *
- *	B_NOWDRAIN	This flag should be set when a device (like MD)
- *			does a turn-around VOP_WRITE from its strategy
- *			routine.  This flag prevents bwrite() from blocking
- *			in wdrain, avoiding a deadlock situation.
  */
 
 #define	B_AGE		0x00000001	/* Move to age queue when I/O done. */
@@ -223,15 +211,15 @@ struct buf {
 #define	B_00000100	0x00000100	/* Available flag. */
 #define	B_DONE		0x00000200	/* I/O completed. */
 #define	B_EINTR		0x00000400	/* I/O was interrupted */
-#define	B_NOWDRAIN	0x00000800	/* Avoid wdrain deadlock */
+#define	B_00000800	0x00000800	/* Available flag. */
 #define	B_00001000	0x00001000	/* Available flag. */
 #define	B_INVAL		0x00002000	/* Does not contain valid info. */
-#define	B_LOCKED	0x00004000	/* Locked in core (not reusable). */
+#define	B_00004000	0x00004000	/* Available flag. */
 #define	B_NOCACHE	0x00008000	/* Do not cache block after use. */
 #define	B_MALLOC	0x00010000	/* malloced b_data */
 #define	B_CLUSTEROK	0x00020000	/* Pagein op, so swap() can count it. */
-#define	B_PHYS		0x00040000	/* I/O to user memory. */
-#define	B_00080000	0x00080000	/* Available flag. */
+#define	B_000400000	0x00040000	/* Available flag. */
+#define	B_000800000	0x00080000	/* Available flag. */
 #define	B_00100000	0x00100000	/* Available flag. */
 #define	B_DIRTY		0x00200000	/* Needs writing later (in EXT2FS). */
 #define	B_RELBUF	0x00400000	/* Release VMIO buffer. */
@@ -256,15 +244,18 @@ struct buf {
  */
 #define	BX_VNDIRTY	0x00000001	/* On vnode dirty list */
 #define	BX_VNCLEAN	0x00000002	/* On vnode clean list */
-#define	BX_BKGRDWRITE	0x00000004	/* Do writes in background */
-#define	BX_BKGRDINPROG	0x00000008	/* Background write in progress */
-#define	BX_BKGRDWAIT	0x00000010	/* Background write waiting */
+#define	BX_BKGRDWRITE	0x00000010	/* Do writes in background */
 #define BX_BKGRDMARKER	0x00000020	/* Mark buffer for splay tree */
 #define	BX_ALTDATA	0x00000040	/* Holds extended data */
 
 #define	NOOFFSET	(-1LL)		/* No buffer offset calculated yet */
 
-#define	BV_SCANNED	0x00001000	/* VOP_FSYNC funcs mark written bufs */
+/*
+ * These flags are kept in b_vflags.
+ */
+#define	BV_SCANNED	0x00000001	/* VOP_FSYNC funcs mark written bufs */
+#define	BV_BKGRDINPROG	0x00000002	/* Background write in progress */
+#define	BV_BKGRDWAIT	0x00000004	/* Background write waiting */
 
 #ifdef _KERNEL
 /*
@@ -467,6 +458,7 @@ buf_countdeps(struct buf *bp, int i)
  * Flags for getblk's last parameter.
  */
 #define	GB_LOCK_NOWAIT	0x0001		/* Fail if we block on a buf lock. */
+#define	GB_NOCREAT	0x0002		/* Don't create a buf if not found. */
 
 #ifdef _KERNEL
 extern int	nbuf;			/* The number of buffer headers */
@@ -506,7 +498,6 @@ struct buf *getblk(struct vnode *, daddr_t, int, int, int, int);
 struct buf *geteblk(int);
 int	bufwait(struct buf *);
 void	bufdone(struct buf *);
-void	bufdonebio(struct bio *);
 
 void	cluster_callback(struct buf *);
 int	cluster_read(struct vnode *, u_quad_t, daddr_t, long,

@@ -28,13 +28,15 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  
- *
- * $FreeBSD: src/sys/kern/uipc_cow.c,v 1.14 2003/04/11 07:02:36 alc Exp $
  */
+
 /*
  * This is a set of routines for enabling and disabling copy on write
  * protection for data written into sockets.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/uipc_cow.c,v 1.16 2003/11/16 06:11:25 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -43,6 +45,7 @@
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/mbuf.h>
+#include <sys/sf_buf.h>
 #include <sys/socketvar.h>
 #include <sys/uio.h>
 
@@ -80,7 +83,7 @@ socow_iodone(void *addr, void *args)
 	vm_page_t pp;
 
 	sf = args;
-	pp = sf->m;
+	pp = sf_buf_page(sf);
 	s = splvm();
 	/* remove COW mapping  */
 	vm_page_lock_queues();
@@ -142,9 +145,10 @@ socow_setup(struct mbuf *m0, struct uio *uio)
 	/* 
 	 * attach to mbuf
 	 */
-	m0->m_data = (caddr_t)sf->kva;
+	m0->m_data = (caddr_t)sf_buf_kva(sf);
 	m0->m_len = PAGE_SIZE;
-	MEXTADD(m0, sf->kva, PAGE_SIZE, socow_iodone, sf, M_RDONLY, EXT_SFBUF);
+	MEXTADD(m0, sf_buf_kva(sf), PAGE_SIZE, socow_iodone, sf, M_RDONLY,
+	    EXT_SFBUF);
 	socow_stats.success++;
 
 	iov = uio->uio_iov;

@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pdq/if_fea.c,v 1.24 2003/04/15 06:37:25 mdodd Exp $
+ * $FreeBSD: src/sys/dev/pdq/if_fea.c,v 1.26 2003/10/31 18:32:03 brooks Exp $
  */
 
 /*
@@ -151,7 +151,7 @@ pdq_eisa_probe (dev)
 	device_set_desc(dev, desc);
 
 	iobase = eisa_get_slot(dev) * EISA_SLOT_SIZE;
-	pdq_eisa_subprobe(SYS_RES_IOPORT, iobase, &maddr, &msize, &irq);
+	pdq_eisa_subprobe((pdq_bus_t)SYS_RES_IOPORT, iobase, &maddr, &msize, &irq);
 
 	eisa_add_iospace(dev, iobase, 0x200, RESVADDR_NONE);
 	eisa_add_mspace(dev, maddr, msize, RESVADDR_NONE);
@@ -223,12 +223,11 @@ pdq_eisa_attach (dev)
 		goto bad;
 	}
 
-	ifp->if_name = "fea";
-	ifp->if_unit = device_get_unit(dev);
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 
 	pdq_eisa_devinit(sc);
 	sc->sc_pdq = pdq_initialize(sc->mem_bst, sc->mem_bsh,
-				    ifp->if_name, ifp->if_unit,
+				    ifp->if_xname, -1,
 				    (void *)sc, PDQ_DEFEA);
 	if (sc->sc_pdq == NULL) {
 		device_printf(dev, "Initialization failed.\n");

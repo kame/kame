@@ -11,7 +11,7 @@
  * this software for any purpose.  It is provided "as is"
  * without express or implied warranty.
  *
- * $FreeBSD: src/sys/pc98/pc98/mse.c,v 1.40 2003/03/03 12:15:53 phk Exp $
+ * $FreeBSD: src/sys/pc98/pc98/mse.c,v 1.41 2003/11/09 09:17:25 tanimura Exp $
  */
 /*
  * Driver for the Logitech and ATI Inport Bus mice for use with 386bsd and
@@ -810,7 +810,7 @@ mseintr(arg)
 			sc->sc_flags &= ~MSESC_WANT;
 			wakeup(sc);
 		}
-		selwakeup(&sc->sc_selp);
+		selwakeuppri(&sc->sc_selp, MSEPRI);
 	}
 }
 

@@ -33,9 +33,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/*
- * $FreeBSD: src/sys/i386/isa/asc.c,v 1.54 2003/03/03 12:15:49 phk Exp $
- */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/isa/asc.c,v 1.56 2003/11/09 09:17:23 tanimura Exp $");
 
 #include "asc.h"
 #include <sys/param.h>
@@ -525,7 +525,7 @@ ascintr(int unit)
 	    dma_restart(scu);
 	}
 	if (SEL_WAITING(&scu->selp)) {
-	    selwakeup(&scu->selp);
+	    selwakeuppri(&scu->selp, ASCPRI);
 	}
     }
 }

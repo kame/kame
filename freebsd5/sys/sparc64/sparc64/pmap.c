@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *      from:   @(#)pmap.c      7.7 (Berkeley)  5/12/91
- * $FreeBSD: src/sys/sparc64/sparc64/pmap.c,v 1.109 2003/04/13 21:54:58 jake Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/pmap.c,v 1.126 2003/10/03 22:46:53 alc Exp $
  */
 
 /*
@@ -63,6 +63,7 @@
  * correct.
  */
 
+#include "opt_kstack_pages.h"
 #include "opt_msgbuf.h"
 #include "opt_pmap.h"
 
@@ -620,6 +621,29 @@ pmap_extract(pmap_t pm, vm_offset_t va)
 }
 
 /*
+ * Atomically extract and hold the physical page with the given
+ * pmap and virtual address pair if that mapping permits the given
+ * protection.
+ */
+vm_page_t
+pmap_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
+{
+	vm_paddr_t pa;
+	vm_page_t m;
+
+	m = NULL;
+	mtx_lock(&Giant);
+	if ((pa = pmap_extract(pmap, va)) != 0) {
+		m = PHYS_TO_VM_PAGE(pa);
+		vm_page_lock_queues();
+		vm_page_hold(m);
+		vm_page_unlock_queues();
+	}
+	mtx_unlock(&Giant);
+	return (m);
+}
+
+/*
  * Extract the physical page address associated with the given kernel virtual
  * address.
  */
@@ -642,6 +666,7 @@ pmap_cache_enter(vm_page_t m, vm_offset_t va)
 	struct tte *tp;
 	int color;
 
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	KASSERT((m->flags & PG_FICTITIOUS) == 0,
 	    ("pmap_cache_enter: fake page"));
 	PMAP_STATS_INC(pmap_ncache_enter);
@@ -713,6 +738,7 @@ pmap_cache_remove(vm_page_t m, vm_offset_t va)
 	struct tte *tp;
 	int color;
 
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	CTR3(KTR_PMAP, "pmap_cache_remove: m=%p va=%#lx c=%d", m, va,
 	    m->md.colors[DCACHE_COLOR(va)]);
 	KASSERT((m->flags & PG_FICTITIOUS) == 0,
@@ -783,6 +809,7 @@ pmap_kenter(vm_offset_t va, vm_page_t m)
 	vm_page_t om;
 	u_long data;
 
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	PMAP_STATS_INC(pmap_nkenter);
 	tp = tsb_kvtotte(va);
 	CTR4(KTR_PMAP, "pmap_kenter: va=%#lx pa=%#lx tp=%p data=%#lx",
@@ -845,6 +872,7 @@ pmap_kremove(vm_offset_t va)
 	struct tte *tp;
 	vm_page_t m;
 
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	PMAP_STATS_INC(pmap_nkremove);
 	tp = tsb_kvtotte(va);
 	CTR3(KTR_PMAP, "pmap_kremove: va=%#lx tp=%p data=%#lx", va, tp,
@@ -895,14 +923,19 @@ void
 pmap_qenter(vm_offset_t sva, vm_page_t *m, int count)
 {
 	vm_offset_t va;
+	int locked;
 
 	PMAP_STATS_INC(pmap_nqenter);
 	va = sva;
+	if (!(locked = mtx_owned(&vm_page_queue_mtx)))
+		vm_page_lock_queues();
 	while (count-- > 0) {
 		pmap_kenter(va, *m);
 		va += PAGE_SIZE;
 		m++;
 	}
+	if (!locked)
+		vm_page_unlock_queues();
 	tlb_range_demap(kernel_pmap, sva, va);
 }
 
@@ -914,210 +947,19 @@ void
 pmap_qremove(vm_offset_t sva, int count)
 {
 	vm_offset_t va;
+	int locked;
 
 	PMAP_STATS_INC(pmap_nqremove);
 	va = sva;
+	if (!(locked = mtx_owned(&vm_page_queue_mtx)))
+		vm_page_lock_queues();
 	while (count-- > 0) {
 		pmap_kremove(va);
 		va += PAGE_SIZE;
 	}
+	if (!locked)
+		vm_page_unlock_queues();
 	tlb_range_demap(kernel_pmap, sva, va);
-}
-
-#ifndef KSTACK_MAX_PAGES
-#define KSTACK_MAX_PAGES 32
-#endif
-
-/*
- * Create the kernel stack and pcb for a new thread.
- * This routine directly affects the fork perf for a process and
- * create performance for a thread.
- */
-void
-pmap_new_thread(struct thread *td, int pages)
-{
-	vm_page_t ma[KSTACK_MAX_PAGES];
-	vm_object_t ksobj;
-	vm_offset_t ks;
-	vm_page_t m;
-	u_int i;
-
-	PMAP_STATS_INC(pmap_nnew_thread);
-	/* Bounds check */
-	if (pages <= 1)
-		pages = KSTACK_PAGES;
-	else if (pages > KSTACK_MAX_PAGES)
-		pages = KSTACK_MAX_PAGES;
-                
-	/*
-	 * Allocate object for the kstack,
-	 */
-	ksobj = vm_object_allocate(OBJT_DEFAULT, pages);
-	td->td_kstack_obj = ksobj;
-
-	/*
-	 * Get a kernel virtual address for the kstack for this thread.
-	 */
-	ks = kmem_alloc_nofault(kernel_map,
-	   (pages + KSTACK_GUARD_PAGES) * PAGE_SIZE);
-	if (ks == 0)
-		panic("pmap_new_thread: kstack allocation failed");
-	if (KSTACK_GUARD_PAGES != 0) {
-		tlb_page_demap(kernel_pmap, ks);
-		ks += KSTACK_GUARD_PAGES * PAGE_SIZE;
-	}
-	td->td_kstack = ks;
-
-	/*
-	 * Knowing the number of pages allocated is useful when you
-	 * want to deallocate them.
-	 */
-	td->td_kstack_pages = pages;
-
-	for (i = 0; i < pages; i++) {
-		/*
-		 * Get a kernel stack page.
-		 */
-		m = vm_page_grab(ksobj, i,
-		    VM_ALLOC_NORMAL | VM_ALLOC_RETRY | VM_ALLOC_WIRED);
-		ma[i] = m;
-		if (DCACHE_COLOR(ks + (i * PAGE_SIZE)) !=
-		    DCACHE_COLOR(VM_PAGE_TO_PHYS(m)))
-			PMAP_STATS_INC(pmap_nnew_thread_oc);
-
-		vm_page_lock_queues();
-		vm_page_wakeup(m);
-		vm_page_flag_clear(m, PG_ZERO);
-		m->valid = VM_PAGE_BITS_ALL;
-		vm_page_unlock_queues();
-	}
-
-	/*
-	 * Enter the page into the kernel address space.
-	 */
-	pmap_qenter(ks, ma, pages);
-}
-
-/*
- * Dispose the kernel stack for a thread that has exited.
- * This routine directly impacts the exit perf of a process and thread.
- */
-void
-pmap_dispose_thread(struct thread *td)
-{
-	vm_object_t ksobj;
-	vm_offset_t ks;
-	vm_page_t m;
-	int pages;
-	int i;
-
-	pages = td->td_kstack_pages;
-	ksobj = td->td_kstack_obj;
-	ks = td->td_kstack;
-	for (i = 0; i < pages ; i++) {
-		m = vm_page_lookup(ksobj, i);
-		if (m == NULL)
-			panic("pmap_dispose_thread: kstack already missing?");
-		vm_page_lock_queues();
-		vm_page_busy(m);
-		vm_page_unwire(m, 0);
-		vm_page_free(m);
-		vm_page_unlock_queues();
-	}
-	pmap_qremove(ks, pages);
-	kmem_free(kernel_map, ks - (KSTACK_GUARD_PAGES * PAGE_SIZE),
-	    (pages + KSTACK_GUARD_PAGES) * PAGE_SIZE);
-	vm_object_deallocate(ksobj);
-}
-
-/*
- * Set up a variable sized alternate kstack.
- */
-void
-pmap_new_altkstack(struct thread *td, int pages)
-{
-	/* shuffle the original stack */
-	td->td_altkstack_obj = td->td_kstack_obj;
-	td->td_altkstack = td->td_kstack;
-	td->td_altkstack_pages = td->td_kstack_pages;
-
-	pmap_new_thread(td, pages);
-}
-
-void
-pmap_dispose_altkstack(struct thread *td)
-{
-	pmap_dispose_thread(td);
-
-	/* restore the original kstack */
-	td->td_kstack = td->td_altkstack;
-	td->td_kstack_obj = td->td_altkstack_obj;
-	td->td_kstack_pages = td->td_altkstack_pages;
-	td->td_altkstack = 0;
-	td->td_altkstack_obj = NULL;
-	td->td_altkstack_pages = 0;
-}
-
-/*
- * Allow the kernel stack for a thread to be prejudicially paged out.
- */
-void
-pmap_swapout_thread(struct thread *td)
-{
-	vm_object_t ksobj;
-	vm_offset_t ks;
-	vm_page_t m;
-	int pages;
-	int i;
-
-	pages = td->td_kstack_pages;
-	ksobj = td->td_kstack_obj;
-	ks = (vm_offset_t)td->td_kstack;
-	for (i = 0; i < pages; i++) {
-		m = vm_page_lookup(ksobj, i);
-		if (m == NULL)
-			panic("pmap_swapout_thread: kstack already missing?");
-		vm_page_lock_queues();
-		vm_page_dirty(m);
-		vm_page_unwire(m, 0);
-		vm_page_unlock_queues();
-	}
-	pmap_qremove(ks, pages);
-}
-
-/*
- * Bring the kernel stack for a specified thread back in.
- */
-void
-pmap_swapin_thread(struct thread *td)
-{
-	vm_page_t ma[KSTACK_MAX_PAGES];
-	vm_object_t ksobj;
-	vm_offset_t ks;
-	vm_page_t m;
-	int rv;
-	int i;
-	int pages;
-
-	pages = td->td_kstack_pages;
-	ksobj = td->td_kstack_obj;
-	ks = td->td_kstack;
-	for (i = 0; i < pages; i++) {
-		m = vm_page_grab(ksobj, i, VM_ALLOC_NORMAL | VM_ALLOC_RETRY);
-		if (m->valid != VM_PAGE_BITS_ALL) {
-			rv = vm_pager_get_pages(ksobj, &m, 1, 0);
-			if (rv != VM_PAGER_OK)
-				panic("pmap_swapin_thread: cannot get kstack");
-			m = vm_page_lookup(ksobj, i);
-			m->valid = VM_PAGE_BITS_ALL;
-		}
-		ma[i] = m;
-		vm_page_lock_queues();
-		vm_page_wire(m);
-		vm_page_wakeup(m);
-		vm_page_unlock_queues();
-	}
-	pmap_qenter(ks, ma, pages);
 }
 
 /*
@@ -1161,6 +1003,7 @@ pmap_pinit(pmap_t pm)
 	if (pm->pm_tsb_obj == NULL)
 		pm->pm_tsb_obj = vm_object_allocate(OBJT_DEFAULT, TSB_PAGES);
 
+	VM_OBJECT_LOCK(pm->pm_tsb_obj);
 	for (i = 0; i < TSB_PAGES; i++) {
 		m = vm_page_grab(pm->pm_tsb_obj, i,
 		    VM_ALLOC_RETRY | VM_ALLOC_WIRED | VM_ALLOC_ZERO);
@@ -1175,6 +1018,7 @@ pmap_pinit(pmap_t pm)
 
 		ma[i] = m;
 	}
+	VM_OBJECT_UNLOCK(pm->pm_tsb_obj);
 	pmap_qenter((vm_offset_t)pm->pm_tsb, ma, TSB_PAGES);
 
 	for (i = 0; i < MAXCPU; i++)
@@ -1202,11 +1046,12 @@ pmap_release(pmap_t pm)
 
 	CTR2(KTR_PMAP, "pmap_release: ctx=%#x tsb=%p",
 	    pm->pm_context[PCPU_GET(cpuid)], pm->pm_tsb);
-	obj = pm->pm_tsb_obj;
-	KASSERT(obj->ref_count == 1, ("pmap_release: tsbobj ref count != 1"));
 	KASSERT(pmap_resident_count(pm) == 0,
 	    ("pmap_release: resident pages %ld != 0",
 	    pmap_resident_count(pm)));
+	obj = pm->pm_tsb_obj;
+	VM_OBJECT_LOCK(obj);
+	KASSERT(obj->ref_count == 1, ("pmap_release: tsbobj ref count != 1"));
 	while (!TAILQ_EMPTY(&obj->memq)) {
 		m = TAILQ_FIRST(&obj->memq);
 		vm_page_lock_queues();
@@ -1217,10 +1062,11 @@ pmap_release(pmap_t pm)
 		    ("pmap_release: freeing held tsb page"));
 		m->md.pmap = NULL;
 		m->wire_count--;
-		cnt.v_wire_count--;
+		atomic_subtract_int(&cnt.v_wire_count, 1);
 		vm_page_free_zero(m);
 		vm_page_unlock_queues();
 	}
+	VM_OBJECT_UNLOCK(obj);
 	pmap_qremove((vm_offset_t)pm->pm_tsb, TSB_PAGES);
 }
 
@@ -1241,6 +1087,7 @@ pmap_remove_tte(struct pmap *pm, struct pmap *pm2, struct tte *tp,
 	vm_page_t m;
 	u_long data;
 
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	data = atomic_readandclear_long(&tp->tte_data);
 	if ((data & TD_FAKE) == 0) {
 		m = PHYS_TO_VM_PAGE(TD_PA(data));
@@ -1273,6 +1120,7 @@ pmap_remove(pmap_t pm, vm_offset_t start, vm_offset_t end)
 	struct tte *tp;
 	vm_offset_t va;
 
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	CTR3(KTR_PMAP, "pmap_remove: ctx=%#lx start=%#lx end=%#lx",
 	    pm->pm_context[PCPU_GET(cpuid)], start, end);
 	if (PMAP_REMOVE_DONE(pm))
@@ -1299,9 +1147,7 @@ pmap_remove_all(vm_page_t m)
 	struct tte *tp;
 	vm_offset_t va;
 
-	KASSERT((m->flags & (PG_FICTITIOUS|PG_UNMANAGED)) == 0,
-	   ("pmap_remove_all: illegal for unmanaged/fake page %#lx",
-	   VM_PAGE_TO_PHYS(m)));
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	for (tp = TAILQ_FIRST(&m->md.tte_list); tp != NULL; tp = tpn) {
 		tpn = TAILQ_NEXT(tp, tte_link);
 		if ((tp->tte_data & TD_PV) == 0)
@@ -1340,7 +1186,7 @@ pmap_protect_tte(struct pmap *pm, struct pmap *pm2, struct tte *tp,
 		if ((data & TD_W) != 0 && pmap_track_modified(pm, va))
 			vm_page_dirty(m);
 	}
-	return (0);
+	return (1);
 }
 
 /*
@@ -1510,17 +1356,22 @@ pmap_enter(pmap_t pm, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	}
 }
 
-void
-pmap_object_init_pt(pmap_t pm, vm_offset_t addr, vm_object_t object,
-		    vm_pindex_t pindex, vm_size_t size, int limit)
+vm_page_t
+pmap_enter_quick(pmap_t pm, vm_offset_t va, vm_page_t m, vm_page_t mpte)
 {
-	/* XXX */
+
+	pmap_enter(pm, va, m, VM_PROT_READ | VM_PROT_EXECUTE, FALSE);
+	return (NULL);
 }
 
 void
-pmap_prefault(pmap_t pm, vm_offset_t va, vm_map_entry_t entry)
+pmap_object_init_pt(pmap_t pm, vm_offset_t addr, vm_object_t object,
+		    vm_pindex_t pindex, vm_size_t size)
 {
-	/* XXX */
+
+	VM_OBJECT_LOCK_ASSERT(object, MA_OWNED);
+	KASSERT(object->type == OBJT_DEVICE,
+	    ("pmap_object_init_pt: non-device object"));
 }
 
 /*
@@ -1552,6 +1403,8 @@ pmap_copy_tte(pmap_t src_pmap, pmap_t dst_pmap, struct tte *tp, vm_offset_t va)
 	vm_page_t m;
 	u_long data;
 
+	if ((tp->tte_data & TD_FAKE) != 0)
+		return (1);
 	if (tsb_tte_lookup(dst_pmap, va) == NULL) {
 		data = tp->tte_data &
 		    ~(TD_PV | TD_REF | TD_SW | TD_CV | TD_W);
@@ -1761,6 +1614,7 @@ pmap_page_exists_quick(pmap_t pm, vm_page_t m)
 	struct tte *tp;
 	int loops;
 
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	if ((m->flags & (PG_FICTITIOUS | PG_UNMANAGED)) != 0)
 		return (FALSE);
 	loops = 0;
@@ -1824,6 +1678,7 @@ pmap_ts_referenced(vm_page_t m)
 	u_long data;
 	int count;
 
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	if ((m->flags & (PG_FICTITIOUS | PG_UNMANAGED)) != 0)
 		return (0);
 	count = 0;
@@ -1850,8 +1705,9 @@ pmap_is_modified(vm_page_t m)
 {
 	struct tte *tp;
 
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	if ((m->flags & (PG_FICTITIOUS | PG_UNMANAGED)) != 0)
-		return FALSE;
+		return (FALSE);
 	TAILQ_FOREACH(tp, &m->md.tte_list, tte_link) {
 		if ((tp->tte_data & TD_PV) == 0 ||
 		    !pmap_track_modified(TTE_GET_PMAP(tp), TTE_GET_VA(tp)))
@@ -1862,12 +1718,26 @@ pmap_is_modified(vm_page_t m)
 	return (FALSE);
 }
 
+/*
+ *	pmap_is_prefaultable:
+ *
+ *	Return whether or not the specified virtual address is elgible
+ *	for prefault.
+ */
+boolean_t
+pmap_is_prefaultable(pmap_t pmap, vm_offset_t addr)
+{
+
+	return (FALSE);
+}
+
 void
 pmap_clear_modify(vm_page_t m)
 {
 	struct tte *tp;
 	u_long data;
 
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	if ((m->flags & (PG_FICTITIOUS | PG_UNMANAGED)) != 0)
 		return;
 	TAILQ_FOREACH(tp, &m->md.tte_list, tte_link) {
@@ -1885,6 +1755,7 @@ pmap_clear_reference(vm_page_t m)
 	struct tte *tp;
 	u_long data;
 
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	if ((m->flags & (PG_FICTITIOUS | PG_UNMANAGED)) != 0)
 		return;
 	TAILQ_FOREACH(tp, &m->md.tte_list, tte_link) {
@@ -1902,6 +1773,7 @@ pmap_clear_write(vm_page_t m)
 	struct tte *tp;
 	u_long data;
 
+	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	if ((m->flags & (PG_FICTITIOUS | PG_UNMANAGED)) != 0 ||
 	    (m->flags & PG_WRITEABLE) == 0)
 		return;

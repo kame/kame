@@ -26,10 +26,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/sr/if_sr_pci.c,v 1.17 2003/04/23 20:22:32 jhay Exp $
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/sr/if_sr_pci.c,v 1.19 2003/08/24 18:17:23 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -42,7 +42,7 @@
 #include <machine/bus_memio.h>
 #include <sys/rman.h>
 
-#include <pci/pcivar.h>
+#include <dev/pci/pcivar.h>
 #include <machine/md_var.h>
 
 #include <dev/ic/hd64570.h>

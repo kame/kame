@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_vfsops.c,v 1.135 2003/05/19 22:35:00 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_vfsops.c,v 1.145 2003/11/22 02:21:49 alfred Exp $");
 
 #include "opt_bootp.h"
 #include "opt_nfsroot.h"
@@ -65,6 +65,8 @@ __FBSDID("$FreeBSD: src/sys/nfsclient/nfs_vfsops.c,v 1.135 2003/05/19 22:35:00 p
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
+
+#include <rpc/rpcclnt.h>
 
 #include <nfs/rpcv2.h>
 #include <nfs/nfsproto.h>
@@ -109,25 +111,27 @@ static vfs_sync_t nfs_sync;
  * nfs vfs operations.
  */
 static struct vfsops nfs_vfsops = {
-	nfs_mount,
-	vfs_stdstart,
-	nfs_unmount,
-	nfs_root,
-	vfs_stdquotactl,
-	nfs_statfs,
-	nfs_sync,
-	vfs_stdvget,
-	vfs_stdfhtovp,		/* shouldn't happen */
-	vfs_stdcheckexp,
-	vfs_stdvptofh,		/* shouldn't happen */
-	nfs_init,
-	nfs_uninit,
-	vfs_stdextattrctl,
+	.vfs_init =		nfs_init,
+	.vfs_mount =		nfs_mount,
+	.vfs_root =		nfs_root,
+	.vfs_statfs =		nfs_statfs,
+	.vfs_sync =		nfs_sync,
+	.vfs_uninit =		nfs_uninit,
+	.vfs_unmount =		nfs_unmount,
 };
 VFS_SET(nfs_vfsops, nfs, VFCF_NETWORK);
 
 /* So that loader and kldload(2) can find us, wherever we are.. */
 MODULE_VERSION(nfs, 1);
+
+static struct nfs_rpcops nfs_rpcops = {
+	nfs_readrpc,
+	nfs_writerpc,
+	nfs_writebp,
+	nfs_readlinkrpc,
+	nfs_invaldir,
+	nfs_commit,
+};
 
 /*
  * This structure must be filled in by a primary bootstrap or bootstrap
@@ -148,18 +152,11 @@ SYSCTL_OPAQUE(_vfs_nfs, OID_AUTO, diskless_rootaddr, CTLFLAG_RD,
 	&nfsv3_diskless.root_saddr, sizeof nfsv3_diskless.root_saddr,
 	"%Ssockaddr_in", "");
 
-SYSCTL_STRING(_vfs_nfs, OID_AUTO, diskless_swappath, CTLFLAG_RD,
-	nfsv3_diskless.swap_hostnam, 0, "");
-
-SYSCTL_OPAQUE(_vfs_nfs, OID_AUTO, diskless_swapaddr, CTLFLAG_RD,
-	&nfsv3_diskless.swap_saddr, sizeof nfsv3_diskless.swap_saddr,
-	"%Ssockaddr_in","");
-
 
 void		nfsargs_ntoh(struct nfs_args *);
 static int	nfs_mountdiskless(char *, char *, int,
 		    struct sockaddr_in *, struct nfs_args *,
-		    struct thread *, struct vnode **, struct mount **);
+		    struct thread *, struct vnode **, struct mount *);
 static void	nfs_convert_diskless(void);
 static void	nfs_convert_oargs(struct nfs_args *args,
 		    struct onfs_args *oargs);
@@ -211,15 +208,6 @@ nfs_convert_diskless(void)
 		sizeof(struct ifaliasreq));
 	bcopy(&nfs_diskless.mygateway, &nfsv3_diskless.mygateway,
 		sizeof(struct sockaddr_in));
-	nfs_convert_oargs(&nfsv3_diskless.swap_args,&nfs_diskless.swap_args);
-	nfsv3_diskless.swap_fhsize = NFSX_V2FH;
-	bcopy(nfs_diskless.swap_fh, nfsv3_diskless.swap_fh, NFSX_V2FH);
-	bcopy(&nfs_diskless.swap_saddr,&nfsv3_diskless.swap_saddr,
-		sizeof(struct sockaddr_in));
-	bcopy(nfs_diskless.swap_hostnam, nfsv3_diskless.swap_hostnam, MNAMELEN);
-	nfsv3_diskless.swap_nblks = nfs_diskless.swap_nblks;
-	bcopy(&nfs_diskless.swap_ucred, &nfsv3_diskless.swap_ucred,
-		sizeof(struct ucred));
 	nfs_convert_oargs(&nfsv3_diskless.root_args,&nfs_diskless.root_args);
 	nfsv3_diskless.root_fhsize = NFSX_V2FH;
 	bcopy(nfs_diskless.root_fh, nfsv3_diskless.root_fh, NFSX_V2FH);
@@ -392,13 +380,14 @@ nfsmout:
 int
 nfs_mountroot(struct mount *mp, struct thread *td)
 {
-	struct mount  *swap_mp;
 	struct nfsv3_diskless *nd = &nfsv3_diskless;
 	struct socket *so;
 	struct vnode *vp;
 	int error, i;
 	u_long l;
 	char buf[128];
+
+	GIANT_REQUIRED;		/* XXX until socket locking done */
 
 #if defined(BOOTP_NFSROOT) && defined(BOOTP)
 	bootpc_init();		/* use bootp to get nfs_diskless filled in */
@@ -415,17 +404,6 @@ nfs_mountroot(struct mount *mp, struct thread *td)
 	 * XXX splnet, so networks will receive...
 	 */
 	splnet();
-
-#ifdef notyet
-	/* Set up swap credentials. */
-	proc0.p_ucred->cr_uid = ntohl(nd->swap_ucred.cr_uid);
-	proc0.p_ucred->cr_gid = ntohl(nd->swap_ucred.cr_gid);
-	if ((proc0.p_ucred->cr_ngroups = ntohs(nd->swap_ucred.cr_ngroups)) >
-		NGROUPS)
-		proc0.p_ucred->cr_ngroups = NGROUPS;
-	for (i = 0; i < proc0.p_ucred->cr_ngroups; i++)
-	    proc0.p_ucred->cr_groups[i] = ntohl(nd->swap_ucred.cr_groups[i]);
-#endif
 
 	/*
 	 * Do enough of ifconfig(8) so that the critical net interface can
@@ -491,49 +469,11 @@ nfs_mountroot(struct mount *mp, struct thread *td)
 		(l >>  8) & 0xff, (l >>  0) & 0xff, nd->root_hostnam);
 	printf("NFS ROOT: %s\n", buf);
 	if ((error = nfs_mountdiskless(buf, "/", MNT_RDONLY,
-	    &nd->root_saddr, &nd->root_args, td, &vp, &mp)) != 0) {
+	    &nd->root_saddr, &nd->root_args, td, &vp, mp)) != 0) {
 		return (error);
 	}
 
-	swap_mp = NULL;
-	if (nd->swap_nblks) {
-
-		/* Convert to DEV_BSIZE instead of Kilobyte */
-		nd->swap_nblks *= 2;
-
-		/*
-		 * Create a fake mount point just for the swap vnode so that the
-		 * swap file can be on a different server from the rootfs.
-		 */
-		nd->swap_args.fh = nd->swap_fh;
-		nd->swap_args.fhsize = nd->swap_fhsize;
-		l = ntohl(nd->swap_saddr.sin_addr.s_addr);
-		snprintf(buf, sizeof(buf), "%ld.%ld.%ld.%ld:%s",
-			(l >> 24) & 0xff, (l >> 16) & 0xff,
-			(l >>  8) & 0xff, (l >>  0) & 0xff, nd->swap_hostnam);
-		printf("NFS SWAP: %s\n", buf);
-		if ((error = nfs_mountdiskless(buf, "/swap", 0,
-		    &nd->swap_saddr, &nd->swap_args, td, &vp, &swap_mp)) != 0)
-			return (error);
-		vfs_unbusy(swap_mp, td);
-
-		VTONFS(vp)->n_size = VTONFS(vp)->n_vattr.va_size =
-				nd->swap_nblks * DEV_BSIZE ;
-		/*
-		 * Since the swap file is not the root dir of a filesystem,
-		 * hack it to a regular file.
-		 */
-		vp->v_type = VREG;
-		vp->v_vflag = 0;
-		vp->v_iflag = 0;
-		VREF(vp);
-		swaponvp(td, vp, NODEV, nd->swap_nblks);
-	}
-
-	mp->mnt_flag |= MNT_ROOTFS;
-	mp->mnt_vnodecovered = NULLVP;
 	rootvp = vp;
-	vfs_unbusy(mp, td);
 
 	/*
 	 * This is not really an nfs issue, but it is much easier to
@@ -555,22 +495,10 @@ nfs_mountroot(struct mount *mp, struct thread *td)
 static int
 nfs_mountdiskless(char *path, char *which, int mountflag,
     struct sockaddr_in *sin, struct nfs_args *args, struct thread *td,
-    struct vnode **vpp, struct mount **mpp)
+    struct vnode **vpp, struct mount *mp)
 {
-	struct mount *mp;
 	struct sockaddr *nam;
 	int error;
-	int didalloc = 0;
-
-	mp = *mpp;
-
-	if (mp == NULL) {
-		if ((error = vfs_rootmountalloc("nfs", path, &mp)) != 0) {
-			printf("nfs_mountroot: NFS not configured");
-			return (error);
-		}
-		didalloc = 1;
-	}
 
 	mp->mnt_kern_flag = 0;
 	mp->mnt_flag = mountflag;
@@ -578,15 +506,10 @@ nfs_mountdiskless(char *path, char *which, int mountflag,
 	if ((error = mountnfs(args, mp, nam, which, path, vpp,
 	    td->td_ucred)) != 0) {
 		printf("nfs_mountroot: mount %s on %s: %d", path, which, error);
-		mp->mnt_vfc->vfc_refcount--;
-		vfs_unbusy(mp, td);
-		if (didalloc)
-			free(mp, M_MOUNT);
 		FREE(nam, M_SONAME);
 		return (error);
 	}
 	(void) copystr(which, mp->mnt_stat.f_mntonname, MNAMELEN - 1, 0);
-	*mpp = mp;
 	return (0);
 }
 
@@ -876,6 +799,7 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 	/* Set up the sockets and per-host congestion */
 	nmp->nm_sotype = argp->sotype;
 	nmp->nm_soproto = argp->proto;
+	nmp->nm_rpcops = &nfs_rpcops;
 
 	nfs_decode_args(nmp, argp);
 
@@ -1001,7 +925,7 @@ nfs_sync(struct mount *mp, int waitfor, struct ucred *cred, struct thread *td)
 	/*
 	 * Force stale buffer cache information to be flushed.
 	 */
-	mtx_lock(&mntvnode_mtx);
+	MNT_ILOCK(mp);
 loop:
 	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist);
 	     vp != NULL;
@@ -1013,24 +937,26 @@ loop:
 		if (vp->v_mount != mp)
 			goto loop;
 		vnp = TAILQ_NEXT(vp, v_nmntvnodes);
-		mtx_unlock(&mntvnode_mtx);
 		VI_LOCK(vp);
+		MNT_IUNLOCK(mp);
 		if (VOP_ISLOCKED(vp, NULL) || TAILQ_EMPTY(&vp->v_dirtyblkhd) ||
 		    waitfor == MNT_LAZY) {
 			VI_UNLOCK(vp);
-			mtx_lock(&mntvnode_mtx);
+			MNT_ILOCK(mp);
 			continue;
 		}
 		if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK, td)) {
-			mtx_lock(&mntvnode_mtx);
+			MNT_ILOCK(mp);
 			goto loop;
 		}
 		error = VOP_FSYNC(vp, cred, waitfor, td);
 		if (error)
 			allerror = error;
-		vput(vp);
-		mtx_lock(&mntvnode_mtx);
+		VOP_UNLOCK(vp, 0, td);
+		vrele(vp);
+
+		MNT_ILOCK(mp);
 	}
-	mtx_unlock(&mntvnode_mtx);
+	MNT_IUNLOCK(mp);
 	return (allerror);
 }

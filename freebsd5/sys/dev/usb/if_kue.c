@@ -30,6 +30,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/if_kue.c,v 1.52 2003/11/14 11:09:45 johan Exp $");
+
 /*
  * Kawasaki LSI KL5KUSB101B USB to ethernet adapter driver.
  *
@@ -62,9 +65,6 @@
  * the development of this driver.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/if_kue.c,v 1.47 2003/04/15 06:37:27 mdodd Exp $");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -82,6 +82,10 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/if_kue.c,v 1.47 2003/04/15 06:37:27 mdodd Ex
 #include <net/bpf.h>
 
 #include <sys/bus.h>
+#include <machine/bus.h>
+#if __FreeBSD_version < 500000
+#include <machine/clock.h>
+#endif
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
@@ -326,7 +330,12 @@ kue_setmulti(struct kue_softc *sc)
 
 	sc->kue_rxfilt &= ~KUE_RXFILT_ALLMULTI;
 
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+#if __FreeBSD_version >= 500000
+	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
+#else
+	LIST_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
+#endif
+	{
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		/*
@@ -441,14 +450,18 @@ USB_ATTACH(kue)
 		}
 	}
 
+#if __FreeBSD_version >= 500000
 	mtx_init(&sc->kue_mtx, device_get_nameunit(self), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
+#endif
 	KUE_LOCK(sc);
 
 	/* Load the firmware into the NIC. */
 	if (kue_load_fw(sc)) {
 		KUE_UNLOCK(sc);
+#if __FreeBSD_version >= 500000
 		mtx_destroy(&sc->kue_mtx);
+#endif
 		USB_ATTACH_ERROR_RETURN;
 	}
 
@@ -473,8 +486,7 @@ USB_ATTACH(kue)
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = sc->kue_unit;
-	ifp->if_name = "kue";
+	if_initname(ifp, "kue", sc->kue_unit);
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = kue_ioctl;
@@ -491,7 +503,11 @@ USB_ATTACH(kue)
 	/*
 	 * Call MI attach routine.
 	 */
+#if __FreeBSD_version >= 500000
 	ether_ifattach(ifp, sc->kue_desc.kue_macaddr);
+#else
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
+#endif
 	usb_register_netisr();
 	sc->kue_dying = 0;
 
@@ -513,7 +529,11 @@ kue_detach(device_ptr_t dev)
 	sc->kue_dying = 1;
 
 	if (ifp != NULL)
+#if __FreeBSD_version >= 500000
 		ether_ifdetach(ifp);
+#else
+		ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
+#endif
 
 	if (sc->kue_ep[KUE_ENDPT_TX] != NULL)
 		usbd_abort_pipe(sc->kue_ep[KUE_ENDPT_TX]);
@@ -526,7 +546,9 @@ kue_detach(device_ptr_t dev)
 		free(sc->kue_mcfilters, M_USBDEV);
 
 	KUE_UNLOCK(sc);
+#if __FreeBSD_version >= 500000
 	mtx_destroy(&sc->kue_mtx);
+#endif
 
 	return(0);
 }

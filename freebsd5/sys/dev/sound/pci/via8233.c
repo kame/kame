@@ -38,13 +38,13 @@
 #include <dev/sound/pcm/sound.h>
 #include <dev/sound/pcm/ac97.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 #include <sys/sysctl.h>
 
 #include <dev/sound/pci/via8233.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/via8233.c,v 1.10 2003/04/17 15:04:11 orion Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/via8233.c,v 1.13 2003/09/02 17:30:37 jhb Exp $");
 
 #define VIA8233_PCI_ID 0x30591106
 
@@ -765,7 +765,7 @@ via_attach(device_t dev)
 	pci_set_powerstate(dev, PCI_POWERSTATE_D0);
 	pci_enable_busmaster(dev);
 	
-	via->regid = PCIR_MAPS;
+	via->regid = PCIR_BAR(0);
 	via->reg = bus_alloc_resource(dev, SYS_RES_IOPORT, &via->regid, 0, ~0,
 				      1, RF_ACTIVE);
 	if (!via->reg) {
@@ -792,7 +792,8 @@ via_attach(device_t dev)
 		/*highaddr*/BUS_SPACE_MAXADDR,
 		/*filter*/NULL, /*filterarg*/NULL,
 		/*maxsize*/via->bufsz, /*nsegments*/1, /*maxsegz*/0x3ffff,
-		/*flags*/0, &via->parent_dmat) != 0) {
+		/*flags*/0, /*lockfunc*/busdma_lock_mutex,
+		/*lockarg*/&Giant, &via->parent_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		goto bad;
 	}
@@ -808,7 +809,8 @@ via_attach(device_t dev)
 		/*filter*/NULL, /*filterarg*/NULL,
 		/*maxsize*/NSEGS * sizeof(struct via_dma_op),
 		/*nsegments*/1, /*maxsegz*/0x3ffff,
-		/*flags*/0, &via->sgd_dmat) != 0) {
+		/*flags*/0, /*lockfunc*/busdma_lock_mutex,
+		/*lockarg*/&Giant, &via->sgd_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		goto bad;
 	}

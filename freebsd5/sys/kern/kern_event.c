@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/kern_event.c,v 1.58 2003/04/12 01:57:04 kbyanc Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_event.c,v 1.65 2003/11/14 18:49:01 cognet Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -68,14 +69,13 @@ static fo_stat_t	kqueue_stat;
 static fo_close_t	kqueue_close;
 
 static struct fileops kqueueops = {
-	kqueue_read,
-	kqueue_write,
-	kqueue_ioctl,
-	kqueue_poll,
-	kqueue_kqfilter,
-	kqueue_stat,
-	kqueue_close,
-	0
+	.fo_read = kqueue_read,
+	.fo_write = kqueue_write,
+	.fo_ioctl = kqueue_ioctl,
+	.fo_poll = kqueue_poll,
+	.fo_kqfilter = kqueue_kqfilter,
+	.fo_stat = kqueue_stat,
+	.fo_close = kqueue_close,
 };
 
 static void 	knote_attach(struct knote *kn, struct filedesc *fdp);
@@ -195,12 +195,12 @@ filt_procattach(struct knote *kn)
 
 	immediate = 0;
 	p = pfind(kn->kn_id);
-	if (p == NULL)
-		return (ESRCH);
 	if (p == NULL && (kn->kn_sfflags & NOTE_EXIT)) {
 		p = zpfind(kn->kn_id);
 		immediate = 1;
 	}
+	if (p == NULL)
+		return (ESRCH);
 	if ((error = p_cansee(curthread, p))) {
 		PROC_UNLOCK(p);
 		return (error);
@@ -218,7 +218,8 @@ filt_procattach(struct knote *kn)
 		kn->kn_flags &= ~EV_FLAG1;
 	}
 
-	SLIST_INSERT_HEAD(&p->p_klist, kn, kn_selnext);
+	if (immediate == 0)
+		SLIST_INSERT_HEAD(&p->p_klist, kn, kn_selnext);
 
 	/*
 	 * Immediately activate any exit notes if the target process is a
@@ -387,6 +388,7 @@ kqueue(struct thread *td, struct kqueue_args *uap)
 	error = falloc(td, &fp, &fd);
 	if (error)
 		goto done2;
+	/* An extra reference on `nfp' has been held for us by falloc(). */
 	kq = malloc(sizeof(struct kqueue), M_KQUEUE, M_WAITOK | M_ZERO);
 	TAILQ_INIT(&kq->kq_head);
 	FILE_LOCK(fp);
@@ -396,6 +398,7 @@ kqueue(struct thread *td, struct kqueue_args *uap)
 	TAILQ_INIT(&kq->kq_head);
 	fp->f_data = kq;
 	FILE_UNLOCK(fp);
+	fdrop(fp, td);
 	FILEDESC_LOCK(fdp);
 	td->td_retval[0] = fd;
 	if (fdp->fd_knlistsize < 0)
@@ -916,7 +919,7 @@ kqueue_wakeup(struct kqueue *kq)
 	}
 	if (kq->kq_state & KQ_SEL) {
 		kq->kq_state &= ~KQ_SEL;
-		selwakeup(&kq->kq_sel);
+		selwakeuppri(&kq->kq_sel, PSOCK);
 	}
 	KNOTE(&kq->kq_sel.si_note, 0);
 }

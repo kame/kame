@@ -28,9 +28,10 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/usb/if_axe.c,v 1.3 2003/04/21 17:34:13 takawata Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/if_axe.c,v 1.9 2003/11/13 20:55:51 obrien Exp $");
 
 /*
  * ASIX Electronics AX88172 USB 2.0 ethernet driver. Used in the
@@ -83,6 +84,7 @@
 #include <net/bpf.h>
 
 #include <sys/bus.h>
+#include <machine/bus.h>
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
@@ -98,11 +100,6 @@
 #include "miibus_if.h"
 
 #include <dev/usb/if_axereg.h>
-
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/usb/if_axe.c,v 1.3 2003/04/21 17:34:13 takawata Exp $";
-#endif
 
 /*
  * Various supported device vendors/products.
@@ -143,7 +140,7 @@ Static int axe_ifmedia_upd(struct ifnet *);
 Static void axe_ifmedia_sts(struct ifnet *, struct ifmediareq *);
 
 Static void axe_setmulti(struct axe_softc *);
-Static u_int32_t axe_crc(caddr_t);
+Static u_int32_t axe_mchash(caddr_t);
 
 Static device_method_t axe_methods[] = {
 	/* Device interface */
@@ -213,6 +210,7 @@ axe_miibus_readreg(device_ptr_t dev, int phy, int reg)
 	if (sc->axe_dying)
 		return(0);
 
+#ifdef notdef
 	/*
 	 * The chip tells us the MII address of any supported
 	 * PHYs attached to the chip, so only read from those.
@@ -222,6 +220,9 @@ axe_miibus_readreg(device_ptr_t dev, int phy, int reg)
 		return (0);
 
 	if (sc->axe_phyaddrs[1] != AXE_NOPHY && phy != sc->axe_phyaddrs[1])
+		return (0);
+#endif
+	if (sc->axe_phyaddrs[0] != 0xFF && sc->axe_phyaddrs[0] != phy)
 		return (0);
 
 	AXE_LOCK(sc);
@@ -234,6 +235,9 @@ axe_miibus_readreg(device_ptr_t dev, int phy, int reg)
 		printf("axe%d: read PHY failed\n", sc->axe_unit);
 		return(-1);
 	}
+
+	if (val)
+		sc->axe_phyaddrs[0] = phy;
 
 	return (val);
 }
@@ -310,21 +314,19 @@ axe_ifmedia_sts(struct ifnet *ifp, struct ifmediareq *ifmr)
 }
 
 Static u_int32_t
-axe_crc(caddr_t addr)
+axe_mchash(caddr_t addr)
 {
-	u_int32_t		crc, carry;
-	int			i, j;
-	u_int8_t		c;
+	u_int32_t	crc, carry;
+	int		idx, bit;
+	u_int8_t	data;
 
 	/* Compute CRC for the address value. */
 	crc = 0xFFFFFFFF; /* initial value */
 
-	for (i = 0; i < 6; i++) {
-		c = *(addr + i);
-		for (j = 0; j < 8; j++) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (c & 0x01);
+	for (idx = 0; idx < 6; idx++) {
+		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
+			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
 			crc <<= 1;
-			c >>= 1;
 			if (carry)
 				crc = (crc ^ 0x04c11db6) | carry;
 		}
@@ -359,7 +361,7 @@ axe_setmulti(struct axe_softc *sc)
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = axe_crc(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = axe_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
 		hashtbl[h / 8] |= 1 << (h % 8);
 	}
 
@@ -377,7 +379,7 @@ axe_reset(struct axe_softc *sc)
 		return;
 
 	if (usbd_set_config_no(sc->axe_udev, AXE_CONFIG_NO, 1) ||
-	    usbd_device2interface_handle(sc->axe_udev, 0 /*AXE_IFACE_IDX*/,
+	    usbd_device2interface_handle(sc->axe_udev, AXE_IFACE_IDX,
 	    &sc->axe_iface)) {
 		printf("axe%d: getting interface handle failed\n",
 		    sc->axe_unit);
@@ -426,7 +428,6 @@ USB_ATTACH(axe)
 	int			i;
 
 	bzero(sc, sizeof(struct axe_softc));
-	sc->axe_iface = uaa->iface;
 	sc->axe_udev = uaa->device;
 	sc->axe_dev = self;
 	sc->axe_unit = device_get_unit(self);
@@ -437,7 +438,14 @@ USB_ATTACH(axe)
 		USB_ATTACH_ERROR_RETURN;
 	}
 
-	id = usbd_get_interface_descriptor(uaa->iface);
+	if (usbd_device2interface_handle(uaa->device,
+	    AXE_IFACE_IDX, &sc->axe_iface)) {
+		printf("axe%d: getting interface handle failed\n",
+		    sc->axe_unit);
+		USB_ATTACH_ERROR_RETURN;
+	}
+
+	id = usbd_get_interface_descriptor(sc->axe_iface);
 
 	usbd_devinfo(uaa->device, 0, devinfo);
 	device_set_desc_copy(self, devinfo);
@@ -445,7 +453,7 @@ USB_ATTACH(axe)
 
 	/* Find endpoints. */
 	for (i = 0; i < id->bNumEndpoints; i++) {
-		ed = usbd_interface2endpoint_descriptor(uaa->iface, i);
+		ed = usbd_interface2endpoint_descriptor(sc->axe_iface, i);
 		if (!ed) {
 			printf("axe%d: couldn't get ep %d\n",
 			    sc->axe_unit, i);
@@ -479,6 +487,12 @@ USB_ATTACH(axe)
 	axe_cmd(sc, AXE_CMD_READ_PHYID, 0, 0, (void *)&sc->axe_phyaddrs);
 
 	/*
+	 * Work around broken adapters that appear to lie about
+	 * their PHY addresses.
+	 */
+	sc->axe_phyaddrs[0] = sc->axe_phyaddrs[1] = 0xFF;
+
+	/*
 	 * An ASIX chip was detected. Inform the world.
 	 */
 	printf("axe%d: Ethernet address: %6D\n", sc->axe_unit, eaddr, ":");
@@ -487,8 +501,7 @@ USB_ATTACH(axe)
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = sc->axe_unit;
-	ifp->if_name = "axe";
+	if_initname(ifp, "axe", sc->axe_unit);
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = axe_ioctl;
@@ -905,7 +918,7 @@ axe_init(void *xsc)
 	/*
 	 * Cancel pending I/O and free all RX/TX buffers.
 	 */
-	
+
 	axe_reset(sc);
 
 #ifdef notdef

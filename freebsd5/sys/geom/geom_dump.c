@@ -31,10 +31,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/geom/geom_dump.c,v 1.26 2003/04/23 21:28:26 phk Exp $
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/geom/geom_dump.c,v 1.29 2003/07/08 21:12:40 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/sbuf.h>
@@ -114,6 +114,8 @@ g_conftxt_geom(struct sbuf *sb, struct g_geom *gp, int level)
 	struct g_provider *pp;
 	struct g_consumer *cp;
 
+	if (gp->flags & G_GEOM_WITHER)
+		return;
 	LIST_FOREACH(pp, &gp->provider, provider) {
 		sbuf_printf(sb, "%d %s %s %ju %u", level, gp->class->name,
 		    pp->name, (uintmax_t)pp->mediasize, pp->sectorsize);
@@ -162,7 +164,9 @@ g_conf_consumer(struct sbuf *sb, struct g_consumer *cp)
 		sbuf_printf(sb, "\t  <provider ref=\"%p\"/>\n", cp->provider);
 	sbuf_printf(sb, "\t  <mode>r%dw%de%d</mode>\n",
 	    cp->acr, cp->acw, cp->ace);
-	if (cp->geom->dumpconf != NULL) {
+	if (cp->geom->flags & G_GEOM_WITHER)
+		;
+	else if (cp->geom->dumpconf != NULL) {
 		sbuf_printf(sb, "\t  <config>\n");
 		cp->geom->dumpconf(sb, "\t    ", cp->geom, cp, NULL);
 		sbuf_printf(sb, "\t  </config>\n");
@@ -182,7 +186,9 @@ g_conf_provider(struct sbuf *sb, struct g_provider *pp)
 	sbuf_printf(sb, "\t  <mediasize>%jd</mediasize>\n",
 	    (intmax_t)pp->mediasize);
 	sbuf_printf(sb, "\t  <sectorsize>%u</sectorsize>\n", pp->sectorsize);
-	if (pp->geom->dumpconf != NULL) {
+	if (pp->geom->flags & G_GEOM_WITHER)
+		;
+	else if (pp->geom->dumpconf != NULL) {
 		sbuf_printf(sb, "\t  <config>\n");
 		pp->geom->dumpconf(sb, "\t    ", pp->geom, NULL, pp);
 		sbuf_printf(sb, "\t  </config>\n");
@@ -201,7 +207,9 @@ g_conf_geom(struct sbuf *sb, struct g_geom *gp, struct g_provider *pp, struct g_
 	sbuf_printf(sb, "      <class ref=\"%p\"/>\n", gp->class);
 	sbuf_printf(sb, "      <name>%s</name>\n", gp->name);
 	sbuf_printf(sb, "      <rank>%d</rank>\n", gp->rank);
-	if (gp->dumpconf != NULL) {
+	if (gp->flags & G_GEOM_WITHER)
+		sbuf_printf(sb, "      <wither/>\n");
+	else if (gp->dumpconf != NULL) {
 		sbuf_printf(sb, "      <config>\n");
 		gp->dumpconf(sb, "\t", gp, NULL, NULL);
 		sbuf_printf(sb, "      </config>\n");
@@ -270,6 +278,7 @@ g_trace(int level, const char *fmt, ...)
 		return;
 	va_start(ap, fmt);
 	vprintf(fmt, ap);
+	va_end(ap);
 	printf("\n");
 }
 

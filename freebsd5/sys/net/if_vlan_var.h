@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_vlan_var.h,v 1.15 2003/03/13 00:30:31 mux Exp $
+ * $FreeBSD: src/sys/net/if_vlan_var.h,v 1.16 2003/07/08 21:54:20 wpaul Exp $
  */
 
 #ifndef _NET_IF_VLAN_VAR_H_
@@ -40,7 +40,8 @@ struct	ether_vlan_header {
 	u_int16_t evl_proto;
 };
 
-#define	EVL_VLANOFTAG(tag) ((tag) & 4095)
+#define EVL_VLID_MASK	0x0FFF
+#define	EVL_VLANOFTAG(tag) ((tag) & EVL_VLID_MASK)
 #define	EVL_PRIOFTAG(tag) (((tag) >> 13) & 7)
 
 /* sysctl(3) tags, for compatibility purposes */

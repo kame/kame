@@ -43,11 +43,11 @@ EXEMPLARY,
  *
  * Author: Dave Chapeskie <dchapeskie@sandvine.com>
  *
- * $FreeBSD: src/sys/netgraph/ng_source.h,v 1.1 2002/10/31 23:03:09 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_source.h,v 1.2 2003/11/11 12:30:37 ru Exp $
  */
 
-#ifndef _NETGRAPH_SOURCE_H_
-#define _NETGRAPH_SOURCE_H_
+#ifndef _NETGRAPH_NG_SOURCE_H_
+#define _NETGRAPH_NG_SOURCE_H_
 
 /* Node type name and magic cookie */
 #define NG_SOURCE_NODE_TYPE	"source"
@@ -91,4 +91,4 @@ enum {
 	NGM_SOURCE_CLR_DATA,		/* clear the queued data */
 };
 
-#endif /* _NETGRAPH_SOURCE_H_ */
+#endif /* _NETGRAPH_NG_SOURCE_H_ */

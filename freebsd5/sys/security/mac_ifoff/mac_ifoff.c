@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/security/mac_ifoff/mac_ifoff.c,v 1.6 2003/04/18 20:22:23 rwatson Exp $
+ * $FreeBSD: src/sys/security/mac_ifoff/mac_ifoff.c,v 1.8 2003/11/18 00:39:06 rwatson Exp $
  */
 
 /*
@@ -114,7 +114,7 @@ check_ifnet_incoming(struct ifnet *ifnet, int viabpf)
 	if (!mac_ifoff_enabled)
 		return (0);
 
-	if (mac_ifoff_lo_enabled && ifnet->if_type == IFT_LOOP)  
+	if (mac_ifoff_lo_enabled && ifnet->if_type == IFT_LOOP)
 		return (0);
 
 	if (mac_ifoff_other_enabled && ifnet->if_type != IFT_LOOP)
@@ -143,6 +143,18 @@ mac_ifoff_check_ifnet_transmit(struct ifnet *ifnet, struct label *ifnetlabel,
 }
 
 static int
+mac_ifoff_check_inpcb_deliver(struct inpcb *inp, struct label *inplabel,
+    struct mbuf *m, struct label *mlabel)
+{
+
+	M_ASSERTPKTHDR(m);
+	if (m->m_pkthdr.rcvif != NULL)
+		return (check_ifnet_incoming(m->m_pkthdr.rcvif, 0));
+
+	return (0);
+}
+
+static int
 mac_ifoff_check_socket_deliver(struct socket *so, struct label *socketlabel,
     struct mbuf *m, struct label *mbuflabel)
 {
@@ -158,6 +170,7 @@ static struct mac_policy_ops mac_ifoff_ops =
 {
 	.mpo_check_bpfdesc_receive = mac_ifoff_check_bpfdesc_receive,
 	.mpo_check_ifnet_transmit = mac_ifoff_check_ifnet_transmit,
+	.mpo_check_inpcb_deliver = mac_ifoff_check_inpcb_deliver,
 	.mpo_check_socket_deliver = mac_ifoff_check_socket_deliver,
 };
 

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)icu.h	5.6 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/isa/icu.h,v 1.27 2002/04/06 08:25:05 nyan Exp $
+ * $FreeBSD: src/sys/i386/isa/icu.h,v 1.30 2003/11/14 19:12:25 jhb Exp $
  */
 
 /*
@@ -44,38 +44,6 @@
 
 #ifndef _I386_ISA_ICU_H_
 #define	_I386_ISA_ICU_H_
-
-#ifndef	LOCORE
-
-/*
- * Note:
- *	Most of the SMP equivilants of the icu macros are coded
- *	elsewhere in an MP-safe fashion.
- *	In particular note that the 'imen' variable is opaque.
- *	DO NOT access imen directly, use INTREN()/INTRDIS().
- */
-
-void	INTREN(u_int);
-void	INTRDIS(u_int);
-
-#ifdef APIC_IO
-extern	unsigned apic_imen;	/* APIC interrupt mask enable */
-#else
-extern	unsigned imen;		/* interrupt mask enable */
-#endif
-
-#endif /* LOCORE */
-
-
-#ifdef APIC_IO
-/*
- * Note: The APIC uses different values for IRQxxx.
- *	 Unfortunately many drivers use the 8259 values as indexes
- *	 into tables, etc.  The APIC equivilants are kept as APIC_IRQxxx.
- *	 The 8259 versions have to be used in SMP for legacy operation
- *	 of the drivers.
- */
-#endif /* APIC_IO */
 
 /*
  * Interrupt enable bits - in normal order of priority (which we change)
@@ -118,10 +86,67 @@ extern	unsigned imen;		/* interrupt mask enable */
 #define	IRQ7		0x0080		/* lowest - parallel printer */
 #endif
 
+/* Initialization control word 1. Written to even address. */
+#define	ICW1_IC4	0x01		/* ICW4 present */
+#define	ICW1_SNGL	0x02		/* 1 = single, 0 = cascaded */
+#define	ICW1_ADI	0x04		/* 1 = 4, 0 = 8 byte vectors */
+#define	ICW1_LTIM	0x08		/* 1 = level trigger, 0 = edge */
+#define	ICW1_RESET	0x10		/* must be 1 */
+/* 0x20 - 0x80 - in 8080/8085 mode only */
+
+/* Initialization control word 2. Written to the odd address. */
+/* No definitions, it is the base vector of the IDT for 8086 mode */
+
+/* Initialization control word 3. Written to the odd address. */
+/* For a master PIC, bitfield indicating a slave 8259 on given input */
+/* For slave, lower 3 bits are the slave's ID binary id on master */
+
+#ifdef PC98
+/* XXX: missing pc98 bits */
+#else
+
+/* Initialization control word 4. Written to the odd address. */
+#define	ICW4_8086	0x01		/* 1 = 8086, 0 = 8080 */
+#define	ICW4_AEOI	0x02		/* 1 = Auto EOI */
+#define	ICW4_MS		0x04		/* 1 = buffered master, 0 = slave */
+#define	ICW4_BUF	0x08		/* 1 = enable buffer mode */
+#define	ICW4_SFNM	0x10		/* 1 = special fully nested mode */
+
+#endif
+
+/* Operation control words.  Written after initialization. */
+
+/* Operation control word type 1 */
+/*
+ * No definitions.  Written to the odd address.  Bitmask for interrupts.
+ * 1 = disabled.
+ */
+
+/* Operation control word type 2.  Bit 3 (0x08) must be zero. Even address. */
+#define	OCW2_L0		0x01		/* Level */
+#define	OCW2_L1		0x02
+#define	OCW2_L2		0x04
+/* 0x08 must be 0 to select OCW2 vs OCW3 */
+/* 0x10 must be 0 to select OCW2 vs ICW1 */
+#define	OCW2_EOI	0x20		/* 1 = EOI */
+#define	OCW2_SL		0x40		/* EOI mode */
+#define	OCW2_R		0x80		/* EOI mode */
+
+/* Operation control word type 3.  Bit 3 (0x08) must be set. Even address. */
+#define	OCW3_RIS	0x01		/* 1 = read IS, 0 = read IR */
+#define	OCW3_RR		0x02		/* register read */
+#define	OCW3_P		0x04		/* poll mode command */
+/* 0x08 must be 1 to select OCW3 vs OCW2 */
+#define	OCW3_SEL	0x08		/* must be 1 */
+/* 0x10 must be 0 to select OCW3 vs ICW1 */
+#define	OCW3_SMM	0x20		/* special mode mask */
+#define	OCW3_ESMM	0x40		/* enable SMM */
+
 /*
  * Interrupt Control offset into Interrupt descriptor table (IDT)
  */
 #define	ICU_OFFSET	32		/* 0-31 are processor exceptions */
+#define	ICU_LEN		16		/* 32-47 are ISA interrupts */
 
 #ifdef PC98
 #define	ICU_IMR_OFFSET	2
@@ -130,23 +155,12 @@ extern	unsigned imen;		/* interrupt mask enable */
 #define	ICU_IMR_OFFSET	1
 #define	ICU_SLAVEID	2
 #endif
-#define	ICU_EOI		0x20
 
-#ifdef APIC_IO
+#define	ICU_EOI		(OCW2_EOI)	/* non-specific EOI */
 
-/* 32-47: ISA IRQ0-IRQ15, 48-63: IO APIC IRQ16-IRQ31 */
-#define	ICU_LEN		32
-#define	HWI_MASK	0xffffffff	/* bits for h/w interrupts */
-#define	NHWI		32
-
-#else
-
-#define	ICU_LEN		16		/* 32-47 are ISA interrupts */
-#define	HWI_MASK	0xffff		/* bits for h/w interrupts */
-#define	NHWI		16
-
-#endif /* APIC_IO */
-
-#define	INTRCNT_COUNT	(1 + ICU_LEN + 2 * ICU_LEN)
+#ifndef LOCORE
+void	atpic_handle_intr(struct intrframe iframe);
+void	atpic_startup(void);
+#endif
 
 #endif /* !_I386_ISA_ICU_H_ */

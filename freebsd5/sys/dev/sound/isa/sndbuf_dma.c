@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,7 @@
 
 #include <isa/isavar.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sndbuf_dma.c,v 1.1 2003/02/07 14:05:33 nyan Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sndbuf_dma.c,v 1.2 2003/09/07 16:28:02 cg Exp $");
 
 int
 sndbuf_dmasetup(struct snd_dbuf *b, struct resource *drq)

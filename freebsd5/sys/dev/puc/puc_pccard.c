@@ -22,8 +22,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/puc/puc_pccard.c,v 1.5 2002/09/27 22:02:46 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/puc/puc_pccard.c,v 1.7 2003/10/27 06:41:40 imp Exp $");
 
 #include "opt_puc.h"
 
@@ -61,7 +63,7 @@ const struct puc_device_description rscom_devices = {
 static int
 puc_pccard_probe(device_t dev)
 {
-	char *vendor, *product;
+	const char *vendor, *product;
 	int error;
 
 	error = pccard_get_vendor_str(dev, &vendor);

@@ -30,6 +30,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/if_vr.c,v 1.77 2003/11/14 19:00:32 sam Exp $");
+
 /*
  * VIA Rhine fast ethernet PCI NIC driver
  *
@@ -41,7 +44,6 @@
  * Electrical Engineering Department
  * Columbia University, New York City
  */
-
 /*
  * The VIA Rhine controllers are similar in some respects to the
  * the DEC tulip chips, except less complicated. The controller
@@ -56,9 +58,6 @@
  * at longword boundaries, so we have to do a buffer copy before
  * transmission.
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_vr.c,v 1.71 2003/04/21 18:34:04 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -88,8 +87,8 @@ __FBSDID("$FreeBSD: src/sys/pci/if_vr.c,v 1.71 2003/04/21 18:34:04 imp Exp $");
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #define VR_USEIOSPACE
 
@@ -161,7 +160,7 @@ static int vr_miibus_writereg	(device_t, int, int, int);
 static void vr_miibus_statchg	(device_t);
 
 static void vr_setcfg		(struct vr_softc *, int);
-static u_int8_t vr_calchash	(u_int8_t *);
+static u_int32_t vr_mchash	(caddr_t);
 static void vr_setmulti		(struct vr_softc *);
 static void vr_reset		(struct vr_softc *);
 static int vr_list_rx_init	(struct vr_softc *);
@@ -565,22 +564,21 @@ vr_miibus_statchg(dev)
 /*
  * Calculate CRC of a multicast group address, return the lower 6 bits.
  */
-static u_int8_t vr_calchash(addr)
-	u_int8_t		*addr;
+static u_int32_t
+vr_mchash(addr)
+	caddr_t		addr;
 {
-	u_int32_t		crc, carry;
-	int			i, j;
-	u_int8_t		c;
+	u_int32_t	crc, carry;
+	int		idx, bit;
+	u_int8_t	data;
 
 	/* Compute CRC for the address value. */
 	crc = 0xFFFFFFFF; /* initial value */
 
-	for (i = 0; i < 6; i++) {
-		c = *(addr + i);
-		for (j = 0; j < 8; j++) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (c & 0x01);
+	for (idx = 0; idx < 6; idx++) {
+		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
+			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
 			crc <<= 1;
-			c >>= 1;
 			if (carry)
 				crc = (crc ^ 0x04c11db6) | carry;
 		}
@@ -624,7 +622,7 @@ vr_setmulti(sc)
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = vr_calchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = vr_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
 		if (h < 32)
 			hashes[0] |= (1 << h);
 		else
@@ -744,7 +742,7 @@ vr_attach(dev)
 
 	mtx_init(&sc->vr_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-
+#ifndef BURN_BRIDGES
 	/*
 	 * Handle power management nonsense.
 	 */
@@ -767,7 +765,7 @@ vr_attach(dev)
 		pci_write_config(dev, VR_PCI_LOMEM, membase, 4);
 		pci_write_config(dev, VR_PCI_INTLINE, irq, 4);
 	}
-
+#endif
 	/*
 	 * Map control/status registers.
 	 */
@@ -849,8 +847,7 @@ vr_attach(dev)
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = unit;
-	ifp->if_name = "vr";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = vr_ioctl;
@@ -1064,6 +1061,8 @@ vr_rxeof(sc)
 	int			total_len = 0;
 	u_int32_t		rxstat;
 
+	VR_LOCK_ASSERT(sc);
+
 	ifp = &sc->arpcom.ac_if;
 
 	while(!((rxstat = sc->vr_cdata.vr_rx_head->vr_ptr->vr_status) &
@@ -1125,7 +1124,9 @@ vr_rxeof(sc)
 		m = m0;
 
 		ifp->if_ipackets++;
+		VR_UNLOCK(sc);
 		(*ifp->if_input)(ifp, m);
+		VR_LOCK(sc);
 	}
 
 	return;

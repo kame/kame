@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/pci/agp.c,v 1.29 2003/03/25 00:07:05 jake Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/agp.c,v 1.34 2003/11/11 21:49:18 anholt Exp $");
 
 #include "opt_bus.h"
 
@@ -41,8 +42,8 @@
 #include <sys/mutex.h>
 #include <sys/proc.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 #include <pci/agppriv.h>
 #include <pci/agpvar.h>
 #include <pci/agpreg.h>
@@ -174,6 +175,11 @@ agp_alloc_gatt(device_t dev)
 			      "allocating GATT for aperture of size %dM\n",
 			      apsize / (1024*1024));
 
+	if (entries == 0) {
+		device_printf(dev, "bad aperture size\n");
+		return NULL;
+	}
+
 	gatt = malloc(sizeof(struct agp_gatt), M_AGP, M_NOWAIT);
 	if (!gatt)
 		return 0;
@@ -277,18 +283,83 @@ agp_generic_detach(device_t dev)
 	return 0;
 }
 
-int
-agp_generic_enable(device_t dev, u_int32_t mode)
+/*
+ * This does the enable logic for v3, with the same topology
+ * restrictions as in place for v2 -- one bus, one device on the bus.
+ */
+static int
+agp_v3_enable(device_t dev, device_t mdev, u_int32_t mode)
 {
-	device_t mdev = agp_find_display();
 	u_int32_t tstatus, mstatus;
 	u_int32_t command;
-	int rq, sba, fw, rate;;
+	int rq, sba, fw, rate, arqsz, cal;
 
-	if (!mdev) {
-		AGP_DPF("can't find display\n");
-		return ENXIO;
-	}
+	tstatus = pci_read_config(dev, agp_find_caps(dev) + AGP_STATUS, 4);
+	mstatus = pci_read_config(mdev, agp_find_caps(mdev) + AGP_STATUS, 4);
+
+	/* Set RQ to the min of mode, tstatus and mstatus */
+	rq = AGP_MODE_GET_RQ(mode);
+	if (AGP_MODE_GET_RQ(tstatus) < rq)
+		rq = AGP_MODE_GET_RQ(tstatus);
+	if (AGP_MODE_GET_RQ(mstatus) < rq)
+		rq = AGP_MODE_GET_RQ(mstatus);
+
+	/*
+	 * ARQSZ - Set the value to the maximum one.
+	 * Don't allow the mode register to override values.
+	 */
+	arqsz = AGP_MODE_GET_ARQSZ(mode);
+	if (AGP_MODE_GET_ARQSZ(tstatus) > rq)
+		rq = AGP_MODE_GET_ARQSZ(tstatus);
+	if (AGP_MODE_GET_ARQSZ(mstatus) > rq)
+		rq = AGP_MODE_GET_ARQSZ(mstatus);
+
+	/* Calibration cycle - don't allow override by mode register */
+	cal = AGP_MODE_GET_CAL(tstatus);
+	if (AGP_MODE_GET_CAL(mstatus) < cal)
+		cal = AGP_MODE_GET_CAL(mstatus);
+
+	/* SBA must be supported for AGP v3. */
+	sba = 1;
+
+	/* Set FW if all three support it. */
+	fw = (AGP_MODE_GET_FW(tstatus)
+	       & AGP_MODE_GET_FW(mstatus)
+	       & AGP_MODE_GET_FW(mode));
+	
+	/* Figure out the max rate */
+	rate = (AGP_MODE_GET_RATE(tstatus)
+		& AGP_MODE_GET_RATE(mstatus)
+		& AGP_MODE_GET_RATE(mode));
+	if (rate & AGP_MODE_V3_RATE_8x)
+		rate = AGP_MODE_V3_RATE_8x;
+	else
+		rate = AGP_MODE_V3_RATE_4x;
+	if (bootverbose)
+		device_printf(dev, "Setting AGP v3 mode %d\n", rate * 4);
+
+	pci_write_config(dev, agp_find_caps(dev) + AGP_COMMAND, 0, 4);
+
+	/* Construct the new mode word and tell the hardware */
+	command = AGP_MODE_SET_RQ(0, rq);
+	command = AGP_MODE_SET_ARQSZ(command, arqsz);
+	command = AGP_MODE_SET_CAL(command, cal);
+	command = AGP_MODE_SET_SBA(command, sba);
+	command = AGP_MODE_SET_FW(command, fw);
+	command = AGP_MODE_SET_RATE(command, rate);
+	command = AGP_MODE_SET_AGP(command, 1);
+	pci_write_config(dev, agp_find_caps(dev) + AGP_COMMAND, command, 4);
+	pci_write_config(mdev, agp_find_caps(mdev) + AGP_COMMAND, command, 4);
+
+	return 0;
+}
+
+static int
+agp_v2_enable(device_t dev, device_t mdev, u_int32_t mode)
+{
+	u_int32_t tstatus, mstatus;
+	u_int32_t command;
+	int rq, sba, fw, rate;
 
 	tstatus = pci_read_config(dev, agp_find_caps(dev) + AGP_STATUS, 4);
 	mstatus = pci_read_config(mdev, agp_find_caps(mdev) + AGP_STATUS, 4);
@@ -314,12 +385,14 @@ agp_generic_enable(device_t dev, u_int32_t mode)
 	rate = (AGP_MODE_GET_RATE(tstatus)
 		& AGP_MODE_GET_RATE(mstatus)
 		& AGP_MODE_GET_RATE(mode));
-	if (rate & AGP_MODE_RATE_4x)
-		rate = AGP_MODE_RATE_4x;
-	else if (rate & AGP_MODE_RATE_2x)
-		rate = AGP_MODE_RATE_2x;
+	if (rate & AGP_MODE_V2_RATE_4x)
+		rate = AGP_MODE_V2_RATE_4x;
+	else if (rate & AGP_MODE_V2_RATE_2x)
+		rate = AGP_MODE_V2_RATE_2x;
 	else
-		rate = AGP_MODE_RATE_1x;
+		rate = AGP_MODE_V2_RATE_1x;
+	if (bootverbose)
+		device_printf(dev, "Setting AGP v2 mode %d\n", rate);
 
 	/* Construct the new mode word and tell the hardware */
 	command = AGP_MODE_SET_RQ(0, rq);
@@ -331,6 +404,34 @@ agp_generic_enable(device_t dev, u_int32_t mode)
 	pci_write_config(mdev, agp_find_caps(mdev) + AGP_COMMAND, command, 4);
 
 	return 0;
+}
+
+int
+agp_generic_enable(device_t dev, u_int32_t mode)
+{
+	device_t mdev = agp_find_display();
+	u_int32_t tstatus, mstatus;
+
+	if (!mdev) {
+		AGP_DPF("can't find display\n");
+		return ENXIO;
+	}
+
+	tstatus = pci_read_config(dev, agp_find_caps(dev) + AGP_STATUS, 4);
+	mstatus = pci_read_config(mdev, agp_find_caps(mdev) + AGP_STATUS, 4);
+
+	/*
+	 * Check display and bridge for AGP v3 support.  AGP v3 allows
+	 * more variety in topology than v2, e.g. multiple AGP devices
+	 * attached to one bridge, or multiple AGP bridges in one
+	 * system.  This doesn't attempt to address those situations,
+	 * but should work fine for a classic single AGP slot system
+	 * with AGP v3.
+	 */
+	if (AGP_MODE_GET_MODE_3(tstatus) && AGP_MODE_GET_MODE_3(mstatus))
+		return (agp_v3_enable(dev, mdev, mode));
+	else
+		return (agp_v2_enable(dev, mdev, mode));	    
 }
 
 struct agp_memory *
@@ -420,8 +521,10 @@ agp_generic_bind_memory(device_t dev, struct agp_memory *mem,
 		 * AGP_PAGE_SIZE. If this is the first call to bind,
 		 * the pages will be allocated and zeroed.
 		 */
+		VM_OBJECT_LOCK(mem->am_obj);
 		m = vm_page_grab(mem->am_obj, OFF_TO_IDX(i),
 		    VM_ALLOC_WIRED | VM_ALLOC_ZERO | VM_ALLOC_RETRY);
+		VM_OBJECT_UNLOCK(mem->am_obj);
 		if ((m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
 		AGP_DPF("found page pa=%#x\n", VM_PAGE_TO_PHYS(m));
@@ -448,6 +551,7 @@ agp_generic_bind_memory(device_t dev, struct agp_memory *mem,
 				vm_page_unlock_queues();
 				for (k = 0; k < i + j; k += AGP_PAGE_SIZE)
 					AGP_UNBIND_PAGE(dev, offset + k);
+				VM_OBJECT_LOCK(mem->am_obj);
 				for (k = 0; k <= i; k += PAGE_SIZE) {
 					m = vm_page_lookup(mem->am_obj,
 							   OFF_TO_IDX(k));
@@ -455,6 +559,7 @@ agp_generic_bind_memory(device_t dev, struct agp_memory *mem,
 					vm_page_unwire(m, 0);
 					vm_page_unlock_queues();
 				}
+				VM_OBJECT_UNLOCK(mem->am_obj);
 				lockmgr(&sc->as_lock, LK_RELEASE, 0, curthread);
 				return error;
 			}
@@ -504,12 +609,14 @@ agp_generic_unbind_memory(device_t dev, struct agp_memory *mem)
 	 */
 	for (i = 0; i < mem->am_size; i += AGP_PAGE_SIZE)
 		AGP_UNBIND_PAGE(dev, mem->am_offset + i);
+	VM_OBJECT_LOCK(mem->am_obj);
 	for (i = 0; i < mem->am_size; i += PAGE_SIZE) {
 		m = vm_page_lookup(mem->am_obj, atop(i));
 		vm_page_lock_queues();
 		vm_page_unwire(m, 0);
 		vm_page_unlock_queues();
 	}
+	VM_OBJECT_UNLOCK(mem->am_obj);
 		
 	agp_flush_cache();
 	AGP_FLUSH_TLB(dev);

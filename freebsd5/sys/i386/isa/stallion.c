@@ -32,9 +32,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/isa/stallion.c,v 1.55 2003/03/05 08:16:29 das Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/isa/stallion.c,v 1.58 2003/11/09 09:17:23 tanimura Exp $");
 
 /*****************************************************************************/
 
@@ -61,8 +62,8 @@
 #ifndef COMPAT_OLDPCI
 #error "The stallion pci driver requires the old pci compatibility shims"
 #endif
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 #endif
 
 /*****************************************************************************/
@@ -1233,7 +1234,7 @@ static void stl_start(struct tty *tp)
 			tp->t_state &= ~TS_ASLEEP;
 			wakeup(&tp->t_outq);
 		}
-		selwakeup(&tp->t_wsel);
+		selwakeuppri(&tp->t_wsel, TTOPRI);
 	}
 #endif
 

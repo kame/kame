@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/buffer.h,v 1.6 2003/02/20 17:31:12 cognet Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/buffer.h,v 1.8 2003/11/27 19:51:44 matk Exp $
  */
 
 #define SND_DMA(b) (sndbuf_getflags((b)) & SNDBUF_F_DMA)
@@ -106,7 +106,6 @@ void sndbuf_updateprevtotal(struct snd_dbuf *b);
 
 int sndbuf_acquire(struct snd_dbuf *b, u_int8_t *from, unsigned int count);
 int sndbuf_dispose(struct snd_dbuf *b, u_int8_t *to, unsigned int count);
-int sndbuf_uiomove(struct snd_dbuf *b, struct uio *uio, unsigned int count);
 int sndbuf_feed(struct snd_dbuf *from, struct snd_dbuf *to, struct pcm_channel *channel, struct pcm_feeder *feeder, unsigned int count);
 
 u_int32_t sndbuf_getflags(struct snd_dbuf *b);

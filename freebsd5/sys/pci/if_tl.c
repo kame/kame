@@ -30,6 +30,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/if_tl.c,v 1.88 2003/11/14 19:00:32 sam Exp $");
+
 /*
  * Texas Instruments ThunderLAN driver for FreeBSD 2.2.6 and 3.x.
  * Supports many Compaq PCI NICs based on the ThunderLAN ethernet controller,
@@ -47,7 +50,6 @@
  * Electrical Engineering Department
  * Columbia University, New York City
  */
-
 /*
  * Some notes about the ThunderLAN:
  *
@@ -118,7 +120,6 @@
  * TX 'end of frame' interrupt. It will also generate an 'end of channel'
  * interrupt when it reaches the end of the list.
  */
-
 /*
  * Some notes about this driver:
  *
@@ -176,9 +177,6 @@
  * itself thereby reducing the load on the host CPU.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_tl.c,v 1.83 2003/04/21 18:34:04 imp Exp $");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -207,8 +205,8 @@ __FBSDID("$FreeBSD: src/sys/pci/if_tl.c,v 1.83 2003/04/21 18:34:04 imp Exp $");
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 /*
  * Default to using PIO register access mode to pacify certain
@@ -300,7 +298,7 @@ static int tl_miibus_writereg	(device_t, int, int, int);
 static void tl_miibus_statchg	(device_t);
 
 static void tl_setmode		(struct tl_softc *, int);
-static int tl_calchash		(caddr_t);
+static u_int32_t tl_mchash	(caddr_t);
 static void tl_setmulti		(struct tl_softc *);
 static void tl_setfilt		(struct tl_softc *, caddr_t, int);
 static void tl_softreset	(struct tl_softc *, int);
@@ -889,11 +887,11 @@ tl_setmode(sc, media)
  * Bytes 0-2 and 3-5 are symmetrical, so are folded together.  Then
  * the folded 24-bit value is split into 6-bit portions and XOR'd.
  */
-static int
-tl_calchash(addr)
-	caddr_t			addr;
+static u_int32_t
+tl_mchash(addr)
+	caddr_t		addr;
 {
-	int			t;
+	int		t;
 
 	t = (addr[0] ^ addr[3]) << 16 | (addr[1] ^ addr[4]) << 8 |
 		(addr[2] ^ addr[5]);
@@ -978,7 +976,7 @@ tl_setmulti(sc)
 				continue;
 			}
 
-			h = tl_calchash(
+			h = tl_mchash(
 				LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
 			if (h < 32)
 				hashes[0] |= (1 << h);
@@ -1268,8 +1266,7 @@ tl_attach(dev)
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = unit;
-	ifp->if_name = "tl";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = tl_ioctl;
 	ifp->if_output = ether_output;
@@ -1507,6 +1504,8 @@ tl_intvec_rxeof(xsc, type)
 	sc = xsc;
 	ifp = &sc->arpcom.ac_if;
 
+	TL_LOCK_ASSERT(sc);
+
 	while(sc->tl_cdata.tl_rx_head != NULL) {
 		cur_rx = sc->tl_cdata.tl_rx_head;
 		if (!(cur_rx->tl_ptr->tlist_cstat & TL_CSTAT_FRAMECMP))
@@ -1546,7 +1545,9 @@ tl_intvec_rxeof(xsc, type)
 		m->m_pkthdr.rcvif = ifp;
 		m->m_pkthdr.len = m->m_len = total_len;
 
+		TL_UNLOCK(sc);
 		(*ifp->if_input)(ifp, m);
+		TL_LOCK(sc);
 	}
 
 	return(r);

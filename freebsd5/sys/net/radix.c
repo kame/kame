@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)radix.c	8.5 (Berkeley) 5/19/95
- * $FreeBSD: src/sys/net/radix.c,v 1.31 2003/02/08 01:44:09 hsu Exp $
+ * $FreeBSD: src/sys/net/radix.c,v 1.32 2003/09/22 23:24:18 peter Exp $
  */
 
 /*
@@ -1076,6 +1076,6 @@ rn_init()
 	addmask_key = cplim = rn_ones + max_keylen;
 	while (cp < cplim)
 		*cp++ = -1;
-	if (rn_inithead((void **)&mask_rnhead, 0) == 0)
+	if (rn_inithead((void **)(void *)&mask_rnhead, 0) == 0)
 		panic("rn_init 2");
 }

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 1996 Massachusetts Institute of Technology
  *
  * Permission to use, copy, modify, and distribute this software and
@@ -25,9 +25,10 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/i386/perfmon.c,v 1.31 2003/03/03 12:15:49 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/i386/perfmon.c,v 1.35 2003/08/25 09:48:47 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -40,6 +41,7 @@
 #endif
 #include <machine/clock.h>
 #include <machine/perfmon.h>
+#include <machine/specialreg.h>
 
 static int perfmon_inuse;
 static int perfmon_cpuok;
@@ -88,18 +90,18 @@ perfmon_init(void)
 	switch(cpu_class) {
 	case CPUCLASS_586:
 		perfmon_cpuok = 1;
-		msr_ctl[0] = 0x11;
-		msr_ctl[1] = 0x11;
-		msr_pmc[0] = 0x12;
-		msr_pmc[1] = 0x13;
+		msr_ctl[0] = MSR_P5_CESR;
+		msr_ctl[1] = MSR_P5_CESR;
+		msr_pmc[0] = MSR_P5_CTR0;
+		msr_pmc[1] = MSR_P5_CTR1;
 		writectl = writectl5;
 		break;
 	case CPUCLASS_686:
 		perfmon_cpuok = 1;
-		msr_ctl[0] = 0x186;
-		msr_ctl[1] = 0x187;
-		msr_pmc[0] = 0xc1;
-		msr_pmc[1] = 0xc2;
+		msr_ctl[0] = MSR_EVNTSEL0;
+		msr_ctl[1] = MSR_EVNTSEL1;
+		msr_pmc[0] = MSR_PERFCTR0;
+		msr_pmc[1] = MSR_PERFCTR1;
 		writectl = writectl6;
 		break;
 

@@ -23,15 +23,15 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_mbr_enc.c,v 1.1 2003/04/12 08:34:39 phk Exp $
- *
  * Functions to encode or decode struct dos_partition into a bytestream
  * of correct endianess and packing.  These functions do no validation
  * or sanity checking, they only pack/unpack the fields correctly.
  *
  * NB!  This file must be usable both in kernel and userland.
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/geom/geom_mbr_enc.c,v 1.2 2003/06/11 06:49:15 obrien Exp $");
 
 #include <sys/types.h>
 #include <sys/diskmbr.h>

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/alq.h,v 1.3 2002/09/26 07:38:56 jeff Exp $
+ * $FreeBSD: src/sys/sys/alq.h,v 1.4 2003/06/22 22:28:55 rwatson Exp $
  *
  */
 #ifndef _SYS_ALQ_H_
@@ -65,7 +65,9 @@ struct ale {
  * Returns:
  *	error from open or 0 on success
  */
-int alq_open(struct alq **, const char *file, int size, int count);
+struct ucred;
+int alq_open(struct alq **, const char *file, struct ucred *cred, int size,
+	    int count);
 
 /*
  * alq_write:  Write data into the queue

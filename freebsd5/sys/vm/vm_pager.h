@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vm_pager.h	8.4 (Berkeley) 1/12/94
- * $FreeBSD: src/sys/vm/vm_pager.h,v 1.37 2002/12/28 21:03:42 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_pager.h,v 1.44 2003/10/24 06:43:04 alc Exp $
  */
 
 /*
@@ -60,8 +60,13 @@ struct pagerops {
 	void (*pgo_putpages)(vm_object_t, vm_page_t *, int, int, int *); /* Put (write) page. */
 	boolean_t (*pgo_haspage)(vm_object_t, vm_pindex_t, int *, int *); /* Does pager have page? */
 	void (*pgo_pageunswapped)(vm_page_t);
-	void (*pgo_strategy)(vm_object_t, struct bio *);
 };
+
+extern struct pagerops defaultpagerops;
+extern struct pagerops swappagerops;
+extern struct pagerops vnodepagerops;
+extern struct pagerops devicepagerops;
+extern struct pagerops physpagerops;
 
 /*
  * get/put return values
@@ -103,7 +108,6 @@ void vm_pager_init(void);
 vm_object_t vm_pager_object_lookup(struct pagerlst *, void *);
 vm_offset_t vm_pager_map_page(vm_page_t);
 void vm_pager_unmap_page(vm_offset_t);
-void vm_pager_strategy(vm_object_t object, struct bio *bp);
 
 /*
  *	vm_page_get_pages:
@@ -121,8 +125,7 @@ vm_pager_get_pages(
 ) {
 	int r;
 
-	GIANT_REQUIRED;
-
+	VM_OBJECT_LOCK_ASSERT(object, MA_OWNED);
 	r = (*pagertab[object->type]->pgo_getpages)(object, m, count, reqpage);
 	if (r == VM_PAGER_OK && m[reqpage]->valid != VM_PAGE_BITS_ALL) {
 		vm_page_zero_invalid(m[reqpage], TRUE);
@@ -138,7 +141,8 @@ vm_pager_put_pages(
 	int flags,
 	int *rtvals
 ) {
-	GIANT_REQUIRED;
+
+	VM_OBJECT_LOCK_ASSERT(object, MA_OWNED);
 	(*pagertab[object->type]->pgo_putpages)
 	    (object, m, count, flags, rtvals);
 }
@@ -162,7 +166,7 @@ vm_pager_has_page(
 ) {
 	boolean_t ret;
 
-	GIANT_REQUIRED;
+	VM_OBJECT_LOCK_ASSERT(object, MA_OWNED);
 	ret = (*pagertab[object->type]->pgo_haspage)
 	    (object, offset, before, after);
 	return (ret);
@@ -174,11 +178,17 @@ vm_pager_has_page(
  *      called at splvm() to destroy swap associated with the page.
  * 
  *      This function may not block.
+ *
+ *	XXX: A much better name would be "vm_pager_page_dirtied()"
+ *	XXX: It is not obvious if this could be profitably used by any
+ *	XXX: pagers besides the swap_pager or if it should even be a
+ *	XXX: generic pager_op in the first place.
  */
 static __inline void
 vm_pager_page_unswapped(vm_page_t m)
 {
-	GIANT_REQUIRED;
+
+	VM_OBJECT_LOCK_ASSERT(m->object, MA_OWNED);
 	if (pagertab[m->object->type]->pgo_pageunswapped)
 		(*pagertab[m->object->type]->pgo_pageunswapped)(m);
 }

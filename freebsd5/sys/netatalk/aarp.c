@@ -2,7 +2,7 @@
  * Copyright (c) 1990,1991 Regents of The University of Michigan.
  * All Rights Reserved.
  *
- * $FreeBSD: src/sys/netatalk/aarp.c,v 1.21 2003/03/21 17:53:16 mdodd Exp $
+ * $FreeBSD: src/sys/netatalk/aarp.c,v 1.24 2003/11/08 22:28:39 sam Exp $
  */
 
 #include "opt_atalk.h"
@@ -167,6 +167,9 @@ aarpwhohas( struct arpcom *ac, struct sockaddr_at *sat )
 		sizeof( eh->ether_dhost ));
 	eh->ether_type = htons(sizeof(struct llc) + sizeof(struct ether_aarp));
 	M_PREPEND( m, sizeof( struct llc ), M_TRYWAIT );
+	if ( m == NULL ) {
+	    return;
+	}
 	llc = mtod( m, struct llc *);
 	llc->llc_dsap = llc->llc_ssap = LLC_SNAP_LSAP;
 	llc->llc_control = LLC_UI;
@@ -180,7 +183,7 @@ aarpwhohas( struct arpcom *ac, struct sockaddr_at *sat )
 	ea->aarp_spnode = AA_SAT( aa )->sat_addr.s_node;
 	ea->aarp_tpnode = sat->sat_addr.s_node;
     } else {
-	bcopy((caddr_t)ac->ac_if.if_broadcastaddr, (caddr_t)eh->ether_dhost,
+	bcopy(ac->ac_if.if_broadcastaddr, (caddr_t)eh->ether_dhost,
 		sizeof( eh->ether_dhost ));
 	eh->ether_type = htons( ETHERTYPE_AARP );
 
@@ -221,7 +224,7 @@ aarpresolve( ac, m, destsat, desten )
 	    bcopy( (caddr_t)atmulticastaddr, (caddr_t)desten,
 		    sizeof( atmulticastaddr ));
 	} else {
-	    bcopy( (caddr_t)ac->ac_if.if_broadcastaddr, (caddr_t)desten,
+	    bcopy( ac->ac_if.if_broadcastaddr, (caddr_t)desten,
 		    sizeof( ac->ac_if.if_addrlen ));
 	}
 	return( 1 );
@@ -308,6 +311,8 @@ at_aarpinput( struct arpcom *ac, struct mbuf *m)
     struct at_addr	spa, tpa, ma;
     int			op;
     u_short		net;
+
+    GIANT_REQUIRED;
 
     ea = mtod( m, struct ether_aarp *);
 
@@ -581,6 +586,9 @@ aarpprobe( void *arg )
 	eh->ether_type = htons( sizeof( struct llc ) +
 		sizeof( struct ether_aarp ));
 	M_PREPEND( m, sizeof( struct llc ), M_TRYWAIT );
+	if ( m == NULL ) {
+	    return;
+	}
 	llc = mtod( m, struct llc *);
 	llc->llc_dsap = llc->llc_ssap = LLC_SNAP_LSAP;
 	llc->llc_control = LLC_UI;
@@ -593,7 +601,7 @@ aarpprobe( void *arg )
 		sizeof( ea->aarp_tpnet ));
 	ea->aarp_spnode = ea->aarp_tpnode = AA_SAT( aa )->sat_addr.s_node;
     } else {
-	bcopy((caddr_t)ac->ac_if.if_broadcastaddr, (caddr_t)eh->ether_dhost,
+	bcopy(ac->ac_if.if_broadcastaddr, (caddr_t)eh->ether_dhost,
 		sizeof( eh->ether_dhost ));
 	eh->ether_type = htons( ETHERTYPE_AARP );
 	ea->aarp_spa = ea->aarp_tpa = AA_SAT( aa )->sat_addr.s_node;

@@ -44,14 +44,14 @@
 #include <dev/sound/pci/cmireg.h>
 #include <dev/sound/isa/sb.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <sys/sysctl.h>
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/cmi.c,v 1.20 2003/02/20 17:31:11 cognet Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/cmi.c,v 1.24 2003/11/11 05:38:27 scottl Exp $");
 
 /* Supported chip ID's */
 #define CMI8338A_PCI_ID   0x010013f6
@@ -516,41 +516,41 @@ cmi_intr(void *data)
 {
 	struct sc_info *sc = data;
 	u_int32_t intrstat;
+	u_int32_t toclear;
 
 	snd_mtxlock(sc->lock);
 	intrstat = cmi_rd(sc, CMPCI_REG_INTR_STATUS, 4);
-	if ((intrstat & CMPCI_REG_ANY_INTR) == 0) {
-		goto out;
-	}
+	if ((intrstat & CMPCI_REG_ANY_INTR) != 0) {
 
-	/* Disable interrupts */
-	if (intrstat & CMPCI_REG_CH0_INTR) {
-		cmi_clr4(sc, CMPCI_REG_INTR_CTRL, CMPCI_REG_CH0_INTR_ENABLE);
-	}
+		toclear = 0;
+		if (intrstat & CMPCI_REG_CH0_INTR) {
+			toclear |= CMPCI_REG_CH0_INTR_ENABLE;
+			//cmi_clr4(sc, CMPCI_REG_INTR_CTRL, CMPCI_REG_CH0_INTR_ENABLE);
+		}
 
-	if (intrstat & CMPCI_REG_CH1_INTR) {
-		cmi_clr4(sc, CMPCI_REG_INTR_CTRL, CMPCI_REG_CH1_INTR_ENABLE);
-	}
+		if (intrstat & CMPCI_REG_CH1_INTR) {
+			toclear |= CMPCI_REG_CH1_INTR_ENABLE;
+			//cmi_clr4(sc, CMPCI_REG_INTR_CTRL, CMPCI_REG_CH1_INTR_ENABLE);
+		}
 
-	/* Signal interrupts to channel */
-	if (intrstat & CMPCI_REG_CH0_INTR) {
-		chn_intr(sc->pch.channel);
-	}
+		if (toclear) {
+			cmi_clr4(sc, CMPCI_REG_INTR_CTRL, toclear);
+			snd_mtxunlock(sc->lock);
 
-	if (intrstat & CMPCI_REG_CH1_INTR) {
-		chn_intr(sc->rch.channel);
-	}
+			/* Signal interrupts to channel */
+			if (intrstat & CMPCI_REG_CH0_INTR) {
+				chn_intr(sc->pch.channel);
+			}
 
-	/* Enable interrupts */
-	if (intrstat & CMPCI_REG_CH0_INTR) {
-		cmi_set4(sc, CMPCI_REG_INTR_CTRL, CMPCI_REG_CH0_INTR_ENABLE);
-	}
+			if (intrstat & CMPCI_REG_CH1_INTR) {
+				chn_intr(sc->rch.channel);
+			}
 
-	if (intrstat & CMPCI_REG_CH1_INTR) {
-		cmi_set4(sc, CMPCI_REG_INTR_CTRL, CMPCI_REG_CH1_INTR_ENABLE);
-	}
+			snd_mtxlock(sc->lock);
+			cmi_set4(sc, CMPCI_REG_INTR_CTRL, toclear);
 
-out:
+		}
+	}
 	snd_mtxunlock(sc->lock);
 	return;
 }
@@ -849,7 +849,7 @@ cmi_attach(device_t dev)
 	data = pci_read_config(dev, PCIR_COMMAND, 2);
 
 	sc->dev = dev;
-	sc->regid = PCIR_MAPS;
+	sc->regid = PCIR_BAR(0);
 	sc->reg = bus_alloc_resource(dev, SYS_RES_IOPORT, &sc->regid,
 				      0, BUS_SPACE_UNRESTRICTED, 1, RF_ACTIVE);
 	if (!sc->reg) {
@@ -876,6 +876,8 @@ cmi_attach(device_t dev)
 			       /*filter*/NULL, /*filterarg*/NULL,
 			       /*maxsize*/sc->bufsz, /*nsegments*/1,
 			       /*maxsegz*/0x3ffff, /*flags*/0,
+			       /*lockfunc*/busdma_lock_mutex,
+			       /*lockfunc*/&Giant,
 			       &sc->parent_dmat) != 0) {
 		device_printf(dev, "cmi_attach: Unable to create dma tag\n");
 		goto bad;

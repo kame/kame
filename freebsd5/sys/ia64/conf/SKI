@@ -20,7 +20,7 @@
 #
 # For hardware specific information check HARDWARE.TXT
 #
-# $FreeBSD: src/sys/ia64/conf/SKI,v 1.13 2003/04/08 08:32:00 marcel Exp $
+# $FreeBSD: src/sys/ia64/conf/SKI,v 1.15 2003/07/25 07:52:20 marcel Exp $
 
 machine		ia64
 cpu		ITANIUM
@@ -34,15 +34,7 @@ options 	DDB
 options 	FFS			#Berkeley Fast Filesystem
 options 	INET			#InterNETworking
 options 	INET6			#IPv6 communications protocols
-options 	INVARIANTS
-options 	INVARIANT_SUPPORT
-options 	KTR
 options 	KTRACE			#ktrace(1) syscall trace support
-options 	KTR_COMPILE="(KTR_INTR|KTR_PROC)"
-options 	KTR_CPUMASK=0x3
-options 	KTR_ENTRIES=1024
-options 	KTR_MASK=0
-options 	KTR_VERBOSE
 options 	MD_ROOT			#MD is a potential root device
 options 	PROCFS			#Process filesystem (requires PSEUDOFS)
 options 	PSEUDOFS		#Pseudo-filesystem framework
@@ -53,7 +45,6 @@ options 	SOFTUPDATES		#Enable FFS soft updates support
 options 	SYSVMSG			#SYSV-style message queues
 options 	SYSVSEM			#SYSV-style semaphores
 options 	SYSVSHM			#SYSV-style shared memory
-options 	WITNESS
 options 	_KPOSIX_PRIORITY_SCHEDULING #Posix P1003_1B real-time extensions
 
 device		acpi

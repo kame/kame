@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_page.h,v 1.118 2003/03/25 00:07:06 jake Exp $
+ * $FreeBSD: src/sys/vm/vm_page.h,v 1.125 2003/10/25 18:33:04 alc Exp $
  */
 
 /*
@@ -116,7 +116,7 @@ struct vm_page {
 
 	vm_object_t object;		/* which object am I in (O,P)*/
 	vm_pindex_t pindex;		/* offset into object (O,P) */
-	vm_paddr_t phys_addr;	/* physical address of page */
+	vm_paddr_t phys_addr;		/* physical address of page */
 	struct md_page md;		/* machine dependant stuff */
 	u_short	queue;			/* page queue index */
 	u_short	flags,			/* see below */
@@ -128,14 +128,27 @@ struct vm_page {
 	/* NOTE that these must support one bit per DEV_BSIZE in a page!!! */
 	/* so, on normal X86 kernels, they must be at least 8 bits wide */
 #if PAGE_SIZE == 4096
-	u_char	valid;			/* map of valid DEV_BSIZE chunks */
+	u_char	valid;			/* map of valid DEV_BSIZE chunks (O) */
 	u_char	dirty;			/* map of dirty DEV_BSIZE chunks */
 #elif PAGE_SIZE == 8192
-	u_short	valid;			/* map of valid DEV_BSIZE chunks */
+	u_short	valid;			/* map of valid DEV_BSIZE chunks (O) */
 	u_short	dirty;			/* map of dirty DEV_BSIZE chunks */
+#elif PAGE_SIZE == 16384
+	u_int valid;			/* map of valid DEV_BSIZE chunks (O) */
+	u_int dirty;			/* map of dirty DEV_BSIZE chunks */
+#elif PAGE_SIZE == 32768
+	u_long valid;			/* map of valid DEV_BSIZE chunks (O) */
+	u_long dirty;			/* map of dirty DEV_BSIZE chunks */
 #endif
 	u_int cow;			/* page cow mapping count */
 };
+
+/* Make sure that u_long is at least 64 bits when PAGE_SIZE is 32K. */
+#if PAGE_SIZE == 32768
+#ifdef CTASSERT
+CTASSERT(sizeof(u_long) >= 8);
+#endif
+#endif
 
 /*
  * note: currently use SWAPBLK_NONE as an absolute value rather then 
@@ -301,11 +314,13 @@ extern struct mtx vm_page_queue_mtx;
 #define vm_page_unlock_queues() mtx_unlock(&vm_page_queue_mtx)
 
 #if PAGE_SIZE == 4096
-#define VM_PAGE_BITS_ALL 0xff
-#endif
-
-#if PAGE_SIZE == 8192
-#define VM_PAGE_BITS_ALL 0xffff
+#define VM_PAGE_BITS_ALL 0xffu
+#elif PAGE_SIZE == 8192
+#define VM_PAGE_BITS_ALL 0xffffu
+#elif PAGE_SIZE == 16384
+#define VM_PAGE_BITS_ALL 0xffffffffu
+#elif PAGE_SIZE == 32768
+#define VM_PAGE_BITS_ALL 0xfffffffffffffffflu
 #endif
 
 /* page allocation classes: */
@@ -327,7 +342,6 @@ void vm_page_io_start(vm_page_t m);
 void vm_page_io_finish(vm_page_t m);
 void vm_page_hold(vm_page_t mem);
 void vm_page_unhold(vm_page_t mem);
-void vm_page_copy(vm_page_t src_m, vm_page_t dest_m);
 void vm_page_free(vm_page_t m);
 void vm_page_free_zero(vm_page_t m);
 int vm_page_sleep_if_busy(vm_page_t m, int also_m_busy, const char *msg);
@@ -354,13 +368,13 @@ void vm_page_insert (vm_page_t, vm_object_t, vm_pindex_t);
 vm_page_t vm_page_lookup (vm_object_t, vm_pindex_t);
 void vm_page_remove (vm_page_t);
 void vm_page_rename (vm_page_t, vm_object_t, vm_pindex_t);
+vm_page_t vm_page_select_cache(int);
 vm_page_t vm_page_splay(vm_pindex_t, vm_page_t);
 vm_offset_t vm_page_startup (vm_offset_t, vm_offset_t, vm_offset_t);
 void vm_page_unmanage (vm_page_t);
 void vm_page_unwire (vm_page_t, int);
 void vm_page_wire (vm_page_t);
 void vm_page_set_validclean (vm_page_t, int, int);
-void vm_page_set_dirty (vm_page_t, int, int);
 void vm_page_clear_dirty (vm_page_t, int, int);
 void vm_page_set_invalid (vm_page_t, int, int);
 int vm_page_is_valid (vm_page_t, int, int);

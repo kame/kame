@@ -23,13 +23,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/ia64/machdep.c,v 1.136 2003/05/29 06:30:36 marcel Exp $
+ * $FreeBSD: src/sys/ia64/ia64/machdep.c,v 1.172 2003/11/20 16:42:39 marcel Exp $
  */
 
 #include "opt_compat.h"
 #include "opt_ddb.h"
+#include "opt_kstack_pages.h"
 #include "opt_msgbuf.h"
-#include "opt_acpi.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -55,6 +55,7 @@
 #include <sys/random.h>
 #include <sys/cons.h>
 #include <sys/uuid.h>
+#include <sys/syscall.h>
 #include <net/netisr.h>
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
@@ -85,7 +86,6 @@
 #include <sys/ucontext.h>
 #include <machine/sigframe.h>
 #include <machine/efi.h>
-#include <machine/inst.h>
 #include <machine/unwind.h>
 #include <i386/include/specialreg.h>
 
@@ -116,8 +116,13 @@ u_int64_t ia64_port_base;
 char machine[] = MACHINE;
 SYSCTL_STRING(_hw, HW_MACHINE, machine, CTLFLAG_RD, machine, 0, "");
 
-static char cpu_model[128];
-SYSCTL_STRING(_hw, HW_MODEL, model, CTLFLAG_RD, cpu_model, 0, "");
+static char cpu_model[64];
+SYSCTL_STRING(_hw, HW_MODEL, model, CTLFLAG_RD, cpu_model, 0,
+    "The CPU model name");
+
+static char cpu_family[64];
+SYSCTL_STRING(_hw, OID_AUTO, family, CTLFLAG_RD, cpu_family, 0,
+    "The CPU family name");
 
 #ifdef DDB
 /* start and end of kernel symbol table */
@@ -138,9 +143,68 @@ vm_offset_t phys_avail[100];
 
 void mi_startup(void);		/* XXX should be in a MI header */
 
-static void identifycpu(void);
-
 struct kva_md_info kmi;
+
+static void
+identifycpu(void)
+{
+	char vendor[17];
+	char *family_name, *model_name;
+	u_int64_t t;
+	int number, revision, model, family, archrev;
+	u_int64_t features;
+
+	/*
+	 * Assumes little-endian.
+	 */
+	*(u_int64_t *) &vendor[0] = ia64_get_cpuid(0);
+	*(u_int64_t *) &vendor[8] = ia64_get_cpuid(1);
+	vendor[16] = '\0';
+
+	t = ia64_get_cpuid(3);
+	number = (t >> 0) & 0xff;
+	revision = (t >> 8) & 0xff;
+	model = (t >> 16) & 0xff;
+	family = (t >> 24) & 0xff;
+	archrev = (t >> 32) & 0xff;
+
+	family_name = model_name = "unknown";
+	switch (family) {
+	case 0x07:
+		family_name = "Itanium";
+		model_name = "Merced";
+		break;
+	case 0x1f:
+		family_name = "Itanium 2";
+		switch (model) {
+		case 0x00:
+			model_name = "McKinley";
+			break;
+		case 0x01:
+			model_name = "Madison";
+			break;
+		}
+		break;
+	}
+	snprintf(cpu_family, sizeof(cpu_family), "%s", family_name);
+	snprintf(cpu_model, sizeof(cpu_model), "%s", model_name);
+
+	features = ia64_get_cpuid(4);
+
+	printf("CPU: %s (", model_name);
+	if (processor_frequency) {
+		printf("%ld.%02ld-Mhz ",
+		    (processor_frequency + 4999) / 1000000,
+		    ((processor_frequency + 4999) / 10000) % 100);
+	}
+	printf("%s)\n", family_name);
+	printf("  Origin = \"%s\"  Revision = %d\n", vendor, revision);
+	printf("  Features = 0x%b\n", (u_int32_t) features,
+	    "\020"
+	    "\001LB"	/* long branch (brl) instruction. */
+	    "\002SD"	/* Spontaneous deferral. */
+	    "\003AO"	/* 16-byte atomic operations (ld, st, cmpxchg). */ );
+}
 
 static void
 cpu_startup(dummy)
@@ -201,6 +265,44 @@ cpu_startup(dummy)
 }
 
 void
+cpu_boot(int howto)
+{
+
+	ia64_efi_runtime->ResetSystem(EfiResetWarm, EFI_SUCCESS, 0, 0);
+}
+
+void
+cpu_halt()
+{
+
+	ia64_efi_runtime->ResetSystem(EfiResetWarm, EFI_SUCCESS, 0, 0);
+}
+
+static void
+cpu_idle_default(void)
+{
+	struct ia64_pal_result res;
+
+	res = ia64_call_pal_static(PAL_HALT_LIGHT, 0, 0, 0);
+}
+
+void
+cpu_idle()
+{
+	(*cpu_idle_hook)();
+}
+
+/* Other subsystems (e.g., ACPI) can hook this later. */
+void (*cpu_idle_hook)(void) = cpu_idle_default;
+
+void
+cpu_reset()
+{
+
+	cpu_boot(0);
+}
+
+void
 cpu_switch(struct thread *old, struct thread *new)
 {
 	struct pcb *oldpcb, *newpcb;
@@ -209,6 +311,8 @@ cpu_switch(struct thread *old, struct thread *new)
 #if IA32
 	ia32_savectx(oldpcb);
 #endif
+	if (PCPU_GET(fpcurthread) == old)
+		old->td_frame->tf_special.psr |= IA64_PSR_DFH;
 	if (!savectx(oldpcb)) {
 		newpcb = new->td_pcb;
 		oldpcb->pcb_current_pmap =
@@ -217,6 +321,8 @@ cpu_switch(struct thread *old, struct thread *new)
 #if IA32
 		ia32_restorectx(newpcb);
 #endif
+		if (PCPU_GET(fpcurthread) == new)
+			new->td_frame->tf_special.psr &= ~IA64_PSR_DFH;
 		restorectx(newpcb);
 		/* We should not get here. */
 		panic("cpu_switch: restorectx() returned");
@@ -244,56 +350,18 @@ cpu_throw(struct thread *old __unused, struct thread *new)
 void
 cpu_pcpu_init(struct pcpu *pcpu, int cpuid, size_t size)
 {
-	KASSERT(size >= sizeof(struct pcpu) + sizeof(struct pcb),
-	    ("%s: too small an allocation for pcpu", __func__));
-	pcpu->pc_pcb = (void*)(pcpu+1);
-}
-
-static void
-identifycpu(void)
-{
-	char vendor[17];
-	u_int64_t t;
-	int number, revision, model, family, archrev;
-	u_int64_t features;
+	size_t pcpusz;
 
 	/*
-	 * Assumes little-endian.
+	 * Make sure the PCB is 16-byte aligned by making the PCPU
+	 * a multiple of 16 bytes. We assume the PCPU is 16-byte
+	 * aligned itself.
 	 */
-	*(u_int64_t *) &vendor[0] = ia64_get_cpuid(0);
-	*(u_int64_t *) &vendor[8] = ia64_get_cpuid(1);
-	vendor[16] = '\0';
-
-	t = ia64_get_cpuid(3);
-	number = (t >> 0) & 0xff;
-	revision = (t >> 8) & 0xff;
-	model = (t >> 16) & 0xff;
-	family = (t >> 24) & 0xff;
-	archrev = (t >> 32) & 0xff;
-
-	if (family == 0x7)
-		strcpy(cpu_model, "Itanium");
-	else if (family == 0x1f)
-		strcpy(cpu_model, "Itanium 2");	/* McKinley */
-	else
-		snprintf(cpu_model, sizeof(cpu_model), "Family=%d", family);
-
-	features = ia64_get_cpuid(4);
-
-	printf("CPU: %s", cpu_model);
-	if (processor_frequency)
-		printf(" (%ld.%02ld-Mhz)\n",
-		       (processor_frequency + 4999) / 1000000,
-		       ((processor_frequency + 4999) / 10000) % 100);
-	else
-		printf("\n");
-	printf("  Origin = \"%s\"  Model = %d  Revision = %d\n",
-	       vendor, model, revision);
-	printf("  Features = 0x%b\n", (u_int32_t) features,
-	    "\020"
-	    "\001LB"	/* long branch (brl) instruction. */
-	    "\002SD"	/* Spontaneous deferral. */
-	    "\003AO"	/* 16-byte atomic operations (ld, st, cmpxchg). */ );
+	pcpusz = (sizeof(struct pcpu) + 15) & ~15;
+	KASSERT(size >= pcpusz + sizeof(struct pcb),
+	    ("%s: too small an allocation for pcpu", __func__));
+	pcpu->pc_pcb = (struct pcb *)((char*)pcpu + pcpusz);
+	pcpu->pc_acpi_id = cpuid;
 }
 
 void
@@ -315,14 +383,14 @@ map_pal_code(void)
 	pte.pte_ppn = ia64_pal_base >> 12;
 
 	__asm __volatile("ptr.d %0,%1; ptr.i %0,%1" ::
-	    "r"(IA64_PHYS_TO_RR7(ia64_pal_base)), "r"(28 << 2));
+	    "r"(IA64_PHYS_TO_RR7(ia64_pal_base)), "r"(IA64_ID_PAGE_SHIFT<<2));
 
 	__asm __volatile("mov	%0=psr" : "=r"(psr));
 	__asm __volatile("rsm	psr.ic|psr.i");
 	__asm __volatile("srlz.i");
 	__asm __volatile("mov	cr.ifa=%0" ::
 	    "r"(IA64_PHYS_TO_RR7(ia64_pal_base)));
-	__asm __volatile("mov	cr.itir=%0" :: "r"(28 << 2));
+	__asm __volatile("mov	cr.itir=%0" :: "r"(IA64_ID_PAGE_SHIFT << 2));
 	__asm __volatile("itr.d	dtr[%0]=%1" :: "r"(1), "r"(*(u_int64_t*)&pte));
 	__asm __volatile("srlz.d");		/* XXX not needed. */
 	__asm __volatile("itr.i	itr[%0]=%1" :: "r"(1), "r"(*(u_int64_t*)&pte));
@@ -355,8 +423,7 @@ map_port_space(void)
 	__asm __volatile("rsm	psr.ic|psr.i");
 	__asm __volatile("srlz.d");
 	__asm __volatile("mov	cr.ifa=%0" :: "r"(ia64_port_base));
-	/* XXX We should use the size from the memory descriptor. */
-	__asm __volatile("mov	cr.itir=%0" :: "r"(24 << 2));
+	__asm __volatile("mov	cr.itir=%0" :: "r"(IA64_ID_PAGE_SHIFT << 2));
 	__asm __volatile("itr.d dtr[%0]=%1" :: "r"(2), "r"(*(u_int64_t*)&pte));
 	__asm __volatile("mov	psr.l=%0" :: "r" (psr));
 	__asm __volatile("srlz.d");
@@ -516,7 +583,7 @@ ia64_init(void)
 	/* OUTPUT NOW ALLOWED */
 
 	if (ia64_pal_base != 0) {
-		ia64_pal_base &= ~((1 << 28) - 1);
+		ia64_pal_base &= ~IA64_ID_PAGE_MASK;
 		/*
 		 * We use a TR to map the first 256M of memory - this might
 		 * cover the palcode too.
@@ -673,31 +740,8 @@ ia64_init(void)
 	/*
 	 * Initialize error message buffer (at end of core).
 	 */
-	{
-		size_t sz = round_page(MSGBUF_SIZE);
-		int i = phys_avail_cnt - 2;
-
-		/* shrink so that it'll fit in the last segment */
-		if (phys_avail[i+1] - phys_avail[i] < sz)
-			sz = phys_avail[i+1] - phys_avail[i];
-
-		phys_avail[i+1] -= sz;
-		msgbufp = (struct msgbuf*) IA64_PHYS_TO_RR7(phys_avail[i+1]);
-
-		msgbufinit(msgbufp, sz);
-
-		/* Remove the last segment if it now has no pages. */
-		if (phys_avail[i] == phys_avail[i+1]) {
-			phys_avail[i] = 0;
-			phys_avail[i+1] = 0;
-		}
-
-		/* warn if the message buffer had to be shrunk */
-		if (sz != round_page(MSGBUF_SIZE))
-			printf("WARNING: %ld bytes not available for msgbuf in last cluster (%ld used)\n",
-			    round_page(MSGBUF_SIZE), sz);
-
-	}
+	msgbufp = (struct msgbuf *)pmap_steal_memory(MSGBUF_SIZE);
+	msgbufinit(msgbufp, MSGBUF_SIZE);
 
 	proc_linkup(&proc0, &ksegrp0, &kse0, &thread0);
 	/*
@@ -723,8 +767,6 @@ ia64_init(void)
 	 * Set the kernel sp, reserving space for an (empty) trapframe,
 	 * and make proc0's trapframe pointer point to it for sanity.
 	 * Initialise proc0's backing store to start after u area.
-	 *
-	 * XXX what is all this +/- 16 stuff?
 	 */
 	thread0.td_frame = (struct trapframe *)thread0.td_pcb - 1;
 	thread0.td_frame->tf_length = sizeof(struct trapframe);
@@ -823,7 +865,6 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	struct trapframe *tf;
 	struct sigacts *psp;
 	struct sigframe sf, *sfp;
-	mcontext_t *mc;
 	u_int64_t sbs, sp;
 	int oonstack;
 
@@ -874,22 +915,7 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(p);
 
-	mc = &sf.sf_uc.uc_mcontext;
-	mc->mc_special = tf->tf_special;
-	mc->mc_scratch = tf->tf_scratch;
-	if ((tf->tf_flags & FRAME_SYSCALL) == 0) {
-		mc->mc_flags |= IA64_MC_FLAGS_SCRATCH_VALID;
-		mc->mc_scratch_fp = tf->tf_scratch_fp;
-		/*
-		 * XXX High FP. If the process has never used the high FP,
-		 * mark the high FP as valid (zero defaults). If the process
-		 * did use the high FP, then store them in the PCB if not
-		 * already there (ie get them from the CPU that has them)
-		 * and write them in the context.
-		 */
-	}
-	save_callee_saved(&mc->mc_preserved);
-	save_callee_saved_fp(&mc->mc_preserved_fp);
+	get_mcontext(td, &sf.sf_uc.uc_mcontext, GET_MC_IA64_SCRATCH);
 
 	/* Copy the frame out to userland. */
 	if (copyout(&sf, sfp, sizeof(sf)) != 0) {
@@ -907,7 +933,7 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 		tf->tf_special.iip = ia64_get_k5() +
 		    ((uint64_t)break_sigtramp - (uint64_t)ia64_gateway_page);
 	} else
-		tf->tf_special.rp = ia64_get_k5() +
+		tf->tf_special.iip = ia64_get_k5() +
 		    ((uint64_t)epc_sigtramp - (uint64_t)ia64_gateway_page);
 
 	/*
@@ -921,12 +947,34 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	 */
 	tf->tf_special.sp = (u_int64_t)sfp - 16;
 	tf->tf_special.gp = sbs;
+	tf->tf_special.bspstore = sf.sf_uc.uc_mcontext.mc_special.bspstore;
+	tf->tf_special.ndirty = 0;
+	tf->tf_special.rnat = sf.sf_uc.uc_mcontext.mc_special.rnat;
 	tf->tf_scratch.gr8 = sig;
 	tf->tf_scratch.gr9 = code;
 	tf->tf_scratch.gr10 = (u_int64_t)catcher;
 
 	PROC_LOCK(p);
 	mtx_lock(&psp->ps_mtx);
+}
+
+/*
+ * Build siginfo_t for SA thread
+ */
+void
+cpu_thread_siginfo(int sig, u_long code, siginfo_t *si)
+{
+	struct proc *p;
+	struct thread *td;
+
+	td = curthread;
+	p = td->td_proc;
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+
+	bzero(si, sizeof(*si));
+	si->si_signo = sig;
+	si->si_code = code;
+	/* XXXKSE fill other fields */
 }
 
 /*
@@ -948,7 +996,6 @@ sigreturn(struct thread *td,
 {
 	ucontext_t uc;
 	struct trapframe *tf;
-	struct __mcontext *mc;
 	struct proc *p;
 	struct pcb *pcb;
 
@@ -963,25 +1010,7 @@ sigreturn(struct thread *td,
 	if (copyin(uap->sigcntxp, (caddr_t)&uc, sizeof(uc)))
 		return (EFAULT);
 
-	/*
-	 * XXX make sure ndirty in the current trapframe is less than
-	 * 0x1f8 so that if we throw away the current register stack,
-	 * we have reached the bottom of the kernel register stack.
-	 * See also exec_setregs.
-	 */
-
-	/*
-	 * Restore the user-supplied information
-	 */
-	mc = &uc.uc_mcontext;
-	tf->tf_special = mc->mc_special;
-	tf->tf_scratch = mc->mc_scratch;
-	if ((mc->mc_flags & IA64_MC_FLAGS_SCRATCH_VALID) != 0) {
-		tf->tf_scratch_fp = mc->mc_scratch_fp;
-		/* XXX high FP. */
-	}
-	restore_callee_saved(&mc->mc_preserved);
-	restore_callee_saved_fp(&mc->mc_preserved_fp);
+	set_mcontext(td, &uc.uc_mcontext);
 
 	PROC_LOCK(p);
 #if defined(COMPAT_43) || defined(COMPAT_SUNOS)
@@ -1008,37 +1037,131 @@ freebsd4_sigreturn(struct thread *td, struct freebsd4_sigreturn_args *uap)
 #endif
 
 int
-get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
+get_mcontext(struct thread *td, mcontext_t *mc, int flags)
 {
+	struct trapframe *tf;
+	uint64_t bspst, kstk, rnat;
 
-	return (ENOSYS);
+	tf = td->td_frame;
+	bzero(mc, sizeof(*mc));
+	if (tf->tf_special.ndirty != 0) {
+		kstk = td->td_kstack + (tf->tf_special.bspstore & 0x1ffUL);
+		__asm __volatile("mov	ar.rsc=0;;");
+		__asm __volatile("mov	%0=ar.bspstore" : "=r"(bspst));
+		/* Make sure we have all the user registers written out. */
+		if (bspst - kstk < tf->tf_special.ndirty) {
+			__asm __volatile("flushrs;;");
+			__asm __volatile("mov	%0=ar.bspstore" : "=r"(bspst));
+		}
+		__asm __volatile("mov	%0=ar.rnat;;" : "=r"(rnat));
+		__asm __volatile("mov	ar.rsc=3");
+		copyout((void*)kstk, (void*)tf->tf_special.bspstore,
+		    tf->tf_special.ndirty);
+		kstk += tf->tf_special.ndirty;
+		mc->mc_special = tf->tf_special;
+		mc->mc_special.rnat =
+		    (bspst > kstk && (bspst & 0x1ffUL) < (kstk & 0x1ffUL))
+		    ? *(uint64_t*)(kstk | 0x1f8UL) : rnat;
+		mc->mc_special.bspstore += mc->mc_special.ndirty;
+		mc->mc_special.ndirty = 0;
+	} else
+		mc->mc_special = tf->tf_special;
+	if (tf->tf_flags & FRAME_SYSCALL) {
+		if (flags & GET_MC_IA64_SCRATCH) {
+			mc->mc_flags |= _MC_FLAGS_SCRATCH_VALID;
+			mc->mc_scratch = tf->tf_scratch;
+		} else {
+			/*
+			 * Put the syscall return values in the context.  We
+			 * need this for swapcontext() to work.  Note that we
+			 * don't use gr11 in the kernel, but the runtime
+			 * specification defines it as a return register,
+			 * just like gr8-gr10.
+			 */
+			mc->mc_flags |= _MC_FLAGS_RETURN_VALID;
+			if ((flags & GET_MC_CLEAR_RET) == 0) {
+				mc->mc_scratch.gr8 = tf->tf_scratch.gr8;
+				mc->mc_scratch.gr9 = tf->tf_scratch.gr9;
+				mc->mc_scratch.gr10 = tf->tf_scratch.gr10;
+				mc->mc_scratch.gr11 = tf->tf_scratch.gr11;
+			}
+		}
+	} else {
+		mc->mc_flags |= _MC_FLAGS_ASYNC_CONTEXT;
+		mc->mc_scratch = tf->tf_scratch;
+		mc->mc_scratch_fp = tf->tf_scratch_fp;
+		/*
+		 * XXX If the thread never used the high FP registers, we
+		 * probably shouldn't waste time saving them.
+		 */
+		ia64_highfp_save(td);
+		mc->mc_flags |= _MC_FLAGS_HIGHFP_VALID;
+		mc->mc_high_fp = td->td_pcb->pcb_high_fp;
+	}
+	save_callee_saved(&mc->mc_preserved);
+	save_callee_saved_fp(&mc->mc_preserved_fp);
+	return (0);
 }
 
 int
-set_mcontext(struct thread *td, const mcontext_t *mcp)
+set_mcontext(struct thread *td, const mcontext_t *mc)
 {
+	struct _special s;
+	struct trapframe *tf;
+	uint64_t psrmask;
 
-	return (ENOSYS);
-}
+	tf = td->td_frame;
 
-/*
- * Machine dependent boot() routine
- */
-void
-cpu_boot(int howto)
-{
+	KASSERT((tf->tf_special.ndirty & ~PAGE_MASK) == 0,
+	    ("Whoa there! We have more than 8KB of dirty registers!"));
 
-	ia64_efi_runtime->ResetSystem(EfiResetWarm, EFI_SUCCESS, 0, 0);
-}
+	s = mc->mc_special;
+	/*
+	 * Only copy the user mask and the restart instruction bit from
+	 * the new context.
+	 */
+	psrmask = IA64_PSR_BE | IA64_PSR_UP | IA64_PSR_AC | IA64_PSR_MFL |
+	    IA64_PSR_MFH | IA64_PSR_RI;
+	s.psr = (tf->tf_special.psr & ~psrmask) | (s.psr & psrmask);
+	/* We don't have any dirty registers of the new context. */
+	s.ndirty = 0;
+	if (mc->mc_flags & _MC_FLAGS_ASYNC_CONTEXT) {
+		/*
+		 * We can get an async context passed to us while we
+		 * entered the kernel through a syscall: sigreturn(2).
+		 * Hence, we cannot assert that the trapframe is not
+		 * a syscall frame, but we can assert that if it is
+		 * the syscall is sigreturn(2).
+		 */
+		if (tf->tf_flags & FRAME_SYSCALL)
+			KASSERT(tf->tf_scratch.gr15 == SYS_sigreturn, ("foo"));
+		tf->tf_scratch = mc->mc_scratch;
+		tf->tf_scratch_fp = mc->mc_scratch_fp;
+		if (mc->mc_flags & _MC_FLAGS_HIGHFP_VALID)
+			td->td_pcb->pcb_high_fp = mc->mc_high_fp;
+	} else {
+		KASSERT((tf->tf_flags & FRAME_SYSCALL) != 0, ("foo"));
+		if ((mc->mc_flags & _MC_FLAGS_SCRATCH_VALID) == 0) {
+			s.cfm = tf->tf_special.cfm;
+			s.iip = tf->tf_special.iip;
+			tf->tf_scratch.gr15 = 0;	/* Clear syscall nr. */
+			if (mc->mc_flags & _MC_FLAGS_RETURN_VALID) {
+				tf->tf_scratch.gr8 = mc->mc_scratch.gr8;
+				tf->tf_scratch.gr9 = mc->mc_scratch.gr9;
+				tf->tf_scratch.gr10 = mc->mc_scratch.gr10;
+				tf->tf_scratch.gr11 = mc->mc_scratch.gr11;
+			}
+		} else
+			tf->tf_scratch = mc->mc_scratch;
+	}
+	tf->tf_special = s;
+	restore_callee_saved(&mc->mc_preserved);
+	restore_callee_saved_fp(&mc->mc_preserved_fp);
 
-/*
- * Shutdown the CPU as much as possible
- */
-void
-cpu_halt(void)
-{
+	if (mc->mc_flags & _MC_FLAGS_KSE_SET_MBOX)
+		suword((caddr_t)mc->mc_special.ifa, mc->mc_special.isr);
 
-	ia64_efi_runtime->ResetSystem(EfiResetWarm, EFI_SUCCESS, 0, 0);
+	return (0);
 }
 
 /*
@@ -1048,61 +1171,49 @@ void
 exec_setregs(struct thread *td, u_long entry, u_long stack, u_long ps_strings)
 {
 	struct trapframe *tf;
-	uint64_t bspst, kstack, ndirty;
-	size_t rssz;
+	uint64_t *ksttop, *kst;
 
 	tf = td->td_frame;
-	kstack = td->td_kstack;
+	ksttop = (uint64_t*)(td->td_kstack + tf->tf_special.ndirty +
+	    (tf->tf_special.bspstore & 0x1ffUL));
 
 	/*
-	 * RSE magic: We have ndirty registers of the process on the kernel
-	 * stack which don't belong to the new image. Discard them. Note
-	 * that for the "legacy" syscall support we need to keep 3 registers
-	 * worth of dirty bytes. These 3 registers are the initial arguments
-	 * to the newly executing program.
-	 * However, we cannot discard all the ndirty registers by simply
-	 * moving the kernel related registers to the bottom of the kernel
-	 * stack and lowering the current bspstore, because we get into
-	 * trouble with the NaT collections. We need to keep that in sync
-	 * with the registers. Hence, we can only copy a multiple of 512
-	 * bytes. Consequently, we may end up with some registers of the
-	 * previous image on the kernel stack. This we ignore by making
-	 * sure we mask-off the lower 9 bits of the bspstore value just
-	 * prior to saving it in ar.k6.
+	 * We can ignore up to 8KB of dirty registers by masking off the
+	 * lower 13 bits in exception_restore() or epc_syscall(). This
+	 * should be enough for a couple of years, but if there are more
+	 * than 8KB of dirty registers, we lose track of the bottom of
+	 * the kernel stack. The solution is to copy the active part of
+	 * the kernel stack down 1 page (or 2, but not more than that)
+	 * so that we always have less than 8KB of dirty registers.
 	 */
-	ndirty = tf->tf_special.ndirty & ~0x1ff;
-	if (ndirty > 0) {
-		__asm __volatile("mov	ar.rsc=0;;");
-		__asm __volatile("mov	%0=ar.bspstore" : "=r"(bspst));
-		rssz = bspst - kstack - ndirty;
-		bcopy((void*)(kstack + ndirty), (void*)kstack, rssz);
-		bspst -= ndirty;
-		__asm __volatile("mov	ar.bspstore=%0;;" :: "r"(bspst));
-		__asm __volatile("mov	ar.rsc=3");
-		tf->tf_special.ndirty -= ndirty;
-	}
-	ndirty = tf->tf_special.ndirty;
+	KASSERT((tf->tf_special.ndirty & ~PAGE_MASK) == 0,
+	    ("Whoa there! We have more than 8KB of dirty registers!"));
 
 	bzero(&tf->tf_special, sizeof(tf->tf_special));
-
 	if ((tf->tf_flags & FRAME_SYSCALL) == 0) {	/* break syscalls. */
 		bzero(&tf->tf_scratch, sizeof(tf->tf_scratch));
 		bzero(&tf->tf_scratch_fp, sizeof(tf->tf_scratch_fp));
-		tf->tf_special.iip = entry;
 		tf->tf_special.cfm = (1UL<<63) | (3UL<<7) | 3UL;
-		tf->tf_special.bspstore = td->td_md.md_bspstore;
-		tf->tf_special.ndirty = 24;
+		tf->tf_special.bspstore = IA64_BACKINGSTORE;
 		/*
 		 * Copy the arguments onto the kernel register stack so that
-		 * they get loaded by the loadrs instruction.
+		 * they get loaded by the loadrs instruction. Skip over the
+		 * NaT collection points.
 		 */
-		*(uint64_t*)(kstack + ndirty - 24) = stack;
-		*(uint64_t*)(kstack + ndirty - 16) = ps_strings;
-		*(uint64_t*)(kstack + ndirty - 8) = 0;
+		kst = ksttop - 1;
+		if (((uintptr_t)kst & 0x1ff) == 0x1f8)
+			*kst-- = 0;
+		*kst-- = 0;
+		if (((uintptr_t)kst & 0x1ff) == 0x1f8)
+			*kst-- = 0;
+		*kst-- = ps_strings;
+		if (((uintptr_t)kst & 0x1ff) == 0x1f8)
+			*kst-- = 0;
+		*kst = stack;
+		tf->tf_special.ndirty = (ksttop - kst) << 3;
 	} else {				/* epc syscalls (default). */
-		tf->tf_special.rp = entry;
-		tf->tf_special.pfs = (3UL<<62) | (3UL<<7) | 3UL;
-		tf->tf_special.bspstore = td->td_md.md_bspstore + 24;
+		tf->tf_special.cfm = (3UL<<62) | (3UL<<7) | 3UL;
+		tf->tf_special.bspstore = IA64_BACKINGSTORE + 24;
 		/*
 		 * Write values for out0, out1 and out2 to the user's backing
 		 * store and arrange for them to be restored into the user's
@@ -1114,6 +1225,7 @@ exec_setregs(struct thread *td, u_long entry, u_long stack, u_long ps_strings)
 		suword((caddr_t)tf->tf_special.bspstore -  8, 0);
 	}
 
+	tf->tf_special.iip = entry;
 	tf->tf_special.sp = (stack & ~15) - 16;
 	tf->tf_special.rsc = 0xf;
 	tf->tf_special.fpsr = IA64_FPSR_DEFAULT;
@@ -1157,12 +1269,6 @@ ptrace_single_step(struct thread *td)
 }
 
 int
-ia64_pa_access(vm_offset_t pa)
-{
-	return VM_PROT_READ|VM_PROT_WRITE;
-}
-
-int
 fill_regs(struct thread *td, struct reg *regs)
 {
 	struct trapframe *tf;
@@ -1170,7 +1276,7 @@ fill_regs(struct thread *td, struct reg *regs)
 	tf = td->td_frame;
 	regs->r_special = tf->tf_special;
 	regs->r_scratch = tf->tf_scratch;
-	/* XXX preserved */
+	save_callee_saved(&regs->r_preserved);
 	return (0);
 }
 
@@ -1182,7 +1288,7 @@ set_regs(struct thread *td, struct reg *regs)
 	tf = td->td_frame;
 	tf->tf_special = regs->r_special;
 	tf->tf_scratch = regs->r_scratch;
-	/* XXX preserved */
+	restore_callee_saved(&regs->r_preserved);
 	return (0);
 }
 
@@ -1210,7 +1316,7 @@ fill_fpregs(struct thread *td, struct fpreg *fpregs)
 	ia64_highfp_save(td);
 
 	fpregs->fpr_scratch = frame->tf_scratch_fp;
-	/* XXX preserved_fp */
+	save_callee_saved_fp(&fpregs->fpr_preserved);
 	fpregs->fpr_high = pcb->pcb_high_fp;
 	return (0);
 }
@@ -1225,7 +1331,7 @@ set_fpregs(struct thread *td, struct fpreg *fpregs)
 	ia64_highfp_drop(td);
 
 	frame->tf_scratch_fp = fpregs->fpr_scratch;
-	/* XXX preserved_fp */
+	restore_callee_saved_fp(&fpregs->fpr_preserved);
 	pcb->pcb_high_fp = fpregs->fpr_high;
 	return (0);
 }
@@ -1252,20 +1358,6 @@ ia64_highfp_drop(struct thread *td)
 
 	/* Post-mortem sanity checking. */
 	KASSERT(thr == td, ("Inconsistent high FP state"));
-	return (1);
-}
-
-int
-ia64_highfp_load(struct thread *td)
-{
-	struct pcb *pcb;
-
-	pcb = td->td_pcb;
-	KASSERT(pcb->pcb_fpcpu == NULL, ("FP race on thread"));
-	KASSERT(PCPU_GET(fpcurthread) == NULL, ("FP race on pcpu"));
-	restore_high_fp(&pcb->pcb_high_fp);
-	PCPU_SET(fpcurthread, td);
-	pcb->pcb_fpcpu = pcpup;
 	return (1);
 }
 
@@ -1310,46 +1402,8 @@ Debugger(const char *msg)
 }
 #endif /* no DDB */
 
-static int
-sysctl_machdep_adjkerntz(SYSCTL_HANDLER_ARGS)
+int
+sysbeep(int pitch, int period)
 {
-	int error;
-	error = sysctl_handle_int(oidp, oidp->oid_arg1, oidp->oid_arg2,
-		req);
-	if (!error && req->newptr)
-		resettodr();
-	return (error);
-}
-
-SYSCTL_PROC(_machdep, CPU_ADJKERNTZ, adjkerntz, CTLTYPE_INT|CTLFLAG_RW,
-	&adjkerntz, 0, sysctl_machdep_adjkerntz, "I", "");
-
-SYSCTL_INT(_machdep, CPU_DISRTCSET, disable_rtc_set,
-	CTLFLAG_RW, &disable_rtc_set, 0, "");
-
-SYSCTL_INT(_machdep, CPU_WALLCLOCK, wall_cmos_clock,
-	CTLFLAG_RW, &wall_cmos_clock, 0, "");
-
-/*
- * Utility functions for manipulating instruction bundles.
- */
-void
-ia64_unpack_bundle(u_int64_t low, u_int64_t high, struct ia64_bundle *bp)
-{
-	bp->template = low & 0x1f;
-	bp->slot[0] = (low >> 5) & ((1L<<41) - 1);
-	bp->slot[1] = (low >> 46) | ((high & ((1L<<23) - 1)) << 18);
-	bp->slot[2] = (high >> 23);
-}
-
-void
-ia64_pack_bundle(u_int64_t *lowp, u_int64_t *highp,
-		 const struct ia64_bundle *bp)
-{
-	u_int64_t low, high;
-
-	low = bp->template | (bp->slot[0] << 5) | (bp->slot[1] << 46);
-	high = (bp->slot[1] >> 18) | (bp->slot[2] << 23);
-	*lowp = low;
-	*highp = high;
+	return (ENODEV);
 }

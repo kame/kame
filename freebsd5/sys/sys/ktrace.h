@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ktrace.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/ktrace.h,v 1.26 2003/03/13 18:31:15 jhb Exp $
+ * $FreeBSD: src/sys/sys/ktrace.h,v 1.27 2003/06/09 17:38:32 jhb Exp $
  */
 
 #ifndef _SYS_KTRACE_H_
@@ -70,7 +70,8 @@ struct ktr_header {
  * is the public interface.
  */
 #define	KTRCHECK(td, type)	((td)->td_proc->p_traceflag & (1 << type))
-#define KTRPOINT(td, type)	(KTRCHECK((td), (type)) && !(td)->td_inktrace)
+#define KTRPOINT(td, type)						\
+	(KTRCHECK((td), (type)) && !((td)->td_pflags & TDP_INKTRACE))
 
 /*
  * ktrace record types

@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/sys/smp.h,v 1.72 2002/05/20 16:11:38 jake Exp $
+ * $FreeBSD: src/sys/sys/smp.h,v 1.76 2003/12/03 14:57:25 jhb Exp $
  */
 
 #ifndef _SYS_SMP_H_
@@ -17,15 +17,44 @@
 #ifndef LOCORE
 
 #ifdef SMP
+
+/*
+ * Topology of a NUMA or HTT system.
+ *
+ * The top level topology is an array of pointers to groups.  Each group
+ * contains a bitmask of cpus in its group or subgroups.  It may also
+ * contain a pointer to an array of child groups.
+ *
+ * The bitmasks at non leaf groups may be used by consumers who support
+ * a smaller depth than the hardware provides.
+ *
+ * The topology may be omitted by systems where all CPUs are equal.
+ */
+
+struct cpu_group {
+	u_int	cg_mask;		/* Mask of cpus in this group. */
+	int	cg_count;		/* Count of cpus in this group. */
+	int	cg_children;		/* Number of children groups. */
+	struct cpu_group *cg_child;	/* Optional child group. */
+};
+
+struct cpu_top {
+	int	ct_count;		/* Count of groups. */
+	struct cpu_group *ct_group;	/* Array of pointers to cpu groups. */
+};
+
+extern struct cpu_top *smp_topology;
 extern void (*cpustop_restartfunc)(void);
-extern int mp_ncpus;
 extern int smp_active;
-extern volatile int smp_started;
 extern int smp_cpus;
-extern u_int all_cpus;
 extern volatile u_int started_cpus;
 extern volatile u_int stopped_cpus;
+#endif /* SMP */
+
+extern u_int all_cpus;
 extern u_int mp_maxid;
+extern int mp_ncpus;
+extern volatile int smp_started;
 
 /*
  * Macro allowing us to determine whether a CPU is absent at any given
@@ -34,6 +63,7 @@ extern u_int mp_maxid;
  */
 #define	CPU_ABSENT(x_cpu)	((all_cpus & (1 << (x_cpu))) == 0)
 
+#ifdef SMP
 /*
  * Machine dependent functions used to initialize MP support.
  *
@@ -47,11 +77,17 @@ extern u_int mp_maxid;
  * executed and a simple message will be output to the console.  Finally,
  * cpu_mp_announce() will be called so that machine dependent messages about
  * the MP support may be output to the console if desired.
+ *
+ * The cpu_setmaxid() function is called very early during the boot process
+ * so that the MD code may set mp_maxid to provide an upper bound on CPU IDs
+ * that other subsystems may use.  If a platform is not able to determine
+ * the exact maximum ID that early, then it may set mp_maxid to MAXCPU - 1.
  */
 struct thread;
 
 void	cpu_mp_announce(void);
 int	cpu_mp_probe(void);
+void	cpu_mp_setmaxid(void);
 void	cpu_mp_start(void);
 
 void	forward_signal(struct thread *);
@@ -59,13 +95,11 @@ void	forward_roundrobin(void);
 int	restart_cpus(u_int);
 int	stop_cpus(u_int);
 void	smp_rendezvous_action(void);
+#endif /* SMP */
 void	smp_rendezvous(void (*)(void *), 
 		       void (*)(void *),
 		       void (*)(void *),
 		       void *arg);
-#else /* SMP */
-#define	CPU_ABSENT(x_cpu)	(0)
-#endif /* SMP */
 #endif /* !LOCORE */
 #endif /* _KERNEL */
 #endif /* _SYS_SMP_H_ */

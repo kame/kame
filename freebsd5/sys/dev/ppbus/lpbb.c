@@ -23,9 +23,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ppbus/lpbb.c,v 1.16 2002/04/07 22:06:20 ticso Exp $
  *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ppbus/lpbb.c,v 1.17 2003/08/24 17:54:16 obrien Exp $");
 
 /*
  * I2C Bit-Banging over parallel port

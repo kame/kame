@@ -37,11 +37,12 @@
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
  * 	from: FreeBSD: src/sys/i386/i386/machdep.c,v 1.477 2001/08/27
- * $FreeBSD: src/sys/sparc64/sparc64/machdep.c,v 1.94 2003/05/13 20:36:02 jhb Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/machdep.c,v 1.105 2003/11/13 07:41:55 simokawa Exp $
  */
 
 #include "opt_compat.h"
 #include "opt_ddb.h"
+#include "opt_kstack_pages.h"
 #include "opt_msgbuf.h"
 
 #include <sys/param.h>
@@ -88,6 +89,7 @@
 
 #include <ddb/ddb.h>
 
+#include <machine/bus.h>
 #include <machine/cache.h>
 #include <machine/clock.h>
 #include <machine/cpu.h>
@@ -97,6 +99,7 @@
 #include <machine/md_var.h>
 #include <machine/metadata.h>
 #include <machine/ofw_machdep.h>
+#include <machine/ofw_mem.h>
 #include <machine/smp.h>
 #include <machine/pmap.h>
 #include <machine/pstate.h>
@@ -162,6 +165,8 @@ CTASSERT(sizeof(struct pcpu) <= ((PCPU_PAGES * PAGE_SIZE) / 2));
 static void
 cpu_startup(void *arg)
 {
+	vm_paddr_t physsz;
+	int i;
 
 	tick_tc.tc_get_timecount = tick_get_timecount;
 	tick_tc.tc_poll_pps = NULL;
@@ -170,8 +175,11 @@ cpu_startup(void *arg)
 	tick_tc.tc_name = "tick";
 	tc_init(&tick_tc);
 
-	printf("real memory  = %lu (%lu MB)\n", physmem * PAGE_SIZE,
-	    physmem / ((1024 * 1024) / PAGE_SIZE));
+	physsz = 0;
+	for (i = 0; i < sparc64_nmemreg; i++)
+		physsz += sparc64_memreg[i].mr_size;
+	printf("real memory  = %lu (%lu MB)\n", physsz,
+	    physsz / (1024 * 1024));
 
 	vm_ksubmap_init(&kmi);
 
@@ -254,6 +262,18 @@ sparc64_init(caddr_t mdp, u_long o1, u_long o2, u_long o3, ofw_vec_t *vec)
 		}
 	}
 
+	init_param1();
+
+	root = OF_peer(0);
+	for (child = OF_child(root); child != 0; child = OF_peer(child)) {
+		OF_getprop(child, "device_type", type, sizeof(type));
+		if (strcmp(type, "cpu") == 0)
+			break;
+	}
+
+	OF_getprop(child, "clock-frequency", &clock, sizeof(clock));
+	tick_init(clock);
+
 	/*
 	 * Initialize the console before printing anything.
 	 */
@@ -278,14 +298,6 @@ sparc64_init(caddr_t mdp, u_long o1, u_long o2, u_long o3, ofw_vec_t *vec)
 		end = (vm_offset_t)_end;
 	}
 
-	root = OF_peer(0);
-	for (child = OF_child(root); child != 0; child = OF_peer(child)) {
-		OF_getprop(child, "device_type", type, sizeof(type));
-		if (strcmp(type, "cpu") == 0)
-			break;
-	}
-	if (child == 0)
-		panic("cpu_startup: no cpu\n");
 	cache_init(child);
 
 	getenv_int("machdep.use_vis", &cpu_use_vis);
@@ -313,7 +325,6 @@ sparc64_init(caddr_t mdp, u_long o1, u_long o2, u_long o3, ofw_vec_t *vec)
 	/*
 	 * Initialize tunables.
 	 */
-	init_param1();
 	init_param2(physmem);
 	env = getenv("kernelname");
 	if (env != NULL) {
@@ -374,10 +385,12 @@ sparc64_init(caddr_t mdp, u_long o1, u_long o2, u_long o3, ofw_vec_t *vec)
 	mutex_init();
 	intr_init2();
 
-	OF_getprop(PCPU_GET(node), "clock-frequency", &clock, sizeof(clock));
-	tick_init(clock);
-
 	OF_getprop(root, "name", sparc64_model, sizeof(sparc64_model) - 1);
+
+#ifdef DDB
+	if (boothowto & RB_KDB)
+		Debugger("Boot flags requested debugger");
+#endif
 }
 
 void
@@ -426,11 +439,11 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 
 	/* Save user context. */
 	bzero(&sf, sizeof(sf));
+	get_mcontext(td, &sf.sf_uc.uc_mcontext, 0);
 	sf.sf_uc.uc_sigmask = *mask;
 	sf.sf_uc.uc_stack = p->p_sigstk;
 	sf.sf_uc.uc_stack.ss_flags = (p->p_flag & P_ALTSTACK)
 	    ? ((oonstack) ? SS_ONSTACK : 0) : SS_DISABLE;
-	bcopy(tf, &sf.sf_uc.uc_mcontext, sizeof(*tf));
 
 	/* Allocate and validate space for the signal handler context. */
 	if ((p->p_flag & P_ALTSTACK) != 0 && !oonstack &&
@@ -482,6 +495,25 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	mtx_lock(&psp->ps_mtx);
 }
 
+/*
+ * Build siginfo_t for SA thread
+ */
+void
+cpu_thread_siginfo(int sig, u_long code, siginfo_t *si)
+{
+	struct proc *p;
+	struct thread *td;
+
+	td = curthread;
+	p = td->td_proc;
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+
+	bzero(si, sizeof(*si));
+	si->si_signo = sig;
+	si->si_code = code;
+	/* XXXKSE fill other fields */
+}
+
 #ifndef	_SYS_SYSPROTO_H_
 struct sigreturn_args {
 	ucontext_t *ucp;
@@ -494,10 +526,10 @@ struct sigreturn_args {
 int
 sigreturn(struct thread *td, struct sigreturn_args *uap)
 {
-	struct trapframe *tf;
 	struct proc *p;
 	mcontext_t *mc;
 	ucontext_t uc;
+	int error;
 
 	p = td->td_proc;
 	if (rwindow_save(td)) {
@@ -512,11 +544,9 @@ sigreturn(struct thread *td, struct sigreturn_args *uap)
 	}
 
 	mc = &uc.uc_mcontext;
-	tf = td->td_frame;
-	if (!TSTATE_SECURE(mc->mc_tstate))
-		return (EINVAL);
-	mc->mc_wstate = tf->tf_wstate;
-	bcopy(mc, tf, sizeof(*tf));
+	error = set_mcontext(td, mc);
+	if (error != 0)
+		return (error);
 
 	PROC_LOCK(p);
 	td->td_sigmask = uc.uc_sigmask;
@@ -525,7 +555,7 @@ sigreturn(struct thread *td, struct sigreturn_args *uap)
 	PROC_UNLOCK(p);
 
 	CTR4(KTR_SIG, "sigreturn: return td=%p pc=%#lx sp=%#lx tstate=%#lx",
-	    td, tf->tf_tpc, tf->tf_sp, tf->tf_tstate);
+	    td, mc->mc_tpc, mc->mc_sp, mc->mc_tstate);
 	return (EJUSTRETURN);
 }
 
@@ -539,7 +569,7 @@ freebsd4_sigreturn(struct thread *td, struct freebsd4_sigreturn_args *uap)
 #endif
 
 int
-get_mcontext(struct thread *td, mcontext_t *mc, int clear_ret)
+get_mcontext(struct thread *td, mcontext_t *mc, int flags)
 {
 	struct trapframe *tf;
 	struct pcb *pcb;
@@ -547,7 +577,7 @@ get_mcontext(struct thread *td, mcontext_t *mc, int clear_ret)
 	tf = td->td_frame;
 	pcb = td->td_pcb;
 	bcopy(tf, mc, sizeof(*tf));
-	if (clear_ret != 0) {
+	if (flags & GET_MC_CLEAR_RET) {
 		mc->mc_out[0] = 0;
 		mc->mc_out[1] = 0;
 	}
@@ -643,6 +673,12 @@ sparc64_shutdown_final(void *dummy, int howto)
 	/* In case of halt, return to the firmware */
 	if ((howto & RB_HALT) != 0)
 		cpu_halt();
+}
+
+void
+cpu_idle(void)
+{
+	/* Insert code to halt (until next interrupt) for the idle loop */
 }
 
 int

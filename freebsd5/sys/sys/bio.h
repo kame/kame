@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)buf.h	8.9 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/sys/bio.h,v 1.133 2003/04/12 09:13:01 phk Exp $
+ * $FreeBSD: src/sys/sys/bio.h,v 1.135.2.1 2004/02/11 08:31:23 scottl Exp $
  */
 
 #ifndef _SYS_BIO_H_
@@ -47,7 +47,7 @@
 struct disk;
 struct bio;
 
-typedef void bio_task_t(struct bio *, void *);
+typedef void bio_task_t(void *);
 
 /*
  * The bio structure describes an I/O operation in the kernel.
@@ -56,7 +56,6 @@ struct bio {
 	u_int	bio_cmd;		/* I/O operation. */
 	dev_t	bio_dev;		/* Device to do I/O on. */
 	struct disk *bio_disk;		/* Valid below geom_disk.c only */
-	daddr_t bio_blkno;		/* Underlying physical block number. */
 	off_t	bio_offset;		/* Offset into file. */
 	long	bio_bcount;		/* Valid bytes in buffer. */
 	caddr_t	bio_data;		/* Memory, superblocks, indirect etc. */
@@ -107,7 +106,7 @@ struct devstat;
 
 struct bio_queue_head {
 	TAILQ_HEAD(bio_queue, bio) queue;
-	daddr_t last_pblkno;
+	off_t last_offset;
 	struct	bio *insert_point;
 	struct	bio *switch_point;
 };
@@ -122,6 +121,8 @@ void bioq_flush(struct bio_queue_head *head, struct devstat *stp, int error);
 void bioq_init(struct bio_queue_head *head);
 void bioq_insert_tail(struct bio_queue_head *head, struct bio *bp);
 void bioq_remove(struct bio_queue_head *head, struct bio *bp);
+
+void bio_taskqueue(struct bio *bp, bio_task_t *fund, void *arg);
 
 int	physio(dev_t dev, struct uio *uio, int ioflag);
 #define physread physio

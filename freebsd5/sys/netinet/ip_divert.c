@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_divert.c,v 1.74 2003/04/08 14:25:45 des Exp $
+ * $FreeBSD: src/sys/netinet/ip_divert.c,v 1.81 2003/11/26 01:40:43 sam Exp $
  */
 
 #include "opt_inet.h"
@@ -111,9 +111,6 @@ static struct inpcbinfo divcbinfo;
 static u_long	div_sendspace = DIVSNDQ;	/* XXX sysctl ? */
 static u_long	div_recvspace = DIVRCVQ;	/* XXX sysctl ? */
 
-/* Optimization: have this preinitialized */
-static struct sockaddr_in divsrc = { sizeof(divsrc), AF_INET };
-
 /*
  * Initialize divert connection block queue.
  */
@@ -159,11 +156,10 @@ divert_packet(struct mbuf *m, int incoming, int port, int rule)
 	struct inpcb *inp;
 	struct socket *sa;
 	u_int16_t nport;
+	struct sockaddr_in divsrc;
 
 	/* Sanity check */
 	KASSERT(port != 0, ("%s: port=0", __func__));
-
-	divsrc.sin_port = rule;		/* record matching rule */
 
 	/* Assure header */
 	if (m->m_len < sizeof(struct ip) &&
@@ -175,7 +171,10 @@ divert_packet(struct mbuf *m, int incoming, int port, int rule)
 	 * Record receive interface address, if any.
 	 * But only for incoming packets.
 	 */
-	divsrc.sin_addr.s_addr = 0;
+	bzero(&divsrc, sizeof(divsrc));
+	divsrc.sin_len = sizeof(divsrc);
+	divsrc.sin_family = AF_INET;
+	divsrc.sin_port = rule;		/* record matching rule */
 	if (incoming) {
 		struct ifaddr *ifa;
 
@@ -196,7 +195,6 @@ divert_packet(struct mbuf *m, int incoming, int port, int rule)
 	/*
 	 * Record the incoming interface name whenever we have one.
 	 */
-	bzero(&divsrc.sin_zero, sizeof(divsrc.sin_zero));
 	if (m->m_pkthdr.rcvif) {
 		/*
 		 * Hide the actual interface name in there in the 
@@ -216,25 +214,47 @@ divert_packet(struct mbuf *m, int incoming, int port, int rule)
 		 * this iface name will come along for the ride.
 		 * (see div_output for the other half of this.)
 		 */ 
-		snprintf(divsrc.sin_zero, sizeof(divsrc.sin_zero),
-			"%s%d", m->m_pkthdr.rcvif->if_name,
-			m->m_pkthdr.rcvif->if_unit);
+		strlcpy(divsrc.sin_zero, m->m_pkthdr.rcvif->if_xname,
+		    sizeof(divsrc.sin_zero));
 	}
 
+	/*
+	 * XXX sbappendaddr must be protected by Giant until
+	 * we have locking at the socket layer.  When entered
+	 * from below we come in w/o Giant and must take it
+	 * here.  Unfortunately we cannot tell whether we're
+	 * entering from above (already holding Giant),
+	 * below (potentially without Giant), or otherwise
+	 * (e.g. from tcp_syncache through a timeout) so we
+	 * have to grab it regardless.  This causes a LOR with
+	 * the tcp lock, at least, and possibly others.  For
+	 * the moment we're ignoring this. Once sockets are
+	 * locked this cruft can be removed.
+	 */
+	mtx_lock(&Giant);
 	/* Put packet on socket queue, if any */
 	sa = NULL;
 	nport = htons((u_int16_t)port);
+	INP_INFO_RLOCK(&divcbinfo);
 	LIST_FOREACH(inp, &divcb, inp_list) {
-		if (inp->inp_lport == nport)
+		INP_LOCK(inp);
+		/* XXX why does only one socket match? */
+		if (inp->inp_lport == nport) {
 			sa = inp->inp_socket;
+			if (sbappendaddr(&sa->so_rcv,
+			    (struct sockaddr *)&divsrc, m,
+			    (struct mbuf *)0) == 0)
+				sa = NULL;	/* force mbuf reclaim below */
+			else
+				sorwakeup(sa);
+			INP_UNLOCK(inp);
+			break;
+		}
+		INP_UNLOCK(inp);
 	}
-	if (sa) {
-		if (sbappendaddr(&sa->so_rcv, (struct sockaddr *)&divsrc,
-				m, (struct mbuf *)0) == 0)
-			m_freem(m);
-		else
-			sorwakeup(sa);
-	} else {
+	INP_INFO_RUNLOCK(&divcbinfo);
+	mtx_unlock(&Giant);
+	if (sa == NULL) {
 		m_freem(m);
 		ipstat.ips_noproto++;
 		ipstat.ips_delivered--;
@@ -264,6 +284,7 @@ div_output(struct socket *so, struct mbuf *m,
 	divert_tag.mh_flags = PACKET_TAG_DIVERT;
 	divert_tag.mh_next = m;
 	divert_tag.mh_data = 0;		/* the matching rule # */
+	divert_tag.mh_nextpkt = NULL;
 	m->m_pkthdr.rcvif = NULL;	/* XXX is it necessary ? */
 
 #ifdef MAC
@@ -292,9 +313,12 @@ div_output(struct socket *so, struct mbuf *m,
 
 	/* Reinject packet into the system as incoming or outgoing */
 	if (!sin || sin->sin_addr.s_addr == 0) {
-		struct inpcb *const inp = sotoinpcb(so);
 		struct ip *const ip = mtod(m, struct ip *);
+		struct inpcb *inp;
 
+		INP_INFO_WLOCK(&divcbinfo);
+		inp = sotoinpcb(so);
+		INP_LOCK(inp);
 		/*
 		 * Don't allow both user specified and setsockopt options,
 		 * and don't allow packet length sizes that will crash
@@ -302,20 +326,23 @@ div_output(struct socket *so, struct mbuf *m,
 		if (((ip->ip_hl != (sizeof (*ip) >> 2)) && inp->inp_options) ||
 		     ((u_short)ntohs(ip->ip_len) > m->m_pkthdr.len)) {
 			error = EINVAL;
-			goto cantsend;
+			m_freem(m);
+		} else {
+			/* Convert fields to host order for ip_output() */
+			ip->ip_len = ntohs(ip->ip_len);
+			ip->ip_off = ntohs(ip->ip_off);
+
+			/* Send packet to output processing */
+			ipstat.ips_rawout++;			/* XXX */
+
+			error = ip_output((struct mbuf *)&divert_tag,
+				    inp->inp_options, NULL,
+				    (so->so_options & SO_DONTROUTE) |
+				    IP_ALLOWBROADCAST | IP_RAWOUTPUT,
+				    inp->inp_moptions, NULL);
 		}
-
-		/* Convert fields to host order for ip_output() */
-		ip->ip_len = ntohs(ip->ip_len);
-		ip->ip_off = ntohs(ip->ip_off);
-
-		/* Send packet to output processing */
-		ipstat.ips_rawout++;			/* XXX */
-		error = ip_output((struct mbuf *)&divert_tag,
-			    inp->inp_options, &inp->inp_route,
-			    (so->so_options & SO_DONTROUTE) |
-			    IP_ALLOWBROADCAST | IP_RAWOUTPUT,
-			    inp->inp_moptions, NULL);
+		INP_UNLOCK(inp);
+		INP_INFO_WUNLOCK(&divcbinfo);
 	} else {
 		if (m->m_pkthdr.rcvif == NULL) {
 			/*
@@ -349,28 +376,37 @@ static int
 div_attach(struct socket *so, int proto, struct thread *td)
 {
 	struct inpcb *inp;
-	int error, s;
+	int error;
 
+	INP_INFO_WLOCK(&divcbinfo);
 	inp  = sotoinpcb(so);
-	if (inp)
-		panic("div_attach");
-	if (td && (error = suser(td)) != 0)
+	if (inp != 0) {
+		INP_INFO_WUNLOCK(&divcbinfo);
+		return EINVAL;
+	}
+	if (td && (error = suser(td)) != 0) {
+		INP_INFO_WUNLOCK(&divcbinfo);
 		return error;
-
+	}
 	error = soreserve(so, div_sendspace, div_recvspace);
-	if (error)
+	if (error) {
+		INP_INFO_WUNLOCK(&divcbinfo);
 		return error;
-	s = splnet();
-	error = in_pcballoc(so, &divcbinfo, td);
-	splx(s);
-	if (error)
+	}
+	error = in_pcballoc(so, &divcbinfo, td, "divinp");
+	if (error) {
+		INP_INFO_WUNLOCK(&divcbinfo);
 		return error;
+	}
 	inp = (struct inpcb *)so->so_pcb;
+	INP_LOCK(inp);
+	INP_INFO_WUNLOCK(&divcbinfo);
 	inp->inp_ip_p = proto;
 	inp->inp_vflag |= INP_IPV4;
 	inp->inp_flags |= INP_HDRINCL;
 	/* The socket is always "connected" because
 	   we always know "where" to send the packet */
+	INP_UNLOCK(inp);
 	so->so_state |= SS_ISCONNECTED;
 	return 0;
 }
@@ -380,18 +416,34 @@ div_detach(struct socket *so)
 {
 	struct inpcb *inp;
 
+	INP_INFO_WLOCK(&divcbinfo);
 	inp = sotoinpcb(so);
-	if (inp == 0)
-		panic("div_detach");
+	if (inp == 0) {
+		INP_INFO_WUNLOCK(&divcbinfo);
+		return EINVAL;
+	}
+	INP_LOCK(inp);
 	in_pcbdetach(inp);
+	INP_INFO_WUNLOCK(&divcbinfo);
 	return 0;
 }
 
 static int
 div_abort(struct socket *so)
 {
+	struct inpcb *inp;
+
+	INP_INFO_WLOCK(&divcbinfo);
+	inp = sotoinpcb(so);
+	if (inp == 0) {
+		INP_INFO_WUNLOCK(&divcbinfo);
+		return EINVAL;	/* ??? possible? panic instead? */
+	}
+	INP_LOCK(inp);
 	soisdisconnected(so);
-	return div_detach(so);
+	in_pcbdetach(inp);
+	INP_INFO_WUNLOCK(&divcbinfo);
+	return 0;
 }
 
 static int
@@ -406,11 +458,14 @@ static int
 div_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 {
 	struct inpcb *inp;
-	int s;
 	int error;
 
-	s = splnet();
+	INP_INFO_WLOCK(&divcbinfo);
 	inp = sotoinpcb(so);
+	if (inp == 0) {
+		INP_INFO_WUNLOCK(&divcbinfo);
+		return EINVAL;
+	}
 	/* in_pcbbind assumes that nam is a sockaddr_in
 	 * and in_pcbbind requires a valid address. Since divert
 	 * sockets don't we need to make sure the address is
@@ -422,16 +477,29 @@ div_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 		error = EAFNOSUPPORT;
 	else {
 		((struct sockaddr_in *)nam)->sin_addr.s_addr = INADDR_ANY;
+		INP_LOCK(inp);
 		error = in_pcbbind(inp, nam, td);
+		INP_UNLOCK(inp);
 	}
-	splx(s);
+	INP_INFO_WUNLOCK(&divcbinfo);
 	return error;
 }
 
 static int
 div_shutdown(struct socket *so)
 {
+	struct inpcb *inp;
+
+	INP_INFO_RLOCK(&divcbinfo);
+	inp = sotoinpcb(so);
+	if (inp == 0) {
+		INP_INFO_RUNLOCK(&divcbinfo);
+		return EINVAL;
+	}
+	INP_LOCK(inp);
+	INP_INFO_RUNLOCK(&divcbinfo);
 	socantsendmore(so);
+	INP_UNLOCK(inp);
 	return 0;
 }
 
@@ -451,10 +519,22 @@ div_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 	return div_output(so, m, (struct sockaddr_in *)nam, control);
 }
 
+void
+div_ctlinput(int cmd, struct sockaddr *sa, void *vip)
+{
+        struct in_addr faddr;
+
+	faddr = ((struct sockaddr_in *)sa)->sin_addr;
+	if (sa->sa_family != AF_INET || faddr.s_addr == INADDR_ANY)
+        	return;
+	if (PRC_IS_REDIRECT(cmd))
+		return;
+}
+
 static int
 div_pcblist(SYSCTL_HANDLER_ARGS)
 {
-	int error, i, n, s;
+	int error, i, n;
 	struct inpcb *inp, **inp_list;
 	inp_gen_t gencnt;
 	struct xinpgen xig;
@@ -476,10 +556,12 @@ div_pcblist(SYSCTL_HANDLER_ARGS)
 	/*
 	 * OK, now we're committed to doing something.
 	 */
-	s = splnet();
+	INP_INFO_RLOCK(&divcbinfo);
 	gencnt = divcbinfo.ipi_gencnt;
 	n = divcbinfo.ipi_count;
-	splx(s);
+	INP_INFO_RUNLOCK(&divcbinfo);
+
+	sysctl_wire_old_buffer(req, 2 * sizeof(xig) + n*sizeof(struct xinpcb));
 
 	xig.xig_len = sizeof xig;
 	xig.xig_count = n;
@@ -493,13 +575,16 @@ div_pcblist(SYSCTL_HANDLER_ARGS)
 	if (inp_list == 0)
 		return ENOMEM;
 	
-	s = splnet();
+	INP_INFO_RLOCK(&divcbinfo);
 	for (inp = LIST_FIRST(divcbinfo.listhead), i = 0; inp && i < n;
 	     inp = LIST_NEXT(inp, inp_list)) {
-		if (inp->inp_gencnt <= gencnt && !prison_xinpcb(req->td, inp))
+		INP_LOCK(inp);
+		if (inp->inp_gencnt <= gencnt &&
+		    cr_canseesocket(req->td->td_ucred, inp->inp_socket) == 0)
 			inp_list[i++] = inp;
+		INP_UNLOCK(inp);
 	}
-	splx(s);
+	INP_INFO_RUNLOCK(&divcbinfo);
 	n = i;
 
 	error = 0;
@@ -523,11 +608,11 @@ div_pcblist(SYSCTL_HANDLER_ARGS)
 		 * while we were processing this request, and it
 		 * might be necessary to retry.
 		 */
-		s = splnet();
+		INP_INFO_RLOCK(&divcbinfo);
 		xig.xig_gen = divcbinfo.ipi_gencnt;
 		xig.xig_sogen = so_gencnt;
 		xig.xig_count = divcbinfo.ipi_count;
-		splx(s);
+		INP_INFO_RUNLOCK(&divcbinfo);
 		error = SYSCTL_OUT(req, &xig, sizeof xig);
 	}
 	free(inp_list, M_TEMP);
@@ -564,5 +649,5 @@ struct pr_usrreqs div_usrreqs = {
 	pru_connect_notsupp, pru_connect2_notsupp, in_control, div_detach,
 	div_disconnect, pru_listen_notsupp, div_peeraddr, pru_rcvd_notsupp,
 	pru_rcvoob_notsupp, div_send, pru_sense_null, div_shutdown,
-	div_sockaddr, sosend, soreceive, sopoll
+	div_sockaddr, sosend, soreceive, sopoll, in_pcbsosetlabel
 };

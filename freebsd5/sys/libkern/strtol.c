@@ -33,10 +33,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * From: static char sccsid[] = "@(#)strtol.c	8.1 (Berkeley) 6/4/93";
- *
- * $FreeBSD: src/sys/libkern/strtol.c,v 1.6 2003/04/29 13:36:04 kan Exp $
+ * From: @(#)strtol.c	8.1 (Berkeley) 6/4/93
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/libkern/strtol.c,v 1.7 2003/06/11 05:23:04 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

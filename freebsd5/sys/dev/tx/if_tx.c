@@ -22,8 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/tx/if_tx.c,v 1.79 2003/11/14 17:16:57 obrien Exp $");
 
 /*
  * EtherPower II 10/100 Fast Ethernet (SMC 9432 serie)
@@ -36,9 +38,6 @@
  *
  * Thanks are going to Steve Bauer and Jason Wright.
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/tx/if_tx.c,v 1.72 2003/04/20 18:08:00 mux Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -66,8 +65,8 @@ __FBSDID("$FreeBSD: src/sys/dev/tx/if_tx.c,v 1.72 2003/04/20 18:08:00 mux Exp $"
 #include <sys/bus.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
@@ -102,7 +101,7 @@ static void epic_start_activity(epic_softc_t *);
 static void epic_set_rx_mode(epic_softc_t *);
 static void epic_set_tx_mode(epic_softc_t *);
 static void epic_set_mc_table(epic_softc_t *);
-static u_int8_t epic_calchash(caddr_t);
+static u_int32_t tx_mchash(caddr_t);
 static int epic_read_eeprom(epic_softc_t *,u_int16_t);
 static void epic_output_eepromw(epic_softc_t *, u_int16_t);
 static u_int16_t epic_input_eepromw(epic_softc_t *);
@@ -234,14 +233,12 @@ epic_attach(dev)
 	unit = device_get_unit(dev);
 
 	/* Preinitialize softc structure. */
-	bzero(sc, sizeof(epic_softc_t));
 	sc->unit = unit;
 	sc->dev = dev;
 
 	/* Fill ifnet structure. */
 	ifp = &sc->sc_if;
-	ifp->if_unit = unit;
-	ifp->if_name = "tx";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_softc = sc;
 	ifp->if_flags = IFF_BROADCAST|IFF_SIMPLEX|IFF_MULTICAST;
 	ifp->if_ioctl = epic_ifioctl;
@@ -280,7 +277,7 @@ epic_attach(dev)
 	/* Allocate DMA tags. */
 	error = bus_dma_tag_create(NULL, 4, 0, BUS_SPACE_MAXADDR_32BIT,
 	    BUS_SPACE_MAXADDR, NULL, NULL, MCLBYTES * EPIC_MAX_FRAGS,
-	    EPIC_MAX_FRAGS, MCLBYTES, 0, &sc->mtag);
+	    EPIC_MAX_FRAGS, MCLBYTES, 0, busdma_lock_mutex, &Giant, &sc->mtag);
 	if (error) {
 		device_printf(dev, "couldn't allocate dma tag\n");
 		goto fail;
@@ -289,7 +286,8 @@ epic_attach(dev)
 	error = bus_dma_tag_create(NULL, 4, 0, BUS_SPACE_MAXADDR_32BIT,
 	    BUS_SPACE_MAXADDR, NULL, NULL,
 	    sizeof(struct epic_rx_desc) * RX_RING_SIZE,
-	    1, sizeof(struct epic_rx_desc) * RX_RING_SIZE, 0, &sc->rtag);
+	    1, sizeof(struct epic_rx_desc) * RX_RING_SIZE, 0, busdma_lock_mutex,
+	    &Giant, &sc->rtag);
 	if (error) {
 		device_printf(dev, "couldn't allocate dma tag\n");
 		goto fail;
@@ -298,7 +296,8 @@ epic_attach(dev)
 	error = bus_dma_tag_create(NULL, 4, 0, BUS_SPACE_MAXADDR_32BIT,
 	    BUS_SPACE_MAXADDR, NULL, NULL,
 	    sizeof(struct epic_tx_desc) * TX_RING_SIZE,
-	    1, sizeof(struct epic_tx_desc) * TX_RING_SIZE, 0, &sc->ttag);
+	    1, sizeof(struct epic_tx_desc) * TX_RING_SIZE, 0,
+	    busdma_lock_mutex, &Giant, &sc->ttag);
 	if (error) {
 		device_printf(dev, "couldn't allocate dma tag\n");
 		goto fail;
@@ -307,7 +306,8 @@ epic_attach(dev)
 	error = bus_dma_tag_create(NULL, 4, 0, BUS_SPACE_MAXADDR_32BIT,
 	    BUS_SPACE_MAXADDR, NULL, NULL,
 	    sizeof(struct epic_frag_list) * TX_RING_SIZE,
-	    1, sizeof(struct epic_frag_list) * TX_RING_SIZE, 0, &sc->ftag);
+	    1, sizeof(struct epic_frag_list) * TX_RING_SIZE, 0,
+	    busdma_lock_mutex, &Giant, &sc->ftag);
 	if (error) {
 		device_printf(dev, "couldn't allocate dma tag\n");
 		goto fail;
@@ -315,12 +315,11 @@ epic_attach(dev)
 
 	/* Allocate DMA safe memory and get the DMA addresses. */
 	error = bus_dmamem_alloc(sc->ftag, (void **)&sc->tx_flist,
-	    BUS_DMA_NOWAIT, &sc->fmap);
+	    BUS_DMA_NOWAIT | BUS_DMA_ZERO, &sc->fmap);
 	if (error) {
 		device_printf(dev, "couldn't allocate dma memory\n");
 		goto fail;
 	}
-	bzero(sc->tx_flist, sizeof(struct epic_frag_list) * TX_RING_SIZE);
 	error = bus_dmamap_load(sc->ftag, sc->fmap, sc->tx_flist,
 	    sizeof(struct epic_frag_list) * TX_RING_SIZE, epic_dma_map_addr,
 	    &sc->frag_addr, 0);
@@ -329,12 +328,11 @@ epic_attach(dev)
 		goto fail;
 	}
 	error = bus_dmamem_alloc(sc->ttag, (void **)&sc->tx_desc,
-	    BUS_DMA_NOWAIT, &sc->tmap);
+	    BUS_DMA_NOWAIT | BUS_DMA_ZERO, &sc->tmap);
 	if (error) {
 		device_printf(dev, "couldn't allocate dma memory\n");
 		goto fail;
 	}
-	bzero(sc->tx_desc, sizeof(struct epic_tx_desc) * TX_RING_SIZE);
 	error = bus_dmamap_load(sc->ttag, sc->tmap, sc->tx_desc,
 	    sizeof(struct epic_tx_desc) * TX_RING_SIZE, epic_dma_map_addr,
 	    &sc->tx_addr, 0);
@@ -343,12 +341,11 @@ epic_attach(dev)
 		goto fail;
 	}
 	error = bus_dmamem_alloc(sc->rtag, (void **)&sc->rx_desc,
-	    BUS_DMA_NOWAIT, &sc->rmap);
+	    BUS_DMA_NOWAIT | BUS_DMA_ZERO, &sc->rmap);
 	if (error) {
 		device_printf(dev, "couldn't allocate dma memory\n");
 		goto fail;
 	}
-	bzero(sc->rx_desc, sizeof(struct epic_rx_desc) * RX_RING_SIZE);
 	error = bus_dmamap_load(sc->rtag, sc->rmap, sc->rx_desc,
 	    sizeof(struct epic_rx_desc) * RX_RING_SIZE, epic_dma_map_addr,
 	    &sc->rx_addr, 0);
@@ -1415,8 +1412,7 @@ epic_set_mc_table(sc)
 #endif
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = epic_calchash(
-		    LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = tx_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
 		filter[h >> 4] |= 1 << (h & 0xF);
 	}
 
@@ -1429,23 +1425,21 @@ epic_set_mc_table(sc)
 /*
  * Synopsis: calculate EPIC's hash of multicast address.
  */
-static u_int8_t
-epic_calchash(addr)
+static u_int32_t
+tx_mchash(addr)
 	caddr_t addr;
 {
 	u_int32_t crc, carry;
-	int i, j;
-	u_int8_t c;
+	int idx, bit;
+	u_int8_t data;
 
 	/* Compute CRC for the address value. */
 	crc = 0xFFFFFFFF; /* initial value */
 
-	for (i = 0; i < 6; i++) {
-		c = *(addr + i);
-		for (j = 0; j < 8; j++) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (c & 0x01);
+	for (idx = 0; idx < 6; idx++) {
+		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
+			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
 			crc <<= 1;
-			c >>= 1;
 			if (carry)
 				crc = (crc ^ 0x04c11db6) | carry;
 		}

@@ -26,12 +26,12 @@
  *
  *	i4b_q931.c - Q931 received messages handling
  *	--------------------------------------------
- *
- * $FreeBSD: src/sys/i4b/layer3/i4b_q931.c,v 1.16 2002/09/02 00:52:11 brooks Exp $
- *
  *      last edit-date: [Sun Aug 11 19:18:08 2002]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer3/i4b_q931.c,v 1.17 2003/06/10 23:59:34 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -31,13 +31,14 @@
  * SUCH DAMAGE.
  *
  *	@(#)string.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/include/string.h,v 1.18 2002/10/14 20:38:40 mike Exp $
+ * $FreeBSD: src/include/string.h,v 1.18.6.1 2003/12/18 00:59:50 peter Exp $
  */
 
 #ifndef _STRING_H_
 #define	_STRING_H_
 
 #include <sys/cdefs.h>
+#include <sys/_null.h>
 #include <sys/_types.h>
 
 /*
@@ -51,10 +52,6 @@
 #ifndef _SIZE_T_DECLARED
 typedef	__size_t	size_t;
 #define	_SIZE_T_DECLARED
-#endif
-
-#ifndef	NULL
-#define	NULL	0
 #endif
 
 __BEGIN_DECLS

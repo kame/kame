@@ -31,11 +31,13 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)isa_device.h	7.1 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/isa/isa_device.h,v 1.76 2002/07/09 01:16:18 mike Exp $
+ * $FreeBSD: src/sys/i386/isa/isa_device.h,v 1.77 2003/09/05 14:55:11 peter Exp $
  */
 
 #ifndef _I386_ISA_ISA_DEVICE_H_
 #define	_I386_ISA_ISA_DEVICE_H_
+
+#ifndef BURN_BRIDGES
 
 #ifdef _KERNEL
 #include <sys/bus.h>
@@ -108,5 +110,9 @@ DECLARE_MODULE(name, name##_mod, SI_SUB_DRIVERS, SI_ORDER_ANY)		\
 #endif
 
 #endif	/* COMPAT_OLDISA */
+
+#else	/* BURN_BRIDGES */
+#error "cvs rm sys/i386/isa/isa_device.h"
+#endif	/* BURN_BRIDGES */
 
 #endif /* !_I386_ISA_ISA_DEVICE_H_ */

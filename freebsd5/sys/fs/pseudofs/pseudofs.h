@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *      $FreeBSD: src/sys/fs/pseudofs/pseudofs.h,v 1.24 2003/03/11 22:15:09 kan Exp $
+ *      $FreeBSD: src/sys/fs/pseudofs/pseudofs.h,v 1.25 2003/06/12 20:48:37 phk Exp $
  */
 
 #ifndef _PSEUDOFS_H_INCLUDED
@@ -250,21 +250,12 @@ _##name##_uninit(struct vfsconf *vfc) {					\
 }									\
 									\
 static struct vfsops name##_vfsops = {					\
-	NULL,								\
-	vfs_stdstart,							\
-	pfs_unmount,							\
-	pfs_root,							\
-	vfs_stdquotactl,						\
-	pfs_statfs,							\
-	vfs_stdnosync,							\
-	vfs_stdvget,							\
-	vfs_stdfhtovp,							\
-	vfs_stdcheckexp,						\
-	vfs_stdvptofh,							\
-	_##name##_init,							\
-	_##name##_uninit,						\
-	vfs_stdextattrctl,						\
-	_##name##_mount,						\
+	.vfs_init =		_##name##_init,				\
+	.vfs_nmount =		_##name##_mount,			\
+	.vfs_root =		pfs_root,				\
+	.vfs_statfs =		pfs_statfs,				\
+	.vfs_uninit =		_##name##_uninit,			\
+	.vfs_unmount =		pfs_unmount,				\
 };									\
 VFS_SET(name##_vfsops, name, VFCF_SYNTHETIC);				\
 MODULE_VERSION(name, version);						\

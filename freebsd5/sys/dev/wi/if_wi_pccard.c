@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/wi/if_wi_pccard.c,v 1.25 2003/04/27 03:34:05 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/wi/if_wi_pccard.c,v 1.41 2003/09/22 05:33:22 imp Exp $");
 
 #include "opt_wi.h"
 
@@ -60,7 +60,9 @@ __FBSDID("$FreeBSD: src/sys/dev/wi/if_wi_pccard.c,v 1.25 2003/04/27 03:34:05 imp
 #include <net/if_dl.h>
 #include <net/if_media.h>
 #include <net/if_types.h>
-#include <net/if_ieee80211.h>
+
+#include <net80211/ieee80211_var.h>
+#include <net80211/ieee80211_radiotap.h>
 
 #include <dev/pccard/pccardvar.h>
 #if __FreeBSD_version >= 500000
@@ -68,8 +70,8 @@ __FBSDID("$FreeBSD: src/sys/dev/wi/if_wi_pccard.c,v 1.25 2003/04/27 03:34:05 imp
 #endif
 
 #include <dev/wi/if_wavelan_ieee.h>
-#include <dev/wi/if_wivar.h>
 #include <dev/wi/if_wireg.h>
+#include <dev/wi/if_wivar.h>
 #ifdef WI_SYMBOL_FIRMWARE
 #include <dev/wi/spectrum24t_cf.h>
 #endif
@@ -126,8 +128,14 @@ static const struct pccard_product wi_pccard_products[] = {
 	PCMCIA_CARD(3COM, 3CRWE777A, 0),
 	PCMCIA_CARD(ACTIONTEC, PRISM, 0),
 	PCMCIA_CARD(ADDTRON, AWP100, 0),
+	PCMCIA_CARD(AIRVAST, WN_100, 0),
 	PCMCIA_CARD(ALLIEDTELESIS, WR211PCM, 0),
+	PCMCIA_CARD(ARTEM, ONAIR, 0),
+ 	PCMCIA_CARD(ASUS, WL100, 0),
 	PCMCIA_CARD(BAY, EMOBILITY_11B, 0),
+	PCMCIA_CARD(BROMAX, IWN, 0),
+	PCMCIA_CARD(BROMAX, IWN3, 0),
+	PCMCIA_CARD(BROMAX, WCF11, 0),
 	PCMCIA_CARD(BUFFALO, WLI_PCM_S11, 0),
 	PCMCIA_CARD(BUFFALO, WLI_CF_S11G, 0),
 	PCMCIA_CARD(COMPAQ, NC5004, 0),
@@ -135,6 +143,7 @@ static const struct pccard_product wi_pccard_products[] = {
 	PCMCIA_CARD(COREGA, WIRELESS_LAN_PCC_11, 0),
 	PCMCIA_CARD(COREGA, WIRELESS_LAN_PCCA_11, 0),
 	PCMCIA_CARD(COREGA, WIRELESS_LAN_PCCB_11, 0),
+	PCMCIA_CARD(COREGA, WIRELESS_LAN_PCCL_11, 0),
 	PCMCIA_CARD(DLINK, DWL650H, 0),
 	PCMCIA_CARD(ELSA, XI300_IEEE, 0),
 	PCMCIA_CARD(ELSA, XI325_IEEE, 0),
@@ -144,18 +153,20 @@ static const struct pccard_product wi_pccard_products[] = {
 	PCMCIA_CARD(GEMTEK, WLAN, 0),
 	PCMCIA_CARD(HWN, AIRWAY80211, 0), 
 	PCMCIA_CARD(INTEL, PRO_WLAN_2011, 0),
-	PCMCIA_CARD(INTERSIL, PRISM2, 0),
+	PCMCIA_CARD(INTERSIL, MA401RA, 0),
+	PCMCIA_CARD(INTERSIL2, PRISM2, 0),
 	PCMCIA_CARD(IODATA2, WNB11PCM, 0),
-	PCMCIA_CARD(LINKSYS2, IWN, 0),
-	PCMCIA_CARD(LINKSYS2, IWN3, 0),
-	PCMCIA_CARD(LINKSYS2, WCF11, 0),
+	PCMCIA_CARD(IODATA2, WCF12, 0),
+	PCMCIA_CARD(FUJITSU, WL110, 0),
 	PCMCIA_CARD(LUCENT, WAVELAN_IEEE, 0),
-	PCMCIA_CARD(NETGEAR_2, MA401RA, 0),
+	PCMCIA_CARD(MICROSOFT, MN_520, 0),
+	PCMCIA_CARD(NOKIA, C020_WLAN, 0),
 	PCMCIA_CARD(NOKIA, C110_WLAN, 0),
-	PCMCIA_CARD(OEM1, PRISM3, 0),
 	PCMCIA_CARD(PLANEX_2, GWNS11H, 0),
 	PCMCIA_CARD(PROXIM, RANGELANDS_8430, 0),
+	PCMCIA_CARD(PROXIM, HARMONY, 0),
 	PCMCIA_CARD(SAMSUNG, SWL_2000N, 0),
+	PCMCIA_CARD(SIEMENS, SS1021, 0),
 	PCMCIA_CARD(SIMPLETECH, SPECTRUM24_ALT, 0),
 	PCMCIA_CARD(SOCKET, LP_WLAN_CF, 0),
 	PCMCIA_CARD(SYMBOL, LA4100, 0),
@@ -210,6 +221,7 @@ wi_pccard_attach(device_t dev)
 	int			error;
 	uint32_t		vendor;
 	uint32_t		product;
+	int			retval;
 
 	sc = device_get_softc(dev);
 
@@ -237,10 +249,13 @@ wi_pccard_attach(device_t dev)
 #else
 		device_printf(dev, 
 		    "Symbol LA4100 needs 'option WI_SYMBOL_FIRMWARE'\n");
+		wi_free(dev);
 		return (ENXIO);
 #endif
 	}
 #endif
-
-	return (wi_attach(dev));
+	retval = wi_attach(dev);
+	if (retval != 0)
+		wi_free(dev);
+	return (retval);
 }

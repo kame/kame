@@ -1,4 +1,3 @@
-/*	$FreeBSD: src/sys/dev/usb/ums.c,v 1.57 2003/03/03 12:15:47 phk Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -37,6 +36,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/ums.c,v 1.64 2003/11/09 09:17:22 tanimura Exp $");
+
 /*
  * HID spec: http://www.usb.org/developers/data/devclass/hid1_1.pdf
  */
@@ -69,7 +71,11 @@
 #include <dev/usb/usb_quirks.h>
 #include <dev/usb/hid.h>
 
+#if __FreeBSD_version >= 500000
 #include <sys/mouse.h>
+#else
+#include <machine/mouse.h>
+#endif
 
 #ifdef USB_DEBUG
 #define DPRINTF(x)	if (umsdebug) logprintf x
@@ -85,7 +91,7 @@ SYSCTL_INT(_hw_usb_ums, OID_AUTO, debug, CTLFLAG_RW,
 
 #define UMSUNIT(s)	(minor(s)&0x1f)
 
-#define MS_TO_TICKS(ms) ((ms) * hz / 1000)                            
+#define MS_TO_TICKS(ms) ((ms) * hz / 1000)
 
 #define QUEUE_BUFSIZE	400	/* MUST be divisible by 5 _and_ 8 */
 
@@ -157,7 +163,7 @@ Static struct cdevsw ums_cdevsw = {
 	.d_name =	"ums",
 	.d_maj =	UMS_CDEV_MAJOR,
 #if __FreeBSD_version < 500014
-	/* bmaj */	-1
+	.d_bmaj		-1
 #endif
 };
 
@@ -170,7 +176,7 @@ USB_MATCH(ums)
 	int size, ret;
 	void *desc;
 	usbd_status err;
-	
+
 	if (!uaa->iface)
 		return (UMATCH_NONE);
 	id = usbd_get_interface_descriptor(uaa->iface);
@@ -181,7 +187,7 @@ USB_MATCH(ums)
 	if (err)
 		return (UMATCH_NONE);
 
-	if (hid_is_collection(desc, size, 
+	if (hid_is_collection(desc, size,
 			      HID_USAGE2(HUP_GENERIC_DESKTOP, HUG_MOUSE)))
 		ret = UMATCH_IFACECLASS;
 	else
@@ -204,7 +210,7 @@ USB_ATTACH(ums)
 	u_int32_t flags;
 	int i;
 	struct hid_location loc_btn;
-	
+
 	sc->sc_disconnected = 1;
 	sc->sc_iface = iface;
 	id = usbd_get_interface_descriptor(iface);
@@ -222,7 +228,7 @@ USB_ATTACH(ums)
 	DPRINTFN(10,("ums_attach: bLength=%d bDescriptorType=%d "
 		     "bEndpointAddress=%d-%s bmAttributes=%d wMaxPacketSize=%d"
 		     " bInterval=%d\n",
-		     ed->bLength, ed->bDescriptorType, 
+		     ed->bLength, ed->bDescriptorType,
 		     UE_GET_ADDR(ed->bEndpointAddress),
 		     UE_GET_DIR(ed->bEndpointAddress) == UE_DIR_IN ? "in":"out",
 		     UE_GET_XFERTYPE(ed->bmAttributes),
@@ -279,7 +285,7 @@ USB_ATTACH(ums)
 				hid_input, &loc_btn, 0))
 			break;
 	sc->nbuttons = i - 1;
-	sc->sc_loc_btn = malloc(sizeof(struct hid_location)*sc->nbuttons, 
+	sc->sc_loc_btn = malloc(sizeof(struct hid_location)*sc->nbuttons,
 				M_USBDEV, M_NOWAIT);
 	if (!sc->sc_loc_btn) {
 		printf("%s: no memory\n", USBDEVNAME(sc->sc_dev));
@@ -307,12 +313,12 @@ USB_ATTACH(ums)
 
 #ifdef USB_DEBUG
 	DPRINTF(("ums_attach: sc=%p\n", sc));
-	DPRINTF(("ums_attach: X\t%d/%d\n", 
+	DPRINTF(("ums_attach: X\t%d/%d\n",
 		 sc->sc_loc_x.pos, sc->sc_loc_x.size));
-	DPRINTF(("ums_attach: Y\t%d/%d\n", 
+	DPRINTF(("ums_attach: Y\t%d/%d\n",
 		 sc->sc_loc_y.pos, sc->sc_loc_y.size));
 	if (sc->flags & UMS_Z)
-		DPRINTF(("ums_attach: Z\t%d/%d\n", 
+		DPRINTF(("ums_attach: Z\t%d/%d\n",
 			 sc->sc_loc_z.pos, sc->sc_loc_z.size));
 	for (i = 1; i <= sc->nbuttons; i++) {
 		DPRINTF(("ums_attach: B%d\t%d/%d\n",
@@ -365,7 +371,6 @@ Static int
 ums_detach(device_t self)
 {
 	struct ums_softc *sc = device_get_softc(self);
-	struct vnode *vp;
 
 	if (sc->sc_enabled)
 		ums_disable(sc);
@@ -374,10 +379,6 @@ ums_detach(device_t self)
 
 	free(sc->sc_loc_btn, M_USB);
 	free(sc->sc_ibuf, M_USB);
-
-	vp = SLIST_FIRST(&sc->dev->si_hlist);
-	if (vp)
-		VOP_REVOKE(vp, REVOKEALL);
 
 	/* someone waiting for data */
 	/*
@@ -393,7 +394,7 @@ ums_detach(device_t self)
 	}
 	if (sc->state & UMS_SELECT) {
 		sc->state &= ~UMS_SELECT;
-		selwakeup(&sc->rsel);
+		selwakeuppri(&sc->rsel, PZERO);
 	}
 
 	destroy_dev(sc->dev);
@@ -532,7 +533,7 @@ ums_add_to_queue(struct ums_softc *sc, int dx, int dy, int dz, int buttons)
 	}
 	if (sc->state & UMS_SELECT) {
 		sc->state &= ~UMS_SELECT;
-		selwakeup(&sc->rsel);
+		selwakeuppri(&sc->rsel, PZERO);
 	}
 }
 Static int
@@ -556,8 +557,8 @@ ums_enable(v)
 	callout_handle_init((struct callout_handle *)&sc->callout_handle);
 
 	/* Set up interrupt pipe. */
-	err = usbd_open_pipe_intr(sc->sc_iface, sc->sc_ep_addr, 
-				USBD_SHORT_XFER_OK, &sc->sc_intrpipe, sc, 
+	err = usbd_open_pipe_intr(sc->sc_iface, sc->sc_ep_addr,
+				USBD_SHORT_XFER_OK, &sc->sc_intrpipe, sc,
 				sc->sc_ibuf, sc->sc_isize, ums_intr,
 				USBD_DEFAULT_INTERVAL);
 	if (err) {
@@ -635,7 +636,7 @@ ums_read(dev_t dev, struct uio *uio, int flag)
 			splx(s);
 			return EWOULDBLOCK;
 		}
-		
+
 		sc->state |= UMS_ASLEEP;	/* blocking I/O */
 		error = tsleep(sc, PZERO | PCATCH, "umsrea", 0);
 		if (error) {
@@ -708,7 +709,7 @@ ums_poll(dev_t dev, int events, usb_proc_ptr p)
 
 	return revents;
 }
-	
+
 int
 ums_ioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, usb_proc_ptr p)
 {

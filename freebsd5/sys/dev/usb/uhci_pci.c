@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -33,9 +33,10 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/usb/uhci_pci.c,v 1.46 2003/05/06 19:30:41 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/uhci_pci.c,v 1.51 2003/11/28 05:28:29 imp Exp $");
 
 /* Universal Host Controller Interface
  *
@@ -63,8 +64,8 @@
 #include <sys/rman.h>
 #endif
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
@@ -244,6 +245,8 @@ uhci_pci_attach(device_t self)
 	uhci_softc_t *sc = device_get_softc(self);
 	int rid;
 	int err;
+
+	pci_enable_busmaster(self);
 
 	rid = PCI_UHCI_BASE_REG;
 	sc->io_res = bus_alloc_resource(self, SYS_RES_IOPORT, &rid,

@@ -27,8 +27,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pcic.c,v 1.179 2002/11/27 06:04:49 imp Exp $
+ * $FreeBSD: src/sys/pccard/pcic.c,v 1.184 2003/11/09 09:17:25 tanimura Exp $
  */
+
+#define OBSOLETE_IN_6
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -84,13 +86,13 @@ SYSCTL_NODE(_hw, OID_AUTO, pcic, CTLFLAG_RD, 0, "PCIC parameters");
 int pcic_override_irq = 0;
 TUNABLE_INT("machdep.pccard.pcic_irq", &pcic_override_irq);
 TUNABLE_INT("hw.pcic.irq", &pcic_override_irq);
-SYSCTL_INT(_hw_pcic, OID_AUTO, irq, CTLFLAG_RD,
+SYSCTL_INT(_hw_pcic, OID_AUTO, irq, CTLFLAG_RDTUN,
     &pcic_override_irq, 0,
     "Override the IRQ configured by the config system for all pcic devices");
 
 int pcic_boot_deactivated = 0;
 TUNABLE_INT("hw.pcic.boot_deactivated", &pcic_boot_deactivated);
-SYSCTL_INT(_hw_pcic, OID_AUTO, boot_deactivated, CTLFLAG_RD,
+SYSCTL_INT(_hw_pcic, OID_AUTO, boot_deactivated, CTLFLAG_RDTUN,
     &pcic_boot_deactivated, 0,
     "Override the automatic powering up of pccards at boot.  This works\n\
 around what turns out to be an old bug in the code that has since been\n\
@@ -105,7 +107,7 @@ FreeBSD 4.8.");
  */
 int pcic_pd6722_vsense = 1;
 TUNABLE_INT("hw.pcic.pd6722_vsense", &pcic_pd6722_vsense);
-SYSCTL_INT(_hw_pcic, OID_AUTO, pd6722_vsense, CTLFLAG_RD,
+SYSCTL_INT(_hw_pcic, OID_AUTO, pd6722_vsense, CTLFLAG_RDTUN,
     &pcic_pd6722_vsense, 1,
     "Select CL-PD6722's VSENSE method.  VSENSE is used to determine the\n\
 volatage of inserted cards.  The CL-PD6722 has two methods to determine the\n\
@@ -268,6 +270,12 @@ pcic_memory(struct slot *slt, int win)
 		pcic_putw(sp, reg+2, 0);
 		pcic_putw(sp, reg+4, 0);
 	}
+	if (bootverbose)
+		printf("pcic: mem addr %p: reg %d: %x %x %x %x %x %x %x\n",
+		    mp->start, reg, sp->getb(sp, reg), sp->getb(sp, reg+1),
+		    sp->getb(sp, reg+2), sp->getb(sp, reg+3),
+		    sp->getb(sp, reg+3), sp->getb(sp, reg+5),
+		    sp->getb(sp, PCIC_ADDRWINE));
 	return (0);
 }
 
@@ -972,7 +980,7 @@ pcic_reset(void *chan)
 		sp->putb(sp, PCIC_TIME_CMD1, 0xf);
 		sp->putb(sp, PCIC_TIME_RECOV1, 0);
 	}
-	selwakeup(&slt->selp);
+	selwakeuppri(&slt->selp, PZERO);
 }
 
 /*

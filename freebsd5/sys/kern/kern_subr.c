@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_subr.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_subr.c,v 1.74 2003/05/05 21:27:29 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_subr.c,v 1.77 2003/10/02 15:00:55 nectar Exp $");
 
 #include "opt_zero.h"
 
@@ -45,6 +47,7 @@
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
@@ -85,12 +88,15 @@ vm_pgmoveco(vm_map_t mapa, vm_object_t srcobj, vm_offset_t kaddr,
 	 * First lookup the kernel page.
 	 */
 	kern_pg = PHYS_TO_VM_PAGE(vtophys(kaddr));
-
+	/*
+	 * XXX The vm object containing kern_pg needs locking.
+	 */
 	if ((vm_map_lookup(&map, uaddr,
 			   VM_PROT_WRITE, &entry, &uobject,
 			   &upindex, &prot, &wired)) != KERN_SUCCESS) {
 		return(EFAULT);
 	}
+	VM_OBJECT_LOCK(uobject);
 	if ((user_pg = vm_page_lookup(uobject, upindex)) != NULL) {
 		do
 			vm_page_lock_queues();
@@ -117,7 +123,7 @@ vm_pgmoveco(vm_map_t mapa, vm_object_t srcobj, vm_offset_t kaddr,
 	vm_page_flag_clear(kern_pg, PG_BUSY);
 	kern_pg->valid = VM_PAGE_BITS_ALL;
 	vm_page_unlock_queues();
-
+	VM_OBJECT_UNLOCK(uobject);
 	vm_map_lookup_done(map, entry);
 	return(KERN_SUCCESS);
 }
@@ -191,6 +197,28 @@ out:
 		mtx_unlock_spin(&sched_lock);
 	}
 	return (error);
+}
+
+/*
+ * Wrapper for uiomove() that validates the arguments against a known-good
+ * kernel buffer.  Currently, uiomove accepts a signed (n) argument, which
+ * is almost definitely a bad thing, so we catch that here as well.  We
+ * return a runtime failure, but it might be desirable to generate a runtime
+ * assertion failure instead.
+ */
+int
+uiomove_frombuf(void *buf, int buflen, struct uio *uio)
+{
+	unsigned int offset, n;
+
+	if (uio->uio_offset < 0 || uio->uio_resid < 0 ||
+	    (offset = uio->uio_offset) != uio->uio_offset)
+		return (EINVAL);
+	if (buflen <= 0 || offset >= buflen)
+		return (0);
+	if ((n = buflen - offset) > INT_MAX)
+		return (EINVAL);
+	return (uiomove((char *)buf + offset, n, uio));
 }
 
 #ifdef ZERO_COPY_SOCKETS

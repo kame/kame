@@ -36,12 +36,12 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_bpf.h,v 1.7 2002/06/01 20:40:05 alfred Exp $
+ * $FreeBSD: src/sys/netgraph/ng_bpf.h,v 1.8 2003/11/11 12:30:37 ru Exp $
  * $Whistle: ng_bpf.h,v 1.3 1999/12/03 20:30:23 archie Exp $
  */
 
-#ifndef _NETGRAPH_BPF_H_
-#define _NETGRAPH_BPF_H_
+#ifndef _NETGRAPH_NG_BPF_H_
+#define _NETGRAPH_NG_BPF_H_
 
 /* Node type name and magic cookie */
 #define NG_BPF_NODE_TYPE	"bpf"
@@ -99,4 +99,4 @@ enum {
 	NGM_BPF_GETCLR_STATS,		/* supply name as char[NG_HOOKLEN+1] */
 };
 
-#endif /* _NETGRAPH_BPF_H_ */
+#endif /* _NETGRAPH_NG_BPF_H_ */

@@ -51,7 +51,7 @@
  *	from: @(#)clock.c	8.1 (Berkeley) 6/11/93
  *	from: NetBSD: clock.c,v 1.41 2001/07/24 19:29:25 eeh Exp
  *
- * $FreeBSD: src/sys/sparc64/sparc64/eeprom_fhc.c,v 1.1 2003/02/18 09:01:01 jake Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/eeprom_fhc.c,v 1.3 2003/08/23 05:56:58 marcel Exp $
  */
 
 #include <sys/param.h>
@@ -67,11 +67,11 @@
 
 #include <sys/rman.h>
 
-#include <ofw/openfirm.h>
+#include <dev/ofw/openfirm.h>
 
 #include <machine/eeprom.h>
 
-#include <mk48txx/mk48txxreg.h>
+#include <dev/mk48txx/mk48txxreg.h>
 
 #include <sparc64/fhc/fhcreg.h>
 #include <sparc64/fhc/fhcvar.h>

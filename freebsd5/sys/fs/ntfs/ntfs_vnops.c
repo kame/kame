@@ -35,7 +35,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/ntfs/ntfs_vnops.c,v 1.38 2003/03/03 19:15:38 njl Exp $
+ * $FreeBSD: src/sys/fs/ntfs/ntfs_vnops.c,v 1.41 2003/10/05 02:43:29 jeff Exp $
  *
  */
 
@@ -256,8 +256,6 @@ ntfs_reclaim(ap)
 		return (error);
 	
 	/* Purge old data structures associated with the inode. */
-	cache_purge(vp);
-
 	ntfs_frele(fp);
 	ntfs_ntput(ip);
 	vp->v_data = NULL;
@@ -282,6 +280,8 @@ ntfs_strategy(ap)
 	struct ntfsmount *ntmp = ip->i_mp;
 	int error;
 
+	KASSERT(ap->a_vp == ap->a_bp->b_vp, ("%s(%p != %p)",
+	    __func__, ap->a_vp, ap->a_bp->b_vp));
 	dprintf(("ntfs_strategy: offset: %d, blkno: %d, lblkno: %d\n",
 		(u_int32_t)bp->b_offset,(u_int32_t)bp->b_blkno,
 		(u_int32_t)bp->b_lblkno));
@@ -493,7 +493,8 @@ ntfs_readdir(ap)
 	register struct ntnode *ip = FTONT(fp);
 	struct uio *uio = ap->a_uio;
 	struct ntfsmount *ntmp = ip->i_mp;
-	int i, error = 0;
+	int i, j, error = 0;
+	wchar c;
 	u_int32_t faked = 0, num;
 	int ncookies = 0;
 	struct dirent cde;
@@ -550,14 +551,17 @@ ntfs_readdir(ap)
 			if(!ntfs_isnamepermitted(ntmp,iep))
 				continue;
 
-			for(i=0; i<iep->ie_fnamelen; i++) {
-				cde.d_name[i] = NTFS_U28(iep->ie_fname[i]);
+			for(i=0, j=0; i<iep->ie_fnamelen; i++, j++) {
+				c = NTFS_U28(iep->ie_fname[i]);
+				if (c&0xFF00)
+					cde.d_name[j++] = (char)(c>>8);
+				cde.d_name[j] = (char)c&0xFF;
 			}
-			cde.d_name[i] = '\0';
+			cde.d_name[j] = '\0';
 			dprintf(("ntfs_readdir: elem: %d, fname:[%s] type: %d, flag: %d, ",
 				num, cde.d_name, iep->ie_fnametype,
 				iep->ie_flag));
-			cde.d_namlen = iep->ie_fnamelen;
+			cde.d_namlen = j;
 			cde.d_fileno = iep->ie_number;
 			cde.d_type = (iep->ie_fflag & NTFS_FFLAG_DIR) ? DT_DIR : DT_REG;
 			cde.d_reclen = sizeof(struct dirent);

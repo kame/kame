@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) KATO Takenori, 1997, 1998.
  * 
  * All rights reserved.  Unpublished rights reserved under the copyright
@@ -25,9 +25,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/i386/initcpu.c,v 1.44 2003/03/20 20:50:22 dwmalone Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/i386/initcpu.c,v 1.49 2003/11/10 15:48:30 jhb Exp $");
 
 #include "opt_cpu.h"
 
@@ -473,16 +474,14 @@ init_6x86MX(void)
 static void
 init_ppro(void)
 {
-#ifndef SMP
 	u_int64_t	apicbase;
 
 	/*
-	 * Local APIC should be diabled in UP kernel.
+	 * Local APIC should be disabled if it is not going to be used.
 	 */
-	apicbase = rdmsr(0x1b);
-	apicbase &= ~0x800LL;
-	wrmsr(0x1b, apicbase);
-#endif
+	apicbase = rdmsr(MSR_APICBASE);
+	apicbase &= ~APICBASE_ENABLED;
+	wrmsr(MSR_APICBASE, apicbase);
 }
 
 /*
@@ -502,7 +501,7 @@ init_mendocino(void)
 	load_cr0(rcr0() | CR0_CD | CR0_NW);
 	wbinvd();
 
-	bbl_cr_ctl3 = rdmsr(0x11e);
+	bbl_cr_ctl3 = rdmsr(MSR_BBL_CR_CTL3);
 
 	/* If the L2 cache is configured, do nothing. */
 	if (!(bbl_cr_ctl3 & 1)) {
@@ -517,7 +516,7 @@ init_mendocino(void)
 #else
 		bbl_cr_ctl3 |= 5 << 1;
 #endif
-		wrmsr(0x11e, bbl_cr_ctl3);
+		wrmsr(MSR_BBL_CR_CTL3, bbl_cr_ctl3);
 	}
 
 	load_cr0(rcr0() & ~(CR0_CD | CR0_NW));

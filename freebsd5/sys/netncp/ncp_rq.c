@@ -30,9 +30,11 @@
  * SUCH DAMAGE.
  *
  * Routines to prepare request and fetch reply
- *
- * $FreeBSD: src/sys/netncp/ncp_rq.c,v 1.12 2003/02/26 21:25:55 fjoe Exp $
  */ 
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netncp/ncp_rq.c,v 1.13 2003/06/11 05:30:35 obrien Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/errno.h>

@@ -1,10 +1,10 @@
-# $FreeBSD: src/sys/modules/streams/Makefile,v 1.10 2002/01/11 15:48:58 ru Exp $ 
+# $FreeBSD: src/sys/modules/streams/Makefile,v 1.11 2003/11/19 05:08:27 imp Exp $ 
 MAINTAINER=	newton@atdot.dotat.org
 
 .PATH: ${.CURDIR}/../../dev/streams
 
 KMOD=	streams
-SRCS=	streams.c opt_streams.h
+SRCS=	streams.c
 
 EXPORT_SYMS=	svr4_str_initialized	\
 		svr4_stream_get		\

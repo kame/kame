@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/atm_usrreq.c,v 1.17 2002/12/22 05:35:02 hsu Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * -----------------
  *
  * ATM DGRAM socket protocol processing
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/atm_usrreq.c,v 1.21 2003/11/18 00:39:03 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -53,10 +51,6 @@
 #include <netatm/atm_stack.h>
 #include <netatm/atm_pcb.h>
 #include <netatm/atm_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_usrreq.c,v 1.17 2002/12/22 05:35:02 hsu Exp $");
-#endif
 
 
 /*
@@ -89,6 +83,10 @@ struct pr_usrreqs	atm_dgram_usrreqs = {
 	pru_sense_null,			/* pru_sense */
 	atm_proto_notsupp1,		/* pru_shutdown */
 	atm_proto_notsupp3,		/* pru_sockaddr */
+	NULL,				/* pru_sosend */
+	NULL,				/* pru_soreceive */
+	NULL,				/* pru_sooll */
+	pru_sosetlabel_null		/* pru_sosetlabel */
 };
 
 
@@ -388,7 +386,7 @@ atm_dgram_control(so, cmd, data, ifp, td)
 			 * Validate interface count - logical interfaces
 			 * are differentiated by the atm address selector.
 			 */
-			if ((asp->asr_nif_cnt <= 0) || (asp->asr_nif_cnt > 256))
+			if (asp->asr_nif_cnt == 0 || asp->asr_nif_cnt > 256)
 				ATM_RETERR(EINVAL);
 
 			/*
@@ -396,7 +394,7 @@ atm_dgram_control(so, cmd, data, ifp, td)
 			 */
 			IFNET_RLOCK();
 			TAILQ_FOREACH(ifp2, &ifnet, if_link) {
-				if (!strcmp(ifp2->if_name, asp->asr_nif_pref)) {
+				if (!strcmp(ifp2->if_dname, asp->asr_nif_pref)) {
 					/*
 					 * If this is for the interface we're
 					 * (re-)defining, let it through

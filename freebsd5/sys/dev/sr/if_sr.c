@@ -27,8 +27,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sr/if_sr.c,v 1.55 2003/04/23 20:22:32 jhay Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/sr/if_sr.c,v 1.57 2003/10/31 18:32:05 brooks Exp $");
 
 /*
  * Programming assumptions and other issues.
@@ -417,8 +419,8 @@ sr_attach(device_t device)
 #ifndef NETGRAPH
 		ifp = &sc->ifsppp.pp_if;
 		ifp->if_softc = sc;
-		ifp->if_unit = sc->unit;
-		ifp->if_name = "sr";
+		if_initname(ifp, device_get_name(device),
+		    device_get_unit(device));
 		ifp->if_mtu = PP_MTU;
 		ifp->if_flags = IFF_POINTOPOINT | IFF_MULTICAST;
 		ifp->if_ioctl = srioctl;

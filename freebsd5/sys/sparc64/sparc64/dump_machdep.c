@@ -24,7 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/sparc64/dump_machdep.c,v 1.4 2003/04/08 06:35:08 jake Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/dump_machdep.c,v 1.6 2003/08/22 07:38:08 imp Exp $
  */
 
 #include <sys/param.h>
@@ -45,9 +45,6 @@
 #include <machine/tlb.h>
 
 CTASSERT(sizeof(struct kerneldumpheader) == DEV_BSIZE);
-
-extern struct ofw_mem_region sparc64_memreg[];
-extern int sparc64_nmemreg;
 
 static struct kerneldumpheader kdh;
 static off_t dumplo, dumppos;

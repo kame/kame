@@ -36,12 +36,12 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_socketvar.h,v 1.7 2000/10/24 17:32:45 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_socketvar.h,v 1.8 2003/11/11 12:30:37 ru Exp $
  * $Whistle: ng_socketvar.h,v 1.1 1999/01/20 21:35:39 archie Exp $
  */
 
 #ifndef _NETGRAPH_NG_SOCKETVAR_H_
-#define _NETGRAPH_NG_SOCKETVAR_H_ 1
+#define _NETGRAPH_NG_SOCKETVAR_H_
 
 /* Netgraph protocol control block for each socket */
 struct ngpcb {

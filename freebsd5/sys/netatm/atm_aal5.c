@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/atm_aal5.c,v 1.16 2002/05/31 11:52:31 tanimura Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * -----------------
  *
  * ATM AAL5 socket protocol processing
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/atm_aal5.c,v 1.18 2003/11/18 00:39:03 rwatson Exp $");
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -55,10 +53,6 @@
 #include <netatm/atm_stack.h>
 #include <netatm/atm_pcb.h>
 #include <netatm/atm_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_aal5.c,v 1.16 2002/05/31 11:52:31 tanimura Exp $");
-#endif
 
 
 /*
@@ -118,7 +112,8 @@ struct pr_usrreqs	atm_aal5_usrreqs = {
 	atm_aal5_sockaddr,		/* pru_sockaddr */
 	sosend,				/* pru_sosend */
 	soreceive,			/* pru_soreceive */
-	sopoll				/* pru_sopoll */
+	sopoll,				/* pru_sopoll */
+	pru_sosetlabel_null		/* pru_sosetlabel */
 };
 
 /*

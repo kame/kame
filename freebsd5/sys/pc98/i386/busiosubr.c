@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/pc98/i386/busiosubr.c,v 1.3 2002/02/18 13:44:46 nyan Exp $ */
+/* $FreeBSD: src/sys/pc98/i386/busiosubr.c,v 1.4 2003/09/23 08:22:33 nyan Exp $ */
 /*	$NecBSD: busiosubr.c,v 1.30.4.4 1999/08/28 02:25:35 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -197,6 +197,14 @@ i386_bus_space_handle_free(bus_space_tag_t t, bus_space_handle_t bsh,
 /*************************************************************************
  * map
  *************************************************************************/
+int
+i386_memio_map(bus_space_tag_t t, bus_addr_t bpa, bus_size_t size, int flags,
+	       bus_space_handle_t *bshp)
+{
+
+	return i386_bus_space_handle_alloc(t, bpa, size, bshp);
+}
+
 void
 i386_memio_unmap(bus_space_tag_t t, bus_space_handle_t bsh, bus_size_t size)
 {

@@ -1,4 +1,3 @@
-/*	$FreeBSD: src/sys/opencrypto/cryptodev.c,v 1.11 2003/03/03 12:15:52 phk Exp $	*/
 /*	$OpenBSD: cryptodev.c,v 1.52 2002/06/19 07:22:46 deraadt Exp $	*/
 
 /*
@@ -30,8 +29,10 @@
  * Effort sponsored in part by the Defense Advanced Research Projects
  * Agency (DARPA) and Air Force Research Laboratory, Air Force
  * Materiel Command, USAF, under agreement number F30602-01-2-0537.
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/opencrypto/cryptodev.c,v 1.17 2003/11/19 22:42:34 sam Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -56,6 +57,7 @@ struct csession {
 	TAILQ_ENTRY(csession) next;
 	u_int64_t	sid;
 	u_int32_t	ses;
+	struct mtx	lock;		/* for op submission */
 
 	u_int32_t	cipher;
 	struct enc_xform *txform;
@@ -70,7 +72,7 @@ struct csession {
 	int		mackeylen;
 	u_char		tmp_mac[CRYPTO_MAX_MAC_LEN];
 
-	struct iovec	iovec[UIO_MAXIOV];
+	struct iovec	iovec;
 	struct uio	uio;
 	int		error;
 };
@@ -91,13 +93,13 @@ static	int cryptof_stat(struct file *, struct stat *,
 static	int cryptof_close(struct file *, struct thread *);
 
 static struct fileops cryptofops = {
-    cryptof_rw,
-    cryptof_rw,
-    cryptof_ioctl,
-    cryptof_poll,
-    cryptof_kqfilter,
-    cryptof_stat,
-    cryptof_close
+    .fo_read = cryptof_rw,
+    .fo_write = cryptof_rw,
+    .fo_ioctl = cryptof_ioctl,
+    .fo_poll = cryptof_poll,
+    .fo_kqfilter = cryptof_kqfilter,
+    .fo_stat = cryptof_stat,
+    .fo_close = cryptof_close
 };
 
 static struct csession *csefind(struct fcrypt *, u_int);
@@ -315,7 +317,7 @@ cryptodev_op(
 {
 	struct cryptop *crp = NULL;
 	struct cryptodesc *crde = NULL, *crda = NULL;
-	int i, error;
+	int error;
 
 	if (cop->len > 256*1024-4)
 		return (E2BIG);
@@ -323,18 +325,15 @@ cryptodev_op(
 	if (cse->txform && (cop->len % cse->txform->blocksize) != 0)
 		return (EINVAL);
 
-	bzero(&cse->uio, sizeof(cse->uio));
+	cse->uio.uio_iov = &cse->iovec;
 	cse->uio.uio_iovcnt = 1;
-	cse->uio.uio_resid = 0;
+	cse->uio.uio_offset = 0;
+	cse->uio.uio_resid = cop->len;
 	cse->uio.uio_segflg = UIO_SYSSPACE;
 	cse->uio.uio_rw = UIO_WRITE;
 	cse->uio.uio_td = td;
-	cse->uio.uio_iov = cse->iovec;
-	bzero(&cse->iovec, sizeof(cse->iovec));
 	cse->uio.uio_iov[0].iov_len = cop->len;
 	cse->uio.uio_iov[0].iov_base = malloc(cop->len, M_XDATA, M_WAITOK);
-	for (i = 0; i < cse->uio.uio_iovcnt; i++)
-		cse->uio.uio_resid += cse->uio.uio_iov[0].iov_len;
 
 	crp = crypto_getreq((cse->txform != NULL) + (cse->thash != NULL));
 	if (crp == NULL) {
@@ -419,12 +418,21 @@ cryptodev_op(
 		crp->crp_mac=cse->tmp_mac;
 	}
 
-	crypto_dispatch(crp);
-	error = tsleep(cse, PSOCK, "crydev", 0);
-	if (error) {
-		/* XXX can this happen?  if so, how do we recover? */
+	/*
+	 * Let the dispatch run unlocked, then, interlock against the
+	 * callback before checking if the operation completed and going
+	 * to sleep.  This insures drivers don't inherit our lock which
+	 * results in a lock order reversal between crypto_dispatch forced
+	 * entry and the crypto_done callback into us.
+	 */
+	error = crypto_dispatch(crp);
+	mtx_lock(&cse->lock);
+	if (error == 0 && (crp->crp_flags & CRYPTO_F_DONE) == 0)
+		error = msleep(crp, &cse->lock, PWAIT, "crydev", 0);
+	mtx_unlock(&cse->lock);
+
+	if (error != 0)
 		goto bail;
-	}
 
 	if (crp->crp_etype != 0) {
 		error = crp->crp_etype;
@@ -462,7 +470,9 @@ cryptodev_cb(void *op)
 	cse->error = crp->crp_etype;
 	if (crp->crp_etype == EAGAIN)
 		return crypto_dispatch(crp);
-	wakeup(cse);
+	mtx_lock(&cse->lock);
+	wakeup_one(crp);
+	mtx_unlock(&cse->lock);
 	return (0);
 }
 
@@ -661,10 +671,17 @@ csecreate(struct fcrypt *fcr, u_int64_t sid, caddr_t key, u_int64_t keylen,
 {
 	struct csession *cse;
 
+#ifdef INVARIANTS
+	/* NB: required when mtx_init is built with INVARIANTS */
+	MALLOC(cse, struct csession *, sizeof(struct csession),
+	    M_XDATA, M_NOWAIT | M_ZERO);
+#else
 	MALLOC(cse, struct csession *, sizeof(struct csession),
 	    M_XDATA, M_NOWAIT);
+#endif
 	if (cse == NULL)
 		return NULL;
+	mtx_init(&cse->lock, "cryptodev", "crypto session lock", MTX_DEF);
 	cse->key = key;
 	cse->keylen = keylen/8;
 	cse->mackey = mackey;
@@ -684,6 +701,7 @@ csefree(struct csession *cse)
 	int error;
 
 	error = crypto_freesession(cse->sid);
+	mtx_destroy(&cse->lock);
 	if (cse->key)
 		FREE(cse->key, M_XDATA);
 	if (cse->mackey)
@@ -730,7 +748,7 @@ cryptoioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 			FREE(fcr, M_XDATA);
 			return (error);
 		}
-		fhold(f);
+		/* falloc automatically provides an extra reference to 'f'. */
 		f->f_flag = FREAD | FWRITE;
 		f->f_type = DTYPE_CRYPTO;
 		f->f_ops = &cryptofops;
@@ -748,7 +766,6 @@ cryptoioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 #define	CRYPTO_MAJOR	70		/* from openbsd */
 static struct cdevsw crypto_cdevsw = {
 	.d_open =	cryptoopen,
-	.d_close =	nullclose,
 	.d_read =	cryptoread,
 	.d_write =	cryptowrite,
 	.d_ioctl =	cryptoioctl,

@@ -23,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
  * DAMAGE.
- *
- * $FreeBSD: src/sys/kern/kern_sx.c,v 1.18 2002/04/04 20:49:35 jhb Exp $
  */
 
 /*
@@ -34,6 +32,9 @@
  * Priority propagation will not generally raise the priority of lock holders,
  * so should not be relied upon in combination with sx locks.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_sx.c,v 1.20 2003/07/13 01:22:20 truckman Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -73,7 +74,7 @@ sx_init(struct sx *sx, const char *description)
 	lock->lo_type = lock->lo_name = description;
 	lock->lo_flags = LO_WITNESS | LO_RECURSABLE | LO_SLEEPABLE |
 	    LO_UPGRADABLE;
-	sx->sx_lock = mtx_pool_find(sx);
+	sx->sx_lock = mtx_pool_find(mtxpool_lockbuilder, sx);
 	sx->sx_cnt = 0;
 	cv_init(&sx->sx_shrd_cv, description);
 	sx->sx_shrd_wcnt = 0;

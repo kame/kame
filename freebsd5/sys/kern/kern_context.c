@@ -22,11 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
  */
-/*
- * $FreeBSD: src/sys/kern/kern_context.c,v 1.5 2003/04/25 01:50:29 deischen Exp $
- */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_context.c,v 1.7 2003/11/09 20:31:03 marcel Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -71,7 +70,7 @@ getcontext(struct thread *td, struct getcontext_args *uap)
 	if (uap->ucp == NULL)
 		ret = EINVAL;
 	else {
-		get_mcontext(td, &uc.uc_mcontext, 1);
+		get_mcontext(td, &uc.uc_mcontext, GET_MC_CLEAR_RET);
 		PROC_LOCK(td->td_proc);
 		uc.uc_sigmask = td->td_sigmask;
 		PROC_UNLOCK(td->td_proc);
@@ -115,7 +114,7 @@ swapcontext(struct thread *td, struct swapcontext_args *uap)
 	if (uap->oucp == NULL || uap->ucp == NULL)
 		ret = EINVAL;
 	else {
-		get_mcontext(td, &uc.uc_mcontext, 1);
+		get_mcontext(td, &uc.uc_mcontext, GET_MC_CLEAR_RET);
 		PROC_LOCK(td->td_proc);
 		uc.uc_sigmask = td->td_sigmask;
 		PROC_UNLOCK(td->td_proc);

@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_vnops.c,v 1.205 2003/05/15 21:12:08 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_vnops.c,v 1.215 2003/11/14 20:54:09 alfred Exp $");
 
 /*
  * vnode op calls for Sun NFS version 2 and 3
@@ -68,6 +68,8 @@ __FBSDID("$FreeBSD: src/sys/nfsclient/nfs_vnops.c,v 1.205 2003/05/15 21:12:08 rw
 #include <vm/vm_extern.h>
 
 #include <fs/fifofs/fifo.h>
+
+#include <rpc/rpcclnt.h>
 
 #include <nfs/rpcv2.h>
 #include <nfs/nfsproto.h>
@@ -135,8 +137,8 @@ static int	nfs_advlock(struct vop_advlock_args *);
 /*
  * Global vfs data structures for nfs
  */
-vop_t **nfsv2_vnodeop_p;
-static struct vnodeopv_entry_desc nfsv2_vnodeop_entries[] = {
+vop_t **nfs_vnodeop_p;
+static struct vnodeopv_entry_desc nfs_vnodeop_entries[] = {
 	{ &vop_default_desc,		(vop_t *) vop_defaultop },
 	{ &vop_access_desc,		(vop_t *) nfs_access },
 	{ &vop_advlock_desc,		(vop_t *) nfs_advlock },
@@ -149,7 +151,6 @@ static struct vnodeopv_entry_desc nfsv2_vnodeop_entries[] = {
 	{ &vop_inactive_desc,		(vop_t *) nfs_inactive },
 	{ &vop_lease_desc,		(vop_t *) vop_null },
 	{ &vop_link_desc,		(vop_t *) nfs_link },
-	{ &vop_lock_desc,		(vop_t *) vop_sharedlock },
 	{ &vop_lookup_desc,		(vop_t *) nfs_lookup },
 	{ &vop_mkdir_desc,		(vop_t *) nfs_mkdir },
 	{ &vop_mknod_desc,		(vop_t *) nfs_mknod },
@@ -168,22 +169,21 @@ static struct vnodeopv_entry_desc nfsv2_vnodeop_entries[] = {
 	{ &vop_write_desc,		(vop_t *) nfs_write },
 	{ NULL, NULL }
 };
-static struct vnodeopv_desc nfsv2_vnodeop_opv_desc =
-	{ &nfsv2_vnodeop_p, nfsv2_vnodeop_entries };
-VNODEOP_SET(nfsv2_vnodeop_opv_desc);
+static struct vnodeopv_desc nfs_vnodeop_opv_desc =
+	{ &nfs_vnodeop_p, nfs_vnodeop_entries };
+VNODEOP_SET(nfs_vnodeop_opv_desc);
 
 /*
  * Special device vnode ops
  */
-vop_t **spec_nfsv2nodeop_p;
-static struct vnodeopv_entry_desc nfsv2_specop_entries[] = {
+vop_t **spec_nfsnodeop_p;
+static struct vnodeopv_entry_desc nfs_specop_entries[] = {
 	{ &vop_default_desc,		(vop_t *) spec_vnoperate },
 	{ &vop_access_desc,		(vop_t *) nfsspec_access },
 	{ &vop_close_desc,		(vop_t *) nfsspec_close },
 	{ &vop_fsync_desc,		(vop_t *) nfs_fsync },
 	{ &vop_getattr_desc,		(vop_t *) nfs_getattr },
 	{ &vop_inactive_desc,		(vop_t *) nfs_inactive },
-	{ &vop_lock_desc,		(vop_t *) vop_sharedlock },
 	{ &vop_print_desc,		(vop_t *) nfs_print },
 	{ &vop_read_desc,		(vop_t *) nfsspec_read },
 	{ &vop_reclaim_desc,		(vop_t *) nfs_reclaim },
@@ -191,19 +191,18 @@ static struct vnodeopv_entry_desc nfsv2_specop_entries[] = {
 	{ &vop_write_desc,		(vop_t *) nfsspec_write },
 	{ NULL, NULL }
 };
-static struct vnodeopv_desc spec_nfsv2nodeop_opv_desc =
-	{ &spec_nfsv2nodeop_p, nfsv2_specop_entries };
-VNODEOP_SET(spec_nfsv2nodeop_opv_desc);
+static struct vnodeopv_desc spec_nfsnodeop_opv_desc =
+	{ &spec_nfsnodeop_p, nfs_specop_entries };
+VNODEOP_SET(spec_nfsnodeop_opv_desc);
 
-vop_t **fifo_nfsv2nodeop_p;
-static struct vnodeopv_entry_desc nfsv2_fifoop_entries[] = {
+vop_t **fifo_nfsnodeop_p;
+static struct vnodeopv_entry_desc nfs_fifoop_entries[] = {
 	{ &vop_default_desc,		(vop_t *) fifo_vnoperate },
 	{ &vop_access_desc,		(vop_t *) nfsspec_access },
 	{ &vop_close_desc,		(vop_t *) nfsfifo_close },
 	{ &vop_fsync_desc,		(vop_t *) nfs_fsync },
 	{ &vop_getattr_desc,		(vop_t *) nfs_getattr },
 	{ &vop_inactive_desc,		(vop_t *) nfs_inactive },
-	{ &vop_lock_desc,		(vop_t *) vop_sharedlock },
 	{ &vop_print_desc,		(vop_t *) nfs_print },
 	{ &vop_read_desc,		(vop_t *) nfsfifo_read },
 	{ &vop_reclaim_desc,		(vop_t *) nfs_reclaim },
@@ -211,9 +210,9 @@ static struct vnodeopv_entry_desc nfsv2_fifoop_entries[] = {
 	{ &vop_write_desc,		(vop_t *) nfsfifo_write },
 	{ NULL, NULL }
 };
-static struct vnodeopv_desc fifo_nfsv2nodeop_opv_desc =
-	{ &fifo_nfsv2nodeop_p, nfsv2_fifoop_entries };
-VNODEOP_SET(fifo_nfsv2nodeop_opv_desc);
+static struct vnodeopv_desc fifo_nfsnodeop_opv_desc =
+	{ &fifo_nfsnodeop_p, nfs_fifoop_entries };
+VNODEOP_SET(fifo_nfsnodeop_opv_desc);
 
 static int	nfs_mknodrpc(struct vnode *dvp, struct vnode **vpp,
 			     struct componentname *cnp, struct vattr *vap);
@@ -285,7 +284,7 @@ nfs3_access_otw(struct vnode *vp, int wmode, struct thread *td,
 	}
 	m_freem(mrep);
 nfsmout:
-	return error;
+	return (error);
 }
 
 /*
@@ -438,7 +437,7 @@ nfs_open(struct vop_open_args *ap)
 #ifdef DIAGNOSTIC
 		printf("open eacces vtyp=%d\n", vp->v_type);
 #endif
-		return (EACCES);
+		return (EOPNOTSUPP);
 	}
 	/*
 	 * Get a valid lease. If cached data is stale, flush it.
@@ -662,7 +661,13 @@ nfs_setattr(struct vop_setattr_args *ap)
  				return (error);
 			    }
  			}
- 			np->n_vattr.va_size = vap->va_size;
+			/*
+			 * np->n_size has already been set to vap->va_size
+			 * in nfs_meta_setsize(). We must set it again since
+			 * nfs_loadattrcache() could be called through
+			 * nfs_meta_setsize() and could modify np->n_size.
+			 */
+ 			np->n_vattr.va_size = np->n_size = vap->va_size;
   		};
   	} else if ((vap->va_mtime.tv_sec != VNOVAL ||
 		vap->va_atime.tv_sec != VNOVAL) && (np->n_flag & NMODIFIED) &&
@@ -950,9 +955,14 @@ nfs_read(struct vop_read_args *ap)
 {
 	struct vnode *vp = ap->a_vp;
 
-	if (vp->v_type != VREG)
-		return (EPERM);
-	return (nfs_bioread(vp, ap->a_uio, ap->a_ioflag, ap->a_cred));
+	switch (vp->v_type) {
+	case VREG:
+		return (nfs_bioread(vp, ap->a_uio, ap->a_ioflag, ap->a_cred));
+	case VDIR:
+		return (EISDIR);
+	default:
+		return (EOPNOTSUPP);
+	}
 }
 
 /*
@@ -1275,7 +1285,7 @@ static int
 nfs_mknod(struct vop_mknod_args *ap)
 {
 
-	return nfs_mknodrpc(ap->a_dvp, ap->a_vpp, ap->a_cnp, ap->a_vap);
+	return (nfs_mknodrpc(ap->a_dvp, ap->a_vpp, ap->a_cnp, ap->a_vap));
 }
 
 static u_long create_verf;
@@ -1463,6 +1473,12 @@ int
 nfs_removeit(struct sillyrename *sp)
 {
 
+	/*
+	 * Make sure that the directory vnode is still valid.
+	 * XXX we should lock sp->s_dvp here.
+	 */
+	if (sp->s_dvp->v_type == VBAD)
+		return (0);
 	return (nfs_removerpc(sp->s_dvp, sp->s_name, sp->s_namlen, sp->s_cred,
 		NULL));
 }
@@ -2383,6 +2399,7 @@ nfs_sillyrename(struct vnode *dvp, struct vnode *vp, struct componentname *cnp)
 		M_NFSREQ, M_WAITOK);
 	sp->s_cred = crhold(cnp->cn_cred);
 	sp->s_dvp = dvp;
+	sp->s_removeit = nfs_removeit;
 	VREF(dvp);
 
 	/* Fudge together a funny name */
@@ -2546,11 +2563,10 @@ nfs_strategy(struct vop_strategy_args *ap)
 	struct thread *td;
 	int error = 0;
 
+	KASSERT(ap->a_vp == ap->a_bp->b_vp, ("%s(%p != %p)",
+	    __func__, ap->a_vp, ap->a_bp->b_vp));
 	KASSERT(!(bp->b_flags & B_DONE), ("nfs_strategy: buffer %p unexpectedly marked B_DONE", bp));
 	KASSERT(BUF_REFCNT(bp) > 0, ("nfs_strategy: buffer %p not locked", bp));
-
-	if (bp->b_flags & B_PHYS)
-		panic("nfs physio");
 
 	if (bp->b_flags & B_ASYNC)
 		td = NULL;
@@ -2959,6 +2975,7 @@ nfs_writebp(struct buf *bp, int force, struct thread *td)
 	if (force)
 		bp->b_flags |= B_WRITEINPROG;
 	BUF_KERNPROC(bp);
+	bp->b_iooffset = dbtob(bp->b_blkno);
 	VOP_STRATEGY(bp->b_vp, bp);
 
 	if( (oldflags & B_ASYNC) == 0) {

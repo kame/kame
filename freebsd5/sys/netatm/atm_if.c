@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/atm_if.c,v 1.21 2003/02/19 05:47:30 imp Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * -----------------
  *
  * ATM interface management
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/atm_if.c,v 1.28 2003/10/31 18:32:10 brooks Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -46,6 +44,7 @@
 #include <net/if_types.h>
 #include <net/if_dl.h>
 #include <net/route.h>
+#include <net/bpf.h>
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #include <netatm/port.h>
@@ -61,18 +60,12 @@
 #include <netatm/atm_pcb.h>
 #include <netatm/atm_var.h>
 
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_if.c,v 1.21 2003/02/19 05:47:30 imp Exp $");
-#endif
-
-
 /*
  * Local functions
  */
 static int	atm_physif_ioctl(int, caddr_t, caddr_t);
-static int	atm_netif_rtdel(struct radix_node *, void *);
 static int	atm_if_ioctl(struct ifnet *, u_long, caddr_t);
-static int	atm_ifparse(char *, char *, int, int *);
+static int	atm_ifparse(const char *, char *, size_t, int *);
 
 /*
  * Local variables
@@ -103,7 +96,7 @@ static int	(*atm_ifouttbl[AF_MAX+1])
 int
 atm_physif_register(cup, name, sdp)
 	Cmn_unit		*cup;
-	char			*name;
+	const char		*name;
 	struct stack_defn	*sdp;
 {
 	struct atm_pif	*pip;
@@ -311,7 +304,9 @@ atm_physif_ioctl(code, data, arg)
 	struct air_int_rsp	apr;
 	struct air_netif_rsp	anr;
 	struct air_cfg_rsp	acr;
-	int			count, len, buf_len = aip->air_buf_len;
+	u_int			count;
+	size_t			len;
+	size_t			buf_len = aip->air_buf_len;
 	int			err = 0;
 	char			ifname[2*IFNAMSIZ];
 	struct ifaddr		*ifa;
@@ -346,7 +341,7 @@ atm_physif_ioctl(code, data, arg)
 			"%s%d", pip->pif_name, pip->pif_unit );
 		if ( pip->pif_nif )
 		{
-			strcpy(apr.anp_nif_pref, pip->pif_nif->nif_if.if_name);
+			strcpy(apr.anp_nif_pref, pip->pif_nif->nif_if.if_dname);
 
 			nip = pip->pif_nif;
 			while ( nip ) {
@@ -397,7 +392,7 @@ atm_physif_ioctl(code, data, arg)
 		 */
 		bzero((caddr_t)&anr, sizeof(anr));
 		(void) snprintf(anr.anp_intf, sizeof(anr.anp_intf),
-		    "%s%d", ifp->if_name, ifp->if_unit);
+		    "%s%d", ifp->if_dname, ifp->if_dunit);
 		IFP_TO_IA(ifp, ia);
 		if (ia) {
 			anr.anp_proto_addr = *ia->ia_ifa.ifa_addr;
@@ -513,8 +508,7 @@ atm_physif_ioctl(code, data, arg)
 			strcpy ( nip->nif_name, asr->asr_nif_pref );
 			nip->nif_sel = count;
 
-			ifp->if_name = nip->nif_name;
-			ifp->if_unit = count;
+			if_initname(ifp, nip->nif_name, count);
 			ifp->if_mtu = ATM_NIF_MTU;
 			ifp->if_flags = IFF_UP | IFF_BROADCAST | IFF_RUNNING;
 			ifp->if_output = atm_ifoutput;
@@ -523,7 +517,7 @@ atm_physif_ioctl(code, data, arg)
 			/*
 			 * Set if_type and if_baudrate
 			 */
-			ifp->if_type = IFT_ATM;
+			ifp->if_type = IFT_IPOVERATM;
 			switch ( cup->cu_config.ac_media ) {
 			case MEDIA_TAXI_100:
 				ifp->if_baudrate = 100000000;
@@ -535,6 +529,15 @@ atm_physif_ioctl(code, data, arg)
 			case MEDIA_OC12C:
 			case MEDIA_UTP155:
 				ifp->if_baudrate = 155000000;
+				break;
+			case MEDIA_UTP25:
+				ifp->if_baudrate = 25600000;
+				break;
+			case MEDIA_VIRTUAL:
+				ifp->if_baudrate = 100000000;	/* XXX */
+				break;
+			case MEDIA_DSL:
+				ifp->if_baudrate = 2500000;	/* XXX */
 				break;
 			case MEDIA_UNKNOWN:
 				ifp->if_baudrate = 9600;
@@ -775,6 +778,13 @@ atm_nif_attach(nip)
 	if_attach(ifp);
 
 	/*
+	 * Add to BPF interface list
+	 * DLT_ATM_RFC_1483 cannot be used because both NULL and LLC/SNAP could
+	 * be provisioned
+	 */
+	bpfattach(ifp, DLT_ATM_CLIP, T_ATM_LLC_MAX_LEN);
+
+	/*
 	 * Add to physical interface list
 	 */
 	LINK2TAIL(nip, struct atm_nif, pip->pif_nif, nif_pnext);
@@ -820,12 +830,8 @@ atm_nif_detach(nip)
 	struct atm_nif	*nip;
 {
 	struct atm_ncm	*ncp;
-	int		s, i;
+	int		s;
 	struct ifnet	*ifp = &nip->nif_if;
-	struct ifaddr	*ifa;
-	struct in_ifaddr	*ia;
-	struct radix_node_head	*rnh;
-
 
 	s = splimp();
 
@@ -837,50 +843,16 @@ atm_nif_detach(nip)
 	}
 
 	/*
-	 * Mark interface down
+	 * Remove from BPF interface list
 	 */
-	if_down(ifp);
+	bpfdetach(ifp);
 
 	/*
-	 * Free all interface routes and addresses
+	 * Free all interface routes and addresses,
+	 * delete all remaining routes using this interface,
+	 * then remove from the system interface list
 	 */
-	while (1) {
-		IFP_TO_IA(ifp, ia);
-		if (ia == NULL)
-			break;
-
-		/* Delete interface route */
-		in_ifscrub(ifp, ia);
-
-		/* Remove interface address from queues */
-		ifa = &ia->ia_ifa;
-		TAILQ_REMOVE(&ifp->if_addrhead, ifa, ifa_link);
-		TAILQ_REMOVE(&in_ifaddrhead, ia, ia_link);
-
-		/* Free interface address */
-		IFAFREE(ifa);
-	}
-
-	/*
-	 * Delete all remaining routes using this interface
-	 * Unfortuneatly the only way to do this is to slog through
-	 * the entire routing table looking for routes which point
-	 * to this interface...oh well...
-	 */
-	for (i = 1; i <= AF_MAX; i++) {
-		if ((rnh = rt_tables[i]) == NULL)
-			continue;
-		RADIX_NODE_HEAD_LOCK(rnh);
-		(void) rnh->rnh_walktree(rnh, atm_netif_rtdel, ifp);
-		RADIX_NODE_HEAD_UNLOCK(rnh);
-	}
-
-	/*
-	 * Remove from system interface list (ie. if_detach())
-	 */
-	IFNET_WLOCK();
-	TAILQ_REMOVE(&ifnet, ifp, if_link);
-	IFNET_WUNLOCK();
+	if_detach(ifp);
 
 	/*
 	 * Remove from physical interface list
@@ -889,52 +861,6 @@ atm_nif_detach(nip)
 
 	(void) splx(s);
 }
-
-
-/*
- * Delete Routes for a Network Interface
- * 
- * Called for each routing entry via the rnh->rnh_walktree() call above
- * to delete all route entries referencing a detaching network interface.
- *
- * Arguments:
- *	rn	pointer to node in the routing table
- *	arg	argument passed to rnh->rnh_walktree() - detaching interface
- *
- * Returns:
- *	0	successful
- *	errno	failed - reason indicated
- *
- */
-static int
-atm_netif_rtdel(rn, arg)
-	struct radix_node	*rn;
-	void			*arg;
-{
-	struct rtentry	*rt = (struct rtentry *)rn;
-	struct ifnet	*ifp = arg;
-	int		err;
-
-	if (rt->rt_ifp == ifp) {
-
-		/*
-		 * Protect (sorta) against walktree recursion problems
-		 * with cloned routes
-		 */
-		if ((rt->rt_flags & RTF_UP) == 0)
-			return (0);
-
-		err = rtrequest(RTM_DELETE, rt_key(rt), rt->rt_gateway,
-				rt_mask(rt), rt->rt_flags,
-				(struct rtentry **) NULL);
-		if (err) {
-			log(LOG_WARNING, "atm_netif_rtdel: error %d\n", err);
-		}
-	}
-
-	return (0);
-}
-
 
 /*
  * Set an ATM Network Interface address
@@ -1095,14 +1021,12 @@ atm_if_ioctl(ifp, cmd, data)
  *
  */
 static int
-atm_ifparse(name, namep, size, unitp)
-	char		*name;
-	char		*namep;
-	int		size;
-	int		*unitp;
+atm_ifparse(const char *name, char *namep, size_t size, int *unitp)
 {
-	char		*cp, *np;
-	int		len = 0, unit = 0;
+	const char *cp;
+	char *np;
+	size_t len = 0;
+	int unit = 0;
 
 	/*
 	 * Separate supplied string into name and unit parts.
@@ -1203,11 +1127,10 @@ atm_nifname(name)
 		 */
 		for (nip = pip->pif_nif; nip; nip = nip->nif_pnext) {
 			struct ifnet	*ifp = (struct ifnet *)nip;
-			if ((ifp->if_unit == unit) && 
-			    (strcmp(ifp->if_name, n) == 0))
+			if ((ifp->if_dunit == unit) && 
+			    (strcmp(ifp->if_dname, n) == 0))
 				return (nip);
 		}
 	}
 	return (NULL);
 }
-

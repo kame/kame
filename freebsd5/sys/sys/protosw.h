@@ -31,16 +31,11 @@
  * SUCH DAMAGE.
  *
  *	@(#)protosw.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/protosw.h,v 1.40 2003/01/01 18:48:59 schweikh Exp $
+ * $FreeBSD: src/sys/sys/protosw.h,v 1.42 2003/11/18 00:39:07 rwatson Exp $
  */
 
 #ifndef _SYS_PROTOSW_H_
 #define _SYS_PROTOSW_H_
-
-/*
- * For pfil_head structure.
- */
-#include <net/pfil.h>
 
 /* Forward declare these structures referenced from prototypes below. */
 struct mbuf;
@@ -107,7 +102,6 @@ struct protosw {
 	pr_drain_t *pr_drain;		/* flush any excess space possible */
 
 	struct	pr_usrreqs *pr_usrreqs;	/* supersedes pr_usrreq() */
-	struct	pfil_head	pr_pfh;
 };
 /*#endif*/
 
@@ -238,6 +232,7 @@ struct pr_usrreqs {
 		    int *flagsp);
 	int	(*pru_sopoll)(struct socket *so, int events,
 		    struct ucred *cred, struct thread *td);
+	void	(*pru_sosetlabel)(struct socket *so);
 };
 
 int	pru_accept_notsupp(struct socket *so, struct sockaddr **nam);
@@ -250,6 +245,7 @@ int	pru_listen_notsupp(struct socket *so, struct thread *td);
 int	pru_rcvd_notsupp(struct socket *so, int flags);
 int	pru_rcvoob_notsupp(struct socket *so, struct mbuf *m, int flags);
 int	pru_sense_null(struct socket *so, struct stat *sb);
+void	pru_sosetlabel_null(struct socket *so);
 
 #endif /* _KERNEL */
 

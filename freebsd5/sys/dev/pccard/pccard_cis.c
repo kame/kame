@@ -1,5 +1,5 @@
 /* $NetBSD: pcmcia_cis.c,v 1.17 2000/02/10 09:01:52 chopps Exp $ */
-/* $FreeBSD: src/sys/dev/pccard/pccard_cis.c,v 1.24 2003/03/18 02:38:33 imp Exp $ */
+/* $FreeBSD: src/sys/dev/pccard/pccard_cis.c,v 1.27 2003/10/07 03:33:53 imp Exp $ */
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -45,6 +45,7 @@
 
 #include <dev/pccard/pccardreg.h>
 #include <dev/pccard/pccardvar.h>
+#include <dev/pccard/pccard_cis.h>
 
 #include "card_if.h"
 
@@ -52,8 +53,8 @@ extern int	pccard_cis_debug;
 
 #define PCCARDCISDEBUG
 #ifdef PCCARDCISDEBUG
-#define	DPRINTF(arg) if (pccard_cis_debug) printf arg
-#define	DEVPRINTF(arg) if (pccard_cis_debug) device_printf arg
+#define	DPRINTF(arg) do { if (pccard_cis_debug) printf arg; } while (0)
+#define	DEVPRINTF(arg) do { if (pccard_cis_debug) device_printf arg; } while (0)
 #else
 #define	DPRINTF(arg)
 #define	DEVPRINTF(arg)
@@ -112,6 +113,9 @@ pccard_scan_cis(device_t dev, int (*fct)(struct pccard_tuple *, void *),
 	u_long longlink_addr;		/* Type suspect */
 	int mfc_count;
 	int mfc_index;
+#ifdef PCCARDCISDEBUG
+	int cis_none_cnt = 10;	/* Only report 10 CIS_NONEs */
+#endif
 	struct {
 		int	common;
 		u_long	addr;
@@ -135,7 +139,8 @@ pccard_scan_cis(device_t dev, int (*fct)(struct pccard_tuple *, void *),
 	tuple.memh = rman_get_bushandle(res);
 	tuple.ptr = 0;
 
-	DPRINTF(("cis mem map %x\n", (unsigned int) tuple.memh));
+	DPRINTF(("cis mem map 0x%x (resource: 0x%lx)\n",
+	    (unsigned int) tuple.memh, rman_get_start(res)));
 
 	tuple.mult = 2;
 
@@ -150,17 +155,34 @@ pccard_scan_cis(device_t dev, int (*fct)(struct pccard_tuple *, void *),
 
 	while (1) {
 		while (1) {
-			/* get the tuple code */
-
-			tuple.code = pccard_cis_read_1(&tuple, tuple.ptr);
+			/*
+			 * Perform boundary check for insane cards.
+			 * If CIS is too long, simulate CIS end.
+			 * (This check may not be sufficient for
+			 * malicious cards.)
+			 */
+			if (tuple.mult * tuple.ptr >= PCCARD_CIS_SIZE - 1
+			    - 32 /* ad hoc value */ ) {
+				printf("CIS is too long -- truncating\n");
+				tuple.code = CISTPL_END;
+			} else {
+				/* get the tuple code */
+				tuple.code = pccard_cis_read_1(&tuple, tuple.ptr);
+			}
 
 			/* two special-case tuples */
 
-			if (tuple.code == PCCARD_CISTPL_NULL) {
-				DPRINTF(("CISTPL_NONE\n 00\n"));
+			if (tuple.code == CISTPL_NULL) {
+#ifdef PCCARDCISDEBUG
+				if (cis_none_cnt > 0)
+					DPRINTF(("CISTPL_NONE\n 00\n"));
+				else if (cis_none_cnt == 0)
+					DPRINTF(("TOO MANY CIS_NONE\n"));
+				cis_none_cnt--;
+#endif
 				tuple.ptr++;
 				continue;
-			} else if (tuple.code == PCCARD_CISTPL_END) {
+			} else if (tuple.code == CISTPL_END) {
 				DPRINTF(("CISTPL_END\n ff\n"));
 				/* Call the function for the END tuple, since
 				   the CIS semantics depend on it */
@@ -175,8 +197,8 @@ pccard_scan_cis(device_t dev, int (*fct)(struct pccard_tuple *, void *),
 
 			tuple.length = pccard_cis_read_1(&tuple, tuple.ptr + 1);
 			switch (tuple.code) {
-			case PCCARD_CISTPL_LONGLINK_A:
-			case PCCARD_CISTPL_LONGLINK_C:
+			case CISTPL_LONGLINK_A:
+			case CISTPL_LONGLINK_C:
 				if (tuple.length < 4) {
 					DPRINTF(("CISTPL_LONGLINK_%s too "
 					    "short %d\n",
@@ -186,17 +208,17 @@ pccard_scan_cis(device_t dev, int (*fct)(struct pccard_tuple *, void *),
 				}
 				longlink_present = 1;
 				longlink_common = (tuple.code ==
-				    PCCARD_CISTPL_LONGLINK_C) ? 1 : 0;
+				    CISTPL_LONGLINK_C) ? 1 : 0;
 				longlink_addr = pccard_tuple_read_4(&tuple, 0);
 				DPRINTF(("CISTPL_LONGLINK_%s %lx\n",
 				    longlink_common ? "C" : "A",
 				    longlink_addr));
 				break;
-			case PCCARD_CISTPL_NO_LINK:
+			case CISTPL_NO_LINK:
 				longlink_present = 0;
 				DPRINTF(("CISTPL_NO_LINK\n"));
 				break;
-			case PCCARD_CISTPL_CHECKSUM:
+			case CISTPL_CHECKSUM:
 				if (tuple.length < 5) {
 					DPRINTF(("CISTPL_CHECKSUM too "
 					    "short %d\n", tuple.length));
@@ -252,7 +274,7 @@ pccard_scan_cis(device_t dev, int (*fct)(struct pccard_tuple *, void *),
 					}
 				}
 				break;
-			case PCCARD_CISTPL_LONGLINK_MFC:
+			case CISTPL_LONGLINK_MFC:
 				if (tuple.length < 1) {
 					DPRINTF(("CISTPL_LONGLINK_MFC too "
 					    "short %d\n", tuple.length));
@@ -361,7 +383,6 @@ pccard_scan_cis(device_t dev, int (*fct)(struct pccard_tuple *, void *),
 		 * In general, this means that if one pointer fails, it will
 		 * try the next one, instead of just bailing.
 		 */
-
 		while (1) {
 			if (longlink_present) {
 				CARD_SET_RES_FLAGS(device_get_parent(dev), dev,
@@ -390,7 +411,7 @@ pccard_scan_cis(device_t dev, int (*fct)(struct pccard_tuple *, void *),
 
 			/* make sure that the link is valid */
 			tuple.code = pccard_cis_read_1(&tuple, tuple.ptr);
-			if (tuple.code != PCCARD_CISTPL_LINKTARGET) {
+			if (tuple.code != CISTPL_LINKTARGET) {
 				DPRINTF(("CISTPL_LINKTARGET expected, "
 				    "code %02x observed\n", tuple.code));
 				continue;
@@ -600,7 +621,7 @@ pccard_parse_cis_tuple(struct pccard_tuple *tuple, void *arg)
 	struct cis_state *state = arg;
 
 	switch (tuple->code) {
-	case PCCARD_CISTPL_END:
+	case CISTPL_END:
 		/* if we've seen a LONGLINK_MFC, and this is the first
 		 * END after it, reset the function list.  
 		 *
@@ -627,7 +648,7 @@ pccard_parse_cis_tuple(struct pccard_tuple *tuple, void *arg)
 			state->pf = NULL;
 		}
 		break;
-	case PCCARD_CISTPL_LONGLINK_MFC:
+	case CISTPL_LONGLINK_MFC:
 		/*
 		 * this tuple's structure was dealt with in scan_cis.  here,
 		 * record the fact that the MFC tuple was seen, so that
@@ -637,8 +658,8 @@ pccard_parse_cis_tuple(struct pccard_tuple *tuple, void *arg)
 		state->gotmfc = 1;
 		break;
 #ifdef PCCARDCISDEBUG
-	case PCCARD_CISTPL_DEVICE:
-	case PCCARD_CISTPL_DEVICE_A:
+	case CISTPL_DEVICE:
+	case CISTPL_DEVICE_A:
 		{
 			u_int reg, dtype, dspeed;
 
@@ -647,7 +668,7 @@ pccard_parse_cis_tuple(struct pccard_tuple *tuple, void *arg)
 			dspeed = reg & PCCARD_DSPEED_MASK;
 
 			DPRINTF(("CISTPL_DEVICE%s type=",
-			(tuple->code == PCCARD_CISTPL_DEVICE) ? "" : "_A"));
+			(tuple->code == CISTPL_DEVICE) ? "" : "_A"));
 			switch (dtype) {
 			case PCCARD_DTYPE_NULL:
 				DPRINTF(("null"));
@@ -711,7 +732,7 @@ pccard_parse_cis_tuple(struct pccard_tuple *tuple, void *arg)
 		DPRINTF(("\n"));
 		break;
 #endif
-	case PCCARD_CISTPL_VERS_1:
+	case CISTPL_VERS_1:
 		if (tuple->length < 6) {
 			DPRINTF(("CISTPL_VERS_1 too short %d\n",
 			    tuple->length));
@@ -738,7 +759,7 @@ pccard_parse_cis_tuple(struct pccard_tuple *tuple, void *arg)
 			DPRINTF(("CISTPL_VERS_1\n"));
 		}
 		break;
-	case PCCARD_CISTPL_MANFID:
+	case CISTPL_MANFID:
 		if (tuple->length < 4) {
 			DPRINTF(("CISTPL_MANFID too short %d\n",
 			    tuple->length));
@@ -760,7 +781,7 @@ pccard_parse_cis_tuple(struct pccard_tuple *tuple, void *arg)
 		}
 		DPRINTF(("CISTPL_MANFID\n"));
 		break;
-	case PCCARD_CISTPL_FUNCID:
+	case CISTPL_FUNCID:
 		if (tuple->length < 1) {
 			DPRINTF(("CISTPL_FUNCID too short %d\n",
 			    tuple->length));
@@ -780,7 +801,7 @@ pccard_parse_cis_tuple(struct pccard_tuple *tuple, void *arg)
 
 		DPRINTF(("CISTPL_FUNCID\n"));
 		break;
-        case PCCARD_CISTPL_FUNCE:
+        case CISTPL_FUNCE:
                 if (state->pf == NULL || state->pf->function <= 0) {
                         DPRINTF(("CISTPL_FUNCE is not followed by "
                                 "valid CISTPL_FUNCID\n"));
@@ -791,7 +812,7 @@ pccard_parse_cis_tuple(struct pccard_tuple *tuple, void *arg)
                 }
                 DPRINTF(("CISTPL_FUNCE\n"));
                 break;
-	case PCCARD_CISTPL_CONFIG:
+	case CISTPL_CONFIG:
 		if (tuple->length < 3) {
 			DPRINTF(("CISTPL_CONFIG too short %d\n",
 			    tuple->length));
@@ -849,7 +870,7 @@ pccard_parse_cis_tuple(struct pccard_tuple *tuple, void *arg)
 		}
 		DPRINTF(("CISTPL_CONFIG\n"));
 		break;
-	case PCCARD_CISTPL_CFTABLE_ENTRY:
+	case CISTPL_CFTABLE_ENTRY:
 		{
 			int idx, i, j;
 			u_int reg, reg2;

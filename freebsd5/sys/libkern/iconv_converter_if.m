@@ -29,7 +29,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/libkern/iconv_converter_if.m,v 1.1 2001/04/09 09:39:29 bp Exp $
+# $FreeBSD: src/sys/libkern/iconv_converter_if.m,v 1.2 2003/09/26 20:26:24 fjoe Exp $
 #
 
 #include <sys/iconv.h>
@@ -53,6 +53,8 @@ METHOD int conv {
         size_t *inbytesleft;
 	char **outbuf;
 	size_t *outbytesleft;
+	int convchar;
+	int casetype;
 };
 
 STATICMETHOD int init {

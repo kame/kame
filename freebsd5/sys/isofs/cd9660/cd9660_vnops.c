@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)cd9660_vnops.c	8.19 (Berkeley) 5/27/95
- * $FreeBSD: src/sys/isofs/cd9660/cd9660_vnops.c,v 1.89 2003/03/03 19:15:39 njl Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/isofs/cd9660/cd9660_vnops.c,v 1.94 2003/10/18 14:10:25 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -560,7 +562,9 @@ cd9660_readdir(ap)
 					   idp->current.d_name, &namelen,
 					   imp->iso_ftype == ISO_FTYPE_9660,
 					   isonum_711(ep->flags)&4,
-					   imp->joliet_level);
+					   imp->joliet_level,
+					   imp->im_flags,
+					   imp->im_d2l);
 				idp->current.d_namlen = (u_char)namelen;
 				if (imp->iso_ftype == ISO_FTYPE_DEFAULT)
 					error = iso_shipdir(idp);
@@ -716,6 +720,8 @@ cd9660_strategy(ap)
 	struct vnode *vp = bp->b_vp;
 	struct iso_node *ip;
 
+	KASSERT(ap->a_vp == ap->a_bp->b_vp, ("%s(%p != %p)",
+	    __func__, ap->a_vp, ap->a_bp->b_vp));
 	ip = VTOI(vp);
 	if (vp->v_type == VBLK || vp->v_type == VCHR)
 		panic("cd9660_strategy: spec");
@@ -731,6 +737,7 @@ cd9660_strategy(ap)
 	}
 	vp = ip->i_devvp;
 	bp->b_dev = vp->v_rdev;
+	bp->b_iooffset = dbtob(bp->b_blkno);
 	VOP_SPECSTRATEGY(vp, bp);
 	return (0);
 }

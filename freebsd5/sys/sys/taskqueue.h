@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/taskqueue.h,v 1.7 2003/02/26 03:15:42 scottl Exp $
+ * $FreeBSD: src/sys/sys/taskqueue.h,v 1.9 2003/09/05 23:09:22 sam Exp $
  */
 
 #ifndef _SYS_TASKQUEUE_H_
@@ -107,10 +107,26 @@ SYSINIT(taskqueue_##name, SI_SUB_CONFIGURE, SI_ORDER_SECOND,		\
 struct __hack
 
 /*
- * This queue is serviced by a software interrupt handler.  To enqueue
- * a task, call taskqueue_enqueue(taskqueue_swi, &task).
+ * These queues are serviced by software interrupt handlers.  To enqueue
+ * a task, call taskqueue_enqueue(taskqueue_swi, &task) or
+ * taskqueue_enqueue(taskqueue_swi_giant, &task).
  */
 TASKQUEUE_DECLARE(swi_giant);
 TASKQUEUE_DECLARE(swi);
+
+/*
+ * This queue is serviced by a kernel thread.  To enqueue a task, call
+ * taskqueue_enqueue(taskqueue_thread, &task).
+ */
+TASKQUEUE_DECLARE(thread);
+
+/*
+ * Queue for swi handlers dispatched from fast interrupt handlers.
+ * These are necessarily different from the above because the queue
+ * must be locked with spinlocks since sleep mutex's cannot be used
+ * from a fast interrupt handler context.
+ */
+TASKQUEUE_DECLARE(fast);
+int	taskqueue_enqueue_fast(struct taskqueue *queue, struct task *task);
 
 #endif /* !_SYS_TASKQUEUE_H_ */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/feeder.h,v 1.8 2002/01/26 22:13:24 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/feeder.h,v 1.11 2003/09/07 16:28:03 cg Exp $
  */
 
 struct pcm_feederdesc {
@@ -57,15 +57,16 @@ u_int32_t chn_fmtchain(struct pcm_channel *c, u_int32_t *to);
 int chn_addfeeder(struct pcm_channel *c, struct feeder_class *fc, struct pcm_feederdesc *desc);
 int chn_removefeeder(struct pcm_channel *c);
 struct pcm_feeder *chn_findfeeder(struct pcm_channel *c, u_int32_t type);
+void feeder_printchain(struct pcm_feeder *head);
 
 #define FEEDER_DECLARE(feeder, palign, pdata) \
 static struct feeder_class feeder ## _class = { \
-	name:		#feeder, \
-	methods:	feeder ## _methods, \
-	size:		sizeof(struct pcm_feeder), \
-	align:		palign, \
-	desc:		feeder ## _desc, \
-	data:		pdata, \
+	.name =		#feeder, \
+	.methods =	feeder ## _methods, \
+	.size =		sizeof(struct pcm_feeder), \
+	.align =	palign, \
+	.desc =		feeder ## _desc, \
+	.data =		pdata, \
 }; \
 SYSINIT(feeder, SI_SUB_DRIVERS, SI_ORDER_MIDDLE, feeder_register, &feeder ## _class);
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/md_var.h,v 1.62 2003/04/04 17:29:54 des Exp $
+ * $FreeBSD: src/sys/i386/include/md_var.h,v 1.66 2003/11/03 22:37:28 jhb Exp $
  */
 
 #ifndef _MACHINE_MD_VAR_H_
@@ -43,6 +43,7 @@ extern	int	(*copyout_vector)(const void *kaddr, void *udaddr, size_t len);
 
 extern	long	Maxmem;
 extern	u_int	atdevbase;	/* offset in virtual memory of ISA io mem */
+extern	u_int	basemem;	/* PA of original top of base memory */
 extern	int	busdma_swi_pending;
 extern	u_int	cpu_exthigh;
 extern	u_int	cpu_feature;
@@ -66,22 +67,6 @@ extern	int	szfreebsd4_sigcode;
 #ifdef COMPAT_43
 extern	int	szosigcode;
 #endif
-#ifdef SWTCH_OPTIM_STATS
-extern int stupid_switch;
-extern int swtch_optim_stats;
-extern int tlb_flush_count;
-extern int lazy_flush_count;
-extern int lazy_flush_fixup;
-#ifdef SMP
-extern int lazy_flush_smpfixup;
-extern int lazy_flush_smpipi;
-extern int lazy_flush_smpbadcr3;
-extern int lazy_flush_smpmiss;
-#endif
-#endif
-#ifdef LAZY_SWITCH
-extern int lazy_flush_enable;
-#endif
 
 typedef void alias_for_inthand_t(u_int cs, u_int ef, u_int esp, u_int ss);
 struct	thread;
@@ -91,8 +76,6 @@ struct  dbreg;
 
 void	bcopyb(const void *from, void *to, size_t len);
 void	busdma_swi(void);
-void	cpu_halt(void);
-void	cpu_reset(void);
 void	cpu_setregs(void);
 void	cpu_switch_load_gs(void) __asm(__STRING(cpu_switch_load_gs));
 void	doreti_iret(void) __asm(__STRING(doreti_iret));
@@ -111,11 +94,12 @@ void	i586_bzero(void *buf, size_t len);
 int	i586_copyin(const void *udaddr, void *kaddr, size_t len);
 int	i586_copyout(const void *kaddr, void *udaddr, size_t len);
 void	i686_pagezero(void *addr);
+void	sse2_pagezero(void *addr);
 void	init_AMD_Elan_sc520(void);
 int	is_physical_memory(vm_offset_t addr);
+int	isa_nmi(int cd);
 vm_paddr_t kvtop(void *addr);
 void	setidt(int idx, alias_for_inthand_t *func, int typ, int dpl, int selec);
-void	swi_vm(void *);
 int     user_dbreg_trap(void);
 
 #endif /* !_MACHINE_MD_VAR_H_ */

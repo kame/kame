@@ -40,8 +40,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_balloc.c	8.8 (Berkeley) 6/16/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_balloc.c,v 1.41 2003/03/04 00:04:43 jeff Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_balloc.c,v 1.43 2003/08/15 20:03:19 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -54,6 +56,8 @@
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
 #include <ufs/ufs/ufs_extern.h>
+#include <ufs/ufs/extattr.h>
+#include <ufs/ufs/ufsmount.h>
 
 #include <ufs/ffs/fs.h>
 #include <ufs/ffs/ffs_extern.h>

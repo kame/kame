@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_object.h,v 1.96 2003/05/18 04:10:16 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_object.h,v 1.103 2003/11/09 05:25:35 alc Exp $
  */
 
 /*
@@ -96,8 +96,8 @@ struct vm_object {
 	LIST_ENTRY(vm_object) shadow_list; /* chain of shadow objects */
 	TAILQ_HEAD(, vm_page) memq;	/* list of resident pages */
 	vm_page_t root;			/* root of the resident page splay tree */
-	int generation;			/* generation ID */
 	vm_pindex_t size;		/* Object size */
+	int generation;			/* generation ID */
 	int ref_count;			/* How many refs?? */
 	int shadow_count;		/* how many objects that this is a shadow for */
 	objtype_t type;			/* type of pager */
@@ -167,8 +167,11 @@ TAILQ_HEAD(object_q, vm_object);
 extern struct object_q vm_object_list;	/* list of allocated objects */
 extern struct mtx vm_object_list_mtx;	/* lock for object list and count */
 
-extern vm_object_t kernel_object;	/* the single kernel object */
-extern vm_object_t kmem_object;
+extern struct vm_object kernel_object_store;
+extern struct vm_object kmem_object_store;
+
+#define	kernel_object	(&kernel_object_store)
+#define	kmem_object	(&kmem_object_store)
 
 #define	VM_OBJECT_LOCK(object)		mtx_lock(&(object)->mtx)
 #define	VM_OBJECT_LOCK_ASSERT(object, type) \
@@ -177,14 +180,19 @@ extern vm_object_t kmem_object;
 					    NULL, MTX_DEF | MTX_DUPOK)
 #define	VM_OBJECT_LOCKED(object)	mtx_owned(&(object)->mtx)
 #define	VM_OBJECT_MTX(object)		(&(object)->mtx)
+#define	VM_OBJECT_TRYLOCK(object)	mtx_trylock(&(object)->mtx)
 #define	VM_OBJECT_UNLOCK(object)	mtx_unlock(&(object)->mtx)
 
-#define	vm_object_lock(object) \
-	mtx_lock((object) == kmem_object ? &kmem_object->mtx : &Giant)
-#define	vm_object_unlock(object) \
-	mtx_unlock((object) == kmem_object ? &kmem_object->mtx : &Giant)
+/*
+ *	The object must be locked or thread private.
+ */
+static __inline void
+vm_object_set_flag(vm_object_t object, u_short bits)
+{
 
-void vm_object_set_flag(vm_object_t object, u_short bits);
+	object->flags |= bits;
+}
+
 void vm_object_clear_flag(vm_object_t object, u_short bits);
 void vm_object_pip_add(vm_object_t object, short i);
 void vm_object_pip_subtract(vm_object_t object, short i);
@@ -205,8 +213,11 @@ void vm_object_init (void);
 void vm_object_page_clean (vm_object_t, vm_pindex_t, vm_pindex_t, boolean_t);
 void vm_object_page_remove (vm_object_t, vm_pindex_t, vm_pindex_t, boolean_t);
 void vm_object_reference (vm_object_t);
+void vm_object_reference_locked(vm_object_t);
 void vm_object_shadow (vm_object_t *, vm_ooffset_t *, vm_size_t);
 void vm_object_split(vm_map_entry_t);
+void vm_object_sync(vm_object_t, vm_ooffset_t, vm_size_t, boolean_t,
+    boolean_t);
 void vm_object_madvise (vm_object_t, vm_pindex_t, int, int);
 #endif				/* _KERNEL */
 

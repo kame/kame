@@ -32,9 +32,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ipx_usrreq.c
- *
- * $FreeBSD: src/sys/netipx/ipx_usrreq.c,v 1.37 2003/03/08 06:58:22 tjr Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netipx/ipx_usrreq.c,v 1.39 2003/11/18 00:39:05 rwatson Exp $");
 
 #include "opt_ipx.h"
 
@@ -91,7 +92,7 @@ struct	pr_usrreqs ipx_usrreqs = {
 	ipx_connect, pru_connect2_notsupp, ipx_control, ipx_detach,
 	ipx_disconnect, pru_listen_notsupp, ipx_peeraddr, pru_rcvd_notsupp,
 	pru_rcvoob_notsupp, ipx_send, pru_sense_null, ipx_shutdown,
-	ipx_sockaddr, sosend, soreceive, sopoll
+	ipx_sockaddr, sosend, soreceive, sopoll, pru_sosetlabel_null
 };
 
 struct	pr_usrreqs ripx_usrreqs = {
@@ -99,7 +100,7 @@ struct	pr_usrreqs ripx_usrreqs = {
 	ipx_connect, pru_connect2_notsupp, ipx_control, ipx_detach,
 	ipx_disconnect, pru_listen_notsupp, ipx_peeraddr, pru_rcvd_notsupp,
 	pru_rcvoob_notsupp, ipx_send, pru_sense_null, ipx_shutdown,
-	ipx_sockaddr, sosend, soreceive, sopoll
+	ipx_sockaddr, sosend, soreceive, sopoll, pru_sosetlabel_null
 };
 
 /*

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/_mutex.h,v 1.9 2002/12/29 11:14:41 phk Exp $
+ * $FreeBSD: src/sys/sys/_mutex.h,v 1.10 2003/11/11 22:07:29 jhb Exp $
  */
 
 #ifndef _SYS__MUTEX_H_
@@ -38,8 +38,6 @@ struct mtx {
 	struct lock_object	mtx_object;	/* Common lock properties. */
 	volatile uintptr_t	mtx_lock;	/* Owner and flags. */
 	volatile u_int		mtx_recurse;	/* Number of recursive holds. */
-	TAILQ_HEAD(, thread)	mtx_blocked;	/* Threads blocked on us. */
-	LIST_ENTRY(mtx)		mtx_contested;	/* Next contested mtx. */
 
 #ifdef MUTEX_PROFILING
 	/*

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2000 Mark R V Murray
+ * Copyright (c) 2000, 2001, 2002, 2003 Mark R V Murray
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,8 +23,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/random/randomdev.c,v 1.40 2003/03/03 12:15:45 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/random/randomdev.c,v 1.46 2003/11/20 15:35:48 markm Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,41 +53,47 @@
 
 #include <dev/random/randomdev.h>
 
-static d_open_t		random_open;
 static d_close_t	random_close;
 static d_read_t		random_read;
 static d_write_t	random_write;
 static d_ioctl_t	random_ioctl;
 static d_poll_t		random_poll;
 
-#define CDEV_MAJOR	2
-#define RANDOM_MINOR	3
+#define RANDOM_MINOR	0
+
+#define RANDOM_FIFO_MAX	256	/* How many events to queue up */
 
 static struct cdevsw random_cdevsw = {
-	.d_open =	random_open,
 	.d_close =	random_close,
 	.d_read =	random_read,
 	.d_write =	random_write,
 	.d_ioctl =	random_ioctl,
 	.d_poll =	random_poll,
 	.d_name =	"random",
-	.d_maj =	CDEV_MAJOR,
 };
 
 static void random_kthread(void *);
 static void random_harvest_internal(u_int64_t, void *, u_int, u_int, u_int, enum esource);
 static void random_write_internal(void *, int);
 
-/* Ring buffer holding harvested entropy */
-static struct harvestring {
-	volatile u_int	head;
-	volatile u_int	tail;
-	struct harvest	data[HARVEST_RING_SIZE];
-} harvestring;
+MALLOC_DEFINE(M_ENTROPY, "entropy", "Entropy harvesting buffers");
+
+/* Lockable FIFO queue holding entropy buffers */
+struct entropyfifo {
+	struct mtx lock;
+	int count;
+	STAILQ_HEAD(harvestlist, harvest) head;
+};
+
+/* Empty entropy buffers */
+static struct entropyfifo emptyfifo;
+#define EMPTYBUFFERS	1024
+
+/* Harvested entropy */
+static struct entropyfifo harvestfifo[ENTROPYSOURCE];
 
 static struct random_systat {
 	u_int		seeded;	/* 0 causes blocking 1 allows normal output */
-	u_int		burst;	/* number of events to do before sleeping */
 	struct selinfo	rsel;	/* For poll(2) */
 } random_systat;
 
@@ -107,8 +115,6 @@ random_check_boolean(SYSCTL_HANDLER_ARGS)
         return sysctl_handle_int(oidp, oidp->oid_arg1, oidp->oid_arg2, req);
 }
 
-RANDOM_CHECK_UINT(burst, 0, 20);
-
 SYSCTL_NODE(_kern, OID_AUTO, random, CTLFLAG_RW,
 	0, "Random Number Generator");
 SYSCTL_NODE(_kern_random, OID_AUTO, sys, CTLFLAG_RW,
@@ -116,9 +122,6 @@ SYSCTL_NODE(_kern_random, OID_AUTO, sys, CTLFLAG_RW,
 SYSCTL_PROC(_kern_random_sys, OID_AUTO, seeded,
 	CTLTYPE_INT|CTLFLAG_RW, &random_systat.seeded, 1,
 	random_check_boolean, "I", "Seeded State");
-SYSCTL_PROC(_kern_random_sys, OID_AUTO, burst,
-	CTLTYPE_INT|CTLFLAG_RW, &random_systat.burst, 20,
-	random_check_uint_burst, "I", "Harvest Burst Size");
 SYSCTL_NODE(_kern_random_sys, OID_AUTO, harvest, CTLFLAG_RW,
 	0, "Entropy Sources");
 SYSCTL_PROC(_kern_random_sys_harvest, OID_AUTO, ethernet,
@@ -136,28 +139,10 @@ SYSCTL_PROC(_kern_random_sys_harvest, OID_AUTO, swi,
 
 /* ARGSUSED */
 static int
-random_open(dev_t dev __unused, int flags, int fmt __unused, struct thread *td)
-{
-	int error;
-
-	if (flags & FWRITE) {
-		error = suser(td);
-		if (error)
-			return (error);
-		error = securelevel_gt(td->td_ucred, 0);
-		if (error)
-			return (error);
-	}
-	return 0;
-}
-
-/* ARGSUSED */
-static int
 random_close(dev_t dev __unused, int flags, int fmt __unused, struct thread *td)
 {
 	if (flags & FWRITE) {
-		if (!(suser(td) ||
-		    securelevel_gt(td->td_ucred, 0)))
+		if (suser(td) == 0 && securelevel_gt(td->td_ucred, 0) == 0)
 			random_reseed();
 	}
 	return 0;
@@ -248,7 +233,8 @@ random_poll(dev_t dev __unused, int events, struct thread *td)
 static int
 random_modevent(module_t mod __unused, int type, void *data __unused)
 {
-	int	error;
+	int	error, i;
+	struct harvest *np;
 
 	switch(type) {
 	case MOD_LOAD:
@@ -259,14 +245,22 @@ random_modevent(module_t mod __unused, int type, void *data __unused)
 		 */
 		random_systat.seeded = 1;
 
-		/* Number of envents to process off the harvest
-		 * queue before giving it a break and sleeping
-		 */
-		random_systat.burst = 20;
-
-		/* Initialise the harvest ringbuffer */
-		harvestring.head = 0;
-		harvestring.tail = 0;
+		/* Initialise the harvest fifos */
+		STAILQ_INIT(&emptyfifo.head);
+		emptyfifo.count = 0;
+		mtx_init(&emptyfifo.lock, "entropy harvest buffers", NULL,
+			MTX_SPIN);
+		for (i = 0; i < EMPTYBUFFERS; i++) {
+			np = malloc(sizeof(struct harvest), M_ENTROPY,
+				M_WAITOK);
+			STAILQ_INSERT_TAIL(&emptyfifo.head, np, next);
+		}
+		for (i = 0; i < ENTROPYSOURCE; i++) {
+			STAILQ_INIT(&harvestfifo[i].head);
+			harvestfifo[i].count = 0;
+			mtx_init(&harvestfifo[i].lock, "entropy harvest", NULL,
+				MTX_SPIN);
+		}
 
 		if (bootverbose)
 			printf("random: <entropy source>\n");
@@ -296,6 +290,22 @@ random_modevent(module_t mod __unused, int type, void *data __unused)
 		random_kthread_control = -1;
 		tsleep((void *)&random_kthread_control, PUSER, "term", 0);
 
+		/* Destroy the harvest fifos */
+		while (!STAILQ_EMPTY(&emptyfifo.head)) {
+			np = STAILQ_FIRST(&emptyfifo.head);
+			STAILQ_REMOVE_HEAD(&emptyfifo.head, next);
+			free(np, M_ENTROPY);
+		}
+		mtx_destroy(&emptyfifo.lock);
+		for (i = 0; i < ENTROPYSOURCE; i++) {
+			while (!STAILQ_EMPTY(&harvestfifo[i].head)) {
+				np = STAILQ_FIRST(&harvestfifo[i].head);
+				STAILQ_REMOVE_HEAD(&harvestfifo[i].head, next);
+				free(np, M_ENTROPY);
+			}
+			mtx_destroy(&harvestfifo[i].lock);
+		}
+
 		random_deinit();
 
 		destroy_dev(random_dev);
@@ -316,51 +326,62 @@ DEV_MODULE(random, random_modevent, NULL);
 static void
 random_kthread(void *arg __unused)
 {
-	struct harvest	*event;
-	u_int		newtail, burst;
+	struct harvest	*event = NULL;
+	int		found, active;
+	enum esource	source;
 
-	/* Drain the harvest queue (in 'burst' size chunks,
-	 * if 'burst' > 0. If 'burst' == 0, then completely
-	 * drain the queue.
-	 */
-	for (burst = 0; ; burst++) {
+	/* Process until told to stop */
+	for (; random_kthread_control == 0;) {
 
-		if ((harvestring.tail == harvestring.head) ||
-			(random_systat.burst && burst == random_systat.burst)) {
-				tsleep(&harvestring, PUSER, "sleep", hz/10);
-				burst = 0;
+		active = 0;
+
+		/* Cycle through all the entropy sources */
+		for (source = 0; source < ENTROPYSOURCE; source++) {
+
+			found = 0;
+
+			/* Lock up queue draining */
+			mtx_lock_spin(&harvestfifo[source].lock);
+
+			if (!STAILQ_EMPTY(&harvestfifo[source].head)) {
+
+				/* Get a harvested entropy event */
+				harvestfifo[source].count--;
+				event = STAILQ_FIRST(&harvestfifo[source].head);
+				STAILQ_REMOVE_HEAD(&harvestfifo[source].head,
+					next);
+
+				active = found = 1;
+
+			}
+
+			/* Unlock the queue */
+			mtx_unlock_spin(&harvestfifo[source].lock);
+
+			/* Deal with the event and dispose of it */
+			if (found) {
+
+				random_process_event(event);
+
+				/* Lock the empty event buffer fifo */
+				mtx_lock_spin(&emptyfifo.lock);
+
+				STAILQ_INSERT_TAIL(&emptyfifo.head, event, next);
+
+				mtx_unlock_spin(&emptyfifo.lock);
+
+			}
 
 		}
-		else {
 
-			/* Suck a harvested entropy event out of the queue and
-			 * hand it to the event processor
-			 */
-
-			newtail = (harvestring.tail + 1) & HARVEST_RING_MASK;
-			event = &harvestring.data[harvestring.tail];
-
-			/* Bump the ring counter. This action is assumed
-			 * to be atomic.
-			 */
-			harvestring.tail = newtail;
-
-			random_process_event(event);
-
-		}
-
-		/* Is the thread scheduled for a shutdown? */
-		if (random_kthread_control != 0) {
-#ifdef DEBUG
-			printf("Random kthread setting terminate\n");
-#endif
-			random_set_wakeup_exit(&random_kthread_control);
-			/* NOTREACHED */
-			break;
-		}
+		/* Found nothing, so don't belabour the issue */
+		if (!active)
+			tsleep(&harvestfifo, PUSER, "-", hz/10);
 
 	}
 
+	random_set_wakeup_exit(&random_kthread_control);
+	/* NOTREACHED */
 }
 
 /* Entropy harvesting routine. This is supposed to be fast; do
@@ -370,33 +391,49 @@ static void
 random_harvest_internal(u_int64_t somecounter, void *entropy, u_int count,
 	u_int bits, u_int frac, enum esource origin)
 {
-	struct harvest	*pharvest;
-	u_int		newhead;
+	struct harvest	*event;
 
-	newhead = (harvestring.head + 1) & HARVEST_RING_MASK;
+	/* Lock the particular fifo */
+	mtx_lock_spin(&harvestfifo[origin].lock);
 
-	if (newhead != harvestring.tail) {
+	/* Don't make the harvest queues too big - help to prevent
+	 * low-grade entropy swamping
+	 */
+	if (harvestfifo[origin].count < RANDOM_FIFO_MAX) {
+		
+		/* Lock the empty event buffer fifo */
+		mtx_lock_spin(&emptyfifo.lock);
 
-		/* Add the harvested data to the ring buffer */
+		if (!STAILQ_EMPTY(&emptyfifo.head)) {
+			event = STAILQ_FIRST(&emptyfifo.head);
+			STAILQ_REMOVE_HEAD(&emptyfifo.head, next);
+		}
+		else
+			event = NULL;
 
-		pharvest = &harvestring.data[harvestring.head];
+		mtx_unlock_spin(&emptyfifo.lock);
 
-		/* Stuff the harvested data into the ring */
-		pharvest->somecounter = somecounter;
-		count = count > HARVESTSIZE ? HARVESTSIZE : count;
-		memcpy(pharvest->entropy, entropy, count);
-		pharvest->size = count;
-		pharvest->bits = bits;
-		pharvest->frac = frac;
-		pharvest->source =
-		    origin < ENTROPYSOURCE ? origin : RANDOM_START;
+		/* If we didn't obtain a buffer, tough */
+		if (event) {
 
-		/* Bump the ring counter. This action is assumed
-		 * to be atomic.
-		 */
-		harvestring.head = newhead;
+			/* Add the harvested data to the fifo */
+			harvestfifo[origin].count++;
+			event->somecounter = somecounter;
+			event->size = count;
+			event->bits = bits;
+			event->frac = frac;
+			event->source = origin;
+
+			/* XXXX Come back and make this dynamic! */
+			count = count > HARVESTSIZE ? HARVESTSIZE : count;
+			memcpy(event->entropy, entropy, count);
+
+			STAILQ_INSERT_TAIL(&harvestfifo[origin].head, event, next);
+		}
 
 	}
+
+	mtx_unlock_spin(&harvestfifo[origin].lock);
 
 }
 
@@ -404,27 +441,18 @@ static void
 random_write_internal(void *buf, int count)
 {
 	int	i;
+	u_int	chunk;
 
 	/* Break the input up into HARVESTSIZE chunks.
 	 * The writer has too much control here, so "estimate" the
 	 * the entropy as zero.
 	 */
 	for (i = 0; i < count; i += HARVESTSIZE) {
+		chunk = HARVESTSIZE;
+		if (i + chunk >= count)
+			chunk = (u_int)(count - i);
 		random_harvest_internal(get_cyclecount(), (char *)buf + i,
-			HARVESTSIZE, 0, 0, RANDOM_WRITE);
-	}
-
-	/* Maybe the loop iterated at least once */
-	if (i > count)
-		i -= HARVESTSIZE;
-
-	/* Get the last bytes even if the input length is not
-	 * a multiple of HARVESTSIZE.
-	 */
-	count %= HARVESTSIZE;
-	if (count) {
-		random_harvest_internal(get_cyclecount(), (char *)buf + i,
-			(u_int)count, 0, 0, RANDOM_WRITE);
+			chunk, 0, 0, RANDOM_WRITE);
 	}
 }
 
@@ -433,7 +461,7 @@ random_unblock(void)
 {
 	if (!random_systat.seeded) {
 		random_systat.seeded = 1;
-		selwakeup(&random_systat.rsel);
+		selwakeuppri(&random_systat.rsel, PUSER);
 		wakeup(&random_systat);
 	}
 }

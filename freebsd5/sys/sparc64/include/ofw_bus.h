@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2001 by Thomas Moestl <tmm@FreeBSD.org>.
+ * Copyright (c) 2001 - 2003 by Thomas Moestl <tmm@FreeBSD.org>.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/ofw_bus.h,v 1.4 2003/05/30 20:48:04 tmm Exp $
+ * $FreeBSD: src/sys/sparc64/include/ofw_bus.h,v 1.5 2003/07/01 14:52:46 tmm Exp $
  */
 
 #ifndef	_MACHINE_OFW_BUS_H_
@@ -31,9 +31,34 @@
 #define	ORIP_NOINT	-1
 #define	ORIR_NOTFOUND	0xffffffff
 
+/*
+ * Other than in OpenFirmware calls, the size of a bus cell seems to be always
+ * the same.
+ */
+typedef u_int32_t pcell_t;
+
+#ifdef OFW_NEWPCI
+
+struct ofw_bus_iinfo {
+	u_int8_t		*opi_imap;
+	u_int8_t		*opi_imapmsk;
+	int			opi_imapsz;
+	pcell_t			opi_addrc;
+};
+
+void ofw_bus_setup_iinfo(phandle_t, struct ofw_bus_iinfo *, int);
+int ofw_bus_lookup_imap(phandle_t, struct ofw_bus_iinfo *, void *, int,
+    void *, int, void *, int, void *);
+int ofw_bus_search_intrmap(void *, int, void *, int, void *, int, void *,
+    void *, void *, int);
+
+#else
+
 typedef int obr_callback_t(phandle_t, u_int8_t *, int, u_int8_t *, int,
     u_int8_t **, int *, void *);
 
 u_int32_t ofw_bus_route_intr(phandle_t, int, obr_callback_t *, void *);
+
+#endif
 
 #endif /* !_MACHINE_OFW_BUS_H_ */

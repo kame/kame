@@ -37,8 +37,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_acct.c	8.1 (Berkeley) 6/14/93
- * $FreeBSD: src/sys/kern/kern_acct.c,v 1.64 2003/05/01 16:59:22 des Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_acct.c,v 1.68 2003/07/27 17:04:55 phk Exp $");
 
 #include "opt_mac.h"
 
@@ -142,7 +144,7 @@ acct(td, uap)
 	if (uap->path != NULL) {
 		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_USERSPACE, uap->path, td);
 		flags = FWRITE | O_APPEND;
-		error = vn_open(&nd, &flags, 0);
+		error = vn_open(&nd, &flags, 0, -1);
 		if (error)
 			goto done2;
 		NDFREE(&nd, NDF_ONLY_PNBUF);
@@ -185,6 +187,7 @@ acct(td, uap)
 		acctp = savacctp = NULLVP;
 		crfree(acctcred != NOCRED ? acctcred : savacctcred);
 		acctcred = savacctcred = NOCRED;
+		log(LOG_NOTICE, "Accounting disabled\n");
 	}
 	if (uap->path == NULL) {
 		mtx_unlock(&acct_mtx);
@@ -200,6 +203,7 @@ acct(td, uap)
 	acctflags = flags;
 	callout_init(&acctwatch_callout, 0);
 	mtx_unlock(&acct_mtx);
+	log(LOG_NOTICE, "Accounting enabled\n");
 	acctwatch(NULL);
 done2:
 	mtx_unlock(&Giant);

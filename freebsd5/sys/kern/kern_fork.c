@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_fork.c	8.6 (Berkeley) 4/8/94
- * $FreeBSD: src/sys/kern/kern_fork.c,v 1.198 2003/05/13 20:35:59 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_fork.c,v 1.208 2003/10/29 15:23:09 bde Exp $");
 
 #include "opt_ktrace.h"
 #include "opt_mac.h"
@@ -48,6 +50,7 @@
 #include <sys/eventhandler.h>
 #include <sys/filedesc.h>
 #include <sys/kernel.h>
+#include <sys/kthread.h>
 #include <sys/sysctl.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
@@ -57,12 +60,12 @@
 #include <sys/resourcevar.h>
 #include <sys/sched.h>
 #include <sys/syscall.h>
+#include <sys/vmmeter.h>
 #include <sys/vnode.h>
 #include <sys/acct.h>
 #include <sys/mac.h>
 #include <sys/ktr.h>
 #include <sys/ktrace.h>
-#include <sys/kthread.h>
 #include <sys/unistd.h>	
 #include <sys/jail.h>
 #include <sys/sx.h>
@@ -73,7 +76,6 @@
 #include <vm/vm_extern.h>
 #include <vm/uma.h>
 
-#include <sys/vmmeter.h>
 #include <sys/user.h>
 #include <machine/critical.h>
 
@@ -102,7 +104,7 @@ fork(td, uap)
 		td->td_retval[0] = p2->p_pid;
 		td->td_retval[1] = 0;
 	}
-	return error;
+	return (error);
 }
 
 /*
@@ -122,7 +124,7 @@ vfork(td, uap)
 		td->td_retval[0] = p2->p_pid;
 		td->td_retval[1] = 0;
 	}
-	return error;
+	return (error);
 }
 
 /*
@@ -139,23 +141,15 @@ rfork(td, uap)
 	/* Don't allow kernel only flags. */
 	if ((uap->flags & RFKERNELONLY) != 0)
 		return (EINVAL);
-	/* 
-	 * Don't allow sharing of file descriptor table unless
-	 * RFTHREAD flag is supplied
-	 */
-	if ((uap->flags & (RFPROC | RFTHREAD | RFFDG | RFCFDG)) ==
-	    RFPROC)
-		return(EINVAL);
 	error = fork1(td, uap->flags, 0, &p2);
 	if (error == 0) {
 		td->td_retval[0] = p2 ? p2->p_pid : 0;
 		td->td_retval[1] = 0;
 	}
-	return error;
+	return (error);
 }
 
-
-int	nprocs = 1;				/* process 0 */
+int	nprocs = 1;		/* process 0 */
 int	lastpid = 0;
 SYSCTL_INT(_kern, OID_AUTO, lastpid, CTLFLAG_RD, &lastpid, 0, 
     "Last used PID");
@@ -197,30 +191,32 @@ SYSCTL_PROC(_kern, OID_AUTO, randompid, CTLTYPE_INT|CTLFLAG_RW,
 
 int
 fork1(td, flags, pages, procp)
-	struct thread *td;			/* parent proc */
+	struct thread *td;
 	int flags;
 	int pages;
-	struct proc **procp;			/* child proc */
+	struct proc **procp;
 {
-	struct proc *p2, *pptr;
+	struct proc *p1, *p2, *pptr;
 	uid_t uid;
 	struct proc *newproc;
-	int trypid;
-	int ok;
-	static int pidchecked = 0;
+	int ok, trypid;
+	static int curfail, pidchecked = 0;
+	static struct timeval lastfail;
 	struct filedesc *fd;
-	struct proc *p1 = td->td_proc;
+	struct filedesc_to_leader *fdtol;
 	struct thread *td2;
 	struct kse *ke2;
 	struct ksegrp *kg2;
 	struct sigacts *newsigacts;
 	int error;
 
-	/* Can't copy and clear */
+	/* Can't copy and clear. */
 	if ((flags & (RFFDG|RFCFDG)) == (RFFDG|RFCFDG))
 		return (EINVAL);
 
+	p1 = td->td_proc;
 	mtx_lock(&Giant);
+
 	/*
 	 * Here we don't create a new process, but we divorce
 	 * certain parts of a process from itself.
@@ -263,7 +259,7 @@ fork1(td, flags, pages, procp)
 	 * other side with the expectation that the process is about to
 	 * exec.
 	 */
-	if (p1->p_flag & P_THREADED) {
+	if (p1->p_flag & P_SA) {
 		/*
 		 * Idle the other threads for a second.
 		 * Since the user space is copied, it must remain stable.
@@ -335,9 +331,8 @@ fork1(td, flags, pages, procp)
 	 */
 	trypid = lastpid + 1;
 	if (flags & RFHIGHPID) {
-		if (trypid < 10) {
+		if (trypid < 10)
 			trypid = 10;
-		}
 	} else {
 		if (randompid)
 			trypid += arc4random() % randompid;
@@ -419,15 +414,40 @@ again:
 	/*
 	 * Copy filedesc.
 	 */
-	if (flags & RFCFDG)
+	if (flags & RFCFDG) {
 		fd = fdinit(td->td_proc->p_fd);
-	else if (flags & RFFDG) {
+		fdtol = NULL;
+	} else if (flags & RFFDG) {
 		FILEDESC_LOCK(p1->p_fd);
 		fd = fdcopy(td->td_proc->p_fd);
 		FILEDESC_UNLOCK(p1->p_fd);
-	} else
+		fdtol = NULL;
+	} else {
 		fd = fdshare(p1->p_fd);
-
+		if (p1->p_fdtol == NULL)
+			p1->p_fdtol =
+				filedesc_to_leader_alloc(NULL,
+							 NULL,
+							 p1->p_leader);
+		if ((flags & RFTHREAD) != 0) {
+			/*
+			 * Shared file descriptor table and
+			 * shared process leaders.
+			 */
+			fdtol = p1->p_fdtol;
+			FILEDESC_LOCK(p1->p_fd);
+			fdtol->fdl_refcount++;
+			FILEDESC_UNLOCK(p1->p_fd);
+		} else {
+			/* 
+			 * Shared file descriptor table, and
+			 * different process leaders 
+			 */
+			fdtol = filedesc_to_leader_alloc(p1->p_fdtol,
+							 p1->p_fd,
+							 p2);
+		}
+	}
 	/*
 	 * Make a proc table entry for the new process.
 	 * Start by zeroing the section of proc that is zero-initialized,
@@ -439,7 +459,7 @@ again:
 
 	/* Allocate and switch to an alternate kstack if specified */
 	if (pages != 0)
-		pmap_new_altkstack(td2, pages);
+		vm_thread_new_altkstack(td2, pages);
 
 	PROC_LOCK(p2);
 	PROC_LOCK(p1);
@@ -506,6 +526,7 @@ again:
 	if (p2->p_textvp)
 		VREF(p2->p_textvp);
 	p2->p_fd = fd;
+	p2->p_fdtol = fdtol;
 	PROC_UNLOCK(p1);
 	PROC_UNLOCK(p2);
 
@@ -559,7 +580,7 @@ again:
 	 * Preserve some more flags in subprocess.  P_PROFIL has already
 	 * been preserved.
 	 */
-	p2->p_flag |= p1->p_flag & (P_SUGID | P_ALTSTACK);
+	p2->p_flag |= p1->p_flag & (P_ALTSTACK | P_SUGID);
 	SESS_LOCK(p1->p_session);
 	if (p1->p_session->s_ttyvp != NULL && p1->p_flag & P_CONTROLT)
 		p2->p_flag |= P_CONTROLT;
@@ -571,7 +592,7 @@ again:
 	PGRP_UNLOCK(p1->p_pgrp);
 	LIST_INIT(&p2->p_children);
 
-	callout_init(&p2->p_itcallout, 1);
+	callout_init(&p2->p_itcallout, CALLOUT_MPSAFE);
 
 #ifdef KTRACE
 	/*
@@ -677,9 +698,10 @@ again:
 	_PRELE(p1);
 
 	/*
-	 * tell any interested parties about the new process
+	 * Tell any interested parties about the new process.
 	 */
 	KNOTE(&p1->p_klist, NOTE_FORK | p2->p_pid);
+
 	PROC_UNLOCK(p1);
 
 	/*
@@ -695,7 +717,7 @@ again:
 	/*
 	 * If other threads are waiting, let them continue now
 	 */
-	if (p1->p_flag & P_THREADED) {
+	if (p1->p_flag & P_SA) {
 		PROC_LOCK(p1);
 		thread_single_end();
 		PROC_UNLOCK(p1);
@@ -708,9 +730,12 @@ again:
 	*procp = p2;
 	return (0);
 fail:
+	if (ppsratecheck(&lastfail, &curfail, 1))
+		printf("maxproc limit exceeded by uid %i, please see tuning(7) and login.conf(5).\n",
+			uid);
 	sx_xunlock(&allproc_lock);
 	uma_zfree(proc_zone, newproc);
-	if (p1->p_flag & P_THREADED) {
+	if (p1->p_flag & P_SA) {
 		PROC_LOCK(p1);
 		thread_single_end();
 		PROC_UNLOCK(p1);
@@ -730,8 +755,14 @@ fork_exit(callout, arg, frame)
 	void *arg;
 	struct trapframe *frame;
 {
-	struct thread *td;
 	struct proc *p;
+	struct thread *td;
+
+	/*
+	 * Processes normally resume in mi_switch() after being
+	 * cpu_switch()'ed to, but when children start up they arrive here
+	 * instead, so we must do much the same things as mi_switch() would.
+	 */
 
 	if ((td = PCPU_GET(deadthread))) {
 		PCPU_SET(deadthread, NULL);
@@ -741,29 +772,23 @@ fork_exit(callout, arg, frame)
 	p = td->td_proc;
 	td->td_oncpu = PCPU_GET(cpuid);
 	p->p_state = PRS_NORMAL;
+
 	/*
-	 * Finish setting up thread glue.  We need to initialize
-	 * the thread into a td_critnest=1 state.  Some platforms
-	 * may have already partially or fully initialized td_critnest
-	 * and/or td_md.md_savecrit (when applciable).
-	 *
-	 * see <arch>/<arch>/critical.c
+	 * Finish setting up thread glue so that it begins execution in a
+	 * non-nested critical section with sched_lock held but not recursed.
 	 */
 	sched_lock.mtx_lock = (uintptr_t)td;
-	sched_lock.mtx_recurse = 0;
+	mtx_assert(&sched_lock, MA_OWNED | MA_NOTRECURSED);
 	cpu_critical_fork_exit();
 	CTR3(KTR_PROC, "fork_exit: new thread %p (pid %d, %s)", td, p->p_pid,
 	    p->p_comm);
-	if (PCPU_GET(switchtime.sec) == 0)
-		binuptime(PCPU_PTR(switchtime));
-	PCPU_SET(switchticks, ticks);
 	mtx_unlock_spin(&sched_lock);
 
 	/*
 	 * cpu_set_fork_handler intercepts this function call to
-         * have this call a non-return function to stay in kernel mode.
-         * initproc has its own fork handler, but it does return.
-         */
+	 * have this call a non-return function to stay in kernel mode.
+	 * initproc has its own fork handler, but it does return.
+	 */
 	KASSERT(callout != NULL, ("NULL callout in fork_exit"));
 	callout(arg, frame);
 

@@ -31,8 +31,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_vfsops.c	8.31 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.211 2003/05/01 06:41:59 tjr Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.225.2.1 2003/12/12 02:23:22 truckman Exp $");
 
 #include "opt_mac.h"
 #include "opt_quota.h"
@@ -81,20 +83,19 @@ static vfs_uninit_t ffs_uninit;
 static vfs_extattrctl_t ffs_extattrctl;
 
 static struct vfsops ufs_vfsops = {
-	ffs_mount,
-	ufs_start,
-	ffs_unmount,
-	ufs_root,
-	ufs_quotactl,
-	ffs_statfs,
-	ffs_sync,
-	ffs_vget,
-	ffs_fhtovp,
-	vfs_stdcheckexp,
-	ffs_vptofh,
-	ffs_init,
-	ffs_uninit,
-	ffs_extattrctl,
+	.vfs_extattrctl =	ffs_extattrctl,
+	.vfs_fhtovp =		ffs_fhtovp,
+	.vfs_init =		ffs_init,
+	.vfs_mount =		ffs_mount,
+	.vfs_quotactl =		ufs_quotactl,
+	.vfs_root =		ufs_root,
+	.vfs_start =		ufs_start,
+	.vfs_statfs =		ffs_statfs,
+	.vfs_sync =		ffs_sync,
+	.vfs_uninit =		ffs_uninit,
+	.vfs_unmount =		ffs_unmount,
+	.vfs_vget =		ffs_vget,
+	.vfs_vptofh =		ffs_vptofh,
 };
 
 VFS_SET(ufs_vfsops, ufs, 0);
@@ -404,7 +405,6 @@ ffs_reload(mp, cred, td)
 	void *space;
 	struct buf *bp;
 	struct fs *fs, *newfs;
-	dev_t dev;
 	ufs2_daddr_t sblockloc;
 	int i, blks, size, error;
 	int32_t *lp;
@@ -421,8 +421,6 @@ ffs_reload(mp, cred, td)
 	if (error)
 		panic("ffs_reload: dirty1");
 
-	dev = devvp->v_rdev;
-
 	/*
 	 * Only VMIO the backing device if the backing device is a real
 	 * block device.
@@ -430,9 +428,7 @@ ffs_reload(mp, cred, td)
 	if (vn_isdisk(devvp, NULL)) {
 		vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY, td);
 		vfs_object_create(devvp, td, td->td_ucred);
-		/* XXX Why lock only to release immediately?? */
-		mtx_lock(&devvp->v_interlock);
-		VOP_UNLOCK(devvp, LK_INTERLOCK, td);
+		VOP_UNLOCK(devvp, 0, td);
 	}
 
 	/*
@@ -459,6 +455,8 @@ ffs_reload(mp, cred, td)
 	newfs->fs_maxcluster = fs->fs_maxcluster;
 	newfs->fs_contigdirs = fs->fs_contigdirs;
 	newfs->fs_active = fs->fs_active;
+	/* The file system is still read-only. */
+	newfs->fs_ronly = 1;
 	sblockloc = fs->fs_sblockloc;
 	bcopy(newfs, fs, (u_int)fs->fs_sbsize);
 	brelse(bp);
@@ -499,24 +497,29 @@ ffs_reload(mp, cred, td)
 	}
 
 loop:
-	mtx_lock(&mntvnode_mtx);
+	MNT_ILOCK(mp);
 	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nvp) {
 		if (vp->v_mount != mp) {
-			mtx_unlock(&mntvnode_mtx);
+			MNT_IUNLOCK(mp);
 			goto loop;
 		}
 		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
-		mtx_unlock(&mntvnode_mtx);
+		VI_LOCK(vp);
+		if (vp->v_iflag & VI_XLOCK) {
+			VI_UNLOCK(vp);
+			continue;
+		}
+		MNT_IUNLOCK(mp);
 		/*
 		 * Step 4: invalidate all inactive vnodes.
 		 */
-		if (vrecycle(vp, NULL, td))
+		if (vp->v_usecount == 0) {
+			vgonel(vp, td);
 			goto loop;
+		}
 		/*
 		 * Step 5: invalidate all cached file data.
 		 */
-		/* XXX Why lock only to release immediately? */
-		mtx_lock(&vp->v_interlock);
 		if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK, td)) {
 			goto loop;
 		}
@@ -530,16 +533,18 @@ loop:
 		    bread(devvp, fsbtodb(fs, ino_to_fsba(fs, ip->i_number)),
 		    (int)fs->fs_bsize, NOCRED, &bp);
 		if (error) {
-			vput(vp);
+			VOP_UNLOCK(vp, 0, td);
+			vrele(vp);
 			return (error);
 		}
 		ffs_load_inode(bp, ip, fs, ip->i_number);
 		ip->i_effnlink = ip->i_nlink;
 		brelse(bp);
-		vput(vp);
-		mtx_lock(&mntvnode_mtx);
+		VOP_UNLOCK(vp, 0, td);
+		vrele(vp);
+		MNT_ILOCK(mp);
 	}
-	mtx_unlock(&mntvnode_mtx);
+	MNT_IUNLOCK(mp);
 	return (0);
 }
 
@@ -599,9 +604,7 @@ ffs_mountfs(devvp, mp, td)
 	if (vn_isdisk(devvp, NULL)) {
 		vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY, td);
 		vfs_object_create(devvp, td, cred);
-		/* XXX Why lock only to release immediately?? */
-		mtx_lock(&devvp->v_interlock);
-		VOP_UNLOCK(devvp, LK_INTERLOCK, td);
+		VOP_UNLOCK(devvp, 0, td);
 	}
 
 	ronly = (mp->mnt_flag & MNT_RDONLY) != 0;
@@ -612,9 +615,9 @@ ffs_mountfs(devvp, mp, td)
 	 * XXX: start to avoid getting trashed later on.
 	 */
 #ifdef notyet
-	error = VOP_OPEN(devvp, ronly ? FREAD : FREAD|FWRITE, FSCRED, td);
+	error = VOP_OPEN(devvp, ronly ? FREAD : FREAD|FWRITE, FSCRED, td, -1);
 #else
-	error = VOP_OPEN(devvp, FREAD|FWRITE, FSCRED, td);
+	error = VOP_OPEN(devvp, FREAD|FWRITE, FSCRED, td, -1);
 #endif
 	VOP_UNLOCK(devvp, 0, td);
 	if (error)
@@ -1075,6 +1078,7 @@ ffs_statfs(mp, sbp, td)
 	fs = ump->um_fs;
 	if (fs->fs_magic != FS_UFS1_MAGIC && fs->fs_magic != FS_UFS2_MAGIC)
 		panic("ffs_statfs");
+	sbp->f_version = STATFS_VERSION;
 	sbp->f_bsize = fs->fs_fsize;
 	sbp->f_iosize = fs->fs_bsize;
 	sbp->f_blocks = fs->fs_dsize;
@@ -1084,8 +1088,18 @@ ffs_statfs(mp, sbp, td)
 	    dbtofsb(fs, fs->fs_pendingblocks);
 	sbp->f_files =  fs->fs_ncg * fs->fs_ipg - ROOTINO;
 	sbp->f_ffree = fs->fs_cstotal.cs_nifree + fs->fs_pendinginodes;
+	sbp->f_namemax = NAME_MAX;
 	if (sbp != &mp->mnt_stat) {
+		sbp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
 		sbp->f_type = mp->mnt_vfc->vfc_typenum;
+		sbp->f_syncwrites = mp->mnt_stat.f_syncwrites;
+		sbp->f_asyncwrites = mp->mnt_stat.f_asyncwrites;
+		sbp->f_syncreads = mp->mnt_stat.f_syncreads;
+		sbp->f_asyncreads = mp->mnt_stat.f_asyncreads;
+		sbp->f_owner = mp->mnt_stat.f_owner;
+		sbp->f_fsid = mp->mnt_stat.f_fsid;
+		bcopy((caddr_t)mp->mnt_stat.f_fstypename,
+			(caddr_t)&sbp->f_fstypename[0], MFSNAMELEN);
 		bcopy((caddr_t)mp->mnt_stat.f_mntonname,
 			(caddr_t)&sbp->f_mntonname[0], MNAMELEN);
 		bcopy((caddr_t)mp->mnt_stat.f_mntfromname,
@@ -1128,7 +1142,8 @@ ffs_sync(mp, waitfor, cred, td)
 		wait = 1;
 		lockreq = LK_EXCLUSIVE;
 	}
-	mtx_lock(&mntvnode_mtx);
+	lockreq |= LK_INTERLOCK;
+	MNT_ILOCK(mp);
 loop:
 	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nvp) {
 		/*
@@ -1145,34 +1160,34 @@ loop:
 		 * call unless there's a good chance that we have work to do.
 		 */
 		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
+		VI_LOCK(vp);
+		if (vp->v_iflag & VI_XLOCK) {
+			VI_UNLOCK(vp);
+			continue;
+		}
 		ip = VTOI(vp);
 		if (vp->v_type == VNON || ((ip->i_flag &
 		    (IN_ACCESS | IN_CHANGE | IN_MODIFIED | IN_UPDATE)) == 0 &&
 		    TAILQ_EMPTY(&vp->v_dirtyblkhd))) {
+			VI_UNLOCK(vp);
 			continue;
 		}
-		if (vp->v_type != VCHR) {
-			mtx_unlock(&mntvnode_mtx);
-			if ((error = vget(vp, lockreq, td)) != 0) {
-				mtx_lock(&mntvnode_mtx);
-				if (error == ENOENT)
-					goto loop;
-			} else {
-				if ((error = VOP_FSYNC(vp, cred, waitfor, td)) != 0)
-					allerror = error;
-				VOP_UNLOCK(vp, 0, td);
-				vrele(vp);
-				mtx_lock(&mntvnode_mtx);
-			}
-		} else {
-			mtx_unlock(&mntvnode_mtx);
-			UFS_UPDATE(vp, wait);
-			mtx_lock(&mntvnode_mtx);
+		MNT_IUNLOCK(mp);
+		if ((error = vget(vp, lockreq, td)) != 0) {
+			MNT_ILOCK(mp);
+			if (error == ENOENT)
+				goto loop;
+			continue;
 		}
+		if ((error = VOP_FSYNC(vp, cred, waitfor, td)) != 0)
+			allerror = error;
+		VOP_UNLOCK(vp, 0, td);
+		vrele(vp);
+		MNT_ILOCK(mp);
 		if (TAILQ_NEXT(vp, v_nmntvnodes) != nvp)
 			goto loop;
 	}
-	mtx_unlock(&mntvnode_mtx);
+	MNT_IUNLOCK(mp);
 	/*
 	 * Force stale filesystem control information to be flushed.
 	 */
@@ -1181,7 +1196,7 @@ loop:
 			allerror = error;
 		/* Flushed work items may create new vnodes to clean */
 		if (allerror == 0 && count) {
-			mtx_lock(&mntvnode_mtx);
+			MNT_ILOCK(mp);
 			goto loop;
 		}
 	}
@@ -1197,7 +1212,7 @@ loop:
 			allerror = error;
 		VOP_UNLOCK(devvp, 0, td);
 		if (allerror == 0 && waitfor == MNT_WAIT) {
-			mtx_lock(&mntvnode_mtx);
+			MNT_ILOCK(mp);
 			goto loop;
 		}
 	} else
@@ -1335,9 +1350,8 @@ ffs_vget(mp, ino, flags, vpp)
 		return (error);
 	}
 	/*
-	 * Finish inode initialization now that aliasing has been resolved.
+	 * Finish inode initialization.
 	 */
-	ip->i_devvp = ump->um_devvp;
 	VREF(ip->i_devvp);
 	/*
 	 * Set up a generation number for this inode if it does not

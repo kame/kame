@@ -23,14 +23,15 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/pci/agp_i810.c,v 1.20 2003/04/15 06:37:29 mdodd Exp $
  */
 
 /*
  * Fixes for 830/845G support: David Dawes <dawes@xfree86.org>
  * 852GM/855GM/865G support added by David Dawes <dawes@xfree86.org>
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/agp_i810.c,v 1.25 2003/10/23 17:48:30 jhb Exp $");
 
 #include "opt_bus.h"
 
@@ -44,8 +45,8 @@
 #include <sys/mutex.h>
 #include <sys/proc.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 #include <pci/agppriv.h>
 #include <pci/agpreg.h>
 
@@ -186,6 +187,7 @@ agp_i810_probe(device_t dev)
 	if (desc) {
 		device_t bdev;
 		u_int8_t smram;
+		unsigned int gcc1;
 		int devid = pci_get_devid(dev);
 
 		bdev = agp_i810_find_bridge(dev);
@@ -198,10 +200,12 @@ agp_i810_probe(device_t dev)
 		/*
 		 * checking whether internal graphics device has been activated.
 		 */
-		if ( (devid == 0x71218086 ) ||
-		     (devid == 0x71238086 ) ||
-		     (devid == 0x71258086 ) ||
-		     (devid == 0x11328086 ) ) {
+		switch (devid) {
+			/* i810 */
+		case 0x71218086:
+		case 0x71238086:
+		case 0x71258086:
+		case 0x11328086:
 			smram = pci_read_config(bdev, AGP_I810_SMRAM, 1);
 			if ((smram & AGP_I810_SMRAM_GMS)
 			    == AGP_I810_SMRAM_GMS_DISABLED) {
@@ -209,14 +213,23 @@ agp_i810_probe(device_t dev)
 					printf("I810: disabled, not probing\n");
 				return ENXIO;
 			}
-		} else {	/* I830MG */
-			unsigned int gcc1;
+			break;
+
+			/* i830 */
+		case 0x35778086:
+		case 0x35828086:
+		case 0x25628086:
+		case 0x25728086:
 			gcc1 = pci_read_config(bdev, AGP_I830_GCC1, 1);
 			if ((gcc1 & AGP_I830_GCC1_DEV2) == AGP_I830_GCC1_DEV2_DISABLED) {
 				if (bootverbose)
 					printf("I830: disabled, not probing\n");
 				return ENXIO;
 			}
+			break;
+
+		default:
+			return ENXIO;
 		}
 
 		device_verbose(dev);
@@ -336,7 +349,7 @@ agp_i810_attach(device_t dev)
 
 		gatt->ag_physical = pgtblctl & ~1;
 	} else {	/* CHIP_I855 */
-		/* The 855GM automatically initializes the 128k gatt on boot. */
+		/* The i855 automatically initializes the 128k gatt on boot. */
 		unsigned int gcc1, pgtblctl;
 		
 		gcc1 = pci_read_config(sc->bdev, AGP_I855_GCC1, 1);
@@ -374,7 +387,11 @@ agp_i810_attach(device_t dev)
 		gatt->ag_physical = pgtblctl & ~1;
 	}
 
-	return 0;
+	/* Add a device for the drm to attach to */
+	if (!device_add_child( dev, "drmsub", -1 ))
+		printf("out of memory...\n");
+
+	return bus_generic_attach(dev);
 }
 
 static int
@@ -382,6 +399,7 @@ agp_i810_detach(device_t dev)
 {
 	struct agp_i810_softc *sc = device_get_softc(dev);
 	int error;
+	device_t child;
 
 	error = agp_generic_detach(dev);
 	if (error)
@@ -407,6 +425,10 @@ agp_i810_detach(device_t dev)
 
 	bus_release_resource(dev, SYS_RES_MEMORY,
 			     AGP_I810_MMADR, sc->regs);
+
+	child = device_find_child( dev, "drmsub", 0 );
+	if (child)
+	   device_delete_child( dev, child );
 
 	return 0;
 }
@@ -583,8 +605,11 @@ agp_i810_alloc_memory(device_t dev, int type, vm_size_t size)
 		 * get its physical address.
 		 */
 		vm_page_t m;
+
+		VM_OBJECT_LOCK(mem->am_obj);
 		m = vm_page_grab(mem->am_obj, 0,
 		    VM_ALLOC_WIRED | VM_ALLOC_ZERO | VM_ALLOC_RETRY);
+		VM_OBJECT_UNLOCK(mem->am_obj);
 		if ((m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
 		vm_page_lock_queues();
@@ -615,7 +640,11 @@ agp_i810_free_memory(device_t dev, struct agp_memory *mem)
 		/*
 		 * Unwire the page which we wired in alloc_memory.
 		 */
-		vm_page_t m = vm_page_lookup(mem->am_obj, 0);
+		vm_page_t m;
+
+		VM_OBJECT_LOCK(mem->am_obj);
+		m = vm_page_lookup(mem->am_obj, 0);
+		VM_OBJECT_UNLOCK(mem->am_obj);
 		vm_page_lock_queues();
 		vm_page_unwire(m, 0);
 		vm_page_unlock_queues();
@@ -668,6 +697,18 @@ agp_i810_unbind_memory(device_t dev, struct agp_memory *mem)
 	return 0;
 }
 
+static int
+agp_i810_print_child(device_t dev, device_t child)
+{
+	int retval = 0;
+
+	retval += bus_print_child_header(dev, child);
+	retval += printf(": (child of agp_i810.c)");
+	retval += bus_print_child_footer(dev, child);
+
+	return retval;
+}
+
 static device_method_t agp_i810_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		agp_i810_probe),
@@ -689,6 +730,14 @@ static device_method_t agp_i810_methods[] = {
 	DEVMETHOD(agp_bind_memory,	agp_i810_bind_memory),
 	DEVMETHOD(agp_unbind_memory,	agp_i810_unbind_memory),
 
+	/* bus methods */
+	DEVMETHOD(bus_print_child,	agp_i810_print_child),
+	DEVMETHOD(bus_alloc_resource,	bus_generic_alloc_resource),
+	DEVMETHOD(bus_release_resource,	bus_generic_release_resource),
+	DEVMETHOD(bus_activate_resource, bus_generic_activate_resource),
+	DEVMETHOD(bus_deactivate_resource, bus_generic_deactivate_resource),
+	DEVMETHOD(bus_setup_intr,	bus_generic_setup_intr),
+	DEVMETHOD(bus_teardown_intr,	bus_generic_teardown_intr),
 	{ 0, 0 }
 };
 

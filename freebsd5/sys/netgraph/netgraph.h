@@ -35,12 +35,12 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/netgraph.h,v 1.35 2002/08/22 00:30:03 archie Exp $
+ * $FreeBSD: src/sys/netgraph/netgraph.h,v 1.37 2003/11/12 09:10:11 harti Exp $
  * $Whistle: netgraph.h,v 1.29 1999/11/01 07:56:13 julian Exp $
  */
 
 #ifndef _NETGRAPH_NETGRAPH_H_
-#define _NETGRAPH_NETGRAPH_H_ 1
+#define _NETGRAPH_NETGRAPH_H_
 
 #ifndef _KERNEL
 #error "This file should not be included in user level programs"
@@ -62,7 +62,7 @@
  * Change it for NETGRAPH_DEBUG version so we cannot mix debug and non debug
  * modules.
  */
-#define _NG_ABI_VERSION 6
+#define _NG_ABI_VERSION 7
 #ifdef	NETGRAPH_DEBUG /*----------------------------------------------*/
 #define NG_ABI_VERSION	(_NG_ABI_VERSION + 0x10000)
 #else	/* NETGRAPH_DEBUG */ /*----------------------------------------------*/

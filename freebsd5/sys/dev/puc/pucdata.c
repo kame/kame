@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/puc/pucdata.c,v 1.21 2003/05/14 09:37:46 wilko Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/puc/pucdata.c,v 1.27 2003/10/24 22:34:56 ambrisko Exp $");
 
 /*
  * PCI "universal" communications card driver configuration data (used to
@@ -47,7 +47,20 @@ __FBSDID("$FreeBSD: src/sys/dev/puc/pucdata.c,v 1.21 2003/05/14 09:37:46 wilko E
 
 #define COM_FREQ	DEFAULT_RCLK
 
+int puc_config_win877(struct puc_softc *);
+
 const struct puc_device_description puc_devices[] = {
+
+	{   "Diva Serial [GSP] Multiport UART",
+	    NULL,
+	    {   0x103c, 0x1048, 0x103c, 0x1282 },
+	    {   0xffff, 0xffff, 0xffff, 0xffff },
+	    {
+		{   PUC_PORT_TYPE_UART, 0x10, 0x00, 0, PUC_FLAGS_MEMORY },
+		{   PUC_PORT_TYPE_UART, 0x10, 0x10, 0, PUC_FLAGS_MEMORY },
+		{   PUC_PORT_TYPE_UART, 0x10, 0x38, 0, PUC_FLAGS_MEMORY },
+	    },
+	},
 
 	{   "Comtrol RocketPort 550/4 RJ45",
 	    NULL,
@@ -750,6 +763,40 @@ const struct puc_device_description puc_devices[] = {
             },
         },
 
+	{   "Titan VScom PCI-200HV2",	/* 2S */
+	    NULL,
+	    {	0x14d2,	0xe020,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ * 8 },
+	    },
+	},
+	/*
+	 * VScom (Titan?) PCI-800L.  More modern variant of the
+	 * PCI-800.  Uses 6 discrete 16550 UARTs, plus another
+	 * two of them obviously implemented as macro cells in
+	 * the ASIC.  This causes the weird port access pattern
+	 * below, where two of the IO port ranges each access
+	 * one of the ASIC UARTs, and a block of IO addresses
+	 * access the external UARTs.
+	 */
+	{   "Titan VScom PCI-800L",
+	    NULL,
+	    {   0x14d2, 0x8080, 0x14d2, 0x8080  },
+	    {   0xffff, 0xffff, 0xffff, 0xffff  },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x08, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x10, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x18, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x20, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x20, 0x28, COM_FREQ * 8 },
+	    },
+	},
+
 	/* NEC PK-UG-X001 K56flex PCI Modem card.
 	   NEC MARTH bridge chip and Rockwell RCVDL56ACF/SP using. */
 	{   "NEC PK-UG-X001 K56flex PCI Modem",
@@ -869,6 +916,19 @@ const struct puc_device_description puc_devices[] = {
 	    },
 	},
 
+	/* Oxford Semiconductor OX16PCI954 PCI UARTs */
+	{   "Oxford Semiconductor OX16PCI954 UARTs",
+	    NULL,
+	    {	0x1415,	0x950a,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ },
+	    },
+	},
+
 	/* Oxford Semiconductor OX16PCI954 PCI Parallel port */
 	{   "Oxford Semiconductor OX16PCI954 Parallel port",
 	    NULL,
@@ -877,6 +937,16 @@ const struct puc_device_description puc_devices[] = {
 	    {
 		{ PUC_PORT_TYPE_LPT, 0x10, 0x00, 0x00 },
 	    },
+	},
+
+	/* Oxford Semiconductor OX12PCI840 PCI Parallel port */
+	{   "Qxford Semiconductor OX12PCI840 Parallel port",
+		NULL,
+		{   0x1415, 0x8403, 0,      0       },
+		{   0xffff, 0xffff, 0,      0 },
+		{
+		    { PUC_PORT_TYPE_LPT, 0x10, 0x00, 0x00 },
+		},
 	},
 
 	/* NetMos 2S1P PCI 16C650 : 2S, 1P */
@@ -962,6 +1032,23 @@ const struct puc_device_description puc_devices[] = {
 	{   "Moxa Technologies, C168H/PCI",
 	    NULL,
 	    {	0x1393,	0x1680,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0,	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x08, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x10, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x18, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x20, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x28, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x30, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x38, COM_FREQ * 8 },
+	    },
+	},
+
+	/* Moxa Technologies Co., Ltd. PCI I/O Card 8S RS232 */
+	{   "Moxa Technologies, C168U/PCI",
+	    NULL,
+	    {	0x1393,	0x1681,	0,	0	},
 	    {	0xffff,	0xffff,	0,	0,	},
 	    {
 		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8 },

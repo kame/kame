@@ -26,12 +26,12 @@
  *
  *      i4b_iwic - isdn4bsd Winbond W6692 driver
  *      ----------------------------------------
- *
- * $FreeBSD: src/sys/i4b/layer1/iwic/i4b_iwic_pci.c,v 1.8 2002/09/02 00:52:10 brooks Exp $
- *
  *      last edit-date: [Tue Jan 16 10:53:03 2001]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/iwic/i4b_iwic_pci.c,v 1.11 2003/09/02 17:30:40 jhb Exp $");
 
 #include "opt_i4b.h"
 
@@ -41,14 +41,13 @@
 #include <sys/socket.h>
 #include <net/if.h>
 
-
 #include <machine/bus.h>
 #include <machine/resource.h>
 #include <sys/bus.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <machine/i4b_ioctl.h>
 #include <machine/i4b_trace.h>
@@ -65,11 +64,8 @@ extern struct i4b_l1mux_func iwic_l1mux_func;
 
 /* Winbond PCI Configuration Space */
 
-#define BASEREG0_MAPOFF 0x00
-#define BASEREG1_MAPOFF 0x04
-
-#define BADDR0 (PCIR_MAPS + BASEREG0_MAPOFF)
-#define BADDR1 (PCIR_MAPS + BASEREG1_MAPOFF)
+#define BADDR0 PCIR_BAR(0)
+#define BADDR1 PCIR_BAR(1)
 
 
 static void iwic_pci_intr(struct iwic_softc *sc);

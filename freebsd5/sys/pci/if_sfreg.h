@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sfreg.h,v 1.9 2001/08/16 00:32:20 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_sfreg.h,v 1.10 2003/11/14 19:00:31 sam Exp $
  */
 
 /*
@@ -1051,6 +1051,7 @@ struct sf_softc {
 
 #define	SF_LOCK(_sc)		mtx_lock(&(_sc)->sf_mtx)
 #define	SF_UNLOCK(_sc)		mtx_unlock(&(_sc)->sf_mtx)
+#define	SF_LOCK_ASSERT(_sc)	mtx_assert(&(_sc)->sf_mtx, MA_OWNED)
 
 #define SF_TIMEOUT	1000
 

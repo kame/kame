@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_mbuf.c,v 1.9 2000/12/07 22:19:06 phk Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ----------------------------------------
  *
  * Message buffer handling routines
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/unisig_mbuf.c,v 1.10 2003/06/11 07:22:30 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -59,11 +57,6 @@
 #include <netatm/uni/unisig_var.h>
 #include <netatm/uni/unisig_mbuf.h>
 #include <netatm/uni/unisig_msg.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/unisig_mbuf.c,v 1.9 2000/12/07 22:19:06 phk Exp $");
-#endif
-
 
 /*
  * Initialize a unisig formatting structure

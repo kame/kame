@@ -33,7 +33,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/i82365.h,v 1.26 2002/07/20 22:29:23 imp Exp $
+ * $FreeBSD: src/sys/pccard/i82365.h,v 1.27 2003/08/29 23:24:41 imp Exp $
  */
 
 #define	PCIC_I82365	0		/* Intel i82365SL-A/B or clone */
@@ -170,7 +170,7 @@
 
 /*
  * For the Address Window Enable Register (PCIC_ADDRWINE)
- * The lower 6 bits contain enable bits for the memory
+ * The lower 5 bits contain enable bits for the memory
  * windows (LSB = memory window 0).
  */
 #define PCIC_MEMCS16	0x20	/* ~MEMCS16 Decode A23-A12 */

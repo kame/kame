@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 1999, 2000, 2001, 2002 Robert N. M. Watson
- * Copyright (c) 2002 Networks Associates Technology, Inc.
+ * Copyright (c) 2002, 2003 Networks Associates Technology, Inc.
  * All rights reserved.
  *
  * This software was developed by Robert Watson for the TrustedBSD Project.
@@ -31,12 +31,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ufs/ufs/ufs_extattr.c,v 1.63 2003/05/15 21:07:33 rwatson Exp $
  */
+
 /*
- * Developed by the TrustedBSD Project.
  * Support for filesystem extended attribute: UFS-specific support functions.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_extattr.c,v 1.67 2003/07/28 18:53:28 rwatson Exp $");
 
 #include "opt_ufs.h"
 
@@ -322,7 +324,7 @@ ufs_extattr_enable_with_open(struct ufsmount *ump, struct vnode *vp,
 {
 	int error;
 
-	error = VOP_OPEN(vp, FREAD|FWRITE, td->td_ucred, td);
+	error = VOP_OPEN(vp, FREAD|FWRITE, td->td_ucred, td, -1);
 	if (error) {
 		printf("ufs_extattr_enable_with_open.VOP_OPEN(): failed "
 		    "with %d\n", error);
@@ -839,11 +841,8 @@ ufs_extattr_get(struct vnode *vp, int attrnamespace, const char *name,
 	if (!(ump->um_extattr.uepm_flags & UFS_EXTATTR_UEPM_STARTED))
 		return (EOPNOTSUPP);
 
-	if (strlen(name) == 0) {
-		/* XXX retrieve attribute lists. */
-		/* XXX should probably be checking for name == NULL? */
+	if (strlen(name) == 0)
 		return (EINVAL);
-	}
 
 	error = extattr_check_cred(vp, attrnamespace, cred, td, IREAD);
 	if (error)
@@ -965,6 +964,37 @@ vopunlock_exit:
 }
 
 /*
+ * Vnode operation to remove a named attribute.
+ */
+int
+ufs_deleteextattr(struct vop_deleteextattr_args *ap)
+/*
+vop_deleteextattr {
+	IN struct vnode *a_vp;
+	IN int a_attrnamespace;
+	IN const char *a_name;
+	IN struct ucred *a_cred;
+	IN struct thread *a_td;
+};
+*/
+{
+	struct mount	*mp = ap->a_vp->v_mount;
+	struct ufsmount	*ump = VFSTOUFS(mp); 
+
+	int	error;
+
+	ufs_extattr_uepm_lock(ump, ap->a_td);
+
+	error = ufs_extattr_rm(ap->a_vp, ap->a_attrnamespace, ap->a_name,
+	    ap->a_cred, ap->a_td);
+
+
+	ufs_extattr_uepm_unlock(ump, ap->a_td);
+
+	return (error);
+}
+
+/*
  * Vnode operation to set a named attribute.
  */
 int
@@ -987,12 +1017,14 @@ vop_setextattr {
 
 	ufs_extattr_uepm_lock(ump, ap->a_td);
 
-	if (ap->a_uio != NULL)
-		error = ufs_extattr_set(ap->a_vp, ap->a_attrnamespace,
-		    ap->a_name, ap->a_uio, ap->a_cred, ap->a_td);
-	else
-		error = ufs_extattr_rm(ap->a_vp, ap->a_attrnamespace,
-		    ap->a_name, ap->a_cred, ap->a_td);
+	/*
+	 * XXX: No longer a supported way to delete extended attributes.
+	 */
+	if (ap->a_uio == NULL)
+		return (EINVAL);
+
+	error = ufs_extattr_set(ap->a_vp, ap->a_attrnamespace, ap->a_name,
+	    ap->a_uio, ap->a_cred, ap->a_td);
 
 	ufs_extattr_uepm_unlock(ump, ap->a_td);
 

@@ -34,11 +34,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_subs.c  8.8 (Berkeley) 5/22/95
- * $FreeBSD: src/sys/nfsserver/nfs_srvsubs.c,v 1.121 2003/05/25 06:17:33 truckman Exp $
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_srvsubs.c,v 1.121 2003/05/25 06:17:33 truckman Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsserver/nfs_srvsubs.c,v 1.122 2003/06/11 05:37:42 obrien Exp $");
 
 /*
  * These functions support the macros and help fiddle mbuf chains for

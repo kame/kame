@@ -29,10 +29,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netncp/ncp_sock.c,v 1.13 2003/02/26 21:25:55 fjoe Exp $
- *
  * Low level socket routines
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netncp/ncp_sock.c,v 1.14 2003/06/11 05:30:35 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/errno.h>

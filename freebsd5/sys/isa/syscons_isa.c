@@ -22,9 +22,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/isa/syscons_isa.c,v 1.21 2003/01/15 03:45:27 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/isa/syscons_isa.c,v 1.24 2003/10/29 20:48:13 njl Exp $");
 
 #include "opt_syscons.h"
 
@@ -107,6 +108,10 @@ scsuspend(device_t dev)
 	sc_softc_t	*sc;
 
 	sc = &main_softc;
+
+	if (sc->cur_scp == NULL)
+		return (0);
+
 	sc_cur_scr = sc->cur_scp->index;
 
 	if (sc_no_suspend_vtswitch)
@@ -194,14 +199,12 @@ sc_softc_t
 int
 sc_get_cons_priority(int *unit, int *flags)
 {
-	int disabled;
 	const char *at;
 	int u, f;
 
 	*unit = -1;
 	for (u = 0; u < 16; u++) {
-		if ((resource_int_value(SC_DRIVER_NAME, u, "disabled",
-					&disabled) == 0) && disabled)
+		if (resource_disabled(SC_DRIVER_NAME, u))
 			continue;
 		if (resource_string_value(SC_DRIVER_NAME, u, "at", &at) != 0)
 			continue;

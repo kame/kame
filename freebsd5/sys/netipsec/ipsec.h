@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netipsec/ipsec.h,v 1.2 2002/11/08 23:37:50 sam Exp $	*/
+/*	$FreeBSD: src/sys/netipsec/ipsec.h,v 1.4 2003/09/29 22:57:42 sam Exp $	*/
 /*	$KAME: ipsec.h,v 1.53 2001/11/20 08:32:38 itojun Exp $	*/
 
 /*
@@ -44,6 +44,7 @@
 
 #include <net/pfkeyv2.h>
 #include <netipsec/keydb.h>
+#include <netipsec/ipsec_osdep.h>
 
 #ifdef _KERNEL
 
@@ -71,6 +72,7 @@ struct secpolicyindex {
 /* Security Policy Data Base */
 struct secpolicy {
 	LIST_ENTRY(secpolicy) chain;
+	struct mtx lock;
 
 	u_int refcnt;			/* reference count */
 	struct secpolicyindex spidx;	/* selector */
@@ -78,8 +80,8 @@ struct secpolicy {
 	u_int state;			/* 0: dead, others: alive */
 #define IPSEC_SPSTATE_DEAD	0
 #define IPSEC_SPSTATE_ALIVE	1
-
-	u_int policy;		/* DISCARD, NONE or IPSEC, see keyv2.h */
+	u_int16_t policy;		/* policy_type per pfkeyv2.h */
+	u_int16_t scangen;		/* scan generation # */
 	struct ipsecrequest *req;
 				/* pointer to the ipsec request tree, */
 				/* if policy == IPSEC else this value == NULL.*/
@@ -91,11 +93,18 @@ struct secpolicy {
 	 * "lifetime" is passed by sadb_lifetime.sadb_lifetime_addtime.
 	 * "validtime" is passed by sadb_lifetime.sadb_lifetime_usetime.
 	 */
-	long created;		/* time created the policy */
-	long lastused;		/* updated every when kernel sends a packet */
+	time_t created;		/* time created the policy */
+	time_t lastused;	/* updated every when kernel sends a packet */
 	long lifetime;		/* duration of the lifetime of this policy */
 	long validtime;		/* duration this policy is valid without use */
 };
+
+#define	SECPOLICY_LOCK_INIT(_sp) \
+	mtx_init(&(_sp)->lock, "ipsec policy", NULL, MTX_DEF)
+#define	SECPOLICY_LOCK(_sp)		mtx_lock(&(_sp)->lock)
+#define	SECPOLICY_UNLOCK(_sp)		mtx_unlock(&(_sp)->lock)
+#define	SECPOLICY_LOCK_DESTROY(_sp)	mtx_destroy(&(_sp)->lock)
+#define	SECPOLICY_LOCK_ASSERT(_sp)	mtx_assert(&(_sp)->lock, MA_OWNED)
 
 /* Request for IPsec */
 struct ipsecrequest {
@@ -108,7 +117,20 @@ struct ipsecrequest {
 
 	struct secasvar *sav;	/* place holder of SA for use */
 	struct secpolicy *sp;	/* back pointer to SP */
+	struct mtx lock;	/* to interlock updates */
 };
+
+/*
+ * Need recursion for when crypto callbacks happen directly,
+ * as in the case of software crypto.  Need to look at how
+ * hard it is to remove this...
+ */
+#define	IPSECREQUEST_LOCK_INIT(_isr) \
+	mtx_init(&(_isr)->lock, "ipsec request", NULL, MTX_DEF | MTX_RECURSE)
+#define	IPSECREQUEST_LOCK(_isr)		mtx_lock(&(_isr)->lock)
+#define	IPSECREQUEST_UNLOCK(_isr)	mtx_unlock(&(_isr)->lock)
+#define	IPSECREQUEST_LOCK_DESTROY(_isr)	mtx_destroy(&(_isr)->lock)
+#define	IPSECREQUEST_LOCK_ASSERT(_isr)	mtx_assert(&(_isr)->lock, MA_OWNED)
 
 /* security policy in PCB */
 struct inpcbpolicy {
@@ -123,7 +145,7 @@ struct secspacq {
 
 	struct secpolicyindex spidx;
 
-	long created;		/* for lifetime */
+	time_t created;		/* for lifetime */
 	int count;		/* for lifetime */
 	/* XXX: here is mbuf place holder to be sent ? */
 };
@@ -322,6 +344,9 @@ extern int crypto_support;
 /* for openbsd compatibility */
 #define	DPRINTF(x)	do { if (ipsec_debug) printf x; } while (0)
 
+extern	struct ipsecrequest *ipsec_newisr(void);
+extern	void ipsec_delisr(struct ipsecrequest *);
+
 struct tdb_ident;
 extern struct secpolicy *ipsec_getpolicy __P((struct tdb_ident*, u_int));
 struct inpcb;
@@ -362,7 +387,9 @@ extern void ipsec_dumpmbuf __P((struct mbuf *));
 
 struct m_tag;
 extern void ah4_input(struct mbuf *m, int off);
+extern void ah4_ctlinput(int cmd, struct sockaddr *sa, void *);
 extern void esp4_input(struct mbuf *m, int off);
+extern void esp4_ctlinput(int cmd, struct sockaddr *sa, void *);
 extern void ipcomp4_input(struct mbuf *m, int off);
 extern int ipsec4_common_input(struct mbuf *m, ...);
 extern int ipsec4_common_input_cb(struct mbuf *m, struct secasvar *sav,

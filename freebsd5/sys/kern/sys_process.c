@@ -27,9 +27,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/sys_process.c,v 1.108 2003/04/25 20:02:16 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/sys_process.c,v 1.115 2003/10/09 10:17:16 robert Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -148,7 +149,7 @@ proc_rwmem(struct proc *p, struct uio *uio)
 {
 	struct vmspace *vm;
 	vm_map_t map;
-	vm_object_t object = NULL;
+	vm_object_t backing_object, object = NULL;
 	vm_offset_t pageno = 0;		/* page number */
 	vm_prot_t reqprot;
 	vm_offset_t kva;
@@ -176,7 +177,7 @@ proc_rwmem(struct proc *p, struct uio *uio)
 	reqprot = writing ? (VM_PROT_WRITE | VM_PROT_OVERRIDE_WRITE) :
 	    VM_PROT_READ;
 
-	kva = kmem_alloc_pageable(kernel_map, PAGE_SIZE);
+	kva = kmem_alloc_nofault(kernel_map, PAGE_SIZE);
 
 	/*
 	 * Only map in one page at a time.  We don't have to, but it
@@ -226,58 +227,39 @@ proc_rwmem(struct proc *p, struct uio *uio)
 		tmap = map;
 		error = vm_map_lookup(&tmap, pageno, reqprot, &out_entry,
 		    &object, &pindex, &out_prot, &wired);
-
 		if (error) {
 			error = EFAULT;
-
-			/*
-			 * Make sure that there is no residue in 'object' from
-			 * an error return on vm_map_lookup.
-			 */
-			object = NULL;
-
 			break;
 		}
-
-		m = vm_page_lookup(object, pindex);
-
-		/* Allow fallback to backing objects if we are reading */
-
-		while (m == NULL && !writing && object->backing_object) {
-
-			pindex += OFF_TO_IDX(object->backing_object_offset);
-			object = object->backing_object;
-
-			m = vm_page_lookup(object, pindex);
-		}
-
-		if (m == NULL) {
-			error = EFAULT;
-
+		VM_OBJECT_LOCK(object);
+		while ((m = vm_page_lookup(object, pindex)) == NULL &&
+		    !writing &&
+		    (backing_object = object->backing_object) != NULL) {
 			/*
-			 * Make sure that there is no residue in 'object' from
-			 * an error return on vm_map_lookup.
+			 * Allow fallback to backing objects if we are reading.
 			 */
-			object = NULL;
-
+			VM_OBJECT_LOCK(backing_object);
+			pindex += OFF_TO_IDX(object->backing_object_offset);
+			VM_OBJECT_UNLOCK(object);
+			object = backing_object;
+		}
+		VM_OBJECT_UNLOCK(object);
+		if (m == NULL) {
 			vm_map_lookup_done(tmap, out_entry);
-
+			error = EFAULT;
 			break;
 		}
 
 		/*
-		 * Wire the page into memory
+		 * Hold the page in memory.
 		 */
 		vm_page_lock_queues();
-		vm_page_wire(m);
+		vm_page_hold(m);
 		vm_page_unlock_queues();
 
 		/*
 		 * We're done with tmap now.
-		 * But reference the object first, so that we won't loose
-		 * it.
 		 */
-		vm_object_reference(object);
 		vm_map_lookup_done(tmap, out_entry);
 
 		pmap_qenter(kva, &m, 1);
@@ -290,19 +272,13 @@ proc_rwmem(struct proc *p, struct uio *uio)
 		pmap_qremove(kva, 1);
 
 		/*
-		 * release the page and the object
+		 * Release the page.
 		 */
 		vm_page_lock_queues();
-		vm_page_unwire(m, 1);
+		vm_page_unhold(m);
 		vm_page_unlock_queues();
-		vm_object_deallocate(object);
-
-		object = NULL;
 
 	} while (error == 0 && uio->uio_resid > 0);
-
-	if (object)
-		vm_object_deallocate(object);
 
 	kmem_free(kernel_map, kva, PAGE_SIZE);
 	vmspace_free(vm);
@@ -360,6 +336,7 @@ ptrace(struct thread *td, struct ptrace_args *uap)
 		break;
 	default:
 		addr = uap->addr;
+		break;
 	}
 	if (error)
 		return (error);
@@ -405,6 +382,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 	case PT_ATTACH:
 	case PT_STEP:
 	case PT_CONTINUE:
+	case PT_TO_SCE:
+	case PT_TO_SCX:
 	case PT_DETACH:
 		sx_xlock(&proctree_lock);
 		proctree_locked = 1;
@@ -473,21 +452,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		/* OK */
 		break;
 
-	case PT_READ_I:
-	case PT_READ_D:
-	case PT_WRITE_I:
-	case PT_WRITE_D:
-	case PT_IO:
-	case PT_CONTINUE:
-	case PT_KILL:
-	case PT_STEP:
-	case PT_DETACH:
-	case PT_GETREGS:
-	case PT_SETREGS:
-	case PT_GETFPREGS:
-	case PT_SETFPREGS:
-	case PT_GETDBREGS:
-	case PT_SETDBREGS:
+	default:
 		/* not being traced... */
 		if ((p->p_flag & P_TRACED) == 0) {
 			error = EPERM;
@@ -508,10 +473,6 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 
 		/* OK */
 		break;
-
-	default:
-		error = EINVAL;
-		goto fail;
 	}
 
 	td2 = FIRST_THREAD_IN_PROC(p);
@@ -548,21 +509,34 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 
 	case PT_STEP:
 	case PT_CONTINUE:
+	case PT_TO_SCE:
+	case PT_TO_SCX:
 	case PT_DETACH:
-		/* XXX data is used even in the PT_STEP case. */
-		if (req != PT_STEP && (unsigned)data > _SIG_MAXSIG) {
+		/* Zero means do not send any signal */
+		if (data < 0 || data > _SIG_MAXSIG) {
 			error = EINVAL;
 			goto fail;
 		}
 
 		_PHOLD(p);
 
-		if (req == PT_STEP) {
+		switch (req) {
+		case PT_STEP:
 			error = ptrace_single_step(td2);
 			if (error) {
 				_PRELE(p);
 				goto fail;
 			}
+			break;
+		case PT_TO_SCE:
+			p->p_stops |= S_PT_SCE;
+			break;
+		case PT_TO_SCX:
+			p->p_stops |= S_PT_SCX;
+			break;
+		case PT_SYSCALL:
+			p->p_stops |= S_PT_SCE | S_PT_SCX;
+			break;
 		}
 
 		if (addr != (void *)1) {
@@ -726,12 +700,20 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		return (error);
 
 	default:
-		KASSERT(0, ("unreachable code\n"));
+#ifdef __HAVE_PTRACE_MACHDEP
+		if (req >= PT_FIRSTMACH) {
+			_PHOLD(p);
+			error = cpu_ptrace(td2, req, addr, data);
+			_PRELE(p);
+			PROC_UNLOCK(p);
+			return (error);
+		}
+#endif
 		break;
 	}
 
-	KASSERT(0, ("unreachable code\n"));
-	return (0);
+	/* Unknown request. */
+	error = EINVAL;
 
 fail:
 	PROC_UNLOCK(p);

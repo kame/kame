@@ -31,8 +31,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_ktrace.c	8.2 (Berkeley) 9/23/93
- * $FreeBSD: src/sys/kern/kern_ktrace.c,v 1.84 2003/04/25 19:59:35 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_ktrace.c,v 1.91 2003/11/11 09:09:26 jkoshy Exp $");
 
 #include "opt_ktrace.h"
 #include "opt_mac.h"
@@ -96,10 +98,10 @@ static STAILQ_HEAD(, ktr_request) ktr_free;
 
 SYSCTL_NODE(_kern, OID_AUTO, ktrace, CTLFLAG_RD, 0, "KTRACE options");
 
-static uint ktr_requestpool = KTRACE_REQUEST_POOL;
+static u_int ktr_requestpool = KTRACE_REQUEST_POOL;
 TUNABLE_INT("kern.ktrace.request_pool", &ktr_requestpool);
 
-static uint ktr_geniosize = PAGE_SIZE;
+static u_int ktr_geniosize = PAGE_SIZE;
 TUNABLE_INT("kern.ktrace.genio_size", &ktr_geniosize);
 SYSCTL_UINT(_kern_ktrace, OID_AUTO, genio_size, CTLFLAG_RW, &ktr_geniosize,
     0, "Maximum size of genio event payload");
@@ -110,7 +112,7 @@ static struct sema ktrace_sema;
 
 static void ktrace_init(void *dummy);
 static int sysctl_kern_ktrace_request_pool(SYSCTL_HANDLER_ARGS);
-static uint ktrace_resize_pool(uint newsize);
+static u_int ktrace_resize_pool(u_int newsize);
 static struct ktr_request *ktr_getrequest(int type);
 static void ktr_submitrequest(struct ktr_request *req);
 static void ktr_freerequest(struct ktr_request *req);
@@ -142,7 +144,7 @@ static int
 sysctl_kern_ktrace_request_pool(SYSCTL_HANDLER_ARGS)
 {
 	struct thread *td;
-	uint newsize, oldsize, wantsize;
+	u_int newsize, oldsize, wantsize;
 	int error;
 
 	/* Handle easy read-only case first to avoid warnings from GCC. */
@@ -150,41 +152,43 @@ sysctl_kern_ktrace_request_pool(SYSCTL_HANDLER_ARGS)
 		mtx_lock(&ktrace_mtx);
 		oldsize = ktr_requestpool;
 		mtx_unlock(&ktrace_mtx);
-		return (SYSCTL_OUT(req, &oldsize, sizeof(uint)));
+		return (SYSCTL_OUT(req, &oldsize, sizeof(u_int)));
 	}
 
-	error = SYSCTL_IN(req, &wantsize, sizeof(uint));
+	error = SYSCTL_IN(req, &wantsize, sizeof(u_int));
 	if (error)
 		return (error);
 	td = curthread;
-	td->td_inktrace = 1;
+	td->td_pflags |= TDP_INKTRACE;
 	mtx_lock(&ktrace_mtx);
 	oldsize = ktr_requestpool;
 	newsize = ktrace_resize_pool(wantsize);
 	mtx_unlock(&ktrace_mtx);
-	td->td_inktrace = 0;
-	error = SYSCTL_OUT(req, &oldsize, sizeof(uint));
+	td->td_pflags &= ~TDP_INKTRACE;
+	error = SYSCTL_OUT(req, &oldsize, sizeof(u_int));
 	if (error)
 		return (error);
-	if (newsize != wantsize)
+	if (wantsize > oldsize && newsize < wantsize)
 		return (ENOSPC);
 	return (0);
 }
 SYSCTL_PROC(_kern_ktrace, OID_AUTO, request_pool, CTLTYPE_UINT|CTLFLAG_RW,
     &ktr_requestpool, 0, sysctl_kern_ktrace_request_pool, "IU", "");
 
-static uint
-ktrace_resize_pool(uint newsize)
+static u_int
+ktrace_resize_pool(u_int newsize)
 {
 	struct ktr_request *req;
+	int bound;
 
 	mtx_assert(&ktrace_mtx, MA_OWNED);
 	print_message = 1;
-	if (newsize == ktr_requestpool)
-		return (newsize);
-	if (newsize < ktr_requestpool)
+	bound = newsize - ktr_requestpool;
+	if (bound == 0)
+		return (ktr_requestpool);
+	if (bound < 0)
 		/* Shrink pool down to newsize if possible. */
-		while (ktr_requestpool > newsize) {
+		while (bound++ < 0) {
 			req = STAILQ_FIRST(&ktr_free);
 			if (req == NULL)
 				return (ktr_requestpool);
@@ -196,7 +200,7 @@ ktrace_resize_pool(uint newsize)
 		}
 	else
 		/* Grow pool up to newsize. */
-		while (ktr_requestpool < newsize) {
+		while (bound-- > 0) {
 			mtx_unlock(&ktrace_mtx);
 			req = malloc(sizeof(struct ktr_request), M_KTRACE,
 			    M_WAITOK);
@@ -215,11 +219,11 @@ ktr_getrequest(int type)
 	struct proc *p = td->td_proc;
 	int pm;
 
-	td->td_inktrace = 1;
+	td->td_pflags |= TDP_INKTRACE;
 	mtx_lock(&ktrace_mtx);
 	if (!KTRCHECK(td, type)) {
 		mtx_unlock(&ktrace_mtx);
-		td->td_inktrace = 0;
+		td->td_pflags &= ~TDP_INKTRACE;
 		return (NULL);
 	}
 	req = STAILQ_FIRST(&ktr_free);
@@ -248,7 +252,7 @@ ktr_getrequest(int type)
 		mtx_unlock(&ktrace_mtx);
 		if (pm)
 			printf("Out of ktrace request objects.\n");
-		td->td_inktrace = 0;
+		td->td_pflags &= ~TDP_INKTRACE;
 	}
 	return (req);
 }
@@ -259,9 +263,9 @@ ktr_submitrequest(struct ktr_request *req)
 
 	mtx_lock(&ktrace_mtx);
 	STAILQ_INSERT_TAIL(&ktr_todo, req, ktr_list);
-	sema_post(&ktrace_sema);
 	mtx_unlock(&ktrace_mtx);
-	curthread->td_inktrace = 0;
+	sema_post(&ktrace_sema);
+	curthread->td_pflags &= ~TDP_INKTRACE;
 }
 
 static void
@@ -514,7 +518,7 @@ ktrace(td, uap)
 	if (ops != KTROP_CLEARFILE && facs == 0)
 		return (EINVAL);
 
-	td->td_inktrace = 1;
+	td->td_pflags |= TDP_INKTRACE;
 	if (ops != KTROP_CLEAR) {
 		/*
 		 * an operation which requires a file argument.
@@ -522,10 +526,10 @@ ktrace(td, uap)
 		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_USERSPACE, uap->fname, td);
 		flags = FREAD | FWRITE | O_NOFOLLOW;
 		mtx_lock(&Giant);
-		error = vn_open(&nd, &flags, 0);
+		error = vn_open(&nd, &flags, 0, -1);
 		if (error) {
 			mtx_unlock(&Giant);
-			td->td_inktrace = 0;
+			td->td_pflags &= ~TDP_INKTRACE;
 			return (error);
 		}
 		NDFREE(&nd, NDF_ONLY_PNBUF);
@@ -534,7 +538,7 @@ ktrace(td, uap)
 		if (vp->v_type != VREG) {
 			(void) vn_close(vp, FREAD|FWRITE, td->td_ucred, td);
 			mtx_unlock(&Giant);
-			td->td_inktrace = 0;
+			td->td_pflags &= ~TDP_INKTRACE;
 			return (EACCES);
 		}
 		mtx_unlock(&Giant);
@@ -623,7 +627,7 @@ done:
 		(void) vn_close(vp, FWRITE, td->td_ucred, td);
 		mtx_unlock(&Giant);
 	}
-	td->td_inktrace = 0;
+	td->td_pflags &= ~TDP_INKTRACE;
 	return (error);
 #else /* !KTRACE */
 	return (ENOSYS);
@@ -660,7 +664,7 @@ utrace(td, uap)
 	req = ktr_getrequest(KTR_USER);
 	if (req == NULL) {
 		free(cp, M_KTRACE);
-		return (0);
+		return (ENOMEM);
 	}
 	req->ktr_header.ktr_buffer = cp;
 	req->ktr_header.ktr_len = uap->len;
@@ -784,7 +788,7 @@ ktr_writerequest(struct ktr_request *req)
 	if (vp == NULL)
 		return;
 	kth = &req->ktr_header;
-	datalen = data_lengths[(ushort)kth->ktr_type & ~KTR_DROP];
+	datalen = data_lengths[(u_short)kth->ktr_type & ~KTR_DROP];
 	buflen = kth->ktr_len;
 	cred = req->ktr_cred;
 	td = curthread;

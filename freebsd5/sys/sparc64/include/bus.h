@@ -69,7 +69,7 @@
  *	and
  *	from: FreeBSD: src/sys/alpha/include/bus.h,v 1.9 2001/01/09
  *
- * $FreeBSD: src/sys/sparc64/include/bus.h,v 1.26 2003/05/30 20:40:33 hmp Exp $
+ * $FreeBSD: src/sys/sparc64/include/bus.h,v 1.32 2003/09/23 08:22:34 nyan Exp $
  */
 
 #ifndef	_MACHINE_BUS_H_
@@ -132,21 +132,31 @@ struct bus_space_tag {
 };
 
 /*
- * Helpers
- */
-int sparc64_bus_mem_map(bus_space_tag_t, bus_space_handle_t, bus_size_t,
-    int, vm_offset_t, void **);
-int sparc64_bus_mem_unmap(void *, bus_size_t);
-bus_space_handle_t sparc64_fake_bustag(int, bus_addr_t,
-    struct bus_space_tag *);
-
-/*
  * Bus space function prototypes.
  */
 static void bus_space_barrier(bus_space_tag_t, bus_space_handle_t, bus_size_t,
     bus_size_t, int);
 static int bus_space_subregion(bus_space_tag_t, bus_space_handle_t,
     bus_size_t, bus_size_t, bus_space_handle_t *);
+
+/*
+ * Map a region of device bus space into CPU virtual address space.
+ */
+
+static __inline int bus_space_map(bus_space_tag_t t, bus_addr_t addr,
+				  bus_size_t size, int flags,
+				  bus_space_handle_t *bshp);
+
+static __inline int
+bus_space_map(bus_space_tag_t t __unused, bus_addr_t addr,
+	      bus_size_t size __unused, int flags __unused,
+	      bus_space_handle_t *bshp)
+{
+
+	*bshp = addr;
+	return (0);
+}
+
 /*
  * Unmap a region of device bus space.
  */
@@ -820,6 +830,33 @@ bus_space_copy_region_stream_8(bus_space_tag_t t, bus_space_handle_t h1,
 	    bus_space_write_stream_8(t, h1, o1, bus_space_read_8(t, h2, o2));
 }
 
+static __inline int
+bus_space_peek_1(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o,
+	u_int8_t *a)
+{
+
+	__BUS_DEBUG_ACCESS(h, o, "peek", 1);
+	return (fasword8(bus_type_asi[t->bst_type], (caddr_t)(h + o), a));
+}
+
+static __inline int
+bus_space_peek_2(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o,
+	u_int16_t *a)
+{
+
+	__BUS_DEBUG_ACCESS(h, o, "peek", 2);
+	return (fasword16(bus_type_asi[t->bst_type], (caddr_t)(h + o), a));
+}
+
+static __inline int
+bus_space_peek_4(bus_space_tag_t t, bus_space_handle_t h, bus_size_t o,
+	u_int32_t *a)
+{
+
+	__BUS_DEBUG_ACCESS(h, o, "peek", 4);
+	return (fasword32(bus_type_asi[t->bst_type], (caddr_t)(h + o), a));
+}
+
 /* Back-compat functions for old ISA drivers */
 extern bus_space_tag_t isa_io_bt;
 extern bus_space_handle_t isa_io_hdl;
@@ -882,23 +919,15 @@ memsetw(void *d, int val, size_t size)
 #define	BUS_DMA_NOWAIT		0x001	/* not safe to sleep */
 #define	BUS_DMA_ALLOCNOW	0x002	/* perform resource allocation now */
 #define	BUS_DMA_COHERENT	0x004	/* hint: map memory in a coherent way */
-#define	BUS_DMA_NOWRITE		0x008
+#define	BUS_DMA_ZERO		0x008	/* allocate zero'ed memory */
 #define	BUS_DMA_BUS1		0x010
 #define	BUS_DMA_BUS2		0x020
 #define	BUS_DMA_BUS3		0x040
 #define	BUS_DMA_BUS4		0x080
-/*
- * The following flags are from NetBSD, but are not implemented for all
- * architetures, and should therefore not be used in MI code.
- * Some have different values than under NetBSD.
- */
-#define	BUS_DMA_STREAMING	0x100	/* hint: sequential, unidirectional */
-#define	BUS_DMA_READ		0x200	/* mapping is device -> memory only */
-#define	BUS_DMA_WRITE		0x400	/* mapping is memory -> device only */
 
-#define	BUS_DMA_NOCACHE		BUS_DMA_BUS1
-/* Don't bother with alignment */
-#define	BUS_DMA_DVMA		BUS_DMA_BUS2
+/* The following two flags are non-standard. */
+#define	BUS_DMA_NOWRITE		0x100
+#define	BUS_DMA_NOCACHE		0x200
 
 /* Forwards needed by prototypes below. */
 struct mbuf;
@@ -939,10 +968,40 @@ typedef void bus_dmamap_callback_t(void *, bus_dma_segment_t *, int, int);
 typedef void bus_dmamap_callback2_t(void *, bus_dma_segment_t *, int, bus_size_t, int);
 
 /*
- *	bus_dma_tag_t
+ * A function that performs driver-specific syncronization on behalf of
+ * busdma.
+ */
+typedef enum {
+        BUS_DMA_LOCK    = 0x01,
+        BUS_DMA_UNLOCK  = 0x02,
+} bus_dma_lock_op_t;
+
+typedef void bus_dma_lock_t(void *, bus_dma_lock_op_t);
+  
+/*
+ * Method table for a bus_dma_tag.
+ */
+struct bus_dma_methods {
+	int	(*dm_dmamap_create)(bus_dma_tag_t, int, bus_dmamap_t *);
+	int	(*dm_dmamap_destroy)(bus_dma_tag_t, bus_dmamap_t);
+	int	(*dm_dmamap_load)(bus_dma_tag_t, bus_dmamap_t, void *,
+	    bus_size_t, bus_dmamap_callback_t *, void *, int);
+	int	(*dm_dmamap_load_mbuf)(bus_dma_tag_t, bus_dmamap_t,
+	    struct mbuf *, bus_dmamap_callback2_t *, void *, int);
+	int	(*dm_dmamap_load_uio)(bus_dma_tag_t, bus_dmamap_t, struct uio *,
+	    bus_dmamap_callback2_t *, void *, int);
+	void	(*dm_dmamap_unload)(bus_dma_tag_t, bus_dmamap_t);
+	void	(*dm_dmamap_sync)(bus_dma_tag_t, bus_dmamap_t,
+	    bus_dmasync_op_t);
+	int	(*dm_dmamem_alloc)(bus_dma_tag_t, void **, int, bus_dmamap_t *);
+	void	(*dm_dmamem_free)(bus_dma_tag_t, void *, bus_dmamap_t);
+};
+
+/*
+ * bus_dma_tag_t
  *
- *	A machine-dependent opaque type describing the implementation of
- *	DMA for a given bus.
+ * A machine-dependent opaque type describing the implementation of
+ * DMA for a given bus.
  */
 struct bus_dma_tag {
 	void		*dt_cookie;		/* cookie used in the guts */
@@ -959,163 +1018,39 @@ struct bus_dma_tag {
 	int		dt_flags;
 	int		dt_ref_count;
 	int		dt_map_count;
+	bus_dma_lock_t	*dt_lockfunc;
+	void *		*dt_lockfuncarg;
 
-	/*
-	 * DMA mapping methods.
-	 */
-	int	(*dt_dmamap_create)(bus_dma_tag_t, bus_dma_tag_t, int,
-	    bus_dmamap_t *);
-	int	(*dt_dmamap_destroy)(bus_dma_tag_t, bus_dma_tag_t,
-	    bus_dmamap_t);
-	int	(*dt_dmamap_load)(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t,
-	    void *, bus_size_t, bus_dmamap_callback_t *, void *, int);
-	int	(*dt_dmamap_load_mbuf)(bus_dma_tag_t, bus_dma_tag_t,
-	    bus_dmamap_t, struct mbuf *, bus_dmamap_callback2_t *, void *, int);
-	int	(*dt_dmamap_load_uio)(bus_dma_tag_t, bus_dma_tag_t,
-	    bus_dmamap_t, struct uio *, bus_dmamap_callback2_t *, void *, int);
-	void	(*dt_dmamap_unload)(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t);
-	void	(*dt_dmamap_sync)(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t,
-	    bus_dmasync_op_t);
-
-	/*
-	 * DMA memory utility functions.
-	 */
-	int	(*dt_dmamem_alloc)(bus_dma_tag_t, bus_dma_tag_t, void **, int,
-	    bus_dmamap_t *);
-	void	(*dt_dmamem_free)(bus_dma_tag_t, bus_dma_tag_t, void *,
-	    bus_dmamap_t);
+	struct bus_dma_methods	*dt_mt;
 };
-
-/*
- * XXX: This is a kluge. It would be better to handle dma tags in a hierarchical
- * way, and have a BUS_GET_DMA_TAG(); however, since this is not currently the
- * case, save a root tag in the relevant bus attach function and use that.
- * Keep the hierarchical structure, it might become needed in the future.
- */
-extern bus_dma_tag_t sparc64_root_dma_tag;
 
 int bus_dma_tag_create(bus_dma_tag_t, bus_size_t, bus_size_t, bus_addr_t,
     bus_addr_t, bus_dma_filter_t *, void *, bus_size_t, int, bus_size_t,
-    int, bus_dma_tag_t *);
+    int, bus_dma_lock_t *, void *, bus_dma_tag_t *);
 
 int bus_dma_tag_destroy(bus_dma_tag_t);
 
-int sparc64_dmamem_alloc_map(bus_dma_tag_t dmat, bus_dmamap_t *mapp);
-void sparc64_dmamem_free_map(bus_dma_tag_t dmat, bus_dmamap_t map);
-
-static __inline int
-sparc64_dmamap_create(bus_dma_tag_t pt, bus_dma_tag_t dt, int f,
-    bus_dmamap_t *p)
-{
-	bus_dma_tag_t lt;
-
-	for (lt = pt; lt->dt_dmamap_create == NULL; lt = lt->dt_parent)
-		;
-	return ((*lt->dt_dmamap_create)(lt, dt, f, p));
-}
 #define	bus_dmamap_create(t, f, p)					\
-	sparc64_dmamap_create((t), (t), (f), (p))
-
-static __inline int
-sparc64_dmamap_destroy(bus_dma_tag_t pt, bus_dma_tag_t dt, bus_dmamap_t p)
-{
-	bus_dma_tag_t lt;
-
-	for (lt = pt; lt->dt_dmamap_destroy == NULL; lt = lt->dt_parent)
-		;
-	return ((*lt->dt_dmamap_destroy)(lt, dt, p));
-}
+	((t)->dt_mt->dm_dmamap_create((t), (f), (p)))
 #define	bus_dmamap_destroy(t, p)					\
-	sparc64_dmamap_destroy((t), (t), (p))
-
-static __inline int
-sparc64_dmamap_load(bus_dma_tag_t pt, bus_dma_tag_t dt, bus_dmamap_t m,
-    void *p, bus_size_t s, bus_dmamap_callback_t *cb, void *cba, int f)
-{
-	bus_dma_tag_t lt;
-
-	for (lt = pt; lt->dt_dmamap_load == NULL; lt = lt->dt_parent)
-		;
-	return ((*lt->dt_dmamap_load)(lt, dt, m, p, s, cb, cba, f));
-}
+	((t)->dt_mt->dm_dmamap_destroy((t), (p)))
 #define	bus_dmamap_load(t, m, p, s, cb, cba, f)				\
-	sparc64_dmamap_load((t), (t), (m), (p), (s), (cb), (cba), (f))
-
-static __inline int
-sparc64_dmamap_load_mbuf(bus_dma_tag_t pt, bus_dma_tag_t dt, bus_dmamap_t m,
-    struct mbuf *mb, bus_dmamap_callback2_t *cb, void *cba, int f)
-{
-	bus_dma_tag_t lt;
-
-	for (lt = pt; lt->dt_dmamap_load_mbuf == NULL; lt = lt->dt_parent)
-		;
-	return ((*lt->dt_dmamap_load_mbuf)(lt, dt, m, mb, cb, cba, f));
-}
-#define	bus_dmamap_load_mbuf(t, m, mb, cb, cba, f)				\
-	sparc64_dmamap_load_mbuf((t), (t), (m), (mb), (cb), (cba), (f))
-
-static __inline int
-sparc64_dmamap_load_uio(bus_dma_tag_t pt, bus_dma_tag_t dt, bus_dmamap_t m,
-    struct uio *ui, bus_dmamap_callback2_t *cb, void *cba, int f)
-{
-	bus_dma_tag_t lt;
-
-	for (lt = pt; lt->dt_dmamap_load_uio == NULL; lt = lt->dt_parent)
-		;
-	return ((*lt->dt_dmamap_load_uio)(lt, dt, m, ui, cb, cba, f));
-}
-#define	bus_dmamap_load_uio(t, m, ui, cb, cba, f)				\
-	sparc64_dmamap_load_uio((t), (t), (m), (ui), (cb), (cba), (f))
-
-static __inline void
-sparc64_dmamap_unload(bus_dma_tag_t pt, bus_dma_tag_t dt, bus_dmamap_t p)
-{
-	bus_dma_tag_t lt;
-
-	for (lt = pt; lt->dt_dmamap_unload == NULL; lt = lt->dt_parent)
-		;
-	(*lt->dt_dmamap_unload)(lt, dt, p);
-}
+	((t)->dt_mt->dm_dmamap_load((t), (m), (p), (s), (cb), (cba), (f)))
+#define	bus_dmamap_load_mbuf(t, m, mb, cb, cba, f)			\
+	((t)->dt_mt->dm_dmamap_load_mbuf((t), (m), (mb), (cb), (cba), (f)))
+#define	bus_dmamap_load_uio(t, m, ui, cb, cba, f)			\
+	((t)->dt_mt->dm_dmamap_load_uio((t), (m), (ui), (cb), (cba), (f)))
 #define	bus_dmamap_unload(t, p)						\
-	sparc64_dmamap_unload((t), (t), (p))
-
-static __inline void
-sparc64_dmamap_sync(bus_dma_tag_t pt, bus_dma_tag_t dt, bus_dmamap_t m,
-    bus_dmasync_op_t op)
-{
-	bus_dma_tag_t lt;
-
-	for (lt = pt; lt->dt_dmamap_sync == NULL; lt = lt->dt_parent)
-		;
-	(*lt->dt_dmamap_sync)(lt, dt, m, op);
-}
+	((t)->dt_mt->dm_dmamap_unload((t), (p)))
 #define	bus_dmamap_sync(t, m, op)					\
-	sparc64_dmamap_sync((t), (t), (m), (op))
-
-static __inline int
-sparc64_dmamem_alloc(bus_dma_tag_t pt, bus_dma_tag_t dt, void **v, int f,
-    bus_dmamap_t *m)
-{
-	bus_dma_tag_t lt;
-
-	for (lt = pt; lt->dt_dmamem_alloc == NULL; lt = lt->dt_parent)
-		;
-	return ((*lt->dt_dmamem_alloc)(lt, dt, v, f, m));
-}
+	((t)->dt_mt->dm_dmamap_sync((t), (m), (op)))
 #define	bus_dmamem_alloc(t, v, f, m)					\
-	sparc64_dmamem_alloc((t), (t), (v), (f), (m))
-
-static __inline void
-sparc64_dmamem_free(bus_dma_tag_t pt, bus_dma_tag_t dt, void *v,
-    bus_dmamap_t m)
-{
-	bus_dma_tag_t lt;
-
-	for (lt = pt; lt->dt_dmamem_free == NULL; lt = lt->dt_parent)
-		;
-	(*lt->dt_dmamem_free)(lt, dt, v, m);
-}
+	((t)->dt_mt->dm_dmamem_alloc((t), (v), (f), (m)))
 #define	bus_dmamem_free(t, v, m)					\
-	sparc64_dmamem_free((t), (t), (v), (m))
+	((t)->dt_mt->dm_dmamem_free((t), (v), (m)))
 
+/*
+ * Generic helper function for manipulating mutexes.
+ */
+void busdma_lock_mutex(void *arg, bus_dma_lock_op_t op);
 #endif /* !_MACHINE_BUS_H_ */

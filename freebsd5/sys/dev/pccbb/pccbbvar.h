@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pccbb/pccbbvar.h,v 1.15 2002/10/07 23:11:29 imp Exp $
+ * $FreeBSD: src/sys/dev/pccbb/pccbbvar.h,v 1.19 2003/06/12 03:37:28 imp Exp $
  */
 
 /*
@@ -33,8 +33,9 @@
  */
 
 struct cbb_intrhand {
-	driver_intr_t *intr;
-	void	*arg;
+	driver_intr_t	*intr;
+	void 		*arg;
+	uint32_t	flags;
 	STAILQ_ENTRY(cbb_intrhand) entries;
 };
 
@@ -80,12 +81,11 @@ struct cbb_softc {
 #define	CB_CIRRUS	6		/* Cirrus Logic CLPD683x */
 #define	CB_TOPIC95	7		/* Toshiba ToPIC95 */
 #define	CB_TOPIC97	8		/* Toshiba ToPIC97/100 */
+#define	CB_O2MICRO	9		/* O2Micro chips */
 	SLIST_HEAD(, cbb_reslist) rl;
 	STAILQ_HEAD(, cbb_intrhand) intr_handlers;
 
 	device_t	cbdev;
-	device_t	pccarddev;
-
 	struct proc	*event_thread;
 };
 
@@ -97,15 +97,11 @@ struct cbb_softc {
 #define	CARD_YV_CARD	0x08
 
 /* for power_socket */
-#define	CARD_VCC_UC	0x0000
-#define	CARD_VCC_3V	0x0001
-#define	CARD_VCC_XV	0x0002
-#define	CARD_VCC_YV	0x0003
-#define	CARD_VCC_0V	0x0004
-#define	CARD_VCC_5V	0x0005
-#define	CARD_VCCMASK	0x000f
-#define	CARD_VPP_UC	0x0000
-#define	CARD_VPP_VCC	0x0010
-#define	CARD_VPP_12V	0x0030
-#define	CARD_VPP_0V	0x0040
-#define	CARD_VPPMASK	0x00f0
+#define	CARD_VCC(X)	(X)
+#define CARD_VPP_VCC	0xf0
+#define CARD_VCCMASK	0xf
+#define CARD_VCCSHIFT	0
+#define XV		2
+#define YV		1
+
+#define CARD_OFF	(CARD_VCC(0))

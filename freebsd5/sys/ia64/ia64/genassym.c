@@ -34,8 +34,10 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)genassym.c	5.11 (Berkeley) 5/10/91
- * $FreeBSD: src/sys/ia64/ia64/genassym.c,v 1.34 2003/05/16 21:26:40 marcel Exp $
+ * $FreeBSD: src/sys/ia64/ia64/genassym.c,v 1.38 2003/09/19 00:37:41 marcel Exp $
  */
+
+#include "opt_kstack_pages.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -76,6 +78,8 @@ ASSYM(ERESTART,		ERESTART);
 
 ASSYM(FRAME_SYSCALL,	FRAME_SYSCALL);
 
+ASSYM(IA64_ID_PAGE_SHIFT, IA64_ID_PAGE_SHIFT);
+
 ASSYM(KSTACK_PAGES,	KSTACK_PAGES);
 
 ASSYM(MC_PRESERVED,	offsetof(mcontext_t, mc_preserved));
@@ -111,8 +115,6 @@ ASSYM(TD_PCB,		offsetof(struct thread, td_pcb));
 
 ASSYM(TDF_ASTPENDING,	TDF_ASTPENDING);
 ASSYM(TDF_NEEDRESCHED,	TDF_NEEDRESCHED);
-
-ASSYM(TF_SPECIAL_NDIRTY, offsetof(struct trapframe, tf_special.ndirty));
 
 ASSYM(UC_MCONTEXT,	offsetof(ucontext_t, uc_mcontext));
 

@@ -33,11 +33,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/swtch.s,v 1.137 2003/04/05 22:18:14 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/swtch.s,v 1.143 2003/09/30 08:11:35 jeff Exp $
  */
 
 #include "opt_npx.h"
-#include "opt_swtch.h"
 
 #include <machine/asmacros.h>
 
@@ -67,27 +66,25 @@ ENTRY(cpu_throw)
 	testl	%ecx,%ecx			/* no thread? */
 	jz	1f
 	/* release bit from old pm_active */
-	movl	TD_PROC(%ecx), %eax		/* thread->td_proc */
-	movl	P_VMSPACE(%eax), %ebx		/* proc->p_vmspace */
+	movl	PCPU(CURPMAP), %ebx
 #ifdef SMP
 	lock
 #endif
-	btrl	%esi, VM_PMAP+PM_ACTIVE(%ebx)	/* clear old */
+	btrl	%esi, PM_ACTIVE(%ebx)		/* clear old */
 1:
 	movl	8(%esp),%ecx			/* New thread */
 	movl	TD_PCB(%ecx),%edx
-#ifdef SWTCH_OPTIM_STATS
-	incl	tlb_flush_count
-#endif
 	movl	PCB_CR3(%edx),%eax
 	movl	%eax,%cr3			/* new address space */
 	/* set bit in new pm_active */
 	movl	TD_PROC(%ecx),%eax
 	movl	P_VMSPACE(%eax), %ebx
+	addl	$VM_PMAP, %ebx
+	movl	%ebx, PCPU(CURPMAP)
 #ifdef SMP
 	lock
 #endif
-	btsl	%esi, VM_PMAP+PM_ACTIVE(%ebx)	/* set new */
+	btsl	%esi, PM_ACTIVE(%ebx)		/* set new */
 	jmp	sw1
 
 /*
@@ -121,7 +118,12 @@ ENTRY(cpu_switch)
 	movl	%gs,PCB_GS(%edx)
 	pushfl					/* PSL */
 	popl	PCB_PSL(%edx)
-
+	/* Check to see if we need to call a switchout function. */
+	movl	PCB_SWITCHOUT(%edx),%eax
+	cmpl	$0, %eax
+	je	1f
+	call	*%eax
+1:
 	/* Test if debug registers should be saved. */
 	testl	$PCB_DBREGS,PCB_FLAGS(%edx)
 	jz      1f                              /* no, skip over */
@@ -164,57 +166,33 @@ ENTRY(cpu_switch)
 
 	/* switch address space */
 	movl	PCB_CR3(%edx),%eax
-#ifdef LAZY_SWITCH
-	cmpl	$0,lazy_flush_enable
-	je	1f
-	cmpl	%eax,IdlePTD			/* Kernel address space? */
-#ifdef SWTCH_OPTIM_STATS
-	je	3f
+#ifdef PAE
+	cmpl	%eax,IdlePDPT			/* Kernel address space? */
 #else
+	cmpl	%eax,IdlePTD			/* Kernel address space? */
+#endif
 	je	sw1
-#endif
-1:
-#endif
 	movl	%cr3,%ebx			/* The same address space? */
 	cmpl	%ebx,%eax
-#ifdef SWTCH_OPTIM_STATS
-	je	2f				/* Yes, skip all that cruft */
-#else
 	je	sw1
-#endif
-#ifdef SWTCH_OPTIM_STATS
-	incl	tlb_flush_count
-#endif
 	movl	%eax,%cr3			/* new address space */
 
 	/* Release bit from old pmap->pm_active */
-	movl	TD_PROC(%edi), %eax		/* oldproc */
-	movl	P_VMSPACE(%eax), %ebx
+	movl	PCPU(CURPMAP), %ebx
 #ifdef SMP
 	lock
 #endif
-	btrl	%esi, VM_PMAP+PM_ACTIVE(%ebx)	/* clear old */
+	btrl	%esi, PM_ACTIVE(%ebx)		/* clear old */
 
 	/* Set bit in new pmap->pm_active */
 	movl	TD_PROC(%ecx),%eax		/* newproc */
 	movl	P_VMSPACE(%eax), %ebx
+	addl	$VM_PMAP, %ebx
+	movl	%ebx, PCPU(CURPMAP)
 #ifdef SMP
 	lock
 #endif
-	btsl	%esi, VM_PMAP+PM_ACTIVE(%ebx)	/* set new */
-
-#ifdef LAZY_SWITCH
-#ifdef SWTCH_OPTIM_STATS
-	jmp	sw1
-
-2:						/* same address space */
-	incl	swtch_optim_stats
-	jmp	sw1
-
-3:						/* kernel address space */
-	incl	lazy_flush_count
-#endif
-#endif
+	btsl	%esi, PM_ACTIVE(%ebx)		/* set new */
 
 sw1:
 	/*

@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/link_elf.c,v 1.73 2003/05/12 15:08:10 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/link_elf.c,v 1.76 2003/08/11 07:14:07 bms Exp $");
 
 #include "opt_ddb.h"
 #include "opt_mac.h"
@@ -560,7 +561,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 
     NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, filename, td);
     flags = FREAD;
-    error = vn_open(&nd, &flags, 0);
+    error = vn_open(&nd, &flags, 0, -1);
     if (error)
 	return error;
     NDFREE(&nd, NDF_ONLY_PNBUF);
@@ -744,7 +745,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	vm_map_wire(kernel_map,
 		    (vm_offset_t) segbase,
 		    (vm_offset_t) segbase + segs[i]->p_memsz,
-		    FALSE);
+		    VM_MAP_WIRE_SYSTEM|VM_MAP_WIRE_NOHOLES);
 #endif
     }
 

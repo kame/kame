@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_nfsiod.c,v 1.77 2003/03/02 16:54:38 des Exp $");
+__FBSDID("$FreeBSD: src/sys/nfsclient/nfs_nfsiod.c,v 1.79 2003/11/14 20:54:08 alfred Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -66,6 +66,9 @@ __FBSDID("$FreeBSD: src/sys/nfsclient/nfs_nfsiod.c,v 1.77 2003/03/02 16:54:38 de
 
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+
+#include <rpc/rpcclnt.h>
+
 #include <nfs/xdr_subs.h>
 #include <nfs/rpcv2.h>
 #include <nfs/nfsproto.h>
@@ -245,7 +248,7 @@ nfssvc_iod(void *instance)
 		 */
 		timo = (myiod < nfs_iodmin) ? 0 : nfs_iodmaxidle * hz;
 		error = tsleep(&nfs_iodwant[myiod], PWAIT | PCATCH,
-		    "nfsidl", timo);
+		    "-", timo);
 	    }
 	    if (error)
 		    break;

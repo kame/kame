@@ -37,11 +37,11 @@
  * 
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_l2tp.h,v 1.1 2002/08/20 21:59:50 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_l2tp.h,v 1.2 2003/11/11 12:30:37 ru Exp $
  */
 
-#ifndef _NETGRAPH_L2TP_H_
-#define _NETGRAPH_L2TP_H_
+#ifndef _NETGRAPH_NG_L2TP_H_
+#define _NETGRAPH_NG_L2TP_H_
 
 /* Node type name and magic cookie */
 #define NG_L2TP_NODE_TYPE	"l2tp"
@@ -158,4 +158,4 @@ enum {
 	NGM_L2TP_ACK_FAILURE,		/* sent *from* node after ack timeout */
 };
 
-#endif /* _NETGRAPH_L2TP_H_ */
+#endif /* _NETGRAPH_NG_L2TP_H_ */

@@ -52,7 +52,7 @@
  *
  * 	from: FreeBSD: src/sys/i386/i386/nexus.c,v 1.43 2001/02/09
  *
- * $FreeBSD: src/sys/sparc64/sparc64/nexus.c,v 1.6 2003/02/19 05:47:45 imp Exp $
+ * $FreeBSD: src/sys/sparc64/sparc64/nexus.c,v 1.8 2003/08/22 07:38:08 imp Exp $
  */
 
 #include <sys/param.h>
@@ -248,8 +248,10 @@ nexus_probe(device_t dev)
 			dinfo->ndi_bustag = &nexus_bustag;
 			dinfo->ndi_dmatag = &nexus_dmatag;
 			device_set_ivars(cdev, dinfo);
-		} else
+		} else {
 			free(name, M_OFWPROP);
+			free(type, M_OFWPROP);
+		}
 
 	}
 	device_set_desc(dev, "OpenFirmware Nexus device");

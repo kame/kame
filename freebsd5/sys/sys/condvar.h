@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/condvar.h,v 1.8 2002/06/29 17:26:22 julian Exp $
+ * $FreeBSD: src/sys/sys/condvar.h,v 1.9 2003/11/09 09:17:26 tanimura Exp $
  */
 
 #ifndef	_SYS_CONDVAR_H_
@@ -59,7 +59,9 @@ int	cv_timedwait(struct cv *cvp, struct mtx *mp, int timo);
 int	cv_timedwait_sig(struct cv *cvp, struct mtx *mp, int timo);
 
 void	cv_signal(struct cv *cvp);
-void	cv_broadcast(struct cv *cvp);
+void	cv_broadcastpri(struct cv *cvp, int);
+
+#define cv_broadcast(cvp)	cv_broadcastpri(cvp, -1)
 
 void	cv_waitq_remove(struct thread *td);
 void	cv_abort(struct thread *td);

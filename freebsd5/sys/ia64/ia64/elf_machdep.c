@@ -22,7 +22,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/ia64/elf_machdep.c,v 1.11 2003/05/16 21:26:40 marcel Exp $
+ * $FreeBSD: src/sys/ia64/ia64/elf_machdep.c,v 1.15 2003/10/28 19:38:25 marcel Exp $
  */
 
 #include <sys/param.h>
@@ -45,8 +45,11 @@
 #include <vm/vm_param.h>
 
 #include <machine/elf.h>
+#include <machine/frame.h>
 #include <machine/md_var.h>
 #include <machine/unwind.h>
+
+static int ia64_coredump(struct thread *, struct vnode *, off_t);
 
 struct sysentvec elf64_freebsd_sysvec = {
 	SYS_MAXSYSCALL,
@@ -63,7 +66,7 @@ struct sysentvec elf64_freebsd_sysvec = {
 	NULL,		/* &szsigcode */
 	NULL,
 	"FreeBSD ELF64",
-	__elfN(coredump),
+	ia64_coredump,
 	NULL,
 	MINSIGSTKSZ,
 	PAGE_SIZE,
@@ -73,7 +76,8 @@ struct sysentvec elf64_freebsd_sysvec = {
 	PS_STRINGS,
 	VM_PROT_ALL,
 	exec_copyout_strings,
-	exec_setregs
+	exec_setregs,
+	NULL
 };
 
 static Elf64_Brandinfo freebsd_brand_info = {
@@ -81,7 +85,7 @@ static Elf64_Brandinfo freebsd_brand_info = {
 						EM_IA_64,
 						"FreeBSD",
 						"",
-						"/usr/libexec/ld-elf.so.1",
+						"/libexec/ld-elf.so.1",
 						&elf64_freebsd_sysvec
 					  };
 
@@ -92,6 +96,36 @@ SYSINIT(elf64, SI_SUB_EXEC, SI_ORDER_ANY,
 Elf_Addr link_elf_get_gp(linker_file_t);
 
 extern Elf_Addr fptr_storage[];
+
+static int
+ia64_coredump(struct thread *td, struct vnode *vp, off_t limit)
+{
+	struct trapframe *tf;
+	uint64_t bspst, kstk, ndirty, rnat;
+
+	tf = td->td_frame;
+	ndirty = tf->tf_special.ndirty;
+	if (ndirty != 0) {
+		kstk = td->td_kstack + (tf->tf_special.bspstore & 0x1ffUL);
+		__asm __volatile("mov	ar.rsc=0;;");
+		__asm __volatile("mov	%0=ar.bspstore" : "=r"(bspst));
+		/* Make sure we have all the user registers written out. */
+		if (bspst - kstk < ndirty) {
+			__asm __volatile("flushrs;;");
+			__asm __volatile("mov	%0=ar.bspstore" : "=r"(bspst));
+		}
+		__asm __volatile("mov	%0=ar.rnat;;" : "=r"(rnat));
+		__asm __volatile("mov	ar.rsc=3");
+		copyout((void*)kstk, (void*)tf->tf_special.bspstore, ndirty);
+		kstk += ndirty;
+		tf->tf_special.bspstore += ndirty;
+		tf->tf_special.ndirty = 0;
+		tf->tf_special.rnat =
+		    (bspst > kstk && (bspst & 0x1ffUL) < (kstk & 0x1ffUL))
+		    ? *(uint64_t*)(kstk | 0x1f8UL) : rnat;
+	}
+	return (elf64_coredump(td, vp, limit));
+}
 
 static Elf_Addr
 lookup_fdesc(linker_file_t lf, Elf_Word symidx)

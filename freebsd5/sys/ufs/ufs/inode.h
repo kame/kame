@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)inode.h	8.9 (Berkeley) 5/14/95
- * $FreeBSD: src/sys/ufs/ufs/inode.h,v 1.43 2002/12/15 19:25:59 mckusick Exp $
+ * $FreeBSD: src/sys/ufs/ufs/inode.h,v 1.44 2003/08/15 20:03:19 phk Exp $
  */
 
 #ifndef _UFS_UFS_INODE_H_
@@ -65,7 +65,6 @@ struct inode {
 	TAILQ_ENTRY(inode) i_nextsnap; /* snapshot file list. */
 	struct	vnode  *i_vnode;/* Vnode associated with this inode. */
 	struct	ufsmount *i_ump;/* Ufsmount point associated with this inode. */
-	struct	vnode  *i_devvp;/* Vnode for block I/O. */
 	u_int32_t i_flag;	/* flags, see below */
 	struct cdev *i_dev;	/* Device associated with the inode. */
 	ino_t	  i_number;	/* The identity of the inode. */
@@ -127,6 +126,7 @@ struct inode {
 #define	IN_LAZYMOD	0x0040		/* Modified, but don't write yet. */
 #define	IN_SPACECOUNTED	0x0080		/* Blocks to be freed in free count. */
 
+#define i_devvp i_ump->um_devvp
 #define i_dirhash i_un.dirhash
 #define i_snapblklist i_un.snapblklist
 #define i_din1 dinode_u.din1

@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/kern_exec.c,v 1.219 2003/05/13 20:35:59 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_exec.c,v 1.232 2003/11/12 03:14:29 rwatson Exp $");
 
 #include "opt_ktrace.h"
 #include "opt_mac.h"
@@ -97,12 +98,6 @@ SYSCTL_ULONG(_kern, OID_AUTO, ps_arg_cache_limit, CTLFLAG_RW,
 int ps_argsopen = 1;
 SYSCTL_INT(_kern, OID_AUTO, ps_argsopen, CTLFLAG_RW, &ps_argsopen, 0, "");
 
-#ifdef __ia64__
-/* XXX HACK */
-static int regstkpages = 256;
-SYSCTL_INT(_machdep, OID_AUTO, regstkpages, CTLFLAG_RW, &regstkpages, 0, "");
-#endif
-
 static int
 sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS)
 {
@@ -172,9 +167,8 @@ kern_execve(td, fname, argv, envv, mac_p)
 	int credential_changing;
 	int textset;
 #ifdef MAC
-	struct label interplabel;	/* label of the interpreted vnode */
-	struct label execlabel;		/* optional label argument */
-	int will_transition, interplabelvalid = 0;
+	struct label *interplabel = NULL;
+	int will_transition;
 #endif
 
 	imgp = &image_params;
@@ -189,7 +183,7 @@ kern_execve(td, fname, argv, envv, mac_p)
 	PROC_LOCK(p);
 	KASSERT((p->p_flag & P_INEXEC) == 0,
 	    ("%s(): process already has P_INEXEC flag", __func__));
-	if (p->p_flag & P_THREADED || p->p_numthreads > 1) {
+	if (p->p_flag & P_SA || p->p_numthreads > 1) {
 		if (thread_single(SINGLE_EXIT)) {
 			PROC_UNLOCK(p);
 			return (ERESTART);	/* Try again later. */
@@ -198,7 +192,7 @@ kern_execve(td, fname, argv, envv, mac_p)
 		 * If we get here all other threads are dead,
 		 * so unset the associated flags and lose KSE mode.
 		 */
-		p->p_flag &= ~P_THREADED;
+		p->p_flag &= ~P_SA;
 		td->td_mailbox = NULL;
 		thread_single_end();
 	}
@@ -227,7 +221,7 @@ kern_execve(td, fname, argv, envv, mac_p)
 	imgp->auxarg_size = 0;
 
 #ifdef MAC
-	error = mac_execve_enter(imgp, mac_p, &execlabel);
+	error = mac_execve_enter(imgp, mac_p);
 	if (error) {
 		mtx_lock(&Giant);
 		goto exec_fail;
@@ -341,9 +335,8 @@ interpret:
 		/* free name buffer and old vnode */
 		NDFREE(ndp, NDF_ONLY_PNBUF);
 #ifdef MAC
-		mac_init_vnode_label(&interplabel);
-		mac_copy_vnode_label(&ndp->ni_vp->v_label, &interplabel);
-		interplabelvalid = 1;
+		interplabel = mac_vnode_label_alloc();
+		mac_copy_vnode_label(ndp->ni_vp->v_label, interplabel);
 #endif
 		vput(ndp->ni_vp);
 		vm_object_deallocate(imgp->object);
@@ -457,7 +450,7 @@ interpret:
 	    attr.va_gid;
 #ifdef MAC
 	will_transition = mac_execve_will_transition(oldcred, imgp->vp,
-	    interplabelvalid ? &interplabel : NULL, imgp);
+	    interplabel, imgp);
 	credential_changing |= will_transition;
 #endif
 
@@ -507,7 +500,7 @@ interpret:
 #ifdef MAC
 		if (will_transition) {
 			mac_execve_transition(oldcred, newcred, imgp->vp,
-			    interplabelvalid ? &interplabel : NULL, imgp);
+			    interplabel, imgp);
 		}
 #endif
 		/*
@@ -659,8 +652,8 @@ exec_fail:
 		/* sorry, no more process anymore. exit gracefully */
 #ifdef MAC
 		mac_execve_exit(imgp);
-		if (interplabelvalid)
-			mac_destroy_vnode_label(&interplabel);
+		if (interplabel != NULL)
+			mac_vnode_label_free(interplabel);
 #endif
 		exit1(td, W_EXITCODE(0, SIGABRT));
 		/* NOT REACHED */
@@ -669,8 +662,8 @@ exec_fail:
 done2:
 #ifdef MAC
 	mac_execve_exit(imgp);
-	if (interplabelvalid)
-		mac_destroy_vnode_label(&interplabel);
+	if (interplabel != NULL)
+		mac_vnode_label_free(interplabel);
 #endif
 	mtx_unlock(&Giant);
 	return (error);
@@ -747,20 +740,21 @@ exec_map_first_page(imgp)
 	}
 
 	VOP_GETVOBJECT(imgp->vp, &object);
-
+	VM_OBJECT_LOCK(object);
 	ma[0] = vm_page_grab(object, 0, VM_ALLOC_NORMAL | VM_ALLOC_RETRY);
-
 	if ((ma[0]->valid & VM_PAGE_BITS_ALL) != VM_PAGE_BITS_ALL) {
 		initial_pagein = VM_INITIAL_PAGEIN;
 		if (initial_pagein > object->size)
 			initial_pagein = object->size;
 		for (i = 1; i < initial_pagein; i++) {
 			if ((ma[i] = vm_page_lookup(object, i)) != NULL) {
-				if ((ma[i]->flags & PG_BUSY) || ma[i]->busy)
-					break;
 				if (ma[i]->valid)
 					break;
 				vm_page_lock_queues();
+				if ((ma[i]->flags & PG_BUSY) || ma[i]->busy) {
+					vm_page_unlock_queues();
+					break;
+				}
 				vm_page_busy(ma[i]);
 				vm_page_unlock_queues();
 			} else {
@@ -771,10 +765,8 @@ exec_map_first_page(imgp)
 			}
 		}
 		initial_pagein = i;
-
 		rv = vm_pager_get_pages(object, ma, initial_pagein, 0);
 		ma[0] = vm_page_lookup(object, 0);
-
 		if ((rv != VM_PAGER_OK) || (ma[0] == NULL) ||
 		    (ma[0]->valid == 0)) {
 			if (ma[0]) {
@@ -783,6 +775,7 @@ exec_map_first_page(imgp)
 				vm_page_free(ma[0]);
 				vm_page_unlock_queues();
 			}
+			VM_OBJECT_UNLOCK(object);
 			return (EIO);
 		}
 	}
@@ -790,6 +783,7 @@ exec_map_first_page(imgp)
 	vm_page_wire(ma[0]);
 	vm_page_wakeup(ma[0]);
 	vm_page_unlock_queues();
+	VM_OBJECT_UNLOCK(object);
 
 	pmap_qenter((vm_offset_t)imgp->image_header, ma, 1);
 	imgp->firstpage = ma[0];
@@ -830,11 +824,18 @@ exec_new_vmspace(imgp, sv)
 
 	GIANT_REQUIRED;
 
-	stack_addr = sv->sv_usrstack - maxssiz;
-
 	imgp->vmspace_destroyed = 1;
 
 	EVENTHANDLER_INVOKE(process_exec, p);
+
+	/*
+	 * Here is as good a place as any to do any resource limit cleanups.
+	 * This is needed if a 64 bit binary exec's a 32 bit binary - the
+	 * data size limit may need to be changed to a value that makes
+	 * sense for the 32 bit binary.
+	 */
+	if (sv->sv_fixlimits)
+		sv->sv_fixlimits(imgp);
 
 	/*
 	 * Blow away entire process VM, if address space not shared,
@@ -857,24 +858,19 @@ exec_new_vmspace(imgp, sv)
 	}
 
 	/* Allocate a new stack */
+	stack_addr = sv->sv_usrstack - maxssiz;
 	error = vm_map_stack(map, stack_addr, (vm_size_t)maxssiz,
-	    sv->sv_stackprot, VM_PROT_ALL, 0);
+	    sv->sv_stackprot, VM_PROT_ALL, MAP_STACK_GROWS_DOWN);
 	if (error)
 		return (error);
 
 #ifdef __ia64__
-	{
-		/*
-		 * Allocate backing store. We really need something
-		 * similar to vm_map_stack which can allow the backing 
-		 * store to grow upwards. This will do for now.
-		 */
-		vm_offset_t bsaddr;
-		bsaddr = p->p_sysent->sv_usrstack - 2 * maxssiz;
-		error = vm_map_find(map, 0, 0, &bsaddr,
-		    regstkpages * PAGE_SIZE, 0, VM_PROT_ALL, VM_PROT_ALL, 0);
-		FIRST_THREAD_IN_PROC(p)->td_md.md_bspstore = bsaddr;
-	}
+	/* Allocate a new register stack */
+	stack_addr = IA64_BACKINGSTORE;
+	error = vm_map_stack(map, stack_addr, (vm_size_t)maxssiz,
+	    sv->sv_stackprot, VM_PROT_ALL, MAP_STACK_GROWS_UP);
+	if (error)
+		return (error);
 #endif
 
 	/* vm_ssize and vm_maxsaddr are somewhat antiquated concepts in the
@@ -1137,7 +1133,7 @@ exec_check_permissions(imgp)
 	 * Call filesystem specific open routine (which does nothing in the
 	 * general case).
 	 */
-	error = VOP_OPEN(vp, FREAD, td->td_ucred, td);
+	error = VOP_OPEN(vp, FREAD, td->td_ucred, td, -1);
 	return (error);
 }
 

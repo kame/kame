@@ -23,13 +23,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/pci/cy_pci.c,v 1.28 2003/04/15 06:37:29 mdodd Exp $
  */
 
 /*
  * Cyclades Y PCI serial interface driver
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/cy_pci.c,v 1.31 2003/12/02 12:47:08 bde Exp $");
 
 #include "opt_cy_pci_fastintr.h"
 
@@ -47,17 +48,17 @@
 
 #include <dev/pci/pcivar.h>
 
-#define CY_PCI_BASE_ADDR0		0x10
-#define CY_PCI_BASE_ADDR1		0x14
-#define CY_PCI_BASE_ADDR2		0x18
+#define	CY_PCI_BASE_ADDR0		0x10
+#define	CY_PCI_BASE_ADDR1		0x14
+#define	CY_PCI_BASE_ADDR2		0x18
 
-#define CY_PLX_9050_ICS			0x4c
-#define CY_PLX_9060_ICS			0x68
-#define CY_PLX_9050_ICS_IENABLE		0x040
-#define CY_PLX_9050_ICS_LOCAL_IENABLE	0x001
-#define CY_PLX_9050_ICS_LOCAL_IPOLARITY	0x002
-#define CY_PLX_9060_ICS_IENABLE		0x100
-#define CY_PLX_9060_ICS_LOCAL_IENABLE	0x800
+#define	CY_PLX_9050_ICS			0x4c
+#define	CY_PLX_9060_ICS			0x68
+#define	CY_PLX_9050_ICS_IENABLE		0x040
+#define	CY_PLX_9050_ICS_LOCAL_IENABLE	0x001
+#define	CY_PLX_9050_ICS_LOCAL_IPOLARITY	0x002
+#define	CY_PLX_9060_ICS_IENABLE		0x100
+#define	CY_PLX_9060_ICS_LOCAL_IENABLE	0x800
 
 /* Cyclom-Y Custom Register for PLX ID. */
 #define	PLX_VER				0x3400
@@ -65,8 +66,8 @@
 #define	PLX_9060			0x0c
 #define	PLX_9080			0x0d
 
-extern int cyattach_common(void *, int); /* Not exactly correct */
-extern void cyintr(int);
+void	*cyattach_common(u_char volatile *iobase, int cy_align);
+driver_intr_t	cyintr;
 
 static int	cy_pci_attach(device_t dev);
 static int	cy_pci_probe(device_t dev);
@@ -109,9 +110,9 @@ cy_pci_attach(dev)
 	device_t dev;
 {
 	struct resource *ioport_res, *irq_res, *mem_res;
-	void *irq_cookie, *vaddr;
+	void *irq_cookie, *vaddr, *vsc;
 	u_int32_t ioport;
-	int adapter, irq_setup, ioport_rid, irq_rid, mem_rid;
+	int irq_setup, ioport_rid, irq_rid, mem_rid;
 	u_char plx_ver;
 
 	ioport_res = NULL;
@@ -129,28 +130,19 @@ cy_pci_attach(dev)
 
 	mem_rid = CY_PCI_BASE_ADDR2;
 	mem_res = bus_alloc_resource(dev, SYS_RES_MEMORY, &mem_rid,
-	     0ul, ~0ul, 0ul, RF_ACTIVE);
+	    0ul, ~0ul, 0ul, RF_ACTIVE);
 	if (mem_res == NULL) {
 		device_printf(dev, "memory resource allocation failed\n");
 		goto fail;
 	}
 	vaddr = rman_get_virtual(mem_res);
 
-	adapter = cyattach_common(vaddr, 1);
-	if (adapter < 0) {
+	vsc = cyattach_common(vaddr, 1);
+	if (vsc == NULL) {
 		device_printf(dev, "no ports found!\n");
 		goto fail;
 	}
 
-	/*
-	 * Allocate our interrupt.
-	 * XXX	Using the ISA interrupt handler directly is a bit of a violation
-	 *	since it doesn't actually take the same argument. For PCI, the
-	 *	argument is a void * token, but for ISA it is a unit. Since
-	 *	there is no overlap in PCI/ISA unit numbers for this driver, and
-	 *	since the ISA driver must handle the interrupt anyway, we use
-	 *	the unit number as the token even for PCI.
-	 */
 	irq_rid = 0;
 	irq_res = bus_alloc_resource(dev, SYS_RES_IRQ, &irq_rid, 0ul, ~0ul, 0ul,
 	    RF_SHAREABLE | RF_ACTIVE);
@@ -160,13 +152,13 @@ cy_pci_attach(dev)
 	}
 #ifdef CY_PCI_FASTINTR
 	irq_setup = bus_setup_intr(dev, irq_res, INTR_TYPE_TTY | INTR_FAST,
-	    (driver_intr_t *)cyintr, (void *)adapter, &irq_cookie);
+	    cyintr, vsc, &irq_cookie);
 #else
 	irq_setup = ENXIO;
 #endif
 	if (irq_setup != 0)
 		irq_setup = bus_setup_intr(dev, irq_res, INTR_TYPE_TTY,
-		    (driver_intr_t *)cyintr, (void *)adapter, &irq_cookie);
+		    cyintr, vsc, &irq_cookie);
 	if (irq_setup != 0) {
 		device_printf(dev, "interrupt setup failed\n");
 		goto fail;

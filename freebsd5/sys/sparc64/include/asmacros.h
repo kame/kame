@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sparc64/include/asmacros.h,v 1.16 2003/04/26 20:54:44 obrien Exp $
+ * $FreeBSD: src/sys/sparc64/include/asmacros.h,v 1.17 2003/07/16 00:08:43 jmg Exp $
  */
 
 #ifndef	_MACHINE_ASMACROS_H_
@@ -64,6 +64,17 @@
 	lduw	[r1], r2 ; \
 9:	add	r2, 1, r3 ; \
 	casa	[r1] ASI_N, r2, r3 ; \
+	cmp	r2, r3 ; \
+	bne,pn	%icc, 9b ; \
+	 mov	r3, r2
+
+/*
+ * Atomically increment an u_long in memory.
+ */
+#define	ATOMIC_INC_ULONG(r1, r2, r3) \
+	ldx	[r1], r2 ; \
+9:	add	r2, 1, r3 ; \
+	casxa	[r1] ASI_N, r2, r3 ; \
 	cmp	r2, r3 ; \
 	bne,pn	%icc, 9b ; \
 	 mov	r3, r2

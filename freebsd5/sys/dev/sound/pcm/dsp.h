@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/dsp.h,v 1.6 2001/09/05 16:28:41 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/dsp.h,v 1.7 2003/09/07 16:28:03 cg Exp $
  */
 
 int dsp_register(int unit, int channel);

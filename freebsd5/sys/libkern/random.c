@@ -31,14 +31,16 @@
  * SUCH DAMAGE.
  *
  *	@(#)random.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/libkern/random.c,v 1.10 2003/02/05 21:28:52 ache Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/libkern/random.c,v 1.12 2003/08/10 17:56:58 ache Exp $");
 
 #include <sys/libkern.h>
 
-#define NSHUFF 100      /* to drop part of seed -> 1st value correlation */
+#define NSHUFF 50       /* to drop some "seed -> 1st value" linearity */
 
-static u_long randseed = 892053144; /* after srandom(1), NSHUFF counted */
+static u_long randseed = 937186357; /* after srandom(1), NSHUFF counted */
 
 void
 srandom(seed)

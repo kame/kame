@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/geom/geom_vol_ffs.c,v 1.8 2003/05/02 08:21:02 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/geom/geom_vol_ffs.c,v 1.10 2003/06/11 06:49:16 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -137,7 +138,6 @@ g_vol_ffs_taste(struct g_class *mp, struct g_provider *pp, int flags)
 static struct g_class g_vol_ffs_class	= {
 	.name = VOL_FFS_CLASS_NAME,
 	.taste = g_vol_ffs_taste,
-	G_CLASS_INITIALIZER
 };
 
 DECLARE_GEOM_CLASS(g_vol_ffs_class, g_vol_ffs);

@@ -24,9 +24,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/subr_mbuf.c,v 1.50.2.1 2003/06/03 23:27:05 bmilekic Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/subr_mbuf.c,v 1.56 2003/10/21 18:28:34 silby Exp $");
 
 #include "opt_mac.h"
 #include "opt_param.h"
@@ -309,13 +310,13 @@ static u_int clust_lowm = 16;	/* Low wm on # of clusters per cache */
  * Objects exported by sysctl(8).
  */
 SYSCTL_DECL(_kern_ipc);
-SYSCTL_INT(_kern_ipc, OID_AUTO, nmbclusters, CTLFLAG_RD, &nmbclusters, 0, 
+SYSCTL_INT(_kern_ipc, OID_AUTO, nmbclusters, CTLFLAG_RDTUN, &nmbclusters, 0, 
     "Maximum number of mbuf clusters available");
-SYSCTL_INT(_kern_ipc, OID_AUTO, nmbufs, CTLFLAG_RD, &nmbufs, 0,
+SYSCTL_INT(_kern_ipc, OID_AUTO, nmbufs, CTLFLAG_RDTUN, &nmbufs, 0,
     "Maximum number of mbufs available"); 
-SYSCTL_INT(_kern_ipc, OID_AUTO, nmbcnt, CTLFLAG_RD, &nmbcnt, 0,
+SYSCTL_INT(_kern_ipc, OID_AUTO, nmbcnt, CTLFLAG_RDTUN, &nmbcnt, 0,
     "Number used to scale kmem_map to ensure sufficient space for counters");
-SYSCTL_INT(_kern_ipc, OID_AUTO, nsfbufs, CTLFLAG_RD, &nsfbufs, 0,
+SYSCTL_INT(_kern_ipc, OID_AUTO, nsfbufs, CTLFLAG_RDTUN, &nsfbufs, 0,
     "Maximum number of sendfile(2) sf_bufs available");
 SYSCTL_INT(_kern_ipc, OID_AUTO, mbuf_wait, CTLFLAG_RW, &mbuf_wait, 0,
     "Sleep time of mbuf subsystem wait allocations during exhaustion");
@@ -391,7 +392,7 @@ mbuf_init(void *dummy)
 	mb_list_mbuf.ml_map->system_map = 1;
 	mb_list_mbuf.ml_mapfull = 0;
 	mb_list_mbuf.ml_objsize = MSIZE;
-	mb_list_mbuf.ml_objbucks = MBUF_BUCK_SZ / MSIZE;
+	mb_list_mbuf.ml_objbucks = MBUF_BUCK_SZ / mb_list_mbuf.ml_objsize;
 	mb_list_mbuf.ml_wmhigh = &mbuf_hiwm;
 	mb_list_mbuf.ml_wmlow = &mbuf_lowm;
 
@@ -407,7 +408,7 @@ mbuf_init(void *dummy)
 	mb_list_clust.ml_map->system_map = 1;
 	mb_list_clust.ml_mapfull = 0;
 	mb_list_clust.ml_objsize = MCLBYTES;
-	mb_list_clust.ml_objbucks = CLUST_BUCK_SZ / MCLBYTES;
+	mb_list_clust.ml_objbucks = CLUST_BUCK_SZ / mb_list_clust.ml_objsize;
 	mb_list_clust.ml_wmhigh = &clust_hiwm;
 	mb_list_clust.ml_wmlow = &clust_lowm;
 
@@ -464,14 +465,14 @@ mbuf_init(void *dummy)
 	/*
 	 * Initialize general mbuf statistics.
 	 */
-	mbstat.m_msize = MSIZE;
-	mbstat.m_mclbytes = MCLBYTES;
+	mbstat.m_msize =  mb_list_mbuf.ml_objsize;
+	mbstat.m_mclbytes = mb_list_clust.ml_objsize;
 	mbstat.m_minclsize = MINCLSIZE;
 	mbstat.m_mlen = MLEN;
 	mbstat.m_mhlen = MHLEN;
 	mbstat.m_numtypes = MT_NTYPES;
-	mbstat.m_mbperbuck = MBUF_BUCK_SZ / MSIZE;
-	mbstat.m_clperbuck = CLUST_BUCK_SZ / MCLBYTES;
+	mbstat.m_mbperbuck = mb_list_mbuf.ml_objbucks;
+	mbstat.m_clperbuck = mb_list_clust.ml_objbucks;
 
 	/*
 	 * Allocate and initialize PCPU containers.
@@ -606,7 +607,7 @@ mb_pop_cont(struct mb_lstmngr *mb_list, int how, struct mb_pcpu_list *cnt_lst)
  * the general container is empty, and we've run out of address space
  * in our map; then we try to block if we're willing to (M_TRYWAIT).
  */
-static __inline
+static 
 void *
 mb_alloc(struct mb_lstmngr *mb_list, int how, short type, short persist, 
 	 int *pers_list)
@@ -629,8 +630,6 @@ mb_alloc(struct mb_lstmngr *mb_list, int how, short type, short persist,
 			how = M_TRYWAIT;
 		}
 	}
-	if ((flags & M_DONTWAIT) == 0)
-		GIANT_REQUIRED;
 #endif
 
 	m = NULL;
@@ -853,7 +852,7 @@ mb_alloc_wait(struct mb_lstmngr *mb_list, short type)
  *	    waiting for the lock; our bucket is in the general container;
  *	    our bucket is empty.
  */
-static __inline
+static 
 void
 mb_free(struct mb_lstmngr *mb_list, void *m, short type, short persist,
 	int *pers_list)

@@ -1,5 +1,7 @@
 /*-
  * Copyright (c) 2000 Michael Smith
+ * Copyright (c) 2003 Paul Saab
+ * Copyright (c) 2003 Vinod Kashyap
  * Copyright (c) 2000 BSDi
  * All rights reserved.
  *
@@ -24,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/twe/twe_compat.h,v 1.7 2003/03/15 12:16:33 phk Exp $
+ * $FreeBSD: src/sys/dev/twe/twe_compat.h,v 1.11 2003/12/02 07:57:20 ps Exp $
  */
 /*
  * Portability and compatibility interfaces.
@@ -37,9 +39,11 @@
 #define TWE_SUPPORTED_PLATFORM
 
 #include <sys/param.h>
+#include <sys/endian.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/sysctl.h>
 
 #include <sys/bus.h>
 #include <sys/conf.h>
@@ -51,46 +55,12 @@
 #include <machine/resource.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
-/*
- * These macros allows us to build a version of the driver which can 
- * safely be loaded into a kernel which already contains a 'twe' driver,
- * and which will override it in all things.
- *
- * All public symbols must be listed here.
- */
-#ifdef TWE_OVERRIDE
-#define twe_setup		Xtwe_setup
-#define twe_init		Xtwe_init
-#define twe_deinit		Xtwe_deinit
-#define twe_intr		Xtwe_intr
-#define twe_submit_bio		Xtwe_submit_bio
-#define twe_ioctl		Xtwe_ioctl
-#define twe_describe_controller	Xtwe_describe_controller
-#define twe_print_controller	Xtwe_print_controller
-#define twe_enable_interrupts	Xtwe_enable_interrupts
-#define twe_disable_interrupts	Xtwe_disable_interrupts
-#define twe_attach_drive	Xtwe_attach_drive
-#define twed_intr		Xtwed_intr
-#define twe_allocate_request	Xtwe_allocate_request
-#define twe_free_request	Xtwe_free_request
-#define twe_map_request		Xtwe_map_request
-#define twe_unmap_request	Xtwe_unmap_request
-#define twe_describe_code	Xtwe_describe_code
-#define twe_table_status	Xtwe_table_status
-#define twe_table_unitstate	Xtwe_table_unitstate
-#define twe_table_unittype	Xtwe_table_unittype
-#define twe_table_aen		Xtwe_table_aen
-#define TWE_DRIVER_NAME		Xtwe
-#define TWED_DRIVER_NAME	Xtwed
-#define TWE_MALLOC_CLASS	M_XTWE
-#else
 #define TWE_DRIVER_NAME		twe
 #define TWED_DRIVER_NAME	twed
 #define TWE_MALLOC_CLASS	M_TWE
-#endif
 
 /* 
  * Wrappers for bus-space actions
@@ -104,6 +74,8 @@
  * FreeBSD-specific softc elements
  */
 #define TWE_PLATFORM_SOFTC								\
+    bus_dmamap_t		twe_cmdmap;	/* DMA map for command */				\
+    u_int32_t			twe_cmdphys;	/* address of command in controller space */		\
     device_t			twe_dev;		/* bus device */		\
     dev_t			twe_dev_t;		/* control device */		\
     struct resource		*twe_io;		/* register interface window */	\
@@ -111,16 +83,21 @@
     bus_space_tag_t		twe_btag;		/* bus space tag */		\
     bus_dma_tag_t		twe_parent_dmat;	/* parent DMA tag */		\
     bus_dma_tag_t		twe_buffer_dmat;	/* data buffer DMA tag */	\
+    bus_dma_tag_t		twe_cmd_dmat;		/* command buffer DMA tag */	\
+    bus_dma_tag_t		twe_immediate_dmat;	/* command buffer DMA tag */	\
     struct resource		*twe_irq;		/* interrupt */			\
     void			*twe_intr;		/* interrupt handle */		\
-    struct intr_config_hook	twe_ich;		/* delayed-startup hook */
+    struct intr_config_hook	twe_ich;		/* delayed-startup hook */	\
+    void			*twe_cmd;		/* command structures */	\
+    void			*twe_immediate;		/* immediate commands */	\
+    bus_dmamap_t		twe_immediate_map;					\
+    struct sysctl_ctx_list	sysctl_ctx;						\
+    struct sysctl_oid		*sysctl_tree;
 
 /*
  * FreeBSD-specific request elements
  */
 #define TWE_PLATFORM_REQUEST										\
-    bus_dmamap_t		tr_cmdmap;	/* DMA map for command */				\
-    u_int32_t			tr_cmdphys;	/* address of command in controller space */		\
     bus_dmamap_t		tr_dmamap;	/* DMA map for data */					\
     u_int32_t			tr_dataphys;	/* data buffer base address in controller space */
 
@@ -133,6 +110,7 @@
 #if __FreeBSD_version < 500003
 # include <machine/clock.h>
 # define INTR_ENTROPY			0
+# define FREEBSD_4
 
 # include <sys/buf.h>			/* old buf style */
 typedef struct buf			twe_bio;
@@ -155,6 +133,7 @@ typedef struct buf_queue_head		twe_bioq;
 # define TWE_BIO_STATS_END(bp)		devstat_end_transaction_buf(&((struct twed_softc *)TWE_BIO_SOFTC(bp))->twed_stats, bp)
 #else
 # include <sys/bio.h>
+# include <geom/geom_disk.h>
 typedef struct bio			twe_bio;
 typedef struct bio_queue_head		twe_bioq;
 # define TWE_BIO_QINIT(bq)		bioq_init(&bq);

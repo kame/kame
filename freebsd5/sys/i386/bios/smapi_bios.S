@@ -1,12 +1,30 @@
-/* $FreeBSD: src/sys/i386/bios/smapi_bios.S,v 1.2 2003/01/18 04:36:12 mdodd Exp $ */
+#include <machine/asm.h>
+__FBSDID("$FreeBSD: src/sys/i386/bios/smapi_bios.S,v 1.4 2003/06/13 00:36:03 mdodd Exp $");
 
 #include <machine/asmacros.h>
+
+/*
+ * This is cribbed from the Linux thinkpad-4.1 driver by
+ * Thomas Hood.
+ */
+
+	.align
+smapi32_entry:					/* far pointer to SMAPI entry */
+	.globl	smapi32_offset
+smapi32_offset:		.long	0x00000000	/* set by caller */
+smapi32_segment:	.word	0x0000		/* %cs stored here */
 
 	.text
 /*
  * smapi32(input_param, output_param)
  *	struct smapi_bios_parameter *input_parm;
  *	struct smapi_bios_parameter *output_parm;
+ *
+ *	stack frame:
+ *		0x00 : saved ebp
+ *		0x04 : return EIP
+ *		0x08 : input_parm
+ *		0x0c : output_parm
  */
 ENTRY(smapi32)
 	pushl	%ebp			/* Save frame */
@@ -19,34 +37,6 @@ ENTRY(smapi32)
 
 	movl	$0,%eax			/* Clear EAX (return 0) */
 	movw	%cs,smapi32_segment	/* Save CS */
-	lcall	*(smapi32_offset)
-
-	leave
-	ret
-
-/*
- * smapi32(offset, segment, input_param, output_param)
- *	u_int offset;
- *	u_short segment;
- *	struct smapi_bios_parameter *input_parm;
- *	struct smapi_bios_parameter *output_parm;
- */
-ENTRY(smapi32_new)
-	pushl	%ebp			/* Save frame */
-	movl	%esp,%ebp
-
-	movl	0x08(%ebp),%eax
-	movl	%eax,smapi32_offset
-	movw	0x0c(%ebp),%ax
-	movw	%ax,smapi32_segment
-
-	pushl	%ds
-	pushl	0x20(%ebp)		/* Output Param */
-	pushl	%ds
-	pushl	0x10(%ebp)		/* Input Param */
-
-	movl	$0,%eax
-	movw	%cs,smapi32_segment
 	lcall	*(smapi32_offset)
 
 	leave

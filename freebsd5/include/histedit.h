@@ -35,7 +35,7 @@
  *
  *	@(#)histedit.h	8.2 (Berkeley) 1/3/94
  *	$NetBSD: histedit.h,v 1.15 2000/02/28 17:41:05 chopps Exp $
- * $FreeBSD: src/include/histedit.h,v 1.8 2002/06/16 08:29:33 mdodd Exp $
+ * $FreeBSD: src/include/histedit.h,v 1.9 2003/07/14 16:31:20 imp Exp $
  */
 
 /*
@@ -46,6 +46,8 @@
 
 #include <sys/types.h>
 #include <stdio.h>
+
+__BEGIN_DECLS
 
 /*
  * ==== Editing ====
@@ -193,5 +195,7 @@ int		history(History *, HistEvent *, int, ...);
 #define	H_LOAD		17	/* , const char *);	*/
 #define	H_SAVE		18	/* , const char *);	*/
 #define	H_CLEAR		19	/* , void);		*/
+
+__END_DECLS
 
 #endif /* _HISTEDIT_H_ */

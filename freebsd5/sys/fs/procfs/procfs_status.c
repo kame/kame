@@ -38,7 +38,7 @@
  *
  * From:
  *	$Id: procfs_status.c,v 3.1 1993/12/15 09:40:17 jsp Exp $
- * $FreeBSD: src/sys/fs/procfs/procfs_status.c,v 1.48 2003/05/01 16:59:22 des Exp $
+ * $FreeBSD: src/sys/fs/procfs/procfs_status.c,v 1.49 2003/06/15 00:31:22 davidxu Exp $
  */
 
 #include <sys/param.h>
@@ -117,7 +117,7 @@ procfs_doprocstatus(PFS_FILL_ARGS)
 	}
 
 	mtx_lock_spin(&sched_lock);
-	if (p->p_flag & P_THREADED)
+	if (p->p_flag & P_SA)
 		wmesg = "-kse- ";
 	else {
 		tdfirst = FIRST_THREAD_IN_PROC(p);

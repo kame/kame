@@ -27,9 +27,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/vx/if_vx.c,v 1.43 2003/04/08 14:25:44 des Exp $
  *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/vx/if_vx.c,v 1.48 2003/10/31 18:32:06 brooks Exp $");
 
 /*
  * Created from if_ep.c driver by Fred Gray (fgray@rice.edu) to support
@@ -70,10 +72,12 @@
 #include <machine/bus_pio.h>
 #include <machine/bus.h>
 
+#include <sys/bus.h>
+
 #include <net/bpf.h>
 
-
 #include <dev/vx/if_vxreg.h>
+#include <dev/vx/if_vxvar.h>
 
 #define ETHER_MAX_LEN	1518
 #define ETHER_ADDR_LEN	6
@@ -120,9 +124,10 @@ static void vxsetlink(struct vx_softc *);
 
 
 int
-vxattach(sc)
-    struct vx_softc *sc;
+vxattach(dev)
+    device_t dev;
 {
+    struct vx_softc *sc = device_get_softc(dev);
     struct ifnet *ifp = &sc->arpcom.ac_if;
     int i;
 
@@ -142,7 +147,7 @@ vxattach(sc)
         if (vxbusyeeprom(sc))
             return 0;
         CSR_WRITE_2(sc,  VX_W0_EEPROM_COMMAND, EEPROM_CMD_RD
-	     | (EEPROM_OEM_ADDR_0 + i));
+	     | (EEPROM_OEM_ADDR0 + i));
         if (vxbusyeeprom(sc))
             return 0;
         x = CSR_READ_2(sc, VX_W0_EEPROM_DATA);
@@ -152,8 +157,7 @@ vxattach(sc)
 
     printf(" address %6D\n", sc->arpcom.ac_enaddr, ":");
 
-    ifp->if_unit = sc->unit;
-    ifp->if_name = "vx";
+    if_initname(ifp, device_get_name(dev), device_get_unit(dev));
     ifp->if_mtu = ETHERMTU;
     ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
     ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
@@ -400,6 +404,9 @@ vxstart(ifp)
 startagain:
     /* Sneak a peek at the next packet */
     m = ifp->if_snd.ifq_head;
+    if (m == NULL) {
+	return;
+    }
     
     /* We need to use m->m_pkthdr.len, so require the header */
     M_ASSERTPKTHDR(m);
@@ -450,10 +457,10 @@ startagain:
 
     while (m) {
         if (m->m_len > 3)
-	    bus_space_write_multi_4(sc->vx_btag, sc->vx_bhandle,
+	    bus_space_write_multi_4(sc->bst, sc->bsh,
 		VX_W1_TX_PIO_WR_1, (u_int32_t *)mtod(m, caddr_t), m->m_len / 4);
         if (m->m_len & 3)
-	    bus_space_write_multi_1(sc->vx_btag, sc->vx_bhandle,
+	    bus_space_write_multi_1(sc->bst, sc->bsh,
 		VX_W1_TX_PIO_WR_1,
 		mtod(m, caddr_t) + (m->m_len & ~3) , m->m_len & 3);
 	m = m_free(m);
@@ -815,10 +822,10 @@ vxget(sc, totlen)
         }
         len = min(totlen, len);
         if (len > 3)
-            bus_space_read_multi_4(sc->vx_btag, sc->vx_bhandle,
+            bus_space_read_multi_4(sc->bst, sc->bsh,
 		VX_W1_RX_PIO_RD_1, mtod(m, u_int32_t *), len / 4);
 	if (len & 3) {
-            bus_space_read_multi_1(sc->vx_btag, sc->vx_bhandle,
+            bus_space_read_multi_1(sc->bst, sc->bsh,
 		VX_W1_RX_PIO_RD_1, mtod(m, u_int8_t *) + (len & ~3),
 		len & 3);
 	}

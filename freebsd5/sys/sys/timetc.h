@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/sys/timetc.h,v 1.57 2003/04/10 23:07:24 des Exp $
+ * $FreeBSD: src/sys/sys/timetc.h,v 1.58 2003/08/16 08:23:52 phk Exp $
  */
 
 #ifndef _SYS_TIMETC_H_
@@ -51,6 +51,13 @@ struct timecounter {
 		/* Frequency of the counter in Hz. */
 	char			*tc_name;
 		/* Name of the timecounter. */
+	int			tc_quality;
+		/*
+		 * Used to determine if this timecounter is better than
+		 * another timecounter higher means better.  Negative
+		 * means "only use at explicit request".
+		 */
+
 	void			*tc_priv;
 		/* Pointer to the timecounter's private parts. */
 	struct timecounter	*tc_next;

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)rune.h	8.1 (Berkeley) 6/27/93
- * $FreeBSD: src/include/rune.h,v 1.3 2002/09/06 04:22:54 mike Exp $
+ * $FreeBSD: src/include/rune.h,v 1.4 2003/06/25 22:28:33 phantom Exp $
  */
 
 #ifndef	_RUNE_H_
@@ -47,8 +47,6 @@
 #define	_RUNE_T_DECLARED
 typedef	__rune_t	rune_t;
 #endif
-
-#define	_PATH_LOCALE	"/usr/share/locale"
 
 #define _INVALID_RUNE   _CurrentRuneLocale->invalid_rune
 

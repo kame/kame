@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_bmap.c	8.7 (Berkeley) 3/21/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_bmap.c,v 1.56 2003/03/04 00:04:44 jeff Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_bmap.c,v 1.59 2003/10/18 14:10:27 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -226,6 +228,7 @@ ufs_bmaparray(vp, bn, bnp, nbp, runp, runb)
 			bp->b_flags &= ~B_INVAL;
 			bp->b_ioflags &= ~BIO_ERROR;
 			vfs_busy_pages(bp, 0);
+			bp->b_iooffset = dbtob(bp->b_blkno);
 			VOP_STRATEGY(bp->b_vp, bp);
 			curproc->p_stats->p_ru.ru_inblock++;	/* XXX */
 			error = bufwait(bp);

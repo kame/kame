@@ -25,12 +25,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ng_btsocket_l2cap_raw.c,v 1.11 2003/04/27 19:52:14 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/socket/ng_btsocket_l2cap_raw.c,v 1.5 2003/05/10 21:44:41 julian Exp $
+ * $Id: ng_btsocket_l2cap_raw.c,v 1.12 2003/09/14 23:29:06 max Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/socket/ng_btsocket_l2cap_raw.c,v 1.7 2003/10/12 22:04:21 emax Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/bitstring.h>
 #include <sys/domain.h>
 #include <sys/errno.h>
 #include <sys/filedesc.h>
@@ -48,7 +49,6 @@
 #include <sys/taskqueue.h>
 #include <netgraph/ng_message.h>
 #include <netgraph/netgraph.h>
-#include <bitstring.h>
 #include "ng_bluetooth.h"
 #include "ng_hci.h"
 #include "ng_l2cap.h"

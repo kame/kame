@@ -22,14 +22,15 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/pci/alpm.c,v 1.18 2003/04/15 06:37:29 mdodd Exp $
- *
  */
 
 /*
  * Power Management support for the Acer M15x3 chipsets
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/alpm.c,v 1.21 2003/08/22 07:13:20 imp Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -43,8 +44,8 @@
 #include <machine/resource.h>
 #include <sys/rman.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 
 #include <dev/iicbus/iiconf.h>
 #include <dev/smbus/smbconf.h>
@@ -174,12 +175,11 @@ alpm_probe(device_t dev)
 static int
 alpm_attach(device_t dev)
 {
-	int rid, unit;
+	int rid;
 	u_int32_t l;
 	struct alpm_softc *alpm;
 
 	alpm = device_get_softc(dev);
-	unit = device_get_unit(dev);
 
 	/* Unlock SMBIO base register access */
 	l = pci_read_config(dev, ATPC, 1);

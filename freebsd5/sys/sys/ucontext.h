@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/ucontext.h,v 1.10 2003/04/25 01:50:30 deischen Exp $
+ * $FreeBSD: src/sys/sys/ucontext.h,v 1.11 2003/11/09 20:31:04 marcel Exp $
  */
 
 #ifndef _SYS_UCONTEXT_H_
@@ -83,9 +83,16 @@ __END_DECLS
 
 struct thread;
 
+/*
+ * Flags for get_mcontext().  The low order 4 bits (i.e a mask of 0x0f) are
+ * reserved for use by machine independent code.  All other bits are for use
+ * by machine dependent code.
+ */
+#define	GET_MC_CLEAR_RET	1
+
 /* Machine-dependent functions: */
-int	get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret);
-int	set_mcontext(struct thread *td, const mcontext_t *mcp);
+int	get_mcontext(struct thread *, mcontext_t *, int);
+int	set_mcontext(struct thread *, const mcontext_t *);
 
 #endif /* !_KERNEL */
 

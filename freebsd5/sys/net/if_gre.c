@@ -1,5 +1,5 @@
 /*	$NetBSD: if_gre.c,v 1.42 2002/08/14 00:23:27 itojun Exp $ */
-/*	 $FreeBSD: src/sys/net/if_gre.c,v 1.12 2003/03/05 19:24:22 peter Exp $ */
+/*	 $FreeBSD: src/sys/net/if_gre.c,v 1.14 2003/11/14 20:58:00 bms Exp $ */
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -48,6 +48,7 @@
 
 #include "opt_atalk.h"
 #include "opt_inet.h"
+#include "opt_inet6.h"
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -162,9 +163,8 @@ gre_clone_create(ifc, unit)
 	sc = malloc(sizeof(struct gre_softc), M_GRE, M_WAITOK);
 	memset(sc, 0, sizeof(struct gre_softc));
 
-	sc->sc_if.if_name = GRENAME;
+	if_initname(&sc->sc_if, ifc->ifc_name, unit);
 	sc->sc_if.if_softc = sc;
-	sc->sc_if.if_unit = unit;
 	sc->sc_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
 	sc->sc_if.if_type = IFT_OTHER;
 	sc->sc_if.if_addrlen = 0;
@@ -586,6 +586,9 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		memcpy(&lifr->dstaddr, &si, sizeof(si));
 		break;
 	case SIOCGIFPSRCADDR:
+#ifdef INET6
+	case SIOCGIFPSRCADDR_IN6:
+#endif
 		if (sc->g_src.s_addr == INADDR_ANY) {
 			error = EADDRNOTAVAIL;
 			break;
@@ -597,6 +600,9 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		bcopy(&si, &ifr->ifr_addr, sizeof(ifr->ifr_addr));
 		break;
 	case SIOCGIFPDSTADDR:
+#ifdef INET6
+	case SIOCGIFPDSTADDR_IN6:
+#endif
 		if (sc->g_dst.s_addr == INADDR_ANY) {
 			error = EADDRNOTAVAIL;
 			break;

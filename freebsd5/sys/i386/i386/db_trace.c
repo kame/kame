@@ -22,9 +22,10 @@
  *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
- *
- * $FreeBSD: src/sys/i386/i386/db_trace.c,v 1.55 2002/12/28 01:23:06 julian Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/i386/db_trace.c,v 1.59 2003/11/03 22:07:21 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -224,8 +225,8 @@ db_nextframe(fp, ip, p)
 		if (strcmp(name, "calltrap") == 0 ||
 		    strcmp(name, "fork_trampoline") == 0)
 			frame_type = TRAP;
-		else if (strncmp(name, "Xintr", 5) == 0 ||
-		    strncmp(name, "Xfastintr", 9) == 0)
+		else if (strncmp(name, "Xatpic_intr", 11) == 0 ||
+		    strncmp(name, "Xapic_isr", 9) == 0)
 			frame_type = INTERRUPT;
 		else if (strcmp(name, "Xlcall_syscall") == 0 ||
 		    strcmp(name, "Xint0x80_syscall") == 0)
@@ -550,7 +551,7 @@ i386_set_watch(watchnum, watchaddr, size, access, d)
 	case DBREG_DR7_WRONLY:
 	case DBREG_DR7_RDWR:
 		break;
-	default : return (-1); break;
+	default : return (-1);
 	}
 	
 	/*
@@ -560,7 +561,7 @@ i386_set_watch(watchnum, watchaddr, size, access, d)
 	case 1	: mask = 0x00; break;
 	case 2	: mask = 0x01 << 2; break;
 	case 4	: mask = 0x03 << 2; break;
-	default : return (-1); break;
+	default : return (-1);
 	}
 
 	mask |= access;

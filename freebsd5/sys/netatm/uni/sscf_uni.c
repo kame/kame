@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/sscf_uni.c,v 1.16 2003/02/19 05:47:31 imp Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ---------------------
  *
  * Signalling AAL SSCF at the UNI
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/sscf_uni.c,v 1.21 2003/07/24 12:24:41 harti Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -61,11 +59,6 @@
 
 #include <vm/uma.h>
 
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/sscf_uni.c,v 1.16 2003/02/19 05:47:31 imp Exp $");
-#endif
-
-
 /*
  * Global variables
  */
@@ -80,7 +73,7 @@ static int	sscf_uni_inst(struct stack_defn **, Atm_connvc *);
  * Local variables
  */
 
-static uma_zone_t	sscf_uni_zone;
+uma_zone_t	sscf_uni_zone;
 
 static struct stack_defn	sscf_uni_service = {
 	NULL,
@@ -123,8 +116,6 @@ sscf_uni_start()
 	    NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
 	if (sscf_uni_zone == NULL)
 		panic("sscf_uni_start: uma_zcreate");
-
-	uma_zone_set_max(sscf_uni_zone, 100);
 
 	/*
 	 * Register stack service
@@ -314,10 +305,7 @@ sscf_uni_abort(uvp, msg)
  *
  */
 void
-sscf_uni_pdu_print(uvp, m, msg)
-	struct univcc	*uvp;
-	KBuffer		*m;
-	char		*msg;
+sscf_uni_pdu_print(const struct univcc *uvp, const KBuffer *m, const char *msg)
 {
 	char		buf[128];
 	struct vccb	*vcp;
@@ -327,4 +315,3 @@ sscf_uni_pdu_print(uvp, m, msg)
 			msg, vcp->vc_vpi, vcp->vc_vci);
 	atm_pdu_print(m, buf);
 }
-

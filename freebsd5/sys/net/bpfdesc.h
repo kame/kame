@@ -37,13 +37,12 @@
  *
  *      @(#)bpfdesc.h	8.1 (Berkeley) 6/10/93
  *
- * $FreeBSD: src/sys/net/bpfdesc.h,v 1.22 2002/11/14 23:24:13 sam Exp $
+ * $FreeBSD: src/sys/net/bpfdesc.h,v 1.24 2003/11/12 03:14:29 rwatson Exp $
  */
 
 #ifndef _NET_BPFDESC_H_
 #define _NET_BPFDESC_H_
 
-#include <sys/_label.h>
 #include <sys/callout.h>
 #include <sys/selinfo.h>
 
@@ -93,7 +92,7 @@ struct bpf_d {
 #endif
 	struct mtx	bd_mtx;		/* mutex for this descriptor */
 	struct callout	bd_callout;	/* for BPF timeouts with select */
-	struct label	bd_label;	/* MAC label for descriptor */
+	struct label	*bd_label;	/* MAC label for descriptor */
 };
 
 /* Values for bd_state */
@@ -103,6 +102,12 @@ struct bpf_d {
 
 #define BPFD_LOCK(bd)		mtx_lock(&(bd)->bd_mtx)
 #define BPFD_UNLOCK(bd)		mtx_unlock(&(bd)->bd_mtx)
+
+/* Test whether a BPF is ready for read(). */
+#define	bpf_ready(bd)						 \
+	((bd)->bd_hlen != 0 ||					 \
+	 (((bd)->bd_immediate || (bd)->bd_state == BPF_TIMED_OUT) && \
+	  (bd)->bd_slen != 0))
 
 /*
  * Descriptor associated with each attached hardware interface.

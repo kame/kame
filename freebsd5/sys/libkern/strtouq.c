@@ -32,9 +32,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/libkern/strtouq.c,v 1.4 2003/04/29 13:36:04 kan Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/libkern/strtouq.c,v 1.5 2003/06/11 05:23:04 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

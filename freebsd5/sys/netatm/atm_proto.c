@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/atm_proto.c,v 1.9 2002/04/21 01:41:04 arr Exp $
- *
  */
 
 /*
@@ -32,14 +28,17 @@
  * -----------------
  *
  * ATM socket protocol family support definitions
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/atm_proto.c,v 1.11 2003/07/24 10:33:01 harti Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/domain.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
+#include <sys/sysctl.h>
 #include <net/if.h>
 #include <netatm/port.h>
 #include <netatm/queue.h>
@@ -51,11 +50,6 @@
 #include <netatm/atm_stack.h>
 #include <netatm/atm_pcb.h>
 #include <netatm/atm_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_proto.c,v 1.9 2002/04/21 01:41:04 arr Exp $");
-#endif
-
 
 struct protosw atmsw[] = {
 {	SOCK_DGRAM,				/* ioctl()-only */
@@ -121,6 +115,8 @@ struct domain atmdomain = {
 
 DOMAIN_SET(atm);
 
+SYSCTL_NODE(_net, PF_ATM, harp, CTLFLAG_RW, 0, "HARP/ATM family");
+SYSCTL_NODE(_net_harp, OID_AUTO, atm, CTLFLAG_RW, 0, "ATM layer");
 
 /*
  * Protocol request not supported

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,7 @@
 
 #include "feeder_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/feeder_fmt.c,v 1.11 2003/04/20 17:08:56 orion Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/feeder_fmt.c,v 1.13 2003/09/07 16:28:03 cg Exp $");
 
 MALLOC_DEFINE(M_FMTFEEDER, "fmtfeed", "pcm format feeder");
 
@@ -291,7 +291,7 @@ feed_monotostereo16(struct pcm_feeder *f, struct pcm_channel *c, u_int8_t *b, u_
 
 	j = k - 1;
 	i = j * 2 + 1;
-	while (i > 3 && j >= 1) {
+	while (i >= 3 && j >= 1) {
 		x = b[j--];
 		y = b[j--];
 		b[i--] = x;

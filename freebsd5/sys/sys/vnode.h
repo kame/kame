@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vnode.h	8.7 (Berkeley) 2/4/94
- * $FreeBSD: src/sys/sys/vnode.h,v 1.223 2003/04/26 08:36:06 alc Exp $
+ * $FreeBSD: src/sys/sys/vnode.h,v 1.230 2003/11/12 03:14:31 rwatson Exp $
  */
 
 #ifndef _SYS_VNODE_H_
@@ -44,7 +44,6 @@
 #include <sys/lockmgr.h>
 
 #include <sys/queue.h>
-#include <sys/_label.h>
 #include <sys/_lock.h>
 #include <sys/lock.h>
 #include <sys/_mutex.h>
@@ -95,8 +94,17 @@ struct vpollinfo {
  *	u - Only a reference to the vnode is needed to read.
  *	v - vnode lock
  *
+ * Vnodes may be found on many lists.  The general way to deal with operating
+ * on a vnode that is on a list is:
+ *	1) Lock the list and find the vnode.
+ *	2) Lock interlock so that the vnode does not go away.
+ *	3) Unlock the list to avoid lock order reversals.
+ *	4) vget with LK_INTERLOCK and check for ENOENT, or
+ *	5) Check for XLOCK if the vnode lock is not required.
+ *	6) Perform your operation, then vput().
+ *
  * XXX Not all fields are locked yet and some fields that are marked are not
- * locked consistently.  This is a work in progress.
+ * locked consistently.  This is a work in progress.  Requires Giant!
  */
 
 struct vnode {
@@ -144,7 +152,7 @@ struct vnode {
 	struct	vnode *v_dd;			/* c .. vnode */
 	u_long	v_ddid;				/* c .. capability identifier */
 	struct vpollinfo *v_pollinfo;		/* p Poll events */
-	struct label v_label;			/* MAC label for vnode */
+	struct label *v_label;			/* MAC label for vnode */
 #ifdef	DEBUG_LOCKS
 	const char *filename;			/* Source file doing locking */
 	int line;				/* Line number doing locking */
@@ -279,7 +287,6 @@ struct vattr {
 #define	IO_INVAL	0x0040		/* invalidate after I/O */
 #define	IO_ASYNC	0x0080		/* bawrite rather then bdwrite */
 #define	IO_DIRECT	0x0100		/* attempt to bypass buffer cache */
-#define	IO_NOWDRAIN	0x0200		/* do not block on wdrain */
 #define	IO_EXT		0x0400		/* operate on external attributes */
 #define	IO_NORMAL	0x0800		/* operate on regular data */
 #define	IO_NOMACCHECK	0x1000		/* MAC checks unnecessary */
@@ -456,25 +463,9 @@ struct vnodeop_desc {
  */
 extern struct vnodeop_desc *vnodeop_descs[];
 
-/*
- * Interlock for scanning list of vnodes attached to a mountpoint
- */
-extern struct mtx mntvnode_mtx;
-
-/*
- * This macro is very helpful in defining those offsets in the vdesc struct.
- *
- * This is stolen from X11R4.  I ignored all the fancy stuff for
- * Crays, so if you decide to port this to such a serious machine,
- * you might want to consult Intrinsic.h's XtOffset{,Of,To}.
- */
-#define	VOPARG_OFFSET(p_type,field) \
-	((int) (((char *) (&(((p_type)NULL)->field))) - ((char *) NULL)))
-#define	VOPARG_OFFSETOF(s_type,field) \
-	VOPARG_OFFSET(s_type*,field)
-#define	VOPARG_OFFSETTO(S_TYPE,S_OFFSET,STRUCT_P) \
-	((S_TYPE)(((char*)(STRUCT_P))+(S_OFFSET)))
-
+#define	VOPARG_OFFSETOF(s_type, field)	__offsetof(s_type, field)
+#define	VOPARG_OFFSETTO(s_type, s_offset, struct_p) \
+    ((s_type)(((char*)(struct_p)) + (s_offset)))
 
 /*
  * This structure is used to configure the new vnodeops vector.
@@ -505,13 +496,13 @@ struct vop_generic_args {
  * change the state.  They are good enough for debugging a single
  * filesystem using a single-threaded test.
  */
-void assert_vi_locked(struct vnode *vp, char *str);
-void assert_vi_unlocked(struct vnode *vp, char *str);
-void assert_vop_unlocked(struct vnode *vp, char *str);
-void assert_vop_locked(struct vnode *vp, char *str);
-void assert_vop_slocked(struct vnode *vp, char *str);
-void assert_vop_elocked(struct vnode *vp, char *str);
-void assert_vop_elocked_other(struct vnode *vp, char *str);
+void assert_vi_locked(struct vnode *vp, const char *str);
+void assert_vi_unlocked(struct vnode *vp, const char *str);
+void assert_vop_unlocked(struct vnode *vp, const char *str);
+void assert_vop_locked(struct vnode *vp, const char *str);
+void assert_vop_slocked(struct vnode *vp, const char *str);
+void assert_vop_elocked(struct vnode *vp, const char *str);
+void assert_vop_elocked_other(struct vnode *vp, const char *str);
 
 /* These are called from within the actuall VOPS */
 void vop_rename_pre(void *a);
@@ -657,9 +648,9 @@ int	debug_vn_lock(struct vnode *vp, int flags, struct thread *p,
 	    const char *filename, int line);
 #define vn_lock(vp,flags,p) debug_vn_lock(vp,flags,p,__FILE__,__LINE__)
 #endif
-int	vn_open(struct nameidata *ndp, int *flagp, int cmode);
+int	vn_open(struct nameidata *ndp, int *flagp, int cmode, int fdidx);
 int	vn_open_cred(struct nameidata *ndp, int *flagp, int cmode,
-	    struct ucred *cred);
+	    struct ucred *cred, int fdidx);
 void	vn_pollevent(struct vnode *vp, int events);
 void	vn_pollgone(struct vnode *vp);
 int	vn_pollrecord(struct vnode *vp, struct thread *p, int events);

@@ -77,7 +77,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_ti.c,v 1.78 2003/04/21 18:34:04 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/if_ti.c,v 1.85 2003/11/14 19:00:32 sam Exp $");
 
 #include "opt_ti.h"
 
@@ -132,10 +132,9 @@ __FBSDID("$FreeBSD: src/sys/pci/if_ti.c,v 1.78 2003/04/21 18:34:04 imp Exp $");
 #include <sys/proc.h>
 #include <sys/jumbo.h>
 #endif /* !TI_PRIVATE_JUMBOS */
-#include <sys/vnode.h> /* for vfindev, vgone */
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <sys/tiio.h>
 #include <pci/if_tireg.h>
@@ -282,20 +281,6 @@ static devclass_t ti_devclass;
 DRIVER_MODULE(ti, pci, ti_driver, ti_devclass, 0, 0);
 MODULE_DEPEND(ti, pci, 1, 1, 1);
 MODULE_DEPEND(ti, ether, 1, 1, 1);
-
-/* List of Tigon softcs */
-static STAILQ_HEAD(ti_softc_list, ti_softc) ti_sc_list;
-
-static struct ti_softc *
-ti_lookup_softc(int unit)
-{
-	struct ti_softc *sc;
-	for (sc = STAILQ_FIRST(&ti_sc_list); sc != NULL;
-	     sc = STAILQ_NEXT(sc, ti_links))
-		if (sc->ti_unit == unit)
-			return(sc);
-	return(NULL);
-}
 
 /*
  * Send an instruction or address to the EEPROM, check for ACK.
@@ -2056,38 +2041,6 @@ ti_probe(dev)
 	return(ENXIO);
 }
 
-#ifdef KLD_MODULE
-static int
-log2rndup(int len)
-{
-	int log2size = 0, t = len;
-	while (t > 1) {
-		log2size++;
-		t >>= 1;
-	}
-	if (len != (1 << log2size))
-		log2size++;
-	return log2size;
-}
-
-static int
-ti_mbuf_sanity(device_t dev)
-{
-	if ((mbstat.m_msize != MSIZE) || mbstat.m_mclbytes != MCLBYTES){
-		device_printf(dev, "\n");
-		device_printf(dev, "This module was compiled with "
-				   "-DMCLSHIFT=%d -DMSIZE=%d\n", MCLSHIFT,
-				   MSIZE);
-		device_printf(dev, "The kernel was compiled with MCLSHIFT=%d,"
-			      " MSIZE=%d\n", log2rndup(mbstat.m_mclbytes),
-			      (int)mbstat.m_msize);
-		return(EINVAL);
-	} 
-	return(0);
-}
-#endif
-
-
 static int
 ti_attach(dev)
 	device_t		dev;
@@ -2096,27 +2049,14 @@ ti_attach(dev)
 	struct ti_softc		*sc;
 	int			unit, error = 0, rid;
 
-	sc = NULL;
-
-#ifdef KLD_MODULE
-	if (ti_mbuf_sanity(dev)){
-		device_printf(dev, "Module mbuf constants do not match "
-			      "kernel constants!\n");
-		device_printf(dev, "Rebuild the module or the kernel so "
-			      "they match\n");
-		device_printf(dev, "\n");
-		error = EINVAL;
-		goto fail;
-	}
-#endif
-
 	sc = device_get_softc(dev);
 	unit = device_get_unit(dev);
 
 	mtx_init(&sc->ti_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
 	ifmedia_init(&sc->ifmedia, IFM_IMASK, ti_ifmedia_upd, ti_ifmedia_sts);
-	sc->arpcom.ac_if.if_capabilities = IFCAP_HWCSUM | IFCAP_VLAN_HWTAGGING;
+	sc->arpcom.ac_if.if_capabilities = IFCAP_HWCSUM |
+	    IFCAP_VLAN_HWTAGGING | IFCAP_VLAN_MTU;
 	sc->arpcom.ac_if.if_capenable = sc->arpcom.ac_if.if_capabilities;
 
 	/*
@@ -2247,8 +2187,7 @@ ti_attach(dev)
 	/* Set up ifnet structure */
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = sc->ti_unit;
-	ifp->if_name = "ti";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	tis[unit] = sc;
 	ifp->if_ioctl = ti_ioctl;
@@ -2292,18 +2231,11 @@ ti_attach(dev)
 	 * thing.  If it isn't, multiple cards probing at the same time
 	 * could stomp on the list of softcs here.
 	 */
-	/*
-	 * If this is the first card to be initialized, initialize the
-	 * softc queue.
-	 */
-	if (unit == 0)
-		STAILQ_INIT(&ti_sc_list);
-
-	STAILQ_INSERT_TAIL(&ti_sc_list, sc, ti_links);
 
 	/* Register the device */
 	sc->dev = make_dev(&ti_cdevsw, sc->ti_unit, UID_ROOT, GID_OPERATOR,
 			   0600, "ti%d", sc->ti_unit);
+	sc->dev->si_drv1 = sc;
 
 	/*
 	 * Call MI attach routine.
@@ -2328,33 +2260,6 @@ fail:
 }
 
 /*
- * Verify that our character special device is not currently
- * open.  Also track down any cached vnodes & kill them before
- * the module is unloaded
- */
-static int
-ti_unref_special(device_t dev)
-{
-	struct vnode *ti_vn;
-	int count;
-	struct ti_softc *sc = sc = device_get_softc(dev);
-
-	if (!vfinddev(sc->dev, VCHR, &ti_vn)) {
-		return 0;
-	}
-	
-	if ((count = vcount(ti_vn))) {
-		device_printf(dev, "%d refs to special device, "
-			      "denying unload\n", count);
-		return count;
-	}
-	/* now we know that there's a vnode in the cache. We hunt it
-	   down and kill it now, before unloading */
-	vgone(ti_vn);
-	return(0);
-}
-
-/*
  * Shutdown hardware and free up resources. This can be called any
  * time after the mutex has been initialized. It is called in both
  * the error case in attach and the normal detach case so it needs
@@ -2368,10 +2273,8 @@ ti_detach(dev)
 	struct ti_softc		*sc;
 	struct ifnet		*ifp;
 
-	if (ti_unref_special(dev))
-		return EBUSY;
-
 	sc = device_get_softc(dev);
+	destroy_dev(sc->dev);
 	KASSERT(mtx_initialized(&sc->ti_mtx), ("ti mutex not initialized"));
 	TI_LOCK(sc);
 	ifp = &sc->arpcom.ac_if;
@@ -2481,12 +2384,13 @@ ti_rxeof(sc)
 	struct ifnet		*ifp;
 	struct ti_cmd_desc	cmd;
 
+	TI_LOCK_ASSERT(sc);
+
 	ifp = &sc->arpcom.ac_if;
 
 	while(sc->ti_rx_saved_considx != sc->ti_return_prodidx.ti_idx) {
 		struct ti_rx_desc	*cur_rx;
 		u_int32_t		rxidx;
-		struct ether_header	*eh;
 		struct mbuf		*m = NULL;
 		u_int16_t		vlan_tag = 0;
 		int			have_tag = 0;
@@ -2561,7 +2465,6 @@ ti_rxeof(sc)
 
 		m->m_pkthdr.len = cur_rx->ti_len;
 		ifp->if_ipackets++;
-		eh = mtod(m, struct ether_header *);
 		m->m_pkthdr.rcvif = ifp;
 
 		if (ifp->if_hwassist) {
@@ -2578,7 +2481,9 @@ ti_rxeof(sc)
 		 */
 		if (have_tag)
 			VLAN_INPUT_TAG(ifp, m, vlan_tag, continue);
+		TI_UNLOCK(sc);
 		(*ifp->if_input)(ifp, m);
+		TI_LOCK(sc);
 	}
 
 	/* Only necessary on the Tigon 1. */
@@ -2908,9 +2813,9 @@ static void ti_init2(sc)
 	ifp = &sc->arpcom.ac_if;
 
 	/* Specify MTU and interface index. */
-	CSR_WRITE_4(sc, TI_GCR_IFINDEX, ifp->if_unit);
+	CSR_WRITE_4(sc, TI_GCR_IFINDEX, sc->ti_unit);
 	CSR_WRITE_4(sc, TI_GCR_IFMTU, ifp->if_mtu +
-	    ETHER_HDR_LEN + ETHER_CRC_LEN);
+	    ETHER_HDR_LEN + ETHER_CRC_LEN + ETHER_VLAN_ENCAP_LEN);
 	TI_DO_CMD(TI_CMD_UPDATE_GENCOM, 0, 0);
 
 	/* Load our MAC address. */
@@ -3224,13 +3129,9 @@ ti_ioctl(ifp, command, data)
 static int
 ti_open(dev_t dev, int flags, int fmt, struct thread *td)
 {
-	int unit;
 	struct ti_softc *sc;
 
-	unit = minor(dev) & 0xff;
-
-	sc = ti_lookup_softc(unit);
-
+	sc = dev->si_drv1;
 	if (sc == NULL)
 		return(ENODEV);
 
@@ -3244,13 +3145,9 @@ ti_open(dev_t dev, int flags, int fmt, struct thread *td)
 static int
 ti_close(dev_t dev, int flag, int fmt, struct thread *td)
 {
-	int unit;
 	struct ti_softc *sc;
 
-	unit = minor(dev) & 0xff;
-
-	sc = ti_lookup_softc(unit);
-
+	sc = dev->si_drv1;
 	if (sc == NULL)
 		return(ENODEV);
 
@@ -3267,13 +3164,10 @@ ti_close(dev_t dev, int flag, int fmt, struct thread *td)
 static int 
 ti_ioctl2(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
 {
-	int unit, error;
+	int error;
 	struct ti_softc *sc;
 
-	unit = minor(dev) & 0xff;
-
-	sc = ti_lookup_softc(unit);
-
+	sc = dev->si_drv1;
 	if (sc == NULL)
 		return(ENODEV);
 

@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/powerpc/powerpc/busdma_machdep.c,v 1.15 2003/05/27 04:59:58 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/powerpc/powerpc/busdma_machdep.c,v 1.18 2003/07/27 13:52:10 mux Exp $");
 
 /*
  * MacPPC bus dma support routines
@@ -67,6 +67,8 @@ struct bus_dma_tag {
 	int               flags;
 	int               ref_count;
 	int               map_count;
+	bus_dma_lock_t	 *lockfunc;
+	void		 *lockfuncarg;
 };
 
 struct bus_dmamap {
@@ -78,6 +80,46 @@ struct bus_dmamap {
 };
 
 /*
+ * Convenience function for manipulating driver locks from busdma (during
+ * busdma_swi, for example).  Drivers that don't provide their own locks
+ * should specify &Giant to dmat->lockfuncarg.  Drivers that use their own
+ * non-mutex locking scheme don't have to use this at all.
+ */
+void
+busdma_lock_mutex(void *arg, bus_dma_lock_op_t op)
+{
+	struct mtx *dmtx;
+
+	dmtx = (struct mtx *)arg;
+	switch (op) {
+	case BUS_DMA_LOCK:
+		mtx_lock(dmtx);
+		break;
+	case BUS_DMA_UNLOCK:
+		mtx_unlock(dmtx);
+		break;
+	default:
+		panic("Unknown operation 0x%x for busdma_lock_mutex!", op);
+	}
+}
+
+/*
+ * dflt_lock should never get called.  It gets put into the dma tag when
+ * lockfunc == NULL, which is only valid if the maps that are associated
+ * with the tag are meant to never be defered.
+ * XXX Should have a way to identify which driver is responsible here.
+ */
+static void
+dflt_lock(void *arg, bus_dma_lock_op_t op)
+{
+#ifdef INVARIANTS
+	panic("driver error: busdma dflt_lock called");
+#else
+	printf("DRIVER_ERROR: busdma dflt_lock called\n");
+#endif
+}
+
+/*
  * Allocate a device specific dma_tag.
  */
 int
@@ -85,7 +127,8 @@ bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 		   bus_size_t boundary, bus_addr_t lowaddr,
 		   bus_addr_t highaddr, bus_dma_filter_t *filter,
 		   void *filterarg, bus_size_t maxsize, int nsegments,
-		   bus_size_t maxsegsz, int flags, bus_dma_tag_t *dmat)
+		   bus_size_t maxsegsz, int flags, bus_dma_lock_t *lockfunc,
+		   void *lockfuncarg, bus_dma_tag_t *dmat)
 {
 	bus_dma_tag_t newtag;
 	int error = 0;
@@ -110,6 +153,13 @@ bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 	newtag->flags = flags;
 	newtag->ref_count = 1; /* Count ourself */
 	newtag->map_count = 0;
+	if (lockfunc != NULL) {
+		newtag->lockfunc = lockfunc;
+		newtag->lockfuncarg = lockfuncarg;
+	} else {
+		newtag->lockfunc = dflt_lock;
+		newtag->lockfuncarg = NULL;
+	}
 
         /*
 	 * Take into account any restrictions imposed by our parent tag
@@ -204,23 +254,28 @@ int
 bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
                  bus_dmamap_t *mapp)
 {
+	int mflags;
+
+	if (flags & BUS_DMA_NOWAIT)
+		mflags = M_NOWAIT;
+	else
+		mflags = M_WAITOK;
+	if (flags & BUS_DMA_ZERO)
+		mflags |= M_ZERO;
+
         *mapp = NULL;
 	
         if (dmat->maxsize <= PAGE_SIZE) {
-                *vaddr = malloc(dmat->maxsize, M_DEVBUF,
-                             (flags & BUS_DMA_NOWAIT) ? M_NOWAIT : M_WAITOK);
+                *vaddr = malloc(dmat->maxsize, M_DEVBUF, mflags);
         } else {
                 /*
                  * XXX Use Contigmalloc until it is merged into this facility
                  *     and handles multi-seg allocations.  Nobody is doing
                  *     multi-seg allocations yet though.
                  */
-		mtx_lock(&Giant);
-                *vaddr = contigmalloc(dmat->maxsize, M_DEVBUF,
-                    (flags & BUS_DMA_NOWAIT) ? M_NOWAIT : M_WAITOK,
+                *vaddr = contigmalloc(dmat->maxsize, M_DEVBUF, mflags,
                     0ul, dmat->lowaddr, dmat->alignment? dmat->alignment : 1ul,
                     dmat->boundary);
-		mtx_unlock(&Giant);
         }
 
         if (*vaddr == NULL)

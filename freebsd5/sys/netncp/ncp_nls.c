@@ -30,9 +30,11 @@
  * SUCH DAMAGE.
  *
  * Character conversion routines
- *
- * $FreeBSD: src/sys/netncp/ncp_nls.c,v 1.5 2001/03/10 05:24:45 bp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netncp/ncp_nls.c,v 1.6 2003/06/11 05:30:35 obrien Exp $");
+
 #include <sys/param.h>
 #include <sys/errno.h>
 

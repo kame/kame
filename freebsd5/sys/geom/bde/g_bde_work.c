@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/bde/g_bde_work.c,v 1.21 2003/05/05 08:37:07 phk Exp $
+ * $FreeBSD: src/sys/geom/bde/g_bde_work.c,v 1.22 2003/05/31 19:08:23 phk Exp $
  *
  * This source file contains the state-engine which makes things happen in the
  * right order.
@@ -370,11 +370,9 @@ g_bde_read_keysector(struct g_bde_softc *sc, struct g_bde_work *wp)
 static void
 g_bde_contribute(struct bio *bp, off_t bytes, int error)
 {
-	struct g_bde_softc *sc;
 
 	g_trace(G_T_TOPOLOGY, "g_bde_contribute bp %p bytes %jd error %d",
 	     bp, (intmax_t)bytes, error);
-	sc = bp->bio_driver1;
 	if (bp->bio_error == 0)
 		bp->bio_error = error;
 	bp->bio_completed += bytes;

@@ -22,12 +22,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/kern_switch.c,v 1.58 2003/05/21 18:53:25 julian Exp $
  */
 
 /***
-
 Here is the logic..
 
 If there are N processors, then there are at most N KSEs (kernel
@@ -86,8 +83,10 @@ The result of this scheme is that the M available KSEs are always
 queued at the priorities they have inherrited from the M highest priority
 threads for that KSEGROUP. If this situation changes, the KSEs are 
 reassigned to keep this true.
-   
-*/
+***/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_switch.c,v 1.63 2003/11/17 08:58:16 peter Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -98,7 +97,7 @@ reassigned to keep this true.
 #include <sys/proc.h>
 #include <sys/queue.h>
 #include <sys/sched.h>
-#if defined(SMP) && defined(__i386__)
+#if defined(SMP) && (defined(__i386__) || defined(__amd64__))
 #include <sys/smp.h>
 #endif
 #include <machine/critical.h>
@@ -125,7 +124,7 @@ choosethread(void)
 	struct thread *td;
 	struct ksegrp *kg;
 
-#if defined(SMP) && defined(__i386__)
+#if defined(SMP) && (defined(__i386__) || defined(__amd64__))
 	if (smp_active == 0 && PCPU_GET(cpuid) != 0) {
 		/* Shutting down, run idlethread on AP's */
 		td = PCPU_GET(idlethread);
@@ -143,7 +142,7 @@ retry:
 		td = ke->ke_thread;
 		KASSERT((td->td_kse == ke), ("kse/thread mismatch"));
 		kg = ke->ke_ksegrp;
-		if (td->td_proc->p_flag & P_THREADED) {
+		if (td->td_proc->p_flag & P_SA) {
 			if (kg->kg_last_assigned == td) {
 				kg->kg_last_assigned = TAILQ_PREV(td,
 				    threadqueue, td_runq);
@@ -211,7 +210,7 @@ kse_reassign(struct kse *ke)
 		kg->kg_last_assigned = td;
 		td->td_kse = ke;
 		ke->ke_thread = td;
-		sched_add(ke);
+		sched_add(td);
 		CTR2(KTR_RUNQ, "kse_reassign: ke%p -> td%p", ke, td);
 		return;
 	}
@@ -248,9 +247,9 @@ remrunqueue(struct thread *td)
 	/*
 	 * If it is not a threaded process, take the shortcut.
 	 */
-	if ((td->td_proc->p_flag & P_THREADED) == 0) {
+	if ((td->td_proc->p_flag & P_SA) == 0) {
 		/* Bring its kse with it, leave the thread attached */
-		sched_rem(ke);
+		sched_rem(td);
 		ke->ke_state = KES_THREAD; 
 		return;
 	}
@@ -263,7 +262,7 @@ remrunqueue(struct thread *td)
 		 * KSE to the next available thread. Then, we should
 		 * see if we need to move the KSE in the run queues.
 		 */
-		sched_rem(ke);
+		sched_rem(td);
 		ke->ke_state = KES_THREAD; 
 		td2 = kg->kg_last_assigned;
 		KASSERT((td2 != NULL), ("last assigned has wrong value"));
@@ -291,12 +290,12 @@ adjustrunqueue( struct thread *td, int newpri)
 	/*
 	 * If it is not a threaded process, take the shortcut.
 	 */
-	if ((td->td_proc->p_flag & P_THREADED) == 0) {
+	if ((td->td_proc->p_flag & P_SA) == 0) {
 		/* We only care about the kse in the run queue. */
 		td->td_priority = newpri;
 		if (ke->ke_rqindex != (newpri / RQ_PPQ)) {
-			sched_rem(ke);
-			sched_add(ke);
+			sched_rem(td);
+			sched_add(td);
 		}
 		return;
 	}
@@ -310,7 +309,7 @@ adjustrunqueue( struct thread *td, int newpri)
 			kg->kg_last_assigned =
 			    TAILQ_PREV(td, threadqueue, td_runq);
 		}
-		sched_rem(ke);
+		sched_rem(td);
 	}
 	TAILQ_REMOVE(&kg->kg_runq, td, td_runq);
 	td->td_priority = newpri;
@@ -332,13 +331,13 @@ setrunqueue(struct thread *td)
 	TD_SET_RUNQ(td);
 	kg = td->td_ksegrp;
 	kg->kg_runnable++;
-	if ((td->td_proc->p_flag & P_THREADED) == 0) {
+	if ((td->td_proc->p_flag & P_SA) == 0) {
 		/*
 		 * Common path optimisation: Only one of everything
 		 * and the KSE is always already attached.
 		 * Totally ignore the ksegrp run queue.
 		 */
-		sched_add(td->td_kse);
+		sched_add(td);
 		return;
 	}
 
@@ -357,11 +356,11 @@ setrunqueue(struct thread *td)
 			 * None free, but there is one we can commandeer.
 			 */
 			ke = tda->td_kse;
+			sched_rem(tda);
 			tda->td_kse = NULL;
 			ke->ke_thread = NULL;
 			tda = kg->kg_last_assigned =
 		    	    TAILQ_PREV(tda, threadqueue, td_runq);
-			sched_rem(ke);
 		}
 	} else {
 		/* 
@@ -420,7 +419,7 @@ setrunqueue(struct thread *td)
 			td2->td_kse = ke;
 			ke->ke_thread = td2;
 		}
-		sched_add(ke);
+		sched_add(ke->ke_thread);
 	}
 }
 
@@ -652,7 +651,7 @@ thread_sanity_check(struct thread *td, char *string)
 		}
 	}
 	
-	if ((p->p_flag & P_THREADED) == 0) {
+	if ((p->p_flag & P_SA) == 0) {
 		if (ke == NULL) {
 			panc(string, "non KSE thread lost kse");
 		}

@@ -33,7 +33,7 @@
 # SUCH DAMAGE.
 #
 #	@(#)vnode_if.sh	8.1 (Berkeley) 6/10/93
-# $FreeBSD: src/sys/tools/vnode_if.awk,v 1.37 2002/09/26 04:48:43 jeff Exp $
+# $FreeBSD: src/sys/tools/vnode_if.awk,v 1.39 2003/06/22 21:20:06 truckman Exp $
 #
 # Script to produce VFS front-end sugar.
 #
@@ -65,7 +65,12 @@ function printh(s) {print s > hfile;}
 
 function add_debug_code(name, arg, pos)
 {
-	if (lockdata[name, arg, pos]) {
+	if (arg == "vpp")
+		arg = "*vpp";
+	if (lockdata[name, arg, pos] && (lockdata[name, arg, pos] != "-")) {
+		if (arg ~ /^\*/) {
+			printh("\tif ("substr(arg, 2)" != NULL) {");
+		}
 		printh("\tASSERT_VI_UNLOCKED("arg", \""uname"\");");
 		# Add assertions for locking
 		if (lockdata[name, arg, pos] == "L")
@@ -74,6 +79,9 @@ function add_debug_code(name, arg, pos)
 			printh("\tASSERT_VOP_UNLOCKED("arg", \""uname"\");");
 		else if (0) {
 			# XXX More checks!
+		}
+		if (arg ~ /^\*/) {
+			printh("\t}");
 		}
 	}
 }
@@ -135,7 +143,7 @@ common_head = \
     " * This file is produced automatically.\n" \
     " * Do not modify anything in here by hand.\n" \
     " *\n" \
-    " * Created from $FreeBSD: src/sys/tools/vnode_if.awk,v 1.37 2002/09/26 04:48:43 jeff Exp $\n" \
+    " * Created from $FreeBSD: src/sys/tools/vnode_if.awk,v 1.39 2003/06/22 21:20:06 truckman Exp $\n" \
     " */\n" \
     "\n";
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/smbus/smb.c,v 1.28 2003/03/03 12:15:46 phk Exp $
+ * $FreeBSD: src/sys/dev/smbus/smb.c,v 1.29 2003/08/10 14:28:24 ticso Exp $
  *
  */
 #include <sys/param.h>
@@ -101,7 +101,7 @@ static struct cdevsw smb_cdevsw = {
 static void
 smb_identify(driver_t *driver, device_t parent)
 {
-	BUS_ADD_CHILD(parent, 0, "smb", 0);
+	BUS_ADD_CHILD(parent, 0, "smb", -1);
 }
 
 static int

@@ -22,14 +22,17 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *      $FreeBSD: src/sys/i386/acpica/acpi_machdep.c,v 1.9 2003/05/13 16:59:46 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/acpica/acpi_machdep.c,v 1.15 2003/11/01 00:18:29 njl Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
+#include <sys/kernel.h>
+#include <sys/sysctl.h>
 #include <sys/uio.h>
 
 #include "acpi.h"
@@ -58,6 +61,9 @@ static device_t	acpi_dev;
 #include <i386/bios/apm.h>
 #endif
 
+u_int32_t acpi_reset_video = 1;
+TUNABLE_INT("hw.acpi.reset_video", &acpi_reset_video);
+
 static struct apm_softc	apm_softc;
 
 static d_open_t apmopen;
@@ -77,6 +83,8 @@ static struct cdevsw apm_cdevsw = {
 	.d_maj =	CDEV_MAJOR,
 };
 
+static int intr_model = ACPI_INTR_PIC;
+
 static int
 acpi_capm_convert_battstate(struct  acpi_battinfo *battp)
 {
@@ -85,18 +93,25 @@ acpi_capm_convert_battstate(struct  acpi_battinfo *battp)
 	state = 0xff;	/* XXX unknown */
 
 	if (battp->state & ACPI_BATT_STAT_DISCHARG) {
+		if (battp->cap >= 50)
+			state = 0;	/* high */
+		else
+			state = 1;	/* low */
+	}
+	if (battp->state & ACPI_BATT_STAT_CRITICAL)
+		state = 2;		/* critical */
+	if (battp->state & ACPI_BATT_STAT_CHARGING)
+		state = 3;		/* charging */
+
+	/* If still unknown, determine it based on the battery capacity. */
+	if (state == 0xff) {
 		if (battp->cap >= 50) {
 			state = 0;	/* high */
 		} else {
 			state = 1;	/* low */
 		}
 	}
-	if (battp->state & ACPI_BATT_STAT_CRITICAL) {
-		state = 2;		/* critical */
-	}
-	if (battp->state & ACPI_BATT_STAT_CHARGING) {
-		state = 3;		/* charging */
-	}
+
 	return (state);
 }
 
@@ -110,18 +125,15 @@ acpi_capm_convert_battflags(struct  acpi_battinfo *battp)
 	if (battp->cap >= 50) {
 		flags |= APM_BATT_HIGH;
 	} else {
-		if (battp->state & ACPI_BATT_STAT_CRITICAL) {
+		if (battp->state & ACPI_BATT_STAT_CRITICAL)
 			flags |= APM_BATT_CRITICAL;
-		} else {
+		else
 			flags |= APM_BATT_LOW;
-		}
 	}
-	if (battp->state & ACPI_BATT_STAT_CHARGING) {
+	if (battp->state & ACPI_BATT_STAT_CHARGING)
 		flags |= APM_BATT_CHARGING;
-	}
-	if (battp->state == ACPI_BATT_STAT_NOT_PRESENT) {
+	if (battp->state == ACPI_BATT_STAT_NOT_PRESENT)
 		flags = APM_BATT_NOT_PRESENT;
-	}
 
 	return (flags);
 }
@@ -138,11 +150,10 @@ acpi_capm_get_info(apm_info_t aip)
 	aip->ai_status      = apm_softc.active;
 	aip->ai_capabilities= 0xff00;	/* XXX unknown */
 
-	if (acpi_acad_get_acline(&acline)) {
+	if (acpi_acad_get_acline(&acline))
 		aip->ai_acline = 0xff;		/* unknown */
-	} else {
+	else
 		aip->ai_acline = acline;	/* on/off */
-	}
 
 	if (acpi_battery_get_battinfo(-1, &batt)) {
 		aip->ai_batt_stat = 0xff;	/* unknown */
@@ -171,26 +182,23 @@ acpi_capm_get_pwstatus(apm_pwstatus_t app)
 		return (1);
 	}
 
-	if (app->ap_device == PMDV_ALLDEV) {
+	if (app->ap_device == PMDV_ALLDEV)
 		batt_unit = -1;			/* all units */
-	} else {
+	else
 		batt_unit = app->ap_device - PMDV_BATT0;
-	}
 
-	if (acpi_battery_get_battinfo(batt_unit, &batt)) {
+	if (acpi_battery_get_battinfo(batt_unit, &batt))
 		return (1);
-	}
 
 	app->ap_batt_stat = acpi_capm_convert_battstate(&batt);
 	app->ap_batt_flag = acpi_capm_convert_battflags(&batt);
 	app->ap_batt_life = batt.cap;
 	app->ap_batt_time = (batt.min == -1) ? -1 : batt.min * 60;
 
-	if (acpi_acad_get_acline(&acline)) {
+	if (acpi_acad_get_acline(&acline))
 		app->ap_acline = 0xff;		/* unknown */
-	} else {
+	else
 		app->ap_acline = acline;	/* on/off */
-	}
 
 	return (0);
 }
@@ -215,29 +223,26 @@ apmioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, d_thread_t *td)
 	struct apm_info info;
 	apm_info_old_t aiop;
 
-	if ((acpi_sc = device_get_softc(acpi_dev)) == NULL) {
+	if ((acpi_sc = device_get_softc(acpi_dev)) == NULL)
 		return (ENXIO);
-	}
 
 	switch (cmd) {
 	case APMIO_SUSPEND:
-		if (!(flag & FWRITE))
+		if ((flag & FWRITE) == 0)
 			return (EPERM);
 		if (apm_softc.active)
 			acpi_SetSleepState(acpi_sc, acpi_sc->acpi_suspend_sx);
 		else
 			error = EINVAL;
 		break;
-
 	case APMIO_STANDBY:
-		if (!(flag & FWRITE))
+		if ((flag & FWRITE) == 0)
 			return (EPERM);
 		if (apm_softc.active)
 			acpi_SetSleepState(acpi_sc, acpi_sc->acpi_standby_sx);
 		else
 			error = EINVAL;
 		break;
-
 	case APMIO_GETINFO_OLD:
 		if (acpi_capm_get_info(&info))
 			error = ENXIO;
@@ -249,47 +254,37 @@ apmioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, d_thread_t *td)
 		aiop->ai_batt_life = info.ai_batt_life;
 		aiop->ai_status = info.ai_status;
 		break;
-
 	case APMIO_GETINFO:
 		if (acpi_capm_get_info((apm_info_t)addr))
 			error = ENXIO;
-
 		break;
-
 	case APMIO_GETPWSTATUS:
 		if (acpi_capm_get_pwstatus((apm_pwstatus_t)addr))
 			error = ENXIO;
 		break;
-
 	case APMIO_ENABLE:
-		if (!(flag & FWRITE))
+		if ((flag & FWRITE) == 0)
 			return (EPERM);
 		apm_softc.active = 1;
 		break;
-
 	case APMIO_DISABLE:
-		if (!(flag & FWRITE))
+		if ((flag & FWRITE) == 0)
 			return (EPERM);
 		apm_softc.active = 0;
 		break;
-
 	case APMIO_HALTCPU:
 		break;
-
 	case APMIO_NOTHALTCPU:
 		break;
-
 	case APMIO_DISPLAY:
-		if (!(flag & FWRITE))
+		if ((flag & FWRITE) == 0)
 			return (EPERM);
 		break;
-
 	case APMIO_BIOS:
-		if (!(flag & FWRITE))
+		if ((flag & FWRITE) == 0)
 			return (EPERM);
 		bzero(addr, sizeof(struct apm_bios_arg));
 		break;
-
 	default:
 		error = EINVAL;
 		break;
@@ -301,7 +296,6 @@ apmioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, d_thread_t *td)
 static int
 apmwrite(dev_t dev, struct uio *uio, int ioflag)
 {
-
 	return (uio->uio_resid);
 }
 
@@ -314,7 +308,6 @@ apmpoll(dev_t dev, int events, d_thread_t *td)
 static void
 acpi_capm_init(struct acpi_softc *sc)
 {
-
         make_dev(&apm_cdevsw, 0, 0, 5, 0664, "apm");
 }
 
@@ -324,9 +317,8 @@ acpi_machdep_init(device_t dev)
 	struct	acpi_softc *sc;
 
 	acpi_dev = dev;
-	if ((sc = device_get_softc(acpi_dev)) == NULL) {
+	if ((sc = device_get_softc(acpi_dev)) == NULL)
 		return (ENXIO);
-	}
 
 	/*
 	 * XXX: Prevent the PnP BIOS code from interfering with
@@ -338,9 +330,20 @@ acpi_machdep_init(device_t dev)
 
 	acpi_install_wakeup_handler(sc);
 
-#ifdef SMP
-	acpi_SetIntrModel(ACPI_INTR_APIC);
-#endif
+	if (intr_model != ACPI_INTR_PIC)
+		acpi_SetIntrModel(intr_model);
+
+	SYSCTL_ADD_UINT(&sc->acpi_sysctl_ctx,
+	    SYSCTL_CHILDREN(sc->acpi_sysctl_tree), OID_AUTO,
+	    "reset_video", CTLFLAG_RD | CTLFLAG_RW, &acpi_reset_video, 0,
+	    "Call the VESA reset BIOS vector on the resume path");
+
 	return (0);
 }
 
+void
+acpi_SetDefaultIntrModel(int model)
+{
+
+	intr_model = model;
+}

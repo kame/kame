@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
  * Derived from the public domain Linux driver
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THEPOSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/neomagic-coeff.h,v 1.1 2000/01/09 08:14:10 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/neomagic-coeff.h,v 1.2 2003/09/07 16:28:03 cg Exp $
  */
 
 #define NM_TOTAL_COEFF_COUNT 0x3158

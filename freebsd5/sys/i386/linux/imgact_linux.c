@@ -27,9 +27,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/linux/imgact_linux.c,v 1.48 2003/03/03 09:17:12 des Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/linux/imgact_linux.c,v 1.50 2003/09/07 13:23:45 bde Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -149,7 +150,7 @@ exec_linux_imgact(struct image_params *imgp)
 	if (error)
 	    goto fail;
 
-	error = copyout((void *)(buffer + file_offset),
+	error = copyout((void *)(uintptr_t)(buffer + file_offset),
 			(void *)vmaddr, a_out->a_text + a_out->a_data);
 
 	vm_map_remove(kernel_map, buffer,
@@ -223,8 +224,9 @@ exec_linux_imgact(struct image_params *imgp)
     /* Fill in process VM information */
     vmspace->vm_tsize = round_page(a_out->a_text) >> PAGE_SHIFT;
     vmspace->vm_dsize = round_page(a_out->a_data + bss_size) >> PAGE_SHIFT;
-    vmspace->vm_taddr = (caddr_t)virtual_offset;
-    vmspace->vm_daddr = (caddr_t)(virtual_offset + a_out->a_text);
+    vmspace->vm_taddr = (caddr_t)(void *)(uintptr_t)virtual_offset;
+    vmspace->vm_daddr = (caddr_t)(void *)(uintptr_t)
+	(virtual_offset + a_out->a_text);
 
     /* Fill in image_params */
     imgp->interpreted = 0;

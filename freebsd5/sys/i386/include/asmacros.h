@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/asmacros.h,v 1.24 2002/06/01 20:22:33 alfred Exp $
+ * $FreeBSD: src/sys/i386/include/asmacros.h,v 1.25 2003/11/03 21:09:17 jhb Exp $
  */
 
 #ifndef _MACHINE_ASMACROS_H_
@@ -137,5 +137,16 @@
 #define MCOUNT_LABEL(name)
 #define MEXITCOUNT
 #endif /* GPROF */
+
+#ifdef LOCORE
+/*
+ * Convenience macros for declaring interrupt entry points and trap
+ * stubs.
+ */
+#define	IDTVEC(name)	ALIGN_TEXT; .globl __CONCAT(X,name); \
+			.type __CONCAT(X,name),@function; __CONCAT(X,name):
+#define	TRAP(a)		pushl $(a) ; jmp alltraps
+
+#endif /* LOCORE */
 
 #endif /* !_MACHINE_ASMACROS_H_ */

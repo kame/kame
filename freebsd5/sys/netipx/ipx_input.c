@@ -32,9 +32,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ipx_input.c
- *
- * $FreeBSD: src/sys/netipx/ipx_input.c,v 1.31 2003/03/04 23:19:53 jlemon Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netipx/ipx_input.c,v 1.34 2003/11/08 22:28:40 sam Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -118,7 +119,7 @@ ipx_init()
 
 	ipxintrq.ifq_maxlen = ipxqmaxlen;
 	mtx_init(&ipxintrq.ifq_mtx, "ipx_inq", NULL, MTX_DEF);
-	netisr_register(NETISR_IPX, ipxintr, &ipxintrq);
+	netisr_register(NETISR_IPX, ipxintr, &ipxintrq, 0);
 }
 
 /*
@@ -131,6 +132,8 @@ ipxintr(struct mbuf *m)
 	register struct ipxpcb *ipxp;
 	struct ipx_ifaddr *ia;
 	int len;
+
+	GIANT_REQUIRED;
 
 	/*
 	 * If no IPX addresses have been set yet but the interfaces
@@ -278,7 +281,7 @@ ipx_ctlinput(cmd, arg_as_sa, dummy)
 	caddr_t arg = (/* XXX */ caddr_t)arg_as_sa;
 	struct ipx_addr *ipx;
 
-	if (cmd < 0 || cmd > PRC_NCMDS)
+	if (cmd < 0 || cmd >= PRC_NCMDS)
 		return;
 	switch (cmd) {
 		struct sockaddr_ipx *sipx;

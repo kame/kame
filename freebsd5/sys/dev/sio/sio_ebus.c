@@ -24,7 +24,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sio/sio_ebus.c,v 1.3 2002/07/16 16:20:44 tmm Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sio/sio_ebus.c,v 1.4 2003/08/23 00:11:16 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -37,7 +37,7 @@ __FBSDID("$FreeBSD: src/sys/dev/sio/sio_ebus.c,v 1.3 2002/07/16 16:20:44 tmm Exp
 
 #include <dev/sio/siovar.h>
 
-#include <ofw/openfirm.h>
+#include <dev/ofw/openfirm.h>
 #include <sparc64/ebus/ebusvar.h>
 
 int	sio_ofw_inlist(char *name, char *list[]);

@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_socket.c,v 1.44 2003/02/19 05:47:32 imp Exp $
+ * $FreeBSD: src/sys/netgraph/ng_socket.c,v 1.45 2003/11/18 00:39:04 rwatson Exp $
  * $Whistle: ng_socket.c,v 1.28 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -978,7 +978,8 @@ static struct pr_usrreqs ngc_usrreqs = {
 	ng_setsockaddr,
 	sosend,
 	soreceive,
-	sopoll
+	sopoll,
+	pru_sosetlabel_null
 };
 
 static struct pr_usrreqs ngd_usrreqs = {
@@ -1001,7 +1002,8 @@ static struct pr_usrreqs ngd_usrreqs = {
 	ng_setsockaddr,
 	sosend,
 	soreceive,
-	sopoll
+	sopoll,
+	pru_sosetlabel_null
 };
 
 /*

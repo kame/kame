@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/sysent.h,v 1.42 2002/12/14 01:56:26 alfred Exp $
+ * $FreeBSD: src/sys/sys/sysent.h,v 1.43 2003/09/25 01:10:26 peter Exp $
  */
 
 #ifndef _SYS_SYSENT_H_
@@ -84,6 +84,7 @@ struct sysentvec {
 	int		sv_stackprot;	/* vm protection for stack */
 	register_t	*(*sv_copyout_strings)(struct image_params *);
 	void		(*sv_setregs)(struct thread *, u_long, u_long, u_long);
+	void		(*sv_fixlimits)(struct image_params *);
 };
 
 #ifdef _KERNEL

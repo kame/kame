@@ -24,12 +24,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *
- * $FreeBSD: src/sys/netgraph/ng_device.h,v 1.1 2002/06/18 21:32:33 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_device.h,v 1.2 2003/11/11 12:30:37 ru Exp $
  *
  */
 
-#ifndef _NETGRAPH_DEVICE_H_
-#define _NETGRAPH_DEVICE_H_
+#ifndef _NETGRAPH_NG_DEVICE_H_
+#define _NETGRAPH_NG_DEVICE_H_
 
 /* Node type name and magic cookie */
 #define NG_DEVICE_NODE_TYPE	"device"
@@ -41,4 +41,4 @@ struct ngd_param_s {
 };
 
 
-#endif /* _NETGRAPH_DEVICE_H_ */
+#endif /* _NETGRAPH_NG_DEVICE_H_ */

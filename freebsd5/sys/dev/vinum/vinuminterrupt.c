@@ -1,5 +1,8 @@
 /* vinuminterrupt.c: bottom half of the driver */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/vinum/vinuminterrupt.c,v 1.43 2003/11/24 04:06:56 grog Exp $");
+
 /*-
  * Copyright (c) 1997, 1998, 1999
  *	Nan Yang Computer Services Limited.  All rights reserved.
@@ -39,8 +42,7 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinuminterrupt.c,v 1.14 2001/05/23 23:03:37 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinuminterrupt.c,v 1.40 2003/01/03 05:57:34 phk Exp $
+ * $Id: vinuminterrupt.c,v 1.41 2003/08/24 17:55:56 obrien Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
@@ -396,6 +398,8 @@ complete_raid5_write(struct rqelement *rqe)
 		    rqe->b.b_bufsize = rqe->b.b_bcount;	    /* don't claim more */
 		    rqe->b.b_resid = rqe->b.b_bcount;	    /* nothing transferred */
 		    rqe->b.b_blkno += rqe->dataoffset;	    /* point to the correct block */
+		    rqe->b.b_offset = rqe->b.b_blkno << DEV_BSHIFT;
+		    rqe->b.b_iooffset = rqe->b.b_offset;
 		    rqg->active++;			    /* another active request */
 		    drive = &DRIVE[rqe->driveno];	    /* drive to access */
 
@@ -432,6 +436,8 @@ complete_raid5_write(struct rqelement *rqe)
     rqe->b.b_iodone = complete_rqe;			    /* call us here when done */
     rqg->flags &= ~XFR_PARITYOP;			    /* reset flags that brought us here */
     rqe->b.b_bcount = rqe->buflen << DEV_BSHIFT;	    /* length to write */
+    rqe->b.b_offset = rqe->b.b_blkno << DEV_BSHIFT;
+    rqe->b.b_iooffset = rqe->b.b_offset;
     rqe->b.b_bufsize = rqe->b.b_bcount;			    /* don't claim we have more */
     rqe->b.b_resid = rqe->b.b_bcount;			    /* nothing transferred */
     rqg->active++;					    /* another active request */

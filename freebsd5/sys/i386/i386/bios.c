@@ -23,9 +23,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/i386/bios.c,v 1.59 2003/03/30 05:24:52 jake Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/i386/bios.c,v 1.64 2003/11/03 22:22:04 jhb Exp $");
 
 /*
  * Code for dealing with the BIOS in x86 PC systems.
@@ -385,27 +386,26 @@ bios16(struct bios_args *args, char *fmt, ...)
 
     ptd = (pd_entry_t *)rcr3();
 #ifdef PAE
-    if (ptd == IdlePDPT) {
+    if (ptd == IdlePDPT)
 #else
-    if (ptd == IdlePTD) {
+    if (ptd == IdlePTD)
 #endif
+    {
 	/*
 	 * no page table, so create one and install it.
 	 */
 	pte = (pt_entry_t *)malloc(PAGE_SIZE, M_TEMP, M_WAITOK);
 	ptd = (pd_entry_t *)((u_int)IdlePTD + KERNBASE);
+	*pte = (vm86pa - PAGE_SIZE) | PG_RW | PG_V;
 	*ptd = vtophys(pte) | PG_RW | PG_V;
     } else {
 	/*
 	 * this is a user-level page table 
 	 */
 	pte = PTmap;
+	*pte = (vm86pa - PAGE_SIZE) | PG_RW | PG_V;
     }
-    /*
-     * install pointer to page 0.  we don't need to flush the tlb,
-     * since there should not be a previous mapping for page 0.
-     */
-    *pte = (vm86pa - PAGE_SIZE) | PG_RW | PG_V; 
+    pmap_invalidate_all(kernel_pmap);	/* XXX insurance for now */
 
     stack_top = stack;
     va_start(ap, fmt);
@@ -455,19 +455,21 @@ bios16(struct bios_args *args, char *fmt, ...)
     bioscall_vector.vec16.segment = GSEL(GBIOSCODE16_SEL, SEL_KPL);
 
     i = bios16_call(&args->r, stack_top);
-    
+
     if (pte == PTmap) {
 	*pte = 0;			/* remove entry */
+	/*
+	 * XXX only needs to be invlpg(0) but that doesn't work on the 386 
+	 */
+	pmap_invalidate_all(kernel_pmap);
     } else {
 	*ptd = 0;			/* remove page table */
+	/*
+	 * XXX only needs to be invlpg(0) but that doesn't work on the 386 
+	 */
+	pmap_invalidate_all(kernel_pmap);
 	free(pte, M_TEMP);		/* ... and free it */
     }
-
-    /*
-     * XXX only needs to be invlpg(0) but that doesn't work on the 386 
-     */
-    pmap_invalidate_all(kernel_pmap);
-
     return (i);
 }
 
@@ -581,20 +583,14 @@ pnpbios_identify(driver_t *driver, device_t parent)
 	}
 
 	/*
-	 * If we are in APIC_IO mode, we should ignore the ISA PIC if it
-	 * shows up.  Likewise, in !APIC_IO mode, we should ignore the
-	 * APIC (less important).
-	 * This is significant because the ISA PIC will claim IRQ 2 (which
-	 * it uses for chaining), while in APIC mode this is a valid IRQ
-	 * available for general use.
+	 * Ignore PICs so that we don't have to worry about the PICs
+	 * claiming IRQs to prevent their use.  The PIC drivers
+	 * already ensure that invalid IRQs are not used.
 	 */
-#ifdef APIC_IO
 	if (!strcmp(pnp_eisaformat(pd->devid), "PNP0000"))	/* ISA PIC */
 	    continue;
-#else
 	if (!strcmp(pnp_eisaformat(pd->devid), "PNP0003"))	/* APIC */
 	    continue;
-#endif	
 	
 	/* Add the device and parse its resources */
 	dev = BUS_ADD_CHILD(parent, ISA_ORDER_PNP, NULL, -1);

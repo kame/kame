@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/kern/subr_taskqueue.c,v 1.15 2003/02/26 03:15:42 scottl Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/subr_taskqueue.c,v 1.20 2003/11/10 20:39:44 alfred Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -35,6 +36,8 @@
 #include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/taskqueue.h>
+#include <sys/kthread.h>
+#include <sys/unistd.h>
 
 static MALLOC_DEFINE(M_TASKQUEUE, "taskqueue", "Task Queues");
 
@@ -43,6 +46,7 @@ static STAILQ_HEAD(taskqueue_list, taskqueue) taskqueue_queues;
 static void	*taskqueue_ih;
 static void	*taskqueue_giant_ih;
 static struct mtx taskqueue_queues_mutex;
+static struct proc *taskqueue_thread_proc;
 
 struct taskqueue {
 	STAILQ_ENTRY(taskqueue)	tq_link;
@@ -232,6 +236,31 @@ taskqueue_swi_giant_run(void *dummy)
 	taskqueue_run(taskqueue_swi_giant);
 }
 
+static void
+taskqueue_kthread(void *arg)
+{
+	struct mtx kthread_mutex;
+
+	bzero(&kthread_mutex, sizeof(kthread_mutex));
+
+	mtx_init(&kthread_mutex, "taskqueue kthread", NULL, MTX_DEF);
+
+	mtx_lock(&kthread_mutex);
+
+	for (;;) {
+		mtx_unlock(&kthread_mutex);
+		taskqueue_run(taskqueue_thread);
+		mtx_lock(&kthread_mutex);
+		msleep(&taskqueue_thread, &kthread_mutex, PWAIT, "tqthr", 0); 
+	}
+}
+
+static void
+taskqueue_thread_enqueue(void *context)
+{
+	wakeup(&taskqueue_thread);
+}
+
 TASKQUEUE_DEFINE(swi, taskqueue_swi_enqueue, 0,
 		 swi_add(NULL, "task queue", taskqueue_swi_run, NULL, SWI_TQ,
 		     INTR_MPSAFE, &taskqueue_ih)); 
@@ -239,3 +268,125 @@ TASKQUEUE_DEFINE(swi, taskqueue_swi_enqueue, 0,
 TASKQUEUE_DEFINE(swi_giant, taskqueue_swi_giant_enqueue, 0,
 		 swi_add(NULL, "Giant task queue", taskqueue_swi_giant_run,
 		     NULL, SWI_TQ_GIANT, 0, &taskqueue_giant_ih)); 
+
+TASKQUEUE_DEFINE(thread, taskqueue_thread_enqueue, 0,
+		 kthread_create(taskqueue_kthread, NULL,
+		 &taskqueue_thread_proc, 0, 0, "taskqueue"));
+
+int
+taskqueue_enqueue_fast(struct taskqueue *queue, struct task *task)
+{
+	struct task *ins;
+	struct task *prev;
+
+	mtx_lock_spin(&queue->tq_mutex);
+
+	/*
+	 * Don't allow new tasks on a queue which is being freed.
+	 */
+	if (queue->tq_draining) {
+		mtx_unlock_spin(&queue->tq_mutex);
+		return EPIPE;
+	}
+
+	/*
+	 * Count multiple enqueues.
+	 */
+	if (task->ta_pending) {
+		task->ta_pending++;
+		mtx_unlock_spin(&queue->tq_mutex);
+		return 0;
+	}
+
+	/*
+	 * Optimise the case when all tasks have the same priority.
+	 */
+	prev = STAILQ_LAST(&queue->tq_queue, task, ta_link);
+	if (!prev || prev->ta_priority >= task->ta_priority) {
+		STAILQ_INSERT_TAIL(&queue->tq_queue, task, ta_link);
+	} else {
+		prev = 0;
+		for (ins = STAILQ_FIRST(&queue->tq_queue); ins;
+		     prev = ins, ins = STAILQ_NEXT(ins, ta_link))
+			if (ins->ta_priority < task->ta_priority)
+				break;
+
+		if (prev)
+			STAILQ_INSERT_AFTER(&queue->tq_queue, prev, task, ta_link);
+		else
+			STAILQ_INSERT_HEAD(&queue->tq_queue, task, ta_link);
+	}
+
+	task->ta_pending = 1;
+	if (queue->tq_enqueue)
+		queue->tq_enqueue(queue->tq_context);
+
+	mtx_unlock_spin(&queue->tq_mutex);
+
+	return 0;
+}
+
+static void
+taskqueue_run_fast(struct taskqueue *queue)
+{
+	struct task *task;
+	int pending;
+
+	mtx_lock_spin(&queue->tq_mutex);
+	while (STAILQ_FIRST(&queue->tq_queue)) {
+		/*
+		 * Carefully remove the first task from the queue and
+		 * zero its pending count.
+		 */
+		task = STAILQ_FIRST(&queue->tq_queue);
+		STAILQ_REMOVE_HEAD(&queue->tq_queue, ta_link);
+		pending = task->ta_pending;
+		task->ta_pending = 0;
+		mtx_unlock_spin(&queue->tq_mutex);
+
+		task->ta_func(task->ta_context, pending);
+
+		mtx_lock_spin(&queue->tq_mutex);
+	}
+	mtx_unlock_spin(&queue->tq_mutex);
+}
+
+struct taskqueue *taskqueue_fast;
+static void	*taskqueue_fast_ih;
+
+static void
+taskqueue_fast_schedule(void *context)
+{
+	swi_sched(taskqueue_fast_ih, 0);
+}
+
+static void
+taskqueue_fast_run(void *dummy)
+{
+	taskqueue_run_fast(taskqueue_fast);
+}
+
+static void
+taskqueue_define_fast(void *arg)
+{
+	taskqueue_fast = malloc(sizeof(struct taskqueue),
+		M_TASKQUEUE, M_NOWAIT | M_ZERO);
+	if (!taskqueue_fast) {
+		printf("%s: Unable to allocate fast task queue!\n", __func__);
+		return;
+	}
+
+	STAILQ_INIT(&taskqueue_fast->tq_queue);
+	taskqueue_fast->tq_name = "fast";
+	taskqueue_fast->tq_enqueue = taskqueue_fast_schedule;
+	mtx_init(&taskqueue_fast->tq_mutex, "taskqueue_fast", NULL, MTX_SPIN);
+
+	mtx_lock(&taskqueue_queues_mutex);
+	STAILQ_INSERT_TAIL(&taskqueue_queues, taskqueue_fast, tq_link);
+	mtx_unlock(&taskqueue_queues_mutex);
+
+	swi_add(NULL, "Fast task queue", taskqueue_fast_run,
+		NULL, SWI_TQ_FAST, 0, &taskqueue_fast_ih);
+}
+SYSINIT(taskqueue_fast, SI_SUB_CONFIGURE, SI_ORDER_SECOND,
+	taskqueue_define_fast, NULL);

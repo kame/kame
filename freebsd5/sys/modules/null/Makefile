@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/null/Makefile,v 1.1 2003/02/27 18:08:44 markm Exp $
+# $FreeBSD: src/sys/modules/null/Makefile,v 1.3 2003/11/18 00:52:30 rwatson Exp $
 
 .PATH: ${.CURDIR}/../../dev/null
 

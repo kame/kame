@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_hci_prse.h,v 1.2 2003/03/18 00:09:36 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/hci/ng_hci_prse.h,v 1.2 2003/05/10 21:44:40 julian Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/hci/ng_hci_prse.h,v 1.3 2003/11/14 03:45:29 emax Exp $
  */
 
 /***************************************************************************
@@ -36,7 +36,7 @@
  ***************************************************************************/
 
 #ifndef _NETGRAPH_HCI_PRSE_H_
-#define _NETGRAPH_HCI_PRSE_H_ 1
+#define _NETGRAPH_HCI_PRSE_H_
 
 /* BDADDR */
 static const struct ng_parse_fixedarray_info	ng_hci_bdaddr_type_info = {

@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/smptests.h,v 1.44 2003/01/23 01:04:27 peter Exp $
+ * $FreeBSD: src/sys/i386/include/smptests.h,v 1.46 2003/11/16 00:55:53 bde Exp $
  */
 
 #ifndef _MACHINE_SMPTESTS_H_
@@ -33,64 +33,17 @@
  * Various 'tests in progress' and configuration parameters.
  */
 
-
-/*
- * Put FAST_INTR() ISRs at an APIC priority above the regular INTs.
- * Allow the mp_lock() routines to handle FAST interrupts while spinning.
- */
-#define FAST_HI
-
-
-/*
- * These defines enable critical region locking of areas that were
- * protected via cli/sti in the UP kernel.
- *
- * COMLOCK protects the sio/cy drivers.
- * known to be incomplete:
- *	joystick lkm
- *	?
- */
-#define USE_COMLOCK
-
-
 /*
  * Send CPUSTOP IPI for stop/restart of other CPUs on DDB break.
 #define VERBOSE_CPUSTOP_ON_DDBBREAK
  */
 #define CPUSTOP_ON_DDBBREAK
 
-
-#ifdef APIC_IO
-/*
- * Don't assume that slow interrupt handler X is called from vector
- * X + ICU_OFFSET.
- */
-#define APIC_INTR_REORDER
-
-#endif /* APIC_IO */
-
 /*
  * Misc. counters.
  *
 #define COUNT_XINVLTLB_HITS
  */
-
-
-/**
- * Hack to "fake-out" kernel into thinking it is running on a 'default config'.
- *
- * value == default type
-#define TEST_DEFAULT_CONFIG	6
- */
-
-
-/*
- * Simple test code for IPI interaction, save for future...
- *
-#define TEST_TEST1
-#define IPI_TARGET_TEST1	1
- */
-
 
 /*
  * Address of POST hardware port.

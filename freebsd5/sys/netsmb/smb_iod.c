@@ -28,9 +28,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/netsmb/smb_iod.c,v 1.11 2003/03/31 22:49:17 jeff Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netsmb/smb_iod.c,v 1.14 2003/08/23 21:43:33 marcel Exp $");
  
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -140,29 +141,39 @@ smb_iod_connect(struct smbiod *iod)
 	}
 	vcp->vc_genid++;
 	error = 0;
-	itry {
-		ithrow(SMB_TRAN_CREATE(vcp, td));
-		SMBIODEBUG("tcreate\n");
-		if (vcp->vc_laddr) {
-			ithrow(SMB_TRAN_BIND(vcp, vcp->vc_laddr, td));
-		}
-		SMBIODEBUG("tbind\n");
-		ithrow(SMB_TRAN_CONNECT(vcp, vcp->vc_paddr, td));
-		SMB_TRAN_SETPARAM(vcp, SMBTP_SELECTID, &iod->iod_flags);
-		iod->iod_state = SMBIOD_ST_TRANACTIVE;
-		SMBIODEBUG("tconnect\n");
-/*		vcp->vc_mid = 0;*/
-		ithrow(smb_smb_negotiate(vcp, &iod->iod_scred));
-		SMBIODEBUG("snegotiate\n");
-		ithrow(smb_smb_ssnsetup(vcp, &iod->iod_scred));
-		iod->iod_state = SMBIOD_ST_VCACTIVE;
-		SMBIODEBUG("completed\n");
-		smb_iod_invrq(iod);
-	} icatch(error) {
-		smb_iod_dead(iod);
-	} ifinally {
-	} iendtry;
-	return error;
+
+	error = (int)SMB_TRAN_CREATE(vcp, td);
+	if (error)
+		goto fail;
+	SMBIODEBUG("tcreate\n");
+	if (vcp->vc_laddr) {
+		error = (int)SMB_TRAN_BIND(vcp, vcp->vc_laddr, td);
+		if (error)
+			goto fail;
+	}
+	SMBIODEBUG("tbind\n");
+	error = (int)SMB_TRAN_CONNECT(vcp, vcp->vc_paddr, td);
+	if (error)
+		goto fail;
+	SMB_TRAN_SETPARAM(vcp, SMBTP_SELECTID, &iod->iod_flags);
+	iod->iod_state = SMBIOD_ST_TRANACTIVE;
+	SMBIODEBUG("tconnect\n");
+	/* vcp->vc_mid = 0;*/
+	error = (int)smb_smb_negotiate(vcp, &iod->iod_scred);
+	if (error)
+		goto fail;
+	SMBIODEBUG("snegotiate\n");
+	error = (int)smb_smb_ssnsetup(vcp, &iod->iod_scred);
+	if (error)
+		goto fail;
+	iod->iod_state = SMBIOD_ST_VCACTIVE;
+	SMBIODEBUG("completed\n");
+	smb_iod_invrq(iod);
+	return (0);
+
+ fail:
+	smb_iod_dead(iod);
+	return (error);
 }
 
 static int
@@ -400,7 +411,8 @@ smb_iod_addrq(struct smb_rq *rqp)
 	int error;
 
 	SMBIODEBUG("\n");
-	if (rqp->sr_cred->scr_td->td_proc == iod->iod_p) {
+	if (rqp->sr_cred->scr_td != NULL &&
+	    rqp->sr_cred->scr_td->td_proc == iod->iod_p) {
 		rqp->sr_flags |= SMBR_INTERNAL;
 		SMB_IOD_RQLOCK(iod);
 		TAILQ_INSERT_HEAD(&iod->iod_rqlist, rqp, sr_link);

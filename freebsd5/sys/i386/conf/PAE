@@ -1,7 +1,7 @@
 #
 # PAE -- Generic kernel configuration file for FreeBSD/i386 PAE
 #
-# $FreeBSD: src/sys/i386/conf/PAE,v 1.5 2003/05/21 07:17:06 ps Exp $
+# $FreeBSD: src/sys/i386/conf/PAE,v 1.8 2003/11/03 22:49:19 jhb Exp $
 
 include GENERIC
 
@@ -9,10 +9,6 @@ ident		PAE-GENERIC
 
 # To make a PAE kernel, the next option is needed
 options		PAE			# Physical Address Extensions Kernel
-
-# To make an SMP kernel, the next two are needed
-#options 	SMP			# Symmetric MultiProcessor Kernel
-#options 	APIC_IO			# Symmetric (APIC) I/O
 
 # Compile acpi in statically since the module isn't built properly.  Most
 # machines which support large amounts of memory require acpi.
@@ -31,7 +27,6 @@ makeoptions	NO_MODULES=yes
 nodevice	ahb
 nodevice	amd
 nodevice	isp
-nodevice	mpt
 nodevice	sym
 nodevice	trm
 
@@ -54,7 +49,6 @@ nodevice	amr
 nodevice	ida
 nodevice	mlx
 nodevice	pst
-nodevice	twe
 
 nodevice	agp
 

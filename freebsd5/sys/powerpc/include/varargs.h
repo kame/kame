@@ -25,11 +25,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
  *	$NetBSD: varargs.h,v 1.5 2000/02/27 17:50:22 tsubai Exp $
- * $FreeBSD: src/sys/powerpc/include/varargs.h,v 1.4 2002/10/06 22:02:06 mike Exp $
+ * $FreeBSD: src/sys/powerpc/include/varargs.h,v 1.5 2003/09/01 03:01:45 kan Exp $
  */
 
-#ifndef _POWERPC_VARARGS_H_
-#define	_POWERPC_VARARGS_H_
+#ifndef _MACHINE_VARARGS_H_
+#define	_MACHINE_VARARGS_H_
 
 #if defined(__GNUC__) && (__GNUC__ == 2 && __GNUC_MINOR__ > 95 || __GNUC__ >= 3)
 
@@ -69,4 +69,4 @@ typedef int __builtin_va_alist_t __attribute__((__mode__(__word__)));
 
 #endif /* __GNUC__ post GCC 2.95 */
 
-#endif /* _POWERPC_VARARGS_H_ */
+#endif /* _MACHINE_VARARGS_H_ */

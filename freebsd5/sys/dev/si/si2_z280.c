@@ -25,8 +25,10 @@
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
  * NO EVENT SHALL THE AUTHORS BE LIABLE.
  *
- * $FreeBSD: src/sys/dev/si/si2_z280.c,v 1.4 2000/01/24 07:24:00 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/si/si2_z280.c,v 1.5 2003/08/24 18:03:43 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>

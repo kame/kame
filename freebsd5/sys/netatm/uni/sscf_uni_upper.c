@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/sscf_uni_upper.c,v 1.10 2002/11/08 18:27:30 jhb Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ---------------------
  *
  * SSCF UNI - SSCOP SAP interface processing
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/sscf_uni_upper.c,v 1.11 2003/06/11 07:22:30 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -57,11 +55,6 @@
 #include <netatm/uni/uni.h>
 #include <netatm/uni/sscop.h>
 #include <netatm/uni/sscf_uni_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/sscf_uni_upper.c,v 1.10 2002/11/08 18:27:30 jhb Exp $");
-#endif
-
 
 /*
  * SSCF_UNI Upper Stack Command Handler

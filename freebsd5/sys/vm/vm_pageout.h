@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_pageout.h,v 1.36 2003/05/03 04:21:16 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_pageout.h,v 1.38 2003/10/18 21:09:21 alc Exp $
  */
 
 #ifndef _VM_VM_PAGEOUT_H_
@@ -103,10 +103,11 @@ extern void vm_waitpfault(void);
 
 /* XXX This is probably misplaced. */
 #ifndef NO_SWAPPING
-void vm_proc_swapin_all(int);
+struct swdevt;
+void vm_proc_swapin_all(struct swdevt *);
 #endif	/* !NO_SWAPPING */
 
 #ifdef _KERNEL
-int vm_pageout_flush(vm_page_t *, int, int, int is_object_locked);
+int vm_pageout_flush(vm_page_t *, int, int);
 #endif
 #endif	/* _VM_VM_PAGEOUT_H_ */

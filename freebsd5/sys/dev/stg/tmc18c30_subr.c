@@ -34,8 +34,10 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/stg/tmc18c30_subr.c,v 1.1 2003/04/07 10:13:25 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/stg/tmc18c30_subr.c,v 1.2 2003/08/24 18:17:23 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

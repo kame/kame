@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)cons.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/kern/tty_cons.c,v 1.110 2003/03/09 20:42:49 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/tty_cons.c,v 1.118 2003/10/18 12:16:17 phk Exp $");
 
 #include "opt_ddb.h"
 
@@ -48,6 +50,7 @@
 #include <sys/fcntl.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/msgbuf.h>
 #include <sys/namei.h>
 #include <sys/proc.h>
 #include <sys/queue.h>
@@ -89,7 +92,6 @@ static struct cdevsw cn_cdevsw = {
 
 struct cn_device {
 	STAILQ_ENTRY(cn_device) cnd_next;
-	char		cnd_name[16];
 	struct		vnode *cnd_vp;
 	struct		consdev *cnd_cn;
 };
@@ -115,11 +117,16 @@ int	cons_unavail = 0;	/* XXX:
 static int cn_mute;
 static int openflag;			/* how /dev/console was opened */
 static int cn_is_open;
+static char *consbuf;			/* buffer used by `consmsgbuf' */
+static struct callout conscallout;	/* callout for outputting to constty */
+struct msgbuf consmsgbuf;		/* message buffer for console tty */
 static u_char console_pausing;		/* pause after each line during probe */
 static char *console_pausestr=
 "<pause; press any key to proceed to next line or '.' to end pause mode>";
+struct tty *constty;			/* pointer to console "window" tty */
 
 void	cndebug(char *);
+static void constty_timeout(void *arg);
 
 CONS_DRIVER(cons, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 SET_DECLARE(cons_set, struct consdev);
@@ -201,6 +208,10 @@ cnadd(struct consdev *cn)
 	if (cnd->cnd_cn != NULL)
 		return (ENOMEM);
 	cnd->cnd_cn = cn;
+	if (cn->cn_name[0] == '\0') {
+		/* XXX: it is unclear if/where this print might output */
+		printf("WARNING: console at %p has no name\n", cn);
+	}
 	STAILQ_INSERT_TAIL(&cn_devlist, cnd, cnd_next);
 	return (0);
 }
@@ -218,7 +229,6 @@ cnremove(struct consdev *cn)
 			vn_close(cnd->cnd_vp, openflag, NOCRED, NULL);
 		cnd->cnd_vp = NULL;
 		cnd->cnd_cn = NULL;
-		cnd->cnd_name[0] = '\0';
 #if 0
 		/*
 		 * XXX
@@ -260,6 +270,10 @@ cndebug(char *str)
 	cnputc('\n');
 }
 
+/*
+ * XXX: rewrite to use sbufs instead
+ */
+
 static int
 sysctl_kern_console(SYSCTL_HANDLER_ARGS)
 {
@@ -271,21 +285,21 @@ sysctl_kern_console(SYSCTL_HANDLER_ARGS)
 	len = 2;
 	SET_FOREACH(list, cons_set) {
 		cp = *list;
-		if (cp->cn_dev != NULL)
-			len += strlen(devtoname(cp->cn_dev)) + 1;
+		if (cp->cn_name[0] != '\0')
+			len += strlen(cp->cn_name) + 1;
 	}
 	STAILQ_FOREACH(cnd, &cn_devlist, cnd_next)
-		len += strlen(devtoname(cnd->cnd_cn->cn_dev)) + 1;
+		len += strlen(cnd->cnd_cn->cn_name) + 1;
 	len = len > CNDEVPATHMAX ? len : CNDEVPATHMAX;
 	MALLOC(name, char *, len, M_TEMP, M_WAITOK | M_ZERO);
 	p = name;
 	STAILQ_FOREACH(cnd, &cn_devlist, cnd_next)
-		p += sprintf(p, "%s,", devtoname(cnd->cnd_cn->cn_dev));
+		p += sprintf(p, "%s,", cnd->cnd_cn->cn_name);
 	*p++ = '/';
 	SET_FOREACH(list, cons_set) {
 		cp = *list;
-		if (cp->cn_dev != NULL)
-			p += sprintf(p, "%s,", devtoname(cp->cn_dev));
+		if (cp->cn_name[0] != '\0')
+			p += sprintf(p, "%s,", cp->cn_name);
 	}
 	error = sysctl_handle_string(oidp, name, len, req);
 	if (error == 0 && req->newptr != NULL) {
@@ -298,8 +312,7 @@ sysctl_kern_console(SYSCTL_HANDLER_ARGS)
 		}
 		SET_FOREACH(list, cons_set) {
 			cp = *list;
-			if (cp->cn_dev == NULL ||
-			    strcmp(p, devtoname(cp->cn_dev)) != 0)
+			if (strcmp(p, cp->cn_name) != 0)
 				continue;
 			if (delete) {
 				cnremove(cp);
@@ -362,13 +375,9 @@ cn_devopen(struct cn_device *cnd, struct thread *td, int forceopen)
 		cnd->cnd_vp = NULL;
 		vn_close(vp, openflag, td->td_ucred, td);
 	}
-	if (cnd->cnd_name[0] == '\0') {
-		strlcpy(cnd->cnd_name, devtoname(cnd->cnd_cn->cn_dev),
-		    sizeof(cnd->cnd_name));
-	}
-	snprintf(path, sizeof(path), "/dev/%s", cnd->cnd_name);
+	snprintf(path, sizeof(path), "/dev/%s", cnd->cnd_cn->cn_name);
 	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, path, td);
-	error = vn_open(&nd, &openflag, 0);
+	error = vn_open(&nd, &openflag, 0, -1);
 	if (error == 0) {
 		NDFREE(&nd, NDF_ONLY_PNBUF);
 		VOP_UNLOCK(nd.ni_vp, 0, td);
@@ -529,10 +538,16 @@ cncheckc(void)
 		return (-1);
 	STAILQ_FOREACH(cnd, &cn_devlist, cnd_next) {
 		cn = cnd->cnd_cn;
-		c = cn->cn_checkc(cn);
-		if (c != -1) {
-			return (c);
+#ifdef DDB
+		if (!db_active || !(cn->cn_flags & CN_FLAG_NODEBUG)) {
+#endif
+			c = cn->cn_checkc(cn);
+			if (c != -1) {
+				return (c);
+			}
+#ifdef DDB
 		}
+#endif
 	}
 	return (-1);
 }
@@ -548,9 +563,15 @@ cnputc(int c)
 		return;
 	STAILQ_FOREACH(cnd, &cn_devlist, cnd_next) {
 		cn = cnd->cnd_cn;
-		if (c == '\n')
-			cn->cn_putc(cn, '\r');
-		cn->cn_putc(cn, c);
+#ifdef DDB
+		if (!db_active || !(cn->cn_flags & CN_FLAG_NODEBUG)) {
+#endif
+			if (c == '\n')
+				cn->cn_putc(cn, '\r');
+			cn->cn_putc(cn, c);
+#ifdef DDB
+		}
+#endif
 	}
 #ifdef DDB
 	if (console_pausing && !db_active && (c == '\n')) {
@@ -585,6 +606,70 @@ cndbctl(int on)
 		}
 	if (on)
 		refcount++;
+}
+
+static int consmsgbuf_size = 8192;
+SYSCTL_INT(_kern, OID_AUTO, consmsgbuf_size, CTLFLAG_RW, &consmsgbuf_size, 0,
+    "");
+
+/*
+ * Redirect console output to a tty.
+ */
+void
+constty_set(struct tty *tp)
+{
+	int size;
+
+	KASSERT(tp != NULL, ("constty_set: NULL tp"));
+	if (consbuf == NULL) {
+		size = consmsgbuf_size;
+		consbuf = malloc(size, M_TTYS, M_WAITOK);
+		msgbuf_init(&consmsgbuf, consbuf, size);
+		callout_init(&conscallout, 0);
+	}
+	constty = tp;
+	constty_timeout(NULL);
+}
+
+/*
+ * Disable console redirection to a tty.
+ */
+void
+constty_clear(void)
+{
+	int c;
+
+	constty = NULL;
+	if (consbuf == NULL)
+		return;
+	callout_stop(&conscallout);
+	while ((c = msgbuf_getchar(&consmsgbuf)) != -1)
+		cnputc(c);
+	free(consbuf, M_TTYS);
+	consbuf = NULL;
+}
+
+/* Times per second to check for pending console tty messages. */
+static int constty_wakeups_per_second = 5;
+SYSCTL_INT(_kern, OID_AUTO, constty_wakeups_per_second, CTLFLAG_RW,
+    &constty_wakeups_per_second, 0, "");
+
+static void
+constty_timeout(void *arg)
+{
+	int c;
+
+	while (constty != NULL && (c = msgbuf_getchar(&consmsgbuf)) != -1) {
+		if (tputchar(c, constty) < 0)
+			constty = NULL;
+	}
+	if (constty != NULL) {
+		callout_reset(&conscallout, hz / constty_wakeups_per_second,
+		    constty_timeout, NULL);
+	} else {
+		/* Deallocate the constty buffer memory. */
+		constty_clear();
+	}
 }
 
 static void

@@ -1,9 +1,32 @@
-/*
- *	(c)Copyright 1998, Matthew Dillon.  Terms for use and redistribution
- *	are covered by the BSD Copyright as found in /usr/src/COPYRIGHT.
+/*-
+ * Copyright (c) 1998 Matthew Dillon.  All Rights Reserved.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 4. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
  *
- * $FreeBSD: src/sys/vm/vm_pageq.c,v 1.9 2003/03/25 00:07:06 jake Exp $
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
+ * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/vm/vm_pageq.c,v 1.12 2003/08/12 23:24:05 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -45,31 +68,21 @@ vm_pageq_init(void)
 	}
 }
 
-static __inline struct vpgqueues *
-vm_pageq_aquire(int queue)
-{
-	struct vpgqueues *vpq = NULL;
-
-	if (queue != PQ_NONE) {
-		vpq = &vm_page_queues[queue];
-	}
-	return (vpq);
-}
-
 void
 vm_pageq_requeue(vm_page_t m)
 {
 	int queue = m->queue;
 	struct vpgqueues *vpq;
 
-	vpq = vm_pageq_aquire(queue);
-	TAILQ_REMOVE(&vpq->pl, m, pageq);
-	TAILQ_INSERT_TAIL(&vpq->pl, m, pageq);
+	if (queue != PQ_NONE) {
+		vpq = &vm_page_queues[queue];
+		TAILQ_REMOVE(&vpq->pl, m, pageq);
+		TAILQ_INSERT_TAIL(&vpq->pl, m, pageq);
+	}
 }
 
 /*
  *	vm_pageq_enqueue:
- *
  */
 void
 vm_pageq_enqueue(int queue, vm_page_t m)

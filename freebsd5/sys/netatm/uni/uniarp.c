@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/uniarp.c,v 1.15 2003/02/19 05:47:31 imp Exp $
- *
  */
 
 /*
@@ -32,18 +28,21 @@
  * ---------------------
  *
  * UNI ATMARP support (RFC1577)
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/uniarp.c,v 1.21 2003/10/31 18:32:10 brooks Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/malloc.h>
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/syslog.h>
+#include <sys/kernel.h>
+#include <sys/sysctl.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/in_var.h>
@@ -68,11 +67,6 @@
 
 #include <vm/uma.h>
 
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/uniarp.c,v 1.15 2003/02/19 05:47:31 imp Exp $");
-#endif
-
-
 /*
  * Global variables
  */
@@ -81,7 +75,13 @@ struct uniarp		*uniarp_nomaptab = NULL;
 struct uniarp		*uniarp_pvctab = NULL;
 struct atm_time		uniarp_timer = {0, 0};		/* Aging timer */
 struct uniarp_stat	uniarp_stat = {0};
+
+/*
+ * net.harp.uni.uniarp_print
+ */
 int			uniarp_print = 0;
+SYSCTL_INT(_net_harp_uni, OID_AUTO, uniarp_print, CTLFLAG_RW,
+    &uniarp_print, 0, "dump UNI/ARP messages");
 
 Atm_endpoint	uniarp_endpt = {
 	NULL,
@@ -133,7 +133,6 @@ uniarp_start()
 	    NULL, NULL, UMA_ALIGN_PTR, 0);
 	if (uniarp_zone == NULL)
 		panic("uniarp_start: uma_zcreate");
-	uma_zone_set_max(uniarp_zone, 200);
 
 	/*
 	 * Register our endpoint
@@ -711,9 +710,10 @@ uniarp_client_mode(uip, aap)
 
 	/*
 	 * Now, get an arp entry for the server connection
+	 * May be called from timeout - don't wait.
 	 */
 	uip->uip_arpstate = UIAS_CLIENT_POPEN;
-	uap = uma_zalloc(uniarp_zone, M_WAITOK | M_ZERO);
+	uap = uma_zalloc(uniarp_zone, M_NOWAIT | M_ZERO);
 	if (uap == NULL) {
 		UNIIP_ARP_TIMER(uip, 1 * ATM_HZ);
 		return;
@@ -864,7 +864,9 @@ uniarp_ioctl(code, data, arg1)
 	struct in_addr		ip;
 	Atm_addr		atmsub;
 	u_long			dst;
-	int			err = 0, i, buf_len;
+	int			err = 0;
+	size_t			buf_len, tlen;
+	u_int			i;
 	caddr_t			buf_addr;
 
 	switch (code) {
@@ -962,7 +964,7 @@ uniarp_ioctl(code, data, arg1)
 		 */
 		if (asp->asr_arp_addr.address_format == T_ATM_ABSENT) {
 			i = asp->asr_arp_plen / sizeof(struct uniarp_prf);
-			if (i <= 0) {
+			if (i == 0) {
 				err = EINVAL;
 				break;
 			}
@@ -1052,10 +1054,8 @@ uniarp_ioctl(code, data, arg1)
 					AF_INET;
 				SATOSIN(&aar.aap_arp_addr)->sin_addr.s_addr =
 					uap->ua_dstip.s_addr;
-				(void) snprintf(aar.aap_intf,
-				    sizeof(aar.aap_intf), "%s%d",
-					nip->nif_if.if_name,
-					nip->nif_if.if_unit);
+				strlcpy(aar.aap_intf, nip->nif_if.if_xname,
+				    sizeof(aar.aap_intf));
 				aar.aap_flags = uap->ua_flags;
 				aar.aap_origin = uap->ua_origin;
 				if (uap->ua_flags & UAF_VALID)
@@ -1107,9 +1107,8 @@ uniarp_ioctl(code, data, arg1)
 			 */
 			SATOSIN(&aar.aap_arp_addr)->sin_family = AF_INET;
 			SATOSIN(&aar.aap_arp_addr)->sin_addr.s_addr = 0;
-			(void) snprintf(aar.aap_intf,
-			    sizeof(aar.aap_intf), "%s%d",
-				nip->nif_if.if_name, nip->nif_if.if_unit);
+			strlcpy(aar.aap_intf, nip->nif_if.if_xname,
+				sizeof(aar.aap_intf));
 			aar.aap_flags = 0;
 			aar.aap_origin = uap->ua_origin;
 			aar.aap_age = 0;
@@ -1188,9 +1187,8 @@ updbuf:
 			/*
 			 * Fill in info to be returned
 			 */
-			(void) snprintf(asr.asp_intf,
-			    sizeof(asr.asp_intf), "%s%d",
-				nip->nif_if.if_name, nip->nif_if.if_unit);
+			strlcpy(asr.asp_intf, nip->nif_if.if_xname,
+				sizeof(asr.asp_intf));
 			asr.asp_state = uip->uip_arpstate;
 			if (uip->uip_arpstate == UIAS_SERVER_ACTIVE) {
 				asr.asp_addr.address_format = T_ATM_ABSENT;
@@ -1215,16 +1213,17 @@ updbuf:
 			 * Copy the prefix list into the user's buffer
 			 */
 			if (uip->uip_nprefix) {
-				i = uip->uip_nprefix 
-						* sizeof(struct uniarp_prf);
-				if (buf_len < i) {
+				tlen = uip->uip_nprefix *
+				    sizeof(struct uniarp_prf);
+				if (buf_len < tlen) {
 					err = ENOSPC;
 					break;
 				}
-				if ((err = copyout(uip->uip_prefix, buf_addr, i)) != 0)
+				err = copyout(uip->uip_prefix, buf_addr, tlen);
+				if (err != 0)
 					break;
-				buf_addr += i;
-				buf_len -= i;
+				buf_addr += tlen;
+				buf_len -= tlen;
 			}
 		}
 

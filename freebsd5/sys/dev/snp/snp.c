@@ -12,8 +12,10 @@
  *
  * Snoop stuff.
  *
- * $FreeBSD: src/sys/dev/snp/snp.c,v 1.80 2003/03/03 12:15:46 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/snp/snp.c,v 1.82 2003/11/09 09:17:22 tanimura Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -368,7 +370,7 @@ snp_in(snp, buf, n)
 		snp->snp_flags &= ~SNOOP_RWAIT;
 		wakeup(snp);
 	}
-	selwakeup(&snp->snp_sel);
+	selwakeuppri(&snp->snp_sel, PZERO + 1);
 
 	return (n);
 }
@@ -442,7 +444,7 @@ snp_detach(snp)
 	snp->snp_target = NODEV;
 
 detach_notty:
-	selwakeup(&snp->snp_sel);
+	selwakeuppri(&snp->snp_sel, PZERO + 1);
 	if ((snp->snp_flags & SNOOP_OPEN) == 0) 
 		free(snp, M_SNP);
 

@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  *	from BSDI $Id: mutex.h,v 2.7.2.35 2000/04/27 03:10:26 cp Exp $
- * $FreeBSD: src/sys/sys/lock.h,v 1.47 2003/03/04 20:56:39 jhb Exp $
+ * $FreeBSD: src/sys/sys/lock.h,v 1.49 2003/09/19 22:01:56 sam Exp $
  */
 
 #ifndef _SYS_LOCK_H_
@@ -127,7 +127,7 @@ struct lock_list_entry {
  * calling conventions for this debugging code in modules so that modules can
  * work with both debug and non-debug kernels.
  */
-#if defined(KLD_MODULE) || defined(WITNESS) || defined(INVARIANTS) || defined(INVARIANT_SUPPORT) || defined(KTR)
+#if defined(KLD_MODULE) || defined(WITNESS) || defined(INVARIANTS) || defined(INVARIANT_SUPPORT) || defined(KTR) || defined(MUTEX_PROFILING)
 #define	LOCK_DEBUG	1
 #else
 #define	LOCK_DEBUG	0
@@ -206,6 +206,7 @@ void	witness_restore(struct lock_object *, const char *, int);
 int	witness_list_locks(struct lock_list_entry **);
 int	witness_warn(int, struct lock_object *, const char *, ...);
 void	witness_assert(struct lock_object *, int, const char *, int);
+void	witness_display_spinlock(struct lock_object *, struct thread *);
 int	witness_line(struct lock_object *);
 const char *witness_file(struct lock_object *);
 

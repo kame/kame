@@ -6,7 +6,6 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/i386/isa/loran.c,v 1.42 2003/03/09 11:03:45 phk Exp $
  *
  * This device-driver helps the userland controlprogram for a LORAN-C
  * receiver avoid monopolizing the CPU.
@@ -17,8 +16,10 @@
  *
  * Details can be found at:
  *     ftp://ftp.eecis.udel.edu/pub/ntp/loran.tar.Z
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/isa/loran.c,v 1.43 2003/06/02 16:32:55 obrien Exp $");
 
 #ifdef _KERNEL
 #include <sys/param.h>

@@ -24,8 +24,10 @@
  * SUCH DAMAGE.
  *
  *	From Id: lpt.c,v 1.55.2.1 1996/11/12 09:08:38 phk Exp
- * $FreeBSD: src/sys/dev/ppbus/if_plip.c,v 1.28 2003/03/04 23:19:54 jlemon Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ppbus/if_plip.c,v 1.31 2003/10/31 18:32:03 brooks Exp $");
 
 /*
  * Parallel port TCP/IP interfaces added.  I looked at the driver from
@@ -144,8 +146,6 @@ static int volatile lptflag = 0;
 #endif
 
 struct lp_data {
-	unsigned short lp_unit;
-
 	struct  ifnet	sc_if;
 	u_char		*sc_ifbuf;
 	int		sc_iferrs;
@@ -220,7 +220,6 @@ lp_probe(device_t dev)
 	/*
 	 * lp dependent initialisation.
 	 */
-	lp->lp_unit = device_get_unit(dev);
 
 	device_set_desc(dev, "PLIP network interface");
 
@@ -234,8 +233,7 @@ lp_attach (device_t dev)
 	struct ifnet *ifp = &lp->sc_if;
 
 	ifp->if_softc = lp;
-	ifp->if_name = "lp";
-	ifp->if_unit = device_get_unit(dev);
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = LPMTU;
 	ifp->if_flags = IFF_SIMPLEX | IFF_POINTOPOINT | IFF_MULTICAST;
 	ifp->if_ioctl = lpioctl;
@@ -296,7 +294,7 @@ lpinittables (void)
 static int
 lpioctl (struct ifnet *ifp, u_long cmd, caddr_t data)
 {
-    device_t dev = UNITODEVICE(ifp->if_unit);
+    device_t dev = UNITODEVICE(ifp->if_dunit);
     device_t ppbus = device_get_parent(dev);
     struct lp_data *sc = DEVTOSOFTC(dev);
     struct ifaddr *ifa = (struct ifaddr *)data;
@@ -610,7 +608,7 @@ static int
 lpoutput (struct ifnet *ifp, struct mbuf *m,
 	  struct sockaddr *dst, struct rtentry *rt)
 {
-    device_t dev = UNITODEVICE(ifp->if_unit);
+    device_t dev = UNITODEVICE(ifp->if_dunit);
     device_t ppbus = device_get_parent(dev);
     int s, err;
     struct mbuf *mm;

@@ -24,14 +24,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_sunlabel_enc.c,v 1.2 2003/04/21 19:42:36 phk Exp $
- *
  * Functions to encode or decode struct sun_disklabel into a bytestream
  * of correct endianess and packing.
  *
  * NB!  This file must be usable both in kernel and userland.
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/geom/geom_sunlabel_enc.c,v 1.3 2003/06/11 06:49:16 obrien Exp $");
 
 #include <sys/types.h>
 #include <sys/endian.h>

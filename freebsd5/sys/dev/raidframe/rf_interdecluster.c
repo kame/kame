@@ -1,5 +1,7 @@
-/*	$FreeBSD: src/sys/dev/raidframe/rf_interdecluster.c,v 1.1 2002/10/20 08:17:36 scottl Exp $ */
 /*	$NetBSD: rf_interdecluster.c,v 1.5 2001/01/26 05:09:13 oster Exp $	*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/raidframe/rf_interdecluster.c,v 1.2 2003/08/24 17:54:18 obrien Exp $");
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)disklabel.h	8.2 (Berkeley) 7/10/94
- * $FreeBSD: src/sys/sys/disklabel.h,v 1.102 2003/05/02 22:46:13 phk Exp $
+ * $FreeBSD: src/sys/sys/disklabel.h,v 1.104 2003/06/07 09:06:39 phk Exp $
  */
 
 #ifndef _SYS_DISKLABEL_H_
@@ -55,31 +55,13 @@
  */
 
 /* XXX these should be defined per controller (or drive) elsewhere, not here! */
-#ifdef __i386__
+#if defined(__i386__) || defined(__amd64__) || defined(__ia64__)
 #define LABELSECTOR	1			/* sector containing label */
 #define LABELOFFSET	0			/* offset of label in sector */
 #endif
 
 #ifdef __alpha__
 #define LABELSECTOR	0
-#define LABELOFFSET	64
-#endif
-
-#ifdef __ia64__
-#define LABELSECTOR	1
-#define LABELOFFSET	0
-#endif
-
-#ifdef __sparc64__
-#define LABELSECTOR	0
-#define LABELOFFSET	128
-#endif
-
-#ifndef	LABELSECTOR
-#define LABELSECTOR	0
-#endif
-
-#ifndef	LABELOFFSET
 #define LABELOFFSET	64
 #endif
 

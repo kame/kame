@@ -28,12 +28,13 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/posix4/ksched.c,v 1.23 2003/02/17 09:55:09 julian Exp $
  */
 
 /* ksched: Soft real time scheduling based on "rtprio".
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/posix4/ksched.c,v 1.25 2003/09/13 18:46:24 nectar Exp $");
 
 #include "opt_posix.h"
 
@@ -227,6 +228,10 @@ int ksched_setscheduler(register_t *ret, struct ksched *ksched,
 			mtx_unlock_spin(&sched_lock);
 		}
 		break;
+		
+		default:
+			e = EINVAL;
+			break;
 	}
 
 	return e;

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/include/nss.h,v 1.1 2003/04/17 14:14:22 nectar Exp $
+ * $FreeBSD: src/include/nss.h,v 1.1.4.1 2004/01/25 06:00:41 scottl Exp $
  *
  * Compatibility header for the GNU C Library-style nsswitch interface.
  */
@@ -46,8 +46,9 @@ enum nss_status {
 	NSS_STATUS_RETURN
 };
 
-#define __nss_compat_result(rv)			\
-((rv == NSS_STATUS_TRYAGAIN) ? NS_TRYAGAIN :	\
+#define __nss_compat_result(rv, err)		\
+((rv == NSS_STATUS_TRYAGAIN && err == ERANGE) ? NS_RETURN : \
+ (rv == NSS_STATUS_TRYAGAIN) ? NS_TRYAGAIN :	\
  (rv == NSS_STATUS_UNAVAIL)  ? NS_UNAVAIL  :	\
  (rv == NSS_STATUS_NOTFOUND) ? NS_NOTFOUND :	\
  (rv == NSS_STATUS_SUCCESS)  ? NS_SUCCESS  :	\

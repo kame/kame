@@ -3,7 +3,9 @@
  * Nate Williams, October 1997.
  * This file is in the public domain.
  */
-/* $FreeBSD: src/sys/pccard/pccard_beep.c,v 1.9 2002/09/29 23:41:25 imp Exp $ */
+/* $FreeBSD: src/sys/pccard/pccard_beep.c,v 1.10 2003/06/12 04:46:42 imp Exp $ */
+
+#define OBSOLETE_IN_6
 
 #include <sys/param.h>
 #include <sys/kernel.h>

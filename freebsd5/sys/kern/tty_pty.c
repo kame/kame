@@ -31,8 +31,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)tty_pty.c	8.4 (Berkeley) 2/20/95
- * $FreeBSD: src/sys/kern/tty_pty.c,v 1.108 2003/05/13 20:35:59 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/tty_pty.c,v 1.112 2003/11/09 09:17:24 tanimura Exp $");
 
 /*
  * Pseudo-teletype Driver
@@ -324,11 +326,11 @@ ptcwakeup(tp, flag)
 	struct pt_ioctl *pti = tp->t_dev->si_drv1;
 
 	if (flag & FREAD) {
-		selwakeup(&pti->pt_selr);
+		selwakeuppri(&pti->pt_selr, TTIPRI);
 		wakeup(TSA_PTC_READ(tp));
 	}
 	if (flag & FWRITE) {
-		selwakeup(&pti->pt_selw);
+		selwakeuppri(&pti->pt_selw, TTOPRI);
 		wakeup(TSA_PTC_WRITE(tp));
 	}
 }
@@ -489,7 +491,8 @@ ptcpoll(dev, events, td)
 	int s;
 
 	if ((tp->t_state & TS_CONNECTED) == 0)
-		return (seltrue(dev, events, td) | POLLHUP);
+		return (events & 
+		   (POLLHUP | POLLIN | POLLRDNORM | POLLOUT | POLLWRNORM));
 
 	/*
 	 * Need to block timeouts (ttrstart).
@@ -787,6 +790,7 @@ ptyioctl(dev, cmd, data, flag, td)
 #endif
 			pti->pt_send |= TIOCPKT_IOCTL;
 			ptcwakeup(tp, FREAD);
+			break;
 		default:
 			break;
 		}

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/vm/uma.h,v 1.15 2003/02/19 05:47:46 imp Exp $
+ * $FreeBSD: src/sys/vm/uma.h,v 1.16 2003/09/19 08:37:44 jeff Exp $
  *
  */
 
@@ -162,7 +162,12 @@ uma_zone_t uma_zcreate(char *name, size_t size, uma_ctor ctor, uma_dtor dtor,
 			uma_init uminit, uma_fini fini, int align,
 			u_int16_t flags);
 
-/* Definitions for uma_zcreate flags */
+/*
+ * Definitions for uma_zcreate flags
+ *
+ * These flags share space with UMA_ZFLAGs in uma_int.h.  Be careful not to
+ * overlap when adding new features.  0xf000 is in use by uma_int.h.
+ */
 #define UMA_ZONE_PAGEABLE	0x0001	/* Return items not fully backed by
 					   physical memory XXX Not yet */
 #define UMA_ZONE_ZINIT		0x0002	/* Initialize with zeros */

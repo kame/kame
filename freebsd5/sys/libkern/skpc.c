@@ -31,9 +31,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)skpc.c	8.1 (Berkeley) 6/10/93
- *
- * $FreeBSD: src/sys/libkern/skpc.c,v 1.6 1999/08/28 00:46:36 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/libkern/skpc.c,v 1.7 2003/06/11 05:23:04 obrien Exp $");
 
 #include <sys/libkern.h>
 

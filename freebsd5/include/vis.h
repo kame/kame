@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vis.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/include/vis.h,v 1.10 2002/08/21 16:19:55 mike Exp $
+ * $FreeBSD: src/include/vis.h,v 1.11 2003/10/30 10:40:49 phk Exp $
  */
 
 #ifndef _VIS_H_
@@ -65,6 +65,7 @@ typedef	__size_t	size_t;
  */
 #define	VIS_NOSLASH	0x40	/* inhibit printing '\' */
 #define	VIS_HTTPSTYLE	0x80	/* http-style escape % HEX HEX */
+#define	VIS_GLOB	0x100	/* encode glob(3) magics */
 
 /*
  * unvis return codes

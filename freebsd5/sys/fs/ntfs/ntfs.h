@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/ntfs/ntfs.h,v 1.14 2001/11/27 00:18:33 jhb Exp $
+ * $FreeBSD: src/sys/fs/ntfs/ntfs.h,v 1.15 2003/09/26 20:26:23 fjoe Exp $
  */
 
 /*#define NTFS_DEBUG 1*/
@@ -254,6 +254,8 @@ struct ntfsmount {
 	int		ntm_adnum;
  	wchar *		ntm_82u;	/* 8bit to Unicode */
  	char **		ntm_u28;	/* Unicode to 8 bit */
+	void *		ntm_ic_l2u;	/* Local to Unicode (iconv) */
+	void *		ntm_ic_u2l;	/* Unicode to Local (iconv) */
 };
 
 #define ntm_mftcn	ntm_bootfile.bf_mftcn

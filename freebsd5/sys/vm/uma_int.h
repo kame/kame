@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/vm/uma_int.h,v 1.13 2002/11/01 01:01:27 jeff Exp $
+ * $FreeBSD: src/sys/vm/uma_int.h,v 1.21 2003/09/19 23:27:46 jeff Exp $
  *
  */
 
@@ -103,9 +103,7 @@
 #define UMA_SLAB_MASK	(PAGE_SIZE - 1)	/* Mask to get back to the page */
 #define UMA_SLAB_SHIFT	PAGE_SHIFT	/* Number of bits PAGE_MASK */
 
-#define UMA_BOOT_PAGES		30	/* Number of pages allocated for startup */
-#define UMA_WORKING_TIME	20	/* Seconds worth of items to keep */
-
+#define UMA_BOOT_PAGES		30	/* Pages allocated for startup */
 
 /* Max waste before going to off page slab management */
 #define UMA_MAX_WASTE	(UMA_SLAB_SIZE / 10)
@@ -116,7 +114,6 @@
  * does expand by powers of two.  Currently it doesn't get smaller.
  */
 #define UMA_HASH_SIZE_INIT	32		
-
 
 /* 
  * I should investigate other hashing algorithms.  This should yield a low
@@ -143,8 +140,8 @@
 struct uma_slab {
 	uma_zone_t	us_zone;		/* Zone we live in */
 	union {
-		LIST_ENTRY(uma_slab)	us_link;	/* slabs in zone */
-		unsigned long	us_size;	/* Size of allocation */
+		LIST_ENTRY(uma_slab)	_us_link;	/* slabs in zone */
+		unsigned long	_us_size;	/* Size of allocation */
 	} us_type;
 	SLIST_ENTRY(uma_slab)	us_hlink;	/* Link for hash table */
 	u_int8_t	*us_data;		/* First item */
@@ -154,8 +151,8 @@ struct uma_slab {
 	u_int8_t	us_freelist[1];	/* Free List (actually larger) */
 };
 
-#define us_link	us_type.us_link
-#define us_size	us_type.us_size
+#define us_link	us_type._us_link
+#define us_size	us_type._us_size
 
 typedef struct uma_slab * uma_slab_t;
 
@@ -173,32 +170,22 @@ struct uma_hash {
  * Structures for per cpu queues.
  */
 
-/*
- * This size was chosen so that the struct bucket size is roughly
- * 128 * sizeof(void *).  This is exactly true for x86, and for alpha
- * it will would be 32bits smaller if it didn't have alignment adjustments.
- */
-
-#define UMA_BUCKET_SIZE	125
-
 struct uma_bucket {
 	LIST_ENTRY(uma_bucket)	ub_link;	/* Link into the zone */
-	int16_t	ub_ptr;				/* Pointer to current item */
-	void	*ub_bucket[UMA_BUCKET_SIZE];	/* actual allocation storage */
+	int16_t	ub_cnt;				/* Count of free items. */
+	int16_t	ub_entries;			/* Max items. */
+	void	*ub_bucket[];			/* actual allocation storage */
 };
 
 typedef struct uma_bucket * uma_bucket_t;
 
 struct uma_cache {
-	struct mtx	uc_lock;	/* Spin lock on this cpu's bucket */
 	uma_bucket_t	uc_freebucket;	/* Bucket we're freeing to */
 	uma_bucket_t	uc_allocbucket;	/* Bucket to allocate from */
 	u_int64_t	uc_allocs;	/* Count of allocations */
 };
 
 typedef struct uma_cache * uma_cache_t;
-
-#define LOCKNAME_LEN	16		/* Length of the name for cpu locks */
 
 /*
  * Zone management structure 
@@ -207,7 +194,6 @@ typedef struct uma_cache * uma_cache_t;
  *
  */
 struct uma_zone {
-	char		uz_lname[LOCKNAME_LEN];	/* Text name for the cpu lock */
 	char		*uz_name;	/* Text name of the zone */
 	LIST_ENTRY(uma_zone)	uz_link;	/* List of all zones */
 	u_int32_t	uz_align;	/* Alignment mask */
@@ -230,8 +216,6 @@ struct uma_zone {
 	struct uma_hash	uz_hash;
 	u_int16_t	uz_pgoff;	/* Offset to uma_slab struct */
 	u_int16_t	uz_ppera;	/* pages per allocation from backend */
-	u_int16_t	uz_cacheoff;	/* Next cache offset */
-	u_int16_t	uz_cachemax;	/* Max cache offset */
 
 	uma_ctor	uz_ctor;	/* Constructor for each allocation */
 	uma_dtor	uz_dtor;	/* Destructor */
@@ -244,9 +228,6 @@ struct uma_zone {
 	struct vm_object	*uz_obj;	/* Zone specific object */
 	vm_offset_t	uz_kva;		/* Base kva for zones with objs */
 	u_int32_t	uz_maxpages;	/* Maximum number of pages to alloc */
-	u_int32_t	uz_cachefree;	/* Last count of items free in caches */
-	u_int64_t	uz_oallocs;	/* old allocs count */
-	u_int64_t	uz_wssize;	/* Working set size */
 	int		uz_recurse;	/* Allocation recursion count */
 	uint16_t	uz_fills;	/* Outstanding bucket fills */
 	uint16_t	uz_count;	/* Highest value ub_ptr can have */
@@ -257,19 +238,13 @@ struct uma_zone {
 	struct uma_cache	uz_cpu[1];	/* Per cpu caches */
 };
 
-#define UMA_CACHE_INC	16	/* How much will we move data */
-
-#define UMA_ZFLAG_OFFPAGE	0x0001	/* Struct slab/freelist off page */
-#define UMA_ZFLAG_PRIVALLOC	0x0002	/* Zone has supplied it's own alloc */
-#define UMA_ZFLAG_INTERNAL	0x0004	/* Internal zone, no offpage no PCPU */
-#define UMA_ZFLAG_MALLOC	0x0008	/* Zone created by malloc */
-#define UMA_ZFLAG_NOFREE	0x0010	/* Don't free data from this zone */
-#define UMA_ZFLAG_FULL		0x0020	/* This zone reached uz_maxpages */
-#define UMA_ZFLAG_BUCKETCACHE	0x0040	/* Only allocate buckets from cache */
-#define	UMA_ZFLAG_HASH		0x0080	/* Look up slab via hash */
-
-/* This lives in uflags */
-#define UMA_ZONE_INTERNAL	0x1000	/* Internal zone for uflags */
+/*
+ * These flags must not overlap with the UMA_ZONE flags specified in uma.h.
+ */
+#define UMA_ZFLAG_PRIVALLOC	0x1000		/* Use uz_allocf. */
+#define UMA_ZFLAG_INTERNAL	0x2000		/* No offpage no PCPU. */
+#define UMA_ZFLAG_FULL		0x4000		/* Reached uz_maxpages */
+#define UMA_ZFLAG_CACHEONLY	0x8000		/* Don't ask VM for buckets. */
 
 /* Internal prototypes */
 static __inline uma_slab_t hash_sfind(struct uma_hash *hash, u_int8_t *data);
@@ -292,26 +267,15 @@ void uma_large_free(uma_slab_t slab);
 #define	ZONE_LOCK(z)	mtx_lock(&(z)->uz_lock)
 #define ZONE_UNLOCK(z)	mtx_unlock(&(z)->uz_lock)
 
-#define	CPU_LOCK_INIT(z, cpu, lc)				\
-	do {							\
-		if ((lc))					\
-			mtx_init(&(z)->uz_cpu[(cpu)].uc_lock,	\
-			    (z)->uz_lname, (z)->uz_lname,	\
-			    MTX_DEF | MTX_DUPOK);		\
-		else						\
-			mtx_init(&(z)->uz_cpu[(cpu)].uc_lock,	\
-			    (z)->uz_lname, "UMA cpu",		\
-			    MTX_DEF | MTX_DUPOK);		\
-	} while (0)
+#define	CPU_LOCK_INIT(cpu)					\
+	mtx_init(&uma_pcpu_mtx[(cpu)], "UMA pcpu", "UMA pcpu",	\
+	    MTX_DEF | MTX_DUPOK)
 
-#define	CPU_LOCK_FINI(z, cpu)	\
-	mtx_destroy(&(z)->uz_cpu[(cpu)].uc_lock)
+#define CPU_LOCK(cpu)						\
+	mtx_lock(&uma_pcpu_mtx[(cpu)])
 
-#define CPU_LOCK(z, cpu)	\
-	mtx_lock(&(z)->uz_cpu[(cpu)].uc_lock)
-
-#define CPU_UNLOCK(z, cpu)	\
-	mtx_unlock(&(z)->uz_cpu[(cpu)].uc_lock)
+#define CPU_UNLOCK(cpu)						\
+	mtx_unlock(&uma_pcpu_mtx[(cpu)])
 
 /*
  * Find a slab within a hash table.  This is used for OFFPAGE zones to lookup

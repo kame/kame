@@ -32,13 +32,14 @@
  *
  *	@(#)stddef.h	8.1 (Berkeley) 6/2/93
  *
- * $FreeBSD: src/include/stddef.h,v 1.9 2002/09/01 17:57:20 mike Exp $
+ * $FreeBSD: src/include/stddef.h,v 1.9.6.1 2003/12/18 00:59:50 peter Exp $
  */
 
 #ifndef _STDDEF_H_
 #define _STDDEF_H_
 
 #include <sys/cdefs.h>
+#include <sys/_null.h>
 #include <sys/_types.h>
 
 typedef	__ptrdiff_t	ptrdiff_t;
@@ -60,10 +61,6 @@ typedef	__size_t	size_t;
 typedef	__wchar_t	wchar_t;
 #define	_WCHAR_T_DECLARED
 #endif
-#endif
-
-#ifndef	NULL
-#define	NULL	0
 #endif
 
 #define	offsetof(type, member)	__offsetof(type, member)

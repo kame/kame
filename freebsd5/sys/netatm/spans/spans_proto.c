@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/spans/spans_proto.c,v 1.11 2003/02/19 05:47:31 imp Exp $
- *
  */
 
 /*
@@ -32,16 +28,19 @@
  * ---------------------------
  *
  * SPANS protocol processing module.
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/spans/spans_proto.c,v 1.13 2003/07/24 14:37:01 harti Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/types.h>
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/syslog.h>
+#include <sys/kernel.h>
+#include <sys/sysctl.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netatm/port.h>
@@ -59,10 +58,6 @@
 
 #include "spans_xdr.h"
 #include <netatm/spans/spans_var.h>
-
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/spans/spans_proto.c,v 1.11 2003/02/19 05:47:31 imp Exp $");
-#endif
 
 /*
  * Internal functions
@@ -189,6 +184,7 @@ struct t_atm_cause spans_cause = {
 	{ 0, 0, 0, 0 }			/* diagnostics */
 };
 
+SYSCTL_NODE(_net_harp, OID_AUTO, spans, CTLFLAG_RW, 0, "spans");
 
 /*
  * Process a SPANS timeout

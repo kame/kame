@@ -24,9 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/i386/ibcs2/ibcs2_signal.c,v 1.30 2003/04/22 18:23:48 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/ibcs2/ibcs2_signal.c,v 1.32 2003/10/12 04:25:26 tjr Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -205,6 +206,8 @@ ibcs2_sigaction(td, uap)
 		nbsap = &nbsa;
 	} else
 		nbsap = NULL;
+	if (uap->sig <= 0 || uap->sig > IBCS2_NSIG)
+		return (EINVAL);
 	error = kern_sigaction(td, ibcs2_to_bsd_sig[_SIG_IDX(uap->sig)], &nbsa,
 	    &obsa, 0);
 	if (error == 0 && uap->oact != NULL) {
@@ -221,15 +224,16 @@ ibcs2_sigsys(td, uap)
 {
 	struct proc *p = td->td_proc;
 	struct sigaction sa;
-	int signum = ibcs2_to_bsd_sig[_SIG_IDX(IBCS2_SIGNO(uap->sig))];
+	int signum = IBCS2_SIGNO(uap->sig);
 	int error;
 
-	if (signum <= 0 || signum >= IBCS2_NSIG) {
+	if (signum <= 0 || signum > IBCS2_NSIG) {
 		if (IBCS2_SIGCALL(uap->sig) == IBCS2_SIGNAL_MASK ||
 		    IBCS2_SIGCALL(uap->sig) == IBCS2_SIGSET_MASK)
 			td->td_retval[0] = (int)IBCS2_SIG_ERR;
 		return EINVAL;
 	}
+	signum = ibcs2_to_bsd_sig[_SIG_IDX(signum)];
 	
 	switch (IBCS2_SIGCALL(uap->sig)) {
 	case IBCS2_SIGSET_MASK:
@@ -429,6 +433,8 @@ ibcs2_kill(td, uap)
 {
 	struct kill_args ka;
 
+	if (uap->signo <= 0 || uap->signo > IBCS2_NSIG)
+		return (EINVAL);
 	ka.pid = uap->pid;
 	ka.signum = ibcs2_to_bsd_sig[_SIG_IDX(uap->signo)];
 	return kill(td, &ka);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * Copyright Luigi Rizzo, 1997,1998
  * Copyright by Hannu Savolainen 1994, 1995
  * All rights reserved.
@@ -33,7 +33,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/ad1816.c,v 1.27 2003/02/07 14:05:33 nyan Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/ad1816.c,v 1.29 2003/09/07 16:28:02 cg Exp $");
 
 struct ad1816_info;
 
@@ -611,7 +611,8 @@ ad1816_attach(device_t dev)
 			/*filter*/NULL, /*filterarg*/NULL,
 			/*maxsize*/ad1816->bufsize, /*nsegments*/1,
 			/*maxsegz*/0x3ffff,
-			/*flags*/0, &ad1816->parent_dmat) != 0) {
+			/*flags*/0, /*lockfunc*/busdma_lock_mutex,
+			/*lockarg*/ &Giant, &ad1816->parent_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		goto no;
     	}

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/acpica/acpi_machdep.c,v 1.1 2001/10/26 17:42:59 iwasaki Exp $
+ * $FreeBSD: src/sys/ia64/acpica/acpi_machdep.c,v 1.2 2003/08/28 16:30:31 njl Exp $
  */
 
 #include <sys/param.h>
@@ -37,12 +37,10 @@ acpi_machdep_init(device_t dev)
 {
 	struct	acpi_softc *sc;
 
-        if ((sc = device_get_softc(dev)) == NULL) {
+        if ((sc = device_get_softc(dev)) == NULL)
                 return (ENXIO);
-        }
 
 	acpi_install_wakeup_handler(sc);
 
 	return (0);
 }
-

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, Stefan Esser <se@freebsd.org>
  * All rights reserved.
  *
@@ -22,10 +22,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/pci/pci_user.c,v 1.9 2003/03/03 12:15:44 phk Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/pci/pci_user.c,v 1.14 2003/10/11 22:20:34 se Exp $");
 
 #include "opt_bus.h"	/* XXX trim includes */
 
@@ -51,8 +51,8 @@
 #include <machine/resource.h>
 
 #include <sys/pciio.h>
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include "pcib_if.h"
 #include "pci_if.h"
@@ -176,9 +176,8 @@ pci_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 	const char *name;
 	int error;
 
-	if (!(flag & FWRITE))
+	if (!(flag & FWRITE) && cmd != PCIOCGETCONF)
 		return EPERM;
-
 
 	switch(cmd) {
 	case PCIOCGETCONF:
@@ -195,15 +194,6 @@ pci_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 
 		num_patterns = 0;
 		dinfo = NULL;
-
-		/*
-		 * Hopefully the user won't pass in a null pointer, but it
-		 * can't hurt to check.
-		 */
-		if (cio == NULL) {
-			error = EINVAL;
-			break;
-		}
 
 		/*
 		 * If the user specified an offset into the device list,
@@ -253,7 +243,7 @@ pci_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 		 * If this test is true, the user wants the pci_conf
 		 * structures returned to match the supplied entries.
 		 */
-		if ((cio->num_patterns > 0)
+		if ((cio->num_patterns > 0) && (cio->num_patterns < pci_numdevs)
 		 && (cio->pat_buf_len > 0)) {
 			/*
 			 * pat_buf_len needs to be:
@@ -272,33 +262,11 @@ pci_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 			    sizeof(struct pci_match_conf)) != cio->pat_buf_len){
 				/* The user made a mistake, return an error*/
 				cio->status = PCI_GETCONF_ERROR;
-				printf("pci_ioctl: pat_buf_len %d != "
-				       "num_patterns (%d) * sizeof(struct "
-				       "pci_match_conf) (%d)\npci_ioctl: "
-				       "pat_buf_len should be = %d\n",
-				       cio->pat_buf_len, cio->num_patterns,
-				       (int)sizeof(struct pci_match_conf),
-				       (int)sizeof(struct pci_match_conf) * 
-				       cio->num_patterns);
-				printf("pci_ioctl: do your headers match your "
-				       "kernel?\n");
 				cio->num_matches = 0;
 				error = EINVAL;
 				break;
 			}
 
-			/*
-			 * Check the user's buffer to make sure it's readable.
-			 */
-			if (!useracc((caddr_t)cio->patterns,
-				    cio->pat_buf_len, VM_PROT_READ)) {
-				printf("pci_ioctl: pattern buffer %p, "
-				       "length %u isn't user accessible for"
-				       " READ\n", cio->patterns,
-				       cio->pat_buf_len);
-				error = EACCES;
-				break;
-			}
 			/*
 			 * Allocate a buffer to hold the patterns.
 			 */
@@ -306,8 +274,10 @@ pci_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 					     M_WAITOK);
 			error = copyin(cio->patterns, pattern_buf,
 				       cio->pat_buf_len);
-			if (error != 0)
-				break;
+			if (error != 0) {
+				error = EINVAL;
+				goto getconfexit;
+			}
 			num_patterns = cio->num_patterns;
 
 		} else if ((cio->num_patterns > 0)
@@ -317,23 +287,10 @@ pci_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 			 */
 			cio->status = PCI_GETCONF_ERROR;
 			cio->num_matches = 0;
-			printf("pci_ioctl: invalid GETCONF arguments\n");
 			error = EINVAL;
 			break;
 		} else
 			pattern_buf = NULL;
-
-		/*
-		 * Make sure we can write to the match buffer.
-		 */
-		if (!useracc((caddr_t)cio->matches,
-			     cio->match_buf_len, VM_PROT_WRITE)) {
-			printf("pci_ioctl: match buffer %p, length %u "
-			       "isn't user accessible for WRITE\n",
-			       cio->matches, cio->match_buf_len);
-			error = EACCES;
-			break;
-		}
 
 		/*
 		 * Go through the list of devices and copy out the devices
@@ -342,7 +299,7 @@ pci_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 		for (cio->num_matches = 0, error = 0, i = 0,
 		     dinfo = STAILQ_FIRST(devlist_head);
 		     (dinfo != NULL) && (cio->num_matches < ionum)
-		     && (error == 0) && (i < pci_numdevs);
+		     && (error == 0) && (i < pci_numdevs) && (dinfo != NULL);
 		     dinfo = STAILQ_NEXT(dinfo, pci_links), i++) {
 
 			if (i < cio->offset)
@@ -375,10 +332,12 @@ pci_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 				if (cio->num_matches >= ionum)
 					break;
 
-				error = copyout(&dinfo->conf,
-					        &cio->matches[cio->num_matches],
-						sizeof(struct pci_conf));
-				cio->num_matches++;
+				/* only if can copy it out do we count it */
+				if (!(error = copyout(&dinfo->conf,
+				    &cio->matches[cio->num_matches],
+				    sizeof(struct pci_conf)))) {
+					cio->num_matches++;
+				}
 			}
 		}
 
@@ -405,51 +364,27 @@ pci_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 		else
 			cio->status = PCI_GETCONF_MORE_DEVS;
 
+getconfexit:
 		if (pattern_buf != NULL)
 			free(pattern_buf, M_TEMP);
 
 		break;
 		}
-	case PCIOCREAD:
-		io = (struct pci_io *)data;
-		switch(io->pi_width) {
-		case 4:
-		case 2:
-		case 1:
-			/*
-			 * Assume that the user-level bus number is
-			 * actually the pciN instance number. We map
-			 * from that to the real pcib+bus combination.
-			 */
-			pci = devclass_get_device(devclass_find("pci"),
-						  io->pi_sel.pc_bus);
-			if (pci) {
-				int b = pcib_get_bus(pci);
-				pcib = device_get_parent(pci);
-				io->pi_data =
-					PCIB_READ_CONFIG(pcib,
-							 b,
-							 io->pi_sel.pc_dev,
-							 io->pi_sel.pc_func,
-							 io->pi_reg,
-							 io->pi_width);
-				error = 0;
-			} else {
-				error = ENODEV;
-			}
-			break;
-		default:
-			error = ENODEV;
-			break;
-		}
-		break;
 
+	case PCIOCREAD:
 	case PCIOCWRITE:
 		io = (struct pci_io *)data;
 		switch(io->pi_width) {
 		case 4:
 		case 2:
 		case 1:
+			/* make sure register is in bounds and aligned */
+			if (cmd == PCIOCREAD || cmd == PCIOCWRITE)
+				if (io->pi_reg < 0 ||
+				    io->pi_reg + io->pi_width > PCI_REGMAX ||
+				    io->pi_reg & (io->pi_width - 1))
+					error = EINVAL;
+
 			/*
 			 * Assume that the user-level bus number is
 			 * actually the pciN instance number. We map
@@ -460,20 +395,29 @@ pci_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 			if (pci) {
 				int b = pcib_get_bus(pci);
 				pcib = device_get_parent(pci);
-				PCIB_WRITE_CONFIG(pcib,
-						  b,
-						  io->pi_sel.pc_dev,
-						  io->pi_sel.pc_func,
-						  io->pi_reg,
-						  io->pi_data,
-						  io->pi_width);
+				if (cmd == PCIOCWRITE)
+					PCIB_WRITE_CONFIG(pcib,
+							  b,
+							  io->pi_sel.pc_dev,
+							  io->pi_sel.pc_func,
+							  io->pi_reg,
+							  io->pi_data,
+							  io->pi_width);
+				else
+					io->pi_data =
+						PCIB_READ_CONFIG(pcib,
+							  b,
+							  io->pi_sel.pc_dev,
+							  io->pi_sel.pc_func,
+							  io->pi_reg,
+							  io->pi_width);
 				error = 0;
 			} else {
 				error = ENODEV;
 			}
 			break;
 		default:
-			error = ENODEV;
+			error = EINVAL;
 			break;
 		}
 		break;

@@ -1,5 +1,11 @@
-/*	$NetBSD: uhid.c,v 1.45 2001/10/26 17:58:21 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uhid.c,v 1.56 2003/04/09 08:43:01 mdodd Exp $	*/
+/*	$NetBSD: uhid.c,v 1.46 2001/11/13 06:24:55 lukem Exp $	*/
+
+/* Also already merged from NetBSD:
+ *	$NetBSD: uhid.c,v 1.54 2002/09/23 05:51:21 simonb Exp $
+ */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/usb/uhid.c,v 1.65 2003/11/09 09:17:22 tanimura Exp $");
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -47,7 +53,9 @@
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#if __FreeBSD_version >= 500000
 #include <sys/mutex.h>
+#endif
 #include <sys/signalvar.h>
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <sys/device.h>
@@ -158,7 +166,7 @@ Static struct cdevsw uhid_cdevsw = {
 	.d_name =	"uhid",
 	.d_maj =	UHID_CDEV_MAJOR,
 #if __FreeBSD_version < 500014
-	/* bmaj */	-1
+	.d_bmaj		-1
 #endif
 };
 #endif
@@ -177,7 +185,7 @@ USB_MATCH(uhid)
 {
 	USB_MATCH_START(uhid, uaa);
 	usb_interface_descriptor_t *id;
-	
+
 	if (uaa->iface == NULL)
 		return (UMATCH_NONE);
 	id = usbd_get_interface_descriptor(uaa->iface);
@@ -198,7 +206,7 @@ USB_ATTACH(uhid)
 	void *desc;
 	usbd_status err;
 	char devinfo[1024];
-	
+
 	sc->sc_udev = uaa->device;
 	sc->sc_iface = iface;
 	id = usbd_get_interface_descriptor(iface);
@@ -218,7 +226,7 @@ USB_ATTACH(uhid)
 	DPRINTFN(10,("uhid_attach: bLength=%d bDescriptorType=%d "
 		     "bEndpointAddress=%d-%s bmAttributes=%d wMaxPacketSize=%d"
 		     " bInterval=%d\n",
-		     ed->bLength, ed->bDescriptorType, 
+		     ed->bLength, ed->bDescriptorType,
 		     ed->bEndpointAddress & UE_ADDR,
 		     UE_GET_DIR(ed->bEndpointAddress)==UE_DIR_IN? "in" : "out",
 		     ed->bmAttributes & UE_XFERTYPE,
@@ -255,7 +263,7 @@ USB_ATTACH(uhid)
 		sc->sc_dying = 1;
 		USB_ATTACH_ERROR_RETURN;
 	}
-	
+
 	(void)usbd_set_idle(iface, 0, 0);
 
 	sc->sc_isize = hid_report_size(desc, size, hid_input,   &sc->sc_iid);
@@ -283,7 +291,6 @@ uhid_activate(device_ptr_t self, enum devact act)
 	switch (act) {
 	case DVACT_ACTIVATE:
 		return (EOPNOTSUPP);
-		break;
 
 	case DVACT_DEACTIVATE:
 		sc->sc_dying = 1;
@@ -299,8 +306,6 @@ USB_DETACH(uhid)
 	int s;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	int maj, mn;
-#elif defined(__FreeBSD__)
-	struct vnode *vp;
 #endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -334,10 +339,6 @@ USB_DETACH(uhid)
 	mn = self->dv_unit;
 	vdevgone(maj, mn, mn, VCHR);
 #elif defined(__FreeBSD__)
-	vp = SLIST_FIRST(&sc->dev->si_hlist);
-	if (vp)
-		VOP_REVOKE(vp, REVOKEALL);
-
 	destroy_dev(sc->dev);
 #endif
 
@@ -355,7 +356,7 @@ uhid_intr(usbd_xfer_handle xfer, usbd_private_handle addr, usbd_status status)
 #ifdef USB_DEBUG
 	if (uhiddebug > 5) {
 		u_int32_t cc, i;
-		
+
 		usbd_get_xfer_status(xfer, NULL, NULL, &cc, NULL);
 		DPRINTF(("uhid_intr: status=%d cc=%d\n", status, cc));
 		DPRINTF(("uhid_intr: data ="));
@@ -376,13 +377,13 @@ uhid_intr(usbd_xfer_handle xfer, usbd_private_handle addr, usbd_status status)
 	}
 
 	(void) b_to_q(sc->sc_ibuf, sc->sc_isize, &sc->sc_q);
-		
+
 	if (sc->sc_state & UHID_ASLP) {
 		sc->sc_state &= ~UHID_ASLP;
 		DPRINTFN(5, ("uhid_intr: waking %p\n", &sc->sc_q));
 		wakeup(&sc->sc_q);
 	}
-	selwakeup(&sc->sc_rsel);
+	selwakeuppri(&sc->sc_rsel, PZERO);
 	if (sc->sc_async != NULL) {
 		DPRINTFN(3, ("uhid_intr: sending SIGIO %p\n", sc->sc_async));
 		PROC_LOCK(sc->sc_async);
@@ -417,14 +418,16 @@ uhidopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 	sc->sc_obuf = malloc(sc->sc_osize, M_USBDEV, M_WAITOK);
 
 	/* Set up interrupt pipe. */
-	err = usbd_open_pipe_intr(sc->sc_iface, sc->sc_ep_addr, 
-		  USBD_SHORT_XFER_OK, &sc->sc_intrpipe, sc, sc->sc_ibuf, 
+	err = usbd_open_pipe_intr(sc->sc_iface, sc->sc_ep_addr,
+		  USBD_SHORT_XFER_OK, &sc->sc_intrpipe, sc, sc->sc_ibuf,
 		  sc->sc_isize, uhid_intr, USBD_DEFAULT_INTERVAL);
 	if (err) {
 		DPRINTF(("uhidopen: usbd_open_pipe_intr failed, "
 			 "error=%d\n",err));
 		free(sc->sc_ibuf, M_USBDEV);
 		free(sc->sc_obuf, M_USBDEV);
+		sc->sc_ibuf = sc->sc_obuf = NULL;
+
 		sc->sc_state &= ~UHID_OPEN;
 		return (EIO);
 	}
@@ -455,6 +458,7 @@ uhidclose(dev_t dev, int flag, int mode, usb_proc_ptr p)
 
 	free(sc->sc_ibuf, M_USBDEV);
 	free(sc->sc_obuf, M_USBDEV);
+	sc->sc_ibuf = sc->sc_obuf = NULL;
 
 	sc->sc_state &= ~UHID_OPEN;
 
@@ -475,7 +479,7 @@ uhid_do_read(struct uhid_softc *sc, struct uio *uio, int flag)
 	DPRINTFN(1, ("uhidread\n"));
 	if (sc->sc_state & UHID_IMMED) {
 		DPRINTFN(1, ("uhidread immed\n"));
-		
+
 		err = usbd_get_report(sc->sc_iface, UHID_INPUT_REPORT,
 			  sc->sc_iid, buffer, sc->sc_isize);
 		if (err)
@@ -548,7 +552,7 @@ uhid_do_write(struct uhid_softc *sc, struct uio *uio, int flag)
 	usbd_status err;
 
 	DPRINTFN(1, ("uhidwrite\n"));
-	
+
 	if (sc->sc_dying)
 		return (EIO);
 
@@ -609,8 +613,12 @@ uhid_do_ioctl(struct uhid_softc *sc, u_long cmd, caddr_t addr, int flag,
 		if (*(int *)addr) {
 			if (sc->sc_async != NULL)
 				return (EBUSY);
-			sc->sc_async = p->td_proc; /* XXXKSE */
-			DPRINTF(("uhid_do_ioctl: FIOASYNC %p\n", p->td_proc));
+#if __FreeBSD_version >= 500000
+			sc->sc_async = p->td_proc;
+#else
+			sc->sc_async = p;
+#endif
+			DPRINTF(("uhid_do_ioctl: FIOASYNC %p\n", sc->sc_async));
 		} else
 			sc->sc_async = NULL;
 		break;

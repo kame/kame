@@ -24,8 +24,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sbni/if_sbni_isa.c,v 1.9 2003/04/15 06:37:26 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/sbni/if_sbni_isa.c,v 1.11 2003/10/31 18:32:04 brooks Exp $");
 
 
 #include <sys/param.h>
@@ -154,8 +156,8 @@ sbni_attach_isa(device_t dev)
 			    dev, SYS_RES_IOPORT, sc->io_rid, sc->io_res);
 			return (ENXIO);
 		} else {
-			printf(" shared irq with sbni%d\n",
-			       master->arpcom.ac_if.if_unit);
+			printf(" shared irq with %s\n",
+			       master->arpcom.ac_if.if_xname);
 		}
 	} 
 #endif	/* SBNI_DUAL_COMPOUND */

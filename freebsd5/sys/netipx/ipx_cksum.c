@@ -32,9 +32,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ipx_cksum.c
- *
- * $FreeBSD: src/sys/netipx/ipx_cksum.c,v 1.9 1999/08/28 18:21:53 jhay Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netipx/ipx_cksum.c,v 1.10 2003/06/11 05:25:14 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/mbuf.h>

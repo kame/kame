@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)sysctl.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/sysctl.h,v 1.113 2003/03/28 14:17:17 robert Exp $
+ * $FreeBSD: src/sys/sys/sysctl.h,v 1.122 2003/11/14 21:37:35 trhodes Exp $
  */
 
 #ifndef _SYS_SYSCTL_H_
@@ -59,7 +59,7 @@ struct thread;
  * for that subsystem. Each name is either a node with further
  * levels defined below it, or it is a leaf of some particular
  * type given below. Each sysctl level defines a set of name/type
- * pairs to be used by sysctl(1) in manipulating the subsystem.
+ * pairs to be used by sysctl(8) in manipulating the subsystem.
  */
 struct ctlname {
 	char	*ctl_name;	/* subsystem name */
@@ -87,6 +87,8 @@ struct ctlname {
 #define CTLFLAG_DYN	0x02000000	/* Dynamic oid - can be freed */
 #define CTLFLAG_SKIP	0x01000000	/* Skip this sysctl when listing */
 #define CTLMASK_SECURE	0x00F00000	/* Secure level */
+#define CTLFLAG_TUN	0x00080000	/* Tunable variable */
+#define CTLFLAG_RDTUN	(CTLFLAG_RD|CTLFLAG_TUN)
 
 /*
  * Secure level.   Note that CTLFLAG_SECURE == CTLFLAG_SECURE1.  
@@ -117,13 +119,18 @@ struct ctlname {
 #define SYSCTL_HANDLER_ARGS struct sysctl_oid *oidp, void *arg1, int arg2, \
 	struct sysctl_req *req
 
+/* definitions for sysctl_req 'lock' member */
+#define REQ_UNLOCKED	0	/* not locked and not wired */
+#define REQ_LOCKED	1	/* locked and not wired */
+#define REQ_WIRED	2	/* locked and wired */
+
 /*
  * This describes the access space for a sysctl request.  This is needed
  * so that we can use the interface from the kernel or from user-space.
  */
 struct sysctl_req {
 	struct thread	*td;		/* used for access checking */
-	int		lock;
+	int		lock;		/* locking/wiring state */
 	void		*oldptr;
 	size_t		oldlen;
 	size_t		oldidx;
@@ -342,7 +349,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	KERN_BOOTTIME		21	/* struct: time kernel was booted */
 #define KERN_NISDOMAINNAME	22	/* string: YP domain name */
 #define KERN_UPDATEINTERVAL	23	/* int: update process sleep time */
-#define KERN_OSRELDATE		24	/* int: OS release date */
+#define KERN_OSRELDATE		24	/* int: kernel release date */
 #define KERN_NTP_PLL		25	/* node: NTP PLL control */
 #define	KERN_BOOTFILE		26	/* string: name of booted kernel */
 #define	KERN_MAXFILESPERPROC	27	/* int: max open files per proc */
@@ -354,7 +361,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	KERN_USRSTACK		33	/* int: address of USRSTACK */
 #define	KERN_LOGSIGEXIT		34	/* int: do we log sigexit procs? */
 #define	KERN_IOV_MAX		35	/* int: value of UIO_MAXIOV */
-#define KERN_MAXID		36      /* number of valid kern ids */
+#define KERN_MAXID		36	/* number of valid kern ids */
 
 #define CTL_KERN_NAMES { \
 	{ 0, 0 }, \
@@ -412,6 +419,8 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	KERN_PROC_UID		5	/* by effective uid */
 #define	KERN_PROC_RUID		6	/* by real uid */
 #define	KERN_PROC_ARGS		7	/* get/set arguments/proctitle */
+#define	KERN_PROC_PROC		8	/* only return procs */
+#define	KERN_PROC_SV_NAME	9	/* get syscall vector name */
 
 /*
  * KERN_IPC identifiers
@@ -581,6 +590,7 @@ SYSCTL_DECL(_compat);
 extern char	machine[];
 extern char	osrelease[];
 extern char	ostype[];
+extern char	kern_ident[];
 
 /* Dynamic oid handling */
 struct sysctl_oid *sysctl_add_oid(struct sysctl_ctx_list *clist,

@@ -27,10 +27,13 @@
  * Copyright (c) 2000 Andrew Miklic, Andrew Gallatin, and Thomas V. Crimi
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/tga/tga_pci.c,v 1.6 2003/08/24 17:55:53 obrien Exp $");
+
 #include "opt_fb.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/tga/tga_pci.c,v 1.4 2003/03/03 12:15:47 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/tga/tga_pci.c,v 1.6 2003/08/24 17:55:53 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -56,8 +59,8 @@ __FBSDID("$FreeBSD: src/sys/dev/tga/tga_pci.c,v 1.4 2003/03/03 12:15:47 phk Exp 
 #include <sys/bus.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/fb/fbreg.h>
 #include <dev/fb/tga.h>

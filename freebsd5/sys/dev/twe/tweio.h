@@ -1,5 +1,7 @@
 /*-
  * Copyright (c) 2000 Michael Smith
+ * Copyright (c) 2003 Paul Saab
+ * Copyright (c) 2003 Vinod Kashyap
  * Copyright (c) 2000 BSDi
  * All rights reserved.
  *
@@ -24,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/twe/tweio.h,v 1.1 2000/10/25 06:59:05 msmith Exp $
+ *	$FreeBSD: src/sys/dev/twe/tweio.h,v 1.3 2003/12/02 07:57:20 ps Exp $
  */
 
 
@@ -55,6 +57,7 @@ struct twe_usercommand {
 struct twe_qstat {
     u_int32_t	q_length;
     u_int32_t	q_max;
+    u_int32_t	q_min;
 };
 
 /*
@@ -70,8 +73,8 @@ union twe_statrequest {
 /*
  * AEN listen
  */
-#define TWEIO_AEN_POLL		_IOR('T', 102, int)
-#define TWEIO_AEN_WAIT		_IOR('T', 103, int)
+#define TWEIO_AEN_POLL		_IOR('T', 102, u_int16_t)
+#define TWEIO_AEN_WAIT		_IOR('T', 103, u_int16_t)
 
 /*
  * Controller parameter access
@@ -90,3 +93,13 @@ struct twe_paramcommand {
  * Request a controller soft-reset
  */
 #define TWEIO_RESET		_IO  ('T', 106)
+
+/*
+ * Request a drive addition or deletion
+ */
+struct twe_drivecommand {
+    int		td_unit;
+};
+
+#define TWEIO_ADD_UNIT		_IOW ('U', 107, int)
+#define TWEIO_DEL_UNIT		_IOW ('U', 108, int)

@@ -1,4 +1,3 @@
-/* $FreeBSD: src/sys/ia64/ia64/trap.c,v 1.79 2003/05/29 05:09:15 marcel Exp $ */
 /* From: src/sys/alpha/alpha/trap.c,v 1.33 */
 /* $NetBSD: trap.c,v 1.31 1998/03/26 02:21:46 thorpej Exp $ */
 
@@ -29,6 +28,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ia64/ia64/trap.c,v 1.94 2003/11/12 01:26:02 marcel Exp $");
+
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
 
@@ -44,8 +46,10 @@
 #include <sys/smp.h>
 #include <sys/vmmeter.h>
 #include <sys/sysent.h>
+#include <sys/signalvar.h>
 #include <sys/syscall.h>
 #include <sys/pioctl.h>
+#include <sys/ptrace.h>
 #include <sys/sysctl.h>
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
@@ -77,15 +81,13 @@
 
 static int print_usertrap = 0;
 SYSCTL_INT(_machdep, OID_AUTO, print_usertrap,
-        CTLFLAG_RW, &print_usertrap, 0, "");
-
-extern int unaligned_fixup(struct trapframe *framep, struct thread *td);
+    CTLFLAG_RW, &print_usertrap, 0, "");
 
 static void break_syscall(struct trapframe *tf);
 static void ia32_syscall(struct trapframe *framep);
 
 /*
- * EFI-Provided FPSWA interface (Floating Point SoftWare Assist
+ * EFI-Provided FPSWA interface (Floating Point SoftWare Assist)
  */
 
 /* The function entry address */
@@ -105,10 +107,10 @@ typedef struct {
 typedef struct {
 	u_int64_t	bitmask_low64;			/* f63 - f2 */
 	u_int64_t	bitmask_high64;			/* f127 - f64 */
-	struct _ia64_fpreg *fp_low_preserved;		/* f2 - f5 */
-	struct _ia64_fpreg *fp_low_volatile;		/* f6 - f15 */
-	struct _ia64_fpreg *fp_high_preserved;		/* f16 - f31 */
-	struct _ia64_fpreg *fp_high_volatile;		/* f32 - f127 */
+	union _ia64_fpreg *fp_low_preserved;		/* f2 - f5 */
+	union _ia64_fpreg *fp_low_volatile;		/* f6 - f15 */
+	union _ia64_fpreg *fp_high_preserved;		/* f16 - f31 */
+	union _ia64_fpreg *fp_high_volatile;		/* f32 - f127 */
 } FP_STATE;
 
 #ifdef WITNESS
@@ -309,6 +311,17 @@ printtrap(int vector, struct trapframe *framep, int isfatal, int user)
 	printf("\n");
 }
 
+static void
+trap_panic(int vector, struct trapframe *tf)
+{
+
+	printtrap(vector, tf, 1, TRAPF_USERMODE(tf));
+#ifdef DDB
+	kdb_trap(vector, tf);
+#endif
+	panic("trap");
+}
+
 /*
  *
  */
@@ -340,16 +353,10 @@ trap(int vector, struct trapframe *framep)
 	struct proc *p;
 	struct thread *td;
 	u_int64_t ucode;
-	int i, user;
+	int error, sig, user;
 	u_int sticks;
 
-	user = ((framep->tf_special.iip >> 61) < 5) ? 1 : 0;
-
-	/* Short-circuit break instruction based system calls. */
-	if (vector == IA64_VEC_BREAK && framep->tf_special.ifa == 0x100000) {
-		break_syscall(framep);
-		return;
-	}
+	user = TRAPF_USERMODE(framep) ? 1 : 0;
 
 	/* Sanitize the FP state in case the user has trashed it. */
 	ia64_set_fpsr(IA64_FPSR_DEFAULT);
@@ -371,252 +378,98 @@ trap(int vector, struct trapframe *framep)
 		    ("kernel trap doesn't have ucred"));
 	}
 
+	sig = 0;
 	switch (vector) {
-
-	case IA64_VEC_UNALIGNED_REFERENCE: {
+	case IA64_VEC_VHPT:
 		/*
-		 * If user-land, do whatever fixups, printing, and
-		 * signalling is appropriate (based on system-wide
-		 * and per-process unaligned-access-handling flags).
+		 * This one is tricky. We should hardwire the VHPT, but
+		 * don't at this time. I think we're mostly lucky that
+		 * the VHPT is mapped.
 		 */
-		if (user) {
-			i = unaligned_fixup(framep, td);
-			if (i == 0)
-				goto out;
-			ucode = framep->tf_special.ifa;	/* VA */
-			break;
-		}
-
-		/*
-		 * Unaligned access from kernel mode is always an error,
-		 * EVEN IF A COPY FAULT HANDLER IS SET!
-		 *
-		 * It's an error if a copy fault handler is set because
-		 * the various routines which do user-initiated copies
-		 * do so in a bcopy-like manner.  In other words, the
-		 * kernel never assumes that pointers provided by the
-		 * user are properly aligned, and so if the kernel
-		 * does cause an unaligned access it's a kernel bug.
-		 */
-		goto dopanic;
-	}
-
-	case IA64_VEC_FLOATING_POINT_FAULT: {
-		FP_STATE fp_state;
-		FPSWA_RET fpswa_ret;
-		FPSWA_BUNDLE bundle;
-
-		/* Always fatal in kernel.  Should never happen. */
-		if (!user)
-			goto dopanic;
-		if (fpswa_interface == NULL) {
-			i = SIGFPE;
-			ucode = 0;
-			break;
-		}
-		mtx_lock(&Giant);
-		i = copyin((void *)(framep->tf_special.iip), &bundle, 16);
-		mtx_unlock(&Giant);
-		if (i) {
-			i = SIGBUS;		/* EFAULT, basically */
-			ucode = /*a0*/ 0;	/* exception summary */
-			break;
-		}
-		/* f6-f15 are saved in exception_save */
-		fp_state.bitmask_low64 = 0xffc0;	/* bits 6 - 15 */
-		fp_state.bitmask_high64 = 0x0;
-		fp_state.fp_low_preserved = NULL;
-		fp_state.fp_low_volatile = &framep->tf_scratch_fp.fr6;
-		fp_state.fp_high_preserved = NULL;
-		fp_state.fp_high_volatile = NULL;
-		/* The docs are unclear.  Is Fpswa reentrant? */
-		fpswa_ret = fpswa_interface->Fpswa(1, &bundle,
-		    &framep->tf_special.psr, &framep->tf_special.fpsr,
-		    &framep->tf_special.isr, &framep->tf_special.pr,
-		    &framep->tf_special.cfm, &fp_state);
-		if (fpswa_ret.status == 0) {
-			/* fixed.  update ipsr and iip to next insn */
-			int ei;
-
-			ei = (framep->tf_special.isr >> 41) & 0x03;
-			if (ei == 0) {		/* no template for this case */
-				framep->tf_special.psr &= ~IA64_ISR_EI;
-				framep->tf_special.psr |= IA64_ISR_EI_1;
-			} else if (ei == 1) {	/* MFI or MFB */
-				framep->tf_special.psr &= ~IA64_ISR_EI;
-				framep->tf_special.psr |= IA64_ISR_EI_2;
-			} else if (ei == 2) {	/* MMF */
-				framep->tf_special.psr &= ~IA64_ISR_EI;
-				framep->tf_special.iip += 0x10;
-			}
-			goto out;
-		} else if (fpswa_ret.status == -1) {
-			printf("FATAL: FPSWA err1 %lx, err2 %lx, err3 %lx\n",
-			    fpswa_ret.err1, fpswa_ret.err2, fpswa_ret.err3);
-			panic("fpswa fatal error on fp fault");
-		} else if (fpswa_ret.status > 0) {
-#if 0
-			if (fpswa_ret.status & 1) {
-				/*
-				 * New exception needs to be raised.
-				 * If set then the following bits also apply:
-				 * & 2 -> fault was converted to a trap
-				 * & 4 -> SIMD caused the exception
-				 */
-				i = SIGFPE;
-				ucode = /*a0*/ 0;	/* exception summary */
-				break;
-			}
-#endif
-			i = SIGFPE;
-			ucode = /*a0*/ 0;		/* exception summary */
-			break;
-		} else {
-			panic("bad fpswa return code %lx", fpswa_ret.status);
-		}
-	}
-
-	case IA64_VEC_FLOATING_POINT_TRAP: {
-		FP_STATE fp_state;
-		FPSWA_RET fpswa_ret;
-		FPSWA_BUNDLE bundle;
-
-		/* Always fatal in kernel.  Should never happen. */
-		if (!user)
-			goto dopanic;
-		if (fpswa_interface == NULL) {
-			i = SIGFPE;
-			ucode = 0;
-			break;
-		}
-		mtx_lock(&Giant);
-		i = copyin((void *)(framep->tf_special.iip), &bundle, 16);
-		mtx_unlock(&Giant);
-		if (i) {
-			i = SIGBUS;			/* EFAULT, basically */
-			ucode = /*a0*/ 0;		/* exception summary */
-			break;
-		}
-		/* f6-f15 are saved in exception_save */
-		fp_state.bitmask_low64 = 0xffc0;	/* bits 6 - 15 */
-		fp_state.bitmask_high64 = 0x0;
-		fp_state.fp_low_preserved = NULL;
-		fp_state.fp_low_volatile = &framep->tf_scratch_fp.fr6;
-		fp_state.fp_high_preserved = NULL;
-		fp_state.fp_high_volatile = NULL;
-		/* The docs are unclear.  Is Fpswa reentrant? */
-		fpswa_ret = fpswa_interface->Fpswa(0, &bundle,
-		    &framep->tf_special.psr, &framep->tf_special.fpsr,
-		    &framep->tf_special.isr, &framep->tf_special.pr,
-		    &framep->tf_special.cfm, &fp_state);
-		if (fpswa_ret.status == 0) {
-			/* fixed */
-			/*
-			 * should we increment iip like the fault case?
-			 * or has fpswa done something like normalizing a
-			 * register so that we should just rerun it?
-			 */
-			goto out;
-		} else if (fpswa_ret.status == -1) {
-			printf("FATAL: FPSWA err1 %lx, err2 %lx, err3 %lx\n",
-			    fpswa_ret.err1, fpswa_ret.err2, fpswa_ret.err3);
-			panic("fpswa fatal error on fp trap");
-		} else if (fpswa_ret.status > 0) {
-			i = SIGFPE;
-			ucode = /*a0*/ 0;		/* exception summary */
-			break;
-		} else {
-			panic("bad fpswa return code %lx", fpswa_ret.status);
-		}
-	}
-
-	case IA64_VEC_DISABLED_FP: {	/* High FP registers are disabled. */
-		struct pcpu *pcpu;
-		struct pcb *pcb;
-		struct thread *thr;
-
-		/* Always fatal in kernel. Should never happen. */
-		if (!user)
-			goto dopanic;
-
-		pcb = td->td_pcb;
-		pcpu = pcb->pcb_fpcpu;
-
-#if 0
-		printf("XXX: td %p: highfp on cpu %p\n", td, pcpu);
-#endif
-
-		/*
-		 * The pcpu variable holds the address of the per-CPU
-		 * structure of the CPU currently holding this threads
-		 * high FP registers (or NULL if no CPU holds these
-		 * registers). We have to interrupt that CPU and wait
-		 * for it to have saved the registers.
-		 */
-		if (pcpu != NULL) {
-			thr = pcpu->pc_fpcurthread;
-			KASSERT(thr == td, ("High FP state out of sync"));
-
-			if (pcpu == pcpup) {
-				/*
-				 * Short-circuit handling the trap when this
-				 * CPU already holds the high FP registers for
-				 * this thread. We really shouldn't get the
-				 * trap in the first place, but since it's
-				 * only a performance issue and not a
-				 * correctness issue, we emit a message for
-				 * now, enable the high FP registers and
-				 * return.
-				 */
-				printf("XXX: bogusly disabled high FP regs\n");
-				framep->tf_special.psr &= ~IA64_PSR_DFH;
-				goto out;
-			}
-#ifdef SMP
-			/*
-			 * Interrupt the other CPU so that it saves the high
-			 * FP registers of this thread. Note that this can
-			 * only happen for the SMP case.
-			 */
-			ipi_send(pcpu->pc_lid, IPI_HIGH_FP);
-#endif
-#ifdef DIAGNOSTICS
-		} else {
-			KASSERT(PCPU_GET(fpcurthread) != td,
-			    ("High FP state out of sync"));
-#endif
-		}
-
-		thr = PCPU_GET(fpcurthread);
-
-#if 0
-		printf("XXX: cpu %p: highfp belongs to td %p\n", pcpup, thr);
-#endif
-
-		/*
-		 * The thr variable holds the thread that owns the high FP
-		 * registers currently on this CPU. Free this CPU so that
-		 * we can load the current threads high FP registers.
-		 */
-		if (thr != NULL) {
-			KASSERT(thr != td, ("High FP state out of sync"));
-			pcb = thr->td_pcb;
-			KASSERT(pcb->pcb_fpcpu == pcpup,
-			    ("High FP state out of sync"));
-			ia64_highfp_save(thr);
-		}
-
-		/*
-		 * Wait for the other CPU to have saved out high FP
-		 * registers (if applicable).
-		 */
-		while (pcpu && pcpu->pc_fpcurthread == td);
-
-		ia64_highfp_load(td);
-		framep->tf_special.psr &= ~IA64_PSR_DFH;
-		goto out;
+		trap_panic(vector, framep);
 		break;
-	}
+
+	case IA64_VEC_ITLB:
+	case IA64_VEC_DTLB:
+	case IA64_VEC_EXT_INTR:
+		/* We never call trap() with these vectors. */
+		trap_panic(vector, framep);
+		break;
+
+	case IA64_VEC_ALT_ITLB:
+	case IA64_VEC_ALT_DTLB:
+		/*
+		 * These should never happen, because regions 0-4 use the
+		 * VHPT. If we get one of these it means we didn't program
+		 * the region registers correctly.
+		 */
+		trap_panic(vector, framep);
+		break;
+
+	case IA64_VEC_NESTED_DTLB:
+		/*
+		 * We never call trap() with this vector. We may want to
+		 * do that in the future in case the nested TLB handler
+		 * could not find the translation it needs. In that case
+		 * we could switch to a special (hardwired) stack and
+		 * come here to produce a nice panic().
+		 */
+		trap_panic(vector, framep);
+		break;
+
+	case IA64_VEC_IKEY_MISS:
+	case IA64_VEC_DKEY_MISS:
+	case IA64_VEC_KEY_PERMISSION:
+		/*
+		 * We don't use protection keys, so we should never get
+		 * these faults.
+		 */
+		trap_panic(vector, framep);
+		break;
+
+	case IA64_VEC_DIRTY_BIT:
+	case IA64_VEC_INST_ACCESS:
+	case IA64_VEC_DATA_ACCESS:
+		/*
+		 * We get here if we read or write to a page of which the
+		 * PTE does not have the access bit or dirty bit set and
+		 * we can not find the PTE in our datastructures. This
+		 * either means we have a stale PTE in the TLB, or we lost
+		 * the PTE in our datastructures.
+		 */
+		trap_panic(vector, framep);
+		break;
+
+	case IA64_VEC_BREAK:
+		if (user) {
+			if (framep->tf_special.ifa == 0x100000) {
+				break_syscall(framep);
+				return;		/* do_ast() already called. */
+			} else if (framep->tf_special.ifa == 0x180000) {
+				mcontext_t mc;
+
+				error = copyin((void*)framep->tf_scratch.gr8,
+				    &mc, sizeof(mc));
+				if (!error) {
+					set_mcontext(td, &mc);
+					return;	/* Don't call do_ast()!!! */
+				}
+				ucode = framep->tf_scratch.gr8;
+				sig = SIGSEGV;
+			} else {
+				framep->tf_special.psr &= ~IA64_PSR_SS;
+				sig = SIGTRAP;
+			}
+		} else {
+#ifdef DDB
+			if (kdb_trap(vector, framep))
+				return;
+			panic("trap");
+#else
+			trap_panic(vector, framep);
+#endif
+		}
+		break;
 
 	case IA64_VEC_PAGE_NOT_PRESENT:
 	case IA64_VEC_INST_ACCESS_RIGHTS:
@@ -627,29 +480,13 @@ trap(int vector, struct trapframe *framep)
 		vm_prot_t ftype;
 		int rv;
 
-		rv = 0; 
-		va = framep->tf_special.ifa;
+		rv = 0;
+		va = trunc_page(framep->tf_special.ifa);
 
-		/*
-		 * If it was caused by fuswintr or suswintr, just punt. Note
-		 * that we check the faulting address against the address
-		 * accessed by [fs]uswintr, in case another fault happens when
-		 * they are running.
-		 */
-		if (!user && td != NULL && td->td_pcb->pcb_accessaddr == va &&
-		    td->td_pcb->pcb_onfault == (unsigned long)fswintrberr) {
-			framep->tf_special.iip = td->td_pcb->pcb_onfault;
-			framep->tf_special.psr &= ~IA64_PSR_RI;
-			td->td_pcb->pcb_onfault = 0;
-			goto out;
-		}
-
-		va = trunc_page((vm_offset_t)va);
-
-		if (va >= VM_MIN_KERNEL_ADDRESS) {
+		if (va >= VM_MAX_ADDRESS) {
 			/*
 			 * Don't allow user-mode faults for kernel virtual
-			 * addresses
+			 * addresses, including the gateway page.
 			 */
 			if (user)
 				goto no_fault_in;
@@ -705,144 +542,275 @@ trap(int vector, struct trapframe *framep)
 				td->td_pcb->pcb_onfault = 0;
 				goto out;
 			}
-			goto dopanic;
+			trap_panic(vector, framep);
 		}
-		ucode = va;	
-		i = (rv == KERN_PROTECTION_FAILURE) ? SIGBUS : SIGSEGV;
+		ucode = va;
+		sig = (rv == KERN_PROTECTION_FAILURE) ? SIGBUS : SIGSEGV;
 		break;
 	}
 
-	case IA64_VEC_BREAK:
+	case IA64_VEC_GENERAL_EXCEPTION:
+	case IA64_VEC_NAT_CONSUMPTION:
+	case IA64_VEC_SPECULATION:
+	case IA64_VEC_UNSUPP_DATA_REFERENCE:
+	case IA64_VEC_LOWER_PRIVILEGE_TRANSFER:
+		if (user) {
+			ucode = vector;
+			sig = SIGILL;
+		} else
+			trap_panic(vector, framep);
+		break;
+
+	case IA64_VEC_DISABLED_FP: {
+		struct pcpu *pcpu;
+		struct pcb *pcb;
+		struct thread *thr;
+
+		/* Always fatal in kernel. Should never happen. */
+		if (!user)
+			trap_panic(vector, framep);
+
+		critical_enter();
+		thr = PCPU_GET(fpcurthread);
+		if (thr == td) {
+			/*
+			 * Short-circuit handling the trap when this CPU
+			 * already holds the high FP registers for this
+			 * thread.  We really shouldn't get the trap in the
+			 * first place, but since it's only a performance
+			 * issue and not a correctness issue, we emit a
+			 * message for now, enable the high FP registers and
+			 * return.
+			 */
+			printf("XXX: bogusly disabled high FP regs\n");
+			framep->tf_special.psr &= ~IA64_PSR_DFH;
+			critical_exit();
+			goto out;
+		} else if (thr != NULL) {
+			pcb = thr->td_pcb;
+			save_high_fp(&pcb->pcb_high_fp);
+			pcb->pcb_fpcpu = NULL;
+			PCPU_SET(fpcurthread, NULL);
+			thr = NULL;
+		}
+
+		pcb = td->td_pcb;
+		pcpu = pcb->pcb_fpcpu;
+
+#ifdef SMP
+		if (pcpu != NULL) {
+			ipi_send(pcpu->pc_lid, IPI_HIGH_FP);
+			critical_exit();
+			while (pcb->pcb_fpcpu != pcpu)
+				DELAY(100);
+			critical_enter();
+			pcpu = pcb->pcb_fpcpu;
+			thr = PCPU_GET(fpcurthread);
+		}
+#endif
+
+		if (thr == NULL && pcpu == NULL) {
+			restore_high_fp(&pcb->pcb_high_fp);
+			PCPU_SET(fpcurthread, td);
+			pcb->pcb_fpcpu = pcpup;
+			framep->tf_special.psr &= ~IA64_PSR_MFH;
+			framep->tf_special.psr &= ~IA64_PSR_DFH;
+		}
+
+		critical_exit();
+		goto out;
+	}
+
 	case IA64_VEC_DEBUG:
+	case IA64_VEC_TAKEN_BRANCH_TRAP:
 	case IA64_VEC_SINGLE_STEP_TRAP:
-	case IA64_VEC_TAKEN_BRANCH_TRAP: {
-		/*
-		 * These are always fatal in kernel, and should never happen.
-		 */
+		framep->tf_special.psr &= ~IA64_PSR_SS;
 		if (!user) {
 #ifdef DDB
-			/*
-			 * ...unless, of course, DDB is configured.
-			 */
 			if (kdb_trap(vector, framep))
 				return;
-
-			/*
-			 * If we get here, DDB did _not_ handle the
-			 * trap, and we need to PANIC!
-			 */
+			panic("trap");
+#else
+			trap_panic(vector, framep);
 #endif
-			goto dopanic;
 		}
-		i = SIGTRAP;
+		sig = SIGTRAP;
 		break;
-	}
 
-	case IA64_VEC_GENERAL_EXCEPTION: {
+	case IA64_VEC_UNALIGNED_REFERENCE:
+		/*
+		 * If user-land, do whatever fixups, printing, and
+		 * signalling is appropriate (based on system-wide
+		 * and per-process unaligned-access-handling flags).
+		 */
 		if (user) {
-			ucode = vector;
-			i = SIGILL;
+			sig = unaligned_fixup(framep, td);
+			if (sig == 0)
+				goto out;
+			ucode = framep->tf_special.ifa;	/* VA */
+		} else
+			trap_panic(vector, framep);
+		break;
+
+	case IA64_VEC_FLOATING_POINT_FAULT:
+	case IA64_VEC_FLOATING_POINT_TRAP: {
+		FP_STATE fp_state;
+		FPSWA_RET fpswa_ret;
+		FPSWA_BUNDLE bundle;
+
+		/* Always fatal in kernel. Should never happen. */
+		if (!user)
+			trap_panic(vector, framep);
+
+		if (fpswa_interface == NULL) {
+			sig = SIGFPE;
+			ucode = 0;
 			break;
 		}
-		goto dopanic;
-	}
 
-	case IA64_VEC_UNSUPP_DATA_REFERENCE:
-	case IA64_VEC_LOWER_PRIVILEGE_TRANSFER: {
-		if (user) {
-			ucode = vector;
-			i = SIGBUS;
+		error = copyin((void *)(framep->tf_special.iip), &bundle, 16);
+		if (error) {
+			sig = SIGBUS;	/* EFAULT, basically */
+			ucode = 0;	/* exception summary */
 			break;
 		}
-		goto dopanic;
+
+		/* f6-f15 are saved in exception_save */
+		fp_state.bitmask_low64 = 0xffc0;	/* bits 6 - 15 */
+		fp_state.bitmask_high64 = 0x0;
+		fp_state.fp_low_preserved = NULL;
+		fp_state.fp_low_volatile = &framep->tf_scratch_fp.fr6;
+		fp_state.fp_high_preserved = NULL;
+		fp_state.fp_high_volatile = NULL;
+
+		/*
+		 * We have the high FP registers disabled while in the
+		 * kernel. Enable them for the FPSWA handler only.
+		 */
+		ia64_enable_highfp();
+
+		/* The docs are unclear.  Is Fpswa reentrant? */
+		fpswa_ret = fpswa_interface->Fpswa(1, &bundle,
+		    &framep->tf_special.psr, &framep->tf_special.fpsr,
+		    &framep->tf_special.isr, &framep->tf_special.pr,
+		    &framep->tf_special.cfm, &fp_state);
+
+		ia64_disable_highfp();
+
+		if (fpswa_ret.status == 0) {
+			/* fixed.  update ipsr and iip to next insn */
+			int ei;
+
+			ei = (framep->tf_special.isr >> 41) & 0x03;
+			if (ei == 0) {		/* no template for this case */
+				framep->tf_special.psr &= ~IA64_ISR_EI;
+				framep->tf_special.psr |= IA64_ISR_EI_1;
+			} else if (ei == 1) {	/* MFI or MFB */
+				framep->tf_special.psr &= ~IA64_ISR_EI;
+				framep->tf_special.psr |= IA64_ISR_EI_2;
+			} else if (ei == 2) {	/* MMF */
+				framep->tf_special.psr &= ~IA64_ISR_EI;
+				framep->tf_special.iip += 0x10;
+			}
+			goto out;
+		} else if (fpswa_ret.status == -1) {
+			printf("FATAL: FPSWA err1 %lx, err2 %lx, err3 %lx\n",
+			    fpswa_ret.err1, fpswa_ret.err2, fpswa_ret.err3);
+			panic("fpswa fatal error on fp fault");
+		} else if (fpswa_ret.status > 0) {
+#if 0
+			if (fpswa_ret.status & 1) {
+				/*
+				 * New exception needs to be raised.
+				 * If set then the following bits also apply:
+				 * & 2 -> fault was converted to a trap
+				 * & 4 -> SIMD caused the exception
+				 */
+				sig = SIGFPE;
+				ucode = 0;		/* exception summary */
+				break;
+			}
+#endif
+			sig = SIGFPE;
+			ucode = 0;			/* exception summary */
+			break;
+		} else
+			panic("bad fpswa return code %lx", fpswa_ret.status);
 	}
 
-	case IA64_VEC_IA32_EXCEPTION: {
-		u_int64_t isr = framep->tf_special.isr;
-
-		switch ((isr >> 16) & 0xffff) {
+	case IA64_VEC_IA32_EXCEPTION:
+		switch ((framep->tf_special.isr >> 16) & 0xffff) {
 		case IA32_EXCEPTION_DIVIDE:
 			ucode = FPE_INTDIV;
-			i = SIGFPE;
+			sig = SIGFPE;
 			break;
-
 		case IA32_EXCEPTION_DEBUG:
 		case IA32_EXCEPTION_BREAK:
-			i = SIGTRAP;
+			sig = SIGTRAP;
 			break;
-
 		case IA32_EXCEPTION_OVERFLOW:
 			ucode = FPE_INTOVF;
-			i = SIGFPE;
+			sig = SIGFPE;
 			break;
-
 		case IA32_EXCEPTION_BOUND:
 			ucode = FPE_FLTSUB;
-			i = SIGFPE;
+			sig = SIGFPE;
 			break;
-
 		case IA32_EXCEPTION_DNA:
 			ucode = 0;
-			i = SIGFPE;
+			sig = SIGFPE;
 			break;
-
 		case IA32_EXCEPTION_NOT_PRESENT:
 		case IA32_EXCEPTION_STACK_FAULT:
 		case IA32_EXCEPTION_GPFAULT:
-			ucode = (isr & 0xffff) + BUS_SEGM_FAULT;
-			i = SIGBUS;
+			ucode = (framep->tf_special.isr & 0xffff) +
+			    BUS_SEGM_FAULT;
+			sig = SIGBUS;
 			break;
-
 		case IA32_EXCEPTION_FPERROR:
-			ucode = 0; /* XXX */
-			i = SIGFPE;
+			ucode = 0;	/* XXX */
+			sig = SIGFPE;
 			break;
-			
 		case IA32_EXCEPTION_ALIGNMENT_CHECK:
 			ucode = framep->tf_special.ifa;	/* VA */
-			i = SIGBUS;
+			sig = SIGBUS;
 			break;
-			
 		case IA32_EXCEPTION_STREAMING_SIMD:
 			ucode = 0; /* XXX */
-			i = SIGFPE;
+			sig = SIGFPE;
 			break;
-
 		default:
-			goto dopanic;
+			trap_panic(vector, framep);
+			break;
 		}
 		break;
-	}
 
-	case IA64_VEC_IA32_INTERRUPT: {
-		/*
-		 * INT n instruction - probably a syscall.
-		 */
+	case IA64_VEC_IA32_INTERCEPT:
+		/* XXX Maybe need to emulate ia32 instruction. */
+		trap_panic(vector, framep);
+
+	case IA64_VEC_IA32_INTERRUPT:
+		/* INT n instruction - probably a syscall. */
 		if (((framep->tf_special.isr >> 16) & 0xffff) == 0x80) {
 			ia32_syscall(framep);
 			goto out;
-		} else {
-			ucode = (framep->tf_special.isr >> 16) & 0xffff;
-			i = SIGILL;
-			break;
 		}
-	}
-
-	case IA64_VEC_IA32_INTERCEPT: {
-		/*
-		 * Maybe need to emulate ia32 instruction.
-		 */
-		goto dopanic;
-	}
+		ucode = (framep->tf_special.isr >> 16) & 0xffff;
+		sig = SIGILL;
+		break;
 
 	default:
-		goto dopanic;
+		/* Reserved vectors get here. Should never happen of course. */
+		trap_panic(vector, framep);
+		break;
 	}
+
+	KASSERT(sig != 0, ("foo"));
 
 	if (print_usertrap)
 		printtrap(vector, framep, 1, user);
 
-	trapsignal(td, i, ucode);
+	trapsignal(td, sig, ucode);
 
 out:
 	if (user) {
@@ -854,13 +822,6 @@ out:
 		do_ast(framep);
 	}
 	return;
-
-dopanic:
-	printtrap(vector, framep, 1, user);
-#ifdef DDB
-	kdb_trap(vector, framep);
-#endif
-	panic("trap");
 }
 
 
@@ -891,7 +852,8 @@ break_syscall(struct trapframe *tf)
 	 */
 	tfp = &tf->tf_scratch.gr16;
 	nargs = tf->tf_special.cfm & 0x7f;
-	bsp = (uint64_t*)(curthread->td_kstack + tf->tf_special.ndirty);
+	bsp = (uint64_t*)(curthread->td_kstack + tf->tf_special.ndirty +
+	    (tf->tf_special.bspstore & 0x1ffUL));
 	bsp -= (((uintptr_t)bsp & 0x1ff) < (nargs << 3)) ? (nargs + 1): nargs;
 	while (nargs--) {
 		*tfp++ = *bsp++;
@@ -936,7 +898,7 @@ syscall(struct trapframe *tf)
 	sticks = td->td_sticks;
 	if (td->td_ucred != p->p_ucred)
 		cred_update_thread(td);
-	if (p->p_flag & P_THREADED)
+	if (p->p_flag & P_SA)
 		thread_user_enter(p, td);
 
 	if (p->p_sysent->sv_prepsyscall) {
@@ -980,6 +942,8 @@ syscall(struct trapframe *tf)
 
 	STOPEVENT(p, S_SCE, (callp->sy_narg & SYF_ARGMASK));
 
+	PTRACESTOP_SC(p, td, S_PT_SCE);
+
 	error = (*callp->sy_call)(td, args);
 
 	if (error != EJUSTRETURN) {
@@ -1021,6 +985,8 @@ syscall(struct trapframe *tf)
 	 * is not the case, this code will need to be revisited.
 	 */
 	STOPEVENT(p, S_SCX, code);
+
+	PTRACESTOP_SC(p, td, S_PT_SCX);
 
 #ifdef DIAGNOSTIC
 	cred_free_thread(td);

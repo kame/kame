@@ -21,9 +21,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/tty_tty.c,v 1.49 2003/03/03 12:15:51 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/tty_tty.c,v 1.51 2003/09/27 12:01:00 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -38,7 +39,6 @@ static	d_open_t	cttyopen;
 
 static struct cdevsw ctty_cdevsw = {
 	.d_open =	cttyopen,
-	.d_close =	nullclose,
 	.d_name =	"ctty",
 	.d_maj =	CDEV_MAJOR,
 	.d_flags =	D_TTY,

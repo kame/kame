@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)sys_generic.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/sys_generic.c,v 1.121 2003/04/29 13:36:03 kan Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/sys_generic.c,v 1.126 2003/11/09 09:17:24 tanimura Exp $");
 
 #include "opt_ktrace.h"
 
@@ -80,6 +82,7 @@ static int	dofileread(struct thread *, struct file *, int, void *,
 		    size_t, off_t, int);
 static int	dofilewrite(struct thread *, struct file *, int,
 		    const void *, size_t, off_t, int);
+static void	doselwakeup(struct selinfo *, int);
 
 /*
  * Read system call.
@@ -135,7 +138,7 @@ pread(td, uap)
 
 	if ((error = fget_read(td, uap->fd, &fp)) != 0)
 		return (error);
-	if (fp->f_type != DTYPE_VNODE) {
+	if (!(fp->f_ops->fo_flags & DFLAG_SEEKABLE)) {
 		error = ESPIPE;
 	} else {
 		error = dofileread(td, fp, uap->fd, uap->buf, uap->nbyte, 
@@ -358,11 +361,11 @@ pwrite(td, uap)
 	int error;
 
 	if ((error = fget_write(td, uap->fd, &fp)) == 0) {
-		if (fp->f_type == DTYPE_VNODE) {
+		if (!(fp->f_ops->fo_flags & DFLAG_SEEKABLE)) {
+			error = ESPIPE;
+		} else {
 			error = dofilewrite(td, fp, uap->fd, uap->buf,
 				    uap->nbyte, uap->offset, FOF_OFFSET);
-		} else {
-			error = ESPIPE;
 		}
 		fdrop(fp, td);
 	} else {
@@ -466,25 +469,20 @@ writev(td, uap)
 	struct uio ktruio;
 #endif
 
-	mtx_lock(&Giant);
-	if ((error = fget_write(td, uap->fd, &fp)) != 0) {
-		error = EBADF;
-		goto done2;
-	}
+	if ((error = fget_write(td, uap->fd, &fp)) != 0)
+		return (EBADF);
+	needfree = NULL;
 	/* note: can't use iovlen until iovcnt is validated */
 	iovlen = uap->iovcnt * sizeof (struct iovec);
 	if (uap->iovcnt > UIO_SMALLIOV) {
 		if (uap->iovcnt > UIO_MAXIOV) {
-			needfree = NULL;
 			error = EINVAL;
 			goto done;
 		}
 		MALLOC(iov, struct iovec *, iovlen, M_IOV, M_WAITOK);
 		needfree = iov;
-	} else {
+	} else
 		iov = aiov;
-		needfree = NULL;
-	}
 	auio.uio_iov = iov;
 	auio.uio_iovcnt = uap->iovcnt;
 	auio.uio_rw = UIO_WRITE;
@@ -541,8 +539,6 @@ done:
 	fdrop(fp, td);
 	if (needfree)
 		FREE(needfree, M_IOV);
-done2:
-	mtx_unlock(&Giant);
 	return (error);
 }
 
@@ -1137,17 +1133,6 @@ clear_selinfo_list(td)
 	TAILQ_INIT(&td->td_selq);
 }
 
-/*ARGSUSED*/
-int
-seltrue(dev, events, td)
-	dev_t dev;
-	int events;
-	struct thread *td;
-{
-
-	return (events & (POLLIN | POLLOUT | POLLRDNORM | POLLWRNORM));
-}
-
 /*
  * Record a select request.
  */
@@ -1178,12 +1163,30 @@ selrecord(selector, sip)
 	mtx_unlock(&sellock);
 }
 
-/*
- * Do a wakeup when a selectable event occurs.
- */
+/* Wake up a selecting thread. */
 void
 selwakeup(sip)
 	struct selinfo *sip;
+{
+	doselwakeup(sip, -1);
+}
+
+/* Wake up a selecting thread, and set its priority. */
+void
+selwakeuppri(sip, pri)
+	struct selinfo *sip;
+	int pri;
+{
+	doselwakeup(sip, pri);
+}
+
+/*
+ * Do a wakeup when a selectable event occurs.
+ */
+static void
+doselwakeup(sip, pri)
+	struct selinfo *sip;
+	int pri;
 {
 	struct thread *td;
 
@@ -1192,7 +1195,7 @@ selwakeup(sip)
 	if ((sip->si_flags & SI_COLL) != 0) {
 		nselcoll++;
 		sip->si_flags &= ~SI_COLL;
-		cv_broadcast(&selwait);
+		cv_broadcastpri(&selwait, pri);
 	}
 	if (td == NULL) {
 		mtx_unlock(&sellock);
@@ -1204,6 +1207,8 @@ selwakeup(sip)
 	if (td->td_wchan == &selwait) {
 		cv_waitq_remove(td);
 		TD_CLR_SLEEPING(td);
+		if (pri >= PRI_MIN && pri <= PRI_MAX && td->td_priority > pri)
+			td->td_priority = pri;
 		setrunnable(td);
 	} else
 		td->td_flags &= ~TDF_SELECT;

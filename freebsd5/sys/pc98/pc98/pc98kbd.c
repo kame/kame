@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/pc98kbd.c,v 1.25 2003/04/29 13:36:05 kan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/pc98kbd.c,v 1.26 2003/07/02 16:09:02 jhb Exp $
  */
 
 #include "opt_kbd.h"
@@ -370,8 +370,7 @@ pckbd_configure(int flags)
 	if (resource_int_value(DRIVER_NAME, 0, "flags", &i) == 0) {
 		flags |= i;
 		/* if the driver is disabled, unregister the keyboard if any */
-		if (resource_int_value(DRIVER_NAME, 0, "disabled", &i) == 0
-		    && i != 0) {
+		if (resource_disabled(DRIVER_NAME, 0)) {
 			i = kbd_find_keyboard(DRIVER_NAME, PC98KBD_DEFAULT);
 			if (i >= 0) {
 				kbd = kbd_get_keyboard(i);

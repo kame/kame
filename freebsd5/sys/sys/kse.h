@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
  * DAMAGE.
  *
- * $FreeBSD: src/sys/sys/kse.h,v 1.13 2003/04/21 07:27:59 davidxu Exp $
+ * $FreeBSD: src/sys/sys/kse.h,v 1.19 2003/08/05 12:00:55 davidxu Exp $
  */
 
 #ifndef _SYS_KSE_H_
@@ -36,6 +36,7 @@
 #include <machine/kse.h>
 #include <sys/ucontext.h>
 #include <sys/time.h>
+#include <sys/signal.h>
 
 /*
  * This file defines the structures needed for communication between
@@ -57,8 +58,9 @@ struct kse_thr_mailbox {
 	unsigned int		tm_flags;	/* Thread flags */
 	struct kse_thr_mailbox	*tm_next;	/* Next thread in list */
 	void			*tm_udata;	/* For use by the UTS */
-	unsigned int		tm_uticks;
-	unsigned int		tm_sticks;
+	uint32_t		tm_uticks;
+	uint32_t		tm_sticks;
+	siginfo_t		tm_syncsig;
 	int			tm_spare[8];
 };
 
@@ -73,7 +75,7 @@ struct kse_mailbox {
 	struct kse_thr_mailbox	*km_curthread;	/* Currently running thread */
 	struct kse_thr_mailbox	*km_completed;	/* Threads back from kernel */
 	sigset_t		km_sigscaught;	/* Caught signals */
-	unsigned int		km_flags;	/* KSE flags */
+	uint32_t		km_flags;	/* KSE flags */
 	kse_func_t		*km_func;	/* UTS function */
 	stack_t			km_stack;	/* UTS context */
 	void			*km_udata;	/* For use by the UTS */
@@ -88,12 +90,24 @@ struct kse_mailbox {
 /* These flags are kept in km_flags */
 #define	KMF_NOUPCALL		0x01
 #define	KMF_NOCOMPLETED		0x02
+#define	KMF_DONE		0x04
+#define	KMF_BOUND		0x08
+#define	KMF_WAITSIGEVENT	0x10
+
+/* These flags are kept in tm_flags */
+#define	TMF_NOUPCALL		0x01
+
+/* Commands for kse_thr_interrupt */
+#define	KSE_INTR_INTERRUPT	0x01
+#define	KSE_INTR_RESTART	0x02
+#define	KSE_INTR_SENDSIG	0x03
+#define	KSE_INTR_SIGEXIT	0x04
 
 #ifndef _KERNEL
 int	kse_create(struct kse_mailbox *, int);
 int	kse_exit(void);
 int	kse_release(struct timespec *);
-int	kse_thr_interrupt(struct kse_thr_mailbox *);
+int	kse_thr_interrupt(struct kse_thr_mailbox *, int, long);
 int	kse_wakeup(struct kse_mailbox *);
 #endif	/* !_KERNEL */
 

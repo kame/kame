@@ -32,9 +32,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ipx_pcb.c
- *
- * $FreeBSD: src/sys/netipx/ipx_pcb.c,v 1.25 2002/05/31 11:52:33 tanimura Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netipx/ipx_pcb.c,v 1.26 2003/06/11 05:25:14 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

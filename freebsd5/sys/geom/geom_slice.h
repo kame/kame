@@ -32,7 +32,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/geom/geom_slice.h,v 1.16 2003/05/02 06:29:33 phk Exp $
+ * $FreeBSD: src/sys/geom/geom_slice.h,v 1.17 2003/05/31 19:25:05 phk Exp $
  */
 
 #ifndef _GEOM_GEOM_SLICE_H_
@@ -81,6 +81,8 @@ int g_slice_conf_hot(struct g_geom *gp, u_int idx, off_t offset, off_t length, i
 #define G_SLICE_HOT_DENY	2
 #define G_SLICE_HOT_START	4
 #define G_SLICE_HOT_CALL	8
+
+int g_slice_destroy_geom(struct gctl_req *req, struct g_class *mp, struct g_geom *gp);
 
 void g_slice_finish_hot(struct bio *bp);
 

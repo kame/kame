@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_inode.c	8.9 (Berkeley) 5/14/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_inode.c,v 1.49 2002/12/27 10:06:36 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ufs/ufs/ufs_inode.c,v 1.52 2003/10/05 02:45:00 jeff Exp $");
 
 #include "opt_quota.h"
 #include "opt_ufs.h"
@@ -166,11 +168,7 @@ ufs_reclaim(ap)
 	/*
 	 * Purge old data structures associated with the inode.
 	 */
-	cache_purge(vp);
-	if (ip->i_devvp) {
-		vrele(ip->i_devvp);
-		ip->i_devvp = 0;
-	}
+	vrele(ip->i_devvp);
 #ifdef QUOTA
 	for (i = 0; i < MAXQUOTAS; i++) {
 		if (ip->i_dquot[i] != NODQUOT) {

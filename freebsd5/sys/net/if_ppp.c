@@ -69,7 +69,7 @@
  * Paul Mackerras (paulus@cs.anu.edu.au).
  */
 
-/* $FreeBSD: src/sys/net/if_ppp.c,v 1.91 2003/03/27 12:52:57 maxim Exp $ */
+/* $FreeBSD: src/sys/net/if_ppp.c,v 1.94 2003/11/14 21:02:22 andre Exp $ */
 /* from if_sl.c,v 1.11 84/10/04 12:54:47 rick Exp */
 /* from NetBSD: if_ppp.c,v 1.15.2.2 1994/07/28 05:17:58 cgd Exp */
 
@@ -201,8 +201,7 @@ ppp_clone_create(struct if_clone *ifc, int unit)
 
 	sc = malloc(sizeof(struct ppp_softc), M_PPP, M_WAITOK | M_ZERO);
 	sc->sc_if.if_softc = sc;
-	sc->sc_if.if_name = PPPNAME;
-	sc->sc_if.if_unit = unit;
+	if_initname(&sc->sc_if, ifc->ifc_name, unit);
 	sc->sc_if.if_mtu = PPP_MTU;
 	sc->sc_if.if_flags = IFF_POINTOPOINT | IFF_MULTICAST;
 	sc->sc_if.if_type = IFT_PPP;
@@ -245,7 +244,7 @@ ppp_modevent(module_t mod, int type, void *data)
 	case MOD_LOAD: 
 		if_clone_attach(&ppp_cloner);
 
-		netisr_register(NETISR_PPP, (netisr_t *)pppintr, NULL);
+		netisr_register(NETISR_PPP, (netisr_t *)pppintr, NULL, 0);
 		/*
 		 * XXX layering violation - if_ppp can work over any lower
 		 * level transport that cares to attach to it.
@@ -414,7 +413,7 @@ pppioctl(sc, cmd, data, flag, td)
 	break;
 
     case PPPIOCGUNIT:
-	*(int *)data = sc->sc_if.if_unit;
+	*(int *)data = sc->sc_if.if_dunit;
 	break;
 
     case PPPIOCGFLAGS:
@@ -850,7 +849,7 @@ pppoutput(ifp, m0, dst, rtp)
     len = m_length(m0, NULL);
 
     if (sc->sc_flags & SC_LOG_OUTPKT) {
-	printf("ppp%d output: ", ifp->if_unit);
+	printf("%s output: ", ifp->if_xname);
 	pppdumpm(m0);
     }
 
@@ -1131,6 +1130,8 @@ pppintr()
     int s;
     struct mbuf *m;
 
+    GIANT_REQUIRED;
+
     LIST_FOREACH(sc, &ppp_softc_list, sc_list) {
 	s = splimp();
 	if (!(sc->sc_flags & SC_TBUSY)
@@ -1214,7 +1215,7 @@ ppp_ccp(sc, m, rcvd)
 		if (sc->sc_xc_state != NULL
 		    && (*sc->sc_xcomp->comp_init)
 			(sc->sc_xc_state, dp + CCP_HDRLEN, slen - CCP_HDRLEN,
-			 sc->sc_if.if_unit, 0, sc->sc_flags & SC_DEBUG)) {
+			 sc->sc_if.if_dunit, 0, sc->sc_flags & SC_DEBUG)) {
 		    s = splimp();
 		    sc->sc_flags |= SC_COMP_RUN;
 		    splx(s);
@@ -1224,7 +1225,7 @@ ppp_ccp(sc, m, rcvd)
 		if (sc->sc_rc_state != NULL
 		    && (*sc->sc_rcomp->decomp_init)
 			(sc->sc_rc_state, dp + CCP_HDRLEN, slen - CCP_HDRLEN,
-			 sc->sc_if.if_unit, 0, sc->sc_mru,
+			 sc->sc_if.if_dunit, 0, sc->sc_mru,
 			 sc->sc_flags & SC_DEBUG)) {
 		    s = splimp();
 		    sc->sc_flags |= SC_DECOMP_RUN;
@@ -1536,7 +1537,7 @@ ppp_inproc(sc, m)
 	m->m_pkthdr.len -= PPP_HDRLEN;
 	m->m_data += PPP_HDRLEN;
 	m->m_len -= PPP_HDRLEN;
-	if (ipflow_fastforward(m))
+	if (ip_fastforward(m))
 	    return;
 	isr = NETISR_IP;
 	break;

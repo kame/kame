@@ -37,8 +37,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_sysctl.c	8.4 (Berkeley) 4/14/94
- * $FreeBSD: src/sys/kern/kern_mib.c,v 1.65 2003/04/30 12:57:39 markm Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_mib.c,v 1.70 2003/10/21 18:28:34 silby Exp $");
 
 #include "opt_posix.h"
 
@@ -85,6 +87,9 @@ SYSCTL_NODE(, OID_AUTO, regression, CTLFLAG_RW, 0,
      "Regression test MIB");
 #endif
 
+SYSCTL_STRING(_kern, OID_AUTO, ident, CTLFLAG_RD,
+    kern_ident, 0, "Kernel identifier");
+
 SYSCTL_STRING(_kern, KERN_OSRELEASE, osrelease, CTLFLAG_RD,
     osrelease, 0, "Operating system release");
 
@@ -97,17 +102,21 @@ SYSCTL_STRING(_kern, KERN_VERSION, version, CTLFLAG_RD,
 SYSCTL_STRING(_kern, KERN_OSTYPE, ostype, CTLFLAG_RD,
     ostype, 0, "Operating system type");
 
+/*
+ * NOTICE: The *userland* release date is available in
+ * /usr/include/osreldate.h
+ */
 extern int osreldate;
 SYSCTL_INT(_kern, KERN_OSRELDATE, osreldate, CTLFLAG_RD,
-    &osreldate, 0, "Operating system release date");
+    &osreldate, 0, "Kernel release date");
 
-SYSCTL_INT(_kern, KERN_MAXPROC, maxproc, CTLFLAG_RD,
+SYSCTL_INT(_kern, KERN_MAXPROC, maxproc, CTLFLAG_RDTUN,
     &maxproc, 0, "Maximum number of processes");
 
 SYSCTL_INT(_kern, KERN_MAXPROCPERUID, maxprocperuid, CTLFLAG_RW,
     &maxprocperuid, 0, "Maximum processes allowed per userid");
 
-SYSCTL_INT(_kern, OID_AUTO, maxusers, CTLFLAG_RD,
+SYSCTL_INT(_kern, OID_AUTO, maxusers, CTLFLAG_RDTUN,
     &maxusers, 0, "Hint for kernel tuning");
 
 SYSCTL_INT(_kern, KERN_ARGMAX, argmax, CTLFLAG_RD,

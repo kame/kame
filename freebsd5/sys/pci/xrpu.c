@@ -6,16 +6,16 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/pci/xrpu.c,v 1.31 2003/04/15 06:37:30 mdodd Exp $
- *
  * A very simple device driver for PCI cards based on Xilinx 6200 series
  * FPGA/RPU devices.  Current Functionality is to allow you to open and
  * mmap the entire thing into your program.
  *
  * Hardware currently supported:
  *	www.vcc.com HotWorks 1 6216 based card.
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/xrpu.c,v 1.35 2003/11/03 10:19:33 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -29,8 +29,8 @@
 #include <machine/bus.h>
 #include <sys/rman.h>
 #include <machine/resource.h>
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 #include "pci_if.h"
 
 /*
@@ -42,14 +42,12 @@ static d_close_t xrpu_close;
 static d_ioctl_t xrpu_ioctl;
 static d_mmap_t xrpu_mmap;
 
-#define CDEV_MAJOR 100
 static struct cdevsw xrpu_cdevsw = {
 	.d_open =	xrpu_open,
 	.d_close =	xrpu_close,
 	.d_ioctl =	xrpu_ioctl,
 	.d_mmap =	xrpu_mmap,
 	.d_name =	"xrpu",
-	.d_maj =	CDEV_MAJOR,
 };
 
 static MALLOC_DEFINE(M_XRPU, "xrpu", "XRPU related");
@@ -225,7 +223,7 @@ xrpu_attach(device_t self)
 	unit = device_get_unit(self);
 	sc = device_get_softc(self);
 	sc->mode = NORMAL;
-	rid = PCIR_MAPS;
+	rid = PCIR_BAR(0);
 	res = bus_alloc_resource(self, SYS_RES_MEMORY, &rid,
 				 0, ~0, 1, RF_ACTIVE);
 	if (res == NULL) {

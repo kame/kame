@@ -1,11 +1,16 @@
-/*
+/*-
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
  * <phk@FreeBSD.ORG> wrote this file.  As long as you retain this notice you
  * can do whatever you want with this stuff. If we meet some day, and you think
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
- *
+ */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i386/i386/mp_clock.c,v 1.18 2003/10/24 21:01:31 jhb Exp $");
+
+/*-
  * Just when we thought life were beautiful, reality pops its grim face over
  * the edge again:
  *
@@ -28,9 +33,6 @@
  * three monotonic samples and then use the middle one, otherwise we are
  * not protected against the fact that the bits can be wrong in two
  * directions.  If we only cared about monosity two reads would be enough.
- *
- * $FreeBSD: src/sys/i386/i386/mp_clock.c,v 1.12 2003/04/06 18:42:22 des Exp $
- *
  */
 
 /* #include "opt_bus.h" */
@@ -42,7 +44,8 @@
 #include <sys/sysctl.h>
 #include <sys/bus.h>
 
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 static unsigned piix_get_timecount(struct timecounter *tc);
 
@@ -50,11 +53,11 @@ static u_int32_t piix_timecounter_address;
 static u_int piix_freq = 14318182/4;
 
 static struct timecounter piix_timecounter = {
-	piix_get_timecount,
-	0,
-	0xffffff,
-	0,
-	"PIIX"
+	piix_get_timecount,	/* get_timecount */
+	0,			/* no poll_pps */
+	0xffffff,		/* counter_mask */
+	0,			/* frequency */
+	"PIIX"			/* name */
 };
 
 
@@ -94,27 +97,32 @@ piix_get_timecount(struct timecounter *tc)
 }
 
 static int
-piix_probe (device_t dev)
+piix_probe(device_t dev)
 {
-	u_int32_t	d;
+	u_int32_t d;
 
+	if (devclass_get_device(devclass_find("acpi"), 0) != NULL)
+		return (ENXIO);
 	switch (pci_get_devid(dev)) {
 	case 0x71138086:
-		d = pci_read_config(dev, 0x4, 2);
-		if (d & 1)
-			return (0);
-		printf("PIIX I/O space not mapped\n");
-		return (ENXIO);
+		device_set_desc(dev, "PIIX Timecounter");
+		break;
 	default:
 		return (ENXIO);
-	};
-	return (ENXIO);
+	}
+
+	d = pci_read_config(dev, PCIR_COMMAND, 2);
+	if (!(d & PCIM_CMD_PORTEN)) {
+		device_printf(dev, "PIIX I/O space not mapped\n");
+		return (ENXIO);
+	}
+	return (0);
 }
 
 static int
-piix_attach (device_t dev)
+piix_attach(device_t dev)
 {
-	u_int32_t	d;
+	u_int32_t d;
 
 	d = pci_read_config(dev, 0x40, 4);
 	piix_timecounter_address = (d & 0xffc0) + 8;

@@ -24,9 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/pst/pst-raid.c,v 1.9 2003/04/28 08:10:27 sos Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/pst/pst-raid.c,v 1.12 2003/09/08 06:28:50 sos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -45,8 +46,8 @@
 #include <machine/resource.h>
 #include <machine/bus.h>
 #include <sys/rman.h>
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 #include <geom/geom_disk.h>
 
 #include "dev/pst/pst-iop.h"
@@ -315,11 +316,6 @@ pst_timeout(struct pst_request *request)
 	mtx_unlock(&request->psc->iop->mtx);
 	return;
     }
-    if (dumping)
-	request->timeout_handle.callout = NULL;
-    else
-	request->timeout_handle =
-	    timeout((timeout_t*)pst_timeout, request, 10 * hz);
     if (pst_rw(request)) {
 	iop_free_mfa(request->psc->iop, request->mfa);
 	biofinish(request->bp, NULL, EIO);

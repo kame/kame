@@ -1,4 +1,4 @@
-/*
+/*-
  *  Device driver optimized for the Symbios/LSI 53C896/53C895A/53C1010 
  *  PCI-SCSI controllers.
  *
@@ -55,7 +55,8 @@
  * SUCH DAMAGE.
  */
 
-/* $FreeBSD: src/sys/dev/sym/sym_hipd.c,v 1.40 2003/04/10 23:50:06 mux Exp $ */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/sym/sym_hipd.c,v 1.46 2003/09/02 17:30:38 jhb Exp $");
 
 #define SYM_DRIVER_NAME	"sym-1.6.5-20000902"
 
@@ -89,6 +90,8 @@
 #include <sys/malloc.h>
 #include <sys/endian.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 #ifdef FreeBSD_Bus_Io_Abstraction
 #include <sys/module.h>
 #include <sys/bus.h>
@@ -96,8 +99,8 @@
 
 #include <sys/proc.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #ifdef	FreeBSD_Bus_Space_Abstraction
 #include <machine/bus_memio.h>
@@ -162,7 +165,7 @@ typedef	u_int32_t u32;
  *  make sense) to be used.
  */
 
-#if	defined	__i386__
+#if	defined	__i386__ || defined __amd64__
 #define MEMORY_BARRIER()	do { ; } while(0)
 #elif	defined	__alpha__
 #define MEMORY_BARRIER()	alpha_mb()
@@ -783,7 +786,8 @@ static m_pool_s *___cre_dma_pool(bus_dma_tag_t dev_dmat)
 			       BUS_SPACE_MAXADDR_32BIT,
 			       BUS_SPACE_MAXADDR_32BIT,
 			       NULL, NULL, MEMO_CLUSTER_SIZE, 1,
-			       MEMO_CLUSTER_SIZE, 0, &mp->dmat)) {
+			       MEMO_CLUSTER_SIZE, 0,
+			       busdma_lock_mutex, &Giant, &mp->dmat)) {
 			mp->getp = ___dma_getp;
 #ifdef	MEMO_FREE_UNUSED
 			mp->freep = ___dma_freep;
@@ -1218,10 +1222,10 @@ struct sym_nvram {
  *  Misc.
  */
 #define SYM_SNOOP_TIMEOUT (10000000)
-#define SYM_PCI_IO	PCIR_MAPS
-#define SYM_PCI_MMIO	(PCIR_MAPS + 4)
-#define SYM_PCI_RAM	(PCIR_MAPS + 8)
-#define SYM_PCI_RAM64	(PCIR_MAPS + 12)
+#define SYM_PCI_IO	PCIR_BAR(0)
+#define SYM_PCI_MMIO	PCIR_BAR(1)
+#define SYM_PCI_RAM	PCIR_BAR(2)
+#define SYM_PCI_RAM64	PCIR_BAR(3)
 
 /*
  *  Back-pointer from the CAM CCB to our data structures.
@@ -8554,28 +8558,7 @@ static void sym_action2(struct cam_sim *sim, union ccb *ccb)
 	}
 	case XPT_CALC_GEOMETRY:
 	{
-		struct ccb_calc_geometry *ccg;
-		u32 size_mb;
-		u32 secs_per_cylinder;
-		int extended;
-
-		/*
-		 *  Silly DOS geometry.  
-		 */
-		ccg = &ccb->ccg;
-		size_mb = ccg->volume_size
-			/ ((1024L * 1024L) / ccg->block_size);
-		extended = 1;
-		
-		if (size_mb > 1024 && extended) {
-			ccg->heads = 255;
-			ccg->secs_per_track = 63;
-		} else {
-			ccg->heads = 64;
-			ccg->secs_per_track = 32;
-		}
-		secs_per_cylinder = ccg->heads * ccg->secs_per_track;
-		ccg->cylinders = ccg->volume_size / secs_per_cylinder;
+		cam_calc_geometry(&ccb->ccg, /*extended*/1);
 		sym_xpt_done2(np, ccb, CAM_REQ_CMP);
 		break;
 	}
@@ -9151,7 +9134,8 @@ sym_pci_attach2(pcici_t pci_tag, int unit)
 				BUS_SPACE_MAXADDR, BUS_SPACE_MAXADDR,
 				NULL, NULL,
 				BUS_SPACE_MAXSIZE, SYM_CONF_MAX_SG,
-				(1<<24), 0, &np->data_dmat)) {
+				(1<<24), 0, busdma_lock_mutex, &Giant,
+				&np->data_dmat)) {
 		device_printf(dev, "failed to create DMA tag.\n");
 		goto attach_failed;
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001 Cameron Grant <gandalf@vilnya.demon.co.uk>
+ * Copyright (c) 2001 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/vchan.h,v 1.2 2001/08/23 11:30:52 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/vchan.h,v 1.3 2003/09/07 16:28:03 cg Exp $
  */
 
 int vchan_create(struct pcm_channel *parent);

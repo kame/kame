@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_vfsops.c	8.8 (Berkeley) 4/18/94
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_vfsops.c,v 1.104 2003/03/04 00:04:42 jeff Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_vfsops.c,v 1.114 2003/11/05 11:56:58 bde Exp $
  */
 
 #include <sys/param.h>
@@ -63,41 +63,36 @@
 #include <gnu/ext2fs/ext2_fs.h>
 #include <gnu/ext2fs/ext2_fs_sb.h>
 
-static int ext2_fhtovp(struct mount *, struct fid *, struct vnode **);
 static int ext2_flushfiles(struct mount *mp, int flags, struct thread *td);
-static int ext2_init(struct vfsconf *);
-static int ext2_mount(struct mount *, struct nameidata *, struct thread *);
 static int ext2_mountfs(struct vnode *, struct mount *, struct thread *);
-static int ext2_reload(struct mount *mountp, struct ucred *cred,
-			struct thread *td);
-static int ext2_root(struct mount *, struct vnode **vpp);
+static int ext2_reload(struct mount *mp, struct ucred *cred, struct thread *td);
 static int ext2_sbupdate(struct ext2mount *, int);
-static int ext2_statfs(struct mount *, struct statfs *, struct thread *);
-static int ext2_sync(struct mount *, int, struct ucred *, struct thread *);
-static int ext2_uninit(struct vfsconf *);
-static int ext2_unmount(struct mount *, int, struct thread *);
-static int ext2_vget(struct mount *, ino_t, int, struct vnode **);
-static int ext2_vptofh(struct vnode *, struct fid *);
+
+static vfs_unmount_t		ext2_unmount;
+static vfs_root_t		ext2_root;
+static vfs_statfs_t		ext2_statfs;
+static vfs_sync_t		ext2_sync;
+static vfs_vget_t		ext2_vget;
+static vfs_fhtovp_t		ext2_fhtovp;
+static vfs_vptofh_t		ext2_vptofh;
+static vfs_init_t		ext2_init;
+static vfs_uninit_t		ext2_uninit;
+static vfs_nmount_t		ext2_mount;
 
 MALLOC_DEFINE(M_EXT2NODE, "EXT2 node", "EXT2 vnode private part");
 static MALLOC_DEFINE(M_EXT2MNT, "EXT2 mount", "EXT2 mount structure");
 
 static struct vfsops ext2fs_vfsops = {
-	NULL,
-	vfs_stdstart,
-	ext2_unmount,
-	ext2_root,		/* root inode via vget */
-	vfs_stdquotactl,
-	ext2_statfs,
-	ext2_sync,
-	ext2_vget,
-	ext2_fhtovp,
-	vfs_stdcheckexp,
-	ext2_vptofh,
-	ext2_init,
-	ext2_uninit,
-	vfs_stdextattrctl,
-	ext2_mount,
+	.vfs_fhtovp =		ext2_fhtovp,
+	.vfs_init =		ext2_init,
+	.vfs_nmount =		ext2_mount,
+	.vfs_root =		ext2_root,	/* root inode via vget */
+	.vfs_statfs =		ext2_statfs,
+	.vfs_sync =		ext2_sync,
+	.vfs_uninit =		ext2_uninit,
+	.vfs_unmount =		ext2_unmount,
+	.vfs_vget =		ext2_vget,
+	.vfs_vptofh =		ext2_vptofh,
 };
 
 VFS_SET(ext2fs_vfsops, ext2fs, 0);
@@ -492,7 +487,6 @@ static int compute_sb_data(devvp, es, fs)
 	    printf("EXT2-fs: unable to read group descriptors (%d)\n", error);
 	    return EIO;
 	}
-	/* Set the B_LOCKED flag on the buffer, then brelse() it */
 	LCK_BUF(fs->s_group_desc[i])
     }
     if(!ext2_check_descriptors(fs)) {
@@ -529,8 +523,8 @@ static int compute_sb_data(devvp, es, fs)
  *	6) re-read inode data for all active vnodes.
  */
 static int
-ext2_reload(mountp, cred, td)
-	struct mount *mountp;
+ext2_reload(mp, cred, td)
+	struct mount *mp;
 	struct ucred *cred;
 	struct thread *td;
 {
@@ -541,12 +535,12 @@ ext2_reload(mountp, cred, td)
 	struct ext2_sb_info *fs;
 	int error;
 
-	if ((mountp->mnt_flag & MNT_RDONLY) == 0)
+	if ((mp->mnt_flag & MNT_RDONLY) == 0)
 		return (EINVAL);
 	/*
 	 * Step 1: invalidate all cached meta-data.
 	 */
-	devvp = VFSTOEXT2(mountp)->um_devvp;
+	devvp = VFSTOEXT2(mp)->um_devvp;
 	if (vinvalbuf(devvp, 0, cred, td, 0, 0))
 		panic("ext2_reload: dirty1");
 	/*
@@ -560,7 +554,7 @@ ext2_reload(mountp, cred, td)
 		brelse(bp);
 		return (EIO);		/* XXX needs translation */
 	}
-	fs = VFSTOEXT2(mountp)->um_e2fs;
+	fs = VFSTOEXT2(mp)->um_e2fs;
 	bcopy(bp->b_data, fs->s_es, sizeof(struct ext2_super_block));
 
 	if((error = compute_sb_data(devvp, es, fs)) != 0) {
@@ -574,23 +568,29 @@ ext2_reload(mountp, cred, td)
 	brelse(bp);
 
 loop:
-	mtx_lock(&mntvnode_mtx);
-	for (vp = TAILQ_FIRST(&mountp->mnt_nvnodelist); vp != NULL; vp = nvp) {
-		if (vp->v_mount != mountp) {
-			mtx_unlock(&mntvnode_mtx);
+	MNT_ILOCK(mp);
+	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nvp) {
+		if (vp->v_mount != mp) {
+			MNT_IUNLOCK(mp);
 			goto loop;
 		}
 		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
-		mtx_unlock(&mntvnode_mtx);
+		VI_LOCK(vp);
+		if (vp->v_iflag & VI_XLOCK) {
+			VI_UNLOCK(vp);
+			continue;
+		}
+		MNT_IUNLOCK(mp);
 		/*
 		 * Step 4: invalidate all inactive vnodes.
 		 */
-  		if (vrecycle(vp, NULL, td))
-  			goto loop;
+		if (vp->v_usecount == 0) {
+			vgonel(vp, td);
+			goto loop;
+		}
 		/*
 		 * Step 5: invalidate all cached file data.
 		 */
-		mtx_lock(&vp->v_interlock);
 		if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK, td)) {
 			goto loop;
 		}
@@ -604,16 +604,18 @@ loop:
 		    bread(devvp, fsbtodb(fs, ino_to_fsba(fs, ip->i_number)),
 		    (int)fs->s_blocksize, NOCRED, &bp);
 		if (error) {
-			vput(vp);
+			VOP_UNLOCK(vp, 0, td);
+			vrele(vp);
 			return (error);
 		}
 		ext2_ei2i((struct ext2_inode *) ((char *)bp->b_data +
 		    EXT2_INODE_SIZE * ino_to_fsbo(fs, ip->i_number)), ip);
 		brelse(bp);
-		vput(vp);
-		mtx_lock(&mntvnode_mtx);
+		VOP_UNLOCK(vp, 0, td);
+		vrele(vp);
+		MNT_ILOCK(mp);
 	}
-	mtx_unlock(&mntvnode_mtx);
+	MNT_IUNLOCK(mp);
 	return (0);
 }
 
@@ -653,7 +655,7 @@ ext2_mountfs(devvp, mp, td)
 
 	ronly = (mp->mnt_flag & MNT_RDONLY) != 0;
 	vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY, td);
-	error = VOP_OPEN(devvp, ronly ? FREAD : FREAD|FWRITE, FSCRED, td);
+	error = VOP_OPEN(devvp, ronly ? FREAD : FREAD|FWRITE, FSCRED, td, -1);
 	VOP_UNLOCK(devvp, 0, td);
 	if (error)
 		return (error);
@@ -898,7 +900,7 @@ ext2_sync(mp, waitfor, cred, td)
 	/*
 	 * Write back each (modified) inode.
 	 */
-	mtx_lock(&mntvnode_mtx);
+	MNT_ILOCK(mp);
 loop:
 	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nvp) {
 		/*
@@ -908,20 +910,24 @@ loop:
 		if (vp->v_mount != mp)
 			goto loop;
 		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
-		mtx_unlock(&mntvnode_mtx);
 		VI_LOCK(vp);
+		if (vp->v_iflag & VI_XLOCK) {
+			VI_UNLOCK(vp);
+			continue;
+		}
+		MNT_IUNLOCK(mp);
 		ip = VTOI(vp);
 		if (vp->v_type == VNON ||
 		    ((ip->i_flag &
 		    (IN_ACCESS | IN_CHANGE | IN_MODIFIED | IN_UPDATE)) == 0 &&
 		    (TAILQ_EMPTY(&vp->v_dirtyblkhd) || waitfor == MNT_LAZY))) {
 			VI_UNLOCK(vp);
-			mtx_lock(&mntvnode_mtx);
+			MNT_ILOCK(mp);
 			continue;
 		}
 		error = vget(vp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK, td);
 		if (error) {
-			mtx_lock(&mntvnode_mtx);
+			MNT_ILOCK(mp);
 			if (error == ENOENT)
 				goto loop;
 			continue;
@@ -930,9 +936,9 @@ loop:
 			allerror = error;
 		VOP_UNLOCK(vp, 0, td);
 		vrele(vp);
-		mtx_lock(&mntvnode_mtx);
+		MNT_ILOCK(mp);
 	}
-	mtx_unlock(&mntvnode_mtx);
+	MNT_IUNLOCK(mp);
 	/*
 	 * Force stale file system control information to be flushed.
 	 */

@@ -31,12 +31,12 @@
 #include <dev/sound/pcm/sound.h>
 #include <dev/sound/pci/vibes.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/vibes.c,v 1.12 2003/02/20 17:31:11 cognet Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/vibes.c,v 1.14 2003/08/22 07:04:11 imp Exp $");
 
 /* ------------------------------------------------------------------------- */
 /* Constants */
@@ -776,7 +776,8 @@ sv_attach(device_t dev) {
                                /*filter*/NULL, /*filterarg*/NULL,
                                /*maxsize*/sc->bufsz, /*nsegments*/1,
                                /*maxsegz*/0x3ffff, /*flags*/0,
-                               &sc->parent_dmat) != 0) {
+			       /*lockfunc*/busdma_lock_mutex,
+			       /*lockarg*/&Giant, &sc->parent_dmat) != 0) {
                 device_printf(dev, "sv_attach: Unable to create dma tag\n");
                 goto fail;
         }

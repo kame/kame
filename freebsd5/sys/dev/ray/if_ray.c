@@ -28,9 +28,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ray/if_ray.c,v 1.63 2003/04/29 13:36:00 kan Exp $
  *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ray/if_ray.c,v 1.67 2003/10/31 18:32:04 brooks Exp $");
 
 /*	$NetBSD: if_ray.c,v 1.12 2000/02/07 09:36:27 augustss Exp $	*/
 /* 
@@ -261,7 +263,7 @@
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <net/if_dl.h>
-#include <net/if_ieee80211.h>
+#include <net80211/ieee80211.h>
 #include <net/if_llc.h>
 
 #include <dev/pccard/pccardvar.h>
@@ -501,8 +503,7 @@ ray_attach(device_t dev)
 	bcopy((char *)&ep->e_station_addr,
 	    (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 	ifp->if_softc = sc;
-	ifp->if_name = "ray";
-	ifp->if_unit = device_get_unit(dev);
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_timer = 0;
 	ifp->if_flags = (IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);
 	ifp->if_hdrlen = sizeof(struct ieee80211_frame) + 

@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	from: if_ethersubr.c,v 1.5 1994/12/13 22:31:45 wollman Exp
- * $FreeBSD: src/sys/net/if_fddisubr.c,v 1.85 2003/03/16 00:17:44 mdodd Exp $
+ * $FreeBSD: src/sys/net/if_fddisubr.c,v 1.87 2003/11/14 21:02:22 andre Exp $
  */
 
 #include "opt_atalk.h"
@@ -404,8 +404,8 @@ fddi_input(ifp, m)
 	 * Set mbuf flags for bcast/mcast.
 	 */
 	if (fh->fddi_dhost[0] & 1) {
-		if (bcmp((caddr_t)ifp->if_broadcastaddr,
-			 (caddr_t)fh->fddi_dhost, FDDI_ADDR_LEN) == 0)
+		if (bcmp(ifp->if_broadcastaddr, fh->fddi_dhost,
+		    FDDI_ADDR_LEN) == 0)
 			m->m_flags |= M_BCAST;
 		else
 			m->m_flags |= M_MCAST;
@@ -471,7 +471,7 @@ fddi_input(ifp, m)
 		switch (type) {
 #ifdef INET
 		case ETHERTYPE_IP:
-			if (ipflow_fastforward(m))
+			if (ip_fastforward(m))
 				return;
 			isr = NETISR_IP;
 			break;

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/powerpc/include/md_var.h,v 1.25 2003/02/05 12:33:49 benno Exp $
+ * $FreeBSD: src/sys/powerpc/include/md_var.h,v 1.26 2003/08/16 16:57:57 marcel Exp $
  */
 
 #ifndef _MACHINE_MD_VAR_H_
@@ -51,10 +51,7 @@ struct cam_sim;
 struct pcicfg;
 
 void	busdma_swi(void);
-void	cpu_halt(void);
-void	cpu_reset(void);
 int	is_physical_memory(vm_offset_t addr);
-void	swi_vm(void *);
 
 void	decr_init(void);
 

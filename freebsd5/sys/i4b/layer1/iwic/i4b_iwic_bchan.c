@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 1999, 2000 Dave Boyce. All rights reserved.
- *
  * Copyright (c) 2000, 2001 Hellmuth Michaelis. All rights reserved. 
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,12 +27,12 @@
  *
  *      i4b_iwic - isdn4bsd Winbond W6692 driver
  *      ----------------------------------------
- *
- * $FreeBSD: src/sys/i4b/layer1/iwic/i4b_iwic_bchan.c,v 1.12 2002/09/02 00:52:10 brooks Exp $
- *
  *      last edit-date: [Tue Jan 16 13:21:24 2001]
  *
  *---------------------------------------------------------------------------*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/layer1/iwic/i4b_iwic_bchan.c,v 1.13 2003/06/10 23:48:55 obrien Exp $");
 
 #include "opt_i4b.h"
 

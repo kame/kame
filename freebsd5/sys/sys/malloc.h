@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)malloc.h	8.5 (Berkeley) 5/3/95
- * $FreeBSD: src/sys/sys/malloc.h,v 1.74 2003/03/25 00:07:05 jake Exp $
+ * $FreeBSD: src/sys/sys/malloc.h,v 1.75 2003/08/19 16:41:12 sam Exp $
  */
 
 #ifndef _SYS_MALLOC_H_
@@ -47,7 +47,7 @@
  * flags to malloc.
  */
 #define	M_NOWAIT	0x0001		/* do not block */
-#define	M_WAITOK	0x0002		/* do not block */
+#define	M_WAITOK	0x0002		/* ok to block */
 #define	M_ZERO		0x0100		/* bzero the allocation */
 #define	M_NOVM		0x0200		/* don't ask VM for pages */
 #define	M_USE_RESERVE	0x0400		/* can alloc out of reserve memory */

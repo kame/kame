@@ -1,5 +1,3 @@
-/* $FreeBSD: src/sys/kern/sysv_sem.c,v 1.61 2003/03/24 21:15:34 jhb Exp $ */
-
 /*
  * Implementation of SVID semaphores
  *
@@ -7,6 +5,9 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/sysv_sem.c,v 1.67 2003/11/15 11:56:53 tjr Exp $");
 
 #include "opt_sysvipc.h"
 
@@ -50,7 +51,7 @@ int semop(struct thread *td, struct semop_args *uap);
 #endif
 
 static struct sem_undo *semu_alloc(struct thread *td);
-static int semundo_adjust(struct thread *td, struct sem_undo **supptr, 
+static int semundo_adjust(struct thread *td, struct sem_undo **supptr,
 		int semid, int semnum, int adjval);
 static void semundo_clear(int semid, int semnum);
 
@@ -159,13 +160,13 @@ struct seminfo seminfo = {
 
 SYSCTL_DECL(_kern_ipc);
 SYSCTL_INT(_kern_ipc, OID_AUTO, semmap, CTLFLAG_RW, &seminfo.semmap, 0, "");
-SYSCTL_INT(_kern_ipc, OID_AUTO, semmni, CTLFLAG_RD, &seminfo.semmni, 0, "");
-SYSCTL_INT(_kern_ipc, OID_AUTO, semmns, CTLFLAG_RD, &seminfo.semmns, 0, "");
-SYSCTL_INT(_kern_ipc, OID_AUTO, semmnu, CTLFLAG_RD, &seminfo.semmnu, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, semmni, CTLFLAG_RDTUN, &seminfo.semmni, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, semmns, CTLFLAG_RDTUN, &seminfo.semmns, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, semmnu, CTLFLAG_RDTUN, &seminfo.semmnu, 0, "");
 SYSCTL_INT(_kern_ipc, OID_AUTO, semmsl, CTLFLAG_RW, &seminfo.semmsl, 0, "");
-SYSCTL_INT(_kern_ipc, OID_AUTO, semopm, CTLFLAG_RD, &seminfo.semopm, 0, "");
-SYSCTL_INT(_kern_ipc, OID_AUTO, semume, CTLFLAG_RD, &seminfo.semume, 0, "");
-SYSCTL_INT(_kern_ipc, OID_AUTO, semusz, CTLFLAG_RD, &seminfo.semusz, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, semopm, CTLFLAG_RDTUN, &seminfo.semopm, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, semume, CTLFLAG_RDTUN, &seminfo.semume, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, semusz, CTLFLAG_RDTUN, &seminfo.semusz, 0, "");
 SYSCTL_INT(_kern_ipc, OID_AUTO, semvmx, CTLFLAG_RW, &seminfo.semvmx, 0, "");
 SYSCTL_INT(_kern_ipc, OID_AUTO, semaem, CTLFLAG_RW, &seminfo.semaem, 0, "");
 SYSCTL_PROC(_kern_ipc, OID_AUTO, sema, CTLFLAG_RD,
@@ -197,6 +198,7 @@ seminit(void)
 	for (i = 0; i < seminfo.semmni; i++) {
 		sema[i].sem_base = 0;
 		sema[i].sem_perm.mode = 0;
+		sema[i].sem_perm.seq = 0;
 	}
 	for (i = 0; i < seminfo.semmni; i++)
 		mtx_init(&sema_mtx[i], "semid", NULL, MTX_DEF);
@@ -274,7 +276,7 @@ semsys(td, uap)
 	struct thread *td;
 	/* XXX actually varargs. */
 	struct semsys_args /* {
-		u_int	which;
+		int	which;
 		int	a2;
 		int	a3;
 		int	a4;
@@ -285,7 +287,8 @@ semsys(td, uap)
 
 	if (!jail_sysvipc_allowed && jailed(td->td_ucred))
 		return (ENOSYS);
-	if (uap->which >= sizeof(semcalls)/sizeof(semcalls[0]))
+	if (uap->which < 0 ||
+	    uap->which >= sizeof(semcalls)/sizeof(semcalls[0]))
 		return (EINVAL);
 	error = (*semcalls[uap->which])(td, &uap->a2);
 	return (error);
@@ -308,7 +311,7 @@ semu_alloc(td)
 	SEMUNDO_LOCKASSERT(MA_OWNED);
 	/*
 	 * Try twice to allocate something.
-	 * (we'll purge any empty structures after the first pass so
+	 * (we'll purge an empty structure after the first pass so
 	 * two passes are always enough)
 	 */
 
@@ -330,11 +333,11 @@ semu_alloc(td)
 
 		/*
 		 * We didn't find a free one, if this is the first attempt
-		 * then try to free some structures.
+		 * then try to free a structure.
 		 */
 
 		if (attempt == 0) {
-			/* All the structures are in use - try to free some */
+			/* All the structures are in use - try to free one */
 			int did_something = 0;
 
 			SLIST_FOREACH_PREVPTR(suptr, supptr, &semu_list,
@@ -343,6 +346,7 @@ semu_alloc(td)
 					suptr->un_proc = NULL;
 					did_something = 1;
 					*supptr = SLIST_NEXT(suptr, un_next);
+					break;
 				}
 			}
 
@@ -525,7 +529,7 @@ __semctl(td, uap)
 		semaptr = &sema[semid];
 		sema_mtxp = &sema_mtx[semid];
 		mtx_lock(sema_mtxp);
-		if ((semaptr->sem_perm.mode & SEM_ALLOC) == 0 ) {
+		if ((semaptr->sem_perm.mode & SEM_ALLOC) == 0) {
 			error = EINVAL;
 			goto done2;
 		}

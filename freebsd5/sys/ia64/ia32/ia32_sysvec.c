@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ia64/ia32/ia32_sysvec.c,v 1.3 2003/05/16 21:26:40 marcel Exp $
+ * $FreeBSD: src/sys/ia64/ia32/ia32_sysvec.c,v 1.5 2003/09/25 01:10:24 peter Exp $
  */
 
 #define __ELF_WORD_SIZE 32
@@ -115,7 +115,8 @@ struct sysentvec ia32_freebsd_sysvec = {
 	IA32_PS_STRINGS,
 	VM_PROT_ALL,
 	ia32_copyout_strings,
-	ia32_setregs
+	ia32_setregs,
+	NULL
 };
 
 static Elf32_Brandinfo ia32_brand_info = {
@@ -123,7 +124,7 @@ static Elf32_Brandinfo ia32_brand_info = {
 						EM_386,
 						"FreeBSD",
 						"/compat/ia32",
-						"/usr/libexec/ld-elf.so.1",
+						"/lib/ld-elf.so.1",
 						&ia32_freebsd_sysvec
 					  };
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)netisr.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/netisr.h,v 1.29 2003/03/05 19:24:22 peter Exp $
+ * $FreeBSD: src/sys/net/netisr.h,v 1.30 2003/11/08 22:28:39 sam Exp $
  */
 
 #ifndef _NET_NETISR_H_
@@ -91,7 +91,8 @@ typedef void netisr_t (struct mbuf *);
   
 void	netisr_dispatch(int, struct mbuf *);
 int	netisr_queue(int, struct mbuf *);
-void	netisr_register(int, netisr_t *, struct ifqueue *);
+#define	NETISR_MPSAFE	0x0001		/* ISR does not need Giant */
+void	netisr_register(int, netisr_t *, struct ifqueue *, int);
 void	netisr_unregister(int);
 
 #endif

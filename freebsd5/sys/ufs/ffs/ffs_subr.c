@@ -31,8 +31,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_subr.c	8.5 (Berkeley) 3/21/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_subr.c,v 1.36 2003/03/18 08:45:24 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_subr.c,v 1.37 2003/06/11 06:31:28 obrien Exp $");
 
 #include <sys/param.h>
 

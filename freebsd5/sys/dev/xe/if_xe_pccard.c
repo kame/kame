@@ -22,11 +22,12 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *
- * xe pccard interface driver
- * $FreeBSD: src/sys/dev/xe/if_xe_pccard.c,v 1.8 2003/04/10 04:36:02 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/xe/if_xe_pccard.c,v 1.14 2003/11/04 21:09:37 rsm Exp $");
+
+/* xe pccard interface driver */
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -54,39 +55,54 @@
 #include <dev/pccard/pccarddevs.h>
 #include "card_if.h"
 
-#define XE_VENDOR_ID_XIRCOM 0x0105
-#define XE_VENDOR_ID_COMPAQ_1 0x0138
-#define XE_VENDOR_ID_COMPAQ_2 0x0183
-#define XE_VENDOR_ID_INTEL 0x0089
-#define XE_VENDOR_ID_UNKNOWN 0
+/*
+ * Debug logging levels - set with hw.xe.debug sysctl
+ * 0 = None
+ * 1 = More hardware details, probe/attach progress
+ * 2 = Most function calls, ioctls and media selection progress
+ * 3 = Everything - interrupts, packets in/out and multicast address setup
+ */
+#define XE_DEBUG
+#ifdef XE_DEBUG
+
+extern int xe_debug;
+
+#define DEVPRINTF(level, arg) if (xe_debug >= (level)) device_printf arg
+#define DPRINTF(level, arg) if (xe_debug >= (level)) printf arg
+#else
+#define DEVPRINTF(level, arg)
+#define DPRINTF(level, arg)
+#endif
+
 
 struct xe_vendor_table {
 	u_int32_t vendor_id;
 	char *vendor_desc;
 } xe_vendor_devs[] = {
-	{ XE_VENDOR_ID_XIRCOM, "Xircom" },
-	{ XE_VENDOR_ID_COMPAQ_1, "Compaq" },
-	{ XE_VENDOR_ID_COMPAQ_2, "Compaq" },
-	{ XE_VENDOR_ID_INTEL, "Intel" },
-	{ XE_VENDOR_ID_UNKNOWN, "Unknown" }
+	{ PCMCIA_VENDOR_XIRCOM, "Xircom" },
+	{ PCMCIA_VENDOR_COMPAQ, "Compaq" },
+	{ PCMCIA_VENDOR_COMPAQ2, "Compaq" },   /* Maybe Paralon Techologies, Inc */
+	{ PCMCIA_VENDOR_INTEL, "Intel" },
+	{ 0, "Unknown" }
 };
 
 #define XE_CARD_TYPE_FLAGS_NO 0x0
 #define XE_CARD_TYPE_FLAGS_CE2 0x1
 #define XE_CARD_TYPE_FLAGS_MOHAWK 0x2
 #define XE_CARD_TYPE_FLAGS_DINGO 0x4
-#define XE_PROD_UMASK 0x100f
-#define XE_PROD_MODEM_UMASK 0x1000
-#define XE_PROD_SINGLE_ID1 0x1
-#define XE_PROD_SINGLE_ID2 0x2
-#define XE_PROD_SINGLE_ID3 0x3
-#define XE_PROD_MULTI_ID1 0x1001
-#define XE_PROD_MULTI_ID2 0x1002
-#define XE_PROD_MULTI_ID3 0x1003
-#define XE_PROD_MULTI_ID4 0x1004
-#define XE_PROD_MULTI_ID5 0x1005
-#define XE_PROD_MULTI_ID6 0x1006 
-#define XE_PROD_MULTI_ID7 0x1007  
+#define XE_PROD_UMASK 0x11000f
+#define XE_PROD_ETHER_UMASK 0x010000
+#define XE_PROD_MODEM_UMASK 0x100000
+#define XE_PROD_SINGLE_ID1 0x010001
+#define XE_PROD_SINGLE_ID2 0x010002
+#define XE_PROD_SINGLE_ID3 0x010003
+#define XE_PROD_MULTI_ID1 0x110001
+#define XE_PROD_MULTI_ID2 0x110002
+#define XE_PROD_MULTI_ID3 0x110003
+#define XE_PROD_MULTI_ID4 0x110004
+#define XE_PROD_MULTI_ID5 0x110005
+#define XE_PROD_MULTI_ID6 0x110006 
+#define XE_PROD_MULTI_ID7 0x110007  
 
 struct xe_card_type_table {
 	u_int32_t prod_type;
@@ -111,18 +127,19 @@ struct xe_card_type_table {
 /*
  * Prototypes
  */
-static int xe_cem56fix(device_t dev);
+static int xe_cemfix(device_t dev);
 static struct xe_vendor_table *xe_vendor_lookup(u_int32_t devid,
 					struct xe_vendor_table *tbl);
 static struct xe_card_type_table *xe_card_type_lookup(u_int32_t devid,
 					struct xe_card_type_table *tbl);
 
 /*
- * Fixing for RealPort cards - they need a little furtling to get the
- * ethernet working. But this codes don't work well in NEWCARD.
+ * Fixing for CEM2, CEM3 and CEM56/REM56 cards.  These need some magic to
+ * enable the Ethernet function, which isn't mentioned anywhere in the CIS.
+ * Despite the register names, most of this isn't Dingo-specific.
  */
 static int
-xe_cem56fix(device_t dev)
+xe_cemfix(device_t dev)
 {
 	struct xe_softc *sc = (struct xe_softc *) device_get_softc(dev);
 	bus_space_tag_t bst;
@@ -131,15 +148,17 @@ xe_cem56fix(device_t dev)
 	int rid;
 	int ioport;
 
-	device_printf(dev, "Realport port 0x%0lx, size 0x%0lx\n",
+	DEVPRINTF(2, (dev, "cemfix\n"));
+
+	DEVPRINTF(1, (dev, "CEM I/O port 0x%0lx, size 0x%0lx\n",
 		bus_get_resource_start(dev, SYS_RES_IOPORT, sc->port_rid),
-		bus_get_resource_count(dev, SYS_RES_IOPORT, sc->port_rid));
+		bus_get_resource_count(dev, SYS_RES_IOPORT, sc->port_rid)));
 
 	rid = 0;
 	r = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid, 0,
 			       ~0, 4 << 10, RF_ACTIVE);
 	if (!r) {
-		device_printf(dev, "Can't map in attribute memory\n");
+		device_printf(dev, "cemfix: Can't map in attribute memory\n");
 		return (-1);
 	}
 
@@ -157,12 +176,14 @@ xe_cem56fix(device_t dev)
 	bus_space_write_1(bst, bsh, DINGO_EBAR0, ioport & 0xff);
 	bus_space_write_1(bst, bsh, DINGO_EBAR1, (ioport >> 8) & 0xff);
 
-	bus_space_write_1(bst, bsh, DINGO_DCOR0, DINGO_DCOR0_SF_INT);
-	bus_space_write_1(bst, bsh, DINGO_DCOR1, DINGO_DCOR1_INT_LEVEL |
-						 DINGO_DCOR1_EEDIO);
-	bus_space_write_1(bst, bsh, DINGO_DCOR2, 0x00);
-	bus_space_write_1(bst, bsh, DINGO_DCOR3, 0x00);
-	bus_space_write_1(bst, bsh, DINGO_DCOR4, 0x00);
+	if (sc->dingo) {
+		bus_space_write_1(bst, bsh, DINGO_DCOR0, DINGO_DCOR0_SF_INT);
+		bus_space_write_1(bst, bsh, DINGO_DCOR1, DINGO_DCOR1_INT_LEVEL |
+						  DINGO_DCOR1_EEDIO);
+		bus_space_write_1(bst, bsh, DINGO_DCOR2, 0x00);
+		bus_space_write_1(bst, bsh, DINGO_DCOR3, 0x00);
+		bus_space_write_1(bst, bsh, DINGO_DCOR4, 0x00);
+	}
 
 	bus_release_resource(dev, SYS_RES_MEMORY, rid, r);
 
@@ -203,10 +224,31 @@ xe_pccard_probe(device_t dev)
 	struct xe_softc *scp = (struct xe_softc *) device_get_softc(dev);
 	u_int32_t vendor,prodid,prod;
 	u_int16_t prodext;
-	char *cis3_str=NULL;
+	const char* vendor_str = NULL;
+	const char* product_str = NULL;
+	const char* cis4_str = NULL;
+	const char *cis3_str=NULL;
 	struct xe_vendor_table *vendor_itm;
 	struct xe_card_type_table *card_itm;
 	int i;
+
+	DEVPRINTF(2, (dev, "pccard_probe\n"));
+
+	pccard_get_vendor(dev, &vendor);
+	pccard_get_product(dev, &prodid);
+	pccard_get_prodext(dev, &prodext);
+	pccard_get_vendor_str(dev, &vendor_str);
+	pccard_get_product_str(dev, &product_str);
+	pccard_get_cis3_str(dev, &cis3_str);
+	pccard_get_cis4_str(dev, &cis4_str);
+
+	DEVPRINTF(1, (dev, "vendor = 0x%04x\n", vendor));
+	DEVPRINTF(1, (dev, "product = 0x%04x\n", prodid));
+	DEVPRINTF(1, (dev, "prodext = 0x%02x\n", prodext));
+	DEVPRINTF(1, (dev, "vendor_str = %s\n", vendor_str));
+	DEVPRINTF(1, (dev, "product_str = %s\n", product_str));
+	DEVPRINTF(1, (dev, "cis3_str = %s\n", cis3_str));
+	DEVPRINTF(1, (dev, "cis4_str = %s\n", cis4_str));
 
 	/*
 	 * PCCARD_CISTPL_MANFID = 0x20
@@ -244,7 +286,7 @@ xe_pccard_probe(device_t dev)
 	 */
 	pccard_get_cis3_str(dev, &cis3_str);
 	if (strcmp(scp->card_type, "CE") == 0)
-		if (strcmp(cis3_str, "CE2") ==0)
+		if (cis3_str != NULL && strcmp(cis3_str, "PS-CE2-10") == 0)
 			scp->card_type = "CE2"; /* Look for "CE2" string */
 
 	/*
@@ -273,12 +315,15 @@ xe_pccard_attach(device_t dev)
 	struct xe_softc *scp = device_get_softc(dev);
 	int err;
 
+	DEVPRINTF(2, (dev, "pccard_attach\n"));
+
 	if ((err = xe_activate(dev)) != 0)
 		return (err);
          
 	/* Hack RealPorts into submission */
-	if (scp->dingo && xe_cem56fix(dev) < 0) {
-		device_printf(dev, "Unable to fix your RealPort\n");
+	if (scp->modem && xe_cemfix(dev) < 0) {
+		device_printf(dev, "Unable to fix your %s combo card\n",
+					  scp->card_type);
 		xe_deactivate(dev);
 		return (ENODEV);
 	}
@@ -299,6 +344,8 @@ static int
 xe_pccard_detach(device_t dev)
 {
 	struct xe_softc *sc = device_get_softc(dev);
+
+	DEVPRINTF(2, (dev, "pccard_detach\n"));
 
 	sc->arpcom.ac_if.if_flags &= ~IFF_RUNNING;
 	ether_ifdetach(&sc->arpcom.ac_if);
@@ -326,11 +373,13 @@ xe_pccard_match(device_t dev)
 {
 	const struct pccard_product *pp;
 
+	DEVPRINTF(2, (dev, "pccard_match\n"));
+
 	if ((pp = pccard_product_lookup(dev, xe_pccard_products,
-	     sizeof(xe_pccard_products[0]), NULL)) != NULL) {
-		if (pp->pp_name != NULL)
-			device_set_desc(dev, pp->pp_name);
-		return (0);
+		sizeof(xe_pccard_products[0]), NULL)) != NULL) {
+	    if (pp->pp_name != NULL)
+					device_set_desc(dev, pp->pp_name);
+			return (0);
 	}
 	return (EIO);
 }

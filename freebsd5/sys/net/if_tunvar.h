@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_tunvar.h,v 1.9 2001/06/01 15:51:10 brian Exp $
+ * $FreeBSD: src/sys/net/if_tunvar.h,v 1.10 2003/09/27 21:43:16 phk Exp $
  */
 
 #ifndef _NET_IF_TUNVAR_H_
@@ -47,10 +47,9 @@ struct tun_softc {
 	struct	ifnet tun_if;		/* the interface */
 	struct  sigio *tun_sigio;	/* information for async I/O */
 	struct	selinfo	tun_rsel;	/* read select */
-	struct	selinfo	tun_wsel;	/* write select (not used) */
 
 	struct	tun_softc *next;	/* Next softc in list */
-	struct	resource *r_unit;	/* resource allocated for this unit */
+	struct	resource *tun_unit;	/* resource allocated for this unit */
 };
 
 #endif /* !_NET_IF_TUNVAR_H_ */

@@ -31,13 +31,14 @@
  * SUCH DAMAGE.
  *
  *	@(#)stdlib.h	8.5 (Berkeley) 5/19/95
- * $FreeBSD: src/include/stdlib.h,v 1.48 2003/03/12 20:29:58 das Exp $
+ * $FreeBSD: src/include/stdlib.h,v 1.54.2.1 2003/12/18 00:59:50 peter Exp $
  */
 
 #ifndef _STDLIB_H_
 #define	_STDLIB_H_
 
 #include <sys/cdefs.h>
+#include <sys/_null.h>
 #include <sys/_types.h>
 
 #if __BSD_VISIBLE
@@ -68,10 +69,6 @@ typedef struct {
 	long	quot;
 	long	rem;
 } ldiv_t;
-
-#ifndef NULL
-#define	NULL	0
-#endif
 
 #define	EXIT_FAILURE	1
 #define	EXIT_SUCCESS	0
@@ -222,7 +219,22 @@ extern const char *_malloc_options;
 extern void (*_malloc_message)(const char *, const char *, const char *,
 	    const char *);
 
-void	*alloca(size_t);		/* built-in for gcc */
+/*
+ * The alloca() function can't be implemented in C, and on some
+ * platforms it can't be implemented at all as a callable function.
+ * The GNU C compiler provides a built-in alloca() which we can use;
+ * in all other cases, provide a prototype, mainly to pacify various
+ * incarnations of lint.  On platforms where alloca() is not in libc,
+ * programs which use it will fail to link when compiled with non-GNU
+ * compilers.
+ */
+#if __GNUC__ >= 2 || defined(__INTEL_COMPILER)
+#undef  alloca	/* some GNU bits try to get cute and define this on their own */
+#define alloca(sz) __builtin_alloca(sz)
+#elif defined(lint)
+void	*alloca(size_t);
+#endif
+
 __uint32_t
 	 arc4random(void);
 void	 arc4random_addrandom(unsigned char *dat, int datlen);
@@ -242,6 +254,7 @@ int	 cgetustr(char *, const char *, char **);
 
 int	 daemon(int, int);
 char	*devname(int, int);
+char 	*devname_r(int, int, char *, int);
 int	 getloadavg(double [], int);
 __const char *
 	 getprogname(void);

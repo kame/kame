@@ -25,8 +25,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ng_ubt.c,v 1.14 2003/04/14 23:00:50 max Exp $
- * $FreeBSD: src/sys/netgraph/bluetooth/drivers/ubt/ng_ubt.c,v 1.6 2003/05/10 21:44:39 julian Exp $
+ * $Id: ng_ubt.c,v 1.16 2003/10/10 19:15:06 max Exp $
+ * $FreeBSD: src/sys/netgraph/bluetooth/drivers/ubt/ng_ubt.c,v 1.9 2003/10/12 22:04:20 emax Exp $
  */
 
 #include <sys/param.h>
@@ -40,7 +40,8 @@
 #include <sys/malloc.h>
 #include <sys/kernel.h>
 #include <sys/poll.h>
-#include <sys/vnode.h>
+#include <sys/uio.h>
+#include <machine/bus.h>
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
@@ -2703,8 +2704,6 @@ ubt_create_device_nodes(ubt_softc_p sc)
 Static void
 ubt_destroy_device_nodes(ubt_softc_p sc)
 {
-	struct vnode	*vp = NULL;
-
 	/*
 	 * Wait for processes to go away. This should be safe as we will not
 	 * call ubt_destroy_device_nodes() from Netgraph unless all devices
@@ -2720,28 +2719,16 @@ ubt_destroy_device_nodes(ubt_softc_p sc)
 
 	/* Destroy device nodes */
 	if (sc->sc_bulk_dev != NODEV) {
-		vp = SLIST_FIRST(&sc->sc_bulk_dev->si_hlist);
-		if (vp != NULL) 
-			VOP_REVOKE(vp, REVOKEALL);
-
 		destroy_dev(sc->sc_bulk_dev);
 		sc->sc_bulk_dev = NODEV;
 	}
 
 	if (sc->sc_intr_dev != NODEV) {
-		vp = SLIST_FIRST(&sc->sc_intr_dev->si_hlist);
-		if (vp != NULL) 
-			VOP_REVOKE(vp, REVOKEALL);
-
 		destroy_dev(sc->sc_intr_dev);
 		sc->sc_intr_dev = NODEV;
 	}
 
 	if (sc->sc_ctrl_dev != NODEV) {
-		vp = SLIST_FIRST(&sc->sc_ctrl_dev->si_hlist);
-		if (vp != NULL) 
-			VOP_REVOKE(vp, REVOKEALL);
-
 		destroy_dev(sc->sc_ctrl_dev);
 		sc->sc_ctrl_dev = NODEV;
 	}

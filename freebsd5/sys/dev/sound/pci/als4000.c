@@ -37,12 +37,12 @@
 #include <dev/sound/isa/sb.h>
 #include <dev/sound/pci/als4000.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/als4000.c,v 1.10 2003/02/20 17:31:11 cognet Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/als4000.c,v 1.13 2003/09/02 17:30:37 jhb Exp $");
 
 /* Debugging macro's */
 #undef DEB
@@ -713,7 +713,7 @@ als_resource_free(device_t dev, struct sc_info *sc)
 static int
 als_resource_grab(device_t dev, struct sc_info *sc)
 {
-	sc->regid = PCIR_MAPS;
+	sc->regid = PCIR_BAR(0);
 	sc->reg = bus_alloc_resource(dev, SYS_RES_IOPORT, &sc->regid, 0, ~0,
 				     ALS_CONFIG_SPACE_BYTES, RF_ACTIVE);
 	if (sc->reg == 0) {
@@ -745,7 +745,8 @@ als_resource_grab(device_t dev, struct sc_info *sc)
 			       /*filter*/NULL, /*filterarg*/NULL,
 			       /*maxsize*/sc->bufsz,
 			       /*nsegments*/1, /*maxsegz*/0x3ffff,
-			       /*flags*/0, &sc->parent_dmat) != 0) {
+			       /*flags*/0, /*lockfunc*/busdma_lock_mutex,
+			       /*lockarg*/&Giant, &sc->parent_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		goto bad;
 	}

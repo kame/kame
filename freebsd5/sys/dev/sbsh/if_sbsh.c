@@ -1,4 +1,4 @@
-/**
+/*-
  * Granch SBNI16 G.SHDSL Modem driver
  * Written by Denis I. Timofeev, 2002-2003.
  *
@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/sbsh/if_sbsh.c,v 1.3 2003/04/15 17:26:28 fjoe Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/sbsh/if_sbsh.c,v 1.7 2003/10/31 18:32:04 brooks Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -52,8 +53,8 @@
 #include <sys/bus.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/sbsh/if_sbshreg.h>
 
@@ -226,7 +227,7 @@ sbsh_attach(device_t dev)
 	sc = device_get_softc(dev);
 	unit = device_get_unit(dev);
 
-	rid = PCIR_MAPS + 4;
+	rid = PCIR_BAR(1);
 	sc->mem_res = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
 					0, ~0, 4096, RF_ACTIVE);
 
@@ -243,7 +244,7 @@ sbsh_attach(device_t dev)
 	if (sc->irq_res == NULL) {
 		printf("sbsh%d: couldn't map interrupt\n", unit);
 		bus_release_resource(dev, SYS_RES_MEMORY,
-					PCIR_MAPS + 4, sc->mem_res);
+					PCIR_BAR(1), sc->mem_res);
 		error = ENXIO;
 		goto fail;
 	}
@@ -256,7 +257,7 @@ sbsh_attach(device_t dev)
 	if (error) {
 		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->irq_res);
 		bus_release_resource(dev, SYS_RES_MEMORY,
-					PCIR_MAPS + 4, sc->mem_res);
+					PCIR_BAR(1), sc->mem_res);
 		printf("sbsh%d: couldn't set up irq\n", unit);
 		goto fail;
 	}
@@ -267,8 +268,7 @@ sbsh_attach(device_t dev)
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = unit;
-	ifp->if_name = "sbsh";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = sbsh_ioctl;
@@ -303,7 +303,7 @@ sbsh_detach(device_t dev)
 
 	bus_teardown_intr(dev, sc->irq_res, sc->intr_hand);
 	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->irq_res);
-	bus_release_resource(dev, SYS_RES_MEMORY, PCIR_MAPS + 4, sc->mem_res);
+	bus_release_resource(dev, SYS_RES_MEMORY, PCIR_BAR(1), sc->mem_res);
 
 	splx(s);
 	return (0);

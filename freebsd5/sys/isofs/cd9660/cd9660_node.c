@@ -36,8 +36,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)cd9660_node.c	8.2 (Berkeley) 1/23/94
- * $FreeBSD: src/sys/isofs/cd9660/cd9660_node.c,v 1.44 2002/10/14 03:20:35 mckusick Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/isofs/cd9660/cd9660_node.c,v 1.46 2003/10/05 02:45:36 jeff Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -218,7 +220,6 @@ cd9660_reclaim(ap)
 	/*
 	 * Purge old data structures associated with the inode.
 	 */
-	cache_purge(vp);
 	if (ip->i_devvp) {
 		vrele(ip->i_devvp);
 		ip->i_devvp = 0;

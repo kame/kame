@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/isa/isa_common.c,v 1.34 2003/04/30 21:41:41 peter Exp $
  */
 /*
  * Modifications for Intel architecture by Garrett A. Wollman.
@@ -58,6 +56,9 @@
 /*
  * Parts of the ISA bus implementation common to all architectures.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/isa/isa_common.c,v 1.36 2003/07/08 18:56:58 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -1116,3 +1117,20 @@ DRIVER_MODULE(isa, eisab, isa_driver, isa_devclass, 0, 0);
 DRIVER_MODULE(isa, legacy, isa_driver, isa_devclass, 0, 0);
 #endif
 MODULE_VERSION(isa, 1);
+
+/*
+ * Code common to ISA bridges.
+ */
+
+devclass_t isab_devclass;
+
+int
+isab_attach(device_t dev)
+{
+	device_t child;
+
+	child = device_add_child(dev, "isa", 0);
+	if (child != NULL)
+		return (bus_generic_attach(dev));
+	return (ENXIO);
+}

@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/dev/pci/pci_if.m,v 1.5 2003/04/16 03:15:08 mdodd Exp $
+# $FreeBSD: src/sys/dev/pci/pci_if.m,v 1.6 2003/07/01 14:08:32 tmm Exp $
 #
 
 #include <sys/bus.h>
@@ -76,4 +76,9 @@ METHOD int disable_io {
 	device_t	dev;
 	device_t	child;
 	int		space;
+};
+
+METHOD int assign_interrupt {
+	device_t	dev;
+	device_t	child;
 };

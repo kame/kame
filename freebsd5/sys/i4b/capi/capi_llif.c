@@ -23,9 +23,10 @@
  * SUCH DAMAGE.
  *
  * capi/capi_llif.c	The i4b CAPI link layer interface.
- *
- * $FreeBSD: src/sys/i4b/capi/capi_llif.c,v 1.2 2002/09/02 00:52:05 brooks Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/i4b/capi/capi_llif.c,v 1.3 2003/06/10 23:09:37 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

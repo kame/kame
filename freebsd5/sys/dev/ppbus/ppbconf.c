@@ -23,9 +23,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ppbus/ppbconf.c,v 1.22 2001/06/12 07:01:27 peter Exp $
  *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ppbus/ppbconf.c,v 1.23 2003/08/24 17:54:16 obrien Exp $");
 #include "opt_ppb_1284.h"
 
 #include <sys/param.h>

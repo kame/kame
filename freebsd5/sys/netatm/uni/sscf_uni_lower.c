@@ -1,5 +1,4 @@
 /*
- *
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
@@ -22,9 +21,6 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/netatm/uni/sscf_uni_lower.c,v 1.10 2002/11/08 18:27:30 jhb Exp $
- *
  */
 
 /*
@@ -32,8 +28,10 @@
  * ---------------------
  *
  * SSCF UNI - SSCF_UNI SAP interface processing
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/netatm/uni/sscf_uni_lower.c,v 1.12 2003/07/24 12:24:41 harti Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -61,11 +59,7 @@
 
 #include <vm/uma.h>
 
-#ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/sscf_uni_lower.c,v 1.10 2002/11/08 18:27:30 jhb Exp $");
-#endif
-
-extern uma_zone_t	unisig_vc_zone;
+extern uma_zone_t	sscf_uni_zone;
 
 /*
  * Local variables
@@ -176,7 +170,7 @@ sscf_uni_lower(cmd, tok, arg1, arg2)
 			sscf_uni_abort(uvp, "sscf_uni: TERM failure\n");
 			return;
 		}
-		uma_zfree(unisig_vc_zone, uvp);
+		uma_zfree(sscf_uni_zone, uvp);
 		sscf_uni_vccnt--;
 		break;
 

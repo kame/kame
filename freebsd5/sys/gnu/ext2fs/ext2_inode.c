@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_inode.c	8.5 (Berkeley) 12/30/93
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_inode.c,v 1.40 2003/03/04 00:04:42 jeff Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_inode.c,v 1.43 2003/10/18 14:10:25 phk Exp $
  */
 
 #include <sys/param.h>
@@ -404,6 +404,7 @@ ext2_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
 			panic("ext2_indirtrunc: bad buffer size");
 		bp->b_blkno = dbn;
 		vfs_busy_pages(bp, 0);
+		bp->b_iooffset = dbtob(bp->b_blkno);
 		VOP_STRATEGY(vp, bp);
 		error = bufwait(bp);
 	}
@@ -541,7 +542,6 @@ ext2_reclaim(ap)
 	/*
 	 * Purge old data structures associated with the inode.
 	 */
-	cache_purge(vp);
 	if (ip->i_devvp) {
 		vrele(ip->i_devvp);
 		ip->i_devvp = 0;

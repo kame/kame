@@ -55,10 +55,11 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/powerpc/powerpc/machdep.c,v 1.57 2003/05/13 20:36:01 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/powerpc/powerpc/machdep.c,v 1.63 2003/11/09 20:31:03 marcel Exp $");
 
 #include "opt_ddb.h"
 #include "opt_compat.h"
+#include "opt_kstack_pages.h"
 #include "opt_msgbuf.h"
 
 #include <sys/param.h>
@@ -130,8 +131,6 @@ SYSCTL_STRING(_hw, HW_MODEL, model, CTLFLAG_RD, model, 0, "");
 static int cacheline_size = CACHELINESIZE;
 SYSCTL_INT(_machdep, CPU_CACHELINE, cacheline_size,
 	   CTLFLAG_RD, &cacheline_size, 0, "");
-
-char		bootpath[256];
 
 #ifdef DDB
 /* start and end of kernel symbol table */
@@ -507,6 +506,25 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	mtx_lock(&psp->ps_mtx);
 }
 
+/*
+ * Build siginfo_t for SA thread
+ */
+void
+cpu_thread_siginfo(int sig, u_long code, siginfo_t *si)
+{
+	struct proc *p;
+	struct thread *td;
+
+	td = curthread;
+	p = td->td_proc;
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+
+	bzero(si, sizeof(*si));
+	si->si_signo = sig;
+	si->si_code = code;
+	/* XXXKSE fill other fields */
+}
+
 int
 sigreturn(struct thread *td, struct sigreturn_args *uap)
 {
@@ -563,7 +581,7 @@ freebsd4_sigreturn(struct thread *td, struct freebsd4_sigreturn_args *uap)
 #endif
 
 int
-get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
+get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 {
 
 	return (ENOSYS);
@@ -589,6 +607,12 @@ cpu_halt(void)
 {
 
 	OF_exit();
+}
+
+void
+cpu_idle(void)
+{
+	/* Insert code to halt (until next interrupt) for the idle loop */
 }
 
 /*

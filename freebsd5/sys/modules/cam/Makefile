@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/cam/Makefile,v 1.8 2002/11/22 22:55:51 njl Exp $ 
+# $FreeBSD: src/sys/modules/cam/Makefile,v 1.9 2003/07/29 18:08:16 njl Exp $ 
 
 MAINTAINER=	n_hibma@freebsd.org
 S=	${.CURDIR}/../..
@@ -11,6 +11,7 @@ KMOD=	cam
 SRCS=	opt_cam.h
 SRCS+=	opt_scsi.h
 SRCS+=	opt_cd.h
+SRCS+=	opt_da.h
 SRCS+=	opt_hw_wdog.h
 SRCS+=	opt_pt.h
 SRCS+=	opt_sa.h

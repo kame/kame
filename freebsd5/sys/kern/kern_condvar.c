@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/kern/kern_condvar.c,v 1.41 2003/05/13 20:35:59 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/kern_condvar.c,v 1.44 2003/11/09 09:17:24 tanimura Exp $");
 
 #include "opt_ktrace.h"
 
@@ -286,8 +287,11 @@ cv_wait_sig(struct cv *cvp, struct mtx *mp)
 
 	PROC_LOCK(p);
 	mtx_lock(&p->p_sigacts->ps_mtx);
-	if (sig == 0)
+	if (sig == 0) {
 		sig = cursig(td);	/* XXXKSE */
+		if (sig == 0 && td->td_flags & TDF_INTERRUPT)
+			rval = td->td_intrval;
+	}
 	if (sig != 0) {
 		if (SIGISMEMBER(p->p_sigacts->ps_sigintr, sig))
 			rval = EINTR;
@@ -451,8 +455,11 @@ cv_timedwait_sig(struct cv *cvp, struct mtx *mp, int timo)
 
 	PROC_LOCK(p);
 	mtx_lock(&p->p_sigacts->ps_mtx);
-	if (sig == 0)
+	if (sig == 0) {
 		sig = cursig(td);
+		if (sig == 0 && td->td_flags & TDF_INTERRUPT)
+			rval = td->td_intrval;
+	}
 	if (sig != 0) {
 		if (SIGISMEMBER(p->p_sigacts->ps_sigintr, sig))
 			rval = EINTR;
@@ -518,14 +525,21 @@ cv_signal(struct cv *cvp)
  * Should be called with the same mutex as was passed to cv_wait held.
  */
 void
-cv_broadcast(struct cv *cvp)
+cv_broadcastpri(struct cv *cvp, int pri)
 {
+	struct thread	*td;
 
 	KASSERT(cvp != NULL, ("%s: cvp NULL", __func__));
 	mtx_lock_spin(&sched_lock);
 	CV_SIGNAL_VALIDATE(cvp);
-	while (!TAILQ_EMPTY(&cvp->cv_waitq))
+	while (!TAILQ_EMPTY(&cvp->cv_waitq)) {
+		if (pri >= PRI_MIN && pri <= PRI_MAX) {
+			td = TAILQ_FIRST(&cvp->cv_waitq);
+			if (td->td_priority > pri)
+				td->td_priority = pri;
+		}
 		cv_wakeup(cvp);
+	}
 	mtx_unlock_spin(&sched_lock);
 }
 
