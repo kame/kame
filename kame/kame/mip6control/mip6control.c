@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.28 2002/07/12 03:17:51 k-sugyou Exp $	*/
+/*	$KAME: mip6control.c,v 1.29 2002/08/11 06:15:15 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -311,6 +311,24 @@ main(argc, argv)
 		       mip6_config.mcfg_debug ? "enable" : "disable");
 	}
 
+	if (debug && debugarg) {
+		int arg = atoi(debugarg);
+		int subcmd = 0;
+
+		switch (arg) {
+		case 0:
+			subcmd = SIOCSMIP6CFG_DISABLEDEBUG;
+			break;
+		default:
+			subcmd = SIOCSMIP6CFG_ENABLEDEBUG;
+			break;
+		}
+		if(ioctl(s, SIOCSMIP6CFG, (caddr_t)&subcmd) == -1) {
+			perror("ioctl");
+			exit(1);
+		}
+	}
+
 	if (smhparg && pfxarg) {
 		struct hif_ifreq *ifr;
 		struct mip6_prefix *mpfx;
@@ -592,24 +610,6 @@ main(argc, argv)
 		}
 	}
 
-	if (debug && debugarg) {
-		int arg = atoi(debugarg);
-		int subcmd = 0;
-
-		switch (arg) {
-		case 0:
-			subcmd = SIOCSMIP6CFG_DISABLEDEBUG;
-			break;
-		default:
-			subcmd = SIOCSMIP6CFG_ENABLEDEBUG;
-			break;
-		}
-		if(ioctl(s, SIOCSMIP6CFG, (caddr_t)&subcmd) == -1) {
-			perror("ioctl");
-			exit(1);
-		}
-	}
-	
 	if (ipsec && ipsecarg) {
 		int arg = atoi(ipsecarg);
 		int subcmd = 0;
@@ -808,13 +808,14 @@ static const char *
 buflg_sprintf(flags)
 	u_int8_t flags;
 {
-	static char buf[] = "AHSO";
+	static char buf[] = "AHSDL";
 
-	snprintf(buf, sizeof(buf), "%s%s%s%s",
-		 (flags & IP6MU_ACK ? "A" : ""),
-		 (flags & IP6MU_HOME ? "H" : ""),
+	snprintf(buf, sizeof(buf), "%s%s%s%s%s",
+		 (flags & IP6MU_ACK ?    "A" : ""),
+		 (flags & IP6MU_HOME ?   "H" : ""),
 		 (flags & IP6MU_SINGLE ? "S" : ""),
-		 (flags & IP6MU_DAD ? "D" : ""));
+		 (flags & IP6MU_DAD ?    "D" : ""),
+		 (flags & IP6MU_LINK ?   "L" : ""));
 
 	return buf;
 }
