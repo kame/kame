@@ -765,7 +765,7 @@ dump_rp_set(fp)
     for (rp = cand_rp_list; rp != (cand_rp_t *) NULL; rp = rp->next)
     {
 
-	fprintf(fp, "%-40s %-3d",
+	fprintf(fp, "%-40s %-3d ",
 		inet6_fmt(&rp->rpentry->address.sin6_addr),
 		rp->rpentry->incoming);
 	if ((rp_grp_entry = rp->rp_grp_next) != (rp_grp_entry_t *) NULL)
