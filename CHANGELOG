@@ -1,10 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1295 2000/09/23 15:40:03 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1296 2000/09/23 19:16:24 sumikawa Exp $
 
 <200009>
+Sun Sep 24 04:15:52 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/wwwoffle: upgrade to 2.5e.
+
 Sun Sep 24 00:38:51 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
-	* kame/freebsd3/ports/tcp_wrapper: upgrade to latest IPv6 patch.
+	* freebsd3/ports/tcp_wrapper: upgrade to latest IPv6 patch.
 	* freebsd3/ports/lynx: upgrade to 2.8.4dev10
 
 Sat Sep 23 JST 2000  itojun@iijlab.net
