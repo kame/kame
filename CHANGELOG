@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.925 2000/05/24 09:11:06 itojun Exp $
+$Id: CHANGELOG,v 1.926 2000/05/24 10:01:30 sakane Exp $
 
 <200005>
+Wed May 24 18:59:55 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	fix to check vendor id.  HASH function for vendor id is always MD5.
+
 Wed May 24 18:09:12 JST 2000  itojun@iijlab.net
 	* sys/netinet6/in6.h: check parameter type to IN6_ARE_ADDR_EQUAL().
 	  this should avoid typecast bugs like below.
