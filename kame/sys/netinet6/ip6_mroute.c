@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.38 2001/02/08 16:30:30 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.39 2001/02/10 02:13:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1781,8 +1781,8 @@ register_send(ip6, mif, m)
 			log(LOG_WARNING,
 			    "register_send: ip_mrouter socket queue full\n");
 #endif
-                ++mrt6stat.mrt6s_upq_sockfull;
-                return ENOBUFS;
+		++mrt6stat.mrt6s_upq_sockfull;
+		return ENOBUFS;
 	}
 	return 0;
 }
@@ -1799,21 +1799,21 @@ pim6_input(mp, offp, proto)
 	struct mbuf **mp;
 	int *offp, proto;
 {
-        struct pim *pim; /* pointer to a pim struct */
-        struct ip6_hdr *ip6;
-        int pimlen;
+	struct pim *pim; /* pointer to a pim struct */
+	struct ip6_hdr *ip6;
+	int pimlen;
 	struct mbuf *m = *mp;
-        int minlen;
+	int minlen;
 	int off = *offp;
 
 	++pim6stat.pim6s_rcv_total;
 
-        ip6 = mtod(m, struct ip6_hdr *);
-        pimlen = m->m_pkthdr.len - *offp;
+	ip6 = mtod(m, struct ip6_hdr *);
+	pimlen = m->m_pkthdr.len - *offp;
 
-        /*
-         * Validate lengths
-         */
+	/*
+	 * Validate lengths
+	 */
 	if (pimlen < PIM_MINLEN) {
 		++pim6stat.pim6s_rcv_tooshort;
 #ifdef MRT6DEBUG
