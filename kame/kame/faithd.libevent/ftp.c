@@ -526,10 +526,21 @@ resin(s, event, arg)
 			goto epsvfail1;
 		}
 		if (bind(s, (struct sockaddr *)&sin6, salen) < 0) {
-			close(s);
-			snprintf(errmsg, sizeof(errmsg),
-			    "bind: %s", strerror(errno));
-			goto epsvfail1;
+			/*
+			 * on some of the KAME platforms (including freebsd4)
+			 * bind(2) with arbitrary address does not go
+			 * successful even with IPV6_FAITH.
+			 * as a workaround, bind(2) to wildcard.
+			 * this behavior violates EPSV spec.
+			 */
+			memset(&sin6.sin6_addr, 0, sizeof(sin6.sin6_addr));
+			sin6.sin6_scope_id = 0;
+			if (bind(s, (struct sockaddr *)&sin6, salen) < 0) {
+				close(s);
+				snprintf(errmsg, sizeof(errmsg),
+				    "bind: %s", strerror(errno));
+				goto epsvfail1;
+			}
 		}
 		if (listen(s, 1) < 0) {
 			close(s);
