@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.55 2000/03/25 07:23:50 sumikawa Exp $	*/
+/*	$KAME: ipsec.c,v 1.56 2000/04/04 08:47:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1002,7 +1002,7 @@ ipsec6_setspidx_ipaddr(m, spidx)
 	struct mbuf *m;
 	struct secpolicyindex *spidx;
 {
-	struct ip6_hdr *ip6_hdr = NULL;
+	struct ip6_hdr *ip6 = NULL;
 	struct ip6_hdr ip6buf;
 
 	/* sanity check 1 for minimum ip header length */
@@ -1018,14 +1018,14 @@ ipsec6_setspidx_ipaddr(m, spidx)
 		return;
 	}
 
-	if (m->m_len >= sizeof(*ip6_hdr))
-		ip6_hdr = mtod(m, struct ip6_hdr *);
+	if (m->m_len >= sizeof(*ip6))
+		ip6 = mtod(m, struct ip6_hdr *);
 	else {
 		m_copydata(m, 0, sizeof(ip6buf), (caddr_t)&ip6buf);
-		ip6_hdr = &ip6buf;
+		ip6 = &ip6buf;
 	}
 
-	if ((ip6_hdr->ip6_vfc & IPV6_VERSION_MASK) != IPV6_VERSION) {
+	if ((ip6->ip6_vfc & IPV6_VERSION_MASK) != IPV6_VERSION) {
 		KEYDEBUG(KEYDEBUG_IPSEC_DUMP,
 			printf("ipsec_setspidx_mbuf: "
 				"wrong ip version on packet "
@@ -1033,10 +1033,8 @@ ipsec6_setspidx_ipaddr(m, spidx)
 		return;
 	}
 
-	bcopy(&ip6_hdr->ip6_src, _INADDRBYSA(&spidx->src),
-		sizeof(ip6_hdr->ip6_src));
-	bcopy(&ip6_hdr->ip6_dst, _INADDRBYSA(&spidx->dst),
-		sizeof(ip6_hdr->ip6_dst));
+	bcopy(&ip6->ip6_src, _INADDRBYSA(&spidx->src), sizeof(ip6->ip6_src));
+	bcopy(&ip6->ip6_dst, _INADDRBYSA(&spidx->dst), sizeof(ip6->ip6_dst));
 
 	return;
 }
