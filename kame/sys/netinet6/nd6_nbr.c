@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.138 2004/02/10 20:52:45 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.139 2004/02/10 21:40:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -893,7 +893,10 @@ nd6_na_input(m, off, icmp6len)
 			 * update the Destination Cache entries.
 			 */
 			struct nd_defrouter *dr;
+			struct in6_addr *in6;
 			int s;
+
+			in6 = &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr;
 
 			/*
 			 * Lock to protect the default router list.
@@ -906,8 +909,7 @@ nd6_na_input(m, off, icmp6len)
 #else
 			s = splnet();
 #endif
-			dr = defrouter_lookup(&((struct sockaddr_in6 *)rt_key(rt))->sin6_addr,
-			    rt->rt_ifp);
+			dr = defrouter_lookup(in6, rt->rt_ifp);
 			if (dr)
 				defrtrlist_del(dr);
 			else if (!ip6_forwarding) {
