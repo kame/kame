@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.57 2003/07/25 09:33:36 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.58 2003/07/25 10:16:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -203,7 +203,7 @@ ah_algorithm_lookup(idx)
 			ah_hmac_sha2_512_init, ah_hmac_sha2_512_loop,
 			ah_hmac_sha2_512_result, },
 		{ ah_sumsiz_1216, ah_common_mature, 160, 160,
-			"hmac-sha2-512",
+			"hmac-ripemd160",
 			ah_hmac_ripemd160_init, ah_hmac_ripemd160_loop,
 			ah_hmac_ripemd160_result, },
 		{ ah_sumsiz_1216, ah_common_mature, 128, 128,
