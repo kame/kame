@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.21 2000/05/01 05:18:21 itojun Exp $	*/
+/*	$KAME: name6.c,v 1.22 2000/05/01 08:19:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1196,9 +1196,9 @@ getanswer(answer, anslen, qname, qtype, template)
 	const char *tname;
 	int (*name_ok) __P((const char *));
 #define host	(*template)
-	char *h_addr_ptrs[MAXADDRS + 1];
-	char *host_aliases[MAXALIASES];
-	char hostbuf[8*1024];
+	static char *h_addr_ptrs[MAXADDRS + 1];
+	static char *host_aliases[MAXALIASES];
+	static char hostbuf[8*1024];
 
 #define DNS_ASSERT(x) \
 	do {				\
