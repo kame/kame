@@ -1880,12 +1880,14 @@ echo_dg(s, sep)			/* Echo service -- echo data back */
 {
 	char buffer[BUFSIZE];
 	int i, size;
-	struct sockaddr sa;
+	struct sockaddr_storage ss;
+	struct sockaddr *sa;
 
-	size = sizeof(sa);
-	if ((i = recvfrom(s, buffer, sizeof(buffer), 0, &sa, &size)) < 0)
+	sa = (struct sockaddr *)&ss;
+	size = sizeof(ss);
+	if ((i = recvfrom(s, buffer, sizeof(buffer), 0, sa, &size)) < 0)
 		return;
-	(void) sendto(s, buffer, i, 0, &sa, sizeof(sa));
+	(void) sendto(s, buffer, i, 0, sa, size);
 }
 
 /* ARGSUSED */
@@ -1968,7 +1970,8 @@ chargen_dg(s, sep)		/* Character generator */
 	int s;
 	struct servtab *sep;
 {
-	struct sockaddr sa;
+	struct sockaddr_storage ss;
+	struct sockaddr *sa;
 	static char *rs;
 	int len, size;
 	char text[LINESIZ+2];
@@ -1978,8 +1981,9 @@ chargen_dg(s, sep)		/* Character generator */
 		rs = ring;
 	}
 
-	size = sizeof(sa);
-	if (recvfrom(s, text, sizeof(text), 0, &sa, &size) < 0)
+	sa = (struct sockaddr *)&ss;
+	size = sizeof(ss);
+	if (recvfrom(s, text, sizeof(text), 0, sa, &size) < 0)
 		return;
 
 	if ((len = endring - rs) >= LINESIZ)
@@ -1992,7 +1996,7 @@ chargen_dg(s, sep)		/* Character generator */
 		rs = ring;
 	text[LINESIZ] = '\r';
 	text[LINESIZ + 1] = '\n';
-	(void) sendto(s, text, sizeof(text), 0, &sa, sizeof(sa));
+	(void) sendto(s, text, sizeof(text), 0, sa, size);
 }
 
 /*
@@ -2037,14 +2041,16 @@ machtime_dg(s, sep)
 	struct servtab *sep;
 {
 	long result;
-	struct sockaddr sa;
+	struct sockaddr_storage ss;
+	struct sockaddr *sa;
 	int size;
 
-	size = sizeof(sa);
-	if (recvfrom(s, (char *)&result, sizeof(result), 0, &sa, &size) < 0)
+	sa = (struct sockaddr *)&ss;
+	size = sizeof(ss);
+	if (recvfrom(s, (char *)&result, sizeof(result), 0, sa, &size) < 0)
 		return;
 	result = machtime();
-	(void) sendto(s, (char *) &result, sizeof(result), 0, &sa, sizeof(sa));
+	(void) sendto(s, (char *) &result, sizeof(result), 0, sa, size);
 }
 
 /* ARGSUSED */
@@ -2071,16 +2077,18 @@ daytime_dg(s, sep)		/* Return human-readable time of day */
 {
 	char buffer[256];
 	time_t clock;
-	struct sockaddr sa;
+	struct sockaddr_storage ss;
+	struct sockaddr *sa;
 	int size, len;
 
 	clock = time((time_t *) 0);
 
-	size = sizeof(sa);
-	if (recvfrom(s, buffer, sizeof(buffer), 0, &sa, &size) < 0)
+	sa = (struct sockaddr *)&ss;
+	size = sizeof(ss);
+	if (recvfrom(s, buffer, sizeof(buffer), 0, sa, &size) < 0)
 		return;
 	len = snprintf(buffer, sizeof buffer, "%.24s\r\n", ctime(&clock));
-	(void) sendto(s, buffer, len, 0, &sa, sizeof(sa));
+	(void) sendto(s, buffer, len, 0, sa, size);
 }
 
 /*
@@ -2227,7 +2235,7 @@ dolog(sep, ctrl)
 	int		ctrl;
 {
 	struct sockaddr_storage	ss;
-	struct sockaddr		*sa = (struct sockaddr *)ss;
+	struct sockaddr		*sa = (struct sockaddr *)&ss;
 	struct sockaddr_in	*sin = (struct sockaddr_in *)&ss;
 	int			len = sizeof(ss);
 	struct hostent		*hp;
