@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.79 2002/06/09 16:29:54 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.80 2002/07/31 03:17:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -144,18 +144,18 @@ struct sockaddr_pack {
 	u_int8_t sp_len;
 	u_int8_t sp_family;	/* not really used */
 	/* followed by variable-length data */
-} __attribute__((__packed__));
+};
 
 struct pack4 {
 	struct sockaddr_pack p;
 	struct sockaddr_in mine;
 	struct sockaddr_in yours;
-} __attribute__((__packed__));
+};
 struct pack6 {
 	struct sockaddr_pack p;
 	struct sockaddr_in6 mine;
 	struct sockaddr_in6 yours;
-} __attribute__((__packed__));
+};
 
 enum direction { INBOUND, OUTBOUND };
 
