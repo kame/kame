@@ -730,9 +730,7 @@ stripoutput(ifp, m, dst, rt)
 	const u_char *dldst;		/* link-level next-hop */
 	int s, error;
 	u_char dl_addrbuf[STARMODE_ADDR_LEN+1];
-#ifdef ALTQ
-	struct altq_pktattr pktattr;
-#endif
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	/*
 	 * Verify tty line is up and alive.
@@ -759,6 +757,12 @@ stripoutput(ifp, m, dst, rt)
 		printf("\n");
 	}
 #endif
+	/*
+	 * if the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+
 	switch (dst->sa_family) {
 	case AF_INET:
                 if (rt != NULL && rt->rt_gwroute != NULL)
@@ -870,13 +874,8 @@ stripoutput(ifp, m, dst, rt)
 			IF_ENQUEUE(ifq, m);
 			error = 0;
 		}
-	} else {
-#ifdef ALTQ
+	} else
 		IFQ_ENQUEUE(&sc->sc_if.if_snd, m, &pktattr, error);
-#else
-		IFQ_ENQUEUE(&sc->sc_if.if_snd, m, error);
-#endif
-	}
 	if (error) {
 		splx(s);
 		sc->sc_if.if_oerrors++;

@@ -901,14 +901,8 @@ sca_output(ifp, m, dst, rt0)
 			error = ENOBUFS;
 		} else
 			IF_ENQUEUE(ifq, m);
-	} else {
-#ifdef ALTQ
+	} else
 		IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
-#else
-		IFQ_ENQUEUE(&ifp->if_snd, m, error);
-#endif
-	}
-
 	if (error != 0) {
 		splx(s);
 		ifp->if_oerrors++;

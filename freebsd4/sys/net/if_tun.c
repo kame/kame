@@ -318,9 +318,7 @@ tunoutput(ifp, m0, dst, rt)
 {
 	struct tun_softc *tp = ifp->if_softc;
 	int		s, error, len;
-#ifdef ALTQ
-	struct altq_pktattr pktattr;
-#endif
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	TUNDEBUG ("%s%d: tunoutput\n", ifp->if_name, ifp->if_unit);
 
@@ -331,13 +329,12 @@ tunoutput(ifp, m0, dst, rt)
 		return EHOSTDOWN;
 	}
 
-#ifdef ALTQ
 	/*
 	 * if the queueing discipline needs packet classification,
 	 * do it before prepending link headers.
 	 */
 	IFQ_CLASSIFY(&ifp->if_snd, m0, dst->sa_family, &pktattr);
-#endif
+
 	/* BPF write needs to be handled specially */
 	if (dst->sa_family == AF_UNSPEC) {
 		dst->sa_family = *(mtod(m0, int *));
@@ -406,11 +403,7 @@ tunoutput(ifp, m0, dst, rt)
 
 	len = m0->m_pkthdr.len;
 	s = splimp();
-#ifdef ALTQ
 	IFQ_ENQUEUE(&ifp->if_snd, m0, &pktattr, error);
-#else
-	IFQ_ENQUEUE(&ifp->if_snd, m0, error);
-#endif
 	if (error) {
 		splx(s);
 		ifp->if_collisions++;

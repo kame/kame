@@ -597,6 +597,7 @@ do {									\
 #endif /* IFAREF_DEBUG */
 
 #ifdef ALTQ
+#define	ALTQ_DECL(x)		x
 
 #define	IFQ_ENQUEUE(ifq, m, pattr, err)					\
 do {									\
@@ -658,8 +659,9 @@ do {									\
 } while (0)
 
 #else /* !ALTQ */
+#define	ALTQ_DECL(x)		/* nothing */
 
-#define	IFQ_ENQUEUE(ifq, m, err)					\
+#define	IFQ_ENQUEUE(ifq, m, pattr, err)					\
 do {									\
 	if (IF_QFULL((ifq))) {						\
 		m_freem((m));						\
@@ -686,8 +688,8 @@ while (1) {								\
 		m_freem(m0);						\
 }
 
-#define	IFQ_SET_READY(ifq)		((void)0)
-#define	IFQ_CLASSIFY(ifq, m, af, pa)	((void)0)
+#define	IFQ_SET_READY(ifq)		/* nothing */
+#define	IFQ_CLASSIFY(ifq, m, af, pa)	/* nothing */
 
 #endif /* !ALTQ */
 

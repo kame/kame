@@ -702,9 +702,7 @@ pppoutput(ifp, m0, dst, rtp)
     enum NPmode mode;
     int len;
     struct mbuf *m;
-#ifdef ALTQ
-    struct altq_pktattr pktattr;
-#endif
+    ALTQ_DECL(struct altq_pktattr pktattr;)
 
     if (sc->sc_devp == NULL || (ifp->if_flags & IFF_RUNNING) == 0
 	|| ((ifp->if_flags & IFF_UP) == 0 && dst->sa_family != AF_UNSPEC)) {
@@ -712,9 +710,8 @@ pppoutput(ifp, m0, dst, rtp)
 	goto bad;
     }
 
-#ifdef ALTQ
     IFQ_CLASSIFY(&ifp->if_snd, m0, dst->sa_family, &pktattr);
-#endif
+
     /*
      * Compute PPP header.
      */
@@ -868,11 +865,7 @@ pppoutput(ifp, m0, dst, rtp)
 		error = 0;
 	    }
 	} else {
-#ifdef ALTQ
 	    IFQ_ENQUEUE(&sc->sc_if.if_snd, m0, &pktattr, error);
-#else
-	    IFQ_ENQUEUE(&sc->sc_if.if_snd, m0, error);
-#endif
 	}
 	if (error) {
 	    splx(s);
@@ -940,11 +933,7 @@ ppp_requeue(sc)
 		    error = 0;
 		}
 	    } else {
-#ifdef ALTQ
 		IFQ_ENQUEUE(&sc->sc_if.if_snd, m, NULL, error);
-#else
-		IFQ_ENQUEUE(&sc->sc_if.if_snd, m, error);
-#endif
 	    }
 	    if (error) {
 		sc->sc_if.if_oerrors++;

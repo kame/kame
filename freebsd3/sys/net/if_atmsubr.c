@@ -97,21 +97,17 @@ atm_output(ifp, m0, dst, rt0)
 	struct atmllc *atmllc;
 	struct atmllc *llc_hdr = NULL;
 	u_int32_t atm_flags;
-#ifdef ALTQ
-	struct altq_pktattr pktattr;
-#endif
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
 
-#ifdef ALTQ
 	/*
 	 * if the queueing discipline needs packet classification,
 	 * do it before prepending link headers.
 	 */
 	IFQ_CLASSIFY(&ifp->if_snd, m,
 		     (dst != NULL ? dst->sa_family : AF_UNSPEC), &pktattr);
-#endif
 
 	/*
 	 * check route
@@ -224,11 +220,7 @@ atm_output(ifp, m0, dst, rt0)
 	 */
 	len = m->m_pkthdr.len;
 	s = splimp();
-#ifdef ALTQ
 	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
-#else
-	IFQ_ENQUEUE(&ifp->if_snd, m, error);
-#endif
 	if (error) {
 		splx(s);
 		return (error);

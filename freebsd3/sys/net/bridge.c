@@ -790,9 +790,7 @@ forward:
 	if (last) { /* need to forward packet */
 	    short mflags;
 	    int len;
-#ifdef ALTQ
-	    struct altq_pktattr pktattr;
-#endif
+	    ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	    if (canfree && once ) { /* no need to copy */
 		m = *m0 ;
@@ -815,11 +813,7 @@ forward:
 	    mflags = m->m_flags;
 	    len = m->m_pkthdr.len;
 	    s = splimp();
-#ifdef ALTQ
 	    IFQ_ENQUEUE(&last->if_snd, m, &pktattr, error);
-#else
-	    IFQ_ENQUEUE(&last->if_snd, m, error);
-#endif
 	    if (error == 0) {
 		last->if_obytes += len;
 		if (mflags & M_MCAST)

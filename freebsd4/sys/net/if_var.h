@@ -308,6 +308,7 @@ int	if_enq_drop __P((struct ifqueue *, struct mbuf *));
 
 #ifdef _KERNEL
 #ifdef ALTQ
+#define	ALTQ_DECL(x)		x
 
 #define	IFQ_ENQUEUE(ifq, m, pattr, err)					\
 do {									\
@@ -369,8 +370,9 @@ do {									\
 } while (0)
 
 #else /* !ALTQ */
+#define	ALTQ_DECL(x)		/* nothing */
 
-#define	IFQ_ENQUEUE(ifq, m, err)					\
+#define	IFQ_ENQUEUE(ifq, m, pattr, err)					\
 do {									\
 	if (IF_QFULL((ifq))) {						\
 		m_freem((m));						\
@@ -397,8 +399,8 @@ while (1) {								\
 		m_freem(m0);						\
 }
 
-#define	IFQ_SET_READY(ifq)		((void)0)
-#define	IFQ_CLASSIFY(ifq, m, af, pa)	((void)0)
+#define	IFQ_SET_READY(ifq)		/* nothing */
+#define	IFQ_CLASSIFY(ifq, m, af, pa)	/* nothing */
 
 #endif /* !ALTQ */
 
@@ -494,10 +496,6 @@ int	ether_output __P((struct ifnet *,
 	   struct mbuf *, struct sockaddr *, struct rtentry *));
 int	ether_output_frame __P((struct ifnet *, struct mbuf *));
 int	ether_ioctl __P((struct ifnet *, int, caddr_t));
-#ifdef ALTQ
-int	altq_etherclassify __P((struct ifaltq *, struct mbuf *,
-				struct altq_pktattr *));
-#endif
 
 int	if_addmulti __P((struct ifnet *, struct sockaddr *,
 			 struct ifmultiaddr **));

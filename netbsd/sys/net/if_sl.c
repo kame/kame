@@ -443,13 +443,8 @@ sloutput(ifp, m, dst, rtp)
 			IF_ENQUEUE(ifq, m);
 			error = 0;
 		}
-	} else {
-#ifdef ALTQ
+	} else
 		IFQ_ENQUEUE(&sc->sc_if.if_snd, m, &pktattr, error);
-#else
-		IFQ_ENQUEUE(&sc->sc_if.if_snd, m, error);
-#endif
-	}
 	if (error) {
 		splx(s);
 		sc->sc_if.if_oerrors++;

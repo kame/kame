@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.89 2002/01/29 00:56:55 jinmei Exp $	*/
+/*	$KAME: if_gif.c,v 1.90 2002/02/19 06:37:39 kjc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -471,14 +471,10 @@ gif_output(ifp, m, dst, rt)
 	struct gif_softc *sc = (struct gif_softc*)ifp;
 	int error = 0;
 	static int called = 0;	/* XXX: MUTEX */
-#ifdef ALTQ
-	struct altq_pktattr pktattr;
-#endif
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 	int s;
 
-#ifdef ALTQ
 	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
-#endif
 
 	/*
 	 * gif may cause infinite recursion calls when misconfigured.
@@ -530,11 +526,7 @@ gif_output(ifp, m, dst, rt)
 	*mtod(m, int *) = dst->sa_family;
 
 	s = splnet();
-#ifdef ALTQ
 	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
-#else
-	IFQ_ENQUEUE(&ifp->if_snd, m, error);
-#endif
 	if (error) {
 		splx(s);
 		goto end;

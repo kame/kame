@@ -480,13 +480,10 @@ sloutput(ifp, m, dst, rtp)
 	register struct ip *ip;
 	register struct ifqueue *ifq;
 	int s, error;
-#ifdef ALTQ
-	struct altq_pktattr pktattr;
-#endif
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
-#ifdef ALTQ
 	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
-#endif
+
 	/*
 	 * `Cannot happen' (see slioctl).  Someday we will extend
 	 * the line protocol to support other address families.
@@ -528,11 +525,7 @@ sloutput(ifp, m, dst, rtp)
 			error = 0;
 		}
 	} else {
-#ifdef ALTQ
 		IFQ_ENQUEUE(&sc->sc_if.if_snd, m, &pktattr, error);
-#else
-		IFQ_ENQUEUE(&sc->sc_if.if_snd, m, error);
-#endif
 	}
 	if (error) {
 		splx(s);

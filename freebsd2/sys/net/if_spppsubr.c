@@ -416,9 +416,7 @@ sppp_output (struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst, struct rte
 	struct ppp_header *h;
 	struct ifqueue *ifq = NULL;
 	int s, len, error;
-#ifdef ALTQ
-	struct altq_pktattr pktattr;
-#endif
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	s = splimp ();
 
@@ -428,13 +426,12 @@ sppp_output (struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst, struct rte
 		return (ENETDOWN);
 	}
 
-#ifdef ALTQ
 	/*
 	 * if the queueing discipline needs packet classification,
 	 * do it before prepending link headers.
 	 */
 	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
-#endif
+
 #ifdef INET
 	/*
 	 * Put low delay, telnet, rlogin and ftp control packets
@@ -562,11 +559,7 @@ nosupport:
 			error = 0;
 		}
 	} else {
-#ifdef ALTQ
 		IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
-#else
-		IFQ_ENQUEUE(&ifp->if_snd, m, error);
-#endif
 	}
 	if (error != 0) {
 		++ifp->if_oerrors;

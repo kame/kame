@@ -699,9 +699,7 @@ sppp_output(struct ifnet *ifp, struct mbuf *m,
 	struct ifqueue *ifq = NULL;
 	int s, len, rv = 0;
 	int debug = ifp->if_flags & IFF_DEBUG;
-#ifdef ALTQ
-	struct altq_pktattr pktattr;
-#endif
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	s = splimp();
 
@@ -885,14 +883,8 @@ nosupport:
 				rv = ENOBUFS;
 		}
 		IF_ENQUEUE (ifq, m);
-	}
-	else {
-#ifdef ALTQ
+	} else
 		IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, rv);
-#else
-		IFQ_ENQUEUE(&ifp->if_snd, m, rv);
-#endif
-	}
 	if (rv != 0) {
 		++ifp->if_oerrors;
 		splx (s);

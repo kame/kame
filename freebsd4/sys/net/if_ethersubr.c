@@ -382,9 +382,7 @@ ether_output_frame(ifp, m)
 {
 	int s, len, error = 0;
 	short mflags;
-#ifdef ALTQ
-	struct altq_pktattr pktattr;
-#endif
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	if (BDG_ACTIVE(ifp) ) {
 		struct ether_header *eh; /* a ptr suffices */
@@ -408,11 +406,7 @@ ether_output_frame(ifp, m)
 	 * Queue message on interface, update output statistics if
 	 * successful, and start output if interface not yet active.
 	 */
-#ifdef ALTQ
 	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
-#else
-	IFQ_ENQUEUE(&ifp->if_snd, m, error);
-#endif
 	if (error) {
 		/* mbuf is already freed */
 		splx(s);
@@ -960,7 +954,7 @@ ether_resolvemulti(ifp, llsa, sa)
 /*
  * find the size of ethernet header, and call classifier
  */
-int
+void
 altq_etherclassify(ifq, m, pktattr)
 	struct ifaltq *ifq;
 	struct mbuf *m;
@@ -1023,12 +1017,11 @@ altq_etherclassify(ifq, m, pktattr)
 
 	pktattr->pattr_af = af;
 	pktattr->pattr_hdr = hdr;
-	return (1);
+	return;
 
 bad:
 	pktattr->pattr_class = NULL;
 	pktattr->pattr_hdr = NULL;
 	pktattr->pattr_af = AF_UNSPEC;
-	return (0);
 }
 #endif /* ALTQ */

@@ -759,11 +759,7 @@ static void xl_testpacket(sc)
 	mtod(m, unsigned char *)[15] = 0;
 	mtod(m, unsigned char *)[16] = 0xE3;
 	m->m_len = m->m_pkthdr.len = sizeof(struct ether_header) + 3;
-#ifdef ALTQ
 	IFQ_ENQUEUE(&ifp->if_snd, m, NULL, error);
-#else
-	IFQ_ENQUEUE(&ifp->if_snd, m, error);
-#endif
 	xl_start(ifp);
 
 	return;

@@ -315,6 +315,7 @@ int	if_enq_drop __P((struct ifqueue *, struct mbuf *));
 
 #ifdef KERNEL
 #ifdef ALTQ
+#define	ALTQ_DECL(x)		x
 
 #define	IFQ_ENQUEUE(ifq, m, pattr, err)					\
 do {									\
@@ -376,8 +377,9 @@ do {									\
 } while (0)
 
 #else /* !ALTQ */
+#define	ALTQ_DECL(x)		/* nothing */
 
-#define	IFQ_ENQUEUE(ifq, m, err)					\
+#define	IFQ_ENQUEUE(ifq, m, pattr, err)					\
 do {									\
 	if (IF_QFULL((ifq))) {						\
 		m_freem((m));						\

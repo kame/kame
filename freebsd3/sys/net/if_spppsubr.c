@@ -637,9 +637,7 @@ sppp_output(struct ifnet *ifp, struct mbuf *m,
 	struct ifqueue *ifq = NULL;
 	int s, len, rv = 0;
 	int debug = ifp->if_flags & IFF_DEBUG;
-#ifdef ALTQ
-	struct altq_pktattr pktattr;
-#endif
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	s = splimp();
 
@@ -661,13 +659,12 @@ sppp_output(struct ifnet *ifp, struct mbuf *m,
 		s = splimp();
 	}
 
-#ifdef ALTQ
 	/*
 	 * if the queueing discipline needs packet classification,
 	 * do it before prepending link headers.
 	 */
 	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
-#endif
+
 #ifdef INET
 	if (dst->sa_family == AF_INET) {
 		/* XXX Check mbuf length here? */
@@ -814,11 +811,7 @@ nosupport:
 		}
 		IF_ENQUEUE (ifq, m);
 	} else {
-#ifdef ALTQ
 		IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, rv);
-#else
-		IFQ_ENQUEUE(&ifp->if_snd, m, rv);
-#endif
 	}
 	if (rv != 0) {
 		++ifp->if_oerrors;
