@@ -2,7 +2,7 @@
 
 			KAME Project
 
-			$Date: 1999/10/06 10:19:57 $
+			$Date: 1999/10/07 01:01:47 $
 
 <<<Project Overview>>>
 
@@ -98,7 +98,12 @@ UO Youjiro, Wayne Knowles, Hajimu UMEMOTO, Ichiro Fukuhara,
 David P. Wiggins, Martti Kuparinen, Tetsuya Isaki, Erik Bertelsen,
 Toshio Shimojou, Kazunori Fujiwara, Kimio Ishii, Masafumi OE,
 SUZUKI Shinsuke, Mickael Hoerdt, Arkadiusz Miskiewicz, 
-and Wolfgang Rupprecht. (in no particular order).
+Wolfgang Rupprecht, YASUOKA Masahiko, Nobumichi Ozoe,
+Frederic SOULIER, Koji Kondo, David PATE, Kenjiro Komaki, Satosi KOBAYASI,
+Takashi Tanaka, Heiko W. Rupp, Kazuto Ushioda, Masahiro Ishiyama,
+Bill Sommerfeld, Jason Thorpe, Yasunari Momoi, Chris P. Ross,
+Hideaki Imaizumi, Alexander Fung, Scott Mace, and Peter Tattam.
+(in no particular order).
 
 We also would like to thank BSDI (http://www.bsdi.com/) for donating
 BSD/OS licenses for development.
