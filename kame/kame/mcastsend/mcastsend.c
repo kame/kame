@@ -33,7 +33,6 @@
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <netinet/in.h>
-#include <netinet6/in6.h>
 #include <netdb.h>
 #include <stdlib.h>
 #include <stdio.h>

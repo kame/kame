@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/*	$Id: mping.h,v 1.1 1999/12/06 06:26:33 jinmei Exp $	*/
+/*	$Id: mping.h,v 1.2 2000/02/06 09:51:47 itojun Exp $	*/
 
 #include <stdio.h>
 #include <unistd.h>
@@ -37,7 +37,6 @@
 #include <sys/signal.h>
 #include <net/if.h>
 #include <netinet/in.h>
-#include <netinet6/in6.h>
 #include <time.h>
 #include <string.h>
 #include <netdb.h>

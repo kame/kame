@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: misc.c,v 1.4 2000/02/03 10:10:16 fujisawa Exp $
+ *	$Id: misc.c,v 1.5 2000/02/06 09:51:47 itojun Exp $
  */
 
 #include <stdio.h>
@@ -47,7 +47,6 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 
-#include <netinet6/in6.h>
 #include <netinet6/natpt_defs.h>
 #include <netinet6/natpt_soctl.h>
 

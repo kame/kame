@@ -37,9 +37,6 @@
 
 #include <netinet/in.h>
 #include <netinet6/ipsec.h>
-#ifdef INET6
-#include <netinet6/in6.h>
-#endif
 #include <arpa/inet.h>
 
 #include <stdlib.h>

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: show.c,v 1.2 2000/01/07 14:33:33 fujisawa Exp $
+ *	$Id: show.c,v 1.3 2000/02/06 09:51:47 itojun Exp $
  */
 
 #include <stdio.h>
@@ -50,7 +50,6 @@
 #define	TCPSTATES	1
 #include <netinet/tcp_fsm.h>
 
-#include <netinet6/in6.h>
 #include <netinet6/natpt_defs.h>
 #include <netinet6/natpt_soctl.h>
 

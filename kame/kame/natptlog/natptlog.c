@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natptlog.c,v 1.1 2000/01/07 15:13:54 fujisawa Exp $
+ *	$Id: natptlog.c,v 1.2 2000/02/06 09:51:48 itojun Exp $
  */
 
 #include <stdio.h>
@@ -51,7 +51,7 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
