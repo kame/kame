@@ -1,4 +1,4 @@
-/*      $KAME: binding.c,v 1.4 2005/01/22 12:56:54 t-momose Exp $	*/
+/*      $KAME: binding.c,v 1.5 2005/01/26 07:41:59 t-momose Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -284,7 +284,8 @@ mip6_bc_set_refresh_timer(bc, tick)
 	int tick;
 {
 	remove_callout_entry(bc->bc_refresh);
-	bc->bc_refresh = new_callout_entry(tick, mip6_bc_refresh_timer, (void *)bc);
+	bc->bc_refresh = new_callout_entry(tick, mip6_bc_refresh_timer,
+					   (void *)bc, "mip6_bc_refresh_timer,");
 }
 
 

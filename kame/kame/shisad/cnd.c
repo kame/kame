@@ -1,4 +1,4 @@
-/*	$KAME: cnd.c,v 1.1 2004/12/09 02:18:30 t-momose Exp $	*/
+/*	$KAME: cnd.c,v 1.2 2005/01/26 07:41:59 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -252,6 +252,11 @@ command_show_status(s, arg)
 
                 command_show_stat(s);
 
+	} else if (strcmp(arg, "callout") == 0) {
+		sprintf(msg, "-- List of callout table --\n");
+		write(s, msg, strlen(msg));
+
+		show_callout_table(s);
         } else {
                 sprintf(msg, "Available options are:\n");
                 sprintf(msg + strlen(msg), "\tbc (Binding Cache in Shisa)\n\tkbc (Binding Cache in kernel)\n\tstat (Statistics)\n");

@@ -1,4 +1,4 @@
-/*      $KAME: common.c,v 1.6 2005/01/26 06:05:05 ryuji Exp $  */
+/*      $KAME: common.c,v 1.7 2005/01/26 07:41:59 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -325,7 +325,8 @@ hal_set_expire_timer(hal, tick)
         int tick;
 {
         remove_callout_entry(hal->hal_expire);
-        hal->hal_expire = new_callout_entry(tick, hal_expire_timer, (void *)hal);
+        hal->hal_expire = new_callout_entry(tick, hal_expire_timer,
+					    (void *)hal, "hal_expire_timer");
 }
 
 

@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.7 2005/01/22 12:56:55 t-momose Exp $	*/
+/*	$KAME: fsm.c,v 1.8 2005/01/26 07:41:59 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2782,7 +2782,7 @@ bul_set_retrans_timer(bul, tick)
 {
 	remove_callout_entry(bul->bul_retrans);
 	bul->bul_retrans = new_callout_entry(tick, bul_retrans_timer,
-	    (void *)bul);
+	    (void *)bul, "bul_retrans_timer");
 }
 
 static void
@@ -2811,7 +2811,7 @@ bul_set_expire_timer(bul, tick)
 {
 	remove_callout_entry(bul->bul_expire);
 	bul->bul_expire = new_callout_entry(tick, bul_expire_timer,
-	    (void *)bul);
+	    (void *)bul, "bul_expire_timer");
 }
 
 static void

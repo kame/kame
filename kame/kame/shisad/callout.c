@@ -1,4 +1,4 @@
-/*	$KAME: callout.c,v 1.1 2004/12/09 02:18:28 t-momose Exp $	*/
+/*	$KAME: callout.c,v 1.2 2005/01/26 07:41:59 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -29,13 +29,19 @@
  * SUCH DAMAGE.
  */
 
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <poll.h>	/* for definition of INFTIM */
 #include <syslog.h>
+#include <time.h>
 
+#include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/time.h>
+#include <sys/uio.h>
+#include <unistd.h>
 
 #include "callout.h"
 
@@ -84,10 +90,11 @@ callout_expire_check()
 }
 
 CALLOUT_HANDLE
-new_callout_entry(exprelative, func, arg)
+new_callout_entry(exprelative, func, arg, funcname)
 	int exprelative;	/* Relative time of expire (s) */
 	void (*func)();		/* Function to be called */
 	void *arg;		/* An argument to pass the function */
+	char *funcname;		/* Function name used for debugging */
 {
 	struct callout_queue_t *newcq;
 
@@ -101,6 +108,7 @@ new_callout_entry(exprelative, func, arg)
 	newcq->exptime.tv_sec += exprelative;
 	newcq->func = func;
 	newcq->arg = arg;
+	newcq->funcname = funcname;
 
 	insert_callout_queue(newcq);
 
@@ -186,4 +194,27 @@ get_next_timeout()
 		}
 	}
 	return (timeout);
+}
+
+void
+show_callout_table(s)
+	int s;
+{
+	struct timeval current_time, t;
+	struct callout_queue_t *cq;
+	char msg[1024];
+	
+	gettimeofday(&current_time, NULL);
+	TAILQ_FOREACH(cq, &callout_head, callout_entry) {
+		struct tm *tm;
+		
+		tm = localtime((time_t *)&cq->exptime.tv_sec);
+		
+  		timersub(&cq->exptime, &current_time, &t);
+		sprintf(msg, "%02d:%02d:%02d(%ld.%06lds) %s()\n",
+			tm->tm_hour, tm->tm_min, tm->tm_sec,
+			t.tv_sec, t.tv_usec,
+			cq->funcname);
+		write(s, msg, strlen(msg));
+	}
 }

@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.4 2005/01/22 12:56:55 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.5 2005/01/26 07:42:00 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -1450,6 +1450,11 @@ command_show_status(s, arg)
 		noro_show(s);
 	} else if (strcmp(arg, "config") == 0) {
 		show_current_config(s);
+	} else if (strcmp(arg, "callout") == 0) {
+		sprintf(msg, "-- List of callout table --\n");
+		write(s, msg, strlen(msg));
+
+		show_callout_table(s);
 	}
 #ifdef MIP_NEMO
 	else if (strcmp(arg, "pt") == 0) {
@@ -1488,11 +1493,9 @@ command_flush(s, arg)
 	} else if (strcmp(arg, "hal") == 0) {
 		sprintf(msg, "-- Clear Home Agent List --\n");
 		write(s, msg, strlen(msg));
-
 	} else if (strcmp(arg, "noro") == 0) {
 		sprintf(msg, "-- Clear No Route Optimization Host --\n");
 		write(s, msg, strlen(msg));
-
 	} else {
 		sprintf(msg, "Available options are:\n");
 		sprintf(msg + strlen(msg), "\tbul (Binding Update List)\n\thal (Home Agent List)\n\tstat (Statistics)\n\tnoro (No Route Optimization Hosts)\n\n");

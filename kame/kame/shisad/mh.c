@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.8 2005/01/22 12:56:55 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.9 2005/01/26 07:41:59 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -699,7 +699,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	} else {
 #ifdef MIP_CN
 		/* 
-		 * If authenticator is not present, just
+		 * If an authenticator is not present, just
 		 * silently drop this BU 
 		 */
 		if (!(homeagent_mode && (flags & IP6_MH_BU_HOME))) {

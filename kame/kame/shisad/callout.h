@@ -1,4 +1,4 @@
-/*	$KAME: callout.h,v 1.1 2004/12/09 02:18:29 t-momose Exp $	*/
+/*	$KAME: callout.h,v 1.2 2005/01/26 07:41:59 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -33,6 +33,7 @@ struct callout_queue_t {
 	TAILQ_ENTRY(callout_queue_t) callout_entry;
 
 	struct timeval exptime;
+	char *funcname;
 	void (*func)(void *);
 	void *arg;
 };
@@ -45,9 +46,9 @@ TAILQ_HEAD(callout_queue_t_head, callout_queue_t);
 
 void callout_init();
 void callout_expire_check();
-CALLOUT_HANDLE new_callout_entry(int, void (*)(), void *);
+CALLOUT_HANDLE new_callout_entry(int, void (*)(), void *, char *);
 void remove_callout_entry(CALLOUT_HANDLE ch);
 void update_callout_entry(CALLOUT_HANDLE ch, int);
 int get_next_timeout();
-
+void show_callout_table(int);
 
