@@ -1,4 +1,4 @@
-/*	$KAME: sockmisc.c,v 1.38 2003/05/09 05:31:11 itojun Exp $	*/
+/*	$KAME: sockmisc.c,v 1.39 2003/10/23 04:22:56 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -729,7 +729,7 @@ str2saddr(host, port)
 	error = getaddrinfo(host, port, &hints, &res);
 	if (error != 0) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"getaddrinfo(%s%s%s): %s",
+			"getaddrinfo(%s%s%s): %s\n",
 			host, port ? "," : "", port ? port : "",
 			gai_strerror(error));
 		return NULL;
@@ -738,7 +738,7 @@ str2saddr(host, port)
 		plog(LLV_ERROR, LOCATION, NULL,
 			"getaddrinfo(%s%s%s): "
 			"resolved to multiple address, "
-			"taking the first one",
+			"taking the first one\n",
 			host, port ? "," : "", port ? port : "");
 	}
 	saddr = racoon_malloc(res->ai_addrlen);
