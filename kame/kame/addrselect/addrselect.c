@@ -1,4 +1,4 @@
-/*	$KAME: addrselect.c,v 1.6 2001/12/10 23:58:48 jinmei Exp $	*/
+/*	$KAME: addrselect.c,v 1.7 2001/12/19 14:32:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -33,9 +33,13 @@
 #include <sys/socket.h>
 #include <sys/queue.h>
 #include <sys/param.h>
+#include <sys/ioctl.h>
 #include <sys/sysctl.h>
 
 #include <net/if.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include <net/if_var.h>
+#endif /* __FreeBSD__ >= 3 */
 
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
@@ -67,7 +71,7 @@ static void plen2mask __P((struct sockaddr_in6 *, int));
 static void set_policy __P((void));
 static void add_policy __P((char *, char *, char *));
 static void delete_policy __P((char *));
-static struct policyqueue *find_policy __P((struct in6_addrpolicy *));
+static void flush_policy __P(());
 
 int
 main(argc, argv)
@@ -100,18 +104,14 @@ main(argc, argv)
 	} else if (strcasecmp(argv[0], "add") == 0) {
 		if (argc < 4)
 			usage();
-		get_policy();
 		add_policy(argv[1], argv[2], argv[3]);
-		set_policy();
 	} else if (strcasecmp(argv[0], "delete") == 0) {
 		if (argc < 2)
 			usage();
-		get_policy();
 		delete_policy(argv[1]);
-		set_policy();
 	} else if (strcasecmp(argv[0], "flush") == 0) {
-		/* flush all the policy by specifying an empty buffer. */
-		set_policy();
+		get_policy();
+		flush_policy();
 	} else
 		usage();
 
@@ -330,33 +330,19 @@ plen2mask(mask, plen)
 static void
 set_policy()
 {
-	int count = 0;
 	struct policyqueue *ent;
-	char *buf;
-	struct in6_addrpolicy *pol;
-	int mib[] = { CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_ADDRSELPOLICY };
-	size_t buflen;
+	int s;
+
+	if ((s = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP)) < 0)
+		err(1, "socket(UDP)");
 
 	for (ent = TAILQ_FIRST(&policyhead); ent;
-	     ent = TAILQ_NEXT(ent, pc_entry), count++)
-		;
-
-	buflen = count * sizeof(struct in6_addrpolicy);
-	if ((buf = malloc(buflen)) == NULL)
-		err(1, "memory allocation failed");
-	pol = (struct in6_addrpolicy *)buf;
-
-	for (ent = TAILQ_FIRST(&policyhead); ent;
-	     ent = TAILQ_NEXT(ent, pc_entry), pol++) {
-		*pol = ent->pc_policy;
-		pol->use = 0;	/* for safety */
+	     ent = TAILQ_NEXT(ent, pc_entry)) {
+		if (ioctl(s, SIOCASRCSEL_POLICY, &ent->pc_policy))
+			warn("ioctl(SIOCASRCSEL_POLICY)");
 	}
 
-	if (sysctl(mib, sizeof(mib) / sizeof(mib[0]), NULL, 0,
-		   buf, buflen) < 0) {
-		err(1, "sysctl(IPV6CTL_ADDRSELPOLICY)");
-		/* NOTREACHED */
-	}
+	close(s);
 }
 
 static int
@@ -423,67 +409,60 @@ static void
 add_policy(prefix, prec, label)
 	char *prefix, *prec, *label;
 {
-	struct policyqueue *new;
+	struct in6_addrpolicy p;
+	int s;
 
-	if ((new = malloc(sizeof(*new))) == NULL)
-		errx(1, "malloc failed\n");
-	memset(new, 0, sizeof(*new));
+	memset(&p, 0, sizeof(p));
 
-	if (parse_prefix((const char *)prefix, &new->pc_policy))
+	if (parse_prefix((const char *)prefix, &p))
 		errx(1, "bad prefix: %s", prefix);
+	p.preced = atoi(prec);
+	p.label = atoi(label);
 
-	/* duplication check */
-	if (find_policy(&new->pc_policy))
-		errx(1, "policy entry for %s exists", prefix);
+	if ((s = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP)) < 0)
+		err(1, "socket(UDP)");
+	if (ioctl(s, SIOCASRCSEL_POLICY, &p))
+		err(1, "ioctl(SIOCASRCSEL_POLICY)");
 
-	new->pc_policy.preced = atoi(prec);
-	new->pc_policy.label = atoi(label);
-
-	TAILQ_INSERT_TAIL(&policyhead, new, pc_entry);
+	close(s);
 }
 
 static void
 delete_policy(prefix)
 	char *prefix;
 {
-	struct in6_addrpolicy key;
-	struct policyqueue *ent;
+	struct in6_addrpolicy p;
+	int s;
 
-	memset(&key, 0, sizeof(key));
+	memset(&p, 0, sizeof(p));
 	
-	if (parse_prefix((const char *)prefix, &key))
+	if (parse_prefix((const char *)prefix, &p))
 		errx(1, "bad prefix: %s", prefix);
 
-	if ((ent = find_policy(&key)) == NULL)
-		errx(1, "policy entry for %s does not exist", prefix);
+	if ((s = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP)) < 0)
+		err(1, "socket(UDP)");
+	if (ioctl(s, SIOCDSRCSEL_POLICY, &p))
+		err(1, "ioctl(SIOCDSRCSEL_POLICY)");
 
-	TAILQ_REMOVE(&policyhead, ent, pc_entry);
+	close(s);
 }
 
-static struct policyqueue *
-find_policy(key)
-	struct in6_addrpolicy *key;
+static void
+flush_policy()
 {
-	int i;
 	struct policyqueue *ent;
+	int s;
+
+	if ((s = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP)) < 0)
+		err(1, "socket(UDP)");
 
 	for (ent = TAILQ_FIRST(&policyhead); ent;
 	     ent = TAILQ_NEXT(ent, pc_entry)) {
-		for (i = 0; i < 16; i++) {
-			if ((ent->pc_policy.addr.sin6_addr.s6_addr[i] &
-			     ent->pc_policy.addrmask.sin6_addr.s6_addr[i]) !=
-			    (key->addr.sin6_addr.s6_addr[i] &
-			     key->addrmask.sin6_addr.s6_addr[i])) {
-				goto next;
-			}
-		}
-		return(ent);
-
-	  next:
-		continue;
+		if (ioctl(s, SIOCDSRCSEL_POLICY, &ent->pc_policy))
+			warn("ioctl(SIOCDSRCSEL_POLICY)");
 	}
 
-	return(NULL);
+	close(s);
 }
 
 static void
