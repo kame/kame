@@ -46,6 +46,10 @@
 #include <net/if_types.h>
 #include <net/if_dl.h>
 #include <netinet/in.h>
+#include <netinet/igmp.h>
+#ifdef IGMP_V3_MEMBERSHIP_REPORT
+#include <netinet/in_msf.h>
+#endif
 #ifndef __NetBSD__
 # ifdef	__FreeBSD__
 #  define	KERNEL
@@ -84,6 +88,12 @@ void acmc __P((struct ether_multi *));
 void if6_addrlist __P((struct ifaddr *));
 void in6_multilist __P((struct in6_multi *));
 struct in6_multi * in6_multientry __P((struct in6_multi *));
+void if_addrlist(struct ifaddr *);
+void in_multilist(struct in_multi *);
+struct in_multi * in_multientry(struct in_multi *);
+#ifdef IGMP_V3_MEMBERSHIP_REPORT
+void in_addr_slistentry(struct in_addr_slist *ias, char *heading);
+#endif
 
 #if !defined(__NetBSD__) && !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__)
 #ifdef __bsdi__
@@ -178,9 +188,11 @@ int main(argc, argv)
 		printf("%s:\n", if_indextoname(ifnet.if_index, ifname));
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
+		if_addrlist(ifnet.if_addrlist.tqh_first);
 		if6_addrlist(ifnet.if_addrlist.tqh_first);
 		nifp = ifnet.if_list.tqe_next;
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+		if_addrlist(TAILQ_FIRST(&ifnet.if_addrhead));
 		if6_addrlist(TAILQ_FIRST(&ifnet.if_addrhead));
 		nifp = ifnet.if_link.tqe_next;
 #else
@@ -392,6 +404,158 @@ in6_multilist(mc)
 	while (mc)
 		mc = in6_multientry(mc);
 }
+
+void
+if_addrlist(ifap)
+	struct ifaddr *ifap;
+{
+	struct ifaddr ifa;
+	struct sockaddr sa;
+	struct in_ifaddr ia;
+	struct in_multi *mc = 0;
+	struct ifaddr *ifap0;
+
+	ifap0 = ifap;
+	while (ifap) {
+		KREAD(ifap, &ifa, struct ifaddr);
+		if (ifa.ifa_addr == NULL)
+			goto nextifap;
+		KREAD(ifa.ifa_addr, &sa, struct sockaddr);
+		if (sa.sa_family != PF_INET)
+			goto nextifap;
+		KREAD(ifap, &ia, struct in_ifaddr);
+		printf("\tinet %s\n", inet_ntoa(ia.ia_addr.sin_addr));
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+		mc = mc ? mc : ia.ia_multiaddrs.lh_first;
+#endif
+	nextifap:
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+		ifap = ifa.ifa_list.tqe_next;
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+		ifap = ifa.ifa_link.tqe_next;
+#else
+		ifap = ifa.ifa_next;
+#endif /* __FreeBSD__ >= 3 */
+	}
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	if (ifap0) {
+		struct ifnet ifnet;
+		struct ifmultiaddr ifm, *ifmp = 0;
+		struct sockaddr_in sin;
+		struct in_multi inm;
+		struct sockaddr_dl sdl;
+		int in_multilist_done = 0;
+
+		KREAD(ifap0, &ifa, struct ifaddr);
+		KREAD(ifa.ifa_ifp, &ifnet, struct ifnet);
+		if (ifnet.if_multiaddrs.lh_first)
+			ifmp = ifnet.if_multiaddrs.lh_first;
+		while (ifmp) {
+			KREAD(ifmp, &ifm, struct ifmultiaddr);
+			if (ifm.ifma_addr == NULL)
+				goto nextmulti;
+			KREAD(ifm.ifma_addr, &sa, struct sockaddr);
+			if (sa.sa_family != AF_INET)
+				goto nextmulti;
+			(void)in_multientry((struct in_multi *)
+					    ifm.ifma_protospec);
+			if (ifm.ifma_lladdr == 0)
+				goto nextmulti;
+			KREAD(ifm.ifma_lladdr, &sdl, struct sockaddr_dl);
+			printf("\t\t\tmcast-macaddr %s multicnt %d\n",
+			       ether_ntoa((struct ether_addr *)LLADDR(&sdl)),
+			       ifm.ifma_refcount);
+		    nextmulti:
+			ifmp = ifm.ifma_link.le_next;
+		}
+	}
+#else
+	if (mc)
+		in_multilist(mc);
+#endif
+}
+
+void
+in_multilist(mc)
+	struct in_multi *mc;
+{
+	while (mc)
+		mc = in_multientry(mc);
+}
+
+struct in_multi *
+in_multientry(mc)
+	struct in_multi *mc;
+{
+	struct in_multi multi;
+	struct in_multi_source src;
+
+	KREAD(mc, &multi, struct in_multi);
+	printf("\t\tgroup %s", inet_ntoa(multi.inm_addr));
+
+#ifdef IGMP_V3_MEMBERSHIP_REPORT
+	if (multi.inm_source == NULL) {
+		printf("\n");
+		return(multi.inm_list.le_next);
+	}
+
+	KREAD(multi.inm_source, &src, struct in_multi_source);
+	printf("\tmode=%s\tgroup join=%d\n",
+		src.ims_mode == MCAST_INCLUDE ? "include" :
+		src.ims_mode == MCAST_EXCLUDE ? "exclude" :
+		"???",
+		src.ims_grpjoin);
+	in_addr_slistentry(src.ims_cur, "current");
+	in_addr_slistentry(src.ims_rec, "recorded");
+	in_addr_slistentry(src.ims_in, "included");
+	in_addr_slistentry(src.ims_ex, "excluded");
+	in_addr_slistentry(src.ims_alw, "allowed");
+	in_addr_slistentry(src.ims_blk, "blocked");
+	in_addr_slistentry(src.ims_toin, "to-include");
+	in_addr_slistentry(src.ims_ex, "to-exclude");
+#else
+	printf("\n");
+#endif
+
+	return(multi.inm_list.le_next);
+}
+
+#ifdef IGMP_V3_MEMBERSHIP_REPORT
+void
+in_addr_slistentry(struct in_addr_slist *ias, char *heading)
+{
+	struct in_addr_slist slist;
+	struct ias_head head;
+	struct in_addr_source src;
+
+	if (ias == NULL) {
+		printf("\t\t\t%s (none)\n", heading);
+		return;
+	}
+	memset(&slist, 0, sizeof(slist));
+	KREAD(ias, &slist, struct in_addr_source);
+	printf("\t\t\t%s (entry num=%d)\n", heading, slist.numsrc);
+	if (slist.numsrc == 0) {
+		return;
+	}
+	KREAD(slist.head, &head, struct ias_head);
+
+	KREAD(head.lh_first, &src, struct in_addr_source);
+	while (1) {
+		struct in_addr dummy;
+
+		dummy = src.ias_addr;
+		dummy.s_addr = htonl(dummy.s_addr);
+		printf("\t\t\t\tsource %s (ref=%d)\n",
+			inet_ntoa(dummy), src.ias_refcount);
+		if (src.ias_list.le_next == NULL)
+			break;
+		KREAD(src.ias_list.le_next, &src, struct in_addr_source);
+	}
+	return;
+}
+#endif
+
 
 #if !defined(__NetBSD__) && !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__)
 static char *
