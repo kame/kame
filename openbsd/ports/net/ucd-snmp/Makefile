@@ -3,18 +3,18 @@
 # Date created:				26 June 1996
 # Whom:					itojun@iijlab.net
 #
-# $Id: Makefile,v 1.2 1999/11/04 00:03:03 itojun Exp $
+# $Id: Makefile,v 1.3 1999/11/18 14:35:32 itojun Exp $
 #
 
 DISTNAME=	ucd-snmp-4.0.1
-PKGNAME=	ucd-snmp-v6-4.0.1.19991104a
+PKGNAME=	ucd-snmp-v6-4.0.1.19991118a
 CATEGORIES=	net
 MASTER_SITES= 	ftp://ucd-snmp.ucdavis.edu/ \
 		ftp://sunsite.cnlab-switch.ch/mirror/ucd-snmp/ \
 		ftp://ftp.win.or.jp/pub/network/snmp/ucd-snmp/
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	ucd-snmp-4.0.1-v6-19991104a.diff.gz
+PATCHFILES=	ucd-snmp-4.0.1-v6-19991118a.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@iijlab.net
