@@ -1,9 +1,17 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.108 1999/09/12 17:07:23 jinmei Exp $
+$Id: CHANGELOG,v 1.109 1999/09/13 03:29:21 itojun Exp $
 
 
 <199909>
+Mon Sep 13 12:26:07 JST 1999  itojun@iijlab.net
+	* netbsd/sys/dev/pcmcia/if_wi*, netbsd/usr.sbin/wiconfig:
+	  WaveLan driver from NetBSD-current.  Works fine with IPv6 as we've
+	  fixed it.  (This may be (1) a bad idea to bring some drivers in
+	  from *-current, for some of version controlling issues, or (2) a
+	  good idea for reducing people's labor for merging.  I'm not really
+	  sure...)
+
 1999-09-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6sd/mtrace6: implemented in order to trace IPv6
 	multicast routing.
