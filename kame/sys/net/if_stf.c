@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.10 2000/03/11 14:07:41 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.11 2000/03/11 14:34:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -73,6 +73,7 @@
 #ifdef __FreeBSD__
 #include <sys/kernel.h>
 #endif
+#include <machine/cpu.h>
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <sys/malloc.h>
