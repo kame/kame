@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.34 2003/09/12 03:31:32 itojun Exp $	*/
+/*	$KAME: setkey.c,v 1.35 2003/09/24 18:03:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -66,7 +66,9 @@ int sendkeymsg __P((char *, size_t));
 int postproc __P((struct sadb_msg *, int));
 int fileproc __P((const char *));
 int dumpkernfs __P((const char *));
+#ifdef KEYCTL_DUMPSA
 int sysctldump __P((u_int, u_int8_t));
+#endif
 const char *numstr __P((int));
 void shortdump_hdr __P((void));
 void shortdump __P((struct sadb_msg *));
@@ -198,8 +200,10 @@ main(argc, argv)
 			break;
 		}
 
+#ifdef KEYCTL_DUMPSA
 		error = sysctldump(f_policy ? SADB_X_SPDDUMP : SADB_DUMP,
 		    SADB_SATYPE_UNSPEC);
+
 		if (error == 0)
 			break;
 		if (error < 0) {
@@ -210,6 +214,7 @@ main(argc, argv)
 			} else if (errno != 0)
 				err(1, "sysctl");
 		}
+#endif
 
 		sendkeyshort(f_policy ? SADB_X_SPDDUMP : SADB_DUMP);
 		break;
@@ -562,6 +567,7 @@ dumpkernfs(dir)
 	return (0);
 }
 
+#ifdef KEYCTL_DUMPSA
 int
 sysctldump(type, satype)
 	u_int type;
@@ -604,6 +610,7 @@ sysctldump(type, satype)
 	free(buf);
 	return (0);
 }
+#endif
 
 /*------------------------------------------------------------*/
 static const char *satype[] = {
