@@ -1,11 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.992 2000/06/11 08:06:51 itojun Exp $
+$Id: CHANGELOG,v 1.993 2000/06/11 10:47:26 sumikawa Exp $
 
 <200006>
 Sun Jun 11 17:03:07 JST 2000  itojun@iijlab.net
-	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 2000/6/5 weekly SNAP from
-	  tcpdump.org.
+	* {netbsd/pkgsrc/net,freebsd3/ports}/{libpcap,tcpdump}: use
+	  2000/6/5 weekly SNAP from tcpdump.org.
 	* netbsd/pkgsrc/net/ethereal: upgrade to 0.8.9.
 
 Sat Jun 10 23:11:41 JST 2000 sakane@ydc.co.jp
