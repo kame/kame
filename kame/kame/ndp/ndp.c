@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.61 2001/02/16 12:23:39 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.62 2001/03/21 15:26:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -564,6 +564,7 @@ dump(addr)
 	int llwidth;
 	int ifwidth;
 	char flgbuf[8];
+	char *ifname;
 
 	/* Print header */
 	if (!tflag && !cflag)
@@ -628,14 +629,15 @@ again:;
 		llwidth = strlen(ether_str(sdl));
 		if (W_ADDR + W_LL - addrwidth > llwidth)
 			llwidth = W_ADDR + W_LL - addrwidth;
-		ifwidth = strlen(if_indextoname(sdl->sdl_index,
-		    ifix_buf));
+		ifname = if_indextoname(sdl->sdl_index, ifix_buf);
+		if (!ifname)
+			ifname = "?";
+		ifwidth = strlen(ifname);
 		if (W_ADDR + W_LL + W_IF - addrwidth - llwidth > ifwidth)
 			ifwidth = W_ADDR + W_LL + W_IF - addrwidth - llwidth;
 
 		printf("%-*.*s %-*.*s %*.*s", addrwidth, addrwidth, host_buf,
-		    llwidth, llwidth, ether_str(sdl), ifwidth, ifwidth,
-		    if_indextoname(sdl->sdl_index, ifix_buf));
+		    llwidth, llwidth, ether_str(sdl), ifwidth, ifwidth, ifname);
 
 		/* Print neighbor discovery specific informations */
 		nbi = getnbrinfo(&sin->sin6_addr, sdl->sdl_index, 1);
