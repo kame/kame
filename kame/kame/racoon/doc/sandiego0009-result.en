@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.21 2000/09/20 23:28:50 sakane Exp $
+$KAME: sandiego0009-result.en,v 1.22 2000/09/20 23:30:50 itojun Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -209,6 +209,12 @@ vs NetLock
 	    preshared, 3des-cbc, sha1, DH group 1
 	phase 2: PFS group 2
 	    ESP 3des-cbc, hmac-md5, transport mode, no PFS
+
+	phase 1: main
+	    preshared, 3des-cbc, sha1, DH group 1
+	phase 2: PFS group 2
+	    IPComp deflate + ESP 3des-cbc, hmac-md5, transport mode, no PFS
+	    (failed due to IPComp SPI size)
 
 	Notes:
 	- fragmented ping works fine, large ftp transfer went well too
