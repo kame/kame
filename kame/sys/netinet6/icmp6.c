@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.247 2001/10/15 12:25:52 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.248 2001/10/15 12:36:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -450,6 +450,10 @@ icmp6_error(m, type, code, param)
 	 * have been swapped while dest6 processing (see dest6.c).  To
 	 * avoid m_pulldown, we had better to swap addresses before
 	 * m_prepend below.
+	 *
+	 * XXX: We should consider the other candidate to keep the
+	 * icmp6 error packet correct that not swapping ip6_src and
+	 * homeaddr in the dest6 processing.
 	 */
 	nip6_srcp = &oip6->ip6_src;
 	n = ip6_findaux(m);
