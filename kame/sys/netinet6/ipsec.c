@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.156 2002/06/21 23:14:36 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.157 2002/06/22 12:03:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -303,7 +303,7 @@ ipsec_checkpcbcache(m, pcbsp, dir)
 		if (ipsec_setspidx(m, &spidx, 1) != 0)
 			return NULL;
 		if (bcmp(&pcbsp->cacheidx[dir], &spidx, sizeof(spidx))) {
-			if (pcbsp->cache[dir]->spidx &&
+			if (!pcbsp->cache[dir]->spidx ||
 			    !key_cmpspidx_withmask(pcbsp->cache[dir]->spidx,
 			    &spidx))
 				return NULL;
@@ -495,7 +495,7 @@ ipsec4_getpolicybysock(m, dir, so, error)
 
 		case IPSEC_POLICY_ENTRUST:
 			/* look for a policy in SPD */
-			if (ipsec_setspidx_mbuf(&spidx, AF_INET, m, 0) == 0 &&
+			if (ipsec_setspidx_mbuf(&spidx, AF_INET, m, 1) == 0 &&
 			    (kernsp = key_allocsp(&spidx, dir)) != NULL) {
 				/* SP found */
 				KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
@@ -529,7 +529,7 @@ ipsec4_getpolicybysock(m, dir, so, error)
 
 	/* when non-privilieged socket */
 	/* look for a policy in SPD */
-	if (ipsec_setspidx_mbuf(&spidx, AF_INET, m, 0) == 0 &&
+	if (ipsec_setspidx_mbuf(&spidx, AF_INET, m, 1) == 0 &&
 	    (kernsp = key_allocsp(&spidx, dir)) != NULL) {
 		/* SP found */
 		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
@@ -697,7 +697,7 @@ ipsec6_getpolicybysock(m, dir, so, error)
 
 		case IPSEC_POLICY_ENTRUST:
 			/* look for a policy in SPD */
-			if (ipsec_setspidx_mbuf(&spidx, AF_INET6, m, 0) == 0 &&
+			if (ipsec_setspidx_mbuf(&spidx, AF_INET6, m, 1) == 0 &&
 			    (kernsp = key_allocsp(&spidx, dir)) != NULL) {
 				/* SP found */
 				KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
@@ -731,7 +731,7 @@ ipsec6_getpolicybysock(m, dir, so, error)
 
 	/* when non-privilieged socket */
 	/* look for a policy in SPD */
-	if (ipsec_setspidx_mbuf(&spidx, AF_INET6, m, 0) == 0 &&
+	if (ipsec_setspidx_mbuf(&spidx, AF_INET6, m, 1) == 0 &&
 	    (kernsp = key_allocsp(&spidx, dir)) != NULL) {
 		/* SP found */
 		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
@@ -1354,6 +1354,7 @@ ipsec_deepcopy_policy(src)
 	dst->req = newchain;
 	dst->state = src->state;
 	dst->policy = src->policy;
+	dst->dir = src->dir;
 	/* do not touch the refcnt fields */
 
 	return dst;
