@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1525 2001/02/03 12:38:28 jinmei Exp $
+$KAME: CHANGELOG,v 1.1526 2001/02/04 02:22:35 itojun Exp $
 
 <200102>
+Sun Feb  4 11:21:15 JST 2001  itojun@iijlab.net
+	* freebsd*: do not remove prefix list on net.inet6.ip6.forwarding
+	  change from 0 to 1.  the behavior is confusing, and not friendly
+	  with recent changes to on-link determination logic.
+
 2001-02-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd/config.c (getconfig):
 	* kame/kame/rtadvd/advcap.c (agetnum):
