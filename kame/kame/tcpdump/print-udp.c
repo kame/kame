@@ -21,7 +21,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: print-udp.c,v 1.60 97/07/27 21:58:48 leres Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-udp.c,v 1.1.1.1 1999/08/08 23:32:09 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -489,6 +489,10 @@ udp_print(register const u_char *bp, u_int length, register const u_char *bp2)
 #ifdef INET6
 		else if (ISPORT(RIPNG_PORT))
 			ripng_print((const u_char *)(up + 1), length);
+		else if (ISPORT(546) || ISPORT(547)) {
+			dhcp6_print((const u_char *)(up + 1), length,
+				sport, dport);
+		}
 #endif /*INET6*/
 		/*
 		 * Kludge in test for whiteboard packets.

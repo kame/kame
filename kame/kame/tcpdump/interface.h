@@ -18,7 +18,7 @@
  * WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * @(#) $Header: interface.h,v 1.105 97/04/26 13:39:58 leres Exp $ (LBL)
+ * @(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/interface.h,v 1.1.1.1 1999/08/08 23:31:57 itojun Exp $ (LBL)
  */
 
 #ifndef tcpdump_interface_h
@@ -233,4 +233,5 @@ extern void icmp6_print(const u_char *, const u_char *);
 extern void ripng_print(const u_char *, int);
 extern int rt6_print(const u_char *, const u_char *);
 extern void ospf6_print(const u_char *, u_int);
+extern void dhcp6_print(const u_char *, u_int, u_short, u_short);
 #endif /*INET6*/

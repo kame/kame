@@ -17,7 +17,7 @@
 #  WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
 #  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 #
-# @(#) $Header: Makefile.in,v 1.207 97/08/17 13:53:29 leres Exp $ (LBL)
+# @(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/Makefile.in,v 1.1.1.1 1999/08/08 23:31:54 itojun Exp $ (LBL)
 
 #
 # Various configurable paths (remember to edit Makefile.in, not Makefile)
@@ -74,7 +74,7 @@ CSRC =	tcpdump.c \
 	print-wb.c addrtoname.c bpf_dump.c gmt2local.c machdep.c \
 	parsenfsfh.c util.c savestr.c setsignal.c \
 	print-esp.c print-ah.c print-vjc.c print-isakmp.c print-chdlc.c \
-	print-ipcomp.c print-mobile.c print-l2tp.c
+	print-ipcomp.c print-mobile.c print-l2tp.c print-dhcp6.c
 LOCALSRC = @LOCALSRC@
 GENSRC = version.c
 
