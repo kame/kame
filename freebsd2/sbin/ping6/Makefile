@@ -1,7 +1,9 @@
 PROG=	ping6
 MAN8=	ping6.8
+SRCS=	ping6.c md5.c
 
-CFLAGS+= -DINET6 -DIPSEC
+CFLAGS+=-DINET6 -DIPSEC
+CFLAGS+=-I${.CURDIR}/../../kame/ping6
 
 BINOWN=	root
 BINGRP=	bin
