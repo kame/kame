@@ -71,6 +71,13 @@ struct bgproute_list {
 #define bgp_route_prev(l) ((l)->prev)
 #define bgp_route_insert(new,post) insque((new), (post)->prev)
 
+#ifdef __FreeBSD__		/* XXX: see PORTABILITY */
+#define LONGLONG "%qu"
+#else
+#define LONGLONG "%llu"
+#endif
+
+
 static char *
 sec2str(total)
 	time_t total;
@@ -500,11 +507,13 @@ print_rip_dump(FILE *fp)
 		fputc('\n', fp);
 
 		/* statistics */
-		fprintf(fp, "  Responses: in/out/fail: %llu/%llu/%llu\n",
+		fprintf(fp, "  Responses: in/out/fail: "
+			LONGLONG "/" LONGLONG "/" LONGLONG "\n",
 			(unsigned long long)ripif->rip_responsercvd,
 			(unsigned long long)ripif->rip_responsesent,
 			(unsigned long long)ripif->rip_respfail);
-		fprintf(fp, "  Requests: in/out/fail: %llu/%llu/%llu\n",
+		fprintf(fp, "  Requests: in/out/fail: "
+			LONGLONG "/" LONGLONG "/" LONGLONG "\n",
 			(unsigned long long)ripif->rip_requestrcvd,
 			(unsigned long long)ripif->rip_requestsent,
 			(unsigned long long)ripif->rip_reqsentfail);
@@ -803,24 +812,26 @@ show_bgp_peer(FILE *fp, struct rpcb *bnp, char *indent)
 	     ((bnp->rp_mode & BGPO_PASSIVE) == 0 &&
 	      find_active_peer(bnp) == NULL))) {
 		fprintf(fp, "%sStatistics:\n", indent);
-		fprintf(fp, "%s Connection retries: %llu\n",
+		fprintf(fp, "%s Connection retries: " LONGLONG "\n",
 			indent,
 			(unsigned long long)abnp->rp_stat.rps_connretry);
-		fprintf(fp, "%s Peering establishments: %llu\n",
+		fprintf(fp, "%s Peering establishments: " LONGLONG "\n",
 			indent, (unsigned long long)abnp->rp_stat.established);
-		fprintf(fp, "%s OPENs: in/out: %llu/%llu\n",
+		fprintf(fp, "%s OPENs: in/out: " LONGLONG "/" LONGLONG "\n",
 			indent, (unsigned long long)abnp->rp_stat.openrcvd,
 			(unsigned long long)abnp->rp_stat.opensent);
-		fprintf(fp, "%s UPDATEs: in/out: %llu/%llu\n",
+		fprintf(fp, "%s UPDATEs: in/out: " LONGLONG "/" LONGLONG "\n",
 			indent, (unsigned long long)abnp->rp_stat.updatercvd,
 			(unsigned long long)abnp->rp_stat.updatesent);
-		fprintf(fp, "%s NOTIFYs: in/out: %llu/%llu\n",
+		fprintf(fp, "%s NOTIFYs: in/out: " LONGLONG "/" LONGLONG "\n",
 			indent, (unsigned long long)abnp->rp_stat.notifyrcvd,
 			(unsigned long long)abnp->rp_stat.notifysent);
-		fprintf(fp, "%s KEEPALIVEs: in/out: %llu/%llu\n",
+		fprintf(fp, "%s KEEPALIVEs: in/out: "
+			LONGLONG "/" LONGLONG "\n",
 			indent, (unsigned long long)abnp->rp_stat.keepalivercvd,
 			(unsigned long long)abnp->rp_stat.keepalivesent);
-		fprintf(fp, "%s WITHDRAWs: in/out: %llu/%llu\n",
+		fprintf(fp, "%s WITHDRAWs: in/out: "
+			LONGLONG "/" LONGLONG "\n",
 			indent, (unsigned long long)abnp->rp_stat.withdrawrcvd,
 			(unsigned long long)abnp->rp_stat.withdrawsent);
 		if (abnp->rp_stat.last_established) {
