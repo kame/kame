@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1120 2000/07/11 02:33:18 jinmei Exp $
+$Id: CHANGELOG,v 1.1121 2000/07/11 04:04:17 jinmei Exp $
 
 <200006>
+2000-07-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.h: commented out the definition of
+	ND6_LLINFO_WAITDELETE, which is not used any more.
+	* kame/sys/netinet6/nd6.c:
+	* kame/sys/netinet6/mip6_md.c:
+	* kame/kame/ndp/ndp.c:
+	removed ND6_LLINFO_WAITDELETE cases according to the above change.
+
 2000-07-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_mroute.h: corrected the type of a member
 	of if_set{} from fd_mask to if_mask.
