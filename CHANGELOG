@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.847 2000/05/01 09:25:34 itojun Exp $
+$Id: CHANGELOG,v 1.848 2000/05/01 10:39:01 itojun Exp $
 
 <200005>
+Mon May  1 19:38:32 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 2000/5/1 weekly snap.
+
 Mon May  1 18:24:04 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_output.c: avoid panic on ip6fw kernel configuration
 	  on IPv6 packet outputs (usually, DAD on reboot).
