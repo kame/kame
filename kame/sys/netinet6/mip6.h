@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.50 2002/05/14 13:31:34 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.51 2002/06/09 16:16:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -82,6 +82,10 @@ struct mip6_req {
 #define MIP6_BA_STATUS_DAD_FAILED            138
 #define MIP6_BA_STATUS_NO_SA                 139
 #define MIP6_BA_STATUS_SEQNO_TOO_SMALL       141
+#define MIP6_BA_STATUS_RO_NOT_DESIRED        142
+#define MIP6_BA_STATUS_INVAL_AUTHENTICATOR   143
+#define MIP6_BA_STATUS_HOME_NONCE_EXPIRED    144
+#define MIP6_BA_STATUS_CAREOF_NONCE_EXPIRED  145
 
 /* Unique Identifier sub-option format. */
 struct mip6_subopt_uniqid {

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.4 2002/06/09 14:44:02 itojun Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.5 2002/06/09 16:16:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -75,18 +75,299 @@ static int mip6_cksum __P((struct sockaddr_in6 *,
 			   u_int32_t, u_int8_t,	char *));
 
 int
+mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
+	struct mbuf *m0;
+	struct ip6m_home_test_init *ip6mhi;
+	int ip6mhilen;
+{
+	struct sockaddr_in6 *src_sa, *dst_sa;
+	struct mbuf *m;
+	struct ip6_pktopts opt;
+	int error = 0;
+
+	if (ip6_getpktaddrs(m0, &src_sa, &dst_sa)) {
+		/* must not happen. */
+		return (EINVAL);
+	}
+
+	init_ip6pktopts(&opt);
+
+	m = mip6_create_ip6hdr(dst_sa, src_sa, IPPROTO_NONE, 0);
+	if (m == NULL) {
+		mip6log((LOG_ERR,
+		    "%s:%d: creating ip6hdr failed.\n",
+		    __FILE__, __LINE__));
+		return (ENOMEM);
+	}
+
+	error = mip6_ip6mh_create(&opt.ip6po_mobility, dst_sa, src_sa,
+	    ntohl(ip6mhi->ip6mhi_mobile_cookie));
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: HoT creation error (%d)\n",
+		    __FILE__, __LINE__, error));
+		m_freem(m);
+ 		goto free_ip6pktopts;
+	}
+
+	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: sending ip packet error. (%d)\n",
+		    __FILE__, __LINE__, error));
+ 		goto free_ip6pktopts;
+	}
+
+ free_ip6pktopts:
+	if (opt.ip6po_mobility)
+		free(opt.ip6po_mobility, M_IP6OPT);
+
+	return (0);
+}
+
+int
+mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
+	struct ip6_mobility **pktopt_mobility;
+	struct sockaddr_in6 *src, *dst;
+	u_int32_t cookie;
+{
+	struct ip6m_home_test *ip6mh;
+	int ip6mh_size;
+
+	*pktopt_mobility = NULL;
+
+	ip6mh_size = sizeof(struct ip6m_home_test);
+
+	MALLOC(ip6mh, struct ip6m_home_test *, ip6mh_size,
+	    M_IP6OPT, M_NOWAIT);
+	if (ip6mh == NULL)
+		return (ENOMEM);
+
+	bzero(ip6mh, ip6mh_size);
+	ip6mh->ip6mh_pproto = IPPROTO_NONE;
+	ip6mh->ip6mh_len = (ip6mh_size - 8) >> 3;
+	ip6mh->ip6mh_type = IP6M_HOME_TEST;
+	/* XXX ip6mh->ip6mh_nonce_index; */
+	ip6mh->ip6mh_mobile_cookie = htonl(cookie);
+	/* XXX ip6mh->ip6mh_home_cookie; */
+
+	/* calculate checksum. */
+	ip6mh->ip6mh_cksum = mip6_cksum(src, dst,
+	    ip6mh_size, IPPROTO_MOBILITY, (char *)ip6mh);
+
+	*pktopt_mobility = (struct ip6_mobility *)ip6mh;
+
+	return (0);
+}
+
+int
+mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
+	struct mbuf *m0;
+	struct ip6m_careof_test_init *ip6mci;
+	int ip6mcilen;
+{
+	struct sockaddr_in6 *src_sa, *dst_sa;
+	struct mbuf *m;
+	struct ip6_pktopts opt;
+	int error = 0;
+
+	if (ip6_getpktaddrs(m0, &src_sa, &dst_sa)) {
+		/* must not happen. */
+		return (EINVAL);
+	}
+
+	init_ip6pktopts(&opt);
+
+	m = mip6_create_ip6hdr(dst_sa, src_sa, IPPROTO_NONE, 0);
+	if (m == NULL) {
+		mip6log((LOG_ERR,
+		    "%s:%d: creating ip6hdr failed.\n",
+		    __FILE__, __LINE__));
+		return (ENOMEM);
+	}
+
+	error = mip6_ip6mc_create(&opt.ip6po_mobility, dst_sa, src_sa,
+	    ntohl(ip6mci->ip6mci_mobile_cookie));
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: HoT creation error (%d)\n",
+		    __FILE__, __LINE__, error));
+		m_freem(m);
+ 		goto free_ip6pktopts;
+	}
+
+	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: sending ip packet error. (%d)\n",
+		    __FILE__, __LINE__, error));
+ 		goto free_ip6pktopts;
+	}
+
+ free_ip6pktopts:
+	if (opt.ip6po_mobility)
+		free(opt.ip6po_mobility, M_IP6OPT);
+
+	return (0);
+}
+
+int
+mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
+	struct ip6_mobility **pktopt_mobility;
+	struct sockaddr_in6 *src, *dst;
+	u_int32_t cookie;
+{
+	struct ip6m_careof_test *ip6mc;
+	int ip6mc_size;
+
+	*pktopt_mobility = NULL;
+
+	ip6mc_size = sizeof(struct ip6m_careof_test);
+
+	MALLOC(ip6mc, struct ip6m_careof_test *, ip6mc_size,
+	    M_IP6OPT, M_NOWAIT);
+	if (ip6mc == NULL)
+		return (ENOMEM);
+
+	bzero(ip6mc, ip6mc_size);
+	ip6mc->ip6mc_pproto = IPPROTO_NONE;
+	ip6mc->ip6mc_len = (ip6mc_size - 8) >> 3;
+	ip6mc->ip6mc_type = IP6M_CAREOF_TEST;
+	/* XXX ip6mc->ip6mc_nonce_index; */
+	ip6mc->ip6mc_mobile_cookie = htonl(cookie);
+	/* XXX ip6mc->ip6mc_careof_cookie; */
+
+	/* calculate checksum. */
+	ip6mc->ip6mc_cksum = mip6_cksum(src, dst,
+	    ip6mc_size, IPPROTO_MOBILITY, (char *)ip6mc);
+
+	*pktopt_mobility = (struct ip6_mobility *)ip6mc;
+
+	return (0);
+}
+
+int
+mip6_ip6mh_input(m, ip6mh, ip6mhlen)
+	struct mbuf *m;
+	struct ip6m_home_test *ip6mh;
+	int ip6mhlen;
+{
+	struct sockaddr_in6 *src_sa, *dst_sa;
+	struct hif_softc *sc;
+	struct mip6_bu *mbu;
+	int error = 0;
+
+	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
+		/* must not happen. */
+		return (EINVAL);
+	}
+
+	sc = hif_list_find_withhaddr(dst_sa);
+	if (sc == NULL) {
+                mip6log((LOG_NOTICE,
+		    "%s:%d: no related hif interface found with this HoT "
+		    "for %s.\n",
+		    __FILE__, __LINE__, ip6_sprintf(&dst_sa->sin6_addr)));
+                return (EINVAL);
+	}
+	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, src_sa, dst_sa);
+	if (mbu == NULL) {
+		mip6log((LOG_NOTICE,
+		    "%s:%d: no related binding update entry found with "
+		    "this HoT for %s.\n",
+		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
+		return (EINVAL);
+	}
+
+	/* check mobile cookie. */
+	if (mbu->mbu_mobile_cookie != ntohl(ip6mh->ip6mh_mobile_cookie)) {
+		mip6log((LOG_INFO,
+		    "%s:%d: HoT mobile cookie mismatch from %s.\n",
+		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
+		return (EINVAL);
+	}
+
+	error = mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_HOT_RECEIVED, ip6mh);
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: state transition failed. (%d)\n",
+		    __FILE__, __LINE__, error));
+		return (error);
+	}
+
+	return (0);
+}
+
+int
+mip6_ip6mc_input(m, ip6mc, ip6mclen)
+	struct mbuf *m;
+	struct ip6m_careof_test *ip6mc;
+	int ip6mclen;
+{
+	struct sockaddr_in6 *src_sa, *dst_sa;
+	struct hif_softc *sc;
+	struct mip6_bu *mbu;
+	int error = 0;
+
+	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
+		/* must not happen. */
+		return (EINVAL);
+	}
+
+	/* too ugly... */
+	for (sc = TAILQ_FIRST(&hif_softc_list);
+	     sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
+		for (mbu = LIST_FIRST(&sc->hif_bu_list);
+		     mbu;
+		     mbu = LIST_NEXT(mbu, mbu_entry)) {
+			if (SA6_ARE_ADDR_EQUAL(dst_sa, &mbu->mbu_coa))
+				break;
+		}
+	}
+	if (mbu == NULL) {
+		mip6log((LOG_NOTICE,
+		    "%s:%d: no related binding update entry found with "
+		    "this CoT for %s.\n",
+		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
+		return (EINVAL);
+	}
+
+	/* check mobile cookie. */
+	if (mbu->mbu_mobile_cookie != ntohl(ip6mc->ip6mc_mobile_cookie)) {
+		mip6log((LOG_INFO,
+		    "%s:%d: CoT mobile cookie mismatch from %s.\n",
+		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
+		return (EINVAL);
+	}
+
+	error = mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_COT_RECEIVED, ip6mc);
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: state transition failed. (%d)\n",
+		    __FILE__, __LINE__, error));
+		return (error);
+	}
+
+	return (0);
+}
+
+int
 mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	struct mbuf *m;
 	struct ip6m_binding_update *ip6mu;
 	int ip6mulen;
 {
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 *src_sa, *dst_sa;
+	struct sockaddr_in6 *src_sa, *dst_sa, coa_sa, hoa_sa;
 	struct mbuf *n;
 	struct ip6aux *ip6a;
+	u_int8_t ip6mu_flags;
+	u_int8_t isprotected;
+	u_int8_t haseen;
 	struct mip6_bc *mbc;
 	u_int16_t seqno;
-	int error;
+	int error = 0;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
@@ -94,40 +375,48 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		return (EINVAL);
 	}
 
-#if 0
-	/* home registration must be protected by ESP. */
-	if (((ip6mu_flags & IP6MU_HOME) != 0) &&
-	    ((m->m_flags & M_DECRYPTED) == 0)) {
-		mip6log((LOG_NOTICE,
-			 "%s:%d: unprotected binging update from host %s\n",
-			 __FILE__, __LINE__,
-			 ip6_sprintf(&src_sa->sin6_addr)));
-		/* discard the packet. */
-		return (EACCES);
-	}
-#endif
+	ip6mu_flags = isprotected = haseen = 0;
 
-	/* check if this packet has a HAO. */
+	ip6mu_flags = ip6mu->ip6mu_flags;
+
+	if (((m->m_flags & M_DECRYPTED) != 0)
+	    || ((m->m_flags & M_AUTHIPHDR) != 0)) {
+		isprotected = 1;
+	}
+
+	coa_sa = *src_sa;
 	n = ip6_findaux(m);
-	if (n == NULL) {
-		mip6log((LOG_NOTICE,
-			 "%s:%d: no ip6aux found "
-			 "in the binding update from host %s.\n",
-			 __FILE__, __LINE__,
-			 ip6_sprintf(&src_sa->sin6_addr)));
-		/* discard. */
-		return (EINVAL);
+	if (n != NULL) {
+		ip6a = mtod(n, struct ip6aux *);
+		if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {
+			haseen = 1;
+			coa_sa = *src_sa;
+			coa_sa.sin6_addr = ip6a->ip6a_coa;
+		}
 	}
-	ip6a = mtod(n, struct ip6aux *);
-	if ((ip6a == NULL) || (ip6a->ip6a_flags & IP6A_HASEEN) == 0) {
-		mip6log((LOG_NOTICE,
-			 "%s:%d: no home address destination option found "
-			 "in the binding update from host %s.\n",
-			 __FILE__, __LINE__,
-			 ip6_sprintf(&src_sa->sin6_addr)));
-		/* discard. */
-		return (EINVAL);
-	}
+		
+	/*
+	 *              HAO          no HAO
+	 * IPseced      HR     -> o  HR     -> x
+	 *              not HR -> o  not HR -> o
+	 * not IPseced  HR     -> x  HR     -> x
+	 *              not HR -> x  not HR -> o
+	 */
+#if 1 /* XXX temporally */
+	if (ip6mu_flags & IP6MU_HOME)
+		goto accept_binding_update;
+#endif
+	if (isprotected
+	    && haseen)
+		goto accept_binding_update;
+	if ((haseen == 0)
+	    && ((ip6mu_flags & IP6MU_HOME) == 0))
+		goto accept_binding_update;
+
+	/* otherwise, discard this packet. */
+	return (EINVAL);
+
+ accept_binding_update:
 
 	/* packet length check. */
 	if (ip6mulen < sizeof(struct ip6m_binding_update)) {
@@ -141,17 +430,16 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		return (EINVAL);
 	}
 
-	/* ip6_src and HAO has been already swapped at this point. */
-	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, src_sa);
-	if ((mbc == NULL) &&
-	    ((ip6mu->ip6mu_flags & IP6MU_HOME) == 0)) {
-		/*
-		 * this packet must have been dropped in
-		 * dest6_input()/esp_input() already.
-		 */
-		panic("this packet must be dropped before.");
+	/* get home address. */
+	if (haseen) {
+		hoa_sa = *src_sa;
+	} else {
+		hoa_sa = *src_sa;
+		hoa_sa.sin6_addr = ip6mu->ip6mu_addr;
 	}
 
+	/* ip6_src and HAO has been already swapped at this point. */
+	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &hoa_sa);
 	if (mbc == NULL)
 		goto check_mobility_options;
 
@@ -159,11 +447,10 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	seqno = ntohs(ip6mu->ip6mu_seqno);
 	if (MIP6_LEQ(seqno, mbc->mbc_seqno)) {
 		mip6log((LOG_NOTICE,
-			 "%s:%d: received sequence no (%d) <= current "
-			 "seq no (%d) in BU from host %s.\n",
-			 __FILE__, __LINE__,
-			 seqno,
-			 mbc->mbc_seqno, ip6_sprintf(&ip6->ip6_src)));
+		    "%s:%d: received sequence no (%d) <= current "
+		    "seq no (%d) in BU from host %s.\n",
+		    __FILE__, __LINE__, seqno, mbc->mbc_seqno,
+		    ip6_sprintf(&ip6->ip6_src)));
 		/*
 		 * the seqno of this binding update is smaller than the
 		 * corresponding binding cache.  we send TOO_SMALL
@@ -173,18 +460,15 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		 * addrress.  because the sending mobile node's coa
 		 * might have changed after it had registered before.
 		 */
-		{
-			struct sockaddr_in6 pcoa;
-			pcoa = ip6a->ip6a_src;
-			pcoa.sin6_addr = ip6a->ip6a_coa;
-			in6_clearscope(&pcoa.sin6_addr);
-			error = mip6_bc_send_ba(&mbc->mbc_addr,
-						&mbc->mbc_phaddr,
-						&pcoa,
-						MIP6_BA_STATUS_SEQNO_TOO_SMALL,
-						mbc->mbc_seqno,
-						0, 0);
+		error = mip6_bc_send_ba(&mbc->mbc_addr, &mbc->mbc_phaddr,
+		    &coa_sa, MIP6_BA_STATUS_SEQNO_TOO_SMALL, mbc->mbc_seqno,
+		    0, 0);
+		if (error) {
+			mip6log((LOG_ERR,
+			    "%s:%d: sending a binding ack failed (%d)\n",
+			    __FILE__, __LINE__, error));
 		}
+
 		/* discard. */
 		return (EINVAL);
 	}
@@ -212,7 +496,7 @@ mip6_ip6mu_process(m, ip6mu, ip6mulen)
 	struct ip6aux *ip6a;
 	u_int32_t lifetime;
 	u_int16_t seqno;
-	int error;
+	int error = 0;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
@@ -423,7 +707,7 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
                          __FILE__, __LINE__, ip6ma->ip6ma_status));
 		if (ip6ma->ip6ma_status == IP6MA_STATUS_NOT_HOME_AGENT &&
 		    mbu->mbu_flags & IP6MU_HOME &&
-		    mbu->mbu_reg_state == MIP6_BU_REG_STATE_REGWAITACK) {
+		    mbu->mbu_fsm_state == MIP6_BU_FSM_STATE_WAITA) {
 			/* XXX no registration? */
 			goto success;
 		}
@@ -470,7 +754,7 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
                 mbu->mbu_refresh = mbu->mbu_expire;
 	if (mbu->mbu_flags & IP6MU_HOME) {
 		/* this is from our home agent. */
-		if (mbu->mbu_reg_state == MIP6_BU_REG_STATE_DEREGWAITACK) {
+		if (mbu->mbu_fsm_state == MIP6_BU_FSM_STATE_WAITD) {
 			/* home unregsitration has completed. */
 
 			/* notify all the CNs that we are home. */
@@ -558,8 +842,8 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
 				 "%s:%d: send a unsolicited na to %s\n",
 				 __FILE__, __LINE__, if_name(ifa->ifa_ifp)));
 		}
-		} else if (mbu->mbu_reg_state
-			   == MIP6_BU_REG_STATE_REGWAITACK) {
+		} else if (mbu->mbu_fsm_state
+			   == MIP6_BU_FSM_STATE_WAITA) {
 			if (lifetime == 0) {
 				mip6log((LOG_WARNING,
 					 "%s:%d: lifetime are zero.\n",
@@ -567,7 +851,7 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
 				/* XXX ignored */
 			}
 			/* home registration completed */
-			mbu->mbu_reg_state = MIP6_BU_REG_STATE_REG;
+			mbu->mbu_fsm_state = MIP6_BU_FSM_STATE_BOUND;
 
 			/* create tunnel to HA */
 			error = mip6_tunnel_control(MIP6_TUNNEL_CHANGE,
@@ -589,7 +873,7 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
 					 __FILE__, __LINE__));
 				return (error);
 			}
-		} else if (mbu->mbu_reg_state == MIP6_BU_REG_STATE_REG) {
+		} else if (mbu->mbu_fsm_state == MIP6_BU_FSM_STATE_BOUND) {
 			/* nothing to do. */
 		} else {
 			mip6log((LOG_NOTICE,
@@ -599,6 +883,144 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
 	}
 
 	return (0);
+}
+
+int
+mip6_bu_send_hoti(mbu)
+	struct mip6_bu *mbu;
+{
+	struct mbuf *m;
+	struct ip6_pktopts opt;
+	int error = 0;
+
+	init_ip6pktopts(&opt);
+
+	m = mip6_create_ip6hdr(&mbu->mbu_haddr, &mbu->mbu_paddr,
+	    IPPROTO_NONE, 0);
+	if (m == NULL) {
+		mip6log((LOG_ERR,
+		    "%s:%d: creating ip6hdr failed.\n",
+		    __FILE__, __LINE__));
+		return (ENOMEM);
+	}
+
+	error = mip6_ip6mhi_create(&opt.ip6po_mobility, mbu);
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: HoTI creation error (%d)\n",
+		    __FILE__, __LINE__, error));
+		m_freem(m);
+ 		goto free_ip6pktopts;
+	}
+
+	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: sending ip packet error. (%d)\n",
+		    __FILE__, __LINE__, error));
+ 		goto free_ip6pktopts;
+	}
+
+ free_ip6pktopts:
+	if (opt.ip6po_mobility)
+		free(opt.ip6po_mobility, M_IP6OPT);
+
+	return (0);
+}
+
+int
+mip6_bu_send_coti(mbu)
+	struct mip6_bu *mbu;
+{
+	struct mbuf *m;
+	struct ip6_pktopts opt;
+	int error = 0;
+
+	init_ip6pktopts(&opt);
+	opt.ip6po_flags |= IP6PO_USECOA;
+
+	m = mip6_create_ip6hdr(&mbu->mbu_coa, &mbu->mbu_paddr,
+	    IPPROTO_NONE, 0);
+	if (m == NULL) {
+		mip6log((LOG_ERR,
+		    "%s:%d: creating ip6hdr failed.\n",
+		    __FILE__, __LINE__));
+		return (ENOMEM);
+	}
+
+	error = mip6_ip6mci_create(&opt.ip6po_mobility, mbu);
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: CoTI creation error (%d)\n",
+		    __FILE__, __LINE__, error));
+		m_freem(m);
+ 		goto free_ip6pktopts;
+	}
+	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: sending ip packet error. (%d)\n",
+		    __FILE__, __LINE__, error));
+		goto free_ip6pktopts;
+	}
+
+ free_ip6pktopts:
+	if (opt.ip6po_mobility)
+		free(opt.ip6po_mobility, M_IP6OPT);
+
+	return (0);
+}
+
+int
+mip6_bu_send_bu(mbu)
+	struct mip6_bu *mbu;
+{
+	struct sockaddr_in6 *busrc_sa;
+	struct mbuf *m;
+	struct ip6_pktopts opt;
+	int error = 0;
+
+	/* sanity check. */
+	if (mbu == NULL)
+		return (EINVAL);
+
+	init_ip6pktopts(&opt);
+
+	if (mbu->mbu_fsm_state == MIP6_BU_FSM_STATE_BOUND)
+		busrc_sa = &mbu->mbu_haddr;
+	else
+		busrc_sa = &mbu->mbu_coa;
+	m = mip6_create_ip6hdr(busrc_sa, &mbu->mbu_paddr, IPPROTO_NONE, 0);
+	if (m == NULL) {
+		mip6log((LOG_ERR,
+		    "%s:%d: creating ip6hdr failed.\n", __FILE__, __LINE__));
+		return (ENOMEM);
+	}
+
+	error = mip6_ip6mu_create(&opt.ip6po_mobility, &mbu->mbu_haddr,
+	    &mbu->mbu_paddr, mbu->mbu_hif);
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: a binding update mobility header "
+		    "creation failed (%d).\n",
+		    __FILE__, __LINE__, error));
+		m_freem(m);
+		goto free_ip6pktopts;
+	}
+
+	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: sending a binding update falied. (%d)\n",
+		    __FILE__, __LINE__, error));
+ 		goto free_ip6pktopts;
+	}
+
+ free_ip6pktopts:
+	if (opt.ip6po_mobility)
+		free(opt.ip6po_mobility, M_IP6OPT);
+
+	return (error);
 }
 
 int
@@ -613,9 +1035,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 {
 	struct mbuf *m;
 	struct ip6_pktopts opt;
-#if 0
 	struct ip6_rthdr *pktopt_rthdr;
-#endif
 	int error = 0;
 
 	init_ip6pktopts(&opt);
@@ -638,7 +1058,12 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 		goto free_ip6pktopts;
 	}
 
-#if 0
+	/*
+	 * a rthdr must be added when sending back a binding ack to
+	 * the mobilenode.  otherwise, the binding ack never reach to
+	 * the mobilenode.  for example, the case that an error occurs
+	 * when the first home registration.
+	 */
 	if (!SA6_ARE_ADDR_EQUAL(dst, dstcoa) &&
 	    mip6_bc_list_find_withphaddr(&mip6_bc_list, dst) == NULL) {
 		error = mip6_rthdr_create(&pktopt_rthdr, dstcoa, NULL);
@@ -649,9 +1074,8 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 			m_freem(m);
 			goto free_ip6pktopts;
 		}
-		opt.ip6po_rthdr = pktopt_rthdr;
+		opt.ip6po_rthdr2 = pktopt_rthdr;
 	}
-#endif
 
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
 	if (error) {
@@ -661,14 +1085,86 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 		goto free_ip6pktopts;
 	}
  free_ip6pktopts:
-#if 0
 	if (opt.ip6po_rthdr)
 		free(opt.ip6po_rthdr, M_IP6OPT);
-#endif
 	if (opt.ip6po_mobility)
 		free(opt.ip6po_mobility, M_IP6OPT);
 
 	return (error);
+}
+
+int
+mip6_ip6mhi_create(pktopt_mobility, mbu)
+	struct ip6_mobility **pktopt_mobility;
+	struct mip6_bu *mbu;
+{
+	struct ip6m_home_test_init *ip6mhi;
+	int ip6mhi_size;
+
+	/* sanity check. */
+	if (mbu == NULL)
+		return (EINVAL);
+
+	*pktopt_mobility = NULL;
+
+	ip6mhi_size =
+	    ((sizeof(struct ip6m_home_test_init) +7) >> 3) * 8;
+
+	MALLOC(ip6mhi, struct ip6m_home_test_init *,
+	    ip6mhi_size, M_IP6OPT, M_NOWAIT);
+	if (ip6mhi == NULL)
+		return (ENOMEM);
+
+	bzero(ip6mhi, ip6mhi_size);
+	ip6mhi->ip6mhi_pproto = IPPROTO_NONE;
+	ip6mhi->ip6mhi_len = (ip6mhi_size - 8) >> 3;
+	ip6mhi->ip6mhi_type = IP6M_HOME_TEST_INIT;
+	ip6mhi->ip6mhi_mobile_cookie = mbu->mbu_mobile_cookie;
+
+	/* calculate checksum. */
+	ip6mhi->ip6mhi_cksum = mip6_cksum(&mbu->mbu_haddr, &mbu->mbu_paddr,
+	    ip6mhi_size, IPPROTO_MOBILITY, (char *)ip6mhi);
+
+	*pktopt_mobility = (struct ip6_mobility *)ip6mhi;
+
+	return (0);
+}
+
+int
+mip6_ip6mci_create(pktopt_mobility, mbu)
+	struct ip6_mobility **pktopt_mobility;
+	struct mip6_bu *mbu;
+{
+	struct ip6m_careof_test_init *ip6mci;
+	int ip6mci_size;
+
+	/* sanity check. */
+	if (mbu == NULL)
+		return (EINVAL);
+
+	*pktopt_mobility = NULL;
+
+	ip6mci_size =
+	    ((sizeof(struct ip6m_careof_test_init) + 7) >> 3) * 8;
+
+	MALLOC(ip6mci, struct ip6m_careof_test_init *,
+	    ip6mci_size, M_IP6OPT, M_NOWAIT);
+	if (ip6mci == NULL)
+		return (ENOMEM);
+
+	bzero(ip6mci, ip6mci_size);
+	ip6mci->ip6mci_pproto = IPPROTO_NONE;
+	ip6mci->ip6mci_len = (ip6mci_size - 8) >> 3;
+	ip6mci->ip6mci_type = IP6M_CAREOF_TEST_INIT;
+	ip6mci->ip6mci_mobile_cookie = mbu->mbu_mobile_cookie;
+
+	/* calculate checksum. */
+	ip6mci->ip6mci_cksum = mip6_cksum(&mbu->mbu_coa, &mbu->mbu_paddr,
+	    ip6mci_size, IPPROTO_MOBILITY, (char *)ip6mci);
+
+	*pktopt_mobility = (struct ip6_mobility *)ip6mci;
+
+	return (0);
 }
 
 int
@@ -690,7 +1186,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	hrmbu = mip6_bu_list_find_home_registration(&sc->hif_bu_list, src);
 	if ((mbu == NULL) &&
 	    (hrmbu != NULL) &&
-	    (hrmbu->mbu_reg_state == MIP6_BU_REG_STATE_REG)) {
+	    (hrmbu->mbu_fsm_state == MIP6_BU_FSM_STATE_BOUND)) {
 		/* XXX */
 		/* create a binding update entry and send CoTI/HoTI. */
 		return (0);
@@ -699,7 +1195,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 		/*
 		 * this is the case that the home registration is on
 		 * going.  that is, (mbu == NULL) && (hrmbu != NULL)
-		 * but hrmbu->reg_state != STATE_REG.
+		 * but hrmbu->mbu_fsm_state != STATE_REG.
 		 */
 		return (0);
 	}

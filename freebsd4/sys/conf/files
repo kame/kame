@@ -936,6 +936,7 @@ netinet6/mip6_ha.c	optional mip6
 netinet6/mip6_binding.c	optional mip6
 netinet6/mip6_icmp6.c	optional mip6
 netinet6/mip6_pktproc.c	optional mip6
+netinet6/mip6_fsm.c	optional mip6
 netipx/ipx.c		optional ipx
 netipx/ipx_cksum.c	optional ipx
 netipx/ipx_input.c	optional ipx

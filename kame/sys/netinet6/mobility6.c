@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.1 2002/05/14 13:31:34 keiichi Exp $	*/
+/*	$KAME: mobility6.c,v 1.2 2002/06/09 16:16:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -107,21 +107,41 @@ mobility6_input(mp, offp, proto)
 
 	switch (mh6->ip6m_type) {
 	case IP6M_HOME_TEST_INIT:
+		if (mip6_ip6mhi_input(m, (struct ip6m_home_test_init *)mh6,
+		    mh6len) < 0)
+			goto bad;
+		break;
+
 	case IP6M_CAREOF_TEST_INIT:
+		if (mip6_ip6mci_input(m, (struct ip6m_careof_test_init *)mh6,
+		    mh6len) < 0)
+			goto bad;
+		break;
+
 	case IP6M_HOME_TEST:
+		if (mip6_ip6mh_input(m, (struct ip6m_home_test *)mh6,
+		    mh6len) < 0)
+			goto bad;
+		break;
+
 	case IP6M_CAREOF_TEST:
+		if (mip6_ip6mc_input(m, (struct ip6m_careof_test *)mh6,
+		    mh6len) < 0)
+			goto bad;
+		break;
+
 	case IP6M_BINDING_REQUEST:
 		break;
 
 	case IP6M_BINDING_UPDATE:
 		if (mip6_ip6mu_input(m, (struct ip6m_binding_update *)mh6,
-				     mh6len) < 0)
+		    mh6len) < 0)
 			goto bad;
 		break;
 
 	case IP6M_BINDING_ACK:
 		if (mip6_ip6ma_input(m, (struct ip6m_binding_ack *)mh6,
-				     mh6len) < 0)
+		    mh6len) < 0)
 			goto bad;
 		break;
 

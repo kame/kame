@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.28 2002/05/24 12:31:25 keiichi Exp $	*/
+/*	$KAME: ip6.h,v 1.29 2002/06/09 16:15:59 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -339,7 +339,7 @@ struct ip6m_home_test {
 	u_int16_t ip6mh_nonce_index;	/* idx of the CN nonce list array */
 	u_int16_t ip6mh_reserved1;
 	u_int32_t ip6mh_mobile_cookie;
-	u_int8_t ip6mh_home_cookie[16];	/* K0 cookie */
+	u_int8_t ip6mh_cookie[16];	/* K0 cookie */
 	/* followed by mobility options */
 } __attribute__((__packed__));
 
@@ -353,7 +353,7 @@ struct ip6m_careof_test {
 	u_int16_t ip6mc_nonce_index;	/* idx of the CN nonce list array */
 	u_int16_t ip6mc_reserved1;
 	u_int32_t ip6mc_mobile_cookie;
-	u_int8_t ip6mc_careof_cookie[16];	/* K1 cookie */
+	u_int8_t ip6mc_cookie[16];	/* K1 cookie */
 	/* followed by mobility options */
 } __attribute__((__packed__));
 

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.283 2002/06/08 21:42:41 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.284 2002/06/09 16:16:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -32,6 +32,7 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_mip6.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
@@ -94,6 +95,12 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
 #include <netinet/icmp6.h>
+
+#ifdef MIP6
+#include <net/if_hif.h>
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6.h>
+#endif /* MIP6 */
 
 #if !defined(__bsdi__) && !defined(__OpenBSD__)
 #include "loop.h"
@@ -2062,6 +2069,23 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 #if defined(__OpenBSD__) && defined(IPSEC)
 	struct m_tag *mtag;
 #endif /* IPSEC */
+
+#ifdef MIP6
+	struct hif_softc *sc;
+	struct sockaddr_in6 *src;
+#endif /* MIP6 */
+
+#ifdef MIP6
+	if (ip6_getpktaddrs(m0, &src, NULL)) {
+		error = EIO;
+		goto bad;
+	}
+	sc = hif_list_find_withhaddr(src);
+	if (sc) {
+		return (sc->hif_if.if_output(sc, m, dst, rt));
+	}
+		
+#endif /* MIP6 */
 
 	if (IN6_IS_ADDR_MULTICAST(&dst->sin6_addr))
 		goto sendpkt;

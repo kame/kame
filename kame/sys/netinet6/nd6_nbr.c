@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.111 2002/06/09 14:44:02 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.112 2002/06/09 16:16:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -475,8 +475,8 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 				continue;
 			if ((mbu->mbu_flags & IP6MU_HOME) == 0)
 				continue;
-			if (mbu->mbu_reg_state ==
-					MIP6_BU_REG_STATE_DEREGWAITACK) {
+			if (mbu->mbu_fsm_state ==
+					MIP6_BU_FSM_STATE_WAITD) {
 				/* unspecified source */
 				dad = 1;
 				if (ln && ND6_IS_LLINFO_PROBREACH(ln))

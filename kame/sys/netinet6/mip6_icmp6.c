@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.46 2002/06/09 14:44:02 itojun Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.47 2002/06/09 16:16:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -245,8 +245,6 @@ mip6_icmp6_input(m, off, icmp6len)
 					if (mbu) {
 						mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
 						mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
-						(void)mip6_bdt_create(sc,
-								      &paddr);
 					}
 				}
 				break;
@@ -275,8 +273,6 @@ mip6_icmp6_input(m, off, icmp6len)
 					if (mbu) {
 						mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
 						mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
-						(void)mip6_bdt_create(sc,
-								      &paddr);
 					}
 				}
 				break;

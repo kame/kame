@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.104 2002/06/09 14:44:01 itojun Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.105 2002/06/09 16:16:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -244,16 +244,23 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 	coa_lifetime = mip6_coa_get_lifetime(&coa->sin6_addr);
 
 	bzero(mbu, sizeof(*mbu));
+	mbu->mbu_flags = flags;
 	mbu->mbu_paddr = *paddr;
 	mbu->mbu_haddr = mpfx->mpfx_haddr;
 	if (sc->hif_location == HIF_LOCATION_HOME) {
 		/* un-registration. */
 		mbu->mbu_coa = mpfx->mpfx_haddr;
-		mbu->mbu_reg_state = MIP6_BU_REG_STATE_DEREGWAITACK;
+		mbu->mbu_fsm_state =
+		    (mbu->mbu_flags & IP6MU_HOME)
+		    ? MIP6_BU_FSM_STATE_WAITD
+		    : MIP6_BU_FSM_STATE_IDLE;
 	} else {
 		/* registration. */
 		mbu->mbu_coa = *coa;
-		mbu->mbu_reg_state = MIP6_BU_REG_STATE_REGWAITACK;
+		mbu->mbu_fsm_state =
+		    (mbu->mbu_flags & IP6MU_HOME)
+		    ? MIP6_BU_FSM_STATE_WAITA
+		    : MIP6_BU_FSM_STATE_IDLE;
 	}
 	if (coa_lifetime < mpfx->mpfx_pltime) {
 		mbu->mbu_lifetime = coa_lifetime;
@@ -271,7 +278,6 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 		mbu->mbu_refexpire = 0x7fffffff;
 	mbu->mbu_acktimeout = MIP6_BA_INITIAL_TIMEOUT;
 	mbu->mbu_ackexpire = time_second + mbu->mbu_acktimeout;
-	mbu->mbu_flags = flags;
 	mbu->mbu_hif = sc;
 	/* *mbu->mbu_encap = NULL; */
 
@@ -407,13 +413,13 @@ mip6_home_registration(sc)
 				if (sc->hif_location == HIF_LOCATION_HOME) {
 					/* un-registration. */
 					mbu->mbu_coa = mbu->mbu_haddr;
-					mbu->mbu_reg_state
-					    = MIP6_BU_REG_STATE_DEREGWAITACK;
+					mbu->mbu_fsm_state
+					    = MIP6_BU_FSM_STATE_WAITD;
 				} else {
 					/* registration. */
 					mbu->mbu_coa = hif_coa;
-					mbu->mbu_reg_state
-						= MIP6_BU_REG_STATE_REGWAITACK;
+					mbu->mbu_fsm_state
+					    = MIP6_BU_FSM_STATE_WAITA;
 				}
 
 				/* update lifetime. */
@@ -1715,7 +1721,7 @@ mip6_bu_print(mbu)
 		 "flags      0x%x\n"
 		 "state      0x%x\n"
 		 "hif        0x%p\n"
-		 "reg_state  %u\n",
+		 "fsm_state  %u\n",
 		 ip6_sprintf(&mbu->mbu_paddr.sin6_addr),
 		 ip6_sprintf(&mbu->mbu_haddr.sin6_addr),
 		 ip6_sprintf(&mbu->mbu_coa.sin6_addr),
@@ -1729,7 +1735,7 @@ mip6_bu_print(mbu)
 		 mbu->mbu_flags,
 		 mbu->mbu_state,
 		 mbu->mbu_hif,
-		 mbu->mbu_reg_state));
+		 mbu->mbu_fsm_state));
 
 }
 #endif /* MIP6_DEBUG */
@@ -2609,8 +2615,6 @@ mip6_route_optimize(m)
 			error = ENOMEM;
 			goto bad;
 		}
-		mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
-
 		mip6_bu_list_insert(&sc->hif_bu_list, mbu);
 	} else {
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -2637,8 +2641,8 @@ mip6_route_optimize(m)
 		/* sanity check for overflow */
 		if (mbu->mbu_refexpire < time_second)
 			mbu->mbu_refexpire = 0x7fffffff;
-		mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
 	}
+	mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_RO_DESIRED);
 
 	return (0);
  bad:

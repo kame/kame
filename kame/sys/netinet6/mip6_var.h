@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.33 2002/06/09 14:44:02 itojun Exp $	*/
+/*	$KAME: mip6_var.h,v 1.34 2002/06/09 16:16:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -120,8 +120,8 @@ LIST_HEAD(mip6_subnet_list, mip6_subnet);
 struct mip6_bu {
 	LIST_ENTRY(mip6_bu) mbu_entry;
 	struct sockaddr_in6 mbu_paddr;      /* peer addr of this BU */
-	struct sockaddr_in6 mbu_haddr;      /* home address */
-	struct sockaddr_in6 mbu_coa;        /* COA */
+	struct sockaddr_in6 mbu_haddr;      /* HoA */
+	struct sockaddr_in6 mbu_coa;        /* CoA */
 	u_int32_t           mbu_lifetime;   /* BU lifetime */
 	time_t              mbu_expire;     /* expiration time of this BU. */
 	u_int32_t           mbu_refresh;    /* refresh frequency */
@@ -130,15 +130,36 @@ struct mip6_bu {
 	time_t              mbu_ackexpire;  /* expiration time of ack. */
 	u_int16_t           mbu_seqno;      /* sequence number */
 	u_int8_t            mbu_flags;      /* BU flags */
+	u_int32_t           mbu_mobile_cookie;
+	u_int16_t           mbu_home_nonce_index;
+	u_int8_t            mbu_home_cookie[16];
+	u_int16_t           mbu_careof_nonce_index;
+	u_int8_t            mbu_careof_cookie[16];
 	u_int8_t            mbu_state;
-	u_int8_t            mbu_reg_state;  /* registration status */
+	u_int8_t            mbu_fsm_state;  /* registration status */
 	struct hif_softc    *mbu_hif;       /* back pointer to hif */
 	const struct encaptab *mbu_encap;
 };
-#define MIP6_BU_REG_STATE_NOTREG       0x01
-#define MIP6_BU_REG_STATE_REGWAITACK   0x02
-#define MIP6_BU_REG_STATE_REG          0x03
-#define MIP6_BU_REG_STATE_DEREGWAITACK 0x04
+#define MIP6_BU_FSM_STATE_IDLE		0
+#define MIP6_BU_FSM_STATE_WAITHC	1
+#define MIP6_BU_FSM_STATE_WAITH		2
+#define MIP6_BU_FSM_STATE_WAITC		3
+#define MIP6_BU_FSM_STATE_WAITA		4
+#define MIP6_BU_FSM_STATE_BOUND		5
+#define MIP6_BU_FSM_STATE_WAITD		6
+#define MIP6_BU_FSM_STATE_WAITDH	7
+
+#define MIP6_BU_FSM_EVENT_HOT_RECEIVED			0
+#define MIP6_BU_FSM_EVENT_COT_RECEIVED			1
+#define MIP6_BU_FSM_EVENT_BA_RECEIVED			2
+#define MIP6_BU_FSM_EVENT_BRR_RECEIVED			3
+#define MIP6_BU_FSM_EVENT_ICMP_PARAMPROB_RECEIVED	4
+#define MIP6_BU_FSM_EVENT_BE_1_RECEIVED			5
+#define MIP6_BU_FSM_EVENT_BE_2_RECEIVED			6
+#define MIP6_BU_FSM_EVENT_MOVEMENT			7
+#define MIP6_BU_FSM_EVENT_RO_DESIRED			8
+#define MIP6_BU_FSM_EVENT_RO_NOT_DESIRED		9
+#define MIP6_BU_FSM_EVENT_RETRANS			10
 
 #define MIP6_BU_STATE_WAITSENT    0x01
 #define MIP6_BU_STATE_WAITACK     0x02

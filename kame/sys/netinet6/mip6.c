@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.128 2002/06/09 14:44:01 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.129 2002/06/09 16:16:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1635,21 +1635,13 @@ mip6_exthdr_create(m, opt, mip6opt)
 		goto noneed;
 	}
 
-	/* check home registration status */
-	mbu = mip6_bu_list_find_home_registration(&sc->hif_bu_list, src);
+	/* check registration status */
+	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, dst, src);
 	if (mbu == NULL) {
-		/* no home registration action started yet. */
-		goto noneed;
-	}
-	if (mbu->mbu_reg_state == MIP6_BU_REG_STATE_NOTREG) {
-		/*
-		 * we have not registered yet.  this means we are still
-		 * home.
-		 */
+		/* no registration action started yet. */
 		goto noneed;
 	}
 
-#ifdef MIP6
 	/* create a binding update mobility header. */
 	error = mip6_ip6mu_create(&mip6opt->mip6po_mobility,
 				  src, dst, sc);
@@ -1660,7 +1652,16 @@ mip6_exthdr_create(m, opt, mip6opt)
 			 __FILE__, __LINE__));
 		goto bad;
 	}
-#endif /* MIP6 */
+
+	if (mbu->mbu_flags & IP6MU_HOME) {
+		/* to my home agent. */
+		if (mbu->mbu_fsm_state == MIP6_BU_FSM_STATE_IDLE)
+			goto noneed;
+	} else {
+		/* to any of correspondent nodes. */
+		if (mbu->mbu_fsm_state != MIP6_BU_FSM_STATE_BOUND)
+			goto noneed;
+	}
 
 	/* create haddr destopt. */
 	error = mip6_haddr_destopt_create(&mip6opt->mip6po_haddr,

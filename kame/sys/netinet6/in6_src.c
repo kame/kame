@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.116 2002/06/09 14:43:59 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.117 2002/06/09 16:15:59 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -450,27 +450,28 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 				}
 			}
 			/*
-			 * if the binding update entry for a certain address
-			 * exists and its registration status is
-			 * MIP6_BU_REG_STATE_NOTREG, the address is a home
-			 * address and a care of addres simultaneously.
+			 * if the binding update entry for a certain
+			 * address exists and its registration status
+			 * is MIP6_BU_FSM_STATE_IDLE, the address is a
+			 * home address and a care of addres
+			 * simultaneously.
 			 */
 			if ((mbu_ia_best &&
-			     (mbu_ia_best->mbu_reg_state
-			      == MIP6_BU_REG_STATE_NOTREG))
+			     (mbu_ia_best->mbu_fsm_state
+			      == MIP6_BU_FSM_STATE_IDLE))
 			    &&
 			    !(mbu_ia &&
-			      (mbu_ia->mbu_reg_state
-			       == MIP6_BU_REG_STATE_NOTREG))) {
+			      (mbu_ia->mbu_fsm_state
+			       == MIP6_BU_FSM_STATE_IDLE))) {
 				NEXT(4);
 			}
 			if (!(mbu_ia_best &&
-			      (mbu_ia_best->mbu_reg_state
-			       == MIP6_BU_REG_STATE_NOTREG))
+			      (mbu_ia_best->mbu_fsm_state
+			       == MIP6_BU_FSM_STATE_IDLE))
 			    &&
 			    (mbu_ia &&
-			     (mbu_ia->mbu_reg_state
-			      == MIP6_BU_REG_STATE_NOTREG))) {
+			     (mbu_ia->mbu_fsm_state
+			      == MIP6_BU_FSM_STATE_IDLE))) {
 				REPLACE(4);
 			}
 			if (usecoa != 0) {

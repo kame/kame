@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.312 2002/06/09 14:44:00 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.313 2002/06/09 16:16:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -338,7 +338,11 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		/* Hop-by-Hop options header */
 		MAKE_EXTHDR(opt->ip6po_hbh, &exthdrs.ip6e_hbh);
 		/* Destination options header(1st part) */
-		if (opt->ip6po_rthdr || opt->ip6po_rthdr2) {
+		if (opt->ip6po_rthdr
+#ifdef MIP6
+		    || opt->ip6po_rthdr2
+#endif /* MIP6 */
+		    ) {
 			/*
 			 * Destination options header(1st part)
 			 * This only makes sence with a routing header.
@@ -407,6 +411,12 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		 */
 		if ((mip6opt.mip6po_mobility != NULL) &&
 		    (exthdrs.ip6e_mobility == NULL)) {
+			/*
+			 * insert a mobility header created by
+			 * mip6_exthdr_create() only if no mobility
+			 * header is specified by the ip6_output()
+			 * caller.
+			 */
 			MAKE_EXTHDR(mip6opt.mip6po_mobility,
 			    &exthdrs.ip6e_mobility);
 		}
