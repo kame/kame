@@ -106,6 +106,12 @@ struct	in6_ndireq {
 	struct nd_ifinfo ndi;
 };
 
+struct	in6_ndifreq {
+	char ifname[IFNAMSIZ];
+	u_long ifindex;
+};
+
+
 /* protocol constants */
 #define MAX_RTR_SOLICITATION_DELAY	1	/*1sec*/
 #define RTR_SOLICITATION_INTERVAL	4	/*4sec*/
@@ -218,6 +224,9 @@ extern struct nd_ifinfo *nd_ifinfo;
 extern struct nd_drhead nd_defrouter;
 extern struct nd_prhead nd_prefix;
 
+/* nd6_rtr.c */
+extern int nd6_defifindex;
+
 union nd_opts {
 	struct nd_opt_hdr *nd_opt_array[9];
 	struct {
@@ -302,7 +311,7 @@ struct nd_defrouter *defrouter_lookup __P((struct in6_addr *,
 int in6_ifdel __P((struct ifnet *, struct in6_addr *));
 int in6_init_prefix_ltimes __P((struct nd_prefix *ndpr));
 void rt6_flush __P((struct in6_addr *, struct ifnet *));
-int nd6_setdefaultiface __P((struct ifnet *));
+int nd6_setdefaultiface __P((int));
 
 #endif /* _KERNEL */
 

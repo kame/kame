@@ -1195,6 +1195,7 @@ nd6_ioctl(cmd, data, ifp)
 	struct in6_prlist *prl = (struct in6_prlist *)data;
 	struct in6_ndireq *ndi = (struct in6_ndireq *)data;
 	struct in6_nbrinfo *nbi = (struct in6_nbrinfo *)data;
+	struct in6_ndifreq *ndif = (struct in6_ndifreq *)data;
 	struct nd_defrouter *dr, any;
 	struct nd_prefix *pr;
 	struct rtentry *rt;
@@ -1391,9 +1392,11 @@ nd6_ioctl(cmd, data, ifp)
 		
 		break;
 	    }
+	case SIOCGDEFIFACE_IN6:	/* XXX: should be implemented as a sysctl? */
+		ndif->ifindex = nd6_defifindex;
+		break;
 	case SIOCSDEFIFACE_IN6:	/* XXX: should be implemented as a sysctl? */
-		/* not care about the data */
-		return(nd6_setdefaultiface(ifp));
+		return(nd6_setdefaultiface(ndif->ifindex));
 		break;
 	}
 	return(error);

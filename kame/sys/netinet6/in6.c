@@ -518,6 +518,7 @@ in6_control(so, cmd, data, ifp)
 	case SIOCGDRLST_IN6:
 	case SIOCGPRLST_IN6:
 	case SIOCGNBRINFO_IN6:
+	case SIOCGDEFIFACE_IN6:
 		return(nd6_ioctl(cmd, data, ifp));
 	}
 

@@ -383,7 +383,8 @@ struct	in6_rrenumreq {
 #define SIOCGIFSTAT_IN6		_IOWR('i', 83, struct in6_ifreq)
 #define SIOCGIFSTAT_ICMP6	_IOWR('i', 84, struct in6_ifreq)
 
-#define SIOCSDEFIFACE_IN6	_IOWR('i', 85, int)
+#define SIOCSDEFIFACE_IN6	_IOWR('i', 85, struct in6_ndifreq)
+#define SIOCGDEFIFACE_IN6	_IOWR('i', 86, struct in6_ndifreq)
 
 #define SIOCSIFPREFIX_IN6	_IOW('i', 100, struct in6_prefixreq) /* set */
 #define SIOCGIFPREFIX_IN6	_IOWR('i', 101, struct in6_prefixreq) /* get */

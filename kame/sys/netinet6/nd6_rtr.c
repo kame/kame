@@ -90,6 +90,7 @@ static u_char bmask [] = {
 #endif
 
 struct ifnet *nd6_defifp;
+int nd6_defifindex;
 
 /*
  * Receive Router Solicitation Message - just for routers.
@@ -472,7 +473,7 @@ defrouter_addifreq(ifp)
 {
 	struct sockaddr_in6 def, mask;
 	struct ifaddr *ifa;
-	int error;
+	int error, flags;
 
 	bzero(&def, sizeof(def));
 	bzero(&mask, sizeof(mask));
@@ -492,9 +493,12 @@ defrouter_addifreq(ifp)
 		return;
 	}
 
+	flags = ifa->ifa_flags;
+	if ((ifp->if_flags & IFF_POINTOPOINT) != 0)
+		flags &= ~RTF_CLONING;
 	if ((error = rtrequest(RTM_ADD, (struct sockaddr *)&def,
 			       ifa->ifa_addr, (struct sockaddr *)&mask,
-			       ifa->ifa_flags, NULL)) != 0) {
+			       flags, NULL)) != 0) {
 		log(LOG_ERR,
 		    "defrouter_addifreq: failed to install a route to "
 		    "interface %s (errno = %d)\n",
@@ -643,14 +647,13 @@ defrouter_select()
 		 * (even harmful) for routers.
 		 */
 		if (!ip6_forwarding) {
+			/*
+			 * De-install the current default route
+			 * in advance.
+			 */
+			bzero(&anydr, sizeof(anydr));
+			defrouter_delreq(&anydr, 0);
 			if (nd6_defifp) {
-				/*
-				 * De-install the current default route
-				 * in advance.
-				 */
-				bzero(&anydr, sizeof(anydr));
-				defrouter_delreq(&anydr, 0);
-
 				/*
 				 * Install a route to the default interface
 				 * as default route.
@@ -1602,20 +1605,26 @@ rt6_deleteroute(rn, arg)
 }
 
 int
-nd6_setdefaultiface(ifp)
-	struct ifnet *ifp;
+nd6_setdefaultiface(ifindex)
+	int ifindex;
 {
 	int error = 0;
+	struct ifnet *ifp;
 
-	if (ifp == NULL)
+	if (ifindex < 0 || if_index < ifindex)
 		return(EINVAL);
 
-	if (nd6_defifp != ifp) {
-		nd6_defifp = ifp;
+	if (nd6_defifindex != ifindex) {
+		nd6_defifindex = ifindex;
+		if (nd6_defifindex > 0)
+			nd6_defifp = ifindex2ifnet[nd6_defifindex];
+		else
+			nd6_defifp = NULL;
 
 		/*
 		 * If the Default Router List is empty, install a route
-		 * to the specified interface as default.
+		 * to the specified interface as default or remove the default
+		 * route when the default interface becomes canceled.
 		 * The check for the queue is actually redundant, but
 		 * we do this here to avoid re-install the default route
 		 * if the list is NOT empty.
