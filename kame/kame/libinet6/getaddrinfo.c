@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.168 2004/04/13 12:13:25 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.169 2004/04/13 12:40:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -502,29 +502,6 @@ getaddrinfo(hostname, servname, hints, res)
 			}
 		}
 	}
-
-#if defined(AI_ALL) && defined(AI_V4MAPPED)
-	/*
-	 * post-2553: AI_ALL and AI_V4MAPPED are effective only against
-	 * AF_INET6 query.  They need to be ignored if specified in other
-	 * occasions.
-	 */
-	switch (pai->ai_flags & (AI_ALL | AI_V4MAPPED)) {
-	case AI_V4MAPPED:
-	case AI_ALL | AI_V4MAPPED:
-		if (pai->ai_family != AF_INET6)
-			pai->ai_flags &= ~(AI_ALL | AI_V4MAPPED);
-		break;
-	case AI_ALL:
-#if 1
-		/* illegal */
-		ERR(EAI_BADFLAGS);
-#else
-		pai->ai_flags &= ~(AI_ALL | AI_V4MAPPED);
-#endif
-		break;
-	}
-#endif
 
 	/*
 	 * check for special cases.  (1) numeric servname is disallowed if
