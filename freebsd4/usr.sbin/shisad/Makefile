@@ -25,6 +25,6 @@
 # SUCH DAMAGE.
 
 SUBDIR+=mnd cnd had mdd
-SUBDIR+=mrd nemonetd
+SUBDIR+=mrd nemonetd movementdetection
 
 .include <bsd.subdir.mk>
