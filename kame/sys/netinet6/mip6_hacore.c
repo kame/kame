@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.16 2003/09/29 09:41:06 t-momose Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.17 2003/11/21 06:01:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -336,6 +336,17 @@ mip6_process_hurbu(bi)
 		/* XXX panic */
 		return (0);
 	}
+
+	/*
+	 * update the CoA of a mobile node.  this is needed to update
+	 * ipsec security policy databse addresses properly.
+	 */
+	mbc->mbc_pcoa = bi->mbc_pcoa;
+
+	/*
+	 * remove a binding cache entry and a link-local binding cache
+	 * entry, if any.
+	 */
 	if ((bi->mbc_flags & IP6MU_LINK) &&  (mbc->mbc_llmbc != NULL)) {
 		/* remove a link-local binding cache entry. */
 		error = mip6_bc_list_remove(&mip6_bc_list, mbc->mbc_llmbc);
