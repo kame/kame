@@ -237,6 +237,7 @@ i386/linux/linux_util.c		optional	compat_linux
 i386/scsi/aic7xxx.c		optional	ahc	device-driver	   \
 	dependency	"aic7xxx_{reg,seq}.h"
 i386/scsi/bt.c			optional	bt	device-driver
+libkern/arc4random.c		standard
 libkern/bcd.c			standard
 libkern/divdi3.c		standard
 libkern/inet_ntoa.c		standard

@@ -71,6 +71,7 @@ int	 fls __P((int));
 int	 locc __P((int, char *, u_int));
 void	 qsort __P((void *base, size_t nmemb, size_t size,
 		    int (*compar)(const void *, const void *)));
+u_int32_t arc4random __P((void));
 u_long	 random __P((void));
 char	*index __P((const char *, int));
 char	*rindex __P((const char *, int));
