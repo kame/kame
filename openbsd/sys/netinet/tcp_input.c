@@ -718,10 +718,6 @@ findpcb:
 			      m_freem(inp->inp_options);
 			      inp->inp_options = NULL;
 			    }
-#if 0
-			    ip6_savecontrol(inp, &inp->inp_options,
-			      mtod(m, struct ip6_hdr *), m);
-#endif
 			  }
 			}
 #endif /* INET6 */
@@ -760,6 +756,22 @@ findpcb:
 			while (tp->request_r_scale < TCP_MAX_WINSHIFT &&
 			   TCP_MAXWIN << tp->request_r_scale < so->so_rcv.sb_hiwat)
 				tp->request_r_scale++;
+		}
+	}
+
+	/* save IPv6 packet options if user wanted */
+	if (is_ipv6 && inp->inp_flags & IN6P_CONTROLOPTS) {
+		struct ip6_recvpktopts opts;
+
+		bzero(&opts, sizeof(opts));
+		ip6_savecontrol(inp, ip6, m, &opts, &inp->inp_inputopts6);
+		if (inp->inp_inputopts6)
+			ip6_update_recvpcbopt(inp->inp_inputopts6, &opts);
+		if (opts.head) {
+			if (sbappendcontrol(&inp->inp_socket->so_rcv,
+					    NULL, opts.head)
+			    == 0)
+				m_freem(opts.head);
 		}
 	}
 
