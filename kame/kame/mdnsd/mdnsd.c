@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.12 2000/05/31 11:29:57 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.13 2000/05/31 11:58:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -70,7 +70,6 @@ static int mcasthops = 1;
 static int mcastloop = 0;
 int dflag = 1;
 struct timeval hz = { 1, 0 };	/* timeout every 1 second */
-int probeinterval = 300;	/* probe reachability every 5min */
 static int mflag;
 
 static void usage __P((void));
@@ -138,7 +137,7 @@ main(argc, argv)
 		/*NOTREACHED*/
 	}
 	while (argc-- > 0) {
-		if (addserv(*argv) != 0) {
+		if (addserv(*argv, -1) != 0) {
 			errx(1, "%s: failed to add it to db", *argv);
 			/*NOTREACHED*/
 		}
@@ -204,9 +203,9 @@ main(argc, argv)
 	}
 
 	if (ready4)
-		(void)addserv(MDNS_GROUP4);
+		(void)addserv(MDNS_GROUP4, -1);
 	if (ready6)
-		(void)addserv(MDNS_GROUP6);
+		(void)addserv(MDNS_GROUP6, -1);
 
 	if (LIST_FIRST(&nsdb) == NULL) {
 		errx(1, "no DNS server to contact");
@@ -467,13 +466,15 @@ iscanon(n)
 }
 
 int
-addserv(n)
+addserv(n, ttl)
 	const char *n;
+	int ttl;
 {
 	struct addrinfo hints, *res;
 	struct sockaddr_in *sin;
 	struct sockaddr_in6 *sin6;
 	int flags;
+	struct nsdb *ns;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_UNSPEC;
@@ -504,9 +505,17 @@ addserv(n)
 		flags = 0;
 		break;
 	}
-	if (newnsdb(res->ai_addr, n, flags) == NULL) {
+	ns = newnsdb(res->ai_addr, n, flags);
+	if (ns == NULL) {
 		freeaddrinfo(res);
 		return -1;
+	}
+	if (ttl < 0) {
+		ns->expire.tv_sec = -1;
+		ns->expire.tv_usec = -1;
+	} else {
+		gettimeofday(&ns->expire, NULL);
+		ns->expire.tv_sec += ttl;
 	}
 
 	dprintf("added server %s\n", n);

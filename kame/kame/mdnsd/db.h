@@ -1,4 +1,4 @@
-/*	$KAME: db.h,v 1.5 2000/05/31 11:29:57 itojun Exp $	*/
+/*	$KAME: db.h,v 1.6 2000/05/31 11:58:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -57,6 +57,7 @@ struct nsdb {
 	char *comment;
 	int flags;
 	int prio;
+	struct timeval expire;
 	struct timeval lasttx;	/* last packet transmit */
 	struct timeval lastrx;	/* last packet delivery */
 };

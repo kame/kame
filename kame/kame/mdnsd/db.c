@@ -1,4 +1,4 @@
-/*	$KAME: db.c,v 1.5 2000/05/31 11:29:57 itojun Exp $	*/
+/*	$KAME: db.c,v 1.6 2000/05/31 11:58:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -57,10 +57,9 @@ int
 dbtimeo()
 {
 	struct scache *sc, *nsc;
-	struct nsdb *ns;
+	struct nsdb *ns, *nns;
 	struct timeval tv;
 	int errcnt;
-	static int probecnt = 0;
 
 	(void)gettimeofday(&tv, NULL);
 
@@ -85,17 +84,28 @@ dbtimeo()
 		delscache(sc);
 	}
 
-	/* check reachability to servers */
-	probecnt++;
-	if ((probecnt % probeinterval) == 0) {
-		dprintf("ns prio cleanup\n");
-		for (ns = LIST_FIRST(&nsdb); ns; ns = LIST_NEXT(ns, link)) {
+	/* check expiry of servers */
+	for (ns = LIST_FIRST(&nsdb); ns; ns = nns) {
+		nns = LIST_NEXT(ns, link);
+
+		if (ns->expire.tv_sec == -1 && ns->expire.tv_usec == -1) {
 #if 0
-			dprintf("ns %p prio was %d\n", ns, ns->prio);
-			ns->prio = 0;
-			probens(ns);
+			dprintf("ns %p expire never\n", ns);
 #endif
+			continue;
 		}
+#if 0
+		dprintf("ns %p expire %lu\n", ns, (u_long)ns->expire.tv_sec);
+#endif
+
+		if (ns->expire.tv_sec > tv.tv_sec)
+			continue;
+		if (ns->expire.tv_sec == tv.tv_sec &&
+		    ns->expire.tv_usec > tv.tv_usec)
+			continue;
+
+		dprintf("ns %p expired\n", ns);
+		delnsdb(ns);
 	}
 
 	return errcnt == 0 ? 0 : -1;
