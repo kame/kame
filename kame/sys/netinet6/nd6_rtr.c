@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.163 2001/09/02 12:28:20 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.164 2001/09/11 11:24:43 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -409,11 +409,25 @@ nd6_ra_input(m, off, icmp6len)
 #ifdef MIP6
 	/* update HA list */
 	if ((MIP6_IS_MN || MIP6_IS_HA)
+	    && dr
 	    && (dr->flags & ND_RA_FLAG_HOME_AGENT)) {
 		if (mip6_ha_list_update_hainfo(&mip6_ha_list,
 					       dr, ndopts.nd_opts_hai)) {
 			mip6log((LOG_ERR, "%s: global HA list update failed\n",
 				 __FUNCTION__));
+		}
+	}
+	if (dr == NULL) {
+		struct mip6_ha *mha;
+
+		/* the home agent is shutting down. */
+		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &saddr6);
+		if (mha) {
+			if (mip6_ha_list_remove(&mip6_ha_list, mha)) {
+				mip6log((LOG_ERR,
+					 "%s: HA entry remove failed.\n",
+					 __FUNCTION__));
+			}
 		}
 	}
 #endif /* MIP6 */
