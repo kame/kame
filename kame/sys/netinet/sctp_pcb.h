@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.h,v 1.8 2003/03/10 05:58:13 itojun Exp $	*/
+/*	$KAME: sctp_pcb.h,v 1.9 2003/04/21 06:26:11 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.h,v 1.92 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef __sctp_pcb_h__
@@ -35,7 +35,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <net/net_osdep.h>
 
 #if defined(__OpenBSD__)
 #include <netinet/sctp_callout.h>
@@ -58,7 +57,7 @@
 #include <netinet6/in6_pcb.h>
 #endif
 
-#if defined(HAVE_NRL_INPCB) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #ifndef in6pcb
 #define in6pcb		inpcb
 #endif
@@ -363,7 +362,7 @@ struct sctp_tcb *sctp_findassociation_addr_sa(struct sockaddr *,
 
 #ifdef SCTP_TCP_MODEL_SUPPORT
 void sctp_move_pcb_and_assoc(struct sctp_inpcb *, struct sctp_inpcb *,
-	struct sctp_tcb  *);
+	struct sctp_tcb *);
 #endif
 
 /*

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.26 2003/04/18 07:06:49 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.27 2003/04/21 06:26:11 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_usrreq.c,v 1.151 2002/04/04 16:49:14 lei Exp	*/
 
 /*
@@ -341,7 +341,11 @@ sctp_notify(struct sctp_inpcb *inp,
 	if (ntohl(sh->v_tag) != (tcb->asoc.peer_vtag)) {
 		return;
 	}
-	if ((errno == EHOSTUNREACH) || (errno == EHOSTDOWN)) {
+	if ((errno == EHOSTUNREACH) ||  /* Host is not reachable */
+	    (errno == EHOSTDOWN) ||	/* Host is down */
+	    (errno == ECONNREFUSED) ||	/* Host refused the connection, (not an abort?) */
+	    (errno == ENOPROTOOPT)	/* SCTP is not present on host */
+		) {
 		/*
 		 * Here we will either abort the INIT (if we are forming
 		 * an association) or mark the destination as down.
@@ -357,15 +361,22 @@ sctp_notify(struct sctp_inpcb *inp,
 			sctp_abort_notification(tcb, SCTP_PEER_FAULTY);
 			sctp_free_assoc(inp, tcb);
 		} else {
-			if (net->dest_state & SCTP_ADDR_REACHABLE) {
-				/* Ok that destination is NOT reachable */
-				net->dest_state &= ~SCTP_ADDR_REACHABLE;
-				net->dest_state |= SCTP_ADDR_NOT_REACHABLE;
-				net->error_count = net->failure_threshold + 1;
-				sctp_ulp_notify(SCTP_NOTIFY_INTERFACE_DOWN,
-						tcb,
-						SCTP_FAILED_THRESHOLD,
-						(void *)net);
+			/*
+			 * Hmm the association was up, so if
+			 * its not reachable, we may have lost
+			 * a network. Or if not, it is a bogus
+			 * icmp.
+			 */
+			if ((errno == EHOSTUNREACH) || (errno == EHOSTDOWN)) {
+				if (net->dest_state & SCTP_ADDR_REACHABLE) {
+					/* Ok that destination is NOT reachable */
+					net->dest_state &= ~SCTP_ADDR_REACHABLE;
+					net->dest_state |= SCTP_ADDR_NOT_REACHABLE;
+					net->error_count = net->failure_threshold + 1;
+					sctp_ulp_notify(SCTP_NOTIFY_INTERFACE_DOWN,
+					    tcb, SCTP_FAILED_THRESHOLD,
+					    (void *)net);
+				}
 			}
 		}
 	} else {
@@ -447,7 +458,7 @@ sctp_ctlinput(cmd, sa, vip)
 				if (cmd == PRC_HOSTDEAD) {
 					cm = EHOSTUNREACH;
 				} else {
-					cm = inet6ctlerrmap[cmd];
+					cm = inetctlerrmap[cmd];
 				}
 				sctp_notify(inp, cm, sh,
 					    (struct sockaddr *)&to, stcb,
@@ -511,14 +522,14 @@ SYSCTL_PROC(_net_inet_sctp, OID_AUTO, getcred, CTLTYPE_OPAQUE|CTLFLAG_RW,
 
 #endif /* #if defined(__FreeBSD__) */
 
-u_long	sctp_sendspace = (128 * 1024);	/* really max datagram size */
+unsigned int	sctp_sendspace = (128 * 1024);	/* really max datagram size */
 /* 64 1K datagrams */
 #if defined(__FreeBSD__)
 SYSCTL_INT(_net_inet_sctp, SCTPCTL_MAXDGRAM, maxdgram, CTLFLAG_RW,
 	   &sctp_sendspace, 0, "Maximum outgoing SCTP datagram size");
 #endif
 
-u_long	sctp_recvspace = 128 * (1024 +
+unsigned int	sctp_recvspace = 128 * (1024 +
 #ifdef INET6
 			       sizeof(struct sockaddr_in6)
 #else
@@ -731,7 +742,7 @@ sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	if (inp->pkt) {
 		inp->pkt_last->m_next = m;
 		inp->pkt_last = m;
-	}else{
+	} else {
 		inp->pkt_last = inp->pkt = m;
 	}
 	if (
@@ -757,7 +768,7 @@ sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		inp->pkt = NULL;
 		inp->control = NULL;
 		return(ret);
-	}else{
+	} else {
 		return(0);
 	}
 }
@@ -807,8 +818,9 @@ sctp_disconnect(struct socket *so)
 						/* Fill in the user initiated abort */
 						struct sctp_paramhdr *ph;
 						ph = mtod(err, struct sctp_paramhdr *);
+						err->m_len = sizeof(struct sctp_paramhdr);
 						ph->param_type = htons(SCTP_CAUSE_USER_INITIATED_ABT);
-						ph->param_length = htons(sizeof(struct sctp_paramhdr));
+						ph->param_length = htons(err->m_len);
 					}
 					sctp_send_abort_tcb(tcb, err);
 				}
@@ -1022,7 +1034,8 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 						continue;
 					}
 				}
-				if (ifa->ifa_addr->sa_family == AF_INET) {
+				if ((ifa->ifa_addr->sa_family == AF_INET) &&
+				    (tcb->asoc.ipv4_addr_legal)) {
 					struct sockaddr_in *sin;
 					sin = (struct sockaddr_in *)ifa->ifa_addr;
 					if (sin->sin_addr.s_addr == 0) {
@@ -1039,8 +1052,8 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 					if (actual >= limit) {
 						return (actual);
 					}
-				} else if (ifa->ifa_addr->sa_family ==
-					   AF_INET6) {
+				} else if ((ifa->ifa_addr->sa_family == AF_INET6) &&
+					   (tcb->asoc.ipv6_addr_legal)) {
 					struct sockaddr_in6 *sin6, lsa6;
 					sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
 					if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
@@ -1550,6 +1563,16 @@ sctp_optsget(struct socket *so,
 		} else {
 			tcb = NULL;
 		}
+		/*
+		 * assure that the TCP model does not need a assoc id 
+		 * once connected.
+		 */
+#ifdef SCTP_TCP_MODEL_SUPPORT
+		if ( (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) &&
+		     (tcb == NULL) ) {
+			tcb = LIST_FIRST(&inp->sctp_asoc_list);			
+		}
+#endif /* SCTP_TCP_MODEL_SUPPORT */				
 		sas = (struct sockaddr_storage *)&saddr->addr[0];
 		limit = m->m_len - sizeof(sctp_assoc_t);
 		actual = sctp_fill_up_addresses(inp, tcb, limit, sas);
@@ -1678,7 +1701,7 @@ sctp_optsget(struct socket *so,
 				if (tcb)
 				    netp = sctp_findnet(tcb, 
 							(struct sockaddr *)&paddri->spinfo_address);
-		    }else{
+		    } else {
 #endif /* SCTP_TCP_MODEL_SUPPORT */
 				tcb = sctp_findassociation_ep_addr(&inp,
 								   (struct sockaddr *)&paddri->spinfo_address,
@@ -2198,9 +2221,13 @@ sctp_optsset(struct socket *so,
 		    (((struct sockaddr *)&paddrp->spp_address)->sa_family == AF_INET6)) {
 				/* Lookup via address */
 #ifdef SCTP_TCP_MODEL_SUPPORT
-			if (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED)
+			if (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) {
 				tcb = LIST_FIRST(&inp->sctp_asoc_list);
-			else
+				if (tcb) {
+					netp = sctp_findnet(tcb, 
+							    (struct sockaddr *)&paddrp->spp_address);
+				}
+			} else
 #endif
 				tcb = sctp_findassociation_ep_addr(&inp,
 								   (struct sockaddr *)&paddrp->spp_address,
@@ -2817,7 +2844,7 @@ sctp_usr_recvd(struct socket *so, int flags)
 						break;
 					}
 				}
-				this = this->m_next;
+				this = this->m_nextpkt;
 			}
 
 		}
@@ -3390,8 +3417,13 @@ sctp_usrreq(so, req, m, nam, control)
 		break;
 
 	case PRU_RCVD:
-		/* Flags are ignored */
-		error = sctp_usr_recvd(so, 0);
+		/*
+		 * For Open and Net BSD, this is real
+		 * ugly. The mbuf *nam that is passed
+		 * (by soreceive()) is the int flags c
+		 * ast as a (mbuf *) yuck!
+		 */
+ 		error = sctp_usr_recvd(so, (int)nam);
 		break;
 
 	case PRU_SEND:
@@ -3484,14 +3516,12 @@ sctp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return (ENOTDIR);
 
 	switch (name[0]) {
-#if 0
 	case SCTPCTL_MAXDGRAM:
 		return (sysctl_int(oldp, oldlenp, newp, newlen,
 		     &sctp_sendspace));
 	case SCTPCTL_RECVSPACE:
 		return (sysctl_int(oldp, oldlenp, newp, newlen,
 		    &sctp_recvspace));
-#endif
 #if 0
 	case SCTPCTL_ASOC_CNT:
 		return (sysctl_int(oldp, oldlenp, newp, newlen,

@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.16 2003/04/15 06:01:30 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.17 2003/04/21 06:26:11 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.c,v 1.153 2002/04/04 16:59:01 randall Exp	*/
 
 /*
@@ -943,15 +943,23 @@ sctp_timer_start(int t_type,
 			 * RTO is in ms.
 			 */
 			if (net) {
-				int rto_val;
+				struct sctp_nets *lnet;
+				int delay;
+				delay = tcb->asoc.heart_beat_delay;
+				TAILQ_FOREACH(lnet, &tcb->asoc.nets, sctp_next) {
+					if ((lnet->dest_state & SCTP_ADDR_UNCONFIRMED) &&
+					    ((lnet->dest_state & SCTP_ADDR_OUT_OF_SCOPE) == 0) && 
+					    (lnet->dest_state & SCTP_ADDR_REACHABLE)) {
+					    delay = 0;
+					}
+				}
 				if (net->RTO == 0) {
 					/* Never been checked */
-					rto_val = tcb->asoc.initial_rto;
+					to_ticks = this_random + tcb->asoc.initial_rto + delay;
 				} else {
 					/* set rto_val to the ms */
-					rto_val = net->RTO;
+					to_ticks = delay + net->RTO + this_random;
 				}
-				to_ticks = tcb->asoc.heart_beat_delay + rto_val + this_random;
 			} else {
 				to_ticks = tcb->asoc.heart_beat_delay + this_random + tcb->asoc.initial_rto;
 			}
@@ -3403,6 +3411,7 @@ sctp_grub_through_socket_buffer(struct sctp_inpcb *inp,
 	struct mbuf **put,**take,*next,*this;
 	struct sockbuf *old_sb,*new_sb;	
 	struct sctp_association *asoc;
+	int moved_top = 0;
 
 	asoc = &tcb->asoc;
 	old_sb = &old->so_rcv;
@@ -3426,7 +3435,7 @@ sctp_grub_through_socket_buffer(struct sctp_inpcb *inp,
 		old_sb->sb_mb = new_sb->sb_mb->m_nextpkt;
 		new_sb->sb_mb->m_nextpkt = NULL;
 		put = &new_sb->sb_mb->m_nextpkt;
-		
+		moved_top = 1;
 	} else {
 		put = &new_sb->sb_mb;
 	}
@@ -3459,11 +3468,12 @@ sctp_grub_through_socket_buffer(struct sctp_inpcb *inp,
 			take = &this->m_nextpkt;
 		}
 	} 
-	if (tcb->sctp_ep->sctp_vtag_last == asoc->my_vtag) {
+	if (moved_top) {
 		/* Ok so now we must re-postion vtag_last to
-		 * match the new first one.
+		 * match the new first one since we moved the
+		 * mbuf at the top.
 		 */
-		tcb->sctp_ep->sctp_vtag_last = 0;
+		inp->sctp_vtag_last = 0;
 		this = old_sb->sb_mb;
 		while (this) {
 			if (this->m_flags & M_PKTHDR) {
@@ -3477,7 +3487,7 @@ sctp_grub_through_socket_buffer(struct sctp_inpcb *inp,
 #endif
 					!= 0) {
 					/* its the one */
-					tcb->sctp_ep->sctp_vtag_last =
+					inp->sctp_vtag_last =
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 					(u_int32_t)this->m_pkthdr.csum_data
 #else
@@ -3489,7 +3499,7 @@ sctp_grub_through_socket_buffer(struct sctp_inpcb *inp,
 				}
 
 			}
-			this = this->m_next;
+			this = this->m_nextpkt;
 		}
 
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_uio.h,v 1.4 2003/03/10 05:58:13 itojun Exp $	*/
+/*	$KAME: sctp_uio.h,v 1.5 2003/04/21 06:26:11 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_uio.h,v 1.40 2002/04/04 16:34:41 lei Exp	*/
 
 #ifndef __sctp_uio_h__
@@ -320,7 +320,6 @@ struct sctp_cwnd_log_req{
  * API system calls
  */
 #ifndef _KERNEL
-#include <sys/cdefs.h>
 
 __BEGIN_DECLS
 int	sctp_peeloff	__P((int, sctp_assoc_t *));
@@ -329,7 +328,9 @@ int	sctp_getpaddrs	__P((int, sctp_assoc_t, struct sockaddr_storage **));
 void	sctp_freepaddrs	__P((struct sockaddr_storage *));
 int	sctp_getladdrs	__P((int, sctp_assoc_t, struct sockaddr_storage **));
 void	sctp_freeladdrs	__P((struct sockaddr_storage *));
-int     sctp_opt_info   __P((int fd, sctp_assoc_t id, int opt, void *arg, size_t *size));
+int     sctp_opt_info   __P((int, sctp_assoc_t, int, void *, size_t *));
+int	sctp_sendmsg    __P((int, void *, size_t, struct sockaddr *,
+    uint32_t, uint32_t, uint16_t, uint32_t, uint32_t));
 
 __END_DECLS
 

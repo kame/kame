@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.13 2003/04/15 06:01:30 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.14 2003/04/21 06:26:11 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_timer.c,v 1.60 2002/04/04 17:47:19 randall Exp	*/
 
 /*
@@ -972,6 +972,7 @@ sctp_heartbeat_timer(struct sctp_inpcb *ep,
 		     struct sctp_tcb *tcb,
 		     struct sctp_nets *net)
 {
+	int cnt_of_unconf=0;
 	if (net) {
 		if (net->hb_responded == 0) {
 			sctp_backoff_on_timeout(ep, net, 1, 0);
@@ -980,13 +981,30 @@ sctp_heartbeat_timer(struct sctp_inpcb *ep,
 		if (net->partial_bytes_acked)
 			net->partial_bytes_acked = 0;
 	}
+	TAILQ_FOREACH(net, &tcb->asoc.nets, sctp_next) {
+		if (net->dest_state & SCTP_ADDR_UNCONFIRMED) {
+			cnt_of_unconf++;
+		}
+	}
 	if ((tcb->asoc.total_output_queue_size > 0) &&
-	   (TAILQ_EMPTY(&tcb->asoc.send_queue)) &&
-	   (TAILQ_EMPTY(&tcb->asoc.sent_queue))) {
+	    (TAILQ_EMPTY(&tcb->asoc.send_queue)) &&
+	    (TAILQ_EMPTY(&tcb->asoc.sent_queue))) {
 		sctp_audit_stream_queues_for_size(ep,tcb);
 	}
 	/* Send a new HB, this will do threshold managment, pick a new dest */
 	sctp_send_hb(tcb, 0, NULL);
+	if (cnt_of_unconf > 1) {
+		/*
+		 * this will send out extra hb's up to maxburst if
+		 * there are any unconfirmed addresses.
+		 */
+		int cnt_sent = 1;
+		while ((cnt_sent < tcb->asoc.max_burst) && (cnt_of_unconf > 1)) {
+			sctp_send_hb(tcb, 0, NULL);
+			cnt_of_unconf--;
+			cnt_sent++;
+		}
+	}
 }
 
 #define SCTP_NUMBER_OF_MTU_SIZES 18

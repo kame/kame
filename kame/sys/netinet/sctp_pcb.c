@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.18 2003/04/15 06:01:30 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.19 2003/04/21 06:26:10 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.c,v 1.207 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -467,6 +467,11 @@ sctp_findassociation_ep_asocid(struct sctp_inpcb *ep, caddr_t asoc_id)
 		/* can't be never allocated a association yet */
 		return (NULL);
 	}
+	if (((u_long)asoc_id % 4) != 0) {
+	       /* Must be aligned to 4 byte boundary */
+	       return (NULL);
+	}
+
 	if ((ep->highest_tcb >= asoc_id) && (ep->lowest_tcb <= asoc_id)) {
 		/* it is possible lets have a look */
 		rtcb = (struct sctp_tcb *)asoc_id;
@@ -1351,16 +1356,16 @@ sctp_isport_inuse(struct sctp_inpcb *ep, u_short lport)
 				if (ep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) {
 					/* collision in V6 space */
 					return(1);
-				}else{
+				} else {
 					/* ep is BOUND_V4 no conflict */
 					continue;
 				}
-			}else if (lep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) {
+			} else if (lep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) {
 				/* lep is bound v4 and v6 
 				 * conflict no matter what.
 				 */
 				return(1);
-			}else{
+			} else {
 				/* lep is bound only V4 */
 				if ((ep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) &&
 #if defined(__FreeBSD__)
@@ -1806,9 +1811,10 @@ sctp_inpcb_free(struct sctp_inpcb *ep, int immediate)
 				if (err) {
 					/* Fill in the user initiated abort */
 					struct sctp_paramhdr *ph;
+					err->m_len = sizeof(struct sctp_paramhdr);
 					ph = mtod(err, struct sctp_paramhdr *);
 					ph->param_type = htons(SCTP_CAUSE_USER_INITIATED_ABT);
-					ph->param_length = htons(sizeof(struct sctp_paramhdr));
+					ph->param_length = htons(err->m_len);
 				}
 				sctp_send_abort_tcb(asoc, err);
 				sctp_free_assoc(ep, asoc);
@@ -2052,7 +2058,7 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 	 */
 	struct sctp_nets *netp, *netfirst;
 	int addr_inscope;
-
+        
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
 		printf("Adding an address (from:%d) to the peer: ", from);
@@ -2072,7 +2078,12 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 		 * will have been added... and we don't wan't to
 		 * end up removing it back out.
 		 */
-		netfirst->dest_state = SCTP_ADDR_REACHABLE;
+            if (netfirst->dest_state & SCTP_ADDR_UNCONFIRMED) {
+			netfirst->dest_state = (SCTP_ADDR_REACHABLE|SCTP_ADDR_UNCONFIRMED);
+            } else {
+			netfirst->dest_state = SCTP_ADDR_REACHABLE;
+            }
+
 		return(0);
 	}
 	addr_inscope = 1;
@@ -2180,7 +2191,7 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 
 	if (netp->addr_is_local) {
 		netp->cwnd = tasoc->asoc.smallest_mtu * 4;
-	}else{
+	} else {
 		netp->cwnd = tasoc->asoc.smallest_mtu * 2;
 	}
 	netp->mtu = tasoc->asoc.smallest_mtu;
@@ -2195,7 +2206,7 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 		netp->dest_state = (SCTP_ADDR_REACHABLE |
 				    SCTP_ADDR_OUT_OF_SCOPE);
 	} else {
-		netp->dest_state = SCTP_ADDR_REACHABLE;
+		netp->dest_state = SCTP_ADDR_REACHABLE | SCTP_ADDR_UNCONFIRMED;
 	}
 	netp->RTO = 0;
 	tasoc->asoc.numnets++;

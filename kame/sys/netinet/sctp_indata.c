@@ -1,4 +1,4 @@
-/*	$KAME: sctp_indata.c,v 1.17 2003/04/15 06:01:29 itojun Exp $	*/
+/*	$KAME: sctp_indata.c,v 1.18 2003/04/21 06:26:10 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_indata.c,v 1.124 2002/04/04 18:48:39 randall Exp	*/
 
 /*
@@ -2477,7 +2477,7 @@ sctp_strike_gap_ack_chunks(struct sctp_tcb *tcb,
 			 * If our TSN is larger than the Highest TSN Newly Acked.
 			 */
 			;
-	 	}else {
+	 	} else {
 		 	/* Strike the TSN */
 			tp1->sent++;
 		}

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_input.c,v 1.11 2003/04/15 06:01:30 itojun Exp $	*/
+/*	$KAME: sctp_input.c,v 1.12 2003/04/21 06:26:10 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_input.c,v 1.189 2002/04/04 18:37:12 randall Exp	*/
 
 /*
@@ -214,7 +214,7 @@ sctp_handle_init(struct mbuf *m, struct sctp_init_chunk *cp,
 			return;
 		}
 	}
-	sctp_send_initiate_ack(inp, assoc, m, iphlen);
+	sctp_send_initiate_ack(inp, assoc, m, iphlen, stcb);
 }
 
 /*
@@ -1831,9 +1831,7 @@ sctp_handle_cookie_echo(struct mbuf *m, int offset, int iphlen,
 	    (cookie_len < (sizeof(struct sctp_cookie_echo_chunk) +
 			   sizeof(struct sctp_init_chunk) +
 			   sizeof(struct sctp_init_ack_chunk) +
-			   SCTP_SIGNATURE_SIZE
-		    )
-		    )) {
+			   SCTP_SIGNATURE_SIZE))) {
 		/* cookie too long!  or too small */
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_INPUT2) {
@@ -3401,6 +3399,11 @@ sctp_common_input_processing(struct sctp_inpcb *inp,
 	sctp_audit_log(0xE0, 1);
 	sctp_auditing(0, inp, stcb, netp);
 #endif
+	if(netp && (netp->dest_state & SCTP_ADDR_UNCONFIRMED)) {
+		/* the minute we get something from the source its confirmed */
+		netp->dest_state &= ~SCTP_ADDR_UNCONFIRMED;
+	}
+
 	if (IS_SCTP_CONTROL(ch)) {
 		/* process the control portion of the SCTP packet */
 		stcb = sctp_process_control(m, inp, stcb, &netp, iphlen,

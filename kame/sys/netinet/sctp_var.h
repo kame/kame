@@ -1,4 +1,4 @@
-/*	$KAME: sctp_var.h,v 1.13 2003/04/18 08:08:47 itojun Exp $	*/
+/*	$KAME: sctp_var.h,v 1.14 2003/04/21 06:26:11 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_var.h,v 1.46 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -42,39 +42,22 @@
 
 /* SCTP Kernel structures */
 
+
 /*
  * Names for SCTP sysctl objects
  */
-#define	SCTPCTL_MAXDGRAM	2	/* max datagram size */
-#define	SCTPCTL_RECVSPACE	3	/* default receive buffer space */
-#if 0 /* skip 5 and 6 for now */
-#define SCTPCTL_ASOC_CNT	5	/* number of assoc for zinit */
-#define SCTPCTL_SCALE_VAL	6	/* how to scale up for addr's */
-#endif
-#define SCTPCTL_AUTOASCONF      5       /* auto asconf enable/disable flag */
-#define SCTPCTL_MAXID		6
+#define	SCTPCTL_MAXDGRAM	1	/* max datagram size */
+#define	SCTPCTL_RECVSPACE	2	/* default receive buffer space */
+#define SCTPCTL_AUTOASCONF      3       /* auto asconf enable/disable flag */
+#define SCTPCTL_MAXID		3
 
-#if 0
 #define SCTPCTL_NAMES { \
-	{ 0, 0 }, \
 	{ 0, 0 }, \
 	{ "maxdgram", CTLTYPE_INT }, \
 	{ "recvspace", CTLTYPE_INT }, \
-	{ 0, 0 }, \
-	{ "asoccount", CTLTYPE_INT }, \
-	{ "asocscale", CTLTYPE_INT }, \
 	{ "autoasconf", CTLTYPE_INT }, \
 }
-#else
-#define SCTPCTL_NAMES { \
-	{ 0, 0 }, \
-	{ 0, 0 }, \
-	{ "maxdgram", CTLTYPE_INT }, \
-	{ "recvspace", CTLTYPE_INT }, \
-	{ 0, 0 }, \
-	{ "autoasconf", CTLTYPE_INT }, \
-}
-#endif /* if 0 */
+
 
 #ifdef _KERNEL
 
@@ -97,8 +80,8 @@ int sctp_usrreq __P((struct socket *, int, struct mbuf *, struct mbuf *,
 
 #define	sctp_sbspace(sb) ((long) ((sb)->sb_hiwat - (sb)->sb_cc))
 
-extern u_long	sctp_sendspace;
-extern u_long	sctp_recvspace;
+extern unsigned int	sctp_sendspace;
+extern unsigned int	sctp_recvspace;
 
 struct sctp_nets;
 struct sctp_inpcb;

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.22 2003/04/15 06:01:30 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.23 2003/04/21 06:26:10 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c, v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -111,6 +111,7 @@
 #include <netinet/icmp6.h>
 
 #endif /* INET6 */
+
 #include <net/net_osdep.h>
 
 #if defined(HAVE_NRL_INPCB) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -1011,6 +1012,23 @@ sctp_choose_correctv6_scope(struct rtentry *rt,
 			/* Can't use these types */
 			ok = 0;
 		}
+		if (sctp_is_addr_restricted(tcb, rt->rt_ifa->ifa_addr)) {
+			/* it is in a list which way ? */
+			if (is_negative_list) {
+				/* negative so we can't use it */
+				ok = 0;
+			} else {
+				/* It is a bound address */
+				*are_done = 1;
+			}
+		} else {
+			/* Not on the restricted list */
+			if (inp->sctp_flags & SCTP_PCB_FLAGS_BOUNDALL)
+				*are_done = 1;
+			else if (sctp_is_addr_in_ep(inp, rt->rt_ifa->ifa_addr))
+				*are_done = 1;
+		}
+
 		if (ok) {
 			return (sin6);
 		}
@@ -1051,9 +1069,10 @@ sctp_choose_correctv6_scope(struct rtentry *rt,
 			/* TCB must be set */
 			if (sctp_is_addr_restricted(tcb, ifa->ifa_addr))
 				continue;
-			if (inp->sctp_flags & SCTP_PCB_FLAGS_BOUNDALL)
+			if (inp->sctp_flags & SCTP_PCB_FLAGS_BOUNDALL) {
 				*are_done = 1;
-			return (sin6);
+			        return (sin6);
+                        }
 			if (sctp_is_addr_in_ep(inp, ifa->ifa_addr)) {
 				*are_done = 1;
 				return (sin6);
@@ -1816,8 +1835,7 @@ sctp_get_ect(struct sctp_tcb *tcb,
 {
 	u_int8_t this_random;
 	if (((tcb->asoc.hb_random_idx == 3) && (tcb->asoc.hb_ect_randombit > 7)) ||
-	     (tcb->asoc.hb_random_idx > 3)
-	     ) {
+	     (tcb->asoc.hb_random_idx > 3)) {
 		u_int32_t rndval;
 		rndval = sctp_select_initial_TSN(&tcb->sctp_ep->sctp_ep);
 		memcpy(tcb->asoc.hb_random_values,&rndval,
@@ -2305,17 +2323,15 @@ int sctp_is_address_in_scope(struct ifaddr *ifa,
 			     int loopback_scope,
 			     int ipv4_local_scope,
 			     int local_scope,
-			     int site_scope
-			     )
+			     int site_scope)
 {
-	if ( (loopback_scope == 0) &&
+	if ((loopback_scope == 0) &&
 	    (ifa->ifa_ifp) &&
 	    (ifa->ifa_ifp->if_type == IFT_LOOP)) {
 		/* skip loopback if not in scope */
 		return(0);
 	}
-	if ((ifa->ifa_addr->sa_family == AF_INET) &&
-	    (ipv4_addr_legal) ) {
+	if ((ifa->ifa_addr->sa_family == AF_INET) && ipv4_addr_legal) {
 		struct sockaddr_in *sin;
 		sin = (struct sockaddr_in *)ifa->ifa_addr;
 		if (sin->sin_addr.s_addr == 0) {
@@ -2351,7 +2367,7 @@ int sctp_is_address_in_scope(struct ifaddr *ifa,
 			/* skip unspecifed addresses */
 			return(0);
 		}
-		if ((local_scope == 0) &&
+		if (/*(local_scope == 0) && */
 		    (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))) {
 			return(0);
 		}
@@ -2926,7 +2942,9 @@ void
 sctp_send_initiate_ack(struct sctp_inpcb *inp,
 		       struct sctp_association *asoc,	/* may be NULL */
 		       struct mbuf *in_initpkt,
-		       int iphlen)
+		       int iphlen,
+		       struct sctp_tcb *tcb /* may be NULL */
+	)
 {
 	struct mbuf *m,*m_at,*m_tmp,*m_cookie,*op_err,*m_last;
 	struct sctp_init_msg *initm_in;
@@ -2939,6 +2957,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 	struct ip6_hdr *ip6;
 	struct sockaddr *to;
 	struct sctp_state_cookie stc;
+	struct sctp_nets *netp=NULL;
 	u_short his_limit, i_want;
 	int abort_flag, padval, sz_of, init_sz;
 
@@ -2947,6 +2966,21 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 	    ((asoc->state & SCTP_STATE_MASK) != SCTP_STATE_COOKIE_WAIT) &&
 	    (sctp_are_there_new_addresses(asoc, in_initpkt, iphlen))) {
 		/* new addresses, out of here in non-cookie-wait states */
+		struct sctphdr *sctphdr;
+
+		sctphdr = (struct sctphdr *)(mtod(in_initpkt, caddr_t) + iphlen);
+		iph = mtod(in_initpkt, struct ip *);
+		/*
+		 * Send a ABORT, we don't add the new address error clause though 
+		 * we even set the T bit and copy in the 0 tag.. this looks no
+		 * different than if no listner was present.
+		 */
+		if (iph->ip_v == IPVERSION) {
+			sctp_send_abort(in_initpkt, iph, sctphdr, iphlen, 0, NULL);
+		} else {
+			ip6 = mtod(in_initpkt, struct ip6_hdr *);
+			sctp6_send_abort(in_initpkt, ip6, sctphdr, iphlen, 0, NULL);
+		}
 		return;
 	}
 	abort_flag = 0;
@@ -2955,7 +2989,8 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 							sizeof(struct sctp_init_msg)),
 						       &abort_flag);
 	if (abort_flag) {
-		/* Ok, we have been asked to abort processing.
+		/*
+		 * Ok, we have been asked to abort processing.
 		 * For now we DO NOT send the op_err but free
 		 * it instead. We probably should send it.
 		 */
@@ -2993,6 +3028,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 		stc.tie_tag_my_vtag = asoc->my_vtag;
 		stc.tie_tag_peer_vtag = asoc->peer_vtag;
 		stc.cookie_life = asoc->cookie_life;
+		netp = asoc->primary_destination;
 	} else {
 		stc.tie_tag_my_vtag = 0;
 		stc.tie_tag_peer_vtag = 0;
@@ -3042,110 +3078,168 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 	memset((caddr_t)&store, 0, sizeof(store));
 	sin = (struct sockaddr_in *)&store;
 	sin6 = (struct sockaddr_in6 *)&store;
-	to = (struct sockaddr *)&store;
-	iph = mtod(in_initpkt, struct ip *);
-	if (iph->ip_v == IPVERSION) {
-		struct in_addr addr;
-		struct route rt;
+	if (netp == NULL) {
+		to = (struct sockaddr *)&store;
+		iph = mtod(in_initpkt, struct ip *);
+		if (iph->ip_v == IPVERSION) {
+			struct in_addr addr;
+			struct route rt;
 
-		sin->sin_family = AF_INET;
-		sin->sin_len = sizeof(struct sockaddr_in);
-		sin->sin_port = initm_in->sh.src_port;
-		sin->sin_addr = iph->ip_src;
-		/* lookup address */
-		stc.address[0] = sin->sin_addr.s_addr;
-		stc.address[1] = 0;
-		stc.address[2] = 0;
-		stc.address[3] = 0;
-		stc.addr_type = SCTP_IPV4_ADDRESS;
-		/* local from address */
-		memset(&rt, 0, sizeof(rt));
-		memcpy(&rt.ro_dst, sin, sizeof(*sin));
-		addr = sctp_ipv4_source_address_selection(inp, NULL, sin, &rt,
-							  NULL, 0);
-		if (rt.ro_rt) {
-			RTFREE(rt.ro_rt);
-		}
-		stc.laddress[0] = addr.s_addr;
-		stc.laddress[1] = 0;
-		stc.laddress[2] = 0;
-		stc.laddress[3] = 0;
-		stc.laddr_type = SCTP_IPV4_ADDRESS;
-		/* scope_id is only for v6 */
-		stc.scope_id = 0;
+			sin->sin_family = AF_INET;
+			sin->sin_len = sizeof(struct sockaddr_in);
+			sin->sin_port = initm_in->sh.src_port;
+			sin->sin_addr = iph->ip_src;
+			/* lookup address */
+			stc.address[0] = sin->sin_addr.s_addr;
+			stc.address[1] = 0;
+			stc.address[2] = 0;
+			stc.address[3] = 0;
+			stc.addr_type = SCTP_IPV4_ADDRESS;
+			/* local from address */
+			memset(&rt, 0, sizeof(rt));
+			memcpy(&rt.ro_dst, sin, sizeof(*sin));
+			addr = sctp_ipv4_source_address_selection(inp, NULL, sin, &rt,
+								  NULL, 0);
+			if (rt.ro_rt) {
+				RTFREE(rt.ro_rt);
+			}
+			stc.laddress[0] = addr.s_addr;
+			stc.laddress[1] = 0;
+			stc.laddress[2] = 0;
+			stc.laddress[3] = 0;
+			stc.laddr_type = SCTP_IPV4_ADDRESS;
+			/* scope_id is only for v6 */
+			stc.scope_id = 0;
 #ifndef SCTP_DONT_DO_PRIVADDR_SCOPE
-		if (IN4_ISPRIVATE_ADDRESS(&sin->sin_addr)) {
-			stc.ipv4_scope = 1;
-		}
+			if (IN4_ISPRIVATE_ADDRESS(&sin->sin_addr)) {
+				stc.ipv4_scope = 1;
+			}
 #else
-		stc.ipv4_scope = 1;
-#endif
-		/* Must use the address in this case */
-		if (sctp_is_address_on_local_host((struct sockaddr *)sin)) {
-			stc.loopback_scope = 1;
 			stc.ipv4_scope = 1;
-			stc.site_scope = 1;
-			stc.local_scope = 1;
+#endif
+			/* Must use the address in this case */
+			if (sctp_is_address_on_local_host((struct sockaddr *)sin)) {
+				stc.loopback_scope = 1;
+				stc.ipv4_scope = 1;
+				stc.site_scope = 1;
+				stc.local_scope = 1;
+			}
+		} else {
+			struct in6_addr addr;
+			struct route rt;
+
+			ip6 = mtod(in_initpkt, struct ip6_hdr *);
+			sin6->sin6_family = AF_INET6;
+			sin6->sin6_len = sizeof(struct sockaddr_in6);
+			sin6->sin6_port = initm_in->sh.src_port;
+			sin6->sin6_addr = ip6->ip6_src;
+			/* lookup address */
+			memcpy((caddr_t)stc.address, (caddr_t)&sin6->sin6_addr,
+			       sizeof(struct in6_addr));
+			sin6->sin6_scope_id = 0;
+			stc.addr_type = SCTP_IPV6_ADDRESS;
+			stc.scope_id = 0;
+			/* local from address */
+			memset(&rt, 0, sizeof(rt));
+			memcpy(&rt.ro_dst, sin6, sizeof(*sin6));
+			addr = sctp_ipv6_source_address_selection(inp, NULL, sin6, &rt,
+								  NULL, 0);
+			if (rt.ro_rt) {
+				RTFREE(rt.ro_rt);
+			}
+			memcpy((caddr_t)stc.laddress, (caddr_t)&addr,
+			       sizeof(struct in6_addr));
+			stc.laddr_type = SCTP_IPV6_ADDRESS;
+			if (sctp_is_address_on_local_host((struct sockaddr *)sin6)) {
+				stc.loopback_scope = 1;
+				stc.local_scope = 1;
+				stc.site_scope = 1;
+				stc.ipv4_scope = 1;
+			} else if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+				struct sockaddr_in6 src;
+				/*
+				 * If the new destination is a LINK_LOCAL we must have
+				 * common both site and local scope. Don't set local
+				 * scope though since we must depend on the source to
+				 * be added implicitly. We cannot assure just because
+				 * we share one link that all links are common.
+				 */
+				stc.local_scope = 0;
+				stc.site_scope = 1;
+				/* pull out the scope_id from the incoming packet */
+				if (ip6_getpktaddrs(in_initpkt, &src, NULL)) {
+					/* hmm... this is bad- can't get the scope! */
+#ifdef SCTP_DEBUG
+					if (sctp_debug_on & SCTP_DEBUG_OUTPUT1) {
+						printf("send_initiate_ack: can't get scope of link-local addr\n");
+					}
+#endif /* SCTP_DEBUG */
+					return;	/* FIX: ??? send op_err? */
+				}
+				sin6->sin6_scope_id = src.sin6_scope_id;
+				stc.scope_id = src.sin6_scope_id;
+			} else if (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr)) {
+				/* If the new destination is SITE_LOCAL
+				 * then we must have site scope in common.
+				 */
+				stc.site_scope = 1;
+			}
 		}
 	} else {
-		struct in6_addr addr;
-		struct route rt;
+		/* set the scope per the existing tcb */
+		stc.loopback_scope = asoc->loopback_scope;
+		stc.ipv4_scope = asoc->ipv4_local_scope;
+		stc.site_scope = asoc->site_scope;
+		stc.local_scope = asoc->local_scope;
 
-		ip6 = mtod(in_initpkt, struct ip6_hdr *);
-		sin6->sin6_family = AF_INET6;
-		sin6->sin6_len = sizeof(struct sockaddr_in6);
-		sin6->sin6_port = initm_in->sh.src_port;
-		sin6->sin6_addr = ip6->ip6_src;
-		/* lookup address */
-		memcpy((caddr_t)stc.address, (caddr_t)&sin6->sin6_addr,
-		       sizeof(struct in6_addr));
-		sin6->sin6_scope_id = 0;
-		stc.addr_type = SCTP_IPV6_ADDRESS;
-		stc.scope_id = 0;
-		/* local from address */
-		memset(&rt, 0, sizeof(rt));
-		memcpy(&rt.ro_dst, sin6, sizeof(*sin6));
-		addr = sctp_ipv6_source_address_selection(inp, NULL, sin6, &rt,
-							  NULL, 0);
-		if (rt.ro_rt) {
-			RTFREE(rt.ro_rt);
-		}
-		memcpy((caddr_t)stc.laddress, (caddr_t)&addr,
-		       sizeof(struct in6_addr));
-		stc.laddr_type = SCTP_IPV6_ADDRESS;
-		if (sctp_is_address_on_local_host((struct sockaddr *)sin6)) {
-			stc.loopback_scope = 1;
-			stc.local_scope = 1;
-			stc.site_scope = 1;
-			stc.ipv4_scope = 1;
-		} else if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
-			struct sockaddr_in6 src;
-			/*
-			 * If the new destination is a LINK_LOCAL we must have
-			 * common both site and local scope. Don't set local
-			 * scope though since we must depend on the source to
-			 * be added implicitly. We cannot assure just because
-			 * we share one link that all links are common.
-			 */
-			stc.local_scope = 0;
-			stc.site_scope = 1;
-			/* pull out the scope_id from the incoming packet */
-			if (ip6_getpktaddrs(in_initpkt, &src, NULL)) {
-				/* hmm... this is bad- can't get the scope! */
-#ifdef SCTP_DEBUG
-				if (sctp_debug_on & SCTP_DEBUG_OUTPUT1) {
-					printf("send_initiate_ack: can't get scope of link-local addr\n");
-				}
-#endif /* SCTP_DEBUG */
-				return;	/* FIX: ??? send op_err? */
+		/* use the netp pointer */
+		to = (struct sockaddr *)&netp->ra._l_addr;
+		if (to->sa_family == AF_INET) {
+			sin = (struct sockaddr_in *)to;
+			stc.address[0] = sin->sin_addr.s_addr;
+			stc.address[1] = 0;
+			stc.address[2] = 0;
+			stc.address[3] = 0;
+			stc.addr_type = SCTP_IPV4_ADDRESS;
+			if (netp->src_addr_selected == 0) {
+				/* strange case here, the INIT
+				 * should have did the selection.
+				 */
+				((struct sockaddr_in *)&netp->ra._s_addr)->sin_addr = sctp_ipv4_source_address_selection(inp, 
+															tcb,
+															(struct sockaddr_in *)&netp->ra._l_addr,
+															(struct route *)&netp->ra,
+															netp, 0);
+				netp->src_addr_selected = 1;
+
 			}
-			sin6->sin6_scope_id = src.sin6_scope_id;
-			stc.scope_id = src.sin6_scope_id;
-		} else if (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr)) {
-			/* If the new destination is SITE_LOCAL
-			 * then we must have site scope in common.
-			 */
-			stc.site_scope = 1;
+			
+			stc.laddress[0] = ((struct sockaddr_in *)&(netp->ra._s_addr))->sin_addr.s_addr;
+			stc.laddress[1] = 0;
+			stc.laddress[2] = 0;
+			stc.laddress[3] = 0;
+			stc.laddr_type = SCTP_IPV4_ADDRESS;
+		} else if (to->sa_family == AF_INET6) {
+			struct sockaddr_in6 *sin6_2;
+			sin6 = (struct sockaddr_in6 *)to;
+			memcpy((caddr_t)stc.address, (caddr_t)&sin6->sin6_addr,
+			       sizeof(struct in6_addr));
+			stc.addr_type = SCTP_IPV6_ADDRESS;
+			if (netp->src_addr_selected == 0) {
+				/* strange case here, the INIT
+				 * should have did the selection.
+				 */
+				((struct sockaddr_in6 *)&netp->ra._s_addr)->sin6_addr = sctp_ipv6_source_address_selection(inp,
+															tcb,
+															(struct sockaddr_in6 *)&netp->ra._l_addr,
+															(struct route *)&netp->ra,
+															netp, 0);
+				netp->src_addr_selected = 1;
+			}
+
+			sin6_2 = (struct sockaddr_in6 *)&netp->ra._l_addr;
+			memcpy((caddr_t)stc.laddress, (caddr_t)&sin6_2->sin6_addr,
+			       sizeof(struct in6_addr));
 		}
 	}
 	/* Now lets put the SCTP header in place */
@@ -3248,7 +3342,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 
 		TAILQ_FOREACH(ifn,&ifnet, if_list) {
 			if ((stc.loopback_scope == 0) &&
-			   (ifn->if_type == IFT_LOOP)) {
+			    (ifn->if_type == IFT_LOOP)) {
 				/*
 				 * Skip loopback devices if loopback_scope
 				 * not set
@@ -3257,12 +3351,9 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 			}
 			TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 				if (sctp_is_address_in_scope(ifa,
-							    stc.ipv4_addr_legal,
-							    stc.ipv6_addr_legal,
-							    stc.loopback_scope,
-							    stc.ipv4_scope,
-							    stc.local_scope,
-							    stc.site_scope) == 0) {
+				    stc.ipv4_addr_legal, stc.ipv6_addr_legal,
+				    stc.loopback_scope, stc.ipv4_scope,
+				    stc.local_scope, stc.site_scope) == 0) {
 					continue;
 				}
 				cnt++;
@@ -3280,12 +3371,10 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 				}
 				TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 					if (sctp_is_address_in_scope(ifa,
-								    stc.ipv4_addr_legal,
-								    stc.ipv6_addr_legal,
-								    stc.loopback_scope,
-								    stc.ipv4_scope,
-								    stc.local_scope,
-								    stc.site_scope) == 0) {
+					    stc.ipv4_addr_legal,
+					    stc.ipv6_addr_legal,
+					    stc.loopback_scope, stc.ipv4_scope,
+					    stc.local_scope, stc.site_scope) == 0) {
 						continue;
 					}
 					m_at = sctp_add_addr_to_mbuf(m_at, ifa);
@@ -3304,12 +3393,9 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 			if (laddr->ifa->ifa_addr == NULL)
 				continue;
 			if (sctp_is_address_in_scope(laddr->ifa,
-						    stc.ipv4_addr_legal,
-						    stc.ipv6_addr_legal,
-						    stc.loopback_scope,
-						    stc.ipv4_scope,
-						    stc.local_scope,
-						    stc.site_scope) == 0) {
+			    stc.ipv4_addr_legal, stc.ipv6_addr_legal,
+			    stc.loopback_scope, stc.ipv4_scope,
+			    stc.local_scope, stc.site_scope) == 0) {
 				continue;
 			}
 			cnt++;
@@ -3330,12 +3416,9 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 				if (laddr->ifa->ifa_addr == NULL)
 					continue;
 				if (sctp_is_address_in_scope(laddr->ifa,
-							    stc.ipv4_addr_legal,
-							    stc.ipv6_addr_legal,
-							    stc.loopback_scope,
-							    stc.ipv4_scope,
-							    stc.local_scope,
-							    stc.site_scope) == 0) {
+				    stc.ipv4_addr_legal, stc.ipv6_addr_legal,
+				    stc.loopback_scope, stc.ipv4_scope,
+				    stc.local_scope, stc.site_scope) == 0) {
 					continue;
 				}
 				m_at = sctp_add_addr_to_mbuf(m_at, laddr->ifa);
@@ -3570,7 +3653,8 @@ sctp_prepare_chunk(struct sctp_tmit_chunk *template,
 	template->rec.data.context = srcv->sinfo_context;
 	template->rec.data.doing_fast_retransmit = 0;
 	template->rec.data.ect_nonce = 0;
-	if (srcv->sinfo_flags & MSG_ADDR_OVER) {
+	if ((srcv->sinfo_flags & MSG_ADDR_OVER) ||
+             (net->dest_state & SCTP_ADDR_UNCONFIRMED)) {
 		template->whoTo = net;
 	} else {
 		if (tcb->asoc.primary_destination)
@@ -3690,9 +3774,10 @@ sctp_msg_append(struct sctp_tcb *tcb,
 			M_PREPEND(m, sizeof(struct sctp_paramhdr), M_DONTWAIT);
 			if (m) {
 				struct sctp_paramhdr *ph;
+				m->m_len = sizeof(struct sctp_paramhdr) + dataout;
 				ph = mtod(m, struct sctp_paramhdr *);
 				ph->param_type = htons(SCTP_CAUSE_USER_INITIATED_ABT);
-				ph->param_length = htons((sizeof(struct sctp_paramhdr) + dataout));
+				ph->param_length = htons(m->m_len);
 			}
 			sctp_abort_an_association(tcb->sctp_ep, tcb, SCTP_RESPONSE_TO_USER_REQ, m);
 		} else {
@@ -6397,7 +6482,6 @@ sctp_output(inp, m, addr, control, p)
 				 * i.e. I can't find it?
 				 */
 				if ((tcb) &&
-				    (srcv.sinfo_flags & MSG_ADDR_OVER) &&
 				    (addr != NULL)) {
 					/* Must locate the net structure */
 					if (addr)
@@ -6586,6 +6670,13 @@ sctp_output(inp, m, addr, control, p)
 		m_freem(control);
 		control = NULL;
 	}
+        if (net && ((srcv.sinfo_flags & MSG_ADDR_OVER) ||
+                    (net->dest_state & SCTP_ADDR_UNCONFIRMED))) {
+                /* we take the override or the unconfirmed */
+                ;
+        } else {
+                net = tcb->asoc.primary_destination;
+        }
 	if ((error = sctp_msg_append(tcb, net, m, &srcv))) {
 		splx(s);
 		return (error);
@@ -7172,8 +7263,7 @@ sctp_send_shutdown_complete(struct sctp_tcb *stcb,
 int
 sctp_send_shutdown_complete2(struct sctp_inpcb *ep,
 			     struct sockaddr *to,
-			     u_int32_t vtag
-			     )
+			     u_int32_t vtag)
 {
 	/* formulate and SEND a SHUTDOWN-COMPLETE */
 	struct mbuf *m_shutdown_comp;
@@ -8181,6 +8271,7 @@ sctp_copy_it_in(struct sctp_inpcb *inp,
 				ph->param_length = htons((sizeof(struct sctp_paramhdr) + tot_out));
 				ph++;
 				mm->m_pkthdr.len = tot_out + sizeof(struct sctp_paramhdr);
+				mm->m_len = mm->m_pkthdr.len;
 				error = uiomove((caddr_t)ph, (int)tot_out, uio);
 				if (error) {
 					/* Here if we can't get his data we still abort 
@@ -8652,20 +8743,16 @@ sctp_sosend(struct socket *so,
 			 * i.e. I can't find it?
 			 */
 			if ((tcb) &&
-			    (srcv.sinfo_flags & MSG_ADDR_OVER) &&
 			    (addr != NULL)) {
 				/* Must locate the net structure */
 				net = sctp_findnet(tcb, addr);
 			}
-			if (net == NULL)
-				net = tcb->asoc.primary_destination;
 		}
 		if (tcb == NULL) {
 			if (addr != NULL)
 				tcb = sctp_findassociation_ep_addr(&t_inp, addr, &net, NULL);
 		}
 	}
-
 	if ((tcb == NULL) &&
 	    (inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE)) {
 		error = ENOTCONN;
@@ -8797,6 +8884,16 @@ sctp_sosend(struct socket *so,
 	if (p)
 		p->p_stats->p_ru.ru_msgsnd++;
 
+	if (tcb) {
+		if (net && ((srcv.sinfo_flags & MSG_ADDR_OVER) ||
+		    (net->dest_state & SCTP_ADDR_UNCONFIRMED))) {
+			/* we take the override or the unconfirmed */
+			;
+		} else {
+			net = tcb->asoc.primary_destination;
+		}
+	}
+
 	/* will it ever fit ? */
 	if (sndlen > tcb->sctp_socket->so_snd.sb_hiwat) {
 		/* It will NEVER fit */
@@ -8818,8 +8915,8 @@ sctp_sosend(struct socket *so,
 		 * been reset and our tcb destroyed. Returning
 		 * an error will flow back to the user...
 		 */
-		while ( (sbspace(&tcb->sctp_socket->so_snd) < (sndlen + asoc->total_output_queue_size)) ||
-			(asoc->total_output_mbuf_queue_size > tcb->sctp_socket->so_snd.sb_mbmax) ) {
+		while ((sbspace(&tcb->sctp_socket->so_snd) < (sndlen + asoc->total_output_queue_size)) ||
+			(asoc->total_output_mbuf_queue_size > tcb->sctp_socket->so_snd.sb_mbmax)) {
 			int err, ret;
 			if (tcb->sctp_socket->so_state & SS_NBIO) {
 				/* Non-blocking io in place */
@@ -8916,10 +9013,7 @@ sctp_sosend(struct socket *so,
 		 */
 		queue_only = 1;
 	}
-	if ((queue_only == 0) && 
-	    tcb->asoc.peers_rwnd  && 
-	    un_sent
-	    ) {
+	if ((queue_only == 0) && tcb->asoc.peers_rwnd  && un_sent) {
 		/* we can attempt to send too.*/
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_OUTPUT1) {

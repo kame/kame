@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.h,v 1.6 2003/03/10 05:58:12 itojun Exp $	*/
+/*	$KAME: sctp_output.h,v 1.7 2003/04/21 06:26:10 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.h,v 1.33 2002/04/01 21:59:20 randall Exp	*/
 
 #ifndef __sctp_output_h__
@@ -40,7 +40,7 @@
 void sctp_send_initiate(struct sctp_inpcb *, struct sctp_tcb *);
 
 void sctp_send_initiate_ack(struct sctp_inpcb *, struct sctp_association *,
-	struct mbuf *, int);
+	struct mbuf *, int, struct sctp_tcb *);
 
 struct mbuf *sctp_arethere_unrecognized_parameters(struct mbuf *, int, int *);
 void sctp_queue_op_err(struct sctp_tcb *, struct mbuf *);

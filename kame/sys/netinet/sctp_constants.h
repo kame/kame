@@ -1,4 +1,4 @@
-/*	$KAME: sctp_constants.h,v 1.7 2003/03/10 05:58:12 itojun Exp $	*/
+/*	$KAME: sctp_constants.h,v 1.8 2003/04/21 06:26:10 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_constants.h,v 1.61 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef __sctp_constants_h__
@@ -289,10 +289,11 @@
 #define SCTP_ADDR_SWITCH_PRIMARY	0x040
 #define SCTP_ADDR_OUT_OF_SCOPE		0x080
 #define SCTP_ADDR_DOUBLE_SWITCH		0x100
+#define SCTP_ADDR_UNCONFIRMED		0x200
 
 #define SCTP_ACTIVE     SCTP_ADDR_REACHABLE
 #define SCTP_INACTIVE   SCTP_ADDR_NOT_REACHABLE
-#define SCTP_REACHABLE_MASK             0x003
+#define SCTP_REACHABLE_MASK             0x203
 
 /* bound address types (e.g. valid address types to allow) */
 #define SCTP_BOUND_V6		0x01
