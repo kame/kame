@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.7 2003/06/19 18:33:34 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.8 2003/06/25 02:53:51 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1421,6 +1421,7 @@ mip6_calculate_kbm_from_index(hoa_sa, coa_sa, ho_nonce_idx, co_nonce_idx, ignore
 	int ignore_co_nonce;
 	u_int8_t *key_bm;	/* needs at least MIP6_KBM_LEN bytes */
 {
+	int stat = IP6MA_STATUS_ACCEPTED;
 	mip6_nonce_t home_nonce, careof_nonce;
 	mip6_nodekey_t home_nodekey, coa_nodekey;
 	mip6_home_token_t home_token;
@@ -1430,21 +1431,27 @@ mip6_calculate_kbm_from_index(hoa_sa, coa_sa, ho_nonce_idx, co_nonce_idx, ignore
 		mip6log((LOG_ERR,
 			 "%s:%d: Home Nonce cannot be acquired.\n",
 			 __FILE__, __LINE__));
-		return (IP6MA_STATUS_HOME_NONCE_EXPIRED);
+		stat =IP6MA_STATUS_HOME_NONCE_EXPIRED;
 	}
-	if (mip6_get_nonce(co_nonce_idx, &careof_nonce) != 0) {
+	if (!ignore_co_nonce && 
+	    mip6_get_nonce(co_nonce_idx, &careof_nonce) != 0) {
 		mip6log((LOG_ERR,
 			 "%s:%d: Care-of Nonce cannot be acquired.\n",
 			 __FILE__, __LINE__));
-		return (IP6MA_STATUS_CAREOF_NONCE_EXPIRED);
+		stat = (stat == IP6MA_STATUS_ACCEPTED) ? 
+			IP6MA_STATUS_CAREOF_NONCE_EXPIRED :
+			IP6MA_STATUS_NONCE_EXPIRED;
 	}
+	if (stat != IP6MA_STATUS_ACCEPTED)
+		return (stat);
 #ifdef RR_DBG
 	mip6_hexdump("CN: Home   Nonce: ", sizeof(home_nonce), &home_nonce);
 	mip6_hexdump("CN: Careof Nonce: ", sizeof(careof_nonce), &careof_nonce);
 #endif
 
 	if ((mip6_get_nodekey(ho_nonce_idx, &home_nodekey) != 0) ||
-	    (mip6_get_nodekey(co_nonce_idx, &coa_nodekey) != 0)) {
+	    (!ignore_co_nonce && 
+		(mip6_get_nodekey(co_nonce_idx, &coa_nodekey) != 0))) {
 		mip6log((LOG_ERR,
 			 "%s:%d: home or care-of node key cannot be acquired.\n",
 			 __FILE__, __LINE__));
