@@ -1012,6 +1012,13 @@ inet6name(in6p)
 	struct hostent *hp;
 	static char domain[MAXHOSTNAMELEN + 1];
 	static int first = 1;
+	struct sockaddr_in6 sin6;
+	char hbuf[NI_MAXHOST];
+#ifdef KAME_SCOPEID
+	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+	const int niflag = NI_NUMERICHOST;
+#endif
 
 	if (first && !nflag) {
 		first = 0;
@@ -1035,9 +1042,23 @@ inet6name(in6p)
 		strcpy(line, "*");
 	else if (cp)
 		strcpy(line, cp);
-	else 
-		sprintf(line, "%s",
-			inet_ntop(AF_INET6, (void *)in6p, ntop_buf,
-				sizeof(ntop_buf)));
+	else {
+		memset(&sin6, 0, sizeof(sin6));
+		sin6.sin6_len = sizeof(sin6);
+		sin6.sin6_family = AF_INET6;
+		sin6.sin6_addr = *in6p;
+#ifdef KAME_SCOPEID
+		if (IN6_IS_ADDR_LINKLOCAL(in6p)) {
+			sin6.sin6_scope_id =
+				ntohs(*(u_int16_t *)&in6p->s6_addr[2]);
+			sin6.sin6_addr.s6_addr[2] = 0;
+			sin6.sin6_addr.s6_addr[3] = 0;
+		}
+#endif
+		if (getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
+				hbuf, sizeof(hbuf), NULL, 0, niflag))
+			strcpy(hbuf, "?");
+		sprintf(line, "%s", hbuf);
+	}
 	return (line);
 }

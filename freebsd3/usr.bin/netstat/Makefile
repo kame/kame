@@ -10,7 +10,7 @@ BINGRP=	kmem
 BINMODE=2555
 DPADD=	${LIBKVM} ${LIBIPX}
 LDADD=	-lkvm -lipx
-CFLAGS+=	-DINET6 -DIPSEC
+CFLAGS+=	-DINET6 -DIPSEC -DKAME_SCOPEID
 LDADD+= -L${.OBJDIR}/../../lib/libinet6 \
         -L/usr/local/v6/lib -linet6
 DPADD+= ${.OBJDIR}/../../lib/libinet6/libinet6.a \
