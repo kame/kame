@@ -1,4 +1,4 @@
-.\"	$KAME: wru.8,v 1.2 2002/01/12 09:16:59 jinmei Exp $
+.\"	$KAME: wru.8,v 1.3 2002/01/21 07:38:48 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -49,7 +49,7 @@ client
 .Op Fl i Ar interval
 .Ek
 .Bk -words
-.Ar host
+.Op Ar host
 .Ek
 .Sh DESCRIPTION
 .Nm
@@ -58,6 +58,19 @@ uses the
 node information queries to collect information on a target
 .Ar host .
 Available information is the host's name and its IPv6 addresses.
+.Pp
+When
+.Ar host
+is omitted,
+.Nm
+sends the query packets to the all-nodes link-local address.
+In this case the link zone is determined as follows:
+If the default interface is set via the
+.Xr ndp 8
+command, the interface is used.
+Otherwise, if the IPv6 default route is installed in the kernel,
+the outgoing interface of the entry is used.
+.Pp
 Available options are as follows:
 .Bl -tag -width Ds
 .It Fl 1
@@ -124,6 +137,7 @@ and non-zero if the arguments are incorrect or the host is not responding.
 .Xr inet6 4 ,
 .Xr ip6 4 ,
 .Xr ping 8
+.Xr ndp 8
 .Rs
 .%A Matt Crawford
 .%T "IPv6 Node Information Queries"
