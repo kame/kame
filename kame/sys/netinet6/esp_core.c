@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.21 2000/08/27 12:11:37 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.22 2000/08/27 16:43:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -695,6 +695,7 @@ esp_blowfish_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	if (m->m_pkthdr.len < bodyoff)
 		panic("assumption failed: mbuf too short");
 	m_copyback(m, ivoff, ivlen, (caddr_t)sav->iv);
+	iv = sav->iv;
 
 	error = BF_cbc_encrypt_m(m, bodyoff, plen, (BF_KEY *)sav->sched, iv,
 	    BF_ENCRYPT);
@@ -858,6 +859,7 @@ esp_cast128cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	if (m->m_pkthdr.len < bodyoff)
 		panic("assumption failed: mbuf too short");
 	m_copyback(m, ivoff, ivlen, sav->iv);
+	iv = sav->iv;
 
 	/* encrypt */
 	error = cast128_cbc_process(m, bodyoff, plen, (u_int32_t *)sav->sched,
@@ -996,6 +998,7 @@ esp_3descbc_encrypt(m, off, plen, sav, algo, ivlen)
 	if (m->m_pkthdr.len < bodyoff)
 		panic("assumption failed: mbuf too short");
 	m_copyback(m, ivoff, ivlen, sav->iv);
+	iv = sav->iv;
 
 	/* encrypt packet */
 	des_3cbc_process(m, bodyoff, plen, (des_key_schedule *)sav->sched,
@@ -1142,6 +1145,7 @@ esp_rc5cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	if (m->m_pkthdr.len < bodyoff)
 		panic("assumption failed: mbuf too short");
 	m_copyback(m, ivoff, ivlen, sav->iv);
+	iv = sav->iv;
 
 	/* encrypt */
 	error = rc5_cbc_process(m, bodyoff, plen, (RC5_WORD *)sav->sched, iv,
