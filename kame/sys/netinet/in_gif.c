@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.68 2001/08/16 16:26:27 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.69 2001/08/30 05:46:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -313,7 +313,11 @@ in_gif_output(ifp, family, m)
 	}
 
 	if (sc->gif_ro.ro_rt == NULL) {
+#ifdef __bsdi__
+		rtcalloc(&sc->gif_ro);
+#else
 		rtalloc(&sc->gif_ro);
+#endif
 		if (sc->gif_ro.ro_rt == NULL) {
 			m_freem(m);
 			return ENETUNREACH;

@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.66 2001/08/22 10:58:46 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.67 2001/08/30 05:46:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -323,7 +323,11 @@ in6_gif_output(ifp, family, m)
 	}
 
 	if (sc->gif_ro6.ro_rt == NULL) {
+#ifdef __bsdi__
+		rtcalloc((struct route *)&sc->gif_ro6);
+#else
 		rtalloc((struct route *)&sc->gif_ro6);
+#endif
 		if (sc->gif_ro6.ro_rt == NULL) {
 			m_freem(m);
 			return ENETUNREACH;
