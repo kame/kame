@@ -1,11 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1324 2000/10/07 12:14:17 itojun Exp $
+$KAME: CHANGELOG,v 1.1325 2000/10/07 13:08:21 itojun Exp $
 
 <200010>
 Sat Oct  7 16:01:12 JST 2000  itojun@iijlab.net
 	* ping6, traceroute, traceroute6, mtrace6, icmp6dump: plug fd_set hole.
 	  see openbsd select(2).  from deraadt@openbsd.
+	* traceroute: repair savestr() hole.
 
 Thu Oct  5 12:31:12 JST 2000  itojun@iijlab.net
 	* sys/netkey/key.c: get rid of all uses of random() in IPsec code,
