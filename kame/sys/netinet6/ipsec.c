@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.200 2003/09/06 05:15:43 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.201 2003/09/06 21:11:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2649,7 +2649,7 @@ ipsec_updatereplay(seq, sav)
 	}
 
 ok:
-	if (replay->count == ~0) {
+	if (replay->count == 0xffffffff) {
 
 		/* set overflow flag */
 		replay->overflow++;
