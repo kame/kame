@@ -130,6 +130,7 @@ static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
 	/* remote */
 %token REMOTE ANONYMOUS
 %token EXCHANGE_MODE EXCHANGETYPE DOI DOITYPE SITUATION SITUATIONTYPE
+%token CERTIFICATE_TYPE CERTTYPE
 %token NONCE_SIZE DH_GROUP KEEPALIVE
 %token POST_COMMAND
 %token EXEC_PATH EXEC_COMMAND EXEC_SUCCESS EXEC_FAILURE
@@ -152,7 +153,7 @@ static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
 %type <num> ul_proto UL_PROTO secproto
 %type <num> LIFETYPE UNITTYPE
 %type <num> SECLEVELTYPE SECMODETYPE 
-%type <num> EXCHANGETYPE DOITYPE SITUATIONTYPE
+%type <num> EXCHANGETYPE DOITYPE SITUATIONTYPE CERTTYPE
 %type <val> QUOTEDSTRING HEXSTRING ADDRSTRING
 %type <res> ike_addrinfo_port
 %type <spidx> policy_index
@@ -704,6 +705,7 @@ remote_spec
 	:	EXCHANGE_MODE exchange_types EOS
 	|	DOI DOITYPE EOS { cur_rmconf->doitype = $2; }
 	|	SITUATION SITUATIONTYPE EOS { cur_rmconf->sittype = $2; }
+	|	CERTIFICATE_TYPE CERTTYPE EOS { cur_rmconf->certtype = $2; }
 	|	IDENTIFIER IDENTIFIERTYPE EOS
 		{
 			cur_rmconf->identtype = idtype2doi($2);

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.h,v 1.3 2000/01/12 04:24:29 sakane Exp $ */
+/* YIPS @(#)$Id: remoteconf.h,v 1.4 2000/01/18 21:41:52 sakane Exp $ */
 
 /* remote configuration */
 
@@ -47,6 +47,7 @@ struct remoteconf {
 	int doitype;			/* doi type */
 	int sittype;			/* situation type */
 	int identtype;			/* identifier type */
+	int certtype;			/* certificate type if need */
 	int nonce_size;			/* the number of bytes of nonce */
 	int keepalive;			/* XXX may not use */
 	int dh_group;			/* use it when only aggressive mode */

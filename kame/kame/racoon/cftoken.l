@@ -241,6 +241,10 @@ octetstring	{octet}({dot}{octet})+
 <S_RMTS>secrecy		{ YYD; yylval.num = IPSECDOI_SIT_SECRECY; return(SITUATIONTYPE); }
 <S_RMTS>integrity	{ YYD; yylval.num = IPSECDOI_SIT_INTEGRITY; return(SITUATIONTYPE); }
 <S_RMTS>identifier	{ YYD; return(IDENTIFIER); }
+<S_RMTS>certificate_type	{ YYD; return(CERTIFICATE_TYPE); }
+<S_RMTS>pkcs7		{ YYD; yylval.num = ISAKMP_CERT_PKCS7; return(CERTTYPE); }
+<S_RMTS>pgp		{ YYD; yylval.num = ISAKMP_CERT_PGP; return(CERTTYPE); }
+<S_RMTS>x509		{ YYD; yylval.num = ISAKMP_CERT_X509SIGN; return(CERTTYPE); }
 <S_RMTS>dh_group	{ YYD; return(DH_GROUP); }
 <S_RMTS>nonce_size	{ YYD; return(NONCE_SIZE); }
 <S_RMTS>keepalive	{ YYD; return(KEEPALIVE); }
@@ -347,8 +351,6 @@ rsarev		{ YYD; yylval.num = algtype_rsarev;	return(ALGORITHMTYPE); }
 vendor_id	{ YYD; return(VENDORID); }
 user_fqdn	{ YYD; yylval.num = LC_IDENTTYPE_USERFQDN; return(IDENTIFIERTYPE); }
 fqdn		{ YYD; yylval.num = LC_IDENTTYPE_FQDN; return(IDENTIFIERTYPE); }
-cert		{ YYD; yylval.num = LC_IDENTTYPE_CERT; return(IDENTIFIERTYPE); }
-secret		{ YYD; yylval.num = LC_IDENTTYPE_SECRET; return(IDENTIFIERTYPE); }
 keyid		{ YYD; yylval.num = LC_IDENTTYPE_KEYID; return(IDENTIFIERTYPE); }
 address		{ YYD; yylval.num = LC_IDENTTYPE_ADDRESS; return(IDENTIFIERTYPE); }
 	/* units */

@@ -1,4 +1,4 @@
-# $Id: basic.conf.in,v 1.5 2000/01/18 05:05:25 sakane Exp $
+# $Id: basic.conf.in,v 1.6 2000/01/18 21:41:53 sakane Exp $
 
 # search this file for pre_shared_key with various ID key.
 path pre_shared_key "@sysconfdir_x@/racoon/psk.txt" ;
@@ -11,8 +11,6 @@ path certificate "@sysconfdir_x@/cert" ;
 identifier vendor_id "KAME/racoon";
 #identifier user_fqdn "sakane@kame.net";
 #identifier fqdn "mine.kame.net";
-identifier cert "@sysconfdir_x@/racoon/cert.pem";
-identifier secret "@sysconfdir_x@/racoon/secret.pem";
 identifier keyid "@sysconfdir_x@/racoon/keyid.txt";
 
 # "log" specifies logging level.  It is followed by either "info", "notify",
