@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.79 2002/07/23 08:11:37 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.80 2002/07/23 08:49:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -583,6 +583,7 @@ stf_output(ifp, m, dst, rt)
 	/* just in case */
 	if ((ifp->if_flags & IFF_UP) == 0) {
 		m_freem(m);
+		ifp->if_oerrors++;
 		return ENETDOWN;
 	}
 
@@ -594,13 +595,16 @@ stf_output(ifp, m, dst, rt)
 	ia6 = stf_getsrcifa6(ifp);
 	if (ia6 == NULL) {
 		m_freem(m);
+		ifp->if_oerrors++;
 		return ENETDOWN;
 	}
 
 	if (m->m_len < sizeof(*ip6)) {
 		m = m_pullup(m, sizeof(*ip6));
-		if (!m)
+		if (!m) {
+			ifp->if_oerrors++;
 			return ENOBUFS;
+		}
 	}
 	ip6 = mtod(m, struct ip6_hdr *);
 
@@ -614,6 +618,7 @@ stf_output(ifp, m, dst, rt)
 		in4 = GET_V4(&dst6->sin6_addr);
 	else {
 		m_freem(m);
+		ifp->if_oerrors++;
 		return ENETUNREACH;
 	}
 
@@ -656,10 +661,13 @@ stf_output(ifp, m, dst, rt)
 	/* encapsulate into IPv4 packet */
 	mp = NULL;
 	error = ipip_output(m, &tdb, &mp, hlen, poff);
-	if (error)
+	if (error) {
+		ifp->if_oerrors++;
 		return error;
-	else if (mp == NULL)
+	} else if (mp == NULL) {
+		ifp->if_oerrors++;
 		return EFAULT;
+	}
 
 	m = mp;
 
@@ -688,6 +696,7 @@ stf_output(ifp, m, dst, rt)
 	/* just in case */
 	if ((ifp->if_flags & IFF_UP) == 0) {
 		m_freem(m);
+		ifp->if_oerrors++;
 		return ENETDOWN;
 	}
 
@@ -699,13 +708,16 @@ stf_output(ifp, m, dst, rt)
 	ia6 = stf_getsrcifa6(ifp);
 	if (ia6 == NULL) {
 		m_freem(m);
+		ifp->if_oerrors++;
 		return ENETDOWN;
 	}
 
 	if (m->m_len < sizeof(*ip6)) {
 		m = m_pullup(m, sizeof(*ip6));
-		if (!m)
+		if (!m) {
+			ifp->if_oerrors++;
 			return ENOBUFS;
+		}
 	}
 	ip6 = mtod(m, struct ip6_hdr *);
 	tos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
@@ -720,6 +732,7 @@ stf_output(ifp, m, dst, rt)
 		in4 = GET_V4(&dst6->sin6_addr);
 	else {
 		m_freem(m);
+		ifp->if_oerrors++;
 		return ENETUNREACH;
 	}
 
@@ -750,8 +763,10 @@ stf_output(ifp, m, dst, rt)
 	M_PREPEND(m, sizeof(struct ip), M_DONTWAIT);
 	if (m && m->m_len < sizeof(struct ip))
 		m = m_pullup(m, sizeof(struct ip));
-	if (m == NULL)
+	if (m == NULL) {
+		ifp->if_oerrors++;
 		return ENOBUFS;
+	}
 	ip = mtod(m, struct ip *);
 
 	bzero(ip, sizeof(*ip));
@@ -784,6 +799,7 @@ stf_output(ifp, m, dst, rt)
 		rtalloc(&sc->sc_ro);
 		if (sc->sc_ro.ro_rt == NULL) {
 			m_freem(m);
+			ifp->if_oerrors++;
 			return ENETUNREACH;
 		}
 	}
