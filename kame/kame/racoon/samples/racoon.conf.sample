@@ -1,4 +1,4 @@
-# $KAME: racoon.conf.sample,v 1.6 2000/04/26 21:03:59 sakane Exp $
+# $KAME: racoon.conf.sample,v 1.7 2000/06/01 02:46:19 sakane Exp $
 
 # "path" must be placed before it should be used.
 # You can overwrite which you defined, but it should not use due to confusing.
@@ -27,7 +27,7 @@ remote anonymous
 
 	#identifier address;
 	identifier user_fqdn;
-	#certificate_type x509;
+	#certificate_type x509 "foo@kame.net.cert" "foo@kame.net.priv" ;
 
 	lifetime time 24 hour ;	# sec,min,hour
 	lifetime byte 100 MB ;	# B,KB,GB
