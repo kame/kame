@@ -1,4 +1,4 @@
-/*	$KAME: remoteconf.c,v 1.26 2001/09/26 05:30:35 sakane Exp $	*/
+/*	$KAME: remoteconf.c,v 1.27 2001/10/02 03:43:16 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -71,7 +71,7 @@ static LIST_HEAD(_rmtree, remoteconf) rmtree;
 /*%%%*/
 /*
  * search remote configuration.
- * don't use port number to search if its value is either ~0.
+ * don't use port number to search if its value is either IPSEC_PORT_ANY.
  * If matching anonymous entry, then new entry is copied from anonymous entry.
  * If no anonymous entry found, then return NULL.
  * OUT:	NULL:	NG
