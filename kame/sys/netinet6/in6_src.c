@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.26 2000/06/18 06:31:40 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.26.2.1 2000/06/21 08:13:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -726,8 +726,15 @@ in6_recoverscope(sin6, in6, ifp)
 			/* sanity check */
 			if (scopeid < 0 || if_index < scopeid)
 				return ENXIO;
+#ifndef FAKE_LOOPBACK_IF
+			if (ifp && (ifp->if_flags & IFF_LOOPBACK) == 0 &&
+			    ifp->if_index != scopeid) {
+				return ENXIO;
+			}
+#else
 			if (ifp && ifp->if_index != scopeid)
 				return ENXIO;
+#endif
 			sin6->sin6_addr.s6_addr16[1] = 0;
 			sin6->sin6_scope_id = scopeid;
 		}
