@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.23 2000/06/08 08:35:25 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.24 2000/06/11 14:31:38 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -68,8 +68,6 @@
 #include "isakmp_base.h"
 #include "isakmp_inf.h"
 #include "vendorid.h"
-
-static vchar_t *base_ir2sendmx __P((struct ph1handle *));
 
 /* %%%
  * begin Identity Protection Mode as initiator.
@@ -169,7 +167,7 @@ end:
 /*
  * receive from responder
  * 	psk: HDR, SA, Idir, Nr_b
- * 	sig: HDR, SA, Idir, Nr_b
+ * 	sig: HDR, SA, Idir, Nr_b, [ CR ]
  * 	rsa: HDR, SA, <IDir_b>PubKey_i, <Nr_b>PubKey_i
  * 	rev: HDR, SA, <Nr_b>PubKey_i, <IDir_b>Ke_r
  */
@@ -283,7 +281,7 @@ end:
 /*
  * send to responder
  * 	psk: HDR, KE, HASH_I
- * 	sig: HDR, KE, [CERT,] SIG_I
+ * 	sig: HDR, KE, [ CR, ] [CERT,] SIG_I
  * 	rsa: HDR, KE, HASH_I
  * 	rev: HDR, <KE>Ke_i, HASH_I
  */
@@ -292,6 +290,9 @@ base_i2send(iph1, msg)
 	struct ph1handle *iph1;
 	vchar_t *msg;
 {
+	struct isakmp_gen *gen;
+	caddr_t p;
+	int tlen;
 	int error = -1;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
@@ -326,8 +327,91 @@ base_i2send(iph1, msg)
 		goto end;
 
 	/* create buffer to send isakmp payload */
-	iph1->sendbuf = base_ir2sendmx(iph1);
-	if (iph1->sendbuf == NULL)
+	tlen = sizeof(struct isakmp);
+
+	switch (iph1->approval->authmethod) {
+	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
+		tlen += sizeof(*gen) + iph1->dhpub->l
+			+ sizeof(*gen) + iph1->hash->l;
+		if (lcconf->vendorid) {
+			tlen += sizeof(*gen) + lcconf->vendorid->l;
+		}
+
+		iph1->sendbuf = vmalloc(tlen);
+		if (iph1->sendbuf == NULL) {
+			plog(logp, LOCATION, NULL,
+				"failed to get buffer to send.\n");
+			goto end;
+		}
+
+		/* set isakmp header */
+		p = set_isakmp_header(iph1->sendbuf, iph1, ISAKMP_NPTYPE_KE);
+		if (p == NULL)
+			goto end;
+
+		/* create isakmp KE payload */
+		p = set_isakmp_payload(p, iph1->dhpub, ISAKMP_NPTYPE_HASH);
+
+		/* create isakmp HASH payload */
+		p = set_isakmp_payload(p, iph1->hash,
+			lcconf->vendorid ? ISAKMP_NPTYPE_VID : ISAKMP_NPTYPE_NONE);
+
+		/* append vendor id, if needed */
+		if (lcconf->vendorid)
+			p = set_isakmp_payload(p, lcconf->vendorid, ISAKMP_NPTYPE_NONE);
+		break;
+#ifdef HAVE_SIGNING_C
+	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
+	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
+		/* XXX if there is CR or not ? */
+
+		if (oakley_getmycert(iph1) < 0)
+			goto end;
+
+		if (oakley_getsign(iph1) < 0)
+			goto end;
+
+		tlen += sizeof(*gen) + iph1->dhpub->l
+			+ sizeof(*gen) + iph1->sig->l;
+		if (iph1->cert != NULL)
+			tlen += sizeof(*gen) + iph1->cert->l;
+
+		iph1->sendbuf = vmalloc(tlen);
+		if (iph1->sendbuf == NULL) {
+			plog(logp, LOCATION, NULL,
+				"failed to get buffer to send.\n");
+			goto end;
+		}
+
+		/* set isakmp header */
+		p = set_isakmp_header(iph1->sendbuf, iph1, ISAKMP_NPTYPE_KE);
+		if (p == NULL)
+			goto end;
+
+		/* create isakmp KE payload */
+		p = set_isakmp_payload(p, iph1->dhpub, iph1->cert != NULL
+							? ISAKMP_NPTYPE_CERT
+							: ISAKMP_NPTYPE_SIG);
+
+		/* add CERT payload if there */
+		if (iph1->cert != NULL)
+			p = set_isakmp_payload(p, iph1->cert, ISAKMP_NPTYPE_SIG);
+		/* add SIG payload */
+		p = set_isakmp_payload(p, iph1->sig, ISAKMP_NPTYPE_NONE);
+		break;
+#endif
+	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
+	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
+		tlen += sizeof(*gen) + iph1->hash->l;
+		break;
+	}
+
+#ifdef HAVE_PRINT_ISAKMP_C
+	isakmp_printpacket(iph1->sendbuf, iph1->local, iph1->remote, 0);
+#endif
+
+	/* send HDR;KE;NONCE to responder */
+	if (isakmp_send(iph1, iph1->sendbuf) < 0)
 		goto end;
 
 	iph1->status = PHASE1ST_MSG2SENT;
@@ -588,7 +672,7 @@ end:
 /*
  * send to initiator
  * 	psk: HDR, SA, Idir, Nr_b
- * 	sig: HDR, SA, Idir, Nr_b
+ * 	sig: HDR, SA, Idir, Nr_b, [ CR ]
  * 	rsa: HDR, SA, <IDir_b>PubKey_i, <Nr_b>PubKey_i
  * 	rev: HDR, SA, <Nr_b>PubKey_i, <IDir_b>Ke_r
  */
@@ -678,7 +762,7 @@ end:
 /*
  * receive from initiator
  * 	psk: HDR, KE, HASH_I
- * 	sig: HDR, KE, [CERT,] SIG_I
+ * 	sig: HDR, KE, [ CR, ] [CERT,] SIG_I
  * 	rsa: HDR, KE, HASH_I
  * 	rev: HDR, <KE>Ke_i, HASH_I
  */
@@ -802,6 +886,9 @@ base_r2send(iph1, msg)
 	struct ph1handle *iph1;
 	vchar_t *msg;
 {
+	struct isakmp_gen *gen;
+	char *p;
+	int tlen;
 	int error = -1;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
@@ -835,53 +922,6 @@ base_r2send(iph1, msg)
 		goto end;
 
 	/* create HDR;KE;NONCE payload */
-	iph1->sendbuf = base_ir2sendmx(iph1);
-	if (iph1->sendbuf == NULL)
-		goto end;
-
-	/* generate SKEYIDs & IV & final cipher key */
-	if (oakley_skeyid_dae(iph1) < 0)
-		goto end;
-	if (oakley_compute_enckey(iph1) < 0)
-		goto end;
-	if (oakley_newiv(iph1) < 0)
-		goto end;
-
-	iph1->status = PHASE1ST_ESTABLISHED;
-
-	iph1->retry_counter = iph1->rmconf->retry_counter;
-	iph1->scr = sched_new(iph1->rmconf->retry_interval,
-			isakmp_ph1resend, iph1);
-
-	log_ph1established(iph1);
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "===\n"));
-
-	error = 0;
-
-end:
-	return error;
-}
-
-/*
- * create KE, NONCE payload with isakmp header.
- * This is used in main mode for:
- *	initiator's 2nd exchange
- *	responders 3rd exchnage
- *	psk: HDR, KE, HASH_I
- *	sig: HDR, KE, [CERT,] SIG_I
- *	rsa: HDR, KE, HASH_I
- *	rev: HDR, <KE>Ke_i, HASH_I
- */
-static vchar_t *
-base_ir2sendmx(iph1)
-	struct ph1handle *iph1;
-{
-	vchar_t *buf = 0;
-	struct isakmp_gen *gen;
-	char *p;
-	int tlen;
-	int error = -1;
-
 	tlen = sizeof(struct isakmp);
 
 	switch (iph1->approval->authmethod) {
@@ -892,15 +932,15 @@ base_ir2sendmx(iph1)
 			tlen += sizeof(*gen) + lcconf->vendorid->l;
 		}
 
-		buf = vmalloc(tlen);
-		if (buf == NULL) {
+		iph1->sendbuf = vmalloc(tlen);
+		if (iph1->sendbuf == NULL) {
 			plog(logp, LOCATION, NULL,
-				"failed to get buffer to send.\n");
+				"failed to get iph1->sendbuf to send.\n");
 			goto end;
 		}
 
 		/* set isakmp header */
-		p = set_isakmp_header(buf, iph1, ISAKMP_NPTYPE_KE);
+		p = set_isakmp_header(iph1->sendbuf, iph1, ISAKMP_NPTYPE_KE);
 		if (p == NULL)
 			goto end;
 
@@ -931,15 +971,15 @@ base_ir2sendmx(iph1)
 		if (iph1->cert != NULL)
 			tlen += sizeof(*gen) + iph1->cert->l;
 
-		buf = vmalloc(tlen);
-		if (buf == NULL) {
+		iph1->sendbuf = vmalloc(tlen);
+		if (iph1->sendbuf == NULL) {
 			plog(logp, LOCATION, NULL,
 				"failed to get buffer to send.\n");
 			goto end;
 		}
 
 		/* set isakmp header */
-		p = set_isakmp_header(buf, iph1, ISAKMP_NPTYPE_KE);
+		p = set_isakmp_header(iph1->sendbuf, iph1, ISAKMP_NPTYPE_KE);
 		if (p == NULL)
 			goto end;
 
@@ -962,21 +1002,33 @@ base_ir2sendmx(iph1)
 	}
 
 #ifdef HAVE_PRINT_ISAKMP_C
-	isakmp_printpacket(buf, iph1->local, iph1->remote, 0);
+	isakmp_printpacket(iph1->sendbuf, iph1->local, iph1->remote, 0);
 #endif
 
 	/* send HDR;KE;NONCE to responder */
-	if (isakmp_send(iph1, buf) < 0)
+	if (isakmp_send(iph1, iph1->sendbuf) < 0)
 		goto end;
+
+	/* generate SKEYIDs & IV & final cipher key */
+	if (oakley_skeyid_dae(iph1) < 0)
+		goto end;
+	if (oakley_compute_enckey(iph1) < 0)
+		goto end;
+	if (oakley_newiv(iph1) < 0)
+		goto end;
+
+	iph1->status = PHASE1ST_ESTABLISHED;
+
+	iph1->retry_counter = iph1->rmconf->retry_counter;
+	iph1->scr = sched_new(iph1->rmconf->retry_interval,
+			isakmp_ph1resend, iph1);
+
+	log_ph1established(iph1);
+	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "===\n"));
 
 	error = 0;
 
 end:
-	if (error && buf != NULL) {
-		vfree(buf);
-		buf = NULL;
-	}
-
-	return buf;
+	return error;
 }
 
