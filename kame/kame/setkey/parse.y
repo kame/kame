@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.40 2001/08/16 10:02:20 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.41 2001/08/16 10:24:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -71,18 +71,16 @@ char *p_policy;
 /* temporary buffer */
 static caddr_t pp_key;
 
-extern u_char m_buf[BUFSIZ];
-extern int m_len;
 extern char cmdarg[8192];
 extern int f_debug;
 
 static struct addrinfo *parse_addr __P((char *, char *));
-static int setvarbuf __P((int *, struct sadb_ext *, int, caddr_t, int));
+static int setvarbuf __P((char *, int *, struct sadb_ext *, int, caddr_t, int));
 void parse_init __P((void));
 void free_buffer __P((void));
 
-extern int setkeymsg __P((void));
-extern int sendkeymsg __P((void));
+extern int setkeymsg __P((char *, size_t *));
+extern int sendkeymsg __P((char *, size_t));
 
 extern int yylex __P((void));
 extern void yyfatal __P((const char *));
@@ -125,11 +123,18 @@ commands
 	:	/*NOTHING*/
 	|	commands command
 		{
-			if (f_debug) {
+			char buf[BUFSIZ];
+			size_t len;
+
+			if (f_debug)
 				printf("cmdarg:\n%s\n", cmdarg);
-			} else {
-				setkeymsg();
-				sendkeymsg();
+			else {
+				len = sizeof(buf);
+				if (setkeymsg(buf, &len) < 0) {
+					yyerror("insufficient buffer size");
+					return -1;
+				}
+				sendkeymsg(buf, len);
 			}
 			free_buffer();
 			parse_init();
@@ -597,20 +602,23 @@ policy_requests
 %%
 
 int
-setkeymsg()
+setkeymsg(buf, lenp)
+	char *buf;
+	size_t *lenp;
 {
-	struct sadb_msg m_msg;
+	struct sadb_msg *msg;
+	int l;
 
-	m_msg.sadb_msg_version = PF_KEY_V2;
-	m_msg.sadb_msg_type = p_type;
-	m_msg.sadb_msg_errno = 0;
-	m_msg.sadb_msg_satype = p_satype;
-	m_msg.sadb_msg_reserved = 0;
-	m_msg.sadb_msg_seq = 0;
-	m_msg.sadb_msg_pid = getpid();
+	msg = (struct sadb_msg *)buf;
+	msg->sadb_msg_version = PF_KEY_V2;
+	msg->sadb_msg_type = p_type;
+	msg->sadb_msg_errno = 0;
+	msg->sadb_msg_satype = p_satype;
+	msg->sadb_msg_reserved = 0;
+	msg->sadb_msg_seq = 0;
+	msg->sadb_msg_pid = getpid();
 
-	m_len = sizeof(struct sadb_msg);
-	memcpy(m_buf, &m_msg, m_len);
+	l = sizeof(struct sadb_msg);
 
 	switch (p_type) {
 	case SADB_FLUSH:
@@ -629,7 +637,7 @@ setkeymsg()
 			m_key.sadb_key_bits = p_key_enc_len * 8;
 			m_key.sadb_key_reserved = 0;
 
-			setvarbuf(&m_len,
+			setvarbuf(buf, &l,
 				(struct sadb_ext *)&m_key, sizeof(m_key),
 				(caddr_t)p_key_enc, p_key_enc_len);
 		}
@@ -645,7 +653,7 @@ setkeymsg()
 			m_key.sadb_key_bits = p_key_auth_len * 8;
 			m_key.sadb_key_reserved = 0;
 
-			setvarbuf(&m_len,
+			setvarbuf(buf, &l,
 				(struct sadb_ext *)&m_key, sizeof(m_key),
 				(caddr_t)p_key_auth, p_key_auth_len);
 		}
@@ -662,8 +670,8 @@ setkeymsg()
 			m_lt.sadb_lifetime_addtime = p_lt_hard;
 			m_lt.sadb_lifetime_usetime = 0;
 
-			memcpy(m_buf + m_len, &m_lt, len);
-			m_len += len;
+			memcpy(buf + l, &m_lt, len);
+			l += len;
 		}
 
 		/* set lifetime for SOFT */
@@ -678,8 +686,8 @@ setkeymsg()
 			m_lt.sadb_lifetime_addtime = p_lt_soft;
 			m_lt.sadb_lifetime_usetime = 0;
 
-			memcpy(m_buf + m_len, &m_lt, len);
-			m_len += len;
+			memcpy(buf + l, &m_lt, len);
+			l += len;
 		}
 		/* FALLTHROUGH */
 
@@ -702,8 +710,8 @@ setkeymsg()
 			m_sa.sadb_sa_encrypt = p_alg_enc;
 			m_sa.sadb_sa_flags = p_ext;
 
-			memcpy(m_buf + m_len, &m_sa, len);
-			m_len += len;
+			memcpy(buf + l, &m_sa, len);
+			l += len;
 
 			len = sizeof(struct sadb_x_sa2);
 			m_sa2.sadb_x_sa2_len = PFKEY_UNIT64(len);
@@ -711,8 +719,8 @@ setkeymsg()
 			m_sa2.sadb_x_sa2_mode = p_mode;
 			m_sa2.sadb_x_sa2_reqid = p_reqid;
 
-			memcpy(m_buf + m_len, &m_sa2, len);
-			m_len += len;
+			memcpy(buf + l, &m_sa2, len);
+			l += len;
 		}
 
 		/* set src */
@@ -738,7 +746,7 @@ setkeymsg()
 		}
 		m_addr.sadb_address_reserved = 0;
 
-		setvarbuf(&m_len,
+		setvarbuf(buf, &l,
 			(struct sadb_ext *)&m_addr, sizeof(m_addr),
 			(caddr_t)p_src, p_src->sa_len);
 
@@ -765,7 +773,7 @@ setkeymsg()
 		}
 		m_addr.sadb_address_reserved = 0;
 
-		setvarbuf(&m_len,
+		setvarbuf(buf, &l,
 			(struct sadb_ext *)&m_addr, sizeof(m_addr),
 			(caddr_t)p_dst, p_dst->sa_len);
 	    }
@@ -782,8 +790,8 @@ setkeymsg()
 		struct sadb_address m_addr;
 		u_int8_t plen;
 
-		memcpy(m_buf + m_len, p_policy, p_policy_len);
-		m_len += p_policy_len;
+		memcpy(buf + l, p_policy, p_policy_len);
+		l += p_policy_len;
 		free(p_policy);
 		p_policy = NULL;
 
@@ -810,7 +818,7 @@ setkeymsg()
 		    (p_prefs != ~0 ? p_prefs : plen);
 		m_addr.sadb_address_reserved = 0;
 
-		setvarbuf(&m_len,
+		setvarbuf(buf, &l,
 			(struct sadb_ext *)&m_addr, sizeof(m_addr),
 			(caddr_t)p_src, p_src->sa_len);
 
@@ -837,14 +845,16 @@ setkeymsg()
 		    (p_prefd != ~0 ? p_prefd : plen);
 		m_addr.sadb_address_reserved = 0;
 
-		setvarbuf(&m_len,
+		setvarbuf(buf, &l,
 			(struct sadb_ext *)&m_addr, sizeof(m_addr),
 			(caddr_t)p_dst, p_dst->sa_len);
 	    }
 		break;
 	}
 
-	((struct sadb_msg *)m_buf)->sadb_msg_len = PFKEY_UNIT64(m_len);
+	((struct sadb_msg *)buf)->sadb_msg_len = PFKEY_UNIT64(l);
+
+	*lenp = l;
 
 	return 0;
 }
@@ -875,14 +885,17 @@ parse_addr(host, port)
 }
 
 static int
-setvarbuf(off, ebuf, elen, vbuf, vlen)
-	caddr_t vbuf;
+setvarbuf(buf, off, ebuf, elen, vbuf, vlen)
+	char *buf;
+	int *off;
 	struct sadb_ext *ebuf;
-	int *off, elen, vlen;
+	int elen;
+	caddr_t vbuf;
+	int vlen;
 {
-	memset(m_buf + *off, 0, PFKEY_UNUNIT64(ebuf->sadb_ext_len));
-	memcpy(m_buf + *off, (caddr_t)ebuf, elen);
-	memcpy(m_buf + *off + elen, vbuf, vlen);
+	memset(buf + *off, 0, PFKEY_UNUNIT64(ebuf->sadb_ext_len));
+	memcpy(buf + *off, (caddr_t)ebuf, elen);
+	memcpy(buf + *off + elen, vbuf, vlen);
 	(*off) += PFKEY_ALIGN8(elen + vlen);
 
 	return 0;

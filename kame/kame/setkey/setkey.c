@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.19 2001/08/12 10:29:46 itojun Exp $	*/
+/*	$KAME: setkey.c,v 1.20 2001/08/16 10:24:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -57,7 +57,7 @@ int main __P((int, char **));
 int get_supported __P((void));
 void sendkeyshort __P((u_int));
 void promisc __P((void));
-int sendkeymsg __P((void));
+int sendkeymsg __P((char *, size_t));
 int postproc __P((struct sadb_msg *, int));
 const char *numstr __P((int));
 void shortdump_hdr __P((void));
@@ -219,20 +219,22 @@ void
 sendkeyshort(type)
         u_int type;
 {
-	struct sadb_msg *m_msg = (struct sadb_msg *)m_buf;
+	char buf[BUFSIZ];
+	struct sadb_msg *msg = (struct sadb_msg *)buf;
+	size_t len;
 
-	m_len = sizeof(struct sadb_msg);
+	len = sizeof(struct sadb_msg);
 
-	m_msg->sadb_msg_version = PF_KEY_V2;
-	m_msg->sadb_msg_type = type;
-	m_msg->sadb_msg_errno = 0;
-	m_msg->sadb_msg_satype = SADB_SATYPE_UNSPEC;
-	m_msg->sadb_msg_len = PFKEY_UNIT64(m_len);
-	m_msg->sadb_msg_reserved = 0;
-	m_msg->sadb_msg_seq = 0;
-	m_msg->sadb_msg_pid = getpid();
+	msg->sadb_msg_version = PF_KEY_V2;
+	msg->sadb_msg_type = type;
+	msg->sadb_msg_errno = 0;
+	msg->sadb_msg_satype = SADB_SATYPE_UNSPEC;
+	msg->sadb_msg_len = PFKEY_UNIT64(m_len);
+	msg->sadb_msg_reserved = 0;
+	msg->sadb_msg_seq = 0;
+	msg->sadb_msg_pid = getpid();
 
-	sendkeymsg();
+	sendkeymsg(buf, len);
 
 	return;
 }
@@ -240,27 +242,30 @@ sendkeyshort(type)
 void
 promisc()
 {
-	struct sadb_msg *m_msg = (struct sadb_msg *)m_buf;
+	char buf[BUFSIZ];
+	size_t len;
+	struct sadb_msg *msg = (struct sadb_msg *)buf;
 	u_char rbuf[1024 * 32];	/* XXX: Enough ? Should I do MSG_PEEK ? */
-	int so, len;
+	int so;
+	ssize_t l;
 
-	m_len = sizeof(struct sadb_msg);
+	len = sizeof(struct sadb_msg);
 
-	m_msg->sadb_msg_version = PF_KEY_V2;
-	m_msg->sadb_msg_type = SADB_X_PROMISC;
-	m_msg->sadb_msg_errno = 0;
-	m_msg->sadb_msg_satype = 1;
-	m_msg->sadb_msg_len = PFKEY_UNIT64(m_len);
-	m_msg->sadb_msg_reserved = 0;
-	m_msg->sadb_msg_seq = 0;
-	m_msg->sadb_msg_pid = getpid();
+	msg->sadb_msg_version = PF_KEY_V2;
+	msg->sadb_msg_type = SADB_X_PROMISC;
+	msg->sadb_msg_errno = 0;
+	msg->sadb_msg_satype = 1;
+	msg->sadb_msg_len = PFKEY_UNIT64(len);
+	msg->sadb_msg_reserved = 0;
+	msg->sadb_msg_seq = 0;
+	msg->sadb_msg_pid = getpid();
 
 	if ((so = socket(PF_KEY, SOCK_RAW, PF_KEY_V2)) < 0) {
 		err(1, "socket(PF_KEY)");
 		/*NOTREACHED*/
 	}
 
-	if ((len = send(so, m_buf, m_len, 0)) < 0) {
+	if ((l = send(so, buf, len, 0)) < 0) {
 		err(1, "send");
 		/*NOTREACHED*/
 	}
@@ -268,16 +273,16 @@ promisc()
 	while (1) {
 		struct sadb_msg *base;
 
-		if ((len = recv(so, rbuf, sizeof(*base), MSG_PEEK)) < 0) {
+		if ((l = recv(so, rbuf, sizeof(*base), MSG_PEEK)) < 0) {
 			err(1, "recv");
 			/*NOTREACHED*/
 		}
 
-		if (len != sizeof(*base))
+		if (l != sizeof(*base))
 			continue;
 
 		base = (struct sadb_msg *)rbuf;
-		if ((len = recv(so, rbuf, PFKEY_UNUNIT64(base->sadb_msg_len),
+		if ((l = recv(so, rbuf, PFKEY_UNUNIT64(base->sadb_msg_len),
 				0)) < 0) {
 			err(1, "recv");
 			/*NOTREACHED*/
@@ -285,19 +290,19 @@ promisc()
 		printdate();
 		if (f_hexdump) {
 			int i;
-			for (i = 0; i < len; i++) {
+			for (i = 0; i < l; i++) {
 				if (i % 16 == 0)
 					printf("%08x: ", i);
 				printf("%02x ", rbuf[i] & 0xff);
 				if (i % 16 == 15)
 					printf("\n");
 			}
-			if (len % 16)
+			if (l % 16)
 				printf("\n");
 		}
 		/* adjust base pointer for promisc mode */
 		if (base->sadb_msg_type == SADB_X_PROMISC) {
-			if (sizeof(*base) < len)
+			if (sizeof(*base) < l)
 				base++;
 			else
 				base = NULL;
@@ -311,12 +316,14 @@ promisc()
 }
 
 int
-sendkeymsg()
+sendkeymsg(buf, len)
+	char *buf;
+	size_t len;
 {
 	int so;
 
 	u_char rbuf[1024 * 32];	/* XXX: Enough ? Should I do MSG_PEEK ? */
-	int len;
+	ssize_t l;
 	struct sadb_msg *msg;
 
 	if ((so = pfkey_open()) < 0) {
@@ -338,23 +345,23 @@ sendkeymsg()
 		shortdump_hdr();
 again:
 	if (f_verbose) {
-		kdebug_sadb((struct sadb_msg *)m_buf);
+		kdebug_sadb((struct sadb_msg *)buf);
 		printf("\n");
 	}
 
-	if ((len = send(so, m_buf, m_len, 0)) < 0) {
+	if ((l = send(so, buf, len, 0)) < 0) {
 		perror("send");
 		goto end;
 	}
 
 	msg = (struct sadb_msg *)rbuf;
 	do {
-		if ((len = recv(so, rbuf, sizeof(rbuf), 0)) < 0) {
+		if ((l = recv(so, rbuf, sizeof(rbuf), 0)) < 0) {
 			perror("recv");
 			goto end;
 		}
 
-		if (PFKEY_UNUNIT64(msg->sadb_msg_len) != len) {
+		if (PFKEY_UNUNIT64(msg->sadb_msg_len) != l) {
 			warnx("invalid keymsg length");
 			break;
 		}
@@ -363,7 +370,7 @@ again:
 			kdebug_sadb((struct sadb_msg *)rbuf);
 			printf("\n");
 		}
-		if (postproc(msg, len) < 0)
+		if (postproc(msg, l) < 0)
 			break;
 	} while (msg->sadb_msg_errno || msg->sadb_msg_seq);
 
