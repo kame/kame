@@ -57,13 +57,7 @@ CONFIGURE_ENV+=	use_cookie=y
 CONFIGURE_ENV+=	use_cookie=n
 .endif
 .if defined(W3M_USE_SSL) && ${W3M_USE_SSL} == YES
-.if !defined(PATENTEDOPENSSLSRC) && !exists(/usr/include/openssl/rsa.h)
-# openssl is necessary for HTTPS support.
-# if PATENTEDOPENSSLSRC is defined, then we assume that
-# RSA already exists in the OpenSSL built as part of the
-# base distribution.
 DEPENDS+=	openssl-0.9.*:../../security/openssl
-.endif
 CONFIGURE_ENV+=	use_ssl=y use_ssl_verify=n
 .else
 CONFIGURE_ENV+=	use_ssl=n use_ssl_verify=n
