@@ -5,7 +5,7 @@ DISTNAME=       lynx2-8-2
 PKGNAME=        lynx-2.8.2.0
 WRKSRC=         ${WRKDIR}/lynx2-8-2
 CATEGORIES=	www
-MASTER_SITES=   http://sol.slcc.edu/lynx/current/
+MASTER_SITES=   http://sol.slcc.edu/lynx/release2-8-2/
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
 		ftp://ftp.v6.kame.net/pub/kame/misc/
