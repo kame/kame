@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.103 2001/03/20 13:25:39 itojun Exp $
+$KAME: COVERAGE,v 1.104 2001/05/07 10:36:16 sumikawa Exp $
 
 
 x: supported/integrated
@@ -8,7 +8,7 @@ x: supported/integrated
 
 
 		KAME
-		net15	open28	free228	free35	free42	bsdi31	bsdi42
+		net15	open28	free228	free35	free43	bsdi31	bsdi42
 		--	--	--	--	--	--	--
 TCP/UDP		see IMPLEMENTATION for details
 
@@ -19,7 +19,7 @@ IPsec		x	(*1)	x	x	x	x	x
 	 If you would like to use OpenBSD IPsec for production system,
 	 use unpatched (non-KAME) OpenBSD.
 
-NAT/PT		-	-	x	(*1)	?	(*1)	?
+NAT/PT		-	-	x	(*1)	x	(*1)	?
     (*1) compilable but not tested
 
 mobile-ip6	(*1)	-	(*1)	(*1)	(*2)	(*1)	?
@@ -64,7 +64,7 @@ ART routing table lookup algorithm
 (+): see above for KAME/*BSD differences
 
 		KAME	merged *-current	merged
-		*BSD	net	open	free	net15	open28	free41	bsdi42
+		*BSD	net	open	free	net15	open28	free43	bsdi42
 		--	--	--	--	--	--	--	---
 KAME IPv6 as of	latest	early	early	early	early	early	early	apr00
 			jun00	jun00	jul00	jun00	jun00	jun00
@@ -186,7 +186,7 @@ getnameinfo uses addr%numeric for scopeid > maxifindex
 		x	x	x	x	x	x	x	x
 
 getnameinfo, 2nd arg type is socklen_t
-		x	x	x	x	x	x	-	-
+		x	x	x	x	x	x	x	-
 
 getnameinfo uses EAI_xx as return value (2553bis)
 		x	x	x	x	x	x	x	-
@@ -268,15 +268,14 @@ faithd		x	x	x	x	x	x	x	x
 		(*1)	(*1)
     (*1) inetd support
 
-syslogd		x	x	-	-	x	-	-	?
+syslogd		x	x	-	x	x	-	x	?
 lpr/lpd		x	x	-	-	x	-	-	?
 
 default sendmail is IPv6 ready
-		(+)	x	x	-	x	x	-	-
+		(+)	x	x	x	x	x	x	-
 
 default sendmail.cf is IPv6 ready
 		(+)	x	x	-	x	x	-	-
 
 racoon		x	x	-	-	-	-	-	x
-racoon version	latest	001229	-	ports	pkgsrc	-	-	?
-					000718a
+racoon version	latest	001229	-	ports	pkgsrc	-	ports	?
