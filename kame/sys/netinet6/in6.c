@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.152 2001/01/30 14:06:19 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.153 2001/01/30 15:35:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1180,10 +1180,29 @@ in6_purgeaddr(ifa)
 	struct ifaddr *ifa;
 {
 	struct ifnet *ifp = ifa->ifa_ifp;
-	struct in6_ifaddr *ia = (void *) ifa;
+	struct in6_ifaddr *ia = (struct in6_ifaddr *) ifa;
 
 	/* stop DAD processing */
 	nd6_dad_stop(ifa);
+
+	/* delete route to the other end (i.e. destination) on a p2p link. */
+	if ((ifp->if_flags & IFF_POINTOPOINT) != 0 &&
+	    (ia->ia_flags & IFA_ROUTE) != 0 &&
+	    ia->ia_dstaddr.sin6_len != 0) {
+		int e;
+
+		if ((e = rtinit(&(ia->ia_ifa), (int)RTM_DELETE, RTF_HOST))
+		    != 0) {
+			log(LOG_ERR, "in6_purgeaddr: failed to remove "
+			    "a route to the p2p destination: %s on %s, "
+			    "errno=%d\n",
+			    ip6_sprintf(&ia->ia_addr.sin6_addr), if_name(ifp),
+			    e);
+			/* proceed anyway... */
+		}
+		else
+			ia->ia_flags &= ~IFA_ROUTE;
+	}
 
 	/* Remove ownaddr's loopback rtentry, if it exists. */
 	in6_ifremloop(&(ia->ia_ifa));
