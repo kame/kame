@@ -203,7 +203,9 @@ in6_pcbbind(inp, nam)
 			 */
 			if (so->so_options & SO_REUSEADDR)
 				reuseport = SO_REUSEADDR | SO_REUSEPORT;
-		} else if (!IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
+		}
+#if 0 /* we don't support it */
+		else if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
 			struct sockaddr_in sin;
 
 			bzero(&sin, sizeof(sin));
@@ -226,6 +228,7 @@ in6_pcbbind(inp, nam)
 				}
 			}
 		}
+#endif
 		if (lport) {
 			struct inpcb *t;
 #if 0 /* we don't support IPv4 mapped address */
