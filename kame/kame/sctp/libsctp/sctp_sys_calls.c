@@ -1,4 +1,4 @@
-/*	$Header: /usr/home/sumikawa/kame/kame/kame/kame/sctp/libsctp/sctp_sys_calls.c,v 1.2 2003/04/16 06:34:32 itojun Exp $ */
+/*	$Header: /usr/home/sumikawa/kame/kame/kame/kame/sctp/libsctp/sctp_sys_calls.c,v 1.3 2003/06/24 05:36:00 itojun Exp $ */
 
 /*
  * Copyright (C) 2002 Cisco Systems Inc,
@@ -38,22 +38,69 @@
 #include <netinet/sctp_uio.h>
 #include <netinet/sctp.h>
 #include <stdlib.h>
+#include <arpa/inet.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#include <sys/uio.h>
+
+int
+sctp_connectx(int fd, struct sockaddr_storage *addrs, int addrcnt)
+{
+	int i, len, ret, *iptr, cnt = 0;
+	char *mchk, *cpyto;
+	struct sockaddr *at;
+	len = sizeof(int);
+	for (i=0; i < addrcnt; i++) {
+		at = (struct sockaddr *)&addrs[i];
+		if (at->sa_family == AF_INET){
+			len += sizeof(struct sockaddr_in);
+			cnt++;
+		} else if (at->sa_family == AF_INET6) {
+			len += sizeof(struct sockaddr_in6);
+			cnt++;
+		}
+	}
+	if (cnt == 0) {
+		errno = EINVAL;
+		return(-1);
+	}
+	mchk = malloc(len);
+	if (mchk == NULL) {
+		return (-1);
+	}
+	iptr = (int *)mchk;
+	*iptr = cnt;
+	cpyto = &mchk[sizeof(int)];
+	for (i=0; i < addrcnt; i++) {
+		at = (struct sockaddr *)&addrs[i];
+		if (at->sa_family == AF_INET) {
+			memcpy(cpyto,at,sizeof(struct sockaddr_in));
+			cpyto += sizeof(struct sockaddr_in);
+		} else if (at->sa_family == AF_INET6) {
+			memcpy(cpyto,at,sizeof(struct sockaddr_in6));
+			cpyto += sizeof(struct sockaddr_in6);
+		}
+	}
+	ret = setsockopt(fd, IPPROTO_SCTP, SCTP_CONNECT_X, mchk, (unsigned int)len);
+	free(mchk);
+	return (ret);
+}
+
 
 int
 sctp_bindx(int fd, struct sockaddr_storage *addrs, int addrcnt, int flags)
 {
 	struct sctp_getaddresses *gaddrs;
-	int i, sz;
+	int i, sz, fam, argsz;
 
-	if ((flags != SCTP_BINDX_ADD_ADDR) && (flags != SCTP_BINDX_REM_ADDR)) {
+	if ((flags != SCTP_BINDX_ADD_ADDR) && 
+	    (flags != SCTP_BINDX_REM_ADDR)) {
 		errno = EFAULT;
 		return(-1);
 	}
-	sz = (sizeof(struct sockaddr_storage) +
+	argsz = (sizeof(struct sockaddr_storage) +
 	    sizeof(struct sctp_getaddresses));
-	gaddrs = (struct sctp_getaddresses *)calloc(1, sz);
+	gaddrs = (struct sctp_getaddresses *)calloc(1, argsz);
 	if (gaddrs == NULL) {
 		errno = ENOMEM;
 		return(-1);
@@ -61,16 +108,41 @@ sctp_bindx(int fd, struct sockaddr_storage *addrs, int addrcnt, int flags)
 	gaddrs->sget_assoc_id = 0;
 	for (i = 0; i < addrcnt; i++) {
 		sz = ((struct sockaddr *)&addrs[i])->sa_len;
+		fam = ((struct sockaddr *)&addrs[i])->sa_family;
+		((struct sockaddr_in *)&addrs[i])->sin_port = ((struct sockaddr_in *)&addrs[i])->sin_port;
+		if ((fam != AF_INET) && (fam != AF_INET6)) {
+			errno = EINVAL;
+			return(-1);
+		}
 		memcpy(gaddrs->addr, &addrs[i], sz);
-		if (setsockopt(fd, IPPROTO_SCTP, flags, &gaddrs,
-		    (unsigned int)sizeof(gaddrs)) != 0) {
+		if (setsockopt(fd, IPPROTO_SCTP, flags, 
+			       gaddrs, (unsigned int)argsz) != 0) {
 			free(gaddrs);
 			return(-1);
 		}
-		memset(gaddrs->addr, 0, sz);
+		memset(gaddrs->addr, 0, argsz);
 	}
 	free(gaddrs);
 	return(0);
+}
+
+
+int
+sctp_opt_info(int fd, sctp_assoc_t id, int opt, void *arg, size_t *size)
+{
+	if ((opt == SCTP_RTOINFO) || 
+ 	    (opt == SCTP_ASSOCINFO) || 
+	    (opt == SCTP_PRIMARY_ADDR) || 
+	    (opt == SCTP_SET_PEER_PRIMARY_ADDR) || 
+	    (opt == SCTP_PEER_ADDR_PARAMS) || 
+	    (opt == SCTP_STATUS) || 
+	    (opt == SCTP_GET_PEER_ADDR_INFO)) { 
+		*(sctp_assoc_t *)arg = id;
+		return(getsockopt(fd, IPPROTO_SCTP, opt, arg, size));
+	}else{
+		errno = EOPNOTSUPP;
+		return(-1);
+	}
 }
 
 int
@@ -193,6 +265,115 @@ void sctp_freeladdrs(struct sockaddr_storage *addrs)
 	fr_addr = (void *)((caddr_t)addrs - sizeof(sctp_assoc_t));
 	/* Now free it */
 	free(fr_addr);
+}
+
+
+int
+sctp_sendmsg(int s, 
+	     void *data, 
+	     size_t len,
+	     struct sockaddr *to,
+	     socklen_t tolen,
+	     uint32_t ppid,
+	     uint32_t flags,
+	     uint16_t stream_no,
+	     uint32_t timetolive,
+	     uint32_t context)
+{
+	int sz;
+	struct msghdr msg;
+	struct iovec iov[2];
+	char controlVector[256];
+	struct sctp_sndrcvinfo *s_info;
+	struct cmsghdr *cmsg;
+
+	iov[0].iov_base = data;
+	iov[0].iov_len = len;
+	iov[1].iov_base = NULL;
+	iov[1].iov_len = 0;
+
+	/* set the length if the caller has not */
+	to->sa_len = tolen;
+
+	msg.msg_name = (caddr_t)to;
+	msg.msg_namelen = to->sa_len;
+	msg.msg_iov = iov;
+	msg.msg_iovlen = 1;
+	msg.msg_control = (caddr_t)controlVector;
+  
+	cmsg = (struct cmsghdr *)controlVector;
+
+	cmsg->cmsg_level = IPPROTO_SCTP;
+	cmsg->cmsg_type = SCTP_SNDRCV;
+	cmsg->cmsg_len = CMSG_LEN(sizeof(struct sctp_sndrcvinfo));
+	s_info = (struct sctp_sndrcvinfo *)CMSG_DATA(cmsg);
+
+
+	s_info->sinfo_stream = stream_no;
+	s_info->sinfo_ssn = 0;
+	s_info->sinfo_flags = flags;
+	s_info->sinfo_ppid = ppid;
+	s_info->sinfo_context = context;
+	s_info->sinfo_assoc_id = 0;
+	s_info->sinfo_timetolive = timetolive;
+	errno = 0;
+	msg.msg_controllen = cmsg->cmsg_len;
+	sz = sendmsg(s, &msg, 0);
+	return(sz);
+}
+
+int
+sctp_recvmsg (int s, 
+	      void *dbuf, 
+	      size_t *len,
+	      struct sockaddr *from,
+	      socklen_t *fromlen,
+	      struct sctp_sndrcvinfo *sinfo,
+	      int *msg_flags)
+{
+	struct sctp_sndrcvinfo *s_info;
+	int sz;
+	struct msghdr msg;
+	struct iovec iov[2];
+	char controlVector[65535];
+	struct cmsghdr *cmsg;
+
+	
+	iov[0].iov_base = dbuf;
+	iov[0].iov_len = *len;
+	iov[1].iov_base = NULL;
+	iov[1].iov_len = 0;
+	msg.msg_name = (caddr_t)from;
+	msg.msg_namelen = *fromlen;
+	msg.msg_iov = iov;
+	msg.msg_iovlen = 1;
+	msg.msg_control = (caddr_t)controlVector;
+	msg.msg_controllen = sizeof(controlVector);
+	errno = 0;
+	sz = recvmsg(s,&msg,0);
+	*len = sz;
+	s_info = NULL;
+	*msg_flags = msg.msg_flags;
+	*fromlen = msg.msg_namelen;
+	if ((msg.msg_controllen) && sinfo){
+		/* parse through and see if we find
+		 * the sctp_sndrcvinfo (if the user wants it).
+		 */
+		cmsg = (struct cmsghdr *)controlVector;
+		while(cmsg){
+			if (cmsg->cmsg_level == IPPROTO_SCTP){
+				if (cmsg->cmsg_type == SCTP_SNDRCV){
+					/* Got it */
+					s_info = (struct sctp_sndrcvinfo *)CMSG_DATA(cmsg);
+					/* Copy it to the user */
+					*sinfo = *s_info;
+					break;
+				}
+			}
+			cmsg = CMSG_NXTHDR(&msg,cmsg);
+		}
+	}
+	return(sz);
 }
 
 #ifdef SYS_sctp_peeloff
