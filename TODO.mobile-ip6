@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.19 2001/11/28 08:34:56 k-sugyou Exp $
+$KAME: TODO.mobile-ip6,v 1.20 2001/12/06 06:57:09 k-sugyou Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -27,7 +27,6 @@ todo
   tunnels used for PIM, and maybe others.
 - define the behavior of the socket API for homeaddress.
 - security mechanism.
-- DAD when registering CoA.
 - mobile prefix advertisement.
 - complete dynamic home agent discovery. (implement user-land daemon?)
 - rate limit (many places).
@@ -55,6 +54,7 @@ HA side
 - home registration.
 - encapsulate packets destined to MNs.
 - dynamic home agent discovery.
+- DAD when registering CoA.
 
 
 <<Usage>>
