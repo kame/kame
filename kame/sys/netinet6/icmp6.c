@@ -106,6 +106,7 @@
 #include <netinet6/ip6protosw.h>
 
 #ifdef IPSEC
+#include <netinet6/ipsec.h>
 #include <netkey/key.h>
 #include <netkey/key_debug.h>
 #endif
