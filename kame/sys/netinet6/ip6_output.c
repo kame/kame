@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.185 2001/06/19 01:57:04 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.186 2001/06/20 12:31:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1048,21 +1048,14 @@ skip_ipsec2:;
 	}
 
 	/*
-	 * advanced API (IPV6_USE_MIN_MTU or IPV6_USE_MTU - the latter is
-	 * KAME-specific at this moment -) overrides mtu setting. We ignore
-	 * the specified MTU if it is larger than the already-known path MTU.
-	 * XXX: which should be preferred, if both IPV6_USE_MIN_MTU and
-	 * IPV6_USE_MTU are specified?
+	 * An advanced API option (IPV6_USE_MIN_MTU) overrides mtu setting.
+	 * We ignore the specified MTU if it is larger than the already-known
+	 * path MTU.
 	 */
-	if (mtu > IPV6_MMTU) {
-		if ((opt && (opt->ip6po_flags & IP6PO_MINMTU)) ||
-		    (flags & IPV6_MINMTU)) {
-			mtu = IPV6_MMTU;
-		}
-		else if (opt && (opt->ip6po_mtu != -1) &&
-			 mtu > opt->ip6po_mtu) {
-			mtu = opt->ip6po_mtu;
-		}
+	if (mtu > IPV6_MMTU &&
+	    ((opt && (opt->ip6po_flags & IP6PO_MINMTU)) ||
+	     (flags & IPV6_MINMTU))) {
+		mtu = IPV6_MMTU;
 	}
 
 	/* Fake scoped addresses */
@@ -1261,14 +1254,8 @@ skip_ipsec2:;
 		if (mtu > IPV6_MAXPACKET)
 			mtu = IPV6_MAXPACKET;
 
-		/*
-		 * Notify a proper path MTU to applications. We skip this
-		 * process if an outgoing MTU is specified, since fragmentation
-		 * can always occur when an application tries to send a larger
-		 * packet than the link MTU even with specifing path MTU.
-		 * Or should we always notify all applications?
-		 */
-		if ((opt == NULL || opt->ip6po_mtu == -1)) {
+		/* Notify a proper path MTU to applications. */
+		if (opt == NULL) {
 			u_int32_t mtu32;
 		 	/* mtu > IPV6_MAXPACKET case is already covered */
 			mtu32 = (u_int32_t)mtu;
@@ -2753,7 +2740,6 @@ init_ip6pktopts(opt)
 
 	bzero(opt, sizeof(*opt));
 	opt->ip6po_hlim = -1;	/* -1 means default hop limit */
-	opt->ip6po_mtu = -1;	/* -1 means not to specify the MTU */
 	opt->ip6po_tclass = 0x00;
 }
 
@@ -3835,14 +3821,6 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 			if (cm->cmsg_len != CMSG_LEN(0))
 				return(EINVAL);
 			opt->ip6po_flags |= IP6PO_MINMTU;
-			break;
-
-		case IPV6_USE_MTU:
-			if (cm->cmsg_len != CMSG_LEN(sizeof(int)))
-				return(EINVAL);
-			opt->ip6po_mtu = *(int *)CMSG_DATA(cm);
-			if (opt->ip6po_mtu < IPV6_MINMTU)
-				return(EINVAL);
 			break;
 
 		default:
