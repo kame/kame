@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.55 2000/09/13 14:18:15 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.56 2000/09/22 04:01:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -219,7 +219,8 @@ ip6_forward(m, srcrt)
 
 #ifdef IPSEC
 	/* get a security policy for this packet */
-	sp = ipsec6_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND, 0, &error);
+	sp = ipsec6_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND, IP_FORWARDING,
+	    &error);
 	if (sp == NULL) {
 		ipsec6stat.out_inval++;
 		ip6stat.ip6s_cantforward++;
