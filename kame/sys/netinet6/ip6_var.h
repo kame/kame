@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.69 2001/09/19 10:05:43 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.70 2001/09/20 08:29:51 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -266,6 +266,7 @@ struct ip6aux {
 #define IP6A_HASEEN	0x02		/* HA was present */
 #define IP6A_BRUID	0x04		/* BR Unique Identifier was present */
 #define IP6A_RTALERTSEEN 0x08		/* rtalert present */
+#define IP6A_MIP6TUNNELED 0x10		/* this is tunneled from my HAgent */
 
 	/* ip6.ip6_src */
 	struct in6_addr ip6a_careof;	/* care-of address of the peer */
