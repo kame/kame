@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.16 2001/09/19 04:48:37 itojun Exp $	*/
+/*	$KAME: if.c,v 1.17 2001/11/08 09:38:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -351,7 +351,7 @@ get_llflag(const char *name)
 			continue;
 
 		memset(&ifr6, 0, sizeof(ifr6));
-		strcpy(ifr6.ifr_name, name);
+		strncpy(ifr6.ifr_name, name, sizeof(ifr6.ifr_name));
 		memcpy(&ifr6.ifr_ifru.ifru_addr, sin6, sin6->sin6_len);
 		if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
 			warnmsg(LOG_ERR, __FUNCTION__,
@@ -413,7 +413,7 @@ get_llflag(const char *name)
 			continue;
 
 		memset(&ifr6, 0, sizeof(ifr6));
-		strcpy(ifr6.ifr_name, name);
+		strncpy(ifr6.ifr_name, name, sizeof(ifr6.ifr_name));
 		memcpy(&ifr6.ifr_ifru.ifru_addr, sin6, sin6->sin6_len);
 		if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
 			warnmsg(LOG_ERR, __FUNCTION__,
