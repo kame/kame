@@ -454,8 +454,7 @@ p_sockaddr(sa, mask, flags, width)
 			cp = netname6(sa6,
 				      &((struct sockaddr_in6 *)mask)->sin6_addr);
 		} else
-			cp = (char *)inet_ntop(AF_INET6, in6, ntop_buf,
-						sizeof(ntop_buf));
+			cp = netname6(sa6, NULL);
 		break;
 	    }
 #endif 
@@ -791,65 +790,64 @@ netname6(sa6, mask)
 	struct in6_addr *mask;
 {
 	static char line[MAXHOSTNAMELEN + 1];
-	struct in6_addr net6;
 	u_char *p;
 	u_char *lim;
 	int masklen, final = 0, illegal = 0, flag = NI_WITHSCOPEID;
 	int i;
 
-	net6 = sa6->sin6_addr;
-	for (i = 0; i < sizeof(net6); i++)
-		net6.s6_addr[i] &= mask->s6_addr[i];
-	
-	masklen = 0;
-	lim = (u_char *)mask + 16;
-	for (p = (u_char *)mask; p < lim; p++) {
-		if (final && *p) {
-			illegal++;
-			continue;
-		}
+	if (mask) {
+		masklen = 0;
+		lim = (u_char *)mask + 16;
+		for (p = (u_char *)mask; p < lim; p++) {
+			if (final && *p) {
+				illegal++;
+				continue;
+			}
 
-		switch (*p & 0xff) {
-		case 0xff:
-			masklen += 8;
-			break;
-		case 0xfe:
-			masklen += 7;
-			final++;
-			break;
-		case 0xfc:
-			masklen += 6;
-			final++;
-			break;
-		case 0xf8:
-			masklen += 5;
-			final++;
-			break;
-		case 0xf0:
-			masklen += 4;
-			final++;
-			break;
-		case 0xe0:
-			masklen += 3;
-			final++;
-			break;
-		case 0xc0:
-			masklen += 2;
-			final++;
-			break;
-		case 0x80:
-			masklen += 1;
-			final++;
-			break;
-		case 0x00:
-			final++;
-			break;
-		default:
-			final++;
-			illegal++;
-			break;
+			switch (*p & 0xff) {
+			 case 0xff:
+				 masklen += 8;
+				 break;
+			 case 0xfe:
+				 masklen += 7;
+				 final++;
+				 break;
+			 case 0xfc:
+				 masklen += 6;
+				 final++;
+				 break;
+			 case 0xf8:
+				 masklen += 5;
+				 final++;
+				 break;
+			 case 0xf0:
+				 masklen += 4;
+				 final++;
+				 break;
+			 case 0xe0:
+				 masklen += 3;
+				 final++;
+				 break;
+			 case 0xc0:
+				 masklen += 2;
+				 final++;
+				 break;
+			 case 0x80:
+				 masklen += 1;
+				 final++;
+				 break;
+			 case 0x00:
+				 final++;
+				 break;
+			 default:
+				 final++;
+				 illegal++;
+				 break;
+			}
 		}
 	}
+	else
+		masklen = 128;
 
 	if (masklen == 0 && IN6_IS_ADDR_UNSPECIFIED(&sa6->sin6_addr))
 		return("default");
@@ -861,6 +859,7 @@ netname6(sa6, mask)
 
 	if (nflag)
 		sprintf(&line[strlen(line)], "/%d", masklen);
+
 	return line;
 }
 
