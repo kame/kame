@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.126 2003/06/25 07:43:20 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.127 2003/06/25 07:46:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1492,7 +1492,7 @@ nd6_dad_timer(ifa)
 		 */
 		nd6_dad_ns_output(dp, ifa);
 		nd6_dad_starttimer(dp,
-		    (long)ND_IFINFO(ifa->ifa_ifp)->retrans) * hz / 1000);
+		    (long)ND_IFINFO(ifa->ifa_ifp)->retrans * hz / 1000);
 	} else {
 		/*
 		 * We have transmitted sufficient number of DAD packets.
