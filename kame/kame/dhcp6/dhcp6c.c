@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.99 2003/01/05 17:12:13 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.100 2003/01/06 16:12:02 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1165,8 +1165,8 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 	if (ev->state != DHCP6S_SOLICIT ||
 	    (ifp->send_flags & DHCIFF_RAPID_COMMIT)) {
 		/*
-		 * We expect a reply message, but does actually receives an
-		 * Advertise message.  The server should not be configured to
+		 * We expect a reply message, but does actually receive an
+		 * Advertise message.  The server should be configured not to
 		 * allow the Rapid Commit option.
 		 * We process the message as if we expected the Advertise.
 		 * [dhcpv6-28 Section 17.1.3]
