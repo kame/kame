@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.11 2003/01/05 17:12:13 jinmei Exp $	*/
+/*	$KAME: prefixconf.c,v 1.12 2003/01/06 02:58:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -305,7 +305,10 @@ duration(iac)
 	struct siteprefix *sp;
 	u_int32_t base = DHCP6_DURATITION_INFINITE;
 
-	/* determine for the smallest pltime */
+	/*
+	 * Determine for the smallest pltime.
+	 * XXX: we assume the lifetimes of all prefixes are synchronized.
+	 */
 	for (sp = TAILQ_FIRST(&iac_pd->siteprefix_head); sp;
 	    sp = TAILQ_NEXT(sp, link)) {
 		if (base == DHCP6_DURATITION_INFINITE ||
