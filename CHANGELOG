@@ -1,10 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.146 1999/09/30 02:00:16 sumikawa Exp $
+$Id: CHANGELOG,v 1.147 1999/10/01 00:05:50 itojun Exp $
+
+<199910>
+Fri Oct  1 09:02:23 JST 1999
+	* freebsd[23]/lib/libftpio: fix EPSV case.
 
 <199909>
 Thu Sep 30 10:57:22 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
-	* freebsd3/ports/w3m: new port W3M, simple text based WWW client.
+	* freebsd[23]/ports/w3m: new port W3M, simple text based WWW client.
 
 1999-09-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtsold/dump.c: was added to dump internal status
