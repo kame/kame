@@ -1,4 +1,4 @@
-/*	$KAME: altq_priq.h,v 1.5 2003/07/10 12:07:48 kjc Exp $	*/
+/*	$KAME: altq_priq.h,v 1.6 2003/09/17 14:23:25 kjc Exp $	*/
 /*
  * Copyright (C) 2000-2003
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -38,7 +38,6 @@ extern "C" {
 #endif
 
 #define	PRIQ_MAXPRI	16	/* upper limit of the number of priorities */
-#define	PRIQ_MAXQID	256	/* upper limit of queues */
 
 #ifdef ALTQ3_COMPAT
 struct priq_interface {

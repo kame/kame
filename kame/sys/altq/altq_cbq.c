@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.c,v 1.18 2003/08/20 23:34:09 itojun Exp $	*/
+/*	$KAME: altq_cbq.c,v 1.19 2003/09/17 14:23:25 kjc Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -109,9 +109,7 @@ static int	cbq_delete_filter(struct cbq_delete_filter *);
 static int
 cbq_class_destroy(cbq_state_t *cbqp, struct rm_class *cl)
 {
-	u_int32_t	chandle;
-
-	chandle = cl->stats_.handle;
+	int	i;
 
 	/* delete the class */
 	rmc_delete_class(&cbqp->ifnp, cl);
@@ -119,26 +117,18 @@ cbq_class_destroy(cbq_state_t *cbqp, struct rm_class *cl)
 	/*
 	 * free the class handle
 	 */
-	switch (chandle) {
-	case ROOT_CLASS_HANDLE:
-		cbqp->ifnp.root_ = NULL;
-		break;
-	case DEFAULT_CLASS_HANDLE:
-		cbqp->ifnp.default_ = NULL;
-		break;
-#ifdef ALTQ3_COMPAT
-	case CTL_CLASS_HANDLE:
-		cbqp->ifnp.ctl_ = NULL;
-		break;
-#endif
-	case NULL_CLASS_HANDLE:
-		break;
-	default:
-		if (chandle >= CBQ_MAX_CLASSES)
-			break;
-		cbqp->cbq_class_tbl[chandle] = NULL;
-	}
+	for (i = 0; i < CBQ_MAX_CLASSES; i++)
+		if (cbqp->cbq_class_tbl[i] == cl)
+			cbqp->cbq_class_tbl[i] = NULL;
 
+	if (cl == cbqp->ifnp.root_)
+		cbqp->ifnp.root_ = NULL;
+	if (cl == cbqp->ifnp.default_)
+		cbqp->ifnp.default_ = NULL;
+#ifdef ALTQ3_COMPAT
+	if (cl == cbqp->ifnp.ctl_)
+		cbqp->ifnp.ctl_ = NULL;
+#endif
 	return (0);
 }
 
@@ -146,23 +136,24 @@ cbq_class_destroy(cbq_state_t *cbqp, struct rm_class *cl)
 static struct rm_class *
 clh_to_clp(cbq_state_t *cbqp, u_int32_t chandle)
 {
-	switch (chandle) {
-	case NULL_CLASS_HANDLE:
-		return (NULL);
-	case ROOT_CLASS_HANDLE:
-		return (cbqp->ifnp.root_);
-	case DEFAULT_CLASS_HANDLE:
-		return (cbqp->ifnp.default_);
-#ifdef ALTQ3_COMPAT
-	case CTL_CLASS_HANDLE:
-		return (cbqp->ifnp.ctl_);
-#endif
-	}
+	int i;
+	struct rm_class *cl;
 
-	if (chandle >= CBQ_MAX_CLASSES)
+	if (chandle == 0)
 		return (NULL);
-
-	return (cbqp->cbq_class_tbl[chandle]);
+	/*
+	 * first, try optimistically the slot matching the lower bits of
+	 * the handle.  if it fails, do the linear table search.
+	 */
+	i = chandle % CBQ_MAX_CLASSES;
+	if ((cl = cbqp->cbq_class_tbl[i]) != NULL &&
+	    cl->stats_.handle == chandle)
+		return (cl);
+	for (i = 0; i < CBQ_MAX_CLASSES; i++)
+		if ((cl = cbqp->cbq_class_tbl[i]) != NULL &&
+		    cl->stats_.handle == chandle)
+			return (cl);
+	return (NULL);
 }
 
 static int
@@ -186,25 +177,16 @@ cbq_clear_interface(cbq_state_t *cbqp)
 				else {
 					cbq_class_destroy(cbqp, cl);
 					cbqp->cbq_class_tbl[i] = NULL;
+					if (cl == cbqp->ifnp.root_)
+						cbqp->ifnp.root_ = NULL;
+					if (cl == cbqp->ifnp.default_)
+						cbqp->ifnp.default_ = NULL;
+#ifdef ALTQ3_COMPAT
+					if (cl == cbqp->ifnp.ctl_)
+						cbqp->ifnp.ctl_ = NULL;
+#endif
 				}
 			}
-		}
-#ifdef ALTQ3_COMPAT
-		if (cbqp->ifnp.ctl_ != NULL &&
-		    !is_a_parent_class(cbqp->ifnp.ctl_)) {
-			cbq_class_destroy(cbqp, cbqp->ifnp.ctl_);
-			cbqp->ifnp.ctl_ = NULL;
-		}
-#endif /* ALTQ3_COMPAT */
-		if (cbqp->ifnp.default_ != NULL &&
-		    !is_a_parent_class(cbqp->ifnp.default_)) {
-			cbq_class_destroy(cbqp, cbqp->ifnp.default_);
-			cbqp->ifnp.default_ = NULL;
-		}
-		if (cbqp->ifnp.root_ != NULL &&
-		    !is_a_parent_class(cbqp->ifnp.root_)) {
-			cbq_class_destroy(cbqp, cbqp->ifnp.root_);
-			cbqp->ifnp.root_ = NULL;
 		}
 	} while (again);
 
@@ -331,9 +313,26 @@ cbq_add_queue(struct pf_altq *a)
 	cbq_state_t	*cbqp;
 	struct rm_class	*cl;
 	struct cbq_opts	*opts;
+	int		i;
 
 	if ((cbqp = a->altq_disc) == NULL)
 		return (EINVAL);
+	if (a->qid == 0)
+		return (EINVAL);
+
+	/*
+	 * find a free slot in the class table.  if the slot matching
+	 * the lower bits of qid is free, use this slot.  otherwise,
+	 * use the first free slot.
+	 */
+	i = a->qid % CBQ_MAX_CLASSES;
+	if (cbqp->cbq_class_tbl[i] != NULL) {
+		for (i = 0; i < CBQ_MAX_CLASSES; i++)
+			if (cbqp->cbq_class_tbl[i] == NULL)
+				break;
+		if (i == CBQ_MAX_CLASSES)
+			return (EINVAL);
+	}
 
 	opts = &a->pq_u.cbq_opts;
 	/* check parameters */
@@ -370,21 +369,14 @@ cbq_add_queue(struct pf_altq *a)
 			return (EINVAL);
 		if (cbqp->ifnp.root_)
 			return (EINVAL);
-		a->qid = ROOT_CLASS_HANDLE;
 		break;
 	case CBQCLF_DEFCLASS:
 		if (cbqp->ifnp.default_)
 			return (EINVAL);
-		a->qid = DEFAULT_CLASS_HANDLE;
 		break;
 	case 0:
 		if (a->qid == 0)
 			return (EINVAL);
-		if (a->qid >= CBQ_MAX_CLASSES &&
-		    a->qid != DEFAULT_CLASS_HANDLE)
-			return (EINVAL);
-		if (cbqp->cbq_class_tbl[a->qid] != NULL)
-			return (EBUSY);
 		break;
 	default:
 		/* more than two flags bits set */
@@ -395,7 +387,7 @@ cbq_add_queue(struct pf_altq *a)
 	 * create a class.  if this is a root class, initialize the
 	 * interface.
 	 */
-	if (a->qid == ROOT_CLASS_HANDLE) {
+	if ((opts->flags & CBQCLF_CLASSMASK) == CBQCLF_ROOTCLASS) {
 		rmc_init(cbqp->ifnp.ifq_, &cbqp->ifnp, opts->ns_per_byte,
 		    cbqrestart, a->qlimit, RM_MAXQUEUED,
 		    opts->maxidle, opts->minidle, opts->offtime,
@@ -416,17 +408,11 @@ cbq_add_queue(struct pf_altq *a)
 	cl->stats_.depth = cl->depth_;
 
 	/* save the allocated class */
-	switch (a->qid) {
-	case NULL_CLASS_HANDLE:
-	case ROOT_CLASS_HANDLE:
-		break;
-	case DEFAULT_CLASS_HANDLE:
+	cbqp->cbq_class_tbl[i] = cl;
+
+	if ((opts->flags & CBQCLF_CLASSMASK) == CBQCLF_DEFCLASS)
 		cbqp->ifnp.default_ = cl;
-		break;
-	default:
-		cbqp->cbq_class_tbl[a->qid] = cl;
-		break;
-	}
+
 	return (0);
 }
 
@@ -435,6 +421,7 @@ cbq_remove_queue(struct pf_altq *a)
 {
 	struct rm_class	*cl;
 	cbq_state_t	*cbqp;
+	int		i;
 
 	if ((cbqp = a->altq_disc) == NULL)
 		return (EINVAL);
@@ -452,20 +439,15 @@ cbq_remove_queue(struct pf_altq *a)
 	/*
 	 * free the class handle
 	 */
-	switch (a->qid) {
-	case ROOT_CLASS_HANDLE:
-		cbqp->ifnp.root_ = NULL;
-		break;
-	case DEFAULT_CLASS_HANDLE:
-		cbqp->ifnp.default_ = NULL;
-		break;
-	case NULL_CLASS_HANDLE:
-		break;
-	default:
-		if (a->qid >= CBQ_MAX_CLASSES)
+	for (i = 0; i < CBQ_MAX_CLASSES; i++)
+		if (cbqp->cbq_class_tbl[i] == cl) {
+			cbqp->cbq_class_tbl[i] = NULL;
+			if (cl == cbqp->ifnp.root_)
+				cbqp->ifnp.root_ = NULL;
+			if (cl == cbqp->ifnp.default_)
+				cbqp->ifnp.default_ = NULL;
 			break;
-		cbqp->cbq_class_tbl[a->qid] = NULL;
-	}
+		}
 
 	return (0);
 }
@@ -488,7 +470,6 @@ cbq_getqstats(struct pf_altq *a, void *ubuf, int *nbytes)
 		return (EINVAL);
 
 	get_class_stats(&stats, cl);
-	stats.handle = a->qid;
 
 	if ((error = copyout((caddr_t)&stats, ubuf, sizeof(stats))) != 0)
 		return (error);
@@ -730,45 +711,23 @@ cbq_class_create(cbqp, acp, parent, borrow)
 	struct rm_class	*cl;
 	cbq_class_spec_t *spec = &acp->cbq_class;
 	u_int32_t	chandle;
+	int		i;
 
 	/*
 	 * allocate class handle
 	 */
-	switch (spec->flags & CBQCLF_CLASSMASK) {
-	case CBQCLF_ROOTCLASS:
-		if (parent != NULL)
-			return (EINVAL);
-		if (cbqp->ifnp.root_)
-			return (EINVAL);
-		chandle = ROOT_CLASS_HANDLE;
-		break;
-	case CBQCLF_DEFCLASS:
-		if (cbqp->ifnp.default_)
-			return (EINVAL);
-		chandle = DEFAULT_CLASS_HANDLE;
-		break;
-	case CBQCLF_CTLCLASS:
-		if (cbqp->ifnp.ctl_)
-			return (EINVAL);
-		chandle = CTL_CLASS_HANDLE;
-		break;
-	case 0:
-		chandle = acp->cbq_class_handle;  /* use specified handle */
-		if (chandle == 0 || chandle >= CBQ_MAX_CLASSES)
-			return (EINVAL);
-		if (cbqp->cbq_class_tbl[chandle] != NULL)
-			return (EBUSY);
-		break;
-	default:
-		/* more than two flags bits set */
+	for (i = 1; i < CBQ_MAX_CLASSES; i++)
+		if (cbqp->cbq_class_tbl[i] == NULL)
+			break;
+	if (i == CBQ_MAX_CLASSES)
 		return (EINVAL);
-	}
+	chandle = i;	/* use the slot number as class handle */
 
 	/*
 	 * create a class.  if this is a root class, initialize the
 	 * interface.
 	 */
-	if (chandle == ROOT_CLASS_HANDLE) {
+	if ((spec->flags & CBQCLF_CLASSMASK) == CBQCLF_ROOTCLASS) {
 		rmc_init(cbqp->ifnp.ifq_, &cbqp->ifnp, spec->nano_sec_per_byte,
 			 cbqrestart, spec->maxq, RM_MAXQUEUED,
 			 spec->maxidle, spec->minidle, spec->offtime,
@@ -791,20 +750,13 @@ cbq_class_create(cbqp, acp, parent, borrow)
 	cl->stats_.depth = cl->depth_;
 
 	/* save the allocated class */
-	switch (chandle) {
-	case NULL_CLASS_HANDLE:
-	case ROOT_CLASS_HANDLE:
-		break;
-	case DEFAULT_CLASS_HANDLE:
+	cbqp->cbq_class_tbl[i] = cl;
+
+	if ((spec->flags & CBQCLF_CLASSMASK) == CBQCLF_DEFCLASS)
 		cbqp->ifnp.default_ = cl;
-		break;
-	case CTL_CLASS_HANDLE:
+	if ((spec->flags & CBQCLF_CLASSMASK) == CBQCLF_CTLCLASS)
 		cbqp->ifnp.ctl_ = cl;
-		break;
-	default:
-		cbqp->cbq_class_tbl[chandle] = cl;
-		break;
-	}
+
 	return (0);
 }
 
@@ -913,7 +865,7 @@ cbq_getstats(gsp)
 	struct cbq_getstats *gsp;
 {
 	char		*ifacename;
-	int		chandle, n, nclasses;
+	int		i, n, nclasses;
 	cbq_state_t	*cbqp;
 	struct rm_class	*cl;
 	class_stats_t	stats, *usp;
@@ -928,35 +880,16 @@ cbq_getstats(gsp)
 	if (nclasses <= 0)
 		return (EINVAL);
 
-	for (n = 0, chandle = 0; n < nclasses && chandle < CBQ_MAX_CLASSES;
-	     n++) {
-		switch(n) {
-		case 0:
-			cl = cbqp->ifnp.root_;
-			stats.handle = ROOT_CLASS_HANDLE;
-			break;
-		case 1:
-			cl = cbqp->ifnp.default_;
-			stats.handle = DEFAULT_CLASS_HANDLE;
-			break;
-		case 2:
-			cl = cbqp->ifnp.ctl_;
-			stats.handle = CTL_CLASS_HANDLE;
-			if (cl != NULL)
-				break;
-			/* fall through if there's no ctl_class */
-		default:
-			while ((cl = cbqp->cbq_class_tbl[chandle]) == NULL)
-				if (++chandle >= CBQ_MAX_CLASSES)
-					goto out;
-			stats.handle = chandle++;
-			break;
-		}
+	for (n = 0, i = 0; n < nclasses && i < CBQ_MAX_CLASSES; n++, i++) {
+		while ((cl = cbqp->cbq_class_tbl[i]) == NULL)
+			if (++i >= CBQ_MAX_CLASSES)
+				goto out;
 
 		get_class_stats(&stats, cl);
+		stats.handle = cl->stats_.handle;
 
 		if ((error = copyout((caddr_t)&stats, (caddr_t)usp++,
-				     sizeof(stats))) != 0)
+		    sizeof(stats))) != 0)
 			return (error);
 	}
 
@@ -1022,13 +955,6 @@ cbq_ifdetach(ifacep)
 	(void)cbq_set_enable(ifacep, DISABLE);
 
 	cbq_clear_interface(cbqp);
-
-	if (cbqp->ifnp.ctl_)
-		cbq_class_destroy(cbqp, cbqp->ifnp.ctl_);
-	if (cbqp->ifnp.default_)
-		cbq_class_destroy(cbqp, cbqp->ifnp.default_);
-	if (cbqp->ifnp.root_)
-		cbq_class_destroy(cbqp, cbqp->ifnp.root_);
 
 	/* remove CBQ from the ifnet structure. */
 	(void)altq_detach(cbqp->ifnp.ifq_);

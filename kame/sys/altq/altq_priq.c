@@ -1,4 +1,4 @@
-/*	$KAME: altq_priq.c,v 1.10 2003/07/10 12:07:48 kjc Exp $	*/
+/*	$KAME: altq_priq.c,v 1.11 2003/09/17 14:23:25 kjc Exp $	*/
 /*
  * Copyright (C) 2000-2003
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -93,9 +93,6 @@ static int priqcmd_class_stats(struct priq_class_stats *);
 
 static void get_class_stats(struct priq_classstats *, struct priq_class *);
 static struct priq_class *clh_to_clp(struct priq_if *, u_int32_t);
-#if 0
-static u_long clp_to_clh(struct priq_class *);
-#endif
 
 #ifdef ALTQ3_COMPAT
 altqdev_decl(priq);
@@ -178,8 +175,8 @@ priq_add_queue(struct pf_altq *a)
 		return (EINVAL);
 	if (a->qid == 0)
 		return (EINVAL);
-	if (a->qid > PRIQ_MAXQID)
-		return (EINVAL);
+	if (pif->pif_classes[a->priority] != NULL)
+		return (EBUSY);
 	if (clh_to_clp(pif, a->qid) != NULL)
 		return (EBUSY);
 
@@ -224,9 +221,6 @@ priq_getqstats(struct pf_altq *a, void *ubuf, int *nbytes)
 		return (EINVAL);
 
 	get_class_stats(&stats, cl);
-#if 0
-	stats.handle = a->qid;
-#endif
 
 	if ((error = copyout((caddr_t)&stats, ubuf, sizeof(stats))) != 0)
 		return (error);
@@ -634,15 +628,16 @@ get_class_stats(struct priq_classstats *sp, struct priq_class *cl)
 static struct priq_class *
 clh_to_clp(struct priq_if *pif, u_int32_t chandle)
 {
+	struct priq_class *cl;
 	int idx;
 
 	if (chandle == 0)
 		return (NULL);
 
 	for (idx = pif->pif_maxpri; idx >= 0; idx--)
-		if (pif->pif_classes[idx] != NULL &&
-		    pif->pif_classes[idx]->cl_handle == chandle)
-			return (pif->pif_classes[idx]);
+		if ((cl = pif->pif_classes[idx]) != NULL &&
+		    cl->cl_handle == chandle)
+			return (cl);
 
 	return (NULL);
 }
@@ -896,21 +891,24 @@ priqcmd_add_class(ap)
 {
 	struct priq_if *pif;
 	struct priq_class *cl;
+	int qid;
 
 	if ((pif = altq_lookup(ap->iface.ifname, ALTQT_PRIQ)) == NULL)
 		return (EBADF);
 
 	if (ap->pri < 0 || ap->pri >= PRIQ_MAXPRI)
 		return (EINVAL);
+	if (pif->pif_classes[ap->pri] != NULL)
+		return (EBUSY);
 
+	qid = ap->pri + 1;
 	if ((cl = priq_class_create(pif, ap->pri,
-	    ap->qlimit, ap->flags, ap->class_handle)) == NULL)
+	    ap->qlimit, ap->flags, qid)) == NULL)
 		return (ENOMEM);
 
-#if 0
 	/* return a class handle to the user */
-	ap->class_handle = clp_to_clh(cl);
-#endif
+	ap->class_handle = cl->cl_handle;
+
 	return (0);
 }
 
@@ -1022,37 +1020,6 @@ priqcmd_class_stats(ap)
 	}
 	return (0);
 }
-
-#if 0
-/* convert a class handle to the corresponding class pointer */
-static struct priq_class *
-clh_to_clp(pif, chandle)
-	struct priq_if *pif;
-	u_long chandle;
-{
-	struct priq_class *cl;
-
-	cl = (struct priq_class *)chandle;
-	if (chandle != ALIGN(cl)) {
-#ifdef ALTQ_DEBUG
-		printf("clh_to_cl: unaligned pointer %p\n", cl);
-#endif
-		return (NULL);
-	}
-
-	if (cl == NULL || cl->cl_handle != chandle || cl->cl_pif != pif)
-		return (NULL);
-	return (cl);
-}
-
-/* convert a class pointer to the corresponding class handle */
-static u_long
-clp_to_clh(cl)
-	struct priq_class *cl;
-{
-	return (cl->cl_handle);
-}
-#endif
 
 #ifdef KLD_MODULE
 

@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.c,v 1.22 2003/07/10 12:07:48 kjc Exp $	*/
+/*	$KAME: altq_hfsc.c,v 1.23 2003/09/17 14:23:25 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -256,13 +256,15 @@ hfsc_add_queue(struct pf_altq *a)
 
 	opts = &a->pq_u.hfsc_opts;
 
-	parent = NULL;
-	if (a->qid != HFSC_ROOTCLASS_HANDLE)
-		if ((parent = clh_to_clp(hif, a->parent_qid)) == NULL)
-			return (EINVAL);
-
-	if (a->qid >= HFSC_MAX_CLASSES || a->qid == 0)
+	if (a->parent_qid == HFSC_NULLCLASS_HANDLE &&
+	    hif->hif_rootclass == NULL)
+		parent = NULL;
+	else if ((parent = clh_to_clp(hif, a->parent_qid)) == NULL)
 		return (EINVAL);
+
+	if (a->qid == 0)
+		return (EINVAL);
+
 	if (clh_to_clp(hif, a->qid) != NULL)
 		return (EBUSY);
 
@@ -388,7 +390,10 @@ hfsc_class_create(struct hfsc_if *hif, struct service_curve *rsc,
     struct hfsc_class *parent, int qlimit, int flags, int qid)
 {
 	struct hfsc_class *cl, *p;
-	int s;
+	int i, s;
+
+	if (hif->hif_classes >= HFSC_MAX_CLASSES)
+		return (NULL);
 
 #ifndef ALTQ_RED
 	if (flags & HFCF_RED) {
@@ -502,7 +507,27 @@ hfsc_class_create(struct hfsc_if *hif, struct service_curve *rsc,
 	s = splimp();
 #endif
 	hif->hif_classes++;
-	hif->hif_class_tbl[qid - 1] = cl;
+
+	/*
+	 * find a free slot in the class table.  if the slot matching
+	 * the lower bits of qid is free, use this slot.  otherwise,
+	 * use the first free slot.
+	 */
+	i = qid % HFSC_MAX_CLASSES;
+	if (hif->hif_class_tbl[i] == NULL)
+		hif->hif_class_tbl[i] = cl;
+	else {
+		for (i = 0; i < HFSC_MAX_CLASSES; i++)
+			if (hif->hif_class_tbl[i] == NULL) {
+				hif->hif_class_tbl[i] = cl;
+				break;
+			}
+		if (i == HFSC_MAX_CLASSES) {
+			splx(s);
+			goto err_ret;
+		}
+	}
+
 	if (flags & HFCF_DEFAULTCLASS)
 		hif->hif_defaultclass = cl;
 
@@ -551,7 +576,7 @@ hfsc_class_create(struct hfsc_if *hif, struct service_curve *rsc,
 static int
 hfsc_class_destroy(struct hfsc_class *cl)
 {
-	int s;
+	int i, s;
 
 	if (cl == NULL)
 		return (0);
@@ -588,7 +613,13 @@ hfsc_class_destroy(struct hfsc_class *cl)
 		} while ((p = p->cl_siblings) != NULL);
 		ASSERT(p != NULL);
 	}
-	cl->cl_hif->hif_class_tbl[cl->cl_handle - 1] = NULL;
+
+	for (i = 0; i < HFSC_MAX_CLASSES; i++)
+		if (cl->cl_hif->hif_class_tbl[i] == cl) {
+			cl->cl_hif->hif_class_tbl[i] = NULL;
+			break;
+		}
+
 	cl->cl_hif->hif_classes--;
 	splx(s);
 
@@ -604,6 +635,12 @@ hfsc_class_destroy(struct hfsc_class *cl)
 			red_destroy(cl->cl_red);
 #endif
 	}
+
+	if (cl == cl->cl_hif->hif_rootclass)
+		cl->cl_hif->hif_rootclass = NULL;
+	if (cl == cl->cl_hif->hif_defaultclass)
+		cl->cl_hif->hif_defaultclass = NULL;
+
 	if (cl->cl_usc != NULL)
 		FREE(cl->cl_usc, M_DEVBUF);
 	if (cl->cl_fsc != NULL)
@@ -1667,14 +1704,23 @@ get_class_stats(struct hfsc_classstats *sp, struct hfsc_class *cl)
 static struct hfsc_class *
 clh_to_clp(struct hfsc_if *hif, u_int32_t chandle)
 {
-	u_int idx;
+	int i;
+	struct hfsc_class *cl;
 
 	if (chandle == 0)
 		return (NULL);
-	idx = chandle - 1;
-	if (idx >= HFSC_MAX_CLASSES)
-		return (NULL);
-	return (hif->hif_class_tbl[idx]);
+	/*
+	 * first, try optimistically the slot matching the lower bits of
+	 * the handle.  if it fails, do the linear table search.
+	 */
+	i = chandle % HFSC_MAX_CLASSES;
+	if ((cl = hif->hif_class_tbl[i]) != NULL && cl->cl_handle == chandle)
+		return (cl);
+	for (i = 0; i < HFSC_MAX_CLASSES; i++)
+		if ((cl = hif->hif_class_tbl[i]) != NULL &&
+		    cl->cl_handle == chandle)
+			return (cl);
+	return (NULL);
 }
 
 #ifdef ALTQ3_COMPAT
@@ -1684,7 +1730,6 @@ hfsc_attach(ifq, bandwidth)
 	u_int bandwidth;
 {
 	struct hfsc_if *hif;
-	struct service_curve root_sc;
 
 	MALLOC(hif, struct hfsc_if *, sizeof(struct hfsc_if),
 	       M_DEVBUF, M_WAITOK);
@@ -1699,19 +1744,6 @@ hfsc_attach(ifq, bandwidth)
 	}
 
 	hif->hif_ifq = ifq;
-
-	/*
-	 * create root class
-	 */
-	root_sc.m1 = bandwidth;
-	root_sc.d = 0;
-	root_sc.m2 = bandwidth;
-	if ((hif->hif_rootclass =
-	     hfsc_class_create(hif, &root_sc, NULL, NULL, NULL, 0, 0,
-	    HFSC_ROOTCLASS_HANDLE)) == NULL) {
-		FREE(hif, M_DEVBUF);
-		return (NULL);
-	}
 
 	/* add this state to the hfsc list */
 	hif->hif_next = hif_list;
@@ -2063,25 +2095,31 @@ hfsccmd_add_class(ap)
 {
 	struct hfsc_if *hif;
 	struct hfsc_class *cl, *parent;
+	int	i;
 
 	if ((hif = altq_lookup(ap->iface.hfsc_ifname, ALTQT_HFSC)) == NULL)
 		return (EBADF);
 
-	if ((parent = clh_to_clp(hif, ap->parent_handle)) == NULL) {
-		if (ap->parent_handle == HFSC_ROOTCLASS_HANDLE)
-			parent = hif->hif_rootclass;
-		else
-			return (EINVAL);
-	}
+	if (ap->parent_handle == HFSC_NULLCLASS_HANDLE &&
+	    hif->hif_rootclass == NULL)
+		parent = NULL;
+	else if ((parent = clh_to_clp(hif, ap->parent_handle)) == NULL)
+		return (EINVAL);
+
+	/* assign a class handle (use a free slot number for now) */
+	for (i = 1; i < HFSC_MAX_CLASSES; i++)
+		if (hif->hif_class_tbl[i] == NULL)
+			break;
+	if (i == HFSC_MAX_CLASSES)
+		return (EBUSY);
 
 	if ((cl = hfsc_class_create(hif, &ap->service_curve, NULL, NULL,
-	    parent, ap->qlimit, ap->flags, ap->class_handle)) == NULL)
+	    parent, ap->qlimit, ap->flags, i)) == NULL)
 		return (ENOMEM);
 
-#if 0
 	/* return a class handle to the user */
-	ap->class_handle = clp_to_clh(cl);
-#endif
+	ap->class_handle = i;
+
 	return (0);
 }
 

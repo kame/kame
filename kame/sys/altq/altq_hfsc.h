@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.h,v 1.10 2003/07/10 12:07:48 kjc Exp $	*/
+/*	$KAME: altq_hfsc.h,v 1.11 2003/09/17 14:23:25 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -52,7 +52,6 @@ struct service_curve {
 
 /* special class handles */
 #define	HFSC_NULLCLASS_HANDLE	0
-#define	HFSC_ROOTCLASS_HANDLE	1
 #define	HFSC_MAX_CLASSES	64
 
 /* hfsc class flags */

@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.h,v 1.10 2003/08/20 23:30:23 itojun Exp $	*/
+/*	$KAME: altq_cbq.h,v 1.11 2003/09/17 14:23:25 kjc Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -44,15 +44,7 @@
 extern "C" {
 #endif
 
-/*
- * Define a well known class handles
- */
-#define	NULL_CLASS_HANDLE	0xffffffff
-#define	ROOT_CLASS_HANDLE	0xfffffffe
-#define	DEFAULT_CLASS_HANDLE	0xfffffffd
-#ifdef ALTQ3_COMPAT
-#define	CTL_CLASS_HANDLE	0xfffffffc
-#endif
+#define	NULL_CLASS_HANDLE	0
 
 /* class flags shoud be same as class flags in rm_class.h */
 #define	CBQCLF_RED		0x0001	/* use RED */
