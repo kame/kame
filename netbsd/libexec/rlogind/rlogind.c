@@ -128,19 +128,6 @@ int	log_success = 0;
 
 struct	passwd *pwd;
 
-union sockunion {
-	struct sockinet {
-		u_char si_len;
-		u_char si_family;
-		u_short si_port;
-	} su_si;
-	struct sockaddr_in  su_sin;
-	struct sockaddr_in6 su_sin6;
-};
-#define su_len		su_si.si_len
-#define su_family	su_si.si_family
-#define su_port		su_si.si_port
-
 void	doit __P((int, struct sockaddr *));
 int	control __P((int, char *, int));
 void	protocol __P((int, int));
@@ -149,7 +136,9 @@ void	fatal __P((int, char *, int));
 int	do_rlogin __P((struct sockaddr *, char *));
 void	getstr __P((char *, int, char *));
 void	setup_term __P((int));
+#if 0
 int	do_krb_login __P((union sockunion *));
+#endif
 void	usage __P((void));
 int	local_domain __P((char *));
 char	*topdomain __P((char *));
@@ -250,9 +239,11 @@ doit(f, fromp)
 	case AF_INET:
 		portp = &((struct sockaddr_in *)fromp)->sin_port;
 		break;
+#ifdef INET6
 	case AF_INET6:
 		portp = &((struct sockaddr_in6 *)fromp)->sin6_port;
 		break;
+#endif
 	default:
 		syslog(LOG_ERR, "malformed \"from\" address (af %d)\n", af);
 		exit(1);
@@ -324,8 +315,7 @@ doit(f, fromp)
 		(void)strncpy(utmphost, hostname, sizeof(utmphost));
 	utmphost[sizeof(utmphost) - 1] = '\0';
 
-	if ((fromp->sa_family != AF_INET && fromp->sa_family != AF_INET6) ||
-	    ntohs(*portp) >= IPPORT_RESERVED ||
+	if (ntohs(*portp) >= IPPORT_RESERVED ||
 	    ntohs(*portp) < IPPORT_RESERVED/2) {
 		syslog(LOG_NOTICE, "Connection from %s on illegal port",
 		       naddr);
