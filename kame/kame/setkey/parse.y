@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.36 2001/06/07 15:53:12 sakane Exp $	*/
+/*	$KAME: parse.y,v 1.37 2001/06/27 17:32:21 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -111,11 +111,11 @@ extern void yyerror __P((const char *));
 %token SPDADD SPDDELETE SPDDUMP SPDFLUSH
 %token F_POLICY PL_REQUESTS
 
-%type <num> PORT PREFIX EXTENSION MODE
+%type <num> PREFIX EXTENSION MODE
 %type <num> UP_PROTO PR_ESP PR_AH PR_IPCOMP
 %type <num> ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
 %type <num> DECSTRING
-%type <val> ADDRESS PL_REQUESTS
+%type <val> PORT ADDRESS PL_REQUESTS
 %type <val> key_string policy_requests
 %type <val> QUOTEDSTRING HEXSTRING STRING
 
@@ -455,12 +455,12 @@ sp_selector_spec
 			switch (p_src->sa_family) {
 			case AF_INET:
 				((struct sockaddr_in *)p_src)->sin_port =
-				    htons(pp_port);
+				    pp_port;
 				break;
 #ifdef INET6
 			case AF_INET6:
 				((struct sockaddr_in6 *)p_src)->sin6_port =
-				    htons(pp_port);
+				    pp_port;
 				break;
 #endif
 			default:
@@ -474,12 +474,12 @@ sp_selector_spec
 			switch (p_dst->sa_family) {
 			case AF_INET:
 				((struct sockaddr_in *)p_dst)->sin_port =
-				    htons(pp_port);
+				    pp_port;
 				break;
 #ifdef INET6
 			case AF_INET6:
 				((struct sockaddr_in6 *)p_dst)->sin6_port =
-				    htons(pp_port);
+				    pp_port;
 				break;
 #endif
 			default:
@@ -543,9 +543,31 @@ prefix
 	;
 
 port
-	:	/*NOTHING*/ { pp_port = IPSEC_PORT_ANY; }
-	|	PORT { pp_port = $1; }
-	|	PORTANY { pp_port = IPSEC_PORT_ANY; }
+	:	/*NOTHING*/ { pp_port = htons(IPSEC_PORT_ANY); }
+	|	PORT
+		{
+			struct servent *ent;
+
+			if (strcmp("any", $1.buf) == 0)
+				pp_port = IPSEC_PORT_ANY;
+			else {
+				ent = getservbyname($1.buf, NULL);
+				if (ent) {
+					/* we just choice the first entry. */
+					pp_port = ent->s_port;
+				} else {
+					char *p = NULL;
+					pp_port = (u_int)strtol($1.buf, &p, 10);
+					if (p && *p != '\0') {
+						yyerror("invalid service name");
+						free($1.buf);
+						return -1;
+					}
+					pp_port = htons(pp_port);
+				}
+			}
+			free($1.buf);
+		}
 	;
 
 upper_spec
@@ -897,7 +919,7 @@ parse_init()
 
 	p_src = 0, p_dst = 0;
 	pp_prefix = p_prefs = p_prefd = ~0;
-	pp_port = IPSEC_PORT_ANY;
+	pp_port = htons(IPSEC_PORT_ANY);
 	p_upper = 0;
 
 	p_satype = 0;
