@@ -222,7 +222,7 @@ struct addrinfo {
 	int ai_family;		/* protocol family for socket */
 	int ai_socktype;	/* socket type */
 	int ai_protocol;	/* protocol for socket */
-	int ai_addrlen;		/* length of socket-address */
+	socklen_t ai_addrlen;	/* length of socket-address */
 	struct sockaddr *ai_addr; /* socket-address for socket */
 	char *ai_canonname;	/* canonical name for service location (iff req) */
 	struct addrinfo *ai_next; /* pointer to next in list */
