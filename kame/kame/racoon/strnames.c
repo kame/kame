@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: strnames.c,v 1.3 2000/01/11 16:45:52 sakane Exp $ */
+/* YIPS @(#)$Id: strnames.c,v 1.4 2000/01/14 00:38:34 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -465,6 +465,7 @@ static char *name_pfkey_satype[] = {
 	"",
 	"AH",
 	"ESP",
+	""
 	"RSVP",
 	"OSPFV2",
 	"RIPV2",
