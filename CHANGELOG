@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1662 2001/05/01 21:28:29 jinmei Exp $
+$KAME: CHANGELOG,v 1.1663 2001/05/02 07:34:30 sakane Exp $
 
 <200105>
+Wed May  2 16:30:34 JST 2001 sakane@ydc.co.jp
+	* kame/racoon:
+	- logged the openssl version when racoon starts.
+	- fixed to check whether to process the pfkey message received.
+	  moved the routine into each pfkey handler.
+
 2001-05-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/net/if.c (if_detach): reversed the order of
 	in6_ifdetach and rnh_walktree(if_rtdel).  Since IPv6 interface direct
