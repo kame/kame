@@ -1,4 +1,4 @@
-/*	$KAME: altq_subr.c,v 1.22 2004/04/20 05:09:08 kjc Exp $	*/
+/*	$KAME: altq_subr.c,v 1.23 2004/04/20 16:10:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997-2003
@@ -495,7 +495,11 @@ altq_pfattach(struct pf_altq *a)
 	if (error == 0 && ifp != NULL && ALTQ_IS_ENABLED(&ifp->if_snd)) {
 		tb.rate = a->ifbandwidth;
 		tb.depth = a->tbrsize;
+#ifdef __NetBSD__
+		s = splnet();
+#else
 		s = splimp();
+#endif
 		error = tbr_set(&ifp->if_snd, &tb);
 		splx(s);
 	}
