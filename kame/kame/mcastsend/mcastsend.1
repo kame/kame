@@ -46,7 +46,11 @@
 .Sh DESCRIPTION
 The 
 .Nm
-utility reads from standard input,
+utility reads the given
+.Ar file
+.Po
+or the standard input if no file is specified
+.Pc
 and sending them to the multicast
 .Ar address
 you specified.
@@ -54,10 +58,6 @@ Also you must specify UDP
 .Ar port
 number or service name
 .Pq Xr services 5 .
-If you specify the
-.Ar file ,
-.Nm
-will read from it.
 .Pp
 The options are as follows:
 .Bl -tag -width Fl
