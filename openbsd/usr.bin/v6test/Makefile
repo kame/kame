@@ -2,7 +2,7 @@ SRCDIR=	${.CURDIR}/../../kame/v6test
 
 PROG=	v6test
 SRCS=	v6test.c cksum.c testcap.c getconfig.c
-MAN=	v6test.1
+MAN=	v6test.1 v6test.conf.5
 
 CFLAGS+=-I${SRCDIR}
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \

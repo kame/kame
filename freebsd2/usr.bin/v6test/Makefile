@@ -2,6 +2,8 @@ SRCDIR=	${.CURDIR}/../../kame/v6test
 
 PROG=	v6test
 SRCS=	v6test.c cksum.c testcap.c getconfig.c
+MAN1=	v6test.1
+MAN5=	v6test.conf.5
 
 CFLAGS+=-I${SRCDIR} -DIPSEC
 CFLAGS+=-Duint8_t=u_int8_t -Duint16_t=u_int16_t -Duint32_t=u_int32_t
