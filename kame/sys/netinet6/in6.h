@@ -422,6 +422,11 @@ struct route_in6 {
 #define IPV6_RECVRTHDRDSTOPTS	41 /* bool; recv dst option after rthdr */
 
 #define IPV6_USE_MIN_MTU	42 /* bool; send packets at the minimum MTU */
+#define IPV6_RECVPATHMTU	43 /* bool; notify an according MTU */
+
+/* the followings are used as cmsg type only */
+#define IPV6_PATHMTU		44 /* 4 bytes int; MTU notification */
+#define IPV6_REACHCONF		45 /* no data; ND reachability confirm */
 
 #define IPV6_RTHDR_LOOSE     0 /* this hop need not be a neighbor. XXX old spec */
 #define IPV6_RTHDR_STRICT    1 /* this hop must be a neighbor. XXX old spec */
