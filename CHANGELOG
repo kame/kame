@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2337 2003/02/07 10:22:22 suz Exp $
+$KAME: CHANGELOG,v 1.2338 2003/02/07 10:42:29 suz Exp $
 
 <200302>
+Fri Feb  7 19:40:36 JST 2003	suz@crl.hitachi.co.jp
+	* kame/kame/pim6sd/{main.c, route_sock.h}: fixed file descriptor
+	  leak by SIGHUP (reported by SUDOH Yoshiaki <sudo@iij.ad.jp>)
+	  
+
 Fri Feb 7 19:17:12 JST 2003	suz@crl.hitachi.co.jp
 	* freebsd5/*, kame/*: KAME for FreeBSD 5-RELEASE. (not supported
 	  officially yet, as the merge work is not completely finished)
