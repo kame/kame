@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.87 2004/02/12 15:38:30 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.88 2004/05/24 11:29:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -33,7 +33,7 @@
  * RFC1827/2406 Encapsulated Security Payload.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #endif
@@ -43,7 +43,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 #include <sys/malloc.h>
 #endif
 #include <sys/mbuf.h>
@@ -52,7 +52,7 @@
 #include <sys/socket.h>
 #include <sys/errno.h>
 #include <sys/time.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 #include <sys/kernel.h>
 #endif
 #include <sys/syslog.h>
@@ -74,7 +74,7 @@
 
 #ifdef INET6
 #include <netinet/ip6.h>
-#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if defined(__OpenBSD__) || defined(__FreeBSD__)
 #include <netinet/in_pcb.h>
 #else
 #include <netinet6/in6_pcb.h>
@@ -103,12 +103,12 @@
 
 #ifdef INET
 extern struct protosw inetsw[];
-#if defined(__bsdi__) || defined(__NetBSD__)
+#ifdef __NetBSD__
 extern u_char ip_protox[];
 #endif
 
 void
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifdef __FreeBSD__
 esp4_input(m, off)
 	struct mbuf *m;
 	int off;
@@ -480,7 +480,7 @@ noreplaycheck:
 				ipsecstat.in_polvio++;
 				goto bad;
 			}
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 			(*inetsw[ip_protox[nxt]].pr_input)(m, off);
 #else
 			(*inetsw[ip_protox[nxt]].pr_input)(m, off, nxt);

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.368 2004/04/09 06:54:29 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.369 2004/05/24 11:29:08 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -95,7 +95,7 @@
  *	@(#)in.c	8.2 (Berkeley) 11/15/93
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_mip6.h"
@@ -105,7 +105,7 @@
 #endif
 
 #include <sys/param.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 #include <sys/ioctl.h>
 #endif
 #include <sys/errno.h>
@@ -114,7 +114,7 @@
 #include <sys/socketvar.h>
 #include <sys/sockio.h>
 #include <sys/systm.h>
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+#ifndef __FreeBSD__
 #include <sys/proc.h>
 #endif
 #include <sys/time.h>
@@ -134,7 +134,7 @@
 #include <netinet/if_ether.h>
 #endif
 #ifndef SCOPEDROUTING
-#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__OpenBSD__) || defined(__FreeBSD__)
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/in_pcb.h>
@@ -149,7 +149,7 @@
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/scope6_var.h>
 #ifndef SCOPEDROUTING
-#if defined(__NetBSD__) || (defined(__bsdi__) && _BSDI_VERSION < 199802) || defined(__FreeBSD__)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 #include <netinet6/in6_pcb.h>
 #endif
 #endif
@@ -177,7 +177,7 @@
 
 #include <net/net_osdep.h>
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 MALLOC_DEFINE(M_IPMADDR, "in6_multi", "internet multicast address");
 #endif
 
@@ -220,7 +220,7 @@ static int in6_ifinit __P((struct ifnet *, struct in6_ifaddr *,
 	struct sockaddr_in6 *, int));
 static void in6_unlink_ifa __P((struct in6_ifaddr *, struct ifnet *));
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 int	(*faithprefix_p)(struct in6_addr *);
 #endif
 
@@ -466,16 +466,16 @@ in6_control(so, cmd, data, ifp)
 	struct	in6_ifaddr *ia = NULL;
 	struct	in6_aliasreq *ifra = (struct in6_aliasreq *)data;
 	struct sockaddr_in6 *sa6;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	time_t time_second = (time_t)time.tv_sec;
 #endif
 	int privileged;
 
 	privileged = 0;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 3)
+#if defined(__NetBSD__)
 	if (p && !suser(p->p_ucred, &p->p_acflag))
 		privileged++;
-#elif (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#elif defined(__FreeBSD__)
 	if (p == NULL || !suser(p))
 		privileged++;
 #else
@@ -576,11 +576,7 @@ in6_control(so, cmd, data, ifp)
 			return (EPERM);
 		/* FALLTHROUGH */
 	case SIOCGLIFADDR:
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 		return in6_lifaddr_ioctl(so, cmd, data, ifp, p);
-#else
-		return in6_lifaddr_ioctl(so, cmd, data, ifp);
-#endif
 	}
 
 	/*
@@ -970,13 +966,13 @@ in6_update_ifa(ifp, ifra, ia)
 {
 	int error = 0, hostIsNew = 0, plen = -1;
 	struct in6_ifaddr *oia;
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+#if __FreeBSD__
 	struct ifaddr *ifa;
 #endif
 	struct sockaddr_in6 dst6;
 	struct in6_addrlifetime *lt;
 	struct in6_multi_mship *imm;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	time_t time_second = (time_t)time.tv_sec;
 #endif
 	struct rtentry *rt;
@@ -1150,16 +1146,7 @@ in6_update_ifa(ifp, ifra, ia)
 		IFAREF(&ia->ia_ifa);
 #endif
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		if ((ifa = ifp->if_addrlist) != NULL) {
-			for ( ; ifa->ifa_next; ifa = ifa->ifa_next)
-				continue;
-			ifa->ifa_next = ia62ifa(ia);
-		} else
-			ifp->if_addrlist = ia62ifa(ia);
-#else
 		TAILQ_INSERT_TAIL(&ifp->if_addrlist, &ia->ia_ifa, ifa_list);
-#endif
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD_version > 501000)
 		/* gain another refcnt for the link from if_addrlist */
 		IFAREF(&ia->ia_ifa);
@@ -1341,7 +1328,7 @@ in6_update_ifa(ifp, ifra, ia)
 			}
 		}
 		if (!rt) {
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__OpenBSD__) || defined(__NetBSD__)
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 			struct rt_addrinfo info;
 
 			bzero(&info, sizeof(info));
@@ -1432,7 +1419,7 @@ in6_update_ifa(ifp, ifra, ia)
 			}
 		}
 		if (!rt) {
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__OpenBSD__) || defined(__NetBSD__)
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 			struct rt_addrinfo info;
 
 			bzero(&info, sizeof(info));
@@ -1570,27 +1557,8 @@ in6_unlink_ifa(ia, ifp)
 #else
 	int	s = splnet();
 #endif
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	struct ifaddr *ifa;
-#endif
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	if ((ifa = ifp->if_addrlist) == ia62ifa(ia))
-		ifp->if_addrlist = ifa->ifa_next;
-	else {
-		while (ifa->ifa_next &&
-		       (ifa->ifa_next != ia62ifa(ia)))
-			ifa = ifa->ifa_next;
-		if (ifa->ifa_next)
-			ifa->ifa_next = ia62ifa(ia)->ifa_next;
-		else {
-			/* search failed */
-			printf("Couldn't unlink in6_ifaddr from ifp\n");
-		}
-	}
-#else
 	TAILQ_REMOVE(&ifp->if_addrlist, &ia->ia_ifa, ifa_list);
-#endif
 #ifdef __NetBSD__
 	/* release a refcnt for the link from if_addrlist */
 	IFAFREE(&ia->ia_ifa);
@@ -1610,7 +1578,7 @@ in6_unlink_ifa(ia, ifp)
 		}
 	}
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	if (oia->ia6_multiaddrs.lh_first != NULL) {
 #ifdef __NetBSD__
 		/*
@@ -1668,25 +1636,14 @@ in6_purgeif(ifp)
 {
 	struct ifaddr *ifa, *nifa;
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifa = ifp->if_addrlist; ifa; ifa = nifa)
-#else
-	for (ifa = TAILQ_FIRST(&ifp->if_addrlist); ifa != NULL; ifa = nifa)
-#endif
-	{
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		nifa = ifa->ifa_next;
-#else
+	for (ifa = TAILQ_FIRST(&ifp->if_addrlist); ifa != NULL; ifa = nifa) {
 		nifa = TAILQ_NEXT(ifa, ifa_list);
-#endif
 		if (ifa->ifa_addr->sa_family != AF_INET6)
 			continue;
 		in6_purgeaddr(ifa);
 	}
 
-#if !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
 	in6_ifdetach(ifp);
-#endif
 }
 
 /*
@@ -1840,11 +1797,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 		in6_prefixlen2mask(&ifra.ifra_prefixmask.sin6_addr, prefixlen);
 
 		ifra.ifra_flags = iflr->flags & ~IFLR_PREFIX;
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 		return in6_control(so, SIOCAIFADDR_IN6, (caddr_t)&ifra, ifp, p);
-#else
-		return in6_control(so, SIOCAIFADDR_IN6, (caddr_t)&ifra, ifp);
-#endif
 	    }
 	case SIOCGLIFADDR:
 	case SIOCDLIFADDR:
@@ -1885,9 +1838,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 			}
 		}
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 		TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
 #else
 		for (ifa = ifp->if_addrlist.tqh_first;
@@ -1979,13 +1930,8 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 			    ia->ia_prefixmask.sin6_len);
 
 			ifra.ifra_flags = ia->ia6_flags;
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 			return in6_control(so, SIOCDIFADDR_IN6, (caddr_t)&ifra,
 			    ifp, p);
-#else
-			return in6_control(so, SIOCDIFADDR_IN6, (caddr_t)&ifra,
-			    ifp);
-#endif
 		}
 	    }
 	}
@@ -2017,9 +1963,7 @@ in6_ifinit(ifp, ia, sin6, newhost)
 	 * if this is its first address,
 	 * and to validate the address if necessary.
 	 */
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
 #else
 	for (ifa = ifp->if_addrlist.tqh_first; ifa;
@@ -2070,10 +2014,8 @@ in6_ifinit(ifp, ia, sin6, newhost)
 		in6_ifaddloop(&(ia->ia_ifa));
 	}
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	if (ifp->if_flags & IFF_MULTICAST)
 		in6_restoremkludge(ia, ifp);
-#endif
 
 	return (error);
 }
@@ -2089,9 +2031,7 @@ in6ifa_ifpforlinklocal(ifp, ignoreflags)
 {
 	struct ifaddr *ifa;
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
 #else
 	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next)
@@ -2123,9 +2063,7 @@ in6ifa_ifpwithaddr(ifp, addr)
 {
 	struct ifaddr *ifa;
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
 #else
 	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next)
@@ -2196,7 +2134,7 @@ ip6_sprintf(addr)
 	return (ip6buf[ip6round]);
 }
 
-#if defined(__FreeBSD__) || defined(__bsdi__)
+#if defined(__FreeBSD__)
 int
 in6_localaddr(in6)
 	struct in6_addr *in6;
@@ -2316,9 +2254,7 @@ in6_ifawithifp(ifp, dst)
 	 * If two or more, return one which matches the dst longest.
 	 * If none, return one of global addresses assigned other ifs.
 	 */
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
 #else
 	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next)
@@ -2357,9 +2293,7 @@ in6_ifawithifp(ifp, dst)
 	if (besta)
 		return (besta);
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
 #else
 	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next)
@@ -2408,9 +2342,7 @@ in6_if_up(ifp)
 	in6_ifattach(ifp, NULL);
 
 	dad_delay = 0;
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
 #else
 	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next)
@@ -2471,12 +2403,7 @@ in6_setmaxmtu()
 	unsigned long maxmtu = 0;
 	struct ifnet *ifp;
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifp = ifnet; ifp; ifp = ifp->if_next)
-#else
-	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list))
-#endif
-	{
+	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list)) {
 		/* this function can be called during ifnet initialization */
 		if (!ifp->if_afdata[AF_INET6])
 			continue;
@@ -2525,7 +2452,7 @@ in6_domifdetach(ifp, aux)
 	free(ext, M_IFADDR);
 }
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 /*
  * Convert sockaddr_in6 to sockaddr_in.  Original sockaddr_in6 must be
  * v4 mapped addr or v4 compat addr
@@ -2584,4 +2511,4 @@ in6_sin_2_v4mapsin6_in_sock(struct sockaddr **nam)
 	FREE(*nam, M_SONAME);
 	*nam = (struct sockaddr *)sin6_p;
 }
-#endif /* freebsd3 */
+#endif

@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.50 2004/02/03 07:25:21 itojun Exp $	*/
+/*	$KAME: frag6.c,v 1.51 2004/05/24 11:29:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -48,7 +48,7 @@
 #include <netinet/in_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__) && !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#ifdef __NetBSD__
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/icmp6.h>
@@ -153,7 +153,7 @@ do {									\
 #define	IP6Q_UNLOCK()		ip6q_unlock()
 
 /* FreeBSD tweak */
-#if !defined(M_FTABLE) && (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if !defined(M_FTABLE) && defined(__FreeBSD__)
 MALLOC_DEFINE(M_FTABLE, "fragment", "fragment reassembly header");
 #endif
 
@@ -167,11 +167,8 @@ MALLOC_DEFINE(M_FTABLE, "fragment", "fragment reassembly header");
 void
 frag6_init()
 {
-#ifdef __bsdi__
-	struct timeval tv;
-#endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 	ip6_maxfragpackets = nmbclusters / 4;
 	ip6_maxfrags = nmbclusters / 4;
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.66 2004/03/17 09:54:17 t-momose Exp $	*/
+/*	$KAME: dest6.c,v 1.67 2004/05/24 11:29:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_mip6.h"
@@ -56,7 +56,7 @@
 #include <netinet/in_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__) && !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#ifdef __NetBSD__
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/icmp6.h>

@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.87 2004/04/08 13:40:35 jinmei Exp $	*/
+/*	$KAME: ah_input.c,v 1.88 2004/05/24 11:29:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -33,7 +33,7 @@
  * RFC1826/2402 authentication header.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #endif
@@ -50,7 +50,7 @@
 #include <sys/socket.h>
 #include <sys/errno.h>
 #include <sys/time.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 #include <sys/kernel.h>
 #endif
 #include <sys/syslog.h>
@@ -74,7 +74,7 @@
 
 #ifdef INET6
 #include <netinet6/ip6_var.h>
-#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if defined(__OpenBSD__) || defined(__FreeBSD__)
 #include <netinet/in_pcb.h>
 #else
 #include <netinet6/in6_pcb.h>
@@ -97,12 +97,12 @@
 
 #ifdef INET
 extern struct protosw inetsw[];
-#if defined(__bsdi__) || defined(__NetBSD__)
+#ifdef __NetBSD__
 extern u_char ip_protox[];
 #endif
 
 void
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifdef __FreeBSD__
 ah4_input(m, off)
 	struct mbuf *m;
 	int off;
@@ -114,7 +114,7 @@ ah4_input(m, va_alist)
 	struct mbuf *m;
 	va_dcl
 #endif
-#endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif
 {
 	struct ip *ip;
 	struct ah *ah;
@@ -132,10 +132,10 @@ ah4_input(m, va_alist)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	int off, proto;
 	va_list ap;
-#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif
 	size_t stripsiz = 0;
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 	va_start(ap, m);
 	off = va_arg(ap, int);
 	proto = va_arg(ap, int);
@@ -591,7 +591,7 @@ ah4_input(m, va_alist)
 				ipsecstat.in_polvio++;
 				goto fail;
 			}
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 			(*inetsw[ip_protox[nxt]].pr_input)(m, off);
 #else
 			(*inetsw[ip_protox[nxt]].pr_input)(m, off, nxt);

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.384 2004/05/20 08:15:54 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.385 2004/05/24 11:29:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,7 +64,7 @@
  *	@(#)ip_icmp.c	8.2 (Berkeley) 1/4/94
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
@@ -97,7 +97,7 @@
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
-#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#ifdef __OpenBSD__
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #endif
@@ -107,10 +107,10 @@
 #include <netinet6/scope6_var.h>
 #include <netinet/icmp6.h>
 #include <netinet6/mld6_var.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <netinet/in_pcb.h>
 #include <netinet6/in6_pcb.h>
-#elif defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#elif defined(__OpenBSD__)
 #include <netinet/in_pcb.h>
 #else
 #include <netinet6/in6_pcb.h>
@@ -175,12 +175,12 @@ extern struct domain inet6domain;
 
 struct icmp6stat icmp6stat;
 
-#if defined (__OpenBSD__)
+#ifdef __OpenBSD__
 extern struct inpcbtable rawin6pcbtable;
-#elif !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-extern struct in6pcb rawin6pcb;
-#else
+#elif __FreeBSD__
 extern struct inpcbhead ripcb;
+#else
+extern struct in6pcb rawin6pcb;
 #endif
 extern int icmp6errppslim;
 static int icmp6errpps_count = 0;
@@ -214,10 +214,8 @@ static int icmp6_redirect_lowat = 1024;
 #endif
 #endif
 
-#ifndef __bsdi__
 struct rttimer_queue *icmp6_mtudisc_timeout_q = NULL;
 extern int pmtu_expire;
-#endif
 
 static void icmp6_errcount __P((struct icmp6errstat *, int, int));
 static int icmp6_rip6_input __P((struct mbuf **, int));
@@ -237,15 +235,13 @@ static int icmp6_recover_src __P((struct mbuf *));
 static struct rtentry *icmp6_mtudisc_clone __P((struct sockaddr *));
 static void icmp6_redirect_timeout __P((struct rtentry *, struct rttimer *));
 #endif
-#ifndef __bsdi__
 static void icmp6_mtudisc_timeout __P((struct rtentry *, struct rttimer *));
-#endif
 
 void
 icmp6_init()
 {
 	mld_init();
-#if defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
 	icmp6_mtudisc_timeout_q = rt_timer_queue_create(pmtu_expire);
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -627,9 +623,9 @@ icmp6_input(mp, offp, proto)
 		goto freeit;
 	}
 
-#if (defined(NFAITH) && 0 < NFAITH) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if (defined(NFAITH) && 0 < NFAITH) || defined(__FreeBSD__)
 	if (
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 	    faithprefix_p != NULL && (*faithprefix_p)(&ip6->ip6_dst)
 #else
 	    faithprefix(&ip6->ip6_dst)
@@ -1401,7 +1397,7 @@ icmp6_notify_error(m, off, icmp6len, code)
 		if (icmp6type == ICMP6_PACKET_TOO_BIG) {
 			notifymtu = ntohl(icmp6->icmp6_mtu);
 			ip6cp.ip6c_cmdarg = (void *)&notifymtu;
-#if !(defined(__NetBSD__) || defined(__OpenBSD__))
+#ifdef __FreeBSD__
 			icmp6_mtudisc_update(&ip6cp, &icmp6dst, 1); /* XXX */
 #endif
 		}
@@ -1421,9 +1417,6 @@ icmp6_notify_error(m, off, icmp6len, code)
 }
 
 
-#ifdef __bsdi__
-extern int pmtu_expire;
-#endif
 void
 icmp6_mtudisc_update(ip6cp, dst, validated)
 	struct ip6ctlparam *ip6cp;
@@ -1441,13 +1434,6 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 	struct rtentry *rt = NULL;
 #ifndef SCOPEDROUTING
 	struct sockaddr_in6 dst_tmp;
-#endif
-#ifdef __bsdi__
-#ifdef NEW_STRUCT_ROUTE
-	struct route ro6;
-#else
-	struct route_in6 ro6;
-#endif
 #endif
 
 #if 0
@@ -1514,16 +1500,6 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 		      | RTF_PRCLONING
 #endif
 		     );
-#else
-#ifdef __bsdi__
-	bcopy(dst, &ro6.ro_dst, sizeof(struct sockaddr_in6));
-	ro6.ro_rt = 0;
-	/* rtcalloc((struct route *)&ro6); */
-	rtalloc((struct route *)&ro6);
-	rt = ro6.ro_rt;
-#else
-#error no case for this particular operating system
-#endif
 #endif
 #endif
 
@@ -1536,7 +1512,7 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 			icmp6stat.icp6s_pmtuchg++;
 			rt->rt_rmx.rmx_mtu = mtu;
 
-#if defined( __FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 			/*
 			 * We intentionally ignore the error case of
 			 * rt_timer_add(), because the only bad effect is that
@@ -1546,11 +1522,6 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 				rt_timer_add(rt, icmp6_mtudisc_timeout,
 				    icmp6_mtudisc_timeout_q);
 			}
-#endif
-#ifdef __bsdi__
-			rt_timer_add(rt,
-			    pmtu_expire ? time.tv_sec + pmtu_expire : 0,
-			    icmp6_mtuexpire, NULL);
 #endif
 		}
 	}
@@ -2114,16 +2085,9 @@ ni6_addrs(ni6, m, ifpp, subj)
 		}
 	}
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifp = ifnet; ifp; ifp = ifp->if_next)
-#else
-	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list))
-#endif
-	{
+	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list)) {
 		addrsofif = 0;
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 		TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
 #else
 		for (ifa = ifp->if_addrlist.tqh_first; ifa;
@@ -2197,7 +2161,7 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 	struct ifnet *ifp0;
 	int resid;
 {
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+#ifdef __FreeBSD__
 	struct ifnet *ifp = ifp0 ? ifp0 : ifnet;
 #else
 	struct ifnet *ifp = ifp0 ? ifp0 : TAILQ_FIRST(&ifnet);
@@ -2209,7 +2173,7 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 	u_char *cp = (u_char *)(nni6 + 1);
 	int niflags = ni6->ni_flags;
 	u_int32_t ltime;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
 
@@ -2218,19 +2182,9 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 
   again:
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (; ifp; ifp = ifp->if_next)
-#else
-	for (; ifp; ifp = TAILQ_NEXT(ifp, if_list))
-#endif
-	{
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#else
+	for (; ifp; ifp = TAILQ_NEXT(ifp, if_list)) {
 		for (ifa = ifp->if_addrlist.tqh_first; ifa;
-		     ifa = ifa->ifa_list.tqe_next)
-#endif
-		{
+		     ifa = ifa->ifa_list.tqe_next) {
 			if (ifa->ifa_addr->sa_family != AF_INET6)
 				continue;
 			ifa6 = (struct in6_ifaddr *)ifa;
@@ -2388,7 +2342,7 @@ icmp6_rip6_input(mp, off)
 		return (IPPROTO_DONE);
 	}
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	LIST_FOREACH(in6p, &ripcb, inp_list)
 #elif defined(__OpenBSD__)
 	for (in6p = rawin6pcbtable.inpt_queue.cqh_first;
@@ -2399,7 +2353,7 @@ icmp6_rip6_input(mp, off)
 	     in6p != &rawin6pcb; in6p = in6p->in6p_next)
 #endif
 	{
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 		if ((in6p->inp_vflag & INP_IPV6) == 0)
 			continue;
 #endif
@@ -2729,7 +2683,7 @@ icmp6_reflect(m, off)
 	 * since the length of ICMP6 errors is limited to the minimum MTU.
 	 */
 	if (ip6_output(m, NULL, NULL, IPV6_MINMTU, NULL, &outif
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
+#ifdef __FreeBSD__
 		       , NULL
 #endif
 		       ) != 0 && outif)
@@ -2766,13 +2720,9 @@ icmp6_redirect_diag(src6, dst6, tgt6)
 	struct in6_addr *src6, *dst6, *tgt6;
 {
 	static char buf[1024];
-#ifndef __bsdi__
+
 	snprintf(buf, sizeof(buf), "(src=%s dst=%s tgt=%s)",
 	    ip6_sprintf(src6), ip6_sprintf(dst6), ip6_sprintf(tgt6));
-#else
-	sprintf(buf, "(src=%s dst=%s tgt=%s)",
-	    ip6_sprintf(src6), ip6_sprintf(dst6), ip6_sprintf(tgt6));
-#endif
 	return buf;
 }
 
@@ -2964,9 +2914,6 @@ icmp6_redirect_input(m, off)
 		struct sockaddr_in6 sdst;
 		struct sockaddr_in6 sgw;
 		struct sockaddr_in6 ssrc;
-#ifdef __bsdi__
-		extern int icmp_redirtimeout;	/* XXX */
-#endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 #ifdef __OpenBSD__
 		unsigned long rtcount;
@@ -3006,9 +2953,7 @@ icmp6_redirect_input(m, off)
 		rtredirect((struct sockaddr *)&sdst, (struct sockaddr *)&sgw,
 		    (struct sockaddr *)NULL, RTF_GATEWAY | RTF_HOST,
 		    (struct sockaddr *)&ssrc
-#ifdef __bsdi__
-		    , icmp_redirtimeout
-#elif defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		    , &newrt
 #elif defined(__FreeBSD__) && __FreeBSD_version > 502000
 		    /* empty */
@@ -3287,7 +3232,7 @@ noredhdropt:
 	(void)ipsec_setsocket(m, NULL);
 #endif /* IPSEC */
 	if (ip6_output(m, NULL, NULL, 0, NULL, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
+#ifdef __FreeBSD__
 		       , NULL
 #endif
 		       ) != 0)
@@ -3315,7 +3260,7 @@ fail:
  * ICMPv6 socket option processing.
  */
 int
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 icmp6_ctloutput(so, sopt)
 	struct socket *so;
 	struct sockopt *sopt;
@@ -3330,7 +3275,7 @@ icmp6_ctloutput(op, so, level, optname, mp)
 	int error = 0;
 	int optlen;
 	struct icmp6_filter *p;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	struct inpcb *inp = sotoinpcb(so);
 	int level, op, optname;
 
@@ -3349,7 +3294,7 @@ icmp6_ctloutput(op, so, level, optname, mp)
 #endif
 
 	if (level != IPPROTO_ICMPV6) {
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 		if (op == PRCO_SETOPT && m)
 			(void)m_free(m);
 #endif
@@ -3364,7 +3309,7 @@ icmp6_ctloutput(op, so, level, optname, mp)
 				error = EINVAL;
 				break;
 			}
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 			if (inp->in6p_icmp6filt == NULL) {
 				error = EINVAL;
 				break;
@@ -3387,7 +3332,7 @@ icmp6_ctloutput(op, so, level, optname, mp)
 			error = ENOPROTOOPT;
 			break;
 		}
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 		if (m)
 			(void)m_freem(m);
 #endif
@@ -3396,7 +3341,7 @@ icmp6_ctloutput(op, so, level, optname, mp)
 	case PRCO_GETOPT:
 		switch (optname) {
 		case ICMP6_FILTER:
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 			if (inp->in6p_icmp6filt == NULL) {
 				error = EINVAL;
 				break;
@@ -3660,7 +3605,6 @@ icmp6_redirect_timeout(rt, r)
 }
 #endif /* __NetBSD__ || __OpenBSD__ */
 
-#ifndef __bsdi__
 static void
 icmp6_mtudisc_timeout(rt, r)
 	struct rtentry *rt;
@@ -3684,61 +3628,6 @@ icmp6_mtudisc_timeout(rt, r)
 	}
 #endif
 }
-#endif
-
-
-#ifdef __bsdi__
-void
-icmp6_mtuexpire(rt, rtt)
-	struct rtentry *rt;
-	struct rttimer *rtt;
-{
-	rt->rt_flags |= RTF_PROBEMTU;
-	Free(rtt);
-}
-
-int *icmp6_sysvars[] = ICMPV6CTL_VARS;
-
-int
-icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
-{
-	if (name[0] >= ICMPV6CTL_MAXID)
-		return (EOPNOTSUPP);
-	switch (name[0]) {
-#if 0
-	ICMPV6CTL_ND6_PRUNE:
-	ICMPV6CTL_ND6_DELAY:
-	ICMPV6CTL_ND6_UMAXTRIES:
-	ICMPV6CTL_ND6_MMAXTRIES:
-	ICMPV6CTL_ND6_USELOOPBACK:
-		/* need to check the value. */
-#endif
-	case ICMPV6CTL_STATS:
-		return sysctl_rdtrunc(oldp, oldlenp, newp, &icmp6stat,
-		    sizeof(icmp6stat));
-	case ICMPV6CTL_ND6_DRLIST:
-	case ICMPV6CTL_ND6_PRLIST:
-		return nd6_sysctl(name[0], oldp, oldlenp, newp, newlen);
-
-#ifdef MLDV2
-	case ICMPV6CTL_MLD_MAXSRCFILTER:
-	case ICMPV6CTL_MLD_SOMAXSRC:
-	case ICMPV6CTL_MLD_ALWAYSV2:
-		return mld_sysctl(name[0], oldp, oldlenp, newp, newlen);
-#endif
-
-	default:
-		return (sysctl_int_arr(icmp6_sysvars, name, namelen,
-		    oldp, oldlenp, newp, newlen));
-	}
-}
-#endif /* __bsdi__ */
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <sys/sysctl.h>
