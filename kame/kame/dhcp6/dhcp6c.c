@@ -1149,7 +1149,16 @@ client6_recvreply(s, serv)
 			}
 			break;
 		case OT6_STR:
+			/*
+			 * XXX SPEC ISSUE: padding requirement for extension
+			 * XXX SPEC ISSUE: string termination requirement for
+			 *	extension
+			 */
 			if (sizeof(buf) >= elen + 1) {
+				/*
+				 * do not use strcpy/strlcpy here, because
+				 * padding requirement is unclear in spec.
+				 */
 				memset(&buf, 0, sizeof(buf));
 				memcpy(buf, &cp[4], elen);
 				buf[elen] = '\0';
@@ -1168,6 +1177,9 @@ client6_recvreply(s, serv)
 				(u_int32_t)ntohl(*(u_int32_t *)&cp[4]));
 			break;
 		default:
+			/*
+			 * XXX SPEC ISSUE: padding requirement for extension
+			 */
 			for (i = 0; i < elen; i++)
 				dprintf(LOG_DEBUG, "  %02x", cp[4 + i] & 0xff);
 		}

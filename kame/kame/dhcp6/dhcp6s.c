@@ -639,6 +639,10 @@ server6_react_solicit(buf, siz, rcvpi)
 	return(0);
 }
 
+/*
+ * XXX SPEC ISSUE: padding requirement for extension
+ * XXX SPEC ISSUE: string termination requirement for extension
+ */
 /* 11.6.1. Receipt of Request messages */
 /* 11.6.3. Creation and sending of Reply messages */
 static int
@@ -848,12 +852,12 @@ server6_react_request(buf, siz, rcvpi)
 
 	/* DNS domain */
 	opt = dhcp6opttab_byname("Domain Name");
-	if (opt && dnsdom && ext + sizeof(extbuf) + strlen(dnsdom) <= ep) {
+	if (opt && dnsdom && ext + sizeof(extbuf) + strlen(dnsdom) + 1 <= ep) {
 		int dnsdom_len;
 
 		dnsdom_len = strlen(dnsdom);
 		extbuf.dh6e_type = htons(opt->code);
-		extbuf.dh6e_len = htons(dnsdom_len);	/*XXX alignment?*/
+		extbuf.dh6e_len = htons(dnsdom_len) + 1;	/*XXX padding?*/
 		memcpy(ext, &extbuf, sizeof(extbuf));
 		memset(ext + sizeof(extbuf), 0, ntohs(extbuf.dh6e_len));
 		strncpy(ext + sizeof(extbuf), dnsdom, ntohs(extbuf.dh6e_len));
@@ -883,12 +887,12 @@ server6_react_request(buf, siz, rcvpi)
 		}
 
 		opt = dhcp6opttab_byname("IEEE 1003.1 POSIX Timezone");
-		if (opt && ext + sizeof(extbuf) + strlen(tm->tm_zone) <= ep) {
+		if (opt && ext + sizeof(extbuf) + strlen(tm->tm_zone) + 1 <= ep) {
 			int zone_len;
 
 			zone_len = strlen(tm->tm_zone);
 			extbuf.dh6e_type = htons(opt->code);
-			extbuf.dh6e_len = htons(zone_len);	/*XXX alignment?*/
+			extbuf.dh6e_len = htons(zone_len) + 1;	/*XXX padding?*/
 			memcpy(ext, &extbuf, sizeof(extbuf));
 			memset(ext + sizeof(extbuf), 0, ntohs(extbuf.dh6e_len));
 			strncpy(ext + sizeof(extbuf), tm->tm_zone,
