@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1365 2000/11/06 06:47:24 itojun Exp $
+$KAME: CHANGELOG,v 1.1366 2000/11/06 16:54:29 sumikawa Exp $
 
 <200011>
+Tue Nov  7 01:49:35 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* kame/kame/libinet6/resolv/res_init.c: fix memory leak.
+
 Mon Nov  6 15:46:39 JST 2000  itojun@iijlab.net
 	* sys/net/if_stf.c, sys/netinet*/in*gif.c: IFF_LINK2 now controls
 	  the use of ingress filter on tunnel outer/inner source address.
