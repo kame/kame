@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.64 2000/11/19 01:23:44 sakane Exp $
+.\"	$KAME: racoon.conf.5,v 1.65 2000/11/19 14:25:24 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -424,7 +424,7 @@ and policies in the kernel.
 .Ic sainfo ( Ar source_id destination_id \*(Ba Ic anonymous )
 .Ic { Ar statements Ic }
 .Xc
-defines the parameters of IKE phase 2 (IPSec-SA establishment).
+defines the parameters of IKE phase 2 (IPsec-SA establishment).
 .Ar source_id destination_id
 are constructed like the following.
 .Pp
@@ -469,7 +469,7 @@ Instead use
 directives.
 .\"
 .It Ic my_identifier Ar idtype ... ;
-specifies ID type to use phase 2 negociation.
+specifies ID type to use phase 2 negotiation.
 The type of address is used as default.
 See
 .Sx my_identifier
