@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.108 2002/06/08 11:16:51 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.109 2002/06/08 21:29:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1487,9 +1487,9 @@ nd6_dad_timer(ifa)
 			 && dp->dad_ns_icount == dp->dad_count
 			 && dp->dad_na_icount == 0) {
 				log(LOG_INFO, "DAD questionable for %s(%s): "
-					"network card loops back multicast?\n",
-					ip6_sprintf(&ia->ia_addr.sin6_addr),
-					if_name(ifa->ifa_ifp));
+				    "network card loops back multicast?\n",
+				    ip6_sprintf(&ia->ia_addr.sin6_addr),
+				    if_name(ifa->ifa_ifp));
 				/* XXX consider it a duplicate or not? */
 				/* duplicate++; */
 			} else {
