@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1000 2000/06/12 05:54:18 sakane Exp $
+$Id: CHANGELOG,v 1.1001 2000/06/12 07:54:01 itojun Exp $
 
 <200006>
+Mon Jun 12 16:52:29 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/lang/ruby: use 1.4.4.
+
 Mon Jun 12 14:53:22 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	Add to handle CR payload on main/aggressive mode.
