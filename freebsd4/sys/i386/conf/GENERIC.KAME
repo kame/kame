@@ -306,6 +306,9 @@ options 	NEW_STRUCT_ROUTE	# mandatory
 #options 	"IPV6FIREWALL_VERBOSE"
 #options 	"IPV6FIREWALL_DEFAULT_TO_ACCEPT"
 
+# RANDOM_IP_ID is needed to support pf
+options 	RANDOM_IP_ID
+
 # ALTQ
 options 	ALTQ		#alternate queueing
 #options 	ALTQ_CBQ	#class based queueing
