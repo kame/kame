@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.14 2000/09/13 04:50:28 itojun Exp $	*/
+/*	$KAME: proposal.c,v 1.15 2000/09/13 14:57:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.c,v 1.14 2000/09/13 04:50:28 itojun Exp $ */
+/* YIPS @(#)$Id: proposal.c,v 1.15 2000/09/13 14:57:57 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -338,7 +338,8 @@ cmpsaprop_alloc(ph1, pp1, pp2)
 		newpr->encmode = pr1->encmode;
 		newpr->spi = pr2->spi;		/* copy my SPI */
 		newpr->spi_p = pr1->spi;	/* copy peer's SPI */
-		newpr->reqid = pr2->reqid;
+		newpr->reqid_in = pr2->reqid_in;
+		newpr->reqid_out = pr2->reqid_out;
 
 		newtr = newsatrns();
 		if (newtr == NULL) {
@@ -586,7 +587,8 @@ aproppair2saprop(p0)
 		newpr->proto_id = p->prop->proto_id;
 		newpr->spisize = p->prop->spi_size;
 		memcpy(&newpr->spi, p->prop + 1, p->prop->spi_size);
-		newpr->reqid = 0;
+		newpr->reqid_in = 0;
+		newpr->reqid_out = 0;
 
 		for (t = p; t; t = t->tnext) {
 
@@ -723,13 +725,13 @@ printsaproto(pr)
 
 	plog(logp, LOCATION, NULL,
 		" (proto_id=%s spisize=%d spi=%08x spi_p=%08x "
-		"encmode=%s reqid=%d)\n",
+		"encmode=%s reqid=%d:%d)\n",
 		s_ipsecdoi_proto(pr->proto_id),
 		pr->spisize,
 		pr->spi,
 		pr->spi_p,
 		s_ipsecdoi_attr_v(IPSECDOI_ATTR_ENC_MODE, pr->encmode),
-		pr->reqid);
+		pr->reqid_in, pr->reqid_out);
 
 	for (tr = pr->head; tr; tr = tr->next) {
 		printsatrns(pr->proto_id, tr);

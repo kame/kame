@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.51 2000/09/13 04:50:26 itojun Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.52 2000/09/13 14:57:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.51 2000/09/13 04:50:26 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.52 2000/09/13 14:57:57 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1738,7 +1738,7 @@ get_proposal_r(iph2)
 	struct ph2handle *iph2;
 {
 	struct policyindex spidx;
-	struct secpolicy *sp;
+	struct secpolicy *sp, *sp_out = NULL;
 	struct ipsecrequest *req;
 	struct saprop *newpp = NULL;
 	int idi2type = 0;	/* switch whether copy IDs into id[src,dst]. */
@@ -1764,6 +1764,7 @@ get_proposal_r(iph2)
 #define _XIDT(d) ((struct ipsecdoi_id_b *)(d)->v)->type
 
 	/* make a spidx; a key to search SPD */
+	/* get inbound policy */
 	spidx.dir = IPSEC_DIR_INBOUND;
 	spidx.ul_proto = 0;
 
@@ -1879,12 +1880,30 @@ get_proposal_r(iph2)
 		return ISAKMP_INTERNAL_ERROR;
 	}
 
+	/* get outbound policy */
+    {
+	struct sockaddr_storage x;
+
+	spidx.dir = IPSEC_DIR_OUTBOUND;
+	memcpy(&x, &spidx.src, sizeof(x));
+	memcpy(&spidx.src, &spidx.dst, sizeof(spidx.src));
+	memcpy(&spidx.dst, &x, sizeof(spidx.dst));
+
+	sp_out = getsp_r(&spidx);
+	if (!sp_out) {
+		YIPSDEBUG(DEBUG_MISC,
+			plog(logp, LOCATION, NULL,
+				"ERROR: no outbound policy found: %s\n",
+				spidx2str(&spidx)));
+	}
+    }
+
 	YIPSDEBUG(DEBUG_SA,
 		plog(logp, LOCATION, NULL,
 			"DEBUG: suitable SP found:%s\n", spidx2str(&spidx)));
 
 	/* require IPsec ? */
-	if (sp->policy != IPSEC_POLICY_IPSEC) {
+	if (!(sp->policy == IPSEC_POLICY_IPSEC && sp_out->policy == IPSEC_POLICY_IPSEC)) {
 		plog(logp, LOCATION, NULL,
 			"NOTICE: policy found, but no IPsec required: %s\n",
 			spidx2str(&spidx));
@@ -1906,6 +1925,7 @@ get_proposal_r(iph2)
 	/* set new saprop */
 	inssaprop(&iph2->proposal, newpp);
 
+	/* from inbound policy */
 	for (req = sp->req; req; req = req->next) {
 		struct saproto *newpr;
 		struct sockaddr *psaddr = NULL;
@@ -1940,13 +1960,32 @@ get_proposal_r(iph2)
 		newpr->proto_id = ipproto2doi(req->saidx.proto);
 		newpr->spisize = 4;
 		newpr->encmode = pfkey2ipsecdoi_mode(req->saidx.mode);
-		newpr->reqid = req->saidx.reqid;
+		newpr->reqid_in = req->saidx.reqid;
 
 		if (set_satrnsbysainfo(newpr, iph2->sainfo) < 0)
 			goto err;
 
 		/* set new saproto */
 		inssaproto(newpp, newpr);
+	}
+
+	/* get reqid_out from outbound policy */
+	if (sp_out) {
+		struct saproto *pr;
+
+		req = sp_out->req;
+		pr = newpp->head;
+		while (req && pr) {
+			pr->reqid_out = req->saidx.reqid;
+			pr = pr->next;
+			req = req->next;
+		}
+		if (pr || req) {
+			plog(logp, LOCATION, NULL,
+				"ERROR: There is a difference "
+				"between the policies.\n");
+			goto err;
+		}
 	}
 
 	YIPSDEBUG(DEBUG_DSA,

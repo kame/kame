@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.78 2000/09/13 04:50:27 itojun Exp $	*/
+/*	$KAME: pfkey.c,v 1.79 2000/09/13 14:57:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.78 2000/09/13 04:50:27 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.79 2000/09/13 14:57:57 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -936,6 +936,9 @@ pk_recvgetspi(mhp)
 	return 0;
 }
 
+/*
+ * set inbound SA
+ */
 int
 pk_sendupdate(iph2)
 	struct ph2handle *iph2;
@@ -995,7 +998,7 @@ pk_sendupdate(iph2)
 				iph2->dst,
 				iph2->src,
 				pr->spi,
-				pr->reqid,
+				pr->reqid_in,
 				4,	/* XXX static size of window */
 				pr->keymat->v,
 				e_type, e_keylen, a_type, a_keylen, flags,
@@ -1123,6 +1126,9 @@ pk_recvupdate(mhp)
 	return 0;
 }
 
+/*
+ * set outbound SA
+ */
 int
 pk_sendadd(iph2)
 	struct ph2handle *iph2;
@@ -1182,7 +1188,7 @@ pk_sendadd(iph2)
 				iph2->src,
 				iph2->dst,
 				pr->spi_p,
-				pr->reqid,
+				pr->reqid_out,
 				4,	/* XXX static size of window */
 				pr->keymat_p->v,
 				e_type, e_keylen, a_type, a_keylen, flags,
@@ -1359,7 +1365,7 @@ pk_recvacquire(mhp)
 {
 	struct sadb_msg *msg;
 	struct sadb_x_policy *xpl;
-	struct secpolicy *sp;
+	struct secpolicy *sp, *sp_in = NULL;
 #define MAXNESTEDSA	5	/* XXX */
 	struct ph2handle *iph2[MAXNESTEDSA];
 	struct ipsecrequest *req;
@@ -1405,6 +1411,27 @@ pk_recvacquire(mhp)
 			xpl->sadb_x_policy_id);
 		return -1;
 	}
+
+	/* get inbound policy */
+    {
+	struct policyindex spidx;
+
+	spidx.dir = IPSEC_DIR_OUTBOUND;
+	memcpy(&spidx.src, &sp->spidx.src, sizeof(spidx.src));
+	memcpy(&spidx.dst, &sp->spidx.dst, sizeof(spidx.dst));
+	spidx.prefs = sp->spidx.prefs;
+	spidx.prefd = sp->spidx.prefd;
+	spidx.ul_proto = sp->spidx.ul_proto;
+
+	sp_in = getsp_r(&spidx);
+	if (!sp_in) {
+		YIPSDEBUG(DEBUG_PFKEY,
+			plog(logp, LOCATION, NULL,
+				"WARNING: no in-bound policy found: %s\n",
+				spidx2str(&spidx)));
+	}
+    }
+
 	YIPSDEBUG(DEBUG_PFKEY,
 		plog(logp, LOCATION, NULL,
 			"policy found: %s.\n", spidx2str(&sp->spidx)));
@@ -1540,7 +1567,7 @@ pk_recvacquire(mhp)
 		newpr->proto_id = ipproto2doi(req->saidx.proto);
 		newpr->spisize = 4;
 		newpr->encmode = pfkey2ipsecdoi_mode(req->saidx.mode);
-		newpr->reqid = req->saidx.reqid;
+		newpr->reqid_out = req->saidx.reqid;
 
 		if (set_satrnsbysainfo(newpr, iph2[n]->sainfo) < 0) {
 			plog(logp, LOCATION, NULL,
@@ -1550,6 +1577,25 @@ pk_recvacquire(mhp)
 
 		/* set new saproto */
 		inssaproto(newpp, newpr);
+	}
+
+	/* get reqid_in from inbound policy */
+	if (sp_in) {
+		struct saproto *pr;
+
+		req = sp_in->req;
+		pr = newpp->head;
+		while (req && pr) {
+			pr->reqid_in = req->saidx.reqid;
+			pr = pr->next;
+			req = req->next;
+		}
+		if (pr || req) {
+			plog(logp, LOCATION, NULL,
+				"ERROR: There is a difference "
+				"between the policies.\n");
+			goto err;
+		}
 	}
 
 	/* start isakmp initiation by using ident exchange */

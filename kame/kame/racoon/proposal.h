@@ -1,4 +1,4 @@
-/*	$KAME: proposal.h,v 1.6 2000/09/13 04:50:28 itojun Exp $	*/
+/*	$KAME: proposal.h,v 1.7 2000/09/13 14:57:58 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.h,v 1.6 2000/09/13 04:50:28 itojun Exp $ */
+/* YIPS @(#)$Id: proposal.h,v 1.7 2000/09/13 14:57:58 sakane Exp $ */
 
 #include <sys/queue.h>
 
@@ -76,7 +76,8 @@ struct saproto {
 	vchar_t *keymat;		/* KEYMAT */
 	vchar_t *keymat_p;		/* peer's KEYMAT */
 
-	int reqid;			/* request id */
+	int reqid_out;			/* request id (outbound) */
+	int reqid_in;			/* request id (inbound) */
 
 	int len;			/* length, in bits */
 	int ok;				/* if 1, success to set SA in kenrel */
