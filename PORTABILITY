@@ -1,11 +1,14 @@
 Portability guideline
 KAME project
-$Id: PORTABILITY,v 1.6 1999/08/24 08:27:33 itojun Exp $
+$Id: PORTABILITY,v 1.7 1999/08/25 00:41:37 itojun Exp $
 
 
 Source code in "kame" directory will be shared among operating systems
 and hardware platforms.  Here are several guidelines to be portable
 across those possibilities.
+
+- Developers MUST compile the code on two or more platforms, before committing
+  it to the repository (trivial changes or comment typos are okay).
 
 - Do not break paren-match.
   Always try to keep paren-match correctly, regardless of #ifdef.
@@ -39,14 +42,14 @@ across those possibilities.
 	if ((1 & (int)p) == 0) {
 		...
 	}
-  This is correct:
+  This is correct (but actually is not future-proven - fail on 128bit arch):
 	void *p;
 	/* alignment check */
 	if ((1 & (u_long)p) == 0) {
 		...
 	}
   
-- size_t can be 64bit.
+- size_t can be 64bit, and may not be of same size as int.
   When doing printf(), cast size_t to u_long and print it as %lu.
 	size_t siz;
 	printf("%lu", (u_long)siz);
@@ -69,14 +72,18 @@ across those possibilities.
 	} while (0)
   Without this wrapper nasty mistakes can happen.
 
-- for BSDI3, you need to set MAN[0-9] like below:
+- On manpage installation.
+  for BSDI3, you need to set MAN[0-9] in Makefile like below.  MANDIR must
+  point to "cat" directory, not "man".
 	MAN5=	foo.0
+	MAN8=	baz.0
 	MLINKS=	foo.5 baa.5
   For NetBSD, you need to set MAN (not MAN[0-9]):
-	MAN=	foo.5
+	MAN=	foo.5 baz.8
 	MLINKS=	foo.5 baa.5
   For other cases, you need to set MAN[0-9] like below:
 	MAN5=	foo.5
+	MAN8=	baz.8
 	MLINKS=	foo.5 baa.5
 
 - BSDI3 /usr/bin/cc is gcc 1.42, and it does not support __FUNCTION__.
@@ -88,8 +95,7 @@ across those possibilities.
 - sys/queue.h are very different in each of *BSDs.  Most of macros found in
   FreeBSD3 are not available in other systems.  Simply avoid those, make sure
   your code compile on non-FreeBSD3 systems.
-  Avoid xx_FOREACH(), which is only available in FreeBSD3.
-  Just use
+  Avoid xx_FOREACH(), which is only available in FreeBSD3.  Just use
 	for (x = xx_FIRST(); x; x = xx_NEXT(x))
   and do not try to do #ifdef (FreeBSD3).  More #ifdef introduces more bugs.
 
