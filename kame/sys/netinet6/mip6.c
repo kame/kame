@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.160 2002/08/27 03:31:39 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.161 2002/08/28 12:13:02 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -47,10 +47,6 @@
 #endif
 
 #define HMACSIZE 16
-
-#if defined(MIP6_ALLOW_COA_FALLBACK) && defined(MIP6_BDT)
-#error "you cannot specify both MIP6_ALLOW_COA_FALLBACK and MIP6_BDT"
-#endif
 
 #if defined(MIP6) && !defined(MIP6_DRAFT18)
 #error "MIP6 is not released yet"

@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.121 2002/08/26 11:36:28 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.122 2002/08/28 12:13:02 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -211,9 +211,6 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	struct hif_softc *sc;
 	struct mip6_unuse_hoa *uh;
 	u_int8_t usecoa = 0;
-#ifdef MIP6_ALLOW_COA_FALLBACK
-	struct mip6_bu *mbu_dst;
-#endif
 #endif /* MIP6 */
 
 	dst = &dstsock->sin6_addr;
@@ -311,17 +308,6 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 			break;
 		}
 	}
-#ifdef MIP6_ALLOW_COA_FALLBACK
-	for (sc = TAILQ_FIRST(&hif_softc_list);
-	     sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
-		mbu_dst = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
-						      dstsock, NULL);
-		if ((mbu_dst != NULL) &&
-		    ((mbu_dst->mbu_state & MIP6_BU_STATE_MIP6NOTSUPP) != 0))
-			usecoa = 1;
-	}
-#endif /* MIP6_ALLOW_COA_FALLBACK */
 #endif /* MIP6 */
 
 #ifdef DIAGNOSTIC
@@ -488,10 +474,6 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 				 *
 				 * 2) a user specified not to use.
 				 * (ex. mip6control -u)
-				 *
-				 * 3) MIP6_ALLOW_COA_FALLABCK is
-				 * defined and the peer doesn't
-				 * recognize HAO.
 				 */
 				if ((ia_best->ia6_flags & IN6_IFF_HOME) == 0 &&
 				    (ia->ia6_flags & IN6_IFF_HOME) != 0) {

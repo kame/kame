@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.121 2002/08/26 12:59:13 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.122 2002/08/28 12:13:02 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -605,12 +605,6 @@ mip6_bu_timeout(arg)
 			/* check if the peer supports BU */
 			if ((mbu->mbu_state & MIP6_BU_STATE_BUNOTSUPP) != 0)
 				continue;
-
-#ifdef MIP6_ALLOW_COA_FALLBACK
-			/* check if the peer supports HA destopt */
-			if ((mbu->mbu_state & MIP6_BU_STATE_MIP6NOTSUPP) != 0)
-				continue;
-#endif
 
 			/* check ack status */
 			if ((mbu->mbu_flags & IP6MU_ACK)
