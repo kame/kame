@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.92 2000/04/04 11:20:12 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.93 2000/04/04 11:20:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -842,7 +842,7 @@ skip_ipsec2:;
 	}
 
 	/*
-	 * setsockopt(IPv6_USE_MIN_MTU) overrides mtu setting
+	 * advanced API (IPV6_USE_MIN_MTU) overrides mtu setting
 	 */
 	if ((flags & IPV6_MINMTU) != 0 && mtu > IPV6_MMTU)
 		mtu = IPV6_MMTU;
