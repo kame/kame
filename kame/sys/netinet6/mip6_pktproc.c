@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.74 2002/10/31 06:34:06 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.75 2002/10/31 14:06:20 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -632,22 +632,23 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	bi.mbc_lifetime = ntohs(ip6mu->ip6mu_lifetime) << 4;	/* units of 16secs */
 #endif
 
+	if (!bu_safe && 
+	    mip6_is_valid_bu(ip6, ip6mu, ip6mulen, &mopt, 
+			     &bi.mbc_phaddr, &bi.mbc_pcoa)) {
+		mip6log((LOG_ERR,
+			 "%s:%d: RR authentication was failed.\n",
+			 __FILE__, __LINE__));
+		m_freem(m);
+		mip6stat.mip6s_rrauthfail++;
+		error = EINVAL;
+		bi.mbc_status = IP6MA_STATUS_INVAL_AUTHENTICATOR;
+		bi.mbc_send_ba = 1;
+		goto send_ba;
+	}
+
 	/* ip6_src and HAO has been already swapped at this point. */
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &bi.mbc_phaddr);
 	if (mbc == NULL) {
-		if (!bu_safe && 
-		    mip6_is_valid_bu(ip6, ip6mu, ip6mulen, &mopt, 
-				     &bi.mbc_phaddr, &bi.mbc_pcoa)) {
-			mip6log((LOG_ERR,
-				 "%s:%d: RR authentication was failed.\n",
-				 __FILE__, __LINE__));
-			m_freem(m);
-			mip6stat.mip6s_rrauthfail++;
-			error = EINVAL;
-			bi.mbc_status = IP6MA_STATUS_INVAL_AUTHENTICATOR;
-			bi.mbc_send_ba = 1;
-			goto send_ba;
-		}
 		if (bi.mbc_lifetime > MIP6_MAX_RR_BINDING_LIFE)
 			bi.mbc_lifetime = MIP6_MAX_RR_BINDING_LIFE;
 	} else {
