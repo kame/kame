@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.149 2004/11/28 11:29:36 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.150 2004/11/28 11:59:37 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1825,40 +1825,47 @@ client6_recvreply(ifp, dh6, len, optinfo)
 
 #ifdef USE_DH6OPT_REFRESHTIME
 	/*
-	 * Set timer if an information refresh time is specified in a reply to
-	 * information-request.  We do not use the value in the stateful
-	 * configuration case (the spec is not clear in such a case).
+	 * Set refresh timer for configuration information specified in
+	 * information-request.  If the timer value is specified by the server
+	 * in an information refresh time option, use it; use the protocol
+	 * default otherwise.
 	 */
-	if (optinfo->refreshtime != DH6OPT_REFRESHTIME_UNDEF) {
-		if (state != DHCP6S_INFOREQ)
-			dprintf(LOG_DEBUG, FNAME,
-			    "ignore information refresh time option");
-		else {
-			ifp->timer =
-			    dhcp6_add_timer(client6_expire_refreshtime, ifp);
-			if (ifp->timer == NULL) {
+	if (state == DHCP6S_INFOREQ) {
+		int64_t refreshtime = DHCP6_IRT_DEFAULT;
+
+		if (optinfo->refreshtime != DH6OPT_REFRESHTIME_UNDEF)
+			refreshtime = optinfo->refreshtime;
+
+		ifp->timer = dhcp6_add_timer(client6_expire_refreshtime, ifp);
+		if (ifp->timer == NULL) {
+			dprintf(LOG_WARNING, FNAME,
+			    "failed to add timer for refresh time");
+		} else {
+			struct timeval tv;
+
+			tv.tv_sec = (long)refreshtime;
+			tv.tv_usec = 0;
+
+			if (tv.tv_sec < 0) {
+				/*
+				 * XXX: tv_sec can overflow for an
+				 * unsigned 32bit value.
+				 */
 				dprintf(LOG_WARNING, FNAME,
-				    "failed to add timer for refresh time");
-			} else {
-				struct timeval tv;
-
-				tv.tv_sec = (long)optinfo->refreshtime;
-				tv.tv_usec = 0;
-
-				if (tv.tv_sec < 0) {
-					/*
-					 * XXX: tv_sec can overflow for an
-					 * unsigned 32bit value.
-					 */
-					dprintf(LOG_WARNING, FNAME,
-					    "refresh time is too large: %lu",
-					    (u_int32_t)optinfo->refreshtime);
-					tv.tv_sec = 0x7fffffff;	/* XXX */
-				}
-
-				dhcp6_set_timer(&tv, ifp->timer);
+				    "refresh time is too large: %lu",
+				    (u_int32_t)refreshtime);
+				tv.tv_sec = 0x7fffffff;	/* XXX */
 			}
+
+			dhcp6_set_timer(&tv, ifp->timer);
 		}
+	} else if (optinfo->refreshtime != DH6OPT_REFRESHTIME_UNDEF) {
+		/*
+		 * draft-ietf-dhc-lifetime-02 clarifies that refresh time
+		 * is only used for information-request and reply exchanges.
+		 */
+		dprintf(LOG_INFO, FNAME,
+		    "unexpected information refresh time option (ignored)");
 	}
 #endif /* USE_DH6OPT_REFRESHTIME */
 
