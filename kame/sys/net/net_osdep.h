@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.65 2001/10/03 13:14:41 jinmei Exp $	*/
+/*	$KAME: net_osdep.h,v 1.66 2001/11/29 08:09:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -275,6 +275,11 @@
  *	of macro expansion contains a large set of condition branches.  If the
  *	size is not constant, compilation optimization cannot be applied, and
  *	a bunch of the large branch will be embedded in the kernel code.
+ *
+ * - M_COPY_PKTHDR
+ *	openbsd30: M_COPY_PKTHDR is deprecated.  use M_MOVE_PKTHDR or
+ *		M_DUP_PKTHDR, depending on how you want to handle m_tag.
+ *	others: M_COPY_PKTHDR is available as usual.
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
