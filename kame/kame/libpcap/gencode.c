@@ -21,7 +21,7 @@
  */
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/gencode.c,v 1.7 2000/01/27 08:09:09 itojun Exp $ (LBL)";
+    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/gencode.c,v 1.8 2000/01/30 17:16:20 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/types.h>
@@ -2357,7 +2357,7 @@ gen_load(proto, index, size)
 #ifdef INET6
 	case Q_IPV6:
 #endif
-		/* XXX Note that we assume a fixed link link header here. */
+		/* XXX Note that we assume a fixed link header here. */
 		s = xfer_to_x(index);
 		tmp = new_stmt(BPF_LD|BPF_IND|size);
 		tmp->s.k = off_nl;
