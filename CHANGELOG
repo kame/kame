@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2653 2004/07/30 00:02:32 jinmei Exp $
+$KAME: CHANGELOG,v 1.2654 2004/07/30 16:48:00 jinmei Exp $
 
 <200407>
+2004-07-31  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6c.c (main): made sure to dump the correct
+	PID in the background mode.
+	* kame/kame/dhcp6/dhcp6s.c (process_auth): corrected the timing to
+	set the realm length.  Without this, dhcp6s could crash when
+	processing authentication information.
+	From: Kensaku Fujimoto
+
 2004-07-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: relocated some configuration files.
 	Automatically-generated DUID files are now in /var/db.  All the
