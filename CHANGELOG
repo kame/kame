@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.915 2000/05/22 12:10:32 itojun Exp $
+$Id: CHANGELOG,v 1.916 2000/05/22 12:16:20 itojun Exp $
 
 <200005>
 Mon May 22 21:08:55 JST 2000  itojun@iijlab.net
@@ -890,7 +890,7 @@ Tue Mar 21 21:56:04 JST 2000  itojun@iijlab.net
 	  (FreeBSD PR should be issued separately)
 	  From: Eric Lemiere <elemiere@matra-ms2i.fr>
 
-Tue Mar 21 18:23:14 JST 2000  itojun@iilab.net
+Tue Mar 21 18:23:14 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_input.c: disable too strong check against
 	  packets with IPv4 compatible address.  this (wrongly) forbids
 	  auto tunnel relaying case in RFC1933.  we may want to re-enable it
@@ -930,12 +930,12 @@ Sat Mar 18 10:27:03 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/mtr: install binary as non-suid root.
 	  unbroken pkgsrc.
 
-Sat Mar 18 01:16:26 JST 2000  itojun@iiljab.net
+Sat Mar 18 01:16:26 JST 2000  itojun@iijlab.net
 	* ports/packages for mtr and lynx: mark them BROKEN for vulnerability
 	  reported on bugtraq.  we recommend you to remove them from your KAME
 	  box by using pkg_delete(8), if you have installed them.
 
-Sat Mar 18 JST 2000  itojun@iiljab.net
+Sat Mar 18 JST 2000  itojun@iijlab.net
 	* {netbsd,openbsd}/sys/netinet/in.c, sys/netinet6/in6.c: backout
 	  memory leak fix on interface address addition failure, added
 	  Mar 11 2000.  the fix was too strict and made it impossible to
@@ -1893,7 +1893,7 @@ Fri Jan 28 15:37:46 JST 2000  itojun@iijlab.net
 	  It is recommended to recompile both the kernel and all the
 	  userland applications with this fix.
 
-Thu Jan 27 15:04:12 JST 2000  itojun@iiljab.net
+Thu Jan 27 15:04:12 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/rsync, freebsd[23]/ports/rsync: upgrade to
 	  2.3.2 with latest IPv6 patch.
 
