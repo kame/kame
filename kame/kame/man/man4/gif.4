@@ -1,4 +1,4 @@
-.\"	$KAME: gif.4,v 1.6 2000/04/14 09:09:50 itojun Exp $
+.\"	$KAME: gif.4,v 1.7 2000/04/14 09:27:27 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -119,24 +119,24 @@ Also,
 .Nm
 will accept tunneled traffic from any outer source address.
 .Pp
-When finding a
-.Nm gif
-interface from the inbound tunneled traffic,
-bidirectional mode interface is preferred than multi-destination mode interface.
-For example, if you have the following three
-.Nm
-interfaces on node A, tunneled traffic from C to A will match the second
-.Nm
-interface, not the third one.
-.Bl -bullet -compact -offset indent
-.It
-bidirectional, A to B
-.It
-bidirectional, A to C
-.It
-multi-destination, A to any
-.El
-.Pp
+.\"When finding a
+.\".Nm gif
+.\"interface from the inbound tunneled traffic,
+.\"bidirectional mode interface is preferred than multi-destination mode interface.
+.\"For example, if you have the following three
+.\".Nm
+.\"interfaces on node A, tunneled traffic from C to A will match the second
+.\".Nm
+.\"interface, not the third one.
+.\".Bl -bullet -compact -offset indent
+.\".It
+.\"bidirectional, A to B
+.\".It
+.\"bidirectional, A to C
+.\".It
+.\"multi-destination, A to any
+.\".El
+.\".Pp
 Please note that multi-destination mode is far less secure
 than bidirectional mode.
 Multi-destination mode
