@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.111 2003/02/04 02:59:22 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.112 2003/03/06 12:33:35 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -124,6 +124,8 @@ int client6_ifinit __P((struct dhcp6_if *));
 #define DHCP6C_CONF "/usr/local/v6/etc/dhcp6c.conf"
 #define DHCP6C_PIDFILE "/var/run/dhcp6c.pid"
 #define DUID_FILE "/etc/dhcp6c_duid"
+
+#define MAX_ELAPSED_TIME 0xffff
 
 int
 main(argc, argv)
@@ -970,12 +972,30 @@ client6_send(ev)
 		optinfo.elapsed_time = 0;
 	} else {
 		struct timeval now, tv_diff;
+		long et;
 
 		gettimeofday(&now, NULL);
 		tv_sub(&now, &ev->tv_start, &tv_diff);
 
-		optinfo.elapsed_time =
-		    tv_diff.tv_sec * 100 + tv_diff.tv_usec / 10000;
+		/*
+		 * The client uses the value 0xffff to represent any elapsed
+		 * time values greater than the largest time value that can be
+		 * represented in the Elapsed Time option.
+		 * [dhcpv6-interop-00, Section 12]
+		 */
+		if (tv_diff.tv_sec >= (MAX_ELAPSED_TIME / 100) + 1) {
+			/*
+			 * Perhaps we are nervous too much, but without this
+			 * additional check, we would see an overflow in 248
+			 * days (of no responses). 
+			 */
+			et = MAX_ELAPSED_TIME;
+		} else {
+			et = tv_diff.tv_sec * 100 + tv_diff.tv_usec / 10000;
+			if (et >= MAX_ELAPSED_TIME)
+				et = MAX_ELAPSED_TIME;
+		}
+		optinfo.elapsed_time = (int32_t)et;
 	}
 
 	/* option request options */
