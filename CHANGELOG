@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.534 2000/02/08 05:20:52 itojun Exp $
+$Id: CHANGELOG,v 1.535 2000/02/08 11:56:28 sumikawa Exp $
 
 <200002>
+Tue Feb  8 20:54:13 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/bind9: bind9 beta.
+	* freebsd3/ports/ssh: fix freeaddrinfo(NULL) bug, which cause by
+	  mis-patched FreeBSD specific patch(patches/patch-al)
+
 Tue Feb  8 03:00:45 JST 2000  itojun@iijlab.net
 	* sys/netinet6/mip6*: mobile-ip6 code from Ericsson.  currently
 	  build tree is made available for netbsd and freebsd2.
