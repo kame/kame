@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.132 2002/07/01 21:12:20 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.133 2002/07/02 15:29:01 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1293,12 +1293,23 @@ natpt_translateTCPv4To6(struct pcv *cv4, struct pAddr *pad)
 		/* payload unchanged */
 		natpt_fixTCPUDP64cksum(AF_INET, IPPROTO_TCP, &cv6, cv4);
 	} else {
+		/*
+		 * TCP payload was changed.  So we must re-calculate
+		 * TCP checksum.
+		 */
+		int		 plen;
+		caddr_t		 ip6;
+		caddr_t		 bp, ep;
 		struct tcp6hdr	*th;
+
+		ip6 = mtod(cv6.m, caddr_t);
+		plen = ntohs(((struct ip6_hdr *)ip6)->ip6_plen);
+		bp = (caddr_t)cv6.pyld.tcp6;
+		ep = ip6 + sizeof(struct ip6_hdr) + plen;
 
 		th = cv6.pyld.tcp6;
 		th->th_sum = 0;
-		th->th_sum = in6_cksum(cv6.m, IPPROTO_TCP, sizeof(struct ip6_hdr),
-				       cv6.m->m_pkthdr.len - sizeof(struct ip6_hdr));
+		th->th_sum = in6_cksum(cv6.m, IPPROTO_TCP, bp - ip6, ep - bp);
 	}
 
 	return (m6);
