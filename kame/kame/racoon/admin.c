@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: admin.c,v 1.11 2000/06/08 06:43:50 sakane Exp $ */
+/* YIPS @(#)$Id: admin.c,v 1.12 2000/07/04 13:38:54 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -432,7 +432,6 @@ admin_init()
 	char *paddr = "127.0.0.1";	/* XXX */
 	char pbuf[10];
 	int error;
-	int tmp;
 
 	snprintf(pbuf, sizeof(pbuf), "%d", lcconf->port_admin);
 	memset(&hints, 0, sizeof(hints));
@@ -468,16 +467,6 @@ admin_init()
 	if (lcconf->sock_admin < 0) {
 		plog(logp, LOCATION, NULL,
 			"socket (%s)\n", strerror(errno));
-		freeaddrinfo(res);
-		return -1;
-	}
-
-	tmp = 1;
-	if (setsockopt(lcconf->sock_admin, SOL_SOCKET, SO_REUSEPORT,
-		       (void *)&tmp, sizeof(tmp)) < 0) {
-		plog(logp, LOCATION, NULL,
-			"setsockopt (%s)\n", strerror(errno));
-		(void)close(lcconf->sock_admin);
 		freeaddrinfo(res);
 		return -1;
 	}
