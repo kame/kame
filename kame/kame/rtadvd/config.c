@@ -1,3 +1,5 @@
+/*	$KAME: config.c,v 1.11 2000/05/16 13:34:13 itojun Exp $	*/
+
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.

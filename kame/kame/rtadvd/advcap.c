@@ -1,3 +1,5 @@
+/*	$KAME: advcap.c,v 1.3 2000/05/16 13:34:13 itojun Exp $	*/
+
 /*
  * Copyright (c) 1983 The Regents of the University of California.
  * All rights reserved.

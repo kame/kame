@@ -1,3 +1,5 @@
+/*	$KAME: rtadvd.c,v 1.23 2000/05/16 13:34:14 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
