@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.58 2002/09/26 14:03:19 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.59 2002/09/27 11:28:47 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -603,9 +603,20 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		m_freem(m);
 		return (error);
 	}
+#ifdef __NetBSD__
+{
+	char bitmask_buf[128];
+	bitmask_snprintf(mopt.valid_options,
+		 "\20\5REFRESH\4AUTH\3NONCE\2ALTCOA\1UID",
+		 bitmask_buf, sizeof(bitmask_buf));
+	mip6log((LOG_INFO, "%s:%d: Mobility options: %s\n", 
+			 __FILE__, __LINE__, bitmask_buf));
+}
+#else
 	mip6log((LOG_INFO, "%s:%d: Mobility options: %b\n", 
 			 __FILE__, __LINE__, mopt.valid_options,
 		 "\20\5REFRESH\4AUTH\3NONCE\2ALTCOA\1UID\n"));
+#endif
 
 	if (mopt.valid_options & MOPT_ALTCOA)
 		bi.mbc_pcoa.sin6_addr = mopt.mopt_altcoa;
@@ -805,9 +816,20 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 		m_freem(m);
 		return (error);
 	}
+#ifdef __NetBSD__
+{
+	char bitmask_buf[128];
+	bitmask_snprintf(mopt.valid_options,
+		 "\20\5REFRESH\4AUTH\3NONCE\2ALTCOA\1UID",
+		 bitmask_buf, sizeof(bitmask_buf));
+	mip6log((LOG_INFO, "%s:%d: Mobility options: %s\n", 
+			 __FILE__, __LINE__, bitmask_buf));
+}
+#else
 	mip6log((LOG_INFO, "%s:%d: Mobility options: %b\n", 
 			 __FILE__, __LINE__, mopt.valid_options,
 		 "\20\5REFRESH\4AUTH\3NONCE\2ALTCOA\1UID\n"));
+#endif
 
 	mip6stat.mip6s_ba_hist[ip6ma->ip6ma_status]++;
 

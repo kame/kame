@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.11 2002/09/23 10:21:26 keiichi Exp $	*/
+/*	$KAME: mobility6.c,v 1.12 2002/09/27 11:28:47 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,6 +67,9 @@
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
 #endif
+
+static int mobility6_send_be __P((struct sockaddr_in6 *, struct sockaddr_in6 *,
+				  struct sockaddr_in6 *));
 
 /*
  * Mobility header processing.
@@ -203,8 +206,8 @@ mobility6_input(mp, offp, proto)
 			if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {
 				src_sa = ip6a->ip6a_src;
 				src_sa.sin6_addr = ip6a->ip6a_coa;
-				(void)mobility6_send_be(ip6a->ip6a_dst,
-				    &src_sa, ip6a->ip6a_src);
+				(void)mobility6_send_be(&ip6a->ip6a_dst,
+				    &src_sa, &ip6a->ip6a_src);
 			}
 		}
 		m_freem(m);

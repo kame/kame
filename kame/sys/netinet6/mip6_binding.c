@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.138 2002/09/27 01:39:53 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.139 2002/09/27 11:28:47 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1136,7 +1136,7 @@ mip6_process_hrbu(bi)
 	struct sockaddr_in6 haddr;
 	struct mip6_bc *mbc = NULL;
 	struct mip6_bc *prim_mbc = NULL;
-	u_int32_t prlifetime, refresh;
+	u_int32_t prlifetime;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
