@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.75 2001/09/24 15:32:12 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.76 2001/09/24 16:21:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1127,7 +1127,13 @@ in6_src_sysctl(oldp, oldlenp, newp, newlen)
 	size_t newlen;
 {
 	int error = 0;
-	int s = splnet();
+	int s;
+
+#ifdef __NetBSD__
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
 
 	if (oldp && oldlenp == NULL) {
 		error = EINVAL;
