@@ -1,8 +1,25 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.234 1999/10/29 12:16:55 jinmei Exp $
+$Id: CHANGELOG,v 1.235 1999/10/29 12:22:35 itojun Exp $
 
 <199910>
+Fri Oct 29 21:17:10 JST 1999  itojun@iijlab.net
+	* kame/libinet6/getaddinfo.c: Bunch of cleanups.
+	  (1) When servname == 0 and protocol == 0, return addrinfo structure
+	  for both DGRAM/UDP and STREAM/TCP.
+	  For example, if you ask for localhost/echo without specifying
+	  servname nor protocol, the following four addrinfo structure will
+	  be returned (the order may vary):
+		::1 dgram/udp port 7
+		::1 stream/tcp port 7
+		127.0.0.1 dgram/udp port 7
+		127.0.0.1 stream/tcp port 7
+	  This fixes KAME PR 141.
+	  TODO: clarify ordering constraints for the above case.
+	  (2) fix memory leak on failure cases
+	  (3) clarify non-udp/tcp protocol cases.
+	* kame/libinet6/getnamenfo.c: clarify non-udp/tcp protocol cases.
+
 1999-10-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6sd: config parser was rewritten using lex and
 	yacc. According to this change, each line MUST now be terminated
