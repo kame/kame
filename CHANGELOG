@@ -1,12 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.84 1999/09/01 05:16:50 itojun Exp $
+$Id: CHANGELOG,v 1.85 1999/09/01 05:19:17 itojun Exp $
 
 <199908>
 Wed Sep  1 14:14:43 JST 1999  itojun@iijlab.net
-	* usr.bin/ftp: On data connection establishment, warn if scoped
-	  address is used.  If peer (ftp daemon) does not handle scoped
-	  address, data connection may not work right.
+	* usr.bin/ftp (all platforms): On data connection establishment,
+	  warn if scoped address is used.  If peer (ftp daemon) does not
+	  handle scoped address, data connection may not work right.
 	* libexec/ftpd (all platforms): Copy sin6_scope_id from control
 	  connection to active data connection destination, hoping
 	  this to help ftpd's behavior with scoped IPv6 addresses.
