@@ -1,6 +1,6 @@
 Installation procedure - OpenBSD
 KAME project
-$Id: INSTALL,v 1.7 2000/11/22 10:51:22 itojun Exp $
+$Id: INSTALL,v 1.8 2000/11/22 10:56:12 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -82,15 +82,13 @@ D-1. Reboot with the command you like.
 
 E. Configurations, in short
 ===========================
-E-1. Most of configuration files are placed in /usr/local/v6/etc.
-     You may want to copy those foo.sample files into non-sample (foo),
-     edit as necessary.  You may also want to invoke /usr/local/v6/etc/rc.net6
-     from /etc/rc.local, by adding the following into /etc/rc.local:
-	if [ -f /usr/local/v6/etc/rc.net6 ]; then
-		sh /usr/local/v6/etc/rc.net6
-	fi
+E-1. Most of configuration files are shipped with normal OS distribution,
+     and are in located in /etc.  If you need special configuration file for
+     KAME-origin daemons, configuration files need to be placed in
+     /usr/local/v6/etc.  You may want to copy /usr/local/v6/etc/foo.sample into
+     /usr/local/v6/etc/foo, and edit as necessary.
 
-E-2. If you would like to use IPv6-ready inetd, you will need to stop using
+E-2. If you would like to use KAME-patched inetd, you will need to stop using
      /usr/sbin/inetd and switch to /usr/local/v6/sbin/inetd.
      To do this, please replace the following section in /etc/rc:
 
