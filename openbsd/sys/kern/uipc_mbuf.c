@@ -865,7 +865,7 @@ m_split(m0, len0, wait)
 	}
 extpacket:
 	if (m->m_flags & M_EXT) {
-		n->m_flags |= M_EXT;
+		n->m_ext = m->m_ext;
 		MCLADDREFERENCE(m, n);
 		n->m_data = m->m_data + len;
 	} else {
