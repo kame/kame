@@ -37,3 +37,4 @@ options 	ALTQ_PRIQ	#priority queue
 
 # Source-Specific Multicast (SSM)
 #options 	IGMPV3		# IPv4
+#options 	MLDV2		# IPv6
