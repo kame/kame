@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: keysock.h,v 1.3 2000/01/14 03:42:05 itojun Exp $ */
+/* $Id: keysock.h,v 1.4 2000/01/16 16:09:35 itojun Exp $ */
 
 #ifndef _NETKEY_KEYSOCK_H_
 #define _NETKEY_KEYSOCK_H_
@@ -83,4 +83,4 @@ extern int key_sendup __P((struct socket *, struct sadb_msg *, u_int, int));
 extern int key_sendup_mbuf __P((struct socket *, struct mbuf *, int));
 #endif /* KERNEL */
 
-#endif _NETKEY_KEYSOCK_H_
+#endif /*_NETKEY_KEYSOCK_H_*/
