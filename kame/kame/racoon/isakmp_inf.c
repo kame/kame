@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.41 2000/07/15 04:55:49 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.42 2000/07/18 00:35:26 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1020,9 +1020,6 @@ isakmp_info_recv_d(iph1, msg)
 				protected++;
 				break;
 			}
-#if 0
-			isakmp_info_send_n1(iph1, ISAKMP_NTYPE_INVALID_PAYLOAD_TYPE, NULL);
-#endif
 			plog(logp, LOCATION, iph1->remote,
 				"received next payload type %d "
 				"in wrong place (must be the first payload).\n",
