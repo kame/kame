@@ -1,4 +1,4 @@
-/*	$KAME: scope.c,v 1.10 2003/03/22 05:50:17 jinmei Exp $ */
+/*	$KAME: scope.c,v 1.11 2004/06/15 07:59:39 itojun Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -37,7 +37,7 @@
 #ifdef INET6
 #include <sys/queue.h>		/* XXX in6_var.h requires this */
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif
 #include <netinet6/in6_var.h>
