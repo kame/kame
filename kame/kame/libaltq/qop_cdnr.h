@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: qop_cdnr.h,v 1.2 2000/02/02 06:39:38 kjc Exp $
+ * $Id: qop_cdnr.h,v 1.3 2000/03/02 11:55:46 kjc Exp $
  */
 
 /*
@@ -94,6 +94,7 @@ int qcmd_cdnr_add_tswtcm(struct tc_action *rp, const char *ifname,
 			 struct tc_action *green_action,
 			 struct tc_action *yellow_action,
 			 struct tc_action *red_action);
+int qcmd_cdnr_delete(const char *ifname, const char *cdnr_name);
 
 int qop_add_cdnr(struct classinfo **rp, const char *cdnr_name,
 		 struct ifinfo *ifinfo, struct classinfo **childlist,
