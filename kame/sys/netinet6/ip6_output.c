@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.189 2001/06/22 19:19:44 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.190 2001/06/22 19:26:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2266,9 +2266,11 @@ do { \
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				if (ip6_fw_ctl_ptr == NULL)
 					return EINVAL;
-				if (error = soopt_getm(sopt, &m)) /* XXX */
+				/* XXX */
+				if ((error = soopt_getm(sopt, &m)) != 0)
 					break;
-				if (error = soopt_mcopyin(sopt, m)) /* XXX */
+				/* XXX */
+				if ((error = soopt_mcopyin(sopt, m)) != 0)
 					break;
 #else
 				if (ip6_fw_ctl_ptr == NULL) {
