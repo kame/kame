@@ -1,8 +1,21 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.981 2000/06/06 10:35:05 jinmei Exp $
+$Id: CHANGELOG,v 1.982 2000/06/06 12:36:39 jinmei Exp $
 
 <200006>
+2000-06-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd3/libexec/tftpd/tftpd.c: do not connect tftp session
+	  sockets. Instead, check consistency of the client's local port.
+	In response to PR: sys/254
+
+2000-06-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd3/usr.bin/tftp/tftp.c:
+        - do not blindly copy server's port, but make sure to check its
+	  consistency during a session.
+        - copy the whole received sockaddr (i.e. not only port) for the
+	  next sendto(), which would be safer if the server has bound its
+	  local address.
+
 2000-06-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd3/ports/bind9, netbsd/pkgsrc/net/bind9:
 	upgraded to bind-9.0.0b3. KAME users are recommended to use this port,
