@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.41 2000/07/12 14:09:59 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.42 2000/08/15 07:24:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -548,7 +548,11 @@ stf_checkaddr4(in, ifp)
 	 * reject packets with the following address:
 	 * 224.0.0.0/4 0.0.0.0/8 127.0.0.0/8 255.0.0.0/8
 	 */
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 	if (IN_MULTICAST(in->s_addr))
+#else
+	if (IN_MULTICAST(ntohl(in->s_addr)))
+#endif
 		return -1;
 	switch ((ntohl(in->s_addr) & 0xff000000) >> 24) {
 	case 0: case 127: case 255:
