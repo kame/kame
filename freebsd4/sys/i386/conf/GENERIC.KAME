@@ -278,7 +278,6 @@ device		uvscom		# SUNTAC serial adapter
 options 	IPSEC			#IP security
 options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 #options 	IPSEC_DEBUG		#debug for IP security
-#pseudo-device	sec			#IPsec tunnel by sec* device
 #options 	NATM			#native mode ATM
 #options 	ENABLE_DEFAULT_SCOPE
 
