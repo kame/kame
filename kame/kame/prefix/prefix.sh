@@ -1,6 +1,6 @@
 #!/bin/sh
 
-#	$KAME: prefix.sh,v 1.8 2001/02/04 03:33:03 itojun Exp $
+#	$KAME: prefix.sh,v 1.9 2001/02/04 03:37:58 itojun Exp $
 
 # Copyright (c) 2001 WIDE Project. All rights reserved.
 #
@@ -56,7 +56,7 @@ case $command in
 	    echo "prefix: no interface ID found"
 	    exit 1
 	fi
-	hostid=`echo $laddr | sed -e 's/fe80:[0-9a-fA-F]*:/fe80::/' -e 's/fe80:://' -e 's/%.*//'`
+	hostid=`echo $laddr | sed -e 's/^fe80:[0-9a-fA-F]*:/fe80::/' -e 's/^fe80:://' -e 's/%.*//'`
 	address=$2$hostid
 	echo $address
 	exec ifconfig $iface inet6 $address prefixlen 64 alias
