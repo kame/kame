@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.105 2000/05/24 08:25:03 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.106 2000/05/28 15:44:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1431,7 +1431,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 #ifdef notyet			/* To be implemented */
 			case IPV6_RECVPATHMTU:
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
 			case IPV6_BINDV6ONLY:
 #endif
 				if (optlen != sizeof(int))
