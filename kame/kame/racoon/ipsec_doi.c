@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.9 2000/01/10 18:52:17 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.10 2000/01/10 19:43:44 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -100,7 +100,8 @@ static int t2ipsecsa __P((struct isakmp_pl_t *trns, struct ipsecsa *sa));
 
 static struct prop_pair **get_proppair
 	__P((struct ipsecdoi_pl_sa *sa, int mode));
-static struct isakmp_pl_t *get_transform __P((struct isakmp_pl_p *prop));
+static int get_transform
+	__P((struct isakmp_pl_p *prop, struct prop_pair **pair, int *num_p));
 static vchar_t *get_sabyproppair __P((struct prop_pair *pair));
 static u_int32_t ipsecdoi_set_ld __P((int type, vchar_t *buf));
 
@@ -322,11 +323,14 @@ get_ph1approvalx(p, proposal)
 			break;
 	}
 
-	if (s == NULL) {
-		YIPSDEBUG(DEBUG_SA,
+	YIPSDEBUG(DEBUG_SA,
+		if (s == NULL) {
 			plog(logp, LOCATION, NULL,
-				"no acceptable proposal found.\n"));
-	}
+				"unacceptable proposal.\n");
+		} else {
+			plog(logp, LOCATION, NULL,
+				"acceptable proposal found.\n");
+		});
 
 	if (sa.dhgrp != NULL)
 		oakley_dhgrp_free(sa.dhgrp);
@@ -673,6 +677,8 @@ get_ph2approvalx(p, proposal)
 	struct isakmp_pl_t *trns = p->trns;
 	struct ipsecsa sa, *s;
 
+	YIPSDEBUG(DEBUG_SA, plog(logp, LOCATION, NULL, "begin.\n"));
+
 	YIPSDEBUG(DEBUG_SA,
 		plog(logp, LOCATION, NULL,
 	       		"prop#=%d prot-id=%s spi-size=%d #trns=%d "
@@ -946,7 +952,6 @@ get_proppair(sa, mode)
 	int num_p = 0;			/* number of proposal for use */
 	int tlen;
 	caddr_t bp;
-	struct prop_pair *p = NULL, *q;
 	int i;
 
 	YIPSDEBUG(DEBUG_SA,
@@ -982,7 +987,6 @@ get_proppair(sa, mode)
 
     {
 	struct isakmp_pl_p *prop;
-	struct isakmp_pl_t *trns;
 	int proplen;
 	vchar_t *pbuf = NULL;
 	struct isakmp_parse_t *pa;
@@ -1034,35 +1038,8 @@ get_proppair(sa, mode)
 			continue;
 		}
 
-		/* get valid transform */
-		trns = get_transform(prop);
-
-		/* check for duplicated protocol id */
-		for (p = pair[prop->p_no]; p; p = p->next) {
-			if (p->prop->proto_id == prop->proto_id) {
-				trns = NULL;
-				break;
-			}
-		}
-
-		p = CALLOC(sizeof(*p), struct prop_pair *);
-		if (p == NULL) {
-			plog(logp, LOCATION, NULL,
-				"calloc (%s)\n", strerror(errno));
-			return NULL;
-		}
-		p->prop = prop;
-		p->trns = trns;
-
-		/* need to preserve the order */
-		for (q = pair[prop->p_no]; q && q->next; q = q->next)
-			;
-		if (q)
-			q->next = p;
-		else {
-			pair[prop->p_no] = p;
-			num_p++;
-		}
+		/* get transform */
+		get_transform(prop, pair, &num_p);
 	}
 	vfree(pbuf);
 	pbuf = NULL;
@@ -1070,7 +1047,7 @@ get_proppair(sa, mode)
 
     {
 	int notrans, nprop;
-	struct prop_pair *q;
+	struct prop_pair *p, *q;
 
 	/* check for proposals with no transforms */
 	for (i = 0; i < MAXPROPPAIRLEN; i++) {
@@ -1086,6 +1063,7 @@ get_proppair(sa, mode)
 			nprop++;
 		}
 
+#if 0
 		/*
 		 * XXX at this moment, we cannot accept proposal group
 		 * with multiple proposals.  this should be fixed.
@@ -1097,6 +1075,7 @@ get_proppair(sa, mode)
 				pair[i]->prop->p_no);
 			notrans++;
 		}
+#endif
 
 		if (notrans) {
 			for (p = pair[i]; p; p = q) {
@@ -1108,7 +1087,7 @@ get_proppair(sa, mode)
 		} else {
 			YIPSDEBUG(DEBUG_MISC,
 				plog(logp, LOCATION, NULL,
-					"proposal #%u: %d proposals\n",
+					"proposal #%u: %d transform\n",
 					pair[i]->prop->p_no, nprop));
 		}
 	}
@@ -1130,24 +1109,26 @@ get_proppair(sa, mode)
  *	positive: return the pointer to the payload of valid transform.
  *	0	: No valid transform found.
  */
-static struct isakmp_pl_t *
-get_transform(prop)
+static int
+get_transform(prop, pair, num_p)
 	struct isakmp_pl_p *prop;
+	struct prop_pair **pair;
+	int *num_p;
 {
-	struct isakmp_pl_t *trns_ok = NULL; /* valid transform payload */
 	int tlen; /* total length of all transform in a proposal */
 	caddr_t bp;
 	struct isakmp_pl_t *trns;
 	int trnslen;
 	vchar_t *pbuf;
 	struct isakmp_parse_t *pa;
+	struct prop_pair *p = NULL, *q;
 
 	bp = (caddr_t)prop + sizeof(struct isakmp_pl_p) + prop->spi_size;
 	tlen = ntohs(prop->h.len)
 		- (sizeof(struct isakmp_pl_p) + prop->spi_size);
 	pbuf = isakmp_parsewoh(ISAKMP_NPTYPE_T, (struct isakmp_gen *)bp, tlen);
 	if (pbuf == NULL)
-		return NULL;
+		return -1;
 
 	/* check and get transform for use */
 	for (pa = (struct isakmp_parse_t *)pbuf->v;
@@ -1168,12 +1149,12 @@ get_transform(prop)
 				"transform #%u len=%u\n", trns->t_no, trnslen));
 
 		/* check transform ID */
-		if (prop->proto_id >= sizeof(check_transform)/sizeof(check_transform[0])) {
+		if (prop->proto_id >= ARRAYLEN(check_transform)) {
 			plog(logp, LOCATION, NULL,
 				"unsupported proto_id %u\n", prop->proto_id);
 			continue;
 		}
-		if (prop->proto_id >= sizeof(check_attributes)/sizeof(check_attributes[0])) {
+		if (prop->proto_id >= ARRAYLEN(check_attributes)) {
 			plog(logp, LOCATION, NULL,
 				"unsupported proto_id %u\n", prop->proto_id);
 			continue;
@@ -1189,20 +1170,32 @@ get_transform(prop)
 			continue;
 
 		/* check data attributes */
-		if (check_attributes[prop->proto_id](trns) == 0) {
-			/* OK. Valid transform found. */
-			trns_ok = trns;
-			break;
+		if (check_attributes[prop->proto_id](trns) != 0)
+			continue;
+
+		p = CALLOC(sizeof(*p), struct prop_pair *);
+		if (p == NULL) {
+			plog(logp, LOCATION, NULL,
+				"calloc (%s)\n", strerror(errno));
+			return -1;
+		}
+		p->prop = prop;
+		p->trns = trns;
+
+		/* need to preserve the order */
+		for (q = pair[prop->p_no]; q && q->next; q = q->next)
+			;
+		if (q)
+			q->next = p;
+		else {
+			pair[prop->p_no] = p;
+			(*num_p)++;
 		}
 	}
 
 	vfree(pbuf);
-	if (trns_ok == NULL) {
-		YIPSDEBUG(DEBUG_SA,
-			plog(logp, LOCATION, NULL,
-				"no acceptable transform found.\n"));
-	}
-	return trns_ok;
+
+	return 0;
 }
 
 /*
