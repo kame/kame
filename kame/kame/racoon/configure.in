@@ -121,9 +121,8 @@ ssleay_version="`$ssleay_cmd version | cut -d' ' -f2 | tr -d '[a-zA-Z\.]' | tr -
 if test -z "$ssleay_version"; then
 	ssleay_version="0"
 fi;
-SSLVERDEF="-DSSLVER=$ssleay_version"
+AC_DEFINE_UNQUOTED(SSLVER, $ssleay_version)
 AC_MSG_RESULT("$ssleay_version")
-AC_SUBST(SSLVERDEF)
 
 AC_CHECK_LIB(crypto, des_cbc_encrypt)
 AC_CHECK_LIB(l, yywrap)
