@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.309 1999/12/01 12:52:05 jinmei Exp $
+$Id: CHANGELOG,v 1.310 1999/12/01 16:54:22 itojun Exp $
 
 <199912>
+Thu Dec  2 01:50:28 JST 1999  itojun@iijlab.net
+	* kame/sys/netinet6/icmp6.c: fix sanity check location for mbuf
+	  requirement in icmp6_error().
+	* kame/sys/netinet6/ip6_forward.c: to protect the original packet
+	  from ipsec tunnel-mode operations, copy it before any ipsec
+	  operations (was copied after ipsec operations - does not make sense
+	  if the packet is tunnelled as IPv6 header will be changed).
+
 1999-12-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ping6/ping6.c: the `-S sourceaddr' option was added,
 	which specifies the source address of outgoing packets.
