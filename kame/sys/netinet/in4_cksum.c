@@ -111,7 +111,9 @@ in4_cksum(m, nxt, off, len)
 
 	/* pseudo header */
 	if (off < sizeof(struct ipovly))
-		panic("offset too short");
+		panic("in4_cksum: offset too short");
+	if (m->m_len < sizeof(struct ip))
+		panic("in4_cksum: bad mbuf chain");
 	bzero(&ipov, sizeof(ipov));
 	ipov.ih_len = htons(len);
 	ipov.ih_pr = nxt;
