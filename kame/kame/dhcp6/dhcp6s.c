@@ -213,7 +213,7 @@ server6_init()
 		/* NOTREACHED */
 	}
 
-	/* initiilize socket */
+	/* initialize socket */
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_INET6;
 	hints.ai_socktype = SOCK_DGRAM;
