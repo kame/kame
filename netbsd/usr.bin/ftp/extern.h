@@ -67,6 +67,7 @@
 struct fd_set;
 struct sockaddr;
 struct tm;
+struct addrinfo;
 
 void    abort_remote __P((FILE *));
 void    abortpt __P((int));
