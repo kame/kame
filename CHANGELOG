@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.270 1999/11/17 14:02:05 sakane Exp $
+$Id: CHANGELOG,v 1.271 1999/11/17 14:56:27 jinmei Exp $
 
 <199911>
+1999-11-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/tcpdump/print-pim.c (pimv2_print):
+	  corrected offset check and calculation for the RP holdtime and
+	  priority fields of Bootstraps.
+
 Wed Nov 17 13:38:40 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/apache13: upgrade to 1.3.9.
 
