@@ -2185,6 +2185,8 @@ sockaddr_ntop(sa)
 }
 
 #if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
+static int setpolicy __P((int, struct addrinfo *, char *));
+
 static int
 setpolicy(net, res, policy)
 	int net;
@@ -2211,6 +2213,7 @@ setpolicy(net, res, policy)
 	}
 
 	free(buf);
+	return 0;
 }
 #endif
 
@@ -2305,36 +2308,38 @@ tn(argc, argv)
     }
 
     memset(&hints, 0, sizeof(hints));
-    hints.ai_flags = AI_NUMERICHOST;
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = 0;
+    hints.ai_flags = AI_NUMERICHOST;	/* avoid forward lookup */
     error = getaddrinfo(hostname, portp, &hints, &res0);
     if (!error) {
-	/*numeric*/
-	freeaddrinfo(res0);
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_flags = AI_CANONNAME;
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = 0;
-	error = getaddrinfo(hostname, portp, &hints, &res0);
+	if (getnameinfo(res0->ai_addr, res0->ai_addrlen,
+		_hostname, sizeof(_hostname), NULL, 0, NI_NAMEREQD) == 0)
+	    ; /* okay */
+	else {
+	    strncpy(_hostname, hostname, sizeof(_hostname) - 1);
+	    _hostname[sizeof(_hostname) - 1] = '\0';
+	}
     } else {
-	/*non-numeric*/
+	/* FQDN - try again with forward DNS lookup */
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = 0;
+	hints.ai_flags = AI_CANONNAME;
 	error = getaddrinfo(hostname, portp, &hints, &res0);
+	if (error) {
+	    fprintf(stderr, "%s: %s\n", hostname, gai_strerror(error));
+	    return 0;
+	}
+	if (res0->ai_canonname) {
+	    (void) strncpy(_hostname, res0->ai_canonname,
+		sizeof(_hostname) - 1);
+	} else
+	    (void) strncpy(_hostname, hostname, sizeof(_hostname) - 1);
+	_hostname[sizeof(_hostname) - 1] = '\0';
     }
-    if (error) {
-	fprintf(stderr, "%s: %s\n", hostname, gai_strerror(error));
-	setuid(getuid());
-	return 0;
-    }
-
-    if (res0->ai_canonname)
-	(void) strcpy(_hostname, res0->ai_canonname);
     hostname = _hostname;
 
     net = -1;
