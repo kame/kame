@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.100 2003/01/10 08:25:47 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.101 2003/01/10 08:27:14 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -249,7 +249,7 @@ stfattach(dummy)
 
 	if (nstf == 0)
 		TAILQ_INIT(&isatap_rtrlist);
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	nstf = dummy;
 #else
 	nstf = NSTF;
