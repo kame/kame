@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.262 1999/11/06 15:20:20 itojun Exp $
+$Id: CHANGELOG,v 1.263 1999/11/07 15:44:41 itojun Exp $
 
 <199911>
+Sun Nov  7 10:40:55 EST 1999  itojun@iijlab.net
+	* netbsd/sys/netinet/tcp_input.c: implement tcp_pullup(),
+	  which ensures mbuf alignment match with what tcp_input() assumes.
+	  the routine is kind of ugly because, in most architectures,
+		MHLEN < ip + tcp + tcp opt
+	  with IPv6.
+
 Sun Nov  6 JST 1999  itojun@iijlab.net
 	* freebsd2/release: improvements to IPv6+PAO boot floppy.  add
 	  isc dhcp client for easier network configuration.
