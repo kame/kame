@@ -499,9 +499,8 @@ tcp_newtcpcb(inp)
 						    inp->in6p_route.ro_rt->rt_ifp :
 						    NULL);
 	else
-#else
-	inp->inp_ip_ttl = ip_defttl;
 #endif
+	inp->inp_ip_ttl = ip_defttl;
 	inp->inp_ppcb = (caddr_t)tp;
 	return (tp);		/* XXX */
 }
