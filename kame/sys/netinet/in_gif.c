@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.77 2001/10/25 09:29:02 jinmei Exp $	*/
+/*	$KAME: in_gif.c,v 1.78 2001/10/25 09:32:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -112,7 +112,7 @@ SYSCTL_INT(_net_inet_ip, IPCTL_GIF_TTL, gifttl, CTLFLAG_RW,
 
 extern struct domain inetdomain;
 struct protosw in_gif_protosw =
-{ SOCK_RAW,	&inetdomain,	0/*IPPROTO_IPV[46]*/,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	0/* IPPROTO_IPV[46] */,	PR_ATOMIC|PR_ADDR,
   in_gif_input, rip_output,	0,		rip_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
@@ -264,7 +264,7 @@ in_gif_output(ifp, family, m)
 		tos = ip->ip_tos;
 		break;
 	    }
-#endif /*INET*/
+#endif /* INET */
 #ifdef INET6
 	case AF_INET6:
 	    {
@@ -279,7 +279,7 @@ in_gif_output(ifp, family, m)
 		tos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
 		break;
 	    }
-#endif /*INET6*/
+#endif /* INET6 */
 #if defined(__NetBSD__) && defined(ISO)
 	case AF_ISO:
 		proto = IPPROTO_EON;
@@ -358,7 +358,7 @@ in_gif_output(ifp, family, m)
 			RTFREE(sc->gif_ro.ro_rt);
 			sc->gif_ro.ro_rt = NULL;
 			m_freem(m);
-			return ENETUNREACH;	/*XXX*/
+			return ENETUNREACH;	/* XXX */
 		}
 
 		sc->rtcache_expire = time_second + in_gif_rtcachettl;
@@ -366,7 +366,7 @@ in_gif_output(ifp, family, m)
 
 	error = ip_output(m, NULL, &sc->gif_ro, 0, NULL);
 	return(error);
-#endif /*openbsd*/
+#endif /* OpenBSD */
 }
 
 void
@@ -489,7 +489,7 @@ in_gif_input(m, va_alist)
 	}
 	gif_input(m, af, gifp);
 	return;
-#endif /*openbsd*/
+#endif /* OpenBSD */
 }
 
 /*
