@@ -4,7 +4,7 @@
 # Whom:			Michael Elbel (me@FreeBSD.org)
 #
 # $FreeBSD: ports/editors/xemacs21/Makefile,v 1.35 1999/11/16 21:14:37 gj Exp $
-# $Id: Makefile,v 1.1 1999/12/16 08:28:49 sumikawa Exp $
+# $Id: Makefile,v 1.2 2000/01/05 15:01:38 sumikawa Exp $
 #
 
 DISTNAME=	xemacs-21.1.8
@@ -19,7 +19,7 @@ MASTER_SITES=	\
 DISTFILES=	${DISTNAME}${EXTRACT_SUFX} ${DISTNAME}-elc${EXTRACT_SUFX} ${DISTNAME}-info${EXTRACT_SUFX}
 
 PATCH_SITES=	http://www.hiru.aoba.yokohama.jp/~ura/ipv6/
-PATCHFILES=	xemacs-21.1.8-ipv6.patch
+PATCHFILES=	xemacs-21.1.8-ipv6.19991229.patch.gz
 PATCH_DIST_STRIP=	-p
 
 MAINTAINER=	sumikawa@kae.net
