@@ -1,8 +1,31 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1438 2000/12/13 08:16:06 itojun Exp $
+$KAME: CHANGELOG,v 1.1439 2000/12/15 14:25:10 sakane Exp $
 
 <200012>
+Fri Dec 15 23:24:58 JST 2000 sakane@ydc.co.jp
+	* racoon:
+	racoon uses syslog() if both the logging file and -F option are not
+	specified when racoon is launched.  Now there are three way to log.
+	One is to the standard output.  Second is to syslog.  Third is to the
+	file specified by the option.
+
+	nuke YIPSDEBUG() macro, instead racoon use the value "loglevel"
+	as logging value.  "loglevel" can be specified either of the following
+	capital word, and they are printed with each output as the tag name in
+	the logging file.
+	INFO: begin negotiation, SA establishment/deletion/expiration.
+	NOTIFY: just notifiable.
+	WARNING: not error strictly.
+	ERROR: system call error. also invalid parameter/format.
+	DEBUG1: debugging informatioin.
+	DEBUG2: too more verbose. e.g. parsing config.
+
+	XXX The logging level and the tag name are mixed. They may be separated.
+	ERROR should be separated because the error of IKE protocol and system
+	call are mixed.
+	XXX to be more checked.
+
 Wed Dec 13 17:05:36 JST 2000  itojun@iijlab.net
 	* netbsd/sbin/racoon: update racoon reachover makefile.  compiles in
 	  GSSAPI support if MKKERBEROS is set.
