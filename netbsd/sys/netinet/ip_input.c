@@ -687,30 +687,6 @@ ip_input(struct mbuf *m)
 	NTOHS(ip->ip_len);
 	NTOHS(ip->ip_off);
 
-#if NPF > 0
-	/*
-	 * Packet filter
-	 */
-#ifdef IPSEC
-	if (!ipsec_getnhist(m))
-#else
-	if (1)
-#endif
-	{
-		struct in_addr odst;
-
-		odst = ip->ip_dst;
-		if (pf_test(PF_IN, m->m_pkthdr.rcvif, &m) != PF_PASS)
-			goto bad;
-		if (m == NULL)
-			return;
-
-		ip = mtod(m, struct ip *);
-		hlen = ip->ip_hl << 2;
-		srcrt = (odst.s_addr != ip->ip_dst.s_addr);
-	}
-#endif
-
 	/*
 	 * Process options and, if not destined for us,
 	 * ship it on.  ip_dooptions returns 1 when an

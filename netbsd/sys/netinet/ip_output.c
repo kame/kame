@@ -800,19 +800,6 @@ spd_done:
 	hlen = ip->ip_hl << 2;
 #endif /* PFIL_HOOKS */
 
-#if NPF > 0
-	if (pf_test(PF_OUT, ifp, &m) != PF_PASS) {
-		error = EHOSTUNREACH;
-		m_freem(m);
-		goto done;
-	}
-	if (m == NULL)
-		goto done;
-
-	ip = mtod(m, struct ip *);
-	hlen = ip->ip_hl << 2;
-#endif
-
 	m->m_pkthdr.csum_flags |= M_CSUM_IPv4;
 	sw_csum = m->m_pkthdr.csum_flags & ~ifp->if_csum_flags_tx;
 	/*
