@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.138 2001/03/29 05:34:32 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.139 2001/04/27 01:37:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1360,6 +1360,17 @@ nd6_rtrequest(req, rt, sa)
 
 	if (rt->rt_flags & RTF_GATEWAY)
 		return;
+
+	if (nd6_need_cache(ifp) == 0 && (rt->rt_flags & RTF_HOST) == 0) {
+		/*
+		 * This is probably an interface direct route for a link
+		 * which does not need neighbor caches (e.g. fe80::%lo0/64).
+		 * We do not need special treatment below for such a route.
+		 * Moreover, the RTF_LLINFO flag which would be set below
+		 * would annoy the ndp(8) command.
+		 */
+		return;
+	}
 
 	switch (req) {
 	case RTM_ADD:

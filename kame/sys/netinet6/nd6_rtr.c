@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.110 2001/04/04 06:16:10 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.111 2001/04/27 01:37:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1843,11 +1843,6 @@ nd6_prefix_onlink(pr)
 		/* explicitly set in case ifa_flags does not set the flag. */
 		rtflags |= RTF_CLONING;
 	} else {
-		/*
-		 * set the gateway flag to prevent nd6_rtrequest() from setting
-		 * RTF_LLINFO (which annoys the ndp(8) command).
-		 */
-		rtflags |= RTF_GATEWAY;
 		/*
 		 * explicitly clear the cloning bit in case ifa_flags sets it.
 		 */
