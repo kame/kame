@@ -33,18 +33,31 @@
  * PURPOSE.
  */
 
+#ifdef __FreeBSD__
+#include "opt_inet.h"
+#include "opt_inet6.h"
+#endif
 #ifdef _KERNEL_OPT
 #include "opt_inet.h"
 #endif
 
+#ifdef __FreeBSD__
+#include "bpf.h"
+#else
 #include "bpfilter.h"
+#endif
 #include "pflog.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
+#ifndef __FreeBSD__
 #include <sys/ioctl.h>
+#else
+#include <sys/kernel.h>
+#include <sys/sockio.h>
+#endif
 
 #include <net/if.h>
 #include <net/if_types.h>
@@ -78,17 +91,29 @@
 
 struct pflog_softc pflogif[NPFLOG];
 
+#if defined(__FreeBSD__)
+void	pflogattach(void *);
+PSEUDO_SET(pflogattach, if_pflog);
+#else
 void	pflogattach(int);
+#endif
 int	pflogoutput(struct ifnet *, struct mbuf *, struct sockaddr *,
 	    	       struct rtentry *);
 int	pflogioctl(struct ifnet *, u_long, caddr_t);
 void	pflogrtrequest(int, struct rtentry *, struct sockaddr *);
 void	pflogstart(struct ifnet *);
 
+#ifndef __FreeBSD__
 extern int ifqmaxlen;
+#endif
 
+#if defined(__FreeBSD__)
+void
+pflogattach(void *pflog)
+#else
 void
 pflogattach(int npflog)
+#endif
 {
 	struct ifnet *ifp;
 	int i;
@@ -97,7 +122,12 @@ pflogattach(int npflog)
 
 	for (i = 0; i < NPFLOG; i++) {
 		ifp = &pflogif[i].sc_if;
+#ifndef __FreeBSD__
 		snprintf(ifp->if_xname, sizeof ifp->if_xname, "pflog%d", i);
+#else
+		snprintf(ifp->if_name, sizeof ifp->if_name, "pflog");
+		ifp->if_unit = i;
+#endif
 		ifp->if_softc = &pflogif[i];
 		ifp->if_mtu = PFLOGMTU;
 		ifp->if_ioctl = pflogioctl;
@@ -107,10 +137,12 @@ pflogattach(int npflog)
 		ifp->if_snd.ifq_maxlen = ifqmaxlen;
 		ifp->if_hdrlen = PFLOG_HDRLEN;
 		if_attach(ifp);
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		if_alloc_sadl(ifp);
+#endif
 
 #if NBPFILTER > 0
-#ifdef __OpenBSD__
+#ifndef HAVE_NEW_BPFATTACH
 		bpfattach(&pflogif[i].sc_if.if_bpf, ifp, DLT_PFLOG,
 			  PFLOG_HDRLEN);
 #else
@@ -133,8 +165,9 @@ pflogstart(struct ifnet *ifp)
 #ifdef __OpenBSD__
 		s = splimp();
 #else
-		IF_DROP(&ifp->if_snd);
+		s = splnet();
 #endif
+		IF_DROP(&ifp->if_snd);
 		IF_DEQUEUE(&ifp->if_snd, m);
 		splx(s);
 
