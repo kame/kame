@@ -306,6 +306,10 @@ param_statement:
 		}
 	|	HOLDTIME NUMBER EOS
 		{
+			if ($2 > 0 && $2 < 3) {
+				yywarn("invalid hold timer value: %d", $2);
+				return(-1);
+			}
 			set_param(yy_holdtime, $2, "holdtime");
 		}
 	|	ROUTEREFLECTOR EOS
