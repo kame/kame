@@ -79,6 +79,8 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet6/ip6_var.h>
 #include <netinet6/tcpipv6.h>
 #include <sys/domain.h>
+#include <netinet6/in6_var.h>
+#include <netinet6/ip6protosw.h>
 #endif /* INET6 */
 
 #ifdef TCP_SIGNATURE
@@ -706,7 +708,6 @@ tcp6_ctlinput(cmd, sa, d)
 	register struct tcphdr *thp;
 	struct tcphdr th;
 	void (*notify) __P((struct inpcb *, int)) = tcp_notify;
-	int nmatch;
 	struct sockaddr_in6 sa6;
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
@@ -717,8 +718,10 @@ tcp6_ctlinput(cmd, sa, d)
 		return;
 	if (cmd == PRC_QUENCH)
 		notify = tcp_quench;
+#if 0
 	else if (cmd == PRC_MSGSIZE)
 		notify = tcp_mtudisc;
+#endif
 	else if (!PRC_IS_REDIRECT(cmd) &&
 		 ((unsigned)cmd > PRC_NCMDS || inet6ctlerrmap[cmd] == 0))
 		return;
@@ -763,11 +766,11 @@ tcp6_ctlinput(cmd, sa, d)
 			thp = &th;
 		} else
 			thp = (struct tcphdr *)(mtod(m, caddr_t) + off);
-		(void)in6_pcbnotify(&tcb, (struct sockaddr *)&sa6,
+		(void)in6_pcbnotify(&tcbtable, (struct sockaddr *)&sa6,
 				    thp->th_dport, &ip6_tmp.ip6_src,
 				    thp->th_sport, cmd, notify);
 	} else {
-		(void)in6_pcbnotify(&tcb, (struct sockaddr *)&sa6, 0,
+		(void)in6_pcbnotify(&tcbtable, (struct sockaddr *)&sa6, 0,
 				    &zeroin6_addr, 0, cmd, notify);
 	}
 }
