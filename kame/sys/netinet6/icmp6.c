@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.149 2000/10/10 16:45:36 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.150 2000/10/13 17:07:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1118,7 +1118,8 @@ icmp6_mtudisc_update(dst, icmp6, m)
 #ifdef __bsdi__
 	bcopy(&sin6, &ro6.ro_dst, sizeof(struct sockaddr_in6));
 	ro6.ro_rt = 0;
-	rtcalloc((struct route *)&ro6);
+	/* rtcalloc((struct route *)&ro6); */
+	rtalloc((struct route *)&ro6);
 	rt = ro6.ro_rt;
 #else
 #error no case for this particular operating system
