@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.14 2000/06/28 08:31:32 suz Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.15 2000/07/02 14:17:37 itojun Exp $	*/
 
 /*
  * Copyright (c) 1993 Daniel Boulet
@@ -13,8 +13,6 @@
  * but requiring it would be too onerous.
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
- *
- *	$Id: ip6_fw.c,v 1.14 2000/06/28 08:31:32 suz Exp $
  */
 
 /*
