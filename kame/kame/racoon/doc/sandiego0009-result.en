@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.5 2000/09/18 19:02:09 sakane Exp $
+$KAME: sandiego0009-result.en,v 1.6 2000/09/18 23:56:37 itojun Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -48,3 +48,13 @@ vs Cryptek
 	he sent 4 as ph1 spi size.  I warned and ignore it.
 	he sent tiger as hash.  It was his fault.
 
+vs SSH (IPv6)
+	phase 1: responder, aggressive
+	    preshared, blowfish, md5, DH group 2
+	phase 2: PFS group 2
+	    ESP blowfish-cbc+md5, transport mode
+	Notes:
+	- both end had issues with ND, if we configure "encrypt all" policy.
+	  both end changed policy to use ipsec on tcp6 only (not on icmp6).
+	- racoon crashed if SSH attaches more than 10 phase 1 proposals.
+	- in phase 2 first packet, racoon crashed in cmpspidx_wild().
