@@ -1,4 +1,4 @@
-/*	$KAME: session.c,v 1.20 2000/12/15 13:43:57 sakane Exp $	*/
+/*	$KAME: session.c,v 1.21 2000/12/15 16:04:58 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -167,6 +167,17 @@ session(void)
 	}
 }
 
+/* clear all status and exit program. */
+void
+close_session()
+{
+	flushph1();
+	close_sockets();
+
+	plog(LLV_INFO, LOCATION, NULL, "racoon shutdown");
+	exit(0);
+}
+
 static void
 check_rtsock(p)
 	void *p;
@@ -259,7 +270,7 @@ check_sigreq()
 		break;
 
 	default:
-		plog(LLV_DEBUG, LOCATION, NULL, "caught signal %d\n", sigreq);
+		plog(LLV_INFO, LOCATION, NULL, "caught signal %d\n", sigreq);
 		pfkey_send_flush(lcconf->sock_pfkey, SADB_SATYPE_UNSPEC);
 		sched_new(1, check_flushsa_stub, NULL);
 		sigreq = 0;
@@ -331,9 +342,7 @@ check_flushsa()
 		return;
 	}
 
-	flushph1();
-	close_sockets();
-	exit(1);
+	close_session();
 }
 
 static void
