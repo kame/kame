@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.45 2002/06/04 05:20:27 itojun Exp $	*/
+/*	$KAME: main.c,v 1.46 2002/07/01 04:08:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -236,10 +236,12 @@ main(ac, av)
 				"cannot open %s", pid_file);
 		}
 		if (!f_local) {
+#if 0
 			if (atexit(cleanup_pidfile) < 0) {
 				plog(LLV_ERROR, LOCATION, NULL,
 					"cannot register pidfile cleanup");
 			}
+#endif
 		}
 	}
 
