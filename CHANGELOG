@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2307 2003/01/17 09:09:54 suz Exp $
+$KAME: CHANGELOG,v 1.2308 2003/01/17 10:19:08 keiichi Exp $
 
 <200301>
+Fri Jan 17 19:18:44 JST 2003	keiichi@iij.ad.jp
+	* kame/sys/netinet/icmp6.h
+	corrected the dhaad reply format.
+
 Fri Jan 17 18:08:00 JST 2003	suz@crl.hitachi.co.jp
 	* kame/sys/netinet6/ip6_input.c:
 	  When listening to a source-specific-multicast group, receives 
