@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.208 2005/01/24 06:04:07 keiichi Exp $	*/
+/*	$Id: mip6.c,v 1.209 2005/01/25 02:44:52 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -1622,3 +1622,35 @@ mip6_get_logical_src_dst(m, src, dst)
 	return (0);
 }
 #endif /* NMIP > 0 */
+
+#if NMIP > 0
+void
+mip6_md_scan(u_int16_t ifindex) {
+        int s;
+        struct nd_defrouter *dr;
+#ifndef __FreeBSD__
+        long time_second = time.tv_sec;
+#endif
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+        s = splsoftnet();
+#else
+        s = splnet();
+#endif
+
+#define MIP6_SCAN_TIME 2
+        /* expire default router list */
+        dr = TAILQ_FIRST(&nd_defrouter);
+        while (dr) {
+                if (dr->ifp && dr->ifp->if_index == ifindex) {
+                        if (dr->expire > (time_second + MIP6_SCAN_TIME))
+                                dr->expire = time_second + MIP6_SCAN_TIME;
+                } 
+                dr = TAILQ_NEXT(dr, dr_entry);
+        }
+        splx(s);
+
+        return;
+}
+#endif /* NMIP > 0 */
+

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.119 2005/01/20 09:14:05 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.120 2005/01/25 02:44:52 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -182,6 +182,8 @@ struct ip6_opt_home_address *mip6_search_hoa_in_destopt(u_int8_t *);
 void mip6_probe_routers(void);
 int mip6_get_logical_src_dst(struct mbuf *, struct in6_addr *,
     struct in6_addr *);
+void mip6_md_scan(u_int16_t);
+
 
 /* used by one or more kind of nodetypes. */
 struct in6_ifaddr *mip6_ifa_ifwithin6addr(const struct in6_addr *,
