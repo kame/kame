@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.81 2003/11/05 14:24:41 suz Exp $	*/
+/*	$KAME: net_osdep.h,v 1.82 2004/01/19 03:24:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -306,6 +306,10 @@
  *
  * - TAILQ_EMPTY
  *	BSD/OS 4.x does not have this macro.
+ *
+ * - timercmp(), timersub()
+ *	bsdi[34]: no timercmp, timersub
+ *	freebsd[45]: only in userland (why?)
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
@@ -368,6 +372,33 @@ int ppsratecheck __P((struct timeval *, int *, int));
 
 #if 1				/* at this moment, all OSes do this */
 #define WITH_CONVERT_IP_OFF
+#endif
+
+#if defined(__bsdi__) || defined(__FreeBSD__)
+#define	timerclear(tvp)		(tvp)->tv_sec = (tvp)->tv_usec = 0
+#define	timerisset(tvp)		((tvp)->tv_sec || (tvp)->tv_usec)
+#define	timercmp(tvp, uvp, cmp)						\
+	(((tvp)->tv_sec == (uvp)->tv_sec) ?				\
+	    ((tvp)->tv_usec cmp (uvp)->tv_usec) :			\
+	    ((tvp)->tv_sec cmp (uvp)->tv_sec))
+#define	timeradd(tvp, uvp, vvp)						\
+	do {								\
+		(vvp)->tv_sec = (tvp)->tv_sec + (uvp)->tv_sec;		\
+		(vvp)->tv_usec = (tvp)->tv_usec + (uvp)->tv_usec;	\
+		if ((vvp)->tv_usec >= 1000000) {			\
+			(vvp)->tv_sec++;				\
+			(vvp)->tv_usec -= 1000000;			\
+		}							\
+	} while (/* CONSTCOND */ 0)
+#define	timersub(tvp, uvp, vvp)						\
+	do {								\
+		(vvp)->tv_sec = (tvp)->tv_sec - (uvp)->tv_sec;		\
+		(vvp)->tv_usec = (tvp)->tv_usec - (uvp)->tv_usec;	\
+		if ((vvp)->tv_usec < 0) {				\
+			(vvp)->tv_sec--;				\
+			(vvp)->tv_usec += 1000000;			\
+		}							\
+	} while (/* CONSTCOND */ 0)
 #endif
 
 #endif /*_KERNEL*/
