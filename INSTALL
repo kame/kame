@@ -1,6 +1,6 @@
 Installation procedure - preparation of the tree
 KAME project
-$Id: INSTALL,v 1.6 1999/09/21 07:16:54 itojun Exp $
+$Id: INSTALL,v 1.7 1999/10/04 03:10:54 itojun Exp $
 
 
 KAME build tree shares part of the tree among operating system
@@ -19,6 +19,8 @@ ready to tackle those troubles.
    files under /usr/local/v6 to avoid conflicts or misuse of old file during
    build process.  We recommend you to remove the following, at least:
 	/usr/local/v6/lib/*
+   Also, do not forget to update /usr/include in step 5 (see below),
+   otherwise include files and source code become out-of-sync.
   
 1. Identify your target operating system, by looking at document named
    "VERSION".  Suppose the target is "netbsd".
