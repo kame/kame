@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.125 2003/10/02 12:11:39 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.126 2003/10/02 20:39:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -393,7 +393,7 @@ ip6_forward(m, srcrt)
 		return;
 	}
 	dst = (struct sockaddr_in6 *)state.dst;
-	rt = state.ro->ro_rt;
+	rt = state.ro ? state.ro->ro_rt : NULL;
 	if (dst != NULL && rt != NULL)
 		ipsecrt = 1;
     }
