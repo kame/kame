@@ -1,5 +1,5 @@
-/*	$OpenBSD: radix.c,v 1.13 2003/12/19 06:57:17 brad Exp $	*/
-/*	$NetBSD: radix.c,v 1.11 1996/03/16 23:55:36 christos Exp $	*/
+/*	$OpenBSD: radix.c,v 1.18 2004/04/25 20:02:39 itojun Exp $	*/
+/*	$NetBSD: radix.c,v 1.20 2003/08/07 16:32:56 agc Exp $	*/
 
 /*
  * Copyright (c) 1988, 1989, 1993
@@ -29,12 +29,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)radix.c	8.4 (Berkeley) 11/2/94
+ *	@(#)radix.c	8.6 (Berkeley) 10/17/95
  */
 
 /*
  * Routines to build and maintain radix trees for routing lookups.
  */
+
+#ifndef _NET_RADIX_H_
 #include <sys/param.h>
 #ifdef _KERNEL
 #include <sys/systm.h>
@@ -44,11 +46,14 @@
 #include <netinet/ip_encap.h>
 #else
 #include <stdlib.h>
-#include <stdlib.h>
-#include <string.h>
 #endif
 #include <sys/syslog.h>
 #include <net/radix.h>
+#endif
+
+#ifndef SMALL_KERNEL
+#include <net/radix_mpath.h>
+#endif
 
 #ifdef RADIX_MPATH
 #include <net/radix_mpath.h>
@@ -65,11 +70,11 @@ static char *rn_zeros, *rn_ones;
 #undef Bcmp
 #define Bcmp(a, b, l) (l == 0 ? 0 : bcmp((caddr_t)(a), (caddr_t)(b), (u_long)l))
 
-
 static int rn_satisfies_leaf(char *, struct radix_node *, int);
 static int rn_lexobetter(void *, void *);
 static struct radix_mask *rn_new_radix_mask(struct radix_node *,
-						 struct radix_mask *);
+    struct radix_mask *);
+
 /*
  * The data structure for the keys is a radix tree with one way
  * branching removed.  The index rn_b at an internal node n represents a bit
@@ -283,7 +288,8 @@ on1:
 	do {
 		struct radix_mask *m;
 		t = t->rn_p;
-		if ((m = t->rn_mklist) != NULL) {
+		m = t->rn_mklist;
+		if (m) {
 			/*
 			 * If non-contiguous masks ever become important
 			 * we can restore the masking and open coding of
@@ -300,9 +306,10 @@ on1:
 					while (x && x->rn_mask != m->rm_mask)
 						x = x->rn_dupedkey;
 					if (x && rn_satisfies_leaf(v, x, off))
-						    return x;
+						return x;
 				}
-			} while ((m = m->rm_mklist) != NULL);
+				m = m->rm_mklist;
+			} while (m);
 		}
 	} while (t != top);
 	return 0;
@@ -459,7 +466,7 @@ rn_addmask(n_arg, search, skip)
 	Bcopy(addmask_key, cp, mlen);
 	x = rn_insert(cp, mask_rnhead, &maskduplicated, x);
 	if (maskduplicated) {
-		log(LOG_ERR, "rn_addmask: mask impossibly already in tree");
+		log(LOG_ERR, "rn_addmask: mask impossibly already in tree\n");
 		Free(saved_x);
 		return (x);
 	}
@@ -556,7 +563,7 @@ rn_addroute(v_arg, n_arg, head, treenodes)
 	saved_tt = tt = rn_insert(v, head, &keyduplicated, treenodes);
 	if (keyduplicated) {
 		for (t = tt; tt; t = tt, tt = tt->rn_dupedkey) {
-#ifdef RADIX_MPATH
+#ifndef SMALL_KERNEL
 			/* permit multipath, if enabled for the family */
 			if (rn_mpath_capable(head) && netmask == tt->rn_mask) {
 				/*
@@ -589,6 +596,9 @@ rn_addroute(v_arg, n_arg, head, treenodes)
 		 * in a masklist -- most specific to least specific.
 		 * This may require the unfortunate nuisance of relocating
 		 * the head of the list.
+		 *
+		 * We also reverse, or doubly link the list through the
+		 * parent pointer.
 		 */
 		if (tt == saved_tt) {
 			struct	radix_node *xx = x;
@@ -596,6 +606,7 @@ rn_addroute(v_arg, n_arg, head, treenodes)
 			(tt = treenodes)->rn_dupedkey = t;
 			tt->rn_flags = t->rn_flags;
 			tt->rn_p = x = t->rn_p;
+			t->rn_p = tt;
 			if (x->rn_l == t)
 				x->rn_l = tt;
 			else
@@ -605,6 +616,9 @@ rn_addroute(v_arg, n_arg, head, treenodes)
 		} else {
 			(tt = treenodes)->rn_dupedkey = t->rn_dupedkey;
 			t->rn_dupedkey = tt;
+			tt->rn_p = t;
+			if (tt->rn_dupedkey)
+				tt->rn_dupedkey->rn_p = tt;
 		}
 #ifdef RN_DEBUG
 		t=tt+1;
@@ -646,7 +660,7 @@ rn_addroute(v_arg, n_arg, head, treenodes)
 		/*
 		 * Skip over masks whose index is > that of new node
 		 */
-		for (mp = &x->rn_mklist; (m = *mp) != NULL; mp = &m->rm_mklist)
+		for (mp = &x->rn_mklist; (m = *mp); mp = &m->rm_mklist)
 			if (m->rm_b >= b_leaf)
 				break;
 		t->rn_mklist = m;
@@ -667,7 +681,7 @@ on2:
 	 * Need same criteria as when sorting dupedkeys to avoid
 	 * double loop on deletion.
 	 */
-	for (mp = &x->rn_mklist; (m = *mp) != NULL; mp = &m->rm_mklist) {
+	for (mp = &x->rn_mklist; (m = *mp); mp = &m->rm_mklist) {
 		if (m->rm_b < b_leaf)
 			continue;
 		if (m->rm_b > b_leaf)
@@ -675,8 +689,8 @@ on2:
 		if (m->rm_flags & RNF_NORMAL) {
 			mmask = m->rm_leaf->rn_mask;
 			if (tt->rn_flags & RNF_NORMAL) {
-				log(LOG_ERR, "Non-unique normal route, "
-				    "mask not entered\n");
+				log(LOG_ERR, "Non-unique normal route,"
+				    " mask not entered\n");
 				return tt;
 			}
 		} else
@@ -704,17 +718,17 @@ rn_delete(v_arg, netmask_arg, head, rn)
 	struct radix_node *dupedkey, *saved_tt, *top;
 	caddr_t v, netmask;
 	int b, head_off, vlen;
-#ifdef RADIX_MPATH
+#ifndef SMALL_KERNEL
 	int mpath_enable = 0;
 #endif
 
 	v = v_arg;
 	netmask = netmask_arg;
 	x = head->rnh_treetop;
-#ifdef RADIX_MPATH
+#ifndef SMALL_KERNEL
 	if (rn) {
 		tt = rn;
-		/* 
+		/*
 		 * Is this route(rn) a rn->dupedkey chain? 
 		 */
 		if (rn_mpath_next(tt->rn_p))
@@ -767,7 +781,7 @@ rn_delete(v_arg, netmask_arg, head, rn)
 		x = t;
 		t = t->rn_p;
 	} while (b <= t->rn_b && x != top);
-	for (mp = &x->rn_mklist; (m = *mp) != NULL; mp = &m->rm_mklist)
+	for (mp = &x->rn_mklist; (m = *mp); mp = &m->rm_mklist)
 		if (m == saved_m) {
 			*mp = m->rm_mklist;
 			MKFree(m);
@@ -791,7 +805,12 @@ on1:
 	if (t) t->rn_ybro = tt->rn_ybro;
 #endif
 	t = tt->rn_p;
-	if ((dupedkey = saved_tt->rn_dupedkey) != 0) {
+	dupedkey = saved_tt->rn_dupedkey;
+	if (dupedkey) {
+		/*
+		 * Here, tt is the deletion target, and
+		 * saved_tt is the head of the dupedkey chain.
+		 */
 		if (tt == saved_tt) {
 			x = dupedkey;
 			x->rn_p = t;
@@ -800,12 +819,14 @@ on1:
 			else
 				t->rn_r = x;
 		} else {
+			/* find node in front of tt on the chain */
 			for (x = p = saved_tt; p && p->rn_dupedkey != tt;)
 				p = p->rn_dupedkey;
-			if (p)
+			if (p) {
 				p->rn_dupedkey = tt->rn_dupedkey;
-			else
-				log(LOG_ERR, "rn_delete: couldn't find us\n");
+				if (tt->rn_dupedkey)
+					tt->rn_dupedkey->rn_p = p;
+			} else log(LOG_ERR, "rn_delete: couldn't find us\n");
 		}
 		t = tt + 1;
 		if  (t->rn_flags & RNF_ACTIVE) {
@@ -827,7 +848,7 @@ on1:
 		}
 		goto out;
 	}
-#ifdef RADIX_MPATH
+#ifndef SMALL_KERNEL
 	if (mpath_enable) {
 		/*
 		 * my parent dupedkey is NULL
@@ -852,7 +873,7 @@ on1:
 	 */
 	if (t->rn_mklist) {
 		if (x->rn_b >= 0) {
-			for (mp = &x->rn_mklist; (m = *mp) != NULL;)
+			for (mp = &x->rn_mklist; (m = *mp);)
 				mp = &m->rm_mklist;
 			*mp = t->rn_mklist;
 		} else {
@@ -869,7 +890,7 @@ on1:
 				}
 			if (m)
 				log(LOG_ERR, "%s %p at %p\n",
-					    "rn_delete: Orphaned Mask", m, x);
+				    "rn_delete: Orphaned Mask", m, x);
 		}
 	}
 	/*
@@ -1004,6 +1025,6 @@ rn_init()
 	addmask_key = cplim = rn_ones + max_keylen;
 	while (cp < cplim)
 		*cp++ = -1;
-	if (rn_inithead((void **)&mask_rnhead, 0) == 0)
+	if (rn_inithead((void *)&mask_rnhead, 0) == 0)
 		panic("rn_init 2");
 }

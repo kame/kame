@@ -1,4 +1,4 @@
-/* $OpenBSD: ip_spd.c,v 1.47 2002/11/12 13:38:41 dhartmei Exp $ */
+/* $OpenBSD: ip_spd.c,v 1.50 2004/06/21 23:50:37 tholo Exp $ */
 /*
  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
  *
@@ -190,8 +190,8 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 		sdst.sin6.sin6_family = ssrc.sin6.sin6_family = AF_INET6;
 		sdst.sin6.sin6_len = ssrc.sin6.sin6_family =
 		    sizeof(struct sockaddr_in6);
-		ssrc.sin6.sin6_addr = ddst->sen_ip6_src;
-		sdst.sin6.sin6_addr = ddst->sen_ip6_dst;
+		in6_recoverscope(&ssrc.sin6, &ddst->sen_ip6_src, NULL);
+		in6_recoverscope(&sdst.sin6, &ddst->sen_ip6_dst, NULL);
 
 		/*
 		 * If TCP/UDP, extract the port numbers to use in the lookup.
@@ -355,12 +355,10 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 				ipo->ipo_tdb->tdb_dst.sa.sa_len))
 				goto nomatchout;
 
-			if (!ipsp_aux_match(ipo->ipo_tdb->tdb_srcid,
-			    ipo->ipo_srcid, ipo->ipo_tdb->tdb_dstid,
-			    ipo->ipo_dstid, ipo->ipo_tdb->tdb_local_cred,
-			    ipo->ipo_local_cred, NULL, NULL,
-			    &ipo->ipo_tdb->tdb_filter, &ipo->ipo_addr,
-			    &ipo->ipo_tdb->tdb_filtermask, &ipo->ipo_mask))
+			if (!ipsp_aux_match(ipo->ipo_tdb,
+			    ipo->ipo_srcid, ipo->ipo_dstid,
+			    ipo->ipo_local_cred, NULL,
+			    &ipo->ipo_addr, &ipo->ipo_mask))
 				goto nomatchout;
 
 			/* Cached entry is good. */
@@ -388,7 +386,7 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 		if (ipo->ipo_last_searched <= ipsec_last_added)	{
 			/* "Touch" the entry. */
 			if (dignore == 0)
-				ipo->ipo_last_searched = time.tv_sec;
+				ipo->ipo_last_searched = time_second;
 
 			/* Find an appropriate SA from the existing ones. */
 			ipo->ipo_tdb =
@@ -502,7 +500,7 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 		/* Find whether there exists an appropriate SA. */
 		if (ipo->ipo_last_searched <= ipsec_last_added)	{
 			if (dignore == 0)
-				ipo->ipo_last_searched = time.tv_sec;
+				ipo->ipo_last_searched = time_second;
 
 			ipo->ipo_tdb =
 			    gettdbbysrc(dignore ? &ssrc : &ipo->ipo_dst,
@@ -966,12 +964,11 @@ ipsp_spd_inp(struct mbuf *m, int af, int hlen, int *error, int direction,
 			if (tdbp->tdb_sproto == inp->inp_ipo->ipo_sproto &&
 			    !bcmp(&tdbp->tdb_src, &inp->inp_ipo->ipo_dst,
 				SA_LEN(&tdbp->tdb_src.sa)) &&
-			    ipsp_aux_match(tdbp->tdb_srcid,
-				inp->inp_ipo->ipo_srcid, tdbp->tdb_dstid,
-				inp->inp_ipo->ipo_dstid, NULL, NULL,
-				NULL, NULL, &tdbp->tdb_filter,
+			    ipsp_aux_match(tdbp,
+				inp->inp_ipo->ipo_srcid, 
+				inp->inp_ipo->ipo_dstid,
+				NULL, NULL,
 				&inp->inp_ipo->ipo_addr,
-				&tdbp->tdb_filtermask,
 				&inp->inp_ipo->ipo_mask))
 				goto justreturn;
 			else {
@@ -992,11 +989,11 @@ ipsp_spd_inp(struct mbuf *m, int af, int hlen, int *error, int direction,
 			    tdbp->tdb_sproto == inp->inp_ipo->ipo_sproto &&
 			    !bcmp(&tdbp->tdb_src, &inp->inp_ipo->ipo_dst,
 				SA_LEN(&tdbp->tdb_src.sa)) &&
-			    ipsp_aux_match(tdbp->tdb_srcid,
-				inp->inp_ipo->ipo_srcid, tdbp->tdb_dstid,
-				inp->inp_ipo->ipo_dstid, NULL, NULL,
-				NULL, NULL, &tdbp->tdb_filter,
-				&inp->inp_ipo->ipo_addr, &tdbp->tdb_filtermask,
+			    ipsp_aux_match(tdbp,
+				inp->inp_ipo->ipo_srcid,
+				inp->inp_ipo->ipo_dstid,
+				NULL, NULL,
+				&inp->inp_ipo->ipo_addr,
 				&inp->inp_ipo->ipo_mask))
 				goto justreturn;
 
@@ -1008,7 +1005,7 @@ ipsp_spd_inp(struct mbuf *m, int af, int hlen, int *error, int direction,
 			 */
 			if (inp->inp_ipo->ipo_last_searched <=
 			    ipsec_last_added) {
-				inp->inp_ipo->ipo_last_searched = time.tv_sec;
+				inp->inp_ipo->ipo_last_searched = time_second;
 
 				/* Do we have an SA already established ? */
 				if (gettdbbysrc(&inp->inp_ipo->ipo_dst,
@@ -1061,7 +1058,7 @@ ipsp_spd_inp(struct mbuf *m, int af, int hlen, int *error, int direction,
 		if (inp->inp_ipo != NULL) {
 			if (inp->inp_ipo->ipo_last_searched <=
 			    ipsec_last_added) {
-				inp->inp_ipo->ipo_last_searched = time.tv_sec;
+				inp->inp_ipo->ipo_last_searched = time_second;
 
 				/* Update, just in case. */
 				ipsec_update_policy(inp, inp->inp_ipo, af,

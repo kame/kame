@@ -1,4 +1,4 @@
-/*	$OpenBSD: init_main.c,v 1.112 2004/03/14 23:12:11 tedu Exp $	*/
+/*	$OpenBSD: init_main.c,v 1.119 2004/07/28 17:15:12 tholo Exp $	*/
 /*	$NetBSD: init_main.c,v 1.84.4.1 1996/06/02 09:08:06 mrg Exp $	*/
 
 /*
@@ -110,7 +110,7 @@ struct	pcred cred0;
 struct	plimit limit0;
 struct	vmspace vmspace0;
 struct	sigacts sigacts0;
-#ifndef curproc
+#if !defined(__HAVE_CPUINFO) && !defined(curproc)
 struct	proc *curproc;
 #endif
 struct	proc *initproc;
@@ -122,7 +122,10 @@ void	(*md_diskconf)(void) = NULL;
 struct	vnode *rootvp, *swapdev_vp;
 int	boothowto;
 struct	timeval boottime;
+#ifndef __HAVE_CPUINFO
 struct	timeval runtime;
+#endif
+int	ncpus =  1;
 
 #if !defined(NO_PROPOLICE)
 long	__guard[8];
@@ -135,8 +138,9 @@ void	start_init(void *);
 void	start_cleaner(void *);
 void	start_update(void *);
 void	start_reaper(void *);
-void    start_crypto(void *);
+void	start_crypto(void *);
 void	init_exec(void);
+void	kqueue_init(void);
 
 extern char sigcode[], esigcode[];
 #ifdef SYSCALL_DEBUG
@@ -193,6 +197,9 @@ main(framep)
 	 * any possible traps/probes to simplify trap processing.
 	 */
 	curproc = p = &proc0;
+#ifdef __HAVE_CPUINFO
+	p->p_cpu = curcpu();
+#endif
 
 	/*
 	 * Initialize timeouts.
@@ -205,7 +212,10 @@ main(framep)
 	 */
 	config_init();		/* init autoconfiguration data structures */
 	consinit();
+
 	printf("%s\n", copyright);
+
+	KERNEL_LOCK_INIT();
 
 	uvm_init();
 	disk_init();		/* must come before autoconfiguration */
@@ -243,6 +253,11 @@ main(framep)
 	pipe_init();
 
 	/*
+	 * Initialize kqueues.
+	 */
+	kqueue_init();
+
+	/*
 	 * Create process 0 (the swapper).
 	 */
 	LIST_INSERT_HEAD(&allproc, p, p_list);
@@ -257,7 +272,7 @@ main(framep)
 	session0.s_leader = p;
 
 	p->p_flag = P_INMEM | P_SYSTEM | P_NOCLDWAIT;
-	p->p_stat = SRUN;
+	p->p_stat = SONPROC;
 	p->p_nice = NZERO;
 	p->p_emul = &emul_native;
 	bcopy("swapper", p->p_comm, sizeof ("swapper"));
@@ -331,6 +346,9 @@ main(framep)
 	/* Start real time and statistics clocks. */
 	initclocks();
 
+	/* Lock the kernel on behalf of proc0. */
+	KERNEL_PROC_LOCK(p);
+
 #ifdef SYSVSHM
 	/* Initialize System V style shared memory. */
 	shminit();
@@ -400,15 +418,25 @@ main(framep)
 	VOP_UNLOCK(rootvnode, 0, p);
 	p->p_fd->fd_rdir = NULL;
 
-	uvm_swap_init();
-
 	/*
 	 * Now can look at time, having had a chance to verify the time
 	 * from the file system.  Reset p->p_rtime as it may have been
 	 * munched in mi_switch() after the time got set.
 	 */
-	p->p_stats->p_start = runtime = mono_time = boottime = time;
+#ifdef __HAVE_TIMECOUNTER
+	microtime(&boottime);
+#else
+	boottime = mono_time = time;	
+#endif
+	p->p_stats->p_start = boottime;	
+#ifdef __HAVE_CPUINFO
+	microuptime(&p->p_cpu->ci_schedstate.spc_runtime);
+#else
+	microuptime(&runtime);
+#endif
 	p->p_rtime.tv_sec = p->p_rtime.tv_usec = 0;
+
+	uvm_swap_init();
 
 	/* Create process 1 (init(8)). */
 	if (fork1(p, SIGCHLD, FORK_FORK, NULL, 0, start_init, NULL, rval))
@@ -447,6 +475,12 @@ main(framep)
 	srandom((u_long)(rtv.tv_sec ^ rtv.tv_usec));
 
 	randompid = 1;
+
+#if defined(MULTIPROCESSOR)
+	/* Boot the secondary processors. */
+	cpu_boot_secondary_processors();
+#endif
+
 	/* The scheduler is an infinite loop. */
 	uvm_scheduler();
 	/* NOTREACHED */
@@ -605,8 +639,10 @@ start_init(arg)
 		 * Now try to exec the program.  If can't for any reason
 		 * other than it doesn't exist, complain.
 		 */
-		if ((error = sys_execve(p, &args, retval)) == 0)
+		if ((error = sys_execve(p, &args, retval)) == 0) {
+			KERNEL_PROC_UNLOCK(p);
 			return;
+		}
 		if (error != ENOENT)
 			printf("exec %s: error %d\n", path, error);
 	}

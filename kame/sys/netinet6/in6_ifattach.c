@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.201 2004/08/17 10:18:58 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.202 2004/11/06 15:44:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -41,8 +41,8 @@
 #include <sys/sockio.h>
 #include <sys/kernel.h>
 #include <sys/syslog.h>
-#if defined(__OpenBSD__)
-#include <sys/md5k.h>
+#ifdef __OpenBSD__
+#include <crypto/md5.h>
 #else
 #include <sys/md5.h>
 #endif

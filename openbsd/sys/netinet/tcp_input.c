@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_input.c,v 1.158.2.2 2004/05/26 20:02:06 brad Exp $	*/
+/*	$OpenBSD: tcp_input.c,v 1.175 2004/07/16 09:26:07 markus Exp $	*/
 /*	$NetBSD: tcp_input.c,v 1.23 1996/02/13 23:43:44 christos Exp $	*/
 
 /*
@@ -68,7 +68,6 @@
  * Research Laboratory (NRL).
  */
 
-#ifndef TUBA_INCLUDE
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
@@ -107,15 +106,14 @@
 #include <net/if_faith.h>
 #endif
 
+struct tcpiphdr tcp_saveti;
+struct tcpipv6hdr tcp_saveti6;
+
 /* for the packet header length in the mbuf */
 #define M_PH_LEN(m)      (((struct mbuf *)(m))->m_pkthdr.len)
 #define M_V6_LEN(m)      (M_PH_LEN(m) - sizeof(struct ip6_hdr))
 #define M_V4_LEN(m)      (M_PH_LEN(m) - sizeof(struct ip))
 #endif /* INET6 */
-
-#ifdef TCP_SIGNATURE
-#include <sys/md5k.h>
-#endif
 
 int	tcprexmtthresh = 3;
 int	tcptv_keep_init = TCPTV_KEEP_INIT;
@@ -130,7 +128,6 @@ int tcp_ackdrop_ppslim = 100;		/* 100pps */
 int tcp_ackdrop_ppslim_count = 0;
 struct timeval tcp_ackdrop_ppslim_last;
 
-#endif /* TUBA_INCLUDE */
 #define TCP_PAWS_IDLE	(24 * 24 * 60 * 60 * PR_SLOWHZ)
 
 /* for modulo comparisons of timestamps */
@@ -190,8 +187,6 @@ do { \
  * Set DELACK for segments received in order, but ack immediately
  * when segments are out of order (so fast retransmit can work).
  */
-
-#ifndef TUBA_INCLUDE
 
 int
 tcp_reass(tp, th, m, tlen)
@@ -371,7 +366,7 @@ tcp_input(struct mbuf *m, ...)
 	struct inpcb *inp;
 	u_int8_t *optp = NULL;
 	int optlen = 0;
-	int len, tlen, off;
+	int tlen, off;
 	struct tcpcb *tp = 0;
 	int tiflags;
 	struct socket *so = NULL;
@@ -394,7 +389,6 @@ tcp_input(struct mbuf *m, ...)
 	int error, s;
 #endif /* IPSEC */
 	int af;
-	struct mbuf *tcp_saveti = NULL;
 #ifdef TCP_ECN
 	u_char iptos;
 #endif
@@ -453,8 +447,7 @@ tcp_input(struct mbuf *m, ...)
 			tcpstat.tcps_rcvshort++;
 			return;
 		}
-		len = m->m_pkthdr.len;
-		tlen = len - toff;
+		tlen = m->m_pkthdr.len - toff;
 #ifdef TCP_ECN
 		/* save ip_tos before clearing it for checksum */
 		iptos = ip->ip_tos;
@@ -476,8 +469,7 @@ tcp_input(struct mbuf *m, ...)
 			tcpstat.tcps_rcvshort++;
 			return;
 		}
-		len = m->m_pkthdr.len;
-		tlen = len - toff;
+		tlen = m->m_pkthdr.len - toff;
 #ifdef TCP_ECN
 		iptos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
 #endif
@@ -515,12 +507,6 @@ tcp_input(struct mbuf *m, ...)
 		    in_broadcast(ip->ip_dst, m->m_pkthdr.rcvif))
 			goto drop;
 
-		tlen = m->m_pkthdr.len - iphlen;
-
-#ifdef TCP_ECN
-		/* save ip_tos before clearing it for checksum */
-		iptos = ip->ip_tos;
-#endif
 		/*
 		 * Checksum extended TCP header and data.
 		 */
@@ -541,7 +527,6 @@ tcp_input(struct mbuf *m, ...)
 		break;
 #ifdef INET6
 	case AF_INET6:
-		tlen = m->m_pkthdr.len - iphlen;
 #ifdef TCP_ECN
 		iptos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
 #endif
@@ -582,7 +567,6 @@ tcp_input(struct mbuf *m, ...)
 		break;
 #endif
 	}
-#endif /* TUBA_INCLUDE */
 
 	/*
 	 * Check that TCP offset makes sense,
@@ -596,7 +580,7 @@ tcp_input(struct mbuf *m, ...)
 	tlen -= off;
 	if (off > sizeof(struct tcphdr)) {
 		IP6_EXTHDR_GET(th, struct tcphdr *, m, toff, off);
-		if (th == NULL) {
+		if (!th) {
 			tcpstat.tcps_rcvshort++;
 			return;
 		}
@@ -726,28 +710,18 @@ findpcb:
 
 		if (so->so_options & SO_DEBUG) {
 			ostate = tp->t_state;
-			tcp_saveti = NULL;
-			MGETHDR(tcp_saveti, M_DONTWAIT, MT_HEADER);
-			if (!tcp_saveti)
-				goto nosave;
-#ifdef DIAGNOSTIC
-			if (iphlen + sizeof(struct tcphdr) > MCLBYTES) {
-				printf("cannot save to tcp_saveti\n");
-				goto nosave;
-			}
+			switch (af) {
+#ifdef INET6
+			case AF_INET6:
+				bcopy(ip6, &tcp_saveti6.ti6_i, sizeof(*ip6));
+				bcopy(th, &tcp_saveti6.ti6_t, sizeof(*th));
+				break;
 #endif
-			if (iphlen + sizeof(struct tcphdr) > MHLEN) {
-				MCLGET(tcp_saveti, M_DONTWAIT);
-				if ((tcp_saveti->m_flags & M_EXT) == 0) {
-					m_freem(tcp_saveti);
-					tcp_saveti = NULL;
-					goto nosave;
-				}
+			case AF_INET:
+				bcopy(ip, &tcp_saveti.ti_i, sizeof(*ip));
+				bcopy(th, &tcp_saveti.ti_t, sizeof(*th));
+				break;
 			}
-			m_copydata(m, 0, iphlen, mtod(tcp_saveti, caddr_t));
-			m_copydata(m, toff, sizeof(struct tcphdr),
-			    mtod(tcp_saveti, caddr_t) + iphlen);
-	nosave:;
 		}
 		if (so->so_options & SO_ACCEPTCONN) {
 			if ((tiflags & (TH_RST|TH_ACK|TH_SYN)) != TH_SYN) {
@@ -1258,6 +1232,15 @@ after_listen:
 			 */
 			if (tp->t_rtttime)
 				tcp_xmit_timer(tp, tcp_now - tp->t_rtttime);
+			/*
+			 * Since new data was acked (the SYN), open the
+			 * congestion window by one MSS.  We do this
+			 * here, because we won't go through the normal
+			 * ACK processing below.  And since this is the
+			 * start of the connection, we know we are in
+			 * the exponential phase of slow-start.
+			 */
+			tp->snd_cwnd += tp->t_maxseg;
 		} else
 			tp->t_state = TCPS_SYN_RECEIVED;
 
@@ -1575,7 +1558,7 @@ trimthenstep6:
 				if (th->th_seq != tp->rcv_nxt &&
 				   SEQ_LT(th->th_ack,
 				   tp->snd_una - tp->max_sndwnd)) {
-					/* XXX stat */
+					tcpstat.tcps_rcvacktooold++;
 					goto drop;
 				}
 				break;
@@ -2109,8 +2092,18 @@ dodata:							/* XXX */
 			break;
 		}
 	}
-	if (so->so_options & SO_DEBUG)
-		tcp_trace(TA_INPUT, ostate, tp, tcp_saveti, 0, tlen);
+	if (so->so_options & SO_DEBUG) {
+		switch (af) {
+		case AF_INET:
+			tcp_trace(TA_INPUT, ostate, tp, (caddr_t)&tcp_saveti,
+			    0, tlen);
+			break;
+		case AF_INET6:
+			tcp_trace(TA_INPUT, ostate, tp, (caddr_t)&tcp_saveti6,
+			    0, tlen);
+			break;
+		}
+	}
 
 	/*
 	 * Return any desired output.
@@ -2118,7 +2111,6 @@ dodata:							/* XXX */
 	if (needoutput || (tp->t_flags & TF_ACKNOW)) {
 		(void) tcp_output(tp);
 	}
-	m_freem(tcp_saveti);
 	return;
 
 badsyn:
@@ -2147,7 +2139,6 @@ dropafterack:
 	m_freem(m);
 	tp->t_flags |= TF_ACKNOW;
 	(void) tcp_output(tp);
-	m_freem(tcp_saveti);
 	return;
 
 dropwithreset_ratelim:
@@ -2182,20 +2173,27 @@ dropwithreset:
 		    (tcp_seq)0, TH_RST|TH_ACK);
 	}
 	/* destroy temporarily created socket */
-	m_freem(tcp_saveti);
 	return;
 
 drop:
 	/*
 	 * Drop space held by incoming segment and return.
 	 */
-	if (tp && (tp->t_inpcb->inp_socket->so_options & SO_DEBUG))
-		tcp_trace(TA_DROP, ostate, tp, tcp_saveti, 0, tlen);
+	if (tp && (tp->t_inpcb->inp_socket->so_options & SO_DEBUG)) {
+		switch (af) {
+		case AF_INET:
+			tcp_trace(TA_DROP, ostate, tp, (caddr_t)&tcp_saveti,
+			    0, tlen);
+			break;
+		case AF_INET6:
+			tcp_trace(TA_DROP, ostate, tp, (caddr_t)&tcp_saveti6,
+			    0, tlen);
+			break;
+		}
+	}
 
-	m_freem(tcp_saveti);
 	m_freem(m);
 	return;
-#ifndef TUBA_INCLUDE
 }
 
 int
@@ -2215,10 +2213,7 @@ tcp_dooptions(tp, cp, cnt, th, m, iphlen, oi)
 	struct tdb *tdb = NULL;
 #endif /* TCP_SIGNATURE */
 
-#ifdef TCP_SIGNATURE
-	if (cp)
-#endif /* TCP_SIGNATURE */
-	for (; cnt > 0; cnt -= optlen, cp += optlen) {
+	for (; cp && cnt > 0; cnt -= optlen, cp += optlen) {
 		opt = cp[0];
 		if (opt == TCPOPT_EOL)
 			break;
@@ -2350,7 +2345,6 @@ tcp_dooptions(tp, cp, cnt, th, m, iphlen, oi)
 	}
 
 	if (sigp) {
-		MD5_CTX ctx;
 		char sig[16];
 
 		if (tdb == NULL) {
@@ -2358,77 +2352,8 @@ tcp_dooptions(tp, cp, cnt, th, m, iphlen, oi)
 			return (-1);
 		}
 
-		MD5Init(&ctx);
-
-		switch(tp->pf) {
-		case 0:
-#ifdef INET
-		case AF_INET:
-			{
-				struct ippseudo ippseudo;
-
-				ippseudo.ippseudo_src =
-				    mtod(m, struct ip *)->ip_src;
-				ippseudo.ippseudo_dst =
-				    mtod(m, struct ip *)->ip_dst;
-				ippseudo.ippseudo_pad = 0;
-				ippseudo.ippseudo_p = IPPROTO_TCP;
-				ippseudo.ippseudo_len = htons(
-				    m->m_pkthdr.len - iphlen);
-
-				MD5Update(&ctx, (char *)&ippseudo,
-				    sizeof(struct ippseudo));
-			}
-			break;
-#endif /* INET */
-#ifdef INET6
-		case AF_INET6:
-			{
-				struct ip6_hdr_pseudo ip6pseudo;
- 
-				bzero(&ip6pseudo, sizeof(ip6pseudo));
-				ip6pseudo.ip6ph_src =
-				    mtod(m, struct ip6_hdr *)->ip6_src;
-				ip6pseudo.ip6ph_dst =
-				    mtod(m, struct ip6_hdr *)->ip6_dst;
-				in6_clearscope(&ip6pseudo.ip6ph_src);
-				in6_clearscope(&ip6pseudo.ip6ph_dst);
-				ip6pseudo.ip6ph_nxt = IPPROTO_TCP;
-				ip6pseudo.ip6ph_len = htonl(m->m_pkthdr.len -
-				    iphlen);
-    
-				MD5Update(&ctx, (char *)&ip6pseudo,
-				    sizeof(ip6pseudo));
-			}
-			break;
-#endif /* INET6 */
-		}
-
-		{
-			struct tcphdr tcphdr;
-
-			tcphdr.th_sport = th->th_sport;
-			tcphdr.th_dport = th->th_dport;
-			tcphdr.th_seq = htonl(th->th_seq);
-			tcphdr.th_ack = htonl(th->th_ack);
-			tcphdr.th_off = th->th_off;
-			tcphdr.th_x2 = th->th_x2;
-			tcphdr.th_flags = th->th_flags;
-			tcphdr.th_win = htons(th->th_win);
-			tcphdr.th_sum = 0;
-			tcphdr.th_urp = htons(th->th_urp);
-
-			MD5Update(&ctx, (char *)&tcphdr,
-			    sizeof(struct tcphdr));
-		}
-
-		if (m_apply(m, iphlen + th->th_off * sizeof(uint32_t),
-		    m->m_pkthdr.len - (iphlen + th->th_off * sizeof(uint32_t)),
-		    tcp_signature_apply, (caddr_t)&ctx))
-			return (-1); 
-
-		MD5Update(&ctx, tdb->tdb_amxkey, tdb->tdb_amxkeylen);
-		MD5Final(sig, &ctx);
+		if (tcp_signature(tdb, tp->pf, m, th, iphlen, 1, sig) < 0)
+			return (-1);
 
 		if (bcmp(sig, sigp, 16)) {
 			tcpstat.tcps_rcvbadsig++;
@@ -3090,13 +3015,17 @@ tcp_mss(tp, offer)
 	 * If we compute a larger value, return it for use in sending
 	 * a max seg size option, but don't store it for use
 	 * unless we received an offer at least that large from peer.
-	 * However, do not accept offers under 216 bytes.
+	 * 
+	 * However, do not accept offers lower than the minimum of
+	 * the interface MTU and 216.
 	 */
 	if (offer > 0)
 		tp->t_peermss = offer;
 	if (tp->t_peermss)
-		mss = min(mss, tp->t_peermss);
-	mss = max(mss, 216);		/* sanity - at least max opt. space */
+		mss = min(mss, max(tp->t_peermss, 216));
+
+	/* sanity - at least max opt. space */
+	mss = max(mss, 64);
 
 	/*
 	 * maxopd stores the maximum length of data AND options
@@ -3151,7 +3080,7 @@ void
 tcp_mss_update(tp)
 	struct tcpcb *tp;
 {
-	int mss, rtt;
+	int mss;
 	u_long bufsize;
 	struct rtentry *rt;
 	struct socket *so;
@@ -3164,45 +3093,7 @@ tcp_mss_update(tp)
 	if (rt == NULL)
 		return;
 
-#ifdef RTV_MTU	/* if route characteristics exist ... */
-	/*
-	 * While we're here, check if there's an initial rtt
-	 * or rttvar.  Convert from the route-table units
-	 * to scaled multiples of the slow timeout timer.
-	 */
-	if (tp->t_srtt == 0 && (rtt = rt->rt_rmx.rmx_rtt)) {
-		/*
-		 * XXX the lock bit for MTU indicates that the value
-		 * is also a minimum value; this is subject to time.
-		 */
-		if (rt->rt_rmx.rmx_locks & RTV_RTT)
-			TCPT_RANGESET(tp->t_rttmin,
-			    rtt / (RTM_RTTUNIT / PR_SLOWHZ),
-			    TCPTV_MIN, TCPTV_REXMTMAX);
-		tp->t_srtt = rtt / (RTM_RTTUNIT / (PR_SLOWHZ * TCP_RTT_SCALE));
-		if (rt->rt_rmx.rmx_rttvar)
-			tp->t_rttvar = rt->rt_rmx.rmx_rttvar /
-			    (RTM_RTTUNIT / (PR_SLOWHZ * TCP_RTTVAR_SCALE));
-		else
-			/* default variation is +- 1 rtt */
-			tp->t_rttvar =
-			    tp->t_srtt * TCP_RTTVAR_SCALE / TCP_RTT_SCALE;
-		TCPT_RANGESET((long) tp->t_rxtcur,
-		    ((tp->t_srtt >> 2) + tp->t_rttvar) >> 1,
-		    tp->t_rttmin, TCPTV_REXMTMAX);
-	}
-#endif
-
-	/*
-	 * If there's a pipesize, change the socket buffer
-	 * to that size.  Make the socket buffers an integral
-	 * number of mss units; if the mss is larger than
-	 * the socket buffer, decrease the mss.
-	 */
-#ifdef RTV_SPIPE
-	if ((bufsize = rt->rt_rmx.rmx_sendpipe) == 0)
-#endif
-		bufsize = so->so_snd.sb_hiwat;
+	bufsize = so->so_snd.sb_hiwat;
 	if (bufsize < mss) {
 		mss = bufsize;
 		/* Update t_maxseg and t_maxopd */
@@ -3214,34 +3105,15 @@ tcp_mss_update(tp)
 		(void)sbreserve(&so->so_snd, bufsize);
 	}
 
-#ifdef RTV_RPIPE
-	if ((bufsize = rt->rt_rmx.rmx_recvpipe) == 0)
-#endif
-		bufsize = so->so_rcv.sb_hiwat;
+	bufsize = so->so_rcv.sb_hiwat;
 	if (bufsize > mss) {
 		bufsize = roundup(bufsize, mss);
 		if (bufsize > sb_max)
 			bufsize = sb_max;
 		(void)sbreserve(&so->so_rcv, bufsize);
-#ifdef RTV_RPIPE
-		if (rt->rt_rmx.rmx_recvpipe > 0)
-			tcp_rscale(tp, so->so_rcv.sb_hiwat);
-#endif
 	}
 
-#ifdef RTV_SSTHRESH
-	if (rt->rt_rmx.rmx_ssthresh) {
-		/*
-		 * There's some sort of gateway or interface
-		 * buffer limit on the path.  Use this to set
-		 * the slow start threshhold, but set the
-		 * threshold to no less than 2*mss.
-		 */
-		tp->snd_ssthresh = max(2 * mss, rt->rt_rmx.rmx_ssthresh);
-	}
-#endif /* RTV_MTU */
 }
-#endif /* TUBA_INCLUDE */
 
 #if defined (TCP_SACK)
 /*
@@ -3754,7 +3626,7 @@ syn_cache_get(src, dst, th, hlen, tlen, so, m)
 	/*
 	 * Give the new socket our cached route reference.
 	 */
-	if (inp)
+	if (src->sa_family == AF_INET)
 		inp->inp_route = sc->sc_route4;         /* struct assignment */
 #ifdef INET6
 	else
@@ -3870,8 +3742,7 @@ syn_cache_get(src, dst, th, hlen, tlen, so, m)
 	return (so);
 
 resetandabort:
-	(void) tcp_respond(NULL, mtod(m, caddr_t), m,
-			   th->th_seq + tlen, (tcp_seq)0, TH_RST|TH_ACK);
+	tcp_respond(NULL, mtod(m, caddr_t), m, (tcp_seq)0, th->th_ack, TH_RST);
 abort:
 	if (so != NULL)
 		(void) soabort(so);
@@ -4277,7 +4148,6 @@ syn_cache_respond(sc, m)
 
 #ifdef TCP_SIGNATURE
 	if (sc->sc_flags & SCF_SIGNATURE) {
-		MD5_CTX ctx;
 		union sockaddr_union src, dst;
 		struct tdb *tdb;
 
@@ -4311,56 +4181,16 @@ syn_cache_respond(sc, m)
 			return (EPERM);
 		}
 
-		MD5Init(&ctx);
-
-		switch (sc->sc_src.sa.sa_family) {
-		case 0:	/*default to PF_INET*/
-#ifdef INET
-		case AF_INET:
-			{
-				struct ippseudo ippseudo;
-
-				ippseudo.ippseudo_src = ip->ip_src;
-				ippseudo.ippseudo_dst = ip->ip_dst;
-				ippseudo.ippseudo_pad = 0;
-				ippseudo.ippseudo_p   = IPPROTO_TCP;
-				ippseudo.ippseudo_len = htons(tlen - hlen);
-
-				MD5Update(&ctx, (char *)&ippseudo,
-				    sizeof(struct ippseudo));
-
-			}
-			break;
-#endif /* INET */
-#ifdef INET6
-		case AF_INET6:
-			{
-				struct ip6_hdr_pseudo ip6pseudo;
-
-				bzero(&ip6pseudo, sizeof(ip6pseudo));
-				ip6pseudo.ip6ph_src = ip6->ip6_src;
-				ip6pseudo.ip6ph_dst = ip6->ip6_dst;
-				in6_clearscope(&ip6pseudo.ip6ph_src);
-				in6_clearscope(&ip6pseudo.ip6ph_dst);
-				ip6pseudo.ip6ph_nxt = IPPROTO_TCP;
-				ip6pseudo.ip6ph_len = htonl(tlen - hlen);
-
-				MD5Update(&ctx, (char *)&ip6pseudo,
-				    sizeof(ip6pseudo));
-			}
-			break;
-#endif /* INET6 */
-		}
-
-		th->th_sum = 0;
-		MD5Update(&ctx, (char *)th, sizeof(struct tcphdr));
-		MD5Update(&ctx, tdb->tdb_amxkey, tdb->tdb_amxkeylen);
-
 		/* Send signature option */
 		*(optp++) = TCPOPT_SIGNATURE;
 		*(optp++) = TCPOLEN_SIGNATURE;
 
-		MD5Final(optp, &ctx);
+		if (tcp_signature(tdb, sc->sc_src.sa.sa_family, m, th,
+		    hlen, 0, optp) < 0) {
+			if (m)
+				m_freem(m);
+			return (EINVAL);
+		}
 		optp += 16;
 
 		/* Pad options list to the next 32 bit boundary and

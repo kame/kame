@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.h,v 1.49 2004/01/15 10:47:55 markus Exp $	*/
+/*	$OpenBSD: if.h,v 1.56 2004/06/26 17:36:33 markus Exp $	*/
 /*	$NetBSD: if.h,v 1.23 1996/05/07 02:40:27 thorpej Exp $	*/
 
 /*
@@ -141,6 +141,7 @@ struct	ifqueue {
 	int	ifq_len;
 	int	ifq_maxlen;
 	int	ifq_drops;
+	int	ifq_congestion;
 };
 
 /*
@@ -164,10 +165,16 @@ TAILQ_HEAD(ifnet_head, ifnet);		/* the actual queue head */
 #define	IFNAMSIZ	16
 #define	IF_NAMESIZE	IFNAMSIZ
 
+/*
+ * Length of interface description, including terminating '\0'.
+ */
+#define	IFDESCRSIZE	64
+
 struct ifnet {				/* and the entries */
 	void	*if_softc;		/* lower-level data for this if */
 	TAILQ_ENTRY(ifnet) if_list;	/* all struct ifnets are chained */
 	TAILQ_HEAD(, ifaddr) if_addrlist; /* linked list of addresses per if */
+	TAILQ_HEAD(, ifgroup) if_groups; /* linked list of groups per if */
 	struct hook_desc_head *if_addrhooks; /* address change callbacks */
 	char	if_xname[IFNAMSIZ];	/* external name (name + unit) */
 	int	if_pcount;		/* number of promiscuous listeners */
@@ -179,6 +186,7 @@ struct ifnet {				/* and the entries */
 	short	if_flags;		/* up/down, broadcast, etc. */
 	struct	if_data if_data;	/* stats and other data about if */
 	int	if_capabilities;	/* interface capabilities */
+	char	if_description[IFDESCRSIZE]; /* interface description */
 
 	/* procedure handles */
 					/* output routine (enqueue) */
@@ -256,6 +264,11 @@ struct ifnet {				/* and the entries */
 #define	IFCAP_VLAN_MTU		0x00000010	/* VLAN-compatible MTU */
 #define	IFCAP_VLAN_HWTAGGING	0x00000020	/* hardware VLAN tag support */
 #define	IFCAP_IPCOMP		0x00000040	/* can do IPcomp */
+#define	IFCAP_JUMBO_MTU		0x00000080	/* 9000 byte MTU supported */
+#define	IFCAP_CSUM_TCPv6	0x00000100	/* can do IPv6/TCP checksums */
+#define	IFCAP_CSUM_UDPv6	0x00000200	/* can do IPv6/UDP checksums */
+#define	IFCAP_CSUM_TCPv4_Rx	0x00000400	/* can do IPv4/TCP (Rx only) */
+#define	IFCAP_CSUM_UDPv4_Rx	0x00000800	/* can do IPv4/UDP (Rx only) */
 
 /*
  * Output queues (ifp->if_snd) and internetwork datagram level (pup level 1)
@@ -290,6 +303,17 @@ struct ifnet {				/* and the entries */
 		(ifq)->ifq_len--; \
 	} \
 }
+
+#define	IF_INPUT_ENQUEUE(ifq, m) {			\
+	if (IF_QFULL(ifq)) {				\
+		IF_DROP(ifq);				\
+		m_freem(m);				\
+		if (!ifq->ifq_congestion)		\
+			if_congestion(ifq);		\
+	} else						\
+		IF_ENQUEUE(ifq, m);			\
+}
+
 #define	IF_POLL(ifq, m)		((m) = (ifq)->ifq_head)
 #define	IF_PURGE(ifq)							\
 do {									\
@@ -372,6 +396,28 @@ struct if_announcemsghdr {
 
 #define IFAN_ARRIVAL	0	/* interface arrival */
 #define IFAN_DEPARTURE	1	/* interface departure */
+
+/*
+ * The groups on an interface
+ */
+struct ifgroup {
+	char ifg_group[IFNAMSIZ];
+	TAILQ_ENTRY(ifgroup) ifg_next;
+};
+
+/*
+ * Used to lookup groups for an interface
+ */
+struct ifgroupreq {
+	char	ifgr_name[IFNAMSIZ];
+	u_int	ifgr_len;
+	union {
+		char	ifgru_group[IFNAMSIZ];
+		struct	ifgroup *ifgru_groups;
+	} ifgr_ifgru;
+#define ifgr_group	ifgr_ifgru.ifgru_group
+#define ifgr_groups	ifgr_ifgru.ifgru_groups
+};
 
 /*
  * Interface request structure used for socket
@@ -597,6 +643,9 @@ int	ifconf(u_long, caddr_t);
 void	ifinit(void);
 int	ifioctl(struct socket *, u_long, caddr_t, struct proc *);
 int	ifpromisc(struct ifnet *, int);
+int	if_addgroup(struct ifgroupreq *, struct ifnet *);
+int	if_delgroup(struct ifgroupreq *, struct ifnet *);
+int	if_getgroup(caddr_t, struct ifnet *);
 struct	ifnet *ifunit(const char *);
 
 struct	ifaddr *ifa_ifwithaddr(struct sockaddr *);
@@ -614,6 +663,8 @@ void	if_clone_detach(struct if_clone *);
 
 int	if_clone_create(const char *);
 int	if_clone_destroy(const char *);
+
+void	if_congestion(struct ifqueue *);
 
 int	loioctl(struct ifnet *, u_long, caddr_t);
 void	loopattach(int);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_fddisubr.c,v 1.36 2003/12/10 07:22:42 itojun Exp $	*/
+/*	$OpenBSD: if_fddisubr.c,v 1.40 2004/07/16 15:01:08 henning Exp $	*/
 /*	$NetBSD: if_fddisubr.c,v 1.5 1996/05/07 23:20:21 christos Exp $	*/
 
 /*
@@ -123,13 +123,6 @@
 #include <netdnet/dn.h>
 #endif
 
-#ifdef ISO
-#include <netiso/argo_debug.h>
-#include <netiso/iso.h>
-#include <netiso/iso_var.h>
-#include <netiso/iso_snpac.h>
-#endif
-
 #include "bpfilter.h"
 
 #include <netccitt/dll.h>
@@ -196,7 +189,7 @@ fddi_output(ifp, m0, dst, rt0)
 		}
 		if (rt->rt_flags & RTF_REJECT)
 			if (rt->rt_rmx.rmx_expire == 0 ||
-			    time.tv_sec < rt->rt_rmx.rmx_expire)
+			    time_second < rt->rt_rmx.rmx_expire)
 				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
 	}
 
@@ -266,42 +259,6 @@ fddi_output(ifp, m0, dst, rt0)
 			mcopy = m_copy(m, 0, (int)M_COPYALL);
 		break;
 #endif
-#ifdef	ISO
-	case AF_ISO: {
-		int	snpalen;
-		struct	llc *l;
-		struct sockaddr_dl *sdl;
-
-		if (rt && (sdl = (struct sockaddr_dl *)rt->rt_gateway) &&
-		    sdl->sdl_family == AF_LINK && sdl->sdl_alen > 0) {
-			bcopy(LLADDR(sdl), (caddr_t)edst, sizeof(edst));
-		} else if ((error =
-			    iso_snparesolve(ifp, (struct sockaddr_iso *)dst,
-					    (char *)edst, &snpalen)) != 0)
-			goto bad; /* Not Resolved */
-		/* If broadcasting on a simplex interface, loopback a copy */
-		if (*edst & 1)
-			m->m_flags |= (M_BCAST|M_MCAST);
-		if ((m->m_flags & M_BCAST) && (ifp->if_flags & IFF_SIMPLEX) &&
-		    (mcopy = m_copy(m, 0, (int)M_COPYALL))) {
-			M_PREPEND(mcopy, sizeof (*fh), M_DONTWAIT);
-			if (mcopy) {
-				fh = mtod(mcopy, struct fddi_header *);
-				bcopy((caddr_t)edst,
-				      (caddr_t)fh->fddi_dhost, sizeof (edst));
-				bcopy((caddr_t)ac->ac_enaddr,
-				      (caddr_t)fh->fddi_shost, sizeof (edst));
-			}
-		}
-		M_PREPEND(m, 3, M_DONTWAIT);
-		if (m == NULL)
-			return (0);
-		type = 0;
-		l = mtod(m, struct llc *);
-		l->llc_dsap = l->llc_ssap = LLC_ISO_LSAP;
-		l->llc_control = LLC_UI;
-		} break;
-#endif /* ISO */
 #ifdef	CCITT
 /*	case AF_NSAP: */
 	case AF_CCITT: {
@@ -431,6 +388,12 @@ fddi_output(ifp, m0, dst, rt0)
 #if NBPFILTER > 0
   queue_it:
 #endif
+	if (hdrcmplt)
+		bcopy((caddr_t)esrc, (caddr_t)fh->fddi_shost,
+		    sizeof(fh->fddi_shost));
+	else
+ 		bcopy((caddr_t)ac->ac_enaddr, (caddr_t)fh->fddi_shost,
+		    sizeof(fh->fddi_shost));
 #if NCARP > 0
 	if (ifp->if_carp) { 
 		int error;
@@ -439,13 +402,6 @@ fddi_output(ifp, m0, dst, rt0)
 			goto bad;
 	}
 #endif
-
-	if (hdrcmplt)
-		bcopy((caddr_t)esrc, (caddr_t)fh->fddi_shost,
-		    sizeof(fh->fddi_shost));
-	else
- 		bcopy((caddr_t)ac->ac_enaddr, (caddr_t)fh->fddi_shost,
-		    sizeof(fh->fddi_shost));
 	mflags = m->m_flags;
 	len = m->m_pkthdr.len;
 	s = splimp();
@@ -486,9 +442,6 @@ fddi_input(ifp, fh, m)
 {
 	struct ifqueue *inq;
 	struct llc *l;
-#ifdef	ISO
-	struct arpcom *ac = (struct arpcom *)ifp;
-#endif
 	int s;
 
 	if ((ifp->if_flags & IFF_UP) == 0) {
@@ -562,68 +515,6 @@ fddi_input(ifp, fh, m)
 		break;
 	}
 #endif /* INET || IPX || NS || DECNET */
-#ifdef	ISO
-	case LLC_ISO_LSAP: 
-		switch (l->llc_control) {
-		case LLC_UI:
-			/* LLC_UI_P forbidden in class 1 service */
-			if ((l->llc_dsap == LLC_ISO_LSAP) &&
-			    (l->llc_ssap == LLC_ISO_LSAP)) {
-				/* LSAP for ISO */
-				m->m_data += 3;		/* XXX */
-				m->m_len -= 3;		/* XXX */
-				m->m_pkthdr.len -= 3;	/* XXX */
-				M_PREPEND(m, sizeof *fh, M_DONTWAIT);
-				if (m == 0)
-					return;
-				*mtod(m, struct fddi_header *) = *fh;
-				schednetisr(NETISR_ISO);
-				inq = &clnlintrq;
-				break;
-			}
-			goto dropanyway;
-			
-		case LLC_XID:
-		case LLC_XID_P:
-			if(m->m_len < 6)
-				goto dropanyway;
-			l->llc_window = 0;
-			l->llc_fid = 9;
-			l->llc_class = 1;
-			l->llc_dsap = l->llc_ssap = 0;
-			/* Fall through to */
-		case LLC_TEST:
-		case LLC_TEST_P:
-		{
-			struct sockaddr sa;
-			struct ether_header *eh;
-			int i;
-			u_char c = l->llc_dsap;
-
-			l->llc_dsap = l->llc_ssap;
-			l->llc_ssap = c;
-			if (m->m_flags & (M_BCAST | M_MCAST))
-				bcopy((caddr_t)ac->ac_enaddr,
-				      (caddr_t)fh->fddi_dhost, 6);
-			sa.sa_family = AF_UNSPEC;
-			sa.sa_len = sizeof(sa);
-			eh = (struct ether_header *)sa.sa_data;
-			for (i = 0; i < 6; i++) {
-				eh->ether_shost[i] = c = fh->fddi_dhost[i];
-				eh->ether_dhost[i] = 
-					fh->fddi_dhost[i] = fh->fddi_shost[i];
-				fh->fddi_shost[i] = c;
-			}
-			eh->ether_type = 0;
-			ifp->if_output(ifp, m, &sa, NULL);
-			return;
-		}
-		default:
-			m_freem(m);
-			return;
-		}
-		break;
-#endif /* ISO */
 #ifdef CCITT
 	case LLC_X25_LSAP:
 	{
@@ -653,11 +544,7 @@ fddi_input(ifp, fh, m)
 	}
 
 	s = splimp();
-	if (IF_QFULL(inq)) {
-		IF_DROP(inq);
-		m_freem(m);
-	} else
-		IF_ENQUEUE(inq, m);
+	IF_INPUT_ENQUEUE(inq, m);
 	splx(s);
 }
 /*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: smc90cx6.c,v 1.6 2003/10/21 18:58:49 jmc Exp $ */
+/*	$OpenBSD: smc90cx6.c,v 1.10 2004/06/24 19:35:23 tholo Exp $ */
 /*	$NetBSD: smc90cx6.c,v 1.17 1996/05/07 01:43:18 thorpej Exp $ */
 
 /*
@@ -77,7 +77,6 @@
 
 #if NBPFILTER > 0
 #include <net/bpf.h>
-#include <net/bpfdesc.h>
 #endif
 
 #include <sys/kernel.h>
@@ -596,7 +595,7 @@ bah_start(ifp)
 	 * bah_ram_ptr[0*2] = mtod(m, u_char *)[0];
 	 */
 	bah_ram_ptr[1 * 2] = mtod(m, u_char *)[1];
-	m_adj(m, 2);
+	m_adj(m, ETHER_ALIGN);
 		
 	/* get total length left at this point */
 	tlen = m->m_pkthdr.len;
@@ -668,10 +667,7 @@ bah_start(ifp)
 
 		sc->sc_arccom.ac_if.if_timer = ARCTIMEOUT;
 #ifdef BAHTIMINGS
-		bcopy((caddr_t)&time,
-		    (caddr_t)&(sc->sc_stats.lasttxstart_tv),
-		    sizeof(struct timeval));
-
+		getmicrotime(&sc->sc_stats.lasttxstart_tv);
 		sc->sc_stats.lasttxstart_mics = clkread();
 #endif
 	}
@@ -980,10 +976,7 @@ bah_tint(sc, isr)
 		ifp->if_timer = ARCTIMEOUT;
 
 #ifdef BAHTIMINGS
-		bcopy((caddr_t)&time,
-		    (caddr_t)&(sc->sc_stats.lasttxstart_tv),
-		    sizeof(struct timeval));
-
+		getmicrotime(&sc->sc_stats.lasttxstart_tv);
 		sc->sc_stats.lasttxstart_mics = clkread();
 #endif
  
@@ -1065,7 +1058,7 @@ bahintr(sc)
 		 * time if necessary.
 		 */
 
-		newsec = time.tv_sec;
+		newsec = time_second;
 		if (newsec - sc->sc_recontime > 2 * sc->sc_reconcount) {
 			sc->sc_recontime = newsec;
 			sc->sc_reconcount = 0;

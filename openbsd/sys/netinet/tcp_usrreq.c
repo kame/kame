@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_usrreq.c,v 1.81 2004/03/02 12:51:12 markus Exp $	*/
+/*	$OpenBSD: tcp_usrreq.c,v 1.86 2004/07/15 15:27:22 markus Exp $	*/
 /*	$NetBSD: tcp_usrreq.c,v 1.20 1996/02/13 23:44:16 christos Exp $	*/
 
 /*
@@ -125,7 +125,7 @@ int *tcpctl_vars[TCPCTL_MAXID] = TCPCTL_VARS;
 
 struct	inpcbtable tcbtable;
 
-int tcp_ident(void *, size_t *, void *, size_t);
+int tcp_ident(void *, size_t *, void *, size_t, int);
 
 #ifdef INET6
 int
@@ -157,7 +157,7 @@ tcp_usrreq(so, req, m, nam, control)
 	struct tcpcb *tp = NULL;
 	int s;
 	int error = 0;
-	int ostate;
+	short ostate;
 
 	if (req == PRU_CONTROL) {
 #ifdef INET6
@@ -181,7 +181,7 @@ tcp_usrreq(so, req, m, nam, control)
 	/*
 	 * When a TCP is attached to a socket, then there will be
 	 * a (struct inpcb) pointed at by the socket, and this
-	 * structure will point at a subsidary (struct tcpcb).
+	 * structure will point at a subsidiary (struct tcpcb).
 	 */
 	if (inp == 0 && req != PRU_ATTACH) {
 		splx(s);
@@ -301,12 +301,6 @@ tcp_usrreq(so, req, m, nam, control)
 			if ((sin->sin_addr.s_addr == INADDR_ANY) ||
 			    IN_MULTICAST(sin->sin_addr.s_addr) ||
 			    in_broadcast(sin->sin_addr, NULL)) {
-				error = EINVAL;
-				break;
-			}
-
-			/* Trying to connect to some broadcast address */
-			if (in_broadcast(sin->sin_addr, NULL)) {
 				error = EINVAL;
 				break;
 			}
@@ -782,30 +776,44 @@ tcp_usrclosed(tp)
 }
 
 /*
- * Look up a socket for ident..
+ * Look up a socket for ident or tcpdrop, ...
  */
 int
-tcp_ident(oldp, oldlenp, newp, newlen)
+tcp_ident(oldp, oldlenp, newp, newlen, dodrop)
 	void *oldp;
 	size_t *oldlenp;
 	void *newp;
 	size_t newlen;
+	int dodrop;
 {
 	int error = 0, s;
 	struct tcp_ident_mapping tir;
 	struct inpcb *inp;
+	struct tcpcb *tp = NULL;
 	struct sockaddr_in *fin, *lin;
 #ifdef INET6
 	struct sockaddr_in6 *fin6, *lin6;
 	struct in6_addr f6, l6;
 #endif
-
-	if (oldp == NULL || newp != NULL || newlen != 0)
-		return (EINVAL);
-	if  (*oldlenp < sizeof(tir))
-		return (ENOMEM);
-	if ((error = copyin(oldp, &tir, sizeof (tir))) != 0 )
-		return (error);
+	if (dodrop) {
+		if (oldp != NULL || *oldlenp != 0)
+			return (EINVAL);
+		if (newp == NULL)
+			return (EPERM);
+		if (newlen < sizeof(tir))
+			return (ENOMEM);
+		if ((error = copyin(newp, &tir, sizeof (tir))) != 0 )
+			return (error);
+	} else {
+		if (oldp == NULL)
+			return (EINVAL);
+		if (*oldlenp < sizeof(tir))
+			return (ENOMEM);
+		if (newp != NULL || newlen != 0)
+			return (EINVAL);
+		if ((error = copyin(oldp, &tir, sizeof (tir))) != 0 )
+			return (error);
+	}
 	switch (tir.faddr.ss_family) {
 #ifdef INET6
 	case AF_INET6:
@@ -845,6 +853,16 @@ tcp_ident(oldp, oldlenp, newp, newlen)
 		inp = in_pcbhashlookup(&tcbtable,  fin->sin_addr,
 		    fin->sin_port, lin->sin_addr, lin->sin_port);
 		break;
+	}
+
+	if (dodrop) {
+		if (inp && (tp = intotcpcb(inp)) &&
+		    ((inp->inp_socket->so_options & SO_ACCEPTCONN) == 0))
+			tp = tcp_drop(tp, ECONNABORTED);
+		else
+			error = ESRCH;
+		splx(s);
+		return (error);
 	}
 
 	if (inp == NULL) {
@@ -909,7 +927,11 @@ tcp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		    baddynamicports.tcp, sizeof(baddynamicports.tcp)));
 
 	case TCPCTL_IDENT:
-		return (tcp_ident(oldp, oldlenp, newp, newlen));
+		return (tcp_ident(oldp, oldlenp, newp, newlen, 0));
+
+	case TCPCTL_DROP:
+		return (tcp_ident(oldp, oldlenp, newp, newlen, 1));
+
 #ifdef TCP_ECN
 	case TCPCTL_ECN:
 		return (sysctl_int(oldp, oldlenp, newp, newlen,

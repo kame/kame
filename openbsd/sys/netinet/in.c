@@ -1,4 +1,4 @@
-/*	$OpenBSD: in.c,v 1.34 2004/03/28 17:39:12 deraadt Exp $	*/
+/*	$OpenBSD: in.c,v 1.37 2004/08/24 20:31:16 brad Exp $	*/
 /*	$NetBSD: in.c,v 1.26 1996/02/13 23:41:39 christos Exp $	*/
 
 /*
@@ -309,6 +309,7 @@ in_control(so, cmd, data, ifp)
 			TAILQ_INSERT_TAIL(&in_ifaddr, ia, ia_list);
 			TAILQ_INSERT_TAIL(&ifp->if_addrlist, (struct ifaddr *)ia,
 			    ifa_list);
+			ia->ia_addr.sin_family = AF_INET;
 			ia->ia_ifa.ifa_addr = sintosa(&ia->ia_addr);
 			ia->ia_ifa.ifa_dstaddr = sintosa(&ia->ia_dstaddr);
 			ia->ia_ifa.ifa_netmask = sintosa(&ia->ia_sockmask);
@@ -407,6 +408,10 @@ in_control(so, cmd, data, ifp)
 		error = in_ifinit(ifp, ia, satosin(&ifr->ifr_addr), 1);
 		if (!error)
 			dohooks(ifp->if_addrhooks, 0);
+		else if (newifaddr) {
+			splx(s);
+			goto cleanup;
+		}
 		splx(s);
 		return error;
 
@@ -449,12 +454,18 @@ in_control(so, cmd, data, ifp)
 			ia->ia_broadaddr = ifra->ifra_broadaddr;
 		if (!error)
 			dohooks(ifp->if_addrhooks, 0);
+		else if (newifaddr) {
+			splx(s);
+			goto cleanup;
+		}
 		splx(s);
 		return (error);
 
 	case SIOCDIFADDR: {
 		struct in_multi *inm;
 
+		error = 0;
+cleanup:
 		/*
 		 * Even if the individual steps were safe, shouldn't
 		 * these kinds of changes happen atomically?  What 
@@ -470,13 +481,13 @@ in_control(so, cmd, data, ifp)
 		IFAFREE((&ia->ia_ifa));
 		dohooks(ifp->if_addrhooks, 0);
 		splx(s);
-		break;
+		return (error);
 		}
 
 #ifdef MROUTING
 	case SIOCGETVIFCNT:
 	case SIOCGETSGCNT:
-		return (mrt_ioctl(cmd, data));
+		return (mrt_ioctl(so, cmd, data));
 #endif /* MROUTING */
 
 #ifdef IGMPV3
@@ -578,7 +589,7 @@ in_lifaddr_ioctl(so, cmd, data, ifp)
 		if (iflr->flags & IFLR_PREFIX)
 			return EINVAL;
 
-		/* copy args to in_aliasreq, perform ioctl(SIOCAIFADDR_IN). */
+		/* copy args to in_aliasreq, perform ioctl(SIOCAIFADDR). */
 		bzero(&ifra, sizeof(ifra));
 		bcopy(iflr->iflr_name, ifra.ifra_name,
 			sizeof(ifra.ifra_name));
@@ -666,7 +677,7 @@ in_lifaddr_ioctl(so, cmd, data, ifp)
 		} else {
 			struct in_aliasreq ifra;
 
-			/* fill in_aliasreq and do ioctl(SIOCDIFADDR_IN) */
+			/* fill in_aliasreq and do ioctl(SIOCDIFADDR) */
 			bzero(&ifra, sizeof(ifra));
 			bcopy(iflr->iflr_name, ifra.ifra_name,
 				sizeof(ifra.ifra_name));

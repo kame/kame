@@ -1,4 +1,4 @@
-/*	$OpenBSD: an.c,v 1.34 2003/10/21 18:58:48 jmc Exp $	*/
+/*	$OpenBSD: an.c,v 1.38 2004/08/05 20:06:58 brad Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -305,34 +305,16 @@ void
 an_rxeof(sc)
 	struct an_softc	 *sc;
 {
-	struct ifnet		*ifp;
+	struct ifnet		*ifp = &sc->sc_arpcom.ac_if;
 	struct ether_header	*eh;
 #ifdef ANCACHE
 	struct an_rxframe	rx_frame;
 #endif
 	struct an_rxframe_802_3	rx_frame_802_3;
 	struct mbuf		*m;
-	int			id, error = 0;
-
-	ifp = &sc->sc_arpcom.ac_if;
+	int			id, len, error = 0;
 
 	id = CSR_READ_2(sc, AN_RX_FID);
-
-	MGETHDR(m, M_DONTWAIT, MT_DATA);
-	if (m == NULL) {
-		ifp->if_ierrors++;
-		return;
-	}
-	MCLGET(m, M_DONTWAIT);
-	if (!(m->m_flags & M_EXT)) {
-		m_freem(m);
-		ifp->if_ierrors++;
-		return;
-	}
-
-	m->m_pkthdr.rcvif = ifp;
-
-	eh = mtod(m, struct ether_header *);
 
 #ifdef ANCACHE
 	/* Read NIC frame header */
@@ -354,13 +336,28 @@ an_rxeof(sc)
 	}
 
 	/* Check for insane frame length */
-	if (letoh16(rx_frame_802_3.an_rx_802_3_payload_len) > MCLBYTES) {
+	len = letoh16(rx_frame_802_3.an_rx_802_3_payload_len);
+	if (len + ETHER_HDR_LEN + 2 > MCLBYTES) {
 		ifp->if_ierrors++;
 		return;
 	}
 
-	m->m_pkthdr.len = m->m_len =
-	    letoh16(rx_frame_802_3.an_rx_802_3_payload_len) + 12;
+	MGETHDR(m, M_DONTWAIT, MT_DATA);
+	if (m == NULL) {
+		ifp->if_ierrors++;
+		return;
+	}
+	MCLGET(m, M_DONTWAIT);
+	if (!(m->m_flags & M_EXT)) {
+		m_freem(m);
+		ifp->if_ierrors++;
+		return;
+	}
+
+	m->m_pkthdr.rcvif = ifp;
+	m->m_pkthdr.len = m->m_len = len + 12;
+	m->m_data += ETHER_ALIGN;
+	eh = mtod(m, struct ether_header *);
 
 	bcopy((char *)&rx_frame_802_3.an_rx_dst_addr,
 	    (char *)&eh->ether_dhost, ETHER_ADDR_LEN);
@@ -368,8 +365,7 @@ an_rxeof(sc)
 	    (char *)&eh->ether_shost, ETHER_ADDR_LEN);
 
 	/* in mbuf header type is just before payload */
-	error = an_read_data(sc, id, 0x44, (caddr_t)&(eh->ether_type),
-			     letoh16(rx_frame_802_3.an_rx_802_3_payload_len));
+	error = an_read_data(sc, id, 0x44, (caddr_t)&(eh->ether_type), len);
 	if (error) {
 		m_freem(m);
 		ifp->if_ierrors++;
@@ -688,7 +684,7 @@ an_read_record(sc, ltv)
 		an_swap16(&ltv->an_val[5], 6);
 		break;
 	case AN_RID_32BITS_CUM:
-		for (i = 0x60; i--; ) {
+		for (i = 0x60; i--;) {
 			u_int16_t t = ltv->an_val[i * 2] ^ ltv->an_val[i * 2 + 1];
 			ltv->an_val[i * 2] ^= t;
 			ltv->an_val[i * 2 + 1] ^= t;
@@ -964,7 +960,7 @@ an_promisc(sc, promisc)
 
 	/* Set RX mode. */
 	if (promisc &&
-	    !(sc->an_config.an_rxmode & AN_RXMODE_LAN_MONITOR_CURBSS) ) {
+	    !(sc->an_config.an_rxmode & AN_RXMODE_LAN_MONITOR_CURBSS)) {
 		sc->an_rxmode = sc->an_config.an_rxmode;
 		sc->an_config.an_rxmode |=
 		    AN_RXMODE_LAN_MONITOR_CURBSS;
@@ -1116,7 +1112,7 @@ an_init_tx_ring(sc)
 		return (0);
 
 	for (i = 0; i < AN_TX_RING_CNT; i++) {
-		if (an_alloc_nicmem(sc, 1518 + 0x44, &id))
+		if (an_alloc_nicmem(sc, ETHER_MAX_LEN + 0x44, &id))
 			return(ENOMEM);
 		sc->an_rdata.an_tx_fids[i] = id;
 		sc->an_rdata.an_tx_ring[i] = 0;
@@ -1428,17 +1424,15 @@ SYSCTL_INT(_machdep, OID_AUTO, an_cache_iponly, CTLFLAG_RW,
  * strength in MAC (src) indexed cache.
  */
 void
-an_cache_store (sc, eh, m, rx_quality)
+an_cache_store(sc, eh, m, rx_quality)
 	struct an_softc *sc;
 	struct ether_header *eh;
 	struct mbuf *m;
 	unsigned short rx_quality;
 {
-	struct ip *ip = 0;
-	int i;
 	static int cache_slot = 0;	/* use this cache entry */
 	static int wrapindex = 0;       /* next "free" cache entry */
-	int saanp=0;
+	int i, saanp = 0;
 
 	/* filters:
 	 * 1. ip only
@@ -1449,8 +1443,7 @@ an_cache_store (sc, eh, m, rx_quality)
 	if ((ntohs(eh->ether_type) == 0x800))
 		saanp = 1;
 
-	/* filter for ip packets only
-	*/
+	/* filter for ip packets only */
 	if (sc->an_cache_iponly && !saanp)
 		return;
 
@@ -1462,18 +1455,13 @@ an_cache_store (sc, eh, m, rx_quality)
 	printf("an: q value %x (MSB=0x%x, LSB=0x%x) \n",
 	    rx_quality & 0xffff, rx_quality >> 8, rx_quality & 0xff);
 #endif
-
-	/* find the ip header.  we want to store the ip_src address */
-	if (saanp)
-		ip = (struct ip *)(mtod(m, char *) + sizeof(struct ether_header));
-
 	/* do a linear search for a matching MAC address
 	 * in the cache table
 	 * . MAC address is 6 bytes,
 	 * . var w_nextitem holds total number of entries already cached
 	 */
 	for(i = 0; i < sc->an_nextitem; i++)
-		if (!bcmp(eh->ether_shost , sc->an_sigcache[i].macsrc, 6))
+		if (!bcmp(eh->ether_shost, sc->an_sigcache[i].macsrc, 6))
 			/* Match!,
 			 * so we already have this entry, update the data
 			 */
@@ -1482,7 +1470,7 @@ an_cache_store (sc, eh, m, rx_quality)
 	/* did we find a matching mac address?
 	 * if yes, then overwrite a previously existing cache entry
 	 */
-	if (i < sc->an_nextitem )
+	if (i < sc->an_nextitem)
 		cache_slot = i;
 
 	/* else, have a new address entry,so
@@ -1495,7 +1483,7 @@ an_cache_store (sc, eh, m, rx_quality)
 		 * note: an_nextitem also holds number of entries
 		 * added in the cache table
 		 */
-		if ( sc->an_nextitem < MAXANCACHE ) {
+		if (sc->an_nextitem < MAXANCACHE) {
 			cache_slot = sc->an_nextitem;
 			sc->an_nextitem++;
 			sc->an_sigitems = sc->an_nextitem;
@@ -1525,9 +1513,11 @@ an_cache_store (sc, eh, m, rx_quality)
 	 *  .mac src
 	 *  .signal, etc.
 	 */
-	if (saanp)
-		sc->an_sigcache[cache_slot].ipsrc = ip->ip_src.s_addr;
-	bcopy( eh->ether_shost, sc->an_sigcache[cache_slot].macsrc,  6);
+	if (saanp) {
+		struct ip *ip = (struct ip *)(mtod(m, char *) + ETHER_HDR_LEN);
+		sc->an_sigcache[cache_slot].ipsrc = ntohl(ip->ip_src.s_addr);
+	}
+	bcopy(eh->ether_shost, sc->an_sigcache[cache_slot].macsrc, 6);
 
 	sc->an_sigcache[cache_slot].signal = rx_quality;
 }

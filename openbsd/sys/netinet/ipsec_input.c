@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipsec_input.c,v 1.71 2004/02/17 12:07:45 markus Exp $	*/
+/*	$OpenBSD: ipsec_input.c,v 1.74 2004/06/21 23:50:37 tholo Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
@@ -130,10 +130,8 @@ ipsec_common_input(struct mbuf *m, int skip, int protoff, int af, int sproto,
 	if ((sproto == IPPROTO_ESP && !esp_enable) ||
 	    (sproto == IPPROTO_AH && !ah_enable) ||
 	    (sproto == IPPROTO_IPCOMP && !ipcomp_enable)) {
-		m_freem(m);
-		IPSEC_ISTAT(espstat.esps_pdrops, ahstat.ahs_pdrops,
-		    ipcompstat.ipcomps_pdrops);
-		return EOPNOTSUPP;
+		rip_input(m, skip, sproto);
+		return 0;
 	}
 
 	if (m->m_pkthdr.len - skip < 2 * sizeof(u_int32_t)) {
@@ -181,6 +179,8 @@ ipsec_common_input(struct mbuf *m, int skip, int protoff, int af, int sproto,
 		m_copydata(m, offsetof(struct ip6_hdr, ip6_dst),
 		    sizeof(struct in6_addr),
 		    (caddr_t) &(dst_address.sin6.sin6_addr));
+		in6_recoverscope(&dst_address.sin6, &dst_address.sin6.sin6_addr,
+		    NULL);
 		break;
 #endif /* INET6 */
 
@@ -243,11 +243,7 @@ ipsec_common_input(struct mbuf *m, int skip, int protoff, int af, int sproto,
 	
 	/* Register first use, setup expiration timer. */
 	if (tdbp->tdb_first_use == 0) {
-		int pri;
-
-		pri = splhigh();
-		tdbp->tdb_first_use = time.tv_sec;
-		splx(pri);
+		tdbp->tdb_first_use = time_second;
 
 		tv.tv_usec = 0;
 
@@ -296,7 +292,7 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff,
 	af = tdbp->tdb_dst.sa.sa_family;
 	sproto = tdbp->tdb_sproto;
 
-	tdbp->tdb_last_used = time.tv_sec;
+	tdbp->tdb_last_used = time_second;
 
 	/* Sanity check */
 	if (m == NULL) {
@@ -869,7 +865,7 @@ ipsec_common_ctlinput(int cmd, struct sockaddr *sa, void *v, int proto)
 
 			/* Store adjusted MTU in tdb */
 			tdbp->tdb_mtu = mtu;
-			tdbp->tdb_mtutimeout = time.tv_sec +
+			tdbp->tdb_mtutimeout = time_second +
 			    ip_mtudisc_timeout;
 		}
 		splx(s);

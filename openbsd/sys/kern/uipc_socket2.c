@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_socket2.c,v 1.35 2003/07/21 22:44:50 tedu Exp $	*/
+/*	$OpenBSD: uipc_socket2.c,v 1.38 2004/04/25 16:25:05 markus Exp $	*/
 /*	$NetBSD: uipc_socket2.c,v 1.11 1996/02/04 02:17:55 christos Exp $	*/
 
 /*
@@ -154,9 +154,13 @@ sonewconn(struct socket *head, int connstatus)
 {
 	struct socket *so;
 	int soqueue = connstatus ? 1 : 0;
+	extern u_long unpst_sendspace, unpst_recvspace;
+	u_long snd_sb_hiwat, rcv_sb_hiwat;
 
 	splassert(IPL_SOFTNET);
 
+	if (mclpool.pr_nout > mclpool.pr_hardlimit * 95 / 100)
+		return ((struct socket *)0);
 	if (head->so_qlen + head->so_q0len > head->so_qlimit * 3)
 		return ((struct socket *)0);
 	so = pool_get(&socket_pool, PR_NOWAIT);
@@ -176,7 +180,19 @@ sonewconn(struct socket *head, int connstatus)
 	so->so_rgid = head->so_rgid;
 	so->so_siguid = head->so_siguid;
 	so->so_sigeuid = head->so_sigeuid;
-	(void) soreserve(so, head->so_snd.sb_hiwat, head->so_rcv.sb_hiwat);
+
+	/*
+	 * If we are tight on mbuf clusters, create the new socket
+	 * with the minimum.  Sorry, you lose.
+	 */
+	snd_sb_hiwat = head->so_snd.sb_hiwat;
+	if (sbcheckreserve(snd_sb_hiwat, unpst_sendspace))
+		snd_sb_hiwat = unpst_sendspace;		/* and udp? */
+	rcv_sb_hiwat = head->so_rcv.sb_hiwat;
+	if (sbcheckreserve(rcv_sb_hiwat, unpst_recvspace))
+		rcv_sb_hiwat = unpst_recvspace;		/* and udp? */
+
+	(void) soreserve(so, snd_sb_hiwat, rcv_sb_hiwat);
 	soqinsque(head, so, soqueue);
 	if ((*so->so_proto->pr_usrreq)(so, PRU_ATTACH,
 	    (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0)) {
@@ -384,14 +400,26 @@ sbreserve(sb, cc)
 	u_long cc;
 {
 
-	if (cc == 0 ||
-	    (u_int64_t)cc > (u_int64_t)sb_max * MCLBYTES / (MSIZE + MCLBYTES))
+	if (cc == 0 || cc > sb_max)
 		return (0);
 	sb->sb_hiwat = cc;
-	sb->sb_mbmax = min(cc * 2, sb_max);
+	sb->sb_mbmax = min(cc * 2, sb_max + (sb_max / MCLBYTES) * MSIZE);
 	if (sb->sb_lowat > sb->sb_hiwat)
 		sb->sb_lowat = sb->sb_hiwat;
 	return (1);
+}
+
+/*
+ * If over 50% of mbuf clusters in use, do not accept any
+ * greater than normal request.
+ */
+int
+sbcheckreserve(u_long cnt, u_long defcnt)
+{
+	if (cnt > defcnt &&
+	    mclpool.pr_nout> mclpool.pr_hardlimit / 2)
+		return (ENOBUFS);
+	return (0);
 }
 
 /*
@@ -499,7 +527,7 @@ sbappend(sb, m)
 {
 	register struct mbuf *n;
 
-	if (m == 0)
+	if (m == NULL)
 		return;
 
 	SBLASTRECORDCHK(sb, "sbappend 1");
@@ -579,7 +607,7 @@ sbappendrecord(struct sockbuf *sb, struct mbuf *m0)
 {
 	struct mbuf *m;
 
-	if (m0 == 0)
+	if (m0 == NULL)
 		return;
 
 	/*
@@ -590,7 +618,7 @@ sbappendrecord(struct sockbuf *sb, struct mbuf *m0)
 	SBLASTRECORDCHK(sb, "sbappendrecord 1");
 	SBLINKRECORD(sb, m0);
 	m = m0->m_next;
-	m0->m_next = 0;
+	m0->m_next = NULL;
 	if (m && (m0->m_flags & M_EOR)) {
 		m0->m_flags &= ~M_EOR;
 		m->m_flags |= M_EOR;
@@ -609,7 +637,7 @@ sbinsertoob(struct sockbuf *sb, struct mbuf *m0)
 {
 	struct mbuf *m, **mp;
 
-	if (m0 == 0)
+	if (m0 == NULL)
 		return;
 
 	SBLASTRECORDCHK(sb, "sbinsertoob 1");
@@ -639,7 +667,7 @@ sbinsertoob(struct sockbuf *sb, struct mbuf *m0)
 	}
 	*mp = m0;
 	m = m0->m_next;
-	m0->m_next = 0;
+	m0->m_next = NULL;
 	if (m && (m0->m_flags & M_EOR)) {
 		m0->m_flags &= ~M_EOR;
 		m->m_flags |= M_EOR;
@@ -667,7 +695,7 @@ sbappendaddr(struct sockbuf *sb, struct sockaddr *asa, struct mbuf *m0,
 		space += m0->m_pkthdr.len;
 	for (n = control; n; n = n->m_next) {
 		space += n->m_len;
-		if (n->m_next == 0)	/* keep pointer to last control buf */
+		if (n->m_next == NULL)	/* keep pointer to last control buf */
 			break;
 	}
 	if (space > sbspace(sb))
@@ -675,7 +703,7 @@ sbappendaddr(struct sockbuf *sb, struct sockaddr *asa, struct mbuf *m0,
 	if (asa->sa_len > MLEN)
 		return (0);
 	MGET(m, M_DONTWAIT, MT_SONAME);
-	if (m == 0)
+	if (m == NULL)
 		return (0);
 	m->m_len = asa->sa_len;
 	bcopy(asa, mtod(m, caddr_t), asa->sa_len);
@@ -707,11 +735,11 @@ sbappendcontrol(struct sockbuf *sb, struct mbuf *m0, struct mbuf *control)
 	struct mbuf *m, *mlast, *n;
 	int space = 0;
 
-	if (control == 0)
+	if (control == NULL)
 		panic("sbappendcontrol");
 	for (m = control; ; m = m->m_next) {
 		space += m->m_len;
-		if (m->m_next == 0)
+		if (m->m_next == NULL)
 			break;
 	}
 	n = m;			/* save pointer to last control buffer */
@@ -780,7 +808,7 @@ sbcompress(struct sockbuf *sb, struct mbuf *m, struct mbuf *n)
 		n = m;
 		m->m_flags &= ~M_EOR;
 		m = m->m_next;
-		n->m_next = 0;
+		n->m_next = NULL;
 	}
 	if (eor) {
 		if (n)
@@ -821,8 +849,8 @@ sbdrop(struct sockbuf *sb, int len)
 
 	next = (m = sb->sb_mb) ? m->m_nextpkt : 0;
 	while (len > 0) {
-		if (m == 0) {
-			if (next == 0)
+		if (m == NULL) {
+			if (next == NULL)
 				panic("sbdrop");
 			m = next;
 			next = m->m_nextpkt;

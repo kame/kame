@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_subr.c,v 1.77 2004/03/02 12:51:12 markus Exp $	*/
+/*	$OpenBSD: tcp_subr.c,v 1.83 2004/08/10 20:04:55 markus Exp $	*/
 /*	$NetBSD: tcp_subr.c,v 1.22 1996/02/13 23:44:00 christos Exp $	*/
 
 /*
@@ -100,7 +100,7 @@
 #endif /* INET6 */
 
 #ifdef TCP_SIGNATURE
-#include <sys/md5k.h>
+#include <crypto/md5.h>
 #endif /* TCP_SIGNATURE */
 
 /* patchable/settable parameters for tcp */
@@ -593,116 +593,6 @@ tcp_close(struct tcpcb *tp)
 #ifdef TCP_SACK
 	struct sackhole *p, *q;
 #endif
-#ifdef RTV_RTT
-	struct rtentry *rt;
-#ifdef INET6
-	int bound_to_specific = 0;  /* I.e. non-default */
-
-	/*
-	 * This code checks the nature of the route for this connection.
-	 * Normally this is done by two simple checks in the next
-	 * INET/INET6 ifdef block, but because of two possible lower layers,
-	 * that check is done here.
-	 *
-	 * Perhaps should be doing this only for a RTF_HOST route.
-	 */
-	rt = inp->inp_route.ro_rt;  /* Same for route or route6. */
-	if (tp->pf == PF_INET6) {
-		if (rt)
-			bound_to_specific =
-			    !(IN6_IS_ADDR_UNSPECIFIED(&
-			      ((struct sockaddr_in6 *)rt_key(rt))->sin6_addr));
-	} else {
-		if (rt)
-			bound_to_specific =
-			    (((struct sockaddr_in *)rt_key(rt))->
-			    sin_addr.s_addr != INADDR_ANY);
-	}
-#endif /* INET6 */
-
-	/*
-	 * If we sent enough data to get some meaningful characteristics,
-	 * save them in the routing entry.  'Enough' is arbitrarily
-	 * defined as the sendpipesize (default 4K) * 16.  This would
-	 * give us 16 rtt samples assuming we only get one sample per
-	 * window (the usual case on a long haul net).  16 samples is
-	 * enough for the srtt filter to converge to within 5% of the correct
-	 * value; fewer samples and we could save a very bogus rtt.
-	 *
-	 * Don't update the default route's characteristics and don't
-	 * update anything that the user "locked".
-	 */
-#ifdef INET6
-	/*
-	 * Note that rt and bound_to_specific are set above.
-	 */
-	if (SEQ_LT(tp->iss + so->so_snd.sb_hiwat * 16, tp->snd_max) &&
-	    rt && bound_to_specific) {
-#else /* INET6 */
-	if (SEQ_LT(tp->iss + so->so_snd.sb_hiwat * 16, tp->snd_max) &&
-	    (rt = inp->inp_route.ro_rt) &&
-	    satosin(rt_key(rt))->sin_addr.s_addr != INADDR_ANY) {
-#endif /* INET6 */
-		u_long i = 0;
-
-		if ((rt->rt_rmx.rmx_locks & RTV_RTT) == 0) {
-			i = tp->t_srtt *
-			    (RTM_RTTUNIT / (PR_SLOWHZ * TCP_RTT_SCALE));
-			if (rt->rt_rmx.rmx_rtt && i)
-				/*
-				 * filter this update to half the old & half
-				 * the new values, converting scale.
-				 * See route.h and tcp_var.h for a
-				 * description of the scaling constants.
-				 */
-				rt->rt_rmx.rmx_rtt =
-				    (rt->rt_rmx.rmx_rtt + i) / 2;
-			else
-				rt->rt_rmx.rmx_rtt = i;
-		}
-		if ((rt->rt_rmx.rmx_locks & RTV_RTTVAR) == 0) {
-			i = tp->t_rttvar *
-			    (RTM_RTTUNIT / (PR_SLOWHZ * TCP_RTTVAR_SCALE));
-			if (rt->rt_rmx.rmx_rttvar && i)
-				rt->rt_rmx.rmx_rttvar =
-				    (rt->rt_rmx.rmx_rttvar + i) / 2;
-			else
-				rt->rt_rmx.rmx_rttvar = i;
-		}
-		/*
-		 * update the pipelimit (ssthresh) if it has been updated
-		 * already or if a pipesize was specified & the threshhold
-		 * got below half the pipesize.  I.e., wait for bad news
-		 * before we start updating, then update on both good
-		 * and bad news.
-		 */
-		if (((rt->rt_rmx.rmx_locks & RTV_SSTHRESH) == 0 &&
-		    (i = tp->snd_ssthresh) && rt->rt_rmx.rmx_ssthresh) ||
-		    i < (rt->rt_rmx.rmx_sendpipe / 2)) {
-			/*
-			 * convert the limit from user data bytes to
-			 * packets then to packet data bytes.
-			 */
-			i = (i + tp->t_maxseg / 2) / tp->t_maxseg;
-			if (i < 2)
-				i = 2;
-#ifdef INET6
-			if (tp->pf == PF_INET6)
-				i *= (u_long)(tp->t_maxseg + sizeof (struct tcphdr)
-				    + sizeof(struct ip6_hdr));
-			else
-#endif /* INET6 */
-				i *= (u_long)(tp->t_maxseg +
-				    sizeof (struct tcpiphdr));
-
-			if (rt->rt_rmx.rmx_ssthresh)
-				rt->rt_rmx.rmx_ssthresh =
-				    (rt->rt_rmx.rmx_ssthresh + i) / 2;
-			else
-				rt->rt_rmx.rmx_ssthresh = i;
-		}
-	}
-#endif /* RTV_RTT */
 
 	/* free the reassembly queue, if any */
 	tcp_reass_lock(tp);
@@ -821,19 +711,25 @@ tcp6_ctlinput(cmd, sa, d)
 	void *d;
 {
 	struct tcphdr th;
+	struct tcpcb *tp;
 	void (*notify)(struct inpcb *, int) = tcp_notify;
 	struct ip6_hdr *ip6;
 	const struct sockaddr_in6 *sa6_src = NULL;
 	struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sa;
+	struct inpcb *inp;
 	struct mbuf *m;
+	tcp_seq seq;
 	int off;
 	struct {
 		u_int16_t th_sport;
 		u_int16_t th_dport;
+		u_int32_t th_seq;
 	} *thp;
 
 	if (sa->sa_family != AF_INET6 ||
-	    sa->sa_len != sizeof(struct sockaddr_in6))
+	    sa->sa_len != sizeof(struct sockaddr_in6) ||
+	    IN6_IS_ADDR_UNSPECIFIED(&sa6->sin6_addr) ||
+	    IN6_IS_ADDR_V4MAPPED(&sa6->sin6_addr))
 		return;
 	if ((unsigned)cmd >= PRC_NCMDS)
 		return;
@@ -879,6 +775,14 @@ tcp6_ctlinput(cmd, sa, d)
 #endif
 		m_copydata(m, off, sizeof(*thp), (caddr_t)&th);
 
+		/*
+		 * Check to see if we have a valid TCP connection
+		 * corresponding to the address in the ICMPv6 message
+		 * payload.
+		 */
+		inp = in6_pcbhashlookup(&tcbtable, &sa6->sin6_addr,
+		    th.th_dport, (struct in6_addr *)&sa6_src->sin6_addr,
+		    th.th_sport);
 		if (cmd == PRC_MSGSIZE) {
 			int valid = 0;
 
@@ -905,10 +809,14 @@ tcp6_ctlinput(cmd, sa, d)
 
 			return;
 		}
-
-		if (in6_pcbnotify(&tcbtable, sa, th.th_dport,
-		    (struct sockaddr *)sa6_src, th.th_sport, cmd, NULL, notify) == 0 &&
-		    syn_cache_count &&
+		if (inp) {
+			seq = ntohl(th.th_seq);
+			if (inp->inp_socket &&
+			    (tp = intotcpcb(inp)) &&
+			    SEQ_GEQ(seq, tp->snd_una) &&
+			    SEQ_LT(seq, tp->snd_max))
+				notify(inp, inet6ctlerrmap[cmd]);
+		} else if (syn_cache_count &&
 		    (inet6ctlerrmap[cmd] == EHOSTUNREACH ||
 		     inet6ctlerrmap[cmd] == ENETUNREACH ||
 		     inet6ctlerrmap[cmd] == EHOSTDOWN))
@@ -929,11 +837,18 @@ tcp_ctlinput(cmd, sa, v)
 {
 	struct ip *ip = v;
 	struct tcphdr *th;
+	struct tcpcb *tp;
+	struct inpcb *inp;
+	struct in_addr faddr;
+	tcp_seq seq;
 	extern int inetctlerrmap[];
 	void (*notify)(struct inpcb *, int) = tcp_notify;
 	int errno;
 
 	if (sa->sa_family != AF_INET)
+		return NULL;
+	faddr = satosin(sa)->sin_addr;
+	if (faddr.s_addr == INADDR_ANY)
 		return NULL;
 
 	if ((unsigned)cmd >= PRC_NCMDS)
@@ -943,24 +858,27 @@ tcp_ctlinput(cmd, sa, v)
 		notify = tcp_quench;
 	else if (PRC_IS_REDIRECT(cmd))
 		notify = in_rtchange, ip = 0;
-	else if (cmd == PRC_MSGSIZE && ip_mtudisc) {
-		th = (struct tcphdr *)((caddr_t)ip + (ip->ip_hl << 2));
+	else if (cmd == PRC_MSGSIZE && ip_mtudisc && ip) {
 		/*
 		 * Verify that the packet in the icmp payload refers
 		 * to an existing TCP connection.
 		 */
-		/*
-		 * XXX is it possible to get a valid PRC_MSGSIZE error for
-		 * a non-established connection?
-		 */
-		if (in_pcbhashlookup(&tcbtable,
-		    ip->ip_dst, th->th_dport, ip->ip_src, th->th_sport)) {
+		th = (struct tcphdr *)((caddr_t)ip + (ip->ip_hl << 2));
+		seq = ntohl(th->th_seq);
+		inp = in_pcbhashlookup(&tcbtable,
+		    ip->ip_dst, th->th_dport, ip->ip_src, th->th_sport);
+		if (inp && (tp = intotcpcb(inp)) &&
+		    SEQ_GEQ(seq, tp->snd_una) &&
+		    SEQ_LT(seq, tp->snd_max)) {
 			struct icmp *icp;
 			icp = (struct icmp *)((caddr_t)ip -
 					      offsetof(struct icmp, icmp_ip));
 
 			/* Calculate new mtu and create corresponding route */
 			icmp_mtudisc(icp);
+		} else {
+			/* ignore if we don't have a matching connection */
+			return NULL;
 		}
 		notify = tcp_mtudisc, ip = 0;
 	} else if (cmd == PRC_MTUINC)
@@ -972,9 +890,16 @@ tcp_ctlinput(cmd, sa, v)
 
 	if (ip) {
 		th = (struct tcphdr *)((caddr_t)ip + (ip->ip_hl << 2));
-		if (in_pcbnotify(&tcbtable, sa, th->th_dport, ip->ip_src,
-		    th->th_sport, errno, notify) == 0 &&
-		    syn_cache_count &&
+		inp = in_pcbhashlookup(&tcbtable,
+		    ip->ip_dst, th->th_dport, ip->ip_src, th->th_sport);
+		if (inp) {
+			seq = ntohl(th->th_seq);
+			if (inp->inp_socket &&
+			    (tp = intotcpcb(inp)) &&
+			    SEQ_GEQ(seq, tp->snd_una) &&
+			    SEQ_LT(seq, tp->snd_max))
+				notify(inp, errno);
+		} else if (syn_cache_count &&
 		    (inetctlerrmap[cmd] == EHOSTUNREACH ||
 		     inetctlerrmap[cmd] == ENETUNREACH ||
 		     inetctlerrmap[cmd] == EHOSTDOWN)) {
@@ -1040,8 +965,10 @@ tcp_mtudisc(inp, errno)
 {
 	struct tcpcb *tp = intotcpcb(inp);
 	struct rtentry *rt = in_pcbrtentry(inp);
+	int change = 0;
 
 	if (tp != 0) {
+		int orig_maxseg = tp->t_maxseg;
 		if (rt != 0) {
 			/*
 			 * If this was not a host route, remove and realloc.
@@ -1051,18 +978,18 @@ tcp_mtudisc(inp, errno)
 				if ((rt = in_pcbrtentry(inp)) == 0)
 					return;
 			}
-
-			if (rt->rt_rmx.rmx_mtu != 0) {
-				/* also takes care of congestion window */
-				tcp_mss(tp, -1);
-			}
+			if (orig_maxseg != tp->t_maxseg ||
+			    (rt->rt_rmx.rmx_locks & RTV_MTU))
+				change = 1;
 		}
+		tcp_mss(tp, -1);
 
 		/*
-		 * Resend unacknowledged packets.
+		 * Resend unacknowledged packets
 		 */
 		tp->snd_nxt = tp->snd_una;
-		tcp_output(tp);
+		if (change || errno > 0)
+			tcp_output(tp);
 	}
 }
 
@@ -1152,6 +1079,81 @@ tcp_signature_apply(fstate, data, len)
 	MD5Update((MD5_CTX *)fstate, (char *)data, len);
 	return 0;
 }
+
+int
+tcp_signature(struct tdb *tdb, int af, struct mbuf *m, struct tcphdr *th,
+    int iphlen, int doswap, char *sig)
+{
+	MD5_CTX ctx;
+	int len;
+	struct tcphdr th0;
+
+	MD5Init(&ctx);
+
+	switch(af) {
+	case 0:
+#ifdef INET
+	case AF_INET: {
+		struct ippseudo ippseudo;
+		struct ip *ip;
+
+		ip = mtod(m, struct ip *);
+
+		ippseudo.ippseudo_src = ip->ip_src;
+		ippseudo.ippseudo_dst = ip->ip_dst;
+		ippseudo.ippseudo_pad = 0;
+		ippseudo.ippseudo_p = IPPROTO_TCP;
+		ippseudo.ippseudo_len = htons(m->m_pkthdr.len - iphlen);
+
+		MD5Update(&ctx, (char *)&ippseudo,
+		    sizeof(struct ippseudo));
+		break;
+		}
+#endif
+#ifdef INET6
+	case AF_INET6: {
+		struct ip6_hdr_pseudo ip6pseudo;
+		struct ip6_hdr *ip6;
+
+		ip6 = mtod(m, struct ip6_hdr *);
+		bzero(&ip6pseudo, sizeof(ip6pseudo));
+		ip6pseudo.ip6ph_src = ip6->ip6_src;
+		ip6pseudo.ip6ph_dst = ip6->ip6_dst;
+		in6_clearscope(&ip6pseudo.ip6ph_src);
+		in6_clearscope(&ip6pseudo.ip6ph_dst);
+		ip6pseudo.ip6ph_nxt = IPPROTO_TCP;
+		ip6pseudo.ip6ph_len = htonl(m->m_pkthdr.len - iphlen);
+
+		MD5Update(&ctx, (char *)&ip6pseudo,
+		    sizeof(ip6pseudo));
+		break;
+		}
+#endif
+	}
+
+	th0 = *th;
+	th0.th_sum = 0;
+
+	if (doswap) {
+		HTONL(th0.th_seq);
+		HTONL(th0.th_ack);
+		HTONS(th0.th_win);
+		HTONS(th0.th_urp);
+	}
+	MD5Update(&ctx, (char *)&th0, sizeof(th0));
+
+	len = m->m_pkthdr.len - iphlen - th->th_off * sizeof(uint32_t);
+
+	if (len > 0 &&
+	    m_apply(m, iphlen + th->th_off * sizeof(uint32_t), len,
+	    tcp_signature_apply, (caddr_t)&ctx))
+		return (-1); 
+
+	MD5Update(&ctx, tdb->tdb_amxkey, tdb->tdb_amxkeylen);
+	MD5Final(sig, &ctx);
+
+	return (0);
+}
 #endif /* TCP_SIGNATURE */
 
 #define TCP_RNDISS_ROUNDS	16
@@ -1183,7 +1185,7 @@ tcp_rndiss_init()
 {
 	get_random_bytes(tcp_rndiss_sbox, sizeof(tcp_rndiss_sbox));
 
-	tcp_rndiss_reseed = time.tv_sec + TCP_RNDISS_OUT;
+	tcp_rndiss_reseed = time_second + TCP_RNDISS_OUT;
 	tcp_rndiss_msb = tcp_rndiss_msb == 0x8000 ? 0 : 0x8000;
 	tcp_rndiss_cnt = 0;
 }
@@ -1192,7 +1194,7 @@ tcp_seq
 tcp_rndiss_next()
 {
         if (tcp_rndiss_cnt >= TCP_RNDISS_MAX ||
-	    time.tv_sec > tcp_rndiss_reseed)
+	    time_second > tcp_rndiss_reseed)
                 tcp_rndiss_init();
 
 	/* (arc4random() & 0x7fff) ensures a 32768 byte gap between ISS */

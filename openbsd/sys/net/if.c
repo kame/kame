@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.84 2004/02/28 09:14:10 mcbride Exp $	*/
+/*	$OpenBSD: if.c,v 1.90 2004/06/26 17:36:32 markus Exp $	*/
 /*	$NetBSD: if.c,v 1.35 1996/05/07 05:26:04 thorpej Exp $	*/
 
 /*
@@ -130,6 +130,8 @@ void	if_detached_watchdog(struct ifnet *);
 int	if_clone_list(struct if_clonereq *);
 struct if_clone	*if_clone_lookup(const char *, int *);
 
+void	if_congestion_clear(void *);
+
 LIST_HEAD(, if_clone) if_cloners = LIST_HEAD_INITIALIZER(if_cloners);
 int if_cloners_count;
 
@@ -164,7 +166,9 @@ void
 if_attachsetup(ifp)
 	struct ifnet *ifp;
 {
+	struct ifgroup *ifg;
 	struct ifaddr *ifa;
+	int n;
 	int wrapped = 0;
 
 	if (ifindex2ifnet == 0)
@@ -234,6 +238,19 @@ if_attachsetup(ifp)
 		}
 		ifindex2ifnet = (struct ifnet **)q;
 	}
+
+	/* setup the group list */
+	TAILQ_INIT(&ifp->if_groups);
+	ifg = (struct ifgroup *)malloc(sizeof(struct ifgroup), M_TEMP,
+	    M_NOWAIT);
+	if (ifg != NULL) {
+		for (n = 0;
+		    ifp->if_xname[n] < '0' || ifp->if_xname[n] > '9';
+		    n++)
+			continue;
+		strlcpy(ifg->ifg_group, ifp->if_xname, n + 1);
+		TAILQ_INSERT_HEAD(&ifp->if_groups, ifg, ifg_next);
+ 	}
 
 	ifindex2ifnet[if_index] = ifp;
 
@@ -449,6 +466,7 @@ if_detach(ifp)
 	struct ifnet *ifp;
 {
 	struct ifaddr *ifa;
+	struct ifgroup *ifg;
 	int i, s = splimp();
 	struct radix_node_head *rnh;
 	struct domain *dp;
@@ -579,6 +597,13 @@ do { \
 
 		free(ifa, M_IFADDR);
 	}
+
+	for (ifg = TAILQ_FIRST(&ifp->if_groups); ifg;
+	    ifg = TAILQ_FIRST(&ifp->if_groups)) {
+		TAILQ_REMOVE(&ifp->if_groups, ifg, ifg_next);
+		free(ifg, M_TEMP);
+	}
+
 	if_free_sadl(ifp);
 
 	free(ifnet_addrs[ifp->if_index], M_IFADDR);
@@ -786,6 +811,29 @@ if_clone_list(ifcr)
 }
 
 /*
+ * set queue congestion marker and register timeout to clear it
+ */
+void
+if_congestion(struct ifqueue *ifq)
+{
+	static struct timeout	to;
+
+	ifq->ifq_congestion = 1;
+	bzero(&to, sizeof(to));
+	timeout_set(&to, if_congestion_clear, ifq);
+	timeout_add(&to, hz / 100);
+}
+
+/*
+ * clear the congestion flag
+ */
+void
+if_congestion_clear(void *ifq)
+{
+	((struct ifqueue *)ifq)->ifq_congestion = 0;
+}
+
+/*
  * Locate an interface based on a complete address.
  */
 /*ARGSUSED*/
@@ -986,6 +1034,10 @@ if_down(struct ifnet *ifp)
 		pfctlinput(PRC_IFDOWN, ifa->ifa_addr);
 	}
 	IFQ_PURGE(&ifp->if_snd);
+#if NCARP > 0
+	if (ifp->if_carp)
+		carp_carpdev_state(ifp->if_carp);
+#endif
 	rt_ifmsg(ifp);
 }
 
@@ -1010,6 +1062,10 @@ if_up(struct ifnet *ifp)
 	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
 		pfctlinput(PRC_IFUP, ifa->ifa_addr);
 	}
+#endif
+#if NCARP > 0
+	if (ifp->if_carp)
+		carp_carpdev_state(ifp->if_carp);
 #endif
 	rt_ifmsg(ifp);
 #ifdef INET6
@@ -1088,7 +1144,9 @@ ifioctl(so, cmd, data, p)
 {
 	struct ifnet *ifp;
 	struct ifreq *ifr;
+	char ifdescrbuf[IFDESCRSIZE];
 	int error = 0;
+	size_t bytesdone;
 	short oif_flags;
 
 	switch (cmd) {
@@ -1105,8 +1163,8 @@ ifioctl(so, cmd, data, p)
 		if ((error = suser(p, 0)) != 0)
 			return (error);
 		return ((cmd == SIOCIFCREATE) ?
-			if_clone_create(ifr->ifr_name) :
-			if_clone_destroy(ifr->ifr_name));
+		    if_clone_create(ifr->ifr_name) :
+		    if_clone_destroy(ifr->ifr_name));
 	case SIOCIFGCLONERS:
 		return (if_clone_list((struct if_clonereq *)data));
 	}
@@ -1201,6 +1259,42 @@ ifioctl(so, cmd, data, p)
 			return (EOPNOTSUPP);
 		error = (*ifp->if_ioctl)(ifp, cmd, data);
 		break;
+
+	case SIOCGIFDESCR:
+		strlcpy(ifdescrbuf, ifp->if_description, IFDESCRSIZE);
+		error = copyoutstr(ifdescrbuf, ifr->ifr_data, IFDESCRSIZE,
+		    &bytesdone);
+		break;
+
+	case SIOCSIFDESCR:
+		if ((error = suser(p, 0)) != 0)
+			return (error);
+		error = copyinstr(ifr->ifr_data, ifdescrbuf,
+		    IFDESCRSIZE, &bytesdone);
+		if (error == 0) {
+			(void)memset(ifp->if_description, 0, IFDESCRSIZE);
+			strlcpy(ifp->if_description, ifdescrbuf, IFDESCRSIZE);
+		}
+		break;
+
+	case SIOCAIFGROUP:
+		if ((error = suser(p, 0)) != 0)
+			return (error);
+		if ((error = if_addgroup((struct ifgroupreq *)data, ifp)))
+			return (error);
+		break;
+
+	case SIOCGIFGROUP:
+		if ((error = if_getgroup(data, ifp)))
+			return (error);
+		break;
+
+	case SIOCDIFGROUP:
+                if ((error = suser(p, 0)) != 0)
+                        return (error);
+                if ((error = if_delgroup((struct ifgroupreq *)data, ifp)))
+                        return (error);
+                break;
 
 	default:
 		if (so->so_proto == 0)
@@ -1407,6 +1501,89 @@ if_detached_watchdog(struct ifnet *ifp)
 	/* nothing */
 }
 
+/*
+ * Add a group to an interface
+ */
+int
+if_addgroup(struct ifgroupreq *ifgr, struct ifnet *ifp)
+{
+	struct ifgroup	*ifgnew, *ifgp;
+
+	TAILQ_FOREACH(ifgp, &ifp->if_groups, ifg_next)
+		if (!strcmp(ifgp->ifg_group, ifgr->ifgr_group))
+			return (EEXIST);
+
+	ifgnew = (struct ifgroup *)malloc(sizeof(struct ifgroup), M_TEMP, 
+	    M_NOWAIT);
+	if (ifgnew == NULL)
+		return (ENOMEM);
+	strlcpy(ifgnew->ifg_group, ifgr->ifgr_group, IFNAMSIZ);
+	TAILQ_INSERT_TAIL(&ifp->if_groups, ifgnew, ifg_next);
+
+	return (0);
+}
+
+/*
+ * Remove a group from an interface
+ * note: the first group is the if-family - do not remove
+ */
+int
+if_delgroup(struct ifgroupreq *ifgr, struct ifnet *ifp)
+{
+	struct ifgroup	*ifgp;
+
+	for (ifgp = TAILQ_FIRST(&ifp->if_groups);
+	    ifgp != TAILQ_END(&ifp->if_groups);
+	    ifgp = TAILQ_NEXT(ifgp, ifg_next)) {
+		if (ifgp == TAILQ_FIRST(&ifp->if_groups) &&
+		    !strcmp(ifgp->ifg_group, ifgr->ifgr_group))
+			return (EPERM);
+		if (!strcmp(ifgp->ifg_group, ifgr->ifgr_group)) {
+			TAILQ_REMOVE(&ifp->if_groups, ifgp, ifg_next);
+			free(ifgp, M_TEMP);
+			return (0);
+		}
+	}
+	return (ENOENT);
+}
+
+/*
+ * Stores all groups from an interface in memory pointed
+ * to by data
+ */
+int
+if_getgroup(caddr_t data, struct ifnet *ifp)
+{
+	int len;
+	int error;
+	struct ifgroup *ifgp, *ifgp2, ifg;
+	struct ifgroupreq *ifgr = (struct ifgroupreq *)data;
+
+	if (ifgr->ifgr_len == 0) {
+		TAILQ_FOREACH(ifgp, &ifp->if_groups, ifg_next)
+			ifgr->ifgr_len += sizeof(struct ifgroup);
+		return (0);
+	}
+
+	len = ifgr->ifgr_len;
+	ifgp = ifgr->ifgr_groups;
+	for (ifgp2 = TAILQ_FIRST(&ifp->if_groups); ifgp2 && 
+	    len >= sizeof(struct ifgroup);
+	    ifgp2 = TAILQ_NEXT(ifgp2, ifg_next)) {
+		memset(&ifg, 0, sizeof(struct ifgroup));
+		strlcpy(ifg.ifg_group, ifgp2->ifg_group, IFNAMSIZ);
+		error = copyout((caddr_t)&ifg, (caddr_t)ifgp, 
+		    sizeof(struct ifgroup));
+		if (error)
+			return (error);
+		ifgp++;
+		len -= sizeof(struct ifgroup);
+	}
+
+	return (0);
+}
+
+		
 /*
  * Set/clear promiscuous mode on interface ifp based on the truth value
  * of pswitch.  The calls are reference counted so that only the first

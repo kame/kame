@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_ipsp.h,v 1.126 2004/01/22 14:38:28 markus Exp $	*/
+/*	$OpenBSD: ip_ipsp.h,v 1.127 2004/04/14 20:10:04 markus Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr),
@@ -674,10 +674,9 @@ extern ssize_t ipsec_hdrsz(struct tdb *);
 extern void ipsec_adjust_mtu(struct mbuf *, u_int32_t);
 extern int ipsp_print_tdb(struct tdb *, char *, size_t);
 extern struct ipsec_acquire *ipsec_get_acquire(u_int32_t);
-extern int ipsp_aux_match(struct ipsec_ref *, struct ipsec_ref *,
-    struct ipsec_ref *, struct ipsec_ref *, struct ipsec_ref *,
-    struct ipsec_ref *, struct ipsec_ref *, struct ipsec_ref *,
-    struct sockaddr_encap *, struct sockaddr_encap *,
+extern int ipsp_aux_match(struct tdb *,
+    struct ipsec_ref *, struct ipsec_ref *,
+    struct ipsec_ref *, struct ipsec_ref *,
     struct sockaddr_encap *, struct sockaddr_encap *);
 #if (defined(MIP6_HOME_AGENT) || defined(MIP6_MOBILE_NODE)) && !defined(MIP6_NOHAIPSEC)
 extern int key_mip6_update_mobile_node_ipsecdb(struct sockaddr_in6 *,

@@ -1,4 +1,4 @@
-/*	$OpenBSD: sockio.h,v 1.24 2003/12/08 09:09:03 markus Exp $	*/
+/*	$OpenBSD: sockio.h,v 1.27 2004/06/26 07:00:58 alex Exp $	*/
 /*	$NetBSD: sockio.h,v 1.5 1995/08/23 00:40:47 thorpej Exp $	*/
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -178,9 +178,14 @@
 #define	SIOCIFDESTROY	 _IOW('i', 121, struct ifreq)	/* destroy clone if */
 #define	SIOCIFGCLONERS	_IOWR('i', 120, struct if_clonereq) /* get cloners */
 
-#define	SIOCSIPMSFILTER	 _IO('s', 130)			/* set src list */
-#define	SIOCGIPMSFILTER	 _IO('s', 131)			/* get src list */
-#define	SIOCSMSFILTER	 _IO('s', 132)			/* set src list */
-#define	SIOCGMSFILTER	 _IO('s', 133)			/* get src list */
+#define	SIOCAIFGROUP	_IOW('i', 130, struct ifgroupreq) /* add an ifgroup */
+#define	SIOCGIFGROUP   _IOWR('i', 131, struct ifgroupreq) /* get ifgroups */
+#define	SIOCDIFGROUP    _IOW('i', 132, struct ifgroupreq) /* delete ifgroup */
+
+#define	SIOCSIFDESCR	 _IOW('i', 128, struct ifreq)	/* set ifnet descr */
+#define	SIOCGIFDESCR	_IOWR('i', 129, struct ifreq)	/* get ifnet descr */
+
+#define	SIOCSIFTIMESLOT	 _IOW('i', 133, struct ifreq)	/* set ifnet timeslot */
+#define	SIOCGIFTIMESLOT	_IOWR('i', 134, struct ifreq)	/* get ifnet timeslot */
 
 #endif /* !_SYS_SOCKIO_H_ */

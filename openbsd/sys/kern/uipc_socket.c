@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_socket.c,v 1.51 2003/07/21 22:44:50 tedu Exp $	*/
+/*	$OpenBSD: uipc_socket.c,v 1.54 2004/07/28 15:12:55 millert Exp $	*/
 /*	$NetBSD: uipc_socket.c,v 1.21 1996/02/04 02:17:52 christos Exp $	*/
 
 /*
@@ -102,7 +102,7 @@ socreate(dom, aso, type, proto)
 		prp = pffindproto(dom, proto, type);
 	else
 		prp = pffindtype(dom, type);
-	if (prp == 0 || prp->pr_usrreq == 0)
+	if (prp == NULL || prp->pr_usrreq == 0)
 		return (EPROTONOSUPPORT);
 	if (prp->pr_type != type)
 		return (EPROTOTYPE);
@@ -614,7 +614,7 @@ bad:
 		return (error);
 	}
 	if (mp)
-		*mp = (struct mbuf *)0;
+		*mp = NULL;
 	if (so->so_state & SS_ISCONFIRMING && uio->uio_resid)
 		(*pr->pr_usrreq)(so, PRU_RCVD, NULL, NULL, NULL);
 
@@ -635,13 +635,13 @@ restart:
 	 * we have to do the receive in sections, and thus risk returning
 	 * a short count if a timeout or signal occurs after we start.
 	 */
-	if (m == 0 || (((flags & MSG_DONTWAIT) == 0 &&
+	if (m == NULL || (((flags & MSG_DONTWAIT) == 0 &&
 	    so->so_rcv.sb_cc < uio->uio_resid) &&
 	    (so->so_rcv.sb_cc < so->so_rcv.sb_lowat ||
 	    ((flags & MSG_WAITALL) && uio->uio_resid <= so->so_rcv.sb_hiwat)) &&
-	    m->m_nextpkt == 0 && (pr->pr_flags & PR_ATOMIC) == 0)) {
+	    m->m_nextpkt == NULL && (pr->pr_flags & PR_ATOMIC) == 0)) {
 #ifdef DIAGNOSTIC
-		if (m == 0 && so->so_rcv.sb_cc)
+		if (m == NULL && so->so_rcv.sb_cc)
 			panic("receive 1");
 #endif
 		if (so->so_error) {
@@ -762,6 +762,13 @@ dontblock:
 				m->m_next = 0;
 				m = so->so_rcv.sb_mb;
 			} else {
+				/*
+				 * Dispose of any SCM_RIGHTS message that went
+				 * through the read path rather than recv.
+				 */
+				if (pr->pr_domain->dom_dispose &&
+				    mtod(m, struct cmsghdr *)->cmsg_type == SCM_RIGHTS)
+					pr->pr_domain->dom_dispose(m);
 				MFREE(m, so->so_rcv.sb_mb);
 				m = so->so_rcv.sb_mb;
 			}
@@ -834,7 +841,7 @@ dontblock:
 		 * we must note any additions to the sockbuf when we
 		 * block interrupts again.
 		 */
-		if (mp == 0 && uio_error == 0) {
+		if (mp == NULL && uio_error == 0) {
 			SBLASTRECORDCHK(&so->so_rcv, "soreceive uiomove");
 			SBLASTMBUFCHK(&so->so_rcv, "soreceive uiomove");
 			resid = uio->uio_resid;
@@ -864,7 +871,7 @@ dontblock:
 					*mp = m;
 					mp = &m->m_next;
 					so->so_rcv.sb_mb = m = m->m_next;
-					*mp = (struct mbuf *)0;
+					*mp = NULL;
 				} else {
 					MFREE(m, so->so_rcv.sb_mb);
 					m = so->so_rcv.sb_mb;
@@ -918,7 +925,7 @@ dontblock:
 		 * with a short count but without error.
 		 * Keep sockbuf locked against other readers.
 		 */
-		while (flags & MSG_WAITALL && m == 0 && uio->uio_resid > 0 &&
+		while (flags & MSG_WAITALL && m == NULL && uio->uio_resid > 0 &&
 		    !sosendallatonce(so) && !nextrecord) {
 			if (so->so_error || so->so_state & SS_CANTRCVMORE)
 				break;
@@ -941,7 +948,7 @@ dontblock:
 			(void) sbdroprecord(&so->so_rcv);
 	}
 	if ((flags & MSG_PEEK) == 0) {
-		if (m == 0) {
+		if (m == NULL) {
 			/*
 			 * First part is an inline SB_EMPTY_FIXUP().  Second
 			 * part makes sure sb_lastrecord is up-to-date if
@@ -1073,6 +1080,8 @@ sosetopt(so, level, optname, m0)
 		case SO_RCVLOWAT:
 		    {
 			u_long cnt;
+			extern u_long unpst_recvspace;
+			extern u_long unpst_sendspace;
 
 			if (m == NULL || m->m_len < sizeof (int)) {
 				error = EINVAL;
@@ -1084,10 +1093,16 @@ sosetopt(so, level, optname, m0)
 			switch (optname) {
 
 			case SO_SNDBUF:
+				if (sbcheckreserve(cnt, unpst_sendspace) ||
+				    sbreserve(&so->so_snd, cnt) == 0) {
+					error = ENOBUFS;
+					goto bad;
+				}
+				break;
+
 			case SO_RCVBUF:
-				if (sbreserve(optname == SO_SNDBUF ?
-				    &so->so_snd : &so->so_rcv,
-				    cnt) == 0) {
+				if (sbcheckreserve(cnt, unpst_recvspace) ||
+				    sbreserve(&so->so_rcv, cnt) == 0) {
 					error = ENOBUFS;
 					goto bad;
 				}

@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_output.c,v 1.65 2004/02/16 21:51:03 markus Exp $	*/
+/*	$OpenBSD: tcp_output.c,v 1.71 2004/06/20 18:16:50 itojun Exp $	*/
 /*	$NetBSD: tcp_output.c,v 1.16 1997/06/03 16:17:09 kml Exp $	*/
 
 /*
@@ -93,11 +93,6 @@
 #include <netinet/tcpip.h>
 #include <netinet/tcp_debug.h>
 
-#ifdef TUBA
-#include <netiso/iso.h>
-#include <netiso/tuba_table.h>
-#endif
-
 #ifdef INET6
 #include <netinet6/tcpipv6.h>
 #include <netinet6/in6_var.h>
@@ -109,10 +104,6 @@
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6_cncore.h>
 #endif /* INET6 && MIP6 */
-
-#ifdef TCP_SIGNATURE
-#include <sys/md5k.h>
-#endif /* TCP_SIGNATURE */
 
 #if defined(INET6) && defined(MIP6)
 static int mip6_hdrsiz_tcp(struct tcpcb *);
@@ -782,6 +773,7 @@ send:
 		m->m_len = hdrlen;
 	}
 	m->m_pkthdr.rcvif = (struct ifnet *)0;
+	m->m_pkthdr.len = hdrlen + len;
 
 	if (!tp->t_template)
 		panic("tcp_output");
@@ -885,8 +877,8 @@ send:
 		win = 0;
 	if (win > (long)TCP_MAXWIN << tp->rcv_scale)
 		win = (long)TCP_MAXWIN << tp->rcv_scale;
-	if (win < (long)(tp->rcv_adv - tp->rcv_nxt))
-		win = (long)(tp->rcv_adv - tp->rcv_nxt);
+	if (win < (long)(int32_t)(tp->rcv_adv - tp->rcv_nxt))
+		win = (long)(int32_t)(tp->rcv_adv - tp->rcv_nxt);
 	if (flags & TH_RST)
 		win = 0;
 	th->th_win = htons((u_int16_t) (win>>tp->rcv_scale));
@@ -907,7 +899,7 @@ send:
 
 #ifdef TCP_SIGNATURE
 	if (tp->t_flags & TF_SIGNATURE) {
-		MD5_CTX ctx;
+		int iphlen;
 		union sockaddr_union src, dst;
 		struct tdb *tdb;
 
@@ -918,6 +910,7 @@ send:
 		case 0:	/*default to PF_INET*/
 #ifdef INET
 		case AF_INET:
+			iphlen = sizeof(struct ip);
 			src.sa.sa_len = sizeof(struct sockaddr_in);
 			src.sa.sa_family = AF_INET;
 			src.sin.sin_addr = mtod(m, struct ip *)->ip_src;
@@ -928,6 +921,7 @@ send:
 #endif /* INET */
 #ifdef INET6
 		case AF_INET6:
+			iphlen = sizeof(struct ip6_hdr);
 			src.sa.sa_len = sizeof(struct sockaddr_in6);
 			src.sa.sa_family = AF_INET6;
 			src.sin6.sin6_addr = mtod(m, struct ip6_hdr *)->ip6_src;
@@ -938,74 +932,15 @@ send:
 #endif /* INET6 */
 		}
 
-		/* XXX gettdbbysrcdst() should really be called at spltdb().      */
+		/* XXX gettdbbysrcdst() should really be called at spltdb(). */
 		/* XXX this is splsoftnet(), currently they are the same. */
 		tdb = gettdbbysrcdst(0, &src, &dst, IPPROTO_TCP);
 		if (tdb == NULL)
 			return (EPERM);
 
-		MD5Init(&ctx);
-
-		switch (tp->pf) {
-		case 0:	/*default to PF_INET*/
-#ifdef INET
-		case AF_INET:
-			{
-				struct ippseudo ippseudo;
-				struct ipovly *ipovly;
-
-				ipovly = mtod(m, struct ipovly *);
-
-				ippseudo.ippseudo_src = ipovly->ih_src;
-				ippseudo.ippseudo_dst = ipovly->ih_dst;
-				ippseudo.ippseudo_pad = 0;
-				ippseudo.ippseudo_p   = IPPROTO_TCP;
-				ippseudo.ippseudo_len = ntohs(ipovly->ih_len) + len +
-				    optlen;
-				ippseudo.ippseudo_len = htons(ippseudo.ippseudo_len);
-				MD5Update(&ctx, (char *)&ippseudo,
-				    sizeof(struct ippseudo));
-			}
-			break;
-#endif /* INET */
-#ifdef INET6
-		case AF_INET6:
-			{
-				struct ip6_hdr_pseudo ip6pseudo;
-				struct ip6_hdr *ip6;
-
-				ip6 = mtod(m, struct ip6_hdr *);
-				bzero(&ip6pseudo, sizeof(ip6pseudo));
-				ip6pseudo.ip6ph_src = ip6->ip6_src;
-				ip6pseudo.ip6ph_dst = ip6->ip6_dst;
-				in6_clearscope(&ip6pseudo.ip6ph_src);
-				in6_clearscope(&ip6pseudo.ip6ph_dst);
-				ip6pseudo.ip6ph_nxt = IPPROTO_TCP;
-				ip6pseudo.ip6ph_len =
-				    htonl(sizeof(struct tcphdr) + len + optlen);
- 
-				MD5Update(&ctx, (char *)&ip6pseudo,
-				    sizeof(ip6pseudo));
-			}
-			break;
-#endif /* INET6 */
-		}
-
-		{
-			u_int16_t thsum = th->th_sum;
-
-			/* RFC 2385 requires th_sum == 0 */
-			th->th_sum = 0;
-			MD5Update(&ctx, (char *)th, sizeof(struct tcphdr));
-			th->th_sum = thsum;
-		}
-
-		if (len && m_apply(m, hdrlen, len, tcp_signature_apply,
-		    (caddr_t)&ctx))
+		if (tcp_signature(tdb, tp->pf, m, th, iphlen, 0,
+		    mtod(m, caddr_t) + hdrlen - optlen + sigoff) < 0)
 			return (EINVAL);
-
-		MD5Update(&ctx, tdb->tdb_amxkey, tdb->tdb_amxkeylen);
-		MD5Final(mtod(m, caddr_t) + hdrlen - optlen + sigoff, &ctx);
 	}
 #endif /* TCP_SIGNATURE */
 
@@ -1026,7 +961,6 @@ send:
 #endif /* INET */
 #ifdef INET6
 	case AF_INET6:
-		m->m_pkthdr.len = hdrlen + len;
 		th->th_sum = in6_cksum(m, IPPROTO_TCP, sizeof(struct ip6_hdr),
 			hdrlen - sizeof(struct ip6_hdr) + len);
 		break;
@@ -1108,20 +1042,8 @@ send:
 	/*
 	 * Trace.
 	 */
-	if (so->so_options & SO_DEBUG) {
-		/* TCP template does not fill ip version, so fill it in here */
-		struct ip *sip;
-		sip = mtod(m, struct ip *);
-		switch (tp->pf) {
-		case AF_INET:
-			sip->ip_v = 4;
-			break;
-		case AF_INET6:
-			sip->ip_v = 6;
-			break;
-		}
-		tcp_trace(TA_OUTPUT, tp->t_state, tp, m, 0, len);
-	}
+	if (so->so_options & SO_DEBUG)
+		tcp_trace(TA_OUTPUT, tp->t_state, tp, mtod(m, caddr_t), 0, len);
 
 	/*
 	 * Fill in IP length and desired time to live and
@@ -1129,7 +1051,6 @@ send:
 	 * to handle ttl and tos; we could keep them in
 	 * the template, but need a way to checksum without them.
 	 */
-	m->m_pkthdr.len = hdrlen + len;
 
 #ifdef TCP_ECN
 	/*
@@ -1191,12 +1112,6 @@ send:
 		    &tp->t_inpcb->inp_route6, ip6oflags, NULL, NULL);
 		break;
 #endif /* INET6 */
-#ifdef TUBA
-	case AF_ISO:
-		if (tp->t_tuba_pcb)
-			error = tuba_output(m, tp);
-		break;
-#endif /* TUBA */
 	}
 
 #if defined(TCP_SACK) && defined(TCP_FACK)
@@ -1218,7 +1133,7 @@ out:
 			 * initiate retransmission, so it is important to
 			 * not do so here.
 			 */
-			tcp_mtudisc(tp->t_inpcb, 0);
+			tcp_mtudisc(tp->t_inpcb, -1);
 			return (0);
 		}
 		if ((error == EHOSTUNREACH || error == ENETDOWN) &&

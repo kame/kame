@@ -1,4 +1,4 @@
-/*	$OpenBSD: in_pcb.h,v 1.49 2003/12/21 15:12:27 markus Exp $	*/
+/*	$OpenBSD: in_pcb.h,v 1.51 2004/08/10 20:12:15 markus Exp $	*/
 /*	$NetBSD: in_pcb.h,v 1.14 1996/02/13 23:42:00 christos Exp $	*/
 
 /*
@@ -227,6 +227,8 @@ struct inpcbtable {
 #define IN6P_RFC2292		0x40000000 /* used RFC2292 API on the socket */
 #define IN6P_MTU		0x80000000 /* receive path MTU */
 
+#define IN6P_MINMTU		0x20000000 /* use minimum MTU */
+
 #define IN6P_CONTROLOPTS	(IN6P_PKTINFO|IN6P_HOPLIMIT|IN6P_HOPOPTS|\
 				 IN6P_DSTOPTS|IN6P_RTHDR|IN6P_RTHDRDSTOPTS|\
 				 IN6P_TCLASS|IN6P_AUTOFLOWLABEL|IN6P_RFC2292|\
@@ -287,8 +289,6 @@ void	 in_pcbinit(struct inpcbtable *, int);
 struct inpcb *
 	 in_pcblookup(struct inpcbtable *, void *, u_int, void *,
 	    u_int, int);
-int	 in_pcbnotify(struct inpcbtable *, struct sockaddr *,
-	    u_int, struct in_addr, u_int, int, void (*)(struct inpcb *, int));
 void	 in_pcbnotifyall(struct inpcbtable *, struct sockaddr *,
 	    int, void (*)(struct inpcb *, int));
 void	 in_pcbrehash(struct inpcb *);
