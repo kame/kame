@@ -181,7 +181,8 @@ tcp6_template(t6p)
 		n->i6t_i.ip6_flow |= 
 			(htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
 	}
-	n->i6t_i.ip6_vfc = IPV6_VERSION;
+	n->i6t_i.ip6_vfc &= ~IPV6_VERSION_MASK;
+	n->i6t_i.ip6_vfc |= IPV6_VERSION;
 	n->i6t_i.ip6_plen = htons(sizeof(struct tcp6hdr));
 	n->i6t_i.ip6_nxt = IPPROTO_TCP;
 	n->i6t_i.ip6_hlim = in6_selecthlim(in6p, in6p->in6p_route.ro_rt ?

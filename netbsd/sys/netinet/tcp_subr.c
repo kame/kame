@@ -311,7 +311,8 @@ tcp_template(tp)
 			ip6->ip6_flow |= 
 				(htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
 		}
-		ip6->ip6_vfc = IPV6_VERSION;
+		ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
+		ip6->ip6_vfc |= IPV6_VERSION;
 		break;
 	    }
 #endif
