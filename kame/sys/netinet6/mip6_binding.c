@@ -1544,7 +1544,7 @@ mip6_process_ba(m, opt)
 			}
 
 			/* remove tunnel to HA */
-			error =mip6_tunnel_control(MIP6_TUNNEL_DELETE,
+			error = mip6_tunnel_control(MIP6_TUNNEL_DELETE,
 						   mbu,
 						   mip6_bu_encapcheck,
 						   &mbu->mbu_encap);
