@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1167 2000/07/31 14:29:28 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1168 2000/07/31 15:22:02 sumikawa Exp $
 
 <200007>
+Tue Aug  1 00:20:44 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* kame/freebsd3/lib/libftpio: try IPv4 if IPv6 connecting was
+	failed.
+	From: FreeBSD-current
+
 Mon Jul 31 23:26:19 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/freebsd4/sys/net/if_types.h: move private use IFT_xx to
 	  0xf0 for syncing FreeBSD-current.
