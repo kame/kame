@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.56 2002/11/01 03:31:30 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.57 2002/12/13 10:32:55 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -73,19 +73,18 @@ struct mip6_req {
 
 /* Binding Ack status code. */
 #define IP6MA_STATUS_ACCEPTED              0	/* Binding Update accepted */
-#define IP6MA_STATUS_ERRORBASE             128
+#define IP6MA_STATUS_ERRORBASE             128	/* ERROR BASE */
 #define IP6MA_STATUS_UNSPECIFIED           128	/* Reason unspecified */
 #define IP6MA_STATUS_PROHIBIT              129	/* Administratively prohibited */
 #define IP6MA_STATUS_RESOURCES             130	/* Insufficient resources */
-#define IP6MA_STATUS_NOT_SUPPORTED         131	/* ome registration not supported */
+#define IP6MA_STATUS_NOT_SUPPORTED         131	/* Home registration not supported */
 #define IP6MA_STATUS_NOT_HOME_SUBNET       132	/* Not home subnet */
 #define IP6MA_STATUS_NOT_HOME_AGENT        133	/* Not home agent for this mobile node */
 #define IP6MA_STATUS_DAD_FAILED            134	/* Duplicate Address Detection failed */
 #define IP6MA_STATUS_SEQNO_TOO_SMALL       135	/* Sequence number out of window */
-#define IP6MA_STATUS_RO_NOT_DESIRED        136	/* Route optimization unnecessary due to low traffic */
-#define IP6MA_STATUS_INVAL_AUTHENTICATOR   137	/* Invalid authenticator */
-#define IP6MA_STATUS_HOME_NONCE_EXPIRED    138	/* Expired Home Nonce Index */
-#define IP6MA_STATUS_CAREOF_NONCE_EXPIRED  139	/* Expired Care-of Nonce Index */
+#define IP6MA_STATUS_HOME_NONCE_EXPIRED    136	/* Expired Home Nonce Index */
+#define IP6MA_STATUS_CAREOF_NONCE_EXPIRED  137	/* Expired Care-of Nonce Index */
+#define IP6MA_STATUS_NONCE_EXPIRED         138	/* Expired Nonces */
 
 /* Binding Error status code. */
 #define IP6ME_STATUS_NO_BINDING		1	/* Home Address destination

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.186 2002/12/09 10:46:02 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.187 2002/12/13 10:32:54 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2645,7 +2645,7 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa)
 	struct mip6_mobility_options *mopt;
 	struct sockaddr_in6 *hoa_sa, *coa_sa;
 {
-	u_int8_t key_bu[MIP6_KBU_LEN]; /* Stated as 'Kbu' in the spec */
+	u_int8_t key_bu[MIP6_KBM_LEN]; /* Stated as 'Kbm' in the spec */
 	u_int8_t authdata[SHA1_RESULTLEN];
 	u_int16_t cksum_backup;
 
@@ -2770,7 +2770,7 @@ mip6_calculate_kbu_from_index(hoa_sa, coa_sa, ho_nonce_idx, co_nonce_idx, key_bu
 	struct sockaddr_in6 *coa_sa;
 	u_int16_t ho_nonce_idx;	/* Home Nonce Index */
 	u_int16_t co_nonce_idx;	/* Care-of Nonce Index */
-	u_int8_t *key_bu;	/* needs at least MIP6_KBU_LEN bytes */
+	u_int8_t *key_bu;	/* needs at least MIP6_KBM_LEN bytes */
 {
 	mip6_nonce_t home_nonce, careof_nonce;
 	mip6_nodekey_t home_nodekey, coa_nodekey;
@@ -2828,7 +2828,7 @@ void
 mip6_calculate_kbu(home_cookie, careof_cookie, key_bu)
 	mip6_home_cookie_t *home_cookie;
 	mip6_careof_cookie_t *careof_cookie;
-	u_int8_t *key_bu;	/* needs at least MIP6_KBU_LEN bytes */
+	u_int8_t *key_bu;	/* needs at least MIP6_KBM_LEN bytes */
 {
 	SHA1_CTX sha1_ctx;
 	u_int8_t result[SHA1_RESULTLEN];
@@ -2838,7 +2838,7 @@ mip6_calculate_kbu(home_cookie, careof_cookie, key_bu)
 	SHA1Update(&sha1_ctx, (caddr_t)careof_cookie, sizeof(*careof_cookie));
 	SHA1Final(result, &sha1_ctx);
 	/* First 128 bit */
-	bcopy(result, key_bu, MIP6_KBU_LEN);
+	bcopy(result, key_bu, MIP6_KBM_LEN);
 }
 
 /*
@@ -2865,8 +2865,8 @@ mip6_calculate_authenticator(key_bu, result, addr1, addr2, data, datalen, exclud
 	u_int8_t sha1_result[SHA1_RESULTLEN];
 
 	/* Calculate authenticator (5.5.6) */
-	/* MAC_Kbu(addr1, | addr2 | (BU|BA) ) */
-	hmac_init(&hmac_ctx, key_bu, MIP6_KBU_LEN, HMAC_SHA1);
+	/* MAC_Kbm(addr1, | addr2 | (BU|BA) ) */
+	hmac_init(&hmac_ctx, key_bu, MIP6_KBM_LEN, HMAC_SHA1);
 	hmac_loop(&hmac_ctx, (u_int8_t *)addr1, sizeof(*addr1));
 #ifdef RR_DBG
 mip6_hexdump("MN: Auth: ", sizeof(*addr1), addr1);

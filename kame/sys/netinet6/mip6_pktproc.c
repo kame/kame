@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.88 2002/12/05 09:22:05 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.89 2002/12/13 10:32:55 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -593,11 +593,10 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	if ((error = mip6_get_mobility_options((struct ip6_mobility *)ip6mu,
 					       sizeof(*ip6mu),
 					       ip6mulen, &mopt))) {
+		/* discard. */
 		m_freem(m);
-		bi.mbc_status = IP6MA_STATUS_INVAL_AUTHENTICATOR;
-		bi.mbc_send_ba = 1;
-		error = EINVAL;
-		goto send_ba;
+		mip6stat.mip6s_rrauthfail++;
+		return (EINVAL);
 	}
 #if 0
 #ifdef __NetBSD__
@@ -628,12 +627,20 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		mip6log((LOG_ERR,
 			 "%s:%d: RR authentication was failed.\n",
 			 __FILE__, __LINE__));
+		/* discard. */
 		m_freem(m);
 		mip6stat.mip6s_rrauthfail++;
-		error = EINVAL;
-		bi.mbc_status = IP6MA_STATUS_INVAL_AUTHENTICATOR;
-		bi.mbc_send_ba = 1;
-		goto send_ba;
+		/* XXX TODO
+		   bi.mbc_status = 
+			IP6MA_STATUS_HOME_NONCE_EXPIRED,
+			IP6MA_STATUS_CAREOF_NONCE_EXPIRED or
+			IP6MA_STATUS_NONCE_EXPIRED;
+		   bi.mbc_seqno = mbc->mbc_seqno;
+		   bi.mbc_send_ba = 1;
+		   error = EINVAL;
+		   goto send_ba;
+		 */
+		return (EINVAL);
 	}
 
 	/* ip6_src and HAO has been already swapped at this point. */
@@ -872,7 +879,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 
 	if (mopt.valid_options & MOPT_AUTHDATA) {
 		/* Check Autheticator */
-		u_int8_t key_bu[MIP6_KBU_LEN];
+		u_int8_t key_bu[MIP6_KBM_LEN];
 		u_int8_t authdata[MIP6_AUTHENTICATOR_LEN];
 		u_int16_t cksum_backup;
 
@@ -1433,7 +1440,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	int bu_size = 0, nonce_size = 0, auth_size = 0;
 	struct mip6_bu *mbu, *hrmbu;
 	int need_rr = 0;
-	u_int8_t key_bu[MIP6_KBU_LEN]; /* Stated as 'Kbu' in the spec */
+	u_int8_t key_bu[MIP6_KBM_LEN]; /* Stated as 'Kbu' in the spec */
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
@@ -1653,7 +1660,7 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 	int need_auth = 0;
 	int ip6ma_size, pad;
 	int ba_size = 0, refresh_size = 0, auth_size = 0;
-	u_int8_t key_bu[MIP6_KBU_LEN]; /* Stated as 'Kbu' in the spec */
+	u_int8_t key_bu[MIP6_KBM_LEN]; /* Stated as 'Kbu' in the spec */
 	u_int8_t *p;
 
 	*pktopt_mobility = NULL;
