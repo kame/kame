@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.23 2000/03/25 07:23:39 sumikawa Exp $	*/
+/*	$KAME: ah_input.c,v 1.24 2000/03/26 23:08:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -76,6 +76,8 @@
 #include <machine/stdarg.h>
 
 #include <net/net_osdep.h>
+
+#define IPLEN_FLIPPED
 
 #ifdef INET
 extern struct protosw inetsw[];
@@ -512,15 +514,15 @@ ah4_input(m, va_alist)
 			}
 		}
 		ip = mtod(m, struct ip *);
-#if 1
-		/*ip_len is in host endian*/
+#ifdef IPLEN_FLIPPED
 		ip->ip_len = ip->ip_len - stripsiz;
 #else
-		/*ip_len is in net endian*/
 		ip->ip_len = htons(ntohs(ip->ip_len) - stripsiz);
 #endif
 		ip->ip_p = nxt;
 		/* forget about IP hdr checksum, the check has already been passed */
+
+		key_sa_recordxfer(sav, m);
 
 		if (nxt != IPPROTO_DONE)
 			(*inetsw[ip_protox[nxt]].pr_input)(m, off, nxt);
