@@ -15,6 +15,8 @@ ip6mrouter=NO
 
 #----------
 # manual configurations - in case ip6router=NO
+# you can configure only single interface, as specification assumes that
+# autoconfigured host has single interface only.
 iface="ed0"
 
 #----------
@@ -105,9 +107,8 @@ else
 	# act as endhost - automatically configured
 	$sysctl -w net.inet6.ip6.forwarding=0
 	$sysctl -w net.inet6.ip6.accept_rtadv=1
-	for i in $iface; do
-		$rtsol $i
-	done
+
+	$rtsol $iface
 
 	# wait for DAD's completion (for global addrs)
 	sleep `$sysctl net.inet6.ip6.dad_count | awk '{print $NF}'`
