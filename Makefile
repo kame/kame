@@ -33,3 +33,15 @@ update-all: update-doc
 			(cd $$i; cvs update -d -P); \
 		fi \
 	done
+
+# % cvs co kame/Makefile
+# % cd kame
+# % make TARGET=foo tree
+tree:
+	$(MAKE) update-doc
+	if test $(TARGET) = bsdi3  -o $(TARGET) = bsdi4; then \
+		$(MAKE) $(TARGET); \
+	else \
+		cvs update -d -P $(TARGET); \
+	fi
+	cvs update -d -P kame
