@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.27 2000/07/12 13:34:13 jinmei Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.28 2000/07/26 05:45:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -123,6 +123,9 @@
 #endif /*IPSEC*/
 
 #include "faith.h"
+#if defined(NFAITH) && NFAITH > 0
+#include <net/if_faith.h>
+#endif
 
 struct tcp6stat	tcp6stat;
 
@@ -148,8 +151,7 @@ extern int tcp_log_in_vain;
 #define TSTMP_LT(a,b)	((int)((a)-(b)) < 0)
 #define TSTMP_GEQ(a,b)	((int)((a)-(b)) >= 0)
 
-static struct in6pcb *tcp6_listen_lookup __P((struct in6_addr, u_short,
-		struct ifnet *));
+static struct in6pcb *tcp6_listen_lookup __P((struct in6_addr, u_short));
 static struct in6pcb *tcp6_conn_lookup __P((struct in6_addr, u_short,
 		struct in6_addr, u_short));
 static void tcp6_start2msl __P((struct in6pcb *, struct tcp6cb *));
@@ -207,20 +209,24 @@ do {									\
  * using hash on destination (local) port.
  */
 static struct in6pcb *
-tcp6_listen_lookup(dst, dport, ifp)
+tcp6_listen_lookup(dst, dport)
 	struct in6_addr dst;
 	u_short dport;
-	struct ifnet *ifp;
 {
 	struct in6pcb *in6p, *maybe = NULL;
+	int faith;
+
+#if defined(NFAITH) && NFAITH > 0
+	faith = faithprefix(&dst);
+#else
+	faith = 0;
+#endif
 
 	for (in6p = tcp6_listen_hash[dport % tcp6_listen_hash_size].lh_first; in6p;
 	     in6p = in6p->in6p_hlist.le_next) {
 #if defined(NFAITH) && NFAITH > 0
-		if (ifp && ifp->if_type == IFT_FAITH
-		 && !(in6p->in6p_flags & IN6P_FAITH)) {
+		if (faith && !(in6p->in6p_flags & IN6P_FAITH))
 			continue;
-		}
 #endif
 		if (in6p->in6p_lport != dport)
 			continue;
@@ -553,8 +559,7 @@ findpcb:
 					     ip6->ip6_dst, th->th_dport))
 		    == NULL &&
 		    ((thflags & (TH_SYN|TH_ACK)) == TH_SYN || syn_cache_count6)) {
-			in6p = tcp6_listen_lookup(ip6->ip6_dst, th->th_dport,
-				m->m_pkthdr.rcvif);
+			in6p = tcp6_listen_lookup(ip6->ip6_dst, th->th_dport);
 		}
 		if (in6p)
 			tcp6_last_in6pcb = in6p;

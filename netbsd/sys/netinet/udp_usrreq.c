@@ -111,6 +111,11 @@
 #endif
 #endif
 
+#include "faith.h"
+#if defined(NFAITH) && NFAITH > 0
+#include <net/if_faith.h>
+#endif
+
 #include <machine/stdarg.h>
 
 #ifdef IPSEC
@@ -320,23 +325,21 @@ udp6_input(mp, offp, proto)
 	struct udphdr *uh;
 	u_int32_t plen, ulen;
 
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, sizeof(struct udphdr), IPPROTO_DONE);
+#endif
+	ip6 = mtod(m, struct ip6_hdr *);
+
 #if defined(NFAITH) && 0 < NFAITH
-	if (m->m_pkthdr.rcvif) {
-		if (m->m_pkthdr.rcvif->if_type == IFT_FAITH) {
-			/* send icmp6 host unreach? */
-			m_freem(m);
-			return IPPROTO_DONE;
-		}
+	if (faithprefix(&ip6->ip6_dst)) {
+		/* send icmp6 host unreach? */
+		m_freem(m);
+		return IPPROTO_DONE;
 	}
 #endif
 
 	udp6stat.udp6s_ipackets++;
 
-#ifndef PULLDOWN_TEST
-	IP6_EXTHDR_CHECK(m, off, sizeof(struct udphdr), IPPROTO_DONE);
-#endif
-
-	ip6 = mtod(m, struct ip6_hdr *);
 	/* check for jumbogram is done in ip6_input.  we can trust pkthdr.len */
 	plen = m->m_pkthdr.len - off;
 #ifndef PULLDOWN_TEST

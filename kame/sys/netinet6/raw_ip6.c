@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.35 2000/06/21 18:35:23 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.36 2000/07/26 05:45:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -104,6 +104,9 @@
 #include <machine/stdarg.h>
 
 #include "faith.h"
+#if defined(NFAITH) && 0 < NFAITH
+#include <net/if_faith.h>
+#endif
 
 struct	in6pcb rawin6pcb;
 #define ifatoia6(ifa)	((struct in6_ifaddr *)(ifa))
@@ -139,12 +142,10 @@ rip6_input(mp, offp, proto)
 	struct ip6_recvpktopts opts;
 
 #if defined(NFAITH) && 0 < NFAITH
-	if (m->m_pkthdr.rcvif) {
-		if (m->m_pkthdr.rcvif->if_type == IFT_FAITH) {
-			/* send icmp6 host unreach? */
-			m_freem(m);
-			return IPPROTO_DONE;
-		}
+	if (faithprefix(&ip6->ip6_dst)) {
+		/* send icmp6 host unreach? */
+		m_freem(m);
+		return IPPROTO_DONE;
 	}
 #endif
 

@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.55 2000/06/13 11:40:15 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.56 2000/07/26 05:45:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -106,6 +106,9 @@
 #endif /*IPSEC*/
 
 #include "faith.h"
+#if defined(NFAITH) && NFAITH > 0
+#include <net/if_faith.h>
+#endif
 
 /*
  * UDP protocol inplementation.
@@ -168,19 +171,19 @@ udp6_input(mp, offp, proto)
 	struct sockaddr_in6 udp_in6;
 	struct ip6_recvpktopts opts;
 
-#if defined(NFAITH) && 0 < NFAITH
-	if (m->m_pkthdr.rcvif) {
-		if (m->m_pkthdr.rcvif->if_type == IFT_FAITH) {
-			/* send icmp6 host unreach? */
-			m_freem(m);
-			return IPPROTO_DONE;
-		}
-	}
-#endif
-	udp6stat.udp6s_ipackets++;
-
 	bzero(&opts, sizeof(opts));
 	ip6 = mtod(m, struct ip6_hdr *);
+
+#if defined(NFAITH) && 0 < NFAITH
+	if (faithprefix(&ip6->ip6_dst)) {
+		/* send icmp6 host unreach? */
+		m_freem(m);
+		return IPPROTO_DONE;
+	}
+#endif
+
+	udp6stat.udp6s_ipackets++;
+
 	/* check for jumbogram is done in ip6_input.  we can trust pkthdr.len */
 	plen = m->m_pkthdr.len - off;
 #ifndef PULLDOWN_TEST

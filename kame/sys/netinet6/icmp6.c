@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.122 2000/07/16 04:27:01 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.123 2000/07/26 05:45:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -123,6 +123,9 @@
 #endif
 
 #include "faith.h"
+#if defined(NFAITH) && 0 < NFAITH
+#include <net/if_faith.h>
+#endif
 
 #include <net/net_osdep.h>
 
@@ -447,7 +450,7 @@ icmp6_input(mp, offp, proto)
 	}
 
 #if defined(NFAITH) && 0 < NFAITH
-	if (m->m_pkthdr.rcvif && m->m_pkthdr.rcvif->if_type == IFT_FAITH) {
+	if (faithprefix(&ip6->ip6_dst)) {
 		/*
 		 * Deliver very specific ICMP6 type only.
 		 * This is important to deilver TOOBIG.  Otherwise PMTUD

@@ -185,6 +185,9 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #endif /*IPSEC*/
 #ifdef INET6
 #include "faith.h"
+#if defined(NFAITH) && NFAITH > 0
+#include <net/if_faith.h>
+#endif
 #endif
 
 int	tcprexmtthresh = 3;
@@ -822,11 +825,7 @@ findpcb:
 		int faith;
 
 #if defined(NFAITH) && NFAITH > 0
-		if (m->m_pkthdr.rcvif
-		 && m->m_pkthdr.rcvif->if_type == IFT_FAITH) {
-			faith = 1;
-		} else
-			faith = 0;
+		faith = faithprefix(&ip6->ip6_dst);
 #else
 		faith = 0;
 #endif

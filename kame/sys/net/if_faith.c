@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.14 2000/06/17 20:29:44 itojun Exp $	*/
+/*	$KAME: if_faith.c,v 1.15 2000/07/26 05:45:06 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -64,6 +64,7 @@
 #include <sys/ioctl.h>
 #endif
 #include <sys/time.h>
+#include <sys/queue.h>
 #if defined(__bsdi__) || defined(__NetBSD__)
 #include <machine/cpu.h>
 #endif
@@ -73,6 +74,7 @@
 #include <net/netisr.h>
 #include <net/route.h>
 #include <net/bpf.h>
+#include <net/if_faith.h>
 
 #ifdef	INET
 #include <netinet/in.h>
@@ -87,6 +89,7 @@
 #endif
 #include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
+#include <netinet6/ip6_var.h>
 #endif
 
 #include "bpfilter.h"
@@ -323,5 +326,35 @@ faithioctl(ifp, cmd, data)
 		error = EINVAL;
 	}
 	return (error);
+}
+
+/*
+ * XXX could be slow
+ * XXX could be layer violation to call sys/net from sys/netinet6
+ */
+int
+faithprefix(in6)
+	struct in6_addr *in6;
+{
+	struct rtentry *rt;
+	struct sockaddr_in6 sin6;
+	int ret;
+
+	if (ip6_keepfaith == 0)
+		return 0;
+
+	bzero(&sin6, sizeof(sin6));
+	sin6.sin6_family = AF_INET6;
+	sin6.sin6_len = sizeof(struct sockaddr_in6);
+	sin6.sin6_addr = *in6;
+	rt = rtalloc1((struct sockaddr *)&sin6, 0);
+	if (rt && rt->rt_ifp && rt->rt_ifp->if_type == IFT_FAITH &&
+	    (rt->rt_ifp->if_flags & IFF_UP) != 0)
+		ret = 1;
+	else
+		ret = 0;
+	if (rt)
+		RTFREE(rt);
+	return ret;
 }
 #endif /* NFAITH > 0 */
