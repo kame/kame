@@ -1,4 +1,4 @@
-/*	$KAME: logger.c,v 1.5 2000/09/23 07:01:24 itojun Exp $	*/
+/*	$KAME: logger.c,v 1.6 2000/09/23 07:08:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 /*
- * $Id: logger.c,v 1.5 2000/09/23 07:01:24 itojun Exp $
+ * $Id: logger.c,v 1.6 2000/09/23 07:08:25 itojun Exp $
  */
 
 #include <sys/types.h>
@@ -56,6 +56,7 @@
 #endif
 
 #include "logger.h"
+#include "var.h"
 
 struct log *
 log_open(siz, fname)
