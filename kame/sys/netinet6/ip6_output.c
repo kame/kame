@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.433 2004/03/09 07:31:55 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.434 2004/03/09 07:34:40 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3533,9 +3533,6 @@ ip6_setmoptions(optname, im6op, m)
 	struct route_in6 ro;
 #endif
 	struct in6_multi_mship *imm;
-#if defined(__bsdi__) && _BSDI_VERSION < 199802
-	struct ifnet *loifp = &loif;
-#endif
 #ifdef MLDV2
 	struct sock_msf *msf;
 	struct sockaddr_storage ss_src, ss_grp;
