@@ -16,7 +16,7 @@
  *
  * NEW command line interface for IP firewall facility
  *
- * $KAME: ip6fw.c,v 1.11 2001/05/08 08:54:24 sumikawa Exp $
+ * $KAME: ip6fw.c,v 1.12 2001/05/08 09:03:59 sumikawa Exp $
  *
  */
 
@@ -37,8 +37,8 @@
 #include <stdarg.h>
 #include <string.h>
 #include <time.h>
-#include <errno.h>
 #include <unistd.h>
+#include <errno.h>
 #include <signal.h>
 #include <sysexits.h>
 
@@ -102,7 +102,7 @@ mask_bits(u_char *m_ad, int m_len)
 		}
 	}
 	return h_num;
-}                       
+}
 
 static int pl2m[9] = { 0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe, 0xff };
 
@@ -148,7 +148,7 @@ print_port(prot, port, comma)
 			printf("%s%s", comma, se->s_name);
 			printed = 1;
 		}
-	} 
+	}
 	if (!printed)
 		printf("%s%d",comma,port);
 }
@@ -163,7 +163,7 @@ print_iface(char *key, union ip6_fw_if *un, int byname)
 		ifnb[IP6FW_IFNLEN]='\0';
 		if (un->fu_via_if.unit == -1)
 			printf(" %s %s*", key, ifnb);
-		else 
+		else
 			printf(" %s %s%d", key, ifnb, un->fu_via_if.unit);
 	} else if (!IN6_IS_ADDR_UNSPECIFIED(&un->fu_via_ip6)) {
 		printf(" %s %s", key, inet_ntop(AF_INET6,&un->fu_via_ip6,ntop_buf,sizeof(ntop_buf)));
@@ -199,7 +199,7 @@ show_ip6fw(struct ip6_fw *chain)
 
 	printf("%05u ", chain->fw_number);
 
-	if (do_acct) 
+	if (do_acct)
 		printf("%10lu %10lu ",chain->fw_pcnt,chain->fw_bcnt);
 
 	if (do_time)
@@ -247,7 +247,7 @@ show_ip6fw(struct ip6_fw *chain)
 		default:
 			errx(EX_OSERR, "impossible");
 	}
- 
+
 	if (chain->fw_flg & IPV6_FW_F_PRN)
 		printf(" log");
 
@@ -365,7 +365,7 @@ show_ip6fw(struct ip6_fw *chain)
 		if (chain->fw_ip6nopt & IPV6_FW_IP6OPT_NONXT)  PRINTOPT("!nonxt");
 		if (chain->fw_ip6opt  & IPV6_FW_IP6OPT_OPTS)   PRINTOPT("opts");
 		if (chain->fw_ip6nopt & IPV6_FW_IP6OPT_OPTS)   PRINTOPT("!opts");
-	} 
+	}
 
 	if (chain->fw_ipflg & IPV6_FW_IF_TCPEST)
 		printf(" established");
@@ -390,7 +390,7 @@ show_ip6fw(struct ip6_fw *chain)
 		if (chain->fw_tcpnf & IPV6_FW_TCPF_ACK)  PRINTFLG("!ack");
 		if (chain->fw_tcpf  & IPV6_FW_TCPF_URG)  PRINTFLG("urg");
 		if (chain->fw_tcpnf & IPV6_FW_TCPF_URG)  PRINTFLG("!urg");
-	} 
+	}
 	if (chain->fw_flg & IPV6_FW_F_ICMPBIT) {
 		int type_index;
 		int first = 1;
@@ -398,7 +398,7 @@ show_ip6fw(struct ip6_fw *chain)
 		printf(" icmptype");
 
 		for (type_index = 0; type_index < IPV6_FW_ICMPTYPES_DIM * sizeof(unsigned) * 8; ++type_index)
-			if (chain->fw_icmp6types[type_index / (sizeof(unsigned) * 8)] & 
+			if (chain->fw_icmp6types[type_index / (sizeof(unsigned) * 8)] &
 				(1U << (type_index % (sizeof(unsigned) * 8)))) {
 				printf("%c%d", first == 1 ? ' ' : ',', type_index);
 				first = 0;
@@ -414,28 +414,28 @@ list(ac, av)
 	int	ac;
 	char 	**av;
 {
- 	struct ip6_fw *r, *rules;
+	struct ip6_fw *r, *rules;
 	int l,i;
 	unsigned long rulenum;
- 	int nalloc, bytes, maxbytes;
+	int nalloc, bytes, maxbytes;
 
- 	/* extract rules from kernel, resizing array as necessary */
- 	rules = NULL;
- 	nalloc = sizeof *rules;
- 	bytes = nalloc;
- 	maxbytes = 65536 * sizeof *rules;
- 	while (bytes >= nalloc) {
- 		nalloc = nalloc * 2 + 200;
- 		bytes = nalloc;
- 		if ((rules = realloc(rules, bytes)) == NULL)
- 			err(EX_OSERR, "realloc");
- 		i = getsockopt(s, IPPROTO_IPV6, IPV6_FW_GET, rules, &bytes);
- 		if ((i < 0 && errno != EINVAL) || nalloc > maxbytes)
- 			err(EX_OSERR, "getsockopt(IPV6_FW_GET)");
- 	}
+	/* extract rules from kernel, resizing array as necessary */
+	rules = NULL;
+	nalloc = sizeof *rules;
+	bytes = nalloc;
+	maxbytes = 65536 * sizeof *rules;
+	while (bytes >= nalloc) {
+		nalloc = nalloc * 2 + 200;
+		bytes = nalloc;
+		if ((rules = realloc(rules, bytes)) == NULL)
+			err(EX_OSERR, "realloc");
+		i = getsockopt(s, IPPROTO_IPV6, IPV6_FW_GET, rules, &bytes);
+		if ((i < 0 && errno != EINVAL) || nalloc > maxbytes)
+			err(EX_OSERR, "getsockopt(IPV6_FW_GET)");
+	}
 	if (!ac) {
 		/* display all rules */
-		for (r = rules, l = bytes; l >= sizeof rules[0]; 
+		for (r = rules, l = bytes; l >= sizeof rules[0];
 			 r++, l-=sizeof rules[0])
 			show_ip6fw(r);
 	}
@@ -455,7 +455,7 @@ list(ac, av)
 				continue;
 			}
 			seen = 0;
-			for (r = rules, l = bytes; 
+			for (r = rules, l = bytes;
 				 l >= sizeof rules[0] && r->fw_number <= rulenum;
 				 r++, l-=sizeof rules[0])
 				if (rulenum == r->fw_number) {
@@ -543,7 +543,7 @@ fill_ip6(ipno, mask, acp, avp)
 		p = strchr(*av, '/');
 		if (p) {
 			md = *p;
-			*p++ = '\0'; 
+			*p++ = '\0';
 		}
 
 		if (lookup_host(*av, ipno, AF_INET6) != 0)
@@ -693,7 +693,7 @@ fill_tcpflag(set, reset, vp)
 			d = set;
 		}
 		q = strchr(p, ',');
-		if (q) 
+		if (q)
 			*q++ = '\0';
 		for (i = 0; i < sizeof(flags) / sizeof(flags[0]); ++i)
 			if (!strncmp(p, flags[i].name, strlen(p))) {
@@ -720,7 +720,7 @@ fill_ip6opt(u_char *set, u_char *reset, char **vp)
 			d = set;
 		}
 		q = strchr(p, ',');
-		if (q) 
+		if (q)
 			*q++ = '\0';
 		if (!strncmp(p,"hopopt",strlen(p))) *d |= IPV6_FW_IP6OPT_HOPOPT;
 		if (!strncmp(p,"route",strlen(p)))  *d |= IPV6_FW_IP6OPT_ROUTE;
@@ -756,7 +756,7 @@ fill_icmptypes(types, vp, fw_flg)
 		if (icmptype >= IPV6_FW_ICMPTYPES_DIM * sizeof(unsigned) * 8)
 			show_usage("ICMP6 type out of range");
 
-		types[icmptype / (sizeof(unsigned) * 8)] |= 
+		types[icmptype / (sizeof(unsigned) * 8)] |=
 			1 << (icmptype % (sizeof(unsigned) * 8));
 		*fw_flg |= IPV6_FW_F_ICMPBIT;
 	}
@@ -797,7 +797,7 @@ verify_interface(union ip6_fw_if *ifu)
 	 *	If a unit was specified, check for that exact interface.
 	 *	If a wildcard was specified, check for unit 0.
 	 */
-	snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s%d", 
+	snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s%d",
 			 ifu->fu_via_if.name,
 			 ifu->fu_via_if.unit == -1 ? 0 : ifu->fu_via_if.unit);
 
@@ -843,7 +843,7 @@ add(ac,av)
 	u_char proto;
 	struct protoent *pe;
 	int saw_xmrc = 0, saw_via = 0;
-	
+
 	memset(&rule, 0, sizeof rule);
 
 	av++; ac--;
@@ -993,11 +993,11 @@ add(ac,av)
 	}
 
 	while (ac) {
-		if (!strncmp(*av,"in",strlen(*av))) { 
+		if (!strncmp(*av,"in",strlen(*av))) {
 			rule.fw_flg |= IPV6_FW_F_IN;
 			av++; ac--; continue;
 		}
-		if (!strncmp(*av,"out",strlen(*av))) { 
+		if (!strncmp(*av,"out",strlen(*av))) {
 			rule.fw_flg |= IPV6_FW_F_OUT;
 			av++; ac--; continue;
 		}
@@ -1011,7 +1011,7 @@ badviacombo:
 				    " with ``xmit'' and ``recv''");
 			}
 			saw_xmrc = 1;
-			av++; ac--; 
+			av++; ac--;
 			fill_iface("xmit", &ifu, &byname, ac, *av);
 			rule.fw_out_if = ifu;
 			rule.fw_flg |= IPV6_FW_F_OIFACE;
@@ -1026,7 +1026,7 @@ badviacombo:
 			if (saw_via)
 				goto badviacombo;
 			saw_xmrc = 1;
-			av++; ac--; 
+			av++; ac--;
 			fill_iface("recv", &ifu, &byname, ac, *av);
 			rule.fw_in_if = ifu;
 			rule.fw_flg |= IPV6_FW_F_IIFACE;
@@ -1041,7 +1041,7 @@ badviacombo:
 			if (saw_xmrc)
 				goto badviacombo;
 			saw_via = 1;
-			av++; ac--; 
+			av++; ac--;
 			fill_iface("via", &ifu, &byname, ac, *av);
 			rule.fw_out_if = rule.fw_in_if = ifu;
 			if (byname)
@@ -1053,8 +1053,8 @@ badviacombo:
 			rule.fw_flg |= IPV6_FW_F_FRAG;
 			av++; ac--; continue;
 		}
-		if (!strncmp(*av,"ipv6options",strlen(*av))) { 
-			av++; ac--; 
+		if (!strncmp(*av,"ipv6options",strlen(*av))) {
+			av++; ac--;
 			if (!ac)
 				show_usage("missing argument"
 				    " for ``ipv6options''");
@@ -1062,17 +1062,17 @@ badviacombo:
 			av++; ac--; continue;
 		}
 		if (rule.fw_prot == IPPROTO_TCP) {
-			if (!strncmp(*av,"established",strlen(*av))) { 
+			if (!strncmp(*av,"established",strlen(*av))) {
 				rule.fw_ipflg |= IPV6_FW_IF_TCPEST;
 				av++; ac--; continue;
 			}
-			if (!strncmp(*av,"setup",strlen(*av))) { 
+			if (!strncmp(*av,"setup",strlen(*av))) {
 				rule.fw_tcpf  |= IPV6_FW_TCPF_SYN;
 				rule.fw_tcpnf  |= IPV6_FW_TCPF_ACK;
 				av++; ac--; continue;
 			}
-			if (!strncmp(*av,"tcpflags",strlen(*av))) { 
-				av++; ac--; 
+			if (!strncmp(*av,"tcpflags",strlen(*av))) {
+				av++; ac--;
 				if (!ac)
 					show_usage("missing argument"
 					    " for ``tcpflags''");
@@ -1228,7 +1228,7 @@ ip6fw_main(ac,av)
 						return (0);
 			} while (c != 'Y' && c != 'N');
 			printf("\n");
-			if (c == 'Y') 
+			if (c == 'Y')
 				do_flush = 1;
 		}
 		if ( do_flush ) {
@@ -1252,7 +1252,7 @@ ip6fw_main(ac,av)
 	return 0;
 }
 
-int 
+int
 main(ac, av)
 	int	ac;
 	char	**av;
@@ -1262,9 +1262,9 @@ main(ac, av)
 	char	buf[BUFSIZ];
 	char	*a, *p, *args[MAX_ARGS], *cmd = NULL;
 	char	linename[10];
- 	int 	i, c, lineno, qflag, pflag, status;
- 	FILE	*f = NULL;
- 	pid_t	preproc = 0;
+	int 	i, c, lineno, qflag, pflag, status;
+	FILE	*f = NULL;
+	pid_t	preproc = 0;
 
 	s = socket( AF_INET6, SOCK_RAW, IPPROTO_RAW );
 	if ( s < 0 )
@@ -1272,15 +1272,15 @@ main(ac, av)
 
 	setbuf(stdout,0);
 
- 	/*
- 	 * this is a nasty check on the last argument!!!
- 	 * If there happens to be a filename matching a keyword in the current
- 	 * directory, things will fail miserably.
- 	 */
+	/*
+	 * Only interpret the last command line argument as a file to
+	 * be preprocessed if it is specified as an absolute pathname.
+	 */
 
- 	if (ac > 1 && av[ac - 1][0] == '/' && access(av[ac - 1], R_OK) == 0) {
- 		qflag = pflag = i = 0;
+	if (ac > 1 && av[ac - 1][0] == '/' && access(av[ac - 1], R_OK) == 0) {
+		qflag = pflag = i = 0;
 		lineno = 0;
+
 		while ((c = getopt(ac, av, "D:U:p:q")) != -1)
 			switch(c) {
 			case 'D':
@@ -1371,11 +1371,11 @@ main(ac, av)
 
 			if (*buf == '#')
 				continue;
- 			if ((p = strchr(buf, '#')) != NULL)
- 				*p = '\0';
- 			i=1;
- 			if (qflag) args[i++]="-q";
- 			for (a = strtok(buf, WHITESP);
+			if ((p = strchr(buf, '#')) != NULL)
+				*p = '\0';
+			i=1;
+			if (qflag) args[i++]="-q";
+			for (a = strtok(buf, WHITESP);
 			    a && i < MAX_ARGS; a = strtok(NULL, WHITESP), i++)
 				args[i] = a;
 			if (i == (qflag? 2: 1))
@@ -1384,7 +1384,7 @@ main(ac, av)
 				errx(EX_USAGE, "%s: too many arguments", linename);
 			args[i] = NULL;
 
-			ip6fw_main(i, args); 
+			ip6fw_main(i, args);
 		}
 		fclose(f);
 		if (pflag) {
