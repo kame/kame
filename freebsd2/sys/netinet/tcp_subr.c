@@ -261,9 +261,10 @@ tcp_respond(tp, ti, m, ack, seq, flags)
 	ti->ti_off = sizeof (struct tcphdr) >> 2;
 	ti->ti_flags = flags;
 	if (tp)
-		ti->ti_win = htons((u_short) (win >> tp->rcv_scale));
-	else
-		ti->ti_win = htons((u_short)win);
+		win >>= tp->rcv_scale;
+	if (win > TCP_MAXWIN)
+		win = TCP_MAXWIN;
+	ti->ti_win = htons((u_short)win);
 	ti->ti_urp = 0;
 	ti->ti_sum = 0;
 	ti->ti_sum = in_cksum(m, tlen);
