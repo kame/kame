@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.130 2001/11/01 13:14:57 jinmei Exp $	*/
+/*	$KAME: ipsec.c,v 1.131 2001/11/06 08:06:21 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3531,13 +3531,17 @@ ipsec4_tunnel_validate(m, off, nxt0, sav)
 
 	sp = key_gettunnel((struct sockaddr *)&osrc, (struct sockaddr *)&odst,
 	    (struct sockaddr *)&isrc, (struct sockaddr *)&idst);
-
-	/* if no SP found, use default policy. */
-	if (!sp && ip4_def_policy.policy == IPSEC_POLICY_DISCARD)
+	/*
+	 * when there is no suitable inbound policy for the packet of the ipsec
+	 * tunnel mode, the kernel never decapsulate the tunneled packet
+	 * as the ipsec tunnel mode even when the system wide policy is "none".
+	 * then the kernel leaves the generic tunnel module to process this
+	 * packet.  if there is no rule of the generic tunnel, the packet
+	 * is rejected and the statistics will be counted up.
+	 */
+	if (!sp)
 		return 0;
-
-	if (sp)
-		key_freesp(sp);
+	key_freesp(sp);
 
 	return 1;
 }
@@ -3600,13 +3604,9 @@ ipsec6_tunnel_validate(m, off, nxt0, sav)
 
 	sp = key_gettunnel((struct sockaddr *)&osrc, (struct sockaddr *)&odst,
 	    (struct sockaddr *)&isrc, (struct sockaddr *)&idst);
-
-	/* if no SP found, use default policy. */
-	if (!sp && ip6_def_policy.policy == IPSEC_POLICY_DISCARD)
+	if (!sp)
 		return 0;
-
-	if (sp)
-		key_freesp(sp);
+	key_freesp(sp);
 
 	return 1;
 }
