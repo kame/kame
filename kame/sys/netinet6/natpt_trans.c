@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_trans.c,v 1.4 2000/01/06 14:27:05 itojun Exp $
+ *	$Id: natpt_trans.c,v 1.5 2000/01/17 09:08:00 itojun Exp $
  */
 
 #include <sys/param.h>
@@ -1055,7 +1055,7 @@ translatingTCPUDPv6To4(struct _cv *cv6, struct _pat *pata, struct _cv *cv4)
     struct mbuf		*m4;
     struct ip		*ip4;
     struct ip6_hdr	*ip6;
-    struct tcpiphdr	*ti;
+    struct tcphdr	*th;
 
 #if	0
     if ((cv6->m->m_flags & M_EXT)
@@ -1141,9 +1141,9 @@ translatingTCPUDPv6To4(struct _cv *cv6, struct _pat *pata, struct _cv *cv4)
     ip4->ip_src = pata->src.u.in4;	/* source addresss			*/
     ip4->ip_dst = pata->dst.u.in4;	/* destination address			*/
 
-    ti = (struct tcpiphdr *)ip4;
-    ti->ti_sport = pata->sport;
-    ti->ti_dport = pata->dport;
+    th = (struct tcphdr *)(ip4 + 1);
+    th->th_sport = pata->sport;
+    th->th_dport = pata->dport;
 
     return (m4);
 }
