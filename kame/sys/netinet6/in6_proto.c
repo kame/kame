@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.76 2001/01/30 14:18:05 jinmei Exp $	*/
+/*	$KAME: in6_proto.c,v 1.77 2001/02/03 18:25:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -730,6 +730,51 @@ sysctl_ip6_forwarding SYSCTL_HANDLER_ARGS
 	return (error);
 }
 
+static int
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+sysctl_ip6_temppltime(SYSCTL_HANDLER_ARGS)
+#else
+sysctl_ip6_temppltime SYSCTL_HANDLER_ARGS
+#endif
+{
+	int error = 0;
+	int old;
+
+	error = SYSCTL_OUT(req, arg1, sizeof(int));
+	if (error || !req->newptr)
+		return (error);
+	old = ip6_temp_preferred_lifetime;
+	error = SYSCTL_IN(req, arg1, sizeof(int));
+	if (ip6_temp_preferred_lifetime <
+	    ip6_desync_factor + ip6_temp_regen_advance) {
+		ip6_temp_preferred_lifetime = old;
+		return(EINVAL);
+	}
+	return(error);
+}
+
+static int
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+sysctl_ip6_tempvltime(SYSCTL_HANDLER_ARGS)
+#else
+sysctl_ip6_tempvltime SYSCTL_HANDLER_ARGS
+#endif
+{
+	int error = 0;
+	int old;
+
+	error = SYSCTL_OUT(req, arg1, sizeof(int));
+	if (error || !req->newptr)
+		return (error);
+	old = ip6_temp_valid_lifetime;
+	error = SYSCTL_IN(req, arg1, sizeof(int));
+	if (ip6_temp_valid_lifetime < ip6_temp_preferred_lifetime) {
+		ip6_temp_preferred_lifetime = old;
+		return(EINVAL);
+	}
+	return(error);
+}
+
 SYSCTL_OID(_net_inet6_ip6, IPV6CTL_FORWARDING, forwarding,
 	   CTLTYPE_INT|CTLFLAG_RW, &ip6_forwarding, 0, sysctl_ip6_forwarding,
 	   "I", "");
@@ -761,6 +806,14 @@ SYSCTL_INT(_net_inet6_ip6, IPV6CTL_USE_DEPRECATED,
 	use_deprecated, CTLFLAG_RW,	&ip6_use_deprecated,	0, "");
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_RR_PRUNE,
 	rr_prune, CTLFLAG_RW,	&ip6_rr_prune,			0, "");
+SYSCTL_INT(_net_inet6_ip6, IPV6CTL_USETEMPADDR,
+	use_tempaddr, CTLFLAG_RW, &ip6_use_tempaddr,		0, "");
+SYSCTL_OID(_net_inet6_ip6, IPV6CTL_TEMPPLTIME, temppltime,
+	   CTLTYPE_INT|CTLFLAG_RW, &ip6_temp_preferred_lifetime, 0,
+	   sysctl_ip6_temppltime, "I", "");
+SYSCTL_OID(_net_inet6_ip6, IPV6CTL_TEMPVLTIME, tempvltime,
+	   CTLTYPE_INT|CTLFLAG_RW, &ip6_temp_valid_lifetime, 0,
+	   sysctl_ip6_tempvltime, "I", "");
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_MAPPED_ADDR,
 	mapped_addr, CTLFLAG_RW,	&ip6_mapped_addr_on,	0, "");
