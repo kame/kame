@@ -377,7 +377,6 @@ dump_vifs(fp)
     vifi_t          vifi;
     register struct uvif *v;
     struct phaddr  *pa;
-    int             i;
 
     fprintf(fp, "\nMulticast Interface Table\n %-4s %-6s %-43s %5s %-14s\n",
 	    "Mif", " PhyIF", "Local-Address/Prefixlen","Scope", "Flags");
