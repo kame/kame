@@ -2195,22 +2195,26 @@ icmp6_ctloutput(op, so, level, optname, mp)
 #elif defined(__OpenBSD__)
 			struct icmp6_filter *p;
 
-			p = mtod(m, struct icmp6_filter *);
-			if (!p || !inp->inp_icmp6filt) {
+			if (!inp->inp_icmp6filt) {
 				error = EINVAL;
 				break;
 			}
+			*mp = m = m_get(M_WAIT, MT_SOOPTS);
+			m->m_len = sizeof(struct icmp6_filter);
+			p = mtod(m, struct icmp6_filter *);
 			bcopy(inp->inp_icmp6filt, p,
 				sizeof(struct icmp6_filter));
 			error = 0;
 #else
 			struct icmp6_filter *p;
 
-			p = mtod(m, struct icmp6_filter *);
-			if (!p || !in6p->in6p_icmp6filt) {
+			if (!in6p->in6p_icmp6filt) {
 				error = EINVAL;
 				break;
 			}
+			*mp = m = m_get(M_WAIT, MT_SOOPTS);
+			m->m_len = sizeof(struct icmp6_filter);
+			p = mtod(m, struct icmp6_filter *);
 			bcopy(in6p->in6p_icmp6filt, p,
 				sizeof(struct icmp6_filter));
 			error = 0;
