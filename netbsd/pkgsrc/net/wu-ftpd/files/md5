@@ -1,2 +1,4 @@
-MD5 (wu-ftpd-2.4.2-beta-18.tar.Z) = b320d7872ba807c04f1b677595f28d86
-MD5 (wu-ftpd-242b18-v6-980924.diff.gz) = d05472414d6b793741a46deae26e08ac
+$NetBSD$
+
+MD5 (wu-ftpd-2.5.0.tar.gz) = 98f9c8490e0d1ca2c3c57e60e65803b7
+MD5 (wu-ftpd-250-v6-19991020.diff.gz) = d162560122c13c2ec3bf2d0f8eac6d27
