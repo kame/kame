@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.173 2002/06/04 05:20:26 itojun Exp $	*/
+/*	$KAME: isakmp.c,v 1.174 2002/06/10 09:36:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2180,7 +2180,7 @@ getname(ap)
 	if (getnameinfo((struct sockaddr *)&addr, addr.sin_len,
 			ntop_buf, sizeof(ntop_buf), NULL, 0,
 			NI_NUMERICHOST | niflags))
-		strncpy(ntop_buf, "?", sizeof(ntop_buf));
+		strlcpy(ntop_buf, "?", sizeof(ntop_buf));
 
 	return ntop_buf;
 }
@@ -2204,7 +2204,7 @@ getname6(ap)
 	if (getnameinfo((struct sockaddr *)&addr, addr.sin6_len,
 			ntop_buf, sizeof(ntop_buf), NULL, 0,
 			NI_NUMERICHOST | niflags))
-		strncpy(ntop_buf, "?", sizeof(ntop_buf));
+		strlcpy(ntop_buf, "?", sizeof(ntop_buf));
 
 	return ntop_buf;
 }
@@ -2253,8 +2253,8 @@ isakmp_printpacket(msg, from, my, decoded)
 		if (getnameinfo(from, from->sa_len, hostbuf, sizeof(hostbuf),
 				portbuf, sizeof(portbuf),
 				NI_NUMERICHOST | NI_NUMERICSERV | niflags)) {
-			strncpy(hostbuf, "?", sizeof(hostbuf));
-			strncpy(portbuf, "?", sizeof(portbuf));
+			strlcpy(hostbuf, "?", sizeof(hostbuf));
+			strlcpy(portbuf, "?", sizeof(portbuf));
 		}
 		printf("%s:%s", hostbuf, portbuf);
 	} else
@@ -2264,8 +2264,8 @@ isakmp_printpacket(msg, from, my, decoded)
 		if (getnameinfo(my, my->sa_len, hostbuf, sizeof(hostbuf),
 				portbuf, sizeof(portbuf),
 				NI_NUMERICHOST | NI_NUMERICSERV | niflags)) {
-			strncpy(hostbuf, "?", sizeof(hostbuf));
-			strncpy(portbuf, "?", sizeof(portbuf));
+			strlcpy(hostbuf, "?", sizeof(hostbuf));
+			strlcpy(portbuf, "?", sizeof(portbuf));
 		}
 		printf("%s:%s", hostbuf, portbuf);
 	} else
