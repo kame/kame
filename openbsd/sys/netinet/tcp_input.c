@@ -710,20 +710,6 @@ findpcb:
 	else
 		tiwin = th->th_win;
 
-#ifdef INET6
-	/* save packet options if user wanted */
-	/* XXX use inp_options, or separate inp_options6? */
-	if (af == AF_INET6 && (inp->inp_flags & IN6P_CONTROLOPTS)) {
-		if (inp->inp_options) {
-			m_freem(inp->inp_options);
-			inp->inp_options = 0;
-		}
-#if 0
-		ip6_savecontrol(inp, &inp->inp_options, ipv6);
-#endif
-	}
-#endif
-
 	so = inp->inp_socket;
 	if (so->so_options & (SO_DEBUG|SO_ACCEPTCONN)) {
 		if (so->so_options & SO_DEBUG) {
@@ -898,24 +884,6 @@ findpcb:
 			tcp_rscale(tp, so->so_rcv.sb_hiwat);
 		}
 	}
-
-#ifdef INET6
-	/* save IPv6 packet options if user wanted */
-	if (af == AF_INET6 && inp->inp_flags & IN6P_CONTROLOPTS) {
-		struct ip6_recvpktopts opts;
-
-		bzero(&opts, sizeof(opts));
-		ip6_savecontrol(inp, ipv6, m, &opts);
-		if (inp->inp_inputopts6)
-			ip6_update_recvpcbopt(inp->inp_inputopts6, &opts);
-		if (opts.head) {
-			if (sbappendcontrol(&inp->inp_socket->so_rcv,
-					    NULL, opts.head)
-			    == 0)
-				m_freem(opts.head);
-		}
-	}
-#endif
 
 #ifdef IPSEC
 	/* Find most recent IPsec tag */
