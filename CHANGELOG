@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1061 2000/06/24 07:51:29 itojun Exp $
+$Id: CHANGELOG,v 1.1062 2000/06/24 14:44:59 itojun Exp $
 
 <200006>
+Sat Jun 24 23:41:31 JST 2000  itojun@iijlab.net
+	* freebsd4/lib/libinet6/getnameinfo.c: correct NIS lookup.  from ume.
+
 Sat Jun 24 16:43:58 JST 2000  itojun@iijlab.net
 	* netbsd/sys/arch/*/conf/GENERIC.v6: enable PULLDOWN_TEST for all
 	  architectures.  this is done because mbuf pullup code in
