@@ -1,6 +1,6 @@
 	RELNOTES of KAME kit
 	KAME Project
-	$KAME: RELNOTES,v 1.73 2001/04/26 09:26:49 itojun Exp $
+	$KAME: RELNOTES,v 1.74 2001/05/02 05:13:23 itojun Exp $
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
 
@@ -111,8 +111,8 @@ Many of old ones have been solved.
   kit.  To make a single effort in tcpdump.org, we have removed the
   compilation tree (*bsd*/usr.sbin/tcpdump and *bsd*/lib/libpcap).  If
   you want IPv6-ready tcpdump/libpcap, download them from tcpdump.org.
-  We supply ports/pkgsrc for easier installation on kame/freebsd[23]
-  and kame/netbsd.
+  We supply ports for easier installation on kame/freebsd[23].
+  For recent *BSD releases, IPv6-ready tcpdump/libpcap is installed by default.
 
 - libinet6 resolver code does not support NIS lookup.
 
