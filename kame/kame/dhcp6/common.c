@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.44 2002/05/09 11:48:54 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.45 2002/05/09 12:00:28 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -577,15 +577,21 @@ dhcp6_get_options(p, ep, optinfo)
 	struct dhcp6opt *p, *ep;
 	struct dhcp6_optinfo *optinfo;
 {
-	struct dhcp6opt *np;
+	struct dhcp6opt *np, opth;
 	int i, opt, optlen, reqopts;
 	char *cp, *val;
 	struct dhcp6_optconf *optconf;
 
 	for (; p + 1 <= ep; p = np) {
+		/*
+		 * get the option header.  XXX: since there is no guarantee
+		 * about the header alignment, we need to make a local copy.
+		 */
+		memcpy(&opth, p, sizeof(opth));
+		optlen = ntohs(opth.dh6opt_len);
+		opt = ntohs(opth.dh6opt_type);
+
 		cp = (char *)(p + 1);
-		optlen = ntohs(p->dh6opt_len);
-		opt = ntohs(p->dh6opt_type);
 		np = (struct dhcp6opt *)(cp + optlen);
 
 		dprintf(LOG_DEBUG, "get DHCP option %s, len %d",
