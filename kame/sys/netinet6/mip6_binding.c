@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.159 2002/12/13 10:56:12 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.160 2002/12/13 10:59:46 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1223,7 +1223,7 @@ mip6_process_hrbu(bi)
 	       is ignored in this case since we cannot derive other on-link
 	       addresses without knowing the interface identifier.
 	*/
-	if (bi->mbc_flags & IP6MU_LINK) == 0)
+	if ((bi->mbc_flags & IP6MU_LINK) == 0)
 		bi->mbc_flags |= IP6MU_SINGLE;
 
 	/* find the home ifp of this homeaddress. */
