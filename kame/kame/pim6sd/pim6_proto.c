@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.58 2003/02/05 15:30:33 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.59 2003/04/30 04:36:32 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -3823,8 +3823,15 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 
     for (mifi = 0; mifi < numvifs; mifi++)
     {
-	if (mifi == incoming)
-	    continue;
+	/* 
+	 * BSR message has to be advertised to the incoming interface as well
+	 * to prepare for the following case.
+	 *  rtr3--|			rtr3's RPF(BSR) = rtr2
+	 *  rtr2--|--rtr1---BSR		rtr2's RPF(BSR) = rtr1
+	 *
+	 * see draft-ietf-pim-sm-bsr-03.txt section 3 "Forward BSM" in page 17
+	 * ToDo: config option to disable advertisement to incoming I/F
+	 */
 	if (uvifs[mifi].uv_flags & (VIFF_DISABLED | VIFF_DOWN |
 				    MIFF_REGISTER | VIFF_NONBRS))
 	    continue;
