@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.132 2002/09/11 07:35:23 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.133 2002/12/08 13:06:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -207,6 +207,9 @@ rip6_input(mp, offp, proto)
 	 * hidden from applications.
 	 */
 	fromsa = *src;
+#ifndef SCOPEDROUTING
+	in6_clearscope(&fromsa.sin6_addr);
+#endif
 
 #if defined(NFAITH) && 0 < NFAITH
 	if (faithprefix(&ip6->ip6_dst)) {
