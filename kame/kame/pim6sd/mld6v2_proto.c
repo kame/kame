@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.30 2004/05/31 12:48:58 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.31 2004/06/07 11:38:41 suz Exp $
  */
 
 /*
@@ -694,6 +694,13 @@ strip_source_in_multicast_record(vifi, mard, src, grp)
 		break;
 
 	case ALLOW_NEW_SOURCES:
+		if (numsrc == 0) {
+			/* do nothing due to a lack of additional sources */
+			log_msg(LOG_DEBUG, 0,
+			    "ignore ALLOW_NEW_SOURCES "
+			    "without additional sources");
+			break;
+		}
 		goto regard_as_report;
 		break;
 

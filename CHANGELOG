@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2616 2004/06/06 15:09:19 suz Exp $
+$KAME: CHANGELOG,v 1.2617 2004/06/07 11:38:41 suz Exp $
 
 <200406>
+2004-06-07  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
+	* kame/pim6sd/mld6v2_proto.c: discard ALLOW_NEW_SOURCES without 
+	any source in MLDv1 compat mode, since it's a meaningless MLDv2-REPORT.
+
 2004-06-06  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
 	* kame/pim6sd/mld6.c: discard MLDv2 packets with hoplimit != 1
 	(draft-vida-mld-v2-08.txt section 6.2 mandates it, although 
