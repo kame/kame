@@ -1567,12 +1567,18 @@ ip6_ctloutput(op, so, level, optname, mp)
 					optbuf = sopt->sopt_val;
 					optlen = sopt->sopt_valsize;
 #else  /* !fbsd3 */
-					if (m->m_next) {
+					if (m && m->m_next) {
 						error = EINVAL;	/* XXX */
 						break;
 					}
-					optbuf = mtod(m, u_char *);
-					optlen = m->m_len;
+					if (m) {
+						optbuf = mtod(m, u_char *);
+						optlen = m->m_len;
+					}
+					else {
+						optbuf = NULL;
+						optlen = 0;
+					}
 #endif
 
 #ifdef HAVE_NRL_INPCB
@@ -2419,8 +2425,10 @@ ip6_clearpktopts(pktopt, needfree, optname)
 		if (needfree && pktopt->ip6po_rhinfo.ip6po_rhi_rthdr)
 			free(pktopt->ip6po_rhinfo.ip6po_rhi_rthdr, M_IP6OPT);
 		pktopt->ip6po_rhinfo.ip6po_rhi_rthdr = NULL;
-		if (pktopt->ip6po_route.ro_rt)
+		if (pktopt->ip6po_route.ro_rt) {
 			RTFREE(pktopt->ip6po_route.ro_rt);
+			pktopt->ip6po_route.ro_rt = NULL;
+		}
 	}
 	if (optname == -1 || optname == IPV6_DSTOPTS) {
 		if (needfree && pktopt->ip6po_dest2)
