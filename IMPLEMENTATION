@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.260 2001/08/16 12:49:32 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.261 2001/08/16 13:08:39 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -643,127 +643,48 @@ automatically assigned to the gif interface.
 
 1.6 Source Address Selection
 
-KAME's source address selection takes care of the following
-conditions:
-- address scope
-- outgoing interface
-- whether an address is deprecated
-- whether an address is temporary (in terms of RFC 3041)
-- prefix matching against the destination
+The KAME kernel chooses the source address for an outgoing packet
+sent from a user application as follows:
 
-Roughly speaking, the selection policy is as follows:
-- always use an address that belongs to the same scope zone as the
-  destination.
-- addresses that have equal or larger scope than the scope of the
-  destination are preferred.
-- a deprecated address is not used in new communications if an
-  alternate (non-deprecated) address is available and has sufficient
-  scope.
-- a temporary address (in terms of RFC 3041 privacy extension) are
-  preferred to a public address.
-- if none of above conditions tie-breaks, addresses assigned on the
-  outgoing interface are preferred.
-- if none of above conditions tie-breaks, one which is longest prefix
-  matching against the destination is preferred as the last resort.
+1. if the source address is explicitly specified via an IPV6_PKTINFO
+   ancillary data item or the socket option of that name, just use it.
+   Note that this item/option overrides the bound address of the
+   corresponding (datagram) socket.
 
-For instance, ::1 is selected for ff01::1,
-fe80::200:f8ff:fe01:6317%ne0 for fe80::2a0:24ff:feab:839b%ne0.
-To see how longest-matching works, suppose that
-3ffe:501:808:1:200:f8ff:fe01:6317 and 3ffe:2001:9:124:200:f8ff:fe01:6317
-are given on the outgoing interface.  Then the former is chosen as the
-source for the destination 3ffe:501:800::1.  Note that even if all
-available addresses have smaller scope than the scope of the
-destination, we choose one anyway.  For example, if we have link-local
-and site-local addresses only, we choose a site-local addresses for a
-global destination.  If the packet is going to break a site boundary,
-the boundary router will return an ICMPv6 destination unreachable
-error with code 2 - beyond scope of source address.
+2. if the corresponding socket is bound, use the address.
 
-The precise desripction of the algorithm is quite complicated.  To
-describe the algorithm, we introduce the following notation:
+3. otherwise, the kernel first tries to find the outgoing interface of
+   the packet.  If it fails, the source address selection also fails.
+   If the kernel can find an interface, choose the most appropriate
+   address based on the algorithm described in
+   draft-ietf-ipngwg-default-addr-select-xx.txt .
+   Addresses that breaks the scope zone of the destination, or
+   addresses whose zone does not contain the outgoing interface are
+   never chosen.
 
-For a given destination D,
-  samescope(D): The set of addresses that have the same scope as D.
-  largerscope(D): The set of addresses that have a larger scope than D.
-  smallerscope(D): The set of addresses that have a smaller scope than D.
+When the procedure above fails, the kernel usually returns
+EADDRNOTAVAIL to the application.
 
-For a given set of addresses A,
-  DEP(A): the set of deprecated addresses in A.
-  nonDEP(A): A - DEP(A).
-
-For a given set of addresses A,
-  tmp(A): the set of preferred temporary-autoconfigured or
-          manually-configure addresses in A.
-
-Also, the algorithm assumes that the outgoing interface for the
-destination D is determined.  We call the interface "I".
-
-The algorithm is as follows.  Selection proceeds step by step as
-described; For example, if an address is selected by item 1, item 2 and
-later are not considered at all.
-
-  0. If there is no address in the same scope zone as D, just give up;
-     the packet will not be sent.
-  1. If we do not prefer temporary addresses, go to 3.
-     Otherwise, and if tmp(samescope(D)) is not empty, 
-     then choose an address that is on the interface I.  If every
-     address is on I, or every address is on a different interface
-     from I, choose an arbitrary one provided that an address longest
-     matching against D is always preferred.
-  2. If tmp(largerscope(D)) is not empty,
-     then choose an address that has the smallest scope.  If more than one
-     address has the smallest scope, choose an arbitrary one provided
-     that addresses on I are always preferred.
-  3. If nonDEP(samescope(D)) is not empty,
-     then apply the same logic as of 1.
-  4. If nonDEP(largerscope(D)) is not empty,
-     then apply the same logic as of 2.
-  5. If we do not prefer temporary addresses, go to 7.
-     Otherwise, and if tmp(DEP(samescope(D))) is not empty,
-     then choose an address that is on the interface I.  If every
-     address is on I, or every address is on a different interface
-     from I, choose an arbitrary one provided that an address longest
-     matching against D is always preferred.
-  6. If tmp(DEP(largerscope(D))) is not empty,
-     then choose an address that has the smallest scope.  If more than
-     one address has the smallest scope, choose an arbitrary one provided
-     that an address on I is always preferred.
-  7. If DEP(samescope(D)) is not empty,
-     then apply the same logic as of 5.
-  8. If DEP(largerscope(D)) is not empty,
-     then apply the same logic as of 6.
-  9. If we do not prefer temporary addresses, go to 11.
-     Otherwise, and if tmp(nonDEP(smallerscope(D))) is not empty,
-     then choose an address that has the largest scope.  If more than
-     one address has the largest scope, choose an arbitrary one provided
-     that an address on I is always preferred.
- 10. If tmp(DEP(smallerscope(D))) is not empty,
-     then choose an address that has the largest scope.  If more than
-     one address has the largest scope, choose an arbitrary one provided
-     that an address on I is always preferred.
- 11. If nonDEP(smallerscope(D)) is not empty,
-     then apply the same logic as of 9.
- 12. If DEP(smallerscope(D)) is not empty,
-     then apply the same logic as of 10.
-
-There exists a document about source address selection
-(draft-ietf-ipngwg-default-addr-select-xx.txt).  KAME's algorithm
-described above takes a similar approach to the document, but there
-are some differences.  See the document for more details.
-
-There are some cases where we do not use the above rule.  One
-example is connected TCP session, and we use the address kept in TCP
-protocol control block (tcb) as the source.
-Another example is source address for Neighbor Advertisement.
+In some cases, the specification explicitly requires the
+implementation to choose a particular source address.  The source
+address for a Neighbor Advertisement (NA) message is an example.
 Under the spec (RFC2461 7.2.2) NA's source should be the target
-address of the corresponding NS's target.  In this case we follow
-the spec rather than the above longest-match rule.
+address of the corresponding NS's target.  In this case we follow the
+spec rather than the above rule.
 
 If you would like to prohibit the use of deprecated address for some
 reason, configure net.inet6.ip6.use_deprecated to 0.  The issue
 related to deprecated address is described in RFC2462 5.5.4 (NOTE:
 there is some debate underway in IETF ipngwg on how to use
 "deprecated" address).
+
+As documented in the source address selection draft, temporary
+addresses for privacy extension are less preferred to public addresses
+by default.  However, for administrators who are particularly aware of
+the privacy, there is a system-wide sysctl(3) variable
+"net.inet6.ip6.prefer_tempaddr".  When the variable is set to
+non-zero, the kernel will rather prefer temporary addresses.  The
+default value of this variable is 0.
 
 1.7 Jumbo Payload
 
