@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.71 2001/10/22 06:09:07 keiichi Exp $	*/
+/*	$KAME: if_stf.c,v 1.72 2001/10/22 07:48:46 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -204,7 +204,7 @@ struct protosw in_stf_protosw =
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 #define STFNAME		"stf"
 #define STF_MAXUNIT	0
-#define MALLOC_DEFINE(M_STF, STFNAME, "6to4 Tunnel Interface");
+static MALLOC_DEFINE(M_STF, STFNAME, "6to4 Tunnel Interface");
 
 static int stfmodevent __P((module_t, int, void *));
 int	stf_clone_create __P((struct if_clone *, int *));
