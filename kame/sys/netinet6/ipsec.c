@@ -197,6 +197,8 @@ static void ipsec6_get_ulp __P((struct mbuf *m, struct secpolicyindex *));
 static void ipsec6_setspidx_in6pcb __P((struct mbuf *, struct in6pcb *pcb));
 static void ipsec6_setspidx_ipaddr __P((struct mbuf *, struct secpolicyindex *));
 #endif
+static struct inpcbpolicy *ipsec_newpcbpolicy __P((void));
+static void ipsec_delpcbpolicy __P((struct inpcbpolicy *));
 static struct secpolicy *ipsec_deepcopy_policy __P((struct secpolicy *src));
 static int ipsec_set_policy __P((struct secpolicy **pcb_sp,
 	int optname, caddr_t request, int priv));
@@ -211,27 +213,6 @@ static struct mbuf *ipsec6_splithdr __P((struct mbuf *));
 static int ipsec4_encapsulate __P((struct mbuf *, struct secasvar *));
 #ifdef INET6
 static int ipsec6_encapsulate __P((struct mbuf *, struct secasvar *));
-#endif
-
-/* serious malloc/free debugging for key management */
-#if 1
-#define KMALLOC(p, t, n) \
-	((p) = (t) malloc((unsigned long)(n), M_SECA, M_NOWAIT))
-#define KFREE(p) \
-	free((caddr_t)(p), M_SECA);
-#else
-#define KMALLOC(p, t, n) \
-	do {								\
-		((p) = (t)malloc((unsigned long)(n), M_SECA, M_NOWAIT));\
-		printf("%s %d: %p <- KMALLOC(%s, %d)\n",		\
-			__FILE__, __LINE__, (p), #t, n);		\
-	} while (0)
-
-#define KFREE(p) \
-	do {								\
-		printf("%s %d: %p -> KFREE()\n", __FILE__, __LINE__, (p));\
-		free((caddr_t)(p), M_SECA);				\
-	} while (0)
 #endif
 
 /*
@@ -1102,6 +1083,22 @@ ipsec6_setspidx_ipaddr(m, spidx)
 }
 #endif
 
+static struct inpcbpolicy *
+ipsec_newpcbpolicy()
+{
+	struct inpcbpolicy *p;
+
+	p = (struct inpcbpolicy *)malloc(sizeof(*p), M_SECA, M_NOWAIT);
+	return p;
+}
+
+static void
+ipsec_delpcbpolicy(p)
+	struct inpcbpolicy *p;
+{
+	free(p, M_SECA);
+}
+
 /* initialize policy in PCB */
 int
 ipsec_init_policy(so, pcb_sp)
@@ -1114,7 +1111,7 @@ ipsec_init_policy(so, pcb_sp)
 	if (so == NULL || pcb_sp == NULL)
 		panic("ipsec_init_policy: NULL pointer was passed.\n");
 
-	KMALLOC(new, struct inpcbpolicy *, sizeof(*new));
+	new = ipsec_newpcbpolicy();
 	if (new == NULL) {
 		ipseclog((LOG_DEBUG, "ipsec_init_policy: No more memory.\n"));
 		return ENOBUFS;
@@ -1153,7 +1150,7 @@ ipsec_init_policy(so, pcb_sp)
 #endif
 
 	if ((new->sp_in = key_newsp()) == NULL) {
-		KFREE(new);
+		ipsec_delpcbpolicy(new);
 		return ENOBUFS;
 	}
 	new->sp_in->state = IPSEC_SPSTATE_ALIVE;
@@ -1161,7 +1158,7 @@ ipsec_init_policy(so, pcb_sp)
 
 	if ((new->sp_out = key_newsp()) == NULL) {
 		key_freesp(new->sp_in);
-		KFREE(new);
+		ipsec_delpcbpolicy(new);
 		return ENOBUFS;
 	}
 	new->sp_out->state = IPSEC_SPSTATE_ALIVE;
@@ -1219,7 +1216,8 @@ ipsec_deepcopy_policy(src)
 	 */
 	q = &newchain;
 	for (p = src->req; p; p = p->next) {
-		KMALLOC(*q, struct ipsecrequest *, sizeof(struct ipsecrequest));
+		*q = (struct ipsecrequest *)malloc(sizeof(struct ipsecrequest),
+			M_SECA, M_NOWAIT);
 		if (*q == NULL)
 			goto fail;
 		bzero(*q, sizeof(**q));
@@ -1249,7 +1247,7 @@ ipsec_deepcopy_policy(src)
 fail:
 	for (p = newchain; p; p = r) {
 		r = p->next;
-		KFREE(p);
+		free(p, M_SECA);
 		p = NULL;
 	}
 	return NULL;
@@ -1306,29 +1304,25 @@ ipsec_get_policy(pcb_sp, mp)
 	struct secpolicy *pcb_sp;
 	struct mbuf **mp;
 {
-	struct sadb_x_policy *xpl;
 
 	/* sanity check. */
 	if (pcb_sp == NULL || mp == NULL)
 		return EINVAL;
 
-	if ((xpl = key_sp2msg(pcb_sp)) == NULL) {
+	*mp = key_sp2msg(pcb_sp);
+	if (!*mp) {
 		ipseclog((LOG_DEBUG, "ipsec_get_policy: No more memory.\n"));
 		return ENOBUFS;
 	}
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	*mp = m_get(M_WAIT, MT_DATA);
+	(*mp)->m_type = MT_DATA;
 #else
-	*mp = m_get(M_WAIT, MT_SOOPTS);
+	(*mp)->m_type = MT_SOOPTS;
 #endif
-	(*mp)->m_len = PFKEY_EXTLEN(xpl);
-	m_copyback((*mp), 0, PFKEY_EXTLEN(xpl), (caddr_t)xpl);
 	KEYDEBUG(KEYDEBUG_IPSEC_DUMP,
 		printf("ipsec_get_policy:\n");
 		kdebug_mbuf(*mp));
-
-	KFREE(xpl);
 
 	return 0;
 }
@@ -1413,7 +1407,7 @@ ipsec4_delete_pcbpolicy(inp)
 		inp->inp_sp->sp_out = NULL;
 	}
 
-	KFREE(inp->inp_sp);
+	ipsec_delpcbpolicy(inp->inp_sp);
 	inp->inp_sp = NULL;
 
 	return 0;
@@ -1499,7 +1493,7 @@ ipsec6_delete_pcbpolicy(in6p)
 		in6p->in6p_sp->sp_out = NULL;
 	}
 
-	KFREE(in6p->in6p_sp);
+	ipsec_delpcbpolicy(in6p->in6p_sp);
 	in6p->in6p_sp = NULL;
 
 	return 0;

@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: key.h,v 1.4 1999/11/10 13:42:37 sakane Exp $ */
+/* $Id: key.h,v 1.5 2000/01/17 10:11:15 itojun Exp $ */
 
 #ifndef _NETKEY_KEY_H_
 #define _NETKEY_KEY_H_
@@ -62,7 +62,7 @@ extern void key_freeso __P((struct socket *so));
 extern void key_freesav __P((struct secasvar *sav));
 extern struct secpolicy *key_newsp __P((void));
 extern struct secpolicy *key_msg2sp __P((struct sadb_x_policy *xpl0, int *error));
-extern struct sadb_x_policy *key_sp2msg __P((struct secpolicy *sp));
+extern struct mbuf *key_sp2msg __P((struct secpolicy *sp));
 extern int key_ismyaddr __P((u_int family, caddr_t addr));
 extern void key_timehandler __P((void));
 extern void key_srandom __P((void));

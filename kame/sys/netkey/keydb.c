@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.52 2000/01/17 09:19:12 itojun Exp $ */
+/* KAME $Id: keydb.c,v 1.53 2000/01/17 10:11:15 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -1170,13 +1170,14 @@ key_newreqid()
 /*
  * copy secpolicy struct to sadb_x_policy structure indicated.
  */
-struct sadb_x_policy *
+struct mbuf *
 key_sp2msg(sp)
 	struct secpolicy *sp;
 {
 	struct sadb_x_policy *xpl;
 	int tlen;
 	caddr_t p;
+	struct mbuf *m;
 
 	/* sanity check. */
 	if (sp == NULL)
@@ -1184,11 +1185,27 @@ key_sp2msg(sp)
 
 	tlen = key_getspreqmsglen(sp);
 
-	KMALLOC(xpl, struct sadb_x_policy *, tlen);
-	if (xpl == NULL) {
+	MGET(m, M_DONTWAIT, MT_DATA);
+	if (m && MLEN < tlen) {
+		MCLGET(m, M_DONTWAIT);
+		if ((m->m_flags & M_EXT) == 0) {
+			m_free(m);
+			m = NULL;
+		}
+	}
+	m->m_len = 0;
+	if (!m || M_TRAILINGSPACE(m) < tlen) {
+#ifdef IPSEC_DEBUG
 		printf("key_sp2msg: No more memory.\n");
+#endif
+		if (m)
+			m_free(m);
 		return NULL;
 	}
+
+	m->m_len = tlen;
+	m->m_next = NULL;
+	xpl = mtod(m, struct sadb_x_policy *);
 	bzero(xpl, tlen);
 
 	xpl->sadb_x_policy_len = PFKEY_UNIT64(tlen);
@@ -1224,7 +1241,7 @@ key_sp2msg(sp)
 		}
 	}
 
-	return xpl;
+	return m;
 }
 
 /*
@@ -1619,7 +1636,6 @@ key_setdumpsp(sp, type, seq, pid)
 {
 	struct mbuf *m;
 	u_int tlen;
-	caddr_t p;
 
 	/* XXX it would be better to avoid pre-computing length */
 	tlen = key_getspmsglen(sp);
@@ -1661,30 +1677,32 @@ key_setdumpsp(sp, type, seq, pid)
 	}
 
     {
+	struct mbuf *n;
 	struct sadb_x_policy *tmp;
 
-	if ((tmp = key_sp2msg(sp)) == NULL) {
+	n = key_sp2msg(sp);
+	if (!n || n->m_len < sizeof(*tmp)) {
 #ifdef IPSEC_DEBUG
 		printf("key_setdumpsp: No more memory.\n");
 #endif
 		m_freem(m);
+		if (n)
+			m_freem(n);
 		return NULL;
 	}
 
+	tmp = mtod(n, struct sadb_x_policy *);
+
 	/* validity check */
-	if (key_getspreqmsglen(sp) != PFKEY_UNUNIT64(tmp->sadb_x_policy_len))
+	if (key_getspreqmsglen(sp) != PFKEY_UNUNIT64(tmp->sadb_x_policy_len)
+	 || n->m_len != PFKEY_UNUNIT64(tmp->sadb_x_policy_len))
 		panic("key_setdumpsp: length mismatch."
 		      "sp:%d msg:%d\n",
 			key_getspreqmsglen(sp),
 			PFKEY_UNUNIT64(tmp->sadb_x_policy_len));
 	
-	p = key_appendmbuf(m, PFKEY_UNUNIT64(tmp->sadb_x_policy_len));
-	if (p == NULL) {
-		m_freem(m);
-		return NULL;
-	}
-	bcopy(tmp, p, PFKEY_UNUNIT64(tmp->sadb_x_policy_len));
-	KFREE(tmp);
+	m_cat(m, n);
+	m->m_pkthdr.len += n->m_len;
     }
 
 	if (m->m_len < sizeof(struct sadb_msg)) {
@@ -1727,24 +1745,28 @@ key_setdumpsp(newmsg, sp, type, seq, pid)
 	                    sp->spidx.ul_proto);
 
     {
+	struct mbuf *n;
 	struct sadb_x_policy *tmp;
 
-	if ((tmp = key_sp2msg(sp)) == NULL) {
+	n = key_sp2msg(sp);
+	if (!n || n->m_len < sizeof(*tmp)) {
 #ifdef IPSEC_DEBUG
 		printf("key_setdumpsp: No more memory.\n");
 #endif
 		return ENOBUFS;
 	}
+	tmp = mtod(n, struct sadb_x_policy *);
 
 	/* validity check */
-	if (key_getspreqmsglen(sp) != PFKEY_UNUNIT64(tmp->sadb_x_policy_len))
+	if (key_getspreqmsglen(sp) != PFKEY_UNUNIT64(tmp->sadb_x_policy_len)
+	 || n->m_len != PFKEY_UNUNIT64(tmp->sadb_x_policy_len))
 		panic("key_setdumpsp: length mismatch."
 		      "sp:%d msg:%d\n",
 			key_getspreqmsglen(sp),
 			PFKEY_UNUNIT64(tmp->sadb_x_policy_len));
 	
-	bcopy(tmp, p, PFKEY_UNUNIT64(tmp->sadb_x_policy_len));
-	KFREE(tmp);
+	m_copydata(n, 0, M_COPYALL, p);
+	m_freem(n);
     }
 
 	return tlen;
