@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2119 2002/04/09 12:20:26 jinmei Exp $
+$KAME: CHANGELOG,v 1.2120 2002/04/09 13:19:35 jinmei Exp $
 
 <200204>
+2002-04-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet/if_ether.c (arp_rtdrain): newly added as
+	the hook for arp entries in the route cache queue.  Since arp does
+	not have much state, the detection algorithm cannot be very smart;
+	we only keep entries that have already been resolved.
+	(see also: nd6_rtdrain below)
+
 2002-04-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/icmp6.c (icmp6_input, icmp6_mtudisc_update):
 	dropped icmp6 too big messages that reported an MTU less than the
