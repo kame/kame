@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.155 2000/09/06 00:37:25 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.156 2000/09/06 10:59:45 jinmei Exp $
 
 1. IPv6
 
@@ -92,7 +92,7 @@ RFC2893: Transition Mechanisms for IPv6 Hosts and Routers
       and it covers "configured tunnel" described in the spec.
       See 1.5 in this document for details.
 RFC2894: Router renumbering for IPv6
-draft-ietf-ipngwg-icmp-name-lookups-06: IPv6 Name Lookups Through ICMP
+draft-ietf-ipngwg-icmp-name-lookups-07: IPv6 Name Lookups Through ICMP
 draft-ietf-pim-ipv6-03.txt: PIM for IPv6
     * pim6dd implements dense mode.  pim6sd implements sparse mode.
 draft-ietf-dhc-dhcpv6-15.txt: DHCPv6
