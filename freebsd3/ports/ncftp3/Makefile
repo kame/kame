@@ -4,7 +4,7 @@
 # Date created:         4 Nov 1994
 # Whom:                 ache
 #
-# $Id: Makefile,v 1.4 1999/10/21 03:25:06 sumikawa Exp $
+# $Id: Makefile,v 1.5 2000/01/26 19:01:12 sumikawa Exp $
 #
 
 DISTNAME=       ncftp-3.0beta21-src
@@ -13,8 +13,8 @@ CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.ncftp.com/ncftp/3.0BETA/
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	ncftp-30b21-19991021.diff.gz
-PATCH_DIST_STRIP=	-p
+PATCHFILES=	ncftp-30b21-v6-20000127.diff.gz
+PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	sumikawa@kame.net
 
@@ -24,6 +24,9 @@ CONFIGURE_ARGS=	--with-ncurses
 MAN1=		ncftp3.1 ncftpbatch.1 ncftpget.1 ncftpls.1 ncftpput.1
 MAN3=		Strn.3
 NO_LATEST_LINK=	yes
+
+CONFIGURE_ARGS+= --with-ipv6-libraries=/usr/local/v6/lib
+CONFIGURE_ARGS+= --with-ipv6-libname=inet6
 
 .include <bsd.port.pre.mk>
 
