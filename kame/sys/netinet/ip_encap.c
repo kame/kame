@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.42 2001/06/22 14:19:35 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.43 2001/06/22 15:01:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -97,7 +97,11 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/ip6protosw.h>
 #include <netinet6/in6_var.h>
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#include <netinet/in_pcb.h>
+#else
 #include <netinet6/in6_pcb.h>
+#endif
 #include <netinet/icmp6.h>
 #endif
 
