@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.5 2005/03/02 19:22:53 ryuji Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.6 2005/03/02 19:39:05 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -175,8 +175,8 @@ main (argc, argv)
 		nemo_usage();
 
 	/* open syslog */
-	openlog("shisad(nemonet)", 0, LOG_DAEMON);
-	syslog(LOG_INFO, "start NEMO Network daemon\n");
+	openlog("shisad(nemod)", 0, LOG_DAEMON);
+	syslog(LOG_INFO, "Start NEMO daemon\n");
 
 	/* parse prefix table */
 	switch (mode) {
@@ -466,16 +466,27 @@ set_nemo_ifinfo() {
 				/* clear tunnel configuration */ 
 				nemo_tun_del(nif->ifname); 
 
-				LIST_INSERT_HEAD(&nemo_ifhead, nif, nemo_ifentry);
+				if (LIST_FIRST(&nemo_ifhead) == NULL)
+					LIST_INSERT_HEAD(&nemo_ifhead, nif, nemo_ifentry);
+				else {
+					struct nemo_if *nif1, *nif2;
+					for (nif1 = LIST_FIRST(&nemo_ifhead); nif1;
+					     nif1 = nif2) {
+						nif2 = LIST_NEXT(nif1, nemo_ifentry);
+						if (nif2 == NULL) {
+							LIST_INSERT_AFTER(&nemo_ifhead, nif1, 
+									  nemo_ifentry);
+							break;
+						}
+					}
+				}
                                 continue;
                         }
                 }               
-
         }
         free(buf); 
 
 	if (debug) {
-		syslog(LOG_INFO, "Watched interface:\n");
 		LIST_FOREACH(nif, &nemo_ifhead, nemo_ifentry) {
 			syslog(LOG_INFO, "%s\n", nif->ifname);
 		}
@@ -949,7 +960,7 @@ nemo_terminate(dummy)
 	short flags;
 
 	LIST_FOREACH(nif, &nemo_ifhead, nemo_ifentry) {
-		syslog(LOG_INFO, "destroy %s\n", nif->ifname);
+
 		nemo_tun_del(nif->ifname);
 
 		flags = nemo_ifflag_get(nif->ifname);
