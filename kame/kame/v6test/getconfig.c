@@ -41,8 +41,10 @@
 
 #define MAYHAVE(var, cap, def, pb)			\
      {							\
-	if ((var = tgetnum(cap,pb)) < 0)		\
-		var = def;				\
+	int t;						\
+	if ((t = tgetnum(cap,pb)) < 0) 		\
+		t = def;				\
+	var = t;					\
      }
 
 #define nextopt nexthdr
