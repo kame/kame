@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.24 2001/08/16 13:20:41 itojun Exp $	*/
+/*	$KAME: setkey.c,v 1.25 2001/08/17 06:33:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -80,8 +80,6 @@ int f_cmddump = 0;
 int f_policy = 0;
 int f_hexdump = 0;
 int f_tflag = 0;
-char *pname;
-
 static time_t thiszone;
 
 extern int lineno;
@@ -91,11 +89,12 @@ extern int parse __P((FILE **));
 void
 usage()
 {
-	printf("usage:\t%s [-v] -c\n", pname);
-	printf("\t%s [-v] -f (file)\n", pname);
-	printf("\t%s [-Palv] -D\n", pname);
-	printf("\t%s [-Pv] -F\n", pname);
-	printf("\t%s [-h] -x\n", pname);
+
+	printf("usage: setkey [-v] -c\n");
+	printf("       setkey [-v] -f filename\n");
+	printf("       setkey [-Palv] -D\n");
+	printf("       setkey [-Pv] -F\n");
+	printf("       setkey [-h] -x\n");
 	exit(1);
 }
 
@@ -107,9 +106,10 @@ main(ac, av)
 	FILE *fp = stdin;
 	int c;
 
-	pname = *av;
-
-	if (ac == 1) usage();
+	if (ac == 1) {
+		usage();
+		/* NOTREACHED */
+	}
 
 	thiszone = gmt2local(0);
 

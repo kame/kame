@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.60 2001/08/16 20:35:29 itojun Exp $
+.\"	$KAME: setkey.8,v 1.61 2001/08/17 06:33:58 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -89,14 +89,8 @@ If with
 .Fl a ,
 the dead SAD entries will be displayed as well.
 A dead SAD entry means that
-it has been expired but remains
-because it is referenced by SPD entries.
-.It Fl x
-Loop forever and dump all the messages transmitted to
-.Dv PF_KEY
-socket.
-.Fl xx
-makes each timestamps unformatted.
+it has been expired but remains in the system
+because it is referenced by some SPD entries.
 .It Fl h
 Add hexadecimal dump on
 .Fl x
@@ -109,6 +103,12 @@ Be verbose.
 The program will dump messages exchanged on
 .Dv PF_KEY
 socket, including messages sent from other processes to the kernel.
+.It Fl x
+Loop forever and dump all the messages transmitted to
+.Dv PF_KEY
+socket.
+.Fl xx
+makes each timestamps unformatted.
 .El
 .Pp
 Operations have the following grammar.
