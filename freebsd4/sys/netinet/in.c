@@ -940,11 +940,10 @@ in_addmulti(ap, ifp)
 		/*
 		 * Found it; merge source addresses in inm_source and send
 		 * State-Change Report if needed, and increment the reference
-		 * count. just increment the refrence count if group address
-		 * is local.
+		 * count. just return if group address is not the target of 
+		 * IGMPv3 (i.e. 224.0.0.0/24)
 		 */
 		if (IN_LOCAL_GROUP(SIN_ADDR(ifma->ifma_addr))) {
-			++ifma->ifma_refcount;
 			splx(s);
 			return inm;
 		}
@@ -1032,6 +1031,7 @@ in_addmulti(ap, ifp)
 	inm->inm_addr = *ap;
 	inm->inm_ifp = ifp;
 	inm->inm_ifma = ifma;
+	ifma->ifma_refcount = 1;
 	ifma->ifma_protospec = inm;
 	LIST_INSERT_HEAD(&in_multihead, inm, inm_link);
 
@@ -1048,6 +1048,7 @@ in_addmulti(ap, ifp)
 	    if (rti == 0) {
 		if ((rti = rti_init(inm->inm_ifp)) == NULL) {
 		    LIST_REMOVE(inm, inm_list);
+		    if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
 		    free(inm, M_IPMADDR);
 		    *error = ENOBUFS;
 		    splx(s);
@@ -1066,6 +1067,7 @@ in_addmulti(ap, ifp)
 					&newhead, &newmode, &newnumsrc)) != 0) {
 		in_free_all_msf_source_list(inm);
 		LIST_REMOVE(inm, inm_list);
+		if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
 		free(inm, M_IPMADDR);
 		splx(s);
 		return NULL;
