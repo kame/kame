@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.116 2004/03/21 14:40:51 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.117 2004/05/13 14:04:14 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -397,7 +397,8 @@ server6_init()
 	    sizeof(mreq6.ipv6mr_multiaddr));
 	if (setsockopt(insock, IPPROTO_IPV6, IPV6_JOIN_GROUP,
 	    &mreq6, sizeof(mreq6))) {
-		dprintf(LOG_ERR, FNAME, "setsockopt(insock, IPV6_JOIN_GROUP)",
+		dprintf(LOG_ERR, FNAME,
+		    "setsockopt(insock, IPV6_JOIN_GROUP): %s",
 		    strerror(errno));
 		exit(1);
 	}
