@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sainfo.c,v 1.2 2000/04/24 18:34:42 sakane Exp $ */
+/* YIPS @(#)$Id: sainfo.c,v 1.3 2000/05/22 21:07:43 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -212,6 +212,9 @@ sainfo2str(si)
 	const struct sainfo *si;
 {
 	static char buf[256];
+
+	if (si->idsrc == NULL)
+		return "anonymous";
 
 	snprintf(buf, sizeof(buf), "%s", ipsecdoi_id2str(si->idsrc));
 	snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf),
