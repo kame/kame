@@ -101,10 +101,11 @@
 #define	IFT_PROPMUX	0x36		/* Proprietary Multiplexing */
 #define	IFT_GIF		0x37		/*0xf0*/
 #define	IFT_FAITH	0x38		/*0xf2*/
-#define	IFT_STF		0x39		/*0xf3*/
 #define	IFT_L2VLAN	0x87		/* Layer 2 Virtual LAN using 802.1Q */
 
 #define	IFT_IEEE1394	0x90		/* IEEE1394 High Performance SerialBus*/
+
+#define IFT_STF		0xd7		/* 6to4 interface */
 
 /* not based on IANA assignments */
 /* #define	IFT_GIF		0xf0 */

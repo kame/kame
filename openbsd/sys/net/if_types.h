@@ -252,16 +252,16 @@
 #define	IFT_SIPTG		   0xcb /* SIP Trunk Group */
 #define	IFT_SIPSIG		   0xcc /* SIP Signaling */
 #define	IFT_DOCSCABLEUPSTREAMCHANNEL 0xcd /* CATV Upstream Channel */
+#define	IFT_BRIDGE		   0xd1	/* bridge interfaces */
+#define IFT_STF			   0xd7	/* 6to4 interface */
 
 /* private usage... how should we define these? */
-#define	IFT_BRIDGE	0xe8		/* bridge interfaces */
 #define	IFT_GIF		0xf0
 #define	IFT_DUMMY	0xf1
 #define	IFT_PVC		0xf2
 #define	IFT_FAITH	0xf3
 #define	IFT_ENC		0xf4		/* Encapsulation */
 #define	IFT_PFLOG	0xf5		/* Packet filter logging */
-#define IFT_STF		0xf6
 #define IFT_HIF		0xf7
 
 #endif /* _NET_IF_TYPES_H_ */

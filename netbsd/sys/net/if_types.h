@@ -179,10 +179,11 @@
 
 #define IFT_IEEE1394		   0x90	/* IEEE1394 High Performance SerialBus*/
 
+#define IFT_STF			   0xd7	/* 6to4 interface */
+
 /* not based on IANA assignments - how should we treat these? */
 #define IFT_GIF		0xf0
 #define IFT_PVC		0xf1
 #define IFT_FAITH	0xf2
-#define IFT_STF		0xf3
 #define IFT_HIF		0xf4
 #endif /* _NET_IF_TYPES_H_ */
