@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1245 2000/08/31 06:18:18 sakane Exp $
+$KAME: CHANGELOG,v 1.1246 2000/08/31 11:04:55 itojun Exp $
 
 <200008>
+Thu Aug 31 20:04:27 JST 2000  itojun@iijlab.net
+	* freebsd2/ports/sendmail.beta: upgrade to 8.11.0.
+
 Thu Aug 31 15:18:39 JST 2000 sakane@ydc.co.jp
 	* kame/kame/pfkey.c:
 	- Fixed to check if kernel supports the algorithm.  the routine
