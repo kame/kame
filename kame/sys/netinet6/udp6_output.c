@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.23 2001/05/16 12:21:17 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.24 2001/05/21 05:37:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -177,7 +177,7 @@ udp6_output(in6p, m, addr6, control)
 	int error = 0;
 	struct ip6_pktopts opt, *stickyopt = in6p->in6p_outputopts;
 	int priv;
-	int af, hlen;
+	int af = AF_INET6, hlen = sizeof(struct ip6_hdr);
 #ifdef INET
 #ifdef __NetBSD__
 	struct ip *ip;
@@ -243,24 +243,35 @@ udp6_output(in6p, m, addr6, control)
 		faddr = &sin6->sin6_addr;
 		fport = sin6->sin6_port; /* allow 0 port */
 
+		if (IN6_IS_ADDR_V4MAPPED(faddr)) {
+#ifdef __OpenBSD__		/* does not support mapped addresses */
+			if (1)
+#else
+			if ((in6p->in6p_flags & IN6P_IPV6_V6ONLY))
+#endif
+			{
+				/*
+				 * 
+				 */
+				error = EINVAL;
+				goto release;
+			} else
+				af = AF_INET;
+		}
+
 		/* KAME hack: embed scopeid */
 		if (in6_embedscope(&sin6->sin6_addr, sin6, in6p, NULL) != 0) {
 			error = EINVAL;
 			goto release;
 		}
 
-#ifdef __OpenBSD__
-		if (1)	/* we don't support IPv4 mapped address */
-#else
-		if (!IN6_IS_ADDR_V4MAPPED(faddr))
-#endif
-		{
+		if (!IN6_IS_ADDR_V4MAPPED(faddr)) {
 			laddr = in6_selectsrc(sin6, in6p->in6p_outputopts,
 					      in6p->in6p_moptions,
 					      &in6p->in6p_route,
 					      &in6p->in6p_laddr, &error);
 		} else
-			laddr = &in6p->in6p_laddr;	/*XXX*/
+			laddr = &in6p->in6p_laddr;	/* XXX */
 		if (laddr == NULL) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
@@ -279,23 +290,34 @@ udp6_output(in6p, m, addr6, control)
 			error = ENOTCONN;
 			goto release;
 		}
+		if (IN6_IS_ADDR_V4MAPPED(faddr)) {
+#ifdef __OpenBSD__		/* does not support mapped addresses */
+			if (1)
+#else
+			if ((in6p->in6p_flags & IN6P_IPV6_V6ONLY))
+#endif
+			{
+				/*
+				 * XXX: this case would happen when the
+				 * application sets the V6ONLY flag after
+				 * connecting the foreign address.
+				 * Such applications should be fixed,
+				 * so we bark here.
+				 */
+				log(LOG_INFO, "udp6_output: IPV6_V6ONLY "
+				    "option was set for a connected socket\n");
+				error = EINVAL;
+				goto release;
+			} else
+				af = AF_INET;
+		}
 		laddr = &in6p->in6p_laddr;
 		faddr = &in6p->in6p_faddr;
 		fport = in6p->in6p_fport;
 	}
 
-#ifdef __OpenBSD__
-	if (1)	/* we don't support IPv4 mapped address */
-#else
-	if (!IN6_IS_ADDR_V4MAPPED(faddr))
-#endif
-	{
-		af = AF_INET6;
-		hlen = sizeof(struct ip6_hdr);
-	} else {
-		af = AF_INET;
+	if (af == AF_INET)
 		hlen = sizeof(struct ip);
-	}
 
 	/*
 	 * Calculate data length and get a mbuf

@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.89 2001/05/08 09:06:26 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.90 2001/05/09 03:10:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -142,9 +142,9 @@ in6_pcballoc(so, head)
 	in6p->in6p_next->in6p_prev = in6p;
 #if defined(__NetBSD__) && !defined(INET6_BINDV6ONLY)
 	if (ip6_v6only)
-		in6p->in6p_flags |= IN6P_BINDV6ONLY;
+		in6p->in6p_flags |= IN6P_IPV6_V6ONLY;
 #else
-	in6p->in6p_flags |= IN6P_BINDV6ONLY;	/*just for safety*/
+	in6p->in6p_flags |= IN6P_IPV6_V6ONLY;	/*just for safety*/
 #endif
 	if (ip6_auto_flowlabel)
 		in6p->in6p_flags |= IN6P_AUTOFLOWLABEL;
@@ -345,6 +345,8 @@ in6_pcbconnect(in6p, nam)
 #ifndef TCP6
 	/* sanity check for mapped address case */
 	if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
+		if ((inp->inp_flags & IN6P_IPV6_V6ONLY) != 0)
+			return EINVAL;
 		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
 			in6p->in6p_laddr.s6_addr16[5] = htons(0xffff);
 		if (!IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr))
@@ -789,7 +791,7 @@ in6_pcblookup(head, faddr6, fport_arg, laddr6, lport_arg, flags)
 		else {
 			if (IN6_IS_ADDR_V4MAPPED(laddr6)) {
 #if !defined(TCP6) && !defined(INET6_BINDV6ONLY)
-				if (in6p->in6p_flags & IN6P_BINDV6ONLY)
+				if (in6p->in6p_flags & IN6P_IPV6_V6ONLY)
 					continue;
 				else
 					wildcard++;
@@ -820,7 +822,7 @@ in6_pcblookup(head, faddr6, fport_arg, laddr6, lport_arg, flags)
 		else {
 			if (IN6_IS_ADDR_V4MAPPED(faddr6)) {
 #if !defined(TCP6) && !defined(INET6_BINDV6ONLY)
-				if (in6p->in6p_flags & IN6P_BINDV6ONLY)
+				if (in6p->in6p_flags & IN6P_IPV6_V6ONLY)
 					continue;
 				else
 					wildcard++;
@@ -928,7 +930,7 @@ in6_pcblookup_bind(head, laddr6, lport_arg, faith)
 #ifndef TCP6
 			if (IN6_IS_ADDR_V4MAPPED(laddr6)) {
 #ifndef INET6_BINDV6ONLY
-				if (in6p->in6p_flags & IN6P_BINDV6ONLY)
+				if (in6p->in6p_flags & IN6P_IPV6_V6ONLY)
 					continue;
 				else
 					match = in6p;
