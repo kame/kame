@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/02 04:18:49 $
+		     $Date: 2000/04/02 15:36:25 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -46,13 +46,5 @@ and the next STABLE release,
   specific operating system platform (openbsd, and maybe freebsd[23]).
   It is not KAME problem, it is problem in fxp driver.
   KAME/OpenBSD contains workaround for this.
-
-PLATFORM DIFFERENCES
-====================
-As we support various platforms, there are several differences between
-those platforms.  Here is a brief list of important differences.
-We hope to improve support coverage sooner.
-
-Look at a document named COVERAGE for details.
 
 							<end of RELNOTES>
