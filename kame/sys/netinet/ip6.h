@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.15 2001/01/23 05:26:59 itojun Exp $	*/
+/*	$KAME: ip6.h,v 1.16 2001/01/23 05:28:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -253,10 +253,10 @@ struct ip6_opt_binding_request {
 
 /* Home Address Option */
 struct ip6_opt_home_address {
-    u_int8_t ip6oh_type;
-    u_int8_t ip6oh_len;
-    u_int8_t ip6oh_addr[16];/* Home Address */
-      /* followed by sub-options */
+	u_int8_t ip6oh_type;
+	u_int8_t ip6oh_len;
+	u_int8_t ip6oh_addr[16];/* Home Address */
+	/* followed by sub-options */
 };
 
 /* Routing header */
