@@ -285,17 +285,10 @@ struct protosw inetsw[] = {
 
 #if NGIF > 0
 struct protosw in_gif_protosw =
-{ SOCK_RAW,	&inetdomain,	0/*IPPROTO_IPV[4]*/,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	0/*IPPROTO_IPV[46]*/,	PR_ATOMIC|PR_ADDR,
   in_gif_input, rip_output,	0,		rip_ctloutput,
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-  0,
-#else
   rip_usrreq,
-#endif
   0,            0,              0,              0,
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-  &rip_usrreqs
-#endif
 };
 #endif /*NGIF*/
 

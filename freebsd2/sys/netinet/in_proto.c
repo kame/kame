@@ -291,7 +291,7 @@ struct protosw inetsw[] = {
 
 #if NGIF > 0
 struct protosw in_gif_protosw =
-{ SOCK_RAW,	&inetdomain,	0/*IPPROTO_IPV[4]*/,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	0/*IPPROTO_IPV[46]*/,	PR_ATOMIC|PR_ADDR,
   in_gif_input, rip_output,	0,		rip_ctloutput,
   rip_usrreq,
   0,            0,              0,              0,
