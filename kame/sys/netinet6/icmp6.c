@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.252 2001/10/22 05:16:40 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.253 2001/10/22 08:18:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1488,6 +1488,7 @@ ni6_input(m, off)
 		/* FALLTHROUGH */
 	case NI_QTYPE_FQDN:
 	case NI_QTYPE_NODEADDR:
+	case NI_QTYPE_IPV4ADDR:
 		switch (ni6->ni_code) {
 		case ICMP6_NI_SUBJ_IPV6:
 #if ICMP6_NI_SUBJ_IPV6 != 0
@@ -1592,9 +1593,6 @@ ni6_input(m, off)
 			goto bad;
 		}
 		break;
-	case NI_QTYPE_IPV4ADDR:
-		/* unsupported */
-		goto bad;
 	}
 
 	/* refuse based on configuration.  XXX ICMP6_NI_REFUSED? */
@@ -1604,6 +1602,7 @@ ni6_input(m, off)
 			goto bad;
 		break;
 	case NI_QTYPE_NODEADDR:
+	case NI_QTYPE_IPV4ADDR:
 		if ((icmp6_nodeinfo & 2) == 0)
 			goto bad;
 		break;
@@ -1626,6 +1625,9 @@ ni6_input(m, off)
 					  sizeof(u_int32_t))) > MCLBYTES)
 			replylen = MCLBYTES; /* XXX: will truncate pkt later */
 		break;
+	case NI_QTYPE_IPV4ADDR:
+		/* unsupported - should respond with unknown Qtype? */
+		goto bad;
 	default:
 		/*
 		 * XXX: We must return a reply with the ICMP6 code
