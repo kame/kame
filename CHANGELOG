@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.68 1999/08/25 17:50:33 jinmei Exp $
+$Id: CHANGELOG,v 1.69 1999/08/25 20:14:17 sumikawa Exp $
 
 <199908>
+Thu Aug 26 05:07:49 JST 1999  sumikawa@ebina.hitachi.co.jp
+	* kame/tcpdump: print the idetification of fragment headers when
+	using -v flag
+
 1999-08-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ah_core.c (ah6_calccksum): fixed a bug
 	of pointer adjustment to chase options. The bug might cause
