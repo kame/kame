@@ -705,6 +705,7 @@ struct	mbuf	*m_split(struct mbuf *, int, int);
 
 
 /* Packet tag routines */
+struct	m_tag	*m_tag_get(int, int, int);
 struct	m_tag 	*m_tag_alloc(u_int32_t, int, int, int);
 void		 m_tag_free(struct m_tag *);
 void		 m_tag_prepend(struct mbuf *, struct m_tag *);
