@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.5 2003/06/11 11:32:27 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.6 2003/06/16 09:34:28 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1587,9 +1587,10 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 			 __FILE__, __LINE__,
 			 ip6mhilen,
 			 ip6_sprintf(&src_sa.sin6_addr)));
-		/* discard */
-		m_freem(m0);
 		ip6stat.ip6s_toosmall++;
+		/* send ICMP parameter problem. */
+		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
+		    (caddr_t)&ip6mhi->ip6mhi_len - (caddr_t)mtod(m0, struct ip6_hdr *));
 		return (EINVAL);
 	}
 
@@ -1683,9 +1684,10 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 			 __FILE__, __LINE__,
 			 ip6mcilen,
 			 ip6_sprintf(&src_sa.sin6_addr)));
-		/* discard */
-		m_freem(m0);
 		ip6stat.ip6s_toosmall++;
+		/* send ICMP parameter problem. */
+		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
+		    (caddr_t)&ip6mci->ip6mci_len - (caddr_t)mtod(m0, struct ip6_hdr *));
 		return (EINVAL);
 	}
 
@@ -1804,9 +1806,10 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 			 __FILE__, __LINE__,
 			 ip6mulen,
 			 ip6_sprintf(&src_sa.sin6_addr)));
-		/* discard */
-		m_freem(m);
 		ip6stat.ip6s_toosmall++;
+		/* send ICMP parameter problem. */
+		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
+		    (caddr_t)&ip6mu->ip6mu_len - (caddr_t)ip6);
 		return (EINVAL);
 	}
 

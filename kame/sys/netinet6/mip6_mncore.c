@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.7 2003/06/16 09:33:22 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.8 2003/06/16 09:34:28 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -2751,9 +2751,10 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 			 __FILE__, __LINE__,
 			 ip6mhlen,
 			 ip6_sprintf(&src_sa.sin6_addr)));
-		/* discard */
-		m_freem(m);
 		ip6stat.ip6s_toosmall++;
+		/* send ICMP parameter problem. */
+		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
+		    (caddr_t)&ip6mh->ip6mh_len - (caddr_t)mtod(m, struct ip6_hdr *));
 		return (EINVAL);
 	}
 
@@ -2839,9 +2840,10 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 			 __FILE__, __LINE__,
 			 ip6mclen,
 			 ip6_sprintf(&src_sa.sin6_addr)));
-		/* discard */
-		m_freem(m);
 		ip6stat.ip6s_toosmall++;
+		/* send ICMP parameter problem. */
+		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
+		    (caddr_t)&ip6mc->ip6mc_len - (caddr_t)mtod(m, struct ip6_hdr *));
 		return (EINVAL);
 	}
 
@@ -2944,9 +2946,10 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 			 __FILE__, __LINE__,
 			 ip6malen,
 			 ip6_sprintf(&src_sa.sin6_addr)));
-		/* discard */
-		m_freem(m);
 		ip6stat.ip6s_toosmall++;
+		/* send ICMP parameter problem. */
+		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
+		    (caddr_t)&ip6ma->ip6ma_len - (caddr_t)ip6);
 		return (EINVAL);
 	}
 
@@ -3309,9 +3312,11 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 		    "from host %s.\n",
 		    __FILE__, __LINE__,
 		    ip6melen, ip6_sprintf(&src_sa.sin6_addr)));
-		/* discard. */
 		ip6stat.ip6s_toosmall++;
-		goto bad;
+		/* send ICMP parameter problem. */
+		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
+		    (caddr_t)&ip6me->ip6me_len - (caddr_t)mtod(m, struct ip6_hdr *));
+		return(EINVAL);
 	}
 
 	/* extract the home address of the sending node. */
