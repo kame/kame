@@ -1,8 +1,20 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.864 2000/05/10 05:08:58 itojun Exp $
+$Id: CHANGELOG,v 1.865 2000/05/11 10:33:48 sakane Exp $
 
 <200005>
+Thu May 11 19:28:22 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	- fix to get lifetime/lifebyte from doi attribute.
+	- fix to lifetime/lifebyte handling.
+	  lifetime of 0 should not be included a packet.  0 of lifebyte should
+	  not be included in a packet although 0 means not to care of the
+	  lifetime of bytes.  If there is such case, it is rejected.
+	- modify racoon.conf.5.
+	- update version to 20000501 means proposal parser is fixed.
+
+	They are reported from <Francis.Dupont@enst-bretagne.fr>.
+
 Wed May 10 14:07:22 JST 2000  itojun@iijlab.net
 	* sys/netinet/* (all platforms): correct more boundary checking issues
 	  in ip options processing.
