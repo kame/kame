@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.5 1999/08/23 10:59:16 sakane Exp $ */
+/* KAME $Id: key.c,v 1.6 1999/08/23 11:19:41 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367,
@@ -4864,7 +4864,10 @@ key_delete(mhp)
 	dst0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_DST]);
 
 	/* get a SA index */
-	key_setsecidx(src0, dst0, &idx, 0);
+	if (key_setsecidx(src0, dst0, &idx, 0)) {
+		msg0->sadb_msg_errno = EINVAL;
+		return NULL;
+	}
 	if ((saidx = key_getsaidxfromany(&idx)) == NULL) {
 		printf("key_delete: no SA index found.\n");
 		msg0->sadb_msg_errno = ENOENT;
@@ -4960,7 +4963,10 @@ key_get(mhp)
 	dst0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_DST]);
 
 	/* get a SA index */
-	key_setsecidx(src0, dst0, &idx, 0);
+	if (key_setsecidx(src0, dst0, &idx, 0)) {
+		msg0->sadb_msg_errno = EINVAL;
+		return NULL;
+	}
 	if ((saidx = key_getsaidxfromany(&idx)) == NULL) {
 		printf("key_get: no SA index found.\n");
 		msg0->sadb_msg_errno = ENOENT;
