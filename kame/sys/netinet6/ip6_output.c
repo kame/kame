@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.253 2001/12/21 07:08:11 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.254 2001/12/21 07:40:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1892,9 +1892,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 #define in6p_moptions inp_moptions6
 #define in6p_flags inp_flags
 #define in6p_route inp_route
-#else
+#else  /* !NRL */
 	struct in6pcb *in6p = sotoin6pcb(so);
-#endif
+#endif /* HAVE_NRL_INPCB */
 	struct mbuf *m = *mp;
 	int error, optval;
 	int optlen;
@@ -1903,7 +1903,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 
 	optlen = m ? m->m_len : 0;
-#endif
+#endif /* FreeBSD >= 3 */
 	error = optval = 0;
 
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 3)
@@ -1971,9 +1971,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 				/* fall through */
 			case IPV6_UNICAST_HOPS:
 			case IPV6_HOPLIMIT:
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-			case IPV6_CHECKSUM:
-#endif
 			case IPV6_FAITH:
 
 			case IPV6_RECVPKTINFO:
@@ -2968,7 +2965,7 @@ do { \
 			}
 			break;
 		}
-	} else {
+	} else {		/* level != IPPROTO_IPV6 */
 		error = EINVAL;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		if (op == PRCO_SETOPT && *mp)
@@ -2976,6 +2973,125 @@ do { \
 #endif
 	}
 	return(error);
+}
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+int
+ip6_raw_ctloutput(so, sopt)
+	struct socket *so;
+	struct sockopt *sopt;
+#else
+int
+ip6_raw_ctloutput(op, so, level, optname, mp)
+	int op;
+	struct socket *so;
+	int level, optname;
+	struct mbuf **mp;
+#endif
+{
+	int error = 0, optval, optlen;
+	const int icmp6off = offsetof(struct icmp6_hdr, icmp6_cksum);
+	struct in6pcb *in6p = sotoin6pcb(so);
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	int level, op, optname;
+	struct proc *p;
+#else
+	struct mbuf *m = *mp;
+#endif /* FreeBSD >= 3 */
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	if (sopt) {
+		level = sopt->sopt_level;
+		op = sopt->sopt_dir;
+		optname = sopt->sopt_name;
+		optlen = sopt->sopt_valsize;
+		p = sopt->sopt_p;
+	} else {
+		panic("ip6_ctloutput: arg soopt is NULL");
+	}
+#else
+	optlen = m ? m->m_len : 0;
+#endif /* FreeBSD >= 3 */
+
+	if (level != IPPROTO_IPV6) {
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+		if (op == PRCO_SETOPT && *mp)
+			(void)m_free(*mp);
+#endif
+		return(EINVAL);
+	}
+		
+	switch (optname) {
+	case IPV6_CHECKSUM:
+		/*
+		 * For ICMPv6 sockets, no modification allowed for checksum
+		 * offset, permit "no change" values to help existing apps.
+		 *
+		 * XXX 2292bis says: "An attempt to set IPV6_CHECKSUM
+		 * for an ICMPv6 socket will fail."
+		 * The current behavior does not meet 2292bis.
+		 */
+		in6p = sotoin6pcb(so);
+		switch (op) {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+		case SOPT_SET:
+#else
+		case PRCO_SETOPT:
+#endif
+			if (optlen != sizeof(int)) {
+				error = EINVAL;
+				break;
+			}
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+			error = sooptcopyin(sopt, &optval, sizeof(optval),
+					    sizeof(optval));
+			if (error)
+				break;
+#else
+			optval = *mtod(m, int *);
+#endif
+			if (so->so_proto->pr_protocol == IPPROTO_ICMPV6) {
+				if (optval != icmp6off)
+					error = EINVAL;
+			} else
+				in6p->in6p_cksum = optval;
+			break;
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+		case SOPT_GET:
+#else
+		case PRCO_GETOPT:
+#endif
+			if (so->so_proto->pr_protocol == IPPROTO_ICMPV6)
+				optval = icmp6off;
+			else
+				optval = in6p->in6p_cksum;
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+			error = sooptcopyout(sopt, &optval, sizeof(optval));
+#else
+			*mp = m = m_get(M_WAIT, MT_SOOPTS);
+			m->m_len = sizeof(int);
+			*mtod(m, int *) = optval;
+#endif /* FreeBSD3 */
+			break;
+		default:
+			error = EINVAL;
+			break;
+		}
+
+	default:
+		error = ENOPROTOOPT;
+		break;
+	}
+
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	if (op == PRCO_SETOPT && m)
+		(void)m_free(m);
+#endif
+
+	return(error);
+}
 
 #ifdef HAVE_NRL_INPCB
 #undef in6p
@@ -2990,7 +3106,6 @@ do { \
 #undef in6p_flags
 #undef in6p_route
 #endif
-}
 
 /*
  * Set up IP6 options in pcb for insertion in output packets or

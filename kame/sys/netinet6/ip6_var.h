@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.75 2001/12/21 03:32:34 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.76 2001/12/21 07:40:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -411,6 +411,12 @@ int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
 int	ip6_ctloutput __P((struct socket *, struct sockopt *sopt));
 #else
 int	ip6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
+#endif
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+int	ip6_raw_ctloutput __P((struct socket *, struct sockopt *sopt));
+#else
+int	ip6_raw_ctloutput __P((int, struct socket *, int, int,
+			       struct mbuf **));
 #endif
 void	init_ip6pktopts __P((struct ip6_pktopts *));
 int	ip6_setpktoptions __P((struct mbuf *, struct ip6_pktopts *, int, int));
