@@ -1,9 +1,9 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2635 2004/07/06 10:21:46 suz Exp $
+$KAME: CHANGELOG,v 1.2636 2004/07/06 10:23:09 suz Exp $
 
 <200407>
 2004-07-06  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
-	* kame/kame/pim6sd/vif.c: fixed a bug that pim6sd cannot receive
+	* kame/kame/pim6[sd]d/vif.c: fixed a bug that pim6[sd]d cannot receive
 	PIM messages on MLDv2-ready kernel.
 
 2004-07-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
