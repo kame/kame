@@ -61,7 +61,7 @@ static struct sockaddr *gw_sock, *src_sock, *grp_sock, *dst_sock, *rcv_sock;
 static char *querypacket;
 static char frombuf[1024];	/* XXX: enough size? */
 
-void
+int
 main(argc, argv)
 	int argc;
 	char *argv[];
