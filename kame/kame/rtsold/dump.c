@@ -36,6 +36,7 @@
 #include <syslog.h>
 #include <time.h>
 #include <stdio.h>
+#include <string.h>
 #include <errno.h>
 
 #include "rtsold.h"
@@ -73,10 +74,16 @@ dump_interface_status()
 			ifinfo->mediareqok ? "available" : "unavailabe");
 		fprintf(fp, "  probes: %d, dadcount = %d\n",
 			ifinfo->probes, ifinfo->dadcount);
-		fprintf(fp, "  timer: interval=%d:%d, expire=%s\n",
-			(int)ifinfo->timer.tv_sec, (int)ifinfo->timer.tv_usec,
-			(ifinfo->expire.tv_sec < now.tv_sec) ? "expired"
-			: sec2str(ifinfo->expire.tv_sec - now.tv_sec));
+		if (ifinfo->timer.tv_sec == tm_max.tv_sec &&
+		    ifinfo->timer.tv_usec == tm_max.tv_usec)
+			fprintf(fp, "  no timer\n");
+		else {
+			fprintf(fp, "  timer: interval=%d:%d, expire=%s\n",
+				(int)ifinfo->timer.tv_sec,
+				(int)ifinfo->timer.tv_usec,
+				(ifinfo->expire.tv_sec < now.tv_sec) ? "expired"
+				: sec2str(ifinfo->expire.tv_sec - now.tv_sec));
+		}
 		fprintf(fp, "  number of valid RAs: %d\n", ifinfo->racnt);
 	}
 }

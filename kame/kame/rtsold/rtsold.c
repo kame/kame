@@ -47,7 +47,7 @@
 #include "rtsold.h"
 
 struct ifinfo *iflist;
-static struct timeval tm_max =	{0x7fffffff, 0x7fffffff};
+struct timeval tm_max =	{0x7fffffff, 0x7fffffff};
 int dflag;
 static int log_upto = 999;
 static int fflag = 0;
