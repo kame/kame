@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.9 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.56 2003/04/09 07:11:11 suz Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.57 2003/09/06 02:49:09 itojun Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -424,8 +424,6 @@ in6_pcbdetach(inp)
 	sotoinpcb(so) = 0;
 	sofree(so);
 
-	if (inp->in6p_inputopts) /* Free all received options. */
- 		m_freem(inp->in6p_inputopts->head); /* this is safe */
  	ip6_freepcbopts(inp->in6p_outputopts);
  	ip6_freemoptions(inp->in6p_moptions);
 	if (inp->in6p_route.ro_rt)
