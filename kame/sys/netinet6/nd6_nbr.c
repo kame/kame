@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.46 2000/12/05 01:40:07 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.47 2000/12/05 01:42:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1043,7 +1043,7 @@ nd6_dad_stoptimer(dp)
 #ifdef __NetBSD__
 	callout_stop(&dp->dad_timer_ch);
 #else
-	untimeout((void (*) __P((void *)))nd6_dad_timer, (void *)ifa
+	untimeout((void (*) __P((void *)))nd6_dad_timer, (void *)dp->dad_ifa
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 		, dp->dad_timer
 #endif
