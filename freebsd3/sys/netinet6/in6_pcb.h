@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.h,v 1.4 2000/03/29 20:03:29 sumikawa Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.5 2000/06/04 16:51:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -100,8 +100,7 @@ struct	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
 				     struct ip6_moptions *,
 				     struct route_in6 *,
 				     struct in6_addr *, int *));
-int	in6_selecthlim __P((struct inpcb *, struct ifnet *));
-
+int	in6_pcbsetport __P((struct in6_addr *, struct inpcb *, struct proc *));
 void	init_sin6 __P((struct sockaddr_in6 *sin6, struct mbuf *m));
 #endif /* KERNEL */
 

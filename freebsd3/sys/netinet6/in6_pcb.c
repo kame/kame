@@ -114,12 +114,10 @@ in6_pcbbind(inp, nam, p)
 	struct proc *p;
 {
 	struct socket *so = inp->inp_socket;
-	unsigned short *lastport;
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)NULL;
 	struct inpcbinfo *pcbinfo = inp->inp_pcbinfo;
 	u_short	lport = 0;
 	int wild = 0, reuseport = (so->so_options & SO_REUSEPORT);
-	int error;
 
 	if (!in6_ifaddr) /* XXX broken! */
 		return (EADDRNOTAVAIL);
@@ -235,78 +233,12 @@ in6_pcbbind(inp, nam, p)
 		inp->in6p_laddr = sin6->sin6_addr;
 	}
 	if (lport == 0) {
-		ushort first, last;
-		int count;
-
-		inp->inp_flags |= INP_ANONPORT;
-
-		if (inp->inp_flags & INP_HIGHPORT) {
-			first = ipport_hifirstauto;	/* sysctl */
-			last  = ipport_hilastauto;
-			lastport = &pcbinfo->lasthi;
-		} else if (inp->inp_flags & INP_LOWPORT) {
-			if (p && (error = suser(p->p_ucred, &p->p_acflag)))
-				return error;
-			first = ipport_lowfirstauto;	/* 1023 */
-			last  = ipport_lowlastauto;	/* 600 */
-			lastport = &pcbinfo->lastlow;
-		} else {
-			first = ipport_firstauto;	/* sysctl */
-			last  = ipport_lastauto;
-			lastport = &pcbinfo->lastport;
-		}
-		/*
-		 * Simple check to ensure all ports are not used up causing
-		 * a deadlock here.
-		 *
-		 * We split the two cases (up and down) so that the direction
-		 * is not being tested on each round of the loop.
-		 */
-		if (first > last) {
-			/*
-			 * counting down
-			 */
-			count = first - last;
-
-			do {
-				if (count-- < 0) {	/* completely used? */
-					/*
-					 * Undo any address bind that may have
-					 * occurred above.
-					 */
-					inp->in6p_laddr = in6addr_any;
-					return (EAGAIN);
-				}
-				--*lastport;
-				if (*lastport > first || *lastport < last)
-					*lastport = first;
-				lport = htons(*lastport);
-			} while (in6_pcblookup_local(pcbinfo,
-				 &inp->in6p_laddr, lport, wild));
-		} else {
-			/*
-			 * counting up
-			 */
-			count = last - first;
-
-			do {
-				if (count-- < 0) {	/* completely used? */
-					/*
-					 * Undo any address bind that may have
-					 * occurred above.
-					 */
-					inp->in6p_laddr = in6addr_any;
-					return (EAGAIN);
-				}
-				++*lastport;
-				if (*lastport < first || *lastport > last)
-					*lastport = first;
-				lport = htons(*lastport);
-			} while (in6_pcblookup_local(pcbinfo,
-				 &inp->in6p_laddr, lport, wild));
-		}
+		int e;
+		if ((e = in6_pcbsetport(&inp->in6p_laddr, inp, p)) != 0)
+			return(e);
 	}
-	inp->inp_lport = lport;
+	else
+		inp->inp_lport = lport;
 	if (in_pcbinshash(inp) != 0) {
 		inp->in6p_laddr = in6addr_any;
 		inp->inp_lport = 0;
