@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: misc.c,v 1.9 2000/05/05 16:48:59 itojun Exp $
+ *	$Id: misc.c,v 1.10 2001/05/05 11:50:07 fujisawa Exp $
  */
 
 #include <sys/ioctl.h>
@@ -110,7 +110,7 @@ setPrefix(int type, struct addrinfo *prefix, int masklen)
     freight->addr[1].in6 = *in6_len2mask(masklen);
 
     if (soctl(_fd, SIOCSETPREFIX, &mBox) < 0)
-	err(errno, "setFaithPrefix: soctl failure");
+	err(errno, "setPrefix: soctl failure");
 }
 
 
@@ -204,37 +204,6 @@ setFromAnyRule(int dir, int proto, int any, u_short *port, struct pAddr *to)
 
     if (soctl(_fd, SIOCSETRULE, &mBox) < 0)
 	err(errno, "setRule: soctl failure");
-}
-
-
-void
-setFaithRule(struct pAddr *from)
-{
-    struct natpt_msgBox	 mBox;
-    struct _cSlot	*freight;
-
-    bzero(&mBox, sizeof(struct natpt_msgBox));
-    mBox.flags = NATPT_FAITH;
-    mBox.size  = sizeof(struct _cSlot);
-    mBox.freight
-	= (caddr_t)(freight = (struct _cSlot *)malloc(mBox.size));
-
-    bzero(freight, mBox.size);
-    freight->type = NATPT_FAITH;
-    freight->dir  = NATPT_OUTBOUND;
-
-    if (from == NULL)
-    {
-	freight->local.ad.type = ADDR_ANY;
-	freight->remote.ad.type = ADDR_FAITH;
-    }
-    else
-    {
-	freight->local = *from;
-    }
-
-    if (soctl(_fd, SIOCSETRULE, &mBox) < 0)
-	err(errno, "setFaithRule: soctl failure");
 }
 
 

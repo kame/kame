@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: yylex.c,v 1.5 2000/04/19 08:09:01 fujisawa Exp $
+ *	$Id: yylex.c,v 1.6 2001/05/05 11:50:07 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -60,7 +60,6 @@ struct
     { "dynamic",	SDYNAMIC,	"SDYNAMIC",	},
     { "enable",		SENABLE,	"SENABLE",	},
     { "external",	SEXTERNAL,	"SEXTERNAL",	},
-    { "faith",		SFAITH,		"SFAITH",	},
     { "flush",		SFLUSH,		"SFLUSH",	},
     { "from",		SFROM,		"SFROM",	},
     { "inbound",	SINBOUND,	"SINBOUND",	},

@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natptconfig.y,v 1.9 2000/10/29 11:56:09 fujisawa Exp $
+ *	$Id: natptconfig.y,v 1.10 2001/05/05 11:50:07 fujisawa Exp $
  */
 
 #include <sys/types.h>
@@ -100,7 +100,6 @@ yyerror(char *msg, ...)
 %token		SDYNAMIC
 %token		SENABLE
 %token		SEXTERNAL
-%token		SFAITH
 %token		SFLUSH
 %token		SFROM
 %token		SINBOUND
@@ -228,15 +227,11 @@ in_ex
 		;
 
 
-/* Set faith/NATPT prefix to the kernel					*/
+/* Set NATPT prefix to the kernel					*/
 
 prefix
 		: SPREFIX SQUESTION
 		    { printHelp(SPREFIX, NULL); }
-		| SPREFIX SFAITH ipv6addr
-		    { setPrefix(PREFIX_FAITH, $3, 0); }
-		| SPREFIX SFAITH ipv6addr SSLASH SDECIMAL
-		    { setPrefix(PREFIX_FAITH, $3, $5); }
 		| SPREFIX SNATPT ipv6addr
 		    { setPrefix(PREFIX_NATPT, $3, 0); }
 		| SPREFIX SNATPT ipv6addr SSLASH SDECIMAL
@@ -255,10 +250,6 @@ rule
 		    { setFromAnyRule($2, $3, SANY4, $6, $8); }
 		| SMAP dir opt_proto SFROM SANY6 port STO ipaddrport
 		    { setFromAnyRule($2, $3, SANY6, $6, $8); }
-		| SMAP SFROM SANY6 STO SFAITH
-		    { setFaithRule(NULL); }
-		| SMAP SFROM ipaddrport STO SFAITH
-		    { setFaithRule($3); }
 		| SMAP SFLUSH opt_type
 		    { flushRule($3); }
 		;

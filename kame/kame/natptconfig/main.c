@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: main.c,v 1.5 2000/05/16 16:22:33 fujisawa Exp $
+ *	$Id: main.c,v 1.6 2001/05/05 11:50:06 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -228,8 +228,6 @@ printInterfaceHelp()
 void
 printPrefixHelp()
 {
-    printf("	    faith <ipv6addr>\n");
-    printf("	    faith <ipv6addr> / <decimal>\n");
     printf("	    natpt <ipv6addr>\n");
     printf("	    natpt <ipv6addr> / <decimal>\n");
 }
@@ -238,8 +236,6 @@ printPrefixHelp()
 void
 printRuleHelp()
 {
-    printf("	    map from any6 to faith\n");
-    printf("	    map from <ipaddrport> to faith\n");
     printf("	    map from <dir> from any4 to <ipaddrport>\n");
     printf("	    map from <dir> from any6 to <ipaddrport>\n");
     printf("	    map from <dir> from <ipaddrport> to <ipaddrport>\n");

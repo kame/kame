@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natptconfig.bnf,v 1.4 2000/03/12 21:46:24 fujisawa Exp $
+ *	$Id: natptconfig.bnf,v 1.5 2001/05/05 11:50:07 fujisawa Exp $
  */
 
 /* Top level definitions							*/
@@ -68,11 +68,9 @@
 		    | "external"
 
 
-/* Set faith/NATPT prefix to the kernel						*/
+/* Set NATPT prefix to the kernel						*/
 
 	 <prefix> ::= "prefix" "?"
-		    | "faith" IPV6ADDR
-		    | "faith" IPV6ADDR "/" DECIMAL
 		    | "natpt" IPV6ADDR
 		    | "natpt" IPV6ADDR "/" DECIMAL
 
@@ -83,8 +81,6 @@
 		    | "map" <dir> "from" <ipaddrport> "to" <ipaddrport>
 		    | "map" <dir> "from" "any4" "to" <ipaddrport>
 		    | "map" <dir> "from" "any6" "to" <ipaddrport>
-		    | "map" "from" "any6" "to" "faith"
-		    | "map" "from" <ipaddrport> "to" "faith"
 		    | "map" "flush" <opt_type>
 
 

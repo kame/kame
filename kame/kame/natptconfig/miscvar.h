@@ -26,12 +26,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: miscvar.h,v 1.4 2000/02/18 11:39:54 fujisawa Exp $
+ *	$Id: miscvar.h,v 1.5 2001/05/05 11:50:07 fujisawa Exp $
  */
 
 void		 setInterface		__P((char *, int));
 void		 setPrefix		__P((int, struct addrinfo *, int));
-void		 setFaithRule		__P((struct pAddr *));
 void		 setRule		__P((int, int, struct pAddr *, struct pAddr *));
 void		 setFromAnyRule		__P((int, int, int, u_short *, struct pAddr *));
 void		 flushRule		__P((int));

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: show.c,v 1.13 2001/03/03 12:36:17 fujisawa Exp $
+ *	$Id: show.c,v 1.14 2001/05/05 11:50:07 fujisawa Exp $
  */
 
 #include <sys/types.h>
@@ -93,9 +93,6 @@ static	struct nlist	nl[] =
 
 static void	_showRuleStatic		__P((int, struct _cSlot *));
 static void	_showRuleDynamic	__P((int, struct _cSlot *));
-#ifdef notyet
-static void	_showRuleFaith		__P((int, struct _cSlot *));
-#endif /* notyet */	
 static void	_showXlate		__P((int, u_long));
 static void	_writeXlateHeader	__P((void));
 
@@ -182,9 +179,6 @@ showRule(int type)
 	    {
 	      case NATPT_STATIC:	_showRuleStatic(num, &acs);	break;
 	      case NATPT_DYNAMIC:	_showRuleDynamic(num, &acs);	break;
-#ifdef notyet
-	      case NATPT_FAITH:		_showRuleFaith(num, &acs);	break;
-#endif /* notyet */
 	    }
 	}
 	num++;
@@ -302,19 +296,6 @@ _showRuleDynamic(int num, struct _cSlot *acs)
 
     printf("\n");
 }
-
-
-#ifdef notyet
-static void
-_showRuleFaith(int num, struct _cSlot *acs)
-{
-    printf("%3d: ", num);
-
-    printf("faith");
-
-    printf("\n");
-}
-#endif /* notyet */
 
 
 static void
