@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1787 2001/07/20 19:45:56 itojun Exp $
+$KAME: CHANGELOG,v 1.1788 2001/07/20 21:31:17 itojun Exp $
 
 <200107>
 Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
@@ -23,6 +23,8 @@ Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
 	  - on RTM_GET, you can identify single route out of multipaths
 	    if you specify rt_gateway.  rt_gateway is still optional,
 	    and the first route is returned if it is not specified.
+	  - IPv4 and IPv6 output logic will pick a route out of multiple
+	    gateways, by very simple hash(ip.ip_dst).
 	  
 	  DEMO:
 	  (adding multipath routes)
@@ -41,9 +43,8 @@ Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
 	  due to multicast routing entries (like ff01::/32).
 	  will fix it soon.
 
-	  NOTE WELL: The change affects radix table only.  there's no L3
-	  support yet (like load balancing among multiple gateways).
-	  it is likely to appear soon.
+	  L3 TODO: more clever hash/gw selection policy, bypassing failing
+	  gateways
 
 Fri Jul 20 14:20:51 JST 2001  itojun@iijlab.net
 	* nodeinfod: a daemon that responds to node information queries.
