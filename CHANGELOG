@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1217 2000/08/21 04:36:24 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1218 2000/08/21 08:15:49 jinmei Exp $
 
 <200008>
+2000-08-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (prelist_update): corrected the
+	interpretation of "StoredLifetime" in the "Jim Bound algorithm".
+	Pointed out by OKABE Nobuo <Nobuo_Okabe@yokogawa.co.jp>.
+
 Mon Aug 21 13:33:12 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/freebsd3/ports/{ct, v6eval}: upgrade to 1.1
 
