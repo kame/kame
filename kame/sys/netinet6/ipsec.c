@@ -1129,14 +1129,7 @@ ipsec_init_policy(so, pcb_sp)
 			printf("so_cred is NULL\n");
 		);
 #else
-	switch (so->so_proto->pr_domain->dom_family) {
-	case AF_INET:
-		new->priv = sotoinpcb(so)->inp_socket->so_state & SS_PRIV;
-		break;
-	case AF_INET6:
-		new->priv = sotoin6pcb(so)->in6p_socket->so_state & SS_PRIV;
-		break;
-	}
+	new->priv = so->so_state & SS_PRIV;
 #endif
 
 	if ((new->sp_in = key_newsp()) == NULL) {
