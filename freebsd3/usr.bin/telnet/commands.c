@@ -2163,8 +2163,7 @@ setpolicy(net, res, policy)
 		return -1;
 	}
 	level = res->ai_family == AF_INET ? IPPROTO_IP : IPPROTO_IPV6;
-	optname = res->ai_family == AF_INET ? IP_IPSEC_POLICY : IPV6_IPSEC_POLIC
-	Y;
+	optname = res->ai_family == AF_INET ? IP_IPSEC_POLICY : IPV6_IPSEC_POLICY;
 	if (setsockopt(net, level, optname, buf, ipsec_get_policylen(buf)) < 0){
 		perror("setsockopt");
 		return -1;
