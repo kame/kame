@@ -1,4 +1,4 @@
-/*	$KAME: mip6stat.c,v 1.8 2001/03/29 05:34:29 itojun Exp $	*/
+/*	$KAME: mip6stat.c,v 1.9 2001/05/16 06:25:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -177,24 +177,21 @@ trimdomain(char *cp)
 char *
 ip6addr_print(struct in6_addr *in6, int plen)
 {
-	register char *cp = 0;
-	static char line[MAXHOSTNAMELEN + 5];
-	struct hostent *hp;
-	char ntop_buf[INET6_ADDRSTRLEN];
+	static char line[NI_MAXHOST + 5];
+	struct sockaddr_in6 sa6;
+	int niflags = 0;
 
-	if (!nflag) {
-		hp = gethostbyaddr((char *)in6, sizeof(*in6), AF_INET6);
-		if (hp) {
-			cp = hp->h_name;
-			trimdomain(cp);
-		}
-	}
-	if (cp)
-		strncpy(line, cp, sizeof(line) - 1);
-	else
-		sprintf(line, "%s", inet_ntop(AF_INET6, in6, ntop_buf,
-					      sizeof(ntop_buf)));
-		
+	memset(&sa6, 0, sizeof(sa6));
+	sa6.sin6_family = AF_INET6;
+	sa6.sin6_len = sizeof(sa6);
+	sa6.sin6_addr = *in6;
+
+	if (!nflag)
+		niflags |= NI_NUMERICHOST;
+	if (getnameinfo((struct sockaddr *)&sa6, sizeof(sa6), line, NI_MAXHOST,
+			NULL, 0, niflags) != 0)
+		strcpy(line, "???"); /* XXX */
+
 	if(plen >= 0) {
 		char plen_str[5];
 
