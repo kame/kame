@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.137 2000/06/24 00:47:07 itojun Exp $	*/
+/*	$KAME: key.c,v 1.138 2000/07/04 04:21:43 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4300,7 +4300,7 @@ key_timehandler(void)
 
 #ifndef IPSEC_DEBUG2
 	/* do exchange to tick time !! */
-	(void)timeout((void *)key_timehandler, (void *)0, 100);
+	(void)timeout((void *)key_timehandler, (void *)0, hz);
 #endif /* IPSEC_DEBUG2 */
 
 	splx(s);
