@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.119 2001/07/31 08:55:53 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.120 2001/07/31 13:33:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3633,7 +3633,7 @@ ipsec_addaux(m)
 		n = m_aux_add(m, AF_INET, IPPROTO_ESP);
 	if (!n)
 		return n;	/* ENOBUFS */
-	n->m_len = sizeof(struct socket *);
+	n->m_len = sizeof(struct ipsecaux);
 	bzero(mtod(n, void *), n->m_len);
 	return n;
 }
@@ -3669,10 +3669,16 @@ ipsec_optaux(m, n)
 	struct mbuf *m;
 	struct mbuf *n;
 {
+	struct ipsecaux *aux;
 
 	if (!n)
 		return;
-	if (n->m_len == sizeof(struct socket *) && !*mtod(n, struct socket **))
+	if (sizeof(*aux) > n->m_len) {
+		ipsec_delaux(m);
+		return;
+	}
+	aux = mtod(n, struct ipsecaux *);
+	if (!aux->so && !aux->sp)
 		ipsec_delaux(m);
 }
 
@@ -3682,6 +3688,7 @@ ipsec_setsocket(m, so)
 	struct socket *so;
 {
 	struct mbuf *n;
+	struct ipsecaux *aux;
 
 	/* if so == NULL, don't insist on getting the aux mbuf */
 	if (so) {
@@ -3690,8 +3697,10 @@ ipsec_setsocket(m, so)
 			return ENOBUFS;
 	} else
 		n = ipsec_findaux(m);
-	if (n && n->m_len >= sizeof(struct socket *))
-		*mtod(n, struct socket **) = so;
+	if (n && n->m_len >= sizeof(*aux)) {
+		aux = mtod(n, struct ipsecaux *);
+		aux->so = so;
+	}
 	ipsec_optaux(m, n);
 	return 0;
 }
@@ -3701,11 +3710,13 @@ ipsec_getsocket(m)
 	struct mbuf *m;
 {
 	struct mbuf *n;
+	struct ipsecaux *aux;
 
 	n = ipsec_findaux(m);
-	if (n && n->m_len >= sizeof(struct socket *))
-		return *mtod(n, struct socket **);
-	else
+	if (n && n->m_len >= sizeof(*aux)) {
+		aux = mtod(n, struct ipsecaux *);
+		return aux->so;
+	} else
 		return NULL;
 }
 
@@ -3716,18 +3727,15 @@ ipsec_addhist(m, proto, spi)
 	u_int32_t spi;
 {
 	struct mbuf *n;
-	struct ipsec_history *p;
+	struct ipsecaux *aux;
 
 	n = ipsec_addaux(m);
 	if (!n)
 		return ENOBUFS;
-	if (M_TRAILINGSPACE(n) < sizeof(*p))
+	if (sizeof(*aux) > n->m_len)
 		return ENOSPC;	/* XXX */
-	p = (struct ipsec_history *)(mtod(n, caddr_t) + n->m_len);
-	n->m_len += sizeof(*p);
-	bzero(p, sizeof(*p));
-	p->ih_proto = proto;
-	p->ih_spi = spi;
+	aux = mtod(n, struct ipsecaux *);
+	aux->hdrs++;
 	return 0;
 }
 
@@ -3735,8 +3743,16 @@ int
 ipsec_getnhist(m)
 	struct mbuf *m;
 {
+	struct mbuf *n;
+	struct ipsecaux *aux;
 
-	return ipsec_gethist(m, NULL) ? 1 : 0;
+	n = ipsec_findaux(m);
+	if (!n)
+		return 0;
+	if (sizeof(*aux) > n->m_len)
+		return 0;
+	aux = mtod(n, struct ipsecaux *);
+	return aux->hdrs;
 }
 
 struct ipsec_history *
@@ -3744,22 +3760,8 @@ ipsec_gethist(m, lenp)
 	struct mbuf *m;
 	int *lenp;
 {
-	struct mbuf *n;
-	int l;
 
-	n = ipsec_findaux(m);
-	if (!n)
-		return NULL;
-	l = n->m_len;
-	if (sizeof(struct socket *) > l)
-		return NULL;
-	if ((l - sizeof(struct socket *)) % sizeof(struct ipsec_history))
-		return NULL;
-	/* XXX does it make more sense to divide by sizeof(ipsec_history)? */
-	if (lenp)
-		*lenp = l - sizeof(struct socket *);
-	return (struct ipsec_history *)
-	    (mtod(n, caddr_t) + sizeof(struct socket *));
+	panic("ipsec_gethist: obsolete API");
 }
 
 void
@@ -3769,8 +3771,8 @@ ipsec_clearhist(m)
 	struct mbuf *n;
 
 	n = ipsec_findaux(m);
-	if ((n) && n->m_len > sizeof(struct socket *))
-		n->m_len = sizeof(struct socket *);
+	if ((n) && n->m_len > sizeof(struct ipsecaux))
+		n->m_len = sizeof(struct ipsecaux); 
 	ipsec_optaux(m, n);
 }
 

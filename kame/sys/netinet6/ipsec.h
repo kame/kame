@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.49 2001/07/31 08:55:53 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.50 2001/07/31 13:33:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -141,6 +141,14 @@ struct secspacq {
 	long created;		/* for lifetime */
 	int count;		/* for lifetime */
 	/* XXX: here is mbuf place holder to be sent ? */
+};
+
+struct ipsecaux {
+	struct socket *so;
+	int hdrs;	/* # of ipsec headers */
+
+	struct secpolicy *sp;
+	struct ipsecrequest *req;
 };
 #endif /* _KERNEL */
 
