@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.972 2000/06/05 12:04:43 jinmei Exp $
+$Id: CHANGELOG,v 1.973 2000/06/05 12:57:59 itojun Exp $
 
 <200006>
+Mon Jun  5 21:56:35 JST 2000  itojun@iijlab.net
+	* traceroute6/traceroute6.c: add -f (skip first hops).  the option
+	  is common to freebsd4/bsdi4/openbsd/netbsd traceroute(8).
+
 2000-06-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/traceroute6/traceroute6.c (main): set a minimum set of
 	socket options as soon as opning a raw socket to avoid
