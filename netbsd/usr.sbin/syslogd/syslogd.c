@@ -324,7 +324,7 @@ main(argc, argv)
 #else
 		finet6 = -1;
 #endif
-        }
+	}
 	else {
 		finet = -1;
 		finet6 = -1;
