@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.44 2001/11/13 12:38:52 jinmei Exp $	*/
+/*	$KAME: traceroute6.c,v 1.45 2002/02/19 02:28:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1308,7 +1308,7 @@ inetname(sa)
 
 	if (first && !nflag) {
 		first = 0;
-		if (gethostname(domain, MAXHOSTNAMELEN) == 0 &&
+		if (gethostname(domain, sizeof(domain)) == 0 &&
 		    (cp = index(domain, '.')))
 			(void) strlcpy(domain, cp + 1, sizeof(domain));
 		else
