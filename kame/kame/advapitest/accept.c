@@ -83,6 +83,14 @@ main(argc, argv)
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on,
 		       sizeof(on)) < 0)
 		err(1, "setsockopt(IPV6_RECVHOPLIMIT)");
+	/* specify to show a received dst opts header after a rthdr (if any) */
+	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVRTHDRDSTOPTS, &on,
+		       sizeof(on)) < 0)
+		err(1, "setsockopt(IPV6_RECVRTHDRDSTOPTS)");
+	/* specify to show a received dst opts header after a rthdr (if any) */
+	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVDSTOPTS, &on,
+		       sizeof(on)) < 0)
+		err(1, "setsockot(IPV6_RECVDSTOPTS)");
 	/* specify to show a received hop-by-hop options header (if any) */
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPOPTS, &on, sizeof(on)) < 0)
 		err(1, "setsockopt(IPV6_RECVHOPOPTS)");
@@ -164,7 +172,7 @@ print_options(mh)
 	struct in6_pktinfo *pi = NULL;
 	int *hlimp = NULL;
 	char ntop_buf[INET6_ADDRSTRLEN];
-	void *rthdr = NULL, *hbh = NULL;
+	void *hbh = NULL, *dst1 = NULL, *dst2 = NULL, *rthdr = NULL;
 
 	if (mh->msg_controllen == 0) {
 		printf("No IPv6 option is received\n");
@@ -191,11 +199,30 @@ print_options(mh)
 			break;
 
 		case IPV6_RTHDR:
-			rthdr = CMSG_DATA(cm);
+			if (rthdr)
+				printf("there're more than one rthdr (ignored).\n");
+			else
+				rthdr = CMSG_DATA(cm);
 			break;
 
 		case IPV6_HOPOPTS:
 			hbh = CMSG_DATA(cm);
+			break;
+
+		case IPV6_RTHDRDSTOPTS:
+			if (dst1)
+				printf("there's more than one dstopt hdr "
+				       "before a rthdr (ignored)\n");
+			else
+				dst1 = CMSG_DATA(cm);
+			break;
+
+		case IPV6_DSTOPTS:
+			if (dst2)
+				printf("there's more than one dstopt hdr "
+				       "after a rthdr (ignored)\n");
+			else
+				dst2 = CMSG_DATA(cm);
 			break;
 		}
 	}
@@ -209,13 +236,21 @@ print_options(mh)
 	}
 	if (hlimp)
 		printf("  Hoplimit = %d\n", *hlimp);
+	if (hbh) {
+		printf("  HbH Options Header\n");
+		print_opthdr(hbh);
+	}
+	if (dst1) {
+		printf("  Destination Options Header (before rthdr)\n");
+		print_opthdr(dst1);
+	}
 	if (rthdr) {
 		printf("  Routing Header\n");
 		print_rthdr(rthdr);
 	}
-	if (hbh) {
-		printf("  HbH Options Header\n");
-		print_opthdr(hbh);
+	if (dst2) {
+		printf("  Destination Options Header (after rthdr)\n");
+		print_opthdr(dst2);
 	}
 }
 
