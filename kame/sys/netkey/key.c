@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.314 2003/09/14 03:10:58 itojun Exp $	*/
+/*	$KAME: key.c,v 1.315 2003/09/14 07:29:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -175,7 +175,8 @@ static LIST_HEAD(_sahtree, secashead) sahtree;			/* SAD */
 static LIST_HEAD(_regtree, secreg) regtree[SADB_SATYPE_MAX + 1];
 							/* registed list */
 
-#define SPIHASHSIZE	131	/* prime */
+#define SPIHASHSIZE	128
+#define	SPIHASH(x)	(((x) ^ ((x) >> 16)) % SPIHASHSIZE)
 static LIST_HEAD(_spihash, secasvar) spihash[SPIHASHSIZE];
 
 #ifndef IPSEC_NONBLOCK_ACQUIRE
@@ -1049,7 +1050,7 @@ key_allocsa(family, src, dst, proto, spi)
 	 */
 	match = NULL;
 	matchidx = arraysize;
-	LIST_FOREACH(sav, &spihash[spi % SPIHASHSIZE], spihash) {
+	LIST_FOREACH(sav, &spihash[SPIHASH(spi)], spihash) {
 		if (sav->spi != spi)
 			continue;
 		if (proto != sav->sah->saidx.proto)
@@ -3116,7 +3117,7 @@ key_checkspidup(saidx, spi)
 	}
 
 	/* check all SAD */
-	LIST_FOREACH(sav, &spihash[spi % SPIHASHSIZE], spihash) {
+	LIST_FOREACH(sav, &spihash[SPIHASH(spi)], spihash) {
 		if (sav->spi != spi)
 			continue;
 		for (stateidx = 0;
@@ -3147,7 +3148,7 @@ key_setspi(sav, spi)
 	sav->spi = spi;
 	if (sav->spihash.le_prev || sav->spihash.le_next)
 		LIST_REMOVE(sav, spihash);
-	LIST_INSERT_HEAD(&spihash[spi % SPIHASHSIZE], sav, spihash);
+	LIST_INSERT_HEAD(&spihash[SPIHASH(spi)], sav, spihash);
 	splx(s);
 }
 
@@ -3167,7 +3168,7 @@ key_getsavbyspi(sah, spi)
 
 	match = NULL;
 	matchidx = _ARRAYLEN(saorder_state_alive);
-	LIST_FOREACH(sav, &spihash[spi % SPIHASHSIZE], spihash) {
+	LIST_FOREACH(sav, &spihash[SPIHASH(spi)], spihash) {
 		if (sav->spi != spi)
 			continue;
 		if (sav->sah != sah)
@@ -7193,7 +7194,7 @@ key_setdumpsa_spi(spi)
 	int cnt;
 
 	cnt = 0;
-	LIST_FOREACH(sav, &spihash[spi % SPIHASHSIZE], spihash) {
+	LIST_FOREACH(sav, &spihash[SPIHASH(spi)], spihash) {
 		if (sav->spi != spi)
 			continue;
 		cnt++;
@@ -7203,7 +7204,7 @@ key_setdumpsa_spi(spi)
 		return NULL;
 
 	m = NULL;
-	LIST_FOREACH(sav, &spihash[spi % SPIHASHSIZE], spihash) {
+	LIST_FOREACH(sav, &spihash[SPIHASH(spi)], spihash) {
 		if (sav->spi != spi)
 			continue;
 		satype = key_proto2satype(sav->sah->saidx.proto);
