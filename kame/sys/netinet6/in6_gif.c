@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.103 2003/02/07 10:17:08 suz Exp $	*/
+/*	$KAME: in6_gif.c,v 1.104 2003/02/08 19:21:49 kjc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -337,7 +337,7 @@ in6_gif_output(ifp, family, m)
 	}
 	ip_ecn_ingress((ifp->if_flags & IFF_LINK1) ? ECN_ALLOWED : ECN_NOCARE,
 		       &otos, &itos);
-	ip6->ip6_flow &= ~ntohl(0xff00000);
+	ip6->ip6_flow &= ~htonl(0xff << 20);
 	ip6->ip6_flow |= htonl((u_int32_t)otos << 20);
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
