@@ -220,15 +220,13 @@ do {									\
 		ip6stat.ip6s_exthdrtoolong++;				\
 		return ret;						\
 	} else if ((m)->m_flags & M_EXT) {				\
-		if ((m)->m_data + (off) + (hlen)			\
-		    > (caddr_t)(m)->m_ext.ext_buf + MCLBYTES) {		\
+		if ((m)->m_len < (off) + (hlen)) {			\
 			ip6stat.ip6s_exthdrtoolong++;			\
 			m_freem(m);					\
 			return ret;					\
 		}							\
 	} else {							\
-		if ((m)->m_data + (off) + (hlen)			\
-		    > (caddr_t)(m) + MSIZE) {				\
+		if ((m)->m_len < (off) + (hlen)) {			\
 			ip6stat.ip6s_exthdrtoolong++;			\
 			m_freem(m);					\
 			return ret;					\
