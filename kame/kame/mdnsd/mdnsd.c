@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.49 2001/11/19 06:24:58 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.50 2001/11/19 06:34:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -416,8 +416,9 @@ getsock0(ai)
 		    &yes, sizeof(yes)) < 0)
 			err(1, "setsockopt(SO_REUSEPORT)");
 #ifdef IPV6_USE_MIN_MTU
-		(void)setsockopt(s, IPPROTO_IPV6, IPV6_USE_MIN_MTU,
-		    &yes, sizeof(yes));
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_USE_MIN_MTU,
+		    &yes, sizeof(yes)) < 0)
+			err(1, "setsockopt(IPV6_USE_MIN_MTU)");
 #endif
 		break;
 	case AF_INET:
