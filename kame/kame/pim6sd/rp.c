@@ -333,10 +333,10 @@ add_cand_rp(used_cand_rp_list, address)
      */
 
     if (local_address(&rpentry_ptr->address) == NO_VIF)
-	{
-		/* TODO: check for error and delete */
-		set_incoming(rpentry_ptr, PIM_IIF_RP);
-	}
+    {
+	/* TODO: check for error and delete */
+	set_incoming(rpentry_ptr, PIM_IIF_RP);
+    }
     else
     {
 	/* TODO: XXX: CHECK!!! */
