@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.88 2001/08/16 06:34:59 itojun Exp $
+.\"	$KAME: racoon.conf.5,v 1.89 2001/08/17 07:16:38 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -43,8 +43,8 @@ is the configuration file for the
 .Xr racoon 8
 ISAKMP daemon.
 .Xr racoon 8
-negotiates security associations for itself (ISAKMP SA)
-and for kernel IPsec (IPsec SA).
+negotiates security associations for itself (ISAKMP SA, or phase 1 SA)
+and for kernel IPsec (IPsec SA, or phase 2 SA).
 The file consists of a sequence of directives and statements.
 Each directive is composed by a tag, and statements are enclosed by
 .Ql {
@@ -100,26 +100,27 @@ Major parameters are listed below.
 .Pp
 .Bl -tag -width addressx -compact
 .It Ar number
-means hexa-decimal or decimal number.
-The former is expressed with
-.Ql 0x .
+means a hexadecimal or a decimal number.
+The former must be prefixed with
+.Ql Li 0x .
 .It Ar string
 .It Ar path
 .It Ar file
-means any string enclosed
+means any string enclosed in
 .Ql \&"
 .Pq double quote .
 .It Ar address
-means IPv6 and IPv4 address.
+means IPv6 and/or IPv4 address.
 .It Ar port
-means TCP/UDP port number.
+means a TCP/UDP port number.
 The port number is always enclosed by
 .Ql \*(lB
 and
 .Ql \*(rB .
 .It Ar timeunit
 is one of following:
-.Ic sec , secs , second , seconds , min , mins , minute , minutes ,
+.Ic sec , secs , second , seconds ,
+.Ic min , mins , minute , minutes ,
 .Ic hour , hours .
 .El
 .\"
@@ -128,7 +129,7 @@ is one of following:
 .It Ic path include Ar path ;
 specifies a path to include a file.
 See
-.Sx File Include .
+.Sx File Inclusion .
 .It Ic path pre_shared_key Ar file ;
 specifies a file containing pre-shared key(s) for various ID(s).
 See
@@ -147,7 +148,7 @@ simply add a SA to the file at the moment.
 You should maintain the file manually.
 .El
 .\"
-.Ss File Include
+.Ss File Inclusion
 .Bl -tag -width Ds -compact
 .It Ic include Ar file
 other configuration files can be included.
@@ -657,7 +658,7 @@ Keys which start with
 are hexa-decimal strings.
 Note that the file must be owned by the user ID running
 .Xr racoon 8
-.Pq usually privileged user ,
+.Pq usually the privileged user ,
 and must not be accessible by others.
 .\"
 .Sh EXAMPLE
@@ -699,7 +700,7 @@ foo.kame.net    hoge
 .\"
 .Sh SEE ALSO
 .\".Xr racoonctl 8 ,
-.Xr racoon 8
+.Xr racoon 8 ,
 .Xr setkey 8
 .\"
 .Sh HISTORY
@@ -710,5 +711,6 @@ configuration file first appeared in
 Yokogawa IPsec implementation.
 .\"
 .Sh BUGS
-Some statements may not yet be implemented.
-These will be added in the future.
+Some statements may not be handled by
+.Xr racoon 8
+yet.
