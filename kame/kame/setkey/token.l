@@ -106,7 +106,7 @@ hexstring	0[xX]{hexdigit}+
 octetstring	{octet}({dot}{octet})+
 ipaddress	{ipv4addr}|{ipv6addr}
 ipv4addr	{digit}{1,3}({dot}{digit}{1,3}){0,3}
-ipv6addr	({hexdigit}{0,4}({colon}{hexdigit}{0,4}){2,7}|{hexdigit}{0,4}({colon}{hexdigit}{0,4}){2,5}{colon}{ipv4addr})
+ipv6addr	({hexdigit}{0,4}({colon}{hexdigit}{0,4}){2,7}|{hexdigit}{0,4}({colon}{hexdigit}{0,4}){2,7}%{letter}+|{hexdigit}{0,4}({colon}{hexdigit}{0,4}){2,5}{colon}{ipv4addr})
 ipaddrmask	{slash}{digit}{1,3}
 ipaddrport	{blcl}{decstring}{elcl}
 keyword		{letter}{letter}+
