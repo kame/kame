@@ -461,7 +461,6 @@ em_start(struct ifnet *ifp)
 
       if (adapter->num_tx_desc_avail <= TX_CLEANUP_THRESHOLD) {
          ifp->if_flags |= IFF_OACTIVE;
-         IF_PREPEND(&ifp->if_snd, m_head);
          adapter->no_tx_desc_avail++;
          break;
       }
@@ -479,11 +478,11 @@ em_start(struct ifnet *ifp)
          tx_buffer = STAILQ_FIRST(&adapter->free_tx_buffer_list);
          if (!tx_buffer) {
             ifp->if_flags |= IFF_OACTIVE;
-            IF_PREPEND(&ifp->if_snd, m_head);
             adapter->no_tx_buffer_avail2++;
             break;
          }
       }
+      IFQ_DEQUEUE(&ifp->if_snd, m_head);
       STAILQ_REMOVE_HEAD(&adapter->free_tx_buffer_list, em_tx_entry);
 
       tx_buffer->num_tx_desc_used = 0;
@@ -1272,7 +1271,8 @@ em_setup_interface(device_t dev, struct adapter * adapter)
    ifp->if_ioctl = em_ioctl;
    ifp->if_start = em_start;
    ifp->if_watchdog = em_watchdog;
-   ifp->if_snd.ifq_maxlen = adapter->num_tx_desc - 1;
+   IFQ_SET_MAXLEN(&ifp->if_snd, adapter->num_tx_desc - 1);
+   IFQ_SET_READY(&ifp->if_snd);
    ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 
    if (adapter->shared.mac_type >= em_82543) {

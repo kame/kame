@@ -1284,7 +1284,7 @@ rl_poll (struct ifnet *ifp, enum poll_cmd cmd, int count)
 	sc->rxcycles = count;
 	rl_rxeof(sc);
 	rl_txeof(sc);
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
                 rl_start(ifp);
 
         if (cmd == POLL_AND_CHECK_STATUS) { /* also check status register */
@@ -1354,7 +1354,7 @@ static void rl_intr(arg)
 		}
 
 	}
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		rl_start(ifp);
 
 	return;

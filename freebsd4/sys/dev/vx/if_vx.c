@@ -480,7 +480,7 @@ startagain:
 	}
     }
     outw(BASE + VX_COMMAND, SET_TX_AVAIL_THRESH | (8188 >> 2));
-    IF_DEQUEUE(&ifp->if_snd, m0);
+    IFQ_DEQUEUE(&ifp->if_snd, m0);
     if (m0 == NULL) {		/* not really needed */
 	return;
     }

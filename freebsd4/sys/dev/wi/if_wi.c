@@ -274,7 +274,8 @@ wi_generic_attach(device_t dev)
 	ifp->if_watchdog = wi_watchdog;
 	ifp->if_init = wi_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	bzero(sc->wi_node_name, sizeof(sc->wi_node_name));
 	bcopy(WI_DEFAULT_NODENAME, sc->wi_node_name,
@@ -888,7 +889,7 @@ wi_intr(xsc)
 	/* Re-enable interrupts. */
 	CSR_WRITE_2(sc, WI_INT_EN, WI_INTRS);
 
-	if (ifp->if_snd.ifq_head != NULL) {
+	if (!IFQ_IS_EMPTY(&ifp->if_snd)) {
 		wi_start(ifp);
 	}
 
@@ -2202,7 +2203,7 @@ wi_start(ifp)
 	}
 
 nextpkt:
-	IF_DEQUEUE(&ifp->if_snd, m0);
+	IFQ_DEQUEUE(&ifp->if_snd, m0);
 	if (m0 == NULL) {
 		WI_UNLOCK(sc, s);
 		return;
