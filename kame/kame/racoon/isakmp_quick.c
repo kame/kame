@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.62 2000/09/22 15:47:02 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.63 2000/09/22 16:12:21 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.62 2000/09/22 15:47:02 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.63 2000/09/22 16:12:21 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -208,7 +208,9 @@ quick_i1send(iph2, msg)
 		PVDUMP(iph2->id_p););
 
 	/* we do not attach IDci nor IDcr for transport mode negotiation */
-	if (ipsecdoi_transportmode(iph2)) {
+	if (ipsecdoi_transportmode(iph2) &&
+	   ((struct ipsecdoi_id_b *)iph2->id->v)->proto_id == IPSEC_PORT_ANY &&
+	   ((struct ipsecdoi_id_b *)iph2->id_p->v)->proto_id == IPSEC_PORT_ANY){
 		/* XXX debug message? */
 		idci = idcr = 0;
 	} else
