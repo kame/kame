@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.45 2000/01/14 07:10:31 sakane Exp $ */
+/* KAME $Id: keydb.c,v 1.46 2000/01/14 08:24:20 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -104,6 +104,17 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 MALLOC_DEFINE(M_SECA, "key mgmt", "security associations, key management");
 #endif
+
+/*
+ * Note on SA reference counting:
+ * - SAs that are not in DEAD state will have (total external reference + 1)
+ *   following value in reference count field.  they cannot be freed and are
+ *   referenced from SA header.
+ * - SAs that are in DEAD state will have (total external reference)
+ *   in reference count field.  they are ready to be freed.  reference from
+ *   SA header will be removed in key_delsav(), when the reference count
+ *   field hits 0 (= no external reference other than from SA header.
+ */
 
 #if defined(IPSEC_DEBUG)
 u_int32_t key_debug_level = 0;
