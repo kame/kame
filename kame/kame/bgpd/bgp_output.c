@@ -110,7 +110,7 @@ bgp_send_open(struct rpcb *bnp)
   if ((write(bnp->rp_socket, outpkt, i)) != i) {
     syslog(LOG_ERR, "<bgp_send_open>: write failed");
     bgp_cease(bnp);
-    return NULL;
+    return 0;
   }
 
   bgp_update_stat(bnp, BGPS_OPENSENT);
@@ -145,7 +145,7 @@ bgp_send_open(struct rpcb *bnp)
   /*  Hold timer ON. */ 
   task_timer_update(tsk);
 
-  return NULL;
+  return 0;
 }
 
 /*
@@ -237,7 +237,7 @@ bgp_send_notification(bnp, errcode, subcode, len, data)
     syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
 	   bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
 
-  return NULL;    /* End of bgp_send_notification() */
+  return 0;    /* End of bgp_send_notification() */
 }
 
 
@@ -278,7 +278,7 @@ bgp_send_keepalive(struct rpcb *bnp)
     dperror("<bgp_send_keepalive>: write failed");
     syslog(LOG_ERR, "<bgp_send_keepalive>: write failed");
     bgp_cease(bnp);
-    return NULL;
+    return 0;
   }
 
   bgp_update_stat(bnp, BGPS_KEEPALIVESENT);
@@ -288,7 +288,7 @@ bgp_send_keepalive(struct rpcb *bnp)
   /*  KeepAlive Timer ON. */
   task_timer_update(bnp->rp_keepalive_timer);
 
-  return NULL;
+  return 0;
 }
 
 #define BGP_LOG_ATTR  IFLOG(LOG_BGPOUTPUT) { syslog(LOG_DEBUG,\
